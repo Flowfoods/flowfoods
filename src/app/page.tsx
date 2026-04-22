@@ -5,6 +5,7 @@ import Menu from "@/components/Menu";
 import Features from "@/components/Features";
 import Testimonials from "@/components/Testimonials";
 import Locations from "@/components/Locations";
+import Instagram from "@/components/Instagram";
 import CTA from "@/components/CTA";
 import Footer from "@/components/Footer";
 
@@ -18,6 +19,7 @@ export default function Home() {
       <Features />
       <Testimonials />
       <Locations />
+      <Instagram />
       <CTA />
       <Footer />
     </>
