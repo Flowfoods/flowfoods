@@ -53,10 +53,10 @@ export default function Hero() {
 
           {/* Subheadline */}
           <p className="font-sans text-white/65 text-sm md:text-lg max-w-md leading-relaxed mb-3 md:mb-4">
-            De operações caóticas para negócio escalável em 90 dias.
+            Estrutura, rentabilidade e crescimento — do diagnóstico à execução.
           </p>
           <p className="font-sans text-white/40 text-sm max-w-md leading-relaxed mb-8 md:mb-12">
-            iFood otimizado · Equipe treinada · SaaS com IA
+            Operação · Financeiro · Delivery · Equipe
           </p>
 
           {/* CTAs */}
