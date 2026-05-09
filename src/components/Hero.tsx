@@ -62,7 +62,7 @@ export default function Hero() {
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-3">
             <ModalTriggerButton className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98] shadow-[0_4px_20px_rgba(185,28,28,0.4)]">
-              📋 Agendar Consultoria Gratuita
+              Conte sobre seu restaurante
             </ModalTriggerButton>
             <a
               href="#servicos"
