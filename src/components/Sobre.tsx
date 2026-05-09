@@ -116,7 +116,7 @@ export default function Sobre() {
                 Chef, gestor, consultor e desenvolvedor com{' '}
                 <strong className="text-primary">14 anos contínuos</strong> no food service carioca.
                 Estruturou dark kitchens, geriu o delivery de 16 lojas da rede Bibi Sucos,
-                planejou inaugurações e criou o Clube Bibi.
+                planejou inaugurações e planejou clube de fidelidade.
               </p>
               <p className="text-ink-4 text-sm leading-relaxed">
                 Membro do <strong className="text-ink">Fórum iFood</strong>, palestrante em eventos
