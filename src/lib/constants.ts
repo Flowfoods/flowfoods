@@ -65,7 +65,7 @@ export const SERVICOS: Servico[] = [
 
 export const CREDENCIAIS = [
   '✅ Conselheiro do Fórum iFood — ajudou no DESIGN da plataforma (não é usuário comum)',
-  '✅ Desenvolveu 3 SaaS para restauração com IA — conhece a stack inteira',
+  '✅ Une tecnologia e operação — sistemas digitais desenvolvidos especificamente para o food service',
   '✅ Treinador de 100+ pessoas (sala, cozinha, gerência) — resultado comprovável',
   '✅ Estruturou restaurantes com arquitetos parceiros (desde a concepção)',
   '✅ Especialista em CMV, DRE, margem — restaurante não quebra na sua mão',
