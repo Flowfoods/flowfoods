@@ -32,7 +32,6 @@ export default function ContactModal() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setStatus('sending');
 
     const msg = encodeURIComponent(
       `Olá Rodolfo! Vi o site da FlowFoods e gostaria de conversar sobre consultoria.\n\n` +
@@ -42,10 +41,8 @@ export default function ContactModal() {
       `*Sobre meu restaurante:*\n${form.message}`
     );
 
-    setTimeout(() => {
-      setStatus('sent');
-      window.open(`https://wa.me/5521996416060?text=${msg}`, '_blank');
-    }, 700);
+    window.open(`https://wa.me/5521996416060?text=${msg}`, '_blank');
+    setStatus('sent');
   };
 
   if (!isOpen) return null;
