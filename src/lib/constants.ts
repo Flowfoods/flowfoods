@@ -151,7 +151,7 @@ export const PROCESSO: EtapaProcesso[] = [
     numero: '04',
     titulo: 'Treinamento',
     descricao:
-      'Capacitação da equipe para sustentar e ampliar os resultados. Sala, cozinha, gerência — todos alinhados.',
+      'Capacitação de toda a equipe — atendimento, cozinha e liderança — para que os resultados conquistados sejam mantidos e evoluídos sem depender exclusivamente do consultor.',
   },
   {
     numero: '05',
