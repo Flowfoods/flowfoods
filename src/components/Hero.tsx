@@ -79,11 +79,10 @@ export default function Hero() {
         </div>
 
         {/* Stats */}
-        <div className="mt-14 md:mt-20 pt-8 md:pt-10 border-t border-white/10 grid grid-cols-3 gap-4 md:gap-6 max-w-xs sm:max-w-sm md:max-w-md">
+        <div className="mt-14 md:mt-20 pt-8 md:pt-10 border-t border-white/10 grid grid-cols-2 gap-6 md:gap-10 max-w-xs sm:max-w-sm">
           {[
-            { num: '14', label: 'Anos de Operação Real' },
+            { num: '14+', label: 'Anos no Food Service' },
             { num: '50+', label: 'Projetos Entregues' },
-            { num: '3',   label: 'Cases de Sucesso' },
           ].map(({ num, label }) => (
             <div key={label}>
               <p className="font-display font-bold text-2xl md:text-4xl text-primary">{num}</p>
