@@ -32,8 +32,13 @@ export default function Header() {
         <div className="flex items-center justify-between h-16 md:h-20">
 
           {/* Logo */}
-          <a href="#" className={`font-display text-2xl md:text-3xl tracking-widest font-bold transition-colors duration-300 ${scrolled ? 'text-ink' : 'text-white'}`}>
-            FLOW<span className="text-primary">FOODS</span>
+          <a href="#" className="flex flex-col leading-none">
+            <span className={`font-display text-2xl md:text-3xl tracking-widest font-bold transition-colors duration-300 ${scrolled ? 'text-ink' : 'text-white'}`}>
+              FLOW<span className="text-primary">FOODS</span>
+            </span>
+            <span className={`font-display italic text-[10px] tracking-wide transition-colors duration-300 hidden sm:block ${scrolled ? 'text-ink-5' : 'text-white/40'}`}>
+              Gastronomia que flui. Negócio que cresce.
+            </span>
           </a>
 
           {/* Desktop Nav */}
