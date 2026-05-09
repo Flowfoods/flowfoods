@@ -49,9 +49,9 @@ export const SERVICOS: Servico[] = [
     id: 'crm',
     titulo: 'Fidelidade & CRM',
     descricao:
-      'Programa de pontos (modelo Clube Bibi), automação de retenção via WhatsApp, análise comportamental e NPS monitorado.',
+      'Criação de programa de fidelidade próprio, captação estruturada de dados de clientes e escuta ativa via NPS — para entender quem compra, com que frequência e por quê voltam (ou não voltam).',
     icone: '🎁',
-    beneficios: ['Cliente volta 3–5x mais. Vida útil +300%'],
+    beneficios: ['Menos custo de aquisição. Mais cliente recorrente.'],
   },
   {
     id: 'saas',
