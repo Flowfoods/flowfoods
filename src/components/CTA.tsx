@@ -9,9 +9,14 @@ export default function CTA() {
         {/* Texto — fundo escuro sólido */}
         <div className="px-5 md:px-8 lg:px-16 py-20 md:py-28 flex flex-col justify-center order-2 lg:order-1">
 
-          <p className="text-primary text-xs font-semibold tracking-[0.4em] uppercase mb-8">
-            Próximo Passo
-          </p>
+          <div className="flex items-center gap-3 mb-8">
+            <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+              <span className="font-display font-bold text-white text-sm leading-none">FF</span>
+            </div>
+            <p className="text-primary text-xs font-semibold tracking-[0.4em] uppercase">
+              Próximo Passo
+            </p>
+          </div>
 
           <h2 className="font-display font-bold leading-[0.92] mb-8">
             <span className="block text-[clamp(2.2rem,7vw,4.5rem)] text-white uppercase">PRONTO PARA</span>

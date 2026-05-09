@@ -11,9 +11,14 @@ export default function Footer() {
 
           {/* Brand */}
           <div>
-            <p className="font-display text-3xl tracking-widest mb-3 text-white">
-              FLOW<span className="text-primary">FOODS</span>
-            </p>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+                <span className="font-display font-bold text-white text-base leading-none">FF</span>
+              </div>
+              <p className="font-display text-2xl tracking-widest text-white">
+                FLOW<span className="text-primary">FOODS</span>
+              </p>
+            </div>
             <p className="font-display italic text-white/30 text-sm leading-relaxed">
               &ldquo;Gastronomia que flui.<br />Negócio que cresce.&rdquo;
             </p>

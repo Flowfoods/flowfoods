@@ -33,10 +33,15 @@ export default function Hero() {
       <div className="relative max-w-6xl mx-auto px-5 md:px-8 lg:px-12 pt-28 pb-16 w-full">
         <div className="w-full lg:max-w-[55%]">
 
-          {/* Label */}
-          <p className="text-primary text-xs font-semibold tracking-[0.4em] uppercase mb-6 md:mb-10">
-            Consultoria Gastronômica · Rio de Janeiro
-          </p>
+          {/* Logo mark */}
+          <div className="flex items-center gap-3 mb-6 md:mb-10">
+            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
+              <span className="font-display font-bold text-white text-base leading-none">FF</span>
+            </div>
+            <p className="text-white/50 text-xs font-semibold tracking-[0.4em] uppercase">
+              Consultoria Gastronômica · Rio de Janeiro
+            </p>
+          </div>
 
           {/* Headline */}
           <h1 className="font-display font-bold leading-[0.92] mb-7 md:mb-10">
