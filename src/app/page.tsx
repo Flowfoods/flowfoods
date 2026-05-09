@@ -4,7 +4,6 @@ import Sobre from '@/components/Sobre';
 import Galeria from '@/components/Galeria';
 import Servicos from '@/components/Servicos';
 import Citacao from '@/components/Citacao';
-import Cases from '@/components/Cases';
 import Processo from '@/components/Processo';
 import Diferenciais from '@/components/Diferenciais';
 import CTA from '@/components/CTA';
@@ -31,7 +30,6 @@ export default function Home() {
         <Galeria />
         <Servicos />
         <Citacao />
-        <Cases />
         <Processo />
         <Diferenciais />
         <Investimento />
