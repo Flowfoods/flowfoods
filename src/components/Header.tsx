@@ -1,0 +1,98 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+
+const navLinks = [
+  { label: 'Sobre',    href: '#sobre' },
+  { label: 'Serviços', href: '#servicos' },
+  { label: 'Cases',    href: '#cases' },
+  { label: 'Processo', href: '#processo' },
+  { label: 'Contato',  href: '#contato' },
+];
+
+export default function Header() {
+  const [scrolled, setScrolled] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 60);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  return (
+    <header
+      className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
+        scrolled
+          ? 'bg-white/95 backdrop-blur-sm border-b border-surface-3 shadow-sm'
+          : 'bg-transparent'
+      }`}
+    >
+      <div className="max-w-6xl mx-auto px-5 md:px-8 lg:px-12">
+        <div className="flex items-center justify-between h-16 md:h-20">
+
+          {/* Logo */}
+          <a href="#" className="font-display text-2xl md:text-3xl tracking-widest text-ink font-bold">
+            FLOW<span className="text-primary">FOODS</span>
+          </a>
+
+          {/* Desktop Nav */}
+          <nav className="hidden md:flex items-center gap-7 lg:gap-9">
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-xs font-semibold uppercase tracking-widest text-ink-4 hover:text-primary transition-colors duration-200"
+              >
+                {link.label}
+              </a>
+            ))}
+          </nav>
+
+          {/* Desktop CTA */}
+          <button
+            onClick={() => window.dispatchEvent(new CustomEvent('flowfoods:open-modal'))}
+            className="hidden md:block bg-primary hover:bg-primary-dark text-white text-xs font-semibold px-5 py-2.5 uppercase tracking-widest transition-colors duration-200"
+          >
+            Agendar Consultoria
+          </button>
+
+          {/* Mobile Hamburger */}
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            className="md:hidden p-2 -mr-2"
+            aria-label="Abrir menu"
+          >
+            <div className="space-y-1.5">
+              <span className={`block w-6 h-0.5 bg-ink transition-all duration-200 origin-center ${menuOpen ? 'translate-y-2 rotate-45' : ''}`} />
+              <span className={`block w-6 h-0.5 bg-ink transition-all duration-200 ${menuOpen ? 'opacity-0' : ''}`} />
+              <span className={`block w-6 h-0.5 bg-ink transition-all duration-200 origin-center ${menuOpen ? '-translate-y-2 -rotate-45' : ''}`} />
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Menu */}
+      <div className={`md:hidden overflow-hidden transition-all duration-300 bg-white border-t border-surface-3 ${menuOpen ? 'max-h-96' : 'max-h-0'}`}>
+        <nav className="flex flex-col px-5 py-6 gap-4">
+          {navLinks.map((link) => (
+            <a
+              key={link.href}
+              href={link.href}
+              onClick={() => setMenuOpen(false)}
+              className="text-sm uppercase tracking-widest text-ink-4 hover:text-primary transition-colors py-1"
+            >
+              {link.label}
+            </a>
+          ))}
+          <button
+            onClick={() => { setMenuOpen(false); window.dispatchEvent(new CustomEvent('flowfoods:open-modal')); }}
+            className="mt-2 bg-primary hover:bg-primary-dark text-white text-xs font-semibold px-5 py-3.5 uppercase tracking-widest text-center w-full transition-colors duration-200"
+          >
+            Agendar Consultoria
+          </button>
+        </nav>
+      </div>
+    </header>
+  );
+}
