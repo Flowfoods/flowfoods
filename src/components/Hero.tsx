@@ -79,14 +79,18 @@ export default function Hero() {
         </div>
 
         {/* Stats */}
-        <div className="mt-14 md:mt-20 pt-8 md:pt-10 border-t border-white/10 grid grid-cols-2 gap-6 md:gap-10 max-w-xs sm:max-w-sm">
+        <div className="mt-14 md:mt-20 pt-8 md:pt-10 border-t border-white/10 flex flex-wrap gap-8 md:gap-12">
           {[
-            { num: '14+', label: 'Anos no Food Service' },
-            { num: '50+', label: 'Projetos Entregues' },
-          ].map(({ num, label }) => (
-            <div key={label}>
-              <p className="font-display font-bold text-2xl md:text-4xl text-primary">{num}</p>
-              <p className="text-[9px] md:text-xs text-white/35 uppercase tracking-wide mt-1 leading-tight">{label}</p>
+            { num: '14+', label: 'Anos no\nFood Service' },
+            { num: '100+', label: 'Profissionais\nTreinados' },
+            { num: '50+', label: 'Projetos\nEstruturados' },
+          ].map(({ num, label }, i) => (
+            <div key={label} className="flex items-center gap-8 md:gap-12">
+              <div>
+                <p className="font-display font-bold text-3xl md:text-5xl text-primary leading-none">{num}</p>
+                <p className="text-[9px] md:text-[11px] text-white/30 uppercase tracking-widest mt-2 leading-snug whitespace-pre-line">{label}</p>
+              </div>
+              {i < 2 && <div className="w-px h-10 bg-white/10 hidden sm:block" />}
             </div>
           ))}
         </div>
