@@ -41,7 +41,7 @@ export const SERVICOS: Servico[] = [
     id: 'financeiro',
     titulo: 'Gestão Financeira',
     descricao:
-      'DRE mensal estruturado, CMV sob controle, análise de margem por prato e benchmarking com restaurantes similares no Rio.',
+      'Estruturação do DRE mensal, controle de CMV, precificação por ficha técnica e análise de margem por produto — para que cada decisão seja tomada com base em números, não em intuição.',
     icone: '💰',
     beneficios: ['Dados governam. Chega de achismo.'],
   },
