@@ -3,97 +3,80 @@ import ModalTriggerButton from '@/components/ModalTriggerButton';
 
 export default function CTA() {
   return (
-    <section
-      id="contato"
-      className="relative py-24 md:py-32 px-5 md:px-8 lg:px-12 overflow-hidden"
-    >
-      {/* Foto de fundo */}
-      <div className="absolute inset-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/galeria/foto-5.jpg"
-          alt=""
-          aria-hidden="true"
-          className="w-full h-full object-cover object-center"
-        />
-        <div className="absolute inset-0 bg-primary/88" />
-      </div>
+    <section id="contato" className="bg-[#111111] overflow-hidden">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2">
 
-      {/* Dot pattern */}
-      <div
-        className="absolute inset-0 opacity-[0.06]"
-        style={{
-          backgroundImage: 'radial-gradient(circle at 1px 1px, white 1px, transparent 0)',
-          backgroundSize: '32px 32px',
-        }}
-      />
+        {/* Texto — fundo escuro sólido */}
+        <div className="px-5 md:px-8 lg:px-16 py-20 md:py-28 flex flex-col justify-center order-2 lg:order-1">
 
-      <div className="relative max-w-6xl mx-auto">
-        <div className="max-w-3xl">
-
-          <p className="text-white/70 text-xs font-semibold tracking-[0.4em] uppercase mb-6">
+          <p className="text-primary text-xs font-semibold tracking-[0.4em] uppercase mb-8">
             Próximo Passo
           </p>
 
-          <h2 className="font-display font-bold leading-[0.9] mb-6">
-            <span className="block text-[clamp(2.5rem,10vw,6rem)] text-white uppercase">PRONTO PARA</span>
-            <span className="block text-[clamp(2.5rem,10vw,6rem)] text-white uppercase">CRESCER?</span>
-            <span className="block text-[clamp(2.5rem,10vw,6rem)] text-white/30 uppercase">VAMOS CONVERSAR.</span>
+          <h2 className="font-display font-bold leading-[0.92] mb-8">
+            <span className="block text-[clamp(2.2rem,7vw,4.5rem)] text-white uppercase">PRONTO PARA</span>
+            <span className="block text-[clamp(2.2rem,7vw,4.5rem)] text-white uppercase">CRESCER?</span>
+            <span className="block text-[clamp(2.2rem,7vw,4.5rem)] text-white/25 uppercase">VAMOS CONVERSAR.</span>
           </h2>
 
-          <p className="text-white/85 text-lg leading-relaxed mb-3 max-w-xl font-sans">
+          <p className="text-white/70 text-base leading-relaxed mb-8 max-w-md font-sans">
             Seu restaurante merece mais que &ldquo;ficar de pé&rdquo;. Merece crescer.
           </p>
 
-          {/* Urgência — copy do brief */}
-          <p className="font-display italic text-white/60 text-base mb-10">
-            ⏰ Rodolfo tem calendário cheio este mês. Vagas limitadas.
-          </p>
-
           {/* Contatos diretos */}
-          <div className="flex flex-col gap-3 mb-8">
+          <div className="flex flex-col gap-3 mb-10 border-l-2 border-primary/30 pl-5">
             <a
               href={CONTACT_INFO.whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-white/90 hover:text-white text-base font-semibold transition-colors"
+              className="text-white/80 hover:text-white text-sm font-semibold transition-colors"
             >
-              📱 {CONTACT_INFO.whatsappDisplay} — resposta em até 2h
+              {CONTACT_INFO.whatsappDisplay} — WhatsApp
             </a>
             <a
               href={`mailto:${CONTACT_INFO.email}`}
-              className="text-white/90 hover:text-white text-base font-semibold transition-colors"
+              className="text-white/80 hover:text-white text-sm font-semibold transition-colors"
             >
-              📧 {CONTACT_INFO.email} — proposta em 24h
+              {CONTACT_INFO.email}
             </a>
             <a
               href={CONTACT_INFO.instagramUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-white/90 hover:text-white text-base font-semibold transition-colors"
+              className="text-white/80 hover:text-white text-sm font-semibold transition-colors"
             >
-              📸 @{CONTACT_INFO.instagram} — cases, stories, conteúdo
+              @{CONTACT_INFO.instagram}
             </a>
           </div>
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-4">
-            <ModalTriggerButton className="inline-flex items-center justify-center gap-2 bg-ink hover:bg-ink-2 text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98]">
-              <span>📋</span>
+            <ModalTriggerButton className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98]">
               Agendar Consultoria
             </ModalTriggerButton>
             <a
               href={CONTACT_INFO.whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 border-2 border-white/40 hover:border-white text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98]"
+              className="inline-flex items-center justify-center gap-2 border border-white/20 hover:border-white/50 text-white/70 hover:text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98]"
             >
-              <span>💬</span>
               WhatsApp Direto
             </a>
           </div>
-
         </div>
+
+        {/* Foto — lado direito */}
+        <div className="relative h-64 lg:h-auto min-h-[300px] overflow-hidden order-1 lg:order-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/images/galeria/foto-5.jpg"
+            alt="Rodolfo Cavalcante"
+            className="w-full h-full object-cover object-top"
+          />
+          <div className="absolute inset-0 bg-gradient-to-r from-[#111111] via-[#111111]/20 to-transparent lg:block hidden" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#111111]/80 via-transparent to-transparent lg:hidden" />
+        </div>
+
       </div>
     </section>
   );
