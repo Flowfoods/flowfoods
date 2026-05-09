@@ -119,8 +119,8 @@ export default function Sobre() {
                 planejou inaugurações e planejou clube de fidelidade.
               </p>
               <p className="text-ink-4 text-sm leading-relaxed">
-                Membro do <strong className="text-ink">Fórum iFood</strong>, palestrante em eventos
-                nacionais e professor formador de novos profissionais. Pós-graduado em Gestão de
+                Membro do <strong className="text-ink">Fórum iFood</strong>, participante em eventos
+                nacionais no iFood e professor formador de novos profissionais. Pós-graduado em Gestão de
                 Restaurante.
               </p>
             </div>
