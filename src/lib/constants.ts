@@ -49,7 +49,7 @@ export const SERVICOS: Servico[] = [
     id: 'crm',
     titulo: 'Fidelidade & CRM',
     descricao:
-      'Criação de programa de fidelidade próprio, captação estruturada de dados de clientes e escuta ativa via NPS — para entender quem compra, com que frequência e por quê voltam (ou não voltam).',
+      'Implantação de programa de fidelidade personalizado com captação estruturada de dados: quem é seu cliente, com que frequência compra e qual é o ticket médio. Escuta ativa via NPS e automação de retenção para agir antes de perder o cliente — não depois.',
     icone: '🎁',
     beneficios: ['Menos custo de aquisição. Mais cliente recorrente.'],
   },
