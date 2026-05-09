@@ -29,11 +29,11 @@ export default function Footer() {
             <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/25 mb-5">Navegação</p>
             <nav className="flex flex-col gap-3">
               {[
-                { label: 'Sobre',    href: '#sobre' },
-                { label: 'Serviços', href: '#servicos' },
-                { label: 'Cases',    href: '#cases' },
-                { label: 'Processo', href: '#processo' },
-                { label: 'Contato',  href: '#contato' },
+                { label: 'Sobre',       href: '#sobre' },
+                { label: 'Serviços',   href: '#servicos' },
+                { label: 'Processo',   href: '#processo' },
+                { label: 'Investimento', href: '#investimento' },
+                { label: 'Contato',    href: '#contato' },
               ].map((l) => (
                 <a
                   key={l.href}
