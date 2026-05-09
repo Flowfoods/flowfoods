@@ -33,10 +33,19 @@ export default function ContactModal() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setStatus('sending');
+
+    const msg = encodeURIComponent(
+      `Olá Rodolfo! Vi o site da FlowFoods e gostaria de conversar sobre consultoria.\n\n` +
+      `*Nome:* ${form.name}\n` +
+      `*E-mail:* ${form.email}\n` +
+      `*WhatsApp:* ${form.phone}\n\n` +
+      `*Sobre meu restaurante:*\n${form.message}`
+    );
+
     setTimeout(() => {
-      console.log('FlowFoods contact form:', form);
       setStatus('sent');
-    }, 900);
+      window.open(`https://wa.me/5521996416060?text=${msg}`, '_blank');
+    }, 700);
   };
 
   if (!isOpen) return null;
