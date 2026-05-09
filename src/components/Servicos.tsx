@@ -61,7 +61,7 @@ export default function Servicos() {
             ))}
           </ul>
           <p className="text-ink-5 text-xs mt-6 pt-6 border-t border-secondary/10 leading-relaxed">
-            Projetos entregues no Rio de Janeiro: Bibi Sucos — expansão para 3 unidades com iFood integrado · Balada Mix — operação 100% automatizada via WhatsApp
+            Projetos entregues no Rio de Janeiro: Bibi Sucos · Balada Mix · e outros
           </p>
         </div>
 
