@@ -57,7 +57,7 @@ export const SERVICOS: Servico[] = [
     id: 'saas',
     titulo: 'SaaS Personalizado com IA',
     descricao:
-      'Plataforma integrada: pedidos + cardápio + financeiro + RH + fidelidade. Funciona offline. Integra iFood, Jota Já e sistema próprio.',
+      'Desenvolvimento de sistema sob medida para a realidade do seu restaurante — com inteligência artificial integrada onde faz sentido: automação de pedidos, gestão de cardápio, controle financeiro, fidelidade e RH em uma única plataforma. Nada genérico. Tudo pensado para o seu negócio.',
     icone: '⚙️',
     beneficios: ['Uma plataforma. Sem mais cacos.'],
   },
