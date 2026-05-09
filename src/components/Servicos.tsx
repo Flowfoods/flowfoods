@@ -61,7 +61,7 @@ export default function Servicos() {
             ))}
           </ul>
           <p className="text-ink-5 text-xs mt-6 pt-6 border-t border-secondary/10 leading-relaxed">
-            Cases: Bibi Sucos (3 unidades, iFood integrado) · Balada Mix (automação WhatsApp) · Casa da Severina (estrutura 0→1)
+            Projetos entregues no Rio de Janeiro: Bibi Sucos — expansão para 3 unidades com iFood integrado · Balada Mix — operação 100% automatizada via WhatsApp
           </p>
         </div>
 
