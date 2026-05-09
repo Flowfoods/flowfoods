@@ -25,9 +25,9 @@ export const SERVICOS: Servico[] = [
     id: 'ifood',
     titulo: 'iFood & Delivery',
     descricao:
-      'Menu otimizado, automação de pedidos com n8n, WhatsApp Business integrado. Taxa de conversão +45% em 15 dias.',
+      'Gestão completa do iFood: da criação da conta e cadastro do cardápio até a operação mensal — precificação, fotos, campanhas, avaliações e relatórios de desempenho.',
     icone: '📱',
-    beneficios: ['Ganha mais, trabalha menos'],
+    beneficios: ['Presença profissional no iFood, do zero ao dia a dia'],
   },
   {
     id: 'treinamento',
