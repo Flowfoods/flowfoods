@@ -32,7 +32,6 @@ export default function Servicos() {
               </span>
 
               <div className="relative">
-                <div className="text-3xl mb-4">{servico.icone}</div>
                 <div className="w-8 h-0.5 bg-primary mb-4" />
                 <h3 className="font-display text-xl md:text-2xl text-ink uppercase leading-tight mb-3">
                   {servico.titulo}

@@ -18,7 +18,7 @@ export const SERVICOS: Servico[] = [
     titulo: 'Estrutura de Restaurante',
     descricao:
       'Planejamento de layout, equipamentos, fornecedores e treinamento operacional. Parceria com arquitetos. Do zero até abrir a porta.',
-    icone: '🏪',
+    icone: '',
     beneficios: ['Restaurante pronto para crescer desde o dia 1'],
   },
   {
@@ -26,7 +26,7 @@ export const SERVICOS: Servico[] = [
     titulo: 'iFood & Delivery',
     descricao:
       'Gestão completa do iFood: da criação da conta e cadastro do cardápio até a operação mensal — precificação, fotos, campanhas, avaliações e relatórios de desempenho.',
-    icone: '📱',
+    icone: '',
     beneficios: ['Presença profissional no iFood, do zero ao dia a dia'],
   },
   {
@@ -34,7 +34,7 @@ export const SERVICOS: Servico[] = [
     titulo: 'Treinamento de Equipe',
     descricao:
       'Capacitação de sala, cozinha, gerência e subgerência. Workshop presencial + mentoria contínua.',
-    icone: '👥',
+    icone: '',
     beneficios: ['Equipe que VENDE e não erra'],
   },
   {
@@ -42,7 +42,7 @@ export const SERVICOS: Servico[] = [
     titulo: 'Gestão Financeira',
     descricao:
       'Estruturação do DRE mensal, controle de CMV, precificação por ficha técnica e análise de margem por produto — para que cada decisão seja tomada com base em números, não em intuição.',
-    icone: '💰',
+    icone: '',
     beneficios: ['Dados governam. Chega de achismo.'],
   },
   {
@@ -50,7 +50,7 @@ export const SERVICOS: Servico[] = [
     titulo: 'Fidelidade & CRM',
     descricao:
       'Implantação de programa de fidelidade personalizado com captação estruturada de dados: quem é seu cliente, com que frequência compra e qual é o ticket médio. Escuta ativa via NPS e automação de retenção para agir antes de perder o cliente — não depois.',
-    icone: '🎁',
+    icone: '',
     beneficios: ['Menos custo de aquisição. Mais cliente recorrente.'],
   },
   {
@@ -58,7 +58,7 @@ export const SERVICOS: Servico[] = [
     titulo: 'SaaS Personalizado com IA',
     descricao:
       'Desenvolvimento de sistema sob medida para a realidade do seu restaurante — com inteligência artificial integrada onde faz sentido: automação de pedidos, gestão de cardápio, controle financeiro, fidelidade e RH em uma única plataforma. Nada genérico. Tudo pensado para o seu negócio.',
-    icone: '⚙️',
+    icone: '',
     beneficios: ['Uma plataforma. Sem mais cacos.'],
   },
 ];
