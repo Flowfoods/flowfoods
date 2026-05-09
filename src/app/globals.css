@@ -4,8 +4,8 @@
 
 /* ─── CSS TOKENS FlowFoods v2 ─────────────────────────────── */
 :root {
-  --ff-primary:      #F97316;
-  --ff-primary-dark: #EA6B05;
+  --ff-primary:      #b91c1c;
+  --ff-primary-dark: #991b1b;
   --ff-secondary:    #1E40AF;
   --ff-success:      #16A34A;
 
@@ -20,7 +20,7 @@
   --ff-shadow-sm:  0 2px 8px  rgba(28,25,23,0.08);
   --ff-shadow-md:  0 4px 16px rgba(28,25,23,0.10);
   --ff-shadow-lg:  0 8px 32px rgba(28,25,23,0.12);
-  --ff-shadow-cta: 0 4px 20px rgba(249,115,22,0.35);
+  --ff-shadow-cta: 0 4px 20px rgba(185,28,28,0.35);
 
   --ff-transition: 250ms cubic-bezier(0.4,0,0.2,1);
 }

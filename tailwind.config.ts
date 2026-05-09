@@ -9,10 +9,10 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Primary — Laranja FlowFoods (energia, ação, apetite)
-        primary: '#F97316',
-        bright:  '#FB923C',
-        'primary-dark': '#EA6B05',
+        // Primary — Vermelho FlowFoods (premium, gastronomia, autoridade)
+        primary: '#b91c1c',
+        bright:  '#dc2626',
+        'primary-dark': '#991b1b',
 
         // Secondary — Azul Confiança (expertise, profissionalismo)
         secondary: '#1E40AF',

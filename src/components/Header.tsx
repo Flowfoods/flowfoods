@@ -32,7 +32,7 @@ export default function Header() {
         <div className="flex items-center justify-between h-16 md:h-20">
 
           {/* Logo */}
-          <a href="#" className="font-display text-2xl md:text-3xl tracking-widest text-ink font-bold">
+          <a href="#" className={`font-display text-2xl md:text-3xl tracking-widest font-bold transition-colors duration-300 ${scrolled ? 'text-ink' : 'text-white'}`}>
             FLOW<span className="text-primary">FOODS</span>
           </a>
 
@@ -42,7 +42,7 @@ export default function Header() {
               <a
                 key={link.href}
                 href={link.href}
-                className="text-xs font-semibold uppercase tracking-widest text-ink-4 hover:text-primary transition-colors duration-200"
+                className={`text-xs font-semibold uppercase tracking-widest hover:text-primary transition-colors duration-200 ${scrolled ? 'text-ink-4' : 'text-white/70'}`}
               >
                 {link.label}
               </a>
@@ -64,9 +64,9 @@ export default function Header() {
             aria-label="Abrir menu"
           >
             <div className="space-y-1.5">
-              <span className={`block w-6 h-0.5 bg-ink transition-all duration-200 origin-center ${menuOpen ? 'translate-y-2 rotate-45' : ''}`} />
-              <span className={`block w-6 h-0.5 bg-ink transition-all duration-200 ${menuOpen ? 'opacity-0' : ''}`} />
-              <span className={`block w-6 h-0.5 bg-ink transition-all duration-200 origin-center ${menuOpen ? '-translate-y-2 -rotate-45' : ''}`} />
+              <span className={`block w-6 h-0.5 transition-all duration-200 origin-center ${scrolled ? 'bg-ink' : 'bg-white'} ${menuOpen ? 'translate-y-2 rotate-45' : ''}`} />
+              <span className={`block w-6 h-0.5 transition-all duration-200 ${scrolled ? 'bg-ink' : 'bg-white'} ${menuOpen ? 'opacity-0' : ''}`} />
+              <span className={`block w-6 h-0.5 transition-all duration-200 origin-center ${scrolled ? 'bg-ink' : 'bg-white'} ${menuOpen ? '-translate-y-2 -rotate-45' : ''}`} />
             </div>
           </button>
         </div>
