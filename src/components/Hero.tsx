@@ -82,7 +82,7 @@ export default function Hero() {
         <div className="mt-14 md:mt-20 pt-8 md:pt-10 border-t border-white/10 flex flex-wrap gap-8 md:gap-12">
           {[
             { num: '14+', label: 'Anos no\nFood Service' },
-            { num: '100+', label: 'Profissionais\nTreinados' },
+            { num: '1000+', label: 'Profissionais\nTreinados' },
             { num: '50+', label: 'Projetos\nEstruturados' },
           ].map(({ num, label }, i) => (
             <div key={label} className="flex items-center gap-8 md:gap-12">
