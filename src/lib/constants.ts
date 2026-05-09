@@ -145,7 +145,7 @@ export const PROCESSO: EtapaProcesso[] = [
     numero: '03',
     titulo: 'Implementação',
     descricao:
-      'Execução estruturada das ações com validações e ajustes em tempo real. iFood: 10–15 dias. Treinamento: 30 dias. SaaS: 60 dias.',
+      'Execução das ações planejadas com acompanhamento próximo, validações em campo e ajustes conforme a realidade do negócio — sem receita pronta, no ritmo certo para cada operação.',
   },
   {
     numero: '04',
