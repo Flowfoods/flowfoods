@@ -45,20 +45,24 @@ export default function Hero() {
 
           {/* Headline */}
           <h1 className="font-display font-bold leading-[0.92] mb-7 md:mb-10">
-            <span className="block text-[clamp(2.4rem,8vw,5.5rem)] text-white uppercase">
-              CONSULTORIA
+            <span className="block text-[clamp(2rem,6.6vw,4.6rem)] text-white uppercase">
+              GASTRONOMIA
             </span>
-            <span className="block text-[clamp(2.4rem,8vw,5.5rem)] text-white uppercase">
-              360° PARA
+            <span className="block text-[clamp(2rem,6.6vw,4.6rem)] text-white uppercase">
+              QUE FLUI.
             </span>
-            <span className="block text-[clamp(2.4rem,8vw,5.5rem)] text-primary uppercase">
-              CRESCER.
+            <span className="block text-[clamp(2rem,6.6vw,4.6rem)] text-white uppercase">
+              NEGÓCIO QUE
+            </span>
+            <span className="block text-[clamp(2rem,6.6vw,4.6rem)] text-primary uppercase">
+              CRESCE.
             </span>
           </h1>
 
           {/* Subheadline */}
           <p className="font-sans text-white/65 text-sm md:text-lg max-w-md leading-relaxed mb-3 md:mb-4">
-            Estrutura, rentabilidade e crescimento — do diagnóstico à execução.
+            Delivery, financeiro, equipe e IA — aplicados por quem opera o delivery de 16 lojas
+            todo dia.
           </p>
           <p className="font-sans text-white/40 text-sm max-w-md leading-relaxed mb-8 md:mb-12">
             Operação · Financeiro · Delivery · Equipe
@@ -66,8 +70,11 @@ export default function Hero() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <ModalTriggerButton className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98] shadow-[0_4px_20px_rgba(185,28,28,0.4)]">
-              Conte sobre seu restaurante
+            <ModalTriggerButton
+              origem="hero"
+              className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98] shadow-[0_4px_20px_rgba(185,28,28,0.4)]"
+            >
+              Diagnóstico gratuito
             </ModalTriggerButton>
             <a
               href="#servicos"
@@ -82,8 +89,8 @@ export default function Hero() {
         <div className="mt-14 md:mt-20 pt-8 md:pt-10 border-t border-white/10 flex flex-wrap gap-8 md:gap-12">
           {[
             { num: '14+', label: 'Anos no\nFood Service' },
-            { num: '1000+', label: 'Profissionais\nTreinados' },
-            { num: '50+', label: 'Projetos\nEstruturados' },
+            { num: '100+', label: 'Profissionais\nTreinados' },
+            { num: '16', label: 'Lojas com\nDelivery Operado' },
           ].map(({ num, label }, i) => (
             <div key={label} className="flex items-center gap-8 md:gap-12">
               <div>

@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "gate": "node scripts/gate-conteudo.mjs"
   },
   "dependencies": {
     "next": "^14",

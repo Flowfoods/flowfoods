@@ -55,10 +55,14 @@ export default function Header() {
 
           {/* Desktop CTA */}
           <button
-            onClick={() => window.dispatchEvent(new CustomEvent('flowfoods:open-modal'))}
+            onClick={() =>
+              window.dispatchEvent(
+                new CustomEvent('flowfoods:open-modal', { detail: { origem: 'diagnostico' } }),
+              )
+            }
             className="hidden md:block bg-primary hover:bg-primary-dark text-white text-xs font-semibold px-5 py-2.5 uppercase tracking-widest transition-colors duration-200"
           >
-            Agendar Consultoria
+            Diagnóstico gratuito
           </button>
 
           {/* Mobile Hamburger */}
@@ -90,10 +94,15 @@ export default function Header() {
             </a>
           ))}
           <button
-            onClick={() => { setMenuOpen(false); window.dispatchEvent(new CustomEvent('flowfoods:open-modal')); }}
+            onClick={() => {
+              setMenuOpen(false);
+              window.dispatchEvent(
+                new CustomEvent('flowfoods:open-modal', { detail: { origem: 'diagnostico' } }),
+              );
+            }}
             className="mt-2 bg-primary hover:bg-primary-dark text-white text-xs font-semibold px-5 py-3.5 uppercase tracking-widest text-center w-full transition-colors duration-200"
           >
-            Agendar Consultoria
+            Diagnóstico gratuito
           </button>
         </nav>
       </div>
