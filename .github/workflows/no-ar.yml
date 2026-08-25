@@ -1,0 +1,61 @@
+name: O que está no ar
+
+# Ninguém conseguia responder "o site publicado já está com o meu commit?".
+# O ambiente onde este repo é desenvolvido não alcança o domínio (o proxy de
+# saída recusa o CONNECT), e o painel do Dokploy também não. O runner do
+# GitHub alcança — então a conferência mora aqui.
+#
+# Só lê: um GET em duas páginas públicas. Não publica, não deploya, não toca
+# em segredo. Nunca reprova o build: "o site ainda está na versão antiga" não
+# é defeito de código, é deploy que não rodou — pintar de vermelho por isso
+# vira ruído e o portão perde valor.
+#
+# Rodar: aba Actions -> "O que está no ar" -> Run workflow.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  conferir:
+    name: Ler consultoriaflowfoods.com.br
+    runs-on: ubuntu-latest
+    steps:
+      - name: Conferir home e /diagnostico
+        run: |
+          set -uo pipefail
+          SITE=https://consultoriaflowfoods.com.br
+
+          ler() {
+            # $1 = caminho. Guarda corpo e código; segue redirect (-L) porque
+            # www -> raiz é normal e não deve ser lido como página quebrada.
+            curl -sSL --max-time 30 -o /tmp/corpo.html -w '%{http_code}' "$SITE$1" 2>/dev/null || echo "000"
+          }
+
+          tem() {
+            # grep -F: procura texto literal, não expressão regular.
+            if grep -qF "$1" /tmp/corpo.html; then echo "SIM"; else echo "nao"; fi
+          }
+
+          echo "== HOME =="
+          codigo=$(ler "/")
+          echo "HTTP $codigo   ($(wc -c < /tmp/corpo.html) bytes)"
+          if [ "$codigo" = "200" ]; then
+            echo "servidor:            $(curl -sSI --max-time 20 "$SITE/" | tr -d '\r' | grep -i '^server:' || echo '(não informado)')"
+            echo "slogan do repo:      $(tem 'Gastronomia que flui')"
+            echo "link /diagnostico:   $(tem 'href="/diagnostico"')"
+            echo "F1 — '100+':         $(tem '100+')"
+            echo "F1 — '1000+' (saiu): $(tem '1000+')"
+            echo "F1 — @rrodolfoac:    $(tem 'rrodolfoac')"
+          fi
+
+          echo
+          echo "== /diagnostico =="
+          codigo=$(ler "/diagnostico")
+          echo "HTTP $codigo   ($(wc -c < /tmp/corpo.html) bytes)"
+          if [ "$codigo" = "200" ]; then
+            echo "título da página:    $(tem 'Diagnóstico gratuito para o seu restaurante')"
+            echo "abertura do fluxo:   $(tem 'Em 4 minutos eu entendo o seu restaurante')"
+            echo "::notice title=Diagnóstico no ar::/diagnostico respondeu 200 — o commit está publicado."
+          else
+            echo "::notice title=Diagnóstico ainda não publicado::/diagnostico respondeu $codigo. O código está verde na master; falta o Dokploy subir a nova versão."
+          fi
