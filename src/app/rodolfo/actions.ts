@@ -255,3 +255,90 @@ export async function acaoImportarJson(_anterior: unknown, form: FormData): Prom
       `${rel.semTelefone} sem celular, ${rel.invalidos} inválida(s).`,
   };
 }
+
+// --------------------------------------------------------------- Lead 360
+
+/**
+ * Registra opt-out à mão.
+ *
+ * Serve para quando o pedido de saída chega por fora do WhatsApp — ligação,
+ * Instagram, um "não me manda mais isso" dito pessoalmente. A trava é a mesma
+ * do automático, porque a chave é o TELEFONE.
+ */
+export async function acaoMarcarOptOut(leadId: string): Promise<Resposta> {
+  const userId = await exigirSessao();
+
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead?.telefoneNormalizado) return { ok: false, mensagem: 'Lead sem telefone normalizado.' };
+
+  await prisma.$transaction([
+    prisma.optOut.upsert({
+      where: { telefoneNormalizado: lead.telefoneNormalizado },
+      create: { telefoneNormalizado: lead.telefoneNormalizado, termo: 'manual', origem: 'MANUAL' },
+      update: { origem: 'MANUAL' },
+    }),
+    prisma.lead.update({ where: { id: leadId }, data: { status: 'OPT_OUT' } }),
+    prisma.enrollment.updateMany({
+      where: { leadId },
+      data: { status: 'OPT_OUT', proximoEnvioEm: null, motivoPausa: 'OPT_OUT manual' },
+    }),
+    prisma.leadEvent.create({
+      data: { leadId, tipo: 'status', descricao: 'Opt-out registrado à mão.' },
+    }),
+  ]);
+
+  await auditar(userId, 'opt_out_manual', { leadId });
+  revalidatePath(`/rodolfo/leads/${leadId}`);
+  return { ok: true, mensagem: 'Opt-out registrado. Não entra mais em cadência.' };
+}
+
+/**
+ * Exclusão por LGPD.
+ *
+ * Apaga o lead e tudo que pende dele. O que NÃO some é o `OptOut`: ele é
+ * chaveado por telefone justamente para sobreviver a isto. Apagar a pessoa e
+ * junto o pedido de saída dela faria a próxima importação abordá-la de novo —
+ * o oposto de atender ao direito que ela exerceu.
+ */
+export async function acaoExcluirLead(leadId: string): Promise<Resposta> {
+  const userId = await exigirSessao();
+
+  const lead = await prisma.lead.findUnique({ where: { id: leadId } });
+  if (!lead) return { ok: false, mensagem: 'Lead não encontrado.' };
+
+  // O audit guarda só o telefone e o nome — o suficiente para provar que a
+  // exclusão aconteceu, sem recriar o cadastro por dentro do log.
+  await auditar(userId, 'lead_excluido_lgpd', {
+    telefone: lead.telefoneNormalizado,
+    nome: lead.nome,
+  });
+
+  await prisma.lead.delete({ where: { id: leadId } });
+
+  revalidatePath('/rodolfo/leads');
+  return {
+    ok: true,
+    mensagem: 'Lead excluído. Um eventual opt-out do número continua valendo.',
+  };
+}
+
+/** Move para a lista de visita presencial / Instagram. */
+export async function acaoMarcarVisita(leadId: string): Promise<Resposta> {
+  const userId = await exigirSessao();
+
+  await prisma.$transaction([
+    prisma.lead.update({ where: { id: leadId }, data: { canal: 'VISITA' } }),
+    prisma.enrollment.updateMany({
+      where: { leadId, status: 'ATIVA' },
+      data: { status: 'PAUSADA_MANUAL', proximoEnvioEm: null, motivoPausa: 'Movido para visita' },
+    }),
+    prisma.leadEvent.create({
+      data: { leadId, tipo: 'status', descricao: 'Movido para Visita / Instagram.' },
+    }),
+  ]);
+
+  await auditar(userId, 'lead_para_visita', { leadId });
+  revalidatePath(`/rodolfo/leads/${leadId}`);
+  revalidatePath('/rodolfo/visitas');
+  return { ok: true, mensagem: 'Movido para Visita / Instagram. Sai da cadência de WhatsApp.' };
+}

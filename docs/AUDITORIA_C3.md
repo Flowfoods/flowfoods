@@ -219,8 +219,8 @@ quem ainda não separou.
 | F2 — templates e cadência | ✅ | Completa |
 | F3 — worker e disparo | ✅ | Envio **real** pendente de credencial; dry-run funciona |
 | F4 — webhooks e inbox | ✅ | Rota, pipeline, classificação e rascunho |
-| F5 — métricas e config | 🟡 | Config completo; métricas são as do painel, sem cortes nem CSV |
-| F6 — produção | ⛔ | **Bloqueado** — sem credencial não há deploy nem instância |
+| F5 — métricas e config | ✅ | Funil, cortes, saúde do número, custo de IA e CSV |
+| F6 — produção | ⛔ | **Bloqueado por rede** — o proxy recusa o túnel até a VPS (curl e Chromium) |
 
 ---
 
@@ -229,6 +229,6 @@ quem ainda não separou.
 ```
 184 testes · 9 arquivos · todos verdes
 tsc --noEmit        · limpo
-next build          · compila, 12 rotas, zero erro de import
+next build          · compila, 15 rotas, zero erro de import
 migration inicial   · 442 linhas, ZERO DROPs (só aditiva)
 ```

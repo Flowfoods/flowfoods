@@ -46,8 +46,11 @@ Mobile-first, sobre chão preto para não se confundir com o site público.
 |---|---|
 | `/rodolfo` | Painel: por que a fila está parada, e o que fazer |
 | `/rodolfo/leads` | Lista, filtros por URL, busca, importação |
+| `/rodolfo/leads/[id]` | Lead 360: score explicado, prévia do gancho, timeline, thread, ações |
 | `/rodolfo/barney` | Lote do dia, aprovar, dry-run, "Enviar agora", fila |
 | `/rodolfo/inbox` | Respostas por intenção, rascunho editável |
+| `/rodolfo/visitas` | Fixos e sem-telefone, com copiar → abrir Direct |
+| `/rodolfo/metricas` | Funil, cortes, saúde do número, custo de IA, CSV |
 | `/rodolfo/config` | Janela, tetos, chave geral + as regras que não se alcança |
 | `/rodolfo/login` · `/setup` | Sessão e primeiro acesso |
 
@@ -55,6 +58,7 @@ Mobile-first, sobre chão preto para não se confundir com o site público.
 
 - `POST /api/leads/import` — token em tempo constante, Zod, alvo do `--push`
 - `POST /api/webhooks/evolution` — secret, idempotência, os 3 eventos
+- `GET /api/metricas/csv` — exporta a base; exige sessão e grava no audit
 - `worker/index.ts` — laço com encerramento limpo em SIGTERM
 
 ---
@@ -64,7 +68,7 @@ Mobile-first, sobre chão preto para não se confundir com o site público.
 ```
 184 testes · 9 arquivos · todos verdes
 tsc --noEmit  · limpo
-next build    · compila, 12 rotas, zero erro de import
+next build    · compila, 15 rotas, zero erro de import
 migration     · 442 linhas, ZERO DROPs
 ```
 
@@ -90,17 +94,16 @@ Os 11 testes obrigatórios do Master Prompt, um a um:
 
 Sem eufemismo:
 
-- **F5 — métricas.** O painel mostra os números do dia. Não existe o funil
-  completo (importados → … → clientes), nem cortes por bloco/bairro/template,
-  nem exportar CSV, nem custo de IA acumulado numa tela.
 - **F6 — produção.** Nenhum deploy, nenhuma instância criada, nenhum `pg_dump`.
-  **Bloqueado por falta de credencial**, não por falta de código.
-- **Lead 360.** Não há `/rodolfo/leads/[id]` com timeline e ações. A lista mostra
-  o essencial; a timeline já é gravada em `LeadEvent` desde a importação.
-- **`/rodolfo/visitas`.** Os fixos são separados e contados na tela de leads, mas
-  não têm tela própria com "copiar → abrir Direct".
-- **`--push` no `montar_pacote.py`.** A rota existe e está pronta; o patch no
-  script é pendência 7 (a skill está fora deste repo).
+  Bloqueado por rede: o proxy desta sessão recusa o túnel CONNECT para o domínio
+  e para a VPS — verificado por `curl` **e** por Chromium. Não é falta de
+  credencial; é ausência de rota.
+- **Aplicar o patch do `--push`.** A rota está pronta e testada; o patch para o
+  `montar_pacote.py` está em `docs/patch-ledsflowfoods-push.diff`. A skill mora
+  fora deste repositório, então não dá para commitar aqui.
+- **As cinco últimas etapas do funil** (diagnóstico preenchido → clientes)
+  ficam em zero até o ambiente de Diagnóstico (Caminho 2) alimentar os status.
+  A tela diz isso; não estima nada.
 - **Nenhum envio real foi feito. Nenhuma instância foi criada. Nenhum recurso
   externo foi tocado.**
 
