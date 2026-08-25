@@ -1,0 +1,22 @@
+# Fora da imagem: pesado, inutil ou perigoso.
+node_modules
+.next
+.git
+.github
+
+# Segredo NUNCA entra na imagem. Um .env copiado para dentro fica na camada
+# para sempre, mesmo que um passo seguinte o apague.
+.env
+.env.*
+!.env.example
+
+# Nada disso roda em producao.
+tests
+docs
+scripts
+*.md
+!README.md
+
+coverage
+*.tsbuildinfo
+.DS_Store

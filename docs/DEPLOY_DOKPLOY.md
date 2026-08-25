@@ -1,27 +1,74 @@
-# Deploy no Dokploy — passo a passo
+# Deploy no Dokploy
 
-Escrito para ser executado **no navegador**, por você. Eu não tenho
-`DOKPLOY_URL` nem `DOKPLOY_API_TOKEN` nesta sessão, e o acesso de saída para
-domínios externos está bloqueado — então não consigo clicar nada aqui.
-
-Ordem importa: **banco → env → migration → web → worker**. Subir o `web` antes
-da migration dá erro em toda tela que lê dados.
+Eu não alcanço o Dokploy desta sessão — o proxy de saída recusa o túnel para o
+domínio e para a VPS (verificado por `curl` e por Chromium). Então o que dá para
+fazer é reduzir o seu trabalho ao mínimo: **um arquivo já pronto e um comando.**
 
 ---
 
-## 0. Antes de tudo: qual branch?
+## Caminho curto — Docker Compose (recomendado)
 
-O código está em `claude/rodolfo-barney-cadence-bc7dcy`, **não** em `master`.
-O site no ar sai de `master` e não foi tocado.
+Sobe Postgres, `web` e `worker` de uma vez. A migration roda sozinha no start.
 
-Duas opções:
+### 1. Gere as variáveis
 
-- **Testar primeiro (recomendado):** aponte o app do Dokploy para a branch
-  `claude/rodolfo-barney-cadence-bc7dcy`. Nada muda no site em produção.
-- **Ir direto:** faça merge na `master`. Aí o autodeploy do site também roda —
-  o build já foi validado aqui, mas é o site institucional que vai junto.
+No seu terminal, dentro do repositório:
+
+```bash
+./scripts/gerar-env.sh https://consultoriaflowfoods.com.br
+```
+
+Ele imprime o bloco inteiro, com os segredos já sorteados. **Copie da tela** —
+o script não grava arquivo nenhum de propósito. Guarde o `ADMIN_SETUP_TOKEN`
+à mão: você vai usá-lo uma vez, no passo 4.
+
+Deixe `EVOLUTION_API_URL` e `EVOLUTION_API_KEY` **vazias** por enquanto. Sem
+elas o portal entra em dry-run: sobe, funciona, e não envia nada. É o jeito
+seguro de treinar o fluxo antes de existir número conectado.
+
+### 2. Crie a aplicação
+
+No projeto `flowfoods` → **Create Application** → tipo **Docker Compose**:
+
+| Campo | Valor |
+|---|---|
+| Repositório | `Flowfoods/flowfoods` |
+| Branch | `claude/rodolfo-barney-cadence-bc7dcy` |
+| Compose path | `docker-compose.yml` |
+
+Em **Environment**, cole o bloco do passo 1.
+
+> **Aponte para a branch, não para `master`.** O site institucional sai de
+> `master` e não foi tocado — assim você testa sem risco nenhum para o que está
+> no ar. Configure um domínio de teste (ex.: `staging.consultoriaflowfoods.com.br`)
+> apontando para o serviço `web`, porta 3000.
+
+### 3. Deploy
+
+O `web` só inicia depois que o Postgres responde, e roda `prisma migrate deploy`
+antes de subir o Next. O `worker` sobe junto e fica dormindo — com
+`disparoAtivo=false` (o padrão) ele não envia nada.
+
+### 4. Sua senha
+
+```
+https://<seu-dominio>/rodolfo/setup?token=<ADMIN_SETUP_TOKEN>
+```
+
+Define a senha; o token para de valer. Depois, `/rodolfo/login`.
+
+### 5. Confira
+
+```bash
+./scripts/verificar-deploy.sh https://<seu-dominio>
+```
 
 ---
+
+## Caminho longo — três serviços na mão
+
+Use se preferir controlar cada peça, ou se o compose falhar. É o mesmo
+resultado, com mais cliques.
 
 ## 1. Postgres
 
@@ -233,6 +280,8 @@ Só depois: 10 envios manuais → ligar `disparoAtivo`.
 
 | Sintoma | Causa provável |
 |---|---|
+| Build falha no `npm ci` | `package-lock.json` desatualizado no fork — rode `npm ci` local para confirmar |
+| Build falha no Prisma | Falta `libc6-compat`/`openssl` — o Dockerfile já instala; se persistir, me mande o log |
 | Erro 500 em toda tela do `/rodolfo` | Migration não rodou, ou `DATABASE_URL` errada |
 | `/rodolfo/login` em laço | `NEXTAUTH_SECRET` ou `NEXTAUTH_URL` ausente/errada |
 | Setup diz "Token inválido" | `ADMIN_SETUP_TOKEN` diferente do que está na URL |

@@ -1,0 +1,88 @@
+# Stack completa do Espaço do Rodolfo + Barney.
+#
+# No Dokploy: Create Application → tipo **Docker Compose** → aponte para este
+# repositório e para a branch. Sobe os três serviços de uma vez, em vez de
+# criar Postgres, web e worker separados na mão.
+#
+# As variáveis vêm do painel do Dokploy (aba Environment). Nada de segredo aqui
+# dentro — este arquivo está no Git.
+#
+# Ordem garantida pelo `depends_on` + healthcheck: o `web` só começa depois que
+# o Postgres aceita conexão, e a migration roda no start do `web` antes do
+# Next subir. Sem isso, o primeiro deploy erra em toda tela que lê dados.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-flowfoods}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no Dokploy}
+      POSTGRES_DB: ${POSTGRES_DB:-flowfoods}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # `pg_isready` responde antes de o banco aceitar login de verdade; o -U
+      # força a checagem com o usuário real.
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-flowfoods} -d ${POSTGRES_DB:-flowfoods}']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # A migration roda no boot, como manda o plano. É só aditiva, então rodar de
+    # novo num banco já migrado é no-op.
+    command: sh -c "npx prisma migrate deploy && npm start"
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-flowfoods}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-flowfoods}?schema=public}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?defina NEXTAUTH_SECRET no Dokploy}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://consultoriaflowfoods.com.br}
+      ADMIN_SETUP_TOKEN: ${ADMIN_SETUP_TOKEN:?defina ADMIN_SETUP_TOKEN no Dokploy}
+      LEADS_IMPORT_TOKEN: ${LEADS_IMPORT_TOKEN:-}
+      # Vazias = o portal entra em DRY-RUN e não envia nada. É seguro subir assim.
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-flowfoods-prospeccao}
+      EVOLUTION_NOTIFY_INSTANCE: ${EVOLUTION_NOTIFY_INSTANCE:-}
+      EVOLUTION_WEBHOOK_SECRET: ${EVOLUTION_WEBHOOK_SECRET:-}
+      RODOLFO_WHATSAPP: ${RODOLFO_WHATSAPP:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_DAILY_BUDGET_BRL: ${AI_DAILY_BUDGET_BRL:-}
+      USD_BRL: ${USD_BRL:-5.40}
+    expose:
+      - '3000'
+    # O Dokploy injeta os labels do Traefik quando você configura o domínio no
+    # painel. Não escreva label de roteamento aqui — duas fontes de verdade
+    # para o mesmo host é como se perde um domínio.
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: npm run worker
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-flowfoods}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-flowfoods}?schema=public}
+      EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
+      EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
+      EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-flowfoods-prospeccao}
+      EVOLUTION_NOTIFY_INSTANCE: ${EVOLUTION_NOTIFY_INSTANCE:-}
+      RODOLFO_WHATSAPP: ${RODOLFO_WHATSAPP:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      AI_DAILY_BUDGET_BRL: ${AI_DAILY_BUDGET_BRL:-}
+      USD_BRL: ${USD_BRL:-5.40}
+    # Sem porta e sem domínio: o worker não atende requisição nenhuma.
+
+volumes:
+  postgres-data:
