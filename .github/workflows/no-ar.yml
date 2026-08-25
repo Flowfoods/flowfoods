@@ -31,21 +31,37 @@ jobs:
             curl -sSL --max-time 30 -o /tmp/corpo.html -w '%{http_code}' "$SITE$1" 2>/dev/null || echo "000"
           }
 
-          tem() {
-            # grep -F: procura texto literal, não expressão regular.
-            if grep -qF "$1" /tmp/corpo.html; then echo "SIM"; else echo "nao"; fi
+          # Os marcadores são LITERAIS (grep -F) e precisam ser inequívocos.
+          # A primeira versão deste passo errou justamente aí: procurava "100+",
+          # que casa dentro de "1000+", e "rrodolfoac", que casa dentro do gmail
+          # antigo "rrodolfoacifood@". Os dois davam SIM lendo o texto que a F1
+          # veio REMOVER. Rodando contra o build local — onde a F1 já está — o
+          # erro não aparecia: só uma página velha de verdade o revela.
+          deve() {
+            # $1 = texto que precisa ESTAR na página depois de publicado
+            if grep -qF "$1" /tmp/corpo.html; then echo "  [ no ar  ] $2"; else echo "  [PENDENTE] $2"; fi
+          }
+          sumiu() {
+            # $1 = texto que precisa TER SUMIDO da página depois de publicado
+            if grep -qF "$1" /tmp/corpo.html; then echo "  [PENDENTE] $2 — ainda na página"; else echo "  [ no ar  ] $2 — removido"; fi
           }
 
           echo "== HOME =="
           codigo=$(ler "/")
           echo "HTTP $codigo   ($(wc -c < /tmp/corpo.html) bytes)"
           if [ "$codigo" = "200" ]; then
-            echo "servidor:            $(curl -sSI --max-time 20 "$SITE/" | tr -d '\r' | grep -i '^server:' || echo '(não informado)')"
-            echo "slogan do repo:      $(tem 'Gastronomia que flui')"
-            echo "link /diagnostico:   $(tem 'href="/diagnostico"')"
-            echo "F1 — '100+':         $(tem '100+')"
-            echo "F1 — '1000+' (saiu): $(tem '1000+')"
-            echo "F1 — @rrodolfoac:    $(tem 'rrodolfoac')"
+            echo
+            echo "  este repositório constrói este site?"
+            deve 'Gastronomia que flui' 'slogan do repositório'
+            echo
+            echo "  funil (Caminho 2)"
+            deve 'href="/diagnostico"' 'link para o diagnóstico na home'
+            echo
+            echo "  credibilidade (F1)"
+            sumiu '1000+'                    'número sem prova'
+            sumiu 'rrodolfoacifood@gmail.com' 'gmail pessoal como contato comercial'
+            sumiu 'Vagas limitadas'          'escassez inventada'
+            deve  'instagram.com/rrodolfoac' 'handle certo do Instagram'
           fi
 
           echo
@@ -53,8 +69,8 @@ jobs:
           codigo=$(ler "/diagnostico")
           echo "HTTP $codigo   ($(wc -c < /tmp/corpo.html) bytes)"
           if [ "$codigo" = "200" ]; then
-            echo "título da página:    $(tem 'Diagnóstico gratuito para o seu restaurante')"
-            echo "abertura do fluxo:   $(tem 'Em 4 minutos eu entendo o seu restaurante')"
+            deve 'Diagnóstico gratuito para o seu restaurante' 'título da página'
+            deve 'Em 4 minutos eu entendo o seu restaurante'   'abertura do fluxo'
             echo "::notice title=Diagnóstico no ar::/diagnostico respondeu 200 — o commit está publicado."
           else
             echo "::notice title=Diagnóstico ainda não publicado::/diagnostico respondeu $codigo. O código está verde na master; falta o Dokploy subir a nova versão."
