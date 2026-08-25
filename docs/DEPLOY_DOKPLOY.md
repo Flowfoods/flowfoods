@@ -200,15 +200,29 @@ Define a senha, o token para de valer. Depois disso, `/rodolfo/login`.
 
 ## 9. Checklist de corte
 
-Antes de considerar no ar:
+**Rode o verificador** — ele cobre sozinho a metade automatizável:
 
-- [ ] `curl` do webhook responde `{"ok":true}`
-- [ ] `/rodolfo/login` abre e aceita a senha
+```bash
+./scripts/verificar-deploy.sh
+# ou, para um ambiente de teste:
+./scripts/verificar-deploy.sh https://staging.consultoriaflowfoods.com.br
+```
+
+Ele não envia mensagem, não cria instância e não altera nada — só lê. Confere
+que o site continua no ar, que o webhook está **fechado** para quem não tem o
+segredo, que a importação recusa sem token, que `/rodolfo` exige sessão e que a
+área privada está `noindex`. Sai com código 1 se algo reprovar, e a saída pode
+ser colada inteira numa conversa para diagnóstico.
+
+O que ele **não** consegue ver, e você precisa conferir no navegador:
+
+- [ ] `/rodolfo/login` aceita a senha que você definiu
 - [ ] `/rodolfo` mostra "Disparo desligado" (é o esperado no começo)
 - [ ] `/rodolfo/config` mostra a instância `open`
 - [ ] Log do worker: `worker iniciado`
 - [ ] Importar um lote pequeno em `/rodolfo/leads` e ver os leads na lista
-- [ ] `/rodolfo/barney` → Montar lote → **Dry-run** → conferir o texto
+- [ ] `/rodolfo/barney` → Montar lote → **Dry-run** → **ler o texto de uma
+      mensagem inteira**, do gancho à assinatura
 - [ ] Site em `/` continua igual ao que estava
 
 Só depois: 10 envios manuais → ligar `disparoAtivo`.
