@@ -1,0 +1,630 @@
+{
+  "versao": "1.0.0",
+  "versaoFormulario": "v1",
+  "revisar": true,
+  "revisarNota": "Textos e pesos escritos na v1 pelo executor autônomo, na voz do Rodolfo, sem número e sem promessa. Tudo aqui é revisável sem tocar em código: o motor lê este arquivo. Enquanto revisar=true, a aba do Rodolfo mostra o aviso de copy não revisada.",
+
+  "modulos": {
+    "estrutura": { "nome": "Estrutura de Restaurante", "frase": "Processo escrito, cozinha que roda sem você no meio." },
+    "ifood": { "nome": "iFood & Delivery", "frase": "O app é vitrine e é margem. Os dois." },
+    "equipe": { "nome": "Treinamento de Equipe", "frase": "Gente treinada erra menos e fica mais tempo." },
+    "financeiro": { "nome": "Gestão Financeira", "frase": "Primeiro o número, depois a decisão. Nessa ordem." },
+    "crm": { "nome": "Fidelidade & CRM", "frase": "Cliente que volta custa bem menos que cliente novo." },
+    "saas": { "nome": "SaaS com IA", "frase": "Sistema pra parar de decidir olhando pro retrovisor." }
+  },
+
+  "etapas": [
+    {
+      "id": 0,
+      "titulo": "Abertura",
+      "chamada": "Em 4 minutos eu entendo o seu restaurante e te mostro por onde começar.",
+      "botao": "Começar",
+      "perguntas": []
+    },
+    {
+      "id": 1,
+      "titulo": "O negócio",
+      "perguntas": [
+        { "id": "restaurante", "tipo": "texto", "rotulo": "Nome do restaurante", "obrigatoria": true, "max": 80 },
+        {
+          "id": "categoria",
+          "tipo": "unica",
+          "rotulo": "Categoria",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "hamburgueria", "rotulo": "Hamburgueria" },
+            { "valor": "pizzaria", "rotulo": "Pizzaria" },
+            { "valor": "japones", "rotulo": "Japonês" },
+            { "valor": "caseira", "rotulo": "Comida caseira / self-service" },
+            { "valor": "bar", "rotulo": "Bar e petiscos" },
+            { "valor": "acai_sucos", "rotulo": "Açaí e sucos" },
+            { "valor": "cafeteria_padaria", "rotulo": "Cafeteria / padaria" },
+            { "valor": "churrascaria", "rotulo": "Churrascaria" },
+            { "valor": "frutos_do_mar", "rotulo": "Frutos do mar" },
+            { "valor": "arabe", "rotulo": "Árabe / esfiharia" },
+            { "valor": "doceria", "rotulo": "Doceria / confeitaria" },
+            { "valor": "outro", "rotulo": "Outro" }
+          ]
+        },
+        {
+          "id": "lojas",
+          "tipo": "unica",
+          "rotulo": "Quantas lojas",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "vou_abrir", "rotulo": "Ainda vou abrir" },
+            { "valor": "uma", "rotulo": "1" },
+            { "valor": "duas_tres", "rotulo": "2 a 3" },
+            { "valor": "quatro_seis", "rotulo": "4 a 6" },
+            { "valor": "sete_mais", "rotulo": "7 ou mais" }
+          ]
+        },
+        {
+          "id": "tempoOperacao",
+          "tipo": "unica",
+          "rotulo": "Tempo de operação",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "nao_abri", "rotulo": "Ainda não abri" },
+            { "valor": "menos_1_ano", "rotulo": "Menos de 1 ano" },
+            { "valor": "um_tres", "rotulo": "1 a 3 anos" },
+            { "valor": "tres_dez", "rotulo": "3 a 10 anos" },
+            { "valor": "dez_mais", "rotulo": "10 anos ou mais" }
+          ]
+        },
+        { "id": "bairroCidade", "tipo": "texto", "rotulo": "Bairro e cidade", "obrigatoria": true, "max": 80 }
+      ]
+    },
+    {
+      "id": 2,
+      "titulo": "Como você vende",
+      "perguntas": [
+        {
+          "id": "canais",
+          "tipo": "multipla",
+          "rotulo": "Por onde você vende hoje",
+          "obrigatoria": true,
+          "min": 1,
+          "opcoes": [
+            { "valor": "salao", "rotulo": "Salão" },
+            { "valor": "delivery_proprio", "rotulo": "Delivery próprio (WhatsApp/site)" },
+            { "valor": "ifood", "rotulo": "iFood" },
+            { "valor": "outros_apps", "rotulo": "Outros apps" },
+            { "valor": "balcao", "rotulo": "Balcão / retirada" }
+          ]
+        },
+        {
+          "id": "percentualDelivery",
+          "tipo": "unica",
+          "rotulo": "Quanto do faturamento vem do delivery",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "d0_20", "rotulo": "Até um quinto" },
+            { "valor": "d20_40", "rotulo": "Perto de um terço" },
+            { "valor": "d40_60", "rotulo": "Perto da metade" },
+            { "valor": "d60_80", "rotulo": "A maior parte" },
+            { "valor": "d80_mais", "rotulo": "Quase tudo" },
+            { "valor": "nao_sei", "rotulo": "Não sei" }
+          ]
+        },
+        { "id": "ifoodUrl", "tipo": "url", "rotulo": "Link da sua loja no iFood", "obrigatoria": false },
+        { "id": "instagram", "tipo": "texto", "rotulo": "Instagram", "obrigatoria": false, "max": 40 }
+      ]
+    },
+    {
+      "id": 3,
+      "titulo": "Seus números",
+      "perguntas": [
+        {
+          "id": "faturamento",
+          "tipo": "unica",
+          "rotulo": "Faturamento mensal por loja",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "ate_30k", "rotulo": "Até 30 mil" },
+            { "valor": "f30_60k", "rotulo": "30 a 60 mil" },
+            { "valor": "f60_120k", "rotulo": "60 a 120 mil" },
+            { "valor": "f120_250k", "rotulo": "120 a 250 mil" },
+            { "valor": "f250k_mais", "rotulo": "250 mil ou mais" },
+            { "valor": "nao_dizer", "rotulo": "Prefiro não dizer" }
+          ]
+        },
+        {
+          "id": "cmv",
+          "tipo": "unica",
+          "rotulo": "Você sabe o seu CMV?",
+          "ajuda": "CMV é o quanto do que você vende vira custo de insumo.",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "sei", "rotulo": "Sei o número" },
+            { "valor": "ideia", "rotulo": "Tenho uma ideia" },
+            { "valor": "nao_sei", "rotulo": "Não sei" }
+          ]
+        },
+        {
+          "id": "dre",
+          "tipo": "unica",
+          "rotulo": "Fecha DRE todo mês?",
+          "ajuda": "DRE é o fechamento que mostra o que sobrou depois de tudo.",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "sim", "rotulo": "Sim" },
+            { "valor": "as_vezes", "rotulo": "Às vezes" },
+            { "valor": "nao", "rotulo": "Não / não sei o que é" }
+          ]
+        },
+        {
+          "id": "margemPrato",
+          "tipo": "unica",
+          "rotulo": "Sabe a margem por prato?",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "sim", "rotulo": "Sim" },
+            { "valor": "parcial", "rotulo": "Parcialmente" },
+            { "valor": "nao", "rotulo": "Não" }
+          ]
+        },
+        {
+          "id": "resultado3Meses",
+          "tipo": "unica",
+          "rotulo": "Resultado dos últimos 3 meses",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "lucro", "rotulo": "Lucro" },
+            { "valor": "empate", "rotulo": "Empate" },
+            { "valor": "prejuizo", "rotulo": "Prejuízo" },
+            { "valor": "nao_sei", "rotulo": "Não sei" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "titulo": "Equipe e operação",
+      "perguntas": [
+        {
+          "id": "equipePorLoja",
+          "tipo": "unica",
+          "rotulo": "Equipe por loja",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "e1_5", "rotulo": "1 a 5" },
+            { "valor": "e6_12", "rotulo": "6 a 12" },
+            { "valor": "e13_25", "rotulo": "13 a 25" },
+            { "valor": "e25_mais", "rotulo": "Mais de 25" }
+          ]
+        },
+        {
+          "id": "gerente",
+          "tipo": "unica",
+          "rotulo": "Tem gerente ou encarregado além de você?",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "sim", "rotulo": "Sim" },
+            { "valor": "nao", "rotulo": "Não" }
+          ]
+        },
+        {
+          "id": "rotatividade",
+          "tipo": "unica",
+          "rotulo": "Rotatividade da equipe",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "baixa", "rotulo": "Baixa" },
+            { "valor": "media", "rotulo": "Média" },
+            { "valor": "alta", "rotulo": "Alta" }
+          ]
+        },
+        {
+          "id": "treinamento",
+          "tipo": "unica",
+          "rotulo": "Como a equipe aprende",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "processo", "rotulo": "Tem processo" },
+            { "valor": "dia_a_dia", "rotulo": "Aprende no dia a dia" },
+            { "valor": "nenhum", "rotulo": "Nenhum" }
+          ]
+        },
+        {
+          "id": "fichasTecnicas",
+          "tipo": "unica",
+          "rotulo": "Fichas técnicas / padrão de produção",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "sim", "rotulo": "Sim" },
+            { "valor": "parcial", "rotulo": "Parcial" },
+            { "valor": "nao", "rotulo": "Não" }
+          ]
+        },
+        {
+          "id": "horasOperacao",
+          "tipo": "unica",
+          "rotulo": "Suas horas na operação por dia",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "menos_4", "rotulo": "Menos de 4" },
+            { "valor": "h4_8", "rotulo": "4 a 8" },
+            { "valor": "h8_12", "rotulo": "8 a 12" },
+            { "valor": "h12_mais", "rotulo": "Mais de 12" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "titulo": "Delivery e iFood",
+      "condicional": { "pergunta": "canais", "contemAlgum": ["ifood", "outros_apps"] },
+      "perguntas": [
+        {
+          "id": "notaIfood",
+          "tipo": "unica",
+          "rotulo": "Sua nota no iFood",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "n48_mais", "rotulo": "4.8 ou mais" },
+            { "valor": "n45_47", "rotulo": "4.5 a 4.7" },
+            { "valor": "n40_44", "rotulo": "4.0 a 4.4" },
+            { "valor": "n_abaixo_40", "rotulo": "Abaixo de 4.0" },
+            { "valor": "nao_sei", "rotulo": "Não sei" }
+          ]
+        },
+        {
+          "id": "respondeAvaliacoes",
+          "tipo": "unica",
+          "rotulo": "Responde avaliações?",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "sempre", "rotulo": "Sempre" },
+            { "valor": "as_vezes", "rotulo": "Às vezes" },
+            { "valor": "nunca", "rotulo": "Nunca" }
+          ]
+        },
+        {
+          "id": "campanhas",
+          "tipo": "unica",
+          "rotulo": "Campanhas e anúncios no iFood",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "com_controle", "rotulo": "Com controle do retorno" },
+            { "valor": "sem_saber", "rotulo": "Sem saber o retorno" },
+            { "valor": "nao_faco", "rotulo": "Não faço" }
+          ]
+        },
+        {
+          "id": "cancelamentos",
+          "tipo": "unica",
+          "rotulo": "Cancelamentos e erros de pedido",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "raro", "rotulo": "Raro" },
+            { "valor": "semana", "rotulo": "Toda semana" },
+            { "valor": "dia", "rotulo": "Todo dia" }
+          ]
+        },
+        {
+          "id": "fotos",
+          "tipo": "unica",
+          "rotulo": "Fotos e cardápio",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "profissionais", "rotulo": "Profissionais" },
+            { "valor": "celular", "rotulo": "Do celular" },
+            { "valor": "sem_fotos", "rotulo": "Sem fotos" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "titulo": "Clientes e sistemas",
+      "perguntas": [
+        {
+          "id": "baseClientes",
+          "tipo": "unica",
+          "rotulo": "Base de clientes (nome e telefone)",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "organizada", "rotulo": "Sim, organizada" },
+            { "valor": "whatsapp", "rotulo": "Tenho no WhatsApp" },
+            { "valor": "nao_tenho", "rotulo": "Não tenho" }
+          ]
+        },
+        {
+          "id": "fidelidade",
+          "tipo": "unica",
+          "rotulo": "Programa de fidelidade",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "tenho", "rotulo": "Tenho" },
+            { "valor": "ja_tentei", "rotulo": "Já tentei" },
+            { "valor": "nunca", "rotulo": "Nunca tive" }
+          ]
+        },
+        {
+          "id": "mensagens",
+          "tipo": "unica",
+          "rotulo": "Manda mensagem para clientes",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "regularmente", "rotulo": "Regularmente" },
+            { "valor": "as_vezes", "rotulo": "Às vezes" },
+            { "valor": "nunca", "rotulo": "Nunca" }
+          ]
+        },
+        {
+          "id": "sistema",
+          "tipo": "unica",
+          "rotulo": "Sistema de gestão",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "pdv_erp", "rotulo": "PDV / ERP" },
+            { "valor": "planilhas", "rotulo": "Planilhas" },
+            { "valor": "caderno_nada", "rotulo": "Caderno / nada" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "titulo": "Dificuldades e momento",
+      "perguntas": [
+        {
+          "id": "dores",
+          "tipo": "ordenada",
+          "rotulo": "Suas 3 maiores dificuldades hoje",
+          "obrigatoria": true,
+          "min": 1,
+          "max": 3,
+          "opcoes": [
+            { "valor": "vendas_caindo", "rotulo": "Vendas caindo" },
+            { "valor": "margem_apertada", "rotulo": "Margem apertada / lucro sumindo" },
+            { "valor": "nao_sei_numeros", "rotulo": "Não sei meus números" },
+            { "valor": "equipe", "rotulo": "Equipe (falta, erros, rotatividade)" },
+            { "valor": "ifood_nao_performa", "rotulo": "iFood não performa" },
+            { "valor": "operacao_baguncada", "rotulo": "Operação bagunçada / tudo depende de mim" },
+            { "valor": "custos_altos", "rotulo": "Custos altos" },
+            { "valor": "cardapio_grande", "rotulo": "Cardápio grande e pouco rentável" },
+            { "valor": "poucos_voltam", "rotulo": "Poucos clientes voltam" },
+            { "valor": "abrir_nova_loja", "rotulo": "Quero abrir nova loja" },
+            { "valor": "abrir_primeira_loja", "rotulo": "Quero abrir a primeira loja" },
+            { "valor": "marketing", "rotulo": "Marketing / Instagram" },
+            { "valor": "outra", "rotulo": "Outra" }
+          ]
+        },
+        { "id": "tiraSono", "tipo": "textoLongo", "rotulo": "O que mais tira o seu sono hoje?", "obrigatoria": false, "max": 1000 },
+        {
+          "id": "objetivo6meses",
+          "tipo": "unica",
+          "rotulo": "Objetivo para os próximos 6 meses",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "parar_perder", "rotulo": "Parar de perder dinheiro" },
+            { "valor": "organizar", "rotulo": "Organizar a casa" },
+            { "valor": "vender_delivery", "rotulo": "Vender mais no delivery" },
+            { "valor": "crescer_abrir", "rotulo": "Crescer / abrir loja" },
+            { "valor": "sair_operacao", "rotulo": "Sair da operação do dia a dia" }
+          ]
+        },
+        {
+          "id": "urgencia",
+          "tipo": "unica",
+          "rotulo": "Urgência",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "pra_ontem", "rotulo": "É pra ontem" },
+            { "valor": "este_mes", "rotulo": "Este mês" },
+            { "valor": "planejando", "rotulo": "Estou planejando" }
+          ]
+        },
+        {
+          "id": "quemDecide",
+          "tipo": "unica",
+          "rotulo": "Quem decide",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "so_eu", "rotulo": "Só eu" },
+            { "valor": "socios", "rotulo": "Eu e sócio(s)" },
+            { "valor": "familia", "rotulo": "Família" }
+          ]
+        },
+        {
+          "id": "jaContratouConsultoria",
+          "tipo": "unica",
+          "rotulo": "Já contratou consultoria?",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "deu_certo", "rotulo": "Deu certo" },
+            { "valor": "nao_deu_certo", "rotulo": "Não deu certo" },
+            { "valor": "nunca", "rotulo": "Nunca" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "titulo": "Contato",
+      "perguntas": [
+        { "id": "nome", "tipo": "texto", "rotulo": "Seu nome", "obrigatoria": true, "max": 80 },
+        { "id": "whatsapp", "tipo": "celular", "rotulo": "WhatsApp", "obrigatoria": true },
+        { "id": "email", "tipo": "email", "rotulo": "E-mail", "obrigatoria": false },
+        {
+          "id": "melhorHorario",
+          "tipo": "unica",
+          "rotulo": "Melhor horário pra falar",
+          "obrigatoria": true,
+          "opcoes": [
+            { "valor": "manha", "rotulo": "Manhã" },
+            { "valor": "tarde", "rotulo": "Tarde" },
+            { "valor": "noite", "rotulo": "Noite" }
+          ]
+        },
+        {
+          "id": "consentimento",
+          "tipo": "consentimento",
+          "rotulo": "Autorizo o uso das minhas respostas para o diagnóstico e a proposta. Guardo por 24 meses. Posso pedir a exclusão pelo WhatsApp.",
+          "obrigatoria": true
+        }
+      ]
+    }
+  ],
+
+  "pesos": {
+    "financeiro": {
+      "cmv": { "sei": 3, "ideia": 1, "nao_sei": 0 },
+      "dre": { "sim": 3, "as_vezes": 1, "nao": 0 },
+      "margemPrato": { "sim": 2, "parcial": 1, "nao": 0 },
+      "resultado3Meses": { "lucro": 2, "empate": 1, "prejuizo": 0, "nao_sei": 0 }
+    },
+    "operacao": {
+      "gerente": { "sim": 3, "nao": 0 },
+      "rotatividade": { "baixa": 2, "media": 1, "alta": 0 },
+      "treinamento": { "processo": 2, "dia_a_dia": 1, "nenhum": 0 },
+      "fichasTecnicas": { "sim": 2, "parcial": 1, "nao": 0 },
+      "horasOperacao": { "menos_4": 1, "h4_8": 1, "h8_12": 0, "h12_mais": 0 }
+    },
+    "digital": {
+      "notaIfood": { "n48_mais": 3, "n45_47": 2, "n40_44": 1, "n_abaixo_40": 0, "nao_sei": 0 },
+      "respondeAvaliacoes": { "sempre": 2, "as_vezes": 1, "nunca": 0 },
+      "campanhas": { "com_controle": 2, "sem_saber": 1, "nao_faco": 0 },
+      "fotos": { "profissionais": 1, "celular": 0, "sem_fotos": 0 },
+      "baseClientes": { "organizada": 2, "whatsapp": 1, "nao_tenho": 0 }
+    }
+  },
+
+  "dorParaModulo": {
+    "vendas_caindo": { "principal": "ifood", "secundario": "crm" },
+    "margem_apertada": { "principal": "financeiro", "secundario": "estrutura" },
+    "nao_sei_numeros": { "principal": "financeiro", "secundario": "saas" },
+    "equipe": { "principal": "equipe", "secundario": "estrutura" },
+    "ifood_nao_performa": { "principal": "ifood", "secundario": null },
+    "operacao_baguncada": { "principal": "estrutura", "secundario": "equipe" },
+    "custos_altos": { "principal": "financeiro", "secundario": null },
+    "cardapio_grande": { "principal": "financeiro", "secundario": "estrutura" },
+    "poucos_voltam": { "principal": "crm", "secundario": "ifood" },
+    "abrir_nova_loja": { "principal": "estrutura", "secundario": "saas" },
+    "abrir_primeira_loja": { "principal": "estrutura", "secundario": "saas" },
+    "marketing": { "principal": "crm", "secundario": "ifood" },
+    "outra": { "principal": null, "secundario": null }
+  },
+
+  "pesoDor": [3, 2, 1],
+  "pesoDorSecundaria": 1,
+
+  "nivelOferta": {
+    "projeto_estrutura": {
+      "nome": "Projeto de Estrutura",
+      "composicao": "Estrutura de Restaurante + base de Gestão Financeira",
+      "modulosFixos": ["estrutura", "financeiro"],
+      "usaModulosRanqueados": 0,
+      "duracaoSemanas": 8
+    },
+    "focada_estancar": {
+      "nome": "Consultoria Focada — Estancar",
+      "composicao": "Gestão Financeira + o módulo número 1, em 60 a 90 dias",
+      "modulosFixos": ["financeiro"],
+      "usaModulosRanqueados": 1,
+      "duracaoSemanas": 12
+    },
+    "focada_organizar": {
+      "nome": "Consultoria Focada — Organizar",
+      "composicao": "Os módulos número 1 e 2 mais Treinamento de Equipe",
+      "modulosFixos": ["equipe"],
+      "usaModulosRanqueados": 2,
+      "duracaoSemanas": 12
+    },
+    "completa": {
+      "nome": "Consultoria Completa",
+      "composicao": "Os quatro primeiros módulos ranqueados, com acompanhamento",
+      "modulosFixos": [],
+      "usaModulosRanqueados": 4,
+      "duracaoSemanas": 24
+    },
+    "parceria": {
+      "nome": "Parceria",
+      "composicao": "SaaS com IA + Fidelidade & CRM, com reuniões mensais",
+      "modulosFixos": ["saas", "crm"],
+      "usaModulosRanqueados": 0,
+      "duracaoSemanas": 0
+    }
+  },
+
+  "conflitoBibi": {
+    "categorias": ["acai_sucos"],
+    "palavrasChave": ["suco", "acai", "salada", "saladaria"],
+    "territorios": ["tijuca", "norte shopping", "norteshopping", "botafogo", "rio sul", "riosul"]
+  },
+
+  "termosProibidos": {
+    "substrings": ["%", "r$", "garant", "gratuito", "sem compromisso"],
+    "porque": "A leitura que chega ao dono não promete resultado, não fala de preço e não vende de graça. É sinal, não diagnóstico fechado."
+  },
+
+  "limitesDeCopy": {
+    "palavrasLeitura": 120,
+    "palavrasSinal": 11,
+    "palavrasFraseMomento": 10,
+    "palavrasFraseModulo": 9,
+    "palavrasPrimeiraAcao": 20,
+    "porque": "A leitura inteira cabe em 120 palavras. Estes tetos por biblioteca são o que garante isso mesmo na pior combinação possível — sem eles, uma revisão de copy estoura o limite em silêncio."
+  },
+
+  "frasesMomento": {
+    "PRE_ABERTURA": { "badge": "PRÉ-ABERTURA", "frase": "Ainda dá pra acertar antes de a conta chegar." },
+    "SOBREVIVENCIA": { "badge": "SOBREVIVÊNCIA", "frase": "Tem furo no casco. Primeiro a gente tapa o furo." },
+    "ESTABILIZACAO": { "badge": "ESTABILIZAÇÃO", "frase": "A casa vende. Falta ela rodar sem sustos." },
+    "CRESCIMENTO": { "badge": "CRESCIMENTO", "frase": "Base firme. Agora é hora de puxar o crescimento." },
+    "ESCALA": { "badge": "ESCALA", "frase": "Já é rede. O jogo agora é padrão e sistema." }
+  },
+
+  "sinais": [
+    { "id": "prejuizo_recente", "prioridade": 1, "texto": "Os últimos meses fecharam no vermelho. Estancar vem antes de crescer." },
+    { "id": "resultado_no_escuro", "prioridade": 2, "texto": "Você não sabe se deu lucro. A casa manda em você." },
+    { "id": "cmv_desconhecido", "prioridade": 3, "texto": "Você não sabe seu CMV. Sem esse número, corte vira chute." },
+    { "id": "sem_dre", "prioridade": 4, "texto": "Sem DRE todo mês, o resultado chega tarde demais." },
+    { "id": "margem_desconhecida", "prioridade": 5, "texto": "Sem margem por prato, tem item seu trabalhando de graça." },
+    { "id": "pre_abertura", "prioridade": 6, "texto": "Você ainda vai abrir. Acertar agora sai muito mais barato." },
+    { "id": "dono_na_operacao", "prioridade": 7, "texto": "Você vive dentro da operação. Ninguém olha o negócio de fora." },
+    { "id": "sem_gerente", "prioridade": 8, "texto": "Sem gerente, toda decisão passa por você. Até as pequenas." },
+    { "id": "nota_baixa", "prioridade": 9, "texto": "Sua nota no app está abaixo do que abre porta." },
+    { "id": "dependencia_ifood", "prioridade": 10, "texto": "Muito do faturamento entra por app. O canal manda na margem." },
+    { "id": "cancelamento_diario", "prioridade": 11, "texto": "Erro de pedido todo dia não é azar, é processo faltando." },
+    { "id": "rotatividade_alta", "prioridade": 12, "texto": "Equipe girando alto é treinar do zero e pagar duas vezes." },
+    { "id": "sem_ficha_tecnica", "prioridade": 13, "texto": "Sem ficha técnica, cada um monta o prato do seu jeito." },
+    { "id": "sem_treinamento", "prioridade": 14, "texto": "Sem processo de treino, o padrão morre no primeiro sábado cheio." },
+    { "id": "campanha_sem_retorno", "prioridade": 15, "texto": "Campanha sem retorno medido não é marketing, é torcida." },
+    { "id": "gestao_no_caderno", "prioridade": 16, "texto": "A casa roda no caderno. Dá pra uma loja, não duas." },
+    { "id": "sem_base_clientes", "prioridade": 17, "texto": "Você não tem a base dos clientes. Toda venda recomeça." },
+    { "id": "nota_desconhecida", "prioridade": 18, "texto": "Você não acompanha sua nota. Ela decide quem te vê." },
+    { "id": "avaliacoes_sem_resposta", "prioridade": 19, "texto": "Avaliação sem resposta é cliente falando sozinho, com plateia." },
+    { "id": "cmv_aproximado", "prioridade": 20, "texto": "Ter ideia do CMV não fecha mês. Ideia não é número." },
+    { "id": "dre_intermitente", "prioridade": 21, "texto": "DRE de vez em quando mostra contorno, não mostra decisão." },
+    { "id": "sem_fidelidade", "prioridade": 22, "texto": "Não existe motivo pro cliente voltar além da fome." },
+    { "id": "sem_fotos", "prioridade": 23, "texto": "Cardápio sem foto boa é prato que ninguém escolhe." },
+    { "id": "rede_em_formacao", "prioridade": 24, "texto": "Com essa quantidade de lojas, o que segura é padrão." },
+
+    { "id": "casa_organizada", "prioridade": 25, "texto": "Casa organizada. Daqui o ganho vem de escolha, não de conserto." },
+    { "id": "sem_delivery", "prioridade": 26, "texto": "Você não vende por app. É escolha ou porta fechada?" },
+    { "id": "foco_no_que_pediu", "prioridade": 27, "texto": "Você já sabe onde dói. Metade do trabalho é essa clareza." },
+    { "id": "momento_define", "prioridade": 28, "texto": "Seu momento já dá o roteiro. A gente começa por ele." },
+    { "id": "proxima_semana", "prioridade": 29, "texto": "Dá pra sair da call com uma tarefa pra semana." }
+  ],
+
+  "primeirasAcoes": {
+    "vendas_caindo": "Lista os dez pratos mais vendidos do mês passado e compara com o mês anterior. A queda tem nome.",
+    "margem_apertada": "Escolhe o prato que mais sai. Soma o custo de cada ingrediente dele hoje. Compara com o preço.",
+    "nao_sei_numeros": "Pega as notas de compra dos últimos trinta dias e soma. Esse total dividido pelo que vendeu é seu CMV.",
+    "equipe": "Escreve o passo a passo de uma única tarefa do salão. Entrega pra alguém executar sem te perguntar nada.",
+    "ifood_nao_performa": "Abre sua loja no app como cliente e conta os toques até fechar um pedido. Toque a mais, venda perdida.",
+    "operacao_baguncada": "Anota hoje as cinco decisões que só você pôde tomar. Amanhã a gente vê quais viram processo.",
+    "custos_altos": "Separa as três maiores notas de fornecedor do mês. Liga pros três e pede prazo e preço melhor.",
+    "cardapio_grande": "Marca no cardápio os itens que quase não saem. Cada um deles ocupa estoque, geladeira e cabeça.",
+    "poucos_voltam": "Pega os pedidos da última semana e separa os telefones repetidos. Essa lista curta é sua base.",
+    "abrir_nova_loja": "Escreve o que a loja atual só funciona porque você está lá. Isso não escala pra segunda.",
+    "abrir_primeira_loja": "Antes do ponto, escreve o cardápio de abertura com dez itens. Estrutura nasce do cardápio, não do contrário.",
+    "marketing": "Escolhe um prato e fotografa ele com luz de janela, sem filtro. Publica hoje contando quem faz.",
+    "outra": "Escreve num papel a pergunta que você não consegue responder sobre a sua loja. É por ali que começamos."
+  },
+
+  "cta": "Agendar minha conversa de 30 min com o Rodolfo"
+}

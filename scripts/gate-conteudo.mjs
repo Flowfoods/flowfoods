@@ -26,11 +26,25 @@ const PROIBIDOS = [
   { termo: 'garantido', motivo: 'promessa de resultado' },
 ];
 
+/**
+ * Arquivo de teste NÃO é conteúdo do site — e tratar como se fosse inverte o portão.
+ *
+ * O motor do Diagnóstico tem a própria guarda de termos proibidos, e o teste dela usa
+ * "Resultado garantido em trinta dias." de propósito, para afirmar que a frase é RECUSADA.
+ * Varrendo esse arquivo, este portão reprovava justamente a prova de que a outra guarda
+ * funciona: lia o flagrante como se fosse o crime.
+ *
+ * O que se protege aqui é o texto que CHEGA no navegador de alguém. Teste não é publicado.
+ */
+const eTeste = (nome) => /\.(test|spec)\.(tsx?|mdx?)$/.test(nome);
+
 const arquivos = [];
+let pulados = 0;
 (function varrer(dir) {
   for (const nome of readdirSync(dir)) {
     const caminho = join(dir, nome);
     if (statSync(caminho).isDirectory()) varrer(caminho);
+    else if (eTeste(nome)) pulados++;
     else if (/\.(tsx?|mdx?)$/.test(nome)) arquivos.push(caminho);
   }
 })('src');
@@ -54,4 +68,7 @@ if (falhas > 0) {
   console.error(`\n  ${falhas} ocorrência(s) de conteúdo proibido.\n`);
   process.exit(1);
 }
-console.log(`  Portão de conteúdo limpo — ${arquivos.length} arquivos varridos.`);
+console.log(
+  `  Portão de conteúdo limpo — ${arquivos.length} arquivos varridos` +
+    ` (${pulados} de teste pulados: teste não é publicado).`,
+);
