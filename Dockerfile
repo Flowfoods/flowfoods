@@ -57,6 +57,9 @@ COPY --from=build /app/prisma ./prisma
 COPY --from=build /app/worker ./worker
 COPY --from=build /app/src ./src
 COPY --from=build /app/tsconfig.json ./tsconfig.json
+# Rodam no start dos containers: exportar-segredos.sh (fonte dos segredos do
+# volume) e imprimir-setup.mjs (o link de primeiro acesso no log).
+COPY --from=build /app/scripts ./scripts
 
 # Não roda como root. Se um dia alguém achar RCE no app, o processo não é dono
 # do container.

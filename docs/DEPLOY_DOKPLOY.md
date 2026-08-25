@@ -1,32 +1,15 @@
 # Deploy no Dokploy
 
 Eu não alcanço o Dokploy desta sessão — o proxy de saída recusa o túnel para o
-domínio e para a VPS (verificado por `curl` e por Chromium). Então o que dá para
-fazer é reduzir o seu trabalho ao mínimo: **um arquivo já pronto e um comando.**
+domínio e para a VPS (verificado por `curl` e por Chromium). Então o deploy
+ficou **zero-config**: os segredos se geram sozinhos no primeiro boot, e o seu
+trabalho é apontar e clicar.
 
 ---
 
-## Caminho curto — Docker Compose (recomendado)
+## Caminho curto — Docker Compose, sem configurar nada
 
-Sobe Postgres, `web` e `worker` de uma vez. A migration roda sozinha no start.
-
-### 1. Gere as variáveis
-
-No seu terminal, dentro do repositório:
-
-```bash
-./scripts/gerar-env.sh https://consultoriaflowfoods.com.br
-```
-
-Ele imprime o bloco inteiro, com os segredos já sorteados. **Copie da tela** —
-o script não grava arquivo nenhum de propósito. Guarde o `ADMIN_SETUP_TOKEN`
-à mão: você vai usá-lo uma vez, no passo 4.
-
-Deixe `EVOLUTION_API_URL` e `EVOLUTION_API_KEY` **vazias** por enquanto. Sem
-elas o portal entra em dry-run: sobe, funciona, e não envia nada. É o jeito
-seguro de treinar o fluxo antes de existir número conectado.
-
-### 2. Crie a aplicação
+### 1. Crie a aplicação
 
 No projeto `flowfoods` → **Create Application** → tipo **Docker Compose**:
 
@@ -36,39 +19,71 @@ No projeto `flowfoods` → **Create Application** → tipo **Docker Compose**:
 | Branch | `claude/rodolfo-barney-cadence-bc7dcy` |
 | Compose path | `docker-compose.yml` |
 
-Em **Environment**, cole o bloco do passo 1.
+**Não precisa preencher Environment nenhum.** No primeiro boot, o serviço
+`segredos` sorteia todos os tokens e guarda num volume — eles sobrevivem a
+redeploy e nunca passam por chat, arquivo ou área de transferência.
 
-> **Aponte para a branch, não para `master`.** O site institucional sai de
-> `master` e não foi tocado — assim você testa sem risco nenhum para o que está
-> no ar. Configure um domínio de teste (ex.: `staging.consultoriaflowfoods.com.br`)
-> apontando para o serviço `web`, porta 3000.
+> Aponte para a **branch**, não para `master`: o site institucional sai de
+> `master` e não foi tocado. Configure um domínio (produção ou um
+> `staging.consultoriaflowfoods.com.br`) no serviço **web**, porta **3000**.
+>
+> Se usar um domínio diferente de `consultoriaflowfoods.com.br`, defina UMA
+> variável no painel: `NEXTAUTH_URL=https://<seu-dominio>` — o login redireciona
+> por ela.
 
-### 3. Deploy
+### 2. Deploy
 
-O `web` só inicia depois que o Postgres responde, e roda `prisma migrate deploy`
-antes de subir o Next. O `worker` sobe junto e fica dormindo — com
-`disparoAtivo=false` (o padrão) ele não envia nada.
+Sobem quatro serviços, nesta ordem: `segredos` (gera e sai) → `postgres`
+(espera ficar saudável) → `web` (roda a migration e sobe o Next) → `worker`
+(fica dormindo; com `disparoAtivo=false`, o padrão, não envia nada).
 
-### 4. Sua senha
+### 3. Abra o LOG do serviço `web`
+
+Enquanto não existir admin, o log imprime um bloco assim:
 
 ```
-https://<seu-dominio>/rodolfo/setup?token=<ADMIN_SETUP_TOKEN>
+────────────────────────────────────────────────────────────────
+  PRIMEIRO ACESSO — abra este endereço para definir sua senha:
+
+  https://<dominio>/rodolfo/setup?token=<token>
+────────────────────────────────────────────────────────────────
 ```
 
-Define a senha; o token para de valer. Depois, `/rodolfo/login`.
+Clique, defina a senha, pronto. O token morre na hora e a mensagem some dos
+próximos boots. (O log do Dokploy só é visível para quem já administra o
+painel — e o token é de uso único.)
 
-### 5. Confira
+### 4. Confira
 
 ```bash
 ./scripts/verificar-deploy.sh https://<seu-dominio>
 ```
+
+### Quando o WhatsApp entrar
+
+No painel do serviço, preencha `EVOLUTION_API_URL` e `EVOLUTION_API_KEY` e
+redeploy. O `EVOLUTION_WEBHOOK_SECRET` já existe no volume desde o primeiro
+boot — para configurar o webhook na Evolution, pegue o valor no terminal do
+container `web`:
+
+```bash
+cat /segredos/webhook_secret
+```
+
+O mesmo vale para o token do `--push` do ledsflowfoods:
+`cat /segredos/leads_import_token`.
+
+Qualquer variável definida no painel **vence** a do volume — é assim que você
+troca um token sem mexer em volume.
 
 ---
 
 ## Caminho longo — três serviços na mão
 
 Use se preferir controlar cada peça, ou se o compose falhar. É o mesmo
-resultado, com mais cliques.
+resultado, com mais cliques. Para gerar o bloco de Environment de uma vez:
+`./scripts/gerar-env.sh https://<seu-dominio>` imprime tudo com os segredos já
+sorteados.
 
 ## 1. Postgres
 

@@ -13,7 +13,6 @@ node_modules
 # Nada disso roda em producao.
 tests
 docs
-scripts
 *.md
 !README.md
 

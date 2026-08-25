@@ -1,30 +1,55 @@
-# Stack completa do Espaço do Rodolfo + Barney.
+# Stack completa do Espaço do Rodolfo + Barney — ZERO configuração obrigatória.
 #
-# No Dokploy: Create Application → tipo **Docker Compose** → aponte para este
-# repositório e para a branch. Sobe os três serviços de uma vez, em vez de
-# criar Postgres, web e worker separados na mão.
+# No Dokploy: Create Application → tipo **Docker Compose** → repositório
+# `Flowfoods/flowfoods`, branch do Barney, compose path `docker-compose.yml`
+# → Deploy. Só isso.
 #
-# As variáveis vêm do painel do Dokploy (aba Environment). Nada de segredo aqui
-# dentro — este arquivo está no Git.
+# Os segredos são gerados NO PRIMEIRO BOOT pelo serviço `segredos` e guardados
+# num volume — sobrevivem a redeploy e nunca passam por chat, arquivo no Git ou
+# área de transferência. O link de primeiro acesso (com o token de setup)
+# aparece no LOG do serviço `web`, que o Rodolfo abre pelo painel.
 #
-# Ordem garantida pelo `depends_on` + healthcheck: o `web` só começa depois que
-# o Postgres aceita conexão, e a migration roda no start do `web` antes do
-# Next subir. Sem isso, o primeiro deploy erra em toda tela que lê dados.
+# Qualquer variável definida no painel do Dokploy VENCE o volume (a precedência
+# está em scripts/exportar-segredos.sh). Ou seja: zero-config por padrão,
+# override por painel quando precisar — as EVOLUTION_* entram assim mais tarde.
+#
+# Ordem de subida: segredos → postgres (healthcheck) → web/worker. O `web` roda
+# a migration antes do Next; sem isso o primeiro deploy erraria em toda tela
+# que lê dados.
 
 services:
+  # Gera os segredos que ainda não existem e termina. Idempotente: num volume
+  # já populado, não toca em nada — redeploy não rotaciona segredo.
+  segredos:
+    image: alpine:3.20
+    command: >
+      sh -c 'set -e; cd /segredos;
+      for f in postgres_password nextauth_secret admin_setup_token leads_import_token webhook_secret; do
+      if [ ! -s "$$f" ]; then head -c 32 /dev/urandom | od -An -tx1 | tr -d " \n" > "$$f"; echo "[segredos] gerado: $$f"; fi;
+      done;
+      chmod 644 postgres_password nextauth_secret admin_setup_token leads_import_token webhook_secret;
+      echo "[segredos] prontos"'
+    volumes:
+      - segredos:/segredos
+    restart: 'no'
+
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    depends_on:
+      segredos:
+        condition: service_completed_successfully
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-flowfoods}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no Dokploy}
-      POSTGRES_DB: ${POSTGRES_DB:-flowfoods}
+      POSTGRES_USER: flowfoods
+      POSTGRES_DB: flowfoods
+      # A imagem oficial lê a senha de arquivo — é o que liga o Postgres ao
+      # mesmo segredo que o web usa para montar a DATABASE_URL.
+      POSTGRES_PASSWORD_FILE: /segredos/postgres_password
     volumes:
       - postgres-data:/var/lib/postgresql/data
+      - segredos:/segredos:ro
     healthcheck:
-      # `pg_isready` responde antes de o banco aceitar login de verdade; o -U
-      # força a checagem com o usuário real.
-      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-flowfoods} -d ${POSTGRES_DB:-flowfoods}']
+      test: ['CMD-SHELL', 'pg_isready -U flowfoods -d flowfoods']
       interval: 5s
       timeout: 5s
       retries: 20
@@ -36,32 +61,41 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
+      segredos:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
-    # A migration roda no boot, como manda o plano. É só aditiva, então rodar de
-    # novo num banco já migrado é no-op.
-    command: sh -c "npx prisma migrate deploy && npm start"
+    # 1. carrega os segredos (painel vence o volume) · 2. migration (só
+    # aditiva; em banco migrado é no-op) · 3. imprime o link de setup no log
+    # enquanto não houver admin · 4. sobe o Next.
+    command: >
+      sh -c '. ./scripts/exportar-segredos.sh
+      && npx prisma migrate deploy
+      && node scripts/imprimir-setup.mjs
+      && npm start'
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-flowfoods}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-flowfoods}?schema=public}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?defina NEXTAUTH_SECRET no Dokploy}
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-https://consultoriaflowfoods.com.br}
-      ADMIN_SETUP_TOKEN: ${ADMIN_SETUP_TOKEN:?defina ADMIN_SETUP_TOKEN no Dokploy}
+      # Passthrough do painel. Vazias = dry-run (não envia nada) e sem IA.
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-}
+      DATABASE_URL: ${DATABASE_URL:-}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-}
+      ADMIN_SETUP_TOKEN: ${ADMIN_SETUP_TOKEN:-}
       LEADS_IMPORT_TOKEN: ${LEADS_IMPORT_TOKEN:-}
-      # Vazias = o portal entra em DRY-RUN e não envia nada. É seguro subir assim.
       EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
       EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-flowfoods-prospeccao}
       EVOLUTION_NOTIFY_INSTANCE: ${EVOLUTION_NOTIFY_INSTANCE:-}
       EVOLUTION_WEBHOOK_SECRET: ${EVOLUTION_WEBHOOK_SECRET:-}
-      RODOLFO_WHATSAPP: ${RODOLFO_WHATSAPP:-}
+      RODOLFO_WHATSAPP: ${RODOLFO_WHATSAPP:-5521996416060}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      AI_DAILY_BUDGET_BRL: ${AI_DAILY_BUDGET_BRL:-}
+      AI_DAILY_BUDGET_BRL: ${AI_DAILY_BUDGET_BRL:-5}
       USD_BRL: ${USD_BRL:-5.40}
+    volumes:
+      - segredos:/segredos:ro
     expose:
       - '3000'
-    # O Dokploy injeta os labels do Traefik quando você configura o domínio no
-    # painel. Não escreva label de roteamento aqui — duas fontes de verdade
-    # para o mesmo host é como se perde um domínio.
+    # O domínio se configura no painel do Dokploy (serviço web, porta 3000).
+    # Não escreva label de Traefik aqui — duas fontes de verdade para o mesmo
+    # host é como se perde um domínio.
 
   worker:
     build:
@@ -69,20 +103,26 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
+      segredos:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
-    command: npm run worker
+    command: >
+      sh -c '. ./scripts/exportar-segredos.sh && npm run worker'
     environment:
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-flowfoods}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-flowfoods}?schema=public}
+      DATABASE_URL: ${DATABASE_URL:-}
       EVOLUTION_API_URL: ${EVOLUTION_API_URL:-}
       EVOLUTION_API_KEY: ${EVOLUTION_API_KEY:-}
       EVOLUTION_INSTANCE: ${EVOLUTION_INSTANCE:-flowfoods-prospeccao}
       EVOLUTION_NOTIFY_INSTANCE: ${EVOLUTION_NOTIFY_INSTANCE:-}
-      RODOLFO_WHATSAPP: ${RODOLFO_WHATSAPP:-}
+      RODOLFO_WHATSAPP: ${RODOLFO_WHATSAPP:-5521996416060}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      AI_DAILY_BUDGET_BRL: ${AI_DAILY_BUDGET_BRL:-}
+      AI_DAILY_BUDGET_BRL: ${AI_DAILY_BUDGET_BRL:-5}
       USD_BRL: ${USD_BRL:-5.40}
+    volumes:
+      - segredos:/segredos:ro
     # Sem porta e sem domínio: o worker não atende requisição nenhuma.
 
 volumes:
   postgres-data:
+  segredos:
