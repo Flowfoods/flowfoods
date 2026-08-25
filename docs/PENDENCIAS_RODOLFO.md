@@ -22,7 +22,8 @@ Nada sobe sem as três primeiras.
 |---|---|---|
 | `DATABASE_URL` | Postgres | do serviço no Dokploy |
 | `NEXTAUTH_SECRET` | Sessão | `openssl rand -hex 32` |
-| `ADMIN_SETUP_TOKEN` | Sua senha + `--push` do ledsflowfoods | `openssl rand -hex 32` |
+| `ADMIN_SETUP_TOKEN` | Definir sua senha, uma vez | `openssl rand -hex 32` |
+| `LEADS_IMPORT_TOKEN` | `--push` do ledsflowfoods (separado de propósito) | `openssl rand -hex 32` |
 | `EVOLUTION_API_URL` / `_API_KEY` | Disparo | da Evolution |
 | `EVOLUTION_WEBHOOK_SECRET` | Autenticar o webhook | `openssl rand -hex 32` |
 | `RODOLFO_WHATSAPP` | Te notificar | E.164 sem "+" |

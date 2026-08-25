@@ -21,29 +21,23 @@ redundante; pode sair num commit à parte quando o Rodolfo confirmar.
 
 ---
 
-## 🔴 Achado #2 — O `@` do Instagram na abordagem não bate com o do site
+## ✅ Achado #2 — RESOLVIDO: o `@` do Instagram
 
-**É o achado de maior impacto operacional desta rodada.**
+`mensagens.md` e o Master Prompt diziam `@rrodolfoac`; o site em produção dizia
+`flowfoods.rj`. Toda mensagem de abordagem carrega essa linha, então o handle
+errado mandaria o dono do restaurante para o lugar errado bem no ponto em que
+ele foi conferir quem é o Rodolfo.
 
-| Fonte | Perfil |
-|---|---|
-| `ledsflowfoods/references/mensagens.md` (fonte da verdade dos textos) | **`@rrodolfoac`** |
-| Master Prompt (bloco "Fatos") | **`@rrodolfoac`** |
-| `src/lib/constants.ts` do site em produção | **`flowfoods.rj`** |
+**Confirmado por ele em 25/08: é `@rrodolfoac`.** Corrigido em `constants.ts`
+(rodapé e CTA) e em `seo-schema.ts` (o `sameAs` do JSON-LD, que é o que o Google
+usa para casar a entidade com o perfil).
 
-Toda mensagem de abordagem carrega *"Se quiser me conhecer antes de responder:
-@rrodolfoac no Instagram e consultoriaflowfoods.com.br"*. Se o perfil comercial
-correto for `@flowfoods.rj`, **30 mensagens por dia mandam o dono do restaurante
-para o lugar errado** — e a prova social, penúltimo bloco da mensagem, vira um
-beco sem saída.
-
-**O que foi feito:** mantive `@rrodolfoac`, porque é o que as duas fontes
-normativas dizem. **Não** alterei `constants.ts` — mexer no site institucional
-por dedução seria pior que a inconsistência.
-
-**Ação do Rodolfo:** confirmar qual perfil vai na abordagem. Se for
-`@flowfoods.rj`, a correção começa em `mensagens.md` (a fonte) e desce para
-`render.ts`. Item 3 de `PENDENCIAS_RODOLFO.md`.
+Ao abrir o `seo-schema` apareceram mais três valores divergentes na mesma
+estrutura: o LinkedIn apontava para `rodolfo-flowfoods` (o rodapé e o Master
+Prompt dizem `rodolfo-cavalcante`) e o domínio era `flowfoods.com.br` em `@id` e
+`url`, sendo que o site roda em `consultoriaflowfoods.com.br`. Mesma classe de
+defeito: contato duplicado em dois arquivos, divergindo com o tempo. O schema
+passa a ler de `CONTACT_INFO` — uma fonte só.
 
 ---
 
@@ -143,6 +137,79 @@ abordagem fria para desconhecido.
 
 ---
 
+## 🔴 Achado #10 — O dry-run inutilizava o lote do dia
+
+**O pior bug encontrado, e o fluxo do próprio RUNBOOK o acionava.**
+
+O dry-run persiste a mensagem no outbox para o Rodolfo poder ler o texto como
+sairia. Só que usava o **mesmo `dedupKey`** do envio real. Resultado: conferir o
+lote antes de aprovar ocupava a chave do dia, e o envio de verdade era recusado
+por dedup — silenciosamente, com a fila reportando "nada elegível".
+
+E o RUNBOOK manda rodar dry-run antes de aprovar, todo dia.
+
+Corrigido com `dedupKeyEnvioDryRun` (prefixo `dry:`), com teste de regressão que
+simula e depois envia de verdade o mesmo lead/toque/dia.
+
+---
+
+## 🔴 Achado #11 — O dry-run avançava a cadência de verdade
+
+Da mesma família. Depois de simular, `registrarEnvioNoLead` rodava: o lead virava
+`EM_CADENCIA`, o enrollment marcava `toqueAtual: D0` e agendava o D+4 — **sem
+nada ter sido enviado**. O D0 real nunca mais seria proposto.
+
+Agora o dry-run só grava um `LeadEvent` do tipo `dry_run`. Simular não toca no
+estado da cadência.
+
+---
+
+## 🟡 Achado #12 — Um lead ruim travava o lote inteiro
+
+`dispararProximo` fazia `return` em qualquer falha. Um lead com `avaliacoes: 0`
+reprova no `R5_GANCHO_COM_DADO_REAL` — e a fila do dia parava ali, sem tentar os
+29 seguintes.
+
+O `ResultadoEnvio` ganhou `escopo: 'ITEM' | 'GLOBAL'`. Falha do item (validador,
+dedup) → pula para o próximo. Falha do número ou do dia (teto, janela,
+stop-loss, Evolution fora) → para, porque insistir só somaria falha. Seis testes
+cobrem a classificação.
+
+---
+
+## 🟡 Achado #13 — O webhook inflava a taxa de entrega
+
+`tratarUpdate` buscava por `evolutionMessageId` sem filtrar direção. Mensagens
+**recebidas** também gravam esse id, então um `MESSAGES_UPDATE` de uma resposta
+marcaria a mensagem de entrada como ENTREGUE e somaria em `DailyCounter.entregues`.
+
+Consequência: a taxa de entrega passa de 100% e o stop-loss — que existe
+justamente para perceber bloqueio silencioso — fica cego. Corrigido com
+`direction: 'OUT'` na busca.
+
+---
+
+## 🟡 Achado #14 — O fallback do próximo toque reenviava a abertura
+
+`c.toqueAtual === 'D0' ? 'D4' : c.toqueAtual === 'D4' ? 'D10' : 'D0'` — um
+enrollment com `toqueAtual: 'D10'` caía no `else` e recebia **D0 de novo**. Hoje
+o `status: CONCLUIDA` impede isso na prática, mas é uma trava dependendo de outra.
+
+Trocado por uma tabela `PROXIMO_TOQUE` onde a ausência de próximo é explícita.
+
+---
+
+## 🟢 Achado #15 — Token de import compartilhado com o do admin
+
+`/api/leads/import` usava o `ADMIN_SETUP_TOKEN`. Esse segredo viaja num script
+de terminal (o `--push`) e acaba em histórico de shell; o token que define a
+senha do admin não deve compartilhar essa exposição.
+
+Agora existe `LEADS_IMPORT_TOKEN`, com fallback para o antigo para não quebrar
+quem ainda não separou.
+
+---
+
 ## Estado das fases
 
 | Fase | Estado | Observação |
@@ -160,8 +227,8 @@ abordagem fria para desconhecido.
 ## Verificação
 
 ```
-173 testes · 8 arquivos · todos verdes
+184 testes · 9 arquivos · todos verdes
 tsc --noEmit        · limpo
 next build          · compila, 12 rotas, zero erro de import
-migration inicial   · 441 linhas, ZERO DROPs (só aditiva)
+migration inicial   · 442 linhas, ZERO DROPs (só aditiva)
 ```

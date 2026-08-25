@@ -48,6 +48,7 @@ para o Dokploy:
 ```bash
 openssl rand -hex 32   # NEXTAUTH_SECRET
 openssl rand -hex 32   # ADMIN_SETUP_TOKEN
+openssl rand -hex 32   # LEADS_IMPORT_TOKEN
 openssl rand -hex 32   # EVOLUTION_WEBHOOK_SECRET
 ```
 
@@ -63,7 +64,8 @@ seções são obrigatórias; o resto pode entrar depois.
 DATABASE_URL=postgresql://...        # do passo 1
 NEXTAUTH_SECRET=...                  # openssl
 NEXTAUTH_URL=https://consultoriaflowfoods.com.br
-ADMIN_SETUP_TOKEN=...                # openssl
+ADMIN_SETUP_TOKEN=...                # openssl — so para definir sua senha
+LEADS_IMPORT_TOKEN=...               # openssl — separado: viaja em script
 
 # WhatsApp — sem elas o portal funciona em DRY-RUN (não envia nada)
 EVOLUTION_API_URL=https://sua-evolution/
@@ -100,7 +102,7 @@ Ou rode uma vez no terminal do container:
 npm run db:migrate
 ```
 
-São **441 linhas, só CREATE** — nenhum DROP. Roda em banco vazio sem risco.
+São **442 linhas, só CREATE** — nenhum DROP. Roda em banco vazio sem risco.
 
 > **Nunca** rode `prisma migrate reset`. Apagaria a tabela `OptOut`, e opt-out
 > apagado é obrigação de LGPD quebrada com gente que já pediu para sair.

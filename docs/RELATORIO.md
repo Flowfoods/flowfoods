@@ -28,7 +28,7 @@ Redis e sem rede.
 
 ### Persistência e integração (`src/lib/rodolfo/`, `src/lib/whatsapp/`)
 
-- `schema.prisma` com 17 modelos + migration inicial (441 linhas, **zero DROPs**)
+- `schema.prisma` com 17 modelos + migration inicial (442 linhas, **zero DROPs**)
 - `estado.ts` — contadores do dia, rampa, falhas consecutivas, tudo em São Paulo
 - `config.ts` — `apertar()` na escrita **e** na leitura
 - `outbox.ts` — repositório + fábrica do serviço, com dry-run automático
@@ -62,10 +62,10 @@ Mobile-first, sobre chão preto para não se confundir com o site público.
 ## Evidências
 
 ```
-173 testes · 8 arquivos · todos verdes
+184 testes · 9 arquivos · todos verdes
 tsc --noEmit  · limpo
 next build    · compila, 12 rotas, zero erro de import
-migration     · 441 linhas, ZERO DROPs
+migration     · 442 linhas, ZERO DROPs
 ```
 
 Os 11 testes obrigatórios do Master Prompt, um a um:
@@ -82,7 +82,7 @@ Os 11 testes obrigatórios do Master Prompt, um a um:
 | Stop-loss: falhas, entrega, instância | `tetos.test.ts` |
 | `disparoAtivo=false` impede envio | `tetos.test.ts` · `service-inbound.test.ts` |
 | Config não sobe tetos | `config.test.ts` · `janela.test.ts` · `tetos.test.ts` |
-| Dry-run com zero chamadas | `service-inbound.test.ts` (mock com asserção) |
+| Dry-run com zero chamadas | `service-inbound.test.ts` · `dry-run-escopo.test.ts` |
 
 ---
 

@@ -31,10 +31,18 @@ const corpoSchema = z.object({
 });
 
 export async function POST(req: Request) {
-  const esperado = process.env.ADMIN_SETUP_TOKEN ?? '';
+  // Token PRÓPRIO da importação, separado do `ADMIN_SETUP_TOKEN`.
+  //
+  // Este segredo viaja num script de terminal (o `--push` do ledsflowfoods) e
+  // acaba em histórico de shell e em variável de ambiente de máquina de
+  // trabalho. O token do setup do admin não pode compartilhar essa exposição.
+  //
+  // O fallback existe só para não quebrar quem ainda não separou; a mensagem de
+  // erro e o `.env.example` empurram para a variável certa.
+  const esperado = process.env.LEADS_IMPORT_TOKEN || process.env.ADMIN_SETUP_TOKEN || '';
   if (!esperado) {
     return NextResponse.json(
-      { erro: 'ADMIN_SETUP_TOKEN não configurado no servidor.' },
+      { erro: 'LEADS_IMPORT_TOKEN não configurado no servidor.' },
       { status: 503 },
     );
   }

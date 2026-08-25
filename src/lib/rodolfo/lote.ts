@@ -15,7 +15,7 @@ import { DateTime } from 'luxon';
 import { prisma } from '@/lib/db';
 import { TOQUES, type Toque } from '@/lib/barney/regras';
 import { agendarToque } from '@/lib/barney/janela';
-import { dedupKeyEnvio } from '@/lib/barney/dedup';
+import { dedupKeyEnvio, dedupKeyEnvioDryRun } from '@/lib/barney/dedup';
 import { renderizar, SEED_TEMPLATES } from '@/lib/barney/render';
 import { podeEnviar } from '@/lib/barney/tetos';
 import { agoraSP, diaSP, montarEstadoEnvio } from './estado';
@@ -23,6 +23,19 @@ import { lerConfig } from './config';
 import { criarWhatsAppService } from './outbox';
 
 export const SEQUENCIA_PADRAO = 'cadencia-padrao';
+
+/**
+ * Qual toque vem depois, e em quantos dias a partir de HOJE.
+ *
+ * Tabela unica, em vez de ternarios espalhados. O ternario anterior tinha um
+ * `else` que devolvia 'D0': um enrollment que chegasse aqui com toqueAtual
+ * 'D10' reenviaria a ABERTURA para quem ja completou a cadencia.
+ * `undefined` = a cadencia acabou. Tres toques e para.
+ */
+const PROXIMO_TOQUE: Partial<Record<Toque, { toque: Toque; emDias: number }>> = {
+  D0: { toque: 'D4', emDias: 4 },
+  D4: { toque: 'D10', emDias: 6 },
+};
 
 /** Cria a sequência D0/D+4/D+10 e os templates do seed. Idempotente. */
 export async function garantirSeed(): Promise<void> {
@@ -136,14 +149,22 @@ export async function proporLote(ref: DateTime = agoraSP()): Promise<ItemPropost
   );
 
   const itens: ItemProposto[] = [
-    ...continuacoes.map((c) => ({
-      leadId: c.leadId,
-      toque: (c.toqueAtual === 'D0' ? 'D4' : c.toqueAtual === 'D4' ? 'D10' : 'D0') as Toque,
-      nome: c.lead.restaurante ?? c.lead.nome,
-      bairro: c.lead.bairro,
-      tier: c.lead.tier,
-      scoreBase: c.lead.scoreBase,
-    })),
+    // `toqueAtual` nulo = enrollment recem-criado e ainda sem envio: comeca no D0.
+    // Quem ja esta no D10 nao tem proximo e e descartado aqui — sem isso, um
+    // enrollment que ficasse ATIVA por engano voltaria para a abertura.
+    ...continuacoes
+      .map((c) => ({ c, proximo: c.toqueAtual ? PROXIMO_TOQUE[c.toqueAtual] : { toque: 'D0' as Toque, emDias: 0 } }))
+      .filter((x): x is { c: (typeof continuacoes)[number]; proximo: { toque: Toque; emDias: number } } =>
+        x.proximo !== undefined,
+      )
+      .map(({ c, proximo }) => ({
+        leadId: c.leadId,
+        toque: proximo.toque,
+        nome: c.lead.restaurante ?? c.lead.nome,
+        bairro: c.lead.bairro,
+        tier: c.lead.tier,
+        scoreBase: c.lead.scoreBase,
+      })),
     ...novos
       .filter((n) => !optOuts.has(n.telefoneNormalizado!))
       .slice(0, espaco)
@@ -274,8 +295,20 @@ export async function dispararProximo(
     });
     if (saiu) continue;
 
-    const dedupKey = dedupKeyEnvio(lead.id, item.toque, ref);
-    const jaSaiu = await prisma.message.findUnique({ where: { dedupKey } });
+    // Chave separada em dry-run: a simulação não pode ocupar o `dedupKey` do
+    // envio real, senão conferir o lote inutilizaria o dia.
+    const dedupKey = opts.dryRun
+      ? dedupKeyEnvioDryRun(lead.id, item.toque, ref)
+      : dedupKeyEnvio(lead.id, item.toque, ref);
+
+    // Um envio REAL já feito hoje também bloqueia a simulação: não faz sentido
+    // simular o que já saiu.
+    const jaSaiu = await prisma.message.findFirst({
+      where: {
+        dedupKey: { in: [dedupKey, dedupKeyEnvio(lead.id, item.toque, ref)] },
+      },
+      select: { id: true },
+    });
     if (jaSaiu) continue;
 
     const template = await prisma.template.findFirst({
@@ -309,12 +342,34 @@ export async function dispararProximo(
       manual: opts.manual,
     });
 
-    if (!r.ok) return { enviou: false, motivo: r.motivo, leadId: lead.id, toque: item.toque };
+    if (!r.ok) {
+      // Falha DESTE item (corpo reprovado no validador, por exemplo): pula para
+      // o próximo. Um lead com dado ruim não pode travar o lote do dia inteiro.
+      if (r.escopo === 'ITEM') continue;
+      // Falha do número ou do dia (teto, janela, stop-loss, Evolution fora):
+      // tentar o próximo só somaria falha.
+      return { enviou: false, motivo: r.motivo, leadId: lead.id, toque: item.toque };
+    }
 
-    await registrarEnvioNoLead(lead.id, item.toque, ref, r.simulado === true);
+    if (r.simulado) {
+      // Dry-run NÃO avança a cadência. Avançar aqui marcaria o lead como
+      // EM_CADENCIA no D0 e agendaria o D4 sem que nada tivesse saído — e o D0
+      // de verdade nunca mais seria proposto. Simular não pode mexer no estado
+      // real; só registra na timeline, para o Rodolfo ver que conferiu.
+      await prisma.leadEvent.create({
+        data: {
+          leadId: lead.id,
+          tipo: 'dry_run',
+          descricao: `${item.toque} simulado — nada foi enviado.`,
+          dados: { toque: item.toque },
+        },
+      });
+    } else {
+      await registrarEnvioNoLead(lead.id, item.toque, ref);
 
-    if (lote.status === 'APROVADO') {
-      await prisma.batch.update({ where: { id: lote.id }, data: { status: 'EM_ENVIO' } });
+      if (lote.status === 'APROVADO') {
+        await prisma.batch.update({ where: { id: lote.id }, data: { status: 'EM_ENVIO' } });
+      }
     }
 
     return { enviou: true, leadId: lead.id, toque: item.toque, simulado: r.simulado };
@@ -323,36 +378,36 @@ export async function dispararProximo(
   return { enviou: false, motivo: 'Nada elegível no lote de hoje.' };
 }
 
-/** Avança o enrollment e escreve a timeline depois de um envio aceito. */
-async function registrarEnvioNoLead(
-  leadId: string,
-  toque: Toque,
-  ref: DateTime,
-  simulado: boolean,
-): Promise<void> {
+/**
+ * Avança o enrollment e escreve a timeline depois de um envio REAL.
+ *
+ * Nunca é chamada em dry-run: simular não pode mexer no estado da cadência.
+ */
+async function registrarEnvioNoLead(leadId: string, toque: Toque, ref: DateTime): Promise<void> {
   const config = await lerConfig();
   const seq = await prisma.sequence.findUnique({ where: { nome: SEQUENCIA_PADRAO } });
   if (!seq) return;
 
-  const proximoToque = toque === 'D0' ? 'D4' : toque === 'D4' ? 'D10' : null;
-  const offset = proximoToque === 'D4' ? 4 : proximoToque === 'D10' ? 10 : null;
+  const proximo = PROXIMO_TOQUE[toque];
 
-  // O próximo toque é agendado a partir de HOJE com o offset restante, já
-  // deslizado para a janela útil.
-  const proximoEnvioEm =
-    offset === null ? null : agendarToque(ref, toque === 'D0' ? 4 : 6, config.janela).toJSDate();
+  // Agendado a partir de HOJE com o intervalo que FALTA (D0→D4 são 4 dias,
+  // D4→D10 são 6), já deslizado para a janela útil. Contar do D0 original daria
+  // datas no passado sempre que um toque atrasasse.
+  const proximoEnvioEm = proximo
+    ? agendarToque(ref, proximo.emDias, config.janela).toJSDate()
+    : null;
 
   await prisma.enrollment.upsert({
     where: { leadId_sequenceId: { leadId, sequenceId: seq.id } },
     create: {
       leadId,
       sequenceId: seq.id,
-      status: proximoToque ? 'ATIVA' : 'CONCLUIDA',
+      status: proximo ? 'ATIVA' : 'CONCLUIDA',
       toqueAtual: toque,
       proximoEnvioEm,
     },
     update: {
-      status: proximoToque ? 'ATIVA' : 'CONCLUIDA',
+      status: proximo ? 'ATIVA' : 'CONCLUIDA',
       toqueAtual: toque,
       proximoEnvioEm,
     },
@@ -364,8 +419,8 @@ async function registrarEnvioNoLead(
       data: {
         leadId,
         tipo: 'envio',
-        descricao: `${toque} ${simulado ? 'simulado (dry-run)' : 'enviado'}.`,
-        dados: { toque, simulado },
+        descricao: `${toque} enviado.`,
+        dados: { toque },
       },
     }),
   ]);

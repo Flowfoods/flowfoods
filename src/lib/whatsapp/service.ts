@@ -58,11 +58,26 @@ export interface PedidoEnvio {
   manual?: boolean;
 }
 
+/**
+ * De quem é a culpa quando não enviou.
+ *
+ * `ITEM`   — o problema é DESTA mensagem (corpo reprovado, já enviada hoje). A
+ *            fila deve pular para a próxima.
+ * `GLOBAL` — o problema é do número ou do dia (teto, janela, stop-loss,
+ *            Evolution fora do ar). Insistir com o próximo item só piora.
+ *
+ * Sem essa distinção um único lead com dado ruim — `avaliacoes: 0` reprova no
+ * validador — travaria o lote inteiro do dia.
+ */
+export type EscopoFalha = 'ITEM' | 'GLOBAL';
+
 export interface ResultadoEnvio {
   ok: boolean;
   mensagem?: MensagemOutbox;
   /** Motivo legível quando `ok` é false. */
   motivo?: string;
+  /** Presente quando `ok` é false: diz se a fila continua ou para. */
+  escopo?: EscopoFalha;
   decisao?: Decisao;
   /** `true` quando nada foi para a rede porque o serviço está em dry-run. */
   simulado?: boolean;
@@ -119,7 +134,12 @@ export class WhatsAppService {
     //    revalidada — só devolvida como está.
     const existente = await this.portas.outbox.acharPorDedup(pedido.dedupKey);
     if (existente) {
-      return { ok: false, mensagem: existente, motivo: 'DEDUP: mensagem já existe para esta chave.' };
+      return {
+        ok: false,
+        mensagem: existente,
+        motivo: 'DEDUP: mensagem já existe para esta chave.',
+        escopo: 'ITEM',
+      };
     }
 
     // 2. Validação do corpo JÁ RENDERIZADO. Template que falha não entra na fila.
@@ -135,7 +155,7 @@ export class WhatsAppService {
           dedupKey: pedido.dedupKey,
           violacoes: v.violacoes,
         });
-        return { ok: false, motivo: `VALIDADOR: ${detalhe}` };
+        return { ok: false, motivo: `VALIDADOR: ${detalhe}`, escopo: 'ITEM' };
       }
     }
 
@@ -143,7 +163,12 @@ export class WhatsAppService {
     const estado = await this.portas.estado();
     const decisao = podeEnviar(estado, agora, { manual: pedido.manual });
     if (!decisao.permitido) {
-      return { ok: false, motivo: `${decisao.motivo}: ${decisao.explicacao}`, decisao };
+      return {
+        ok: false,
+        motivo: `${decisao.motivo}: ${decisao.explicacao}`,
+        escopo: 'GLOBAL',
+        decisao,
+      };
     }
 
     // 4. Grava no outbox ANTES de mandar. Se o processo morrer entre o insert e
@@ -201,7 +226,12 @@ export class WhatsAppService {
       status: 'FALHA',
       erro: ultimoErro,
     });
-    return { ok: false, mensagem: falha, motivo: `FALHA após ${max} tentativas: ${ultimoErro}` };
+    return {
+      ok: false,
+      mensagem: falha,
+      motivo: `FALHA após ${max} tentativas: ${ultimoErro}`,
+      escopo: 'GLOBAL',
+    };
   }
 
   /** Intervalo até o próximo envio da fila, respeitando o piso rígido. */

@@ -18,6 +18,7 @@ import { salvarConfig, type ConfigBarney } from '@/lib/rodolfo/config';
 import { importarLote } from '@/lib/rodolfo/importar-lote';
 import { criarWhatsAppService } from '@/lib/rodolfo/outbox';
 import { agoraSP } from '@/lib/rodolfo/estado';
+import { PREFIXO_DRY_RUN } from '@/lib/barney/dedup';
 import type { LinhaPlanilha } from '@/lib/leds/importar';
 
 export interface Resposta {
@@ -97,6 +98,13 @@ export async function acaoEnviarAgora(leadId?: string): Promise<Resposta> {
  */
 export async function acaoDryRun(): Promise<Resposta> {
   const userId = await exigirSessao();
+
+  // Limpa a simulação anterior antes de refazer. Sem isto, o segundo dry-run do
+  // dia devolveria "0 simuladas" — as chaves `dry:` já existiriam — e pareceria
+  // que o lote esvaziou. Apaga só simulação: a chave real nunca tem o prefixo.
+  await prisma.message.deleteMany({
+    where: { dedupKey: { startsWith: PREFIXO_DRY_RUN }, status: 'AGENDADA' },
+  });
 
   let n = 0;
   let ultimoMotivo = '';

@@ -144,7 +144,15 @@ async function tratarUpdate(payload: PayloadEvolution) {
   if (!id) return;
 
   const status = String(data.status ?? '').toUpperCase();
-  const msg = await prisma.message.findUnique({ where: { evolutionMessageId: id } });
+
+  // `direction: OUT` não é filtro decorativo. As mensagens RECEBIDAS também
+  // gravam `evolutionMessageId`, e um MESSAGES_UPDATE de uma delas marcaria a
+  // resposta do lead como "entregue" e somaria no contador de entregas do dia —
+  // inflando a taxa e cegando justamente o stop-loss que existe para perceber
+  // bloqueio silencioso.
+  const msg = await prisma.message.findFirst({
+    where: { evolutionMessageId: id, direction: 'OUT' },
+  });
   if (!msg) return;
 
   const agora = agoraSP();
