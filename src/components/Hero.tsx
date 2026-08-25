@@ -1,4 +1,3 @@
-import ModalTriggerButton from '@/components/ModalTriggerButton';
 
 export default function Hero() {
   return (
@@ -66,9 +65,15 @@ export default function Hero() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-3">
-            <ModalTriggerButton className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98] shadow-[0_4px_20px_rgba(185,28,28,0.4)]">
+            {/* O rotulo ja era a promessa do diagnostico; agora o destino
+                confere. Modal de contato captura nome e telefone — o
+                diagnostico captura o negocio inteiro e devolve leitura na hora. */}
+            <a
+              href="/diagnostico"
+              className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98] shadow-[0_4px_20px_rgba(185,28,28,0.4)]"
+            >
               Conte sobre seu restaurante
-            </ModalTriggerButton>
+            </a>
             <a
               href="#servicos"
               className="inline-flex items-center justify-center gap-2 border border-white/20 hover:border-white/50 text-white/60 hover:text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98]"

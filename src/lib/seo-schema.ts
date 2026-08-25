@@ -4,9 +4,9 @@ export function getSEOSchema() {
     '@graph': [
       {
         '@type': 'Organization',
-        '@id': 'https://flowfoods.com.br/#organization',
+        '@id': 'https://consultoriaflowfoods.com.br/#organization',
         name: 'FlowFoods Consultoria',
-        url: 'https://flowfoods.com.br',
+        url: 'https://consultoriaflowfoods.com.br',
         description:
           'Consultoria gastronômica especializada em estruturação, otimização e escala de restaurantes.',
         foundingDate: '2010',
@@ -25,12 +25,12 @@ export function getSEOSchema() {
         ],
         sameAs: [
           'https://instagram.com/flowfoods.rj',
-          'https://linkedin.com/in/rodolfo-flowfoods',
+          'https://linkedin.com/in/rodolfo-cavalcante',
         ],
       },
       {
         '@type': 'LocalBusiness',
-        '@id': 'https://flowfoods.com.br/#business',
+        '@id': 'https://consultoriaflowfoods.com.br/#business',
         name: 'FlowFoods Consultoria',
         description: 'Gastronomia que flui. Negócio que cresce.',
         priceRange: '$$',

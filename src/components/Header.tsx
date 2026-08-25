@@ -7,6 +7,8 @@ const navLinks = [
   { label: 'Serviços',   href: '#servicos' },
   { label: 'Processo',   href: '#processo' },
   { label: 'Contato',    href: '#contato' },
+  // Rota, nao ancora: e a unica entrada do funil que nao depende de rolar.
+  { label: 'Diagnóstico', href: '/diagnostico' },
 ];
 
 export default function Header() {
@@ -54,12 +56,12 @@ export default function Header() {
           </nav>
 
           {/* Desktop CTA */}
-          <button
-            onClick={() => window.dispatchEvent(new CustomEvent('flowfoods:open-modal'))}
+          <a
+            href="/diagnostico"
             className="hidden md:block bg-primary hover:bg-primary-dark text-white text-xs font-semibold px-5 py-2.5 uppercase tracking-widest transition-colors duration-200"
           >
-            Agendar Consultoria
-          </button>
+            Diagnóstico gratuito
+          </a>
 
           {/* Mobile Hamburger */}
           <button
@@ -76,8 +78,15 @@ export default function Header() {
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      <div className={`md:hidden overflow-hidden transition-all duration-300 bg-white border-t border-surface-3 ${menuOpen ? 'max-h-96' : 'max-h-0'}`}>
+      {/* Mobile Menu
+          `max-h-0 overflow-hidden` esconde aos olhos, mas NÃO tira da ordem de
+          tabulação nem da árvore de acessibilidade: com o menu fechado, quem
+          navega por teclado focava links invisíveis, e um clique neles caía no
+          Hero por baixo. `invisible` + `aria-hidden` resolvem os dois. */}
+      <div
+        aria-hidden={!menuOpen}
+        className={`md:hidden overflow-hidden transition-all duration-300 bg-white border-t border-surface-3 ${menuOpen ? 'max-h-96 visible' : 'max-h-0 invisible'}`}
+      >
         <nav className="flex flex-col px-5 py-6 gap-4">
           {navLinks.map((link) => (
             <a
@@ -89,12 +98,13 @@ export default function Header() {
               {link.label}
             </a>
           ))}
-          <button
-            onClick={() => { setMenuOpen(false); window.dispatchEvent(new CustomEvent('flowfoods:open-modal')); }}
-            className="mt-2 bg-primary hover:bg-primary-dark text-white text-xs font-semibold px-5 py-3.5 uppercase tracking-widest text-center w-full transition-colors duration-200"
+          <a
+            href="/diagnostico"
+            onClick={() => setMenuOpen(false)}
+            className="mt-2 block bg-primary hover:bg-primary-dark text-white text-xs font-semibold px-5 py-3.5 uppercase tracking-widest text-center w-full transition-colors duration-200"
           >
-            Agendar Consultoria
-          </button>
+            Diagnóstico gratuito
+          </a>
         </nav>
       </div>
     </header>

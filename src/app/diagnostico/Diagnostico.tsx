@@ -161,7 +161,10 @@ export default function Diagnostico() {
         <div className="mt-10 md:mt-14 flex items-start justify-between gap-4 md:gap-8">
           <div className="flex-1 min-w-0 lg:max-w-[62%]">
             <div className="w-8 h-0.5 bg-primary mb-5" />
-            <h1 className="font-display text-ink uppercase leading-[0.95] text-[clamp(1.7rem,6vw,3rem)] text-balance">
+            <h1
+              id="pergunta-atual"
+              className="font-display text-ink uppercase leading-[0.95] text-[clamp(1.7rem,6vw,3rem)] text-balance"
+            >
               {pergunta.rotulo}
             </h1>
             {pergunta.ajuda && (
@@ -396,6 +399,9 @@ function Campo({
 
   return multiline ? (
     <textarea
+      // O nome acessivel do campo E' a pergunta na tela: sem isto o leitor de
+      // tela anuncia so' "caixa de texto", e o dono nao sabe o que responder.
+      aria-labelledby="pergunta-atual"
       value={typeof valor === 'string' ? valor : ''}
       onChange={(e) => onResponder(e.target.value)}
       rows={4}
@@ -405,6 +411,7 @@ function Campo({
     />
   ) : (
     <input
+      aria-labelledby="pergunta-atual"
       type={tipoHtml}
       inputMode={pergunta.tipo === 'celular' ? 'tel' : undefined}
       value={typeof valor === 'string' ? valor : ''}
