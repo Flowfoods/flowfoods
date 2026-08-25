@@ -6,8 +6,12 @@ export const CONTACT_INFO: ContactInfo = {
     'https://wa.me/5521996416060?text=Ol%C3%A1!%20Vi%20o%20site%20da%20FlowFoods%20e%20gostaria%20de%20saber%20mais%20sobre%20a%20consultoria.',
   whatsappDisplay: '(21) 99641-6060',
   email: 'rrodolfoacifood@gmail.com',
-  instagram: 'flowfoods.rj',
-  instagramUrl: 'https://instagram.com/flowfoods.rj',
+  // Confirmado pelo Rodolfo em 25/08/2026. É o mesmo perfil que vai em TODA
+  // mensagem de abordagem do Barney (fonte: `ledsflowfoods/references/mensagens.md`):
+  // se o site e a abordagem divergirem, o dono do restaurante que for conferir
+  // quem é o Rodolfo cai num beco sem saída.
+  instagram: 'rrodolfoac',
+  instagramUrl: 'https://instagram.com/rrodolfoac',
   linkedin: 'Rodolfo Cavalcante',
   linkedinUrl: 'https://linkedin.com/in/rodolfo-cavalcante',
 };

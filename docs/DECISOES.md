@@ -203,3 +203,45 @@ pedido. Uma resposta que ele leu e escreveu para uma pessoa específica não tem
 esse risco, e um validador que recusasse "sem compromisso" numa conversa em
 andamento seria atrito sem ganho. Os TETOS continuam valendo: a resposta passa
 pelo `WhatsAppService` e conta contra o número como qualquer outra saída.
+
+---
+
+### 17. 2026-08-25 · Modo telefone pessoal: notificação suprimida sozinha
+
+**Contexto:** o Rodolfo decidiu começar prospectando pelo próprio telefone. O
+Master Prompt manda número dedicado ("nunca o pessoal"), mas a decisão é dele e
+tem base técnica: `whatsapp-ban-prevention.md` classifica número pessoal antigo
+como *mais* tolerante (200/dia) que chip novo (50/dia).
+
+**Alternativa:** manter a notificação sempre, ou exigir uma env var extra para
+desligá-la.
+
+**Razão:** com um número só, `notificar()` mandaria mensagem do Rodolfo para o
+Rodolfo. Não informa nada — a resposta do lead já chegou no aparelho dele — e
+ainda gasta atividade do número, que é justamente o recurso escasso. Detectar é
+melhor que configurar: o worker lê o `ownerJid` da instância e guarda em
+`InstanceState.numeroProprio`; se bate com `RODOLFO_WHATSAPP` e não há
+`EVOLUTION_NOTIFY_INSTANCE` separada, a notificação é suprimida.
+
+Na dúvida (número desconhecido, Evolution fora do ar) **notifica** — perder um
+aviso é pior que mandar um redundante.
+
+O que NÃO mudou: a rampa e os 10 envios manuais continuam valendo. Eles não são
+sobre aquecer o número, são sobre não acumular denúncia rápido — e denúncia é o
+risco real aqui, não ban por número frio.
+
+---
+
+### 18. 2026-08-25 · `seo-schema.ts` passa a ler de `CONTACT_INFO`
+
+**Alternativa:** corrigir só o Instagram, que era o que o Rodolfo confirmou.
+
+**Razão:** ao abrir o arquivo para trocar o `@`, apareceram mais três valores
+divergentes na mesma estrutura — LinkedIn (`rodolfo-flowfoods` contra
+`rodolfo-cavalcante` do rodapé e do Master Prompt) e o domínio (`flowfoods.com.br`
+em `@id` e `url`, contra `consultoriaflowfoods.com.br`, que é onde o site roda).
+
+Todos são a mesma classe de defeito: dado de contato duplicado em dois arquivos,
+divergindo com o tempo. Num JSON-LD isso é caro — `sameAs` e `url` são o que o
+Google usa para casar a entidade com os perfis e o domínio. Corrigir um e deixar
+os outros sabendo que estavam errados seria pior. Agora há uma fonte só.

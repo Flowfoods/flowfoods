@@ -38,14 +38,45 @@ gravada em log nem em relatório.
 
 ### 1.4 O número
 
-Isto é calendário, não software — **comece hoje**:
+Duas rotas. A decisão é sua; o sistema funciona nas duas.
 
-1. chip novo, WhatsApp **Business**, dedicado à FlowFoods;
-2. perfil completo: foto, descrição, site, catálogo;
-3. **aqueça 2–3 semanas** conversando normalmente antes do primeiro disparo.
+#### Rota A — seu telefone atual (o que você escolheu para começar)
 
-Depois, crie a instância `flowfoods-prospeccao` na Evolution, pareie o QR e
-aponte o webhook para:
+Vantagem real, não consolo: um número com anos de histórico e conversa de gente
+de verdade **resiste melhor a bloqueio** que um chip novo. A tabela do anti-ban
+diz isso — número pessoal antigo tolera 200/dia; chip novo, 50.
+
+O que muda:
+
+- **As notificações se desligam sozinhas.** O sistema percebe que o número que
+  prospecta é o mesmo que receberia o aviso e não manda nada — a resposta do
+  lead já chega no seu aparelho. `/rodolfo/config` mostra "Modo telefone
+  pessoal" quando isso acontece.
+- **A rampa continua valendo.** 10/dia na primeira semana, 20 na segunda, 30
+  depois. Não é sobre aquecer o número, é sobre não acumular denúncia rápido.
+- **O que você está apostando:** o risco não é ban por número frio, é
+  **denúncia**. Abordagem fria gera denúncia, e denúncia neste número derruba o
+  WhatsApp que está no seu site, no seu cartão e nas suas conversas pessoais.
+  Se cair, você perde o canal comercial junto com o pessoal.
+
+Se for por aqui, vale ativar o WhatsApp Business neste número mesmo (dá para
+converter sem perder histórico) e completar o perfil: descrição da FlowFoods,
+site, catálogo. Isso reduz denúncia porque o dono do restaurante vê na hora quem
+está falando.
+
+#### Rota B — chip dedicado
+
+Chip novo, WhatsApp Business, perfil completo, **aquecido 2–3 semanas**
+conversando normalmente antes do primeiro disparo. É calendário, não software:
+começar hoje encurta a espera lá na frente.
+
+Vantagem: se queimar, queima só o número de prospecção. Você configura
+`EVOLUTION_NOTIFY_INSTANCE` e recebe os avisos no seu telefone.
+
+#### Em qualquer uma das rotas
+
+Crie a instância `flowfoods-prospeccao` na Evolution, pareie o QR e aponte o
+webhook para:
 
 ```
 POST https://consultoriaflowfoods.com.br/api/webhooks/evolution
@@ -165,8 +196,10 @@ Sucos. Outras categorias no mesmo bairro passam normal.
 
 - `prisma migrate reset` em produção — apaga opt-outs
 - Subir teto no código para "acelerar" — os limites existem contra o WhatsApp,
-  e o número leva 2–3 semanas para ser substituído
-- Usar o número pessoal na instância de prospecção
+  e um número queimado leva 2–3 semanas para ser substituído
+- Pular a rampa porque "esse número é antigo" — a rampa não é sobre aquecimento,
+  é sobre não acumular denúncia rápido. Número antigo com 30 abordagens frias no
+  primeiro dia cai igual
 - Responder lead por automação
 - Reconectar instância em laço depois de bloqueio
 - Mandar mensagem fora de seg–sex 10h–18h

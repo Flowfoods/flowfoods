@@ -252,6 +252,7 @@ CREATE TABLE "InstanceState" (
     "estado" TEXT NOT NULL DEFAULT 'close',
     "ultimoCheck" TIMESTAMP(3),
     "primeiroEnvioEm" TIMESTAMP(3),
+    "numeroProprio" TEXT,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "InstanceState_pkey" PRIMARY KEY ("id")

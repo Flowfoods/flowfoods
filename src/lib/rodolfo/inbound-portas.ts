@@ -9,6 +9,22 @@
 import { prisma } from '@/lib/db';
 import type { Classificacao, MensagemRecebida, PortasInbound } from '@/lib/barney/inbound';
 import { dedupKeyWebhook } from '@/lib/barney/dedup';
+import { normalizarTelefone } from '@/lib/barney/telefone';
+
+/**
+ * O número de destino é o mesmo que está pareado na instância de prospecção?
+ *
+ * Lê o `numeroProprio` que o worker sincroniza. Devolve `false` quando não
+ * sabe — na dúvida, notifica: perder um aviso é pior que mandar um redundante.
+ */
+async function ehOProprioNumero(destino: string): Promise<boolean> {
+  const instancia = await prisma.instanceState.findUnique({
+    where: { nome: process.env.EVOLUTION_INSTANCE ?? 'flowfoods-prospeccao' },
+    select: { numeroProprio: true },
+  });
+  if (!instancia?.numeroProprio) return false;
+  return normalizarTelefone(instancia.numeroProprio).e164 === destino;
+}
 
 export const portasInbound: PortasInbound = {
   async jaProcessado(chave) {
@@ -107,12 +123,19 @@ export const portasInbound: PortasInbound = {
   async notificar(texto) {
     const url = process.env.EVOLUTION_API_URL;
     const key = process.env.EVOLUTION_API_KEY;
-    const destino = process.env.RODOLFO_WHATSAPP;
+    const destino = normalizarTelefone(process.env.RODOLFO_WHATSAPP).e164;
     // Instância de notificação separada, quando o Rodolfo quiser desacoplar o
     // número que avisa do número que prospecta.
-    const instancia = process.env.EVOLUTION_NOTIFY_INSTANCE ?? process.env.EVOLUTION_INSTANCE;
+    const notifyInstance = process.env.EVOLUTION_NOTIFY_INSTANCE;
+    const instancia = notifyInstance ?? process.env.EVOLUTION_INSTANCE;
 
     if (!url || !key || !destino || !instancia) return;
+
+    // Prospectar do próprio telefone: notificar seria mandar mensagem para si
+    // mesmo. A resposta do lead já chegou no aparelho — o aviso não informa
+    // nada e ainda gasta atividade do número. Só vale a pena checar quando NÃO
+    // há instância de notificação separada.
+    if (!notifyInstance && (await ehOProprioNumero(destino))) return;
 
     try {
       await fetch(`${url.replace(/\/+$/, '')}/message/sendText/${instancia}`, {

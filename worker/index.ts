@@ -59,12 +59,17 @@ async function sincronizarInstancia(transporte: TransporteEvolutionHttp): Promis
   if (!transporte.configurado) return;
 
   const nome = process.env.EVOLUTION_INSTANCE ?? 'flowfoods-prospeccao';
-  const estado = await transporte.estadoInstancia();
+  const [estado, numeroProprio] = await Promise.all([
+    transporte.estadoInstancia(),
+    transporte.numeroDaInstancia(),
+  ]);
 
   await prisma.instanceState.upsert({
     where: { nome },
-    create: { nome, estado, ultimoCheck: new Date() },
-    update: { estado, ultimoCheck: new Date() },
+    create: { nome, estado, numeroProprio, ultimoCheck: new Date() },
+    // `numeroProprio` só é sobrescrito quando veio algo: um `null` de falha de
+    // rede não pode apagar o valor bom que já estava lá.
+    update: { estado, ultimoCheck: new Date(), ...(numeroProprio ? { numeroProprio } : {}) },
   });
 
   if (estado !== 'open') log('aviso', 'instancia fora do ar', { nome, estado });

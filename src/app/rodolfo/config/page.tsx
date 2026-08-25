@@ -1,4 +1,6 @@
+import { prisma } from '@/lib/db';
 import { lerConfig } from '@/lib/rodolfo/config';
+import { normalizarTelefone } from '@/lib/barney/telefone';
 import { montarEstadoEnvio, INSTANCIA } from '@/lib/rodolfo/estado';
 import {
   ENVIOS_MANUAIS_INICIAIS,
@@ -13,7 +15,23 @@ import { ConfigForm } from './config-form';
 export const dynamic = 'force-dynamic';
 
 export default async function ConfigPage() {
-  const [config, estado] = await Promise.all([lerConfig(), montarEstadoEnvio()]);
+  const [config, estado, instancia] = await Promise.all([
+    lerConfig(),
+    montarEstadoEnvio(),
+    prisma.instanceState.findUnique({
+      where: { nome: INSTANCIA },
+      select: { numeroProprio: true },
+    }),
+  ]);
+
+  // Prospectar do próprio telefone é decisão do Rodolfo, e é defensável: número
+  // antigo com histórico real resiste melhor a ban que chip novo. O que muda é o
+  // CUSTO de um bloqueio — por isso a tela diz em voz alta quando é o caso.
+  const proprioNumero =
+    instancia?.numeroProprio && process.env.RODOLFO_WHATSAPP
+      ? normalizarTelefone(instancia.numeroProprio).e164 ===
+        normalizarTelefone(process.env.RODOLFO_WHATSAPP).e164
+      : false;
 
   return (
     <div className="space-y-4">
@@ -42,6 +60,16 @@ export default async function ConfigPage() {
           <p className="mt-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
             Pareie o QR na Evolution. Enquanto não estiver <code>open</code>, o Barney não envia.
           </p>
+        )}
+
+        {proprioNumero && (
+          <div className="mt-3 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+            <strong>Modo telefone pessoal.</strong> O número que prospecta é o mesmo que recebe as
+            notificações — então elas ficam desligadas: a resposta do lead já chega neste aparelho.
+            <br />
+            Um número antigo resiste melhor a bloqueio que um chip novo, mas se cair leva junto o
+            WhatsApp que está no site. A rampa continua valendo.
+          </div>
         )}
       </Cartao>
 

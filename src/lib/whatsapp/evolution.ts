@@ -82,6 +82,37 @@ export class TransporteEvolutionHttp implements TransporteEvolution {
     }
   }
 
+  /**
+   * Número pareado na instância (E.164 sem "+"), do `ownerJid`.
+   *
+   * `null` quando a instância não está pareada ou a Evolution não respondeu —
+   * quem chama trata `null` como "não sei", nunca como "são diferentes".
+   */
+  async numeroDaInstancia(): Promise<string | null> {
+    if (!this.configurado) return null;
+    try {
+      const r = await fetch(
+        `${this.baseUrl}/instance/fetchInstances?instanceName=${encodeURIComponent(this.instancia)}`,
+        { headers: { apikey: this.apiKey } },
+      );
+      if (!r.ok) return null;
+
+      // A Evolution devolve ora um array, ora um objeto, dependendo da versão.
+      const json = (await r.json()) as unknown;
+      const primeiro = Array.isArray(json) ? json[0] : json;
+      const registro = (primeiro ?? {}) as Record<string, unknown>;
+      const instancia = (registro.instance ?? registro) as Record<string, unknown>;
+
+      const jid = (instancia.ownerJid ?? instancia.owner ?? instancia.wuid) as string | undefined;
+      if (!jid) return null;
+
+      const digitos = String(jid).split('@')[0].replace(/\D/g, '');
+      return digitos || null;
+    } catch {
+      return null;
+    }
+  }
+
   /** Estado da instância, para o stop-loss e para `/rodolfo/config`. */
   async estadoInstancia(): Promise<string> {
     if (!this.configurado) return 'close';

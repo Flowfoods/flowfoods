@@ -390,6 +390,12 @@ model InstanceState {
   // Início da rampa. É o PRIMEIRO ENVIO, não a criação da instância: número
   // criado e esquecido por um mês não está aquecido, está parado.
   primeiroEnvioEm DateTime?
+  // Número pareado nesta instância (E.164 sem "+"), lido do `ownerJid` da
+  // Evolution. Serve para uma coisa: saber se o número que PROSPECTA é o mesmo
+  // que RECEBE as notificações. Quando é — o caso de usar o telefone pessoal —
+  // notificar vira mandar mensagem para si mesmo: inútil, porque a resposta já
+  // chega no aparelho, e gasta atividade do número à toa.
+  numeroProprio   String?
   atualizadoEm    DateTime  @updatedAt
 }
 

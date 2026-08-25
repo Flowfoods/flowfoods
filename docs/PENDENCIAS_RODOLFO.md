@@ -36,34 +36,48 @@ dry-run — dá para treinar tudo antes de ter número.
 
 ---
 
-## 🔴 3. Qual é o Instagram da abordagem?
+## ✅ 3. Instagram — RESOLVIDO
 
-`mensagens.md` e o Master Prompt dizem **`@rrodolfoac`**. O site em produção
-(`src/lib/constants.ts`) diz **`flowfoods.rj`**.
+Confirmado pelo Rodolfo em 25/08/2026: é **`@rrodolfoac`**.
 
-Toda mensagem carrega essa linha. Se o handle estiver errado, **30 mensagens por
-dia** mandam o dono do restaurante para o lugar errado, bem no ponto em que ele
-foi conferir quem você é.
+O site estava com `flowfoods.rj` em dois lugares e ambos foram corrigidos:
 
-Mantive `@rrodolfoac` (é o que as fontes normativas dizem) e **não** mexi no
-site. Me diga qual é o certo:
+- `src/lib/constants.ts` → rodapé e CTA;
+- `src/lib/seo-schema.ts` → o `sameAs` do JSON-LD, que é o que o Google usa para
+  ligar o negócio ao perfil. Agora lê de `CONTACT_INFO` em vez de repetir o
+  valor, para não divergir de novo.
 
-- se for `@rrodolfoac` → corrigir `constants.ts` no site;
-- se for `@flowfoods.rj` → corrigir `mensagens.md` (a fonte) e o `render.ts`.
-
-**Trava:** nada tecnicamente, mas cada dia de disparo errado é lead queimado.
+De quebra, o mesmo arquivo apontava para `linkedin.com/in/rodolfo-flowfoods`
+(o rodapé e o Master Prompt dizem `rodolfo-cavalcante`) e usava o domínio
+`flowfoods.com.br` em `@id` e `url` — sendo que o site é
+`consultoriaflowfoods.com.br`. Os três estavam errados no JSON-LD; todos
+alinhados agora.
 
 ---
 
-## 🔴 4. Chip novo + WhatsApp Business dedicado
+## ✅ 4. O número — DECIDIDO: telefone pessoal no início
 
-Número **dedicado** à FlowFoods, nunca o pessoal. Perfil completo: foto,
-descrição, site, catálogo.
+Sua escolha, e ela tem argumento técnico a favor: número com anos de histórico
+resiste melhor a bloqueio que chip novo (`whatsapp-ban-prevention.md`:
+pessoal antigo tolera 200/dia, chip novo 50).
 
-**Aqueça 2–3 semanas antes do primeiro disparo** — isto é calendário, não
-software. Começar hoje encurta a espera lá na frente.
+O código se ajustou sozinho a isso:
 
-Depois: criar a instância `flowfoods-prospeccao` na Evolution e parear o QR.
+- **notificações desligadas automaticamente** quando o número que prospecta é o
+  mesmo que receberia o aviso — mandar mensagem para si mesmo não informa nada e
+  gasta atividade do número;
+- `/rodolfo/config` mostra **"Modo telefone pessoal"** quando detecta o caso;
+- a rampa (10 → 20 → 30/dia) e os 10 envios manuais **continuam valendo**. Não
+  são sobre aquecer o número; são sobre não acumular denúncia rápido.
+
+**O que fica na sua conta:** o risco aqui não é ban por número frio, é
+**denúncia**. Se este número cair, cai junto o WhatsApp que está no site, no
+cartão e nas conversas pessoais. Vale ativar o WhatsApp Business neste mesmo
+número (converte sem perder histórico) e completar o perfil — descrição da
+FlowFoods, site, catálogo. Quem vê na hora quem está falando denuncia menos.
+
+Se um dia quiser separar: chip novo, `EVOLUTION_NOTIFY_INSTANCE` apontando para
+o seu, e as notificações voltam sozinhas.
 
 ---
 
