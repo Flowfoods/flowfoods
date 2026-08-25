@@ -17,20 +17,40 @@ const dmSans = DM_Sans({
   display: 'swap',
 });
 
+const SITE_URL = 'https://consultoriaflowfoods.com.br';
+const DESCRICAO =
+  'Consultoria gastronômica no Rio: delivery, financeiro, equipe e IA aplicados por quem opera o delivery de 16 lojas todo dia. Comece pelo diagnóstico gratuito de 30 min.';
+
 export const metadata: Metadata = {
-  title: 'FlowFoods — Consultoria 360° para Restaurantes | Rio de Janeiro',
-  description:
-    'Consultoria gastronômica especializada: iFood, operações, SaaS com IA e treinamento de equipes. 14 anos de experiência no food service carioca.',
+  metadataBase: new URL(SITE_URL),
+  title: 'FlowFoods — Consultoria para Restaurantes | Rio de Janeiro',
+  description: DESCRICAO,
   keywords:
-    'consultoria restaurante Rio, consultoria iFood, gestão restaurante RJ, SaaS gastronomia, treinamento equipe restaurante',
+    'consultoria restaurante Rio, consultoria iFood, gestão restaurante RJ, CMV e DRE restaurante, treinamento equipe restaurante',
   authors: [{ name: 'Rodolfo Cavalcante' }],
   robots: 'index, follow',
+  alternates: { canonical: '/' },
   openGraph: {
     type: 'website',
-    title: 'FlowFoods — Consultoria 360° para Restaurantes',
-    description:
-      'De operações caóticas para negócio escalável. iFood otimizado, equipe treinada, SaaS personalizado.',
+    url: SITE_URL,
+    siteName: 'FlowFoods Consultoria',
+    title: 'Gastronomia que flui. Negócio que cresce.',
+    description: DESCRICAO,
     locale: 'pt_BR',
+    images: [
+      {
+        url: '/images/galeria/foto-7.jpg',
+        width: 860,
+        height: 1280,
+        alt: 'Rodolfo Cavalcante — FlowFoods Consultoria',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Gastronomia que flui. Negócio que cresce.',
+    description: DESCRICAO,
+    images: ['/images/galeria/foto-7.jpg'],
   },
 };
 

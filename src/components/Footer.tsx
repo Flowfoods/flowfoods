@@ -58,12 +58,14 @@ export default function Footer() {
               >
                 WhatsApp: {CONTACT_INFO.whatsappDisplay}
               </a>
-              <a
-                href={`mailto:${CONTACT_INFO.email}`}
-                className="text-sm text-white/40 hover:text-white transition-colors duration-200"
-              >
-                {CONTACT_INFO.email}
-              </a>
+              {CONTACT_INFO.email && (
+                <a
+                  href={`mailto:${CONTACT_INFO.email}`}
+                  className="text-sm text-white/40 hover:text-white transition-colors duration-200"
+                >
+                  {CONTACT_INFO.email}
+                </a>
+              )}
               <a
                 href={CONTACT_INFO.instagramUrl}
                 target="_blank"

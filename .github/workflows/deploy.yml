@@ -30,6 +30,11 @@ jobs:
       - run: npm ci
       - name: Lint
         run: npm run lint
+      # O portão de conteúdo veio com a F1 do Caminho 1 e rodava só à mão.
+      # Ele existe justamente porque build e tipos não enxergam credibilidade:
+      # "1000+" compila igual a "100+". Rodando aqui, ele passa a valer.
+      - name: Portão de conteúdo
+        run: npm run gate
       - name: Tipos
         run: npx tsc --noEmit
       - name: Testes do motor do Diagnóstico

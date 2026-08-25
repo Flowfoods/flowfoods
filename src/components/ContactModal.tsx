@@ -1,14 +1,20 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { CONTACT_INFO } from '@/lib/constants';
+import { CONTACT_INFO, WHATSAPP_NUMERO, WHATSAPP_TEXTOS } from '@/lib/constants';
+import type { OrigemContato } from '@/types';
 
 export default function ContactModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [status, setStatus] = useState<'idle' | 'sending' | 'sent'>('idle');
+  const [origem, setOrigem] = useState<OrigemContato>('hero');
   const [form, setForm] = useState({ name: '', email: '', phone: '', message: '' });
 
-  const open = useCallback(() => setIsOpen(true), []);
+  const open = useCallback((e: Event) => {
+    const detalhe = (e as CustomEvent<{ origem?: OrigemContato }>).detail;
+    setOrigem(detalhe?.origem ?? 'hero');
+    setIsOpen(true);
+  }, []);
   const close = useCallback(() => {
     setIsOpen(false);
     setTimeout(() => setStatus('idle'), 300);
@@ -34,14 +40,14 @@ export default function ContactModal() {
     e.preventDefault();
 
     const msg = encodeURIComponent(
-      `Olá Rodolfo! Vi o site da FlowFoods e gostaria de conversar sobre consultoria.\n\n` +
+      `${WHATSAPP_TEXTOS[origem]}\n\n` +
       `*Nome:* ${form.name}\n` +
       `*E-mail:* ${form.email}\n` +
       `*WhatsApp:* ${form.phone}\n\n` +
       `*Sobre meu restaurante:*\n${form.message}`
     );
 
-    window.open(`https://wa.me/5521996416060?text=${msg}`, '_blank');
+    window.open(`https://wa.me/${WHATSAPP_NUMERO}?text=${msg}`, '_blank');
     setStatus('sent');
   };
 
@@ -61,8 +67,9 @@ export default function ContactModal() {
           <div>
             <p className="text-primary text-[10px] font-semibold tracking-[0.4em] uppercase mb-1">Primeiro Passo</p>
             <h2 className="font-display text-2xl md:text-3xl text-ink uppercase leading-tight">
-              Agendar<br />Consultoria
+              Diagnóstico<br />gratuito
             </h2>
+            <p className="text-ink-5 text-xs mt-2">30 min online · sem compromisso</p>
           </div>
           <button
             onClick={close}
@@ -80,9 +87,11 @@ export default function ContactModal() {
               <div className="w-16 h-16 bg-primary/10 border border-primary/30 flex items-center justify-center mx-auto mb-5">
                 <span className="text-primary text-2xl font-display font-bold">✓</span>
               </div>
-              <h3 className="font-display text-2xl text-ink uppercase mb-3">Mensagem Enviada!</h3>
-              <p className="text-ink-4 text-sm leading-relaxed mb-2">Rodolfo retorna em até 2h por WhatsApp.</p>
-              <p className="text-ink-5 text-xs mb-8">Verifique também sua caixa de e-mail.</p>
+              <h3 className="font-display text-2xl text-ink uppercase mb-3">WhatsApp aberto!</h3>
+              <p className="text-ink-4 text-sm leading-relaxed mb-2">
+                A conversa abriu numa aba nova, com os seus dados já escritos. É só tocar em enviar.
+              </p>
+              <p className="text-ink-5 text-xs mb-8">Não abriu? Fale direto no {CONTACT_INFO.whatsappDisplay}.</p>
               <button
                 onClick={close}
                 className="bg-primary hover:bg-primary-dark text-white font-semibold text-xs px-8 py-3 uppercase tracking-widest transition-all"
@@ -154,7 +163,7 @@ export default function ContactModal() {
                   disabled={status === 'sending'}
                   className="flex-1 bg-primary hover:bg-primary-dark disabled:opacity-60 text-white font-semibold text-xs px-6 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98]"
                 >
-                  {status === 'sending' ? 'Enviando...' : 'Agendar Consulta'}
+                  {status === 'sending' ? 'Abrindo...' : 'Abrir no WhatsApp'}
                 </button>
                 <button
                   type="button"

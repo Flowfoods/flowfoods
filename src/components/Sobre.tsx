@@ -61,7 +61,7 @@ export default function Sobre() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src="/images/galeria/foto-2.jpg"
-                alt="Equipe FlowFoods"
+                alt="FlowFoods em campo"
                 className="w-full h-full object-cover object-center opacity-90"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-white via-white/20 to-transparent" />
@@ -79,9 +79,9 @@ export default function Sobre() {
               </h3>
               <p className="text-ink-4 text-sm leading-relaxed mb-4">
                 Consultoria especializada em food service com sede no{' '}
-                <strong className="text-ink">Rio de Janeiro</strong>, atuando em seis frentes
-                integradas: cardápio, iFood estratégico, CRM e fidelização, sistemas com IA e
-                treinamento de equipes.
+                <strong className="text-ink">Rio de Janeiro</strong>, atuando em seis frentes:
+                estrutura de restaurante, iFood e delivery, treinamento de equipe, gestão
+                financeira, fidelidade e CRM, e sistemas com IA.
               </p>
               <p className="text-ink-4 text-sm leading-relaxed">
                 Atendemos desde restaurantes independentes até redes com múltiplas unidades — sempre
@@ -116,7 +116,7 @@ export default function Sobre() {
                 Chef, gestor, consultor e desenvolvedor com{' '}
                 <strong className="text-primary">14 anos contínuos</strong> no food service carioca.
                 Estruturou dark kitchens, geriu o delivery de 16 lojas da rede Bibi Sucos,
-                planejou inaugurações e planejou clube de fidelidade.
+                planejou inaugurações e estruturou clube de fidelidade.
               </p>
               <p className="text-ink-4 text-sm leading-relaxed">
                 Membro do <strong className="text-ink">Fórum iFood</strong>, participante em eventos
@@ -140,12 +140,13 @@ export default function Sobre() {
             ))}
           </div>
           <p className="text-ink-4 text-lg md:text-xl leading-relaxed max-w-3xl font-sans">
-            Um dos profissionais mais completos do food service brasileiro.{' '}
+            Chef de formação, gestor do delivery de 16 lojas, conselheiro do Fórum iFood e
+            desenvolvedor dos próprios sistemas.{' '}
             <strong className="text-ink">
               Não é só gestor. Não é só técnico. Não é só estrategista.
             </strong>{' '}
             Com <strong className="text-primary">14 anos de trajetória contínua</strong>, passou
-            pelo chão de fábrica, pela liderança de redes e pelo palco do iFood.
+            pelo chão de cozinha, pela liderança de redes e pelo palco do iFood.
           </p>
         </div>
       </div>

@@ -1,21 +1,35 @@
 import ModalTriggerButton from '@/components/ModalTriggerButton';
+import type { OrigemContato } from '@/types';
 
-const PACOTES = [
+const PACOTES: {
+  id: string;
+  numero: string;
+  titulo: string;
+  subtitulo: string;
+  descricao: string;
+  inclui: string[];
+  destaque: boolean;
+  preco: string;
+  cta: string;
+  origem: OrigemContato;
+}[] = [
   {
     id: 'diagnostico',
     numero: '01',
-    titulo: 'Diagnóstico',
+    titulo: 'Diagnóstico Gratuito',
     subtitulo: 'O primeiro passo',
     descricao:
-      'Análise completa da sua operação em até 5 dias. Você recebe um relatório detalhado e um plano de ação prioritário — mesmo que não contrate a consultoria completa.',
+      'Uma conversa de 30 minutos, online. Antes dela, eu analiso a sua loja no iFood. Depois dela, você recebe por escrito as 3 prioridades do seu negócio — mesmo que não contrate nada.',
     inclui: [
-      'Visita técnica presencial',
-      'Análise financeira (CMV, margem, DRE)',
-      'Avaliação de iFood e delivery',
-      'Relatório + plano de ação em PDF',
+      'Análise prévia da sua loja no iFood',
+      'Conversa de 30 min, online',
+      '3 prioridades por escrito, no WhatsApp',
+      'Sem compromisso',
     ],
     destaque: false,
-    cta: 'Solicitar Diagnóstico',
+    preco: 'Gratuito',
+    cta: 'Agendar diagnóstico gratuito',
+    origem: 'diagnostico',
   },
   {
     id: 'consultoria',
@@ -25,7 +39,7 @@ const PACOTES = [
     descricao:
       'O pacote completo para restaurantes que querem crescer de forma estruturada. Cada etapa é adaptada à realidade do seu negócio — sem prazo engessado, no ritmo que faz sentido para a sua operação.',
     inclui: [
-      'Diagnóstico completo',
+      'Diagnóstico completo presencial (visita técnica, DRE/CMV, iFood, relatório + plano de ação em PDF)',
       'Otimização iFood e delivery',
       'Treinamento de equipe',
       'Gestão financeira + CMV',
@@ -33,7 +47,9 @@ const PACOTES = [
       'Suporte por WhatsApp',
     ],
     destaque: true,
+    preco: 'Sob consulta',
     cta: 'Quero a Consultoria',
+    origem: 'consultoria',
   },
   {
     id: 'parceria',
@@ -51,7 +67,9 @@ const PACOTES = [
       'Expansão e escala de unidades',
     ],
     destaque: false,
+    preco: 'Sob consulta',
     cta: 'Falar sobre Parceria',
+    origem: 'parceria',
   },
 ];
 
@@ -114,8 +132,9 @@ export default function Investimento() {
 
                 <div className="border-t border-surface-3 pt-6">
                   <p className="text-[10px] font-semibold uppercase tracking-widest text-ink-5 mb-3">Investimento</p>
-                  <p className="font-display text-xl text-ink uppercase mb-4">Sob consulta</p>
+                  <p className="font-display text-xl text-ink uppercase mb-4">{p.preco}</p>
                   <ModalTriggerButton
+                    origem={p.origem}
                     className={`w-full py-3.5 text-xs font-semibold uppercase tracking-widest transition-all duration-200 active:scale-[0.98] ${
                       p.destaque
                         ? 'bg-primary hover:bg-primary-dark text-white'
@@ -130,19 +149,25 @@ export default function Investimento() {
           ))}
         </div>
 
-        {/* Nota de urgência */}
+        {/* Convite ao primeiro passo — sem escassez inventada. */}
         <div
           data-reveal
           className="border border-primary/20 bg-primary/5 p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
         >
           <div>
             <p className="font-display italic text-ink text-base md:text-lg">
-              ⏰ Rodolfo tem <strong>calendário cheio este mês</strong>. Vagas limitadas para novos clientes.
+              Comece pelo <strong>diagnóstico gratuito</strong>. Se não fizer sentido seguir, você
+              fica com as 3 prioridades do mesmo jeito.
             </p>
-            <p className="text-ink-5 text-sm mt-1">Diagnóstico gratuito · Sem compromisso · Rio de Janeiro e região</p>
+            <p className="text-ink-5 text-sm mt-1">
+              Diagnóstico gratuito · 30 min online · Sem compromisso
+            </p>
           </div>
-          <ModalTriggerButton className="flex-shrink-0 bg-primary hover:bg-primary-dark text-white font-semibold text-xs px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98] whitespace-nowrap">
-            Verificar disponibilidade
+          <ModalTriggerButton
+            origem="diagnostico"
+            className="flex-shrink-0 bg-primary hover:bg-primary-dark text-white font-semibold text-xs px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98] whitespace-nowrap"
+          >
+            Agendar diagnóstico gratuito
           </ModalTriggerButton>
         </div>
 
