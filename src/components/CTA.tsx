@@ -1,4 +1,4 @@
-import { CONTACT_INFO } from '@/lib/constants';
+import { CONTACT_INFO, whatsappUrl } from '@/lib/constants';
 import ModalTriggerButton from '@/components/ModalTriggerButton';
 
 export default function CTA() {
@@ -31,19 +31,21 @@ export default function CTA() {
           {/* Contatos diretos */}
           <div className="flex flex-col gap-3 mb-10 border-l-2 border-primary/30 pl-5">
             <a
-              href={CONTACT_INFO.whatsappUrl}
+              href={whatsappUrl('diagnostico')}
               target="_blank"
               rel="noopener noreferrer"
               className="text-white/80 hover:text-white text-sm font-semibold transition-colors"
             >
               {CONTACT_INFO.whatsappDisplay} — WhatsApp
             </a>
-            <a
-              href={`mailto:${CONTACT_INFO.email}`}
-              className="text-white/80 hover:text-white text-sm font-semibold transition-colors"
-            >
-              {CONTACT_INFO.email}
-            </a>
+            {CONTACT_INFO.email && (
+              <a
+                href={`mailto:${CONTACT_INFO.email}`}
+                className="text-white/80 hover:text-white text-sm font-semibold transition-colors"
+              >
+                {CONTACT_INFO.email}
+              </a>
+            )}
             <a
               href={CONTACT_INFO.instagramUrl}
               target="_blank"
@@ -70,7 +72,7 @@ export default function CTA() {
               Fazer meu diagnóstico
             </a>
             <a
-              href={CONTACT_INFO.whatsappUrl}
+              href={whatsappUrl('diagnostico')}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 border border-white/20 hover:border-white/50 text-white/70 hover:text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98]"

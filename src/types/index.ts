@@ -6,15 +6,6 @@ export interface Servico {
   beneficios: string[];
 }
 
-export interface CaseStudy {
-  id: string;
-  nome: string;
-  descricao: string;
-  desafios: string;
-  resultados: string[];
-  impacto: string;
-}
-
 export interface EtapaProcesso {
   numero: string;
   titulo: string;
@@ -31,9 +22,16 @@ export interface ContactInfo {
   whatsapp: string;
   whatsappUrl: string;
   whatsappDisplay: string;
-  email: string;
+  /**
+   * Opcional de propósito. Enquanto `contato@consultoriaflowfoods.com.br` não existir,
+   * o site não mostra e-mail nenhum — o pessoal não volta como contato comercial.
+   */
+  email?: string;
   instagram: string;
   instagramUrl: string;
   linkedin: string;
   linkedinUrl: string;
 }
+
+/** Origem do clique — decide o texto com que o WhatsApp abre. */
+export type OrigemContato = 'hero' | 'diagnostico' | 'consultoria' | 'parceria' | 'flutuante';

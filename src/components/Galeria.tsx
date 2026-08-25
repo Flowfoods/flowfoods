@@ -10,7 +10,7 @@ const FOTOS_ROW1 = [
 const FOTOS_ROW2 = [
   { src: '/images/galeria/foto-1.jpg', alt: 'Rodolfo Cavalcante' },
   { src: '/images/galeria/foto-7.jpg', alt: 'Rodolfo Cavalcante — Retrato' },
-  { src: '/images/galeria/foto-2.jpg', alt: 'Equipe FlowFoods' },
+  { src: '/images/galeria/foto-2.jpg', alt: 'FlowFoods em campo' },
   { src: '/images/galeria/foto-6.jpg', alt: 'Rodolfo — Evento' },
 ];
 

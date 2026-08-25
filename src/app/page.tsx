@@ -13,7 +13,7 @@ import ProgressBar from '@/components/ProgressBar';
 import ScrollReveal from '@/components/ScrollReveal';
 import Investimento from '@/components/Investimento';
 import { getSEOSchema } from '@/lib/seo-schema';
-import { CONTACT_INFO } from '@/lib/constants';
+import { whatsappUrl } from '@/lib/constants';
 
 export default function Home() {
   return (
@@ -42,7 +42,7 @@ export default function Home() {
 
       {/* Floating WhatsApp — mobile only */}
       <a
-        href={CONTACT_INFO.whatsappUrl}
+        href={whatsappUrl('flutuante')}
         target="_blank"
         rel="noopener noreferrer"
         className="md:hidden fixed bottom-5 right-5 z-50 bg-primary hover:bg-bright text-white text-xl p-4 shadow-xl shadow-black/30 transition-all duration-200"
