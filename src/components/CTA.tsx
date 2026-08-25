@@ -56,9 +56,19 @@ export default function CTA() {
 
           {/* CTAs */}
           <div className="flex flex-col sm:flex-row gap-4">
-            <ModalTriggerButton className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98]">
-              Agendar Consultoria
-            </ModalTriggerButton>
+            {/* A seção de fecho passa a abrir o diagnóstico, e não o modal: ele
+                continua a um toque no Hero e no Investimento. Diagnóstico já é
+                a etapa 01 do processo descrito logo acima — o botão agora faz
+                o que a página promete. */}
+            {/* `<a>` e não `next/link`: o site inteiro navega assim, e o Link
+                traria o router de cliente (+8,7 kB no First Load da home) para
+                um clique que sai da página de qualquer jeito. */}
+            <a
+              href="/diagnostico"
+              className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98]"
+            >
+              Fazer meu diagnóstico
+            </a>
             <a
               href={CONTACT_INFO.whatsappUrl}
               target="_blank"
