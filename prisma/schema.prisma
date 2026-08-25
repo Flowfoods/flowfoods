@@ -1,0 +1,429 @@
+// Schema do portal FlowFoods — Caminho 3 (Barney).
+//
+// Migrations são SÓ ADITIVAS. Nada de DROP, remoção ou renomeação de coluna,
+// nem `migrate reset`: isso é parada de segurança do Master Prompt.
+//
+// Os modelos compartilhados (User, Lead, Message, OptOut, Setting, AuditLog,
+// WebEvent) seguem o contrato comum dos 3 caminhos. Os campos marcados
+// "C3" são as adições deste caminho; se o Caminho 1 ou 2 já tiver criado o
+// modelo, este arquivo só acrescenta.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------------------------------------------ admin
+
+enum Role {
+  ADMIN
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  senhaHash    String?
+  role         Role      @default(ADMIN)
+  criadoEm     DateTime  @default(now())
+  ultimoLogin  DateTime?
+  auditorias   AuditLog[]
+}
+
+// ------------------------------------------------------------------- lead
+
+enum LeadSource {
+  SITE
+  LEDS_IMPORT
+  MANUAL
+  BARNEY
+  INDICACAO
+}
+
+enum Interesse {
+  CONSULTORIA
+  MENTORIA
+  CURSO
+  CONTEUDO
+}
+
+enum LeadStatus {
+  NOVO
+  EM_CADENCIA
+  RESPONDEU
+  DIAGNOSTICO_PREENCHIDO
+  DIAGNOSTICO_AGENDADO
+  DIAGNOSTICO_FEITO
+  PROPOSTA
+  CLIENTE
+  PERDIDO
+  OPT_OUT
+  CONFLITO
+}
+
+enum TipoTelefone {
+  CELULAR
+  FIXO
+  INVALIDO
+}
+
+enum Canal {
+  WHATSAPP
+  INSTAGRAM
+  VISITA
+}
+
+enum Tier {
+  T1
+  T2
+  T3
+}
+
+model Lead {
+  id                   String       @id @default(cuid())
+  nome                 String
+  restaurante          String?
+  telefoneNormalizado  String?      // E.164 sem "+": 5521999998888
+  tipoTelefone         TipoTelefone @default(INVALIDO)
+  telefoneOriginal     String?      // o que veio na planilha, para auditoria
+  categoria            String?
+  bairro               String?
+  bloco                String?
+  source               LeadSource   @default(LEDS_IMPORT)
+  interesse            Interesse?
+  status               LeadStatus   @default(NOVO)
+  flags                String[]     @default([])
+  utm                  Json?
+
+  // C3 — dados da planilha do ledsflowfoods
+  endereco             String?
+  nota                 Float?
+  avaliacoes           Int?
+  obs                  String?
+
+  // C3 — enriquecimento (2ª passada, manual)
+  instagram            String?
+  ifoodUrl             String?
+  donoNome             String?
+
+  // C3 — scoring
+  scoreBase            Int?         // 0–70
+  capacidade           Int?         // 0–35
+  acessoDecisor        Int?         // 0–20
+  territorio           Int?         // 0–15
+  gapDigital           Int?         // 0–30, null enquanto não apurado
+  scoreTotal           Int?         // 0–100, null enquanto gapDigital for null
+  tier                 Tier?
+
+  canal                Canal        @default(VISITA)
+  lote                 String?
+  importadoEm          DateTime?
+  criadoEm             DateTime     @default(now())
+  atualizadoEm         DateTime     @updatedAt
+
+  eventos              LeadEvent[]
+  mensagens            Message[]
+  enrollments          Enrollment[]
+  itensLote            BatchItem[]
+
+  // Dedup de reimportação. Parcial no Postgres (só onde não é null) via
+  // migration — Prisma não expressa índice parcial no schema.
+  @@unique([telefoneNormalizado])
+  @@index([status])
+  @@index([tier])
+  @@index([bloco, bairro])
+  @@index([canal])
+  @@index([lote])
+}
+
+model LeadEvent {
+  id        String   @id @default(cuid())
+  leadId    String
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tipo      String   // import, score, envio, entrega, leitura, resposta, classificacao, status, nota, exclusao
+  descricao String
+  dados     Json?
+  criadoEm  DateTime @default(now())
+
+  @@index([leadId, criadoEm])
+  @@index([tipo])
+}
+
+// Opt-out sobrevive a reimportação: a chave é o telefone, não o lead. Apagar o
+// lead e reimportar NÃO devolve a pessoa para a fila.
+model OptOut {
+  id                  String   @id @default(cuid())
+  telefoneNormalizado String   @unique
+  termo               String?  // a palavra que casou, para auditoria
+  origem              String   @default("RESPOSTA")
+  criadoEm            DateTime @default(now())
+}
+
+// --------------------------------------------------------------- templates
+
+enum Toque {
+  D0
+  D4
+  D10
+}
+
+enum CanalTemplate {
+  WHATSAPP
+  INSTAGRAM
+}
+
+model Template {
+  id          String        @id @default(cuid())
+  categoria   String?       // null = template padrão
+  toque       Toque
+  canal       CanalTemplate @default(WHATSAPP)
+  variante    String        @default("A")
+  corpo       String
+  ativo       Boolean       @default(true)
+  validadoEm  DateTime?
+  criadoEm    DateTime      @default(now())
+  atualizadoEm DateTime     @updatedAt
+
+  mensagens   Message[]
+
+  @@unique([categoria, toque, canal, variante])
+  @@index([ativo, toque])
+}
+
+model Sequence {
+  id          String         @id @default(cuid())
+  nome        String         @unique
+  ativa       Boolean        @default(true)
+  criadoEm    DateTime       @default(now())
+  steps       SequenceStep[]
+  enrollments Enrollment[]
+}
+
+model SequenceStep {
+  id          String   @id @default(cuid())
+  sequenceId  String
+  sequence    Sequence @relation(fields: [sequenceId], references: [id], onDelete: Cascade)
+  toque       Toque
+  offsetDias  Int
+  ordem       Int
+
+  @@unique([sequenceId, toque])
+  @@index([sequenceId, ordem])
+}
+
+enum EnrollmentStatus {
+  ATIVA
+  PAUSADA_RESPOSTA
+  PAUSADA_MANUAL
+  CONCLUIDA
+  OPT_OUT
+}
+
+model Enrollment {
+  id             String           @id @default(cuid())
+  leadId         String
+  lead           Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sequenceId     String
+  sequence       Sequence         @relation(fields: [sequenceId], references: [id])
+  status         EnrollmentStatus @default(ATIVA)
+  toqueAtual     Toque?
+  proximoEnvioEm DateTime?
+  pausadoEm      DateTime?
+  motivoPausa    String?
+  criadoEm       DateTime         @default(now())
+
+  mensagens      Message[]
+
+  // Um lead não fica em duas cadências da mesma sequência ao mesmo tempo.
+  @@unique([leadId, sequenceId])
+  @@index([status, proximoEnvioEm])
+  @@index([proximoEnvioEm])
+}
+
+// ----------------------------------------------------------------- outbox
+
+enum Direction {
+  IN
+  OUT
+}
+
+enum MessageStatus {
+  PENDENTE
+  AGENDADA
+  ENVIADA
+  ENTREGUE
+  LIDA
+  FALHA
+  RECUSADA
+}
+
+model Message {
+  id                 String        @id @default(cuid())
+  direction          Direction
+  kind               String        // CADENCIA | RESPOSTA_MANUAL | NOTIFICACAO | ...
+  status             MessageStatus @default(PENDENTE)
+
+  // A unicidade do dedup mora AQUI, no banco. Worker reiniciado no meio de um
+  // lote e duplo clique em "Aprovar" batem na constraint, não na boa vontade
+  // do código.
+  dedupKey           String        @unique
+  evolutionMessageId String?       @unique
+
+  to                 String?
+  corpoRenderizado   String?
+  erro               String?
+  tentativas         Int           @default(0)
+
+  agendadaPara       DateTime?
+  enviadaEm          DateTime?
+  entregueEm         DateTime?
+  lidaEm             DateTime?
+  criadoEm           DateTime      @default(now())
+
+  leadId             String?
+  lead               Lead?         @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  enrollmentId       String?
+  enrollment         Enrollment?   @relation(fields: [enrollmentId], references: [id], onDelete: SetNull)
+  templateId         String?
+  template           Template?     @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  loteId             String?
+  lote               Batch?        @relation(fields: [loteId], references: [id], onDelete: SetNull)
+  toque              Toque?
+
+  classificacao      InboundClassification?
+
+  @@index([status, agendadaPara])
+  @@index([leadId, criadoEm])
+  @@index([loteId])
+  @@index([direction, criadoEm])
+}
+
+// ------------------------------------------------------------------- lote
+
+enum BatchStatus {
+  PROPOSTO
+  APROVADO
+  EM_ENVIO
+  CONCLUIDO
+  CANCELADO
+}
+
+model Batch {
+  id         String      @id @default(cuid())
+  data       DateTime    @db.Date
+  status     BatchStatus @default(PROPOSTO)
+  aprovadoEm DateTime?
+  aprovadoPor String?
+  criadoEm   DateTime    @default(now())
+
+  itens      BatchItem[]
+  mensagens  Message[]
+
+  // Um lote por dia. O segundo "propor lote" do mesmo dia atualiza, não duplica.
+  @@unique([data])
+  @@index([status])
+}
+
+model BatchItem {
+  id       String   @id @default(cuid())
+  batchId  String
+  batch    Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  leadId   String
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  toque    Toque
+  ordem    Int
+
+  @@unique([batchId, leadId])
+  @@index([batchId, ordem])
+}
+
+// -------------------------------------------------------------- inbox / IA
+
+enum Intencao {
+  INTERESSADO
+  PERGUNTA
+  DEPOIS
+  RECUSA
+  OPT_OUT
+  OUTRO
+}
+
+model InboundClassification {
+  id               String   @id @default(cuid())
+  messageId        String   @unique
+  message          Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  intencao         Intencao
+  confianca        Float
+  rascunhoSugerido String?
+  custoIA          Decimal? @db.Decimal(10, 6)
+  modelo           String?
+  criadoEm         DateTime @default(now())
+
+  @@index([intencao])
+}
+
+// ------------------------------------------------------ contadores e estado
+
+// Base dos tetos. A data é o dia em America/Sao_Paulo — gravada já convertida,
+// nunca derivada de now() em UTC.
+model DailyCounter {
+  id            String   @id @default(cuid())
+  data          DateTime @db.Date
+  instancia     String
+  enviados      Int      @default(0)
+  entregues     Int      @default(0)
+  falhas        Int      @default(0)
+  ultimoEnvioEm DateTime?
+
+  @@unique([data, instancia])
+  @@index([instancia, data])
+}
+
+model InstanceState {
+  id              String    @id @default(cuid())
+  nome            String    @unique
+  estado          String    @default("close")
+  ultimoCheck     DateTime?
+  // Início da rampa. É o PRIMEIRO ENVIO, não a criação da instância: número
+  // criado e esquecido por um mês não está aquecido, está parado.
+  primeiroEnvioEm DateTime?
+  atualizadoEm    DateTime  @updatedAt
+}
+
+// ------------------------------------------------------------ infra comum
+
+model Setting {
+  chave        String   @id
+  valor        Json
+  atualizadoEm DateTime @updatedAt
+}
+
+model AuditLog {
+  id       String   @id @default(cuid())
+  userId   String?
+  user     User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  evento   String
+  dados    Json?
+  ip       String?
+  criadoEm DateTime @default(now())
+
+  @@index([evento, criadoEm])
+  @@index([criadoEm])
+}
+
+model WebEvent {
+  id          String   @id @default(cuid())
+  pagina      String
+  evento      String
+  origem      String?
+  utm         Json?
+  referrer    String?
+  sessionHash String?
+  ts          DateTime @default(now())
+
+  @@index([pagina, ts])
+  @@index([evento, ts])
+}
