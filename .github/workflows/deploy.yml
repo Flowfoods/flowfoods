@@ -1,0 +1,73 @@
+name: Portão e deploy
+
+# O deploy deixa de depender de alguém abrir o painel: todo push em `master`
+# roda o portão e, passando, chama o webhook do Dokploy.
+#
+# Enquanto o segredo DOKPLOY_DEPLOY_WEBHOOK não existir, o passo de deploy
+# avisa e sai com sucesso — sem falhar o build por uma configuração que ainda
+# não foi feita. O portão continua rodando e protegendo `master` desde já.
+#
+# Para ligar: Dokploy → aplicação → Deployments → copiar a URL do webhook →
+# GitHub → Settings → Secrets and variables → Actions → New repository secret
+# → nome `DOKPLOY_DEPLOY_WEBHOOK`.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  portao:
+    name: Portão (lint · tipos · testes · build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      # O portão de conteúdo veio com a F1 do Caminho 1 e rodava só à mão.
+      # Ele existe justamente porque build e tipos não enxergam credibilidade:
+      # "1000+" compila igual a "100+". Rodando aqui, ele passa a valer.
+      - name: Portão de conteúdo
+        run: npm run gate
+      - name: Tipos
+        run: npx tsc --noEmit
+      - name: Testes do motor do Diagnóstico
+        run: npm test
+      - name: Build de produção
+        run: npm run build
+
+  deploy:
+    name: Deploy no Dokploy
+    needs: portao
+    # workflow_dispatch entra na condição para o deploy poder ser re-disparado
+    # da aba Actions no instante em que o segredo existir — sem commit vazio só
+    # para acordar o webhook. Continua travado na master: dispatch em outra ref
+    # roda só o portão.
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar o webhook
+        env:
+          WEBHOOK: ${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WEBHOOK:-}" ]; then
+            echo "::notice title=Deploy não disparado::O segredo DOKPLOY_DEPLOY_WEBHOOK não está configurado. O portão passou; a subida segue manual."
+            exit 0
+          fi
+          codigo=$(curl -sS -X POST -o /tmp/resposta.txt -w '%{http_code}' --max-time 60 "$WEBHOOK")
+          echo "Dokploy respondeu HTTP $codigo"
+          # A resposta pode trazer id de build; nunca traz segredo — o webhook
+          # inteiro vive no secret e não é ecoado.
+          head -c 500 /tmp/resposta.txt || true
+          echo
+          if [ "$codigo" -lt 200 ] || [ "$codigo" -ge 300 ]; then
+            echo "::error title=Deploy recusado::O Dokploy respondeu $codigo."
+            exit 1
+          fi

@@ -1,15 +1,39 @@
-import type { Servico, CaseStudy, EtapaProcesso, Diferencial, ContactInfo } from '@/types';
+import type {
+  Servico,
+  EtapaProcesso,
+  Diferencial,
+  ContactInfo,
+  OrigemContato,
+} from '@/types';
+
+/**
+ * Um texto de WhatsApp por origem de clique.
+ *
+ * Serve para duas coisas: a conversa já começa no assunto certo, e o Rodolfo sabe de qual
+ * botão do site a pessoa veio sem precisar perguntar.
+ */
+export const WHATSAPP_TEXTOS: Record<OrigemContato, string> = {
+  hero: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero agendar o diagnóstico gratuito de 30 min.',
+  diagnostico:
+    'Olá Rodolfo! Vim pelo site da FlowFoods e quero agendar o diagnóstico gratuito de 30 min.',
+  consultoria:
+    'Olá Rodolfo! Vim pelo site da FlowFoods e quero conversar sobre a Consultoria completa.',
+  parceria: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero conversar sobre a Parceria contínua.',
+  flutuante: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero saber mais.',
+};
+
+export const WHATSAPP_NUMERO = '5521996416060';
+
+export function whatsappUrl(origem: OrigemContato): string {
+  return `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(WHATSAPP_TEXTOS[origem])}`;
+}
 
 export const CONTACT_INFO: ContactInfo = {
-  whatsapp: '5521996416060',
-  whatsappUrl:
-    'https://wa.me/5521996416060?text=Ol%C3%A1!%20Vi%20o%20site%20da%20FlowFoods%20e%20gostaria%20de%20saber%20mais%20sobre%20a%20consultoria.',
+  whatsapp: WHATSAPP_NUMERO,
+  whatsappUrl: whatsappUrl('flutuante'),
   whatsappDisplay: '(21) 99641-6060',
-  email: 'rrodolfoacifood@gmail.com',
-  // Confirmado pelo Rodolfo em 25/08/2026. É o mesmo perfil que vai em TODA
-  // mensagem de abordagem do Barney (fonte: `ledsflowfoods/references/mensagens.md`):
-  // se o site e a abordagem divergirem, o dono do restaurante que for conferir
-  // quem é o Rodolfo cai num beco sem saída.
+  // `email` fica fora até `contato@consultoriaflowfoods.com.br` existir. Ver
+  // sites/flowfoods/docs/PENDENCIAS_RODOLFO.md, item 8.
   instagram: 'rrodolfoac',
   instagramUrl: 'https://instagram.com/rrodolfoac',
   linkedin: 'Rodolfo Cavalcante',
@@ -70,66 +94,9 @@ export const SERVICOS: Servico[] = [
 export const CREDENCIAIS = [
   '✅ Conselheiro do Fórum iFood — ajudou no DESIGN da plataforma (não é usuário comum)',
   '✅ Une tecnologia e operação — sistemas digitais desenvolvidos especificamente para o food service',
-  '✅ Treinador de 100+ pessoas (sala, cozinha, gerência) — resultado comprovável',
+  '✅ Treinador de 100+ profissionais (sala, cozinha, gerência)',
   '✅ Estruturou restaurantes com arquitetos parceiros (desde a concepção)',
   '✅ Especialista em CMV, DRE, margem — restaurante não quebra na sua mão',
-];
-
-export const CASES: CaseStudy[] = [
-  {
-    id: 'bibi-sucos',
-    nome: 'Bibi Sucos',
-    descricao:
-      'Rede de Suco & Açaí — transformação operacional completa com expansão para delivery e implementação do Clube Bibi.',
-    desafios:
-      'Operação manual, inconsistência de processos, falta de padronização e baixa presença em plataformas de delivery.',
-    resultados: [
-      '3 unidades ativas com operação sistêmica',
-      'iFood integrado 24/7 com +45% receita em 6 meses',
-      'SaaS próprio em produção',
-      'Clube Bibi — programa de fidelidade ativo',
-      'Fichas técnicas e controle de CMV',
-      'Treinamento com padronização completa',
-    ],
-    impacto:
-      'De 1 loja caótica para 3 lojas sistêmicas. iFood integrado, fidelidade automatizada, gestão de custos no controle.',
-  },
-  {
-    id: 'balada-mix',
-    nome: 'Balada Mix',
-    descricao:
-      'Hamburgueria Premium — automação completa de delivery e estruturação de marca desde a concepção.',
-    desafios:
-      'Gerente respondendo pedidos manualmente 15h/dia, marca nova sem posicionamento, cardápio indefinido.',
-    resultados: [
-      'Automação WhatsApp 100% — n8n responde automaticamente',
-      'Tempo de resposta: 5 min (era 45 min)',
-      'Ticket médio +R$ 80 após menu otimizado',
-      'Taxa de repetição: 40%',
-      'Desenvolvimento completo de marca e identidade',
-      'Processo de trabalho padronizado',
-    ],
-    impacto:
-      'Gerente supervisiona ao invés de executar. Menos erro, mais tempo livre, ticket médio maior.',
-  },
-  {
-    id: 'casa-severina',
-    nome: 'Casa da Severina',
-    descricao:
-      'Comida Caseira Nordestina — estruturação de cozinha, treinamento e cardápio em 60 dias.',
-    desafios:
-      'Severina fazia tudo sozinha, equipe sem estrutura, sem cardápio documentado, operação dependente de uma pessoa.',
-    resultados: [
-      'Estrutura de cozinha planejada e implementada',
-      'Cardápio visual com descrições culturais',
-      'Treinamento de gerente em 60 dias',
-      'Receitas documentadas (padrão garantido)',
-      'Equipe operando sem Severina presente',
-      'Presença em plataformas de delivery',
-    ],
-    impacto:
-      'Severina agora viaja 1x/mês. O restaurante funciona sem ela presente — foi a primeira vez em 8 anos.',
-  },
 ];
 
 export const PROCESSO: EtapaProcesso[] = [

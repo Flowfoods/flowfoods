@@ -10,8 +10,8 @@ export default function Servicos() {
           <div>
             <p className="text-primary text-xs font-semibold tracking-[0.4em] uppercase mb-4">Serviços</p>
             <h2 className="font-display leading-none uppercase">
-              <span className="block text-[clamp(2.5rem,8vw,5rem)] text-ink">CONSULTORIA</span>
-              <span className="block text-[clamp(2.5rem,8vw,5rem)] text-ink-5">360°</span>
+              <span className="block text-[clamp(2.5rem,8vw,5rem)] text-ink">SEIS</span>
+              <span className="block text-[clamp(2.5rem,8vw,5rem)] text-ink-5">FRENTES.</span>
             </h2>
           </div>
           <p className="text-ink-4 max-w-xs text-sm leading-relaxed md:text-right">
@@ -60,7 +60,8 @@ export default function Servicos() {
             ))}
           </ul>
           <p className="text-ink-5 text-xs mt-6 pt-6 border-t border-secondary/10 leading-relaxed">
-            Projetos entregues no Rio de Janeiro: Bibi Sucos · Balada Mix · e outros
+            Onde essa experiência foi construída: Balada Mix (8 anos) · Grupo Bibi Sucos (16
+            lojas, 5 marcas no iFood) · Instituto Gourmet
           </p>
         </div>
 
