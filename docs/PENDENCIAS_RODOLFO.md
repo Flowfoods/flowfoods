@@ -14,9 +14,16 @@ Sobrou uma ponta: o subtree `flowfoods/` que a primeira rodada criou dentro do
 
 ---
 
-## 🔴 2. Credenciais no Dokploy
+## 🔴 2. Um gesto no painel do Dokploy
 
-Nada sobe sem as três primeiras.
+Desde 26/08 está tudo na `master` com CI verde, e o compose gera os segredos
+sozinho no primeiro boot — **não precisa gerar nem colar variável nenhuma
+para subir**. O gesto é: Create Application → **Docker Compose** →
+`Flowfoods/flowfoods` @ `master` → Deploy, e abrir o log do `web` para pegar
+o link de setup (`docs/DEPLOY_DOKPLOY.md`, caminho curto).
+
+A tabela abaixo vale para o caminho longo (serviços na mão) ou para
+sobrescrever um segredo do volume pelo painel — não é pré-requisito.
 
 | Variável | Para quê | Como gerar |
 |---|---|---|

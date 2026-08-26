@@ -245,3 +245,38 @@ Todos são a mesma classe de defeito: dado de contato duplicado em dois arquivos
 divergindo com o tempo. Num JSON-LD isso é caro — `sameAs` e `url` são o que o
 Google usa para casar a entidade com os perfis e o domínio. Corrigir um e deixar
 os outros sabendo que estavam errados seria pior. Agora há uma fonte só.
+
+---
+
+### 19. 2026-08-26 · O Barney vai para a `master` — porque é onde o deploy mora
+
+**Alternativa:** manter o Caminho 3 na branch e pedir para o Dokploy apontar
+para ela.
+
+**Razão:** enquanto eu desenvolvia, as outras frentes deram à `master` um CI
+próprio ("Portão e deploy": lint, portão de conteúdo, tsc, testes, build →
+webhook do Dokploy) e provaram, lendo a produção pelo runner do GitHub, que o
+ar ainda serve o build de julho — falta a primeira subida pelo painel. Ou
+seja: o único caminho de deploy que existe passa pela `master`. Branch parada
+não deploya.
+
+Como foi feito, na ordem que protege o site:
+
+1. `origin/master` entrou NA branch primeiro; conflitos resolvidos e portão
+   inteiro rodado ali (330 testes = 184 do Barney + 146 do Diagnóstico).
+2. Arquivos do SITE ficaram com a versão da `master` (`constants.ts`,
+   `seo-schema.ts`) — a F1 fez as mesmas correções que eu, melhor.
+3. zod unificado na v4: o motor do Diagnóstico tinha UM zod-3-ismo
+   (`errorMap`), adaptado em uma linha; os `z.record` deles já eram de dois
+   argumentos, válidos nas duas versões. Os 146 testes deles validam que nada
+   mudou de comportamento.
+4. Vitest num config só (`vitest.config.mts`), com os dois `include` e fuso
+   `America/Sao_Paulo`.
+5. Só então `master ← branch` (merge `8b0b9aa`) e push.
+
+**A trava que fez isso ser seguro:** o middleware ganhou o gate de banco —
+sem `DATABASE_URL` no processo, todo `/rodolfo/*` responde **503 "em
+configuração"** (testado em runtime nos dois modos). O app da produção não
+tem banco hoje; quando este merge subir, o site continua idêntico e a área
+privada degrada com honestidade em vez de estourar 500. Ligar o banco no
+painel desliga o gate sozinho, sem redeploy de código.

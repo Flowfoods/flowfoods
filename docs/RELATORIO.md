@@ -125,7 +125,18 @@ Sem eufemismo:
 
 ## Próximo
 
-1. Credenciais no Dokploy → migration → deploy de `web` e `worker`
-2. Instância `flowfoods-prospeccao` + webhook + QR
+O código chegou ao fim do que este ambiente alcança: **F1–F5 completos e o
+Barney inteiro estão na `master`** (merge `8b0b9aa`, 26/08), com o portão do
+CI verde — lint, portão de conteúdo, tsc, 330 testes, build. A sessão não
+alcança o painel do Dokploy (o proxy recusa o túnel; confirmado por curl e
+por navegador), então o que resta é painel, na sua mão:
+
+1. **Subir o compose** (`docs/DEPLOY_DOKPLOY.md`, caminho curto): Create
+   Application → Docker Compose → `Flowfoods/flowfoods` @ `master` →
+   Deploy. Zero variável; o link de setup aparece no log do `web`.
+   — *ou, se preferir manter o app Nixpacks atual:* copie a URL do webhook
+   (app → Deployments) para o secret `DOKPLOY_DEPLOY_WEBHOOK` no GitHub e
+   clique Deploy uma vez; o site sobe atualizado com `/rodolfo` em modo
+   "em configuração" até existir Postgres.
+2. Instância `flowfoods-prospeccao` na Evolution + webhook + QR
 3. 10 envios manuais → ligar `disparoAtivo`
-4. F5 (funil, cortes, CSV) e Lead 360

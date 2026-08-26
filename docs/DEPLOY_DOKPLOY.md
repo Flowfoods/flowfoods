@@ -16,16 +16,19 @@ No projeto `flowfoods` → **Create Application** → tipo **Docker Compose**:
 | Campo | Valor |
 |---|---|
 | Repositório | `Flowfoods/flowfoods` |
-| Branch | `claude/rodolfo-barney-cadence-bc7dcy` |
+| Branch | `master` |
 | Compose path | `docker-compose.yml` |
 
 **Não precisa preencher Environment nenhum.** No primeiro boot, o serviço
 `segredos` sorteia todos os tokens e guarda num volume — eles sobrevivem a
 redeploy e nunca passam por chat, arquivo ou área de transferência.
 
-> Aponte para a **branch**, não para `master`: o site institucional sai de
-> `master` e não foi tocado. Configure um domínio (produção ou um
-> `staging.consultoriaflowfoods.com.br`) no serviço **web**, porta **3000**.
+> Desde 26/08 o Barney vive na `master` (merge `8b0b9aa`, portão verde) — o
+> compose sobe da `master` e traz site + `/rodolfo` juntos. O serviço `web`
+> serve TUDO: mova o domínio `consultoriaflowfoods.com.br` para ele (porta
+> **3000**) e o app Nixpacks antigo fica redundante — pode ser pausado. Se
+> preferir testar antes, dê um `staging.consultoriaflowfoods.com.br` ao
+> compose e deixe o app antigo onde está.
 >
 > Se usar um domínio diferente de `consultoriaflowfoods.com.br`, defina UMA
 > variável no painel: `NEXTAUTH_URL=https://<seu-dominio>` — o login redireciona
@@ -178,7 +181,7 @@ São **442 linhas, só CREATE** — nenhum DROP. Roda em banco vazio sem risco.
 | Campo | Valor |
 |---|---|
 | Repositório | `Flowfoods/flowfoods` |
-| Branch | `claude/rodolfo-barney-cadence-bc7dcy` (ou `master`) |
+| Branch | `master` |
 | Build | Nixpacks (autodetecta Next.js) |
 | Build command | `npm ci && npm run build` |
 | Start command | `npm start` |
