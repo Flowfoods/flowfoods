@@ -45,7 +45,11 @@ jobs:
   deploy:
     name: Deploy no Dokploy
     needs: portao
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # workflow_dispatch entra na condição para o deploy poder ser re-disparado
+    # da aba Actions no instante em que o segredo existir — sem commit vazio só
+    # para acordar o webhook. Continua travado na master: dispatch em outra ref
+    # roda só o portão.
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Chamar o webhook
