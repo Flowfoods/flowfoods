@@ -1,0 +1,160 @@
+Patch para `ledsflowfoods/scripts/montar_pacote.py`
+==================================================
+
+A skill mora em `~/.claude/skills/synced/ledsflowfoods/`, fora deste
+repositório — por isso vem como patch em vez de commit.
+
+Aplicar:
+
+    cd ~/.claude/skills/synced/ledsflowfoods
+    git apply /caminho/para/patch-ledsflowfoods-push.diff
+    # ou aplicar as três mudanças à mão: são pequenas e independentes
+
+Traz três coisas:
+
+1. `--push` manda o lote direto para `POST /api/leads/import`. O app HTML
+   continua existindo e vira o caminho alternativo, não some.
+2. `limpa()` para de deixar traço órfão no nome do restaurante — o defeito que
+   colocava "Katsuo Culinaria Asiatica **-**" na primeira linha que o dono lê.
+3. `dor()` passa a receber o bairro e aplica o ângulo do Centro, que
+   `references/mensagens.md` manda e o script nunca implementou.
+
+O token vai por variável de ambiente, nunca em argumento: argumento de linha de
+comando aparece em `ps` e fica no histórico do shell.
+
+    export FLOWFOODS_IMPORT_TOKEN=...   # o LEADS_IMPORT_TOKEN do Dokploy
+    python3 scripts/montar_pacote.py leads.json --rotulo ZonaOeste \
+        --somente-celular --push
+
+---
+
+--- a/scripts/montar_pacote.py
++++ b/scripts/montar_pacote.py
+@@ -1,6 +1,9 @@
+ import argparse
+ import csv
+ import json
++import os
++import urllib.error
++import urllib.request
+ import sys
+ from collections import Counter
+
+@@ -30,7 +33,11 @@
+ def limpa(n):
+     for c in [" Campo Grande"," Bangu"," Realengo"," RJ"," - "," |"]:
+         if c in n: n = n.split(c)[0]
+-    return n.strip().rstrip(".").strip()
++    # Os sufixos sao testados em ordem: " Campo Grande" corta ANTES de " - ",
++    # e o que sobra termina em " -" — que ja nao casa com " - ". O rstrip(".")
++    # original so limpava ponto, entao o traco sobrevivia e entrava no gancho,
++    # que e a primeira linha que o dono do restaurante le.
++    return n.strip().rstrip(" .,-|").strip()
+
+
+ def gancho(nome, nota, aval, bairro):
+@@ -54,8 +61,15 @@
+     return f"Vi o perfil do {nome} no Google — {nota} com {a} avaliacoes e presenca firme em {bairro}."
+
+
+-def dor(cat):
++def dor(cat, bairro=""):
++    """Angulo de valor. O bairro vem antes da categoria de proposito."""
++    # references/mensagens.md: "Para Centro, troque o angulo por giro de almoco,
++    # fila e ticket executivo — delivery noturno nao e o jogo ali." Sem isto,
++    # uma hamburgueria no Centro recebe o argumento de marketplace, que e o
++    # errado para quem vive de almoco executivo.
++    if "centro" in (bairro or "").lower():
++        return ("No Centro o jogo e giro de almoco: fila que anda, ticket executivo e mesa "
++                "que vira. Delivery noturno ali quase nunca e o que paga a conta.")
+     c = cat.lower()
+     if "hamburgueria" in c: return "O que costumo encontrar em hamburgueria com esse movimento e margem presa no marketplace e cardapio que poderia vender mais por pedido."
+     if "japon" in c or "asiat" in c: return "Japones costuma ter o ticket mais alto da regiao e o cliente mais fiel — mas quase ninguem tem base de dados pra chamar esse cliente de volta."
+@@ -115,7 +129,7 @@
+         notabr = f"{nota:.1f}".replace(".", ",")
+
+         g = gancho(nome_curto, notabr, aval, r["bairro"])
+-        d = dor(r["categoria"])
++        d = dor(r["categoria"], r.get("bairro", ""))
+
+         corpo = (
+             "{SAUDACAO}! Aqui e o Rodolfo, da FlowFoods — consultoria de gastronomia aqui do Rio. "
+@@ -756,6 +770,58 @@
+     return caminho
+
+
++# ------------------------------------------------------------------------- push
++def enviar_para_portal(leads, rotulo, url, somente_celular):
++    """Manda o lote para o portal. Devolve o resumo da importacao.
++
++    O portal e quem decide o que entra: conflito com o Bibi, opt-out antigo e
++    telefone invalido sao barrados LA, nao aqui. Este script so entrega.
++    """
++    token = os.environ.get("FLOWFOODS_IMPORT_TOKEN", "").strip()
++    if not token:
++        sys.exit(
++            "Falta FLOWFOODS_IMPORT_TOKEN no ambiente.\n"
++            "  export FLOWFOODS_IMPORT_TOKEN=<LEADS_IMPORT_TOKEN do Dokploy>\n"
++            "Nunca passe o token como argumento: ele apareceria em `ps` e no historico."
++        )
++
++    # So as colunas da planilha. As chaves internas (msg, msgig, num, curto) sao
++    # do app HTML e nao interessam ao portal.
++    linhas = [{c: l.get(c, "") for c in COLS} for l in leads]
++    corpo = json.dumps(
++        {"lote": rotulo, "somenteCelular": bool(somente_celular), "linhas": linhas}
++    ).encode("utf-8")
++
++    req = urllib.request.Request(
++        url.rstrip("/") + "/api/leads/import",
++        data=corpo,
++        method="POST",
++        headers={"Content-Type": "application/json", "x-import-token": token},
++    )
++
++    try:
++        with urllib.request.urlopen(req, timeout=120) as r:
++            return json.loads(r.read().decode("utf-8"))
++    except urllib.error.HTTPError as e:
++        detalhe = e.read().decode("utf-8", "replace")[:400]
++        if e.code == 401:
++            sys.exit("Token recusado (401). Confira o LEADS_IMPORT_TOKEN no Dokploy.")
++        sys.exit(f"O portal recusou o lote (HTTP {e.code}): {detalhe}")
++    except urllib.error.URLError as e:
++        sys.exit(f"Nao consegui falar com o portal: {e.reason}")
++
++
+ # ------------------------------------------------------------------------------ main
+ def main():
+     p = argparse.ArgumentParser(description="Gera os entregaveis de prospeccao da FlowFoods")
+@@ -764,6 +830,11 @@
+     p.add_argument("--rotulo", default="Lote", help="rotulo do lote, ex: ZonaOeste")
+     p.add_argument("--somente-celular", action="store_true",
+                    help="descarta fixos e leads sem telefone")
++    p.add_argument("--push", action="store_true",
++                   help="envia o lote para o portal (exige FLOWFOODS_IMPORT_TOKEN)")
++    p.add_argument("--portal", default="https://consultoriaflowfoods.com.br",
++                   help="URL do portal para o --push")
+     a = p.parse_args()
+
+     with open(a.json, encoding="utf-8") as f:
+@@ -786,6 +857,18 @@
+     print()
+     for c in (app, xlsx, csvf):
+         print("->", c)
++
++    if a.push:
++        print()
++        print(f"Enviando para {a.portal} ...")
++        r = enviar_para_portal(leads, a.rotulo, a.portal, a.somente_celular)
++        print(f"  novos ............ {r.get('novos', 0)}")
++        print(f"  atualizados ...... {r.get('atualizados', 0)}")
++        print(f"  conflito Bibi .... {r.get('bloqueadosConflito', 0)}")
++        print(f"  opt-out .......... {r.get('bloqueadosOptOut', 0)}")
++        print(f"  sem celular ...... {r.get('semTelefone', 0)}")
++        if r.get("flagados"):
++            print(f"  revisar antes de abordar: {', '.join(r['flagados'][:8])}")
++
+     print()
+     print("Passe os tres para present_files, com o HTML primeiro.")
+

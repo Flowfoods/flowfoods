@@ -14,3 +14,8 @@ yarn-error.log*
 .vercel
 *.tsbuildinfo
 next-env.d.ts
+
+# Barney / Espaco do Rodolfo
+tsconfig.tsbuildinfo
+.env
+.env.local

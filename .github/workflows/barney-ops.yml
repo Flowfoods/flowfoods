@@ -1,0 +1,127 @@
+# Operações do Barney executadas pelos runners do GitHub.
+#
+# Por que isto existe: a sessão do Claude não tem rota de rede até a VPS (o
+# proxy recusa o túnel), mas os runners do GitHub têm internet aberta — e o
+# Claude consegue DISPARAR este workflow e LER os logs pela API do GitHub.
+# Ou seja: este arquivo é o par de mãos remoto da sessão.
+#
+# Nenhum job imprime segredo. O token do Dokploy só viaja em header.
+#
+# Ações:
+#   verificar      — roda scripts/verificar-deploy.sh contra o alvo (sem segredo)
+#   descobrir-api  — mapeia a API do Dokploy instalado (exige os 2 secrets)
+#   deploy-compose — dispara o deploy de um compose já criado no painel
+#
+# Secrets (Settings → Secrets and variables → Actions):
+#   DOKPLOY_URL        ex.: https://dokploy.seu-dominio ou http://IP:3000
+#   DOKPLOY_API_TOKEN  gerado no Dokploy em Settings → API/CLI
+
+name: barney-ops
+
+on:
+  workflow_dispatch:
+    inputs:
+      acao:
+        description: O que executar
+        type: choice
+        required: true
+        default: verificar
+        options:
+          - verificar
+          - descobrir-api
+          - deploy-compose
+      alvo:
+        description: URL do portal (para "verificar")
+        type: string
+        required: false
+        default: https://consultoriaflowfoods.com.br
+      compose_id:
+        description: composeId do Dokploy (para "deploy-compose")
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    if: inputs.acao == 'verificar'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar o portal
+        run: |
+          chmod +x scripts/verificar-deploy.sh
+          ./scripts/verificar-deploy.sh "${{ inputs.alvo }}"
+
+  descobrir-api:
+    if: inputs.acao == 'descobrir-api'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mapear a API do Dokploy instalado
+        env:
+          URL: ${{ secrets.DOKPLOY_URL }}
+          TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+        run: |
+          set -u
+          if [ -z "${URL:-}" ] || [ -z "${TOKEN:-}" ]; then
+            echo "::error::Faltam os secrets DOKPLOY_URL e/ou DOKPLOY_API_TOKEN."
+            echo "Crie o token no Dokploy (Settings → API/CLI) e cadastre os dois em"
+            echo "Settings → Secrets and variables → Actions deste repositório."
+            exit 1
+          fi
+          BASE="${URL%/}"
+          echo "Sondando a API em ${BASE} (token nunca é impresso)"
+          echo
+
+          sonda() {
+            # $1 = descrição · $2 = método · $3 = caminho
+            code=$(curl -sk -o /tmp/corpo -w '%{http_code}' --max-time 20 \
+                     -X "$2" -H "x-api-key: ${TOKEN}" -H 'Content-Type: application/json' \
+                     "${BASE}$3" || echo 000)
+            printf '%-38s %s %-34s -> %s\n' "$1" "$2" "$3" "$code"
+            if [ "$code" != "000" ] && [ -s /tmp/corpo ]; then
+              head -c 400 /tmp/corpo | tr -d '\000' ; echo; echo '---'
+            fi
+          }
+
+          sonda 'raiz'                     GET  /
+          sonda 'openapi'                  GET  /api/openapi.json
+          sonda 'swagger'                  GET  /swagger
+          sonda 'settings.health'          GET  /api/settings.health
+          sonda 'project.all'              GET  /api/project.all
+          sonda 'trpc project.all'         GET  '/api/trpc/project.all?batch=1&input=%7B%7D'
+          sonda 'compose.all'              GET  /api/compose.all
+          echo
+          echo "Pronto. O Claude lê este log e escreve a chamada exata para a versão instalada."
+
+  deploy-compose:
+    if: inputs.acao == 'deploy-compose'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar deploy do compose
+        env:
+          URL: ${{ secrets.DOKPLOY_URL }}
+          TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          COMPOSE_ID: ${{ inputs.compose_id }}
+        run: |
+          set -u
+          if [ -z "${URL:-}" ] || [ -z "${TOKEN:-}" ]; then
+            echo "::error::Faltam os secrets DOKPLOY_URL e/ou DOKPLOY_API_TOKEN."
+            exit 1
+          fi
+          if [ -z "${COMPOSE_ID:-}" ]; then
+            echo "::error::Informe compose_id (aparece na URL do app no painel, ou via descobrir-api)."
+            exit 1
+          fi
+          BASE="${URL%/}"
+          code=$(curl -sk -o /tmp/corpo -w '%{http_code}' --max-time 60 \
+                   -X POST -H "x-api-key: ${TOKEN}" -H 'Content-Type: application/json' \
+                   -d "{\"composeId\":\"${COMPOSE_ID}\"}" \
+                   "${BASE}/api/compose.deploy" || echo 000)
+          echo "POST /api/compose.deploy -> ${code}"
+          head -c 600 /tmp/corpo || true; echo
+          case "$code" in
+            200|201) echo "Deploy disparado." ;;
+            *) echo "::error::Não disparou (HTTP ${code}). Rode a ação descobrir-api e me mande o log."; exit 1 ;;
+          esac
