@@ -70,18 +70,26 @@ jobs:
             echo "Settings → Secrets and variables → Actions deste repositório."
             exit 1
           fi
-          BASE="${URL%/}"
+          # Aceita a URL como for colada: com caminho, âncora, barra final —
+          # fica só scheme://host[:porta]. Quem cola é humano com pressa.
+          BASE=$(printf '%s' "$URL" | sed -E 's#^(https?://[^/]+).*#\1#')
           echo "Sondando a API em ${BASE} (token nunca é impresso)"
           echo
 
           sonda() {
-            # $1 = descrição · $2 = método · $3 = caminho
-            code=$(curl -sk -o /tmp/corpo -w '%{http_code}' --max-time 20 \
-                     -X "$2" -H "x-api-key: ${TOKEN}" -H 'Content-Type: application/json' \
-                     "${BASE}$3" || echo 000)
+            # $1 = descrição · $2 = método · $3 = caminho · $4 = corpo opcional
+            if [ -n "${4:-}" ]; then
+              code=$(curl -sk -o /tmp/corpo -w '%{http_code}' --max-time 20 \
+                       -X "$2" -H "x-api-key: ${TOKEN}" -H 'Content-Type: application/json' \
+                       -d "$4" "${BASE}$3" || echo 000)
+            else
+              code=$(curl -sk -o /tmp/corpo -w '%{http_code}' --max-time 20 \
+                       -X "$2" -H "x-api-key: ${TOKEN}" -H 'Content-Type: application/json' \
+                       "${BASE}$3" || echo 000)
+            fi
             printf '%-38s %s %-34s -> %s\n' "$1" "$2" "$3" "$code"
             if [ "$code" != "000" ] && [ -s /tmp/corpo ]; then
-              head -c 400 /tmp/corpo | tr -d '\000' ; echo; echo '---'
+              head -c 600 /tmp/corpo | tr -d '\000' ; echo; echo '---'
             fi
           }
 
@@ -92,6 +100,10 @@ jobs:
           sonda 'project.all'              GET  /api/project.all
           sonda 'trpc project.all'         GET  '/api/trpc/project.all?batch=1&input=%7B%7D'
           sonda 'compose.all'              GET  /api/compose.all
+          # Corpo vazio de propósito: o 400 de validação do Zod lista os campos
+          # que a versão instalada espera — é o "manual" do create sem docs.
+          sonda 'project.create (campos?)' POST /api/project.create '{}'
+          sonda 'compose.create (campos?)' POST /api/compose.create '{}'
           echo
           echo "Pronto. O Claude lê este log e escreve a chamada exata para a versão instalada."
 
@@ -114,7 +126,7 @@ jobs:
             echo "::error::Informe compose_id (aparece na URL do app no painel, ou via descobrir-api)."
             exit 1
           fi
-          BASE="${URL%/}"
+          BASE=$(printf '%s' "$URL" | sed -E 's#^(https?://[^/]+).*#\1#')
           code=$(curl -sk -o /tmp/corpo -w '%{http_code}' --max-time 60 \
                    -X POST -H "x-api-key: ${TOKEN}" -H 'Content-Type: application/json' \
                    -d "{\"composeId\":\"${COMPOSE_ID}\"}" \

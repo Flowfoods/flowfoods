@@ -25,6 +25,15 @@ o link de setup (`docs/DEPLOY_DOKPLOY.md`, caminho curto).
 A tabela abaixo vale para o caminho longo (serviços na mão) ou para
 sobrescrever um segredo do volume pelo painel — não é pré-requisito.
 
+**Atalho "eu faço tudo": me entregue a chave da API.** Se preferir não clicar
+nada de deploy, faça só isto uma vez (2 min): no Dokploy, **Settings →
+API/CLI → gerar token**; no GitHub, crie DOIS secrets em
+`Settings → Secrets and variables → Actions` — `DOKPLOY_API_TOKEN` (o token)
+e `DOKPLOY_URL` (o endereço do painel, como está na barra do navegador).
+A partir daí o Claude descobre a API instalada, cria a aplicação, dispara o
+deploy e verifica tudo pelos runners do GitHub — sem mais nenhum clique seu.
+O token fica SÓ no GitHub Secrets: nunca colar em chat ou arquivo.
+
 | Variável | Para quê | Como gerar |
 |---|---|---|
 | `DATABASE_URL` | Postgres | do serviço no Dokploy |
