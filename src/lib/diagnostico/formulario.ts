@@ -180,7 +180,7 @@ export const etapa8Schema = z.object({
   // Sem consentimento não existe diagnóstico. `z.literal(true)` recusa `false`
   // e recusa ausente — é a trava, não um aviso na tela.
   consentimento: z.literal(true, {
-    errorMap: () => ({ message: "Preciso do seu ok para usar as respostas." }),
+    error: "Preciso do seu ok para usar as respostas.",
   }),
 });
 
