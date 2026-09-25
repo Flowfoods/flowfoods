@@ -58,6 +58,8 @@ jobs:
             deve 'Seis frentes'              'seção das frentes'
             deve 'href="/rodolfo/login"'     'botão Entrar para o painel'
             sumiu 'href="/diagnostico"'      'oferta de diagnóstico gratuito'
+            deve  'id="entregas"'            'seção "o que a casa recebe"'
+            sumiu 'visitas presenciais'      'termos comerciais (ficam na proposta)'
             echo
             echo "  credibilidade (F1)"
             sumiu '1000+'                    'número sem prova'
