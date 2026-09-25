@@ -20,7 +20,7 @@ jobs:
     name: Ler consultoriaflowfoods.com.br
     runs-on: ubuntu-latest
     steps:
-      - name: Conferir home e /diagnostico
+      - name: Conferir a home
         run: |
           set -uo pipefail
           SITE=https://consultoriaflowfoods.com.br
@@ -54,8 +54,10 @@ jobs:
             echo "  este repositório constrói este site?"
             deve 'Gastronomia que flui' 'slogan do repositório'
             echo
-            echo "  funil (Caminho 2)"
-            deve 'href="/diagnostico"' 'link para o diagnóstico na home'
+            echo "  site de 25/09 (identidade FlowFoods)"
+            deve 'Seis frentes'              'seção das frentes'
+            deve 'href="/rodolfo/login"'     'botão Entrar para o painel'
+            sumiu 'href="/diagnostico"'      'oferta de diagnóstico gratuito'
             echo
             echo "  credibilidade (F1)"
             sumiu '1000+'                    'número sem prova'
@@ -65,13 +67,11 @@ jobs:
           fi
 
           echo
-          echo "== /diagnostico =="
+          echo "== /diagnostico (apagado em 25/09) =="
           codigo=$(ler "/diagnostico")
-          echo "HTTP $codigo   ($(wc -c < /tmp/corpo.html) bytes)"
-          if [ "$codigo" = "200" ]; then
-            deve 'Diagnóstico gratuito para o seu restaurante' 'título da página'
-            deve 'Em 4 minutos eu entendo o seu restaurante'   'abertura do fluxo'
-            echo "::notice title=Diagnóstico no ar::/diagnostico respondeu 200 — o commit está publicado."
+          echo "HTTP $codigo"
+          if [ "$codigo" = "404" ]; then
+            echo "::notice title=Site de 25/09 no ar::/diagnostico responde 404 — a versão publicada é a atual."
           else
-            echo "::notice title=Diagnóstico ainda não publicado::/diagnostico respondeu $codigo. O código está verde na master; falta o Dokploy subir a nova versão."
+            echo "::notice title=Versão antiga no ar::/diagnostico respondeu $codigo. Falta o Dokploy subir a nova versão."
           fi
