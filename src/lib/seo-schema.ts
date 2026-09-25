@@ -77,7 +77,7 @@ export function getSEOSchema() {
             '@type': 'Offer',
             name: 'Consultoria contínua para restaurantes',
             description:
-              'Ciclo contínuo em seis frentes: estrutura de restaurante, iFood e delivery, treinamento de equipes, gestão financeira, fidelidade e CRM, e sistemas com IA. Duas visitas presenciais por mês e reunião mensal com relatório.',
+              'Ciclo contínuo em seis frentes: estrutura de restaurante, iFood e delivery, treinamento de equipes, gestão financeira, fidelidade e CRM, e sistemas com IA. Diagnóstico, plano de ação, execução com a equipe e acompanhamento mensal com relatório.',
             priceCurrency: 'BRL',
             availability: 'https://schema.org/InStock',
             itemOffered: {
