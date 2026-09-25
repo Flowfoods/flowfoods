@@ -11,6 +11,9 @@
 #   verificar      — roda scripts/verificar-deploy.sh contra o alvo (sem segredo)
 #   descobrir-api  — mapeia a API do Dokploy instalado (exige os 2 secrets)
 #   deploy-compose — dispara o deploy de um compose já criado no painel
+#   api            — uma chamada qualquer à API do Dokploy (método, caminho,
+#                    corpo). É o "par de mãos" para criar app, domínio e
+#                    variáveis sem abrir o painel.
 #
 # Secrets (Settings → Secrets and variables → Actions):
 #   DOKPLOY_URL        ex.: https://dokploy.seu-dominio ou http://IP:3000
@@ -30,6 +33,7 @@ on:
           - verificar
           - descobrir-api
           - deploy-compose
+          - api
       alvo:
         description: URL do portal (para "verificar")
         type: string
@@ -39,6 +43,25 @@ on:
         description: composeId do Dokploy (para "deploy-compose")
         type: string
         required: false
+      metodo:
+        description: Método HTTP (para "api")
+        type: choice
+        required: false
+        default: GET
+        options: [GET, POST]
+      caminho:
+        description: Caminho da API, ex. /api/project.all (para "api")
+        type: string
+        required: false
+      corpo:
+        description: Corpo JSON (para "api" com POST)
+        type: string
+        required: false
+      limite:
+        description: Máximo de caracteres da resposta a imprimir
+        type: string
+        required: false
+        default: '20000'
 
 permissions:
   contents: read
@@ -137,3 +160,37 @@ jobs:
             200|201) echo "Deploy disparado." ;;
             *) echo "::error::Não disparou (HTTP ${code}). Rode a ação descobrir-api e me mande o log."; exit 1 ;;
           esac
+
+  api:
+    if: inputs.acao == 'api'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Chamar a API do Dokploy
+        env:
+          URL: ${{ secrets.DOKPLOY_URL }}
+          TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          METODO: ${{ inputs.metodo }}
+          CAMINHO: ${{ inputs.caminho }}
+          CORPO: ${{ inputs.corpo }}
+          LIMITE: ${{ inputs.limite }}
+        run: |
+          set -u
+          if [ -z "${URL:-}" ] || [ -z "${TOKEN:-}" ]; then
+            echo "::error::Faltam os secrets DOKPLOY_URL e/ou DOKPLOY_API_TOKEN."
+            exit 1
+          fi
+          BASE=$(printf '%s' "$URL" | sed -E 's#^(https?://[^/]+).*#\1#')
+          if [ -n "${CORPO:-}" ]; then
+            code=$(curl -sk -o /tmp/corpo -w '%{http_code}' --max-time 120 \
+                     -X "$METODO" -H "x-api-key: ${TOKEN}" -H 'Content-Type: application/json' \
+                     -d "$CORPO" "${BASE}${CAMINHO}" || echo 000)
+          else
+            code=$(curl -sk -o /tmp/corpo -w '%{http_code}' --max-time 120 \
+                     -X "$METODO" -H "x-api-key: ${TOKEN}" "${BASE}${CAMINHO}" || echo 000)
+          fi
+          echo "${METODO} ${CAMINHO} -> ${code}"
+          echo '=== RESPOSTA ==='
+          head -c "${LIMITE:-20000}" /tmp/corpo | tr -d '\000'; echo
+          echo '=== FIM ==='
+          case "$code" in 2*) exit 0 ;; *) exit 1 ;; esac
+
