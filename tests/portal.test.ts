@@ -20,7 +20,7 @@ describe('questionário do Valentin’s', () => {
       path.join(__dirname, '../src/lib/portal/questionarios/valentins.json'),
     );
     expect(createHash('sha256').update(bruto).digest('hex')).toBe(
-      '5c0eee0335c18c1f3f5173687a227eb9384eb71b13d88c64fbddec2600f03932',
+      '5b6aaf00aa5ebbfab71f470a383be10dc8e915ae96e3debcb688194737e36ac5',
     );
   });
 

@@ -10,7 +10,7 @@
       { "id": "a3", "nome": "Sócios e responsável pelo projeto", "detalhe": "quem acompanha o plano do lado de vocês" },
       { "id": "a4", "nome": "Quadro de funcionários", "detalhe": "por endereço, com função e turno" },
       { "id": "a5", "nome": "Escala dos sócios e da liderança", "detalhe": "" },
-      { "id": "a6", "nome": "E-mail da empresa para cobrança e relatórios", "detalhe": "onde chegam o boleto semanal e o relatório mensal" },
+      { "id": "a6", "nome": "Dados de quem recebe a cobrança", "detalhe": "nome ou razão social, CPF ou CNPJ, e-mail, celular e endereço completo com CEP. É o cadastro para emitir o boleto semanal; o relatório mensal vai para o mesmo e-mail" },
       { "id": "a7", "nome": "Telefone ou WhatsApp do financeiro", "detalhe": "quem recebe a cobrança e resolve pagamento" }
     ]},
     { "bloco": "B", "titulo": "B. Acessos", "itens": [
