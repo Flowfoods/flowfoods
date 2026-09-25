@@ -3,7 +3,7 @@ import { CONTACT_INFO } from '@/lib/constants';
 const NAV = [
   { label: 'Frentes', href: '#frentes' },
   { label: 'Como funciona', href: '#como-funciona' },
-  { label: 'Formato', href: '#formato' },
+  { label: 'Entregas', href: '#entregas' },
   { label: 'Rodolfo', href: '#sobre' },
   { label: 'Contato', href: '#contato' },
 ];

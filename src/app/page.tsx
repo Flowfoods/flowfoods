@@ -3,7 +3,7 @@ import Hero from '@/components/Hero';
 import Sinais from '@/components/Sinais';
 import Frentes from '@/components/Frentes';
 import ComoFunciona from '@/components/ComoFunciona';
-import Formato from '@/components/Formato';
+import Entregas from '@/components/Entregas';
 import Sobre from '@/components/Sobre';
 import CTA from '@/components/CTA';
 import Footer from '@/components/Footer';
@@ -22,7 +22,7 @@ export default function Home() {
         <Sinais />
         <Frentes />
         <ComoFunciona />
-        <Formato />
+        <Entregas />
         <Sobre />
         <CTA />
       </main>

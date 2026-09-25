@@ -322,3 +322,9 @@ em 25/08 e vetado pelo portão de conteúdo) e o rótulo "360°" (vetado pelo
 portão como posicionamento antigo); o site usa "do diagnóstico à execução" e
 "muito além do delivery".
 
+**Adendo 25/09:** a seção "Formato" (2 visitas/mês, reunião mensal, mínimo
+de 3 meses, investimento, o que fica fora do escopo) saiu do site a pedido do
+Rodolfo: são termos particulares de cada consultoria e ficam na proposta. No
+lugar entrou "O que a casa recebe": diagnóstico, plano de 90 dias, relatório
+mensal e materiais de operação, mais como o trabalho se combina, sem número.
+

@@ -136,19 +136,21 @@ export const PRINCIPIOS = [
   },
 ];
 
-/** Como a consultoria funciona no dia a dia. */
-export const FORMATO = {
-  itens: [
-    { rotulo: 'Ritmo', valor: 'Ciclo contínuo, sem pacote fechado' },
-    { rotulo: 'Presença', valor: '2 visitas presenciais por mês' },
-    { rotulo: 'Prestação de contas', valor: '1 reunião mensal com relatório' },
-    { rotulo: 'Compromisso', valor: 'Mínimo de 3 meses, aviso prévio de 15 dias' },
-    { rotulo: 'Investimento', valor: 'Definido depois do diagnóstico inicial, por grupo' },
+/**
+ * O que a casa recebe em qualquer trabalho. Termos comerciais (visitas, prazo,
+ * investimento, escopo) são combinados caso a caso e ficam na proposta, não no site.
+ */
+export const ENTREGAS = {
+  documentos: [
+    { rotulo: 'Diagnóstico', valor: 'Leitura da operação, dos números, do cardápio e dos canais, com os achados e as prioridades' },
+    { rotulo: 'Plano de 90 dias', valor: 'Ações com responsável, prazo e forma de medir, combinadas com os sócios' },
+    { rotulo: 'Relatório mensal', valor: 'O que andou, o que travou e o que vem, apresentado em reunião' },
+    { rotulo: 'Materiais de operação', valor: 'Ficha técnica, procedimento padrão, checklist e roteiro de treinamento' },
   ],
-  foraDoEscopo: [
-    'Gestão de Instagram e redes sociais',
-    'Criação de sistemas e ferramentas de IA',
-    'Contratação de terceiros: foto, vídeo, impressão e software',
+  comoSeCombina: [
+    'Escopo e ritmo definidos depois do diagnóstico, no tamanho que a operação aguenta',
+    'Presença na casa, junto da equipe, e acompanhamento entre as visitas',
+    'Contratado por grupo ou por casa, sem pacote fechado nem promessa de faturamento',
   ],
 };
 
