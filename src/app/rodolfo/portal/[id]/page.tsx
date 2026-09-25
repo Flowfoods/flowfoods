@@ -55,6 +55,16 @@ export default async function PortalClientePage({ params }: { params: { id: stri
         <p className="mt-2 text-xs text-surface/50">
           Arquivos no VPS: <code>{pastaBase()}/{cliente.token}/&lt;bloco&gt;/</code>
         </p>
+        <a
+          href={`/rodolfo/portal/${cliente.id}/contexto`}
+          className="mt-3 inline-flex min-h-[44px] items-center rounded-md border border-white/20 px-4 text-xs font-semibold uppercase tracking-wider text-surface transition hover:border-white/50"
+        >
+          Baixar contexto (.md)
+        </a>
+        <p className="mt-2 text-xs text-surface/50">
+          Tudo que o cliente respondeu, marcou e enviou, item a item. Guarde em{' '}
+          <code>clientes/{cliente.slug}/</code> no repositório.
+        </p>
       </Cartao>
 
       <Cartao titulo="Situação">

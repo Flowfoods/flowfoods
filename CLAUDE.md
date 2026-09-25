@@ -84,6 +84,12 @@ VPS Hostinger com Dokploy, n8n, PostgreSQL e Evolution API. Portal de formulári
 em portal.consultoriaflowfoods.com.br. Este repo é o site/portal
 (Next.js 14 + Prisma); ver `docs/` para decisões, deploy e pendências.
 
+## Contexto dos clientes
+
+`clientes/<slug>/contexto-<data>.md`: o que cada cliente respondeu no Portal,
+exportado do painel. Antes de trabalhar num cliente, leia o mais recente.
+Regras em `clientes/README.md`.
+
 ## Cliente ativo
 
 **Grupo Valentin's** — Vila da Penha (RJ). Multimarcas: Valentin's Burger e

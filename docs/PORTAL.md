@@ -38,6 +38,14 @@ do teste muda junto.
   branco vira item do diagnóstico
 - Limite de 50 MB por arquivo, conferido no navegador e no servidor
 
+## O `.md` de contexto
+
+No painel, "Baixar contexto (.md)" gera `contexto-<slug>-<data>.md` com tudo
+que o cliente respondeu, marcou e enviou: ausências primeiro (cada uma vira
+item do plano), depois item a item com texto em citação e arquivos com caminho
+no VPS (áudio marcado para transcrever), e a lista de pendentes. Vai para
+`clientes/<slug>/` no repositório; regras em `clientes/README.md`.
+
 ## O que acontece no Enviar
 
 1. Grava a data de envio
