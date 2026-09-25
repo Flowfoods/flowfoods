@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { whatsappUrl } from '@/lib/constants';
 
 const NAV = [
   { label: 'Frentes', href: '#frentes' },
@@ -47,10 +48,12 @@ export default function Header() {
             Entrar
           </a>
           <a
-            href="/diagnostico"
+            href={whatsappUrl('hero')}
+            target="_blank"
+            rel="noopener noreferrer"
             className="bg-ink px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-surface transition-colors hover:bg-primary"
           >
-            Diagnóstico gratuito
+            Falar com o Rodolfo
           </a>
         </div>
 
@@ -85,11 +88,13 @@ export default function Header() {
             </a>
           ))}
           <a
-            href="/diagnostico"
+            href={whatsappUrl('hero')}
+            target="_blank"
+            rel="noopener noreferrer"
             onClick={() => setAberto(false)}
             className="mt-2 bg-ink px-5 py-3.5 text-center text-[12px] font-semibold uppercase tracking-[0.12em] text-surface"
           >
-            Diagnóstico gratuito
+            Falar com o Rodolfo
           </a>
           <a
             href="/rodolfo/login"

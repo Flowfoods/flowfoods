@@ -14,9 +14,8 @@ import type { Servico, EtapaProcesso, ContactInfo, OrigemContato } from '@/types
  * pessoa veio sem precisar perguntar.
  */
 export const WHATSAPP_TEXTOS: Record<OrigemContato, string> = {
-  hero: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero agendar o diagnóstico gratuito de 30 min.',
-  diagnostico:
-    'Olá Rodolfo! Vim pelo site da FlowFoods e quero agendar o diagnóstico gratuito de 30 min.',
+  hero: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero conversar sobre o meu restaurante.',
+  diagnostico: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero conversar sobre o meu restaurante.',
   consultoria: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero conversar sobre a consultoria.',
   parceria: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero conversar sobre a consultoria.',
   flutuante: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero saber mais.',
@@ -144,7 +143,7 @@ export const FORMATO = {
     { rotulo: 'Presença', valor: '2 visitas presenciais por mês' },
     { rotulo: 'Prestação de contas', valor: '1 reunião mensal com relatório' },
     { rotulo: 'Compromisso', valor: 'Mínimo de 3 meses, aviso prévio de 15 dias' },
-    { rotulo: 'Investimento', valor: 'Definido depois do diagnóstico, por grupo' },
+    { rotulo: 'Investimento', valor: 'Definido depois do diagnóstico inicial, por grupo' },
   ],
   foraDoEscopo: [
     'Gestão de Instagram e redes sociais',

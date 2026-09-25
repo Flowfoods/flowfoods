@@ -11,7 +11,7 @@ export default function Formato() {
           <Titulo>Presença na casa, prestação de contas todo mês.</Titulo>
           <p className="mt-5 max-w-md text-base leading-relaxed text-ink-3">
             A consultoria é contratada por grupo, não por loja, e funciona em ciclos. O investimento
-            é definido depois do diagnóstico gratuito, quando o escopo está claro.
+            é definido depois do diagnóstico inicial, quando o escopo está claro.
           </p>
           <a
             href={whatsappUrl('consultoria')}

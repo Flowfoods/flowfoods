@@ -32,18 +32,18 @@ export default function Hero() {
 
           <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <a
-              href="/diagnostico"
-              className="inline-flex min-h-[52px] items-center justify-center bg-primary px-8 text-[13px] font-semibold uppercase tracking-[0.12em] text-white transition-colors hover:bg-primary-dark"
-            >
-              Diagnóstico gratuito
-            </a>
-            <a
               href={whatsappUrl('hero')}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-[52px] items-center justify-center border border-ink/25 px-8 text-[13px] font-semibold uppercase tracking-[0.12em] text-ink transition-colors hover:border-ink"
+              className="inline-flex min-h-[52px] items-center justify-center bg-primary px-8 text-[13px] font-semibold uppercase tracking-[0.12em] text-white transition-colors hover:bg-primary-dark"
             >
               Falar no WhatsApp
+            </a>
+            <a
+              href="#frentes"
+              className="inline-flex min-h-[52px] items-center justify-center border border-ink/25 px-8 text-[13px] font-semibold uppercase tracking-[0.12em] text-ink transition-colors hover:border-ink"
+            >
+              Conhecer as frentes
             </a>
           </div>
 

@@ -21,7 +21,7 @@ const franklin = Libre_Franklin({
 
 const SITE_URL = 'https://consultoriaflowfoods.com.br';
 const DESCRICAO =
-  'Consultoria para restaurantes no Rio de Janeiro: estrutura, rentabilidade e crescimento, do diagnóstico à execução. Seis frentes, um ciclo contínuo de trabalho. Comece pelo diagnóstico gratuito de 30 min.';
+  'Consultoria para restaurantes no Rio de Janeiro: estrutura, rentabilidade e crescimento, do diagnóstico à execução. Seis frentes, um ciclo contínuo de trabalho, com presença na casa e reunião mensal.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

@@ -5,7 +5,7 @@ const NAV = [
   { label: 'Como funciona', href: '#como-funciona' },
   { label: 'Formato', href: '#formato' },
   { label: 'Rodolfo', href: '#sobre' },
-  { label: 'Diagnóstico gratuito', href: '/diagnostico' },
+  { label: 'Contato', href: '#contato' },
 ];
 
 export default function Footer() {

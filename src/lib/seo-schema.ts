@@ -75,21 +75,6 @@ export function getSEOSchema() {
         itemListElement: [
           {
             '@type': 'Offer',
-            name: 'Diagnóstico Gratuito',
-            description:
-              'Conversa de 30 minutos, online, com análise prévia da loja no iFood e as 3 prioridades entregues por escrito. Sem compromisso.',
-            price: '0',
-            priceCurrency: 'BRL',
-            availability: 'https://schema.org/InStock',
-            itemOffered: {
-              '@type': 'Service',
-              name: 'Diagnóstico gratuito para restaurantes',
-              serviceType: 'Consultoria gastronômica',
-              provider: { '@id': `${SITE}/#business` },
-            },
-          },
-          {
-            '@type': 'Offer',
             name: 'Consultoria contínua para restaurantes',
             description:
               'Ciclo contínuo em seis frentes: estrutura de restaurante, iFood e delivery, treinamento de equipes, gestão financeira, fidelidade e CRM, e sistemas com IA. Duas visitas presenciais por mês e reunião mensal com relatório.',
