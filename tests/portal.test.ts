@@ -14,12 +14,12 @@ describe('questionário do Valentin’s', () => {
   it('é o arquivo fechado com o consultor, byte a byte', () => {
     // Mudou o hash? Alguém editou texto do cliente. O conteúdo só muda com um
     // JSON novo vindo do Rodolfo — e aí este hash muda junto, de propósito.
-    // 25/09: tirou "ou em áudio" da instrução das perguntas, a pedido dele.
+    // 25/09: tirou "ou em áudio" da instrução e o texto de fechamento, a pedido dele.
     const bruto = readFileSync(
       path.join(__dirname, '../src/lib/portal/questionarios/valentins.json'),
     );
     expect(createHash('sha256').update(bruto).digest('hex')).toBe(
-      '7f612bae00bfd26daa906865a336627a4c7e2f67bee7149dd5c4ac0474ff6e28',
+      '14d84d62e80cdce1d01924851ab4187f755645a51e599e31ade3f1d2798c82a0',
     );
   });
 

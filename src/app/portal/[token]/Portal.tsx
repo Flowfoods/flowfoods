@@ -241,7 +241,7 @@ export default function Portal({
 
       <section className="mx-auto mt-10 max-w-2xl px-4">
         <div className="border-t border-footer/15 pt-8">
-          <p className="leading-relaxed">{q.abertura.fechamento}</p>
+          {q.abertura.fechamento && <p className="leading-relaxed">{q.abertura.fechamento}</p>}
           <p className="mt-6 text-sm text-footer/70">{q.abertura.assinatura}</p>
           <p className="mt-2 font-serifa text-lg italic">{q.abertura.tagline}</p>
         </div>
