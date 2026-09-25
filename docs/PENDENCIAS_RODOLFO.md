@@ -14,7 +14,16 @@ Sobrou uma ponta: o subtree `flowfoods/` que a primeira rodada criou dentro do
 
 ---
 
-## 🔴 2. Um gesto no painel do Dokploy
+## ✅ 2. Um gesto no painel do Dokploy — RESOLVIDO em 25/09
+
+O app `flowfoods-web` (Docker Compose, projeto FlowFoods) está no ar em
+consultoriaflowfoods.com.br, criado pela API com os secrets `DOKPLOY_URL` e
+`DOKPLOY_API_TOKEN`. O app antigo `flowfoods` (Nixpacks) foi parado e ficou só
+com o endereço provisório. Todo push na `master` passa a publicar sozinho.
+
+<details><summary>Texto original</summary>
+
+## 2. Um gesto no painel do Dokploy
 
 Desde 26/08 está tudo na `master` com CI verde, e o compose gera os segredos
 sozinho no primeiro boot — **não precisa gerar nem colar variável nenhuma
@@ -50,6 +59,8 @@ Só no Dokploy, **nunca em arquivo**. Sem as `EVOLUTION_*` o portal funciona em
 dry-run — dá para treinar tudo antes de ter número.
 
 **Trava:** deploy, envio real, IA, F6 inteiro.
+
+</details>
 
 ---
 
@@ -181,9 +192,14 @@ Além disso:
 
 ---
 
-## 🔴 9. Portal do Valentin's — subir e mandar o link
+## 🟡 9. Portal do Valentin's — no ar; falta a senha e o WhatsApp
 
-Pronto e testado (`docs/PORTAL.md`). Falta: o deploy do item 2 e as três
-`EVOLUTION_*` no painel. Depois, copiar o link em `/rodolfo/portal` e mandar
-para o Valentin's.
+Deploy feito em 25/09. Falta, nesta ordem:
+
+1. Abrir o log do serviço `web` do app `flowfoods-web` no Dokploy, clicar no
+   link de PRIMEIRO ACESSO e criar a senha.
+2. `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` e `EVOLUTION_INSTANCE` na aba
+   Environment do app (ou como secrets no GitHub, que eu aplico). Sem elas o
+   portal funciona; só o aviso no WhatsApp não sai.
+3. Em `/rodolfo/portal`, copiar o link e mandar para o Valentin's.
 

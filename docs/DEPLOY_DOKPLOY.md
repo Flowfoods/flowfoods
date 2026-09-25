@@ -1,5 +1,20 @@
 # Deploy no Dokploy
 
+> **Estado em 25/09/2026:** feito. O app é o `flowfoods-web` (Docker Compose,
+> projeto FlowFoods, composeId `JWsPI2ZLgUrh11MS_EwwB`), com
+> `consultoriaflowfoods.com.br` e `www` no serviço `web`, porta 3000, Let's
+> Encrypt. O app antigo `flowfoods` está parado e responde só em
+> `flowfoods.76.13.230.78.sslip.io`; o novo tem também o provisório
+> `novo.76.13.230.78.sslip.io`. Todo push na `master` publica sozinho
+> (`deploy.yml` → `compose.deploy`). Para operar o painel sem clicar, use a
+> ação `api` do `barney-ops.yml`.
+>
+> Lição do dia: a rota Traefik do app antigo tinha sido editada à mão (com
+> `www`) e continuou segurando o domínio depois que ele foi parado — 502 até
+> reescrever `application.updateTraefikConfig`. Domínio de compose só entra no
+> ar no próximo deploy.
+
+
 Eu não alcanço o Dokploy desta sessão — o proxy de saída recusa o túnel para o
 domínio e para a VPS (verificado por `curl` e por Chromium). Então o deploy
 ficou **zero-config**: os segredos se geram sozinhos no primeiro boot, e o seu

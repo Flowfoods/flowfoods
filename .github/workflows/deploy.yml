@@ -3,13 +3,13 @@ name: Portão e deploy
 # O deploy deixa de depender de alguém abrir o painel: todo push em `master`
 # roda o portão e, passando, chama o webhook do Dokploy.
 #
-# Enquanto o segredo DOKPLOY_DEPLOY_WEBHOOK não existir, o passo de deploy
-# avisa e sai com sucesso — sem falhar o build por uma configuração que ainda
-# não foi feita. O portão continua rodando e protegendo `master` desde já.
+# O deploy usa a API do Dokploy com os mesmos segredos do barney-ops
+# (DOKPLOY_URL e DOKPLOY_API_TOKEN): dispara `compose.deploy` do app
+# `flowfoods-web`, criado em 25/09. Sem os segredos, avisa e sai com sucesso —
+# o portão continua protegendo `master`.
 #
-# Para ligar: Dokploy → aplicação → Deployments → copiar a URL do webhook →
-# GitHub → Settings → Secrets and variables → Actions → New repository secret
-# → nome `DOKPLOY_DEPLOY_WEBHOOK`.
+# DOKPLOY_DEPLOY_WEBHOOK (a URL de webhook do painel) ainda é aceito como
+# alternativa, se um dia for cadastrado.
 
 on:
   push:
@@ -52,16 +52,26 @@ jobs:
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
-      - name: Chamar o webhook
+      - name: Disparar o deploy
         env:
           WEBHOOK: ${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}
+          URL: ${{ secrets.DOKPLOY_URL }}
+          TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          # composeId do app flowfoods-web no painel (projeto FlowFoods).
+          COMPOSE_ID: JWsPI2ZLgUrh11MS_EwwB
         run: |
           set -euo pipefail
-          if [ -z "${WEBHOOK:-}" ]; then
-            echo "::notice title=Deploy não disparado::O segredo DOKPLOY_DEPLOY_WEBHOOK não está configurado. O portão passou; a subida segue manual."
+          if [ -n "${WEBHOOK:-}" ]; then
+            codigo=$(curl -sS -X POST -o /tmp/resposta.txt -w '%{http_code}' --max-time 60 "$WEBHOOK")
+          elif [ -n "${URL:-}" ] && [ -n "${TOKEN:-}" ]; then
+            BASE=$(printf '%s' "$URL" | sed -E 's#^(https?://[^/]+).*#\1#')
+            codigo=$(curl -sk -X POST -o /tmp/resposta.txt -w '%{http_code}' --max-time 60 \
+                       -H "x-api-key: ${TOKEN}" -H 'Content-Type: application/json' \
+                       -d "{\"composeId\":\"${COMPOSE_ID}\"}" "${BASE}/api/compose.deploy")
+          else
+            echo "::notice title=Deploy não disparado::Faltam DOKPLOY_URL e DOKPLOY_API_TOKEN (ou DOKPLOY_DEPLOY_WEBHOOK). O portão passou; a subida segue manual."
             exit 0
           fi
-          codigo=$(curl -sS -X POST -o /tmp/resposta.txt -w '%{http_code}' --max-time 60 "$WEBHOOK")
           echo "Dokploy respondeu HTTP $codigo"
           # A resposta pode trazer id de build; nunca traz segredo — o webhook
           # inteiro vive no secret e não é ecoado.
