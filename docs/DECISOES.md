@@ -298,3 +298,27 @@ O aviso do Enviar não reusa o `notificar` do Barney, que se cala quando a
 instância é o próprio número do Rodolfo. Aqui o aviso é a única notícia de
 que o formulário chegou, então vai sempre.
 
+---
+
+### 21. 2026-09-25 · Site institucional refeito na identidade FlowFoods
+
+**Alternativa:** manter o site de maio (Playfair, chão escuro, três pacotes,
+marquee de fotos) e só acrescentar o botão de login.
+
+**Razão:** o Rodolfo pediu visual mais moderno e conteúdo atualizado, e o
+briefing de setembro fixou a identidade (creme #F5F0EB, preto, vermelho
+#EA1D2C como único acento, Gelasio e Libre Franklin) e o conteúdo (seis
+frentes, ciclo de quatro passos, formato com 2 visitas/mês e reunião mensal,
+o que fica fora do escopo). O site passou a ser a mesma coisa que o material
+da consultoria. O "Entrar" para o `/rodolfo` fica no cabeçalho e no rodapé,
+discreto. Preço não vai para o site: é definido depois do diagnóstico.
+
+Ficaram de fora, de propósito: os três pacotes (Diagnóstico, Consultoria,
+Parceria), que não batiam com o ciclo contínuo; o modal de contato, que só
+abria o WhatsApp; as fotos 1, 4 e 6, que são prints do Instagram com etiqueta
+de carrossel. Dois pontos do briefing não entraram por conflitarem com
+decisões anteriores: o handle `@flowfoods.rj` (confirmado como `@rrodolfoac`
+em 25/08 e vetado pelo portão de conteúdo) e o rótulo "360°" (vetado pelo
+portão como posicionamento antigo); o site usa "do diagnóstico à execução" e
+"muito além do delivery".
+

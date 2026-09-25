@@ -1,114 +1,78 @@
+import { TAGLINE, whatsappUrl } from '@/lib/constants';
 
+const FATOS = [
+  { valor: '14+', rotulo: 'anos no food service' },
+  { valor: '16', rotulo: 'lojas e 5 marcas no delivery que opera hoje' },
+  { valor: 'iFood', rotulo: 'conselheiro do Fórum de Restaurantes' },
+];
+
+/**
+ * Abertura: a tagline como título, sobre creme, com o retrato ao lado. Sem
+ * tela cheia — o resto da página precisa aparecer no primeiro rolar.
+ */
 export default function Hero() {
+  const [frase1, frase2] = TAGLINE.split('. ');
+
   return (
-    <section className="relative min-h-screen flex items-center bg-[#111111] overflow-hidden">
-
-      {/* Barra vermelha esquerda */}
-      <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-primary" />
-
-      {/* Foto Rodolfo — desktop lado direito */}
-      <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-[42%] overflow-hidden pointer-events-none">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/galeria/foto-7.jpg"
-          alt="Rodolfo Cavalcante"
-          className="w-full h-full object-cover object-center scale-105"
-        />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#111111] via-[#111111]/60 to-transparent" />
-      </div>
-
-      {/* Foto — mobile fundo */}
-      <div className="lg:hidden absolute inset-0 pointer-events-none">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/images/galeria/foto-7.jpg"
-          alt=""
-          aria-hidden="true"
-          className="w-full h-full object-cover object-top"
-        />
-        <div className="absolute inset-0 bg-[#111111]/88" />
-      </div>
-
-      <div className="relative max-w-6xl mx-auto px-5 md:px-8 lg:px-12 pt-28 pb-16 w-full">
-        <div className="w-full lg:max-w-[55%]">
-
-          {/* Logo mark */}
-          <div className="flex items-center gap-3 mb-6 md:mb-10">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-              <span className="font-display font-bold text-white text-base leading-none">FF</span>
-            </div>
-            <p className="text-white/50 text-xs font-semibold tracking-[0.4em] uppercase">
-              Consultoria Gastronômica · Rio de Janeiro
-            </p>
-          </div>
-
-          {/* Headline */}
-          <h1 className="font-display font-bold leading-[0.92] mb-7 md:mb-10">
-            <span className="block text-[clamp(2rem,6.6vw,4.6rem)] text-white uppercase">
-              GASTRONOMIA
-            </span>
-            <span className="block text-[clamp(2rem,6.6vw,4.6rem)] text-white uppercase">
-              QUE FLUI.
-            </span>
-            <span className="block text-[clamp(2rem,6.6vw,4.6rem)] text-white uppercase">
-              NEGÓCIO QUE
-            </span>
-            <span className="block text-[clamp(2rem,6.6vw,4.6rem)] text-primary uppercase">
-              CRESCE.
-            </span>
+    <section className="px-5 pb-14 pt-28 md:px-8 md:pb-20 md:pt-40">
+      <div className="mx-auto grid max-w-6xl items-end gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">
+            Consultoria para restaurantes · Rio de Janeiro
+          </p>
+          <h1 className="mt-5 font-display text-[clamp(2.6rem,7vw,5.2rem)] font-bold leading-[1.02] tracking-tight text-ink [text-wrap:balance]">
+            {frase1}.<br />
+            <span className="text-ink-4">{frase2}</span>
           </h1>
-
-          {/* Subheadline */}
-          <p className="font-sans text-white/65 text-sm md:text-lg max-w-md leading-relaxed mb-3 md:mb-4">
-            Delivery, financeiro, equipe e IA — aplicados por quem opera o delivery de 16 lojas
-            todo dia.
-          </p>
-          <p className="font-sans text-white/40 text-sm max-w-md leading-relaxed mb-8 md:mb-12">
-            Operação · Financeiro · Delivery · Equipe
+          <p className="mt-7 max-w-xl text-lg leading-relaxed text-ink-3">
+            Estrutura, rentabilidade e crescimento, do diagnóstico à execução. Seis frentes de
+            trabalho, um ciclo contínuo, e um consultor que opera delivery todos os dias.
+            Muito além do delivery.
           </p>
 
-          {/* CTAs */}
-          <div className="flex flex-col sm:flex-row gap-3">
-            {/* Rótulo da F1 ("Diagnóstico gratuito"), destino do Caminho 2.
-                Um botão que promete diagnóstico e abre modal de contato é a
-                mesma promessa quebrada que este merge veio resolver. */}
+          <div className="mt-9 flex flex-col gap-3 sm:flex-row">
             <a
               href="/diagnostico"
-              className="inline-flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98] shadow-[0_4px_20px_rgba(185,28,28,0.4)]"
+              className="inline-flex min-h-[52px] items-center justify-center bg-primary px-8 text-[13px] font-semibold uppercase tracking-[0.12em] text-white transition-colors hover:bg-primary-dark"
             >
               Diagnóstico gratuito
             </a>
             <a
-              href="#servicos"
-              className="inline-flex items-center justify-center gap-2 border border-white/20 hover:border-white/50 text-white/60 hover:text-white font-semibold text-xs sm:text-sm px-7 py-4 uppercase tracking-widest transition-all duration-200 active:scale-[0.98]"
+              href={whatsappUrl('hero')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-[52px] items-center justify-center border border-ink/25 px-8 text-[13px] font-semibold uppercase tracking-[0.12em] text-ink transition-colors hover:border-ink"
             >
-              ↓ Conheça a consultoria
+              Falar no WhatsApp
             </a>
           </div>
-        </div>
 
-        {/* Stats */}
-        <div className="mt-14 md:mt-20 pt-8 md:pt-10 border-t border-white/10 flex flex-wrap gap-8 md:gap-12">
-          {[
-            { num: '14+', label: 'Anos no\nFood Service' },
-            { num: '100+', label: 'Profissionais\nTreinados' },
-            { num: '16', label: 'Lojas com\nDelivery Operado' },
-          ].map(({ num, label }, i) => (
-            <div key={label} className="flex items-center gap-8 md:gap-12">
-              <div>
-                <p className="font-display font-bold text-3xl md:text-5xl text-primary leading-none">{num}</p>
-                <p className="text-[9px] md:text-[11px] text-white/30 uppercase tracking-widest mt-2 leading-snug whitespace-pre-line">{label}</p>
+          <dl className="mt-12 grid grid-cols-1 gap-6 border-t border-ink/10 pt-8 sm:grid-cols-3">
+            {FATOS.map((f) => (
+              <div key={f.rotulo}>
+                <dt className="font-display text-3xl font-bold leading-none text-ink">{f.valor}</dt>
+                <dd className="mt-2 max-w-[14rem] text-sm leading-snug text-ink-4">{f.rotulo}</dd>
               </div>
-              {i < 2 && <div className="w-px h-10 bg-white/10 hidden sm:block" />}
-            </div>
-          ))}
+            ))}
+          </dl>
         </div>
-      </div>
 
-      {/* Scroll cue */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 opacity-30">
-        <span className="text-[9px] uppercase tracking-widest font-sans text-white">Scroll</span>
-        <div className="w-px h-8 bg-gradient-to-b from-white to-transparent" />
+        <figure className="relative mx-auto w-full max-w-sm lg:max-w-none">
+          <div className="overflow-hidden border border-ink/10 bg-papel p-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/galeria/foto-7.jpg"
+              alt="Rodolfo Cavalcante, chef e consultor da FlowFoods"
+              width={860}
+              height={1280}
+              className="aspect-[3/4] w-full object-cover object-top"
+            />
+          </div>
+          <figcaption className="mt-3 flex items-baseline justify-between text-[11px] uppercase tracking-[0.16em] text-ink-5">
+            <span>Rodolfo Cavalcante</span>
+            <span>Chef · Gestor · Consultor</span>
+          </figcaption>
+        </figure>
       </div>
     </section>
   );

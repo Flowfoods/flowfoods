@@ -32,7 +32,7 @@ export function getSEOSchema() {
         url: SITE,
         slogan: 'Gastronomia que flui. Negócio que cresce.',
         description:
-          'Consultoria gastronômica para restaurantes no Rio de Janeiro: estrutura de restaurante, iFood e delivery, treinamento de equipe, gestão financeira, fidelidade e CRM, e sistemas com IA.',
+          'Consultoria para restaurantes no Rio de Janeiro: estrutura, rentabilidade e crescimento, do diagnóstico à execução. Seis frentes: estrutura de restaurante, iFood e delivery, treinamento de equipes, gestão financeira, fidelidade e CRM, e sistemas com IA.',
         priceRange: '$$',
         telephone: '+55' + CONTACT_INFO.whatsapp,
         founder: { '@id': `${SITE}/#rodolfo` },
@@ -90,28 +90,14 @@ export function getSEOSchema() {
           },
           {
             '@type': 'Offer',
-            name: 'Consultoria',
+            name: 'Consultoria contínua para restaurantes',
             description:
-              'Diagnóstico completo presencial, otimização de iFood e delivery, treinamento de equipe, gestão financeira com CMV e acompanhamento contínuo.',
+              'Ciclo contínuo em seis frentes: estrutura de restaurante, iFood e delivery, treinamento de equipes, gestão financeira, fidelidade e CRM, e sistemas com IA. Duas visitas presenciais por mês e reunião mensal com relatório.',
             priceCurrency: 'BRL',
             availability: 'https://schema.org/InStock',
             itemOffered: {
               '@type': 'Service',
-              name: 'Consultoria completa para restaurantes',
-              serviceType: 'Consultoria gastronômica',
-              provider: { '@id': `${SITE}/#business` },
-            },
-          },
-          {
-            '@type': 'Offer',
-            name: 'Parceria',
-            description:
-              'Gestão estratégica contínua com SaaS personalizado, CRM, automação de WhatsApp e reuniões mensais de performance.',
-            priceCurrency: 'BRL',
-            availability: 'https://schema.org/InStock',
-            itemOffered: {
-              '@type': 'Service',
-              name: 'Parceria contínua de gestão',
+              name: 'Consultoria contínua para restaurantes',
               serviceType: 'Consultoria gastronômica',
               provider: { '@id': `${SITE}/#business` },
             },

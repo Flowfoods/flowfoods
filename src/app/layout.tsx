@@ -1,25 +1,27 @@
 import type { Metadata } from 'next';
-import { Playfair_Display, DM_Sans } from 'next/font/google';
+import { Gelasio, Libre_Franklin } from 'next/font/google';
 import './globals.css';
 
-const playfair = Playfair_Display({
+// Identidade FlowFoods: títulos em Gelasio, texto em Libre Franklin. As duas
+// variáveis servem o site, o Portal do cliente e o Espaço do Rodolfo.
+const gelasio = Gelasio({
   subsets: ['latin'],
   weight: ['400', '600', '700'],
   style: ['normal', 'italic'],
-  variable: '--font-display',
+  variable: '--font-gelasio',
   display: 'swap',
 });
 
-const dmSans = DM_Sans({
+const franklin = Libre_Franklin({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700'],
-  variable: '--font-sans',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-franklin',
   display: 'swap',
 });
 
 const SITE_URL = 'https://consultoriaflowfoods.com.br';
 const DESCRICAO =
-  'Consultoria gastronômica no Rio: delivery, financeiro, equipe e IA aplicados por quem opera o delivery de 16 lojas todo dia. Comece pelo diagnóstico gratuito de 30 min.';
+  'Consultoria para restaurantes no Rio de Janeiro: estrutura, rentabilidade e crescimento, do diagnóstico à execução. Seis frentes, um ciclo contínuo de trabalho. Comece pelo diagnóstico gratuito de 30 min.';
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -58,7 +60,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="pt-BR"
-      className={`${playfair.variable} ${dmSans.variable}`}
+      className={`${gelasio.variable} ${franklin.variable}`}
     >
       <body className="bg-surface text-ink antialiased font-sans overflow-x-hidden">
         {children}

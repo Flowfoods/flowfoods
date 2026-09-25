@@ -9,60 +9,40 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Primary — Vermelho FlowFoods (premium, gastronomia, autoridade)
-        primary: '#b91c1c',
-        bright:  '#dc2626',
-        'primary-dark': '#991b1b',
+        // Identidade FlowFoods: creme, preto e o vermelho como único acento.
+        primary: '#EA1D2C',
+        bright:  '#F2323F',
+        'primary-dark': '#C41522',
+        marca: '#EA1D2C',
 
-        // Secondary — Azul Confiança (expertise, profissionalismo)
-        secondary: '#1E40AF',
-        'secondary-dark': '#1e3a8a',
-
-        // Semânticas
+        // Semânticas (só no painel privado)
         success: '#16A34A',
         error:   '#DC2626',
         warning: '#D97706',
 
-        // Superfícies — Warm Stone (premium, não corporativo frio)
-        surface:   '#FAFAF9',
-        'surface-2': '#F5F5F4',
-        'surface-3': '#E7E5E4',
-
-        // Texto — Warm Stone escuro
-        ink:   '#1C1917',
-        'ink-2': '#292524',
-        'ink-3': '#44403C',
-        'ink-4': '#78716C',
-        'ink-5': '#A8A29E',
-
-        // Rodapé escuro (contraste final)
-        footer: '#0A0A0A',
-
-        // Portal do cliente — identidade editorial da FlowFoods: creme, preto e
-        // o vermelho como único acento.
+        // Superfícies — creme e seus tons
+        surface:   '#F5F0EB',
+        'surface-2': '#EDE6DF',
+        'surface-3': '#DDD3C8',
         creme: '#F5F0EB',
-        marca: '#EA1D2C',
+        papel: '#FCFAF8',
+
+        // Texto — preto e cinzas quentes
+        ink:   '#0A0A0A',
+        'ink-2': '#1A1A1A',
+        'ink-3': '#3D3A37',
+        'ink-4': '#6B6661',
+        'ink-5': '#9A938C',
+
+        // Rodapé e painel privado
+        footer: '#0A0A0A',
       },
       fontFamily: {
-        sans:    ['var(--font-sans)',    'Helvetica Neue', 'sans-serif'],
-        display: ['var(--font-display)', 'Georgia',        'serif'],
-        // Portal do cliente: títulos em Gelasio, texto em Libre Franklin.
-        serifa:  ['var(--font-gelasio)',  'Georgia',        'serif'],
-        franklin: ['var(--font-franklin)', 'Helvetica Neue', 'sans-serif'],
-      },
-      animation: {
-        'scroll-left':  'scroll-left  40s linear infinite',
-        'scroll-right': 'scroll-right 35s linear infinite',
-      },
-      keyframes: {
-        'scroll-left': {
-          from: { transform: 'translateX(0)' },
-          to:   { transform: 'translateX(-50%)' },
-        },
-        'scroll-right': {
-          from: { transform: 'translateX(-50%)' },
-          to:   { transform: 'translateX(0)' },
-        },
+        // Títulos em Gelasio, texto em Libre Franklin — o site inteiro e o portal.
+        sans:    ['var(--font-franklin)', 'Helvetica Neue', 'Arial', 'sans-serif'],
+        display: ['var(--font-gelasio)',  'Georgia', 'serif'],
+        serifa:  ['var(--font-gelasio)',  'Georgia', 'serif'],
+        franklin: ['var(--font-franklin)', 'Helvetica Neue', 'Arial', 'sans-serif'],
       },
     },
   },

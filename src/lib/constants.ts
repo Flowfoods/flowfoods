@@ -1,24 +1,24 @@
-import type {
-  Servico,
-  EtapaProcesso,
-  Diferencial,
-  ContactInfo,
-  OrigemContato,
-} from '@/types';
+import type { Servico, EtapaProcesso, ContactInfo, OrigemContato } from '@/types';
+
+/**
+ * Conteúdo do site institucional.
+ *
+ * Tudo aqui vem do briefing do Rodolfo (CLAUDE.md): frentes, método, formato e
+ * credenciais. Números só os comprováveis. Nada de promessa de resultado.
+ */
 
 /**
  * Um texto de WhatsApp por origem de clique.
  *
- * Serve para duas coisas: a conversa já começa no assunto certo, e o Rodolfo sabe de qual
- * botão do site a pessoa veio sem precisar perguntar.
+ * A conversa já começa no assunto certo, e o Rodolfo sabe de qual botão a
+ * pessoa veio sem precisar perguntar.
  */
 export const WHATSAPP_TEXTOS: Record<OrigemContato, string> = {
   hero: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero agendar o diagnóstico gratuito de 30 min.',
   diagnostico:
     'Olá Rodolfo! Vim pelo site da FlowFoods e quero agendar o diagnóstico gratuito de 30 min.',
-  consultoria:
-    'Olá Rodolfo! Vim pelo site da FlowFoods e quero conversar sobre a Consultoria completa.',
-  parceria: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero conversar sobre a Parceria contínua.',
+  consultoria: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero conversar sobre a consultoria.',
+  parceria: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero conversar sobre a consultoria.',
   flutuante: 'Olá Rodolfo! Vim pelo site da FlowFoods e quero saber mais.',
 };
 
@@ -28,133 +28,145 @@ export function whatsappUrl(origem: OrigemContato): string {
   return `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(WHATSAPP_TEXTOS[origem])}`;
 }
 
+export const TAGLINE = 'Gastronomia que flui. Negócio que cresce.';
+
 export const CONTACT_INFO: ContactInfo = {
   whatsapp: WHATSAPP_NUMERO,
   whatsappUrl: whatsappUrl('flutuante'),
   whatsappDisplay: '(21) 99641-6060',
   // `email` fica fora até `contato@consultoriaflowfoods.com.br` existir. Ver
-  // sites/flowfoods/docs/PENDENCIAS_RODOLFO.md, item 8.
+  // docs/PENDENCIAS_RODOLFO.md, item 8.
   instagram: 'rrodolfoac',
   instagramUrl: 'https://instagram.com/rrodolfoac',
   linkedin: 'Rodolfo Cavalcante',
   linkedinUrl: 'https://linkedin.com/in/rodolfo-cavalcante',
 };
 
+/** As seis frentes, na ordem do briefing. */
 export const SERVICOS: Servico[] = [
   {
     id: 'estrutura',
-    titulo: 'Estrutura de Restaurante',
+    titulo: 'Estrutura de restaurante',
     descricao:
-      'Planejamento de layout, equipamentos, fornecedores e treinamento operacional. Parceria com arquitetos. Do zero até abrir a porta.',
+      'Layout, fluxo de cozinha, equipamentos e fornecedores. Para quem vai abrir e para quem precisa arrumar a casa que já existe.',
     icone: '',
-    beneficios: ['Restaurante pronto para crescer desde o dia 1'],
+    beneficios: ['Operação que aguenta o pico'],
   },
   {
     id: 'ifood',
-    titulo: 'iFood & Delivery',
+    titulo: 'iFood e delivery',
     descricao:
-      'Gestão completa do iFood: da criação da conta e cadastro do cardápio até a operação mensal — precificação, fotos, campanhas, avaliações e relatórios de desempenho.',
+      'Cardápio, precificação, campanhas, avaliações e leitura dos relatórios. O canal próprio ao lado do iFood, sem depender de um só.',
     icone: '',
-    beneficios: ['Presença profissional no iFood, do zero ao dia a dia'],
+    beneficios: ['Delivery que dá margem, não só volume'],
   },
   {
     id: 'treinamento',
-    titulo: 'Treinamento de Equipe',
+    titulo: 'Treinamento de equipes',
     descricao:
-      'Capacitação de sala, cozinha, gerência e subgerência. Workshop presencial + mentoria contínua.',
+      'Salão, cozinha e liderança treinados no padrão da casa, com roteiro, checklist e acompanhamento. O padrão se mantém quando o dono não está.',
     icone: '',
-    beneficios: ['Equipe que VENDE e não erra'],
+    beneficios: ['Equipe que sustenta o padrão'],
   },
   {
     id: 'financeiro',
-    titulo: 'Gestão Financeira',
+    titulo: 'Gestão financeira',
     descricao:
-      'Estruturação do DRE mensal, controle de CMV, precificação por ficha técnica e análise de margem por produto — para que cada decisão seja tomada com base em números, não em intuição.',
+      'DRE mensal, CMV, ficha técnica e margem por produto. Decisão com número na mesa, não com sensação.',
     icone: '',
-    beneficios: ['Dados governam. Chega de achismo.'],
+    beneficios: ['Dado antes de opinião'],
   },
   {
     id: 'crm',
-    titulo: 'Fidelidade & CRM',
+    titulo: 'Fidelidade e CRM',
     descricao:
-      'Implantação de programa de fidelidade personalizado com captação estruturada de dados: quem é seu cliente, com que frequência compra e qual é o ticket médio. Escuta ativa via NPS e automação de retenção para agir antes de perder o cliente — não depois.',
+      'Programa de fidelidade com cadastro de verdade: quem compra, com que frequência, quanto gasta. Retenção antes de perder o cliente.',
     icone: '',
-    beneficios: ['Menos custo de aquisição. Mais cliente recorrente.'],
+    beneficios: ['Cliente que volta custa menos'],
   },
   {
     id: 'saas',
-    titulo: 'SaaS Personalizado com IA',
+    titulo: 'Sistemas com IA',
     descricao:
-      'Desenvolvimento de sistema sob medida para a realidade do seu restaurante — com inteligência artificial integrada onde faz sentido: automação de pedidos, gestão de cardápio, controle financeiro, fidelidade e RH em uma única plataforma. Nada genérico. Tudo pensado para o seu negócio.',
+      'Automação de rotinas do restaurante onde faz sentido: pedidos, cardápio, financeiro e fidelidade conversando entre si.',
     icone: '',
-    beneficios: ['Uma plataforma. Sem mais cacos.'],
+    beneficios: ['Menos planilha solta, mais rotina'],
   },
 ];
 
-export const CREDENCIAIS = [
-  '✅ Conselheiro do Fórum iFood — ajudou no DESIGN da plataforma (não é usuário comum)',
-  '✅ Une tecnologia e operação — sistemas digitais desenvolvidos especificamente para o food service',
-  '✅ Treinador de 100+ profissionais (sala, cozinha, gerência)',
-  '✅ Estruturou restaurantes com arquitetos parceiros (desde a concepção)',
-  '✅ Especialista em CMV, DRE, margem — restaurante não quebra na sua mão',
-];
-
+/** O ciclo de trabalho. Não é linha reta: o acompanhamento reabre o diagnóstico. */
 export const PROCESSO: EtapaProcesso[] = [
   {
     numero: '01',
     titulo: 'Diagnóstico',
     descricao:
-      'Análise profunda da operação: financeiro, iFood, equipe, processos. Identificamos exatamente onde o dinheiro está saindo.',
+      'Leitura da operação, dos números, do cardápio, dos canais, da cozinha e do que os sócios dizem. Duas semanas no início e a cada novo ciclo.',
   },
   {
     numero: '02',
-    titulo: 'Planejamento',
+    titulo: 'Plano de ação',
     descricao:
-      'Estratégia personalizada com metas claras e prazos definidos. Sem receita genérica — cada restaurante é diferente.',
+      'Prioridades, responsáveis e prazos definidos junto com os sócios. Os temas andam na ordem do que mais pesa para a marca.',
   },
   {
     numero: '03',
-    titulo: 'Implementação',
+    titulo: 'Execução e treinamento',
     descricao:
-      'Execução das ações planejadas com acompanhamento próximo, validações em campo e ajustes conforme a realidade do negócio — sem receita pronta, no ritmo certo para cada operação.',
+      'Implementação junto com a equipe, dentro da rotina da casa. O consultor conduz e ensina; a casa executa e mantém.',
   },
   {
     numero: '04',
-    titulo: 'Treinamento',
-    descricao:
-      'Capacitação de toda a equipe — atendimento, cozinha e liderança — para que os resultados conquistados sejam mantidos e evoluídos sem depender exclusivamente do consultor.',
-  },
-  {
-    numero: '05',
     titulo: 'Acompanhamento',
-    descricao:
-      'Monitoramento contínuo via WhatsApp e reuniões mensais. Suporte estratégico e melhoria permanente.',
+    descricao: 'Reunião mensal com relatório do que andou, do que travou e do que vem. E o ciclo recomeça.',
   },
 ];
 
-export const DIFERENCIAIS: Diferencial[] = [
+/** Regras da casa, ditas em voz alta. */
+export const PRINCIPIOS = [
   {
-    icone: '★',
-    titulo: '14 Anos de Operação Real',
-    descricao:
-      'Rodolfo não é consultor que "visita" restaurantes. Ele operou dezenas deles — do chão de cozinha à liderança de redes.',
+    titulo: 'Dado antes de opinião',
+    texto: 'Sem número, é hipótese, e é apresentada como hipótese. "Não tenho" e "não sei" viram item do plano.',
   },
   {
-    icone: '◎',
-    titulo: 'Metodologia Comprovada',
-    descricao:
-      'Processos desenvolvidos em projetos reais, com resultados documentados e replicáveis. Não é teoria — é o que funcionou.',
+    titulo: 'Nada é aplicado sem estar combinado',
+    texto: 'Cada ação tem responsável, prazo e forma de medir. O que a operação não absorve não entra no plano.',
   },
   {
-    icone: '↑',
-    titulo: 'Foco em Rentabilidade',
-    descricao:
-      'Crescimento com saúde financeira — CMV controlado, margem preservada, operação sustentável. Não adianta vender mais e ganhar menos.',
+    titulo: 'Resultado é trabalho conjunto',
+    texto: 'Ninguém promete faturamento. O consultor conduz e ensina; a casa executa e mantém.',
   },
-  {
-    icone: '∞',
-    titulo: 'Parceria, Não Consultoria',
-    descricao:
-      'Acompanhamento pós-implementação que garante evolução. "Você cresce, a gente cresce junto." — Rodolfo Cavalcante.',
-  },
+];
+
+/** Como a consultoria funciona no dia a dia. */
+export const FORMATO = {
+  itens: [
+    { rotulo: 'Ritmo', valor: 'Ciclo contínuo, sem pacote fechado' },
+    { rotulo: 'Presença', valor: '2 visitas presenciais por mês' },
+    { rotulo: 'Prestação de contas', valor: '1 reunião mensal com relatório' },
+    { rotulo: 'Compromisso', valor: 'Mínimo de 3 meses, aviso prévio de 15 dias' },
+    { rotulo: 'Investimento', valor: 'Definido depois do diagnóstico, por grupo' },
+  ],
+  foraDoEscopo: [
+    'Gestão de Instagram e redes sociais',
+    'Criação de sistemas e ferramentas de IA',
+    'Contratação de terceiros: foto, vídeo, impressão e software',
+  ],
+};
+
+/** Credenciais verificáveis do Rodolfo. */
+export const CREDENCIAIS = [
+  'Chef formado pela UNISUAM',
+  'Pós-graduado em Gestão de Restaurantes pela Estácio',
+  '8 anos na Balada Mix',
+  'Instrutor no Instituto Gourmet',
+  'Gestor de delivery, fidelidade e IA numa rede carioca de 16 lojas e 5 marcas',
+  'Conselheiro do Fórum de Restaurantes do iFood',
+];
+
+/** Perguntas que costumam trazer um dono até aqui. */
+export const SINAIS = [
+  'A venda caiu contra o ano passado e ninguém sabe dizer exatamente por quê.',
+  'O iFood virou o único canal, e a margem foi embora na taxa.',
+  'O padrão só se mantém quando o sócio está no salão.',
+  'Tem faturamento, mas não tem DRE. Tem cliente, mas não tem cadastro.',
 ];

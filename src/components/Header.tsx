@@ -1,109 +1,102 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
-const navLinks = [
-  { label: 'Sobre',      href: '#sobre' },
-  { label: 'Serviços',   href: '#servicos' },
-  { label: 'Processo',   href: '#processo' },
-  { label: 'Contato',    href: '#contato' },
-  // Rota, nao ancora: e a unica entrada do funil que nao depende de rolar.
-  { label: 'Diagnóstico', href: '/diagnostico' },
+const NAV = [
+  { label: 'Frentes', href: '#frentes' },
+  { label: 'Como funciona', href: '#como-funciona' },
+  { label: 'Formato', href: '#formato' },
+  { label: 'Rodolfo', href: '#sobre' },
+  { label: 'Contato', href: '#contato' },
 ];
 
+/**
+ * Cabeçalho fixo, sempre creme, com o filete vermelho no topo: a assinatura
+ * editorial da FlowFoods. O "Entrar" leva ao painel privado do Rodolfo — é
+ * discreto de propósito: o cliente não precisa dele, mas o Rodolfo abre o
+ * painel de qualquer aparelho sem decorar endereço.
+ */
 export default function Header() {
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 60);
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
+  const [aberto, setAberto] = useState(false);
 
   return (
-    <header
-      className={`fixed top-0 inset-x-0 z-50 transition-all duration-300 ${
-        scrolled
-          ? 'bg-white/95 backdrop-blur-sm border-b border-surface-3 shadow-sm'
-          : 'bg-transparent'
-      }`}
-    >
-      <div className="max-w-6xl mx-auto px-5 md:px-8 lg:px-12">
-        <div className="flex items-center justify-between h-16 md:h-20">
+    <header className="fixed inset-x-0 top-0 z-50 bg-surface/95 backdrop-blur-sm">
+      <div className="h-1 w-full bg-primary" aria-hidden />
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 md:h-[72px] md:px-8">
+        <a href="#" className="font-display text-2xl font-bold leading-none tracking-tight text-ink">
+          Flow<span className="text-primary">Foods</span>
+        </a>
 
-          {/* Logo */}
-          <a href="#" className="flex flex-col leading-none">
-            <span className={`font-display text-2xl md:text-3xl tracking-widest font-bold transition-colors duration-300 ${scrolled ? 'text-ink' : 'text-white'}`}>
-              FLOW<span className="text-primary">FOODS</span>
-            </span>
-            <span className={`font-display italic text-[10px] tracking-wide transition-colors duration-300 hidden sm:block ${scrolled ? 'text-ink-5' : 'text-white/40'}`}>
-              Gastronomia que flui. Negócio que cresce.
-            </span>
+        <nav className="hidden items-center gap-7 md:flex">
+          {NAV.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              className="text-[13px] font-medium text-ink-3 transition-colors hover:text-ink"
+            >
+              {l.label}
+            </a>
+          ))}
+        </nav>
+
+        <div className="hidden items-center gap-5 md:flex">
+          <a
+            href="/rodolfo/login"
+            className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-5 transition-colors hover:text-ink"
+          >
+            Entrar
           </a>
-
-          {/* Desktop Nav */}
-          <nav className="hidden md:flex items-center gap-7 lg:gap-9">
-            {navLinks.map((link) => (
-              <a
-                key={link.href}
-                href={link.href}
-                className={`text-xs font-semibold uppercase tracking-widest hover:text-primary transition-colors duration-200 ${scrolled ? 'text-ink-4' : 'text-white/70'}`}
-              >
-                {link.label}
-              </a>
-            ))}
-          </nav>
-
-          {/* Desktop CTA */}
           <a
             href="/diagnostico"
-            className="hidden md:block bg-primary hover:bg-primary-dark text-white text-xs font-semibold px-5 py-2.5 uppercase tracking-widest transition-colors duration-200"
+            className="bg-ink px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-surface transition-colors hover:bg-primary"
           >
             Diagnóstico gratuito
           </a>
-
-          {/* Mobile Hamburger */}
-          <button
-            onClick={() => setMenuOpen((o) => !o)}
-            className="md:hidden p-2 -mr-2"
-            aria-label="Abrir menu"
-          >
-            <div className="space-y-1.5">
-              <span className={`block w-6 h-0.5 transition-all duration-200 origin-center ${scrolled ? 'bg-ink' : 'bg-white'} ${menuOpen ? 'translate-y-2 rotate-45' : ''}`} />
-              <span className={`block w-6 h-0.5 transition-all duration-200 ${scrolled ? 'bg-ink' : 'bg-white'} ${menuOpen ? 'opacity-0' : ''}`} />
-              <span className={`block w-6 h-0.5 transition-all duration-200 origin-center ${scrolled ? 'bg-ink' : 'bg-white'} ${menuOpen ? '-translate-y-2 -rotate-45' : ''}`} />
-            </div>
-          </button>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setAberto((a) => !a)}
+          className="-mr-2 flex h-11 w-11 items-center justify-center md:hidden"
+          aria-label={aberto ? 'Fechar menu' : 'Abrir menu'}
+          aria-expanded={aberto}
+        >
+          <span className="relative block h-4 w-6">
+            <span className={`absolute left-0 top-0 h-0.5 w-6 bg-ink transition-transform ${aberto ? 'translate-y-[7px] rotate-45' : ''}`} />
+            <span className={`absolute left-0 top-[7px] h-0.5 w-6 bg-ink transition-opacity ${aberto ? 'opacity-0' : ''}`} />
+            <span className={`absolute left-0 top-[14px] h-0.5 w-6 bg-ink transition-transform ${aberto ? '-translate-y-[7px] -rotate-45' : ''}`} />
+          </span>
+        </button>
       </div>
 
-      {/* Mobile Menu
-          `max-h-0 overflow-hidden` esconde aos olhos, mas NÃO tira da ordem de
-          tabulação nem da árvore de acessibilidade: com o menu fechado, quem
-          navega por teclado focava links invisíveis, e um clique neles caía no
-          Hero por baixo. `invisible` + `aria-hidden` resolvem os dois. */}
       <div
-        aria-hidden={!menuOpen}
-        className={`md:hidden overflow-hidden transition-all duration-300 bg-white border-t border-surface-3 ${menuOpen ? 'max-h-96 visible' : 'max-h-0 invisible'}`}
+        aria-hidden={!aberto}
+        className={`overflow-hidden border-t border-surface-3 bg-surface transition-all duration-300 md:hidden ${aberto ? 'visible max-h-[420px]' : 'invisible max-h-0'}`}
       >
-        <nav className="flex flex-col px-5 py-6 gap-4">
-          {navLinks.map((link) => (
+        <nav className="flex flex-col gap-1 px-5 py-4">
+          {NAV.map((l) => (
             <a
-              key={link.href}
-              href={link.href}
-              onClick={() => setMenuOpen(false)}
-              className="text-sm uppercase tracking-widest text-ink-4 hover:text-primary transition-colors py-1"
+              key={l.href}
+              href={l.href}
+              onClick={() => setAberto(false)}
+              className="py-3 text-base font-medium text-ink-2"
             >
-              {link.label}
+              {l.label}
             </a>
           ))}
           <a
             href="/diagnostico"
-            onClick={() => setMenuOpen(false)}
-            className="mt-2 block bg-primary hover:bg-primary-dark text-white text-xs font-semibold px-5 py-3.5 uppercase tracking-widest text-center w-full transition-colors duration-200"
+            onClick={() => setAberto(false)}
+            className="mt-2 bg-ink px-5 py-3.5 text-center text-[12px] font-semibold uppercase tracking-[0.12em] text-surface"
           >
             Diagnóstico gratuito
+          </a>
+          <a
+            href="/rodolfo/login"
+            onClick={() => setAberto(false)}
+            className="py-3 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-5"
+          >
+            Entrar
           </a>
         </nav>
       </div>

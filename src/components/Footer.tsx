@@ -1,99 +1,77 @@
 import { CONTACT_INFO } from '@/lib/constants';
 
+const NAV = [
+  { label: 'Frentes', href: '#frentes' },
+  { label: 'Como funciona', href: '#como-funciona' },
+  { label: 'Formato', href: '#formato' },
+  { label: 'Rodolfo', href: '#sobre' },
+  { label: 'Diagnóstico gratuito', href: '/diagnostico' },
+];
+
 export default function Footer() {
-  const year = new Date().getFullYear();
+  const ano = new Date().getFullYear();
 
   return (
-    <footer className="bg-footer border-t border-white/[0.05]">
-      <div className="max-w-6xl mx-auto px-5 md:px-8 lg:px-12">
-
-        <div className="py-16 grid grid-cols-1 md:grid-cols-3 gap-12">
-
-          {/* Brand */}
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-                <span className="font-display font-bold text-white text-base leading-none">FF</span>
-              </div>
-              <p className="font-display text-2xl tracking-widest text-white">
-                FLOW<span className="text-primary">FOODS</span>
-              </p>
-            </div>
-            <p className="font-display italic text-white/30 text-sm leading-relaxed">
-              &ldquo;Gastronomia que flui.<br />Negócio que cresce.&rdquo;
-            </p>
-          </div>
-
-          {/* Nav */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/25 mb-5">Navegação</p>
-            <nav className="flex flex-col gap-3">
-              {[
-                { label: 'Sobre',       href: '#sobre' },
-                { label: 'Serviços',   href: '#servicos' },
-                { label: 'Processo',   href: '#processo' },
-                { label: 'Investimento', href: '#investimento' },
-                { label: 'Contato',    href: '#contato' },
-              ].map((l) => (
-                <a
-                  key={l.href}
-                  href={l.href}
-                  className="text-sm text-white/40 hover:text-white transition-colors duration-200"
-                >
-                  {l.label}
-                </a>
-              ))}
-            </nav>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-white/25 mb-5">Contato</p>
-            <div className="flex flex-col gap-3">
-              <a
-                href={CONTACT_INFO.whatsappUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-white/40 hover:text-white transition-colors duration-200"
-              >
-                WhatsApp: {CONTACT_INFO.whatsappDisplay}
-              </a>
-              {CONTACT_INFO.email && (
-                <a
-                  href={`mailto:${CONTACT_INFO.email}`}
-                  className="text-sm text-white/40 hover:text-white transition-colors duration-200"
-                >
-                  {CONTACT_INFO.email}
-                </a>
-              )}
-              <a
-                href={CONTACT_INFO.instagramUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-white/40 hover:text-white transition-colors duration-200"
-              >
-                @{CONTACT_INFO.instagram}
-              </a>
-              <a
-                href={CONTACT_INFO.linkedinUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sm text-white/40 hover:text-white transition-colors duration-200"
-              >
-                LinkedIn — Rodolfo Cavalcante
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <div className="py-6 border-t border-white/[0.05] flex flex-col sm:flex-row items-center justify-between gap-2">
-          <p className="text-white/20 text-xs">
-            © {year} FlowFoods Consultoria. Todos os direitos reservados.
+    <footer className="border-t border-ink/10 bg-surface px-5 md:px-8">
+      <div className="mx-auto grid max-w-6xl gap-10 py-14 md:grid-cols-3">
+        <div>
+          <p className="font-display text-2xl font-bold leading-none text-ink">
+            Flow<span className="text-primary">Foods</span>
           </p>
-          <p className="text-white/20 text-xs">
-            Consultoria Gastronômica — Rio de Janeiro, Brasil
+          <p className="mt-3 max-w-xs text-sm leading-relaxed text-ink-4">
+            Consultoria para restaurantes. Estrutura, rentabilidade e crescimento, do diagnóstico à
+            execução.
           </p>
         </div>
+
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-5">Navegação</p>
+          <nav className="mt-4 flex flex-col gap-2.5">
+            {NAV.map((l) => (
+              <a key={l.href} href={l.href} className="text-sm text-ink-3 transition-colors hover:text-ink">
+                {l.label}
+              </a>
+            ))}
+          </nav>
+        </div>
+
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-5">Contato</p>
+          <div className="mt-4 flex flex-col gap-2.5">
+            <a
+              href={CONTACT_INFO.whatsappUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-ink-3 transition-colors hover:text-ink"
+            >
+              WhatsApp {CONTACT_INFO.whatsappDisplay}
+            </a>
+            <a
+              href={CONTACT_INFO.instagramUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-ink-3 transition-colors hover:text-ink"
+            >
+              Instagram @{CONTACT_INFO.instagram}
+            </a>
+            <a
+              href={CONTACT_INFO.linkedinUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-ink-3 transition-colors hover:text-ink"
+            >
+              LinkedIn
+            </a>
+            <span className="text-sm text-ink-3">Rio de Janeiro, RJ</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mx-auto flex max-w-6xl flex-col gap-2 border-t border-ink/10 py-6 text-xs text-ink-5 sm:flex-row sm:items-center sm:justify-between">
+        <p>© {ano} FlowFoods Consultoria.</p>
+        <a href="/rodolfo/login" className="font-semibold uppercase tracking-[0.16em] transition-colors hover:text-ink">
+          Entrar
+        </a>
       </div>
     </footer>
   );
