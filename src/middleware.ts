@@ -15,7 +15,9 @@ import comSessao from 'next-auth/middleware';
  *    (que seria um laço) e /rodolfo/setup (que se autentica pelo
  *    ADMIN_SETUP_TOKEN, e existe justamente porque ainda não há senha).
  *
- * O site institucional não passa por aqui: o matcher é só o /rodolfo.
+ * O site institucional não passa por aqui: o matcher é o /rodolfo e o Portal
+ * do cliente (/portal e /api/portal). O Portal recebe só a trava 1 — o cliente
+ * não tem login; quem autentica é o código do link.
  */
 
 const PAGINA_EM_CONFIGURACAO = `<!doctype html>
@@ -56,6 +58,9 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
 
   const { pathname } = req.nextUrl;
   if (SEM_SESSAO.has(pathname)) return NextResponse.next();
+  if (pathname.startsWith('/portal/') || pathname.startsWith('/api/portal/')) {
+    return NextResponse.next();
+  }
 
   // O default do next-auth/middleware também funciona chamado à mão — é o
   // mesmo objeto, só que decidimos NÓS quando ele entra.
@@ -63,5 +68,5 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
 }
 
 export const config = {
-  matcher: ['/rodolfo', '/rodolfo/:path*'],
+  matcher: ['/rodolfo', '/rodolfo/:path*', '/portal/:path*', '/api/portal/:path*'],
 };
