@@ -14,6 +14,7 @@ const NAV = [
   { href: '/rodolfo/barney', rotulo: 'Barney' },
   { href: '/rodolfo/inbox', rotulo: 'Inbox' },
   { href: '/rodolfo/visitas', rotulo: 'Visitas' },
+  { href: '/rodolfo/portal', rotulo: 'Portal' },
   { href: '/rodolfo/metricas', rotulo: 'Métricas' },
   { href: '/rodolfo/config', rotulo: 'Config' },
 ];

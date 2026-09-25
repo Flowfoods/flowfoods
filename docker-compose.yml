@@ -89,8 +89,14 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AI_DAILY_BUDGET_BRL: ${AI_DAILY_BUDGET_BRL:-5}
       USD_BRL: ${USD_BRL:-5.40}
+      # Portal do cliente: onde os arquivos enviados caem.
+      PORTAL_UPLOAD_DIR: /data/portal
     volumes:
       - segredos:/segredos:ro
+      # Arquivos do Portal do cliente (/data/portal/<token>/<bloco>/). Volume
+      # nomeado: sobrevive a redeploy. Sem ele, cada deploy apagaria a
+      # planilha que o cliente mandou.
+      - portal-uploads:/data/portal
     expose:
       - '3000'
     # O domínio se configura no painel do Dokploy (serviço web, porta 3000).
@@ -126,3 +132,4 @@ services:
 volumes:
   postgres-data:
   segredos:
+  portal-uploads:

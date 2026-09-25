@@ -280,3 +280,21 @@ configuração"** (testado em runtime nos dois modos). O app da produção não
 tem banco hoje; quando este merge subir, o site continua idêntico e a área
 privada degrada com honestidade em vez de estourar 500. Ligar o banco no
 painel desliga o gate sozinho, sem redeploy de código.
+
+---
+
+### 20. 2026-09-25 · Portal do cliente dentro do site, não num app separado
+
+**Alternativa:** o pacote original (`index.html` e `admin.html` estáticos,
+webhooks no n8n, schema `portal` à parte e Basic Auth no proxy).
+
+**Razão:** o site já tinha Postgres, login do `/rodolfo`, integração com a
+Evolution e deploy preparado. Dentro dele, é uma publicação em vez de três,
+sem senha extra e com teste automatizado. O Rodolfo escolheu este caminho em
+25/09. O conteúdo veio do `questionario-valentins.json` do Drive: o pacote
+`.tar.gz` em duas partes chegou corrompido, com o md5 errado.
+
+O aviso do Enviar não reusa o `notificar` do Barney, que se cala quando a
+instância é o próprio número do Rodolfo. Aqui o aviso é a única notícia de
+que o formulário chegou, então vai sempre.
+

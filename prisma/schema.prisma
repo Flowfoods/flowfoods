@@ -433,3 +433,65 @@ model WebEvent {
   @@index([pagina, ts])
   @@index([evento, ts])
 }
+
+// ----------------------------------------------------------- portal cliente
+//
+// Formulário inicial de cada cliente da consultoria, em
+// /portal/<token>. O CONTEÚDO (itens, perguntas, textos) não mora no banco:
+// vem de `src/lib/portal/questionarios/<questionario>.json`, versionado e
+// fechado com o consultor. O banco guarda só quem é o cliente e o que ele
+// respondeu.
+
+enum PortalMarcacao {
+  NAO_TENHO
+  NAO_SEI
+  AGORA_NAO
+}
+
+model PortalCliente {
+  id                String           @id @default(cuid())
+  nome              String
+  slug              String           @unique
+  // O código do link. Aleatório e longo: quem não recebeu o link não adivinha.
+  token             String           @unique
+  // Chave do JSON em src/lib/portal/questionarios.
+  questionario      String
+  finalizadoEm      DateTime?
+  ultimaAtividadeEm DateTime?
+  avisoEnviadoEm    DateTime?
+  avisoErro         String?
+  criadoEm          DateTime         @default(now())
+
+  respostas         PortalResposta[]
+  arquivos          PortalArquivo[]
+}
+
+model PortalResposta {
+  id           String          @id @default(cuid())
+  clienteId    String
+  cliente      PortalCliente   @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  itemId       String
+  texto        String?
+  marcacao     PortalMarcacao?
+  criadoEm     DateTime        @default(now())
+  atualizadoEm DateTime        @updatedAt
+
+  // Uma linha por item: o autosave atualiza, não empilha.
+  @@unique([clienteId, itemId])
+}
+
+model PortalArquivo {
+  id           String        @id @default(cuid())
+  clienteId    String
+  cliente      PortalCliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  itemId       String
+  bloco        String
+  nomeOriginal String
+  // Caminho absoluto no disco do container (volume portal-uploads).
+  caminho      String
+  tamanho      Int
+  mime         String?
+  criadoEm     DateTime      @default(now())
+
+  @@index([clienteId, itemId])
+}

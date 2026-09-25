@@ -1,0 +1,88 @@
+{
+  "marca": "Grupo Valentin's",
+  "versao": "2026-09",
+  "observacao": "Conteudo fechado com o consultor. Nao alterar textos. Cada item e cada pergunta aceita uma das marcacoes quando o cliente nao responder.",
+  "marcacoes": ["NAO_TENHO", "NAO_SEI", "AGORA_NAO"],
+  "arquivos_e_acessos": [
+    { "bloco": "A", "titulo": "A. Dados da empresa", "itens": [
+      { "id": "a1", "nome": "Razão social e CNPJ de cada loja", "detalhe": "" },
+      { "id": "a2", "nome": "Endereço completo dos dois pontos", "detalhe": "" },
+      { "id": "a3", "nome": "Sócios e responsável pelo projeto", "detalhe": "quem acompanha o plano do lado de vocês" },
+      { "id": "a4", "nome": "Quadro de funcionários", "detalhe": "por endereço, com função e turno" },
+      { "id": "a5", "nome": "Escala dos sócios e da liderança", "detalhe": "" }
+    ]},
+    { "bloco": "B", "titulo": "B. Acessos", "itens": [
+      { "id": "b1", "nome": "iFood — Portal do Parceiro", "detalhe": "cadastrar rrodolfoac@gmail.com como administrador, em todas as lojas, inclusive fechadas e pausadas" },
+      { "id": "b2", "nome": "Delivery próprio", "detalhe": "link do painel e um usuário, ou o login de vocês" },
+      { "id": "b3", "nome": "Google — Perfil da Empresa", "detalhe": "das duas lojas" },
+      { "id": "b4", "nome": "PDV", "detalhe": "acesso ou relatórios exportados" }
+    ]},
+    { "bloco": "C", "titulo": "C. Números", "itens": [
+      { "id": "c1", "nome": "Faturamento mês a mês dos últimos 12 meses", "detalhe": "" },
+      { "id": "c2", "nome": "Venda por canal e por marca", "detalhe": "" },
+      { "id": "c3", "nome": "Pedidos e ticket médio por canal", "detalhe": "" },
+      { "id": "c4", "nome": "Custo fixo de cada endereço", "detalhe": "aluguel, folha e contas" },
+      { "id": "c5", "nome": "Compras por mês e CMV, se acompanharem", "detalhe": "" }
+    ]},
+    { "bloco": "D", "titulo": "D. Operação documentada", "itens": [
+      { "id": "d1", "nome": "Fichas técnicas dos produtos", "detalhe": "" },
+      { "id": "d2", "nome": "POPs, manuais ou checklists", "detalhe": "montagem e atendimento" },
+      { "id": "d3", "nome": "Itens produzidos numa cozinha e vendidos pela outra marca", "detalhe": "" },
+      { "id": "d4", "nome": "Capacidade do pico", "detalhe": "se já tiverem esse número" },
+      { "id": "d5", "nome": "Regras de meta, bônus ou comissão", "detalhe": "" },
+      { "id": "d6", "nome": "Desligamentos dos últimos 12 meses", "detalhe": "" }
+    ]},
+    { "bloco": "E", "titulo": "E. Cliente e marca", "itens": [
+      { "id": "e1", "nome": "Cadastro de clientes exportado", "detalhe": "" },
+      { "id": "e2", "nome": "Regra da fidelidade e relatório de uso", "detalhe": "" },
+      { "id": "e3", "nome": "Material de marca", "detalhe": "manual, logos, paleta, fontes, fotos, embalagens e artes" }
+    ]}
+  ],
+  "perguntas": [
+    { "bloco": "1", "titulo": "1. O momento", "itens": [
+      { "id": "p1.1", "texto": "O que precisa acontecer nos próximos 6 meses pra vocês dizerem que valeu?" },
+      { "id": "p1.2", "texto": "Qual é a maior dor hoje?" },
+      { "id": "p1.3", "texto": "Quando vocês sentiram a queda de venda começar?" },
+      { "id": "p1.4", "texto": "Na percepção de vocês, o que causou essa queda?" },
+      { "id": "p1.5", "texto": "Se desse pra resolver uma só coisa em 30 dias, qual seria?" }
+    ]},
+    { "bloco": "2", "titulo": "2. A marca", "itens": [
+      { "id": "p2.1", "texto": "Se o cliente descrevesse o Valentin’s em uma frase, qual seria?" },
+      { "id": "p2.2", "texto": "O que diferencia a marca de refeições da de hambúrguer?" },
+      { "id": "p2.3", "texto": "O que não pode mudar de jeito nenhum, mesmo que venda mais?" },
+      { "id": "p2.4", "texto": "Como vocês imaginam o Valentin’s daqui a 5 anos?" },
+      { "id": "p2.5", "texto": "Do que vocês mais se orgulham nessa marca?" }
+    ]},
+    { "bloco": "3", "titulo": "3. O cliente", "itens": [
+      { "id": "p3.1", "texto": "O que faz o cliente voltar hoje?" },
+      { "id": "p3.2", "texto": "Se o Valentin’s fechasse por um mês, faria falta pra quem?" },
+      { "id": "p3.3", "texto": "Qual a reclamação que mais chega até vocês?" },
+      { "id": "p3.4", "texto": "O cliente valoriza a fidelidade dos 10 pedidos?" }
+    ]},
+    { "bloco": "4", "titulo": "4. A operação", "itens": [
+      { "id": "p4.1", "texto": "O que mais trava a cozinha no pico?" },
+      { "id": "p4.2", "texto": "A equipe entrega o mesmo padrão quando vocês não estão?" },
+      { "id": "p4.3", "texto": "O que mais te incomoda na operação hoje?" },
+      { "id": "p4.4", "texto": "Onde vocês sentem que perdem dinheiro sem perceber?" }
+    ]},
+    { "bloco": "5", "titulo": "5. Sócios e equipe", "itens": [
+      { "id": "p5.1", "texto": "Como vocês dividem as decisões entre os sócios?" },
+      { "id": "p5.2", "texto": "O que só acontece se o sócio estiver presente?" },
+      { "id": "p5.3", "texto": "Quem dá a palavra final quando vocês divergem?" },
+      { "id": "p5.4", "texto": "Como vocês avaliam a liderança de cada endereço hoje?" },
+      { "id": "p5.5", "texto": "A equipe sabe o que se espera dela e o que ganha se entregar?" }
+    ]},
+    { "bloco": "6", "titulo": "6. Canais e mercado", "itens": [
+      { "id": "p6.1", "texto": "Como vocês enxergam o canal próprio perto do iFood?" },
+      { "id": "p6.2", "texto": "Quais lojas num raio de 5 km tiram cliente de vocês?" },
+      { "id": "p6.3", "texto": "Quais marcas inspiram vocês, no Rio ou no Brasil?" }
+    ]}
+  ],
+  "texto_de_abertura": {
+    "instrucao": "Este formulário tem duas partes. A primeira é a lista de arquivos e acessos, onde ficam os dados. A segunda são 26 perguntas sobre como vocês enxergam o negócio. Número eu busco nos relatórios, opinião só vocês têm. Pode responder por tópicos ou em áudio.",
+    "marcacoes": "Não deixe nada em branco. Se não der pra responder ou enviar, marque NÃO TENHO (não existe hoje), NÃO SEI (existe, mas você não tem na mão) ou AGORA NÃO (prefere não compartilhar ainda). Isso não é problema, é diagnóstico: mostra onde a gestão precisa evoluir.",
+    "fechamento": "Depois que voltar: cruzo as respostas com os dados do iFood e do PDV, marcamos a primeira visita no horário de pico e eu apresento o diagnóstico com o primeiro plano de ação. Me mande dois dias que funcionam pra vocês.",
+    "assinatura": "Rodolfo Cavalcante · FlowFoods · WhatsApp (21) 99641-6060 · consultoriaflowfoods.com.br",
+    "tagline": "Gastronomia que flui. Negócio que cresce."
+  }
+}

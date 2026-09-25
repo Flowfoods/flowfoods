@@ -64,6 +64,10 @@ COPY --from=build /app/scripts ./scripts
 # Não roda como root. Se um dia alguém achar RCE no app, o processo não é dono
 # do container.
 RUN addgroup -g 1001 -S nodejs && adduser -u 1001 -S nextjs -G nodejs
+# Pasta dos arquivos do Portal do cliente, já do usuário do app. O volume
+# nomeado herda dono e permissão desta pasta na primeira montagem — sem isto
+# ela nasceria do root e todo upload falharia com EACCES.
+RUN mkdir -p /data/portal && chown nextjs:nodejs /data/portal
 USER nextjs
 
 EXPOSE 3000
