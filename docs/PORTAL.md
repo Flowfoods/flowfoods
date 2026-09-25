@@ -8,7 +8,7 @@ envia. O Rodolfo acompanha em `/rodolfo/portal`.
 
 | O quê | Onde |
 |---|---|
-| Conteúdo do Valentin's (23 itens, 26 perguntas, textos) | `src/lib/portal/questionarios/valentins.json`, cópia byte a byte do Drive |
+| Conteúdo do Valentin's (25 itens, 26 perguntas, textos) | `src/lib/portal/questionarios/valentins.json`, cópia byte a byte do Drive |
 | Tela do cliente | `src/app/portal/[token]/` |
 | Painel | `src/app/rodolfo/portal/` |
 | Autosave, upload, envio | `src/app/api/portal/[token]/{salvar,arquivo,finalizar}` |

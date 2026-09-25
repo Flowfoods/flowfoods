@@ -14,20 +14,21 @@ describe('questionário do Valentin’s', () => {
   it('é o arquivo fechado com o consultor, byte a byte', () => {
     // Mudou o hash? Alguém editou texto do cliente. O conteúdo só muda com um
     // JSON novo vindo do Rodolfo — e aí este hash muda junto, de propósito.
-    // 25/09: tirou "ou em áudio" da instrução e o texto de fechamento, a pedido dele.
+    // 25/09: tirou "ou em áudio" da instrução e o texto de fechamento, e pôs
+    // e-mail e telefone de cobrança no bloco A (a6, a7), a pedido dele.
     const bruto = readFileSync(
       path.join(__dirname, '../src/lib/portal/questionarios/valentins.json'),
     );
     expect(createHash('sha256').update(bruto).digest('hex')).toBe(
-      '14d84d62e80cdce1d01924851ab4187f755645a51e599e31ade3f1d2798c82a0',
+      '5c0eee0335c18c1f3f5173687a227eb9384eb71b13d88c64fbddec2600f03932',
     );
   });
 
-  it('tem 23 itens de arquivos em 5 blocos e 26 perguntas em 6 blocos', () => {
+  it('tem 25 itens de arquivos em 5 blocos e 26 perguntas em 6 blocos', () => {
     const arquivos = q.blocos.filter((b) => b.tipo === 'ARQUIVO');
     const perguntas = q.blocos.filter((b) => b.tipo === 'PERGUNTA');
     expect(arquivos.map((b) => b.bloco)).toEqual(['A', 'B', 'C', 'D', 'E']);
-    expect(arquivos.flatMap((b) => b.itens)).toHaveLength(23);
+    expect(arquivos.flatMap((b) => b.itens)).toHaveLength(25);
     expect(perguntas.map((b) => b.bloco)).toEqual(['P1', 'P2', 'P3', 'P4', 'P5', 'P6']);
     expect(perguntas.flatMap((b) => b.itens)).toHaveLength(26);
   });
@@ -59,7 +60,7 @@ describe('questionário do Valentin’s', () => {
 describe('calcularProgresso', () => {
   it('conta tudo como pendente quando nada foi respondido', () => {
     const p = calcularProgresso(q.itens, [], []);
-    expect(p).toMatchObject({ total: 49, recebidos: 0, marcados: 0, pendentes: 49 });
+    expect(p).toMatchObject({ total: 51, recebidos: 0, marcados: 0, pendentes: 51 });
   });
 
   it('conteúdo vence marcação: marcou NÃO SEI e depois mandou o arquivo', () => {
@@ -75,7 +76,7 @@ describe('calcularProgresso', () => {
 
   it('texto só com espaço não conta como resposta', () => {
     const p = calcularProgresso(q.itens, [{ itemId: 'p1.1', texto: '   \n', marcacao: null }], []);
-    expect(p.pendentes).toBe(49);
+    expect(p.pendentes).toBe(51);
   });
 
   it('separa recebido, marcado e pendente e conta cada marcação', () => {
@@ -88,7 +89,7 @@ describe('calcularProgresso', () => {
       ],
       [{ itemId: 'e3' }, { itemId: 'e3' }],
     );
-    expect(p).toMatchObject({ recebidos: 2, marcados: 2, pendentes: 45 });
+    expect(p).toMatchObject({ recebidos: 2, marcados: 2, pendentes: 47 });
     expect(p.porMarcacao).toEqual({ NAO_TENHO: 1, NAO_SEI: 0, AGORA_NAO: 1 });
     expect(p.situacoes.find((s) => s.item.id === 'e3')!.arquivos).toBe(2);
   });
@@ -150,9 +151,9 @@ describe('aviso no WhatsApp', () => {
       linkPainel: 'https://consultoriaflowfoods.com.br/rodolfo/portal/abc',
     });
     expect(texto).toContain("Grupo Valentin's enviou o formulário.");
-    expect(texto).toContain('Recebidos: 1 de 49');
+    expect(texto).toContain('Recebidos: 1 de 51');
     expect(texto).toContain('Marcados: 1 (NÃO TENHO: 1)');
-    expect(texto).toContain('Pendentes: 47');
+    expect(texto).toContain('Pendentes: 49');
     expect(texto).toContain('https://consultoriaflowfoods.com.br/rodolfo/portal/abc');
   });
 });
