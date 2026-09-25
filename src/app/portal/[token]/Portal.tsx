@@ -7,11 +7,16 @@
  *
  * 1. Nada se perde. Cada item salva sozinho ~1 s depois da última tecla, ao
  *    sair do campo e ao fechar a aba (fetch com keepalive). Falhou? Tenta de
- *    novo e diz na tela. Não existe botão "salvar".
+ *    novo e diz na tela. Não existe botão "salvar". E cada cartão mostra o
+ *    próprio estado ("Salvando…", "Salvo"), porque a barra no pé da tela fica
+ *    longe de onde o dono está digitando.
  * 2. Polegar. Todo alvo de toque tem 44 px ou mais, e o "Enviar" mora numa
  *    barra fixa no pé da tela, onde o polegar alcança.
  * 3. O texto é do consultor. Itens, perguntas, abertura e fechamento vêm do
  *    JSON sem edição; esta tela só acrescenta rótulos de interface.
+ * 4. Falar é mais fácil que escrever. Cada pergunta grava áudio na hora, pelo
+ *    microfone, com prévia antes de enviar. Anexar um arquivo é o caminho
+ *    reserva, não o principal.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -24,6 +29,7 @@ import {
 } from '@/lib/portal/questionario';
 import { calcularProgresso, type EstadoItem } from '@/lib/portal/progresso';
 import { LIMITE_BYTES, formatarTamanho } from '@/lib/portal/limites';
+import { LIMITE_GRAVACAO_S, MIMES_GRAVACAO, formatarDuracao, nomeDaGravacao } from '@/lib/portal/audio';
 
 export interface ArquivoTela {
   id: string;
@@ -62,6 +68,11 @@ export default function Portal({
   );
   const [arquivos, setArquivos] = useState<ArquivoTela[]>(inicial.arquivos);
   const [status, setStatus] = useState<StatusSalvar>('ocioso');
+  // Estado de cada cartão, para o retorno visual ficar ao lado do que foi feito.
+  const [statusItens, setStatusItens] = useState<Record<string, StatusSalvar>>({});
+  const marcarItem = useCallback((itemId: string, s: StatusSalvar) => {
+    setStatusItens((m) => ({ ...m, [itemId]: s }));
+  }, []);
   const [finalizadoEm, setFinalizadoEm] = useState<string | null>(inicial.finalizadoEm);
 
   // Textos ainda não confirmados pelo servidor, por item.
@@ -105,7 +116,10 @@ export default function Portal({
 
       const texto = sujos.current.get(itemId);
       if (texto === undefined) return;
+      marcarItem(itemId, 'salvando');
       const ok = await enviarItem(itemId, { texto });
+      // Digitou de novo enquanto salvava? Continua "salvando" até o próximo ciclo.
+      marcarItem(itemId, ok ? (sujos.current.get(itemId) === texto ? 'salvo' : 'salvando') : 'erro');
       // Só limpa se ninguém digitou de novo enquanto o pedido voava.
       if (ok && sujos.current.get(itemId) === texto) sujos.current.delete(itemId);
       if (!ok) {
@@ -116,13 +130,14 @@ export default function Portal({
       }
       atualizarStatus(ok);
     },
-    [enviarItem, atualizarStatus],
+    [enviarItem, atualizarStatus, marcarItem],
   );
 
   const aoDigitar = (itemId: string, valor: string) => {
     setTextos((s) => ({ ...s, [itemId]: valor }));
     sujos.current.set(itemId, valor);
     setStatus('salvando');
+    marcarItem(itemId, 'salvando');
     const t = temporizadores.current.get(itemId);
     if (t) clearTimeout(t);
     temporizadores.current.set(itemId, setTimeout(() => void salvarTexto(itemId), ESPERA_MS));
@@ -132,8 +147,10 @@ export default function Portal({
     const nova = marcacoes[itemId] === m ? null : m;
     const anterior = marcacoes[itemId] ?? null;
     setMarcacoes((s) => ({ ...s, [itemId]: nova }));
+    marcarItem(itemId, 'salvando');
     const ok = await enviarItem(itemId, { marcacao: nova });
     if (!ok) setMarcacoes((s) => ({ ...s, [itemId]: anterior }));
+    marcarItem(itemId, ok ? 'salvo' : 'erro');
     atualizarStatus(ok);
   };
 
@@ -188,6 +205,7 @@ export default function Portal({
     marcacoes,
     arquivos,
     estadoDe,
+    statusItens,
     aoDigitar,
     aoSairDoCampo: (id: string) => void salvarTexto(id),
     aoMarcar,
@@ -195,6 +213,7 @@ export default function Portal({
     aoSubir: (a: ArquivoTela) => {
       setArquivos((s) => [...s, a]);
       setStatus('salvo');
+      marcarItem(a.itemId, 'salvo');
     },
     aoRemover: (id: string) => setArquivos((s) => s.filter((a) => a.id !== id)),
   };
@@ -321,6 +340,7 @@ function CartaoItem({
   marcacoes,
   arquivos,
   estadoDe,
+  statusItens,
   aoDigitar,
   aoSairDoCampo,
   aoMarcar,
@@ -333,6 +353,7 @@ function CartaoItem({
   marcacoes: Record<string, Marcacao | null>;
   arquivos: ArquivoTela[];
   estadoDe: Map<string, EstadoItem>;
+  statusItens: Record<string, StatusSalvar>;
   aoDigitar: (id: string, v: string) => void;
   aoSairDoCampo: (id: string) => void;
   aoMarcar: (id: string, m: Marcacao) => void;
@@ -345,6 +366,8 @@ function CartaoItem({
   const meus = arquivos.filter((a) => a.itemId === item.id);
   const ehPergunta = item.tipo === 'PERGUNTA';
   const idCampo = `campo-${item.id}`;
+  const statusItem = statusItens[item.id] ?? 'ocioso';
+  const salvando = statusItem === 'salvando';
 
   return (
     <article id={`item-${item.id}`} className="rounded-lg border border-footer/10 bg-white/70 p-4 sm:p-5">
@@ -370,10 +393,14 @@ function CartaoItem({
         className="mt-3 w-full resize-y rounded-md border border-footer/15 bg-white px-3 py-2.5 text-base leading-relaxed outline-none transition placeholder:text-footer/35 focus:border-footer/60"
       />
 
+      <EstadoDoCartao status={statusItem} />
+
       <ListaArquivos token={token} arquivos={meus} aoRemover={aoRemover} />
 
+      {ehPergunta && <Gravador token={token} item={item} aoSubir={aoSubir} />}
+
       <div className="mt-3 flex flex-wrap gap-2">
-        <BotaoAnexar token={token} item={item} aoSubir={aoSubir} />
+        <BotaoAnexar token={token} item={item} aoSubir={aoSubir} secundario={ehPergunta} />
         {MARCACOES.map((m) => {
           const ativa = marcacoes[item.id] === m;
           return (
@@ -381,8 +408,9 @@ function CartaoItem({
               key={m}
               type="button"
               aria-pressed={ativa}
+              disabled={salvando}
               onClick={() => aoMarcar(item.id, m)}
-              className={`min-h-[44px] rounded-md border px-3 text-xs font-semibold uppercase tracking-wider transition ${
+              className={`min-h-[44px] rounded-md border px-3 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60 ${
                 ativa
                   ? 'border-marca bg-marca text-white'
                   : 'border-footer/20 text-footer/70 hover:border-footer/50'
@@ -394,6 +422,273 @@ function CartaoItem({
         })}
       </div>
     </article>
+  );
+}
+
+/**
+ * O retorno visual de cada cartão. "Salvando…" fica enquanto durar; "Salvo"
+ * aparece e some sozinho; o erro fica até resolver.
+ */
+function EstadoDoCartao({ status }: { status: StatusSalvar }) {
+  const [mostrarSalvo, setMostrarSalvo] = useState(false);
+
+  useEffect(() => {
+    if (status !== 'salvo') {
+      setMostrarSalvo(false);
+      return;
+    }
+    setMostrarSalvo(true);
+    const t = setTimeout(() => setMostrarSalvo(false), 2500);
+    return () => clearTimeout(t);
+  }, [status]);
+
+  if (status === 'ocioso' || (status === 'salvo' && !mostrarSalvo)) {
+    return <p className="mt-2 min-h-[1.25rem] text-xs" aria-live="polite" />;
+  }
+
+  return (
+    <p
+      aria-live="polite"
+      className={`mt-2 flex min-h-[1.25rem] items-center gap-2 text-xs ${
+        status === 'erro' ? 'text-marca' : status === 'salvo' ? 'text-footer' : 'text-footer/60'
+      }`}
+    >
+      {status === 'salvando' && (
+        <span className="h-2 w-2 animate-pulse rounded-full bg-footer/50" aria-hidden />
+      )}
+      {status === 'salvo' && <span aria-hidden>✓</span>}
+      {status === 'salvando' ? 'Salvando…' : status === 'salvo' ? 'Salvo' : 'Não salvou. Tentando de novo…'}
+    </p>
+  );
+}
+
+type ResultadoUpload = { ok: true; arquivo: ArquivoTela } | { ok: false; erro: string };
+
+/** Upload com progresso. Planilha de 12 meses ou áudio de 8 min no 4G leva tempo. */
+function subirArquivo(
+  token: string,
+  itemId: string,
+  arquivo: File,
+  aoProgredir: (pct: number) => void,
+): Promise<ResultadoUpload> {
+  return new Promise((resolve) => {
+    if (arquivo.size > LIMITE_BYTES) {
+      resolve({ ok: false, erro: `"${arquivo.name}" passa de 50 MB. Mande por link no campo de texto.` });
+      return;
+    }
+    const form = new FormData();
+    form.append('itemId', itemId);
+    form.append('arquivo', arquivo);
+
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `/api/portal/${token}/arquivo`);
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) aoProgredir(Math.round((e.loaded / e.total) * 100));
+    };
+    xhr.onload = () => {
+      try {
+        const r = JSON.parse(xhr.responseText) as { ok: boolean; arquivo?: ArquivoTela; erro?: string };
+        if (xhr.status < 300 && r.ok && r.arquivo) resolve({ ok: true, arquivo: r.arquivo });
+        else resolve({ ok: false, erro: r.erro ?? 'Não enviou. Tente de novo.' });
+      } catch {
+        resolve({ ok: false, erro: xhr.status === 413 ? 'Arquivo acima de 50 MB.' : 'Não enviou. Tente de novo.' });
+      }
+    };
+    xhr.onerror = () => resolve({ ok: false, erro: 'Sem conexão. Tente de novo.' });
+    xhr.send(form);
+  });
+}
+
+type FaseGravacao = 'ocioso' | 'gravando' | 'pronto' | 'enviando';
+
+function escolherMime(): string | undefined {
+  return MIMES_GRAVACAO.find((m) => MediaRecorder.isTypeSupported(m));
+}
+
+/**
+ * Grava pelo microfone, mostra a prévia e envia. Sem MediaRecorder (navegador
+ * muito antigo) ou sem permissão, avisa e deixa o "Anexar arquivo" como saída.
+ */
+function Gravador({
+  token,
+  item,
+  aoSubir,
+}: {
+  token: string;
+  item: Item;
+  aoSubir: (a: ArquivoTela) => void;
+}) {
+  const [fase, setFase] = useState<FaseGravacao>('ocioso');
+  const [segundos, setSegundos] = useState(0);
+  const [pct, setPct] = useState<number | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [gravacao, setGravacao] = useState<{ blob: Blob; url: string } | null>(null);
+
+  const gravador = useRef<MediaRecorder | null>(null);
+  const pedacos = useRef<Blob[]>([]);
+  const relogio = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const suportado =
+    typeof window !== 'undefined' && 'MediaRecorder' in window && !!navigator.mediaDevices?.getUserMedia;
+
+  const pararRelogio = () => {
+    if (relogio.current) clearInterval(relogio.current);
+    relogio.current = null;
+  };
+
+  const parar = useCallback(() => {
+    pararRelogio();
+    const g = gravador.current;
+    if (g && g.state !== 'inactive') g.stop();
+  }, []);
+
+  const descartar = useCallback(() => {
+    setGravacao((g) => {
+      if (g) URL.revokeObjectURL(g.url);
+      return null;
+    });
+    setSegundos(0);
+    setFase('ocioso');
+  }, []);
+
+  // Saiu da tela no meio: solta o microfone e a prévia.
+  useEffect(
+    () => () => {
+      pararRelogio();
+      const g = gravador.current;
+      if (g && g.state !== 'inactive') g.stop();
+      g?.stream.getTracks().forEach((t) => t.stop());
+    },
+    [],
+  );
+
+  const iniciar = async () => {
+    setErro(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mime = escolherMime();
+      const g = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      pedacos.current = [];
+      g.ondataavailable = (e) => {
+        if (e.data.size > 0) pedacos.current.push(e.data);
+      };
+      g.onstop = () => {
+        stream.getTracks().forEach((t) => t.stop());
+        const tipo = g.mimeType || mime || 'audio/webm';
+        const blob = new Blob(pedacos.current, { type: tipo });
+        if (blob.size === 0) {
+          setErro('Não gravou nada. Tente de novo.');
+          setFase('ocioso');
+          return;
+        }
+        setGravacao({ blob, url: URL.createObjectURL(blob) });
+        setFase('pronto');
+      };
+      gravador.current = g;
+      g.start(1000);
+      setSegundos(0);
+      setFase('gravando');
+      relogio.current = setInterval(() => {
+        setSegundos((s) => {
+          if (s + 1 >= LIMITE_GRAVACAO_S) parar();
+          return s + 1;
+        });
+      }, 1000);
+    } catch (e) {
+      const nome = e instanceof DOMException ? e.name : '';
+      setErro(
+        nome === 'NotAllowedError' || nome === 'SecurityError'
+          ? 'O navegador não liberou o microfone. Permita o acesso ou anexe um áudio gravado no celular.'
+          : 'Não consegui usar o microfone. Anexe um áudio gravado no celular.',
+      );
+      setFase('ocioso');
+    }
+  };
+
+  const enviar = async () => {
+    if (!gravacao) return;
+    setFase('enviando');
+    setPct(0);
+    setErro(null);
+    const nome = nomeDaGravacao(item.id, new Date(), gravacao.blob.type);
+    const arquivo = new File([gravacao.blob], nome, { type: gravacao.blob.type });
+    const r = await subirArquivo(token, item.id, arquivo, setPct);
+    setPct(null);
+    if (r.ok) {
+      aoSubir(r.arquivo);
+      descartar();
+    } else {
+      setErro(r.erro);
+      setFase('pronto');
+    }
+  };
+
+  const botao =
+    'inline-flex min-h-[44px] items-center gap-2 rounded-md px-4 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60';
+
+  if (!suportado) {
+    return (
+      <p className="mt-3 text-sm text-footer/60">
+        Este navegador não grava áudio. Grave no celular e use “Anexar arquivo”.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-3">
+      {fase === 'ocioso' && (
+        <button type="button" onClick={iniciar} className={`${botao} border border-footer bg-footer text-creme hover:bg-footer/85`}>
+          <span className="h-2.5 w-2.5 rounded-full bg-marca" aria-hidden />
+          Gravar áudio
+        </button>
+      )}
+
+      {fase === 'gravando' && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-marca/40 bg-white px-3 py-2">
+          <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-marca" aria-hidden />
+          <span className="text-sm font-medium tabular-nums" aria-live="polite">
+            Gravando {formatarDuracao(segundos)}
+          </span>
+          <span className="text-xs text-footer/50">máx. {formatarDuracao(LIMITE_GRAVACAO_S)}</span>
+          <button type="button" onClick={parar} className={`${botao} ml-auto bg-marca text-white hover:brightness-95`}>
+            Parar
+          </button>
+        </div>
+      )}
+
+      {(fase === 'pronto' || fase === 'enviando') && gravacao && (
+        <div className="rounded-md border border-footer/15 bg-white p-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-footer/55">
+            Ouça antes de enviar · {formatarDuracao(segundos)}
+          </p>
+          <audio controls src={gravacao.url} className="mt-2 h-10 w-full" />
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={enviar}
+              disabled={fase === 'enviando'}
+              className={`${botao} bg-marca text-white hover:brightness-95`}
+            >
+              {fase === 'enviando' ? `Enviando ${pct ?? 0}%` : 'Enviar áudio'}
+            </button>
+            <button
+              type="button"
+              onClick={descartar}
+              disabled={fase === 'enviando'}
+              className={`${botao} border border-footer/20 text-footer/70 hover:border-footer/50`}
+            >
+              Gravar de novo
+            </button>
+          </div>
+        </div>
+      )}
+
+      {erro && (
+        <p role="alert" className="mt-2 text-sm text-marca">
+          {erro}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -439,52 +734,21 @@ function ListaArquivos({
   );
 }
 
-/** Upload com barra de progresso: planilha de 12 meses no 4G leva tempo. */
+/** Anexar do celular ou do computador. Nas perguntas é o caminho reserva do gravador. */
 function BotaoAnexar({
   token,
   item,
   aoSubir,
+  secundario = false,
 }: {
   token: string;
   item: Item;
   aoSubir: (a: ArquivoTela) => void;
+  secundario?: boolean;
 }) {
   const entrada = useRef<HTMLInputElement>(null);
   const [pct, setPct] = useState<number | null>(null);
   const [erro, setErro] = useState<string | null>(null);
-
-  const subirUm = (arquivo: File) =>
-    new Promise<void>((resolve) => {
-      if (arquivo.size > LIMITE_BYTES) {
-        setErro(`"${arquivo.name}" passa de 50 MB. Mande por link no campo de texto.`);
-        resolve();
-        return;
-      }
-      const form = new FormData();
-      form.append('itemId', item.id);
-      form.append('arquivo', arquivo);
-
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `/api/portal/${token}/arquivo`);
-      xhr.upload.onprogress = (e) => {
-        if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100));
-      };
-      xhr.onload = () => {
-        try {
-          const r = JSON.parse(xhr.responseText) as { ok: boolean; arquivo?: ArquivoTela; erro?: string };
-          if (xhr.status < 300 && r.ok && r.arquivo) aoSubir(r.arquivo);
-          else setErro(r.erro ?? 'Não enviou. Tente de novo.');
-        } catch {
-          setErro(xhr.status === 413 ? 'Arquivo acima de 50 MB.' : 'Não enviou. Tente de novo.');
-        }
-        resolve();
-      };
-      xhr.onerror = () => {
-        setErro('Sem conexão. Tente de novo.');
-        resolve();
-      };
-      xhr.send(form);
-    });
 
   return (
     <>
@@ -492,7 +756,6 @@ function BotaoAnexar({
         ref={entrada}
         type="file"
         multiple
-        accept={item.tipo === 'PERGUNTA' ? 'audio/*' : undefined}
         className="hidden"
         onChange={async (e) => {
           const lista = Array.from(e.target.files ?? []);
@@ -500,7 +763,9 @@ function BotaoAnexar({
           setErro(null);
           for (const a of lista) {
             setPct(0);
-            await subirUm(a);
+            const r = await subirArquivo(token, item.id, a, setPct);
+            if (r.ok) aoSubir(r.arquivo);
+            else setErro(r.erro);
           }
           setPct(null);
         }}
@@ -509,9 +774,13 @@ function BotaoAnexar({
         type="button"
         disabled={pct !== null}
         onClick={() => entrada.current?.click()}
-        className="min-h-[44px] rounded-md border border-footer bg-footer px-4 text-xs font-semibold uppercase tracking-wider text-creme transition hover:bg-footer/85 disabled:opacity-60"
+        className={`min-h-[44px] rounded-md border px-4 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60 ${
+          secundario
+            ? 'border-footer/20 text-footer/70 hover:border-footer/50'
+            : 'border-footer bg-footer text-creme hover:bg-footer/85'
+        }`}
       >
-        {pct !== null ? `Enviando ${pct}%` : item.tipo === 'PERGUNTA' ? 'Anexar áudio' : 'Anexar arquivo'}
+        {pct !== null ? `Enviando ${pct}%` : 'Anexar arquivo'}
       </button>
       {erro && (
         <p role="alert" className="basis-full text-sm text-marca">

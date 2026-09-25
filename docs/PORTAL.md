@@ -27,8 +27,12 @@ do teste muda junto.
 
 - Abertura (instrução e marcações), as duas partes, fechamento, assinatura e
   tagline, tudo do JSON
-- Cada item: campo de texto, anexar (arquivo ou áudio), e as três marcações
+- Cada item: campo de texto, anexar arquivo, e as três marcações
+- Cada pergunta: "Gravar áudio" pelo microfone, com prévia para ouvir antes de
+  enviar (teto de 10 min). Sem microfone ou permissão, avisa e sobra o anexar
 - Salva sozinho ~1 s depois da última tecla, ao sair do campo e ao fechar a aba
+- Cada cartão mostra o próprio estado: "Salvando…", "Salvo" (some sozinho) ou
+  "Não salvou. Tentando de novo…"
 - Barra fixa no pé: quantos faltam e o botão Enviar, ao alcance do polegar
 - Pode enviar com itens em branco: a tela avisa quantos, e o que ficou em
   branco vira item do diagnóstico

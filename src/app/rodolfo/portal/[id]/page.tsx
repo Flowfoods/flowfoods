@@ -11,6 +11,7 @@ import { prisma } from '@/lib/db';
 import { questionario, ROTULO_MARCACAO } from '@/lib/portal/questionario';
 import { calcularProgresso, type EstadoItem } from '@/lib/portal/progresso';
 import { formatarTamanho, pastaBase } from '@/lib/portal/arquivos';
+import { ehAudio } from '@/lib/portal/audio';
 import { origemPublica } from '@/lib/portal/http';
 import { Cartao, Numero, Selo } from '../../ui';
 import { BotaoAcao } from '../../botoes';
@@ -126,6 +127,15 @@ export default async function PortalClientePage({ params }: { params: { id: stri
                           <span className="text-surface/50">
                             · {formatarTamanho(a.tamanho)} · {formatarQuando(a.criadoEm)}
                           </span>
+                          {ehAudio(a.nomeOriginal) && (
+                            // Gravado no formulário (ou anexado): toca aqui, sem baixar.
+                            <audio
+                              controls
+                              preload="none"
+                              src={`/rodolfo/portal/arquivo/${a.id}`}
+                              className="mt-1 h-10 w-full max-w-md"
+                            />
+                          )}
                         </li>
                       ))}
                     </ul>

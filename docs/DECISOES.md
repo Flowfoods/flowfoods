@@ -344,3 +344,21 @@ fazer o redeploy reabre o setup, e o log do `web` volta a imprimir o link. O
 token antigo continua morto (registro sem hash, de antes desta regra, também
 conta como usado). A redefinição troca a senha do admin que já existe; nunca
 nasce um segundo admin. O `docs/RUNBOOK.md` tem o passo a passo.
+
+---
+
+### 23. 2026-09-25 · Áudio gravado na hora e estado por cartão no Portal
+
+**Alternativa:** manter o "Anexar áudio" abrindo a biblioteca de arquivos do
+celular; e manter só a barra fixa no pé da tela como retorno de "salvo".
+
+**Razão:** o Rodolfo testou e viu duas dores. Gravar no app de notas de voz,
+salvar em Arquivos e depois anexar é um caminho que o dono de restaurante não
+faz. E a barra de status fica longe do cartão onde ele está digitando: ele
+não sabe se a resposta pegou. Então cada pergunta ganhou um gravador pelo
+microfone (MediaRecorder, com prévia para ouvir antes de enviar, teto de 10
+min), e cada cartão mostra o próprio "Salvando…" / "Salvo" / "Não salvou".
+O "Anexar arquivo" continua como caminho reserva, sem filtro de tipo. No
+painel, áudio toca inline (`Content-Type` de áudio e `inline`; o resto segue
+`octet-stream` e anexo, pelo mesmo motivo de sempre). Chrome e Android gravam
+WebM/Opus; iPhone grava MP4/AAC. O nome do arquivo diz item, dia e hora.

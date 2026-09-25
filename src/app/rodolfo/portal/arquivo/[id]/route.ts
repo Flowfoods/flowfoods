@@ -4,6 +4,7 @@ import { Readable } from 'node:stream';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/rodolfo/auth';
 import { prisma } from '@/lib/db';
+import { mimeDoNome } from '@/lib/portal/audio';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,8 +12,10 @@ export const dynamic = 'force-dynamic';
 /**
  * Download de um arquivo do cliente, só com sessão.
  *
- * Sai sempre como anexo e `application/octet-stream`: um HTML ou SVG enviado
- * pelo formulário nunca é renderizado dentro do domínio do painel.
+ * Sai como anexo e `application/octet-stream`: um HTML ou SVG enviado pelo
+ * formulário nunca é renderizado dentro do domínio do painel. A exceção é
+ * áudio (gravado no formulário ou anexado), que vai com o tipo certo e
+ * `inline` para o player do painel tocar — áudio não executa nada.
  */
 export async function GET(_req: Request, { params }: { params: { id: string } }) {
   const sessao = await getServerSession(authOptions);
@@ -21,14 +24,17 @@ export async function GET(_req: Request, { params }: { params: { id: string } })
   const a = await prisma.portalArquivo.findUnique({ where: { id: params.id } });
   if (!a) return new Response('Arquivo não encontrado.', { status: 404 });
 
+  const audio = mimeDoNome(a.nomeOriginal);
+  const nome = encodeURIComponent(a.nomeOriginal);
+
   try {
     const s = await stat(a.caminho);
     const corpo = Readable.toWeb(createReadStream(a.caminho)) as ReadableStream;
     return new Response(corpo, {
       headers: {
-        'Content-Type': 'application/octet-stream',
+        'Content-Type': audio ?? 'application/octet-stream',
         'Content-Length': String(s.size),
-        'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(a.nomeOriginal)}`,
+        'Content-Disposition': `${audio ? 'inline' : 'attachment'}; filename*=UTF-8''${nome}`,
         'X-Content-Type-Options': 'nosniff',
         'Cache-Control': 'private, no-store',
       },
