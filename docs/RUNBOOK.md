@@ -36,6 +36,12 @@ Abra `https://consultoriaflowfoods.com.br/rodolfo/setup?token=<ADMIN_SETUP_TOKEN
 defina a senha. O token para de valer quando a senha existe. A senha não é
 gravada em log nem em relatório.
 
+**Esqueceu a senha?** Troque o `ADMIN_SETUP_TOKEN` no painel (serviço `web` →
+Environment), Redeploy, e abra o link "TOKEN NOVO" que o log do `web` imprime.
+O setup aceita um token que nunca foi usado e troca a senha do admin que já
+existe. Cinco erros de login em 15 minutos bloqueiam o e-mail até o próximo
+redeploy.
+
 ### 1.4 O número
 
 Duas rotas. A decisão é sua; o sistema funciona nas duas.

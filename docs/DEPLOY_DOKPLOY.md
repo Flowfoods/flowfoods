@@ -318,6 +318,7 @@ Só depois: 10 envios manuais → ligar `disparoAtivo`.
 | Erro 500 em toda tela do `/rodolfo` | Migration não rodou, ou `DATABASE_URL` errada |
 | `/rodolfo/login` em laço | `NEXTAUTH_SECRET` ou `NEXTAUTH_URL` ausente/errada |
 | Setup diz "Token inválido" | `ADMIN_SETUP_TOKEN` diferente do que está na URL |
+| Esqueci a senha | Troque o `ADMIN_SETUP_TOKEN` no painel, Redeploy, abra o link novo do log do `web` (ver RUNBOOK) |
 | Webhook responde 401 | `EVOLUTION_WEBHOOK_SECRET` diferente do header configurado |
 | Tudo aparece "SIMULADO" | `EVOLUTION_API_URL`/`_API_KEY` ausentes — é o dry-run |
 | Worker reinicia em laço | Olhe o log: quase sempre é `DATABASE_URL` |

@@ -328,3 +328,19 @@ Rodolfo: são termos particulares de cada consultoria e ficam na proposta. No
 lugar entrou "O que a casa recebe": diagnóstico, plano de 90 dias, relatório
 mensal e materiais de operação, mais como o trabalho se combina, sem número.
 
+
+---
+
+### 22. 2026-09-25 · Redefinir a senha do `/rodolfo` trocando o token de setup
+
+**Alternativa:** manter o setup de uso único absoluto (como era) e redefinir
+senha à mão no banco; ou um "esqueci a senha" por e-mail.
+
+**Razão:** o Rodolfo ficou sem entrar no painel e não tem terminal nem e-mail
+transacional. O que ele tem é o painel do Dokploy. Então o setup passou a
+gravar o hash do token usado no audit (`admin_senha_definida`) e a aceitar
+qualquer token que nunca foi usado: trocar o `ADMIN_SETUP_TOKEN` no painel e
+fazer o redeploy reabre o setup, e o log do `web` volta a imprimir o link. O
+token antigo continua morto (registro sem hash, de antes desta regra, também
+conta como usado). A redefinição troca a senha do admin que já existe; nunca
+nasce um segundo admin. O `docs/RUNBOOK.md` tem o passo a passo.

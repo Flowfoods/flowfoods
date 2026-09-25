@@ -34,7 +34,8 @@ function Formulario() {
     return (
       <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">
         Abra este endereço com o token: <code>/rodolfo/setup?token=…</code>
-        <br />O token está no env do Dokploy, em <code>ADMIN_SETUP_TOKEN</code>.
+        <br />O link completo aparece no log do serviço <code>web</code> no Dokploy. Para redefinir a
+        senha, troque o <code>ADMIN_SETUP_TOKEN</code> no painel e faça o redeploy.
       </p>
     );
   }
@@ -106,8 +107,10 @@ export default function SetupPage() {
   return (
     <div className="flex min-h-[70vh] items-center justify-center">
       <div className="w-full max-w-sm">
-        <h1 className="font-display text-2xl font-bold">Primeiro acesso</h1>
-        <p className="mb-6 mt-1 text-sm text-surface/60">Defina a senha do Espaço do Rodolfo.</p>
+        <h1 className="font-display text-2xl font-bold">Definir senha</h1>
+        <p className="mb-6 mt-1 text-sm text-surface/60">
+          Primeiro acesso ou senha nova para o Espaço do Rodolfo.
+        </p>
         <Suspense fallback={null}>
           <Formulario />
         </Suspense>

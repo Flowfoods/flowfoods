@@ -1,19 +1,22 @@
 'use server';
 
 /**
- * Primeiro acesso: o Rodolfo define a própria senha.
+ * Definir (ou redefinir) a senha do Rodolfo.
  *
- * O `ADMIN_SETUP_TOKEN` existe só no env do Dokploy. Depois que a senha existe,
- * o setup para de funcionar — a checagem é "já existe admin com senha?", que é
- * estado do banco, não uma flag que alguém possa reverter no .env.
+ * O `ADMIN_SETUP_TOKEN` existe só no env do Dokploy e vale uma vez: o setup
+ * grava o hash do token usado e recusa o mesmo token dali em diante. Para
+ * redefinir a senha, basta trocar o token no painel e fazer o redeploy — ver
+ * `src/lib/rodolfo/setup-token.ts`.
  *
  * A senha não é escrita em lugar nenhum: nem em log, nem em relatório, nem no
- * audit (que registra só o evento).
+ * audit (que registra só o evento e o hash do token).
  */
 
 import { timingSafeEqual } from 'node:crypto';
 import bcrypt from 'bcryptjs';
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
+import { ERRO_TOKEN_USADO, EVENTOS_TOKEN_USADO, hashDoToken, tokenJaUsado } from '@/lib/rodolfo/setup-token';
 
 const MIN_SENHA = 12;
 
@@ -47,23 +50,47 @@ export async function definirSenha(_anterior: unknown, form: FormData): Promise<
   }
   if (senha !== confirmacao) return { ok: false, erro: 'As senhas não conferem.' };
 
-  // Token usado uma vez: se já existe admin COM senha, o setup está encerrado.
-  const jaConfigurado = await prisma.user.findFirst({ where: { senhaHash: { not: null } } });
-  if (jaConfigurado) {
-    return { ok: false, erro: 'A senha já foi definida. Use o login.' };
+  const tokenHash = hashDoToken(esperado);
+
+  // Token usado uma vez: com admin já configurado, só um token NOVO reabre o setup.
+  const admin = await prisma.user.findFirst({
+    where: { senhaHash: { not: null } },
+    orderBy: { criadoEm: 'asc' },
+  });
+  if (admin) {
+    const ultimo = await prisma.auditLog.findFirst({
+      where: { evento: { in: EVENTOS_TOKEN_USADO } },
+      orderBy: { criadoEm: 'desc' },
+    });
+    if (tokenJaUsado(tokenHash, ultimo?.dados)) return { ok: false, erro: ERRO_TOKEN_USADO };
   }
 
   const senhaHash = await bcrypt.hash(senha, 12);
 
-  await prisma.user.upsert({
-    where: { email },
-    create: { email, senhaHash, role: 'ADMIN' },
-    update: { senhaHash },
-  });
+  try {
+    // Redefinição troca a senha (e o e-mail, se ele digitou outro) do admin que
+    // já existe. Um usuário só: nunca nasce um segundo admin por aqui.
+    const user = admin
+      ? await prisma.user.update({ where: { id: admin.id }, data: { email, senhaHash } })
+      : await prisma.user.upsert({
+          where: { email },
+          create: { email, senhaHash, role: 'ADMIN' },
+          update: { senhaHash },
+        });
 
-  await prisma.auditLog.create({
-    data: { evento: 'admin_senha_definida', dados: { email } },
-  });
+    await prisma.auditLog.create({
+      data: {
+        userId: user.id,
+        evento: 'admin_senha_definida',
+        dados: { email, tokenHash, redefinicao: Boolean(admin) },
+      },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
+      return { ok: false, erro: 'Já existe outro usuário com esse e-mail.' };
+    }
+    throw e;
+  }
 
   return { ok: true };
 }

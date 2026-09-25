@@ -196,8 +196,10 @@ Além disso:
 
 Deploy feito em 25/09. Falta, nesta ordem:
 
-1. Abrir o log do serviço `web` do app `flowfoods-web` no Dokploy, clicar no
-   link de PRIMEIRO ACESSO e criar a senha.
+1. Senha do painel. Se o login não entra: no Dokploy, app `flowfoods-web` →
+   serviço `web` → Environment, dê um valor novo ao `ADMIN_SETUP_TOKEN`
+   (qualquer texto longo, sem espaço), Redeploy, e abra o link "TOKEN NOVO" que
+   o log do `web` imprime. Lá você define e-mail e senha de novo.
 2. `EVOLUTION_API_URL`, `EVOLUTION_API_KEY` e `EVOLUTION_INSTANCE` na aba
    Environment do app (ou como secrets no GitHub, que eu aplico). Sem elas o
    portal funciona; só o aviso no WhatsApp não sai.
