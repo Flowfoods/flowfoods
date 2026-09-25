@@ -37,10 +37,18 @@ const config: Config = {
 
         // Rodapé escuro (contraste final)
         footer: '#0A0A0A',
+
+        // Portal do cliente — identidade editorial da FlowFoods: creme, preto e
+        // o vermelho como único acento.
+        creme: '#F5F0EB',
+        marca: '#EA1D2C',
       },
       fontFamily: {
         sans:    ['var(--font-sans)',    'Helvetica Neue', 'sans-serif'],
         display: ['var(--font-display)', 'Georgia',        'serif'],
+        // Portal do cliente: títulos em Gelasio, texto em Libre Franklin.
+        serifa:  ['var(--font-gelasio)',  'Georgia',        'serif'],
+        franklin: ['var(--font-franklin)', 'Helvetica Neue', 'sans-serif'],
       },
       animation: {
         'scroll-left':  'scroll-left  40s linear infinite',

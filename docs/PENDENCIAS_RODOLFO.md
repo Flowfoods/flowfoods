@@ -178,3 +178,12 @@ Além disso:
   `contato@consultoriaflowfoods.com.br` — falta criar.
 - **Profissionais treinados:** o site diz "100+", que é o conservador combinado.
   Sobe se 1000+ for real e comprovável.
+
+---
+
+## 🔴 9. Portal do Valentin's — subir e mandar o link
+
+Pronto e testado (`docs/PORTAL.md`). Falta: o deploy do item 2 e as três
+`EVOLUTION_*` no painel. Depois, copiar o link em `/rodolfo/portal` e mandar
+para o Valentin's.
+
