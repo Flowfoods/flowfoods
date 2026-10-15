@@ -19,3 +19,6 @@ next-env.d.ts
 tsconfig.tsbuildinfo
 .env
 .env.local
+
+# Estado local do oh-my-claudecode (orquestração dos agentes)
+.omc/
