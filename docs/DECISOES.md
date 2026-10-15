@@ -626,3 +626,72 @@ ao Rodolfo preparar o acesso antes de liberar o parceiro e não apaga o
 histórico de quem está suspenso; a tela avisa o porquê. Bloquear o acesso de
 uma pessoa é outra ação (desativar o vínculo), com efeito imediato.
 
+
+---
+
+### 39. 2026-10-15 · ERP 0.4: catálogo e perfis base em código; perfil próprio é fotografia; tudo no vínculo, fora do tenant; setor não concede
+
+**Alternativas:** (a) perfis base como linhas no banco, semeadas por parceiro;
+(b) perfil próprio guardado como diferença do base (herda permissão nova);
+(c) permissões e perfis em tabelas de tenant (RLS); (d) setor como papel que
+concede permissões.
+
+**Razão:** (a) catálogo e perfis base mudam junto com o código (módulo novo traz
+permissão nova): em código, versionados (`VERSAO_DO_CATALOGO`), sem migration
+de dado por parceiro. (b) herdar sozinho é dar acesso que ninguém escolheu:
+perfil próprio guarda a lista completa (menor privilégio) e a versão do
+catálogo em que foi salvo. (c) o alcance é resolvido em `validarSessao`, a cada
+requisição, antes do contexto do parceiro e na mesma ida ao banco do vínculo;
+e qualquer relação Prisma entre credencial e tenant abriria `include` sem o
+portão (o teste-guarda reprova). Ficou tudo do lado das credenciais
+(`AcessoParceiro` + `PerfilAcesso`), travado em `credenciais.ts`, sem GRANT
+para `erp_tenant`, com histórico no tenant do parceiro. (d) "cozinha" não diz
+o que a pessoa pode (o cozinheiro-chefe e o auxiliar são da cozinha): setor
+filtra e sugere o perfil próprio pensado para ele; quem concede é o perfil.
+
+---
+
+### 40. 2026-10-15 · ERP 0.4: lojas no vínculo (rede inteira OU lista), 3 níveis, checagem única no servidor
+
+**Alternativas:** tabela de junção pessoa × loja com FK para `Loja`; nível
+explícito (enum) na pessoa; checagem só na tela.
+
+**Razão:** "rede inteira" precisa valer para loja aberta amanhã — é um
+booleano, não a lista de hoje. Sócio de uma unidade e gerente de loja são o
+mesmo caso (lista de lojas) com perfis diferentes. O nível sai do vínculo
+(FLOWFOODS para o /rodolfo, REDE com rede inteira, LOJA com lista), sem campo
+para ficar incoerente. `lojaIds` sem FK porque credencial não aponta para
+tenant; em troca, a lista é validada contra as lojas do parceiro (lidas pelo
+portão) na gravação e toda consulta de loja passa pelo portão (`filtroDeLojas`),
+então um id estranho não acha nada. CHECK: rede inteira XOR lista não vazia;
+um perfil só; FK composta para o perfil do mesmo parceiro. Permissão "por
+loja" é checada com `lojaId`; `lojas.gerir` e `historico.ver` exigem a rede
+inteira (mexem na estrutura ou mostram toda a rede). Uma função decide
+(`exigirPermissao`, com `pode`/`recusaDaAcao`/`exigirPermissaoNaPagina` sobre
+a mesma regra) e o teste-guarda reprova página ou action do `/erp` sem ela.
+Vínculos da 0.3 viraram Gerente com rede inteira: continuam podendo o que
+podiam (cadastrar insumo) sem ganhar a equipe.
+
+---
+
+### 41. 2026-10-15 · ERP 0.4: sem escalada por cobertura, último administrador sob trava, link de senha restrito
+
+**Alternativas:** conferir só "o ator tem `acessos.gerir`"; contar
+administradores fora de transação; manter o link de senha liberado a qualquer
+administrador do parceiro (ou só redefinir e avisar a pessoa).
+
+**Razão:** com "cuidar da equipe" sozinho, um gerente com esse extra se faria
+dono, ou tiraria o dono. Regra única: o ator precisa **cobrir** a pessoa —
+todas as permissões dela e as lojas dela — antes (não mexe em quem está acima)
+e depois (não sobe ninguém acima de si). Perfil próprio só por quem tem a rede
+inteira e todas as permissões do perfil. Último administrador = ativo +
+cuidar da equipe + rede inteira; nenhuma mudança (nem do nível 1) deixa o
+parceiro com zero, se tinha algum. A contagem antes/depois roda na transação
+da mudança, sob `pg_advisory_xact_lock` do parceiro: dois administradores
+tirando um ao outro ao mesmo tempo, um só consegue (teste). Link de senha: a
+senha é da pessoa e vale em TODOS os parceiros dela; um administrador de A que
+gerasse o link de quem também está em B tomaria a conta e entraria em B. Por
+isso só o nível 1 gera, ou o administrador de um parceiro onde a pessoa está
+sozinha (sem vínculo em outro, ativo ou não). "Só redefinir e avisar" não
+serve: ainda não há canal de aviso (0.5). E-mail travado pelo limite: o nível
+1 libera (grava uma "tentativa ok" marcada; o limite por IP segue).

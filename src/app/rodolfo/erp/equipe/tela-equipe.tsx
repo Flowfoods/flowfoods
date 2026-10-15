@@ -150,10 +150,18 @@ export function TelaEquipe({
           Perfis <span className="tabular-nums text-surface/40">{perfis.length + 3}</span>
         </Link>
       </nav>
+      {aba === 'pessoas' && !bloqueio && (
+        <a
+          href="#nova-pessoa"
+          className="-mt-2 inline-block rounded-[7px] bg-primary px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-dark lg:hidden"
+        >
+          Nova pessoa
+        </a>
+      )}
 
       {aba === 'pessoas' ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
-          <div className="order-2 min-w-0 space-y-4 lg:order-1">
+          <div className="min-w-0 space-y-4">
             <Painel
               titulo="Pessoas com acesso"
               acessorio={
@@ -354,7 +362,8 @@ export function TelaEquipe({
             )}
           </div>
 
-          <Painel titulo="Nova pessoa" className={`order-1 self-start lg:order-2 ${bloqueio ? 'hidden lg:block' : ''}`}>
+          <Painel titulo="Nova pessoa" id="nova-pessoa"
+            className={`scroll-mt-4 self-start ${bloqueio ? 'hidden lg:block' : ''}`}>
             {bloqueio ? (
               <p className="text-sm text-surface/55">{bloqueio}</p>
             ) : (
@@ -377,7 +386,7 @@ export function TelaEquipe({
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)]">
-          <Painel titulo="Perfis" semRespiro className="order-2 lg:order-1">
+          <Painel titulo="Perfis" semRespiro className="order-2 self-start lg:order-1">
             <ul>
               {ORDEM_DOS_PERFIS_BASE.map((b) => {
                 const n = todas.filter((p) => p.perfilBase === b && p.status === 'ATIVO').length;
