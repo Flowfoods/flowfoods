@@ -516,7 +516,8 @@ model PortalArquivo {
 //    tenant é FK COMPOSTA (parceiroId, xId) → (parceiroId, id). O banco recusa
 //    uma ficha de B apontando para insumo de A, mesmo que o código erre. Por
 //    isso toda tabela referenciada tem `@@unique([parceiroId, id])`, e toda FK
-//    composta é Restrict/Cascade, nunca SetNull (anularia o parceiroId).
+//    composta é Restrict/Cascade, nunca SetNull (anularia o parceiroId). E um
+//    trigger em toda tabela de tenant recusa UPDATE que troque o parceiroId.
 // 5. Snapshot: documento que registra um fato (item de nota, movimento,
 //    contagem, produção, etiqueta) grava nome/unidade/valor daquele momento.
 //    Renomear o insumo amanhã não reescreve o passado.
@@ -936,6 +937,7 @@ model ProdutoVenda {
   embalagens ProdutoEmbalagem[]
 
   @@unique([parceiroId, id])
+  // NULLS NOT DISTINCT (no SQL): sem marca, o nome também não repete.
   @@unique([parceiroId, marcaId, nome])
   @@index([parceiroId, fichaId])
   @@index([parceiroId, codigoExterno])
@@ -1287,7 +1289,8 @@ model Etiqueta {
 // Faturamento por canal por dia (2.1). Cada lançamento tem chave de
 // idempotência ÚNICA no parceiro: reprocessar integração ou reenviar
 // planilha não duplica venda. Manual usa chave determinística
-// (ex.: manual:<loja>:<canal>:<data>), então redigitar é correção, não soma.
+// (manual:<loja>:<marca ou ->:<canal>:<data>), então redigitar é correção, não
+// soma, e duas marcas na mesma loja não se sobrescrevem.
 model FaturamentoLancamento {
   id                String       @id @default(cuid())
   parceiroId        String
@@ -1300,6 +1303,8 @@ model FaturamentoLancamento {
   data              DateTime     @db.Date
   valorCentavos     Int
   pedidos           Int
+  // ATENDIMENTOS no dia (o que o canal reporta), não clientes únicos: a
+  // mesma pessoa em dois dias conta duas vezes. Ticket médio = valor ÷ pedidos.
   clientes          Int
   origem            OrigemDado
   chaveIdempotencia String
@@ -1327,6 +1332,11 @@ enum DreGrupo {
   OUTRAS
 }
 
+enum DreSentido {
+  MAIOR_MELHOR // receita, margem
+  MENOR_MELHOR // CMV, despesas, taxas
+}
+
 // Linhas/categorias do DRE do parceiro. `calculada` = vem do sistema
 // (faturamento, CMV, taxas), não recebe despesa manual.
 model DreLinha {
@@ -1337,51 +1347,64 @@ model DreLinha {
   grupo      DreGrupo
   ordem      Int          @default(0)
   calculada  Boolean      @default(false)
+  // Para que lado o desvio vs meta é bom: receita maior é melhor; CMV e
+  // despesa, menor. O farol lê o desvio já com esse sinal.
+  sentido    DreSentido   @default(MENOR_MELHOR)
   ativa      Boolean      @default(true)
   criadoEm   DateTime     @default(now())
 
-  metas    DreMeta[]
-  despesas Despesa[]
+  metas       DreMeta[]
+  despesas    Despesa[]
+  farolFaixas FarolFaixa[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, nome])
 }
 
 // Meta % por linha (sobre o faturamento), por parceiro, com vigência: mudar a
-// meta não reescreve o realizado vs meta dos períodos passados.
+// meta não reescreve o realizado vs meta dos períodos passados. Canal null =
+// meta da rede (todos os canais); com canal, vale só para aquele canal.
+// Unique com NULLS NOT DISTINCT (no SQL): só uma meta "de rede" por vigência.
 model DreMeta {
   id           String       @id @default(cuid())
   parceiroId   String
   parceiro     ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
   linhaId      String
   linha        DreLinha     @relation(fields: [parceiroId, linhaId], references: [parceiroId, id], onDelete: Cascade)
+  canal        CanalVenda?
   percentualBp Int
   vigenteDesde DateTime     @db.Date
   criadoEm     DateTime     @default(now())
 
   @@unique([parceiroId, id])
-  @@unique([parceiroId, linhaId, vigenteDesde])
+  @@unique([parceiroId, linhaId, canal, vigenteDesde])
 }
 
-// Despesa manual (ou importada) numa linha do DRE. Loja null = despesa da rede.
+// Despesa manual (ou importada) numa linha do DRE. Loja null = despesa da rede;
+// canal null = rateada entre canais (canal preenchido = despesa só daquele canal).
 model Despesa {
-  id            String       @id @default(cuid())
-  parceiroId    String
-  parceiro      ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
-  lojaId        String?
-  loja          Loja?        @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
-  linhaId       String
-  linha         DreLinha     @relation(fields: [parceiroId, linhaId], references: [parceiroId, id], onDelete: Restrict)
-  descricao     String
+  id                String       @id @default(cuid())
+  parceiroId        String
+  parceiro          ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId            String?
+  loja              Loja?        @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  linhaId           String
+  linha             DreLinha     @relation(fields: [parceiroId, linhaId], references: [parceiroId, id], onDelete: Restrict)
+  descricao         String
   // Dia de competência (entra no período que contém essa data).
-  competencia   DateTime     @db.Date
-  valorCentavos Int
-  origem        OrigemDado   @default(MANUAL)
-  origemRef     String?
-  criadoEm      DateTime     @default(now())
-  atualizadoEm  DateTime     @updatedAt
+  competencia       DateTime     @db.Date
+  canal             CanalVenda?
+  valorCentavos     Int
+  origem            OrigemDado   @default(MANUAL)
+  origemRef         String?
+  // Obrigatória na importação/integração (CHECK): reimportar a planilha não
+  // duplica despesa. Digitada à mão pode ficar nula.
+  chaveIdempotencia String?
+  criadoEm          DateTime     @default(now())
+  atualizadoEm      DateTime     @updatedAt
 
   @@unique([parceiroId, id])
+  @@unique([parceiroId, chaveIdempotencia])
   @@index([parceiroId, competencia])
   @@index([parceiroId, lojaId, competencia])
   @@index([parceiroId, linhaId, competencia])
@@ -1418,23 +1441,23 @@ enum FarolCor {
   VERMELHO
 }
 
-enum FarolIndicador {
-  MARGEM_LIQUIDA // margem líquida do canal (1.10/2.4)
-}
-
-// Faixas do farol por canal (2.4): a cor vale a partir de `aPartirDeBp`
-// (pontos-base, pode ser negativo). As 5 faixas de um canal se leem em ordem.
+// Farol (2.4): 5 faixas por linha do DRE com meta, por canal (null = visão da
+// rede). Mede o DESVIO vs meta em pontos-base do faturamento, já com o sinal
+// do `sentido` da linha: positivo = melhor que a meta. A cor vale a partir de
+// `desvioMinimoBp`; lê-se da maior para a menor (VERMELHO costuma ser o piso).
+// Unique com NULLS NOT DISTINCT (no SQL): canal null também não repete cor.
 model FarolFaixa {
-  id          String         @id @default(cuid())
-  parceiroId  String
-  parceiro    ParceiroFlow   @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
-  indicador   FarolIndicador @default(MARGEM_LIQUIDA)
-  canal       CanalVenda
-  cor         FarolCor
-  aPartirDeBp Int
+  id             String       @id @default(cuid())
+  parceiroId     String
+  parceiro       ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  linhaId        String
+  linha          DreLinha     @relation(fields: [parceiroId, linhaId], references: [parceiroId, id], onDelete: Cascade)
+  canal          CanalVenda?
+  cor            FarolCor
+  desvioMinimoBp Int
 
   @@unique([parceiroId, id])
-  @@unique([parceiroId, indicador, canal, cor])
+  @@unique([parceiroId, linhaId, canal, cor])
 }
 
 // ------------------------------------------------- ERP · alterações visíveis

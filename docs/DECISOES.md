@@ -431,3 +431,34 @@ do dia (3.2) não tem tabela: é ordem PLANEJADA × saldo, derivada.
 relatório; planilha pode ser reimportada. Cada lançamento leva
 `chaveIdempotencia` única no parceiro (manual usa chave determinística, então
 redigitar é correção, registrada em `HistoricoAlteracao`). O dia é a soma.
+
+---
+
+### 29. 2026-10-15 · ERP 0.1 (revisão): tenant travado em runtime e no banco
+
+**Alternativa:** manter só o teste de grep contra `prisma.<modelo>` e confiar
+na FK composta para impedir referência cruzada.
+
+**Razão:** os fiscais provaram dois furos. (1) `connect` numa relação
+composta grava `parceiroId` junto com a FK: um `update` de B "conectando" a
+ficha de A movia a linha para A e lia a receita. Agora o portão recusa
+qualquer campo de relação no dado (lista lida do esquema, `Prisma.dmmf`) e um
+trigger em toda tabela de tenant recusa UPDATE do `parceiroId`, o que também
+neutraliza o ON UPDATE CASCADE. (2) grep não pega alias nem `tx` de
+`$transaction`. Agora o `prisma` do portal é travado em runtime para os
+modelos de tenant e o portão usa um PrismaClient base privado. Custo: um
+segundo pool de conexões (lazy, só abre quando o ERP é usado). O SQL cru do
+portal continua possível e segue vigiado só pelo teste-guarda.
+
+---
+
+### 30. 2026-10-15 · ERP 0.1 (revisão): farol por linha do DRE com sentido
+
+**Alternativa:** farol só de margem líquida por canal (versão reprovada).
+
+**Razão:** o contrato (2.4) pede farol por canal em todas as linhas com meta.
+`FarolFaixa` aponta `DreLinha` (FK composta) e canal (nulo = rede); a faixa é
+o desvio vs meta em pontos-base, já com o `sentido` da linha (receita: maior
+é melhor; CMV e despesa: menor). Meta e despesa ganharam canal opcional (nulo =
+rede/rateio). Uniques com canal nulo usam `NULLS NOT DISTINCT` no SQL
+(Postgres 15+; o Prisma não descreve e o diff não reverte).

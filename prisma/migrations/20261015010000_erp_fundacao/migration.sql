@@ -46,13 +46,13 @@ CREATE TYPE "EtiquetaFormato" AS ENUM ('E60X40', 'E60X60');
 CREATE TYPE "DreGrupo" AS ENUM ('RECEITA', 'DEDUCAO', 'CMV', 'DESPESA_VARIAVEL', 'PESSOAL', 'OCUPACAO', 'ADMINISTRATIVA', 'MARKETING', 'FINANCEIRA', 'OUTRAS');
 
 -- CreateEnum
+CREATE TYPE "DreSentido" AS ENUM ('MAIOR_MELHOR', 'MENOR_MELHOR');
+
+-- CreateEnum
 CREATE TYPE "PeriodoStatus" AS ENUM ('ABERTO', 'FECHADO');
 
 -- CreateEnum
 CREATE TYPE "FarolCor" AS ENUM ('AZUL', 'VERDE', 'AMARELO', 'LARANJA', 'VERMELHO');
-
--- CreateEnum
-CREATE TYPE "FarolIndicador" AS ENUM ('MARGEM_LIQUIDA');
 
 -- AlterTable
 ALTER TABLE "Insumo" ADD COLUMN     "ativo" BOOLEAN NOT NULL DEFAULT true,
@@ -449,6 +449,7 @@ CREATE TABLE "DreLinha" (
     "grupo" "DreGrupo" NOT NULL,
     "ordem" INTEGER NOT NULL DEFAULT 0,
     "calculada" BOOLEAN NOT NULL DEFAULT false,
+    "sentido" "DreSentido" NOT NULL DEFAULT 'MENOR_MELHOR',
     "ativa" BOOLEAN NOT NULL DEFAULT true,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -460,6 +461,7 @@ CREATE TABLE "DreMeta" (
     "id" TEXT NOT NULL,
     "parceiroId" TEXT NOT NULL,
     "linhaId" TEXT NOT NULL,
+    "canal" "CanalVenda",
     "percentualBp" INTEGER NOT NULL,
     "vigenteDesde" DATE NOT NULL,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -475,9 +477,11 @@ CREATE TABLE "Despesa" (
     "linhaId" TEXT NOT NULL,
     "descricao" TEXT NOT NULL,
     "competencia" DATE NOT NULL,
+    "canal" "CanalVenda",
     "valorCentavos" INTEGER NOT NULL,
     "origem" "OrigemDado" NOT NULL DEFAULT 'MANUAL',
     "origemRef" TEXT,
+    "chaveIdempotencia" TEXT,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
 
@@ -502,10 +506,10 @@ CREATE TABLE "PeriodoApuracao" (
 CREATE TABLE "FarolFaixa" (
     "id" TEXT NOT NULL,
     "parceiroId" TEXT NOT NULL,
-    "indicador" "FarolIndicador" NOT NULL DEFAULT 'MARGEM_LIQUIDA',
-    "canal" "CanalVenda" NOT NULL,
+    "linhaId" TEXT NOT NULL,
+    "canal" "CanalVenda",
     "cor" "FarolCor" NOT NULL,
-    "aPartirDeBp" INTEGER NOT NULL,
+    "desvioMinimoBp" INTEGER NOT NULL,
 
     CONSTRAINT "FarolFaixa_pkey" PRIMARY KEY ("id")
 );
@@ -621,7 +625,7 @@ CREATE INDEX "ProdutoVenda_parceiroId_codigoExterno_idx" ON "ProdutoVenda"("parc
 CREATE UNIQUE INDEX "ProdutoVenda_parceiroId_id_key" ON "ProdutoVenda"("parceiroId", "id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "ProdutoVenda_parceiroId_marcaId_nome_key" ON "ProdutoVenda"("parceiroId", "marcaId", "nome");
+CREATE UNIQUE INDEX "ProdutoVenda_parceiroId_marcaId_nome_key" ON "ProdutoVenda"("parceiroId", "marcaId", "nome") NULLS NOT DISTINCT;
 
 -- CreateIndex
 CREATE UNIQUE INDEX "ProdutoCanal_parceiroId_id_key" ON "ProdutoCanal"("parceiroId", "id");
@@ -741,7 +745,7 @@ CREATE UNIQUE INDEX "DreLinha_parceiroId_nome_key" ON "DreLinha"("parceiroId", "
 CREATE UNIQUE INDEX "DreMeta_parceiroId_id_key" ON "DreMeta"("parceiroId", "id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "DreMeta_parceiroId_linhaId_vigenteDesde_key" ON "DreMeta"("parceiroId", "linhaId", "vigenteDesde");
+CREATE UNIQUE INDEX "DreMeta_parceiroId_linhaId_canal_vigenteDesde_key" ON "DreMeta"("parceiroId", "linhaId", "canal", "vigenteDesde") NULLS NOT DISTINCT;
 
 -- CreateIndex
 CREATE INDEX "Despesa_parceiroId_competencia_idx" ON "Despesa"("parceiroId", "competencia");
@@ -756,6 +760,9 @@ CREATE INDEX "Despesa_parceiroId_linhaId_competencia_idx" ON "Despesa"("parceiro
 CREATE UNIQUE INDEX "Despesa_parceiroId_id_key" ON "Despesa"("parceiroId", "id");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "Despesa_parceiroId_chaveIdempotencia_key" ON "Despesa"("parceiroId", "chaveIdempotencia");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "PeriodoApuracao_parceiroId_id_key" ON "PeriodoApuracao"("parceiroId", "id");
 
 -- CreateIndex
@@ -765,7 +772,7 @@ CREATE UNIQUE INDEX "PeriodoApuracao_parceiroId_inicio_fim_key" ON "PeriodoApura
 CREATE UNIQUE INDEX "FarolFaixa_parceiroId_id_key" ON "FarolFaixa"("parceiroId", "id");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "FarolFaixa_parceiroId_indicador_canal_cor_key" ON "FarolFaixa"("parceiroId", "indicador", "canal", "cor");
+CREATE UNIQUE INDEX "FarolFaixa_parceiroId_linhaId_canal_cor_key" ON "FarolFaixa"("parceiroId", "linhaId", "canal", "cor") NULLS NOT DISTINCT;
 
 -- CreateIndex
 CREATE INDEX "HistoricoAlteracao_parceiroId_entidade_entidadeId_ocorridoE_idx" ON "HistoricoAlteracao"("parceiroId", "entidade", "entidadeId", "ocorridoEm");
@@ -1017,6 +1024,9 @@ ALTER TABLE "PeriodoApuracao" ADD CONSTRAINT "PeriodoApuracao_parceiroId_fkey" F
 ALTER TABLE "FarolFaixa" ADD CONSTRAINT "FarolFaixa_parceiroId_fkey" FOREIGN KEY ("parceiroId") REFERENCES "ParceiroFlow"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "FarolFaixa" ADD CONSTRAINT "FarolFaixa_parceiroId_linhaId_fkey" FOREIGN KEY ("parceiroId", "linhaId") REFERENCES "DreLinha"("parceiroId", "id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "HistoricoAlteracao" ADD CONSTRAINT "HistoricoAlteracao_parceiroId_fkey" FOREIGN KEY ("parceiroId") REFERENCES "ParceiroFlow"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -1036,10 +1046,8 @@ ALTER TABLE "Insumo" ADD CONSTRAINT "Insumo_taxaEntregaCentavos_naoneg" CHECK ("
 ALTER TABLE "Insumo" ADD CONSTRAINT "Insumo_estoqueMinimoMilesimos_naoneg" CHECK ("estoqueMinimoMilesimos" >= 0);
 ALTER TABLE "Insumo" ADD CONSTRAINT "Insumo_validades_positivas" CHECK (
   "validadeSecoMin" > 0 AND "validadePistaFriaMin" > 0 AND "validadeRefrigeradoMin" > 0 AND "validadeCongeladoMin" > 0
-) NOT VALID;
--- NOT VALID + VALIDATE: nulos passam (CHECK com NULL é verdadeiro); as linhas
--- antigas só têm nulo, então a validação é instantânea.
-ALTER TABLE "Insumo" VALIDATE CONSTRAINT "Insumo_validades_positivas";
+);
+-- (Nulo passa: CHECK com NULL é verdadeiro. As linhas antigas só têm nulo.)
 
 ALTER TABLE "InsumoVariante" ADD CONSTRAINT "InsumoVariante_conteudoMilesimos_positivo" CHECK ("conteudoMilesimos" > 0);
 ALTER TABLE "InsumoVariante" ADD CONSTRAINT "InsumoVariante_precoEmbalagemCentavos_naoneg" CHECK ("precoEmbalagemCentavos" >= 0);
@@ -1108,8 +1116,9 @@ ALTER TABLE "FaturamentoLancamento" ADD CONSTRAINT "FaturamentoLancamento_chave_
 
 ALTER TABLE "DreMeta" ADD CONSTRAINT "DreMeta_percentualBp_faixa" CHECK ("percentualBp" BETWEEN 0 AND 10000);
 ALTER TABLE "Despesa" ADD CONSTRAINT "Despesa_valorCentavos_naoneg" CHECK ("valorCentavos" >= 0);
+ALTER TABLE "Despesa" ADD CONSTRAINT "Despesa_chave_fora_do_manual" CHECK ("origem" = 'MANUAL' OR ("chaveIdempotencia" IS NOT NULL AND length("chaveIdempotencia") > 0));
 ALTER TABLE "PeriodoApuracao" ADD CONSTRAINT "PeriodoApuracao_fim_apos_inicio" CHECK ("fim" >= "inicio");
-ALTER TABLE "FarolFaixa" ADD CONSTRAINT "FarolFaixa_aPartirDeBp_faixa" CHECK ("aPartirDeBp" BETWEEN -10000 AND 10000);
+ALTER TABLE "FarolFaixa" ADD CONSTRAINT "FarolFaixa_desvioMinimoBp_faixa" CHECK ("desvioMinimoBp" BETWEEN -10000 AND 10000);
 
 -- =====================================================================
 -- Livro-razão só se acrescenta: movimento de estoque e histórico de
@@ -1128,3 +1137,79 @@ CREATE TRIGGER "MovimentoEstoque_sem_update" BEFORE UPDATE ON "MovimentoEstoque"
   FOR EACH ROW EXECUTE FUNCTION "erp_bloquear_update"();
 CREATE TRIGGER "HistoricoAlteracao_sem_update" BEFORE UPDATE ON "HistoricoAlteracao"
   FOR EACH ROW EXECUTE FUNCTION "erp_bloquear_update"();
+
+-- =====================================================================
+-- Dono da linha é imutável. Nenhum UPDATE troca o "parceiroId" de uma linha
+-- de tenant — nem um `connect` do Prisma numa relação composta (que grava
+-- parceiroId junto com a FK), nem o ON UPDATE CASCADE das FKs compostas, nem
+-- SQL cru. Trocar parceiro de dado é exportar e importar, nunca UPDATE.
+-- =====================================================================
+
+CREATE OR REPLACE FUNCTION "erp_parceiro_imutavel"() RETURNS trigger AS $$
+BEGIN
+  IF NEW."parceiroId" IS DISTINCT FROM OLD."parceiroId" THEN
+    RAISE EXCEPTION '[erp] % não troca de parceiro (parceiroId é imutável).', TG_TABLE_NAME
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "Insumo_parceiro_imutavel" BEFORE UPDATE ON "Insumo"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "Loja_parceiro_imutavel" BEFORE UPDATE ON "Loja"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "Marca_parceiro_imutavel" BEFORE UPDATE ON "Marca"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "Colaborador_parceiro_imutavel" BEFORE UPDATE ON "Colaborador"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "Fornecedor_parceiro_imutavel" BEFORE UPDATE ON "Fornecedor"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "InsumoVariante_parceiro_imutavel" BEFORE UPDATE ON "InsumoVariante"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "FichaTecnica_parceiro_imutavel" BEFORE UPDATE ON "FichaTecnica"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "FichaItem_parceiro_imutavel" BEFORE UPDATE ON "FichaItem"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "ProdutoVenda_parceiro_imutavel" BEFORE UPDATE ON "ProdutoVenda"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "ProdutoCanal_parceiro_imutavel" BEFORE UPDATE ON "ProdutoCanal"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "ProdutoEmbalagem_parceiro_imutavel" BEFORE UPDATE ON "ProdutoEmbalagem"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "CanalConfig_parceiro_imutavel" BEFORE UPDATE ON "CanalConfig"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "NotaEntrada_parceiro_imutavel" BEFORE UPDATE ON "NotaEntrada"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "NotaEntradaItem_parceiro_imutavel" BEFORE UPDATE ON "NotaEntradaItem"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "SaldoEstoque_parceiro_imutavel" BEFORE UPDATE ON "SaldoEstoque"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "MovimentoEstoque_parceiro_imutavel" BEFORE UPDATE ON "MovimentoEstoque"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "Contagem_parceiro_imutavel" BEFORE UPDATE ON "Contagem"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "ContagemItem_parceiro_imutavel" BEFORE UPDATE ON "ContagemItem"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "Requisicao_parceiro_imutavel" BEFORE UPDATE ON "Requisicao"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "RequisicaoItem_parceiro_imutavel" BEFORE UPDATE ON "RequisicaoItem"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "OrdemProducao_parceiro_imutavel" BEFORE UPDATE ON "OrdemProducao"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "Etiqueta_parceiro_imutavel" BEFORE UPDATE ON "Etiqueta"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "FaturamentoLancamento_parceiro_imutavel" BEFORE UPDATE ON "FaturamentoLancamento"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "DreLinha_parceiro_imutavel" BEFORE UPDATE ON "DreLinha"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "DreMeta_parceiro_imutavel" BEFORE UPDATE ON "DreMeta"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "Despesa_parceiro_imutavel" BEFORE UPDATE ON "Despesa"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "PeriodoApuracao_parceiro_imutavel" BEFORE UPDATE ON "PeriodoApuracao"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "FarolFaixa_parceiro_imutavel" BEFORE UPDATE ON "FarolFaixa"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();
+CREATE TRIGGER "HistoricoAlteracao_parceiro_imutavel" BEFORE UPDATE ON "HistoricoAlteracao"
+  FOR EACH ROW EXECUTE FUNCTION "erp_parceiro_imutavel"();

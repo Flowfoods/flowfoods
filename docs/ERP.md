@@ -36,15 +36,15 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Venda | `CanalConfig` | taxa do canal (%, fixa) e margem-alvo padrão, por parceiro |
 | Estoque | `SaldoEstoque` | saldo e valor por loja × insumo (cache dos movimentos, com versão) |
 | Estoque | `MovimentoEstoque` | livro-razão: entrada, requisição, produção, ajuste, contagem, perda; snapshot e saldo antes/depois |
-| Estoque | `Contagem` / `ContagemItem` | abertura, cíclica, fechamento de período; sistema × contado |
+| Estoque | `Contagem` / `ContagemItem` | abertura, cíclica, fechamento de período; sistema × contado. O "piso obrigatório no fechamento" (1.7) é regra da lógica da 1.7, não do esquema |
 | Estoque | `Requisicao` / `RequisicaoItem` | pedido do setor; a baixa sai daqui |
 | Produção | `OrdemProducao` | lote: planejado/produzido, custo, responsável (snapshot). Lista do dia = ordens planejadas × saldo (derivada) |
 | Produção | `Etiqueta` | etiqueta impressa: lote do fornecedor, validade, abertura, snapshot |
-| DRE | `FaturamentoLancamento` | faturamento por loja × canal × dia: valor, pedidos, clientes; chave de idempotência única |
-| DRE | `DreLinha` / `DreMeta` | linhas do DRE e meta % por linha com vigência |
-| DRE | `Despesa` | despesa manual/importada numa linha, por loja ou da rede |
+| DRE | `FaturamentoLancamento` | faturamento por loja × marca × canal × dia: valor, pedidos, clientes (= atendimentos do dia, não clientes únicos); chave de idempotência única |
+| DRE | `DreLinha` / `DreMeta` | linhas do DRE (com `sentido`: maior ou menor é melhor) e meta % por linha, por canal ou da rede (canal nulo), com vigência |
+| DRE | `Despesa` | despesa manual/importada numa linha; loja nula = rede, canal nulo = rateio; importada exige chave de idempotência |
 | DRE | `PeriodoApuracao` | períodos configuráveis; contagem de fechamento aponta o período |
-| DRE | `FarolFaixa` | 5 faixas do farol por canal |
+| DRE | `FarolFaixa` | 5 faixas por linha do DRE × canal (nulo = rede), sobre o desvio vs meta já com o sentido da linha |
 | Auditoria | `HistoricoAlteracao` | antes/depois de todo corte, ajuste ou alteração sensível |
 
 ### Unidades inteiras
@@ -64,10 +64,22 @@ custo médio sai da divisão (em `unidades.ts`). Nada acumulado é gravado
 ## Regras travadas
 
 - **Multi-tenant.** Modelo de tenant só se lê/grava por `doParceiro(id)`, que
-  amarra o parceiro em toda query e estoura se alguém apontar outro.
-  `tests/erp-tenant-portao.test.ts` reprova `prisma.<modelo>` cru e acesso pelas
-  relações do ParceiroFlow fora do portão, e confere `MODELOS_DE_TENANT` e
-  `RELACOES_DE_TENANT` contra o esquema. Para transação: `cliente.transacao(tx => …)`.
+  amarra o parceiro em toda query e estoura se alguém apontar outro. Para
+  transação: `cliente.transacao(tx => …)`. Três camadas:
+  1. **Runtime, portal.** O `prisma` de `src/lib/db.ts` é travado: qualquer
+     operação num modelo de tenant (inclusive dentro de `$transaction`) e
+     qualquer relação de tenant do ParceiroFlow estoura. O portão usa um
+     PrismaClient base próprio, privado de `tenant.ts`.
+  2. **Runtime, portão.** Dado de create/update/upsert só aceita escalares:
+     `connect`, create aninhado, `connectOrCreate` etc. são recusados (FK entra
+     como `fichaId`). O cliente expõe só operações de dado, congeladas, sem
+     `$parent`.
+  3. **Banco.** FK composta com `parceiroId` e trigger que recusa UPDATE do
+     `parceiroId` em toda tabela de tenant.
+
+  `tests/erp-tenant-portao.test.ts` ainda varre o código atrás de `prisma.<modelo>`,
+  SQL cru nas tabelas e relações do ParceiroFlow (o SQL cru do portal só é
+  vigiado aí), e confere `MODELOS_DE_TENANT` e `RELACOES_DE_TENANT` contra o esquema.
 - **Inteiros.** Quantidade em milésimos da unidade base, dinheiro em centavos.
   O banco tem CHECK: quantidade > 0, preço >= 0 (e faixas de %/fator).
 - **Tenant nas FKs.** Toda FK entre tabelas de tenant é composta
@@ -77,7 +89,11 @@ custo médio sai da divisão (em `unidades.ts`). Nada acumulado é gravado
   UPDATE (trigger); correção é lançamento novo. Movimento tem CHECK de sinal
   por tipo e de saldo antes + quantidade = depois.
 - **Idempotência.** `FaturamentoLancamento.chaveIdempotencia` é única por
-  parceiro; movimento também aceita chave.
+  parceiro (manual: `manual:<loja>:<marca ou ->:<canal>:<data>`); despesa
+  importada e movimento também têm chave única.
+- **Nulo que não repete.** Unique com `NULLS NOT DISTINCT` (escrito no SQL, o
+  Prisma não descreve): produto sem marca, meta de rede e faixa de rede não
+  duplicam.
 - **Origem.** `origem` MANUAL/IMPORTACAO/INTEGRACAO onde dado pode vir de fora.
 - **Servidor decide.** O formulário manda texto; a conversão e o custo por
   unidade são calculados no servidor. A prévia na tela é só prévia.
