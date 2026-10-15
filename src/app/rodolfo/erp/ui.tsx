@@ -94,9 +94,14 @@ export function Ponto({ tom }: { tom: 'ativo' | 'rascunho' | 'suspenso' }) {
 
 export function Metrica({ rotulo, valor, detalhe }: { rotulo: string; valor: ReactNode; detalhe?: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-[14px] border border-white/[0.09] border-t-white/[0.16] bg-[#131211] px-4 py-4 sm:px-5">
-      <div className="truncate text-[10px] font-semibold uppercase tracking-[0.12em] text-surface/45 sm:tracking-[0.16em]">{rotulo}</div>
-      <div className="mt-2 truncate font-display text-[26px] font-bold leading-none lining-nums tabular-nums">{valor}</div>
+    <div className="flex min-w-0 flex-col rounded-[14px] border border-white/[0.09] border-t-white/[0.16] bg-[#131211] px-4 py-4 sm:px-5">
+      {/* Rótulo pode quebrar em 2 linhas no celular; o número fica sempre alinhado embaixo. */}
+      <div className="text-[10px] font-semibold uppercase leading-snug tracking-[0.12em] text-surface/45 sm:tracking-[0.16em]">
+        {rotulo}
+      </div>
+      <div className="mt-auto truncate pt-2 font-display text-[26px] font-bold leading-none lining-nums tabular-nums">
+        {valor}
+      </div>
       {detalhe && <div className="mt-1.5 truncate text-[11px] text-surface/45">{detalhe}</div>}
     </div>
   );

@@ -19,9 +19,10 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 ## O que a 0.2 entregou (multi-tenant)
 
 1. **Parceiro Flow no nível 1.** Em `/rodolfo/erp`: criar (nome, endereço/slug
-   gerado do nome e editável só na criação, nasce Ativo ou Aguardando). Na aba
-   Cadastro: renomear e mudar a situação (Aguardando → Ativo, Ativo → Suspenso
-   com motivo obrigatório, Suspenso → Ativo). Toda mudança grava antes/depois em
+   gerado do nome e editável só na criação, nasce Ativo ou Aguardando
+   liberação). Na aba Cadastro: renomear (permitido também em suspenso) e mudar
+   a situação (Aguardando liberação → Ativo, Ativo → Suspenso com motivo
+   obrigatório, Suspenso → Ativo). Toda mudança grava antes/depois em
    `HistoricoAlteracao` do próprio parceiro **na mesma transação**
    (`gravarParceiroFlow`), aparece no histórico curto da aba Cadastro e no
    Histórico completo. Mudança é condicional ao valor lido (duas abas não se
@@ -34,10 +35,15 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
    parceiro (uma ida ao banco por requisição, `react.cache`) e devolve o
    cliente do portão. Todas as páginas e server actions do ERP passam por ele
    (ou por `exigirNivel1` na lista N1). Parceiro **não ATIVO** (suspenso ou
-   aguardando) recebe cliente **somente leitura**: o portão recusa
+   aguardando liberação) recebe cliente **somente leitura**: o portão recusa
    create/update/upsert/delete e a transação abre `transaction_read_only` no
-   Postgres. A action ainda devolve a mensagem amigável; a trava não depende dela.
-4. **RLS no banco.** Ver "Regras travadas" (camada 4) e decisão 31.
+   Postgres. E, por baixo, **toda escrita de qualquer `doParceiro`** (worker,
+   webhook) confere o status na própria transação, com `FOR SHARE`
+   (`erp_exigir_parceiro_ativo`, decisão 32).
+4. **RLS no banco.** Ver "Regras travadas" (camada 4) e decisão 31. Instalada
+   só quando o usuário da migration pode (dono das tabelas + papel disponível);
+   senão a migration avisa e segue, e o portão detecta em runtime e opera sem
+   o papel (aviso único no log).
 
 ## Mapa do esquema (0.1)
 
@@ -108,9 +114,15 @@ custo médio sai da divisão (em `unidades.ts`). Nada acumulado é gravado
      com `set_config('app.parceiro_id', id, true)` + `set_config('role',
      'erp_tenant', true)`. Assim até SQL cru **dentro do contexto** só vê o
      parceiro: `cliente.sql` (template com parâmetros) é o caminho para
-     relatório. Sem `app.parceiro_id`, debaixo do papel, nada aparece. O usuário
-     do app é superusuário e ignora RLS fora do papel: migrations, seed e o
-     `prisma` do portal seguem iguais.
+     relatório; ele recusa `set_config`, `SET`, `RESET`, `ROLE`, `COMMIT`,
+     `ROLLBACK`, `BEGIN`, `START TRANSACTION` e `SAVEPOINT` no texto, e leitura
+     avulsa abre read-only. Sem `app.parceiro_id`, debaixo do papel, nada
+     aparece. O usuário do app é superusuário e ignora RLS fora do papel:
+     migrations, seed e o `prisma` do portal seguem iguais. Se a migration não
+     puder instalar a RLS (usuário sem dono/papel), ela avisa e segue; o portão
+     detecta e opera sem o papel (aviso único no log).
+  5. **Banco, status (0.2).** Escrita só em parceiro ATIVO, conferido na
+     transação da escrita com `FOR SHARE` (`erp_exigir_parceiro_ativo`).
 
   `tests/erp-tenant-portao.test.ts` ainda varre o código atrás de `prisma.<modelo>`,
   SQL cru nas tabelas e relações do ParceiroFlow (o SQL cru do portal só é
@@ -152,9 +164,16 @@ ERP_DB_TESTE=postgresql://USUARIO:SENHA@localhost:5432/BANCO \
 `erp-rls.db.test.ts` prova: toda tabela com `parceiroId` tem RLS forçada e
 política; o papel não alcança `User`/`ParceiroFlow`/portal; SQL cru sem WHERE no
 contexto de B (avulso e dentro de `transacao`) não vê, não altera, não apaga e
-não grava em A; sem contexto nada aparece; o papel não vaza para o pool;
-cliente somente leitura é barrado no portão e no banco; criar/renomear/
-suspender gravam histórico e são atômicos.
+não grava em A; sem contexto nada aparece; papel e parceiro não vazam para o
+pool; `cliente.sql` recusa mexer no contexto; cliente somente leitura é barrado
+no portão e no banco; `doParceiro` gravável não escreve em suspenso/aguardando;
+suspensão concorrente espera a escrita em curso; criar/renomear/suspender
+gravam histórico e são atômicos.
+
+Os dois arquivos rodam como superusuário ou como dono não-superusuário (com ou
+sem RLS instalada): o que depende da RLS é pulado sem ela
+(`tests/erp-db-apoio.ts`). Com dono não-superusuário, use
+`--no-file-parallelism` (a limpeza desliga o FORCE numa transação).
 
 Sem `ERP_DB_TESTE`, esse arquivo é pulado e a suíte padrão segue sem banco.
 
@@ -163,7 +182,8 @@ Sem `ERP_DB_TESTE`, esse arquivo é pulado e a suíte padrão segue sem banco.
 - `NULLS NOT DISTINCT` existe só no SQL da migration (o Prisma não enxerga): migration futura que mexa nesses índices precisa reescrevê-lo à mão.
 - ~~`$queryRaw` do portal alcança tabelas do ERP; antes de relatório em SQL cru: RLS ou papel separado.~~ **Resolvido na 0.2 para o caminho do ERP:** RLS + papel `erp_tenant`; relatório em SQL cru vai por `cliente.sql` (contexto do parceiro). O `$queryRaw` do `prisma` do PORTAL continua superusuário (ignora RLS) e segue vigiado pelo teste-guarda — fechar isso de vez exige o app conectar com usuário não-superusuário (credencial/infra nova; ver decisão 31).
 - RLS protege contra consulta que ESQUECE o filtro, não contra SQL escrito para fugir (`RESET ROLE`/`set_config` também são SQL). Nunca montar `cliente.sql` por concatenação.
-- Tabela nova de tenant: além da lista do portão, a migration precisa de `GRANT` para `erp_tenant`, `ENABLE`/`FORCE ROW LEVEL SECURITY` e a política — o teste `erp-rls.db.test.ts` reprova se faltar.
+- Tabela nova de tenant: além da lista do portão, a migration precisa de `GRANT` para `erp_tenant`, `ENABLE`/`FORCE ROW LEVEL SECURITY` e a política, no MESMO padrão condicional da `20261015020000` (só se o papel estiver disponível) — o teste `erp-rls.db.test.ts` reprova se faltar.
+- Worker/webhook que escrever no ERP: use `doParceiro(id)`; a conferência de status já está no portão (não precisa repetir), mas trate `ErroDeTenant` "não está ATIVO".
 - Cada operação avulsa do portão é uma transação curta (contexto + operação). Tela com muitas leituras: agrupar em `cliente.transacao`.
 - Dois pools de conexão por processo (portal + portão de tenant): conferir `connection_limit` na VPS.
 - `DreLinha.sentido` tem default `MENOR_MELHOR`: linhas de receita nascem `MAIOR_MELHOR` (tratar na 2.2).

@@ -87,7 +87,8 @@ async function main() {
     for (const nome of p.marcas) linha(`marca ${nome}`, await cadastrarMarca(cliente, { nome }, AUTOR));
     for (const i of p.itens) linha(i.nome, await cadastrarInsumo(cliente, i, AUTOR));
     if (novo && p.suspender) {
-      await mudarStatusParceiro(parceiro.id, 'SUSPENSO', p.suspender, AUTOR);
+      const r = await mudarStatusParceiro(parceiro.id, 'SUSPENSO', p.suspender, AUTOR);
+      if (!r.ok) throw new Error(`${p.nome}: não suspendeu: ${JSON.stringify(r.erros)}`);
       console.log('  suspenso');
     }
   }

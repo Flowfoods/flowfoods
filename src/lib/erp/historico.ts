@@ -25,7 +25,7 @@ const ACAO: Record<string, string> = {
 
 const CAMPO: Record<string, string> = {
   nome: 'nome',
-  slug: 'endereço',
+  slug: 'link',
   status: 'status',
   unidade: 'unidade',
   conteudoMilesimos: 'embalagem',

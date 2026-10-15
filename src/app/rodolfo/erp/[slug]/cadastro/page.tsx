@@ -18,8 +18,8 @@ const DATA = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: 'long', y
 
 const EXPLICA = {
   ATIVO: 'Opera normalmente: cadastros e lançamentos liberados.',
-  RASCUNHO: 'Criado, mas ainda não liberado. Ninguém cadastra nada até ativar.',
-  SUSPENSO: 'Leitura liberada; o servidor recusa qualquer cadastro ou alteração.',
+  RASCUNHO: 'Criado, mas ainda não liberado. Insumos, lojas e marcas abrem quando ativar.',
+  SUSPENSO: 'Dá para consultar tudo. Insumos, lojas e marcas ficam bloqueados até reativar; o nome ainda pode ser corrigido.',
 } as const;
 
 export default async function CadastroParceiroPage({ params }: { params: { slug: string } }) {
@@ -36,7 +36,7 @@ export default async function CadastroParceiroPage({ params }: { params: { slug:
             <FormRenomear slug={parceiro.slug} nome={parceiro.nome} />
             <dl className="grid grid-cols-2 gap-4 border-t border-white/[0.07] pt-4 text-sm">
               <div className="min-w-0">
-                <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-surface/45">Endereço</dt>
+                <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-surface/45">Link do parceiro</dt>
                 <dd className="mt-1 truncate tabular-nums text-surface/80">/{parceiro.slug}</dd>
               </div>
               <div>
@@ -44,7 +44,7 @@ export default async function CadastroParceiroPage({ params }: { params: { slug:
                 <dd className="mt-1 text-surface/80">{DATA.format(parceiro.criadoEm)}</dd>
               </div>
             </dl>
-            <p className="text-[12px] text-surface/40">O endereço é fixo depois de criado: links e relatórios apontam para ele.</p>
+            <p className="text-[12px] text-surface/40">O link é fixo depois de criado: favoritos e relatórios apontam para ele.</p>
           </div>
         </Painel>
 

@@ -48,12 +48,12 @@ export default async function EstruturaPage({ params }: { params: { slug: string
         <Metrica
           rotulo="Lojas"
           valor={lojasAtivas}
-          detalhe={lojas.length === lojasAtivas ? 'todas ativas' : `${lojas.length} no total`}
+          detalhe={lojas.length === 0 ? 'nenhuma ainda' : lojas.length === lojasAtivas ? 'todas ativas' : `${lojas.length} no total`}
         />
         <Metrica
           rotulo="Marcas"
           valor={marcasAtivas}
-          detalhe={marcas.length === marcasAtivas ? 'todas ativas' : `${marcas.length} no total`}
+          detalhe={marcas.length === 0 ? 'nenhuma ainda' : marcas.length === marcasAtivas ? 'todas ativas' : `${marcas.length} no total`}
         />
         <Metrica
           rotulo="Último cadastro"
@@ -68,7 +68,8 @@ export default async function EstruturaPage({ params }: { params: { slug: string
           acessorio={<span className="text-[11px] tabular-nums text-surface/40">{lojas.length}</span>}
           semRespiro
         >
-          <div className="border-b border-white/[0.07] px-5 pb-1 pt-4">
+          {/* Bloqueado: no celular o aviso do topo já explica; no desktop, a frase fica no lugar do campo. */}
+          <div className={`border-b border-white/[0.07] px-5 pb-1 pt-4 ${bloqueio ? 'hidden lg:block' : ''}`}>
             {bloqueio ? (
               <p className="pb-3 text-sm text-surface/55">{bloqueio}</p>
             ) : (
@@ -122,7 +123,8 @@ export default async function EstruturaPage({ params }: { params: { slug: string
           acessorio={<span className="text-[11px] tabular-nums text-surface/40">{marcas.length}</span>}
           semRespiro
         >
-          <div className="border-b border-white/[0.07] px-5 pb-1 pt-4">
+          {/* Bloqueado: no celular o aviso do topo já explica; no desktop, a frase fica no lugar do campo. */}
+          <div className={`border-b border-white/[0.07] px-5 pb-1 pt-4 ${bloqueio ? 'hidden lg:block' : ''}`}>
             {bloqueio ? (
               <p className="pb-3 text-sm text-surface/55">{bloqueio}</p>
             ) : (

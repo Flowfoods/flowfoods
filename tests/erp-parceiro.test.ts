@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 import { gerarSlug, SLUG_VALIDO } from '@/lib/erp/slug';
 import { transicoesDe } from '@/lib/erp/parceiros';
 import { descreverMudancas, rotuloAcao, rotuloEntidade } from '@/lib/erp/historico';
+import { conferirSqlDoParceiro, ErroDeTenant } from '@/lib/erp/tenant';
 
 describe('ERP · slug do parceiro', () => {
   it('gera endereço limpo a partir do nome', () => {
@@ -59,5 +60,38 @@ describe('ERP · histórico legível', () => {
     expect(rotuloEntidade('ParceiroFlow')).toBe('Parceiro');
     expect(rotuloAcao('SUSPENDEU')).toBe('Suspendeu');
     expect(rotuloAcao('ZEROU')).toBe('Zerou');
+  });
+});
+
+describe('ERP · cliente.sql não mexe no contexto do tenant (NB1)', () => {
+  const partes = (s: TemplateStringsArray, ..._valores: unknown[]) => s;
+  it('recusa set_config, SET, RESET, ROLE e controle de transação, sem diferenciar maiúscula', () => {
+    const proibidos = [
+      partes`SELECT set_config('app.parceiro_id', ${'x'}, true)`,
+      partes`select PG_CATALOG.Set_Config('role', 'x', true)`,
+      partes`SET app.parceiro_id = 'x'`,
+      partes`  set role none`,
+      partes`SELECT 1; SET search_path = x`,
+      partes`SELECT 1 /* */ SET LOCAL x = 1`,
+      partes`set session authorization x`,
+      partes`RESET ALL`,
+      partes`SELECT current_setting('role')`,
+      partes`COMMIT`,
+      partes`rollback`,
+      partes`BEGIN`,
+      partes`start   transaction`,
+      partes`SAVEPOINT a`,
+    ];
+    for (const p of proibidos) expect(() => conferirSqlDoParceiro(p), p.join('$')).toThrow(ErroDeTenant);
+  });
+
+  it('aceita consulta comum, UPDATE ... SET e palavras parecidas', () => {
+    const ok = [
+      partes`SELECT "nome" FROM "Insumo" WHERE "parceiroId" = ${'x'}`,
+      partes`UPDATE "Insumo" SET "nome" = ${'y'} WHERE "id" = ${'z'}`,
+      partes`SELECT "reseted", "roles_x", "beginning" FROM t`,
+      partes`SELECT sum("valorCentavos") FROM "Despesa" GROUP BY "linhaId"`,
+    ];
+    for (const p of ok) expect(() => conferirSqlDoParceiro(p), p.join('$')).not.toThrow();
   });
 });

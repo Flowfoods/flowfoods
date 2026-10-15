@@ -37,6 +37,14 @@ export async function cadastrarLoja(
 
   try {
     return await cliente.transacao(async (tx) => {
+      // "Penha" e "Penha!" geram o mesmo link: diz isso, em vez de "nome repetido".
+      const mesmoLink = await tx.loja.findFirst({ where: { slug }, select: { nome: true } });
+      if (mesmoLink && mesmoLink.nome !== r.data.nome) {
+        return {
+          ok: false as const,
+          erros: { nome: `Esse nome gera o mesmo link da loja “${mesmoLink.nome}” (${slug}). Diferencie o nome.` },
+        };
+      }
       const loja = await tx.loja.create({
         data: { parceiroId: tx.parceiroId, nome: r.data.nome, slug },
         select: { id: true, nome: true, slug: true },

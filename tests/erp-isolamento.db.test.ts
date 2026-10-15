@@ -13,12 +13,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { doParceiro, ErroDeTenant } from '@/lib/erp/tenant';
 import { travarTenant } from '@/lib/db';
 import { cadastrarInsumo, listarInsumos } from '@/lib/erp/insumos';
+import { cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 
 describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres real)', () => {
   // Criado no beforeAll: o corpo do describe roda mesmo quando ele é pulado.
   let db: PrismaClient;
+  let perfil: PerfilDoBanco;
   const sufixo = Date.now().toString(36);
   let A: { id: string };
   let B: { id: string };
@@ -28,6 +30,7 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
     const host = new URL(URL_TESTE!).hostname;
     if (!['localhost', '127.0.0.1'].includes(host)) throw new Error('ERP_DB_TESTE precisa ser local.');
     db = new PrismaClient({ datasources: { db: { url: URL_TESTE } } });
+    perfil = await perfilDoBanco(db);
     A = await db.parceiroFlow.create({ data: { nome: 'Iso A', slug: `iso-a-${sufixo}`, status: 'ATIVO' } });
     B = await db.parceiroFlow.create({ data: { nome: 'Iso B', slug: `iso-b-${sufixo}`, status: 'ATIVO' } });
     const r = await cadastrarInsumo(doParceiro(A.id, db), {
@@ -39,19 +42,9 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
   });
 
   afterAll(async () => {
-    // Ordem de dependência (filhos antes dos pais). Só linhas destes dois parceiros.
-    const tabelas = [
-      'HistoricoAlteracao', 'Etiqueta', 'MovimentoEstoque', 'SaldoEstoque', 'ContagemItem', 'Contagem',
-      'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
-      'ProdutoCanal', 'ProdutoVenda', 'FichaItem', 'FichaTecnica', 'InsumoVariante', 'FaturamentoLancamento',
-      'Despesa', 'DreMeta', 'DreLinha', 'PeriodoApuracao', 'FarolFaixa', 'CanalConfig', 'Insumo', 'Fornecedor',
-      'Colaborador', 'Marca', 'Loja',
-    ];
-    for (const t of tabelas) {
-      await db.$executeRawUnsafe(`DELETE FROM "${t}" WHERE "parceiroId" IN ($1, $2)`, A.id, B.id);
-    }
-    await db.parceiroFlow.deleteMany({ where: { id: { in: [A.id, B.id] } } });
-    await db.$disconnect();
+    // Só linhas destes dois parceiros (ver tests/erp-db-apoio.ts).
+    if (db) await limparParceiros(db, perfil, [A.id, B.id]);
+    await db?.$disconnect();
   });
 
   it('cada parceiro lista só o seu', async () => {
@@ -125,7 +118,8 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
     ).rejects.toMatchObject({ code: 'P2003' });
     // Nem por SQL cru, sem portão nenhum: a trava é do banco.
     await expect(
-      db.$executeRawUnsafe(
+      cru(
+        db, perfil, B.id,
         `INSERT INTO "FichaItem" ("id","parceiroId","fichaId","insumoId","quantidadeMilesimos") VALUES ($1,$2,$3,$4,150)`,
         `iso-${sufixo}`, B.id, ficha.id, insumoDeA,
       ),
@@ -192,14 +186,17 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
         data: { ...base, tipo: 'REQUISICAO', quantidadeMilesimos: 500, valorCentavos: 0, saldoAntesMilesimos: 20000, saldoDepoisMilesimos: 20500 },
       }),
     ).rejects.toThrow();
-    // Livro-razão: UPDATE é recusado pelo banco. Pelo portão, o papel erp_tenant
-    // nem tem GRANT de UPDATE (0.2); e o trigger segue valendo para quem tem.
+    // Livro-razão: UPDATE é recusado pelo banco. Com a RLS, o papel erp_tenant
+    // nem tem GRANT de UPDATE (0.2); sem ela, o trigger recusa.
     await expect(a.movimentoEstoque.update({ where: { id: mov.id }, data: { motivo: 'mexi' } })).rejects.toThrow(
-      /permission denied/,
+      perfil.rls ? /permission denied/ : /só aceita INSERT/,
     );
-    await expect(
-      db.$executeRawUnsafe(`UPDATE "MovimentoEstoque" SET "motivo" = 'mexi' WHERE "id" = $1`, mov.id),
-    ).rejects.toThrow(/só aceita INSERT/);
+    // E o trigger segue valendo para quem tem GRANT (o usuário do app, fora do papel).
+    if (perfil.superusuario || !perfil.rls) {
+      await expect(
+        db.$executeRawUnsafe(`UPDATE "MovimentoEstoque" SET "motivo" = 'mexi' WHERE "id" = $1`, mov.id),
+      ).rejects.toThrow(/só aceita INSERT/);
+    }
   });
 
   // ------------------------------------------------ reprovação 1 dos fiscais
@@ -258,10 +255,10 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
 
   it('o banco não deixa UPDATE trocar o parceiroId, nem por SQL cru, nem em cascata', async () => {
     await expect(
-      db.$executeRawUnsafe(`UPDATE "Insumo" SET "parceiroId" = $1 WHERE "id" = $2`, B.id, insumoDeA),
+      cru(db, perfil, A.id, `UPDATE "Insumo" SET "parceiroId" = $1 WHERE "id" = $2`, B.id, insumoDeA),
     ).rejects.toThrow(/parceiroId é imutável/);
     await expect(
-      db.$executeRawUnsafe(`UPDATE "Loja" SET "parceiroId" = $1 WHERE "parceiroId" = $2`, B.id, A.id),
+      cru(db, perfil, A.id, `UPDATE "Loja" SET "parceiroId" = $1 WHERE "parceiroId" = $2`, B.id, A.id),
     ).rejects.toThrow(/parceiroId é imutável/);
     // ON UPDATE CASCADE das FKs esbarra no mesmo trigger.
     await expect(

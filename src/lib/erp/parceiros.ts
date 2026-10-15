@@ -42,7 +42,7 @@ function errosDoZod(issues: z.core.$ZodIssue[]) {
   return { ok: false as const, erros };
 }
 
-/** Slug editável na criação; vazio = gerado do nome. Depois disso ele é o endereço e não muda. */
+/** Slug (link) editável na criação; vazio = gerado do nome. Depois disso o link não muda. */
 export async function criarParceiro(
   entrada: Record<string, unknown>,
   autorNome: string,
@@ -52,7 +52,7 @@ export async function criarParceiro(
   if (!r.success) return errosDoZod(r.error.issues);
   const slug = r.data.slug || gerarSlug(r.data.nome);
   if (slug.length < 3 || slug.length > 48 || !SLUG_VALIDO.test(slug)) {
-    return { ok: false, erros: { slug: 'Use de 3 a 48 letras minúsculas, números e hífen. Ex.: grupo-valentins.' } };
+    return { ok: false, erros: { slug: 'O link usa de 3 a 48 letras minúsculas, números e hífen. Ex.: grupo-valentins.' } };
   }
 
   try {
@@ -72,7 +72,7 @@ export async function criarParceiro(
     }, base);
     return { ok: true, id: p.id, slug: p.slug, nome: p.nome, mensagem: `“${p.nome}” criado.` };
   } catch (e) {
-    if (ehErroDeUnicidade(e)) return { ok: false, erros: { slug: 'Esse endereço já é de outro parceiro.' } };
+    if (ehErroDeUnicidade(e)) return { ok: false, erros: { slug: 'Esse link já é de outro parceiro.' } };
     throw e;
   }
 }

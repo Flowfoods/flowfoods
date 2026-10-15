@@ -41,7 +41,7 @@ export default async function ErpPage() {
 
       <div className="grid grid-cols-3 gap-3">
         <Metrica rotulo="Ativos" valor={porStatus.ATIVO} />
-        <Metrica rotulo="A liberar" valor={porStatus.RASCUNHO} />
+        <Metrica rotulo="Aguardando liberação" valor={porStatus.RASCUNHO} />
         <Metrica rotulo="Suspensos" valor={porStatus.SUSPENSO} />
       </div>
 

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * Novo Parceiro Flow. O endereço (slug) acompanha o nome até a pessoa mexer
+ * Novo Parceiro Flow. O link (slug) acompanha o nome até a pessoa mexer
  * nele; daí em diante fica o que ela escreveu. O servidor confere de novo.
  */
 
@@ -59,7 +59,7 @@ export function FormParceiro() {
 
       <div>
         <label htmlFor="novo-slug" className={ROTULO}>
-          Endereço
+          Link do parceiro
         </label>
         <div className="flex items-stretch overflow-hidden rounded-[7px] border border-white/[0.12] bg-black/40 focus-within:border-surface/40">
           <span className="flex items-center whitespace-nowrap border-r border-white/[0.08] px-2.5 text-[12px] text-surface/35">
@@ -94,7 +94,7 @@ export function FormParceiro() {
           {(
             [
               ['ATIVO', 'Ativo'],
-              ['RASCUNHO', 'Aguardando'],
+              ['RASCUNHO', 'Aguardando liberação'],
             ] as const
           ).map(([v, r]) => (
             <label key={v} className="relative">

@@ -96,7 +96,11 @@ export default async function ParceiroInsumosPage({ params }: { params: { slug: 
           )}
         </Painel>
 
-        <Painel titulo="Novo insumo" className="order-1 self-start lg:order-2">
+        {/* Bloqueado: no celular o card some (o aviso do topo já explica). */}
+        <Painel
+          titulo="Novo insumo"
+          className={`order-1 self-start lg:order-2 ${bloqueio ? 'hidden lg:block' : ''}`}
+        >
           {bloqueio ? (
             <p className="text-sm text-surface/55">{bloqueio}</p>
           ) : (

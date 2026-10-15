@@ -33,8 +33,14 @@
  * que entra no CONTEXTO do parceiro — `app.parceiro_id` e o papel `erp_tenant`
  * (migration `20261015020000_erp_multitenant`). Debaixo desse papel o Postgres
  * só devolve e só aceita linhas daquele parceiro, inclusive em SQL cru
- * (`cliente.sql`, o caminho certo para relatório). Cliente `somenteLeitura`
- * (parceiro suspenso) recusa escrita aqui E abre a transação como read-only.
+ * (`cliente.sql`, o caminho certo para relatório). Se o banco não tem o papel
+ * (migration não pôde instalar a RLS), o portão detecta e segue sem ele.
+ *
+ * Status (0.2): toda ESCRITA confere, na própria transação e com FOR SHARE,
+ * que o parceiro está ATIVO (`erp_exigir_parceiro_ativo`). Vale para qualquer
+ * `doParceiro` — tela, worker, webhook. Cliente `somenteLeitura` (o que
+ * `exigirParceiro` entrega para parceiro não ATIVO) recusa a escrita antes do
+ * banco e abre a transação read-only.
  */
 
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -84,13 +90,106 @@ export const PAPEL_DE_TENANT = 'erp_tenant';
 /**
  * Primeira instrução de toda transação do portão. `true` em set_config = vale
  * só até o fim da transação: a conexão volta ao pool sem papel nem parceiro.
- * `role` via set_config é o mesmo que `SET LOCAL ROLE`, numa ida só.
+ * `role` via set_config é o mesmo que `SET LOCAL ROLE`, numa ida só. Sem o
+ * papel disponível (migration não conseguiu instalar a RLS), só o parceiro.
+ * `leitura`: a transação abre read-only no Postgres.
  */
-function sqlDeContexto(parceiroId: string, somenteLeitura: boolean): Prisma.Sql {
-  return somenteLeitura
-    ? Prisma.sql`SELECT set_config('app.parceiro_id', ${parceiroId}, true), set_config('role', ${PAPEL_DE_TENANT}, true), set_config('transaction_read_only', 'on', true)`
-    : Prisma.sql`SELECT set_config('app.parceiro_id', ${parceiroId}, true), set_config('role', ${PAPEL_DE_TENANT}, true)`;
+function sqlDeContexto(parceiroId: string, leitura: boolean, papel: boolean): Prisma.Sql {
+  const ro = leitura ? Prisma.sql`, set_config('transaction_read_only', 'on', true)` : Prisma.empty;
+  return papel
+    ? Prisma.sql`SELECT set_config('app.parceiro_id', ${parceiroId}, true), set_config('role', ${PAPEL_DE_TENANT}, true)${ro}`
+    : Prisma.sql`SELECT set_config('app.parceiro_id', ${parceiroId}, true)${ro}`;
 }
+
+/**
+ * Toda ESCRITA confere o status do parceiro dentro da própria transação (função
+ * da migration, com FOR SHARE): parceiro que não está ATIVO não recebe escrita,
+ * venha ela de tela, worker ou webhook, e uma suspensão concorrente é respeitada.
+ */
+function sqlDeStatus(parceiroId: string): Prisma.Sql {
+  return Prisma.sql`SELECT "erp_exigir_parceiro_ativo"(${parceiroId}) AS "status"`;
+}
+
+/** Erro do banco que o portão traduz para ErroDeTenant. */
+function traduzirErro(e: unknown): unknown {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (msg.includes('erp_parceiro_inativo')) {
+    return new ErroDeTenant('parceiro não está ATIVO (suspenso ou aguardando liberação): escrita recusada.');
+  }
+  return e;
+}
+
+// ------------------------------------------------------- papel disponível?
+
+const papelPorBase = new WeakMap<PrismaClient, Promise<boolean>>();
+let avisouSemPapel = false;
+
+/**
+ * O papel `erp_tenant` existe, o usuário do app consegue assumi-lo e ele tem
+ * GRANT nas tabelas (a migration instalou a RLS)? Conferido uma vez por cliente
+ * base. Se não, o portão opera sem `SET ROLE` (o isolamento por `parceiroId`,
+ * FK composta e triggers continua) e avisa UMA vez no log.
+ */
+export function papelDisponivel(base: PrismaClient = baseDoTenant()): Promise<boolean> {
+  const emCache = papelPorBase.get(base);
+  if (emCache) return emCache;
+  const conferencia = base.$queryRaw<{ ok: boolean }[]>`
+      SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_roles WHERE rolname = ${PAPEL_DE_TENANT})
+        THEN (CASE WHEN current_setting('server_version_num')::int >= 160000
+                   THEN pg_has_role(current_user, ${PAPEL_DE_TENANT}, 'SET')
+                   ELSE pg_has_role(current_user, ${PAPEL_DE_TENANT}, 'MEMBER') END)
+             AND has_table_privilege(${PAPEL_DE_TENANT}, '"HistoricoAlteracao"', 'INSERT')
+             AND coalesce((SELECT relforcerowsecurity FROM pg_class WHERE oid = to_regclass('"HistoricoAlteracao"')), false)
+        ELSE false END AS "ok"`
+    .then(([r]) => {
+      const ok = !!r?.ok;
+      if (!ok && !avisouSemPapel) {
+        avisouSemPapel = true;
+        console.warn(
+          `[tenant] papel ${PAPEL_DE_TENANT} indisponível neste banco (a migration não instalou a RLS ou o usuário do app não pode assumi-lo). ` +
+            'O ERP segue isolado pelo portão (parceiroId + FK composta + triggers), SEM a RLS do banco. Ver docs/DECISOES.md, decisão 31.',
+        );
+      }
+      return ok;
+    })
+    .catch((e) => {
+      papelPorBase.delete(base); // falha de conexão não vira "sem papel" para sempre
+      throw e;
+    });
+  papelPorBase.set(base, conferencia);
+  return conferencia;
+}
+
+// ------------------------------------------------------- SQL cru do cliente
+
+/**
+ * `cliente.sql` roda DENTRO do contexto do parceiro; o texto (fora dos
+ * parâmetros) não pode mexer no contexto nem na transação.
+ */
+const PROIBIDO_NO_SQL: [RegExp, string][] = [
+  [/\bset_config\b/i, 'set_config'],
+  [/(^|;)\s*set\s/i, 'SET'],
+  [/\bset\s+(local|session)\b/i, 'SET LOCAL/SESSION'],
+  [/\breset\b/i, 'RESET'],
+  [/\brole\b/i, 'ROLE'],
+  [/\bcommit\b/i, 'COMMIT'],
+  [/\brollback\b/i, 'ROLLBACK'],
+  [/\bbegin\b/i, 'BEGIN'],
+  [/\bstart\s+transaction\b/i, 'START TRANSACTION'],
+  [/\bsavepoint\b/i, 'SAVEPOINT'],
+];
+
+/** Puro e exportado para teste: recusa o texto do SQL (parâmetros não entram). */
+export function conferirSqlDoParceiro(partes: readonly string[]): void {
+  const texto = partes.join(' $ ');
+  for (const [re, nome] of PROIBIDO_NO_SQL) {
+    if (re.test(texto))
+      throw new ErroDeTenant(`SQL do parceiro não pode usar ${nome}: o contexto do tenant é do portão.`);
+  }
+}
+
+const ESCRITA_NO_SQL = /\b(insert|update|delete|merge|truncate|copy|call)\b/i;
+
 const COM_DADO_DE_UPDATE = new Set(['update', 'updateMany', 'updateManyAndReturn']);
 
 /** Campos de relação de cada modelo, lidos do esquema (não de lista à mão). */
@@ -215,12 +314,17 @@ export type ClienteDoParceiro = ModelosDoParceiro & {
    * SQL cru (template com parâmetros, como `$queryRaw`) DENTRO do contexto do
    * parceiro: o Postgres aplica a RLS, então linha de outro parceiro não
    * aparece nem se o SQL esquecer o `WHERE "parceiroId"`. É o caminho para
-   * relatório (DRE, CMV). Nunca monte o texto com concatenação.
+   * relatório (DRE, CMV). Nunca monte o texto com concatenação. O texto não
+   * pode mexer no contexto nem na transação (set_config, SET, RESET, ROLE,
+   * COMMIT, ROLLBACK, BEGIN, SAVEPOINT): `conferirSqlDoParceiro` recusa.
+   * Leitura avulsa abre read-only; INSERT/UPDATE/DELETE passam pela
+   * conferência de status do parceiro, como as escritas por modelo.
    */
   sql<T = Record<string, unknown>>(consulta: TemplateStringsArray, ...valores: unknown[]): Promise<T[]>;
 };
 
-type Executor = <T>(consulta: Promise<T>) => Promise<T>;
+/** Roda a consulta no contexto do parceiro. `escreve`: passa pela conferência de status. */
+type Executor = <T>(consulta: Promise<T>, escreve: boolean) => Promise<T>;
 
 /** Objeto congelado só com as operações, chamando o delegate por closure. */
 function embrulhar(delegate: Record<string, unknown>, executar: Executor) {
@@ -229,7 +333,8 @@ function embrulhar(delegate: Record<string, unknown>, executar: Executor) {
     const f = delegate[op];
     // async: erro do portão vira promessa rejeitada, nunca throw síncrono.
     if (typeof f === 'function') {
-      ops[op] = async (...a: unknown[]) => executar((f as (...x: unknown[]) => Promise<unknown>).apply(delegate, a));
+      ops[op] = async (...a: unknown[]) =>
+        executar((f as (...x: unknown[]) => Promise<unknown>).apply(delegate, a), ESCRITA.has(op));
     }
   }
   return Object.freeze(ops);
@@ -253,34 +358,74 @@ function montar(
     parceiroId,
     somenteLeitura,
     transacao: abrir ?? ((fn) => fn(cliente)),
-    sql: async <T,>(consulta: TemplateStringsArray, ...valores: unknown[]) =>
-      executar(cru.$queryRaw(consulta, ...valores)) as Promise<T[]>,
+    sql: async <T>(consulta: TemplateStringsArray, ...valores: unknown[]) => {
+      conferirSqlDoParceiro(consulta);
+      return executar(cru.$queryRaw(consulta, ...valores), ESCRITA_NO_SQL.test(consulta.join(' '))) as Promise<T[]>;
+    },
   };
   return Object.freeze(cliente);
 }
 
 function construir(base: PrismaClient, parceiroId: string, somenteLeitura: boolean): ClienteDoParceiro {
   const amarrado = estender(base, parceiroId, somenteLeitura);
-  const contexto = sqlDeContexto(parceiroId, somenteLeitura);
 
-  // Fora de transação: cada operação vira um lote [contexto, operação] numa
-  // transação só (a consulta do Prisma é preguiçosa até o lote rodar).
-  const avulso: Executor = async (consulta) => {
-    const [, r] = await amarrado.$transaction([
-      amarrado.$queryRaw(contexto),
-      consulta as unknown as Prisma.PrismaPromise<unknown>,
-    ]);
-    return r as Awaited<typeof consulta>;
+  function barrarSeSoLeitura(escreve: boolean) {
+    if (somenteLeitura && escreve) {
+      throw new ErroDeTenant('parceiro em somente leitura (suspenso ou aguardando liberação): escrita recusada.');
+    }
+  }
+
+  // Fora de transação: cada operação vira um lote numa transação só —
+  // [contexto, (status, se escreve), operação]. A consulta do Prisma é
+  // preguiçosa até o lote rodar. Leitura avulsa abre read-only no banco.
+  const avulso: Executor = async (consulta, escreve) => {
+    const papel = await papelDisponivel(base);
+    const passos: Prisma.PrismaPromise<unknown>[] = [
+      amarrado.$queryRaw(sqlDeContexto(parceiroId, somenteLeitura || !escreve, papel)),
+    ];
+    if (escreve) passos.push(amarrado.$queryRaw(sqlDeStatus(parceiroId)));
+    passos.push(consulta as unknown as Prisma.PrismaPromise<unknown>);
+    try {
+      const r = await amarrado.$transaction(passos);
+      return r[r.length - 1] as Awaited<typeof consulta>;
+    } catch (e) {
+      throw traduzirErro(e);
+    }
   };
-  // Dentro de `transacao`: o contexto já foi aberto no começo dela.
-  const direto: Executor = (consulta) => consulta;
 
-  return montar(amarrado as unknown as Record<string, unknown>, parceiroId, somenteLeitura, avulso, (fn, opcoes) =>
-    // O `tx` de um cliente estendido carrega a mesma extensão de query.
-    amarrado.$transaction(async (tx) => {
-      await tx.$queryRaw(contexto);
-      return fn(montar(tx as unknown as Record<string, unknown>, parceiroId, somenteLeitura, direto, null));
-    }, opcoes),
+  const avulsoComTrava: Executor = async (c, escreve) => {
+    barrarSeSoLeitura(escreve);
+    return avulso(c, escreve);
+  };
+
+  return montar(
+    amarrado as unknown as Record<string, unknown>,
+    parceiroId,
+    somenteLeitura,
+    avulsoComTrava,
+    async (fn, opcoes) => {
+      const papel = await papelDisponivel(base);
+      try {
+        // O `tx` de um cliente estendido carrega a mesma extensão de query.
+        return await amarrado.$transaction(async (tx) => {
+          await tx.$queryRaw(sqlDeContexto(parceiroId, somenteLeitura, papel));
+          // Dentro de `transacao`: contexto já aberto; a 1ª escrita confere o
+          // status (FOR SHARE segura a linha do parceiro até o fim da transação).
+          let statusConferido = false;
+          const direto: Executor = async (consulta, escreve) => {
+            barrarSeSoLeitura(escreve);
+            if (escreve && !statusConferido) {
+              await tx.$queryRaw(sqlDeStatus(parceiroId));
+              statusConferido = true;
+            }
+            return consulta;
+          };
+          return fn(montar(tx as unknown as Record<string, unknown>, parceiroId, somenteLeitura, direto, null));
+        }, opcoes);
+      } catch (e) {
+        throw traduzirErro(e);
+      }
+    },
   );
 }
 
@@ -341,10 +486,13 @@ export async function gravarParceiroFlow<T>(
   ) => Promise<{ parceiroId: string; resultado: T; historico: RegistroDeHistorico | null }>,
   base: PrismaClient = baseDoTenant(),
 ): Promise<T> {
+  const papel = await papelDisponivel(base);
   return base.$transaction(async (tx) => {
     const { parceiroId, resultado, historico } = await gravar(tx.parceiroFlow);
     if (historico) {
-      await tx.$queryRaw(sqlDeContexto(parceiroId, false));
+      // Sem conferência de status: é o nível 1 mudando o próprio status/nome
+      // (suspender grava histórico de um parceiro que acabou de ficar SUSPENSO).
+      await tx.$queryRaw(sqlDeContexto(parceiroId, false, papel));
       const { antes, depois, ...resto } = historico;
       const args = amarrarAoParceiro(
         'HistoricoAlteracao',

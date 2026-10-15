@@ -46,8 +46,8 @@ export const exigirNivel1 = cache(async (): Promise<SessaoErp> => {
 const parceiroDaRequisicao = cache((slug: string) => parceiroPorSlug(slug));
 
 export function bloqueioDeEscrita(status: ParceiroFlow['status']): string | null {
-  if (status === 'SUSPENSO') return 'Parceiro suspenso: dá para consultar, mas cadastros e alterações estão bloqueados.';
-  if (status === 'RASCUNHO') return 'Parceiro aguardando liberação: cadastros abrem quando ele for ativado.';
+  if (status === 'SUSPENSO') return 'Parceiro suspenso: insumos, lojas e marcas ficam bloqueados até reativar.';
+  if (status === 'RASCUNHO') return 'Parceiro aguardando liberação: insumos, lojas e marcas abrem quando ele for ativado.';
   return null;
 }
 

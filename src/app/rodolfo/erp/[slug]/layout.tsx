@@ -66,8 +66,8 @@ export default async function ParceiroLayout({
       {bloqueio && (
         <Aviso tom={parceiro.status === 'SUSPENSO' ? 'suspenso' : 'rascunho'} titulo={status.rotulo}>
           {parceiro.status === 'SUSPENSO'
-            ? 'Dá para consultar tudo; cadastros e alterações ficam bloqueados até reativar em Cadastro.'
-            : 'Cadastros abrem quando o parceiro for liberado em Cadastro.'}
+            ? 'Insumos, lojas e marcas ficam bloqueados até reativar. O nome do parceiro ainda pode ser corrigido em Cadastro.'
+            : 'Insumos, lojas e marcas abrem quando o parceiro for ativado em Cadastro.'}
         </Aviso>
       )}
 
