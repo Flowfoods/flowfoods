@@ -35,7 +35,7 @@ export function LinkGerado({ link, validade }: { link: string; validade?: string
         <button
           type="button"
           onClick={copiar}
-          className="whitespace-nowrap rounded-[7px] bg-primary px-3 py-2 text-[13px] font-semibold text-white transition hover:bg-primary-dark"
+          className="whitespace-nowrap rounded-[7px] border border-white/[0.16] px-3 py-2 text-[13px] font-semibold text-surface transition hover:border-surface/45 hover:bg-white/[0.04]"
         >
           {copiado ? 'Copiado' : 'Copiar'}
         </button>

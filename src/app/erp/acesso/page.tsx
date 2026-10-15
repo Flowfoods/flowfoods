@@ -6,11 +6,21 @@
 import { exigirParceiroDaSessao } from '@/lib/erp/contexto';
 import { listarRostos, podeAtivarRosto } from '@/lib/erp/credenciais';
 import { Painel, Vazio } from '@/app/rodolfo/erp/ui';
+import { AjudaDeAcesso } from '@/app/entrar/ajuda';
+import { configDoRosto, rostoPossivel } from '@/lib/erp/rosto';
 import { AtivarRosto, RemoverRosto } from './rosto';
 
 export const dynamic = 'force-dynamic';
 
 const DATA = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+
+function rostoNoSite(): boolean {
+  try {
+    return rostoPossivel(configDoRosto());
+  } catch {
+    return false;
+  }
+}
 
 export default async function SeuAcessoPage() {
   const { pessoa } = await exigirParceiroDaSessao();
@@ -33,9 +43,7 @@ export default async function SeuAcessoPage() {
             <dd className="mt-1 text-surface">{pessoa.parceiros.map((p) => p.nome).join(' · ')}</dd>
           </div>
         </dl>
-        <p className="mt-5 border-t border-white/[0.07] pt-4 text-[12px] leading-relaxed text-surface/45">
-          Esqueceu a senha? Peça à FlowFoods um link novo.
-        </p>
+        <AjudaDeAcesso className="mt-5 border-t border-white/[0.07] pt-4" />
       </Painel>
 
       <div className="space-y-4">
@@ -49,7 +57,11 @@ export default async function SeuAcessoPage() {
               A imagem do seu rosto nunca sai do aparelho: a FlowFoods não vê, não recebe e não guarda foto nenhuma. O
               aparelho confere que é você e manda só uma chave de segurança.
             </p>
-            <AtivarRosto podeAtivar={podeAtivarRosto(pessoa)} />
+            {rostoNoSite() ? (
+              <AtivarRosto podeAtivar={podeAtivarRosto(pessoa)} secundario={rostos.length > 0} />
+            ) : (
+              <p className="text-[13px] text-surface/55">A entrada pelo rosto liga quando o site estiver em endereço seguro (https).</p>
+            )}
           </div>
         </Painel>
 

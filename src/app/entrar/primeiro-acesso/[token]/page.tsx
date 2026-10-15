@@ -6,6 +6,7 @@
 import Link from 'next/link';
 import { ERRO_DE_LINK } from '@/lib/erp/acesso';
 import { consultarLink } from '@/lib/erp/credenciais';
+import { AjudaDeAcesso } from '../../ajuda';
 import { FormSenha } from './form-senha';
 
 export const dynamic = 'force-dynamic';
@@ -33,10 +34,11 @@ export default async function PrimeiroAcessoPage({ params }: { params: { token: 
           </>
         ) : (
           <>
-            <h1 className="font-display text-[26px] font-bold leading-tight">Link sem validade</h1>
+            <h1 className="font-display text-[26px] font-bold leading-tight">Link vencido ou já usado</h1>
             <p className="mt-2 text-[14px] leading-relaxed text-surface/60">
-              {ERRO_DE_LINK} Cada link funciona uma vez só e vale por 72 horas.
+              {ERRO_DE_LINK} Cada link funciona uma vez só e vale por 72 horas. Se você já criou a senha, é só entrar.
             </p>
+            <AjudaDeAcesso className="mt-4" />
             <Link
               href="/entrar"
               className="mt-6 inline-block rounded-[7px] border border-white/[0.16] px-4 py-2.5 text-sm font-semibold transition hover:border-surface/45"

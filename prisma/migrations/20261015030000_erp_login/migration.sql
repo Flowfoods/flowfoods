@@ -86,6 +86,7 @@ CREATE TABLE "DesafioWebauthn" (
     "desafio" TEXT NOT NULL,
     "tipo" "DesafioTipo" NOT NULL,
     "usuarioId" TEXT,
+    "ip" TEXT,
     "expiraEm" TIMESTAMP(3) NOT NULL,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -149,6 +150,12 @@ CREATE UNIQUE INDEX "DesafioWebauthn_desafio_key" ON "DesafioWebauthn"("desafio"
 CREATE INDEX "DesafioWebauthn_expiraEm_idx" ON "DesafioWebauthn"("expiraEm");
 
 -- CreateIndex
+CREATE INDEX "DesafioWebauthn_ip_expiraEm_idx" ON "DesafioWebauthn"("ip", "expiraEm");
+
+-- CreateIndex
+CREATE INDEX "DesafioWebauthn_usuarioId_expiraEm_idx" ON "DesafioWebauthn"("usuarioId", "expiraEm");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "SessaoErp_tokenHash_key" ON "SessaoErp"("tokenHash");
 
 -- CreateIndex
@@ -192,6 +199,7 @@ ALTER TABLE "PasskeyErp" ADD CONSTRAINT "PasskeyErp_contador_uint32" CHECK ("con
 ALTER TABLE "ConviteAcesso" ADD CONSTRAINT "ConviteAcesso_validade" CHECK ("expiraEm" > "criadoEm");
 ALTER TABLE "SessaoErp" ADD CONSTRAINT "SessaoErp_validade" CHECK ("expiraEm" > "criadoEm");
 ALTER TABLE "DesafioWebauthn" ADD CONSTRAINT "DesafioWebauthn_dono" CHECK (("tipo" = 'REGISTRO') = ("usuarioId" IS NOT NULL));
+ALTER TABLE "DesafioWebauthn" ADD CONSTRAINT "DesafioWebauthn_ip_na_entrada" CHECK (("tipo" = 'ENTRADA') = ("ip" IS NOT NULL));
 
 -- O papel do tenant NÃO alcança credencial nenhuma. Condicional, no padrão da
 -- 0.2: só se o papel existir e quem roda for dono das tabelas (que acabou de

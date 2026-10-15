@@ -8,6 +8,7 @@
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-acesso.db.test.ts
  */
+import bcrypt from 'bcryptjs';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { ERRO_DE_BLOQUEIO, ERRO_DE_ENTRADA, LIMITE_DE_TENTATIVAS, VALIDADE_DO_DESAFIO_MS, hashDoToken } from '@/lib/erp/acesso';
@@ -26,6 +27,8 @@ import {
   iniciarRegistroDeRosto,
   listarAcessos,
   listarRostos,
+  DESAFIOS_ABERTOS_POR_IP,
+  LimiteDoRosto,
   mudarStatusDoAcesso,
   removerRosto,
   validarSessao,
@@ -105,6 +108,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
       await db.$queryRawUnsafe<{ id: string }[]>(`SELECT id FROM "UsuarioErp" WHERE email LIKE $1`, `%.${sufixo}@teste.flow`)
     ).map((u) => u.id);
     await db.$executeRawUnsafe(`DELETE FROM "TentativaEntradaErp" WHERE email LIKE $1 OR ip LIKE $2`, `%${sufixo}%`, `%-${sufixo}`);
+    await db.$executeRawUnsafe(`DELETE FROM "DesafioWebauthn" WHERE ip LIKE $1`, `%-${sufixo}`);
     await db.$executeRawUnsafe(`DELETE FROM "SessaoErp" WHERE "usuarioId" = ANY($1)`, usuarios);
     await db.$executeRawUnsafe(`DELETE FROM "ConviteAcesso" WHERE "usuarioId" = ANY($1)`, usuarios);
     await db.$executeRawUnsafe(`DELETE FROM "AcessoParceiro" WHERE "usuarioId" = ANY($1)`, usuarios);
@@ -215,6 +219,60 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
     expect((await entrarComSenha({ email: e, senha: SENHA, ip: ip(5) }, o())).ok).toBe(true);
   });
 
+  it('pedidos SIMULTÂNEOS no mesmo e-mail: só 5 chegam ao bcrypt (contar e reservar é atômico)', async () => {
+    const e = await pessoaComSenha(A, 'Nina', 'nina');
+    const compare = vi.spyOn(bcrypt, 'compare');
+    try {
+      const rs = await Promise.all(
+        Array.from({ length: 20 }, (_, i) => entrarComSenha({ email: e, senha: `chute ${i} errado`, ip: ip(10) }, o())),
+      );
+      expect(compare).toHaveBeenCalledTimes(LIMITE_DE_TENTATIVAS.porEmail);
+      expect(rs.filter((r) => !r.ok && r.bloqueado)).toHaveLength(20 - LIMITE_DE_TENTATIVAS.porEmail);
+    } finally {
+      compare.mockRestore();
+    }
+    const t = await db.$queryRawUnsafe<{ motivo: string; n: number }[]>(
+      `SELECT motivo, count(*)::int AS n FROM "TentativaEntradaErp" WHERE email = $1 GROUP BY motivo ORDER BY motivo`,
+      e,
+    );
+    expect(t).toEqual([
+      { motivo: 'BLOQUEADO', n: 15 },
+      { motivo: 'SENHA_ERRADA', n: 5 },
+    ]);
+    // Bloqueado também com a senha certa.
+    expect(await entrarComSenha({ email: e, senha: SENHA, ip: ip(11) }, o())).toMatchObject({ ok: false, bloqueado: true });
+  });
+
+  it('pedidos SIMULTÂNEOS do mesmo IP com e-mails diferentes: só 20 chegam ao bcrypt', async () => {
+    const meuIp = ip(12);
+    const compare = vi.spyOn(bcrypt, 'compare');
+    try {
+      const rs = await Promise.all(
+        Array.from({ length: 30 }, (_, i) => entrarComSenha({ email: email(`par${i}`), senha: 'x', ip: meuIp }, o())),
+      );
+      // Sem usuário, o bcrypt roda contra o hash de mentira (tempo igual): conta também.
+      expect(compare).toHaveBeenCalledTimes(LIMITE_DE_TENTATIVAS.porIp);
+      expect(rs.filter((r) => !r.ok && r.bloqueado)).toHaveLength(30 - LIMITE_DE_TENTATIVAS.porIp);
+    } finally {
+      compare.mockRestore();
+    }
+  });
+
+  it('desafio do rosto tem teto por IP (não dá para inundar o banco)', async () => {
+    const meuIp = ip(13);
+    const pedidos = await Promise.allSettled(
+      Array.from({ length: DESAFIOS_ABERTOS_POR_IP + 5 }, () => iniciarEntradaComRosto(meuIp, { ...o(), rosto })),
+    );
+    expect(pedidos.filter((p) => p.status === 'fulfilled')).toHaveLength(DESAFIOS_ABERTOS_POR_IP);
+    const recusados = pedidos.filter((p): p is PromiseRejectedResult => p.status === 'rejected');
+    expect(recusados).toHaveLength(5);
+    expect(recusados.every((p) => p.reason instanceof LimiteDoRosto)).toBe(true);
+    // Vencidos não contam: depois de 5 min, abre de novo.
+    await expect(
+      iniciarEntradaComRosto(meuIp, { ...o(), rosto, agora: new Date(Date.now() + VALIDADE_DO_DESAFIO_MS + 1000) }),
+    ).resolves.toHaveProperty('challenge');
+  });
+
   // ---------------------------------------------------------------- sessão
 
   it('desativar derruba a sessão na próxima validação; reativar volta a deixar entrar; tudo no histórico', async () => {
@@ -313,7 +371,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
       ['aparelho', 'chavePublica', 'contador', 'credencialId', 'criadoEm', 'id', 'sincronizada', 'transportes', 'ultimoUsoEm', 'usuarioId'].sort(),
     );
 
-    const ent = await iniciarEntradaComRosto({ ...o(), rosto });
+    const ent = await iniciarEntradaComRosto(ip(8), { ...o(), rosto });
     const r = await entrarComRosto(aut.entrar(ent.challenge), ip(8), { ...o(), rosto });
     expect(r.ok).toBe(true);
     if (!r.ok) throw new Error();
@@ -323,10 +381,10 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
     // Resposta repetida (mesmo desafio): recusada.
     expect((await entrarComRosto(aut.entrar(ent.challenge), ip(8), { ...o(), rosto })).ok).toBe(false);
     // Contador que não sobe (aparelho clonado): recusado.
-    const ent2 = await iniciarEntradaComRosto({ ...o(), rosto });
+    const ent2 = await iniciarEntradaComRosto(ip(8), { ...o(), rosto });
     expect((await entrarComRosto(aut.entrar(ent2.challenge, { contador: 1 }), ip(8), { ...o(), rosto })).ok).toBe(false);
     // userHandle de outra pessoa: recusado.
-    const ent3 = await iniciarEntradaComRosto({ ...o(), rosto });
+    const ent3 = await iniciarEntradaComRosto(ip(8), { ...o(), rosto });
     expect((await entrarComRosto(aut.entrar(ent3.challenge, { userHandle: 'outra-pessoa' }), ip(8), { ...o(), rosto })).ok).toBe(false);
     // Entrar com o rosto NÃO serve para ativar outro aparelho (pede senha recente).
     await expect(iniciarRegistroDeRosto(s!, { ...o(), rosto })).rejects.toThrow(/senha/);
@@ -334,7 +392,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
     const [p] = await listarRostos(sessao.usuario.id, o());
     expect(p.aparelho).toBe('iPhone');
     expect((await removerRosto(sessao, p.id, o())).ok).toBe(true);
-    const ent4 = await iniciarEntradaComRosto({ ...o(), rosto });
+    const ent4 = await iniciarEntradaComRosto(ip(8), { ...o(), rosto });
     expect((await entrarComRosto(aut.entrar(ent4.challenge), ip(8), { ...o(), rosto })).ok).toBe(false);
 
     const acoes = (await doParceiro(A, db).historicoAlteracao.findMany({ where: { entidadeId: sessao.acessoId! } })).map((h) => h.acao);
@@ -342,7 +400,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
   });
 
   it('desafio: uso único, com validade curta, preso ao tipo e à pessoa', async () => {
-    const ent = await iniciarEntradaComRosto({ ...o(), rosto });
+    const ent = await iniciarEntradaComRosto(ip(8), { ...o(), rosto });
     const depois = { base: db, agora: new Date(Date.now() + VALIDADE_DO_DESAFIO_MS + 1000) };
     expect(await consumirDesafio(ent.challenge, 'ENTRADA', null, depois)).toBe(false); // vencido
     expect(await consumirDesafio(ent.challenge, 'REGISTRO', null, o())).toBe(false); // outro tipo
@@ -362,7 +420,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
     const reg = await iniciarRegistroDeRosto(sessao, { ...o(), rosto });
     expect((await concluirRegistroDeRosto(sessao, aut.registrar(reg.challenge), 'Android', { ...o(), rosto })).ok).toBe(true);
     await mudarStatusDoAcesso(B, sessao.acessoId!, 'DESATIVADO', 'Rodolfo', o());
-    const ent = await iniciarEntradaComRosto({ ...o(), rosto });
+    const ent = await iniciarEntradaComRosto(ip(8), { ...o(), rosto });
     expect((await entrarComRosto(aut.entrar(ent.challenge), ip(9), { ...o(), rosto })).ok).toBe(false);
   });
 });

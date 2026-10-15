@@ -64,8 +64,16 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 3. **Entrar** em `/entrar`: e-mail e senha; mensagem única ("E-mail ou senha
    incorretos.") para e-mail inexistente, senha errada, senha não definida e
    acesso desativado; limite de 5 falhas por e-mail (desde o último acerto) e
-   20 por IP em 15 min, conferido antes do bcrypt e guardado no banco
-   (`TentativaEntradaErp`, que também é a auditoria ok/falhou). Sessão própria
+   20 por IP em 15 min, guardado no banco (`TentativaEntradaErp`, que também é
+   a auditoria ok/falhou). **Contar e reservar é atômico** (revisão da 0.3):
+   numa transação com `pg_advisory_xact_lock` do e-mail e do IP, conta as
+   falhas e grava a tentativa como falha ("EM_ANDAMENTO") ANTES do bcrypt; no
+   fim vira OK ou o motivo. Pedidos simultâneos esperam a trava e veem as
+   reservas uns dos outros: 20 chutes paralelos no mesmo e-mail testam 5
+   senhas (teste com banco). Quem não consegue entrar tem saída em todas as
+   larguras: "Esqueceu a senha ou não consegue entrar? Fale com a FlowFoods"
+   (WhatsApp, `AJUDA_DE_ACESSO_ERP` em `src/lib/constants.ts`), também no link
+   vencido e em "Seu acesso". Sessão própria
    (cookie `ff_erp` / `__Host-ff_erp`, token aleatório, só o hash no banco,
    7 dias), validada no banco a CADA requisição: desativar derruba na próxima.
    Sair encerra a sessão. Trocar a senha derruba todas as sessões da pessoa.
@@ -78,10 +86,14 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
    usuário obrigatória — no celular, Face ID/reconhecimento facial/digital do
    próprio aparelho. O servidor guarda só a chave pública; nenhuma imagem é
    capturada ou enviada. Ativar em `/erp/acesso` exige sessão aberta com senha
-   há até 30 min; desafio no banco, 5 min, uso único, preso ao tipo e à pessoa;
+   há até 30 min; desafio no banco, 5 min, uso único, preso ao tipo e à pessoa,
+   com teto de abertos (10 por IP na entrada, 3 por pessoa no registro) e
+   recusado para IP já bloqueado por falhas;
    contador conferido (condicional no banco); listar e remover aparelhos.
    `rpID`/`origin` de `ERP_WEBAUTHN_RP_ID`/`ERP_WEBAUTHN_ORIGIN`, senão do
-   `NEXTAUTH_URL`. Senha continua sendo o caminho principal.
+   `NEXTAUTH_URL`. Fora de https (e do localhost) o botão nem aparece
+   (`rostoPossivel`): hoje a produção é http. Senha continua sendo o caminho
+   principal.
 6. **Sessões separadas.** O middleware manda `/erp` sem o cookie próprio para
    `/entrar`; o `/rodolfo` só aceita o JWT do next-auth. Provado em teste
    (middleware) e na prova visual (uma sessão não abre a outra área).
@@ -264,6 +276,6 @@ com dono não-superusuário (com e sem a RLS instalada).
 - **0.4:** `AcessoParceiro` é onde entram perfil, setores e lojas da pessoa; ligar `Colaborador` (tenant) ao vínculo exige cuidado — credencial não pode apontar para modelo de tenant (o teste-guarda reprova): o caminho é o `Colaborador` apontar para o usuário, não o contrário. `/erp` hoje deixa qualquer pessoa ativa cadastrar insumo (sem perfis ainda).
 - **0.5:** o envio do link (WhatsApp/e-mail) entra no `criarAcesso`/`gerarNovoLink`; hoje o Rodolfo copia.
 - `TentativaEntradaErp`, `SessaoErp` encerradas/vencidas e `ConviteAcesso` usados crescem sem faxina: criar rotina de retenção (ex.: 90 dias) no worker.
-- O limite por IP confia no `X-Real-Ip` do Traefik (ou no último item do `X-Forwarded-For`). Sem proxy na frente, todos caem em "desconhecido" e dividem o limite de IP.
+- **IP do limite.** Vale o `X-Real-Ip`; sem ele, o ÚLTIMO item do `X-Forwarded-For`. O Traefik (Dokploy), com a configuração padrão (sem `forwardedHeaders.insecure` nem `trustedIPs` abertos), apaga o `X-Real-Ip` que vem de fora e escreve o IP real da conexão — por isso ele é o preferido. Isso só vale se o `web` NÃO estiver exposto direto na internet (o compose usa `expose`, não `ports`): acesso direto à porta 3000 deixa o cabeçalho ser inventado e o limite por IP fica contornável (o por e-mail continua). Sem proxy nenhum (dev), todos caem em "desconhecido" e dividem o limite de IP.
 - Rosto exige https em produção; trocar o domínio invalida as chaves (as pessoas ativam de novo).
 - Contador do rosto é `BigInt` (uint32 do aparelho) — exceção única à regra "sem BigInt", não é número de negócio.

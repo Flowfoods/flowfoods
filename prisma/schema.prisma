@@ -1605,10 +1605,14 @@ model DesafioWebauthn {
   // Registro: de quem é. Entrada pelo rosto: nulo (o aparelho diz quem é).
   usuarioId String?
   usuario   UsuarioErp? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  // Entrada pelo rosto: de que IP veio o pedido (teto de desafios abertos por IP).
+  ip        String?
   expiraEm  DateTime
   criadoEm  DateTime    @default(now())
 
   @@index([expiraEm])
+  @@index([ip, expiraEm])
+  @@index([usuarioId, expiraEm])
 }
 
 // Sessão do ERP do parceiro: cookie próprio (não é a do /rodolfo). O cookie

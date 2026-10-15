@@ -32,7 +32,7 @@ export const LIMITE_DE_TENTATIVAS = {
 export const ERRO_DE_ENTRADA = 'E-mail ou senha incorretos.';
 export const ERRO_DE_ROSTO = 'Não deu para entrar com o rosto. Use e-mail e senha.';
 export const ERRO_DE_BLOQUEIO = 'Muitas tentativas seguidas. Espere 15 minutos e tente de novo.';
-export const ERRO_DE_LINK = 'Este link não vale mais. Peça um novo à FlowFoods.';
+export const ERRO_DE_LINK = 'Este link não vale mais. Peça um novo à FlowFoods pelo WhatsApp.';
 
 // ------------------------------------------------------------------ e-mail
 

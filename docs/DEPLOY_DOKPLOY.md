@@ -170,7 +170,14 @@ ERP_WEBAUTHN_RP_ID=consultoriaflowfoods.com.br            # domínio (igual ou "
 rosto (passkey) só funciona em **https** (o navegador recusa em http, fora do
 localhost) e fica preso ao domínio: trocar de domínio depois obriga cada pessoa
 a ativar o rosto de novo (a senha continua valendo). O cookie da sessão do
-parceiro é `__Host-ff_erp` em https e `ff_erp` em http.
+parceiro é `__Host-ff_erp` em https e `ff_erp` em http. Enquanto o site
+estiver em http, o botão "Entrar com o rosto" não aparece (só e-mail e senha).
+
+**Limite de tentativas por IP:** o app usa o `X-Real-Ip` que o Traefik escreve
+(ele descarta o que vier do navegador, na configuração padrão do Dokploy). Não
+publique a porta 3000 do `web` direto na internet nem ligue
+`forwardedHeaders.insecure` no Traefik: aí o cabeçalho pode ser inventado e o
+limite por IP deixa de valer (o limite por e-mail continua).
 
 **Sobre `RODOLFO_WHATSAPP` quando você usa o próprio telefone:** deixe o seu
 número mesmo. O sistema detecta que o número que prospecta é o mesmo que

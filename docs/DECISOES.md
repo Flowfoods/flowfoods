@@ -589,6 +589,14 @@ encerram de verdade. O limite de tentativas também vai para o banco (não para
 memória como no /rodolfo): vale com várias réplicas do `web` e já é a
 auditoria de login ok/falhou.
 
+**Revisão (Guardião):** contar → bcrypt → gravar deixava 60 chutes simultâneos
+passarem do limite. Agora contar e reservar é uma transação só, sob
+`pg_advisory_xact_lock` do e-mail e do IP (sempre nessa ordem: sem deadlock):
+a tentativa entra como falha antes do bcrypt e é corrigida no fim. Alternativa
+descartada: `SERIALIZABLE` com nova tentativa — mais código e erro de
+serialização visível sob ataque. O desafio do rosto ganhou teto de abertos
+por IP pelo mesmo motivo (inundar a tabela).
+
 ---
 
 ### 37. 2026-10-15 · ERP 0.3: "rosto" é passkey com verificação obrigatória; ativar pede senha recente

@@ -21,7 +21,7 @@ function Botao() {
   );
 }
 
-export function FormEntrar({ aviso }: { aviso: string | null }) {
+export function FormEntrar({ aviso, rosto }: { aviso: string | null; rosto: boolean }) {
   const [estado, enviar] = useFormState<EstadoEntrar, FormData>(acaoEntrar, null);
   return (
     <div className="space-y-5">
@@ -73,7 +73,7 @@ export function FormEntrar({ aviso }: { aviso: string | null }) {
         )}
         <Botao />
       </form>
-      <EntrarComRosto />
+      {rosto && <EntrarComRosto />}
     </div>
   );
 }

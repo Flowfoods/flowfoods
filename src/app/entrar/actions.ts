@@ -14,6 +14,7 @@ import {
   entrarComSenha,
   escolherParceiro,
   iniciarEntradaComRosto,
+  LimiteDoRosto,
 } from '@/lib/erp/credenciais';
 import { ERRO_DE_ROSTO } from '@/lib/erp/acesso';
 import type { AuthenticationResponseJSON } from '@/lib/erp/rosto';
@@ -29,9 +30,17 @@ export async function acaoEntrar(anterior: EstadoEntrar, form: FormData): Promis
   redirect(r.escolher ? '/entrar/escolher' : '/erp');
 }
 
-/** Opções para o navegador pedir o rosto ao aparelho (desafio guardado no servidor). */
+/**
+ * Opções para o navegador pedir o rosto ao aparelho (desafio guardado no
+ * servidor, com teto de abertos por IP).
+ */
 export async function acaoOpcoesDoRosto() {
-  return iniciarEntradaComRosto();
+  try {
+    return { ok: true as const, opcoes: await iniciarEntradaComRosto(ipAtual()) };
+  } catch (e) {
+    if (e instanceof LimiteDoRosto) return { ok: false as const, erro: e.message };
+    throw e;
+  }
 }
 
 export async function acaoEntrarComRosto(

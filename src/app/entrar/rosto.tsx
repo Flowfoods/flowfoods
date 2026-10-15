@@ -25,8 +25,13 @@ export function EntrarComRosto() {
     setEsperando(true);
     setErro('');
     try {
-      const opcoes = await acaoOpcoesDoRosto();
-      const resposta = await startAuthentication({ optionsJSON: opcoes });
+      const pedido = await acaoOpcoesDoRosto();
+      if (!pedido.ok) {
+        setErro(pedido.erro);
+        setEsperando(false);
+        return;
+      }
+      const resposta = await startAuthentication({ optionsJSON: pedido.opcoes });
       const r = await acaoEntrarComRosto(resposta);
       if (r.ok) {
         window.location.assign(r.destino);

@@ -319,7 +319,7 @@ export async function consultarLink(token: unknown, o?: Opcoes): Promise<EstadoD
 }
 
 /**
- * A pessoa define a senha pelo link. Uso único garantido no banco: a marcação
+ * A pessoa define a senha pelo link. O banco segura o uso único: a marcação
  * de "usado" é condicional (não usado, não revogado, não vencido) e só uma
  * transação consegue. Trocar a senha derruba as sessões abertas da pessoa.
  */
@@ -379,9 +379,9 @@ function compararSempre(senha: string, hash: string | null | undefined) {
   return hash ? bcrypt.compare(senha, hash) : hashDeMentira.then((h) => bcrypt.compare(senha, h)).then(() => false);
 }
 
-/** Falhas recentes: por e-mail desde o último acerto (na janela) e por IP na janela toda. */
-export async function falhasRecentes(email: string | null, ip: string, o?: Opcoes) {
-  const { db, agora } = abrir(o);
+type Db = PrismaClient | Prisma.TransactionClient;
+
+async function contarFalhas(db: Db, email: string | null, ip: string, agora: Date) {
   const desde = new Date(agora.getTime() - LIMITE_DE_TENTATIVAS.janelaMs);
   let desdeEmail = desde;
   if (email) {
@@ -392,17 +392,60 @@ export async function falhasRecentes(email: string | null, ip: string, o?: Opcoe
     });
     if (ok) desdeEmail = ok.criadoEm;
   }
-  const [porEmail, porIp] = await Promise.all([
-    email ? db.tentativaEntradaErp.count({ where: { email, ok: false, criadoEm: { gt: desdeEmail } } }) : 0,
-    db.tentativaEntradaErp.count({ where: { ip, ok: false, criadoEm: { gte: desde } } }),
-  ]);
+  const porEmail = email
+    ? await db.tentativaEntradaErp.count({ where: { email, ok: false, criadoEm: { gt: desdeEmail } } })
+    : 0;
+  const porIp = await db.tentativaEntradaErp.count({ where: { ip, ok: false, criadoEm: { gte: desde } } });
   return { porEmail, porIp };
 }
 
-type Tentativa = { email: string | null; ip: string; metodo: 'SENHA' | 'ROSTO'; ok: boolean; motivo: string; usuarioId?: string };
+/** Falhas recentes: por e-mail desde o último acerto (na janela) e por IP na janela toda. */
+export async function falhasRecentes(email: string | null, ip: string, o?: Opcoes) {
+  const { db, agora } = abrir(o);
+  return contarFalhas(db, email, ip, agora);
+}
 
-async function registrar(db: PrismaClient, t: Tentativa, agora: Date) {
-  await db.tentativaEntradaErp.create({ data: { ...t, usuarioId: t.usuarioId ?? null, criadoEm: agora } });
+/**
+ * Trava por chave até o fim da transação (pg_advisory_xact_lock). Ordem fixa:
+ * e-mail antes de IP, e ninguém trava IP antes de e-mail — sem deadlock.
+ */
+async function travar(tx: Prisma.TransactionClient, chave: string) {
+  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${chave}, 0))::text AS "trava"`;
+}
+
+type Tentativa = { email: string | null; ip: string; metodo: 'SENHA' | 'ROSTO' };
+
+/**
+ * CONTA E RESERVA numa transação só, sob trava do e-mail e do IP: a tentativa
+ * entra no banco como falha ("EM_ANDAMENTO") ANTES do bcrypt/verificação. Com
+ * 60 pedidos simultâneos, cada um espera a trava, vê as reservas dos
+ * anteriores e, passado o limite, é recusado sem testar a senha. Devolve o id
+ * da reserva, ou null se bloqueado (registrado como BLOQUEADO).
+ */
+async function reservarTentativa(db: PrismaClient, t: Tentativa, agora: Date): Promise<string | null> {
+  return db.$transaction(async (tx) => {
+    if (t.email) await travar(tx, `erp-entrada:email:${t.email}`);
+    await travar(tx, `erp-entrada:ip:${t.ip}`);
+    const f = await contarFalhas(tx, t.email, t.ip, agora);
+    const bloqueado = excedeuLimite(f.porEmail, f.porIp);
+    const r = await tx.tentativaEntradaErp.create({
+      data: { ...t, ok: false, motivo: bloqueado ? 'BLOQUEADO' : 'EM_ANDAMENTO', criadoEm: agora },
+      select: { id: true },
+    });
+    return bloqueado ? null : r.id;
+  }, { maxWait: 10_000, timeout: 10_000 });
+}
+
+/** Resultado da tentativa reservada (a reserva já contava como falha). */
+async function concluirTentativa(
+  db: PrismaClient,
+  id: string,
+  r: { ok: boolean; motivo: string; usuarioId?: string; email?: string },
+) {
+  await db.tentativaEntradaErp.update({
+    where: { id },
+    data: { ok: r.ok, motivo: r.motivo.slice(0, 200), usuarioId: r.usuarioId ?? null, ...(r.email ? { email: r.email } : {}) },
+  });
 }
 
 /** Abre a sessão: parceiro já escolhido se a pessoa só tem um. */
@@ -447,45 +490,75 @@ export async function entrarComSenha(
   const email = normalizarEmail(entrada.email);
   const emailRegistro = email ?? (typeof entrada.email === 'string' ? entrada.email.trim().toLowerCase().slice(0, 160) : null);
   const senha = typeof entrada.senha === 'string' ? entrada.senha : '';
-  const ip = entrada.ip;
-  const base = { email: emailRegistro, ip, metodo: 'SENHA' as const };
 
-  const falhas = await falhasRecentes(emailRegistro, ip, { base: db, agora });
-  if (excedeuLimite(falhas.porEmail, falhas.porIp)) {
-    await registrar(db, { ...base, ok: false, motivo: 'BLOQUEADO' }, agora);
-    return { ok: false, erro: ERRO_DE_BLOQUEIO, bloqueado: true };
-  }
+  // Limite conferido e tentativa reservada ANTES do bcrypt, atomicamente.
+  const reserva = await reservarTentativa(db, { email: emailRegistro || null, ip: entrada.ip, metodo: 'SENHA' }, agora);
+  if (!reserva) return { ok: false, erro: ERRO_DE_BLOQUEIO, bloqueado: true };
 
   const usuario = email ? await db.usuarioErp.findUnique({ where: { email } }) : null;
   const confere = await compararSempre(senha.slice(0, 200), usuario?.senhaHash);
   if (!usuario || !usuario.senhaHash || !confere) {
     const motivo = !usuario ? 'SEM_USUARIO' : !usuario.senhaHash ? 'SEM_SENHA' : 'SENHA_ERRADA';
-    await registrar(db, { ...base, ok: false, motivo, usuarioId: usuario?.id }, agora);
+    await concluirTentativa(db, reserva, { ok: false, motivo, usuarioId: usuario?.id });
     return { ok: false, erro: ERRO_DE_ENTRADA, bloqueado: false };
   }
 
-  const sessao = await abrirSessao(db, usuario.id, 'SENHA', ip, agora);
+  const sessao = await abrirSessao(db, usuario.id, 'SENHA', entrada.ip, agora);
   if (!sessao) {
-    await registrar(db, { ...base, ok: false, motivo: 'SEM_ACESSO', usuarioId: usuario.id }, agora);
+    await concluirTentativa(db, reserva, { ok: false, motivo: 'SEM_ACESSO', usuarioId: usuario.id });
     return { ok: false, erro: ERRO_DE_ENTRADA, bloqueado: false };
   }
-  await registrar(db, { ...base, ok: true, motivo: 'OK', usuarioId: usuario.id }, agora);
+  await concluirTentativa(db, reserva, { ok: true, motivo: 'OK', usuarioId: usuario.id });
   return { ok: true, ...sessao };
 }
 
 // ====================================================================== rosto
 
+/** Desafios abertos ao mesmo tempo: por IP (entrar) e por pessoa (ativar). */
+export const DESAFIOS_ABERTOS_POR_IP = 10;
+export const DESAFIOS_ABERTOS_POR_PESSOA = 3;
+
+/** Pedido de desafio recusado: muitos abertos, ou IP já bloqueado por falhas. */
+export class LimiteDoRosto extends Error {
+  constructor() {
+    super(ERRO_DE_BLOQUEIO);
+    this.name = 'LimiteDoRosto';
+  }
+}
+
+/**
+ * Guarda o desafio com teto de abertos (trava por IP ou pessoa): ninguém
+ * inunda a tabela pedindo desafio sem parar. Faxina dos vencidos junto.
+ */
 async function guardarDesafio(
   db: PrismaClient,
   desafio: string,
   tipo: 'REGISTRO' | 'ENTRADA',
-  usuarioId: string | null,
+  dono: { usuarioId: string } | { ip: string },
   agora: Date,
 ) {
-  // Faxina dos vencidos (barata: índice em expiraEm).
-  await db.desafioWebauthn.deleteMany({ where: { expiraEm: { lt: agora } } });
-  await db.desafioWebauthn.create({
-    data: { desafio, tipo, usuarioId, criadoEm: agora, expiraEm: new Date(agora.getTime() + VALIDADE_DO_DESAFIO_MS) },
+  await db.$transaction(async (tx) => {
+    const porPessoa = 'usuarioId' in dono;
+    await travar(tx, porPessoa ? `erp-desafio:usuario:${dono.usuarioId}` : `erp-desafio:ip:${dono.ip}`);
+    await tx.desafioWebauthn.deleteMany({ where: { expiraEm: { lt: agora } } });
+    if (porPessoa) {
+      const abertos = await tx.desafioWebauthn.count({ where: { usuarioId: dono.usuarioId, expiraEm: { gt: agora } } });
+      if (abertos >= DESAFIOS_ABERTOS_POR_PESSOA) throw new LimiteDoRosto();
+    } else {
+      const abertos = await tx.desafioWebauthn.count({ where: { ip: dono.ip, expiraEm: { gt: agora } } });
+      const falhas = await contarFalhas(tx, null, dono.ip, agora);
+      if (abertos >= DESAFIOS_ABERTOS_POR_IP || excedeuLimite(0, falhas.porIp)) throw new LimiteDoRosto();
+    }
+    await tx.desafioWebauthn.create({
+      data: {
+        desafio,
+        tipo,
+        usuarioId: porPessoa ? dono.usuarioId : null,
+        ip: porPessoa ? null : dono.ip,
+        criadoEm: agora,
+        expiraEm: new Date(agora.getTime() + VALIDADE_DO_DESAFIO_MS),
+      },
+    });
   });
 }
 
@@ -507,12 +580,12 @@ export async function consumirDesafio(
   return count === 1;
 }
 
-/** Opções para a tela de login ("Entrar com o rosto"). */
-export async function iniciarEntradaComRosto(o?: Opcoes) {
+/** Opções para a tela de login ("Entrar com o rosto"). Estoura `LimiteDoRosto` se o IP passou do teto. */
+export async function iniciarEntradaComRosto(ip: string, o?: Opcoes) {
   const { db, agora } = abrir(o);
   const cfg = o?.rosto ?? configDoRosto();
   const opcoes = await opcoesDeEntrada(cfg);
-  await guardarDesafio(db, opcoes.challenge, 'ENTRADA', null, agora);
+  await guardarDesafio(db, opcoes.challenge, 'ENTRADA', { ip }, agora);
   return opcoes;
 }
 
@@ -529,17 +602,12 @@ export async function entrarComRosto(
 ): Promise<ResultadoDeEntrada> {
   const { db, agora } = abrir(o);
   const cfg = o?.rosto ?? configDoRosto();
-  const base = { email: null, ip, metodo: 'ROSTO' as const };
+  const reserva = await reservarTentativa(db, { email: null, ip, metodo: 'ROSTO' }, agora);
+  if (!reserva) return { ok: false, erro: ERRO_DE_BLOQUEIO, bloqueado: true };
   const falha = async (motivo: string, usuarioId?: string, email?: string) => {
-    await registrar(db, { ...base, email: email ?? null, ok: false, motivo, usuarioId }, agora);
+    await concluirTentativa(db, reserva, { ok: false, motivo, usuarioId, email });
     return { ok: false as const, erro: ERRO_DE_ROSTO, bloqueado: false };
   };
-
-  const falhas = await falhasRecentes(null, ip, { base: db, agora });
-  if (excedeuLimite(0, falhas.porIp)) {
-    await registrar(db, { ...base, ok: false, motivo: 'BLOQUEADO' }, agora);
-    return { ok: false, erro: ERRO_DE_BLOQUEIO, bloqueado: true };
-  }
 
   const desafio = desafioDaResposta(resposta);
   if (!(await consumirDesafio(desafio, 'ENTRADA', null, { base: db, agora }))) return falha('ROSTO_DESAFIO');
@@ -567,7 +635,7 @@ export async function entrarComRosto(
 
   const sessao = await abrirSessao(db, passkey.usuarioId, 'ROSTO', ip, agora);
   if (!sessao) return falha('SEM_ACESSO', passkey.usuarioId, passkey.usuario.email);
-  await registrar(db, { ...base, email: passkey.usuario.email, ok: true, motivo: 'OK', usuarioId: passkey.usuarioId }, agora);
+  await concluirTentativa(db, reserva, { ok: true, motivo: 'OK', usuarioId: passkey.usuarioId, email: passkey.usuario.email });
   return { ok: true, ...sessao };
 }
 
@@ -594,7 +662,7 @@ export async function iniciarRegistroDeRosto(sessao: SessaoValida, o?: Opcoes) {
     select: { credencialId: true, transportes: true },
   });
   const opcoes = await opcoesDeRegistro(cfg, sessao.usuario, existentes);
-  await guardarDesafio(db, opcoes.challenge, 'REGISTRO', sessao.usuario.id, agora);
+  await guardarDesafio(db, opcoes.challenge, 'REGISTRO', { usuarioId: sessao.usuario.id }, agora);
   return opcoes;
 }
 

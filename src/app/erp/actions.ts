@@ -12,6 +12,7 @@ import {
   concluirRegistroDeRosto,
   ERRO_ATIVAR_ROSTO,
   iniciarRegistroDeRosto,
+  LimiteDoRosto,
   podeAtivarRosto,
   removerRosto,
 } from '@/lib/erp/credenciais';
@@ -32,7 +33,12 @@ export async function acaoCadastrarInsumoDaSessao(anterior: EstadoCadastro, form
 export async function acaoOpcoesDeAtivarRosto() {
   const pessoa = await exigirPessoa();
   if (!podeAtivarRosto(pessoa)) return { ok: false as const, erro: ERRO_ATIVAR_ROSTO };
-  return { ok: true as const, opcoes: await iniciarRegistroDeRosto(pessoa) };
+  try {
+    return { ok: true as const, opcoes: await iniciarRegistroDeRosto(pessoa) };
+  } catch (e) {
+    if (e instanceof LimiteDoRosto) return { ok: false as const, erro: 'Muitos pedidos seguidos. Espere 5 minutos.' };
+    throw e;
+  }
 }
 
 export async function acaoConfirmarRosto(resposta: RegistrationResponseJSON) {

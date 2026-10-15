@@ -11,7 +11,8 @@ import { useRouter } from 'next/navigation';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import { acaoConfirmarRosto, acaoOpcoesDeAtivarRosto, acaoRemoverRosto } from '../actions';
 
-export function AtivarRosto({ podeAtivar }: { podeAtivar: boolean }) {
+/** `secundario`: já há aparelho ativado; ativar outro deixa de ser a ação principal. */
+export function AtivarRosto({ podeAtivar, secundario = false }: { podeAtivar: boolean; secundario?: boolean }) {
   const router = useRouter();
   const [suporta, setSuporta] = useState<boolean | null>(null);
   const [esperando, setEsperando] = useState(false);
@@ -59,9 +60,13 @@ export function AtivarRosto({ podeAtivar }: { podeAtivar: boolean }) {
         type="button"
         onClick={ativar}
         disabled={esperando || suporta === null || !podeAtivar}
-        className="w-full rounded-[7px] bg-primary px-4 py-3 text-sm font-semibold text-white transition hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        className={`w-full rounded-[7px] px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${
+          secundario
+            ? 'border border-white/[0.16] text-surface hover:border-surface/45 hover:bg-white/[0.04]'
+            : 'bg-primary text-white hover:bg-primary-dark'
+        }`}
       >
-        {esperando ? 'Olhe para o aparelho…' : 'Ativar entrada por rosto neste aparelho'}
+        {esperando ? 'Olhe para o aparelho…' : secundario ? 'Ativar também neste aparelho' : 'Ativar entrada por rosto neste aparelho'}
       </button>
       {!podeAtivar && (
         <p className="text-[12px] text-surface/50">

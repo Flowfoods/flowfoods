@@ -39,7 +39,7 @@ export default async function AcessosPage({ params }: { params: { slug: string }
           titulo="Pessoas com acesso"
           acessorio={
             <span className="text-[11px] tabular-nums text-surface/40">
-              {ativos} {ativos === 1 ? 'ativa' : 'ativas'}
+              {ativos} {ativos === 1 ? 'pessoa' : 'pessoas'}
             </span>
           }
           semRespiro
