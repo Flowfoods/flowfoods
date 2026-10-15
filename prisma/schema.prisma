@@ -586,6 +586,12 @@ model ParceiroFlow {
   erpPeriodosApuracao    PeriodoApuracao[]
   erpFarolFaixas         FarolFaixa[]
   erpHistoricoAlteracoes HistoricoAlteracao[]
+
+  // Acesso das pessoas (0.3): FORA do tenant, só por `src/lib/erp/credenciais.ts`
+  // (RELACOES_DE_CREDENCIAL; o prisma do portal recusa).
+  erpAcessos             AcessoParceiro[]
+  erpConvites            ConviteAcesso[]
+  erpSessoes             SessaoErp[]
 }
 
 // ------------------------------------------------- ERP · comuns
@@ -1486,4 +1492,157 @@ model HistoricoAlteracao {
 
   @@index([parceiroId, entidade, entidadeId, ocorridoEm])
   @@index([parceiroId, ocorridoEm])
+}
+
+// ------------------------------------------------- ERP · acesso das pessoas (0.3)
+//
+// Login das pessoas dos parceiros (o Rodolfo continua no `User` do /rodolfo,
+// que estas pessoas NUNCA alcançam). Estas tabelas ficam FORA do tenant de
+// propósito: e-mail, senha, link de primeiro acesso, rosto e sessão são lidos
+// ANTES de saber o parceiro (no login). Por isso não têm RLS nem GRANT para
+// `erp_tenant`, e o acesso a elas é travado num módulo só:
+// `src/lib/erp/credenciais.ts` (o prisma do portal recusa em runtime; o
+// teste-guarda reprova uso fora dele). Nada aqui é dado de negócio do parceiro:
+// o que muda no acesso vai para o `HistoricoAlteracao` DO parceiro.
+//
+// Uma pessoa pode estar em mais de um parceiro (consultor, sócio de rede): a
+// identidade (e-mail, senha, rosto) é uma só e o vínculo é por parceiro, com
+// status próprio. Perfis, setores e acesso por loja são da 0.4.
+
+enum AcessoStatus {
+  ATIVO
+  DESATIVADO
+}
+
+enum MetodoEntrada {
+  SENHA
+  ROSTO
+}
+
+enum DesafioTipo {
+  REGISTRO
+  ENTRADA
+}
+
+// A pessoa. E-mail único (sempre minúsculo, CHECK no banco). Senha só com
+// bcrypt; nula até a pessoa usar o link de primeiro acesso.
+model UsuarioErp {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  nome            String
+  senhaHash       String?
+  senhaDefinidaEm DateTime?
+  ultimoLogin     DateTime?
+  criadoEm        DateTime  @default(now())
+
+  acessos  AcessoParceiro[]
+  convites ConviteAcesso[]
+  passkeys PasskeyErp[]
+  sessoes  SessaoErp[]
+  desafios DesafioWebauthn[]
+}
+
+// Vínculo pessoa × parceiro. Desativar aqui derruba a sessão naquele parceiro
+// na próxima requisição; o vínculo com outro parceiro segue.
+model AcessoParceiro {
+  id           String       @id @default(cuid())
+  parceiroId   String
+  parceiro     ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  usuarioId    String
+  usuario      UsuarioErp   @relation(fields: [usuarioId], references: [id], onDelete: Restrict)
+  status       AcessoStatus @default(ATIVO)
+  criadoEm     DateTime     @default(now())
+  atualizadoEm DateTime     @updatedAt
+
+  @@unique([parceiroId, usuarioId])
+  @@index([usuarioId])
+}
+
+// Link de primeiro acesso (ou de nova senha). Uso único, com validade. O token
+// só existe no link que o Rodolfo copia: aqui fica o SHA-256 dele.
+model ConviteAcesso {
+  id         String       @id @default(cuid())
+  usuarioId  String
+  usuario    UsuarioErp   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  // De qual parceiro o link saiu (para o histórico).
+  parceiroId String
+  parceiro   ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  tokenHash  String       @unique
+  expiraEm   DateTime
+  usadoEm    DateTime?
+  revogadoEm DateTime?
+  criadoEm   DateTime     @default(now())
+
+  @@index([usuarioId, criadoEm])
+}
+
+// Entrada com o rosto (WebAuthn/passkey com verificação do usuário obrigatória).
+// O servidor guarda SÓ a chave pública: imagem de rosto nunca sai do aparelho.
+// `contador` é BigInt porque o aparelho manda um inteiro sem sinal de 32 bits
+// (passa do `Int`); não é número de negócio.
+model PasskeyErp {
+  id           String     @id @default(cuid())
+  usuarioId    String
+  usuario      UsuarioErp @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  credencialId String     @unique
+  chavePublica Bytes
+  contador     BigInt     @default(0)
+  transportes  String[]
+  // Rótulo para a pessoa reconhecer o aparelho ("iPhone", "Android").
+  aparelho     String
+  sincronizada Boolean    @default(false)
+  criadoEm     DateTime   @default(now())
+  ultimoUsoEm  DateTime?
+
+  @@index([usuarioId])
+}
+
+// Desafio do WebAuthn: aleatório, validade curta, uso único (apagado ao usar).
+model DesafioWebauthn {
+  id        String      @id @default(cuid())
+  desafio   String      @unique
+  tipo      DesafioTipo
+  // Registro: de quem é. Entrada pelo rosto: nulo (o aparelho diz quem é).
+  usuarioId String?
+  usuario   UsuarioErp? @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  expiraEm  DateTime
+  criadoEm  DateTime    @default(now())
+
+  @@index([expiraEm])
+}
+
+// Sessão do ERP do parceiro: cookie próprio (não é a do /rodolfo). O cookie
+// leva um token aleatório; aqui fica o SHA-256. O parceiro da sessão é a ÚNICA
+// fonte do parceiro em /erp (nunca a URL). Nulo = ainda vai escolher.
+model SessaoErp {
+  id          String        @id @default(cuid())
+  tokenHash   String        @unique
+  usuarioId   String
+  usuario     UsuarioErp    @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  parceiroId  String?
+  parceiro    ParceiroFlow? @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  metodo      MetodoEntrada
+  ip          String?
+  criadoEm    DateTime      @default(now())
+  expiraEm    DateTime
+  encerradaEm DateTime?
+
+  @@index([usuarioId])
+}
+
+// Toda tentativa de entrar (deu certo ou não): auditoria e base do limite de
+// tentativas por e-mail E por IP (vale com várias réplicas do `web`).
+model TentativaEntradaErp {
+  id        String        @id @default(cuid())
+  email     String?
+  ip        String
+  metodo    MetodoEntrada
+  ok        Boolean
+  // Para auditoria; a pessoa vê sempre a mesma mensagem.
+  motivo    String
+  usuarioId String?
+  criadoEm  DateTime      @default(now())
+
+  @@index([email, criadoEm])
+  @@index([ip, criadoEm])
 }

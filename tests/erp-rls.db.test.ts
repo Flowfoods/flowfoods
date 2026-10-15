@@ -21,9 +21,11 @@ import { cadastrarInsumo } from '@/lib/erp/insumos';
 import { cadastrarLoja, cadastrarMarca, listarEstrutura } from '@/lib/erp/estrutura';
 import { criarParceiro, mudarStatusParceiro, renomearParceiro } from '@/lib/erp/parceiros';
 import { listarHistorico } from '@/lib/erp/historico';
+import { MODELOS_DE_CREDENCIAL } from '@/lib/erp/modelos';
 import { limparParceiros, perfilDoBanco, TABELAS_DE_TENANT, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
+const TABELAS_DE_CREDENCIAL = MODELOS_DE_CREDENCIAL.map((m) => m[0].toUpperCase() + m.slice(1)) as string[];
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres real)', () => {
@@ -83,8 +85,12 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
       WHERE n.nspname = current_schema() AND c.relkind = 'r'
         AND EXISTS (SELECT 1 FROM pg_attribute a
                      WHERE a.attrelid = c.oid AND a.attname = 'parceiroId' AND NOT a.attisdropped)`;
-    expect(linhas.map((l) => l.tabela).sort()).toEqual([...TABELAS_DE_TENANT].sort());
-    expect(linhas.filter((l) => !l.rls || !l.forcada || l.politicas !== 1)).toEqual([]);
+    // Credenciais (0.3) têm parceiroId mas ficam FORA do tenant de propósito (lidas
+    // antes de saber o parceiro): sem RLS, sem política, sem GRANT para o papel.
+    const deTenant = linhas.filter((l) => !TABELAS_DE_CREDENCIAL.includes(l.tabela));
+    expect(deTenant.map((l) => l.tabela).sort()).toEqual([...TABELAS_DE_TENANT].sort());
+    expect(deTenant.filter((l) => !l.rls || !l.forcada || l.politicas !== 1)).toEqual([]);
+    expect(linhas.filter((l) => TABELAS_DE_CREDENCIAL.includes(l.tabela) && (l.rls || l.politicas > 0))).toEqual([]);
   });
 
   it('o papel é sem login, sem BYPASSRLS, e não alcança tabela fora do tenant', async (ctx) => {
@@ -92,7 +98,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
     const [papel] = await db.$queryRaw<{ rolcanlogin: boolean; rolbypassrls: boolean; rolsuper: boolean }[]>`
       SELECT rolcanlogin, rolbypassrls, rolsuper FROM pg_roles WHERE rolname = ${PAPEL_DE_TENANT}`;
     expect(papel).toEqual({ rolcanlogin: false, rolbypassrls: false, rolsuper: false });
-    for (const t of ['User', 'ParceiroFlow', 'Lead', 'AuditLog', 'PortalCliente', '_prisma_migrations']) {
+    for (const t of ['User', 'ParceiroFlow', 'Lead', 'AuditLog', 'PortalCliente', '_prisma_migrations', ...TABELAS_DE_CREDENCIAL]) {
       const [p] = await db.$queryRaw<{ ok: boolean }[]>`
         SELECT has_table_privilege(${PAPEL_DE_TENANT}, quote_ident(${t}), 'SELECT,INSERT,UPDATE,DELETE') AS ok`;
       expect(p.ok, t).toBe(false);

@@ -12,6 +12,7 @@ const ENTIDADE: Record<string, string> = {
   Loja: 'Loja',
   Marca: 'Marca',
   Insumo: 'Insumo',
+  AcessoParceiro: 'Acesso',
 };
 
 const ACAO: Record<string, string> = {
@@ -21,6 +22,13 @@ const ACAO: Record<string, string> = {
   SUSPENDEU: 'Suspendeu',
   CANCELOU: 'Cancelou',
   CORTOU: 'Cortou',
+  DESATIVOU: 'Desativou',
+  REATIVOU: 'Reativou',
+  GEROU_LINK: 'Gerou link de',
+  DEFINIU_SENHA: 'Definiu a senha do',
+  TROCOU_SENHA: 'Trocou a senha do',
+  ATIVOU_ROSTO: 'Ativou o rosto no',
+  REMOVEU_ROSTO: 'Tirou o rosto do',
 };
 
 const CAMPO: Record<string, string> = {
@@ -30,9 +38,26 @@ const CAMPO: Record<string, string> = {
   unidade: 'unidade',
   conteudoMilesimos: 'embalagem',
   precoEmbalagemCentavos: 'preço',
+  email: 'e-mail',
+  linkValeAte: 'link vale até',
+  senha: 'senha',
+  aparelho: 'aparelho',
 };
 
-const STATUS: Record<string, string> = { ATIVO: 'Ativo', RASCUNHO: 'Aguardando liberação', SUSPENSO: 'Suspenso' };
+const STATUS: Record<string, string> = {
+  ATIVO: 'Ativo',
+  RASCUNHO: 'Aguardando liberação',
+  SUSPENSO: 'Suspenso',
+  DESATIVADO: 'Desativado',
+};
+
+const DATA_HORA = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'America/Sao_Paulo',
+});
 
 export function rotuloEntidade(entidade: string): string {
   return ENTIDADE[entidade] ?? entidade;
@@ -45,6 +70,9 @@ export function rotuloAcao(acao: string): string {
 function valor(campo: string, v: unknown): string {
   if (v === null || v === undefined || v === '') return '—';
   if (campo === 'status' && typeof v === 'string') return STATUS[v] ?? v;
+  if (campo.endsWith('Ate') && typeof v === 'string' && !Number.isNaN(Date.parse(v))) {
+    return DATA_HORA.format(new Date(v)).replace(',', ' às');
+  }
   if (campo.endsWith('Centavos') && typeof v === 'number') return formatarDinheiro(v);
   if (campo.endsWith('Milesimos') && typeof v === 'number') {
     return (v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 3 });

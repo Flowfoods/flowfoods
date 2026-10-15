@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { acaoCadastrarInsumo, type EstadoCadastro } from './actions';
+import type { EstadoCadastro } from './actions';
 import {
   UNIDADES,
   custoPorUnidadeBase,
@@ -39,11 +39,9 @@ function Enviar() {
   );
 }
 
-export function FormInsumo({ slug }: { slug: string }) {
-  const [estado, acao] = useFormState<EstadoCadastro, FormData>(
-    acaoCadastrarInsumo.bind(null, slug),
-    null,
-  );
+/** `acao`: a server action de quem usa a tela (nível 1 por slug, ou a pessoa do parceiro pela sessão). */
+export function FormInsumo({ acao: acaoDoServidor }: { acao: (anterior: EstadoCadastro, form: FormData) => Promise<EstadoCadastro> }) {
+  const [estado, acao] = useFormState<EstadoCadastro, FormData>(acaoDoServidor, null);
   const [unidade, setUnidade] = useState<Unidade>('KG');
   const [conteudo, setConteudo] = useState('');
   const [preco, setPreco] = useState('');

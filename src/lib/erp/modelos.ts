@@ -89,6 +89,33 @@ export function ehModeloDeTenant(model: string | undefined): boolean {
   return !!model && NOMES_DE_MODELO.has(model);
 }
 
+/**
+ * Acesso das pessoas dos parceiros (0.3): FORA do tenant de propósito — e-mail,
+ * senha, link, rosto e sessão são lidos ANTES de saber o parceiro (no login).
+ * Três deles têm `parceiroId` (o vínculo, o link e a sessão) e mesmo assim não
+ * são dado de negócio do parceiro: o que muda neles vai para o histórico DO
+ * parceiro. Só `src/lib/erp/credenciais.ts` toca nestes modelos: o `prisma` do
+ * portal recusa em runtime e o teste-guarda reprova uso fora do módulo.
+ */
+export const MODELOS_DE_CREDENCIAL = [
+  'usuarioErp',
+  'acessoParceiro',
+  'conviteAcesso',
+  'passkeyErp',
+  'desafioWebauthn',
+  'sessaoErp',
+  'tentativaEntradaErp',
+] as const;
+
+/** Relações do ParceiroFlow que chegam nas credenciais (mesma trava do portal). */
+export const RELACOES_DE_CREDENCIAL = ['erpAcessos', 'erpConvites', 'erpSessoes'] as const;
+
+const NOMES_DE_CREDENCIAL = new Set<string>(MODELOS_DE_CREDENCIAL.map((m) => m[0].toUpperCase() + m.slice(1)));
+
+export function ehModeloDeCredencial(model: string | undefined): boolean {
+  return !!model && NOMES_DE_CREDENCIAL.has(model);
+}
+
 export class ErroDeTenant extends Error {
   constructor(mensagem: string) {
     super(`[tenant] ${mensagem}`);

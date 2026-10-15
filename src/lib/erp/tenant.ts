@@ -25,7 +25,8 @@
  *
  * O `prisma` do portal (`src/lib/db.ts`) é TRAVADO em runtime para os modelos
  * de tenant: qualquer operação neles (inclusive dentro de `$transaction`)
- * estoura. O portão usa um PrismaClient base próprio, privado deste módulo.
+ * estoura. O portão usa um PrismaClient base próprio (`base.ts`, que só ele e
+ * `credenciais.ts` importam).
  * O SQL cru (`$queryRaw`) do prisma do portal continua possível: esse caminho
  * é vigiado pelo teste-guarda (`tests/erp-tenant-portao.test.ts`), não pelo runtime.
  *
@@ -43,26 +44,16 @@
  * banco e abre a transação read-only.
  */
 
-import { Prisma, PrismaClient } from '@prisma/client';
+import { Prisma, type PrismaClient } from '@prisma/client';
+import { baseDoErp } from './base';
 import { ErroDeTenant, ehModeloDeTenant, MODELOS_DE_TENANT, type ModeloDeTenant } from './modelos';
 
 export { ErroDeTenant, ehModeloDeTenant, MODELOS_DE_TENANT, RELACOES_DE_TENANT } from './modelos';
 export type { ModeloDeTenant } from './modelos';
 
 // Cliente base do portão: separado do `prisma` do portal (que é travado para
-// os modelos de tenant). Cache no globalThis pelo mesmo motivo de `db.ts`:
-// o reload do Next em dev abriria um pool novo a cada edição.
-const globalDoTenant = globalThis as unknown as { prismaDoTenant?: PrismaClient };
-
-function baseDoTenant(): PrismaClient {
-  if (globalDoTenant.prismaDoTenant) return globalDoTenant.prismaDoTenant;
-  const base = new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
-  });
-  // Um por processo (lazy: quem nunca abre o portão não abre o pool).
-  globalDoTenant.prismaDoTenant = base;
-  return base;
-}
+// os modelos de tenant). Um por processo, lazy (`base.ts`).
+const baseDoTenant = baseDoErp;
 
 type Args = Record<string, unknown> & {
   where?: Record<string, unknown>;
@@ -489,19 +480,39 @@ export async function gravarParceiroFlow<T>(
   const papel = await papelDisponivel(base);
   return base.$transaction(async (tx) => {
     const { parceiroId, resultado, historico } = await gravar(tx.parceiroFlow);
-    if (historico) {
-      // Sem conferência de status: é o nível 1 mudando o próprio status/nome
-      // (suspender grava histórico de um parceiro que acabou de ficar SUSPENSO).
-      await tx.$queryRaw(sqlDeContexto(parceiroId, false, papel));
-      const { antes, depois, ...resto } = historico;
-      const args = amarrarAoParceiro(
-        'HistoricoAlteracao',
-        'create',
-        { data: { ...resto, antes: antes ?? undefined, depois: depois ?? undefined } },
-        parceiroId,
-      );
-      await tx.historicoAlteracao.create(args as Prisma.HistoricoAlteracaoCreateArgs);
-    }
+    // Sem conferência de status: é o nível 1 mudando o próprio status/nome
+    // (suspender grava histórico de um parceiro que acabou de ficar SUSPENSO).
+    if (historico) await fecharComHistorico(tx, parceiroId, [historico], papel);
     return resultado;
   });
+}
+
+/**
+ * ÚLTIMO passo de uma transação fora do tenant (ParceiroFlow, acesso das
+ * pessoas): entra no contexto do parceiro e grava o histórico sob a RLS, que
+ * confere que ele é mesmo daquele parceiro. Ou fica tudo, ou nada.
+ *
+ * Depois disto a transação está no papel `erp_tenant` (quando há papel): nada
+ * fora do tenant pode vir depois. Não confere status do parceiro — é registro
+ * de auditoria, não escrita de negócio. Só `gravarParceiroFlow` e
+ * `credenciais.ts` usam (teste-guarda).
+ */
+export async function fecharComHistorico(
+  tx: Prisma.TransactionClient,
+  parceiroId: string,
+  registros: RegistroDeHistorico[],
+  papel: boolean,
+): Promise<void> {
+  if (registros.length === 0) return;
+  await tx.$queryRaw(sqlDeContexto(parceiroId, false, papel));
+  for (const registro of registros) {
+    const { antes, depois, ...resto } = registro;
+    const args = amarrarAoParceiro(
+      'HistoricoAlteracao',
+      'create',
+      { data: { ...resto, antes: antes ?? undefined, depois: depois ?? undefined } },
+      parceiroId,
+    );
+    await tx.historicoAlteracao.create(args as Prisma.HistoricoAlteracaoCreateArgs);
+  }
 }

@@ -14,6 +14,7 @@ export function Abas({ slug }: { slug: string }) {
   const abas = [
     { href: base, rotulo: 'Insumos' },
     { href: `${base}/estrutura`, rotulo: 'Lojas e marcas' },
+    { href: `${base}/acessos`, rotulo: 'Acessos' },
     { href: `${base}/historico`, rotulo: 'Histórico' },
     { href: `${base}/cadastro`, rotulo: 'Cadastro' },
   ];

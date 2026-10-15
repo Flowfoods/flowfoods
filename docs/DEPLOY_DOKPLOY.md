@@ -158,7 +158,19 @@ RODOLFO_WHATSAPP=5521996416060
 ANTHROPIC_API_KEY=...
 AI_DAILY_BUDGET_BRL=5
 USD_BRL=5.40
+
+# ERP — "entrar com o rosto" das pessoas dos parceiros (só no `web`). Opcionais:
+# vazias = o mesmo endereço do NEXTAUTH_URL. Só preencha se o ERP rodar num
+# endereço diferente do site (ex.: portal.consultoriaflowfoods.com.br).
+ERP_WEBAUTHN_ORIGIN=https://consultoriaflowfoods.com.br   # endereço exato da página
+ERP_WEBAUTHN_RP_ID=consultoriaflowfoods.com.br            # domínio (igual ou "pai" do endereço)
 ```
+
+**Sobre o ERP do parceiro (`/entrar` e `/erp`):** não pede variável nova. O
+rosto (passkey) só funciona em **https** (o navegador recusa em http, fora do
+localhost) e fica preso ao domínio: trocar de domínio depois obriga cada pessoa
+a ativar o rosto de novo (a senha continua valendo). O cookie da sessão do
+parceiro é `__Host-ff_erp` em https e `ff_erp` em http.
 
 **Sobre `RODOLFO_WHATSAPP` quando você usa o próprio telefone:** deixe o seu
 número mesmo. O sistema detecta que o número que prospecta é o mesmo que
