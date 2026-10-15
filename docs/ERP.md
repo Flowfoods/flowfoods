@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1) e multi-tenant (0.2)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2) e login (0.3)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -14,7 +14,10 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | RLS no banco (papel `erp_tenant`) | migration `20261015020000_erp_multitenant` |
 | Milésimos e centavos (texto → inteiro, arredondamento) | `src/lib/erp/unidades.ts` |
 | Regras de cadastro | `insumos.ts`, `parceiros.ts` (N1), `estrutura.ts` (lojas e marcas), `historico.ts`, `slug.ts` |
-| Telas | `/rodolfo/erp` (N1: parceiros + novo) e `/rodolfo/erp/<slug>` com abas Insumos · Lojas e marcas (`/estrutura`) · Histórico (`/historico`) · Cadastro (`/cadastro`) |
+| Telas | `/rodolfo/erp` (N1: parceiros + novo) e `/rodolfo/erp/<slug>` com abas Insumos · Lojas e marcas (`/estrutura`) · Acessos (`/acessos`) · Histórico (`/historico`) · Cadastro (`/cadastro`) |
+| Login das pessoas dos parceiros (0.3) | `UsuarioErp` e companhia (bloco "acesso das pessoas" do esquema) + migration `20261015030000_erp_login` |
+| Acesso ao banco das credenciais (único módulo) | `src/lib/erp/credenciais.ts` (regras puras em `acesso.ts`; rosto em `rosto.ts`; cookie em `sessao.ts`/`sessao-cookie.ts`) |
+| Telas da pessoa do parceiro | `/entrar` (e-mail e senha, entrar com o rosto), `/entrar/primeiro-acesso/<token>`, `/entrar/escolher`, `/erp` (Insumos) e `/erp/acesso` (Seu acesso: rosto) |
 
 ## O que a 0.2 entregou (multi-tenant)
 
@@ -44,6 +47,65 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
    só quando o usuário da migration pode (dono das tabelas + papel disponível);
    senão a migration avisa e segue, e o portão detecta em runtime e opera sem
    o papel (aviso único no log).
+
+## O que a 0.3 entregou (login das pessoas dos parceiros)
+
+1. **Contas.** `UsuarioErp` (e-mail único e minúsculo, senha bcrypt custo 12,
+   nula até o primeiro acesso) + `AcessoParceiro` (vínculo pessoa × parceiro,
+   ATIVO/DESATIVADO). Uma pessoa pode estar em mais de um parceiro (consultor,
+   sócio de rede): a identidade é uma, o vínculo é por parceiro (decisão 34).
+   Ela NUNCA entra no /rodolfo: o login de lá só lê `User`.
+2. **Gestão pelo nível 1** (aba Acessos): criar (nome, e-mail) gera o link de
+   primeiro acesso (token de 32 bytes, guardado só o SHA-256, 72 h, uso
+   único); gerar link novo (revoga o anterior; serve também para senha
+   esquecida); desativar/reativar. E-mail que já entra em outro parceiro só
+   ganha o vínculo (sem link). Tudo com antes/depois no histórico do parceiro,
+   na mesma transação. Sem envio automático: o Rodolfo copia o link.
+3. **Entrar** em `/entrar`: e-mail e senha; mensagem única ("E-mail ou senha
+   incorretos.") para e-mail inexistente, senha errada, senha não definida e
+   acesso desativado; limite de 5 falhas por e-mail (desde o último acerto) e
+   20 por IP em 15 min, guardado no banco (`TentativaEntradaErp`, que também é
+   a auditoria ok/falhou). **Contar e reservar é atômico** (revisão da 0.3):
+   numa transação com `pg_advisory_xact_lock` do e-mail e do IP, conta as
+   falhas e grava a tentativa como falha ("EM_ANDAMENTO") ANTES do bcrypt; no
+   fim vira OK ou o motivo. Pedidos simultâneos esperam a trava e veem as
+   reservas uns dos outros: 20 chutes paralelos no mesmo e-mail testam 5
+   senhas (teste com banco). Quem não consegue entrar tem saída em todas as
+   larguras: "Esqueceu a senha ou não consegue entrar? Fale com a FlowFoods"
+   (WhatsApp, `AJUDA_DE_ACESSO_ERP` em `src/lib/constants.ts`), também no link
+   vencido e em "Seu acesso". Sessão própria
+   (cookie `ff_erp` / `__Host-ff_erp`, token aleatório, só o hash no banco,
+   7 dias), validada no banco a CADA requisição: desativar derruba na próxima.
+   Sair encerra a sessão. Trocar a senha derruba todas as sessões da pessoa.
+4. **`/erp`**: mostra o parceiro da sessão e a MESMA tela de Insumos do nível 1
+   (`tela-insumos.tsx`), sempre por `exigirParceiroDaSessao()` → `doParceiro`
+   com o parceiro DA SESSÃO; nenhuma rota recebe parceiro pela URL. Quem tem
+   mais de um parceiro escolhe em `/entrar/escolher` (vínculo conferido).
+   Parceiro suspenso/aguardando: entra, mas só lê (decisão 38).
+5. **Entrar com o rosto** (passkey/WebAuthn, `@simplewebauthn`): verificação do
+   usuário obrigatória — no celular, Face ID/reconhecimento facial/digital do
+   próprio aparelho. O servidor guarda só a chave pública; nenhuma imagem é
+   capturada ou enviada. Ativar em `/erp/acesso` exige sessão aberta com senha
+   há até 30 min; desafio no banco, 5 min, uso único, preso ao tipo e à pessoa,
+   com teto de abertos (10 por IP na entrada, 3 por pessoa no registro) e
+   recusado para IP já bloqueado por falhas;
+   contador conferido (condicional no banco); listar e remover aparelhos.
+   `rpID`/`origin` de `ERP_WEBAUTHN_RP_ID`/`ERP_WEBAUTHN_ORIGIN`, senão do
+   `NEXTAUTH_URL`. Fora de https (e do localhost) o botão nem aparece
+   (`rostoPossivel`): hoje a produção é http. Senha continua sendo o caminho
+   principal.
+6. **Sessões separadas.** O middleware manda `/erp` sem o cookie próprio para
+   `/entrar`; o `/rodolfo` só aceita o JWT do next-auth. Provado em teste
+   (middleware) e na prova visual (uma sessão não abre a outra área).
+
+### Por que as credenciais ficam fora do tenant (decisão 35)
+
+E-mail, senha, link, rosto e sessão precisam ser lidos ANTES de saber o
+parceiro (no login), então não cabem na RLS por parceiro. Em troca, travas:
+`MODELOS_DE_CREDENCIAL` (o `prisma` do portal recusa em runtime), teste-guarda
+(só `credenciais.ts` toca nelas; só ele e o portão importam `base.ts` e
+`fecharComHistorico`), papel `erp_tenant` sem GRANT nelas (a migration revoga,
+no padrão condicional da 0.2) e o histórico das mudanças no tenant do parceiro.
 
 ## Mapa do esquema (0.1)
 
@@ -177,6 +239,18 @@ sem RLS instalada): o que depende da RLS é pulado sem ela
 
 Sem `ERP_DB_TESTE`, esse arquivo é pulado e a suíte padrão segue sem banco.
 
+## Provar o login (0.3)
+
+```bash
+npx vitest run tests/erp-acesso.test.ts            # sem banco: senha, token, limite, WebAuthn com autenticador sintético, middleware
+ERP_DB_TESTE=postgresql://USUARIO:SENHA@localhost:5432/BANCO \
+  npx vitest run tests/erp-acesso.db.test.ts       # com banco: link, senha, limite, desativar, 2 parceiros, suspenso, rosto de ponta a ponta
+```
+
+O rosto usa um autenticador sintético (`tests/erp-autenticador-sintetico.ts`):
+chave EC P-256 real, assinatura real, sem mock da verificação. Rodado também
+com dono não-superusuário (com e sem a RLS instalada).
+
 ## Herança para as próximas subfases (apontada pelos fiscais na 0.1)
 
 - `NULLS NOT DISTINCT` existe só no SQL da migration (o Prisma não enxerga): migration futura que mexa nesses índices precisa reescrevê-lo à mão.
@@ -196,3 +270,22 @@ Sem `ERP_DB_TESTE`, esse arquivo é pulado e a suíte padrão segue sem banco.
 - Suspensão sob escrita contínua pode esperar; `gravarParceiroFlow` precisa de timeout maior e mensagem em PT-BR para o estouro.
 - Na 0.4, `exigirParceiro` passa a conferir se o usuário pertence ao parceiro (o slug vem do cliente via `.bind`).
 - Identificador técnico da loja (`vila-da-penha`) aparece sob o nome: esconder numa fase de tela.
+
+## Herança da 0.3 (para as próximas subfases)
+
+- **0.4:** `AcessoParceiro` é onde entram perfil, setores e lojas da pessoa; ligar `Colaborador` (tenant) ao vínculo exige cuidado — credencial não pode apontar para modelo de tenant (o teste-guarda reprova): o caminho é o `Colaborador` apontar para o usuário, não o contrário. `/erp` hoje deixa qualquer pessoa ativa cadastrar insumo (sem perfis ainda).
+- **0.5:** o envio do link (WhatsApp/e-mail) entra no `criarAcesso`/`gerarNovoLink`; hoje o Rodolfo copia.
+- `TentativaEntradaErp`, `SessaoErp` encerradas/vencidas e `ConviteAcesso` usados crescem sem faxina: criar rotina de retenção (ex.: 90 dias) no worker.
+- **IP do limite.** Vale o `X-Real-Ip`; sem ele, o ÚLTIMO item do `X-Forwarded-For`. O Traefik (Dokploy), com a configuração padrão (sem `forwardedHeaders.insecure` nem `trustedIPs` abertos), apaga o `X-Real-Ip` que vem de fora e escreve o IP real da conexão — por isso ele é o preferido. Isso só vale se o `web` NÃO estiver exposto direto na internet (o compose usa `expose`, não `ports`): acesso direto à porta 3000 deixa o cabeçalho ser inventado e o limite por IP fica contornável (o por e-mail continua). Sem proxy nenhum (dev), todos caem em "desconhecido" e dividem o limite de IP.
+- Rosto exige https em produção; trocar o domínio invalida as chaves (as pessoas ativam de novo).
+- Contador do rosto é `BigInt` (uint32 do aparelho) — exceção única à regra "sem BigInt", não é número de negócio.
+
+## Herança da 0.3 (apontada pelos fiscais)
+
+- HTTPS em produção é pré-requisito antes de abrir o acesso aos parceiros: sem ele, cookie sai sem Secure e a entrada pelo rosto fica escondida.
+- Limite por IP depende do Traefik sobrescrever `X-Real-Ip` (porta 3000 nunca publicada direto).
+- bcrypt em JS (custo 12) no processo principal: sob rajada o login enfileira. Avaliar bcrypt nativo ou fila limitada.
+- Bloqueio por e-mail pode ser mantido por terceiro: dar ao nível 1 um "desbloquear" (0.4 ou 0.5).
+- Após a reserva de tentativa, exceção de infraestrutura deixa a linha EM_ANDAMENTO (conta como falha por 15 min): finalizar como ERRO_INTERNO num try/catch.
+- Faxina de desafios vencidos roda dentro da transação do pedido: mover para fora/amostragem quando o volume crescer.
+- Link de senha nova vale para a pessoa em todos os parceiros dela: rever com vários administradores (0.4).

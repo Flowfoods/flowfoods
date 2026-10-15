@@ -29,6 +29,15 @@ export function whatsappUrl(origem: OrigemContato): string {
 
 export const TAGLINE = 'Gastronomia que flui. Negócio que cresce.';
 
+/**
+ * Ajuda de acesso ao ERP do parceiro (senha esquecida, link vencido): o mesmo
+ * WhatsApp do Rodolfo, com a conversa já no assunto.
+ */
+export const AJUDA_DE_ACESSO_ERP = {
+  url: `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent('Olá Rodolfo! Não consigo entrar no ERP da FlowFoods.')}`,
+  display: '(21) 99641-6060',
+} as const;
+
 export const CONTACT_INFO: ContactInfo = {
   whatsapp: WHATSAPP_NUMERO,
   whatsappUrl: whatsappUrl('flutuante'),

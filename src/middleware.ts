@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import type { NextFetchEvent } from 'next/server';
 import comSessao from 'next-auth/middleware';
+import { COOKIE_DO_ERP, COOKIE_DO_ERP_SEGURO } from '@/lib/erp/sessao-cookie';
 
 /**
  * Duas travas, nesta ordem:
@@ -15,9 +16,16 @@ import comSessao from 'next-auth/middleware';
  *    (que seria um laço) e /rodolfo/setup (que se autentica pelo
  *    ADMIN_SETUP_TOKEN, e existe justamente porque ainda não há senha).
  *
- * O site institucional não passa por aqui: o matcher é o /rodolfo e o Portal
- * do cliente (/portal e /api/portal). O Portal recebe só a trava 1 — o cliente
- * não tem login; quem autentica é o código do link.
+ * O site institucional não passa por aqui: o matcher é o /rodolfo, o Portal
+ * do cliente (/portal e /api/portal) e o ERP do parceiro (/entrar e /erp). O
+ * Portal recebe só a trava 1 — o cliente não tem login; quem autentica é o
+ * código do link.
+ *
+ * ERP do parceiro (0.3): /entrar é público (login, link de primeiro acesso).
+ * /erp exige o cookie PRÓPRIO da sessão do parceiro — sem ele, volta para
+ * /entrar aqui mesmo; com ele, a página valida no banco (token, validade,
+ * acesso ativo). As duas sessões não se cruzam: o next-auth do /rodolfo não
+ * olha o cookie do ERP, e o /erp não aceita o JWT do next-auth.
  */
 
 const PAGINA_EM_CONFIGURACAO = `<!doctype html>
@@ -61,6 +69,14 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
   if (pathname.startsWith('/portal/') || pathname.startsWith('/api/portal/')) {
     return NextResponse.next();
   }
+  if (pathname === '/entrar' || pathname.startsWith('/entrar/')) {
+    return NextResponse.next();
+  }
+  if (pathname === '/erp' || pathname.startsWith('/erp/')) {
+    const temSessao = req.cookies.get(COOKIE_DO_ERP)?.value || req.cookies.get(COOKIE_DO_ERP_SEGURO)?.value;
+    if (temSessao) return NextResponse.next();
+    return NextResponse.redirect(new URL('/entrar', req.url));
+  }
 
   // O default do next-auth/middleware também funciona chamado à mão — é o
   // mesmo objeto, só que decidimos NÓS quando ele entra.
@@ -68,5 +84,14 @@ export default function middleware(req: NextRequest, event: NextFetchEvent) {
 }
 
 export const config = {
-  matcher: ['/rodolfo', '/rodolfo/:path*', '/portal/:path*', '/api/portal/:path*'],
+  matcher: [
+    '/rodolfo',
+    '/rodolfo/:path*',
+    '/portal/:path*',
+    '/api/portal/:path*',
+    '/entrar',
+    '/entrar/:path*',
+    '/erp',
+    '/erp/:path*',
+  ],
 };

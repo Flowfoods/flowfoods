@@ -89,6 +89,9 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AI_DAILY_BUDGET_BRL: ${AI_DAILY_BUDGET_BRL:-5}
       USD_BRL: ${USD_BRL:-5.40}
+      # ERP do parceiro, "entrar com o rosto": vazias = mesmo endereço do NEXTAUTH_URL.
+      ERP_WEBAUTHN_ORIGIN: ${ERP_WEBAUTHN_ORIGIN:-}
+      ERP_WEBAUTHN_RP_ID: ${ERP_WEBAUTHN_RP_ID:-}
       # Portal do cliente: onde os arquivos enviados caem.
       PORTAL_UPLOAD_DIR: /data/portal
     volumes:

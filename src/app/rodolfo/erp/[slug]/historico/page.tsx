@@ -17,6 +17,7 @@ const FILTROS = [
   { valor: 'Loja', rotulo: 'Lojas' },
   { valor: 'Marca', rotulo: 'Marcas' },
   { valor: 'Insumo', rotulo: 'Insumos' },
+  { valor: 'AcessoParceiro', rotulo: 'Acessos' },
 ];
 const LIMITE = 100;
 

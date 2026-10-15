@@ -538,3 +538,91 @@ nenhum. Slug é editável só na criação (é endereço de link e relatório);
 mudanças de nome e status são condicionais ao valor lido (sem atropelo entre
 abas). Suspender exige motivo, que vai para `HistoricoAlteracao.motivo`.
 Cadastro de loja, marca e insumo também passa a gravar o "depois".
+
+---
+
+### 34. 2026-10-15 · ERP 0.3: pessoa do parceiro é `UsuarioErp`, não o `User` do /rodolfo; vínculo por parceiro
+
+**Alternativa:** estender o `User` com papel e `parceiroId`; ou um usuário por
+parceiro (e-mail único por parceiro).
+
+**Razão:** o `User` é o login do nível 1 e o next-auth do /rodolfo autentica
+contra ele; misturar abriria o /rodolfo para a pessoa do parceiro ao primeiro
+erro de papel. Modelo novo, outra sessão, outro cookie: a pessoa nunca alcança
+o /rodolfo por construção. Consultor e sócio de rede entram em mais de um
+parceiro com o mesmo e-mail, senha e rosto: identidade única (`UsuarioErp`) e
+vínculo por parceiro (`AcessoParceiro`, com status próprio — desativar em B não
+mexe em A). Quem tem mais de um escolhe o parceiro depois de entrar; o
+parceiro escolhido fica gravado na sessão e é a única fonte do parceiro em
+`/erp`. Perfis e setores ficam para a 0.4 (vão no vínculo).
+
+---
+
+### 35. 2026-10-15 · ERP 0.3: credenciais fora do tenant, travadas num módulo só
+
+**Alternativa:** pôr vínculo, link e sessão (que têm `parceiroId`) no
+`MODELOS_DE_TENANT` com RLS.
+
+**Razão:** no login ainda não se sabe o parceiro: a RLS forçada esconderia o
+vínculo do próprio login (com dono não-superusuário) e não protegeria nada que
+a validação não proteja. Ficaram fora, com travas equivalentes: o `prisma` do
+portal recusa os 7 modelos e as 3 relações em runtime; só
+`src/lib/erp/credenciais.ts` toca neles (teste-guarda, que também restringe
+`base.ts` e `fecharComHistorico`); o papel `erp_tenant` não tem GRANT (a
+migration revoga, condicional como na 0.2) e o teste de RLS confere; e toda
+mudança de acesso grava antes/depois no `HistoricoAlteracao` DO parceiro na
+mesma transação (`fecharComHistorico`, último passo da transação).
+
+---
+
+### 36. 2026-10-15 · ERP 0.3: sessão própria no banco, não um segundo next-auth
+
+**Alternativa:** segundo provider/instância do next-auth com outro cookie; ou
+papel dentro do JWT do mesmo next-auth.
+
+**Razão:** o contrato exige que acesso desativado caia na próxima requisição.
+JWT só cai quando vence; seria preciso consultar o banco a cada requisição de
+qualquer jeito. Sessão no banco faz isso direto: o cookie leva um token
+aleatório (só o SHA-256 no banco), e `validarSessao` confere token, validade,
+encerramento e vínculo ATIVO numa ida só por requisição. Sair e trocar a senha
+encerram de verdade. O limite de tentativas também vai para o banco (não para
+memória como no /rodolfo): vale com várias réplicas do `web` e já é a
+auditoria de login ok/falhou.
+
+**Revisão (Guardião):** contar → bcrypt → gravar deixava 60 chutes simultâneos
+passarem do limite. Agora contar e reservar é uma transação só, sob
+`pg_advisory_xact_lock` do e-mail e do IP (sempre nessa ordem: sem deadlock):
+a tentativa entra como falha antes do bcrypt e é corrigida no fim. Alternativa
+descartada: `SERIALIZABLE` com nova tentativa — mais código e erro de
+serialização visível sob ataque. O desafio do rosto ganhou teto de abertos
+por IP pelo mesmo motivo (inundar a tabela).
+
+---
+
+### 37. 2026-10-15 · ERP 0.3: "rosto" é passkey com verificação obrigatória; ativar pede senha recente
+
+**Alternativa:** reconhecimento facial no servidor (foto/vídeo + modelo); ou
+passkey sem exigir verificação do usuário.
+
+**Razão:** rosto é dado biométrico sensível na LGPD; capturar, mandar ou guardar
+imagem não tem justificativa quando o celular já faz isso melhor. WebAuthn com
+`userVerification: 'required'` deixa o Face ID / reconhecimento facial /
+digital do aparelho conferir a pessoa; o servidor guarda só a chave pública e
+confere assinatura, desafio (banco, 5 min, uso único), origem, domínio e
+contador. Chave residente: a pessoa entra sem digitar e-mail. Ativar um
+aparelho exige sessão aberta COM SENHA há até 30 min: um cookie roubado não
+pendura um aparelho novo na conta. Versão `@simplewebauthn` 13.3 (a 14 saiu em
+setembro; ficamos na linha estável conhecida).
+
+---
+
+### 38. 2026-10-15 · ERP 0.3: parceiro suspenso ou aguardando — entra e só lê
+
+**Alternativa:** bloquear o login enquanto o parceiro não está ATIVO.
+
+**Razão:** é a regra que o portão já tem (decisão 32): parceiro não ATIVO recebe
+cliente somente leitura, recusado no portão e no banco. Deixar entrar permite
+ao Rodolfo preparar o acesso antes de liberar o parceiro e não apaga o
+histórico de quem está suspenso; a tela avisa o porquê. Bloquear o acesso de
+uma pessoa é outra ação (desativar o vínculo), com efeito imediato.
+
