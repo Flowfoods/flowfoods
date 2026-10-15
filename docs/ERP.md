@@ -115,3 +115,11 @@ ERP_DB_TESTE=postgresql://USUARIO:SENHA@localhost:5432/BANCO \
 ```
 
 Sem `ERP_DB_TESTE`, esse arquivo é pulado e a suíte padrão segue sem banco.
+
+## Herança para as próximas subfases (apontada pelos fiscais na 0.1)
+
+- `NULLS NOT DISTINCT` existe só no SQL da migration (o Prisma não enxerga): migration futura que mexa nesses índices precisa reescrevê-lo à mão.
+- `$queryRaw` do `prisma` do portal ainda alcança tabelas do ERP (vigiado só pelo teste-guarda). Antes da primeira fase com relatório em SQL cru: RLS ou papel de banco separado.
+- Dois pools de conexão por processo (portal + portão de tenant): conferir `connection_limit` na VPS.
+- `DreLinha.sentido` tem default `MENOR_MELHOR`: linhas de receita nascem `MAIOR_MELHOR` (tratar na 2.2).
+- "Piso obrigatório" da contagem fica na lógica da 1.7.
