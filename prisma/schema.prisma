@@ -495,3 +495,61 @@ model PortalArquivo {
 
   @@index([clienteId, itemId])
 }
+
+// ---------------------------------------------------------------- ERP Barney
+//
+// FlowFoods Barney — ERP multi-tenant. Plano e ordem das fases: página
+// "FlowFoods Barney — ERP" no Notion (fonte única da verdade).
+//
+// Duas regras que valem para TODA tabela deste bloco, agora e nas próximas fases:
+//
+// 1. Multi-tenant: toda linha pertence a um ParceiroFlow (`parceiroId`). Nenhum
+//    código lê ou grava esses modelos pelo `prisma` cru: passa por
+//    `doParceiro()` em `src/lib/erp/tenant.ts`, que amarra o parceiro em toda
+//    query. Há teste que reprova o uso direto.
+// 2. Inteiros sempre: quantidade em MILÉSIMOS da unidade base (1 kg = 1000,
+//    1 L = 1000, 1 un = 1000) e dinheiro em CENTAVOS. Nada de float, nada de
+//    Decimal — arredondamento acontece num lugar só (`src/lib/erp/unidades.ts`).
+
+enum ParceiroStatus {
+  // Lead que entrou pela landing e espera o Rodolfo liberar (fase 0.5).
+  RASCUNHO
+  ATIVO
+  SUSPENSO
+}
+
+model ParceiroFlow {
+  id       String         @id @default(cuid())
+  nome     String
+  slug     String         @unique
+  status   ParceiroStatus @default(RASCUNHO)
+  criadoEm DateTime       @default(now())
+
+  insumos  Insumo[]
+}
+
+enum UnidadeBase {
+  KG
+  L
+  UN
+}
+
+model Insumo {
+  id                     String       @id @default(cuid())
+  parceiroId             String
+  // Restrict: parceiro com dado não some por acidente.
+  parceiro               ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  nome                   String
+  unidade                UnidadeBase
+  // Embalagem de compra: "caixa de 5 kg por R$ 89,90" vira
+  // conteudoMilesimos = 5000 e precoEmbalagemCentavos = 8990. O custo por
+  // unidade base é derivado, nunca gravado — não tem como discordar da origem.
+  conteudoMilesimos      Int
+  precoEmbalagemCentavos Int
+  criadoEm               DateTime     @default(now())
+  atualizadoEm           DateTime     @updatedAt
+
+  // O nome repete entre parceiros (todo mundo tem "Cebola"), nunca dentro de um.
+  @@unique([parceiroId, nome])
+  @@index([parceiroId, criadoEm])
+}
