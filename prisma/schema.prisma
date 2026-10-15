@@ -510,6 +510,20 @@ model PortalArquivo {
 // 2. Inteiros sempre: quantidade em MILÉSIMOS da unidade base (1 kg = 1000,
 //    1 L = 1000, 1 un = 1000) e dinheiro em CENTAVOS. Nada de float, nada de
 //    Decimal — arredondamento acontece num lugar só (`src/lib/erp/unidades.ts`).
+// 3. Percentual em PONTOS-BASE (1% = 100, 100% = 10000). Fator (correção,
+//    rendimento) em MILÉSIMOS (1,000 = 1000; FC 1,18 = 1180).
+// 4. Tenant também nas chaves estrangeiras: toda referência entre tabelas de
+//    tenant é FK COMPOSTA (parceiroId, xId) → (parceiroId, id). O banco recusa
+//    uma ficha de B apontando para insumo de A, mesmo que o código erre. Por
+//    isso toda tabela referenciada tem `@@unique([parceiroId, id])`, e toda FK
+//    composta é Restrict/Cascade, nunca SetNull (anularia o parceiroId). E um
+//    trigger em toda tabela de tenant recusa UPDATE que troque o parceiroId.
+// 5. Snapshot: documento que registra um fato (item de nota, movimento,
+//    contagem, produção, etiqueta) grava nome/unidade/valor daquele momento.
+//    Renomear o insumo amanhã não reescreve o passado.
+// 6. Nada acumulado é gravado: total do mês, DRE, CMV e lista do dia são
+//    somas/derivações na hora. Por isso `Int` (até R$ 21 mi por linha) basta e
+//    não há `BigInt` no ERP.
 
 enum ParceiroStatus {
   // Lead que entrou pela landing e espera o Rodolfo liberar (fase 0.5).
@@ -518,20 +532,183 @@ enum ParceiroStatus {
   SUSPENSO
 }
 
-model ParceiroFlow {
-  id       String         @id @default(cuid())
-  nome     String
-  slug     String         @unique
-  status   ParceiroStatus @default(RASCUNHO)
-  criadoEm DateTime       @default(now())
-
-  insumos  Insumo[]
+// Como o parceiro fecha o período do DRE (2.2). Os períodos em si ficam em
+// PeriodoApuracao; isto só diz como sugerir o próximo.
+enum PeriodoTipo {
+  MENSAL
+  QUINZENAL
+  SEMANAL
+  PERSONALIZADO
 }
+
+model ParceiroFlow {
+  id               String         @id @default(cuid())
+  nome             String
+  slug             String         @unique
+  status           ParceiroStatus @default(RASCUNHO)
+  criadoEm         DateTime       @default(now())
+  periodoTipo      PeriodoTipo    @default(MENSAL)
+  // Dia do mês em que o período começa (1 = mês civil). CHECK 1..28.
+  periodoDiaInicio Int            @default(1)
+
+  // Relações de tenant: nunca acessadas pelo prisma cru (RELACOES_DE_TENANT).
+  // Prefixo `erp` nas novas: nome único, o teste-guarda não confunde com
+  // campos homônimos do Diagnóstico (`lojas`, `fichasTecnicas`).
+  insumos                Insumo[]
+  erpLojas               Loja[]
+  erpMarcas              Marca[]
+  erpColaboradores       Colaborador[]
+  erpFornecedores        Fornecedor[]
+  erpInsumoVariantes     InsumoVariante[]
+  erpFichasTecnicas      FichaTecnica[]
+  erpFichaItens          FichaItem[]
+  erpProdutosVenda       ProdutoVenda[]
+  erpProdutoCanais       ProdutoCanal[]
+  erpProdutoEmbalagens   ProdutoEmbalagem[]
+  erpCanaisConfig        CanalConfig[]
+  erpNotasEntrada        NotaEntrada[]
+  erpNotaEntradaItens    NotaEntradaItem[]
+  erpSaldosEstoque       SaldoEstoque[]
+  erpMovimentosEstoque   MovimentoEstoque[]
+  erpContagens           Contagem[]
+  erpContagemItens       ContagemItem[]
+  erpRequisicoes         Requisicao[]
+  erpRequisicaoItens     RequisicaoItem[]
+  erpOrdensProducao      OrdemProducao[]
+  erpEtiquetas           Etiqueta[]
+  erpFaturamentos        FaturamentoLancamento[]
+  erpDreLinhas           DreLinha[]
+  erpDreMetas            DreMeta[]
+  erpDespesas            Despesa[]
+  erpPeriodosApuracao    PeriodoApuracao[]
+  erpFarolFaixas         FarolFaixa[]
+  erpHistoricoAlteracoes HistoricoAlteracao[]
+}
+
+// ------------------------------------------------- ERP · comuns
 
 enum UnidadeBase {
   KG
   L
   UN
+}
+
+// De onde veio a linha: digitada, planilha importada ou integração (iFood etc.).
+// Importação manual sempre ao lado da integração.
+enum OrigemDado {
+  MANUAL
+  IMPORTACAO
+  INTEGRACAO
+}
+
+enum CanalVenda {
+  LOJA // salão/balcão: custo = insumos
+  DELIVERY_PROPRIO // + embalagem
+  IFOOD // + embalagem + taxa do canal
+}
+
+enum Conservacao {
+  SECO // seco / ambiente
+  PISTA_FRIA
+  REFRIGERADO
+  CONGELADO
+}
+
+// ------------------------------------------------- ERP · estrutura (N2 → N3)
+
+// N3: a loja/unidade, onde a operação acontece. Pertence a um parceiro (N2).
+model Loja {
+  id         String       @id @default(cuid())
+  parceiroId String
+  parceiro   ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  nome       String
+  slug       String
+  ativa      Boolean      @default(true)
+  criadoEm   DateTime     @default(now())
+
+  colaboradores  Colaborador[]
+  notasEntrada   NotaEntrada[]
+  saldos         SaldoEstoque[]
+  movimentos     MovimentoEstoque[]
+  contagens      Contagem[]
+  requisicoes    Requisicao[]
+  ordensProducao OrdemProducao[]
+  etiquetas      Etiqueta[]
+  faturamentos   FaturamentoLancamento[]
+  despesas       Despesa[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, slug])
+  @@unique([parceiroId, nome])
+}
+
+// Marca do grupo (ex.: Valentin's Burger, Valentin's Gourmet). Uma loja pode
+// operar várias marcas; o vínculo aparece no faturamento (loja × marca × canal).
+model Marca {
+  id         String       @id @default(cuid())
+  parceiroId String
+  parceiro   ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  nome       String
+  ativa      Boolean      @default(true)
+  criadoEm   DateTime     @default(now())
+
+  produtos     ProdutoVenda[]
+  faturamentos FaturamentoLancamento[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, nome])
+}
+
+// Pessoa da operação: âncora do histórico de produção, contagem e requisição
+// por funcionário. Login e permissões (0.3/0.4) se penduram aqui depois.
+model Colaborador {
+  id         String       @id @default(cuid())
+  parceiroId String
+  parceiro   ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId     String?
+  loja       Loja?        @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  nome       String
+  ativo      Boolean      @default(true)
+  criadoEm   DateTime     @default(now())
+
+  movimentos          MovimentoEstoque[]
+  contagemItens       ContagemItem[]
+  requisicoesFeitas   Requisicao[]         @relation("RequisicaoSolicitante")
+  requisicoesAtendida Requisicao[]         @relation("RequisicaoAtendente")
+  producoes           OrdemProducao[]
+  etiquetas           Etiqueta[]
+  alteracoes          HistoricoAlteracao[]
+
+  @@unique([parceiroId, id])
+  @@index([parceiroId, lojaId])
+}
+
+// ------------------------------------------------- ERP · insumos e compras
+
+model Fornecedor {
+  id         String       @id @default(cuid())
+  parceiroId String
+  parceiro   ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  nome       String
+  // CNPJ/CPF só dígitos; opcional porque feira e atacarejo nem sempre têm.
+  documento  String?
+  contato    String?
+  ativo      Boolean      @default(true)
+  criadoEm   DateTime     @default(now())
+
+  insumosPadrao Insumo[]
+  variantes     InsumoVariante[]
+  notas         NotaEntrada[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, nome])
+  @@index([parceiroId, documento])
+}
+
+enum InsumoTipo {
+  INGREDIENTE
+  EMBALAGEM // embalagem é item de estoque (custo do delivery/iFood)
+  PRE_PREPARO // intermediário produzido pela casa (tem FichaTecnica que o produz)
 }
 
 model Insumo {
@@ -549,7 +726,761 @@ model Insumo {
   criadoEm               DateTime     @default(now())
   atualizadoEm           DateTime     @updatedAt
 
+  // 0.1 (fundação) — só acréscimos, todos com default ou opcionais.
+  tipo                   InsumoTipo  @default(INGREDIENTE)
+  // Frete rateado por embalagem de compra (1.1), em centavos.
+  taxaEntregaCentavos    Int         @default(0)
+  conservacao            Conservacao @default(SECO)
+  // Validade por conservação (1.4), em MINUTOS (pista fria conta em horas).
+  // Null = não se aplica àquela conservação.
+  validadeSecoMin        Int?
+  validadePistaFriaMin   Int?
+  validadeRefrigeradoMin Int?
+  validadeCongeladoMin   Int?
+  estoqueMinimoMilesimos Int?
+  fornecedorPadraoId     String?
+  fornecedorPadrao       Fornecedor? @relation(fields: [parceiroId, fornecedorPadraoId], references: [parceiroId, id], onDelete: Restrict)
+  ativo                  Boolean     @default(true)
+  origem                 OrigemDado  @default(MANUAL)
+
+  variantes         InsumoVariante[]
+  fichaQueProduz    FichaTecnica?      @relation("FichaProduzInsumo")
+  usosEmFichas      FichaItem[]
+  usosComoEmbalagem ProdutoEmbalagem[]
+  notaItens         NotaEntradaItem[]
+  saldos            SaldoEstoque[]
+  movimentos        MovimentoEstoque[]
+  contagemItens     ContagemItem[]
+  requisicaoItens   RequisicaoItem[]
+  producoes         OrdemProducao[]
+  etiquetas         Etiqueta[]
+
   // O nome repete entre parceiros (todo mundo tem "Cebola"), nunca dentro de um.
   @@unique([parceiroId, nome])
+  @@unique([parceiroId, id])
   @@index([parceiroId, criadoEm])
+  @@index([parceiroId, tipo])
+}
+
+// Outras embalagens de compra do mesmo insumo (fardo, caixa, marca B...).
+// A do próprio Insumo continua sendo a padrão.
+model InsumoVariante {
+  id                     String       @id @default(cuid())
+  parceiroId             String
+  parceiro               ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  insumoId               String
+  insumo                 Insumo       @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Cascade)
+  nome                   String
+  conteudoMilesimos      Int
+  precoEmbalagemCentavos Int
+  taxaEntregaCentavos    Int          @default(0)
+  fornecedorId           String?
+  fornecedor             Fornecedor?  @relation(fields: [parceiroId, fornecedorId], references: [parceiroId, id], onDelete: Restrict)
+  codigoBarras           String?
+  ativo                  Boolean      @default(true)
+  criadoEm               DateTime     @default(now())
+
+  notaItens NotaEntradaItem[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, insumoId, nome])
+  @@index([parceiroId, codigoBarras])
+}
+
+enum NotaStatus {
+  RASCUNHO // digitada/importada, ainda não mexeu no estoque
+  LANCADA // conferida: gerou movimentos de ENTRADA
+  CANCELADA
+}
+
+// Nota de entrada (compra). Só mexe no estoque quando LANCADA.
+model NotaEntrada {
+  id                     String       @id @default(cuid())
+  parceiroId             String
+  parceiro               ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId                 String
+  loja                   Loja         @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  fornecedorId           String?
+  fornecedor             Fornecedor?  @relation(fields: [parceiroId, fornecedorId], references: [parceiroId, id], onDelete: Restrict)
+  fornecedorNomeSnapshot String?
+  numero                 String?
+  // Chave de acesso da NF-e (44 dígitos): impede lançar a mesma nota duas vezes.
+  chaveAcesso            String?
+  emitidaEm              DateTime?    @db.Date
+  entradaEm              DateTime     @db.Date
+  freteCentavos          Int          @default(0)
+  descontoCentavos       Int          @default(0)
+  totalCentavos          Int
+  status                 NotaStatus   @default(RASCUNHO)
+  origem                 OrigemDado   @default(MANUAL)
+  origemRef              String?
+  lancadaEm              DateTime?
+  criadoEm               DateTime     @default(now())
+
+  itens NotaEntradaItem[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, chaveAcesso])
+  @@index([parceiroId, lojaId, entradaEm])
+  @@index([parceiroId, fornecedorId, entradaEm])
+}
+
+model NotaEntradaItem {
+  id                  String          @id @default(cuid())
+  parceiroId          String
+  parceiro            ParceiroFlow    @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  notaId              String
+  nota                NotaEntrada     @relation(fields: [parceiroId, notaId], references: [parceiroId, id], onDelete: Cascade)
+  // Null enquanto a linha importada não foi casada com um insumo.
+  insumoId            String?
+  insumo              Insumo?         @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  varianteId          String?
+  variante            InsumoVariante? @relation(fields: [parceiroId, varianteId], references: [parceiroId, id], onDelete: Restrict)
+  // Snapshot: como estava escrito na nota e como o insumo se chamava.
+  descricaoNota       String
+  insumoNomeSnapshot  String?
+  unidadeSnapshot     UnidadeBase?
+  // Quantidade de embalagens (milésimos: 2,5 caixas = 2500) × conteúdo de cada.
+  embalagensMilesimos Int
+  conteudoMilesimos   Int
+  // Total na unidade base, já multiplicado: é o que entra no estoque.
+  quantidadeMilesimos Int
+  valorTotalCentavos  Int
+  criadoEm            DateTime        @default(now())
+
+  movimentos MovimentoEstoque[]
+  etiquetas  Etiqueta[]
+
+  @@unique([parceiroId, id])
+  @@index([parceiroId, notaId])
+  @@index([parceiroId, insumoId])
+}
+
+// ------------------------------------------------- ERP · ficha técnica
+
+enum FichaTipo {
+  PRATO // vira item de venda
+  PRE_PREPARO // subficha: produz um Insumo PRE_PREPARO (ou é usada direto)
+}
+
+model FichaTecnica {
+  id                  String       @id @default(cuid())
+  parceiroId          String
+  parceiro            ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  nome                String
+  tipo                FichaTipo
+  // Quanto a receita rende, na unidade de rendimento (PRATO: 1 un = 1000).
+  rendimentoMilesimos Int
+  unidadeRendimento   UnidadeBase
+  // PRE_PREPARO que vai para o estoque: o insumo que ele produz (1:1).
+  insumoProduzidoId   String?
+  insumoProduzido     Insumo?      @relation("FichaProduzInsumo", fields: [parceiroId, insumoProduzidoId], references: [parceiroId, id], onDelete: Restrict)
+  modoPreparo         String?
+  ativa               Boolean      @default(true)
+  origem              OrigemDado   @default(MANUAL)
+  criadoEm            DateTime     @default(now())
+  atualizadoEm        DateTime     @updatedAt
+
+  itens          FichaItem[]     @relation("FichaItens")
+  usadaComoSub   FichaItem[]     @relation("FichaSubficha")
+  produtos       ProdutoVenda[]
+  ordensProducao OrdemProducao[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, nome])
+  @@unique([parceiroId, insumoProduzidoId])
+  @@index([parceiroId, tipo])
+}
+
+// Linha da ficha: OU um insumo OU outra ficha (subficha) — CHECK no banco.
+// Ciclo (A usa B que usa A) é barrado pela regra da 1.3, não pelo banco.
+model FichaItem {
+  id                     String        @id @default(cuid())
+  parceiroId             String
+  parceiro               ParceiroFlow  @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  fichaId                String
+  ficha                  FichaTecnica  @relation("FichaItens", fields: [parceiroId, fichaId], references: [parceiroId, id], onDelete: Cascade)
+  insumoId               String?
+  insumo                 Insumo?       @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  subfichaId             String?
+  subficha               FichaTecnica? @relation("FichaSubficha", fields: [parceiroId, subfichaId], references: [parceiroId, id], onDelete: Restrict)
+  // Quantidade LÍQUIDA usada, na unidade base do insumo / de rendimento da subficha.
+  quantidadeMilesimos    Int
+  // Fator de correção (bruto ÷ líquido), em milésimos: 1000 = sem perda.
+  fatorCorrecaoMilesimos Int           @default(1000)
+  ordem                  Int           @default(0)
+
+  @@unique([parceiroId, id])
+  @@index([parceiroId, fichaId])
+  @@index([parceiroId, insumoId])
+  @@index([parceiroId, subfichaId])
+}
+
+// ------------------------------------------------- ERP · venda e preço por canal
+
+model ProdutoVenda {
+  id            String       @id @default(cuid())
+  parceiroId    String
+  parceiro      ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  marcaId       String?
+  marca         Marca?       @relation(fields: [parceiroId, marcaId], references: [parceiroId, id], onDelete: Restrict)
+  fichaId       String
+  ficha         FichaTecnica @relation(fields: [parceiroId, fichaId], references: [parceiroId, id], onDelete: Restrict)
+  nome          String
+  // Código no PDV/iFood, para casar importação e integração.
+  codigoExterno String?
+  ativo         Boolean      @default(true)
+  origem        OrigemDado   @default(MANUAL)
+  criadoEm      DateTime     @default(now())
+
+  canais     ProdutoCanal[]
+  embalagens ProdutoEmbalagem[]
+
+  @@unique([parceiroId, id])
+  // NULLS NOT DISTINCT (no SQL): sem marca, o nome também não repete.
+  @@unique([parceiroId, marcaId, nome])
+  @@index([parceiroId, fichaId])
+  @@index([parceiroId, codigoExterno])
+}
+
+// Preço por canal (1.9/1.10). Preço sugerido = custo do canal + margem-alvo,
+// calculado no servidor; `precoManualCentavos` sobrescreve (null = sugerido).
+model ProdutoCanal {
+  id                  String       @id @default(cuid())
+  parceiroId          String
+  parceiro            ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  produtoId           String
+  produto             ProdutoVenda @relation(fields: [parceiroId, produtoId], references: [parceiroId, id], onDelete: Cascade)
+  canal               CanalVenda
+  precoManualCentavos Int?
+  // Null = usa a margem-alvo padrão do canal (CanalConfig).
+  margemAlvoBp        Int?
+  ativo               Boolean      @default(true)
+  atualizadoEm        DateTime     @updatedAt
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, produtoId, canal])
+}
+
+// Camada de embalagem do custo por canal: o que vai junto no delivery/iFood.
+model ProdutoEmbalagem {
+  id                  String       @id @default(cuid())
+  parceiroId          String
+  parceiro            ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  produtoId           String
+  produto             ProdutoVenda @relation(fields: [parceiroId, produtoId], references: [parceiroId, id], onDelete: Cascade)
+  canal               CanalVenda
+  insumoId            String
+  insumo              Insumo       @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  quantidadeMilesimos Int
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, produtoId, canal, insumoId])
+}
+
+// Configuração do canal por parceiro: taxa do iFood (e de quem mais cobrar)
+// e margem-alvo padrão.
+model CanalConfig {
+  id                 String       @id @default(cuid())
+  parceiroId         String
+  parceiro           ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  canal              CanalVenda
+  // Comissão sobre o preço, em pontos-base (12% = 1200).
+  taxaBp             Int          @default(0)
+  // Taxa fixa por pedido (ex.: taxa de transação), em centavos.
+  taxaFixaCentavos   Int          @default(0)
+  margemAlvoPadraoBp Int?
+  ativo              Boolean      @default(true)
+  atualizadoEm       DateTime     @updatedAt
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, canal])
+}
+
+// ------------------------------------------------- ERP · estoque
+
+// Saldo corrente por loja × insumo. É cache dos movimentos, atualizado na MESMA
+// transação que grava o movimento. Custo médio = valor ÷ quantidade (derivado).
+model SaldoEstoque {
+  id                  String       @id @default(cuid())
+  parceiroId          String
+  parceiro            ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId              String
+  loja                Loja         @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  insumoId            String
+  insumo              Insumo       @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  // Pode ficar negativo (baixa antes da nota): é sinal de divergência, não erro.
+  quantidadeMilesimos Int          @default(0)
+  valorCentavos       Int          @default(0)
+  // Trava otimista: update só com a versão lida.
+  versao              Int          @default(0)
+  atualizadoEm        DateTime     @updatedAt
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, lojaId, insumoId])
+}
+
+enum MovimentoTipo {
+  ABERTURA // 1ª contagem = saldo inicial (1.6)            (+)
+  ENTRADA_COMPRA // nota lançada (1.5)                            (+)
+  REQUISICAO // baixa pela requisição (1.8)                   (−)
+  PRODUCAO_ENTRADA // lote produzido entra no estoque (3.1)         (+)
+  PRODUCAO_CONSUMO // insumo consumido pela produção (3.1)          (−)
+  AJUSTE // ajuste manual com motivo                      (±)
+  CONTAGEM // acerto do saldo pela contagem (1.7)           (±)
+  PERDA // descarte/vencido                              (−)
+}
+
+// Livro-razão do estoque: só se acrescenta; correção é outro movimento.
+// Quantidade e valor COM SINAL (+ entra, − sai). Antes/depois do saldo
+// gravados: todo ajuste mostra de quanto para quanto foi.
+model MovimentoEstoque {
+  id                   String           @id @default(cuid())
+  parceiroId           String
+  parceiro             ParceiroFlow     @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId               String
+  loja                 Loja             @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  insumoId             String
+  insumo               Insumo           @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  tipo                 MovimentoTipo
+  quantidadeMilesimos  Int
+  valorCentavos        Int
+  saldoAntesMilesimos  Int
+  saldoDepoisMilesimos Int
+  // Snapshot do insumo no momento.
+  insumoNomeSnapshot   String
+  unidadeSnapshot      UnidadeBase
+  motivo               String?
+  ocorridoEm           DateTime         @default(now())
+  criadoEm             DateTime         @default(now())
+  origem               OrigemDado       @default(MANUAL)
+  // Retry da tela/integração não duplica movimento.
+  chaveIdempotencia    String?
+  colaboradorId        String?
+  colaborador          Colaborador?     @relation(fields: [parceiroId, colaboradorId], references: [parceiroId, id], onDelete: Restrict)
+  // Documento que gerou o movimento (no máximo um, CHECK no banco).
+  notaItemId           String?
+  notaItem             NotaEntradaItem? @relation(fields: [parceiroId, notaItemId], references: [parceiroId, id], onDelete: Restrict)
+  requisicaoItemId     String?
+  requisicaoItem       RequisicaoItem?  @relation(fields: [parceiroId, requisicaoItemId], references: [parceiroId, id], onDelete: Restrict)
+  contagemItemId       String?
+  contagemItem         ContagemItem?    @relation(fields: [parceiroId, contagemItemId], references: [parceiroId, id], onDelete: Restrict)
+  ordemProducaoId      String?
+  ordemProducao        OrdemProducao?   @relation(fields: [parceiroId, ordemProducaoId], references: [parceiroId, id], onDelete: Restrict)
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, chaveIdempotencia])
+  @@index([parceiroId, lojaId, insumoId, ocorridoEm])
+  @@index([parceiroId, lojaId, tipo, ocorridoEm])
+  @@index([parceiroId, colaboradorId, ocorridoEm])
+}
+
+enum ContagemTipo {
+  ABERTURA // 1ª contagem da loja: vira saldo inicial
+  CICLICA // inventário cíclico do dia a dia
+  FECHAMENTO // fecha o período: estoque final do CMV real
+}
+
+enum ContagemStatus {
+  ABERTA
+  FECHADA
+  CANCELADA
+}
+
+model Contagem {
+  id                 String           @id @default(cuid())
+  parceiroId         String
+  parceiro           ParceiroFlow     @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId             String
+  loja               Loja             @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  periodoId          String?
+  periodo            PeriodoApuracao? @relation(fields: [parceiroId, periodoId], references: [parceiroId, id], onDelete: Restrict)
+  tipo               ContagemTipo
+  status             ContagemStatus   @default(ABERTA)
+  // Data de referência do estoque contado.
+  referenciaEm       DateTime         @db.Date
+  // A contagem fecha sozinha neste horário (1.7), se ainda aberta.
+  fechaAutomaticoEm  DateTime?
+  fechadaEm          DateTime?
+  // Snapshot do valor total contado no fechamento (soma dos itens).
+  valorTotalCentavos Int?
+  origem             OrigemDado       @default(MANUAL)
+  criadoEm           DateTime         @default(now())
+
+  itens ContagemItem[]
+
+  @@unique([parceiroId, id])
+  @@index([parceiroId, lojaId, referenciaEm])
+  @@index([parceiroId, periodoId])
+}
+
+model ContagemItem {
+  id                    String       @id @default(cuid())
+  parceiroId            String
+  parceiro              ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  contagemId            String
+  contagem              Contagem     @relation(fields: [parceiroId, contagemId], references: [parceiroId, id], onDelete: Cascade)
+  insumoId              String
+  insumo                Insumo       @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  insumoNomeSnapshot    String
+  unidadeSnapshot       UnidadeBase
+  // Null = ainda não contado.
+  contadoMilesimos      Int?
+  // Snapshot do sistema na hora da contagem: a divergência é contado − sistema.
+  saldoSistemaMilesimos Int
+  valorSistemaCentavos  Int
+  colaboradorId         String?
+  colaborador           Colaborador? @relation(fields: [parceiroId, colaboradorId], references: [parceiroId, id], onDelete: Restrict)
+  contadoEm             DateTime?
+
+  movimentos MovimentoEstoque[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, contagemId, insumoId])
+  @@index([parceiroId, insumoId])
+}
+
+enum RequisicaoStatus {
+  ABERTA
+  ATENDIDA
+  CANCELADA
+}
+
+// Requisição (1.8): o setor pede, o estoque entrega, a baixa sai daqui.
+model Requisicao {
+  id            String           @id @default(cuid())
+  parceiroId    String
+  parceiro      ParceiroFlow     @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId        String
+  loja          Loja             @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  status        RequisicaoStatus @default(ABERTA)
+  // Setor de destino em texto livre até a 0.4 trazer o cadastro de setores.
+  setor         String?
+  solicitanteId String?
+  solicitante   Colaborador?     @relation("RequisicaoSolicitante", fields: [parceiroId, solicitanteId], references: [parceiroId, id], onDelete: Restrict)
+  atendenteId   String?
+  atendente     Colaborador?     @relation("RequisicaoAtendente", fields: [parceiroId, atendenteId], references: [parceiroId, id], onDelete: Restrict)
+  observacao    String?
+  solicitadaEm  DateTime         @default(now())
+  atendidaEm    DateTime?
+
+  itens          RequisicaoItem[]
+  ordensProducao OrdemProducao[]
+
+  @@unique([parceiroId, id])
+  @@index([parceiroId, lojaId, solicitadaEm])
+}
+
+model RequisicaoItem {
+  id                  String       @id @default(cuid())
+  parceiroId          String
+  parceiro            ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  requisicaoId        String
+  requisicao          Requisicao   @relation(fields: [parceiroId, requisicaoId], references: [parceiroId, id], onDelete: Cascade)
+  insumoId            String
+  insumo              Insumo       @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  insumoNomeSnapshot  String
+  unidadeSnapshot     UnidadeBase
+  solicitadoMilesimos Int
+  // Null até atender; pode ser menor que o pedido (corte visível).
+  atendidoMilesimos   Int?
+
+  movimentos MovimentoEstoque[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, requisicaoId, insumoId])
+  @@index([parceiroId, insumoId])
+}
+
+// ------------------------------------------------- ERP · produção
+
+enum ProducaoStatus {
+  PLANEJADA
+  EM_EXECUCAO
+  CONCLUIDA
+  CANCELADA
+}
+
+// Ordem de produção = lote (3.1/3.3). A lista do dia (3.2) é derivada das
+// ordens PLANEJADAS da data × saldo: não tem tabela própria.
+model OrdemProducao {
+  id                      String         @id @default(cuid())
+  parceiroId              String
+  parceiro                ParceiroFlow   @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId                  String
+  loja                    Loja           @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  fichaId                 String
+  ficha                   FichaTecnica   @relation(fields: [parceiroId, fichaId], references: [parceiroId, id], onDelete: Restrict)
+  insumoProduzidoId       String?
+  insumoProduzido         Insumo?        @relation(fields: [parceiroId, insumoProduzidoId], references: [parceiroId, id], onDelete: Restrict)
+  // Código do lote impresso na etiqueta; único no parceiro.
+  codigoLote              String
+  status                  ProducaoStatus @default(PLANEJADA)
+  dataPlanejada           DateTime       @db.Date
+  planejadoMilesimos      Int
+  produzidoMilesimos      Int?
+  // Snapshot do custo do lote no fechamento (soma dos consumos).
+  custoTotalCentavos      Int?
+  fichaNomeSnapshot       String
+  responsavelId           String?
+  responsavel             Colaborador?   @relation(fields: [parceiroId, responsavelId], references: [parceiroId, id], onDelete: Restrict)
+  responsavelNomeSnapshot String?
+  // Insumos baixam pela requisição (3.1).
+  requisicaoId            String?
+  requisicao              Requisicao?    @relation(fields: [parceiroId, requisicaoId], references: [parceiroId, id], onDelete: Restrict)
+  iniciadaEm              DateTime?
+  concluidaEm             DateTime?
+  observacao              String?
+  criadoEm                DateTime       @default(now())
+
+  movimentos MovimentoEstoque[]
+  etiquetas  Etiqueta[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, codigoLote])
+  @@index([parceiroId, lojaId, dataPlanejada])
+  @@index([parceiroId, responsavelId, concluidaEm])
+}
+
+enum EtiquetaFormato {
+  E60X40
+  E60X60
+}
+
+// Etiqueta impressa (3.4): rastreio de lote/validade com snapshot. Vem de um
+// lote produzido OU de um item de nota (lote do fornecedor) OU de um insumo aberto.
+model Etiqueta {
+  id                      String           @id @default(cuid())
+  parceiroId              String
+  parceiro                ParceiroFlow     @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId                  String
+  loja                    Loja             @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  // Código lido no leitor (vai no ZPL); único no parceiro.
+  codigo                  String
+  insumoId                String?
+  insumo                  Insumo?          @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  ordemProducaoId         String?
+  ordemProducao           OrdemProducao?   @relation(fields: [parceiroId, ordemProducaoId], references: [parceiroId, id], onDelete: Restrict)
+  notaItemId              String?
+  notaItem                NotaEntradaItem? @relation(fields: [parceiroId, notaItemId], references: [parceiroId, id], onDelete: Restrict)
+  // Snapshot.
+  nomeSnapshot            String
+  unidadeSnapshot         UnidadeBase?
+  quantidadeMilesimos     Int?
+  conservacao             Conservacao
+  loteFornecedor          String?
+  fabricadoEm             DateTime?
+  abertoEm                DateTime?
+  validadeEm              DateTime
+  responsavelId           String?
+  responsavel             Colaborador?     @relation(fields: [parceiroId, responsavelId], references: [parceiroId, id], onDelete: Restrict)
+  responsavelNomeSnapshot String?
+  formato                 EtiquetaFormato
+  impressaEm              DateTime         @default(now())
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, codigo])
+  @@index([parceiroId, lojaId, validadeEm])
+  @@index([parceiroId, ordemProducaoId])
+}
+
+// ------------------------------------------------- ERP · faturamento e DRE
+
+// Faturamento por canal por dia (2.1). Cada lançamento tem chave de
+// idempotência ÚNICA no parceiro: reprocessar integração ou reenviar
+// planilha não duplica venda. Manual usa chave determinística
+// (manual:<loja>:<marca ou ->:<canal>:<data>), então redigitar é correção, não
+// soma, e duas marcas na mesma loja não se sobrescrevem.
+model FaturamentoLancamento {
+  id                String       @id @default(cuid())
+  parceiroId        String
+  parceiro          ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId            String
+  loja              Loja         @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  marcaId           String?
+  marca             Marca?       @relation(fields: [parceiroId, marcaId], references: [parceiroId, id], onDelete: Restrict)
+  canal             CanalVenda
+  data              DateTime     @db.Date
+  valorCentavos     Int
+  pedidos           Int
+  // ATENDIMENTOS no dia (o que o canal reporta), não clientes únicos: a
+  // mesma pessoa em dois dias conta duas vezes. Ticket médio = valor ÷ pedidos.
+  clientes          Int
+  origem            OrigemDado
+  chaveIdempotencia String
+  // Id externo (pedido/relatório iFood, nome do arquivo importado).
+  origemRef         String?
+  criadoEm          DateTime     @default(now())
+  atualizadoEm      DateTime     @updatedAt
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, chaveIdempotencia])
+  @@index([parceiroId, lojaId, data])
+  @@index([parceiroId, canal, data])
+}
+
+enum DreGrupo {
+  RECEITA // faturamento (calculada)
+  DEDUCAO // taxas de canal, impostos sobre venda
+  CMV // calculada (compras ou inicial+compras−final)
+  DESPESA_VARIAVEL
+  PESSOAL
+  OCUPACAO
+  ADMINISTRATIVA
+  MARKETING
+  FINANCEIRA
+  OUTRAS
+}
+
+enum DreSentido {
+  MAIOR_MELHOR // receita, margem
+  MENOR_MELHOR // CMV, despesas, taxas
+}
+
+// Linhas/categorias do DRE do parceiro. `calculada` = vem do sistema
+// (faturamento, CMV, taxas), não recebe despesa manual.
+model DreLinha {
+  id         String       @id @default(cuid())
+  parceiroId String
+  parceiro   ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  nome       String
+  grupo      DreGrupo
+  ordem      Int          @default(0)
+  calculada  Boolean      @default(false)
+  // Para que lado o desvio vs meta é bom: receita maior é melhor; CMV e
+  // despesa, menor. O farol lê o desvio já com esse sinal.
+  sentido    DreSentido   @default(MENOR_MELHOR)
+  ativa      Boolean      @default(true)
+  criadoEm   DateTime     @default(now())
+
+  metas       DreMeta[]
+  despesas    Despesa[]
+  farolFaixas FarolFaixa[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, nome])
+}
+
+// Meta % por linha (sobre o faturamento), por parceiro, com vigência: mudar a
+// meta não reescreve o realizado vs meta dos períodos passados. Canal null =
+// meta da rede (todos os canais); com canal, vale só para aquele canal.
+// Unique com NULLS NOT DISTINCT (no SQL): só uma meta "de rede" por vigência.
+model DreMeta {
+  id           String       @id @default(cuid())
+  parceiroId   String
+  parceiro     ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  linhaId      String
+  linha        DreLinha     @relation(fields: [parceiroId, linhaId], references: [parceiroId, id], onDelete: Cascade)
+  canal        CanalVenda?
+  percentualBp Int
+  vigenteDesde DateTime     @db.Date
+  criadoEm     DateTime     @default(now())
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, linhaId, canal, vigenteDesde])
+}
+
+// Despesa manual (ou importada) numa linha do DRE. Loja null = despesa da rede;
+// canal null = rateada entre canais (canal preenchido = despesa só daquele canal).
+model Despesa {
+  id                String       @id @default(cuid())
+  parceiroId        String
+  parceiro          ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId            String?
+  loja              Loja?        @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  linhaId           String
+  linha             DreLinha     @relation(fields: [parceiroId, linhaId], references: [parceiroId, id], onDelete: Restrict)
+  descricao         String
+  // Dia de competência (entra no período que contém essa data).
+  competencia       DateTime     @db.Date
+  canal             CanalVenda?
+  valorCentavos     Int
+  origem            OrigemDado   @default(MANUAL)
+  origemRef         String?
+  // Obrigatória na importação/integração (CHECK): reimportar a planilha não
+  // duplica despesa. Digitada à mão pode ficar nula.
+  chaveIdempotencia String?
+  criadoEm          DateTime     @default(now())
+  atualizadoEm      DateTime     @updatedAt
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, chaveIdempotencia])
+  @@index([parceiroId, competencia])
+  @@index([parceiroId, lojaId, competencia])
+  @@index([parceiroId, linhaId, competencia])
+}
+
+enum PeriodoStatus {
+  ABERTO
+  FECHADO
+}
+
+// Período de apuração do DRE/CMV (datas inclusivas). Fechado = números travados.
+model PeriodoApuracao {
+  id         String        @id @default(cuid())
+  parceiroId String
+  parceiro   ParceiroFlow  @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  nome       String
+  inicio     DateTime      @db.Date
+  fim        DateTime      @db.Date
+  status     PeriodoStatus @default(ABERTO)
+  fechadoEm  DateTime?
+  criadoEm   DateTime      @default(now())
+
+  contagens Contagem[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, inicio, fim])
+}
+
+enum FarolCor {
+  AZUL
+  VERDE
+  AMARELO
+  LARANJA
+  VERMELHO
+}
+
+// Farol (2.4): 5 faixas por linha do DRE com meta, por canal (null = visão da
+// rede). Mede o DESVIO vs meta em pontos-base do faturamento, já com o sinal
+// do `sentido` da linha: positivo = melhor que a meta. A cor vale a partir de
+// `desvioMinimoBp`; lê-se da maior para a menor (VERMELHO costuma ser o piso).
+// Unique com NULLS NOT DISTINCT (no SQL): canal null também não repete cor.
+model FarolFaixa {
+  id             String       @id @default(cuid())
+  parceiroId     String
+  parceiro       ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  linhaId        String
+  linha          DreLinha     @relation(fields: [parceiroId, linhaId], references: [parceiroId, id], onDelete: Cascade)
+  canal          CanalVenda?
+  cor            FarolCor
+  desvioMinimoBp Int
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, linhaId, canal, cor])
+}
+
+// ------------------------------------------------- ERP · alterações visíveis
+
+// Todo corte/ajuste/alteração de cadastro sensível (preço, ficha, meta,
+// faturamento manual, despesa) grava antes/depois aqui. Só se acrescenta.
+// Movimento de estoque já carrega saldo antes/depois por conta própria.
+model HistoricoAlteracao {
+  id            String       @id @default(cuid())
+  parceiroId    String
+  parceiro      ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  // Nome do modelo (ex.: "ProdutoCanal") e id da linha alterada.
+  entidade      String
+  entidadeId    String
+  acao          String // CRIOU | ALTEROU | CANCELOU | CORTOU ...
+  antes         Json?
+  depois        Json?
+  motivo        String?
+  autorNome     String
+  colaboradorId String?
+  colaborador   Colaborador? @relation(fields: [parceiroId, colaboradorId], references: [parceiroId, id], onDelete: Restrict)
+  ocorridoEm    DateTime     @default(now())
+
+  @@index([parceiroId, entidade, entidadeId, ocorridoEm])
+  @@index([parceiroId, ocorridoEm])
 }
