@@ -1,17 +1,19 @@
 'use server';
 
 /**
- * Ações do ERP. Mesma regra do resto do /rodolfo: sessão antes de tudo. O
- * parceiro vem do slug, resolvido aqui no servidor; o formulário nunca diz
- * "grave no parceiro X" — ele só manda texto.
+ * Ações do espaço de um parceiro (insumos, lojas, marcas). Toda ação abre com
+ * `exigirParceiro(slug)`: sessão + parceiro resolvido no servidor + cliente do
+ * portão. Parceiro suspenso/não liberado devolve a mensagem aqui; e mesmo que
+ * uma ação esquecesse de conferir, o cliente dele é somente leitura (portão e
+ * banco recusam a escrita).
  */
 
 import { revalidatePath } from 'next/cache';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/rodolfo/auth';
 import { prisma } from '@/lib/db';
-import { doParceiro, parceiroPorSlug } from '@/lib/erp/tenant';
+import { exigirParceiro } from '@/lib/erp/contexto';
 import { cadastrarInsumo, type ResultadoCadastro } from '@/lib/erp/insumos';
+import { cadastrarLoja, cadastrarMarca } from '@/lib/erp/estrutura';
+import type { EstadoForm } from '../campos';
 
 export type EstadoCadastro = (ResultadoCadastro & { vez: number }) | null;
 
@@ -20,24 +22,47 @@ export async function acaoCadastrarInsumo(
   anterior: EstadoCadastro,
   form: FormData,
 ): Promise<EstadoCadastro> {
-  const sessao = await getServerSession(authOptions);
-  const userId = (sessao?.user as { id?: string } | undefined)?.id;
-  if (!userId) throw new Error('Sem sessão.');
-
+  const { sessao, parceiro, cliente, bloqueio } = await exigirParceiro(slug);
   const vez = (anterior?.vez ?? 0) + 1;
-  const parceiro = await parceiroPorSlug(slug);
-  if (!parceiro) return { ok: false, erros: { geral: 'Parceiro não encontrado.' }, vez };
-  if (parceiro.status !== 'ATIVO') {
-    return { ok: false, erros: { geral: 'Parceiro ainda não liberado para operar.' }, vez };
-  }
+  if (bloqueio) return { ok: false, erros: { geral: bloqueio }, vez };
 
-  const r = await cadastrarInsumo(doParceiro(parceiro.id), Object.fromEntries(form));
+  const r = await cadastrarInsumo(cliente, Object.fromEntries(form), sessao.autorNome);
   if (r.ok) {
     await prisma.auditLog.create({
-      data: { userId, evento: 'erp_insumo_criado', dados: { parceiroId: parceiro.id, insumoId: r.id } },
+      data: { userId: sessao.userId, evento: 'erp_insumo_criado', dados: { parceiroId: parceiro.id, insumoId: r.id } },
     });
-    revalidatePath(`/rodolfo/erp/${slug}`);
+    revalidatePath(`/rodolfo/erp/${slug}`, 'layout');
     revalidatePath('/rodolfo/erp');
   }
   return { ...r, vez };
+}
+
+async function cadastrarEstrutura(
+  tipo: 'loja' | 'marca',
+  slug: string,
+  anterior: EstadoForm,
+  form: FormData,
+): Promise<EstadoForm> {
+  const { sessao, parceiro, cliente, bloqueio } = await exigirParceiro(slug);
+  const vez = (anterior?.vez ?? 0) + 1;
+  if (bloqueio) return { ok: false, erros: { geral: bloqueio }, vez };
+
+  const cadastrar = tipo === 'loja' ? cadastrarLoja : cadastrarMarca;
+  const r = await cadastrar(cliente, Object.fromEntries(form), sessao.autorNome);
+  if (!r.ok) return { ok: false, erros: r.erros, vez };
+
+  await prisma.auditLog.create({
+    data: { userId: sessao.userId, evento: `erp_${tipo}_criada`, dados: { parceiroId: parceiro.id, id: r.id } },
+  });
+  revalidatePath(`/rodolfo/erp/${slug}`, 'layout');
+  revalidatePath('/rodolfo/erp');
+  return { ok: true, mensagem: `“${r.nome}” cadastrada.`, vez };
+}
+
+export async function acaoCadastrarLoja(slug: string, anterior: EstadoForm, form: FormData) {
+  return cadastrarEstrutura('loja', slug, anterior, form);
+}
+
+export async function acaoCadastrarMarca(slug: string, anterior: EstadoForm, form: FormData) {
+  return cadastrarEstrutura('marca', slug, anterior, form);
 }

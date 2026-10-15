@@ -1,16 +1,13 @@
 /**
- * ERP — espaço de um Parceiro Flow: Insumos. Tudo o que esta tela lê passa por
- * `doParceiro(parceiro.id)`; trocar de parceiro é trocar de URL, e a URL só
- * escolhe — o isolamento é o portão de tenant.
+ * ERP — espaço de um Parceiro Flow: Insumos. Tudo o que esta tela lê passa pelo
+ * cliente de `exigirParceiro` (portão de tenant + RLS); trocar de parceiro é
+ * trocar de URL, e a URL só escolhe — o isolamento é o portão.
  */
 
-import Link from 'next/link';
-import { notFound } from 'next/navigation';
-import { prisma } from '@/lib/db';
-import { doParceiro, parceiroPorSlug } from '@/lib/erp/tenant';
+import { exigirParceiro } from '@/lib/erp/contexto';
 import { listarInsumos } from '@/lib/erp/insumos';
 import { UNIDADES, formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
-import { Cabecalho, Metrica, Painel, Ponto, Trilha } from '../ui';
+import { Metrica, Painel } from '../ui';
 import { FormInsumo } from './form-insumo';
 
 export const dynamic = 'force-dynamic';
@@ -22,13 +19,8 @@ const DATA = new Intl.DateTimeFormat('pt-BR', {
 });
 
 export default async function ParceiroInsumosPage({ params }: { params: { slug: string } }) {
-  const parceiro = await parceiroPorSlug(params.slug);
-  if (!parceiro) notFound();
-
-  const [insumos, outros] = await Promise.all([
-    listarInsumos(doParceiro(parceiro.id)),
-    prisma.parceiroFlow.findMany({ select: { slug: true, nome: true }, orderBy: { nome: 'asc' } }),
-  ]);
+  const { parceiro, cliente, bloqueio } = await exigirParceiro(params.slug);
+  const insumos = await listarInsumos(cliente);
 
   const porUnidade = { KG: 0, L: 0, UN: 0 };
   for (const i of insumos) porUnidade[i.unidade]++;
@@ -36,49 +28,10 @@ export default async function ParceiroInsumosPage({ params }: { params: { slug: 
     (a, i) => (!a || i.criadoEm > a.criadoEm ? i : a),
     null,
   );
-  const ativo = parceiro.status === 'ATIVO';
 
   return (
     <div className="space-y-6">
-      <Trilha
-        itens={[
-          { rotulo: 'ERP', href: '/rodolfo/erp' },
-          { rotulo: 'Parceiros Flow', href: '/rodolfo/erp' },
-          { rotulo: parceiro.nome },
-        ]}
-      />
-
-      <Cabecalho
-        rotulo={
-          <>
-            <Ponto tom={ativo ? 'ativo' : parceiro.status === 'RASCUNHO' ? 'rascunho' : 'suspenso'} />
-            Parceiro Flow · {parceiro.nome}
-          </>
-        }
-        titulo="Insumos"
-        descricao="Tudo o que entra na ficha técnica começa aqui. Custo sempre por unidade base."
-        acessorio={
-          outros.length > 1 && (
-            <nav
-              aria-label="Trocar de parceiro"
-              className="flex max-w-full gap-1 overflow-x-auto rounded-[9px] border border-white/[0.09] bg-[#131211] p-1"
-            >
-              {outros.map((o) => (
-                <Link
-                  key={o.slug}
-                  href={`/rodolfo/erp/${o.slug}`}
-                  aria-current={o.slug === parceiro.slug ? 'page' : undefined}
-                  className="whitespace-nowrap rounded-[6px] px-3 py-1.5 text-[12px] text-surface/55 transition hover:text-surface aria-[current=page]:bg-white/[0.1] aria-[current=page]:text-surface"
-                >
-                  {o.nome}
-                </Link>
-              ))}
-            </nav>
-          )
-        }
-      />
-
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
         <Metrica rotulo="Cadastrados" valor={insumos.length} detalhe="insumos ativos" />
         <Metrica
           rotulo="Por unidade"
@@ -112,7 +65,7 @@ export default async function ParceiroInsumosPage({ params }: { params: { slug: 
                     <th scope="col" className="px-5 py-2.5 text-left font-semibold">Insumo</th>
                     <th scope="col" className="px-3 py-2.5 text-right font-semibold">Embalagem</th>
                     <th scope="col" className="hidden px-3 py-2.5 text-right font-semibold sm:table-cell">Preço pago</th>
-                    <th scope="col" className="px-5 py-2.5 text-right font-semibold">Custo / unid.</th>
+                    <th scope="col" className="whitespace-nowrap px-5 py-2.5 text-right font-semibold">Custo / unid.</th>
                   </tr>
                 </thead>
                 <tbody className="tabular-nums">
@@ -144,12 +97,10 @@ export default async function ParceiroInsumosPage({ params }: { params: { slug: 
         </Painel>
 
         <Painel titulo="Novo insumo" className="order-1 self-start lg:order-2">
-          {ativo ? (
-            <FormInsumo slug={parceiro.slug} />
+          {bloqueio ? (
+            <p className="text-sm text-surface/55">{bloqueio}</p>
           ) : (
-            <p className="text-sm text-surface/55">
-              Este parceiro ainda não foi liberado. Cadastros abrem quando ele estiver ativo.
-            </p>
+            <FormInsumo slug={parceiro.slug} />
           )}
         </Painel>
       </div>

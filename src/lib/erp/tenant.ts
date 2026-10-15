@@ -28,6 +28,13 @@
  * estoura. O portão usa um PrismaClient base próprio, privado deste módulo.
  * O SQL cru (`$queryRaw`) do prisma do portal continua possível: esse caminho
  * é vigiado pelo teste-guarda (`tests/erp-tenant-portao.test.ts`), não pelo runtime.
+ *
+ * Banco (0.2, Row-Level Security): toda operação do cliente roda numa transação
+ * que entra no CONTEXTO do parceiro — `app.parceiro_id` e o papel `erp_tenant`
+ * (migration `20261015020000_erp_multitenant`). Debaixo desse papel o Postgres
+ * só devolve e só aceita linhas daquele parceiro, inclusive em SQL cru
+ * (`cliente.sql`, o caminho certo para relatório). Cliente `somenteLeitura`
+ * (parceiro suspenso) recusa escrita aqui E abre a transação como read-only.
  */
 
 import { Prisma, PrismaClient } from '@prisma/client';
@@ -59,6 +66,31 @@ type Args = Record<string, unknown> & {
 };
 
 const SO_DADO = new Set(['create', 'createMany', 'createManyAndReturn']);
+const ESCRITA = new Set([
+  'create',
+  'createMany',
+  'createManyAndReturn',
+  'update',
+  'updateMany',
+  'updateManyAndReturn',
+  'upsert',
+  'delete',
+  'deleteMany',
+]);
+
+/** Papel do banco com RLS (migration 20261015020000_erp_multitenant). */
+export const PAPEL_DE_TENANT = 'erp_tenant';
+
+/**
+ * Primeira instrução de toda transação do portão. `true` em set_config = vale
+ * só até o fim da transação: a conexão volta ao pool sem papel nem parceiro.
+ * `role` via set_config é o mesmo que `SET LOCAL ROLE`, numa ida só.
+ */
+function sqlDeContexto(parceiroId: string, somenteLeitura: boolean): Prisma.Sql {
+  return somenteLeitura
+    ? Prisma.sql`SELECT set_config('app.parceiro_id', ${parceiroId}, true), set_config('role', ${PAPEL_DE_TENANT}, true), set_config('transaction_read_only', 'on', true)`
+    : Prisma.sql`SELECT set_config('app.parceiro_id', ${parceiroId}, true), set_config('role', ${PAPEL_DE_TENANT}, true)`;
+}
 const COM_DADO_DE_UPDATE = new Set(['update', 'updateMany', 'updateManyAndReturn']);
 
 /** Campos de relação de cada modelo, lidos do esquema (não de lista à mão). */
@@ -121,12 +153,15 @@ export function amarrarAoParceiro(modelo: string, operacao: string, args: Args, 
   return novo;
 }
 
-function estender(base: PrismaClient, parceiroId: string) {
+function estender(base: PrismaClient, parceiroId: string, somenteLeitura: boolean) {
   return base.$extends({
     name: 'tenant-parceiro-flow',
     query: {
       $allModels: {
         $allOperations({ model, operation, args, query }) {
+          if (somenteLeitura && ESCRITA.has(operation)) {
+            throw new ErroDeTenant('parceiro em somente leitura (suspenso ou não liberado): escrita recusada.');
+          }
           // Modelo fora da lista não passa (amarrarAoParceiro recusa).
           return query(amarrarAoParceiro(model, operation, args as Args, parceiroId) as typeof args);
         },
@@ -163,56 +198,104 @@ type OpcoesDeTransacao = { maxWait?: number; timeout?: number };
 
 /**
  * Cliente de UM parceiro: os modelos de tenant (e só eles, só com operações de
- * dado), o `parceiroId` e `transacao`. Nada de `$queryRaw`, `parceiroFlow`,
- * `$parent` ou modelo do portal.
+ * dado), o `parceiroId`, `transacao` e `sql`. Nada de `$queryRaw`,
+ * `parceiroFlow`, `$parent` ou modelo do portal.
  */
 export type ClienteDoParceiro = ModelosDoParceiro & {
   readonly parceiroId: string;
+  /** true: toda escrita é recusada (portão e transação read-only no banco). */
+  readonly somenteLeitura: boolean;
   /**
    * Transação interativa ainda amarrada ao parceiro: o `tx` recebido é outro
    * `ClienteDoParceiro`. Chamada de dentro de uma transação, só reaproveita a
    * mesma (o Prisma não aninha).
    */
   transacao<T>(fn: (tx: ClienteDoParceiro) => Promise<T>, opcoes?: OpcoesDeTransacao): Promise<T>;
+  /**
+   * SQL cru (template com parâmetros, como `$queryRaw`) DENTRO do contexto do
+   * parceiro: o Postgres aplica a RLS, então linha de outro parceiro não
+   * aparece nem se o SQL esquecer o `WHERE "parceiroId"`. É o caminho para
+   * relatório (DRE, CMV). Nunca monte o texto com concatenação.
+   */
+  sql<T = Record<string, unknown>>(consulta: TemplateStringsArray, ...valores: unknown[]): Promise<T[]>;
 };
 
+type Executor = <T>(consulta: Promise<T>) => Promise<T>;
+
 /** Objeto congelado só com as operações, chamando o delegate por closure. */
-function embrulhar(delegate: Record<string, unknown>) {
+function embrulhar(delegate: Record<string, unknown>, executar: Executor) {
   const ops: Record<string, unknown> = {};
   for (const op of OPERACOES) {
     const f = delegate[op];
-    if (typeof f === 'function') ops[op] = (...a: unknown[]) => (f as (...x: unknown[]) => unknown).apply(delegate, a);
+    // async: erro do portão vira promessa rejeitada, nunca throw síncrono.
+    if (typeof f === 'function') {
+      ops[op] = async (...a: unknown[]) => executar((f as (...x: unknown[]) => Promise<unknown>).apply(delegate, a));
+    }
   }
   return Object.freeze(ops);
 }
 
-function montar(fonte: Record<string, unknown>, parceiroId: string, abrir: ClienteDoParceiro['transacao'] | null) {
+type FonteSql = { $queryRaw: (consulta: TemplateStringsArray | Prisma.Sql, ...valores: unknown[]) => Promise<unknown> };
+
+function montar(
+  fonte: Record<string, unknown>,
+  parceiroId: string,
+  somenteLeitura: boolean,
+  executar: Executor,
+  abrir: ClienteDoParceiro['transacao'] | null,
+) {
   const modelos = Object.fromEntries(
-    MODELOS_DE_TENANT.map((m) => [m, embrulhar(fonte[m] as Record<string, unknown>)]),
+    MODELOS_DE_TENANT.map((m) => [m, embrulhar(fonte[m] as Record<string, unknown>, executar)]),
   ) as unknown as ModelosDoParceiro;
+  const cru = fonte as unknown as FonteSql;
   const cliente: ClienteDoParceiro = {
     ...modelos,
     parceiroId,
+    somenteLeitura,
     transacao: abrir ?? ((fn) => fn(cliente)),
+    sql: async <T,>(consulta: TemplateStringsArray, ...valores: unknown[]) =>
+      executar(cru.$queryRaw(consulta, ...valores)) as Promise<T[]>,
   };
   return Object.freeze(cliente);
 }
 
-function construir(base: PrismaClient, parceiroId: string): ClienteDoParceiro {
-  const amarrado = estender(base, parceiroId);
-  return montar(amarrado as unknown as Record<string, unknown>, parceiroId, (fn, opcoes) =>
+function construir(base: PrismaClient, parceiroId: string, somenteLeitura: boolean): ClienteDoParceiro {
+  const amarrado = estender(base, parceiroId, somenteLeitura);
+  const contexto = sqlDeContexto(parceiroId, somenteLeitura);
+
+  // Fora de transação: cada operação vira um lote [contexto, operação] numa
+  // transação só (a consulta do Prisma é preguiçosa até o lote rodar).
+  const avulso: Executor = async (consulta) => {
+    const [, r] = await amarrado.$transaction([
+      amarrado.$queryRaw(contexto),
+      consulta as unknown as Prisma.PrismaPromise<unknown>,
+    ]);
+    return r as Awaited<typeof consulta>;
+  };
+  // Dentro de `transacao`: o contexto já foi aberto no começo dela.
+  const direto: Executor = (consulta) => consulta;
+
+  return montar(amarrado as unknown as Record<string, unknown>, parceiroId, somenteLeitura, avulso, (fn, opcoes) =>
     // O `tx` de um cliente estendido carrega a mesma extensão de query.
-    amarrado.$transaction(
-      (tx) => fn(montar(tx as unknown as Record<string, unknown>, parceiroId, null)),
-      opcoes,
-    ),
+    amarrado.$transaction(async (tx) => {
+      await tx.$queryRaw(contexto);
+      return fn(montar(tx as unknown as Record<string, unknown>, parceiroId, somenteLeitura, direto, null));
+    }, opcoes),
   );
 }
 
-/** `base` existe para o teste de isolamento apontar para o banco de teste. */
-export function doParceiro(parceiroId: string, base: PrismaClient = baseDoTenant()): ClienteDoParceiro {
+/**
+ * `base` existe para o teste de isolamento apontar para o banco de teste.
+ * `somenteLeitura`: parceiro suspenso/não liberado — quem decide é
+ * `exigirParceiro` (`src/lib/erp/contexto.ts`), não a tela.
+ */
+export function doParceiro(
+  parceiroId: string,
+  base: PrismaClient = baseDoTenant(),
+  opcoes: { somenteLeitura?: boolean } = {},
+): ClienteDoParceiro {
   if (!parceiroId) throw new ErroDeTenant('parceiro não informado.');
-  return construir(base, parceiroId);
+  return construir(base, parceiroId, opcoes.somenteLeitura ?? false);
 }
 
 /**
@@ -226,4 +309,51 @@ export async function parceiroPorSlug(slug: string, base: PrismaClient = baseDoT
 
 export function ehErroDeUnicidade(e: unknown): boolean {
   return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';
+}
+
+// ------------------------------------------------------------- nível 1
+
+/** O que vai para `HistoricoAlteracao` (o `parceiroId` vem da gravação). */
+export interface RegistroDeHistorico {
+  entidade: string;
+  entidadeId: string;
+  acao: string;
+  antes?: Prisma.InputJsonValue | null;
+  depois?: Prisma.InputJsonValue | null;
+  motivo?: string | null;
+  autorNome: string;
+}
+
+export type DelegateParceiroFlow = Prisma.TransactionClient['parceiroFlow'];
+
+/**
+ * Nível 1 (FlowFoods) mexendo no próprio ParceiroFlow — criar, renomear,
+ * ativar, suspender — com o antes/depois gravado no histórico DO parceiro, na
+ * MESMA transação: ou as duas coisas ficam, ou nenhuma.
+ *
+ * `gravar` recebe só o delegate do ParceiroFlow (tabela fora do tenant). O
+ * histórico entra depois, já no contexto do parceiro (papel `erp_tenant`): a
+ * RLS confere que ele é mesmo daquele parceiro.
+ */
+export async function gravarParceiroFlow<T>(
+  gravar: (
+    parceiroFlow: DelegateParceiroFlow,
+  ) => Promise<{ parceiroId: string; resultado: T; historico: RegistroDeHistorico | null }>,
+  base: PrismaClient = baseDoTenant(),
+): Promise<T> {
+  return base.$transaction(async (tx) => {
+    const { parceiroId, resultado, historico } = await gravar(tx.parceiroFlow);
+    if (historico) {
+      await tx.$queryRaw(sqlDeContexto(parceiroId, false));
+      const { antes, depois, ...resto } = historico;
+      const args = amarrarAoParceiro(
+        'HistoricoAlteracao',
+        'create',
+        { data: { ...resto, antes: antes ?? undefined, depois: depois ?? undefined } },
+        parceiroId,
+      );
+      await tx.historicoAlteracao.create(args as Prisma.HistoricoAlteracaoCreateArgs);
+    }
+    return resultado;
+  });
 }

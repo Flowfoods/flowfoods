@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero) + fundação do banco (0.1)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1) e multi-tenant (0.2)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -9,10 +9,35 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 |---|---|
 | Parceiro Flow (tenant) e Insumo | `prisma/schema.prisma` (bloco ERP) + migration `20261015000000_erp_insumo` |
 | Esquema inteiro de Ficha, Estoque, Produção e DRE (0.1) | bloco ERP + migration `20261015010000_erp_fundacao` |
-| Portão de tenant (`doParceiro`) | `src/lib/erp/tenant.ts` |
+| Portão de tenant (`doParceiro`, `gravarParceiroFlow`) | `src/lib/erp/tenant.ts` |
+| Contexto de tenant (sessão + parceiro + cliente) | `src/lib/erp/contexto.ts` (`exigirNivel1`, `exigirParceiro`) |
+| RLS no banco (papel `erp_tenant`) | migration `20261015020000_erp_multitenant` |
 | Milésimos e centavos (texto → inteiro, arredondamento) | `src/lib/erp/unidades.ts` |
-| Regra de cadastro | `src/lib/erp/insumos.ts` |
-| Telas | `/rodolfo/erp` (parceiros) e `/rodolfo/erp/<slug>` (insumos) |
+| Regras de cadastro | `insumos.ts`, `parceiros.ts` (N1), `estrutura.ts` (lojas e marcas), `historico.ts`, `slug.ts` |
+| Telas | `/rodolfo/erp` (N1: parceiros + novo) e `/rodolfo/erp/<slug>` com abas Insumos · Lojas e marcas (`/estrutura`) · Histórico (`/historico`) · Cadastro (`/cadastro`) |
+
+## O que a 0.2 entregou (multi-tenant)
+
+1. **Parceiro Flow no nível 1.** Em `/rodolfo/erp`: criar (nome, endereço/slug
+   gerado do nome e editável só na criação, nasce Ativo ou Aguardando). Na aba
+   Cadastro: renomear e mudar a situação (Aguardando → Ativo, Ativo → Suspenso
+   com motivo obrigatório, Suspenso → Ativo). Toda mudança grava antes/depois em
+   `HistoricoAlteracao` do próprio parceiro **na mesma transação**
+   (`gravarParceiroFlow`), aparece no histórico curto da aba Cadastro e no
+   Histórico completo. Mudança é condicional ao valor lido (duas abas não se
+   atropelam). Criar parceiro pela landing/aprovação de lead é da 0.5.
+2. **Estrutura N2 → N3.** Aba "Lojas e marcas": cadastro (nome; loja ganha slug
+   próprio) e lista. Cadastro de loja, marca e insumo grava o "depois" no
+   histórico, na mesma transação. Aba "Histórico": tudo, com filtro por
+   entidade, 100 últimas.
+3. **Contexto num lugar só.** `exigirParceiro(slug)` confere a sessão, resolve o
+   parceiro (uma ida ao banco por requisição, `react.cache`) e devolve o
+   cliente do portão. Todas as páginas e server actions do ERP passam por ele
+   (ou por `exigirNivel1` na lista N1). Parceiro **não ATIVO** (suspenso ou
+   aguardando) recebe cliente **somente leitura**: o portão recusa
+   create/update/upsert/delete e a transação abre `transaction_read_only` no
+   Postgres. A action ainda devolve a mensagem amigável; a trava não depende dela.
+4. **RLS no banco.** Ver "Regras travadas" (camada 4) e decisão 31.
 
 ## Mapa do esquema (0.1)
 
@@ -65,7 +90,7 @@ custo médio sai da divisão (em `unidades.ts`). Nada acumulado é gravado
 
 - **Multi-tenant.** Modelo de tenant só se lê/grava por `doParceiro(id)`, que
   amarra o parceiro em toda query e estoura se alguém apontar outro. Para
-  transação: `cliente.transacao(tx => …)`. Três camadas:
+  transação: `cliente.transacao(tx => …)`. Quatro camadas:
   1. **Runtime, portal.** O `prisma` de `src/lib/db.ts` é travado: qualquer
      operação num modelo de tenant (inclusive dentro de `$transaction`) e
      qualquer relação de tenant do ParceiroFlow estoura. O portão usa um
@@ -76,6 +101,16 @@ custo médio sai da divisão (em `unidades.ts`). Nada acumulado é gravado
      `$parent`.
   3. **Banco.** FK composta com `parceiroId` e trigger que recusa UPDATE do
      `parceiroId` em toda tabela de tenant.
+  4. **Banco, RLS (0.2).** As 29 tabelas de tenant têm RLS ligada e FORÇADA,
+     com política `"parceiroId" = app.parceiro_id` para o papel `erp_tenant`
+     (NOLOGIN, sem BYPASSRLS, GRANT só nessas tabelas; livro-razão e histórico
+     só SELECT/INSERT). Toda operação do portão roda numa transação que começa
+     com `set_config('app.parceiro_id', id, true)` + `set_config('role',
+     'erp_tenant', true)`. Assim até SQL cru **dentro do contexto** só vê o
+     parceiro: `cliente.sql` (template com parâmetros) é o caminho para
+     relatório. Sem `app.parceiro_id`, debaixo do papel, nada aparece. O usuário
+     do app é superusuário e ignora RLS fora do papel: migrations, seed e o
+     `prisma` do portal seguem iguais.
 
   `tests/erp-tenant-portao.test.ts` ainda varre o código atrás de `prisma.<modelo>`,
   SQL cru nas tabelas e relações do ParceiroFlow (o SQL cru do portal só é
@@ -103,7 +138,7 @@ custo médio sai da divisão (em `unidades.ts`). Nada acumulado é gravado
 ```bash
 # Postgres local com DATABASE_URL apontando para localhost no .env
 npx prisma migrate deploy
-npm run erp:seed-teste        # cria "Teste · Casa Alfa" e "Teste · Casa Beta"
+npm run erp:seed-teste        # Casa Alfa e Beta (ativas) e Gama (suspensa), com lojas, marcas, insumos
 npm run build && npm start    # entre em /rodolfo/login → menu ERP
 ```
 
@@ -111,15 +146,25 @@ npm run build && npm start    # entre em /rodolfo/login → menu ERP
 
 ```bash
 ERP_DB_TESTE=postgresql://USUARIO:SENHA@localhost:5432/BANCO \
-  npx vitest run tests/erp-isolamento.db.test.ts
+  npx vitest run tests/erp-isolamento.db.test.ts tests/erp-rls.db.test.ts
 ```
+
+`erp-rls.db.test.ts` prova: toda tabela com `parceiroId` tem RLS forçada e
+política; o papel não alcança `User`/`ParceiroFlow`/portal; SQL cru sem WHERE no
+contexto de B (avulso e dentro de `transacao`) não vê, não altera, não apaga e
+não grava em A; sem contexto nada aparece; o papel não vaza para o pool;
+cliente somente leitura é barrado no portão e no banco; criar/renomear/
+suspender gravam histórico e são atômicos.
 
 Sem `ERP_DB_TESTE`, esse arquivo é pulado e a suíte padrão segue sem banco.
 
 ## Herança para as próximas subfases (apontada pelos fiscais na 0.1)
 
 - `NULLS NOT DISTINCT` existe só no SQL da migration (o Prisma não enxerga): migration futura que mexa nesses índices precisa reescrevê-lo à mão.
-- `$queryRaw` do `prisma` do portal ainda alcança tabelas do ERP (vigiado só pelo teste-guarda). Antes da primeira fase com relatório em SQL cru: RLS ou papel de banco separado.
+- ~~`$queryRaw` do portal alcança tabelas do ERP; antes de relatório em SQL cru: RLS ou papel separado.~~ **Resolvido na 0.2 para o caminho do ERP:** RLS + papel `erp_tenant`; relatório em SQL cru vai por `cliente.sql` (contexto do parceiro). O `$queryRaw` do `prisma` do PORTAL continua superusuário (ignora RLS) e segue vigiado pelo teste-guarda — fechar isso de vez exige o app conectar com usuário não-superusuário (credencial/infra nova; ver decisão 31).
+- RLS protege contra consulta que ESQUECE o filtro, não contra SQL escrito para fugir (`RESET ROLE`/`set_config` também são SQL). Nunca montar `cliente.sql` por concatenação.
+- Tabela nova de tenant: além da lista do portão, a migration precisa de `GRANT` para `erp_tenant`, `ENABLE`/`FORCE ROW LEVEL SECURITY` e a política — o teste `erp-rls.db.test.ts` reprova se faltar.
+- Cada operação avulsa do portão é uma transação curta (contexto + operação). Tela com muitas leituras: agrupar em `cliente.transacao`.
 - Dois pools de conexão por processo (portal + portão de tenant): conferir `connection_limit` na VPS.
 - `DreLinha.sentido` tem default `MENOR_MELHOR`: linhas de receita nascem `MAIOR_MELHOR` (tratar na 2.2).
 - "Piso obrigatório" da contagem fica na lógica da 1.7.

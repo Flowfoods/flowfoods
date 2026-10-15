@@ -192,8 +192,14 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
         data: { ...base, tipo: 'REQUISICAO', quantidadeMilesimos: 500, valorCentavos: 0, saldoAntesMilesimos: 20000, saldoDepoisMilesimos: 20500 },
       }),
     ).rejects.toThrow();
-    // Livro-razão: UPDATE é recusado pelo banco.
-    await expect(a.movimentoEstoque.update({ where: { id: mov.id }, data: { motivo: 'mexi' } })).rejects.toThrow(/só aceita INSERT/);
+    // Livro-razão: UPDATE é recusado pelo banco. Pelo portão, o papel erp_tenant
+    // nem tem GRANT de UPDATE (0.2); e o trigger segue valendo para quem tem.
+    await expect(a.movimentoEstoque.update({ where: { id: mov.id }, data: { motivo: 'mexi' } })).rejects.toThrow(
+      /permission denied/,
+    );
+    await expect(
+      db.$executeRawUnsafe(`UPDATE "MovimentoEstoque" SET "motivo" = 'mexi' WHERE "id" = $1`, mov.id),
+    ).rejects.toThrow(/só aceita INSERT/);
   });
 
   // ------------------------------------------------ reprovação 1 dos fiscais

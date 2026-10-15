@@ -1,0 +1,106 @@
+/**
+ * Estrutura do parceiro (N2 → N3): lojas e marcas. Regra de negócio sem tela;
+ * recebe sempre um `ClienteDoParceiro`, então não há como cadastrar loja em
+ * outro parceiro. Cada cadastro grava o "depois" em `HistoricoAlteracao` na
+ * mesma transação.
+ */
+
+import { z } from 'zod';
+import { gerarSlug } from './slug';
+import { ehErroDeUnicidade, type ClienteDoParceiro } from './tenant';
+
+const nome = (max: number) =>
+  z
+    .string()
+    .trim()
+    .min(2, 'Dê um nome com pelo menos 2 letras.')
+    .max(max, `Nome longo demais (máx. ${max}).`)
+    .transform((s) => s.replace(/\s+/g, ' '));
+
+export type ResultadoEstrutura =
+  | { ok: true; id: string; nome: string }
+  | { ok: false; erros: Partial<Record<'nome' | 'geral', string>> };
+
+function primeiroErro(issues: { message: string }[]): ResultadoEstrutura {
+  return { ok: false, erros: { nome: issues[0]?.message ?? 'Nome inválido.' } };
+}
+
+export async function cadastrarLoja(
+  cliente: ClienteDoParceiro,
+  entrada: Record<string, unknown>,
+  autorNome: string,
+): Promise<ResultadoEstrutura> {
+  const r = z.object({ nome: nome(60) }).safeParse(entrada);
+  if (!r.success) return primeiroErro(r.error.issues);
+  const slug = gerarSlug(r.data.nome, 40);
+  if (slug.length < 2) return { ok: false, erros: { nome: 'Use letras ou números no nome da loja.' } };
+
+  try {
+    return await cliente.transacao(async (tx) => {
+      const loja = await tx.loja.create({
+        data: { parceiroId: tx.parceiroId, nome: r.data.nome, slug },
+        select: { id: true, nome: true, slug: true },
+      });
+      await tx.historicoAlteracao.create({
+        data: {
+          parceiroId: tx.parceiroId,
+          entidade: 'Loja',
+          entidadeId: loja.id,
+          acao: 'CRIOU',
+          depois: { nome: loja.nome, slug: loja.slug },
+          autorNome,
+        },
+      });
+      return { ok: true as const, id: loja.id, nome: loja.nome };
+    });
+  } catch (e) {
+    if (ehErroDeUnicidade(e)) return { ok: false, erros: { nome: 'Já existe uma loja com esse nome.' } };
+    throw e;
+  }
+}
+
+export async function cadastrarMarca(
+  cliente: ClienteDoParceiro,
+  entrada: Record<string, unknown>,
+  autorNome: string,
+): Promise<ResultadoEstrutura> {
+  const r = z.object({ nome: nome(60) }).safeParse(entrada);
+  if (!r.success) return primeiroErro(r.error.issues);
+
+  try {
+    return await cliente.transacao(async (tx) => {
+      const marca = await tx.marca.create({
+        data: { parceiroId: tx.parceiroId, nome: r.data.nome },
+        select: { id: true, nome: true },
+      });
+      await tx.historicoAlteracao.create({
+        data: {
+          parceiroId: tx.parceiroId,
+          entidade: 'Marca',
+          entidadeId: marca.id,
+          acao: 'CRIOU',
+          depois: { nome: marca.nome },
+          autorNome,
+        },
+      });
+      return { ok: true as const, ...marca };
+    });
+  } catch (e) {
+    if (ehErroDeUnicidade(e)) return { ok: false, erros: { nome: 'Já existe uma marca com esse nome.' } };
+    throw e;
+  }
+}
+
+export async function listarEstrutura(cliente: ClienteDoParceiro) {
+  const [lojas, marcas] = await Promise.all([
+    cliente.loja.findMany({
+      orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
+      select: { id: true, nome: true, slug: true, ativa: true, criadoEm: true },
+    }),
+    cliente.marca.findMany({
+      orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
+      select: { id: true, nome: true, ativa: true, criadoEm: true },
+    }),
+  ]);
+  return { lojas, marcas };
+}
