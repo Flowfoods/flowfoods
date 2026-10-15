@@ -6,12 +6,15 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { exigirParceiroDaSessao } from '@/lib/erp/contexto';
+import { Suspense } from 'react';
+import { exigirParceiroDaSessao, telasPermitidas } from '@/lib/erp/contexto';
+import { listarLojasDoAlcance } from '@/lib/erp/estrutura';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
+import { rotuloDasLojas } from '@/lib/erp/permissoes';
 import { Aviso, Cabecalho, Ponto } from '@/app/rodolfo/erp/ui';
 import { MarcaErp } from '../entrar/marca';
 import { acaoSair } from '../entrar/actions';
-import { AbasDoParceiro } from './abas';
+import { AbasDoParceiro, AvisoSemAcesso } from './abas';
 
 export const metadata: Metadata = {
   title: 'FlowFoods ERP',
@@ -26,8 +29,11 @@ const AVISO = {
 } as const;
 
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
-  const { parceiro, pessoa, bloqueio } = await exigirParceiroDaSessao();
+  const { parceiro, pessoa, bloqueio, alcance, cliente } = await exigirParceiroDaSessao();
   const status = STATUS_DO_PARCEIRO[parceiro.status];
+  const abas = telasPermitidas(alcance).map(({ href, rotulo }) => ({ href, rotulo }));
+  const lojas = alcance.lojas === 'todas' ? [] : await listarLojasDoAlcance(cliente, alcance);
+  const onde = rotuloDasLojas(alcance.lojas, new Map(lojas.map((l) => [l.id, l.nome])));
 
   return (
     <div className="min-h-screen bg-footer text-surface">
@@ -60,6 +66,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             </>
           }
           titulo={parceiro.nome}
+          descricao={`${pessoa.perfilRotulo ?? ''} · ${onde}`}
           acessorio={
             pessoa.parceiros.length > 1 && (
               <Link
@@ -76,7 +83,10 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             {AVISO[parceiro.status]}
           </Aviso>
         )}
-        <AbasDoParceiro />
+        <AbasDoParceiro abas={abas} />
+        <Suspense>
+          <AvisoSemAcesso />
+        </Suspense>
         {children}
       </main>
     </div>

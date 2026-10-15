@@ -1,20 +1,19 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
-const ABAS = [
-  { href: '/erp', rotulo: 'Insumos' },
-  { href: '/erp/acesso', rotulo: 'Seu acesso' },
-];
-
-/** Mesmo desenho das abas do nível 1: sublinhado vermelho na atual, rolagem em 390 px. */
-export function AbasDoParceiro() {
+/**
+ * Mesmo desenho das abas do nível 1: sublinhado vermelho na atual, rolagem em
+ * 390 px. As abas vêm do servidor, já filtradas pelo que a pessoa pode
+ * (`telasPermitidas`); a página confere de novo.
+ */
+export function AbasDoParceiro({ abas }: { abas: { href: string; rotulo: string }[] }) {
   const atual = usePathname();
   return (
     <nav aria-label="Seções" className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
       <ul className="flex min-w-max gap-6 border-b border-white/[0.08]">
-        {ABAS.map((a) => (
+        {abas.map((a) => (
           <li key={a.href}>
             <Link
               href={a.href}
@@ -27,5 +26,20 @@ export function AbasDoParceiro() {
         ))}
       </ul>
     </nav>
+  );
+}
+
+/** Quem tentou abrir uma tela fora do acesso chega aqui com `?sem-acesso=1`. */
+export function AvisoSemAcesso() {
+  const sem = useSearchParams().get('sem-acesso');
+  if (!sem) return null;
+  return (
+    <p
+      role="status"
+      className="rounded-[14px] border border-white/[0.09] bg-[#131211] px-5 py-3.5 text-sm text-surface/70"
+    >
+      <span className="font-semibold text-surface">Essa tela não está no seu acesso.</span> Se precisar dela, fale com
+      quem cuida da equipe.
+    </p>
   );
 }

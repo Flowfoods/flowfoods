@@ -592,6 +592,8 @@ model ParceiroFlow {
   erpAcessos             AcessoParceiro[]
   erpConvites            ConviteAcesso[]
   erpSessoes             SessaoErp[]
+  // Perfis próprios do parceiro (0.4): mesma trava das credenciais.
+  erpPerfis              PerfilAcesso[]
 }
 
 // ------------------------------------------------- ERP · comuns
@@ -1507,7 +1509,7 @@ model HistoricoAlteracao {
 //
 // Uma pessoa pode estar em mais de um parceiro (consultor, sócio de rede): a
 // identidade (e-mail, senha, rosto) é uma só e o vínculo é por parceiro, com
-// status próprio. Perfis, setores e acesso por loja são da 0.4.
+// status próprio. Perfis, setores e lojas de cada pessoa (0.4) ficam no vínculo.
 
 enum AcessoStatus {
   ATIVO
@@ -1544,6 +1546,15 @@ model UsuarioErp {
 
 // Vínculo pessoa × parceiro. Desativar aqui derruba a sessão naquele parceiro
 // na próxima requisição; o vínculo com outro parceiro segue.
+//
+// Permissões (0.4) moram no vínculo: a mesma pessoa pode ser dona em A e
+// operadora em B. Perfil = um base (dono/gerente/operador, definidos em
+// `src/lib/erp/permissoes.ts`) OU um perfil próprio do parceiro (CHECK: um dos
+// dois). Ajuste por pessoa: extras e removidas. Lojas: rede inteira (vale para
+// lojas futuras) OU a lista `lojaIds` (CHECK: um ou outro). `lojaIds` não tem
+// FK de propósito (credencial nunca aponta para tabela de tenant): toda
+// consulta de loja passa pelo portão do parceiro, então id de outro parceiro
+// não acha nada. Setores são atributo da pessoa, não concedem nada.
 model AcessoParceiro {
   id           String       @id @default(cuid())
   parceiroId   String
@@ -1554,8 +1565,69 @@ model AcessoParceiro {
   criadoEm     DateTime     @default(now())
   atualizadoEm DateTime     @updatedAt
 
+  perfilBase          PerfilBase?
+  perfilId            String?
+  // FK composta: o perfil é do MESMO parceiro do vínculo.
+  perfil              PerfilAcesso? @relation(fields: [parceiroId, perfilId], references: [parceiroId, id], onDelete: Restrict)
+  permissoesExtras    String[]      @default([])
+  permissoesRemovidas String[]      @default([])
+  setores             Setor[]       @default([])
+  redeInteira         Boolean       @default(true)
+  lojaIds             String[]      @default([])
+
   @@unique([parceiroId, usuarioId])
   @@index([usuarioId])
+  @@index([parceiroId, perfilId])
+}
+
+// ------------------------------------------------- ERP · permissões (0.4)
+//
+// O catálogo de permissões e os perfis base (dono, gerente, operador) ficam em
+// código (`src/lib/erp/permissoes.ts`), versionados. Aqui só o que o parceiro
+// cria: perfil próprio, nascido de um base, com a lista COMPLETA de
+// permissões (fotografia: permissão nova do catálogo não entra sozinha).
+// Fora do tenant, junto das credenciais (é lido na validação da sessão).
+
+enum PerfilBase {
+  DONO
+  GERENTE
+  OPERADOR
+}
+
+// Setor da pessoa no parceiro (pode ter mais de um). Filtro e sugestão de
+// perfil; não é permissão.
+enum Setor {
+  COZINHA
+  SALAO
+  ADMINISTRATIVO
+  ESTOQUE
+  CAIXA
+  MOTOBOY
+  FREELANCER
+  COMPRAS
+  MARKETING_CRM
+  GERENCIA
+}
+
+model PerfilAcesso {
+  id             String       @id @default(cuid())
+  parceiroId     String
+  parceiro       ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  nome           String
+  // De qual perfil base foi copiado (para a tela; não concede nada).
+  base           PerfilBase
+  permissoes     String[]
+  // Setores para os quais o perfil foi pensado (sugestão no cadastro da pessoa).
+  setores        Setor[]      @default([])
+  // Versão do catálogo quando o perfil foi salvo pela última vez.
+  catalogoVersao Int
+  criadoEm       DateTime     @default(now())
+  atualizadoEm   DateTime     @updatedAt
+
+  acessos AcessoParceiro[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, nome])
 }
 
 // Link de primeiro acesso (ou de nova senha). Uso único, com validade. O token

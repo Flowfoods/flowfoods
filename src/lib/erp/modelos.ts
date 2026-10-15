@@ -105,10 +105,13 @@ export const MODELOS_DE_CREDENCIAL = [
   'desafioWebauthn',
   'sessaoErp',
   'tentativaEntradaErp',
+  // 0.4: perfil próprio do parceiro. Lido na validação da sessão (antes do
+  // contexto do parceiro), por isso mora aqui e não no tenant.
+  'perfilAcesso',
 ] as const;
 
 /** Relações do ParceiroFlow que chegam nas credenciais (mesma trava do portal). */
-export const RELACOES_DE_CREDENCIAL = ['erpAcessos', 'erpConvites', 'erpSessoes'] as const;
+export const RELACOES_DE_CREDENCIAL = ['erpAcessos', 'erpConvites', 'erpSessoes', 'erpPerfis'] as const;
 
 const NOMES_DE_CREDENCIAL = new Set<string>(MODELOS_DE_CREDENCIAL.map((m) => m[0].toUpperCase() + m.slice(1)));
 

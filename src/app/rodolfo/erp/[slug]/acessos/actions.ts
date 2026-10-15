@@ -1,97 +1,97 @@
 'use server';
 
 /**
- * Acessos das pessoas do parceiro (nível 1). Toda ação abre com
+ * Equipe do parceiro pelo nível 1 (aba Acessos). Toda ação abre com
  * `exigirParceiro(slug)` (sessão do /rodolfo + parceiro resolvido no servidor)
- * e passa o `parceiroId` para `credenciais.ts`, que grava antes/depois no
- * histórico do parceiro na mesma transação.
+ * e confere `exigirPermissao(ctx, 'acessos.gerir')` — o nível 1 sempre pode,
+ * mas a checagem é a mesma de todo o ERP. O nível 1 mexe em qualquer
+ * situação do parceiro (prepara os acessos antes de liberar).
  *
- * Vale em qualquer situação do parceiro (ativo, suspenso, aguardando): o
- * Rodolfo prepara os acessos antes de liberar; quem entra num parceiro não
- * ativo só consulta (cliente somente leitura).
- *
- * O link aparece UMA vez, na resposta: o banco guarda só o hash do token. Não
- * há envio por e-mail/WhatsApp aqui — o Rodolfo copia e manda.
+ * O link aparece UMA vez, na resposta: o banco guarda só o hash do token.
  */
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/db';
-import { exigirParceiro } from '@/lib/erp/contexto';
-import { criarAcesso, gerarNovoLink, mudarStatusDoAcesso } from '@/lib/erp/credenciais';
-import { linkDePrimeiroAcesso } from '@/lib/erp/sessao';
+import { atorNivel1 } from '@/lib/erp/credenciais';
+import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
+import type { EstadoEquipe } from '../../equipe/estado';
+import {
+  executarAtualizar,
+  executarCriar,
+  executarExcluirPerfil,
+  executarLiberar,
+  executarNovoLink,
+  executarSalvarPerfil,
+  executarStatus,
+  recusado,
+} from '../../equipe/executar';
 
-export type EstadoAcesso = {
-  ok: boolean;
-  mensagem?: string;
-  erros?: Partial<Record<string, string>>;
-  link?: string;
-  validade?: string;
-  vez: number;
-} | null;
-
-const VALIDADE = new Intl.DateTimeFormat('pt-BR', {
-  day: '2-digit',
-  month: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZone: 'America/Sao_Paulo',
-});
-
-function validade(d: Date) {
-  return VALIDADE.format(d).replace(',', ' às');
+async function contexto(slug: string) {
+  const ctx = await exigirParceiro(slug);
+  return { ...ctx, ator: atorNivel1(ctx.sessao.autorNome), negado: recusaDaAcao(ctx, 'acessos.gerir') };
 }
 
-async function auditar(userId: string, evento: string, dados: Record<string, string>) {
-  await prisma.auditLog.create({ data: { userId, evento, dados } });
+async function concluir(slug: string, userId: string, evento: string, dados: Record<string, string>, r: EstadoEquipe) {
+  if (r?.ok) {
+    await prisma.auditLog.create({ data: { userId, evento, dados } });
+    revalidatePath(`/rodolfo/erp/${slug}`, 'layout');
+  }
+  return r;
 }
 
-export async function acaoCriarAcesso(slug: string, anterior: EstadoAcesso, form: FormData): Promise<EstadoAcesso> {
-  const { sessao, parceiro } = await exigirParceiro(slug);
-  const vez = (anterior?.vez ?? 0) + 1;
-  const r = await criarAcesso(parceiro.id, Object.fromEntries(form), sessao.autorNome);
-  if (!r.ok) return { ok: false, erros: r.erros, vez };
-  await auditar(sessao.userId, 'erp_acesso_criado', { parceiroId: parceiro.id });
-  revalidatePath(`/rodolfo/erp/${slug}`, 'layout');
-  return {
-    ok: true,
-    mensagem: r.mensagem,
-    link: r.link ? linkDePrimeiroAcesso(r.link.token) : undefined,
-    validade: r.link ? validade(r.link.expiraEm) : undefined,
-    vez,
-  };
+export async function acaoCriarAcesso(slug: string, anterior: EstadoEquipe, form: FormData): Promise<EstadoEquipe> {
+  const c = await contexto(slug);
+  if (c.negado) return recusado(anterior, c.negado);
+  const r = await executarCriar(c.parceiro.id, c.ator, anterior, form);
+  return concluir(slug, c.sessao.userId, 'erp_acesso_criado', { parceiroId: c.parceiro.id }, r);
 }
 
-export async function acaoNovoLink(slug: string, acessoId: string, anterior: EstadoAcesso): Promise<EstadoAcesso> {
-  const { sessao, parceiro } = await exigirParceiro(slug);
-  const vez = (anterior?.vez ?? 0) + 1;
-  const r = await gerarNovoLink(parceiro.id, acessoId, sessao.autorNome);
-  if (!r.ok) return { ok: false, erros: { geral: r.erro }, vez };
-  await auditar(sessao.userId, 'erp_acesso_novo_link', { parceiroId: parceiro.id, acessoId });
-  revalidatePath(`/rodolfo/erp/${slug}`, 'layout');
-  return {
-    ok: true,
-    mensagem: `Link novo de ${r.nome}. O anterior deixou de valer.`,
-    link: linkDePrimeiroAcesso(r.token),
-    validade: validade(r.expiraEm),
-    vez,
-  };
+export async function acaoAtualizarAcesso(slug: string, acessoId: string, anterior: EstadoEquipe, form: FormData) {
+  const c = await contexto(slug);
+  if (c.negado) return recusado(anterior, c.negado);
+  const r = await executarAtualizar(c.parceiro.id, c.ator, acessoId, anterior, form);
+  return concluir(slug, c.sessao.userId, 'erp_acesso_alterado', { parceiroId: c.parceiro.id, acessoId }, r);
 }
 
-export async function acaoMudarStatusAcesso(
-  slug: string,
-  acessoId: string,
-  novo: 'ATIVO' | 'DESATIVADO',
-  anterior: EstadoAcesso,
-): Promise<EstadoAcesso> {
-  const { sessao, parceiro } = await exigirParceiro(slug);
-  const vez = (anterior?.vez ?? 0) + 1;
-  if (novo !== 'ATIVO' && novo !== 'DESATIVADO') return { ok: false, erros: { geral: 'Situação inválida.' }, vez };
-  const r = await mudarStatusDoAcesso(parceiro.id, acessoId, novo, sessao.autorNome);
-  if (!r.ok) return { ok: false, erros: { geral: r.erro }, vez };
-  await auditar(sessao.userId, novo === 'ATIVO' ? 'erp_acesso_reativado' : 'erp_acesso_desativado', {
-    parceiroId: parceiro.id,
-    acessoId,
-  });
-  revalidatePath(`/rodolfo/erp/${slug}`, 'layout');
-  return { ok: true, mensagem: r.mensagem, vez };
+export async function acaoNovoLink(slug: string, acessoId: string, anterior: EstadoEquipe): Promise<EstadoEquipe> {
+  const c = await contexto(slug);
+  if (c.negado) return recusado(anterior, c.negado);
+  const r = await executarNovoLink(c.parceiro.id, c.ator, acessoId, anterior);
+  return concluir(slug, c.sessao.userId, 'erp_acesso_novo_link', { parceiroId: c.parceiro.id, acessoId }, r);
+}
+
+export async function acaoDesativarAcesso(slug: string, acessoId: string, anterior: EstadoEquipe): Promise<EstadoEquipe> {
+  const c = await contexto(slug);
+  if (c.negado) return recusado(anterior, c.negado);
+  const r = await executarStatus(c.parceiro.id, c.ator, acessoId, 'DESATIVADO', anterior);
+  return concluir(slug, c.sessao.userId, 'erp_acesso_desativado', { parceiroId: c.parceiro.id, acessoId }, r);
+}
+
+export async function acaoReativarAcesso(slug: string, acessoId: string, anterior: EstadoEquipe): Promise<EstadoEquipe> {
+  const c = await contexto(slug);
+  if (c.negado) return recusado(anterior, c.negado);
+  const r = await executarStatus(c.parceiro.id, c.ator, acessoId, 'ATIVO', anterior);
+  return concluir(slug, c.sessao.userId, 'erp_acesso_reativado', { parceiroId: c.parceiro.id, acessoId }, r);
+}
+
+/** Só o nível 1: libera o e-mail travado pelo limite de tentativas. */
+export async function acaoLiberarEntrada(slug: string, acessoId: string, anterior: EstadoEquipe): Promise<EstadoEquipe> {
+  const c = await contexto(slug);
+  if (c.negado) return recusado(anterior, c.negado);
+  const r = await executarLiberar(c.parceiro.id, c.ator.nome, acessoId, anterior);
+  return concluir(slug, c.sessao.userId, 'erp_acesso_liberado', { parceiroId: c.parceiro.id, acessoId }, r);
+}
+
+export async function acaoSalvarPerfil(slug: string, anterior: EstadoEquipe, form: FormData): Promise<EstadoEquipe> {
+  const c = await contexto(slug);
+  if (c.negado) return recusado(anterior, c.negado);
+  const r = await executarSalvarPerfil(c.parceiro.id, c.ator, anterior, form);
+  return concluir(slug, c.sessao.userId, 'erp_perfil_salvo', { parceiroId: c.parceiro.id }, r);
+}
+
+export async function acaoExcluirPerfil(slug: string, perfilId: string, anterior: EstadoEquipe): Promise<EstadoEquipe> {
+  const c = await contexto(slug);
+  if (c.negado) return recusado(anterior, c.negado);
+  const r = await executarExcluirPerfil(c.parceiro.id, c.ator, perfilId, anterior);
+  return concluir(slug, c.sessao.userId, 'erp_perfil_excluido', { parceiroId: c.parceiro.id, perfilId }, r);
 }

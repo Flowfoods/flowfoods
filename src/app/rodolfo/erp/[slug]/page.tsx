@@ -4,7 +4,7 @@
  * trocar de URL, e a URL só escolhe — o isolamento é o portão.
  */
 
-import { exigirParceiro } from '@/lib/erp/contexto';
+import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { TelaInsumos } from '../tela-insumos';
 import { acaoCadastrarInsumo } from './actions';
 import { FormInsumo } from './form-insumo';
@@ -12,7 +12,9 @@ import { FormInsumo } from './form-insumo';
 export const dynamic = 'force-dynamic';
 
 export default async function ParceiroInsumosPage({ params }: { params: { slug: string } }) {
-  const { parceiro, cliente, bloqueio } = await exigirParceiro(params.slug);
+  const ctx = await exigirParceiro(params.slug);
+  exigirPermissao(ctx, 'insumos.ver');
+  const { parceiro, cliente, bloqueio } = ctx;
   return (
     <TelaInsumos
       cliente={cliente}
