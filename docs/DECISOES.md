@@ -362,3 +362,72 @@ O "Anexar arquivo" continua como caminho reserva, sem filtro de tipo. No
 painel, áudio toca inline (`Content-Type` de áudio e `inline`; o resto segue
 `octet-stream` e anexo, pelo mesmo motivo de sempre). Chrome e Android gravam
 WebM/Opus; iPhone grava MP4/AAC. O nome do arquivo diz item, dia e hora.
+
+
+---
+
+### 24. 2026-10-15 · ERP 0.1: tenant garantido também pelo banco (FK composta)
+
+**Alternativa:** FK simples (`insumoId → Insumo.id`) e confiar só no portão
+`doParceiro` para impedir referência entre parceiros.
+
+**Razão:** o portão amarra o `parceiroId` da linha, mas não confere o dono do
+id apontado: uma ficha de B poderia citar o insumo de A e o `include` vazaria
+o nome. Com FK composta `(parceiroId, xId) → (parceiroId, id)` o banco recusa,
+inclusive por SQL cru. Custo: um `@@unique([parceiroId, id])` por tabela
+referenciada e FKs nunca `SetNull` (anularia o `parceiroId`). O teste-guarda
+reprova FK de tenant que não seja composta.
+
+---
+
+### 25. 2026-10-15 · ERP 0.1: unidades inteiras e nada de `BigInt`
+
+**Alternativa:** `Decimal` para dinheiro; custo unitário gravado em
+micro-unidades; `BigInt` para acumulados.
+
+**Razão:** quantidade em milésimos, dinheiro em centavos, percentual em
+pontos-base (1% = 100), fator em milésimos (FC 1,18 = 1180), validade em
+minutos. Custo unitário não é gravado: guarda-se quantidade e valor total e o
+custo médio é derivado, sem perda de precisão para item de centavo fracionado
+(palito, sachê). Nenhum acumulado é gravado (DRE, CMV, total do mês são
+somas na hora), então `Int` (até R$ 21 mi por linha) basta; `BigInt` só
+traria atrito no JS sem caso real.
+
+---
+
+### 26. 2026-10-15 · ERP 0.1: pré-preparo é Insumo; subficha é item da ficha
+
+**Alternativa:** tabela própria de pré-preparo, ou ficha de produto separada
+de ficha de preparo.
+
+**Razão:** o estoque só conhece `Insumo`. Um pré-preparo que vai para a
+câmara vira `Insumo` tipo PRE_PREPARO produzido pela sua `FichaTecnica`
+(`insumoProduzidoId`); a produção dá entrada nele e baixa os insumos. Item de
+ficha aponta insumo OU subficha (CHECK `num_nonnulls = 1`), o que cobre
+molho feito na hora e combo. Ciclo entre fichas fica para a regra da 1.3.
+`ProdutoVenda` é separado da ficha porque preço, canal e embalagem são da
+venda, não da receita.
+
+---
+
+### 27. 2026-10-15 · ERP 0.1: livro-razão de estoque, saldo como cache
+
+**Alternativa:** só uma tabela de saldo atualizada no lugar; ou só
+movimentos, somando na hora.
+
+**Razão:** `MovimentoEstoque` é a verdade (só INSERT, trigger recusa UPDATE;
+saldo antes/depois e snapshot do insumo em cada linha: todo ajuste mostra de
+quanto para quanto). `SaldoEstoque` é cache por loja × insumo, gravado na
+mesma transação (`cliente.transacao`) com `versao` para trava otimista. Lista
+do dia (3.2) não tem tabela: é ordem PLANEJADA × saldo, derivada.
+
+---
+
+### 28. 2026-10-15 · ERP 0.1: faturamento idempotente por chave, não por dia
+
+**Alternativa:** uma linha única por loja × canal × dia.
+
+**Razão:** integração pode mandar por pedido, por dia ou reenviar o mesmo
+relatório; planilha pode ser reimportada. Cada lançamento leva
+`chaveIdempotencia` única no parceiro (manual usa chave determinística, então
+redigitar é correção, registrada em `HistoricoAlteracao`). O dia é a soma.

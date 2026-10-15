@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { amarrarAoParceiro, ErroDeTenant } from '@/lib/erp/tenant';
+import { amarrarAoParceiro, doParceiro, ehModeloDeTenant, ErroDeTenant, MODELOS_DE_TENANT } from '@/lib/erp/tenant';
 
 const A = 'parceiro-a';
 
@@ -33,5 +33,39 @@ describe('ERP · portão de tenant (reescrita de query)', () => {
 
   it('sem parceiro não roda', () => {
     expect(() => amarrarAoParceiro('findMany', {}, '')).toThrow(ErroDeTenant);
+  });
+});
+
+describe('ERP · portão de tenant (todos os modelos)', () => {
+  it('a reescrita vale igual para cada modelo novo', () => {
+    // A extensão é `$allModels`: o que decide é o nome do modelo estar na lista.
+    for (const m of MODELOS_DE_TENANT) {
+      const nome = m[0].toUpperCase() + m.slice(1);
+      expect(ehModeloDeTenant(nome), nome).toBe(true);
+    }
+    for (const fora of ['ParceiroFlow', 'Lead', 'User', 'PortalCliente', 'Message', undefined]) {
+      expect(ehModeloDeTenant(fora)).toBe(false);
+    }
+  });
+
+  it('o cliente do parceiro expõe todos os modelos de tenant, e só eles', () => {
+    // $extends não conecta: dá para inspecionar sem banco.
+    const cliente = doParceiro(A);
+    expect(Object.keys(cliente).sort()).toEqual([...MODELOS_DE_TENANT, 'parceiroId', 'transacao'].sort());
+    for (const m of MODELOS_DE_TENANT) expect(typeof cliente[m].findMany, m).toBe('function');
+    for (const proibido of ['parceiroFlow', 'lead', '$queryRaw', '$executeRaw', '$transaction']) {
+      expect(proibido in cliente, proibido).toBe(false);
+    }
+    expect(Object.isFrozen(cliente)).toBe(true);
+  });
+
+  it('upsert e updateMany em modelo novo também travam o dono', () => {
+    expect(() =>
+      amarrarAoParceiro('upsert', { where: { id: '1' }, create: { nome: 'x' }, update: { parceiroId: 'B' } }, A),
+    ).toThrow(ErroDeTenant);
+    expect(amarrarAoParceiro('updateMany', { where: { lojaId: 'l' }, data: { status: 'FECHADA' } }, A)).toEqual({
+      where: { lojaId: 'l', parceiroId: A },
+      data: { status: 'FECHADA' },
+    });
   });
 });
