@@ -188,3 +188,11 @@ Sem `ERP_DB_TESTE`, esse arquivo é pulado e a suíte padrão segue sem banco.
 - Dois pools de conexão por processo (portal + portão de tenant): conferir `connection_limit` na VPS.
 - `DreLinha.sentido` tem default `MENOR_MELHOR`: linhas de receita nascem `MAIOR_MELHOR` (tratar na 2.2).
 - "Piso obrigatório" da contagem fica na lógica da 1.7.
+
+## Herança da 0.2 (apontada pelos fiscais)
+
+- `cliente.sql` filtra erro de descuido, não código feito para burlar (`query_to_xml`, `U&"…"`, `pg_settings` passam); tem falso positivo com `role`/`begin` em alias/string. Revisar antes da primeira fase com relatório em SQL cru.
+- Sem RLS em produção o único sinal é um aviso no log: criar health check que falhe se `papelDisponivel()` for falso no cenário compose.
+- Suspensão sob escrita contínua pode esperar; `gravarParceiroFlow` precisa de timeout maior e mensagem em PT-BR para o estouro.
+- Na 0.4, `exigirParceiro` passa a conferir se o usuário pertence ao parceiro (o slug vem do cliente via `.bind`).
+- Identificador técnico da loja (`vila-da-penha`) aparece sob o nome: esconder numa fase de tela.
