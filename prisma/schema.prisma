@@ -518,6 +518,9 @@ model PortalArquivo {
 //    isso toda tabela referenciada tem `@@unique([parceiroId, id])`, e toda FK
 //    composta é Restrict/Cascade, nunca SetNull (anularia o parceiroId). E um
 //    trigger em toda tabela de tenant recusa UPDATE que troque o parceiroId.
+//    E RLS (0.2): toda tabela de tenant tem RLS forçada + política para o papel
+//    `erp_tenant`. Tabela nova de tenant: a migration precisa do GRANT, do
+//    ENABLE/FORCE ROW LEVEL SECURITY e da política (tests/erp-rls.db.test.ts).
 // 5. Snapshot: documento que registra um fato (item de nota, movimento,
 //    contagem, produção, etiqueta) grava nome/unidade/valor daquele momento.
 //    Renomear o insumo amanhã não reescreve o passado.

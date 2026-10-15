@@ -31,6 +31,7 @@ export type ResultadoCadastro =
 export async function cadastrarInsumo(
   cliente: ClienteDoParceiro,
   entrada: Record<string, unknown>,
+  autorNome = 'Sistema',
 ): Promise<ResultadoCadastro> {
   const r = formInsumo.safeParse(entrada);
   if (!r.success) {
@@ -47,15 +48,29 @@ export async function cadastrarInsumo(
   if (!conteudoMilesimos || precoEmbalagemCentavos === null) return { ok: false, erros };
 
   try {
-    const criado = await cliente.insumo.create({
-      data: {
-        parceiroId: cliente.parceiroId,
-        nome: r.data.nome,
-        unidade: r.data.unidade,
-        conteudoMilesimos,
-        precoEmbalagemCentavos,
-      },
-      select: { id: true, nome: true },
+    // Insumo e "depois" no histórico na mesma transação (alterações visíveis).
+    const criado = await cliente.transacao(async (tx) => {
+      const novo = await tx.insumo.create({
+        data: {
+          parceiroId: tx.parceiroId,
+          nome: r.data.nome,
+          unidade: r.data.unidade,
+          conteudoMilesimos,
+          precoEmbalagemCentavos,
+        },
+        select: { id: true, nome: true },
+      });
+      await tx.historicoAlteracao.create({
+        data: {
+          parceiroId: tx.parceiroId,
+          entidade: 'Insumo',
+          entidadeId: novo.id,
+          acao: 'CRIOU',
+          depois: { nome: novo.nome, unidade: r.data.unidade, conteudoMilesimos, precoEmbalagemCentavos },
+          autorNome,
+        },
+      });
+      return novo;
     });
     return { ok: true, ...criado };
   } catch (e) {

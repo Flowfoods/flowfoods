@@ -35,6 +35,18 @@ describe('ERP · portão de tenant (reescrita de query)', () => {
   it('sem parceiro não roda', () => {
     expect(() => amarrarAoParceiro('Insumo', 'findMany', {}, '')).toThrow(ErroDeTenant);
   });
+
+  it('cliente somente leitura recusa escrita antes de ir ao banco', async () => {
+    const leitura = doParceiro(A, undefined, { somenteLeitura: true });
+    for (const escrever of [
+      () => leitura.insumo.create({ data: { parceiroId: A, nome: 'x', unidade: 'UN', conteudoMilesimos: 1, precoEmbalagemCentavos: 1 } }),
+      () => leitura.loja.updateMany({ data: { nome: 'x' } }),
+      () => leitura.marca.deleteMany(),
+      () => leitura.historicoAlteracao.create({ data: { parceiroId: A, entidade: 'x', entidadeId: 'x', acao: 'x', autorNome: 'x' } }),
+    ]) {
+      await expect(escrever()).rejects.toThrow(/somente leitura/);
+    }
+  });
 });
 
 describe('ERP · portão de tenant (todos os modelos)', () => {
@@ -52,7 +64,9 @@ describe('ERP · portão de tenant (todos os modelos)', () => {
   it('o cliente do parceiro expõe todos os modelos de tenant, e só eles', () => {
     // $extends não conecta: dá para inspecionar sem banco.
     const cliente = doParceiro(A);
-    expect(Object.keys(cliente).sort()).toEqual([...MODELOS_DE_TENANT, 'parceiroId', 'transacao'].sort());
+    expect(Object.keys(cliente).sort()).toEqual([...MODELOS_DE_TENANT, 'parceiroId', 'somenteLeitura', 'sql', 'transacao'].sort());
+    expect(cliente.somenteLeitura).toBe(false);
+    expect(doParceiro(A, undefined, { somenteLeitura: true }).somenteLeitura).toBe(true);
     for (const m of MODELOS_DE_TENANT) expect(typeof cliente[m].findMany, m).toBe('function');
     for (const proibido of ['parceiroFlow', 'lead', '$queryRaw', '$executeRaw', '$transaction']) {
       expect(proibido in cliente, proibido).toBe(false);

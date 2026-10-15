@@ -462,3 +462,79 @@ o desvio vs meta em pontos-base, já com o `sentido` da linha (receita: maior
 é melhor; CMV e despesa: menor). Meta e despesa ganharam canal opcional (nulo =
 rede/rateio). Uniques com canal nulo usam `NULLS NOT DISTINCT` no SQL
 (Postgres 15+; o Prisma não descreve e o diff não reverte).
+
+---
+
+### 31. 2026-10-15 · ERP 0.2: RLS com papel `erp_tenant` (SET LOCAL ROLE), instalada só quando dá
+
+**Alternativa:** (a) não fazer RLS e seguir só com portão + teste-guarda;
+(b) app conectando com um usuário Postgres não-superusuário dedicado ao ERP.
+
+**Razão:** relatório de DRE/CMV vai precisar de SQL cru, e SQL cru é onde se
+esquece o `WHERE "parceiroId"`. (b) fecharia também o `$queryRaw` do portal,
+mas exige credencial nova e mudança no docker-compose/Dokploy. Ficou o padrão
+oficial (prisma-client-extensions/row-level-security) adaptado ao superusuário:
+papel NOLOGIN `erp_tenant` (sem BYPASSRLS, GRANT só nas 29 tabelas de tenant;
+livro-razão e histórico só SELECT/INSERT), `ENABLE` + `FORCE ROW LEVEL
+SECURITY` e política `"parceiroId" = NULLIF(current_setting('app.parceiro_id',
+true), '')`. O portão abre TODA transação com `set_config('app.parceiro_id',
+id, true), set_config('role', 'erp_tenant', true)`.
+
+**Deploy seguro nos dois cenários** (o deploy roda `migrate deploy` sozinho e
+`docs/DEPLOY_DOKPLOY.md` admite usuário não-superusuário): a migration só
+instala a RLS se quem roda é dono das 29 tabelas E o papel existe (ou dá para
+criá-lo: SUPERUSER/CREATEROLE) E consegue assumi-lo (`pg_has_role ... 'SET'`,
+ou concede a si mesmo). Senão, `RAISE NOTICE` e segue sem RLS. O portão confere
+em runtime, uma vez por cliente (cache), se o papel existe, se o usuário pode
+assumi-lo e se ele tem GRANT/RLS forçada; se não, opera sem o `SET ROLE` e
+avisa UMA vez no log — o isolamento do portão (filtro, FK composta, triggers,
+status) continua. Testado em banco scratch com dono não-superusuário: com o
+papel concedido (RLS instalada, 38/38 testes) e sem (RLS pulada, 32 + 6 pulados).
+
+**`cliente.sql`** é o caminho do relatório em SQL cru, dentro do contexto; o
+texto (fora dos parâmetros) não pode ter `set_config`, `SET` como comando,
+`SET LOCAL/SESSION`, `RESET`, `ROLE`, `COMMIT`, `ROLLBACK`, `BEGIN`,
+`START TRANSACTION`, `SAVEPOINT`. Leitura avulsa abre read-only.
+
+**Custo:** cada operação avulsa vira uma transação curta (contexto, operação);
+e a RLS protege contra esquecimento, não contra quem tem acesso ao código. O
+`$queryRaw` do portal segue superusuário e vigiado pelo teste-guarda; fechar de
+vez = alternativa (b), quando houver janela de infra. Com dono
+não-superusuário e RLS instalada, o FORCE já tira dado de tenant do portal.
+
+---
+
+### 32. 2026-10-15 · ERP 0.2: escrita só em parceiro ATIVO, conferido DENTRO da transação
+
+**Alternativa:** conferir o status só na server action (Passo zero), ou só no
+`exigirParceiro`.
+
+**Razão:** worker ou webhook futuro vai chamar `doParceiro(id)` direto, e uma
+suspensão pode acontecer entre a conferência e a escrita. Agora toda escrita do
+portão (modelo, `transacao`, `cliente.sql` com INSERT/UPDATE/DELETE...) chama
+`erp_exigir_parceiro_ativo(id)` na mesma transação: função da migration
+(SECURITY DEFINER, lê só o status daquele id) com `SELECT ... FOR SHARE`, que
+recusa se não for ATIVO. A suspensão concorrente espera a escrita em curso
+terminar; a seguinte já é recusada (teste com banco). Exceções do nível 1
+(renomear, mudar status) usam `gravarParceiroFlow`, que não passa pela
+conferência — suspender grava histórico de um parceiro que acabou de ficar
+SUSPENSO, e o nome pode ser corrigido em suspenso (decisão do Maestro).
+Por cima, `exigirParceiro` entrega cliente `somenteLeitura` para parceiro não
+ATIVO: recusa no portão antes do banco e abre a transação read-only. RASCUNHO
+(aguardando liberação) também não recebe escrita.
+
+---
+
+### 33. 2026-10-15 · ERP 0.2: histórico do ParceiroFlow mora no próprio parceiro, na mesma transação
+
+**Alternativa:** tabela de auditoria separada para o nível 1, ou gravar o
+histórico depois, fora da transação.
+
+**Razão:** `HistoricoAlteracao` já é por parceiro e só aceita INSERT; o que
+mudou no cadastro de um parceiro é dele. `gravarParceiroFlow` (no portão)
+grava o ParceiroFlow como usuário do app e, na MESMA transação, entra no
+contexto do parceiro e insere o histórico sob RLS: ou ficam os dois, ou
+nenhum. Slug é editável só na criação (é endereço de link e relatório);
+mudanças de nome e status são condicionais ao valor lido (sem atropelo entre
+abas). Suspender exige motivo, que vai para `HistoricoAlteracao.motivo`.
+Cadastro de loja, marca e insumo também passa a gravar o "depois".
