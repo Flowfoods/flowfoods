@@ -71,7 +71,9 @@ function Total({ c }: { c: CamadasDoCanal }) {
   return (
     <>
       <span className={`font-semibold ${c.incompleto ? 'text-atencao' : 'text-texto'}`}>{formatarFracao(c.total ?? c.semTaxa)}</span>
-      {c.taxa.tipo === 'sobrePreco' && !c.total && <span className="block text-[12px] font-normal text-suave">+ {formatarPontosBase(c.taxa.totalBp)} do preço</span>}
+      {c.taxa.tipo === 'sobrePreco' && !c.total && (
+        <span className="block text-[12px] font-normal text-suave">+ {formatarPontosBase(c.taxa.totalBp)} do preço</span>
+      )}
       {c.incompleto && (
         <span className="mt-1 block">
           <Selo tom="alerta">Incompleto</Selo>
@@ -147,7 +149,9 @@ export function CustoPorCanalDaFicha({
           <tr className="border-t border-linha">
             <th scope="row" className="py-2.5 pl-5 pr-3 text-left font-medium text-texto">
               Embalagens
-              {linhas.length === 0 && <span className="block text-[12px] font-normal text-suave">Nenhuma ainda{linkDasEmbalagens ? ': em Editar embalagens' : ''}.</span>}
+              {linhas.length === 0 && (
+                <span className="block text-[12px] font-normal text-suave">Nenhuma ainda{linkDasEmbalagens ? ': em Editar embalagens' : ''}.</span>
+              )}
             </th>
             {canais.map((c) => (
               <td key={c.canal} className={`${td} last:pr-5`}>
@@ -157,7 +161,7 @@ export function CustoPorCanalDaFicha({
           </tr>
           {linhas.map((l) => (
             <tr key={l.insumoId} className="text-[13px]">
-              <th scope="row" className="py-1.5 pl-9 pr-3 text-left font-normal text-suave">
+              <th scope="row" className="py-1.5 pl-9 pr-3 text-left align-top font-normal text-suave">
                 {l.nome}
               </th>
               {canais.map((c) => (
@@ -210,7 +214,10 @@ export function CustoPorCanalDaFicha({
               </div>
               {c.canal !== 'LOJA' && (
                 <div className="flex justify-between gap-3">
-                  <dt className="text-suave">Embalagens{c.embalagens.length ? ` (${c.embalagens.map((e) => `${e.nome} ${formatarQuantidade(e.quantidadeMilesimos, e.unidade)}`).join(', ')})` : ''}</dt>
+                  <dt className="text-suave">
+                    Embalagens
+                    {c.embalagens.length ? ` (${c.embalagens.map((e) => `${e.nome} ${formatarQuantidade(e.quantidadeMilesimos, e.unidade)}`).join(', ')})` : ''}
+                  </dt>
                   <dd className="shrink-0">{c.embalagens.length ? formatarFracao(c.embalagensTotal) : 'nenhuma'}</dd>
                 </div>
               )}

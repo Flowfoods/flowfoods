@@ -83,7 +83,14 @@ export function FormEmbalagens({
     );
     saida.aoMudar();
   }
-  const nova = (canal: CanalComEmbalagem, base?: Omit<LinhaDaEmbalagem, 'canal'>) => ({ canal, insumoId: '', quantidade: '1', unidade: 'un', ...base, chave: proxima.current++ });
+  const nova = (canal: CanalComEmbalagem, base?: Omit<LinhaDaEmbalagem, 'canal'>) => ({
+    canal,
+    insumoId: '',
+    quantidade: '1',
+    unidade: 'un',
+    ...base,
+    chave: proxima.current++,
+  });
 
   /** Prévia de uma linha: o custo exato dela (null = sem preço ou número inválido). */
   function contaDaLinha(l: LinhaDaEmbalagem): { valor: Fracao | null; semPreco: boolean } | null {
@@ -99,9 +106,7 @@ export function FormEmbalagens({
   // Erros do servidor vêm pela posição da linha PREENCHIDA no canal (linha em branco não vai).
   const posicaoNoCanal = new Map<number, number>();
   for (const canal of CANAIS_COM_EMBALAGEM) {
-    linhas
-      .filter((l) => l.canal === canal && (l.insumoId || l.quantidade.trim()))
-      .forEach((l, i) => posicaoNoCanal.set(l.chave, i));
+    linhas.filter((l) => l.canal === canal && (l.insumoId || l.quantidade.trim())).forEach((l, i) => posicaoNoCanal.set(l.chave, i));
   }
   const idBase = 'embalagens';
   const rotuloDoErro = (campo: string) => {
@@ -177,31 +182,36 @@ export function FormEmbalagens({
                           <label htmlFor={`${idL}-q`} className="sr-only">
                             Quanto vai em uma porção{o ? ` (${o.nome})` : ''}
                           </label>
-                          <input
-                            id={`${idL}-q`}
-                            name="emb_quantidade"
-                            inputMode="decimal"
-                            autoComplete="off"
-                            value={l.quantidade}
-                            onChange={(e) => mudar(l.chave, { quantidade: e.target.value })}
-                            className={`${CAMPO} min-h-11 w-24 shrink-0 text-right text-base font-semibold tabular-nums sm:text-sm`}
-                            aria-invalid={!!erro}
-                            aria-describedby={erro ? `${idL}-erro` : undefined}
-                          />
+                          {/* O CAMPO é w-full: a largura fixa vem do invólucro. */}
+                          <div className="w-20 shrink-0 sm:w-24">
+                            <input
+                              id={`${idL}-q`}
+                              name="emb_quantidade"
+                              inputMode="decimal"
+                              autoComplete="off"
+                              value={l.quantidade}
+                              onChange={(e) => mudar(l.chave, { quantidade: e.target.value })}
+                              className={`${CAMPO} min-h-11 text-right text-base font-semibold tabular-nums sm:text-sm`}
+                              aria-invalid={!!erro}
+                              aria-describedby={erro ? `${idL}-erro` : undefined}
+                            />
+                          </div>
                           {o && o.unidade !== 'UN' ? (
-                            <select
-                              name="emb_unidade"
-                              value={l.unidade}
-                              onChange={(e) => mudar(l.chave, { unidade: e.target.value })}
-                              aria-label="Unidade"
-                              className={`${CAMPO} min-h-11 w-20 shrink-0 text-base sm:text-sm`}
-                            >
-                              {SIGLAS_DIGITAVEIS[o.unidade].map((s) => (
-                                <option key={s} value={s}>
-                                  {s}
-                                </option>
-                              ))}
-                            </select>
+                            <div className="w-20 shrink-0">
+                              <select
+                                name="emb_unidade"
+                                value={l.unidade}
+                                onChange={(e) => mudar(l.chave, { unidade: e.target.value })}
+                                aria-label="Unidade"
+                                className={`${CAMPO} min-h-11 text-base sm:text-sm`}
+                              >
+                                {SIGLAS_DIGITAVEIS[o.unidade].map((s) => (
+                                  <option key={s} value={s}>
+                                    {s}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
                           ) : (
                             <>
                               <input type="hidden" name="emb_unidade" value="un" />
@@ -209,7 +219,13 @@ export function FormEmbalagens({
                             </>
                           )}
                           <span className="flex min-w-0 flex-1 items-center justify-end text-right text-[13px] tabular-nums">
-                            {conta ? conta.valor ? <span className="text-texto">{formatarFracao(conta.valor)}</span> : <span className="text-atencao">sem preço</span> : null}
+                            {conta ? (
+                              conta.valor ? (
+                                <span className="text-texto">{formatarFracao(conta.valor)}</span>
+                              ) : (
+                                <span className="text-atencao">sem preço</span>
+                              )
+                            ) : null}
                           </span>
                           <button
                             type="button"

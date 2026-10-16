@@ -110,7 +110,15 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     }
     const f = await cadastrarFicha(
       a,
-      { nome: 'Burger cheddar', tipo: 'PRATO', rendimento: '1', itens: [{ insumoId: ids.pao, quantidade: '1', unidade: 'un' }, { insumoId: ids.blend, quantidade: '180', unidade: 'g' }] },
+      {
+        nome: 'Burger cheddar',
+        tipo: 'PRATO',
+        rendimento: '1',
+        itens: [
+          { insumoId: ids.pao, quantidade: '1', unidade: 'un' },
+          { insumoId: ids.blend, quantidade: '180', unidade: 'g' },
+        ],
+      },
       { tipo: 'manter' },
       'Marina',
     );
@@ -119,7 +127,12 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     const caixaB = await cadastrarInsumo(b, { escala: 'base', tipo: 'EMBALAGEM', nome: 'Caixa de B', unidade: 'UN', conteudo: '100', preco: '50,00' });
     if (!caixaB.ok) throw new Error('caixa B');
     ids.caixaB = caixaB.id;
-    const fb = await cadastrarFicha(b, { nome: 'Burger de B', tipo: 'PRATO', rendimento: '1', itens: [{ insumoId: ids.caixaB, quantidade: '1', unidade: 'un' }] }, { tipo: 'manter' }, 'Bia');
+    const fb = await cadastrarFicha(
+      b,
+      { nome: 'Burger de B', tipo: 'PRATO', rendimento: '1', itens: [{ insumoId: ids.caixaB, quantidade: '1', unidade: 'un' }] },
+      { tipo: 'manter' },
+      'Bia',
+    );
     if (!fb.ok) throw new Error(JSON.stringify(fb));
     ids.burgerB = fb.id;
   });
@@ -194,7 +207,12 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     );
     const hc = await listarHistorico(a, { entidade: 'CanalConfig', limite: 5 });
     expect(hc[0]).toMatchObject({ acao: 'CRIOU', autorNome: 'Marina' });
-    expect(hc[0].mudancas).toEqual(expect.arrayContaining([expect.objectContaining({ campo: 'comissão', depois: '23%' }), expect.objectContaining({ campo: 'pagamento online', depois: '3,2%' })]));
+    expect(hc[0].mudancas).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ campo: 'comissão', depois: '23%' }),
+        expect.objectContaining({ campo: 'pagamento online', depois: '3,2%' }),
+      ]),
+    );
   });
 
   it('nota da caixa kraft mais cara (R$ 99,00 o cento) sobe o delivery e o iFood em 10 c; a loja não muda', async () => {
@@ -202,7 +220,21 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     const forn = await cadastrarFornecedor(a, { nome: 'Embalagens Rio' }, 'Marina');
     if (!loja.ok || !forn.ok) throw new Error('loja/fornecedor');
     const dona = alcanceDe('DONO');
-    const n = await lancarNota(a, dona, { lojaId: loja.id, fornecedorId: forn.id, numero: '77', serie: '', data: hojeNoRio(), frete: '', total: '99,00', itens: [{ insumoId: ids.caixa, embalagem: 'padrao', quantidade: '1', valor: '99,00' }] }, 'Marina');
+    const n = await lancarNota(
+      a,
+      dona,
+      {
+        lojaId: loja.id,
+        fornecedorId: forn.id,
+        numero: '77',
+        serie: '',
+        data: hojeNoRio(),
+        frete: '',
+        total: '99,00',
+        itens: [{ insumoId: ids.caixa, embalagem: 'padrao', quantidade: '1', valor: '99,00' }],
+      },
+      'Marina',
+    );
     expect(n.ok).toBe(true);
     const [l, d, i] = (await camadas(a, ids.burger)).canais;
     igual(l.total, 49_164n, 100n);
@@ -213,12 +245,18 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
 
   it('isolamento: B não lê nem grava na ficha de A; embalagem de B recusada em A; a taxa de A não vale em B', async () => {
     expect(await obterFicha(b, ids.burger)).toBeNull();
-    expect(await salvarEmbalagens(b, ids.burger, { impressao: '', linhas: [linha('IFOOD', ids.caixaB, '1')] }, 'Bia')).toMatchObject({ ok: false, naoEncontrado: true });
+    expect(await salvarEmbalagens(b, ids.burger, { impressao: '', linhas: [linha('IFOOD', ids.caixaB, '1')] }, 'Bia')).toMatchObject({
+      ok: false,
+      naoEncontrado: true,
+    });
     const c = await camadas(a, ids.burger);
     const comB = await salvarEmbalagens(a, ids.burger, { impressao: c.impressao, linhas: [linha('IFOOD', ids.caixaB, '1')] }, 'Marina');
     expect(comB).toMatchObject({ ok: false, erros: { 'emb-IFOOD-0': expect.stringMatching(/não encontrada/) } });
     // Embalagem de A em ficha de B: também não existe para B.
-    expect(await salvarEmbalagens(b, ids.burgerB, { impressao: '', linhas: [linha('IFOOD', ids.caixa, '1')] }, 'Bia')).toMatchObject({ ok: false, erros: { 'emb-IFOOD-0': expect.any(String) } });
+    expect(await salvarEmbalagens(b, ids.burgerB, { impressao: '', linhas: [linha('IFOOD', ids.caixa, '1')] }, 'Bia')).toMatchObject({
+      ok: false,
+      erros: { 'emb-IFOOD-0': expect.any(String) },
+    });
     // B ainda não configurou: o iFood de B está incompleto, mesmo com A configurada.
     expect((await camadas(b, ids.burgerB)).canais[2]).toMatchObject({ incompleto: true, taxa: { tipo: 'naoConfigurada' } });
     expect(await salvarTaxaDoIfood(b, { comissao: '12', pagamento: '', versao: '' }, 'Bia')).toMatchObject({ ok: true });
@@ -226,13 +264,24 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     expect((await obterTaxaDoIfood(a)).taxa).toEqual({ comissaoBp: 2300, pagamentoBp: 320 });
     // O banco também: a FK composta recusa embalagem de B no produto de A.
     const produtoA = (await a.produtoVenda.findFirst({ where: { fichaId: ids.burger } }))!.id;
-    await expect(a.produtoEmbalagem.create({ data: { parceiroId: A.id, produtoId: produtoA, canal: 'IFOOD', insumoId: ids.caixaB, quantidadeMilesimos: 1000 } })).rejects.toThrow();
+    await expect(
+      a.produtoEmbalagem.create({ data: { parceiroId: A.id, produtoId: produtoA, canal: 'IFOOD', insumoId: ids.caixaB, quantidadeMilesimos: 1000 } }),
+    ).rejects.toThrow();
   });
 
   it('concorrência: duas abas nas embalagens (uma grava, a outra recebe "alguém mudou"); taxa com versão velha recusada; primeira configuração em corrida', async () => {
     const c = await camadas(a, ids.burger);
-    const so = (q: string) => [linha('DELIVERY_PROPRIO', ids.caixa, '1'), linha('DELIVERY_PROPRIO', ids.guardanapo, q), linha('IFOOD', ids.caixa, '1'), linha('IFOOD', ids.sacola, '1'), linha('IFOOD', ids.guardanapo, '2')];
-    const [x, y] = await Promise.all([salvarEmbalagens(a, ids.burger, { impressao: c.impressao, linhas: so('3') }, 'Ana'), salvarEmbalagens(a, ids.burger, { impressao: c.impressao, linhas: so('4') }, 'Bia')]);
+    const so = (q: string) => [
+      linha('DELIVERY_PROPRIO', ids.caixa, '1'),
+      linha('DELIVERY_PROPRIO', ids.guardanapo, q),
+      linha('IFOOD', ids.caixa, '1'),
+      linha('IFOOD', ids.sacola, '1'),
+      linha('IFOOD', ids.guardanapo, '2'),
+    ];
+    const [x, y] = await Promise.all([
+      salvarEmbalagens(a, ids.burger, { impressao: c.impressao, linhas: so('3') }, 'Ana'),
+      salvarEmbalagens(a, ids.burger, { impressao: c.impressao, linhas: so('4') }, 'Bia'),
+    ]);
     expect([x, y].filter((r) => r.ok)).toHaveLength(1);
     expect([x, y].find((r) => !r.ok)).toMatchObject({ ok: false, conflito: true });
     expect(await a.produtoEmbalagem.count({ where: { canal: 'DELIVERY_PROPRIO' } })).toBe(2);
@@ -251,7 +300,10 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     const C = await db.parceiroFlow.create({ data: { nome: 'Canais C', slug: `canais-c-${sufixo}`, status: 'ATIVO' } });
     const cc = doParceiro(C.id, db);
     try {
-      const [p, s] = await Promise.all([salvarTaxaDoIfood(cc, { comissao: '23', pagamento: '', versao: '' }, 'X'), salvarTaxaDoIfood(cc, { comissao: '12', pagamento: '', versao: '' }, 'Y')]);
+      const [p, s] = await Promise.all([
+        salvarTaxaDoIfood(cc, { comissao: '23', pagamento: '', versao: '' }, 'X'),
+        salvarTaxaDoIfood(cc, { comissao: '12', pagamento: '', versao: '' }, 'Y'),
+      ]);
       expect([p, s].filter((r) => r.ok)).toHaveLength(1);
       expect([p, s].find((r) => !r.ok)).toMatchObject({ conflito: true });
       expect(await cc.canalConfig.count()).toBe(1);
@@ -262,10 +314,27 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
 
   it('regras: só embalagem; pré-preparo não tem canal; desativada sai do seletor mas fica se já estava; renomear a ficha leva o produto junto', async () => {
     const c = await camadas(a, ids.burger);
-    expect(await salvarEmbalagens(a, ids.burger, { impressao: c.impressao, linhas: [linha('IFOOD', ids.pao, '1')] }, 'Marina')).toMatchObject({ ok: false, erros: { 'emb-IFOOD-0': expect.stringMatching(/não é embalagem/) } });
-    const molho = await cadastrarFicha(a, { nome: 'Molho da casa', tipo: 'PRE_PREPARO', rendimento: '1', rendimentoUnidade: 'kg', itens: [{ insumoId: ids.blend, quantidade: '100', unidade: 'g' }] }, { tipo: 'manter' }, 'Marina');
+    expect(await salvarEmbalagens(a, ids.burger, { impressao: c.impressao, linhas: [linha('IFOOD', ids.pao, '1')] }, 'Marina')).toMatchObject({
+      ok: false,
+      erros: { 'emb-IFOOD-0': expect.stringMatching(/não é embalagem/) },
+    });
+    const molho = await cadastrarFicha(
+      a,
+      {
+        nome: 'Molho da casa',
+        tipo: 'PRE_PREPARO',
+        rendimento: '1',
+        rendimentoUnidade: 'kg',
+        itens: [{ insumoId: ids.blend, quantidade: '100', unidade: 'g' }],
+      },
+      { tipo: 'manter' },
+      'Marina',
+    );
     expect(molho.ok).toBe(true);
-    expect(await salvarEmbalagens(a, (molho as { id: string }).id, { impressao: '', linhas: [] }, 'Marina')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/Pré-preparo/) } });
+    expect(await salvarEmbalagens(a, (molho as { id: string }).id, { impressao: '', linhas: [] }, 'Marina')).toMatchObject({
+      ok: false,
+      erros: { geral: expect.stringMatching(/Pré-preparo/) },
+    });
     // A sacola desativada: some do seletor; segue no iFood (já estava) e o custo continua contando.
     await a.insumo.update({ where: { id: ids.sacola }, data: { ativo: false } });
     expect((await embalagensParaEscolher(a)).map((e) => e.nome)).not.toContain('Sacola');
@@ -274,7 +343,22 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     expect(await salvarEmbalagens(a, ids.burger, { impressao: c.impressao, linhas: linhasDe(c) }, 'Marina')).toMatchObject({ ok: true, mudou: [] });
     // Renomear a ficha: o produto de venda da casa acompanha.
     const f = (await obterFicha(a, ids.burger))!;
-    const r = await editarFicha(a, ids.burger, { nome: 'Burger cheddar duplo', tipo: 'PRATO', rendimento: '1', itens: [{ insumoId: ids.pao, quantidade: '1', unidade: 'un' }, { insumoId: ids.blend, quantidade: '180', unidade: 'g' }], versao: f.versao }, { tipo: 'manter' }, 'Marina');
+    const r = await editarFicha(
+      a,
+      ids.burger,
+      {
+        nome: 'Burger cheddar duplo',
+        tipo: 'PRATO',
+        rendimento: '1',
+        itens: [
+          { insumoId: ids.pao, quantidade: '1', unidade: 'un' },
+          { insumoId: ids.blend, quantidade: '180', unidade: 'g' },
+        ],
+        versao: f.versao,
+      },
+      { tipo: 'manter' },
+      'Marina',
+    );
     expect(r.ok).toBe(true);
     expect((await a.produtoVenda.findFirst({ where: { fichaId: ids.burger } }))!.nome).toBe('Burger cheddar duplo');
   });

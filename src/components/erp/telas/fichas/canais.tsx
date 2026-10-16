@@ -97,7 +97,6 @@ export function TelaCanaisDeVenda({
   const mensagem = fraseDoFeitoDaFicha(feito);
   return (
     <div className="space-y-6">
-      <TrilhaDaPagina itens={[{ rotulo: 'Canais de venda' }]} />
       <Voltar href={base}>Voltar para as fichas</Voltar>
       <PageHeader icone="canais" cor={COR.fichas} titulo="Canais de venda" subtitulo={`${contexto} · o que entra no custo do prato em cada canal`} />
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
@@ -148,7 +147,10 @@ export function TelaCanaisDeVenda({
                 acao={acao}
                 aqui={`${base}/canais`}
                 versao={versao}
-                inicial={{ comissao: taxa ? pontosBaseParaCampo(taxa.comissaoBp) : '', pagamento: taxa && taxa.pagamentoBp ? pontosBaseParaCampo(taxa.pagamentoBp) : '' }}
+                inicial={{
+                  comissao: taxa ? pontosBaseParaCampo(taxa.comissaoBp) : '',
+                  pagamento: taxa && taxa.pagamentoBp ? pontosBaseParaCampo(taxa.pagamentoBp) : '',
+                }}
                 bloqueio={bloqueio}
               />
             ) : taxa ? (

@@ -35,7 +35,12 @@ const itensDoBurger: ItemParaCusto[] = [
 ];
 const burger = custoDaFicha(itensDoBurger, 1000);
 
-const insumo = (preco: number, conteudo: number, frete = 0) => ({ precoEmbalagemCentavos: preco, taxaEntregaCentavos: frete, conteudoMilesimos: conteudo, ultimaCompra: null });
+const insumo = (preco: number, conteudo: number, frete = 0) => ({
+  precoEmbalagemCentavos: preco,
+  taxaEntregaCentavos: frete,
+  conteudoMilesimos: conteudo,
+  ultimaCompra: null,
+});
 // Caixa kraft R$ 89,00 o cento (89 c/un); guardanapo R$ 4,00 o milheiro (0,4 c/un); sacola R$ 25,00 o cento.
 const caixa: EmbalagemParaCusto = { insumoId: 'cx', nome: 'Caixa kraft', unidade: 'UN', quantidadeMilesimos: 1000, insumo: insumo(8900, 100_000) };
 const guardanapo: EmbalagemParaCusto = { insumoId: 'gu', nome: 'Guardanapo', unidade: 'UN', quantidadeMilesimos: 2000, insumo: insumo(400, 1_000_000) };
@@ -149,7 +154,10 @@ describe('embalagens por canal: leitura do formulário', () => {
   const l = (canal: string, insumoId: string, quantidade: string, unidade = 'un') => ({ canal, insumoId, quantidade, unidade });
 
   it('delivery e iFood com listas diferentes; g na embalagem em kg; o canal LOJA forjado não entra', () => {
-    const r = lerEmbalagens([l('DELIVERY_PROPRIO', 'cx', '1'), l('DELIVERY_PROPRIO', 'gu', '2'), l('IFOOD', 'cx', '1'), l('IFOOD', 'fi', '5', 'g'), l('LOJA', 'cx', '1')], cad);
+    const r = lerEmbalagens(
+      [l('DELIVERY_PROPRIO', 'cx', '1'), l('DELIVERY_PROPRIO', 'gu', '2'), l('IFOOD', 'cx', '1'), l('IFOOD', 'fi', '5', 'g'), l('LOJA', 'cx', '1')],
+      cad,
+    );
     expect(r).toEqual({
       ok: true,
       dados: [
@@ -163,7 +171,16 @@ describe('embalagens por canal: leitura do formulário', () => {
 
   it('recusa: não é embalagem, desativada (a não ser que já estivesse), repetida, unidade de outra família, zero, acima de 1.000, de outro parceiro', () => {
     const r = lerEmbalagens(
-      [l('IFOOD', 'ch', '1', 'kg'), l('IFOOD', 've', '1'), l('IFOOD', 'cx', '1'), l('IFOOD', 'cx', '2'), l('IFOOD', 'gu', '2', 'g'), l('DELIVERY_PROPRIO', 'gu', '0'), l('DELIVERY_PROPRIO', 'cx', '1001'), l('DELIVERY_PROPRIO', 'deB', '1')],
+      [
+        l('IFOOD', 'ch', '1', 'kg'),
+        l('IFOOD', 've', '1'),
+        l('IFOOD', 'cx', '1'),
+        l('IFOOD', 'cx', '2'),
+        l('IFOOD', 'gu', '2', 'g'),
+        l('DELIVERY_PROPRIO', 'gu', '0'),
+        l('DELIVERY_PROPRIO', 'cx', '1001'),
+        l('DELIVERY_PROPRIO', 'deB', '1'),
+      ],
       cad,
     );
     expect(r.ok).toBe(false);
@@ -177,7 +194,12 @@ describe('embalagens por canal: leitura do formulário', () => {
     expect(r.erros['emb-DELIVERY_PROPRIO-2']).toMatch(/não encontrada/);
     expect(lerEmbalagens([l('IFOOD', 've', '1')], cad, new Set(['IFOOD:ve']))).toMatchObject({ ok: true });
     expect(lerEmbalagens([l('IFOOD', 've', '1')], cad, new Set(['DELIVERY_PROPRIO:ve']))).toMatchObject({ ok: false });
-    expect(lerEmbalagens(Array.from({ length: 21 }, () => l('IFOOD', 'cx', '1')), cad)).toMatchObject({ ok: false, erros: { 'emb-IFOOD': expect.stringMatching(/20/) } });
+    expect(
+      lerEmbalagens(
+        Array.from({ length: 21 }, () => l('IFOOD', 'cx', '1')),
+        cad,
+      ),
+    ).toMatchObject({ ok: false, erros: { 'emb-IFOOD': expect.stringMatching(/20/) } });
   });
 
   it('retrato para o histórico e impressão para a concorrência', () => {

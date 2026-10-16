@@ -46,9 +46,7 @@ import {
 } from './canal-campos';
 import { formatarPontosBase, type CustoExato, type Unidade } from './unidades';
 
-export type ResultadoDoCanal =
-  | { ok: true; id: string; mudou: string[] }
-  | { ok: false; erros: Erros; conflito?: boolean; naoEncontrado?: boolean };
+export type ResultadoDoCanal = { ok: true; id: string; mudou: string[] } | { ok: false; erros: Erros; conflito?: boolean; naoEncontrado?: boolean };
 
 class Recusa extends Error {
   constructor(readonly resultado: Extract<ResultadoDoCanal, { ok: false }>) {
@@ -81,7 +79,12 @@ async function embalagensGravadas(tx: ClienteDoParceiro, fichaId: string) {
       quantidadeMilesimos: e.quantidadeMilesimos,
       insumo: { ...e.insumo, unidade: e.insumo.unidade as Unidade, ultimaCompra: null as CustoExato | null },
     }))
-    .sort((a, b) => CANAIS_COM_EMBALAGEM.indexOf(a.canal) - CANAIS_COM_EMBALAGEM.indexOf(b.canal) || a.insumo.nome.localeCompare(b.insumo.nome, 'pt-BR') || (a.insumoId < b.insumoId ? -1 : 1));
+    .sort(
+      (a, b) =>
+        CANAIS_COM_EMBALAGEM.indexOf(a.canal) - CANAIS_COM_EMBALAGEM.indexOf(b.canal) ||
+        a.insumo.nome.localeCompare(b.insumo.nome, 'pt-BR') ||
+        (a.insumoId < b.insumoId ? -1 : 1),
+    );
   return { produtoId: produto?.id ?? null, lista };
 }
 
@@ -100,10 +103,15 @@ export async function custoPorCanal(cliente: ClienteDoParceiro, ficha: { id: str
   return cliente.transacao(async (tx) => {
     const [{ produtoId, lista }, cfg] = await Promise.all([embalagensGravadas(tx, ficha.id), taxaDoIfood(tx)]);
     // 1.5: a embalagem custa o último preço da nota (uma consulta para a leitura inteira).
-    await anexarUltimasCompras(tx, lista.map((e) => e.insumo));
+    await anexarUltimasCompras(
+      tx,
+      lista.map((e) => e.insumo),
+    );
     const taxa: TaxaDoCanal | null = cfg ? { comissaoBp: cfg.taxaBp, pagamentoBp: cfg.taxaPagamentoBp } : null;
     const paraCusto = (canal: CanalComEmbalagem): EmbalagemParaCusto[] =>
-      lista.filter((e) => e.canal === canal).map((e) => ({ insumoId: e.insumoId, nome: e.insumo.nome, unidade: e.insumo.unidade, quantidadeMilesimos: e.quantidadeMilesimos, insumo: e.insumo }));
+      lista
+        .filter((e) => e.canal === canal)
+        .map((e) => ({ insumoId: e.insumoId, nome: e.insumo.nome, unidade: e.insumo.unidade, quantidadeMilesimos: e.quantidadeMilesimos, insumo: e.insumo }));
     const canais: CamadasDoCanal[] = ORDEM_DOS_CANAIS.map((canal) =>
       camadasDoCanal({
         canal,
@@ -116,7 +124,15 @@ export async function custoPorCanal(cliente: ClienteDoParceiro, ficha: { id: str
     return {
       produtoId,
       impressao: impressaoDasEmbalagens(lista),
-      embalagens: lista.map((e) => ({ canal: e.canal, insumoId: e.insumoId, nome: e.insumo.nome, unidade: e.insumo.unidade, ativo: e.insumo.ativo, tipo: e.insumo.tipo, quantidadeMilesimos: e.quantidadeMilesimos })),
+      embalagens: lista.map((e) => ({
+        canal: e.canal,
+        insumoId: e.insumoId,
+        nome: e.insumo.nome,
+        unidade: e.insumo.unidade,
+        ativo: e.insumo.ativo,
+        tipo: e.insumo.tipo,
+        quantidadeMilesimos: e.quantidadeMilesimos,
+      })),
       taxaDoIfood: taxa,
       canais,
     };
@@ -181,7 +197,9 @@ export async function salvarEmbalagens(
       // Os insumos citados, travados (FOR SHARE) e só deste parceiro.
       const ids = Array.from(new Set(entrada.linhas.map((l) => l.insumoId).filter((x) => typeof x === 'string' && ID.test(x))));
       if (ids.length) await tx.sql`SELECT 1 FROM "Insumo" WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ANY(${ids}::text[]) FOR SHARE`;
-      const lidos = ids.length ? await tx.insumo.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, unidade: true, tipo: true, ativo: true } }) : [];
+      const lidos = ids.length
+        ? await tx.insumo.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, unidade: true, tipo: true, ativo: true } })
+        : [];
       const cadastro = new Map<string, EmbalagemDoCadastro>(lidos.map((i) => [i.id, { ...i, unidade: i.unidade as Unidade }]));
       const lido = lerEmbalagens(entrada.linhas, cadastro, new Set(atual.lista.map((e) => `${e.canal}:${e.insumoId}`)));
       if (!lido.ok) throw new Recusa({ ok: false, erros: lido.erros });
@@ -204,11 +222,25 @@ export async function salvarEmbalagens(
       await tx.produtoEmbalagem.deleteMany({ where: { produtoId, canal: { in: [...CANAIS_COM_EMBALAGEM] } } });
       if (lido.dados.length) {
         await tx.produtoEmbalagem.createMany({
-          data: lido.dados.map((e: EmbalagemDoCanal) => ({ parceiroId: tx.parceiroId, produtoId: produtoId!, canal: e.canal, insumoId: e.insumoId, quantidadeMilesimos: e.quantidadeMilesimos })),
+          data: lido.dados.map((e: EmbalagemDoCanal) => ({
+            parceiroId: tx.parceiroId,
+            produtoId: produtoId!,
+            canal: e.canal,
+            insumoId: e.insumoId,
+            quantidadeMilesimos: e.quantidadeMilesimos,
+          })),
         });
       }
       await tx.historicoAlteracao.create({
-        data: { parceiroId: tx.parceiroId, entidade: 'FichaTecnica', entidadeId: f.id, acao: 'ALTEROU', antes: mudanca.antes, depois: mudanca.depois, autorNome },
+        data: {
+          parceiroId: tx.parceiroId,
+          entidade: 'FichaTecnica',
+          entidadeId: f.id,
+          acao: 'ALTEROU',
+          antes: mudanca.antes,
+          depois: mudanca.depois,
+          autorNome,
+        },
       });
       return { ok: true as const, id: f.id, mudou: mudanca.campos };
     });
@@ -258,19 +290,36 @@ export async function salvarTaxaDoIfood(
   try {
     return await cliente.transacao(async (tx) => {
       const atual = await taxaDoIfood(tx);
-      if ((atual ? atual.atualizadoEm.toISOString() : '') !== versao) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DA_TAXA }, conflito: true });
+      if ((atual ? atual.atualizadoEm.toISOString() : '') !== versao)
+        throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DA_TAXA }, conflito: true });
       if (!atual) {
-        const novo = await tx.canalConfig.create({ data: { parceiroId: tx.parceiroId, canal: 'IFOOD', taxaBp: t.comissaoBp, taxaPagamentoBp: t.pagamentoBp }, select: { id: true } });
-        await tx.historicoAlteracao.create({ data: { parceiroId: tx.parceiroId, entidade: 'CanalConfig', entidadeId: novo.id, acao: 'CRIOU', depois: retratoDaTaxa(t), autorNome } });
+        const novo = await tx.canalConfig.create({
+          data: { parceiroId: tx.parceiroId, canal: 'IFOOD', taxaBp: t.comissaoBp, taxaPagamentoBp: t.pagamentoBp },
+          select: { id: true },
+        });
+        await tx.historicoAlteracao.create({
+          data: { parceiroId: tx.parceiroId, entidade: 'CanalConfig', entidadeId: novo.id, acao: 'CRIOU', depois: retratoDaTaxa(t), autorNome },
+        });
         return { ok: true as const, id: novo.id, mudou: ['comissao', 'pagamento'] };
       }
       const antes = retratoDaTaxa({ comissaoBp: atual.taxaBp, pagamentoBp: atual.taxaPagamentoBp });
       const mudanca = diferenca(antes, retratoDaTaxa(t));
       if (!mudanca) return { ok: true as const, id: atual.id, mudou: [] };
-      const r = await tx.canalConfig.updateMany({ where: { id: atual.id, atualizadoEm: atual.atualizadoEm }, data: { taxaBp: t.comissaoBp, taxaPagamentoBp: t.pagamentoBp } });
+      const r = await tx.canalConfig.updateMany({
+        where: { id: atual.id, atualizadoEm: atual.atualizadoEm },
+        data: { taxaBp: t.comissaoBp, taxaPagamentoBp: t.pagamentoBp },
+      });
       if (r.count !== 1) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DA_TAXA }, conflito: true });
       await tx.historicoAlteracao.create({
-        data: { parceiroId: tx.parceiroId, entidade: 'CanalConfig', entidadeId: atual.id, acao: 'ALTEROU', antes: mudanca.antes, depois: mudanca.depois, autorNome },
+        data: {
+          parceiroId: tx.parceiroId,
+          entidade: 'CanalConfig',
+          entidadeId: atual.id,
+          acao: 'ALTEROU',
+          antes: mudanca.antes,
+          depois: mudanca.depois,
+          autorNome,
+        },
       });
       return { ok: true as const, id: atual.id, mudou: mudanca.campos };
     });

@@ -177,7 +177,8 @@ export function lerEmbalagens(
       vistos.set(ins.id, i);
       const u = UNIDADES[ins.unidade];
       const escala = escalaDaSigla(l.unidade, ins.unidade);
-      if (!escala) return void (erros[chave] = `“${ins.nome}” é medida em ${u.nome.toLowerCase()}: use ${ins.unidade === 'UN' ? 'un' : `${u.menor} ou ${u.sigla}`}.`);
+      if (!escala)
+        return void (erros[chave] = `“${ins.nome}” é medida em ${u.nome.toLowerCase()}: use ${ins.unidade === 'UN' ? 'un' : `${u.menor} ou ${u.sigla}`}.`);
       const t = l.quantidade.trim();
       if (!t) return void (erros[chave] = `Quanto de “${ins.nome}” vai em cada porção?`);
       const q = lerQuantidadeNa(t, ins.unidade, escala);
@@ -217,7 +218,11 @@ export function retratoDasEmbalagens(
     // Na ordem do nome (a da tela): a mesma lista em outra ordem não é mudança.
     const l = lista
       .filter((e) => e.canal === c)
-      .map((e) => ({ nome: nomes.get(e.insumoId)?.nome ?? '?', unidade: nomes.get(e.insumoId)?.unidade ?? ('UN' as const), quantidadeMilesimos: e.quantidadeMilesimos }))
+      .map((e) => ({
+        nome: nomes.get(e.insumoId)?.nome ?? '?',
+        unidade: nomes.get(e.insumoId)?.unidade ?? ('UN' as const),
+        quantidadeMilesimos: e.quantidadeMilesimos,
+      }))
       .sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
     if (l.length === 0) return SEM_EMBALAGEM;
     return itensEmTexto(l);
@@ -312,7 +317,12 @@ export function camadasDoCanal(p: {
 }
 
 const citar = (nomes: readonly string[]) =>
-  nomes.length === 1 ? `“${nomes[0]}”` : `${nomes.slice(0, -1).map((n) => `“${n}”`).join(', ')} e “${nomes[nomes.length - 1]}”`;
+  nomes.length === 1
+    ? `“${nomes[0]}”`
+    : `${nomes
+        .slice(0, -1)
+        .map((n) => `“${n}”`)
+        .join(', ')} e “${nomes[nomes.length - 1]}”`;
 
 /** Por que o canal está incompleto, numa frase ("falta preço em “Sacola”; taxa do iFood não configurada"). */
 export function porQueIncompleto(c: CamadasDoCanal): string | null {

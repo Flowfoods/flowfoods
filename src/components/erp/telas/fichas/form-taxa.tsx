@@ -47,17 +47,19 @@ export function FormTaxaDoIfood({
         {rotulo}
       </label>
       <div className="flex items-stretch gap-2">
-        <input
-          id={`taxa-${id}`}
-          name={id}
-          inputMode="decimal"
-          autoComplete="off"
-          value={valor}
-          onChange={(e) => aoMudar(e.target.value)}
-          className={`${CAMPO} min-h-11 w-28 text-right text-base font-semibold tabular-nums sm:text-sm`}
-          aria-invalid={!!erros[id]}
-          aria-describedby={`taxa-${id}-ajuda${erros[id] ? ` taxa-${id}-erro` : ''}`}
-        />
+        <div className="w-28 shrink-0">
+          <input
+            id={`taxa-${id}`}
+            name={id}
+            inputMode="decimal"
+            autoComplete="off"
+            value={valor}
+            onChange={(e) => aoMudar(e.target.value)}
+            className={`${CAMPO} min-h-11 text-right text-base font-semibold tabular-nums sm:text-sm`}
+            aria-invalid={!!erros[id]}
+            aria-describedby={`taxa-${id}-ajuda${erros[id] ? ` taxa-${id}-erro` : ''}`}
+          />
+        </div>
         <span className="flex items-center text-[14px] text-suave">% do preço</span>
       </div>
       <p id={`taxa-${id}-ajuda`} className={AJUDA}>
@@ -77,7 +79,8 @@ export function FormTaxaDoIfood({
       <p className="rounded-[10px] border border-linha px-4 py-3 text-[13px] tabular-nums text-texto" aria-live="polite">
         {total !== null && total < 10_000 ? (
           <>
-            <strong className="font-semibold">{formatarPontosBase(total)} do preço</strong> vão para o iFood: a cada R$ 10,00 de venda, {taxaACadaDezReais(total)}.
+            <strong className="font-semibold">{formatarPontosBase(total)} do preço</strong> vão para o iFood: a cada R$ 10,00 de venda,{' '}
+            {taxaACadaDezReais(total)}.
           </>
         ) : (
           <span className="text-suave">Digite a comissão (e o pagamento online, se houver) para ver a conta.</span>
