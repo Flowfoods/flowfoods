@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -29,6 +29,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Requisição (o setor pede, o estoque entrega e dá baixa) e divergências requisição × contagem (1.8) | `src/lib/erp/{requisicao-campos,requisicao}.ts` (puro / com banco); telas em `src/components/erp/telas/requisicoes/`; rotas `<loja>/requisicoes` (quadro), `/nova`, `/<id>`, `/<id>/atender`, `<loja>/divergencias`, e `requisicoes`/`divergencias` (escolher a loja) em `/erp/estoque` e `/rodolfo/erp/<slug>/estoque`; migration `20261021000000_erp_requisicao` |
 | Precificação dentro da ficha: custo por canal em camadas (loja · delivery · iFood), embalagens por canal e taxa do iFood (1.9) | `src/lib/erp/{canal-campos,canais}.ts` (puro / com banco); telas `telas/fichas/{custo-por-canal,canais,form-embalagens,form-taxa}.tsx`; rotas `fichas/<id>/canais` (embalagens) e `fichas/canais` (canais de venda e taxa) em `/erp` e `/rodolfo/erp/<slug>`; migration `20261022000000_erp_custo_por_canal` |
 | Preço e margem por canal na ficha: sugerido pela margem-alvo, preço próprio, margem bruta e líquida, farol (1.10) | `src/lib/erp/preco-campos.ts` (puro: a MESMA conta no servidor e na prévia) + `canais.ts` (`contaDosCanais`, `salvarPrecos`, `salvarMargensAlvo`, `precosDaLista`); telas `telas/fichas/{custo-por-canal,form-margens}.tsx` e `ui/dica.tsx`; sem migration |
+| Onboarding (0.5): pedido de acesso (landing ou manual), quadro "Aguardando liberação" e ativação | `src/lib/erp/{pedido-textos,pedido-campos,pedidos,trava}.ts` (textos e limites / regras puras / banco / trava) + `ativarPedido` em `credenciais.ts`; landing `src/components/FormComecar.tsx` + `src/app/comecar/actions.ts`; N1 em `src/app/rodolfo/(painel)/onboarding/` (`/rodolfo/onboarding`, `/<id>`, `/novo`); migration `20261023000000_erp_onboarding` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
@@ -42,7 +43,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
    `HistoricoAlteracao` do próprio parceiro **na mesma transação**
    (`gravarParceiroFlow`), aparece no histórico curto da aba Cadastro e no
    Histórico completo. Mudança é condicional ao valor lido (duas abas não se
-   atropelam). Criar parceiro pela landing/aprovação de lead é da 0.5.
+   atropelam). (0.5: o parceiro deixou de ser criado por esse formulário: nasce na ativação de um pedido, já ATIVO e com dono; ver "O que a 0.5 entregou".)
 2. **Estrutura N2 → N3.** Aba "Lojas e marcas": cadastro (nome; loja ganha slug
    próprio) e lista. Cadastro de loja, marca e insumo grava o "depois" no
    histórico, na mesma transação. Aba "Histórico": tudo, com filtro por
@@ -94,7 +95,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
    (`tela-insumos.tsx`), sempre por `exigirParceiroDaSessao()` → `doParceiro`
    com o parceiro DA SESSÃO; nenhuma rota recebe parceiro pela URL. Quem tem
    mais de um parceiro escolhe em `/entrar/escolher` (vínculo conferido).
-   Parceiro suspenso/aguardando: entra, mas só lê (decisão 38).
+   Parceiro suspenso: entra, mas só lê (decisão 38). Parceiro em RASCUNHO NÃO entra (0.5, decisão 92).
 5. **Entrar com o rosto** (passkey/WebAuthn, `@simplewebauthn`): verificação do
    usuário obrigatória — no celular, Face ID/reconhecimento facial/digital do
    próprio aparelho. O servidor guarda só a chave pública; nenhuma imagem é
@@ -1113,6 +1114,116 @@ e vê a taxa virar R$ 7,83 e as margens mudarem ao vivo ("abaixo do alvo"), salv
 (o servidor chega no mesmo número); uma nota do queijo cheddar mais cara baixa a
 margem do iFood; o gerente vê sem o campo; o operador não vê (nem na lista).
 
+## O que a 0.5 entregou — onboarding: a landing capta, o Rodolfo ativa
+
+Migration `20261023000000_erp_onboarding` (ADITIVA; 3 enums, 3 tabelas, 1 gatilho; nenhuma
+tabela existente muda: a ligação com o parceiro fica do lado do pedido; sem índice parcial:
+`migrate diff` vazio). Provada em banco novo como superusuário, dono não-superusuário com RLS e sem
+RLS, e no `ff_dev` com dado.
+
+1. **O pedido mora FORA do tenant** (decisão 91). `PedidoParceiro` (grupo, responsável, WhatsApp em
+   E.164, e-mail minúsculo, lojas, marcas, cidade, consentimento + versão, etapa, `etapaDesde`,
+   `versao`, `reenvios`, motivo da recusa, `parceiroCriadoId`), `PedidoParceiroEvento` (só se
+   acrescenta: o gatilho recusa UPDATE; guarda etapa antes/depois, motivo e autor, nunca dado pessoal)
+   e `TentativaPedidoParceiro` (limite do formulário). O vínculo se chama `parceiroCriadoId` (não
+   `parceiroId`, a marca de tabela de tenant). CHECKs: lojas 1–200, marcas 1–50, e-mail minúsculo,
+   ATIVADO ⇔ parceiro criado, RECUSADO ⇒ motivo ≥ 3, LANDING ⇒ consentimento, dados excluídos só em
+   recusado. O papel `erp_tenant` não tem GRANT (a migration revoga, no padrão condicional da 0.3) e o
+   `prisma` do portal recusa os modelos (`MODELOS_DE_PEDIDO`). Só `pedidos.ts` e a ativação em
+   `credenciais.ts` tocam neles; nada em `/erp`, `/entrar` ou `telas/` os importa (teste-guarda).
+2. **Landing** (`/` continua estática, ○ no build): formulário dentro do convite final (`#comecar`,
+   componente cliente + server action) com nome do grupo, responsável, WhatsApp (celular BR),
+   e-mail, lojas, marcas, cidade/UF e a caixa obrigatória "Autorizo a FlowFoods a usar estes dados só
+   para falar comigo sobre a consultoria e o sistema." (versão `v1`). **Funciona sem JavaScript**
+   (formulário nativo; a página volta com a resposta) e mantém o que foi digitado quando há erro. Os
+   botões do WhatsApp continuam. Sem `DATABASE_URL` (ou erro inesperado) a resposta é "Fale pelo
+   WhatsApp" com o link, nunca 500. O placeholder do e-mail não usa a palavra proibida pelo gate.
+3. **Resposta única e anti-abuso** (decisão 94). Tudo numa transação sob `pg_advisory_xact_lock` do IP
+   (depois, nesta ordem, o teto global e o e-mail e o WhatsApp): limite de **3 por hora e 10 por dia
+   por IP** (conta pedido novo, reenvio e armadilha), **teto global de 100 cartões novos por dia**, e
+   um teto de ruído por IP (40 linhas/hora; passou, nem anota). Tabela própria: pedido que falha não
+   trava o login de quem divide o IP. IP real = o `X-Real-Ip` do Traefik (herança da 0.3). Campo
+   escondido `site_da_empresa` (fora da tela, `tabindex=-1`, `aria-hidden`): preenchido, a resposta é
+   a mesma e nada é gravado além da tentativa `ARMADILHA`. **Reenvio**: pedido aberto com o mesmo
+   e-mail OU WhatsApp recebe `reenvios + 1` e um evento `REENVIOU` no MESMO cartão (o cartão não é
+   reescrito: ninguém assume o cartão de outro mandando o e-mail dele). O formulário nunca consulta
+   `UsuarioErp`: e-mail que já entra no ERP, de pedido aberto e novo recebem a mesma resposta, byte a
+   byte (provado em teste e no navegador sem JavaScript).
+4. **Quadro "Aguardando liberação"** em `/rodolfo/onboarding` (menu Parceiros Flow; contagem e atraso
+   no sino do nível 1; só o nível 1 lê): colunas **Novo · Em conversa · Ativado · Recusado** (as duas
+   últimas, 30 dias). Cartão = grupo, quem pediu e onde, lojas/marcas, "chegou há 3d", origem
+   (site/digitado) e "mandou de novo 3×". **Atraso** (decisão 97): Novo > 2 dias, Em conversa > 7 dias
+   sem movimento (`etapaDesde`; reenvio do lead não conta como movimento), dias corridos no calendário
+   do Rio, → **filete vermelho de 2 px à esquerda + "Xd de atraso"** (na 1.8 o filete é de 3 px; aqui
+   são 2, como pedido). Mover de etapa por botão no detalhe (sem arrastar). No celular as colunas
+   viram abas (links `?etapa=`, sem JavaScript); de 768 px, todas à vista; 4 por linha a partir de
+   1280 px.
+5. **Detalhe do pedido**: quem pediu (WhatsApp `wa.me` só com dígitos, e-mail `mailto` só se válido,
+   montados no servidor), a autorização (data e versão do texto), o histórico antes/depois, as marcas
+   só-leitura do nível 1 ("este e-mail já tem acesso ao ERP: Parceiro X"; "este WhatsApp já está no
+   Barney: status Y" — nada é pausado na cadência) e a decisão: marcar em conversa / voltar a Novo,
+   **ativar**, **recusar** (motivo obrigatório, 3–200) e, no recusado, **excluir dados pessoais**.
+6. **Ativar** (decisão 93; só nível 1; `ativarPedido` em `credenciais.ts`): formulário pré-preenchido
+   e editável (nome do parceiro, link/slug gerado e editável, nome e e-mail do dono). UMA transação:
+   trava `erp-pedido:<id>` → confere etapa aberta e versão lida → cria o `ParceiroFlow` ATIVO →
+   `criarAcessoNaTransacao` (o miolo de `criarAcesso`, extraído: dono = perfil Dono com a rede inteira,
+   mesma regra de e-mail já existente e de `revogarMeiosDeEntrada`) → convite do nível 1 (72 h, uso
+   único, só o hash) → `updateMany` condicional marca o pedido ATIVADO com `parceiroCriadoId` → evento
+   `ATIVOU` → **por último** o histórico do parceiro (CRIOU do parceiro, CRIOU e GEROU_LINK do acesso).
+   Duas ativações juntas, ou ativar × recusar: um vence, o outro recebe "Este pedido já foi ativado por
+   X em DD/MM. Nada foi criado de novo." (slug repetido vira frase). Falha no meio não deixa nada (teste
+   com gatilho de falha forçada). **E-mail do dono que já tem senha em outro parceiro**: ativa sem
+   link e com a frase da 0.4; senha criada por link de parceiro é revogada e o histórico dos dois
+   parceiros registra.
+7. **Convite sem SMTP** (decisão 95): o link aparece UMA vez, na resposta da ativação (estado da tela,
+   no topo da coluna de decisão), com **Copiar** e **Abrir no WhatsApp** (`wa.me/<número do pedido>`
+   com a mensagem e o link). O token não vai para o banco, o AuditLog, o histórico nem a URL (teste e
+   prova procuram o token em 7 tabelas). Recarregou: o link não volta; "Gerar link novo" na Equipe
+   (herança da 0.3/0.4 fechada: o envio do link é esse botão, sem servidor de envio).
+8. **Parceiro em RASCUNHO não entra** (decisão 92, revoga a 38 só para RASCUNHO): `abrirSessao`,
+   `validarSessao` (a sessão aberta morre na próxima requisição), `escolherParceiro` e `conviteValido`
+   ignoram vínculo de parceiro em RASCUNHO; `criarAcesso` e `gerarNovoLink` recusam nele. Suspenso
+   segue entrando e lendo. Como não há acesso à produção para contar quem ficaria de fora, a **lista
+   de parceiros do nível 1** avisa, na linha de cada RASCUNHO com pessoas ativas, "N pessoas não
+   entram: ative para liberar o acesso" (`rascunhosComPessoasAtivas`); ativar é a transição
+   RASCUNHO → ATIVO que já existe na aba Cadastro.
+9. **Regra Nº 2: um caminho só.** O formulário "Novo parceiro" com "Nasce como: Aguardando liberação"
+   saiu (e a action `acaoCriarParceiro`): "Aguardando liberação" é o quadro, "Cadastrar pedido manual"
+   (tela própria, origem MANUAL, sem a caixa de autorização, "Já estamos conversando" opcional;
+   contato igual a pedido aberto é recusado) é a entrada do que não veio do site, e a ativação é a
+   mesma. O rótulo do status RASCUNHO passou a "Rascunho" (legado). `criarParceiro` fica para o seed e
+   os testes. A métrica "Aguardando liberação" da lista soma pedidos abertos + rascunhos. O Lead do
+   Barney não foi reaproveitado (unicidade do telefone devolveria erro diferente, e o lead entraria na
+   cadência automática).
+10. **LGPD** (decisão 96): consentimento versionado; pedido recusado guardado por 180 dias (o detalhe
+    diz até quando); "Excluir dados pessoais" anonimiza o pedido recusado e mantém o cartão e o
+    histórico sem dado pessoal. A rotina que apaga sozinha aos 180 dias NÃO foi feita (pendência).
+
+## Provar o onboarding (0.5)
+
+```bash
+npx vitest run tests/erp-onboarding.test.ts tests/erp-tenant-portao.test.ts   # limpeza e bidi, validação, consentimento, atraso, links, landing sem banco, guarda (só pedidos.ts e a ativação tocam o pedido)
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev \
+  npx vitest run tests/erp-onboarding.db.test.ts tests/erp-rls.db.test.ts tests/erp-acesso.db.test.ts
+```
+`erp-onboarding.db.test.ts` (29 testes): envio válido, sem caixa, armadilha, enumeração (resposta
+idêntica), reenvio, **20 envios paralelos do mesmo IP = exatamente 3**, 10/dia, teto global, ruído, login
+independente, quadro e atraso, versão, pedido manual, evento só-inclusão, CHECKs, `prisma` do portal
+recusa, ativar (tudo + token ausente do banco + link de uso único + a dona entra no ERP), ativar duas
+vezes, **corrida de ativação dupla = 1 parceiro**, ativar × recusar, atomicidade (falha forçada),
+slug repetido, tela velha, dono com senha em outro parceiro, recusa com e sem motivo, excluir dados,
+**RASCUNHO que não entra** (login, sessão aberta, link, criar acesso) e N2 sem leitura do pedido.
+Rodado como superusuário, como dono não-superusuário com RLS (247 testes) e sem RLS (239 + 8 pulados),
+duas vezes seguidas no `ff_dev`.
+
+Na tela (produção local, `NODE_ENV=production`, porta 3100; roteiro em `prova05/jornada.mjs` no
+scratchpad): enviar o formulário do site (com e sem JavaScript; com erro, com a armadilha, o 4º envio do
+mesmo IP bloqueado) → o quadro mostra o Novo de 3 dias com "1d de atraso" e o Em conversa de 9 dias com
+"2d de atraso" (filete de 2 px) → ativar, copiar o link e abrir no WhatsApp → o link aberto num navegador
+novo cria a senha, o segundo uso dá "link vencido" e a dona entra no ERP como Dono → recusar com e sem
+motivo → cadastrar pedido manual → lista de parceiros com o aviso do rascunho. Prints em 390/820/1440,
+claro e escuro.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -1144,6 +1255,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | DRE | `Despesa` | despesa manual/importada numa linha; loja nula = rede, canal nulo = rateio; importada exige chave de idempotência |
 | DRE | `PeriodoApuracao` | períodos configuráveis; contagem de fechamento aponta o período |
 | DRE | `FarolFaixa` | 5 faixas por linha do DRE × canal (nulo = rede), sobre o desvio vs meta já com o sentido da linha |
+| Onboarding (0.5, FORA do tenant) | `PedidoParceiro` / `PedidoParceiroEvento` / `TentativaPedidoParceiro` | pedido de acesso (landing ou manual) com consentimento, etapa e versão; evento só-inclusão; tentativas do formulário público. Sem `parceiroId`: o vínculo com o parceiro criado é `parceiroCriadoId` |
 | Auditoria | `HistoricoAlteracao` | antes/depois de todo corte, ajuste ou alteração sensível |
 
 ### Unidades inteiras
@@ -1294,7 +1406,7 @@ banco de teste: o operador é recusado pelo servidor.
 ## Herança da 0.3 (para as próximas subfases)
 
 - ~~**0.4:** perfil, setores e lojas no `AcessoParceiro`; `/erp` deixava qualquer pessoa cadastrar insumo.~~ **Feito na 0.4.** `Colaborador` NÃO foi ligado à pessoa: setores não precisaram dele (moram no vínculo). Fica para a fase de RH/produção (3.3): `Colaborador` (tenant) ganharia `usuarioId` SEM relação Prisma (relação criaria campo de volta no `UsuarioErp` e o teste-guarda reprova credencial apontando para tenant), conferido na escrita.
-- **0.5:** o envio do link (WhatsApp/e-mail) entra no `criarAcesso`/`gerarNovoLink`; hoje o Rodolfo copia.
+- ~~**0.5:** o envio do link (WhatsApp/e-mail) entra no `criarAcesso`/`gerarNovoLink`; hoje o Rodolfo copia.~~ **0.5:** a ativação mostra o link uma vez com "Copiar" e "Abrir no WhatsApp" (wa.me); sem servidor de envio (sem SMTP, Evolution sem conexão).
 - `TentativaEntradaErp`, `SessaoErp` encerradas/vencidas e `ConviteAcesso` usados crescem sem faxina: criar rotina de retenção (ex.: 90 dias) no worker.
 - **IP do limite.** Vale o `X-Real-Ip`; sem ele, o ÚLTIMO item do `X-Forwarded-For`. O Traefik (Dokploy), com a configuração padrão (sem `forwardedHeaders.insecure` nem `trustedIPs` abertos), apaga o `X-Real-Ip` que vem de fora e escreve o IP real da conexão — por isso ele é o preferido. Isso só vale se o `web` NÃO estiver exposto direto na internet (o compose usa `expose`, não `ports`): acesso direto à porta 3000 deixa o cabeçalho ser inventado e o limite por IP fica contornável (o por e-mail continua). Sem proxy nenhum (dev), todos caem em "desconhecido" e dividem o limite de IP.
 - Rosto exige https em produção; trocar o domínio invalida as chaves (as pessoas ativam de novo).
@@ -1328,8 +1440,7 @@ banco de teste: o operador é recusado pelo servidor.
   (e quem tem a rede); o nome de loja fora do alcance aparece como "+N lojas".
 - `listarAcessos` conta tentativas por pessoa (2 consultas cada): trocar por
   uma consulta agrupada quando a equipe passar de dezenas.
-- O envio do link (0.5) entra em `executar.ts`/`criarAcesso`; a regra do link
-  (decisão 41) já está no servidor.
+- ~~O envio do link (0.5) entra em `executar.ts`/`criarAcesso`.~~ **0.5:** botão "Abrir no WhatsApp" (wa.me) no link gerado; a regra do link (decisão 41) já está no servidor.
 
 ## Herança da 0.4 (apontada pelos fiscais)
 
@@ -1650,3 +1761,29 @@ banco de teste: o operador é recusado pelo servidor.
 - UX: selo "sugerido" para a dona no campo do preço (como o gerente já vê "o sugerido" no texto).
 - [Guardião] Testes com banco rodando em paralelo com papel não-superusuário dão deadlock: `limparParceiros` faz `ALTER TABLE … NO FORCE ROW LEVEL SECURITY`. Rodar em série (como hoje) ou trocar a limpeza por exclusão dentro do contexto.
 - Pendentes da execução: alvo por prato (`ProdutoCanal.margemAlvoBp` sem tela); filtro "margem abaixo do alvo" na lista (hoje a conta é por página); o mesmo prato em duas marcas; a prova da 1.10 deixou preços e margens da Casa Alfa no `ff_dev` (desfaz com `prova110/montar.ts limpar` no scratchpad).
+
+## Herança da 0.5 (para as próximas subfases)
+
+- **Rotina de retenção** (worker): apagar/anonimizar pedido RECUSADO aos 180 dias, e faxinar
+  `TentativaPedidoParceiro`, `PedidoParceiroEvento` antigos, `TentativaEntradaErp`, `SessaoErp` e
+  `ConviteAcesso` vencidos. Hoje só o botão "Excluir dados pessoais" (manual).
+- **Antes do deploy** (sem acesso à produção nesta fase): contar parceiros em RASCUNHO com pessoas ativas
+  (`SELECT count(*) FROM "AcessoParceiro" a JOIN "ParceiroFlow" p ON p.id=a."parceiroId" WHERE p.status='RASCUNHO' AND a.status='ATIVO'`);
+  quem existir sai do ar até o parceiro ser ativado. A lista de parceiros do nível 1 já avisa.
+- **Página de política de privacidade** completa (hoje só o texto curto do consentimento).
+- A decisão 91 desvia da letra do contrato (o Parceiro Flow nasce na ativação, não "aguardando
+  liberação" no envio): registrar na seção 8 do Notion para o Rodolfo validar. Se ele quiser o literal, a
+  fase precisa de slug editável em RASCUNHO, status RECUSADO no enum, um caminho para apagar spam com
+  histórico e um filtro na lista, na busca e no seletor do shell.
+- Fora do escopo, anotado: e-mail automático/SMTP e envio pela Evolution; CAPTCHA de terceiros; escolha
+  de plano; criar lojas e marcas a partir do número informado (é só informativo); pausar a cadência do
+  Barney quando o telefone coincide (hoje só o aviso no cartão); arrastar e soltar; exportar CSV; reabrir
+  recusado (novo envio vira novo pedido); trocar o link "/rodolfo/login" do cabeçalho da landing.
+- O quadro é próprio (`onboarding/quadro.tsx`), não uma generalização de `requisicoes/quadro.tsx`: o
+  teste-guarda proíbe `telas/` de importar pedido. Se um terceiro quadro aparecer, extrair o esqueleto
+  (coluna, cartão com filete) para `telas/quadro/` sem dado de pedido.
+- O IP do limite depende do Traefik sobrescrever `X-Real-Ip` (herança da 0.3); atrás de CDN ou rede
+  compartilhada (escritório, 4G) o limite de 3/h pode pegar gente de verdade: o bloqueio já mostra a
+  saída pelo WhatsApp.
+- O formulário não tem CAPTCHA; a armadilha só pega robô simples. Spam feito à mão passa até 3/h por IP
+  e 100/dia no total, e cai no quadro como cartão Novo para recusar com motivo.
