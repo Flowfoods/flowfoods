@@ -10,7 +10,7 @@ import { obterFicha } from '@/lib/erp/fichas';
 import { custoPorCanal } from '@/lib/erp/canais';
 import { lerFiltrosDeFicha, queryDosFiltrosDeFicha } from '@/lib/erp/ficha-campos';
 import { TelaDetalheFicha } from '@/components/erp/telas/fichas/detalhe';
-import { acaoSituacaoFicha } from '../actions';
+import { acaoSalvarPrecos, acaoSituacaoFicha } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +39,8 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
       linkDasEmbalagens={pode(ctx.alcance, 'fichas.editar') && verPrecos && !ctx.bloqueio ? `${BASE}/${ficha.id}/canais` : undefined}
       linkDaTaxa={verPrecos ? `${BASE}/canais` : undefined}
       podeConfigurarTaxa={pode(ctx.alcance, 'precos.editar') && !ctx.bloqueio}
+      // 1.10: o preço é campo só para quem muda preços (a action confere de novo).
+      acaoPrecos={pode(ctx.alcance, 'precos.editar') && !ctx.bloqueio ? acaoSalvarPrecos.bind(null, ficha.id) : undefined}
     />
   );
 }

@@ -6,7 +6,7 @@ import { obterFicha } from '@/lib/erp/fichas';
 import { custoPorCanal } from '@/lib/erp/canais';
 import { lerFiltrosDeFicha, queryDosFiltrosDeFicha } from '@/lib/erp/ficha-campos';
 import { TelaDetalheFicha } from '@/components/erp/telas/fichas/detalhe';
-import { acaoSituacaoFicha } from '../actions';
+import { acaoSalvarPrecos, acaoSituacaoFicha } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,6 +39,7 @@ export default async function ParceiroFichaPage({
       linkDasEmbalagens={ctx.bloqueio ? undefined : `${base}/fichas/${ficha.id}/canais`}
       linkDaTaxa={`${base}/fichas/canais`}
       podeConfigurarTaxa={!ctx.bloqueio}
+      acaoPrecos={ctx.bloqueio ? undefined : acaoSalvarPrecos.bind(null, ctx.parceiro.slug, ficha.id)}
     />
   );
 }

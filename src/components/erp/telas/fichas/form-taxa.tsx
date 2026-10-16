@@ -24,6 +24,7 @@ export function FormTaxaDoIfood({
   inicial,
   bloqueio,
   cancelar,
+  variante = 'primario',
 }: {
   acao: AcaoDeCadastro;
   aqui: string;
@@ -32,6 +33,8 @@ export function FormTaxaDoIfood({
   inicial: { comissao: string; pagamento: string };
   bloqueio: string | null;
   cancelar?: string;
+  /** 1.10: na tela dos canais, o principal é o das margens-alvo. */
+  variante?: 'primario' | 'secundario';
 }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida();
@@ -92,7 +95,7 @@ export function FormTaxaDoIfood({
             Cancelar
           </Link>
         )}
-        <BotaoEnviar disabled={!!bloqueio} className="sm:min-w-44">
+        <BotaoEnviar disabled={!!bloqueio} variante={variante} className="sm:min-w-44">
           Salvar taxa do iFood
         </BotaoEnviar>
       </div>
