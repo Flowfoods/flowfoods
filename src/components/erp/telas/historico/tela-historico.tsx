@@ -16,6 +16,7 @@ export const FILTROS: { valor: string; rotulo: string; entidades?: string[] }[] 
   { valor: 'Marca', rotulo: 'Marcas' },
   // Insumos e as outras embalagens de compra deles.
   { valor: 'Insumo', rotulo: 'Insumos', entidades: ['Insumo', 'InsumoVariante'] },
+  { valor: 'FichaTecnica', rotulo: 'Fichas técnicas' },
   { valor: 'AcessoParceiro', rotulo: 'Acessos' },
   { valor: 'PerfilAcesso', rotulo: 'Perfis' },
 ];

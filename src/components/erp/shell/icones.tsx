@@ -31,6 +31,7 @@ import {
   Briefcase,
   Handshake,
   FileText,
+  FileUp,
   type LucideIcon,
   type LucideProps,
 } from 'lucide-react';
@@ -40,6 +41,7 @@ export const ICONES: Record<ChaveIcone, LucideIcon> = {
   inicio: LayoutGrid,
   insumo: Wheat,
   novo: Plus,
+  importar: FileUp,
   fichas: ClipboardList,
   compras: ShoppingCart,
   estoque: Boxes,

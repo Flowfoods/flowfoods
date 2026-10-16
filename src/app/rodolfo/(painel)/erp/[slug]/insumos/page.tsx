@@ -6,10 +6,10 @@
 
 import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { listarInsumos } from '@/lib/erp/insumos';
-import { lerFiltros } from '@/lib/erp/insumo-campos';
+import { lerFiltros, temFiltro } from '@/lib/erp/insumo-campos';
 import { FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
 import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
-import { subtituloDosInsumos } from '@/components/erp/telas/insumos/subtitulo';
+import { INSUMOS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtitulo';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,7 +28,7 @@ export default async function ParceiroInsumosPage({
   return (
     <div className="space-y-6">
       <CabecalhoDaLista
-        subtitulo={`${ctx.parceiro.nome} · ${subtituloDosInsumos(visao, pagina.total, filtros)}`}
+        subtitulo={`${ctx.parceiro.nome} · ${subtituloDaLista(visao, pagina.total, INSUMOS, temFiltro(filtros))}`}
         novoHref={`${base}/novo`}
         bloqueio={ctx.bloqueio}
       >

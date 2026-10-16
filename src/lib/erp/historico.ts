@@ -6,6 +6,7 @@
 import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
 import { CONSERVACOES, TIPOS } from './insumo-campos';
+import { TIPOS_DE_FICHA } from './ficha-campos';
 import { UNIDADES, formatarCusto, formatarDinheiro, formatarQuantidade, type CustoExato, type Unidade } from './unidades';
 
 const ENTIDADE: Record<string, string> = {
@@ -15,6 +16,7 @@ const ENTIDADE: Record<string, string> = {
   Insumo: 'Insumo',
   // "Variante" é palavra de sistema; na tela é outra embalagem de compra do insumo.
   InsumoVariante: 'Embalagem',
+  FichaTecnica: 'Ficha técnica',
   AcessoParceiro: 'Acesso',
   PerfilAcesso: 'Perfil',
 };
@@ -68,12 +70,22 @@ const CAMPO: Record<string, string> = {
   incluiu: 'incluiu',
   tirou: 'tirou',
   tentativas: 'tentativas',
+  rendimento: 'rende',
+  descricao: 'descrição',
+  modoPreparo: 'modo de preparo',
+  foto: 'foto',
+  itens: 'insumos',
 };
 
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */
 const ORDEM = [
   'nome',
   'tipo',
+  'rendimento',
+  'descricao',
+  'foto',
+  'itens',
+  'modoPreparo',
   'conservacao',
   'unidade',
   'conteudoMilesimos',
@@ -114,7 +126,9 @@ function valor(campo: string, v: unknown): string {
   if (campo === 'precoEmbalagemCentavos' && v === 0) return 'Sem preço';
   if (campo === 'taxaEntregaCentavos' && v === 0) return 'Sem frete';
   if (v === null || v === undefined || v === '') return '—';
-  if (campo === 'tipo' && typeof v === 'string') return TIPOS[v as keyof typeof TIPOS] ?? v;
+  if (campo === 'tipo' && typeof v === 'string') {
+    return TIPOS[v as keyof typeof TIPOS] ?? TIPOS_DE_FICHA[v as keyof typeof TIPOS_DE_FICHA] ?? v;
+  }
   if (campo === 'conservacao' && typeof v === 'string') return CONSERVACOES[v as keyof typeof CONSERVACOES] ?? v;
   if (campo === 'unidade' && typeof v === 'string') return UNIDADES[v as Unidade]?.nome ?? v;
   if (campo === 'ativo' && typeof v === 'boolean') return v ? 'Ativo' : 'Desativado';
@@ -126,8 +140,12 @@ function valor(campo: string, v: unknown): string {
   if (campo.endsWith('Milesimos') && typeof v === 'number') {
     return (v / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
   }
-  return String(v);
+  const t = String(v);
+  // Texto longo (modo de preparo, lista de insumos): a linha do histórico mostra o começo.
+  return t.length > LIMITE_DO_TEXTO ? `${t.slice(0, LIMITE_DO_TEXTO).trimEnd()}…` : t;
 }
+
+const LIMITE_DO_TEXTO = 160;
 
 function objeto(j: Prisma.JsonValue | null | undefined): Record<string, unknown> {
   return j && typeof j === 'object' && !Array.isArray(j) ? (j as Record<string, unknown>) : {};
@@ -162,6 +180,8 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     if (c === 'conteudoMilesimos' && juntarUnidade && typeof o[c] === 'number' && unidade(o)) {
       return formatarQuantidade(o[c] as number, unidade(o)!);
     }
+    // Foto: o nome do arquivo é sorteado, não é informação. Diz se tem e se trocou.
+    if (c === 'foto') return typeof o[c] === 'string' ? (o === antes && !criacao ? 'foto anterior' : criacao ? 'com foto' : 'foto nova') : 'sem foto';
     // Custo de referência: a MESMA frase da tela ("R$ 18,98/kg", "R$ 0,004/un" ou "Sem preço").
     if (c === 'custoPorUnidade' && unidade(o)) return formatarCusto(custoExato(o[c]), unidade(o)!);
     if (c === 'custoPorUnidadeCentavos' && unidade(o) && (o[c] === null || typeof o[c] === 'number')) {

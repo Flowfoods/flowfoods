@@ -90,8 +90,9 @@ describe('ERP 1.1 · custo por unidade = (preço + frete) ÷ conteúdo, exato (f
     expect(custoDaQuantidade(custoDaEmbalagem(8990, 500, 5000)!, 180)).toBe(342);
     // 30 guardanapos a R$ 4,00 o milheiro = 12 centavos exatos (o custo/un arredondado daria 0).
     expect(custoDaQuantidade(custoDaEmbalagem(400, 0, 1_000_000)!, 30_000)).toBe(12);
-    // Números grandes não estouram (conta em BigInt por dentro).
-    expect(custoDaQuantidade(custoDaEmbalagem(1_999_999_999, 0, 1)!, 2_000_000_000)).toBe(1_999_999_999 * 2_000_000_000);
+    // Conta em BigInt por dentro; acima de 2^53 é recusada (herança da 1.1), nunca um Number já errado.
+    expect(custoDaQuantidade(custoDaEmbalagem(4_000_000, 0, 1)!, 2_000_000_000)).toBe(8_000_000_000_000_000);
+    expect(() => custoDaQuantidade(custoDaEmbalagem(1_999_999_999, 0, 1)!, 2_000_000_000)).toThrow(RangeError);
   });
 
   it('meio centavo arredonda para cima', () => {

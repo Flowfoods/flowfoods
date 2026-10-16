@@ -15,23 +15,23 @@ const QUANDO = new Intl.DateTimeFormat('pt-BR', {
 });
 
 /**
- * `doInsumo`: a lista mora no detalhe desse insumo. O nome dele não se repete
+ * `doCadastro`: a lista mora no detalhe desse insumo (ou ficha). O nome dele não se repete
  * em toda linha ("Alterou insumo"; "Criou embalagem · Caixa 10 kg").
  */
-function alvoVisivel(alvo: string | null, doInsumo?: string): string | null {
-  if (!alvo || !doInsumo) return alvo;
-  if (alvo === doInsumo) return null;
-  return alvo.startsWith(`${doInsumo} · `) ? alvo.slice(doInsumo.length + 3) : alvo;
+function alvoVisivel(alvo: string | null, doCadastro?: string): string | null {
+  if (!alvo || !doCadastro) return alvo;
+  if (alvo === doCadastro) return null;
+  return alvo.startsWith(`${doCadastro} · `) ? alvo.slice(doCadastro.length + 3) : alvo;
 }
 
 export function ListaHistorico({
   linhas,
   compacta = false,
-  doInsumo,
+  doCadastro,
 }: {
   linhas: LinhaDeHistorico[];
   compacta?: boolean;
-  doInsumo?: string;
+  doCadastro?: string;
 }) {
   return (
     <ol>
@@ -41,7 +41,7 @@ export function ListaHistorico({
           <>
             <span className="font-medium">{rotuloAcao(h.acao)}</span>{' '}
             <span className="text-suave">{rotuloEntidade(h.entidade).toLowerCase()}</span>
-            {alvoVisivel(h.alvo, doInsumo) && <span className="text-texto"> · {alvoVisivel(h.alvo, doInsumo)}</span>}
+            {alvoVisivel(h.alvo, doCadastro) && <span className="text-texto"> · {alvoVisivel(h.alvo, doCadastro)}</span>}
           </>
         );
         return (

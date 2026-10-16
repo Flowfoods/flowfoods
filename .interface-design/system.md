@@ -78,6 +78,12 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   ("O que é", "Como você compra"), resumo de erros quando há mais de um,
   Cancelar (fantasma) + ação principal à direita; bloqueado = fieldset
   desabilitado com o motivo.
+- **Foto de cadastro** (ficha técnica, 1.2): miniatura 44 px raio 7 com borda
+  `linha` na lista; 4:3 raio 10 no detalhe e no formulário; sem foto = quadro
+  `forte` do mesmo tamanho (a linha não pula). Foto e descrição no topo do
+  detalhe: quem opera bate o olho e sabe o que é.
+- **Custo incompleto**: selo "Custo incompleto" (tom atenção) no lugar do
+  número na lista; no detalhe, o parcial com "sem contar X (sem preço)".
 - **Foco** anel 3 px `acento`, folga 4 px (campo: 1 px). **Movimento** 160 ms
   hover, 220 ms entrada (8 px); `prefers-reduced-motion` zera.
 

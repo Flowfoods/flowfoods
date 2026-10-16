@@ -55,10 +55,20 @@ const futuros = (a: Alcance) =>
     .map((m) => m.chave);
 
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
-  it('Dono: todas as telas construídas e os seis módulos futuros', () => {
+  it('Dono: todas as telas construídas (com Ficha técnica, 1.2) e os cinco módulos futuros', () => {
     const a = alcance({ perfilBase: 'DONO' });
-    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/insumos/novo', '/erp/lojas', '/erp/equipe', '/erp/historico', '/erp/acesso']);
-    expect(futuros(a)).toEqual(['fichas', 'compras', 'estoque', 'dre', 'producao', 'etiquetas']);
+    expect(hrefs(a)).toEqual([
+      '/erp/insumos',
+      '/erp/insumos/novo',
+      '/erp/fichas',
+      '/erp/fichas/nova',
+      '/erp/fichas/importar',
+      '/erp/lojas',
+      '/erp/equipe',
+      '/erp/historico',
+      '/erp/acesso',
+    ]);
+    expect(futuros(a)).toEqual(['compras', 'estoque', 'dre', 'producao', 'etiquetas']);
   });
 
   it('Gerente: sem Equipe (não cuida da equipe); com Histórico (rede inteira)', () => {
@@ -70,8 +80,9 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
 
   it('Operador: insumos, lojas e Seu acesso; sem Equipe e Histórico; futuros só os que ele vai ver', () => {
     const a = alcance({ perfilBase: 'OPERADOR' });
-    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/lojas', '/erp/acesso']);
-    expect(futuros(a)).toEqual(['fichas', 'estoque', 'producao', 'etiquetas']);
+    // Operador VÊ fichas (bate o olho na foto e no preparo), sem criar nem importar.
+    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/fichas', '/erp/lojas', '/erp/acesso']);
+    expect(futuros(a)).toEqual(['estoque', 'producao', 'etiquetas']);
   });
 
   it('Gerente de uma loja só (N3): Histórico some (exige a rede inteira)', () => {
@@ -93,7 +104,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       expect(m.grupos).toEqual([]);
       expect(m.fase).toMatch(/^\d\.\d$/);
     }
-    expect(MODULOS_FUTUROS.map((f) => f.fase)).toEqual(['1.2', '1.5', '1.6', '2.1', '3.1', '3.4']);
+    expect(MODULOS_FUTUROS.map((f) => f.fase)).toEqual(['1.5', '1.6', '2.1', '3.1', '3.4']);
   });
 
   it('nível 1 dentro do parceiro: mesmas telas sob a base dele, com Cadastro e sem "Seu acesso"', () => {
@@ -101,6 +112,9 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     expect(h).toEqual([
       '/rodolfo/erp/valentins/insumos',
       '/rodolfo/erp/valentins/insumos/novo',
+      '/rodolfo/erp/valentins/fichas',
+      '/rodolfo/erp/valentins/fichas/nova',
+      '/rodolfo/erp/valentins/fichas/importar',
       '/rodolfo/erp/valentins/lojas',
       '/rodolfo/erp/valentins/equipe',
       '/rodolfo/erp/valentins/historico',
@@ -256,13 +270,14 @@ describe('ERP 1.1 · actions do shell no servidor', () => {
     expect(estado.gravados).toEqual([['ff_visao', 'p1:pen']]);
   });
 
-  it('acaoBuscarNoErp: quem não tem "ver insumos" recebe lista vazia sem consulta', async () => {
+  it('acaoBuscarNoErp: quem não tem "ver insumos"/"ver fichas" recebe lista vazia sem consulta', async () => {
     const { acaoBuscarNoErp } = await import('@/app/erp/actions');
     const consultas: unknown[] = [];
+    const registra = (q: unknown) => (consultas.push(q), []);
     estado.ctx = {
       parceiro: { id: 'p1' },
       alcance: alcance({ perfilBase: null, perfilProprio: ['lojas.ver'] }),
-      cliente: { insumo: { findMany: async (q: unknown) => (consultas.push(q), []) } },
+      cliente: { insumo: { findMany: registra }, fichaTecnica: { findMany: registra } },
     };
     expect(await acaoBuscarNoErp('arroz')).toEqual([]);
     expect(consultas).toEqual([]);
@@ -276,12 +291,19 @@ describe('ERP 1.1 · actions do shell no servidor', () => {
             [{ id: 'i1', nome: 'Arroz', unidade: 'KG', ativo: false }]
           ),
         },
+        fichaTecnica: {
+          findMany: async (q: unknown) => (
+            consultas.push(q),
+            [{ id: 'f1', nome: 'Arroz da casa', tipo: 'PRE_PREPARO', ativa: true }]
+          ),
+        },
       },
     };
     expect(await acaoBuscarNoErp('arroz')).toEqual([
       { tipo: 'insumo', rotulo: 'Arroz', detalhe: 'Insumo · Quilo', href: '/erp/insumos/i1', desativado: true },
+      { tipo: 'ficha', rotulo: 'Arroz da casa', detalhe: 'Ficha técnica · Pré-preparo', href: '/erp/fichas/f1', desativado: false },
     ]);
-    expect(consultas).toHaveLength(1);
+    expect(consultas).toHaveLength(2);
   });
 });
 

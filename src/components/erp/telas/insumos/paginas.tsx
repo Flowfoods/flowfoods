@@ -12,14 +12,12 @@ import { TIPOS } from '@/lib/erp/insumo-campos';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, dinheiroParaCampo, quantidadeParaCampo } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
-import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
-import Link from 'next/link';
-import { BotaoOuMotivo } from './detalhe';
-import type { AcaoDeInsumo } from './estado';
+import type { AcaoDeCadastro } from '../cadastro/estado';
+import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { FormEmbalagem } from './form-embalagem';
-import { FormInsumo, type ValoresDoInsumo } from './form-insumo';
-import { FormSituacao } from './form-situacao';
+import { FormInsumo, INSUMO_NOVO, type ValoresDoInsumo } from './form-insumo';
+import { FormSituacao } from '../cadastro/form-situacao';
 import { TrilhaDaPagina } from '../../shell/trilha';
 
 export function CabecalhoDaLista({
@@ -66,35 +64,30 @@ function embalagemParaCampo(e: { conteudoMilesimos: number; precoEmbalagemCentav
   };
 }
 
-function Voltar({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link href={href} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
-      {children}
-    </Link>
-  );
-}
-
 export function TelaFormInsumo({
   insumo,
   base,
   contexto,
   acao,
   bloqueio,
+  nomeSugerido,
 }: {
   /** Ausente = novo. */
   insumo?: InsumoDetalhado;
+  /** Novo vindo da importação de fichas ("Cadastrar “Picles”"): o nome já vem escrito. */
+  nomeSugerido?: string;
   base: string;
   contexto: string;
-  acao: AcaoDeInsumo;
+  acao: AcaoDeCadastro;
   bloqueio: string | null;
 }) {
-  const inicial: ValoresDoInsumo | undefined = insumo && {
+  const inicial: ValoresDoInsumo | undefined = insumo ? {
     nome: insumo.nome,
     tipo: insumo.tipo,
     unidade: insumo.unidade,
     conservacao: insumo.conservacao,
     ...embalagemParaCampo(insumo, insumo.unidade),
-  };
+  } : nomeSugerido ? { ...INSUMO_NOVO, nome: nomeSugerido.slice(0, 80) } : undefined;
   const volta = insumo ? `${base}/${insumo.id}` : base;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -133,8 +126,8 @@ export function TelaEmbalagem({
   /** Ausente = nova. */
   varianteId?: string;
   base: string;
-  acaoSalvar: AcaoDeInsumo;
-  acaoSituacao?: AcaoDeInsumo;
+  acaoSalvar: AcaoDeCadastro;
+  acaoSituacao?: AcaoDeCadastro;
   bloqueio: string | null;
 }) {
   const v = varianteId ? insumo.variantes.find((x) => x.id === varianteId) : undefined;

@@ -11,10 +11,10 @@
 
 import { prisma } from '@/lib/db';
 import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
-import { cadastrarInsumo, editarInsumo, mudarSituacaoInsumo, type ResultadoInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumo, editarInsumo, mudarSituacaoInsumo, type ResultadoCadastro } from '@/lib/erp/insumos';
 import { cadastrarVariante, editarVariante, mudarSituacaoVariante, type ResultadoVariante } from '@/lib/erp/variantes';
-import type { EstadoInsumo } from '@/components/erp/telas/insumos/estado';
-import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/insumos/executar';
+import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
+import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 
 async function paraEditar(slug: string) {
   const ctx = await exigirParceiro(slug);
@@ -24,14 +24,14 @@ async function paraEditar(slug: string) {
 
 type Ctx = Awaited<ReturnType<typeof exigirParceiro>>;
 
-async function auditar(ctx: Ctx, evento: string, r: ResultadoInsumo | ResultadoVariante, extra: Record<string, string> = {}) {
+async function auditar(ctx: Ctx, evento: string, r: ResultadoCadastro | ResultadoVariante, extra: Record<string, string> = {}) {
   if (!r.ok) return;
   await prisma.auditLog.create({
     data: { userId: ctx.sessao.userId, evento, dados: { parceiroId: ctx.parceiro.id, id: r.id, ...extra } },
   });
 }
 
-export async function acaoCadastrarInsumo(slug: string, anterior: EstadoInsumo, form: FormData): Promise<EstadoInsumo> {
+export async function acaoCadastrarInsumo(slug: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado, base } = await paraEditar(slug);
   if (negado) return recusado(anterior, negado);
   const r = await cadastrarInsumo(ctx.cliente, entradaDe(form), ctx.sessao.autorNome);
@@ -39,7 +39,7 @@ export async function acaoCadastrarInsumo(slug: string, anterior: EstadoInsumo, 
   return concluir(r, anterior, base, { mudou: 'criado' });
 }
 
-export async function acaoEditarInsumo(slug: string, id: string, anterior: EstadoInsumo, form: FormData): Promise<EstadoInsumo> {
+export async function acaoEditarInsumo(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado, base } = await paraEditar(slug);
   if (negado) return recusado(anterior, negado);
   const r = await editarInsumo(ctx.cliente, String(id), entradaDe(form), ctx.sessao.autorNome);
@@ -47,7 +47,7 @@ export async function acaoEditarInsumo(slug: string, id: string, anterior: Estad
   return concluir(r, anterior, base, { mudou: 'editado', igual: 'igual' });
 }
 
-export async function acaoSituacaoInsumo(slug: string, id: string, anterior: EstadoInsumo, form: FormData): Promise<EstadoInsumo> {
+export async function acaoSituacaoInsumo(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado, base } = await paraEditar(slug);
   if (negado) return recusado(anterior, negado);
   const ativo = querAtivo(form);
@@ -61,9 +61,9 @@ export async function acaoSalvarEmbalagem(
   slug: string,
   insumoId: string,
   varianteId: string,
-  anterior: EstadoInsumo,
+  anterior: EstadoCadastro,
   form: FormData,
-): Promise<EstadoInsumo> {
+): Promise<EstadoCadastro> {
   const { ctx, negado, base } = await paraEditar(slug);
   if (negado) return recusado(anterior, negado);
   const r = varianteId
@@ -78,9 +78,9 @@ export async function acaoSituacaoEmbalagem(
   slug: string,
   insumoId: string,
   varianteId: string,
-  anterior: EstadoInsumo,
+  anterior: EstadoCadastro,
   form: FormData,
-): Promise<EstadoInsumo> {
+): Promise<EstadoCadastro> {
   const { ctx, negado, base } = await paraEditar(slug);
   if (negado) return recusado(anterior, negado);
   const ativo = querAtivo(form);

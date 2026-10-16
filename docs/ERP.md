@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -20,6 +20,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Telas da pessoa do parceiro | `/entrar` (e-mail e senha, entrar com o rosto), `/entrar/primeiro-acesso/<token>`, `/entrar/escolher`, `/erp` (hub Módulos da Rede), `/erp/insumos`, `/erp/lojas`, `/erp/equipe`, `/erp/historico` e `/erp/acesso` (Seu acesso: o que a pessoa pode, rosto) — cada aba só aparece para quem pode |
 | Permissões (0.4): catálogo, perfis base, resolução, checagem única, sem escalada | `src/lib/erp/permissoes.ts` (puro) + `equipe.ts` (formulários e retrato do histórico, puro); banco em `credenciais.ts`; migrations `20261015040000_erp_permissoes` e `20261016000000_erp_revogar_meios_de_entrada` |
 | Telas compartilhadas (as MESMAS no nível 1 e no parceiro) | `src/components/erp/telas/*`: `equipe/` (`TelaEquipe`), `estrutura/`, `historico/`, `insumos/`, `hub-do-parceiro.tsx` |
+| Ficha técnica (1.2): regras, planilha, foto | `src/lib/erp/{fichas,ficha-campos,ficha-planilha,ficha-importar,foto,arquivos,foto-resposta}.ts`; telas em `src/components/erp/telas/fichas/`; peças de cadastro comuns em `telas/cadastro/`; migration `20261016010000_erp_ficha_foto`; modelo `public/modelos/fichas-tecnicas.csv` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
 ## O que a 0.2 entregou (multi-tenant)
@@ -339,6 +340,78 @@ Na tela: a dona cadastra um insumo com frete, duas embalagens (uma em g),
 edita, desativa e vê em Histórico › Insumos; o operador vê lista e detalhe sem
 botão nenhum e, abrindo `/erp/insumos/novo`, volta ao hub com aviso.
 
+## O que a 1.2 entregou — ficha técnica (criar do zero e importar, com foto e descrição)
+
+Migration `20261016010000_erp_ficha_foto` (aditiva): `descricao`, `fotoArquivo`,
+`fotoMime`, `fotoBytes` em `FichaTecnica` + CHECKs (nome sorteado, tipo,
+tamanho, tudo ou nada). Nenhuma tabela nova: portão e RLS sem mudança.
+
+1. **Ficha é a receita** (`FichaTecnica`): Prato (rende N porções inteiras) ou
+   Pré-preparo (rende kg/g, L/ml ou un). Produto de venda e preço por canal
+   (`ProdutoVenda`) são 1.9/1.10; subficha, fator de correção e pré-preparo
+   que vira insumo são 1.3 (o esquema e a conta já recebem).
+2. **Itens**: insumo + quantidade LÍQUIDA digitada em g/kg, ml/L ou un,
+   convertida no servidor para milésimos da unidade base do insumo
+   (`escalaDaSigla` + `lerQuantidadeNa`); unidade de outra família, meio
+   grama, zero, insumo repetido ou desativado (fora os que já estavam na
+   ficha) são erro na linha. Até 60 itens. Os insumos citados são lidos com
+   FOR SHARE (a unidade não muda no meio) e pelo portão (insumo de outro
+   parceiro não existe para a regra; o banco recusa pela FK composta).
+3. **Custo exato, nunca gravado**: Σ custo de referência × quantidade × fator,
+   em fração BigInt (`custoExatoDaQuantidade`, `somar`), e o custo por porção
+   (ou por kg/L/un) = total ÷ rendimento; arredonda só na tela. Insumo "Sem
+   preço" deixa o custo **incompleto**: selo, valor parcial dito como "sem
+   contar X (sem preço)", nunca R$ 0,00 no lugar. Herança da 1.1 resolvida:
+   `custoDaQuantidade` recusa resultado acima de 2^53 (RangeError).
+4. **Foto e descrição**: descrição curta (até 280) + modo de preparo (até
+   4000, com quebras de linha). Uma foto por ficha: tipo conferido pelos BYTES
+   (JPEG/PNG/WebP; SVG/GIF recusados), até 8 MB, nome sorteado (32 hex), em
+   `<ERP_ARQUIVOS_DIR>/<parceiroId>/fichas/` (volume `erp-arquivos` no
+   compose). Vai para o disco antes da transação e sai se ela não fechar; a
+   antiga só é apagada depois do commit. Servida por
+   `/erp/fichas/<id>/foto` e `/rodolfo/erp/<slug>/fichas/<id>/foto`, que leem
+   a ficha pelo portão (de outro parceiro: 404) e exigem "ver fichas" (403),
+   com `nosniff` e CSP fechada. O navegador reduz para 1600 px em JPEG antes
+   de enviar (HEIC do iPhone também); server action aceita até 9 MB.
+5. **Importar planilha** (CSV; não há lib de XLSX no repo e não se adicionou
+   dependência): modelo para baixar, uma linha por insumo, `;` ou `,`, aspas,
+   UTF-8 ou Windows-1252. Prévia sem gravar (nova / vai mudar / igual / com
+   erro e a linha), insumo não encontrado com "Cadastrar “X”" (o novo insumo
+   já abre com o nome). Importar = UMA transação, só as fichas sem erro.
+   Idempotente pelo nome da ficha: reimportar não cria nem altera; mudou,
+   atualiza só aquela; descrição e modo vazios não apagam o que existe.
+   `origem = IMPORTACAO`, histórico com motivo "Importada por planilha".
+6. **Editar** condicional a `atualizadoEm` (duas abas: a segunda recebe
+   "alguém alterou", nada sobrescrito); itens trocados por inteiro; desativar
+   e reativar com motivo. **Histórico** na mesma transação, legível: rende,
+   descrição, foto (com foto / foto anterior → foto nova / sem foto),
+   insumos numa frase ("Pão brioche 1 un · Blend 180 g"), modo de preparo.
+7. **Telas** (as MESMAS no N1 e no parceiro, `telas/fichas/`): lista com
+   miniatura, "Rede Completa · N fichas", "Importar planilha" + "Nova ficha",
+   busca/tipo/situação/"só custo incompleto" na URL, cartões no celular;
+   detalhe com foto e descrição no topo, custo por porção com a conta,
+   insumos com quantidade e custo, modo de preparo, situação e alterações;
+   nova/editar em tela própria com prévia da conta; importar com prévia.
+   Módulo "Ficha técnica" no menu, no hub (saiu de "em breve") e no ⌘K.
+8. **Permissões e tenant**: páginas `exigirPermissaoNaPagina(ctx,
+   'fichas.ver' | 'fichas.editar')` (N1: `exigirPermissao`); actions
+   (`src/app/erp/fichas/actions.ts` e `.../[slug]/fichas/actions.ts`):
+   contexto → `recusaDaAcao(ctx, 'fichas.editar')` → bloqueio → lib. Operador
+   vê lista, detalhe e foto; criar/editar/importar volta ao hub com aviso.
+9. **Regra Nº 2**: estado/concluir/erros/situação/BotaoOuMotivo dos insumos
+   viraram `telas/cadastro/*`; paginação virou `ui/paginacao.tsx`; subtítulo
+   de lista virou `cadastro/subtitulo.ts`; nada copiado.
+
+## Provar a ficha técnica (1.2)
+
+```bash
+npx vitest run tests/erp-fichas.test.ts       # conversão, custo exato e incompleto, planilha, foto, histórico, filtros
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-fichas.db.test.ts
+```
+Na tela: a dona cria uma ficha com foto e 3 insumos (um sem preço: custo
+incompleto), edita, importa a planilha do modelo e reimporta (tudo "igual");
+o operador vê lista, detalhe e foto, sem botão nenhum.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -581,8 +654,8 @@ banco de teste: o operador é recusado pelo servidor.
   fornecedor antes; nenhum select vazio na tela).
 - "Tornar padrão" uma embalagem (trocar a do insumo pela de uma variante).
 - Estoque mínimo (rede × loja): 1.6/3.2. Validades por conservação: 1.4.
-- Importar insumos por planilha: 1.2, junto com a planilha de ficha (mesmo
-  parser, prévia e confirmação); `origem` já existe.
+- Importar insumos por planilha: o leitor de CSV da 1.2 (`lerCsv`,
+  `decodificarPlanilha`) e o padrão prévia → confirmação servem; falta a regra.
 - Preço 0 é a sentinela de "Sem preço". Se aparecer item de fato gratuito,
   migrar para `precoEmbalagemCentavos` nulo.
 - Ordenar por custo é feito em memória (o custo é derivado, nunca gravado):
@@ -596,10 +669,33 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.1 (apontada pelos fiscais)
 
-- `custoDaQuantidade` devolve Number de BigInt: antes da 1.3 usar, recusar acima de 2^53 ou devolver BigInt.
+- ~~`custoDaQuantidade` devolve Number de BigInt: antes da 1.3 usar, recusar acima de 2^53 ou devolver BigInt.~~ **1.2:** recusa acima de 2^53; a ficha soma em fração BigInt.
 - Casos irreais de custo minúsculo: milheiro "R$ 0,00" e rótulo "menos de R$ 0,000001" citando casa errada.
 - Ordenar por custo carrega todos os insumos do parceiro (0,8 s com 5 mil): levar para SQL quando crescer.
 - Aviso de sair sem salvar não pega navegação pelo menu; nome do insumo diferencia maiúscula.
 - Texto da comparação: "por unidade" e "embalagem padrão" leem melhor.
 - `/portal/<token>`: erro de hydration antigo (React #418, `Portal.tsx` lê `window` no render).
 - `npm audit`: next 14.2.35 (crítico) e prisma (alto) antigos — planejar atualização.
+
+## Herança da 1.2 (para as próximas subfases)
+
+- 1.3: subficha (`subfichaId`), fator de correção na tela e custo em cascata;
+  hoje item de subficha conta como "sem preço". Ciclo entre fichas é regra da 1.3.
+- 1.5: custo pelo último preço de compra troca `custoDoInsumo` (hoje, embalagem padrão).
+- 1.9/1.10: preço por canal aponta a ficha (`ProdutoVenda.fichaId`).
+- XLSX: só CSV. Se entrar lib de planilha, trocar só `decodificarPlanilha`/`lerCsv`.
+- Foto: sem faxina de arquivo órfão (processo morto entre gravar o arquivo e a
+  transação). Rotina no worker: apagar o que não está em `FichaTecnica.fotoArquivo`.
+- Lista de fichas carrega os itens de cada ficha da página para o custo (50
+  por página): com fichas enormes, levar a soma para o SQL.
+- O seletor de insumo do formulário é um `<select>` com todos os ativos: com
+  milhares, trocar por busca.
+- Importar reabre a prévia inteira na transação (5000 linhas, timeout 30 s).
+
+## Herança da 1.2 (apontada pelos fiscais)
+
+- [médio] `bodySizeLimit` 9 MB é global (Next 14) e o corpo é lido antes da sessão: mover o upload da foto para rota própria que confere sessão antes de ler o corpo.
+- [médio] Importar 5000 fichas leva ~26 s numa transação de 30 s com insumos travados: limitar fichas por importação ou dividir em lotes, com mensagem clara no estouro.
+- [médio] Foto guardada com os bytes originais (EXIF/GPS do celular): regravar a imagem no servidor sem metadados.
+- [baixo] Mensagem de parceiro suspenso não cita fichas; exports só usados no próprio arquivo (`pastaDoErp`, `versaoDaFoto`, `siglaDaPlanilha`).
+- UX: no celular, modo de preparo logo depois da foto; trilha a 820 px truncando; hub com atalhos crescendo; faxina de foto órfã no disco; XLSX fora (só CSV); seletor de insumo vira busca com muitos insumos.

@@ -907,3 +907,61 @@ copo e sachê se compram. O histórico grava a fração exata
 (`custoPorUnidade`); as linhas antigas com `custoPorUnidadeCentavos`
 continuam legíveis. Revisa a parte de arredondamento da decisão 46.
 
+### 53. 2026-10-16 · ERP 1.2: ficha é a receita; custo da ficha é fração exata, nunca gravado
+
+**Alternativas:** (a) ficha = produto de venda (com preço junto); (b) custo
+gravado na ficha e recalculado quando o insumo muda; (c) ficha = receita
+(prato ou pré-preparo), custo derivado na hora, em fração exata.
+
+**Razão:** (c). Preço, canal e embalagem são da venda (`ProdutoVenda`,
+1.9/1.10; decisão 26). Custo gravado envelhece quando a farinha sobe (Notion
+Core: "o custo é um número velho numa planilha"). A soma é Σ custo ×
+quantidade × fator em BigInt e arredonda uma vez, na tela: 180 g de blend +
+pão + 2 guardanapos dá R$ 4,92 exato, não 4,93 da soma de linhas arredondadas
+(cada linha da tela mostra o seu arredondado; a nota da tabela diz isso).
+Insumo "Sem preço" deixa o custo INCOMPLETO, dito com o nome do insumo — nunca
+R$ 0,00 escondido. `custoDaQuantidade` passou a recusar acima de 2^53.
+
+### 54. 2026-10-16 · ERP 1.2: foto no disco do parceiro, conferida pelos bytes, servida pelo portão
+
+**Alternativas:** (a) foto no banco (bytea); (b) pasta pública em `/public`
+ou CDN; (c) disco em volume nomeado, isolado por parceiro, servido por rota
+que lê a ficha pelo portão.
+
+**Razão:** (c), o mesmo padrão do Portal (`portal-uploads`), num volume
+próprio (`erp-arquivos`). (a) incha o banco e o backup; (b) deixa a foto de
+um parceiro acessível a quem tiver o link. O nome é sorteado no servidor (32
+hex; CHECK no banco), o tipo vem dos bytes (JPEG/PNG/WebP; SVG pode levar
+script), 8 MB no máximo, `nosniff` + CSP fechada na resposta. O id do
+parceiro do caminho vem da sessão/portão, nunca da URL. Foto nova vai ao disco
+antes da transação e sai se ela falhar; a velha só sai depois do commit (um
+arquivo órfão é melhor que uma ficha sem foto). Uma foto por ficha: colunas
+na própria `FichaTecnica` (sem tabela nova, sem mexer em RLS). O navegador
+reduz a foto (1600 px, JPEG) antes de enviar; o servidor confere de novo.
+
+### 55. 2026-10-16 · ERP 1.2: importar fichas por CSV, com prévia, idempotente pelo nome, numa transação
+
+**Alternativas:** (a) XLSX com lib nova; (b) importar direto, sem prévia;
+(c) CSV (modelo para baixar), prévia que não grava e confirmação numa
+transação, chave = nome da ficha.
+
+**Razão:** (c). Não há lib de XLSX no repo e o Excel salva CSV (lido em
+UTF-8 ou Windows-1252, `;` ou `,`). A prévia usa o MESMO leitor do formulário
+(`lerFormFicha`), então formulário e planilha não discordam; erro volta com
+a linha do arquivo. Ficha com linha ruim fica de fora, as outras entram;
+insumo não encontrado é sinalizado com atalho para cadastrar (não se cria
+insumo pela planilha de ficha: preço e embalagem precisam de alguém). Pelo
+nome: reimportar não duplica nem gera histórico; o que mudou atualiza só
+aquela ficha (condicional à versão, como a edição). Campos de texto vazios na
+planilha não apagam o que a ficha tem (planilha de itens não é lugar de
+apagar descrição).
+
+### 56. 2026-10-16 · ERP 1.2: peças de cadastro generalizadas em `telas/cadastro`
+
+**Alternativas:** (a) copiar estado, erros, situação e paginação dos insumos
+para as fichas; (b) importar de `telas/insumos/*` nas fichas; (c) mover para
+`telas/cadastro/*` e `ui/paginacao.tsx` e as duas telas usarem.
+
+**Razão:** (c), Regra Nº 2. (a) é a deriva X1 de novo; (b) amarraria a ficha
+ao insumo. `EstadoInsumo` virou `EstadoCadastro`, `FormSituacao` ganhou o
+gênero ("a ficha desativada"), `ResumoDeErros` recebe os rótulos de quem usa.

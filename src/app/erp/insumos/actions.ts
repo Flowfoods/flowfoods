@@ -11,8 +11,8 @@
 import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarInsumo, editarInsumo, mudarSituacaoInsumo } from '@/lib/erp/insumos';
 import { cadastrarVariante, editarVariante, mudarSituacaoVariante } from '@/lib/erp/variantes';
-import type { EstadoInsumo } from '@/components/erp/telas/insumos/estado';
-import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/insumos/executar';
+import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
+import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 
 const BASE = '/erp/insumos';
 
@@ -23,21 +23,21 @@ async function paraEditar() {
   return { ctx, negado };
 }
 
-export async function acaoCadastrarInsumo(anterior: EstadoInsumo, form: FormData): Promise<EstadoInsumo> {
+export async function acaoCadastrarInsumo(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraEditar();
   if (negado) return recusado(anterior, negado);
   const r = await cadastrarInsumo(ctx.cliente, entradaDe(form), ctx.sessao.autorNome);
   return concluir(r, anterior, BASE, { mudou: 'criado' });
 }
 
-export async function acaoEditarInsumo(id: string, anterior: EstadoInsumo, form: FormData): Promise<EstadoInsumo> {
+export async function acaoEditarInsumo(id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraEditar();
   if (negado) return recusado(anterior, negado);
   const r = await editarInsumo(ctx.cliente, String(id), entradaDe(form), ctx.sessao.autorNome);
   return concluir(r, anterior, BASE, { mudou: 'editado', igual: 'igual' });
 }
 
-export async function acaoSituacaoInsumo(id: string, anterior: EstadoInsumo, form: FormData): Promise<EstadoInsumo> {
+export async function acaoSituacaoInsumo(id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraEditar();
   if (negado) return recusado(anterior, negado);
   const ativo = querAtivo(form);
@@ -49,9 +49,9 @@ export async function acaoSituacaoInsumo(id: string, anterior: EstadoInsumo, for
 export async function acaoSalvarEmbalagem(
   insumoId: string,
   varianteId: string,
-  anterior: EstadoInsumo,
+  anterior: EstadoCadastro,
   form: FormData,
-): Promise<EstadoInsumo> {
+): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraEditar();
   if (negado) return recusado(anterior, negado);
   const r = varianteId
@@ -64,9 +64,9 @@ export async function acaoSalvarEmbalagem(
 export async function acaoSituacaoEmbalagem(
   insumoId: string,
   varianteId: string,
-  anterior: EstadoInsumo,
+  anterior: EstadoCadastro,
   form: FormData,
-): Promise<EstadoInsumo> {
+): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraEditar();
   if (negado) return recusado(anterior, negado);
   const ativo = querAtivo(form);

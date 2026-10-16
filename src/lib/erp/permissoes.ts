@@ -74,7 +74,6 @@ export const CATALOGO = [
   {
     chave: 'fichas',
     rotulo: 'Ficha técnica',
-    emBreve: true,
     permissoes: {
       'fichas.ver': { rotulo: 'Ver fichas técnicas' },
       'fichas.editar': { rotulo: 'Criar e editar fichas técnicas' },

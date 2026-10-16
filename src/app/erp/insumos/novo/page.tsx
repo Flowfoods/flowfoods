@@ -6,8 +6,8 @@ import { acaoCadastrarInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpNovoInsumoPage() {
+export default async function ErpNovoInsumoPage({ searchParams }: { searchParams: { nome?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.editar');
-  return <TelaFormInsumo base="/erp/insumos" contexto={ctx.parceiro.nome} acao={acaoCadastrarInsumo} bloqueio={ctx.bloqueio} />;
+  return <TelaFormInsumo base="/erp/insumos" contexto={ctx.parceiro.nome} acao={acaoCadastrarInsumo} bloqueio={ctx.bloqueio} nomeSugerido={searchParams.nome} />;
 }

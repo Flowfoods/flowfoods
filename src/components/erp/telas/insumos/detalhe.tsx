@@ -8,47 +8,19 @@
  */
 
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
 import { compararEmbalagens, CONSERVACOES, TIPOS } from '@/lib/erp/insumo-campos';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, contaDoCusto, formatarCusto, formatarDinheiro, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
-import { classeDeBotao, LINK_DE_TEXTO, type Variante } from '../../ui/estilos';
+import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
 import { ListaHistorico } from '../historico/lista-historico';
-import { fraseDoFeito, type AcaoDeInsumo } from './estado';
-import { FormSituacao } from './form-situacao';
+import type { AcaoDeCadastro } from '../cadastro/estado';
+import { FormSituacao } from '../cadastro/form-situacao';
+import { BotaoOuMotivo } from '../cadastro/partes';
+import { fraseDoFeito } from './estado';
 import { TrilhaDaPagina } from '../../shell/trilha';
-
-/** Link com cara de botão; bloqueado, vira botão desabilitado com o motivo. */
-export function BotaoOuMotivo({
-  href,
-  bloqueio,
-  variante = 'secundario',
-  className = '',
-  children,
-}: {
-  href: string;
-  bloqueio: string | null;
-  variante?: Variante;
-  className?: string;
-  children: ReactNode;
-}) {
-  if (bloqueio) {
-    return (
-      <button type="button" disabled title={bloqueio} className={classeDeBotao(variante, className)}>
-        {children}
-        <span className="sr-only"> (indisponível: {bloqueio})</span>
-      </button>
-    );
-  }
-  return (
-    <Link href={href} className={classeDeBotao(variante, className)}>
-      {children}
-    </Link>
-  );
-}
 
 export function TelaDetalheInsumo({
   insumo: i,
@@ -70,7 +42,7 @@ export function TelaDetalheInsumo({
   contexto?: string;
   podeEditar: boolean;
   bloqueio: string | null;
-  acaoSituacao: AcaoDeInsumo;
+  acaoSituacao: AcaoDeCadastro;
 }) {
   const u = UNIDADES[i.unidade];
   const aqui = `${base}/${i.id}`;
@@ -226,7 +198,7 @@ export function TelaDetalheInsumo({
             {i.historico.length === 0 ? (
               <Vazio>Nada registrado ainda.</Vazio>
             ) : (
-              <ListaHistorico linhas={i.historico} compacta doInsumo={i.nome} />
+              <ListaHistorico linhas={i.historico} compacta doCadastro={i.nome} />
             )}
           </Painel>
         </aside>

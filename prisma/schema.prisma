@@ -891,6 +891,14 @@ model FichaTecnica {
   origem              OrigemDado   @default(MANUAL)
   criadoEm            DateTime     @default(now())
   atualizadoEm        DateTime     @updatedAt
+  // 1.2: o que é, numa olhada (até 280), e a foto. Da foto, só o nome do
+  // arquivo (32 hex aleatórios + extensão; CHECK no banco), o tipo conferido
+  // pelos bytes e o tamanho. O arquivo mora em
+  // <ERP_ARQUIVOS_DIR>/<parceiroId>/fichas/ e só é servido pelo portão.
+  descricao           String?
+  fotoArquivo         String?
+  fotoMime            String?
+  fotoBytes           Int?
 
   itens          FichaItem[]     @relation("FichaItens")
   usadaComoSub   FichaItem[]     @relation("FichaSubficha")
