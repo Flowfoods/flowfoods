@@ -105,13 +105,92 @@ function dividirBig(a: bigint, b: bigint): bigint {
 
 /**
  * Quanto custam `quantidadeMilesimos` deste insumo, em centavos, com UM
- * arredondamento (metade para cima). É o que a ficha técnica (1.3) usa:
- * 180 g a R$ 94,90 por 5 kg = 342 centavos, sem passar pelo custo/kg
- * arredondado. Por dentro em BigInt: produto de dois inteiros grandes não
- * cabe em número de JavaScript sem perder precisão.
+ * arredondamento (metade para cima): 180 g a R$ 94,90 por 5 kg = 342
+ * centavos, sem passar pelo custo/kg arredondado. Por dentro em BigInt:
+ * produto de dois inteiros grandes não cabe em número de JavaScript sem
+ * perder precisão. Resultado acima de 2^53 é RECUSADO (RangeError), nunca
+ * devolvido como um Number já errado. A ficha técnica soma em fração exata
+ * (`custoExatoDaQuantidade`) e só arredonda na tela.
  */
 export function custoDaQuantidade(custo: CustoExato, quantidadeMilesimos: number): number {
-  return Number(dividirBig(BigInt(custo.centavos) * BigInt(quantidadeMilesimos), BigInt(custo.milesimos)));
+  const v = dividirBig(BigInt(custo.centavos) * BigInt(quantidadeMilesimos), BigInt(custo.milesimos));
+  if (v > BigInt(Number.MAX_SAFE_INTEGER)) throw new RangeError('Custo grande demais para conta em centavos.');
+  return Number(v);
+}
+
+// ------------------------------------------------------------ frações exatas
+
+/**
+ * Valor em centavos como fração exata `num ÷ den` (BigInt, den > 0). É como a
+ * ficha técnica soma: cada item vale custo × quantidade × fator, sem
+ * arredondar; o total arredonda uma vez, na exibição (`formatarFracao`).
+ */
+export interface Fracao {
+  num: bigint;
+  den: bigint;
+}
+
+export const ZERO: Fracao = { num: 0n, den: 1n };
+
+function mdcBig(a: bigint, b: bigint): bigint {
+  while (b) [a, b] = [b, a % b];
+  return a < 0n ? -a : a;
+}
+
+function reduzir(f: Fracao): Fracao {
+  if (f.num === 0n) return ZERO;
+  const d = mdcBig(f.num, f.den);
+  return { num: f.num / d, den: f.den / d };
+}
+
+/**
+ * Centavos de `quantidadeMilesimos` do insumo, exato. `fatorMilesimos` é o
+ * fator de correção (bruto ÷ líquido, 1000 = sem perda; a 1.3 usa).
+ */
+export function custoExatoDaQuantidade(custo: CustoExato, quantidadeMilesimos: number, fatorMilesimos = 1000): Fracao {
+  return reduzir({
+    num: BigInt(custo.centavos) * BigInt(quantidadeMilesimos) * BigInt(fatorMilesimos),
+    den: BigInt(custo.milesimos) * 1000n,
+  });
+}
+
+export function somar(a: Fracao, b: Fracao): Fracao {
+  return reduzir({ num: a.num * b.den + b.num * a.den, den: a.den * b.den });
+}
+
+/** Custo de 1 unidade de rendimento: total ÷ (rendimento em milésimos ÷ 1000). */
+export function porRendimento(total: Fracao, rendimentoMilesimos: number): Fracao {
+  if (rendimentoMilesimos <= 0) throw new Error('Rendimento precisa ser positivo.');
+  return reduzir({ num: total.num * 1000n, den: total.den * BigInt(rendimentoMilesimos) });
+}
+
+/** Centavos inteiros (metade para cima): só para comparar e testar; a tela usa `formatarFracao`. */
+export function centavosDaFracao(f: Fracao): bigint {
+  return dividirBig(f.num, f.den);
+}
+
+/** Reais da fração para a tela: "R$ 12,34"; abaixo de 1 centavo, "R$ 0,004". */
+export function formatarFracao(f: Fracao): string {
+  return formatarReaisDaFracao(f.num, f.den);
+}
+
+/**
+ * A unidade que a pessoa digitou na ficha ("g", "kg", "ml", "L", "un"), para a
+ * unidade base DO INSUMO: em que escala ler o número. Unidade de outra família
+ * (g num insumo em litro) é null: o servidor recusa a linha.
+ */
+export const SIGLAS_DIGITAVEIS: Record<Unidade, readonly string[]> = {
+  KG: ['g', 'kg'],
+  L: ['ml', 'L'],
+  UN: ['un'],
+};
+
+export function escalaDaSigla(sigla: string, unidade: Unidade): Escala | null {
+  const s = sigla.trim().toLowerCase();
+  const u = UNIDADES[unidade];
+  if (s === u.sigla.toLowerCase()) return 'base';
+  if (unidade !== 'UN' && s === u.menor.toLowerCase()) return 'menor';
+  return null;
 }
 
 /** -1, 0 ou 1: qual custo por unidade é menor, por multiplicação cruzada exata. */

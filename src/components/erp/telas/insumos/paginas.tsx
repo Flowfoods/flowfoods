@@ -12,14 +12,12 @@ import { TIPOS } from '@/lib/erp/insumo-campos';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, dinheiroParaCampo, quantidadeParaCampo } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
-import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
-import Link from 'next/link';
-import { BotaoOuMotivo } from './detalhe';
-import type { AcaoDeInsumo } from './estado';
+import type { AcaoDeCadastro } from '../cadastro/estado';
+import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { FormEmbalagem } from './form-embalagem';
 import { FormInsumo, type ValoresDoInsumo } from './form-insumo';
-import { FormSituacao } from './form-situacao';
+import { FormSituacao } from '../cadastro/form-situacao';
 import { TrilhaDaPagina } from '../../shell/trilha';
 
 export function CabecalhoDaLista({
@@ -66,14 +64,6 @@ function embalagemParaCampo(e: { conteudoMilesimos: number; precoEmbalagemCentav
   };
 }
 
-function Voltar({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link href={href} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
-      {children}
-    </Link>
-  );
-}
-
 export function TelaFormInsumo({
   insumo,
   base,
@@ -85,7 +75,7 @@ export function TelaFormInsumo({
   insumo?: InsumoDetalhado;
   base: string;
   contexto: string;
-  acao: AcaoDeInsumo;
+  acao: AcaoDeCadastro;
   bloqueio: string | null;
 }) {
   const inicial: ValoresDoInsumo | undefined = insumo && {
@@ -133,8 +123,8 @@ export function TelaEmbalagem({
   /** Ausente = nova. */
   varianteId?: string;
   base: string;
-  acaoSalvar: AcaoDeInsumo;
-  acaoSituacao?: AcaoDeInsumo;
+  acaoSalvar: AcaoDeCadastro;
+  acaoSituacao?: AcaoDeCadastro;
   bloqueio: string | null;
 }) {
   const v = varianteId ? insumo.variantes.find((x) => x.id === varianteId) : undefined;

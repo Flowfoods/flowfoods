@@ -9,7 +9,7 @@
  */
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import { CONSERVACOES, TIPOS, type Conservacao, type TipoInsumo } from '@/lib/erp/insumo-campos';
 import { UNIDADES, type Unidade } from '@/lib/erp/unidades';
@@ -19,7 +19,8 @@ import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Segmentos } from '../../ui/segmentos';
 import { Painel } from '../../ui/superficies';
 import { CamposDaEmbalagem, EMBALAGEM_VAZIA, type ValoresDaEmbalagem } from './campos-embalagem';
-import type { AcaoDeInsumo, EstadoInsumo } from './estado';
+import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
+import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 
 export interface ValoresDoInsumo extends ValoresDaEmbalagem {
   nome: string;
@@ -40,63 +41,6 @@ const ROTULO_DO_CAMPO: Record<string, string> = {
   frete: 'Frete',
 };
 
-/** Resumo quando há mais de um erro: cada item leva ao campo. */
-export function ResumoDeErros({ erros, idBase }: { erros: Partial<Record<string, string>>; idBase: string }) {
-  const campos = Object.keys(erros).filter((c) => c !== 'geral' && erros[c]);
-  if (campos.length < 2) return null;
-  return (
-    <div role="alert" className="rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
-      <p className="font-semibold text-erro">Corrija {campos.length} campos antes de salvar:</p>
-      <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
-        {campos.map((c) => (
-          <li key={c}>
-            <a href={`#${idBase}-${c}`} className={LINK_DE_TEXTO}>
-              {ROTULO_DO_CAMPO[c] ?? c}
-            </a>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-/** Erro geral (permissão, bloqueio, conflito de versão), com o próximo passo. */
-export function ErroGeral({ estado, recarregar }: { estado: EstadoInsumo; recarregar: string }) {
-  if (!estado?.erros.geral) return null;
-  return (
-    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
-      <p className="text-erro">{estado.erros.geral}</p>
-      {estado.conflito && (
-        <a href={recarregar} className={classeDeBotao('secundario')}>
-          Recarregar
-        </a>
-      )}
-    </div>
-  );
-}
-
-/** Avisa antes de sair (fechar, recarregar) com o formulário alterado e não salvo. */
-export function useAvisoDeSaida() {
-  const sujo = useRef(false);
-  useEffect(() => {
-    const aviso = (e: BeforeUnloadEvent) => {
-      if (!sujo.current) return;
-      e.preventDefault();
-      e.returnValue = '';
-    };
-    window.addEventListener('beforeunload', aviso);
-    return () => window.removeEventListener('beforeunload', aviso);
-  }, []);
-  return {
-    aoMudar: () => {
-      sujo.current = true;
-    },
-    aoEnviar: () => {
-      sujo.current = false;
-    },
-  };
-}
-
 export function FormInsumo({
   acao,
   modo,
@@ -108,7 +52,7 @@ export function FormInsumo({
   travaDaUnidade = null,
   bloqueio = null,
 }: {
-  acao: AcaoDeInsumo;
+  acao: AcaoDeCadastro;
   modo: 'criar' | 'editar';
   /** Lista de insumos de quem usa a tela (para o link do desativado). */
   base: string;
@@ -122,7 +66,7 @@ export function FormInsumo({
   travaDaUnidade?: string | null;
   bloqueio?: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoInsumo, FormData>(acao, null);
+  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   const [unidade, setUnidade] = useState<Unidade>(inicial.unidade);
   const [tipo, setTipo] = useState<TipoInsumo>(inicial.tipo);
   const saida = useAvisoDeSaida();
@@ -133,7 +77,7 @@ export function FormInsumo({
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
-      <ResumoDeErros erros={erros} idBase={idBase} />
+      <ResumoDeErros erros={erros} idBase={idBase} rotulos={(c) => ROTULO_DO_CAMPO[c] ?? c} />
       <ErroGeral estado={estado} recarregar={aqui} />
 
       <fieldset disabled={!!bloqueio} className="min-w-0 space-y-4">

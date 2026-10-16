@@ -1,15 +1,22 @@
 'use client';
 
 /**
- * Desativar ou reativar (insumo ou embalagem), com motivo opcional que vai
- * para o histórico. Desativar não apaga: some da lista padrão e o histórico
- * fica. Recusa e conflito aparecem aqui mesmo.
+ * Desativar ou reativar um cadastro (insumo, embalagem, ficha técnica), com
+ * motivo opcional que vai para o histórico. Desativar não apaga: some da lista
+ * padrão e o histórico fica. Recusa e conflito aparecem aqui mesmo.
  */
 
 import { useFormState } from 'react-dom';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, ROTULO } from '../../ui/campos';
-import type { AcaoDeInsumo, EstadoInsumo } from './estado';
+import type { AcaoDeCadastro, EstadoCadastro } from './estado';
+
+/** Nome na frase e o gênero, para a concordância ("o insumo desativado" / "a ficha desativada"). */
+const O_QUE = {
+  insumo: { nome: 'insumo', fem: false },
+  embalagem: { nome: 'embalagem', fem: true },
+  ficha: { nome: 'ficha', fem: true },
+} as const;
 
 export function FormSituacao({
   acao,
@@ -17,23 +24,22 @@ export function FormSituacao({
   oQue,
   idBase,
 }: {
-  acao: AcaoDeInsumo;
+  acao: AcaoDeCadastro;
   /** Situação de agora: ativo → o botão desativa. */
   ativo: boolean;
-  oQue: 'insumo' | 'embalagem';
+  oQue: keyof typeof O_QUE;
   idBase: string;
 }) {
-  const [estado, enviar] = useFormState<EstadoInsumo, FormData>(acao, null);
-  // Concordância: "o insumo … desativado" / "a embalagem … desativada".
-  const fem = oQue === 'embalagem';
+  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
+  const { nome, fem } = O_QUE[oQue];
   const [o, este, desativ, ele] = fem ? ['a', 'Esta', 'desativada', 'ela'] : ['o', 'Este', 'desativado', 'ele'];
   return (
     <form action={enviar} className="space-y-3">
       <input type="hidden" name="ativo" value={ativo ? 'nao' : 'sim'} />
       <p className="text-sm text-suave">
         {ativo
-          ? `Desativar tira ${o} ${oQue} da lista e da busca padrão. Nada é apagado: o histórico continua e dá para reativar.`
-          : `${este} ${oQue} está ${desativ}. Reativar devolve ${ele} à lista.`}
+          ? `Desativar tira ${o} ${nome} da lista e da busca padrão. Nada é apagado: o histórico continua e dá para reativar.`
+          : `${este} ${nome} está ${desativ}. Reativar devolve ${ele} à lista.`}
       </p>
       <div>
         <label htmlFor={`${idBase}-motivo`} className={ROTULO}>
@@ -58,7 +64,7 @@ export function FormSituacao({
         </p>
       )}
       <BotaoEnviar variante={ativo ? 'perigo' : 'secundario'} className="w-full" pendente={ativo ? 'Desativando…' : 'Reativando…'}>
-        {ativo ? `Desativar ${oQue}` : `Reativar ${oQue}`}
+        {ativo ? `Desativar ${nome}` : `Reativar ${nome}`}
       </BotaoEnviar>
     </form>
   );

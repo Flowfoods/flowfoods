@@ -21,6 +21,7 @@ import {
 import { UNIDADES, formatarDinheiro, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
 import { CAMPO, MARCAR } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
+import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 
 /** Link da lista com estes filtros mudados (página volta à 1 se não for ela que muda). */
@@ -296,36 +297,15 @@ export function TelaListaInsumos({
         </tbody>
       </table>
 
-      <nav
-        aria-label="Páginas da lista"
-        className="flex flex-wrap items-center justify-between gap-3 border-t border-linha px-4 py-3 text-[13px] text-suave sm:px-5"
-      >
-        <span className="tabular-nums">
-          {de === ate ? `${de}` : `${de}–${ate}`} de {total} {total === 1 ? 'insumo' : 'insumos'}
-        </span>
-        {paginas > 1 && (
-          <span className="flex gap-2">
-            {pagina > 1 ? (
-              <Link href={hrefCom(base, f, { pagina: pagina - 1 })} className={classeDeBotao('secundario')}>
-                Anterior
-              </Link>
-            ) : (
-              <span aria-disabled className={classeDeBotao('secundario', 'pointer-events-none opacity-55')}>
-                Anterior
-              </span>
-            )}
-            {pagina < paginas ? (
-              <Link href={hrefCom(base, f, { pagina: pagina + 1 })} className={classeDeBotao('secundario')}>
-                Próxima
-              </Link>
-            ) : (
-              <span aria-disabled className={classeDeBotao('secundario', 'pointer-events-none opacity-55')}>
-                Próxima
-              </span>
-            )}
-          </span>
-        )}
-      </nav>
+      <Paginacao
+        de={de}
+        ate={ate}
+        total={total}
+        singular="insumo"
+        plural="insumos"
+        anterior={pagina > 1 ? hrefCom(base, f, { pagina: pagina - 1 }) : null}
+        proxima={pagina < paginas ? hrefCom(base, f, { pagina: pagina + 1 }) : null}
+      />
     </Painel>
   );
 }

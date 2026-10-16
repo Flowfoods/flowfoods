@@ -15,8 +15,16 @@ import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
 import { CamposDaEmbalagem, EMBALAGEM_VAZIA, type ValoresDaEmbalagem } from './campos-embalagem';
-import type { AcaoDeInsumo, EstadoInsumo } from './estado';
-import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from './form-insumo';
+import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
+import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
+
+const ROTULOS: Record<string, string> = {
+  nome: 'Nome',
+  conteudo: 'Quanto vem na embalagem',
+  preco: 'Preço',
+  frete: 'Frete',
+  codigoBarras: 'Código de barras',
+};
 
 export interface ValoresDaOutraEmbalagem extends ValoresDaEmbalagem {
   nome: string;
@@ -32,7 +40,7 @@ export function FormEmbalagem({
   versao,
   bloqueio = null,
 }: {
-  acao: AcaoDeInsumo;
+  acao: AcaoDeCadastro;
   unidade: Unidade;
   aqui: string;
   cancelar: string;
@@ -40,7 +48,7 @@ export function FormEmbalagem({
   versao?: string;
   bloqueio?: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoInsumo, FormData>(acao, null);
+  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida();
   const erros = estado?.erros ?? {};
   const idBase = 'embalagem';
@@ -48,7 +56,7 @@ export function FormEmbalagem({
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
-      <ResumoDeErros erros={erros} idBase={idBase} />
+      <ResumoDeErros erros={erros} idBase={idBase} rotulos={(c) => ROTULOS[c] ?? c} />
       <ErroGeral estado={estado} recarregar={aqui} />
       <fieldset disabled={!!bloqueio} className="min-w-0">
         <Painel titulo="Embalagem de compra">
