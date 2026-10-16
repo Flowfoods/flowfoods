@@ -162,6 +162,23 @@ export function textoDaContagem(i: {
   return i.soltoMilesimos ? `${emb} + ${formatarQuantidade(i.soltoMilesimos, i.unidade)} = ${total}` : `${emb} = ${total}`;
 }
 
+/**
+ * Quando o número foi DIGITADO (decisão 76): a tela manda há quantos ms a
+ * pessoa digitou (`idadeMs`, medido no relógio do próprio aparelho, então o
+ * relógio errado do celular não conta); o servidor tira do seu "agora". É
+ * dado do cliente, NÃO confiável: fica preso entre o início da contagem e
+ * agora (nunca no futuro, nunca antes de a contagem existir). O pior que um
+ * aparelho mal-intencionado consegue é dizer que contou mais tarde do que
+ * contou — e o que entrou no livro entre o instante declarado e agora
+ * aparece como "depois de contar" e segura o "fecha sozinha".
+ */
+export function instanteDigitado(agora: Date, idadeMs: unknown, inicioDaContagem: Date): Date {
+  const idade = typeof idadeMs === 'number' ? idadeMs : Number(idadeMs);
+  const ms = Number.isFinite(idade) && idade > 0 ? Math.trunc(idade) : 0;
+  const t = Math.max(inicioDaContagem.getTime(), Math.min(agora.getTime(), agora.getTime() - ms));
+  return new Date(Math.min(t, agora.getTime()));
+}
+
 // ---------------------------------------------------------------- valor
 
 /**

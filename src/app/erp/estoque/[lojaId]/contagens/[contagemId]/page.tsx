@@ -26,6 +26,7 @@ export default async function ErpContagemDoDiaPage({ params, searchParams }: { p
     <TelaPaginaDaContagemDoDia
       c={c}
       base={BASE}
+      pessoa={ctx.sessao.userId}
       feito={searchParams.feito}
       acao={acaoContarNaContagem.bind(null, lojaId, c.contagem.id)}
       podeConcluir={pode(ctx.alcance, 'estoque.ajustar', { lojaId })}

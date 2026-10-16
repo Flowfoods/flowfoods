@@ -15,5 +15,5 @@ export default async function ParceiroContagemDeAberturaPage({ params, searchPar
   const c = await obterContagemDeAbertura(ctx.cliente, ctx.alcance, params.lojaId);
   if (!c) notFound();
   if (ctx.bloqueio || c.contagem?.status !== 'ABERTA') redirect(`${base}/${c.loja.id}`);
-  return <TelaPaginaDaContagem c={c} base={base} contexto={ctx.parceiro.nome} feito={searchParams.feito} acao={acaoContarItem.bind(null, ctx.parceiro.slug, c.loja.id)} podeConcluir />;
+  return <TelaPaginaDaContagem c={c} base={base} pessoa={`n1:${ctx.sessao.userId}`} contexto={ctx.parceiro.nome} feito={searchParams.feito} acao={acaoContarItem.bind(null, ctx.parceiro.slug, c.loja.id)} podeConcluir />;
 }

@@ -41,6 +41,7 @@ import {
   entradasDaNota,
   ErroDeTeto,
   estouroDoRazao,
+  instanteDigitado,
   estadoDoEstoque,
   estornoDe,
   fraseDoEfeito,
@@ -654,7 +655,7 @@ export async function contarItem(
   cliente: ClienteDoParceiro,
   alcance: Alcance,
   lojaId: string,
-  entrada: { itemId: unknown; embalagens: unknown; solto: unknown; escala: unknown; versao: unknown },
+  entrada: { itemId: unknown; embalagens: unknown; solto: unknown; escala: unknown; versao: unknown; idadeMs?: unknown },
   autorNome = 'Sistema',
   opcoes: { contagemId?: string; agora?: Date; ganchos?: GanchosDaContagem } = {},
 ): Promise<ResultadoDoItem> {
@@ -672,7 +673,7 @@ export async function contarItem(
       await lojaDoAlcance(tx, alcance, lojaId, 'estoque.contar');
       const item = await tx.contagemItem.findFirst({
         where: opcoes.contagemId ? { id: itemId, contagemId: opcoes.contagemId, contagem: { lojaId } } : { id: itemId, contagem: { lojaId, tipo: 'ABERTURA' } },
-        select: { ...SELECAO_DO_ITEM, contagemId: true, contagem: { select: { id: true, tipo: true, status: true, desfecho: true, fechaAutomaticoEm: true, fechadaPorNome: true } } },
+        select: { ...SELECAO_DO_ITEM, contagemId: true, contagem: { select: { id: true, tipo: true, status: true, desfecho: true, fechaAutomaticoEm: true, fechadaPorNome: true, criadoEm: true } } },
       });
       if (!item) throw new Recusa({ ok: false, erros: { geral: 'Item não encontrado nesta contagem. Recarregue a página.' }, naoEncontrado: true });
       const contagem = item.contagem as ContagemDoItem;
@@ -694,11 +695,13 @@ export async function contarItem(
         return { ok: false as const, erros: { geral: fraseDaContagemFechada(atual ?? { ...contagem, status: 'CANCELADA' }) }, fechada: true };
       }
       const l = lido.lida;
-      // 1.7: o esperado é o saldo do livro NO MOMENTO em que o item é contado (a abertura parte do zero).
-      const esperado =
-        contagem.tipo === 'ABERTURA'
-          ? null
-          : ((await tx.saldoEstoque.findFirst({ where: { lojaId, insumoId: item.insumoId }, select: { quantidadeMilesimos: true, valorCentavos: true } })) ?? { quantidadeMilesimos: 0, valorCentavos: 0 });
+      // 1.7 (decisão 76): o número vale para o instante em que foi DIGITADO (rascunho reenviado horas depois
+      // continua sendo de quando a pessoa olhou a prateleira), preso entre o início da contagem e agora.
+      const digitadoEm = instanteDigitado(agora, entrada.idadeMs, item.contagem.criadoEm);
+      // O esperado é o livro NAQUELE instante: o saldo de agora menos o que entrou/saiu depois dele, numa
+      // consulta só (um retrato). O que veio depois aparece como "depois de contar" e segura o "fecha sozinha".
+      // A abertura parte do zero.
+      const esperado = contagem.tipo === 'ABERTURA' ? null : await livroNoInstante(tx, lojaId, item.insumoId, digitadoEm);
       const r = await tx.contagemItem.updateMany({
         where: { id: itemId, versao: versaoLida },
         data: {
@@ -706,7 +709,7 @@ export async function contarItem(
           embalagensMilesimos: l.embalagensMilesimos,
           soltoMilesimos: l.soltoMilesimos,
           escalaDigitada: l.contadoMilesimos === null ? null : l.escala,
-          contadoEm: l.contadoMilesimos === null ? null : agora,
+          contadoEm: l.contadoMilesimos === null ? null : digitadoEm,
           contadoPorNome: l.contadoMilesimos === null ? null : autorNome,
           ...(esperado && l.contadoMilesimos !== null ? { saldoSistemaMilesimos: esperado.quantidadeMilesimos, valorSistemaCentavos: esperado.valorCentavos } : {}),
           versao: { increment: 1 },
@@ -751,6 +754,22 @@ export async function contarItem(
     if (e instanceof Recusa) return { ok: false, erros: { geral: e.resultado.erros.geral ?? 'Não deu para salvar.' } };
     throw e;
   }
+}
+
+/**
+ * O livro de (loja, insumo) num instante: saldo de agora − Σ movimentos com
+ * `ocorridoEm` depois dele (quantidade e valor). Uma consulta = um retrato
+ * (READ COMMITTED): nota que confirma no meio entra nos dois lados ou em
+ * nenhum.
+ */
+export async function livroNoInstante(tx: ClienteDoParceiro, lojaId: string, insumoId: string, instante: Date): Promise<{ quantidadeMilesimos: number; valorCentavos: number }> {
+  const [r] = await tx.sql<{ q: number; v: number }>`
+    SELECT
+      (coalesce((SELECT s."quantidadeMilesimos" FROM "SaldoEstoque" s WHERE s."parceiroId" = ${tx.parceiroId} AND s."lojaId" = ${lojaId} AND s."insumoId" = ${insumoId}), 0)
+        - coalesce((SELECT sum(m."quantidadeMilesimos") FROM "MovimentoEstoque" m WHERE m."parceiroId" = ${tx.parceiroId} AND m."lojaId" = ${lojaId} AND m."insumoId" = ${insumoId} AND m."ocorridoEm" > ${instante.toISOString()}::timestamp), 0))::int AS "q",
+      (coalesce((SELECT s."valorCentavos" FROM "SaldoEstoque" s WHERE s."parceiroId" = ${tx.parceiroId} AND s."lojaId" = ${lojaId} AND s."insumoId" = ${insumoId}), 0)
+        - coalesce((SELECT sum(m."valorCentavos") FROM "MovimentoEstoque" m WHERE m."parceiroId" = ${tx.parceiroId} AND m."lojaId" = ${lojaId} AND m."insumoId" = ${insumoId} AND m."ocorridoEm" > ${instante.toISOString()}::timestamp), 0))::int AS "v"`;
+  return { quantidadeMilesimos: r?.q ?? 0, valorCentavos: r?.v ?? 0 };
 }
 
 /** Resposta pronta que precisa desfazer a transação (o "versao + 1" da contagem não fica). */

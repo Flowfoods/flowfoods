@@ -33,7 +33,7 @@ import { classeDeBotao } from '../../ui/estilos';
 import { Barra } from '../../ui/superficies';
 import { IconeDaConservacao } from '../cadastro/validade';
 import type { AcaoDeContar } from './estado';
-import { apagarRascunho, destinoDoRascunho, guardarRascunho, lerRascunhos } from './rascunho';
+import { apagarRascunho, chaveDoRascunho, destinoDoRascunho, guardarRascunho, lerRascunhos } from './rascunho';
 
 type Situacao = 'parado' | 'pendente' | 'salvando' | 'salvo' | 'erro' | 'falha' | 'conflito';
 
@@ -43,6 +43,8 @@ interface Linha {
   situacao: Situacao;
   erros: Partial<Record<'embalagens' | 'solto' | 'geral', string>>;
   conflito: ItemDaContagem | null;
+  /** Quando a pessoa digitou este número (ms, relógio do aparelho): o reenvio manda a idade (decisão 76). */
+  digitadoEm: number | null;
 }
 
 type Aba = 'faltam' | 'contados' | 'todos';
@@ -54,6 +56,7 @@ const mesmosCampos = (a: ContagemDigitada, b: ContagemDigitada) => a.embalagens.
 
 export function TelaContagem({
   contagemId,
+  pessoa,
   itens,
   acao,
   conferirHref,
@@ -64,6 +67,8 @@ export function TelaContagem({
 }: {
   /** Chave do rascunho local (o número que falhou ao salvar fica no aparelho). */
   contagemId: string;
+  /** Quem conta (id da sessão): a memória do aparelho é por contagem E pessoa. */
+  pessoa: string;
   itens: ItemDaContagem[];
   acao: AcaoDeContar;
   /** Conferir e concluir (só quem ajusta saldo). */
@@ -75,7 +80,7 @@ export function TelaContagem({
   paraOPiso?: string[];
 }) {
   const [linhas, setLinhas] = useState<Record<string, Linha>>(() =>
-    Object.fromEntries(itens.map((i) => [i.id, { item: i, campos: i.campos, situacao: 'parado' as Situacao, erros: {}, conflito: null }])),
+    Object.fromEntries(itens.map((i) => [i.id, { item: i, campos: i.campos, situacao: 'parado' as Situacao, erros: {}, conflito: null, digitadoEm: null }])),
   );
   const [aba, setAba] = useState<Aba>('todos');
   const [busca, setBusca] = useState('');
@@ -85,6 +90,7 @@ export function TelaContagem({
   // 1.7: o último número fez a contagem fechar sozinha (tudo bateu, dentro da tolerância).
   const [fechouSozinha, setFechouSozinha] = useState(false);
   const piso = useMemo(() => new Set(paraOPiso), [paraOPiso]);
+  const chave = chaveDoRascunho(contagemId, pessoa);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const emVoo = useRef<Record<string, boolean>>({});
   const atual = useRef(linhas);
@@ -122,19 +128,20 @@ export function TelaContagem({
       emVoo.current[id] = true;
       mudar(id, () => ({ situacao: 'salvando', erros: {} }));
       const versao = versaoForcada ?? l.item.versao;
+      const digitadoEm = l.digitadoEm ?? Date.now();
       let r: ResultadoDoItem;
       try {
-        r = await acao({ itemId: id, embalagens: enviados.embalagens, solto: enviados.solto, escala: enviados.escala, versao });
+        r = await acao({ itemId: id, embalagens: enviados.embalagens, solto: enviados.solto, escala: enviados.escala, versao, idadeMs: Math.max(0, Date.now() - digitadoEm) });
       } catch {
         emVoo.current[id] = false;
-        // Fica no aparelho até salvar: volta sozinho quando o sinal voltar.
-        guardarRascunho(contagemId, id, { campos: enviados, versao });
+        // Fica no aparelho até salvar (com a hora em que foi digitado): volta sozinho quando o sinal voltar.
+        guardarRascunho(chave, id, { campos: enviados, versao, em: digitadoEm });
         mudar(id, () => ({ situacao: 'falha', erros: { geral: 'Sem sinal: o número ficou guardado neste aparelho e vai sozinho quando a conexão voltar.' } }));
         return;
       }
       emVoo.current[id] = false;
       // O servidor respondeu (salvou, recusou ou deu conflito): o rascunho já não serve.
-      apagarRascunho(contagemId, id);
+      apagarRascunho(chave, id);
       if (r.ok) {
         const agora = atual.current[id];
         const mudouDepois = !mesmosCampos(agora.campos, enviados);
@@ -155,24 +162,24 @@ export function TelaContagem({
       }
       mudar(id, () => ({ situacao: 'erro', erros: r.erros }));
     },
-    [acao, mudar, contagemId],
+    [acao, mudar, chave],
   );
 
   // Ao abrir: o que ficou guardado no aparelho volta para o campo e é reenviado com a versão de quando foi digitado.
   useEffect(() => {
-    const guardados = lerRascunhos(contagemId);
+    const guardados = lerRascunhos(chave);
     const reenviar: [string, number][] = [];
     for (const [id, r] of Object.entries(guardados)) {
       const l = atual.current[id];
       if (!l) {
-        apagarRascunho(contagemId, id);
+        apagarRascunho(chave, id);
         continue;
       }
       if (destinoDoRascunho(r, l.item) === 'descartar') {
-        apagarRascunho(contagemId, id);
+        apagarRascunho(chave, id);
         continue;
       }
-      mudar(id, (x) => ({ campos: r.campos, item: { ...x.item, versao: r.versao }, situacao: 'falha', erros: { geral: 'Número guardado neste aparelho: ainda não tinha sido salvo.' } }));
+      mudar(id, (x) => ({ campos: r.campos, item: { ...x.item, versao: r.versao }, digitadoEm: r.em, situacao: 'falha', erros: { geral: 'Número guardado neste aparelho: ainda não tinha sido salvo.' } }));
       reenviar.push([id, r.versao]);
     }
     if (reenviar.length === 0) return;
@@ -183,7 +190,7 @@ export function TelaContagem({
     return () => clearTimeout(t);
     // Só ao abrir a contagem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contagemId]);
+  }, [chave]);
 
   // O sinal voltou (ou a cada 20 s, enquanto houver falha): reenvia o que falhou, com a versão de cada um.
   const comFalha = Object.values(linhas).some((l) => l.situacao === 'falha');
@@ -204,7 +211,7 @@ export function TelaContagem({
   const digitar = (id: string, campos: Partial<ContagemDigitada>) => {
     setMexidos((m) => (m.has(id) ? m : new Set(m).add(id)));
     const emConflito = atual.current[id]?.situacao === 'conflito';
-    mudar(id, (l) => ({ campos: { ...l.campos, ...campos }, situacao: l.situacao === 'conflito' ? 'conflito' : 'pendente', erros: l.situacao === 'conflito' ? l.erros : {} }));
+    mudar(id, (l) => ({ campos: { ...l.campos, ...campos }, digitadoEm: Date.now(), situacao: l.situacao === 'conflito' ? 'conflito' : 'pendente', erros: l.situacao === 'conflito' ? l.erros : {} }));
     clearTimeout(timers.current[id]);
     if (!emConflito) timers.current[id] = setTimeout(() => void salvar(id), ESPERA_MS);
   };

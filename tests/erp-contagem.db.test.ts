@@ -434,6 +434,60 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     expect(await estoqueDaSessao.acaoContarNaContagem(ids.vp, id, { itemId: item.id, embalagens: '', solto: '100', escala: 'base', versao: item.versao })).toMatchObject({ ok: true, fechouSozinha: true });
   });
 
+  it('decisão 76 (Guardião): rascunho reenviado depois de uma nota NÃO apaga a nota — o esperado é o livro de quando foi digitado, e nada fecha sozinho', async () => {
+    const umaHora = new Date(Date.now() - 3_600_000);
+    const r = await iniciarCiclo(a, GERENTE(), ids.vp, { insumoIds: [ids.cheddar], titulo: 'Sem sinal' }, 'Gil', umaHora);
+    const ciclo = (r as { id: string }).id;
+    const antes = Number((await saldo(ids.cheddar))!.quantidadeMilesimos);
+    // O operador conta 100 g a menos, sem sinal (t0); a dona lança 1 caixa (5 kg) depois; o sinal volta e o número é reenviado.
+    await new Promise((x) => setTimeout(x, 30));
+    const t0 = Date.now();
+    await new Promise((x) => setTimeout(x, 30));
+    await lancarNota(a, DONA(), notaDeCheddar('601', '1', '94,90'), 'Marina');
+    await new Promise((x) => setTimeout(x, 30));
+    expect((await saldo(ids.cheddar))!.quantidadeMilesimos).toBe(antes + 5000);
+    const i = await itemDe(ciclo, 'Cheddar fatiado');
+    const contado = ((antes - 100) / 1000).toString().replace('.', ',');
+    const res = await contarNaContagem(a, OPERADOR(), ids.vp, ciclo, { itemId: i.id, embalagens: '', solto: contado, escala: 'base', versao: i.versao, idadeMs: Date.now() - t0 }, 'Caio');
+    // −100 g × R$ 18,98 = R$ 1,90 cabe na tolerância, mas entrou nota depois de contar: o gerente confere.
+    expect(res).toMatchObject({ ok: true });
+    expect('fechouSozinha' in res && res.fechouSozinha).toBeFalsy();
+    const conf = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ciclo, CFG))!;
+    const ch = conf.linhas[0];
+    expect(ch).toMatchObject({ esperadoMilesimos: antes, atualMilesimos: antes + 5000 });
+    expect(ch.div).toMatchObject({ diferencaMilesimos: -100, mudouDepoisMilesimos: 5000, ficaEmMilesimos: antes + 4900, dentroDaTolerancia: true });
+    expect(ch.depois).toEqual([expect.objectContaining({ tipo: 'ENTRADA_COMPRA', quantidadeMilesimos: 5000 })]);
+    const item = (await a.contagemItem.findUnique({ where: { id: i.id }, select: { contadoEm: true } }))!;
+    expect(Math.abs(item.contadoEm!.getTime() - t0)).toBeLessThan(25);
+    expect(await concluir(GERENTE(), ciclo)).toMatchObject({ ok: true });
+    // Certo: a nota fica. (O ataque dava saldo = contado, apagando os 5 kg.)
+    expect((await saldo(ids.cheddar))!.quantidadeMilesimos).toBe(antes + 4900);
+    expect(await razaoCoerente()).toEqual({ divergentes: 0, quebrados: 0 });
+  });
+
+  it('decisão 76: rascunho de 2 dias vale para o início da contagem (nunca antes); idade negativa ou lixo = agora; corrigir número depois da nota segue a mesma regra', async () => {
+    await new Promise((x) => setTimeout(x, 30));
+    const r = await iniciarCiclo(a, GERENTE(), ids.vp, { insumoIds: [ids.presunto], titulo: 'Dois dias' }, 'Gil');
+    const ciclo = (r as { id: string }).id;
+    const antes = Number((await saldo(ids.presunto))!.quantidadeMilesimos);
+    await new Promise((x) => setTimeout(x, 30));
+    await lancarNota(a, DONA(), { ...notaDeCheddar('602', '2', '60,00'), itens: [{ insumoId: ids.presunto, embalagem: 'padrao', quantidade: '2', valor: '60,00' }] }, 'Marina');
+    const i = await itemDe(ciclo, 'Presunto');
+    const txt = (m: number) => (m / 1000).toString().replace('.', ',');
+    const r1 = await contarNaContagem(a, OPERADOR(), ids.vp, ciclo, { itemId: i.id, embalagens: '', solto: txt(antes), escala: 'base', versao: i.versao, idadeMs: 2 * 86_400_000 }, 'Caio');
+    expect(r1).toMatchObject({ ok: true });
+    expect('fechouSozinha' in r1 && r1.fechouSozinha).toBeFalsy();
+    const c1 = (await a.contagemItem.findUnique({ where: { id: i.id }, select: { contadoEm: true, saldoSistemaMilesimos: true, versao: true } }))!;
+    const criada = (await a.contagem.findUnique({ where: { id: ciclo }, select: { criadoEm: true } }))!.criadoEm;
+    expect(c1.contadoEm!.getTime()).toBe(criada.getTime());
+    expect(c1.saldoSistemaMilesimos).toBe(antes);
+    // A pessoa recontou AGORA (idade 0, ou lixo, ou negativa): o esperado já inclui a nota — e o número novo também.
+    const r2 = await contarNaContagem(a, OPERADOR(), ids.vp, ciclo, { itemId: i.id, embalagens: '', solto: txt(antes + 2000), escala: 'base', versao: c1.versao, idadeMs: -5000 }, 'Caio');
+    expect(r2).toMatchObject({ ok: true, fechouSozinha: true });
+    expect((await saldo(ids.presunto))!.quantidadeMilesimos).toBe(antes + 2000);
+    expect(await razaoCoerente()).toEqual({ divergentes: 0, quebrados: 0 });
+  });
+
   it('isolamento: o parceiro B não enxerga as contagens, o período nem as regras de A', async () => {
     expect(await b.contagem.count()).toBe(0);
     expect(await obterContagem(b, DONA(), ids.vp, ids.ciclo, CFG)).toBeNull();

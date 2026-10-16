@@ -32,7 +32,8 @@ import {
   valorDaQuantidade,
 } from '@/lib/erp/estoque-campos';
 import { custoPorUnidade } from '@/lib/erp/unidades';
-import { apagarRascunho, destinoDoRascunho, guardarRascunho, lerRascunhos, VALIDADE_DO_RASCUNHO_MS } from '@/components/erp/telas/estoque/rascunho';
+import { apagarRascunho, chaveDoRascunho, destinoDoRascunho, guardarRascunho, lerRascunhos, VALIDADE_DO_RASCUNHO_MS } from '@/components/erp/telas/estoque/rascunho';
+import { instanteDigitado } from '@/lib/erp/estoque-campos';
 
 const CHEDDAR = { unidade: 'KG' as const, embalagemConteudoMilesimos: 5000 };
 const PAO = { unidade: 'UN' as const, embalagemConteudoMilesimos: 12000 };
@@ -259,9 +260,9 @@ describe('herança b da 1.6: rascunho local do número que falhou ao salvar', ()
 
   it('guarda por contagem e item, com a versão; salvar apaga; vencido some', () => {
     const a = memoria();
-    guardarRascunho('c1', 'i1', { campos: campos('12'), versao: 3 }, 1000, a);
-    guardarRascunho('c1', 'i2', { campos: campos('4'), versao: 0 }, 1000, a);
-    guardarRascunho('c2', 'i1', { campos: campos('9'), versao: 1 }, 1000, a);
+    guardarRascunho('c1', 'i1', { campos: campos('12'), versao: 3, em: 1000 }, a);
+    guardarRascunho('c1', 'i2', { campos: campos('4'), versao: 0, em: 1000 }, a);
+    guardarRascunho('c2', 'i1', { campos: campos('9'), versao: 1, em: 1000 }, a);
     expect(lerRascunhos('c1', 2000, a)).toEqual({ i1: { campos: campos('12'), versao: 3, em: 1000 }, i2: { campos: campos('4'), versao: 0, em: 1000 } });
     apagarRascunho('c1', 'i1', a);
     expect(Object.keys(lerRascunhos('c1', 2000, a))).toEqual(['i2']);
@@ -272,12 +273,12 @@ describe('herança b da 1.6: rascunho local do número que falhou ao salvar', ()
 
   it('sem localStorage (ou com lixo) a tela segue: nada quebra', () => {
     expect(lerRascunhos('c1', 0, null)).toEqual({});
-    expect(() => guardarRascunho('c1', 'i1', { campos: campos('1'), versao: 0 }, 0, null)).not.toThrow();
+    expect(() => guardarRascunho('c1', 'i1', { campos: campos('1'), versao: 0, em: 0 }, null)).not.toThrow();
     const a = memoria();
     a.setItem('ff-contagem:c1', '{"i1":{"campos":{"solto":5},"versao":"x"}');
     expect(lerRascunhos('c1', 0, a)).toEqual({});
     const cheio = { getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); }, removeItem: () => {} };
-    expect(() => guardarRascunho('c1', 'i1', { campos: campos('1'), versao: 0 }, 0, cheio)).not.toThrow();
+    expect(() => guardarRascunho('c1', 'i1', { campos: campos('1'), versao: 0, em: 0 }, cheio)).not.toThrow();
   });
 
   it('ao abrir: o servidor já tem o mesmo número = descarta; senão reenvia com a versão do rascunho (o servidor dá conflito se o item andou)', () => {
@@ -286,5 +287,23 @@ describe('herança b da 1.6: rascunho local do número que falhou ao salvar', ()
     expect(destinoDoRascunho(r, { campos: campos(''), versao: 3 })).toBe('reenviar');
     // Alguém salvou 10 depois (versão 5): reenviar com a versão 3 = conflito no servidor, nunca sobrescreve.
     expect(destinoDoRascunho(r, { campos: campos('10'), versao: 5 })).toBe('reenviar');
+  });
+});
+
+describe('decisão 76: o número vale para quando foi digitado (dado do cliente, preso entre o início da contagem e agora)', () => {
+  const agora = new Date('2026-10-16T15:00:00Z');
+  const inicio = new Date('2026-10-16T12:00:00Z');
+  it('idade em ms medida no aparelho: agora − idade', () => {
+    expect(instanteDigitado(agora, 30 * 60_000, inicio).toISOString()).toBe('2026-10-16T14:30:00.000Z');
+  });
+  it('nunca antes do início da contagem (rascunho de 2 dias) nem no futuro (idade negativa, lixo)', () => {
+    expect(instanteDigitado(agora, 2 * 86_400_000, inicio).toISOString()).toBe(inicio.toISOString());
+    expect(instanteDigitado(agora, -60_000, inicio).toISOString()).toBe(agora.toISOString());
+    expect(instanteDigitado(agora, 'x', inicio).toISOString()).toBe(agora.toISOString());
+    expect(instanteDigitado(agora, undefined, inicio).toISOString()).toBe(agora.toISOString());
+    expect(instanteDigitado(agora, Infinity, inicio).toISOString()).toBe(agora.toISOString());
+  });
+  it('rascunho chaveado por contagem e pessoa', () => {
+    expect(chaveDoRascunho('c1', 'ana')).not.toBe(chaveDoRascunho('c1', 'bia'));
   });
 });

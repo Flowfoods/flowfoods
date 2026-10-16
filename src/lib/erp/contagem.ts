@@ -486,7 +486,7 @@ export function contarNaContagem(
   alcance: Alcance,
   lojaId: string,
   contagemId: string,
-  entrada: { itemId: unknown; embalagens: unknown; solto: unknown; escala: unknown; versao: unknown },
+  entrada: { itemId: unknown; embalagens: unknown; solto: unknown; escala: unknown; versao: unknown; idadeMs?: unknown },
   autorNome = 'Sistema',
   agora = new Date(),
 ): Promise<ResultadoDoItem> {

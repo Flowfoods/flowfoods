@@ -29,6 +29,7 @@ function TelaDeContar({
   loja,
   base,
   contagemId,
+  pessoa,
   titulo,
   subtitulo,
   explicacao,
@@ -44,6 +45,7 @@ function TelaDeContar({
   loja: { id: string; nome: string };
   base: string;
   contagemId: string;
+  pessoa: string;
   titulo: string;
   subtitulo: string;
   explicacao: ReactNode;
@@ -68,6 +70,7 @@ function TelaDeContar({
       <p className="text-sm text-suave">{explicacao}</p>
       <TelaContagem
         contagemId={contagemId}
+        pessoa={pessoa}
         itens={itens}
         acao={acao}
         conferirHref={conferirHref}
@@ -81,12 +84,13 @@ function TelaDeContar({
 }
 
 /** Contagem de abertura (1.6). */
-export function TelaPaginaDaContagem({ c, base, contexto, feito, acao, podeConcluir }: { c: ContagemDeAbertura; base: string; contexto?: string; feito?: string; acao: AcaoDeContar; podeConcluir: boolean }) {
+export function TelaPaginaDaContagem({ c, base, contexto, feito, acao, podeConcluir, pessoa }: { c: ContagemDeAbertura; base: string; contexto?: string; feito?: string; acao: AcaoDeContar; podeConcluir: boolean; pessoa: string }) {
   return (
     <TelaDeContar
       loja={c.loja}
       base={base}
       contagemId={c.contagem?.id ?? c.loja.id}
+      pessoa={pessoa}
       titulo="Contagem de abertura"
       subtitulo={[contexto, c.loja.nome, c.contagem ? `começada ${quando(c.contagem.criadoEm)}${c.contagem.iniciadaPorNome ? ` por ${c.contagem.iniciadaPorNome}` : ''}` : null].filter(Boolean).join(' · ')}
       explicacao="Conte o que tem na loja agora. Caixa fechada vai em embalagens; o aberto, no solto (kg ou g). Deixe vazio o que ainda não contou; o que não tem, marque “Não tem”."
@@ -100,7 +104,7 @@ export function TelaPaginaDaContagem({ c, base, contexto, feito, acao, podeConcl
 }
 
 /** Contagem do dia a dia ou do fechamento do período (1.7). */
-export function TelaPaginaDaContagemDoDia({ c, base, contexto, feito, acao, podeConcluir }: { c: ContagemDaLoja; base: string; contexto?: string; feito?: string; acao: AcaoDeContar; podeConcluir: boolean }) {
+export function TelaPaginaDaContagemDoDia({ c, base, contexto, feito, acao, podeConcluir, pessoa }: { c: ContagemDaLoja; base: string; contexto?: string; feito?: string; acao: AcaoDeContar; podeConcluir: boolean; pessoa: string }) {
   const fechamento = c.contagem.tipo === 'FECHAMENTO';
   const prazo = c.contagem.fechaAutomaticoEm;
   const conferir = `${base}/${c.loja.id}/contagens/${c.contagem.id}/conferir`;
@@ -109,6 +113,7 @@ export function TelaPaginaDaContagemDoDia({ c, base, contexto, feito, acao, pode
       loja={c.loja}
       base={base}
       contagemId={c.contagem.id}
+      pessoa={pessoa}
       titulo={c.contagem.titulo ?? (fechamento ? 'Fechamento do período' : 'Contagem')}
       subtitulo={[contexto, c.loja.nome, prazo ? `prazo ${quando(prazo)}` : null, c.contagem.iniciadaPorNome ? `começada por ${c.contagem.iniciadaPorNome}` : null].filter(Boolean).join(' · ')}
       explicacao={

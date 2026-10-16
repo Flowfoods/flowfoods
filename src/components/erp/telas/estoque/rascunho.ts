@@ -1,7 +1,10 @@
 /**
  * Rascunho local da contagem (herança b da 1.6): o número que FALHOU ao
- * salvar (sem sinal na câmara fria) fica guardado no aparelho, por contagem e
- * item, com a VERSÃO do item em que a pessoa digitou. Quando o sinal volta (ou
+ * salvar (sem sinal na câmara fria) fica guardado no aparelho, por contagem,
+ * PESSOA e item (aparelho compartilhado não reenvia o número de A em nome de
+ * B), com a VERSÃO do item e a HORA em que a pessoa digitou (decisão 76: o
+ * reenvio diz há quanto tempo foi digitado, e o servidor compara com o livro
+ * daquele instante — a nota que entrou enquanto não havia sinal não some). Quando o sinal volta (ou
  * a página abre de novo), a tela reenvia com essa versão: se alguém salvou
  * depois, o servidor devolve conflito (o número dele e o nome) em vez de
  * aceitar o velho por cima — nada mais novo é sobrescrito em silêncio.
@@ -15,7 +18,7 @@ export interface Rascunho {
   campos: ContagemDigitada;
   /** Versão do item em que a pessoa digitou (a que vai no reenvio). */
   versao: number;
-  /** Quando foi guardado (ms). */
+  /** Quando a pessoa DIGITOU (ms, relógio do aparelho; o reenvio manda a idade = agora − em). */
   em: number;
 }
 
@@ -24,7 +27,9 @@ export const VALIDADE_DO_RASCUNHO_MS = 2 * 24 * 60 * 60 * 1000;
 
 type Armazem = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 
-const chaveDe = (contagemId: string) => `ff-contagem:${contagemId}`;
+/** Chave da memória: contagem + pessoa. */
+export const chaveDoRascunho = (contagemId: string, pessoa: string) => `${contagemId}:${pessoa}`;
+const chaveDe = (chave: string) => `ff-contagem:${chave}`;
 
 function armazem(): Armazem | null {
   try {
@@ -70,9 +75,9 @@ export function lerRascunhos(contagemId: string, agora = Date.now(), a: Armazem 
   return validos;
 }
 
-export function guardarRascunho(contagemId: string, itemId: string, r: Omit<Rascunho, 'em'>, agora = Date.now(), a: Armazem | null = armazem()) {
+export function guardarRascunho(contagemId: string, itemId: string, r: Rascunho, a: Armazem | null = armazem()) {
   const tudo = lerTudo(contagemId, a);
-  tudo[itemId] = { ...r, em: agora };
+  tudo[itemId] = { ...r };
   gravarTudo(contagemId, tudo, a);
 }
 

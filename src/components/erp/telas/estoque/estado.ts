@@ -22,6 +22,8 @@ export interface ItemParaSalvar {
   solto: string;
   escala: string;
   versao: number;
+  /** Há quantos ms a pessoa digitou (relógio do aparelho). Dado do cliente: o servidor prende entre o início da contagem e agora. */
+  idadeMs?: number;
 }
 
 export type AcaoDeContar = (item: ItemParaSalvar) => Promise<ResultadoDoItem>;
