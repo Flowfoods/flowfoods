@@ -4,7 +4,9 @@
  * de dado conferido, o atraso conta no calendário do Rio e o texto do
  * consentimento é o decidido.
  */
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('next/headers', () => ({ headers: () => new Headers({ 'x-real-ip': '10.0.0.1' }) }));
 import {
   CAMPO_ARMADILHA,
   CONSENTIMENTO,
@@ -182,5 +184,21 @@ describe('ERP 0.5 · apresentação do pedido', () => {
     expect(textoDoEvento({ acao: 'REENVIOU', antes: null, depois: { reenvios: 2 }, motivo: null })).toBe('Mandou de novo (2ª vez)');
     expect(textoDoEvento({ acao: 'RECUSOU', antes: { etapa: 'NOVO' }, depois: { etapa: 'RECUSADO' }, motivo: 'fora da região' })).toBe('Recusado: fora da região');
     expect(textoDoEvento({ acao: 'MOVEU', antes: { etapa: '<script>' }, depois: null, motivo: null })).toBe('— → —');
+  });
+});
+
+describe('ERP 0.5 · a landing sem banco responde com o WhatsApp, sem erro', () => {
+  const original = process.env.DATABASE_URL;
+  afterEach(() => {
+    if (original === undefined) delete process.env.DATABASE_URL;
+    else process.env.DATABASE_URL = original;
+  });
+  it('sem DATABASE_URL: "indisponível" com a saída pelo WhatsApp, nada estoura', async () => {
+    const { enviarPedido } = await import('@/app/comecar/actions'); // o Prisma lê o .env ao carregar: tirar a variável DEPOIS
+    delete process.env.DATABASE_URL;
+    const f = new FormData();
+    f.set('nomeGrupo', 'Grupo');
+    const r = await enviarPedido(null, f);
+    expect(r).toEqual({ tipo: 'indisponivel', mensagem: 'O formulário está fora do ar por enquanto. Fale pelo WhatsApp.', vez: 1 });
   });
 });

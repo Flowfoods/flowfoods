@@ -91,7 +91,7 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
         </Aviso>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)] lg:grid-rows-[auto_1fr]">
         <Painel titulo="Quem pediu" className="self-start lg:col-start-1">
           {p.excluido ? (
             <p className="text-sm text-suave">Os dados pessoais deste pedido foram excluídos.</p>
@@ -145,6 +145,14 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
         </Painel>
 
         <div className="space-y-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+          <DecisaoDoPedido
+            status={p.status}
+            versao={p.versao}
+            padrao={{ nomeParceiro: p.nomeGrupo, donoNome: p.responsavel, donoEmail: p.email }}
+            ativar={acaoAtivarPedido.bind(null, p.id)}
+            mover={acaoMoverPedido.bind(null, p.id)}
+            recusar={acaoRecusarPedido.bind(null, p.id)}
+          />
           {p.status === 'ATIVADO' && p.parceiro && (
             <Painel titulo="Ativado">
               <div className="space-y-3 text-sm">
@@ -186,14 +194,6 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
               </div>
             </Painel>
           )}
-          <DecisaoDoPedido
-            status={p.status}
-            versao={p.versao}
-            padrao={{ nomeParceiro: p.nomeGrupo, donoNome: p.responsavel, donoEmail: p.email }}
-            ativar={acaoAtivarPedido.bind(null, p.id)}
-            mover={acaoMoverPedido.bind(null, p.id)}
-            recusar={acaoRecusarPedido.bind(null, p.id)}
-          />
         </div>
 
         <Painel titulo="Histórico" subtitulo="Só a etapa, o motivo e quem fez." className="self-start lg:col-start-1">

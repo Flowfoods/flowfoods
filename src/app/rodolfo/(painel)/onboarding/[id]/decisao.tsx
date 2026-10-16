@@ -10,13 +10,11 @@
  * Funciona sem JavaScript: cada bloco é um formulário com a action.
  */
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import { gerarSlug } from '@/lib/erp/slug';
 import { BotaoEnviar } from '@/components/erp/ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '@/components/erp/ui/campos';
-import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { Painel } from '@/components/erp/ui/superficies';
 import { LinkGerado } from '@/components/erp/telas/equipe/link-gerado';
 import type { EstadoDoPedido } from '../actions';
@@ -66,14 +64,6 @@ export function DecisaoDoPedido({
           <p className="text-[12px] text-suave">
             O link aparece só agora e não fica guardado em lugar nenhum. Se perder, gere outro na Equipe do parceiro.
           </p>
-          <div className="flex flex-wrap gap-2">
-            <Link href={`/rodolfo/erp/${a.slug}`} className={classeDeBotao('secundario')}>
-              Abrir o parceiro
-            </Link>
-            <Link href={`/rodolfo/erp/${a.slug}/equipe`} className={classeDeBotao('fantasma')}>
-              Equipe
-            </Link>
-          </div>
         </div>
       </Painel>
     );
