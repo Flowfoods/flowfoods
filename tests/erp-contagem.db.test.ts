@@ -255,7 +255,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     expect(await razaoCoerente()).toEqual({ divergentes: 0, quebrados: 0 });
     // Depois de aplicada, número novo não entra.
     expect(await contar(OPERADOR(), 'Caio', ids.ciclo, 'Presunto', '5')).toMatchObject({ ok: false, fechada: true, erros: { geral: expect.stringMatching(/já foi aplicada/) } });
-    const h = await listarHistorico(a, { de: [{ entidade: 'Contagem', ids: [ids.ciclo] }], limite: 10 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'Contagem', ids: [ids.ciclo] }], limite: 10, verPrecos: true });
     expect(h.map((l) => l.acao)).toEqual(expect.arrayContaining(['INICIOU', 'CONCLUIU']));
   });
 
@@ -320,7 +320,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     expect(await a.contagem.findUnique({ where: { id: ids.vencida }, select: { status: true, desfecho: true, fechadaPorNome: true } })).toEqual({ status: 'FECHADA', desfecho: 'VENCIDA', fechadaPorNome: 'Prazo' });
     expect(await concluir(GERENTE(), ids.vencida)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/fechou sem aplicar/) } });
     expect(await a.movimentoEstoque.count()).toBe(antes);
-    const h = await listarHistorico(a, { de: [{ entidade: 'Contagem', ids: [ids.vencida] }], limite: 10 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'Contagem', ids: [ids.vencida] }], limite: 10, verPrecos: true });
     expect(h.map((l) => l.acao)).toContain('VENCEU');
   });
 
@@ -394,7 +394,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     f.append('lidas', '{}');
     expect(await estoqueDaSessao.acaoSalvarRegrasDaContagem(ids.vp, null, f)).toMatchObject({ ok: false, conflito: true });
     expect((await obterRegras(a, GERENTE(), ids.vp))!.regras.pisoValorBp).toBe(6000);
-    const h = await listarHistorico(a, { de: [{ entidade: 'Loja', ids: [ids.vp] }], limite: 5 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'Loja', ids: [ids.vp] }], limite: 5, verPrecos: true });
     expect(h[0]).toMatchObject({ acao: 'ALTEROU' });
   });
 

@@ -21,7 +21,7 @@ export default async function HistoricoPage({
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'historico.ver');
   const entidade = entidadeDoFiltro(searchParams.entidade);
-  const linhas = await listarHistorico(ctx.cliente, { entidades: entidadesDoFiltro(entidade), limite: LIMITE_DO_HISTORICO });
+  const linhas = await listarHistorico(ctx.cliente, { entidades: entidadesDoFiltro(entidade), limite: LIMITE_DO_HISTORICO, verPrecos: true });
   return (
     <div className="space-y-6">
       <PageHeader

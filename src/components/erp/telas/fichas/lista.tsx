@@ -26,6 +26,46 @@ import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { Miniatura } from './miniatura';
+import { CANAIS } from '@/lib/erp/canal-campos';
+import { FAROL, formatarPorcentagem, type PrecoDoCanal } from '@/lib/erp/preco-campos';
+
+/** 1.10: a margem líquida de um canal na lista — o número, e a palavra quando sai do alvo (nunca só a cor). */
+function MargemNaLista({ p }: { p: PrecoDoCanal }) {
+  if (!p.margens) return p.porQue && p.preco ? <span className="text-[12px] text-atencao">incompleta</span> : <span className="text-suave">—</span>;
+  const f = p.margens.farol;
+  // Sem preço próprio vale o sugerido, que fica no alvo por construção: número em cinza, sem farol.
+  if (p.preco?.origem === 'sugerido') {
+    return (
+      <span className="text-suave">
+        {formatarPorcentagem(p.margens.liquidaBp)}
+        <span className="sr-only"> pelo preço sugerido</span>
+      </span>
+    );
+  }
+  return (
+    <>
+      <span className={f === 'prejuizo' ? 'text-erro font-semibold' : 'font-semibold text-texto'}>{formatarPorcentagem(p.margens.liquidaBp)}</span>
+      {f && f !== 'noAlvo' && <span className={`block text-[12px] ${f === 'prejuizo' ? 'text-erro' : 'text-atencao'}`}>{FAROL[f].rotulo}</span>}
+    </>
+  );
+}
+
+/**
+ * Celular e tablet: só os canais FORA do alvo, com o número e a palavra; o
+ * resto resumido ("iFood 30,6% abaixo do alvo; os outros no alvo").
+ */
+function margemEmLinha(precos: readonly PrecoDoCanal[]): string | null {
+  if (precos.every((p) => !p.margens && !p.preco)) return null;
+  const fora = precos.filter((p) => (p.margens && p.preco?.origem === 'proprio' && p.margens.farol && p.margens.farol !== 'noAlvo') || (!p.margens && p.porQue && p.preco));
+  const noAlvo = precos.filter((p) => p.margens && !fora.includes(p));
+  const semPreco = precos.filter((p) => !p.margens && !fora.includes(p));
+  const partes = fora.map((p) =>
+    p.margens ? `${CANAIS[p.canal].curto} ${formatarPorcentagem(p.margens.liquidaBp)} ${FAROL[p.margens.farol!].rotulo}` : `${CANAIS[p.canal].curto} incompleta`,
+  );
+  if (noAlvo.length) partes.push(fora.length ? (noAlvo.length === 1 ? `${CANAIS[noAlvo[0].canal].curto} no alvo` : 'os outros no alvo') : 'no alvo nos canais com preço');
+  if (semPreco.length) partes.push(`${semPreco.map((p) => CANAIS[p.canal].curto).join(' e ')} sem preço`);
+  return `Margem líquida: ${partes.join('; ')}`;
+}
 
 function hrefCom(base: string, f: FiltrosDeFicha, mudar: Partial<FiltrosDeFicha>): string {
   const q = queryDosFiltrosDeFicha({ ...f, pagina: 1, ...mudar });
@@ -111,6 +151,7 @@ export function TelaListaFichas({
   paginas,
   novaHref,
   importarHref,
+  precos,
 }: {
   /** /erp/fichas ou /rodolfo/erp/<slug>/fichas */
   base: string;
@@ -122,6 +163,8 @@ export function TelaListaFichas({
   /** Quem cria (e não está bloqueado) vê os atalhos no vazio. */
   novaHref?: string;
   importarHref?: string;
+  /** 1.10: preço e margem por canal das fichas de prato (só para quem vê preços). */
+  precos?: ReadonlyMap<string, PrecoDoCanal[]>;
 }) {
   if (total === 0) {
     return (
@@ -182,6 +225,9 @@ export function TelaListaFichas({
                 </span>
                 {/* 1.5 (herança d): validade em linha própria, quebrando em vez de cortar. */}
                 {validadesEmTexto(l.validades) && <span className="mt-0.5 block text-[12px] leading-snug text-suave">{validadesEmTexto(l.validades)}</span>}
+                {precos?.get(l.id) && margemEmLinha(precos.get(l.id)!) && (
+                  <span className="mt-0.5 block text-[12px] leading-snug tabular-nums text-suave">{margemEmLinha(precos.get(l.id)!)}</span>
+                )}
               </span>
               <span className="shrink-0 text-right text-sm tabular-nums">
                 <CustoPorRende l={l} empilhado />
@@ -196,6 +242,14 @@ export function TelaListaFichas({
           Fichas técnicas, {total} no total. Custo = soma dos insumos pelo custo de referência; por porção = custo dividido pelo rendimento.
         </caption>
         <thead>
+          {precos && (
+            <tr className="hidden bg-forte text-[12px] text-suave lg:table-row">
+              <td colSpan={4} />
+              <th scope="colgroup" colSpan={3} className="border-b border-linha px-3 pr-5 pt-2 text-center font-semibold">
+                Margem líquida
+              </th>
+            </tr>
+          )}
           <tr className="bg-forte text-left text-[12px] text-suave">
             <th scope="col" className="h-10 pl-4 pr-3 font-semibold sm:pl-5">
               Ficha
@@ -203,7 +257,7 @@ export function TelaListaFichas({
             <th scope="col" className="hidden h-10 px-3 font-semibold md:table-cell">
               Rende
             </th>
-            <th scope="col" className="hidden h-10 px-3 text-right font-semibold md:table-cell">
+            <th scope="col" className={`hidden h-10 px-3 text-right font-semibold ${precos ? '' : 'md:table-cell'}`}>
               Insumos
             </th>
             <th scope="col" className="h-10 px-3 text-right font-semibold">
@@ -212,7 +266,14 @@ export function TelaListaFichas({
             <th scope="col" className="h-10 px-3 text-right font-semibold">
               Por porção ou kg
             </th>
-            <th scope="col" className="hidden h-10 px-3 pr-5 font-semibold lg:table-cell">
+            {precos &&
+              (['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] as const).map((c) => (
+                <th key={c} scope="col" className="hidden h-10 px-3 text-right font-semibold lg:table-cell">
+                  <span className="sr-only">Margem líquida no </span>
+                  {CANAIS[c].curto}
+                </th>
+              ))}
+            <th scope="col" className={`hidden h-10 px-3 pr-5 font-semibold ${precos ? '' : 'lg:table-cell'}`}>
               Situação
             </th>
           </tr>
@@ -234,16 +295,19 @@ export function TelaListaFichas({
                       {TIPOS_DE_FICHA[l.tipo]}
                       {l.preparos > 0 ? ` · com ${l.preparos === 1 ? '1 pré-preparo' : `${l.preparos} pré-preparos`}` : ''}
                       {l.descricao ? ` · ${l.descricao}` : ''}
-                      <span className="lg:hidden">{!l.ativa && ' · Desativada'}</span>
+                      <span className={precos ? '' : 'lg:hidden'}>{!l.ativa && ' · Desativada'}</span>
                     </div>
                     {validadesEmTexto(l.validades) && <div className="text-[12px] leading-snug text-suave">{validadesEmTexto(l.validades)}</div>}
+                    {precos?.get(l.id) && margemEmLinha(precos.get(l.id)!) && (
+                      <div className="text-[12px] leading-snug tabular-nums text-suave lg:hidden">{margemEmLinha(precos.get(l.id)!)}</div>
+                    )}
                   </div>
                 </div>
               </td>
               <td className="hidden whitespace-nowrap px-3 py-2 text-suave md:table-cell">
                 {formatarRendimento(l.rendimentoMilesimos, l.unidadeRendimento, l.tipo)}
               </td>
-              <td className="hidden px-3 py-2 text-right text-suave md:table-cell">{l.itens}</td>
+              <td className={`hidden px-3 py-2 text-right text-suave ${precos ? '' : 'md:table-cell'}`}>{l.itens}</td>
               <td className="whitespace-nowrap px-3 py-2 text-right">
                 {custoIncompleto(l.custo) ? (
                   <span className="text-suave" title={`Falta preço em: ${l.custo.faltaPreco.join(', ')}`}>
@@ -256,7 +320,19 @@ export function TelaListaFichas({
               <td className="px-3 py-2 text-right">
                 <CustoPorRende l={l} />
               </td>
-              <td className="hidden py-2 pl-3 pr-5 lg:table-cell">
+              {precos &&
+                (precos.get(l.id) ? (
+                  precos.get(l.id)!.map((p) => (
+                    <td key={p.canal} className="hidden whitespace-nowrap px-3 py-2 text-right last:pr-5 lg:table-cell">
+                      <MargemNaLista p={p} />
+                    </td>
+                  ))
+                ) : (
+                  <td colSpan={3} className="hidden px-3 py-2 pr-5 text-right text-[12px] text-suave lg:table-cell">
+                    não se vende
+                  </td>
+                ))}
+              <td className={`hidden py-2 pl-3 pr-5 ${precos ? '' : 'lg:table-cell'}`}>
                 {l.ativa ? <Selo tom="ok">Ativa</Selo> : <Selo>Desativada</Selo>}
               </td>
             </tr>
@@ -264,6 +340,12 @@ export function TelaListaFichas({
         </tbody>
       </table>
 
+      {precos && (
+        <p className="hidden border-t border-linha px-5 py-2.5 text-[12px] text-suave lg:block">
+          Margem líquida = o que sobra do preço depois dos insumos, das embalagens e da taxa do canal. Em cinza: sem preço próprio (vale o sugerido, que
+          fica no alvo).
+        </p>
+      )}
       <Paginacao
         de={de}
         ate={ate}

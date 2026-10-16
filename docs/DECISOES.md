@@ -1296,3 +1296,39 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Razão:** (b). A trava da requisição só serializa a MESMA requisição; duas requisições do mesmo insumo entregues juntas liam o mesmo saldo e as duas passavam sem a confirmação. Com os saldos travados, a segunda espera e confere o saldo que a primeira deixou. Mesma ordem de trava do razão: sem deadlock com contagem e nota.
 
+### 85. 2026-10-23 · ERP 1.10: margem bruta = preço − insumos − embalagens; líquida = bruta − taxa do canal; % sobre o preço
+
+**Alternativas:** (a) bruta = preço − CMV dos insumos (embalagem fora); (b) bruta = preço − insumos − embalagens, líquida = bruta − taxa do canal; (c) líquida já descontando despesas fixas rateadas.
+
+**Razão:** (b). Embalagem é custo do prato no canal (decisão 81); a taxa é o que o canal leva do preço. "Líquida" aqui é o que sobra do PRATO para pagar a casa e o lucro — dito assim na tela —, não o lucro do restaurante: despesa fixa, mensalidade e entrega são do DRE e do lucro por pedido (c misturaria rateio sem dado). Loja e delivery próprio não cobram sobre o preço: líquida = bruta. % sempre sobre o preço (como o dono lê CMV).
+
+### 86. 2026-10-23 · ERP 1.10: margem-alvo da líquida, por canal do parceiro; sugerido = custo ÷ (1 − taxa − alvo), para cima ao centavo
+
+**Alternativas:** alvo — (a) da bruta (estilo "CMV 30 %"); (b) da líquida; origem — (c) `DreMeta`; (d) `CanalConfig.margemAlvoPadraoBp` por parceiro × canal, com ou sem (e) override por prato. Arredondamento — (f) metade para cima; (g) para cima; (h) regra de cardápio gravada.
+
+**Razão:** (b)+(d) sem (e)+(g). Com a taxa sobre o preço, só o alvo da líquida dá a fórmula do contrato (P = C ÷ (1 − t − m)) e o mesmo alvo vale em canais com e sem taxa; o alvo da bruta faria o iFood "bater a meta" perdendo dinheiro. `DreMeta` é meta de linha do DRE com vigência (outra pergunta, 2.x). O override por prato é o próprio preço; o campo `ProdutoCanal.margemAlvoBp` fica para quando houver o caso. Para cima ao centavo: o sugerido é o MENOR preço em centavos que atinge o alvo (metade para cima podia ficar um centavo abaixo). "De cardápio" (próxima ,90) é só um botão que preenche o campo — nenhuma regra inventada. iFood: alvo só com a taxa configurada, e taxa + alvo < 100 % conferido ao salvar qualquer um dos dois (a mesma linha, a mesma versão).
+
+### 87. 2026-10-23 · ERP 1.10: preço próprio sobrescreve; vazio vale o sugerido; com custo incompleto o preço entra e as margens esperam
+
+**Alternativas:** (a) exigir preço em todo canal; (b) vazio = o sugerido (acompanha o custo); (c) recusar preço com custo incompleto.
+
+**Razão:** (b), e não (c): o preço é do cardápio, não depende de saber o custo; recusar travaria a dona por um insumo sem nota. O que não pode é número falso: com custo incompleto, sugerido e margens viram "Incompleto/Incompleta" com o porquê. Preço > 0 e ≤ R$ 100.000,00 por porção.
+
+### 88. 2026-10-23 · ERP 1.10: o servidor recalcula tudo; a prévia é a mesma função, e o formulário só manda o texto do preço
+
+**Alternativas:** (a) o navegador manda preço, sugerido e margens e o servidor confere; (b) o navegador manda só o texto do preço; o servidor trava a ficha, confere os preços lidos, lê o custo de agora e recalcula.
+
+**Razão:** (b). Não há o que conferir se nada calculado vem do navegador — campo forjado nem é lido (teste). A prévia ao vivo chama a MESMA `precoDoCanal` com as entradas que o servidor serializou (BigInt em texto, ida e volta testada), então a tela e o salvo batem (prova visual). Duas abas: impressão dos preços lidos sob a trava da ficha (a mesma das embalagens); a segunda recebe "alguém mudou os preços".
+
+### 89. 2026-10-23 · ERP 1.10: snapshot no histórico da ficha — preço, margem líquida antes/depois e o custo do canal na hora
+
+**Alternativas:** (a) tabela nova de preços com o custo fotografado; (b) o retrato em texto no `HistoricoAlteracao` da ficha, na mesma transação.
+
+**Razão:** (b): sem migration, no lugar onde o dono já olha ("Últimas alterações"), só o canal que mudou. O custo "na hora" é o lido DEPOIS da trava, na transação do preço; a nota que entra junto não espera o preço, e o histórico fica coerente (custo e margem do mesmo instante — teste de corrida). Se o custo mudou desde que a tela abriu, a frase avisa. Número para o DRE, se precisar, é herança (tabela própria na 2.x).
+
+### 90. 2026-10-23 · ERP 1.10 (veto do Guardião): o histórico obedece "ver preços" — o leitor declara, o servidor tira
+
+**Alternativas:** (a) mover o retrato do preço para uma entidade própria e filtrá-la como `NotaEntrada`; (b) `listarHistorico` com `verPrecos` OBRIGATÓRIO: sem ele, some a entidade `CanalConfig` e saem da ficha os campos de precificação (preço, margem, custo na hora, embalagens por canal; taxa e alvo vão com a entidade); linha que só tinha isso some.
+
+**Razão:** (b). (a) cobriria só o preço e deixaria as embalagens e qualquer campo futuro na ficha; (b) é uma regra só, num lugar só, e o tipo obriga todo leitor (os 12 de hoje e os próximos) a decidir — esquecer não compila. O corte é no servidor, antes de virar texto da tela: o payload não leva. `obterFicha` nega por padrão. Os campos de precificação são uma lista (`CAMPOS_DE_PRECIFICACAO`) ao lado dos rótulos do histórico: campo novo de preço entra nela.
+

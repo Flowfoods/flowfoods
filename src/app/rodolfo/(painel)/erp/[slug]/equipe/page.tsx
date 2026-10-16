@@ -39,7 +39,7 @@ export default async function AcessosPage({
     listarAcessos(parceiro.id),
     listarPerfis(parceiro.id),
     listarLojasDoAlcance(cliente, alcance),
-    listarHistorico(cliente, { entidades: ['AcessoParceiro', 'PerfilAcesso'], limite: 6 }),
+    listarHistorico(cliente, { entidades: ['AcessoParceiro', 'PerfilAcesso'], limite: 6, verPrecos: false }),
   ]);
   const slug = parceiro.slug;
 

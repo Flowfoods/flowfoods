@@ -190,3 +190,21 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   valor + lixeira; campos de largura fixa vão num invólucro (o `CAMPO` é
   `w-full`). **Canais de venda**: tabela "o que entra no custo" + painel da
   taxa (duas porcentagens de 112 px e a conta ao vivo num quadro de borda).
+- **Preço e margem por canal (1.10)**: o mesmo painel do custo por canal,
+  agora "Preço e margem por canal", com duas faixas na mesma tabela Corporativo:
+  o que entra (até "Custo do canal" em `linha-forte`) e, depois de outro filete
+  `linha-forte` e da linha "Margem-alvo" em `forte/50`, Preço sugerido (600 +
+  a conta curta "R$ 11,10 ÷ 0,138" em 12 px, a inteira no `title`, e o botão de
+  texto "usar R$ 28,90"), Preço de venda (campo de 112 px à direita, placeholder =
+  o sugerido, "vazio = o sugerido"/"seu preço" em 12 px), Margem bruta e Margem
+  líquida (15/600) com "% do preço" embaixo e o farol em selo com a palavra (no
+  alvo · abaixo do alvo · prejuízo). Rótulos das linhas com a fórmula em 12 px
+  ("bruta − taxa do canal"). "Salvar preços" é secundário (o primário da tela é
+  "Editar ficha"). Celular: bloco por canal com o farol ao lado do nome e o
+  campo de 128 px. **Dica**: explicação longa vai num `<details>` com
+  `CircleHelp` 16 px + rótulo ("Como a conta é feita"), abre no fluxo. **Lista
+  de fichas com margem**: grupo "Margem líquida" (cabeçalho de duas linhas,
+  `colgroup`) com Loja · Delivery · iFood a partir de 1024 px; sem preço
+  próprio = cinza sem farol; abaixo do alvo = palavra em atenção embaixo.
+  **Margens-alvo**: linha = canal + ajuda, campo de 96 px + "%", e o exemplo ao
+  vivo "Prato de R$ 10,00: sai a R$ 33,34" à direita (14rem).

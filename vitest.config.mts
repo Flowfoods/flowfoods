@@ -16,6 +16,9 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  // 1.10: testes com banco montam a PÁGINA (server component) para conferir o
+  // que vai para a tela; o tsconfig preserva JSX para o Next, aqui ele vira JS.
+  oxc: { jsx: { runtime: 'automatic' } },
   test: {
     environment: 'node',
     include: ['src/lib/diagnostico/**/*.test.ts', 'tests/**/*.test.ts'],

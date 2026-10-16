@@ -476,7 +476,7 @@ export async function obterRequisicao(cliente: ClienteDoParceiro, alcance: Alcan
       const status = req.status as StatusDaRequisicao;
       const hoje = hojeNoRio(agora);
       const paraDia = iso(req.paraDia);
-      const historico = await listarHistorico(tx, { de: [{ entidade: 'Requisicao', ids: [req.id] }], limite: 20 });
+      const historico = await listarHistorico(tx, { de: [{ entidade: 'Requisicao', ids: [req.id] }], limite: 20, verPrecos: false });
       const movimentos: MovimentoDaTela[] = movs.map(movimentoParaTela);
       return {
         loja,

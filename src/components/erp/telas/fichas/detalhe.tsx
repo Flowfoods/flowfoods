@@ -27,7 +27,23 @@ import { fraseDoFeitoDaFicha } from './estado';
 import { urlDaFoto } from './miniatura';
 import { ValidadesDoItem } from '../cadastro/validade';
 import type { CustoPorCanal } from '@/lib/erp/canais';
-import { CustoPorCanalDaFicha } from './custo-por-canal';
+import { entradaParaTela } from '@/lib/erp/preco-campos';
+import { PrecoEMargemPorCanal, type PrecosParaTela } from './custo-por-canal';
+
+/** A conta dos canais como o navegador recebe (BigInt em texto): a prévia refaz com a mesma função. */
+function precosParaTela(c: CustoPorCanal): PrecosParaTela {
+  const proprio = (canal: string) => {
+    const p = c.precos.find((x) => x.canal === canal)?.preco;
+    return p?.origem === 'proprio' ? p.centavos : null;
+  };
+  return {
+    entradas: c.entradas.map(entradaParaTela),
+    margensAlvo: c.margensAlvo,
+    precosProprios: { LOJA: proprio('LOJA'), DELIVERY_PROPRIO: proprio('DELIVERY_PROPRIO'), IFOOD: proprio('IFOOD') },
+    impressaoDosPrecos: c.impressaoDosPrecos,
+    impressaoDosCustos: c.impressaoDosCustos,
+  };
+}
 
 export function TelaDetalheFicha({
   ficha: f,
@@ -43,6 +59,7 @@ export function TelaDetalheFicha({
   linkDasEmbalagens,
   linkDaTaxa,
   podeConfigurarTaxa = false,
+  acaoPrecos,
 }: {
   ficha: FichaDetalhada;
   base: string;
@@ -61,6 +78,8 @@ export function TelaDetalheFicha({
   linkDasEmbalagens?: string;
   linkDaTaxa?: string;
   podeConfigurarTaxa?: boolean;
+  /** 1.10: só quem muda preços (a dona), com a ficha ativa e o parceiro livre: o preço vira campo. */
+  acaoPrecos?: AcaoDeCadastro;
 }) {
   const quantidade = (q: number, fator: number, unidade: Parameters<typeof formatarQuantidade>[1]) =>
     fator === 1000 ? null : `bruto ${formatarQuantidade(quantidadeBruta(q, fator), unidade)} · fator ${formatarFator(fator)}`;
@@ -256,12 +275,14 @@ export function TelaDetalheFicha({
           </Painel>
 
           {canais && (
-            <CustoPorCanalDaFicha
+            <PrecoEMargemPorCanal
               className="order-4 sm:order-3"
-              dados={canais}
+              dados={precosParaTela(canais)}
               linkDasEmbalagens={f.ativa ? linkDasEmbalagens : undefined}
-              linkDaTaxa={linkDaTaxa}
-              podeConfigurarTaxa={podeConfigurarTaxa}
+              linkDosCanais={linkDaTaxa}
+              podeConfigurar={podeConfigurarTaxa}
+              acao={f.ativa ? acaoPrecos : undefined}
+              aqui={`${base}/${f.id}`}
             />
           )}
 

@@ -147,7 +147,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.4 · validade por conservação (Postgres rea
     const linha = await a.fichaTecnica.findUnique({ where: { id }, select: { conservacao: true, validadeRefrigeradoMin: true, validadeCongeladoMin: true, validadeSecoMin: true } });
     expect(linha).toEqual({ conservacao: 'REFRIGERADO', validadeRefrigeradoMin: 4320, validadeCongeladoMin: 43_200, validadeSecoMin: null });
     // Histórico da ficha com a validade legível.
-    const [h] = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [id] }], limite: 1 });
+    const [h] = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [id] }], limite: 1, verPrecos: true });
     expect(h.mudancas.find((m) => m.campo === 'validade')?.depois).toBe('Refrigerado 3 dias · Congelado 30 dias');
     expect(h.mudancas.find((m) => m.campo === 'conservação')?.depois).toBe('Refrigerado');
   });
@@ -186,7 +186,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.4 · validade por conservação (Postgres rea
     const ok = await editarFicha(a, ids.molho, { ...entrada('Molho cheddar'), versao }, { tipo: 'manter' }, 'Marina');
     expect(ok).toMatchObject({ ok: true, mudou: ['conservacao', 'validade'] });
     expect(await insumoDoMolho()).toMatchObject({ conservacao: 'CONGELADO', validadeCongeladoMin: 86_400, validadePistaFriaMin: 360, validadeRefrigeradoMin: null });
-    const [hi] = await listarHistorico(a, { entidade: 'Insumo', limite: 1 });
+    const [hi] = await listarHistorico(a, { entidade: 'Insumo', limite: 1, verPrecos: true });
     expect(hi.mudancas.map((m) => [m.campo, m.antes, m.depois])).toEqual([
       ['conservação', 'Refrigerado', 'Congelado'],
       ['validade', 'Refrigerado 3 dias · Congelado 30 dias', 'Pista fria 6 horas · Congelado 60 dias'],
@@ -238,7 +238,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.4 · validade por conservação (Postgres rea
     atual.ctx = () => ctxDe(A, 'DONO');
     expect(await rodar(() => insumosDaSessao.acaoEditarInsumo(ids.cheddar, null, fi))).toMatchObject({ redirect: expect.stringContaining(ids.cheddar) });
     expect((await obterInsumo(a, ids.cheddar, ALCANCE_FLOWFOODS))!.validades).toEqual({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 7200 } });
-    const [h] = await listarHistorico(a, { de: [{ entidade: 'Insumo', ids: [ids.cheddar] }], limite: 1 });
+    const [h] = await listarHistorico(a, { de: [{ entidade: 'Insumo', ids: [ids.cheddar] }], limite: 1, verPrecos: true });
     expect(h.mudancas.map((m) => [m.campo, m.antes, m.depois])).toEqual([['validade', '—', 'Refrigerado 5 dias']]);
   });
 

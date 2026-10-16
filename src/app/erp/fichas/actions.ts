@@ -10,11 +10,18 @@
 
 import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarFicha, editarFicha, mudarSituacaoFicha } from '@/lib/erp/fichas';
-import { salvarEmbalagens, salvarTaxaDoIfood } from '@/lib/erp/canais';
+import { salvarEmbalagens, salvarMargensAlvo, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import type { EstadoImportacao } from '@/components/erp/telas/fichas/estado';
-import { executarImportacao, executarPrevia, lerEnvioDaFicha, lerEnvioDasEmbalagens } from '@/components/erp/telas/fichas/executar';
+import {
+  executarImportacao,
+  executarPrevia,
+  lerEnvioDaFicha,
+  lerEnvioDasEmbalagens,
+  lerEnvioDasMargens,
+  lerEnvioDosPrecos,
+} from '@/components/erp/telas/fichas/executar';
 
 const BASE = '/erp/fichas';
 
@@ -83,4 +90,25 @@ export async function acaoSalvarTaxaDoIfood(anterior: EstadoCadastro, form: Form
   if (negado) return recusado(anterior, negado);
   const r = await salvarTaxaDoIfood(ctx.cliente, { comissao: form.get('comissao'), pagamento: form.get('pagamento'), versao: form.get('versao') }, ctx.sessao.autorNome);
   return concluir(r, anterior, BASE, { mudou: 'taxa', igual: 'taxa-igual' }, 'canais');
+}
+
+/**
+ * 1.10: preço de venda por canal da ficha. Preço é condição comercial: só quem
+ * muda preços (a dona). O form manda o texto; o servidor recalcula tudo.
+ */
+export async function acaoSalvarPrecos(id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = recusaDaAcao(ctx, 'fichas.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
+  if (negado) return recusado(anterior, negado);
+  const r = await salvarPrecos(ctx.cliente, String(id), lerEnvioDosPrecos(form), ctx.sessao.autorNome);
+  return concluir(r, anterior, BASE, { mudou: r.ok && r.custoMudou ? 'precos-custo' : 'precos', igual: 'precos-igual' });
+}
+
+/** 1.10: margem-alvo de cada canal do parceiro (só a dona). */
+export async function acaoSalvarMargensAlvo(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
+  if (negado) return recusado(anterior, negado);
+  const r = await salvarMargensAlvo(ctx.cliente, lerEnvioDasMargens(form), ctx.sessao.autorNome);
+  return concluir(r, anterior, BASE, { mudou: 'margens', igual: 'margens-igual' }, 'canais');
 }

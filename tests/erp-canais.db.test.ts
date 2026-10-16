@@ -37,6 +37,7 @@ import { cadastrarInsumo } from '@/lib/erp/insumos';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { cadastrarFornecedor, lancarNota } from '@/lib/erp/compras';
 import { cadastrarFicha, editarFicha, obterFicha } from '@/lib/erp/fichas';
+import { importarFichas } from '@/lib/erp/ficha-importar';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { custoPorCanal, embalagensParaEscolher, obterTaxaDoIfood, salvarEmbalagens, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import { porQueIncompleto, totalEmTexto, type EmbalagemDigitada } from '@/lib/erp/canal-campos';
@@ -197,15 +198,16 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     expect(sp(totalEmTexto(ifood))).toBe('R$ 6,06 + 26,2% do preço');
     const produto = (await a.produtoVenda.findFirst({ where: { fichaId: ids.burger } }))!;
     expect(produto).toMatchObject({ nome: 'Burger cheddar', marcaId: null });
-    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 5 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 5, verPrecos: true });
     expect(h[0]).toMatchObject({ acao: 'ALTEROU', autorNome: 'Gil Gerente' });
     expect(h[0].mudancas).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ campo: 'embalagens do delivery', depois: 'Caixa kraft 1 un · Guardanapo 2 un' }),
-        expect.objectContaining({ campo: 'embalagens do iFood', depois: 'Caixa kraft 1 un · Guardanapo 2 un · Sacola 1 un' }),
+        // 1.10 (herança b da 1.9): de "Nenhuma" para a lista = só o que entrou.
+        expect.objectContaining({ campo: 'embalagens do delivery · entrou', antes: null, depois: 'Caixa kraft 1 un · Guardanapo 2 un' }),
+        expect.objectContaining({ campo: 'embalagens do iFood · entrou', antes: null, depois: 'Caixa kraft 1 un · Guardanapo 2 un · Sacola 1 un' }),
       ]),
     );
-    const hc = await listarHistorico(a, { entidade: 'CanalConfig', limite: 5 });
+    const hc = await listarHistorico(a, { entidade: 'CanalConfig', limite: 5, verPrecos: true });
     expect(hc[0]).toMatchObject({ acao: 'CRIOU', autorNome: 'Marina' });
     expect(hc[0].mudancas).toEqual(
       expect.arrayContaining([
@@ -361,5 +363,45 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     );
     expect(r.ok).toBe(true);
     expect((await a.produtoVenda.findFirst({ where: { fichaId: ids.burger } }))!.nome).toBe('Burger cheddar duplo');
+  });
+  it('1.10 (herança a da 1.9): prato com produto de venda não vira pré-preparo — nem pela edição, nem pela planilha', async () => {
+    const f = (await obterFicha(a, ids.burger))!;
+    const r = await editarFicha(
+      a,
+      ids.burger,
+      {
+        nome: f.nome,
+        tipo: 'PRE_PREPARO',
+        rendimento: '1',
+        rendimentoUnidade: 'kg',
+        itens: [
+          { insumoId: ids.pao, quantidade: '1', unidade: 'un' },
+          { insumoId: ids.blend, quantidade: '180', unidade: 'g' },
+        ],
+        versao: f.versao,
+      },
+      { tipo: 'manter' },
+      'Marina',
+    );
+    expect(r).toMatchObject({ ok: false, erros: { tipo: expect.stringMatching(/não vira pré-preparo/) } });
+    expect((await obterFicha(a, ids.burger))!.tipo).toBe('PRATO');
+    const planilha = [
+      'ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade',
+      `${f.nome};pré-preparo;1;kg;;;Pão brioche;1;un`,
+    ].join('\n');
+    expect(await importarFichas(a, planilha, 'Marina')).toMatchObject({ ok: false, erro: expect.stringMatching(/não vira pré-preparo/) });
+    expect((await obterFicha(a, ids.burger))!.tipo).toBe('PRATO');
+    // Sem produto de venda (nunca teve embalagem nem preço), o prato ainda pode virar pré-preparo.
+    const solto = await cadastrarFicha(a, { nome: 'Prato solto', tipo: 'PRATO', rendimento: '1', itens: [{ insumoId: ids.pao, quantidade: '1', unidade: 'un' }] }, { tipo: 'manter' }, 'Marina');
+    if (!solto.ok) throw new Error(JSON.stringify(solto));
+    const fs = (await obterFicha(a, solto.id))!;
+    const virou = await editarFicha(
+      a,
+      solto.id,
+      { nome: 'Prato solto', tipo: 'PRE_PREPARO', rendimento: '1', rendimentoUnidade: 'un', itens: [{ insumoId: ids.pao, quantidade: '1', unidade: 'un' }], versao: fs.versao },
+      { tipo: 'manter' },
+      'Marina',
+    );
+    expect(virou.ok).toBe(true);
   });
 });

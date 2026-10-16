@@ -7,7 +7,7 @@
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { obterTaxaDoIfood } from '@/lib/erp/canais';
 import { TelaCanaisDeVenda } from '@/components/erp/telas/fichas/canais';
-import { acaoSalvarTaxaDoIfood } from '../actions';
+import { acaoSalvarMargensAlvo, acaoSalvarTaxaDoIfood } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +26,9 @@ export default async function ErpCanaisDeVendaPage({ searchParams }: { searchPar
       bloqueio={ctx.bloqueio}
       acao={acaoSalvarTaxaDoIfood}
       feito={searchParams.feito}
+      margens={t.margens}
+      versaoDasMargens={t.versaoDasMargens}
+      acaoMargens={acaoSalvarMargensAlvo}
     />
   );
 }

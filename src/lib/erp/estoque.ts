@@ -1160,6 +1160,8 @@ export async function historicoDaAbertura(cliente: ClienteDoParceiro, contagemId
         { entidade: 'ContagemItem', ids: itens.map((i) => i.id) },
       ],
       limite: 20,
+      // Contagem não tem campo de preço por canal.
+      verPrecos: false,
     });
   });
 }

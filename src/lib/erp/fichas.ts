@@ -261,6 +261,18 @@ export async function conferirEstrutura(
     }
   }
 
+  // 1.10 (herança a da 1.9): o prato que já tem produto de venda (embalagens, preço) não vira pré-preparo — o
+  // produto ficaria pendurado numa ficha que não se vende. A ficha travada: a gravação das embalagens e dos preços
+  // (que criam o produto) também a trava, então a conferência não perde a corrida.
+  if (atual?.tipo === 'PRATO' && dados.tipo === 'PRE_PREPARO') {
+    await tx.sql`SELECT 1 FROM "FichaTecnica" WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ${atual.id} FOR NO KEY UPDATE`;
+    if ((await tx.produtoVenda.count({ where: { fichaId: atual.id } })) > 0) {
+      recusar({
+        tipo: 'Este prato já tem preço ou embalagem por canal: ele não vira pré-preparo. Para usar a receita como pré-preparo, crie uma ficha nova de pré-preparo.',
+      });
+    }
+  }
+
   if (subfichas.length > 0 || atual?.tipo === 'PRE_PREPARO') {
     const arestas = await tx.fichaItem.findMany({ where: { subfichaId: { not: null } }, select: { fichaId: true, subfichaId: true } });
     const nomes = new Map((await tx.fichaTecnica.findMany({ where: { tipo: 'PRE_PREPARO' }, select: { id: true, nome: true } })).map((f) => [f.id, f.nome]));
@@ -794,7 +806,11 @@ function itensDoPreparo(sub: FichaLida, custo: CustoDaFicha, fichas: ReadonlyMap
   });
 }
 
-export async function obterFicha(cliente: ClienteDoParceiro, id: string) {
+/**
+ * `verPrecos` (1.10): o histórico da ficha leva preço, margem e custo do canal
+ * só para quem vê preços (`precos.ver`). Padrão: não.
+ */
+export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes: { verPrecos?: boolean } = {}) {
   return cliente.transacao(async (tx) => {
     const f = await tx.fichaTecnica.findUnique({
       where: { id },
@@ -808,7 +824,7 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string) {
       },
     });
     if (!f) return null;
-    const historico = await listarHistorico(tx, { de: [{ entidade: 'FichaTecnica', ids: [id] }], limite: 10 });
+    const historico = await listarHistorico(tx, { de: [{ entidade: 'FichaTecnica', ids: [id] }], limite: 10, verPrecos: opcoes.verPrecos === true });
     const cascata = await custosEmCascata(tx, [], [f]);
     const custo = cascata.custo(id)!;
     const usadaEm = Array.from(new Map(f.usadaComoSub.map((u) => [u.ficha.id, u.ficha])).values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));

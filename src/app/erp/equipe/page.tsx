@@ -32,7 +32,7 @@ export default async function ErpEquipePage({ searchParams }: { searchParams: { 
     listarAcessos(ctx.parceiro.id),
     listarPerfis(ctx.parceiro.id),
     listarLojasDoAlcance(ctx.cliente, ctx.alcance),
-    rede ? listarHistorico(ctx.cliente, { entidades: ['AcessoParceiro', 'PerfilAcesso'], limite: 6 }) : undefined,
+    rede ? listarHistorico(ctx.cliente, { entidades: ['AcessoParceiro', 'PerfilAcesso'], limite: 6, verPrecos: false }) : undefined,
   ]);
 
   return (

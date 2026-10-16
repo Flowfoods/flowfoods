@@ -500,6 +500,8 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string, alcanc
         { entidade: 'InsumoVariante', ids: i.variantes.map((v) => v.id) },
       ],
       limite: 10,
+      // Insumo não tem campo de preço por canal (o preço de compra é do cadastro).
+      verPrecos: false,
     });
     return {
       id: i.id,

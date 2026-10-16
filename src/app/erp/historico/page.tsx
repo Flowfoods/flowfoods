@@ -20,6 +20,8 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
     limite: LIMITE_DO_HISTORICO,
     // 1.5: nota e fornecedor (valores, lojas) só para quem vê compras.
     semEntidades: pode(ctx.alcance, 'compras.ver') ? [] : ['NotaEntrada', 'Fornecedor'],
+    // 1.10: taxa, margem-alvo, preço, margem e custo do canal só para quem vê preços.
+    verPrecos: pode(ctx.alcance, 'precos.ver'),
   });
   return (
     <div className="space-y-6">
