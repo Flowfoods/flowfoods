@@ -139,12 +139,16 @@ const SELECAO_DE_USO = {
  * Por que a unidade NÃO pode mudar (null = pode). Com outra embalagem ou
  * qualquer uso, os milésimos gravados ali passariam a significar outra coisa.
  */
-export async function motivoDaUnidadeTravada(cliente: ClienteDoParceiro, id: string): Promise<string | null> {
+export async function motivoDaUnidadeTravada(
+  cliente: ClienteDoParceiro,
+  id: string,
+  { peloPreparo = false }: { /** Quem muda é a ficha que o produz (1.3): ela não conta como uso. */ peloPreparo?: boolean } = {},
+): Promise<string | null> {
   const i = await cliente.insumo.findUnique({ where: { id }, select: SELECAO_DE_USO });
   if (!i) return null;
   if (i._count.variantes > 0) return 'A unidade não muda: este insumo tem outra embalagem cadastrada.';
   const { variantes: _v, ...usos } = i._count;
-  const emUso = Object.values(usos).some((n) => n > 0) || !!i.fichaQueProduz;
+  const emUso = Object.values(usos).some((n) => n > 0) || (!!i.fichaQueProduz && !peloPreparo);
   return emUso ? 'A unidade não muda: este insumo já é usado em ficha, compra ou estoque.' : null;
 }
 

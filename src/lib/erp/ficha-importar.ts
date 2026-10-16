@@ -14,9 +14,31 @@
 
 import type { ClienteDoParceiro } from './tenant';
 import { ehErroDeUnicidade } from './tenant';
-import { custoDaFicha, custoDoInsumo, formatarRendimento, lerFormFicha, porUnidadeDeRendimento, retratoDaFicha, type DadosFicha, type InsumoDaFicha } from './ficha-campos';
+import {
+  custoDaFicha,
+  custoDoInsumo,
+  custoIncompleto,
+  formatarRendimento,
+  lerFormFicha,
+  porUnidadeDeRendimento,
+  retratoDaFicha,
+  type DadosFicha,
+  type InsumoDaFicha,
+  type PreparoDaFicha,
+} from './ficha-campos';
 import { casarComInsumos, chaveDeNome, lerPlanilhaDeFichas, type ErroDeLinha, type FichaDaPlanilha } from './ficha-planilha';
-import { dadosGravados, gravarFicha, insumosTravados, RecusaDaFicha, SELECAO_PARA_EDITAR } from './fichas';
+import { custosEmCascata } from './ficha-custos';
+import {
+  cadastroDaEntrada,
+  conferirEstrutura,
+  dadosGravados,
+  gravarFicha,
+  insumosTravados,
+  preparosTravados,
+  RecusaDaFicha,
+  SELECAO_PARA_EDITAR,
+  travarGrafoDeFichas,
+} from './fichas';
 import { diferenca } from './insumo-campos';
 import { formatarFracao } from './unidades';
 
@@ -83,23 +105,42 @@ interface Plano {
 async function planejar(tx: ClienteDoParceiro, texto: string, travar: boolean): Promise<{ planos: Plano[]; previa: Previa }> {
   const leitura = lerPlanilhaDeFichas(texto);
   const todos = await tx.insumo.findMany({
+    // O insumo que um pré-preparo produz não entra: na receita, vale o pré-preparo (mesmo nome).
+    where: { fichaQueProduz: { is: null } },
     select: { id: true, nome: true, unidade: true, ativo: true, conteudoMilesimos: true, precoEmbalagemCentavos: true, taxaEntregaCentavos: true },
   });
-  const porNome = new Map<string, { id: string }[]>();
-  for (const i of todos) porNome.set(chaveDeNome(i.nome), [...(porNome.get(chaveDeNome(i.nome)) ?? []), i]);
+  const preparosLidos = await tx.fichaTecnica.findMany({
+    where: { tipo: 'PRE_PREPARO' },
+    select: { id: true, nome: true, tipo: true, ativa: true, unidadeRendimento: true },
+  });
+  const agrupar = <T extends { nome: string }>(lista: T[]) => {
+    const m = new Map<string, T[]>();
+    for (const i of lista) m.set(chaveDeNome(i.nome), [...(m.get(chaveDeNome(i.nome)) ?? []), i]);
+    return m;
+  };
+  const porNome = agrupar(todos);
+  const preparosPorNome = agrupar(preparosLidos);
+  const daPlanilha = new Set(leitura.fichas.filter((f) => f.tipo === 'PRE_PREPARO').map((f) => chaveDeNome(f.nome)));
   const atuais = new Map((await lerAtuais(tx, leitura.fichas.map((f) => f.nome))).map((a) => [a.nome, a]));
 
-  const casadas = leitura.fichas.map((f) => ({ f, ...casarComInsumos(f, porNome) }));
+  const casadas = leitura.fichas.map((f) => ({ f, ...casarComInsumos(f, porNome, preparosPorNome, daPlanilha) }));
   let doCadastro: Map<string, InsumoDaFicha> = new Map(todos.map((i) => [i.id, i]));
+  let preparos: Map<string, PreparoDaFicha> = new Map(preparosLidos.map((p) => [p.id, p]));
   if (travar) {
-    const ids = casadas.flatMap((c) => [
-      ...c.entrada.itens.map((i) => i.insumoId),
-      ...(atuais.get(c.f.nome)?.itens.map((i) => i.insumoId ?? '') ?? []),
-    ]);
-    doCadastro = new Map([...doCadastro, ...(await insumosTravados(tx, ids))]);
+    const doItem = (c: (typeof casadas)[number], chave: 'insumoId' | 'subfichaId') => [
+      ...c.entrada.itens.map((i) => i[chave] ?? ''),
+      ...(atuais.get(c.f.nome)?.itens.map((i) => i[chave] ?? '') ?? []),
+    ];
+    doCadastro = new Map([...doCadastro, ...(await insumosTravados(tx, casadas.flatMap((c) => doItem(c, 'insumoId'))))]);
+    preparos = new Map([...preparos, ...(await preparosTravados(tx, casadas.flatMap((c) => doItem(c, 'subfichaId'))))]);
   }
+  // Custo dos pré-preparos citados, em cascata (uma leitura por nível para a planilha inteira).
+  const citados = Array.from(new Set(casadas.flatMap((c) => c.entrada.itens.map((i) => i.subfichaId ?? '')).filter(Boolean)));
+  const cascata = await custosEmCascata(tx, citados);
 
-  const planos: Plano[] = casadas.map(({ f, entrada, linhaDoItem, faltam, erros }) => planejarUma(f, entrada, linhaDoItem, faltam, erros, atuais.get(f.nome), doCadastro));
+  const planos: Plano[] = casadas.map(({ f, entrada, linhaDoItem, faltam, erros }) =>
+    planejarUma(f, entrada, linhaDoItem, faltam, erros, atuais.get(f.nome), doCadastro, preparos, cascata.custo),
+  );
   const contagem: Record<SituacaoNaPrevia, number> = { nova: 0, muda: 0, igual: 0, erro: 0 };
   for (const p of planos) contagem[p.previa.situacao]++;
   return { planos, previa: { fichas: planos.map((p) => p.previa), erros: leitura.erros, linhasLidas: leitura.linhasLidas, contagem } };
@@ -113,12 +154,14 @@ function planejarUma(
   errosDoCasamento: ErroDeLinha[],
   atual: Atual | undefined,
   doCadastro: ReadonlyMap<string, InsumoDaFicha>,
+  preparos: ReadonlyMap<string, PreparoDaFicha>,
+  custoDoPreparo: (id: string) => ReturnType<typeof custoDaFicha> | null,
 ): Plano {
   const base = { nome: f.nome, linhas: intervalo(f.linhas), mudancas: [], itens: f.itens.length, rende: null, custo: null, incompleto: false, faltam };
   const erros: ErroDeLinha[] = [...f.erros, ...errosDoCasamento];
   if (atual && !atual.ativa) erros.push({ linha: f.primeiraLinha, mensagem: `A ficha “${f.nome}” está desativada: reative antes de importar por cima.` });
-  const jaNaFicha = new Set((atual?.itens ?? []).map((i) => i.insumoId).filter((x): x is string => !!x));
-  const lido = lerFormFicha(entrada, doCadastro, jaNaFicha);
+  const jaNaFicha = new Set((atual?.itens ?? []).flatMap((i) => [i.insumoId, i.subfichaId]).filter((x): x is string => !!x));
+  const lido = lerFormFicha(entrada, doCadastro, jaNaFicha, { preparos, propriaId: atual?.id });
   if (!lido.ok) {
     for (const [chave, mensagem] of Object.entries(lido.erros)) {
       const m = /^item-(\d+)$/.exec(chave);
@@ -139,8 +182,10 @@ function planejarUma(
   };
   const custo = custoDaFicha(
     dados.itens.map((i) => {
-      const ins = doCadastro.get(i.insumoId)!;
-      return { nome: ins.nome, quantidadeMilesimos: i.quantidadeMilesimos, fatorCorrecaoMilesimos: 1000, custo: custoDoInsumo(ins) };
+      const comum = { quantidadeMilesimos: i.quantidadeMilesimos, fatorCorrecaoMilesimos: i.fatorCorrecaoMilesimos };
+      if (i.subfichaId) return { ...comum, nome: preparos.get(i.subfichaId)!.nome, custo: null, preparo: custoDoPreparo(i.subfichaId) ?? undefined };
+      const ins = doCadastro.get(i.insumoId!)!;
+      return { ...comum, nome: ins.nome, custo: custoDoInsumo(ins) };
     }),
     dados.rendimentoMilesimos,
   );
@@ -150,12 +195,12 @@ function planejarUma(
     itens: dados.itens.length,
     rende: formatarRendimento(dados.rendimentoMilesimos, dados.unidadeRendimento, dados.tipo),
     custo: `${formatarFracao(custo.porRendimento)} ${porUnidadeDeRendimento(dados.unidadeRendimento, dados.tipo)}`,
-    incompleto: custo.semPreco.length > 0,
+    incompleto: custoIncompleto(custo),
   };
   if (!atual) return { previa: { ...comum, situacao: 'nova' }, dados };
   const mudanca = diferenca(
-    retratoDaFicha(dadosGravados(atual), doCadastro, atual.fotoArquivo),
-    retratoDaFicha(dados, doCadastro, atual.fotoArquivo),
+    retratoDaFicha(dadosGravados(atual), doCadastro, atual.fotoArquivo, preparos),
+    retratoDaFicha(dados, doCadastro, atual.fotoArquivo, preparos),
   );
   if (!mudanca) return { previa: { ...comum, situacao: 'igual' }, dados, atual };
   return { previa: { ...comum, situacao: 'muda', mudancas: mudanca.campos.map((c) => PALAVRA[c] ?? c) }, dados, atual };
@@ -194,6 +239,8 @@ export async function importarFichas(
   try {
     return await cliente.transacao(
       async (tx) => {
+        // A mesma trava das edições: o círculo entre pré-preparos é conferido com o grafo parado.
+        await travarGrafoDeFichas(tx);
         const { planos, previa } = await planejar(tx, texto, true);
         const boas = planos.filter((p) => p.previa.situacao === 'nova' || p.previa.situacao === 'muda');
         if (boas.length === 0) {
@@ -210,14 +257,26 @@ export async function importarFichas(
           });
         }
         for (const p of boas) {
-          const doCadastro = await insumosTravados(tx, p.dados!.itens.map((i) => i.insumoId).concat(p.atual?.itens.map((i) => i.insumoId ?? '') ?? []));
+          const entrada = { itens: p.dados!.itens.map((i) => ({ insumoId: i.insumoId ?? undefined, subfichaId: i.subfichaId ?? undefined, quantidade: '', unidade: '' })) };
+          const { doCadastro, preparos } = await cadastroDaEntrada(tx, entrada, p.atual ?? null);
+          try {
+            await conferirEstrutura(tx, p.dados!, p.atual ?? null, doCadastro);
+          } catch (e) {
+            // Ex.: a planilha faria um círculo entre pré-preparos. Nada entra (tudo ou nada).
+            if (e instanceof RecusaDaFicha) {
+              const motivo = Object.values(e.resultado.erros)[0] ?? 'recusada';
+              throw new RecusaDaFicha({ ok: false, erros: { geral: `“${p.dados!.nome}”: ${motivo} Nada foi gravado.` } });
+            }
+            throw e;
+          }
           await gravarFicha(tx, {
             atual: p.atual ?? null,
             dados: p.dados!,
             doCadastro,
+            preparos,
             foto: 'manter',
             origem: 'IMPORTACAO',
-            antes: p.atual ? retratoDaFicha(dadosGravados(p.atual), doCadastro, p.atual.fotoArquivo) : undefined,
+            antes: p.atual ? retratoDaFicha(dadosGravados(p.atual), doCadastro, p.atual.fotoArquivo, preparos) : undefined,
             motivo: 'Importada por planilha',
             autorNome,
           });

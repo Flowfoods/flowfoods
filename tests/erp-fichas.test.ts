@@ -69,12 +69,8 @@ describe('ERP 1.2 · item digitado em g/kg, ml/L ou un vira milésimos do insumo
     );
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.dados.itens).toEqual([
-      { insumoId: 'blend', quantidadeMilesimos: 180 },
-      { insumoId: 'pao', quantidadeMilesimos: 1000 },
-      { insumoId: 'oleo', quantidadeMilesimos: 50 },
-      { insumoId: 'guard', quantidadeMilesimos: 2000 },
-    ]);
+    const it = (insumoId: string, quantidadeMilesimos: number) => ({ insumoId, subfichaId: null, quantidadeMilesimos, fatorCorrecaoMilesimos: 1000 });
+    expect(r.dados.itens).toEqual([it('blend', 180), it('pao', 1000), it('oleo', 50), it('guard', 2000)]);
     expect(r.dados).toMatchObject({ tipo: 'PRATO', rendimentoMilesimos: 1000, unidadeRendimento: 'UN' });
     // Modo de preparo guarda as quebras de linha, sem empilhar linhas vazias.
     expect(r.dados.modoPreparo).toBe('Selar o blend.\n\nMontar.');
@@ -332,8 +328,8 @@ describe('ERP 1.2 · histórico da ficha: legível, só o que mudou', () => {
     rendimentoMilesimos: 1000,
     unidadeRendimento: 'UN' as const,
     itens: [
-      { insumoId: 'pao', quantidadeMilesimos: 1000 },
-      { insumoId: 'blend', quantidadeMilesimos: 180 },
+      { insumoId: 'pao', subfichaId: null, quantidadeMilesimos: 1000, fatorCorrecaoMilesimos: 1000 },
+      { insumoId: 'blend', subfichaId: null, quantidadeMilesimos: 180, fatorCorrecaoMilesimos: 1000 },
     ],
   };
 
@@ -351,7 +347,7 @@ describe('ERP 1.2 · histórico da ficha: legível, só o que mudou', () => {
 
   it('edição: troca de foto e de quantidade, com antes e depois', () => {
     const antes = retratoDaFicha(dados, nomes, `${'b'.repeat(32)}.png`);
-    const depois = retratoDaFicha({ ...dados, itens: [dados.itens[0], { insumoId: 'blend', quantidadeMilesimos: 200 }] }, nomes, `${'c'.repeat(32)}.jpg`);
+    const depois = retratoDaFicha({ ...dados, itens: [dados.itens[0], { ...dados.itens[1], quantidadeMilesimos: 200 }] }, nomes, `${'c'.repeat(32)}.jpg`);
     const d = diferenca(antes, depois)!;
     expect(d.campos).toEqual(['foto', 'itens']);
     expect(descreverMudancas(d.antes, d.depois).map((x) => [x.campo, x.antes, x.depois])).toEqual([
