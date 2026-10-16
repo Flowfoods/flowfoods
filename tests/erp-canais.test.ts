@@ -45,7 +45,7 @@ const IFOOD = { comissaoBp: 2300, pagamentoBp: 320 };
 describe('camadas por canal, exatas', () => {
   it('loja = só os insumos (a porção da ficha), sem embalagem nem taxa', () => {
     const c = camadasDoCanal({ canal: 'LOJA', custoDaFicha: burger, embalagens: [caixa], taxa: null });
-    igual(c.insumos, 49_164n, 100n);
+    igual(c.daFicha, 49_164n, 100n);
     expect(c.embalagens).toEqual([]);
     expect(c.taxa).toEqual({ tipo: 'nenhuma' });
     igual(c.total!, 49_164n, 100n);
@@ -192,5 +192,22 @@ describe('embalagens por canal: leitura do formulário', () => {
     expect(retratoDasEmbalagens(lista, nomes)).toEqual({ embalagensDelivery: 'Caixa kraft 1 un · Guardanapo 2 un', embalagensIfood: 'Nenhuma' });
     expect(impressaoDasEmbalagens(lista)).toBe('DELIVERY_PROPRIO:cx:1000|DELIVERY_PROPRIO:gu:2000');
     expect(impressaoDasEmbalagens([])).toBe('');
+  });
+});
+
+describe('retrato: a mesma lista em outra ordem não é mudança', () => {
+  it('ordena pelo nome dentro do canal', () => {
+    const nomes = new Map([
+      ['sa', { nome: 'Sacola', unidade: 'UN' as const }],
+      ['cx', { nome: 'Caixa kraft', unidade: 'UN' as const }],
+    ]);
+    const r = retratoDasEmbalagens(
+      [
+        { canal: 'IFOOD', insumoId: 'sa', quantidadeMilesimos: 1000 },
+        { canal: 'IFOOD', insumoId: 'cx', quantidadeMilesimos: 1000 },
+      ],
+      nomes,
+    );
+    expect(r.embalagensIfood).toBe('Caixa kraft 1 un · Sacola 1 un');
   });
 });

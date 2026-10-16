@@ -8,6 +8,10 @@ export const FEITO_FICHA: Readonly<Record<string, string>> = {
   igual: 'Nada mudou: os valores já eram esses.',
   desativada: 'Ficha desativada. Ela sai da lista padrão; o histórico continua. Para editar, reative.',
   reativada: 'Ficha reativada.',
+  // 1.9
+  embalagens: 'Embalagens salvas. O custo do delivery e do iFood já mudou; o antes e o depois estão em Últimas alterações.',
+  taxa: 'Taxa do iFood salva. O custo do iFood de todas as fichas já usa a nova.',
+  'taxa-igual': 'Nada mudou: a taxa já era essa.',
 };
 
 export function fraseDoFeitoDaFicha(feito: string | undefined): string | undefined {

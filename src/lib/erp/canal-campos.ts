@@ -214,9 +214,13 @@ export function retratoDasEmbalagens(
   nomes: ReadonlyMap<string, { nome: string; unidade: Unidade }>,
 ): Record<'embalagensDelivery' | 'embalagensIfood', string> {
   const doCanal = (c: CanalComEmbalagem) => {
-    const l = lista.filter((e) => e.canal === c);
+    // Na ordem do nome (a da tela): a mesma lista em outra ordem não é mudança.
+    const l = lista
+      .filter((e) => e.canal === c)
+      .map((e) => ({ nome: nomes.get(e.insumoId)?.nome ?? '?', unidade: nomes.get(e.insumoId)?.unidade ?? ('UN' as const), quantidadeMilesimos: e.quantidadeMilesimos }))
+      .sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
     if (l.length === 0) return SEM_EMBALAGEM;
-    return itensEmTexto(l.map((e) => ({ nome: nomes.get(e.insumoId)?.nome ?? '?', unidade: nomes.get(e.insumoId)?.unidade ?? 'UN', quantidadeMilesimos: e.quantidadeMilesimos })));
+    return itensEmTexto(l);
   };
   return { embalagensDelivery: doCanal('DELIVERY_PROPRIO'), embalagensIfood: doCanal('IFOOD') };
 }
@@ -243,7 +247,7 @@ export type TaxaDaCamada =
 export interface CamadasDoCanal {
   canal: CanalVenda;
   /** Custo de UMA porção da ficha (a cascata). */
-  insumos: Fracao;
+  daFicha: Fracao;
   /** Itens da ficha sem preço (até o fundo da cascata). */
   insumosSemPreco: string[];
   /** Embalagens do canal, cada uma com o custo exato (null = sem preço). LOJA: lista vazia. */
@@ -295,7 +299,7 @@ export function camadasDoCanal(p: {
   const total = taxa.tipo === 'nenhuma' ? semTaxa : taxa.tipo === 'sobrePreco' && taxa.valor ? somar(semTaxa, taxa.valor) : null;
   return {
     canal: p.canal,
-    insumos: p.custoDaFicha.porRendimento,
+    daFicha: p.custoDaFicha.porRendimento,
     insumosSemPreco: [...p.custoDaFicha.faltaPreco],
     embalagens,
     embalagensTotal,
