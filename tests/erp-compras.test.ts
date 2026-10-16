@@ -15,6 +15,7 @@ import {
   compararCompras,
   custoDaCompra,
   documentoValido,
+  erroDoFormatoDaData,
   hojeNoRio,
   lerData,
   lerFormFornecedor,
@@ -253,6 +254,13 @@ describe('ERP 1.5 · número, data, documento, filtros', () => {
     expect(lerData('2026-10-14')).toBe('2026-10-14');
     expect(lerData('31/02/2026')).toBeNull();
     expect(hojeNoRio(new Date('2026-10-17T02:00:00Z'))).toBe('2026-10-16');
+  });
+
+  it('herança da 1.5: data com formato errado tem frase (o campo mostra ao sair dele)', () => {
+    expect(erroDoFormatoDaData('')).toBeNull();
+    expect(erroDoFormatoDaData('14/10/2026')).toBeNull();
+    expect(erroDoFormatoDaData('14/10')).toBe('Data incompleta: use dd/mm/aaaa (ex.: 14/10/2026).');
+    expect(erroDoFormatoDaData('31/02/2026')).toBe('31/02/2026 não existe no calendário.');
   });
 
   it('CPF/CNPJ com dígito verificador', () => {
