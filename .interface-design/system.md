@@ -141,3 +141,18 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   referência, valor; sem preço = selo + "pendente") e o **livro do estoque**
   (quando, insumo, selo do tipo — "Estorno · compra" em atenção —, quantidade
   com sinal, saldo "antes › depois", origem com link da nota).
+- **Contagem do dia a dia (1.7)**: estado da contagem em selo com palavra
+  ("Em contagem"/"Fechou sem aplicar" atenção, "Pronta para conferir"
+  neutro, "Aplicada"/"Fechou sozinha" ok). **Planejar**: filtros em trilho
+  (lugar · quais), lista por lugar com a linha inteira clicável (caixa 20 px,
+  48 px de altura), apoio "Curva A · contado em 06/10 · venceu 13/10" (atenção
+  quando vencido), quem está noutra contagem desabilitado com o nome dela;
+  rodapé fixo com "Começar a contagem (N)". **Cobertura × piso**: barra de
+  8 px com a marca do piso (filete de 2 px em `texto`), número tabular à
+  direita ("47,8 % · piso 80 %") e "atinge"/"abaixo do piso" escrito.
+  **Conferir**: três métricas (contados, diferença em R$ com o sinal
+  tipográfico, para conferir), tabela Corporativo (livro ao contar, contado,
+  diferença com "R$ X a menos · confira" em atenção, depois de contar com
+  link da nota, fica em) que rola dentro do painel; "Bateram" recolhido em
+  `<details>`; painel lateral ≥ 1280 px. "Para o piso" em 12 px atenção ao
+  lado do nome na contagem e selo atenção na lista do período.
