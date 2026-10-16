@@ -258,11 +258,11 @@ export async function opcoesDoPedido(cliente: ClienteDoParceiro, alcance: Alcanc
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'requisicao.pedir');
       const aberto = ((await aberturasDe(tx, [lojaId])).get(lojaId)?.status ?? null) === 'FECHADA';
-      const insumos: OpcaoDeInsumo[] = (await tx.insumo.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, unidade: true, conservacao: true } })).map((i) => ({ ...i, unidade: i.unidade as Unidade, conservacao: i.conservacao as Conservacao }));
+      const ativos: OpcaoDeInsumo[] = (await tx.insumo.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, unidade: true, conservacao: true } })).map((i) => ({ ...i, unidade: i.unidade as Unidade, conservacao: i.conservacao as Conservacao }));
       const fichas = pode(alcance, 'fichas.ver')
         ? (await tx.fichaTecnica.findMany({ where: { ativa: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, tipo: true, unidadeRendimento: true } })).map((f) => ({ ...f, unidadeRendimento: f.unidadeRendimento as Unidade }))
         : [];
-      return { loja, aberto, insumos, fichas };
+      return { loja, aberto, ativos, fichas };
     }),
   );
   return 'ok' in r ? null : r;

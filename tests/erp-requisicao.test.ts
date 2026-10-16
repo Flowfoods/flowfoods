@@ -294,7 +294,7 @@ describe('cruzamento requisição × contagem: consumo apurado × requisitado = 
     expect(ds.map((d) => d.insumoId)).toEqual(['ched', 'pao', 'bat']);
     expect(resumoDasDivergencias(ds)).toEqual({ sumicoCentavos: 1139, comSumico: 2, sobraCentavos: 300, comSobra: 1, semPreco: 1, pequenosRepetidos: 1, pequenosCentavos: 1139 });
     const setores = porSetor(ds, new Map([['pao', PAO]]));
-    expect(setores).toEqual([{ setor: 'COZINHA', requisitadoCentavos: 1800, insumos: 1, sumicoNosSeusCentavos: 0, insumosComSumico: 0 }]);
+    expect(setores).toEqual([{ setor: 'COZINHA', requisitadoCentavos: 1800, quantosInsumos: 1, sumicoNosSeusCentavos: 0, insumosComSumico: 0 }]);
   });
   it('a janela pega o trecho pelo FIM; insumo sem trecho que feche na janela fica de fora', () => {
     const ds = divergenciasDoPeriodo(

@@ -121,7 +121,7 @@ const escalaDe = (e: string, u: Unidade): Escala => (e === 'menor' && u !== 'UN'
  */
 export function lerPedido(
   f: { setor: unknown; paraDia: unknown; observacao: unknown; linhas: readonly LinhaDigitada[] },
-  insumos: ReadonlyMap<string, InsumoParaPedir>,
+  cadastro: ReadonlyMap<string, InsumoParaPedir>,
   hoje: string,
 ): { ok: true; pedido: PedidoLido } | { ok: false; erros: Record<string, string> } {
   const erros: Record<string, string> = {};
@@ -141,7 +141,7 @@ export function lerPedido(
     const q = (l.quantidade ?? '').trim();
     if (!id && !q) return;
     const chave = `item:${n}`;
-    const ins = insumos.get(id);
+    const ins = cadastro.get(id);
     if (!ins) return void (erros[chave] = 'Escolha o insumo.');
     if (!ins.ativo) return void (erros[chave] = `“${ins.nome}” está desativado.`);
     if (vistos.has(id)) return void (erros[chave] = `“${ins.nome}” já está na lista: junte numa linha só.`);
@@ -514,12 +514,12 @@ export const PEQUENO_REPETIDO = 2;
  * do "fecha sozinha"). Só insumos com algum trecho na janela.
  */
 export function divergenciasDoPeriodo(
-  insumos: readonly { insumoId: string; nome: string; unidade: Unidade; marcos: readonly Marco[]; fluxos: readonly Fluxo[]; porUnidade: Fracao | null }[],
+  porInsumo: readonly { insumoId: string; nome: string; unidade: Unidade; marcos: readonly Marco[]; fluxos: readonly Fluxo[]; porUnidade: Fracao | null }[],
   janela: { de: Date; ate: Date },
   toleranciaCentavos: number,
 ): DivergenciaDoInsumo[] {
   const out: DivergenciaDoInsumo[] = [];
-  for (const i of insumos) {
+  for (const i of porInsumo) {
     const ts = trechosDoInsumo(i.marcos, i.fluxos).filter((t) => t.ate.getTime() >= janela.de.getTime() && t.ate.getTime() < janela.ate.getTime());
     if (ts.length === 0) continue;
     const soma = (f: (t: Trecho) => number) => ts.reduce((s, t) => s + f(t), 0);
@@ -588,7 +588,7 @@ export interface LinhaDoSetor {
   setor: string;
   /** O que o setor requisitou no período, em R$ (custo de referência de hoje). */
   requisitadoCentavos: number;
-  insumos: number;
+  quantosInsumos: number;
   /** Sumiço (R$) nos insumos que o setor pede: onde olhar primeiro, não culpa. */
   sumicoNosSeusCentavos: number;
   insumosComSumico: number;
@@ -600,9 +600,9 @@ export function porSetor(ds: readonly DivergenciaDoInsumo[], custos: ReadonlyMap
   for (const d of ds) {
     for (const [s, q] of Array.from(d.requisitadoPorSetor)) {
       if (q <= 0) continue;
-      const l = m.get(s) ?? { setor: s, requisitadoCentavos: 0, insumos: 0, sumicoNosSeusCentavos: 0, insumosComSumico: 0 };
+      const l = m.get(s) ?? { setor: s, requisitadoCentavos: 0, quantosInsumos: 0, sumicoNosSeusCentavos: 0, insumosComSumico: 0 };
       l.requisitadoCentavos += valorDaQuantidade(custos.get(d.insumoId) ?? null, q) ?? 0;
-      l.insumos++;
+      l.quantosInsumos++;
       if (d.sumicoMilesimos > 0) {
         l.insumosComSumico++;
         l.sumicoNosSeusCentavos += d.sumicoCentavos ?? 0;

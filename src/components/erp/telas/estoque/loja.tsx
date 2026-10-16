@@ -71,6 +71,7 @@ export function TelaEstoqueDaLoja({
   acoes,
   bloqueio,
   periodo,
+  requisicoes,
 }: {
   e: EstoqueDaLoja;
   base: string;
@@ -81,11 +82,13 @@ export function TelaEstoqueDaLoja({
   insumosBase?: string;
   /** Link da nota (quem vê compras nesta loja). */
   notasBase?: string;
-  pode: { contar: boolean; ajustar: boolean };
+  pode: { contar: boolean; ajustar: boolean; requisicoes?: boolean; pedir?: boolean };
   acoes: { abrir: AcaoDeEstoque; descartar: AcaoDeEstoque };
   bloqueio: string | null;
   /** 1.7: o período e as contagens do dia a dia (com o estoque aberto). */
   periodo?: SituacaoDoPeriodo | null;
+  /** 1.8: o que está pendente nas requisições da loja (quem pede ou atende). */
+  requisicoes?: { pendentes: number; atrasadas: number } | null;
 }) {
   const aqui = `${base}/${e.loja.id}`;
   const a = e.abertura;
@@ -191,9 +194,49 @@ export function TelaEstoqueDaLoja({
 
           {periodo?.aberto && <PainelDaContagem s={periodo} aqui={aqui} pode={{ planejar: pode.ajustar && !bloqueio }} />}
 
+          {(pode.requisicoes || pode.ajustar) && (
+            <Painel titulo="Requisições" subtitulo="O setor pede, o estoque entrega; a baixa sai no livro">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <p className="min-w-0 text-sm">
+                  {requisicoes ? (
+                    <>
+                      <span className="font-display text-[26px] font-bold tabular-nums">{requisicoes.pendentes}</span>{' '}
+                      <span className="text-suave">{requisicoes.pendentes === 1 ? 'pendente' : 'pendentes'}</span>
+                      {requisicoes.atrasadas > 0 && (
+                        <>
+                          {' '}
+                          <Selo tom="erro">{requisicoes.atrasadas} com atraso</Selo>
+                        </>
+                      )}
+                    </>
+                  ) : (
+                    <span className="text-suave">Consumo da loja pelo que o setor pediu, contra o que a contagem acusa.</span>
+                  )}
+                </p>
+                <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                  {pode.ajustar && (
+                    <Link href={`${aqui}/divergencias`} className={classeDeBotao('fantasma')}>
+                      Divergências
+                    </Link>
+                  )}
+                  {pode.requisicoes && (
+                    <Link href={`${aqui}/requisicoes`} className={classeDeBotao('secundario')}>
+                      Ver o quadro
+                    </Link>
+                  )}
+                  {pode.pedir && !bloqueio && (
+                    <Link href={`${aqui}/requisicoes/nova`} className={classeDeBotao('secundario')}>
+                      Nova requisição
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </Painel>
+          )}
+
           <Painel
             titulo="Saldo por insumo"
-            subtitulo="Quantidade = abertura + compras ± contagens − saídas (a baixa pela requisição chega em breve)"
+            subtitulo="Quantidade = abertura + compras ± contagens − requisições"
             semRespiro
           >
             <div className="space-y-3 border-b border-linha px-4 py-3 sm:px-5">
@@ -320,7 +363,7 @@ export function TelaEstoqueDaLoja({
           </Painel>
 
           <Painel titulo="Livro do estoque" subtitulo="Só se acrescenta: correção é um lançamento novo (estorno), nunca apagar" semRespiro>
-            <LivroDoEstoque movimentos={e.movimentos} notasBase={notasBase} />
+            <LivroDoEstoque movimentos={e.movimentos} notasBase={notasBase} requisicoesBase={pode.requisicoes ? `${aqui}/requisicoes` : undefined} />
           </Painel>
         </>
       )}
