@@ -61,6 +61,7 @@ import {
 import { camposDasRegras, REGRAS_PADRAO } from '@/lib/erp/contagem-campos';
 import { listarHistorico } from '@/lib/erp/historico';
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
+import * as estoqueDaSessao from '@/app/erp/estoque/actions';
 import { cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
@@ -192,7 +193,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     expect(await iniciarCiclo(a, OPERADOR(), ids.vp, { insumoIds: [ids.cheddar], titulo: '' }, 'Caio')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/ajustar saldo/) } });
     expect(await iniciarCiclo(a, GERENTE_DELIVERY(), ids.vp, { insumoIds: [ids.cheddar], titulo: '' }, 'Gil')).toMatchObject({ ok: false, naoEncontrado: true });
     expect(await planejamentoDoCiclo(a, GERENTE_DELIVERY(), ids.vp, { conservacao: '', quais: 'vencidos' })).toBeNull();
-    expect(await iniciarCiclo(a, GERENTE(), ids.vp, { insumoIds: [], titulo: '' }, 'Gil')).toMatchObject({ ok: false, erros: { insumos: expect.any(String) } });
+    expect(await iniciarCiclo(a, GERENTE(), ids.vp, { insumoIds: [], titulo: '' }, 'Gil')).toMatchObject({ ok: false, erros: { lista: expect.any(String) } });
     expect(await a.contagem.count({ where: { tipo: 'CICLICA' } })).toBe(0);
   });
 
@@ -208,7 +209,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     expect(await iniciarCiclo(a, GERENTE(), ids.vp, { insumoIds: [ids.cheddar, ids.pao], titulo: 'Outro' }, 'Gil')).toMatchObject({
       ok: false,
       conflito: true,
-      erros: { insumos: expect.stringMatching(/Cheddar fatiado \(Refrigerado · 3 insumos\)/) },
+      erros: { lista: expect.stringMatching(/Cheddar fatiado \(Refrigerado · 3 insumos\)/) },
     });
     const p = (await planejamentoDoCiclo(a, GERENTE(), ids.vp, { conservacao: '', quais: 'todos' }))!;
     expect(p.linhas.find((l) => l.nome === 'Cheddar fatiado')).toMatchObject({ emOutraContagem: 'Refrigerado · 3 insumos', sugerido: false });
@@ -398,6 +399,39 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
         ids.cheddar,
       ),
     ).rejects.toThrow(/MovimentoEstoque_contagem_tem_item/);
+  });
+
+  it('pelas actions de verdade: operador não planeja nem aplica; gerente não muda as regras; operador conta (a regra decide)', async () => {
+    const ctxDe = (alcance: Alcance, autorNome: string) => () => ({ parceiro: A, alcance, cliente: doParceiro(A.id, db), bloqueio: null, podeEscrever: true, sessao: { userId: 'u', autorNome } });
+    const rodar = async <T,>(fn: () => Promise<T>): Promise<T | { redirect: string }> => {
+      try {
+        return await fn();
+      } catch (e) {
+        const url = (e as { url?: string }).url;
+        if (url) return { redirect: url };
+        throw e;
+      }
+    };
+    const form = (pares: [string, string][]) => {
+      const f = new FormData();
+      for (const [k, v] of pares) f.append(k, v);
+      return f;
+    };
+    const antes = await a.contagem.count();
+    atual.ctx = ctxDe(OPERADOR(), 'Caio');
+    expect(await rodar(() => estoqueDaSessao.acaoIniciarCiclo(ids.vp, null, form([['insumo', ids.pao]])))).toMatchObject({ erros: { geral: expect.stringMatching(/ajustar saldo/) } });
+    expect(await rodar(() => estoqueDaSessao.acaoConcluirContagem(ids.vp, ids.ciclo, null, form([['versao', '0']])))).toMatchObject({ erros: { geral: expect.stringMatching(/ajustar saldo/) } });
+    expect(await rodar(() => estoqueDaSessao.acaoIniciarFechamento(ids.vp, null, form([])))).toMatchObject({ erros: { geral: expect.stringMatching(/ajustar saldo/) } });
+    atual.ctx = ctxDe(GERENTE(), 'Gil');
+    expect(await rodar(() => estoqueDaSessao.acaoSalvarRegrasDaContagem(ids.vp, null, form([['pisoValor', '50']])))).toMatchObject({ erros: { geral: expect.any(String) } });
+    expect(await a.contagem.count()).toBe(antes);
+    // O gerente planeja pela action (vai para a contagem) e o operador conta pela action.
+    const r = await rodar(() => estoqueDaSessao.acaoIniciarCiclo(ids.vp, null, form([['insumo', ids.ketchup], ['titulo', 'Sachês']])));
+    expect(r).toMatchObject({ redirect: expect.stringMatching(new RegExp(`^/erp/estoque/${ids.vp}/contagens/[a-z0-9]+\\?feito=ciclo$`)) });
+    const id = (r as { redirect: string }).redirect.split('/contagens/')[1].split('?')[0];
+    const item = (await obterContagem(a, DONA(), ids.vp, id, CFG))!.itens[0];
+    atual.ctx = ctxDe(OPERADOR(), 'Caio');
+    expect(await estoqueDaSessao.acaoContarNaContagem(ids.vp, id, { itemId: item.id, embalagens: '', solto: '100', escala: 'base', versao: item.versao })).toMatchObject({ ok: true, fechouSozinha: true });
   });
 
   it('isolamento: o parceiro B não enxerga as contagens, o período nem as regras de A', async () => {

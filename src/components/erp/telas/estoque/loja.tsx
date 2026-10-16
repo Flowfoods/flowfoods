@@ -27,6 +27,8 @@ import type { AcaoDeEstoque } from './estado';
 import { FormAbrirEstoque, FormDescartarContagem } from './formularios';
 import { LivroDoEstoque } from './livro';
 import { SeloDoEstado } from './situacao';
+import { PainelDaContagem } from './periodo';
+import type { SituacaoDoPeriodo } from '@/lib/erp/contagem';
 
 const DATA_HORA = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 const quando = (d: Date) => DATA_HORA.format(d).replace(',', ' às');
@@ -68,6 +70,7 @@ export function TelaEstoqueDaLoja({
   pode,
   acoes,
   bloqueio,
+  periodo,
 }: {
   e: EstoqueDaLoja;
   base: string;
@@ -81,6 +84,8 @@ export function TelaEstoqueDaLoja({
   pode: { contar: boolean; ajustar: boolean };
   acoes: { abrir: AcaoDeEstoque; descartar: AcaoDeEstoque };
   bloqueio: string | null;
+  /** 1.7: o período e as contagens do dia a dia (com o estoque aberto). */
+  periodo?: SituacaoDoPeriodo | null;
 }) {
   const aqui = `${base}/${e.loja.id}`;
   const a = e.abertura;
@@ -184,6 +189,8 @@ export function TelaEstoqueDaLoja({
             </div>
           </div>
 
+          {periodo?.aberto && <PainelDaContagem s={periodo} aqui={aqui} pode={{ planejar: pode.ajustar && !bloqueio }} />}
+
           <Painel
             titulo="Saldo por insumo"
             subtitulo="Quantidade = abertura + compras ± contagens − saídas (a baixa pela requisição chega em breve)"
@@ -272,9 +279,14 @@ export function TelaEstoqueDaLoja({
                       <th scope="col" className="h-10 px-3 text-right font-semibold">
                         Custo de referência
                       </th>
-                      <th scope="col" className="h-10 px-3 pr-5 text-right font-semibold">
+                      <th scope="col" className={`h-10 px-3 text-right font-semibold ${pode.ajustar && !bloqueio ? '' : 'pr-5'}`}>
                         Valor
                       </th>
+                      {pode.ajustar && !bloqueio && (
+                        <th scope="col" className="h-10 px-3 pr-5 font-semibold">
+                          <span className="sr-only">Recontar</span>
+                        </th>
+                      )}
                     </tr>
                   </thead>
                   <tbody className="tabular-nums">
@@ -291,7 +303,14 @@ export function TelaEstoqueDaLoja({
                         </td>
                         <td className={`px-3 py-2 text-right font-semibold ${l.quantidadeMilesimos < 0 ? 'text-erro' : ''}`}>{formatarQuantidadeComSinal(l.quantidadeMilesimos, l.unidade)}</td>
                         <td className="px-3 py-2 text-right text-suave">{l.porUnidade ? `${formatarFracao(l.porUnidade)}/${UNIDADES[l.unidade].sigla}` : <Selo tom="alerta">Sem preço</Selo>}</td>
-                        <td className="px-3 py-2 pr-5 text-right">{l.valorCentavos === null ? <span className="text-suave">pendente</span> : formatarDinheiro(l.valorCentavos)}</td>
+                        <td className={`px-3 py-2 text-right ${pode.ajustar && !bloqueio ? '' : 'pr-5'}`}>{l.valorCentavos === null ? <span className="text-suave">pendente</span> : formatarDinheiro(l.valorCentavos)}</td>
+                        {pode.ajustar && !bloqueio && (
+                          <td className="px-3 py-2 pr-5 text-right">
+                            <Link href={`${aqui}/contagens/nova?insumo=${l.insumoId}`} className={LINK_DE_TEXTO}>
+                              Recontar<span className="sr-only"> {l.nome}</span>
+                            </Link>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

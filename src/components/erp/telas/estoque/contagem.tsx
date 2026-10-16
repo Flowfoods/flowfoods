@@ -59,6 +59,8 @@ export function TelaContagem({
   conferirHref,
   saldoHref,
   podeConcluir,
+  rotuloConferir = 'Conferir e concluir',
+  paraOPiso = [],
 }: {
   /** Chave do rascunho local (o número que falhou ao salvar fica no aparelho). */
   contagemId: string;
@@ -68,6 +70,9 @@ export function TelaContagem({
   conferirHref?: string;
   saldoHref: string;
   podeConcluir: boolean;
+  rotuloConferir?: string;
+  /** Fechamento do período (1.7): insumos que levam a cobertura ao piso (marcados na lista). */
+  paraOPiso?: string[];
 }) {
   const [linhas, setLinhas] = useState<Record<string, Linha>>(() =>
     Object.fromEntries(itens.map((i) => [i.id, { item: i, campos: i.campos, situacao: 'parado' as Situacao, erros: {}, conflito: null }])),
@@ -77,6 +82,9 @@ export function TelaContagem({
   // Quem a pessoa mexeu continua na tela até ela trocar de aba (não some no meio da digitação).
   const [mexidos, setMexidos] = useState<Set<string>>(() => new Set());
   const [fechada, setFechada] = useState<string | null>(null);
+  // 1.7: o último número fez a contagem fechar sozinha (tudo bateu, dentro da tolerância).
+  const [fechouSozinha, setFechouSozinha] = useState(false);
+  const piso = useMemo(() => new Set(paraOPiso), [paraOPiso]);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const emVoo = useRef<Record<string, boolean>>({});
   const atual = useRef(linhas);
@@ -131,6 +139,7 @@ export function TelaContagem({
         const agora = atual.current[id];
         const mudouDepois = !mesmosCampos(agora.campos, enviados);
         mudar(id, () => ({ item: r.item, situacao: mudouDepois ? 'pendente' : 'salvo', erros: {}, conflito: null }));
+        if (r.fechouSozinha) setFechouSozinha(true);
         // A pessoa continuou digitando enquanto salvava: salva o novo também.
         if (mudouDepois) timers.current[id] = setTimeout(() => void salvar(id), ESPERA_MS);
         return;
@@ -229,6 +238,16 @@ export function TelaContagem({
 
   return (
     <div className="space-y-4">
+      {fechouSozinha && (
+        <div role="status" className="rounded-[14px] border border-linha bg-painel px-4 py-3 text-sm">
+          <p className="font-semibold text-texto">Tudo bateu: a contagem fechou sozinha e o estoque foi acertado.</p>
+          <p className="mt-1 text-suave">As diferenças pequenas (dentro da tolerância da loja) entraram no livro do estoque.</p>
+          <Link href={saldoHref} className="mt-2 inline-flex min-h-11 items-center text-[13px] font-semibold underline underline-offset-4">
+            Ver o estoque da loja
+          </Link>
+        </div>
+      )}
+
       {fechada && (
         <div role="alert" className="rounded-[14px] border border-linha bg-painel px-4 py-3 text-sm">
           <p className="font-semibold text-texto">{fechada}</p>
@@ -298,7 +317,8 @@ export function TelaContagem({
                 <ItemContavel
                   key={l.item.id}
                   l={l}
-                  bloqueado={!!fechada}
+                  bloqueado={!!fechada || fechouSozinha}
+                  paraOPiso={piso.has(l.item.insumoId)}
                   digitar={(c) => digitar(l.item.id, c)}
                   sair={() => void salvar(l.item.id)}
                   repetir={() => void salvar(l.item.id, l.item.versao)}
@@ -327,9 +347,13 @@ export function TelaContagem({
               <Barra valor={resumo.contados} total={resumo.total} tom={resumo.naoContados === 0 ? 'ok' : 'alerta'} rotulo={`${resumo.contados} de ${resumo.total} contados`} />
             </div>
           </div>
-          {podeConcluir && conferirHref ? (
+          {fechouSozinha ? (
+            <Link href={saldoHref} className={classeDeBotao('primario', 'w-full sm:w-auto')}>
+              Ver o estoque
+            </Link>
+          ) : podeConcluir && conferirHref ? (
             <Link href={conferirHref} aria-disabled={pendentes} className={classeDeBotao('primario', `w-full sm:w-auto ${pendentes ? 'pointer-events-none opacity-55' : ''}`)}>
-              Conferir e concluir
+              {rotuloConferir}
             </Link>
           ) : (
             <p className="w-full text-[12px] text-suave sm:w-auto sm:max-w-xs">Terminou? Só gerente ou dona concluem: avise quem confere.</p>
@@ -343,6 +367,7 @@ export function TelaContagem({
 function ItemContavel({
   l,
   bloqueado,
+  paraOPiso,
   digitar,
   sair,
   repetir,
@@ -352,6 +377,7 @@ function ItemContavel({
 }: {
   l: Linha;
   bloqueado: boolean;
+  paraOPiso?: boolean;
   digitar: (c: Partial<ContagemDigitada>) => void;
   sair: () => void;
   repetir: () => void;
@@ -373,7 +399,10 @@ function ItemContavel({
   return (
     <li className="px-4 py-3.5">
       <div className="flex min-h-10 items-center justify-between gap-3">
-        <h3 className="min-w-0 text-[15px] font-semibold text-texto">{i.nome}</h3>
+        <h3 className="min-w-0 text-[15px] font-semibold text-texto">
+          {i.nome}
+          {paraOPiso && <span className="ml-2 inline-block align-middle text-[12px] font-semibold text-atencao">para o piso</span>}
+        </h3>
         {l.item.contadoMilesimos === null && l.situacao === 'parado' && !l.campos.embalagens.trim() && !l.campos.solto.trim() ? (
           <button type="button" disabled={bloqueado} onClick={() => digitar({ embalagens: '', solto: '0', escala: 'base' })} className={classeDeBotao('secundario', 'min-h-12 shrink-0 px-4 text-[14px]')}>
             Não tem

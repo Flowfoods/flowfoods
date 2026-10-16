@@ -377,8 +377,8 @@ export async function iniciarCiclo(
   agora = new Date(),
 ): Promise<ResultadoEstoque> {
   const ids = Array.isArray(entrada.insumoIds) ? Array.from(new Set(entrada.insumoIds.filter((x): x is string => typeof x === 'string' && ID.test(x)))) : [];
-  if (ids.length === 0) return { ok: false, erros: { insumos: 'Marque pelo menos um insumo para contar.' } };
-  if (ids.length > TETO_DO_CICLO) return { ok: false, erros: { insumos: `No máximo ${TETO_DO_CICLO} insumos por contagem: divida em duas.` } };
+  if (ids.length === 0) return { ok: false, erros: { lista: 'Marque pelo menos um insumo para contar.' } };
+  if (ids.length > TETO_DO_CICLO) return { ok: false, erros: { lista: `No máximo ${TETO_DO_CICLO} insumos por contagem: divida em duas.` } };
   const tituloDigitado = motivoLimpo(entrada.titulo)?.slice(0, 120) ?? null;
   return comRecusa(() =>
     cliente.transacao(
@@ -390,13 +390,13 @@ export async function iniciarCiclo(
         const fechamento = await tx.contagem.findFirst({ where: { lojaId, tipo: 'FECHAMENTO', status: 'ABERTA' }, select: { titulo: true } });
         if (fechamento) throw new Recusa({ ok: false, erros: { geral: `O fechamento do período está em andamento (${fechamento.titulo ?? 'fechamento'}): conclua ou descarte antes de começar outra contagem.` } });
         const insumos = await tx.insumo.findMany({ where: { id: { in: ids } }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, unidade: true, conservacao: true, conteudoMilesimos: true, tipo: true } });
-        if (insumos.length !== ids.length) throw new Recusa({ ok: false, erros: { insumos: 'Algum insumo marcado não existe mais. Recarregue a página.' } });
+        if (insumos.length !== ids.length) throw new Recusa({ ok: false, erros: { lista: 'Algum insumo marcado não existe mais. Recarregue a página.' } });
         const ocupados = await emContagemAberta(tx, lojaId, agora);
         const presos = insumos.filter((i) => ocupados.has(i.id));
         if (presos.length) {
           throw new Recusa({
             ok: false,
-            erros: { insumos: `Já estão em outra contagem aberta: ${presos.map((i) => `${i.nome} (${ocupados.get(i.id)})`).join(', ')}. Desmarque ou termine aquela antes.` },
+            erros: { lista: `Já estão em outra contagem aberta: ${presos.map((i) => `${i.nome} (${ocupados.get(i.id)})`).join(', ')}. Desmarque ou termine aquela antes.` },
             conflito: true,
           });
         }
