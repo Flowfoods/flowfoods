@@ -23,6 +23,7 @@ import {
   custoDaCompra,
   EMBALAGEM_PADRAO,
   embalagemDoItem,
+  formatarData,
   LIMITES_DA_NOTA,
   PREFIXO_DA_EMBALAGEM,
   quantidadeDoItem,
@@ -32,6 +33,7 @@ import { formatarCusto, formatarDinheiro, formatarQuantidade, lerDinheiro, lerQu
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
+import { CampoData } from '../../ui/campo-data';
 import { ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 import type { AcaoDeNota, EstadoNota } from './estado';
 import { PreviaDoImpacto } from './previa';
@@ -246,7 +248,7 @@ export function FormNota({
               </div>
               <div>
                 <label htmlFor={`${idBase}-serie`} className={ROTULO}>
-                  Série
+                  Série <span className="font-normal text-suave">(se tiver)</span>
                 </label>
                 <input
                   id={`${idBase}-serie`}
@@ -271,18 +273,15 @@ export function FormNota({
               <label htmlFor={`${idBase}-data`} className={ROTULO}>
                 Data da nota
               </label>
-              <input
+              <CampoData
                 id={`${idBase}-data`}
                 name="data"
-                type="date"
-                max={hoje}
-                defaultValue={inicial.data}
-                className={`${CAMPO} tabular-nums`}
+                defaultValue={/^\d{4}-\d{2}-\d{2}$/.test(inicial.data) ? formatarData(inicial.data) : inicial.data}
                 aria-invalid={!!erros.data}
                 aria-describedby={`${idBase}-data-ajuda${erros.data ? ` ${idBase}-data-erro` : ''}`}
               />
               <p id={`${idBase}-data-ajuda`} className={AJUDA}>
-                A data impressa na nota. É ela que diz qual compra é a mais nova.
+                A data impressa na nota (dd/mm/aaaa, até {formatarData(hoje)}). É ela que diz qual compra é a mais nova.
               </p>
               <Erro id={`${idBase}-data-erro`} texto={erros.data} />
             </div>

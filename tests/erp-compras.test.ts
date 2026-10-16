@@ -273,3 +273,14 @@ describe('ERP 1.5 · número, data, documento, filtros', () => {
     expect(queryDosFiltrosDeNota(f)).toBe('loja=abc&de=2026-10-01&situacao=canceladas&pagina=2');
   });
 });
+
+describe('ERP 1.5 (revisão de UX) · data em dd/mm/aaaa em qualquer navegador', () => {
+  it('a máscara põe as barras e o servidor lê o que ela produz', async () => {
+    const { mascararData } = await import('@/lib/erp/compra-campos');
+    expect(mascararData('14')).toBe('14');
+    expect(mascararData('1410')).toBe('14/10');
+    expect(mascararData('14102026')).toBe('14/10/2026');
+    expect(mascararData('14/10/20261')).toBe('14/10/2026');
+    expect(lerData(mascararData('14102026'))).toBe('2026-10-14');
+  });
+});

@@ -1,3 +1,5 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Padrão · 5 kg" e "Nota 123 · série 1" são as frases do snapshot e do histórico, no padrão "A · B" da 1.1–1.4. (O ignore do scanner não aceita id com minúscula.)
+// avoid-ai-design-ignore-file: CP3 — a seta está em comentário de código (exemplo de antes → depois), não em botão nem link.
 /**
  * Compras (1.5) — a parte PURA (sem banco, sem Next): leitura da nota e do
  * fornecedor, rateio do frete, total conferido, custo de cada item, desempate
@@ -104,6 +106,12 @@ export function lerData(t: string): string | null {
   const dt = new Date(Date.UTC(a, me - 1, d));
   if (dt.getUTCFullYear() !== a || dt.getUTCMonth() !== me - 1 || dt.getUTCDate() !== d) return null;
   return dt.toISOString().slice(0, 10);
+}
+
+/** Máscara do campo de data enquanto digita: "14102026" vira "14/10/2026" (só dígitos, até 8). */
+export function mascararData(t: string): string {
+  const d = t.replace(/\D/g, '').slice(0, 8);
+  return [d.slice(0, 2), d.slice(2, 4), d.slice(4, 8)].filter(Boolean).join('/');
 }
 
 /** Hoje no Rio ("2026-10-16"): a data da nota não pode passar disso. */

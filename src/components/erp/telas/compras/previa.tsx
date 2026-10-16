@@ -17,6 +17,25 @@ const EFEITO = {
   'nao-muda': 'não muda',
 } as const;
 
+const MOSTRA_NO_CELULAR = 3;
+
+function ItemDaFicha({ f, className = '' }: { f: PreviaDaNota['fichas'][number]; className?: string }) {
+  return (
+    <li className={`py-2.5 text-sm ${className}`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+        <span className="font-medium text-texto">{f.nome}</span>
+        <span className="text-[12px] text-suave">{f.tipo}</span>
+      </div>
+      <div className="tabular-nums text-suave">
+        {f.antes} <span aria-hidden>→</span>
+        <span className="sr-only"> passa a </span> <span className="font-semibold text-texto">{f.depois}</span>
+        <span className={`ml-2 text-[12px] font-semibold ${f.sobe ? 'text-erro' : 'text-ok'}`}>{f.sobe ? 'sobe' : 'desce'}</span>
+      </div>
+      <div className="text-[12px] text-suave">{f.porQue}</div>
+    </li>
+  );
+}
+
 export function PreviaDoImpacto({ previa: p }: { previa: PreviaDaNota }) {
   const confere = p.somaItensCentavos + p.freteCentavos === p.totalCentavos;
   return (
@@ -51,23 +70,28 @@ export function PreviaDoImpacto({ previa: p }: { previa: PreviaDaNota }) {
           {p.fichas.length === 0 ? (
             <p className="mt-1 text-sm text-suave">Nenhuma ficha usa estes insumos com custo diferente.</p>
           ) : (
-            <ul className="mt-1 divide-y divide-linha">
-              {p.fichas.map((f) => (
-                <li key={f.id} className="py-2.5 text-sm">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-                    <span className="font-medium text-texto">{f.nome}</span>
-                    <span className="text-[12px] text-suave">{f.tipo}</span>
-                  </div>
-                  <div className="tabular-nums text-suave">
-                    {f.antes} <span aria-hidden>→</span>
-                    <span className="sr-only"> passa a </span> <span className="font-semibold text-texto">{f.depois}</span>
-                    <span className={`ml-2 text-[12px] font-semibold ${f.sobe ? 'text-erro' : 'text-ok'}`}>{f.sobe ? 'sobe' : 'desce'}</span>
-                  </div>
-                  <div className="text-[12px] text-suave">{f.porQue}</div>
-                </li>
-              ))}
-              {p.maisFichas > 0 && <li className="py-2.5 text-[13px] text-suave">E mais {p.maisFichas} fichas.</li>}
-            </ul>
+            <>
+              {/* Maior alta primeiro. No celular, as 3 primeiras e o resto em "ver todas"; a partir de 640 px, todas. */}
+              <ul className="mt-1 divide-y divide-linha">
+                {p.fichas.map((f, n) => (
+                  <ItemDaFicha key={f.id} f={f} className={n >= MOSTRA_NO_CELULAR ? 'hidden sm:block' : ''} />
+                ))}
+                {p.maisFichas > 0 && <li className="hidden py-2.5 text-[13px] text-suave sm:block">E mais {p.maisFichas} fichas.</li>}
+              </ul>
+              {p.fichas.length > MOSTRA_NO_CELULAR && (
+                <details className="sm:hidden">
+                  <summary className="ff-transicao flex min-h-11 cursor-pointer items-center text-[13px] font-semibold text-texto underline decoration-linha-forte underline-offset-4">
+                    Ver todas as {p.fichas.length + p.maisFichas} fichas
+                  </summary>
+                  <ul className="divide-y divide-linha">
+                    {p.fichas.slice(MOSTRA_NO_CELULAR).map((f) => (
+                      <ItemDaFicha key={f.id} f={f} />
+                    ))}
+                    {p.maisFichas > 0 && <li className="py-2.5 text-[13px] text-suave">E mais {p.maisFichas} fichas.</li>}
+                  </ul>
+                </details>
+              )}
+            </>
           )}
         </div>
       </Painel>

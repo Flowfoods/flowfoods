@@ -177,7 +177,7 @@ export function TelaDetalheFornecedor({
         icone="fornecedor"
         cor={COR.compras}
         titulo={f.nome}
-        subtitulo={[contexto, formatarDocumento(f.documento) ?? 'sem CNPJ', f.contato].filter(Boolean).join(' · ')}
+        subtitulo={<PartesSemQuebra partes={[contexto, formatarDocumento(f.documento) ?? 'sem CNPJ', f.contato]} />}
         acao={
           podeEditar && f.ativo ? (
             <BotaoOuMotivo href={`${base}/${f.id}/editar`} bloqueio={bloqueio} variante="primario">
@@ -268,5 +268,20 @@ export function TelaDetalheFornecedor({
         </aside>
       </div>
     </div>
+  );
+}
+
+/** "A · B · C" em que cada parte (CNPJ, "Seu Jorge (21) 99999-0000") não quebra no meio; a linha quebra entre elas. */
+function PartesSemQuebra({ partes }: { partes: (string | null | undefined)[] }) {
+  const lista = partes.filter((p): p is string => !!p);
+  return (
+    <>
+      {lista.map((p, n) => (
+        <span key={n}>
+          {n > 0 && ' · '}
+          <span className="whitespace-nowrap">{p}</span>
+        </span>
+      ))}
+    </>
   );
 }

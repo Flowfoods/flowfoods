@@ -17,6 +17,7 @@ import { PageHeader } from '../../ui/cabecalho';
 import { CAMPO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
+import { CampoData } from '../../ui/campo-data';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { BotaoOuMotivo } from '../cadastro/partes';
 
@@ -79,7 +80,7 @@ export function FiltrosDasNotas({
   return (
     <form role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-[repeat(2,minmax(11rem,1fr))_repeat(2,minmax(9.5rem,auto))_minmax(9rem,auto)_auto]">
       {lojas.length > 1 && (
-        <div>
+        <div className="col-span-2 lg:col-span-1">
           <label htmlFor="notas-loja" className="sr-only">
             Loja
           </label>
@@ -93,7 +94,8 @@ export function FiltrosDasNotas({
           </select>
         </div>
       )}
-      <div className={lojas.length > 1 ? '' : 'col-span-2 lg:col-span-1'}>
+      {/* No celular, loja e fornecedor em linha inteira: "Todos os fornecedores" não corta. */}
+      <div className="col-span-2 lg:col-span-1">
         <label htmlFor="notas-fornecedor" className="sr-only">
           Fornecedor
         </label>
@@ -110,13 +112,13 @@ export function FiltrosDasNotas({
         <label htmlFor="notas-de" className="mb-1 block text-[12px] text-suave lg:sr-only">
           De
         </label>
-        <input id="notas-de" name="de" type="date" defaultValue={f.de} aria-label="Data da nota a partir de" className={CAMPO} />
+        <CampoData id="notas-de" name="de" defaultValue={f.de ? formatarData(f.de) : ''} aria-label="Data da nota a partir de (dd/mm/aaaa)" />
       </div>
       <div>
         <label htmlFor="notas-ate" className="mb-1 block text-[12px] text-suave lg:sr-only">
           Até
         </label>
-        <input id="notas-ate" name="ate" type="date" defaultValue={f.ate} aria-label="Data da nota até" className={CAMPO} />
+        <CampoData id="notas-ate" name="ate" defaultValue={f.ate ? formatarData(f.ate) : ''} aria-label="Data da nota até (dd/mm/aaaa)" />
       </div>
       <div>
         <label htmlFor="notas-situacao" className="sr-only">

@@ -46,7 +46,7 @@ import { formatarRendimento, porUnidadeDeRendimento, TIPOS_DE_FICHA, type CustoD
 import { lerCascata } from './ficha-custos';
 import { cascataDeCusto, PROFUNDIDADE_MAXIMA, type FichaDaCascata } from './ficha-cascata';
 import { diferenca, type Erros } from './insumo-campos';
-import { compararCustos, compararFracoes, custoDaEmbalagem, formatarCusto, formatarFracao, formatarQuantidade as formatarQtd, type CustoExato, type Unidade } from './unidades';
+import { centavosDaFracao, compararCustos, compararFracoes, custoDaEmbalagem, formatarCusto, formatarFracao, formatarQuantidade as formatarQtd, type CustoExato, type Unidade } from './unidades';
 
 export type ResultadoCompras =
   | { ok: true; id: string; mudou: string[] }
@@ -675,6 +675,8 @@ export interface ImpactoNaFicha {
   antes: string;
   depois: string;
   sobe: boolean;
+  /** Quanto muda por porção/kg, em centavos (arredondado; negativo = desce): ordena a prévia. */
+  variacaoCentavos: number;
 }
 
 export interface PreviaDaNota {
@@ -829,9 +831,11 @@ async function fichasAfetadas(
       antes: `${formatarFracao(a.porRendimento)} ${por}`,
       depois: `${formatarFracao(b.porRendimento)} ${por}`,
       sobe: compararFracoes(b.porRendimento, a.porRendimento) > 0,
+      variacaoCentavos: Number(centavosDaFracao(b.porRendimento) - centavosDaFracao(a.porRendimento)),
     });
   }
-  out.sort((x, y) => (x.tipo === y.tipo ? x.nome.localeCompare(y.nome, 'pt-BR') : x.tipo === TIPOS_DE_FICHA.PRATO ? -1 : 1));
+  // Maior alta primeiro (é o que pede atenção); empate, pelo nome.
+  out.sort((x, y) => y.variacaoCentavos - x.variacaoCentavos || x.nome.localeCompare(y.nome, 'pt-BR'));
   return { fichas: out.slice(0, TETO_DE_FICHAS_NA_PREVIA), mais: Math.max(0, out.length - TETO_DE_FICHAS_NA_PREVIA) };
 }
 
