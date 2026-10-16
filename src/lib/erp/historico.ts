@@ -7,6 +7,7 @@ import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
 import { CONSERVACOES, TIPOS } from './insumo-campos';
 import { TIPOS_DE_FICHA } from './ficha-campos';
+import { SEPARADOR_DE_ITENS } from './compra-campos';
 import { UNIDADES, formatarCusto, formatarDinheiro, formatarQuantidade, type CustoExato, type Unidade } from './unidades';
 
 const ENTIDADE: Record<string, string> = {
@@ -17,6 +18,9 @@ const ENTIDADE: Record<string, string> = {
   // "Variante" é palavra de sistema; na tela é outra embalagem de compra do insumo.
   InsumoVariante: 'Embalagem',
   FichaTecnica: 'Ficha técnica',
+  // 1.5
+  NotaEntrada: 'Nota de compra',
+  Fornecedor: 'Fornecedor',
   AcessoParceiro: 'Acesso',
   PerfilAcesso: 'Perfil',
 };
@@ -77,6 +81,16 @@ const CAMPO: Record<string, string> = {
   foto: 'foto',
   itens: 'insumos',
   fichaQueProduz: 'vem da ficha',
+  // 1.5: nota e fornecedor
+  fornecedor: 'fornecedor',
+  loja: 'loja',
+  data: 'data da nota',
+  freteNotaCentavos: 'frete',
+  totalCentavos: 'total',
+  itensDaNota: 'itens',
+  situacao: 'situação',
+  documento: 'CNPJ/CPF',
+  contato: 'contato',
 };
 
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */
@@ -98,6 +112,15 @@ const ORDEM = [
   'custoPorUnidadeCentavos',
   'codigoBarras',
   'fichaQueProduz',
+  'documento',
+  'contato',
+  'loja',
+  'fornecedor',
+  'data',
+  'itensDaNota',
+  'freteNotaCentavos',
+  'totalCentavos',
+  'situacao',
   'ativo',
 ];
 const posicao = (c: string) => (ORDEM.includes(c) ? ORDEM.indexOf(c) : ORDEM.length);
@@ -108,6 +131,8 @@ const STATUS: Record<string, string> = {
   SUSPENSO: 'Suspenso',
   DESATIVADO: 'Desativado',
 };
+
+const SITUACAO_DA_NOTA: Record<string, string> = { LANCADA: 'Lançada', CANCELADA: 'Cancelada', RASCUNHO: 'Rascunho' };
 
 const DATA_HORA = new Intl.DateTimeFormat('pt-BR', {
   day: '2-digit',
@@ -128,7 +153,8 @@ export function rotuloAcao(acao: string): string {
 function valor(campo: string, v: unknown): string {
   // Preço 0 é "ainda não sei o preço": nunca R$ 0,00 (custo incompleto ≠ custo baixo).
   if (campo === 'precoEmbalagemCentavos' && v === 0) return 'Sem preço';
-  if (campo === 'taxaEntregaCentavos' && v === 0) return 'Sem frete';
+  if ((campo === 'taxaEntregaCentavos' || campo === 'freteNotaCentavos') && v === 0) return 'Sem frete';
+  if (campo === 'situacao' && typeof v === 'string') return SITUACAO_DA_NOTA[v] ?? v;
   if (v === null || v === undefined || v === '') return '—';
   if (campo === 'tipo' && typeof v === 'string') {
     return TIPOS[v as keyof typeof TIPOS] ?? TIPOS_DE_FICHA[v as keyof typeof TIPOS_DE_FICHA] ?? v;
@@ -203,6 +229,19 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     if (c === 'unidade' && juntarUnidade && criacao) continue;
     // De quem é a embalagem já está no "alvo" da linha.
     if (c === 'insumo') continue;
+    // Itens da nota (1.5): o que entrou e o que saiu (uma linha mudada sai e entra de novo).
+    if (c === 'itensDaNota' && typeof depois[c] === 'string') {
+      const a = new Set(criacao || typeof antes[c] !== 'string' ? [] : (antes[c] as string).split(SEPARADOR_DE_ITENS));
+      const d = (depois[c] as string).split(SEPARADOR_DE_ITENS);
+      const entrou = d.filter((x) => !a.has(x));
+      const saiu = Array.from(a).filter((x) => !d.includes(x));
+      if (criacao) out.push({ campo: 'itens', antes: null, depois: d.join(' · ') });
+      else {
+        if (entrou.length) out.push({ campo: 'entrou', antes: null, depois: entrou.join(' · ') });
+        if (saiu.length) out.push({ campo: 'saiu', antes: null, depois: saiu.join(' · ') });
+      }
+      continue;
+    }
     // Itens da ficha (1.4): o que entrou, saiu e mudou, em vez de lista velha × lista nova.
     if (c === 'itens' && !criacao && typeof antes[c] === 'string' && typeof depois[c] === 'string') {
       const itens = mudancasDosItens(antes[c] as string, depois[c] as string);
