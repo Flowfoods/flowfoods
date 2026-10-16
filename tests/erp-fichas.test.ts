@@ -331,6 +331,7 @@ describe('ERP 1.2 · histórico da ficha: legível, só o que mudou', () => {
       { insumoId: 'pao', subfichaId: null, quantidadeMilesimos: 1000, fatorCorrecaoMilesimos: 1000 },
       { insumoId: 'blend', subfichaId: null, quantidadeMilesimos: 180, fatorCorrecaoMilesimos: 1000 },
     ],
+    validades: null,
   };
 
   it('criação: rende, itens em frase e "com foto"', () => {

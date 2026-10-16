@@ -38,6 +38,7 @@ import {
   type Fracao,
   type Unidade,
 } from './unidades';
+import { lerValidades, retratoDaValidade, type EntradaDeValidade, type Validades } from './validade';
 
 export const TIPOS_DE_FICHA = {
   PRATO: 'Prato',
@@ -112,6 +113,12 @@ export interface EntradaDaFicha {
   rendimento?: unknown;
   rendimentoUnidade?: unknown;
   itens: ItemDigitado[];
+  /**
+   * 1.4: em que conservação o item fica e quanto dura em cada uma. Ausente
+   * (planilha sem as colunas) = não disse nada: quem grava mantém o que a
+   * ficha já tem. Presente sem nenhuma marcada (formulário) = não informada.
+   */
+  validade?: EntradaDeValidade;
 }
 
 export interface DadosFicha {
@@ -122,6 +129,8 @@ export interface DadosFicha {
   rendimentoMilesimos: number;
   unidadeRendimento: Unidade;
   itens: ItemDaFicha[];
+  /** 1.4: principal + validade por conservação; null = não informada. */
+  validades: Validades | null;
 }
 
 export interface ItemDaFicha {
@@ -288,7 +297,11 @@ export function lerFormFicha(
     });
   });
 
-  if (!r.success || rendimentoMilesimos === null || Object.keys(erros).length > 0) return { ok: false, erros };
+  // Validade por conservação (1.4): opcional; marcada exige quanto dura.
+  const v = entrada.validade ? lerValidades(entrada.validade, 'ficha') : ({ ok: true, validades: null } as const);
+  if (!v.ok) Object.assign(erros, v.erros);
+
+  if (!r.success || rendimentoMilesimos === null || !v.ok || Object.keys(erros).length > 0) return { ok: false, erros };
   return {
     ok: true,
     dados: {
@@ -299,6 +312,7 @@ export function lerFormFicha(
       rendimentoMilesimos,
       unidadeRendimento: RENDE_EM[rendeEm!].unidade,
       itens,
+      validades: v.validades,
     },
   };
 }
@@ -457,6 +471,8 @@ export function retratoDaFicha(
     descricao: d.descricao,
     modoPreparo: d.modoPreparo,
     foto: fotoArquivo,
+    conservacao: d.validades?.principal ?? null,
+    validade: retratoDaValidade(d.validades),
     itens: itensEmTexto(
       d.itens.map((i) => {
         const p = i.subfichaId ? preparos.get(i.subfichaId) : undefined;

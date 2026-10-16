@@ -33,6 +33,7 @@ import {
 import { compararFracoes, custoDaEmbalagem, custoPorUnidade, type CustoExato, type Fracao, type Unidade } from './unidades';
 import { contaDaFicha, custoIncompleto, type CustoDaFicha } from './ficha-campos';
 import { custosEmCascata } from './ficha-custos';
+import { colunasDaValidade, COLUNA_DA_VALIDADE, SELECAO_DA_VALIDADE, validadesDaLinha, type ColunasDaValidade, type Validades } from './validade';
 
 export type ResultadoCadastro =
   | { ok: true; id: string; nome: string; mudou: string[] }
@@ -96,6 +97,7 @@ export async function cadastrarInsumo(
           tipo: d.tipo,
           unidade: d.unidade,
           conservacao: d.conservacao,
+          ...colunasDaValidade(d.validades),
           conteudoMilesimos: d.conteudoMilesimos,
           precoEmbalagemCentavos: d.precoEmbalagemCentavos,
           taxaEntregaCentavos: d.taxaEntregaCentavos,
@@ -158,20 +160,23 @@ export async function motivoDaUnidadeTravada(
   return emUso ? 'A unidade não muda: este insumo já é usado em ficha, compra ou estoque.' : null;
 }
 
-function dadosDe(i: {
-  nome: string;
-  tipo: TipoInsumo;
-  unidade: Unidade;
-  conservacao: Conservacao;
-  conteudoMilesimos: number;
-  precoEmbalagemCentavos: number;
-  taxaEntregaCentavos: number;
-}): DadosInsumo {
+function dadosDe(
+  i: {
+    nome: string;
+    tipo: TipoInsumo;
+    unidade: Unidade;
+    conservacao: Conservacao;
+    conteudoMilesimos: number;
+    precoEmbalagemCentavos: number;
+    taxaEntregaCentavos: number;
+  } & ColunasDaValidade,
+): DadosInsumo {
   return {
     nome: i.nome,
     tipo: i.tipo,
     unidade: i.unidade,
     conservacao: i.conservacao,
+    validades: validadesDaLinha(i)!,
     conteudoMilesimos: i.conteudoMilesimos,
     precoEmbalagemCentavos: i.precoEmbalagemCentavos,
     taxaEntregaCentavos: i.taxaEntregaCentavos,
@@ -218,6 +223,7 @@ export async function editarInsumo(
           tipo: d.tipo,
           unidade: d.unidade,
           conservacao: d.conservacao,
+          ...colunasDaValidade(d.validades),
           conteudoMilesimos: d.conteudoMilesimos,
           precoEmbalagemCentavos: d.precoEmbalagemCentavos,
           taxaEntregaCentavos: d.taxaEntregaCentavos,
@@ -305,6 +311,10 @@ export interface LinhaDeInsumo {
   tipo: TipoInsumo;
   unidade: Unidade;
   conservacao: Conservacao;
+  /** 1.4: principal + validade em cada conservação aceita (minutos). */
+  validades: Validades;
+  /** Insumo de pré-preparo cuja ficha não diz a validade: a conservação também não foi dita. */
+  conservacaoInformada: boolean;
   conteudoMilesimos: number;
   precoEmbalagemCentavos: number;
   taxaEntregaCentavos: number;
@@ -322,7 +332,8 @@ function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
   return {
     ...(q ? { nome: { contains: q, mode: 'insensitive' as const } } : {}),
     ...(f.tipo ? { tipo: f.tipo } : {}),
-    ...(f.conservacao ? { conservacao: f.conservacao } : {}),
+    // 1.4: "conservação X" = os que ficam em X (a principal ou com validade nela).
+    ...(f.conservacao ? { OR: [{ conservacao: f.conservacao }, { [COLUNA_DA_VALIDADE[f.conservacao]]: { not: null } }] } : {}),
     ...(f.situacao === 'ativos' ? { ativo: true } : f.situacao === 'desativados' ? { ativo: false } : {}),
     // "Sem preço" é quem precisa de preço digitado: o pré-preparo tem custo da ficha.
     ...(f.semPreco ? { precoEmbalagemCentavos: 0, fichaQueProduz: { is: null } } : {}),
@@ -334,7 +345,7 @@ const SELECAO_DA_LINHA = {
   nome: true,
   tipo: true,
   unidade: true,
-  conservacao: true,
+  ...SELECAO_DA_VALIDADE,
   conteudoMilesimos: true,
   precoEmbalagemCentavos: true,
   taxaEntregaCentavos: true,
@@ -351,10 +362,13 @@ type LinhaDoBanco = Prisma.InsumoGetPayload<{ select: typeof SELECAO_DA_LINHA }>
  * de uma vez (`custosDosPreparos`).
  */
 function paraLinha(i: LinhaDoBanco, preparos: ReadonlyMap<string, CustoDaFicha>): LinhaDeInsumo {
-  const { _count, fichaQueProduz, ...resto } = i;
+  const { _count, fichaQueProduz, validadeSecoMin: _s, validadePistaFriaMin: _p, validadeRefrigeradoMin: _r, validadeCongeladoMin: _g, ...resto } = i;
   const c = fichaQueProduz ? preparos.get(fichaQueProduz.id) : undefined;
+  const validades = validadesDaLinha(i)!;
   return {
     ...resto,
+    validades,
+    conservacaoInformada: !fichaQueProduz || Object.keys(validades.minutos).length > 0,
     custo: fichaQueProduz ? null : custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
     variantes: _count.variantes,
     preparo: fichaQueProduz && c ? { fichaId: fichaQueProduz.id, porUnidade: c.porRendimento, incompleto: custoIncompleto(c) } : null,
@@ -441,6 +455,7 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
       tipo: i.tipo,
       unidade: i.unidade,
       conservacao: i.conservacao,
+      validades: validadesDaLinha(i)!,
       conteudoMilesimos: i.conteudoMilesimos,
       precoEmbalagemCentavos: i.precoEmbalagemCentavos,
       taxaEntregaCentavos: i.taxaEntregaCentavos,

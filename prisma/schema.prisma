@@ -899,6 +899,15 @@ model FichaTecnica {
   fotoArquivo         String?
   fotoMime            String?
   fotoBytes           Int?
+  // 1.4: validade por conservação, o mesmo modelo do Insumo. `conservacao` é a
+  // principal (null = validade não informada); cada coluna é a validade em
+  // MINUTOS naquela conservação, null = o item não fica nela. CHECKs no banco:
+  // 1 min a 730 dias; a principal tem validade; sem principal, nenhuma.
+  conservacao            Conservacao?
+  validadeSecoMin        Int?
+  validadePistaFriaMin   Int?
+  validadeRefrigeradoMin Int?
+  validadeCongeladoMin   Int?
 
   itens          FichaItem[]     @relation("FichaItens")
   usadaComoSub   FichaItem[]     @relation("FichaSubficha")

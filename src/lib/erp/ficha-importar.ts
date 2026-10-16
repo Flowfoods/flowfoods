@@ -31,7 +31,7 @@ import { custosEmCascata } from './ficha-custos';
 import {
   cadastroDaEntrada,
   conferirEstrutura,
-  dadosGravados,
+  dadosDaFichaGravada,
   gravarFicha,
   insumosTravados,
   preparosTravados,
@@ -41,6 +41,7 @@ import {
 } from './fichas';
 import { diferenca } from './insumo-campos';
 import { formatarFracao } from './unidades';
+import { validadesDaLinha } from './validade';
 
 export type SituacaoNaPrevia = 'nova' | 'muda' | 'igual' | 'erro';
 
@@ -174,11 +175,12 @@ function planejarUma(
     return { previa: { ...base, situacao: 'erro', erros: unicos.sort((a, b) => a.linha - b.linha) } };
   }
 
-  // Vazio na planilha não apaga o que a ficha já tem.
+  // Vazio na planilha não apaga o que a ficha já tem (1.4: nem a validade, quando as colunas não vieram).
   const dados: DadosFicha = {
     ...lido.dados,
     descricao: lido.dados.descricao ?? atual?.descricao ?? null,
     modoPreparo: lido.dados.modoPreparo ?? atual?.modoPreparo ?? null,
+    validades: entrada.validade === undefined ? (atual ? validadesDaLinha(atual) : null) : lido.dados.validades,
   };
   const custo = custoDaFicha(
     dados.itens.map((i) => {
@@ -199,7 +201,7 @@ function planejarUma(
   };
   if (!atual) return { previa: { ...comum, situacao: 'nova' }, dados };
   const mudanca = diferenca(
-    retratoDaFicha(dadosGravados(atual), doCadastro, atual.fotoArquivo, preparos),
+    retratoDaFicha(dadosDaFichaGravada(atual), doCadastro, atual.fotoArquivo, preparos),
     retratoDaFicha(dados, doCadastro, atual.fotoArquivo, preparos),
   );
   if (!mudanca) return { previa: { ...comum, situacao: 'igual' }, dados, atual };
@@ -276,7 +278,7 @@ export async function importarFichas(
             preparos,
             foto: 'manter',
             origem: 'IMPORTACAO',
-            antes: p.atual ? retratoDaFicha(dadosGravados(p.atual), doCadastro, p.atual.fotoArquivo, preparos) : undefined,
+            antes: p.atual ? retratoDaFicha(dadosDaFichaGravada(p.atual), doCadastro, p.atual.fotoArquivo, preparos) : undefined,
             motivo: 'Importada por planilha',
             autorNome,
           });

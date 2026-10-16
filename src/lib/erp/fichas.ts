@@ -20,7 +20,7 @@
  * - itens são trocados por inteiro a cada gravação (a ficha é a receita de
  *   agora; o retrato antigo fica no histórico);
  * - pré-preparo mantém, na mesma transação, o insumo que ele produz (nome,
- *   unidade e situação acompanham a ficha);
+ *   unidade, situação e — 1.4 — conservação e validades acompanham a ficha);
  * - a foto vai para o disco ANTES da transação e sai se ela não fechar; a
  *   antiga só é apagada depois do commit.
  */
@@ -52,6 +52,7 @@ import { motivoDaUnidadeTravada } from './insumos';
 import { prepararFoto, type FotoPronta } from './foto';
 import { apagarFoto, assumirFotoPendente, devolverFotoPendente, faxinarPendentesDeVezEmQuando, salvarFoto } from './arquivos';
 import { cabeNaExibicao, UNIDADES, type CustoExato, type Fracao, type Unidade } from './unidades';
+import { colunasDaValidade, retratoDaValidade, SELECAO_DA_VALIDADE, validadesDaLinha, type Validades } from './validade';
 
 export type ResultadoFicha =
   | { ok: true; id: string; nome: string; mudou: string[] }
@@ -175,6 +176,7 @@ export const SELECAO_PARA_EDITAR = {
   atualizadoEm: true,
   fotoArquivo: true,
   insumoProduzidoId: true,
+  ...SELECAO_DA_VALIDADE,
   itens: { orderBy: { ordem: 'asc' as const }, select: { insumoId: true, subfichaId: true, quantidadeMilesimos: true, fatorCorrecaoMilesimos: true } },
 } as const;
 
@@ -189,6 +191,8 @@ export function dadosGravados(f: {
   rendimentoMilesimos: number;
   unidadeRendimento: Unidade;
   itens: { insumoId: string | null; subfichaId?: string | null; quantidadeMilesimos: number; fatorCorrecaoMilesimos?: number }[];
+  /** 1.4: as colunas de validade (sem elas, a ficha conta como "não informada"). */
+  validades?: Validades | null;
 }): DadosFicha {
   return {
     nome: f.nome,
@@ -205,8 +209,12 @@ export function dadosGravados(f: {
         quantidadeMilesimos: i.quantidadeMilesimos,
         fatorCorrecaoMilesimos: i.fatorCorrecaoMilesimos ?? 1000,
       })),
+    validades: f.validades ?? null,
   };
 }
+
+/** Ficha gravada (com as colunas de validade) → dados do leitor. */
+export const dadosDaFichaGravada = (f: FichaGravada): DadosFicha => dadosGravados({ ...f, validades: validadesDaLinha(f) });
 
 /** Os insumos e pré-preparos que a entrada e a ficha atual citam, travados. */
 export async function cadastroDaEntrada(tx: ClienteDoParceiro, entrada: EntradaDaFicha, atual: Pick<FichaGravada, 'itens'> | null) {
@@ -286,7 +294,16 @@ const MOTIVO_DO_PREPARO = 'Acompanha a ficha técnica do pré-preparo';
  */
 async function sincronizarInsumoProduzido(
   tx: ClienteDoParceiro,
-  f: { id: string; nome: string; tipo: TipoFicha; unidadeRendimento: Unidade; ativa: boolean; insumoProduzidoId: string | null },
+  f: {
+    id: string;
+    nome: string;
+    tipo: TipoFicha;
+    unidadeRendimento: Unidade;
+    ativa: boolean;
+    insumoProduzidoId: string | null;
+    /** 1.4: a conservação do insumo produzido vem daqui (null = não informada). */
+    validades: Validades | null;
+  },
   autorNome: string,
 ): Promise<void> {
   const historico = (entidadeId: string, acao: string, antes: Prisma.InputJsonValue | undefined, depois: Prisma.InputJsonValue, motivo = MOTIVO_DO_PREPARO) =>
@@ -314,11 +331,21 @@ async function sincronizarInsumoProduzido(
     if (motivo) recusar({ rendimento: `O rendimento não muda de unidade: o insumo “${f.nome}” já tem compra, estoque ou outra embalagem.` });
   };
 
+  // Conservação do insumo produzido (1.4): a da ficha. Sem validade na ficha, as
+  // validades do insumo ficam nulas e a principal fica a que estava (coluna NOT NULL).
+  const conservacaoDe = (atual: Validades['principal']) => ({ conservacao: f.validades?.principal ?? atual, ...colunasDaValidade(f.validades) });
+
   if (f.insumoProduzidoId) {
-    const ins = await tx.insumo.findUnique({ where: { id: f.insumoProduzidoId }, select: { nome: true, unidade: true, ativo: true } });
+    const ins = await tx.insumo.findUnique({ where: { id: f.insumoProduzidoId }, select: { nome: true, unidade: true, ativo: true, ...SELECAO_DA_VALIDADE } });
     if (ins) {
-      const antes: Record<string, string | boolean> = {};
-      const depois: Record<string, string | boolean> = {};
+      const antes: Record<string, string | boolean | null> = {};
+      const depois: Record<string, string | boolean | null> = {};
+      const validadeAntes = validadesDaLinha(ins);
+      const conservacao = conservacaoDe(ins.conservacao);
+      if (ins.conservacao !== conservacao.conservacao) [antes.conservacao, depois.conservacao] = [ins.conservacao, conservacao.conservacao];
+      if (retratoDaValidade(validadeAntes) !== retratoDaValidade(f.validades)) {
+        [antes.validade, depois.validade] = [retratoDaValidade(validadeAntes), retratoDaValidade(f.validades)];
+      }
       if (ins.nome !== f.nome) {
         await nomeOcupado(f.nome, f.insumoProduzidoId);
         [antes.nome, depois.nome] = [ins.nome, f.nome];
@@ -329,7 +356,7 @@ async function sincronizarInsumoProduzido(
       }
       if (ins.ativo !== f.ativa) [antes.ativo, depois.ativo] = [ins.ativo, f.ativa];
       if (Object.keys(depois).length === 0) return;
-      await tx.insumo.updateMany({ where: { id: f.insumoProduzidoId }, data: { nome: f.nome, unidade: f.unidadeRendimento, ativo: f.ativa } });
+      await tx.insumo.updateMany({ where: { id: f.insumoProduzidoId }, data: { nome: f.nome, unidade: f.unidadeRendimento, ativo: f.ativa, ...conservacao } });
       await historico(f.insumoProduzidoId, 'ALTEROU', { nome: ins.nome, ...antes }, { nome: f.nome, ...depois });
       return;
     }
@@ -338,13 +365,13 @@ async function sincronizarInsumoProduzido(
   // Ainda não tem insumo: adota um de pré-preparo solto e sem preço com o mesmo nome, ou cria.
   const mesmoNome = await tx.insumo.findFirst({
     where: { nome: f.nome },
-    select: { id: true, tipo: true, unidade: true, ativo: true, precoEmbalagemCentavos: true, fichaQueProduz: { select: { id: true } } },
+    select: { id: true, tipo: true, unidade: true, ativo: true, precoEmbalagemCentavos: true, conservacao: true, fichaQueProduz: { select: { id: true } } },
   });
   let insumoId: string;
   if (mesmoNome) {
     if (mesmoNome.tipo !== 'PRE_PREPARO' || mesmoNome.fichaQueProduz || mesmoNome.precoEmbalagemCentavos !== 0) await nomeOcupado(f.nome, null);
     if (mesmoNome.unidade !== f.unidadeRendimento) await conferirUnidade(mesmoNome.id);
-    await tx.insumo.updateMany({ where: { id: mesmoNome.id }, data: { unidade: f.unidadeRendimento, ativo: f.ativa } });
+    await tx.insumo.updateMany({ where: { id: mesmoNome.id }, data: { unidade: f.unidadeRendimento, ativo: f.ativa, ...conservacaoDe(mesmoNome.conservacao) } });
     await historico(mesmoNome.id, 'ALTEROU', { nome: f.nome, fichaQueProduz: null }, { nome: f.nome, fichaQueProduz: f.nome });
     insumoId = mesmoNome.id;
   } else {
@@ -357,10 +384,17 @@ async function sincronizarInsumoProduzido(
         conteudoMilesimos: 1000,
         precoEmbalagemCentavos: 0,
         ativo: f.ativa,
+        ...conservacaoDe('SECO'),
       },
       select: { id: true },
     });
-    await historico(novo.id, 'CRIOU', undefined, { nome: f.nome, tipo: 'PRE_PREPARO', unidade: f.unidadeRendimento, fichaQueProduz: f.nome });
+    await historico(novo.id, 'CRIOU', undefined, {
+      nome: f.nome,
+      tipo: 'PRE_PREPARO',
+      unidade: f.unidadeRendimento,
+      fichaQueProduz: f.nome,
+      ...(f.validades ? { conservacao: f.validades.principal, validade: retratoDaValidade(f.validades) } : {}),
+    });
     insumoId = novo.id;
   }
   await tx.fichaTecnica.updateMany({ where: { id: f.id }, data: { insumoProduzidoId: insumoId } });
@@ -395,7 +429,11 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
     g.foto === 'manter' ? {} : { fotoArquivo: g.foto?.arquivo ?? null, fotoMime: g.foto?.mime ?? null, fotoBytes: g.foto?.bytes ?? null };
   const depois = retratoDaFicha(d, g.doCadastro, fotoArquivo, g.preparos);
   const sincronizar = (id: string, insumoProduzidoId: string | null) =>
-    sincronizarInsumoProduzido(tx, { id, nome: d.nome, tipo: d.tipo, unidadeRendimento: d.unidadeRendimento, ativa: true, insumoProduzidoId }, g.autorNome);
+    sincronizarInsumoProduzido(
+      tx,
+      { id, nome: d.nome, tipo: d.tipo, unidadeRendimento: d.unidadeRendimento, ativa: true, insumoProduzidoId, validades: d.validades },
+      g.autorNome,
+    );
 
   if (!g.atual) {
     const nova = await tx.fichaTecnica.create({
@@ -407,6 +445,8 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
         unidadeRendimento: d.unidadeRendimento,
         descricao: d.descricao,
         modoPreparo: d.modoPreparo,
+        conservacao: d.validades?.principal ?? null,
+        ...colunasDaValidade(d.validades),
         origem: g.origem ?? 'MANUAL',
         ...dadosDaFoto,
       },
@@ -443,6 +483,8 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
       unidadeRendimento: d.unidadeRendimento,
       descricao: d.descricao,
       modoPreparo: d.modoPreparo,
+      conservacao: d.validades?.principal ?? null,
+      ...colunasDaValidade(d.validades),
       ...dadosDaFoto,
     },
   });
@@ -575,7 +617,7 @@ export async function editarFicha(
           doCadastro,
           preparos,
           foto: nova,
-          antes: retratoDaFicha(dadosGravados(atual), doCadastro, atual.fotoArquivo, preparos),
+          antes: retratoDaFicha(dadosDaFichaGravada(atual), doCadastro, atual.fotoArquivo, preparos),
           autorNome,
         });
         if (nova !== 'manter' && r.mudou.includes('foto')) fotoAntiga = atual.fotoArquivo;
@@ -607,7 +649,7 @@ export async function mudarSituacaoFicha(
     return await cliente.transacao(async (tx) => {
       const atual = await tx.fichaTecnica.findUnique({
         where: { id },
-        select: { nome: true, tipo: true, unidadeRendimento: true, insumoProduzidoId: true },
+        select: { nome: true, tipo: true, unidadeRendimento: true, insumoProduzidoId: true, ...SELECAO_DA_VALIDADE },
       });
       if (!atual) throw new RecusaDaFicha({ ok: false, erros: { geral: 'Ficha não encontrada.' }, naoEncontrado: true });
       const r = await tx.fichaTecnica.updateMany({ where: { id, ativa: !ativa }, data: { ativa } });
@@ -630,7 +672,10 @@ export async function mudarSituacaoFicha(
           autorNome,
         },
       });
-      if (atual.insumoProduzidoId) await sincronizarInsumoProduzido(tx, { id, ...atual, ativa }, autorNome);
+      if (atual.insumoProduzidoId) {
+        const { conservacao: _c, validadeSecoMin: _s, validadePistaFriaMin: _p, validadeRefrigeradoMin: _r, validadeCongeladoMin: _g, ...resto } = atual;
+        await sincronizarInsumoProduzido(tx, { id, ...resto, ativa, validades: validadesDaLinha(atual) }, autorNome);
+      }
       return { ok: true as const, id, nome: atual.nome, mudou: ['ativo'] };
     });
   } catch (e) {
@@ -671,6 +716,7 @@ const SELECAO_DA_LISTA = {
   unidadeRendimento: true,
   ativa: true,
   fotoArquivo: true,
+  ...SELECAO_DA_VALIDADE,
   itens: { orderBy: { ordem: 'asc' as const }, select: SELECAO_DO_ITEM },
 } as const;
 
@@ -704,6 +750,7 @@ export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<
       itens: l.itens.length,
       preparos: l.itens.filter((i) => i.subfichaId).length,
       custo: cascata.custo(l.id)!,
+      validades: validadesDaLinha(l),
     }));
     return { linhas, total, pagina, paginas };
   });
@@ -767,6 +814,7 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string) {
       versao: f.atualizadoEm.toISOString(),
       foto: versaoDaFoto(f.fotoArquivo),
       insumoProduzido: f.insumoProduzido,
+      validades: validadesDaLinha(f),
       usadaEm,
       itens: f.itens.map((i, n) => {
         const sub = i.subfichaId ? cascata.fichas.get(i.subfichaId) : undefined;

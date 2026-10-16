@@ -28,13 +28,9 @@ export type TipoInsumo = keyof typeof TIPOS;
 /** Pré-preparo nasce da ficha técnica (fase 1.3): no formulário, só estes. */
 export const TIPOS_DO_FORM = ['INGREDIENTE', 'EMBALAGEM'] as const;
 
-export const CONSERVACOES = {
-  SECO: 'Seco',
-  PISTA_FRIA: 'Pista fria',
-  REFRIGERADO: 'Refrigerado',
-  CONGELADO: 'Congelado',
-} as const;
-export type Conservacao = keyof typeof CONSERVACOES;
+// Conservações e validade (1.4) moram em `validade.ts`; daqui seguem exportadas para quem já usava.
+import { CONSERVACOES, entradaDoFormulario, lerValidades, retratoDaValidade, type Conservacao, type Validades } from './validade';
+export { CONSERVACOES, type Conservacao };
 
 export type Erros = Record<string, string>;
 
@@ -107,16 +103,16 @@ const formInsumo = z.object({
   nome: nomeObrigatorio(80),
   tipo: z.enum(['INGREDIENTE', 'EMBALAGEM', 'PRE_PREPARO'], { message: 'Escolha o tipo.' }).default('INGREDIENTE'),
   unidade: z.enum(['KG', 'L', 'UN'], { message: 'Escolha a unidade.' }),
-  conservacao: z
-    .enum(['SECO', 'PISTA_FRIA', 'REFRIGERADO', 'CONGELADO'], { message: 'Escolha a conservação.' })
-    .default('SECO'),
 });
 
 export interface DadosInsumo extends Embalagem {
   nome: string;
   tipo: TipoInsumo;
   unidade: Unidade;
+  /** A principal (onde se guarda); é `validades.principal`. */
   conservacao: Conservacao;
+  /** 1.4: validade por conservação (minutos); sem nenhuma = não informada. */
+  validades: Validades;
 }
 
 export type Leitura<T> = { ok: true; dados: T } | { ok: false; erros: Erros };
@@ -132,9 +128,11 @@ export function lerFormInsumo(entrada: Record<string, unknown>, tipoAtual?: Tipo
     nome: entrada.nome,
     tipo: vazio(entrada.tipo),
     unidade: entrada.unidade,
-    conservacao: vazio(entrada.conservacao),
   });
   const erros: Erros = r.success ? {} : primeiroErroPorCampo(r.error.issues);
+  // 1.4: conservação principal + validade em cada uma que o insumo aceita (opcionais).
+  const v = lerValidades(entradaDoFormulario((k) => (k === 'conservacao' ? vazio(entrada.conservacao) : entrada[k])), 'insumo');
+  if (!v.ok) Object.assign(erros, v.erros);
   if (r.success) {
     if (tipoAtual === 'PRE_PREPARO' && r.data.tipo !== 'PRE_PREPARO') {
       erros.tipo = 'Pré-preparo continua pré-preparo: ele nasce da ficha técnica.';
@@ -144,8 +142,8 @@ export function lerFormInsumo(entrada: Record<string, unknown>, tipoAtual?: Tipo
   }
   const unidade = r.success ? r.data.unidade : (['KG', 'L', 'UN'] as const).find((u) => u === entrada.unidade);
   const embalagem = unidade ? lerEmbalagem(entrada, unidade, erros) : null;
-  if (!r.success || !embalagem || Object.keys(erros).length > 0) return { ok: false, erros };
-  return { ok: true, dados: { ...r.data, ...embalagem } };
+  if (!r.success || !embalagem || !v.ok || !v.validades || Object.keys(erros).length > 0) return { ok: false, erros };
+  return { ok: true, dados: { ...r.data, ...embalagem, conservacao: v.validades.principal, validades: v.validades } };
 }
 
 // ------------------------------------------------------------- variante
@@ -191,6 +189,7 @@ export function retratoDoInsumo(i: DadosInsumo & { ativo?: boolean }): Retrato {
     tipo: i.tipo,
     unidade: i.unidade,
     conservacao: i.conservacao,
+    validade: retratoDaValidade(i.validades),
     conteudoMilesimos: i.conteudoMilesimos,
     precoEmbalagemCentavos: i.precoEmbalagemCentavos,
     taxaEntregaCentavos: i.taxaEntregaCentavos,

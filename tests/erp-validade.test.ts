@@ -9,7 +9,24 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
 import { FAXINA, faxinarPendentes, faxinarPendentesDeVezEmQuando } from '@/lib/erp/arquivos';
-import { lerFormFicha, type InsumoDaFicha, type PreparoDaFicha } from '@/lib/erp/ficha-campos';
+import { lerFormFicha, retratoDaFicha, type InsumoDaFicha, type PreparoDaFicha } from '@/lib/erp/ficha-campos';
+import { lerFormInsumo } from '@/lib/erp/insumo-campos';
+import {
+  colunasDaValidade,
+  entradaDoFormulario,
+  formatarValidade,
+  lerConservacaoDaPlanilha,
+  lerValidadeDaPlanilha,
+  lerValidades,
+  paraMinutos,
+  retratoDaValidade,
+  VALIDADE_MAXIMA_MIN,
+  validadeParaCampo,
+  validadesDaLinha,
+  validadesEmTexto,
+  validadesParaCampos,
+  type EntradaDeValidade,
+} from '@/lib/erp/validade';
 import { limparMetadados, MENSAGEM_JPEG_ESTRANHO } from '@/lib/erp/foto-metadados';
 import { GPS, JPG_LIMPO, jpgComGps } from './erp-fotos-teste';
 
@@ -22,6 +39,176 @@ const ins = (id: string, nome: string, extra: Partial<InsumoDaFicha> = {}): Insu
   precoEmbalagemCentavos: 500,
   taxaEntregaCentavos: 0,
   ...extra,
+});
+
+/** Formulário como o navegador manda (`aceita_X=on`, `validade_X`, `validadeEm_X`, `conservacao`). */
+const form = (campos: Record<string, string>) => entradaDoFormulario((k) => campos[k]);
+
+describe('ERP 1.4 · dias/horas ↔ minutos', () => {
+  it('inteiros: 3 dias = 4320 min, 6 horas = 360 min; decimal, negativo e texto são inválidos', () => {
+    expect(paraMinutos('3', 'dias')).toBe(4320);
+    expect(paraMinutos(' 30 ', 'dias')).toBe(43_200);
+    expect(paraMinutos('6', 'horas')).toBe(360);
+    expect(paraMinutos('0', 'dias')).toBe(0);
+    for (const t of ['1,5', '1.5', '-2', 'três', '', '1e3']) expect(paraMinutos(t, 'dias'), t).toBeNull();
+  });
+
+  it('volta para o campo em dias quando fecha em dias, senão em horas', () => {
+    expect(validadeParaCampo(4320)).toEqual({ quantidade: '3', em: 'dias' });
+    expect(validadeParaCampo(2160)).toEqual({ quantidade: '36', em: 'horas' });
+    expect(validadeParaCampo(360)).toEqual({ quantidade: '6', em: 'horas' });
+  });
+
+  it('texto: "1 dia", "3 dias", "1 hora", "36 horas"; minuto quebrado aparece como é', () => {
+    expect(formatarValidade(1440)).toBe('1 dia');
+    expect(formatarValidade(4320)).toBe('3 dias');
+    expect(formatarValidade(60)).toBe('1 hora');
+    expect(formatarValidade(2160)).toBe('36 horas');
+    expect(formatarValidade(90)).toBe('90 min');
+  });
+});
+
+describe('ERP 1.4 · validação das conservações e validades', () => {
+  const cheddar = { aceita_REFRIGERADO: 'on', validade_REFRIGERADO: '3', validadeEm_REFRIGERADO: 'dias', aceita_CONGELADO: 'on', validade_CONGELADO: '30', validadeEm_CONGELADO: 'dias', conservacao: 'REFRIGERADO' };
+
+  it('Molho cheddar: refrigerado 3 dias e congelado 30 dias, principal refrigerado', () => {
+    expect(lerValidades(form(cheddar), 'ficha')).toEqual({ ok: true, validades: { principal: 'REFRIGERADO', minutos: { REFRIGERADO: 4320, CONGELADO: 43_200 } } });
+  });
+
+  it('pista fria em horas', () => {
+    const r = lerValidades(form({ aceita_PISTA_FRIA: 'on', validade_PISTA_FRIA: '6', validadeEm_PISTA_FRIA: 'horas' }), 'ficha');
+    expect(r).toEqual({ ok: true, validades: { principal: 'PISTA_FRIA', minutos: { PISTA_FRIA: 360 } } });
+  });
+
+  it('uma marcada só: ela é a principal sem precisar escolher', () => {
+    const r = lerValidades(form({ aceita_CONGELADO: 'on', validade_CONGELADO: '90' }), 'ficha');
+    expect(r.ok && r.validades).toEqual({ principal: 'CONGELADO', minutos: { CONGELADO: 129_600 } });
+  });
+
+  it('ficha sem nenhuma marcada = validade não informada (null), mesmo com a principal escolhida', () => {
+    expect(lerValidades(form({ conservacao: 'SECO' }), 'ficha')).toEqual({ ok: true, validades: null });
+  });
+
+  it('insumo sem nenhuma marcada: fica a principal, sem validade', () => {
+    expect(lerValidades(form({ conservacao: 'REFRIGERADO' }), 'insumo')).toEqual({ ok: true, validades: { principal: 'REFRIGERADO', minutos: {} } });
+    expect(lerValidades({ linhas: {} }, 'insumo')).toEqual({ ok: true, validades: { principal: 'SECO', minutos: {} } });
+  });
+
+  it('marcada exige validade > 0 e ≤ 730 dias, inteira', () => {
+    const r = lerValidades(
+      form({
+        aceita_SECO: 'on', validade_SECO: '',
+        aceita_PISTA_FRIA: 'on', validade_PISTA_FRIA: '0', validadeEm_PISTA_FRIA: 'horas',
+        aceita_REFRIGERADO: 'on', validade_REFRIGERADO: '2,5',
+        aceita_CONGELADO: 'on', validade_CONGELADO: '731',
+        conservacao: 'CONGELADO',
+      }),
+      'ficha',
+    );
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.erros['validade-SECO']).toMatch(/Diga quanto dura em seco/);
+    expect(r.erros['validade-PISTA_FRIA']).toMatch(/maior que zero/);
+    expect(r.erros['validade-REFRIGERADO']).toMatch(/número inteiro de dias/);
+    expect(r.erros['validade-CONGELADO']).toMatch(/730 dias/);
+    // O teto exato passa.
+    expect(lerValidades(form({ aceita_CONGELADO: 'on', validade_CONGELADO: '730' }), 'ficha').ok).toBe(true);
+    expect(VALIDADE_MAXIMA_MIN).toBe(1_051_200);
+  });
+
+  it('a principal precisa estar marcada; com várias marcadas, precisa ser dita; valor forjado é recusado', () => {
+    const naoMarcada = lerValidades(form({ ...cheddar, conservacao: 'SECO' }), 'ficha');
+    expect(!naoMarcada.ok && naoMarcada.erros.conservacao).toMatch(/principal \(seco\) precisa estar marcada/);
+    const semPrincipal = lerValidades(form({ ...cheddar, conservacao: '' }), 'ficha');
+    expect(!semPrincipal.ok && semPrincipal.erros.conservacao).toMatch(/Diga qual é a conservação principal/);
+    const forjada = lerValidades(form({ ...cheddar, conservacao: 'FORNO' }), 'ficha');
+    expect(!forjada.ok && forjada.erros.conservacao).toMatch(/desconhecida/);
+    const insumo = lerValidades(form({ aceita_CONGELADO: 'on', validade_CONGELADO: '30', conservacao: 'SECO' }), 'insumo');
+    expect(insumo.ok).toBe(false);
+  });
+
+  it('texto para o cozinheiro: principal primeiro; histórico na ordem fixa', () => {
+    const v = { principal: 'CONGELADO' as const, minutos: { REFRIGERADO: 4320, CONGELADO: 43_200 } };
+    expect(validadesEmTexto(v)).toBe('Congelado: 30 dias · Refrigerado: 3 dias');
+    expect(validadesEmTexto({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 4320, CONGELADO: 43_200 } })).toBe('Refrigerado: 3 dias · Congelado: 30 dias');
+    expect(retratoDaValidade(v)).toBe('Refrigerado 3 dias · Congelado 30 dias');
+    expect(validadesEmTexto(null)).toBeNull();
+    expect(validadesEmTexto({ principal: 'SECO', minutos: {} })).toBeNull();
+    expect(retratoDaValidade({ principal: 'SECO', minutos: {} })).toBeNull();
+  });
+
+  it('banco ↔ validades: as 4 colunas sempre (null onde não aceita); principal nula = não informada', () => {
+    const col = colunasDaValidade({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 4320 } });
+    expect(col).toEqual({ validadeSecoMin: null, validadePistaFriaMin: null, validadeRefrigeradoMin: 4320, validadeCongeladoMin: null });
+    expect(validadesDaLinha({ ...col, conservacao: 'REFRIGERADO' })).toEqual({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 4320 } });
+    expect(validadesDaLinha({ ...colunasDaValidade(null), conservacao: null })).toBeNull();
+    expect(colunasDaValidade(null)).toEqual({ validadeSecoMin: null, validadePistaFriaMin: null, validadeRefrigeradoMin: null, validadeCongeladoMin: null });
+    const campos = validadesParaCampos({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 4320, PISTA_FRIA: 360 } });
+    expect(campos.REFRIGERADO).toEqual({ marcada: true, quantidade: '3', em: 'dias' });
+    expect(campos.PISTA_FRIA).toEqual({ marcada: true, quantidade: '6', em: 'horas' });
+    expect(campos.SECO.marcada).toBe(false);
+    expect(campos.principal).toBe('REFRIGERADO');
+  });
+});
+
+describe('ERP 1.4 · formulário da ficha e do insumo com validade', () => {
+  const base = { nome: 'Molho cheddar', tipo: 'PRE_PREPARO', rendimento: '2', rendimentoUnidade: 'kg', itens: [{ insumoId: 'c', quantidade: '1', unidade: 'kg' }] };
+  const doCadastro = new Map([['c', ins('c', 'Cheddar')]]);
+  const validade: EntradaDeValidade = {
+    principal: 'REFRIGERADO',
+    linhas: { REFRIGERADO: { marcada: true, quantidade: '3', em: 'dias' }, CONGELADO: { marcada: true, quantidade: '30', em: 'dias' } },
+  };
+
+  it('ficha: as validades vão para os dados e para o retrato do histórico', () => {
+    const r = lerFormFicha({ ...base, validade }, doCadastro);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.dados.validades).toEqual({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 4320, CONGELADO: 43_200 } });
+    const retrato = retratoDaFicha(r.dados, new Map([['c', { nome: 'Cheddar', unidade: 'KG' as const }]]), null);
+    expect(retrato.conservacao).toBe('REFRIGERADO');
+    expect(retrato.validade).toBe('Refrigerado 3 dias · Congelado 30 dias');
+  });
+
+  it('ficha sem o bloco (planilha antiga) ou sem marcada: validades null; erro de validade volta junto com os outros', () => {
+    const sem = lerFormFicha(base, doCadastro);
+    expect(sem.ok && sem.dados.validades).toBeNull();
+    const ruim = lerFormFicha({ ...base, nome: '', validade: { linhas: { SECO: { marcada: true, quantidade: '', em: 'dias' } } } }, doCadastro);
+    expect(!ruim.ok && Object.keys(ruim.erros).sort()).toEqual(['nome', 'validade-SECO']);
+  });
+
+  it('insumo: formulário antigo (só a conservação) continua valendo; com validade, grava os minutos', () => {
+    const antigo = { nome: 'Cebola', unidade: 'KG', conservacao: 'REFRIGERADO', conteudo: '5', preco: '10' };
+    const r = lerFormInsumo(antigo);
+    expect(r.ok && r.dados.validades).toEqual({ principal: 'REFRIGERADO', minutos: {} });
+    const comValidade = lerFormInsumo({ ...antigo, aceita_REFRIGERADO: 'on', validade_REFRIGERADO: '5', validadeEm_REFRIGERADO: 'dias' });
+    expect(comValidade.ok && comValidade.dados).toMatchObject({ conservacao: 'REFRIGERADO', validades: { principal: 'REFRIGERADO', minutos: { REFRIGERADO: 7200 } } });
+    const errado = lerFormInsumo({ ...antigo, aceita_CONGELADO: 'on', validade_CONGELADO: '30' });
+    expect(!errado.ok && errado.erros.conservacao).toMatch(/principal \(refrigerado\) precisa estar marcada/);
+  });
+});
+
+describe('ERP 1.4 · planilha: célula de validade e de conservação', () => {
+  it('"3", "3 dias", "3d", "1 dia" = dias; "6 h", "6 horas", "6hs" = horas; vazio = não aceita', () => {
+    expect(lerValidadeDaPlanilha('3')).toBe(4320);
+    expect(lerValidadeDaPlanilha('3 dias')).toBe(4320);
+    expect(lerValidadeDaPlanilha('3d')).toBe(4320);
+    expect(lerValidadeDaPlanilha(' 1 Dia ')).toBe(1440);
+    expect(lerValidadeDaPlanilha('6 h')).toBe(360);
+    expect(lerValidadeDaPlanilha('6 horas')).toBe(360);
+    expect(lerValidadeDaPlanilha('6hs')).toBe(360);
+    expect(lerValidadeDaPlanilha('')).toBeUndefined();
+    expect(lerValidadeDaPlanilha('2 semanas')).toBeNull();
+    expect(lerValidadeDaPlanilha('1,5')).toBeNull();
+  });
+
+  it('conservação pelo nome, com ou sem acento, e sinônimos de cozinha', () => {
+    expect(lerConservacaoDaPlanilha('Refrigerado')).toBe('REFRIGERADO');
+    expect(lerConservacaoDaPlanilha('pista_fria')).toBe('PISTA_FRIA');
+    expect(lerConservacaoDaPlanilha('Freezer')).toBe('CONGELADO');
+    expect(lerConservacaoDaPlanilha('ambiente')).toBe('SECO');
+    expect(lerConservacaoDaPlanilha('')).toBeUndefined();
+    expect(lerConservacaoDaPlanilha('forno')).toBeNull();
+  });
 });
 
 describe('ERP 1.4 (herança a da 1.3) · insumo produzido não entra como insumo comum', () => {
