@@ -247,6 +247,9 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
       { insumoNomeSnapshot: 'Cheddar fatiado', quantidadeMilesimos: -1000, valorCentavos: -1898, saldoAntesMilesimos: 15_000, saldoDepoisMilesimos: 14_000, chave: true },
     ]);
     expect((await saldo(ids.cheddar))!.quantidadeMilesimos).toBe(14_000);
+    // Fechada: o "fica em" é o que o ajuste desta contagem deixou (não soma a diferença de novo).
+    const fechada = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.ciclo, CFG))!;
+    expect(fechada.linhas.find((l) => l.item.nome === 'Cheddar fatiado')!.div.ficaEmMilesimos).toBe(14_000);
     const c = (await a.contagem.findUnique({ where: { id: ids.ciclo } }))!;
     expect(c).toMatchObject({ status: 'FECHADA', desfecho: 'APLICADA', fechadaPorNome: 'Gil Gerente', naoContadosNoFechamento: 0 });
     expect(await razaoCoerente()).toEqual({ divergentes: 0, quebrados: 0 });

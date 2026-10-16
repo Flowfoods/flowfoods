@@ -25,7 +25,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Validade por conservação (1.4) | `src/lib/erp/validade.ts` (puro: leitura, dias/horas ↔ minutos, texto, colunas); telas `telas/cadastro/{validade,campos-validade}.tsx`; migration `20261017000000_erp_validade` |
 | Entrada de compra e custo pelo último preço (1.5) | `src/lib/erp/{compra-campos,compras-custo,compras}.ts` (puro / última compra numa consulta / regras com banco); telas em `src/components/erp/telas/compras/`; rotas `/erp/compras` e `/rodolfo/erp/<slug>/compras` (notas, `nova`, `<id>`, `<id>/editar`, `fornecedores`); migrations `20261018000000_erp_validar_checks_insumo` e `20261018010000_erp_compras` |
 | Estoque: abertura do zero, livro-razão + saldo, nota entrando no estoque (1.6) | `src/lib/erp/{estoque-campos,estoque}.ts` (puro / com banco); telas em `src/components/erp/telas/estoque/`; rotas `/erp/estoque` e `/rodolfo/erp/<slug>/estoque` (`<loja>`, `<loja>/abertura`, `<loja>/abertura/conferir`); migration `20261019000000_erp_estoque_abertura` |
-| Contagem do dia a dia (inventário cíclico que fecha sozinho) e fechamento do período com piso (1.7) | `src/lib/erp/{contagem-campos,contagem}.ts` (puro / com banco; `contarItem` da 1.6 generalizado com ganchos); telas `telas/estoque/{planejar,planejar-form,conferir-contagem,periodo,cobertura,rascunho}.tsx`; rotas `<loja>/contagens/nova`, `<loja>/contagens/<id>`, `<loja>/contagens/<id>/conferir`, `<loja>/periodo` em `/erp/estoque` e `/rodolfo/erp/<slug>/estoque`; migration `20261020000000_erp_contagem_ciclica` |
+| Contagem do dia a dia (inventário cíclico que fecha sozinho) e fechamento do período com piso (1.7) | `src/lib/erp/{contagem-campos,contagem}.ts` (puro / com banco; `contarItem` da 1.6 generalizado com ganchos); telas `telas/estoque/{planejar,planejar-form,conferir-contagem,periodo,cobertura,rascunho}.tsx`; rotas `<loja>/contagens/nova`, `<loja>/contagens/<id>`, `<loja>/contagens/<id>/conferir`, `<loja>/periodo` em `/erp/estoque` e `/rodolfo/erp/<slug>/estoque`; migrations `20261020000000_erp_contagem_ciclica` e `20261020010000_erp_contagem_fotografia` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
@@ -817,6 +817,23 @@ com dado da 1.6 como superusuário, dono não-superusuário com RLS e sem RLS
    cabeçalho do estoque mais curto e explicação recolhível, filtro de
    conservação que rola com indício a 390 px.
 
+10. **Revisão (Guardião + UX, volta 1)**: (a) o número vale para quando
+    foi DIGITADO (decisão 76): a tela manda a idade do número (relógio do
+    aparelho; o rascunho guarda a hora em que se digitou), o servidor prende
+    entre o início da contagem e agora e fotografa o livro daquele instante
+    (`livroNoInstante`: saldo − o que entrou depois, numa consulta); o
+    rascunho reenviado depois de uma nota não apaga a nota — ela aparece em
+    "depois de contar" e segura o "fecha sozinha"; corrigir número segue a
+    mesma regra. Rascunho por contagem E pessoa. (b) Fotografia imutável no
+    banco: migration aditiva `20261020010000_erp_contagem_fotografia`
+    (gatilhos `Contagem_fechada_imutavel` e `ContagemItem_da_fechada_imutavel`;
+    DELETE segue possível, como no razão). (c) Regras da loja só gravam com as
+    seis regras lidas. (d) Conferência com colunas fixas e "depois de contar"
+    na 2ª linha do item; perda em vermelho, sobra em verde; "Mais caro (A) /
+    Médio (B) / Menor (C)", "Todos daqui"; uma faixa só na contagem aplicada;
+    "Cobertura da semana de …"; contagem fechada mostra o "fica em" que o
+    ajuste dela deixou.
+
 ## Provar a contagem (1.7)
 
 ```bash
@@ -1252,6 +1269,12 @@ banco de teste: o operador é recusado pelo servidor.
   período no DRE deve exigir o FECHAMENTO aplicado de cada loja aberta.
 - Fecha sozinha usa a tolerância por item da loja: diferenças pequenas
   repetidas somam (vigiar no relatório de divergências da 1.8).
+- A hora de contar vem do aparelho (idade do número): dado não confiável,
+  preso entre o início da contagem e agora. O pior caso é o aparelho dizer
+  que contou MAIS TARDE do que contou (o esperado passa a incluir o que entrou
+  no meio) — indistinguível de recontar de verdade; o histórico guarda quem
+  e quando. Relógio do servidor com várias réplicas: `ocorridoEm` × hora
+  digitada dependem dele (como na 1.6).
 - Sem lembrete/cobrança (Notion §7, outbox) e sem link de contagem sem
   login; contagem vencida só é gravada na próxima escrita da loja (a tela
   já mostra "fechou sem aplicar").

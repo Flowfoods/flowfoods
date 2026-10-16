@@ -619,6 +619,12 @@ export async function conferenciaDaContagem(cliente: ClienteDoParceiro, alcance:
           valorContadoCentavos: l.item.contadoMilesimos === null ? 0 : valorDaQuantidade(l.porUnidade, l.item.contadoMilesimos),
         };
       });
+      // Fechada: o "fica em" é o que o ajuste DESTA contagem deixou no livro (o saldo de agora já o inclui).
+      if (c.status !== 'ABERTA') {
+        const proprios = await tx.movimentoEstoque.findMany({ where: { contagemItemId: { in: brutos.map((i) => i.id) }, estornoDeId: null }, select: { contagemItemId: true, saldoDepoisMilesimos: true } });
+        const depoisDe = new Map(proprios.map((m) => [m.contagemItemId!, m.saldoDepoisMilesimos]));
+        for (const l of linhas) l.div = { ...l.div, ficaEmMilesimos: depoisDe.get(l.item.id) ?? l.atualMilesimos };
+      }
       const resumo = resumoDaContagem(brutos);
       const soma = somaDasDivergencias(linhas.map((l) => l.div));
       const acimaDoTeto = linhas.map((l) => valorAcimaDoTeto(l.item.nome, l.valorContadoCentavos)).filter((x): x is string => !!x);

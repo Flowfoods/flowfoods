@@ -62,16 +62,18 @@ export function FormPlanejarCiclo({ linhas, lugar, acao, bloqueio }: { linhas: L
         const nMarcados = g.linhas.filter((l) => marcados.has(l.insumoId)).length;
         return (
           <section key={g.c} aria-labelledby={`lugar-${g.c}`} className="overflow-hidden rounded-[14px] border border-linha bg-painel">
-            <header className="flex min-h-12 flex-wrap items-center justify-between gap-2 border-b border-linha px-4 py-2 sm:px-5">
-              <h2 id={`lugar-${g.c}`} className="flex items-center gap-2 text-[13px] font-semibold text-texto">
+            <header className="flex min-h-12 items-center justify-between gap-2 border-b border-linha px-4 py-2 sm:px-5">
+              <h2 id={`lugar-${g.c}`} className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-texto">
                 <IconeDaConservacao conservacao={g.c} />
-                {CONSERVACOES[g.c]}
-                <span className="font-normal tabular-nums text-suave">
-                  · {nMarcados} de {g.linhas.length} marcados
+                <span className="min-w-0">
+                  {CONSERVACOES[g.c]}
+                  <span className="block font-normal tabular-nums text-suave sm:ml-1.5 sm:inline">
+                    {nMarcados} de {g.linhas.length} marcados
+                  </span>
                 </span>
               </h2>
               {livres.length > 0 && !bloqueio && (
-                <button type="button" onClick={() => marcarGrupo(livres, !todosMarcados)} className={classeDeBotao('fantasma', 'min-h-11 px-3 text-[13px]')}>
+                <button type="button" onClick={() => marcarGrupo(livres, !todosMarcados)} className={classeDeBotao('fantasma', 'min-h-11 shrink-0 px-3 text-[13px]')}>
                   {todosMarcados ? 'Desmarcar o lugar' : 'Marcar o lugar todo'}
                 </button>
               )}
