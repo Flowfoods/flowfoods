@@ -560,6 +560,7 @@ export async function criarAcesso(
       // morre; e senha criada por link de administrador de OUTRO parceiro não
       // atravessa — apaga e a pessoa cria outra pelo link do nível 1 (decisão 41).
       let senhaApagada = false;
+      let rostosApagados = 0;
       if (!novo) {
         await tx.conviteAcesso.updateMany({
           where: { usuarioId: usuario.id, usadoEm: null, revogadoEm: null },
@@ -570,7 +571,15 @@ export async function criarAcesso(
             where: { id: usuario.id },
             data: { senhaHash: null, senhaDefinidaEm: null, senhaPorLinkDoParceiroId: null },
           });
+          // TUDO que deixa entrar sem a senha nova sai junto (revisão do
+          // Guardião, volta 2): quem conhecia a senha do link pode ter ativado
+          // o rosto. Inventário das credenciais da pessoa: senha (acima),
+          // sessões (encerradas), links pendentes (revogados logo acima, para
+          // qualquer parceiro), rostos/passkeys e desafios WebAuthn pendentes
+          // (apagados aqui). Tentativas de entrada não deixam entrar.
           await tx.sessaoErp.updateMany({ where: { usuarioId: usuario.id, encerradaEm: null }, data: { encerradaEm: agora } });
+          rostosApagados = (await tx.passkeyErp.deleteMany({ where: { usuarioId: usuario.id } })).count;
+          await tx.desafioWebauthn.deleteMany({ where: { usuarioId: usuario.id } });
           senhaApagada = true;
         }
       }
@@ -594,7 +603,11 @@ export async function criarAcesso(
           entidade: ENTIDADE,
           entidadeId: acesso.id,
           acao: 'PEDIU_SENHA_NOVA',
-          depois: { nome: usuario.nome, senha: 'criada por link de outro parceiro: precisa criar de novo' },
+          depois: {
+            nome: usuario.nome,
+            senha: 'criada por link de outro parceiro: precisa criar de novo',
+            aparelho: rostosApagados === 0 ? 'nenhum rosto ativado' : `${rostosApagados} com rosto removido${rostosApagados > 1 ? 's' : ''}`,
+          },
           autorNome: ator.nome,
         });
       }
@@ -610,7 +623,7 @@ export async function criarAcesso(
         });
       }
       const mensagem = senhaApagada
-        ? `Acesso de ${usuario.nome} criado. A senha dela tinha sido criada por link de outro parceiro e não vale aqui: mande o link para ela criar uma senha nova.`
+        ? `Acesso de ${usuario.nome} criado. A senha dela tinha sido criada por link de outro parceiro e não vale aqui: a senha e a entrada pelo rosto foram desligadas. Mande o link para ela criar uma senha nova.`
         : link
           ? `Acesso de ${usuario.nome} criado. Copie o link e mande para a pessoa.`
           : `Atenção: esse e-mail já tem senha e entra em outro parceiro. ${usuario.nome} agora vê este também, com a mesma senha.`;

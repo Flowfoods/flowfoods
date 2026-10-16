@@ -707,3 +707,11 @@ ao ganhar outro parceiro ela é apagada, as sessões caem e o nível 1 manda
 link novo (custo: a pessoa cria senha de novo uma vez). Só o nível 1 vincula
 e-mail de outro parceiro; para a pessoa do parceiro a recusa é neutra (não
 revela que o e-mail existe). As funções de equipe releem o ator no banco.
+
+**Revisão (Guardião, volta 2):** apagar só a senha não bastava: quem conhecia a
+senha do link podia ter ativado o rosto (passkey) e entrar por ele em B. Agora,
+na mesma transação em que a senha "do parceiro" é apagada, saem também todos
+os rostos da pessoa e os desafios WebAuthn pendentes dela, além das sessões e
+dos links já tratados; o histórico de B registra quantos rostos saíram.
+Inventário das credenciais da pessoa: senha, sessões, links, rostos, desafios
+— todas tratadas; tentativas de entrada não deixam entrar.

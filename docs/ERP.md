@@ -167,8 +167,9 @@ no padrão condicional da 0.2) e o histórico das mudanças no tenant do parceir
    (sob trava da pessoa) e morre quando a pessoa ganha vínculo em mais um
    parceiro (todo vínculo novo revoga links pendentes); senha criada por link
    de parceiro fica marcada (`UsuarioErp.senhaPorLinkDoParceiroId`) e, se a
-   pessoa ganhar outro parceiro, é apagada (sessões caem) e o nível 1 manda
-   link novo. Só o nível 1 vincula e-mail que já está em outro parceiro (a
+   pessoa ganhar outro parceiro, é apagada junto com TODOS os rostos e desafios
+   de rosto pendentes dela (sessões caem, links já revogados) e o nível 1
+   manda link novo. Só o nível 1 vincula e-mail que já está em outro parceiro (a
    pessoa do parceiro recebe frase neutra; o nível 1 é avisado quando o e-mail
    já tem senha). As funções de equipe conferem o ator NO BANCO (vínculo deste
    parceiro, ativo, parceiro ativo, "cuidar da equipe"), não só a action.

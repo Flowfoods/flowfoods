@@ -35,7 +35,12 @@ vi.mock('@/lib/erp/contexto', async () => {
 
 import {
   atualizarAcesso,
+  concluirRegistroDeRosto,
   consultarLink,
+  entrarComRosto,
+  iniciarEntradaComRosto,
+  iniciarRegistroDeRosto,
+  listarRostos,
   criarAcesso,
   ERRO_EMAIL_NEUTRO,
   ERRO_SEM_GESTAO,
@@ -66,7 +71,9 @@ import { ALCANCE_FLOWFOODS, pode, recusa, TODAS_AS_PERMISSOES, PERFIS_BASE } fro
 import { doParceiro } from '@/lib/erp/tenant';
 import { acaoCadastrarInsumoDaSessao, acaoCadastrarLojaDaSessao } from '@/app/erp/actions';
 import { acaoCriarPessoa } from '@/app/erp/equipe/actions';
+import { configDoRosto } from '@/lib/erp/rosto';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { criarAutenticador } from './erp-autenticador-sintetico';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const SENHA = 'cozinha limpa 2026';
@@ -582,5 +589,50 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     const sem = await parceirosSemAdministrador(o());
     expect(sem.has(c.id)).toBe(true);
     expect(sem.has(A)).toBe(false);
+  });
+
+  it('Guardião, volta 2: rosto ativado com a senha do link de parceiro também não atravessa para B', async () => {
+    const rosto = configDoRosto({ NEXTAUTH_URL: 'http://localhost:3100' });
+    const comRosto = () => ({ ...o(), rosto });
+    await pessoa(A, 'xis', { perfil: 'OPERADOR' });
+    const v = (await listarAcessos(A, o())).find((l) => l.email === email('xis'))!;
+    // Dono de A define a senha de xis pelo link de parceiro e entra como xis.
+    const l = await gerarNovoLink(A, v.acessoId, ator(dono.s), o());
+    if (!l.ok) throw new Error();
+    expect((await definirSenhaPeloLink(l.token, 'senha do dono de a', 'senha do dono de a', o())).ok).toBe(true);
+    const e = await entrarComSenha({ email: email('xis'), senha: 'senha do dono de a', ip: ip() }, o());
+    if (!e.ok) throw new Error();
+    const s = (await validarSessao(e.token, o()))!;
+    // ...e ativa o rosto (dentro dos 30 min), deixando ainda um desafio de registro pendente.
+    const aut = criarAutenticador({ rpID: rosto.rpID, origin: rosto.origin, userHandle: s.usuario.id });
+    const reg = await iniciarRegistroDeRosto(s, comRosto());
+    expect((await concluirRegistroDeRosto(s, aut.registrar(reg.challenge), 'iPhone', comRosto())).ok).toBe(true);
+    await iniciarRegistroDeRosto(s, comRosto());
+    const ipRosto = ip();
+    const antes = await entrarComRosto(aut.entrar((await iniciarEntradaComRosto(ipRosto, comRosto())).challenge), ipRosto, comRosto());
+    expect(antes.ok).toBe(true); // o rosto funcionava
+    if (!antes.ok) throw new Error();
+
+    // Nível 1 põe xis em B como dona: senha, rosto, desafios e sessões caem juntos.
+    const emB = await criarAcesso(B, { nome: 'Xis', email: email('xis'), perfil: 'DONO' }, 'Rodolfo', o());
+    expect(emB.ok && emB.link).not.toBeNull();
+    expect(await listarRostos(s.usuario.id, o())).toEqual([]);
+    const [d] = await db.$queryRawUnsafe<{ n: number }[]>(
+      `SELECT count(*)::int AS n FROM "DesafioWebauthn" WHERE "usuarioId" = $1`,
+      s.usuario.id,
+    );
+    expect(d.n).toBe(0);
+    expect(await validarSessao(antes.token, o())).toBeNull();
+    expect(await validarSessao(e.token, o())).toBeNull();
+
+    // Entrar pelo rosto falha; entrar com a senha antiga falha.
+    const ip2 = ip();
+    const depois = await entrarComRosto(aut.entrar((await iniciarEntradaComRosto(ip2, comRosto())).challenge, { contador: 5 }), ip2, comRosto());
+    expect(depois.ok).toBe(false);
+    expect((await entrarComSenha({ email: email('xis'), senha: 'senha do dono de a', ip: ip() }, o())).ok).toBe(false);
+    // E fica no histórico de B.
+    const h = await listarHistorico(doParceiro(B, db), { entidade: 'AcessoParceiro' });
+    const pediu = h.find((x) => x.acao === 'PEDIU_SENHA_NOVA' && x.mudancas.some((m) => m.depois === 'Xis' || m.depois === `Pessoa xis`))!;
+    expect(pediu.mudancas.find((m) => m.campo === 'aparelho')?.depois).toBe('1 com rosto removido');
   });
 });
