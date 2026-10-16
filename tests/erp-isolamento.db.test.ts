@@ -48,8 +48,8 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
   });
 
   it('cada parceiro lista só o seu', async () => {
-    expect((await listarInsumos(doParceiro(A.id, db))).map((i) => i.nome)).toEqual(['Cebola roxa']);
-    expect((await listarInsumos(doParceiro(B.id, db))).map((i) => i.nome)).toEqual(['Leite']);
+    expect((await listarInsumos(doParceiro(A.id, db))).linhas.map((i) => i.nome)).toEqual(['Cebola roxa']);
+    expect((await listarInsumos(doParceiro(B.id, db))).linhas.map((i) => i.nome)).toEqual(['Leite']);
   });
 
   it('B não acha o insumo de A nem sabendo o id', async () => {

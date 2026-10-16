@@ -23,6 +23,7 @@ export function ListaHistorico({ linhas, compacta = false }: { linhas: LinhaDeHi
           <>
             <span className="font-medium">{rotuloAcao(h.acao)}</span>{' '}
             <span className="text-suave">{rotuloEntidade(h.entidade).toLowerCase()}</span>
+            {h.alvo && <span className="text-texto"> · {h.alvo}</span>}
           </>
         );
         return (

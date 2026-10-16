@@ -57,7 +57,7 @@ const futuros = (a: Alcance) =>
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
   it('Dono: todas as telas construídas e os seis módulos futuros', () => {
     const a = alcance({ perfilBase: 'DONO' });
-    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/lojas', '/erp/equipe', '/erp/historico', '/erp/acesso']);
+    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/insumos/novo', '/erp/lojas', '/erp/equipe', '/erp/historico', '/erp/acesso']);
     expect(futuros(a)).toEqual(['fichas', 'compras', 'estoque', 'dre', 'producao', 'etiquetas']);
   });
 
@@ -100,6 +100,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     const h = hrefs(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins');
     expect(h).toEqual([
       '/rodolfo/erp/valentins/insumos',
+      '/rodolfo/erp/valentins/insumos/novo',
       '/rodolfo/erp/valentins/lojas',
       '/rodolfo/erp/valentins/equipe',
       '/rodolfo/erp/valentins/historico',
@@ -278,7 +279,7 @@ describe('ERP 1.1 · actions do shell no servidor', () => {
       },
     };
     expect(await acaoBuscarNoErp('arroz')).toEqual([
-      { tipo: 'insumo', rotulo: 'Arroz', detalhe: 'Insumo · Quilo', href: '/erp/insumos#insumo-i1', desativado: true },
+      { tipo: 'insumo', rotulo: 'Arroz', detalhe: 'Insumo · Quilo', href: '/erp/insumos/i1', desativado: true },
     ]);
     expect(consultas).toHaveLength(1);
   });

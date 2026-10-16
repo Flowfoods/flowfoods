@@ -19,6 +19,7 @@ import {
   KeyRound,
   LayoutGrid,
   MapPin,
+  Plus,
   Repeat,
   Settings2,
   ShoppingCart,
@@ -38,6 +39,7 @@ import type { ChaveIcone } from '@/lib/erp/modulos';
 export const ICONES: Record<ChaveIcone, LucideIcon> = {
   inicio: LayoutGrid,
   insumo: Wheat,
+  novo: Plus,
   fichas: ClipboardList,
   compras: ShoppingCart,
   estoque: Boxes,

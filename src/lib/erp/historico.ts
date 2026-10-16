@@ -5,13 +5,16 @@
 
 import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
-import { UNIDADES, formatarDinheiro, formatarQuantidade, type Unidade } from './unidades';
+import { CONSERVACOES, TIPOS } from './insumo-campos';
+import { UNIDADES, formatarCusto, formatarDinheiro, formatarQuantidade, type Unidade } from './unidades';
 
 const ENTIDADE: Record<string, string> = {
   ParceiroFlow: 'Parceiro',
   Loja: 'Loja',
   Marca: 'Marca',
   Insumo: 'Insumo',
+  // "Variante" é palavra de sistema; na tela é outra embalagem de compra do insumo.
+  InsumoVariante: 'Embalagem',
   AcessoParceiro: 'Acesso',
   PerfilAcesso: 'Perfil',
 };
@@ -42,6 +45,13 @@ const CAMPO: Record<string, string> = {
   unidade: 'unidade',
   conteudoMilesimos: 'embalagem',
   precoEmbalagemCentavos: 'preço',
+  taxaEntregaCentavos: 'frete',
+  custoPorUnidadeCentavos: 'custo por unidade',
+  tipo: 'tipo',
+  conservacao: 'conservação',
+  codigoBarras: 'código de barras',
+  ativo: 'situação',
+  insumo: 'insumo',
   email: 'e-mail',
   linkValeAte: 'link vale até',
   senha: 'senha',
@@ -82,7 +92,14 @@ export function rotuloAcao(acao: string): string {
 }
 
 function valor(campo: string, v: unknown): string {
+  // Preço 0 é "ainda não sei o preço": nunca R$ 0,00 (custo incompleto ≠ custo baixo).
+  if (campo === 'precoEmbalagemCentavos' && v === 0) return 'Sem preço';
+  if (campo === 'taxaEntregaCentavos' && v === 0) return 'Sem frete';
   if (v === null || v === undefined || v === '') return '—';
+  if (campo === 'tipo' && typeof v === 'string') return TIPOS[v as keyof typeof TIPOS] ?? v;
+  if (campo === 'conservacao' && typeof v === 'string') return CONSERVACOES[v as keyof typeof CONSERVACOES] ?? v;
+  if (campo === 'unidade' && typeof v === 'string') return UNIDADES[v as Unidade]?.nome ?? v;
+  if (campo === 'ativo' && typeof v === 'boolean') return v ? 'Ativo' : 'Desativado';
   if (campo === 'status' && typeof v === 'string') return STATUS[v] ?? v;
   if (campo.endsWith('Ate') && typeof v === 'string' && !Number.isNaN(Date.parse(v))) {
     return DATA_HORA.format(new Date(v)).replace(',', ' às');
@@ -115,14 +132,22 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
   const unidade = (o: Record<string, unknown>) =>
     typeof o.unidade === 'string' && o.unidade in UNIDADES ? (o.unidade as Unidade) : null;
   const juntarUnidade = campos.includes('conteudoMilesimos') && !!unidade(depois);
-  const fmt = (c: string, o: Record<string, unknown>) =>
-    c === 'conteudoMilesimos' && juntarUnidade && typeof o[c] === 'number' && unidade(o)
-      ? formatarQuantidade(o[c] as number, unidade(o)!)
-      : valor(c, o[c]);
+  const fmt = (c: string, o: Record<string, unknown>) => {
+    if (c === 'conteudoMilesimos' && juntarUnidade && typeof o[c] === 'number' && unidade(o)) {
+      return formatarQuantidade(o[c] as number, unidade(o)!);
+    }
+    // Custo de referência: a MESMA frase da tela ("R$ 18,98/kg" ou "Sem preço").
+    if (c === 'custoPorUnidadeCentavos' && unidade(o) && (o[c] === null || typeof o[c] === 'number')) {
+      return formatarCusto(o[c] as number | null, unidade(o)!);
+    }
+    return valor(c, o[c]);
+  };
   const out: Mudanca[] = [];
   for (const c of campos) {
     if (!criacao && JSON.stringify(antes[c]) === JSON.stringify(depois[c])) continue;
     if (c === 'unidade' && juntarUnidade && criacao) continue;
+    // De quem é a embalagem já está no "alvo" da linha.
+    if (c === 'insumo') continue;
     out.push({
       campo: CAMPO[c] ?? c,
       antes: criacao ? null : fmt(c, antes),
@@ -132,13 +157,32 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
   return out;
 }
 
+/**
+ * De quem é a linha ("Pão brioche", "Pão brioche · Caixa 10 un"): sai do nome
+ * gravado no retrato (depois, ou antes numa exclusão). Sem nome, null.
+ */
+export function alvoDaLinha(antesJ: Prisma.JsonValue | null, depoisJ: Prisma.JsonValue | null): string | null {
+  const o = { ...objeto(antesJ), ...objeto(depoisJ) };
+  const partes = [o.insumo, o.nome].filter((x): x is string => typeof x === 'string' && x.length > 0);
+  return partes.length ? partes.join(' · ') : null;
+}
+
 export async function listarHistorico(
   cliente: ClienteDoParceiro,
-  filtro: { entidade?: string; entidades?: string[]; limite?: number } = {},
+  filtro: {
+    entidade?: string;
+    entidades?: string[];
+    limite?: number;
+    /** Só destas linhas (ex.: o insumo e as embalagens dele). */
+    de?: { entidade: string; ids: string[] }[];
+  } = {},
 ) {
   const entidades = filtro.entidades ?? (filtro.entidade ? [filtro.entidade] : null);
   const linhas = await cliente.historicoAlteracao.findMany({
-    where: entidades ? { entidade: { in: entidades } } : undefined,
+    where: {
+      ...(entidades ? { entidade: { in: entidades } } : {}),
+      ...(filtro.de ? { OR: filtro.de.map((d) => ({ entidade: d.entidade, entidadeId: { in: d.ids } })) } : {}),
+    },
     orderBy: { ocorridoEm: 'desc' },
     take: filtro.limite ?? 100,
   });
@@ -149,6 +193,7 @@ export async function listarHistorico(
     motivo: h.motivo,
     autorNome: h.autorNome,
     ocorridoEm: h.ocorridoEm,
+    alvo: alvoDaLinha(h.antes, h.depois),
     mudancas: descreverMudancas(h.antes, h.depois),
   }));
 }

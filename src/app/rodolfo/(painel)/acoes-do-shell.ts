@@ -24,7 +24,7 @@ export async function acaoBuscarNoParceiro(slug: string, q: string): Promise<Res
     tipo: 'insumo' as const,
     rotulo: i.nome,
     detalhe: `${ctx.parceiro.nome} · ${UNIDADES[i.unidade].nome}`,
-    href: `/rodolfo/erp/${ctx.parceiro.slug}/insumos#insumo-${i.id}`,
+    href: `/rodolfo/erp/${ctx.parceiro.slug}/insumos/${i.id}`,
     desativado: !i.ativo,
   }));
 }

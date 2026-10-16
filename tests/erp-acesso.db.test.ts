@@ -309,11 +309,11 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
     const deA = await sessaoDe(await pessoaComSenha(A, 'Gil', 'gil'));
     const ctxA = contextoDaSessao(deA.sessao as SessaoValida & { parceiro: ParceiroFlow }, db);
     expect(ctxA.parceiro.id).toBe(A);
-    expect((await listarInsumos(ctxA.cliente)).map((i) => i.nome)).toEqual(['Segredo de A']);
+    expect((await listarInsumos(ctxA.cliente)).linhas.map((i) => i.nome)).toEqual(['Segredo de A']);
 
     const deB = await sessaoDe(await pessoaComSenha(B, 'Hana', 'hana'));
     const ctxB = contextoDaSessao(deB.sessao as SessaoValida & { parceiro: ParceiroFlow }, db);
-    expect((await listarInsumos(ctxB.cliente)).map((i) => i.nome)).toEqual(['Coisa de B']);
+    expect((await listarInsumos(ctxB.cliente)).linhas.map((i) => i.nome)).toEqual(['Coisa de B']);
     // A pessoa de B não consegue escolher A.
     expect(await escolherParceiro(deB.token, A, o())).toBe(false);
 
@@ -329,7 +329,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
     expect(await escolherParceiro(r.token, B, o())).toBe(true);
     const s = (await validarSessao(r.token, o()))!;
     expect(s.parceiros.map((p) => p.id).sort()).toEqual([A, B].sort());
-    expect((await listarInsumos(contextoDaSessao(s as SessaoValida & { parceiro: ParceiroFlow }, db).cliente)).map((i) => i.nome)).toEqual([
+    expect((await listarInsumos(contextoDaSessao(s as SessaoValida & { parceiro: ParceiroFlow }, db).cliente)).linhas.map((i) => i.nome)).toEqual([
       'Coisa de B',
     ]);
     // Desativada em B, a sessão em B cai; o vínculo com A segue.
@@ -344,7 +344,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
     const { sessao } = await sessaoDe(await pessoaComSenha(C, 'João', 'joao'));
     const ctx = contextoDaSessao(sessao as SessaoValida & { parceiro: ParceiroFlow }, db);
     expect(ctx.bloqueio).toMatch(/suspenso/i);
-    expect((await listarInsumos(ctx.cliente)).map((i) => i.nome)).toEqual(['Coisa de C']);
+    expect((await listarInsumos(ctx.cliente)).linhas.map((i) => i.nome)).toEqual(['Coisa de C']);
     await expect(
       ctx.cliente.insumo.create({ data: { parceiroId: C, nome: 'X', unidade: 'UN', conteudoMilesimos: 1000, precoEmbalagemCentavos: 1 } }),
     ).rejects.toThrow(ErroDeTenant);

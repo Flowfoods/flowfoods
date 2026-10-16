@@ -49,9 +49,35 @@ export function dividirArredondado(numerador: number, denominador: number): numb
   return Math.floor((2 * numerador + denominador) / (2 * denominador));
 }
 
-/** Custo de 1 unidade base (1 kg, 1 L, 1 un), em centavos. */
-export function custoPorUnidadeBase(precoEmbalagemCentavos: number, conteudoMilesimos: number): number {
-  return dividirArredondado(precoEmbalagemCentavos * 1000, conteudoMilesimos);
+/**
+ * Em que a embalagem foi digitada: na unidade base (kg, L, un) ou na menor
+ * (g, ml). Para UN as duas são a mesma coisa.
+ */
+export type Escala = 'base' | 'menor';
+
+/**
+ * Quantidade digitada na unidade escolhida → milésimos da unidade base.
+ * "750" g de KG = 750 milésimos; "1,5" kg = 1500. Na menor (g, ml), só
+ * inteiro: 1 g é o menor passo do ERP, então "0,5 g" é recusado.
+ */
+export function lerQuantidadeNa(texto: string, unidade: Unidade, escala: Escala): number | null {
+  if (escala === 'menor' && unidade !== 'UN') return textoParaInteiro(texto, 0);
+  return textoParaInteiro(texto, 3);
+}
+
+/**
+ * Custo de referência de 1 unidade base (1 kg, 1 L, 1 un), em centavos:
+ * (preço + frete da embalagem) × 1000 ÷ conteúdo em milésimos, com UM
+ * arredondamento só, no fim (metade para cima). Preço 0 = "Sem preço": o
+ * custo está incompleto, e a resposta é null — nunca R$ 0,00.
+ */
+export function custoDaEmbalagem(
+  precoEmbalagemCentavos: number,
+  taxaEntregaCentavos: number,
+  conteudoMilesimos: number,
+): number | null {
+  if (precoEmbalagemCentavos <= 0) return null;
+  return dividirArredondado((precoEmbalagemCentavos + taxaEntregaCentavos) * 1000, conteudoMilesimos);
 }
 
 const BRL = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -69,4 +95,41 @@ export function formatarQuantidade(milesimos: number, unidade: Unidade): string 
   const resto = milesimos % 1000;
   const fracao = resto ? ',' + String(resto).padStart(3, '0').replace(/0+$/, '') : '';
   return `${inteiro.toLocaleString('pt-BR')}${fracao} ${u.sigla}`;
+}
+
+/** Custo por unidade para a tela: "R$ 18,98/kg", ou "Sem preço" (nunca R$ 0,00). */
+export function formatarCusto(custoCentavos: number | null, unidade: Unidade): string {
+  return custoCentavos === null ? 'Sem preço' : `${formatarDinheiro(custoCentavos)}/${UNIDADES[unidade].sigla}`;
+}
+
+/**
+ * A conta do custo, por extenso, igual na prévia, na lista e no detalhe:
+ * "R$ 89,90 + R$ 5,00 frete ÷ 5 kg = R$ 18,98/kg".
+ */
+export function contaDoCusto(e: {
+  precoEmbalagemCentavos: number;
+  taxaEntregaCentavos: number;
+  conteudoMilesimos: number;
+  unidade: Unidade;
+}): string {
+  const custo = custoDaEmbalagem(e.precoEmbalagemCentavos, e.taxaEntregaCentavos, e.conteudoMilesimos);
+  if (custo === null) return 'Sem preço: o custo fica incompleto até alguém informar o preço.';
+  const frete = e.taxaEntregaCentavos > 0 ? ` + ${formatarDinheiro(e.taxaEntregaCentavos)} frete` : '';
+  return `${formatarDinheiro(e.precoEmbalagemCentavos)}${frete} ÷ ${formatarQuantidade(e.conteudoMilesimos, e.unidade)} = ${formatarCusto(custo, e.unidade)}`;
+}
+
+/** Milésimos → o que volta para o campo de edição: 750 de KG = "750" g; 2270 = "2,27" kg. */
+export function quantidadeParaCampo(milesimos: number, unidade: Unidade): { texto: string; escala: Escala } {
+  if (unidade !== 'UN' && milesimos < 1000) return { texto: String(milesimos), escala: 'menor' };
+  const inteiro = Math.trunc(milesimos / 1000);
+  const resto = milesimos % 1000;
+  return {
+    texto: `${inteiro}${resto ? ',' + String(resto).padStart(3, '0').replace(/0+$/, '') : ''}`,
+    escala: 'base',
+  };
+}
+
+/** Centavos → texto do campo: 8990 = "89,90". */
+export function dinheiroParaCampo(centavos: number): string {
+  return `${Math.trunc(centavos / 100)},${String(centavos % 100).padStart(2, '0')}`;
 }

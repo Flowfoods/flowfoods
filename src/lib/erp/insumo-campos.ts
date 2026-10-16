@@ -1,0 +1,346 @@
+/**
+ * Insumos — a parte PURA (sem banco, sem Next): leitura do formulário, rótulos,
+ * retrato para o histórico, diferença entre versões e comparação de
+ * embalagens. Serve ao servidor (`insumos.ts`, `variantes.ts`) e à prévia da
+ * tela. O que vale é sempre o que o servidor calcula a partir do texto.
+ */
+
+import { z } from 'zod';
+import {
+  custoDaEmbalagem,
+  formatarCusto,
+  formatarDinheiro,
+  lerDinheiro,
+  lerQuantidadeNa,
+  UNIDADES,
+  type Escala,
+  type Unidade,
+} from './unidades';
+
+export const TIPOS = {
+  INGREDIENTE: 'Ingrediente',
+  EMBALAGEM: 'Embalagem',
+  PRE_PREPARO: 'Pré-preparo',
+} as const;
+export type TipoInsumo = keyof typeof TIPOS;
+/** Pré-preparo nasce da ficha técnica (fase 1.3): no formulário, só estes. */
+export const TIPOS_DO_FORM = ['INGREDIENTE', 'EMBALAGEM'] as const;
+
+export const CONSERVACOES = {
+  SECO: 'Seco',
+  PISTA_FRIA: 'Pista fria',
+  REFRIGERADO: 'Refrigerado',
+  CONGELADO: 'Congelado',
+} as const;
+export type Conservacao = keyof typeof CONSERVACOES;
+
+export type Erros = Record<string, string>;
+
+const MARCADO = new Set(['on', 'sim', 'true', '1']);
+const marcado = (v: unknown) => typeof v === 'string' && MARCADO.has(v);
+const texto = (v: unknown) => (typeof v === 'string' ? v : '');
+
+function nome(max: number) {
+  return z
+    .string({ message: 'Dê um nome.' })
+    .trim()
+    .min(2, 'Dê um nome com pelo menos 2 letras.')
+    .max(max, `Nome longo demais (máx. ${max}).`)
+    .transform((s) => s.replace(/\s+/g, ' '));
+}
+
+function primeiroErroPorCampo(issues: readonly { path: PropertyKey[]; message: string }[]): Erros {
+  const erros: Erros = {};
+  for (const i of issues) erros[String(i.path[0] ?? 'geral')] ??= i.message;
+  return erros;
+}
+
+// ------------------------------------------------------------ embalagem
+
+export interface Embalagem {
+  conteudoMilesimos: number;
+  precoEmbalagemCentavos: number;
+  taxaEntregaCentavos: number;
+}
+
+/**
+ * Conteúdo, preço e frete de uma embalagem (a padrão do insumo ou outra).
+ * Texto → inteiro só aqui. Preço vazio sem "Ainda não sei o preço" é erro;
+ * marcado, grava 0 (a tela mostra "Sem preço").
+ */
+export function lerEmbalagem(entrada: Record<string, unknown>, unidade: Unidade, erros: Erros): Embalagem | null {
+  const escala: Escala = entrada.escala === 'menor' ? 'menor' : 'base';
+  const u = UNIDADES[unidade];
+  const naMenor = escala === 'menor' && unidade !== 'UN';
+
+  const conteudoTxt = texto(entrada.conteudo).trim();
+  const conteudoMilesimos = conteudoTxt ? lerQuantidadeNa(conteudoTxt, unidade, escala) : null;
+  if (!conteudoTxt) erros.conteudo = `Diga quanto vem na embalagem. Ex.: ${unidade === 'UN' ? '12' : naMenor ? '750' : '5'} ${naMenor ? u.menor : u.sigla}.`;
+  else if (conteudoMilesimos === null)
+    erros.conteudo = naMenor ? `Em ${u.menor}, só números inteiros. Ex.: 750.` : 'Quantidade inválida. Ex.: 5 ou 0,750.';
+  else if (conteudoMilesimos === 0) erros.conteudo = 'A embalagem precisa ter mais que zero.';
+
+  let precoEmbalagemCentavos: number | null = 0;
+  if (!marcado(entrada.semPreco)) {
+    const precoTxt = texto(entrada.preco).trim();
+    precoEmbalagemCentavos = precoTxt ? lerDinheiro(precoTxt) : null;
+    if (!precoTxt) erros.preco = 'Informe o preço ou marque “Ainda não sei o preço”.';
+    else if (precoEmbalagemCentavos === null) erros.preco = 'Preço inválido. Ex.: 89,90.';
+    else if (precoEmbalagemCentavos === 0) erros.preco = 'Preço zero? Se ainda não sabe, marque “Ainda não sei o preço”.';
+  }
+
+  const freteTxt = texto(entrada.frete).trim();
+  const taxaEntregaCentavos = freteTxt ? lerDinheiro(freteTxt) : 0;
+  if (taxaEntregaCentavos === null) erros.frete = 'Frete inválido. Ex.: 5,00 (deixe vazio se não paga frete).';
+
+  if (!conteudoMilesimos || precoEmbalagemCentavos === null || taxaEntregaCentavos === null) return null;
+  if (erros.preco) return null;
+  return { conteudoMilesimos, precoEmbalagemCentavos, taxaEntregaCentavos };
+}
+
+// --------------------------------------------------------------- insumo
+
+const formInsumo = z.object({
+  nome: nome(80),
+  tipo: z.enum(['INGREDIENTE', 'EMBALAGEM', 'PRE_PREPARO'], { message: 'Escolha o tipo.' }).default('INGREDIENTE'),
+  unidade: z.enum(['KG', 'L', 'UN'], { message: 'Escolha a unidade.' }),
+  conservacao: z
+    .enum(['SECO', 'PISTA_FRIA', 'REFRIGERADO', 'CONGELADO'], { message: 'Escolha a conservação.' })
+    .default('SECO'),
+});
+
+export interface DadosInsumo extends Embalagem {
+  nome: string;
+  tipo: TipoInsumo;
+  unidade: Unidade;
+  conservacao: Conservacao;
+}
+
+export type Leitura<T> = { ok: true; dados: T } | { ok: false; erros: Erros };
+
+/**
+ * Formulário do insumo → dados prontos para gravar. `tipoAtual` (editar): um
+ * pré-preparo continua pré-preparo; nenhum outro vira pré-preparo pelo
+ * formulário (nasce da ficha técnica, fase 1.3).
+ */
+export function lerFormInsumo(entrada: Record<string, unknown>, tipoAtual?: TipoInsumo): Leitura<DadosInsumo> {
+  const vazio = (v: unknown) => (v === '' ? undefined : v);
+  const r = formInsumo.safeParse({
+    nome: entrada.nome,
+    tipo: vazio(entrada.tipo),
+    unidade: entrada.unidade,
+    conservacao: vazio(entrada.conservacao),
+  });
+  const erros: Erros = r.success ? {} : primeiroErroPorCampo(r.error.issues);
+  if (r.success) {
+    if (tipoAtual === 'PRE_PREPARO' && r.data.tipo !== 'PRE_PREPARO') {
+      erros.tipo = 'Pré-preparo continua pré-preparo: ele nasce da ficha técnica.';
+    } else if (tipoAtual !== 'PRE_PREPARO' && r.data.tipo === 'PRE_PREPARO') {
+      erros.tipo = 'Pré-preparo nasce da ficha técnica (fase 1.3), não deste cadastro.';
+    }
+  }
+  const unidade = r.success ? r.data.unidade : (['KG', 'L', 'UN'] as const).find((u) => u === entrada.unidade);
+  const embalagem = unidade ? lerEmbalagem(entrada, unidade, erros) : null;
+  if (!r.success || !embalagem || Object.keys(erros).length > 0) return { ok: false, erros };
+  return { ok: true, dados: { ...r.data, ...embalagem } };
+}
+
+// ------------------------------------------------------------- variante
+
+const formVariante = z.object({
+  nome: nome(60),
+  codigoBarras: z
+    .string()
+    .trim()
+    .transform((s) => s.replace(/\s+/g, ''))
+    .refine((s) => s === '' || /^\d{8,14}$/.test(s), 'Código de barras tem de 8 a 14 números.')
+    .default(''),
+});
+
+export interface DadosVariante extends Embalagem {
+  nome: string;
+  codigoBarras: string | null;
+}
+
+/** Outra embalagem de compra do mesmo insumo: conteúdo na unidade DO INSUMO. */
+export function lerFormVariante(entrada: Record<string, unknown>, unidade: Unidade): Leitura<DadosVariante> {
+  const r = formVariante.safeParse({ nome: entrada.nome, codigoBarras: entrada.codigoBarras ?? undefined });
+  const erros: Erros = r.success ? {} : primeiroErroPorCampo(r.error.issues);
+  const embalagem = lerEmbalagem(entrada, unidade, erros);
+  if (!r.success || !embalagem || Object.keys(erros).length > 0) return { ok: false, erros };
+  return { ok: true, dados: { nome: r.data.nome, codigoBarras: r.data.codigoBarras || null, ...embalagem } };
+}
+
+// ------------------------------------------------- histórico e versões
+
+type Retrato = Record<string, string | number | boolean | null>;
+
+/**
+ * O que vai para o histórico de um insumo. Leva o custo de referência já
+ * calculado (fotografia do momento, para o histórico mostrar o mesmo número
+ * que a tela mostrou) e a unidade, que formata a embalagem ("5 kg").
+ */
+export function retratoDoInsumo(i: DadosInsumo & { ativo?: boolean }): Retrato {
+  return {
+    nome: i.nome,
+    tipo: i.tipo,
+    unidade: i.unidade,
+    conservacao: i.conservacao,
+    conteudoMilesimos: i.conteudoMilesimos,
+    precoEmbalagemCentavos: i.precoEmbalagemCentavos,
+    taxaEntregaCentavos: i.taxaEntregaCentavos,
+    custoPorUnidadeCentavos: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+  };
+}
+
+export function retratoDaVariante(v: DadosVariante, insumo: { nome: string; unidade: Unidade }): Retrato {
+  return {
+    insumo: insumo.nome,
+    nome: v.nome,
+    unidade: insumo.unidade,
+    conteudoMilesimos: v.conteudoMilesimos,
+    precoEmbalagemCentavos: v.precoEmbalagemCentavos,
+    taxaEntregaCentavos: v.taxaEntregaCentavos,
+    custoPorUnidadeCentavos: custoDaEmbalagem(v.precoEmbalagemCentavos, v.taxaEntregaCentavos, v.conteudoMilesimos),
+    codigoBarras: v.codigoBarras,
+  };
+}
+
+/** Campos que identificam a linha no histórico: vão nos dois lados mesmo sem mudar. */
+const CONTEXTO = ['insumo', 'nome', 'unidade'];
+
+/**
+ * Antes e depois só com o que mudou (mais o contexto: nome e unidade, para a
+ * linha do histórico dizer de quem é e formatar a quantidade). null = nada mudou.
+ */
+export function diferenca(antes: Retrato, depois: Retrato): { antes: Retrato; depois: Retrato; campos: string[] } | null {
+  // `insumo` (na embalagem) é só de quem ela é: renomear o insumo não muda a embalagem.
+  const mudaram = Object.keys(depois).filter(
+    (k) => k !== 'insumo' && JSON.stringify(antes[k] ?? null) !== JSON.stringify(depois[k] ?? null),
+  );
+  if (mudaram.length === 0) return null;
+  const a: Retrato = {};
+  const d: Retrato = {};
+  for (const k of [...CONTEXTO.filter((k) => k in depois), ...mudaram]) {
+    a[k] = antes[k] ?? null;
+    d[k] = depois[k] ?? null;
+  }
+  return { antes: a, depois: d, campos: mudaram };
+}
+
+/**
+ * Versão de uma embalagem (variante não tem `atualizadoEm`): uma impressão
+ * dos valores lidos. O formulário devolve a que leu; se a de agora for outra,
+ * alguém mudou no meio do caminho.
+ */
+export function versaoDaVariante(v: {
+  nome: string;
+  conteudoMilesimos: number;
+  precoEmbalagemCentavos: number;
+  taxaEntregaCentavos: number;
+  codigoBarras: string | null;
+  ativo: boolean;
+}): string {
+  const s = JSON.stringify([v.nome, v.conteudoMilesimos, v.precoEmbalagemCentavos, v.taxaEntregaCentavos, v.codigoBarras, v.ativo]);
+  // FNV-1a 32 bits: só para comparar, não é segredo.
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return `${h.toString(36)}.${s.length}`;
+}
+
+// ---------------------------------------------------- comparar embalagens
+
+export interface EmbalagemComparada {
+  nome: string;
+  custo: number | null;
+}
+
+/**
+ * Qual embalagem sai mais barata por unidade, em texto. Só entra quem tem
+ * preço; sem duas com preço, não há comparação (e a frase diz isso).
+ */
+export function compararEmbalagens(lista: EmbalagemComparada[], unidade: Unidade): string | null {
+  if (lista.length < 2) return null;
+  const comPreco = lista.filter((e): e is { nome: string; custo: number } => e.custo !== null);
+  if (comPreco.length < 2) return 'Falta preço para comparar as embalagens.';
+  const ordenada = [...comPreco].sort((a, b) => a.custo - b.custo);
+  const [barata, segunda] = ordenada;
+  if (barata.custo === segunda.custo && ordenada.every((e) => e.custo === barata.custo)) {
+    return `As embalagens saem pelo mesmo custo: ${formatarCusto(barata.custo, unidade)}.`;
+  }
+  const cara = ordenada[ordenada.length - 1];
+  const diferenca = formatarDinheiro(cara.custo - barata.custo);
+  return `“${barata.nome}” sai mais barata: ${formatarCusto(barata.custo, unidade)}, ${diferenca} a menos por ${UNIDADES[unidade].sigla} que “${cara.nome}” (${formatarCusto(cara.custo, unidade)}).`;
+}
+
+// --------------------------------------------------------- filtros da lista
+
+export type Situacao = 'ativos' | 'desativados' | 'todos';
+
+export interface FiltrosDeInsumo {
+  q: string;
+  tipo: TipoInsumo | null;
+  conservacao: Conservacao | null;
+  situacao: Situacao;
+  semPreco: boolean;
+  ordem: 'nome' | 'custo';
+  direcao: 'asc' | 'desc';
+  pagina: number;
+}
+
+export const POR_PAGINA = 50;
+
+export const FILTROS_PADRAO: FiltrosDeInsumo = {
+  q: '',
+  tipo: null,
+  conservacao: null,
+  situacao: 'ativos',
+  semPreco: false,
+  ordem: 'nome',
+  direcao: 'asc',
+  pagina: 1,
+};
+
+
+const um = <T extends string>(v: unknown, lista: readonly T[]): T | null =>
+  typeof v === 'string' && (lista as readonly string[]).includes(v) ? (v as T) : null;
+
+/**
+ * Filtros da lista lidos da URL (o estado mora na URL: voltar do detalhe e
+ * mandar o link já filtrado funcionam). Valor desconhecido cai no padrão.
+ */
+export function lerFiltros(sp: Record<string, string | string[] | undefined>): FiltrosDeInsumo {
+  const v = (k: string) => (Array.isArray(sp[k]) ? sp[k]![0] : sp[k]);
+  return {
+    q: (v('q') ?? '').trim().slice(0, 80),
+    tipo: um(v('tipo'), Object.keys(TIPOS) as TipoInsumo[]),
+    conservacao: um(v('conservacao'), Object.keys(CONSERVACOES) as Conservacao[]),
+    situacao: um(v('situacao'), ['ativos', 'desativados', 'todos'] as const) ?? 'ativos',
+    semPreco: v('preco') === 'sem',
+    ordem: um(v('ordem'), ['nome', 'custo'] as const) ?? 'nome',
+    direcao: um(v('dir'), ['asc', 'desc'] as const) ?? 'asc',
+    pagina: Math.max(1, Math.trunc(Number(v('pagina'))) || 1),
+  };
+}
+
+/** Os filtros de volta para a URL, só o que difere do padrão. */
+export function queryDosFiltros(f: FiltrosDeInsumo): string {
+  const p = new URLSearchParams();
+  if (f.q) p.set('q', f.q);
+  if (f.tipo) p.set('tipo', f.tipo);
+  if (f.conservacao) p.set('conservacao', f.conservacao);
+  if (f.situacao !== 'ativos') p.set('situacao', f.situacao);
+  if (f.semPreco) p.set('preco', 'sem');
+  if (f.ordem !== 'nome') p.set('ordem', f.ordem);
+  if (f.direcao !== 'asc') p.set('dir', f.direcao);
+  if (f.pagina > 1) p.set('pagina', String(f.pagina));
+  return p.toString();
+}
+
+/** Há algum filtro (além da ordem e da página)? Serve ao "Limpar filtros". */
+export function temFiltro(f: FiltrosDeInsumo): boolean {
+  return !!(f.q || f.tipo || f.conservacao || f.situacao !== 'ativos' || f.semPreco);
+}

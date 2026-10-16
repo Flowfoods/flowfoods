@@ -8,11 +8,14 @@
  * Idempotente: rodar de novo não duplica nada (repetidos são recusados pela
  * própria regra de cadastro). Usa as mesmas regras das telas, então tudo entra
  * com histórico. "Casa Gama" nasce e é suspensa, para ver o modo leitura.
+ * A Casa Alfa (1.1) tem insumo com frete, embalagem em g, outras embalagens
+ * de compra, um "Sem preço" e um desativado.
  */
 
 import { prisma } from '@/lib/db';
 import { doParceiro } from '@/lib/erp/tenant';
-import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumo, mudarSituacaoInsumo } from '@/lib/erp/insumos';
+import { cadastrarVariante } from '@/lib/erp/variantes';
 import { cadastrarLoja, cadastrarMarca } from '@/lib/erp/estrutura';
 import { criarParceiro, mudarStatusParceiro } from '@/lib/erp/parceiros';
 
@@ -24,7 +27,11 @@ const PARCEIROS: {
   lojas: string[];
   marcas: string[];
   suspender?: string;
-  itens: { nome: string; unidade: string; conteudo: string; preco: string }[];
+  itens: Record<string, string>[];
+  /** Outras embalagens de compra (nome do insumo → embalagens). */
+  embalagens?: Record<string, Record<string, string>[]>;
+  /** Insumos que nascem desativados (com o motivo). */
+  desativar?: Record<string, string>;
 }[] = [
   {
     slug: 'teste-casa-alfa',
@@ -36,7 +43,19 @@ const PARCEIROS: {
       { nome: 'Pão brioche', unidade: 'UN', conteudo: '12', preco: '18,00' },
       { nome: 'Queijo cheddar fatiado', unidade: 'KG', conteudo: '2,27', preco: '96,50' },
       { nome: 'Bacon em cubos', unidade: 'KG', conteudo: '1', preco: '42,90' },
+      { nome: 'Cebola roxa', unidade: 'KG', conservacao: 'SECO', conteudo: '20', preco: '79,90', frete: '6,00' },
+      { nome: 'Molho especial da casa', unidade: 'KG', conservacao: 'REFRIGERADO', conteudo: '750', escala: 'menor', preco: '28,50' },
+      { nome: 'Óleo de soja', unidade: 'L', conservacao: 'SECO', conteudo: '900', escala: 'menor', preco: '8,49', frete: '0,40' },
+      { nome: 'Caixa kraft hambúrguer', tipo: 'EMBALAGEM', unidade: 'UN', conteudo: '100', preco: '74,00', frete: '4,00' },
+      { nome: 'Picles de pepino', unidade: 'KG', conservacao: 'REFRIGERADO', conteudo: '2', preco: '', semPreco: 'on' },
+      { nome: 'Batata palha', unidade: 'KG', conteudo: '1', preco: '24,90' },
     ],
+    embalagens: {
+      'Cebola roxa': [{ nome: 'Saco 10 kg (feira)', conteudo: '10', preco: '35,00', frete: '3,00' }],
+      'Óleo de soja': [{ nome: 'Caixa 20 × 900 ml', conteudo: '18', preco: '159,80', frete: '6,00', codigoBarras: '7891107101621' }],
+      'Caixa kraft hambúrguer': [{ nome: 'Fardo 500 un', conteudo: '500', preco: '335,00', frete: '12,00' }],
+    },
+    desativar: { 'Batata palha': 'Saiu do cardápio de inverno' },
   },
   {
     slug: 'teste-casa-beta',
@@ -86,6 +105,16 @@ async function main() {
     for (const nome of p.lojas) linha(`loja ${nome}`, await cadastrarLoja(cliente, { nome }, AUTOR));
     for (const nome of p.marcas) linha(`marca ${nome}`, await cadastrarMarca(cliente, { nome }, AUTOR));
     for (const i of p.itens) linha(i.nome, await cadastrarInsumo(cliente, i, AUTOR));
+    for (const [nomeDoInsumo, lista] of Object.entries(p.embalagens ?? {})) {
+      const insumo = await cliente.insumo.findFirst({ where: { nome: nomeDoInsumo }, select: { id: true } });
+      for (const e of insumo ? lista : []) {
+        linha(`  embalagem ${e.nome}`, await cadastrarVariante(cliente, insumo!.id, e, AUTOR));
+      }
+    }
+    for (const [nomeDoInsumo, motivo] of Object.entries(p.desativar ?? {})) {
+      const insumo = await cliente.insumo.findFirst({ where: { nome: nomeDoInsumo, ativo: true }, select: { id: true } });
+      if (insumo) linha(`  desativado ${nomeDoInsumo}`, await mudarSituacaoInsumo(cliente, insumo.id, false, motivo, AUTOR));
+    }
     if (novo && p.suspender) {
       const r = await mudarStatusParceiro(parceiro.id, 'SUSPENSO', p.suspender, AUTOR);
       if (!r.ok) throw new Error(`${p.nome}: não suspendeu: ${JSON.stringify(r.erros)}`);

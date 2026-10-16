@@ -6,33 +6,35 @@
 
 import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { listarInsumos } from '@/lib/erp/insumos';
-import { COR } from '@/lib/erp/modulos';
-import { PageHeader } from '@/components/erp/ui/cabecalho';
-import { TelaInsumos } from '@/components/erp/telas/insumos/tela-insumos';
-import { FormInsumo } from '@/components/erp/telas/insumos/form-insumo';
+import { lerFiltros } from '@/lib/erp/insumo-campos';
+import { FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
+import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
 import { subtituloDosInsumos } from '@/components/erp/telas/insumos/subtitulo';
-import { acaoCadastrarInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroInsumosPage({ params }: { params: { slug: string } }) {
+export default async function ParceiroInsumosPage({
+  params,
+  searchParams,
+}: {
+  params: { slug: string };
+  searchParams: Record<string, string | string[] | undefined>;
+}) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.ver');
-  const { parceiro, cliente, bloqueio } = ctx;
-  const [insumos, { visao }] = await Promise.all([listarInsumos(cliente), visaoDaRequisicao(ctx)]);
+  const base = `/rodolfo/erp/${ctx.parceiro.slug}/insumos`;
+  const filtros = lerFiltros(searchParams);
+  const [pagina, { visao }] = await Promise.all([listarInsumos(ctx.cliente, filtros), visaoDaRequisicao(ctx)]);
   return (
     <div className="space-y-6">
-      <PageHeader
-        icone="insumo"
-        cor={COR.insumo}
-        titulo="Insumos"
-        subtitulo={`${parceiro.nome} · ${subtituloDosInsumos(visao, insumos.length)}`}
-      />
-      <TelaInsumos
-        linhas={insumos}
-        bloqueio={bloqueio}
-        formulario={<FormInsumo acao={acaoCadastrarInsumo.bind(null, parceiro.slug)} />}
-      />
+      <CabecalhoDaLista
+        subtitulo={`${ctx.parceiro.nome} · ${subtituloDosInsumos(visao, pagina.total, filtros)}`}
+        novoHref={`${base}/novo`}
+        bloqueio={ctx.bloqueio}
+      >
+        <FiltrosDaLista base={base} filtros={filtros} />
+      </CabecalhoDaLista>
+      <TelaListaInsumos base={base} filtros={filtros} {...pagina} novoHref={ctx.bloqueio ? undefined : `${base}/novo`} />
     </div>
   );
 }

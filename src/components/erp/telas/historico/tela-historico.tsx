@@ -9,12 +9,13 @@ import { FiltroEmLinks } from '../../ui/filtros';
 import { Painel, Vazio } from '../../ui/superficies';
 import { ListaHistorico } from './lista-historico';
 
-export const FILTROS = [
+export const FILTROS: { valor: string; rotulo: string; entidades?: string[] }[] = [
   { valor: '', rotulo: 'Tudo' },
   { valor: 'ParceiroFlow', rotulo: 'Parceiro' },
   { valor: 'Loja', rotulo: 'Lojas' },
   { valor: 'Marca', rotulo: 'Marcas' },
-  { valor: 'Insumo', rotulo: 'Insumos' },
+  // Insumos e as outras embalagens de compra deles.
+  { valor: 'Insumo', rotulo: 'Insumos', entidades: ['Insumo', 'InsumoVariante'] },
   { valor: 'AcessoParceiro', rotulo: 'Acessos' },
   { valor: 'PerfilAcesso', rotulo: 'Perfis' },
 ];
@@ -23,6 +24,12 @@ export const LIMITE_DO_HISTORICO = 100;
 /** Entidade do filtro, só se for uma das conhecidas. */
 export function entidadeDoFiltro(valor: string | undefined): string | undefined {
   return FILTROS.some((f) => f.valor && f.valor === valor) ? valor : undefined;
+}
+
+/** O que o filtro lê do histórico (Insumos inclui as embalagens). */
+export function entidadesDoFiltro(valor: string | undefined): string[] | undefined {
+  const f = FILTROS.find((x) => x.valor && x.valor === valor);
+  return f ? (f.entidades ?? [f.valor]) : undefined;
 }
 
 export function TelaHistorico({

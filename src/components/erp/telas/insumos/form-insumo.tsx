@@ -1,146 +1,249 @@
 'use client';
 
 /**
- * Cadastro de insumo (formulário da 0.2, só reestilizado no shell; o
- * formulário completo da 1.1 é o Cartão B). Peças do design system do ERP:
- * nada de rótulo, campo ou botão copiado aqui.
+ * Formulário do insumo (novo e editar), a MESMA peça para o nível 1 e para a
+ * pessoa do parceiro: a action vem de quem usa a tela. Tudo vai como texto; o
+ * servidor converte, calcula e confere (permissão, versão lida, unidade
+ * travada). Erro volta para o lado do campo, sem perder o que foi digitado;
+ * com vários, um resumo no topo leva a cada um.
  */
 
+import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { useFormState } from 'react-dom';
+import { CONSERVACOES, TIPOS, type Conservacao, type TipoInsumo } from '@/lib/erp/insumo-campos';
+import { UNIDADES, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
-import { CAMPO, Erro, ROTULO } from '../../ui/campos';
+import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
+import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Segmentos } from '../../ui/segmentos';
-import type { EstadoCadastro } from './estado';
-import {
-  UNIDADES,
-  custoPorUnidadeBase,
-  formatarDinheiro,
-  lerDinheiro,
-  lerQuantidade,
-  type Unidade,
-} from '@/lib/erp/unidades';
+import { Painel } from '../../ui/superficies';
+import { CamposDaEmbalagem, EMBALAGEM_VAZIA, type ValoresDaEmbalagem } from './campos-embalagem';
+import type { AcaoDeInsumo, EstadoInsumo } from './estado';
 
-/** `acao`: a server action de quem usa a tela (nível 1 por slug, ou a pessoa do parceiro pela sessão). */
-export function FormInsumo({
-  acao: acaoDoServidor,
-}: {
-  acao: (anterior: EstadoCadastro, form: FormData) => Promise<EstadoCadastro>;
-}) {
-  const [estado, acao] = useFormState<EstadoCadastro, FormData>(acaoDoServidor, null);
-  const [unidade, setUnidade] = useState<Unidade>('KG');
-  const [conteudo, setConteudo] = useState('');
-  const [preco, setPreco] = useState('');
-  const nomeRef = useRef<HTMLInputElement>(null);
+export interface ValoresDoInsumo extends ValoresDaEmbalagem {
+  nome: string;
+  tipo: TipoInsumo;
+  unidade: Unidade;
+  conservacao: Conservacao;
+}
 
-  // Depois de salvar: limpa e devolve o foco ao nome, pronto para o próximo.
+const NOVO: ValoresDoInsumo = { nome: '', tipo: 'INGREDIENTE', unidade: 'KG', conservacao: 'SECO', ...EMBALAGEM_VAZIA };
+
+const ROTULO_DO_CAMPO: Record<string, string> = {
+  nome: 'Nome',
+  tipo: 'Tipo',
+  unidade: 'Unidade',
+  conservacao: 'Conservação',
+  conteudo: 'Quanto vem na embalagem',
+  preco: 'Preço',
+  frete: 'Frete',
+};
+
+/** Resumo quando há mais de um erro: cada item leva ao campo. */
+export function ResumoDeErros({ erros, idBase }: { erros: Partial<Record<string, string>>; idBase: string }) {
+  const campos = Object.keys(erros).filter((c) => c !== 'geral' && erros[c]);
+  if (campos.length < 2) return null;
+  return (
+    <div role="alert" className="rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
+      <p className="font-semibold text-erro">Corrija {campos.length} campos antes de salvar:</p>
+      <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
+        {campos.map((c) => (
+          <li key={c}>
+            <a href={`#${idBase}-${c}`} className={LINK_DE_TEXTO}>
+              {ROTULO_DO_CAMPO[c] ?? c}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+/** Erro geral (permissão, bloqueio, conflito de versão), com o próximo passo. */
+export function ErroGeral({ estado, recarregar }: { estado: EstadoInsumo; recarregar: string }) {
+  if (!estado?.erros.geral) return null;
+  return (
+    <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
+      <p className="text-erro">{estado.erros.geral}</p>
+      {estado.conflito && (
+        <a href={recarregar} className={classeDeBotao('secundario')}>
+          Recarregar
+        </a>
+      )}
+    </div>
+  );
+}
+
+/** Avisa antes de sair (fechar, recarregar) com o formulário alterado e não salvo. */
+export function useAvisoDeSaida() {
+  const sujo = useRef(false);
   useEffect(() => {
-    if (estado?.ok) {
-      setConteudo('');
-      setPreco('');
-      if (nomeRef.current) {
-        nomeRef.current.value = '';
-        nomeRef.current.focus();
-      }
-    }
-  }, [estado]);
+    const aviso = (e: BeforeUnloadEvent) => {
+      if (!sujo.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', aviso);
+    return () => window.removeEventListener('beforeunload', aviso);
+  }, []);
+  return {
+    aoMudar: () => {
+      sujo.current = true;
+    },
+    aoEnviar: () => {
+      sujo.current = false;
+    },
+  };
+}
 
-  const erros = estado && !estado.ok ? estado.erros : {};
-  const u = UNIDADES[unidade];
-
-  // Só prévia: o custo que vale é o que o servidor calcula e grava.
-  const q = lerQuantidade(conteudo);
-  const p = lerDinheiro(preco);
-  const previa = q && p !== null ? formatarDinheiro(custoPorUnidadeBase(p, q)) : null;
+export function FormInsumo({
+  acao,
+  modo,
+  base,
+  aqui,
+  cancelar,
+  inicial = NOVO,
+  versao,
+  travaDaUnidade = null,
+  bloqueio = null,
+}: {
+  acao: AcaoDeInsumo;
+  modo: 'criar' | 'editar';
+  /** Lista de insumos de quem usa a tela (para o link do desativado). */
+  base: string;
+  /** Esta página (recarregar depois de um conflito). */
+  aqui: string;
+  cancelar: string;
+  inicial?: ValoresDoInsumo;
+  /** Editar: `atualizadoEm` lido (a gravação só passa se ainda for ele). */
+  versao?: string;
+  /** Editar: por que a unidade não pode mudar. */
+  travaDaUnidade?: string | null;
+  bloqueio?: string | null;
+}) {
+  const [estado, enviar] = useFormState<EstadoInsumo, FormData>(acao, null);
+  const [unidade, setUnidade] = useState<Unidade>(inicial.unidade);
+  const [tipo, setTipo] = useState<TipoInsumo>(inicial.tipo);
+  const saida = useAvisoDeSaida();
+  const erros = estado?.erros ?? {};
+  const idBase = 'insumo';
+  const prePreparo = inicial.tipo === 'PRE_PREPARO';
 
   return (
-    <form action={acao} className="space-y-4" noValidate>
-      <div>
-        <label htmlFor="nome" className={ROTULO}>
-          Nome do insumo
-        </label>
-        <input
-          ref={nomeRef}
-          id="nome"
-          name="nome"
-          required
-          maxLength={80}
-          autoComplete="off"
-          placeholder="Ex.: Blend bovino 180 g"
-          className={CAMPO}
-          aria-invalid={!!erros.nome}
-          aria-describedby="nome-erro"
-        />
-        <Erro id="nome-erro" texto={erros.nome} />
-      </div>
+    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+      {versao && <input type="hidden" name="versao" value={versao} />}
+      <ResumoDeErros erros={erros} idBase={idBase} />
+      <ErroGeral estado={estado} recarregar={aqui} />
 
-      <Segmentos
-        nome="unidade"
-        legenda="Unidade base"
-        opcoes={(Object.keys(UNIDADES) as Unidade[]).map((k) => [k, UNIDADES[k].nome] as const)}
-        valor={unidade}
-        aoMudar={setUnidade}
-      />
+      <fieldset disabled={!!bloqueio} className="min-w-0 space-y-4">
+        <Painel titulo="O que é">
+          <div className="space-y-4">
+            <div>
+              <label htmlFor={`${idBase}-nome`} className={ROTULO}>
+                Nome do insumo
+              </label>
+              <input
+                id={`${idBase}-nome`}
+                name="nome"
+                required
+                maxLength={80}
+                autoComplete="off"
+                defaultValue={inicial.nome}
+                placeholder="Ex.: Blend bovino 180 g"
+                className={CAMPO}
+                aria-invalid={!!erros.nome}
+                aria-describedby={erros.nome ? `${idBase}-nome-erro` : undefined}
+              />
+              <Erro id={`${idBase}-nome-erro`} texto={erros.nome} />
+              {estado?.desativadoId && (
+                <Link href={`${base}/${estado.desativadoId}`} className={`${LINK_DE_TEXTO} mt-1.5 inline-block`}>
+                  Abrir o insumo desativado para reativar
+                </Link>
+              )}
+            </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label htmlFor="conteudo" className={ROTULO}>
-            Embalagem
-          </label>
-          <div className="relative">
-            <input
-              id="conteudo"
-              name="conteudo"
-              inputMode="decimal"
-              placeholder="5"
-              value={conteudo}
-              onChange={(e) => setConteudo(e.target.value)}
-              className={`${CAMPO} pr-10 text-right tabular-nums`}
-              aria-invalid={!!erros.conteudo}
-              aria-describedby="conteudo-erro"
-            />
-            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[12px] text-suave">
-              {u.sigla}
-            </span>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {prePreparo ? (
+                <div>
+                  <span className={ROTULO}>Tipo</span>
+                  <p className="flex min-h-11 items-center text-sm text-texto sm:min-h-[42px]">{TIPOS.PRE_PREPARO}</p>
+                  <p className={AJUDA}>Pré-preparo nasce da ficha técnica e continua pré-preparo.</p>
+                  <input type="hidden" name="tipo" value="PRE_PREPARO" />
+                </div>
+              ) : (
+                <div>
+                  <Segmentos
+                    nome="tipo"
+                    legenda="Tipo"
+                    opcoes={[
+                      ['INGREDIENTE', TIPOS.INGREDIENTE],
+                      ['EMBALAGEM', TIPOS.EMBALAGEM],
+                    ]}
+                    valor={tipo}
+                    aoMudar={setTipo}
+                  />
+                  <Erro id={`${idBase}-tipo-erro`} texto={erros.tipo} />
+                </div>
+              )}
+              <div>
+                <label htmlFor={`${idBase}-conservacao`} className={ROTULO}>
+                  Conservação
+                </label>
+                <select
+                  id={`${idBase}-conservacao`}
+                  name="conservacao"
+                  defaultValue={inicial.conservacao}
+                  className={CAMPO}
+                  aria-invalid={!!erros.conservacao}
+                >
+                  {(Object.keys(CONSERVACOES) as Conservacao[]).map((c) => (
+                    <option key={c} value={c}>
+                      {CONSERVACOES[c]}
+                    </option>
+                  ))}
+                </select>
+                <Erro id={`${idBase}-conservacao-erro`} texto={erros.conservacao} />
+              </div>
+            </div>
           </div>
-          <Erro id="conteudo-erro" texto={erros.conteudo} />
-        </div>
-        <div>
-          <label htmlFor="preco" className={ROTULO}>
-            Preço pago
-          </label>
-          <div className="relative">
-            <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[12px] text-suave">
-              R$
-            </span>
-            <input
-              id="preco"
-              name="preco"
-              inputMode="decimal"
-              placeholder="89,90"
-              value={preco}
-              onChange={(e) => setPreco(e.target.value)}
-              className={`${CAMPO} pl-9 text-right tabular-nums`}
-              aria-invalid={!!erros.preco}
-              aria-describedby="preco-erro"
-            />
+        </Painel>
+
+        <Painel titulo="Como você compra">
+          <div className="space-y-4">
+            <div>
+              {travaDaUnidade ? (
+                <div>
+                  <span className={ROTULO}>Unidade de medida</span>
+                  <p className="flex min-h-11 items-center text-sm text-texto sm:min-h-[42px]">{UNIDADES[unidade].nome}</p>
+                  <p className={AJUDA}>{travaDaUnidade}</p>
+                  <input type="hidden" name="unidade" value={unidade} />
+                </div>
+              ) : (
+                <Segmentos
+                  nome="unidade"
+                  legenda="Unidade de medida"
+                  opcoes={(Object.keys(UNIDADES) as Unidade[]).map((k) => [k, UNIDADES[k].nome] as const)}
+                  valor={unidade}
+                  aoMudar={setUnidade}
+                />
+              )}
+              <Erro id={`${idBase}-unidade-erro`} texto={erros.unidade} />
+            </div>
+            <CamposDaEmbalagem unidade={unidade} inicial={inicial} erros={erros} idBase={idBase} />
           </div>
-          <Erro id="preco-erro" texto={erros.preco} />
-        </div>
-      </div>
+        </Painel>
+      </fieldset>
 
-      <div className="flex items-baseline justify-between border-t border-linha pt-3 text-[13px]">
-        <span className="text-suave">Custo por {u.sigla}</span>
-        <span className="font-display text-lg font-bold tabular-nums text-texto">
-          {previa ?? <span className="text-suave">—</span>}
-        </span>
+      <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+        <Link href={cancelar} className={classeDeBotao('fantasma')}>
+          Cancelar
+        </Link>
+        <BotaoEnviar disabled={!!bloqueio} className="sm:min-w-44">
+          {modo === 'criar' ? 'Cadastrar insumo' : 'Salvar alterações'}
+        </BotaoEnviar>
       </div>
-
-      {erros.geral && <p className="text-[13px] text-erro">{erros.geral}</p>}
-      <BotaoEnviar className="w-full">Cadastrar insumo</BotaoEnviar>
-      <p aria-live="polite" className="min-h-[1.25rem] text-center text-[13px] text-ok">
-        {estado?.ok ? `“${estado.nome}” cadastrado.` : ''}
-      </p>
+      {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
     </form>
   );
 }

@@ -21,25 +21,13 @@ import {
   podeAtivarRosto,
   removerRosto,
 } from '@/lib/erp/credenciais';
-import { buscarInsumos, cadastrarInsumo } from '@/lib/erp/insumos';
+import { buscarInsumos } from '@/lib/erp/insumos';
 import type { RegistrationResponseJSON } from '@/lib/erp/rosto';
 import { aparelhoAtual } from '@/lib/erp/sessao';
-import type { EstadoCadastro } from '@/components/erp/telas/insumos/estado';
 import type { RespostaDaVisao, ResultadoDaBusca } from '@/components/erp/shell/tipos';
 import { UNIDADES } from '@/lib/erp/unidades';
 import { sessaoSegura } from '@/lib/erp/sessao-cookie';
 import { COOKIE_VISAO, escolhaPermitida, valorDoCookieDeVisao } from '@/lib/erp/visao';
-
-export async function acaoCadastrarInsumoDaSessao(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
-  const ctx = await exigirParceiroDaSessao();
-  const vez = (anterior?.vez ?? 0) + 1;
-  const negado = recusaDaAcao(ctx, 'insumos.editar');
-  if (negado) return { ok: false, erros: { geral: negado }, vez };
-  if (ctx.bloqueio) return { ok: false, erros: { geral: ctx.bloqueio }, vez };
-  const r = await cadastrarInsumo(ctx.cliente, Object.fromEntries(form), ctx.sessao.autorNome);
-  if (r.ok) revalidatePath('/erp/insumos');
-  return { ...r, vez };
-}
 
 /** Lojas e marcas são da rede: "cadastrar lojas e marcas" exige a rede inteira (a regra está no catálogo). */
 async function cadastrarEstruturaDaSessao(tipo: 'loja' | 'marca', anterior: EstadoForm, form: FormData): Promise<EstadoForm> {
@@ -102,7 +90,7 @@ export async function acaoBuscarNoErp(q: string): Promise<ResultadoDaBusca[]> {
     tipo: 'insumo' as const,
     rotulo: i.nome,
     detalhe: `Insumo · ${UNIDADES[i.unidade].nome}`,
-    href: `/erp/insumos#insumo-${i.id}`,
+    href: `/erp/insumos/${i.id}`,
     desativado: !i.ativo,
   }));
 }

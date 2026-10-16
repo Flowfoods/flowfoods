@@ -18,6 +18,7 @@ import { pode, type Alcance, type Permissao } from './permissoes';
 export type ChaveIcone =
   | 'inicio'
   | 'insumo'
+  | 'novo'
   | 'fichas'
   | 'compras'
   | 'estoque'
@@ -171,6 +172,13 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
               icone: 'insumo',
               subtitulo: 'Lista, embalagem e custo por unidade',
               permissao: 'insumos.ver',
+            },
+            {
+              href: `${base}/insumos/novo`,
+              rotulo: 'Novo insumo',
+              icone: 'novo',
+              subtitulo: 'Cadastrar com embalagem, preço e frete',
+              permissao: 'insumos.editar',
             },
           ],
         },

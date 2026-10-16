@@ -1,38 +1,41 @@
 /**
- * ERP do parceiro — Insumos. A mesma tela do nível 1, com o cliente do portão
- * resolvido pela SESSÃO da pessoa (`exigirParceiroDaSessao`). Ver exige
- * "ver insumos"; o cadastro só aparece com "cadastrar e editar insumos" (e a
- * action recusa do mesmo jeito, venha de onde vier).
+ * ERP do parceiro — Insumos (lista). A mesma tela do nível 1, com o cliente do
+ * portão resolvido pela SESSÃO da pessoa. Ver exige "ver insumos"; "Novo
+ * insumo" só aparece com "cadastrar e editar insumos" (e a action recusa do
+ * mesmo jeito, venha de onde vier).
  */
 
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { listarInsumos } from '@/lib/erp/insumos';
-import { COR } from '@/lib/erp/modulos';
-import { PageHeader } from '@/components/erp/ui/cabecalho';
-import { TelaInsumos } from '@/components/erp/telas/insumos/tela-insumos';
-import { FormInsumo } from '@/components/erp/telas/insumos/form-insumo';
+import { lerFiltros } from '@/lib/erp/insumo-campos';
+import { FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
+import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
 import { subtituloDosInsumos } from '@/components/erp/telas/insumos/subtitulo';
-import { acaoCadastrarInsumoDaSessao } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpInsumosPage() {
+const BASE = '/erp/insumos';
+
+export default async function ErpInsumosPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.ver');
-  const [insumos, { visao }] = await Promise.all([listarInsumos(ctx.cliente), visaoDaRequisicao(ctx)]);
+  const filtros = lerFiltros(searchParams);
+  const [pagina, { visao }] = await Promise.all([listarInsumos(ctx.cliente, filtros), visaoDaRequisicao(ctx)]);
   const cadastra = pode(ctx.alcance, 'insumos.editar');
   return (
     <div className="space-y-6">
-      <PageHeader
-        icone="insumo"
-        cor={COR.insumo}
-        titulo="Insumos"
-        subtitulo={subtituloDosInsumos(visao, insumos.length)}
-      />
-      <TelaInsumos
-        linhas={insumos}
+      <CabecalhoDaLista
+        subtitulo={subtituloDosInsumos(visao, pagina.total, filtros)}
+        novoHref={cadastra ? `${BASE}/novo` : undefined}
         bloqueio={ctx.bloqueio}
-        formulario={cadastra ? <FormInsumo acao={acaoCadastrarInsumoDaSessao} /> : undefined}
+      >
+        <FiltrosDaLista base={BASE} filtros={filtros} />
+      </CabecalhoDaLista>
+      <TelaListaInsumos
+        base={BASE}
+        filtros={filtros}
+        {...pagina}
+        novoHref={cadastra && !ctx.bloqueio ? `${BASE}/novo` : undefined}
       />
     </div>
   );
