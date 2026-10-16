@@ -25,6 +25,7 @@ import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { ListaHistorico } from '../historico/lista-historico';
 import { fraseDoFeitoDaFicha } from './estado';
 import { urlDaFoto } from './miniatura';
+import { ValidadesDoItem } from '../cadastro/validade';
 
 export function TelaDetalheFicha({
   ficha: f,
@@ -114,6 +115,27 @@ export function TelaDetalheFicha({
                     {incompleto && <Selo tom="alerta">Custo incompleto</Selo>}
                   </div>
                   <p className="mt-2 text-[13px] tabular-nums text-suave">{contaDaFicha(f.custo, f.rendimentoMilesimos, f.unidadeRendimento, f.tipo)}</p>
+                </div>
+                <div className="border-t border-linha pt-4">
+                  <h2 className="text-[13px] font-semibold text-suave">Onde fica e quanto dura</h2>
+                  <div className="mt-1">
+                    <ValidadesDoItem
+                      validades={f.validades}
+                      vazio={
+                        <>
+                          {f.tipo === 'PRE_PREPARO' ? <span className="text-atencao">Validade não informada.</span> : 'Validade não informada.'}
+                          {podeEditar && f.ativa && !bloqueio ? (
+                            <>
+                              {' '}
+                              <Link href={`${base}/${f.id}/editar`} className={LINK_DE_TEXTO}>
+                                Dizer em Editar ficha
+                              </Link>
+                            </>
+                          ) : null}
+                        </>
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             </div>

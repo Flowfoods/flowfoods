@@ -9,6 +9,7 @@
  */
 
 import Link from 'next/link';
+import { validadesEmTexto } from '@/lib/erp/validade';
 import type { LinhaDeInsumo } from '@/lib/erp/insumos';
 import {
   CONSERVACOES,
@@ -241,6 +242,7 @@ export function TelaListaInsumos({
                   {i.preparo ? 'Pré-preparo · custo da ficha' : `${TIPOS[i.tipo]} · ${formatarQuantidade(i.conteudoMilesimos, i.unidade)}`}
                   {!i.ativo && ' · Desativado'}
                 </span>
+                {validadesEmTexto(i.validades) && <span className="block truncate text-[12px] text-suave">{validadesEmTexto(i.validades)}</span>}
               </span>
               <span className="shrink-0 text-right text-sm tabular-nums">
                 <Custo i={i} />
@@ -289,7 +291,9 @@ export function TelaListaInsumos({
                   </span>
                 )}
                 <div className="text-[12px] text-suave">
-                  {i.preparo ? 'Custo da ficha técnica' : `${TIPOS[i.tipo]} · ${CONSERVACOES[i.conservacao]}`}
+                  {i.preparo ? 'Custo da ficha técnica' : TIPOS[i.tipo]}
+                  {' · '}
+                  {i.conservacaoInformada ? (validadesEmTexto(i.validades) ?? CONSERVACOES[i.conservacao]) : 'validade não informada'}
                   <span className="lg:hidden">{!i.ativo && ' · Desativado'}</span>
                 </div>
               </td>
