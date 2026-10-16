@@ -1031,3 +1031,47 @@ bloqueio e origem antes de ler, exige Content-Length e lê com teto; a foto
 espera em `pendentes/` e a action só move o nome sorteado. As server actions
 voltaram ao limite padrão de 1 MB (planilha até 256 KB). Importação limitada
 a 300 fichas por arquivo, com o estouro de tempo traduzido.
+
+### 61. 2026-10-17 · ERP 1.4: validade por conservação — o mesmo modelo no insumo e na ficha; aceita = tem validade
+
+**Alternativas:** (a) tabela nova `ValidadeConservacao` (item × conservação);
+(b) as 4 colunas em minutos + a principal, que o Insumo já tinha desde a 0.1,
+repetidas na `FichaTecnica`; (c) guardar só no insumo produzido do pré-preparo.
+
+**Razão:** (b). (a) pedia tabela nova de tenant (portão, RLS, GRANT) para 4
+linhas fixas; (c) deixava o prato sem lugar e a ficha dependente do insumo.
+Com (b), "o item aceita uma conservação" é ter validade nela (não existe
+"aceita, sem saber quanto dura"), a principal é uma das aceitas, e o banco
+garante isso por CHECK (com `COALESCE`: um CHECK que dá NULL passa). Na ficha
+é opcional (principal nula = "Validade não informada", com aviso em atenção no
+pré-preparo — a etiqueta da 3.4 vai precisar); no insumo a principal sempre
+existe (coluna NOT NULL: é onde se guarda) e as validades são opcionais. Para
+o insumo COMPRADO a validade é a de depois de aberto/manipulado; a do
+fabricante vem do lote (3.4) — o gancho de pós-abertura cabe nas colunas que
+já existem, sem coluna nova. Dias ou horas inteiros na tela, minutos no banco,
+teto 730 dias. Os CHECKs novos do Insumo entram `NOT VALID` (não reprovam a
+migration por linha antiga gravada por fora; valem para toda escrita nova).
+
+### 62. 2026-10-17 · ERP 1.4: o insumo produzido herda a validade da ficha na mesma transação
+
+**Alternativas:** (a) editar a conservação do insumo produzido na tela de
+insumos; (b) a ficha do pré-preparo é a fonte e o insumo acompanha.
+
+**Razão:** (b), como nome, unidade e situação na 1.3 (decisão 59): uma fonte
+só, sem duas telas discordando. `sincronizarInsumoProduzido` copia principal e
+validades e grava o antes/depois no histórico do insumo; recusada a gravação
+da ficha (nome em uso, conflito), nada muda nos dois (teste com banco). Ficha
+sem validade deixa as validades do insumo nulas e a principal como estava; a
+lista mostra "validade não informada" no lugar de um "Seco" que ninguém disse.
+
+### 63. 2026-10-17 · ERP 1.4: planilha sem as colunas novas não mexe na validade; formulário sempre diz
+
+**Alternativas:** (a) coluna ausente = apagar a validade; (b) ausente ou vazia
+= manter a da ficha; com alguma preenchida = substituir o conjunto.
+
+**Razão:** (b), como descrição e modo de preparo na 1.2: planilha antiga
+reimportada continua "igual". O formulário manda um marcador do bloco
+(`validadeNoFormulario`), então "nada marcado" ali é uma escolha (limpa); envio
+sem o marcador mantém a validade. Colunas: `conservacao` e
+`validade_seco|pista_fria|refrigerado|congelado` ("3 dias", "3", "6 h"; só
+número = dias). Conservação principal sem validade é erro na linha.
