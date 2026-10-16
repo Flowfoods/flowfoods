@@ -1,6 +1,6 @@
 /**
  * O miolo das actions de ficha técnica, comum ao nível 1 e à pessoa do
- * parceiro: ler o envio do formulário (itens repetidos, foto) e o arquivo da
+ * parceiro: ler o envio do formulário (itens repetidos, nome da foto enviada) e o arquivo da
  * planilha. Quem chama já resolveu o contexto e conferiu `fichas.editar` e o
  * bloqueio. As regras estão em `src/lib/erp/{fichas,ficha-importar}.ts`.
  */
@@ -10,7 +10,7 @@ import type { EntradaDaFicha } from '@/lib/erp/ficha-campos';
 import type { MudancaDeFoto } from '@/lib/erp/fichas';
 import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { decodificarPlanilha, LIMITE_DA_PLANILHA } from '@/lib/erp/ficha-planilha';
-import { LIMITE_DA_FOTO } from '@/lib/erp/foto';
+import { NOME_DA_FOTO } from '@/lib/erp/foto';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { EstadoImportacao } from './estado';
 
@@ -37,12 +37,12 @@ export async function lerEnvioDaFicha(
     versao: textoDe(form.get('versao')),
     itens,
   };
-  const arquivo = form.get('foto');
+  // A foto não vem no formulário (1.3): a tela já a enviou pela rota própria e manda só o nome sorteado.
+  const enviada = textoDe(form.get('fotoNova'));
   let foto: MudancaDeFoto = { tipo: 'manter' };
-  if (arquivo instanceof File && arquivo.size > 0) {
-    // Antes de ler o corpo inteiro para a memória.
-    if (arquivo.size > LIMITE_DA_FOTO) return { erroDaFoto: 'Foto acima de 8 MB. Tire outra ou reduza antes de enviar.' };
-    foto = { tipo: 'trocar', bytes: new Uint8Array(await arquivo.arrayBuffer()) };
+  if (enviada) {
+    if (!NOME_DA_FOTO.test(enviada)) return { erroDaFoto: 'Escolha a foto de novo.' };
+    foto = { tipo: 'enviada', arquivo: enviada };
   } else if (form.get('removerFoto') === 'sim') foto = { tipo: 'remover' };
   return { entrada, foto };
 }
@@ -53,7 +53,7 @@ const vez = (a: EstadoImportacao) => (a?.vez ?? 0) + 1;
 export async function executarPrevia(cliente: ClienteDoParceiro, anterior: EstadoImportacao, form: FormData): Promise<EstadoImportacao> {
   const arquivo = form.get('planilha');
   if (!(arquivo instanceof File) || arquivo.size === 0) return { vez: vez(anterior), erro: 'Escolha o arquivo da planilha (CSV).' };
-  if (arquivo.size > LIMITE_DA_PLANILHA) return { vez: vez(anterior), erro: 'Planilha acima de 512 KB: divida em arquivos menores.' };
+  if (arquivo.size > LIMITE_DA_PLANILHA) return { vez: vez(anterior), erro: 'Planilha acima de 256 KB: divida em arquivos menores.' };
   const texto = decodificarPlanilha(new Uint8Array(await arquivo.arrayBuffer()));
   const previa = await previaDaImportacao(cliente, texto);
   return { vez: vez(anterior), previa, texto, arquivo: arquivo.name.slice(0, 120) };

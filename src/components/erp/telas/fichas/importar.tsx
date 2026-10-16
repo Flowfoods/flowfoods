@@ -156,7 +156,7 @@ export function TelaImportarFichas({
                 </label>
                 <span className="min-w-0 truncate text-sm text-suave">{arquivo ?? 'Nenhum arquivo escolhido'}</span>
               </div>
-              <p className={AJUDA}>Até 512 KB. Nada é gravado agora: primeiro você vê a prévia.</p>
+              <p className={AJUDA}>Até 256 KB. Nada é gravado agora: primeiro você vê a prévia.</p>
             </div>
             <BotaoEnviar variante="secundario" pendente="Lendo a planilha…">
               Ver a prévia

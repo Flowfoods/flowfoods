@@ -17,8 +17,12 @@
 
 import { RENDE_DO_PREPARO, type EntradaDaFicha, type RendeEm, type TipoFicha } from './ficha-campos';
 
-/** 512 KB: milhares de linhas de ficha; mais que isso é outro arquivo. */
-export const LIMITE_DA_PLANILHA = 512 * 1024;
+/**
+ * 256 KB: ~5000 linhas de ficha. Também mantém o envio da confirmação (o
+ * texto, em UTF-8, até o dobro) abaixo do limite padrão de 1 MB das server
+ * actions — o limite global de 9 MB saiu na 1.3 (a foto tem rota própria).
+ */
+export const LIMITE_DA_PLANILHA = 256 * 1024;
 export const LIMITE_DE_LINHAS = 5000;
 
 export interface ErroDeLinha {
@@ -143,7 +147,7 @@ function lerRendeEm(v: string, tipo: TipoFicha): RendeEm | '' | null {
 }
 
 /** Sigla da quantidade do item, como o leitor da ficha entende (g, kg, ml, L, un). */
-export function siglaDaPlanilha(v: string): string {
+function siglaDaPlanilha(v: string): string {
   const t = semAcento(v).replace(/\.$/, '');
   const mapa: Record<string, string> = {
     g: 'g', gr: 'g', grama: 'g', gramas: 'g',

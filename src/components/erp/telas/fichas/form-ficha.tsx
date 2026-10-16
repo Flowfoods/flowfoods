@@ -4,7 +4,7 @@
 /**
  * Formulário da ficha técnica (nova e editar), a MESMA peça para o nível 1 e
  * para a pessoa do parceiro: a action vem de quem usa a tela. Tudo vai como
- * texto (e a foto como arquivo); o servidor converte g/kg/ml/L/un, calcula o
+ * texto (a foto já foi enviada pela rota própria: vai só o nome); o servidor converte g/kg/ml/L/un, calcula o
  * custo e confere permissão, versão lida e insumos do parceiro. A conta que
  * aparece aqui embaixo é PRÉVIA, feita com a mesma regra.
  */
@@ -115,6 +115,7 @@ export function FormFicha({
   const saida = useAvisoDeSaida();
   const [tipo, setTipo] = useState<TipoFicha>(inicial.tipo);
   const [nome, setNome] = useState(inicial.nome);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [rendimento, setRendimento] = useState(inicial.rendimento);
   const [rendeEm, setRendeEm] = useState<RendeEm>(inicial.tipo === 'PRATO' ? 'kg' : inicial.rendimentoUnidade);
   const proximaChave = useRef(inicial.itens.length);
@@ -228,7 +229,7 @@ export function FormFicha({
               />
               <Erro id={`${idBase}-descricao-erro`} texto={erros.descricao} />
             </div>
-            <CampoFoto atual={fotoAtual} nome={nome} erro={erros.foto} idBase={idBase} aoMudar={saida.aoMudar} />
+            <CampoFoto atual={fotoAtual} nome={nome} erro={erros.foto} idBase={idBase} envio={`${base}/fotos`} aoMudar={saida.aoMudar} aoOcupar={setEnviandoFoto} />
           </div>
         </Painel>
 
@@ -423,7 +424,7 @@ export function FormFicha({
         <Link href={cancelar} className={classeDeBotao('fantasma')}>
           Cancelar
         </Link>
-        <BotaoEnviar disabled={!!bloqueio} className="sm:min-w-44">
+        <BotaoEnviar disabled={!!bloqueio || enviandoFoto} className="sm:min-w-44">
           {modo === 'criar' ? 'Cadastrar ficha' : 'Salvar alterações'}
         </BotaoEnviar>
       </div>

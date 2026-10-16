@@ -380,8 +380,19 @@ describe('ERP 1.2 · rota de arquivo do /erp confere a permissão', () => {
     expect(rotas.length).toBeGreaterThan(0);
     for (const f of rotas) {
       const t = readFileSync(f, 'utf8');
-      expect(t, f).toMatch(/exigirParceiroDaSessao\(\)/);
-      expect(t, f).toMatch(/pode\(ctx\.alcance, '[a-z]+\.[a-z]+'\)|exigirPermissao\(ctx, /);
+      expect(t, f).toMatch(/exigirParceiroDaSessao\(\)|parceiroDaSessaoOuNada\(\)/);
+      expect(t, f).toMatch(/pode\(ctx\.alcance, '[a-z]+\.[a-z]+'\)|exigirPermissao\(ctx, |receberFotoDaFicha\(/);
+    }
+  });
+
+  it('a rota de envio confere sessão, permissão, bloqueio e origem ANTES de ler o corpo', async () => {
+    const { readFileSync } = await import('node:fs');
+    const t = readFileSync('src/lib/erp/foto-envio.ts', 'utf8');
+    const corpo = t.slice(t.indexOf('export async function receberFotoDaFicha'));
+    const leitura = corpo.indexOf('lerComTeto(req');
+    for (const antes of ['if (!ctx)', "pode(ctx.alcance, 'fichas.editar')", 'ctx.bloqueio', 'mesmaOrigem(req)', 'content-length']) {
+      expect(corpo.indexOf(antes), antes).toBeGreaterThan(-1);
+      expect(corpo.indexOf(antes), antes).toBeLessThan(leitura);
     }
   });
 });

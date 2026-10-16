@@ -38,7 +38,7 @@ import {
   type TipoFicha,
 } from './ficha-campos';
 import { prepararFoto, type FotoPronta } from './foto';
-import { apagarFoto, salvarFoto } from './arquivos';
+import { apagarFoto, assumirFotoPendente, devolverFotoPendente, salvarFoto } from './arquivos';
 import type { CustoExato, Unidade } from './unidades';
 
 export type ResultadoFicha =
@@ -49,8 +49,18 @@ export const MENSAGEM_CONFLITO_FICHA =
   'Alguém alterou esta ficha agora há pouco. Recarregue a página para ver a versão nova; nada foi gravado.';
 export const MENSAGEM_FICHA_DESATIVADA = 'Ficha desativada: reative antes de editar.';
 
-/** O que fazer com a foto ao gravar. */
-export type MudancaDeFoto = { tipo: 'manter' } | { tipo: 'trocar'; bytes: Uint8Array } | { tipo: 'remover' };
+/**
+ * O que fazer com a foto ao gravar. `enviada` = a tela já mandou a foto pela
+ * rota de envio (`foto-envio.ts`) e só traz o nome da pendente; `trocar` =
+ * bytes na mão (testes e scripts), passam pela mesma limpeza.
+ */
+export type MudancaDeFoto =
+  | { tipo: 'manter' }
+  | { tipo: 'trocar'; bytes: Uint8Array }
+  | { tipo: 'enviada'; arquivo: string }
+  | { tipo: 'remover' };
+
+export const MENSAGEM_FOTO_SUMIU = 'A foto enviada não está mais aqui (passou de 24 h ou já foi usada). Escolha a foto de novo.';
 
 /** Recusa no meio da transação: desfaz tudo e vira mensagem. */
 export class RecusaDaFicha extends Error {
@@ -245,7 +255,11 @@ export const SELECAO_PARA_EDITAR = {
   itens: { orderBy: { ordem: 'asc' as const }, select: { insumoId: true, quantidadeMilesimos: true } },
 } as const;
 
-/** Salva a foto no disco (se veio, já sem metadados) e roda a gravação; se a transação não fechar, a foto nova sai do disco. */
+/**
+ * Põe a foto nova no lugar (bytes: grava já sem metadados; enviada: move a
+ * pendente) e roda a gravação. Se a transação não fechar, a foto nova sai do
+ * lugar: a gravada é apagada, a enviada volta a ser pendente.
+ */
 async function comFoto<T>(
   cliente: ClienteDoParceiro,
   foto: MudancaDeFoto,
@@ -257,10 +271,17 @@ async function comFoto<T>(
     const arquivo = await salvarFoto(cliente.parceiroId, pronta.bytes, pronta.extensao);
     nova = { arquivo, mime: pronta.mime, bytes: pronta.bytes.length };
   }
+  if (foto.tipo === 'enviada') {
+    nova = await assumirFotoPendente(cliente.parceiroId, foto.arquivo);
+    if (!nova) throw new RecusaDaFicha({ ok: false, erros: { foto: MENSAGEM_FOTO_SUMIU } });
+  }
   try {
     return await fn(nova);
   } catch (e) {
-    if (nova && nova !== 'manter') await apagarFoto(cliente.parceiroId, nova.arquivo);
+    if (nova && nova !== 'manter') {
+      if (foto.tipo === 'enviada') await devolverFotoPendente(cliente.parceiroId, nova.arquivo);
+      else await apagarFoto(cliente.parceiroId, nova.arquivo);
+    }
     throw e;
   }
 }

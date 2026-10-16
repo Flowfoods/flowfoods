@@ -5,6 +5,13 @@
  * Dockerfile.
  *
  *   <ERP_ARQUIVOS_DIR>/<parceiroId>/fichas/<32 hex>.<jpg|png|webp>
+ *   <ERP_ARQUIVOS_DIR>/<parceiroId>/fichas/pendentes/<32 hex>.<ext>
+ *
+ * Pendente (1.3): a foto chega pela rota de envio (`foto-envio.ts`), já sem
+ * metadados, e espera ali até o formulário ser salvo — a action só leva o
+ * nome e a MOVE para o lugar (rename, mesmo disco). Se a gravação não fechar,
+ * ela volta para pendentes (dá para salvar de novo sem reenviar). Pendente
+ * esquecida sai depois de 24 h, na faxina feita a cada envio.
  *
  * Isolado por parceiro já no caminho, e nada que veio do navegador entra
  * nele: o id do parceiro vem da sessão/portão e o nome é sorteado aqui. Quem
@@ -13,31 +20,31 @@
 
 import { randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { mkdir, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Readable } from 'node:stream';
-import { NOME_DA_FOTO, type ExtensaoDaFoto } from './foto';
+import { NOME_DA_FOTO, TIPOS_DE_FOTO, type ExtensaoDaFoto } from './foto';
 
-export function pastaDoErp(): string {
+function pastaDoErp(): string {
   return process.env.ERP_ARQUIVOS_DIR || '/data/erp';
 }
 
 const ID_OK = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** Caminho da foto; recusa id ou nome fora do formato (nunca um `../`). */
-export function caminhoDaFoto(parceiroId: string, arquivo: string, base = pastaDoErp()): string {
+export function caminhoDaFoto(parceiroId: string, arquivo: string, base = pastaDoErp(), pendente = false): string {
   if (!ID_OK.test(parceiroId)) throw new Error('parceiro fora do formato');
   if (!NOME_DA_FOTO.test(arquivo)) throw new Error('nome de foto fora do formato');
-  const pasta = path.join(base, parceiroId, 'fichas');
+  const pasta = pendente ? path.join(base, parceiroId, 'fichas', 'pendentes') : path.join(base, parceiroId, 'fichas');
   const final = path.join(pasta, arquivo);
   if (!final.startsWith(pasta + path.sep)) throw new Error('caminho fora da pasta do parceiro');
   return final;
 }
 
-/** Grava a foto (já conferida) com nome sorteado; devolve o nome. Nunca sobrescreve. */
-export async function salvarFoto(parceiroId: string, bytes: Uint8Array, extensao: ExtensaoDaFoto): Promise<string> {
+/** Grava a foto (já conferida e limpa) com nome sorteado; devolve o nome. Nunca sobrescreve. */
+export async function salvarFoto(parceiroId: string, bytes: Uint8Array, extensao: ExtensaoDaFoto, pendente = false): Promise<string> {
   const arquivo = `${randomBytes(16).toString('hex')}.${extensao}`;
-  const caminho = caminhoDaFoto(parceiroId, arquivo);
+  const caminho = caminhoDaFoto(parceiroId, arquivo, pastaDoErp(), pendente);
   await mkdir(path.dirname(caminho), { recursive: true, mode: 0o750 });
   await writeFile(caminho, bytes, { flag: 'wx', mode: 0o640 });
   return arquivo;
@@ -62,4 +69,53 @@ export async function abrirFoto(parceiroId: string, arquivo: string): Promise<{ 
   } catch {
     return null;
   }
+}
+
+const UM_DIA = 24 * 60 * 60 * 1000;
+
+/**
+ * Leva a foto pendente (enviada pela rota, deste parceiro) para o lugar
+ * definitivo. null = não existe (outro parceiro, já usada, faxinada).
+ */
+export async function assumirFotoPendente(parceiroId: string, arquivo: string): Promise<{ arquivo: string; mime: string; bytes: number } | null> {
+  if (!NOME_DA_FOTO.test(arquivo)) return null;
+  const de = caminhoDaFoto(parceiroId, arquivo, pastaDoErp(), true);
+  try {
+    const s = await stat(de);
+    await rename(de, caminhoDaFoto(parceiroId, arquivo));
+    const extensao = arquivo.slice(arquivo.lastIndexOf('.') + 1) as ExtensaoDaFoto;
+    return { arquivo, mime: TIPOS_DE_FOTO[extensao], bytes: s.size };
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    throw e;
+  }
+}
+
+/** A gravação não fechou: a foto volta a ser pendente (salvar de novo não pede reenviar). */
+export async function devolverFotoPendente(parceiroId: string, arquivo: string): Promise<void> {
+  try {
+    await rename(caminhoDaFoto(parceiroId, arquivo), caminhoDaFoto(parceiroId, arquivo, pastaDoErp(), true));
+  } catch (e) {
+    console.warn('[erp] foto pendente não devolvida:', (e as Error).message);
+  }
+}
+
+/** Apaga as pendentes deste parceiro com mais de 24 h (feito a cada envio; melhor esforço). */
+export async function faxinarPendentes(parceiroId: string, agora = Date.now()): Promise<number> {
+  const pasta = path.dirname(caminhoDaFoto(parceiroId, `${'0'.repeat(32)}.jpg`, pastaDoErp(), true));
+  let apagadas = 0;
+  try {
+    for (const nome of await readdir(pasta)) {
+      if (!NOME_DA_FOTO.test(nome)) continue;
+      const c = path.join(pasta, nome);
+      const s = await stat(c);
+      if (agora - s.mtimeMs > UM_DIA) {
+        await unlink(c);
+        apagadas++;
+      }
+    }
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('[erp] faxina de fotos pendentes:', (e as Error).message);
+  }
+  return apagadas;
 }
