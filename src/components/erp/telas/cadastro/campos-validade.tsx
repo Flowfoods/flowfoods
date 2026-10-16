@@ -126,7 +126,7 @@ export function CamposDeValidade({
                       setPrincipal(c);
                       aoMudar?.();
                     }}
-                    className={`${MARCAR} disabled:opacity-40`}
+                    className={`${MARCAR} disabled:cursor-not-allowed disabled:opacity-70`}
                   />
                   {/* A partir de 640 px o cabeçalho da coluna já diz "Principal". */}
                   <span className="sm:sr-only">Principal</span>

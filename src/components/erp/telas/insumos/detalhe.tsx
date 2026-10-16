@@ -218,7 +218,10 @@ export function TelaDetalheInsumo({
         </div>
 
         <aside className="min-w-0 space-y-4" aria-label="Validade, situação e alterações">
-          <Painel titulo={p ? 'Onde fica e quanto dura' : 'Onde guarda e quanto dura'}>
+          <Painel
+            titulo={p ? 'Onde fica e quanto dura' : 'Onde guarda e quanto dura'}
+            subtitulo={p ? undefined : 'Validade depois de aberto ou manipulado'}
+          >
             <ValidadesDoItem
               validades={i.validades}
               vazio={
@@ -244,7 +247,7 @@ export function TelaDetalheInsumo({
                   .
                 </>
               ) : (
-                'Depois de aberto ou manipulado. A validade do fabricante vem no lote de cada compra.'
+                'A validade do fabricante vem no lote de cada compra.'
               )}
             </p>
           </Painel>
