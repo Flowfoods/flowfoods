@@ -50,17 +50,21 @@ function MargemNaLista({ p }: { p: PrecoDoCanal }) {
   );
 }
 
-/** A mesma informação numa linha (celular e tablet): "Margem: Loja 71,7% · Delivery 66,1% · iFood 50,2% abaixo do alvo". */
+/**
+ * Celular e tablet: só os canais FORA do alvo, com o número e a palavra; o
+ * resto resumido ("iFood 30,6% abaixo do alvo; os outros no alvo").
+ */
 function margemEmLinha(precos: readonly PrecoDoCanal[]): string | null {
   if (precos.every((p) => !p.margens && !p.preco)) return null;
-  const partes = precos.map((p) => {
-    const nome = CANAIS[p.canal].curto;
-    if (!p.margens) return `${nome} ${p.porQue && p.preco ? 'incompleta' : '—'}`;
-    const f = p.margens.farol;
-    if (p.preco?.origem === 'sugerido') return `${nome} ${formatarPorcentagem(p.margens.liquidaBp)} (sugerido)`;
-    return `${nome} ${formatarPorcentagem(p.margens.liquidaBp)}${f && f !== 'noAlvo' ? ` ${FAROL[f].rotulo}` : ''}`;
-  });
-  return `Margem líquida: ${partes.join(' · ')}`;
+  const fora = precos.filter((p) => (p.margens && p.preco?.origem === 'proprio' && p.margens.farol && p.margens.farol !== 'noAlvo') || (!p.margens && p.porQue && p.preco));
+  const noAlvo = precos.filter((p) => p.margens && !fora.includes(p));
+  const semPreco = precos.filter((p) => !p.margens && !fora.includes(p));
+  const partes = fora.map((p) =>
+    p.margens ? `${CANAIS[p.canal].curto} ${formatarPorcentagem(p.margens.liquidaBp)} ${FAROL[p.margens.farol!].rotulo}` : `${CANAIS[p.canal].curto} incompleta`,
+  );
+  if (noAlvo.length) partes.push(fora.length ? (noAlvo.length === 1 ? `${CANAIS[noAlvo[0].canal].curto} no alvo` : 'os outros no alvo') : 'no alvo nos canais com preço');
+  if (semPreco.length) partes.push(`${semPreco.map((p) => CANAIS[p.canal].curto).join(' e ')} sem preço`);
+  return `Margem líquida: ${partes.join('; ')}`;
 }
 
 function hrefCom(base: string, f: FiltrosDeFicha, mudar: Partial<FiltrosDeFicha>): string {

@@ -166,7 +166,7 @@ export function formatarReaisComSinal(f: Fracao): string {
   return f.num < 0n ? `−${formatarFracao(neg(f))}` : formatarFracao(f);
 }
 
-/** Pontos-base exatos → "39,8%" (uma casa, metade para longe do zero; "−28,0%"). */
+/** Pontos-base exatos em texto: "39,8%" (uma casa, metade para longe do zero; "−28,0%"). */
 export function formatarPorcentagem(bp: Fracao): string {
   const negativo = bp.num < 0n;
   const n = negativo ? -bp.num : bp.num;
@@ -183,6 +183,9 @@ export const margemEmTexto = (valor: Fracao, bp: Fracao) => `${formatarReaisComS
 
 const ROTULO_CURTO: Record<CanalVenda, string> = { LOJA: 'Loja', DELIVERY_PROPRIO: 'Delivery', IFOOD: 'iFood' };
 
+const NUMERO_DE_DINHEIRO = /^(R\$\s*)?\d[\d.]*(,\d{1,2})?$/i;
+const FRASE_DO_LIMITE = 'Mais de R$ 100.000,00 por porção? Confira o número.';
+
 /** Formulário → preço próprio por canal (centavos); vazio = usar o sugerido (null). */
 export function lerPrecos(entrada: Partial<Record<CanalVenda, unknown>>): Leitura<Record<CanalVenda, number | null>> {
   const erros: Erros = {};
@@ -192,9 +195,11 @@ export function lerPrecos(entrada: Partial<Record<CanalVenda, unknown>>): Leitur
     const t = typeof v === 'string' ? v.trim() : '';
     if (!t) continue;
     const c = lerDinheiro(t);
-    if (c === null) erros[`preco-${canal}`] = 'Preço inválido. Ex.: 29,90.';
+    // Número bem escrito, mas grande demais para caber (ex.: 2147483648): a frase do limite, não "inválido".
+    if (c === null && NUMERO_DE_DINHEIRO.test(t)) erros[`preco-${canal}`] = FRASE_DO_LIMITE;
+    else if (c === null) erros[`preco-${canal}`] = 'Preço inválido. Ex.: 29,90.';
     else if (c === 0) erros[`preco-${canal}`] = 'O preço precisa ser maior que zero. Para usar o sugerido, deixe vazio.';
-    else if (c > LIMITES_DO_PRECO.centavos) erros[`preco-${canal}`] = 'Mais de R$ 100.000,00 por porção? Confira o número.';
+    else if (c > LIMITES_DO_PRECO.centavos) erros[`preco-${canal}`] = FRASE_DO_LIMITE;
     else dados[canal] = c;
   }
   if (Object.keys(erros).length) return { ok: false, erros };

@@ -96,11 +96,16 @@ const TONS: Record<Tom, string> = {
   neutro: 'border-linha-forte text-suave',
 };
 
-/** Selo de situação: sempre com texto. Borda e texto na cor, fundo neutro. */
-export function Selo({ tom = 'neutro', children }: { tom?: Tom; children: ReactNode }) {
+/**
+ * Selo de situação: sempre com texto. Borda e texto na cor, fundo neutro.
+ * `cheio` (1.10): o estado mais grave de uma escala (prejuízo) ganha o fundo
+ * tingido e a borda inteira — grita mais que o alerta ao lado.
+ */
+export function Selo({ tom = 'neutro', cheio = false, children }: { tom?: Tom; cheio?: boolean; children: ReactNode }) {
+  const fundo = cheio ? { ok: 'bg-ok/15 border-ok', alerta: 'bg-atencao/15 border-atencao', erro: 'bg-erro/15 border-erro', neutro: 'bg-texto/10' }[tom] : 'bg-texto/[0.03]';
   return (
     <span
-      className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-[7px] border bg-texto/[0.03] px-2 py-0.5 text-[12px] font-semibold ${TONS[tom]}`}
+      className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-[7px] border px-2 py-0.5 text-[12px] font-semibold ${TONS[tom]} ${fundo}`}
     >
       {children}
     </span>

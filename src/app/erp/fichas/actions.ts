@@ -107,7 +107,7 @@ export async function acaoSalvarPrecos(id: string, anterior: EstadoCadastro, for
 /** 1.10: margem-alvo de cada canal do parceiro (só a dona). */
 export async function acaoSalvarMargensAlvo(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const ctx = await exigirParceiroDaSessao();
-  const negado = recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
+  const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
   if (negado) return recusado(anterior, negado);
   const r = await salvarMargensAlvo(ctx.cliente, lerEnvioDasMargens(form), ctx.sessao.autorNome);
   return concluir(r, anterior, BASE, { mudou: 'margens', igual: 'margens-igual' }, 'canais');

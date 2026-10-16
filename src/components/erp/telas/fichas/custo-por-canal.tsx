@@ -27,11 +27,12 @@ import {
   formatarPorcentagem,
   formatarReaisComSinal,
   LIMITES_DO_PRECO,
+  lerPrecos,
   precoDoCanal,
   type EntradaEmTexto,
   type PrecoDoCanal,
 } from '@/lib/erp/preco-campos';
-import { ACIMA_DO_LIMITE, dinheiroParaCampo, formatarDinheiro, formatarFracao, formatarPontosBase, formatarQuantidade, lerDinheiro, type Unidade } from '@/lib/erp/unidades';
+import { ACIMA_DO_LIMITE, dinheiroParaCampo, formatarDinheiro, formatarFracao, formatarPontosBase, formatarQuantidade, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO } from '../../ui/campos';
 import { Dica } from '../../ui/dica';
@@ -167,7 +168,7 @@ function Sugerido({ p, usar }: { p: PrecoDoCanal; usar?: (centavos: number) => v
       <span className="block text-[12px] text-suave" title={contaDoSugerido(p.semTaxa, p.taxaBp, p.margemAlvoBp!, s)}>
         {formatarFracao(p.semTaxa)} ÷ {divisorDoSugerido(p.taxaBp, p.margemAlvoBp!)}
       </span>
-      {usar && s.cardapio !== s.centavos && (
+      {usar && s.cardapio !== s.centavos && s.cardapio <= LIMITES_DO_PRECO.centavos && (
         <button type="button" onClick={() => usar(s.cardapio)} className={`mt-0.5 min-h-8 text-[12px] ${LINK_DE_TEXTO}`}>
           usar {reais(s.cardapio)}
         </button>
@@ -184,11 +185,13 @@ function Margem({ p, qual }: { p: PrecoDoCanal; qual: 'bruta' | 'liquida' }) {
   const farol = qual === 'liquida' ? p.margens.farol : null;
   return (
     <>
-      <span className={qual === 'liquida' ? 'text-[15px] font-semibold text-texto' : 'text-texto'}>{formatarReaisComSinal(valor)}</span>
+      <span className={`${qual === 'liquida' ? 'text-[15px] font-semibold' : ''} ${valor.num < 0n ? 'text-erro' : 'text-texto'}`}>{formatarReaisComSinal(valor)}</span>
       <span className="block text-[12px] text-suave">{formatarPorcentagem(bp)} do preço</span>
       {farol && (
         <span className="mt-1 block">
-          <Selo tom={FAROL[farol].tom}>{FAROL[farol].rotulo}</Selo>
+          <Selo tom={FAROL[farol].tom} cheio={farol === 'prejuizo'}>
+            {FAROL[farol].rotulo}
+          </Selo>
         </span>
       )}
     </>
@@ -232,10 +235,10 @@ function Conteudo({
   // A conta de cada canal com o que está digitado agora (texto ruim = prévia sem ele, e o aviso no campo).
   const contas = entradas.map((e) => {
     const t = textos[e.canal].trim();
-    const lido = t ? lerDinheiro(t) : null;
-    const invalido = !!t && (lido === null || lido <= 0 || lido > LIMITES_DO_PRECO.centavos);
-    const p = precoDoCanal(e, { margemAlvoBp: dados.margensAlvo[e.canal], precoProprioCentavos: t && !invalido ? lido : null });
-    return { p, invalido, digitado: !!t };
+    // A MESMA leitura do servidor (e a mesma frase de erro).
+    const lido = lerPrecos({ [e.canal]: t });
+    const p = precoDoCanal(e, { margemAlvoBp: dados.margensAlvo[e.canal], precoProprioCentavos: lido.ok ? lido.dados[e.canal] : null });
+    return { p, erro: lido.ok ? undefined : lido.erros[`preco-${e.canal}`], digitado: !!t };
   });
   const precos = contas.map((x) => x.p);
   const camadas = precos.map((p) => p.camadas);
@@ -250,7 +253,7 @@ function Conteudo({
   const campoDoPreco = (canal: CanalVenda, i: number, sufixo: string, largura: string) => {
     const x = contas[i];
     const id = `preco-${canal}${sufixo}`;
-    const erro = erros[`preco-${canal}`] ?? (x.invalido ? 'Preço inválido. Ex.: 29,90.' : undefined);
+    const erro = erros[`preco-${canal}`] ?? x.erro;
     const sugerido = x.p.sugerido.tipo === 'ok' ? x.p.sugerido.centavos : null;
     return (
       <>
@@ -458,7 +461,11 @@ function Conteudo({
             <li key={p.canal} className="px-4 py-4">
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="text-[15px] font-semibold text-texto">{CANAIS[p.canal].rotulo}</h3>
-                {p.margens?.farol && <Selo tom={FAROL[p.margens.farol].tom}>{FAROL[p.margens.farol].rotulo}</Selo>}
+                {p.margens?.farol && (
+                  <Selo tom={FAROL[p.margens.farol].tom} cheio={p.margens.farol === 'prejuizo'}>
+                    {FAROL[p.margens.farol].rotulo}
+                  </Selo>
+                )}
               </div>
               <dl className="mt-2 space-y-1.5 text-[13px] tabular-nums">
                 <div className="flex justify-between gap-3">
@@ -515,7 +522,7 @@ function Conteudo({
                   <dd className="text-right">
                     {p.margens ? (
                       <>
-                        <span className="text-[15px] font-semibold text-texto">{formatarReaisComSinal(p.margens.liquida)}</span>
+                        <span className={`text-[15px] font-semibold ${p.margens.liquida.num < 0n ? 'text-erro' : 'text-texto'}`}>{formatarReaisComSinal(p.margens.liquida)}</span>
                         <span className="block text-[12px] text-suave">{formatarPorcentagem(p.margens.liquidaBp)} do preço</span>
                       </>
                     ) : (
