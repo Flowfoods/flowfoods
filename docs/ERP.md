@@ -888,3 +888,10 @@ banco de teste: o operador é recusado pelo servidor.
   réplicas, cada uma faz a sua (o teto por vez continua valendo).
 - Histórico de itens lê a frase gravada ("Nome 300 g (fator 1,18)"); nome de
   insumo que termine como quantidade cai na lista inteira (como antes).
+
+## Herança da 1.4 (apontada pelos fiscais)
+
+- [médio] CHECKs de Insumo entraram `NOT VALID`: rodar `VALIDATE CONSTRAINT` numa próxima migration (passa nos dados da 1.3) ou tratar 23514 com mensagem — hoje linha fora da regra dá 500 ao desativar.
+- [baixo] Marcador JPEG 0xC8 (reservado) ainda aceito em `foto-metadados.ts:86`: tirar da lista.
+- [baixo] Ficha com principal marcada e nenhuma validade grava sem principal, em silêncio: avisar.
+- UX: validade na lista de fichas corta no celular (linha própria); botão "Principal" desabilitado com pouco contraste no claro; "Validade não informada" maior; "Depois de aberto" como subtítulo no detalhe do insumo; contorno do selo "Sem preço" no escuro; conferir "Custo incompleto" subindo do molho para o prato.
