@@ -230,4 +230,42 @@ export function guardadoAte(recusadoEm: Date): Date {
   return new Date(recusadoEm.getTime() + RETENCAO_DO_RECUSADO_DIAS * 86_400_000);
 }
 
+// -------------------------------------------------------------- apresentação
+
+/** "5521996416060" → "(21) 99641-6060". Fora do formato, devolve como veio. */
+export function formatarWhatsapp(e164: string): string {
+  const m = /^55(\d{2})(\d{5})(\d{4})$/.exec(e164);
+  return m ? `(${m[1]}) ${m[2]}-${m[3]}` : e164;
+}
+
+const ETAPAS = new Set<string>(['NOVO', 'EM_CONVERSA', 'ATIVADO', 'RECUSADO']);
+const etapaDe = (v: unknown): string | null => {
+  const e = v && typeof v === 'object' ? (v as { etapa?: unknown }).etapa : null;
+  return typeof e === 'string' && ETAPAS.has(e) ? ROTULO_DA_ETAPA[e as EtapaDoPedido] : null;
+};
+
+/** Uma linha por evento do histórico do pedido (sem dado pessoal: só etapa, motivo e autor). */
+export function textoDoEvento(e: { acao: string; antes: unknown; depois: unknown; motivo: string | null }): string {
+  switch (e.acao) {
+    case 'CRIOU': {
+      const origem = e.depois && typeof e.depois === 'object' ? (e.depois as { origem?: unknown }).origem : null;
+      return origem === 'MANUAL' ? 'Pedido digitado' : 'Pedido recebido pelo site';
+    }
+    case 'REENVIOU': {
+      const n = e.depois && typeof e.depois === 'object' ? Number((e.depois as { reenvios?: unknown }).reenvios) : NaN;
+      return Number.isFinite(n) ? `Mandou de novo (${n}ª vez)` : 'Mandou de novo';
+    }
+    case 'MOVEU':
+      return `${etapaDe(e.antes) ?? '—'} → ${etapaDe(e.depois) ?? '—'}`;
+    case 'ATIVOU':
+      return 'Ativado: parceiro, dono e link de primeiro acesso criados';
+    case 'RECUSOU':
+      return e.motivo ? `Recusado: ${e.motivo}` : 'Recusado';
+    case 'EXCLUIU_DADOS':
+      return 'Dados pessoais excluídos';
+    default:
+      return e.acao;
+  }
+}
+
 export { ROTULO_DA_ETAPA };

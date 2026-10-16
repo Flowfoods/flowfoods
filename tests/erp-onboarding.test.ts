@@ -10,6 +10,7 @@ import {
   CONSENTIMENTO,
   caiuNaArmadilha,
   diasDeAtrasoDoPedido,
+  formatarWhatsapp,
   fraseJaDecidido,
   guardadoAte,
   lerAtivacao,
@@ -20,6 +21,7 @@ import {
   linkDoWhatsApp,
   mensagemDoConvite,
   textoDaEtapa,
+  textoDoEvento,
 } from '@/lib/erp/pedido-campos';
 
 const BOM = {
@@ -165,5 +167,20 @@ describe('ERP 0.5 · atraso (Novo > 2 dias, Em conversa > 7 dias, calendário do
   });
   it('o recusado fica guardado 180 dias', () => {
     expect(guardadoAte(new Date('2026-10-16T00:00:00Z')).toISOString().slice(0, 10)).toBe('2027-04-14');
+  });
+});
+
+describe('ERP 0.5 · apresentação do pedido', () => {
+  it('WhatsApp com máscara; fora do formato, como veio', () => {
+    expect(formatarWhatsapp('5521996416060')).toBe('(21) 99641-6060');
+    expect(formatarWhatsapp('')).toBe('');
+  });
+  it('o histórico diz a etapa de antes e de depois, o motivo e nada de dado pessoal', () => {
+    expect(textoDoEvento({ acao: 'CRIOU', antes: null, depois: { etapa: 'NOVO', origem: 'LANDING' }, motivo: null })).toBe('Pedido recebido pelo site');
+    expect(textoDoEvento({ acao: 'CRIOU', antes: null, depois: { origem: 'MANUAL' }, motivo: null })).toBe('Pedido digitado');
+    expect(textoDoEvento({ acao: 'MOVEU', antes: { etapa: 'NOVO' }, depois: { etapa: 'EM_CONVERSA' }, motivo: null })).toBe('Novo → Em conversa');
+    expect(textoDoEvento({ acao: 'REENVIOU', antes: null, depois: { reenvios: 2 }, motivo: null })).toBe('Mandou de novo (2ª vez)');
+    expect(textoDoEvento({ acao: 'RECUSOU', antes: { etapa: 'NOVO' }, depois: { etapa: 'RECUSADO' }, motivo: 'fora da região' })).toBe('Recusado: fora da região');
+    expect(textoDoEvento({ acao: 'MOVEU', antes: { etapa: '<script>' }, depois: null, motivo: null })).toBe('— → —');
   });
 });

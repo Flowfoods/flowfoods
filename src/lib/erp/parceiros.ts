@@ -3,7 +3,9 @@
  * Regra de negócio sem tela. Toda mudança grava antes/depois no histórico do
  * próprio parceiro, na mesma transação (`gravarParceiroFlow`).
  *
- * Criação pela landing / aprovação de lead é da fase 0.5, não daqui.
+ * Na tela do nível 1 o parceiro NÃO se cria mais por aqui (0.5): ele nasce na
+ * ativação de um pedido de acesso (`ativarPedido`, em `credenciais.ts`), já ATIVO
+ * e com dono. `criarParceiro` fica para o seed e os testes.
  */
 
 import type { ParceiroStatus, PrismaClient } from '@prisma/client';
@@ -15,7 +17,8 @@ export { gerarSlug } from './slug';
 
 export const STATUS_DO_PARCEIRO: Record<ParceiroStatus, { rotulo: string; tom: 'ativo' | 'rascunho' | 'suspenso' }> = {
   ATIVO: { rotulo: 'Ativo', tom: 'ativo' },
-  RASCUNHO: { rotulo: 'Aguardando liberação', tom: 'rascunho' },
+  // Legado: parceiro criado antes da 0.5 como "aguardando liberação". Hoje o pedido espera no quadro (fora do tenant) e o parceiro já nasce ATIVO.
+  RASCUNHO: { rotulo: 'Rascunho', tom: 'rascunho' },
   SUSPENSO: { rotulo: 'Suspenso', tom: 'suspenso' },
 };
 

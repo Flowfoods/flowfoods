@@ -32,7 +32,7 @@ export interface ContextoDoParceiro {
 
 export function bloqueioDeEscrita(status: ParceiroFlow['status']): string | null {
   if (status === 'SUSPENSO') return 'Parceiro suspenso: insumos, fichas técnicas, lojas e marcas ficam bloqueados até reativar.';
-  if (status === 'RASCUNHO') return 'Parceiro aguardando liberação: insumos, fichas técnicas, lojas e marcas abrem quando ele for ativado.';
+  if (status === 'RASCUNHO') return 'Parceiro em rascunho (ainda não liberado): insumos, fichas técnicas, lojas e marcas abrem quando ele for ativado.';
   return null;
 }
 

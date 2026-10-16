@@ -26,7 +26,7 @@ const DATA = new Intl.DateTimeFormat('pt-BR', {
 
 const EXPLICA = {
   ATIVO: 'Opera normalmente: cadastros e lançamentos liberados.',
-  RASCUNHO: 'Criado, mas ainda não liberado. Insumos, fichas técnicas, lojas e marcas abrem quando ativar.',
+  RASCUNHO: 'Rascunho: ninguém deste parceiro entra e nada se cadastra até ativar. Ative para liberar o acesso.',
   SUSPENSO:
     'Dá para consultar tudo. Insumos, fichas técnicas, lojas e marcas ficam bloqueados até reativar; o nome ainda pode ser corrigido.',
 } as const;

@@ -15,6 +15,7 @@ import { exigirNivel1 } from '@/lib/erp/contexto';
 import { VERSAO_DO_ERP } from '@/lib/erp/modulos';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { COOKIE_MENU, COOKIE_TEMA, lerMenuRecolhido, lerTema } from '@/lib/erp/tema';
+import { contarPedidosAbertos } from '@/lib/erp/pedidos';
 import { navegacaoDoNivel1 } from '@/lib/rodolfo/modulos';
 import { contarRespostasSemClassificar } from '@/lib/rodolfo/notificacoes';
 import { AppShell } from '@/components/erp/shell/AppShell';
@@ -29,19 +30,28 @@ const parceirosDoShell = cache(() =>
 
 export default async function PainelLayout({ children }: { children: React.ReactNode }) {
   const sessao = await exigirNivel1();
-  const [parceiros, semClassificar] = await Promise.all([parceirosDoShell(), contarRespostasSemClassificar()]);
+  const [parceiros, semClassificar, pedidos] = await Promise.all([
+    parceirosDoShell(),
+    contarRespostasSemClassificar(),
+    contarPedidosAbertos(),
+  ]);
   const c = cookies();
 
-  const notificacoes: Notificacao[] =
-    semClassificar > 0
-      ? [
-          {
-            titulo: `${semClassificar} resposta${semClassificar === 1 ? '' : 's'} sem classificar`,
-            detalhe: 'Inbox · a IA ainda não leu',
-            href: '/rodolfo/inbox',
-          },
-        ]
-      : [];
+  const notificacoes: Notificacao[] = [];
+  if (pedidos.abertos > 0) {
+    notificacoes.push({
+      titulo: `${pedidos.abertos} ${pedidos.abertos === 1 ? 'pedido aguardando' : 'pedidos aguardando'} liberação`,
+      detalhe: pedidos.atrasados > 0 ? `Parceiros Flow · ${pedidos.atrasados} com atraso` : 'Parceiros Flow · dentro do prazo',
+      href: '/rodolfo/onboarding',
+    });
+  }
+  if (semClassificar > 0) {
+    notificacoes.push({
+      titulo: `${semClassificar} resposta${semClassificar === 1 ? '' : 's'} sem classificar`,
+      detalhe: 'Inbox · a IA ainda não leu',
+      href: '/rodolfo/inbox',
+    });
+  }
 
   return (
     <AppShell

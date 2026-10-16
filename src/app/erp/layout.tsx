@@ -29,7 +29,7 @@ export const dynamic = 'force-dynamic';
 
 const AVISO = {
   SUSPENSO: 'Você pode consultar tudo, mas cadastros e alterações estão parados. Fale com a FlowFoods.',
-  RASCUNHO: 'Você já pode olhar. Cadastros e alterações abrem quando a FlowFoods liberar o parceiro.',
+  RASCUNHO: 'Este parceiro ainda não foi liberado. Fale com a FlowFoods.',
 } as const;
 
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
