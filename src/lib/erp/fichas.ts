@@ -94,8 +94,11 @@ export async function insumosTravados(tx: ClienteDoParceiro, ids: string[]): Pro
   const unicos = Array.from(new Set(ids.filter((x) => typeof x === 'string' && x.length > 0 && x.length <= 64)));
   if (unicos.length === 0) return new Map();
   await tx.sql`SELECT 1 FROM "Insumo" WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ANY(${unicos}::text[]) FOR SHARE`;
-  const lidos = await tx.insumo.findMany({ where: { id: { in: unicos } }, select: SELECAO_DO_INSUMO });
-  return new Map(lidos.map((i) => [i.id, i]));
+  const lidos = await tx.insumo.findMany({
+    where: { id: { in: unicos } },
+    select: { ...SELECAO_DO_INSUMO, fichaQueProduz: { select: { nome: true } } },
+  });
+  return new Map(lidos.map(({ fichaQueProduz, ...i }) => [i.id, { ...i, produzidoPor: fichaQueProduz?.nome ?? null }]));
 }
 
 /** O mesmo para os pré-preparos (fichas) citados: travados, só deste parceiro. */

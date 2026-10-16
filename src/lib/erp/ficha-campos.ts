@@ -72,6 +72,12 @@ export interface InsumoDaFicha {
   conteudoMilesimos: number;
   precoEmbalagemCentavos: number;
   taxaEntregaCentavos: number;
+  /**
+   * Nome da ficha que PRODUZ este insumo (1.3), quando ele é a face de estoque
+   * de um pré-preparo. Na receita vale o pré-preparo (`subfichaId`), nunca o
+   * insumo produzido: por ele, o item escaparia da conferência de círculo.
+   */
+  produzidoPor?: string | null;
 }
 
 /** Pré-preparo como o item da ficha precisa dele (1.3): a ficha que pode entrar em outra. */
@@ -247,6 +253,9 @@ export function lerFormFicha(
       const insumo = item.insumoId ? doCadastro.get(item.insumoId) : undefined;
       if (!item.insumoId) return void (erros[chave] = 'Escolha o insumo ou o pré-preparo.');
       if (!insumo) return void (erros[chave] = 'Insumo não encontrado neste cadastro.');
+      if (insumo.produzidoPor) {
+        return void (erros[chave] = `“${insumo.nome}” é o pré-preparo “${insumo.produzidoPor}”: escolha-o em “Pré-preparos”, não em “Insumos”.`);
+      }
       if (!insumo.ativo && !jaNaFicha.has(insumo.id)) {
         return void (erros[chave] = `“${insumo.nome}” está desativado: reative em Insumos para usar.`);
       }
