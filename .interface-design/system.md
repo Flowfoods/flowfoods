@@ -173,3 +173,20 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   requisitado a mais neutro), tabela Corporativo com o sumiço em
   quantidade (15/700) e "R$ X sem requisição" embaixo; selo atenção "pequeno
   e repetido · 2× dentro de R$ 5,00"; por setor; abaixo de zero.
+- **Custo por canal (1.9)**: painel no detalhe do prato com a tabela
+  Corporativo virada — canais nas COLUNAS (Loja · Delivery · iFood, números
+  tabulares à direita) e camadas empilhadas nas linhas (Insumos da receita;
+  Embalagens com o total e, recuadas 36 px em 13 px suave, cada embalagem com
+  o valor e "1 un" embaixo; Taxa do iFood com a conta "23% de comissão + 3,2%
+  de pagamento online = 26,2% do preço" sob o rótulo e "a cada R$ 10,00:
+  R$ 2,62" sob o valor; rodapé `linha-forte` "Custo do canal" em 600). Camada
+  que não se aplica = "—" suave. Taxa sem preço nunca vira R$: o total diz
+  "R$ 9,98" e "+ 26,2% do preço" em 12 px embaixo. Incompleto = selo
+  "Incompleto"/"Não configurada" (atenção) e a frase do porquê no pé do
+  painel. No celular (< 640), um bloco por canal: nome 15/600 + total à
+  direita e as camadas em `dl` de 13 px. **Embalagens por canal**: tela
+  própria (max 768), um painel por canal com o total ao vivo no acessório do
+  cabeçalho, linha = seletor em largura cheia + quantidade (96 px) + unidade +
+  valor + lixeira; campos de largura fixa vão num invólucro (o `CAMPO` é
+  `w-full`). **Canais de venda**: tabela "o que entra no custo" + painel da
+  taxa (duas porcentagens de 112 px e a conta ao vivo num quadro de borda).
