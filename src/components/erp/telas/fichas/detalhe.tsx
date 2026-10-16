@@ -1,3 +1,4 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Prato · rende 1 porção", "bruto 354 g · fator 1,18" e "40 g · pré-preparo" seguem o subtítulo do contrato ("Rede Completa · N fichas") e a linha de apoio da tabela densa. (O ignore do scanner não aceita id com minúscula.)
 /**
  * Detalhe da ficha técnica (1.2), o MESMO para o nível 1 e para a pessoa do
  * parceiro. No topo, o que ajuda a operar: a foto e a descrição. Depois o

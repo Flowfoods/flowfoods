@@ -1,6 +1,6 @@
 /**
- * Custo em cascata com banco (1.3): lê as fichas por NÍVEL — as pedidas, os
- * pré-preparos que elas usam, os que esses usam... — uma consulta por nível
+ * Custo em cascata com banco (1.3): lê as fichas por nível (as pedidas, os
+ * pré-preparos que elas usam, os que esses usam...), uma consulta por nível
  * (`id in [...]`), no máximo `PROFUNDIDADE_MAXIMA`. A lista de 50 fichas com
  * pré-preparos custa as mesmas ≤ 6 idas ao banco que uma ficha só: nada de uma
  * consulta por item. A conta é a pura (`ficha-cascata.ts`), com memória: cada

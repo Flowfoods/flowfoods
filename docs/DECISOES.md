@@ -965,3 +965,69 @@ para as fichas; (b) importar de `telas/insumos/*` nas fichas; (c) mover para
 **Razão:** (c), Regra Nº 2. (a) é a deriva X1 de novo; (b) amarraria a ficha
 ao insumo. `EstadoInsumo` virou `EstadoCadastro`, `FormSituacao` ganhou o
 gênero ("a ficha desativada"), `ResumoDeErros` recebe os rótulos de quem usa.
+
+### 57. 2026-10-16 · ERP 1.3: pré-preparo é ficha; custo em cascata exato, lido por nível, nunca gravado
+
+**Alternativas:** (a) custo do pré-preparo gravado no insumo produzido e
+recalculado "em cascata" quando um insumo muda (gatilho ou fila); (b) item
+aponta o insumo produzido e o custo vem dele; (c) item aponta a ficha
+(`subfichaId`) e o custo do pré-preparo é a conta da ficha dele ÷ rendimento,
+calculada na hora, em fração exata, lida por nível.
+
+**Razão:** (c). (a) volta ao "número velho numa planilha" (decisão 53) e
+exige ordem topológica de escrita a cada preço; (b) misturaria a face de
+estoque (o insumo produzido) com a receita. Fator de correção é bruto ÷
+líquido por item (a quantidade digitada é a limpa; paga-se a bruta), o
+rendimento da ficha já carrega a perda/ganho da cocção — um fator só por item,
+nenhum "fator de cocção" separado. A leitura vai por nível (`id in`), no
+máximo 5, com memória: o custo de 50 fichas sai em 8 consultas. Incompleto
+sobe pela cascata dizendo o insumo que falta. A tela recusa mostrar acima de
+2^53 centavos ("acima do limite") e a gravação recusa ficha que passaria
+disso; o banco ganhou CHECK de fator ≤ 10.
+
+### 58. 2026-10-16 · ERP 1.3: círculo e profundidade conferidos sob trava do grafo do parceiro
+
+**Alternativas:** (a) trigger no banco com CTE recursiva; (b) conferir no
+servidor sem trava; (c) conferir no servidor com `pg_advisory_xact_lock` por
+parceiro tomado antes de ler as ligações.
+
+**Razão:** (c). (b) deixa passar duas edições simultâneas (A passa a usar B
+enquanto B passa a usar A: cada uma lê o grafo sem a outra) — o teste com
+banco prova que, sem a trava, o círculo entra. (a) também precisaria de trava
+(READ COMMITTED) e mensagem em SQL. Com (c) as gravações de ficha de um
+parceiro entram uma de cada vez (são curtas), a conferência é pura
+(`conferirGrafo`) e a frase diz o caminho ("“Base de cebola” usa “Molho
+cheddar”, que usa “Base de cebola”"). Profundidade máxima: 5 fichas numa
+cadeia, contando quem usa (acima) e o que é usado (abaixo). Pré-preparo em
+uso não vira prato nem troca a família da unidade do rendimento.
+
+### 59. 2026-10-16 · ERP 1.3: o pré-preparo mantém o insumo que produz, na mesma transação
+
+**Alternativas:** (a) a pessoa cadastra o insumo do pré-preparo à mão; (b)
+o insumo é criado só quando houver produção (3.1); (c) a ficha cria e mantém
+o insumo (nome, unidade, situação) ao gravar.
+
+**Razão:** (c). O contrato pede o pré-preparo na lista de insumos com o
+custo da ficha, e o esquema da 0.1 já previa `insumoProduzidoId` 1:1. O
+insumo produzido não tem embalagem nem preço próprio (o custo vem da ficha),
+não se edita pela tela de insumos e não entra no seletor da receita (vale o
+pré-preparo). Nome em uso por outro insumo é recusado com sugestão; insumo
+de pré-preparo solto e sem preço com o mesmo nome é adotado. Ficha que deixa
+de ser pré-preparo solta o insumo e o desativa (histórico preservado).
+
+### 60. 2026-10-16 · ERP 1.3 (herança da 1.2): foto limpa nos bytes e enviada por rota que confere a sessão antes do corpo
+
+**Alternativas:** (a) `sharp` (reencoda e tira metadados); (b) remover os
+segmentos de metadados nos bytes, sem reencodar; (c) confiar no navegador
+(o canvas já tira o EXIF).
+
+**Razão:** (b). (a) traz binário nativo (libvips para musl no Alpine), versão
+fixa a manter e reencode com perda; (c) não vale contra quem manda o arquivo
+cru. A limpeza guarda só o que desenha a imagem (lista do que FICA, não do
+que sai), mantém a orientação num APP1 mínimo e recusa arquivo malformado.
+O envio saiu da server action (que lia até 9 MB antes de qualquer conferência,
+com limite global) para uma rota própria que confere sessão, permissão,
+bloqueio e origem antes de ler, exige Content-Length e lê com teto; a foto
+espera em `pendentes/` e a action só move o nome sorteado. As server actions
+voltaram ao limite padrão de 1 MB (planilha até 256 KB). Importação limitada
+a 300 fichas por arquivo, com o estouro de tempo traduzido.

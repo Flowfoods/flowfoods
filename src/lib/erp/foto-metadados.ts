@@ -3,7 +3,7 @@
  * grava no arquivo onde a foto foi tirada (GPS), o aparelho, a data e às vezes
  * uma miniatura. Nada disso pode ir para o disco do parceiro.
  *
- * Sem biblioteca de imagem (decisão 59): a limpeza é feita nos BYTES, sem
+ * Sem biblioteca de imagem (decisão 60): a limpeza é feita nos BYTES, sem
  * reencodar — nenhuma perda de qualidade, nenhum binário nativo no Alpine.
  * Em vez de procurar o que tirar, guarda-se só o que a imagem precisa para
  * ser desenhada (lista do que FICA); o resto sai:
