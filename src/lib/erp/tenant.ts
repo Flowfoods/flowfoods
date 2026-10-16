@@ -447,6 +447,18 @@ export function ehErroDeUnicidade(e: unknown): boolean {
   return e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002';
 }
 
+/**
+ * CHECK do banco recusou a gravação (Postgres 23514): o nome do CHECK, ou null
+ * se o erro é outro. O Prisma não traduz esse código (vem como erro
+ * desconhecido, com o texto do Postgres); quem grava devolve uma frase em vez
+ * de deixar virar 500.
+ */
+export function checkVioladoDe(e: unknown): string | null {
+  const msg = e instanceof Error ? e.message : '';
+  if (!/23514|violates check constraint/.test(msg)) return null;
+  return /constraint \\?"([^"\\]+)\\?"/.exec(msg)?.[1] ?? 'desconhecido';
+}
+
 // ------------------------------------------------------------- nível 1
 
 /** O que vai para `HistoricoAlteracao` (o `parceiroId` vem da gravação). */
