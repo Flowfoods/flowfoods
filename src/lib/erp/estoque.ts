@@ -975,10 +975,12 @@ export interface MovimentoDaTela {
   motivo: string | null;
   estorno: boolean;
   notaId: string | null;
+  /** 1.8: a requisição que gerou a baixa (link no livro). */
+  requisicaoId: string | null;
   ocorridoEm: Date;
 }
 
-const SELECAO_DO_MOVIMENTO = {
+export const SELECAO_DO_MOVIMENTO = {
   id: true,
   tipo: true,
   insumoId: true,
@@ -992,9 +994,10 @@ const SELECAO_DO_MOVIMENTO = {
   estornoDeId: true,
   notaId: true,
   ocorridoEm: true,
+  requisicaoItem: { select: { requisicaoId: true } },
 } as const;
 
-function movimentoParaTela(m: {
+export function movimentoParaTela(m: {
   id: string;
   tipo: string;
   insumoId: string;
@@ -1008,6 +1011,7 @@ function movimentoParaTela(m: {
   estornoDeId: string | null;
   notaId: string | null;
   ocorridoEm: Date;
+  requisicaoItem?: { requisicaoId: string } | null;
 }): MovimentoDaTela {
   return {
     id: m.id,
@@ -1022,6 +1026,7 @@ function movimentoParaTela(m: {
     motivo: m.motivo,
     estorno: !!m.estornoDeId,
     notaId: m.notaId,
+    requisicaoId: m.requisicaoItem?.requisicaoId ?? null,
     ocorridoEm: m.ocorridoEm,
   };
 }

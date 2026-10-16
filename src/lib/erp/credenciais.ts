@@ -1570,6 +1570,8 @@ export interface SessaoValida {
   alcance: Alcance | null;
   /** "Dono", "Gerente", nome do perfil próprio. */
   perfilRotulo: string | null;
+  /** 1.8: setores da pessoa NESTE parceiro (pré-escolhem o setor da requisição; não concedem nada). */
+  setores: Setor[];
 }
 
 /**
@@ -1610,6 +1612,7 @@ export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoV
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
     alcance: atual ? alcanceDe(atual) : null,
     perfilRotulo: atual ? perfilRotuloDe(atual) : null,
+    setores: atual ? normalizarSetores(atual.setores ?? []) : [],
   };
 }
 

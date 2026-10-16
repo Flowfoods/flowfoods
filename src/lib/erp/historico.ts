@@ -22,6 +22,8 @@ const ENTIDADE: Record<string, string> = {
   NotaEntrada: 'Nota de compra',
   Contagem: 'Estoque',
   ContagemItem: 'Contagem',
+  // 1.8
+  Requisicao: 'Requisição',
   Fornecedor: 'Fornecedor',
   AcessoParceiro: 'Acesso',
   PerfilAcesso: 'Perfil',
@@ -51,6 +53,10 @@ const ACAO: Record<string, string> = {
   // 1.7
   FECHOU_SOZINHA: 'Fechou sozinha',
   VENCEU: 'Fechou sem aplicar',
+  // 1.8
+  PEDIU: 'Pediu',
+  ATENDEU: 'Entregou',
+  DEVOLVEU: 'Recebeu de volta',
 };
 
 const CAMPO: Record<string, string> = {
@@ -118,6 +124,16 @@ const CAMPO: Record<string, string> = {
   pisoDoFechamento: 'piso do fechamento',
   frequencia: 'frequência da contagem',
   tolerancia: 'tolerância para fechar sozinha',
+  // 1.8: requisição
+  setor: 'setor',
+  paraQuando: 'para quando',
+  pedido: 'pedido',
+  ficha: 'puxada da ficha',
+  observacao: 'observação',
+  saiu: 'saiu do estoque',
+  corte: 'encerrada sem sair (corte)',
+  negativo: 'saldo negativo (entregue mesmo assim)',
+  voltou: 'voltou para o estoque',
 };
 
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */

@@ -123,8 +123,8 @@ export function lerPedido(
   f: { setor: unknown; paraDia: unknown; observacao: unknown; linhas: readonly LinhaDigitada[] },
   insumos: ReadonlyMap<string, InsumoParaPedir>,
   hoje: string,
-): { ok: true; pedido: PedidoLido } | { ok: false; erros: Partial<Record<string, string>> } {
-  const erros: Partial<Record<string, string>> = {};
+): { ok: true; pedido: PedidoLido } | { ok: false; erros: Record<string, string> } {
+  const erros: Record<string, string> = {};
   const setor = typeof f.setor === 'string' && ehSetor(f.setor) ? f.setor : null;
   if (!setor) erros.setor = 'Escolha o setor que vai usar (cozinha, salão…).';
   const pd = typeof f.paraDia === 'string' ? f.paraDia.trim() : '';
@@ -240,8 +240,8 @@ export function lerEntrega(
   linhas: readonly { itemId: string; quantidade: string; escala: string }[],
   itens: readonly ItemParaEntregar[],
   encerrar: boolean,
-): { ok: true; entregas: Entrega[] } | { ok: false; erros: Partial<Record<string, string>> } {
-  const erros: Partial<Record<string, string>> = {};
+): { ok: true; entregas: Entrega[] } | { ok: false; erros: Record<string, string> } {
+  const erros: Record<string, string> = {};
   const entregas: Entrega[] = [];
   const porId = new Map(itens.map((i) => [i.id, i]));
   for (const l of linhas) {

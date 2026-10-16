@@ -131,7 +131,7 @@ const inicioDoDia = (iso: string) => new Date(`${iso}T03:00:00.000Z`);
  * PERSONALIZADO usa o cadastrado que contém a data; sem cadastro, o mês civil
  * (e a frase diz isso).
  */
-async function periodoDe(tx: ClienteDoParceiro, cfg: ConfigDoPeriodo, data: string): Promise<{ periodo: Periodo; aviso: string | null }> {
+export async function periodoDe(tx: ClienteDoParceiro, cfg: ConfigDoPeriodo, data: string): Promise<{ periodo: Periodo; aviso: string | null }> {
   if (cfg.periodoTipo === 'PERSONALIZADO') {
     const p = await tx.periodoApuracao.findFirst({
       where: { inicio: { lte: new Date(`${data}T00:00:00.000Z`) }, fim: { gte: new Date(`${data}T00:00:00.000Z`) } },

@@ -26,6 +26,7 @@ import {
   executarSalvarRegras,
   recusadoNoEstoque,
 } from '@/components/erp/telas/estoque/executar';
+import { executarAtender, executarCancelar, executarDevolver, executarPedir } from '@/components/erp/telas/requisicoes/executar';
 
 async function preparar(slug: string, lojaId: string, permissao: Permissao) {
   const ctx = await exigirParceiro(slug);
@@ -105,4 +106,32 @@ export async function acaoSalvarRegrasDaContagem(slug: string, lojaId: string, a
   if (negado) return recusadoNoEstoque(anterior, negado);
   await auditar(ctx, 'erp_estoque_regras_salvar', lojaId);
   return executarSalvarRegras(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, base);
+}
+
+// ================================================================ 1.8: requisição
+
+export async function acaoPedirRequisicao(slug: string, lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base } = await preparar(slug, lojaId, 'requisicao.pedir');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarPedir(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, base);
+}
+
+export async function acaoAtenderRequisicao(slug: string, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base } = await preparar(slug, lojaId, 'requisicao.atender');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_requisicao_atender', lojaId);
+  return executarAtender(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(id), anterior, form, base);
+}
+
+export async function acaoDevolverNaRequisicao(slug: string, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base } = await preparar(slug, lojaId, 'requisicao.atender');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_requisicao_devolver', lojaId);
+  return executarDevolver(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(id), anterior, form, base);
+}
+
+export async function acaoCancelarRequisicao(slug: string, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base } = await preparar(slug, lojaId, 'requisicao.pedir');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarCancelar(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(id), anterior, form, base);
 }
