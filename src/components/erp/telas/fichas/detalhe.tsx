@@ -80,7 +80,8 @@ export function TelaDetalheFicha({
       )}
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 space-y-4">
+        {/* Celular: o modo de preparo vem logo depois da foto (quem opera lê isso primeiro); a partir de 640 px, depois dos insumos. */}
+        <div className="flex min-w-0 flex-col gap-4">
           <Painel>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
               <div className="aspect-[4/3] w-full shrink-0 overflow-hidden rounded-[10px] border border-linha bg-forte sm:w-64">
@@ -112,7 +113,7 @@ export function TelaDetalheFicha({
             </div>
           </Painel>
 
-          <Painel titulo="Insumos" semRespiro acessorio={<span className="text-[12px] tabular-nums text-suave">{f.itens.length}</span>}>
+          <Painel className="order-3 sm:order-2" titulo="Insumos" semRespiro acessorio={<span className="text-[12px] tabular-nums text-suave">{f.itens.length}</span>}>
             <table className="w-full text-sm">
               <caption className="sr-only">Insumos da receita, quantidade e custo de cada um pelo custo de referência.</caption>
               <thead>
@@ -171,7 +172,7 @@ export function TelaDetalheFicha({
             </p>
           </Painel>
 
-          <Painel titulo="Modo de preparo">
+          <Painel className="order-2 sm:order-3" titulo="Modo de preparo">
             {f.modoPreparo ? (
               <p className="whitespace-pre-line text-[15px] leading-relaxed text-texto">{f.modoPreparo}</p>
             ) : (

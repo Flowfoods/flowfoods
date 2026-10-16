@@ -451,7 +451,7 @@ function filtroDoBanco(f: FiltrosDeFicha): Prisma.FichaTecnicaWhereInput {
 }
 
 /** Versão da foto para a URL (troca de foto = URL nova; o navegador não mostra a velha). */
-export const versaoDaFoto = (arquivo: string | null) => (arquivo ? arquivo.slice(0, 12) : null);
+const versaoDaFoto = (arquivo: string | null) => (arquivo ? arquivo.slice(0, 12) : null);
 
 /** Página da lista com o total, custo calculado na hora (nunca gravado). */
 export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<FiltrosDeFicha> = {}) {
