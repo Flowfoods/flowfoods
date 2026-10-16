@@ -593,3 +593,13 @@ banco de teste: o operador é recusado pelo servidor.
 - Nome único é sensível a maiúscula ("Cebola" ≠ "cebola"), como na 0.2.
 - O aviso de sair com alterações pega fechar/recarregar, não a navegação
   interna do Next (link do menu).
+
+## Herança da 1.1 (apontada pelos fiscais)
+
+- `custoDaQuantidade` devolve Number de BigInt: antes da 1.3 usar, recusar acima de 2^53 ou devolver BigInt.
+- Casos irreais de custo minúsculo: milheiro "R$ 0,00" e rótulo "menos de R$ 0,000001" citando casa errada.
+- Ordenar por custo carrega todos os insumos do parceiro (0,8 s com 5 mil): levar para SQL quando crescer.
+- Aviso de sair sem salvar não pega navegação pelo menu; nome do insumo diferencia maiúscula.
+- Texto da comparação: "por unidade" e "embalagem padrão" leem melhor.
+- `/portal/<token>`: erro de hydration antigo (React #418, `Portal.tsx` lê `window` no render).
+- `npm audit`: next 14.2.35 (crítico) e prisma (alto) antigos — planejar atualização.
