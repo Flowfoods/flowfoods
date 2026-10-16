@@ -691,3 +691,11 @@ banco de teste: o operador é recusado pelo servidor.
 - O seletor de insumo do formulário é um `<select>` com todos os ativos: com
   milhares, trocar por busca.
 - Importar reabre a prévia inteira na transação (5000 linhas, timeout 30 s).
+
+## Herança da 1.2 (apontada pelos fiscais)
+
+- [médio] `bodySizeLimit` 9 MB é global (Next 14) e o corpo é lido antes da sessão: mover o upload da foto para rota própria que confere sessão antes de ler o corpo.
+- [médio] Importar 5000 fichas leva ~26 s numa transação de 30 s com insumos travados: limitar fichas por importação ou dividir em lotes, com mensagem clara no estouro.
+- [médio] Foto guardada com os bytes originais (EXIF/GPS do celular): regravar a imagem no servidor sem metadados.
+- [baixo] Mensagem de parceiro suspenso não cita fichas; exports só usados no próprio arquivo (`pastaDoErp`, `versaoDaFoto`, `siglaDaPlanilha`).
+- UX: no celular, modo de preparo logo depois da foto; trilha a 820 px truncando; hub com atalhos crescendo; faxina de foto órfã no disco; XLSX fora (só CSV); seletor de insumo vira busca com muitos insumos.
