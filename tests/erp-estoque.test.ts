@@ -307,3 +307,13 @@ describe('decisão 76: o número vale para quando foi digitado (dado do cliente,
     expect(chaveDoRascunho('c1', 'ana')).not.toBe(chaveDoRascunho('c1', 'bia'));
   });
 });
+
+describe('herança da 1.7: a conta das embalagens, curta, em linha própria', () => {
+  it('"1 × 2 kg + 600 g", "3 × 5 kg"; sem embalagem = null', async () => {
+    const { contaDaContagem } = await import('@/lib/erp/estoque-campos');
+    expect(contaDaContagem({ unidade: 'KG', embalagensMilesimos: 1000, soltoMilesimos: 600, embalagemConteudoMilesimos: 2000 })).toBe('1 × 2 kg + 600 g');
+    expect(contaDaContagem({ unidade: 'KG', embalagensMilesimos: 3000, soltoMilesimos: null, embalagemConteudoMilesimos: 5000 })).toBe('3 × 5 kg');
+    expect(contaDaContagem({ unidade: 'UN', embalagensMilesimos: 1500, soltoMilesimos: 4000, embalagemConteudoMilesimos: 12_000 })).toBe('1,5 × 12 un + 4 un');
+    expect(contaDaContagem({ unidade: 'KG', embalagensMilesimos: null, soltoMilesimos: 600, embalagemConteudoMilesimos: 2000 })).toBeNull();
+  });
+});

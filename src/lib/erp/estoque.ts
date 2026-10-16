@@ -36,6 +36,7 @@ import { hojeNoRio, numeroDaNota } from './compra-campos';
 import {
   aplicarNosSaldos,
   camposDaContagem,
+  contaDaContagem,
   chaveDoSaldo,
   efeitoDaNota,
   entradasDaNota,
@@ -536,6 +537,8 @@ export interface ItemDaContagem {
   campos: ContagemDigitada;
   contadoMilesimos: number | null;
   texto: string;
+  /** A conta das embalagens, curta ("1 × 2 kg + 600 g"); null sem embalagem. */
+  conta: string | null;
   versao: number;
   por: string | null;
   em: Date | null;
@@ -587,6 +590,7 @@ export function paraTela(i: ItemLido): ItemDaContagem {
     campos: camposDaContagem({ unidade, embalagensMilesimos: i.embalagensMilesimos, soltoMilesimos: i.soltoMilesimos, escalaDigitada: i.escalaDigitada }),
     contadoMilesimos: i.contadoMilesimos,
     texto: textoDaContagem({ unidade, contadoMilesimos: i.contadoMilesimos, embalagensMilesimos: i.embalagensMilesimos, soltoMilesimos: i.soltoMilesimos, embalagemSnapshot: i.embalagemSnapshot }),
+    conta: i.contadoMilesimos === null ? null : contaDaContagem({ unidade, embalagensMilesimos: i.embalagensMilesimos, soltoMilesimos: i.soltoMilesimos, embalagemConteudoMilesimos: i.embalagemConteudoMilesimos }),
     versao: i.versao,
     por: i.contadoPorNome,
     em: i.contadoEm,

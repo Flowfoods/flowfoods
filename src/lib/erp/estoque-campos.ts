@@ -163,6 +163,17 @@ export function textoDaContagem(i: {
 }
 
 /**
+ * A conta das embalagens, curta, para a linha própria sob o número contado
+ * (herança da 1.7): "1 × 2 kg + 600 g", "3 × 5 kg". Null quando não se
+ * contou por embalagem (o número já é a conta).
+ */
+export function contaDaContagem(i: { unidade: Unidade; embalagensMilesimos: number | null; soltoMilesimos: number | null; embalagemConteudoMilesimos: number | null }): string | null {
+  if (!i.embalagensMilesimos || !i.embalagemConteudoMilesimos) return null;
+  const emb = `${textoNaEscala(i.embalagensMilesimos, 'UN', 'base')} × ${formatarQuantidade(i.embalagemConteudoMilesimos, i.unidade)}`;
+  return i.soltoMilesimos ? `${emb} + ${formatarQuantidade(i.soltoMilesimos, i.unidade)}` : emb;
+}
+
+/**
  * Quando o número foi DIGITADO (decisão 76): a tela manda há quantos ms a
  * pessoa digitou (`idadeMs`, medido no relógio do próprio aparelho, então o
  * relógio errado do celular não conta); o servidor tira do seu "agora". É
