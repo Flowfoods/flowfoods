@@ -8,9 +8,11 @@
  * Em vez de procurar o que tirar, guarda-se só o que a imagem precisa para
  * ser desenhada (lista do que FICA); o resto sai:
  *
- * - JPEG: SOI, APP0 JFIF, APP2 ICC (cor), APP14 Adobe (cor do CMYK), tabelas,
- *   quadro, varreduras e dados até o EOI. Sai APP1 (EXIF/GPS/XMP), APP2 MPF
- *   (outras imagens), APP3–APP13, APP15, comentários e tudo depois do EOI.
+ * - JPEG: SOI, APP0 JFIF, APP2 ICC (cor), APP14 Adobe (cor do CMYK) e só os
+ *   marcadores que desenham a imagem (C0–CF, DB, DD, DA, D0–D7, DC, DF) até o
+ *   EOI. Sai APP1 (EXIF/GPS/XMP), APP2 MPF (outras imagens), APP3–APP13,
+ *   APP15, comentários e tudo depois do EOI. Qualquer outro marcador (TEM,
+ *   reservados, extensões JPGn) RECUSA a foto: não se guarda o desconhecido.
  *   A orientação do EXIF (de pé/deitada) volta num APP1 mínimo, só com ela.
  * - PNG: só os chunks de imagem e de cor (IHDR, PLTE, IDAT, IEND, tRNS, cHRM,
  *   gAMA, iCCP, sBIT, sRGB, pHYs, bKGD e os da animação). Sai eXIf, tEXt,
@@ -76,14 +78,29 @@ function app1SoComOrientacao(v: number): Uint8Array<ArrayBufferLike> {
   ]);
 }
 
-function ficaNoJpeg(marcador: number, dados: Uint8Array): boolean {
-  if (marcador === 0xe0) return comeca(dados, 0, 'JFIF\0') || comeca(dados, 0, 'JFXX\0');
-  if (marcador === 0xe2) return comeca(dados, 0, 'ICC_PROFILE\0');
-  if (marcador === 0xee) return comeca(dados, 0, 'Adobe');
-  if (marcador >= 0xe0 && marcador <= 0xef) return false; // APP1 (EXIF/XMP) e os outros
-  if (marcador === 0xfe) return false; // comentário
-  return true; // tabelas, quadro, varredura, intervalo de reinício
+/**
+ * Marcadores que DESENHAM a imagem (lista fechada, herança da 1.3): quadros e
+ * tabelas C0–CF (SOFn, DHT, DAC), DQT (DB), DRI (DD), varredura (DA), DNL (DC)
+ * e EXP (DF). RST0–7 (D0–D7) não têm tamanho e são tratados à parte.
+ */
+const DESENHA_A_IMAGEM = (m: number) => (m >= 0xc0 && m <= 0xcf) || m === 0xdb || m === 0xdd || m === 0xda || m === 0xdc || m === 0xdf;
+
+/**
+ * O que fazer com cada segmento: fica (desenha a imagem ou a cor), sai
+ * (metadado conhecido: APPn e comentário) ou recusa (qualquer outro marcador:
+ * não se guarda o que não se conhece).
+ */
+function destinoNoJpeg(marcador: number, dados: Uint8Array): 'fica' | 'sai' | 'recusa' {
+  if (marcador === 0xe0) return comeca(dados, 0, 'JFIF\0') || comeca(dados, 0, 'JFXX\0') ? 'fica' : 'sai';
+  if (marcador === 0xe2) return comeca(dados, 0, 'ICC_PROFILE\0') ? 'fica' : 'sai';
+  if (marcador === 0xee) return comeca(dados, 0, 'Adobe') ? 'fica' : 'sai';
+  if (marcador >= 0xe0 && marcador <= 0xef) return 'sai'; // APP1 (EXIF/XMP) e os outros
+  if (marcador === 0xfe) return 'sai'; // comentário
+  return DESENHA_A_IMAGEM(marcador) ? 'fica' : 'recusa';
 }
+
+export const MENSAGEM_JPEG_ESTRANHO = 'A foto tem uma parte que o sistema não reconhece. Tire outra ou salve como JPEG ou PNG comum e escolha de novo.';
+const JPEG_ESTRANHO: Limpeza = { ok: false, erro: MENSAGEM_JPEG_ESTRANHO };
 
 function limparJpeg(b: Uint8Array): Limpeza {
   if (b.length < 4 || b[0] !== 0xff || b[1] !== 0xd8) return DANIFICADA;
@@ -101,7 +118,8 @@ function limparJpeg(b: Uint8Array): Limpeza {
       if (orientacao && orientacao !== 1) cabeca.push(app1SoComOrientacao(orientacao));
       return { ok: true, bytes: juntar([...cabeca, ...partes, new Uint8Array([0xff, 0xd9])]) };
     }
-    if ((m >= 0xd0 && m <= 0xd7) || m === 0x01) {
+    if (m === 0x01) return JPEG_ESTRANHO; // TEM: fora da lista
+    if (m >= 0xd0 && m <= 0xd7) {
       partes.push(new Uint8Array([0xff, m]));
       continue;
     }
@@ -110,7 +128,9 @@ function limparJpeg(b: Uint8Array): Limpeza {
     if (tamanho < 2 || i + tamanho > b.length) return DANIFICADA;
     const dados = b.subarray(i + 2, i + tamanho);
     if (m === 0xe1 && orientacao === null) orientacao = orientacaoDoExif(dados);
-    if (ficaNoJpeg(m, dados)) partes.push(b.subarray(i - 2, i + tamanho));
+    const destino = destinoNoJpeg(m, dados);
+    if (destino === 'recusa') return JPEG_ESTRANHO;
+    if (destino === 'fica') partes.push(b.subarray(i - 2, i + tamanho));
     i += tamanho;
     if (m === 0xda) {
       // Dados da varredura até o próximo marcador (FF00 e RSTn fazem parte deles).

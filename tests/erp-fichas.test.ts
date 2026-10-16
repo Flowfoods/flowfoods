@@ -331,6 +331,7 @@ describe('ERP 1.2 · histórico da ficha: legível, só o que mudou', () => {
       { insumoId: 'pao', subfichaId: null, quantidadeMilesimos: 1000, fatorCorrecaoMilesimos: 1000 },
       { insumoId: 'blend', subfichaId: null, quantidadeMilesimos: 180, fatorCorrecaoMilesimos: 1000 },
     ],
+    validades: null,
   };
 
   it('criação: rende, itens em frase e "com foto"', () => {
@@ -352,7 +353,8 @@ describe('ERP 1.2 · histórico da ficha: legível, só o que mudou', () => {
     expect(d.campos).toEqual(['foto', 'itens']);
     expect(descreverMudancas(d.antes, d.depois).map((x) => [x.campo, x.antes, x.depois])).toEqual([
       ['foto', 'foto anterior', 'foto nova'],
-      ['insumos', 'Pão brioche 1 un · Blend bovino 180 g', 'Pão brioche 1 un · Blend bovino 200 g'],
+      // 1.4: só o que mudou no item, não a lista inteira de novo.
+      ['Blend bovino', '180 g', '200 g'],
     ]);
   });
 });

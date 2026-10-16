@@ -11,13 +11,15 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useFormState } from 'react-dom';
-import { CONSERVACOES, TIPOS, type Conservacao, type TipoInsumo } from '@/lib/erp/insumo-campos';
+import { TIPOS, type TipoInsumo } from '@/lib/erp/insumo-campos';
+import { CONSERVACOES, type Conservacao, type Validades } from '@/lib/erp/validade';
 import { UNIDADES, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Segmentos } from '../../ui/segmentos';
 import { Painel } from '../../ui/superficies';
+import { CamposDeValidade } from '../cadastro/campos-validade';
 import { CamposDaEmbalagem, EMBALAGEM_VAZIA, type ValoresDaEmbalagem } from './campos-embalagem';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
@@ -27,15 +29,17 @@ export interface ValoresDoInsumo extends ValoresDaEmbalagem {
   tipo: TipoInsumo;
   unidade: Unidade;
   conservacao: Conservacao;
+  /** 1.4: principal + validade depois de aberto em cada conservação (opcional). */
+  validades: Validades | null;
 }
 
-export const INSUMO_NOVO: ValoresDoInsumo = { nome: '', tipo: 'INGREDIENTE', unidade: 'KG', conservacao: 'SECO', ...EMBALAGEM_VAZIA };
+export const INSUMO_NOVO: ValoresDoInsumo = { nome: '', tipo: 'INGREDIENTE', unidade: 'KG', conservacao: 'SECO', validades: null, ...EMBALAGEM_VAZIA };
 
 const ROTULO_DO_CAMPO: Record<string, string> = {
   nome: 'Nome',
   tipo: 'Tipo',
   unidade: 'Unidade',
-  conservacao: 'Conservação',
+  conservacao: 'Conservação principal',
   conteudo: 'Quanto vem na embalagem',
   preco: 'Preço',
   frete: 'Frete',
@@ -77,7 +81,7 @@ export function FormInsumo({
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
-      <ResumoDeErros erros={erros} idBase={idBase} rotulos={(c) => ROTULO_DO_CAMPO[c] ?? c} />
+      <ResumoDeErros erros={erros} idBase={idBase} rotulos={(c) => ROTULO_DO_CAMPO[c] ?? (c.startsWith('validade-') ? `Validade em ${CONSERVACOES[c.slice(9) as Conservacao]?.toLowerCase() ?? c}` : c)} />
       <ErroGeral estado={estado} recarregar={aqui} />
 
       <fieldset disabled={!!bloqueio} className="min-w-0 space-y-4">
@@ -107,7 +111,7 @@ export function FormInsumo({
               )}
             </div>
 
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div>
               {prePreparo ? (
                 <div>
                   <span className={ROTULO}>Tipo</span>
@@ -116,7 +120,7 @@ export function FormInsumo({
                   <input type="hidden" name="tipo" value="PRE_PREPARO" />
                 </div>
               ) : (
-                <div>
+                <div className="sm:max-w-sm">
                   <Segmentos
                     nome="tipo"
                     legenda="Tipo"
@@ -130,27 +134,18 @@ export function FormInsumo({
                   <Erro id={`${idBase}-tipo-erro`} texto={erros.tipo} />
                 </div>
               )}
-              <div>
-                <label htmlFor={`${idBase}-conservacao`} className={ROTULO}>
-                  Conservação
-                </label>
-                <select
-                  id={`${idBase}-conservacao`}
-                  name="conservacao"
-                  defaultValue={inicial.conservacao}
-                  className={CAMPO}
-                  aria-invalid={!!erros.conservacao}
-                >
-                  {(Object.keys(CONSERVACOES) as Conservacao[]).map((c) => (
-                    <option key={c} value={c}>
-                      {CONSERVACOES[c]}
-                    </option>
-                  ))}
-                </select>
-                <Erro id={`${idBase}-conservacao-erro`} texto={erros.conservacao} />
-              </div>
             </div>
           </div>
+        </Painel>
+
+        <Painel titulo="Onde guarda e quanto dura">
+          <CamposDeValidade
+            para="insumo"
+            inicial={inicial.validades ?? { principal: inicial.conservacao, minutos: {} }}
+            erros={erros}
+            idBase={idBase}
+            aoMudar={saida.aoMudar}
+          />
         </Painel>
 
         <Painel titulo="Como você compra">

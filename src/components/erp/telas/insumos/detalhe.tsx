@@ -10,6 +10,8 @@
 import Link from 'next/link';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
 import { compararEmbalagens, CONSERVACOES, TIPOS } from '@/lib/erp/insumo-campos';
+import { temValidade } from '@/lib/erp/validade';
+import { IconeDaConservacao, ValidadesDoItem } from '../cadastro/validade';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, contaDoCusto, formatarCusto, formatarDinheiro, formatarFracao, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
@@ -85,7 +87,7 @@ export function TelaDetalheInsumo({
         icone="insumo"
         cor={COR.insumo}
         titulo={i.nome}
-        subtitulo={[contexto, TIPOS[i.tipo], p ? null : CONSERVACOES[i.conservacao], `medido em ${u.nome.toLowerCase()}`]
+        subtitulo={[contexto, TIPOS[i.tipo], p && !temValidade(i.validades) ? null : CONSERVACOES[i.conservacao], `medido em ${u.nome.toLowerCase()}`]
           .filter(Boolean)
           .join(' · ')}
         acao={
@@ -215,7 +217,37 @@ export function TelaDetalheInsumo({
           )}
         </div>
 
-        <aside className="min-w-0 space-y-4" aria-label="Situação e alterações">
+        <aside className="min-w-0 space-y-4" aria-label="Validade, situação e alterações">
+          <Painel titulo={p ? 'Onde fica e quanto dura' : 'Onde guarda e quanto dura'}>
+            <ValidadesDoItem
+              validades={i.validades}
+              vazio={
+                p ? (
+                  <span className="text-atencao">A ficha técnica ainda não diz a validade.</span>
+                ) : (
+                  <span className="flex items-center gap-2.5">
+                    <IconeDaConservacao conservacao={i.conservacao} />
+                    <span>
+                      <span className="text-texto">{CONSERVACOES[i.conservacao]}</span> · validade depois de aberto não informada.
+                    </span>
+                  </span>
+                )
+              }
+            />
+            <p className="mt-2 text-[12px] text-suave">
+              {p ? (
+                <>
+                  Vem da ficha técnica{' '}
+                  <Link href={`${fichas}/${p.fichaId}`} className={LINK_DE_TEXTO}>
+                    {p.nome}
+                  </Link>
+                  .
+                </>
+              ) : (
+                'Depois de aberto ou manipulado. A validade do fabricante vem no lote de cada compra.'
+              )}
+            </p>
+          </Painel>
           {editaAqui && (
             <Painel titulo="Situação">
               {bloqueio ? (

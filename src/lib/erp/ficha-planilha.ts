@@ -14,12 +14,27 @@
  * pré-preparo, com o custo em cascata) e "fator" (opcional) é o fator de
  * correção da linha (1,18; vazio = 1).
  *
+ * 1.4 (colunas opcionais, da ficha): `conservacao` (a principal: seco,
+ * pista fria, refrigerado, congelado) e `validade_seco`, `validade_pista_fria`,
+ * `validade_refrigerado`, `validade_congelado` ("3 dias", "3", "12 h"; só número
+ * = dias). Planilha sem essas colunas, ou com elas vazias, não mexe na validade
+ * da ficha; com alguma preenchida, a ficha passa a ter exatamente aquelas.
+ *
  * Aceita `;` (Excel em português) ou `,`, aspas no padrão CSV (modo de
  * preparo com quebra de linha), cabeçalho com ou sem acento, UTF-8 ou
  * Windows-1252 (o "CSV" do Excel brasileiro). Linha vazia é pulada.
  */
 
 import { RENDE_DO_PREPARO, type EntradaDaFicha, type RendeEm, type TipoFicha } from './ficha-campos';
+import {
+  CONSERVACOES,
+  lerConservacaoDaPlanilha,
+  lerValidadeDaPlanilha,
+  ORDEM_DAS_CONSERVACOES,
+  validadeParaCampo,
+  type Conservacao,
+  type EntradaDeValidade,
+} from './validade';
 
 /**
  * 256 KB: ~5000 linhas de ficha. Também mantém o envio da confirmação (o
@@ -114,11 +129,23 @@ const COLUNAS = {
   quantidade: ['quantidade', 'qtd', 'qtde'],
   unidade: ['unidade', 'medida'],
   fator: ['fator', 'fator de correcao', 'fator correcao', 'fc'],
+  conservacao: ['conservacao', 'conservacao principal'],
+  validadeSeco: ['validade seco', 'validade ambiente', 'validade seco ambiente'],
+  validadePistaFria: ['validade pista fria', 'validade pista'],
+  validadeRefrigerado: ['validade refrigerado', 'validade geladeira'],
+  validadeCongelado: ['validade congelado', 'validade freezer'],
 } as const;
+const COLUNA_DA_CONSERVACAO = {
+  SECO: 'validadeSeco',
+  PISTA_FRIA: 'validadePistaFria',
+  REFRIGERADO: 'validadeRefrigerado',
+  CONGELADO: 'validadeCongelado',
+} as const satisfies Record<Conservacao, string>;
 type Coluna = keyof typeof COLUNAS;
 const OBRIGATORIAS: Coluna[] = ['ficha', 'insumo', 'quantidade', 'unidade'];
 
-export const CABECALHO_DO_MODELO = 'ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade;fator';
+export const CABECALHO_DO_MODELO =
+  'ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade;fator;conservacao;validade_seco;validade_pista_fria;validade_refrigerado;validade_congelado';
 
 /** Uma ficha como veio na planilha, ainda com nomes de insumo (texto). */
 export interface FichaDaPlanilha {
@@ -131,6 +158,8 @@ export interface FichaDaPlanilha {
   descricao: string;
   modoPreparo: string;
   itens: { linha: number; insumo: string; quantidade: string; unidade: string; fator: string }[];
+  /** 1.4: o que a planilha disse da validade (vazio = não disse). Minutos por conservação. */
+  validade: { principal: Conservacao | null; minutos: Partial<Record<Conservacao, number>> };
   erros: ErroDeLinha[];
 }
 
@@ -218,7 +247,19 @@ export function lerPlanilhaDeFichas(texto: string): LeituraDaPlanilha {
     }
     let f = porNome.get(nome);
     if (!f) {
-      f = { nome, primeiraLinha: r.linha, linhas: [], tipo: 'PRATO', rende: '', rendeEm: '', descricao: '', modoPreparo: '', itens: [], erros: [] };
+      f = {
+        nome,
+        primeiraLinha: r.linha,
+        linhas: [],
+        tipo: 'PRATO',
+        rende: '',
+        rendeEm: '',
+        descricao: '',
+        modoPreparo: '',
+        itens: [],
+        validade: { principal: null, minutos: {} },
+        erros: [],
+      };
       porNome.set(nome, f);
     }
     f.linhas.push(r.linha);
@@ -250,6 +291,25 @@ export function lerPlanilhaDeFichas(texto: string): LeituraDaPlanilha {
       if (emVisto.has(nome) && emVisto.get(nome) !== emTxt) {
         f.erros.push({ linha: r.linha, mensagem: `Unidade do rendimento diferente do que veio antes para “${nome}”.` });
       } else emVisto.set(nome, emTxt);
+    }
+
+    // Validade (1.4): campos da ficha, como o rende — vale a primeira linha que preenche.
+    const principalTxt = limpo(val('conservacao'));
+    if (principalTxt) {
+      const c = lerConservacaoDaPlanilha(principalTxt);
+      if (!c) f.erros.push({ linha: r.linha, mensagem: `Conservação “${principalTxt}” não existe: use seco, pista fria, refrigerado ou congelado.` });
+      else if (f.validade.principal && f.validade.principal !== c) f.erros.push({ linha: r.linha, mensagem: `Conservação diferente do que veio antes para “${nome}”.` });
+      else f.validade.principal = c;
+    }
+    for (const c of ORDEM_DAS_CONSERVACOES) {
+      const txt = limpo(val(COLUNA_DA_CONSERVACAO[c]));
+      if (!txt) continue;
+      const m = lerValidadeDaPlanilha(txt);
+      const onde = CONSERVACOES[c].toLowerCase();
+      if (m === null || m === undefined) f.erros.push({ linha: r.linha, mensagem: `Validade “${txt}” em ${onde}: use dias ou horas inteiros (ex.: 3 dias, 12 h).` });
+      else if (f.validade.minutos[c] !== undefined && f.validade.minutos[c] !== m) {
+        f.erros.push({ linha: r.linha, mensagem: `Validade em ${onde} diferente do que veio antes para “${nome}”.` });
+      } else f.validade.minutos[c] = m;
     }
 
     const insumo = limpo(val('insumo'));
@@ -331,9 +391,26 @@ export function casarComInsumos(
       descricao: f.descricao,
       modoPreparo: f.modoPreparo,
       itens,
+      validade: entradaDeValidadeDaPlanilha(f.validade),
     },
     linhaDoItem,
     faltam,
     erros,
   };
+}
+
+/**
+ * O que a planilha disse da validade → a entrada do MESMO leitor do
+ * formulário. Nada dito = undefined (a ficha mantém o que tem). Conservação
+ * principal sem validade vira linha marcada sem número (o leitor pede a validade).
+ */
+export function entradaDeValidadeDaPlanilha(v: FichaDaPlanilha['validade']): EntradaDeValidade | undefined {
+  if (!v.principal && Object.keys(v.minutos).length === 0) return undefined;
+  const linhas: EntradaDeValidade['linhas'] = {};
+  for (const c of ORDEM_DAS_CONSERVACOES) {
+    const m = v.minutos[c];
+    if (m !== undefined) linhas[c] = { marcada: true, ...validadeParaCampo(m) };
+    else if (c === v.principal) linhas[c] = { marcada: true, quantidade: '', em: 'dias' };
+  }
+  return { principal: v.principal ?? undefined, linhas };
 }

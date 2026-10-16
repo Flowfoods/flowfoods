@@ -51,6 +51,8 @@ import { Painel } from '../../ui/superficies';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 import { CampoFoto } from './campo-foto';
+import { CamposDeValidade } from '../cadastro/campos-validade';
+import { CONSERVACOES, type Conservacao, type Validades } from '@/lib/erp/validade';
 import { PREFIXO_DO_PREPARO } from './prefixo';
 
 export interface LinhaDoItem {
@@ -69,6 +71,8 @@ export interface ValoresDaFicha {
   rendimento: string;
   rendimentoUnidade: RendeEm;
   itens: LinhaDoItem[];
+  /** 1.4: onde fica e quanto dura (null = não informada). */
+  validades: Validades | null;
 }
 
 const VAZIA: LinhaDoItem = { escolha: '', quantidade: '', unidade: '', fator: '' };
@@ -80,6 +84,7 @@ const NOVA: ValoresDaFicha = {
   rendimento: '1',
   rendimentoUnidade: 'porcao',
   itens: [VAZIA],
+  validades: null,
 };
 
 const ROTULOS: Record<string, string> = {
@@ -90,8 +95,15 @@ const ROTULOS: Record<string, string> = {
   rendimento: 'Rendimento',
   itens: 'Insumos e pré-preparos',
   modoPreparo: 'Modo de preparo',
+  conservacao: 'Conservação principal',
 };
-const rotuloDoCampo = (c: string) => ROTULOS[c] ?? (c.startsWith('item-') ? `Item ${Number(c.slice(5)) + 1}` : c);
+const rotuloDoCampo = (c: string) =>
+  ROTULOS[c] ??
+  (c.startsWith('item-')
+    ? `Item ${Number(c.slice(5)) + 1}`
+    : c.startsWith('validade-')
+      ? `Validade em ${CONSERVACOES[c.slice(9) as Conservacao]?.toLowerCase() ?? c}`
+      : c);
 
 /** O que a linha escolheu: um insumo ou um pré-preparo, com o custo por unidade (null = sem preço). */
 interface Escolhido {
@@ -331,10 +343,13 @@ export function FormFicha({
           )}
         </Painel>
 
+        <Painel titulo="Onde fica e quanto dura">
+          <CamposDeValidade para="ficha" inicial={inicial.validades} erros={erros} idBase={idBase} aoMudar={saida.aoMudar} />
+        </Painel>
+
         <Painel titulo="Insumos e pré-preparos" semRespiro>
           <p className="border-b border-linha px-4 py-3 text-[12px] leading-relaxed text-suave sm:px-5">
-            Quantidade <strong className="font-semibold text-texto">limpa</strong>, como vai na receita. Fator de correção é quanto se compra para ter 1
-            limpo: cebola com fator 1,18 = 1,18 kg comprados para 1 kg descascado. Vazio = sem perda.
+            Quantidade <strong className="font-semibold text-texto">limpa</strong>. Fator = bruto ÷ limpo (cebola: 1,18). Vazio = sem perda.
           </p>
           {erros.itens && (
             <p id={`${idBase}-itens`} className="border-b border-linha px-4 py-3 text-[13px] text-erro sm:px-5">
@@ -468,7 +483,7 @@ export function FormFicha({
                     <p className="mt-1.5 text-[12px] tabular-nums text-suave">
                       {c.fator !== 1000 && (
                         <>
-                          Peso bruto {formatarQuantidade(c.bruta, e.unidade)} para {formatarQuantidade(c.q, e.unidade)} limpos (fator {formatarFator(c.fator)})
+                          Bruto {formatarQuantidade(c.bruta, e.unidade)} (fator {formatarFator(c.fator)})
                         </>
                       )}
                       {c.fator !== 1000 && e.preparo && ' · '}

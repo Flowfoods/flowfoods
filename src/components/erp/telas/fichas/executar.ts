@@ -11,6 +11,7 @@ import type { MudancaDeFoto } from '@/lib/erp/fichas';
 import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { decodificarPlanilha, LIMITE_DA_PLANILHA } from '@/lib/erp/ficha-planilha';
 import { NOME_DA_FOTO } from '@/lib/erp/foto';
+import { entradaDoFormulario } from '@/lib/erp/validade';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { EstadoImportacao } from './estado';
 import { PREFIXO_DO_PREPARO } from './prefixo';
@@ -45,6 +46,8 @@ export async function lerEnvioDaFicha(
     rendimentoUnidade: textoDe(form.get('rendimentoUnidade')),
     versao: textoDe(form.get('versao')),
     itens,
+    // 1.4: o bloco de validade vem sempre do formulário (marcador); sem ele, a ficha mantém a que tem.
+    validade: form.get('validadeNoFormulario') === 'sim' ? entradaDoFormulario((k) => textoDe(form.get(k))) : undefined,
   };
   // A foto não vem no formulário (1.3): a tela já a enviou pela rota própria e manda só o nome sorteado.
   const enviada = textoDe(form.get('fotoNova'));

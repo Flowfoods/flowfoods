@@ -102,3 +102,12 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   custo de cada item). Fator de correção: quantidade LIMPA no campo, "Peso
   bruto 354 g para 300 g limpos (fator 1,18)" em 12 px suave. Incompleto em
   cascata = selo "Incompleto" (atenção) e a frase com o insumo que falta.
+- **Validade por conservação (1.4)**: bloco "Onde fica e quanto dura", o
+  MESMO na ficha e no insumo — 4 linhas (marcar + ícone funcional da
+  conservação + nome; número inteiro; dias/horas; "Principal" em rádio, só
+  entre as marcadas na ficha), cabeçalho de coluna a partir de 640 px. No
+  detalhe, lista com ícone, nome, "principal" em 12 px suave e a validade em
+  600 tabular à direita; nas listas, a frase "Refrigerado: 3 dias · Congelado:
+  30 dias". Não informada = texto (atenção no pré-preparo), nunca um prazo
+  inventado. Ícones: Seco `Package`, Pista fria `ThermometerSnowflake`,
+  Refrigerado `Refrigerator`, Congelado `Snowflake`, sempre com a palavra.

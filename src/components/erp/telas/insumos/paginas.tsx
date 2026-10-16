@@ -86,6 +86,7 @@ export function TelaFormInsumo({
     tipo: insumo.tipo,
     unidade: insumo.unidade,
     conservacao: insumo.conservacao,
+    validades: insumo.validades,
     ...embalagemParaCampo(insumo, insumo.unidade),
   } : nomeSugerido ? { ...INSUMO_NOVO, nome: nomeSugerido.slice(0, 80) } : undefined;
   const volta = insumo ? `${base}/${insumo.id}` : base;

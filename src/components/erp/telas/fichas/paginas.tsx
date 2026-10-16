@@ -93,6 +93,7 @@ export function TelaFormFicha({
       ...itemParaCampo(i.quantidadeMilesimos, i.unidade),
       fator: i.fatorCorrecaoMilesimos === 1000 ? '' : formatarFator(i.fatorCorrecaoMilesimos),
     })),
+    validades: ficha.validades,
   };
   const volta = ficha ? `${base}/${ficha.id}` : base;
   return (

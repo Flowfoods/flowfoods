@@ -25,6 +25,7 @@ import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { ListaHistorico } from '../historico/lista-historico';
 import { fraseDoFeitoDaFicha } from './estado';
 import { urlDaFoto } from './miniatura';
+import { ValidadesDoItem } from '../cadastro/validade';
 
 export function TelaDetalheFicha({
   ficha: f,
@@ -90,12 +91,15 @@ export function TelaDetalheFicha({
         <div className="flex min-w-0 flex-col gap-4">
           <Painel>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-              <div className="aspect-[4/3] w-full shrink-0 overflow-hidden rounded-[10px] border border-linha bg-forte sm:w-64">
+              {/* Sem foto, no celular, uma faixa baixa (não um quadro vazio do tamanho da foto). */}
+              <div
+                className={`w-full shrink-0 overflow-hidden rounded-[10px] border border-linha bg-forte sm:aspect-[4/3] sm:w-64 ${f.foto ? 'aspect-[4/3]' : 'min-h-11'}`}
+              >
                 {f.foto ? (
                   // eslint-disable-next-line @next/next/no-img-element -- foto privada servida pelo portão do parceiro; o otimizador do Next não a alcança.
                   <img src={urlDaFoto(base, f.id, f.foto)} alt={`Foto de ${f.nome}`} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="grid h-full place-items-center px-4 text-center text-[13px] text-suave">
+                  <div className="flex h-full min-h-11 items-center px-4 text-[13px] text-suave sm:justify-center sm:text-center">
                     Sem foto.{podeEditar && f.ativa && !bloqueio ? ' Em Editar ficha dá para pôr uma.' : ''}
                   </div>
                 )}
@@ -114,6 +118,27 @@ export function TelaDetalheFicha({
                     {incompleto && <Selo tom="alerta">Custo incompleto</Selo>}
                   </div>
                   <p className="mt-2 text-[13px] tabular-nums text-suave">{contaDaFicha(f.custo, f.rendimentoMilesimos, f.unidadeRendimento, f.tipo)}</p>
+                </div>
+                <div className="border-t border-linha pt-4">
+                  <h2 className="text-[13px] font-semibold text-suave">Onde fica e quanto dura</h2>
+                  <div className="mt-1">
+                    <ValidadesDoItem
+                      validades={f.validades}
+                      vazio={
+                        <>
+                          {f.tipo === 'PRE_PREPARO' ? <span className="text-atencao">Validade não informada.</span> : 'Validade não informada.'}
+                          {podeEditar && f.ativa && !bloqueio ? (
+                            <>
+                              {' '}
+                              <Link href={`${base}/${f.id}/editar`} className={LINK_DE_TEXTO}>
+                                Dizer em Editar ficha
+                              </Link>
+                            </>
+                          ) : null}
+                        </>
+                      }
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -214,9 +239,8 @@ export function TelaDetalheFicha({
               </tfoot>
             </table>
             <p className="border-t border-linha px-4 py-3 text-[12px] text-suave sm:px-5">
-              Quantidade limpa; o custo conta o peso bruto (fator de correção). Insumo pelo custo de referência (embalagem padrão); pré-preparo pelo custo
-              da receita dele ÷ o que ela rende. Tudo somado sem arredondar; cada linha mostra o valor arredondado. O custo pelas compras de verdade chega
-              em Compras.
+              Quantidade limpa; o custo conta o bruto (fator). Insumo pelo custo de referência; pré-preparo pelo custo da receita dele ÷ o que rende. Soma
+              sem arredondar; cada linha mostra o valor arredondado.
             </p>
           </Painel>
 

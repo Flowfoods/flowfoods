@@ -8,6 +8,7 @@
  */
 
 import Link from 'next/link';
+import { validadesEmTexto } from '@/lib/erp/validade';
 import type { LinhaDeFicha } from '@/lib/erp/fichas';
 import {
   custoIncompleto,
@@ -179,6 +180,7 @@ export function TelaListaFichas({
                   {TIPOS_DE_FICHA[l.tipo]} · rende {formatarRendimento(l.rendimentoMilesimos, l.unidadeRendimento, l.tipo)}
                   {!l.ativa && ' · Desativada'}
                 </span>
+                {validadesEmTexto(l.validades) && <span className="block truncate text-[12px] text-suave">{validadesEmTexto(l.validades)}</span>}
               </span>
               <span className="shrink-0 text-right text-sm tabular-nums">
                 <CustoPorRende l={l} empilhado />
@@ -229,6 +231,7 @@ export function TelaListaFichas({
                     </Link>
                     <div className="max-w-[15rem] truncate text-[12px] text-suave lg:max-w-[28rem]">
                       {TIPOS_DE_FICHA[l.tipo]}
+                      {validadesEmTexto(l.validades) ? ` · ${validadesEmTexto(l.validades)}` : ''}
                       {l.preparos > 0 ? ` · com ${l.preparos === 1 ? '1 pré-preparo' : `${l.preparos} pré-preparos`}` : ''}
                       {l.descricao ? ` · ${l.descricao}` : ''}
                       <span className="lg:hidden">{!l.ativa && ' · Desativada'}</span>

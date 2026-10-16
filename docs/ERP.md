@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -22,6 +22,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Telas compartilhadas (as MESMAS no nível 1 e no parceiro) | `src/components/erp/telas/*`: `equipe/` (`TelaEquipe`), `estrutura/`, `historico/`, `insumos/`, `hub-do-parceiro.tsx` |
 | Ficha técnica (1.2): regras, planilha, foto | `src/lib/erp/{fichas,ficha-campos,ficha-planilha,ficha-importar,foto,arquivos,foto-resposta}.ts`; telas em `src/components/erp/telas/fichas/`; peças de cadastro comuns em `telas/cadastro/`; migration `20261016010000_erp_ficha_foto`; modelo `public/modelos/fichas-tecnicas.csv` |
 | Pré-preparo, fator de correção, custo em cascata (1.3) | `src/lib/erp/{ficha-cascata,ficha-custos}.ts` (conta e grafo puros; leitura por nível); regras em `fichas.ts`; migration `20261016020000_erp_subficha` |
+| Validade por conservação (1.4) | `src/lib/erp/validade.ts` (puro: leitura, dias/horas ↔ minutos, texto, colunas); telas `telas/cadastro/{validade,campos-validade}.tsx`; migration `20261017000000_erp_validade` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
@@ -503,6 +504,61 @@ fator 1,18, foto do celular), usa 40 g num "Burger cheddar", abre "De onde
 vem", muda o preço do cheddar e vê o burger mudar; cria "Base de cebola",
 põe no molho e tenta pôr o molho na base: recusado.
 
+## O que a 1.4 entregou — validade por conservação na ficha (e no insumo)
+
+Migration `20261017000000_erp_validade` (aditiva): em `FichaTecnica`,
+`conservacao` (nula) + `validade{Seco,PistaFria,Refrigerado,Congelado}Min`;
+CHECKs de faixa (1 min a 730 dias) e da principal (nas duas tabelas; no
+Insumo, `NOT VALID`). Nenhuma tabela nova: portão, RLS e trigger sem mudança.
+
+1. **Mesmo modelo no insumo e na ficha** (decisão 61): a principal (onde
+   fica normalmente) e a validade em MINUTOS em cada conservação aceita. Aceita
+   = tem validade: marcar sem dizer quanto dura é erro na linha. Principal
+   entre as aceitas; uma marcada só já é a principal. Dias ou horas inteiros
+   (pista fria costuma ser horas); 0, decimal e mais de 730 dias recusados.
+2. **Ficha**: bloco "Onde fica e quanto dura" no formulário (4 linhas com
+   ícone, marcar, número, dias/horas, principal; digitar marca a linha).
+   Opcional: sem nenhuma, "Validade não informada" (em atenção no
+   pré-preparo, com atalho para editar). Detalhe: a lista com a principal
+   primeiro ("Refrigerado 3 dias", "Congelado 30 dias"); listas de fichas e de
+   insumos: "Refrigerado: 3 dias · Congelado: 30 dias".
+3. **Insumo comprado**: o mesmo bloco ("Onde guarda e quanto dura"); a
+   principal sempre existe, as validades são as de depois de aberto ou
+   manipulado (a do fabricante vem do lote, na 3.4). Formulário antigo (só a
+   conservação) continua valendo. Filtro "Conservação" da lista = fica ali
+   (principal ou com validade nela).
+4. **Insumo produzido** (herança c da 1.3, decisão 62): conservação e
+   validades vêm da ficha do pré-preparo, na mesma transação, com histórico;
+   não se editam em Insumos.
+5. **Planilha** (decisão 63): colunas opcionais `conservacao`,
+   `validade_seco`, `validade_pista_fria`, `validade_refrigerado`,
+   `validade_congelado`; sem elas (ou vazias), a ficha mantém a dela; a prévia
+   mostra como fica. Modelo para baixar atualizado.
+6. **Histórico**: `conservação` e `validade` em texto ("Refrigerado 3 dias ·
+   Congelado 30 dias"); edição concorrente recusada (`atualizadoEm`);
+   permissões `fichas.editar`/`insumos.editar` no servidor (operador só vê).
+7. **Heranças da 1.3 resolvidas**: (a) `lerFormFicha` recusa o insumo
+   produzido como item comum ("escolha-o em Pré-preparos"), também no
+   formulário forjado; (b) limpeza de JPEG guarda só C0–CF, DB, DD, DA,
+   D0–D7, DC, DF (mais APP0/ICC/Adobe) e RECUSA qualquer outro marcador; (c)
+   item 4; (d) faxina de fotos pendentes também ao abrir a lista de fichas (no
+   máximo a cada 10 min por parceiro e processo; olha até 500 e apaga até 50
+   por vez); (e) trilha abaixo de 1024 px troca os níveis do meio por "…";
+   histórico de itens diz o que entrou, saiu e mudou ("Cebola: 300 g (fator
+   1,18) → 250 g"); texto do fator curto ("Bruto 354 g (fator 1,18)"); "Sem
+   foto" vira faixa baixa no celular; exceção do scanner na seta do comentário.
+
+## Provar a validade (1.4)
+
+```bash
+npx vitest run tests/erp-validade.test.ts      # dias/horas ↔ minutos, regras, planilha com e sem colunas, heranças a, b, d, e
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-validade.db.test.ts
+```
+Na tela: a dona marca o "Molho cheddar" como refrigerado 3 dias e congelado
+30 (principal refrigerado), vê no detalhe e em Insumos ("Refrigerado: 3 dias ·
+Congelado: 30 dias"), importa uma planilha com `validade_pista_fria`; o
+operador vê a validade e não tem botão nenhum.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -792,9 +848,7 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.3 (para as próximas subfases)
 
-- 1.4: o insumo produzido nasce "Seco" (conservação padrão) e não se edita
-  pela tela de insumos; a validade por conservação do pré-preparo precisa de
-  um lugar para escolher a conservação (na ficha do pré-preparo).
+- ~~1.4: o insumo produzido nasce "Seco" e não se edita.~~ **1.4:** vem da ficha.
 - 1.5: o custo pelo último preço de compra entra em `custoDoInsumo`; a
   cascata, o fator e o teto de exibição não mudam.
 - 1.6/3.1: o insumo produzido é a face de estoque do pré-preparo (produção dá
@@ -807,14 +861,37 @@ banco de teste: o operador é recusado pelo servidor.
   hoje). Importação longa segura as edições do parceiro até 30 s.
 - O filtro "só custo incompleto" calcula a cascata de TODOS os pré-preparos
   do parceiro; com milhares, levar para SQL recursivo (`cliente.sql`).
-- Foto: envio exige JavaScript (o formulário sem JS salva sem foto). Faxina
-  de pendentes só roda quando alguém envia outra foto do mesmo parceiro.
+- Foto: envio exige JavaScript (o formulário sem JS salva sem foto). ~~Faxina
+  de pendentes só no próximo envio.~~ **1.4:** também ao abrir a lista.
 - Foto órfã fora de `pendentes/` (processo morto no meio) continua sem faxina
   (herança da 1.2).
 
 ## Herança da 1.3 (apontada pelos fiscais)
 
-- [médio] Formulário forjado aceita como item comum o insumo produzido por um pré-preparo (escapa do ciclo): recusar em `lerFormFicha` insumo com `fichaQueProduz`.
-- [médio] Limpeza de JPEG guarda marcadores desconhecidos (`foto-metadados.ts:79-86`): guardar só C0–CF, DB, DD, DA, D0–D7, DC, DF.
-- [baixo] Foto pendente só é faxinada no próximo envio do mesmo parceiro.
-- UX: trilha a 820 px; histórico de itens pesado ("lista riscada → lista nova"); texto do fator mais curto; espaço "Sem foto" grande no celular; conferir selo "Custo incompleto" subindo do molho para o prato; seta "→" em `ficha-campos.ts:149` sem comentário de exceção do scanner.
+- ~~[médio] Formulário forjado aceita o insumo produzido como item comum.~~ **1.4** (a).
+- ~~[médio] Limpeza de JPEG guarda marcadores desconhecidos.~~ **1.4** (b).
+- ~~[baixo] Foto pendente só é faxinada no próximo envio.~~ **1.4** (d).
+- UX: ~~trilha a 820 px; histórico de itens pesado; texto do fator; "Sem foto" grande no celular; seta sem exceção do scanner~~ (1.4, e); conferir selo "Custo incompleto" subindo do molho para o prato (segue).
+
+## Herança da 1.4 (para as próximas subfases)
+
+- 3.4 etiquetas: validade da etiqueta = data de produção/abertura + minutos da
+  conservação escolhida NA HORA (snapshot na `Etiqueta`; reimpressão não
+  recalcula). Insumo comprado: a do fabricante vem do lote; a das colunas é a
+  de depois de aberto.
+- Pré-preparo sem validade aparece em atenção ("Validade não informada"); a
+  3.4 pode exigir antes de imprimir. Não travamos a gravação para não quebrar
+  fichas e planilhas da 1.2/1.3.
+- CHECKs do Insumo entraram `NOT VALID`: quando conferido que nenhuma linha
+  antiga viola, rodar `ALTER TABLE "Insumo" VALIDATE CONSTRAINT …` (sem pressa).
+- O intervalo da faxina de pendentes é por processo (memória); com várias
+  réplicas, cada uma faz a sua (o teto por vez continua valendo).
+- Histórico de itens lê a frase gravada ("Nome 300 g (fator 1,18)"); nome de
+  insumo que termine como quantidade cai na lista inteira (como antes).
+
+## Herança da 1.4 (apontada pelos fiscais)
+
+- [médio] CHECKs de Insumo entraram `NOT VALID`: rodar `VALIDATE CONSTRAINT` numa próxima migration (passa nos dados da 1.3) ou tratar 23514 com mensagem — hoje linha fora da regra dá 500 ao desativar.
+- [baixo] Marcador JPEG 0xC8 (reservado) ainda aceito em `foto-metadados.ts:86`: tirar da lista.
+- [baixo] Ficha com principal marcada e nenhuma validade grava sem principal, em silêncio: avisar.
+- UX: validade na lista de fichas corta no celular (linha própria); botão "Principal" desabilitado com pouco contraste no claro; "Validade não informada" maior; "Depois de aberto" como subtítulo no detalhe do insumo; contorno do selo "Sem preço" no escuro; conferir "Custo incompleto" subindo do molho para o prato.

@@ -11,7 +11,9 @@
  * metadados, e espera ali até o formulário ser salvo — a action só leva o
  * nome e a MOVE para o lugar (rename, mesmo disco). Se a gravação não fechar,
  * ela volta para pendentes (dá para salvar de novo sem reenviar). Pendente
- * esquecida sai depois de 24 h, na faxina feita a cada envio.
+ * esquecida sai depois de 24 h, na faxina feita a cada envio e também ao
+ * abrir a lista de fichas (1.4: no máximo a cada 10 min por parceiro, com
+ * limite de arquivos por vez).
  *
  * Isolado por parceiro já no caminho, e nada que veio do navegador entra
  * nele: o id do parceiro vem da sessão/portão e o nome é sorteado aqui. Quem
@@ -20,7 +22,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { createReadStream } from 'node:fs';
-import { mkdir, readdir, rename, stat, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, opendir, rename, stat, unlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { NOME_DA_FOTO, TIPOS_DE_FOTO, type ExtensaoDaFoto } from './foto';
@@ -100,14 +102,24 @@ export async function devolverFotoPendente(parceiroId: string, arquivo: string):
   }
 }
 
-/** Apaga as pendentes deste parceiro com mais de 24 h (feito a cada envio; melhor esforço). */
+/** Teto de uma faxina: arquivos olhados e apagados por vez (a próxima continua). */
+export const FAXINA = { olhar: 500, apagar: 50, intervaloMs: 10 * 60 * 1000 } as const;
+
+/**
+ * Apaga as pendentes deste parceiro com mais de 24 h (feito a cada envio e ao
+ * abrir a lista de fichas; melhor esforço). Barata e com teto: olha no máximo
+ * `FAXINA.olhar` nomes e apaga no máximo `FAXINA.apagar`.
+ */
 export async function faxinarPendentes(parceiroId: string, agora = Date.now()): Promise<number> {
   const pasta = path.dirname(caminhoDaFoto(parceiroId, `${'0'.repeat(32)}.jpg`, pastaDoErp(), true));
   let apagadas = 0;
+  let olhadas = 0;
   try {
-    for (const nome of await readdir(pasta)) {
-      if (!NOME_DA_FOTO.test(nome)) continue;
-      const c = path.join(pasta, nome);
+    const dir = await opendir(pasta);
+    for await (const e of dir) {
+      if (++olhadas > FAXINA.olhar || apagadas >= FAXINA.apagar) break;
+      if (!e.isFile() || !NOME_DA_FOTO.test(e.name)) continue;
+      const c = path.join(pasta, e.name);
       const s = await stat(c);
       if (agora - s.mtimeMs > UM_DIA) {
         await unlink(c);
@@ -118,4 +130,24 @@ export async function faxinarPendentes(parceiroId: string, agora = Date.now()): 
     if ((e as NodeJS.ErrnoException).code !== 'ENOENT') console.warn('[erp] faxina de fotos pendentes:', (e as Error).message);
   }
   return apagadas;
+}
+
+/** Última faxina por parceiro neste processo (o intervalo é por processo; o teto vale sempre). */
+const ultimaFaxina = new Map<string, number>();
+
+/**
+ * Faxina de pendentes ao abrir a lista de fichas (herança d da 1.3): a pendente
+ * esquecida não depende de alguém enviar outra foto. No máximo uma a cada
+ * `FAXINA.intervaloMs` por parceiro; nunca derruba a tela.
+ */
+export async function faxinarPendentesDeVezEmQuando(parceiroId: string, agora = Date.now()): Promise<number | null> {
+  const ultima = ultimaFaxina.get(parceiroId);
+  if (ultima !== undefined && agora - ultima < FAXINA.intervaloMs) return null;
+  ultimaFaxina.set(parceiroId, agora);
+  if (ultimaFaxina.size > 5000) ultimaFaxina.delete(ultimaFaxina.keys().next().value!);
+  try {
+    return await faxinarPendentes(parceiroId, agora);
+  } catch {
+    return 0;
+  }
 }

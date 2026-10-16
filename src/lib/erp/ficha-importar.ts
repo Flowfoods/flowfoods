@@ -31,7 +31,7 @@ import { custosEmCascata } from './ficha-custos';
 import {
   cadastroDaEntrada,
   conferirEstrutura,
-  dadosGravados,
+  dadosDaFichaGravada,
   gravarFicha,
   insumosTravados,
   preparosTravados,
@@ -41,6 +41,7 @@ import {
 } from './fichas';
 import { diferenca } from './insumo-campos';
 import { formatarFracao } from './unidades';
+import { validadesDaLinha, validadesEmTexto } from './validade';
 
 export type SituacaoNaPrevia = 'nova' | 'muda' | 'igual' | 'erro';
 
@@ -57,6 +58,8 @@ export interface FichaNaPrevia {
   /** "R$ 3,09 por porção"; null com erro. */
   custo: string | null;
   incompleto: boolean;
+  /** 1.4: "Refrigerado: 3 dias · Congelado: 30 dias" (como fica depois de importar); null = não informada. */
+  validade: string | null;
   erros: ErroDeLinha[];
   /** Insumos que a planilha cita e não estão cadastrados. */
   faltam: string[];
@@ -77,6 +80,8 @@ const PALAVRA: Record<string, string> = {
   descricao: 'descrição',
   modoPreparo: 'modo de preparo',
   itens: 'insumos e quantidades',
+  conservacao: 'conservação',
+  validade: 'validade',
 };
 
 const intervalo = (linhas: number[]) => {
@@ -157,7 +162,7 @@ function planejarUma(
   preparos: ReadonlyMap<string, PreparoDaFicha>,
   custoDoPreparo: (id: string) => ReturnType<typeof custoDaFicha> | null,
 ): Plano {
-  const base = { nome: f.nome, linhas: intervalo(f.linhas), mudancas: [], itens: f.itens.length, rende: null, custo: null, incompleto: false, faltam };
+  const base = { nome: f.nome, linhas: intervalo(f.linhas), mudancas: [], itens: f.itens.length, rende: null, custo: null, incompleto: false, validade: null, faltam };
   const erros: ErroDeLinha[] = [...f.erros, ...errosDoCasamento];
   if (atual && !atual.ativa) erros.push({ linha: f.primeiraLinha, mensagem: `A ficha “${f.nome}” está desativada: reative antes de importar por cima.` });
   const jaNaFicha = new Set((atual?.itens ?? []).flatMap((i) => [i.insumoId, i.subfichaId]).filter((x): x is string => !!x));
@@ -174,11 +179,12 @@ function planejarUma(
     return { previa: { ...base, situacao: 'erro', erros: unicos.sort((a, b) => a.linha - b.linha) } };
   }
 
-  // Vazio na planilha não apaga o que a ficha já tem.
+  // Vazio na planilha não apaga o que a ficha já tem (1.4: nem a validade, quando as colunas não vieram).
   const dados: DadosFicha = {
     ...lido.dados,
     descricao: lido.dados.descricao ?? atual?.descricao ?? null,
     modoPreparo: lido.dados.modoPreparo ?? atual?.modoPreparo ?? null,
+    validades: entrada.validade === undefined ? (atual ? validadesDaLinha(atual) : null) : lido.dados.validades,
   };
   const custo = custoDaFicha(
     dados.itens.map((i) => {
@@ -196,10 +202,11 @@ function planejarUma(
     rende: formatarRendimento(dados.rendimentoMilesimos, dados.unidadeRendimento, dados.tipo),
     custo: `${formatarFracao(custo.porRendimento)} ${porUnidadeDeRendimento(dados.unidadeRendimento, dados.tipo)}`,
     incompleto: custoIncompleto(custo),
+    validade: validadesEmTexto(dados.validades),
   };
   if (!atual) return { previa: { ...comum, situacao: 'nova' }, dados };
   const mudanca = diferenca(
-    retratoDaFicha(dadosGravados(atual), doCadastro, atual.fotoArquivo, preparos),
+    retratoDaFicha(dadosDaFichaGravada(atual), doCadastro, atual.fotoArquivo, preparos),
     retratoDaFicha(dados, doCadastro, atual.fotoArquivo, preparos),
   );
   if (!mudanca) return { previa: { ...comum, situacao: 'igual' }, dados, atual };
@@ -276,7 +283,7 @@ export async function importarFichas(
             preparos,
             foto: 'manter',
             origem: 'IMPORTACAO',
-            antes: p.atual ? retratoDaFicha(dadosGravados(p.atual), doCadastro, p.atual.fotoArquivo, preparos) : undefined,
+            antes: p.atual ? retratoDaFicha(dadosDaFichaGravada(p.atual), doCadastro, p.atual.fotoArquivo, preparos) : undefined,
             motivo: 'Importada por planilha',
             autorNome,
           });
