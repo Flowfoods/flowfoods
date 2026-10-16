@@ -208,13 +208,6 @@ export function TelaDetalheInsumo({
         </div>
 
         <aside className="min-w-0 space-y-4" aria-label="Situação e alterações">
-          <Painel titulo="Últimas alterações" semRespiro>
-            {i.historico.length === 0 ? (
-              <Vazio>Nada registrado ainda.</Vazio>
-            ) : (
-              <ListaHistorico linhas={i.historico} compacta />
-            )}
-          </Painel>
           {podeEditar && (
             <Painel titulo="Situação">
               {bloqueio ? (
@@ -224,6 +217,13 @@ export function TelaDetalheInsumo({
               )}
             </Painel>
           )}
+          <Painel titulo="Últimas alterações" semRespiro>
+            {i.historico.length === 0 ? (
+              <Vazio>Nada registrado ainda.</Vazio>
+            ) : (
+              <ListaHistorico linhas={i.historico} compacta />
+            )}
+          </Painel>
         </aside>
       </div>
     </div>

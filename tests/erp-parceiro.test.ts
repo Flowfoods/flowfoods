@@ -43,9 +43,10 @@ describe('ERP · histórico legível', () => {
   it('criação mostra o que nasceu; dinheiro e quantidade formatados', () => {
     const m = descreverMudancas(null, { nome: 'Bacon', precoEmbalagemCentavos: 4290, conteudoMilesimos: 1500 });
     expect(m.map((x) => [x.campo, x.antes, x.depois.replace(/\s/g, ' ')])).toEqual([
+      // Ordem da tela (1.1), não a do JSON: o jsonb do Postgres não guarda a ordem das chaves.
       ['nome', null, 'Bacon'],
-      ['preço', null, 'R$ 42,90'],
       ['embalagem', null, '1,5'],
+      ['preço', null, 'R$ 42,90'],
     ]);
     // Com a unidade na linha, a quantidade sai com ela e a unidade não repete.
     expect(

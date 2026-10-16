@@ -68,6 +68,21 @@ const CAMPO: Record<string, string> = {
   tentativas: 'tentativas',
 };
 
+/** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */
+const ORDEM = [
+  'nome',
+  'tipo',
+  'conservacao',
+  'unidade',
+  'conteudoMilesimos',
+  'precoEmbalagemCentavos',
+  'taxaEntregaCentavos',
+  'custoPorUnidadeCentavos',
+  'codigoBarras',
+  'ativo',
+];
+const posicao = (c: string) => (ORDEM.includes(c) ? ORDEM.indexOf(c) : ORDEM.length);
+
 const STATUS: Record<string, string> = {
   ATIVO: 'Ativo',
   RASCUNHO: 'Aguardando liberação',
@@ -142,8 +157,12 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     }
     return valor(c, o[c]);
   };
+  // O Postgres (jsonb) não guarda a ordem das chaves: a leitura segue a da tela.
+  campos.sort((x, y) => posicao(x) - posicao(y));
   const out: Mudanca[] = [];
   for (const c of campos) {
+    // Na criação, campo vazio não é informação ("código de barras: —").
+    if (criacao && (depois[c] === null || depois[c] === undefined || depois[c] === '')) continue;
     if (!criacao && JSON.stringify(antes[c]) === JSON.stringify(depois[c])) continue;
     if (c === 'unidade' && juntarUnidade && criacao) continue;
     // De quem é a embalagem já está no "alvo" da linha.

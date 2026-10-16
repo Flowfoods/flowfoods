@@ -29,7 +29,7 @@ export function ListaHistorico({ linhas, compacta = false }: { linhas: LinhaDeHi
         return (
           <li
             key={h.id}
-            className={`grid gap-x-4 gap-y-1 border-t border-linha px-5 py-3 text-sm first:border-t-0 ${
+            className={`grid grid-cols-1 gap-x-4 gap-y-1 border-t border-linha px-5 py-3 text-sm first:border-t-0 ${
               compacta ? '' : 'sm:grid-cols-[112px_150px_minmax(0,1fr)_140px] sm:items-baseline'
             }`}
           >
