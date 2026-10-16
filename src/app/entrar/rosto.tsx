@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { browserSupportsWebAuthn, startAuthentication } from '@simplewebauthn/browser';
+import { AREA_DO_ERP, destinoSeguro } from '@/lib/destino-seguro';
 import { acaoEntrarComRosto, acaoOpcoesDoRosto } from './actions';
 
 export function EntrarComRosto() {
@@ -34,7 +35,8 @@ export function EntrarComRosto() {
       const resposta = await startAuthentication({ optionsJSON: pedido.opcoes });
       const r = await acaoEntrarComRosto(resposta);
       if (r.ok) {
-        window.location.assign(r.destino);
+        // Destino vem do servidor; mesmo assim, só dentro da área do ERP.
+        window.location.assign(destinoSeguro(r.destino, window.location.origin, AREA_DO_ERP, '/erp'));
         return;
       }
       setErro(r.erro);

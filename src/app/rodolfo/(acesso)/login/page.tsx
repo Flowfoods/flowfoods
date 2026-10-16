@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { CAMPO, ROTULO } from '@/components/erp/ui/campos';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
+import { AREA_DO_RODOLFO, destinoSeguro } from '@/lib/destino-seguro';
 
 function Formulario() {
   const params = useSearchParams();
@@ -25,7 +26,9 @@ function Formulario() {
       // Navegação completa, não `router.push`: os links do menu do /rodolfo
       // são pré-carregados ainda SEM sessão, e o router do Next reaproveitava
       // esse cache — o redirect para o login — logo depois de entrar.
-      window.location.assign(params.get('callbackUrl') ?? '/rodolfo');
+      // O destino vem da URL: só caminho interno do /rodolfo (nada de
+      // `javascript:` nem outro site).
+      window.location.assign(destinoSeguro(params.get('callbackUrl'), window.location.origin, AREA_DO_RODOLFO, '/rodolfo'));
     } else {
       // Mensagem única para senha errada, e-mail inexistente e rate limit: dizer
       // qual dos três é entregar meio caminho a quem está tentando adivinhar.
