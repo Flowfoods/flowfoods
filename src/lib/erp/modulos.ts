@@ -84,7 +84,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 1.5';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 1.6';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -266,6 +266,27 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
       ],
     },
     {
+      chave: 'estoque',
+      nome: 'Estoque',
+      subtitulo: 'Saldo por loja, abertura e contagem',
+      icone: 'estoque',
+      grupos: [
+        {
+          rotulo: 'Estoque',
+          icone: 'estoque',
+          telas: [
+            {
+              href: `${base}/estoque`,
+              rotulo: 'Estoque por loja',
+              icone: 'estoque',
+              subtitulo: 'Situação, saldo e valor de cada loja',
+              permissao: 'estoque.ver',
+            },
+          ],
+        },
+      ],
+    },
+    {
       chave: 'rede',
       nome: 'Rede e equipe',
       subtitulo: 'Lojas, marcas e pessoas',
@@ -292,14 +313,6 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
 
 /** Do plano (Notion "FlowFoods Barney — ERP"), ainda sem tela. */
 export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [
-  {
-    chave: 'estoque',
-    nome: 'Estoque',
-    subtitulo: 'Saldo, contagem e requisição',
-    icone: 'estoque',
-    fase: '1.6',
-    ver: ['estoque.ver'],
-  },
   {
     chave: 'dre',
     nome: 'Faturamento e DRE',

@@ -8,7 +8,7 @@
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import type { FornecedorDetalhado, LinhaDeFornecedor, SituacaoDoFornecedor } from '@/lib/erp/compras';
-import { formatarData, formatarDocumento } from '@/lib/erp/compra-campos';
+import { formatarData, formatarDocumento, numeroDaNota } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarCusto, formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
@@ -234,8 +234,7 @@ export function TelaDetalheFornecedor({
                     <Link href={`${notasBase}/${n.id}`} className="ff-transicao flex min-h-12 items-center justify-between gap-3 px-4 py-2.5 text-sm hover:bg-texto/[0.03] sm:px-5">
                       <span className="min-w-0">
                         <span className={`block font-medium ${n.status === 'CANCELADA' ? 'text-suave line-through' : 'text-texto'}`}>
-                          Nota {n.numero}
-                          {n.serie ? `-${n.serie}` : ''}
+                          Nota {numeroDaNota(n)}
                         </span>
                         <span className="block text-[12px] tabular-nums text-suave">
                           {n.loja} · {formatarData(n.entradaEm)}

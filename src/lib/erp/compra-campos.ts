@@ -108,6 +108,16 @@ export function lerData(t: string): string | null {
   return dt.toISOString().slice(0, 10);
 }
 
+/**
+ * Erro de formato da data, para o campo mostrar ao sair dele (herança da 1.5):
+ * vazio vale (quem exige é o servidor); incompleta ou impossível, a frase.
+ */
+export function erroDoFormatoDaData(texto: string): string | null {
+  const t = texto.trim();
+  if (!t || lerData(t)) return null;
+  return /^\d{2}\/\d{2}\/\d{4}$/.test(t) ? `${t} não existe no calendário.` : 'Data incompleta: use dd/mm/aaaa (ex.: 14/10/2026).';
+}
+
 /** Máscara do campo de data enquanto digita: "14102026" vira "14/10/2026" (só dígitos, até 8). */
 export function mascararData(t: string): string {
   const d = t.replace(/\D/g, '').slice(0, 8);
@@ -124,6 +134,11 @@ export function formatarData(d: string | Date, curta = false): string {
   const iso = typeof d === 'string' ? d : d.toISOString().slice(0, 10);
   const [a, m, dia] = iso.split('-');
   return curta ? `${dia}/${m}` : `${dia}/${m}/${a}`;
+}
+
+/** Número curto da nota, igual em toda lista (desktop e celular): "4521-1", "4521", "s/n". */
+export function numeroDaNota(n: { numero: string | null; serie: string }): string {
+  return `${n.numero ?? 's/n'}${n.serie ? `-${n.serie}` : ''}`;
 }
 
 /** "Nota 123 · série 1" / "Nota 123". */

@@ -20,6 +20,8 @@ const ENTIDADE: Record<string, string> = {
   FichaTecnica: 'Ficha técnica',
   // 1.5
   NotaEntrada: 'Nota de compra',
+  Contagem: 'Estoque',
+  ContagemItem: 'Contagem',
   Fornecedor: 'Fornecedor',
   AcessoParceiro: 'Acesso',
   PerfilAcesso: 'Perfil',
@@ -42,6 +44,10 @@ const ACAO: Record<string, string> = {
   EXCLUIU: 'Excluiu',
   LIBEROU_ENTRADA: 'Liberou a entrada do',
   PEDIU_SENHA_NOVA: 'Pediu senha nova no',
+  INICIOU: 'Começou',
+  CONCLUIU: 'Concluiu',
+  DESCARTOU: 'Descartou',
+  RECONTOU: 'Recontou',
 };
 
 const CAMPO: Record<string, string> = {
@@ -61,6 +67,12 @@ const CAMPO: Record<string, string> = {
   codigoBarras: 'código de barras',
   ativo: 'situação',
   insumo: 'insumo',
+  contado: 'contado',
+  contados: 'contados',
+  zerados: 'contados com zero',
+  naoContados: 'não contados (entraram com zero)',
+  semCusto: 'sem preço (valor pendente)',
+  valorCentavos: 'valor do estoque',
   email: 'e-mail',
   linkValeAte: 'link vale até',
   senha: 'senha',

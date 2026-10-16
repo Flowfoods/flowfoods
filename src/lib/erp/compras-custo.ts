@@ -15,7 +15,7 @@
 
 import type { ClienteDoParceiro } from './tenant';
 import { filtroDeLojas, pode, type Alcance } from './permissoes';
-import { custoDaCompra } from './compra-campos';
+import { custoDaCompra, numeroDaNota } from './compra-campos';
 import { compararCustos, type CustoExato } from './unidades';
 
 export interface UltimaCompra {
@@ -195,7 +195,7 @@ export async function comprasDoInsumo(tx: ClienteDoParceiro, insumoId: string, a
     if (porNota.size >= limite) continue;
     porNota.set(i.notaId, {
       notaId: i.notaId,
-      rotulo: `${i.nota.numero ?? 's/n'}${i.nota.serie ? `-${i.nota.serie}` : ''}`,
+      rotulo: numeroDaNota(i.nota),
       entradaEm: i.nota.entradaEm.toISOString().slice(0, 10),
       lojaId: i.nota.lojaId,
       lojaNome: i.nota.loja.nome,

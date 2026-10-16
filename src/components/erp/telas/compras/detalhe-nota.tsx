@@ -13,6 +13,7 @@ import { formatarData } from '@/lib/erp/compra-campos';
 import { formatarDocumento } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarCusto, formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
+import { quantidadeComSinal } from '@/lib/erp/estoque-campos';
 import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Linha, Painel, Selo, Vazio } from '../../ui/superficies';
@@ -35,6 +36,7 @@ export function TelaDetalheNota({
   bloqueio,
   insumosBase,
   fornecedoresBase,
+  estoqueBase,
   acaoCancelar,
 }: {
   nota: NotaDetalhada;
@@ -48,6 +50,8 @@ export function TelaDetalheNota({
   /** Link do insumo (quem vê insumos). */
   insumosBase?: string;
   fornecedoresBase: string;
+  /** 1.6: link do estoque da loja (quem vê o estoque dela). */
+  estoqueBase?: string;
   acaoCancelar: AcaoDeNota;
 }) {
   const mensagem = fraseDaNota(feito);
@@ -90,7 +94,7 @@ export function TelaDetalheNota({
             </div>
             <p className="mt-3 border-t border-linha pt-3 text-[12px] text-suave">
               {n.freteCentavos > 0 ? 'O frete foi dividido entre os itens pelo valor de cada um e entra no custo. ' : ''}
-              Esta fase não mexe no estoque: o saldo da loja começa na abertura do estoque.
+              {n.estoque.frase}
             </p>
           </Painel>
 
@@ -183,6 +187,37 @@ export function TelaDetalheNota({
               {n.canceladaEm && <Linha rotulo="Cancelada em">{DATA_HORA.format(n.canceladaEm).replace(',', ' às')}</Linha>}
             </dl>
           </Painel>
+          {n.estoque.movimentos.length > 0 && (
+            <Painel
+              titulo="No estoque"
+              subtitulo="Entrada e estorno, nunca apagados"
+              semRespiro
+              acessorio={
+                estoqueBase ? (
+                  <Link href={`${estoqueBase}/${n.lojaId}`} className={`${LINK_DE_TEXTO} whitespace-nowrap`}>
+                    Ver o estoque
+                  </Link>
+                ) : undefined
+              }
+            >
+              <ul className="divide-y divide-linha">
+                {n.estoque.movimentos.map((m) => (
+                  <li key={m.id} className="px-4 py-2.5 text-sm sm:px-5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate text-texto">
+                        {m.estorno && <span className="font-semibold">Estorno · </span>}
+                        {m.nome}
+                      </span>
+                      <span className={`shrink-0 font-semibold tabular-nums ${m.estorno ? 'text-suave' : 'text-texto'}`}>{quantidadeComSinal(m.quantidadeMilesimos, m.unidade)}</span>
+                    </div>
+                    <div className="text-[12px] tabular-nums text-suave">
+                      {DATA_HORA.format(m.ocorridoEm).replace(',', ' às')} · saldo {formatarQuantidade(m.antes, m.unidade)} para {formatarQuantidade(m.depois, m.unidade)}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Painel>
+          )}
           {edita && (
             <Painel titulo="Situação">{bloqueio ? <p className="text-sm text-suave">{bloqueio}</p> : <FormCancelarNota acao={acaoCancelar} />}</Painel>
           )}
