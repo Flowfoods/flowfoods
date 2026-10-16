@@ -120,7 +120,7 @@ export function TelaDetalheFicha({
                   <th scope="col" className="h-10 pl-4 pr-3 font-semibold sm:pl-5">
                     Insumo
                   </th>
-                  <th scope="col" className="h-10 px-3 text-right font-semibold">
+                  <th scope="col" className="hidden h-10 px-3 text-right font-semibold sm:table-cell">
                     Quantidade
                   </th>
                   <th scope="col" className="h-10 pl-3 pr-4 text-right font-semibold sm:pr-5">
@@ -140,8 +140,12 @@ export function TelaDetalheFicha({
                         <span className="font-medium text-texto">{i.nome}</span>
                       )}
                       {!i.ativo && <span className="ml-2 text-[12px] text-suave">insumo desativado</span>}
+                      {/* Celular: a quantidade vem embaixo do nome (a coluna some). */}
+                      <span className="block text-[12px] text-suave sm:hidden">{formatarQuantidade(i.quantidadeMilesimos, i.unidade)}</span>
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right text-suave">{formatarQuantidade(i.quantidadeMilesimos, i.unidade)}</td>
+                    <td className="hidden whitespace-nowrap px-3 py-2 text-right text-suave sm:table-cell">
+                      {formatarQuantidade(i.quantidadeMilesimos, i.unidade)}
+                    </td>
                     <td className="whitespace-nowrap py-2 pl-3 pr-4 text-right sm:pr-5">
                       {i.custo ? <span className="text-texto">{formatarFracao(i.custo)}</span> : <Selo tom="alerta">Sem preço</Selo>}
                     </td>
@@ -150,9 +154,10 @@ export function TelaDetalheFicha({
               </tbody>
               <tfoot>
                 <tr className="border-t border-linha-forte">
-                  <th scope="row" colSpan={2} className="h-11 pl-4 pr-3 text-left font-semibold sm:pl-5">
+                  <th scope="row" className="h-11 pl-4 pr-3 text-left font-semibold sm:pl-5">
                     Custo da receita (rende {rende})
                   </th>
+                  <td className="hidden sm:table-cell" />
                   <td className="whitespace-nowrap py-2 pl-3 pr-4 text-right font-semibold tabular-nums sm:pr-5">
                     {formatarFracao(f.custo.total)}
                     {incompleto && <span className="font-normal text-suave"> + sem preço</span>}

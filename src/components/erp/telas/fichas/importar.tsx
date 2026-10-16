@@ -9,6 +9,7 @@
  */
 
 import Link from 'next/link';
+import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import type { FichaNaPrevia, SituacaoNaPrevia } from '@/lib/erp/ficha-importar';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -85,6 +86,7 @@ export function TelaImportarFichas({
     (anterior, form) => (form.get('passo') === 'importar' ? acaoImportar(anterior, form) : acaoPrevia(anterior, form)),
     null,
   );
+  const [arquivo, setArquivo] = useState<string | null>(null);
   const previa = estado?.previa;
   const entram = previa ? previa.contagem.nova + previa.contagem.muda : 0;
 
@@ -132,17 +134,28 @@ export function TelaImportarFichas({
           <input type="hidden" name="passo" value="previa" />
           <fieldset disabled={!!bloqueio} className="min-w-0 space-y-3">
             <div>
-              <label htmlFor="planilha" className={ROTULO}>
-                Arquivo CSV
-              </label>
-              <input
-                id="planilha"
-                name="planilha"
-                type="file"
-                accept=".csv,text/csv"
-                required
-                className="block w-full text-sm text-texto file:mr-3 file:min-h-10 file:cursor-pointer file:rounded-[7px] file:border file:border-linha-forte file:bg-transparent file:px-4 file:text-sm file:font-semibold file:text-texto"
-              />
+              <span className={ROTULO}>Arquivo CSV</span>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  id="planilha"
+                  name="planilha"
+                  type="file"
+                  accept=".csv,text/csv"
+                  required
+                  onChange={(e) => setArquivo(e.target.files?.[0]?.name ?? null)}
+                  className="peer sr-only"
+                />
+                <label
+                  htmlFor="planilha"
+                  className={classeDeBotao(
+                    'secundario',
+                    'cursor-pointer peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-acento',
+                  )}
+                >
+                  Escolher arquivo
+                </label>
+                <span className="min-w-0 truncate text-sm text-suave">{arquivo ?? 'Nenhum arquivo escolhido'}</span>
+              </div>
               <p className={AJUDA}>Até 512 KB. Nada é gravado agora: primeiro você vê a prévia.</p>
             </div>
             <BotaoEnviar variante="secundario" pendente="Lendo a planilha…">

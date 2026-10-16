@@ -191,7 +191,7 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
     {
       chave: 'fichas',
       nome: 'Ficha técnica',
-      subtitulo: 'Receita com foto, modo de preparo e custo',
+      subtitulo: 'Receita, foto e custo',
       icone: 'fichas',
       grupos: [
         {

@@ -212,7 +212,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
     form.append('item_unidade', 'un');
     const r = await rodar(daSessao.acaoCadastrarFicha(null, form));
     expect(r).toMatchObject({ ok: false });
-    expect((r as { erros: { geral: string } }).erros.geral).toMatch(/fichas técnicas/i);
+    expect((r as unknown as { erros: { geral: string } }).erros.geral).toMatch(/fichas técnicas/i);
     const sit = await rodar(daSessao.acaoSituacaoFicha(ids.xburger, null, new FormData()));
     expect(sit).toMatchObject({ ok: false });
     const imp = await daSessao.acaoPreviaDaPlanilha(null, new FormData());

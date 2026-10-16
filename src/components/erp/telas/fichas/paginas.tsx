@@ -134,7 +134,6 @@ export function TelaImportar({
 }) {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <TrilhaDaPagina itens={[{ rotulo: 'Importar planilha' }]} />
       <Voltar href={base}>Voltar para a lista</Voltar>
       <PageHeader
         icone="fichas"

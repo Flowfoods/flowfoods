@@ -1,3 +1,4 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Prato · rende 1 porção" e "R$ 3,20 · R$ 1,60 por porção" seguem o subtítulo do contrato ("Rede Completa · N fichas") como linha de apoio, igual aos insumos da 1.1. (O ignore do scanner não aceita id com minúscula.)
 /**
  * Lista de fichas técnicas (1.2), a MESMA para o nível 1 e para a pessoa do
  * parceiro. Recebe a página já lida pelo cliente do portão de quem chama.
@@ -34,12 +35,13 @@ function hrefDoDetalhe(base: string, id: string, f: FiltrosDeFicha): string {
   return q ? `${base}/${id}?de=${encodeURIComponent(q)}` : `${base}/${id}`;
 }
 
-function CustoPorRende({ l }: { l: LinhaDeFicha }) {
-  if (l.custo.semPreco.length > 0) return <Selo tom="alerta">Custo incompleto</Selo>;
+/** Custo por porção (ou kg); `empilhado` (celular): o "por porção" vai embaixo e o nome ganha espaço. */
+function CustoPorRende({ l, empilhado = false }: { l: LinhaDeFicha; empilhado?: boolean }) {
+  if (l.custo.semPreco.length > 0) return <Selo tom="alerta">{empilhado ? 'Incompleto' : 'Custo incompleto'}</Selo>;
   return (
-    <span className="whitespace-nowrap">
-      <span className="font-semibold text-texto">{formatarFracao(l.custo.porRendimento)}</span>
-      <span className="ml-1 text-[12px] text-suave">{porUnidadeDeRendimento(l.unidadeRendimento, l.tipo)}</span>
+    <span className={empilhado ? 'block' : 'whitespace-nowrap'}>
+      <span className={`font-semibold text-texto ${empilhado ? 'block' : ''}`}>{formatarFracao(l.custo.porRendimento)}</span>
+      <span className={`text-[12px] text-suave ${empilhado ? 'block' : 'ml-1'}`}>{porUnidadeDeRendimento(l.unidadeRendimento, l.tipo)}</span>
     </span>
   );
 }
@@ -178,7 +180,7 @@ export function TelaListaFichas({
                 </span>
               </span>
               <span className="shrink-0 text-right text-sm tabular-nums">
-                <CustoPorRende l={l} />
+                <CustoPorRende l={l} empilhado />
               </span>
             </Link>
           </li>
