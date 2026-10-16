@@ -7,6 +7,7 @@
 
 import { revalidatePath } from 'next/cache';
 import type { EntradaDaFicha, ItemDigitado } from '@/lib/erp/ficha-campos';
+import type { EmbalagemDigitada } from '@/lib/erp/canal-campos';
 import type { MudancaDeFoto } from '@/lib/erp/fichas';
 import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { decodificarPlanilha, LIMITE_DA_PLANILHA } from '@/lib/erp/ficha-planilha';
@@ -86,4 +87,20 @@ export async function executarImportacao(
   revalidatePath(base, 'layout');
   const { ok: _ok, ...resultado } = r;
   return { vez: vez(anterior), resultado };
+}
+
+/**
+ * 1.9: FormData das embalagens por canal → linhas (na ordem da tela) + a
+ * impressão da lista que a tela leu. Linha nova deixada em branco não é
+ * embalagem (nem erro).
+ */
+export function lerEnvioDasEmbalagens(form: FormData): { impressao: string; linhas: EmbalagemDigitada[] } {
+  const canais = form.getAll('emb_canal').map(textoDe);
+  const insumos = form.getAll('emb_insumo').map(textoDe);
+  const quantidades = form.getAll('emb_quantidade').map(textoDe);
+  const unidades = form.getAll('emb_unidade').map(textoDe);
+  const linhas = canais
+    .map((canal, i) => ({ canal, insumoId: insumos[i] ?? '', quantidade: quantidades[i] ?? '', unidade: unidades[i] ?? '' }))
+    .filter((l) => l.insumoId || l.quantidade.trim());
+  return { impressao: textoDe(form.get('impressao')), linhas };
 }

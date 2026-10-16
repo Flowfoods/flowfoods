@@ -1052,8 +1052,12 @@ model CanalConfig {
   canal              CanalVenda
   // Comissão sobre o preço, em pontos-base (12% = 1200).
   taxaBp             Int          @default(0)
-  // Taxa fixa por pedido (ex.: taxa de transação), em centavos.
+  // Taxa fixa por pedido (ex.: taxa de transação), em centavos. 1.9: não entra
+  // no custo do PRATO (é do pedido: lucro por pedido); sem tela.
   taxaFixaCentavos   Int          @default(0)
+  // 1.9: taxa de pagamento online sobre o preço, em pontos-base (3,2% = 320).
+  // CHECK 0..10000 e comissão + pagamento < 10000. Ver decisão 81.
+  taxaPagamentoBp    Int          @default(0)
   margemAlvoPadraoBp Int?
   ativo              Boolean      @default(true)
   atualizadoEm       DateTime     @updatedAt

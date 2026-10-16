@@ -10,10 +10,11 @@
 
 import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarFicha, editarFicha, mudarSituacaoFicha } from '@/lib/erp/fichas';
+import { salvarEmbalagens, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import type { EstadoImportacao } from '@/components/erp/telas/fichas/estado';
-import { executarImportacao, executarPrevia, lerEnvioDaFicha } from '@/components/erp/telas/fichas/executar';
+import { executarImportacao, executarPrevia, lerEnvioDaFicha, lerEnvioDasEmbalagens } from '@/components/erp/telas/fichas/executar';
 
 const BASE = '/erp/fichas';
 
@@ -61,4 +62,25 @@ export async function acaoImportarPlanilha(anterior: EstadoImportacao, form: For
   const { ctx, negado } = await paraEditar();
   if (negado) return { vez: (anterior?.vez ?? 0) + 1, erro: negado };
   return executarImportacao(ctx.cliente, anterior, form, ctx.sessao.autorNome, BASE);
+}
+
+/**
+ * 1.9: embalagens por canal da ficha. O que vai no saco é da operação: quem
+ * edita fichas (gerente inclusive) e vê a precificação.
+ */
+export async function acaoSalvarEmbalagens(id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = recusaDaAcao(ctx, 'fichas.editar') ?? recusaDaAcao(ctx, 'precos.ver') ?? ctx.bloqueio;
+  if (negado) return recusado(anterior, negado);
+  const r = await salvarEmbalagens(ctx.cliente, String(id), lerEnvioDasEmbalagens(form), ctx.sessao.autorNome);
+  return concluir(r, anterior, BASE, { mudou: 'embalagens', igual: 'igual' });
+}
+
+/** 1.9: a taxa do iFood do parceiro é condição comercial: só quem muda preços (a dona). */
+export async function acaoSalvarTaxaDoIfood(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
+  if (negado) return recusado(anterior, negado);
+  const r = await salvarTaxaDoIfood(ctx.cliente, { comissao: form.get('comissao'), pagamento: form.get('pagamento'), versao: form.get('versao') }, ctx.sessao.autorNome);
+  return concluir(r, anterior, BASE, { mudou: 'taxa', igual: 'taxa-igual' }, 'canais');
 }

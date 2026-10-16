@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -27,6 +27,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Estoque: abertura do zero, livro-razão + saldo, nota entrando no estoque (1.6) | `src/lib/erp/{estoque-campos,estoque}.ts` (puro / com banco); telas em `src/components/erp/telas/estoque/`; rotas `/erp/estoque` e `/rodolfo/erp/<slug>/estoque` (`<loja>`, `<loja>/abertura`, `<loja>/abertura/conferir`); migration `20261019000000_erp_estoque_abertura` |
 | Contagem do dia a dia (inventário cíclico que fecha sozinho) e fechamento do período com piso (1.7) | `src/lib/erp/{contagem-campos,contagem}.ts` (puro / com banco; `contarItem` da 1.6 generalizado com ganchos); telas `telas/estoque/{planejar,planejar-form,conferir-contagem,periodo,cobertura,rascunho}.tsx`; rotas `<loja>/contagens/nova`, `<loja>/contagens/<id>`, `<loja>/contagens/<id>/conferir`, `<loja>/periodo` em `/erp/estoque` e `/rodolfo/erp/<slug>/estoque`; migrations `20261020000000_erp_contagem_ciclica` e `20261020010000_erp_contagem_fotografia` |
 | Requisição (o setor pede, o estoque entrega e dá baixa) e divergências requisição × contagem (1.8) | `src/lib/erp/{requisicao-campos,requisicao}.ts` (puro / com banco); telas em `src/components/erp/telas/requisicoes/`; rotas `<loja>/requisicoes` (quadro), `/nova`, `/<id>`, `/<id>/atender`, `<loja>/divergencias`, e `requisicoes`/`divergencias` (escolher a loja) em `/erp/estoque` e `/rodolfo/erp/<slug>/estoque`; migration `20261021000000_erp_requisicao` |
+| Precificação dentro da ficha: custo por canal em camadas (loja · delivery · iFood), embalagens por canal e taxa do iFood (1.9) | `src/lib/erp/{canal-campos,canais}.ts` (puro / com banco); telas `telas/fichas/{custo-por-canal,canais,form-embalagens,form-taxa}.tsx`; rotas `fichas/<id>/canais` (embalagens) e `fichas/canais` (canais de venda e taxa) em `/erp` e `/rodolfo/erp/<slug>`; migration `20261022000000_erp_custo_por_canal` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
@@ -935,6 +936,93 @@ reenviar a tela velha não baixa de novo; uma pedida para anteontem aparece com
 "R$ 21,45 sem requisição", e o cheddar como pequeno e repetido; a gerente da
 Delivery recebe 404 na Penha; o operador não entrega nem vê divergências.
 
+## O que a 1.9 entregou — precificação dentro da ficha técnica: custo por canal em camadas
+
+Migration `20261022000000_erp_custo_por_canal` (ADITIVA, sem exceção à regra;
+sem tabela nova: portão e RLS iguais): `CanalConfig.taxaPagamentoBp` (default
+0, CHECK 0..10000) + CHECK comissão + pagamento < 100 %; teto da embalagem por
+porção (`ProdutoEmbalagem` ≤ 1.000 un). Provada em banco novo com dado da 1.8
+como superusuário e dono não-superusuário com e sem RLS (`migrate diff` vazio).
+
+1. **Onde mora** (decisão 81): na ficha de PRATO (pré-preparo não se vende),
+   painel "Custo por canal". Por baixo, o `ProdutoVenda` da casa (sem marca,
+   nome = o da ficha, criado na 1ª gravação das embalagens; renomear a ficha
+   leva o nome junto, na mesma transação). As embalagens são dele
+   (`ProdutoEmbalagem`, produto × canal × insumo). Marca e nome de venda
+   próprios (o mesmo prato em duas marcas) ficam para a 1.10+.
+2. **Camadas, exatas** (`camadasDoCanal`): Loja = insumos (o custo de UMA
+   porção, a cascata da 1.3 com o último preço da 1.5); Delivery = + as
+   embalagens do delivery; iFood = + as embalagens do iFood + a taxa do iFood.
+   Fração BigInt até a tela; um arredondamento na exibição. Embalagem entra
+   INTEIRA (~100 % de rendimento: sem fator), pelo custo de referência — a nota
+   da caixa kraft mais cara sobe delivery e iFood na próxima leitura, a loja
+   não muda.
+3. **Embalagem por canal** (tela própria "Embalagens por canal"): só insumo
+   tipo Embalagem do estoque (o seletor nem mostra os outros; o servidor
+   recusa), quantidade por porção em un, g/kg ou ml/L, até 20 por canal e
+   1.000 por porção; delivery e iFood com listas próprias ("Começar com as do
+   delivery"); desativada ou que deixou de ser embalagem só fica se já
+   estava; prévia exata ao vivo. Gravar trava a ficha (`FOR NO KEY UPDATE`),
+   confere a impressão da lista lida (duas abas: a segunda recebe "alguém
+   mudou") e trava os insumos citados (`FOR SHARE`); histórico na ficha
+   ("embalagens do iFood · entrou: Sacola kraft 1 un"), na mesma transação;
+   a mesma lista em outra ordem não é mudança.
+4. **Taxa do iFood por Parceiro Flow** (decisão 82, tela "Canais de venda"):
+   comissão do plano (`taxaBp`) + pagamento online (`taxaPagamentoBp`), em
+   pontos-base sobre o PREÇO. Hipóteses (documentadas, configuráveis): as duas
+   incidem sobre o preço do prato; mensalidade do plano, taxa de entrega e
+   taxa fixa por pedido não entram no custo do prato (são do mês e do pedido:
+   lucro por pedido, Notion "Evolução"). Nada pré-preenchido: sem configurar,
+   o iFood fica "Não configurada" e o canal, incompleto. Editar condicional
+   ao `atualizadoEm`; a primeira configuração em corrida cai no único
+   (parceiro, canal); histórico em `CanalConfig` ("comissão: 23%").
+5. **Taxa × preço** (decisão 83): o preço é da 1.10, então a camada da taxa
+   aparece como "26,2% do preço" e "a cada R$ 10,00: R$ 2,62"; o custo do
+   iFood é "R$ 9,98 + 26,2% do preço". A conta já está pronta:
+   `camadasDoCanal({ …, precoCentavos })` resolve a taxa em fração exata e o
+   total; `taxaSobrePreco` é a porta.
+6. **Incompleto propagado**: insumo da ficha sem preço deixa os três canais
+   incompletos; embalagem sem preço, só o canal dela; taxa não configurada, só
+   o iFood. O parcial entra (nunca R$ 0,00) e a tela diz o porquê ("iFood:
+   custo incompleto — falta preço em “Sacola”").
+7. **Telas** (as mesmas no N1 e no parceiro): detalhe do prato com a tabela
+   densa (Kairu Corporativo) — canais nas colunas, camadas empilhadas nas
+   linhas (insumos da receita, embalagens e cada uma com a quantidade, taxa do
+   iFood, custo do canal); no celular, um bloco por canal; "Embalagens por
+   canal"; "Canais de venda" no menu da Ficha técnica (o que entra no custo de
+   cada canal, a taxa do iFood, últimas alterações). Precificação saiu de "em
+   breve" no catálogo.
+8. **Permissões** (catálogo 0.4, sem permissão nova): ver o custo por canal e
+   os canais = `fichas.ver` + `precos.ver` (o custo por canal nem sai do
+   servidor sem `precos.ver`; operador não vê); editar embalagens =
+   `fichas.editar` + `precos.ver` (o que vai no saco é operação: o gerente
+   pode); taxa do iFood = `precos.editar` (só a dona). Tenant: embalagem,
+   produto e taxa de outro parceiro não existem (portão + RLS + FK composta).
+9. **Heranças da 1.8 resolvidas**: (a) a entrega confere o negativo com os
+   saldos TRAVADOS (`saldosTravados`, `FOR UPDATE` na ordem de
+   `gravarMovimentos`): duas entregas do mesmo insumo em requisições
+   diferentes se enfileiram e a segunda pede a confirmação (teste de corrida;
+   falha sem a trava); (b) `fichaQuantidade` ≤ 10.000.000 também na gravação
+   (`TETO_DA_QUANTIDADE_DA_FICHA`); (c) teste com banco estável (a corrida do
+   número decidia quem era #2); (d) cartão pendente do quadro com "há 53 min",
+   histórico DENTRO da requisição pelo estado ("Pedida", "Entregue", "Voltou
+   para o estoque", "Cancelada"), seletor do insumo na nova requisição em
+   linha inteira, agrupado pelo lugar (nome inteiro no celular).
+
+## Provar o custo por canal (1.9)
+
+```bash
+npx vitest run tests/erp-canais.test.ts         # camadas exatas, embalagem inteira, pontos-base, incompleto, leitura, retrato
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-canais.db.test.ts tests/erp-requisicao.db.test.ts
+```
+Na tela (Casa Alfa): a dona abre o "Burger cheddar" (iFood "Não
+configurada"), configura as embalagens (delivery: caixa kraft + 2 guardanapos;
+iFood: caixa kraft + sacola + 2 guardanapos), a taxa do iFood (23 % + 3,2 %) e
+vê Loja R$ 8,45 · Delivery R$ 9,66 · iFood R$ 9,98 + 26,2% do preço; uma nota
+da caixa kraft mais cara sobe delivery e iFood no mesmo valor e a loja não
+muda; o gerente vê e edita embalagens, mas não a taxa; o operador não vê a
+precificação (e volta ao hub nas duas telas).
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -951,10 +1039,10 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Compras | `NotaEntrada` / `NotaEntradaItem` | nota de compra e itens com snapshot; LANCADA vale para o custo; com o estoque da loja aberto, entra no razão (`MovimentoEstoque.notaId`, 1.6) |
 | Ficha | `FichaTecnica` | prato ou pré-preparo, rendimento; pré-preparo pode produzir um Insumo |
 | Ficha | `FichaItem` | insumo OU subficha, quantidade líquida, fator de correção |
-| Venda | `ProdutoVenda` | item de venda (aponta a ficha) |
-| Venda | `ProdutoCanal` | preço por canal: manual sobrescreve o sugerido; margem-alvo |
-| Venda | `ProdutoEmbalagem` | camada de embalagem por canal (delivery, iFood) |
-| Venda | `CanalConfig` | taxa do canal (%, fixa) e margem-alvo padrão, por parceiro |
+| Venda | `ProdutoVenda` | item de venda (aponta a ficha). 1.9: o da casa (sem marca, nome = da ficha) é criado com as embalagens |
+| Venda | `ProdutoCanal` | preço por canal: manual sobrescreve o sugerido; margem-alvo (1.10, sem uso na 1.9) |
+| Venda | `ProdutoEmbalagem` | camada de embalagem por canal (delivery, iFood): insumo tipo Embalagem × quantidade por porção (1.9) |
+| Venda | `CanalConfig` | taxa do canal por parceiro: comissão (`taxaBp`) + pagamento online (`taxaPagamentoBp`, 1.9) sobre o preço; taxa fixa (sem uso: é do pedido) e margem-alvo padrão (1.10) |
 | Estoque | `SaldoEstoque` | saldo e valor por loja × insumo (soma do razão, atualizada na mesma transação, com versão) |
 | Estoque | `MovimentoEstoque` | livro-razão: abertura, entrada, requisição, produção, ajuste, contagem, perda; snapshot e saldo antes/depois; estorno = mesmo tipo, sinal contrário, `estornoDeId` único (1.6) |
 | Estoque | `Contagem` / `ContagemItem` | abertura (1.6: estado da loja), cíclica e fechamento de período (1.7: título, prazo, desfecho aplicada/fechou sozinha/venceu; fechamento aponta o `PeriodoApuracao`, um por loja); esperado (livro na hora de contar) × contado; versão, lista e fator congelados, digitado × normalizado. O piso é regra da lógica com os números na `Loja` |
@@ -1405,8 +1493,38 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.8 (apontada pelos fiscais)
 
-- [médio] Confirmação de saldo negativo pulável com duas entregas simultâneas (`requisicao.ts:529-531` lê o saldo sem trava): conferir com saldos travados (`FOR UPDATE`) antes de gravar.
-- [baixo] `fichaQuantidade` forjado acima de INT4 dá 500 (`requisicao.ts:356-357`): limitar a 10.000.000 como `listaDaFicha`.
-- [baixo] Teste com banco instável ("cancelar" e "atrasada" falharam 1 vez em 3): estabilizar.
-- UX: rodapé do card do quadro com tempo no processo ("há 3 h") além da hora; print do saldo insuficiente com confirmação; "Pedida"/"Entregue" no histórico; nome do insumo inteiro no seletor do celular; conferir sinal de "Requisitado a mais".
+- ~~[médio] Confirmação de saldo negativo pulável com duas entregas simultâneas.~~ **1.9 (a):** `saldosTravados`.
+- ~~[baixo] `fichaQuantidade` forjado acima de INT4 dá 500.~~ **1.9 (b).**
+- ~~[baixo] Teste com banco instável ("cancelar" e "atrasada").~~ **1.9 (c):** era a corrida do número (#2/#3).
+- UX: ~~rodapé com "há 3 h"; "Pedida"/"Entregue" no histórico; nome do insumo inteiro no seletor do celular~~ (1.9, d); seguem: print do saldo insuficiente com confirmação; conferir sinal de "Requisitado a mais".
 - Sino sem requisições pendentes; "Minhas requisições" depende de ligar `Colaborador` à pessoa; lançar perda à mão sem tela; divergências para milhares de insumos precisam ir para SQL.
+
+## Herança da 1.9 (para as próximas subfases)
+
+- **1.10 preço**: `ProdutoCanal` (preço manual, margem-alvo) e
+  `CanalConfig.margemAlvoPadraoBp` seguem intocados. Preço sugerido por canal
+  = custo sem taxa ÷ (1 − taxa − margem), em fração exata; com o preço,
+  `camadasDoCanal({ precoCentavos })` já devolve a taxa em R$ e o total;
+  margem bruta = preço − total; snapshot do custo ao gravar o preço.
+- O mesmo prato em duas marcas (preço e embalagem com a marca): `ProdutoVenda`
+  com `marcaId` — a 1.9 só cria o da casa (sem marca). Ao entrar, decidir se a
+  marca herda as embalagens do da casa.
+- Taxa só no iFood. Delivery próprio com maquininha/link de pagamento ou
+  outros apps (99Food, Keeta) entram como `CanalConfig` do canal — o enum
+  `CanalVenda` só tem LOJA, DELIVERY_PROPRIO e IFOOD (canal novo = ADD VALUE).
+- Mensalidade do plano, taxa de entrega e `taxaFixaCentavos` (por pedido) são
+  do lucro por pedido (Notion "Evolução · Lucro por pedido"); a 1.9 não as
+  rateia no prato.
+- Custo por canal é lido por ficha (detalhe). Lista de fichas com o custo do
+  iFood e filtro "canal incompleto" pedem a leitura em lote (as embalagens de
+  50 produtos numa consulta).
+- `ProdutoEmbalagem` não tem ordem própria: a tela ordena pelo nome (o
+  retrato também, então a ordem nunca é mudança).
+
+## Herança da 1.9 (apontada pelos fiscais)
+
+- [baixo] Prato com produto de venda pode virar pré-preparo pela edição da ficha (fica produto pendurado): recusar a troca de tipo quando há produto, ou tratar na 1.10.
+- [decisão do Rodolfo] O operador ainda vê o custo da receita no detalhe da ficha (vem da 1.2) — igual à camada "Loja". Esconder também?
+- [decisão do Rodolfo] Hipóteses da taxa do iFood (comissão + pagamento online sobre o preço; mensalidade/entrega fora).
+- UX: aviso discreto em delivery sem embalagem; exemplo "se vender a R$ 30,00…" (1.10); "Camada" → "O que entra"; aviso longo da embalagem vira dica; histórico de embalagens mostrando só o que mudou.
+- Taxas só do iFood (maquininha, 99Food, Keeta depois); mesmo prato em duas marcas; custo por canal na lista de fichas.

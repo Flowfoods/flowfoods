@@ -40,6 +40,7 @@ import {
   lojaDoAlcance,
   movimentoParaTela,
   Recusa,
+  saldosTravados,
   SELECAO_DO_MOVIMENTO,
   travarAberturas,
   type MovimentoDaTela,
@@ -277,6 +278,13 @@ export type OpcoesDoPedido = NonNullable<Awaited<ReturnType<typeof opcoesDoPedid
  * (fazer o pré-preparo é a produção, 3.1). Devolve as linhas do formulário
  * (editáveis antes de pedir) e os avisos.
  */
+/**
+ * Teto do "quanto vai produzir" pela ficha (milésimos): 10 mil porções ou
+ * 10 mil kg/L/un. O mesmo na lista e na gravação (herança b da 1.8: o número
+ * forjado acima do INTEGER dava 500).
+ */
+export const TETO_DA_QUANTIDADE_DA_FICHA = 10_000_000;
+
 export async function listaDaFicha(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, fichaId: unknown, quantidadeTexto: unknown) {
   return comRecusa(() =>
     cliente.transacao(async (tx) => {
@@ -301,7 +309,7 @@ export async function listaDaFicha(cliente: ClienteDoParceiro, alcance: Alcance,
       const prato = ficha.tipo === 'PRATO';
       const txt = typeof quantidadeTexto === 'string' ? quantidadeTexto.trim() : '';
       const q = txt ? lerQuantidadeNa(txt, prato ? 'UN' : unidade, 'base') : null;
-      if (q === null || q <= 0 || (prato && q % 1000 !== 0) || q > 10_000_000) {
+      if (q === null || q <= 0 || (prato && q % 1000 !== 0) || q > TETO_DA_QUANTIDADE_DA_FICHA) {
         throw new Recusa({ ok: false, erros: { quantidade: prato ? 'Quantas porções: número inteiro (ex.: 20).' : `Quanto vai produzir: número em ${formatarQuantidade(1000, unidade).replace(/^1 /, '')} (ex.: 2 ou 1,5).` } });
       }
       const r = quantidadesDaFicha(
@@ -354,7 +362,7 @@ export async function criarRequisicao(
       if (typeof entrada.fichaId === 'string' && ID.test(entrada.fichaId)) {
         const f = await tx.fichaTecnica.findFirst({ where: { id: entrada.fichaId }, select: { id: true, nome: true } });
         const q = Number(entrada.fichaQuantidade);
-        if (f && Number.isSafeInteger(q) && q > 0) ficha = { id: f.id, nome: f.nome, q };
+        if (f && Number.isSafeInteger(q) && q > 0 && q <= TETO_DA_QUANTIDADE_DA_FICHA) ficha = { id: f.id, nome: f.nome, q };
       }
       await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp:requisicao:${tx.parceiroId}:${lojaId}`}, 0))::text AS "trava"`;
       const [{ proximo }] = await tx.sql<{ proximo: number }>`
@@ -526,8 +534,10 @@ export async function atenderRequisicao(
         if (!lido.ok) throw new Recusa({ ok: false, erros: lido.erros });
         const entregas = lido.entregas;
         const insumoIds = itens.map((i) => i.insumoId);
-        const saldos = await tx.saldoEstoque.findMany({ where: { lojaId, insumoId: { in: insumoIds } }, select: { insumoId: true, quantidadeMilesimos: true } });
-        const negativos = negativosDaEntrega(itens, entregas, new Map(saldos.map((s) => [s.insumoId, s.quantidadeMilesimos])));
+        // Herança a da 1.8: o saldo do negativo é lido TRAVADO — duas entregas do mesmo insumo (requisições diferentes)
+        // se enfileiram aqui, e a segunda confere o saldo que a primeira deixou.
+        const saldos = await saldosTravados(tx, lojaId, entregas.map((e) => itens.find((i) => i.id === e.itemId)!.insumoId));
+        const negativos = negativosDaEntrega(itens, entregas, saldos);
         if (negativos.length && !ehSim(entrada.confirmarNegativo)) {
           throw new Recusa({
             ok: false,

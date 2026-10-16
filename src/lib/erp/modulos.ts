@@ -44,7 +44,9 @@ export type ChaveIcone =
   | 'portal'
   | 'parceiros'
   | 'sistema'
-  | 'config';
+  | 'config'
+  // 1.9: canais de venda (loja, delivery, iFood) e a taxa do iFood.
+  | 'canais';
 
 export interface ItemNav {
   href: string;
@@ -90,7 +92,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 1.8';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 1.9';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -226,6 +228,13 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
               icone: 'importar',
               subtitulo: 'Várias fichas de uma vez, com prévia',
               permissao: 'fichas.editar',
+            },
+            {
+              href: `${base}/fichas/canais`,
+              rotulo: 'Canais de venda',
+              icone: 'canais',
+              subtitulo: 'Loja, delivery e iFood: o que entra no custo de cada um',
+              permissao: 'precos.ver',
             },
           ],
         },

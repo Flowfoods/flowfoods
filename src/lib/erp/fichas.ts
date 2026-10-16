@@ -497,6 +497,8 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
     await tx.fichaItem.deleteMany({ where: { fichaId: g.atual.id } });
     await gravarItens(tx, g.atual.id, d.itens);
   }
+  // 1.9: o produto de venda da casa (sem marca) leva o nome da ficha — renomear a ficha leva o dele junto.
+  if (mudanca.campos.includes('nome')) await tx.produtoVenda.updateMany({ where: { fichaId: g.atual.id, marcaId: null }, data: { nome: d.nome } });
   await tx.historicoAlteracao.create({
     data: {
       parceiroId: tx.parceiroId,

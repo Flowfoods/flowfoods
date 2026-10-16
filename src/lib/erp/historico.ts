@@ -24,6 +24,8 @@ const ENTIDADE: Record<string, string> = {
   ContagemItem: 'Contagem',
   // 1.8
   Requisicao: 'Requisição',
+  // 1.9: a taxa do iFood do parceiro.
+  CanalConfig: 'Canal de venda',
   Fornecedor: 'Fornecedor',
   AcessoParceiro: 'Acesso',
   PerfilAcesso: 'Perfil',
@@ -134,6 +136,11 @@ const CAMPO: Record<string, string> = {
   corte: 'encerrada sem sair (corte)',
   negativo: 'saldo negativo (entregue mesmo assim)',
   voltou: 'voltou para o estoque',
+  // 1.9: custo por canal
+  embalagensDelivery: 'embalagens do delivery',
+  embalagensIfood: 'embalagens do iFood',
+  comissao: 'comissão',
+  pagamento: 'pagamento online',
 };
 
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */
@@ -144,6 +151,10 @@ const ORDEM = [
   'descricao',
   'foto',
   'itens',
+  'embalagensDelivery',
+  'embalagensIfood',
+  'comissao',
+  'pagamento',
   'modoPreparo',
   'conservacao',
   'validade',
@@ -284,6 +295,14 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
         if (saiu.length) out.push({ campo: 'saiu', antes: null, depois: saiu.join(' · ') });
       }
       continue;
+    }
+    // Embalagens por canal (1.9): a mesma leitura dos itens, dizendo de qual canal ("embalagens do iFood · entrou").
+    if ((c === 'embalagensDelivery' || c === 'embalagensIfood') && !criacao && typeof antes[c] === 'string' && typeof depois[c] === 'string') {
+      const itens = mudancasDosItens(antes[c] as string, depois[c] as string);
+      if (itens) {
+        out.push(...itens.map((m) => ({ ...m, campo: `${CAMPO[c]} · ${m.campo}` })));
+        continue;
+      }
     }
     // Itens da ficha (1.4): o que entrou, saiu e mudou, em vez de lista velha × lista nova.
     if (c === 'itens' && !criacao && typeof antes[c] === 'string' && typeof depois[c] === 'string') {

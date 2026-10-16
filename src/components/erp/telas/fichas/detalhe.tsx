@@ -26,6 +26,8 @@ import { ListaHistorico } from '../historico/lista-historico';
 import { fraseDoFeitoDaFicha } from './estado';
 import { urlDaFoto } from './miniatura';
 import { ValidadesDoItem } from '../cadastro/validade';
+import type { CustoPorCanal } from '@/lib/erp/canais';
+import { CustoPorCanalDaFicha } from './custo-por-canal';
 
 export function TelaDetalheFicha({
   ficha: f,
@@ -37,6 +39,10 @@ export function TelaDetalheFicha({
   bloqueio,
   acaoSituacao,
   linkDoInsumo,
+  canais,
+  linkDasEmbalagens,
+  linkDaTaxa,
+  podeConfigurarTaxa = false,
 }: {
   ficha: FichaDetalhada;
   base: string;
@@ -50,6 +56,11 @@ export function TelaDetalheFicha({
   acaoSituacao: AcaoDeCadastro;
   /** Base dos insumos (link de cada item), só para quem vê insumos. */
   linkDoInsumo?: string;
+  /** 1.9: custo por canal (prato, só para quem vê a precificação). */
+  canais?: CustoPorCanal | null;
+  linkDasEmbalagens?: string;
+  linkDaTaxa?: string;
+  podeConfigurarTaxa?: boolean;
 }) {
   const quantidade = (q: number, fator: number, unidade: Parameters<typeof formatarQuantidade>[1]) =>
     fator === 1000 ? null : `bruto ${formatarQuantidade(quantidadeBruta(q, fator), unidade)} · fator ${formatarFator(fator)}`;
@@ -244,7 +255,17 @@ export function TelaDetalheFicha({
             </p>
           </Painel>
 
-          <Painel className="order-2 sm:order-3" titulo="Modo de preparo">
+          {canais && (
+            <CustoPorCanalDaFicha
+              className="order-4 sm:order-3"
+              dados={canais}
+              linkDasEmbalagens={f.ativa ? linkDasEmbalagens : undefined}
+              linkDaTaxa={linkDaTaxa}
+              podeConfigurarTaxa={podeConfigurarTaxa}
+            />
+          )}
+
+          <Painel className="order-2 sm:order-4" titulo="Modo de preparo">
             {f.modoPreparo ? (
               <p className="whitespace-pre-line text-[15px] leading-relaxed text-texto">{f.modoPreparo}</p>
             ) : (

@@ -325,3 +325,23 @@ export function quantidadeParaCampo(milesimos: number, unidade: Unidade): { text
 export function dinheiroParaCampo(centavos: number): string {
   return `${Math.trunc(centavos / 100)},${String(centavos % 100).padStart(2, '0')}`;
 }
+
+// ------------------------------------------------------------ porcentagem (1.9)
+
+/**
+ * "23", "3,2", "12,5%" → pontos-base (2300, 320, 1250). Até 2 casas (0,01 %
+ * é 1 ponto-base). Sinal, letra e casa a mais: null.
+ */
+export function lerPontosBase(texto: string): number | null {
+  return textoParaInteiro(texto.trim().replace(/\s*%$/, ''), 2);
+}
+
+/** 2620 → "26,2%"; 320 → "3,2%"; 2300 → "23%". */
+export function formatarPontosBase(bp: number): string {
+  return `${(bp / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
+}
+
+/** Pontos-base → o que volta para o campo: 320 = "3,2"; 2300 = "23". */
+export function pontosBaseParaCampo(bp: number): string {
+  return (bp / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2, useGrouping: false });
+}

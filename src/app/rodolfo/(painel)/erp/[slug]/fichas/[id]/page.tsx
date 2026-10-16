@@ -3,6 +3,7 @@
 import { notFound } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { obterFicha } from '@/lib/erp/fichas';
+import { custoPorCanal } from '@/lib/erp/canais';
 import { lerFiltrosDeFicha, queryDosFiltrosDeFicha } from '@/lib/erp/ficha-campos';
 import { TelaDetalheFicha } from '@/components/erp/telas/fichas/detalhe';
 import { acaoSituacaoFicha } from '../actions';
@@ -21,6 +22,7 @@ export default async function ParceiroFichaPage({
   const ficha = await obterFicha(ctx.cliente, params.id);
   if (!ficha) notFound();
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;
+  const canais = await custoPorCanal(ctx.cliente, ficha);
   const de = queryDosFiltrosDeFicha(lerFiltrosDeFicha(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));
   return (
     <TelaDetalheFicha
@@ -33,6 +35,10 @@ export default async function ParceiroFichaPage({
       bloqueio={ctx.bloqueio}
       acaoSituacao={acaoSituacaoFicha.bind(null, ctx.parceiro.slug, ficha.id)}
       linkDoInsumo={`${base}/insumos`}
+      canais={canais}
+      linkDasEmbalagens={ctx.bloqueio ? undefined : `${base}/fichas/${ficha.id}/canais`}
+      linkDaTaxa={`${base}/fichas/canais`}
+      podeConfigurarTaxa={!ctx.bloqueio}
     />
   );
 }

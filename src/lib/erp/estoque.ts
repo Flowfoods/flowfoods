@@ -190,6 +190,26 @@ export async function custosDeReferencia(tx: ClienteDoParceiro, insumoIds: reado
 // ================================================================ livro-razão
 
 /**
+ * Saldos de uma loja JÁ TRAVADOS (`FOR UPDATE`, na mesma ordem de
+ * `gravarMovimentos`: loja, insumo), com a linha que faltar criada em zero.
+ * Quem confere algo pelo saldo antes de gravar (o negativo da entrega) lê
+ * aqui: outra transação que mexa nesses saldos espera esta terminar, então o
+ * número conferido é o que a gravação vai usar (herança a da 1.8).
+ */
+export async function saldosTravados(tx: ClienteDoParceiro, lojaId: string, insumoIds: readonly string[]): Promise<Map<string, number>> {
+  const ids = Array.from(new Set(insumoIds)).sort();
+  if (ids.length === 0) return new Map();
+  await tx.saldoEstoque.createMany({ data: ids.map((insumoId) => ({ parceiroId: tx.parceiroId, lojaId, insumoId })), skipDuplicates: true });
+  const travados = await tx.sql<{ insumoId: string; quantidadeMilesimos: number }>`
+    SELECT s."insumoId", s."quantidadeMilesimos"
+    FROM "SaldoEstoque" s
+    WHERE s."parceiroId" = ${tx.parceiroId} AND s."lojaId" = ${lojaId} AND s."insumoId" = ANY(${ids}::text[])
+    ORDER BY s."lojaId", s."insumoId"
+    FOR UPDATE OF s`;
+  return new Map(travados.map((s) => [s.insumoId, s.quantidadeMilesimos]));
+}
+
+/**
  * Grava os movimentos e o saldo na transação de quem chama: cria a linha de
  * saldo que faltar (inclusive dos `garantir`, com zero), trava os saldos em
  * ordem (loja, insumo), calcula antes/depois (o CHECK do banco confere),

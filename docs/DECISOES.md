@@ -1271,3 +1271,28 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) somar os `CONTAGEM` negativos do período; (b) por insumo, trechos entre duas contagens aplicadas consecutivas: consumo apurado (inicial + entradas − final) × requisitado × outras saídas lançadas. Pequenas diferenças — (c) ignorar o que ficou dentro da tolerância; (d) contar quantas vezes se repetiu e somar. Gravar — (e) lançar perda; (f) só relatório.
 
 **Razão:** (b): é a conta que o dono entende ("tinha 3 kg, chegou 0, contou 1,9; consumiu 1,1 kg; a cozinha pediu 600 g; sumiram 500 g") e dá o mesmo número que o "esperado − contado" da 1.7, sem depender de quando o ajuste foi aplicado. A abertura vale da conclusão (o livro começa ali); as outras contagens, de quando o item foi contado; estornos entram com o sinal deles. A janela pega os trechos que TERMINAM nela (padrão: o período do parceiro). R$ pelo custo de referência de hoje (como a conferência). (d): o "fecha sozinha" aplica sem olho humano tudo o que cabe na tolerância; 2+ trechos assim no período viram "pequeno e repetido", com a soma (herança da 1.7). Por setor: o que pediu e o sumiço nos insumos que ele pede — onde olhar, não culpa (o sumiço não tem dono). (f): divergência não é perda comprovada (Notion "Estoque unificado"); o acerto do saldo já foi a contagem. Ver = `estoque.ajustar` (quem confere contagem).
+
+### 81. 2026-10-22 · ERP 1.9: a precificação mora na ficha de prato; por baixo, o produto de venda da casa com as embalagens por canal
+
+**Alternativas:** (a) tabela nova de embalagem por ficha; (b) colunas na `FichaTecnica`; (c) usar o `ProdutoVenda` da 0.1 (aponta a ficha) com `ProdutoEmbalagem` (produto × canal × insumo), criando o produto "da casa" (sem marca, nome = o da ficha) na primeira gravação.
+
+**Razão:** (c), Regra Nº 2: o esquema da 0.1 já separou a venda da receita (decisão 26) e já tinha a camada de embalagem por canal com CHECK (nunca na loja) e FK composta. Sem tabela nova, portão e RLS ficam iguais. O nome do produto acompanha a ficha (mesma transação de `gravarFicha`), então o único `(parceiro, marca nula, nome)` também serializa dois "primeiros" produtos. Embalagem é insumo tipo Embalagem do estoque, por porção, SEM fator (rendimento ~100 %), pelo custo de referência (último preço, decisão 65): a nota mais cara muda o custo sem gravar nada. Gravar trava a ficha e confere a impressão da lista lida (como a variante da 1.1). Ver = `precos.ver`; editar embalagens = `fichas.editar` + `precos.ver` (o que vai no saco é operação); o operador não vê.
+
+### 82. 2026-10-22 · ERP 1.9: taxa do iFood = comissão + pagamento online, por parceiro, sobre o preço; nada pré-preenchido
+
+**Alternativas:** (a) uma porcentagem só; (b) comissão + pagamento online separados (como o contrato do iFood e o Notion "Lucro por pedido" mostram); (c) planos pré-cadastrados (Básico/Entrega) com os números do iFood.
+
+**Razão:** (b). Separadas, a pessoa confere cada uma com o contrato; somadas, fica opaco. (c) inventaria número que muda por contrato e por época — a tela diz onde achar e nada vem preenchido: sem configurar, o iFood fica "Não configurada" e o canal, incompleto (ausência de dado é achado). Hipóteses registradas: as duas incidem sobre o preço do prato; mensalidade, taxa de entrega e taxa fixa por pedido não entram no custo do PRATO (são do mês e do pedido). Migration aditiva: `taxaPagamentoBp` + CHECK da soma < 100 %. Só quem muda preços (`precos.editar`, a dona) configura; editar é condicional ao `atualizadoEm`.
+
+### 83. 2026-10-22 · ERP 1.9: a taxa sobre o preço aparece como porcentagem até a 1.10 — nunca um preço inventado
+
+**Alternativas:** (a) supor um preço (ex.: custo × 3) para mostrar a taxa em R$; (b) esconder a taxa até a 1.10; (c) mostrar a camada como "26,2% do preço", com "a cada R$ 10,00: R$ 2,62", e o total como "custo sem a taxa + 26,2% do preço"; a conta com preço pronta e testada.
+
+**Razão:** (c). (a) seria um número sem origem na tela de custo; (b) esconderia o canal mais caro. Com (c) o dono vê o peso da taxa sem preço, e a 1.10 só passa `precoCentavos` a `camadasDoCanal` (taxa em fração exata, um arredondamento na tela) — preço sugerido = custo sem taxa ÷ (1 − taxa − margem) cabe sem mudar as camadas.
+
+### 84. 2026-10-22 · ERP 1.9 (herança a da 1.8): o negativo da entrega é conferido com os saldos travados
+
+**Alternativas:** (a) ler o saldo sem trava e confiar na trava da requisição; (b) travar os saldos (`FOR UPDATE`, na ordem de `gravarMovimentos`, linha que falta criada em zero) antes de conferir.
+
+**Razão:** (b). A trava da requisição só serializa a MESMA requisição; duas requisições do mesmo insumo entregues juntas liam o mesmo saldo e as duas passavam sem a confirmação. Com os saldos travados, a segunda espera e confere o saldo que a primeira deixou. Mesma ordem de trava do razão: sem deadlock com contagem e nota.
+

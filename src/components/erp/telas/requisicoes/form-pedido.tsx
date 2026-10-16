@@ -115,34 +115,34 @@ export function FormPedido({
               const idQ = `pedido-q-${l.chave}`;
               return (
                 <li key={l.chave} className="rounded-[10px] border border-linha p-3">
-                  <div className="flex items-start gap-2">
-                    <div className="min-w-0 flex-1">
-                      <label htmlFor={`pedido-i-${l.chave}`} className="sr-only">
-                        Insumo da linha {n + 1}
-                      </label>
-                      <select
-                        id={`pedido-i-${l.chave}`}
-                        name="insumo"
-                        value={l.insumoId}
-                        onChange={(e) => muda(l.chave, { insumoId: e.target.value, escala: 'base' })}
-                        className={`${CAMPO} min-h-12 text-base sm:text-sm`}
-                        aria-invalid={!!erro}
-                        aria-describedby={erro ? `${idQ}-erro` : undefined}
-                      >
-                        <option value="">Escolha o insumo</option>
-                        {listaDeInsumos.map((i) => (
-                          <option key={i.id} value={i.id}>
-                            {i.nome} · {CONSERVACOES[i.conservacao]}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    {linhas.length > 1 && (
-                      <button type="button" onClick={() => setLinhas((ls) => ls.filter((x) => x.chave !== l.chave))} className={classeDeBotao('fantasma', 'min-h-12 px-3')} aria-label={`Tirar a linha ${n + 1}${ins ? ` (${ins.nome})` : ''}`}>
-                        Tirar
-                      </button>
-                    )}
-                  </div>
+                  {/* Herança d da 1.8: o seletor ocupa a linha inteira (no celular o nome do insumo cabe inteiro); "Tirar" desce para a linha do número. */}
+                  <label htmlFor={`pedido-i-${l.chave}`} className="sr-only">
+                    Insumo da linha {n + 1}
+                  </label>
+                  <select
+                    id={`pedido-i-${l.chave}`}
+                    name="insumo"
+                    value={l.insumoId}
+                    onChange={(e) => muda(l.chave, { insumoId: e.target.value, escala: 'base' })}
+                    className={`${CAMPO} min-h-12 text-base sm:text-sm`}
+                    aria-invalid={!!erro}
+                    aria-describedby={erro ? `${idQ}-erro` : undefined}
+                  >
+                    <option value="">Escolha o insumo</option>
+                    {/* Agrupado pelo lugar: a opção é só o nome (o lugar está no grupo), para caber inteira. */}
+                    {(Object.keys(CONSERVACOES) as (keyof typeof CONSERVACOES)[]).map((c) => {
+                      const doLugar = listaDeInsumos.filter((i) => i.conservacao === c);
+                      return doLugar.length === 0 ? null : (
+                        <optgroup key={c} label={CONSERVACOES[c]}>
+                          {doLugar.map((i) => (
+                            <option key={i.id} value={i.id}>
+                              {i.nome}
+                            </option>
+                          ))}
+                        </optgroup>
+                      );
+                    })}
+                  </select>
                   <div className="mt-2 flex items-stretch gap-2">
                     <label htmlFor={idQ} className="sr-only">
                       Quanto{ins ? ` de ${ins.nome}` : ''}
@@ -178,6 +178,11 @@ export function FormPedido({
                       <span className="flex w-[112px] shrink-0 items-center justify-center rounded-[10px] border border-linha text-[14px] text-suave">{u ? u.sigla : '—'}</span>
                     )}
                     <input type="hidden" name="escala" value={l.escala} />
+                    {linhas.length > 1 && (
+                      <button type="button" onClick={() => setLinhas((ls) => ls.filter((x) => x.chave !== l.chave))} className={classeDeBotao('fantasma', 'min-h-12 shrink-0 px-3')} aria-label={`Tirar a linha ${n + 1}${ins ? ` (${ins.nome})` : ''}`}>
+                        Tirar
+                      </button>
+                    )}
                   </div>
                   <Erro id={`${idQ}-erro`} texto={erro} />
                 </li>

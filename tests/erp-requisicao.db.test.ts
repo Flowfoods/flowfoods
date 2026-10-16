@@ -198,10 +198,11 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
   it('número por loja em corrida: dois pedidos juntos dão #2 e #3', async () => {
     const [x, y] = await Promise.all([pedir(COZINHA(), 'Ana', [{ insumoId: ids.pao, quantidade: '12' }]), pedir(COZINHA(), 'Bia', [{ insumoId: ids.batata, quantidade: '1' }], { setor: 'SALAO' })]);
     expect(x.ok && y.ok).toBe(true);
-    const ns = await a.requisicao.findMany({ where: { id: { in: [(x as { id: string }).id, (y as { id: string }).id] } }, select: { numero: true } });
+    const ns = await a.requisicao.findMany({ where: { id: { in: [(x as { id: string }).id, (y as { id: string }).id] } }, select: { id: true, numero: true } });
     expect(ns.map((n) => n.numero).sort()).toEqual([2, 3]);
-    ids.r2 = (x as { id: string }).id;
-    ids.r3 = (y as { id: string }).id;
+    // Herança c da 1.8: a corrida decide quem fica com #2 — os testes seguintes falam do NÚMERO, não da ordem do Promise.all.
+    ids.r2 = ns.find((n) => n.numero === 2)!.id;
+    ids.r3 = ns.find((n) => n.numero === 3)!.id;
   });
 
   it('isolamento e alcance: B não vê; gerente da Delivery não vê nem entrega na Penha', async () => {
@@ -375,6 +376,14 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     expect(r.ok).toBe(true);
     expect((await req((r as { id: string }).id)).requisicao).toMatchObject({ fichaNomeSnapshot: 'Burger bacon', fichaQuantidadeMilesimos: 20_000 });
     await cancelarRequisicao(a, OPERADOR(), ids.vp, (r as { id: string }).id, { motivo: 'só teste da ficha' }, 'Caio');
+    // Herança b da 1.8: quantidade da ficha forjada acima do INTEGER não dá 500 — o pedido entra, sem a origem ficha.
+    for (const forjada of ['3000000000', '10000001']) {
+      const f = await pedir(OPERADOR(), 'Caio', l.linhas, { fichaId: l.ficha.id, fichaQuantidade: forjada });
+      expect(f.ok).toBe(true);
+      expect((await req((f as { id: string }).id)).requisicao).toMatchObject({ fichaId: null, fichaQuantidadeMilesimos: null });
+      await cancelarRequisicao(a, OPERADOR(), ids.vp, (f as { id: string }).id, { motivo: 'só teste do teto' }, 'Caio');
+    }
+    expect(await listaDaFicha(a, OPERADOR(), ids.vp, (burger as { id: string }).id, '10001')).toMatchObject({ ok: false, erros: { quantidade: expect.any(String) } });
   });
 
   it('cruzamento: contagem acusa 500 g de bacon a menos sem requisição → divergência de R$ 21,00; pequenos repetidos do cheddar; pão negativo', async () => {
@@ -413,5 +422,29 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     // Gerente de outra loja e parceiro B não veem.
     expect(await divergenciasDaLoja(a, GERENTE_DELIVERY(), ids.vp, {}, CFG)).toBeNull();
     expect(await divergenciasDaLoja(b, DONA(), ids.vp, {}, CFG)).toBeNull();
+  });
+
+  it('herança a da 1.8: duas entregas do MESMO insumo em requisições diferentes, juntas, não pulam a confirmação do negativo', async () => {
+    // Queijo prato entra pela nota (loja aberta): 1 kg no livro. Duas requisições de 700 g, cada uma cabe sozinha.
+    const q = await cadastrarInsumo(a, { tipo: 'INGREDIENTE', escala: 'base', nome: 'Queijo prato', unidade: 'KG', conteudo: '1', preco: '30,00', conservacao: 'REFRIGERADO' });
+    expect(q.ok).toBe(true);
+    ids.prato = (q as { id: string }).id;
+    const n = await lancarNota(a, DONA(), { lojaId: ids.vp, fornecedorId: ids.fornecedor, numero: '9001', serie: '', data: hoje, frete: '', total: '30,00', itens: [{ insumoId: ids.prato, embalagem: 'padrao', quantidade: '1', valor: '30,00' }] }, 'Marina');
+    expect(n.ok).toBe(true);
+    expect(await saldo(ids.prato)).toBe(1000);
+    const [p1, p2] = [await pedir(OPERADOR(), 'Ana', [{ insumoId: ids.prato, quantidade: '700', escala: 'menor' }]), await pedir(OPERADOR(), 'Bia', [{ insumoId: ids.prato, quantidade: '700', escala: 'menor' }])];
+    const r1 = (p1 as { id: string }).id;
+    const r2 = (p2 as { id: string }).id;
+    const [x, y] = await Promise.all([entregar(GERENTE(), r1, { 'Queijo prato': '0,7' }), entregar(GERENTE(), r2, { 'Queijo prato': '0,7' })]);
+    // Uma passa; a outra, que leu o saldo travado depois da primeira, pede a confirmação (o livro diz 300 g).
+    expect([x, y].filter((r) => r.ok)).toHaveLength(1);
+    const recusada = [x, y].find((r) => !r.ok)!;
+    expect(recusada).toMatchObject({ ok: false, erros: { confirmarNegativo: expect.stringMatching(/Queijo prato: o livro diz 300 g; com esta saída fica −400 g/) } });
+    expect(await saldo(ids.prato)).toBe(300);
+    // Confirmado, sai e fica negativo (alarme), com o razão coerente.
+    const qual = x.ok ? r2 : r1;
+    expect(await entregar(GERENTE(), qual, { 'Queijo prato': '0,7' }, { confirmarNegativo: true })).toMatchObject({ ok: true });
+    expect(await saldo(ids.prato)).toBe(-400);
+    expect(await razaoCoerente()).toEqual({ divergentes: 0, quebrados: 0 });
   });
 });

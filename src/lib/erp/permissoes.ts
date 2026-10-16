@@ -124,7 +124,7 @@ export const CATALOGO = [
   {
     chave: 'precos',
     rotulo: 'Precificação',
-    emBreve: true,
+    // 1.9: custo por canal na ficha e a taxa do iFood (Canais de venda); o preço em si chega na 1.10.
     permissoes: {
       'precos.ver': { rotulo: 'Ver preços e margens' },
       'precos.editar': { rotulo: 'Mudar preços e margens' },
