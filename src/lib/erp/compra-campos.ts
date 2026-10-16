@@ -300,7 +300,7 @@ export function lerFormNota(
     hoje: string;
     lojas: ReadonlyMap<string, { nome: string; ativa: boolean }>;
     fornecedores: ReadonlyMap<string, { nome: string; ativo: boolean }>;
-    jaNaNota?: { insumos: ReadonlySet<string>; variantes: ReadonlySet<string>; lojaId?: string; fornecedorId?: string };
+    jaNaNota?: { insumoIds: ReadonlySet<string>; variantes: ReadonlySet<string>; lojaId?: string; fornecedorId?: string };
   },
 ): Leitura<DadosDaNota> {
   const erros: Erros = {};
@@ -351,7 +351,7 @@ export function lerFormNota(
     const ins = cadastro.get(item.insumoId);
     if (!ins) return void (erros[chave] = 'Insumo não encontrado neste cadastro.');
     if (ins.produzidoPor) return void (erros[chave] = `“${ins.nome}” é feito na casa (ficha “${ins.produzidoPor}”): não entra em nota de compra.`);
-    if (!ins.ativo && !ja?.insumos.has(ins.id)) return void (erros[chave] = `“${ins.nome}” está desativado: reative em Insumos para comprar.`);
+    if (!ins.ativo && !ja?.insumoIds.has(ins.id)) return void (erros[chave] = `“${ins.nome}” está desativado: reative em Insumos para comprar.`);
     const emb = embalagemDoItem(ins, item.embalagem);
     if (!emb) return void (erros[chave] = `Embalagem não encontrada em “${ins.nome}”.`);
     if (!emb.ativa && !(emb.varianteId && ja?.variantes.has(emb.varianteId))) {

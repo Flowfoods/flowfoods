@@ -356,7 +356,7 @@ export type InsumoDoFormularioDeNota = FormularioDeNota['insumos'][number];
 interface Contexto {
   lojas: Map<string, { nome: string; ativa: boolean }>;
   fornecedores: Map<string, { nome: string; ativo: boolean }>;
-  insumos: Map<string, InsumoLido>;
+  cadastro: Map<string, InsumoLido>;
 }
 
 /** Lê o que a entrada cita (lojas do alcance, fornecedor, insumos) e passa pelo leitor puro. */
@@ -374,7 +374,7 @@ async function lerNota(
   const ctx: Contexto = {
     lojas: new Map(lojas.map((l) => [l.id, l])),
     fornecedores: new Map(fornecedores.map((f) => [f.id, f])),
-    insumos,
+    cadastro: insumos,
   };
   const lido = lerFormNota(entrada, new Map(Array.from(insumos.values()).map((i) => [i.id, paraCompra(i)])), {
     hoje: hojeNoRio(),
@@ -382,7 +382,7 @@ async function lerNota(
     fornecedores: ctx.fornecedores,
     jaNaNota: atual
       ? {
-          insumos: new Set(atual.itens.map((i) => i.insumoId ?? '').filter(Boolean)),
+          insumoIds: new Set(atual.itens.map((i) => i.insumoId ?? '').filter(Boolean)),
           variantes: new Set(atual.itens.map((i) => i.varianteId ?? '').filter(Boolean)),
           lojaId: atual.lojaId,
           fornecedorId: atual.fornecedorId ?? undefined,
@@ -686,7 +686,7 @@ export interface PreviaDaNota {
   somaItensCentavos: number;
   freteCentavos: number;
   totalCentavos: number;
-  insumos: ImpactoNoInsumo[];
+  custos: ImpactoNoInsumo[];
   fichas: ImpactoNaFicha[];
   /** Fichas afetadas que ficaram de fora da lista (teto da tela). */
   maisFichas: number;
@@ -721,9 +721,9 @@ export async function previaDaNota(
     const candidata = { notaId: atual?.id ?? '~nova', entradaEm: d.entradaEm, lancadaEm: atual?.lancadaEm?.getTime() ?? Date.now() };
 
     const novos = new Map<string, CustoExato | null>();
-    const insumos: ImpactoNoInsumo[] = [];
+    const custos: ImpactoNoInsumo[] = [];
     for (const insumoId of afetados) {
-      const ins = ctx.insumos.get(insumoId);
+      const ins = ctx.cadastro.get(insumoId);
       if (!ins) continue;
       const antes = efetivo(ins, agora.get(insumoId));
       const base = semEsta.get(insumoId);
@@ -734,7 +734,7 @@ export async function previaDaNota(
       const depois = vence ? custoDaCompra(daNota) : efetivo(ins, base);
       novos.set(insumoId, depois);
       const comparado = antes && depois ? compararCustos(depois, antes) : null;
-      insumos.push({
+      custos.push({
         insumoId,
         nome: ins.nome,
         antes: formatarCusto(antes, ins.unidade),
@@ -743,10 +743,10 @@ export async function previaDaNota(
         ...(!vence && daNota.length > 0 && base ? { vale: formatarData(base.entradaEm) } : {}),
       });
     }
-    insumos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    custos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
-    const mudaram = insumos.filter((i) => i.efeito === 'sobe' || i.efeito === 'desce' || i.efeito === 'primeira').map((i) => i.insumoId);
-    const { fichas, mais } = await fichasAfetadas(tx, mudaram, novos, insumos);
+    const mudaram = custos.filter((i) => i.efeito === 'sobe' || i.efeito === 'desce' || i.efeito === 'primeira').map((i) => i.insumoId);
+    const { fichas, mais } = await fichasAfetadas(tx, mudaram, novos, custos);
 
     const somaItens = d.itens.reduce((s, i) => s + i.valorCentavos, 0);
     return {
@@ -763,7 +763,7 @@ export async function previaDaNota(
         somaItensCentavos: somaItens,
         freteCentavos: d.freteCentavos,
         totalCentavos: d.totalCentavos,
-        insumos,
+        custos,
         fichas,
         maisFichas: mais,
       },

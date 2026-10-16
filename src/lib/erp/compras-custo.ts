@@ -110,12 +110,12 @@ export interface ComUltimaCompra {
  * insumo, numa consulta só. Muda os próprios objetos: quem já os tem em mãos
  * (a cascata lida, a página da lista) passa a calcular pelo último preço.
  */
-export async function anexarUltimasCompras<T extends ComUltimaCompra>(tx: ClienteDoParceiro, insumos: readonly T[]): Promise<Map<string, UltimaCompra>> {
+export async function anexarUltimasCompras<T extends ComUltimaCompra>(tx: ClienteDoParceiro, lista: readonly T[]): Promise<Map<string, UltimaCompra>> {
   const mapa = await ultimasCompras(
     tx,
-    insumos.map((i) => i.id),
+    lista.map((i) => i.id),
   );
-  for (const i of insumos) i.ultimaCompra = mapa.get(i.id)?.custo ?? null;
+  for (const i of lista) i.ultimaCompra = mapa.get(i.id)?.custo ?? null;
   return mapa;
 }
 

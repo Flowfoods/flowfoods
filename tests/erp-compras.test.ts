@@ -227,7 +227,7 @@ describe('ERP 1.5 · leitura da nota (total conferido no servidor)', () => {
     const inativo = new Map(cadastro).set('pao', { ...PAO, ativo: false });
     const so = { ...base, total: '60,90', itens: [base.itens[1]] };
     expect(lerFormNota(so, inativo, opcoes).ok).toBe(false);
-    expect(lerFormNota(so, inativo, { ...opcoes, jaNaNota: { insumos: new Set(['pao']), variantes: new Set() } }).ok).toBe(true);
+    expect(lerFormNota(so, inativo, { ...opcoes, jaNaNota: { insumoIds: new Set(['pao']), variantes: new Set() } }).ok).toBe(true);
   });
 
   it('retrato do histórico: legível, com os itens', () => {

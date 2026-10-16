@@ -82,7 +82,6 @@ export const CATALOGO = [
   {
     chave: 'compras',
     rotulo: 'Compras',
-    emBreve: true,
     permissoes: {
       'compras.ver': { rotulo: 'Ver compras e notas', porLoja: true },
       'compras.lancar': { rotulo: 'Lançar nota de compra', porLoja: true },
