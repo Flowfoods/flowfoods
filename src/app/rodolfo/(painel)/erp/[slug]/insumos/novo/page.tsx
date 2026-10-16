@@ -6,7 +6,7 @@ import { acaoCadastrarInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroNovoInsumoPage({ params }: { params: { slug: string } }) {
+export default async function ParceiroNovoInsumoPage({ params, searchParams }: { params: { slug: string }; searchParams: { nome?: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.editar');
   return (
@@ -15,6 +15,7 @@ export default async function ParceiroNovoInsumoPage({ params }: { params: { slu
       contexto={ctx.parceiro.nome}
       acao={acaoCadastrarInsumo.bind(null, ctx.parceiro.slug)}
       bloqueio={ctx.bloqueio}
+      nomeSugerido={searchParams.nome}
     />
   );
 }

@@ -319,3 +319,19 @@ describe('ERP 1.2 · filtros da lista de fichas na URL', () => {
     expect(lerFiltrosDeFicha({ tipo: '__proto__' }).tipo).toBeNull();
   });
 });
+
+describe('ERP 1.2 · rota de arquivo do /erp confere a permissão', () => {
+  it('toda route.ts sob src/app/erp chama pode(...) ou exigirPermissao(...) com a sessão', async () => {
+    const { readdirSync, readFileSync, statSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const andar = (d: string): string[] =>
+      readdirSync(d).flatMap((n) => (statSync(join(d, n)).isDirectory() ? andar(join(d, n)) : [join(d, n)]));
+    const rotas = andar(join('src', 'app', 'erp')).filter((f) => f.endsWith('route.ts'));
+    expect(rotas.length).toBeGreaterThan(0);
+    for (const f of rotas) {
+      const t = readFileSync(f, 'utf8');
+      expect(t, f).toMatch(/exigirParceiroDaSessao\(\)/);
+      expect(t, f).toMatch(/pode\(ctx\.alcance, '[a-z]+\.[a-z]+'\)|exigirPermissao\(ctx, /);
+    }
+  });
+});

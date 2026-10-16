@@ -1,0 +1,327 @@
+/**
+ * ERP 1.2 · Ficha técnica no Postgres de verdade: criar com foto e insumo sem
+ * preço (custo incompleto); isolamento entre parceiros em ficha, item e foto
+ * (ficha de B com insumo de A recusada pela regra E pelo banco; foto de A não
+ * sai pela rota de B); operador sem "criar e editar fichas" recusado chamando a
+ * action de verdade; foto com tipo/tamanho inválido recusada sem gravar nada;
+ * edição concorrente recusada; trocar foto apaga a antiga; importação por
+ * planilha com prévia (nada gravado), erro por linha e reimportação que não
+ * duplica.
+ *
+ *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-fichas.db.test.ts
+ */
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { PrismaClient } from '@prisma/client';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+
+const atual = vi.hoisted(() => ({ ctx: null as null | (() => unknown) }));
+vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
+vi.mock('next/navigation', () => ({
+  redirect: (url: string) => {
+    throw Object.assign(new Error(`REDIRECT ${url}`), { url });
+  },
+  notFound: () => {
+    throw new Error('NOT_FOUND');
+  },
+}));
+vi.mock('@/lib/erp/contexto', async () => {
+  const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
+  return { exigirParceiroDaSessao: async () => atual.ctx!(), exigirParceiro: async () => atual.ctx!(), recusaDaAcao, exigirPermissao, pode };
+});
+vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
+
+import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
+import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { cadastrarFicha, editarFicha, MENSAGEM_CONFLITO_FICHA, mudarSituacaoFicha, obterFicha } from '@/lib/erp/fichas';
+import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
+import { responderFoto } from '@/lib/erp/foto-resposta';
+import { listarHistorico } from '@/lib/erp/historico';
+import { resolverAlcance } from '@/lib/erp/permissoes';
+import { centavosDaFracao } from '@/lib/erp/unidades';
+import * as daSessao from '@/app/erp/fichas/actions';
+import { GET as fotoDaSessao } from '@/app/erp/fichas/[id]/foto/route';
+import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+
+const URL_TESTE = process.env.ERP_DB_TESTE;
+const JPG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1]);
+const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+
+describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeout: 60_000 }, () => {
+  let db: PrismaClient;
+  let perfil: PerfilDoBanco;
+  let pasta: string;
+  const sufixo = `f${Date.now().toString(36)}`;
+  let A: { id: string; slug: string; nome: string; status: string };
+  let B: { id: string; slug: string; nome: string; status: string };
+  let a: ClienteDoParceiro;
+  let b: ClienteDoParceiro;
+  const ids: Record<string, string> = {};
+
+  const vinculo = (perfilBase: 'DONO' | 'OPERADOR') =>
+    resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] });
+  const ctxDe = (parceiro: typeof A, perfilBase: 'DONO' | 'OPERADOR', bloqueio: string | null = null) => ({
+    parceiro,
+    alcance: vinculo(perfilBase),
+    cliente: doParceiro(parceiro.id, db, { somenteLeitura: bloqueio !== null }),
+    bloqueio,
+    podeEscrever: bloqueio === null,
+    sessao: { userId: 'u', autorNome: perfilBase === 'DONO' ? 'Marina Dona' : 'Paulo Operador' },
+  });
+  async function rodar<T>(p: Promise<T>): Promise<{ destino: string } | T> {
+    try {
+      return await p;
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith('REDIRECT ')) return { destino: (e as Error & { url: string }).url };
+      throw e;
+    }
+  }
+  const fotosDe = (parceiroId: string) => {
+    const p = join(pasta, parceiroId, 'fichas');
+    return existsSync(p) ? readdirSync(p) : [];
+  };
+  const xburger = (extra: Record<string, unknown> = {}) => ({
+    nome: 'X-Burger',
+    tipo: 'PRATO',
+    rendimento: '1',
+    descricao: 'Pão brioche, blend 180 g e picles',
+    modoPreparo: 'Selar o blend.\nMontar.',
+    itens: [
+      { insumoId: ids.pao, quantidade: '1', unidade: 'un' },
+      { insumoId: ids.blend, quantidade: '180', unidade: 'g' },
+      { insumoId: ids.picles, quantidade: '20', unidade: 'g' },
+    ],
+    ...extra,
+  });
+
+  beforeAll(async () => {
+    const host = new URL(URL_TESTE!).hostname;
+    if (!['localhost', '127.0.0.1'].includes(host)) throw new Error('ERP_DB_TESTE precisa ser local.');
+    pasta = mkdtempSync(join(tmpdir(), 'erp-fotos-'));
+    process.env.ERP_ARQUIVOS_DIR = pasta;
+    db = new PrismaClient({ datasources: { db: { url: URL_TESTE } } });
+    perfil = await perfilDoBanco(db);
+    A = await db.parceiroFlow.create({ data: { nome: 'Fic A', slug: `fic-a-${sufixo}`, status: 'ATIVO' } });
+    B = await db.parceiroFlow.create({ data: { nome: 'Fic B', slug: `fic-b-${sufixo}`, status: 'ATIVO' } });
+    a = doParceiro(A.id, db);
+    b = doParceiro(B.id, db);
+    for (const [chave, campos] of Object.entries({
+      pao: { nome: 'Pão brioche', unidade: 'UN', conteudo: '12', preco: '18,00' },
+      blend: { nome: 'Blend bovino', unidade: 'KG', conteudo: '5', preco: '89,90', frete: '5,00' },
+      picles: { nome: 'Picles', unidade: 'KG', conteudo: '2', semPreco: 'on' },
+      oleo: { nome: 'Óleo de soja', unidade: 'L', conteudo: '900', escala: 'menor', preco: '8,49' },
+    })) {
+      const r = await cadastrarInsumo(a, { tipo: 'INGREDIENTE', conservacao: 'SECO', escala: 'base', ...campos });
+      if (!r.ok) throw new Error(JSON.stringify(r));
+      ids[chave] = r.id;
+    }
+    const rb = await cadastrarInsumo(b, { nome: 'Pão de B', tipo: 'INGREDIENTE', unidade: 'UN', conservacao: 'SECO', conteudo: '10', escala: 'base', preco: '10,00' });
+    if (!rb.ok) throw new Error('insumo de B');
+    ids.paoB = rb.id;
+  });
+
+  afterAll(async () => {
+    if (db) await limparParceiros(db, perfil, [A.id, B.id]);
+    await db?.$disconnect();
+    if (pasta) rmSync(pasta, { recursive: true, force: true });
+  });
+
+  it('cria com foto e 3 insumos (um sem preço): custo incompleto, por porção, histórico e foto na pasta de A', async () => {
+    const r = await cadastrarFicha(a, xburger(), { tipo: 'trocar', bytes: JPG }, 'Marina');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    ids.xburger = r.id;
+    const f = (await obterFicha(a, r.id))!;
+    expect(f.itens.map((i) => [i.nome, i.quantidadeMilesimos])).toEqual([
+      ['Pão brioche', 1000],
+      ['Blend bovino', 180],
+      ['Picles', 20],
+    ]);
+    expect(f.custo.semPreco).toEqual(['Picles']);
+    // pão 150 c + 180 g de (94,90 / 5 kg) = 341,64 c → 491,64 c, arredondado só aqui
+    expect(centavosDaFracao(f.custo.total)).toBe(492n);
+    expect(f.itens[2].custo).toBeNull();
+    expect(f.foto).toMatch(/^[0-9a-f]{12}$/);
+    expect(fotosDe(A.id)).toHaveLength(1);
+    const [h] = await listarHistorico(a, { entidade: 'FichaTecnica' });
+    expect(h.acao).toBe('CRIOU');
+    expect(h.mudancas.find((m) => m.campo === 'insumos')?.depois).toBe('Pão brioche 1 un · Blend bovino 180 g · Picles 20 g');
+  });
+
+  it('isolamento: ficha de B com insumo de A é recusada pela regra E pelo banco (FK composta)', async () => {
+    const r = await cadastrarFicha(b, { ...xburger(), itens: [{ insumoId: ids.blend, quantidade: '100', unidade: 'g' }] });
+    expect(r).toMatchObject({ ok: false, erros: { 'item-0': 'Insumo não encontrado neste cadastro.' } });
+    expect(await b.fichaTecnica.count()).toBe(0);
+    // Mesmo pulando a regra: o banco recusa o item de B apontando para insumo de A.
+    const fb = await b.fichaTecnica.create({ data: { parceiroId: B.id, nome: 'Furo', tipo: 'PRATO', rendimentoMilesimos: 1000, unidadeRendimento: 'UN' } });
+    await expect(b.fichaItem.create({ data: { parceiroId: B.id, fichaId: fb.id, insumoId: ids.blend, quantidadeMilesimos: 100 } })).rejects.toThrow();
+    // E B não lê nem a ficha nem os itens de A.
+    expect(await obterFicha(b, ids.xburger)).toBeNull();
+    expect(await b.fichaItem.count({ where: { fichaId: ids.xburger } })).toBe(0);
+    await b.fichaTecnica.delete({ where: { id: fb.id } });
+  });
+
+  it('foto: servida para A; ficha de A pela sessão de B é 404; sem "ver fichas" é 403', async () => {
+    const okA = await responderFoto(a, ids.xburger, true);
+    expect(okA.status).toBe(200);
+    expect(okA.headers.get('content-type')).toBe('image/jpeg');
+    expect(okA.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(new Uint8Array(await okA.arrayBuffer())).toEqual(JPG);
+    // A rota de verdade, com a sessão de B: o id de A não é achado pelo portão de B.
+    atual.ctx = () => ctxDe(B, 'DONO');
+    const deB = await fotoDaSessao(new Request('http://x'), { params: { id: ids.xburger } });
+    expect(deB.status).toBe(404);
+    atual.ctx = () => ({ ...ctxDe(A, 'DONO'), alcance: resolverAlcance({ perfilBase: null, perfilProprio: ['insumos.ver'], permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] }) });
+    expect((await fotoDaSessao(new Request('http://x'), { params: { id: ids.xburger } })).status).toBe(403);
+    atual.ctx = () => ctxDe(A, 'OPERADOR');
+    expect((await fotoDaSessao(new Request('http://x'), { params: { id: ids.xburger } })).status).toBe(200);
+  });
+
+  it('foto com tipo ou tamanho inválido é recusada: nada gravado, nada no disco', async () => {
+    const antes = fotosDe(A.id).length;
+    const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>');
+    const r = await cadastrarFicha(a, xburger({ nome: 'Com SVG' }), { tipo: 'trocar', bytes: svg });
+    expect(r).toEqual({ ok: false, erros: { foto: 'Use uma foto em JPG, PNG ou WebP.' } });
+    const grande = new Uint8Array(8 * 1024 * 1024 + 1);
+    grande.set(JPG);
+    const r2 = await cadastrarFicha(a, xburger({ nome: 'Foto enorme' }), { tipo: 'trocar', bytes: grande });
+    expect(r2.ok).toBe(false);
+    // Pela action (arquivo de verdade no FormData): o tamanho é recusado antes de ler o corpo.
+    atual.ctx = () => ctxDe(A, 'DONO');
+    const form = new FormData();
+    form.set('nome', 'Pela action');
+    form.set('tipo', 'PRATO');
+    form.append('item_insumo', ids.pao);
+    form.append('item_quantidade', '1');
+    form.append('item_unidade', 'un');
+    form.set('foto', new File([new TextEncoder().encode('GIF89a')], 'x.gif', { type: 'image/gif' }));
+    const e = await rodar(daSessao.acaoCadastrarFicha(null, form));
+    expect(e).toMatchObject({ ok: false, erros: { foto: 'Use uma foto em JPG, PNG ou WebP.' } });
+    expect(await a.fichaTecnica.count({ where: { nome: { in: ['Com SVG', 'Foto enorme', 'Pela action'] } } })).toBe(0);
+    expect(fotosDe(A.id).length).toBe(antes);
+  });
+
+  it('operador (só vê fichas) chamando a action é recusado; nada gravado', async () => {
+    atual.ctx = () => ctxDe(A, 'OPERADOR');
+    const form = new FormData();
+    form.set('nome', 'Do operador');
+    form.set('tipo', 'PRATO');
+    form.append('item_insumo', ids.pao);
+    form.append('item_quantidade', '1');
+    form.append('item_unidade', 'un');
+    const r = await rodar(daSessao.acaoCadastrarFicha(null, form));
+    expect(r).toMatchObject({ ok: false });
+    expect((r as { erros: { geral: string } }).erros.geral).toMatch(/fichas técnicas/i);
+    const sit = await rodar(daSessao.acaoSituacaoFicha(ids.xburger, null, new FormData()));
+    expect(sit).toMatchObject({ ok: false });
+    const imp = await daSessao.acaoPreviaDaPlanilha(null, new FormData());
+    expect(imp?.erro).toBeTruthy();
+    expect(await a.fichaTecnica.count({ where: { nome: 'Do operador' } })).toBe(0);
+    expect((await obterFicha(a, ids.xburger))!.ativa).toBe(true);
+  });
+
+  it('dona pela action: cria e cai no detalhe; parceiro suspenso não grava', async () => {
+    atual.ctx = () => ctxDe(A, 'DONO');
+    const form = new FormData();
+    form.set('nome', 'Fritas');
+    form.set('tipo', 'PRATO');
+    form.set('rendimento', '2');
+    form.append('item_insumo', ids.oleo);
+    form.append('item_quantidade', '50');
+    form.append('item_unidade', 'ml');
+    // Linha deixada em branco no formulário não vira item nem erro.
+    form.append('item_insumo', '');
+    form.append('item_quantidade', '');
+    form.append('item_unidade', 'g');
+    const r = await rodar(daSessao.acaoCadastrarFicha(null, form));
+    expect(r).toMatchObject({ destino: expect.stringMatching(/^\/erp\/fichas\/.+\?feito=criada$/) });
+    atual.ctx = () => ctxDe(A, 'DONO', 'Parceiro suspenso.');
+    form.set('nome', 'Suspensa');
+    expect(await rodar(daSessao.acaoCadastrarFicha(null, form))).toMatchObject({ ok: false, erros: { geral: 'Parceiro suspenso.' } });
+  });
+
+  it('editar: só o que mudou; duas abas, a segunda é recusada; trocar a foto apaga a antiga', async () => {
+    const lida = (await obterFicha(a, ids.xburger))!;
+    const fotoAntiga = fotosDe(A.id).find((n) => n.startsWith(lida.foto!))!;
+    const r = await editarFicha(a, ids.xburger, { ...xburger({ rendimento: '2' }), versao: lida.versao }, { tipo: 'trocar', bytes: PNG }, 'Marina');
+    expect(r).toMatchObject({ ok: true, mudou: ['rendimento', 'foto'] });
+    expect(fotosDe(A.id)).not.toContain(fotoAntiga);
+    const [h] = await listarHistorico(a, { entidade: 'FichaTecnica' });
+    expect(h.mudancas.map((m) => [m.campo, m.antes, m.depois])).toEqual([
+      ['rende', '1 porção', '2 porções'],
+      ['foto', 'foto anterior', 'foto nova'],
+    ]);
+    // Segunda aba, com a versão velha: recusada, nada sobrescrito.
+    const segunda = await editarFicha(a, ids.xburger, { ...xburger({ rendimento: '9' }), versao: lida.versao });
+    expect(segunda).toEqual({ ok: false, erros: { geral: MENSAGEM_CONFLITO_FICHA }, conflito: true });
+    expect((await obterFicha(a, ids.xburger))!.rendimentoMilesimos).toBe(2000);
+    // Tirar a foto: o arquivo some do disco.
+    const v2 = (await obterFicha(a, ids.xburger))!.versao;
+    expect(await editarFicha(a, ids.xburger, { ...xburger({ rendimento: '2' }), versao: v2 }, { tipo: 'remover' })).toMatchObject({ ok: true, mudou: ['foto'] });
+    expect((await obterFicha(a, ids.xburger))!.foto).toBeNull();
+  });
+
+  it('desativar/reativar com histórico; desativada não edita', async () => {
+    expect(await mudarSituacaoFicha(a, ids.xburger, false, 'saiu do cardápio')).toMatchObject({ ok: true });
+    const v = (await obterFicha(a, ids.xburger))!.versao;
+    expect(await editarFicha(a, ids.xburger, { ...xburger(), versao: v })).toMatchObject({ ok: false, erros: { geral: /desativada/ } });
+    expect(await mudarSituacaoFicha(a, ids.xburger, true, null)).toMatchObject({ ok: true });
+  });
+
+  const PLANILHA = [
+    'ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade',
+    'Smash duplo;prato;1;;Dois smash;Prensar;Pão brioche;1;un',
+    'Smash duplo;;;;;;blend bovino;200;g',
+    'Molho;pré-preparo;1;kg;Base;Bater;Óleo de soja;300;ml',
+    'Batata;prato;2;;;;Óleo de soja;100;ml',
+    'Picles na brasa;prato;1;;;;Picles;50;g',
+    'Combo;prato;1;;;;Pão brioche;1;un',
+    'Combo;;;;;;Cebola roxa;30;g',
+  ].join('\n');
+
+  it('importar: prévia não grava; linha ruim só tira a ficha dela; reimportar não duplica', async () => {
+    const antes = await a.fichaTecnica.count();
+    const p = await previaDaImportacao(a, PLANILHA);
+    expect(await a.fichaTecnica.count()).toBe(antes);
+    expect(p.contagem).toEqual({ nova: 4, muda: 0, igual: 0, erro: 1 });
+    const combo = p.fichas.find((f) => f.nome === 'Combo')!;
+    expect(combo.erros).toEqual([{ linha: 8, mensagem: 'Insumo “Cebola roxa” não está cadastrado.' }]);
+    expect(combo.faltam).toEqual(['Cebola roxa']);
+    expect(p.fichas.find((f) => f.nome === 'Picles na brasa')).toMatchObject({ situacao: 'nova', incompleto: true });
+
+    const r = await importarFichas(a, PLANILHA, 'Marina');
+    expect(r).toEqual({ ok: true, criadas: 4, alteradas: 0, iguais: 0, comErro: 1 });
+    expect(await a.fichaTecnica.count()).toBe(antes + 4);
+    const smash = await a.fichaTecnica.findFirstOrThrow({ where: { nome: 'Smash duplo' }, include: { itens: true } });
+    expect(smash.origem).toBe('IMPORTACAO');
+    expect(smash.itens.map((i) => i.quantidadeMilesimos).sort((x, y) => x - y)).toEqual([200, 1000]);
+    const [h] = await listarHistorico(a, { entidade: 'FichaTecnica' });
+    expect(h.motivo).toBe('Importada por planilha');
+
+    // Reimportar a MESMA planilha: nada novo, nada alterado, nada duplicado.
+    const historicoAntes = await a.historicoAlteracao.count();
+    expect((await previaDaImportacao(a, PLANILHA)).contagem).toEqual({ nova: 0, muda: 0, igual: 4, erro: 1 });
+    expect(await importarFichas(a, PLANILHA)).toEqual({ ok: false, erro: 'Nenhuma ficha da planilha pode entrar: corrija os erros e envie de novo.' });
+    expect(await a.fichaTecnica.count()).toBe(antes + 4);
+    expect(await a.historicoAlteracao.count()).toBe(historicoAntes);
+
+    // Mudou uma quantidade: só aquela ficha muda; descrição vazia não apaga a que existe.
+    const nova = PLANILHA.replace('blend bovino;200;g', 'blend bovino;220;g').replace('Dois smash', '');
+    const p2 = await previaDaImportacao(a, nova);
+    expect(p2.fichas.find((f) => f.nome === 'Smash duplo')).toMatchObject({ situacao: 'muda', mudancas: ['insumos e quantidades'] });
+    expect(await importarFichas(a, nova)).toEqual({ ok: true, criadas: 0, alteradas: 1, iguais: 3, comErro: 1 });
+    const smash2 = await a.fichaTecnica.findFirstOrThrow({ where: { nome: 'Smash duplo' } });
+    expect(smash2.descricao).toBe('Dois smash');
+  });
+
+  it('importar em B com nome de insumo que só existe em A: não encontrado (isolamento)', async () => {
+    const p = await previaDaImportacao(b, 'ficha;insumo;quantidade;unidade\nXis;Pão brioche;1;un\nYakisoba;Pão de B;1;un');
+    expect(p.fichas.map((f) => [f.nome, f.situacao])).toEqual([
+      ['Xis', 'erro'],
+      ['Yakisoba', 'nova'],
+    ]);
+    expect(await importarFichas(b, 'ficha;insumo;quantidade;unidade\nYakisoba;Pão de B;1;un')).toMatchObject({ ok: true, criadas: 1 });
+    expect(await a.fichaTecnica.count({ where: { nome: 'Yakisoba' } })).toBe(0);
+  });
+});

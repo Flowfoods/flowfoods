@@ -94,12 +94,16 @@ services:
       ERP_WEBAUTHN_RP_ID: ${ERP_WEBAUTHN_RP_ID:-}
       # Portal do cliente: onde os arquivos enviados caem.
       PORTAL_UPLOAD_DIR: /data/portal
+      # ERP: fotos das fichas técnicas (/data/erp/<parceiro>/fichas/).
+      ERP_ARQUIVOS_DIR: /data/erp
     volumes:
       - segredos:/segredos:ro
       # Arquivos do Portal do cliente (/data/portal/<token>/<bloco>/). Volume
       # nomeado: sobrevive a redeploy. Sem ele, cada deploy apagaria a
       # planilha que o cliente mandou.
       - portal-uploads:/data/portal
+      # Fotos das fichas técnicas do ERP. Volume nomeado: sobrevive a redeploy.
+      - erp-arquivos:/data/erp
     expose:
       - '3000'
     # O domínio se configura no painel do Dokploy (serviço web, porta 3000).
@@ -136,3 +140,4 @@ volumes:
   postgres-data:
   segredos:
   portal-uploads:
+  erp-arquivos:

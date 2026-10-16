@@ -29,7 +29,7 @@ export interface ValoresDoInsumo extends ValoresDaEmbalagem {
   conservacao: Conservacao;
 }
 
-const NOVO: ValoresDoInsumo = { nome: '', tipo: 'INGREDIENTE', unidade: 'KG', conservacao: 'SECO', ...EMBALAGEM_VAZIA };
+export const INSUMO_NOVO: ValoresDoInsumo = { nome: '', tipo: 'INGREDIENTE', unidade: 'KG', conservacao: 'SECO', ...EMBALAGEM_VAZIA };
 
 const ROTULO_DO_CAMPO: Record<string, string> = {
   nome: 'Nome',
@@ -47,7 +47,7 @@ export function FormInsumo({
   base,
   aqui,
   cancelar,
-  inicial = NOVO,
+  inicial = INSUMO_NOVO,
   versao,
   travaDaUnidade = null,
   bloqueio = null,
