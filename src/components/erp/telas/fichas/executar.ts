@@ -104,3 +104,20 @@ export function lerEnvioDasEmbalagens(form: FormData): { impressao: string; linh
     .filter((l) => l.insumoId || l.quantidade.trim());
   return { impressao: textoDe(form.get('impressao')), linhas };
 }
+
+/** 1.10: o formulário dos preços — só o TEXTO de cada canal (o resto o servidor calcula) e o que a tela leu. */
+export function lerEnvioDosPrecos(form: FormData) {
+  return {
+    impressao: textoDe(form.get('impressao')),
+    custos: textoDe(form.get('custos')),
+    precos: { LOJA: textoDe(form.get('preco_LOJA')), DELIVERY_PROPRIO: textoDe(form.get('preco_DELIVERY_PROPRIO')), IFOOD: textoDe(form.get('preco_IFOOD')) },
+  };
+}
+
+/** 1.10: as margens-alvo dos canais e a versão lida. */
+export function lerEnvioDasMargens(form: FormData) {
+  return {
+    versao: textoDe(form.get('versao')),
+    margens: { LOJA: textoDe(form.get('margem_LOJA')), DELIVERY_PROPRIO: textoDe(form.get('margem_DELIVERY_PROPRIO')), IFOOD: textoDe(form.get('margem_IFOOD')) },
+  };
+}

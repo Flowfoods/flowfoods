@@ -12,6 +12,12 @@ export const FEITO_FICHA: Readonly<Record<string, string>> = {
   embalagens: 'Embalagens salvas. O custo do delivery e do iFood já mudou; o antes e o depois estão em Últimas alterações.',
   taxa: 'Taxa do iFood salva. O custo do iFood de todas as fichas já usa a nova.',
   'taxa-igual': 'Nada mudou: a taxa já era essa.',
+  // 1.10
+  precos: 'Preços salvos. O antes e o depois, com o custo do canal na hora, estão em Últimas alterações.',
+  'precos-custo': 'Preços salvos. O custo mudou enquanto você editava: as margens abaixo já são as de agora.',
+  'precos-igual': 'Nada mudou: os preços já eram esses.',
+  margens: 'Margens-alvo salvas. O preço sugerido de todas as fichas já usa as novas.',
+  'margens-igual': 'Nada mudou: as margens-alvo já eram essas.',
 };
 
 export function fraseDoFeitoDaFicha(feito: string | undefined): string | undefined {
