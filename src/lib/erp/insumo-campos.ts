@@ -139,7 +139,7 @@ export function lerFormInsumo(entrada: Record<string, unknown>, tipoAtual?: Tipo
     if (tipoAtual === 'PRE_PREPARO' && r.data.tipo !== 'PRE_PREPARO') {
       erros.tipo = 'Pré-preparo continua pré-preparo: ele nasce da ficha técnica.';
     } else if (tipoAtual !== 'PRE_PREPARO' && r.data.tipo === 'PRE_PREPARO') {
-      erros.tipo = 'Pré-preparo nasce da ficha técnica (fase 1.3), não deste cadastro.';
+      erros.tipo = 'Pré-preparo nasce da ficha técnica: em Fichas técnicas, crie a receita como pré-preparo.';
     }
   }
   const unidade = r.success ? r.data.unidade : (['KG', 'L', 'UN'] as const).find((u) => u === entrada.unidade);

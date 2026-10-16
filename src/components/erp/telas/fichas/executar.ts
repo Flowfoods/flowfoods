@@ -16,17 +16,27 @@ import type { EstadoImportacao } from './estado';
 
 const textoDe = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : '');
 
+/** No seletor do item, o valor do pré-preparo é "ficha:<id>"; o do insumo, só o id. */
+export const PREFIXO_DO_PREPARO = 'ficha:';
+
 /** FormData → entrada da ficha (itens na ordem da tela) + o que fazer com a foto. */
 export async function lerEnvioDaFicha(
   form: FormData,
 ): Promise<{ entrada: EntradaDaFicha & { versao?: string }; foto: MudancaDeFoto } | { erroDaFoto: string }> {
-  const insumos = form.getAll('item_insumo').map(textoDe);
+  const escolhas = form.getAll('item_insumo').map(textoDe);
   const quantidades = form.getAll('item_quantidade').map(textoDe);
   const unidades = form.getAll('item_unidade').map(textoDe);
-  const itens = insumos
-    .map((insumoId, i) => ({ insumoId, quantidade: quantidades[i] ?? '', unidade: unidades[i] ?? '' }))
+  const fatores = form.getAll('item_fator').map(textoDe);
+  const itens = escolhas
+    .map((escolha, i) => ({
+      // O seletor manda o id do insumo ou "ficha:<id>" do pré-preparo (1.3).
+      ...(escolha.startsWith(PREFIXO_DO_PREPARO) ? { subfichaId: escolha.slice(PREFIXO_DO_PREPARO.length) } : { insumoId: escolha }),
+      quantidade: quantidades[i] ?? '',
+      unidade: unidades[i] ?? '',
+      fator: fatores[i] ?? '',
+    }))
     // Linha nova deixada em branco não é item (nem erro).
-    .filter((i) => i.insumoId || i.quantidade.trim());
+    .filter((i) => i.insumoId || i.subfichaId || i.quantidade.trim());
   const entrada = {
     nome: textoDe(form.get('nome')),
     tipo: textoDe(form.get('tipo')),

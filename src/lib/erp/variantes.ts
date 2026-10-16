@@ -33,9 +33,12 @@ async function insumoTravado(tx: ClienteDoParceiro, insumoId: string) {
   await tx.sql`SELECT 1 FROM "Insumo" WHERE "id" = ${insumoId} AND "parceiroId" = ${tx.parceiroId} FOR SHARE`;
   const insumo = await tx.insumo.findUnique({
     where: { id: insumoId },
-    select: { id: true, nome: true, unidade: true, ativo: true },
+    select: { id: true, nome: true, unidade: true, ativo: true, fichaQueProduz: { select: { nome: true } } },
   });
   if (!insumo) throw new Recusa({ ok: false, erros: { geral: 'Insumo não encontrado.' }, naoEncontrado: true });
+  if (insumo.fichaQueProduz) {
+    throw new Recusa({ ok: false, erros: { geral: `“${insumo.nome}” é pré-preparo: o custo vem da ficha “${insumo.fichaQueProduz.nome}”, sem embalagem de compra.` } });
+  }
   if (!insumo.ativo) {
     throw new Recusa({ ok: false, erros: { geral: 'Insumo desativado: reative antes de mexer nas embalagens.' } });
   }

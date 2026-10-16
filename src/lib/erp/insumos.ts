@@ -30,7 +30,9 @@ import {
   type FiltrosDeInsumo,
   type TipoInsumo,
 } from './insumo-campos';
-import { compararCustos, custoDaEmbalagem, type CustoExato, type Unidade } from './unidades';
+import { compararFracoes, custoDaEmbalagem, custoPorUnidade, type CustoExato, type Fracao, type Unidade } from './unidades';
+import { contaDaFicha, custoIncompleto, type CustoDaFicha } from './ficha-campos';
+import { custosEmCascata } from './ficha-custos';
 
 export type ResultadoCadastro =
   | { ok: true; id: string; nome: string; mudou: string[] }
@@ -47,6 +49,10 @@ export type ResultadoCadastro =
 export const MENSAGEM_CONFLITO = 'Alguém alterou este insumo agora há pouco. Recarregue a página para ver a versão nova; nada foi gravado.';
 
 export const MENSAGEM_DESATIVADO = 'Insumo desativado: reative antes de editar.';
+
+/** Insumo produzido por pré-preparo (1.3): nome, unidade, situação e custo vêm da ficha. */
+const mensagemDoPreparo = (nome: string, ficha: string) =>
+  `“${nome}” é pré-preparo: muda junto com a ficha técnica “${ficha}” (nome, rendimento, situação e custo).`;
 
 /** Recusa no meio da transação: desfaz tudo e vira mensagem. */
 class Recusa extends Error {
@@ -185,8 +191,9 @@ export async function editarInsumo(
   const versao = new Date(typeof entrada.versao === 'string' ? entrada.versao : '');
   if (Number.isNaN(versao.getTime())) return { ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true };
 
-  const atual = await cliente.insumo.findUnique({ where: { id } });
+  const atual = await cliente.insumo.findUnique({ where: { id }, include: { fichaQueProduz: { select: { nome: true } } } });
   if (!atual) return { ok: false, erros: { geral: 'Insumo não encontrado.' }, naoEncontrado: true };
+  if (atual.fichaQueProduz) return { ok: false, erros: { geral: mensagemDoPreparo(atual.nome, atual.fichaQueProduz.nome) } };
   // A tela esconde "Editar" de desativado; quem decide é aqui.
   if (!atual.ativo) return { ok: false, erros: { geral: MENSAGEM_DESATIVADO } };
   if (atual.atualizadoEm.getTime() !== versao.getTime()) {
@@ -259,8 +266,9 @@ export async function mudarSituacaoInsumo(
   const motivo = typeof motivoTexto === 'string' ? motivoTexto.trim().replace(/\s+/g, ' ').slice(0, 200) || null : null;
   try {
     return await cliente.transacao(async (tx) => {
-      const atual = await tx.insumo.findUnique({ where: { id }, select: { nome: true, ativo: true } });
+      const atual = await tx.insumo.findUnique({ where: { id }, select: { nome: true, ativo: true, fichaQueProduz: { select: { nome: true } } } });
       if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Insumo não encontrado.' }, naoEncontrado: true });
+      if (atual.fichaQueProduz) throw new Recusa({ ok: false, erros: { geral: mensagemDoPreparo(atual.nome, atual.fichaQueProduz.nome) } });
       const r = await tx.insumo.updateMany({ where: { id, ativo: !ativo }, data: { ativo } });
       if (r.count === 0) {
         throw new Recusa({
@@ -300,11 +308,13 @@ export interface LinhaDeInsumo {
   conteudoMilesimos: number;
   precoEmbalagemCentavos: number;
   taxaEntregaCentavos: number;
-  /** Custo de referência exato; null = "Sem preço" (custo incompleto). */
+  /** Custo de referência exato; null = "Sem preço" (custo incompleto). Pré-preparo: ver `preparo`. */
   custo: CustoExato | null;
   /** Outras embalagens ativas. */
   variantes: number;
   ativo: boolean;
+  /** Produzido por um pré-preparo (1.3): o custo por unidade vem da ficha, em cascata. */
+  preparo: { fichaId: string; porUnidade: Fracao; incompleto: boolean } | null;
 }
 
 function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
@@ -314,7 +324,8 @@ function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
     ...(f.tipo ? { tipo: f.tipo } : {}),
     ...(f.conservacao ? { conservacao: f.conservacao } : {}),
     ...(f.situacao === 'ativos' ? { ativo: true } : f.situacao === 'desativados' ? { ativo: false } : {}),
-    ...(f.semPreco ? { precoEmbalagemCentavos: 0 } : {}),
+    // "Sem preço" é quem precisa de preço digitado: o pré-preparo tem custo da ficha.
+    ...(f.semPreco ? { precoEmbalagemCentavos: 0, fichaQueProduz: { is: null } } : {}),
   };
 }
 
@@ -329,18 +340,36 @@ const SELECAO_DA_LINHA = {
   taxaEntregaCentavos: true,
   ativo: true,
   _count: { select: { variantes: { where: { ativo: true } } } },
+  fichaQueProduz: { select: { id: true } },
 } as const;
 
 type LinhaDoBanco = Prisma.InsumoGetPayload<{ select: typeof SELECAO_DA_LINHA }>;
 
-function paraLinha(i: LinhaDoBanco): LinhaDeInsumo {
-  const { _count, ...resto } = i;
+/**
+ * Banco → linha. Pré-preparo: custo da ficha que o produz, por unidade (o
+ * rendimento é na unidade do insumo), lido em cascata para a página inteira
+ * de uma vez (`custosDosPreparos`).
+ */
+function paraLinha(i: LinhaDoBanco, preparos: ReadonlyMap<string, CustoDaFicha>): LinhaDeInsumo {
+  const { _count, fichaQueProduz, ...resto } = i;
+  const c = fichaQueProduz ? preparos.get(fichaQueProduz.id) : undefined;
   return {
     ...resto,
-    custo: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+    custo: fichaQueProduz ? null : custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
     variantes: _count.variantes,
+    preparo: fichaQueProduz && c ? { fichaId: fichaQueProduz.id, porUnidade: c.porRendimento, incompleto: custoIncompleto(c) } : null,
   };
 }
+
+async function custosDosPreparos(tx: ClienteDoParceiro, linhas: LinhaDoBanco[]): Promise<Map<string, CustoDaFicha>> {
+  const ids = linhas.map((l) => l.fichaQueProduz?.id).filter((x): x is string => !!x);
+  if (ids.length === 0) return new Map();
+  const c = await custosEmCascata(tx, ids);
+  return new Map(ids.map((id) => [id, c.custo(id)!]));
+}
+
+/** Custo por unidade para ordenar (exato); null = sem preço (vai para o fim). */
+const custoParaOrdenar = (l: LinhaDeInsumo): Fracao | null => l.preparo?.porUnidade ?? (l.custo ? custoPorUnidade(l.custo) : null);
 
 /**
  * Página da lista com o total. Filtros e ordem vêm da URL (`lerFiltros`), o
@@ -366,14 +395,19 @@ export async function listarInsumos(
         take: POR_PAGINA,
         select: SELECAO_DA_LINHA,
       });
-      return { linhas: linhas.map(paraLinha), total, pagina, paginas };
+      const preparos = await custosDosPreparos(tx, linhas);
+      return { linhas: linhas.map((l) => paraLinha(l, preparos)), total, pagina, paginas };
     }
-    const todas = (await tx.insumo.findMany({ where, orderBy: { nome: 'asc' }, select: SELECAO_DA_LINHA })).map(paraLinha);
+    const lidas = await tx.insumo.findMany({ where, orderBy: { nome: 'asc' }, select: SELECAO_DA_LINHA });
+    const preparos = await custosDosPreparos(tx, lidas);
+    const todas = lidas.map((l) => paraLinha(l, preparos));
     const sinal = f.direcao === 'asc' ? 1 : -1;
     todas.sort((a, b) => {
-      if (a.custo === null || b.custo === null) return a.custo === b.custo ? 0 : a.custo === null ? 1 : -1;
+      const x = custoParaOrdenar(a);
+      const y = custoParaOrdenar(b);
+      if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
       // Exato (multiplicação cruzada): R$ 0,004/un vem antes de R$ 0,005/un.
-      return sinal * compararCustos(a.custo, b.custo);
+      return sinal * compararFracoes(x, y);
     });
     return { linhas: todas.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA), total, pagina, paginas };
   });
@@ -385,9 +419,14 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
   return cliente.transacao(async (tx) => {
     const i = await tx.insumo.findUnique({
       where: { id },
-      include: { variantes: { orderBy: [{ ativo: 'desc' }, { nome: 'asc' }] } },
+      include: {
+        variantes: { orderBy: [{ ativo: 'desc' }, { nome: 'asc' }] },
+        fichaQueProduz: { select: { id: true, nome: true, tipo: true, rendimentoMilesimos: true, unidadeRendimento: true } },
+      },
     });
     if (!i) return null;
+    const ficha = i.fichaQueProduz;
+    const custoDaFicha = ficha ? (await custosEmCascata(tx, [ficha.id])).custo(ficha.id)! : null;
     const travaDaUnidade = await motivoDaUnidadeTravada(tx, id);
     const historico = await listarHistorico(tx, {
       de: [
@@ -409,6 +448,16 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
       ativo: i.ativo,
       versao: i.atualizadoEm.toISOString(),
       travaDaUnidade,
+      preparo:
+        ficha && custoDaFicha
+          ? {
+              fichaId: ficha.id,
+              nome: ficha.nome,
+              porUnidade: custoDaFicha.porRendimento,
+              incompleto: custoIncompleto(custoDaFicha),
+              conta: contaDaFicha(custoDaFicha, ficha.rendimentoMilesimos, ficha.unidadeRendimento, ficha.tipo),
+            }
+          : null,
       variantes: i.variantes.map((v) => ({
         id: v.id,
         nome: v.nome,
