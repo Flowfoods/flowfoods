@@ -71,6 +71,11 @@ export function contaDoSugerido(semTaxa: Fracao, taxaBp: number, margemAlvoBp: n
   return `${formatarFracao(semTaxa)} ÷ (1${taxa} − ${formatarPontosBase(margemAlvoBp)}) = ${formatarFracao({ num: BigInt(s.centavos), den: 1n })}`;
 }
 
+/** O divisor do sugerido por extenso, para a célula estreita: (1 − 26,2% − 60%) = "0,138". */
+export function divisorDoSugerido(taxaBp: number, margemAlvoBp: number): string {
+  return ((10_000 - taxaBp - margemAlvoBp) / 10_000).toLocaleString('pt-BR', { maximumFractionDigits: 4, minimumFractionDigits: 2 });
+}
+
 // ------------------------------------------------------------------ margens
 
 /** no alvo · abaixo do alvo · prejuízo (líquida < 0). Sem alvo e sem prejuízo: null. */

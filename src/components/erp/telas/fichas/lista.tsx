@@ -33,9 +33,18 @@ import { FAROL, formatarPorcentagem, type PrecoDoCanal } from '@/lib/erp/preco-c
 function MargemNaLista({ p }: { p: PrecoDoCanal }) {
   if (!p.margens) return p.porQue && p.preco ? <span className="text-[12px] text-atencao">incompleta</span> : <span className="text-suave">—</span>;
   const f = p.margens.farol;
+  // Sem preço próprio vale o sugerido, que fica no alvo por construção: número em cinza, sem farol.
+  if (p.preco?.origem === 'sugerido') {
+    return (
+      <span className="text-suave">
+        {formatarPorcentagem(p.margens.liquidaBp)}
+        <span className="sr-only"> pelo preço sugerido</span>
+      </span>
+    );
+  }
   return (
     <>
-      <span className={f === 'prejuizo' ? 'text-erro' : 'text-texto'}>{formatarPorcentagem(p.margens.liquidaBp)}</span>
+      <span className={f === 'prejuizo' ? 'text-erro font-semibold' : 'font-semibold text-texto'}>{formatarPorcentagem(p.margens.liquidaBp)}</span>
       {f && f !== 'noAlvo' && <span className={`block text-[12px] ${f === 'prejuizo' ? 'text-erro' : 'text-atencao'}`}>{FAROL[f].rotulo}</span>}
     </>
   );
@@ -48,6 +57,7 @@ function margemEmLinha(precos: readonly PrecoDoCanal[]): string | null {
     const nome = CANAIS[p.canal].curto;
     if (!p.margens) return `${nome} ${p.porQue && p.preco ? 'incompleta' : '—'}`;
     const f = p.margens.farol;
+    if (p.preco?.origem === 'sugerido') return `${nome} ${formatarPorcentagem(p.margens.liquidaBp)} (sugerido)`;
     return `${nome} ${formatarPorcentagem(p.margens.liquidaBp)}${f && f !== 'noAlvo' ? ` ${FAROL[f].rotulo}` : ''}`;
   });
   return `Margem líquida: ${partes.join(' · ')}`;
@@ -231,11 +241,9 @@ export function TelaListaFichas({
           {precos && (
             <tr className="hidden bg-forte text-[12px] text-suave lg:table-row">
               <td colSpan={4} />
-              <td className="hidden xl:table-cell" />
-              <th scope="colgroup" colSpan={3} className="border-b border-linha px-3 pt-2 text-center font-semibold">
+              <th scope="colgroup" colSpan={3} className="border-b border-linha px-3 pr-5 pt-2 text-center font-semibold">
                 Margem líquida
               </th>
-              <td className="hidden xl:table-cell" />
             </tr>
           )}
           <tr className="bg-forte text-left text-[12px] text-suave">
@@ -245,7 +253,7 @@ export function TelaListaFichas({
             <th scope="col" className="hidden h-10 px-3 font-semibold md:table-cell">
               Rende
             </th>
-            <th scope="col" className={`hidden h-10 px-3 text-right font-semibold ${precos ? 'xl:table-cell' : 'md:table-cell'}`}>
+            <th scope="col" className={`hidden h-10 px-3 text-right font-semibold ${precos ? '' : 'md:table-cell'}`}>
               Insumos
             </th>
             <th scope="col" className="h-10 px-3 text-right font-semibold">
@@ -261,7 +269,7 @@ export function TelaListaFichas({
                   {CANAIS[c].curto}
                 </th>
               ))}
-            <th scope="col" className={`hidden h-10 px-3 pr-5 font-semibold ${precos ? 'xl:table-cell' : 'lg:table-cell'}`}>
+            <th scope="col" className={`hidden h-10 px-3 pr-5 font-semibold ${precos ? '' : 'lg:table-cell'}`}>
               Situação
             </th>
           </tr>
@@ -283,7 +291,7 @@ export function TelaListaFichas({
                       {TIPOS_DE_FICHA[l.tipo]}
                       {l.preparos > 0 ? ` · com ${l.preparos === 1 ? '1 pré-preparo' : `${l.preparos} pré-preparos`}` : ''}
                       {l.descricao ? ` · ${l.descricao}` : ''}
-                      <span className="lg:hidden">{!l.ativa && ' · Desativada'}</span>
+                      <span className={precos ? '' : 'lg:hidden'}>{!l.ativa && ' · Desativada'}</span>
                     </div>
                     {validadesEmTexto(l.validades) && <div className="text-[12px] leading-snug text-suave">{validadesEmTexto(l.validades)}</div>}
                     {precos?.get(l.id) && margemEmLinha(precos.get(l.id)!) && (
@@ -295,7 +303,7 @@ export function TelaListaFichas({
               <td className="hidden whitespace-nowrap px-3 py-2 text-suave md:table-cell">
                 {formatarRendimento(l.rendimentoMilesimos, l.unidadeRendimento, l.tipo)}
               </td>
-              <td className={`hidden px-3 py-2 text-right text-suave ${precos ? 'xl:table-cell' : 'md:table-cell'}`}>{l.itens}</td>
+              <td className={`hidden px-3 py-2 text-right text-suave ${precos ? '' : 'md:table-cell'}`}>{l.itens}</td>
               <td className="whitespace-nowrap px-3 py-2 text-right">
                 {custoIncompleto(l.custo) ? (
                   <span className="text-suave" title={`Falta preço em: ${l.custo.faltaPreco.join(', ')}`}>
@@ -311,16 +319,16 @@ export function TelaListaFichas({
               {precos &&
                 (precos.get(l.id) ? (
                   precos.get(l.id)!.map((p) => (
-                    <td key={p.canal} className="hidden whitespace-nowrap px-3 py-2 text-right align-top lg:table-cell">
+                    <td key={p.canal} className="hidden whitespace-nowrap px-3 py-2 text-right last:pr-5 lg:table-cell">
                       <MargemNaLista p={p} />
                     </td>
                   ))
                 ) : (
-                  <td colSpan={3} className="hidden px-3 py-2 text-right text-[12px] text-suave lg:table-cell">
+                  <td colSpan={3} className="hidden px-3 py-2 pr-5 text-right text-[12px] text-suave lg:table-cell">
                     não se vende
                   </td>
                 ))}
-              <td className={`hidden py-2 pl-3 pr-5 ${precos ? 'xl:table-cell' : 'lg:table-cell'}`}>
+              <td className={`hidden py-2 pl-3 pr-5 ${precos ? '' : 'lg:table-cell'}`}>
                 {l.ativa ? <Selo tom="ok">Ativa</Selo> : <Selo>Desativada</Selo>}
               </td>
             </tr>
@@ -328,6 +336,12 @@ export function TelaListaFichas({
         </tbody>
       </table>
 
+      {precos && (
+        <p className="hidden border-t border-linha px-5 py-2.5 text-[12px] text-suave lg:block">
+          Margem líquida = o que sobra do preço depois dos insumos, das embalagens e da taxa do canal. Em cinza: sem preço próprio (vale o sugerido, que
+          fica no alvo).
+        </p>
+      )}
       <Paginacao
         de={de}
         ate={ate}

@@ -76,8 +76,8 @@ export function FormMargensAlvo({
             const semTaxa = canal === 'IFOOD' && taxaBp === null;
             const erro = erros[id];
             return (
-              <li key={canal} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto_11rem]">
-                <div className="min-w-0 pt-2.5">
+              <li key={canal} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto_14rem]">
+                <div className="min-w-0">
                   <label htmlFor={id} className="text-[14px] font-medium text-texto">
                     {CANAIS[canal].rotulo}
                   </label>
@@ -102,7 +102,7 @@ export function FormMargensAlvo({
                   </div>
                   <span className="flex items-center text-[14px] text-suave">%</span>
                 </div>
-                <p id={`${id}-exemplo`} className="col-span-2 text-[12px] tabular-nums text-suave sm:col-span-1 sm:pt-3 sm:text-right" aria-live="polite">
+                <p id={`${id}-exemplo`} className="col-span-2 text-[12px] tabular-nums text-suave sm:col-span-1 sm:text-right" aria-live="polite">
                   Prato de R$ 10,00: {exemplo(canal)}
                 </p>
                 <div className="col-span-2 sm:col-span-3">

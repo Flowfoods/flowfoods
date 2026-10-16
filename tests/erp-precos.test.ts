@@ -11,6 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   contaDoSugerido,
+  divisorDoSugerido,
   entradaDaTela,
   entradaParaTela,
   formatarPorcentagem,
@@ -60,6 +61,8 @@ describe('preço sugerido = custo sem a taxa ÷ (1 − taxa − margem-alvo)', (
     expect(s.centavos).toBe(7377);
     expect(s.cardapio).toBe(7390);
     expect(sp(contaDoSugerido(c(1018), 2620, 6000, s))).toBe('R$ 10,18 ÷ (1 − 26,2% − 60%) = R$ 73,77');
+    expect(divisorDoSugerido(2620, 6000)).toBe('0,138');
+    expect(divisorDoSugerido(0, 7000)).toBe('0,30');
   });
 
   it('o sugerido atinge o alvo e um centavo a menos não', () => {

@@ -21,6 +21,7 @@ import { useFormState } from 'react-dom';
 import { CANAIS, contaDaTaxa, ORDEM_DOS_CANAIS, porQueIncompleto, taxaACadaDezReais, type CamadasDoCanal, type CanalVenda } from '@/lib/erp/canal-campos';
 import {
   contaDoSugerido,
+  divisorDoSugerido,
   entradaDaTela,
   FAROL,
   formatarPorcentagem,
@@ -163,7 +164,9 @@ function Sugerido({ p, usar }: { p: PrecoDoCanal; usar?: (centavos: number) => v
   return (
     <>
       <span className="font-semibold text-texto">{reais(s.centavos)}</span>
-      <span className="block whitespace-normal text-[12px] text-suave">{contaDoSugerido(p.semTaxa, p.taxaBp, p.margemAlvoBp!, s).replace(/ = .*$/, '')}</span>
+      <span className="block text-[12px] text-suave" title={contaDoSugerido(p.semTaxa, p.taxaBp, p.margemAlvoBp!, s)}>
+        {formatarFracao(p.semTaxa)} ÷ {divisorDoSugerido(p.taxaBp, p.margemAlvoBp!)}
+      </span>
       {usar && s.cardapio !== s.centavos && (
         <button type="button" onClick={() => usar(s.cardapio)} className={`mt-0.5 min-h-8 text-[12px] ${LINK_DE_TEXTO}`}>
           usar {reais(s.cardapio)}
@@ -404,7 +407,7 @@ function Conteudo({
           <tr className="border-t border-linha">
             <th scope="row" className={rotulo}>
               Preço sugerido
-              <span className="block text-[12px] font-normal text-suave">custo ÷ (1 − taxa − alvo)</span>
+              <span className="block text-[12px] font-normal text-suave">custo ÷ (1 − taxa − alvo), para cima</span>
             </th>
             {precos.map((p) => (
               <td key={p.canal} className={`${td} last:pr-5`}>
