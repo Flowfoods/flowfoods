@@ -17,6 +17,7 @@ import { CANAIS, contaDaTaxa, porQueIncompleto, taxaACadaDezReais, type CamadasD
 import { formatarFracao, formatarPontosBase, formatarQuantidade, type Unidade } from '@/lib/erp/unidades';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel, Selo } from '../../ui/superficies';
+import { Dica } from '../../ui/dica';
 
 type Linha = { insumoId: string; nome: string; unidade: Unidade; porCanal: Partial<Record<CanalVenda, CamadasDoCanal['embalagens'][number]>> };
 
@@ -103,6 +104,8 @@ export function CustoPorCanalDaFicha({
   const linhas = linhasDasEmbalagens(canais);
   const ifood = canais.find((c) => c.canal === 'IFOOD')!;
   const motivos = canais.map((c) => ({ c, por: porQueIncompleto(c) })).filter((x) => x.por);
+  // 1.10 (herança b da 1.9): aviso discreto quando delivery ou iFood não têm embalagem.
+  const semEmbalagem = canais.filter((c) => c.canal !== 'LOJA' && c.embalagens.length === 0).map((c) => CANAIS[c.canal].rotulo);
   const th = 'h-10 px-3 text-right font-semibold';
   const td = 'whitespace-nowrap px-3 py-2.5 text-right align-top';
   return (
@@ -125,7 +128,7 @@ export function CustoPorCanalDaFicha({
         <thead>
           <tr className="bg-forte text-[12px] text-suave">
             <th scope="col" className="h-10 pl-5 pr-3 text-left font-semibold">
-              Camada
+              O que entra
             </th>
             {canais.map((c) => (
               <th key={c.canal} scope="col" className={`${th} last:pr-5`}>
@@ -155,7 +158,7 @@ export function CustoPorCanalDaFicha({
             </th>
             {canais.map((c) => (
               <td key={c.canal} className={`${td} last:pr-5`}>
-                {c.canal === 'LOJA' ? TRACO : c.embalagens.length ? formatarFracao(c.embalagensTotal) : <span className="text-suave">nenhuma</span>}
+                {c.canal === 'LOJA' ? TRACO : c.embalagens.length ? formatarFracao(c.embalagensTotal) : <span className="text-[13px] text-atencao">sem embalagem</span>}
               </td>
             ))}
           </tr>
@@ -218,7 +221,7 @@ export function CustoPorCanalDaFicha({
                     Embalagens
                     {c.embalagens.length ? ` (${c.embalagens.map((e) => `${e.nome} ${formatarQuantidade(e.quantidadeMilesimos, e.unidade)}`).join(', ')})` : ''}
                   </dt>
-                  <dd className="shrink-0">{c.embalagens.length ? formatarFracao(c.embalagensTotal) : 'nenhuma'}</dd>
+                  <dd className="shrink-0">{c.embalagens.length ? formatarFracao(c.embalagensTotal) : <span className="text-atencao">sem embalagem</span>}</dd>
                 </div>
               )}
               {c.taxa.tipo !== 'nenhuma' && (
@@ -240,17 +243,29 @@ export function CustoPorCanalDaFicha({
             {CANAIS[c.canal].rotulo}: custo incompleto — {por}.
           </p>
         ))}
-        <p>
-          Embalagem entra inteira, pelo custo de referência (o último preço pago). A taxa do iFood é sobre o preço de venda, que chega em breve.
-          {linkDaTaxa && (
-            <>
-              {' '}
-              <Link href={linkDaTaxa} className={LINK_DE_TEXTO}>
-                Ver os canais de venda
-              </Link>
-            </>
-          )}
-        </p>
+        {semEmbalagem.length > 0 && (
+          <p className="text-atencao">
+            {semEmbalagem.join(' e ')} sem embalagem cadastrada: se vai caixa ou sacola, o custo está baixo.
+            {linkDasEmbalagens && (
+              <>
+                {' '}
+                <Link href={linkDasEmbalagens} className={LINK_DE_TEXTO}>
+                  Cadastrar
+                </Link>
+              </>
+            )}
+          </p>
+        )}
+        <Dica rotulo="Como a conta é feita">
+          <p>Embalagem entra inteira, pelo custo de referência (o último preço pago). A taxa do iFood é comissão + pagamento online, sobre o preço de venda.</p>
+        </Dica>
+        {linkDaTaxa && (
+          <p>
+            <Link href={linkDaTaxa} className={LINK_DE_TEXTO}>
+              Ver os canais de venda
+            </Link>
+          </p>
+        )}
       </div>
     </Painel>
   );
