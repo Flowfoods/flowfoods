@@ -10,7 +10,7 @@
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-fichas.db.test.ts
  */
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
@@ -43,10 +43,11 @@ import { centavosDaFracao } from '@/lib/erp/unidades';
 import * as daSessao from '@/app/erp/fichas/actions';
 import { GET as fotoDaSessao } from '@/app/erp/fichas/[id]/foto/route';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { JPG_LIMPO, jpgComGps, PNG_LIMPO, temGps } from './erp-fotos-teste';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
-const JPG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1]);
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+const JPG = JPG_LIMPO;
+const PNG = PNG_LIMPO;
 
 describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeout: 60_000 }, () => {
   let db: PrismaClient;
@@ -128,10 +129,14 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
   });
 
   it('cria com foto e 3 insumos (um sem preço): custo incompleto, por porção, histórico e foto na pasta de A', async () => {
-    const r = await cadastrarFicha(a, xburger(), { tipo: 'trocar', bytes: JPG }, 'Marina');
+    // Foto de celular, com GPS no EXIF: vai para o disco SEM ele.
+    const r = await cadastrarFicha(a, xburger(), { tipo: 'trocar', bytes: jpgComGps(JPG, 1) }, 'Marina');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     ids.xburger = r.id;
+    const gravada = readFileSync(join(pasta, A.id, 'fichas', fotosDe(A.id)[0]));
+    expect(temGps(gravada)).toBe(false);
+    expect(gravada.equals(Buffer.from(JPG))).toBe(true);
     const f = (await obterFicha(a, r.id))!;
     expect(f.itens.map((i) => [i.nome, i.quantidadeMilesimos])).toEqual([
       ['Pão brioche', 1000],

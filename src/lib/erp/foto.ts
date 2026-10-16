@@ -6,6 +6,8 @@
  * enviar (conforto); quem decide é aqui.
  */
 
+import { limparMetadados } from './foto-metadados';
+
 /** 8 MB: foto de celular cabe; a tela reduz para ~1600 px antes de enviar. */
 export const LIMITE_DA_FOTO = 8 * 1024 * 1024;
 
@@ -38,4 +40,19 @@ export function conferirFoto(b: Uint8Array): FotoConferida {
   const extensao = tipoPelosBytes(b);
   if (!extensao) return { ok: false, erro: 'Use uma foto em JPG, PNG ou WebP.' };
   return { ok: true, extensao, mime: TIPOS_DE_FOTO[extensao], bytes: b.length };
+}
+
+export type FotoPronta = { ok: true; extensao: ExtensaoDaFoto; mime: string; bytes: Uint8Array } | { ok: false; erro: string };
+
+/**
+ * O que vai para o disco: tipo e tamanho conferidos e a imagem regravada SEM
+ * metadados (GPS, aparelho, data, miniatura — `foto-metadados.ts`). É o único
+ * caminho de foto para o disco.
+ */
+export function prepararFoto(b: Uint8Array): FotoPronta {
+  const c = conferirFoto(b);
+  if (!c.ok) return c;
+  const limpa = limparMetadados(b, c.extensao);
+  if (!limpa.ok) return limpa;
+  return { ok: true, extensao: c.extensao, mime: c.mime, bytes: limpa.bytes };
 }

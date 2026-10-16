@@ -37,7 +37,7 @@ import {
   type InsumoDaFicha,
   type TipoFicha,
 } from './ficha-campos';
-import { conferirFoto } from './foto';
+import { prepararFoto, type FotoPronta } from './foto';
 import { apagarFoto, salvarFoto } from './arquivos';
 import type { CustoExato, Unidade } from './unidades';
 
@@ -108,11 +108,14 @@ async function gravarItens(tx: ClienteDoParceiro, fichaId: string, itens: DadosF
   });
 }
 
-/** Confere a foto que chegou (bytes, não nome) — antes de qualquer gravação. */
-function conferirMudancaDeFoto(foto: MudancaDeFoto): { erro: string } | { extensao: 'jpg' | 'png' | 'webp'; mime: string; bytes: number } | null {
+/**
+ * Confere a foto que chegou (bytes, não nome) e a regrava sem metadados —
+ * antes de qualquer gravação.
+ */
+function prepararMudancaDeFoto(foto: MudancaDeFoto): { erro: string } | Extract<FotoPronta, { ok: true }> | null {
   if (foto.tipo !== 'trocar') return null;
-  const c = conferirFoto(foto.bytes);
-  return c.ok ? c : { erro: c.erro };
+  const p = prepararFoto(foto.bytes);
+  return p.ok ? p : { erro: p.erro };
 }
 
 // --------------------------------------------------------- gravar (comum)
@@ -242,17 +245,17 @@ export const SELECAO_PARA_EDITAR = {
   itens: { orderBy: { ordem: 'asc' as const }, select: { insumoId: true, quantidadeMilesimos: true } },
 } as const;
 
-/** Salva a foto no disco (se veio) e roda a gravação; se a transação não fechar, a foto nova sai do disco. */
+/** Salva a foto no disco (se veio, já sem metadados) e roda a gravação; se a transação não fechar, a foto nova sai do disco. */
 async function comFoto<T>(
   cliente: ClienteDoParceiro,
   foto: MudancaDeFoto,
-  conferida: { extensao: 'jpg' | 'png' | 'webp'; mime: string; bytes: number } | null,
+  pronta: Extract<FotoPronta, { ok: true }> | null,
   fn: (nova: { arquivo: string; mime: string; bytes: number } | null | 'manter') => Promise<T>,
 ): Promise<T> {
   let nova: { arquivo: string; mime: string; bytes: number } | null | 'manter' = foto.tipo === 'manter' ? 'manter' : null;
-  if (foto.tipo === 'trocar' && conferida) {
-    const arquivo = await salvarFoto(cliente.parceiroId, foto.bytes, conferida.extensao);
-    nova = { arquivo, mime: conferida.mime, bytes: conferida.bytes };
+  if (foto.tipo === 'trocar' && pronta) {
+    const arquivo = await salvarFoto(cliente.parceiroId, pronta.bytes, pronta.extensao);
+    nova = { arquivo, mime: pronta.mime, bytes: pronta.bytes.length };
   }
   try {
     return await fn(nova);
@@ -270,11 +273,11 @@ export async function cadastrarFicha(
   foto: MudancaDeFoto = { tipo: 'manter' },
   autorNome = 'Sistema',
 ): Promise<ResultadoFicha> {
-  const conferida = conferirMudancaDeFoto(foto);
-  if (conferida && 'erro' in conferida) return { ok: false, erros: { foto: conferida.erro } };
+  const pronta = prepararMudancaDeFoto(foto);
+  if (pronta && 'erro' in pronta) return { ok: false, erros: { foto: pronta.erro } };
   let nome = '';
   try {
-    return await comFoto(cliente, foto.tipo === 'remover' ? { tipo: 'manter' } : foto, conferida, (nova) =>
+    return await comFoto(cliente, foto.tipo === 'remover' ? { tipo: 'manter' } : foto, pronta, (nova) =>
       cliente.transacao(async (tx) => {
         const doCadastro = await insumosTravados(tx, entrada.itens.map((i) => i.insumoId));
         const lido = lerFormFicha(entrada, doCadastro);
@@ -309,14 +312,14 @@ export async function editarFicha(
 ): Promise<ResultadoFicha> {
   const versao = new Date(typeof entrada.versao === 'string' ? entrada.versao : '');
   if (Number.isNaN(versao.getTime())) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_FICHA }, conflito: true };
-  const conferida = conferirMudancaDeFoto(foto);
-  if (conferida && 'erro' in conferida) return { ok: false, erros: { foto: conferida.erro } };
+  const pronta = prepararMudancaDeFoto(foto);
+  if (pronta && 'erro' in pronta) return { ok: false, erros: { foto: pronta.erro } };
 
   let nome = '';
   let fotoAntiga: string | null = null;
   let resultado: ResultadoFicha;
   try {
-    resultado = await comFoto(cliente, foto, conferida, (nova) =>
+    resultado = await comFoto(cliente, foto, pronta, (nova) =>
       cliente.transacao(async (tx) => {
         const atual = await tx.fichaTecnica.findUnique({ where: { id }, select: SELECAO_PARA_EDITAR });
         if (!atual) throw new RecusaDaFicha({ ok: false, erros: { geral: 'Ficha não encontrada.' }, naoEncontrado: true });

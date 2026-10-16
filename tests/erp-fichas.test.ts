@@ -19,7 +19,8 @@ import {
   type InsumoDaFicha,
 } from '@/lib/erp/ficha-campos';
 import { casarComInsumos, chaveDeNome, decodificarPlanilha, lerCsv, lerPlanilhaDeFichas } from '@/lib/erp/ficha-planilha';
-import { conferirFoto, LIMITE_DA_FOTO, tipoPelosBytes } from '@/lib/erp/foto';
+import { conferirFoto, LIMITE_DA_FOTO, prepararFoto, tipoPelosBytes } from '@/lib/erp/foto';
+import { GPS, JPG_LIMPO, jpgComGps, PNG_LIMPO, pngComGps, temGps, WEBP_LIMPO, webpComGps } from './erp-fotos-teste';
 import { caminhoDaFoto } from '@/lib/erp/arquivos';
 import { descreverMudancas } from '@/lib/erp/historico';
 import { diferenca } from '@/lib/erp/insumo-campos';
@@ -269,6 +270,55 @@ describe('ERP 1.2 · foto conferida pelos bytes, nome sorteado e caminho isolado
     expect(() => caminhoDaFoto('../outro', nome, '/data/erp')).toThrow();
     expect(() => caminhoDaFoto('ckparceiroA', '../../etc/passwd', '/data/erp')).toThrow();
     expect(() => caminhoDaFoto('ckparceiroA', 'foto.svg', '/data/erp')).toThrow();
+  });
+});
+
+describe('ERP 1.3 (herança da 1.2) · foto regravada sem metadados (GPS, aparelho, data)', () => {
+  const pronta = (b: Uint8Array) => {
+    const p = prepararFoto(b);
+    if (!p.ok) throw new Error(p.erro);
+    return p.bytes;
+  };
+
+  it('JPEG: sai EXIF/GPS, APP13, comentário e o que vem depois do fim; fica a imagem e a orientação', () => {
+    const suja = jpgComGps();
+    expect(temGps(suja)).toBe(true);
+    const limpa = pronta(suja);
+    expect(temGps(limpa)).toBe(false);
+    expect(Buffer.from(limpa).includes(Buffer.from('Photoshop'))).toBe(false);
+    // SOI + APP1 mínimo (36 bytes, só a orientação 6) + o JPEG original sem o SOI.
+    expect([...limpa.subarray(0, 4)]).toEqual([0xff, 0xd8, 0xff, 0xe1]);
+    expect(limpa[31]).toBe(6);
+    expect(Buffer.from(limpa.subarray(38)).equals(Buffer.from(JPG_LIMPO.subarray(2)))).toBe(true);
+    expect([...limpa.subarray(-2)]).toEqual([0xff, 0xd9]);
+    // Orientação 1 (normal) não precisa de APP1 nenhum: volta o JPEG limpo, byte a byte.
+    expect(Buffer.from(pronta(jpgComGps(JPG_LIMPO, 1))).equals(Buffer.from(JPG_LIMPO))).toBe(true);
+    // Foto que já vem limpa não muda.
+    expect(Buffer.from(pronta(JPG_LIMPO)).equals(Buffer.from(JPG_LIMPO))).toBe(true);
+  });
+
+  it('PNG: sai eXIf, tEXt e tIME; WebP: sai EXIF e XMP e o VP8X deixa de anunciá-los', () => {
+    const png = pronta(pngComGps());
+    expect(temGps(pngComGps())).toBe(true);
+    expect(Buffer.from(png).equals(Buffer.from(PNG_LIMPO))).toBe(true);
+    const suja = webpComGps();
+    expect(temGps(suja)).toBe(true);
+    const webp = pronta(suja);
+    expect(temGps(webp)).toBe(false);
+    expect(Buffer.from(webp.subarray(12, 16)).toString()).toBe('VP8X');
+    expect(webp[20] & 0x0c).toBe(0);
+    // Tamanho do RIFF refeito: arquivo inteiro − 8.
+    expect(Buffer.from(webp).readUInt32LE(4)).toBe(webp.length - 8);
+    expect(Buffer.from(webp.subarray(-WEBP_LIMPO.length + 12)).equals(Buffer.from(WEBP_LIMPO.subarray(12)))).toBe(true);
+  });
+
+  it('arquivo cortado ou forjado com a assinatura certa é recusado (não vai para o disco)', () => {
+    const cortado = JPG_LIMPO.subarray(0, 120);
+    expect(prepararFoto(cortado)).toEqual({ ok: false, erro: 'A foto está danificada ou incompleta. Tire outra ou escolha de novo.' });
+    expect(prepararFoto(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])).ok).toBe(false);
+    expect(prepararFoto(PNG_LIMPO.subarray(0, 40)).ok).toBe(false);
+    expect(prepararFoto(new Uint8Array([...Buffer.from('RIFF'), 4, 0, 0, 0, ...Buffer.from('WEBP')])).ok).toBe(false);
+    expect(GPS).toContain('-22.906847');
   });
 });
 
