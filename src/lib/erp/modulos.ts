@@ -83,7 +83,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 1.2';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 1.3';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -191,7 +191,7 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
     {
       chave: 'fichas',
       nome: 'Ficha técnica',
-      subtitulo: 'Receita, foto e custo',
+      subtitulo: 'Receita, pré-preparo e custo',
       icone: 'fichas',
       grupos: [
         {

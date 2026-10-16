@@ -85,7 +85,7 @@ export function TelaDetalheInsumo({
         icone="insumo"
         cor={COR.insumo}
         titulo={i.nome}
-        subtitulo={[contexto, TIPOS[i.tipo], CONSERVACOES[i.conservacao], `medido em ${u.nome.toLowerCase()}`]
+        subtitulo={[contexto, TIPOS[i.tipo], p ? null : CONSERVACOES[i.conservacao], `medido em ${u.nome.toLowerCase()}`]
           .filter(Boolean)
           .join(' · ')}
         acao={

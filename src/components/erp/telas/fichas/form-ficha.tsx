@@ -210,7 +210,8 @@ export function FormFicha({
     return { total, semPreco, incompletos, porLinha, porRende: rende ? porRendimento(total, rende) : null };
   }, [linhas, porEscolha, tipo, rendimento, rendeEm]);
 
-  const unidadeDoRende = tipo === 'PRATO' ? 'porção' : RENDE_EM[rendeEm].rotulo.replace(/s$/, '');
+  // O custo da prévia é por unidade BASE (kg, L, un), mesmo com o rendimento digitado em g ou ml (como no servidor).
+  const unidadeDoRende = tipo === 'PRATO' ? 'porção' : UNIDADES[RENDE_EM[rendeEm].unidade].sigla;
 
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
