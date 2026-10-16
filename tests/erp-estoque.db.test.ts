@@ -289,9 +289,10 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
   it('conferência: contados, zerados, não contados, valor pelo custo de referência e o que está sem preço', async () => {
     const c = (await conferenciaDaAbertura(a, DONA(), ids.vp))!;
     expect(c.resumo).toEqual({ total: 7, contados: 6, zerados: 1, naoContados: 1 });
-    // Cheddar 17,4 kg a R$ 94,90/5 kg = R$ 330,25; pão 29 un a R$ 18,00/12 = R$ 43,50;
-    // carne 3,5 kg a R$ 42,00 = R$ 147,00; molho 800 g a R$ 9,49/kg = R$ 7,59; batata sem preço (pendente).
-    expect(c.valorCentavos).toBe(33025 + 4350 + 14700 + 759);
+    // Custo de referência = último preço pago (1.5): a nota lançada durante a contagem (R$ 95,00 por 5 kg).
+    // Cheddar 17,4 kg a R$ 19,00/kg = R$ 330,60; pão 29 un a R$ 18,00/12 = R$ 43,50; carne 3,5 kg a
+    // R$ 42,00 = R$ 147,00; molho 800 g a R$ 9,50/kg (1 kg de cheddar rende 2 kg) = R$ 7,60; batata sem preço (pendente).
+    expect(c.valorCentavos).toBe(33060 + 4350 + 14700 + 760);
     expect(c.semCusto.map((l) => l.nome)).toEqual(['Batata']);
     expect(c.linhas.filter((l) => l.contadoMilesimos === null).map((l) => l.nome)).toEqual(['Ketchup sachê']);
     expect(c.notasDeHoje).toBe(1);
@@ -331,15 +332,15 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
     expect(movs.map((m) => [m.tipo, m.insumoNomeSnapshot, m.quantidadeMilesimos, m.valorCentavos, m.saldoAntesMilesimos, m.saldoDepoisMilesimos])).toEqual([
       ['ABERTURA', 'Batata', 4000, 0, 0, 4000],
       ['ABERTURA', 'Carne moída', 3500, 14700, 0, 3500],
-      ['ABERTURA', 'Cheddar fatiado', 17400, 33025, 0, 17400],
-      ['ABERTURA', 'Molho cheddar', 800, 759, 0, 800],
+      ['ABERTURA', 'Cheddar fatiado', 17400, 33060, 0, 17400],
+      ['ABERTURA', 'Molho cheddar', 800, 760, 0, 800],
       ['ABERTURA', 'Pão brioche', 29000, 4350, 0, 29000],
     ]);
     expect(movs.every((m) => m.contagemItemId && m.chaveIdempotencia?.startsWith('abertura:'))).toBe(true);
     expect(await a.saldoEstoque.count({ where: { lojaId: ids.vp } })).toBe(7);
     expect(await saldo(ids.vp, ids.ketchup)).toEqual({ quantidadeMilesimos: 0, valorCentavos: 0 });
     const fechada = (await a.contagem.findUnique({ where: { id: ids.contagem } }))!;
-    expect(fechada).toMatchObject({ status: 'FECHADA', valorTotalCentavos: 52834, naoContadosNoFechamento: 1, fechadaPorNome: 'Marina Dona' });
+    expect(fechada).toMatchObject({ status: 'FECHADA', valorTotalCentavos: 52870, naoContadosNoFechamento: 1, fechadaPorNome: 'Marina Dona' });
     const [h] = await listarHistorico(a, { de: [{ entidade: 'Contagem', ids: [ids.contagem] }] });
     expect(h).toMatchObject({ acao: 'CONCLUIU', motivo: '1 não contados entraram com zero (confirmado).' });
     expect(await concluirAbertura(a, DONA(), ids.vp, { versao: 0, confirmarNaoContados: true }, 'Marina')).toEqual({ ok: true, id: ids.contagem, jaFeito: true });
@@ -357,9 +358,9 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
   it('a tela do saldo: quantidade e valor por insumo pelo custo de referência; total com o pendente à parte; razão recente', async () => {
     const e = (await obterEstoqueDaLoja(a, DONA(), ids.vp))!;
     expect(e.estado).toBe('ABERTO');
-    expect(e.linhas.find((l) => l.nome === 'Cheddar fatiado')).toMatchObject({ quantidadeMilesimos: 17400, valorCentavos: 33025 });
+    expect(e.linhas.find((l) => l.nome === 'Cheddar fatiado')).toMatchObject({ quantidadeMilesimos: 17400, valorCentavos: 33060 });
     expect(e.linhas.find((l) => l.nome === 'Batata')).toMatchObject({ quantidadeMilesimos: 4000, valorCentavos: null });
-    expect(e.total).toEqual({ centavos: 52834, pendentes: 1 });
+    expect(e.total).toEqual({ centavos: 52870, pendentes: 1 });
     expect(e.movimentos).toHaveLength(5);
     expect((await obterEstoqueDaLoja(a, DONA(), ids.vp, { comSaldo: true }))!.linhas).toHaveLength(5);
     expect((await obterEstoqueDaLoja(a, DONA(), ids.vp, { q: 'ched' }))!.linhas.map((l) => l.nome)).toEqual(['Cheddar fatiado', 'Molho cheddar']);
@@ -368,7 +369,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
     expect((await saldosDoInsumo(a, GERENTE_DELIVERY(), ids.cheddar)).map((s) => s.loja)).toEqual(['Delivery']);
     expect(await saldosDoInsumo(a, DONA(), ids.cheddar)).toEqual([
       { lojaId: ids.delivery, loja: 'Delivery', estado: 'EM_CONTAGEM', quantidadeMilesimos: null, valorCentavos: null },
-      { lojaId: ids.vp, loja: 'Vila da Penha', estado: 'ABERTO', quantidadeMilesimos: 17400, valorCentavos: 33025 },
+      { lojaId: ids.vp, loja: 'Vila da Penha', estado: 'ABERTO', quantidadeMilesimos: 17400, valorCentavos: 33060 },
     ]);
     // Operador vê o estoque da loja dele.
     expect((await obterEstoqueDaLoja(a, OPERADOR(), ids.vp))!.estado).toBe('ABERTO');
@@ -382,7 +383,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
     expect(movs.map((m) => [m.tipo, m.quantidadeMilesimos, m.valorCentavos, m.saldoAntesMilesimos, m.saldoDepoisMilesimos, m.motivo])).toEqual([
       ['ENTRADA_COMPRA', 10000, 18400, 17400, 27400, 'Nota 20 · Padrão · 5 kg'],
     ]);
-    expect(await saldo(ids.vp, ids.cheddar)).toEqual({ quantidadeMilesimos: 27400, valorCentavos: 33025 + 18400 });
+    expect(await saldo(ids.vp, ids.cheddar)).toEqual({ quantidadeMilesimos: 27400, valorCentavos: 33060 + 18400 });
     const n = (await obterNota(a, DONA(), ids.notaDepois))!;
     expect(n.estoque.frase).toBe('Entrou no estoque da Vila da Penha.');
     expect(n.estoque.movimentos).toHaveLength(1);
@@ -415,7 +416,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
     ]);
     expect(movs[1].estornoDeId).toBe(movs[0].id);
     expect(movs[1].motivo).toBe('Nota 20 alterada');
-    expect(await saldo(ids.vp, ids.cheddar)).toEqual({ quantidadeMilesimos: 32400, valorCentavos: 33025 + 27400 });
+    expect(await saldo(ids.vp, ids.cheddar)).toEqual({ quantidadeMilesimos: 32400, valorCentavos: 33060 + 27400 });
     n = (await obterNota(a, DONA(), ids.notaDepois))!;
     const s = await editarNota(a, DONA(), ids.notaDepois, { ...notaSimples('20B', hoje, '3', '270,00', '4,00'), versao: n.versao }, 'Marina');
     expect(s.ok).toBe(true);
@@ -426,7 +427,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
   it('cancelar a nota: estorno no razão, o saldo volta ao da abertura; o estorno aparece na nota e no estoque', async () => {
     const r = await cancelarNota(a, DONA(), ids.notaDepois, 'Devolvida ao fornecedor', 'Marina');
     expect(r.ok).toBe(true);
-    expect(await saldo(ids.vp, ids.cheddar)).toEqual({ quantidadeMilesimos: 17400, valorCentavos: 33025 });
+    expect(await saldo(ids.vp, ids.cheddar)).toEqual({ quantidadeMilesimos: 17400, valorCentavos: 33060 });
     const n = (await obterNota(a, DONA(), ids.notaDepois))!;
     expect(n.estoque.frase).toMatch(/foi estornado/);
     expect(n.estoque.movimentos.filter((m) => m.estorno)).toHaveLength(2);
@@ -467,7 +468,10 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
         original.id,
       );
     await expect(insere(-1000, -14700, 'torto')).rejects.toThrow(/espelho exato/);
-    await expect(insere(1000, 4200, 'sinal')).rejects.toThrow(/MovimentoEstoque_sinal_do_tipo/);
+    // Abertura negativa sem ser estorno: o CHECK do sinal recusa.
+    await expect(
+      cru(db, perfil, A.id, `INSERT INTO "MovimentoEstoque" ("id","parceiroId","lojaId","insumoId","tipo","quantidadeMilesimos","valorCentavos","saldoAntesMilesimos","saldoDepoisMilesimos","insumoNomeSnapshot","unidadeSnapshot","contagemItemId") VALUES ('tsinal',$1,$2,$3,'ABERTURA',-1,0,1,0,'x','KG',$4)`, A.id, ids.vp, ids.carne, original.contagemItemId),
+    ).rejects.toThrow(/MovimentoEstoque_sinal_do_tipo/);
     // ABERTURA sem o item da contagem: o CHECK do documento recusa.
     await expect(
       cru(db, perfil, A.id, `INSERT INTO "MovimentoEstoque" ("id","parceiroId","lojaId","insumoId","tipo","quantidadeMilesimos","valorCentavos","saldoAntesMilesimos","saldoDepoisMilesimos","insumoNomeSnapshot","unidadeSnapshot") VALUES ('tsemdoc',$1,$2,$3,'ABERTURA',1,0,0,1,'x','KG')`, A.id, ids.vp, ids.carne),
