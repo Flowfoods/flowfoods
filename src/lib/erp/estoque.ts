@@ -722,7 +722,7 @@ export async function conferenciaDaAbertura(cliente: ClienteDoParceiro, alcance:
         where: { lojaId, tipo: 'ABERTURA', status: { not: 'CANCELADA' } },
         select: { id: true, status: true, versao: true, criadoEm: true, iniciadaPorNome: true, fechadaEm: true, fechadaPorNome: true, valorTotalCentavos: true },
       });
-      if (!c) return { loja, contagem: null };
+      if (!c) return { loja, contagem: null, resumo: resumoDaContagem([]), linhas: [] as LinhaDaConferencia[], valorCentavos: 0, semCusto: [] as LinhaDaConferencia[], notasDeHoje: 0 };
       const itens = await tx.contagemItem.findMany({ where: { contagemId: c.id }, orderBy: { insumoNomeSnapshot: 'asc' }, select: SELECAO_DO_ITEM });
       const custos = await custosDeReferencia(
         tx,
