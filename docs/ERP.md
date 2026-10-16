@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3) e permissões (0.4)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4) e shell único (1.1)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -14,12 +14,13 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | RLS no banco (papel `erp_tenant`) | migration `20261015020000_erp_multitenant` |
 | Milésimos e centavos (texto → inteiro, arredondamento) | `src/lib/erp/unidades.ts` |
 | Regras de cadastro | `insumos.ts`, `parceiros.ts` (N1), `estrutura.ts` (lojas e marcas), `historico.ts`, `slug.ts` |
-| Telas | `/rodolfo/erp` (N1: parceiros + novo) e `/rodolfo/erp/<slug>` com abas Insumos · Lojas e marcas (`/estrutura`) · Acessos (`/acessos`) · Histórico (`/historico`) · Cadastro (`/cadastro`) |
+| Telas | `/rodolfo/erp` (N1: parceiros + novo) e `/rodolfo/erp/<slug>` (hub do parceiro) com `/insumos` · `/lojas` (era `/estrutura`) · `/equipe` (era `/acessos`) · `/historico` · `/cadastro` — os nomes velhos redirecionam |
 | Login das pessoas dos parceiros (0.3) | `UsuarioErp` e companhia (bloco "acesso das pessoas" do esquema) + migration `20261015030000_erp_login` |
 | Acesso ao banco das credenciais (único módulo) | `src/lib/erp/credenciais.ts` (regras puras em `acesso.ts`; rosto em `rosto.ts`; cookie em `sessao.ts`/`sessao-cookie.ts`) |
-| Telas da pessoa do parceiro | `/entrar` (e-mail e senha, entrar com o rosto), `/entrar/primeiro-acesso/<token>`, `/entrar/escolher`, `/erp` (Insumos), `/erp/lojas`, `/erp/equipe`, `/erp/historico` e `/erp/acesso` (Seu acesso: o que a pessoa pode, rosto) — cada aba só aparece para quem pode |
+| Telas da pessoa do parceiro | `/entrar` (e-mail e senha, entrar com o rosto), `/entrar/primeiro-acesso/<token>`, `/entrar/escolher`, `/erp` (hub Módulos da Rede), `/erp/insumos`, `/erp/lojas`, `/erp/equipe`, `/erp/historico` e `/erp/acesso` (Seu acesso: o que a pessoa pode, rosto) — cada aba só aparece para quem pode |
 | Permissões (0.4): catálogo, perfis base, resolução, checagem única, sem escalada | `src/lib/erp/permissoes.ts` (puro) + `equipe.ts` (formulários e retrato do histórico, puro); banco em `credenciais.ts`; migration `20261015040000_erp_permissoes` |
-| Tela de Equipe (a MESMA no nível 1 e no parceiro) | `src/app/rodolfo/erp/equipe/*` (`TelaEquipe`), usada em `/rodolfo/erp/<slug>/acessos` e `/erp/equipe`; telas compartilhadas `tela-estrutura.tsx`, `tela-historico.tsx`, `tela-insumos.tsx` |
+| Telas compartilhadas (as MESMAS no nível 1 e no parceiro) | `src/components/erp/telas/*`: `equipe/` (`TelaEquipe`), `estrutura/`, `historico/`, `insumos/`, `hub-do-parceiro.tsx` |
+| Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
 ## O que a 0.2 entregou (multi-tenant)
 
@@ -181,6 +182,75 @@ no padrão condicional da 0.2) e o histórico das mudanças no tenant do parceir
    recomeça; o por IP segue). Vínculos que já existiam viram Gerente com rede
    inteira (sem ganhar "cuidar da equipe").
 
+## O que a 1.1 entregou — shell único e design system (Cartão A)
+
+1. **Um shell só para `/erp` e `/rodolfo`** (`AppShell`). Menu LATERAL fixo
+   no desktop (≥ 900 px), recolhível (cookie `ff_menu`); abaixo de 900 px vira
+   gaveta à esquerda (botão Menu, `<dialog>` nativo: Escape, fundo inerte,
+   foco volta ao botão). No topo do menu, o **seletor de módulo**; embaixo, os
+   grupos do módulo (abrem e fecham), item ativo com `aria-current` e o
+   indicador vermelho de 2 px; a fase no rodapé. **Barra superior**: trilha,
+   seletor de visão, busca ⌘K, sino e menu do usuário (nome, papel, iniciais,
+   tema, Sair). As sessões continuam separadas: cada layout resolve a SUA e
+   entrega dados prontos; o shell não decide nada.
+2. **Hub de módulos** como entrada: `/erp` ("Módulos da Rede"),
+   `/rodolfo` ("Módulos da FlowFoods") e `/rodolfo/erp/<slug>` (o hub do
+   parceiro visto pelo N1). Grade 4/3/2 colunas; card = quadrado do ícone na
+   cor do módulo + nome + subtítulo. Módulos do plano sem tela (Ficha 1.2,
+   Compras 1.5, Estoque 1.6, Faturamento e DRE 2.1, Produção 3.1, Etiquetas
+   3.4) aparecem desabilitados com a fase, SÓ para quem vai poder vê-los, e
+   nunca com link. `modulosDoParceiro(alcance)` filtra pela mesma regra de
+   `pode` (0.4); quem abre tela fora do acesso volta para o hub com aviso.
+3. **Barney antigo dentro do shell** (Regra Nº 2): grupo de rota
+   `src/app/rodolfo/(painel)` para Hoje (agora `/rodolfo/hoje`), Leads,
+   Cadência (`/rodolfo/barney`), Inbox, Visitas, Métricas, Portal do cliente,
+   Config e Parceiros Flow; `(acesso)` para login e definição de senha, FORA
+   do shell. Lógica intacta; casca reconstruída com o design system.
+   Descartados sem shim: `rodolfo/ui.tsx`, `rodolfo/botoes.tsx`,
+   `logout-button.tsx`, `rodolfo/erp/{ui,campos,abas}.tsx`, `erp/abas.tsx`,
+   `entrar/marca.tsx`, a métrica "Por unidade kg · L · un" e a cópia de
+   rótulo/campo/botão dentro do formulário de insumo.
+4. **Design system** em `src/components/erp/ui`: `Painel`, `Metrica`,
+   `Numero`, `Selo`, `Ponto`, `Vazio`, `Aviso`, `Barra`, `Linha`, `Citacao`,
+   `PageHeader`/`IconeDoModulo`, `HubDeModulos`, `FiltroEmLinks`,
+   `BuscaEmFormulario`, `Segmentos`, `Dialogo`, `Marca`, botões
+   (`classeDeBotao`, `BotaoEnviar`, `BotaoAcao`) e campos (`ROTULO`, `CAMPO`,
+   `Erro`, `Resultado`). Kit Kairu Dark "pulso" na geometria (menu de altura
+   total, indicador de 2 px, cards 14 px, botões 7 px, foco 3 px, 160/220 ms,
+   gaveta < 900 px, sheet < 600 px) e Corporativo nas tabelas (linha 44 px,
+   cabeçalho em `forte`, números tabulares à direita); cor e tipo FlowFoods.
+5. **Tema claro e escuro, escolhido pela pessoa** (Claro / Escuro / Do
+   aparelho) no menu do usuário: cookie `ff_tema` lido NO SERVIDOR pelos
+   layouts do shell (`data-tema` no wrapper `.ff-app`); "Do aparelho" resolve
+   no CSS. Zero JS para pintar, zero flash. O layout raiz não lê o cookie: o
+   `/` continua estático (○ no build). `/entrar` e `/portal` não mudaram.
+6. **Visão "Rede Completa ↔ loja"** (cookie `ff_visao` =
+   `<parceiroId>:<rede|lojaId>`): opções = lojas que o alcance já alcança;
+   conferida no servidor a cada requisição (`visaoDaRequisicao`); valor
+   forjado, de outro parceiro ou de loja fora do alcance cai na primeira
+   opção. A action recusa loja fora do alcance sem gravar nada. N3 não vê
+   "Rede Completa". Nunca concede: a checagem continua `exigirPermissao`.
+   Insumo é cadastro da rede: com loja escolhida, a tela diz "Loja X ·
+   cadastro da rede: N insumos" em vez de fingir que filtrou.
+7. **Busca ⌘K** (Ctrl+K ou "/"): telas permitidas (a mesma lista do menu),
+   parceiros (N1) e insumos do parceiro atual por nome — no servidor, com
+   "ver insumos" conferido (`acaoBuscarNoErp`, `acaoBuscarNoParceiro`).
+8. **Notificações honestas**: parceiro não tem fonte ainda → sino sem ponto,
+   "Nada novo por aqui."; N1 mostra só "respostas sem classificar" (a mesma
+   contagem de Hoje). Nenhum número inventado.
+9. Telas do N1 conferem a sessão na página (`exigirNivel1`) além do
+   middleware; o layout não substitui a checagem.
+
+## Provar o shell (1.1)
+
+```bash
+npx vitest run tests/erp-shell.test.ts   # módulos por perfil, visão, tema, rotas, guarda
+npm run build                            # "/" tem de sair ○ (estático)
+```
+Na tela: entrar como Dono e como Operador do mesmo parceiro e comparar o
+menu e o hub; abrir `/erp/equipe` como Operador (volta ao hub com aviso);
+trocar o tema no menu do usuário e recarregar com JS desligado.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -287,7 +357,7 @@ custo médio sai da divisão (em `unidades.ts`). Nada acumulado é gravado
 # Postgres local com DATABASE_URL apontando para localhost no .env
 npx prisma migrate deploy
 npm run erp:seed-teste        # Casa Alfa e Beta (ativas) e Gama (suspensa), com lojas, marcas, insumos
-npm run build && npm start    # entre em /rodolfo/login → menu ERP
+npm run build && npm start    # entre em /rodolfo/login → hub → Parceiros Flow
 ```
 
 ## Provar o isolamento
@@ -398,3 +468,16 @@ banco de teste: o operador é recusado pelo servidor.
   uma consulta agrupada quando a equipe passar de dezenas.
 - O envio do link (0.5) entra em `executar.ts`/`criarAcesso`; a regra do link
   (decisão 41) já está no servidor.
+
+## Herança da 1.1 · shell (para as próximas subfases)
+
+- Cartão B (insumos completos) entra NO shell: `/erp/insumos/novo` e
+  `/[id]` com `PageHeader` + "+ Novo insumo" no cabeçalho (hoje o formulário
+  da 0.2 fica ao lado da lista, sem CTA duplicado).
+- Sino do parceiro sem fonte: quando houver (requisição, contagem, nota), a
+  contagem real entra em `notificacoes` do layout do /erp.
+- Visão por loja ainda não filtra nada (só insumos existem, e são da rede):
+  estoque, compras e faturamento (1.5+) leem `visaoDaRequisicao`.
+- Página do N1 dentro de parceiro usa `exigirPermissao` (lança erro); o /erp
+  usa `exigirPermissaoNaPagina` (volta ao hub). N1 tem tudo, então não
+  aparece; se um dia houver papel restrito no N1, trocar.

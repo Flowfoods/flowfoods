@@ -715,3 +715,60 @@ os rostos da pessoa e os desafios WebAuthn pendentes dela, além das sessões e
 dos links já tratados; o histórico de B registra quantos rostos saíram.
 Inventário das credenciais da pessoa: senha, sessões, links, rostos, desafios
 — todas tratadas; tentativas de entrada não deixam entrar.
+
+### 42. 2026-10-16 · ERP 1.1: um shell só, com o Barney antigo dentro, e um design system só
+
+**Alternativas:** (a) dois shells (um do /rodolfo, outro do /erp) com o mesmo
+visual; (b) manter o Barney antigo com o menu horizontal e só o ERP novo no
+shell; (c) shell único com os dados entregues pelo layout de cada área.
+
+**Razão:** (c). Regra Nº 2 do contrato: revisar o velho e reconstruir na
+arquitetura nova, sem empilhar. Havia três kits visuais paralelos e duas abas
+copiadas (deriva X1); agora há `src/components/erp/{shell,ui,telas}` e
+nenhuma rota importa de outra. As sessões continuam duas (decisões 34/36): o
+shell é o mesmo componente, cada layout resolve a SUA sessão e passa dados
+prontos (menu filtrado por `pode`, visão conferida, server actions que
+reconferem). Login e setup do nível 1 ficam num grupo de rota próprio
+`(acesso)` — o shell exige sessão, e envolver o login seria um laço.
+
+### 43. 2026-10-16 · ERP 1.1: tema por cookie lido no servidor, escopado no wrapper
+
+**Alternativas:** (a) `next-themes`/script no `<head>` do layout raiz; (b)
+classe no `<html>` lida no layout raiz; (c) cookie `ff_tema` lido pelos
+layouts do shell, `data-tema` no wrapper `.ff-app`, "do aparelho" por
+`prefers-color-scheme` no CSS.
+
+**Razão:** (c). (a) e (b) tornam o layout raiz dinâmico (o site institucional
+perderia o estático) ou exigem script antes da pintura. Em (c) não há flash
+(o servidor já pinta o tema), não há JS para pintar e o `/` segue ○ no build
+(teste em `tests/erp-shell.test.ts`). Tokens em canais RGB para o Tailwind
+aplicar opacidade; fora do `.ff-app` os tokens caem no valor escuro, então
+peça do DS usada no /entrar (Marca, Ponto) mantém o visual de antes.
+
+### 44. 2026-10-16 · ERP 1.1: visão "Rede Completa ↔ loja" é filtro, nunca permissão
+
+**Alternativas:** (a) a visão escolhida vira o alcance da requisição; (b)
+cookie com o id da loja, aceito como veio; (c) cookie
+`<parceiroId>:<rede|lojaId>` conferido a cada requisição contra
+`listarLojasDoAlcance` (0.4), com recusa na action.
+
+**Razão:** (c). (a) faria um cookie conceder ou tirar permissão — a checagem
+única é `exigirPermissao` (decisão 40). (b) aceitaria loja forjada ou de
+outro parceiro. Em (c) o valor fora do alcance cai na primeira opção
+permitida e a action não grava nada; N3 não tem "Rede Completa".
+
+### 45. 2026-10-16 · ERP 1.1: kit Kairu Dark "pulso" na geometria, FlowFoods na cor e no tipo
+
+**Alternativas:** (a) o kit inteiro (menta, Inter, vidro); (b) só a
+identidade FlowFoods, sem kit; (c) geometria e comportamento do kit + cor e
+tipo FlowFoods + tabelas do Corporativo.
+
+**Razão:** (c). O contrato pede o kit puxado de verdade (código lido via MCP:
+`design-kit.css`, `DesignKit.tsx`) e a identidade FlowFoods (CLAUDE.md).
+Ficam do kit: menu de altura total com indicador de 2 px, cards 14 px,
+botões 7 px, foco 3 px/4 px, 160/220 ms, gaveta < 900 px, sheet < 600 px,
+`<dialog>` nativo. Não vêm: vidro/blur, gradiente, glow, Inter/Sora, menta.
+Botão principal em #C41522 (branco ≈ 6:1); #EA1D2C fica para acento
+(indicador, filete, foco). Cor de módulo só no quadrado do ícone. Rótulo em
+caixa alta só no hub e nos grupos do menu. Contrato completo em
+`.interface-design/system.md`.
