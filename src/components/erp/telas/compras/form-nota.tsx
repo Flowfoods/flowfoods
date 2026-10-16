@@ -1,3 +1,4 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Padrão · 2,27 kg" e "4,54 kg · R$ 65,54/kg" são a linha de apoio do item, no padrão "A · B" das telas da 1.1–1.4. (O ignore do scanner não aceita id com minúscula.)
 'use client';
 
 /**

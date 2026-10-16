@@ -111,3 +111,17 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   30 dias". Não informada = texto (atenção no pré-preparo), nunca um prazo
   inventado. Ícones: Seco `Package`, Pista fria `ThermometerSnowflake`,
   Refrigerado `Refrigerator`, Congelado `Snowflake`, sempre com a palavra.
+- **Compras (1.5)**: nota em tela própria (max 896) com três painéis ("A
+  nota", "Itens", "Frete e total"); item = insumo, embalagem (padrão, outra
+  ou "A granel (por kg)"), quantidade e o VALOR TOTAL DO ITEM; embaixo de cada
+  item, em 12 px tabular, "4,54 kg · R$ 65,54/kg com frete · hoje R$ 57,27/kg".
+  Total digitado com a conta ao vivo ("… = R$ 471,50 · confere com a nota" em
+  `ok`, ou "diferença de R$ X" em `atencao`). Dois envios: "Conferir o
+  impacto" (secundário, só prévia) e "Lançar nota" (primário). A prévia é um
+  painel com subtítulo "Nada foi gravado" e antes → depois por insumo e por
+  ficha, com a palavra "sobe"/"desce" (cor só reforça). Detalhe: total em
+  Gelasio, tabela Corporativo (quantidade, valor, frete, custo por unidade)
+  e o selo "vale no custo" (ou "vale a de DD/MM"); cancelar pede o motivo na
+  própria tela. No insumo: "Custo de referência" com subtítulo "Último preço
+  pago" ou "Preço cadastrado…" e o painel "Preço pago" (compras, canceladas
+  riscadas, último preço por fornecedor com "mais barato").
