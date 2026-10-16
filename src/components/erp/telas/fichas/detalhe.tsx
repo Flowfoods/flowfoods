@@ -2,18 +2,21 @@
  * Detalhe da ficha técnica (1.2), o MESMO para o nível 1 e para a pessoa do
  * parceiro. No topo, o que ajuda a operar: a foto e a descrição. Depois o
  * custo (por porção e da receita, com a conta por extenso; incompleto quando
- * algum insumo está "Sem preço"), os insumos com quantidade e custo, e o modo
- * de preparo. Quem não edita só lê: nenhum botão aparece. Parceiro
+ * algum insumo está "Sem preço", inclusive dentro de um pré-preparo), os itens
+ * com quantidade limpa, peso bruto (fator de correção) e custo — o pré-preparo
+ * abre "de onde vem" o custo dele (1.3) —, e o modo de preparo. Pré-preparo
+ * diz em que insumo vira e quais fichas o usam (para onde o custo vai). Quem não edita só lê: nenhum botão aparece. Parceiro
  * bloqueado: botões desabilitados, com o motivo.
  */
 
 import Link from 'next/link';
 import type { FichaDetalhada } from '@/lib/erp/fichas';
-import { contaDaFicha, formatarRendimento, porUnidadeDeRendimento, TIPOS_DE_FICHA } from '@/lib/erp/ficha-campos';
+import { contaDaFicha, custoIncompleto, formatarFator, formatarRendimento, porUnidadeDeRendimento, quantidadeBruta, TIPOS_DE_FICHA } from '@/lib/erp/ficha-campos';
 import { COR } from '@/lib/erp/modulos';
-import { formatarFracao, formatarQuantidade } from '@/lib/erp/unidades';
+import { formatarFracao, formatarQuantidade, UNIDADES } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
 import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
+import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import type { AcaoDeCadastro } from '../cadastro/estado';
 import { FormSituacao } from '../cadastro/form-situacao';
@@ -46,9 +49,11 @@ export function TelaDetalheFicha({
   /** Base dos insumos (link de cada item), só para quem vê insumos. */
   linkDoInsumo?: string;
 }) {
+  const quantidade = (q: number, fator: number, unidade: Parameters<typeof formatarQuantidade>[1]) =>
+    fator === 1000 ? null : `bruto ${formatarQuantidade(quantidadeBruta(q, fator), unidade)} · fator ${formatarFator(fator)}`;
   const rende = formatarRendimento(f.rendimentoMilesimos, f.unidadeRendimento, f.tipo);
   const por = porUnidadeDeRendimento(f.unidadeRendimento, f.tipo);
-  const incompleto = f.custo.semPreco.length > 0;
+  const incompleto = custoIncompleto(f.custo);
   const mensagem = fraseDoFeitoDaFicha(feito);
 
   return (
@@ -113,13 +118,13 @@ export function TelaDetalheFicha({
             </div>
           </Painel>
 
-          <Painel className="order-3 sm:order-2" titulo="Insumos" semRespiro acessorio={<span className="text-[12px] tabular-nums text-suave">{f.itens.length}</span>}>
+          <Painel className="order-3 sm:order-2" titulo="Insumos e pré-preparos" semRespiro acessorio={<span className="text-[12px] tabular-nums text-suave">{f.itens.length}</span>}>
             <table className="w-full text-sm">
-              <caption className="sr-only">Insumos da receita, quantidade e custo de cada um pelo custo de referência.</caption>
+              <caption className="sr-only">Insumos e pré-preparos da receita: quantidade limpa, peso bruto e custo de cada um.</caption>
               <thead>
                 <tr className="bg-forte text-left text-[12px] text-suave">
                   <th scope="col" className="h-10 pl-4 pr-3 font-semibold sm:pl-5">
-                    Insumo
+                    Item
                   </th>
                   <th scope="col" className="hidden h-10 px-3 text-right font-semibold sm:table-cell">
                     Quantidade
@@ -130,28 +135,69 @@ export function TelaDetalheFicha({
                 </tr>
               </thead>
               <tbody className="tabular-nums">
-                {f.itens.map((i) => (
-                  <tr key={i.id} className="border-t border-linha">
-                    <td className="h-11 py-2 pl-4 pr-3 sm:pl-5">
-                      {linkDoInsumo && i.insumoId ? (
-                        <Link href={`${linkDoInsumo}/${i.insumoId}`} className="font-medium text-texto underline-offset-4 hover:underline">
-                          {i.nome}
-                        </Link>
-                      ) : (
-                        <span className="font-medium text-texto">{i.nome}</span>
-                      )}
-                      {!i.ativo && <span className="ml-2 text-[12px] text-suave">insumo desativado</span>}
-                      {/* Celular: a quantidade vem embaixo do nome (a coluna some). */}
-                      <span className="block text-[12px] text-suave sm:hidden">{formatarQuantidade(i.quantidadeMilesimos, i.unidade)}</span>
-                    </td>
-                    <td className="hidden whitespace-nowrap px-3 py-2 text-right text-suave sm:table-cell">
-                      {formatarQuantidade(i.quantidadeMilesimos, i.unidade)}
-                    </td>
-                    <td className="whitespace-nowrap py-2 pl-3 pr-4 text-right sm:pr-5">
-                      {i.custo ? <span className="text-texto">{formatarFracao(i.custo)}</span> : <Selo tom="alerta">Sem preço</Selo>}
-                    </td>
-                  </tr>
-                ))}
+                {f.itens.map((i) => {
+                  const bruto = quantidade(i.quantidadeMilesimos, i.fatorCorrecaoMilesimos, i.unidade);
+                  const p = i.preparo;
+                  return (
+                    <tr key={i.id} className="border-t border-linha align-top">
+                      <td className="py-2.5 pl-4 pr-3 sm:pl-5">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                          {p ? (
+                            <Link href={`${base}/${p.id}`} className="font-medium text-texto underline-offset-4 hover:underline">
+                              {i.nome}
+                            </Link>
+                          ) : linkDoInsumo && i.insumoId ? (
+                            <Link href={`${linkDoInsumo}/${i.insumoId}`} className="font-medium text-texto underline-offset-4 hover:underline">
+                              {i.nome}
+                            </Link>
+                          ) : (
+                            <span className="font-medium text-texto">{i.nome}</span>
+                          )}
+                          {p && <Selo>Pré-preparo</Selo>}
+                          {!i.ativo && <span className="text-[12px] text-suave">{p ? 'desativado' : 'insumo desativado'}</span>}
+                        </div>
+                        {/* Celular: a quantidade vem embaixo do nome (a coluna some). */}
+                        <span className="block text-[12px] text-suave sm:hidden">
+                          {formatarQuantidade(i.quantidadeMilesimos, i.unidade)}
+                          {bruto ? ` · ${bruto}` : ''}
+                        </span>
+                        {p && (
+                          <details className="group mt-1.5">
+                            <summary className="cursor-pointer list-none text-[12px] text-suave underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
+                              De onde vem: {formatarFracao(p.custo.porRendimento)} por {UNIDADES[p.unidadeRendimento].sigla} ({formatarFracao(p.custo.total)} ÷{' '}
+                              {formatarQuantidade(p.rendimentoMilesimos, p.unidadeRendimento)})
+                              <span className="ml-1 group-open:hidden">· ver a receita</span>
+                            </summary>
+                            <ul className="mt-2 space-y-1 border-l-2 border-linha-forte pl-3 text-[12px] text-suave">
+                              {p.itens.map((x, k) => (
+                                <li key={k} className="flex flex-wrap justify-between gap-x-3">
+                                  <span>
+                                    {x.nome} {formatarQuantidade(x.quantidadeMilesimos, x.unidade)}
+                                    {x.fatorCorrecaoMilesimos !== 1000 ? ` (fator ${formatarFator(x.fatorCorrecaoMilesimos)})` : ''}
+                                    {x.preparo ? ' · pré-preparo' : ''}
+                                  </span>
+                                  <span className="tabular-nums">{x.custo ? formatarFracao(x.custo) : 'sem preço'}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </details>
+                        )}
+                      </td>
+                      <td className="hidden whitespace-nowrap px-3 py-2.5 text-right text-suave sm:table-cell">
+                        {formatarQuantidade(i.quantidadeMilesimos, i.unidade)}
+                        {bruto && <span className="block text-[12px]">{bruto}</span>}
+                      </td>
+                      <td className="whitespace-nowrap py-2.5 pl-3 pr-4 text-right sm:pr-5">
+                        {i.custo ? <span className="text-texto">{formatarFracao(i.custo)}</span> : <Selo tom="alerta">Sem preço</Selo>}
+                        {p && custoIncompleto(p.custo) && (
+                          <span className="mt-1 block">
+                            <Selo tom="alerta">Incompleto</Selo>
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
               <tfoot>
                 <tr className="border-t border-linha-forte">
@@ -167,8 +213,9 @@ export function TelaDetalheFicha({
               </tfoot>
             </table>
             <p className="border-t border-linha px-4 py-3 text-[12px] text-suave sm:px-5">
-              Pelo custo de referência de cada insumo (embalagem padrão), somado sem arredondar; cada linha mostra o valor arredondado. O custo pelas compras
-              de verdade chega em Compras.
+              Quantidade limpa; o custo conta o peso bruto (fator de correção). Insumo pelo custo de referência (embalagem padrão); pré-preparo pelo custo
+              da receita dele ÷ o que ela rende. Tudo somado sem arredondar; cada linha mostra o valor arredondado. O custo pelas compras de verdade chega
+              em Compras.
             </p>
           </Painel>
 
@@ -182,6 +229,49 @@ export function TelaDetalheFicha({
         </div>
 
         <aside className="min-w-0 space-y-4" aria-label="Situação e alterações">
+          {f.tipo === 'PRE_PREPARO' && (
+            <Painel titulo="Pré-preparo">
+              <div className="space-y-3 text-sm">
+                <p className="text-texto">
+                  {f.insumoProduzido ? (
+                    <>
+                      Aparece em Insumos como{' '}
+                      {linkDoInsumo ? (
+                        <Link href={`${linkDoInsumo}/${f.insumoProduzido.id}`} className={LINK_DE_TEXTO}>
+                          {f.insumoProduzido.nome}
+                        </Link>
+                      ) : (
+                        <strong className="font-semibold">{f.insumoProduzido.nome}</strong>
+                      )}
+                      , a {formatarFracao(f.custo.porRendimento)} por {UNIDADES[f.unidadeRendimento].sigla}.
+                    </>
+                  ) : (
+                    'Vira insumo na próxima vez que a ficha for salva.'
+                  )}
+                </p>
+                <div>
+                  <h3 className="text-[13px] font-semibold text-suave">Usado em</h3>
+                  {f.usadaEm.length === 0 ? (
+                    <p className="mt-1 text-suave">Nenhuma ficha ainda.</p>
+                  ) : (
+                    <>
+                      <ul className="mt-1 space-y-1">
+                        {f.usadaEm.map((u) => (
+                          <li key={u.id}>
+                            <Link href={`${base}/${u.id}`} className={LINK_DE_TEXTO}>
+                              {u.nome}
+                            </Link>
+                            {!u.ativa && <span className="ml-1 text-[12px] text-suave">desativada</span>}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="mt-2 text-[12px] text-suave">Mudar esta receita muda o custo dessas fichas na hora.</p>
+                    </>
+                  )}
+                </div>
+              </div>
+            </Painel>
+          )}
           {podeEditar && (
             <Painel titulo="Situação">
               {bloqueio ? (

@@ -14,7 +14,8 @@ export default async function ParceiroEmbalagemPage({ params }: { params: { slug
   const insumo = await obterInsumo(ctx.cliente, params.id);
   if (!insumo) notFound();
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/insumos`;
-  if (!insumo.ativo) redirect(`${base}/${insumo.id}`);
+  // Pré-preparo (1.3) só muda pela ficha técnica.
+  if (!insumo.ativo || insumo.preparo) redirect(`${base}/${insumo.id}`);
   const nova = params.varianteId === 'nova';
   if (!nova && !insumo.variantes.some((v) => v.id === params.varianteId)) notFound();
   const varianteId = nova ? '' : params.varianteId;

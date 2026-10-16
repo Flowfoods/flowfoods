@@ -18,7 +18,7 @@ import {
   POR_PAGINA,
   type FiltrosDeInsumo,
 } from '@/lib/erp/insumo-campos';
-import { UNIDADES, formatarDinheiro, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
+import { UNIDADES, formatarDinheiro, formatarFracao, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
 import { CAMPO, MARCAR } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
@@ -36,6 +36,16 @@ function hrefDoDetalhe(base: string, id: string, f: FiltrosDeInsumo): string {
 }
 
 function Custo({ i }: { i: LinhaDeInsumo }) {
+  // Pré-preparo (1.3): o custo é o da ficha que o produz, por unidade do rendimento.
+  if (i.preparo) {
+    return (
+      <span className="whitespace-nowrap">
+        <span className={`font-semibold ${i.preparo.incompleto ? 'text-atencao' : 'text-texto'}`}>{formatarFracao(i.preparo.porUnidade)}</span>
+        <span className="ml-0.5 text-[12px] text-suave">/{UNIDADES[i.unidade].sigla}</span>
+        {i.preparo.incompleto && <span className="block text-[12px] text-atencao">incompleto</span>}
+      </span>
+    );
+  }
   if (i.custo === null) return <Selo tom="alerta">Sem preço</Selo>;
   return (
     <span className="whitespace-nowrap">
@@ -228,7 +238,7 @@ export function TelaListaInsumos({
               <span className="min-w-0">
                 <span className={`block truncate font-medium ${i.ativo ? 'text-texto' : 'text-suave'}`}>{i.nome}</span>
                 <span className="block truncate text-[12px] text-suave">
-                  {TIPOS[i.tipo]} · {formatarQuantidade(i.conteudoMilesimos, i.unidade)}
+                  {i.preparo ? 'Pré-preparo · custo da ficha' : `${TIPOS[i.tipo]} · ${formatarQuantidade(i.conteudoMilesimos, i.unidade)}`}
                   {!i.ativo && ' · Desativado'}
                 </span>
               </span>
@@ -273,14 +283,19 @@ export function TelaListaInsumos({
                 <Link href={hrefDoDetalhe(base, i.id, f)} className={`ff-transicao rounded-[5px] font-medium underline-offset-4 hover:underline ${i.ativo ? 'text-texto' : 'text-suave'}`}>
                   {i.nome}
                 </Link>
+                {i.preparo && (
+                  <span className="ml-2 align-middle">
+                    <Selo>Pré-preparo</Selo>
+                  </span>
+                )}
                 <div className="text-[12px] text-suave">
-                  {TIPOS[i.tipo]} · {CONSERVACOES[i.conservacao]}
+                  {i.preparo ? 'Custo da ficha técnica' : `${TIPOS[i.tipo]} · ${CONSERVACOES[i.conservacao]}`}
                   <span className="lg:hidden">{!i.ativo && ' · Desativado'}</span>
                 </div>
               </td>
-              <td className="px-3 py-2 text-right text-suave">{formatarQuantidade(i.conteudoMilesimos, i.unidade)}</td>
+              <td className="px-3 py-2 text-right text-suave">{i.preparo ? '—' : formatarQuantidade(i.conteudoMilesimos, i.unidade)}</td>
               <td className="px-3 py-2 text-right">
-                <div className="text-texto">{i.precoEmbalagemCentavos > 0 ? formatarDinheiro(i.precoEmbalagemCentavos) : '—'}</div>
+                <div className={i.preparo ? 'text-suave' : 'text-texto'}>{i.precoEmbalagemCentavos > 0 ? formatarDinheiro(i.precoEmbalagemCentavos) : i.preparo ? 'da ficha' : '—'}</div>
                 {i.taxaEntregaCentavos > 0 && (
                   <div className="text-[12px] text-suave">+ {formatarDinheiro(i.taxaEntregaCentavos)} frete</div>
                 )}

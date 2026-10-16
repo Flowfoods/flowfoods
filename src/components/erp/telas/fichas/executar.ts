@@ -13,11 +13,10 @@ import { decodificarPlanilha, LIMITE_DA_PLANILHA } from '@/lib/erp/ficha-planilh
 import { NOME_DA_FOTO } from '@/lib/erp/foto';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { EstadoImportacao } from './estado';
+import { PREFIXO_DO_PREPARO } from './prefixo';
 
 const textoDe = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : '');
 
-/** No seletor do item, o valor do pré-preparo é "ficha:<id>"; o do insumo, só o id. */
-export const PREFIXO_DO_PREPARO = 'ficha:';
 
 /** FormData → entrada da ficha (itens na ordem da tela) + o que fazer com a foto. */
 export async function lerEnvioDaFicha(

@@ -2,7 +2,7 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
-import { insumosParaFicha, obterFicha } from '@/lib/erp/fichas';
+import { insumosParaFicha, preparosParaFicha, obterFicha } from '@/lib/erp/fichas';
 import { TelaFormFicha } from '@/components/erp/telas/fichas/paginas';
 import { acaoEditarFicha } from '../../actions';
 
@@ -14,7 +14,10 @@ export default async function ErpEditarFichaPage({ params }: { params: { id: str
   const ficha = await obterFicha(ctx.cliente, params.id);
   if (!ficha) notFound();
   if (!ficha.ativa) redirect(`/erp/fichas/${ficha.id}`);
-  const opcoes = await insumosParaFicha(ctx.cliente, ficha.itens.map((i) => i.insumoId).filter((x): x is string => !!x));
+  const [opcoes, preparos] = await Promise.all([
+    insumosParaFicha(ctx.cliente, ficha.itens.map((i) => i.insumoId).filter((x): x is string => !!x)),
+    preparosParaFicha(ctx.cliente, ficha.itens.map((i) => i.subfichaId).filter((x): x is string => !!x), ficha.id),
+  ]);
   return (
     <TelaFormFicha
       ficha={ficha}
@@ -22,6 +25,7 @@ export default async function ErpEditarFichaPage({ params }: { params: { id: str
       contexto={ctx.parceiro.nome}
       acao={acaoEditarFicha.bind(null, ficha.id)}
       opcoes={opcoes}
+      preparos={preparos}
       bloqueio={ctx.bloqueio}
       novoInsumo={pode(ctx.alcance, 'insumos.editar') ? '/erp/insumos/novo' : undefined}
     />

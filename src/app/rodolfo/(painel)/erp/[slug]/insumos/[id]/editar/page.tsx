@@ -14,7 +14,8 @@ export default async function ParceiroEditarInsumoPage({ params }: { params: { s
   const insumo = await obterInsumo(ctx.cliente, params.id);
   if (!insumo) notFound();
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/insumos`;
-  if (!insumo.ativo) redirect(`${base}/${insumo.id}`);
+  // Pré-preparo (1.3) só muda pela ficha técnica.
+  if (!insumo.ativo || insumo.preparo) redirect(`${base}/${insumo.id}`);
   return (
     <TelaFormInsumo
       insumo={insumo}

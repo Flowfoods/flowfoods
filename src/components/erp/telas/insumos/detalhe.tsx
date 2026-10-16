@@ -11,9 +11,9 @@ import Link from 'next/link';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
 import { compararEmbalagens, CONSERVACOES, TIPOS } from '@/lib/erp/insumo-campos';
 import { COR } from '@/lib/erp/modulos';
-import { UNIDADES, contaDoCusto, formatarCusto, formatarDinheiro, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
+import { UNIDADES, contaDoCusto, formatarCusto, formatarDinheiro, formatarFracao, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
-import { LINK_DE_TEXTO } from '../../ui/estilos';
+import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
 import { ListaHistorico } from '../historico/lista-historico';
 import type { AcaoDeCadastro } from '../cadastro/estado';
@@ -46,6 +46,10 @@ export function TelaDetalheInsumo({
 }) {
   const u = UNIDADES[i.unidade];
   const aqui = `${base}/${i.id}`;
+  // Pré-preparo (1.3): nome, unidade, situação e custo vêm da ficha técnica; aqui só se lê.
+  const p = i.preparo;
+  const fichas = base.replace(/insumos$/, 'fichas');
+  const editaAqui = podeEditar && !p;
   const ativas = i.variantes.filter((v) => v.ativo);
   const comparacao = i.ativo
     ? compararEmbalagens(
@@ -85,10 +89,14 @@ export function TelaDetalheInsumo({
           .filter(Boolean)
           .join(' · ')}
         acao={
-          podeEditar && i.ativo ? (
+          editaAqui && i.ativo ? (
             <BotaoOuMotivo href={`${aqui}/editar`} bloqueio={bloqueio} variante="primario">
               Editar insumo
             </BotaoOuMotivo>
+          ) : p && podeEditar ? (
+            <Link href={`${fichas}/${p.fichaId}`} className={classeDeBotao('secundario')}>
+              Abrir a ficha técnica
+            </Link>
           ) : undefined
         }
       />
@@ -98,12 +106,33 @@ export function TelaDetalheInsumo({
       {!i.ativo && feito !== 'desativado' && (
         <Aviso tom="alerta" titulo="Insumo desativado.">
           Fica fora da lista padrão e da busca, com o histórico guardado.
-          {podeEditar ? ' Para editar, reative primeiro.' : ''}
+          {p ? ' Ele acompanha a ficha técnica: reative a ficha.' : podeEditar ? ' Para editar, reative primeiro.' : ''}
         </Aviso>
       )}
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4">
+          {p ? (
+            <Painel titulo="Custo (vem da ficha técnica)">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+                <div className="flex flex-wrap items-baseline gap-3">
+                  <span className={`font-display text-[32px] font-bold leading-none tabular-nums ${p.incompleto ? 'text-atencao' : ''}`}>
+                    {formatarFracao(p.porUnidade)}/{u.sigla}
+                  </span>
+                  {p.incompleto && <Selo tom="alerta">Custo incompleto</Selo>}
+                </div>
+                <p className="text-sm tabular-nums text-suave">{p.conta}</p>
+              </div>
+              <p className="mt-3 border-t border-linha pt-3 text-[12px] text-suave">
+                Pré-preparo da casa: o custo é o da receita{' '}
+                <Link href={`${fichas}/${p.fichaId}`} className={LINK_DE_TEXTO}>
+                  {p.nome}
+                </Link>{' '}
+                dividido pelo que ela rende. Mudou a receita ou o preço de um insumo dela, este custo muda junto. Não tem embalagem de compra.
+              </p>
+            </Painel>
+          ) : (
+            <>
           <Painel titulo="Custo de referência">
             <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
               <div className={`font-display text-[32px] font-bold leading-none ${i.custo === null ? 'text-atencao' : ''}`}>
@@ -182,10 +211,12 @@ export function TelaDetalheInsumo({
               {podeEditar && i.ativo && i.variantes.length > 0 && !bloqueio && ' Toque numa embalagem para editar.'}
             </p>
           </Painel>
+            </>
+          )}
         </div>
 
         <aside className="min-w-0 space-y-4" aria-label="Situação e alterações">
-          {podeEditar && (
+          {editaAqui && (
             <Painel titulo="Situação">
               {bloqueio ? (
                 <p className="text-sm text-suave">{bloqueio}</p>

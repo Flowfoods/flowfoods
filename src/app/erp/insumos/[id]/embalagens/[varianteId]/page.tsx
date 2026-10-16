@@ -16,7 +16,8 @@ export default async function ErpEmbalagemPage({ params }: { params: { id: strin
   exigirPermissaoNaPagina(ctx, 'insumos.editar');
   const insumo = await obterInsumo(ctx.cliente, params.id);
   if (!insumo) notFound();
-  if (!insumo.ativo) redirect(`/erp/insumos/${insumo.id}`);
+  // Pré-preparo (1.3) só muda pela ficha técnica.
+  if (!insumo.ativo || insumo.preparo) redirect(`/erp/insumos/${insumo.id}`);
   const nova = params.varianteId === 'nova';
   if (!nova && !insumo.variantes.some((v) => v.id === params.varianteId)) notFound();
   const varianteId = nova ? '' : params.varianteId;
