@@ -160,9 +160,9 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     expect((await listarInsumos(a, { semPreco: true })).linhas.map((l) => l.nome)).toEqual(['Picles']);
     const ins = (await obterInsumo(a, f.insumoProduzido!.id, ALCANCE_FLOWFOODS))!;
     expect(ins.preparo).toMatchObject({ nome: 'Molho cheddar', incompleto: false });
-    const [h] = await listarHistorico(a, { entidade: 'Insumo', limite: 1 });
+    const [h] = await listarHistorico(a, { entidade: 'Insumo', limite: 1, verPrecos: true });
     expect(h.mudancas.find((m) => m.campo === 'vem da ficha')?.depois).toBe('Molho cheddar');
-    const [hf] = await listarHistorico(a, { entidade: 'FichaTecnica', limite: 1 });
+    const [hf] = await listarHistorico(a, { entidade: 'FichaTecnica', limite: 1, verPrecos: true });
     expect(hf.mudancas.find((m) => m.campo === 'insumos')?.depois).toBe('Cheddar 1 kg · Creme de leite 500 g · Cebola 200 g (fator 1,18)');
   });
 

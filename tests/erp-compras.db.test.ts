@@ -189,7 +189,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
     const r = await rodar(() => comprasDaSessao.acaoCadastrarFornecedor(null, form));
     expect(r).toMatchObject({ redirect: expect.stringMatching(/^\/erp\/compras\/fornecedores\/.+\?feito=criado$/) });
     ids.laticinios = idDo(r);
-    const [h] = await listarHistorico(a, { de: [{ entidade: 'Fornecedor', ids: [ids.laticinios] }] });
+    const [h] = await listarHistorico(a, { de: [{ entidade: 'Fornecedor', ids: [ids.laticinios] }], verPrecos: true });
     expect(h.mudancas.find((m) => m.campo === 'CNPJ/CPF')?.depois).toBe('11.222.333/0001-81');
     const outro = await cadastrarFornecedor(a, { nome: 'Hortifruti Penha' }, 'Marina');
     if (!outro.ok) throw new Error('fornecedor');
@@ -236,7 +236,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
     // Decisão 64: o estoque só abre na 1.6.
     expect(await a.movimentoEstoque.count()).toBe(0);
     expect(await a.saldoEstoque.count()).toBe(0);
-    const [h] = await listarHistorico(a, { de: [{ entidade: 'NotaEntrada', ids: [ids.nota] }] });
+    const [h] = await listarHistorico(a, { de: [{ entidade: 'NotaEntrada', ids: [ids.nota] }], verPrecos: true });
     expect(h.acao).toBe('CRIOU');
     expect(h.alvo).toBe('Nota 123 · série 1');
     expect(sp(h.mudancas.find((m) => m.campo === 'itens')!.depois)).toContain('Cheddar, Caixa · 5 kg: 3 = 15 kg por R$ 224,50');
@@ -302,7 +302,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
     const n = (await obterNota(a, DONA(), ids.mesmaData))!;
     expect(n.cancelada).toBe(true);
     expect(n.motivoCancelamento).toBe('Digitada em dobro');
-    const [h] = await listarHistorico(a, { de: [{ entidade: 'NotaEntrada', ids: [ids.mesmaData] }] });
+    const [h] = await listarHistorico(a, { de: [{ entidade: 'NotaEntrada', ids: [ids.mesmaData] }], verPrecos: true });
     expect(h).toMatchObject({ acao: 'CANCELOU', motivo: 'Digitada em dobro' });
     expect(h.mudancas).toEqual([{ campo: 'situação', antes: 'Lançada', depois: 'Cancelada' }]);
     // A chave fica livre: relançar certa entra.
@@ -330,7 +330,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
     expect(r1).toMatchObject({ ok: true, mudou: expect.arrayContaining(['itensDaNota', 'totalCentavos']) });
     const r2 = await editarNota(a, DONA(), ids.cara, entrada('62,00'), 'Paulo');
     expect(r2).toMatchObject({ ok: false, conflito: true });
-    const [h] = await listarHistorico(a, { de: [{ entidade: 'NotaEntrada', ids: [ids.cara] }] });
+    const [h] = await listarHistorico(a, { de: [{ entidade: 'NotaEntrada', ids: [ids.cara] }], verPrecos: true });
     expect(h.acao).toBe('ALTEROU');
     expect(h.mudancas.map((m) => m.campo)).toEqual(expect.arrayContaining(['entrou', 'saiu', 'total']));
   });

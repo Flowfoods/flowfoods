@@ -176,7 +176,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
     expect(f.itens[2].custo).toBeNull();
     expect(f.foto).toMatch(/^[0-9a-f]{12}$/);
     expect(fotosDe(A.id)).toHaveLength(1);
-    const [h] = await listarHistorico(a, { entidade: 'FichaTecnica' });
+    const [h] = await listarHistorico(a, { entidade: 'FichaTecnica', verPrecos: true });
     expect(h.acao).toBe('CRIOU');
     expect(h.mudancas.find((m) => m.campo === 'insumos')?.depois).toBe('Pão brioche 1 un · Blend bovino 180 g · Picles 20 g');
   });
@@ -347,7 +347,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
     const r = await editarFicha(a, ids.xburger, { ...xburger({ rendimento: '2' }), versao: lida.versao }, { tipo: 'trocar', bytes: PNG }, 'Marina');
     expect(r).toMatchObject({ ok: true, mudou: ['rendimento', 'foto'] });
     expect(fotosDe(A.id)).not.toContain(fotoAntiga);
-    const [h] = await listarHistorico(a, { entidade: 'FichaTecnica' });
+    const [h] = await listarHistorico(a, { entidade: 'FichaTecnica', verPrecos: true });
     expect(h.mudancas.map((m) => [m.campo, m.antes, m.depois])).toEqual([
       ['rende', '1 porção', '2 porções'],
       ['foto', 'foto anterior', 'foto nova'],
@@ -396,7 +396,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
     const smash = await a.fichaTecnica.findFirstOrThrow({ where: { nome: 'Smash duplo' }, include: { itens: true } });
     expect(smash.origem).toBe('IMPORTACAO');
     expect(smash.itens.map((i) => i.quantidadeMilesimos).sort((x, y) => x - y)).toEqual([200, 1000]);
-    const [h] = await listarHistorico(a, { entidade: 'FichaTecnica' });
+    const [h] = await listarHistorico(a, { entidade: 'FichaTecnica', verPrecos: true });
     expect(h.motivo).toBe('Importada por planilha');
 
     // Reimportar a MESMA planilha: nada novo, nada alterado, nada duplicado.

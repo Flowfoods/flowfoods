@@ -270,7 +270,7 @@ export async function obterFornecedor(cliente: ClienteDoParceiro, alcance: Alcan
         custo: custoDaCompra(p.partes.map((x) => ({ valorCentavos: x.valorTotalCentavos, freteRateadoCentavos: x.freteRateadoCentavos, quantidadeMilesimos: x.quantidadeMilesimos }))),
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-    const historico = await listarHistorico(tx, { de: [{ entidade: 'Fornecedor', ids: [id] }], limite: 10 });
+    const historico = await listarHistorico(tx, { de: [{ entidade: 'Fornecedor', ids: [id] }], limite: 10, verPrecos: false });
     return {
       id: f.id,
       nome: f.nome,
@@ -958,7 +958,7 @@ export async function obterNota(cliente: ClienteDoParceiro, alcance: Pick<Alcanc
     if (!n) return null;
     const insumoIds = n.itens.map((i) => i.insumoId ?? '').filter(Boolean);
     const valem = await ultimasCompras(tx, insumoIds);
-    const historico = await listarHistorico(tx, { de: [{ entidade: 'NotaEntrada', ids: [id] }], limite: 10 });
+    const historico = await listarHistorico(tx, { de: [{ entidade: 'NotaEntrada', ids: [id] }], limite: 10, verPrecos: false });
     const somaItens = n.itens.reduce((s, i) => s + i.valorTotalCentavos, 0);
     const estoque = await estoqueDaNota(tx, { id: n.id, lojaId: n.lojaId, loja: n.loja.nome, status: n.status, lancadaEm: n.lancadaEm, entradaEm: n.entradaEm.toISOString().slice(0, 10) });
     return {

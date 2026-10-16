@@ -422,7 +422,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
   });
 
   it('toda mudança fica no histórico com antes e depois, em nomes legíveis', async () => {
-    const h = await listarHistorico(doParceiro(A, db), { entidades: ['AcessoParceiro', 'PerfilAcesso'], limite: 100 });
+    const h = await listarHistorico(doParceiro(A, db), { entidades: ['AcessoParceiro', 'PerfilAcesso'], limite: 100, verPrecos: true });
     const perfilCriado = h.find((x) => x.entidade === 'PerfilAcesso' && x.acao === 'CRIOU')!;
     expect(perfilCriado.autorNome).toBe('Pessoa dono');
     expect(perfilCriado.mudancas.find((m) => m.campo === 'nome')?.depois).toBe('Cozinha');
@@ -478,7 +478,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     );
     if (!solto.ok) throw new Error();
     expect((await excluirPerfil(A, solto.id, ator(dono.s), o())).ok).toBe(true);
-    const h = await listarHistorico(doParceiro(A, db), { entidade: 'PerfilAcesso' });
+    const h = await listarHistorico(doParceiro(A, db), { entidade: 'PerfilAcesso', verPrecos: true });
     expect(h.some((x) => x.acao === 'EXCLUIU')).toBe(true);
   });
 
@@ -493,7 +493,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     expect(linha.bloqueada).toBe(true);
     expect((await liberarEntrada(A, linha.acessoId, 'Rodolfo', o())).ok).toBe(true);
     expect((await entrarComSenha({ email: email('gerente'), senha: SENHA, ip: ip() }, o())).ok).toBe(true);
-    const h = await listarHistorico(doParceiro(A, db), { entidade: 'AcessoParceiro' });
+    const h = await listarHistorico(doParceiro(A, db), { entidade: 'AcessoParceiro', verPrecos: true });
     expect(h.some((x) => x.acao === 'LIBEROU_ENTRADA')).toBe(true);
   });
 
@@ -639,11 +639,11 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     expect(depois.ok).toBe(false);
     expect((await entrarComSenha({ email: email('xis'), senha: 'senha do dono de a', ip: ip() }, o())).ok).toBe(false);
     // E fica no histórico de B.
-    const h = await listarHistorico(doParceiro(B, db), { entidade: 'AcessoParceiro' });
+    const h = await listarHistorico(doParceiro(B, db), { entidade: 'AcessoParceiro', verPrecos: true });
     const pediu = h.find((x) => x.acao === 'PEDIU_SENHA_NOVA' && x.mudancas.some((m) => m.depois === 'Xis' || m.depois === `Pessoa xis`))!;
     expect(pediu.mudancas.find((m) => m.campo === 'aparelho')?.depois).toBe('1 aparelho com rosto removido');
     // E no histórico de A (o rosto valia lá também).
-    const hA = await listarHistorico(doParceiro(A, db), { entidade: 'AcessoParceiro' });
+    const hA = await listarHistorico(doParceiro(A, db), { entidade: 'AcessoParceiro', verPrecos: true });
     expect(hA.some((x) => x.acao === 'PEDIU_SENHA_NOVA' && x.mudancas.some((m) => m.depois === '1 aparelho com rosto removido'))).toBe(true);
   });
 
@@ -731,7 +731,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     expect.soft(desafios.n).toBe(0);
     expect.soft(await validarSessao(atk.token, o())).toBeNull();
     expect.soft(u.rostosRemovidosEm).not.toBeNull(); // "Seu acesso" avisa
-    const hA = await listarHistorico(doParceiro(A, db), { entidade: 'AcessoParceiro' });
+    const hA = await listarHistorico(doParceiro(A, db), { entidade: 'AcessoParceiro', verPrecos: true });
     expect.soft(
       hA.some((x) => x.acao === 'TROCOU_SENHA' && x.mudancas.some((m) => m.campo === 'aparelho' && m.depois === '1 aparelho com rosto removido')),
     ).toBe(true);

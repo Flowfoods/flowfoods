@@ -247,3 +247,32 @@ describe('impressões e retrato para o histórico', () => {
     });
   });
 });
+
+describe('veto do Guardião (1.10): histórico sem precificação para quem não vê preços', () => {
+  it('a ficha perde preço, margem, custo na hora e embalagens por canal; alteração só de preço some inteira', async () => {
+    const { semPrecificacao, descreverMudancas } = await import('@/lib/erp/historico');
+    expect(semPrecificacao({ nome: 'Burger', precoIfood: 'sugerido (R$ 51,20)', margemIfood: 'R$ 30,72 (60,0%)' }, { nome: 'Burger', precoIfood: 'R$ 29,90', margemIfood: 'R$ 15,00 (50,2%)', custoIfood: 'R$ 14,90' })).toBeNull();
+    const misto = semPrecificacao({ nome: 'Burger', rendimento: '1 porção', embalagensIfood: 'Nenhuma' }, { nome: 'Burger cheddar', rendimento: '1 porção', embalagensIfood: 'Caixa 1 un' });
+    expect(misto).not.toBeNull();
+    const texto = JSON.stringify(descreverMudancas(misto!.antes, misto!.depois));
+    expect(texto).toMatch(/Burger cheddar/);
+    expect(texto).not.toMatch(/embalagens|caixa|R\$|sugerido|margem|preço/i);
+    // Sem nada de preço: passa igual.
+    const igual = { nome: 'X', tipo: 'PRATO' };
+    expect(semPrecificacao(igual, igual)).toEqual({ antes: igual, depois: igual });
+  });
+
+  it('de/para o sugerido em frase: "R$ 29,90 (o sugerido era R$ 87,06)" e "o sugerido, R$ 87,06"', async () => {
+    const { descreverMudancas } = await import('@/lib/erp/historico');
+    expect(descreverMudancas({ precoIfood: 'sugerido (R$ 87,06)' }, { precoIfood: 'R$ 29,90' })).toEqual([
+      { campo: 'preço no iFood', antes: null, depois: 'R$ 29,90 (o sugerido era R$ 87,06)' },
+    ]);
+    expect(descreverMudancas({ precoLoja: 'R$ 29,90' }, { precoLoja: 'sugerido (R$ 31,24)' })).toEqual([{ campo: 'preço na loja', antes: 'R$ 29,90', depois: 'o sugerido, R$ 31,24' }]);
+  });
+
+  it('preço grande demais (2147483648) leva a frase do limite, não "inválido"; 3 casas é inválido', () => {
+    expect(lerPrecos({ LOJA: '2147483648' })).toMatchObject({ ok: false, erros: { 'preco-LOJA': expect.stringMatching(/R\$ 100\.000,00/) } });
+    expect(lerPrecos({ LOJA: '99999999999999999999' })).toMatchObject({ ok: false, erros: { 'preco-LOJA': expect.stringMatching(/R\$ 100\.000,00/) } });
+    expect(lerPrecos({ LOJA: '29,999' })).toMatchObject({ ok: false, erros: { 'preco-LOJA': expect.stringMatching(/inválido/) } });
+  });
+});

@@ -19,10 +19,10 @@ const BASE = '/erp/fichas';
 export default async function ErpFichaPage({ params, searchParams }: { params: { id: string }; searchParams: { de?: string; feito?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.ver');
-  const ficha = await obterFicha(ctx.cliente, params.id);
-  if (!ficha) notFound();
-  // 1.9: o custo por canal só sai do servidor para quem vê a precificação.
+  // 1.9/1.10: o custo, o preço e a margem por canal — inclusive no histórico da ficha — só saem do servidor para quem vê a precificação.
   const verPrecos = pode(ctx.alcance, 'precos.ver');
+  const ficha = await obterFicha(ctx.cliente, params.id, { verPrecos });
+  if (!ficha) notFound();
   const canais = verPrecos ? await custoPorCanal(ctx.cliente, ficha) : null;
   const de = queryDosFiltrosDeFicha(lerFiltrosDeFicha(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));
   return (

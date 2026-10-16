@@ -191,7 +191,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
       ['Bacon', 1000, 0, 3000],
     ]);
     expect(await a.movimentoEstoque.count({ where: { tipo: 'REQUISICAO' } })).toBe(0);
-    const h = await listarHistorico(a, { de: [{ entidade: 'Requisicao', ids: [ids.r1] }], limite: 5 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'Requisicao', ids: [ids.r1] }], limite: 5, verPrecos: true });
     expect(h[0]).toMatchObject({ acao: 'PEDIU', autorNome: 'Caio Cozinha' });
   });
 
@@ -271,7 +271,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     expect(await saldo(ids.pao)).toBe(24_000);
     expect(await entregar(GERENTE(), ids.r4, { 'Pão brioche': '30' }, { confirmarNegativo: true })).toMatchObject({ ok: true });
     expect(await saldo(ids.pao)).toBe(-6000);
-    const h = await listarHistorico(a, { de: [{ entidade: 'Requisicao', ids: [ids.r4] }], limite: 5 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'Requisicao', ids: [ids.r4] }], limite: 5, verPrecos: true });
     expect(JSON.stringify(h[0])).toMatch(/negativo/);
   });
 

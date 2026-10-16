@@ -33,7 +33,7 @@ const EXPLICA = {
 
 export default async function CadastroParceiroPage({ params }: { params: { slug: string } }) {
   const { parceiro, cliente } = await exigirParceiro(params.slug);
-  const historico = await listarHistorico(cliente, { entidade: 'ParceiroFlow', limite: 6 });
+  const historico = await listarHistorico(cliente, { entidade: 'ParceiroFlow', limite: 6, verPrecos: false });
   const status = STATUS_DO_PARCEIRO[parceiro.status];
   const proximo = transicoesDe(parceiro.status)[0] as 'ATIVO' | 'SUSPENSO' | undefined;
 

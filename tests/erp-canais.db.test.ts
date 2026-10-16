@@ -198,7 +198,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     expect(sp(totalEmTexto(ifood))).toBe('R$ 6,06 + 26,2% do preço');
     const produto = (await a.produtoVenda.findFirst({ where: { fichaId: ids.burger } }))!;
     expect(produto).toMatchObject({ nome: 'Burger cheddar', marcaId: null });
-    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 5 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 5, verPrecos: true });
     expect(h[0]).toMatchObject({ acao: 'ALTEROU', autorNome: 'Gil Gerente' });
     expect(h[0].mudancas).toEqual(
       expect.arrayContaining([
@@ -207,7 +207,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
         expect.objectContaining({ campo: 'embalagens do iFood · entrou', antes: null, depois: 'Caixa kraft 1 un · Guardanapo 2 un · Sacola 1 un' }),
       ]),
     );
-    const hc = await listarHistorico(a, { entidade: 'CanalConfig', limite: 5 });
+    const hc = await listarHistorico(a, { entidade: 'CanalConfig', limite: 5, verPrecos: true });
     expect(hc[0]).toMatchObject({ acao: 'CRIOU', autorNome: 'Marina' });
     expect(hc[0].mudancas).toEqual(
       expect.arrayContaining([

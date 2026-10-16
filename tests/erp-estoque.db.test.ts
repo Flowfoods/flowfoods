@@ -278,7 +278,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
     // A dona escolhe "usar o meu" com a versão nova: grava e deixa o antes/depois.
     const nova = (conflito as { conflito: { item: { versao: number; id: string } } }).conflito.item;
     expect(await contar(DONA(), 'Marina Dona', ids.vp, nova, '', '4')).toMatchObject({ ok: true, item: { contadoMilesimos: 4000, por: 'Marina Dona' } });
-    const [h] = await listarHistorico(a, { de: [{ entidade: 'ContagemItem', ids: [carne.id] }] });
+    const [h] = await listarHistorico(a, { de: [{ entidade: 'ContagemItem', ids: [carne.id] }], verPrecos: true });
     expect(h).toMatchObject({ acao: 'RECONTOU', autorNome: 'Marina Dona', alvo: 'Carne moída' });
     expect(h.mudancas).toEqual([{ campo: 'contado', antes: '3,5 kg (Caio Estoque)', depois: '4 kg' }]);
     // A volta para 3,5 kg (combinado: a dona errou).
@@ -341,7 +341,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
     expect(await saldo(ids.vp, ids.ketchup)).toEqual({ quantidadeMilesimos: 0, valorCentavos: 0 });
     const fechada = (await a.contagem.findUnique({ where: { id: ids.contagem } }))!;
     expect(fechada).toMatchObject({ status: 'FECHADA', valorTotalCentavos: 52870, naoContadosNoFechamento: 1, fechadaPorNome: 'Marina Dona' });
-    const [h] = await listarHistorico(a, { de: [{ entidade: 'Contagem', ids: [ids.contagem] }] });
+    const [h] = await listarHistorico(a, { de: [{ entidade: 'Contagem', ids: [ids.contagem] }], verPrecos: true });
     expect(h).toMatchObject({ acao: 'CONCLUIU', motivo: '1 não contados entraram com zero (confirmado).' });
     expect(await concluirAbertura(a, DONA(), ids.vp, { versao: 0, confirmarNaoContados: true }, 'Marina')).toEqual({ ok: true, id: ids.contagem, jaFeito: true });
     expect(await a.movimentoEstoque.count({ where: { lojaId: ids.vp } })).toBe(5);

@@ -1083,6 +1083,8 @@ export async function historicoDaContagem(cliente: ClienteDoParceiro, contagemId
         { entidade: 'ContagemItem', ids: itens.map((i) => i.id) },
       ],
       limite: 30,
+      // Contagem não tem campo de preço por canal.
+      verPrecos: false,
     });
   });
 }

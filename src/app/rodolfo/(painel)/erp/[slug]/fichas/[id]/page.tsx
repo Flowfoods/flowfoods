@@ -19,7 +19,8 @@ export default async function ParceiroFichaPage({
 }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.ver');
-  const ficha = await obterFicha(ctx.cliente, params.id);
+  // O nível 1 vê a precificação (inclusive no histórico).
+  const ficha = await obterFicha(ctx.cliente, params.id, { verPrecos: true });
   if (!ficha) notFound();
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;
   const canais = await custoPorCanal(ctx.cliente, ficha);

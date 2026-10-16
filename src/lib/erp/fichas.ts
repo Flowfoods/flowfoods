@@ -806,7 +806,11 @@ function itensDoPreparo(sub: FichaLida, custo: CustoDaFicha, fichas: ReadonlyMap
   });
 }
 
-export async function obterFicha(cliente: ClienteDoParceiro, id: string) {
+/**
+ * `verPrecos` (1.10): o histórico da ficha leva preço, margem e custo do canal
+ * só para quem vê preços (`precos.ver`). Padrão: não.
+ */
+export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes: { verPrecos?: boolean } = {}) {
   return cliente.transacao(async (tx) => {
     const f = await tx.fichaTecnica.findUnique({
       where: { id },
@@ -820,7 +824,7 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string) {
       },
     });
     if (!f) return null;
-    const historico = await listarHistorico(tx, { de: [{ entidade: 'FichaTecnica', ids: [id] }], limite: 10 });
+    const historico = await listarHistorico(tx, { de: [{ entidade: 'FichaTecnica', ids: [id] }], limite: 10, verPrecos: opcoes.verPrecos === true });
     const cascata = await custosEmCascata(tx, [], [f]);
     const custo = cascata.custo(id)!;
     const usadaEm = Array.from(new Map(f.usadaComoSub.map((u) => [u.ficha.id, u.ficha])).values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));

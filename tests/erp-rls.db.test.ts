@@ -281,7 +281,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
   // ------------------------------------------------ Parceiro Flow (nível 1) e histórico
 
   it('criar parceiro grava o "depois" no histórico do próprio parceiro', async () => {
-    const h = await listarHistorico(doParceiro(A, db), { entidade: 'ParceiroFlow' });
+    const h = await listarHistorico(doParceiro(A, db), { entidade: 'ParceiroFlow', verPrecos: true });
     expect(h).toHaveLength(1);
     expect(h[0]).toMatchObject({ acao: 'CRIOU', autorNome: 'Teste' });
     expect(h[0].mudancas.map((m) => m.campo)).toEqual(['nome', 'link', 'status']);
@@ -305,7 +305,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
       ok: true,
       mensagem: 'Nada mudou.',
     });
-    const h = await listarHistorico(doParceiro(A, db), { entidade: 'ParceiroFlow' });
+    const h = await listarHistorico(doParceiro(A, db), { entidade: 'ParceiroFlow', verPrecos: true });
     expect(h).toHaveLength(2);
     expect(h[0]).toMatchObject({ acao: 'ALTEROU', mudancas: [{ campo: 'nome', antes: 'RLS A', depois: 'RLS A Renomeado' }] });
   });
@@ -319,7 +319,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
     expect(await mudarStatusParceiro(A, 'SUSPENSO', 'de novo', 'Teste', db)).toMatchObject({ ok: false });
     expect(await mudarStatusParceiro(A, 'RASCUNHO', '', 'Teste', db)).toMatchObject({ ok: false });
     expect(await mudarStatusParceiro(A, 'ATIVO', '', 'Teste', db)).toMatchObject({ ok: true });
-    const h = await listarHistorico(doParceiro(A, db), { entidade: 'ParceiroFlow' });
+    const h = await listarHistorico(doParceiro(A, db), { entidade: 'ParceiroFlow', verPrecos: true });
     expect(h.slice(0, 3).map((x) => x.acao)).toEqual(['ATIVOU', 'ALTEROU', 'SUSPENDEU']);
     expect(h[2]).toMatchObject({ motivo: 'Contrato pausado', mudancas: [{ campo: 'status', antes: 'Ativo', depois: 'Suspenso' }] });
   });
@@ -372,7 +372,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
     expect(estA.marcas.map((m) => m.nome)).toEqual(["Valentin's Burger"]);
     expect((await listarEstrutura(b, ALCANCE_FLOWFOODS)).marcas).toEqual([]);
 
-    const h = await listarHistorico(a);
+    const h = await listarHistorico(a, { verPrecos: true });
     expect(h.filter((x) => x.entidade === 'Loja')).toHaveLength(1);
     expect(h.filter((x) => x.entidade === 'Marca')).toHaveLength(1);
   });

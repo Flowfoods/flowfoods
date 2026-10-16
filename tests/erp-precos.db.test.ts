@@ -32,7 +32,16 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
-  return { exigirParceiroDaSessao: async () => atual.ctx!(), exigirParceiro: async () => atual.ctx!(), recusaDaAcao, exigirPermissao, pode };
+  return {
+    exigirParceiroDaSessao: async () => atual.ctx!(),
+    exigirParceiro: async () => atual.ctx!(),
+    recusaDaAcao,
+    exigirPermissao,
+    pode,
+    exigirPermissaoNaPagina: (ctx: { alcance: Alcance }, p: Parameters<typeof pode>[1]) => {
+      if (!pode(ctx.alcance, p)) throw new Error('SEM_ACESSO');
+    },
+  };
 });
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
 
@@ -47,6 +56,8 @@ import { formatarPorcentagem, formatarReaisComSinal } from '@/lib/erp/preco-camp
 import { listarHistorico } from '@/lib/erp/historico';
 import { compararFracoes } from '@/lib/erp/unidades';
 import { pode, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
+import ErpFichaPage from '@/app/erp/fichas/[id]/page';
+import ErpHistoricoPage from '@/app/erp/historico/page';
 import * as fichasDaSessao from '@/app/erp/fichas/actions';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
@@ -64,11 +75,11 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
   const ids: Record<string, string> = {};
   let notas = 0;
 
-  const alcanceDe = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR'): Alcance =>
-    resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] });
-  const ctxDe = (cliente: ClienteDoParceiro, parceiro: { id: string }, perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR', autorNome: string) => () => ({
+  const alcanceDe = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR', extras: string[] = []): Alcance =>
+    resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: extras, permissoesRemovidas: [], redeInteira: true, lojaIds: [] });
+  const ctxDe = (cliente: ClienteDoParceiro, parceiro: { id: string }, perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR', autorNome: string, extras: string[] = []) => () => ({
     cliente,
-    alcance: alcanceDe(perfilBase),
+    alcance: alcanceDe(perfilBase, extras),
     parceiro,
     sessao: { userId: 'u', autorNome },
     bloqueio: null,
@@ -276,10 +287,10 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
     expect(ifood.preco).toEqual({ centavos: 2990, origem: 'proprio' });
     expect(ifood.sugerido).toMatchObject({ centavos: 5120 });
     expect(depois.canais[2].total).not.toBeNull();
-    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 1 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 1, verPrecos: true });
     expect(h[0].autorNome).toBe('Marina');
     expect(h[0].mudancas.map((m) => ({ ...m, depois: sp(m.depois), antes: m.antes && sp(m.antes) }))).toEqual([
-      { campo: 'preço no iFood', antes: 'sugerido (R$ 51,20)', depois: 'R$ 29,90' },
+      { campo: 'preço no iFood', antes: null, depois: 'R$ 29,90 (o sugerido era R$ 51,20)' },
       { campo: 'margem líquida no iFood', antes: 'R$ 30,72 (60,0%)', depois: 'R$ 15,00 (50,2%)' },
       { campo: 'custo do iFood na hora', antes: null, depois: 'R$ 14,90' },
     ]);
@@ -340,7 +351,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
     await expect(fichasDaSessao.acaoSalvarPrecos(ids.burger, null, formDosPrecos(t, { LOJA: '25,90', IFOOD: '29,90' }))).rejects.toMatchObject({
       url: `/erp/fichas/${ids.burger}?feito=precos-custo`,
     });
-    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 1 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 1, verPrecos: true });
     expect(h[0].mudancas.map((m) => sp(m.depois))).toEqual(expect.arrayContaining(['R$ 25,90', 'R$ 19,38 (74,8%)', 'R$ 6,52']));
   });
 
@@ -350,7 +361,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
       notaDoCheddar('110,00'), // 20 g = 220 c: loja = 7,1164
       salvarPrecos(a, ids.burger, { impressao: t.impressaoDosPrecos, custos: t.impressaoDosCustos, precos: { LOJA: '27,90', IFOOD: '29,90' } }, 'Marina'),
     ]);
-    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 1 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 1, verPrecos: true });
     const de = (campo: string) => sp(h[0].mudancas.find((m) => m.campo === campo)!.depois);
     // Antes da nota: 6,5164 → margem 21,3836 (76,6%); depois: 7,1164 → 20,7836 (74,5%).
     const par = [de('custo da loja na hora'), de('margem líquida na loja')];
@@ -366,7 +377,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
     expect(await salvarPrecos(a, ids.baconBurger, { impressao: t.impressaoDosPrecos, custos: t.impressaoDosCustos, precos: { LOJA: '32,90' } }, 'Marina')).toMatchObject({ ok: true });
     const d = await tela(a, ids.baconBurger);
     expect(d.precos[0]).toMatchObject({ preco: { centavos: 3290, origem: 'proprio' }, margens: null });
-    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.baconBurger] }], limite: 1 });
+    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.baconBurger] }], limite: 1, verPrecos: true });
     // A margem era e continua "incompleta": não é mudança; o custo na hora sempre vai.
     expect(h[0].mudancas.map((m) => sp(m.depois))).toEqual(['R$ 32,90', 'incompleto (R$ 1,50 sem “Bacon”)']);
     // Pré-preparo não se vende.
@@ -407,5 +418,47 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
     expect(burger.map((p) => p.margens && formatarPorcentagem(p.margens.liquidaBp))).toEqual(t.precos.map((p) => p.margens && formatarPorcentagem(p.margens.liquidaBp)));
     expect(mapa.get(ids.baconBurger)![0].margens).toBeNull();
     expect([...mapa.keys()]).not.toContain(pagina.linhas.find((l) => l.tipo === 'PRE_PREPARO')!.id);
+  });
+
+  it('veto do Guardião: sem "ver preços", nada de preço, margem, custo do canal, taxa ou alvo no histórico — nem no payload da página', async () => {
+    // O que nunca pode aparecer (sem diferenciar maiúscula).
+    const PROIBIDO = /preço no|margem líquida|margem-alvo|custo d[oa] .* na hora|custo do|sugerido|comiss|pagamento online|R\$|embalagens do/i;
+    const json = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
+    // A dona vê tudo (controle: o filtro não esconde de quem pode).
+    atual.ctx = ctxDe(a, A, 'DONO', 'Marina');
+    const dona = (await ErpFichaPage({ params: { id: ids.burger }, searchParams: {} })) as { props: { ficha: { historico: unknown[] }; canais: unknown } };
+    expect(json(dona.props.ficha.historico)).toMatch(/preço no iFood/);
+    // O operador abre o MESMO prato: o histórico da ficha vem sem preço, e a alteração que só tinha preço some inteira.
+    atual.ctx = ctxDe(a, A, 'OPERADOR', 'Caio');
+    const op = (await ErpFichaPage({ params: { id: ids.burger }, searchParams: {} })) as typeof dona;
+    expect(op.props.canais).toBeNull();
+    const histOp = json(op.props.ficha.historico);
+    expect(histOp.match(PROIBIDO)?.[0] ?? null).toBeNull();
+    expect(op.props.ficha.historico.length).toBeGreaterThan(0); // a criação da ficha continua lá
+    expect(json(op.props)).not.toMatch(/preço no|margem líquida|custo do iFood|sugerido \(/i);
+    // A lib, direto: CanalConfig some inteiro; a ficha perde os campos de preço.
+    const semPreco = await listarHistorico(a, { limite: 100, verPrecos: false });
+    expect(semPreco.some((h) => h.entidade === 'CanalConfig')).toBe(false);
+    // (O histórico da rede inteira tem R$ legítimo de compras e do preço do insumo; o que não pode é a precificação.)
+    const DA_PRECIFICACAO = /preço n[oa] |margem líquida|margem-alvo|custo d[oa] .{0,20}na hora|sugerido|comiss|pagamento online|embalagens do/i;
+    expect(json(semPreco).match(DA_PRECIFICACAO)?.[0] ?? null).toBeNull();
+    const comPreco = await listarHistorico(a, { limite: 100, verPrecos: true });
+    expect(comPreco.some((h) => h.entidade === 'CanalConfig')).toBe(true);
+    // Perfil próprio com "ver o histórico" e sem "ver preços" em /erp/historico: o mesmo filtro.
+    const extras = ['historico.ver'];
+    expect(pode(alcanceDe('OPERADOR', extras), 'historico.ver')).toBe(true);
+    expect(pode(alcanceDe('OPERADOR', extras), 'precos.ver')).toBe(false);
+    atual.ctx = ctxDe(a, A, 'OPERADOR', 'Hugo', extras);
+    // A rede inteira: nada da precificação (o R$ das compras e do preço do insumo é de outra permissão e fica).
+    const tudo = json(await ErpHistoricoPage({ searchParams: {} }));
+    expect(tudo.match(DA_PRECIFICACAO)?.[0] ?? null).toBeNull();
+    expect(tudo).not.toMatch(/CanalConfig/);
+    // Só as fichas (e os canais): nem um "R$".
+    const fichas = json(await ErpHistoricoPage({ searchParams: { entidade: 'FichaTecnica' } }));
+    expect(fichas.match(PROIBIDO)?.[0] ?? null).toBeNull();
+    expect(fichas).toMatch(/Burger cheddar/);
+    // E a gerente (vê preços) em /erp/historico vê a taxa e os preços.
+    atual.ctx = ctxDe(a, A, 'GERENTE', 'Gil', []);
+    expect(json(await ErpHistoricoPage({ searchParams: {} }))).toMatch(/preço no iFood/);
   });
 });

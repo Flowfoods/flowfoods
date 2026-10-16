@@ -320,7 +320,7 @@ export async function obterTaxaDoIfood(cliente: ClienteDoParceiro) {
   return cliente.transacao(async (tx) => {
     const cfg = await configsDosCanais(tx);
     const ifood = cfg.de('IFOOD');
-    const historico = cfg.lidas.length ? await listarHistorico(tx, { de: [{ entidade: 'CanalConfig', ids: cfg.lidas.map((l) => l.id) }], limite: 10 }) : [];
+    const historico = cfg.lidas.length ? await listarHistorico(tx, { de: [{ entidade: 'CanalConfig', ids: cfg.lidas.map((l) => l.id) }], limite: 10, verPrecos: true }) : [];
     return {
       taxa: cfg.taxa,
       versao: ifood ? ifood.atualizadoEm.toISOString() : '',

@@ -304,6 +304,20 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
   for (const c of campos) {
     // Na criação, campo vazio não é informação ("código de barras: —").
     if (criacao && (depois[c] === null || depois[c] === undefined || depois[c] === '')) continue;
+    // Preço do canal (1.10): de/para o sugerido em frase, sem riscar o sugerido ("R$ 29,90 (o sugerido era R$ 87,06)").
+    if (!criacao && /^preco(Loja|Delivery|Ifood)$/.test(c) && typeof antes[c] === 'string' && typeof depois[c] === 'string') {
+      const sugerido = (t: string) => /^sugerido \((.+)\)$/.exec(t)?.[1];
+      const a = sugerido(antes[c] as string);
+      const d = sugerido(depois[c] as string);
+      if (a && !d) {
+        out.push({ campo: CAMPO[c], antes: null, depois: `${depois[c]} (o sugerido era ${a})` });
+        continue;
+      }
+      if (d && !a) {
+        out.push({ campo: CAMPO[c], antes: antes[c] as string, depois: `o sugerido, ${d}` });
+        continue;
+      }
+    }
     if (NA_HORA.has(c) && typeof depois[c] === 'string') {
       out.push({ campo: CAMPO[c], antes: null, depois: depois[c] as string });
       continue;
@@ -391,6 +405,44 @@ export function alvoDaLinha(antesJ: Prisma.JsonValue | null, depoisJ: Prisma.Jso
   return partes.length ? partes.join(' · ') : null;
 }
 
+/**
+ * Precificação (1.10, veto do Guardião): quem não tem "ver preços e margens"
+ * não recebe NADA de preço, margem, custo do canal, taxa ou alvo — nem no
+ * histórico. As linhas de `CanalConfig` (taxa do iFood, margens-alvo) somem
+ * inteiras; da ficha saem os campos de preço por canal, o custo na hora e as
+ * embalagens por canal (a tela delas também é de quem vê preços). Uma
+ * alteração que só tinha esses campos some inteira. Filtro no servidor, antes
+ * de montar a tela: o payload não leva o que foi tirado.
+ */
+export const ENTIDADES_DE_PRECIFICACAO: readonly string[] = ['CanalConfig'];
+export const CAMPOS_DE_PRECIFICACAO: ReadonlySet<string> = new Set([
+  'precoLoja',
+  'precoDelivery',
+  'precoIfood',
+  'margemLoja',
+  'margemDelivery',
+  'margemIfood',
+  'custoLoja',
+  'custoDelivery',
+  'custoIfood',
+  'embalagensDelivery',
+  'embalagensIfood',
+  'margemAlvo',
+  'comissao',
+  'pagamento',
+]);
+
+/** O retrato sem os campos de precificação; null = só tinha isso (a linha some). */
+export function semPrecificacao(antes: Prisma.JsonValue | null, depois: Prisma.JsonValue | null): { antes: Prisma.JsonValue | null; depois: Prisma.JsonValue | null } | null {
+  const a = objeto(antes);
+  const d = objeto(depois);
+  const tinha = [...Object.keys(a), ...Object.keys(d)].some((k) => CAMPOS_DE_PRECIFICACAO.has(k));
+  if (!tinha) return { antes, depois };
+  const limpar = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([k]) => !CAMPOS_DE_PRECIFICACAO.has(k))) as Prisma.JsonObject;
+  const r = { antes: antes === null ? null : limpar(a), depois: depois === null ? null : limpar(d) };
+  return descreverMudancas(r.antes, r.depois).length ? r : null;
+}
+
 export async function listarHistorico(
   cliente: ClienteDoParceiro,
   filtro: {
@@ -401,28 +453,50 @@ export async function listarHistorico(
     de?: { entidade: string; ids: string[] }[];
     /** Nunca estas entidades (1.5: notas e fornecedores para quem não vê compras). */
     semEntidades?: string[];
-  } = {},
+    /**
+     * 1.10: quem lê pode ver preços e margens (`precos.ver`)? Obrigatório: todo
+     * leitor decide. false = sem taxa, alvo, preço, margem, custo do canal.
+     */
+    verPrecos: boolean;
+  },
 ) {
   const entidades = filtro.entidades ?? (filtro.entidade ? [filtro.entidade] : null);
-  const linhas = await cliente.historicoAlteracao.findMany({
-    where: {
-      ...(entidades ? { entidade: { in: entidades } } : {}),
-      ...(filtro.semEntidades?.length ? { NOT: { entidade: { in: filtro.semEntidades } } } : {}),
-      ...(filtro.de ? { OR: filtro.de.map((d) => ({ entidade: d.entidade, entidadeId: { in: d.ids } })) } : {}),
-    },
-    orderBy: { ocorridoEm: 'desc' },
-    take: filtro.limite ?? 100,
-  });
-  return linhas.map((h) => ({
+  const fora = [...(filtro.semEntidades ?? []), ...(filtro.verPrecos ? [] : ENTIDADES_DE_PRECIFICACAO)];
+  const limite = filtro.limite ?? 100;
+  const where = {
+    ...(entidades ? { entidade: { in: entidades } } : {}),
+    ...(fora.length ? { NOT: { entidade: { in: fora } } } : {}),
+    ...(filtro.de ? { OR: filtro.de.map((d) => ({ entidade: d.entidade, entidadeId: { in: d.ids } })) } : {}),
+  };
+  const out: ReturnType<typeof paraTela>[] = [];
+  // Sem `precos.ver`, linhas que só tinham preço somem: lê mais um lote até completar o limite (no máximo 5 voltas).
+  for (let volta = 0, pular = 0; volta < 5 && out.length < limite; volta++) {
+    const lote = await cliente.historicoAlteracao.findMany({ where, orderBy: [{ ocorridoEm: 'desc' }, { id: 'desc' }], skip: pular, take: limite });
+    pular += lote.length;
+    for (const h of lote) {
+      const r = filtro.verPrecos ? { antes: h.antes, depois: h.depois } : semPrecificacao(h.antes, h.depois);
+      if (r && out.length < limite) out.push(paraTela(h, r.antes, r.depois));
+    }
+    if (lote.length < limite || filtro.verPrecos) break;
+  }
+  return out;
+}
+
+function paraTela(
+  h: { id: string; entidade: string; acao: string; motivo: string | null; autorNome: string; ocorridoEm: Date },
+  antes: Prisma.JsonValue | null,
+  depois: Prisma.JsonValue | null,
+) {
+  return {
     id: h.id,
     entidade: h.entidade,
     acao: h.acao,
     motivo: h.motivo,
     autorNome: h.autorNome,
     ocorridoEm: h.ocorridoEm,
-    alvo: alvoDaLinha(h.antes, h.depois),
-    mudancas: descreverMudancas(h.antes, h.depois),
-  }));
+    alvo: alvoDaLinha(antes, depois),
+    mudancas: descreverMudancas(antes, depois),
+  };
 }
 
 export type LinhaDeHistorico = Awaited<ReturnType<typeof listarHistorico>>[number];
