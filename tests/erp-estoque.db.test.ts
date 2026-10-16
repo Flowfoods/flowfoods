@@ -448,7 +448,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
   });
 
   it('livro-razão no banco: UPDATE recusado; estorno duplicado e estorno torto recusados', async () => {
-    await expect(cru(db, perfil, A.id, `UPDATE "MovimentoEstoque" SET "motivo" = 'mexido' WHERE "parceiroId" = $1`, A.id)).rejects.toThrow(/só aceita INSERT/);
+    // Superusuário: o trigger recusa; dono não-superusuário com RLS: o papel nem tem UPDATE no razão (GRANT só SELECT/INSERT).
+    await expect(cru(db, perfil, A.id, `UPDATE "MovimentoEstoque" SET "motivo" = 'mexido' WHERE "parceiroId" = $1`, A.id)).rejects.toThrow(/só aceita INSERT|permission denied|permissão negada/);
     const original = (await a.movimentoEstoque.findFirst({ where: { tipo: 'ABERTURA', insumoNomeSnapshot: 'Carne moída' } }))!;
     const insere = (q: number, v: number, chave: string) =>
       cru(
