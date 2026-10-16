@@ -161,6 +161,7 @@ export function lerFator(t: string | undefined): { ok: true; milesimos: number }
   return { ok: true, milesimos: m };
 }
 
+// avoid-ai-design-ignore: CP3 — a seta é de um comentário de exemplo (milésimos para texto), não de botão nem link.
 /** 1180 → "1,18"; 1000 → "1". */
 export function formatarFator(milesimos: number): string {
   return (milesimos / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 3 });

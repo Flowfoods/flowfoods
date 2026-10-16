@@ -72,8 +72,8 @@ export function ListaHistorico({
             )}
             <div className="min-w-0 text-[13px] text-suave">
               {h.mudancas.length === 0 && <span className="text-suave">—</span>}
-              {h.mudancas.map((m) => (
-                <div key={m.campo} className="[overflow-wrap:anywhere]">
+              {h.mudancas.map((m, k) => (
+                <div key={k} className="[overflow-wrap:anywhere]">
                   <span className="text-suave">{m.campo}: </span>
                   {m.antes !== null && (
                     <>

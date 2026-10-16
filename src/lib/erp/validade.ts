@@ -1,3 +1,4 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Refrigerado: 3 dias · Congelado: 30 dias" é a frase do contrato da 1.4 para o cozinheiro, no mesmo padrão "A · B" das linhas de apoio da 1.1–1.3. (O ignore do scanner não aceita id com minúscula.)
 /**
  * Validade por conservação (1.4) — a parte PURA: leitura do formulário (ficha
  * e insumo) e da planilha, conversão dias/horas ↔ minutos, texto da tela e do

@@ -383,3 +383,23 @@ describe('ERP 1.4 (herança d da 1.3) · faxina de pendentes barata, com teto e 
     expect(await faxinarPendentesDeVezEmQuando('sem-pasta')).toBe(0);
   });
 });
+
+describe('ERP 1.4 (herança e da 1.3) · histórico de itens: entrou, saiu, mudou', () => {
+  it('diz só a diferença, item a item', async () => {
+    const { mudancasDosItens, descreverMudancas } = await import('@/lib/erp/historico');
+    const antes = 'Pão brioche 1 un · Cebola 300 g (fator 1,18) · Picles 20 g';
+    const depois = 'Pão brioche 1 un · Cebola 250 g (fator 1,2) · Molho cheddar 1.500 g · Bacon 2,5 kg';
+    expect(mudancasDosItens(antes, depois)).toEqual([
+      { campo: 'entrou', antes: null, depois: 'Molho cheddar 1.500 g · Bacon 2,5 kg' },
+      { campo: 'saiu', antes: null, depois: 'Picles 20 g' },
+      { campo: 'Cebola', antes: '300 g (fator 1,18)', depois: '250 g (fator 1,2)' },
+    ]);
+    expect(mudancasDosItens('A 1 un · B 2 un', 'B 2 un · A 1 un')).toEqual([{ campo: 'insumos', antes: null, depois: 'mesma receita, outra ordem' }]);
+    // Fora do formato: a tela mostra as listas inteiras, como antes.
+    expect(mudancasDosItens('texto livre', 'A 1 un')).toBeNull();
+    const m = descreverMudancas({ nome: 'X', itens: antes }, { nome: 'X', itens: depois });
+    expect(m.map((x) => x.campo)).toEqual(['entrou', 'saiu', 'Cebola']);
+    // Na criação, a lista inteira (é o que nasceu).
+    expect(descreverMudancas(null, { nome: 'X', itens: antes }).find((x) => x.campo === 'insumos')?.depois).toBe(antes);
+  });
+});

@@ -349,8 +349,7 @@ export function FormFicha({
 
         <Painel titulo="Insumos e pré-preparos" semRespiro>
           <p className="border-b border-linha px-4 py-3 text-[12px] leading-relaxed text-suave sm:px-5">
-            Quantidade <strong className="font-semibold text-texto">limpa</strong>, como vai na receita. Fator de correção é quanto se compra para ter 1
-            limpo: cebola com fator 1,18 = 1,18 kg comprados para 1 kg descascado. Vazio = sem perda.
+            Quantidade <strong className="font-semibold text-texto">limpa</strong>. Fator = bruto ÷ limpo (cebola: 1,18). Vazio = sem perda.
           </p>
           {erros.itens && (
             <p id={`${idBase}-itens`} className="border-b border-linha px-4 py-3 text-[13px] text-erro sm:px-5">
@@ -484,7 +483,7 @@ export function FormFicha({
                     <p className="mt-1.5 text-[12px] tabular-nums text-suave">
                       {c.fator !== 1000 && (
                         <>
-                          Peso bruto {formatarQuantidade(c.bruta, e.unidade)} para {formatarQuantidade(c.q, e.unidade)} limpos (fator {formatarFator(c.fator)})
+                          Bruto {formatarQuantidade(c.bruta, e.unidade)} (fator {formatarFator(c.fator)})
                         </>
                       )}
                       {c.fator !== 1000 && e.preparo && ' · '}

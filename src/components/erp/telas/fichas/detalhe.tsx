@@ -91,12 +91,15 @@ export function TelaDetalheFicha({
         <div className="flex min-w-0 flex-col gap-4">
           <Painel>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-              <div className="aspect-[4/3] w-full shrink-0 overflow-hidden rounded-[10px] border border-linha bg-forte sm:w-64">
+              {/* Sem foto, no celular, uma faixa baixa (não um quadro vazio do tamanho da foto). */}
+              <div
+                className={`w-full shrink-0 overflow-hidden rounded-[10px] border border-linha bg-forte sm:aspect-[4/3] sm:w-64 ${f.foto ? 'aspect-[4/3]' : 'min-h-11'}`}
+              >
                 {f.foto ? (
                   // eslint-disable-next-line @next/next/no-img-element -- foto privada servida pelo portão do parceiro; o otimizador do Next não a alcança.
                   <img src={urlDaFoto(base, f.id, f.foto)} alt={`Foto de ${f.nome}`} className="h-full w-full object-cover" />
                 ) : (
-                  <div className="grid h-full place-items-center px-4 text-center text-[13px] text-suave">
+                  <div className="flex h-full min-h-11 items-center px-4 text-[13px] text-suave sm:justify-center sm:text-center">
                     Sem foto.{podeEditar && f.ativa && !bloqueio ? ' Em Editar ficha dá para pôr uma.' : ''}
                   </div>
                 )}
@@ -236,9 +239,8 @@ export function TelaDetalheFicha({
               </tfoot>
             </table>
             <p className="border-t border-linha px-4 py-3 text-[12px] text-suave sm:px-5">
-              Quantidade limpa; o custo conta o peso bruto (fator de correção). Insumo pelo custo de referência (embalagem padrão); pré-preparo pelo custo
-              da receita dele ÷ o que ela rende. Tudo somado sem arredondar; cada linha mostra o valor arredondado. O custo pelas compras de verdade chega
-              em Compras.
+              Quantidade limpa; o custo conta o bruto (fator). Insumo pelo custo de referência; pré-preparo pelo custo da receita dele ÷ o que rende. Soma
+              sem arredondar; cada linha mostra o valor arredondado.
             </p>
           </Painel>
 

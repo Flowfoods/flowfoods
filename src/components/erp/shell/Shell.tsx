@@ -134,8 +134,15 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
                     Início
                   </Link>
                 </li>
+                {/* Abaixo de 1024 px (tablet a 820), os níveis do meio dão lugar a "…": fica o pai e a tela atual, sem cortar o nome. */}
+                {trilha.length > 2 && (
+                  <li className="flex shrink-0 items-center gap-1.5 text-suave lg:hidden">
+                    <ChevronRight size={14} aria-hidden className="shrink-0" />
+                    <span title={trilha.slice(0, -2).map((t) => t.rotulo).join(' › ')}>…</span>
+                  </li>
+                )}
                 {trilha.map((t, n) => (
-                  <li key={t.rotulo + n} className="flex min-w-0 items-center gap-1.5">
+                  <li key={t.rotulo + n} className={`min-w-0 items-center gap-1.5 ${n < trilha.length - 2 ? 'hidden lg:flex' : 'flex'}`}>
                     <ChevronRight size={14} aria-hidden className="shrink-0 text-suave" />
                     {t.href && n < trilha.length - 1 ? (
                       <Link href={t.href} className="ff-transicao truncate rounded-[5px] text-suave hover:text-texto">

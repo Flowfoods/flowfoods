@@ -203,12 +203,48 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     if (c === 'unidade' && juntarUnidade && criacao) continue;
     // De quem é a embalagem já está no "alvo" da linha.
     if (c === 'insumo') continue;
+    // Itens da ficha (1.4): o que entrou, saiu e mudou, em vez de lista velha × lista nova.
+    if (c === 'itens' && !criacao && typeof antes[c] === 'string' && typeof depois[c] === 'string') {
+      const itens = mudancasDosItens(antes[c] as string, depois[c] as string);
+      if (itens) {
+        out.push(...itens);
+        continue;
+      }
+    }
     out.push({
       campo: CAMPO[c] ?? c,
       antes: criacao ? null : fmt(c, antes),
       depois: fmt(c, depois),
     });
   }
+  return out;
+}
+
+/** "Cebola 300 g (fator 1,18)" → nome e o resto ("300 g (fator 1,18)"); fora do formato, null. */
+const ITEM_EM_TEXTO = /^(.+?) (\d[\d.]*(?:,\d+)? (?:g|kg|ml|L|un)(?: \(fator [\d.,]+\))?)$/;
+
+/**
+ * Itens da ficha antes e depois (a frase "A 1 un · B 180 g") → o que entrou,
+ * o que saiu e o que mudou de quantidade/fator, um por linha. Texto que não
+ * segue o formato (linha antiga, nome estranho) → null: a tela mostra a lista
+ * inteira como antes.
+ */
+export function mudancasDosItens(antes: string, depois: string): Mudanca[] | null {
+  const ler = (t: string) => {
+    const lista = t.split(' · ').map((x) => ITEM_EM_TEXTO.exec(x));
+    if (lista.some((m) => !m)) return null;
+    return new Map(lista.map((m) => [m![1], m![2]]));
+  };
+  const a = ler(antes);
+  const d = ler(depois);
+  if (!a || !d || a.size !== antes.split(' · ').length || d.size !== depois.split(' · ').length) return null;
+  const entrou = [...d].filter(([n]) => !a.has(n)).map(([n, q]) => `${n} ${q}`);
+  const saiu = [...a].filter(([n]) => !d.has(n)).map(([n, q]) => `${n} ${q}`);
+  const out: Mudanca[] = [];
+  if (entrou.length) out.push({ campo: 'entrou', antes: null, depois: entrou.join(' · ') });
+  if (saiu.length) out.push({ campo: 'saiu', antes: null, depois: saiu.join(' · ') });
+  for (const [n, q] of d) if (a.has(n) && a.get(n) !== q) out.push({ campo: n, antes: a.get(n)!, depois: q });
+  if (out.length === 0) out.push({ campo: 'insumos', antes: null, depois: 'mesma receita, outra ordem' });
   return out;
 }
 
