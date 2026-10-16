@@ -16,7 +16,11 @@ export function PrecosPagos({ insumo: i, linkDaNota }: { insumo: InsumoDetalhado
   if (i.compras.length === 0) {
     return (
       <Painel titulo="Preço pago">
-        <p className="text-sm text-suave">Nenhuma nota de compra com este insumo ainda. Lançada a primeira, o custo passa a ser o preço pago.</p>
+        <p className="text-sm text-suave">
+          {i.ultimaCompra
+            ? 'As compras deste insumo são de lojas fora do seu acesso a compras: o custo acima vale, as notas ficam com quem cuida delas.'
+            : 'Nenhuma nota de compra com este insumo ainda. Lançada a primeira, o custo passa a ser o preço pago.'}
+        </p>
       </Painel>
     );
   }
