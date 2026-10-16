@@ -8,6 +8,7 @@ import type { ClienteDoParceiro } from './tenant';
 import { CONSERVACOES, TIPOS } from './insumo-campos';
 import { TIPOS_DE_FICHA } from './ficha-campos';
 import { SEPARADOR_DE_ITENS } from './compra-campos';
+import { SEM_EMBALAGEM } from './canal-campos';
 import { UNIDADES, formatarCusto, formatarDinheiro, formatarQuantidade, type CustoExato, type Unidade } from './unidades';
 
 const ENTIDADE: Record<string, string> = {
@@ -141,7 +142,21 @@ const CAMPO: Record<string, string> = {
   embalagensIfood: 'embalagens do iFood',
   comissao: 'comissão',
   pagamento: 'pagamento online',
+  // 1.10: preço e margem por canal (na ficha) e margem-alvo (no canal)
+  precoLoja: 'preço na loja',
+  precoDelivery: 'preço no delivery',
+  precoIfood: 'preço no iFood',
+  margemLoja: 'margem líquida na loja',
+  margemDelivery: 'margem líquida no delivery',
+  margemIfood: 'margem líquida no iFood',
+  custoLoja: 'custo da loja na hora',
+  custoDelivery: 'custo do delivery na hora',
+  custoIfood: 'custo do iFood na hora',
+  margemAlvo: 'margem-alvo',
 };
+
+/** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. */
+const NA_HORA = new Set(['custoLoja', 'custoDelivery', 'custoIfood']);
 
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */
 const ORDEM = [
@@ -155,6 +170,16 @@ const ORDEM = [
   'embalagensIfood',
   'comissao',
   'pagamento',
+  'margemAlvo',
+  'precoLoja',
+  'margemLoja',
+  'custoLoja',
+  'precoDelivery',
+  'margemDelivery',
+  'custoDelivery',
+  'precoIfood',
+  'margemIfood',
+  'custoIfood',
   'modoPreparo',
   'conservacao',
   'validade',
@@ -279,6 +304,10 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
   for (const c of campos) {
     // Na criação, campo vazio não é informação ("código de barras: —").
     if (criacao && (depois[c] === null || depois[c] === undefined || depois[c] === '')) continue;
+    if (NA_HORA.has(c) && typeof depois[c] === 'string') {
+      out.push({ campo: CAMPO[c], antes: null, depois: depois[c] as string });
+      continue;
+    }
     if (!criacao && JSON.stringify(antes[c]) === JSON.stringify(depois[c])) continue;
     if (c === 'unidade' && juntarUnidade && criacao) continue;
     // De quem é a embalagem já está no "alvo" da linha.
@@ -298,7 +327,8 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     }
     // Embalagens por canal (1.9): a mesma leitura dos itens, dizendo de qual canal ("embalagens do iFood · entrou").
     if ((c === 'embalagensDelivery' || c === 'embalagensIfood') && !criacao && typeof antes[c] === 'string' && typeof depois[c] === 'string') {
-      const itens = mudancasDosItens(antes[c] as string, depois[c] as string);
+      // 1.10 (herança b da 1.9): de/para "Nenhuma" também é só o que entrou ou saiu, não a lista inteira.
+      const itens = mudancasDosItens(antes[c] === SEM_EMBALAGEM ? '' : (antes[c] as string), depois[c] === SEM_EMBALAGEM ? '' : (depois[c] as string));
       if (itens) {
         out.push(...itens.map((m) => ({ ...m, campo: `${CAMPO[c]} · ${m.campo}` })));
         continue;
@@ -332,13 +362,15 @@ const ITEM_EM_TEXTO = /^(.+?) (\d[\d.]*(?:,\d+)? (?:g|kg|ml|L|un)(?: \(fator [\d
  */
 export function mudancasDosItens(antes: string, depois: string): Mudanca[] | null {
   const ler = (t: string) => {
+    if (t === '') return new Map<string, string>();
     const lista = t.split(' · ').map((x) => ITEM_EM_TEXTO.exec(x));
     if (lista.some((m) => !m)) return null;
     return new Map(lista.map((m) => [m![1], m![2]]));
   };
   const a = ler(antes);
   const d = ler(depois);
-  if (!a || !d || a.size !== antes.split(' · ').length || d.size !== depois.split(' · ').length) return null;
+  const tamanho = (t: string) => (t === '' ? 0 : t.split(' · ').length);
+  if (!a || !d || a.size !== tamanho(antes) || d.size !== tamanho(depois)) return null;
   const entrou = [...d].filter(([n]) => !a.has(n)).map(([n, q]) => `${n} ${q}`);
   const saiu = [...a].filter(([n]) => !d.has(n)).map(([n, q]) => `${n} ${q}`);
   const out: Mudanca[] = [];

@@ -202,8 +202,9 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
     expect(h[0]).toMatchObject({ acao: 'ALTEROU', autorNome: 'Gil Gerente' });
     expect(h[0].mudancas).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ campo: 'embalagens do delivery', depois: 'Caixa kraft 1 un · Guardanapo 2 un' }),
-        expect.objectContaining({ campo: 'embalagens do iFood', depois: 'Caixa kraft 1 un · Guardanapo 2 un · Sacola 1 un' }),
+        // 1.10 (herança b da 1.9): de "Nenhuma" para a lista = só o que entrou.
+        expect.objectContaining({ campo: 'embalagens do delivery · entrou', antes: null, depois: 'Caixa kraft 1 un · Guardanapo 2 un' }),
+        expect.objectContaining({ campo: 'embalagens do iFood · entrou', antes: null, depois: 'Caixa kraft 1 un · Guardanapo 2 un · Sacola 1 un' }),
       ]),
     );
     const hc = await listarHistorico(a, { entidade: 'CanalConfig', limite: 5 });

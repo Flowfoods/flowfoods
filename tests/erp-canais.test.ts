@@ -233,3 +233,18 @@ describe('retrato: a mesma lista em outra ordem não é mudança', () => {
     expect(r.embalagensIfood).toBe('Caixa kraft 1 un · Sacola 1 un');
   });
 });
+
+describe('histórico das embalagens: só o que mudou (1.10, herança b da 1.9)', () => {
+  it('de "Nenhuma" entra a lista; para "Nenhuma" sai a lista; quantidade mudada vira uma linha', async () => {
+    const { descreverMudancas } = await import('@/lib/erp/historico');
+    expect(descreverMudancas({ nome: 'Burger', embalagensIfood: 'Nenhuma' }, { nome: 'Burger', embalagensIfood: 'Caixa kraft 1 un · Sacola 1 un' })).toEqual([
+      { campo: 'embalagens do iFood · entrou', antes: null, depois: 'Caixa kraft 1 un · Sacola 1 un' },
+    ]);
+    expect(descreverMudancas({ embalagensDelivery: 'Caixa kraft 1 un' }, { embalagensDelivery: 'Nenhuma' })).toEqual([
+      { campo: 'embalagens do delivery · saiu', antes: null, depois: 'Caixa kraft 1 un' },
+    ]);
+    expect(descreverMudancas({ embalagensDelivery: 'Caixa kraft 1 un · Guardanapo 2 un' }, { embalagensDelivery: 'Caixa kraft 1 un · Guardanapo 3 un' })).toEqual([
+      { campo: 'embalagens do delivery · Guardanapo', antes: '2 un', depois: '3 un' },
+    ]);
+  });
+});
