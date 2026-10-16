@@ -811,3 +811,10 @@ banco de teste: o operador é recusado pelo servidor.
   de pendentes só roda quando alguém envia outra foto do mesmo parceiro.
 - Foto órfã fora de `pendentes/` (processo morto no meio) continua sem faxina
   (herança da 1.2).
+
+## Herança da 1.3 (apontada pelos fiscais)
+
+- [médio] Formulário forjado aceita como item comum o insumo produzido por um pré-preparo (escapa do ciclo): recusar em `lerFormFicha` insumo com `fichaQueProduz`.
+- [médio] Limpeza de JPEG guarda marcadores desconhecidos (`foto-metadados.ts:79-86`): guardar só C0–CF, DB, DD, DA, D0–D7, DC, DF.
+- [baixo] Foto pendente só é faxinada no próximo envio do mesmo parceiro.
+- UX: trilha a 820 px; histórico de itens pesado ("lista riscada → lista nova"); texto do fator mais curto; espaço "Sem foto" grande no celular; conferir selo "Custo incompleto" subindo do molho para o prato; seta "→" em `ficha-campos.ts:149` sem comentário de exceção do scanner.
