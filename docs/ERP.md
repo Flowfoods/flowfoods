@@ -1025,3 +1025,9 @@ banco de teste: o operador é recusado pelo servidor.
 
 - A lista de fichas afetadas na prévia sai inteira em fichas grandes (teto 30
   e "E mais N fichas"); com centenas de fichas, paginar.
+
+## Herança da 1.5 (apontada pelos fiscais)
+
+- [decisão do Rodolfo] Custo de referência da rede mostra o preço/kg (e a data) que outra loja pagou: aceitável como "custo da rede" ou esconder a data/mostrar só para quem vê compras?
+- UX: campo de data sem erro visível para formato inválido; texto "peça a quem cuida das compras"; padronizar "Nota 4521-1" na lista (desktop × celular).
+- 1.6: nota com data anterior à abertura digitada depois; editar nota com movimento ligado vai precisar de estorno; desconto/bonificação; CSV de notas, XML de NF-e e contas a pagar fora; fornecedor padrão do insumo sem tela; índice único parcial da chave da nota só no SQL.
