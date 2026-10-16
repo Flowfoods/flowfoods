@@ -1,4 +1,5 @@
 'use client';
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Seco · contou Ana", "Faltam 9 · salvando…" e "Vila da Penha · desde 16/10" são linhas de apoio da lista densa, no padrão "A · B" das telas da 1.1–1.5. (O ignore do scanner não aceita id com minúscula.)
 
 /**
  * Contagem de abertura (1.6), feita para o CELULAR: a pessoa está na câmara
@@ -313,97 +314,95 @@ function ItemContavel({
     'ff-transicao block h-12 rounded-[7px] border border-linha-forte bg-campo px-3 text-right text-lg font-semibold tabular-nums text-texto placeholder:font-normal placeholder:text-suave/60 hover:border-texto/30 disabled:opacity-60 aria-[invalid=true]:border-erro';
   return (
     <li className="px-4 py-3.5">
-      <div className="flex items-baseline justify-between gap-3">
+      <div className="flex min-h-10 items-center justify-between gap-3">
         <h3 className="min-w-0 text-[15px] font-semibold text-texto">{i.nome}</h3>
-        <SituacaoDoItem l={l} repetir={repetir} />
-      </div>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-2">
-        {comEmbalagem && (
-          <>
-            <label htmlFor={`${idBase}-emb`} className="flex items-center gap-2">
-              <input
-                id={`${idBase}-emb`}
-                data-campo-contagem
-                inputMode="decimal"
-                enterKeyHint="next"
-                autoComplete="off"
-                value={l.campos.embalagens}
-                placeholder="0"
-                disabled={bloqueado}
-                onChange={(e) => digitar({ embalagens: e.target.value })}
-                onBlur={sair}
-                onKeyDown={proximo}
-                aria-invalid={!!erroEmb}
-                aria-describedby={descritores}
-                className={`${campo} w-[4.5rem]`}
-              />
-              <span className="text-[13px] leading-tight text-suave">
-                × {i.embalagem!.nome.replace(/^embalagem de /, 'emb. ')}
-                <span className="sr-only"> (embalagens fechadas)</span>
-              </span>
-            </label>
-            <span aria-hidden className="text-suave">
-              +
-            </span>
-          </>
-        )}
-        <span className="flex items-center gap-2">
-          <label htmlFor={`${idBase}-solto`} className="sr-only">
-            {comEmbalagem ? `Solto, em ${l.campos.escala === 'menor' ? u.menor : u.sigla}` : `Quantidade, em ${l.campos.escala === 'menor' ? u.menor : u.sigla}`}
-          </label>
-          <input
-            id={`${idBase}-solto`}
-            data-campo-contagem
-            inputMode={l.campos.escala === 'menor' || i.unidade === 'UN' ? 'numeric' : 'decimal'}
-            enterKeyHint="next"
-            autoComplete="off"
-            value={l.campos.solto}
-            placeholder={comEmbalagem ? 'solto' : '0'}
-            disabled={bloqueado}
-            onChange={(e) => digitar({ solto: e.target.value })}
-            onBlur={sair}
-            onKeyDown={proximo}
-            aria-invalid={!!erroSolto}
-            aria-describedby={descritores}
-            className={`${campo} w-24`}
-          />
-          {i.unidade === 'UN' ? (
-            <span className="text-[13px] text-suave">un</span>
-          ) : (
-            <span role="group" aria-label="Unidade do solto" className="inline-grid grid-cols-2 gap-0.5 rounded-[8px] border border-linha-forte bg-campo p-0.5">
-              {(['base', 'menor'] as const).map((esc) => (
-                <button
-                  key={esc}
-                  type="button"
-                  aria-pressed={l.campos.escala === esc}
-                  disabled={bloqueado}
-                  onClick={() => digitar({ escala: esc })}
-                  className="ff-transicao min-h-10 min-w-10 rounded-[6px] px-2 text-[13px] text-suave aria-[pressed=true]:bg-forte aria-[pressed=true]:font-semibold aria-[pressed=true]:text-texto"
-                >
-                  {esc === 'base' ? u.sigla : u.menor}
-                </button>
-              ))}
-            </span>
-          )}
-        </span>
-        {l.item.contadoMilesimos === null && !l.campos.embalagens.trim() && !l.campos.solto.trim() && (
-          <button type="button" disabled={bloqueado} onClick={() => digitar({ embalagens: '', solto: '0', escala: 'base' })} className={classeDeBotao('fantasma', 'ml-auto min-h-10 px-3 text-[13px]')}>
+        {l.item.contadoMilesimos === null && l.situacao === 'parado' && !l.campos.embalagens.trim() && !l.campos.solto.trim() ? (
+          <button type="button" disabled={bloqueado} onClick={() => digitar({ embalagens: '', solto: '0', escala: 'base' })} className={classeDeBotao('secundario', 'min-h-10 shrink-0 px-3 text-[13px] sm:min-h-9')}>
             Não tem
+            <span className="sr-only"> (marca zero)</span>
           </button>
+        ) : (
+          <SituacaoDoItem l={l} repetir={repetir} />
         )}
       </div>
-      <p id={`${idBase}-conta`} className="mt-2 text-[12px] tabular-nums text-suave">
-        {total === undefined ? (
-          ' '
-        ) : total === null ? (
-          'Não contado'
-        ) : (
-          <>
-            = <span className="font-semibold text-texto">{formatarQuantidade(total, i.unidade)}</span>
-            {l.situacao === 'salvo' || l.situacao === 'parado' ? (i.por && i.em ? ` · ${i.por}, ${HORA.format(new Date(i.em))}` : '') : ''}
-          </>
+      <div className={`mt-2.5 grid items-end gap-3 ${comEmbalagem ? 'grid-cols-2 sm:flex' : 'grid-cols-1 sm:flex'}`}>
+        {comEmbalagem && (
+          <div className="min-w-0">
+            <label htmlFor={`${idBase}-emb`} className="mb-1 block truncate text-[12px] text-suave">
+              Fechadas · {i.embalagem!.nome.replace(/^embalagem /, '')}
+            </label>
+            <input
+              id={`${idBase}-emb`}
+              data-campo-contagem
+              inputMode="decimal"
+              enterKeyHint="next"
+              autoComplete="off"
+              value={l.campos.embalagens}
+              placeholder="0"
+              disabled={bloqueado}
+              onChange={(e) => digitar({ embalagens: e.target.value })}
+              onBlur={sair}
+              onKeyDown={proximo}
+              aria-invalid={!!erroEmb}
+              aria-describedby={descritores}
+              className={`${campo} w-full sm:w-28`}
+            />
+          </div>
         )}
-      </p>
+        <div className="min-w-0">
+          <label htmlFor={`${idBase}-solto`} className="mb-1 block text-[12px] text-suave">
+            {comEmbalagem ? 'Solto' : 'Quantidade'}
+            <span className="sr-only">, em {l.campos.escala === 'menor' ? u.menor : u.sigla}</span>
+          </label>
+          <div className="flex items-center gap-1.5">
+            <input
+              id={`${idBase}-solto`}
+              data-campo-contagem
+              inputMode={l.campos.escala === 'menor' || i.unidade === 'UN' ? 'numeric' : 'decimal'}
+              enterKeyHint="next"
+              autoComplete="off"
+              value={l.campos.solto}
+              placeholder="0"
+              disabled={bloqueado}
+              onChange={(e) => digitar({ solto: e.target.value })}
+              onBlur={sair}
+              onKeyDown={proximo}
+              aria-invalid={!!erroSolto}
+              aria-describedby={descritores}
+              className={`${campo} w-full min-w-0 sm:w-28`}
+            />
+            {i.unidade === 'UN' ? (
+              <span className="shrink-0 px-1 text-[13px] text-suave">un</span>
+            ) : (
+              <span role="group" aria-label="Unidade" className="inline-grid shrink-0 grid-cols-2 gap-0.5 rounded-[8px] border border-linha-forte bg-campo p-0.5">
+                {(['base', 'menor'] as const).map((esc) => (
+                  <button
+                    key={esc}
+                    type="button"
+                    aria-pressed={l.campos.escala === esc}
+                    disabled={bloqueado}
+                    onClick={() => digitar({ escala: esc })}
+                    className="ff-transicao min-h-10 min-w-9 rounded-[6px] px-1.5 text-[13px] text-suave aria-[pressed=true]:bg-forte aria-[pressed=true]:font-semibold aria-[pressed=true]:text-texto"
+                  >
+                    {esc === 'base' ? u.sigla : u.menor}
+                  </button>
+                ))}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="mt-1.5">
+        <p id={`${idBase}-conta`} className="min-w-0 text-[12px] tabular-nums text-suave">
+          {typeof total === 'number' && (
+            <>
+              {comEmbalagem && <>= </>}
+              <span className="font-semibold text-texto">{formatarQuantidade(total, i.unidade)}</span>
+              {l.situacao === 'salvo' || l.situacao === 'parado' ? (i.por && i.em ? ` · ${i.por}, ${HORA.format(new Date(i.em))}` : '') : ''}
+            </>
+          )}
+        </p>
+      </div>
       {erroEmb && (
         <p id={`${idBase}-erro-emb`} className="mt-1 text-[13px] text-erro">
           {erroEmb}

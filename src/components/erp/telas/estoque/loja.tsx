@@ -1,3 +1,4 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Seco · contou Ana", "Desde 16/10 · 7 insumos com saldo" e "custo de referência de hoje · 1 sem preço" são linhas de apoio da tabela densa, no padrão "A · B" das telas da 1.1–1.5. (O ignore do scanner não aceita id com minúscula.)
 /**
  * O estoque de UMA loja (1.6), a mesma tela no nível 1 e na pessoa do
  * parceiro. Três estados:
@@ -178,7 +179,7 @@ export function TelaEstoqueDaLoja({
               <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(a?.valorTotalCentavos ?? 0)}</div>
               <div className="mt-1.5 text-[12px] text-suave">
                 {a?.fechadaEm ? `valor de ${DATA_HORA.format(a.fechadaEm).slice(0, 10)}, fotografado` : ''}
-                {a?.naoContadosNoFechamento ? ` · ${a.naoContadosNoFechamento} entraram com zero` : ''}
+                {a?.naoContadosNoFechamento ? ` · ${a.naoContadosNoFechamento} sem contar entraram com zero` : ''}
               </div>
             </div>
           </div>

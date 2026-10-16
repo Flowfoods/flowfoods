@@ -1,3 +1,4 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Seco · contou Ana", "Desde 16/10 · 7 insumos com saldo" e "custo de referência de hoje · 1 sem preço" são linhas de apoio da tabela densa, no padrão "A · B" das telas da 1.1–1.5. (O ignore do scanner não aceita id com minúscula.)
 /**
  * Estoque por loja (1.6), a MESMA tela no nível 1 e na pessoa do parceiro:
  * cada loja do alcance com a situação do estoque — não aberto (com o "Abrir

@@ -1,3 +1,4 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Seco · contou Ana", "Desde 16/10 · 7 insumos com saldo" e "custo de referência de hoje · 1 sem preço" são linhas de apoio da tabela densa, no padrão "A · B" das telas da 1.1–1.5. (O ignore do scanner não aceita id com minúscula.)
 /**
  * Conferir e concluir a abertura (1.6): antes de virar saldo, o gerente vê
  * quanto foi contado, o valor do estoque inicial pelo custo de referência de
@@ -10,7 +11,7 @@ import Link from 'next/link';
 import type { ConferenciaDaAbertura, LinhaDaConferencia } from '@/lib/erp/estoque';
 import { COR } from '@/lib/erp/modulos';
 import { CONSERVACOES } from '@/lib/erp/validade';
-import { formatarDinheiro } from '@/lib/erp/unidades';
+import { formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Selo } from '../../ui/superficies';
@@ -25,19 +26,26 @@ function ListaCurta({ linhas, vazio, mostrarValor = false }: { linhas: LinhaDaCo
   return (
     <ul className="divide-y divide-linha">
       {linhas.map((l) => (
-        <li key={l.id} className="flex min-h-11 items-center justify-between gap-3 px-4 py-2 text-sm sm:px-5">
-          <span className="flex min-w-0 items-center gap-2.5">
-            <IconeDaConservacao conservacao={l.conservacao} />
+        <li key={l.id} className="flex min-h-11 items-start justify-between gap-3 px-4 py-2.5 text-sm sm:px-5">
+          <span className="flex min-w-0 flex-1 items-start gap-2.5">
+            <span className="mt-0.5">
+              <IconeDaConservacao conservacao={l.conservacao} />
+            </span>
             <span className="min-w-0">
-              <span className="block truncate font-medium text-texto">{l.nome}</span>
+              <span className="block font-medium text-texto">{l.nome}</span>
               <span className="block text-[12px] text-suave">
                 {CONSERVACOES[l.conservacao]}
                 {l.por ? ` · contou ${l.por}` : ''}
               </span>
+              {l.texto.includes('×') && <span className="block text-[12px] tabular-nums text-suave">{l.texto}</span>}
             </span>
           </span>
           <span className="shrink-0 text-right tabular-nums">
-            <span className="block font-semibold text-texto">{l.texto}</span>
+            {l.contadoMilesimos === null ? (
+              <span className="block text-[13px] text-suave">sem contar</span>
+            ) : (
+              <span className="block font-semibold text-texto">{formatarQuantidade(l.contadoMilesimos, l.unidade)}</span>
+            )}
             {mostrarValor && <span className="block text-[12px] text-suave">{l.valorCentavos === null ? 'valor pendente' : formatarDinheiro(l.valorCentavos)}</span>}
           </span>
         </li>

@@ -190,11 +190,11 @@ export function TelaDetalheNota({
           {n.estoque.movimentos.length > 0 && (
             <Painel
               titulo="No estoque"
-              subtitulo={`Livro do estoque da ${n.loja}: entrada e estorno, nunca apagados`}
+              subtitulo="Entrada e estorno, nunca apagados"
               semRespiro
               acessorio={
                 estoqueBase ? (
-                  <Link href={`${estoqueBase}/${n.lojaId}`} className={LINK_DE_TEXTO}>
+                  <Link href={`${estoqueBase}/${n.lojaId}`} className={`${LINK_DE_TEXTO} whitespace-nowrap`}>
                     Ver o estoque
                   </Link>
                 ) : undefined
