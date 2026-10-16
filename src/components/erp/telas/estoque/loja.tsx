@@ -86,9 +86,9 @@ export function TelaEstoqueDaLoja({
   const a = e.abertura;
   const subtitulo =
     e.estado === 'ABERTO' && a?.fechadaEm
-      ? `Aberto em ${quando(a.fechadaEm)}${a.fechadaPorNome ? ` por ${a.fechadaPorNome}` : ''}`
+      ? `Aberto desde ${DATA_HORA.format(a.fechadaEm).slice(0, 10)}`
       : e.estado === 'EM_CONTAGEM' && a
-        ? `Contagem de abertura começada em ${quando(a.criadoEm)}${a.iniciadaPorNome ? ` por ${a.iniciadaPorNome}` : ''}`
+        ? `Abertura começada ${quando(a.criadoEm)}`
         : 'Estoque ainda não aberto';
   return (
     <div className="space-y-6">
@@ -119,7 +119,7 @@ export function TelaEstoqueDaLoja({
             ) : pode.ajustar && !bloqueio ? (
               <FormAbrirEstoque acao={acoes.abrir} />
             ) : (
-              <p className="text-sm text-suave">{bloqueio ?? 'Quem abre o estoque é quem ajusta saldo (gerente ou dona). Você conta quando a contagem começar.'}</p>
+              <p className="text-sm text-suave">{bloqueio ?? 'Só gerente ou dona abrem o estoque. Você conta quando a contagem começar.'}</p>
             )}
           </div>
         </Painel>
@@ -186,7 +186,7 @@ export function TelaEstoqueDaLoja({
 
           <Painel
             titulo="Saldo por insumo"
-            subtitulo="Quantidade = abertura + compras − saídas (as saídas chegam com a requisição, na fase 1.8)"
+            subtitulo="Quantidade = abertura + compras ± contagens − saídas (a baixa pela requisição chega em breve)"
             semRespiro
           >
             <div className="space-y-3 border-b border-linha px-4 py-3 sm:px-5">
@@ -208,7 +208,7 @@ export function TelaEstoqueDaLoja({
                   Buscar
                 </button>
               </form>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <FiltroEmLinks
                   rotulo="Onde fica"
                   opcoes={[

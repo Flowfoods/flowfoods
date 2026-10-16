@@ -427,7 +427,7 @@ export async function iniciarAbertura(cliente: ClienteDoParceiro, alcance: Alcan
           const loja = await lojaDoAlcance(tx, alcance, lojaId, 'estoque.ajustar');
           const ja = (await aberturasDe(tx, [lojaId])).get(lojaId);
           if (ja?.status === 'ABERTA') return { ok: true as const, id: ja.id, jaFeito: true };
-          if (ja?.status === 'FECHADA') throw new Recusa({ ok: false, erros: { geral: `O estoque da ${loja.nome} já está aberto. Correção de saldo é pela contagem (fase 1.7), nunca reabrindo.` } });
+          if (ja?.status === 'FECHADA') throw new Recusa({ ok: false, erros: { geral: `O estoque da ${loja.nome} já está aberto. Correção de saldo é por uma contagem (Planejar contagem), nunca reabrindo.` } });
           if (!loja.ativa) throw new Recusa({ ok: false, erros: { geral: `A ${loja.nome} está desativada: reative a loja antes de abrir o estoque.` } });
           const insumos = await tx.insumo.findMany({
             where: { ativo: true },
@@ -492,7 +492,7 @@ export async function descartarAbertura(cliente: ClienteDoParceiro, alcance: Alc
         WHERE "parceiroId" = ${tx.parceiroId} AND "lojaId" = ${lojaId} AND "tipo" = 'ABERTURA' AND "status" <> 'CANCELADA'
         FOR UPDATE`;
       if (!c) throw new Recusa({ ok: false, erros: { geral: 'Não há contagem de abertura em andamento nesta loja.' }, conflito: true });
-      if (c.status === 'FECHADA') throw new Recusa({ ok: false, erros: { geral: 'A abertura já foi concluída: não se descarta. Correção é pela contagem (fase 1.7).' }, conflito: true });
+      if (c.status === 'FECHADA') throw new Recusa({ ok: false, erros: { geral: 'A abertura já foi concluída: não se descarta. Correção é por uma contagem (Planejar contagem).' }, conflito: true });
       await tx.contagem.updateMany({ where: { id: c.id, status: 'ABERTA' }, data: { status: 'CANCELADA' } });
       await tx.historicoAlteracao.create({
         data: {
@@ -644,7 +644,7 @@ export async function contarItem(
         const atual = await tx.contagem.findUnique({ where: { id: item.contagemId }, select: { status: true, fechadaPorNome: true } });
         const frase =
           atual?.status === 'FECHADA'
-            ? `A abertura já foi concluída${atual.fechadaPorNome ? ` por ${atual.fechadaPorNome}` : ''}: este número não entrou. Correção é pela contagem (fase 1.7).`
+            ? `A abertura já foi concluída${atual.fechadaPorNome ? ` por ${atual.fechadaPorNome}` : ''}: este número não entrou. Correção é por uma contagem (Planejar contagem).`
             : 'Esta contagem foi descartada: este número não entrou.';
         return { ok: false as const, erros: { geral: frase }, fechada: true };
       }

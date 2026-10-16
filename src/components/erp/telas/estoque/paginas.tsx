@@ -47,7 +47,7 @@ export function TelaPaginaDaContagem({
       <p className="text-sm text-suave">
         Conte o que tem na loja agora. Caixa fechada vai em embalagens; o aberto, no solto (kg ou g). Deixe vazio o que ainda não contou; o que não tem, marque “Não tem”.
       </p>
-      <TelaContagem itens={c.itens} acao={acao} conferirHref={`${loja}/abertura/conferir`} saldoHref={loja} podeConcluir={podeConcluir} />
+      <TelaContagem contagemId={c.contagem?.id ?? c.loja.id} itens={c.itens} acao={acao} conferirHref={`${loja}/abertura/conferir`} saldoHref={loja} podeConcluir={podeConcluir} />
     </div>
   );
 }

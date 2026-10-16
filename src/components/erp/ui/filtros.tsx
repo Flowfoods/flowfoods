@@ -20,7 +20,7 @@ export function FiltroEmLinks({
     // avoid-ai-design-ignore: C1 — máscara funcional (indício de rolagem), não gradiente decorativo.
     <nav
       aria-label={rotulo}
-      className="max-w-full overflow-x-auto max-sm:pr-8 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]"
+      className="min-w-0 max-w-full overflow-x-auto max-sm:pr-8 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]"
     >
       <ul className="flex w-max gap-1 rounded-[10px] border border-linha bg-painel p-1">
         {opcoes.map((o) => (

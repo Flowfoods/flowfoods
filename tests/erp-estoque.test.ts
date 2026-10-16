@@ -32,6 +32,7 @@ import {
   valorDaQuantidade,
 } from '@/lib/erp/estoque-campos';
 import { custoPorUnidade } from '@/lib/erp/unidades';
+import { apagarRascunho, destinoDoRascunho, guardarRascunho, lerRascunhos, VALIDADE_DO_RASCUNHO_MS } from '@/components/erp/telas/estoque/rascunho';
 
 const CHEDDAR = { unidade: 'KG' as const, embalagemConteudoMilesimos: 5000 };
 const PAO = { unidade: 'UN' as const, embalagemConteudoMilesimos: 12000 };
@@ -244,5 +245,44 @@ describe('herança a da 1.6: tetos que cabem no INTEGER, com frase', () => {
     expect(estouroDoRazao(passa.linhas, passa.finais)).toMatch(/“Guardanapo” passaria do limite do sistema/);
     const valor = aplicarNosSaldos(new Map([[chaveDoSaldo('l', 'i'), { quantidadeMilesimos: 0, valorCentavos: LIMITE_DO_INTEIRO }]]), [{ ...base, quantidadeMilesimos: 1, valorCentavos: 1 }]);
     expect(estouroDoRazao(valor.linhas, valor.finais)).not.toBeNull();
+  });
+});
+
+describe('herança b da 1.6: rascunho local do número que falhou ao salvar', () => {
+  const memoria = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k), m };
+  };
+  const campos = (solto: string) => ({ embalagens: '', solto, escala: 'base' });
+
+  it('guarda por contagem e item, com a versão; salvar apaga; vencido some', () => {
+    const a = memoria();
+    guardarRascunho('c1', 'i1', { campos: campos('12'), versao: 3 }, 1000, a);
+    guardarRascunho('c1', 'i2', { campos: campos('4'), versao: 0 }, 1000, a);
+    guardarRascunho('c2', 'i1', { campos: campos('9'), versao: 1 }, 1000, a);
+    expect(lerRascunhos('c1', 2000, a)).toEqual({ i1: { campos: campos('12'), versao: 3, em: 1000 }, i2: { campos: campos('4'), versao: 0, em: 1000 } });
+    apagarRascunho('c1', 'i1', a);
+    expect(Object.keys(lerRascunhos('c1', 2000, a))).toEqual(['i2']);
+    expect(lerRascunhos('c1', 1000 + VALIDADE_DO_RASCUNHO_MS + 1, a)).toEqual({});
+    expect(a.m.has('ff-contagem:c1')).toBe(false);
+    expect(Object.keys(lerRascunhos('c2', 2000, a))).toEqual(['i1']);
+  });
+
+  it('sem localStorage (ou com lixo) a tela segue: nada quebra', () => {
+    expect(lerRascunhos('c1', 0, null)).toEqual({});
+    expect(() => guardarRascunho('c1', 'i1', { campos: campos('1'), versao: 0 }, 0, null)).not.toThrow();
+    const a = memoria();
+    a.setItem('ff-contagem:c1', '{"i1":{"campos":{"solto":5},"versao":"x"}');
+    expect(lerRascunhos('c1', 0, a)).toEqual({});
+    const cheio = { getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); }, removeItem: () => {} };
+    expect(() => guardarRascunho('c1', 'i1', { campos: campos('1'), versao: 0 }, 0, cheio)).not.toThrow();
+  });
+
+  it('ao abrir: o servidor já tem o mesmo número = descarta; senão reenvia com a versão do rascunho (o servidor dá conflito se o item andou)', () => {
+    const r = { campos: campos('12'), versao: 3, em: 0 };
+    expect(destinoDoRascunho(r, { campos: campos('12'), versao: 4 })).toBe('descartar');
+    expect(destinoDoRascunho(r, { campos: campos(''), versao: 3 })).toBe('reenviar');
+    // Alguém salvou 10 depois (versão 5): reenviar com a versão 3 = conflito no servidor, nunca sobrescreve.
+    expect(destinoDoRascunho(r, { campos: campos('10'), versao: 5 })).toBe('reenviar');
   });
 });

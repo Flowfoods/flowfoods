@@ -15,6 +15,12 @@
  * número: o servidor aceita a retentativa). Outra pessoa contou o mesmo item
  * antes: o número dela aparece e a pessoa escolhe. Vazio = não contado; "Não
  * tem" grava zero. O rodapé fixo diz quanto falta.
+ *
+ * Sem sinal (herança b da 1.6): o número que falhou fica no aparelho
+ * (`rascunho.ts`, por contagem e item, com a versão) e é reenviado sozinho
+ * quando a rede volta ou a página abre de novo; o servidor confere a versão,
+ * então um número velho nunca passa por cima de um mais novo (vira conflito).
+ * Alvos de toque de 48 px (contar de luva).
  */
 
 import Link from 'next/link';
@@ -27,6 +33,7 @@ import { classeDeBotao } from '../../ui/estilos';
 import { Barra } from '../../ui/superficies';
 import { IconeDaConservacao } from '../cadastro/validade';
 import type { AcaoDeContar } from './estado';
+import { apagarRascunho, destinoDoRascunho, guardarRascunho, lerRascunhos } from './rascunho';
 
 type Situacao = 'parado' | 'pendente' | 'salvando' | 'salvo' | 'erro' | 'falha' | 'conflito';
 
@@ -46,12 +53,15 @@ const ESPERA_MS = 800;
 const mesmosCampos = (a: ContagemDigitada, b: ContagemDigitada) => a.embalagens.trim() === b.embalagens.trim() && a.solto.trim() === b.solto.trim() && a.escala === b.escala;
 
 export function TelaContagem({
+  contagemId,
   itens,
   acao,
   conferirHref,
   saldoHref,
   podeConcluir,
 }: {
+  /** Chave do rascunho local (o número que falhou ao salvar fica no aparelho). */
+  contagemId: string;
   itens: ItemDaContagem[];
   acao: AcaoDeContar;
   /** Conferir e concluir (só quem ajusta saldo). */
@@ -103,15 +113,20 @@ export function TelaContagem({
       const enviados = l.campos;
       emVoo.current[id] = true;
       mudar(id, () => ({ situacao: 'salvando', erros: {} }));
+      const versao = versaoForcada ?? l.item.versao;
       let r: ResultadoDoItem;
       try {
-        r = await acao({ itemId: id, embalagens: enviados.embalagens, solto: enviados.solto, escala: enviados.escala, versao: versaoForcada ?? l.item.versao });
+        r = await acao({ itemId: id, embalagens: enviados.embalagens, solto: enviados.solto, escala: enviados.escala, versao });
       } catch {
         emVoo.current[id] = false;
-        mudar(id, () => ({ situacao: 'falha', erros: { geral: 'Sem conexão: o número ainda não foi salvo.' } }));
+        // Fica no aparelho até salvar: volta sozinho quando o sinal voltar.
+        guardarRascunho(contagemId, id, { campos: enviados, versao });
+        mudar(id, () => ({ situacao: 'falha', erros: { geral: 'Sem sinal: o número ficou guardado neste aparelho e vai sozinho quando a conexão voltar.' } }));
         return;
       }
       emVoo.current[id] = false;
+      // O servidor respondeu (salvou, recusou ou deu conflito): o rascunho já não serve.
+      apagarRascunho(contagemId, id);
       if (r.ok) {
         const agora = atual.current[id];
         const mudouDepois = !mesmosCampos(agora.campos, enviados);
@@ -131,8 +146,51 @@ export function TelaContagem({
       }
       mudar(id, () => ({ situacao: 'erro', erros: r.erros }));
     },
-    [acao, mudar],
+    [acao, mudar, contagemId],
   );
+
+  // Ao abrir: o que ficou guardado no aparelho volta para o campo e é reenviado com a versão de quando foi digitado.
+  useEffect(() => {
+    const guardados = lerRascunhos(contagemId);
+    const reenviar: [string, number][] = [];
+    for (const [id, r] of Object.entries(guardados)) {
+      const l = atual.current[id];
+      if (!l) {
+        apagarRascunho(contagemId, id);
+        continue;
+      }
+      if (destinoDoRascunho(r, l.item) === 'descartar') {
+        apagarRascunho(contagemId, id);
+        continue;
+      }
+      mudar(id, (x) => ({ campos: r.campos, item: { ...x.item, versao: r.versao }, situacao: 'falha', erros: { geral: 'Número guardado neste aparelho: ainda não tinha sido salvo.' } }));
+      reenviar.push([id, r.versao]);
+    }
+    if (reenviar.length === 0) return;
+    const t = setTimeout(() => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      for (const [id, v] of reenviar) void salvar(id, v);
+    }, 300);
+    return () => clearTimeout(t);
+    // Só ao abrir a contagem.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [contagemId]);
+
+  // O sinal voltou (ou a cada 20 s, enquanto houver falha): reenvia o que falhou, com a versão de cada um.
+  const comFalha = Object.values(linhas).some((l) => l.situacao === 'falha');
+  useEffect(() => {
+    if (!comFalha) return;
+    const reenviar = () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      for (const l of Object.values(atual.current)) if (l.situacao === 'falha') void salvar(l.item.id, l.item.versao);
+    };
+    window.addEventListener('online', reenviar);
+    const t = setInterval(reenviar, 20_000);
+    return () => {
+      window.removeEventListener('online', reenviar);
+      clearInterval(t);
+    };
+  }, [comFalha, salvar]);
 
   const digitar = (id: string, campos: Partial<ContagemDigitada>) => {
     setMexidos((m) => (m.has(id) ? m : new Set(m).add(id)));
@@ -274,7 +332,7 @@ export function TelaContagem({
               Conferir e concluir
             </Link>
           ) : (
-            <p className="w-full text-[12px] text-suave sm:w-auto sm:max-w-xs">Terminou? Avise o gerente: ele confere e conclui.</p>
+            <p className="w-full text-[12px] text-suave sm:w-auto sm:max-w-xs">Terminou? Só gerente ou dona concluem: avise quem confere.</p>
           )}
         </div>
       </div>
@@ -317,7 +375,7 @@ function ItemContavel({
       <div className="flex min-h-10 items-center justify-between gap-3">
         <h3 className="min-w-0 text-[15px] font-semibold text-texto">{i.nome}</h3>
         {l.item.contadoMilesimos === null && l.situacao === 'parado' && !l.campos.embalagens.trim() && !l.campos.solto.trim() ? (
-          <button type="button" disabled={bloqueado} onClick={() => digitar({ embalagens: '', solto: '0', escala: 'base' })} className={classeDeBotao('secundario', 'min-h-10 shrink-0 px-3 text-[13px] sm:min-h-9')}>
+          <button type="button" disabled={bloqueado} onClick={() => digitar({ embalagens: '', solto: '0', escala: 'base' })} className={classeDeBotao('secundario', 'min-h-12 shrink-0 px-4 text-[14px]')}>
             Não tem
             <span className="sr-only"> (marca zero)</span>
           </button>
@@ -374,7 +432,7 @@ function ItemContavel({
             {i.unidade === 'UN' ? (
               <span className="shrink-0 px-1 text-[13px] text-suave">un</span>
             ) : (
-              <span role="group" aria-label="Unidade" className="inline-grid shrink-0 grid-cols-2 gap-0.5 rounded-[8px] border border-linha-forte bg-campo p-0.5">
+              <span role="group" aria-label="Unidade" className="inline-grid shrink-0 grid-cols-2 overflow-hidden rounded-[8px] border border-linha-forte bg-campo">
                 {(['base', 'menor'] as const).map((esc) => (
                   <button
                     key={esc}
@@ -382,7 +440,7 @@ function ItemContavel({
                     aria-pressed={l.campos.escala === esc}
                     disabled={bloqueado}
                     onClick={() => digitar({ escala: esc })}
-                    className="ff-transicao min-h-10 min-w-9 rounded-[6px] px-1.5 text-[13px] text-suave aria-[pressed=true]:bg-forte aria-[pressed=true]:font-semibold aria-[pressed=true]:text-texto"
+                    className="ff-transicao h-12 min-w-12 px-2 text-[14px] text-suave aria-[pressed=true]:bg-forte aria-[pressed=true]:font-semibold aria-[pressed=true]:text-texto"
                   >
                     {esc === 'base' ? u.sigla : u.menor}
                   </button>
@@ -457,7 +515,7 @@ function SituacaoDoItem({ l, repetir }: { l: Linha; repetir: () => void }) {
       );
     case 'falha':
       return (
-        <button type="button" onClick={repetir} className={`${base} min-h-10 rounded-[6px] px-1 text-erro underline underline-offset-4`}>
+        <button type="button" onClick={repetir} className={`${base} min-h-12 rounded-[7px] border border-linha-forte px-3 text-[13px] text-erro`}>
           Falhou · tentar de novo
         </button>
       );
