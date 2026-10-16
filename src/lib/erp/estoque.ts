@@ -36,6 +36,7 @@ import { hojeNoRio, numeroDaNota } from './compra-campos';
 import {
   aplicarNosSaldos,
   camposDaContagem,
+  contaDaContagem,
   chaveDoSaldo,
   efeitoDaNota,
   entradasDaNota,
@@ -244,6 +245,7 @@ export async function gravarMovimentos(
       chaveIdempotencia: m.chave,
       notaId: m.notaId ?? null,
       contagemItemId: m.contagemItemId ?? null,
+      requisicaoItemId: m.requisicaoItemId ?? null,
       estornoDeId: m.estornoDeId ?? null,
     })),
   });
@@ -536,6 +538,8 @@ export interface ItemDaContagem {
   campos: ContagemDigitada;
   contadoMilesimos: number | null;
   texto: string;
+  /** A conta das embalagens, curta ("1 × 2 kg + 600 g"); null sem embalagem. */
+  conta: string | null;
   versao: number;
   por: string | null;
   em: Date | null;
@@ -587,6 +591,7 @@ export function paraTela(i: ItemLido): ItemDaContagem {
     campos: camposDaContagem({ unidade, embalagensMilesimos: i.embalagensMilesimos, soltoMilesimos: i.soltoMilesimos, escalaDigitada: i.escalaDigitada }),
     contadoMilesimos: i.contadoMilesimos,
     texto: textoDaContagem({ unidade, contadoMilesimos: i.contadoMilesimos, embalagensMilesimos: i.embalagensMilesimos, soltoMilesimos: i.soltoMilesimos, embalagemSnapshot: i.embalagemSnapshot }),
+    conta: i.contadoMilesimos === null ? null : contaDaContagem({ unidade, embalagensMilesimos: i.embalagensMilesimos, soltoMilesimos: i.soltoMilesimos, embalagemConteudoMilesimos: i.embalagemConteudoMilesimos }),
     versao: i.versao,
     por: i.contadoPorNome,
     em: i.contadoEm,
@@ -970,10 +975,12 @@ export interface MovimentoDaTela {
   motivo: string | null;
   estorno: boolean;
   notaId: string | null;
+  /** 1.8: a requisição que gerou a baixa (link no livro). */
+  requisicaoId: string | null;
   ocorridoEm: Date;
 }
 
-const SELECAO_DO_MOVIMENTO = {
+export const SELECAO_DO_MOVIMENTO = {
   id: true,
   tipo: true,
   insumoId: true,
@@ -987,9 +994,10 @@ const SELECAO_DO_MOVIMENTO = {
   estornoDeId: true,
   notaId: true,
   ocorridoEm: true,
+  requisicaoItem: { select: { requisicaoId: true } },
 } as const;
 
-function movimentoParaTela(m: {
+export function movimentoParaTela(m: {
   id: string;
   tipo: string;
   insumoId: string;
@@ -1003,6 +1011,7 @@ function movimentoParaTela(m: {
   estornoDeId: string | null;
   notaId: string | null;
   ocorridoEm: Date;
+  requisicaoItem?: { requisicaoId: string } | null;
 }): MovimentoDaTela {
   return {
     id: m.id,
@@ -1017,6 +1026,7 @@ function movimentoParaTela(m: {
     motivo: m.motivo,
     estorno: !!m.estornoDeId,
     notaId: m.notaId,
+    requisicaoId: m.requisicaoItem?.requisicaoId ?? null,
     ocorridoEm: m.ocorridoEm,
   };
 }

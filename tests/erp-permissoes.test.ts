@@ -188,6 +188,7 @@ describe('ERP 0.4 · escopo de lojas e a checagem única', () => {
       acessoId: 'v',
       parceiros: [],
       perfilRotulo: 'Operador',
+      setores: [],
     };
     expect(contextoDaSessao({ ...base, alcance: daLojaX }).alcance).toBe(daLojaX);
     expect(() => contextoDaSessao({ ...base, alcance: null })).toThrow(/sem alcance/);

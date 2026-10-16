@@ -67,6 +67,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/compras/nova',
       '/erp/compras/fornecedores',
       '/erp/estoque',
+      '/erp/estoque/requisicoes',
+      '/erp/estoque/divergencias',
       '/erp/lojas',
       '/erp/equipe',
       '/erp/historico',
@@ -85,7 +87,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
   it('Operador: insumos, fichas, estoque (1.6: ele conta), lojas e Seu acesso; sem Equipe e Histórico; futuros só os que ele vai ver', () => {
     const a = alcance({ perfilBase: 'OPERADOR' });
     // Operador VÊ fichas (bate o olho na foto e no preparo), sem criar nem importar.
-    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/fichas', '/erp/estoque', '/erp/lojas', '/erp/acesso']);
+    // 1.8: ele pede requisição (o quadro aparece); divergências são de quem confere contagem.
+    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/fichas', '/erp/estoque', '/erp/estoque/requisicoes', '/erp/lojas', '/erp/acesso']);
     expect(futuros(a)).toEqual(['producao', 'etiquetas']);
   });
 
@@ -93,6 +96,20 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     const h = hrefs(alcance({ perfilBase: 'GERENTE', redeInteira: false, lojaIds: ['l1'] }));
     expect(h).not.toContain('/erp/historico');
     expect(h).toContain('/erp/lojas');
+  });
+
+  it('1.8: requisições aparecem para quem pede OU atende; divergências só para quem ajusta saldo', () => {
+    expect(hrefs(alcance({ perfilBase: null, perfilProprio: ['requisicao.atender'] }))).toEqual(['/erp/estoque/requisicoes', '/erp/acesso']);
+    expect(hrefs(alcance({ perfilBase: null, perfilProprio: ['requisicao.pedir'] }))).toEqual(['/erp/estoque/requisicoes', '/erp/acesso']);
+    expect(hrefs(alcance({ perfilBase: null, perfilProprio: ['estoque.ajustar'] }))).toEqual(['/erp/estoque/divergencias', '/erp/acesso']);
+  });
+
+  it('1.8: o quadro e as divergências de uma loja acendem o item do menu deles, não "Estoque por loja"', () => {
+    const nav = navegacaoDoParceiro(alcance({ perfilBase: 'DONO' }));
+    expect(itemAtivo(nav, '/erp/estoque/l1/requisicoes')?.item.rotulo).toBe('Requisições');
+    expect(itemAtivo(nav, '/erp/estoque/l1/requisicoes/r9/atender')?.item.rotulo).toBe('Requisições');
+    expect(itemAtivo(nav, '/erp/estoque/l1/divergencias')?.item.rotulo).toBe('Divergências');
+    expect(itemAtivo(nav, '/erp/estoque/l1')?.item.rotulo).toBe('Estoque por loja');
   });
 
   it('perfil sem "ver insumos": o módulo Insumos nem aparece; Seu acesso sempre aparece', () => {
@@ -123,6 +140,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/compras/nova',
       '/rodolfo/erp/valentins/compras/fornecedores',
       '/rodolfo/erp/valentins/estoque',
+      '/rodolfo/erp/valentins/estoque/requisicoes',
+      '/rodolfo/erp/valentins/estoque/divergencias',
       '/rodolfo/erp/valentins/lojas',
       '/rodolfo/erp/valentins/equipe',
       '/rodolfo/erp/valentins/historico',

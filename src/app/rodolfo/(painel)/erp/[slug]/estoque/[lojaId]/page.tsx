@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { obterEstoqueDaLoja } from '@/lib/erp/estoque';
 import { situacaoDoPeriodo } from '@/lib/erp/contagem';
+import { lojasDasRequisicoes } from '@/lib/erp/requisicao';
 import { lerFiltrosDoSaldo, TelaEstoqueDaLoja } from '@/components/erp/telas/estoque/loja';
 import { fraseDoEstoque } from '@/components/erp/telas/estoque/estado';
 import { acaoDescartarAbertura, acaoIniciarAbertura } from '../actions';
@@ -19,6 +20,7 @@ export default async function ParceiroEstoqueDaLojaPage({ params, searchParams }
   if (!e) notFound();
   // 1.7: com o estoque aberto, o período (cobertura × piso) e as contagens do dia a dia.
   const periodo = e.estado === 'ABERTO' ? await situacaoDoPeriodo(ctx.cliente, ctx.alcance, e.loja.id, ctx.parceiro) : null;
+  const requisicoes = e.estado === 'ABERTO' ? ((await lojasDasRequisicoes(ctx.cliente, ctx.alcance)).find((l) => l.id === e.loja.id) ?? null) : null;
   return (
     <TelaEstoqueDaLoja
       e={e}
@@ -28,10 +30,11 @@ export default async function ParceiroEstoqueDaLojaPage({ params, searchParams }
       filtros={filtros}
       insumosBase={`${base}/insumos`}
       notasBase={`${base}/compras`}
-      pode={{ contar: true, ajustar: true }}
+      pode={{ contar: true, ajustar: true, requisicoes: true, pedir: true }}
       acoes={{ abrir: acaoIniciarAbertura.bind(null, ctx.parceiro.slug, e.loja.id), descartar: acaoDescartarAbertura.bind(null, ctx.parceiro.slug, e.loja.id) }}
       bloqueio={ctx.bloqueio}
       periodo={periodo}
+      requisicoes={requisicoes}
     />
   );
 }

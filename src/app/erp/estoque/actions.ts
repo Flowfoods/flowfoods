@@ -30,6 +30,7 @@ import {
   executarSalvarRegras,
   recusadoNoEstoque,
 } from '@/components/erp/telas/estoque/executar';
+import { executarAtender, executarCancelar, executarDevolver, executarPedir } from '@/components/erp/telas/requisicoes/executar';
 
 const BASE = '/erp/estoque';
 
@@ -99,4 +100,32 @@ export async function acaoSalvarRegrasDaContagem(lojaId: string, anterior: Estad
   const { ctx, negado } = await preparar(lojaId, 'lojas.gerir');
   if (negado) return recusadoNoEstoque(anterior, negado);
   return executarSalvarRegras(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, BASE);
+}
+
+// ================================================================ 1.8: requisição
+
+export async function acaoPedirRequisicao(lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado } = await preparar(lojaId, 'requisicao.pedir');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarPedir(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, BASE);
+}
+
+export async function acaoAtenderRequisicao(lojaId: string, id: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado } = await preparar(lojaId, 'requisicao.atender');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarAtender(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(id), anterior, form, BASE);
+}
+
+export async function acaoDevolverNaRequisicao(lojaId: string, id: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado } = await preparar(lojaId, 'requisicao.atender');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarDevolver(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(id), anterior, form, BASE);
+}
+
+/** Cancelar a pedida: quem pede OU quem atende. */
+export async function acaoCancelarRequisicao(lojaId: string, id: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = (recusaDaAcao(ctx, 'requisicao.pedir', { lojaId: String(lojaId) }) && recusaDaAcao(ctx, 'requisicao.atender', { lojaId: String(lojaId) })) || ctx.bloqueio;
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarCancelar(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(id), anterior, form, BASE);
 }

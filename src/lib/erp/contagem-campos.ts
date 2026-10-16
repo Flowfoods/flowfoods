@@ -460,7 +460,8 @@ export function fraseAbaixoDoPiso(c: Cobertura, r: Pick<RegrasDaContagem, 'pisoV
 
 /** "R$ 12,40 sobrando" / "R$ 3,10 faltando". */
 export function textoDoValorDaDiferenca(valor: number | null): string {
-  if (valor === null) return 'valor pendente (sem preço)';
+  // Herança da 1.7: curto (a cor de atenção já diz "confira").
+  if (valor === null) return 'sem preço';
   if (valor === 0) return 'R$ 0,00';
   return valor > 0 ? `${formatarDinheiro(valor)} a mais` : `${formatarDinheiro(-valor)} a menos`;
 }

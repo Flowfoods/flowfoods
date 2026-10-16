@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -26,6 +26,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Entrada de compra e custo pelo último preço (1.5) | `src/lib/erp/{compra-campos,compras-custo,compras}.ts` (puro / última compra numa consulta / regras com banco); telas em `src/components/erp/telas/compras/`; rotas `/erp/compras` e `/rodolfo/erp/<slug>/compras` (notas, `nova`, `<id>`, `<id>/editar`, `fornecedores`); migrations `20261018000000_erp_validar_checks_insumo` e `20261018010000_erp_compras` |
 | Estoque: abertura do zero, livro-razão + saldo, nota entrando no estoque (1.6) | `src/lib/erp/{estoque-campos,estoque}.ts` (puro / com banco); telas em `src/components/erp/telas/estoque/`; rotas `/erp/estoque` e `/rodolfo/erp/<slug>/estoque` (`<loja>`, `<loja>/abertura`, `<loja>/abertura/conferir`); migration `20261019000000_erp_estoque_abertura` |
 | Contagem do dia a dia (inventário cíclico que fecha sozinho) e fechamento do período com piso (1.7) | `src/lib/erp/{contagem-campos,contagem}.ts` (puro / com banco; `contarItem` da 1.6 generalizado com ganchos); telas `telas/estoque/{planejar,planejar-form,conferir-contagem,periodo,cobertura,rascunho}.tsx`; rotas `<loja>/contagens/nova`, `<loja>/contagens/<id>`, `<loja>/contagens/<id>/conferir`, `<loja>/periodo` em `/erp/estoque` e `/rodolfo/erp/<slug>/estoque`; migrations `20261020000000_erp_contagem_ciclica` e `20261020010000_erp_contagem_fotografia` |
+| Requisição (o setor pede, o estoque entrega e dá baixa) e divergências requisição × contagem (1.8) | `src/lib/erp/{requisicao-campos,requisicao}.ts` (puro / com banco); telas em `src/components/erp/telas/requisicoes/`; rotas `<loja>/requisicoes` (quadro), `/nova`, `/<id>`, `/<id>/atender`, `<loja>/divergencias`, e `requisicoes`/`divergencias` (escolher a loja) em `/erp/estoque` e `/rodolfo/erp/<slug>/estoque`; migration `20261021000000_erp_requisicao` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
@@ -848,6 +849,92 @@ dona lança nota de cheddar no meio; o gerente confere ("depois de contar:
 recusado ("não fecha abaixo do piso"); conta os "para o piso" e fecha; um
 "Recontar" que bate fecha sozinho.
 
+## O que a 1.8 entregou — requisição, baixa pela requisição e cruzamento requisição × contagem
+
+Migration `20261021000000_erp_requisicao` (ADITIVA, sem exceção à regra; sem
+tabela nova: portão e RLS iguais): `RequisicaoStatus` + `PARCIAL` (ADD VALUE,
+não usado no mesmo arquivo); em `Requisicao`, `numero` (único por loja),
+`versao`, `paraDia`, nomes de quem pediu/entregou/cancelou, `canceladaEm` +
+`motivoCancelamento`, `fichaId` (FK composta) + snapshot do nome e da
+quantidade; em `RequisicaoItem`, `devolvidoMilesimos` e `ordem`; CHECKs (setor
+da lista da 0.4, cancelada ⇔ data e motivo, atendida tem data, textos curtos,
+ficha coerente, devolvido ≥ 0, e `REQUISICAO` aponta o item — novo, ao lado dos
+da 1.6/1.7). Provada em banco novo com dado da 1.7 como superusuário e dono
+não-superusuário com e sem RLS (`migrate diff` vazio).
+
+1. **Requisição = pedido de saída do estoque da LOJA para um setor** (decisão
+   77): setor da 0.4 (cozinha, salão, caixa…), para quando (hoje até 14 dias),
+   itens em kg/g, L/ml ou un, observação; número sequencial por loja (#12) sob
+   trava. Estados: Pedida → Atendida em parte (saiu parte, o resto ainda sai)
+   → Atendida (tudo saiu, ou "encerrar o resto" com o corte à vista) ·
+   Cancelada (só sem nada entregue, com motivo). Precisa do estoque aberto.
+2. **A baixa é na ENTREGA** (decisão 77): `REQUISICAO` (−) por item que sai,
+   valor pelo custo de referência de agora (um arredondamento; sem preço = 0 e
+   "pendente"), snapshot, `requisicaoItemId`, chave `requisicao:<item>:<versão>`;
+   razão e saldo na mesma transação (`gravarMovimentos`). Entrega parcial,
+   várias entregas, até o dobro do pedido (a peça de 2,1 kg passa; acima é
+   dedo errado). Entregar de novo a mesma tela: versão lida + `FOR UPDATE` —
+   "já atendida" ou o conflito, nunca baixa dupla.
+3. **Saldo insuficiente não para a cozinha** (decisão 78): a entrega passa com
+   a confirmação de quem entrega ("o produto está aqui, o livro é que está
+   errado"); o negativo vira alarme (tela, histórico e Divergências).
+4. **Devolução por estorno** (decisão 79): estorna as baixas ativas do item
+   (espelho exato, conferido pelo trigger) e baixa de novo o líquido, valor
+   proporcional ao da época; nenhuma linha muda; Σ `REQUISICAO` = consumo
+   requisitado líquido; `devolvidoMilesimos` à vista.
+5. **Da ficha técnica**: "Puxar de uma ficha" — ficha + quanto vai produzir →
+   insumos pela receita, quantidade BRUTA (líquida × fator × quantidade ÷
+   rendimento, BigInt, um arredondamento); pré-preparo da receita entra pelo
+   insumo que ele produz (vem pronto), SEM cascata (fazer o pré-preparo é a
+   3.1). A lista volta editável; a requisição guarda a ficha e a quantidade.
+   Porta da 3.1: `criarRequisicao` aceita a origem ficha e `OrdemProducao.requisicaoId` já existe.
+6. **Cruzamento requisição × contagem** (decisão 80, só leitura): por
+   insumo, trechos entre duas contagens APLICADAS consecutivas (a abertura vale
+   da conclusão; as outras, de quando foi contado). Consumo apurado = contado
+   no início + entradas (compra, produção, e os estornos com o sinal deles) −
+   contado no fim; requisitado = Σ −`REQUISICAO`; outras saídas lançadas
+   (perda, produção, ajuste); **sumiço = consumo − requisitado − outras** (é o
+   "esperado − contado" da 1.7). > 0 = sumiu sem requisição; < 0 = requisitou
+   a mais. R$ pelo custo de referência de hoje. Janela = trechos que terminam
+   nela (padrão: o período do parceiro; dd/mm/aaaa; até 366 dias). **Pequeno e
+   repetido**: sumiço dentro da tolerância da loja em 2+ trechos — o que o
+   "fecha sozinha" deixa passar (herança da 1.7) — com a soma. Por setor:
+   o que pediu e o sumiço nos insumos que ele pede (onde olhar, não culpa).
+   Abaixo de zero agora; requisitado sem contagem para cruzar.
+7. **Telas** (as mesmas no N1 e no parceiro): quadro por estado (título na cor
+   do estado + barra fina + contador; atrasada = filete vermelho + "2d de
+   atraso"; "Nenhum item nesta etapa"); nova (celular primeiro, setor da
+   pessoa marcado, rodapé fixo); entregar (o livro ao lado, "fica em",
+   negativo com confirmação, encerrar o resto); detalhe (pedido × saiu × voltou
+   × falta × no livro, o que saiu do livro, receber de volta, cancelar,
+   histórico); divergências. Menu Estoque: Requisições e Divergências (uma loja
+   no acesso vai direto); no estoque da loja, o painel de requisições; o livro
+   leva à requisição.
+8. **Permissões** (catálogo 0.4, sem permissão nova): quadro e detalhe =
+   `requisicao.pedir` OU `requisicao.atender`; pedir = `requisicao.pedir`
+   (operador pede); entregar, encerrar e receber de volta =
+   `requisicao.atender` (gerente/dona); cancelar a pedida = qualquer das duas;
+   divergências = `estoque.ajustar`. Sempre com a loja; fora do alcance = 404.
+   Setor não concede (decisão 39): só pré-escolhe o setor do pedido (a sessão
+   passou a levar os setores da pessoa).
+9. **Heranças da 1.7 resolvidas**: coluna "Contado" com a conta das embalagens
+   curta e em linha própria ("1 × 2 kg + 600 g", `contaDaContagem`, também no
+   celular); "sem preço" curto na coluna Diferença.
+
+## Provar a requisição (1.8)
+
+```bash
+npx vitest run tests/erp-requisicao.test.ts      # pedido, ficha (bruta, sem cascata), entrega parcial, baixa exata, negativo, devolução, consumo × requisitado, sumiço em R$, pequenos repetidos, por setor
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-requisicao.db.test.ts
+```
+Na tela (Casa Alfa, Vila da Penha aberta há 10 dias): o cozinheiro pede no
+celular 2 kg de cheddar e 1 kg de bacon (setor Cozinha já marcado); o
+estoquista entrega 2 kg e 600 g (atendida em parte; o livro mostra a saída);
+reenviar a tela velha não baixa de novo; uma pedida para anteontem aparece com
+"2d de atraso"; uma contagem acusa 500 g de bacon a menos → Divergências
+"R$ 21,45 sem requisição", e o cheddar como pequeno e repetido; a gerente da
+Delivery recebe 404 na Penha; o operador não entrega nem vê divergências.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -871,7 +958,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Estoque | `SaldoEstoque` | saldo e valor por loja × insumo (soma do razão, atualizada na mesma transação, com versão) |
 | Estoque | `MovimentoEstoque` | livro-razão: abertura, entrada, requisição, produção, ajuste, contagem, perda; snapshot e saldo antes/depois; estorno = mesmo tipo, sinal contrário, `estornoDeId` único (1.6) |
 | Estoque | `Contagem` / `ContagemItem` | abertura (1.6: estado da loja), cíclica e fechamento de período (1.7: título, prazo, desfecho aplicada/fechou sozinha/venceu; fechamento aponta o `PeriodoApuracao`, um por loja); esperado (livro na hora de contar) × contado; versão, lista e fator congelados, digitado × normalizado. O piso é regra da lógica com os números na `Loja` |
-| Estoque | `Requisicao` / `RequisicaoItem` | pedido do setor; a baixa sai daqui |
+| Estoque | `Requisicao` / `RequisicaoItem` | pedido do setor (1.8: número por loja, setor da 0.4, para quando, versão, pedida → atendida em parte → atendida · cancelada, ficha de origem); a baixa sai na entrega (`REQUISICAO` com `requisicaoItemId`), devolução por estorno |
 | Produção | `OrdemProducao` | lote: planejado/produzido, custo, responsável (snapshot). Lista do dia = ordens planejadas × saldo (derivada) |
 | Produção | `Etiqueta` | etiqueta impressa: lote do fornecedor, validade, abertura, snapshot |
 | DRE | `FaturamentoLancamento` | faturamento por loja × marca × canal × dia: valor, pedidos, clientes (= atendimentos do dia, não clientes únicos); chave de idempotência única |
@@ -1255,10 +1342,9 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.7 (para as próximas subfases)
 
-- **1.8 requisição**: a baixa pela requisição entra no livro antes da
-  contagem; a conferência já separa "livro ao contar" de "depois de contar".
-  Cruzar requisição × contagem: diferença negativa sem requisição =
-  divergência/perda (hoje o texto diz "diferença não é perda").
+- ~~**1.8 requisição**~~ **Feito na 1.8** (decisões 77–80): a baixa entra no
+  livro na entrega; a conferência mostra a baixa depois de contar em "depois
+  de contar"; o cruzamento está em Divergências.
 - **2.3 CMV real**: inicial = estoque final fotografado do fechamento
   anterior (ou a abertura, no 1º período); final = `valorTotalCentavos` do
   FECHAMENTO aplicado; compras pela data da nota. Fechamento aplicado DEPOIS
@@ -1267,8 +1353,8 @@ banco de teste: o operador é recusado pelo servidor.
   referência de hoje (fotografado) — a 2.3 escolhe.
 - `PeriodoApuracao.status` não muda na 1.7 (é do DRE, 2.2); fechar o
   período no DRE deve exigir o FECHAMENTO aplicado de cada loja aberta.
-- Fecha sozinha usa a tolerância por item da loja: diferenças pequenas
-  repetidas somam (vigiar no relatório de divergências da 1.8).
+- ~~Fecha sozinha usa a tolerância por item da loja: diferenças pequenas
+  repetidas somam.~~ **1.8:** "pequeno e repetido" nas Divergências.
 - A hora de contar vem do aparelho (idade do número): dado não confiável,
   preso entre o início da contagem e agora. O pior caso é o aparelho dizer
   que contou MAIS TARDE do que contou (o esperado passa a incluir o que entrou
@@ -1288,5 +1374,39 @@ banco de teste: o operador é recusado pelo servidor.
 ## Herança da 1.7 (apontada pelos fiscais)
 
 - [baixo] A idade do número digitado vem do aparelho: forjá-la empurra o esperado até o início da contagem (fica visível como "depois de contar" e trava o "fecha sozinha"; só o gerente aplica).
-- UX: coluna "Contado" corta a conta de embalagens ("1 × 2 kg + 600 g" em linha própria); "sem preço · confira" mais curto na coluna Diferença.
-- 1.8: cruzar requisição × contagem; diferenças pequenas repetidas dentro da tolerância precisam de vigilância. 2.3: CMV desconta o que se moveu entre o fim do período e o fechamento. Sem lembretes de contagem nem link sem login; planejamento e saldo sem paginação.
+- ~~UX: coluna "Contado"; "sem preço · confira".~~ **1.8.**
+- ~~1.8: cruzar requisição × contagem; pequenos repetidos.~~ **1.8.** 2.3: CMV desconta o que se moveu entre o fim do período e o fechamento. Sem lembretes de contagem nem link sem login; planejamento e saldo sem paginação.
+
+## Herança da 1.8 (para as próximas subfases)
+
+- **3.1 produção**: o lote baixa os insumos PELA requisição — criar a
+  requisição com a origem ficha (`criarRequisicao` com `fichaId` e a
+  quantidade) e ligar `OrdemProducao.requisicaoId`; a entrega dela é a baixa.
+  `PRODUCAO_CONSUMO`/`PRODUCAO_ENTRADA` já entram no cruzamento (consumo
+  explicado e entrada). O pré-preparo pedido pela cozinha vem pronto (sem
+  cascata); a cascata é da 3.1.
+- **Perda lançada** (`PERDA`) não tem tela: quando tiver, o cruzamento já a
+  desconta ("perda lançada") e o sumiço cai.
+- **2.3 CMV**: Σ `REQUISICAO` é o consumo requisitado líquido (estornos
+  incluídos); o CMV real continua pela contagem (inicial + compras − final).
+- O cruzamento lê todos os marcos e movimentos dos insumos com trecho na
+  janela (centenas): com milhares, levar a soma por trecho para o SQL.
+- Sino do parceiro: requisições pendentes/atrasadas são a primeira fonte
+  real (herança da 1.1); não ligado ainda.
+- Quem pediu é um nome (snapshot): `Colaborador` segue sem ligação com a
+  pessoa do login (herança da 0.3); "minhas requisições" depende disso.
+- Valor da baixa = custo de referência de agora (como a abertura e a
+  contagem); sem preço entra 0 e a tela diz pendente.
+- Devolução estorna TODAS as baixas ativas do item e relança o líquido
+  (valor proporcional): várias devoluções viram várias camadas de estorno no
+  livro do item — correto e legível no detalhe, mas longo.
+- Índice único `(parceiroId, lojaId, numero)` declarado no Prisma; `numero`
+  é nulo só nas linhas de antes da 1.8 (nenhuma em produção).
+
+## Herança da 1.8 (apontada pelos fiscais)
+
+- [médio] Confirmação de saldo negativo pulável com duas entregas simultâneas (`requisicao.ts:529-531` lê o saldo sem trava): conferir com saldos travados (`FOR UPDATE`) antes de gravar.
+- [baixo] `fichaQuantidade` forjado acima de INT4 dá 500 (`requisicao.ts:356-357`): limitar a 10.000.000 como `listaDaFicha`.
+- [baixo] Teste com banco instável ("cancelar" e "atrasada" falharam 1 vez em 3): estabilizar.
+- UX: rodapé do card do quadro com tempo no processo ("há 3 h") além da hora; print do saldo insuficiente com confirmação; "Pedida"/"Entregue" no histórico; nome do insumo inteiro no seletor do celular; conferir sinal de "Requisitado a mais".
+- Sino sem requisições pendentes; "Minhas requisições" depende de ligar `Colaborador` à pessoa; lançar perda à mão sem tela; divergências para milhares de insumos precisam ir para SQL.

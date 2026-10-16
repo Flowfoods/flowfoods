@@ -42,6 +42,13 @@ const FEITO: Readonly<Record<string, string>> = {
   'fechamento-ja': 'O fechamento deste período já estava começado: continue de onde parou.',
   'periodo-fechado': 'Período fechado: os ajustes entraram no livro e o estoque final ficou fotografado.',
   regras: 'Regras da contagem salvas. Valem a partir de agora.',
+  // 1.8
+  pedida: 'Requisição pedida. O estoque vê no quadro e entrega; a baixa acontece na entrega.',
+  entregue: 'Entregue: a baixa entrou no livro do estoque, com o antes e o depois.',
+  'ja-atendida': 'Esta requisição já tinha sido entregue (por outra pessoa ou outra aba): nada saiu de novo.',
+  devolvida: 'Devolução registrada: a saída foi estornada no livro e saiu de novo só o que ficou.',
+  cancelada: 'Requisição cancelada. Nada saiu do estoque por ela.',
+  'ja-cancelada': 'Esta requisição já estava cancelada.',
 };
 
 export const fraseDoEstoque = (feito: string | undefined) => fraseDe(FEITO, feito);

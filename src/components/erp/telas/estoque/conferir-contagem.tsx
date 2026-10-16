@@ -81,7 +81,7 @@ function Diferenca({ l }: { l: LinhaDaDivergencia }) {
       <span className={`block text-[15px] font-bold ${cor}`}>{quantidadeComSinal(d.diferencaMilesimos, l.item.unidade)}</span>
       <span className={`block text-[12px] ${d.valorCentavos === null ? 'text-atencao' : cor}`}>
         {textoDoValorDaDiferenca(d.valorCentavos)}
-        {d.dentroDaTolerancia ? '' : <span className="text-suave"> · confira</span>}
+        {d.dentroDaTolerancia || d.valorCentavos === null ? '' : <span className="text-suave"> · confira</span>}
       </span>
     </span>
   );
@@ -115,6 +115,7 @@ function Tabela({ linhas, notasBase, legenda }: { linhas: LinhaDaDivergencia[]; 
               <div>
                 <dt className="text-suave">Contado</dt>
                 <dd className="font-semibold text-texto">{l.item.contadoMilesimos === null ? '—' : qtd(l.item.contadoMilesimos, l.item.unidade)}</dd>
+                {l.item.conta && <dd className="text-suave">{l.item.conta}</dd>}
               </div>
               <div>
                 <dt className="text-suave">Fica em</dt>
@@ -179,7 +180,8 @@ function Tabela({ linhas, notasBase, legenda }: { linhas: LinhaDaDivergencia[]; 
                 <td className="px-3 py-2.5 text-right text-suave">{qtd(l.esperadoMilesimos, l.item.unidade)}</td>
                 <td className="px-3 py-2.5 text-right font-semibold text-texto">
                   {l.item.contadoMilesimos === null ? '—' : qtd(l.item.contadoMilesimos, l.item.unidade)}
-                  {l.item.texto.includes('×') && <span className="block truncate text-[12px] font-normal text-suave">{l.item.texto.split(' = ')[0]}</span>}
+                  {/* Herança da 1.7: a conta das embalagens em linha própria, curta e inteira ("1 × 2 kg + 600 g"). */}
+                  {l.item.conta && <span className="block whitespace-normal break-words text-[12px] font-normal leading-snug text-suave">{l.item.conta}</span>}
                 </td>
                 <td className="px-3 py-2.5 text-right">
                   <Diferenca l={l} />

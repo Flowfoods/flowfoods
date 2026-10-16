@@ -52,6 +52,12 @@ export interface ItemNav {
   icone: ChaveIcone;
   /** Uma linha, no hub e na busca. */
   subtitulo: string;
+  /**
+   * 1.8: o item também acende nestes caminhos (fonte de RegExp), com
+   * prioridade sobre o prefixo: o quadro de uma loja
+   * (`/estoque/<loja>/requisicoes`) é "Requisições", não "Estoque por loja".
+   */
+  ativoEm?: string;
 }
 
 export interface GrupoNav {
@@ -84,7 +90,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 1.7';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 1.8';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -106,7 +112,8 @@ export const COR = {
 export type ChaveDeCor = keyof typeof COR;
 
 interface Tela extends ItemNav {
-  permissao: Permissao | null;
+  /** null = livre; lista = qualquer uma delas (1.8: requisições = quem pede OU quem atende). */
+  permissao: Permissao | readonly Permissao[] | null;
 }
 
 interface DefinicaoDeModulo {
@@ -268,7 +275,7 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
     {
       chave: 'estoque',
       nome: 'Estoque',
-      subtitulo: 'Saldo por loja, abertura e contagem',
+      subtitulo: 'Saldo por loja, contagem e requisição',
       icone: 'estoque',
       grupos: [
         {
@@ -281,6 +288,22 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
               icone: 'estoque',
               subtitulo: 'Situação, saldo e valor de cada loja',
               permissao: 'estoque.ver',
+            },
+            {
+              href: `${base}/estoque/requisicoes`,
+              rotulo: 'Requisições',
+              icone: 'estoque',
+              subtitulo: 'O setor pede, o estoque entrega e dá baixa',
+              permissao: ['requisicao.pedir', 'requisicao.atender'],
+              ativoEm: `^${base}/estoque/[^/]+/requisicoes(/|$)`,
+            },
+            {
+              href: `${base}/estoque/divergencias`,
+              rotulo: 'Divergências',
+              icone: 'estoque',
+              subtitulo: 'O que a contagem acusa sem requisição',
+              permissao: 'estoque.ajustar',
+              ativoEm: `^${base}/estoque/[^/]+/divergencias(/|$)`,
             },
           ],
         },
@@ -357,7 +380,7 @@ export function modulosDoParceiro(alcance: Alcance, base = '/erp'): ModuloNav[] 
         rotulo: g.rotulo,
         icone: g.icone,
         itens: g.telas
-          .filter((t) => t.permissao === null || pode(alcance, t.permissao))
+          .filter((t) => t.permissao === null || (typeof t.permissao === 'string' ? pode(alcance, t.permissao) : t.permissao.some((p) => pode(alcance, p))))
           .map(({ permissao: _p, ...item }) => item),
       }))
       .filter((g) => g.itens.length > 0);
@@ -408,6 +431,7 @@ export function itemAtivo(nav: Navegacao, caminho: string): { modulo: ModuloNav;
   for (const modulo of nav.modulos) {
     for (const g of modulo.grupos) {
       for (const item of g.itens) {
+        if (item.ativoEm && new RegExp(item.ativoEm).test(caminho)) return { modulo, item };
         const casa = caminho === item.href || caminho.startsWith(`${item.href}/`);
         if (casa && (!melhor || item.href.length > melhor.item.href.length)) melhor = { modulo, item };
       }

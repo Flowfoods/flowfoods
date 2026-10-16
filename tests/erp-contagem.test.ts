@@ -226,3 +226,11 @@ describe('textos do período', () => {
     expect(coberturaDe('15/10 a 14/11')).toBe('Cobertura de 15/10 a 14/11');
   });
 });
+
+describe('herança da 1.7: "sem preço" curto na diferença', () => {
+  it('sem preço não vira "valor pendente (sem preço) · confira"', async () => {
+    const { textoDoValorDaDiferenca } = await import('@/lib/erp/contagem-campos');
+    expect(textoDoValorDaDiferenca(null)).toBe('sem preço');
+    expect(textoDoValorDaDiferenca(-1898)).toMatch(/18,98 a menos/);
+  });
+});
