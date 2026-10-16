@@ -198,7 +198,7 @@ export function TelaDetalheInsumo({
             {i.historico.length === 0 ? (
               <Vazio>Nada registrado ainda.</Vazio>
             ) : (
-              <ListaHistorico linhas={i.historico} compacta doInsumo={i.nome} />
+              <ListaHistorico linhas={i.historico} compacta doCadastro={i.nome} />
             )}
           </Painel>
         </aside>

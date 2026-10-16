@@ -11,6 +11,8 @@ import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
 import { exigirParceiro, recusaDaAcao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { buscarInsumos } from '@/lib/erp/insumos';
+import { buscarFichas } from '@/lib/erp/fichas';
+import { TIPOS_DE_FICHA } from '@/lib/erp/ficha-campos';
 import { sessaoSegura } from '@/lib/erp/sessao-cookie';
 import { UNIDADES } from '@/lib/erp/unidades';
 import { COOKIE_VISAO, escolhaPermitida, valorDoCookieDeVisao, type OpcaoDeVisao } from '@/lib/erp/visao';
@@ -18,15 +20,25 @@ import type { RespostaDaVisao, ResultadoDaBusca } from '@/components/erp/shell/t
 
 export async function acaoBuscarNoParceiro(slug: string, q: string): Promise<ResultadoDaBusca[]> {
   const ctx = await exigirParceiro(String(slug));
-  if (recusaDaAcao(ctx, 'insumos.ver')) return [];
-  const achados = await buscarInsumos(ctx.cliente, String(q ?? ''));
-  return achados.map((i) => ({
-    tipo: 'insumo' as const,
-    rotulo: i.nome,
-    detalhe: `${ctx.parceiro.nome} · ${UNIDADES[i.unidade].nome}`,
-    href: `/rodolfo/erp/${ctx.parceiro.slug}/insumos/${i.id}`,
-    desativado: !i.ativo,
-  }));
+  const termo = String(q ?? '');
+  const insumos = recusaDaAcao(ctx, 'insumos.ver') ? [] : await buscarInsumos(ctx.cliente, termo);
+  const fichas = recusaDaAcao(ctx, 'fichas.ver') ? [] : await buscarFichas(ctx.cliente, termo);
+  return [
+    ...insumos.map((i) => ({
+      tipo: 'insumo' as const,
+      rotulo: i.nome,
+      detalhe: `${ctx.parceiro.nome} · ${UNIDADES[i.unidade].nome}`,
+      href: `/rodolfo/erp/${ctx.parceiro.slug}/insumos/${i.id}`,
+      desativado: !i.ativo,
+    })),
+    ...fichas.map((f) => ({
+      tipo: 'ficha' as const,
+      rotulo: f.nome,
+      detalhe: `${ctx.parceiro.nome} · ${TIPOS_DE_FICHA[f.tipo]}`,
+      href: `/rodolfo/erp/${ctx.parceiro.slug}/fichas/${f.id}`,
+      desativado: !f.ativa,
+    })),
+  ];
 }
 
 export async function acaoVisaoDoParceiro(

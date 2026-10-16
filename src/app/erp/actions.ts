@@ -22,6 +22,8 @@ import {
   removerRosto,
 } from '@/lib/erp/credenciais';
 import { buscarInsumos } from '@/lib/erp/insumos';
+import { buscarFichas } from '@/lib/erp/fichas';
+import { TIPOS_DE_FICHA } from '@/lib/erp/ficha-campos';
 import type { RegistrationResponseJSON } from '@/lib/erp/rosto';
 import { aparelhoAtual } from '@/lib/erp/sessao';
 import type { RespostaDaVisao, ResultadoDaBusca } from '@/components/erp/shell/tipos';
@@ -79,20 +81,30 @@ export async function acaoRemoverRosto(passkeyId: string) {
 // ------------------------------------------------------------ shell (1.1)
 
 /**
- * Busca do ⌘K: insumos do parceiro DA SESSÃO. Confere "ver insumos" aqui —
- * quem não pode recebe lista vazia, mesmo chamando a action direto.
+ * Busca do ⌘K: insumos e fichas do parceiro DA SESSÃO. Confere "ver insumos" e
+ * "ver fichas" aqui — quem não pode recebe lista vazia, mesmo chamando a action direto.
  */
 export async function acaoBuscarNoErp(q: string): Promise<ResultadoDaBusca[]> {
   const ctx = await exigirParceiroDaSessao();
-  if (recusaDaAcao(ctx, 'insumos.ver')) return [];
-  const achados = await buscarInsumos(ctx.cliente, String(q ?? ''));
-  return achados.map((i) => ({
-    tipo: 'insumo' as const,
-    rotulo: i.nome,
-    detalhe: `Insumo · ${UNIDADES[i.unidade].nome}`,
-    href: `/erp/insumos/${i.id}`,
-    desativado: !i.ativo,
-  }));
+  const termo = String(q ?? '');
+  const insumos = recusaDaAcao(ctx, 'insumos.ver') ? [] : await buscarInsumos(ctx.cliente, termo);
+  const fichas = recusaDaAcao(ctx, 'fichas.ver') ? [] : await buscarFichas(ctx.cliente, termo);
+  return [
+    ...insumos.map((i) => ({
+      tipo: 'insumo' as const,
+      rotulo: i.nome,
+      detalhe: `Insumo · ${UNIDADES[i.unidade].nome}`,
+      href: `/erp/insumos/${i.id}`,
+      desativado: !i.ativo,
+    })),
+    ...fichas.map((f) => ({
+      tipo: 'ficha' as const,
+      rotulo: f.nome,
+      detalhe: `Ficha técnica · ${TIPOS_DE_FICHA[f.tipo]}`,
+      href: `/erp/fichas/${f.id}`,
+      desativado: !f.ativa,
+    })),
+  ];
 }
 
 /**

@@ -90,16 +90,16 @@ async function planejar(tx: ClienteDoParceiro, texto: string, travar: boolean): 
   const atuais = new Map((await lerAtuais(tx, leitura.fichas.map((f) => f.nome))).map((a) => [a.nome, a]));
 
   const casadas = leitura.fichas.map((f) => ({ f, ...casarComInsumos(f, porNome) }));
-  let insumos: Map<string, InsumoDaFicha> = new Map(todos.map((i) => [i.id, i]));
+  let doCadastro: Map<string, InsumoDaFicha> = new Map(todos.map((i) => [i.id, i]));
   if (travar) {
     const ids = casadas.flatMap((c) => [
       ...c.entrada.itens.map((i) => i.insumoId),
       ...(atuais.get(c.f.nome)?.itens.map((i) => i.insumoId ?? '') ?? []),
     ]);
-    insumos = new Map([...insumos, ...(await insumosTravados(tx, ids))]);
+    doCadastro = new Map([...doCadastro, ...(await insumosTravados(tx, ids))]);
   }
 
-  const planos: Plano[] = casadas.map(({ f, entrada, linhaDoItem, faltam, erros }) => planejarUma(f, entrada, linhaDoItem, faltam, erros, atuais.get(f.nome), insumos));
+  const planos: Plano[] = casadas.map(({ f, entrada, linhaDoItem, faltam, erros }) => planejarUma(f, entrada, linhaDoItem, faltam, erros, atuais.get(f.nome), doCadastro));
   const contagem: Record<SituacaoNaPrevia, number> = { nova: 0, muda: 0, igual: 0, erro: 0 };
   for (const p of planos) contagem[p.previa.situacao]++;
   return { planos, previa: { fichas: planos.map((p) => p.previa), erros: leitura.erros, linhasLidas: leitura.linhasLidas, contagem } };
@@ -112,13 +112,13 @@ function planejarUma(
   faltam: string[],
   errosDoCasamento: ErroDeLinha[],
   atual: Atual | undefined,
-  insumos: ReadonlyMap<string, InsumoDaFicha>,
+  doCadastro: ReadonlyMap<string, InsumoDaFicha>,
 ): Plano {
   const base = { nome: f.nome, linhas: intervalo(f.linhas), mudancas: [], itens: f.itens.length, rende: null, custo: null, incompleto: false, faltam };
   const erros: ErroDeLinha[] = [...f.erros, ...errosDoCasamento];
   if (atual && !atual.ativa) erros.push({ linha: f.primeiraLinha, mensagem: `A ficha “${f.nome}” está desativada: reative antes de importar por cima.` });
   const jaNaFicha = new Set((atual?.itens ?? []).map((i) => i.insumoId).filter((x): x is string => !!x));
-  const lido = lerFormFicha(entrada, insumos, jaNaFicha);
+  const lido = lerFormFicha(entrada, doCadastro, jaNaFicha);
   if (!lido.ok) {
     for (const [chave, mensagem] of Object.entries(lido.erros)) {
       const m = /^item-(\d+)$/.exec(chave);
@@ -139,7 +139,7 @@ function planejarUma(
   };
   const custo = custoDaFicha(
     dados.itens.map((i) => {
-      const ins = insumos.get(i.insumoId)!;
+      const ins = doCadastro.get(i.insumoId)!;
       return { nome: ins.nome, quantidadeMilesimos: i.quantidadeMilesimos, fatorCorrecaoMilesimos: 1000, custo: custoDoInsumo(ins) };
     }),
     dados.rendimentoMilesimos,
@@ -154,8 +154,8 @@ function planejarUma(
   };
   if (!atual) return { previa: { ...comum, situacao: 'nova' }, dados };
   const mudanca = diferenca(
-    retratoDaFicha(dadosGravados(atual), insumos, atual.fotoArquivo),
-    retratoDaFicha(dados, insumos, atual.fotoArquivo),
+    retratoDaFicha(dadosGravados(atual), doCadastro, atual.fotoArquivo),
+    retratoDaFicha(dados, doCadastro, atual.fotoArquivo),
   );
   if (!mudanca) return { previa: { ...comum, situacao: 'igual' }, dados, atual };
   return { previa: { ...comum, situacao: 'muda', mudancas: mudanca.campos.map((c) => PALAVRA[c] ?? c) }, dados, atual };
@@ -193,14 +193,14 @@ export async function importarFichas(cliente: ClienteDoParceiro, texto: string, 
           });
         }
         for (const p of boas) {
-          const insumos = await insumosTravados(tx, p.dados!.itens.map((i) => i.insumoId).concat(p.atual?.itens.map((i) => i.insumoId ?? '') ?? []));
+          const doCadastro = await insumosTravados(tx, p.dados!.itens.map((i) => i.insumoId).concat(p.atual?.itens.map((i) => i.insumoId ?? '') ?? []));
           await gravarFicha(tx, {
             atual: p.atual ?? null,
             dados: p.dados!,
-            insumos,
+            doCadastro,
             foto: 'manter',
             origem: 'IMPORTACAO',
-            antes: p.atual ? retratoDaFicha(dadosGravados(p.atual), insumos, p.atual.fotoArquivo) : undefined,
+            antes: p.atual ? retratoDaFicha(dadosGravados(p.atual), doCadastro, p.atual.fotoArquivo) : undefined,
             motivo: 'Importada por planilha',
             autorNome,
           });

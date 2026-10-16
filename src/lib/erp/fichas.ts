@@ -121,7 +121,7 @@ export interface Gravacao {
   /** Ficha nova (null) ou a versão lida da existente. */
   atual: { id: string; atualizadoEm: Date; fotoArquivo: string | null } | null;
   dados: DadosFicha;
-  insumos: ReadonlyMap<string, InsumoDaFicha>;
+  doCadastro: ReadonlyMap<string, InsumoDaFicha>;
   foto: { arquivo: string; mime: string; bytes: number } | null | 'manter';
   origem?: 'MANUAL' | 'IMPORTACAO';
   autorNome: string;
@@ -140,7 +140,7 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
   const fotoArquivo = g.foto === 'manter' ? (g.atual?.fotoArquivo ?? null) : (g.foto?.arquivo ?? null);
   const dadosDaFoto =
     g.foto === 'manter' ? {} : { fotoArquivo: g.foto?.arquivo ?? null, fotoMime: g.foto?.mime ?? null, fotoBytes: g.foto?.bytes ?? null };
-  const depois = retratoDaFicha(d, g.insumos, fotoArquivo);
+  const depois = retratoDaFicha(d, g.doCadastro, fotoArquivo);
 
   if (!g.atual) {
     const nova = await tx.fichaTecnica.create({
@@ -276,14 +276,14 @@ export async function cadastrarFicha(
   try {
     return await comFoto(cliente, foto.tipo === 'remover' ? { tipo: 'manter' } : foto, conferida, (nova) =>
       cliente.transacao(async (tx) => {
-        const insumos = await insumosTravados(tx, entrada.itens.map((i) => i.insumoId));
-        const lido = lerFormFicha(entrada, insumos);
+        const doCadastro = await insumosTravados(tx, entrada.itens.map((i) => i.insumoId));
+        const lido = lerFormFicha(entrada, doCadastro);
         if (!lido.ok) throw new RecusaDaFicha(lido);
         nome = lido.dados.nome;
         const r = await gravarFicha(tx, {
           atual: null,
           dados: lido.dados,
-          insumos,
+          doCadastro,
           foto: nova === 'manter' ? null : nova,
           autorNome,
         });
@@ -325,16 +325,16 @@ export async function editarFicha(
           throw new RecusaDaFicha({ ok: false, erros: { geral: MENSAGEM_CONFLITO_FICHA }, conflito: true });
         }
         const jaNaFicha = new Set(atual.itens.map((i) => i.insumoId).filter((x): x is string => !!x));
-        const insumos = await insumosTravados(tx, [...entrada.itens.map((i) => i.insumoId), ...jaNaFicha]);
-        const lido = lerFormFicha(entrada, insumos, jaNaFicha);
+        const doCadastro = await insumosTravados(tx, [...entrada.itens.map((i) => i.insumoId), ...jaNaFicha]);
+        const lido = lerFormFicha(entrada, doCadastro, jaNaFicha);
         if (!lido.ok) throw new RecusaDaFicha(lido);
         nome = lido.dados.nome;
         const r = await gravarFicha(tx, {
           atual,
           dados: lido.dados,
-          insumos,
+          doCadastro,
           foto: nova,
-          antes: retratoDaFicha(dadosGravados(atual), insumos, atual.fotoArquivo),
+          antes: retratoDaFicha(dadosGravados(atual), doCadastro, atual.fotoArquivo),
           autorNome,
         });
         if (nova !== 'manter' && r.mudou.includes('foto')) fotoAntiga = atual.fotoArquivo;

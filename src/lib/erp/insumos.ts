@@ -32,7 +32,7 @@ import {
 } from './insumo-campos';
 import { compararCustos, custoDaEmbalagem, type CustoExato, type Unidade } from './unidades';
 
-export type ResultadoInsumo =
+export type ResultadoCadastro =
   | { ok: true; id: string; nome: string; mudou: string[] }
   | {
       ok: false;
@@ -50,12 +50,12 @@ export const MENSAGEM_DESATIVADO = 'Insumo desativado: reative antes de editar.'
 
 /** Recusa no meio da transação: desfaz tudo e vira mensagem. */
 class Recusa extends Error {
-  constructor(readonly resultado: Extract<ResultadoInsumo, { ok: false }>) {
+  constructor(readonly resultado: Extract<ResultadoCadastro, { ok: false }>) {
     super('recusa');
   }
 }
 
-async function erroDeNomeRepetido(cliente: ClienteDoParceiro, nome: string): Promise<ResultadoInsumo> {
+async function erroDeNomeRepetido(cliente: ClienteDoParceiro, nome: string): Promise<ResultadoCadastro> {
   const existente = await cliente.insumo.findFirst({ where: { nome }, select: { id: true, ativo: true } });
   if (existente && !existente.ativo) {
     return {
@@ -77,7 +77,7 @@ export async function cadastrarInsumo(
   cliente: ClienteDoParceiro,
   entrada: Record<string, unknown>,
   autorNome = 'Sistema',
-): Promise<ResultadoInsumo> {
+): Promise<ResultadoCadastro> {
   const lido = lerFormInsumo(entrada);
   if (!lido.ok) return lido;
   const d = lido.dados;
@@ -177,7 +177,7 @@ export async function editarInsumo(
   id: string,
   entrada: Record<string, unknown>,
   autorNome = 'Sistema',
-): Promise<ResultadoInsumo> {
+): Promise<ResultadoCadastro> {
   const versao = new Date(typeof entrada.versao === 'string' ? entrada.versao : '');
   if (Number.isNaN(versao.getTime())) return { ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true };
 
@@ -251,7 +251,7 @@ export async function mudarSituacaoInsumo(
   ativo: boolean,
   motivoTexto: unknown,
   autorNome = 'Sistema',
-): Promise<ResultadoInsumo> {
+): Promise<ResultadoCadastro> {
   const motivo = typeof motivoTexto === 'string' ? motivoTexto.trim().replace(/\s+/g, ' ').slice(0, 200) || null : null;
   try {
     return await cliente.transacao(async (tx) => {

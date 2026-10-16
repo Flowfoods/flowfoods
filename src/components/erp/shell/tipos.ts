@@ -9,11 +9,11 @@ import type { OpcaoDeVisao } from '@/lib/erp/visao';
 import type { Tema } from '@/lib/erp/tema';
 
 export interface ResultadoDaBusca {
-  tipo: 'tela' | 'parceiro' | 'insumo';
+  tipo: 'tela' | 'parceiro' | 'insumo' | 'ficha';
   rotulo: string;
   detalhe: string;
   href: string;
-  /** Insumo desativado aparece marcado (achar ≠ usar). */
+  /** Insumo ou ficha desativada aparece marcada (achar ≠ usar). */
   desativado?: boolean;
 }
 

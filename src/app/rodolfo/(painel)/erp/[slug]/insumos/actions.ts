@@ -11,7 +11,7 @@
 
 import { prisma } from '@/lib/db';
 import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
-import { cadastrarInsumo, editarInsumo, mudarSituacaoInsumo, type ResultadoInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumo, editarInsumo, mudarSituacaoInsumo, type ResultadoCadastro } from '@/lib/erp/insumos';
 import { cadastrarVariante, editarVariante, mudarSituacaoVariante, type ResultadoVariante } from '@/lib/erp/variantes';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
@@ -24,7 +24,7 @@ async function paraEditar(slug: string) {
 
 type Ctx = Awaited<ReturnType<typeof exigirParceiro>>;
 
-async function auditar(ctx: Ctx, evento: string, r: ResultadoInsumo | ResultadoVariante, extra: Record<string, string> = {}) {
+async function auditar(ctx: Ctx, evento: string, r: ResultadoCadastro | ResultadoVariante, extra: Record<string, string> = {}) {
   if (!r.ok) return;
   await prisma.auditLog.create({
     data: { userId: ctx.sessao.userId, evento, dados: { parceiroId: ctx.parceiro.id, id: r.id, ...extra } },

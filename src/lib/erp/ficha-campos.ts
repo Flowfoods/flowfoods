@@ -76,7 +76,7 @@ export interface ItemDigitado {
   unidade: string;
 }
 
-/** O que chega do formulário (ou da planilha, já casada com os insumos). */
+/** O que chega do formulário (ou da planilha, já casada com os doCadastro). */
 export interface EntradaDaFicha {
   nome?: unknown;
   tipo?: unknown;
@@ -127,7 +127,7 @@ export const chaveDoItem = (i: number) => `item-${i}`;
  */
 export function lerFormFicha(
   entrada: EntradaDaFicha,
-  insumos: ReadonlyMap<string, InsumoDaFicha>,
+  doCadastro: ReadonlyMap<string, InsumoDaFicha>,
   jaNaFicha: ReadonlySet<string> = new Set(),
 ): Leitura<DadosFicha> {
   const r = formFicha.safeParse({ nome: entrada.nome, tipo: entrada.tipo || 'PRATO' });
@@ -169,7 +169,7 @@ export function lerFormFicha(
   if (entrada.itens.length > LIMITES_DA_FICHA.itens) erros.itens = `Até ${LIMITES_DA_FICHA.itens} insumos por ficha.`;
   entrada.itens.slice(0, LIMITES_DA_FICHA.itens).forEach((item, i) => {
     const chave = chaveDoItem(i);
-    const insumo = item.insumoId ? insumos.get(item.insumoId) : undefined;
+    const insumo = item.insumoId ? doCadastro.get(item.insumoId) : undefined;
     if (!item.insumoId) return void (erros[chave] = 'Escolha o insumo.');
     if (!insumo) return void (erros[chave] = 'Insumo não encontrado neste cadastro.');
     if (!insumo.ativo && !jaNaFicha.has(insumo.id)) {
@@ -312,11 +312,11 @@ export function itensEmTexto(itens: readonly { nome: string; unidade: Unidade; q
  * O que vai para o histórico de uma ficha: os campos que a pessoa mexe, em
  * texto legível (rendimento "4 porções", itens numa frase). A foto entra pelo
  * nome do arquivo (trocar a foto é mudança; a tela diz "foto nova"). O custo
- * não entra: é derivado dos insumos, que têm o próprio histórico de preço.
+ * não entra: é derivado dos doCadastro, que têm o próprio histórico de preço.
  */
 export function retratoDaFicha(
   d: DadosFicha,
-  insumos: ReadonlyMap<string, { nome: string; unidade: Unidade }>,
+  doCadastro: ReadonlyMap<string, { nome: string; unidade: Unidade }>,
   fotoArquivo: string | null,
 ): Retrato {
   return {
@@ -328,7 +328,7 @@ export function retratoDaFicha(
     foto: fotoArquivo,
     itens: itensEmTexto(
       d.itens.map((i) => {
-        const ins = insumos.get(i.insumoId);
+        const ins = doCadastro.get(i.insumoId);
         return { nome: ins?.nome ?? '?', unidade: ins?.unidade ?? 'UN', quantidadeMilesimos: i.quantidadeMilesimos };
       }),
     ),

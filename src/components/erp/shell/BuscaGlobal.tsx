@@ -19,6 +19,7 @@ const ROTULO_DO_TIPO: Record<ResultadoDaBusca['tipo'], string> = {
   tela: 'Tela',
   parceiro: 'Parceiro',
   insumo: 'Insumo',
+  ficha: 'Ficha',
 };
 
 function normalizar(s: string) {
@@ -146,8 +147,8 @@ export function BuscaGlobal({
             aria-expanded="true"
             aria-controls={idLista}
             aria-activedescendant={resultados[ativo] ? `${idLista}-${ativo}` : undefined}
-            aria-label="Buscar telas, parceiros e insumos"
-            placeholder="Telas, parceiros e insumos"
+            aria-label="Buscar telas, parceiros, insumos e fichas"
+            placeholder="Telas, parceiros, insumos e fichas"
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') {
                 e.preventDefault();
@@ -203,7 +204,7 @@ export function BuscaGlobal({
         </ul>
         <p aria-live="polite" className="border-t border-linha px-4 py-2.5 text-[12px] text-suave">
           {buscando
-            ? 'Procurando insumos…'
+            ? 'Procurando insumos e fichas…'
             : resultados.length === 0
               ? `Nada encontrado para “${q.trim()}”.`
               : q.trim().length === 1 && buscarNoServidor

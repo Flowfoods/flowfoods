@@ -19,6 +19,7 @@ export type ChaveIcone =
   | 'inicio'
   | 'insumo'
   | 'novo'
+  | 'importar'
   | 'fichas'
   | 'compras'
   | 'estoque'
@@ -82,7 +83,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 1.1';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 1.2';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -188,6 +189,41 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
       ],
     },
     {
+      chave: 'fichas',
+      nome: 'Ficha técnica',
+      subtitulo: 'Receita com foto, modo de preparo e custo',
+      icone: 'fichas',
+      grupos: [
+        {
+          rotulo: 'Receitas',
+          icone: 'fichas',
+          telas: [
+            {
+              href: `${base}/fichas`,
+              rotulo: 'Fichas técnicas',
+              icone: 'fichas',
+              subtitulo: 'Foto, insumos e custo por porção',
+              permissao: 'fichas.ver',
+            },
+            {
+              href: `${base}/fichas/nova`,
+              rotulo: 'Nova ficha',
+              icone: 'novo',
+              subtitulo: 'Montar a receita do zero',
+              permissao: 'fichas.editar',
+            },
+            {
+              href: `${base}/fichas/importar`,
+              rotulo: 'Importar planilha',
+              icone: 'importar',
+              subtitulo: 'Várias fichas de uma vez, com prévia',
+              permissao: 'fichas.editar',
+            },
+          ],
+        },
+      ],
+    },
+    {
       chave: 'rede',
       nome: 'Rede e equipe',
       subtitulo: 'Lojas, marcas e pessoas',
@@ -214,14 +250,6 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
 
 /** Do plano (Notion "FlowFoods Barney — ERP"), ainda sem tela. */
 export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [
-  {
-    chave: 'fichas',
-    nome: 'Ficha técnica',
-    subtitulo: 'Receita com custo calculado',
-    icone: 'fichas',
-    fase: '1.2',
-    ver: ['fichas.ver'],
-  },
   {
     chave: 'compras',
     nome: 'Compras',

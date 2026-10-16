@@ -7,10 +7,10 @@
 
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { listarInsumos } from '@/lib/erp/insumos';
-import { lerFiltros } from '@/lib/erp/insumo-campos';
+import { lerFiltros, temFiltro } from '@/lib/erp/insumo-campos';
 import { FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
 import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
-import { subtituloDosInsumos } from '@/components/erp/telas/insumos/subtitulo';
+import { INSUMOS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtitulo';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ export default async function ErpInsumosPage({ searchParams }: { searchParams: R
   return (
     <div className="space-y-6">
       <CabecalhoDaLista
-        subtitulo={subtituloDosInsumos(visao, pagina.total, filtros)}
+        subtitulo={subtituloDaLista(visao, pagina.total, INSUMOS, temFiltro(filtros))}
         novoHref={cadastra ? `${BASE}/novo` : undefined}
         bloqueio={ctx.bloqueio}
       >
