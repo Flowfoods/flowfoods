@@ -44,6 +44,7 @@ import { cadastrarFicha, editarFicha, listarFichas, mudarSituacaoFicha, obterFic
 import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { listarHistorico } from '@/lib/erp/historico';
 import { resolverAlcance } from '@/lib/erp/permissoes';
+import type { ItemDigitado } from '@/lib/erp/ficha-campos';
 import { centavosDaFracao, type Fracao } from '@/lib/erp/unidades';
 import * as daSessao from '@/app/erp/fichas/actions';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
@@ -97,7 +98,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     ],
     ...extra,
   });
-  const preparo = (nome: string, itens: unknown[] = [{ insumoId: ids.cebola, quantidade: '100', unidade: 'g' }]) => ({
+  const preparo = (nome: string, itens: ItemDigitado[] = [{ insumoId: ids.cebola, quantidade: '100', unidade: 'g' }]) => ({
     nome,
     tipo: 'PRE_PREPARO',
     rendimento: '1',

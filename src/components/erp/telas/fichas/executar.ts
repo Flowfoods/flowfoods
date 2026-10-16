@@ -6,7 +6,7 @@
  */
 
 import { revalidatePath } from 'next/cache';
-import type { EntradaDaFicha } from '@/lib/erp/ficha-campos';
+import type { EntradaDaFicha, ItemDigitado } from '@/lib/erp/ficha-campos';
 import type { MudancaDeFoto } from '@/lib/erp/fichas';
 import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { decodificarPlanilha, LIMITE_DA_PLANILHA } from '@/lib/erp/ficha-planilha';
@@ -28,7 +28,7 @@ export async function lerEnvioDaFicha(
   const unidades = form.getAll('item_unidade').map(textoDe);
   const fatores = form.getAll('item_fator').map(textoDe);
   const itens = escolhas
-    .map((escolha, i) => ({
+    .map((escolha, i): ItemDigitado => ({
       // O seletor manda o id do insumo ou "ficha:<id>" do pré-preparo (1.3).
       ...(escolha.startsWith(PREFIXO_DO_PREPARO) ? { subfichaId: escolha.slice(PREFIXO_DO_PREPARO.length) } : { insumoId: escolha }),
       quantidade: quantidades[i] ?? '',
