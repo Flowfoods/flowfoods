@@ -31,14 +31,17 @@ ALTER TABLE "FichaTecnica" ADD CONSTRAINT "FichaTecnica_validades_faixa" CHECK (
   ("validadeCongeladoMin" IS NULL OR "validadeCongeladoMin" BETWEEN 1 AND 1051200)
 );
 
--- Sem principal, nenhuma validade; com principal, ela tem validade.
-ALTER TABLE "FichaTecnica" ADD CONSTRAINT "FichaTecnica_validade_principal" CHECK (
+-- Sem principal, nenhuma validade; com principal, ela tem validade. O COALESCE
+-- importa: com "conservacao" nula, `= 'SECO'` dá NULL, e um CHECK que dá NULL
+-- PASSA — sem ele, principal nula com validade preenchida entraria.
+ALTER TABLE "FichaTecnica" ADD CONSTRAINT "FichaTecnica_validade_principal" CHECK (COALESCE(
   ("conservacao" IS NULL AND num_nonnulls("validadeSecoMin", "validadePistaFriaMin", "validadeRefrigeradoMin", "validadeCongeladoMin") = 0)
   OR ("conservacao" = 'SECO' AND "validadeSecoMin" IS NOT NULL)
   OR ("conservacao" = 'PISTA_FRIA' AND "validadePistaFriaMin" IS NOT NULL)
   OR ("conservacao" = 'REFRIGERADO' AND "validadeRefrigeradoMin" IS NOT NULL)
-  OR ("conservacao" = 'CONGELADO' AND "validadeCongeladoMin" IS NOT NULL)
-);
+  OR ("conservacao" = 'CONGELADO' AND "validadeCongeladoMin" IS NOT NULL),
+  false
+));
 
 -- Insumo: a mesma faixa e, havendo alguma validade, a principal tem a sua.
 ALTER TABLE "Insumo" ADD CONSTRAINT "Insumo_validades_faixa" CHECK (
@@ -48,10 +51,11 @@ ALTER TABLE "Insumo" ADD CONSTRAINT "Insumo_validades_faixa" CHECK (
   ("validadeCongeladoMin" IS NULL OR "validadeCongeladoMin" <= 1051200)
 ) NOT VALID;
 
-ALTER TABLE "Insumo" ADD CONSTRAINT "Insumo_validade_principal" CHECK (
+ALTER TABLE "Insumo" ADD CONSTRAINT "Insumo_validade_principal" CHECK (COALESCE(
   num_nonnulls("validadeSecoMin", "validadePistaFriaMin", "validadeRefrigeradoMin", "validadeCongeladoMin") = 0
   OR ("conservacao" = 'SECO' AND "validadeSecoMin" IS NOT NULL)
   OR ("conservacao" = 'PISTA_FRIA' AND "validadePistaFriaMin" IS NOT NULL)
   OR ("conservacao" = 'REFRIGERADO' AND "validadeRefrigeradoMin" IS NOT NULL)
-  OR ("conservacao" = 'CONGELADO' AND "validadeCongeladoMin" IS NOT NULL)
-) NOT VALID;
+  OR ("conservacao" = 'CONGELADO' AND "validadeCongeladoMin" IS NOT NULL),
+  false
+)) NOT VALID;
