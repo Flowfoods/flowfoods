@@ -216,7 +216,10 @@ async function naEquipe<T>(
   db: PrismaClient,
   parceiroId: string,
   quem: Ator,
-  fn: (tx: Prisma.TransactionClient, ator: Ator) => Promise<{ resultado: T; historico: RegistroDeHistorico[] }>,
+  fn: (
+    tx: Prisma.TransactionClient,
+    ator: Ator,
+  ) => Promise<{ resultado: T; historico: RegistroDeHistorico[]; outrosParceiros?: HistoricoEmOutroParceiro[] }>,
 ): Promise<T | { ok: false; erros: Erros }> {
   const papel = await papelDisponivel(db);
   try {
@@ -228,6 +231,8 @@ async function naEquipe<T>(
         const r = await fn(tx, ator);
         if (deixaSemAdministrador(antes, await alcancesAtivos(tx, parceiroId))) throw new Desfazer({ geral: ERRO_ULTIMO_ADMIN });
         await fecharComHistorico(tx, parceiroId, r.historico, papel);
+        // Depois do primeiro, a transação já está no tenant: só mais histórico.
+        for (const h of r.outrosParceiros ?? []) await fecharComHistorico(tx, h.parceiroId, h.registros, papel);
         return r.resultado;
       },
       { maxWait: 10_000, timeout: 15_000 },
@@ -496,6 +501,79 @@ async function novoConvite(tx: Prisma.TransactionClient, usuarioId: string, parc
   return { token, expiraEm };
 }
 
+// ============================================== revogar os meios de entrar
+
+/** Histórico de uma mudança da pessoa no tenant de OUTRO parceiro dela. */
+interface HistoricoEmOutroParceiro {
+  parceiroId: string;
+  registros: RegistroDeHistorico[];
+}
+
+/**
+ * Por que os meios de entrar da pessoa caem:
+ *   - SENHA_PELO_LINK: ela definiu/redefiniu a senha pelo link (quem chama já
+ *     gravou a senha nova). Recuperar a conta tira tudo o que alguém pode ter
+ *     pendurado nela com a senha antiga (Fiscal QA, 0.4).
+ *   - SENHA_DE_OUTRO_PARCEIRO: ganhou vínculo em outro parceiro e a senha
+ *     tinha sido criada por link de administrador de parceiro: a senha também
+ *     sai (decisão 41, Guardião voltas 1 e 2).
+ */
+export type MotivoDaRevogacao = 'SENHA_PELO_LINK' | 'SENHA_DE_OUTRO_PARCEIRO';
+
+export interface Revogacao {
+  rostos: number;
+  sessoes: number;
+  links: number;
+  /** Todos os vínculos da pessoa (ativos ou não), para o histórico de cada parceiro. */
+  vinculos: { acessoId: string; parceiroId: string }[];
+}
+
+/**
+ * O ÚNICO lugar que revoga os meios de entrar de uma pessoa. Inventário das
+ * credenciais dela, todas tratadas aqui, na transação de quem chama:
+ *   - senha: apagada em SENHA_DE_OUTRO_PARCEIRO (em SENHA_PELO_LINK é a nova);
+ *   - sessões: todas encerradas, em qualquer parceiro;
+ *   - links pendentes: revogados (o link em uso já foi marcado como usado);
+ *   - rostos (passkeys) e desafios WebAuthn pendentes: apagados;
+ *   - `versaoCredencial` +1: login, entrada pelo rosto e ativação de rosto que
+ *     já tinham lido a versão (antes do bcrypt/da assinatura) não gravam sessão
+ *     nem aparelho depois daqui, e sessão de versão velha não vale
+ *     (`abrirSessao`, `concluirRegistroDeRosto`, `validarSessao`).
+ * Tentativas de entrada não deixam entrar (ficam). Roda sob a trava da pessoa
+ * (`erp-usuario:<id>`), a mesma de `abrirSessao` e `concluirRegistroDeRosto`:
+ * nada que confere a credencial passa no meio.
+ */
+async function revogarMeiosDeEntrada(
+  tx: Prisma.TransactionClient,
+  usuarioId: string,
+  motivo: MotivoDaRevogacao,
+  agora: Date,
+): Promise<Revogacao> {
+  await travar(tx, `erp-usuario:${usuarioId}`);
+  const sessoes = (await tx.sessaoErp.updateMany({ where: { usuarioId, encerradaEm: null }, data: { encerradaEm: agora } })).count;
+  const links = (
+    await tx.conviteAcesso.updateMany({ where: { usuarioId, usadoEm: null, revogadoEm: null }, data: { revogadoEm: agora } })
+  ).count;
+  const rostos = (await tx.passkeyErp.deleteMany({ where: { usuarioId } })).count;
+  await tx.desafioWebauthn.deleteMany({ where: { usuarioId } });
+  await tx.usuarioErp.update({
+    where: { id: usuarioId },
+    data: {
+      versaoCredencial: { increment: 1 },
+      ...(rostos > 0 ? { rostosRemovidosEm: agora } : {}),
+      ...(motivo === 'SENHA_DE_OUTRO_PARCEIRO' ? { senhaHash: null, senhaDefinidaEm: null, senhaPorLinkDoParceiroId: null } : {}),
+    },
+  });
+  const vinculos = await tx.acessoParceiro.findMany({ where: { usuarioId }, select: { id: true, parceiroId: true }, orderBy: { criadoEm: 'asc' } });
+  return { rostos, sessoes, links, vinculos: vinculos.map((v) => ({ acessoId: v.id, parceiroId: v.parceiroId })) };
+}
+
+/** "aparelho" no histórico: quantos rostos saíram. */
+export function textoDosRostosRemovidos(n: number): string {
+  if (n === 0) return 'nenhum rosto ativado';
+  return n === 1 ? '1 aparelho com rosto removido' : `${n} aparelhos com rosto removidos`;
+}
+
 /**
  * A senha é da PESSOA, não do vínculo: vale em todos os parceiros dela. Por
  * isso link de senha (primeiro acesso ou nova) só sai do nível 1 ou de quem
@@ -559,30 +637,21 @@ export async function criarAcesso(
       // Vínculo novo em mais um parceiro: link pendente (de qualquer parceiro)
       // morre; e senha criada por link de administrador de OUTRO parceiro não
       // atravessa — apaga e a pessoa cria outra pelo link do nível 1 (decisão 41).
-      let senhaApagada = false;
-      let rostosApagados = 0;
+      let revogacao: Revogacao | null = null;
       if (!novo) {
         await tx.conviteAcesso.updateMany({
           where: { usuarioId: usuario.id, usadoEm: null, revogadoEm: null },
           data: { revogadoEm: agora },
         });
         if (usuario.senhaHash && usuario.senhaPorLinkDoParceiroId && usuario.senhaPorLinkDoParceiroId !== parceiroId) {
-          usuario = await tx.usuarioErp.update({
-            where: { id: usuario.id },
-            data: { senhaHash: null, senhaDefinidaEm: null, senhaPorLinkDoParceiroId: null },
-          });
-          // TUDO que deixa entrar sem a senha nova sai junto (revisão do
-          // Guardião, volta 2): quem conhecia a senha do link pode ter ativado
-          // o rosto. Inventário das credenciais da pessoa: senha (acima),
-          // sessões (encerradas), links pendentes (revogados logo acima, para
-          // qualquer parceiro), rostos/passkeys e desafios WebAuthn pendentes
-          // (apagados aqui). Tentativas de entrada não deixam entrar.
-          await tx.sessaoErp.updateMany({ where: { usuarioId: usuario.id, encerradaEm: null }, data: { encerradaEm: agora } });
-          rostosApagados = (await tx.passkeyErp.deleteMany({ where: { usuarioId: usuario.id } })).count;
-          await tx.desafioWebauthn.deleteMany({ where: { usuarioId: usuario.id } });
-          senhaApagada = true;
+          // TUDO que deixa entrar sem a senha nova sai junto (Guardião, voltas
+          // 2 e 3): quem conhecia a senha do link pode ter ativado o rosto ou
+          // ter um login em voo. Inventário em `revogarMeiosDeEntrada`.
+          revogacao = await revogarMeiosDeEntrada(tx, usuario.id, 'SENHA_DE_OUTRO_PARCEIRO', agora);
+          usuario = await tx.usuarioErp.findUniqueOrThrow({ where: { id: usuario.id } });
         }
       }
+      const senhaApagada = revogacao !== null;
 
       const historico: RegistroDeHistorico[] = [
         {
@@ -606,11 +675,30 @@ export async function criarAcesso(
           depois: {
             nome: usuario.nome,
             senha: 'criada por link de outro parceiro: precisa criar de novo',
-            aparelho: rostosApagados === 0 ? 'nenhum rosto ativado' : `${rostosApagados} com rosto removido${rostosApagados > 1 ? 's' : ''}`,
+            aparelho: textoDosRostosRemovidos(revogacao!.rostos),
           },
           autorNome: ator.nome,
         });
       }
+      // A senha e os rostos valiam nos outros parceiros dela também: fica lá.
+      const outrosParceiros: HistoricoEmOutroParceiro[] = (revogacao?.vinculos ?? [])
+        .filter((v) => v.parceiroId !== parceiroId)
+        .map((v) => ({
+          parceiroId: v.parceiroId,
+          registros: [
+            {
+              entidade: ENTIDADE,
+              entidadeId: v.acessoId,
+              acao: 'PEDIU_SENHA_NOVA',
+              depois: {
+                nome: usuario!.nome,
+                senha: 'apagada ao ganhar acesso a outro parceiro: precisa criar de novo',
+                aparelho: textoDosRostosRemovidos(revogacao!.rostos),
+              },
+              autorNome: ator.nome,
+            },
+          ],
+        }));
       let link: { token: string; expiraEm: Date } | null = null;
       if (!usuario.senhaHash && (novo || (await podeGerarLink(tx, ator, usuario.id, parceiroId)))) {
         link = await novoConvite(tx, usuario.id, parceiroId, agora, nivel1);
@@ -627,7 +715,7 @@ export async function criarAcesso(
         : link
           ? `Acesso de ${usuario.nome} criado. Copie o link e mande para a pessoa.`
           : `Atenção: esse e-mail já tem senha e entra em outro parceiro. ${usuario.nome} agora vê este também, com a mesma senha.`;
-      return { resultado: { ok: true, link, mensagem }, historico };
+      return { resultado: { ok: true, link, mensagem }, historico, outrosParceiros };
     });
   } catch (e) {
     if (ehErroDeUnicidade(e)) return { ok: false, erros: { email: 'Esse e-mail acabou de ser cadastrado. Recarregue.' } };
@@ -966,14 +1054,18 @@ export async function consultarLink(token: unknown, o?: Opcoes): Promise<EstadoD
 /**
  * A pessoa define a senha pelo link. O banco segura o uso único: a marcação
  * de "usado" é condicional (não usado, não revogado, não vencido) e só uma
- * transação consegue. Trocar a senha derruba as sessões abertas da pessoa.
+ * transação consegue. Definir ou redefinir a senha pelo link REVOGA todos os
+ * outros meios de entrar da pessoa (`revogarMeiosDeEntrada`): sessões, links
+ * pendentes, rostos e desafios de rosto, em todos os parceiros dela. Sem isso,
+ * o rosto que um administrador de A ativou com a senha que ele definiu
+ * sobreviveria à senha refeita pelo nível 1 e entraria em B (Fiscal QA, 0.4).
  */
 export async function definirSenhaPeloLink(
   token: unknown,
   senha: string,
   confirmacao: string,
   o?: Opcoes,
-): Promise<{ ok: true; email: string } | { ok: false; erro: string; linkInvalido?: boolean }> {
+): Promise<{ ok: true; email: string; rostosRemovidos: number } | { ok: false; erro: string; linkInvalido?: boolean }> {
   const { db, agora } = abrir(o);
   const antes = await conviteValido(db, token, agora);
   if (!antes) return { ok: false, erro: 'Este link não vale mais. Peça um novo à FlowFoods.', linkInvalido: true };
@@ -1005,22 +1097,25 @@ export async function definirSenhaPeloLink(
         senhaPorLinkDoParceiroId: antes.convite.doNivel1 ? null : antes.convite.parceiroId,
       },
     });
-    await tx.sessaoErp.updateMany({ where: { usuarioId: u.id, encerradaEm: null }, data: { encerradaEm: agora } });
+    const r = await revogarMeiosDeEntrada(tx, u.id, 'SENHA_PELO_LINK', agora);
+    const acao = antes.convite.usuario.senhaHash ? 'TROCOU_SENHA' : 'DEFINIU_SENHA';
+    const aparelho = r.rostos > 0 ? { aparelho: textoDosRostosRemovidos(r.rostos) } : {};
+    // No parceiro do link e em cada outro parceiro dela (a senha vale em todos).
     await fecharComHistorico(
       tx,
       antes.convite.parceiroId,
-      [
-        {
-          entidade: ENTIDADE,
-          entidadeId: antes.acessoId,
-          acao: antes.convite.usuario.senhaHash ? 'TROCOU_SENHA' : 'DEFINIU_SENHA',
-          depois: { nome: u.nome, senha: 'definida pela pessoa' },
-          autorNome: u.nome,
-        },
-      ],
+      [{ entidade: ENTIDADE, entidadeId: antes.acessoId, acao, depois: { nome: u.nome, senha: 'definida pela pessoa', ...aparelho }, autorNome: u.nome }],
       papel,
     );
-    return { ok: true as const, email: u.email };
+    for (const v of r.vinculos.filter((x) => x.parceiroId !== antes.convite.parceiroId)) {
+      await fecharComHistorico(
+        tx,
+        v.parceiroId,
+        [{ entidade: ENTIDADE, entidadeId: v.acessoId, acao, depois: { nome: u.nome, senha: 'definida pela pessoa por link', ...aparelho }, autorNome: u.nome }],
+        papel,
+      );
+    }
+    return { ok: true as const, email: u.email, rostosRemovidos: r.rostos };
   });
 }
 
@@ -1106,33 +1201,54 @@ async function concluirTentativa(
   });
 }
 
-/** Abre a sessão: parceiro já escolhido se a pessoa só tem um. */
+type SessaoAberta = { ok: true; token: string; expiraEm: Date; escolher: boolean };
+
+/**
+ * Abre a sessão: parceiro já escolhido se a pessoa só tem um. Grava SÓ se a
+ * credencial conferida ainda vale: sob a trava da pessoa (a mesma de
+ * `revogarMeiosDeEntrada`), a `versaoCredencial` precisa ser a lida ANTES do
+ * bcrypt/da assinatura. Um login em voo enquanto a senha é redefinida ou
+ * apagada não cria sessão depois da limpeza (Guardião, volta 3). `naTrava`
+ * roda dentro, antes de gravar (o contador do rosto); devolve o motivo da
+ * recusa ou null.
+ */
 async function abrirSessao(
   db: PrismaClient,
   usuarioId: string,
+  versaoLida: number,
   metodo: 'SENHA' | 'ROSTO',
   ip: string,
   agora: Date,
-): Promise<{ token: string; expiraEm: Date; escolher: boolean } | null> {
-  const ativos = await db.acessoParceiro.findMany({ where: { usuarioId, status: 'ATIVO' }, select: { parceiroId: true } });
-  if (ativos.length === 0) return null;
+  naTrava?: (tx: Prisma.TransactionClient) => Promise<string | null>,
+): Promise<SessaoAberta | { ok: false; motivo: string }> {
   const token = gerarToken();
   const expiraEm = new Date(agora.getTime() + VALIDADE_DA_SESSAO_MS);
-  await db.$transaction([
-    db.sessaoErp.create({
-      data: {
-        tokenHash: hashDoToken(token),
-        usuarioId,
-        parceiroId: ativos.length === 1 ? ativos[0].parceiroId : null,
-        metodo,
-        ip,
-        criadoEm: agora,
-        expiraEm,
-      },
-    }),
-    db.usuarioErp.update({ where: { id: usuarioId }, data: { ultimoLogin: agora } }),
-  ]);
-  return { token, expiraEm, escolher: ativos.length > 1 };
+  return db.$transaction(
+    async (tx) => {
+      await travar(tx, `erp-usuario:${usuarioId}`);
+      const u = await tx.usuarioErp.findUnique({ where: { id: usuarioId }, select: { versaoCredencial: true } });
+      if (!u || u.versaoCredencial !== versaoLida) return { ok: false as const, motivo: 'CREDENCIAL_REVOGADA' };
+      const recusa = naTrava ? await naTrava(tx) : null;
+      if (recusa) return { ok: false as const, motivo: recusa };
+      const ativos = await tx.acessoParceiro.findMany({ where: { usuarioId, status: 'ATIVO' }, select: { parceiroId: true } });
+      if (ativos.length === 0) return { ok: false as const, motivo: 'SEM_ACESSO' };
+      await tx.sessaoErp.create({
+        data: {
+          tokenHash: hashDoToken(token),
+          usuarioId,
+          parceiroId: ativos.length === 1 ? ativos[0].parceiroId : null,
+          metodo,
+          ip,
+          criadoEm: agora,
+          expiraEm,
+          versaoCredencial: versaoLida,
+        },
+      });
+      await tx.usuarioErp.update({ where: { id: usuarioId }, data: { ultimoLogin: agora } });
+      return { ok: true as const, token, expiraEm, escolher: ativos.length > 1 };
+    },
+    { maxWait: 10_000, timeout: 10_000 },
+  );
 }
 
 /**
@@ -1161,13 +1277,14 @@ export async function entrarComSenha(
     return { ok: false, erro: ERRO_DE_ENTRADA, bloqueado: false };
   }
 
-  const sessao = await abrirSessao(db, usuario.id, 'SENHA', entrada.ip, agora);
-  if (!sessao) {
-    await concluirTentativa(db, reserva, { ok: false, motivo: 'SEM_ACESSO', usuarioId: usuario.id });
+  // `usuario.versaoCredencial` foi lida junto com o hash, antes do bcrypt.
+  const sessao = await abrirSessao(db, usuario.id, usuario.versaoCredencial, 'SENHA', entrada.ip, agora);
+  if (!sessao.ok) {
+    await concluirTentativa(db, reserva, { ok: false, motivo: sessao.motivo, usuarioId: usuario.id });
     return { ok: false, erro: ERRO_DE_ENTRADA, bloqueado: false };
   }
   await concluirTentativa(db, reserva, { ok: true, motivo: 'OK', usuarioId: usuario.id });
-  return { ok: true, ...sessao };
+  return { ok: true, token: sessao.token, expiraEm: sessao.expiraEm, escolher: sessao.escolher };
 }
 
 // ====================================================================== rosto
@@ -1284,17 +1401,19 @@ export async function entrarComRosto(
   });
   if (!v.ok) return falha(`ROSTO_INVALIDO: ${v.motivo}`.slice(0, 200), passkey.usuarioId, passkey.usuario.email);
 
-  // Contador condicional ao lido: duas entradas com a mesma assinatura não passam.
-  const { count } = await db.passkeyErp.updateMany({
-    where: { id: passkey.id, contador: passkey.contador },
-    data: { contador: BigInt(v.novoContador), ultimoUsoEm: agora },
+  // Sob a trava da pessoa, com a versão lida junto com o rosto (antes da
+  // assinatura): rosto apagado por uma revogação no meio não abre sessão. E o
+  // contador condicional ao lido: duas entradas com a mesma assinatura não passam.
+  const sessao = await abrirSessao(db, passkey.usuarioId, passkey.usuario.versaoCredencial, 'ROSTO', ip, agora, async (tx) => {
+    const { count } = await tx.passkeyErp.updateMany({
+      where: { id: passkey.id, contador: passkey.contador },
+      data: { contador: BigInt(v.novoContador), ultimoUsoEm: agora },
+    });
+    return count === 0 ? 'ROSTO_CONTADOR' : null;
   });
-  if (count === 0) return falha('ROSTO_CONTADOR', passkey.usuarioId, passkey.usuario.email);
-
-  const sessao = await abrirSessao(db, passkey.usuarioId, 'ROSTO', ip, agora);
-  if (!sessao) return falha('SEM_ACESSO', passkey.usuarioId, passkey.usuario.email);
+  if (!sessao.ok) return falha(sessao.motivo, passkey.usuarioId, passkey.usuario.email);
   await concluirTentativa(db, reserva, { ok: true, motivo: 'OK', usuarioId: passkey.usuarioId, email: passkey.usuario.email });
-  return { ok: true, ...sessao };
+  return { ok: true, token: sessao.token, expiraEm: sessao.expiraEm, escolher: sessao.escolher };
 }
 
 /**
@@ -1342,7 +1461,19 @@ export async function concluirRegistroDeRosto(
 
   const papel = await papelDisponivel(db);
   try {
-    await db.$transaction(async (tx) => {
+    return await db.$transaction(async (tx) => {
+      // Sob a trava da pessoa: a sessão que pediu ainda vale (aberta, da versão
+      // atual da credencial)? Uma revogação no meio (senha refeita pelo link)
+      // não deixa pendurar aparelho depois dela (Guardião, volta 3).
+      await travar(tx, `erp-usuario:${sessao.usuario.id}`);
+      const viva = await tx.sessaoErp.findUnique({
+        where: { id: sessao.sessaoId },
+        select: { encerradaEm: true, expiraEm: true, versaoCredencial: true, usuario: { select: { versaoCredencial: true } } },
+      });
+      if (!viva || viva.encerradaEm || viva.expiraEm <= agora || viva.versaoCredencial !== viva.usuario.versaoCredencial) {
+        return { ok: false as const, erro: ERRO_ATIVAR_ROSTO };
+      }
+      await tx.usuarioErp.update({ where: { id: sessao.usuario.id }, data: { rostosRemovidosEm: null } });
       await tx.passkeyErp.create({
         data: {
           usuarioId: sessao.usuario.id,
@@ -1371,12 +1502,19 @@ export async function concluirRegistroDeRosto(
           papel,
         );
       }
+      return { ok: true as const, mensagem: 'Pronto. Na próxima vez, toque em “Entrar com o rosto”.' };
     });
   } catch (e) {
     if (ehErroDeUnicidade(e)) return { ok: false, erro: 'Este aparelho já está ativado.' };
     throw e;
   }
-  return { ok: true, mensagem: 'Pronto. Na próxima vez, toque em “Entrar com o rosto”.' };
+}
+
+/** Quando a última revogação tirou aparelhos com rosto (null = nada a avisar). */
+export async function rostosRemovidosEm(usuarioId: string, o?: Opcoes): Promise<Date | null> {
+  const { db } = abrir(o);
+  const u = await db.usuarioErp.findUnique({ where: { id: usuarioId }, select: { rostosRemovidosEm: true } });
+  return u?.rostosRemovidosEm ?? null;
 }
 
 export async function listarRostos(usuarioId: string, o?: Opcoes) {
@@ -1435,9 +1573,9 @@ export interface SessaoValida {
 }
 
 /**
- * Sessão de pé? Confere, a CADA requisição: token, validade, encerramento e
- * vínculo ATIVO com o parceiro da sessão. Acesso desativado = sessão morta já
- * na próxima requisição.
+ * Sessão de pé? Confere, a CADA requisição: token, validade, encerramento,
+ * versão da credencial (revogou, morreu) e vínculo ATIVO com o parceiro da
+ * sessão. Acesso desativado = sessão morta já na próxima requisição.
  */
 export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoValida | null> {
   if (!tokenTemFormato(token)) return null;
@@ -1453,7 +1591,10 @@ export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoV
   if (!s || s.encerradaEm || s.expiraEm <= agora) return null;
   const vinculos = s.usuario.acessos;
   const atual = s.parceiroId ? vinculos.find((a) => a.parceiroId === s.parceiroId) : null;
-  if (vinculos.length === 0 || (s.parceiroId && !atual)) {
+  // Sessão nascida antes da última revogação dos meios de entrar: morta, mesmo
+  // que tenha escapado do encerramento (segunda trava da volta 3 do Guardião).
+  const revogada = s.versaoCredencial !== s.usuario.versaoCredencial;
+  if (revogada || vinculos.length === 0 || (s.parceiroId && !atual)) {
     await db.sessaoErp.updateMany({ where: { id: s.id, encerradaEm: null }, data: { encerradaEm: agora } });
     return null;
   }

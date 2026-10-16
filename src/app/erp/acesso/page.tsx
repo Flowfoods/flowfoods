@@ -6,7 +6,7 @@
 import { exigirParceiroDaSessao } from '@/lib/erp/contexto';
 import { listarLojasDoAlcance } from '@/lib/erp/estrutura';
 import { CATALOGO, rotuloDasLojas } from '@/lib/erp/permissoes';
-import { listarRostos, podeAtivarRosto } from '@/lib/erp/credenciais';
+import { listarRostos, podeAtivarRosto, rostosRemovidosEm } from '@/lib/erp/credenciais';
 import { Painel, Vazio } from '@/app/rodolfo/erp/ui';
 import { AjudaDeAcesso } from '@/app/entrar/ajuda';
 import { configDoRosto, rostoPossivel } from '@/lib/erp/rosto';
@@ -26,7 +26,11 @@ function rostoNoSite(): boolean {
 
 export default async function SeuAcessoPage() {
   const { pessoa, alcance, cliente, parceiro } = await exigirParceiroDaSessao();
-  const [rostos, lojas] = await Promise.all([listarRostos(pessoa.usuario.id), listarLojasDoAlcance(cliente, alcance)]);
+  const [rostos, removidosEm, lojas] = await Promise.all([
+    listarRostos(pessoa.usuario.id),
+    rostosRemovidosEm(pessoa.usuario.id),
+    listarLojasDoAlcance(cliente, alcance),
+  ]);
   const onde = rotuloDasLojas(alcance.lojas, new Map(lojas.map((l) => [l.id, l.nome])));
   const modulos = CATALOGO.map((m) => ({
     rotulo: m.rotulo,
@@ -105,7 +109,12 @@ export default async function SeuAcessoPage() {
           acessorio={<span className="text-[11px] tabular-nums text-surface/40">{rostos.length}</span>}
           semRespiro
         >
-          {rostos.length === 0 ? (
+          {rostos.length === 0 && removidosEm ? (
+            <Vazio titulo="Seus aparelhos foram removidos.">
+              Por segurança, a entrada pelo rosto saiu de todos os aparelhos em {DATA.format(removidosEm)}, quando sua senha
+              foi redefinida. Você pode ativar de novo no celular que usa no dia a dia.
+            </Vazio>
+          ) : rostos.length === 0 ? (
             <Vazio titulo="Nenhum aparelho ainda.">Ative no celular que você usa no dia a dia.</Vazio>
           ) : (
             <ul>

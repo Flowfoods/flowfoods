@@ -1541,6 +1541,16 @@ model UsuarioErp {
   // parceiro, essa senha não atravessa: é apagada e o nível 1 gera link novo
   // (decisão 41). Nulo = senha do nível 1 (ou ainda sem senha).
   senhaPorLinkDoParceiroId String?
+  // 0.4 (Fiscal QA): quando a última revogação dos meios de entrar
+  // (`revogarMeiosDeEntrada`: senha redefinida por link, ou senha de outro
+  // parceiro apagada) tirou aparelhos com rosto. "Seu acesso" avisa que eles
+  // saíram e que dá para ativar de novo; ativar um aparelho limpa.
+  rostosRemovidosEm DateTime?
+  // Sobe +1 a cada revogação dos meios de entrar. Login, entrada pelo rosto e
+  // ativação de rosto leem a versão ANTES de conferir a credencial e só gravam
+  // (sessão, aparelho) se ela ainda for a mesma, sob a trava da pessoa; e a
+  // sessão guarda a versão em que nasceu (validarSessao recusa a de versão velha).
+  versaoCredencial Int @default(0)
 
   acessos  AcessoParceiro[]
   convites ConviteAcesso[]
@@ -1711,6 +1721,8 @@ model SessaoErp {
   criadoEm    DateTime      @default(now())
   expiraEm    DateTime
   encerradaEm DateTime?
+  // `UsuarioErp.versaoCredencial` de quando a sessão nasceu: revogou, morreu.
+  versaoCredencial Int @default(0)
 
   @@index([usuarioId])
 }
