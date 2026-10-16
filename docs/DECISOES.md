@@ -884,3 +884,26 @@ e `/entrar` passaram a usar os tokens do ERP e o tema do cookie `ff_tema` (o
 `/` continua estático), e o estado da Evolution aparece em palavra
 (Conectado/Conectando/Desconectado), não "close".
 
+### 52. 2026-10-16 · ERP 1.1 (revisão do Guardião): custo de referência exato, como fração inteira
+
+**Problema:** o custo por unidade era arredondado ao centavo na origem. R$ 4,00
+por 1000 guardanapos virava "R$ 0,00/un" na lista e `0` no histórico, e duas
+embalagens (R$ 4,00/1000 un e R$ 15,00/5000 un) "saíam pelo mesmo custo". Na
+ficha técnica (1.3) isso zeraria o custo de todo item barato.
+
+**Alternativas:** (a) milésimos de centavo por unidade base (inteiro, mas
+ainda arredonda; e embalagem de 2.000 un a R$ 0,01 já some); (b) float (proibido
+pela decisão 25); (c) guardar a fração exata (preço + frete) ÷ conteúdo,
+reduzida, e arredondar só no uso.
+
+**Razão:** (c). `custoDaEmbalagem` devolve `{ centavos, milesimos }` (inteiros,
+divididos pelo MDC); `custoDaQuantidade` multiplica pela quantidade e
+arredonda UMA vez (é o que a ficha usa); `compararCustos` compara por
+multiplicação cruzada; produtos grandes vão em BigInt por dentro (nunca no
+banco: decisão 25 continua). A tela mostra duas casas a partir de 1 centavo e,
+abaixo disso, as casas necessárias para dois algarismos ("R$ 0,004/un",
+"R$ 0,0035/un"), mais o milheiro na conta de itens em un — é como guardanapo,
+copo e sachê se compram. O histórico grava a fração exata
+(`custoPorUnidade`); as linhas antigas com `custoPorUnidadeCentavos`
+continuam legíveis. Revisa a parte de arredondamento da decisão 46.
+

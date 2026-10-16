@@ -18,7 +18,7 @@ import {
   POR_PAGINA,
   type FiltrosDeInsumo,
 } from '@/lib/erp/insumo-campos';
-import { UNIDADES, formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
+import { UNIDADES, formatarDinheiro, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
 import { CAMPO, MARCAR } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
@@ -35,16 +35,17 @@ function hrefDoDetalhe(base: string, id: string, f: FiltrosDeInsumo): string {
 }
 
 function Custo({ i }: { i: LinhaDeInsumo }) {
-  if (i.custoCentavos === null) return <Selo tom="alerta">Sem preço</Selo>;
+  if (i.custo === null) return <Selo tom="alerta">Sem preço</Selo>;
   return (
     <span className="whitespace-nowrap">
-      <span className="font-semibold text-texto">{formatarDinheiro(i.custoCentavos)}</span>
+      <span className="font-semibold text-texto">{valorDoCusto(i.custo)}</span>
       <span className="ml-0.5 text-[12px] text-suave">/{UNIDADES[i.unidade].sigla}</span>
     </span>
   );
 }
 
-const ROTULO_DA_SITUACAO = { ativos: 'Ativos', desativados: 'Desativados', todos: 'Todas as situações' } as const;
+// Curtos: cabem em meia largura de 390 px sem cortar (o rótulo completo vai para o leitor de tela).
+const ROTULO_DA_SITUACAO = { ativos: 'Ativos', desativados: 'Desativados', todos: 'Todos' } as const;
 
 /** Barra de busca e filtros (GET: o estado vai para a URL). */
 export function FiltrosDaLista({ base, filtros: f }: { base: string; filtros: FiltrosDeInsumo }) {
@@ -92,7 +93,7 @@ export function FiltrosDaLista({ base, filtros: f }: { base: string; filtros: Fi
           Conservação
         </label>
         <select id="insumos-conservacao" name="conservacao" defaultValue={f.conservacao ?? ''} className={SELECT}>
-          <option value="">Toda conservação</option>
+          <option value="">Conservação</option>
           {Object.entries(CONSERVACOES).map(([k, r]) => (
             <option key={k} value={k}>
               {r}

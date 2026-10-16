@@ -22,8 +22,17 @@ import { Notificacoes } from './Notificacoes';
 import { BOTAO_ICONE } from './Popover';
 import { SeletorVisao } from './SeletorVisao';
 import type { PropsDoShell, ResultadoDaBusca } from './tipos';
+import { ProvedorDaTrilha, useTrilhaExtra, type ItemDaTrilha } from './trilha';
 
-export function Shell({ props, children }: { props: PropsDoShell; children: ReactNode }) {
+export function Shell(p: { props: PropsDoShell; children: ReactNode }) {
+  return (
+    <ProvedorDaTrilha>
+      <Casca {...p} />
+    </ProvedorDaTrilha>
+  );
+}
+
+function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }) {
   const caminho = usePathname();
   const [recolhido, setRecolhido] = useState(props.menuRecolhido);
   const [gaveta, setGaveta] = useState(false);
@@ -77,7 +86,12 @@ export function Shell({ props, children }: { props: PropsDoShell; children: Reac
     void acaoGuardarMenu(novo);
   }
 
-  const trilha = [ativo?.modulo.nome, ativo?.item.rotulo].filter(Boolean) as string[];
+  // Módulo › tela (› o que a página acrescentar: o insumo aberto, "Editar"...).
+  const extra = useTrilhaExtra();
+  const trilha: ItemDaTrilha[] = [
+    ...(ativo ? [{ rotulo: ativo.modulo.nome }, { rotulo: ativo.item.rotulo, href: extra.length ? ativo.item.href : undefined }] : []),
+    ...extra,
+  ];
 
   return (
     <div
@@ -121,14 +135,20 @@ export function Shell({ props, children }: { props: PropsDoShell; children: Reac
                   </Link>
                 </li>
                 {trilha.map((t, n) => (
-                  <li key={t + n} className="flex min-w-0 items-center gap-1.5">
+                  <li key={t.rotulo + n} className="flex min-w-0 items-center gap-1.5">
                     <ChevronRight size={14} aria-hidden className="shrink-0 text-suave" />
-                    <span
-                      className={`truncate ${n === trilha.length - 1 ? 'font-medium text-texto' : 'text-suave'}`}
-                      aria-current={n === trilha.length - 1 ? 'page' : undefined}
-                    >
-                      {t}
-                    </span>
+                    {t.href && n < trilha.length - 1 ? (
+                      <Link href={t.href} className="ff-transicao truncate rounded-[5px] text-suave hover:text-texto">
+                        {t.rotulo}
+                      </Link>
+                    ) : (
+                      <span
+                        className={`truncate ${n === trilha.length - 1 ? 'font-medium text-texto' : 'text-suave'}`}
+                        aria-current={n === trilha.length - 1 ? 'page' : undefined}
+                      >
+                        {t.rotulo}
+                      </span>
+                    )}
                   </li>
                 ))}
               </ol>

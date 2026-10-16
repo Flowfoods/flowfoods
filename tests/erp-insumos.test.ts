@@ -5,8 +5,10 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  compararCustos,
   contaDoCusto,
   custoDaEmbalagem,
+  custoDaQuantidade,
   dinheiroParaCampo,
   dividirArredondado,
   formatarCusto,
@@ -24,6 +26,7 @@ import {
   type DadosInsumo,
 } from '@/lib/erp/insumo-campos';
 import { alvoDaLinha, descreverMudancas, rotuloEntidade } from '@/lib/erp/historico';
+import { fraseDoFeito } from '@/components/erp/telas/insumos/estado';
 
 /** O Intl põe espaço sem quebra depois do "R$"; o teste compara com espaço comum. */
 const n = <T,>(x: T): T => JSON.parse(JSON.stringify(x).replace(/\u00a0/g, ' '));
@@ -60,10 +63,11 @@ describe('ERP 1.1 · embalagem digitada em kg/g, L/ml ou un vira milésimos', ()
   });
 });
 
-describe('ERP 1.1 · custo por unidade = (preço + frete) ÷ conteúdo, um arredondamento só', () => {
+describe('ERP 1.1 · custo por unidade = (preço + frete) ÷ conteúdo, exato (fração inteira)', () => {
   it('a conta do contrato', () => {
     // R$ 89,90 + R$ 5,00 frete ÷ 5 kg = R$ 18,98/kg
-    expect(custoDaEmbalagem(8990, 500, 5000)).toBe(1898);
+    const c = custoDaEmbalagem(8990, 500, 5000)!;
+    expect(custoDaQuantidade(c, 1000)).toBe(1898);
     expect(n(contaDoCusto({ precoEmbalagemCentavos: 8990, taxaEntregaCentavos: 500, conteudoMilesimos: 5000, unidade: 'KG' }))).toBe(
       'R$ 89,90 + R$ 5,00 frete ÷ 5 kg = R$ 18,98/kg',
     );
@@ -72,23 +76,57 @@ describe('ERP 1.1 · custo por unidade = (preço + frete) ÷ conteúdo, um arred
     );
   });
 
-  it('frete soma ANTES de dividir: arredondar separado erraria 1 centavo', () => {
+  it('o custo é a fração exata, reduzida, em inteiros: nada se perde antes de usar', () => {
+    // R$ 4,00 por 1000 un: 400 centavos por 1.000.000 milésimos = 1 centavo a cada 2.500 milésimos.
+    expect(custoDaEmbalagem(400, 0, 1_000_000)).toEqual({ centavos: 1, milesimos: 2500 });
+    expect(custoDaEmbalagem(8990, 500, 5000)).toEqual({ centavos: 949, milesimos: 500 });
+  });
+
+  it('frete soma ANTES de dividir e o arredondamento é um só, no fim (pronto para a ficha técnica)', () => {
     // R$ 10,00 + R$ 0,01 em 3 kg = 333,67 → 334. Separado: 333 + 0 = 333.
-    expect(custoDaEmbalagem(1000, 1, 3000)).toBe(334);
+    expect(custoDaQuantidade(custoDaEmbalagem(1000, 1, 3000)!, 1000)).toBe(334);
     expect(dividirArredondado(1000 * 1000, 3000) + dividirArredondado(1 * 1000, 3000)).toBe(333);
+    // Ficha: 180 g de um insumo a R$ 94,90 por 5 kg = 341,64 → 342 centavos (sem passar pelo custo/kg arredondado).
+    expect(custoDaQuantidade(custoDaEmbalagem(8990, 500, 5000)!, 180)).toBe(342);
+    // 30 guardanapos a R$ 4,00 o milheiro = 12 centavos exatos (o custo/un arredondado daria 0).
+    expect(custoDaQuantidade(custoDaEmbalagem(400, 0, 1_000_000)!, 30_000)).toBe(12);
+    // Números grandes não estouram (conta em BigInt por dentro).
+    expect(custoDaQuantidade(custoDaEmbalagem(1_999_999_999, 0, 1)!, 2_000_000_000)).toBe(1_999_999_999 * 2_000_000_000);
   });
 
   it('meio centavo arredonda para cima', () => {
-    // R$ 0,01 por 2 kg = 0,5 centavo/kg → 1
-    expect(custoDaEmbalagem(1, 0, 2000)).toBe(1);
-    // R$ 0,03 por 2 kg = 1,5 → 2
-    expect(custoDaEmbalagem(3, 0, 2000)).toBe(2);
+    expect(custoDaQuantidade(custoDaEmbalagem(1, 0, 2000)!, 1000)).toBe(1);
+    expect(custoDaQuantidade(custoDaEmbalagem(3, 0, 2000)!, 1000)).toBe(2);
+  });
+
+  it('abaixo de 1 centavo por unidade: mais casas, nunca R$ 0,00 (e o milheiro para un)', () => {
+    const guardanapo = custoDaEmbalagem(400, 0, 1_000_000);
+    expect(n(formatarCusto(guardanapo, 'UN'))).toBe('R$ 0,004/un');
+    expect(n(formatarCusto(custoDaEmbalagem(1500, 0, 5_000_000), 'UN'))).toBe('R$ 0,003/un');
+    // R$ 3,50 o milheiro: duas casas significativas.
+    expect(n(formatarCusto(custoDaEmbalagem(350, 0, 1_000_000), 'UN'))).toBe('R$ 0,0035/un');
+    expect(n(contaDoCusto({ precoEmbalagemCentavos: 400, taxaEntregaCentavos: 0, conteudoMilesimos: 1_000_000, unidade: 'UN' }))).toBe(
+      'R$ 4,00 ÷ 1.000 un = R$ 0,004/un (R$ 4,00 o milheiro)',
+    );
+    // Acima de 1 centavo, duas casas como sempre.
+    expect(n(formatarCusto(custoDaEmbalagem(1800, 0, 12_000), 'UN'))).toBe('R$ 1,50/un');
+    for (const [p, c] of [[1, 1_000_000], [1, 2_000_000_000], [400, 999_999]] as const) {
+      expect(n(formatarCusto(custoDaEmbalagem(p, 0, c), 'UN')), `${p}/${c}`).not.toMatch(/R\$ 0,00\//);
+    }
+  });
+
+  it('comparar é por multiplicação cruzada, exata', () => {
+    const a = custoDaEmbalagem(400, 0, 1_000_000)!; // 0,004/un
+    const b = custoDaEmbalagem(1500, 0, 5_000_000)!; // 0,003/un
+    expect(compararCustos(a, b)).toBe(1);
+    expect(compararCustos(b, a)).toBe(-1);
+    expect(compararCustos(a, custoDaEmbalagem(800, 0, 2_000_000)!)).toBe(0);
   });
 
   it('preço 0 é "Sem preço": custo incompleto, nunca R$ 0,00 (mesmo com frete)', () => {
     expect(custoDaEmbalagem(0, 500, 1000)).toBeNull();
-    expect(n(formatarCusto(null, 'KG'))).toBe('Sem preço');
-    expect(n(formatarCusto(1898, 'KG'))).toBe('R$ 18,98/kg');
+    expect(formatarCusto(null, 'KG')).toBe('Sem preço');
+    expect(n(formatarCusto(custoDaEmbalagem(8990, 500, 5000), 'KG'))).toBe('R$ 18,98/kg');
     const conta = contaDoCusto({ precoEmbalagemCentavos: 0, taxaEntregaCentavos: 500, conteudoMilesimos: 1000, unidade: 'KG' });
     expect(conta).toMatch(/^Sem preço/);
     expect(conta).not.toMatch(/0,00/);
@@ -180,8 +218,9 @@ describe('ERP 1.1 · histórico: só o que mudou, legível', () => {
 
   it('diferenca: só os campos mudados, com nome e unidade de contexto', () => {
     const d = diferenca(retratoDoInsumo(cebola), retratoDoInsumo({ ...cebola, taxaEntregaCentavos: 500 }));
-    expect(d?.campos).toEqual(['taxaEntregaCentavos', 'custoPorUnidadeCentavos']);
-    expect(d?.depois).toEqual({ nome: 'Cebola', unidade: 'KG', taxaEntregaCentavos: 500, custoPorUnidadeCentavos: 1898 });
+    expect(d?.campos).toEqual(['taxaEntregaCentavos', 'custoPorUnidade']);
+    // O histórico guarda o custo EXATO (fração reduzida), nunca um centavo arredondado.
+    expect(d?.depois).toEqual({ nome: 'Cebola', unidade: 'KG', taxaEntregaCentavos: 500, custoPorUnidade: { centavos: 949, milesimos: 500 } });
     expect(diferenca(retratoDoInsumo(cebola), retratoDoInsumo(cebola))).toBeNull();
   });
 
@@ -215,6 +254,15 @@ describe('ERP 1.1 · histórico: só o que mudou, legível', () => {
     ]);
   });
 
+  it('guardanapo (1000 un por R$ 4,00): o histórico mostra R$ 0,004/un, não R$ 0,00', () => {
+    const r = retratoDoInsumo({ ...cebola, nome: 'Guardanapo de papel', tipo: 'EMBALAGEM', unidade: 'UN', conteudoMilesimos: 1_000_000, precoEmbalagemCentavos: 400 });
+    expect(r.custoPorUnidade).toEqual({ centavos: 1, milesimos: 2500 });
+    const custo = n(descreverMudancas(null, r)).find((m) => m.campo === 'custo por unidade');
+    expect(custo?.depois).toBe('R$ 0,004/un');
+    // Linha antiga (antes desta correção) com o custo em centavos inteiros continua legível.
+    expect(n(descreverMudancas(null, { unidade: 'KG', custoPorUnidadeCentavos: 1898 })).find((m) => m.campo === 'custo por unidade')?.depois).toBe('R$ 18,98/kg');
+  });
+
   it('embalagem (variante): rótulo simples e o alvo diz de quem é', () => {
     const r = retratoDaVariante(
       { nome: 'Caixa 10 kg', codigoBarras: null, conteudoMilesimos: 10_000, precoEmbalagemCentavos: 17_000, taxaEntregaCentavos: 0 },
@@ -236,25 +284,49 @@ describe('ERP 1.1 · histórico: só o que mudou, legível', () => {
 });
 
 describe('ERP 1.1 · qual embalagem sai mais barata (em texto)', () => {
+  const c = (p: number, q: number) => custoDaEmbalagem(p, 0, q);
+
   it('compara por unidade e diz a diferença', () => {
     expect(
       n(compararEmbalagens(
         [
-          { nome: 'Saco 5 kg', custo: 1898 },
-          { nome: 'Caixa 10 kg', custo: 1750 },
+          { nome: 'Saco 5 kg', custo: custoDaEmbalagem(8990, 500, 5000) },
+          { nome: 'Caixa 10 kg', custo: c(17_500, 10_000) },
         ],
         'KG',
       )),
     ).toBe('“Caixa 10 kg” sai mais barata: R$ 17,50/kg, R$ 1,48 a menos por kg que “Saco 5 kg” (R$ 18,98/kg).');
   });
 
-  it('sem preço não entra; uma só não compara; empate diz empate', () => {
-    expect(n(compararEmbalagens([{ nome: 'A', custo: 100 }], 'KG'))).toBeNull();
-    expect(n(compararEmbalagens([{ nome: 'A', custo: 100 }, { nome: 'B', custo: null }], 'KG'))).toBe(
+  it('abaixo de 1 centavo: guardanapo 1000 un por R$ 4,00 contra 5000 un por R$ 15,00 NÃO empata', () => {
+    expect(
+      n(compararEmbalagens(
+        [
+          { nome: 'Pacote 1000 un', custo: c(400, 1_000_000) },
+          { nome: 'Fardo 5000 un', custo: c(1500, 5_000_000) },
+        ],
+        'UN',
+      )),
+    ).toBe('“Fardo 5000 un” sai mais barata: R$ 0,003/un, R$ 0,001 a menos por un que “Pacote 1000 un” (R$ 0,004/un).');
+  });
+
+  it('sem preço não entra; uma só não compara; empate exato diz empate', () => {
+    expect(compararEmbalagens([{ nome: 'A', custo: c(100, 1000) }], 'KG')).toBeNull();
+    expect(compararEmbalagens([{ nome: 'A', custo: c(100, 1000) }, { nome: 'B', custo: null }], 'KG')).toBe(
       'Falta preço para comparar as embalagens.',
     );
-    expect(n(compararEmbalagens([{ nome: 'A', custo: 100 }, { nome: 'B', custo: 100 }], 'UN'))).toBe(
+    expect(n(compararEmbalagens([{ nome: 'A', custo: c(100, 1000) }, { nome: 'B', custo: c(300, 3000) }], 'UN'))).toBe(
       'As embalagens saem pelo mesmo custo: R$ 1,00/un.',
     );
+  });
+});
+
+
+describe('ERP 1.1 · ?feito= da URL só escolhe uma frase conhecida', () => {
+  it('__proto__, constructor e desconhecido não viram frase (antes davam 500)', () => {
+    expect(fraseDoFeito('criado')).toBe('Insumo cadastrado.');
+    for (const f of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'xyz', '', undefined]) {
+      expect(fraseDoFeito(f), String(f)).toBeUndefined();
+    }
   });
 });

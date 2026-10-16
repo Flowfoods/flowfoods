@@ -20,6 +20,7 @@ import type { AcaoDeInsumo } from './estado';
 import { FormEmbalagem } from './form-embalagem';
 import { FormInsumo, type ValoresDoInsumo } from './form-insumo';
 import { FormSituacao } from './form-situacao';
+import { TrilhaDaPagina } from '../../shell/trilha';
 
 export function CabecalhoDaLista({
   subtitulo,
@@ -97,6 +98,7 @@ export function TelaFormInsumo({
   const volta = insumo ? `${base}/${insumo.id}` : base;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      {insumo && <TrilhaDaPagina itens={[{ rotulo: insumo.nome, href: volta }, { rotulo: 'Editar' }]} />}
       <Voltar href={volta}>{insumo ? `Voltar para ${insumo.nome}` : 'Voltar para a lista'}</Voltar>
       <PageHeader
         icone="insumo"
@@ -140,6 +142,7 @@ export function TelaEmbalagem({
   const u = UNIDADES[insumo.unidade];
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      <TrilhaDaPagina itens={[{ rotulo: insumo.nome, href: volta }, { rotulo: v ? v.nome : 'Nova embalagem' }]} />
       <Voltar href={volta}>Voltar para {insumo.nome}</Voltar>
       <PageHeader
         icone="insumo"

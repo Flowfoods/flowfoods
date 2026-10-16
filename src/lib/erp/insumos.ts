@@ -30,7 +30,7 @@ import {
   type FiltrosDeInsumo,
   type TipoInsumo,
 } from './insumo-campos';
-import { custoDaEmbalagem, type Unidade } from './unidades';
+import { compararCustos, custoDaEmbalagem, type CustoExato, type Unidade } from './unidades';
 
 export type ResultadoInsumo =
   | { ok: true; id: string; nome: string; mudou: string[] }
@@ -45,6 +45,8 @@ export type ResultadoInsumo =
     };
 
 export const MENSAGEM_CONFLITO = 'Alguém alterou este insumo agora há pouco. Recarregue a página para ver a versão nova; nada foi gravado.';
+
+export const MENSAGEM_DESATIVADO = 'Insumo desativado: reative antes de editar.';
 
 /** Recusa no meio da transação: desfaz tudo e vira mensagem. */
 class Recusa extends Error {
@@ -181,6 +183,8 @@ export async function editarInsumo(
 
   const atual = await cliente.insumo.findUnique({ where: { id } });
   if (!atual) return { ok: false, erros: { geral: 'Insumo não encontrado.' }, naoEncontrado: true };
+  // A tela esconde "Editar" de desativado; quem decide é aqui.
+  if (!atual.ativo) return { ok: false, erros: { geral: MENSAGEM_DESATIVADO } };
   if (atual.atualizadoEm.getTime() !== versao.getTime()) {
     return { ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true };
   }
@@ -196,7 +200,8 @@ export async function editarInsumo(
       // Condicional: a linha só muda se ainda está na versão que a tela leu.
       // O UPDATE trava a linha até o fim da transação.
       const r = await tx.insumo.updateMany({
-        where: { id, atualizadoEm: versao },
+        // `ativo: true`: desativar no meio do caminho também conta como conflito.
+        where: { id, atualizadoEm: versao, ativo: true },
         data: {
           nome: d.nome,
           tipo: d.tipo,
@@ -291,8 +296,8 @@ export interface LinhaDeInsumo {
   conteudoMilesimos: number;
   precoEmbalagemCentavos: number;
   taxaEntregaCentavos: number;
-  /** null = "Sem preço" (custo incompleto). */
-  custoCentavos: number | null;
+  /** Custo de referência exato; null = "Sem preço" (custo incompleto). */
+  custo: CustoExato | null;
   /** Outras embalagens ativas. */
   variantes: number;
   ativo: boolean;
@@ -328,7 +333,7 @@ function paraLinha(i: LinhaDoBanco): LinhaDeInsumo {
   const { _count, ...resto } = i;
   return {
     ...resto,
-    custoCentavos: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+    custo: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
     variantes: _count.variantes,
   };
 }
@@ -336,8 +341,8 @@ function paraLinha(i: LinhaDoBanco): LinhaDeInsumo {
 /**
  * Página da lista com o total. Filtros e ordem vêm da URL (`lerFiltros`), o
  * servidor filtra. Por custo: o custo é derivado (nunca gravado), então a
- * ordenação é feita aqui com o MESMO cálculo da tela, e "Sem preço" fica sempre
- * no fim. Contagem e página na mesma transação (o total bate com a página).
+ * ordenação é feita aqui pelo custo exato (multiplicação cruzada), e "Sem
+ * preço" fica sempre no fim. Contagem e página na mesma transação (o total bate com a página).
  */
 export async function listarInsumos(
   cliente: ClienteDoParceiro,
@@ -362,10 +367,9 @@ export async function listarInsumos(
     const todas = (await tx.insumo.findMany({ where, orderBy: { nome: 'asc' }, select: SELECAO_DA_LINHA })).map(paraLinha);
     const sinal = f.direcao === 'asc' ? 1 : -1;
     todas.sort((a, b) => {
-      if (a.custoCentavos === null || b.custoCentavos === null) {
-        return a.custoCentavos === b.custoCentavos ? 0 : a.custoCentavos === null ? 1 : -1;
-      }
-      return sinal * (a.custoCentavos - b.custoCentavos);
+      if (a.custo === null || b.custo === null) return a.custo === b.custo ? 0 : a.custo === null ? 1 : -1;
+      // Exato (multiplicação cruzada): R$ 0,004/un vem antes de R$ 0,005/un.
+      return sinal * compararCustos(a.custo, b.custo);
     });
     return { linhas: todas.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA), total, pagina, paginas };
   });
@@ -397,7 +401,7 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
       conteudoMilesimos: i.conteudoMilesimos,
       precoEmbalagemCentavos: i.precoEmbalagemCentavos,
       taxaEntregaCentavos: i.taxaEntregaCentavos,
-      custoCentavos: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+      custo: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
       ativo: i.ativo,
       versao: i.atualizadoEm.toISOString(),
       travaDaUnidade,
@@ -407,7 +411,7 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
         conteudoMilesimos: v.conteudoMilesimos,
         precoEmbalagemCentavos: v.precoEmbalagemCentavos,
         taxaEntregaCentavos: v.taxaEntregaCentavos,
-        custoCentavos: custoDaEmbalagem(v.precoEmbalagemCentavos, v.taxaEntregaCentavos, v.conteudoMilesimos),
+        custo: custoDaEmbalagem(v.precoEmbalagemCentavos, v.taxaEntregaCentavos, v.conteudoMilesimos),
         codigoBarras: v.codigoBarras,
         ativo: v.ativo,
         versao: versaoDaVariante(v),

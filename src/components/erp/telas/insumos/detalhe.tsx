@@ -12,13 +12,14 @@ import type { ReactNode } from 'react';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
 import { compararEmbalagens, CONSERVACOES, TIPOS } from '@/lib/erp/insumo-campos';
 import { COR } from '@/lib/erp/modulos';
-import { UNIDADES, contaDoCusto, formatarCusto, formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
+import { UNIDADES, contaDoCusto, formatarCusto, formatarDinheiro, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO, type Variante } from '../../ui/estilos';
 import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
 import { ListaHistorico } from '../historico/lista-historico';
-import { FEITO, type AcaoDeInsumo } from './estado';
+import { fraseDoFeito, type AcaoDeInsumo } from './estado';
 import { FormSituacao } from './form-situacao';
+import { TrilhaDaPagina } from '../../shell/trilha';
 
 /** Link com cara de botão; bloqueado, vira botão desabilitado com o motivo. */
 export function BotaoOuMotivo({
@@ -76,11 +77,12 @@ export function TelaDetalheInsumo({
   const ativas = i.variantes.filter((v) => v.ativo);
   const comparacao = i.ativo
     ? compararEmbalagens(
-        [{ nome: 'Padrão', custo: i.custoCentavos }, ...ativas.map((v) => ({ nome: v.nome, custo: v.custoCentavos }))],
+        [{ nome: 'Padrão', custo: i.custo }, ...ativas.map((v) => ({ nome: v.nome, custo: v.custo }))],
         i.unidade,
       )
     : null;
-  const mensagem = feito ? FEITO[feito] : undefined;
+  // `feito` vem da URL: só chave própria do mapa (nada de __proto__/constructor).
+  const mensagem = fraseDoFeito(feito);
 
   const embalagens = [
     {
@@ -90,7 +92,7 @@ export function TelaDetalheInsumo({
       conteudoMilesimos: i.conteudoMilesimos,
       precoEmbalagemCentavos: i.precoEmbalagemCentavos,
       taxaEntregaCentavos: i.taxaEntregaCentavos,
-      custoCentavos: i.custoCentavos,
+      custo: i.custo,
       ativo: true,
       codigoBarras: null as string | null,
     },
@@ -99,6 +101,7 @@ export function TelaDetalheInsumo({
 
   return (
     <div className="space-y-6">
+      <TrilhaDaPagina itens={[{ rotulo: i.nome }]} />
       <Link href={voltar} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
         Voltar para a lista
       </Link>
@@ -119,7 +122,8 @@ export function TelaDetalheInsumo({
       />
 
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
-      {!i.ativo && (
+      {/* Recém-desativado: a frase do "feito" já diz isso; não repetir. */}
+      {!i.ativo && feito !== 'desativado' && (
         <Aviso tom="alerta" titulo="Insumo desativado.">
           Fica fora da lista padrão e da busca, com o histórico guardado.
           {podeEditar ? ' Para editar, reative primeiro.' : ''}
@@ -130,13 +134,13 @@ export function TelaDetalheInsumo({
         <div className="min-w-0 space-y-4">
           <Painel titulo="Custo de referência">
             <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-              <div className={`font-display text-[32px] font-bold leading-none ${i.custoCentavos === null ? 'text-atencao' : ''}`}>
-                {formatarCusto(i.custoCentavos, i.unidade)}
+              <div className={`font-display text-[32px] font-bold leading-none ${i.custo === null ? 'text-atencao' : ''}`}>
+                {formatarCusto(i.custo, i.unidade)}
               </div>
               <p className="text-sm tabular-nums text-suave">{contaDoCusto(i)}</p>
             </div>
             <p className="mt-3 border-t border-linha pt-3 text-[12px] text-suave">
-              Pelo preço da embalagem padrão. O custo pelas compras de verdade (última nota) chega com Compras, na fase 1.5.
+              Pelo preço da embalagem padrão. O custo pelas compras de verdade (última nota) chega em breve, em Compras.
             </p>
           </Painel>
 
@@ -169,11 +173,11 @@ export function TelaDetalheInsumo({
                       </span>
                     </span>
                     <span className="shrink-0 text-right text-sm tabular-nums">
-                      {e.custoCentavos === null ? (
+                      {e.custo === null ? (
                         <Selo tom="alerta">Sem preço</Selo>
                       ) : (
                         <>
-                          <span className="font-semibold text-texto">{formatarDinheiro(e.custoCentavos)}</span>
+                          <span className="font-semibold text-texto">{valorDoCusto(e.custo)}</span>
                           <span className="ml-0.5 text-[12px] text-suave">/{u.sigla}</span>
                         </>
                       )}
@@ -222,7 +226,7 @@ export function TelaDetalheInsumo({
             {i.historico.length === 0 ? (
               <Vazio>Nada registrado ainda.</Vazio>
             ) : (
-              <ListaHistorico linhas={i.historico} compacta />
+              <ListaHistorico linhas={i.historico} compacta doInsumo={i.nome} />
             )}
           </Painel>
         </aside>

@@ -7,12 +7,14 @@
 
 import { z } from 'zod';
 import {
+  compararCustos,
   custoDaEmbalagem,
   formatarCusto,
-  formatarDinheiro,
+  formatarReaisDaFracao,
   lerDinheiro,
   lerQuantidadeNa,
   UNIDADES,
+  type CustoExato,
   type Escala,
   type Unidade,
 } from './unidades';
@@ -173,12 +175,14 @@ export function lerFormVariante(entrada: Record<string, unknown>, unidade: Unida
 
 // ------------------------------------------------- histórico e versões
 
-type Retrato = Record<string, string | number | boolean | null>;
+/** Custo exato como vai para o JSON do histórico (tipo literal: cabe em `JsonValue`). */
+type CustoNoJson = { centavos: number; milesimos: number };
+type Retrato = Record<string, string | number | boolean | null | CustoNoJson>;
 
 /**
- * O que vai para o histórico de um insumo. Leva o custo de referência já
- * calculado (fotografia do momento, para o histórico mostrar o mesmo número
- * que a tela mostrou) e a unidade, que formata a embalagem ("5 kg").
+ * O que vai para o histórico de um insumo. Leva o custo de referência EXATO do
+ * momento (a fração reduzida, nunca um centavo arredondado: R$ 4,00 por 1000 un
+ * não vira "0") e a unidade, que formata a embalagem ("5 kg").
  */
 export function retratoDoInsumo(i: DadosInsumo & { ativo?: boolean }): Retrato {
   return {
@@ -189,7 +193,7 @@ export function retratoDoInsumo(i: DadosInsumo & { ativo?: boolean }): Retrato {
     conteudoMilesimos: i.conteudoMilesimos,
     precoEmbalagemCentavos: i.precoEmbalagemCentavos,
     taxaEntregaCentavos: i.taxaEntregaCentavos,
-    custoPorUnidadeCentavos: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+    custoPorUnidade: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
   };
 }
 
@@ -201,7 +205,7 @@ export function retratoDaVariante(v: DadosVariante, insumo: { nome: string; unid
     conteudoMilesimos: v.conteudoMilesimos,
     precoEmbalagemCentavos: v.precoEmbalagemCentavos,
     taxaEntregaCentavos: v.taxaEntregaCentavos,
-    custoPorUnidadeCentavos: custoDaEmbalagem(v.precoEmbalagemCentavos, v.taxaEntregaCentavos, v.conteudoMilesimos),
+    custoPorUnidade: custoDaEmbalagem(v.precoEmbalagemCentavos, v.taxaEntregaCentavos, v.conteudoMilesimos),
     codigoBarras: v.codigoBarras,
   };
 }
@@ -255,24 +259,30 @@ export function versaoDaVariante(v: {
 
 export interface EmbalagemComparada {
   nome: string;
-  custo: number | null;
+  custo: CustoExato | null;
 }
 
 /**
  * Qual embalagem sai mais barata por unidade, em texto. Só entra quem tem
- * preço; sem duas com preço, não há comparação (e a frase diz isso).
+ * preço; sem duas com preço, não há comparação (e a frase diz isso). Ordem e
+ * diferença pelo custo EXATO (multiplicação cruzada): 1000 un por R$ 4,00 e
+ * 5000 un por R$ 15,00 não "empatam em R$ 0,00".
  */
 export function compararEmbalagens(lista: EmbalagemComparada[], unidade: Unidade): string | null {
   if (lista.length < 2) return null;
-  const comPreco = lista.filter((e): e is { nome: string; custo: number } => e.custo !== null);
+  const comPreco = lista.filter((e): e is { nome: string; custo: CustoExato } => e.custo !== null);
   if (comPreco.length < 2) return 'Falta preço para comparar as embalagens.';
-  const ordenada = [...comPreco].sort((a, b) => a.custo - b.custo);
-  const [barata, segunda] = ordenada;
-  if (barata.custo === segunda.custo && ordenada.every((e) => e.custo === barata.custo)) {
+  const ordenada = [...comPreco].sort((a, b) => compararCustos(a.custo, b.custo));
+  const barata = ordenada[0];
+  const cara = ordenada[ordenada.length - 1];
+  if (compararCustos(barata.custo, cara.custo) === 0) {
     return `As embalagens saem pelo mesmo custo: ${formatarCusto(barata.custo, unidade)}.`;
   }
-  const cara = ordenada[ordenada.length - 1];
-  const diferenca = formatarDinheiro(cara.custo - barata.custo);
+  // Diferença por unidade base = 1000 × (c/m da cara − c/m da barata), exata.
+  const num =
+    1000n * (BigInt(cara.custo.centavos) * BigInt(barata.custo.milesimos) - BigInt(barata.custo.centavos) * BigInt(cara.custo.milesimos));
+  const den = BigInt(cara.custo.milesimos) * BigInt(barata.custo.milesimos);
+  const diferenca = formatarReaisDaFracao(num, den);
   return `“${barata.nome}” sai mais barata: ${formatarCusto(barata.custo, unidade)}, ${diferenca} a menos por ${UNIDADES[unidade].sigla} que “${cara.nome}” (${formatarCusto(cara.custo, unidade)}).`;
 }
 

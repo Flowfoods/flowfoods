@@ -6,7 +6,7 @@
 import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
 import { CONSERVACOES, TIPOS } from './insumo-campos';
-import { UNIDADES, formatarCusto, formatarDinheiro, formatarQuantidade, type Unidade } from './unidades';
+import { UNIDADES, formatarCusto, formatarDinheiro, formatarQuantidade, type CustoExato, type Unidade } from './unidades';
 
 const ENTIDADE: Record<string, string> = {
   ParceiroFlow: 'Parceiro',
@@ -46,6 +46,8 @@ const CAMPO: Record<string, string> = {
   conteudoMilesimos: 'embalagem',
   precoEmbalagemCentavos: 'preço',
   taxaEntregaCentavos: 'frete',
+  custoPorUnidade: 'custo por unidade',
+  // Linhas gravadas antes do custo exato (centavos inteiros por unidade).
   custoPorUnidadeCentavos: 'custo por unidade',
   tipo: 'tipo',
   conservacao: 'conservação',
@@ -77,6 +79,7 @@ const ORDEM = [
   'conteudoMilesimos',
   'precoEmbalagemCentavos',
   'taxaEntregaCentavos',
+  'custoPorUnidade',
   'custoPorUnidadeCentavos',
   'codigoBarras',
   'ativo',
@@ -130,6 +133,14 @@ function objeto(j: Prisma.JsonValue | null | undefined): Record<string, unknown>
   return j && typeof j === 'object' && !Array.isArray(j) ? (j as Record<string, unknown>) : {};
 }
 
+/** `{ centavos, milesimos }` gravado no histórico → custo; qualquer outra coisa = sem preço. */
+function custoExato(v: unknown): CustoExato | null {
+  const o = v as { centavos?: unknown; milesimos?: unknown } | null;
+  return o && Number.isSafeInteger(o.centavos) && Number.isSafeInteger(o.milesimos) && (o.milesimos as number) > 0
+    ? { centavos: o.centavos as number, milesimos: o.milesimos as number }
+    : null;
+}
+
 export interface Mudanca {
   campo: string;
   antes: string | null;
@@ -151,9 +162,10 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     if (c === 'conteudoMilesimos' && juntarUnidade && typeof o[c] === 'number' && unidade(o)) {
       return formatarQuantidade(o[c] as number, unidade(o)!);
     }
-    // Custo de referência: a MESMA frase da tela ("R$ 18,98/kg" ou "Sem preço").
+    // Custo de referência: a MESMA frase da tela ("R$ 18,98/kg", "R$ 0,004/un" ou "Sem preço").
+    if (c === 'custoPorUnidade' && unidade(o)) return formatarCusto(custoExato(o[c]), unidade(o)!);
     if (c === 'custoPorUnidadeCentavos' && unidade(o) && (o[c] === null || typeof o[c] === 'number')) {
-      return formatarCusto(o[c] as number | null, unidade(o)!);
+      return o[c] === null ? 'Sem preço' : `${formatarDinheiro(o[c] as number)}/${UNIDADES[unidade(o)!].sigla}`;
     }
     return valor(c, o[c]);
   };

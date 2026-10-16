@@ -44,6 +44,7 @@ import {
   editarInsumo,
   listarInsumos,
   MENSAGEM_CONFLITO,
+  MENSAGEM_DESATIVADO,
   mudarSituacaoInsumo,
   obterInsumo,
 } from '@/lib/erp/insumos';
@@ -51,6 +52,7 @@ import { cadastrarVariante, editarVariante, mudarSituacaoVariante } from '@/lib/
 import { ALCANCE_FLOWFOODS, resolverAlcance } from '@/lib/erp/permissoes';
 import * as daSessao from '@/app/erp/insumos/actions';
 import * as doNivel1 from '@/app/rodolfo/(painel)/erp/[slug]/insumos/actions';
+import { custoDaQuantidade } from '@/lib/erp/unidades';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
@@ -122,8 +124,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     const salvo = await a.insumo.findUniqueOrThrow({ where: { id: r.id } });
     expect(salvo).toMatchObject({ conteudoMilesimos: 5000, precoEmbalagemCentavos: 8990, taxaEntregaCentavos: 500, tipo: 'INGREDIENTE', conservacao: 'SECO', ativo: true });
     const lista = await listarInsumos(a);
-    expect(lista.linhas.find((l) => l.id === r.id)?.custoCentavos).toBe(1898);
-    expect((await obterInsumo(a, r.id))?.custoCentavos).toBe(1898);
+    expect(custoDaQuantidade(lista.linhas.find((l) => l.id === r.id)!.custo!, 1000)).toBe(1898);
+    expect(custoDaQuantidade((await obterInsumo(a, r.id))!.custo!, 1000)).toBe(1898);
     const [h] = await listarHistorico(a, { entidade: 'Insumo' });
     expect(h.acao).toBe('CRIOU');
     expect(h.alvo).toBe('Cebola');
@@ -134,7 +136,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     const r = await cadastrarInsumo(a, { ...cebola, nome: 'Azeite', unidade: 'L', conteudo: '500', escala: 'menor', preco: '', semPreco: 'on', frete: '' });
     expect(r.ok).toBe(true);
     const semPreco = await listarInsumos(a, { semPreco: true });
-    expect(semPreco.linhas.map((l) => [l.nome, l.custoCentavos, l.conteudoMilesimos])).toEqual([['Azeite', null, 500]]);
+    expect(semPreco.linhas.map((l) => [l.nome, l.custo, l.conteudoMilesimos])).toEqual([['Azeite', null, 500]]);
     // Ordenar por custo: "Sem preço" fica no fim nos dois sentidos.
     expect((await listarInsumos(a, { ordem: 'custo', direcao: 'asc' })).linhas.at(-1)?.nome).toBe('Azeite');
     expect((await listarInsumos(a, { ordem: 'custo', direcao: 'desc' })).linhas.at(-1)?.nome).toBe('Azeite');
@@ -144,7 +146,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     const i = (await a.insumo.findFirstOrThrow({ where: { nome: 'Cebola' } }))!;
     const d = (await obterInsumo(a, i.id))!;
     const r = await editarInsumo(a, i.id, { ...cebola, frete: '7,50', conservacao: 'REFRIGERADO', versao: d.versao }, 'Marina');
-    expect(r).toMatchObject({ ok: true, mudou: ['conservacao', 'taxaEntregaCentavos', 'custoPorUnidadeCentavos'] });
+    expect(r).toMatchObject({ ok: true, mudou: ['conservacao', 'taxaEntregaCentavos', 'custoPorUnidade'] });
     const [h] = await listarHistorico(a, { entidade: 'Insumo' });
     expect(h.acao).toBe('ALTEROU');
     expect(h.mudancas.map((m) => [m.campo, m.antes, m.depois].map((x) => x?.replace(/ /g, ' ')))).toEqual([
@@ -207,8 +209,33 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     // Nome repetido de um desativado oferece reativar.
     const repetido = await cadastrarInsumo(a, { ...cebola, nome: 'Azeite' });
     expect(repetido).toMatchObject({ ok: false, desativadoId: i.id, erros: { nome: expect.stringMatching(/desativado/) } });
+    // Desativado não se edita (nem embalagem nova), mesmo chamando o servidor direto.
+    const lido = (await obterInsumo(a, i.id))!;
+    expect(await editarInsumo(a, i.id, { ...cebola, nome: 'Azeite', versao: lido.versao })).toEqual({ ok: false, erros: { geral: MENSAGEM_DESATIVADO } });
+    expect(await cadastrarVariante(a, i.id, { nome: 'Lata', conteudo: '1', preco: '1,00' })).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/reative/) } });
     expect((await mudarSituacaoInsumo(a, i.id, true, null)).ok).toBe(true);
     expect((await listarHistorico(a, { entidade: 'Insumo' }))[0].acao).toBe('REATIVOU');
+  });
+
+  it('custo abaixo de 1 centavo (guardanapo 1000 un por R$ 4,00): exato na lista, na ordem, no histórico e na comparação', async () => {
+    const r = await cadastrarInsumo(a, { ...cebola, nome: 'Guardanapo de papel', tipo: 'EMBALAGEM', unidade: 'UN', conteudo: '1000', frete: '', preco: '4,00' });
+    if (!r.ok) throw new Error(JSON.stringify(r));
+    const outro = await cadastrarInsumo(a, { ...cebola, nome: 'Palito', tipo: 'EMBALAGEM', unidade: 'UN', conteudo: '1000', frete: '', preco: '5,00' });
+    if (!outro.ok) throw new Error('setup');
+    const linha = (await listarInsumos(a, { q: 'Guardanapo' })).linhas[0];
+    expect(linha.custo).toEqual({ centavos: 1, milesimos: 2500 });
+    // Ordem por custo distingue 0,004 de 0,005 (antes os dois eram "0").
+    const ordem = (await listarInsumos(a, { ordem: 'custo' })).linhas.map((l) => l.nome);
+    expect(ordem.indexOf('Guardanapo de papel')).toBeLessThan(ordem.indexOf('Palito'));
+    const [h] = await listarHistorico(a, { de: [{ entidade: 'Insumo', ids: [r.id] }] });
+    expect(h.mudancas.find((m) => m.campo === 'custo por unidade')?.depois.replace(/\u00a0/g, ' ')).toBe('R$ 0,004/un');
+    const gravado = await a.historicoAlteracao.findFirstOrThrow({ where: { entidadeId: r.id } });
+    expect((gravado.depois as Record<string, unknown>).custoPorUnidade).toEqual({ centavos: 1, milesimos: 2500 });
+    // Duas embalagens: 1000 un por R$ 4,00 (padrão) e 5000 un por R$ 15,00.
+    expect((await cadastrarVariante(a, r.id, { nome: 'Fardo 5000 un', conteudo: '5000', preco: '15,00' })).ok).toBe(true);
+    const d = (await obterInsumo(a, r.id))!;
+    expect(d.variantes[0].custo).toEqual({ centavos: 3, milesimos: 10_000 });
+    expect(custoDaQuantidade(d.custo!, 30_000)).toBe(12); // 30 guardanapos = R$ 0,12
   });
 
   it('embalagens: criar, comparar, editar com versão, nome único por insumo, desativar', async () => {
@@ -222,7 +249,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     });
     const d = (await obterInsumo(a, i.id))!;
     const v = d.variantes.find((x) => x.id === caixa.id)!;
-    expect(v.custoCentavos).toBe(1750);
+    expect(custoDaQuantidade(v.custo!, 1000)).toBe(1750);
     // Duas abas: a primeira passa, a segunda (versão velha) é recusada.
     expect((await editarVariante(a, i.id, v.id, { nome: 'Caixa 10 kg', conteudo: '10', preco: '160,00', frete: '5,00', codigoBarras: '7891000100103', versao: v.versao })).ok).toBe(true);
     const velha = await editarVariante(a, i.id, v.id, { nome: 'Caixa 10 kg', conteudo: '10', preco: '1,00', versao: v.versao });

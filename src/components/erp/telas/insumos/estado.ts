@@ -16,11 +16,11 @@ export type EstadoInsumo = {
 export type AcaoDeInsumo = (anterior: EstadoInsumo, form: FormData) => Promise<EstadoInsumo>;
 
 /** O que aparece no detalhe depois de gravar (`?feito=`). Frases fixas: a URL só escolhe. */
-export const FEITO: Record<string, string> = {
+export const FEITO: Readonly<Record<string, string>> = {
   criado: 'Insumo cadastrado.',
   editado: 'Alterações salvas. O antes e o depois estão em Últimas alterações.',
   igual: 'Nada mudou: os valores já eram esses.',
-  desativado: 'Insumo desativado. Ele sai da lista padrão; o histórico continua.',
+  desativado: 'Insumo desativado. Ele sai da lista padrão; o histórico continua. Para editar, reative.',
   reativado: 'Insumo reativado.',
   'embalagem-criada': 'Embalagem cadastrada.',
   'embalagem-editada': 'Embalagem alterada. O antes e o depois estão em Últimas alterações.',
@@ -28,3 +28,8 @@ export const FEITO: Record<string, string> = {
   'embalagem-desativada': 'Embalagem desativada.',
   'embalagem-reativada': 'Embalagem reativada.',
 };
+
+/** A frase do `?feito=` — só chave própria do mapa (`__proto__`, `constructor` não são frase). */
+export function fraseDoFeito(feito: string | undefined): string | undefined {
+  return feito && Object.hasOwn(FEITO, feito) ? FEITO[feito] : undefined;
+}

@@ -118,8 +118,11 @@ html:has(.ff-app[data-tema='escuro']) {
   outline: 3px solid rgb(var(--ff-acento));
   outline-offset: 4px;
 }
-/* Campo já tem borda: o anel encosta (folga de 1 px) para não invadir o vizinho. */
-.ff-app :is(input, select, textarea):focus-visible {
+/* Campo já tem borda: o anel encosta (folga de 1 px) para não invadir o vizinho.
+   E é neutro (cor do texto), não vermelho: vermelho no campo é erro.
+   `.ff-app.ff-app`: o seletor geral acima pesa mais (o `[tabindex]` do :is). */
+.ff-app.ff-app :is(input, select, textarea):focus-visible {
+  outline: 2px solid rgb(var(--ff-texto) / 0.7);
   outline-offset: 1px;
 }
 

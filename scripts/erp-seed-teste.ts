@@ -49,11 +49,14 @@ const PARCEIROS: {
       { nome: 'Caixa kraft hambúrguer', tipo: 'EMBALAGEM', unidade: 'UN', conteudo: '100', preco: '74,00', frete: '4,00' },
       { nome: 'Picles de pepino', unidade: 'KG', conservacao: 'REFRIGERADO', conteudo: '2', preco: '', semPreco: 'on' },
       { nome: 'Batata palha', unidade: 'KG', conteudo: '1', preco: '24,90' },
+      // Custo abaixo de 1 centavo por unidade: R$ 0,004/un (R$ 4,00 o milheiro).
+      { nome: 'Guardanapo de papel', tipo: 'EMBALAGEM', unidade: 'UN', conteudo: '1000', preco: '4,00' },
     ],
     embalagens: {
       'Cebola roxa': [{ nome: 'Saco 10 kg (feira)', conteudo: '10', preco: '35,00', frete: '3,00' }],
       'Óleo de soja': [{ nome: 'Caixa 20 × 900 ml', conteudo: '18', preco: '159,80', frete: '6,00', codigoBarras: '7891107101621' }],
       'Caixa kraft hambúrguer': [{ nome: 'Fardo 500 un', conteudo: '500', preco: '335,00', frete: '12,00' }],
+      'Guardanapo de papel': [{ nome: 'Fardo 5000 un', conteudo: '5000', preco: '15,00' }],
     },
     desativar: { 'Batata palha': 'Saiu do cardápio de inverno' },
   },

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   custoDaEmbalagem,
+  custoDaQuantidade,
   dividirArredondado,
   formatarQuantidade,
   lerDinheiro,
@@ -52,8 +53,8 @@ describe('ERP · custo por unidade base', () => {
     expect(dividirArredondado(5, 2)).toBe(3);
     expect(dividirArredondado(4, 3)).toBe(1);
     // R$ 96,50 por 2,27 kg = R$ 42,5110… → R$ 42,51/kg
-    expect(custoDaEmbalagem(9650, 0, 2270)).toBe(4251);
+    expect(custoDaQuantidade(custoDaEmbalagem(9650, 0, 2270)!, 1000)).toBe(4251);
     // R$ 18,00 por 12 un = R$ 1,50/un
-    expect(custoDaEmbalagem(1800, 0, 12_000)).toBe(150);
+    expect(custoDaQuantidade(custoDaEmbalagem(1800, 0, 12_000)!, 1000)).toBe(150);
   });
 });

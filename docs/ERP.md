@@ -269,12 +269,19 @@ Sem migration: o esquema da 0.1 já tinha `InsumoVariante`, `tipo`,
    (un é un); o servidor converte para milésimos da unidade base
    (`lerQuantidadeNa`: em g/ml só inteiro, 1 g é o menor passo). Preço e frete
    em centavos, lidos do texto no servidor.
-2. **Custo de referência = (preço + frete) × 1000 ÷ conteúdo**, UM
-   arredondamento (metade para cima), em `custoDaEmbalagem`. A conta aparece
-   por extenso igual na prévia do formulário, na lista, no detalhe e no
-   histórico: "R$ 89,90 + R$ 5,00 frete ÷ 5 kg = R$ 18,98/kg". Frete é
-   **por embalagem** (a parte da entrega que cai em cada uma). Custo pelas
-   compras reais (último preço) continua sendo a 1.5.
+2. **Custo de referência EXATO = (preço + frete) ÷ conteúdo**, guardado como
+   fração inteira reduzida (`CustoExato { centavos, milesimos }`, em
+   `custoDaEmbalagem`): nada se arredonda antes de usar. A ficha técnica (1.3)
+   usa `custoDaQuantidade(custo, quantidadeMilesimos)`, UM arredondamento
+   (metade para cima) no fim: 180 g a R$ 94,90 por 5 kg = 342 centavos; 30
+   guardanapos a R$ 4,00 o milheiro = 12 centavos. Comparar e ordenar é por
+   multiplicação cruzada exata (`compararCustos`, BigInt por dentro). A tela
+   mostra duas casas a partir de 1 centavo e, abaixo disso, as casas que
+   precisar ("R$ 0,004/un", nunca "R$ 0,00"); em un, a conta ainda diz o
+   milheiro. A conta por extenso é a mesma na prévia, na lista, no detalhe e
+   no histórico: "R$ 89,90 + R$ 5,00 frete ÷ 5 kg = R$ 18,98/kg" /
+   "R$ 4,00 ÷ 1.000 un = R$ 0,004/un (R$ 4,00 o milheiro)". Frete é **por
+   embalagem**. Custo pelas compras reais (último preço) continua sendo a 1.5.
 3. **"Ainda não sei o preço"** grava 0 e a tela diz **"Sem preço"** (custo
    incompleto, nunca R$ 0,00), com filtro próprio; na ordem por custo fica
    sempre no fim. Preço 0 digitado sem marcar é recusado.
@@ -291,11 +298,12 @@ Sem migration: o esquema da 0.1 já tinha `InsumoVariante`, `tipo`,
    ficha que o produz), conferido com a linha travada na transação; a
    embalagem nova trava o insumo em FOR SHARE.
 7. **Desativar/reativar** com motivo opcional (não apaga: há FK de uso). Sai
-   da lista padrão (filtro "Desativados"/"Todas as situações"); nome repetido
+   da lista padrão (filtro "Desativados"/"Todos"); nome repetido
    de um desativado oferece abrir e reativar.
 8. **Histórico** na MESMA transação de toda gravação, só com o que mudou:
    tipo, conservação, embalagem ("5 kg"), preço ("Sem preço"), frete ("Sem
-   frete"), custo por unidade (fotografado), situação, código de barras; cada
+   frete"), custo por unidade (a fração exata do momento, não um centavo
+   arredondado), situação, código de barras; cada
    linha diz de quem é ("Cebola · Caixa 10 kg"). Campos na ordem da tela (o
    jsonb não guarda ordem). O filtro "Insumos" do histórico inclui as
    embalagens; o detalhe mostra as últimas 10 alterações do insumo e das
@@ -578,8 +586,10 @@ banco de teste: o operador é recusado pelo servidor.
 - Preço 0 é a sentinela de "Sem preço". Se aparecer item de fato gratuito,
   migrar para `precoEmbalagemCentavos` nulo.
 - Ordenar por custo é feito em memória (o custo é derivado, nunca gravado):
-  serve a centenas de insumos; com milhares, levar a conta para o SQL
-  (`cliente.sql`) com a mesma regra de arredondamento.
+  serve a centenas de insumos; com milhares, levar a comparação exata para o
+  SQL (`cliente.sql`, numeric).
+- Ficha técnica (1.3): custo do item = `custoDaQuantidade(custo, quantidade)`
+  — nunca multiplicar o custo/unidade arredondado da tela.
 - Nome único é sensível a maiúscula ("Cebola" ≠ "cebola"), como na 0.2.
 - O aviso de sair com alterações pega fechar/recarregar, não a navegação
   interna do Next (link do menu).

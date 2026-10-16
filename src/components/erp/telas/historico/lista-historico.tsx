@@ -14,7 +14,25 @@ const QUANDO = new Intl.DateTimeFormat('pt-BR', {
   timeZone: 'America/Sao_Paulo',
 });
 
-export function ListaHistorico({ linhas, compacta = false }: { linhas: LinhaDeHistorico[]; compacta?: boolean }) {
+/**
+ * `doInsumo`: a lista mora no detalhe desse insumo. O nome dele não se repete
+ * em toda linha ("Alterou insumo"; "Criou embalagem · Caixa 10 kg").
+ */
+function alvoVisivel(alvo: string | null, doInsumo?: string): string | null {
+  if (!alvo || !doInsumo) return alvo;
+  if (alvo === doInsumo) return null;
+  return alvo.startsWith(`${doInsumo} · `) ? alvo.slice(doInsumo.length + 3) : alvo;
+}
+
+export function ListaHistorico({
+  linhas,
+  compacta = false,
+  doInsumo,
+}: {
+  linhas: LinhaDeHistorico[];
+  compacta?: boolean;
+  doInsumo?: string;
+}) {
   return (
     <ol>
       {linhas.map((h) => {
@@ -23,7 +41,7 @@ export function ListaHistorico({ linhas, compacta = false }: { linhas: LinhaDeHi
           <>
             <span className="font-medium">{rotuloAcao(h.acao)}</span>{' '}
             <span className="text-suave">{rotuloEntidade(h.entidade).toLowerCase()}</span>
-            {h.alvo && <span className="text-texto"> · {h.alvo}</span>}
+            {alvoVisivel(h.alvo, doInsumo) && <span className="text-texto"> · {alvoVisivel(h.alvo, doInsumo)}</span>}
           </>
         );
         return (
@@ -35,7 +53,8 @@ export function ListaHistorico({ linhas, compacta = false }: { linhas: LinhaDeHi
           >
             {/* Cabeçalho da linha: o quê à esquerda, quando à direita (celular e modo compacto). */}
             <div className={`flex items-baseline justify-between gap-3 text-texto ${compacta ? '' : 'sm:hidden'}`}>
-              <div className="min-w-0 truncate">{oQue}</div>
+              {/* Compacta (coluna estreita): o quê quebra linha em vez de cortar. */}
+              <div className={`min-w-0 ${compacta ? '[overflow-wrap:anywhere]' : 'truncate'}`}>{oQue}</div>
               <time dateTime={h.ocorridoEm.toISOString()} className="shrink-0 text-[12px] tabular-nums text-suave">
                 {quando}
               </time>

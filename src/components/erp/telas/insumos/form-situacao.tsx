@@ -20,18 +20,20 @@ export function FormSituacao({
   acao: AcaoDeInsumo;
   /** Situação de agora: ativo → o botão desativa. */
   ativo: boolean;
-  /** "insumo" | "embalagem" */
-  oQue: string;
+  oQue: 'insumo' | 'embalagem';
   idBase: string;
 }) {
   const [estado, enviar] = useFormState<EstadoInsumo, FormData>(acao, null);
+  // Concordância: "o insumo … desativado" / "a embalagem … desativada".
+  const fem = oQue === 'embalagem';
+  const [o, este, desativ, ele] = fem ? ['a', 'Esta', 'desativada', 'ela'] : ['o', 'Este', 'desativado', 'ele'];
   return (
     <form action={enviar} className="space-y-3">
       <input type="hidden" name="ativo" value={ativo ? 'nao' : 'sim'} />
       <p className="text-sm text-suave">
         {ativo
-          ? `Desativar tira o ${oQue} da lista e da busca padrão. Nada é apagado: o histórico continua e dá para reativar.`
-          : `Este ${oQue} está desativado. Reativar devolve ele à lista.`}
+          ? `Desativar tira ${o} ${oQue} da lista e da busca padrão. Nada é apagado: o histórico continua e dá para reativar.`
+          : `${este} ${oQue} está ${desativ}. Reativar devolve ${ele} à lista.`}
       </p>
       <div>
         <label htmlFor={`${idBase}-motivo`} className={ROTULO}>
