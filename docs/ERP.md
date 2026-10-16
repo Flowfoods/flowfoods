@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -25,6 +25,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Validade por conservação (1.4) | `src/lib/erp/validade.ts` (puro: leitura, dias/horas ↔ minutos, texto, colunas); telas `telas/cadastro/{validade,campos-validade}.tsx`; migration `20261017000000_erp_validade` |
 | Entrada de compra e custo pelo último preço (1.5) | `src/lib/erp/{compra-campos,compras-custo,compras}.ts` (puro / última compra numa consulta / regras com banco); telas em `src/components/erp/telas/compras/`; rotas `/erp/compras` e `/rodolfo/erp/<slug>/compras` (notas, `nova`, `<id>`, `<id>/editar`, `fornecedores`); migrations `20261018000000_erp_validar_checks_insumo` e `20261018010000_erp_compras` |
 | Estoque: abertura do zero, livro-razão + saldo, nota entrando no estoque (1.6) | `src/lib/erp/{estoque-campos,estoque}.ts` (puro / com banco); telas em `src/components/erp/telas/estoque/`; rotas `/erp/estoque` e `/rodolfo/erp/<slug>/estoque` (`<loja>`, `<loja>/abertura`, `<loja>/abertura/conferir`); migration `20261019000000_erp_estoque_abertura` |
+| Contagem do dia a dia (inventário cíclico que fecha sozinho) e fechamento do período com piso (1.7) | `src/lib/erp/{contagem-campos,contagem}.ts` (puro / com banco; `contarItem` da 1.6 generalizado com ganchos); telas `telas/estoque/{planejar,planejar-form,conferir-contagem,periodo,cobertura,rascunho}.tsx`; rotas `<loja>/contagens/nova`, `<loja>/contagens/<id>`, `<loja>/contagens/<id>/conferir`, `<loja>/periodo` em `/erp/estoque` e `/rodolfo/erp/<slug>/estoque`; migrations `20261020000000_erp_contagem_ciclica` e `20261020010000_erp_contagem_fotografia` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
@@ -736,6 +737,117 @@ contados confirmados) e conclui; vê saldo e valor; lança nota na Penha e o
 saldo sobe; cancela e o saldo volta (estorno no livro); o gerente da Delivery
 não vê a Penha (404); o operador conta, mas não conclui.
 
+## O que a 1.7 entregou — contagem do dia a dia (inventário cíclico + fecha sozinha) e piso no fechamento do período
+
+Migration `20261020000000_erp_contagem_ciclica` (ADITIVA, sem exceção à
+regra; sem tabela nova: portão e RLS iguais): enum `ContagemDesfecho`
+(APLICADA, APLICADA_SOZINHA, VENCIDA) e `Contagem.desfecho` (FECHADA ⇔
+desfecho; as aberturas já fechadas viram APLICADA — com a RLS forçada, o
+FORCE sai e volta só naquela transação), `Contagem.titulo`; CHECKs (cíclica
+tem prazo, fechamento tem período, só a cíclica fecha sozinha/vence, título
+curto, `CONTAGEM` aponta o item da contagem — CHECK novo ao lado do da 1.6);
+índice parcial `Contagem_um_fechamento_por_loja_e_periodo` (só no SQL); na
+`Loja`, as regras da contagem com default e faixa. Provada em banco novo
+com dado da 1.6 como superusuário, dono não-superusuário com RLS e sem RLS
+(`migrate diff` vazio).
+
+1. **Ciclo = um pedaço por vez, pelo lugar** (decisão 72): o gerente
+   planeja escolhendo a conservação (é onde se conta) e "quais" — vencidos
+   pela frequência da curva ABC (valor do saldo hoje: A até 80 %, B até 95 %,
+   C o resto; frequência por classe na loja, padrão 7/15/30 dias; nunca
+   contado = vencido), todos do lugar, ou só a curva A — e marca/desmarca à
+   mão ("Recontar" no saldo abre com um insumo só: é como se corrige número
+   errado da abertura). Lista congelada como na 1.6; um insumo numa contagem
+   aberta só (trava da loja); até 500 por ciclo.
+2. **Contar = a tela da 1.6, generalizada** (`TelaContagem`, `contarItem`
+   com ganchos): a cada número salvo, o esperado é FOTOGRAFADO do livro
+   (`saldoSistemaMilesimos`).
+3. **Ajuste = contado − esperado, somado ao saldo de agora** (decisão 73):
+   nunca "saldo = contagem". Nota que entra depois de contar continua no
+   estoque; a conferência mostra "depois de contar: +4,54 kg (Nota 78111)" e
+   em quanto o saldo fica. `CONTAGEM` ± por item com diferença, valor pelo
+   custo de referência de agora (um arredondamento; sem preço = 0 e
+   "pendente"), chave `contagem:<item>`, `contagemItemId`. Não contado fica
+   como está (só com confirmação). Item recontado e aplicado depois por
+   outra contagem fica de fora.
+4. **Fecha sozinha** (decisão 74): contou o último item e TODOS batem
+   (diferença ≤ tolerância da loja em R$ por item, padrão R$ 5,00; sem preço
+   só se exato) e nada mexeu nos itens depois de contados → aplica na
+   transação de quem salvou (`APLICADA_SOZINHA`, "fechou sozinha" no nome de
+   quem fechou e no histórico). **Prazo** = fim do dia seguinte (Rio):
+   passou = "fechou sem aplicar" (`VENCIDA`), derivado na leitura e gravado
+   na próxima escrita (salvar, aplicar, planejar, fechar); número não entra;
+   aplicar é recusado. Sem cron.
+5. **Período e piso** (decisão 75): período pelo `ParceiroFlow` (mensal do
+   dia d; quinzenal d..d+14 e d+15..; semanal com dia 1–7 = segunda…domingo;
+   personalizado = `PeriodoApuracao` cadastrado, sem ele o mês civil).
+   Cobertura = insumos com contagem APLICADA no período (abertura, cíclica,
+   fechamento) sobre o universo (saldo ≠ 0 agora ∪ contados), por valor e
+   por itens; piso padrão 80 % do valor e 50 % dos insumos. **Fechamento**:
+   contagem FECHAMENTO (loja × período) com o que ainda não foi contado no
+   período ("para o piso" nos de maior valor); abre nos 3 últimos dias do
+   período (ou depois), sem cíclica aberta; aplicar só com a cobertura (com
+   o que foi contado nele, pelo saldo de depois do ajuste) no piso — senão a
+   frase com os números e quantos faltam, nada gravado. Fotografa o estoque
+   final (valor pelo custo de referência) em `valorTotalCentavos`: base do
+   CMV real (2.3, não feito). `PeriodoApuracao` é criado (upsert) ao começar;
+   o `status` dele é do DRE (2.2) — se já FECHADO, recusa.
+6. **Regras da loja** (piso, frequência, tolerância): só com "cadastrar
+   lojas" (rede inteira = dona): o gerente não baixa o piso que o trava.
+   Condicional aos valores lidos, histórico na mesma transação.
+7. **Telas** (as mesmas no N1 e no parceiro): no estoque da loja, "Contagem
+   do dia a dia" (cobertura × piso com a marca do piso, abertas, Planejar,
+   Ver o período) e "Recontar" por insumo; Planejar contagem; a contagem;
+   Conferir divergências / Conferir e fechar (livro ao contar, contado,
+   diferença em quantidade e R$, depois de contar, fica em; bateram e sem
+   contar; aplicar, descartar; resultado quando fechada); Período e
+   contagens (cobertura, o que falta, fechamento, contagens, regras).
+8. **Permissões** (catálogo 0.4, sem permissão nova): ver = `estoque.ver`,
+   contar = `estoque.contar`, planejar/aplicar/descartar/fechar =
+   `estoque.ajustar`, sempre com a loja; regras = `lojas.gerir`.
+9. **Heranças da 1.6 resolvidas**: (a) tetos — contagem até 100 mil
+   kg/L/un por item, valor por item até R$ 1 milhão (conferência e servidor,
+   abertura e cíclica), total da contagem e razão/saldo conferidos contra o
+   INTEGER antes do banco (`ErroDeTeto`), também na nota: frase em vez de
+   500; (b) contagem com luva — alvos de 48 px ("Não tem", kg/g, "Falhou ·
+   tentar de novo"), rascunho local por contagem/item com a versão
+   (`rascunho.ts`: reenviado quando o sinal volta ou a página reabre;
+   número velho vira conflito no servidor, nunca sobrescreve; salvo =
+   apagado), "em breve" no lugar das fases, "Só gerente ou dona concluem",
+   cabeçalho do estoque mais curto e explicação recolhível, filtro de
+   conservação que rola com indício a 390 px.
+
+10. **Revisão (Guardião + UX, volta 1)**: (a) o número vale para quando
+    foi DIGITADO (decisão 76): a tela manda a idade do número (relógio do
+    aparelho; o rascunho guarda a hora em que se digitou), o servidor prende
+    entre o início da contagem e agora e fotografa o livro daquele instante
+    (`livroNoInstante`: saldo − o que entrou depois, numa consulta); o
+    rascunho reenviado depois de uma nota não apaga a nota — ela aparece em
+    "depois de contar" e segura o "fecha sozinha"; corrigir número segue a
+    mesma regra. Rascunho por contagem E pessoa. (b) Fotografia imutável no
+    banco: migration aditiva `20261020010000_erp_contagem_fotografia`
+    (gatilhos `Contagem_fechada_imutavel` e `ContagemItem_da_fechada_imutavel`;
+    DELETE segue possível, como no razão). (c) Regras da loja só gravam com as
+    seis regras lidas. (d) Conferência com colunas fixas e "depois de contar"
+    na 2ª linha do item; perda em vermelho, sobra em verde; "Mais caro (A) /
+    Médio (B) / Menor (C)", "Todos daqui"; uma faixa só na contagem aplicada;
+    "Cobertura da semana de …"; contagem fechada mostra o "fica em" que o
+    ajuste dela deixou.
+
+## Provar a contagem (1.7)
+
+```bash
+npx vitest run tests/erp-contagem.test.ts tests/erp-estoque.test.ts   # período, ABC, vencidos, prazo, divergência, fecha sozinha, ajuste exato, cobertura × piso, regras; tetos e rascunho (heranças a–b)
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-contagem.db.test.ts tests/erp-estoque.db.test.ts
+```
+Na tela (Casa Alfa, Vila da Penha aberta há 10 dias, semana que termina
+hoje): o gerente planeja os refrigerados; o operador conta no celular, o
+sinal cai ("Falhou", guardado no aparelho) e volta (reenviado, "Salvo"); a
+dona lança nota de cheddar no meio; o gerente confere ("depois de contar:
++4,54 kg") e aplica; a cobertura sobe; o fechamento com só o guardanapo é
+recusado ("não fecha abaixo do piso"); conta os "para o piso" e fecha; um
+"Recontar" que bate fecha sozinho.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -743,7 +855,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Bloco | Tabela | Para quê |
 |---|---|---|
 | Estrutura | `ParceiroFlow` | N2, o tenant. Ganhou `periodoTipo`/`periodoDiaInicio` (sugestão de período do DRE) |
-| Estrutura | `Loja` | N3, loja/unidade do parceiro; estoque, produção e faturamento são por loja |
+| Estrutura | `Loja` | N3, loja/unidade do parceiro; estoque, produção e faturamento são por loja. 1.7: regras da contagem (piso do fechamento, frequência ABC, tolerância para fechar sozinha) |
 | Estrutura | `Marca` | marca do grupo; produto e faturamento podem apontar marca |
 | Estrutura | `Colaborador` | pessoa da operação; âncora do histórico por funcionário (login vem na 0.3) |
 | Insumos | `Insumo` | já existia; ganhou tipo (ingrediente/embalagem/pré-preparo), taxa de entrega, conservação e validade por conservação, mínimo, fornecedor padrão, origem |
@@ -758,7 +870,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Venda | `CanalConfig` | taxa do canal (%, fixa) e margem-alvo padrão, por parceiro |
 | Estoque | `SaldoEstoque` | saldo e valor por loja × insumo (soma do razão, atualizada na mesma transação, com versão) |
 | Estoque | `MovimentoEstoque` | livro-razão: abertura, entrada, requisição, produção, ajuste, contagem, perda; snapshot e saldo antes/depois; estorno = mesmo tipo, sinal contrário, `estornoDeId` único (1.6) |
-| Estoque | `Contagem` / `ContagemItem` | abertura (1.6: estado da loja), cíclica, fechamento de período; sistema × contado; versão, lista e fator congelados, digitado × normalizado. O "piso obrigatório no fechamento" (1.7) é regra da lógica da 1.7, não do esquema |
+| Estoque | `Contagem` / `ContagemItem` | abertura (1.6: estado da loja), cíclica e fechamento de período (1.7: título, prazo, desfecho aplicada/fechou sozinha/venceu; fechamento aponta o `PeriodoApuracao`, um por loja); esperado (livro na hora de contar) × contado; versão, lista e fator congelados, digitado × normalizado. O piso é regra da lógica com os números na `Loja` |
 | Estoque | `Requisicao` / `RequisicaoItem` | pedido do setor; a baixa sai daqui |
 | Produção | `OrdemProducao` | lote: planejado/produzido, custo, responsável (snapshot). Lista do dia = ordens planejadas × saldo (derivada) |
 | Produção | `Etiqueta` | etiqueta impressa: lote do fornecedor, validade, abertura, snapshot |
@@ -904,7 +1016,7 @@ banco de teste: o operador é recusado pelo servidor.
 - Cada operação avulsa do portão é uma transação curta (contexto + operação). Tela com muitas leituras: agrupar em `cliente.transacao`.
 - Dois pools de conexão por processo (portal + portão de tenant): conferir `connection_limit` na VPS.
 - `DreLinha.sentido` tem default `MENOR_MELHOR`: linhas de receita nascem `MAIOR_MELHOR` (tratar na 2.2).
-- "Piso obrigatório" da contagem fica na lógica da 1.7.
+- ~~"Piso obrigatório" da contagem fica na lógica da 1.7.~~ **1.7:** `coberturaDoPeriodo` + `concluirContagem`, números na `Loja`.
 
 ## Herança da 0.2 (apontada pelos fiscais)
 
@@ -1112,15 +1224,14 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.6 (para as próximas subfases)
 
-- **1.7 contagem cíclica**: reaproveita `ContagemItem` (lista e fator
+- ~~**1.7 contagem cíclica**~~ **Feito na 1.7** (variantes de embalagem na contagem e recontagem com as duas versões e motivo seguem abertas): reaproveita `ContagemItem` (lista e fator
   congelados, digitado × normalizado, versão por item, conflito), a tela de
   contar (`TelaContagem`) e `gravarMovimentos`; o acerto entra como
   `CONTAGEM` (±) com `contagemItemId`. Falta: agenda/fecha sozinha, janela
   máxima (contagem velha não se aplica como de agora), piso no fechamento do
   período, recontagem com as duas versões e motivo, variantes de embalagem na
   contagem.
-- Correção da abertura é pela 1.7 (ajuste/contagem); até lá, número errado na
-  abertura só se corrige com um movimento novo (não há tela de ajuste).
+- ~~Correção da abertura é pela 1.7.~~ **1.7:** "Recontar" no saldo.
 - Nota de HOJE lançada depois de concluir entra no estoque (assume que chegou
   depois da contagem); a conferência avisa das notas de hoje já lançadas. Com
   várias réplicas do app, `lancadaEm` × `fechadaEm` dependem do relógio de
@@ -1138,6 +1249,44 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.6 (apontada pelos fiscais)
 
-- [médio] Estouro de INT4: contagem de 1.000.000 kg × R$ 26,75 estoura `concluirAbertura` (500, sem corromper); o mesmo pode ocorrer no saldo em `gravarMovimentos` acima de ~R$ 21 mi por insumo. Conferir tetos na conferência e ao gravar movimentos, com frase em vez de 500; baixar o teto da contagem.
-- UX (contagem com luva): alvos "Não tem", seletor kg/g e "Tentar de novo" de 40 → 48 px; rascunho local (localStorage) do número que falhou ao salvar, reenviado quando o sinal voltar; "fase 1.7/1.8" → "em breve"; "Só gerente ou dona concluem"; cabeçalho do estoque no celular mais curto; filtro de conservação cortado a 390 px sem indício de rolagem.
+- ~~[médio] Estouro de INT4~~ **1.7 (a):** contagem de 1.000.000 kg × R$ 26,75 estoura `concluirAbertura` (500, sem corromper); o mesmo pode ocorrer no saldo em `gravarMovimentos` acima de ~R$ 21 mi por insumo. Conferir tetos na conferência e ao gravar movimentos, com frase em vez de 500; baixar o teto da contagem.
+- ~~UX (contagem com luva)~~ **1.7 (b):** alvos "Não tem", seletor kg/g e "Tentar de novo" de 40 → 48 px; rascunho local (localStorage) do número que falhou ao salvar, reenviado quando o sinal voltar; "fase 1.7/1.8" → "em breve"; "Só gerente ou dona concluem"; cabeçalho do estoque no celular mais curto; filtro de conservação cortado a 390 px sem indício de rolagem.
 - Correção de número errado na abertura só pela 1.7; valor da época × de hoje no CMV real fica para a 2.3; variantes de embalagem na contagem e paginação do saldo para milhares de insumos.
+
+## Herança da 1.7 (para as próximas subfases)
+
+- **1.8 requisição**: a baixa pela requisição entra no livro antes da
+  contagem; a conferência já separa "livro ao contar" de "depois de contar".
+  Cruzar requisição × contagem: diferença negativa sem requisição =
+  divergência/perda (hoje o texto diz "diferença não é perda").
+- **2.3 CMV real**: inicial = estoque final fotografado do fechamento
+  anterior (ou a abertura, no 1º período); final = `valorTotalCentavos` do
+  FECHAMENTO aplicado; compras pela data da nota. Fechamento aplicado DEPOIS
+  do fim do período inclui o que se moveu entre o fim e o fechamento: a 2.3
+  desconta pelo `ocorridoEm` do livro. Valor da época (razão) × custo de
+  referência de hoje (fotografado) — a 2.3 escolhe.
+- `PeriodoApuracao.status` não muda na 1.7 (é do DRE, 2.2); fechar o
+  período no DRE deve exigir o FECHAMENTO aplicado de cada loja aberta.
+- Fecha sozinha usa a tolerância por item da loja: diferenças pequenas
+  repetidas somam (vigiar no relatório de divergências da 1.8).
+- A hora de contar vem do aparelho (idade do número): dado não confiável,
+  preso entre o início da contagem e agora. O pior caso é o aparelho dizer
+  que contou MAIS TARDE do que contou (o esperado passa a incluir o que entrou
+  no meio) — indistinguível de recontar de verdade; o histórico guarda quem
+  e quando. Relógio do servidor com várias réplicas: `ocorridoEm` × hora
+  digitada dependem dele (como na 1.6).
+- Sem lembrete/cobrança (Notion §7, outbox) e sem link de contagem sem
+  login; contagem vencida só é gravada na próxima escrita da loja (a tela
+  já mostra "fechou sem aplicar").
+- Universo da cobertura: saldo ≠ 0 agora ∪ contados no período; insumo
+  zerado nunca contado não pesa. Período personalizado sem cadastro cai no
+  mês civil (avisado).
+- Variantes de embalagem na contagem, recontagem com as duas versões e
+  motivo (hoje: antes/depois no histórico), paginação para milhares de
+  insumos (planejar e saldo leem tudo).
+
+## Herança da 1.7 (apontada pelos fiscais)
+
+- [baixo] A idade do número digitado vem do aparelho: forjá-la empurra o esperado até o início da contagem (fica visível como "depois de contar" e trava o "fecha sozinha"; só o gerente aplica).
+- UX: coluna "Contado" corta a conta de embalagens ("1 × 2 kg + 600 g" em linha própria); "sem preço · confira" mais curto na coluna Diferença.
+- 1.8: cruzar requisição × contagem; diferenças pequenas repetidas dentro da tolerância precisam de vigilância. 2.3: CMV desconta o que se moveu entre o fim do período e o fechamento. Sem lembretes de contagem nem link sem login; planejamento e saldo sem paginação.

@@ -7,13 +7,29 @@
  * `lojaId`): contar = "fazer contagem"; abrir, concluir e descartar = "ajustar
  * saldo". A regra (`estoque.ts`) confere a loja de novo. Esconder o botão é
  * conforto; quem decide é aqui.
+ *
+ * 1.7: planejar, aplicar, descartar e fechar o período = "ajustar saldo";
+ * contar = "fazer contagem"; mudar as regras da contagem da loja = "cadastrar
+ * lojas" (rede inteira). O período vem do parceiro DA SESSÃO.
  */
 
 import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
 import type { ResultadoDoItem } from '@/lib/erp/estoque';
 import type { Permissao } from '@/lib/erp/permissoes';
 import type { EstadoEstoque, ItemParaSalvar } from '@/components/erp/telas/estoque/estado';
-import { executarConcluir, executarContar, executarDescartar, executarIniciar, recusadoNoEstoque } from '@/components/erp/telas/estoque/executar';
+import {
+  executarConcluir,
+  executarConcluirContagem,
+  executarContar,
+  executarContarNaContagem,
+  executarDescartar,
+  executarDescartarContagem,
+  executarIniciar,
+  executarIniciarCiclo,
+  executarIniciarFechamento,
+  executarSalvarRegras,
+  recusadoNoEstoque,
+} from '@/components/erp/telas/estoque/executar';
 
 const BASE = '/erp/estoque';
 
@@ -45,4 +61,42 @@ export async function acaoDescartarAbertura(lojaId: string, anterior: EstadoEsto
   const { ctx, negado } = await preparar(lojaId, 'estoque.ajustar');
   if (negado) return recusadoNoEstoque(anterior, negado);
   return executarDescartar(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, BASE);
+}
+
+// ================================================================ 1.7: contagem do dia a dia
+
+export async function acaoIniciarCiclo(lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado } = await preparar(lojaId, 'estoque.ajustar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarIniciarCiclo(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, BASE);
+}
+
+export async function acaoContarNaContagem(lojaId: string, contagemId: string, item: ItemParaSalvar): Promise<ResultadoDoItem> {
+  const { ctx, negado } = await preparar(lojaId, 'estoque.contar');
+  if (negado) return { ok: false, erros: { geral: negado } };
+  return executarContarNaContagem(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(contagemId), item);
+}
+
+export async function acaoConcluirContagem(lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado } = await preparar(lojaId, 'estoque.ajustar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarConcluirContagem(ctx.cliente, ctx.alcance, ctx.parceiro, ctx.sessao.autorNome, String(lojaId), String(contagemId), anterior, form, BASE);
+}
+
+export async function acaoDescartarContagem(lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado } = await preparar(lojaId, 'estoque.ajustar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarDescartarContagem(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(contagemId), anterior, form, BASE);
+}
+
+export async function acaoIniciarFechamento(lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado } = await preparar(lojaId, 'estoque.ajustar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarIniciarFechamento(ctx.cliente, ctx.alcance, ctx.parceiro, ctx.sessao.autorNome, String(lojaId), anterior, form, BASE);
+}
+
+export async function acaoSalvarRegrasDaContagem(lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado } = await preparar(lojaId, 'lojas.gerir');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  return executarSalvarRegras(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, BASE);
 }

@@ -13,7 +13,19 @@ import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
 import type { ResultadoDoItem } from '@/lib/erp/estoque';
 import type { Permissao } from '@/lib/erp/permissoes';
 import type { EstadoEstoque, ItemParaSalvar } from '@/components/erp/telas/estoque/estado';
-import { executarConcluir, executarContar, executarDescartar, executarIniciar, recusadoNoEstoque } from '@/components/erp/telas/estoque/executar';
+import {
+  executarConcluir,
+  executarConcluirContagem,
+  executarContar,
+  executarContarNaContagem,
+  executarDescartar,
+  executarDescartarContagem,
+  executarIniciar,
+  executarIniciarCiclo,
+  executarIniciarFechamento,
+  executarSalvarRegras,
+  recusadoNoEstoque,
+} from '@/components/erp/telas/estoque/executar';
 
 async function preparar(slug: string, lojaId: string, permissao: Permissao) {
   const ctx = await exigirParceiro(slug);
@@ -50,4 +62,47 @@ export async function acaoDescartarAbertura(slug: string, lojaId: string, anteri
   if (negado) return recusadoNoEstoque(anterior, negado);
   await auditar(ctx, 'erp_estoque_abertura_descartar', lojaId);
   return executarDescartar(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, base);
+}
+
+// ================================================================ 1.7: contagem do dia a dia
+
+export async function acaoIniciarCiclo(slug: string, lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base } = await preparar(slug, lojaId, 'estoque.ajustar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_estoque_ciclo_iniciar', lojaId);
+  return executarIniciarCiclo(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, base);
+}
+
+export async function acaoContarNaContagem(slug: string, lojaId: string, contagemId: string, item: ItemParaSalvar): Promise<ResultadoDoItem> {
+  const { ctx, negado } = await preparar(slug, lojaId, 'estoque.contar');
+  if (negado) return { ok: false, erros: { geral: negado } };
+  return executarContarNaContagem(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(contagemId), item);
+}
+
+export async function acaoConcluirContagem(slug: string, lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base } = await preparar(slug, lojaId, 'estoque.ajustar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_estoque_contagem_concluir', lojaId);
+  return executarConcluirContagem(ctx.cliente, ctx.alcance, ctx.parceiro, ctx.sessao.autorNome, String(lojaId), String(contagemId), anterior, form, base);
+}
+
+export async function acaoDescartarContagem(slug: string, lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base } = await preparar(slug, lojaId, 'estoque.ajustar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_estoque_contagem_descartar', lojaId);
+  return executarDescartarContagem(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(contagemId), anterior, form, base);
+}
+
+export async function acaoIniciarFechamento(slug: string, lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base } = await preparar(slug, lojaId, 'estoque.ajustar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_estoque_fechamento_iniciar', lojaId);
+  return executarIniciarFechamento(ctx.cliente, ctx.alcance, ctx.parceiro, ctx.sessao.autorNome, String(lojaId), anterior, form, base);
+}
+
+export async function acaoSalvarRegrasDaContagem(slug: string, lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base } = await preparar(slug, lojaId, 'lojas.gerir');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_estoque_regras_salvar', lojaId);
+  return executarSalvarRegras(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, base);
 }

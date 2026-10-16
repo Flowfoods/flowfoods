@@ -39,6 +39,9 @@ import {
   chaveDoSaldo,
   efeitoDaNota,
   entradasDaNota,
+  ErroDeTeto,
+  estouroDoRazao,
+  instanteDigitado,
   estadoDoEstoque,
   estornoDe,
   fraseDoEfeito,
@@ -47,6 +50,8 @@ import {
   resumoDaContagem,
   somarValores,
   textoDaContagem,
+  totalAcimaDoLimite,
+  valorAcimaDoTeto,
   valorDaQuantidade,
   type ContagemDigitada,
   type EstadoDoEstoque,
@@ -63,7 +68,8 @@ export type ResultadoEstoque =
 
 type Recusada = Extract<ResultadoEstoque, { ok: false }>;
 
-class Recusa extends Error {
+/** Recusa com resultado pronto (desfaz a transação). Usada também pela contagem do dia a dia (`contagem.ts`). */
+export class Recusa extends Error {
   constructor(readonly resultado: Recusada) {
     super('recusa');
   }
@@ -83,7 +89,7 @@ async function lojasCom(tx: ClienteDoParceiro, alcance: Alcance, permissao: Perm
 }
 
 /** A loja, se está no alcance e a pessoa tem a permissão nela; senão a recusa. */
-async function lojaDoAlcance(tx: ClienteDoParceiro, alcance: Alcance, lojaId: string, permissao: Permissao) {
+export async function lojaDoAlcance(tx: ClienteDoParceiro, alcance: Alcance, lojaId: string, permissao: Permissao) {
   if (!ID.test(lojaId) || !alcancaLoja(alcance, lojaId)) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_LOJA_FORA }, naoEncontrado: true });
   const loja = await tx.loja.findUnique({ where: { id: lojaId }, select: { id: true, nome: true, ativa: true } });
   if (!loja) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_LOJA_FORA }, naoEncontrado: true });
@@ -92,11 +98,12 @@ async function lojaDoAlcance(tx: ClienteDoParceiro, alcance: Alcance, lojaId: st
   return loja;
 }
 
-async function comRecusa<T>(fn: () => Promise<T>): Promise<T | Recusada> {
+export async function comRecusa<T>(fn: () => Promise<T>): Promise<T | Recusada> {
   try {
     return await fn();
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
+    if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
     throw e;
   }
 }
@@ -111,7 +118,7 @@ interface AberturaLida {
 }
 
 /** A abertura (não descartada) de cada loja pedida. */
-async function aberturasDe(tx: ClienteDoParceiro, lojaIds: readonly string[]): Promise<Map<string, AberturaLida>> {
+export async function aberturasDe(tx: ClienteDoParceiro, lojaIds: readonly string[]): Promise<Map<string, AberturaLida>> {
   if (lojaIds.length === 0) return new Map();
   const lidas = await tx.contagem.findMany({
     where: { tipo: 'ABERTURA', status: { not: 'CANCELADA' }, lojaId: { in: [...lojaIds] } },
@@ -216,6 +223,9 @@ export async function gravarMovimentos(
     new Map(travados.map((s) => [chaveDoSaldo(s.lojaId, s.insumoId), { quantidadeMilesimos: s.quantidadeMilesimos, valorCentavos: s.valorCentavos }])),
     movimentos,
   );
+  // Herança a da 1.6: estourar o INTEGER vira frase, nunca 500 (nada gravado: a transação volta).
+  const estouro = estouroDoRazao(linhas, finais);
+  if (estouro) throw new ErroDeTeto(estouro);
   const quando = opcoes.ocorridoEm ?? new Date();
   await tx.movimentoEstoque.createMany({
     data: linhas.map((m) => ({
@@ -411,7 +421,7 @@ export async function situacaoDoEstoque(cliente: ClienteDoParceiro, alcance: Alc
  * com nome, unidade, conservação e a embalagem padrão). Já começada =
  * devolve a mesma (idempotente, inclusive na corrida); já aberta = recusa.
  */
-export async function iniciarAbertura(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, autorNome = 'Sistema'): Promise<ResultadoEstoque> {
+export async function iniciarAbertura(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, autorNome = 'Sistema', agora = new Date()): Promise<ResultadoEstoque> {
   const tentar = () =>
     comRecusa(() =>
       cliente.transacao(
@@ -419,7 +429,7 @@ export async function iniciarAbertura(cliente: ClienteDoParceiro, alcance: Alcan
           const loja = await lojaDoAlcance(tx, alcance, lojaId, 'estoque.ajustar');
           const ja = (await aberturasDe(tx, [lojaId])).get(lojaId);
           if (ja?.status === 'ABERTA') return { ok: true as const, id: ja.id, jaFeito: true };
-          if (ja?.status === 'FECHADA') throw new Recusa({ ok: false, erros: { geral: `O estoque da ${loja.nome} já está aberto. Correção de saldo é pela contagem (fase 1.7), nunca reabrindo.` } });
+          if (ja?.status === 'FECHADA') throw new Recusa({ ok: false, erros: { geral: `O estoque da ${loja.nome} já está aberto. Correção de saldo é por uma contagem (Planejar contagem), nunca reabrindo.` } });
           if (!loja.ativa) throw new Recusa({ ok: false, erros: { geral: `A ${loja.nome} está desativada: reative a loja antes de abrir o estoque.` } });
           const insumos = await tx.insumo.findMany({
             where: { ativo: true },
@@ -428,26 +438,10 @@ export async function iniciarAbertura(cliente: ClienteDoParceiro, alcance: Alcan
           });
           if (insumos.length === 0) throw new Recusa({ ok: false, erros: { geral: 'Nenhum insumo ativo para contar. Cadastre os insumos antes de abrir o estoque.' } });
           const c = await tx.contagem.create({
-            data: { parceiroId: tx.parceiroId, lojaId, tipo: 'ABERTURA', status: 'ABERTA', referenciaEm: new Date(`${hojeNoRio()}T00:00:00.000Z`), iniciadaPorNome: autorNome },
+            data: { parceiroId: tx.parceiroId, lojaId, tipo: 'ABERTURA', status: 'ABERTA', referenciaEm: new Date(`${hojeNoRio(agora)}T00:00:00.000Z`), iniciadaPorNome: autorNome, criadoEm: agora },
             select: { id: true },
           });
-          await tx.contagemItem.createMany({
-            data: insumos.map((i) => {
-              const porEmbalagem = i.tipo !== 'PRE_PREPARO' && i.conteudoMilesimos !== 1000;
-              return {
-                parceiroId: tx.parceiroId,
-                contagemId: c.id,
-                insumoId: i.id,
-                insumoNomeSnapshot: i.nome,
-                unidadeSnapshot: i.unidade,
-                conservacaoSnapshot: i.conservacao,
-                embalagemSnapshot: porEmbalagem ? `embalagem de ${formatarQuantidade(i.conteudoMilesimos, i.unidade)}` : null,
-                embalagemConteudoMilesimos: porEmbalagem ? i.conteudoMilesimos : null,
-                saldoSistemaMilesimos: 0,
-                valorSistemaCentavos: 0,
-              };
-            }),
-          });
+          await tx.contagemItem.createMany({ data: insumos.map((i) => itemCongelado(tx.parceiroId, c.id, i)) });
           await tx.historicoAlteracao.create({
             data: {
               parceiroId: tx.parceiroId,
@@ -484,7 +478,7 @@ export async function descartarAbertura(cliente: ClienteDoParceiro, alcance: Alc
         WHERE "parceiroId" = ${tx.parceiroId} AND "lojaId" = ${lojaId} AND "tipo" = 'ABERTURA' AND "status" <> 'CANCELADA'
         FOR UPDATE`;
       if (!c) throw new Recusa({ ok: false, erros: { geral: 'Não há contagem de abertura em andamento nesta loja.' }, conflito: true });
-      if (c.status === 'FECHADA') throw new Recusa({ ok: false, erros: { geral: 'A abertura já foi concluída: não se descarta. Correção é pela contagem (fase 1.7).' }, conflito: true });
+      if (c.status === 'FECHADA') throw new Recusa({ ok: false, erros: { geral: 'A abertura já foi concluída: não se descarta. Correção é por uma contagem (Planejar contagem).' }, conflito: true });
       await tx.contagem.updateMany({ where: { id: c.id, status: 'ABERTA' }, data: { status: 'CANCELADA' } });
       await tx.historicoAlteracao.create({
         data: {
@@ -503,7 +497,34 @@ export async function descartarAbertura(cliente: ClienteDoParceiro, alcance: Alc
   );
 }
 
-// ================================================================ abertura: contar
+/**
+ * O item como entra numa contagem: lista e fator CONGELADOS (nome, unidade,
+ * conservação e a embalagem padrão do momento) e o esperado do livro de
+ * agora (a cíclica fotografa de novo a cada número salvo). O mesmo para a
+ * abertura (1.6), a cíclica e o fechamento (1.7).
+ */
+export function itemCongelado(
+  parceiroId: string,
+  contagemId: string,
+  i: { id: string; nome: string; unidade: Unidade; conservacao: Conservacao; conteudoMilesimos: number; tipo: string },
+  saldo: { quantidadeMilesimos: number; valorCentavos: number } = { quantidadeMilesimos: 0, valorCentavos: 0 },
+) {
+  const porEmbalagem = i.tipo !== 'PRE_PREPARO' && i.conteudoMilesimos !== 1000;
+  return {
+    parceiroId,
+    contagemId,
+    insumoId: i.id,
+    insumoNomeSnapshot: i.nome,
+    unidadeSnapshot: i.unidade,
+    conservacaoSnapshot: i.conservacao,
+    embalagemSnapshot: porEmbalagem ? `embalagem de ${formatarQuantidade(i.conteudoMilesimos, i.unidade)}` : null,
+    embalagemConteudoMilesimos: porEmbalagem ? i.conteudoMilesimos : null,
+    saldoSistemaMilesimos: saldo.quantidadeMilesimos,
+    valorSistemaCentavos: saldo.valorCentavos,
+  };
+}
+
+// ================================================================ contar (abertura e, pela 1.7, toda contagem)
 
 export interface ItemDaContagem {
   id: string;
@@ -520,7 +541,7 @@ export interface ItemDaContagem {
   em: Date | null;
 }
 
-const SELECAO_DO_ITEM = {
+export const SELECAO_DO_ITEM = {
   id: true,
   insumoId: true,
   insumoNomeSnapshot: true,
@@ -537,7 +558,7 @@ const SELECAO_DO_ITEM = {
   versao: true,
 } as const;
 
-type ItemLido = {
+export type ItemLido = {
   id: string;
   insumoId: string;
   insumoNomeSnapshot: string;
@@ -554,7 +575,7 @@ type ItemLido = {
   versao: number;
 };
 
-function paraTela(i: ItemLido): ItemDaContagem {
+export function paraTela(i: ItemLido): ItemDaContagem {
   const unidade = i.unidadeSnapshot as Unidade;
   return {
     id: i.id,
@@ -592,8 +613,37 @@ export async function obterContagemDeAbertura(cliente: ClienteDoParceiro, alcanc
 export type ContagemDeAbertura = NonNullable<Awaited<ReturnType<typeof obterContagemDeAbertura>>>;
 
 export type ResultadoDoItem =
-  | { ok: true; item: ItemDaContagem }
+  | { ok: true; item: ItemDaContagem; fechouSozinha?: boolean }
   | { ok: false; erros: Partial<Record<'embalagens' | 'solto' | 'geral', string>>; conflito?: { item: ItemDaContagem }; fechada?: boolean };
+
+/** A contagem que o item salvo toca (para os ganchos da 1.7). */
+export interface ContagemDoItem {
+  id: string;
+  tipo: 'ABERTURA' | 'CICLICA' | 'FECHAMENTO';
+  status: 'ABERTA' | 'FECHADA' | 'CANCELADA';
+  desfecho: 'APLICADA' | 'APLICADA_SOZINHA' | 'VENCIDA' | null;
+  fechaAutomaticoEm: Date | null;
+  fechadaPorNome: string | null;
+}
+
+/**
+ * Ganchos da contagem do dia a dia (1.7) dentro da MESMA transação do número
+ * salvo: `antes` pode fechar a contagem vencida (e devolve a frase: o número
+ * não entra, mas o "fechou sem aplicar" fica gravado); `depois` pode fechar a
+ * contagem sozinha.
+ */
+export interface GanchosDaContagem {
+  antes?: (tx: ClienteDoParceiro, c: ContagemDoItem, agora: Date) => Promise<string | null>;
+  depois?: (tx: ClienteDoParceiro, c: ContagemDoItem, agora: Date, autorNome: string) => Promise<{ fechouSozinha: boolean }>;
+}
+
+function fraseDaContagemFechada(c: Pick<ContagemDoItem, 'tipo' | 'status' | 'desfecho' | 'fechadaPorNome'>): string {
+  if (c.status === 'CANCELADA') return 'Esta contagem foi descartada: este número não entrou.';
+  if (c.tipo === 'ABERTURA') return `A abertura já foi concluída${c.fechadaPorNome ? ` por ${c.fechadaPorNome}` : ''}: este número não entrou. Correção é por uma contagem (Planejar contagem).`;
+  if (c.desfecho === 'VENCIDA') return 'O prazo desta contagem acabou e ela fechou sem mexer no estoque: este número não entrou. Peça ao gerente outra contagem.';
+  if (c.desfecho === 'APLICADA_SOZINHA') return 'Esta contagem já fechou sozinha (tudo bateu): este número não entrou.';
+  return `Esta contagem já foi aplicada${c.fechadaPorNome ? ` por ${c.fechadaPorNome}` : ''}: este número não entrou.`;
+}
 
 /**
  * Salva o número de UM item (a tela chama sozinha, ao parar de digitar).
@@ -605,9 +655,11 @@ export async function contarItem(
   cliente: ClienteDoParceiro,
   alcance: Alcance,
   lojaId: string,
-  entrada: { itemId: unknown; embalagens: unknown; solto: unknown; escala: unknown; versao: unknown },
+  entrada: { itemId: unknown; embalagens: unknown; solto: unknown; escala: unknown; versao: unknown; idadeMs?: unknown },
   autorNome = 'Sistema',
+  opcoes: { contagemId?: string; agora?: Date; ganchos?: GanchosDaContagem } = {},
 ): Promise<ResultadoDoItem> {
+  const agora = opcoes.agora ?? new Date();
   const itemId = typeof entrada.itemId === 'string' && ID.test(entrada.itemId) ? entrada.itemId : '';
   const versaoLida = typeof entrada.versao === 'number' ? entrada.versao : Number(entrada.versao);
   const digitado: ContagemDigitada = {
@@ -620,27 +672,36 @@ export async function contarItem(
     return await cliente.transacao(async (tx) => {
       await lojaDoAlcance(tx, alcance, lojaId, 'estoque.contar');
       const item = await tx.contagemItem.findFirst({
-        where: { id: itemId, contagem: { lojaId, tipo: 'ABERTURA' } },
-        select: { ...SELECAO_DO_ITEM, contagemId: true },
+        where: opcoes.contagemId ? { id: itemId, contagemId: opcoes.contagemId, contagem: { lojaId } } : { id: itemId, contagem: { lojaId, tipo: 'ABERTURA' } },
+        select: { ...SELECAO_DO_ITEM, contagemId: true, contagem: { select: { id: true, tipo: true, status: true, desfecho: true, fechaAutomaticoEm: true, fechadaPorNome: true, criadoEm: true } } },
       });
       if (!item) throw new Recusa({ ok: false, erros: { geral: 'Item não encontrado nesta contagem. Recarregue a página.' }, naoEncontrado: true });
+      const contagem = item.contagem as ContagemDoItem;
       const unidade = item.unidadeSnapshot as Unidade;
       const lido = lerContagem(digitado, { unidade, embalagemConteudoMilesimos: item.embalagemConteudoMilesimos });
       if (!lido.ok) return { ok: false as const, erros: lido.erros };
+      // 1.7: a contagem cíclica vencida fecha sem aplicar AGORA (fica gravado) e o número não entra.
+      if (contagem.status === 'ABERTA' && opcoes.ganchos?.antes) {
+        const frase = await opcoes.ganchos.antes(tx, contagem, agora);
+        if (frase) return { ok: false as const, erros: { geral: frase }, fechada: true };
+      }
       // Trava a contagem e confere que segue aberta (concluir espera; quem salva depois de concluída, recebe a frase).
       const [c] = await tx.sql<{ versao: number }>`
         UPDATE "Contagem" SET "versao" = "versao" + 1
         WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ${item.contagemId} AND "status" = 'ABERTA'
         RETURNING "versao"`;
       if (!c) {
-        const atual = await tx.contagem.findUnique({ where: { id: item.contagemId }, select: { status: true, fechadaPorNome: true } });
-        const frase =
-          atual?.status === 'FECHADA'
-            ? `A abertura já foi concluída${atual.fechadaPorNome ? ` por ${atual.fechadaPorNome}` : ''}: este número não entrou. Correção é pela contagem (fase 1.7).`
-            : 'Esta contagem foi descartada: este número não entrou.';
-        return { ok: false as const, erros: { geral: frase }, fechada: true };
+        const atual = await tx.contagem.findUnique({ where: { id: item.contagemId }, select: { tipo: true, status: true, desfecho: true, fechadaPorNome: true } });
+        return { ok: false as const, erros: { geral: fraseDaContagemFechada(atual ?? { ...contagem, status: 'CANCELADA' }) }, fechada: true };
       }
       const l = lido.lida;
+      // 1.7 (decisão 76): o número vale para o instante em que foi DIGITADO (rascunho reenviado horas depois
+      // continua sendo de quando a pessoa olhou a prateleira), preso entre o início da contagem e agora.
+      const digitadoEm = instanteDigitado(agora, entrada.idadeMs, item.contagem.criadoEm);
+      // O esperado é o livro NAQUELE instante: o saldo de agora menos o que entrou/saiu depois dele, numa
+      // consulta só (um retrato). O que veio depois aparece como "depois de contar" e segura o "fecha sozinha".
+      // A abertura parte do zero.
+      const esperado = contagem.tipo === 'ABERTURA' ? null : await livroNoInstante(tx, lojaId, item.insumoId, digitadoEm);
       const r = await tx.contagemItem.updateMany({
         where: { id: itemId, versao: versaoLida },
         data: {
@@ -648,8 +709,9 @@ export async function contarItem(
           embalagensMilesimos: l.embalagensMilesimos,
           soltoMilesimos: l.soltoMilesimos,
           escalaDigitada: l.contadoMilesimos === null ? null : l.escala,
-          contadoEm: l.contadoMilesimos === null ? null : new Date(),
+          contadoEm: l.contadoMilesimos === null ? null : digitadoEm,
           contadoPorNome: l.contadoMilesimos === null ? null : autorNome,
+          ...(esperado && l.contadoMilesimos !== null ? { saldoSistemaMilesimos: esperado.quantidadeMilesimos, valorSistemaCentavos: esperado.valorCentavos } : {}),
           versao: { increment: 1 },
         },
       });
@@ -683,13 +745,31 @@ export async function contarItem(
         });
       }
       const salvo = (await tx.contagemItem.findUnique({ where: { id: itemId }, select: SELECAO_DO_ITEM }))!;
-      return { ok: true as const, item: paraTela(salvo) };
+      // 1.7: contou o último e tudo bateu? A contagem fecha sozinha, nesta mesma transação.
+      const depois = opcoes.ganchos?.depois ? await opcoes.ganchos.depois(tx, contagem, agora, autorNome) : { fechouSozinha: false };
+      return { ok: true as const, item: paraTela(salvo), ...(depois.fechouSozinha ? { fechouSozinha: true } : {}) };
     });
   } catch (e) {
     if (e instanceof Pronto) return e.resultado;
     if (e instanceof Recusa) return { ok: false, erros: { geral: e.resultado.erros.geral ?? 'Não deu para salvar.' } };
     throw e;
   }
+}
+
+/**
+ * O livro de (loja, insumo) num instante: saldo de agora − Σ movimentos com
+ * `ocorridoEm` depois dele (quantidade e valor). Uma consulta = um retrato
+ * (READ COMMITTED): nota que confirma no meio entra nos dois lados ou em
+ * nenhum.
+ */
+export async function livroNoInstante(tx: ClienteDoParceiro, lojaId: string, insumoId: string, instante: Date): Promise<{ quantidadeMilesimos: number; valorCentavos: number }> {
+  const [r] = await tx.sql<{ q: number; v: number }>`
+    SELECT
+      (coalesce((SELECT s."quantidadeMilesimos" FROM "SaldoEstoque" s WHERE s."parceiroId" = ${tx.parceiroId} AND s."lojaId" = ${lojaId} AND s."insumoId" = ${insumoId}), 0)
+        - coalesce((SELECT sum(m."quantidadeMilesimos") FROM "MovimentoEstoque" m WHERE m."parceiroId" = ${tx.parceiroId} AND m."lojaId" = ${lojaId} AND m."insumoId" = ${insumoId} AND m."ocorridoEm" > ${instante.toISOString()}::timestamp), 0))::int AS "q",
+      (coalesce((SELECT s."valorCentavos" FROM "SaldoEstoque" s WHERE s."parceiroId" = ${tx.parceiroId} AND s."lojaId" = ${lojaId} AND s."insumoId" = ${insumoId}), 0)
+        - coalesce((SELECT sum(m."valorCentavos") FROM "MovimentoEstoque" m WHERE m."parceiroId" = ${tx.parceiroId} AND m."lojaId" = ${lojaId} AND m."insumoId" = ${insumoId} AND m."ocorridoEm" > ${instante.toISOString()}::timestamp), 0))::int AS "v"`;
+  return { quantidadeMilesimos: r?.q ?? 0, valorCentavos: r?.v ?? 0 };
 }
 
 /** Resposta pronta que precisa desfazer a transação (o "versao + 1" da contagem não fica). */
@@ -722,7 +802,7 @@ export async function conferenciaDaAbertura(cliente: ClienteDoParceiro, alcance:
         where: { lojaId, tipo: 'ABERTURA', status: { not: 'CANCELADA' } },
         select: { id: true, status: true, versao: true, criadoEm: true, iniciadaPorNome: true, fechadaEm: true, fechadaPorNome: true, valorTotalCentavos: true },
       });
-      if (!c) return { loja, contagem: null, resumo: resumoDaContagem([]), linhas: [] as LinhaDaConferencia[], valorCentavos: 0, semCusto: [] as LinhaDaConferencia[], notasDeHoje: 0 };
+      if (!c) return { loja, contagem: null, resumo: resumoDaContagem([]), linhas: [] as LinhaDaConferencia[], valorCentavos: 0, semCusto: [] as LinhaDaConferencia[], notasDeHoje: 0, acimaDoTeto: [] as string[] };
       const itens = await tx.contagemItem.findMany({ where: { contagemId: c.id }, orderBy: { insumoNomeSnapshot: 'asc' }, select: SELECAO_DO_ITEM });
       const custos = await custosDeReferencia(
         tx,
@@ -745,6 +825,7 @@ export async function conferenciaDaAbertura(cliente: ClienteDoParceiro, alcance:
       const soma = somarValores(contadas.map((l) => l.valorCentavos));
       // Notas desta loja com data de hoje já lançadas: o que chegou hoje e já está na prateleira.
       const notasDeHoje = await tx.notaEntrada.count({ where: { lojaId, status: 'LANCADA', entradaEm: new Date(`${hojeNoRio()}T00:00:00.000Z`) } });
+      const acimaDoTeto = [...contadas.map((l) => valorAcimaDoTeto(l.nome, l.valorCentavos)), totalAcimaDoLimite(soma.centavos)].filter((x): x is string => !!x);
       return {
         loja,
         contagem: c,
@@ -753,6 +834,7 @@ export async function conferenciaDaAbertura(cliente: ClienteDoParceiro, alcance:
         valorCentavos: soma.centavos,
         semCusto: contadas.filter((l) => l.valorCentavos === null),
         notasDeHoje,
+        acimaDoTeto,
       };
     }),
   );
@@ -775,6 +857,7 @@ export async function concluirAbertura(
   lojaId: string,
   entrada: { versao: unknown; confirmarNaoContados: unknown },
   autorNome = 'Sistema',
+  agora = new Date(),
 ): Promise<ResultadoEstoque> {
   const versao = Number(entrada.versao);
   const confirmou = entrada.confirmarNaoContados === true || entrada.confirmarNaoContados === 'sim' || entrada.confirmarNaoContados === 'on';
@@ -808,7 +891,7 @@ export async function concluirAbertura(
           tx,
           itens.map((i) => i.insumoId),
         );
-        const abertoEm = new Date();
+        const abertoEm = agora;
         const movimentos: MovimentoNovo[] = itens
           .filter((i) => i.contadoMilesimos !== null && i.contadoMilesimos > 0)
           .map((i) => ({
@@ -823,12 +906,15 @@ export async function concluirAbertura(
             chave: `abertura:${i.id}`,
             contagemItemId: i.id,
           }));
-        await gravarMovimentos(tx, movimentos, { ocorridoEm: abertoEm, garantir: itens.map((i) => ({ lojaId, insumoId: i.insumoId })) });
+        // Herança a da 1.6: valor por item e total conferidos antes do banco (frase, nunca 500).
         const valorTotal = movimentos.reduce((s, m) => s + m.valorCentavos, 0);
+        const teto = movimentos.map((m) => valorAcimaDoTeto(m.insumoNome, m.valorCentavos)).find(Boolean) ?? totalAcimaDoLimite(valorTotal);
+        if (teto) throw new Recusa({ ok: false, erros: { geral: teto } });
+        await gravarMovimentos(tx, movimentos, { ocorridoEm: abertoEm, garantir: itens.map((i) => ({ lojaId, insumoId: i.insumoId })) });
         const semCusto = movimentos.filter((m) => custos.get(m.insumoId)?.porUnidade == null).length;
         await tx.contagem.updateMany({
           where: { id: c.id, status: 'ABERTA' },
-          data: { status: 'FECHADA', fechadaEm: abertoEm, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: resumo.naoContados },
+          data: { status: 'FECHADA', desfecho: 'APLICADA', fechadaEm: abertoEm, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: resumo.naoContados },
         });
         await tx.historicoAlteracao.create({
           data: {

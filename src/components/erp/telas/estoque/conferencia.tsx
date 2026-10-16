@@ -105,6 +105,16 @@ export function TelaConferencia({
         </div>
       </div>
 
+      {c.acimaDoTeto.length > 0 && (
+        <Aviso tom="erro" titulo="Tem número grande demais nesta contagem: não dá para concluir assim.">
+          <ul className="list-disc space-y-1 pl-5">
+            {c.acimaDoTeto.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </Aviso>
+      )}
+
       {c.notasDeHoje > 0 && (
         <Aviso tom="alerta" titulo={`${c.notasDeHoje} ${c.notasDeHoje === 1 ? 'nota de hoje já foi lançada' : 'notas de hoje já foram lançadas'} nesta loja.`}>
           O que veio nelas tem de estar na contagem: notas lançadas antes de concluir não entram de novo no estoque.
@@ -136,7 +146,7 @@ export function TelaConferencia({
               <p>
                 <span className="font-semibold text-texto">A contagem vira o saldo inicial</span> de cada insumo nesta loja. Daí em diante, nota lançada aqui entra no estoque na hora (nota de hoje lançada depois de concluir também).
               </p>
-              <p>Não se desfaz: se algum número estiver errado, a correção é pela contagem do dia a dia (fase 1.7), com o antes e o depois.</p>
+              <p>Não se desfaz: se algum número estiver errado, a correção é por uma contagem do dia a dia (Planejar contagem), com o antes e o depois no livro.</p>
             </div>
             <div className="mt-4 border-t border-linha pt-4">
               {bloqueio ? (
@@ -145,7 +155,7 @@ export function TelaConferencia({
                 <FormConcluirAbertura acao={acao} versao={c.contagem!.versao} naoContados={c.resumo.naoContados} recarregar={`${loja}/abertura/conferir`} />
               ) : (
                 <>
-                  <p className="text-sm text-suave">Quem conclui é quem ajusta saldo (gerente ou dona).</p>
+                  <p className="text-sm text-suave">Só gerente ou dona concluem.</p>
                   <Link href={`${loja}/abertura`} className={classeDeBotao('secundario', 'mt-3 w-full')}>
                     Voltar para a contagem
                   </Link>

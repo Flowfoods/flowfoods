@@ -11,6 +11,8 @@ import { redirect } from 'next/navigation';
 import type { Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import { concluirAbertura, contarItem, descartarAbertura, iniciarAbertura, type ResultadoDoItem, type ResultadoEstoque } from '@/lib/erp/estoque';
+import { concluirContagem, contarNaContagem, descartarContagem, iniciarCiclo, iniciarFechamento, salvarRegras, type ConfigDoPeriodo } from '@/lib/erp/contagem';
+import type { RegrasDaContagem } from '@/lib/erp/contagem-campos';
 import type { EstadoEstoque, ItemParaSalvar } from './estado';
 
 const vezDe = (anterior: EstadoEstoque) => (anterior?.vez ?? 0) + 1;
@@ -44,4 +46,53 @@ export async function executarDescartar(cliente: ClienteDoParceiro, alcance: Alc
 export async function executarContar(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, lojaId: string, item: ItemParaSalvar): Promise<ResultadoDoItem> {
   const entrada = item && typeof item === 'object' ? item : ({} as ItemParaSalvar);
   return contarItem(cliente, alcance, lojaId, entrada, autorNome);
+}
+
+// ================================================================ 1.7: contagem do dia a dia
+
+export async function executarIniciarCiclo(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await iniciarCiclo(cliente, alcance, lojaId, { insumoIds: form.getAll('insumo'), titulo: form.get('titulo') }, autorNome);
+  if (!r.ok) return { ok: false as const, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
+  revalidatePath(base, 'layout');
+  redirect(`${base}/${lojaId}/contagens/${r.id}?feito=ciclo`);
+}
+
+export async function executarContarNaContagem(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, lojaId: string, contagemId: string, item: ItemParaSalvar): Promise<ResultadoDoItem> {
+  const entrada = item && typeof item === 'object' ? item : ({} as ItemParaSalvar);
+  return contarNaContagem(cliente, alcance, lojaId, contagemId, entrada, autorNome);
+}
+
+export async function executarConcluirContagem(cliente: ClienteDoParceiro, alcance: Alcance, cfg: ConfigDoPeriodo, autorNome: string, lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await concluirContagem(cliente, alcance, lojaId, contagemId, { versao: form.get('versao'), confirmarNaoContados: form.get('confirmarNaoContados') }, cfg, autorNome);
+  if (!r.ok) return { ok: false as const, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
+  revalidatePath(base, 'layout');
+  const fechamento = form.get('tipo') === 'FECHAMENTO';
+  redirect(`${base}/${lojaId}/${fechamento ? 'periodo' : `contagens/${contagemId}/conferir`}?feito=${r.jaFeito ? 'ja-aplicada' : fechamento ? 'periodo-fechado' : 'aplicada'}`);
+}
+
+export async function executarDescartarContagem(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await descartarContagem(cliente, alcance, lojaId, contagemId, form.get('motivo'), autorNome);
+  return concluir(r, anterior, base, `${base}/${lojaId}`, 'ciclo-descartado');
+}
+
+export async function executarIniciarFechamento(cliente: ClienteDoParceiro, alcance: Alcance, cfg: ConfigDoPeriodo, autorNome: string, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await iniciarFechamento(cliente, alcance, lojaId, { inicio: form.get('inicio') }, cfg, autorNome);
+  if (!r.ok) return { ok: false as const, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
+  revalidatePath(base, 'layout');
+  redirect(`${base}/${lojaId}/contagens/${r.id}?feito=${r.jaFeito ? 'fechamento-ja' : 'fechamento'}`);
+}
+
+export async function executarSalvarRegras(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const campos = Object.fromEntries(['pisoValor', 'pisoItens', 'freqA', 'freqB', 'freqC', 'tolerancia'].map((k) => [k, form.get(k)]));
+  let lidas: RegrasDaContagem | null = null;
+  try {
+    const l = JSON.parse(String(form.get('lidas') ?? 'null')) as Record<string, unknown> | null;
+    const chaves: (keyof RegrasDaContagem)[] = ['pisoValorBp', 'pisoItensBp', 'freqADias', 'freqBDias', 'freqCDias', 'toleranciaCentavos'];
+    // Todas as seis, inteiras: `{}` ou faltando uma não desliga a trava de edição simultânea.
+    if (l && typeof l === 'object' && chaves.every((k) => Number.isSafeInteger(l[k]))) lidas = Object.fromEntries(chaves.map((k) => [k, l[k]])) as unknown as RegrasDaContagem;
+  } catch {
+    lidas = null;
+  }
+  const r = await salvarRegras(cliente, alcance, lojaId, campos, lidas, autorNome);
+  return concluir(r, anterior, base, `${base}/${lojaId}/periodo`, 'regras');
 }

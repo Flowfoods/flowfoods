@@ -637,6 +637,19 @@ model Loja {
   ativa      Boolean      @default(true)
   criadoEm   DateTime     @default(now())
 
+  // 1.7: regras da contagem desta loja (mudam só com "cadastrar lojas", rede
+  // inteira: o gerente não baixa o piso que o trava). Piso do fechamento do
+  // período: cobertura mínima por valor e por itens, em pontos-base (CHECK
+  // 5000..10000 e 0..10000). Frequência por classe da curva ABC, em dias
+  // (CHECK 1..90, A <= B <= C). Tolerância por item para a contagem fechar
+  // sozinha, em centavos (0 = só se bater exato; CHECK 0..100000).
+  contagemPisoValorBp        Int @default(8000)
+  contagemPisoItensBp        Int @default(5000)
+  contagemFreqADias          Int @default(7)
+  contagemFreqBDias          Int @default(15)
+  contagemFreqCDias          Int @default(30)
+  contagemToleranciaCentavos Int @default(500)
+
   colaboradores  Colaborador[]
   notasEntrada   NotaEntrada[]
   saldos         SaldoEstoque[]
@@ -1149,6 +1162,13 @@ enum ContagemStatus {
   CANCELADA
 }
 
+// 1.7: como uma contagem FECHADA terminou (CHECK: FECHADA <=> desfecho).
+enum ContagemDesfecho {
+  APLICADA // o gerente conferiu e aplicou (ou a abertura concluída)
+  APLICADA_SOZINHA // tudo contado e dentro da tolerância: fechou sozinha
+  VENCIDA // passou do prazo sem aplicar: fechou sem mexer no estoque
+}
+
 model Contagem {
   id                 String           @id @default(cuid())
   parceiroId         String
@@ -1175,6 +1195,9 @@ model Contagem {
   iniciadaPorNome         String?
   fechadaPorNome          String?
   naoContadosNoFechamento Int?
+  // 1.7: nome do ciclo ("Refrigerado · vencidos") e como terminou.
+  titulo                  String?
+  desfecho                ContagemDesfecho?
 
   itens ContagemItem[]
 

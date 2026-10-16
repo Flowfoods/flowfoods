@@ -69,8 +69,21 @@ export interface ContagemLida {
   escala: Escala;
 }
 
-/** Teto de uma contagem: 1 milhão de kg/L/un (cabe com folga no INTEGER). */
-export const TETO_DA_CONTAGEM = 1_000_000_000;
+/**
+ * Teto de uma contagem por item: 100 mil kg/L/un (herança a da 1.6 — o de 1
+ * milhão deixava o valor estourar o INTEGER). Nenhuma loja tem 100 toneladas
+ * de um insumo; acima disso é dedo errado.
+ */
+export const TETO_DA_CONTAGEM = 100_000_000;
+
+/** Maior número que cabe numa coluna INTEGER do Postgres (quantidade, valor, saldo). */
+export const LIMITE_DO_INTEIRO = 2_147_483_647;
+
+/** Teto do valor de UM item numa contagem: R$ 1 milhão (acima é número errado, não estoque de restaurante). */
+export const TETO_DO_VALOR_DO_ITEM = 100_000_000;
+
+/** Cabe na coluna INTEGER (com sinal)? */
+export const cabeNoInteiro = (n: number) => Number.isSafeInteger(n) && Math.abs(n) <= LIMITE_DO_INTEIRO;
 
 /** A embalagem padrão vale perguntar? (Caixa de 5 kg sim; "1 kg" é o próprio solto.) */
 export const perguntaEmbalagens = (i: ItemParaContar) => !!i.embalagemConteudoMilesimos && i.embalagemConteudoMilesimos !== 1000;
@@ -105,7 +118,9 @@ export function lerContagem(d: ContagemDigitada, item: ItemParaContar): { ok: tr
   if (embalagens === null && solto === null) return { ok: true, lida: { contadoMilesimos: null, embalagensMilesimos: null, soltoMilesimos: null, escala } };
   const daEmbalagem = embalagens !== null && item.embalagemConteudoMilesimos ? dividirArredondado(embalagens * item.embalagemConteudoMilesimos, 1000) : 0;
   const total = daEmbalagem + (solto ?? 0);
-  if (!Number.isSafeInteger(total) || total > TETO_DA_CONTAGEM) return { ok: false, erros: { solto: 'Quantidade grande demais: confira o número.' } };
+  if (!Number.isSafeInteger(total) || total > TETO_DA_CONTAGEM) {
+    return { ok: false, erros: { solto: `Passa de ${formatarQuantidade(TETO_DA_CONTAGEM, item.unidade)}, o máximo de uma contagem: confira o número.` } };
+  }
   return { ok: true, lida: { contadoMilesimos: total, embalagensMilesimos: embalagens, soltoMilesimos: solto, escala } };
 }
 
@@ -145,6 +160,23 @@ export function textoDaContagem(i: {
   if (!i.embalagensMilesimos) return total;
   const emb = `${textoNaEscala(i.embalagensMilesimos, 'UN', 'base')} × ${i.embalagemSnapshot ?? 'embalagem'}`;
   return i.soltoMilesimos ? `${emb} + ${formatarQuantidade(i.soltoMilesimos, i.unidade)} = ${total}` : `${emb} = ${total}`;
+}
+
+/**
+ * Quando o número foi DIGITADO (decisão 76): a tela manda há quantos ms a
+ * pessoa digitou (`idadeMs`, medido no relógio do próprio aparelho, então o
+ * relógio errado do celular não conta); o servidor tira do seu "agora". É
+ * dado do cliente, NÃO confiável: fica preso entre o início da contagem e
+ * agora (nunca no futuro, nunca antes de a contagem existir). O pior que um
+ * aparelho mal-intencionado consegue é dizer que contou mais tarde do que
+ * contou — e o que entrou no livro entre o instante declarado e agora
+ * aparece como "depois de contar" e segura o "fecha sozinha".
+ */
+export function instanteDigitado(agora: Date, idadeMs: unknown, inicioDaContagem: Date): Date {
+  const idade = typeof idadeMs === 'number' ? idadeMs : Number(idadeMs);
+  const ms = Number.isFinite(idade) && idade > 0 ? Math.trunc(idade) : 0;
+  const t = Math.max(inicioDaContagem.getTime(), Math.min(agora.getTime(), agora.getTime() - ms));
+  return new Date(Math.min(t, agora.getTime()));
 }
 
 // ---------------------------------------------------------------- valor
@@ -198,8 +230,8 @@ export function resumoDaContagem(itens: readonly { contadoMilesimos: number | nu
 /** "Faltam 12 de 40" / "Todos os 40 contados". */
 export function fraseDoQueFalta(r: ResumoDaContagem): string {
   if (r.total === 0) return 'Nenhum insumo para contar.';
-  if (r.naoContados === 0) return `Todos os ${r.total} contados`;
-  return `Faltam ${r.naoContados} de ${r.total}`;
+  if (r.naoContados === 0) return r.total === 1 ? 'O insumo foi contado' : `Todos os ${r.total} contados`;
+  return `${r.naoContados === 1 ? 'Falta' : 'Faltam'} ${r.naoContados} de ${r.total}`;
 }
 
 // ------------------------------------------------------- nota × estoque
@@ -359,6 +391,47 @@ export function aplicarNosSaldos(
 }
 
 export const chaveDoSaldo = (lojaId: string, insumoId: string) => `${lojaId}|${insumoId}`;
+
+/**
+ * Herança a da 1.6: o que vai para o razão e para o saldo cabe no INTEGER?
+ * Confere cada movimento (quantidade, valor, saldo depois) e o saldo final de
+ * cada par (quantidade e valor). Devolve a frase do primeiro que estoura, ou
+ * null. Quem grava recusa com a frase em vez de deixar o banco dar 500.
+ */
+export function estouroDoRazao(
+  linhas: readonly (Pick<MovimentoNovo, 'insumoNome' | 'quantidadeMilesimos' | 'valorCentavos' | 'lojaId' | 'insumoId'> & { saldoDepoisMilesimos: number })[],
+  finais: ReadonlyMap<string, { quantidadeMilesimos: number; valorCentavos: number }>,
+): string | null {
+  const frase = (nome: string) => `O saldo de “${nome}” passaria do limite do sistema (2,1 milhões de kg/L/un ou R$ 21 milhões). Confira os números: nada foi gravado.`;
+  for (const m of linhas) {
+    if (!cabeNoInteiro(m.quantidadeMilesimos) || !cabeNoInteiro(m.valorCentavos) || !cabeNoInteiro(m.saldoDepoisMilesimos)) return frase(m.insumoNome);
+  }
+  for (const [k, f] of Array.from(finais)) {
+    if (cabeNoInteiro(f.quantidadeMilesimos) && cabeNoInteiro(f.valorCentavos)) continue;
+    const m = linhas.find((l) => chaveDoSaldo(l.lojaId, l.insumoId) === k);
+    return frase(m?.insumoNome ?? 'um insumo');
+  }
+  return null;
+}
+
+/** Recusa por teto (herança a da 1.6): a frase vai para a tela, nada é gravado. */
+export class ErroDeTeto extends Error {
+  constructor(frase: string) {
+    super(frase);
+    this.name = 'ErroDeTeto';
+  }
+}
+
+/** Valor de um item acima do teto da contagem (R$ 1 milhão)? A frase, ou null. */
+export function valorAcimaDoTeto(nome: string, valorCentavos: number | null): string | null {
+  if (valorCentavos === null || Math.abs(valorCentavos) <= TETO_DO_VALOR_DO_ITEM) return null;
+  return `“${nome}” daria mais de R$ 1.000.000,00 em estoque: confira o número contado.`;
+}
+
+/** O total de uma contagem cabe no INTEGER? A frase, ou null. */
+export function totalAcimaDoLimite(totalCentavos: number): string | null {
+  return cabeNoInteiro(totalCentavos) ? null : 'O valor total passa do limite do sistema (R$ 21 milhões). Confira os números contados.';
+}
 
 /** "+15 kg" / "−2,5 kg" (sinal sempre, menos tipográfico). */
 export function quantidadeComSinal(milesimos: number, unidade: Unidade): string {

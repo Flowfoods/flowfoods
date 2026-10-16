@@ -15,6 +15,12 @@
  * número: o servidor aceita a retentativa). Outra pessoa contou o mesmo item
  * antes: o número dela aparece e a pessoa escolhe. Vazio = não contado; "Não
  * tem" grava zero. O rodapé fixo diz quanto falta.
+ *
+ * Sem sinal (herança b da 1.6): o número que falhou fica no aparelho
+ * (`rascunho.ts`, por contagem e item, com a versão) e é reenviado sozinho
+ * quando a rede volta ou a página abre de novo; o servidor confere a versão,
+ * então um número velho nunca passa por cima de um mais novo (vira conflito).
+ * Alvos de toque de 48 px (contar de luva).
  */
 
 import Link from 'next/link';
@@ -27,6 +33,7 @@ import { classeDeBotao } from '../../ui/estilos';
 import { Barra } from '../../ui/superficies';
 import { IconeDaConservacao } from '../cadastro/validade';
 import type { AcaoDeContar } from './estado';
+import { apagarRascunho, chaveDoRascunho, destinoDoRascunho, guardarRascunho, lerRascunhos } from './rascunho';
 
 type Situacao = 'parado' | 'pendente' | 'salvando' | 'salvo' | 'erro' | 'falha' | 'conflito';
 
@@ -36,6 +43,8 @@ interface Linha {
   situacao: Situacao;
   erros: Partial<Record<'embalagens' | 'solto' | 'geral', string>>;
   conflito: ItemDaContagem | null;
+  /** Quando a pessoa digitou este número (ms, relógio do aparelho): o reenvio manda a idade (decisão 76). */
+  digitadoEm: number | null;
 }
 
 type Aba = 'faltam' | 'contados' | 'todos';
@@ -46,27 +55,42 @@ const ESPERA_MS = 800;
 const mesmosCampos = (a: ContagemDigitada, b: ContagemDigitada) => a.embalagens.trim() === b.embalagens.trim() && a.solto.trim() === b.solto.trim() && a.escala === b.escala;
 
 export function TelaContagem({
+  contagemId,
+  pessoa,
   itens,
   acao,
   conferirHref,
   saldoHref,
   podeConcluir,
+  rotuloConferir = 'Conferir e concluir',
+  paraOPiso = [],
 }: {
+  /** Chave do rascunho local (o número que falhou ao salvar fica no aparelho). */
+  contagemId: string;
+  /** Quem conta (id da sessão): a memória do aparelho é por contagem E pessoa. */
+  pessoa: string;
   itens: ItemDaContagem[];
   acao: AcaoDeContar;
   /** Conferir e concluir (só quem ajusta saldo). */
   conferirHref?: string;
   saldoHref: string;
   podeConcluir: boolean;
+  rotuloConferir?: string;
+  /** Fechamento do período (1.7): insumos que levam a cobertura ao piso (marcados na lista). */
+  paraOPiso?: string[];
 }) {
   const [linhas, setLinhas] = useState<Record<string, Linha>>(() =>
-    Object.fromEntries(itens.map((i) => [i.id, { item: i, campos: i.campos, situacao: 'parado' as Situacao, erros: {}, conflito: null }])),
+    Object.fromEntries(itens.map((i) => [i.id, { item: i, campos: i.campos, situacao: 'parado' as Situacao, erros: {}, conflito: null, digitadoEm: null }])),
   );
   const [aba, setAba] = useState<Aba>('todos');
   const [busca, setBusca] = useState('');
   // Quem a pessoa mexeu continua na tela até ela trocar de aba (não some no meio da digitação).
   const [mexidos, setMexidos] = useState<Set<string>>(() => new Set());
   const [fechada, setFechada] = useState<string | null>(null);
+  // 1.7: o último número fez a contagem fechar sozinha (tudo bateu, dentro da tolerância).
+  const [fechouSozinha, setFechouSozinha] = useState(false);
+  const piso = useMemo(() => new Set(paraOPiso), [paraOPiso]);
+  const chave = chaveDoRascunho(contagemId, pessoa);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const emVoo = useRef<Record<string, boolean>>({});
   const atual = useRef(linhas);
@@ -103,19 +127,26 @@ export function TelaContagem({
       const enviados = l.campos;
       emVoo.current[id] = true;
       mudar(id, () => ({ situacao: 'salvando', erros: {} }));
+      const versao = versaoForcada ?? l.item.versao;
+      const digitadoEm = l.digitadoEm ?? Date.now();
       let r: ResultadoDoItem;
       try {
-        r = await acao({ itemId: id, embalagens: enviados.embalagens, solto: enviados.solto, escala: enviados.escala, versao: versaoForcada ?? l.item.versao });
+        r = await acao({ itemId: id, embalagens: enviados.embalagens, solto: enviados.solto, escala: enviados.escala, versao, idadeMs: Math.max(0, Date.now() - digitadoEm) });
       } catch {
         emVoo.current[id] = false;
-        mudar(id, () => ({ situacao: 'falha', erros: { geral: 'Sem conexão: o número ainda não foi salvo.' } }));
+        // Fica no aparelho até salvar (com a hora em que foi digitado): volta sozinho quando o sinal voltar.
+        guardarRascunho(chave, id, { campos: enviados, versao, em: digitadoEm });
+        mudar(id, () => ({ situacao: 'falha', erros: { geral: 'Sem sinal: o número ficou guardado neste aparelho e vai sozinho quando a conexão voltar.' } }));
         return;
       }
       emVoo.current[id] = false;
+      // O servidor respondeu (salvou, recusou ou deu conflito): o rascunho já não serve.
+      apagarRascunho(chave, id);
       if (r.ok) {
         const agora = atual.current[id];
         const mudouDepois = !mesmosCampos(agora.campos, enviados);
         mudar(id, () => ({ item: r.item, situacao: mudouDepois ? 'pendente' : 'salvo', erros: {}, conflito: null }));
+        if (r.fechouSozinha) setFechouSozinha(true);
         // A pessoa continuou digitando enquanto salvava: salva o novo também.
         if (mudouDepois) timers.current[id] = setTimeout(() => void salvar(id), ESPERA_MS);
         return;
@@ -131,13 +162,56 @@ export function TelaContagem({
       }
       mudar(id, () => ({ situacao: 'erro', erros: r.erros }));
     },
-    [acao, mudar],
+    [acao, mudar, chave],
   );
+
+  // Ao abrir: o que ficou guardado no aparelho volta para o campo e é reenviado com a versão de quando foi digitado.
+  useEffect(() => {
+    const guardados = lerRascunhos(chave);
+    const reenviar: [string, number][] = [];
+    for (const [id, r] of Object.entries(guardados)) {
+      const l = atual.current[id];
+      if (!l) {
+        apagarRascunho(chave, id);
+        continue;
+      }
+      if (destinoDoRascunho(r, l.item) === 'descartar') {
+        apagarRascunho(chave, id);
+        continue;
+      }
+      mudar(id, (x) => ({ campos: r.campos, item: { ...x.item, versao: r.versao }, digitadoEm: r.em, situacao: 'falha', erros: { geral: 'Número guardado neste aparelho: ainda não tinha sido salvo.' } }));
+      reenviar.push([id, r.versao]);
+    }
+    if (reenviar.length === 0) return;
+    const t = setTimeout(() => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      for (const [id, v] of reenviar) void salvar(id, v);
+    }, 300);
+    return () => clearTimeout(t);
+    // Só ao abrir a contagem.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chave]);
+
+  // O sinal voltou (ou a cada 20 s, enquanto houver falha): reenvia o que falhou, com a versão de cada um.
+  const comFalha = Object.values(linhas).some((l) => l.situacao === 'falha');
+  useEffect(() => {
+    if (!comFalha) return;
+    const reenviar = () => {
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
+      for (const l of Object.values(atual.current)) if (l.situacao === 'falha') void salvar(l.item.id, l.item.versao);
+    };
+    window.addEventListener('online', reenviar);
+    const t = setInterval(reenviar, 20_000);
+    return () => {
+      window.removeEventListener('online', reenviar);
+      clearInterval(t);
+    };
+  }, [comFalha, salvar]);
 
   const digitar = (id: string, campos: Partial<ContagemDigitada>) => {
     setMexidos((m) => (m.has(id) ? m : new Set(m).add(id)));
     const emConflito = atual.current[id]?.situacao === 'conflito';
-    mudar(id, (l) => ({ campos: { ...l.campos, ...campos }, situacao: l.situacao === 'conflito' ? 'conflito' : 'pendente', erros: l.situacao === 'conflito' ? l.erros : {} }));
+    mudar(id, (l) => ({ campos: { ...l.campos, ...campos }, digitadoEm: Date.now(), situacao: l.situacao === 'conflito' ? 'conflito' : 'pendente', erros: l.situacao === 'conflito' ? l.erros : {} }));
     clearTimeout(timers.current[id]);
     if (!emConflito) timers.current[id] = setTimeout(() => void salvar(id), ESPERA_MS);
   };
@@ -171,6 +245,16 @@ export function TelaContagem({
 
   return (
     <div className="space-y-4">
+      {fechouSozinha && (
+        <div role="status" className="rounded-[14px] border border-linha bg-painel px-4 py-3 text-sm">
+          <p className="font-semibold text-texto">Tudo bateu: a contagem fechou sozinha e o estoque foi acertado.</p>
+          <p className="mt-1 text-suave">As diferenças pequenas (dentro da tolerância da loja) entraram no livro do estoque.</p>
+          <Link href={saldoHref} className="mt-2 inline-flex min-h-11 items-center text-[13px] font-semibold underline underline-offset-4">
+            Ver o estoque da loja
+          </Link>
+        </div>
+      )}
+
       {fechada && (
         <div role="alert" className="rounded-[14px] border border-linha bg-painel px-4 py-3 text-sm">
           <p className="font-semibold text-texto">{fechada}</p>
@@ -240,7 +324,8 @@ export function TelaContagem({
                 <ItemContavel
                   key={l.item.id}
                   l={l}
-                  bloqueado={!!fechada}
+                  bloqueado={!!fechada || fechouSozinha}
+                  paraOPiso={piso.has(l.item.insumoId)}
                   digitar={(c) => digitar(l.item.id, c)}
                   sair={() => void salvar(l.item.id)}
                   repetir={() => void salvar(l.item.id, l.item.versao)}
@@ -269,12 +354,16 @@ export function TelaContagem({
               <Barra valor={resumo.contados} total={resumo.total} tom={resumo.naoContados === 0 ? 'ok' : 'alerta'} rotulo={`${resumo.contados} de ${resumo.total} contados`} />
             </div>
           </div>
-          {podeConcluir && conferirHref ? (
+          {fechouSozinha ? (
+            <Link href={saldoHref} className={classeDeBotao('primario', 'w-full sm:w-auto')}>
+              Ver o estoque
+            </Link>
+          ) : podeConcluir && conferirHref ? (
             <Link href={conferirHref} aria-disabled={pendentes} className={classeDeBotao('primario', `w-full sm:w-auto ${pendentes ? 'pointer-events-none opacity-55' : ''}`)}>
-              Conferir e concluir
+              {rotuloConferir}
             </Link>
           ) : (
-            <p className="w-full text-[12px] text-suave sm:w-auto sm:max-w-xs">Terminou? Avise o gerente: ele confere e conclui.</p>
+            <p className="w-full text-[12px] text-suave sm:w-auto sm:max-w-xs">Terminou? Só gerente ou dona concluem: avise quem confere.</p>
           )}
         </div>
       </div>
@@ -285,6 +374,7 @@ export function TelaContagem({
 function ItemContavel({
   l,
   bloqueado,
+  paraOPiso,
   digitar,
   sair,
   repetir,
@@ -294,6 +384,7 @@ function ItemContavel({
 }: {
   l: Linha;
   bloqueado: boolean;
+  paraOPiso?: boolean;
   digitar: (c: Partial<ContagemDigitada>) => void;
   sair: () => void;
   repetir: () => void;
@@ -315,9 +406,12 @@ function ItemContavel({
   return (
     <li className="px-4 py-3.5">
       <div className="flex min-h-10 items-center justify-between gap-3">
-        <h3 className="min-w-0 text-[15px] font-semibold text-texto">{i.nome}</h3>
+        <h3 className="min-w-0 text-[15px] font-semibold text-texto">
+          {i.nome}
+          {paraOPiso && <span className="ml-2 inline-block align-middle text-[12px] font-semibold text-atencao">para o piso</span>}
+        </h3>
         {l.item.contadoMilesimos === null && l.situacao === 'parado' && !l.campos.embalagens.trim() && !l.campos.solto.trim() ? (
-          <button type="button" disabled={bloqueado} onClick={() => digitar({ embalagens: '', solto: '0', escala: 'base' })} className={classeDeBotao('secundario', 'min-h-10 shrink-0 px-3 text-[13px] sm:min-h-9')}>
+          <button type="button" disabled={bloqueado} onClick={() => digitar({ embalagens: '', solto: '0', escala: 'base' })} className={classeDeBotao('secundario', 'min-h-12 shrink-0 px-4 text-[14px]')}>
             Não tem
             <span className="sr-only"> (marca zero)</span>
           </button>
@@ -374,7 +468,7 @@ function ItemContavel({
             {i.unidade === 'UN' ? (
               <span className="shrink-0 px-1 text-[13px] text-suave">un</span>
             ) : (
-              <span role="group" aria-label="Unidade" className="inline-grid shrink-0 grid-cols-2 gap-0.5 rounded-[8px] border border-linha-forte bg-campo p-0.5">
+              <span role="group" aria-label="Unidade" className="inline-grid shrink-0 grid-cols-2 overflow-hidden rounded-[8px] border border-linha-forte bg-campo">
                 {(['base', 'menor'] as const).map((esc) => (
                   <button
                     key={esc}
@@ -382,7 +476,7 @@ function ItemContavel({
                     aria-pressed={l.campos.escala === esc}
                     disabled={bloqueado}
                     onClick={() => digitar({ escala: esc })}
-                    className="ff-transicao min-h-10 min-w-9 rounded-[6px] px-1.5 text-[13px] text-suave aria-[pressed=true]:bg-forte aria-[pressed=true]:font-semibold aria-[pressed=true]:text-texto"
+                    className="ff-transicao h-12 min-w-12 px-2 text-[14px] text-suave aria-[pressed=true]:bg-forte aria-[pressed=true]:font-semibold aria-[pressed=true]:text-texto"
                   >
                     {esc === 'base' ? u.sigla : u.menor}
                   </button>
@@ -457,7 +551,7 @@ function SituacaoDoItem({ l, repetir }: { l: Linha; repetir: () => void }) {
       );
     case 'falha':
       return (
-        <button type="button" onClick={repetir} className={`${base} min-h-10 rounded-[6px] px-1 text-erro underline underline-offset-4`}>
+        <button type="button" onClick={repetir} className={`${base} min-h-12 rounded-[7px] border border-linha-forte px-3 text-[13px] text-erro`}>
           Falhou · tentar de novo
         </button>
       );

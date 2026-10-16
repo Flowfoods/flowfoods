@@ -1217,3 +1217,33 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativa:** manter o CHECK da 0.1 e representar o estorno como um tipo novo de movimento.
 
 **Razão:** o estorno precisa do mesmo tipo do original (para o CMV e o livro contarem certo) com o sinal invertido. A migration `20261019000000_erp_estoque_abertura` faz DROP + ADD do CHECK na mesma transação: para movimento sem `estornoDeId` a regra é idêntica à da 0.1; o estorno é conferido por gatilho como espelho exato do original (mesma loja, insumo, tipo e documento, sinal trocado, nunca estorno de estorno) e índice único impede estorno duplo. O ADD valida as linhas existentes: se houvesse dado fora da regra, a migration falharia inteira. Provado pelos fiscais com dados da 1.5 (superuser e não-superuser, `migrate diff` vazio). **Não é precedente:** qualquer outra troca de regra existente passa pelo mesmo crivo (prova com dados reais + registro aqui).
+
+### 72. 2026-10-20 · ERP 1.7: o ciclo é um pedaço por vez, pelo lugar; a frequência vem da curva ABC da loja
+
+**Alternativas:** subconjunto — (a) sorteio diário; (b) por grupo/setor; (c) pelo lugar (conservação) com os vencidos pela frequência; frequência — (d) fixa por insumo; (e) por classe ABC do valor do saldo na loja.
+
+**Razão:** (c) + (e): conta-se onde se está (câmara, freezer, prateleira) e o que mais pesa em valor volta mais vezes (A 7, B 15, C 30 dias por padrão, mudável na loja). Nunca contado = vencido. O gerente ainda marca à mão; "Recontar" no saldo abre com um insumo só — é como se corrige número errado da abertura (a 1.6 não reabre). Um insumo fica numa contagem aberta só (trava da loja ao planejar): duas contagens aplicando diferença sobre o mesmo item dobrariam o ajuste.
+
+### 73. 2026-10-20 · ERP 1.7: o ajuste é contado − esperado do momento da contagem, somado ao saldo de agora
+
+**Alternativas:** (a) saldo = contado (o que o Notion proíbe: apaga a nota que entrou depois); (b) diferença contra o saldo na hora de aplicar; (c) diferença contra o livro fotografado a cada número salvo.
+
+**Razão:** (c): o esperado (`saldoSistemaMilesimos`) é o livro no instante em que a pessoa contou; a nota que entra depois continua no estoque (fica = atual + diferença), e a conferência mostra "depois de contar" para o gerente decidir se a mercadoria já estava na prateleira. Vale também para a corrida nota × contagem: qualquer ordem dá o saldo certo, porque a diferença não depende do saldo na hora de aplicar. `CONTAGEM` ± com `contagemItemId` (CHECK novo) e chave por item; valor pelo custo de referência de agora; não contado fica como está; item reaplicado depois por outra contagem fica de fora.
+
+### 74. 2026-10-20 · ERP 1.7: "fecha sozinha" quando tudo bate dentro da tolerância; passou do prazo, fecha sem aplicar
+
+**Alternativas:** (a) sempre o gerente aplica; (b) aplica sozinha quando o último item é contado e tudo bate dentro de uma tolerância por item definida pela loja; prazo — (c) cron que fecha; (d) estado derivado + gravado na próxima escrita.
+
+**Razão:** (b): é o "contagem que fecha sozinha" (Notion) sem dar ao operador o poder de ajustar — quem decide é a regra que a dona deixou (tolerância em R$ por item, padrão R$ 5,00; 0 = só exato). Nunca fecha sozinha com item sem preço com diferença nem com movimento depois de contado (pede olho humano). (d): sem infraestrutura nova; cron atrasado não existe; contagem velha não se aplica como se fosse de agora (prazo = fim do dia seguinte, Rio). O "fechou sem aplicar" fica gravado na primeira escrita depois do prazo (salvar, aplicar, planejar, fechar), e a tela já o mostra antes.
+
+### 75. 2026-10-20 · ERP 1.7: piso obrigatório = cobertura do período por valor E por insumos; fechamento por loja; números na loja, só a dona muda
+
+**Alternativas:** piso — (a) contagem completa no fim do período; (b) cobertura mínima de contagens aplicadas no período; medida — (c) só itens; (d) valor e itens; onde configurar — (e) no parceiro; (f) na loja, pelo gerente; (g) na loja, só com "cadastrar lojas".
+
+**Razão:** (b)+(d): é o inventário cíclico — o livro é confiável se o que pesa foi verificado no período; o fechamento conta o que falta ("para o piso": os de maior valor primeiro) e só aplica com as duas medidas no piso (padrão 80 % do valor, 50 % dos insumos; faixa 50–100 % e 0–100 %). A cobertura do fechamento conta os números dele pelo saldo de depois do ajuste (a mesma antes e depois de aplicar). (g): o gerente é quem fecha; se pudesse baixar o piso, ele não seria obrigatório. O fechamento é por loja (índice parcial loja × período), abre nos 3 últimos dias do período, sem cíclica aberta, e fotografa o estoque final (base do CMV real, 2.3). O período vem do `ParceiroFlow` (semanal: dia 1–7 = segunda…domingo); `PeriodoApuracao` é criado ao começar e o status dele segue do DRE (2.2). Migration aditiva: nenhuma regra existente trocada (a decisão 71 não se repete).
+
+### 76. 2026-10-20 · ERP 1.7 (revisão do Guardião): o número vale para o instante em que foi digitado
+
+**Alternativas:** (a) o esperado é o livro na hora em que o servidor recebe o número (1ª versão: o rascunho reenviado horas depois, com uma nota no meio, era comparado com o livro que já incluía a nota — a diferença apagava a nota e, dentro da tolerância, fechava sozinha); (b) o cliente manda a hora absoluta; (c) o cliente manda a IDADE do número (agora − quando digitou, no relógio do próprio aparelho) e o servidor prende o instante entre o início da contagem e agora.
+
+**Razão:** (c): relógio errado do celular não conta (a idade é diferença no mesmo relógio); o instante nunca fica no futuro nem antes de a contagem existir (rascunho de 2 dias vale para o início dela). O esperado é o livro naquele instante — saldo de agora − Σ movimentos com `ocorridoEm` depois dele, numa consulta (um retrato) — e `contadoEm` é esse instante: o que entrou depois aparece em "depois de contar" e impede o "fecha sozinha" mesmo dentro da tolerância. A idade é dado do cliente, não confiável: o pior que um aparelho consegue é dizer que contou mais tarde (o mesmo que recontar de verdade). Junto: rascunho por contagem E pessoa (aparelho compartilhado), fotografia da contagem fechada imutável por gatilho (migration aditiva) e regras da loja só com as regras lidas (a trava de edição simultânea não desliga).

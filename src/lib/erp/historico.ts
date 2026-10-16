@@ -48,6 +48,9 @@ const ACAO: Record<string, string> = {
   CONCLUIU: 'Concluiu',
   DESCARTOU: 'Descartou',
   RECONTOU: 'Recontou',
+  // 1.7
+  FECHOU_SOZINHA: 'Fechou sozinha',
+  VENCEU: 'Fechou sem aplicar',
 };
 
 const CAMPO: Record<string, string> = {
@@ -103,6 +106,18 @@ const CAMPO: Record<string, string> = {
   situacao: 'situação',
   documento: 'CNPJ/CPF',
   contato: 'contato',
+  // 1.7: contagem do dia a dia e regras da loja
+  prazo: 'prazo',
+  ajustes: 'ajustes no estoque',
+  sobrou: 'sobrou (R$)',
+  faltou: 'faltou (R$)',
+  naoAjustados: 'sem contar (sem ajuste)',
+  recontadosDepois: 'recontados depois em outra contagem',
+  estoqueFinal: 'estoque final',
+  cobertura: 'cobertura do período',
+  pisoDoFechamento: 'piso do fechamento',
+  frequencia: 'frequência da contagem',
+  tolerancia: 'tolerância para fechar sozinha',
 };
 
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */

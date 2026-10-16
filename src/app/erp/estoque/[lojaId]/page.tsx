@@ -7,6 +7,7 @@
 import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { obterEstoqueDaLoja } from '@/lib/erp/estoque';
+import { situacaoDoPeriodo } from '@/lib/erp/contagem';
 import { lerFiltrosDoSaldo, TelaEstoqueDaLoja } from '@/components/erp/telas/estoque/loja';
 import { fraseDoEstoque } from '@/components/erp/telas/estoque/estado';
 import { acaoDescartarAbertura, acaoIniciarAbertura } from '../actions';
@@ -21,6 +22,8 @@ export default async function ErpEstoqueDaLojaPage({ params, searchParams }: { p
   const filtros = lerFiltrosDoSaldo(searchParams);
   const e = await obterEstoqueDaLoja(ctx.cliente, ctx.alcance, params.lojaId, filtros);
   if (!e) notFound();
+  // 1.7: com o estoque aberto, o período (cobertura × piso) e as contagens do dia a dia.
+  const periodo = e.estado === 'ABERTO' ? await situacaoDoPeriodo(ctx.cliente, ctx.alcance, e.loja.id, ctx.parceiro) : null;
   const lojaId = e.loja.id;
   return (
     <TelaEstoqueDaLoja
@@ -33,6 +36,7 @@ export default async function ErpEstoqueDaLojaPage({ params, searchParams }: { p
       pode={{ contar: pode(ctx.alcance, 'estoque.contar', { lojaId }), ajustar: pode(ctx.alcance, 'estoque.ajustar', { lojaId }) }}
       acoes={{ abrir: acaoIniciarAbertura.bind(null, lojaId), descartar: acaoDescartarAbertura.bind(null, lojaId) }}
       bloqueio={ctx.bloqueio}
+      periodo={periodo}
     />
   );
 }

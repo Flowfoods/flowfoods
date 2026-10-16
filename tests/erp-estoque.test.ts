@@ -12,6 +12,12 @@ import {
   chaveDoSaldo,
   efeitoDaNota,
   entradasDaNota,
+  estouroDoRazao,
+  LIMITE_DO_INTEIRO,
+  TETO_DA_CONTAGEM,
+  TETO_DO_VALOR_DO_ITEM,
+  totalAcimaDoLimite,
+  valorAcimaDoTeto,
   estadoDoEstoque,
   estornoDe,
   fraseDoEfeito,
@@ -26,6 +32,8 @@ import {
   valorDaQuantidade,
 } from '@/lib/erp/estoque-campos';
 import { custoPorUnidade } from '@/lib/erp/unidades';
+import { apagarRascunho, chaveDoRascunho, destinoDoRascunho, guardarRascunho, lerRascunhos, VALIDADE_DO_RASCUNHO_MS } from '@/components/erp/telas/estoque/rascunho';
+import { instanteDigitado } from '@/lib/erp/estoque-campos';
 
 const CHEDDAR = { unidade: 'KG' as const, embalagemConteudoMilesimos: 5000 };
 const PAO = { unidade: 'UN' as const, embalagemConteudoMilesimos: 12000 };
@@ -89,6 +97,8 @@ describe('ERP 1.6 · ler o que se contou', () => {
     expect(r).toEqual({ total: 4, contados: 2, zerados: 1, naoContados: 2 });
     expect(fraseDoQueFalta(r)).toBe('Faltam 2 de 4');
     expect(fraseDoQueFalta({ total: 3, contados: 3, zerados: 0, naoContados: 0 })).toBe('Todos os 3 contados');
+    expect(fraseDoQueFalta({ total: 1, contados: 1, zerados: 0, naoContados: 0 })).toBe('O insumo foi contado');
+    expect(fraseDoQueFalta({ total: 3, contados: 2, zerados: 0, naoContados: 1 })).toBe('Falta 1 de 3');
   });
 });
 
@@ -203,5 +213,97 @@ describe('ERP 1.6 · saldo antes + quantidade = depois (a conta do CHECK do banc
   it('quantidade com sinal: "+15 kg" e "−2,5 kg"', () => {
     expect(sp(quantidadeComSinal(15000, 'KG'))).toBe('+15 kg');
     expect(sp(quantidadeComSinal(-2500, 'KG'))).toBe('−2,5 kg');
+  });
+});
+
+describe('herança a da 1.6: tetos que cabem no INTEGER, com frase', () => {
+  it('a contagem aceita até 100 mil kg/L/un por item; um milésimo a mais é recusado com a frase', () => {
+    expect(TETO_DA_CONTAGEM).toBe(100_000_000);
+    expect(lerContagem({ embalagens: '', solto: '100000', escala: 'base' }, { unidade: 'KG', embalagemConteudoMilesimos: null })).toMatchObject({ ok: true, lida: { contadoMilesimos: 100_000_000 } });
+    expect(lerContagem({ embalagens: '20000', solto: '', escala: 'base' }, CHEDDAR)).toMatchObject({ ok: true, lida: { contadoMilesimos: 100_000_000 } });
+    const r = lerContagem({ embalagens: '20000', solto: '0,001', escala: 'base' }, CHEDDAR);
+    expect(r).toMatchObject({ ok: false, erros: { solto: expect.stringMatching(/máximo de uma contagem/) } });
+    // O antigo teto (1 milhão de kg) caía aqui.
+    expect(lerContagem({ embalagens: '', solto: '1000000', escala: 'base' }, { unidade: 'KG', embalagemConteudoMilesimos: null }).ok).toBe(false);
+  });
+
+  it('valor de um item: até R$ 1 milhão passa; acima, a frase com o nome', () => {
+    expect(valorAcimaDoTeto('Cheddar', TETO_DO_VALOR_DO_ITEM)).toBeNull();
+    expect(valorAcimaDoTeto('Cheddar', null)).toBeNull();
+    expect(valorAcimaDoTeto('Cheddar', TETO_DO_VALOR_DO_ITEM + 1)).toMatch(/“Cheddar” daria mais de R\$ 1\.000\.000,00/);
+    // 100 mil kg (o teto) × R$ 26,75/kg = R$ 2.675.000: a contagem passa, o valor não.
+    const valor = valorDaQuantidade(custoPorUnidade({ centavos: 2675, milesimos: 1000 }), TETO_DA_CONTAGEM)!;
+    expect(valor).toBe(267_500_000);
+    expect(valorAcimaDoTeto('Carne', valor)).not.toBeNull();
+    expect(totalAcimaDoLimite(LIMITE_DO_INTEIRO)).toBeNull();
+    expect(totalAcimaDoLimite(LIMITE_DO_INTEIRO + 1)).toMatch(/R\$ 21 milhões/);
+  });
+
+  it('razão: movimento ou saldo que passaria do INTEGER vira a frase (no limite exato, passa)', () => {
+    const base = { lojaId: 'l', insumoId: 'i', tipo: 'ENTRADA_COMPRA' as const, insumoNome: 'Guardanapo', unidade: 'UN' as const, motivo: null, chave: 'k' };
+    const saldos = new Map([[chaveDoSaldo('l', 'i'), { quantidadeMilesimos: LIMITE_DO_INTEIRO - 10, valorCentavos: 0 }]]);
+    const cabe = aplicarNosSaldos(saldos, [{ ...base, quantidadeMilesimos: 10, valorCentavos: 5 }]);
+    expect(estouroDoRazao(cabe.linhas, cabe.finais)).toBeNull();
+    const passa = aplicarNosSaldos(saldos, [{ ...base, quantidadeMilesimos: 11, valorCentavos: 5 }]);
+    expect(estouroDoRazao(passa.linhas, passa.finais)).toMatch(/“Guardanapo” passaria do limite do sistema/);
+    const valor = aplicarNosSaldos(new Map([[chaveDoSaldo('l', 'i'), { quantidadeMilesimos: 0, valorCentavos: LIMITE_DO_INTEIRO }]]), [{ ...base, quantidadeMilesimos: 1, valorCentavos: 1 }]);
+    expect(estouroDoRazao(valor.linhas, valor.finais)).not.toBeNull();
+  });
+});
+
+describe('herança b da 1.6: rascunho local do número que falhou ao salvar', () => {
+  const memoria = () => {
+    const m = new Map<string, string>();
+    return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v), removeItem: (k: string) => void m.delete(k), m };
+  };
+  const campos = (solto: string) => ({ embalagens: '', solto, escala: 'base' });
+
+  it('guarda por contagem e item, com a versão; salvar apaga; vencido some', () => {
+    const a = memoria();
+    guardarRascunho('c1', 'i1', { campos: campos('12'), versao: 3, em: 1000 }, a);
+    guardarRascunho('c1', 'i2', { campos: campos('4'), versao: 0, em: 1000 }, a);
+    guardarRascunho('c2', 'i1', { campos: campos('9'), versao: 1, em: 1000 }, a);
+    expect(lerRascunhos('c1', 2000, a)).toEqual({ i1: { campos: campos('12'), versao: 3, em: 1000 }, i2: { campos: campos('4'), versao: 0, em: 1000 } });
+    apagarRascunho('c1', 'i1', a);
+    expect(Object.keys(lerRascunhos('c1', 2000, a))).toEqual(['i2']);
+    expect(lerRascunhos('c1', 1000 + VALIDADE_DO_RASCUNHO_MS + 1, a)).toEqual({});
+    expect(a.m.has('ff-contagem:c1')).toBe(false);
+    expect(Object.keys(lerRascunhos('c2', 2000, a))).toEqual(['i1']);
+  });
+
+  it('sem localStorage (ou com lixo) a tela segue: nada quebra', () => {
+    expect(lerRascunhos('c1', 0, null)).toEqual({});
+    expect(() => guardarRascunho('c1', 'i1', { campos: campos('1'), versao: 0, em: 0 }, null)).not.toThrow();
+    const a = memoria();
+    a.setItem('ff-contagem:c1', '{"i1":{"campos":{"solto":5},"versao":"x"}');
+    expect(lerRascunhos('c1', 0, a)).toEqual({});
+    const cheio = { getItem: () => null, setItem: () => { throw new Error('QuotaExceeded'); }, removeItem: () => {} };
+    expect(() => guardarRascunho('c1', 'i1', { campos: campos('1'), versao: 0, em: 0 }, cheio)).not.toThrow();
+  });
+
+  it('ao abrir: o servidor já tem o mesmo número = descarta; senão reenvia com a versão do rascunho (o servidor dá conflito se o item andou)', () => {
+    const r = { campos: campos('12'), versao: 3, em: 0 };
+    expect(destinoDoRascunho(r, { campos: campos('12'), versao: 4 })).toBe('descartar');
+    expect(destinoDoRascunho(r, { campos: campos(''), versao: 3 })).toBe('reenviar');
+    // Alguém salvou 10 depois (versão 5): reenviar com a versão 3 = conflito no servidor, nunca sobrescreve.
+    expect(destinoDoRascunho(r, { campos: campos('10'), versao: 5 })).toBe('reenviar');
+  });
+});
+
+describe('decisão 76: o número vale para quando foi digitado (dado do cliente, preso entre o início da contagem e agora)', () => {
+  const agora = new Date('2026-10-16T15:00:00Z');
+  const inicio = new Date('2026-10-16T12:00:00Z');
+  it('idade em ms medida no aparelho: agora − idade', () => {
+    expect(instanteDigitado(agora, 30 * 60_000, inicio).toISOString()).toBe('2026-10-16T14:30:00.000Z');
+  });
+  it('nunca antes do início da contagem (rascunho de 2 dias) nem no futuro (idade negativa, lixo)', () => {
+    expect(instanteDigitado(agora, 2 * 86_400_000, inicio).toISOString()).toBe(inicio.toISOString());
+    expect(instanteDigitado(agora, -60_000, inicio).toISOString()).toBe(agora.toISOString());
+    expect(instanteDigitado(agora, 'x', inicio).toISOString()).toBe(agora.toISOString());
+    expect(instanteDigitado(agora, undefined, inicio).toISOString()).toBe(agora.toISOString());
+    expect(instanteDigitado(agora, Infinity, inicio).toISOString()).toBe(agora.toISOString());
+  });
+  it('rascunho chaveado por contagem e pessoa', () => {
+    expect(chaveDoRascunho('c1', 'ana')).not.toBe(chaveDoRascunho('c1', 'bia'));
   });
 });
