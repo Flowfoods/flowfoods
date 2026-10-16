@@ -26,9 +26,9 @@ const DATA = new Intl.DateTimeFormat('pt-BR', {
 
 const EXPLICA = {
   ATIVO: 'Opera normalmente: cadastros e lançamentos liberados.',
-  RASCUNHO: 'Criado, mas ainda não liberado. Insumos, lojas e marcas abrem quando ativar.',
+  RASCUNHO: 'Criado, mas ainda não liberado. Insumos, fichas técnicas, lojas e marcas abrem quando ativar.',
   SUSPENSO:
-    'Dá para consultar tudo. Insumos, lojas e marcas ficam bloqueados até reativar; o nome ainda pode ser corrigido.',
+    'Dá para consultar tudo. Insumos, fichas técnicas, lojas e marcas ficam bloqueados até reativar; o nome ainda pode ser corrigido.',
 } as const;
 
 export default async function CadastroParceiroPage({ params }: { params: { slug: string } }) {

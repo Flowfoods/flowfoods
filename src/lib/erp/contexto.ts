@@ -100,6 +100,24 @@ export async function exigirParceiroDaSessao(): Promise<ContextoDaPessoa> {
 }
 
 /**
+ * Para a rota que RECEBE arquivo (foto da ficha): a mesma sessão, mas sem
+ * redirecionar — null quando não há sessão válida, para a rota recusar ANTES
+ * de ler o corpo.
+ */
+export async function parceiroDaSessaoOuNada(): Promise<ContextoDaPessoa | null> {
+  const pessoa = await sessaoDaRequisicao();
+  if (!pessoa?.parceiro || !pessoa.alcance) return null;
+  return contextoDaSessao(pessoa as SessaoValida & { parceiro: ParceiroFlow });
+}
+
+/** O mesmo para o nível 1: sem a sessão do /rodolfo, null (nada é lido do pedido). */
+export async function parceiroDoNivel1OuNada(slug: string): Promise<ContextoDoParceiro | null> {
+  const sessao = await getServerSession(authOptions);
+  if (!(sessao?.user as { id?: string } | undefined)?.id) return null;
+  return exigirParceiro(slug);
+}
+
+/**
  * Telas do /erp. A primeira é o hub "Módulos da Rede" (livre: só a sessão; ele
  * lista só o que `modulosDoParceiro(alcance)` libera) — é para lá que vai quem
  * abre uma tela fora do acesso.

@@ -75,6 +75,7 @@ const CAMPO: Record<string, string> = {
   modoPreparo: 'modo de preparo',
   foto: 'foto',
   itens: 'insumos',
+  fichaQueProduz: 'vem da ficha',
 };
 
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */
@@ -94,6 +95,7 @@ const ORDEM = [
   'custoPorUnidade',
   'custoPorUnidadeCentavos',
   'codigoBarras',
+  'fichaQueProduz',
   'ativo',
 ];
 const posicao = (c: string) => (ORDEM.includes(c) ? ORDEM.indexOf(c) : ORDEM.length);

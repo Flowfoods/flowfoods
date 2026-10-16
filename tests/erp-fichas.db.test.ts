@@ -10,7 +10,7 @@
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-fichas.db.test.ts
  */
-import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
@@ -28,25 +28,34 @@ vi.mock('next/navigation', () => ({
 }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
-  return { exigirParceiroDaSessao: async () => atual.ctx!(), exigirParceiro: async () => atual.ctx!(), recusaDaAcao, exigirPermissao, pode };
+  return {
+    exigirParceiroDaSessao: async () => atual.ctx!(),
+    exigirParceiro: async () => atual.ctx!(),
+    parceiroDaSessaoOuNada: async () => (atual.ctx ? atual.ctx() : null),
+    recusaDaAcao,
+    exigirPermissao,
+    pode,
+  };
 });
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarInsumo } from '@/lib/erp/insumos';
-import { cadastrarFicha, editarFicha, MENSAGEM_CONFLITO_FICHA, mudarSituacaoFicha, obterFicha } from '@/lib/erp/fichas';
-import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
+import { cadastrarFicha, editarFicha, MENSAGEM_CONFLITO_FICHA, MENSAGEM_FOTO_SUMIU, mudarSituacaoFicha, obterFicha } from '@/lib/erp/fichas';
+import { importarFichas, MENSAGEM_IMPORTACAO_DEMOROU, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { responderFoto } from '@/lib/erp/foto-resposta';
 import { listarHistorico } from '@/lib/erp/historico';
 import { resolverAlcance } from '@/lib/erp/permissoes';
 import { centavosDaFracao } from '@/lib/erp/unidades';
 import * as daSessao from '@/app/erp/fichas/actions';
 import { GET as fotoDaSessao } from '@/app/erp/fichas/[id]/foto/route';
+import { POST as envioDaSessao } from '@/app/erp/fichas/fotos/route';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { JPG_LIMPO, jpgComGps, PNG_LIMPO, temGps } from './erp-fotos-teste';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
-const JPG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1]);
-const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]);
+const JPG = JPG_LIMPO;
+const PNG = PNG_LIMPO;
 
 describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeout: 60_000 }, () => {
   let db: PrismaClient;
@@ -77,6 +86,25 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
       throw e;
     }
   }
+  /** POST na rota de envio da foto (/erp/fichas/fotos), com o corpo vigiado: diz se alguém o leu. */
+  function pedidoDeFoto(bytes: Uint8Array, cabecalhos: Record<string, string> = {}) {
+    const vigia = { lido: false };
+    const corpo = new ReadableStream<Uint8Array>({
+      pull(c) {
+        vigia.lido = true;
+        c.enqueue(bytes);
+        c.close();
+      },
+    }, { highWaterMark: 0 }); // só puxa quando alguém LÊ
+    const req = new Request('http://localhost:3100/erp/fichas/fotos', {
+      method: 'POST',
+      body: corpo,
+      headers: { 'content-type': 'image/jpeg', 'content-length': String(bytes.length), host: 'localhost:3100', ...cabecalhos },
+      duplex: 'half',
+    } as RequestInit);
+    return { req, vigia };
+  }
+  const enviarFoto = (bytes: Uint8Array) => envioDaSessao(pedidoDeFoto(bytes).req);
   const fotosDe = (parceiroId: string) => {
     const p = join(pasta, parceiroId, 'fichas');
     return existsSync(p) ? readdirSync(p) : [];
@@ -128,10 +156,14 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
   });
 
   it('cria com foto e 3 insumos (um sem preço): custo incompleto, por porção, histórico e foto na pasta de A', async () => {
-    const r = await cadastrarFicha(a, xburger(), { tipo: 'trocar', bytes: JPG }, 'Marina');
+    // Foto de celular, com GPS no EXIF: vai para o disco SEM ele.
+    const r = await cadastrarFicha(a, xburger(), { tipo: 'trocar', bytes: jpgComGps(JPG, 1) }, 'Marina');
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     ids.xburger = r.id;
+    const gravada = readFileSync(join(pasta, A.id, 'fichas', fotosDe(A.id)[0]));
+    expect(temGps(gravada)).toBe(false);
+    expect(gravada.equals(Buffer.from(JPG))).toBe(true);
     const f = (await obterFicha(a, r.id))!;
     expect(f.itens.map((i) => [i.nome, i.quantidadeMilesimos])).toEqual([
       ['Pão brioche', 1000],
@@ -187,17 +219,21 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
     grande.set(JPG);
     const r2 = await cadastrarFicha(a, xburger({ nome: 'Foto enorme' }), { tipo: 'trocar', bytes: grande });
     expect(r2.ok).toBe(false);
-    // Pela action (arquivo de verdade no FormData): o tamanho é recusado antes de ler o corpo.
+    // Pela rota de envio (arquivo de verdade): GIF recusado, nada no disco.
     atual.ctx = () => ctxDe(A, 'DONO');
+    const gif = await enviarFoto(new TextEncoder().encode('GIF89a......'));
+    expect(gif.status).toBe(422);
+    expect(await gif.json()).toEqual({ erro: 'Use uma foto em JPG, PNG ou WebP.' });
+    // E a action não aceita mais arquivo no formulário: só o nome da foto já enviada.
     const form = new FormData();
     form.set('nome', 'Pela action');
     form.set('tipo', 'PRATO');
     form.append('item_insumo', ids.pao);
     form.append('item_quantidade', '1');
     form.append('item_unidade', 'un');
-    form.set('foto', new File([new TextEncoder().encode('GIF89a')], 'x.gif', { type: 'image/gif' }));
+    form.set('fotoNova', '../../../etc/passwd');
     const e = await rodar(daSessao.acaoCadastrarFicha(null, form));
-    expect(e).toMatchObject({ ok: false, erros: { foto: 'Use uma foto em JPG, PNG ou WebP.' } });
+    expect(e).toMatchObject({ ok: false, erros: { foto: 'Escolha a foto de novo.' } });
     expect(await a.fichaTecnica.count({ where: { nome: { in: ['Com SVG', 'Foto enorme', 'Pela action'] } } })).toBe(0);
     expect(fotosDe(A.id).length).toBe(antes);
   });
@@ -219,6 +255,70 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
     expect(imp?.erro).toBeTruthy();
     expect(await a.fichaTecnica.count({ where: { nome: 'Do operador' } })).toBe(0);
     expect((await obterFicha(a, ids.xburger))!.ativa).toBe(true);
+  });
+
+  it('envio da foto (rota própria): sem sessão, operador, suspenso e acima de 8 MB recusados SEM ler o corpo', async () => {
+    const corpo = jpgComGps(JPG);
+    atual.ctx = null;
+    const sem = pedidoDeFoto(corpo);
+    const r0 = await envioDaSessao(sem.req);
+    expect(r0.status).toBe(401);
+    expect(sem.vigia.lido).toBe(false);
+    for (const [ctx, status] of [
+      [() => ctxDe(A, 'OPERADOR'), 403],
+      [() => ctxDe(A, 'DONO', 'Parceiro suspenso: insumos, fichas técnicas, lojas e marcas ficam bloqueados até reativar.'), 403],
+    ] as const) {
+      atual.ctx = ctx;
+      const p = pedidoDeFoto(corpo);
+      expect((await envioDaSessao(p.req)).status).toBe(status);
+      expect(p.vigia.lido).toBe(false);
+    }
+    atual.ctx = () => ctxDe(A, 'DONO');
+    const grande = pedidoDeFoto(corpo, { 'content-length': String(8 * 1024 * 1024 + 1) });
+    expect((await envioDaSessao(grande.req)).status).toBe(413);
+    expect(grande.vigia.lido).toBe(false);
+    const deFora = pedidoDeFoto(corpo, { origin: 'https://outro-site.example' });
+    expect((await envioDaSessao(deFora.req)).status).toBe(403);
+    expect(deFora.vigia.lido).toBe(false);
+    // Tamanho declarado mentindo (pequeno) e corpo grande: a leitura corta no teto.
+    const mentira = new Uint8Array(8 * 1024 * 1024 + 10);
+    mentira.set(JPG);
+    expect((await envioDaSessao(pedidoDeFoto(mentira, { 'content-length': '100' }).req)).status).toBe(413);
+  });
+
+  it('envio da foto: a dona envia foto de celular (com GPS), salva a ficha com o nome, e o disco fica sem GPS', async () => {
+    atual.ctx = () => ctxDe(A, 'DONO');
+    const p = pedidoDeFoto(jpgComGps(JPG, 6));
+    const r = await envioDaSessao(p.req);
+    expect(r.status).toBe(201);
+    expect(p.vigia.lido).toBe(true); // o vigia funciona: com sessão e permissão, o corpo é lido
+    const { arquivo } = (await r.json()) as { arquivo: string };
+    expect(arquivo).toMatch(/^[0-9a-f]{32}\.jpg$/);
+    const pendente = readFileSync(join(pasta, A.id, 'fichas', 'pendentes', arquivo));
+    expect(temGps(pendente)).toBe(false);
+    // B não consegue usar a pendente de A (o caminho é do parceiro DA SESSÃO).
+    expect(await cadastrarFicha(b, { nome: 'Roubo', tipo: 'PRATO', rendimento: '1', itens: [{ insumoId: ids.paoB, quantidade: '1', unidade: 'un' }] }, { tipo: 'enviada', arquivo })).toEqual({
+      ok: false,
+      erros: { foto: MENSAGEM_FOTO_SUMIU },
+    });
+    // Erro no formulário: a foto volta a ser pendente e o segundo envio do formulário a usa.
+    const form = new FormData();
+    form.set('nome', '');
+    form.set('tipo', 'PRATO');
+    form.append('item_insumo', ids.pao);
+    form.append('item_quantidade', '1');
+    form.append('item_unidade', 'un');
+    form.set('fotoNova', arquivo);
+    expect(await rodar(daSessao.acaoCadastrarFicha(null, form))).toMatchObject({ ok: false, erros: { nome: expect.any(String) } });
+    expect(existsSync(join(pasta, A.id, 'fichas', 'pendentes', arquivo))).toBe(true);
+    form.set('nome', 'Com foto enviada');
+    expect(await rodar(daSessao.acaoCadastrarFicha(null, form))).toMatchObject({ destino: expect.stringMatching(/feito=criada$/) });
+    expect(existsSync(join(pasta, A.id, 'fichas', 'pendentes', arquivo))).toBe(false);
+    const gravada = readFileSync(join(pasta, A.id, 'fichas', arquivo));
+    expect(temGps(gravada)).toBe(false);
+    const f = await a.fichaTecnica.findFirstOrThrow({ where: { nome: 'Com foto enviada' } });
+    expect(f.fotoArquivo).toBe(arquivo);
+    expect(f.fotoBytes).toBe(gravada.length);
   });
 
   it('dona pela action: cria e cai no detalhe; parceiro suspenso não grava', async () => {
@@ -313,6 +413,21 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
     expect(await importarFichas(a, nova)).toEqual({ ok: true, criadas: 0, alteradas: 1, iguais: 3, comErro: 1 });
     const smash2 = await a.fichaTecnica.findFirstOrThrow({ where: { nome: 'Smash duplo' } });
     expect(smash2.descricao).toBe('Dois smash');
+  });
+
+  it('importar acima do limite (301 fichas): prévia e importação dizem o porquê e o que fazer; nada gravado', async () => {
+    const linhas = ['ficha;insumo;quantidade;unidade', ...Array.from({ length: 301 }, (_, i) => `Lote ${i + 1};Pão brioche;1;un`)];
+    const texto = linhas.join('\n');
+    const antes = await a.fichaTecnica.count();
+    const p = await previaDaImportacao(a, texto);
+    expect(p.fichas).toEqual([]);
+    expect(p.erros[0].mensagem).toBe('A planilha tem 301 fichas: importe até 300 por vez. Divida o arquivo e envie as partes uma de cada vez (reimportar não duplica).');
+    expect(await importarFichas(a, texto)).toEqual({ ok: false, erro: p.erros[0].mensagem });
+    expect(await a.fichaTecnica.count()).toBe(antes);
+    // Estourou o tempo da transação: mensagem clara, nada gravado (tudo ou nada).
+    const ok = linhas.slice(0, 41).join('\n');
+    expect(await importarFichas(a, ok, 'Marina', { timeout: 1 })).toEqual({ ok: false, erro: MENSAGEM_IMPORTACAO_DEMOROU });
+    expect(await a.fichaTecnica.count()).toBe(antes);
   });
 
   it('importar em B com nome de insumo que só existe em A: não encontrado (isolamento)', async () => {

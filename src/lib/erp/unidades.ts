@@ -148,15 +148,47 @@ function reduzir(f: Fracao): Fracao {
   return { num: f.num / d, den: f.den / d };
 }
 
+/** Custo de 1 unidade base (1 kg, 1 L, 1 un) do custo de referência, como fração exata de centavos. */
+export function custoPorUnidade(custo: CustoExato): Fracao {
+  return reduzir({ num: BigInt(custo.centavos) * 1000n, den: BigInt(custo.milesimos) });
+}
+
 /**
- * Centavos de `quantidadeMilesimos` do insumo, exato. `fatorMilesimos` é o
- * fator de correção (bruto ÷ líquido, 1000 = sem perda; a 1.3 usa).
+ * Centavos de `quantidadeMilesimos` de algo que custa `porUnidade` centavos
+ * por unidade base, exato. `fatorMilesimos` é o fator de correção (bruto ÷
+ * líquido, 1000 = sem perda): a quantidade é a LÍQUIDA, paga-se a BRUTA.
+ * Serve ao insumo (custo de referência) e ao pré-preparo (custo da ficha ÷
+ * rendimento) — é a mesma conta em toda a cascata (1.3).
  */
-export function custoExatoDaQuantidade(custo: CustoExato, quantidadeMilesimos: number, fatorMilesimos = 1000): Fracao {
+export function custoDoUso(porUnidade: Fracao, quantidadeMilesimos: number, fatorMilesimos = 1000): Fracao {
   return reduzir({
-    num: BigInt(custo.centavos) * BigInt(quantidadeMilesimos) * BigInt(fatorMilesimos),
-    den: BigInt(custo.milesimos) * 1000n,
+    num: porUnidade.num * BigInt(quantidadeMilesimos) * BigInt(fatorMilesimos),
+    den: porUnidade.den * 1_000_000n,
   });
+}
+
+/** Centavos de `quantidadeMilesimos` do insumo, exato (ver `custoDoUso`). */
+export function custoExatoDaQuantidade(custo: CustoExato, quantidadeMilesimos: number, fatorMilesimos = 1000): Fracao {
+  return custoDoUso(custoPorUnidade(custo), quantidadeMilesimos, fatorMilesimos);
+}
+
+/** -1, 0 ou 1, exato (multiplicação cruzada). */
+export function compararFracoes(a: Fracao, b: Fracao): number {
+  const x = a.num * b.den;
+  const y = b.num * a.den;
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
+/**
+ * Teto do que a tela mostra: 2^53 centavos (o maior inteiro que o JavaScript
+ * guarda sem errar). Acima disso a tela RECUSA mostrar ("acima do limite"),
+ * nunca um número já errado; e a ficha que passaria disso não é gravada.
+ */
+export const TETO_DE_EXIBICAO = BigInt(Number.MAX_SAFE_INTEGER);
+export const ACIMA_DO_LIMITE = 'acima do limite';
+
+export function cabeNaExibicao(f: Fracao): boolean {
+  return dividirBig(f.num, f.den) <= TETO_DE_EXIBICAO;
 }
 
 export function somar(a: Fracao, b: Fracao): Fracao {
@@ -229,7 +261,10 @@ export function formatarQuantidade(milesimos: number, unidade: Unidade): string 
  * "R$ 0,00". Arredondamento metade para cima na última casa mostrada.
  */
 export function formatarReaisDaFracao(num: bigint, den: bigint): string {
-  if (num >= den || num === 0n) return formatarDinheiro(Number(dividirBig(num, den)));
+  if (num >= den || num === 0n) {
+    const centavos = dividirBig(num, den);
+    return centavos > TETO_DE_EXIBICAO ? ACIMA_DO_LIMITE : formatarDinheiro(Number(centavos));
+  }
   for (let casas = 3; casas <= 8; casas++) {
     const v = dividirBig(num * 10n ** BigInt(casas - 2), den);
     if (v >= 10n || casas === 8) {

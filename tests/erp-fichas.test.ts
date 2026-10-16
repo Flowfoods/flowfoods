@@ -19,7 +19,8 @@ import {
   type InsumoDaFicha,
 } from '@/lib/erp/ficha-campos';
 import { casarComInsumos, chaveDeNome, decodificarPlanilha, lerCsv, lerPlanilhaDeFichas } from '@/lib/erp/ficha-planilha';
-import { conferirFoto, LIMITE_DA_FOTO, tipoPelosBytes } from '@/lib/erp/foto';
+import { conferirFoto, LIMITE_DA_FOTO, prepararFoto, tipoPelosBytes } from '@/lib/erp/foto';
+import { GPS, JPG_LIMPO, jpgComGps, PNG_LIMPO, pngComGps, temGps, WEBP_LIMPO, webpComGps } from './erp-fotos-teste';
 import { caminhoDaFoto } from '@/lib/erp/arquivos';
 import { descreverMudancas } from '@/lib/erp/historico';
 import { diferenca } from '@/lib/erp/insumo-campos';
@@ -68,12 +69,8 @@ describe('ERP 1.2 · item digitado em g/kg, ml/L ou un vira milésimos do insumo
     );
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.dados.itens).toEqual([
-      { insumoId: 'blend', quantidadeMilesimos: 180 },
-      { insumoId: 'pao', quantidadeMilesimos: 1000 },
-      { insumoId: 'oleo', quantidadeMilesimos: 50 },
-      { insumoId: 'guard', quantidadeMilesimos: 2000 },
-    ]);
+    const it = (insumoId: string, quantidadeMilesimos: number) => ({ insumoId, subfichaId: null, quantidadeMilesimos, fatorCorrecaoMilesimos: 1000 });
+    expect(r.dados.itens).toEqual([it('blend', 180), it('pao', 1000), it('oleo', 50), it('guard', 2000)]);
     expect(r.dados).toMatchObject({ tipo: 'PRATO', rendimentoMilesimos: 1000, unidadeRendimento: 'UN' });
     // Modo de preparo guarda as quebras de linha, sem empilhar linhas vazias.
     expect(r.dados.modoPreparo).toBe('Selar o blend.\n\nMontar.');
@@ -272,6 +269,55 @@ describe('ERP 1.2 · foto conferida pelos bytes, nome sorteado e caminho isolado
   });
 });
 
+describe('ERP 1.3 (herança da 1.2) · foto regravada sem metadados (GPS, aparelho, data)', () => {
+  const pronta = (b: Uint8Array) => {
+    const p = prepararFoto(b);
+    if (!p.ok) throw new Error(p.erro);
+    return p.bytes;
+  };
+
+  it('JPEG: sai EXIF/GPS, APP13, comentário e o que vem depois do fim; fica a imagem e a orientação', () => {
+    const suja = jpgComGps();
+    expect(temGps(suja)).toBe(true);
+    const limpa = pronta(suja);
+    expect(temGps(limpa)).toBe(false);
+    expect(Buffer.from(limpa).includes(Buffer.from('Photoshop'))).toBe(false);
+    // SOI + APP1 mínimo (36 bytes, só a orientação 6) + o JPEG original sem o SOI.
+    expect([...limpa.subarray(0, 4)]).toEqual([0xff, 0xd8, 0xff, 0xe1]);
+    expect(limpa[31]).toBe(6);
+    expect(Buffer.from(limpa.subarray(38)).equals(Buffer.from(JPG_LIMPO.subarray(2)))).toBe(true);
+    expect([...limpa.subarray(-2)]).toEqual([0xff, 0xd9]);
+    // Orientação 1 (normal) não precisa de APP1 nenhum: volta o JPEG limpo, byte a byte.
+    expect(Buffer.from(pronta(jpgComGps(JPG_LIMPO, 1))).equals(Buffer.from(JPG_LIMPO))).toBe(true);
+    // Foto que já vem limpa não muda.
+    expect(Buffer.from(pronta(JPG_LIMPO)).equals(Buffer.from(JPG_LIMPO))).toBe(true);
+  });
+
+  it('PNG: sai eXIf, tEXt e tIME; WebP: sai EXIF e XMP e o VP8X deixa de anunciá-los', () => {
+    const png = pronta(pngComGps());
+    expect(temGps(pngComGps())).toBe(true);
+    expect(Buffer.from(png).equals(Buffer.from(PNG_LIMPO))).toBe(true);
+    const suja = webpComGps();
+    expect(temGps(suja)).toBe(true);
+    const webp = pronta(suja);
+    expect(temGps(webp)).toBe(false);
+    expect(Buffer.from(webp.subarray(12, 16)).toString()).toBe('VP8X');
+    expect(webp[20] & 0x0c).toBe(0);
+    // Tamanho do RIFF refeito: arquivo inteiro − 8.
+    expect(Buffer.from(webp).readUInt32LE(4)).toBe(webp.length - 8);
+    expect(Buffer.from(webp.subarray(-WEBP_LIMPO.length + 12)).equals(Buffer.from(WEBP_LIMPO.subarray(12)))).toBe(true);
+  });
+
+  it('arquivo cortado ou forjado com a assinatura certa é recusado (não vai para o disco)', () => {
+    const cortado = JPG_LIMPO.subarray(0, 120);
+    expect(prepararFoto(cortado)).toEqual({ ok: false, erro: 'A foto está danificada ou incompleta. Tire outra ou escolha de novo.' });
+    expect(prepararFoto(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3])).ok).toBe(false);
+    expect(prepararFoto(PNG_LIMPO.subarray(0, 40)).ok).toBe(false);
+    expect(prepararFoto(new Uint8Array([...Buffer.from('RIFF'), 4, 0, 0, 0, ...Buffer.from('WEBP')])).ok).toBe(false);
+    expect(GPS).toContain('-22.906847');
+  });
+});
+
 describe('ERP 1.2 · histórico da ficha: legível, só o que mudou', () => {
   const nomes = new Map([BLEND, PAO].map((i) => [i.id, i]));
   const dados = {
@@ -282,8 +328,8 @@ describe('ERP 1.2 · histórico da ficha: legível, só o que mudou', () => {
     rendimentoMilesimos: 1000,
     unidadeRendimento: 'UN' as const,
     itens: [
-      { insumoId: 'pao', quantidadeMilesimos: 1000 },
-      { insumoId: 'blend', quantidadeMilesimos: 180 },
+      { insumoId: 'pao', subfichaId: null, quantidadeMilesimos: 1000, fatorCorrecaoMilesimos: 1000 },
+      { insumoId: 'blend', subfichaId: null, quantidadeMilesimos: 180, fatorCorrecaoMilesimos: 1000 },
     ],
   };
 
@@ -301,7 +347,7 @@ describe('ERP 1.2 · histórico da ficha: legível, só o que mudou', () => {
 
   it('edição: troca de foto e de quantidade, com antes e depois', () => {
     const antes = retratoDaFicha(dados, nomes, `${'b'.repeat(32)}.png`);
-    const depois = retratoDaFicha({ ...dados, itens: [dados.itens[0], { insumoId: 'blend', quantidadeMilesimos: 200 }] }, nomes, `${'c'.repeat(32)}.jpg`);
+    const depois = retratoDaFicha({ ...dados, itens: [dados.itens[0], { ...dados.itens[1], quantidadeMilesimos: 200 }] }, nomes, `${'c'.repeat(32)}.jpg`);
     const d = diferenca(antes, depois)!;
     expect(d.campos).toEqual(['foto', 'itens']);
     expect(descreverMudancas(d.antes, d.depois).map((x) => [x.campo, x.antes, x.depois])).toEqual([
@@ -330,8 +376,19 @@ describe('ERP 1.2 · rota de arquivo do /erp confere a permissão', () => {
     expect(rotas.length).toBeGreaterThan(0);
     for (const f of rotas) {
       const t = readFileSync(f, 'utf8');
-      expect(t, f).toMatch(/exigirParceiroDaSessao\(\)/);
-      expect(t, f).toMatch(/pode\(ctx\.alcance, '[a-z]+\.[a-z]+'\)|exigirPermissao\(ctx, /);
+      expect(t, f).toMatch(/exigirParceiroDaSessao\(\)|parceiroDaSessaoOuNada\(\)/);
+      expect(t, f).toMatch(/pode\(ctx\.alcance, '[a-z]+\.[a-z]+'\)|exigirPermissao\(ctx, |receberFotoDaFicha\(/);
+    }
+  });
+
+  it('a rota de envio confere sessão, permissão, bloqueio e origem ANTES de ler o corpo', async () => {
+    const { readFileSync } = await import('node:fs');
+    const t = readFileSync('src/lib/erp/foto-envio.ts', 'utf8');
+    const corpo = t.slice(t.indexOf('export async function receberFotoDaFicha'));
+    const leitura = corpo.indexOf('lerComTeto(req');
+    for (const antes of ['if (!ctx)', "pode(ctx.alcance, 'fichas.editar')", 'ctx.bloqueio', 'mesmaOrigem(req)', 'content-length']) {
+      expect(corpo.indexOf(antes), antes).toBeGreaterThan(-1);
+      expect(corpo.indexOf(antes), antes).toBeLessThan(leitura);
     }
   });
 });

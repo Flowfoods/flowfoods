@@ -7,8 +7,8 @@
 
 import { FileUp, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { FichaDetalhada, InsumoDoFormulario } from '@/lib/erp/fichas';
-import { itemParaCampo, rendimentoParaCampo } from '@/lib/erp/ficha-campos';
+import type { FichaDetalhada, InsumoDoFormulario, PreparoDoFormulario } from '@/lib/erp/fichas';
+import { formatarFator, itemParaCampo, rendimentoParaCampo } from '@/lib/erp/ficha-campos';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
 import { TrilhaDaPagina } from '../../shell/trilha';
@@ -18,6 +18,7 @@ import type { AcaoDeImportacao } from './estado';
 import { FormFicha, type ValoresDaFicha } from './form-ficha';
 import { TelaImportarFichas } from './importar';
 import { urlDaFoto } from './miniatura';
+import { PREFIXO_DO_PREPARO } from './prefixo';
 
 export function CabecalhoDasFichas({
   subtitulo,
@@ -65,6 +66,7 @@ export function TelaFormFicha({
   contexto,
   acao,
   opcoes,
+  preparos,
   bloqueio,
   novoInsumo,
 }: {
@@ -74,6 +76,7 @@ export function TelaFormFicha({
   contexto: string;
   acao: AcaoDeCadastro;
   opcoes: InsumoDoFormulario[];
+  preparos: PreparoDoFormulario[];
   bloqueio: string | null;
   novoInsumo?: string;
 }) {
@@ -85,9 +88,11 @@ export function TelaFormFicha({
     modoPreparo: ficha.modoPreparo ?? '',
     rendimento: rende!.texto,
     rendimentoUnidade: rende!.em,
-    itens: ficha.itens
-      .filter((i) => i.insumoId)
-      .map((i) => ({ insumoId: i.insumoId!, ...itemParaCampo(i.quantidadeMilesimos, i.unidade) })),
+    itens: ficha.itens.map((i) => ({
+      escolha: i.subfichaId ? `${PREFIXO_DO_PREPARO}${i.subfichaId}` : (i.insumoId ?? ''),
+      ...itemParaCampo(i.quantidadeMilesimos, i.unidade),
+      fator: i.fatorCorrecaoMilesimos === 1000 ? '' : formatarFator(i.fatorCorrecaoMilesimos),
+    })),
   };
   const volta = ficha ? `${base}/${ficha.id}` : base;
   return (
@@ -107,6 +112,7 @@ export function TelaFormFicha({
         aqui={ficha ? `${base}/${ficha.id}/editar` : `${base}/nova`}
         cancelar={volta}
         opcoes={opcoes}
+        preparos={preparos}
         inicial={inicial}
         fotoAtual={ficha?.foto ? urlDaFoto(base, ficha.id, ficha.foto) : null}
         versao={ficha?.versao}

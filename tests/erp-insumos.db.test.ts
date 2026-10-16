@@ -330,7 +330,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     const r = await cadastrarInsumo(doParceiro(S.id, db), { ...cebola, nome: 'Antes de suspender' });
     if (!r.ok) throw new Error('setup');
     await db.parceiroFlow.update({ where: { id: S.id }, data: { status: 'SUSPENSO' } });
-    const motivo = 'Parceiro suspenso: insumos, lojas e marcas ficam bloqueados até reativar.';
+    const motivo = 'Parceiro suspenso: insumos, fichas técnicas, lojas e marcas ficam bloqueados até reativar.';
     atual.ctx = () => ctxDaPessoa(S, 'DONO', motivo);
     const recusa = await rodar(daSessao.acaoSituacaoInsumo(r.id, null, form({ ativo: 'nao' })));
     expect(recusa).toMatchObject({ ok: false, erros: { geral: motivo } });

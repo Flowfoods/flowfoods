@@ -10,6 +10,7 @@
 import Link from 'next/link';
 import type { LinhaDeFicha } from '@/lib/erp/fichas';
 import {
+  custoIncompleto,
   FICHAS_POR_PAGINA,
   formatarRendimento,
   porUnidadeDeRendimento,
@@ -37,7 +38,7 @@ function hrefDoDetalhe(base: string, id: string, f: FiltrosDeFicha): string {
 
 /** Custo por porção (ou kg); `empilhado` (celular): o "por porção" vai embaixo e o nome ganha espaço. */
 function CustoPorRende({ l, empilhado = false }: { l: LinhaDeFicha; empilhado?: boolean }) {
-  if (l.custo.semPreco.length > 0) return <Selo tom="alerta">{empilhado ? 'Incompleto' : 'Custo incompleto'}</Selo>;
+  if (custoIncompleto(l.custo)) return <Selo tom="alerta">{empilhado ? 'Incompleto' : 'Custo incompleto'}</Selo>;
   return (
     <span className={empilhado ? 'block' : 'whitespace-nowrap'}>
       <span className={`font-semibold text-texto ${empilhado ? 'block' : ''}`}>{formatarFracao(l.custo.porRendimento)}</span>
@@ -226,8 +227,9 @@ export function TelaListaFichas({
                     >
                       {l.nome}
                     </Link>
-                    <div className="max-w-[28rem] truncate text-[12px] text-suave">
+                    <div className="max-w-[15rem] truncate text-[12px] text-suave lg:max-w-[28rem]">
                       {TIPOS_DE_FICHA[l.tipo]}
+                      {l.preparos > 0 ? ` · com ${l.preparos === 1 ? '1 pré-preparo' : `${l.preparos} pré-preparos`}` : ''}
                       {l.descricao ? ` · ${l.descricao}` : ''}
                       <span className="lg:hidden">{!l.ativa && ' · Desativada'}</span>
                     </div>
@@ -239,8 +241,8 @@ export function TelaListaFichas({
               </td>
               <td className="hidden px-3 py-2 text-right text-suave md:table-cell">{l.itens}</td>
               <td className="whitespace-nowrap px-3 py-2 text-right">
-                {l.custo.semPreco.length > 0 ? (
-                  <span className="text-suave" title={`Sem contar: ${l.custo.semPreco.join(', ')}`}>
+                {custoIncompleto(l.custo) ? (
+                  <span className="text-suave" title={`Falta preço em: ${l.custo.faltaPreco.join(', ')}`}>
                     {formatarFracao(l.custo.total)} + ?
                   </span>
                 ) : (

@@ -8,7 +8,11 @@
  * UMA LINHA POR INSUMO; as colunas da ficha (tipo, rende, descrição, modo de
  * preparo) basta preencher numa linha da ficha.
  *
- *   ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade
+ *   ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade;fator
+ *
+ * 1.3: "insumo" pode ser o nome de um pré-preparo já cadastrado (vira item de
+ * pré-preparo, com o custo em cascata) e "fator" (opcional) é o fator de
+ * correção da linha (1,18; vazio = 1).
  *
  * Aceita `;` (Excel em português) ou `,`, aspas no padrão CSV (modo de
  * preparo com quebra de linha), cabeçalho com ou sem acento, UTF-8 ou
@@ -17,9 +21,19 @@
 
 import { RENDE_DO_PREPARO, type EntradaDaFicha, type RendeEm, type TipoFicha } from './ficha-campos';
 
-/** 512 KB: milhares de linhas de ficha; mais que isso é outro arquivo. */
-export const LIMITE_DA_PLANILHA = 512 * 1024;
+/**
+ * 256 KB: ~5000 linhas de ficha. Também mantém o envio da confirmação (o
+ * texto, em UTF-8, até o dobro) abaixo do limite padrão de 1 MB das server
+ * actions — o limite global de 9 MB saiu na 1.3 (a foto tem rota própria).
+ */
+export const LIMITE_DA_PLANILHA = 256 * 1024;
 export const LIMITE_DE_LINHAS = 5000;
+/**
+ * Fichas por arquivo (herança da 1.2): a importação grava tudo numa transação
+ * com os insumos travados; 5000 fichas levavam ~26 s de 30. Com 300, fica na
+ * casa de 2 s e a planilha grande é dividida, com a mensagem dizendo isso.
+ */
+export const LIMITE_DE_FICHAS = 300;
 
 export interface ErroDeLinha {
   linha: number;
@@ -99,11 +113,12 @@ const COLUNAS = {
   insumo: ['insumo', 'ingrediente'],
   quantidade: ['quantidade', 'qtd', 'qtde'],
   unidade: ['unidade', 'medida'],
+  fator: ['fator', 'fator de correcao', 'fator correcao', 'fc'],
 } as const;
 type Coluna = keyof typeof COLUNAS;
 const OBRIGATORIAS: Coluna[] = ['ficha', 'insumo', 'quantidade', 'unidade'];
 
-export const CABECALHO_DO_MODELO = 'ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade';
+export const CABECALHO_DO_MODELO = 'ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade;fator';
 
 /** Uma ficha como veio na planilha, ainda com nomes de insumo (texto). */
 export interface FichaDaPlanilha {
@@ -115,7 +130,7 @@ export interface FichaDaPlanilha {
   rendeEm: RendeEm | '';
   descricao: string;
   modoPreparo: string;
-  itens: { linha: number; insumo: string; quantidade: string; unidade: string }[];
+  itens: { linha: number; insumo: string; quantidade: string; unidade: string; fator: string }[];
   erros: ErroDeLinha[];
 }
 
@@ -143,7 +158,7 @@ function lerRendeEm(v: string, tipo: TipoFicha): RendeEm | '' | null {
 }
 
 /** Sigla da quantidade do item, como o leitor da ficha entende (g, kg, ml, L, un). */
-export function siglaDaPlanilha(v: string): string {
+function siglaDaPlanilha(v: string): string {
   const t = semAcento(v).replace(/\.$/, '');
   const mapa: Record<string, string> = {
     g: 'g', gr: 'g', grama: 'g', gramas: 'g',
@@ -241,7 +256,7 @@ export function lerPlanilhaDeFichas(texto: string): LeituraDaPlanilha {
     const quantidade = limpo(val('quantidade'));
     const unidade = limpo(val('unidade'));
     if (!insumo) f.erros.push({ linha: r.linha, mensagem: 'Falta o nome do insumo.' });
-    else f.itens.push({ linha: r.linha, insumo, quantidade, unidade: siglaDaPlanilha(unidade) });
+    else f.itens.push({ linha: r.linha, insumo, quantidade, unidade: siglaDaPlanilha(unidade), fator: limpo(val('fator')) });
   }
 
   // Unidade do rendimento: depende do tipo, que pode ter vindo depois.
@@ -254,6 +269,13 @@ export function lerPlanilhaDeFichas(texto: string): LeituraDaPlanilha {
       });
     } else f.rendeEm = em;
   }
+  if (porNome.size > LIMITE_DE_FICHAS) {
+    return {
+      fichas: [],
+      erros: [{ linha: 1, mensagem: `A planilha tem ${porNome.size} fichas: importe até ${LIMITE_DE_FICHAS} por vez. Divida o arquivo e envie as partes uma de cada vez (reimportar não duplica).` }],
+      linhasLidas,
+    };
+  }
   return { fichas: Array.from(porNome.values()), erros, linhasLidas };
 }
 
@@ -261,31 +283,43 @@ export function lerPlanilhaDeFichas(texto: string): LeituraDaPlanilha {
 export const chaveDeNome = (s: string) => s.replace(/\s+/g, ' ').trim().toLocaleLowerCase('pt-BR');
 
 /**
- * Casa os insumos da ficha com o cadastro (por nome, sem diferenciar
- * maiúscula). Não encontrado vira erro na linha e entra em `faltam` (a tela
- * sugere cadastrar). Devolve a entrada no formato do formulário e, para cada
+ * Casa os itens da ficha com o cadastro (por nome, sem diferenciar
+ * maiúscula): primeiro os pré-preparos (1.3: o nome do pré-preparo é também o
+ * do insumo que ele produz, e na receita vale o pré-preparo), depois os
+ * insumos. Não encontrado vira erro na linha e entra em `faltam` (a tela
+ * sugere cadastrar); pré-preparo que só existe NESTA planilha pede para ser
+ * importado antes. Devolve a entrada no formato do formulário e, para cada
  * item, a linha da planilha (o erro do leitor volta para a linha certa).
  */
 export function casarComInsumos(
   f: FichaDaPlanilha,
   insumosPorNome: ReadonlyMap<string, { id: string }[]>,
+  preparosPorNome: ReadonlyMap<string, { id: string }[]> = new Map(),
+  preparosDaPlanilha: ReadonlySet<string> = new Set(),
 ): { entrada: EntradaDaFicha; linhaDoItem: number[]; faltam: string[]; erros: ErroDeLinha[] } {
   const erros: ErroDeLinha[] = [];
   const faltam: string[] = [];
   const itens: EntradaDaFicha['itens'] = [];
   const linhaDoItem: number[] = [];
   for (const i of f.itens) {
-    const achados = insumosPorNome.get(chaveDeNome(i.insumo)) ?? [];
+    const chave = chaveDeNome(i.insumo);
+    const preparos = preparosPorNome.get(chave) ?? [];
+    const achados = preparos.length > 0 ? preparos : (insumosPorNome.get(chave) ?? []);
     if (achados.length === 0) {
+      if (preparosDaPlanilha.has(chave)) {
+        erros.push({ linha: i.linha, mensagem: `“${i.insumo}” é pré-preparo desta planilha e ainda não existe: importe o pré-preparo primeiro (outro arquivo) e depois esta ficha.` });
+        continue;
+      }
       faltam.push(i.insumo);
       erros.push({ linha: i.linha, mensagem: `Insumo “${i.insumo}” não está cadastrado.` });
       continue;
     }
     if (achados.length > 1) {
-      erros.push({ linha: i.linha, mensagem: `Há mais de um insumo chamado “${i.insumo}” (com maiúsculas diferentes): renomeie um deles.` });
+      erros.push({ linha: i.linha, mensagem: `Há mais de um item chamado “${i.insumo}” (com maiúsculas diferentes): renomeie um deles.` });
       continue;
     }
-    itens.push({ insumoId: achados[0].id, quantidade: i.quantidade, unidade: i.unidade });
+    const base = { quantidade: i.quantidade, unidade: i.unidade, fator: i.fator };
+    itens.push(preparos.length > 0 ? { subfichaId: achados[0].id, ...base } : { insumoId: achados[0].id, ...base });
     linhaDoItem.push(i.linha);
   }
   return {

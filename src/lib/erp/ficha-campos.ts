@@ -10,19 +10,25 @@
  * insumo, digitada em g/kg, ml/L ou un. O custo nunca é gravado: é a soma
  * exata (fração) de custo de referência × quantidade × fator de correção, e
  * só arredonda na tela. Insumo "Sem preço" deixa o custo INCOMPLETO (nunca
- * vira R$ 0,00). Subficha e fator de correção na tela são da 1.3; o esquema e
- * a conta já os recebem.
+ * vira R$ 0,00).
+ *
+ * 1.3: o item é um insumo OU um pré-preparo (outra ficha, `subfichaId`), com
+ * fator de correção (bruto ÷ líquido: 1,18 = compra 1,18 kg para ter 1 kg
+ * limpo). O custo do pré-preparo por unidade (custo da receita ÷ rendimento)
+ * entra em cascata em quem o usa (`ficha-cascata.ts`); "incompleto" sobe junto.
  */
 
 import { z } from 'zod';
 import { marcado, nomeObrigatorio, primeiroErroPorCampo, um, type Erros, type Leitura, type Retrato } from './insumo-campos';
 import {
   custoDaEmbalagem,
-  custoExatoDaQuantidade,
+  custoDoUso,
+  custoPorUnidade,
   escalaDaSigla,
   formatarFracao,
   formatarQuantidade,
   lerInteiro,
+  lerQuantidade,
   lerQuantidadeNa,
   porRendimento,
   somar,
@@ -68,12 +74,27 @@ export interface InsumoDaFicha {
   taxaEntregaCentavos: number;
 }
 
+/** Pré-preparo como o item da ficha precisa dele (1.3): a ficha que pode entrar em outra. */
+export interface PreparoDaFicha {
+  id: string;
+  nome: string;
+  tipo: TipoFicha;
+  ativa: boolean;
+  /** A quantidade do item é na unidade do rendimento dele (2 kg de molho → g/kg). */
+  unidadeRendimento: Unidade;
+}
+
 export interface ItemDigitado {
-  insumoId: string;
-  /** Texto, como digitado ("180", "1,5"). */
+  /** O item é um insumo... */
+  insumoId?: string;
+  /** ...ou um pré-preparo (outra ficha), nunca os dois. */
+  subfichaId?: string;
+  /** Texto, como digitado ("180", "1,5"): a quantidade LÍQUIDA (limpa). */
   quantidade: string;
   /** Sigla digitada: g, kg, ml, L ou un. */
   unidade: string;
+  /** Fator de correção digitado ("1,18"); vazio = 1 (sem perda). */
+  fator?: string;
 }
 
 /** O que chega do formulário (ou da planilha, já casada com os doCadastro). */
@@ -94,7 +115,45 @@ export interface DadosFicha {
   modoPreparo: string | null;
   rendimentoMilesimos: number;
   unidadeRendimento: Unidade;
-  itens: { insumoId: string; quantidadeMilesimos: number }[];
+  itens: ItemDaFicha[];
+}
+
+export interface ItemDaFicha {
+  insumoId: string | null;
+  subfichaId: string | null;
+  /** Líquida, em milésimos da unidade base do insumo / do rendimento do pré-preparo. */
+  quantidadeMilesimos: number;
+  /** Bruto ÷ líquido, em milésimos (1000 = sem perda). */
+  fatorCorrecaoMilesimos: number;
+}
+
+// ------------------------------------------------------- fator de correção
+
+/** 1 a 10: menos que 1 não é perda; mais que 10 é quase certo erro de digitação. */
+export const FATOR = { minimo: 1000, maximo: 10_000 } as const;
+
+/**
+ * Fator de correção digitado → milésimos. Vazio = 1 (sem perda). Aceita
+ * "1,18" e também "1.18" (fator nunca tem milhar).
+ */
+export function lerFator(t: string | undefined): { ok: true; milesimos: number } | { ok: false; erro: string } {
+  const txt = (t ?? '').trim();
+  if (!txt) return { ok: true, milesimos: FATOR.minimo };
+  const m = lerQuantidade(/^\d+\.\d{1,3}$/.test(txt) ? txt.replace('.', ',') : txt);
+  if (m === null) return { ok: false, erro: 'Fator de correção inválido. Ex.: 1,18 (vazio = 1, sem perda).' };
+  if (m < FATOR.minimo) return { ok: false, erro: 'O fator de correção começa em 1 (1 = sem perda; 1,18 = compra 1,18 kg para ter 1 kg limpo).' };
+  if (m > FATOR.maximo) return { ok: false, erro: 'Fator acima de 10? Confira: é o peso bruto dividido pelo peso limpo.' };
+  return { ok: true, milesimos: m };
+}
+
+/** 1180 → "1,18"; 1000 → "1". */
+export function formatarFator(milesimos: number): string {
+  return (milesimos / 1000).toLocaleString('pt-BR', { maximumFractionDigits: 3 });
+}
+
+/** Peso bruto (o que se compra/pesa antes de limpar): líquido × fator, arredondado ao milésimo (metade para cima). */
+export function quantidadeBruta(liquidaMilesimos: number, fatorMilesimos: number): number {
+  return Math.floor((2 * liquidaMilesimos * fatorMilesimos + 1000) / 2000);
 }
 
 const texto = (v: unknown) => (typeof v === 'string' ? v : '');
@@ -129,7 +188,14 @@ export function lerFormFicha(
   entrada: EntradaDaFicha,
   doCadastro: ReadonlyMap<string, InsumoDaFicha>,
   jaNaFicha: ReadonlySet<string> = new Set(),
+  opcoes: {
+    /** Pré-preparos que a entrada cita, lidos pelo portão (de outro parceiro: não estão aqui). */
+    preparos?: ReadonlyMap<string, PreparoDaFicha>;
+    /** A própria ficha (edição): não entra nela mesma. */
+    propriaId?: string;
+  } = {},
 ): Leitura<DadosFicha> {
+  const preparos = opcoes.preparos ?? new Map<string, PreparoDaFicha>();
   const r = formFicha.safeParse({ nome: entrada.nome, tipo: entrada.tipo || 'PRATO' });
   const erros: Erros = r.success ? {} : primeiroErroPorCampo(r.error.issues);
   const tipo: TipoFicha = r.success ? r.data.tipo : entrada.tipo === 'PRE_PREPARO' ? 'PRE_PREPARO' : 'PRATO';
@@ -165,34 +231,52 @@ export function lerFormFicha(
   // Itens.
   const itens: DadosFicha['itens'] = [];
   const vistos = new Map<string, number>();
-  if (entrada.itens.length === 0) erros.itens = 'Inclua pelo menos um insumo na ficha.';
-  if (entrada.itens.length > LIMITES_DA_FICHA.itens) erros.itens = `Até ${LIMITES_DA_FICHA.itens} insumos por ficha.`;
+  if (entrada.itens.length === 0) erros.itens = 'Inclua pelo menos um insumo ou pré-preparo na ficha.';
+  if (entrada.itens.length > LIMITES_DA_FICHA.itens) erros.itens = `Até ${LIMITES_DA_FICHA.itens} itens por ficha.`;
   entrada.itens.slice(0, LIMITES_DA_FICHA.itens).forEach((item, i) => {
     const chave = chaveDoItem(i);
-    const insumo = item.insumoId ? doCadastro.get(item.insumoId) : undefined;
-    if (!item.insumoId) return void (erros[chave] = 'Escolha o insumo.');
-    if (!insumo) return void (erros[chave] = 'Insumo não encontrado neste cadastro.');
-    if (!insumo.ativo && !jaNaFicha.has(insumo.id)) {
-      return void (erros[chave] = `“${insumo.nome}” está desativado: reative em Insumos para usar.`);
+    let alvo: { chave: string; id: string; nome: string; unidade: Unidade; preparo: boolean };
+    if (item.subfichaId) {
+      const p = preparos.get(item.subfichaId);
+      if (!p) return void (erros[chave] = 'Pré-preparo não encontrado neste cadastro.');
+      if (p.id === opcoes.propriaId) return void (erros[chave] = 'Uma ficha não entra nela mesma.');
+      if (p.tipo !== 'PRE_PREPARO') return void (erros[chave] = `“${p.nome}” é prato: só pré-preparo entra em outra ficha.`);
+      if (!p.ativa && !jaNaFicha.has(p.id)) return void (erros[chave] = `“${p.nome}” está desativado: reative em Fichas técnicas para usar.`);
+      alvo = { chave: `f:${p.id}`, id: p.id, nome: p.nome, unidade: p.unidadeRendimento, preparo: true };
+    } else {
+      const insumo = item.insumoId ? doCadastro.get(item.insumoId) : undefined;
+      if (!item.insumoId) return void (erros[chave] = 'Escolha o insumo ou o pré-preparo.');
+      if (!insumo) return void (erros[chave] = 'Insumo não encontrado neste cadastro.');
+      if (!insumo.ativo && !jaNaFicha.has(insumo.id)) {
+        return void (erros[chave] = `“${insumo.nome}” está desativado: reative em Insumos para usar.`);
+      }
+      alvo = { chave: `i:${insumo.id}`, id: insumo.id, nome: insumo.nome, unidade: insumo.unidade, preparo: false };
     }
-    const repetido = vistos.get(insumo.id);
-    if (repetido !== undefined) return void (erros[chave] = `“${insumo.nome}” já está na ficha (item ${repetido + 1}).`);
-    vistos.set(insumo.id, i);
-    const u = UNIDADES[insumo.unidade];
-    const escala = escalaDaSigla(item.unidade, insumo.unidade);
+    const repetido = vistos.get(alvo.chave);
+    if (repetido !== undefined) return void (erros[chave] = `“${alvo.nome}” já está na ficha (item ${repetido + 1}).`);
+    vistos.set(alvo.chave, i);
+    const u = UNIDADES[alvo.unidade];
+    const escala = escalaDaSigla(item.unidade, alvo.unidade);
     if (!escala) {
-      const aceitas = insumo.unidade === 'UN' ? 'un' : `${u.menor} ou ${u.sigla}`;
-      return void (erros[chave] = `“${insumo.nome}” é medido em ${u.nome.toLowerCase()}: use ${aceitas}.`);
+      const aceitas = alvo.unidade === 'UN' ? 'un' : `${u.menor} ou ${u.sigla}`;
+      return void (erros[chave] = `“${alvo.nome}” ${alvo.preparo ? 'rende' : 'é medido'} em ${u.nome.toLowerCase()}: use ${aceitas}.`);
     }
     const qTxt = item.quantidade.trim();
-    const q = qTxt ? lerQuantidadeNa(qTxt, insumo.unidade, escala) : null;
-    if (!qTxt) return void (erros[chave] = `Diga quanto de “${insumo.nome}” vai na receita.`);
+    const q = qTxt ? lerQuantidadeNa(qTxt, alvo.unidade, escala) : null;
+    if (!qTxt) return void (erros[chave] = `Diga quanto de “${alvo.nome}” vai na receita.`);
     if (q === null) {
       return void (erros[chave] =
         escala === 'menor' ? `Em ${u.menor}, só números inteiros (1 ${u.menor} é o menor passo).` : 'Quantidade inválida. Ex.: 180 ou 0,5.');
     }
     if (q === 0) return void (erros[chave] = 'A quantidade precisa ser maior que zero.');
-    itens.push({ insumoId: insumo.id, quantidadeMilesimos: q });
+    const fator = lerFator(item.fator);
+    if (!fator.ok) return void (erros[chave] = fator.erro);
+    itens.push({
+      insumoId: alvo.preparo ? null : alvo.id,
+      subfichaId: alvo.preparo ? alvo.id : null,
+      quantidadeMilesimos: q,
+      fatorCorrecaoMilesimos: fator.milesimos,
+    });
   });
 
   if (!r.success || rendimentoMilesimos === null || Object.keys(erros).length > 0) return { ok: false, erros };
@@ -254,58 +338,95 @@ export interface ItemParaCusto {
   fatorCorrecaoMilesimos: number;
   /** Custo de referência do insumo; null = "Sem preço". */
   custo: CustoExato | null;
+  /** Pré-preparo (1.3): o custo DELE, já calculado (o item usa o custo por unidade de rendimento). */
+  preparo?: CustoDaFicha;
 }
 
 export interface CustoDaFicha {
-  /** Soma exata dos itens COM preço. */
+  /** Soma exata dos itens COM preço (o pré-preparo incompleto entra com a parte que tem). */
   total: Fracao;
   /** Total ÷ rendimento (uma porção, 1 kg...). */
   porRendimento: Fracao;
-  /** Custo de cada item, na ordem; null = sem preço. */
+  /** Custo de cada item, na ordem; null = insumo sem preço. */
   itens: (Fracao | null)[];
-  /** Nomes dos insumos sem preço: com algum, o custo é INCOMPLETO. */
+  /** Insumos DESTA receita sem preço. */
   semPreco: string[];
+  /** Pré-preparos desta receita com custo incompleto (entram com o parcial). */
+  preparosIncompletos: string[];
+  /** Todos os insumos sem preço, até o fundo da cascata (sem repetir). Com algum, o custo é INCOMPLETO. */
+  faltaPreco: string[];
 }
+
+export const custoIncompleto = (c: Pick<CustoDaFicha, 'faltaPreco'>) => c.faltaPreco.length > 0;
 
 export function custoDoInsumo(i: Pick<InsumoDaFicha, 'precoEmbalagemCentavos' | 'taxaEntregaCentavos' | 'conteudoMilesimos'>): CustoExato | null {
   return custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos);
 }
 
 /**
- * Custo da receita: Σ custo × quantidade × fator, em fração exata, e o custo
- * de uma unidade de rendimento. Nada se arredonda aqui.
+ * Custo da receita: Σ custo por unidade × quantidade líquida × fator, em
+ * fração exata, e o custo de uma unidade de rendimento. Nada se arredonda
+ * aqui. Item de pré-preparo usa o custo dele por unidade de rendimento.
  */
 export function custoDaFicha(itens: readonly ItemParaCusto[], rendimentoMilesimos: number): CustoDaFicha {
   let total = ZERO;
   const semPreco: string[] = [];
+  const preparosIncompletos: string[] = [];
+  const faltaPreco = new Set<string>();
   const porItem = itens.map((i) => {
+    if (i.preparo) {
+      if (custoIncompleto(i.preparo)) {
+        preparosIncompletos.push(i.nome);
+        i.preparo.faltaPreco.forEach((n) => faltaPreco.add(n));
+      }
+      const v = custoDoUso(i.preparo.porRendimento, i.quantidadeMilesimos, i.fatorCorrecaoMilesimos);
+      total = somar(total, v);
+      return v;
+    }
     if (!i.custo) {
       semPreco.push(i.nome);
+      faltaPreco.add(i.nome);
       return null;
     }
-    const v = custoExatoDaQuantidade(i.custo, i.quantidadeMilesimos, i.fatorCorrecaoMilesimos);
+    const v = custoDoUso(custoPorUnidade(i.custo), i.quantidadeMilesimos, i.fatorCorrecaoMilesimos);
     total = somar(total, v);
     return v;
   });
-  return { total, porRendimento: porRendimento(total, rendimentoMilesimos), itens: porItem, semPreco };
+  return { total, porRendimento: porRendimento(total, rendimentoMilesimos), itens: porItem, semPreco, preparosIncompletos, faltaPreco: [...faltaPreco] };
 }
+
+const citar = (nomes: readonly string[]) =>
+  nomes.length === 1 ? `“${nomes[0]}”` : `${nomes.slice(0, -1).map((n) => `“${n}”`).join(', ')} e “${nomes[nomes.length - 1]}”`;
 
 /**
  * A conta da ficha, por extenso: "R$ 12,34 ÷ 4 porções = R$ 3,09 por porção".
- * Incompleto: diz que é parcial e o que falta.
+ * Incompleto: diz que é parcial e o que falta, inclusive dentro do pré-preparo.
  */
 export function contaDaFicha(c: CustoDaFicha, rendimentoMilesimos: number, unidade: Unidade, tipo: TipoFicha): string {
   const conta = `${formatarFracao(c.total)} ÷ ${formatarRendimento(rendimentoMilesimos, unidade, tipo)} = ${formatarFracao(c.porRendimento)} ${porUnidadeDeRendimento(unidade, tipo)}`;
-  if (c.semPreco.length === 0) return conta;
-  const faltam = c.semPreco.length === 1 ? `“${c.semPreco[0]}”` : `${c.semPreco.length} insumos`;
-  return `${conta}, sem contar ${faltam} (sem preço).`;
+  if (!custoIncompleto(c)) return conta;
+  const partes: string[] = [];
+  if (c.semPreco.length > 0) partes.push(`sem contar ${c.semPreco.length === 1 ? `“${c.semPreco[0]}”` : `${c.semPreco.length} insumos`} (sem preço)`);
+  if (c.preparosIncompletos.length > 0) {
+    const dentro = c.faltaPreco.filter((n) => !c.semPreco.includes(n));
+    partes.push(`${citar(c.preparosIncompletos)} com custo incompleto${dentro.length ? ` (falta preço em ${citar(dentro)})` : ''}`);
+  }
+  return `${conta}, ${partes.join('; ')}.`;
 }
 
 // ------------------------------------------------------------- histórico
 
-/** "Pão brioche 1 un · Blend bovino 180 g": os itens numa frase, na ordem da ficha. */
-export function itensEmTexto(itens: readonly { nome: string; unidade: Unidade; quantidadeMilesimos: number }[]): string {
-  return itens.map((i) => `${i.nome} ${formatarQuantidade(i.quantidadeMilesimos, i.unidade)}`).join(' · ');
+/**
+ * "Pão brioche 1 un · Cebola 100 g (fator 1,18) · Molho cheddar 40 g": os
+ * itens numa frase, na ordem da ficha. O fator só aparece quando há perda.
+ */
+export function itensEmTexto(itens: readonly { nome: string; unidade: Unidade; quantidadeMilesimos: number; fatorCorrecaoMilesimos?: number }[]): string {
+  return itens
+    .map((i) => {
+      const f = i.fatorCorrecaoMilesimos ?? FATOR.minimo;
+      return `${i.nome} ${formatarQuantidade(i.quantidadeMilesimos, i.unidade)}${f !== FATOR.minimo ? ` (fator ${formatarFator(f)})` : ''}`;
+    })
+    .join(' · ');
 }
 
 /**
@@ -318,6 +439,7 @@ export function retratoDaFicha(
   d: DadosFicha,
   doCadastro: ReadonlyMap<string, { nome: string; unidade: Unidade }>,
   fotoArquivo: string | null,
+  preparos: ReadonlyMap<string, { nome: string; unidadeRendimento: Unidade }> = new Map(),
 ): Retrato {
   return {
     nome: d.nome,
@@ -328,8 +450,14 @@ export function retratoDaFicha(
     foto: fotoArquivo,
     itens: itensEmTexto(
       d.itens.map((i) => {
-        const ins = doCadastro.get(i.insumoId);
-        return { nome: ins?.nome ?? '?', unidade: ins?.unidade ?? 'UN', quantidadeMilesimos: i.quantidadeMilesimos };
+        const p = i.subfichaId ? preparos.get(i.subfichaId) : undefined;
+        const ins = i.insumoId ? doCadastro.get(i.insumoId) : undefined;
+        return {
+          nome: p?.nome ?? ins?.nome ?? '?',
+          unidade: p?.unidadeRendimento ?? ins?.unidade ?? 'UN',
+          quantidadeMilesimos: i.quantidadeMilesimos,
+          fatorCorrecaoMilesimos: i.fatorCorrecaoMilesimos,
+        };
       }),
     ),
   };
@@ -343,7 +471,7 @@ export interface FiltrosDeFicha {
   q: string;
   tipo: TipoFicha | null;
   situacao: SituacaoDaFicha;
-  /** Só fichas com algum insumo "Sem preço". */
+  /** Só fichas com custo incompleto (insumo "Sem preço", inclusive dentro de pré-preparo). */
   incompleto: boolean;
   pagina: number;
 }

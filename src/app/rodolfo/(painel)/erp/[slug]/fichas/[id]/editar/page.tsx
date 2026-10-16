@@ -2,7 +2,7 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
-import { insumosParaFicha, obterFicha } from '@/lib/erp/fichas';
+import { insumosParaFicha, obterFicha, preparosParaFicha } from '@/lib/erp/fichas';
 import { TelaFormFicha } from '@/components/erp/telas/fichas/paginas';
 import { acaoEditarFicha } from '../../actions';
 
@@ -22,6 +22,7 @@ export default async function ParceiroEditarFichaPage({ params }: { params: { sl
       contexto={ctx.parceiro.nome}
       acao={acaoEditarFicha.bind(null, ctx.parceiro.slug, ficha.id)}
       opcoes={await insumosParaFicha(ctx.cliente, ficha.itens.map((i) => i.insumoId).filter((x): x is string => !!x))}
+      preparos={await preparosParaFicha(ctx.cliente, ficha.itens.map((i) => i.subfichaId).filter((x): x is string => !!x), ficha.id)}
       bloqueio={ctx.bloqueio}
       novoInsumo={`${base}/insumos/novo`}
     />

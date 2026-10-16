@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -21,6 +21,8 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Permissões (0.4): catálogo, perfis base, resolução, checagem única, sem escalada | `src/lib/erp/permissoes.ts` (puro) + `equipe.ts` (formulários e retrato do histórico, puro); banco em `credenciais.ts`; migrations `20261015040000_erp_permissoes` e `20261016000000_erp_revogar_meios_de_entrada` |
 | Telas compartilhadas (as MESMAS no nível 1 e no parceiro) | `src/components/erp/telas/*`: `equipe/` (`TelaEquipe`), `estrutura/`, `historico/`, `insumos/`, `hub-do-parceiro.tsx` |
 | Ficha técnica (1.2): regras, planilha, foto | `src/lib/erp/{fichas,ficha-campos,ficha-planilha,ficha-importar,foto,arquivos,foto-resposta}.ts`; telas em `src/components/erp/telas/fichas/`; peças de cadastro comuns em `telas/cadastro/`; migration `20261016010000_erp_ficha_foto`; modelo `public/modelos/fichas-tecnicas.csv` |
+| Pré-preparo, fator de correção, custo em cascata (1.3) | `src/lib/erp/{ficha-cascata,ficha-custos}.ts` (conta e grafo puros; leitura por nível); regras em `fichas.ts`; migration `20261016020000_erp_subficha` |
+| Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
 ## O que a 0.2 entregou (multi-tenant)
@@ -412,6 +414,95 @@ Na tela: a dona cria uma ficha com foto e 3 insumos (um sem preço: custo
 incompleto), edita, importa a planilha do modelo e reimporta (tudo "igual");
 o operador vê lista, detalhe e foto, sem botão nenhum.
 
+## O que a 1.3 entregou — subfichas / pré-preparos, fator de correção, custo em cascata
+
+Migration `20261016020000_erp_subficha` (aditiva): só o CHECK `fatorCorrecaoMilesimos <= 10000`.
+O resto já estava no esquema da 0.1 (`subfichaId` com CHECK insumo-OU-subficha
+e "não aponta para si", fator ≥ 1000, `insumoProduzidoId`). Nenhuma tabela nova.
+
+1. **Item = insumo OU pré-preparo.** No formulário, o mesmo seletor tem dois
+   grupos ("Pré-preparos (fichas da casa)" e "Insumos"); o pré-preparo vai como
+   `ficha:<id>`. Só ficha **Pré-preparo** entra em outra (prato não). A
+   quantidade é na unidade do rendimento do pré-preparo (rende 2 kg → g/kg).
+   O servidor lê os pré-preparos pelo portão, travados (FOR SHARE): de outro
+   parceiro "não encontrado" (e o banco recusa pela FK composta).
+2. **Fator de correção** por item (1 a 10, vazio = 1; aceita "1,18" e
+   "1.18"): a quantidade digitada é a LIMPA e o custo paga a BRUTA (líquida ×
+   fator). A tela mostra "Peso bruto 354 g para 300 g limpos (fator 1,18)" na
+   prévia e "bruto · fator" no detalhe; o histórico diz "Cebola 300 g (fator
+   1,18)". Vale também para item de pré-preparo.
+3. **Rendimento / cocção** é o rendimento da ficha do pré-preparo: quanto sai
+   pronto (já com o que o cozimento tira ou põe). Custo do pré-preparo por kg
+   (L, un) = custo da receita ÷ rendimento — é o "preço" dele em quem o usa.
+4. **Custo em cascata, nunca gravado** (decisão 57): fração BigInt até o fim
+   (`custoDoUso`), um arredondamento só na tela. Leitura por nível
+   (`ficha-custos.ts`): uma consulta por nível, `id in [...]`, até 5 níveis —
+   a lista de 50 fichas faz as mesmas 8 consultas que uma (teste conta). Memo:
+   cada ficha calculada uma vez por leitura. **Incompleto sobe**: insumo sem
+   preço dentro do molho deixa o molho e o burger incompletos, com a frase
+   "“Molho cheddar” com custo incompleto (falta preço em “Picles”)"; o parcial
+   entra, nunca R$ 0,00. O filtro "só custo incompleto" enxerga a cascata.
+   Teto de exibição 2^53 centavos: acima, a tela diz "acima do limite" e a
+   gravação da ficha é recusada.
+5. **Círculo e profundidade recusados no servidor** (decisão 58): toda
+   gravação de ficha (formulário e planilha) pega `pg_advisory_xact_lock` do
+   "grafo de fichas" do parceiro ANTES de ler as ligações; lê todas (1
+   consulta), troca as da ficha e confere círculo (frase: "Assim fica um
+   círculo: “Base de cebola” usa “Molho cheddar”, que usa “Base de cebola”") e
+   **profundidade máxima de 5 fichas numa cadeia** (prato › molho › base › …,
+   contando quem usa acima e o que é usado abaixo). Duas edições simultâneas
+   que juntas fariam o círculo: uma entra, a outra é recusada (teste com
+   banco; sem a trava o mesmo teste falha). A conta não entra em laço se um
+   círculo aparecer no banco por fora: o item vira incompleto.
+6. **Pré-preparo vira insumo** (decisão 59): na mesma transação, a ficha
+   mantém o `Insumo` tipo PRE_PREPARO que produz (nome = da ficha, unidade =
+   do rendimento, situação acompanha; embalagem não se usa). Nome já usado
+   por outro insumo é recusado (adota só insumo de pré-preparo solto e sem
+   preço). Pré-preparo usado por outra ficha não vira prato nem muda a família
+   da unidade. Fichas de pré-preparo da 1.2 ganham o insumo na próxima
+   gravação. Em Insumos: selo "Pré-preparo", custo da ficha ("R$ 24,07/kg",
+   "incompleto" se for o caso), fora do filtro "só sem preço", ordena pelo
+   custo da ficha; o detalhe mostra a conta da ficha com link, sem editar,
+   sem embalagem e sem situação (o servidor recusa as três). Na receita, o
+   insumo produzido não aparece no seletor: vale o pré-preparo.
+7. **Telas**: detalhe da ficha com "Insumos e pré-preparos" (quantidade
+   limpa, bruto, custo), "De onde vem: R$ 24,07 por kg (R$ 48,15 ÷ 2 kg)" que
+   abre a receita do pré-preparo com o custo de cada item, painel
+   "Pré-preparo" (aparece em Insumos como…, usado em…, "mudar esta receita muda
+   o custo dessas fichas na hora"); lista com "com 1 pré-preparo"; formulário
+   com o fator, peso bruto, custo do pré-preparo por kg e prévia em cascata.
+8. **Planilha**: coluna opcional `fator`; item com nome de pré-preparo vira
+   subficha (o pré-preparo vence o insumo produzido de mesmo nome);
+   pré-preparo novo citado na MESMA planilha pede para ser importado antes; a
+   planilha que faria círculo é recusada inteira, com o nome da ficha.
+9. **Herança da 1.2 resolvida**: (a) foto regravada sem metadados, nos bytes,
+   sem lib (decisão 60; JPEG guarda só o que desenha a imagem e a orientação
+   num APP1 mínimo; PNG só chunks de imagem e cor; WebP sem EXIF/XMP, VP8X
+   corrigido; malformado recusado). (b) Foto por rota própria
+   (`POST <base>/fichas/fotos`): sessão (401), `fichas.editar` (403),
+   bloqueio e origem conferidos ANTES de ler o corpo; Content-Length
+   obrigatório e leitura com teto de 8 MB; vai para `pendentes/` e a action só
+   recebe o nome, move para o lugar e devolve se a transação falhar; faxina de
+   pendentes > 24 h a cada envio. O `bodySizeLimit` global de 9 MB saiu
+   (server actions no padrão de 1 MB; planilha até 256 KB). O navegador
+   redesenha toda foto antes de enviar (orientação aplicada). (c) Importação
+   até 300 fichas por arquivo, e o estouro do tempo da transação vira "A
+   importação passou de 30 segundos e foi desfeita: nada foi gravado. Divida a
+   planilha…". (d) Mensagem de suspenso cita fichas técnicas;
+   `pastaDoErp`/`versaoDaFoto`/`siglaDaPlanilha` não são mais exportados; no
+   celular, o modo de preparo vem logo depois da foto.
+
+## Provar os pré-preparos (1.3)
+
+```bash
+npx vitest run tests/erp-subfichas.test.ts tests/erp-fichas.test.ts   # fator, cascata 3 níveis exata, incompleto, círculo, profundidade, EXIF
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-subfichas.db.test.ts tests/erp-fichas.db.test.ts
+```
+Na tela: a dona cria "Molho cheddar" (pré-preparo, rende 2 kg, cebola com
+fator 1,18, foto do celular), usa 40 g num "Burger cheddar", abre "De onde
+vem", muda o preço do cheddar e vê o burger mudar; cria "Base de cebola",
+põe no molho e tenta pôr o molho na base: recusado.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -679,9 +770,8 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.2 (para as próximas subfases)
 
-- 1.3: subficha (`subfichaId`), fator de correção na tela e custo em cascata;
-  hoje item de subficha conta como "sem preço". Ciclo entre fichas é regra da 1.3.
-- 1.5: custo pelo último preço de compra troca `custoDoInsumo` (hoje, embalagem padrão).
+- ~~1.3: subficha, fator de correção na tela e custo em cascata; ciclo.~~ **Feito na 1.3.**
+- 1.5: custo pelo último preço de compra troca `custoDoInsumo` (hoje, embalagem padrão); a cascata não muda (ela chama `custoDoInsumo`).
 - 1.9/1.10: preço por canal aponta a ficha (`ProdutoVenda.fichaId`).
 - XLSX: só CSV. Se entrar lib de planilha, trocar só `decodificarPlanilha`/`lerCsv`.
 - Foto: sem faxina de arquivo órfão (processo morto entre gravar o arquivo e a
@@ -694,8 +784,37 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.2 (apontada pelos fiscais)
 
-- [médio] `bodySizeLimit` 9 MB é global (Next 14) e o corpo é lido antes da sessão: mover o upload da foto para rota própria que confere sessão antes de ler o corpo.
-- [médio] Importar 5000 fichas leva ~26 s numa transação de 30 s com insumos travados: limitar fichas por importação ou dividir em lotes, com mensagem clara no estouro.
-- [médio] Foto guardada com os bytes originais (EXIF/GPS do celular): regravar a imagem no servidor sem metadados.
-- [baixo] Mensagem de parceiro suspenso não cita fichas; exports só usados no próprio arquivo (`pastaDoErp`, `versaoDaFoto`, `siglaDaPlanilha`).
-- UX: no celular, modo de preparo logo depois da foto; trilha a 820 px truncando; hub com atalhos crescendo; faxina de foto órfã no disco; XLSX fora (só CSV); seletor de insumo vira busca com muitos insumos.
+- ~~[médio] `bodySizeLimit` 9 MB global.~~ **1.3:** rota própria, sessão antes do corpo.
+- ~~[médio] Importar 5000 fichas em ~26 s.~~ **1.3:** até 300 por arquivo; estouro com mensagem.
+- ~~[médio] Foto com EXIF/GPS.~~ **1.3:** regravada sem metadados.
+- ~~[baixo] Suspenso sem fichas; exports internos.~~ **1.3.**
+- UX: ~~no celular, modo de preparo logo depois da foto~~ (1.3); trilha a 820 px truncando; hub com atalhos crescendo; faxina de foto órfã no disco; XLSX fora (só CSV); seletor de insumo vira busca com muitos insumos.
+
+## Herança da 1.3 (para as próximas subfases)
+
+- 1.4: o insumo produzido nasce "Seco" (conservação padrão) e não se edita
+  pela tela de insumos; a validade por conservação do pré-preparo precisa de
+  um lugar para escolher a conservação (na ficha do pré-preparo).
+- 1.5: o custo pelo último preço de compra entra em `custoDoInsumo`; a
+  cascata, o fator e o teto de exibição não mudam.
+- 1.6/3.1: o insumo produzido é a face de estoque do pré-preparo (produção dá
+  entrada nele); a receita aponta a FICHA (`subfichaId`), não o insumo.
+- Planilha: pré-preparo novo usado na mesma planilha exige dois arquivos
+  (ordem). Dá para gravar primeiro os pré-preparos da planilha e depois o
+  resto, na mesma transação.
+- Toda gravação de ficha do parceiro passa por uma trava só (o grafo):
+  serializa as gravações de ficha de um parceiro (curtas; ok para o volume de
+  hoje). Importação longa segura as edições do parceiro até 30 s.
+- O filtro "só custo incompleto" calcula a cascata de TODOS os pré-preparos
+  do parceiro; com milhares, levar para SQL recursivo (`cliente.sql`).
+- Foto: envio exige JavaScript (o formulário sem JS salva sem foto). Faxina
+  de pendentes só roda quando alguém envia outra foto do mesmo parceiro.
+- Foto órfã fora de `pendentes/` (processo morto no meio) continua sem faxina
+  (herança da 1.2).
+
+## Herança da 1.3 (apontada pelos fiscais)
+
+- [médio] Formulário forjado aceita como item comum o insumo produzido por um pré-preparo (escapa do ciclo): recusar em `lerFormFicha` insumo com `fichaQueProduz`.
+- [médio] Limpeza de JPEG guarda marcadores desconhecidos (`foto-metadados.ts:79-86`): guardar só C0–CF, DB, DD, DA, D0–D7, DC, DF.
+- [baixo] Foto pendente só é faxinada no próximo envio do mesmo parceiro.
+- UX: trilha a 820 px; histórico de itens pesado ("lista riscada → lista nova"); texto do fator mais curto; espaço "Sem foto" grande no celular; conferir selo "Custo incompleto" subindo do molho para o prato; seta "→" em `ficha-campos.ts:149` sem comentário de exceção do scanner.

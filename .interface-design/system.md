@@ -96,3 +96,9 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
 | Sem vidro, gradiente, glow, Inter do kit | identidade FlowFoods e avoid-ai-design (K3, C1) | 2026-10-16 |
 | Formulários em tela própria, não painel lateral | sem JS, tela cheia no celular, voltar funciona | 2026-10-16 |
 | Máscara na borda do trilho de filtros no celular | indício de rolagem (funcional, não decorativa) | 2026-10-16 |
+- **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
+  "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em
+  `<details>` que abre a receita dele (filete esquerdo `linha-forte`, 12 px,
+  custo de cada item). Fator de correção: quantidade LIMPA no campo, "Peso
+  bruto 354 g para 300 g limpos (fator 1,18)" em 12 px suave. Incompleto em
+  cascata = selo "Incompleto" (atenção) e a frase com o insumo que falta.

@@ -3,8 +3,10 @@
 
 /**
  * Formulário da ficha técnica (nova e editar), a MESMA peça para o nível 1 e
- * para a pessoa do parceiro: a action vem de quem usa a tela. Tudo vai como
- * texto (e a foto como arquivo); o servidor converte g/kg/ml/L/un, calcula o
+ * para a pessoa do parceiro: a action vem de quem usa a tela. Cada linha é um
+ * insumo OU um pré-preparo (1.3: outra ficha, com o custo dela em cascata), com
+ * a quantidade LIMPA e o fator de correção (o peso bruto aparece embaixo). Tudo vai como
+ * texto (a foto já foi enviada pela rota própria: vai só o nome); o servidor converte g/kg/ml/L/un, calcula o
  * custo e confere permissão, versão lida e insumos do parceiro. A conta que
  * aparece aqui embaixo é PRÉVIA, feita com a mesma regra.
  */
@@ -13,19 +15,33 @@ import Link from 'next/link';
 import { useMemo, useRef, useState } from 'react';
 import { useFormState } from 'react-dom';
 import { Trash2 } from 'lucide-react';
-import { LIMITES_DA_FICHA, RENDE_DO_PREPARO, RENDE_EM, TIPOS_DE_FICHA, type RendeEm, type TipoFicha } from '@/lib/erp/ficha-campos';
-import type { InsumoDoFormulario } from '@/lib/erp/fichas';
 import {
-  custoExatoDaQuantidade,
+  formatarFator,
+  lerFator,
+  LIMITES_DA_FICHA,
+  quantidadeBruta,
+  RENDE_DO_PREPARO,
+  RENDE_EM,
+  TIPOS_DE_FICHA,
+  type RendeEm,
+  type TipoFicha,
+} from '@/lib/erp/ficha-campos';
+import type { InsumoDoFormulario, PreparoDoFormulario } from '@/lib/erp/fichas';
+import {
+  custoDoUso,
+  custoPorUnidade,
   escalaDaSigla,
   formatarFracao,
+  formatarQuantidade,
   lerInteiro,
   lerQuantidadeNa,
   porRendimento,
   SIGLAS_DIGITAVEIS,
   somar,
+  UNIDADES,
   ZERO,
   type Fracao,
+  type Unidade,
 } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
@@ -35,11 +51,14 @@ import { Painel } from '../../ui/superficies';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 import { CampoFoto } from './campo-foto';
+import { PREFIXO_DO_PREPARO } from './prefixo';
 
 export interface LinhaDoItem {
-  insumoId: string;
+  /** Id do insumo, ou "ficha:<id>" do pré-preparo (o valor do seletor). */
+  escolha: string;
   quantidade: string;
   unidade: string;
+  fator: string;
 }
 
 export interface ValoresDaFicha {
@@ -52,7 +71,7 @@ export interface ValoresDaFicha {
   itens: LinhaDoItem[];
 }
 
-const VAZIA: LinhaDoItem = { insumoId: '', quantidade: '', unidade: '' };
+const VAZIA: LinhaDoItem = { escolha: '', quantidade: '', unidade: '', fator: '' };
 const NOVA: ValoresDaFicha = {
   nome: '',
   tipo: 'PRATO',
@@ -69,19 +88,28 @@ const ROTULOS: Record<string, string> = {
   descricao: 'Descrição',
   foto: 'Foto',
   rendimento: 'Rendimento',
-  itens: 'Insumos',
+  itens: 'Insumos e pré-preparos',
   modoPreparo: 'Modo de preparo',
 };
-const rotuloDoCampo = (c: string) => ROTULOS[c] ?? (c.startsWith('item-') ? `Insumo ${Number(c.slice(5)) + 1}` : c);
+const rotuloDoCampo = (c: string) => ROTULOS[c] ?? (c.startsWith('item-') ? `Item ${Number(c.slice(5)) + 1}` : c);
 
-/** Custo da linha na prévia (null = sem preço ou ainda incompleta). */
-function custoDaLinha(l: LinhaDoItem, insumo: InsumoDoFormulario | undefined): Fracao | 'sem-preco' | null {
-  if (!insumo) return null;
-  const escala = escalaDaSigla(l.unidade, insumo.unidade);
-  const q = escala ? lerQuantidadeNa(l.quantidade.trim(), insumo.unidade, escala) : null;
-  if (!q) return null;
-  if (!insumo.custo) return 'sem-preco';
-  return custoExatoDaQuantidade(insumo.custo, q);
+/** O que a linha escolheu: um insumo ou um pré-preparo, com o custo por unidade (null = sem preço). */
+interface Escolhido {
+  nome: string;
+  unidade: Unidade;
+  porUnidade: Fracao | null;
+  preparo: boolean;
+  incompleto: boolean;
+}
+
+/** Linha na prévia: quantidade limpa e bruta, custo (null = sem preço) — ou nada, se ainda incompleta. */
+function contaDaLinha(l: LinhaDoItem, e: Escolhido | undefined) {
+  if (!e) return null;
+  const escala = escalaDaSigla(l.unidade, e.unidade);
+  const q = escala ? lerQuantidadeNa(l.quantidade.trim(), e.unidade, escala) : null;
+  const f = lerFator(l.fator);
+  if (!q || !f.ok) return null;
+  return { q, fator: f.milesimos, bruta: quantidadeBruta(q, f.milesimos), custo: e.porUnidade ? custoDoUso(e.porUnidade, q, f.milesimos) : null };
 }
 
 export function FormFicha({
@@ -91,6 +119,7 @@ export function FormFicha({
   aqui,
   cancelar,
   opcoes,
+  preparos = [],
   inicial = NOVA,
   fotoAtual = null,
   versao,
@@ -104,6 +133,8 @@ export function FormFicha({
   aqui: string;
   cancelar: string;
   opcoes: InsumoDoFormulario[];
+  /** Pré-preparos que podem entrar (sem a própria ficha), com o custo por unidade. */
+  preparos?: PreparoDoFormulario[];
   inicial?: ValoresDaFicha;
   fotoAtual?: string | null;
   versao?: string;
@@ -115,23 +146,37 @@ export function FormFicha({
   const saida = useAvisoDeSaida();
   const [tipo, setTipo] = useState<TipoFicha>(inicial.tipo);
   const [nome, setNome] = useState(inicial.nome);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [rendimento, setRendimento] = useState(inicial.rendimento);
   const [rendeEm, setRendeEm] = useState<RendeEm>(inicial.tipo === 'PRATO' ? 'kg' : inicial.rendimentoUnidade);
   const proximaChave = useRef(inicial.itens.length);
   const [linhas, setLinhas] = useState(() => inicial.itens.map((l, i) => ({ ...l, chave: i })));
   const erros = estado?.erros ?? {};
   const idBase = 'ficha';
-  const porId = useMemo(() => new Map(opcoes.map((i) => [i.id, i])), [opcoes]);
+  const porEscolha = useMemo(() => {
+    const m = new Map<string, Escolhido>();
+    for (const i of opcoes) m.set(i.id, { nome: i.nome, unidade: i.unidade, porUnidade: i.custo ? custoPorUnidade(i.custo) : null, preparo: false, incompleto: false });
+    for (const p of preparos) {
+      m.set(`${PREFIXO_DO_PREPARO}${p.id}`, {
+        nome: p.nome,
+        unidade: p.unidade,
+        porUnidade: { num: BigInt(p.custo.num), den: BigInt(p.custo.den) },
+        preparo: true,
+        incompleto: p.incompleto,
+      });
+    }
+    return m;
+  }, [opcoes, preparos]);
 
   function mudarLinha(chave: number, mudanca: Partial<LinhaDoItem>) {
     setLinhas((ls) =>
       ls.map((l) => {
         if (l.chave !== chave) return l;
         const nova = { ...l, ...mudanca };
-        // Trocou o insumo: a unidade passa a ser a dele (g para kg, ml para L, un).
-        if (mudanca.insumoId !== undefined) {
-          const ins = porId.get(mudanca.insumoId);
-          if (ins && !SIGLAS_DIGITAVEIS[ins.unidade].includes(nova.unidade)) nova.unidade = SIGLAS_DIGITAVEIS[ins.unidade][0];
+        // Trocou o item: a unidade passa a ser a dele (g para kg, ml para L, un).
+        if (mudanca.escolha !== undefined) {
+          const e = porEscolha.get(mudanca.escolha);
+          if (e && !SIGLAS_DIGITAVEIS[e.unidade].includes(nova.unidade)) nova.unidade = SIGLAS_DIGITAVEIS[e.unidade][0];
         }
         return nova;
       }),
@@ -143,12 +188,16 @@ export function FormFicha({
   const previa = useMemo(() => {
     let total: Fracao = ZERO;
     const semPreco: string[] = [];
-    const porLinha = new Map<number, Fracao | 'sem-preco' | null>();
+    const incompletos: string[] = [];
+    const porLinha = new Map<number, ReturnType<typeof contaDaLinha>>();
     for (const l of linhas) {
-      const c = custoDaLinha(l, porId.get(l.insumoId));
+      const e = porEscolha.get(l.escolha);
+      const c = contaDaLinha(l, e);
       porLinha.set(l.chave, c);
-      if (c === 'sem-preco') semPreco.push(porId.get(l.insumoId)!.nome);
-      else if (c) total = somar(total, c);
+      if (!c || !e) continue;
+      if (!c.custo) semPreco.push(e.nome);
+      else total = somar(total, c.custo);
+      if (e.incompleto) incompletos.push(e.nome);
     }
     let rende: number | null = null;
     if (tipo === 'PRATO') {
@@ -158,10 +207,11 @@ export function FormFicha({
       const { unidade, escala } = RENDE_EM[rendeEm];
       rende = lerQuantidadeNa(rendimento.trim(), unidade, escala) || null;
     }
-    return { total, semPreco, porLinha, porRende: rende ? porRendimento(total, rende) : null };
-  }, [linhas, porId, tipo, rendimento, rendeEm]);
+    return { total, semPreco, incompletos, porLinha, porRende: rende ? porRendimento(total, rende) : null };
+  }, [linhas, porEscolha, tipo, rendimento, rendeEm]);
 
-  const unidadeDoRende = tipo === 'PRATO' ? 'porção' : RENDE_EM[rendeEm].rotulo.replace(/s$/, '');
+  // O custo da prévia é por unidade BASE (kg, L, un), mesmo com o rendimento digitado em g ou ml (como no servidor).
+  const unidadeDoRende = tipo === 'PRATO' ? 'porção' : UNIDADES[RENDE_EM[rendeEm].unidade].sigla;
 
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
@@ -208,7 +258,9 @@ export function FormFicha({
                 aoMudar={setTipo}
               />
               <p className={AJUDA}>
-                {tipo === 'PRATO' ? 'Prato rende porções: o custo sai por porção.' : 'Pré-preparo (molho, massa, recheio) rende em kg, L ou un.'}
+                {tipo === 'PRATO'
+                  ? 'Prato rende porções: o custo sai por porção.'
+                  : 'Pré-preparo (molho, massa, recheio) rende em kg, L ou un, entra em outras fichas e aparece em Insumos com o custo desta receita.'}
               </p>
             </div>
             <div>
@@ -228,7 +280,7 @@ export function FormFicha({
               />
               <Erro id={`${idBase}-descricao-erro`} texto={erros.descricao} />
             </div>
-            <CampoFoto atual={fotoAtual} nome={nome} erro={erros.foto} idBase={idBase} aoMudar={saida.aoMudar} />
+            <CampoFoto atual={fotoAtual} nome={nome} erro={erros.foto} idBase={idBase} envio={`${base}/fotos`} aoMudar={saida.aoMudar} aoOcupar={setEnviandoFoto} />
           </div>
         </Painel>
 
@@ -274,49 +326,80 @@ export function FormFicha({
             )}
           </div>
           <Erro id={`${idBase}-rendimento-erro`} texto={erros.rendimento} />
+          {tipo === 'PRE_PREPARO' && (
+            <p className={AJUDA}>Quanto sai pronto, já pesado depois do preparo: o que o cozimento tira ou acrescenta já está aqui.</p>
+          )}
         </Painel>
 
-        <Painel titulo="Insumos" semRespiro>
+        <Painel titulo="Insumos e pré-preparos" semRespiro>
+          <p className="border-b border-linha px-4 py-3 text-[12px] leading-relaxed text-suave sm:px-5">
+            Quantidade <strong className="font-semibold text-texto">limpa</strong>, como vai na receita. Fator de correção é quanto se compra para ter 1
+            limpo: cebola com fator 1,18 = 1,18 kg comprados para 1 kg descascado. Vazio = sem perda.
+          </p>
           {erros.itens && (
             <p id={`${idBase}-itens`} className="border-b border-linha px-4 py-3 text-[13px] text-erro sm:px-5">
               {erros.itens}
             </p>
           )}
+          <div
+            aria-hidden
+            className="hidden grid-cols-[minmax(0,1fr)_6.5rem_5rem_5.5rem_7rem_auto] gap-2 border-b border-linha bg-forte px-5 py-2 text-[12px] font-semibold text-suave sm:grid"
+          >
+            <span>Insumo ou pré-preparo</span>
+            <span className="text-right">Quantidade</span>
+            <span>Medida</span>
+            <span className="text-right">Fator</span>
+            <span className="text-right">Custo</span>
+            <span className="w-11" />
+          </div>
           <ul className="divide-y divide-linha">
             {linhas.map((l, n) => {
-              const ins = porId.get(l.insumoId);
-              const siglas = ins ? SIGLAS_DIGITAVEIS[ins.unidade] : ['g', 'kg', 'ml', 'L', 'un'];
+              const e = porEscolha.get(l.escolha);
+              const siglas = e ? SIGLAS_DIGITAVEIS[e.unidade] : ['g', 'kg', 'ml', 'L', 'un'];
               const c = previa.porLinha.get(l.chave);
               const erro = erros[`item-${n}`];
               return (
                 <li key={l.chave} className="px-4 py-3 sm:px-5">
-                  <div className="grid grid-cols-[5.5rem_4.75rem_minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_6.5rem_5rem_7rem_auto] sm:items-center">
+                  <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_5rem_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_6.5rem_5rem_5.5rem_7rem_auto] sm:items-center">
                     <div className="col-span-4 sm:col-span-1">
                       <label htmlFor={`${idBase}-item-${n}`} className="sr-only">
-                        Insumo {n + 1}
+                        Insumo ou pré-preparo {n + 1}
                       </label>
                       <select
                         id={`${idBase}-item-${n}`}
                         name="item_insumo"
-                        value={l.insumoId}
-                        onChange={(e) => mudarLinha(l.chave, { insumoId: e.target.value })}
+                        value={l.escolha}
+                        onChange={(ev) => mudarLinha(l.chave, { escolha: ev.target.value })}
                         className={CAMPO}
                         aria-invalid={!!erro}
                         aria-describedby={erro ? `${idBase}-item-${n}-erro` : undefined}
                       >
-                        <option value="">Escolha o insumo</option>
-                        {opcoes.map((i) => (
-                          <option key={i.id} value={i.id}>
-                            {i.nome}
-                            {i.ativo ? '' : ' (desativado)'}
-                            {i.custo ? '' : ' · sem preço'}
-                          </option>
-                        ))}
+                        <option value="">Escolha o insumo ou o pré-preparo</option>
+                        {preparos.length > 0 && (
+                          <optgroup label="Pré-preparos (fichas da casa)">
+                            {preparos.map((p) => (
+                              <option key={p.id} value={`${PREFIXO_DO_PREPARO}${p.id}`}>
+                                {p.nome}
+                                {p.ativo ? '' : ' (desativado)'}
+                                {p.incompleto ? ' · custo incompleto' : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        )}
+                        <optgroup label="Insumos">
+                          {opcoes.map((i) => (
+                            <option key={i.id} value={i.id}>
+                              {i.nome}
+                              {i.ativo ? '' : ' (desativado)'}
+                              {i.custo ? '' : ' · sem preço'}
+                            </option>
+                          ))}
+                        </optgroup>
                       </select>
                     </div>
                     <div>
                       <label htmlFor={`${idBase}-item-${n}-qtd`} className="sr-only">
-                        Quantidade do insumo {n + 1}
+                        Quantidade limpa do item {n + 1}
                       </label>
                       <input
                         id={`${idBase}-item-${n}-qtd`}
@@ -325,30 +408,49 @@ export function FormFicha({
                         autoComplete="off"
                         placeholder="Qtd."
                         value={l.quantidade}
-                        onChange={(e) => mudarLinha(l.chave, { quantidade: e.target.value })}
+                        onChange={(ev) => mudarLinha(l.chave, { quantidade: ev.target.value })}
                         className={`${CAMPO} text-right tabular-nums`}
                       />
                     </div>
                     <div>
                       <label htmlFor={`${idBase}-item-${n}-un`} className="sr-only">
-                        Unidade do insumo {n + 1}
+                        Medida do item {n + 1}
                       </label>
                       <select
                         id={`${idBase}-item-${n}-un`}
                         name="item_unidade"
                         value={l.unidade || siglas[0]}
-                        onChange={(e) => mudarLinha(l.chave, { unidade: e.target.value })}
+                        onChange={(ev) => mudarLinha(l.chave, { unidade: ev.target.value })}
                         className={CAMPO}
                       >
-                        {siglas.map((s) => (
-                          <option key={s} value={s}>
-                            {s}
+                        {siglas.map((sg) => (
+                          <option key={sg} value={sg}>
+                            {sg}
                           </option>
                         ))}
                       </select>
                     </div>
-                    <p className="flex min-h-11 items-center justify-end text-right text-[13px] tabular-nums text-suave sm:min-h-[42px]" aria-live="polite">
-                      {c === 'sem-preco' ? <span className="text-atencao">sem preço</span> : c ? formatarFracao(c) : '—'}
+                    <div>
+                      <label htmlFor={`${idBase}-item-${n}-fator`} className="sr-only">
+                        Fator de correção do item {n + 1} (vazio = 1)
+                      </label>
+                      <input
+                        id={`${idBase}-item-${n}-fator`}
+                        name="item_fator"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="Fator 1"
+                        value={l.fator}
+                        onChange={(ev) => mudarLinha(l.chave, { fator: ev.target.value })}
+                        className={`${CAMPO} text-right tabular-nums placeholder:text-[13px]`}
+                      />
+                    </div>
+                    <p
+                      className="col-span-4 row-start-3 flex items-center justify-end text-right text-[13px] tabular-nums text-suave sm:col-span-1 sm:row-start-auto sm:min-h-[42px]"
+                      aria-live="polite"
+                    >
+                      <span className="mr-1 sm:hidden">Custo</span>
+                      {!c ? '—' : c.custo ? formatarFracao(c.custo) : <span className="text-atencao">sem preço</span>}
                     </p>
                     <button
                       type="button"
@@ -356,12 +458,28 @@ export function FormFicha({
                         setLinhas((ls) => (ls.length === 1 ? [{ ...VAZIA, chave: proximaChave.current++ }] : ls.filter((x) => x.chave !== l.chave)));
                         saida.aoMudar();
                       }}
-                      aria-label={`Tirar ${ins?.nome ?? `o insumo ${n + 1}`} da ficha`}
+                      aria-label={`Tirar ${e?.nome ?? `o item ${n + 1}`} da ficha`}
                       className={classeDeBotao('fantasma', 'px-3')}
                     >
                       <Trash2 size={16} aria-hidden />
                     </button>
                   </div>
+                  {e && c && (c.fator !== 1000 || e.preparo) && (
+                    <p className="mt-1.5 text-[12px] tabular-nums text-suave">
+                      {c.fator !== 1000 && (
+                        <>
+                          Peso bruto {formatarQuantidade(c.bruta, e.unidade)} para {formatarQuantidade(c.q, e.unidade)} limpos (fator {formatarFator(c.fator)})
+                        </>
+                      )}
+                      {c.fator !== 1000 && e.preparo && ' · '}
+                      {e.preparo && (
+                        <>
+                          Pré-preparo a {e.porUnidade ? formatarFracao(e.porUnidade) : '—'} por {UNIDADES[e.unidade].sigla}
+                          {e.incompleto && <span className="text-atencao"> (custo incompleto)</span>}
+                        </>
+                      )}
+                    </p>
+                  )}
                   <Erro id={`${idBase}-item-${n}-erro`} texto={erro} />
                 </li>
               );
@@ -378,7 +496,7 @@ export function FormFicha({
                 disabled={linhas.length >= LIMITES_DA_FICHA.itens}
                 className={classeDeBotao('secundario')}
               >
-                Adicionar insumo
+                Adicionar item
               </button>
               {novoInsumo && (
                 <Link href={novoInsumo} className={LINK_DE_TEXTO}>
@@ -396,6 +514,9 @@ export function FormFicha({
                 </span>
               )}
               {previa.semPreco.length > 0 && <span className="block text-[12px] text-atencao">Custo incompleto: falta preço em {previa.semPreco.join(', ')}.</span>}
+              {previa.incompletos.length > 0 && (
+                <span className="block text-[12px] text-atencao">Custo incompleto dentro de {previa.incompletos.join(', ')}.</span>
+              )}
             </p>
           </div>
         </Painel>
@@ -423,7 +544,7 @@ export function FormFicha({
         <Link href={cancelar} className={classeDeBotao('fantasma')}>
           Cancelar
         </Link>
-        <BotaoEnviar disabled={!!bloqueio} className="sm:min-w-44">
+        <BotaoEnviar disabled={!!bloqueio || enviandoFoto} className="sm:min-w-44">
           {modo === 'criar' ? 'Cadastrar ficha' : 'Salvar alterações'}
         </BotaoEnviar>
       </div>

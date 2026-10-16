@@ -2,9 +2,11 @@
 
 /**
  * Foto da ficha no formulário: escolher (câmera no celular), ver antes de
- * salvar, trocar ou tirar. Foto grande (ou HEIC do iPhone) é reduzida AQUI
- * para até 1600 px em JPEG antes de enviar — conforto de rede e de disco. Quem
- * decide é o servidor: confere o tipo pelos bytes e o tamanho de novo.
+ * salvar, trocar ou tirar. A foto é redesenhada AQUI em JPEG de até 1600 px
+ * (conforto de rede e de disco; a orientação do celular já vem aplicada) e
+ * enviada na hora pela rota própria (`/fichas/fotos`), que confere sessão e
+ * permissão antes de ler, o tipo pelos bytes e regrava sem metadados. O
+ * formulário leva só o nome que o servidor devolveu (`fotoNova`).
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -13,12 +15,14 @@ import { AJUDA, Erro, MARCAR, ROTULO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 
 const LADO_MAXIMO = 1600;
-const ACEITOS = ['image/jpeg', 'image/png', 'image/webp'];
 
-/** Reduz no navegador; se não der (navegador antigo, formato que ele não abre), devolve o original. */
+/**
+ * Redesenha no navegador (sempre: aplica a orientação do celular e já deixa o
+ * EXIF para trás); se não der (navegador antigo, formato que ele não abre),
+ * devolve o original — o servidor limpa do mesmo jeito.
+ */
 async function reduzir(arquivo: File): Promise<File> {
-  const precisa = arquivo.size > 1_500_000 || !ACEITOS.includes(arquivo.type);
-  if (!precisa || typeof createImageBitmap !== 'function') return arquivo;
+  if (typeof createImageBitmap !== 'function') return arquivo;
   try {
     const img = await createImageBitmap(arquivo);
     const escala = Math.min(1, LADO_MAXIMO / Math.max(img.width, img.height));
@@ -34,22 +38,41 @@ async function reduzir(arquivo: File): Promise<File> {
   }
 }
 
+/** Manda a foto para a rota de envio; devolve o nome sorteado ou a frase do erro. */
+async function enviar(url: string, foto: File): Promise<{ arquivo: string } | { erro: string }> {
+  try {
+    const r = await fetch(url, { method: 'POST', body: foto, headers: { 'Content-Type': foto.type || 'application/octet-stream' } });
+    const corpo = (await r.json().catch(() => ({}))) as { arquivo?: string; erro?: string };
+    if (r.ok && corpo.arquivo) return { arquivo: corpo.arquivo };
+    return { erro: corpo.erro ?? 'Não deu para enviar a foto. Tente de novo.' };
+  } catch {
+    return { erro: 'Sem conexão para enviar a foto. Tente de novo.' };
+  }
+}
+
 export function CampoFoto({
   atual,
   nome,
   erro,
   idBase,
+  envio,
   aoMudar,
+  aoOcupar,
 }: {
   /** URL da foto gravada (edição), ou null. */
   atual: string | null;
   nome: string;
   erro?: string;
   idBase: string;
+  /** Rota que recebe a foto (`<base>/fotos`). */
+  envio: string;
   aoMudar: () => void;
+  /** Enquanto envia, o formulário não salva. */
+  aoOcupar: (ocupado: boolean) => void;
 }) {
   const entrada = useRef<HTMLInputElement>(null);
   const [previa, setPrevia] = useState<string | null>(null);
+  const [enviada, setEnviada] = useState('');
   const [remover, setRemover] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
@@ -63,14 +86,17 @@ export function CampoFoto({
     setAviso(null);
     if (!original) return;
     setPreparando(true);
+    aoOcupar(true);
     const final = await reduzir(original);
+    const r = final.size > LIMITE_DA_FOTO ? { erro: 'Foto acima de 8 MB: escolha outra.' } : await enviar(envio, final);
     setPreparando(false);
-    if (final !== original) {
-      const dt = new DataTransfer();
-      dt.items.add(final);
-      e.target.files = dt.files;
+    aoOcupar(false);
+    if ('erro' in r) {
+      setAviso(r.erro);
+      e.target.value = '';
+      return;
     }
-    if (final.size > LIMITE_DA_FOTO) setAviso('Foto acima de 8 MB: escolha outra.');
+    setEnviada(r.arquivo);
     setPrevia(URL.createObjectURL(final));
     setRemover(false);
     aoMudar();
@@ -90,11 +116,11 @@ export function CampoFoto({
           )}
         </div>
         <div className="min-w-0 flex-1 space-y-2">
+          {enviada && !remover && <input type="hidden" name="fotoNova" value={enviada} />}
           <input
             ref={entrada}
             id={`${idBase}-foto`}
             type="file"
-            name="foto"
             accept="image/jpeg,image/png,image/webp,image/heic,image/heif"
             onChange={escolheu}
             className="peer sr-only"
@@ -104,10 +130,10 @@ export function CampoFoto({
               'secundario',
               'cursor-pointer peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-acento',
             )}>
-            {preparando ? 'Preparando a foto…' : mostrada ? 'Trocar foto' : 'Escolher foto'}
+            {preparando ? 'Enviando a foto…' : mostrada ? 'Trocar foto' : 'Escolher foto'}
           </label>
           <p id={`${idBase}-foto-ajuda`} className={AJUDA}>
-            Do prato pronto ou da montagem: quem opera bate o olho e sabe o que é. JPG, PNG ou WebP; a foto é reduzida antes de enviar.
+            Do prato pronto ou da montagem: quem opera bate o olho e sabe o que é. JPG, PNG ou WebP. A foto é reduzida e guardada sem a localização do celular.
           </p>
           {atual && (
             <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-texto sm:min-h-0">
@@ -120,6 +146,7 @@ export function CampoFoto({
                   setRemover(e.target.checked);
                   if (e.target.checked && entrada.current) entrada.current.value = '';
                   setPrevia(null);
+                  setEnviada('');
                   aoMudar();
                 }}
                 className={MARCAR}
