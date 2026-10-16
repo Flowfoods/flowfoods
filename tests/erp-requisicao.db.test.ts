@@ -376,6 +376,14 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     expect(r.ok).toBe(true);
     expect((await req((r as { id: string }).id)).requisicao).toMatchObject({ fichaNomeSnapshot: 'Burger bacon', fichaQuantidadeMilesimos: 20_000 });
     await cancelarRequisicao(a, OPERADOR(), ids.vp, (r as { id: string }).id, { motivo: 'só teste da ficha' }, 'Caio');
+    // Herança b da 1.8: quantidade da ficha forjada acima do INTEGER não dá 500 — o pedido entra, sem a origem ficha.
+    for (const forjada of ['3000000000', '10000001']) {
+      const f = await pedir(OPERADOR(), 'Caio', l.linhas, { fichaId: l.ficha.id, fichaQuantidade: forjada });
+      expect(f.ok).toBe(true);
+      expect((await req((f as { id: string }).id)).requisicao).toMatchObject({ fichaId: null, fichaQuantidadeMilesimos: null });
+      await cancelarRequisicao(a, OPERADOR(), ids.vp, (f as { id: string }).id, { motivo: 'só teste do teto' }, 'Caio');
+    }
+    expect(await listaDaFicha(a, OPERADOR(), ids.vp, (burger as { id: string }).id, '10001')).toMatchObject({ ok: false, erros: { quantidade: expect.any(String) } });
   });
 
   it('cruzamento: contagem acusa 500 g de bacon a menos sem requisição → divergência de R$ 21,00; pequenos repetidos do cheddar; pão negativo', async () => {
@@ -415,4 +423,5 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     expect(await divergenciasDaLoja(a, GERENTE_DELIVERY(), ids.vp, {}, CFG)).toBeNull();
     expect(await divergenciasDaLoja(b, DONA(), ids.vp, {}, CFG)).toBeNull();
   });
+
 });
