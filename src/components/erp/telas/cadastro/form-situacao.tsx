@@ -16,6 +16,7 @@ const O_QUE = {
   insumo: { nome: 'insumo', fem: false },
   embalagem: { nome: 'embalagem', fem: true },
   ficha: { nome: 'ficha', fem: true },
+  fornecedor: { nome: 'fornecedor', fem: false },
 } as const;
 
 export function FormSituacao({

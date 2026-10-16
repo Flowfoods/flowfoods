@@ -319,7 +319,7 @@ async function lojasParaLancar(tx: ClienteDoParceiro, alcance: Alcance) {
 }
 
 /** O que o formulário de nota precisa: lojas, fornecedores e insumos comprados (com o custo de agora). */
-export async function dadosDoFormularioDeNota(cliente: ClienteDoParceiro, alcance: Alcance, ja: { lojaId?: string; fornecedorId?: string; insumos?: string[] } = {}) {
+export async function dadosDoFormularioDeNota(cliente: ClienteDoParceiro, alcance: Alcance, ja: { lojaId?: string; fornecedorId?: string; insumoIds?: string[] } = {}) {
   return cliente.transacao(async (tx) => {
     const lojas = (await lojasParaLancar(tx, alcance)).filter((l) => l.ativa || l.id === ja.lojaId);
     const fornecedores = await tx.fornecedor.findMany({
@@ -328,7 +328,7 @@ export async function dadosDoFormularioDeNota(cliente: ClienteDoParceiro, alcanc
       select: { id: true, nome: true, ativo: true },
     });
     const lidos = await tx.insumo.findMany({
-      where: { fichaQueProduz: { is: null }, OR: [{ ativo: true }, { id: { in: ja.insumos ?? [] } }] },
+      where: { fichaQueProduz: { is: null }, OR: [{ ativo: true }, { id: { in: ja.insumoIds ?? [] } }] },
       orderBy: { nome: 'asc' },
       select: SELECAO_DO_INSUMO_DA_COMPRA,
     });

@@ -22,6 +22,7 @@ export type ChaveIcone =
   | 'importar'
   | 'fichas'
   | 'compras'
+  | 'fornecedor'
   | 'estoque'
   | 'producao'
   | 'etiquetas'
@@ -251,12 +252,12 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
         },
         {
           rotulo: 'Fornecedores',
-          icone: 'rede',
+          icone: 'fornecedor',
           telas: [
             {
               href: `${base}/compras/fornecedores`,
               rotulo: 'Fornecedores',
-              icone: 'rede',
+              icone: 'fornecedor',
               subtitulo: 'Quem vende e por quanto',
               permissao: 'compras.ver',
             },

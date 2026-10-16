@@ -23,6 +23,8 @@ import { FormSituacao } from '../cadastro/form-situacao';
 import { BotaoOuMotivo } from '../cadastro/partes';
 import { fraseDoFeito } from './estado';
 import { TrilhaDaPagina } from '../../shell/trilha';
+import { PrecosPagos } from './precos-pagos';
+import { formatarData } from '@/lib/erp/compra-campos';
 
 export function TelaDetalheInsumo({
   insumo: i,
@@ -33,7 +35,13 @@ export function TelaDetalheInsumo({
   podeEditar,
   bloqueio,
   acaoSituacao,
+  linkDaNota,
 }: {
+  /**
+   * 1.5: link para a nota de compra, para quem vê compras naquela loja (null =
+   * a pessoa vê o preço, que é custo da rede, mas não a nota).
+   */
+  linkDaNota?: (notaId: string, lojaId: string) => string | null;
   insumo: InsumoDetalhado;
   base: string;
   /** A lista como a pessoa deixou (filtros e página). */
@@ -48,6 +56,8 @@ export function TelaDetalheInsumo({
 }) {
   const u = UNIDADES[i.unidade];
   const aqui = `${base}/${i.id}`;
+  const uc = i.ultimaCompra;
+  const notaDaUltima = uc && linkDaNota ? linkDaNota(uc.notaId, uc.lojaId) : null;
   // Pré-preparo (1.3): nome, unidade, situação e custo vêm da ficha técnica; aqui só se lê.
   const p = i.preparo;
   const fichas = base.replace(/insumos$/, 'fichas');
@@ -55,7 +65,7 @@ export function TelaDetalheInsumo({
   const ativas = i.variantes.filter((v) => v.ativo);
   const comparacao = i.ativo
     ? compararEmbalagens(
-        [{ nome: 'Padrão', custo: i.custo }, ...ativas.map((v) => ({ nome: v.nome, custo: v.custo }))],
+        [{ nome: 'Padrão', custo: i.custoCadastrado }, ...ativas.map((v) => ({ nome: v.nome, custo: v.custo }))],
         i.unidade,
       )
     : null;
@@ -70,7 +80,8 @@ export function TelaDetalheInsumo({
       conteudoMilesimos: i.conteudoMilesimos,
       precoEmbalagemCentavos: i.precoEmbalagemCentavos,
       taxaEntregaCentavos: i.taxaEntregaCentavos,
-      custo: i.custo,
+      // Na comparação de embalagens vale o preço CADASTRADO (o da compra está no painel de custo).
+      custo: i.custoCadastrado,
       ativo: true,
       codigoBarras: null as string | null,
     },
@@ -135,17 +146,37 @@ export function TelaDetalheInsumo({
             </Painel>
           ) : (
             <>
-          <Painel titulo="Custo de referência">
+          <Painel titulo="Custo de referência" subtitulo={uc ? 'Último preço pago' : 'Preço cadastrado da embalagem padrão'}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
               <div className={`font-display text-[32px] font-bold leading-none ${i.custo === null ? 'text-atencao' : ''}`}>
                 {formatarCusto(i.custo, i.unidade)}
               </div>
-              <p className="text-sm tabular-nums text-suave">{contaDoCusto(i)}</p>
+              <p className="text-sm tabular-nums text-suave">
+                {uc
+                  ? contaDoCusto({ precoEmbalagemCentavos: uc.valorCentavos, taxaEntregaCentavos: uc.freteCentavos, conteudoMilesimos: uc.quantidadeMilesimos, unidade: i.unidade })
+                  : contaDoCusto(i)}
+              </p>
             </div>
             <p className="mt-3 border-t border-linha pt-3 text-[12px] text-suave">
-              Pelo preço da embalagem padrão. O custo pelas compras de verdade (última nota) chega em breve, em Compras.
+              {uc ? (
+                <>
+                  Último preço: {formatarCusto(uc.custo, i.unidade)} em {formatarData(uc.entradaEm, true)} (
+                  {notaDaUltima ? (
+                    <Link href={notaDaUltima} className={LINK_DE_TEXTO}>
+                      nota {uc.numero}
+                    </Link>
+                  ) : (
+                    `nota ${uc.numero}`
+                  )}
+                  , {uc.fornecedor ?? 'sem fornecedor'}{uc.lojaNome ? `, ${uc.lojaNome}` : ''}). É o que as fichas usam; o preço cadastrado ({formatarCusto(i.custoCadastrado, i.unidade)}) só vale sem nota.
+                </>
+              ) : (
+                'Pelo preço cadastrado. Quando houver nota de compra lançada, vale o último preço pago.'
+              )}
             </p>
           </Painel>
+
+          <PrecosPagos insumo={i} linkDaNota={linkDaNota} />
 
           <Painel
             titulo="Embalagens de compra"

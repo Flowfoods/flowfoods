@@ -32,6 +32,7 @@ export default async function ParceiroInsumoPage({
       podeEditar
       bloqueio={ctx.bloqueio}
       acaoSituacao={acaoSituacaoInsumo.bind(null, ctx.parceiro.slug, insumo.id)}
+      linkDaNota={(notaId) => `/rodolfo/erp/${ctx.parceiro.slug}/compras/${notaId}`}
     />
   );
 }

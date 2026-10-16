@@ -9,6 +9,7 @@
  */
 
 import Link from 'next/link';
+import { formatarData } from '@/lib/erp/compra-campos';
 import { validadesEmTexto } from '@/lib/erp/validade';
 import type { LinhaDeInsumo } from '@/lib/erp/insumos';
 import {
@@ -52,6 +53,8 @@ function Custo({ i }: { i: LinhaDeInsumo }) {
     <span className="whitespace-nowrap">
       <span className="font-semibold text-texto">{valorDoCusto(i.custo)}</span>
       <span className="ml-0.5 text-[12px] text-suave">/{UNIDADES[i.unidade].sigla}</span>
+      {/* 1.5: o custo é o da última compra; sem ela, o do preço cadastrado. */}
+      <span className="block text-[12px] font-normal text-suave">{i.ultimaCompra ? `compra ${formatarData(i.ultimaCompra.entradaEm, true)}` : 'cadastrado'}</span>
     </span>
   );
 }
@@ -265,7 +268,7 @@ export function TelaListaInsumos({
               Embalagem
             </th>
             <th scope="col" className="h-10 px-3 text-right font-semibold">
-              Preço e frete
+              Preço cadastrado
             </th>
             <Ordenar base={base} f={f} coluna="custo" alinhar="right">
               Custo por unidade

@@ -36,6 +36,7 @@ export default async function ErpInsumoPage({
       podeEditar={pode(ctx.alcance, 'insumos.editar')}
       bloqueio={ctx.bloqueio}
       acaoSituacao={acaoSituacaoInsumo.bind(null, insumo.id)}
+      linkDaNota={(notaId, lojaId) => (pode(ctx.alcance, 'compras.ver', { lojaId }) ? `/erp/compras/${notaId}` : null)}
     />
   );
 }
