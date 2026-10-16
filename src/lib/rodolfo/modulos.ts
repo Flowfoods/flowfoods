@@ -25,6 +25,7 @@ export function modulosDoNivel1(): ModuloNav[] {
       grupos: [
         {
           rotulo: 'Prospecção',
+          icone: 'leads',
           itens: [
             { href: '/rodolfo/hoje', rotulo: 'Hoje', icone: 'hoje', subtitulo: 'Se o envio está rodando, e por quê' },
             { href: '/rodolfo/leads', rotulo: 'Leads', icone: 'leads', subtitulo: 'Base, filtros e importação' },
@@ -38,6 +39,7 @@ export function modulosDoNivel1(): ModuloNav[] {
         },
         {
           rotulo: 'Conversas',
+          icone: 'inbox',
           itens: [
             {
               href: '/rodolfo/inbox',
@@ -50,6 +52,7 @@ export function modulosDoNivel1(): ModuloNav[] {
         },
         {
           rotulo: 'Resultado',
+          icone: 'metricas',
           itens: [
             {
               href: '/rodolfo/metricas',
@@ -71,6 +74,7 @@ export function modulosDoNivel1(): ModuloNav[] {
       grupos: [
         {
           rotulo: 'Diagnóstico',
+          icone: 'portal',
           itens: [
             {
               href: '/rodolfo/portal',
@@ -92,6 +96,7 @@ export function modulosDoNivel1(): ModuloNav[] {
       grupos: [
         {
           rotulo: 'Parceiros',
+          icone: 'parceiros',
           itens: [
             {
               href: '/rodolfo/erp',
@@ -113,6 +118,7 @@ export function modulosDoNivel1(): ModuloNav[] {
       grupos: [
         {
           rotulo: 'Ajustes',
+          icone: 'config',
           itens: [
             {
               href: '/rodolfo/config',
@@ -157,6 +163,7 @@ export function comParceiroAtual(
   const base = `/rodolfo/erp/${parceiro.slug}`;
   const doParceiro: GrupoNav = {
     rotulo: parceiro.nome,
+    icone: 'rede',
     itens: [
       { href: base, rotulo: 'Módulos do parceiro', icone: 'inicio', subtitulo: `Hub de ${parceiro.nome}` },
       ...modulosDoParceiro(ALCANCE_FLOWFOODS, base).flatMap((m) => m.grupos.flatMap((g) => g.itens)),

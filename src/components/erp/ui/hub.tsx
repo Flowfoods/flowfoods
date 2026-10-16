@@ -4,7 +4,7 @@
  * Grade de 4 colunas no desktop, 3 no tablet, 2 no celular. Card = quadrado
  * do ícone na cor do módulo + nome + subtítulo de uma linha; borda fina, raio
  * 14 px; hover troca borda e fundo (sem pulo). Módulo do plano ainda não
- * construído: mesmo card, sem link, com o selo da fase — nunca leva a uma
+ * construído: mesmo card, sem link, com o selo "Em breve" — nunca leva a uma
  * tela que não existe.
  */
 
@@ -32,7 +32,7 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
       </span>
       {!c.href && c.fase && (
         <span className="mt-3 inline-flex w-max items-center rounded-[7px] border border-linha-forte px-2 py-0.5 text-[12px] font-medium text-suave">
-          Chega na fase {c.fase}
+          Em breve
         </span>
       )}
     </>

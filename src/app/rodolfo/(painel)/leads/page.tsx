@@ -127,9 +127,10 @@ export default async function LeadsPage({
       </PageHeader>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Metrica rotulo="Novos" valor={conta('NOVO')} />
-        <Metrica rotulo="Em cadência" valor={conta('EM_CADENCIA')} />
-        <Metrica rotulo="Responderam" valor={conta('RESPONDEU')} />
+        {/* Todos com a linha de apoio: os números ficam na mesma altura. */}
+        <Metrica rotulo="Novos" valor={conta('NOVO')} detalhe="ainda não contatados" />
+        <Metrica rotulo="Em cadência" valor={conta('EM_CADENCIA')} detalhe="em andamento" />
+        <Metrica rotulo="Responderam" valor={conta('RESPONDEU')} detalhe="pelo WhatsApp" />
         <Metrica rotulo="Visita / Instagram" valor={visita} detalhe="fixo ou sem celular" />
       </div>
 

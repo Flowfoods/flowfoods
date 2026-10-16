@@ -17,32 +17,32 @@ export default async function EscolherPage() {
 
   return (
     <div className="mx-auto w-full max-w-[480px]">
-      <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-surface/50">
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-suave">
         Olá, {sessao.usuario.nome.split(' ')[0]}
       </div>
       <h1 className="font-display text-[26px] font-bold leading-tight">Com qual parceiro vai trabalhar?</h1>
-      <p className="mb-6 mt-2 text-[14px] text-surface/55">Dá para trocar depois, pelo topo da tela.</p>
-      <ul className="overflow-hidden rounded-[14px] border border-white/[0.09] border-t-white/[0.16] bg-[#131211]">
+      <p className="mb-6 mt-2 text-[14px] text-suave">Dá para trocar depois, pelo topo da tela.</p>
+      <ul className="overflow-hidden rounded-[14px] border border-linha bg-painel">
         {sessao.parceiros.map((p) => {
           const s = STATUS_DO_PARCEIRO[p.status];
           const atual = sessao.parceiro?.id === p.id;
           return (
-            <li key={p.id} className="border-t border-white/[0.06] first:border-t-0">
+            <li key={p.id} className="border-t border-linha first:border-t-0">
               <form action={acaoEscolherParceiro}>
                 <input type="hidden" name="parceiroId" value={p.id} />
                 <button
                   type="submit"
-                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-white/[0.03]"
+                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-texto/5"
                 >
                   <span className="min-w-0">
-                    <span className="block truncate font-medium text-surface">{p.nome}</span>
-                    <span className="mt-0.5 flex items-center gap-2 text-[12px] text-surface/50">
+                    <span className="block truncate font-medium text-texto">{p.nome}</span>
+                    <span className="mt-0.5 flex items-center gap-2 text-[12px] text-suave">
                       <Ponto tom={s.tom} />
                       {s.rotulo}
                       {atual && ' · aberto agora'}
                     </span>
                   </span>
-                  <span aria-hidden className="text-surface/35">
+                  <span aria-hidden className="text-suave">
                     →
                   </span>
                 </button>
@@ -52,7 +52,7 @@ export default async function EscolherPage() {
         })}
       </ul>
       <form action={acaoSair} className="mt-6">
-        <button type="submit" className="text-[13px] text-surface/50 underline-offset-4 transition hover:text-surface hover:underline">
+        <button type="submit" className="text-[13px] text-suave underline-offset-4 transition hover:text-texto hover:underline">
           Sair
         </button>
       </form>

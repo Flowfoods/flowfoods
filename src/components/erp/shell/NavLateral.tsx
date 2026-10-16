@@ -24,8 +24,9 @@ export interface EstadoDaNav {
   hrefAtivo: string | null;
 }
 
+// 44 px na gaveta (toque); 40 px na barra fixa do desktop (≥ 900 px).
 const ITEM =
-  'ff-nav-item ff-transicao flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-[14px] text-suave hover:bg-texto/5 hover:text-texto';
+  'ff-nav-item ff-transicao flex min-h-11 min-[900px]:min-h-10 items-center gap-3 rounded-[5px] px-3 text-[14px] text-suave hover:bg-texto/5 hover:text-texto';
 
 export function NavLateral({
   nav,
@@ -84,7 +85,7 @@ export function NavLateral({
           </ul>
         ) : (
           modulo.grupos.map((g) => (
-            <Grupo key={g.rotulo} rotulo={g.rotulo} recolhido={recolhido}>
+            <Grupo key={g.rotulo} rotulo={g.rotulo} icone={g.icone} recolhido={recolhido}>
               {g.itens.map((i) => (
                 <li key={i.href}>
                   <ItemDoMenu
@@ -147,19 +148,41 @@ function ItemDoMenu({
   );
 }
 
-function Grupo({ rotulo, recolhido, children }: { rotulo: string; recolhido: boolean; children: React.ReactNode }) {
+function Grupo({
+  rotulo,
+  icone,
+  recolhido,
+  children,
+}: {
+  rotulo: string;
+  icone: Parameters<typeof Icone>[0]['nome'];
+  recolhido: boolean;
+  children: React.ReactNode;
+}) {
   const [aberto, setAberto] = useState(true);
-  if (recolhido) return <ul className="mt-3 space-y-0.5 border-t border-linha pt-3 first:border-t-0">{children}</ul>;
+  if (recolhido) {
+    // Recolhido: o ícone do grupo fica como âncora (com o nome para leitor de tela e na dica).
+    return (
+      <div className="mt-3 border-t border-linha pt-3 first:mt-2 first:border-t-0">
+        <div title={rotulo} className="flex h-6 items-center justify-center text-suave/80">
+          <Icone nome={icone} size={13} aria-hidden />
+          <span className="sr-only">{rotulo}</span>
+        </div>
+        <ul className="mt-1 space-y-0.5">{children}</ul>
+      </div>
+    );
+  }
   return (
     <div className="mt-4">
       <button
         type="button"
         aria-expanded={aberto}
         onClick={() => setAberto((v) => !v)}
-        className="ff-transicao flex min-h-8 w-full items-center justify-between rounded-[5px] px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-suave hover:text-texto"
+        className="ff-transicao flex min-h-11 w-full items-center gap-2 rounded-[5px] px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-suave hover:text-texto min-[900px]:min-h-8"
       >
+        <Icone nome={icone} size={13} aria-hidden className="shrink-0" />
         {/* avoid-ai-design-ignore: SD4 — grupo do menu em caixa alta é pedido do contrato do shell (só aqui e no hub). */}
-        <span className="truncate">{rotulo}</span>
+        <span className="min-w-0 flex-1 truncate text-left">{rotulo}</span>
         <ChevronDown size={14} aria-hidden className={`shrink-0 transition-transform ${aberto ? '' : '-rotate-90'}`} />
       </button>
       {aberto && <ul className="mt-1 space-y-0.5">{children}</ul>}
@@ -211,7 +234,7 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
               <OpcaoDeModulo
                 href={m.href}
                 nome={m.nome}
-                sub={m.href ? m.subtitulo : `Chega na fase ${m.fase}`}
+                sub={m.href ? m.subtitulo : 'Em breve'}
                 icone={m.icone}
                 cor={m.cor}
                 atual={atual?.chave === m.chave}

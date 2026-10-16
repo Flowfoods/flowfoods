@@ -15,7 +15,13 @@ export function FiltroEmLinks({
   opcoes: { href: string; rotulo: string; ativo: boolean }[];
 }) {
   return (
-    <nav aria-label={rotulo} className="max-w-full overflow-x-auto">
+    // No celular o trilho rola de lado: a borda direita esmaece para mostrar
+    // que tem mais opção (o espaço no fim deixa a última aparecer inteira).
+    // avoid-ai-design-ignore: C1 — máscara funcional (indício de rolagem), não gradiente decorativo.
+    <nav
+      aria-label={rotulo}
+      className="max-w-full overflow-x-auto max-sm:pr-8 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-32px),transparent)]"
+    >
       <ul className="flex w-max gap-1 rounded-[10px] border border-linha bg-painel p-1">
         {opcoes.map((o) => (
           <li key={o.href + o.rotulo}>

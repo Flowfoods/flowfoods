@@ -53,25 +53,25 @@ export function EntrarComRosto() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-surface/35">
-        <span className="h-px flex-1 bg-white/[0.08]" />
+      <div className="flex items-center gap-3 text-[11px] uppercase tracking-[0.16em] text-suave">
+        <span className="h-px flex-1 bg-linha" />
         ou
-        <span className="h-px flex-1 bg-white/[0.08]" />
+        <span className="h-px flex-1 bg-linha" />
       </div>
       <button
         type="button"
         onClick={entrar}
         disabled={esperando}
-        className="w-full rounded-[7px] border border-white/[0.16] px-4 py-3 text-[15px] font-semibold text-surface transition hover:border-surface/45 hover:bg-white/[0.04] disabled:cursor-wait disabled:opacity-60"
+        className="w-full rounded-[7px] border border-linha-forte px-4 py-3 text-[15px] font-semibold text-texto transition hover:border-texto/35 hover:bg-texto/5 disabled:cursor-wait disabled:opacity-60"
       >
         {esperando ? 'Olhe para o aparelho…' : 'Entrar com o rosto'}
       </button>
       {erro ? (
-        <p role="alert" className="text-center text-[13px] text-bright">
+        <p role="alert" className="text-center text-[13px] text-erro">
           {erro}
         </p>
       ) : (
-        <p className="text-center text-[12px] leading-relaxed text-surface/40">
+        <p className="text-center text-[12px] leading-relaxed text-suave">
           Funciona no aparelho em que você ativou a entrada pelo rosto.
         </p>
       )}

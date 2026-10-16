@@ -6,6 +6,7 @@
  * página — fila parada sem causa visível é o que faz alguém desligar a trava.
  */
 
+import { situacaoDaInstancia } from '@/lib/whatsapp/situacao-da-instancia';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { montarEstadoEnvio, agoraSP, diaSP, INSTANCIA } from '@/lib/rodolfo/estado';
@@ -132,7 +133,7 @@ export default async function PainelPage() {
               : `piso ${STOP_LOSS.taxaEntregaMinima * 100}%`
           }
         />
-        <Metrica rotulo="Instância" valor={estado.estadoInstancia === 'open' ? 'No ar' : 'Fora'} detalhe={INSTANCIA} />
+        <Metrica rotulo="WhatsApp" valor={situacaoDaInstancia(estado.estadoInstancia).texto} detalhe={INSTANCIA} />
         <Metrica
           rotulo="Manuais restantes"
           valor={faltamManuais > 0 ? faltamManuais : 'Feito'}

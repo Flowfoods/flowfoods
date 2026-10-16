@@ -1,3 +1,4 @@
+import { situacaoDaInstancia } from '@/lib/whatsapp/situacao-da-instancia';
 import { prisma } from '@/lib/db';
 import { lerConfig } from '@/lib/rodolfo/config';
 import { normalizarTelefone } from '@/lib/barney/telefone';
@@ -42,7 +43,9 @@ export default async function ConfigPage() {
 
       <Painel
         titulo="Instância"
-        acessorio={<Selo tom={estado.estadoInstancia === 'open' ? 'ok' : 'erro'}>{estado.estadoInstancia}</Selo>}
+        acessorio={
+          <Selo tom={situacaoDaInstancia(estado.estadoInstancia).tom}>{situacaoDaInstancia(estado.estadoInstancia).texto}</Selo>
+        }
       >
         <p className="text-sm text-texto">{INSTANCIA}</p>
         <p className="mt-2 text-[13px] text-suave">
@@ -52,7 +55,7 @@ export default async function ConfigPage() {
         </p>
         {estado.estadoInstancia !== 'open' && (
           <p className="mt-3 rounded-[7px] border border-atencao/40 px-3 py-2 text-[13px] text-atencao">
-            Pareie o QR na Evolution. Enquanto não estiver <code>open</code>, o Barney não envia.
+            Pareie o QR na Evolution. Enquanto o WhatsApp não estiver conectado, o Barney não envia.
           </p>
         )}
 

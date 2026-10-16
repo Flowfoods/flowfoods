@@ -1,7 +1,7 @@
 'use server';
 
 /**
- * Equipe do parceiro pelo nível 1 (aba Acessos). Toda ação abre com
+ * Equipe do parceiro pelo nível 1 (tela Equipe). Toda ação abre com
  * `exigirParceiro(slug)` (sessão do /rodolfo + parceiro resolvido no servidor)
  * e confere `exigirPermissao(ctx, 'acessos.gerir')` — o nível 1 sempre pode,
  * mas a checagem é a mesma de todo o ERP. O nível 1 mexe em qualquer

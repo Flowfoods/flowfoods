@@ -34,24 +34,24 @@ export default async function EntrarPage({ searchParams }: { searchParams: { sen
   return (
     <div className="grid w-full items-center gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,420px)] lg:gap-20">
       <section className="max-w-xl">
-        <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-surface/50">
+        <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-suave">
           Parceiro Flow
         </div>
         <h1 className="font-display text-[30px] font-bold leading-[1.1] tracking-tight sm:text-[44px]">
           Estoque, ficha técnica e resultado do seu grupo, num lugar só.
         </h1>
-        <p className="mt-3 max-w-md text-[14px] leading-relaxed text-surface/55 sm:mt-4 sm:text-[15px]">
+        <p className="mt-3 max-w-md text-[14px] leading-relaxed text-suave sm:mt-4 sm:text-[15px]">
           O acesso é criado pela FlowFoods. Use o e-mail e a senha que você definiu pelo link que recebeu.
         </p>
       </section>
 
       <section
         aria-label="Entrar"
-        className="rounded-[14px] border border-white/[0.09] border-t-white/[0.16] bg-[#131211] p-5 sm:p-7"
+        className="rounded-[14px] border border-linha bg-painel p-5 sm:p-7"
       >
         <h2 className="mb-5 font-display text-xl font-bold">Entrar</h2>
         <FormEntrar aviso={aviso} rosto={rosto} />
-        <AjudaDeAcesso className="mt-6 border-t border-white/[0.07] pt-4" />
+        <AjudaDeAcesso className="mt-6 border-t border-linha pt-4" />
       </section>
     </div>
   );

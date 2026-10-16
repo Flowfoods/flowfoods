@@ -1,6 +1,6 @@
 /**
- * Tela de Equipe — a MESMA para o nível 1 (aba Acessos em
- * /rodolfo/erp/<slug>/acessos) e para quem cuida da equipe no parceiro
+ * Tela de Equipe — a MESMA para o nível 1 (tela Equipe em
+ * /rodolfo/erp/<slug>/equipe) e para quem cuida da equipe no parceiro
  * (/erp/equipe). Recebe os dados já lidos e as actions de quem usa; decide só o
  * que MOSTRAR (botão que não vai passar nem aparece). Quem decide de verdade é
  * o servidor (`credenciais.ts`: sem escalada, último administrador).

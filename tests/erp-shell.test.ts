@@ -303,10 +303,11 @@ describe('ERP 1.1 · tema por cookie, sem tocar no site', () => {
     }
   });
 
-  it('os tokens (e o tema) só entram pelos layouts do shell e do login do nível 1', () => {
+  it('os tokens (e o tema) só entram pelos layouts do shell, do login do nível 1 e do /entrar', () => {
     const quem = arquivos('src').filter((f) => /import ['"][^'"]*tokens\.css['"]/.test(readFileSync(f, 'utf8')));
     expect(quem.sort()).toEqual(
       [
+        join('src', 'app', 'entrar', 'layout.tsx'),
         join('src', 'app', 'rodolfo', '(acesso)', 'layout.tsx'),
         join('src', 'components', 'erp', 'shell', 'AppShell.tsx'),
       ].sort(),

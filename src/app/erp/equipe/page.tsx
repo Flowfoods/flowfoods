@@ -1,7 +1,7 @@
 /**
  * ERP do parceiro — Equipe: quem tem "cuidar da equipe" (o dono, por padrão)
  * cria e ajusta acessos, perfis, setores e lojas de cada pessoa. A mesma tela
- * da aba Acessos do nível 1, com o alcance DESTA pessoa: o que ela não pode
+ * da tela Equipe do nível 1, com o alcance DESTA pessoa: o que ela não pode
  * dar aparece travado, e o servidor recusa do mesmo jeito.
  */
 

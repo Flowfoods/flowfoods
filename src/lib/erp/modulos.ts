@@ -54,6 +54,8 @@ export interface ItemNav {
 
 export interface GrupoNav {
   rotulo: string;
+  /** Âncora do grupo no menu (e o que sobra dele com o menu recolhido). */
+  icone: ChaveIcone;
   itens: ItemNav[];
 }
 
@@ -110,7 +112,7 @@ interface DefinicaoDeModulo {
   nome: string;
   subtitulo: string;
   icone: ChaveIcone;
-  grupos: { rotulo: string; telas: Tela[] }[];
+  grupos: { rotulo: string; icone: ChaveIcone; telas: Tela[] }[];
 }
 
 interface ModuloFuturo {
@@ -165,6 +167,7 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
       grupos: [
         {
           rotulo: 'Cadastro',
+          icone: 'insumo',
           telas: [
             {
               href: `${base}/insumos`,
@@ -192,6 +195,7 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
       grupos: [
         {
           rotulo: 'Rede',
+          icone: 'lojas',
           telas: [
             {
               href: `${base}/lojas`,
@@ -202,7 +206,7 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
             },
           ],
         },
-        { rotulo: 'Pessoas', telas: pessoas },
+        { rotulo: 'Pessoas', icone: 'equipe', telas: pessoas },
       ],
     },
   ];
@@ -276,6 +280,7 @@ export function modulosDoParceiro(alcance: Alcance, base = '/erp'): ModuloNav[] 
     const grupos = m.grupos
       .map((g) => ({
         rotulo: g.rotulo,
+        icone: g.icone,
         itens: g.telas
           .filter((t) => t.permissao === null || pode(alcance, t.permissao))
           .map(({ permissao: _p, ...item }) => item),

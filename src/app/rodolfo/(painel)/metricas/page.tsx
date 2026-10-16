@@ -12,6 +12,7 @@
  * - Número em `tabular-nums` para as colunas alinharem na vertical.
  */
 
+import { situacaoDaInstancia } from '@/lib/whatsapp/situacao-da-instancia';
 import { carregarMetricas, type Corte, type EtapaFunil } from '@/lib/rodolfo/metricas';
 import { STOP_LOSS } from '@/lib/barney/regras';
 import { COR } from '@/lib/erp/modulos';
@@ -119,8 +120,8 @@ export default async function MetricasPage() {
       <Painel
         titulo="Saúde do número"
         acessorio={
-          <Selo tom={m.saude.estadoInstancia === 'open' ? 'ok' : 'erro'}>
-            {m.saude.estadoInstancia === 'open' ? 'conectada' : m.saude.estadoInstancia}
+          <Selo tom={situacaoDaInstancia(m.saude.estadoInstancia).tom}>
+            {situacaoDaInstancia(m.saude.estadoInstancia).texto}
           </Selo>
         }
       >
@@ -166,7 +167,8 @@ export default async function MetricasPage() {
       </div>
 
       <Painel titulo="Custo de IA">
-        <div className="grid grid-cols-3 gap-4">
+        {/* 2 colunas no celular: valor em reais não cabe em um terço de 390 px. */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <Numero
             valor={brl(m.custoIA.hojeBRL)}
             rotulo="Hoje"
