@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4) e shell único (1.1)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -13,7 +13,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Contexto de tenant (sessão + parceiro + cliente) | `src/lib/erp/contexto.ts` (`exigirNivel1`, `exigirParceiro`) |
 | RLS no banco (papel `erp_tenant`) | migration `20261015020000_erp_multitenant` |
 | Milésimos e centavos (texto → inteiro, arredondamento) | `src/lib/erp/unidades.ts` |
-| Regras de cadastro | `insumos.ts`, `parceiros.ts` (N1), `estrutura.ts` (lojas e marcas), `historico.ts`, `slug.ts` |
+| Regras de cadastro | `insumos.ts` + `variantes.ts` (com banco) e `insumo-campos.ts` (puro), `parceiros.ts` (N1), `estrutura.ts` (lojas e marcas), `historico.ts`, `slug.ts` |
 | Telas | `/rodolfo/erp` (N1: parceiros + novo) e `/rodolfo/erp/<slug>` (hub do parceiro) com `/insumos` · `/lojas` (era `/estrutura`) · `/equipe` (era `/acessos`) · `/historico` · `/cadastro` — os nomes velhos redirecionam |
 | Login das pessoas dos parceiros (0.3) | `UsuarioErp` e companhia (bloco "acesso das pessoas" do esquema) + migration `20261015030000_erp_login` |
 | Acesso ao banco das credenciais (único módulo) | `src/lib/erp/credenciais.ts` (regras puras em `acesso.ts`; rosto em `rosto.ts`; cookie em `sessao.ts`/`sessao-cookie.ts`) |
@@ -260,6 +260,77 @@ Na tela: entrar como Dono e como Operador do mesmo parceiro e comparar o
 menu e o hub; abrir `/erp/equipe` como Operador (volta ao hub com aviso);
 trocar o tema no menu do usuário e recarregar com JS desligado.
 
+## O que a 1.1 entregou — cadastro de insumos (Cartão B)
+
+Sem migration: o esquema da 0.1 já tinha `InsumoVariante`, `tipo`,
+`conservacao`, `taxaEntregaCentavos` e `ativo`.
+
+1. **Embalagem digitada como se compra.** "Quanto vem" em kg ou g, L ou ml
+   (un é un); o servidor converte para milésimos da unidade base
+   (`lerQuantidadeNa`: em g/ml só inteiro, 1 g é o menor passo). Preço e frete
+   em centavos, lidos do texto no servidor.
+2. **Custo de referência = (preço + frete) × 1000 ÷ conteúdo**, UM
+   arredondamento (metade para cima), em `custoDaEmbalagem`. A conta aparece
+   por extenso igual na prévia do formulário, na lista, no detalhe e no
+   histórico: "R$ 89,90 + R$ 5,00 frete ÷ 5 kg = R$ 18,98/kg". Frete é
+   **por embalagem** (a parte da entrega que cai em cada uma). Custo pelas
+   compras reais (último preço) continua sendo a 1.5.
+3. **"Ainda não sei o preço"** grava 0 e a tela diz **"Sem preço"** (custo
+   incompleto, nunca R$ 0,00), com filtro próprio; na ordem por custo fica
+   sempre no fim. Preço 0 digitado sem marcar é recusado.
+4. **Outras embalagens de compra** (`InsumoVariante`, na tela "Embalagem"):
+   caixa, fardo, outra marca — nome único por insumo, conteúdo na unidade do
+   insumo, preço, frete, código de barras opcional, desativar. O detalhe diz
+   em texto qual sai mais barata e por quanto. A do insumo é a padrão.
+5. **Editar com controle de concorrência.** Insumo: `updateMany` condicional ao
+   `atualizadoEm` lido; embalagem (sem `atualizadoEm`): condicional aos valores
+   lidos (impressão na tela + os mesmos valores no `where`). Duas abas: a
+   segunda recebe "Alguém alterou… Recarregue" e nada é sobrescrito.
+6. **Unidade travada** quando o insumo tem outra embalagem ou qualquer uso
+   (ficha, nota, saldo, movimento, contagem, requisição, produção, etiqueta,
+   ficha que o produz), conferido com a linha travada na transação; a
+   embalagem nova trava o insumo em FOR SHARE.
+7. **Desativar/reativar** com motivo opcional (não apaga: há FK de uso). Sai
+   da lista padrão (filtro "Desativados"/"Todas as situações"); nome repetido
+   de um desativado oferece abrir e reativar.
+8. **Histórico** na MESMA transação de toda gravação, só com o que mudou:
+   tipo, conservação, embalagem ("5 kg"), preço ("Sem preço"), frete ("Sem
+   frete"), custo por unidade (fotografado), situação, código de barras; cada
+   linha diz de quem é ("Cebola · Caixa 10 kg"). Campos na ordem da tela (o
+   jsonb não guarda ordem). O filtro "Insumos" do histórico inclui as
+   embalagens; o detalhe mostra as últimas 10 alterações do insumo e das
+   embalagens dele.
+9. **Telas** (as MESMAS no N1 e no parceiro, em
+   `src/components/erp/telas/insumos/`): lista densa (kit Corporativo) com
+   cabeçalho "Rede Completa · N insumos" + "Novo insumo", busca e filtros
+   (tipo, conservação, situação, só sem preço) na URL, ordenar por nome ou
+   custo (`aria-sort`), 50 por página com total, cartões no celular; novo,
+   editar e embalagem em **tela própria** (no celular, tela cheia); detalhe
+   com a conta, as embalagens, situação e alterações; voltar preserva os
+   filtros (`?de=`). Resumo de erros quando há mais de um; aviso ao sair com
+   o formulário alterado. Menu ganha "Novo insumo" (só com "cadastrar e
+   editar insumos"); a busca ⌘K abre o detalhe.
+10. **Permissões e tenant.** Páginas: `exigirPermissaoNaPagina(ctx,
+    'insumos.ver' | 'insumos.editar')` (N1: `exigirPermissao`); actions finas
+    (`src/app/erp/insumos/actions.ts` e
+    `src/app/rodolfo/(painel)/erp/[slug]/insumos/actions.ts`): contexto →
+    `recusaDaAcao(ctx, 'insumos.editar')` → bloqueio → lib. Quem só vê não
+    tem botão nenhum; parceiro suspenso vê os botões desabilitados com o
+    motivo, e o portão recusa a escrita do mesmo jeito. Id de outro parceiro na
+    URL é 404 (lido pelo portão). Saíram a tela/form da 0.2 e as actions
+    `acaoCadastrarInsumoDaSessao`/`acaoCadastrarInsumo` velhas.
+
+## Provar os insumos (1.1)
+
+```bash
+npx vitest run tests/erp-insumos.test.ts       # conversão, custo com frete, Sem preço, formulário, histórico
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_shell npx vitest run tests/erp-insumos.db.test.ts
+npm run erp:seed-teste                          # Casa Alfa ganha frete, g/ml, embalagens, Sem preço e desativado
+```
+Na tela: a dona cadastra um insumo com frete, duas embalagens (uma em g),
+edita, desativa e vê em Histórico › Insumos; o operador vê lista e detalhe sem
+botão nenhum e, abrindo `/erp/insumos/novo`, volta ao hub com aviso.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -488,9 +559,6 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.1 · shell (para as próximas subfases)
 
-- Cartão B (insumos completos) entra NO shell: `/erp/insumos/novo` e
-  `/[id]` com `PageHeader` + "+ Novo insumo" no cabeçalho (hoje o formulário
-  da 0.2 fica ao lado da lista, sem CTA duplicado).
 - Sino do parceiro sem fonte: quando houver (requisição, contagem, nota), a
   contagem real entra em `notificacoes` do layout do /erp.
 - Visão por loja ainda não filtra nada (só insumos existem, e são da rede):
@@ -498,3 +566,20 @@ banco de teste: o operador é recusado pelo servidor.
 - Página do N1 dentro de parceiro usa `exigirPermissao` (lança erro); o /erp
   usa `exigirPermissaoNaPagina` (volta ao hub). N1 tem tudo, então não
   aparece; se um dia houver papel restrito no N1, trocar.
+
+## Herança da 1.1 · insumos (para as próximas subfases)
+
+- Fornecedor padrão do insumo e por embalagem: 1.5 (não há cadastro de
+  fornecedor antes; nenhum select vazio na tela).
+- "Tornar padrão" uma embalagem (trocar a do insumo pela de uma variante).
+- Estoque mínimo (rede × loja): 1.6/3.2. Validades por conservação: 1.4.
+- Importar insumos por planilha: 1.2, junto com a planilha de ficha (mesmo
+  parser, prévia e confirmação); `origem` já existe.
+- Preço 0 é a sentinela de "Sem preço". Se aparecer item de fato gratuito,
+  migrar para `precoEmbalagemCentavos` nulo.
+- Ordenar por custo é feito em memória (o custo é derivado, nunca gravado):
+  serve a centenas de insumos; com milhares, levar a conta para o SQL
+  (`cliente.sql`) com a mesma regra de arredondamento.
+- Nome único é sensível a maiúscula ("Cebola" ≠ "cebola"), como na 0.2.
+- O aviso de sair com alterações pega fechar/recarregar, não a navegação
+  interna do Next (link do menu).

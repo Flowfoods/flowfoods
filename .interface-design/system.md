@@ -67,6 +67,17 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   subtítulo com contexto e contagem + ação à direita + busca/filtros abaixo.
 - **Hub** grade 4/3/2; card com ícone, nome 15/600, subtítulo 13; futuro sem
   link, com "Chega na fase X".
+- **A conta** (assinatura do ERP de custo): custo por unidade em Gelasio +
+  a conta por extenso em 12 px tabular ("R$ 89,90 + R$ 5,00 frete ÷ 5 kg =
+  R$ 18,98/kg"), igual na prévia, na lista, no detalhe e no histórico. Sem
+  preço = selo "Sem preço" (tom atenção), nunca R$ 0,00.
+- **Barra de lista** busca + Filtrar na mesma linha, selects e marcadores na
+  grade abaixo (2 colunas no celular, uma linha ≥ 1024); estado na URL;
+  "Limpar" só com filtro ativo.
+- **Formulário de cadastro** em tela própria (max 768), painéis por assunto
+  ("O que é", "Como você compra"), resumo de erros quando há mais de um,
+  Cancelar (fantasma) + ação principal à direita; bloqueado = fieldset
+  desabilitado com o motivo.
 - **Foco** anel 3 px `acento`, folga 4 px (campo: 1 px). **Movimento** 160 ms
   hover, 220 ms entrada (8 px); `prefers-reduced-motion` zera.
 
@@ -77,3 +88,5 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
 | Só bordas + uma superfície | ferramenta densa; sombra não carrega informação | 2026-10-16 |
 | #C41522 no botão, #EA1D2C no acento | #EA1D2C com branco dá 4,47:1, abaixo de AA em 14 px | 2026-10-16 |
 | Sem vidro, gradiente, glow, Inter do kit | identidade FlowFoods e avoid-ai-design (K3, C1) | 2026-10-16 |
+| Formulários em tela própria, não painel lateral | sem JS, tela cheia no celular, voltar funciona | 2026-10-16 |
+| Máscara na borda do trilho de filtros no celular | indício de rolagem (funcional, não decorativa) | 2026-10-16 |

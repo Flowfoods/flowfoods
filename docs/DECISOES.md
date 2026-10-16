@@ -803,3 +803,84 @@ Botão principal em #C41522 (branco ≈ 6:1); #EA1D2C fica para acento
 (indicador, filete, foco). Cor de módulo só no quadrado do ícone. Rótulo em
 caixa alta só no hub e nos grupos do menu. Contrato completo em
 `.interface-design/system.md`.
+
+### 46. 2026-10-16 · ERP 1.1: embalagem digitada como se compra; custo com frete e um arredondamento; "Sem preço" ≠ R$ 0,00
+
+**Alternativas:** (a) pedir tudo na unidade base (5,000 kg; 0,750 kg); (b)
+unidade de compra própria (caixa, fardo) com fator; (c) "quanto vem" em kg ou
+g (L ou ml), convertido no servidor para milésimos.
+
+**Razão:** (c). Ninguém compra "0,750 kg": a embalagem diz 750 g. A
+conversão é só aqui (`lerQuantidadeNa`), sem float, e 1 g é o menor passo
+(meio grama recusado). Unidade de uso na ficha (colher, porção) é 1.2.
+Custo de referência = (preço + frete) × 1000 ÷ conteúdo, somando ANTES de
+dividir: arredondar preço e frete separados erra 1 centavo
+(`tests/erp-insumos.test.ts`). Frete é por embalagem, no insumo e em cada
+outra embalagem. Preço desconhecido grava 0 e o custo vira null: a tela diz
+"Sem preço" (Notion Core: custo incompleto não é custo baixo), filtra e ordena
+no fim; 0 digitado sem marcar é recusado. Custo pela última compra continua
+travado para a 1.5.
+
+### 47. 2026-10-16 · ERP 1.1: variante é outra embalagem de compra, na mesma unidade; a unidade do insumo trava
+
+**Alternativas:** (a) variante como "sabor/tamanho" com unidade própria; (b)
+outra embalagem de compra do mesmo insumo, conteúdo na unidade dele.
+
+**Razão:** (b). Comparar custo entre caixa, fardo e outra marca só faz
+sentido na mesma unidade; a tela diz qual sai mais barata. Na tela o nome é
+"Embalagem" (variante é palavra de sistema). Por isso a unidade do insumo só
+muda sem outra embalagem e sem uso: os milésimos gravados passariam a
+significar outra coisa. A conferência roda com a linha do insumo travada
+(UPDATE) e a embalagem nova trava o insumo em FOR SHARE: uma não entra no
+meio da outra. "Tornar padrão" e fornecedor por embalagem ficam para depois.
+
+### 48. 2026-10-16 · ERP 1.1: edição concorrente recusada, nunca sobrescrita
+
+**Alternativas:** (a) último a salvar vence; (b) trava pessimista ao abrir o
+formulário; (c) gravação condicional à versão lida.
+
+**Razão:** (c). Insumo: `updateMany where { id, atualizadoEm: lido }` — 0
+linhas = "alguém alterou, recarregue", nada gravado. Embalagem não tem
+`atualizadoEm` (e a 1.1 não faz migration por isso): a tela leva uma
+impressão dos valores lidos e o `updateMany` repete esses valores no `where`.
+(a) perde trabalho em silêncio; (b) deixa insumo preso por aba esquecida.
+Desativar/reativar é condicional à situação lida.
+
+### 49. 2026-10-16 · ERP 1.1: histórico com retrato legível (custo fotografado, ordem da tela, alvo da linha)
+
+**Alternativas:** (a) gravar só os campos crus e recalcular na leitura; (b)
+gravar o retrato do que a tela mostrou.
+
+**Razão:** (b). O histórico guarda, além dos campos que mudaram, o custo por
+unidade daquele momento (o mesmo número da tela) e o contexto (nome, unidade,
+insumo da embalagem) para a linha dizer de quem é ("Cebola · Caixa 10 kg").
+Na criação, campo vazio não aparece; a leitura segue a ordem da tela porque o
+jsonb do Postgres não guarda a ordem das chaves. Só se acrescentou a
+`ENTIDADE`/`CAMPO`: o histórico antigo continua lido igual.
+
+### 50. 2026-10-16 · ERP 1.1: novo, editar e embalagem em tela própria; filtros na URL
+
+**Alternativas:** (a) painel lateral (diálogo) por cima da lista; (b) tela
+própria para cada formulário.
+
+**Razão:** (b). Funciona sem JS, vira tela cheia no celular de graça, o
+botão voltar do navegador faz o que se espera e a URL de editar pode ser
+mandada para alguém. A lista guarda busca, filtros, ordem e página na URL, e
+o detalhe volta para ela (`?de=`, só filtros conhecidos passam). Sucesso leva
+ao detalhe com uma frase fixa do que mudou (`?feito=`, a URL só escolhe a
+frase). Ordenar por custo é em memória, com o mesmo cálculo da tela
+(custo derivado, nunca gravado).
+
+### 51. 2026-10-16 · ERP 1.1 (fiscais do shell): destino depois do login só dentro da área; login e /entrar no tema do app
+
+**Alternativas:** (a) confiar no `callbackUrl` do next-auth; (b) aceitar só
+mesma origem e caminho da área.
+
+**Razão:** (b). `window.location.assign(callbackUrl)` executava
+`javascript:` e levava a outro site. `destinoSeguro` resolve a URL contra a
+origem e exige o caminho `/rodolfo/...` (no /entrar, `/erp` ou
+`/entrar/escolher`); o resto vira o padrão. No mesmo passe, `/rodolfo/login`
+e `/entrar` passaram a usar os tokens do ERP e o tema do cookie `ff_tema` (o
+`/` continua estático), e o estado da Evolution aparece em palavra
+(Conectado/Conectando/Desconectado), não "close".
+
