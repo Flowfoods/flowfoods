@@ -48,4 +48,6 @@ CREATE UNIQUE INDEX "NotaEntrada_chave_da_nota" ON "NotaEntrada"("parceiroId", "
   WHERE "status" <> 'CANCELADA' AND "fornecedorId" IS NOT NULL AND "numero" IS NOT NULL;
 
 -- Último preço: a nota mais recente de cada insumo (data da nota, depois a hora do lançamento).
+-- Declarado também no schema.prisma (@@index com map): `migrate diff` fica vazio.
+-- O índice único parcial acima, não: o Prisma não descreve WHERE em índice.
 CREATE INDEX "NotaEntrada_parceiroId_status_entradaEm_idx" ON "NotaEntrada"("parceiroId", "status", "entradaEm" DESC, "lancadaEm" DESC);

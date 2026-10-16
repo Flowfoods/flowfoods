@@ -845,6 +845,8 @@ model NotaEntrada {
   @@unique([parceiroId, chaveAcesso])
   @@index([parceiroId, lojaId, entradaEm])
   @@index([parceiroId, fornecedorId, entradaEm])
+  // 1.5: a última compra de cada insumo (data da nota, depois a hora do lançamento).
+  @@index([parceiroId, status, entradaEm(sort: Desc), lancadaEm(sort: Desc)], map: "NotaEntrada_parceiroId_status_entradaEm_idx")
 }
 
 model NotaEntradaItem {
