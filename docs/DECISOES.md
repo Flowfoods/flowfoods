@@ -716,6 +716,37 @@ dos links já tratados; o histórico de B registra quantos rostos saíram.
 Inventário das credenciais da pessoa: senha, sessões, links, rostos, desafios
 — todas tratadas; tentativas de entrada não deixam entrar.
 
+**Revisão (Fiscal QA + Guardião, volta 3):** dois furos com o mesmo princípio.
+(a) Redefinir a senha pelo link encerrava as sessões mas deixava os rostos:
+o dono de A definia a senha da pessoa (só em A) e ativava o rosto no aparelho
+dele; a pessoa pedia ajuda, o nível 1 mandava link novo, ela refazia a senha
+(marca do parceiro volta a nula); o nível 1 a punha em B como Dona; nada era
+apagado e o atacante entrava pelo rosto em B. (b) Corrida: um login que leu a
+senha antes da limpeza gravava a sessão depois dela; `escolherParceiro(B)` dava
+Dono em B (o mesmo valia para ativar rosto e entrar pelo rosto). **Princípio:
+recuperar/redefinir a senha pelo link revoga TODOS os outros meios de entrar
+da pessoa.** Uma função só, `revogarMeiosDeEntrada(tx, usuarioId, motivo)`,
+usada pelos dois caminhos que mudam a senha (definir/redefinir pelo link;
+senha "de outro parceiro" apagada ao ganhar vínculo): encerra as sessões,
+revoga os links pendentes, apaga rostos e desafios, apaga a senha quando é o
+caso e sobe `UsuarioErp.versaoCredencial`, sob a trava da pessoa; o histórico
+de CADA parceiro dela registra quantos rostos saíram. Contra a corrida, a
+versão é lida antes do bcrypt/da assinatura e a gravação é condicional, sob a
+mesma trava: `abrirSessao` (senha e rosto) só grava se a versão não mudou (e o
+contador do rosto sobe ali dentro); `concluirRegistroDeRosto` só pendura o
+aparelho se a sessão ainda está aberta e da versão atual; e a sessão guarda a
+versão em que nasceu (`validarSessao` recusa a velha — segunda trava).
+"Seu acesso" avisa que os aparelhos foram removidos e que dá para ativar de
+novo (`rostosRemovidosEm`, limpo ao ativar). Varredura dos outros pontos:
+vínculo ganho sem senha "de parceiro" só revoga links (as credenciais que
+restam nasceram da senha atual, que é da pessoa ou do nível 1); desativar
+encerra as sessões e links DAQUELE parceiro e mantém senha e rosto (valem nos
+outros; reativar devolve), e o vínculo desativado continua contando para a
+regra do link; mudar perfil/lojas, liberar tentativas e remover um rosto não
+mudam a senha nem vínculo. Custo: quem redefine a senha ativa o rosto de novo.
+Alternativa descartada: apagar rostos também a cada vínculo novo (derrubaria
+quem não tem nada de errado).
+
 ### 42. 2026-10-16 · ERP 1.1: um shell só, com o Barney antigo dentro, e um design system só
 
 **Alternativas:** (a) dois shells (um do /rodolfo, outro do /erp) com o mesmo

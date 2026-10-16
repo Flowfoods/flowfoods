@@ -18,7 +18,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Login das pessoas dos parceiros (0.3) | `UsuarioErp` e companhia (bloco "acesso das pessoas" do esquema) + migration `20261015030000_erp_login` |
 | Acesso ao banco das credenciais (único módulo) | `src/lib/erp/credenciais.ts` (regras puras em `acesso.ts`; rosto em `rosto.ts`; cookie em `sessao.ts`/`sessao-cookie.ts`) |
 | Telas da pessoa do parceiro | `/entrar` (e-mail e senha, entrar com o rosto), `/entrar/primeiro-acesso/<token>`, `/entrar/escolher`, `/erp` (hub Módulos da Rede), `/erp/insumos`, `/erp/lojas`, `/erp/equipe`, `/erp/historico` e `/erp/acesso` (Seu acesso: o que a pessoa pode, rosto) — cada aba só aparece para quem pode |
-| Permissões (0.4): catálogo, perfis base, resolução, checagem única, sem escalada | `src/lib/erp/permissoes.ts` (puro) + `equipe.ts` (formulários e retrato do histórico, puro); banco em `credenciais.ts`; migration `20261015040000_erp_permissoes` |
+| Permissões (0.4): catálogo, perfis base, resolução, checagem única, sem escalada | `src/lib/erp/permissoes.ts` (puro) + `equipe.ts` (formulários e retrato do histórico, puro); banco em `credenciais.ts`; migrations `20261015040000_erp_permissoes` e `20261016000000_erp_revogar_meios_de_entrada` |
 | Telas compartilhadas (as MESMAS no nível 1 e no parceiro) | `src/components/erp/telas/*`: `equipe/` (`TelaEquipe`), `estrutura/`, `historico/`, `insumos/`, `hub-do-parceiro.tsx` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
@@ -170,7 +170,16 @@ no padrão condicional da 0.2) e o histórico das mudanças no tenant do parceir
    de parceiro fica marcada (`UsuarioErp.senhaPorLinkDoParceiroId`) e, se a
    pessoa ganhar outro parceiro, é apagada junto com TODOS os rostos e desafios
    de rosto pendentes dela (sessões caem, links já revogados) e o nível 1
-   manda link novo. Só o nível 1 vincula e-mail que já está em outro parceiro (a
+   manda link novo. **Revisão (Fiscal QA + Guardião, volta 3):** recuperar ou
+   redefinir a senha pelo link também REVOGA todos os outros meios de entrar
+   (rostos, desafios, sessões, links pendentes), numa função só
+   (`revogarMeiosDeEntrada`) usada por todo caminho que muda a senha, com o
+   número de rostos removidos no histórico de cada parceiro da pessoa; "Seu
+   acesso" avisa que os aparelhos saíram e que dá para ativar de novo. Login,
+   entrada pelo rosto e ativação de rosto em voo durante a limpeza não gravam
+   depois dela: `UsuarioErp.versaoCredencial` lida antes da conferência e
+   exigida igual na gravação, sob a trava da pessoa; sessão de versão velha
+   não vale (migration `20261016000000_erp_revogar_meios_de_entrada`). Só o nível 1 vincula e-mail que já está em outro parceiro (a
    pessoa do parceiro recebe frase neutra; o nível 1 é avisado quando o e-mail
    já tem senha). As funções de equipe conferem o ator NO BANCO (vínculo deste
    parceiro, ativo, parceiro ativo, "cuidar da equipe"), não só a action.
@@ -468,6 +477,14 @@ banco de teste: o operador é recusado pelo servidor.
   uma consulta agrupada quando a equipe passar de dezenas.
 - O envio do link (0.5) entra em `executar.ts`/`criarAcesso`; a regra do link
   (decisão 41) já está no servidor.
+
+## Herança da 0.4 (apontada pelos fiscais)
+
+- `validarSessao` (segunda trava por versão) sem teste próprio; entrada pelo rosto durante a limpeza sem teste de ordem forçada.
+- Texto em "Seu acesso": "quando sua senha foi trocada ou apagada" é mais preciso.
+- `abrirSessao` com timeout 10 s < 15 s de `naEquipe`: login atrás de mudança longa de equipe pode virar erro 500.
+- Remover um rosto não derruba sessões abertas por ele (a sessão não guarda o aparelho).
+- Dono de A ainda muda perfil/desativa a pessoa em A depois que ela entra em B (afeta só A).
 
 ## Herança da 1.1 · shell (para as próximas subfases)
 

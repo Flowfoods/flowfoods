@@ -633,6 +633,180 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     // E fica no histórico de B.
     const h = await listarHistorico(doParceiro(B, db), { entidade: 'AcessoParceiro' });
     const pediu = h.find((x) => x.acao === 'PEDIU_SENHA_NOVA' && x.mudancas.some((m) => m.depois === 'Xis' || m.depois === `Pessoa xis`))!;
-    expect(pediu.mudancas.find((m) => m.campo === 'aparelho')?.depois).toBe('1 com rosto removido');
+    expect(pediu.mudancas.find((m) => m.campo === 'aparelho')?.depois).toBe('1 aparelho com rosto removido');
+    // E no histórico de A (o rosto valia lá também).
+    const hA = await listarHistorico(doParceiro(A, db), { entidade: 'AcessoParceiro' });
+    expect(hA.some((x) => x.acao === 'PEDIU_SENHA_NOVA' && x.mudancas.some((m) => m.depois === '1 aparelho com rosto removido'))).toBe(true);
+  });
+
+  // ------------------------------- Fiscal QA + Guardião, volta 3 (0.4)
+
+  const rostoCfg = () => configDoRosto({ NEXTAUTH_URL: 'http://localhost:3100' });
+
+  /** Dono de A cria a pessoa (só em A), define a senha pelo link de A e entra como ela. */
+  async function plantada(apelido: string) {
+    const c = await criarAcesso(A, { nome: `Pessoa ${apelido}`, email: email(apelido), perfil: 'OPERADOR' }, ator(dono.s), o());
+    if (!c.ok || !c.link) throw new Error('setup plantada');
+    expect((await definirSenhaPeloLink(c.link.token, 'senha do dono de a', 'senha do dono de a', o())).ok).toBe(true);
+    const e = await entrarComSenha({ email: email(apelido), senha: 'senha do dono de a', ip: ip() }, o());
+    if (!e.ok) throw new Error('setup plantada entrar');
+    const s = (await validarSessao(e.token, o()))!;
+    const acessoId = (await listarAcessos(A, o())).find((l) => l.email === email(apelido))!.acessoId;
+    return { token: e.token, s, acessoId };
+  }
+
+  /** Espera até `n` transações estarem na fila da trava da pessoa (pg_advisory_xact_lock). */
+  async function naFila(usuarioId: string, n: number) {
+    for (let i = 0; i < 400; i++) {
+      const [r] = await db.$queryRawUnsafe<{ n: number }[]>(
+        `WITH k AS (SELECT hashtextextended($1, 0) AS k)
+         SELECT count(*)::int AS n FROM pg_locks l, k
+         WHERE l.locktype = 'advisory' AND NOT l.granted
+           AND l.classid::bigint = ((k.k >> 32) & 4294967295) AND l.objid::bigint = (k.k & 4294967295)`,
+        `erp-usuario:${usuarioId}`,
+      );
+      if (r.n >= n) return;
+      await new Promise((ok) => setTimeout(ok, 25));
+    }
+    throw new Error(`fila da trava não chegou a ${n}`);
+  }
+
+  /** Segura a trava da pessoa até `soltar()`: ordena quem chega à fila. */
+  function segurarTrava(usuarioId: string) {
+    let soltar!: () => void;
+    const solta = new Promise<void>((ok) => (soltar = ok));
+    let pegou!: () => void;
+    const pegouP = new Promise<void>((ok) => (pegou = ok));
+    const fim = db.$transaction(
+      async (tx) => {
+        await tx.$queryRawUnsafe(`SELECT pg_advisory_xact_lock(hashtextextended($1, 0))::text`, `erp-usuario:${usuarioId}`);
+        pegou();
+        await solta;
+      },
+      { maxWait: 10_000, timeout: 30_000 },
+    );
+    return { pegou: pegouP, soltar: async () => (soltar(), fim) };
+  }
+
+  /** Sessões abertas da pessoa que ainda valem (validarSessao de cada uma não dá para chamar sem token). */
+  async function sessoesVivas(usuarioId: string) {
+    const [r] = await db.$queryRawUnsafe<{ n: number }[]>(
+      `SELECT count(*)::int AS n FROM "SessaoErp" s JOIN "UsuarioErp" u ON u.id = s."usuarioId"
+       WHERE s."usuarioId" = $1 AND s."encerradaEm" IS NULL AND s."versaoCredencial" = u."versaoCredencial"`,
+      usuarioId,
+    );
+    return r.n;
+  }
+
+  it('Fiscal QA: rosto plantado pelo dono de A não sobrevive à senha refeita pelo link do nível 1 (passos 1–4)', async () => {
+    const rosto = rostoCfg();
+    const comRosto = () => ({ ...o(), rosto });
+    // (1) Dono de A define a senha da pessoa pelo link de A e ativa o rosto no aparelho DELE.
+    const atk = await plantada('qa1');
+    const aut = criarAutenticador({ rpID: rosto.rpID, origin: rosto.origin, userHandle: atk.s.usuario.id });
+    const reg = await iniciarRegistroDeRosto(atk.s, comRosto());
+    expect((await concluirRegistroDeRosto(atk.s, aut.registrar(reg.challenge), 'Celular do dono', comRosto())).ok).toBe(true);
+    await iniciarRegistroDeRosto(atk.s, comRosto()); // desafio pendente também
+    // (2) A pessoa pede ajuda; o nível 1 gera link novo e ela redefine a senha.
+    const n1 = await gerarNovoLink(A, atk.acessoId, 'Rodolfo', o());
+    if (!n1.ok) throw new Error();
+    const d = await definirSenhaPeloLink(n1.token, SENHA, SENHA, o());
+    expect.soft(d.ok && d.rostosRemovidos).toBe(1);
+    const u = await db.usuarioErp.findUniqueOrThrow({ where: { id: atk.s.usuario.id } });
+    expect.soft(u.senhaPorLinkDoParceiroId).toBeNull();
+    // Todos os outros meios de entrar caíram: rostos, desafios, sessões.
+    expect.soft(await listarRostos(u.id, o())).toEqual([]);
+    const [desafios] = await db.$queryRawUnsafe<{ n: number }[]>(
+      `SELECT count(*)::int AS n FROM "DesafioWebauthn" WHERE "usuarioId" = $1`,
+      u.id,
+    );
+    expect.soft(desafios.n).toBe(0);
+    expect.soft(await validarSessao(atk.token, o())).toBeNull();
+    expect.soft(u.rostosRemovidosEm).not.toBeNull(); // "Seu acesso" avisa
+    const hA = await listarHistorico(doParceiro(A, db), { entidade: 'AcessoParceiro' });
+    expect.soft(
+      hA.some((x) => x.acao === 'TROCOU_SENHA' && x.mudancas.some((m) => m.campo === 'aparelho' && m.depois === '1 aparelho com rosto removido')),
+    ).toBe(true);
+    // (3) Nível 1 vincula a pessoa a B como Dona: a senha é dela (do nível 1), nada a apagar.
+    const emB = await criarAcesso(B, { nome: 'QA1', email: email('qa1'), perfil: 'DONO' }, 'Rodolfo', o());
+    expect(emB.ok && emB.link).toBe(null);
+    // (4) O atacante tenta entrar com o rosto e escolher B: falha (sem a correção, vira Dono em B).
+    const ipR = ip();
+    const r = await entrarComRosto(aut.entrar((await iniciarEntradaComRosto(ipR, comRosto())).challenge), ipR, comRosto());
+    expect(r.ok, 'o rosto do atacante entrou').toBe(false);
+    if (r.ok) expect(await escolherParceiro(r.token, B, o()), 'atacante chegou a B').toBe(false);
+    // A pessoa entra com a senha dela, nos dois, e pode ativar o rosto de novo (o aviso some).
+    const p = await entrarComSenha({ email: email('qa1'), senha: SENHA, ip: ip() }, o());
+    expect(p.ok && p.escolher).toBe(true);
+    if (!p.ok) return;
+    const sP = (await validarSessao(p.token, o()))!;
+    const meu = criarAutenticador({ rpID: rosto.rpID, origin: rosto.origin, userHandle: sP.usuario.id });
+    const reg2 = await iniciarRegistroDeRosto(sP, comRosto());
+    expect((await concluirRegistroDeRosto(sP, meu.registrar(reg2.challenge), 'Meu celular', comRosto())).ok).toBe(true);
+    expect((await db.usuarioErp.findUniqueOrThrow({ where: { id: u.id } })).rostosRemovidosEm).toBeNull();
+  });
+
+  it('Guardião, volta 3: login em voo com a senha do link de A não cria sessão depois da limpeza (ordem forçada)', async () => {
+    const atk = await plantada('voo1');
+    const uid = atk.s.usuario.id;
+    // Segura a trava da pessoa; a limpeza (vínculo em B apaga a senha "de A") entra na fila primeiro...
+    const t = segurarTrava(uid);
+    await t.pegou;
+    const limpeza = criarAcesso(B, { nome: 'Voo1', email: email('voo1'), perfil: 'DONO' }, 'Rodolfo', o());
+    await naFila(uid, 1);
+    // ...e o login do atacante, que já leu a senha e a versão (antes do bcrypt), entra atrás.
+    const login = entrarComSenha({ email: email('voo1'), senha: 'senha do dono de a', ip: ip() }, o());
+    await naFila(uid, 2);
+    await t.soltar();
+    const [l, r] = await Promise.all([limpeza, login]);
+    expect(l.ok && l.mensagem).toMatch(/criada por link de outro parceiro/);
+    expect(r.ok).toBe(false);
+    expect(await sessoesVivas(uid)).toBe(0);
+    if (r.ok) expect(await escolherParceiro(r.token, B, o())).toBe(false);
+  });
+
+  it('Guardião, volta 3: logins em rajada durante a limpeza — nenhuma sessão viva depois', async () => {
+    for (let rodada = 0; rodada < 3; rodada++) {
+      const atk = await plantada(`raj${rodada}`);
+      const voos: Promise<Awaited<ReturnType<typeof entrarComSenha>>>[] = [];
+      let limpeza: ReturnType<typeof criarAcesso> | null = null;
+      for (let i = 0; i < 4; i++) {
+        voos.push(entrarComSenha({ email: email(`raj${rodada}`), senha: 'senha do dono de a', ip: ip() }, o()));
+        if (i === 1) {
+          await new Promise((ok) => setTimeout(ok, 120));
+          limpeza = criarAcesso(B, { nome: `Raj${rodada}`, email: email(`raj${rodada}`), perfil: 'DONO' }, 'Rodolfo', o());
+        }
+        await new Promise((ok) => setTimeout(ok, 60));
+      }
+      const res = await Promise.all(voos);
+      expect((await limpeza!).ok).toBe(true);
+      expect(await sessoesVivas(atk.s.usuario.id)).toBe(0);
+      for (const r of res) if (r.ok) expect(await validarSessao(r.token, o())).toBeNull();
+    }
+  });
+
+  it('Guardião, volta 3: ativar rosto em voo durante a senha refeita pelo nível 1 não pendura aparelho (ordem forçada)', async () => {
+    const rosto = rostoCfg();
+    const comRosto = () => ({ ...o(), rosto });
+    const atk = await plantada('voo2');
+    const uid = atk.s.usuario.id;
+    const aut = criarAutenticador({ rpID: rosto.rpID, origin: rosto.origin, userHandle: uid });
+    const reg = await iniciarRegistroDeRosto(atk.s, comRosto());
+    const n1 = await gerarNovoLink(A, atk.acessoId, 'Rodolfo', o());
+    if (!n1.ok) throw new Error();
+    const t = segurarTrava(uid);
+    await t.pegou;
+    // A pessoa redefine a senha (entra na fila primeiro)...
+    const refaz = definirSenhaPeloLink(n1.token, SENHA, SENHA, o());
+    await naFila(uid, 1);
+    // ...e o atacante conclui a ativação com a sessão que já tinha validado.
+    const ativa = concluirRegistroDeRosto(atk.s, aut.registrar(reg.challenge), 'Celular do dono', comRosto());
+    await naFila(uid, 2);
+    await t.soltar();
+    const [d, a] = await Promise.all([refaz, ativa]);
+    expect(d.ok).toBe(true);
+    expect(a.ok).toBe(false);
+    expect(await listarRostos(uid, o())).toEqual([]);
+    expect(await sessoesVivas(uid)).toBe(0);
   });
 });
