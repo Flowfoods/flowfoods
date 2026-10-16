@@ -156,3 +156,20 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   link da nota, fica em) que rola dentro do painel; "Bateram" recolhido em
   `<details>`; painel lateral ≥ 1280 px. "Para o piso" em 12 px atenção ao
   lado do nome na contagem e selo atenção na lista do período.
+- **Requisição (1.8)**: **quadro por estado** (kanban do contrato, seção 5):
+  colunas Pedidas · Atendidas em parte · Atendidas · Canceladas (as duas
+  últimas da semana), 4 / 2 / 1 por linha (≥ 1280 / ≥ 768 / celular); coluna
+  sem caixa (só cabeçalho: título 13/600 na cor do estado — atenção, texto,
+  ok, suave —, contador tabular e barra de 2 px na mesma cor); cartão =
+  `painel` raio 10 com "#12 · Cozinha", até 3 itens (pedido, ou "600 g de
+  1 kg" em atenção) e "Caio · 09:21"; **atrasada = filete vermelho de 3 px à
+  esquerda + selo "2d de atraso" (erro)** — exceção registrada à regra "card
+  sem borda colorida": é o sinal pedido pelo contrato, sempre com a palavra;
+  vazia = "Nenhum item nesta etapa" em borda tracejada. **Pedido e entrega no
+  celular**: campos de 48 px, número 18/600 à direita, kg|g segmentado de
+  104–112 px, rodapé fixo com a contagem e o botão. Entregar mostra "no livro"
+  e "no livro fica" (vermelho com "abaixo de zero"). **Divergências**: três
+  métricas (sumiu sem requisição em `erro`, pequeno e repetido em `atencao`,
+  requisitado a mais neutro), tabela Corporativo com o sumiço em
+  quantidade (15/700) e "R$ X sem requisição" embaixo; selo atenção "pequeno
+  e repetido · 2× dentro de R$ 5,00"; por setor; abaixo de zero.
