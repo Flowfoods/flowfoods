@@ -5,6 +5,22 @@ import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 
+/**
+ * Para onde ir depois de entrar. O `callbackUrl` vem da URL, ou seja, de quem
+ * mandou o link: só vale caminho deste site dentro do /rodolfo. Sem isso, um
+ * link com `javascript:` ou outro domínio rodava/abria o que quisesse com a
+ * sessão do Rodolfo recém-aberta.
+ */
+function destinoSeguro(callbackUrl: string | null): string {
+  try {
+    const u = new URL(callbackUrl ?? '/rodolfo', window.location.origin);
+    const interno = u.origin === window.location.origin && /^\/rodolfo(\/|$)/.test(u.pathname);
+    return interno ? u.pathname + u.search : '/rodolfo';
+  } catch {
+    return '/rodolfo';
+  }
+}
+
 function Formulario() {
   const params = useSearchParams();
   const [email, setEmail] = useState('');
@@ -23,7 +39,7 @@ function Formulario() {
       // Navegação completa, não `router.push`: os links do menu do /rodolfo
       // são pré-carregados ainda SEM sessão, e o router do Next reaproveitava
       // esse cache — o redirect para o login — logo depois de entrar.
-      window.location.assign(params.get('callbackUrl') ?? '/rodolfo');
+      window.location.assign(destinoSeguro(params.get('callbackUrl')));
     } else {
       // Mensagem única para senha errada, e-mail inexistente e rate limit: dizer
       // qual dos três é entregar meio caminho a quem está tentando adivinhar.
