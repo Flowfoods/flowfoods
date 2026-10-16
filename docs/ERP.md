@@ -407,3 +407,11 @@ banco de teste: o operador é recusado pelo servidor.
   uma consulta agrupada quando a equipe passar de dezenas.
 - O envio do link (0.5) entra em `executar.ts`/`criarAcesso`; a regra do link
   (decisão 41) já está no servidor.
+
+## Herança da 0.4 (apontada pelos fiscais)
+
+- `validarSessao` (segunda trava por versão) sem teste próprio; entrada pelo rosto durante a limpeza sem teste de ordem forçada.
+- Texto em "Seu acesso": "quando sua senha foi trocada ou apagada" é mais preciso.
+- `abrirSessao` com timeout 10 s < 15 s de `naEquipe`: login atrás de mudança longa de equipe pode virar erro 500.
+- Remover um rosto não derruba sessões abertas por ele (a sessão não guarda o aparelho).
+- Dono de A ainda muda perfil/desativa a pessoa em A depois que ela entra em B (afeta só A).
