@@ -93,6 +93,8 @@ export function TelaContagem({
       clearTimeout(timers.current[id]);
       const l = atual.current[id];
       if (!l || emVoo.current[id]) return;
+      // Em conflito, a pessoa escolhe ("ficar com o dela" / "usar o meu"): sair do campo não reenvia.
+      if (l.situacao === 'conflito' && versaoForcada === undefined) return;
       if (versaoForcada === undefined && mesmosCampos(l.campos, l.item.campos) && l.situacao !== 'falha') {
         if (l.situacao === 'pendente') mudar(id, () => ({ situacao: 'parado' }));
         return;
@@ -133,9 +135,10 @@ export function TelaContagem({
 
   const digitar = (id: string, campos: Partial<ContagemDigitada>) => {
     setMexidos((m) => (m.has(id) ? m : new Set(m).add(id)));
-    mudar(id, (l) => ({ campos: { ...l.campos, ...campos }, situacao: l.situacao === 'conflito' ? 'conflito' : 'pendente', erros: {} }));
+    const emConflito = atual.current[id]?.situacao === 'conflito';
+    mudar(id, (l) => ({ campos: { ...l.campos, ...campos }, situacao: l.situacao === 'conflito' ? 'conflito' : 'pendente', erros: l.situacao === 'conflito' ? l.erros : {} }));
     clearTimeout(timers.current[id]);
-    timers.current[id] = setTimeout(() => void salvar(id), ESPERA_MS);
+    if (!emConflito) timers.current[id] = setTimeout(() => void salvar(id), ESPERA_MS);
   };
 
   const trocarAba = (a: Aba) => {
