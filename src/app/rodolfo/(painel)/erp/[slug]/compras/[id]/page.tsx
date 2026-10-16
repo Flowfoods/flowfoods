@@ -27,6 +27,7 @@ export default async function ParceiroNotaPage({ params, searchParams }: { param
       bloqueio={ctx.bloqueio}
       insumosBase={`${base}/insumos`}
       fornecedoresBase={`${base}/compras/fornecedores`}
+      estoqueBase={`${base}/estoque`}
       acaoCancelar={acaoCancelarNota.bind(null, ctx.parceiro.slug, nota.id)}
     />
   );

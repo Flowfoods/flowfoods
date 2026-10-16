@@ -31,6 +31,7 @@ export default async function ErpNotaPage({ params, searchParams }: { params: { 
       bloqueio={ctx.bloqueio}
       insumosBase={pode(ctx.alcance, 'insumos.ver') ? '/erp/insumos' : undefined}
       fornecedoresBase={`${BASE}/fornecedores`}
+      estoqueBase={pode(ctx.alcance, 'estoque.ver', { lojaId: nota.lojaId }) ? '/erp/estoque' : undefined}
       acaoCancelar={acaoCancelarNota.bind(null, nota.id)}
     />
   );

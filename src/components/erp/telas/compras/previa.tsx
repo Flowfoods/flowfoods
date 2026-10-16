@@ -66,6 +66,10 @@ export function PreviaDoImpacto({ previa: p }: { previa: PreviaDaNota }) {
           ))}
         </ul>
         <div className="mt-4">
+          <h3 className="text-[13px] font-semibold text-texto">Estoque</h3>
+          <p className="mt-1 text-sm text-suave">{p.estoque.frase}</p>
+        </div>
+        <div className="mt-4">
           <h3 className="text-[13px] font-semibold text-texto">Fichas que mudam junto</h3>
           {p.fichas.length === 0 ? (
             <p className="mt-1 text-sm text-suave">Nenhuma ficha usa estes insumos com custo diferente.</p>
