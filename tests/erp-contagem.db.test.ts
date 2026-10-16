@@ -383,8 +383,23 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     // A outra aba ainda tinha as regras de antes: recusa, nada sobrescrito.
     expect(await salvarRegras(a, DONA(), ids.vp, { ...campos, pisoValor: '95' }, REGRAS_PADRAO, 'Marina')).toMatchObject({ ok: false, conflito: true });
     expect((await obterRegras(a, GERENTE(), ids.vp))!.regras.pisoValorBp).toBe(6000);
+    // Sem as regras lidas (ou {} pela action), não grava: a trava de edição simultânea é obrigatória.
+    expect(await salvarRegras(a, DONA(), ids.vp, { ...campos, pisoValor: '95' }, null, 'Marina')).toMatchObject({ ok: false, conflito: true });
+    atual.ctx = () => ({ parceiro: A, alcance: DONA(), cliente: doParceiro(A.id, db), bloqueio: null, podeEscrever: true, sessao: { userId: 'u', autorNome: 'Marina' } });
+    const f = new FormData();
+    for (const [k, v] of Object.entries({ ...campos, pisoValor: '95' })) f.append(k, v);
+    f.append('lidas', '{}');
+    expect(await estoqueDaSessao.acaoSalvarRegrasDaContagem(ids.vp, null, f)).toMatchObject({ ok: false, conflito: true });
+    expect((await obterRegras(a, GERENTE(), ids.vp))!.regras.pisoValorBp).toBe(6000);
     const h = await listarHistorico(a, { de: [{ entidade: 'Loja', ids: [ids.vp] }], limite: 5 });
     expect(h[0]).toMatchObject({ acao: 'ALTEROU' });
+  });
+
+  it('fotografia no banco: contagem fechada e os itens dela não mudam, nem por SQL cru (gatilho)', async () => {
+    await expect(cru(db, perfil, A.id, `UPDATE "Contagem" SET "valorTotalCentavos" = 1 WHERE "id" = $1`, ids.fechamento)).rejects.toThrow(/Contagem_fechada_imutavel/);
+    await expect(cru(db, perfil, A.id, `UPDATE "Contagem" SET "desfecho" = 'VENCIDA' WHERE "id" = $1`, ids.ciclo)).rejects.toThrow(/Contagem_fechada_imutavel/);
+    await expect(cru(db, perfil, A.id, `UPDATE "ContagemItem" SET "contadoMilesimos" = 1 WHERE "contagemId" = $1`, ids.fechamento)).rejects.toThrow(/ContagemItem_da_fechada_imutavel/);
+    expect((await a.contagem.findUnique({ where: { id: ids.fechamento }, select: { valorTotalCentavos: true } }))!.valorTotalCentavos).toBe(45552 + 12300 + 79800 + 3600 + 2000);
   });
 
   it('livro no banco: CONTAGEM sem o item da contagem é recusado pelo CHECK', async () => {

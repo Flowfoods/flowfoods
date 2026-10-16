@@ -242,7 +242,9 @@ export async function salvarRegras(
       const loja = await tx.loja.findUnique({ where: { id: lojaId }, select: { id: true, nome: true, ...SELECAO_DAS_REGRAS } });
       if (!loja) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_LOJA_FORA }, naoEncontrado: true });
       const antes = regrasDaLoja(loja);
-      const base = lidas ?? antes;
+      // A trava de edição simultânea é obrigatória: sem as regras que a tela leu, não se grava (nunca "as de agora").
+      if (!lidas) throw new Recusa({ ok: false, erros: { geral: 'Recarregue a página e confira as regras antes de salvar: não deu para saber o que você estava vendo.' }, conflito: true });
+      const base = lidas;
       const mudou = await tx.loja.updateMany({
         where: {
           id: lojaId,

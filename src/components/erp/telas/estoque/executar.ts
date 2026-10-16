@@ -86,8 +86,10 @@ export async function executarSalvarRegras(cliente: ClienteDoParceiro, alcance: 
   const campos = Object.fromEntries(['pisoValor', 'pisoItens', 'freqA', 'freqB', 'freqC', 'tolerancia'].map((k) => [k, form.get(k)]));
   let lidas: RegrasDaContagem | null = null;
   try {
-    const l = JSON.parse(String(form.get('lidas') ?? 'null')) as RegrasDaContagem | null;
-    if (l && typeof l === 'object' && Object.values(l).every((v) => Number.isSafeInteger(v))) lidas = l;
+    const l = JSON.parse(String(form.get('lidas') ?? 'null')) as Record<string, unknown> | null;
+    const chaves: (keyof RegrasDaContagem)[] = ['pisoValorBp', 'pisoItensBp', 'freqADias', 'freqBDias', 'freqCDias', 'toleranciaCentavos'];
+    // Todas as seis, inteiras: `{}` ou faltando uma não desliga a trava de edição simultânea.
+    if (l && typeof l === 'object' && chaves.every((k) => Number.isSafeInteger(l[k]))) lidas = Object.fromEntries(chaves.map((k) => [k, l[k]])) as unknown as RegrasDaContagem;
   } catch {
     lidas = null;
   }
