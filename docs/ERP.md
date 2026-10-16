@@ -1402,3 +1402,11 @@ banco de teste: o operador é recusado pelo servidor.
   livro do item — correto e legível no detalhe, mas longo.
 - Índice único `(parceiroId, lojaId, numero)` declarado no Prisma; `numero`
   é nulo só nas linhas de antes da 1.8 (nenhuma em produção).
+
+## Herança da 1.8 (apontada pelos fiscais)
+
+- [médio] Confirmação de saldo negativo pulável com duas entregas simultâneas (`requisicao.ts:529-531` lê o saldo sem trava): conferir com saldos travados (`FOR UPDATE`) antes de gravar.
+- [baixo] `fichaQuantidade` forjado acima de INT4 dá 500 (`requisicao.ts:356-357`): limitar a 10.000.000 como `listaDaFicha`.
+- [baixo] Teste com banco instável ("cancelar" e "atrasada" falharam 1 vez em 3): estabilizar.
+- UX: rodapé do card do quadro com tempo no processo ("há 3 h") além da hora; print do saldo insuficiente com confirmação; "Pedida"/"Entregue" no histórico; nome do insumo inteiro no seletor do celular; conferir sinal de "Requisitado a mais".
+- Sino sem requisições pendentes; "Minhas requisições" depende de ligar `Colaborador` à pessoa; lançar perda à mão sem tela; divergências para milhares de insumos precisam ir para SQL.
