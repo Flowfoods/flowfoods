@@ -305,12 +305,15 @@ export async function listarHistorico(
     limite?: number;
     /** Só destas linhas (ex.: o insumo e as embalagens dele). */
     de?: { entidade: string; ids: string[] }[];
+    /** Nunca estas entidades (1.5: notas e fornecedores para quem não vê compras). */
+    semEntidades?: string[];
   } = {},
 ) {
   const entidades = filtro.entidades ?? (filtro.entidade ? [filtro.entidade] : null);
   const linhas = await cliente.historicoAlteracao.findMany({
     where: {
       ...(entidades ? { entidade: { in: entidades } } : {}),
+      ...(filtro.semEntidades?.length ? { NOT: { entidade: { in: filtro.semEntidades } } } : {}),
       ...(filtro.de ? { OR: filtro.de.map((d) => ({ entidade: d.entidade, entidadeId: { in: d.ids } })) } : {}),
     },
     orderBy: { ocorridoEm: 'desc' },

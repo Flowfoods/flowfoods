@@ -57,7 +57,8 @@ export function TelaDetalheInsumo({
   const u = UNIDADES[i.unidade];
   const aqui = `${base}/${i.id}`;
   const uc = i.ultimaCompra;
-  const notaDaUltima = uc && linkDaNota ? linkDaNota(uc.notaId, uc.lojaId) : null;
+  const ud = uc?.detalhe ?? null;
+  const notaDaUltima = ud && linkDaNota ? linkDaNota(ud.notaId, ud.lojaId) : null;
   // Pré-preparo (1.3): nome, unidade, situação e custo vêm da ficha técnica; aqui só se lê.
   const p = i.preparo;
   const fichas = base.replace(/insumos$/, 'fichas');
@@ -152,23 +153,30 @@ export function TelaDetalheInsumo({
                 {formatarCusto(i.custo, i.unidade)}
               </div>
               <p className="text-sm tabular-nums text-suave">
-                {uc
-                  ? contaDoCusto({ precoEmbalagemCentavos: uc.valorCentavos, taxaEntregaCentavos: uc.freteCentavos, conteudoMilesimos: uc.quantidadeMilesimos, unidade: i.unidade })
-                  : contaDoCusto(i)}
+                {ud
+                  ? contaDoCusto({ precoEmbalagemCentavos: ud.valorCentavos, taxaEntregaCentavos: ud.freteCentavos, conteudoMilesimos: ud.quantidadeMilesimos, unidade: i.unidade })
+                  : uc
+                    ? `Pela compra de ${formatarData(uc.entradaEm)}`
+                    : contaDoCusto(i)}
               </p>
             </div>
             <p className="mt-3 border-t border-linha pt-3 text-[12px] text-suave">
-              {uc ? (
+              {uc && ud ? (
                 <>
                   Último preço: {formatarCusto(uc.custo, i.unidade)} em {formatarData(uc.entradaEm, true)} (
                   {notaDaUltima ? (
                     <Link href={notaDaUltima} className={LINK_DE_TEXTO}>
-                      nota {uc.numero}
+                      nota {ud.numero}
                     </Link>
                   ) : (
-                    `nota ${uc.numero}`
+                    `nota ${ud.numero}`
                   )}
-                  , {uc.fornecedor ?? 'sem fornecedor'}{uc.lojaNome ? `, ${uc.lojaNome}` : ''}). É o que as fichas usam; o preço cadastrado ({formatarCusto(i.custoCadastrado, i.unidade)}) só vale sem nota.
+                  , {ud.fornecedor ?? 'sem fornecedor'}
+                  {ud.lojaNome ? `, ${ud.lojaNome}` : ''}). É o que as fichas usam; o preço cadastrado ({formatarCusto(i.custoCadastrado, i.unidade)}) só vale sem nota.
+                </>
+              ) : uc ? (
+                <>
+                  Último preço pago na rede, em {formatarData(uc.entradaEm, true)}: é o que as fichas usam. A nota é de uma loja fora do seu acesso a compras.
                 </>
               ) : (
                 'Pelo preço cadastrado. Quando houver nota de compra lançada, vale o último preço pago.'

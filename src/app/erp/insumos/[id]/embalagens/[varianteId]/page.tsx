@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 export default async function ErpEmbalagemPage({ params }: { params: { id: string; varianteId: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.editar');
-  const insumo = await obterInsumo(ctx.cliente, params.id);
+  const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);
   if (!insumo) notFound();
   // Pré-preparo (1.3) só muda pela ficha técnica.
   if (!insumo.ativo || insumo.preparo) redirect(`/erp/insumos/${insumo.id}`);

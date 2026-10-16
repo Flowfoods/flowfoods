@@ -15,6 +15,7 @@
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-validade.db.test.ts
  */
+import { ALCANCE_FLOWFOODS } from '@/lib/erp/permissoes';
 import { mkdirSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -159,7 +160,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.4 · validade por conservação (Postgres rea
     // Filtro "fica em congelado": a principal OU com validade nela.
     expect((await listarInsumos(a, { conservacao: 'CONGELADO' })).linhas.map((l) => l.nome)).toEqual(['Molho cheddar']);
     expect((await listarInsumos(a, { conservacao: 'REFRIGERADO' })).linhas.map((l) => l.nome)).toEqual(['Cheddar', 'Molho cheddar']);
-    const det = (await obterInsumo(a, ins.id))!;
+    const det = (await obterInsumo(a, ins.id, ALCANCE_FLOWFOODS))!;
     expect(det.validades).toEqual({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 4320, CONGELADO: 43_200 } });
     // Pela tela de insumos não se edita (vem da ficha).
     const r = await editarInsumo(a, ins.id, { nome: 'Molho cheddar', tipo: 'PRE_PREPARO', unidade: 'KG', conservacao: 'SECO', conteudo: '1', preco: '1', versao: det.versao });
@@ -226,17 +227,17 @@ describe.skipIf(!URL_TESTE)('ERP 1.4 · validade por conservação (Postgres rea
     form.set('versao', (await obterFicha(a, ids.molho))!.versao);
     validadeNoForm(form, { SECO: ['10', 'dias'] }, 'SECO');
     expect(await rodar(() => fichasDaSessao.acaoEditarFicha(ids.molho, null, form))).toMatchObject({ ok: false, erros: { geral: expect.any(String) } });
-    const ch = (await obterInsumo(a, ids.cheddar))!;
+    const ch = (await obterInsumo(a, ids.cheddar, ALCANCE_FLOWFOODS))!;
     const fi = new FormData();
     for (const [k, v] of Object.entries({ nome: 'Cheddar', tipo: 'INGREDIENTE', unidade: 'KG', conteudo: '1', escala: 'base', preco: '40,00', versao: ch.versao })) fi.set(k, v);
     validadeNoForm(fi, { REFRIGERADO: ['5', 'dias'] }, 'REFRIGERADO');
     expect(await rodar(() => insumosDaSessao.acaoEditarInsumo(ids.cheddar, null, fi))).toMatchObject({ ok: false });
     expect((await obterFicha(a, ids.molho))!.validades?.minutos).toEqual({ REFRIGERADO: 4320 });
-    expect((await obterInsumo(a, ids.cheddar))!.validades).toEqual({ principal: 'REFRIGERADO', minutos: {} });
+    expect((await obterInsumo(a, ids.cheddar, ALCANCE_FLOWFOODS))!.validades).toEqual({ principal: 'REFRIGERADO', minutos: {} });
     // A dona, pela MESMA action de insumo: validade depois de aberto, com histórico.
     atual.ctx = () => ctxDe(A, 'DONO');
     expect(await rodar(() => insumosDaSessao.acaoEditarInsumo(ids.cheddar, null, fi))).toMatchObject({ redirect: expect.stringContaining(ids.cheddar) });
-    expect((await obterInsumo(a, ids.cheddar))!.validades).toEqual({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 7200 } });
+    expect((await obterInsumo(a, ids.cheddar, ALCANCE_FLOWFOODS))!.validades).toEqual({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 7200 } });
     const [h] = await listarHistorico(a, { de: [{ entidade: 'Insumo', ids: [ids.cheddar] }], limite: 1 });
     expect(h.mudancas.map((m) => [m.campo, m.antes, m.depois])).toEqual([['validade', '—', 'Refrigerado 5 dias']]);
   });

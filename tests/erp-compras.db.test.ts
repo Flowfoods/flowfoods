@@ -109,7 +109,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
   };
   const custoDoBurger = async () => sp(formatarFracao((await obterFicha(a, ids.burger))!.custo.porRendimento));
   const custoDoCheddar = async () => {
-    const i = (await obterInsumo(a, ids.cheddar))!;
+    const i = (await obterInsumo(a, ids.cheddar, DONA()))!;
     return i.custo ? sp(formatarFracao({ num: BigInt(i.custo.centavos) * 1000n, den: BigInt(i.custo.milesimos) })) : null;
   };
   /** Lança direto pela regra (sem a action): a nota mínima de um insumo. */
@@ -243,8 +243,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
     // A unidade do insumo comprado trava.
     expect(await motivoDaUnidadeTravada(a, ids.carne)).toMatch(/compra/);
     // "Sem preço" não é mais quem tem compra; o detalhe do insumo mostra a última compra.
-    const i = (await obterInsumo(a, ids.cheddar))!;
-    expect(i.ultimaCompra).toMatchObject({ notaId: ids.nota, numero: '123', fornecedor: 'Laticínios Rio', lojaNome: 'Vila da Penha' });
+    const i = (await obterInsumo(a, ids.cheddar, DONA()))!;
+    expect(i.ultimaCompra).toMatchObject({ entradaEm: '2026-10-14', detalhe: { notaId: ids.nota, numero: '123', fornecedor: 'Laticínios Rio', lojaNome: 'Vila da Penha' } });
     expect(i.compras).toHaveLength(1);
     expect((await listarInsumos(a, { q: 'Cheddar' })).linhas[0].ultimaCompra).toMatchObject({ entradaEm: '2026-10-14' });
   });
@@ -373,6 +373,39 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
     expect(await a.notaEntrada.count()).toBe(antes);
   });
 
+  it('insumo: gerente de outra loja e operador sem "ver compras" recebem o CUSTO, mas nada da nota (número, fornecedor, loja, valores)', async () => {
+    const gerente = alcanceDe('GERENTE', [ids.centro]);
+    const operador = alcanceDe('OPERADOR', 'rede');
+    const daDona = (await obterInsumo(a, ids.cheddar, DONA()))!;
+    expect(daDona.ultimaCompra?.detalhe?.lojaNome).toBe('Vila da Penha');
+    for (const [quem, alcance] of [['gerente do Centro', gerente], ['operador', operador]] as const) {
+      const i = (await obterInsumo(a, ids.cheddar, alcance))!;
+      // O custo de referência da rede continua (é o que a ficha usa).
+      expect(i.custo, quem).toEqual(daDona.custo);
+      expect(i.ultimaCompra?.custo, quem).toEqual(daDona.ultimaCompra?.custo);
+      // A nota que dá o custo é da Vila da Penha: fora do acesso de compras dos dois.
+      expect(i.ultimaCompra?.detalhe, quem).toBeNull();
+      const json = JSON.stringify(i);
+      expect(json, quem).not.toContain('Vila da Penha');
+      expect(json, quem).not.toContain(ids.nota);
+      expect(i.compras.every((c) => c.lojaId === ids.centro), quem).toBe(true);
+      expect(i.precoPorFornecedor.every((c) => c.lojaId === ids.centro), quem).toBe(true);
+    }
+    // O gerente vê a nota da loja dele (901, no Centro); o operador, nenhuma.
+    expect((await obterInsumo(a, ids.cheddar, gerente))!.compras.map((c) => c.rotulo)).toEqual(['901-1']);
+    const doOperador = (await obterInsumo(a, ids.cheddar, operador))!;
+    expect(doOperador.compras).toEqual([]);
+    expect(doOperador.precoPorFornecedor).toEqual([]);
+    expect(JSON.stringify(doOperador)).not.toContain('Laticínios');
+    // Fornecedor: sem "ver compras", nenhuma nota nem preço; o gerente só as do Centro.
+    const fOp = (await obterFornecedor(a, operador, ids.laticinios))!;
+    expect([fOp.notas, fOp.insumos]).toEqual([[], []]);
+    expect((await obterFornecedor(a, gerente, ids.laticinios))!.insumos.every((x) => x.entradaEm === '2026-10-14')).toBe(true);
+    // Lista de insumos: só a data da compra (nada de nota ou fornecedor).
+    const linha = (await listarInsumos(a, { q: 'Cheddar' })).linhas[0];
+    expect(Object.keys(linha.ultimaCompra ?? {})).toEqual(['entradaEm']);
+  });
+
   it('isolamento: B não lê nota nem fornecedor de A, não usa insumo nem fornecedor de A, nem por SQL cru', async () => {
     const donaB = alcanceDe('DONO', 'rede');
     expect(await obterNota(b, donaB, ids.nota)).toBeNull();
@@ -394,7 +427,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
     // A nota de B com o mesmo número não colide com a de A (chave por parceiro), e o custo de B é o de B.
     const okB = await lancarNota(b, donaB, { lojaId: ids.lojaB, fornecedorId: fB, numero: '123', serie: '1', data: '2026-10-14', frete: '', total: '33,00', itens: [{ insumoId: ids.cheddarB, embalagem: 'padrao', quantidade: '1', valor: '33,00' }] }, 'Bia');
     expect(okB.ok).toBe(true);
-    expect((await obterInsumo(b, ids.cheddarB))!.custo).toEqual({ centavos: 33, milesimos: 10 });
+    expect((await obterInsumo(b, ids.cheddarB, alcanceDe("DONO", "rede")))!.custo).toEqual({ centavos: 33, milesimos: 10 });
     expect(await custoDoCheddar()).toBe('R$ 52,00');
   });
 

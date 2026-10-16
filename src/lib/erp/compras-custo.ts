@@ -14,6 +14,7 @@
  */
 
 import type { ClienteDoParceiro } from './tenant';
+import { filtroDeLojas, pode, type Alcance } from './permissoes';
 import { custoDaCompra } from './compra-campos';
 import { compararCustos, type CustoExato } from './unidades';
 
@@ -119,6 +120,17 @@ export async function anexarUltimasCompras<T extends ComUltimaCompra>(tx: Client
   return mapa;
 }
 
+/**
+ * Lojas cujas notas a pessoa pode ver (`compras.ver` por loja): `undefined` =
+ * todas (rede inteira), `{ in }` = estas, null = nenhuma (sem a permissão).
+ * Fora do módulo de compras, todo lugar que mostra nota, fornecedor, loja ou
+ * valor de compra passa por aqui. O CUSTO de referência (número derivado) é
+ * da rede e continua para quem vê o insumo.
+ */
+export function lojasComCompras(alcance: Alcance): { in: string[] } | undefined | null {
+  return pode(alcance, 'compras.ver') ? filtroDeLojas(alcance) : null;
+}
+
 /** Uma compra do insumo, para o histórico de preços do detalhe. */
 export interface CompraDoInsumo {
   notaId: string;
@@ -142,9 +154,12 @@ export interface CompraDoInsumo {
  * e o último preço de cada fornecedor entre as lançadas, do mais barato ao
  * mais caro (Notion Core: comparar preço por fornecedor a partir do histórico).
  */
-export async function comprasDoInsumo(tx: ClienteDoParceiro, insumoId: string, limite = 30) {
+export async function comprasDoInsumo(tx: ClienteDoParceiro, insumoId: string, alcance: Alcance, limite = 30) {
+  // Nota é da loja: só as compras das lojas em que a pessoa vê compras (sem "ver compras", nenhuma).
+  const lojas = lojasComCompras(alcance);
+  if (lojas === null) return { compras: [] as CompraDoInsumo[], fornecedores: [] as CompraDoInsumo[] };
   const itens = await tx.notaEntradaItem.findMany({
-    where: { insumoId, nota: { status: { in: ['LANCADA', 'CANCELADA'] } } },
+    where: { insumoId, nota: { status: { in: ['LANCADA', 'CANCELADA'] }, lojaId: lojas } },
     orderBy: [{ nota: { entradaEm: 'desc' } }, { nota: { lancadaEm: 'desc' } }, { notaId: 'desc' }, { ordem: 'asc' }],
     take: limite * 2,
     select: {

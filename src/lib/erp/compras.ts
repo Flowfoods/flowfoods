@@ -41,7 +41,7 @@ import {
   type FiltrosDeNota,
   type InsumoDaCompra,
 } from './compra-campos';
-import { ultimasCompras, type UltimaCompra } from './compras-custo';
+import { lojasComCompras, ultimasCompras, type UltimaCompra } from './compras-custo';
 import { formatarRendimento, porUnidadeDeRendimento, TIPOS_DE_FICHA, type CustoDaFicha } from './ficha-campos';
 import { lerCascata } from './ficha-custos';
 import { cascataDeCusto, PROFUNDIDADE_MAXIMA, type FichaDaCascata } from './ficha-cascata';
@@ -183,7 +183,7 @@ export type SituacaoDoFornecedor = 'ativos' | 'desativados' | 'todos';
 /** Fornecedores com quantas notas lançadas (nas lojas do alcance) e a data da última. */
 export async function listarFornecedores(
   cliente: ClienteDoParceiro,
-  alcance: Pick<Alcance, 'lojas'>,
+  alcance: Alcance,
   filtros: { q?: string; situacao?: SituacaoDoFornecedor } = {},
 ) {
   const q = (filtros.q ?? '').trim().slice(0, 80);
@@ -199,10 +199,11 @@ export async function listarFornecedores(
       select: { id: true, nome: true, documento: true, contato: true, ativo: true },
     });
     const ids = lidos.map((f) => f.id);
-    const notas = ids.length
+    const lojas = lojasComCompras(alcance);
+    const notas = ids.length && lojas !== null
       ? await tx.notaEntrada.groupBy({
           by: ['fornecedorId'],
-          where: { fornecedorId: { in: ids }, status: 'LANCADA', lojaId: filtroDeLojas(alcance) },
+          where: { fornecedorId: { in: ids }, status: 'LANCADA', lojaId: lojas },
           _count: { _all: true },
           _max: { entradaEm: true },
         })
@@ -219,18 +220,20 @@ export async function listarFornecedores(
 export type LinhaDeFornecedor = Awaited<ReturnType<typeof listarFornecedores>>[number];
 
 /** Detalhe: cadastro, últimas notas nas lojas do alcance, o que já vendeu (último preço por insumo) e alterações. */
-export async function obterFornecedor(cliente: ClienteDoParceiro, alcance: Pick<Alcance, 'lojas'>, id: string) {
+export async function obterFornecedor(cliente: ClienteDoParceiro, alcance: Alcance, id: string) {
   return cliente.transacao(async (tx) => {
     const f = await tx.fornecedor.findUnique({ where: { id } });
     if (!f) return null;
-    const notas = await tx.notaEntrada.findMany({
-      where: { fornecedorId: id, lojaId: filtroDeLojas(alcance), status: { in: ['LANCADA', 'CANCELADA'] } },
+    // Notas e preços são das lojas em que a pessoa vê compras (sem a permissão: nenhum).
+    const lojas = lojasComCompras(alcance);
+    const notas = lojas === null ? [] : await tx.notaEntrada.findMany({
+      where: { fornecedorId: id, lojaId: lojas, status: { in: ['LANCADA', 'CANCELADA'] } },
       orderBy: [{ entradaEm: 'desc' }, { lancadaEm: 'desc' }],
       take: 10,
       select: { id: true, numero: true, serie: true, entradaEm: true, totalCentavos: true, status: true, loja: { select: { nome: true } } },
     });
-    const itens = await tx.notaEntradaItem.findMany({
-      where: { nota: { fornecedorId: id, status: 'LANCADA', lojaId: filtroDeLojas(alcance) }, insumoId: { not: null } },
+    const itens = lojas === null ? [] : await tx.notaEntradaItem.findMany({
+      where: { nota: { fornecedorId: id, status: 'LANCADA', lojaId: lojas }, insumoId: { not: null } },
       orderBy: [{ nota: { entradaEm: 'desc' } }, { nota: { lancadaEm: 'desc' } }],
       take: 300,
       select: {

@@ -30,6 +30,7 @@ import {
   type FiltrosDeInsumo,
   type TipoInsumo,
 } from './insumo-campos';
+import { pode, type Alcance } from './permissoes';
 import { compararFracoes, custoDaEmbalagem, custoPorUnidade, type CustoExato, type Fracao, type Unidade } from './unidades';
 import { contaDaFicha, custoIncompleto, type CustoDaFicha } from './ficha-campos';
 import { custosEmCascata } from './ficha-custos';
@@ -345,8 +346,8 @@ export interface LinhaDeInsumo {
    * Pré-preparo: ver `preparo`.
    */
   custo: CustoExato | null;
-  /** 1.5: a última compra lançada (de onde vem o custo), quando há. */
-  ultimaCompra: { entradaEm: string; numero: string | null; fornecedor: string | null } | null;
+  /** 1.5: a data da última compra lançada (de onde vem o custo), quando há. Nota, fornecedor e loja ficam no módulo de compras. */
+  ultimaCompra: { entradaEm: string } | null;
   /** Outras embalagens ativas. */
   variantes: number;
   ativo: boolean;
@@ -399,7 +400,7 @@ function paraLinha(i: LinhaDoBanco, preparos: ReadonlyMap<string, CustoDaFicha>,
     validades,
     conservacaoInformada: !fichaQueProduz || Object.keys(validades.minutos).length > 0,
     custo: fichaQueProduz ? null : (compra?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos)),
-    ultimaCompra: compra ? { entradaEm: compra.entradaEm, numero: compra.numero, fornecedor: compra.fornecedor } : null,
+    ultimaCompra: compra ? { entradaEm: compra.entradaEm } : null,
     variantes: _count.variantes,
     preparo: fichaQueProduz && c ? { fichaId: fichaQueProduz.id, porUnidade: c.porRendimento, incompleto: custoIncompleto(c) } : null,
   };
@@ -469,7 +470,13 @@ export async function listarInsumos(
 
 // ---------------------------------------------------------------- obter
 
-export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
+/**
+ * Detalhe do insumo. `alcance`: quem pede. O custo de referência (último
+ * preço, número derivado) é da rede e vem sempre; nota, série, fornecedor,
+ * loja, quantidade, valor e frete de cada compra só nas lojas em que a pessoa
+ * tem "ver compras e notas" (o resto nem sai do servidor).
+ */
+export async function obterInsumo(cliente: ClienteDoParceiro, id: string, alcance: Alcance) {
   return cliente.transacao(async (tx) => {
     const i = await tx.insumo.findUnique({
       where: { id },
@@ -484,8 +491,9 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
     const travaDaUnidade = await motivoDaUnidadeTravada(tx, id);
     // 1.5: o custo vem da última compra lançada, quando há; o histórico de preços e o último de cada fornecedor.
     const ultima = ficha ? undefined : (await ultimasCompras(tx, [id])).get(id);
-    const compras = ficha ? { compras: [], fornecedores: [] } : await comprasDoInsumo(tx, id);
-    const lojaDaUltima = ultima ? compras.compras.find((c) => c.notaId === ultima.notaId)?.lojaNome ?? null : null;
+    const compras = ficha ? { compras: [], fornecedores: [] } : await comprasDoInsumo(tx, id, alcance);
+    const veUltima = !!ultima && pode(alcance, 'compras.ver', { lojaId: ultima.lojaId });
+    const lojaDaUltima = ultima && veUltima ? ((await tx.loja.findUnique({ where: { id: ultima.lojaId }, select: { nome: true } }))?.nome ?? null) : null;
     const historico = await listarHistorico(tx, {
       de: [
         { entidade: 'Insumo', ids: [id] },
@@ -507,7 +515,26 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
       custo: ultima?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
       /** O do preço cadastrado (embalagem padrão), sempre. */
       custoCadastrado: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
-      ultimaCompra: ultima ? { ...ultima, lojaNome: lojaDaUltima } : null,
+      ultimaCompra: ultima
+        ? {
+            custo: ultima.custo,
+            entradaEm: ultima.entradaEm,
+            /** De que compra veio: só para quem vê compras naquela loja (null = só o custo). */
+            detalhe: veUltima
+              ? {
+                  notaId: ultima.notaId,
+                  numero: ultima.numero,
+                  serie: ultima.serie,
+                  lojaId: ultima.lojaId,
+                  lojaNome: lojaDaUltima,
+                  fornecedor: ultima.fornecedor,
+                  valorCentavos: ultima.valorCentavos,
+                  freteCentavos: ultima.freteCentavos,
+                  quantidadeMilesimos: ultima.quantidadeMilesimos,
+                }
+              : null,
+          }
+        : null,
       compras: compras.compras,
       precoPorFornecedor: compras.fornecedores,
       ativo: i.ativo,

@@ -23,7 +23,7 @@ export default async function ErpInsumoPage({
 }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.ver');
-  const insumo = await obterInsumo(ctx.cliente, params.id);
+  const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);
   if (!insumo) notFound();
   // Volta para a lista como ela estava (só os filtros conhecidos passam).
   const de = queryDosFiltros(lerFiltros(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));

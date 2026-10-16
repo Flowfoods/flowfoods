@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export default async function ErpEditarInsumoPage({ params }: { params: { id: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.editar');
-  const insumo = await obterInsumo(ctx.cliente, params.id);
+  const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);
   if (!insumo) notFound();
   // Desativado não se edita: primeiro reativa (no detalhe).
   // Pré-preparo (1.3) só muda pela ficha técnica.

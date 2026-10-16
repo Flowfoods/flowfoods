@@ -18,7 +18,7 @@ export default async function ParceiroInsumoPage({
 }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.ver');
-  const insumo = await obterInsumo(ctx.cliente, params.id);
+  const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);
   if (!insumo) notFound();
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/insumos`;
   const de = queryDosFiltros(lerFiltros(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));
