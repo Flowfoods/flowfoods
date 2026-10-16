@@ -1086,6 +1086,21 @@ Sem migration: `ProdutoCanal.precoManualCentavos` e `CanalConfig.margemAlvoPadra
     embalagens de/para "Nenhuma" só com o que entrou/saiu. As duas decisões do
     Rodolfo (taxa do iFood; operador ver o custo da receita) ficam como estão.
 
+11. **Veto do Guardião (1ª reprovação), corrigido** (decisão 90): o retrato do
+    preço gravado no histórico da ficha aparecia em "Últimas alterações" para
+    quem só tinha `fichas.ver` (o operador via "preço no iFood…"). Agora
+    `listarHistorico` exige `verPrecos` (todo leitor decide, o compilador
+    cobra): sem `precos.ver`, as linhas de `CanalConfig` (taxa, margem-alvo)
+    somem e da ficha saem preço, margem, custo na hora e embalagens por canal —
+    no servidor, antes do payload; a alteração que só tinha isso some inteira.
+    `obterFicha(…, { verPrecos })` (padrão: não); `/erp/historico` passa
+    `precos.ver`. Testes com banco montam a PÁGINA (detalhe e histórico) para o
+    operador e um perfil com `historico.ver` sem `precos.ver`. Junto: margens
+    exigem também `precos.ver`; "usar R$ X,90" respeita o limite; número grande
+    demais leva a frase do limite (a prévia usa `lerPrecos`); prejuízo em selo
+    cheio; no celular da lista, só os canais fora do alvo; histórico "R$ 29,90
+    (o sugerido era R$ 87,06)".
+
 ## Provar o preço por canal (1.10)
 
 ```bash

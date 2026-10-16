@@ -1326,3 +1326,9 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Razão:** (b): sem migration, no lugar onde o dono já olha ("Últimas alterações"), só o canal que mudou. O custo "na hora" é o lido DEPOIS da trava, na transação do preço; a nota que entra junto não espera o preço, e o histórico fica coerente (custo e margem do mesmo instante — teste de corrida). Se o custo mudou desde que a tela abriu, a frase avisa. Número para o DRE, se precisar, é herança (tabela própria na 2.x).
 
+### 90. 2026-10-23 · ERP 1.10 (veto do Guardião): o histórico obedece "ver preços" — o leitor declara, o servidor tira
+
+**Alternativas:** (a) mover o retrato do preço para uma entidade própria e filtrá-la como `NotaEntrada`; (b) `listarHistorico` com `verPrecos` OBRIGATÓRIO: sem ele, some a entidade `CanalConfig` e saem da ficha os campos de precificação (preço, margem, custo na hora, embalagens por canal; taxa e alvo vão com a entidade); linha que só tinha isso some.
+
+**Razão:** (b). (a) cobriria só o preço e deixaria as embalagens e qualquer campo futuro na ficha; (b) é uma regra só, num lugar só, e o tipo obriga todo leitor (os 12 de hoje e os próximos) a decidir — esquecer não compila. O corte é no servidor, antes de virar texto da tela: o payload não leva. `obterFicha` nega por padrão. Os campos de precificação são uma lista (`CAMPOS_DE_PRECIFICACAO`) ao lado dos rótulos do histórico: campo novo de preço entra nela.
+
