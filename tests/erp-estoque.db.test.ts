@@ -524,6 +524,56 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
     expect(de.ok && !('jaFeito' in de && de.jaFeito)).toBe(true);
   });
 
+  it('herança a da 1.6: contagem no teto com valor acima de R$ 1 milhão é recusada com frase (conferência e concluir), nada no razão', async () => {
+    const lt = await cadastrarLoja(a, { nome: 'Loja do teto' }, 'Marina');
+    if (!lt.ok) throw new Error(JSON.stringify(lt));
+    ids.teto = lt.id;
+    expect((await iniciarAbertura(a, DONA(), ids.teto, 'Marina')).ok).toBe(true);
+    const c = (await obterContagemDeAbertura(a, DONA(), ids.teto))!;
+    const ched = c.itens.find((i) => i.nome === 'Cheddar fatiado')!;
+    // 100 mil kg (o teto da contagem) × R$ 18,98/kg = R$ 1,9 milhão.
+    expect(await contar(DONA(), 'Marina', ids.teto, ched, '', '100000')).toMatchObject({ ok: true });
+    expect(await contar(DONA(), 'Marina', ids.teto, ched, '', '100000,001')).toMatchObject({ ok: false });
+    const conf = (await conferenciaDaAbertura(a, DONA(), ids.teto))!;
+    expect(conf.acimaDoTeto).toEqual([expect.stringMatching(/“Cheddar fatiado” daria mais de R\$ 1\.000\.000,00/)]);
+    expect(await concluirAbertura(a, DONA(), ids.teto, { versao: conf.contagem!.versao, confirmarNaoContados: true }, 'Marina')).toMatchObject({
+      ok: false,
+      erros: { geral: expect.stringMatching(/daria mais de R\$ 1\.000\.000,00/) },
+    });
+    expect(await a.movimentoEstoque.count({ where: { lojaId: ids.teto } })).toBe(0);
+    // Guardanapo no teto (100 mil un × R$ 0,03 = R$ 3.000): cabe. Conclui.
+    const item = (await obterContagemDeAbertura(a, DONA(), ids.teto))!.itens;
+    expect(await contar(DONA(), 'Marina', ids.teto, item.find((i) => i.nome === 'Cheddar fatiado')!, '', '')).toMatchObject({ ok: true });
+    expect(await contar(DONA(), 'Marina', ids.teto, item.find((i) => i.nome === 'Guardanapo')!, '', '100000')).toMatchObject({ ok: true });
+    const conf2 = (await conferenciaDaAbertura(a, DONA(), ids.teto))!;
+    expect(conf2.acimaDoTeto).toEqual([]);
+    expect(await concluirAbertura(a, DONA(), ids.teto, { versao: conf2.contagem!.versao, confirmarNaoContados: true }, 'Marina')).toMatchObject({ ok: true });
+    expect(await saldo(ids.teto, ids.guardanapo)).toEqual({ quantidadeMilesimos: 100_000_000, valorCentavos: 300_000 });
+  });
+
+  it('herança a da 1.6: nota que levaria o saldo além do INTEGER recebe a frase (nada gravado), não 500', async () => {
+    const nota = (numero: string, caixas: string, valor: string) => ({
+      lojaId: ids.teto,
+      fornecedorId: ids.fornecedor,
+      numero,
+      serie: '',
+      data: hoje,
+      frete: '',
+      total: valor,
+      itens: [{ insumoId: ids.guardanapo, embalagem: 'padrao', quantidade: caixas, valor }],
+    });
+    // 4.000 caixas de 500 = 2 milhões de un (o teto da nota): o saldo vai a 2,1 bilhões de milésimos — cabe.
+    expect(await lancarNota(a, DONA(), nota('900', '4000', '60000,00'), 'Marina')).toMatchObject({ ok: true });
+    expect((await saldo(ids.teto, ids.guardanapo))!.quantidadeMilesimos).toBe(2_100_000_000);
+    const antes = await a.movimentoEstoque.count({ where: { lojaId: ids.teto } });
+    // Mais 200 caixas passariam de 2.147.483.647: frase, e a nota não fica lançada.
+    const r = await lancarNota(a, DONA(), nota('901', '200', '3000,00'), 'Marina');
+    expect(r).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/“Guardanapo” passaria do limite do sistema/) } });
+    expect(await a.notaEntrada.count({ where: { numero: '901' } })).toBe(0);
+    expect(await a.movimentoEstoque.count({ where: { lojaId: ids.teto } })).toBe(antes);
+    expect(await razaoCoerente()).toEqual({ divergentes: 0, quebrados: 0 });
+  });
+
   it('isolamento: o parceiro B não enxerga a contagem, o saldo nem o razão de A (nem por SQL cru no contexto dele)', async () => {
     expect(await b.movimentoEstoque.count()).toBe(0);
     expect(await b.saldoEstoque.count()).toBe(0);

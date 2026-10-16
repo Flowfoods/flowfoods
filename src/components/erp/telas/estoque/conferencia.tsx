@@ -105,6 +105,16 @@ export function TelaConferencia({
         </div>
       </div>
 
+      {c.acimaDoTeto.length > 0 && (
+        <Aviso tom="erro" titulo="Tem número grande demais nesta contagem: não dá para concluir assim.">
+          <ul className="list-disc space-y-1 pl-5">
+            {c.acimaDoTeto.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </Aviso>
+      )}
+
       {c.notasDeHoje > 0 && (
         <Aviso tom="alerta" titulo={`${c.notasDeHoje} ${c.notasDeHoje === 1 ? 'nota de hoje já foi lançada' : 'notas de hoje já foram lançadas'} nesta loja.`}>
           O que veio nelas tem de estar na contagem: notas lançadas antes de concluir não entram de novo no estoque.

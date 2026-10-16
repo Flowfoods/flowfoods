@@ -48,6 +48,7 @@ import {
 } from './compra-campos';
 import { lojasComCompras, ultimasCompras, type UltimaCompra } from './compras-custo';
 import { aplicarNotaNoEstoque, efeitoPrevistoDaNota, estoqueDaNota, travarAberturas } from './estoque';
+import { ErroDeTeto } from './estoque-campos';
 import { formatarRendimento, porUnidadeDeRendimento, TIPOS_DE_FICHA, type CustoDaFicha } from './ficha-campos';
 import { lerCascata } from './ficha-custos';
 import { cascataDeCusto, PROFUNDIDADE_MAXIMA, type FichaDaCascata } from './ficha-cascata';
@@ -143,6 +144,7 @@ export async function editarFornecedor(
     });
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
+    if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
     if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, d.nome);
     throw e;
   }
@@ -180,6 +182,7 @@ export async function mudarSituacaoFornecedor(
     });
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
+    if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
     throw e;
   }
 }
@@ -496,6 +499,7 @@ export async function lancarNota(cliente: ClienteDoParceiro, alcance: Alcance, e
     });
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
+    if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
     if (ehErroDeUnicidade(e)) return { ok: false, erros: { numero: MENSAGEM_CORRIDA } };
     throw e;
   }
@@ -623,6 +627,7 @@ export async function editarNota(
     });
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
+    if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
     if (ehErroDeUnicidade(e)) return { ok: false, erros: { numero: MENSAGEM_CORRIDA } };
     throw e;
   }
@@ -669,6 +674,7 @@ export async function cancelarNota(
     });
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
+    if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
     throw e;
   }
 }

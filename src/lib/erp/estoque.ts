@@ -39,6 +39,8 @@ import {
   chaveDoSaldo,
   efeitoDaNota,
   entradasDaNota,
+  ErroDeTeto,
+  estouroDoRazao,
   estadoDoEstoque,
   estornoDe,
   fraseDoEfeito,
@@ -47,6 +49,8 @@ import {
   resumoDaContagem,
   somarValores,
   textoDaContagem,
+  totalAcimaDoLimite,
+  valorAcimaDoTeto,
   valorDaQuantidade,
   type ContagemDigitada,
   type EstadoDoEstoque,
@@ -97,6 +101,7 @@ async function comRecusa<T>(fn: () => Promise<T>): Promise<T | Recusada> {
     return await fn();
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
+    if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
     throw e;
   }
 }
@@ -216,6 +221,9 @@ export async function gravarMovimentos(
     new Map(travados.map((s) => [chaveDoSaldo(s.lojaId, s.insumoId), { quantidadeMilesimos: s.quantidadeMilesimos, valorCentavos: s.valorCentavos }])),
     movimentos,
   );
+  // Herança a da 1.6: estourar o INTEGER vira frase, nunca 500 (nada gravado: a transação volta).
+  const estouro = estouroDoRazao(linhas, finais);
+  if (estouro) throw new ErroDeTeto(estouro);
   const quando = opcoes.ocorridoEm ?? new Date();
   await tx.movimentoEstoque.createMany({
     data: linhas.map((m) => ({
@@ -722,7 +730,7 @@ export async function conferenciaDaAbertura(cliente: ClienteDoParceiro, alcance:
         where: { lojaId, tipo: 'ABERTURA', status: { not: 'CANCELADA' } },
         select: { id: true, status: true, versao: true, criadoEm: true, iniciadaPorNome: true, fechadaEm: true, fechadaPorNome: true, valorTotalCentavos: true },
       });
-      if (!c) return { loja, contagem: null, resumo: resumoDaContagem([]), linhas: [] as LinhaDaConferencia[], valorCentavos: 0, semCusto: [] as LinhaDaConferencia[], notasDeHoje: 0 };
+      if (!c) return { loja, contagem: null, resumo: resumoDaContagem([]), linhas: [] as LinhaDaConferencia[], valorCentavos: 0, semCusto: [] as LinhaDaConferencia[], notasDeHoje: 0, acimaDoTeto: [] as string[] };
       const itens = await tx.contagemItem.findMany({ where: { contagemId: c.id }, orderBy: { insumoNomeSnapshot: 'asc' }, select: SELECAO_DO_ITEM });
       const custos = await custosDeReferencia(
         tx,
@@ -745,6 +753,7 @@ export async function conferenciaDaAbertura(cliente: ClienteDoParceiro, alcance:
       const soma = somarValores(contadas.map((l) => l.valorCentavos));
       // Notas desta loja com data de hoje já lançadas: o que chegou hoje e já está na prateleira.
       const notasDeHoje = await tx.notaEntrada.count({ where: { lojaId, status: 'LANCADA', entradaEm: new Date(`${hojeNoRio()}T00:00:00.000Z`) } });
+      const acimaDoTeto = [...contadas.map((l) => valorAcimaDoTeto(l.nome, l.valorCentavos)), totalAcimaDoLimite(soma.centavos)].filter((x): x is string => !!x);
       return {
         loja,
         contagem: c,
@@ -753,6 +762,7 @@ export async function conferenciaDaAbertura(cliente: ClienteDoParceiro, alcance:
         valorCentavos: soma.centavos,
         semCusto: contadas.filter((l) => l.valorCentavos === null),
         notasDeHoje,
+        acimaDoTeto,
       };
     }),
   );
@@ -823,8 +833,11 @@ export async function concluirAbertura(
             chave: `abertura:${i.id}`,
             contagemItemId: i.id,
           }));
-        await gravarMovimentos(tx, movimentos, { ocorridoEm: abertoEm, garantir: itens.map((i) => ({ lojaId, insumoId: i.insumoId })) });
+        // Herança a da 1.6: valor por item e total conferidos antes do banco (frase, nunca 500).
         const valorTotal = movimentos.reduce((s, m) => s + m.valorCentavos, 0);
+        const teto = movimentos.map((m) => valorAcimaDoTeto(m.insumoNome, m.valorCentavos)).find(Boolean) ?? totalAcimaDoLimite(valorTotal);
+        if (teto) throw new Recusa({ ok: false, erros: { geral: teto } });
+        await gravarMovimentos(tx, movimentos, { ocorridoEm: abertoEm, garantir: itens.map((i) => ({ lojaId, insumoId: i.insumoId })) });
         const semCusto = movimentos.filter((m) => custos.get(m.insumoId)?.porUnidade == null).length;
         await tx.contagem.updateMany({
           where: { id: c.id, status: 'ABERTA' },

@@ -12,6 +12,12 @@ import {
   chaveDoSaldo,
   efeitoDaNota,
   entradasDaNota,
+  estouroDoRazao,
+  LIMITE_DO_INTEIRO,
+  TETO_DA_CONTAGEM,
+  TETO_DO_VALOR_DO_ITEM,
+  totalAcimaDoLimite,
+  valorAcimaDoTeto,
   estadoDoEstoque,
   estornoDe,
   fraseDoEfeito,
@@ -203,5 +209,40 @@ describe('ERP 1.6 · saldo antes + quantidade = depois (a conta do CHECK do banc
   it('quantidade com sinal: "+15 kg" e "−2,5 kg"', () => {
     expect(sp(quantidadeComSinal(15000, 'KG'))).toBe('+15 kg');
     expect(sp(quantidadeComSinal(-2500, 'KG'))).toBe('−2,5 kg');
+  });
+});
+
+describe('herança a da 1.6: tetos que cabem no INTEGER, com frase', () => {
+  it('a contagem aceita até 100 mil kg/L/un por item; um milésimo a mais é recusado com a frase', () => {
+    expect(TETO_DA_CONTAGEM).toBe(100_000_000);
+    expect(lerContagem({ embalagens: '', solto: '100000', escala: 'base' }, { unidade: 'KG', embalagemConteudoMilesimos: null })).toMatchObject({ ok: true, lida: { contadoMilesimos: 100_000_000 } });
+    expect(lerContagem({ embalagens: '20000', solto: '', escala: 'base' }, CHEDDAR)).toMatchObject({ ok: true, lida: { contadoMilesimos: 100_000_000 } });
+    const r = lerContagem({ embalagens: '20000', solto: '0,001', escala: 'base' }, CHEDDAR);
+    expect(r).toMatchObject({ ok: false, erros: { solto: expect.stringMatching(/máximo de uma contagem/) } });
+    // O antigo teto (1 milhão de kg) caía aqui.
+    expect(lerContagem({ embalagens: '', solto: '1000000', escala: 'base' }, { unidade: 'KG', embalagemConteudoMilesimos: null }).ok).toBe(false);
+  });
+
+  it('valor de um item: até R$ 1 milhão passa; acima, a frase com o nome', () => {
+    expect(valorAcimaDoTeto('Cheddar', TETO_DO_VALOR_DO_ITEM)).toBeNull();
+    expect(valorAcimaDoTeto('Cheddar', null)).toBeNull();
+    expect(valorAcimaDoTeto('Cheddar', TETO_DO_VALOR_DO_ITEM + 1)).toMatch(/“Cheddar” daria mais de R\$ 1\.000\.000,00/);
+    // 100 mil kg (o teto) × R$ 26,75/kg = R$ 2.675.000: a contagem passa, o valor não.
+    const valor = valorDaQuantidade(custoPorUnidade({ centavos: 2675, milesimos: 1000 }), TETO_DA_CONTAGEM)!;
+    expect(valor).toBe(267_500_000);
+    expect(valorAcimaDoTeto('Carne', valor)).not.toBeNull();
+    expect(totalAcimaDoLimite(LIMITE_DO_INTEIRO)).toBeNull();
+    expect(totalAcimaDoLimite(LIMITE_DO_INTEIRO + 1)).toMatch(/R\$ 21 milhões/);
+  });
+
+  it('razão: movimento ou saldo que passaria do INTEGER vira a frase (no limite exato, passa)', () => {
+    const base = { lojaId: 'l', insumoId: 'i', tipo: 'ENTRADA_COMPRA' as const, insumoNome: 'Guardanapo', unidade: 'UN' as const, motivo: null, chave: 'k' };
+    const saldos = new Map([[chaveDoSaldo('l', 'i'), { quantidadeMilesimos: LIMITE_DO_INTEIRO - 10, valorCentavos: 0 }]]);
+    const cabe = aplicarNosSaldos(saldos, [{ ...base, quantidadeMilesimos: 10, valorCentavos: 5 }]);
+    expect(estouroDoRazao(cabe.linhas, cabe.finais)).toBeNull();
+    const passa = aplicarNosSaldos(saldos, [{ ...base, quantidadeMilesimos: 11, valorCentavos: 5 }]);
+    expect(estouroDoRazao(passa.linhas, passa.finais)).toMatch(/“Guardanapo” passaria do limite do sistema/);
+    const valor = aplicarNosSaldos(new Map([[chaveDoSaldo('l', 'i'), { quantidadeMilesimos: 0, valorCentavos: LIMITE_DO_INTEIRO }]]), [{ ...base, quantidadeMilesimos: 1, valorCentavos: 1 }]);
+    expect(estouroDoRazao(valor.linhas, valor.finais)).not.toBeNull();
   });
 });
