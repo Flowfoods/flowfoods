@@ -7,6 +7,7 @@
 import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { obterFicha } from '@/lib/erp/fichas';
+import { custoPorCanal } from '@/lib/erp/canais';
 import { lerFiltrosDeFicha, queryDosFiltrosDeFicha } from '@/lib/erp/ficha-campos';
 import { TelaDetalheFicha } from '@/components/erp/telas/fichas/detalhe';
 import { acaoSituacaoFicha } from '../actions';
@@ -20,6 +21,9 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
   exigirPermissaoNaPagina(ctx, 'fichas.ver');
   const ficha = await obterFicha(ctx.cliente, params.id);
   if (!ficha) notFound();
+  // 1.9: o custo por canal só sai do servidor para quem vê a precificação.
+  const verPrecos = pode(ctx.alcance, 'precos.ver');
+  const canais = verPrecos ? await custoPorCanal(ctx.cliente, ficha) : null;
   const de = queryDosFiltrosDeFicha(lerFiltrosDeFicha(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));
   return (
     <TelaDetalheFicha
@@ -31,6 +35,10 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
       bloqueio={ctx.bloqueio}
       acaoSituacao={acaoSituacaoFicha.bind(null, ficha.id)}
       linkDoInsumo={pode(ctx.alcance, 'insumos.ver') ? '/erp/insumos' : undefined}
+      canais={canais}
+      linkDasEmbalagens={pode(ctx.alcance, 'fichas.editar') && verPrecos && !ctx.bloqueio ? `${BASE}/${ficha.id}/canais` : undefined}
+      linkDaTaxa={verPrecos ? `${BASE}/canais` : undefined}
+      podeConfigurarTaxa={pode(ctx.alcance, 'precos.editar') && !ctx.bloqueio}
     />
   );
 }

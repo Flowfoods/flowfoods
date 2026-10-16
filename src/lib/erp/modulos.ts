@@ -44,7 +44,9 @@ export type ChaveIcone =
   | 'portal'
   | 'parceiros'
   | 'sistema'
-  | 'config';
+  | 'config'
+  // 1.9: canais de venda (loja, delivery, iFood) e a taxa do iFood.
+  | 'canais';
 
 export interface ItemNav {
   href: string;
@@ -226,6 +228,13 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
               icone: 'importar',
               subtitulo: 'Várias fichas de uma vez, com prévia',
               permissao: 'fichas.editar',
+            },
+            {
+              href: `${base}/fichas/canais`,
+              rotulo: 'Canais de venda',
+              icone: 'canais',
+              subtitulo: 'Loja, delivery e iFood: o que entra no custo de cada um',
+              permissao: 'precos.ver',
             },
           ],
         },

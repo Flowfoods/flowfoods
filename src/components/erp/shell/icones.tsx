@@ -16,6 +16,7 @@ import {
   Gauge,
   History,
   Inbox,
+  Bike,
   KeyRound,
   LayoutGrid,
   MapPin,
@@ -68,6 +69,7 @@ export const ICONES: Record<ChaveIcone, LucideIcon> = {
   parceiros: Handshake,
   sistema: SlidersHorizontal,
   config: Settings2,
+  canais: Bike,
 };
 
 export function Icone({ nome, ...props }: { nome: ChaveIcone } & LucideProps) {

@@ -63,6 +63,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/fichas',
       '/erp/fichas/nova',
       '/erp/fichas/importar',
+      '/erp/fichas/canais',
       '/erp/compras',
       '/erp/compras/nova',
       '/erp/compras/fornecedores',
@@ -82,6 +83,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     expect(h).toContain('/erp/insumos');
     expect(h).toContain('/erp/historico');
     expect(h).not.toContain('/erp/equipe');
+    // 1.9: vê os canais de venda (ver preços); mudar a taxa é da dona (a tela esconde o formulário).
+    expect(h).toContain('/erp/fichas/canais');
   });
 
   it('Operador: insumos, fichas, estoque (1.6: ele conta), lojas e Seu acesso; sem Equipe e Histórico; futuros só os que ele vai ver', () => {
@@ -136,6 +139,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/fichas',
       '/rodolfo/erp/valentins/fichas/nova',
       '/rodolfo/erp/valentins/fichas/importar',
+      '/rodolfo/erp/valentins/fichas/canais',
       '/rodolfo/erp/valentins/compras',
       '/rodolfo/erp/valentins/compras/nova',
       '/rodolfo/erp/valentins/compras/fornecedores',
