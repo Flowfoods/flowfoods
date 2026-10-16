@@ -96,6 +96,14 @@ export function periodoDaData(cfg: { tipo: TipoDePeriodo; diaInicio: number }, d
   return { inicio: inicioDoMes, fim: fimDoMes, nome };
 }
 
+/** "Cobertura da semana de 10/10 a 16/10" / "de outubro de 2026" / "da 1ª quinzena · …" / "de 15/10 a 14/11". */
+export function coberturaDe(nome: string): string {
+  if (/^Semana /.test(nome)) return `Cobertura da ${nome[0].toLowerCase()}${nome.slice(1)}`;
+  if (/^\dª quinzena/.test(nome)) return `Cobertura da ${nome}`;
+  if (/^\d/.test(nome)) return `Cobertura de ${nome}`;
+  return `Cobertura de ${nome[0].toLowerCase()}${nome.slice(1)}`;
+}
+
 /** O período anterior (o que contém a véspera do início). */
 export function periodoAnterior(cfg: { tipo: TipoDePeriodo; diaInicio: number }, p: Periodo): Periodo {
   return periodoDaData(cfg, somarDias(p.inicio, -1));
@@ -172,8 +180,8 @@ export function lerRegras(f: Partial<Record<CampoDasRegras, unknown>>): { ok: tr
   const a = inteiro('freqA', 1, 90, 'De 1 a 90 dias.');
   const b = inteiro('freqB', 1, 90, 'De 1 a 90 dias.');
   const c = inteiro('freqC', 1, 90, 'De 1 a 90 dias.');
-  if (!erros.freqA && !erros.freqB && a > b) erros.freqB = 'A curva B não pode ser contada mais vezes que a A: use um número maior ou igual ao da A.';
-  if (!erros.freqB && !erros.freqC && b > c) erros.freqC = 'A curva C não pode ser contada mais vezes que a B: use um número maior ou igual ao da B.';
+  if (!erros.freqA && !erros.freqB && a > b) erros.freqB = 'Os médios (B) não podem ser contados mais vezes que os mais caros (A): use um número maior ou igual ao da A.';
+  if (!erros.freqB && !erros.freqC && b > c) erros.freqC = 'Os menores (C) não podem ser contados mais vezes que os médios (B): use um número maior ou igual ao da B.';
   const tolTxt = txt('tolerancia').replace(/^R\$\s*/i, '');
   const tol = tolTxt === '' ? null : lerDinheiro(tolTxt);
   if (tol === null || tol < 0 || tol > 100_000) erros.tolerancia = 'Tolerância em reais, de 0,00 a 1.000,00 (0 = só fecha sozinha se bater exato).';
@@ -235,7 +243,10 @@ export const PARA_CONTAR: ReadonlySet<SituacaoDoItem> = new Set(['nunca', 'venci
 
 export type Quais = 'vencidos' | 'todos' | 'A';
 
-export const ROTULO_DE_QUAIS: Record<Quais, string> = { vencidos: 'Vencidos', todos: 'Todos do lugar', A: 'Curva A' };
+export const ROTULO_DE_QUAIS: Record<Quais, string> = { vencidos: 'Vencidos', todos: 'Todos daqui', A: 'Mais caros (A)' };
+
+/** A classe ABC em palavras: "Mais caro (A)", "Médio (B)", "Menor (C)". */
+export const ROTULO_DA_CLASSE: Record<Classe, string> = { A: 'Mais caro (A)', B: 'Médio (B)', C: 'Menor (C)' };
 
 /** O que já vem marcado no planejamento: o lugar escolhido e "quais" (vencidos, todos ou curva A); quem está em outra contagem aberta, nunca. */
 export function sugerido(i: { conservacao: Conservacao; classe: Classe; situacao: SituacaoDoItem; emOutraContagem: boolean }, filtro: { conservacao: Conservacao | ''; quais: Quais }): boolean {

@@ -1,4 +1,4 @@
-// Scanner avoid-ai-design, SD4d (P2) aceito: "Curva A · R$ 840,00" e "3 de 5 contados · prazo 17/10" são linhas de apoio da lista densa, no padrão "A · B" das telas da 1.1–1.6.
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Mais caro (A) · R$ 840,00" e "3 de 5 contados · prazo 17/10" são linhas de apoio da lista densa, no padrão "A · B" das telas da 1.1–1.6.
 /**
  * Período e contagens da loja (1.7), a MESMA tela no nível 1 e no parceiro:
  * a cobertura do período contra o piso (valor e insumos), o que falta contar
@@ -279,7 +279,7 @@ export function TelaPeriodo({
                 <div className="flex flex-col gap-0.5">
                   <dt className="text-suave">Contar a cada</dt>
                   <dd className="tabular-nums text-texto">
-                    A {s.regras.freqADias} dias · B {s.regras.freqBDias} · C {s.regras.freqCDias}
+                    mais caros (A) {s.regras.freqADias} dias · médios (B) {s.regras.freqBDias} · menores (C) {s.regras.freqCDias}
                   </dd>
                 </div>
                 <div className="flex flex-col gap-0.5">

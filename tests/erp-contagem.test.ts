@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ajustesDaContagem,
   camposDasRegras,
+  coberturaDe,
   coberturaDoPeriodo,
   curvaAbc,
   divergenciaDoItem,
@@ -214,5 +215,14 @@ describe('regras da loja (piso, frequência, tolerância)', () => {
     if (r.ok) return;
     expect(Object.keys(r.erros).sort()).toEqual(['freqB', 'freqC', 'pisoItens', 'pisoValor', 'tolerancia']);
     expect(r.erros.freqB).toMatch(/maior ou igual ao da A/);
+  });
+});
+
+describe('textos do período', () => {
+  it('"Cobertura da semana…", "de outubro…", "da 1ª quinzena…", "de 15/10 a 14/11"', () => {
+    expect(coberturaDe('Semana de 10/10 a 16/10')).toBe('Cobertura da semana de 10/10 a 16/10');
+    expect(coberturaDe('Outubro de 2026')).toBe('Cobertura de outubro de 2026');
+    expect(coberturaDe('1ª quinzena · 01/10 a 15/10')).toBe('Cobertura da 1ª quinzena · 01/10 a 15/10');
+    expect(coberturaDe('15/10 a 14/11')).toBe('Cobertura de 15/10 a 14/11');
   });
 });

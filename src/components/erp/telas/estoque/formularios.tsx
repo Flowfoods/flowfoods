@@ -236,9 +236,9 @@ export function FormRegrasDaContagem({ acao, campos, lidas }: { acao: AcaoDeEsto
       </fieldset>
       <fieldset className="grid gap-4 sm:grid-cols-3">
         <legend className="mb-2 text-[13px] font-semibold text-texto">Contar de quantos em quantos dias</legend>
-        {campo('freqA', 'Curva A', 'dias')}
-        {campo('freqB', 'Curva B', 'dias')}
-        {campo('freqC', 'Curva C', 'dias')}
+        {campo('freqA', 'Mais caros (A)', 'dias')}
+        {campo('freqB', 'Médios (B)', 'dias')}
+        {campo('freqC', 'Menores (C)', 'dias')}
       </fieldset>
       {campo('tolerancia', 'Diferença que ainda fecha sozinha', 'R$ por item', 'Se todo item bater até este valor, a contagem fecha sem o gerente. 0 = só se bater exato.')}
       <ErroGeral estado={estado} />

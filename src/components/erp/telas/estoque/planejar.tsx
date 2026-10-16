@@ -1,4 +1,4 @@
-// Scanner avoid-ai-design, SD4d (P2) aceito: "Curva A · contado em 06/10 · venceu" é linha de apoio da lista densa, no padrão "A · B" das telas da 1.1–1.6.
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Mais caro (A) · contado em 06/10 · venceu" é linha de apoio da lista densa, no padrão "A · B" das telas da 1.1–1.6.
 /**
  * Planejar a contagem do dia (1.7), a MESMA tela no nível 1 e no parceiro:
  * o lugar (conservação: é onde se conta) e "quais" (vencidos pela frequência
@@ -9,7 +9,7 @@
  */
 
 import type { PlanejamentoDoCiclo } from '@/lib/erp/contagem';
-import { ROTULO_DE_QUAIS, type Quais } from '@/lib/erp/contagem-campos';
+import { ROTULO_DA_CLASSE, ROTULO_DE_QUAIS, type Quais } from '@/lib/erp/contagem-campos';
 import { CONSERVACOES, ORDEM_DAS_CONSERVACOES, type Conservacao } from '@/lib/erp/validade';
 import { COR } from '@/lib/erp/modulos';
 import { formatarData } from '@/lib/erp/compra-campos';
@@ -37,7 +37,7 @@ export function lerFiltroDoPlanejamento(sp: Record<string, string | string[] | u
 const DIA_MES = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
 
 function apoio(l: PlanejamentoDoCiclo['linhas'][number]): string {
-  const partes = [`Curva ${l.classe}`];
+  const partes = [ROTULO_DA_CLASSE[l.classe]];
   if (!l.ultima) partes.push('nunca contado aqui');
   else partes.push(`contado em ${DIA_MES.format(l.ultima)}`);
   if (l.situacao === 'vencido') partes.push(`venceu ${l.venceEm ? formatarData(l.venceEm, true) : ''}`.trim());
@@ -100,7 +100,7 @@ export function TelaPlanejarCiclo({
         </Aviso>
       )}
       <p className="max-w-3xl text-sm text-suave">
-        Conte um pedaço por vez, pelo lugar. A frequência vem da curva ABC (o que mais pesa em valor): A a cada {p.regras.freqADias} dias, B a cada {p.regras.freqBDias}, C a cada {p.regras.freqCDias}. Vencido = passou da frequência desde a última contagem.
+        Conte um pedaço por vez, pelo lugar. O que mais pesa em valor volta mais vezes: os mais caros (A) a cada {p.regras.freqADias} dias, os médios (B) a cada {p.regras.freqBDias}, os menores (C) a cada {p.regras.freqCDias}. Vencido = passou desse prazo desde a última contagem.
       </p>
       <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:flex-wrap">
         <FiltroEmLinks
