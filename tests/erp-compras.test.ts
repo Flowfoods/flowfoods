@@ -22,6 +22,7 @@ import {
   lerFormNota,
   lerFiltrosDeNota,
   normalizarCodigo,
+  numeroDaNota,
   quantidadeDoItem,
   queryDosFiltrosDeNota,
   ratearFrete,
@@ -261,6 +262,12 @@ describe('ERP 1.5 · número, data, documento, filtros', () => {
     expect(erroDoFormatoDaData('14/10/2026')).toBeNull();
     expect(erroDoFormatoDaData('14/10')).toBe('Data incompleta: use dd/mm/aaaa (ex.: 14/10/2026).');
     expect(erroDoFormatoDaData('31/02/2026')).toBe('31/02/2026 não existe no calendário.');
+  });
+
+  it('herança da 1.5: o número da nota é o mesmo na lista do desktop e do celular ("4521-1")', () => {
+    expect(numeroDaNota({ numero: '4521', serie: '1' })).toBe('4521-1');
+    expect(numeroDaNota({ numero: '4521', serie: '' })).toBe('4521');
+    expect(numeroDaNota({ numero: null, serie: '' })).toBe('s/n');
   });
 
   it('CPF/CNPJ com dígito verificador', () => {

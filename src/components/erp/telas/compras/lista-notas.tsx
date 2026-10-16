@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { LinhaDeNota } from '@/lib/erp/compras';
-import { formatarData, NOTAS_POR_PAGINA, queryDosFiltrosDeNota, temFiltroDeNota, type FiltrosDeNota } from '@/lib/erp/compra-campos';
+import { formatarData, NOTAS_POR_PAGINA, numeroDaNota, queryDosFiltrosDeNota, temFiltroDeNota, type FiltrosDeNota } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
@@ -235,8 +235,7 @@ export function TelaListaNotas({
               <span className="min-w-0">
                 <span className={`block truncate font-medium ${n.cancelada ? 'text-suave line-through' : 'text-texto'}`}>{n.fornecedor}</span>
                 <span className="block text-[12px] tabular-nums text-suave">
-                  Nota {n.numero}
-                  {n.serie ? `-${n.serie}` : ''} · {formatarData(n.entradaEm)}
+                  Nota {numeroDaNota(n)} · {formatarData(n.entradaEm)}
                 </span>
                 <span className="block truncate text-[12px] text-suave">
                   {n.loja} · {n.itens} {n.itens === 1 ? 'item' : 'itens'}
@@ -291,8 +290,7 @@ export function TelaListaNotas({
                 <div className="text-[12px] text-suave md:hidden">{n.loja}</div>
               </td>
               <td className="whitespace-nowrap px-3 py-2 text-suave">
-                {n.numero}
-                {n.serie ? <span className="text-[12px]"> série {n.serie}</span> : null}
+                Nota {numeroDaNota(n)}
               </td>
               <td className="hidden px-3 py-2 text-suave md:table-cell">{n.loja}</td>
               <td className="hidden px-3 py-2 text-right text-suave lg:table-cell">{n.itens}</td>

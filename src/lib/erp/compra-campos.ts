@@ -136,6 +136,11 @@ export function formatarData(d: string | Date, curta = false): string {
   return curta ? `${dia}/${m}` : `${dia}/${m}/${a}`;
 }
 
+/** Número curto da nota, igual em toda lista (desktop e celular): "4521-1", "4521", "s/n". */
+export function numeroDaNota(n: { numero: string | null; serie: string }): string {
+  return `${n.numero ?? 's/n'}${n.serie ? `-${n.serie}` : ''}`;
+}
+
 /** "Nota 123 · série 1" / "Nota 123". */
 export function rotuloDaNota(n: { numero: string | null; serie: string }): string {
   return `Nota ${n.numero ?? 's/n'}${n.serie ? ` · série ${n.serie}` : ''}`;
