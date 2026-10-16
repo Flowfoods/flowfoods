@@ -198,10 +198,11 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
   it('número por loja em corrida: dois pedidos juntos dão #2 e #3', async () => {
     const [x, y] = await Promise.all([pedir(COZINHA(), 'Ana', [{ insumoId: ids.pao, quantidade: '12' }]), pedir(COZINHA(), 'Bia', [{ insumoId: ids.batata, quantidade: '1' }], { setor: 'SALAO' })]);
     expect(x.ok && y.ok).toBe(true);
-    const ns = await a.requisicao.findMany({ where: { id: { in: [(x as { id: string }).id, (y as { id: string }).id] } }, select: { numero: true } });
+    const ns = await a.requisicao.findMany({ where: { id: { in: [(x as { id: string }).id, (y as { id: string }).id] } }, select: { id: true, numero: true } });
     expect(ns.map((n) => n.numero).sort()).toEqual([2, 3]);
-    ids.r2 = (x as { id: string }).id;
-    ids.r3 = (y as { id: string }).id;
+    // Herança c da 1.8: a corrida decide quem fica com #2 — os testes seguintes falam do NÚMERO, não da ordem do Promise.all.
+    ids.r2 = ns.find((n) => n.numero === 2)!.id;
+    ids.r3 = ns.find((n) => n.numero === 3)!.id;
   });
 
   it('isolamento e alcance: B não vê; gerente da Delivery não vê nem entrega na Penha', async () => {
