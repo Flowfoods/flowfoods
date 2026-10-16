@@ -1,7 +1,7 @@
-﻿ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade;fator
+﻿ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade;fator;conservacao;validade_seco;validade_pista_fria;validade_refrigerado;validade_congelado
 X-Burger;prato;1;porção;Pão brioche, blend 180 g e cheddar;"Selar o blend 2 min de cada lado. Derreter o cheddar por cima. Montar: pão, blend, cheddar.";Pão brioche;1;un
 X-Burger;;;;;;Blend bovino 180 g;1;un
 X-Burger;;;;;;Queijo cheddar fatiado;40;g
 X-Burger;;;;;;Cebola;20;g;1,18
-Molho da casa;pré-preparo;1;kg;Base do X-Burger;Bater tudo e guardar refrigerado.;Maionese;800;g
+Molho da casa;pré-preparo;1;kg;Base do X-Burger;Bater tudo e guardar refrigerado.;Maionese;800;g;;refrigerado;;;3 dias;30 dias
 Molho da casa;;;;;;Mostarda;200;g

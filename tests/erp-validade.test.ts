@@ -11,6 +11,8 @@ import { afterAll, describe, expect, it } from 'vitest';
 import { FAXINA, faxinarPendentes, faxinarPendentesDeVezEmQuando } from '@/lib/erp/arquivos';
 import { lerFormFicha, retratoDaFicha, type InsumoDaFicha, type PreparoDaFicha } from '@/lib/erp/ficha-campos';
 import { lerFormInsumo } from '@/lib/erp/insumo-campos';
+import { readFileSync } from 'node:fs';
+import { casarComInsumos, decodificarPlanilha, lerPlanilhaDeFichas } from '@/lib/erp/ficha-planilha';
 import {
   colunasDaValidade,
   entradaDoFormulario,
@@ -208,6 +210,69 @@ describe('ERP 1.4 · planilha: célula de validade e de conservação', () => {
     expect(lerConservacaoDaPlanilha('ambiente')).toBe('SECO');
     expect(lerConservacaoDaPlanilha('')).toBeUndefined();
     expect(lerConservacaoDaPlanilha('forno')).toBeNull();
+  });
+});
+
+describe('ERP 1.4 · planilha com e sem as colunas novas', () => {
+  const insumos = new Map([['cheddar', [{ id: 'c' }]]]);
+  const doCadastro = new Map([['c', ins('c', 'Cheddar')]]);
+
+  it('planilha da 1.2/1.3 (sem as colunas) continua lendo, e não diz nada da validade (a ficha mantém a dela)', () => {
+    const l = lerPlanilhaDeFichas('ficha;tipo;rende;unidade_rende;insumo;quantidade;unidade;fator\nMolho cheddar;pré-preparo;2;kg;Cheddar;1;kg;\n');
+    expect(l.erros).toEqual([]);
+    const f = l.fichas[0];
+    expect(f.erros).toEqual([]);
+    const { entrada } = casarComInsumos(f, insumos);
+    expect(entrada.validade).toBeUndefined();
+    const r = lerFormFicha(entrada, doCadastro);
+    expect(r.ok && r.dados.validades).toBeNull();
+  });
+
+  it('com as colunas: refrigerado 3 dias (principal) e congelado 30 dias, preenchidas numa linha só da ficha', () => {
+    const csv = [
+      'ficha;tipo;rende;unidade_rende;insumo;quantidade;unidade;conservacao;validade_refrigerado;validade_congelado',
+      'Molho cheddar;pré-preparo;2;kg;Cheddar;1;kg;Refrigerado;3 dias;30',
+      'Molho cheddar;;;;Cheddar;100;g;;;',
+    ].join('\n');
+    const f = lerPlanilhaDeFichas(csv).fichas[0];
+    expect(f.erros).toEqual([]);
+    const { entrada } = casarComInsumos(f, insumos);
+    const r = lerFormFicha({ ...entrada, itens: entrada.itens.slice(0, 1) }, doCadastro);
+    expect(r.ok && r.dados.validades).toEqual({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 4320, CONGELADO: 43_200 } });
+  });
+
+  it('cabeçalho sem acento/underline e só uma validade: ela é a principal', () => {
+    const f = lerPlanilhaDeFichas('ficha,tipo,rende,unidade_rende,insumo,quantidade,unidade,Validade Pista Fria\nVinagrete,pre-preparo,1,kg,Cheddar,1,kg,6 h\n').fichas[0];
+    const r = lerFormFicha(casarComInsumos(f, insumos).entrada, doCadastro);
+    expect(r.ok && r.dados.validades).toEqual({ principal: 'PISTA_FRIA', minutos: { PISTA_FRIA: 360 } });
+  });
+
+  it('erros com a linha: validade ilegível, conservação desconhecida, divergência entre linhas, principal sem validade', () => {
+    const csv = [
+      'ficha;tipo;rende;unidade_rende;insumo;quantidade;unidade;conservacao;validade_refrigerado;validade_congelado',
+      'A;pré-preparo;1;kg;Cheddar;1;kg;;2 semanas;',
+      'B;pré-preparo;1;kg;Cheddar;1;kg;forno;;',
+      'C;pré-preparo;1;kg;Cheddar;1;kg;;3;',
+      'C;;;;Cheddar;1;kg;;4;',
+    ].join('\n');
+    const l = lerPlanilhaDeFichas(csv);
+    const erro = (n: string) => l.fichas.find((f) => f.nome === n)!.erros;
+    expect(erro('A')).toEqual([{ linha: 2, mensagem: 'Validade “2 semanas” em refrigerado: use dias ou horas inteiros (ex.: 3 dias, 12 h).' }]);
+    expect(erro('B')[0]).toMatchObject({ linha: 3, mensagem: expect.stringMatching(/Conservação “forno” não existe/) });
+    expect(erro('C')[0]).toMatchObject({ linha: 5, mensagem: expect.stringMatching(/Validade em refrigerado diferente/) });
+    const D = lerPlanilhaDeFichas('ficha;tipo;rende;unidade_rende;insumo;quantidade;unidade;conservacao\nD;pré-preparo;1;kg;Cheddar;1;kg;congelado\n').fichas[0];
+    const r = lerFormFicha(casarComInsumos(D, insumos).entrada, doCadastro);
+    expect(!r.ok && r.erros['validade-CONGELADO']).toMatch(/Diga quanto dura em congelado/);
+  });
+
+  it('o modelo para baixar tem as colunas novas e lê sem erro', () => {
+    const texto = decodificarPlanilha(new Uint8Array(readFileSync('public/modelos/fichas-tecnicas.csv')));
+    const l = lerPlanilhaDeFichas(texto);
+    expect(l.erros).toEqual([]);
+    const molho = l.fichas.find((f) => f.nome === 'Molho da casa')!;
+    expect(molho.erros).toEqual([]);
+    expect(molho.validade).toEqual({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 4320, CONGELADO: 43_200 } });
+    expect(l.fichas.find((f) => f.nome === 'X-Burger')!.validade).toEqual({ principal: null, minutos: {} });
   });
 });
 

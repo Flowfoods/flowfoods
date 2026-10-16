@@ -78,6 +78,8 @@ const PALAVRA: Record<string, string> = {
   descricao: 'descrição',
   modoPreparo: 'modo de preparo',
   itens: 'insumos e quantidades',
+  conservacao: 'conservação',
+  validade: 'validade',
 };
 
 const intervalo = (linhas: number[]) => {

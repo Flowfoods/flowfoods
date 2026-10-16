@@ -609,6 +609,8 @@ export async function editarFicha(
         const { doCadastro, preparos, jaNaFicha } = await cadastroDaEntrada(tx, entrada, atual);
         const lido = lerFormFicha(entrada, doCadastro, jaNaFicha, { preparos, propriaId: atual.id });
         if (!lido.ok) throw new RecusaDaFicha(lido);
+        // Envio sem o bloco de validade (1.4) não apaga a que a ficha tem.
+        if (entrada.validade === undefined) lido.dados.validades = validadesDaLinha(atual);
         nome = lido.dados.nome;
         await conferirEstrutura(tx, lido.dados, atual, doCadastro);
         const r = await gravarFicha(tx, {
