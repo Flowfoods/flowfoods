@@ -1284,3 +1284,9 @@ banco de teste: o operador é recusado pelo servidor.
 - Variantes de embalagem na contagem, recontagem com as duas versões e
   motivo (hoje: antes/depois no histórico), paginação para milhares de
   insumos (planejar e saldo leem tudo).
+
+## Herança da 1.7 (apontada pelos fiscais)
+
+- [baixo] A idade do número digitado vem do aparelho: forjá-la empurra o esperado até o início da contagem (fica visível como "depois de contar" e trava o "fecha sozinha"; só o gerente aplica).
+- UX: coluna "Contado" corta a conta de embalagens ("1 × 2 kg + 600 g" em linha própria); "sem preço · confira" mais curto na coluna Diferença.
+- 1.8: cruzar requisição × contagem; diferenças pequenas repetidas dentro da tolerância precisam de vigilância. 2.3: CMV desconta o que se moveu entre o fim do período e o fechamento. Sem lembretes de contagem nem link sem login; planejamento e saldo sem paginação.
