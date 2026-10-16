@@ -39,10 +39,11 @@ export type Conservacao = keyof typeof CONSERVACOES;
 export type Erros = Record<string, string>;
 
 const MARCADO = new Set(['on', 'sim', 'true', '1']);
-const marcado = (v: unknown) => typeof v === 'string' && MARCADO.has(v);
+export const marcado = (v: unknown) => typeof v === 'string' && MARCADO.has(v);
 const texto = (v: unknown) => (typeof v === 'string' ? v : '');
 
-function nome(max: number) {
+/** Nome obrigatório (2..max letras, espaços colapsados): insumo, embalagem, ficha. */
+export function nomeObrigatorio(max: number) {
   return z
     .string({ message: 'Dê um nome.' })
     .trim()
@@ -51,7 +52,7 @@ function nome(max: number) {
     .transform((s) => s.replace(/\s+/g, ' '));
 }
 
-function primeiroErroPorCampo(issues: readonly { path: PropertyKey[]; message: string }[]): Erros {
+export function primeiroErroPorCampo(issues: readonly { path: PropertyKey[]; message: string }[]): Erros {
   const erros: Erros = {};
   for (const i of issues) erros[String(i.path[0] ?? 'geral')] ??= i.message;
   return erros;
@@ -103,7 +104,7 @@ export function lerEmbalagem(entrada: Record<string, unknown>, unidade: Unidade,
 // --------------------------------------------------------------- insumo
 
 const formInsumo = z.object({
-  nome: nome(80),
+  nome: nomeObrigatorio(80),
   tipo: z.enum(['INGREDIENTE', 'EMBALAGEM', 'PRE_PREPARO'], { message: 'Escolha o tipo.' }).default('INGREDIENTE'),
   unidade: z.enum(['KG', 'L', 'UN'], { message: 'Escolha a unidade.' }),
   conservacao: z
@@ -150,7 +151,7 @@ export function lerFormInsumo(entrada: Record<string, unknown>, tipoAtual?: Tipo
 // ------------------------------------------------------------- variante
 
 const formVariante = z.object({
-  nome: nome(60),
+  nome: nomeObrigatorio(60),
   codigoBarras: z
     .string()
     .trim()
@@ -177,7 +178,7 @@ export function lerFormVariante(entrada: Record<string, unknown>, unidade: Unida
 
 /** Custo exato como vai para o JSON do histórico (tipo literal: cabe em `JsonValue`). */
 type CustoNoJson = { centavos: number; milesimos: number };
-type Retrato = Record<string, string | number | boolean | null | CustoNoJson>;
+export type Retrato = Record<string, string | number | boolean | null | CustoNoJson>;
 
 /**
  * O que vai para o histórico de um insumo. Leva o custo de referência EXATO do
@@ -315,7 +316,8 @@ export const FILTROS_PADRAO: FiltrosDeInsumo = {
 };
 
 
-const um = <T extends string>(v: unknown, lista: readonly T[]): T | null =>
+/** Um valor de uma lista fechada (vindo da URL ou do formulário); fora dela, null. */
+export const um = <T extends string>(v: unknown, lista: readonly T[]): T | null =>
   typeof v === 'string' && (lista as readonly string[]).includes(v) ? (v as T) : null;
 
 /**

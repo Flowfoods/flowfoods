@@ -38,6 +38,11 @@ export function lerQuantidade(texto: string): number | null {
   return textoParaInteiro(texto, 3);
 }
 
+/** Número inteiro digitado ("4", "1.200"); casa decimal é recusada. */
+export function lerInteiro(texto: string): number | null {
+  return textoParaInteiro(texto, 0);
+}
+
 /** "R$ 89,90" ou "89,90" → 8990 centavos. */
 export function lerDinheiro(texto: string): number | null {
   return textoParaInteiro(texto.replace(/^R\$/i, ''), 2);
