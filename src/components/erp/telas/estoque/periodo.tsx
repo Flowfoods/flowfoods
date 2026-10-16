@@ -147,7 +147,7 @@ export function TelaPeriodo({
         icone="estoque"
         cor={COR.estoque}
         titulo="Período e contagens"
-        subtitulo={[contexto, s.loja.nome, `${s.periodo.nome} (${dataCurta(s.periodo.inicio)} a ${dataCurta(s.periodo.fim)})`].filter(Boolean).join(' · ')}
+        subtitulo={[contexto, s.loja.nome, s.periodo.nome.includes(dataCurta(s.periodo.inicio)) ? s.periodo.nome : `${s.periodo.nome} (${dataCurta(s.periodo.inicio)} a ${dataCurta(s.periodo.fim)})`].filter(Boolean).join(' · ')}
         acao={f?.status === 'FECHADA' ? <Selo tom="ok">Período fechado</Selo> : s.cobertura.atinge ? <Selo tom="ok">No piso</Selo> : <Selo tom="alerta">Abaixo do piso</Selo>}
       />
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
@@ -172,7 +172,9 @@ export function TelaPeriodo({
           >
             <CoberturaComPiso c={s.cobertura} regras={s.regras} />
             <p className="mt-4 border-t border-linha pt-3 text-sm text-suave">
-              {s.cobertura.atinge ? (
+              {f?.status === 'FECHADA' ? (
+                <span className="font-semibold text-texto">O estoque deste período já fechou. A cobertura acima é a de agora, com o saldo depois dos ajustes.</span>
+              ) : s.cobertura.atinge ? (
                 <span className="font-semibold text-texto">A cobertura chegou ao piso: o período pode fechar.</span>
               ) : (
                 <>
@@ -268,21 +270,21 @@ export function TelaPeriodo({
               <FormRegrasDaContagem acao={acoes.regras} campos={camposDasRegras(s.regras)} lidas={JSON.stringify(s.regras)} />
             ) : (
               <dl className="space-y-2 text-sm">
-                <div className="flex justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
                   <dt className="text-suave">Piso para fechar</dt>
-                  <dd className="text-right tabular-nums text-texto">
+                  <dd className="tabular-nums text-texto">
                     {porcento(s.regras.pisoValorBp)} do valor · {porcento(s.regras.pisoItensBp)} dos insumos
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
                   <dt className="text-suave">Contar a cada</dt>
-                  <dd className="text-right tabular-nums text-texto">
+                  <dd className="tabular-nums text-texto">
                     A {s.regras.freqADias} dias · B {s.regras.freqBDias} · C {s.regras.freqCDias}
                   </dd>
                 </div>
-                <div className="flex justify-between gap-4">
+                <div className="flex flex-col gap-0.5">
                   <dt className="text-suave">Fecha sozinha até</dt>
-                  <dd className="text-right tabular-nums text-texto">{formatarDinheiro(s.regras.toleranciaCentavos)} por item</dd>
+                  <dd className="tabular-nums text-texto">{formatarDinheiro(s.regras.toleranciaCentavos)} por item</dd>
                 </div>
               </dl>
             )}

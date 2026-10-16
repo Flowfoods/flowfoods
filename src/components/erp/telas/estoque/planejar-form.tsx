@@ -113,7 +113,8 @@ export function FormPlanejarCiclo({ linhas, lugar, acao, bloqueio }: { linhas: L
           <p className="text-sm text-suave">{bloqueio}</p>
         ) : (
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
-            <div className="min-w-0 flex-1">
+            {/* No celular, o nome sai da frente (é opcional; o automático diz o lugar e quantos). */}
+            <div className="hidden min-w-0 flex-1 sm:block">
               <label htmlFor="ciclo-titulo" className={ROTULO}>
                 Nome da contagem <span className="font-normal text-suave">(opcional)</span>
               </label>
@@ -125,6 +126,7 @@ export function FormPlanejarCiclo({ linhas, lugar, acao, bloqueio }: { linhas: L
             <BotaoEnviar pendente="Começando…" className="w-full sm:w-auto" disabled={total === 0}>
               {total === 0 ? 'Marque o que contar' : `Começar a contagem (${total})`}
             </BotaoEnviar>
+            <p className="text-[12px] text-suave sm:hidden">Prazo: até o fim de amanhã.</p>
           </div>
         )}
         <Erro id="ciclo-erro-lista" texto={estado?.erros.lista} />

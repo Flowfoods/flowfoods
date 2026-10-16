@@ -839,14 +839,19 @@ async function coberturaDaLoja(
     : await periodoDe(tx, cfg, hojeNoRio(agora));
   const intervalo = { de: inicioDoDia(periodo.inicio), ate: inicioDoDia(somarUmDia(periodo.fim)) };
   const contadosNoPeriodo = await contadosAplicados(tx, lojaId, intervalo);
-  if (fechamentoId) {
-    const doFechamento = await tx.contagemItem.findMany({ where: { contagemId: fechamentoId, contadoMilesimos: { not: null } }, select: { insumoId: true, contadoEm: true } });
-    for (const i of doFechamento) contadosNoPeriodo.set(i.insumoId, i.contadoEm!);
-  }
   const saldos = await tx.saldoEstoque.findMany({ where: { lojaId }, select: { insumoId: true, quantidadeMilesimos: true } });
+  const saldoDe = new Map(saldos.map((s) => [s.insumoId, s.quantidadeMilesimos]));
+  if (fechamentoId) {
+    // O que já foi contado no fechamento em andamento vale como se aplicado: conta na cobertura e o saldo
+    // dele é o de depois do ajuste (atual + contado − esperado) — a mesma conta de antes e de depois de fechar.
+    const doFechamento = await tx.contagemItem.findMany({ where: { contagemId: fechamentoId, contadoMilesimos: { not: null } }, select: { insumoId: true, contadoEm: true, contadoMilesimos: true, saldoSistemaMilesimos: true } });
+    for (const i of doFechamento) {
+      contadosNoPeriodo.set(i.insumoId, i.contadoEm!);
+      saldoDe.set(i.insumoId, (saldoDe.get(i.insumoId) ?? 0) + i.contadoMilesimos! - i.saldoSistemaMilesimos);
+    }
+  }
   const ids = Array.from(new Set([...saldos.filter((s) => s.quantidadeMilesimos !== 0).map((s) => s.insumoId), ...Array.from(contadosNoPeriodo.keys())]));
   const custos = await custosDeReferencia(tx, ids);
-  const saldoDe = new Map(saldos.map((s) => [s.insumoId, s.quantidadeMilesimos]));
   const valores = new Map(ids.map((id) => [id, valorDaQuantidade(custos.get(id)?.porUnidade ?? null, saldoDe.get(id) ?? 0)]));
   const cobertura = coberturaDoPeriodo(
     ids.map((id) => ({ insumoId: id, valorCentavos: valores.get(id) ?? null, contadoNoPeriodo: contadosNoPeriodo.has(id) })),

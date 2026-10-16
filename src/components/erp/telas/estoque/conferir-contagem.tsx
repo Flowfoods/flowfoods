@@ -31,6 +31,9 @@ const DATA_HORA = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-d
 const HORA = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 const quando = (d: Date) => DATA_HORA.format(d).replace(',', ' às');
 const qtd = (m: number, u: Unidade) => (m < 0 ? `−${formatarQuantidade(-m, u)}` : formatarQuantidade(m, u));
+/** "contou Caio às 07:44" (o primeiro nome basta na linha de apoio). */
+const quemContou = (i: { por: string | null; em: Date | null }) => (i.por && i.em ? `contou ${i.por.split(' ')[0]} às ${HORA.format(new Date(i.em))}` : 'sem contar');
+const dinheiroComSinal = (c: number) => (c < 0 ? `−${formatarDinheiro(-c)}` : formatarDinheiro(c));
 
 function TomDoEstado({ e }: { e: ConferenciaDaContagem['estado'] }) {
   const tom = e === 'APLICADA' || e === 'APLICADA_SOZINHA' ? 'ok' : e === 'VENCIDA' || e === 'EM_CONTAGEM' ? 'alerta' : 'neutro';
@@ -42,7 +45,7 @@ function Depois({ l, notasBase }: { l: LinhaDaDivergencia; notasBase?: string })
   return (
     <ul className="space-y-0.5">
       {l.depois.map((m, i) => (
-        <li key={i}>
+        <li key={i} className="whitespace-nowrap">
           <span className="font-semibold text-texto">{quantidadeComSinal(m.quantidadeMilesimos, l.item.unidade)}</span>{' '}
           {m.notaId && notasBase ? (
             <Link href={`${notasBase}/${m.notaId}`} className={LINK_DE_TEXTO}>
@@ -85,7 +88,7 @@ function Tabela({ linhas, notasBase, legenda }: { linhas: LinhaDaDivergencia[]; 
                 </span>
                 <span className="min-w-0">
                   <span className="block font-medium text-texto">{l.item.nome}</span>
-                  <span className="block text-[12px] text-suave">{l.item.por && l.item.em ? `contou ${l.item.por} às ${HORA.format(new Date(l.item.em))}` : 'sem contar'}</span>
+                  <span className="block text-[12px] text-suave">{quemContou(l.item)}</span>
                 </span>
               </span>
               <span className="shrink-0 text-right tabular-nums">
@@ -122,7 +125,7 @@ function Tabela({ linhas, notasBase, legenda }: { linhas: LinhaDaDivergencia[]; 
             <th scope="col" className="h-10 pl-5 pr-3 font-semibold">
               Insumo
             </th>
-            <th scope="col" className="h-10 px-3 text-right font-semibold">
+            <th scope="col" className="h-10 whitespace-nowrap px-3 text-right font-semibold">
               Livro ao contar
             </th>
             <th scope="col" className="h-10 px-3 text-right font-semibold">
@@ -131,10 +134,10 @@ function Tabela({ linhas, notasBase, legenda }: { linhas: LinhaDaDivergencia[]; 
             <th scope="col" className="h-10 px-3 text-right font-semibold">
               Diferença
             </th>
-            <th scope="col" className="h-10 px-3 font-semibold">
+            <th scope="col" className="h-10 whitespace-nowrap px-3 font-semibold">
               Depois de contar
             </th>
-            <th scope="col" className="h-10 px-3 pr-5 text-right font-semibold">
+            <th scope="col" className="h-10 whitespace-nowrap px-3 pr-5 text-right font-semibold">
               Fica em
             </th>
           </tr>
@@ -150,22 +153,23 @@ function Tabela({ linhas, notasBase, legenda }: { linhas: LinhaDaDivergencia[]; 
                   <span>
                     <span className="block font-medium text-texto">{l.item.nome}</span>
                     <span className="block text-[12px] text-suave">
-                      {CONSERVACOES[l.conservacao]}
-                      {l.item.por && l.item.em ? ` · contou ${l.item.por} às ${HORA.format(new Date(l.item.em))}` : ''}
+                      {CONSERVACOES[l.conservacao]} · {quemContou(l.item)}
                     </span>
-                    {l.item.texto.includes('×') && <span className="block text-[12px] text-suave">{l.item.texto}</span>}
                   </span>
                 </span>
               </td>
-              <td className="px-3 py-2.5 text-right text-suave">{qtd(l.esperadoMilesimos, l.item.unidade)}</td>
-              <td className="px-3 py-2.5 text-right font-semibold text-texto">{l.item.contadoMilesimos === null ? '—' : qtd(l.item.contadoMilesimos, l.item.unidade)}</td>
-              <td className="px-3 py-2.5 text-right">
+              <td className="whitespace-nowrap px-3 py-2.5 text-right text-suave">{qtd(l.esperadoMilesimos, l.item.unidade)}</td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-right font-semibold text-texto">
+                {l.item.contadoMilesimos === null ? '—' : qtd(l.item.contadoMilesimos, l.item.unidade)}
+                {l.item.texto.includes('×') && <span className="block text-[12px] font-normal text-suave">{l.item.texto.split(' = ')[0]}</span>}
+              </td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-right">
                 <Diferenca l={l} />
               </td>
               <td className="px-3 py-2.5 text-[13px]">
                 <Depois l={l} notasBase={notasBase} />
               </td>
-              <td className="px-3 py-2.5 pr-5 text-right font-semibold text-texto">{qtd(l.div.ficaEmMilesimos, l.item.unidade)}</td>
+              <td className="whitespace-nowrap px-3 py-2.5 pr-5 text-right font-semibold text-texto">{qtd(l.div.ficaEmMilesimos, l.item.unidade)}</td>
             </tr>
           ))}
         </tbody>
@@ -240,7 +244,7 @@ export function TelaConferirContagem({
         </div>
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
           <div className="text-[12px] font-medium text-suave">Diferença em R$</div>
-          <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(c.soma.sobraCentavos - c.soma.faltaCentavos)}</div>
+          <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{dinheiroComSinal(c.soma.sobraCentavos - c.soma.faltaCentavos)}</div>
           <div className="mt-1.5 text-[12px] tabular-nums text-suave">
             {formatarDinheiro(c.soma.faltaCentavos)} a menos · {formatarDinheiro(c.soma.sobraCentavos)} a mais{c.soma.semPreco ? ` · ${c.soma.semPreco} sem preço` : ''}
           </div>
@@ -275,7 +279,7 @@ export function TelaConferirContagem({
       )}
       {aberta && fechamento && cob && !cob.cobertura.atinge && <Aviso tom="erro" titulo="Abaixo do piso: o período ainda não fecha.">{fraseAbaixoDoPiso(cob.cobertura, cob.regras).replace(/^O período não fecha abaixo do piso: /, '').replace(/; nada foi gravado\.$/, '.')}</Aviso>}
 
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-4">
           <Painel titulo="Com diferença" subtitulo="Diferença não é perda: pode ser consumo sem baixa, nota atrasada ou conta errada" semRespiro acessorio={<Selo tom={comDiferenca.length ? 'alerta' : 'ok'}>{comDiferenca.length || 'nenhum'}</Selo>}>
             {comDiferenca.length === 0 ? <p className="px-4 py-4 text-sm text-suave sm:px-5">Tudo o que foi contado bateu com o livro.</p> : <Tabela linhas={comDiferenca} notasBase={notasBase} legenda="Itens com diferença entre o contado e o livro." />}
@@ -319,7 +323,7 @@ export function TelaConferirContagem({
           )}
         </div>
 
-        <aside className="min-w-0 space-y-4 lg:sticky lg:top-20" aria-label={fechamento ? 'Fechar o período' : 'Aplicar'}>
+        <aside className="min-w-0 space-y-4 xl:sticky xl:top-20" aria-label={fechamento ? 'Fechar o período' : 'Aplicar'}>
           {fechamento && cob && (
             <Painel titulo={`Cobertura de ${cob.periodo.nome}`} subtitulo={aberta ? 'Com o que já foi contado nesta contagem' : 'No fechamento'}>
               <CoberturaComPiso c={cob.cobertura} regras={cob.regras} />
