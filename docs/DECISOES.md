@@ -1209,3 +1209,11 @@ arredondamento por item; o total da contagem é a soma, bate com o razão); o
 custo de referência de hoje (derivado, como todo custo do ERP). Sem preço ou
 pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 (no razão entra 0 e a tela conta à parte).
+
+---
+
+### 71. 2026-10-16 · Exceção registrada à regra "migrations só aditivas": troca do CHECK de sinal do livro de estoque (1.6)
+
+**Alternativa:** manter o CHECK da 0.1 e representar o estorno como um tipo novo de movimento.
+
+**Razão:** o estorno precisa do mesmo tipo do original (para o CMV e o livro contarem certo) com o sinal invertido. A migration `20261019000000_erp_estoque_abertura` faz DROP + ADD do CHECK na mesma transação: para movimento sem `estornoDeId` a regra é idêntica à da 0.1; o estorno é conferido por gatilho como espelho exato do original (mesma loja, insumo, tipo e documento, sinal trocado, nunca estorno de estorno) e índice único impede estorno duplo. O ADD valida as linhas existentes: se houvesse dado fora da regra, a migration falharia inteira. Provado pelos fiscais com dados da 1.5 (superuser e não-superuser, `migrate diff` vazio). **Não é precedente:** qualquer outra troca de regra existente passa pelo mesmo crivo (prova com dados reais + registro aqui).

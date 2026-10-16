@@ -1135,3 +1135,9 @@ banco de teste: o operador é recusado pelo servidor.
   milhares de insumos, paginar no SQL.
 - Índice parcial `Contagem_uma_abertura_por_loja` só no SQL (como o da nota).
 
+
+## Herança da 1.6 (apontada pelos fiscais)
+
+- [médio] Estouro de INT4: contagem de 1.000.000 kg × R$ 26,75 estoura `concluirAbertura` (500, sem corromper); o mesmo pode ocorrer no saldo em `gravarMovimentos` acima de ~R$ 21 mi por insumo. Conferir tetos na conferência e ao gravar movimentos, com frase em vez de 500; baixar o teto da contagem.
+- UX (contagem com luva): alvos "Não tem", seletor kg/g e "Tentar de novo" de 40 → 48 px; rascunho local (localStorage) do número que falhou ao salvar, reenviado quando o sinal voltar; "fase 1.7/1.8" → "em breve"; "Só gerente ou dona concluem"; cabeçalho do estoque no celular mais curto; filtro de conservação cortado a 390 px sem indício de rolagem.
+- Correção de número errado na abertura só pela 1.7; valor da época × de hoje no CMV real fica para a 2.3; variantes de embalagem na contagem e paginação do saldo para milhares de insumos.
