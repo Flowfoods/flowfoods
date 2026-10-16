@@ -50,7 +50,7 @@ import { cascataDeCusto, conferirGrafo, grafoDasArestas, type FichaDaCascata } f
 import { custosEmCascata, lerCascata, SELECAO_DO_INSUMO, SELECAO_DO_ITEM, type FichaLida } from './ficha-custos';
 import { motivoDaUnidadeTravada } from './insumos';
 import { prepararFoto, type FotoPronta } from './foto';
-import { apagarFoto, assumirFotoPendente, devolverFotoPendente, salvarFoto } from './arquivos';
+import { apagarFoto, assumirFotoPendente, devolverFotoPendente, faxinarPendentesDeVezEmQuando, salvarFoto } from './arquivos';
 import { cabeNaExibicao, UNIDADES, type CustoExato, type Fracao, type Unidade } from './unidades';
 
 export type ResultadoFicha =
@@ -677,6 +677,8 @@ const SELECAO_DA_LISTA = {
 /** Página da lista com o total, custo calculado na hora (nunca gravado), em cascata. */
 export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<FiltrosDeFicha> = {}) {
   const f: FiltrosDeFicha = { ...FILTROS_DE_FICHA_PADRAO, ...filtros };
+  // Foto enviada e nunca salva (herança d da 1.3): sai também ao abrir a lista, de vez em quando.
+  await faxinarPendentesDeVezEmQuando(cliente.parceiroId);
   return cliente.transacao(async (tx) => {
     const where = filtroDoBanco(f, f.incompleto ? await preparosIncompletos(tx) : []);
     const total = await tx.fichaTecnica.count({ where });

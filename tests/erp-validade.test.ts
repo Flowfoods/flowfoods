@@ -1,9 +1,14 @@
 /**
  * ERP 1.4 · Validade por conservação, sem banco — e as heranças puras da 1.3:
  * (a) o insumo produzido por um pré-preparo não entra como insumo comum;
- * (b) a limpeza de JPEG guarda só os marcadores que desenham a imagem.
+ * (b) a limpeza de JPEG guarda só os marcadores que desenham a imagem;
+ * (d) faxina de foto pendente com teto e intervalo (também ao abrir a lista).
  */
-import { describe, expect, it } from 'vitest';
+import { mkdirSync, mkdtempSync, readdirSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterAll, describe, expect, it } from 'vitest';
+import { FAXINA, faxinarPendentes, faxinarPendentesDeVezEmQuando } from '@/lib/erp/arquivos';
 import { lerFormFicha, type InsumoDaFicha, type PreparoDaFicha } from '@/lib/erp/ficha-campos';
 import { limparMetadados, MENSAGEM_JPEG_ESTRANHO } from '@/lib/erp/foto-metadados';
 import { GPS, JPG_LIMPO, jpgComGps } from './erp-fotos-teste';
@@ -86,5 +91,43 @@ describe('ERP 1.4 (herança b da 1.3) · JPEG: só marcadores conhecidos ficam; 
       expect(r.ok, `marcador ${m.toString(16)}`).toBe(true);
       if (r.ok) expect(Array.from(r.bytes.subarray(2, 4))).toEqual([0xff, m]);
     }
+  });
+});
+
+describe('ERP 1.4 (herança d da 1.3) · faxina de pendentes barata, com teto e intervalo', () => {
+  const pasta = mkdtempSync(join(tmpdir(), 'erp-faxina-'));
+  process.env.ERP_ARQUIVOS_DIR = pasta;
+  afterAll(() => rmSync(pasta, { recursive: true, force: true }));
+  const pendentes = (parceiro: string) => join(pasta, parceiro, 'fichas', 'pendentes');
+  const criar = (parceiro: string, n: number, horasAtras: number) => {
+    mkdirSync(pendentes(parceiro), { recursive: true });
+    const quando = new Date(Date.now() - horasAtras * 3600_000);
+    for (let i = 0; i < n; i++) {
+      const nome = `${(Math.random().toString(16).slice(2) + '0'.repeat(32)).slice(0, 32)}.jpg`;
+      writeFileSync(join(pendentes(parceiro), nome), 'x');
+      utimesSync(join(pendentes(parceiro), nome), quando, quando);
+    }
+  };
+
+  it('apaga só as de mais de 24 h, e no máximo FAXINA.apagar por vez', async () => {
+    criar('p1', FAXINA.apagar + 5, 30);
+    criar('p1', 3, 1);
+    expect(await faxinarPendentes('p1')).toBe(FAXINA.apagar);
+    expect(await faxinarPendentes('p1')).toBe(5);
+    expect(readdirSync(pendentes('p1'))).toHaveLength(3);
+  });
+
+  it('de vez em quando: a segunda chamada dentro do intervalo não varre; depois dele varre de novo', async () => {
+    const t0 = Date.now();
+    criar('p2', 2, 30);
+    expect(await faxinarPendentesDeVezEmQuando('p2', t0)).toBe(2);
+    criar('p2', 1, 30);
+    expect(await faxinarPendentesDeVezEmQuando('p2', t0 + 1000)).toBeNull();
+    expect(readdirSync(pendentes('p2'))).toHaveLength(1);
+    expect(await faxinarPendentesDeVezEmQuando('p2', t0 + FAXINA.intervaloMs + 1)).toBe(1);
+  });
+
+  it('parceiro sem pasta não é erro', async () => {
+    expect(await faxinarPendentesDeVezEmQuando('sem-pasta')).toBe(0);
   });
 });
