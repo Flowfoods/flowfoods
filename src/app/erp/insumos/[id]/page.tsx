@@ -6,6 +6,7 @@
 import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { obterInsumo } from '@/lib/erp/insumos';
+import { saldosDoInsumo } from '@/lib/erp/estoque';
 import { lerFiltros, queryDosFiltros } from '@/lib/erp/insumo-campos';
 import { TelaDetalheInsumo } from '@/components/erp/telas/insumos/detalhe';
 import { acaoSituacaoInsumo } from '../actions';
@@ -25,6 +26,7 @@ export default async function ErpInsumoPage({
   exigirPermissaoNaPagina(ctx, 'insumos.ver');
   const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);
   if (!insumo) notFound();
+  const saldos = await saldosDoInsumo(ctx.cliente, ctx.alcance, insumo.id);
   // Volta para a lista como ela estava (só os filtros conhecidos passam).
   const de = queryDosFiltros(lerFiltros(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));
   return (
@@ -37,6 +39,7 @@ export default async function ErpInsumoPage({
       bloqueio={ctx.bloqueio}
       acaoSituacao={acaoSituacaoInsumo.bind(null, insumo.id)}
       linkDaNota={(notaId, lojaId) => (pode(ctx.alcance, 'compras.ver', { lojaId }) ? `/erp/compras/${notaId}` : null)}
+      estoque={{ saldos, base: '/erp/estoque' }}
     />
   );
 }

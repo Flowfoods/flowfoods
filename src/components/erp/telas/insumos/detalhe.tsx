@@ -24,6 +24,8 @@ import { BotaoOuMotivo } from '../cadastro/partes';
 import { fraseDoFeito } from './estado';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { PrecosPagos } from './precos-pagos';
+import { PainelEstoqueDoInsumo } from '../estoque/saldo-do-insumo';
+import type { SaldoDoInsumoNaLoja } from '@/lib/erp/estoque';
 import { formatarData } from '@/lib/erp/compra-campos';
 
 export function TelaDetalheInsumo({
@@ -36,7 +38,10 @@ export function TelaDetalheInsumo({
   bloqueio,
   acaoSituacao,
   linkDaNota,
+  estoque,
 }: {
+  /** 1.6: o saldo nas lojas em que a pessoa vê o estoque (vazio = painel não aparece). */
+  estoque?: { saldos: SaldoDoInsumoNaLoja[]; base: string };
   /**
    * 1.5: link para a nota de compra, para quem vê compras naquela loja (null =
    * a pessoa vê o preço, que é custo da rede, mas não a nota).
@@ -185,6 +190,8 @@ export function TelaDetalheInsumo({
           </Painel>
 
           <PrecosPagos insumo={i} linkDaNota={linkDaNota} />
+
+          {estoque && <PainelEstoqueDoInsumo saldos={estoque.saldos} unidade={i.unidade} estoqueBase={estoque.base} />}
 
           <Painel
             titulo="Embalagens de compra"

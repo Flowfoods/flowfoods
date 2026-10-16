@@ -953,28 +953,22 @@ export async function obterEstoqueDaLoja(cliente: ClienteDoParceiro, alcance: Al
       });
       const estado = estadoDoEstoque(c);
       const base = { loja, estado, abertura: c };
-      if (estado === 'NAO_ABERTO') return { ...base, contagem: null, linhas: [] as LinhaDeSaldo[], total: { centavos: 0, pendentes: 0 }, movimentos: [] as MovimentoDaTela[], totalDeItens: 0 };
+      if (estado === 'NAO_ABERTO') return { ...base, contagem: null, linhas: [] as LinhaDeSaldo[], total: { centavos: 0, pendentes: 0 }, movimentos: [] as MovimentoDaTela[], totalDeItens: 0, itensComSaldo: 0 };
       if (estado === 'EM_CONTAGEM') {
         const itens = await tx.contagemItem.findMany({ where: { contagemId: c!.id }, select: { contadoMilesimos: true } });
-        return { ...base, contagem: resumoDaContagem(itens), linhas: [] as LinhaDeSaldo[], total: { centavos: 0, pendentes: 0 }, movimentos: [] as MovimentoDaTela[], totalDeItens: 0 };
+        return { ...base, contagem: resumoDaContagem(itens), linhas: [] as LinhaDeSaldo[], total: { centavos: 0, pendentes: 0 }, movimentos: [] as MovimentoDaTela[], totalDeItens: 0, itensComSaldo: 0 };
       }
-      const q = (filtros.q ?? '').trim().slice(0, 80);
+      const q = (filtros.q ?? '').trim().slice(0, 80).toLocaleLowerCase('pt-BR');
+      // Todos os saldos da loja (centenas, no máximo): o total e a contagem não dependem do filtro da tela.
       const saldos = await tx.saldoEstoque.findMany({
-        where: {
-          lojaId,
-          ...(filtros.comSaldo ? { quantidadeMilesimos: { not: 0 } } : {}),
-          insumo: {
-            ...(q ? { nome: { contains: q, mode: 'insensitive' as const } } : {}),
-            ...(filtros.conservacao ? { conservacao: filtros.conservacao } : {}),
-          },
-        },
+        where: { lojaId },
         select: { insumoId: true, quantidadeMilesimos: true, insumo: { select: { nome: true, unidade: true, conservacao: true, ativo: true } } },
       });
       const custos = await custosDeReferencia(
         tx,
         saldos.map((s) => s.insumoId),
       );
-      const linhas: LinhaDeSaldo[] = saldos
+      const todas: LinhaDeSaldo[] = saldos
         .map((s) => {
           const porUnidade = custos.get(s.insumoId)?.porUnidade ?? null;
           return {
@@ -989,7 +983,14 @@ export async function obterEstoqueDaLoja(cliente: ClienteDoParceiro, alcance: Al
           };
         })
         .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-      const totalDeItens = await tx.saldoEstoque.count({ where: { lojaId } });
+      const linhas = todas.filter(
+        (l) =>
+          (!filtros.comSaldo || l.quantidadeMilesimos !== 0) &&
+          (!filtros.conservacao || l.conservacao === filtros.conservacao) &&
+          (!q || l.nome.toLocaleLowerCase('pt-BR').includes(q)),
+      );
+      const totalDeItens = todas.length;
+      const itensComSaldo = todas.filter((l) => l.quantidadeMilesimos > 0).length;
       const movimentos = await tx.movimentoEstoque.findMany({
         where: { lojaId },
         orderBy: [{ ocorridoEm: 'desc' }, { criadoEm: 'desc' }, { id: 'desc' }],
@@ -1000,9 +1001,10 @@ export async function obterEstoqueDaLoja(cliente: ClienteDoParceiro, alcance: Al
         ...base,
         contagem: null,
         linhas,
-        total: somarValores(linhas.filter((l) => l.quantidadeMilesimos !== 0).map((l) => l.valorCentavos)),
+        total: somarValores(todas.filter((l) => l.quantidadeMilesimos !== 0).map((l) => l.valorCentavos)),
         movimentos: movimentos.map(movimentoParaTela),
         totalDeItens,
+        itensComSaldo,
       };
     }),
   );
