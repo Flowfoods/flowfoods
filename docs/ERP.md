@@ -1639,3 +1639,14 @@ banco de teste: o operador é recusado pelo servidor.
   (hoje é por página).
 - Mensalidade do iFood, taxa de entrega e taxa fixa por pedido seguem fora do
   prato (lucro por pedido).
+
+## Herança da 1.10 (apontada pelos fiscais)
+
+- UX: selo "prejuízo" repetido na margem bruta quando ela também fica negativa.
+- UX: selo de prejuízo ainda mais forte (caixa alta ou ícone funcional), além do selo cheio de hoje.
+- UX: faixa acima do painel quando há prejuízo ("No iFood, a esse preço, cada prato perde R$ X").
+- UX: linhas do histórico longas no celular (preço, margem e custo na hora quebram em várias linhas).
+- UX: frase "a taxa muda quando o preço muda" perto da taxa do iFood em R$.
+- UX: selo "sugerido" para a dona no campo do preço (como o gerente já vê "o sugerido" no texto).
+- [Guardião] Testes com banco rodando em paralelo com papel não-superusuário dão deadlock: `limparParceiros` faz `ALTER TABLE … NO FORCE ROW LEVEL SECURITY`. Rodar em série (como hoje) ou trocar a limpeza por exclusão dentro do contexto.
+- Pendentes da execução: alvo por prato (`ProdutoCanal.margemAlvoBp` sem tela); filtro "margem abaixo do alvo" na lista (hoje a conta é por página); o mesmo prato em duas marcas; a prova da 1.10 deixou preços e margens da Casa Alfa no `ff_dev` (desfaz com `prova110/montar.ts limpar` no scratchpad).

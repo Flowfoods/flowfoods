@@ -24,9 +24,11 @@ const TETO = 2_000_000_000;
  * Aceita "1.234,5", "1234,50", "0,75", "12". Rejeita sinal, letra e casas a mais.
  * Devolve null quando o texto não é um número válido.
  */
+const FORMATO_DECIMAL = /^\d{1,3}(\.\d{3})*(,\d+)?$|^\d+(,\d+)?$/;
+
 function textoParaInteiro(texto: string, casas: number): number | null {
   const limpo = texto.trim().replace(/\s/g, '');
-  if (!/^\d{1,3}(\.\d{3})*(,\d+)?$|^\d+(,\d+)?$/.test(limpo)) return null;
+  if (!FORMATO_DECIMAL.test(limpo)) return null;
   const [inteira, fracao = ''] = limpo.replace(/\./g, '').split(',');
   if (fracao.length > casas) return null;
   const valor = Number(inteira) * 10 ** casas + Number(fracao.padEnd(casas, '0') || '0');
@@ -41,6 +43,17 @@ export function lerQuantidade(texto: string): number | null {
 /** Número inteiro digitado ("4", "1.200"); casa decimal é recusada. */
 export function lerInteiro(texto: string): number | null {
   return textoParaInteiro(texto, 0);
+}
+
+/**
+ * 1.10: o texto tem a forma de dinheiro que `lerDinheiro` aceita (até 2 casas)?
+ * Serve para separar "número grande demais" (forma certa, passou do teto) de
+ * "texto inválido" ("29.90", "1..2").
+ */
+export function temFormaDeDinheiro(texto: string): boolean {
+  const limpo = texto.replace(/^\s*R\$/i, '').trim().replace(/\s/g, '');
+  if (!FORMATO_DECIMAL.test(limpo)) return false;
+  return (limpo.split(',')[1] ?? '').length <= 2;
 }
 
 /** "R$ 89,90" ou "89,90" → 8990 centavos. */

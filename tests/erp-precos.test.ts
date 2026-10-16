@@ -274,5 +274,11 @@ describe('veto do Guardião (1.10): histórico sem precificação para quem não
     expect(lerPrecos({ LOJA: '2147483648' })).toMatchObject({ ok: false, erros: { 'preco-LOJA': expect.stringMatching(/R\$ 100\.000,00/) } });
     expect(lerPrecos({ LOJA: '99999999999999999999' })).toMatchObject({ ok: false, erros: { 'preco-LOJA': expect.stringMatching(/R\$ 100\.000,00/) } });
     expect(lerPrecos({ LOJA: '29,999' })).toMatchObject({ ok: false, erros: { 'preco-LOJA': expect.stringMatching(/inválido/) } });
+    // Forma errada nunca recebe a frase do limite (achado dos fiscais).
+    for (const t of ['29.90', 'R$ 29.90', '1..2']) {
+      expect(lerPrecos({ LOJA: t }), t).toMatchObject({ ok: false, erros: { 'preco-LOJA': 'Preço inválido. Ex.: 29,90.' } });
+    }
+    expect(lerPrecos({ LOJA: '2147483648' })).toMatchObject({ ok: false, erros: { 'preco-LOJA': 'Mais de R$ 100.000,00 por porção? Confira o número.' } });
+    expect(lerPrecos({ LOJA: 'R$ 2.147.483.648,00' })).toMatchObject({ ok: false, erros: { 'preco-LOJA': expect.stringMatching(/R\$ 100\.000,00/) } });
   });
 });

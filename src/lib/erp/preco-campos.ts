@@ -20,7 +20,7 @@
 import { camadasDoCanal, ORDEM_DOS_CANAIS, porQueIncompleto, taxaTotalBp, type CamadasDoCanal, type CanalVenda, type EmbalagemParaCusto, type TaxaDoCanal } from './canal-campos';
 import type { CustoDaFicha } from './ficha-campos';
 import type { Erros, Leitura } from './insumo-campos';
-import { compararFracoes, formatarFracao, formatarPontosBase, lerDinheiro, lerPontosBase, somar, TETO_DE_EXIBICAO, type Fracao } from './unidades';
+import { compararFracoes, formatarFracao, formatarPontosBase, lerDinheiro, lerPontosBase, somar, temFormaDeDinheiro, TETO_DE_EXIBICAO, type Fracao } from './unidades';
 
 export const LIMITES_DO_PRECO = {
   /** Preço próprio por porção: até R$ 100.000,00 (acima é dedo errado). */
@@ -183,7 +183,6 @@ export const margemEmTexto = (valor: Fracao, bp: Fracao) => `${formatarReaisComS
 
 const ROTULO_CURTO: Record<CanalVenda, string> = { LOJA: 'Loja', DELIVERY_PROPRIO: 'Delivery', IFOOD: 'iFood' };
 
-const NUMERO_DE_DINHEIRO = /^(R\$\s*)?\d[\d.]*(,\d{1,2})?$/i;
 const FRASE_DO_LIMITE = 'Mais de R$ 100.000,00 por porção? Confira o número.';
 
 /** Formulário → preço próprio por canal (centavos); vazio = usar o sugerido (null). */
@@ -195,8 +194,9 @@ export function lerPrecos(entrada: Partial<Record<CanalVenda, unknown>>): Leitur
     const t = typeof v === 'string' ? v.trim() : '';
     if (!t) continue;
     const c = lerDinheiro(t);
-    // Número bem escrito, mas grande demais para caber (ex.: 2147483648): a frase do limite, não "inválido".
-    if (c === null && NUMERO_DE_DINHEIRO.test(t)) erros[`preco-${canal}`] = FRASE_DO_LIMITE;
+    // Número na forma que a leitura aceita, mas grande demais para caber (ex.: 2147483648): a frase do limite.
+    // Forma errada ("29.90", "1..2") é "inválido".
+    if (c === null && temFormaDeDinheiro(t)) erros[`preco-${canal}`] = FRASE_DO_LIMITE;
     else if (c === null) erros[`preco-${canal}`] = 'Preço inválido. Ex.: 29,90.';
     else if (c === 0) erros[`preco-${canal}`] = 'O preço precisa ser maior que zero. Para usar o sugerido, deixe vazio.';
     else if (c > LIMITES_DO_PRECO.centavos) erros[`preco-${canal}`] = FRASE_DO_LIMITE;
