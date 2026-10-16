@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { limparMetadados, MENSAGEM_JPEG_ESTRANHO } from '@/lib/erp/foto-metadados';
 import { JPG_LIMPO } from './erp-fotos-teste';
+import { lerValidades } from '@/lib/erp/validade';
 
 describe('ERP 1.5 (herança b da 1.4) · JPEG: o reservado 0xC8 recusa', () => {
   const comSegmento = (marcador: number, dados: number[]) =>
@@ -21,5 +22,22 @@ describe('ERP 1.5 (herança b da 1.4) · JPEG: o reservado 0xC8 recusa', () => {
       const r = limparMetadados(comSegmento(m, [0, 2]), 'jpg');
       expect(r.ok, `marcador ${m.toString(16)}`).toBe(true);
     }
+  });
+});
+
+describe('ERP 1.5 (herança c da 1.4) · ficha com principal e nenhuma validade avisa', () => {
+  it('formulário com "refrigerado" como principal e nada marcado: erro na principal, não grava sem dizer', () => {
+    const r = lerValidades({ principal: 'REFRIGERADO', linhas: {} }, 'ficha');
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.erros.conservacao).toMatch(/refrigerado.*nenhuma conservação tem validade/i);
+  });
+
+  it('sem principal e sem nada marcado continua sendo "validade não informada"', () => {
+    expect(lerValidades({ principal: '', linhas: {} }, 'ficha')).toEqual({ ok: true, validades: null });
+    expect(lerValidades({ linhas: {} }, 'ficha')).toEqual({ ok: true, validades: null });
+  });
+
+  it('no insumo a principal sem validade continua valendo (é onde se guarda)', () => {
+    expect(lerValidades({ principal: 'REFRIGERADO', linhas: {} }, 'insumo')).toEqual({ ok: true, validades: { principal: 'REFRIGERADO', minutos: {} } });
   });
 });
