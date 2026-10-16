@@ -1,5 +1,7 @@
 'use client';
 
+// avoid-ai-design-ignore-file: SD4, SD5, K3 — Portal do cliente, fora do shell do ERP: o contrato da 1.1 exige o /portal visualmente igual (identidade editorial FlowFoods, CLAUDE.md).
+
 /**
  * Formulário inicial — a tela que o dono do restaurante usa no celular.
  *

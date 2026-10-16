@@ -7,8 +7,10 @@
 
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { listarEstrutura } from '@/lib/erp/estrutura';
-import { FormNome } from '@/app/rodolfo/erp/form-nome';
-import { TelaEstrutura } from '@/app/rodolfo/erp/tela-estrutura';
+import { COR } from '@/lib/erp/modulos';
+import { PageHeader } from '@/components/erp/ui/cabecalho';
+import { FormNome } from '@/components/erp/telas/estrutura/form-nome';
+import { resumoDaEstrutura, TelaEstrutura } from '@/components/erp/telas/estrutura/tela-estrutura';
 import { acaoCadastrarLojaDaSessao, acaoCadastrarMarcaDaSessao } from '../actions';
 
 export const dynamic = 'force-dynamic';
@@ -19,12 +21,20 @@ export default async function ErpLojasPage() {
   const { lojas, marcas } = await listarEstrutura(ctx.cliente, ctx.alcance);
   const cadastra = pode(ctx.alcance, 'lojas.gerir');
   return (
-    <TelaEstrutura
-      lojas={lojas}
-      marcas={marcas}
-      bloqueio={ctx.bloqueio}
-      formLoja={cadastra ? <FormNome acao={acaoCadastrarLojaDaSessao} tipo="loja" /> : undefined}
-      formMarca={cadastra ? <FormNome acao={acaoCadastrarMarcaDaSessao} tipo="marca" /> : undefined}
-    />
+    <div className="space-y-6">
+      <PageHeader
+        icone="lojas"
+        cor={COR.rede}
+        titulo="Lojas e marcas"
+        subtitulo={`${ctx.alcance.lojas === 'todas' ? 'Rede Completa' : 'Suas lojas'} · ${resumoDaEstrutura(lojas, marcas)}`}
+      />
+      <TelaEstrutura
+        lojas={lojas}
+        marcas={marcas}
+        bloqueio={ctx.bloqueio}
+        formLoja={cadastra ? <FormNome acao={acaoCadastrarLojaDaSessao} tipo="loja" /> : undefined}
+        formMarca={cadastra ? <FormNome acao={acaoCadastrarMarcaDaSessao} tipo="marca" /> : undefined}
+      />
+    </div>
   );
 }

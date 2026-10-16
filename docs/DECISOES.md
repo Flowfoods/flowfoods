@@ -746,3 +746,164 @@ regra do link; mudar perfil/lojas, liberar tentativas e remover um rosto não
 mudam a senha nem vínculo. Custo: quem redefine a senha ativa o rosto de novo.
 Alternativa descartada: apagar rostos também a cada vínculo novo (derrubaria
 quem não tem nada de errado).
+
+### 42. 2026-10-16 · ERP 1.1: um shell só, com o Barney antigo dentro, e um design system só
+
+**Alternativas:** (a) dois shells (um do /rodolfo, outro do /erp) com o mesmo
+visual; (b) manter o Barney antigo com o menu horizontal e só o ERP novo no
+shell; (c) shell único com os dados entregues pelo layout de cada área.
+
+**Razão:** (c). Regra Nº 2 do contrato: revisar o velho e reconstruir na
+arquitetura nova, sem empilhar. Havia três kits visuais paralelos e duas abas
+copiadas (deriva X1); agora há `src/components/erp/{shell,ui,telas}` e
+nenhuma rota importa de outra. As sessões continuam duas (decisões 34/36): o
+shell é o mesmo componente, cada layout resolve a SUA sessão e passa dados
+prontos (menu filtrado por `pode`, visão conferida, server actions que
+reconferem). Login e setup do nível 1 ficam num grupo de rota próprio
+`(acesso)` — o shell exige sessão, e envolver o login seria um laço.
+
+### 43. 2026-10-16 · ERP 1.1: tema por cookie lido no servidor, escopado no wrapper
+
+**Alternativas:** (a) `next-themes`/script no `<head>` do layout raiz; (b)
+classe no `<html>` lida no layout raiz; (c) cookie `ff_tema` lido pelos
+layouts do shell, `data-tema` no wrapper `.ff-app`, "do aparelho" por
+`prefers-color-scheme` no CSS.
+
+**Razão:** (c). (a) e (b) tornam o layout raiz dinâmico (o site institucional
+perderia o estático) ou exigem script antes da pintura. Em (c) não há flash
+(o servidor já pinta o tema), não há JS para pintar e o `/` segue ○ no build
+(teste em `tests/erp-shell.test.ts`). Tokens em canais RGB para o Tailwind
+aplicar opacidade; fora do `.ff-app` os tokens caem no valor escuro, então
+peça do DS usada no /entrar (Marca, Ponto) mantém o visual de antes.
+
+### 44. 2026-10-16 · ERP 1.1: visão "Rede Completa ↔ loja" é filtro, nunca permissão
+
+**Alternativas:** (a) a visão escolhida vira o alcance da requisição; (b)
+cookie com o id da loja, aceito como veio; (c) cookie
+`<parceiroId>:<rede|lojaId>` conferido a cada requisição contra
+`listarLojasDoAlcance` (0.4), com recusa na action.
+
+**Razão:** (c). (a) faria um cookie conceder ou tirar permissão — a checagem
+única é `exigirPermissao` (decisão 40). (b) aceitaria loja forjada ou de
+outro parceiro. Em (c) o valor fora do alcance cai na primeira opção
+permitida e a action não grava nada; N3 não tem "Rede Completa".
+
+### 45. 2026-10-16 · ERP 1.1: kit Kairu Dark "pulso" na geometria, FlowFoods na cor e no tipo
+
+**Alternativas:** (a) o kit inteiro (menta, Inter, vidro); (b) só a
+identidade FlowFoods, sem kit; (c) geometria e comportamento do kit + cor e
+tipo FlowFoods + tabelas do Corporativo.
+
+**Razão:** (c). O contrato pede o kit puxado de verdade (código lido via MCP:
+`design-kit.css`, `DesignKit.tsx`) e a identidade FlowFoods (CLAUDE.md).
+Ficam do kit: menu de altura total com indicador de 2 px, cards 14 px,
+botões 7 px, foco 3 px/4 px, 160/220 ms, gaveta < 900 px, sheet < 600 px,
+`<dialog>` nativo. Não vêm: vidro/blur, gradiente, glow, Inter/Sora, menta.
+Botão principal em #C41522 (branco ≈ 6:1); #EA1D2C fica para acento
+(indicador, filete, foco). Cor de módulo só no quadrado do ícone. Rótulo em
+caixa alta só no hub e nos grupos do menu. Contrato completo em
+`.interface-design/system.md`.
+
+### 46. 2026-10-16 · ERP 1.1: embalagem digitada como se compra; custo com frete e um arredondamento; "Sem preço" ≠ R$ 0,00
+
+**Alternativas:** (a) pedir tudo na unidade base (5,000 kg; 0,750 kg); (b)
+unidade de compra própria (caixa, fardo) com fator; (c) "quanto vem" em kg ou
+g (L ou ml), convertido no servidor para milésimos.
+
+**Razão:** (c). Ninguém compra "0,750 kg": a embalagem diz 750 g. A
+conversão é só aqui (`lerQuantidadeNa`), sem float, e 1 g é o menor passo
+(meio grama recusado). Unidade de uso na ficha (colher, porção) é 1.2.
+Custo de referência = (preço + frete) × 1000 ÷ conteúdo, somando ANTES de
+dividir: arredondar preço e frete separados erra 1 centavo
+(`tests/erp-insumos.test.ts`). Frete é por embalagem, no insumo e em cada
+outra embalagem. Preço desconhecido grava 0 e o custo vira null: a tela diz
+"Sem preço" (Notion Core: custo incompleto não é custo baixo), filtra e ordena
+no fim; 0 digitado sem marcar é recusado. Custo pela última compra continua
+travado para a 1.5.
+
+### 47. 2026-10-16 · ERP 1.1: variante é outra embalagem de compra, na mesma unidade; a unidade do insumo trava
+
+**Alternativas:** (a) variante como "sabor/tamanho" com unidade própria; (b)
+outra embalagem de compra do mesmo insumo, conteúdo na unidade dele.
+
+**Razão:** (b). Comparar custo entre caixa, fardo e outra marca só faz
+sentido na mesma unidade; a tela diz qual sai mais barata. Na tela o nome é
+"Embalagem" (variante é palavra de sistema). Por isso a unidade do insumo só
+muda sem outra embalagem e sem uso: os milésimos gravados passariam a
+significar outra coisa. A conferência roda com a linha do insumo travada
+(UPDATE) e a embalagem nova trava o insumo em FOR SHARE: uma não entra no
+meio da outra. "Tornar padrão" e fornecedor por embalagem ficam para depois.
+
+### 48. 2026-10-16 · ERP 1.1: edição concorrente recusada, nunca sobrescrita
+
+**Alternativas:** (a) último a salvar vence; (b) trava pessimista ao abrir o
+formulário; (c) gravação condicional à versão lida.
+
+**Razão:** (c). Insumo: `updateMany where { id, atualizadoEm: lido }` — 0
+linhas = "alguém alterou, recarregue", nada gravado. Embalagem não tem
+`atualizadoEm` (e a 1.1 não faz migration por isso): a tela leva uma
+impressão dos valores lidos e o `updateMany` repete esses valores no `where`.
+(a) perde trabalho em silêncio; (b) deixa insumo preso por aba esquecida.
+Desativar/reativar é condicional à situação lida.
+
+### 49. 2026-10-16 · ERP 1.1: histórico com retrato legível (custo fotografado, ordem da tela, alvo da linha)
+
+**Alternativas:** (a) gravar só os campos crus e recalcular na leitura; (b)
+gravar o retrato do que a tela mostrou.
+
+**Razão:** (b). O histórico guarda, além dos campos que mudaram, o custo por
+unidade daquele momento (o mesmo número da tela) e o contexto (nome, unidade,
+insumo da embalagem) para a linha dizer de quem é ("Cebola · Caixa 10 kg").
+Na criação, campo vazio não aparece; a leitura segue a ordem da tela porque o
+jsonb do Postgres não guarda a ordem das chaves. Só se acrescentou a
+`ENTIDADE`/`CAMPO`: o histórico antigo continua lido igual.
+
+### 50. 2026-10-16 · ERP 1.1: novo, editar e embalagem em tela própria; filtros na URL
+
+**Alternativas:** (a) painel lateral (diálogo) por cima da lista; (b) tela
+própria para cada formulário.
+
+**Razão:** (b). Funciona sem JS, vira tela cheia no celular de graça, o
+botão voltar do navegador faz o que se espera e a URL de editar pode ser
+mandada para alguém. A lista guarda busca, filtros, ordem e página na URL, e
+o detalhe volta para ela (`?de=`, só filtros conhecidos passam). Sucesso leva
+ao detalhe com uma frase fixa do que mudou (`?feito=`, a URL só escolhe a
+frase). Ordenar por custo é em memória, com o mesmo cálculo da tela
+(custo derivado, nunca gravado).
+
+### 51. 2026-10-16 · ERP 1.1 (fiscais do shell): destino depois do login só dentro da área; login e /entrar no tema do app
+
+**Alternativas:** (a) confiar no `callbackUrl` do next-auth; (b) aceitar só
+mesma origem e caminho da área.
+
+**Razão:** (b). `window.location.assign(callbackUrl)` executava
+`javascript:` e levava a outro site. `destinoSeguro` resolve a URL contra a
+origem e exige o caminho `/rodolfo/...` (no /entrar, `/erp` ou
+`/entrar/escolher`); o resto vira o padrão. No mesmo passe, `/rodolfo/login`
+e `/entrar` passaram a usar os tokens do ERP e o tema do cookie `ff_tema` (o
+`/` continua estático), e o estado da Evolution aparece em palavra
+(Conectado/Conectando/Desconectado), não "close".
+
+### 52. 2026-10-16 · ERP 1.1 (revisão do Guardião): custo de referência exato, como fração inteira
+
+**Problema:** o custo por unidade era arredondado ao centavo na origem. R$ 4,00
+por 1000 guardanapos virava "R$ 0,00/un" na lista e `0` no histórico, e duas
+embalagens (R$ 4,00/1000 un e R$ 15,00/5000 un) "saíam pelo mesmo custo". Na
+ficha técnica (1.3) isso zeraria o custo de todo item barato.
+
+**Alternativas:** (a) milésimos de centavo por unidade base (inteiro, mas
+ainda arredonda; e embalagem de 2.000 un a R$ 0,01 já some); (b) float (proibido
+pela decisão 25); (c) guardar a fração exata (preço + frete) ÷ conteúdo,
+reduzida, e arredondar só no uso.
+
+**Razão:** (c). `custoDaEmbalagem` devolve `{ centavos, milesimos }` (inteiros,
+divididos pelo MDC); `custoDaQuantidade` multiplica pela quantidade e
+arredonda UMA vez (é o que a ficha usa); `compararCustos` compara por
+multiplicação cruzada; produtos grandes vão em BigInt por dentro (nunca no
+banco: decisão 25 continua). A tela mostra duas casas a partir de 1 centavo e,
+abaixo disso, as casas necessárias para dois algarismos ("R$ 0,004/un",
+"R$ 0,0035/un"), mais o milheiro na conta de itens em un — é como guardanapo,
+copo e sachê se compram. O histórico grava a fração exata
+(`custoPorUnidade`); as linhas antigas com `custoPorUnidadeCentavos`
+continuam legíveis. Revisa a parte de arredondamento da decisão 46.
+

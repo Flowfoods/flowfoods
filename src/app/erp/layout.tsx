@@ -1,20 +1,24 @@
 /**
- * ERP do parceiro (0.3): a área das pessoas do Parceiro Flow. O parceiro vem SÓ
- * da sessão (`exigirParceiroDaSessao`), nunca da URL: não existe endereço que
- * escolha outro parceiro. Sessão própria (não é a do /rodolfo).
+ * ERP do parceiro: a área das pessoas do Parceiro Flow, dentro do shell
+ * ÚNICO (o mesmo do /rodolfo). O parceiro vem SÓ da sessão
+ * (`exigirParceiroDaSessao`), nunca da URL: não existe endereço que escolha
+ * outro parceiro. Sessão própria (não é a do /rodolfo).
+ *
+ * O layout monta o que o shell desenha (menu filtrado pelo alcance, visão
+ * conferida contra as lojas do alcance, tema do cookie); cada página continua
+ * conferindo a própria permissão (`exigirPermissaoNaPagina`).
  */
 
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import { Suspense } from 'react';
-import { exigirParceiroDaSessao, telasPermitidas } from '@/lib/erp/contexto';
-import { listarLojasDoAlcance } from '@/lib/erp/estrutura';
+import { cookies } from 'next/headers';
+import { exigirParceiroDaSessao, visaoDaRequisicao } from '@/lib/erp/contexto';
+import { navegacaoDoParceiro, VERSAO_DO_ERP } from '@/lib/erp/modulos';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
-import { rotuloDasLojas } from '@/lib/erp/permissoes';
-import { Aviso, Cabecalho, Ponto } from '@/app/rodolfo/erp/ui';
-import { MarcaErp } from '../entrar/marca';
+import { COOKIE_MENU, COOKIE_TEMA, lerMenuRecolhido, lerTema } from '@/lib/erp/tema';
+import { AppShell } from '@/components/erp/shell/AppShell';
+import { Aviso } from '@/components/erp/ui/superficies';
 import { acaoSair } from '../entrar/actions';
-import { AbasDoParceiro, AvisoSemAcesso } from './abas';
+import { acaoBuscarNoErp, acaoEscolherVisao } from './actions';
 
 export const metadata: Metadata = {
   title: 'FlowFoods ERP',
@@ -29,66 +33,41 @@ const AVISO = {
 } as const;
 
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
-  const { parceiro, pessoa, bloqueio, alcance, cliente } = await exigirParceiroDaSessao();
+  const ctx = await exigirParceiroDaSessao();
+  const { parceiro, pessoa, bloqueio, alcance } = ctx;
   const status = STATUS_DO_PARCEIRO[parceiro.status];
-  const abas = telasPermitidas(alcance).map(({ href, rotulo }) => ({ href, rotulo }));
-  const lojas = alcance.lojas === 'todas' ? [] : await listarLojasDoAlcance(cliente, alcance);
-  const onde = rotuloDasLojas(alcance.lojas, new Map(lojas.map((l) => [l.id, l.nome])));
+  const { opcoes, valor } = await visaoDaRequisicao(ctx);
+  const c = cookies();
+
+  const links = [{ rotulo: 'Seu acesso', href: '/erp/acesso' }];
+  if (pessoa.parceiros.length > 1) links.push({ rotulo: 'Trocar de parceiro', href: '/entrar/escolher' });
 
   return (
-    <div className="min-h-screen bg-footer text-surface">
-      <div aria-hidden className="h-[3px] bg-primary" />
-      <header className="border-b border-white/10">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <Link href="/erp" aria-label="FlowFoods ERP — início">
-            <MarcaErp />
-          </Link>
-          <div className="flex min-w-0 items-center gap-3">
-            <span className="hidden truncate text-[13px] text-surface/55 sm:block">{pessoa.usuario.nome}</span>
-            <form action={acaoSair}>
-              <button
-                type="submit"
-                className="rounded-[7px] border border-white/15 px-3 py-1.5 text-xs font-medium text-surface/70 transition hover:border-white/30 hover:text-surface"
-              >
-                Sair
-              </button>
-            </form>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto max-w-5xl space-y-6 px-4 py-6">
-        <Cabecalho
-          rotulo={
-            <>
-              <Ponto tom={status.tom} />
-              Parceiro Flow · {status.rotulo}
-            </>
-          }
-          titulo={parceiro.nome}
-          descricao={`${pessoa.perfilRotulo ?? ''} · ${onde}`}
-          acessorio={
-            pessoa.parceiros.length > 1 && (
-              <Link
-                href="/entrar/escolher"
-                className="rounded-[7px] border border-white/[0.14] px-3 py-1.5 text-[12px] text-surface/70 transition hover:border-surface/40 hover:text-surface"
-              >
-                Trocar de parceiro
-              </Link>
-            )
-          }
-        />
+    <AppShell
+      navegacao={navegacaoDoParceiro(alcance)}
+      contexto={`${parceiro.nome} · ${status.rotulo}`}
+      usuario={{
+        nome: pessoa.usuario.nome,
+        papel: pessoa.perfilRotulo ?? 'Acesso próprio',
+        email: pessoa.usuario.email,
+      }}
+      tema={lerTema(c.get(COOKIE_TEMA)?.value)}
+      menuRecolhido={lerMenuRecolhido(c.get(COOKIE_MENU)?.value)}
+      versao={VERSAO_DO_ERP}
+      visao={{ modo: 'parceiro', opcoes, valor, escolher: acaoEscolherVisao }}
+      notificacoes={[]}
+      links={links}
+      sair={acaoSair}
+      buscarInsumos={acaoBuscarNoErp}
+    >
+      <div className="space-y-6">
         {bloqueio && (parceiro.status === 'SUSPENSO' || parceiro.status === 'RASCUNHO') && (
-          <Aviso tom={parceiro.status === 'SUSPENSO' ? 'suspenso' : 'rascunho'} titulo={status.rotulo}>
+          <Aviso tom={parceiro.status === 'SUSPENSO' ? 'erro' : 'alerta'} titulo={`${status.rotulo}.`}>
             {AVISO[parceiro.status]}
           </Aviso>
         )}
-        <AbasDoParceiro abas={abas} />
-        <Suspense>
-          <AvisoSemAcesso />
-        </Suspense>
         {children}
-      </main>
-    </div>
+      </div>
+    </AppShell>
   );
 }

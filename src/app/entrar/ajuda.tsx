@@ -1,19 +1,23 @@
 import { AJUDA_DE_ACESSO_ERP } from '@/lib/constants';
 
-/** Saída para quem não consegue entrar: WhatsApp da FlowFoods, em todas as larguras. */
+/**
+ * Saída para quem não consegue entrar: WhatsApp da FlowFoods, em todas as
+ * larguras. Cores por token: no /entrar (fora do shell) caem no tema escuro;
+ * em Seu acesso (dentro do shell) seguem o tema escolhido.
+ */
 export function AjudaDeAcesso({ className = '' }: { className?: string }) {
   return (
-    <p className={`text-[13px] leading-relaxed text-surface/55 ${className}`}>
+    <p className={`text-[13px] leading-relaxed text-suave ${className}`}>
       Esqueceu a senha ou não consegue entrar?{' '}
       <a
         href={AJUDA_DE_ACESSO_ERP.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="font-semibold text-surface underline decoration-surface/30 underline-offset-4 transition hover:decoration-surface"
+        className="font-semibold text-texto underline decoration-texto/30 underline-offset-4 transition hover:decoration-texto"
       >
         Fale com a FlowFoods
       </a>{' '}
-      <span className="whitespace-nowrap tabular-nums text-surface/45">· WhatsApp {AJUDA_DE_ACESSO_ERP.display}</span>
+      <span className="whitespace-nowrap tabular-nums text-suave">· WhatsApp {AJUDA_DE_ACESSO_ERP.display}</span>
     </p>
   );
 }

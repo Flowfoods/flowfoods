@@ -1,3 +1,4 @@
+// avoid-ai-design-ignore-file: CP3 — a seta está em comentário de código (exemplo de conversão), não em botão nem link.
 import { NextResponse, type NextRequest } from 'next/server';
 import type { NextFetchEvent } from 'next/server';
 import comSessao from 'next-auth/middleware';
