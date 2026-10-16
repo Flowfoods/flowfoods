@@ -802,13 +802,14 @@ model InsumoVariante {
 
 enum NotaStatus {
   RASCUNHO // digitada/importada, ainda não conferida (sem uso na 1.5)
-  LANCADA // conferida: vale para o custo (último preço). Movimento de estoque: só com o estoque da loja aberto (1.6)
+  LANCADA // conferida: vale para o custo (último preço). Movimento de estoque: só com o estoque da loja aberto (1.6, decisão 68)
   CANCELADA // não vale mais para nada; a chave da nota fica livre para relançar certa
 }
 
-// Nota de entrada (compra), por LOJA. Na 1.5 ela não gera MovimentoEstoque
-// (decisão 64): o estoque só abre na 1.6 (1ª contagem); dali em diante, nota
-// lançada na loja aberta gera ENTRADA_COMPRA na mesma transação.
+// Nota de entrada (compra), por LOJA. Antes da abertura do estoque da loja ela
+// não gera MovimentoEstoque (decisão 64); depois (1.6), nota lançada na loja
+// aberta, com data a partir da abertura, gera ENTRADA_COMPRA na mesma
+// transação; editar e cancelar estornam (decisão 68).
 // Idempotência: fornecedor + número + série é único por parceiro entre as não
 // canceladas (índice parcial escrito no SQL da migration 20261018010000).
 model NotaEntrada {
@@ -839,7 +840,9 @@ model NotaEntrada {
   canceladaEm            DateTime?
   motivoCancelamento     String?
 
-  itens NotaEntradaItem[]
+  itens      NotaEntradaItem[]
+  // 1.6: entradas e estornos no estoque da loja (só com o estoque aberto).
+  movimentos MovimentoEstoque[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, chaveAcesso])
@@ -1115,9 +1118,18 @@ model MovimentoEstoque {
   contagemItem         ContagemItem?    @relation(fields: [parceiroId, contagemItemId], references: [parceiroId, id], onDelete: Restrict)
   ordemProducaoId      String?
   ordemProducao        OrdemProducao?   @relation(fields: [parceiroId, ordemProducaoId], references: [parceiroId, id], onDelete: Restrict)
+  // 1.6: a nota (cabeçalho, estável: editar troca os itens) que gerou a entrada.
+  notaId               String?
+  nota                 NotaEntrada?     @relation(fields: [parceiroId, notaId], references: [parceiroId, id], onDelete: Restrict)
+  // 1.6: o movimento que este desfaz (espelho exato, conferido por trigger). Único.
+  estornoDeId          String?
+  estornoDe            MovimentoEstoque? @relation("EstornoDoMovimento", fields: [parceiroId, estornoDeId], references: [parceiroId, id], onDelete: Restrict)
+  estorno              MovimentoEstoque? @relation("EstornoDoMovimento")
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, chaveIdempotencia])
+  @@unique([parceiroId, estornoDeId])
+  @@index([parceiroId, notaId])
   @@index([parceiroId, lojaId, insumoId, ocorridoEm])
   @@index([parceiroId, lojaId, tipo, ocorridoEm])
   @@index([parceiroId, colaboradorId, ocorridoEm])
@@ -1154,6 +1166,13 @@ model Contagem {
   valorTotalCentavos Int?
   origem             OrigemDado       @default(MANUAL)
   criadoEm           DateTime         @default(now())
+  // 1.6: sobe a cada número salvo (trava a contagem; é a "versão conferida" do
+  // concluir). Quem começou e quem concluiu (snapshot do nome). Quantos itens
+  // ficaram sem contar no fechamento (entraram com zero, confirmado).
+  versao                  Int     @default(0)
+  iniciadaPorNome         String?
+  fechadaPorNome          String?
+  naoContadosNoFechamento Int?
 
   itens ContagemItem[]
 
@@ -1180,6 +1199,17 @@ model ContagemItem {
   colaboradorId         String?
   colaborador           Colaborador? @relation(fields: [parceiroId, colaboradorId], references: [parceiroId, id], onDelete: Restrict)
   contadoEm             DateTime?
+  // 1.6: lista e fatores congelados ao abrir a contagem; o digitado
+  // (embalagens fechadas + solto, e a escala kg/g) separado do normalizado
+  // (`contadoMilesimos`); versão do item (dois contadores); quem contou.
+  versao                     Int          @default(0)
+  conservacaoSnapshot        Conservacao?
+  embalagemSnapshot          String?
+  embalagemConteudoMilesimos Int?
+  embalagensMilesimos        Int?
+  soltoMilesimos             Int?
+  escalaDigitada             String?
+  contadoPorNome             String?
 
   movimentos MovimentoEstoque[]
 
