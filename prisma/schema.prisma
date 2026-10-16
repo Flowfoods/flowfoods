@@ -949,6 +949,7 @@ model FichaTecnica {
   usadaComoSub   FichaItem[]     @relation("FichaSubficha")
   produtos       ProdutoVenda[]
   ordensProducao OrdemProducao[]
+  requisicoes    Requisicao[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, nome])
@@ -1244,9 +1245,10 @@ model ContagemItem {
 }
 
 enum RequisicaoStatus {
-  ABERTA
-  ATENDIDA
-  CANCELADA
+  ABERTA // pedida: nada saiu ainda
+  ATENDIDA // tudo saiu (ou o resto foi encerrado: corte visível)
+  CANCELADA // só sem nada entregue, com motivo
+  PARCIAL // 1.8: saiu parte; o resto ainda pode sair
 }
 
 // Requisição (1.8): o setor pede, o estoque entrega, a baixa sai daqui.
@@ -1267,11 +1269,33 @@ model Requisicao {
   solicitadaEm  DateTime         @default(now())
   atendidaEm    DateTime?
 
+  // 1.8: número por loja (#12; único na loja, dado sob a trava da loja),
+  // versão (atender só na versão lida: duas entregas da mesma tela não baixam
+  // duas vezes), para quando (dia, Rio), quem pediu/entregou/cancelou
+  // (snapshot do nome: Colaborador ainda não liga à pessoa do login),
+  // cancelamento com motivo, e a ficha técnica de onde a lista foi puxada
+  // (snapshot do nome e de quanto se ia produzir). `setor` guarda a chave do
+  // setor da 0.4 (CHECK no banco).
+  numero                   Int?
+  versao                   Int           @default(0)
+  paraDia                  DateTime?     @db.Date
+  pedidaPorNome            String?
+  atendidaPorNome          String?
+  canceladaPorNome         String?
+  canceladaEm              DateTime?
+  motivoCancelamento       String?
+  fichaId                  String?
+  ficha                    FichaTecnica? @relation(fields: [parceiroId, fichaId], references: [parceiroId, id], onDelete: Restrict)
+  fichaNomeSnapshot        String?
+  fichaQuantidadeMilesimos Int?
+
   itens          RequisicaoItem[]
   ordensProducao OrdemProducao[]
 
   @@unique([parceiroId, id])
+  @@unique([parceiroId, lojaId, numero])
   @@index([parceiroId, lojaId, solicitadaEm])
+  @@index([parceiroId, lojaId, status])
 }
 
 model RequisicaoItem {
@@ -1287,6 +1311,9 @@ model RequisicaoItem {
   solicitadoMilesimos Int
   // Null até atender; pode ser menor que o pedido (corte visível).
   atendidoMilesimos   Int?
+  // 1.8: o que voltou (devolução por estorno; `atendido` é o líquido) e a ordem da lista.
+  devolvidoMilesimos  Int          @default(0)
+  ordem               Int          @default(0)
 
   movimentos MovimentoEstoque[]
 
