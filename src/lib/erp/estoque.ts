@@ -245,6 +245,7 @@ export async function gravarMovimentos(
       chaveIdempotencia: m.chave,
       notaId: m.notaId ?? null,
       contagemItemId: m.contagemItemId ?? null,
+      requisicaoItemId: m.requisicaoItemId ?? null,
       estornoDeId: m.estornoDeId ?? null,
     })),
   });
