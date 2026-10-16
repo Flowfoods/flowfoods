@@ -706,6 +706,8 @@ model Fornecedor {
   contato    String?
   ativo      Boolean      @default(true)
   criadoEm   DateTime     @default(now())
+  // 1.5: edição condicional à versão lida (duas abas não se atropelam).
+  atualizadoEm DateTime   @default(now()) @updatedAt
 
   insumosPadrao Insumo[]
   variantes     InsumoVariante[]
@@ -799,12 +801,16 @@ model InsumoVariante {
 }
 
 enum NotaStatus {
-  RASCUNHO // digitada/importada, ainda não mexeu no estoque
-  LANCADA // conferida: gerou movimentos de ENTRADA
-  CANCELADA
+  RASCUNHO // digitada/importada, ainda não conferida (sem uso na 1.5)
+  LANCADA // conferida: vale para o custo (último preço). Movimento de estoque: só com o estoque da loja aberto (1.6)
+  CANCELADA // não vale mais para nada; a chave da nota fica livre para relançar certa
 }
 
-// Nota de entrada (compra). Só mexe no estoque quando LANCADA.
+// Nota de entrada (compra), por LOJA. Na 1.5 ela não gera MovimentoEstoque
+// (decisão 64): o estoque só abre na 1.6 (1ª contagem); dali em diante, nota
+// lançada na loja aberta gera ENTRADA_COMPRA na mesma transação.
+// Idempotência: fornecedor + número + série é único por parceiro entre as não
+// canceladas (índice parcial escrito no SQL da migration 20261018010000).
 model NotaEntrada {
   id                     String       @id @default(cuid())
   parceiroId             String
@@ -827,6 +833,11 @@ model NotaEntrada {
   origemRef              String?
   lancadaEm              DateTime?
   criadoEm               DateTime     @default(now())
+  // 1.5: série da nota ('' = sem série), versão para editar, cancelamento.
+  serie                  String       @default("")
+  atualizadoEm           DateTime     @default(now()) @updatedAt
+  canceladaEm            DateTime?
+  motivoCancelamento     String?
 
   itens NotaEntradaItem[]
 
@@ -858,6 +869,13 @@ model NotaEntradaItem {
   quantidadeMilesimos Int
   valorTotalCentavos  Int
   criadoEm            DateTime        @default(now())
+  // 1.5: parte do frete da nota que cabe a este item (rateado pelo valor; a
+  // soma dos itens bate com o frete da nota). Custo do item = (valor + frete) ÷ quantidade.
+  freteRateadoCentavos Int            @default(0)
+  // Snapshot da embalagem como foi comprada ("Caixa 5 kg", "Padrão 1 kg", "A granel (kg)").
+  embalagemSnapshot   String?
+  // Ordem da linha na nota (como foi digitada).
+  ordem               Int             @default(0)
 
   movimentos MovimentoEstoque[]
   etiquetas  Etiqueta[]
