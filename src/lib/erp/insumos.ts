@@ -15,7 +15,7 @@
 
 import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
-import { ehErroDeUnicidade } from './tenant';
+import { checkVioladoDe, ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
 import {
   diferenca,
@@ -60,6 +60,20 @@ class Recusa extends Error {
   constructor(readonly resultado: Extract<ResultadoCadastro, { ok: false }>) {
     super('recusa');
   }
+}
+
+/**
+ * O banco recusou por um CHECK (herança a da 1.4): frase em vez de 500. Com os
+ * CHECKs validados (migration 20261018000000) uma linha antiga fora da regra
+ * não existe mais; se aparecer (gravada por fora), a pessoa sabe o que fazer.
+ */
+export function erroDoCheck(e: unknown): Extract<ResultadoCadastro, { ok: false }> | null {
+  const check = checkVioladoDe(e);
+  if (!check) return null;
+  const geral = /validade/i.test(check)
+    ? 'A validade gravada neste insumo está fora da regra (a conservação principal precisa ter validade, até 730 dias). Corrija em Editar, no bloco “Onde guarda e quanto dura”, e tente de novo. Nada foi gravado.'
+    : 'O banco recusou estes valores (fora da faixa permitida). Confira os números e tente de novo. Nada foi gravado.';
+  return { ok: false, erros: { geral } };
 }
 
 async function erroDeNomeRepetido(cliente: ClienteDoParceiro, nome: string): Promise<ResultadoCadastro> {
@@ -119,6 +133,8 @@ export async function cadastrarInsumo(
     return { ok: true, ...criado, mudou: [] };
   } catch (e) {
     if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, d.nome);
+    const check = erroDoCheck(e);
+    if (check) return check;
     throw e;
   }
 }
@@ -251,6 +267,8 @@ export async function editarInsumo(
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
     if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, d.nome);
+    const check = erroDoCheck(e);
+    if (check) return check;
     throw e;
   }
   return { ok: true, id, nome: d.nome, mudou: mudanca.campos };
@@ -299,6 +317,8 @@ export async function mudarSituacaoInsumo(
     });
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
+    const check = erroDoCheck(e);
+    if (check) return check;
     throw e;
   }
 }
