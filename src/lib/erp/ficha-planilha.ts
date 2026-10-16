@@ -24,6 +24,12 @@ import { RENDE_DO_PREPARO, type EntradaDaFicha, type RendeEm, type TipoFicha } f
  */
 export const LIMITE_DA_PLANILHA = 256 * 1024;
 export const LIMITE_DE_LINHAS = 5000;
+/**
+ * Fichas por arquivo (herança da 1.2): a importação grava tudo numa transação
+ * com os insumos travados; 5000 fichas levavam ~26 s de 30. Com 300, fica na
+ * casa de 2 s e a planilha grande é dividida, com a mensagem dizendo isso.
+ */
+export const LIMITE_DE_FICHAS = 300;
 
 export interface ErroDeLinha {
   linha: number;
@@ -257,6 +263,13 @@ export function lerPlanilhaDeFichas(texto: string): LeituraDaPlanilha {
         mensagem: f.tipo === 'PRATO' ? 'Prato rende em porções: deixe “unidade_rende” vazia ou escreva porção.' : 'Pré-preparo rende em kg, g, L, ml ou un.',
       });
     } else f.rendeEm = em;
+  }
+  if (porNome.size > LIMITE_DE_FICHAS) {
+    return {
+      fichas: [],
+      erros: [{ linha: 1, mensagem: `A planilha tem ${porNome.size} fichas: importe até ${LIMITE_DE_FICHAS} por vez. Divida o arquivo e envie as partes uma de cada vez (reimportar não duplica).` }],
+      linhasLidas,
+    };
   }
   return { fichas: Array.from(porNome.values()), erros, linhasLidas };
 }

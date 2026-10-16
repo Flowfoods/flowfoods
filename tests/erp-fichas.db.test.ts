@@ -42,7 +42,7 @@ vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarInsumo } from '@/lib/erp/insumos';
 import { cadastrarFicha, editarFicha, MENSAGEM_CONFLITO_FICHA, MENSAGEM_FOTO_SUMIU, mudarSituacaoFicha, obterFicha } from '@/lib/erp/fichas';
-import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
+import { importarFichas, MENSAGEM_IMPORTACAO_DEMOROU, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { responderFoto } from '@/lib/erp/foto-resposta';
 import { listarHistorico } from '@/lib/erp/historico';
 import { resolverAlcance } from '@/lib/erp/permissoes';
@@ -413,6 +413,21 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
     expect(await importarFichas(a, nova)).toEqual({ ok: true, criadas: 0, alteradas: 1, iguais: 3, comErro: 1 });
     const smash2 = await a.fichaTecnica.findFirstOrThrow({ where: { nome: 'Smash duplo' } });
     expect(smash2.descricao).toBe('Dois smash');
+  });
+
+  it('importar acima do limite (301 fichas): prévia e importação dizem o porquê e o que fazer; nada gravado', async () => {
+    const linhas = ['ficha;insumo;quantidade;unidade', ...Array.from({ length: 301 }, (_, i) => `Lote ${i + 1};Pão brioche;1;un`)];
+    const texto = linhas.join('\n');
+    const antes = await a.fichaTecnica.count();
+    const p = await previaDaImportacao(a, texto);
+    expect(p.fichas).toEqual([]);
+    expect(p.erros[0].mensagem).toBe('A planilha tem 301 fichas: importe até 300 por vez. Divida o arquivo e envie as partes uma de cada vez (reimportar não duplica).');
+    expect(await importarFichas(a, texto)).toEqual({ ok: false, erro: p.erros[0].mensagem });
+    expect(await a.fichaTecnica.count()).toBe(antes);
+    // Estourou o tempo da transação: mensagem clara, nada gravado (tudo ou nada).
+    const ok = linhas.slice(0, 41).join('\n');
+    expect(await importarFichas(a, ok, 'Marina', { timeout: 1 })).toEqual({ ok: false, erro: MENSAGEM_IMPORTACAO_DEMOROU });
+    expect(await a.fichaTecnica.count()).toBe(antes);
   });
 
   it('importar em B com nome de insumo que só existe em A: não encontrado (isolamento)', async () => {

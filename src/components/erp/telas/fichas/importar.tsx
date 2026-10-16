@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import type { FichaNaPrevia, SituacaoNaPrevia } from '@/lib/erp/ficha-importar';
+import { LIMITE_DE_FICHAS } from '@/lib/erp/ficha-planilha';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, ROTULO } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
@@ -156,7 +157,7 @@ export function TelaImportarFichas({
                 </label>
                 <span className="min-w-0 truncate text-sm text-suave">{arquivo ?? 'Nenhum arquivo escolhido'}</span>
               </div>
-              <p className={AJUDA}>Até 256 KB. Nada é gravado agora: primeiro você vê a prévia.</p>
+              <p className={AJUDA}>Até 256 KB e {LIMITE_DE_FICHAS} fichas por arquivo. Nada é gravado agora: primeiro você vê a prévia.</p>
             </div>
             <BotaoEnviar variante="secundario" pendente="Lendo a planilha…">
               Ver a prévia

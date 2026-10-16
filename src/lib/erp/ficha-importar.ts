@@ -175,7 +175,22 @@ export type ResultadoDaImportacao =
  * prévia mostrou como boas, ou nenhuma (conflito com uma edição em curso,
  * nome criado por outra pessoa no meio).
  */
-export async function importarFichas(cliente: ClienteDoParceiro, texto: string, autorNome = 'Sistema'): Promise<ResultadoDaImportacao> {
+export const MENSAGEM_IMPORTACAO_DEMOROU =
+  'A importação passou de 30 segundos e foi desfeita: nada foi gravado. Divida a planilha em arquivos menores e envie um de cada vez (reimportar não duplica).';
+
+/** Prisma: transação que estourou o tempo (P2028) ou que fechou por isso. */
+function estourouOTempo(e: unknown): boolean {
+  const codigo = (e as { code?: string } | null)?.code;
+  const msg = e instanceof Error ? e.message : '';
+  return codigo === 'P2028' || /expired transaction|Transaction already closed|timeout for this transaction/i.test(msg);
+}
+
+export async function importarFichas(
+  cliente: ClienteDoParceiro,
+  texto: string,
+  autorNome = 'Sistema',
+  { timeout = 30_000 }: { timeout?: number } = {},
+): Promise<ResultadoDaImportacao> {
   try {
     return await cliente.transacao(
       async (tx) => {
@@ -186,7 +201,9 @@ export async function importarFichas(cliente: ClienteDoParceiro, texto: string, 
             ok: false,
             erros: {
               geral:
-                previa.contagem.igual > 0 && previa.contagem.erro === 0
+                previa.fichas.length === 0 && previa.erros.length > 0
+                  ? previa.erros[0].mensagem
+                  : previa.contagem.igual > 0 && previa.contagem.erro === 0
                   ? 'Nada mudou: as fichas da planilha já estão iguais no cadastro.'
                   : 'Nenhuma ficha da planilha pode entrar: corrija os erros e envie de novo.',
             },
@@ -207,10 +224,11 @@ export async function importarFichas(cliente: ClienteDoParceiro, texto: string, 
         }
         return { ok: true as const, criadas: previa.contagem.nova, alteradas: previa.contagem.muda, iguais: previa.contagem.igual, comErro: previa.contagem.erro };
       },
-      { timeout: 30_000 },
+      { timeout },
     );
   } catch (e) {
     if (e instanceof RecusaDaFicha) return { ok: false, erro: e.resultado.erros.geral ?? 'Importação recusada.' };
+    if (estourouOTempo(e)) return { ok: false, erro: MENSAGEM_IMPORTACAO_DEMOROU };
     if (ehErroDeUnicidade(e)) {
       return { ok: false, erro: 'Alguém criou uma ficha com o mesmo nome enquanto você importava. Veja a prévia de novo; nada foi gravado.' };
     }
