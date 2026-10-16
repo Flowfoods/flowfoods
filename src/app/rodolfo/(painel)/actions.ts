@@ -125,8 +125,7 @@ export async function acaoDryRun(): Promise<Resposta> {
   return {
     ok: true,
     mensagem:
-      `${n} mensagem(ns) simulada(s). Zero chamadas à Evolution.` +
-      (ultimoMotivo ? ` Parou em: ${ultimoMotivo}` : ''),
+      `${n} mensagem(ns) simulada(s). Zero chamadas à Evolution.` + (ultimoMotivo ? ` Parou em: ${ultimoMotivo}` : ''),
   };
 }
 

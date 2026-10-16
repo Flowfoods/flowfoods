@@ -11,7 +11,6 @@ import { parceirosSemAdministrador } from '@/lib/erp/credenciais';
 import { COR } from '@/lib/erp/modulos';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
-import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { Contagem, Metrica, Painel, Ponto, Vazio } from '@/components/erp/ui/superficies';
 import { FormParceiro } from './form-parceiro';
 
@@ -44,11 +43,6 @@ export default async function ErpPage() {
         cor={COR.parceiros}
         titulo="Parceiros Flow"
         subtitulo={`Nível 1 · ${parceiros.length} parceiro${parceiros.length === 1 ? '' : 's'} · cada um enxerga só o que é dele`}
-        acao={
-          <a href="#novo-parceiro" className={classeDeBotao('primario')}>
-            + Novo parceiro
-          </a>
-        }
       />
 
       <div className="grid grid-cols-3 gap-3">

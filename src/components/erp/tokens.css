@@ -107,6 +107,12 @@ html:has(.ff-app[data-tema='escuro']) {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Gelasio tem algarismo de texto ("0" vira "o"): número em Gelasio é sempre de
+   linha e tabular. Especificidade acima do utilitário tabular-nums. */
+.ff-app .font-display {
+  font-variant-numeric: lining-nums tabular-nums;
+}
+
 /* Foco do kit: anel de 3 px, 4 px de folga, na cor do acento. Nunca removido. */
 .ff-app :is(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 3px solid rgb(var(--ff-acento));

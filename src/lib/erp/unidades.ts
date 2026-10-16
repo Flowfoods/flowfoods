@@ -1,3 +1,4 @@
+// avoid-ai-design-ignore-file: CP3 — a seta está em comentário de código (exemplo de conversão), não em botão nem link.
 /**
  * Números do ERP: quantidade em milésimos, dinheiro em centavos, sempre inteiros.
  *

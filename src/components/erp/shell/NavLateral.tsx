@@ -10,6 +10,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+// avoid-ai-design-ignore: I3 — Check marca estado (opção escolhida, mensagem entregue), não é enfeite.
 import { Check, ChevronDown, ChevronsUpDown, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import type { ModuloNav, Navegacao } from '@/lib/erp/modulos';
 import { IconeDoModulo } from '../ui/cabecalho';
@@ -167,8 +168,8 @@ function Grupo({ rotulo, recolhido, children }: { rotulo: string; recolhido: boo
 }
 
 function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: ModuloNav | null; recolhido: boolean }) {
-  const nome = atual?.nome ?? nav.inicio.titulo;
-  const sub = atual?.subtitulo ?? nav.inicio.subtitulo;
+  const nome = atual?.nome ?? 'Início';
+  const sub = atual?.subtitulo ?? nav.inicio.titulo;
   return (
     <Popover
       rotulo={`Módulo: ${nome}. Trocar de módulo`}

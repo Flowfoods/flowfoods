@@ -9,7 +9,6 @@ import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode, visaoDaRequisica
 import { listarInsumos } from '@/lib/erp/insumos';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
-import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { TelaInsumos } from '@/components/erp/telas/insumos/tela-insumos';
 import { FormInsumo } from '@/components/erp/telas/insumos/form-insumo';
 import { subtituloDosInsumos } from '@/components/erp/telas/insumos/subtitulo';
@@ -29,13 +28,6 @@ export default async function ErpInsumosPage() {
         cor={COR.insumo}
         titulo="Insumos"
         subtitulo={subtituloDosInsumos(visao, insumos.length)}
-        acao={
-          cadastra && !ctx.bloqueio ? (
-            <a href="#novo-insumo" className={classeDeBotao('primario')}>
-              + Novo insumo
-            </a>
-          ) : undefined
-        }
       />
       <TelaInsumos
         linhas={insumos}

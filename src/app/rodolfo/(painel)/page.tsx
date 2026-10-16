@@ -13,7 +13,7 @@ import { HubDeModulos } from '@/components/erp/ui/hub';
 export const dynamic = 'force-dynamic';
 
 export default async function HubDoNivel1() {
-  const { autorNome } = await exigirNivel1();
+  await exigirNivel1();
   const modulos = modulosDoNivel1();
   const telas = modulos.reduce((n, m) => n + m.grupos.reduce((k, g) => k + g.itens.length, 0), 0);
 
@@ -23,7 +23,7 @@ export default async function HubDoNivel1() {
         icone="inicio"
         cor={COR.inicio}
         titulo="Módulos da FlowFoods"
-        subtitulo={`${autorNome.split(' ')[0]} · nível 1 · ${modulos.length} módulos, ${telas} telas`}
+        subtitulo={`Nível 1 · ${modulos.length} módulos, ${telas} telas`}
       />
       <HubDeModulos
         secoes={modulos.map((m) => ({

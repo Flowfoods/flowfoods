@@ -103,7 +103,7 @@ export default async function LeadsPage({
         titulo="Leads"
         subtitulo={`${total} resultado${total === 1 ? '' : 's'}${params.q ? ` para “${params.q}”` : ''}`}
         acao={
-          <a href="#importar" className={classeDeBotao('primario')}>
+          <a href="#importar" className={classeDeBotao('secundario')}>
             Importar lote
           </a>
         }

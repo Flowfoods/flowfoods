@@ -12,6 +12,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useTransition } from 'react';
+// avoid-ai-design-ignore: I3 — Check marca estado (opção escolhida, mensagem entregue), não é enfeite.
 import { Check, ChevronDown, Store } from 'lucide-react';
 import { slugNoCaminho } from '@/lib/rodolfo/modulos';
 import type { OpcaoDeVisao } from '@/lib/erp/visao';

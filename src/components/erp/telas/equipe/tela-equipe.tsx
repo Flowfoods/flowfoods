@@ -21,7 +21,7 @@ import {
   TODAS_AS_PERMISSOES,
   type Alcance,
 } from '@/lib/erp/permissoes';
-import { classeDeBotao } from '../../ui/estilos';
+import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Metrica, Painel, Ponto, Vazio } from '../../ui/superficies';
 import { ListaHistorico } from '../historico/lista-historico';
 import { AcoesDaPessoa } from './acoes-pessoa';
@@ -344,8 +344,8 @@ export function TelaEquipe({
                 titulo="Últimas mudanças na equipe"
                 acessorio={
                   historicoHref && (
-                    <Link href={historicoHref} className="text-[12px] text-suave transition hover:text-texto">
-                      Ver tudo →
+                    <Link href={historicoHref} className={LINK_DE_TEXTO}>
+                      Ver o histórico completo
                     </Link>
                   )
                 }

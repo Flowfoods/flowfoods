@@ -11,6 +11,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { gancho, angulo } from '@/lib/barney/render';
 import { agoraSP } from '@/lib/rodolfo/estado';
+// avoid-ai-design-ignore: I3 — Check marca estado (opção escolhida, mensagem entregue), não é enfeite.
 import {
   CircleDashed,
   Check,

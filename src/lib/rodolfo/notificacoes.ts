@@ -1,6 +1,6 @@
 /**
  * Notificações do nível 1 no sino do shell: só contagem REAL que já existia
- * numa tela (Hoje → "Respostas sem classificar"). Sem fonte, sem sino aceso.
+ * numa tela (o "Respostas sem classificar" de Hoje). Sem fonte, sem sino aceso.
  */
 
 import { prisma } from '@/lib/db';

@@ -104,7 +104,7 @@ export default async function BarneyPage() {
             </BotaoAcao>
           )}
 
-          <BotaoAcao acao={() => acaoEnviarAgora()} variante={lote?.status === 'PROPOSTO' ? 'secundario' : 'primario'}>
+          <BotaoAcao acao={acaoEnviarAgora} variante={lote?.status === 'PROPOSTO' ? 'secundario' : 'primario'}>
             Enviar agora (1)
           </BotaoAcao>
 

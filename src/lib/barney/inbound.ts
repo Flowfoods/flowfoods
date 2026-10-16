@@ -1,3 +1,4 @@
+// avoid-ai-design-ignore-file: I2 — emoji no texto do aviso que vai para o WhatsApp do Rodolfo (mensagem, não ícone de interface).
 /**
  * Processamento de resposta recebida (MESSAGES_UPSERT).
  *

@@ -60,14 +60,22 @@ export async function acaoNovoLink(slug: string, acessoId: string, anterior: Est
   return concluir(slug, c.sessao.userId, 'erp_acesso_novo_link', { parceiroId: c.parceiro.id, acessoId }, r);
 }
 
-export async function acaoDesativarAcesso(slug: string, acessoId: string, anterior: EstadoEquipe): Promise<EstadoEquipe> {
+export async function acaoDesativarAcesso(
+  slug: string,
+  acessoId: string,
+  anterior: EstadoEquipe,
+): Promise<EstadoEquipe> {
   const c = await contexto(slug);
   if (c.negado) return recusado(anterior, c.negado);
   const r = await executarStatus(c.parceiro.id, c.ator, acessoId, 'DESATIVADO', anterior);
   return concluir(slug, c.sessao.userId, 'erp_acesso_desativado', { parceiroId: c.parceiro.id, acessoId }, r);
 }
 
-export async function acaoReativarAcesso(slug: string, acessoId: string, anterior: EstadoEquipe): Promise<EstadoEquipe> {
+export async function acaoReativarAcesso(
+  slug: string,
+  acessoId: string,
+  anterior: EstadoEquipe,
+): Promise<EstadoEquipe> {
   const c = await contexto(slug);
   if (c.negado) return recusado(anterior, c.negado);
   const r = await executarStatus(c.parceiro.id, c.ator, acessoId, 'ATIVO', anterior);
@@ -75,7 +83,11 @@ export async function acaoReativarAcesso(slug: string, acessoId: string, anterio
 }
 
 /** Só o nível 1: libera o e-mail travado pelo limite de tentativas. */
-export async function acaoLiberarEntrada(slug: string, acessoId: string, anterior: EstadoEquipe): Promise<EstadoEquipe> {
+export async function acaoLiberarEntrada(
+  slug: string,
+  acessoId: string,
+  anterior: EstadoEquipe,
+): Promise<EstadoEquipe> {
   const c = await contexto(slug);
   if (c.negado) return recusado(anterior, c.negado);
   const r = await executarLiberar(c.parceiro.id, c.ator.nome, acessoId, anterior);

@@ -1,3 +1,4 @@
+// avoid-ai-design-ignore-file: CP3 — a seta está em comentário de código (exemplo de conversão), não em botão nem link.
 /**
  * POST /api/webhooks/evolution
  *

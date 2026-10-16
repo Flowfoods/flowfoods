@@ -24,7 +24,12 @@ export function TelaInsumos({
 }) {
   return (
     <div className={`grid gap-4 ${formulario ? 'lg:grid-cols-[minmax(0,1.8fr)_minmax(300px,1fr)]' : ''}`}>
-      <Painel titulo="Lista de insumos" acessorio={<Contagem>{insumos.length}</Contagem>} semRespiro className="order-2 lg:order-1">
+      <Painel
+        titulo="Lista de insumos"
+        acessorio={<Contagem>{insumos.length}</Contagem>}
+        semRespiro
+        className="order-2 lg:order-1"
+      >
         {insumos.length === 0 ? (
           <Vazio titulo="Nenhum insumo ainda.">
             {formulario ? 'Cadastre o primeiro no formulário.' : 'Quem cuida dos cadastros ainda não incluiu nenhum.'}
@@ -62,7 +67,9 @@ export function TelaInsumos({
                         <span className="sm:hidden"> · {formatarDinheiro(i.precoEmbalagemCentavos)}</span>
                       </div>
                     </td>
-                    <td className="px-3 py-2.5 text-right text-suave">{formatarQuantidade(i.conteudoMilesimos, i.unidade)}</td>
+                    <td className="px-3 py-2.5 text-right text-suave">
+                      {formatarQuantidade(i.conteudoMilesimos, i.unidade)}
+                    </td>
                     <td className="hidden px-3 py-2.5 text-right text-suave sm:table-cell">
                       {formatarDinheiro(i.precoEmbalagemCentavos)}
                     </td>

@@ -114,7 +114,7 @@ export function BuscaGlobal({
         onClick={() => setAberta(true)}
         aria-label="Buscar (Ctrl+K)"
         aria-haspopup="dialog"
-        className={`${BOTAO_ICONE} lg:w-auto lg:justify-start lg:gap-2 lg:border lg:border-linha lg:px-3 lg:text-[13px]`}
+        className={`${BOTAO_ICONE} lg:inline-flex lg:w-auto lg:items-center lg:gap-2 lg:border lg:border-linha lg:px-3 lg:text-[13px]`}
       >
         <Search size={18} aria-hidden />
         <span className="hidden lg:inline">Buscar</span>
