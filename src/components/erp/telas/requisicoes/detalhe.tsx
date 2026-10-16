@@ -49,7 +49,7 @@ export function TelaDetalheDaRequisicao({
   const podeCancelar = pode.cancelar && !bloqueio && r.status === 'ABERTA';
   return (
     <div className="mx-auto max-w-4xl space-y-5">
-      <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: daLoja }, { rotulo: 'Requisições', href: quadro }, { rotulo: numeroDaRequisicao(r.numero) }]} />
+      <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: quadro }, { rotulo: numeroDaRequisicao(r.numero) }]} />
       <Voltar href={quadro}>Voltar para as requisições</Voltar>
       <PageHeader
         icone="estoque"

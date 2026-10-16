@@ -123,7 +123,7 @@ export function TelaQuadroDeRequisicoes({
   const atrasadas = [...q.colunas.ABERTA, ...q.colunas.PARCIAL].filter((c) => c.atrasoDias > 0).length;
   return (
     <div className="space-y-6">
-      <TrilhaDaPagina itens={[{ rotulo: q.loja.nome, href: daLoja }, { rotulo: 'Requisições' }]} />
+      <TrilhaDaPagina itens={[{ rotulo: q.loja.nome }]} />
       <Voltar href={daLoja}>Voltar para o estoque da {q.loja.nome}</Voltar>
       <PageHeader
         icone="estoque"

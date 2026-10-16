@@ -1,3 +1,4 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Vila da Penha · nada sai do estoque…" é a linha de apoio do cabeçalho, no padrão "A · B" das telas da 1.1–1.7.
 /**
  * Nova requisição (1.8): o formulário do pedido e, para quem vê fichas,
  * "Puxar de uma ficha" — escolhe a ficha e quanto vai produzir, e a lista
@@ -51,7 +52,7 @@ export function TelaNovaRequisicao({
   const textoDaFicha = daFicha ? (daFicha.ficha.prato ? `${daFicha.ficha.quantidadeMilesimos / 1000} ${daFicha.ficha.quantidadeMilesimos === 1000 ? 'porção' : 'porções'}` : formatarQuantidade(daFicha.ficha.quantidadeMilesimos, daFicha.ficha.unidade)) : '';
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <TrilhaDaPagina itens={[{ rotulo: o.loja.nome, href: daLoja }, { rotulo: 'Requisições', href: quadro }, { rotulo: 'Nova' }]} />
+      <TrilhaDaPagina itens={[{ rotulo: o.loja.nome, href: quadro }, { rotulo: 'Nova' }]} />
       <Voltar href={quadro}>Voltar para as requisições</Voltar>
       <PageHeader icone="estoque" cor={COR.estoque} titulo="Nova requisição" subtitulo={[contexto, o.loja.nome, 'nada sai do estoque até alguém entregar'].filter(Boolean).join(' · ')} />
       {!o.aberto && <Aviso tom="alerta" titulo={`O estoque da ${o.loja.nome} ainda não foi aberto.`}>A requisição começa depois da contagem de abertura.</Aviso>}

@@ -1,4 +1,5 @@
 'use client';
+// Scanner avoid-ai-design, SD4d (P2) aceito: "pedido 2 kg · já saiu · falta" é a linha de apoio do item, no padrão "A · B" das telas da 1.1–1.7.
 
 /**
  * Entregar (1.8): o estoquista confere item a item e diz quanto sai AGORA

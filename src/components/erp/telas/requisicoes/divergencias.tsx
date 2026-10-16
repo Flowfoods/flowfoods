@@ -55,7 +55,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
   if (!d.aberto) {
     return (
       <div className="space-y-6">
-        <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: daLoja }, { rotulo: 'Divergências' }]} />
+        <TrilhaDaPagina itens={[{ rotulo: d.loja.nome }]} />
         <PageHeader icone="estoque" cor={COR.estoque} titulo={titulo} subtitulo={contexto} />
         <Aviso tom="alerta" titulo={`O estoque da ${d.loja.nome} ainda não foi aberto.`}>O cruzamento começa depois da abertura e da primeira contagem do dia a dia.</Aviso>
       </div>
@@ -67,7 +67,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
   const periodoAtual = d.janela.de === d.periodo.inicio && d.janela.ate === d.periodo.fim;
   return (
     <div className="space-y-6">
-      <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: daLoja }, { rotulo: 'Divergências' }]} />
+      <TrilhaDaPagina itens={[{ rotulo: d.loja.nome }]} />
       <Voltar href={daLoja}>Voltar para o estoque da {d.loja.nome}</Voltar>
       <PageHeader
         icone="estoque"
@@ -138,12 +138,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
               {comSumico.map((l) => (
                 <li key={l.insumoId} className="space-y-2 px-4 py-3 text-sm">
                   <div className="flex items-start justify-between gap-3">
-                    <span className="min-w-0">
-                      <span className="block font-medium text-texto">{l.nome}</span>
-                      <span className="mt-1 block">
-                        <Pequenos d={l} tolerancia={d.toleranciaCentavos} />
-                      </span>
-                    </span>
+                    <span className="min-w-0 font-medium text-texto">{l.nome}</span>
                     <span className="shrink-0 text-right tabular-nums">
                       <Sumico d={l} />
                     </span>
@@ -162,6 +157,11 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
                       <dd className="font-semibold text-texto">{l.trechos + 1}</dd>
                     </div>
                   </dl>
+                  {l.pequenos.vezes >= PEQUENO_REPETIDO && (
+                    <div>
+                      <Pequenos d={l} tolerancia={d.toleranciaCentavos} />
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -256,7 +256,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
                   <tr key={s.setor} className="h-11 border-t border-linha">
                     <td className="py-2.5 pl-5 pr-3 font-medium text-texto">
                       {rotuloDoSetor(s.setor || null)}
-                      <span className="block text-[12px] font-normal text-suave">{s.quantosInsumos === 1 ? '1 insumo' : `${s.quantosInsumos} insumos`}</span>
+                      <span className="block whitespace-nowrap text-[12px] font-normal text-suave">{s.quantosInsumos === 1 ? '1 insumo' : `${s.quantosInsumos} insumos`}</span>
                     </td>
                     <td className="px-3 py-2.5 text-right">{formatarDinheiro(s.requisitadoCentavos)}</td>
                     <td className={`px-3 py-2.5 pr-5 text-right font-semibold ${s.sumicoNosSeusCentavos > 0 ? 'text-erro' : 'text-suave'}`}>

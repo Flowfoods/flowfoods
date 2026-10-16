@@ -22,7 +22,7 @@ export function TelaEntregar({ d, base, contexto, acao }: { d: RequisicaoDaLoja;
   const aqui = `${quadro}/${r.id}`;
   return (
     <div className="mx-auto max-w-3xl space-y-5">
-      <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: daLoja }, { rotulo: 'Requisições', href: quadro }, { rotulo: numeroDaRequisicao(r.numero), href: aqui }, { rotulo: 'Entregar' }]} />
+      <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: quadro }, { rotulo: numeroDaRequisicao(r.numero), href: aqui }, { rotulo: 'Entregar' }]} />
       <Voltar href={aqui}>Voltar para a requisição</Voltar>
       <PageHeader
         icone="estoque"
