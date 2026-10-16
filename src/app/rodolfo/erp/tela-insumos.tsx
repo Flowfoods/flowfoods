@@ -2,7 +2,9 @@
  * Tela de Insumos do ERP, a MESMA para o nível 1 (/rodolfo/erp/<slug>) e para a
  * pessoa do parceiro (/erp). Recebe o cliente do portão já resolvido por quem
  * chama (`exigirParceiro` ou `exigirParceiroDaSessao`) e o formulário com a
- * action certa: esta tela não escolhe parceiro nenhum.
+ * action certa: esta tela não escolhe parceiro nenhum. Sem `formulario` (a
+ * pessoa não tem "cadastrar e editar insumos"), o cadastro nem aparece — e a
+ * action recusa do mesmo jeito.
  */
 
 import type { ReactNode } from 'react';
@@ -24,7 +26,7 @@ export async function TelaInsumos({
 }: {
   cliente: ClienteDoParceiro;
   bloqueio: string | null;
-  formulario: ReactNode;
+  formulario?: ReactNode;
 }) {
   const insumos = await listarInsumos(cliente);
 
@@ -51,7 +53,7 @@ export async function TelaInsumos({
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.8fr)_minmax(280px,1fr)]">
+      <div className={`grid gap-4 ${formulario ? 'lg:grid-cols-[minmax(0,1.8fr)_minmax(280px,1fr)]' : ''}`}>
         <Painel
           titulo="Lista de insumos"
           acessorio={<span className="text-[11px] tabular-nums text-surface/40">{insumos.length}</span>}
@@ -61,7 +63,9 @@ export async function TelaInsumos({
           {insumos.length === 0 ? (
             <div className="px-5 py-14 text-center">
               <p className="font-display text-lg">Nenhum insumo ainda.</p>
-              <p className="mt-1 text-sm text-surface/45">Cadastre o primeiro no formulário ao lado.</p>
+              <p className="mt-1 text-sm text-surface/45">
+                {formulario ? 'Cadastre o primeiro no formulário ao lado.' : 'Quem cuida dos cadastros ainda não incluiu nenhum.'}
+              </p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -103,16 +107,11 @@ export async function TelaInsumos({
         </Painel>
 
         {/* Bloqueado: no celular o card some (o aviso do topo já explica). */}
-        <Painel
-          titulo="Novo insumo"
-          className={`order-1 self-start lg:order-2 ${bloqueio ? 'hidden lg:block' : ''}`}
-        >
-          {bloqueio ? (
-            <p className="text-sm text-surface/55">{bloqueio}</p>
-          ) : (
-            formulario
-          )}
-        </Painel>
+        {formulario && (
+          <Painel titulo="Novo insumo" className={`order-1 self-start lg:order-2 ${bloqueio ? 'hidden lg:block' : ''}`}>
+            {bloqueio ? <p className="text-sm text-surface/55">{bloqueio}</p> : formulario}
+          </Painel>
+        )}
       </div>
     </div>
   );

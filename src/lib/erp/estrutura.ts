@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { filtroDeLojas, type Alcance } from './permissoes';
 import { gerarSlug } from './slug';
 import { ehErroDeUnicidade, type ClienteDoParceiro } from './tenant';
 
@@ -99,9 +100,15 @@ export async function cadastrarMarca(
   }
 }
 
-export async function listarEstrutura(cliente: ClienteDoParceiro) {
+/**
+ * Lojas e marcas que quem está na tela alcança: rede inteira vê todas; quem
+ * tem só algumas lojas vê só elas (o filtro vai na consulta, pelo portão —
+ * loja de outro parceiro nem existe aqui). Marca é da rede (não é por loja).
+ */
+export async function listarEstrutura(cliente: ClienteDoParceiro, alcance: Pick<Alcance, 'lojas'>) {
   const [lojas, marcas] = await Promise.all([
     cliente.loja.findMany({
+      where: { id: filtroDeLojas(alcance) },
       orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
       select: { id: true, nome: true, slug: true, ativa: true, criadoEm: true },
     }),
@@ -111,4 +118,13 @@ export async function listarEstrutura(cliente: ClienteDoParceiro) {
     }),
   ]);
   return { lojas, marcas };
+}
+
+/** Lojas no alcance (para escolher lojas de uma pessoa e para rótulos). */
+export async function listarLojasDoAlcance(cliente: ClienteDoParceiro, alcance: Pick<Alcance, 'lojas'>) {
+  return cliente.loja.findMany({
+    where: { id: filtroDeLojas(alcance) },
+    orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
+    select: { id: true, nome: true, ativa: true },
+  });
 }

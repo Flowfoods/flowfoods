@@ -2,10 +2,12 @@
  * Contexto de tenant do ERP, num lugar só. Toda página e toda server action do
  * ERP começa aqui:
  *
- * - `exigirNivel1()`: sessão do /rodolfo (hoje o nível 1 é só o Rodolfo; perfis
- *   e permissões por parceiro chegam na 0.3/0.4);
- * - `exigirParceiro(slug)`: sessão + parceiro resolvido pelo slug + o cliente
- *   `doParceiro(id)`. O slug só ESCOLHE; quem libera é a sessão.
+ * - `exigirNivel1()`: sessão do /rodolfo (o nível 1, FlowFoods: vê e muda tudo,
+ *   em qualquer parceiro — `ALCANCE_FLOWFOODS`);
+ * - `exigirParceiro(slug)`: SÓ para o nível 1. Sessão do /rodolfo + parceiro
+ *   resolvido pelo slug + o cliente `doParceiro(id)`. O slug só ESCOLHE; quem
+ *   libera é a sessão do nível 1. Pessoa do parceiro nunca passa por aqui (o
+ *   middleware e `exigirNivel1` só aceitam o JWT do /rodolfo).
  * - `exigirParceiroDaSessao()` (0.3): a pessoa do parceiro em /erp. O parceiro
  *   vem SÓ da sessão dela (cookie próprio, validado no banco a cada
  *   requisição), nunca da URL. Sessão do /rodolfo não serve aqui, e esta não
@@ -15,6 +17,10 @@
  * cliente SOMENTE LEITURA: a escrita é recusada no portão e a transação abre
  * read-only no banco. Não depende de a tela esconder o botão nem de a action
  * lembrar de conferir — `podeEscrever` serve para a mensagem, não para a trava.
+ *
+ * Permissões (0.4): o contexto traz `alcance`; toda página e action chama
+ * `exigirPermissao(ctx, 'modulo.acao', { lojaId? })`. Nas páginas,
+ * `exigirPermissaoNaPagina` leva quem não pode para uma tela que pode.
  */
 
 import { cache } from 'react';
@@ -31,9 +37,18 @@ import {
   type SessaoErp,
 } from './contexto-base';
 import { sessaoDaRequisicao } from './sessao';
+import {
+  ALCANCE_FLOWFOODS,
+  ErroDePermissao,
+  exigirPermissao,
+  pode,
+  recusaDaAcao,
+  type Alcance,
+  type Permissao,
+} from './permissoes';
 import { doParceiro, parceiroPorSlug, type ClienteDoParceiro } from './tenant';
 
-export { bloqueioDeEscrita, contextoDaSessao };
+export { bloqueioDeEscrita, contextoDaSessao, ErroDePermissao, exigirPermissao, pode, recusaDaAcao };
 export type { ContextoDaPessoa, ContextoDoParceiro, SessaoErp };
 
 export const exigirNivel1 = cache(async (): Promise<SessaoErp> => {
@@ -57,6 +72,7 @@ export async function exigirParceiro(slug: string): Promise<ContextoDoParceiro> 
     podeEscrever: bloqueio === null,
     bloqueio,
     cliente: doParceiro(parceiro.id, undefined, { somenteLeitura: bloqueio !== null }),
+    alcance: ALCANCE_FLOWFOODS,
   };
 }
 
@@ -76,6 +92,32 @@ export async function exigirPessoa(): Promise<SessaoValida> {
 
 export async function exigirParceiroDaSessao(): Promise<ContextoDaPessoa> {
   const pessoa = await exigirPessoa();
-  if (!pessoa.parceiro) redirect('/entrar/escolher');
+  if (!pessoa.parceiro || !pessoa.alcance) redirect('/entrar/escolher');
   return contextoDaSessao(pessoa as SessaoValida & { parceiro: ParceiroFlow });
+}
+
+/** Abas do /erp na ordem: a primeira que a pessoa pode é a casa dela. */
+export const TELAS_DO_ERP: { href: string; rotulo: string; permissao: Permissao | null }[] = [
+  { href: '/erp', rotulo: 'Insumos', permissao: 'insumos.ver' },
+  { href: '/erp/lojas', rotulo: 'Lojas e marcas', permissao: 'lojas.ver' },
+  { href: '/erp/equipe', rotulo: 'Equipe', permissao: 'acessos.gerir' },
+  { href: '/erp/historico', rotulo: 'Histórico', permissao: 'historico.ver' },
+  { href: '/erp/acesso', rotulo: 'Seu acesso', permissao: null },
+];
+
+export function telasPermitidas(alcance: Alcance) {
+  return TELAS_DO_ERP.filter((t) => t.permissao === null || pode(alcance, t.permissao));
+}
+
+/**
+ * Página do /erp: confere com a MESMA regra (`exigirPermissao`). Quem não pode
+ * vai para a primeira tela que pode ("Seu acesso" sempre pode), com aviso.
+ */
+export function exigirPermissaoNaPagina(ctx: { alcance: Alcance }, permissao: Permissao, opcoes: { lojaId?: string } = {}) {
+  try {
+    exigirPermissao(ctx, permissao, opcoes);
+  } catch (e) {
+    if (!(e instanceof ErroDePermissao)) throw e;
+    redirect(`${telasPermitidas(ctx.alcance)[0].href}?sem-acesso=1`);
+  }
 }

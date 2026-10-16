@@ -102,14 +102,14 @@ describe('ERP 0.3 · credenciais só em credenciais.ts', () => {
   const delegate = (nome: string) => nome[0].toLowerCase() + nome.slice(1);
   const nomesDeCredencial = new Set<string>(MODELOS_DE_CREDENCIAL.map((m) => m[0].toUpperCase() + m.slice(1)));
 
-  it('a lista de credenciais existe no esquema e só três delas carregam parceiroId (vínculo, link, sessão)', () => {
+  it('a lista de credenciais existe no esquema e só quatro delas carregam parceiroId (vínculo, link, sessão, perfil próprio)', () => {
     const nomes = new Set(modelos.map((m) => delegate(m.name)));
     expect(MODELOS_DE_CREDENCIAL.filter((m) => !nomes.has(m))).toEqual([]);
     const comParceiro = modelos
       .filter((m) => nomesDeCredencial.has(m.name) && m.fields.some((f) => f.name === 'parceiroId'))
       .map((m) => m.name)
       .sort();
-    expect(comParceiro).toEqual(['AcessoParceiro', 'ConviteAcesso', 'SessaoErp']);
+    expect(comParceiro).toEqual(['AcessoParceiro', 'ConviteAcesso', 'PerfilAcesso', 'SessaoErp']);
   });
 
   it('credencial nunca aponta para modelo de tenant (só para ParceiroFlow e entre si)', () => {

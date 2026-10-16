@@ -7,6 +7,7 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { exigirNivel1, leituraDoParceiro } from '@/lib/erp/contexto';
+import { parceirosSemAdministrador } from '@/lib/erp/credenciais';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { FormParceiro } from './form-parceiro';
 import { Cabecalho, Metrica, Painel, Ponto, Trilha, Vazio } from './ui';
@@ -15,7 +16,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function ErpPage() {
   await exigirNivel1();
-  const parceiros = await prisma.parceiroFlow.findMany({ orderBy: [{ status: 'asc' }, { nome: 'asc' }] });
+  const [parceiros, semAdmin] = await Promise.all([
+    prisma.parceiroFlow.findMany({ orderBy: [{ status: 'asc' }, { nome: 'asc' }] }),
+    parceirosSemAdministrador(),
+  ]);
   const linhas = await Promise.all(
     parceiros.map(async (p) => {
       const c = leituraDoParceiro(p.id);
@@ -77,6 +81,9 @@ export default async function ErpPage() {
                           <div className="mt-1 flex items-center gap-2 text-[11px] text-surface/45">
                             <Ponto tom={s.tom} />
                             <span className="truncate">{s.rotulo}</span>
+                            {semAdmin.has(p.id) && (
+                              <span className="truncate text-bright/90">· sem ninguém cuidando da equipe</span>
+                            )}
                           </div>
                         </div>
                         <span className="w-12 text-right font-display text-lg font-bold lining-nums tabular-nums">{lojas}</span>

@@ -3,14 +3,15 @@
 /**
  * Ações do espaço de um parceiro (insumos, lojas, marcas). Toda ação abre com
  * `exigirParceiro(slug)`: sessão + parceiro resolvido no servidor + cliente do
- * portão. Parceiro suspenso/não liberado devolve a mensagem aqui; e mesmo que
+ * portão, e confere a permissão (`recusaDaAcao`, a mesma regra de
+ * `exigirPermissao`; o nível 1 sempre pode). Parceiro suspenso/não liberado devolve a mensagem aqui; e mesmo que
  * uma ação esquecesse de conferir, o cliente dele é somente leitura (portão e
  * banco recusam a escrita).
  */
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/db';
-import { exigirParceiro } from '@/lib/erp/contexto';
+import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarInsumo, type ResultadoCadastro } from '@/lib/erp/insumos';
 import { cadastrarLoja, cadastrarMarca } from '@/lib/erp/estrutura';
 import type { EstadoForm } from '../campos';
@@ -22,8 +23,11 @@ export async function acaoCadastrarInsumo(
   anterior: EstadoCadastro,
   form: FormData,
 ): Promise<EstadoCadastro> {
-  const { sessao, parceiro, cliente, bloqueio } = await exigirParceiro(slug);
+  const ctx = await exigirParceiro(slug);
+  const { sessao, parceiro, cliente, bloqueio } = ctx;
   const vez = (anterior?.vez ?? 0) + 1;
+  const negado = recusaDaAcao(ctx, 'insumos.editar');
+  if (negado) return { ok: false, erros: { geral: negado }, vez };
   if (bloqueio) return { ok: false, erros: { geral: bloqueio }, vez };
 
   const r = await cadastrarInsumo(cliente, Object.fromEntries(form), sessao.autorNome);
@@ -43,8 +47,11 @@ async function cadastrarEstrutura(
   anterior: EstadoForm,
   form: FormData,
 ): Promise<EstadoForm> {
-  const { sessao, parceiro, cliente, bloqueio } = await exigirParceiro(slug);
+  const ctx = await exigirParceiro(slug);
+  const { sessao, parceiro, cliente, bloqueio } = ctx;
   const vez = (anterior?.vez ?? 0) + 1;
+  const negado = recusaDaAcao(ctx, 'lojas.gerir');
+  if (negado) return { ok: false, erros: { geral: negado }, vez };
   if (bloqueio) return { ok: false, erros: { geral: bloqueio }, vez };
 
   const cadastrar = tipo === 'loja' ? cadastrarLoja : cadastrarMarca;

@@ -626,3 +626,123 @@ ao Rodolfo preparar o acesso antes de liberar o parceiro e não apaga o
 histórico de quem está suspenso; a tela avisa o porquê. Bloquear o acesso de
 uma pessoa é outra ação (desativar o vínculo), com efeito imediato.
 
+
+---
+
+### 39. 2026-10-15 · ERP 0.4: catálogo e perfis base em código; perfil próprio é fotografia; tudo no vínculo, fora do tenant; setor não concede
+
+**Alternativas:** (a) perfis base como linhas no banco, semeadas por parceiro;
+(b) perfil próprio guardado como diferença do base (herda permissão nova);
+(c) permissões e perfis em tabelas de tenant (RLS); (d) setor como papel que
+concede permissões.
+
+**Razão:** (a) catálogo e perfis base mudam junto com o código (módulo novo traz
+permissão nova): em código, versionados (`VERSAO_DO_CATALOGO`), sem migration
+de dado por parceiro. (b) herdar sozinho é dar acesso que ninguém escolheu:
+perfil próprio guarda a lista completa (menor privilégio) e a versão do
+catálogo em que foi salvo. (c) o alcance é resolvido em `validarSessao`, a cada
+requisição, antes do contexto do parceiro e na mesma ida ao banco do vínculo;
+e qualquer relação Prisma entre credencial e tenant abriria `include` sem o
+portão (o teste-guarda reprova). Ficou tudo do lado das credenciais
+(`AcessoParceiro` + `PerfilAcesso`), travado em `credenciais.ts`, sem GRANT
+para `erp_tenant`, com histórico no tenant do parceiro. (d) "cozinha" não diz
+o que a pessoa pode (o cozinheiro-chefe e o auxiliar são da cozinha): setor
+filtra e sugere o perfil próprio pensado para ele; quem concede é o perfil.
+
+---
+
+### 40. 2026-10-15 · ERP 0.4: lojas no vínculo (rede inteira OU lista), 3 níveis, checagem única no servidor
+
+**Alternativas:** tabela de junção pessoa × loja com FK para `Loja`; nível
+explícito (enum) na pessoa; checagem só na tela.
+
+**Razão:** "rede inteira" precisa valer para loja aberta amanhã — é um
+booleano, não a lista de hoje. Sócio de uma unidade e gerente de loja são o
+mesmo caso (lista de lojas) com perfis diferentes. O nível sai do vínculo
+(FLOWFOODS para o /rodolfo, REDE com rede inteira, LOJA com lista), sem campo
+para ficar incoerente. `lojaIds` sem FK porque credencial não aponta para
+tenant; em troca, a lista é validada contra as lojas do parceiro (lidas pelo
+portão) na gravação e toda consulta de loja passa pelo portão (`filtroDeLojas`),
+então um id estranho não acha nada. CHECK: rede inteira XOR lista não vazia;
+um perfil só; FK composta para o perfil do mesmo parceiro. Permissão "por
+loja" é checada com `lojaId`; `lojas.gerir` e `historico.ver` exigem a rede
+inteira (mexem na estrutura ou mostram toda a rede). Uma função decide
+(`exigirPermissao`, com `pode`/`recusaDaAcao`/`exigirPermissaoNaPagina` sobre
+a mesma regra) e o teste-guarda reprova página ou action do `/erp` sem ela.
+Vínculos da 0.3 viraram Gerente com rede inteira: continuam podendo o que
+podiam (cadastrar insumo) sem ganhar a equipe.
+
+---
+
+### 41. 2026-10-15 · ERP 0.4: sem escalada por cobertura, último administrador sob trava, link de senha restrito
+
+**Alternativas:** conferir só "o ator tem `acessos.gerir`"; contar
+administradores fora de transação; manter o link de senha liberado a qualquer
+administrador do parceiro (ou só redefinir e avisar a pessoa).
+
+**Razão:** com "cuidar da equipe" sozinho, um gerente com esse extra se faria
+dono, ou tiraria o dono. Regra única: o ator precisa **cobrir** a pessoa —
+todas as permissões dela e as lojas dela — antes (não mexe em quem está acima)
+e depois (não sobe ninguém acima de si). Perfil próprio só por quem tem a rede
+inteira e todas as permissões do perfil. Último administrador = ativo +
+cuidar da equipe + rede inteira; nenhuma mudança (nem do nível 1) deixa o
+parceiro com zero, se tinha algum. A contagem antes/depois roda na transação
+da mudança, sob `pg_advisory_xact_lock` do parceiro: dois administradores
+tirando um ao outro ao mesmo tempo, um só consegue (teste). Link de senha: a
+senha é da pessoa e vale em TODOS os parceiros dela; um administrador de A que
+gerasse o link de quem também está em B tomaria a conta e entraria em B. Por
+isso só o nível 1 gera, ou o administrador de um parceiro onde a pessoa está
+sozinha (sem vínculo em outro, ativo ou não). "Só redefinir e avisar" não
+serve: ainda não há canal de aviso (0.5). E-mail travado pelo limite: o nível
+1 libera (grava uma "tentativa ok" marcada; o limite por IP segue).
+
+**Revisão (Guardião, volta 1):** a regra só valia na geração do link. Sequência
+provada: o dono de A gera link para quem só está em A; o nível 1 põe essa
+pessoa em B; o link de A seguia valendo e entregava B. Agora: (1) o link
+guarda quem gerou (`doNivel1`) e o de parceiro é reconferido no uso, dentro da
+transação, sob `pg_advisory_xact_lock` da pessoa (a mesma trava de criar
+vínculo e gerar link); (2) vínculo novo revoga links pendentes da pessoa; (3)
+senha criada por link de parceiro fica marcada com o parceiro e não atravessa:
+ao ganhar outro parceiro ela é apagada, as sessões caem e o nível 1 manda
+link novo (custo: a pessoa cria senha de novo uma vez). Só o nível 1 vincula
+e-mail de outro parceiro; para a pessoa do parceiro a recusa é neutra (não
+revela que o e-mail existe). As funções de equipe releem o ator no banco.
+
+**Revisão (Guardião, volta 2):** apagar só a senha não bastava: quem conhecia a
+senha do link podia ter ativado o rosto (passkey) e entrar por ele em B. Agora,
+na mesma transação em que a senha "do parceiro" é apagada, saem também todos
+os rostos da pessoa e os desafios WebAuthn pendentes dela, além das sessões e
+dos links já tratados; o histórico de B registra quantos rostos saíram.
+Inventário das credenciais da pessoa: senha, sessões, links, rostos, desafios
+— todas tratadas; tentativas de entrada não deixam entrar.
+
+**Revisão (Fiscal QA + Guardião, volta 3):** dois furos com o mesmo princípio.
+(a) Redefinir a senha pelo link encerrava as sessões mas deixava os rostos:
+o dono de A definia a senha da pessoa (só em A) e ativava o rosto no aparelho
+dele; a pessoa pedia ajuda, o nível 1 mandava link novo, ela refazia a senha
+(marca do parceiro volta a nula); o nível 1 a punha em B como Dona; nada era
+apagado e o atacante entrava pelo rosto em B. (b) Corrida: um login que leu a
+senha antes da limpeza gravava a sessão depois dela; `escolherParceiro(B)` dava
+Dono em B (o mesmo valia para ativar rosto e entrar pelo rosto). **Princípio:
+recuperar/redefinir a senha pelo link revoga TODOS os outros meios de entrar
+da pessoa.** Uma função só, `revogarMeiosDeEntrada(tx, usuarioId, motivo)`,
+usada pelos dois caminhos que mudam a senha (definir/redefinir pelo link;
+senha "de outro parceiro" apagada ao ganhar vínculo): encerra as sessões,
+revoga os links pendentes, apaga rostos e desafios, apaga a senha quando é o
+caso e sobe `UsuarioErp.versaoCredencial`, sob a trava da pessoa; o histórico
+de CADA parceiro dela registra quantos rostos saíram. Contra a corrida, a
+versão é lida antes do bcrypt/da assinatura e a gravação é condicional, sob a
+mesma trava: `abrirSessao` (senha e rosto) só grava se a versão não mudou (e o
+contador do rosto sobe ali dentro); `concluirRegistroDeRosto` só pendura o
+aparelho se a sessão ainda está aberta e da versão atual; e a sessão guarda a
+versão em que nasceu (`validarSessao` recusa a velha — segunda trava).
+"Seu acesso" avisa que os aparelhos foram removidos e que dá para ativar de
+novo (`rostosRemovidosEm`, limpo ao ativar). Varredura dos outros pontos:
+vínculo ganho sem senha "de parceiro" só revoga links (as credenciais que
+restam nasceram da senha atual, que é da pessoa ou do nível 1); desativar
+encerra as sessões e links DAQUELE parceiro e mantém senha e rosto (valem nos
+outros; reativar devolve), e o vínculo desativado continua contando para a
+regra do link; mudar perfil/lojas, liberar tentativas e remover um rosto não
+mudam a senha nem vínculo. Custo: quem redefine a senha ativa o rosto de novo.
+Alternativa descartada: apagar rostos também a cada vínculo novo (derrubaria
+quem não tem nada de errado).

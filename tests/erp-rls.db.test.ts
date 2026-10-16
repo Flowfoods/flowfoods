@@ -22,6 +22,7 @@ import { cadastrarLoja, cadastrarMarca, listarEstrutura } from '@/lib/erp/estrut
 import { criarParceiro, mudarStatusParceiro, renomearParceiro } from '@/lib/erp/parceiros';
 import { listarHistorico } from '@/lib/erp/historico';
 import { MODELOS_DE_CREDENCIAL } from '@/lib/erp/modelos';
+import { ALCANCE_FLOWFOODS } from '@/lib/erp/permissoes';
 import { limparParceiros, perfilDoBanco, TABELAS_DE_TENANT, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
@@ -366,10 +367,10 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
     expect(await cadastrarMarca(a, { nome: "Valentin's Burger" }, 'Teste')).toMatchObject({ ok: true });
     expect(await cadastrarMarca(a, { nome: 'x' }, 'Teste')).toMatchObject({ ok: false });
 
-    const estA = await listarEstrutura(a);
+    const estA = await listarEstrutura(a, ALCANCE_FLOWFOODS);
     expect(estA.lojas.map((l) => [l.nome, l.slug])).toEqual([['Vila da Penha', 'vila-da-penha']]);
     expect(estA.marcas.map((m) => m.nome)).toEqual(["Valentin's Burger"]);
-    expect((await listarEstrutura(b)).marcas).toEqual([]);
+    expect((await listarEstrutura(b, ALCANCE_FLOWFOODS)).marcas).toEqual([]);
 
     const h = await listarHistorico(a);
     expect(h.filter((x) => x.entidade === 'Loja')).toHaveLength(1);
@@ -379,6 +380,6 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
   it('cliente somente leitura: cadastro de loja recusado mesmo chamando a regra direto', async () => {
     const leitura = doParceiro(A, db, { somenteLeitura: true });
     await expect(cadastrarLoja(leitura, { nome: 'Méier' }, 'Teste')).rejects.toThrow(ErroDeTenant);
-    expect((await listarEstrutura(doParceiro(A, db))).lojas).toHaveLength(1);
+    expect((await listarEstrutura(doParceiro(A, db), ALCANCE_FLOWFOODS)).lojas).toHaveLength(1);
   });
 });

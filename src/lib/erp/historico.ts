@@ -13,6 +13,7 @@ const ENTIDADE: Record<string, string> = {
   Marca: 'Marca',
   Insumo: 'Insumo',
   AcessoParceiro: 'Acesso',
+  PerfilAcesso: 'Perfil',
 };
 
 const ACAO: Record<string, string> = {
@@ -29,6 +30,9 @@ const ACAO: Record<string, string> = {
   TROCOU_SENHA: 'Trocou a senha do',
   ATIVOU_ROSTO: 'Ativou o rosto no',
   REMOVEU_ROSTO: 'Tirou o rosto do',
+  EXCLUIU: 'Excluiu',
+  LIBEROU_ENTRADA: 'Liberou a entrada do',
+  PEDIU_SENHA_NOVA: 'Pediu senha nova no',
 };
 
 const CAMPO: Record<string, string> = {
@@ -42,6 +46,16 @@ const CAMPO: Record<string, string> = {
   linkValeAte: 'link vale até',
   senha: 'senha',
   aparelho: 'aparelho',
+  perfil: 'perfil',
+  setores: 'setores',
+  lojas: 'lojas',
+  permissoesExtras: 'pode a mais',
+  permissoesRemovidas: 'tirado do perfil',
+  permissoes: 'permissões',
+  base: 'copiado de',
+  incluiu: 'incluiu',
+  tirou: 'tirou',
+  tentativas: 'tentativas',
 };
 
 const STATUS: Record<string, string> = {
@@ -120,10 +134,11 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
 
 export async function listarHistorico(
   cliente: ClienteDoParceiro,
-  filtro: { entidade?: string; limite?: number } = {},
+  filtro: { entidade?: string; entidades?: string[]; limite?: number } = {},
 ) {
+  const entidades = filtro.entidades ?? (filtro.entidade ? [filtro.entidade] : null);
   const linhas = await cliente.historicoAlteracao.findMany({
-    where: filtro.entidade ? { entidade: filtro.entidade } : undefined,
+    where: entidades ? { entidade: { in: entidades } } : undefined,
     orderBy: { ocorridoEm: 'desc' },
     take: filtro.limite ?? 100,
   });

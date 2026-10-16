@@ -4,12 +4,17 @@
 
 import { useEffect, useRef } from 'react';
 import { useFormState } from 'react-dom';
-import { CAMPO, Enviar, Erro, Resultado, type EstadoForm } from '../../campos';
-import { acaoCadastrarLoja, acaoCadastrarMarca } from '../actions';
+import { CAMPO, Enviar, Erro, Resultado, type EstadoForm } from './campos';
 
-export function FormNome({ slug, tipo }: { slug: string; tipo: 'loja' | 'marca' }) {
-  const acao = tipo === 'loja' ? acaoCadastrarLoja : acaoCadastrarMarca;
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acao.bind(null, slug), null);
+/** `acao`: a server action de quem usa (nível 1 por slug, ou a pessoa do parceiro pela sessão). */
+export function FormNome({
+  acao,
+  tipo,
+}: {
+  acao: (anterior: EstadoForm, form: FormData) => Promise<EstadoForm>;
+  tipo: 'loja' | 'marca';
+}) {
+  const [estado, enviar] = useFormState<EstadoForm, FormData>(acao, null);
   const ref = useRef<HTMLInputElement>(null);
   const id = `nome-${tipo}`;
 

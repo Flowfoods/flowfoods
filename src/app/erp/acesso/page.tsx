@@ -4,7 +4,9 @@
  */
 
 import { exigirParceiroDaSessao } from '@/lib/erp/contexto';
-import { listarRostos, podeAtivarRosto } from '@/lib/erp/credenciais';
+import { listarLojasDoAlcance } from '@/lib/erp/estrutura';
+import { CATALOGO, rotuloDasLojas } from '@/lib/erp/permissoes';
+import { listarRostos, podeAtivarRosto, rostosRemovidosEm } from '@/lib/erp/credenciais';
 import { Painel, Vazio } from '@/app/rodolfo/erp/ui';
 import { AjudaDeAcesso } from '@/app/entrar/ajuda';
 import { configDoRosto, rostoPossivel } from '@/lib/erp/rosto';
@@ -23,8 +25,20 @@ function rostoNoSite(): boolean {
 }
 
 export default async function SeuAcessoPage() {
-  const { pessoa } = await exigirParceiroDaSessao();
-  const rostos = await listarRostos(pessoa.usuario.id);
+  const { pessoa, alcance, cliente, parceiro } = await exigirParceiroDaSessao();
+  const [rostos, removidosEm, lojas] = await Promise.all([
+    listarRostos(pessoa.usuario.id),
+    rostosRemovidosEm(pessoa.usuario.id),
+    listarLojasDoAlcance(cliente, alcance),
+  ]);
+  const onde = rotuloDasLojas(alcance.lojas, new Map(lojas.map((l) => [l.id, l.nome])));
+  const modulos = CATALOGO.map((m) => ({
+    rotulo: m.rotulo,
+    emBreve: 'emBreve' in m && m.emBreve,
+    itens: Object.entries(m.permissoes)
+      .filter(([p]) => alcance.permissoes.has(p as never))
+      .map(([, d]) => d.rotulo),
+  })).filter((m) => m.itens.length > 0);
 
   return (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
@@ -47,6 +61,31 @@ export default async function SeuAcessoPage() {
       </Painel>
 
       <div className="space-y-4">
+        <Painel titulo={`O que você faz em ${parceiro.nome}`}>
+          <div className="space-y-4">
+            <p className="text-[14px] text-surface/70">
+              <span className="font-semibold text-surface">{pessoa.perfilRotulo}</span>
+              <span aria-hidden className="mx-2 text-surface/25">·</span>
+              {onde}
+            </p>
+            {modulos.length === 0 ? (
+              <p className="text-[13px] text-surface/50">Seu acesso ainda não inclui nenhuma tela. Fale com quem cuida da equipe.</p>
+            ) : (
+              <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+                {modulos.map((m) => (
+                  <div key={m.rotulo} className="min-w-0">
+                    <dt className="text-[10px] font-semibold uppercase tracking-[0.14em] text-surface/45">
+                      {m.rotulo}
+                      {m.emBreve && <span className="ml-1.5 font-normal normal-case tracking-normal text-surface/35">· em breve</span>}
+                    </dt>
+                    <dd className="mt-1 text-[13px] leading-relaxed text-surface/75">{m.itens.join(' · ')}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+            <p className="text-[12px] text-surface/40">Quem cuida da equipe muda o que você pode fazer.</p>
+          </div>
+        </Painel>
         <Painel titulo="Entrar com o rosto">
           <div className="space-y-4">
             <p className="text-[14px] leading-relaxed text-surface/70">
@@ -70,7 +109,12 @@ export default async function SeuAcessoPage() {
           acessorio={<span className="text-[11px] tabular-nums text-surface/40">{rostos.length}</span>}
           semRespiro
         >
-          {rostos.length === 0 ? (
+          {rostos.length === 0 && removidosEm ? (
+            <Vazio titulo="Seus aparelhos foram removidos.">
+              Por segurança, a entrada pelo rosto saiu de todos os aparelhos em {DATA.format(removidosEm)}, quando sua senha
+              foi redefinida. Você pode ativar de novo no celular que usa no dia a dia.
+            </Vazio>
+          ) : rostos.length === 0 ? (
             <Vazio titulo="Nenhum aparelho ainda.">Ative no celular que você usa no dia a dia.</Vazio>
           ) : (
             <ul>

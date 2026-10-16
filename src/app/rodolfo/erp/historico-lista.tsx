@@ -53,7 +53,7 @@ export function ListaHistorico({ linhas, compacta = false }: { linhas: LinhaDeHi
             <div className="min-w-0 text-[13px] text-surface/70">
               {h.mudancas.length === 0 && <span className="text-surface/35">—</span>}
               {h.mudancas.map((m) => (
-                <div key={m.campo} className="truncate">
+                <div key={m.campo} className="[overflow-wrap:anywhere]">
                   <span className="text-surface/40">{m.campo}: </span>
                   {m.antes !== null && (
                     <>

@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2) e login (0.3)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3) e permissões (0.4)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -17,7 +17,9 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Telas | `/rodolfo/erp` (N1: parceiros + novo) e `/rodolfo/erp/<slug>` com abas Insumos · Lojas e marcas (`/estrutura`) · Acessos (`/acessos`) · Histórico (`/historico`) · Cadastro (`/cadastro`) |
 | Login das pessoas dos parceiros (0.3) | `UsuarioErp` e companhia (bloco "acesso das pessoas" do esquema) + migration `20261015030000_erp_login` |
 | Acesso ao banco das credenciais (único módulo) | `src/lib/erp/credenciais.ts` (regras puras em `acesso.ts`; rosto em `rosto.ts`; cookie em `sessao.ts`/`sessao-cookie.ts`) |
-| Telas da pessoa do parceiro | `/entrar` (e-mail e senha, entrar com o rosto), `/entrar/primeiro-acesso/<token>`, `/entrar/escolher`, `/erp` (Insumos) e `/erp/acesso` (Seu acesso: rosto) |
+| Telas da pessoa do parceiro | `/entrar` (e-mail e senha, entrar com o rosto), `/entrar/primeiro-acesso/<token>`, `/entrar/escolher`, `/erp` (Insumos), `/erp/lojas`, `/erp/equipe`, `/erp/historico` e `/erp/acesso` (Seu acesso: o que a pessoa pode, rosto) — cada aba só aparece para quem pode |
+| Permissões (0.4): catálogo, perfis base, resolução, checagem única, sem escalada | `src/lib/erp/permissoes.ts` (puro) + `equipe.ts` (formulários e retrato do histórico, puro); banco em `credenciais.ts`; migrations `20261015040000_erp_permissoes` e `20261016000000_erp_revogar_meios_de_entrada` |
+| Tela de Equipe (a MESMA no nível 1 e no parceiro) | `src/app/rodolfo/erp/equipe/*` (`TelaEquipe`), usada em `/rodolfo/erp/<slug>/acessos` e `/erp/equipe`; telas compartilhadas `tela-estrutura.tsx`, `tela-historico.tsx`, `tela-insumos.tsx` |
 
 ## O que a 0.2 entregou (multi-tenant)
 
@@ -106,6 +108,87 @@ parceiro (no login), então não cabem na RLS por parceiro. Em troca, travas:
 (só `credenciais.ts` toca nelas; só ele e o portão importam `base.ts` e
 `fecharComHistorico`), papel `erp_tenant` sem GRANT nelas (a migration revoga,
 no padrão condicional da 0.2) e o histórico das mudanças no tenant do parceiro.
+
+## O que a 0.4 entregou (permissões)
+
+1. **Catálogo em código, versionado** (`permissoes.ts`, `VERSAO_DO_CATALOGO`):
+   permissões por módulo e ação, com rótulo humano (`insumos.ver` "Ver insumos
+   e custos", `insumos.editar` "Cadastrar e editar insumos", `lojas.ver`,
+   `lojas.gerir`, `acessos.gerir` "Cuidar da equipe", `historico.ver`) e já as
+   dos módulos futuros, sem tela (ficha técnica, compras/fornecedores,
+   estoque/contagem/ajuste/requisição, produção, etiquetas, faturamento, DRE,
+   despesas, metas, precificação). Algumas são **por loja** (checadas com
+   `lojaId`); `lojas.gerir` e `historico.ver` **exigem a rede inteira**.
+2. **Perfis base em código**: Dono (tudo), Gerente (tudo menos equipe, cadastro
+   de lojas, metas e preços), Operador (consulta, contagem, requisição,
+   produção, etiquetas). **Perfil próprio** (`PerfilAcesso`, por parceiro):
+   nasce copiando um base, marca/desmarca, guarda a lista completa
+   (fotografia) e, opcionalmente, para quais setores foi pensado. **Ajuste por
+   pessoa** no vínculo: extras e removidas (guardado o ajuste mínimo).
+   Efetivas = (perfil ∪ extras) − removidas (decisão 39).
+3. **Setores** (os 10 do contrato) são atributo da pessoa no vínculo, vários por
+   pessoa: filtram a Equipe e sugerem o perfil próprio pensado para eles. **Não
+   concedem nada** (decisão 39).
+4. **Lojas e 3 níveis**: N1 FlowFoods (`ALCANCE_FLOWFOODS`, tudo, todo
+   parceiro); N2 rede (vínculo com `redeInteira`, inclusive lojas futuras); N3
+   loja (vínculo com `lojaIds`). "Sócio de uma unidade" é N3 com o perfil que
+   o dono quiser. CHECK no banco: um perfil só (base OU próprio) e rede inteira
+   OU pelo menos uma loja; FK composta garante perfil do mesmo parceiro.
+   `lojaIds` não tem FK (credencial não aponta para tenant): toda consulta de
+   loja passa pelo portão, então id estranho não acha nada (decisão 40).
+5. **Servidor decide**: `validarSessao` resolve o alcance do vínculo DESTE
+   parceiro a cada requisição (mudou o perfil: vale na próxima tela, sem
+   relogar). O contexto (`exigirParceiro`/`exigirParceiroDaSessao`) leva
+   `alcance`; toda página e server action do `/erp` chama a checagem única
+   (`exigirPermissao` / `exigirPermissaoNaPagina` / `recusaDaAcao`, mesma
+   regra) — teste-guarda reprova página ou action sem ela. A tela esconde o
+   que não pode (abas, formulário de insumo, cadastro de loja). Quem abre uma
+   tela fora do acesso pela URL volta para a primeira que pode, com aviso.
+   Listas de loja (`listarEstrutura`, `listarLojasDoAlcance`) filtram pelo
+   alcance na consulta.
+6. **Equipe** (`/erp/equipe` para quem tem "cuidar da equipe"; aba Acessos do
+   nível 1, mesma tela): pessoas (filtro por setor, perfil, lojas, setores,
+   ajuste fino), perfis (prontos e próprios: criar, editar, excluir sem uso),
+   criar acesso com link, desativar/reativar. **Sem escalada**: o ator precisa
+   cobrir o que a pessoa tem antes e o que vai ter depois, permissões E lojas
+   (`cobre`); perfil próprio só por quem tem a rede inteira. **Último
+   administrador** (ativo + cuidar da equipe + rede inteira): nenhuma mudança
+   zera, nem do nível 1; transação de equipe sob `pg_advisory_xact_lock` do
+   parceiro (dois tirando um ao outro: só um consegue). Ninguém desativa o
+   próprio acesso. Antes/depois legível no histórico, na mesma transação
+   (decisão 41).
+7. **Heranças endereçadas**: `exigirParceiro` segue só do nível 1 (o slug só
+   escolhe; quem libera é a sessão do /rodolfo); pessoa do parceiro tem o
+   parceiro SÓ da sessão e precisa de vínculo ATIVO nele (sessão adulterada no
+   banco morre; teste). **Link de senha** sai do nível 1, ou de quem cuida da
+   equipe só se a pessoa não tem vínculo em outro parceiro (a senha vale em
+   todos) — decisão 41. **Revisão (Guardião):** o link guarda quem gerou
+   (`ConviteAcesso.doNivel1`); link de parceiro é reconferido NA HORA DO USO
+   (sob trava da pessoa) e morre quando a pessoa ganha vínculo em mais um
+   parceiro (todo vínculo novo revoga links pendentes); senha criada por link
+   de parceiro fica marcada (`UsuarioErp.senhaPorLinkDoParceiroId`) e, se a
+   pessoa ganhar outro parceiro, é apagada junto com TODOS os rostos e desafios
+   de rosto pendentes dela (sessões caem, links já revogados) e o nível 1
+   manda link novo. **Revisão (Fiscal QA + Guardião, volta 3):** recuperar ou
+   redefinir a senha pelo link também REVOGA todos os outros meios de entrar
+   (rostos, desafios, sessões, links pendentes), numa função só
+   (`revogarMeiosDeEntrada`) usada por todo caminho que muda a senha, com o
+   número de rostos removidos no histórico de cada parceiro da pessoa; "Seu
+   acesso" avisa que os aparelhos saíram e que dá para ativar de novo. Login,
+   entrada pelo rosto e ativação de rosto em voo durante a limpeza não gravam
+   depois dela: `UsuarioErp.versaoCredencial` lida antes da conferência e
+   exigida igual na gravação, sob a trava da pessoa; sessão de versão velha
+   não vale (migration `20261016000000_erp_revogar_meios_de_entrada`). Só o nível 1 vincula e-mail que já está em outro parceiro (a
+   pessoa do parceiro recebe frase neutra; o nível 1 é avisado quando o e-mail
+   já tem senha). As funções de equipe conferem o ator NO BANCO (vínculo deste
+   parceiro, ativo, parceiro ativo, "cuidar da equipe"), não só a action.
+   Perfil próprio só muda se quem edita cobre cada pessoa que usa o perfil,
+   antes e depois. Na tela: desativar, tirar "cuidar da equipe" e salvar perfil
+   em uso pedem confirmação na própria tela. A lista do nível 1 marca parceiro
+   com pessoas ativas e ninguém cuidando da equipe. **Liberar tentativas** pelo nível 1 (botão na linha da
+   pessoa bloqueada; grava "tentativa ok" marcada, o contador por e-mail
+   recomeça; o por IP segue). Vínculos que já existiam viram Gerente com rede
+   inteira (sem ganhar "cuidar da equipe").
 
 ## Mapa do esquema (0.1)
 
@@ -251,6 +334,20 @@ O rosto usa um autenticador sintético (`tests/erp-autenticador-sintetico.ts`):
 chave EC P-256 real, assinatura real, sem mock da verificação. Rodado também
 com dono não-superusuário (com e sem a RLS instalada).
 
+## Provar as permissões (0.4)
+
+```bash
+npx vitest run tests/erp-permissoes.test.ts         # sem banco: catálogo, resolução, lojas, checagem, sem escalada, último admin, formulários, guarda das páginas/actions
+ERP_DB_TESTE=postgresql://USUARIO:SENHA@localhost:5432/BANCO \
+  npx vitest run tests/erp-permissoes.db.test.ts    # com banco: o fluxo inteiro (ver cabeçalho do arquivo)
+```
+
+Rodado como superusuário e como dono não-superusuário com e sem a RLS
+instalada (migration 0.4 aplicada nos dois cenários; 4 arquivos com banco:
+61 + 6 pulados sem RLS, 67/67 com RLS). O teste com banco chama a server
+action de verdade (`src/app/erp/actions.ts`) com o contexto apontado para o
+banco de teste: o operador é recusado pelo servidor.
+
 ## Herança para as próximas subfases (apontada pelos fiscais na 0.1)
 
 - `NULLS NOT DISTINCT` existe só no SQL da migration (o Prisma não enxerga): migration futura que mexa nesses índices precisa reescrevê-lo à mão.
@@ -268,12 +365,12 @@ com dono não-superusuário (com e sem a RLS instalada).
 - `cliente.sql` filtra erro de descuido, não código feito para burlar (`query_to_xml`, `U&"…"`, `pg_settings` passam); tem falso positivo com `role`/`begin` em alias/string. Revisar antes da primeira fase com relatório em SQL cru.
 - Sem RLS em produção o único sinal é um aviso no log: criar health check que falhe se `papelDisponivel()` for falso no cenário compose.
 - Suspensão sob escrita contínua pode esperar; `gravarParceiroFlow` precisa de timeout maior e mensagem em PT-BR para o estouro.
-- Na 0.4, `exigirParceiro` passa a conferir se o usuário pertence ao parceiro (o slug vem do cliente via `.bind`).
-- Identificador técnico da loja (`vila-da-penha`) aparece sob o nome: esconder numa fase de tela.
+- ~~Na 0.4, `exigirParceiro` passa a conferir se o usuário pertence ao parceiro.~~ **0.4:** `exigirParceiro` é só do nível 1 (que alcança todo parceiro); a pessoa do parceiro nunca passa por ele — o parceiro dela vem da sessão, com vínculo ATIVO conferido a cada requisição (teste).
+- ~~Identificador técnico da loja aparece sob o nome.~~ **0.4:** escondido no `/erp`; só o nível 1 vê.
 
 ## Herança da 0.3 (para as próximas subfases)
 
-- **0.4:** `AcessoParceiro` é onde entram perfil, setores e lojas da pessoa; ligar `Colaborador` (tenant) ao vínculo exige cuidado — credencial não pode apontar para modelo de tenant (o teste-guarda reprova): o caminho é o `Colaborador` apontar para o usuário, não o contrário. `/erp` hoje deixa qualquer pessoa ativa cadastrar insumo (sem perfis ainda).
+- ~~**0.4:** perfil, setores e lojas no `AcessoParceiro`; `/erp` deixava qualquer pessoa cadastrar insumo.~~ **Feito na 0.4.** `Colaborador` NÃO foi ligado à pessoa: setores não precisaram dele (moram no vínculo). Fica para a fase de RH/produção (3.3): `Colaborador` (tenant) ganharia `usuarioId` SEM relação Prisma (relação criaria campo de volta no `UsuarioErp` e o teste-guarda reprova credencial apontando para tenant), conferido na escrita.
 - **0.5:** o envio do link (WhatsApp/e-mail) entra no `criarAcesso`/`gerarNovoLink`; hoje o Rodolfo copia.
 - `TentativaEntradaErp`, `SessaoErp` encerradas/vencidas e `ConviteAcesso` usados crescem sem faxina: criar rotina de retenção (ex.: 90 dias) no worker.
 - **IP do limite.** Vale o `X-Real-Ip`; sem ele, o ÚLTIMO item do `X-Forwarded-For`. O Traefik (Dokploy), com a configuração padrão (sem `forwardedHeaders.insecure` nem `trustedIPs` abertos), apaga o `X-Real-Ip` que vem de fora e escreve o IP real da conexão — por isso ele é o preferido. Isso só vale se o `web` NÃO estiver exposto direto na internet (o compose usa `expose`, não `ports`): acesso direto à porta 3000 deixa o cabeçalho ser inventado e o limite por IP fica contornável (o por e-mail continua). Sem proxy nenhum (dev), todos caem em "desconhecido" e dividem o limite de IP.
@@ -285,7 +382,36 @@ com dono não-superusuário (com e sem a RLS instalada).
 - HTTPS em produção é pré-requisito antes de abrir o acesso aos parceiros: sem ele, cookie sai sem Secure e a entrada pelo rosto fica escondida.
 - Limite por IP depende do Traefik sobrescrever `X-Real-Ip` (porta 3000 nunca publicada direto).
 - bcrypt em JS (custo 12) no processo principal: sob rajada o login enfileira. Avaliar bcrypt nativo ou fila limitada.
-- Bloqueio por e-mail pode ser mantido por terceiro: dar ao nível 1 um "desbloquear" (0.4 ou 0.5).
+- ~~Bloqueio por e-mail pode ser mantido por terceiro: "desbloquear" no nível 1.~~ **0.4:** "Liberar tentativas" na aba Acessos.
 - Após a reserva de tentativa, exceção de infraestrutura deixa a linha EM_ANDAMENTO (conta como falha por 15 min): finalizar como ERRO_INTERNO num try/catch.
 - Faxina de desafios vencidos roda dentro da transação do pedido: mover para fora/amostragem quando o volume crescer.
-- Link de senha nova vale para a pessoa em todos os parceiros dela: rever com vários administradores (0.4).
+- ~~Link de senha nova vale em todos os parceiros: rever com vários administradores.~~ **0.4:** decisão 41 (só nível 1, ou administrador de parceiro onde a pessoa está sozinha).
+
+## Herança da 0.4 (para as próximas subfases)
+
+- Módulo novo (ficha, compras, estoque...): usar as permissões que já estão no
+  catálogo; página com `exigirPermissaoNaPagina`, action com `recusaDaAcao`/
+  `exigirPermissao` (o teste-guarda cobra no `/erp`), e as por loja SEMPRE com
+  `{ lojaId }` + consulta filtrada por `filtroDeLojas(alcance)`.
+- Permissão nova no catálogo: subir `VERSAO_DO_CATALOGO`; perfis próprios NÃO
+  ganham sozinhos (fotografia). Falta a tela avisar "perfil criado antes de X
+  funções novas" (o campo `catalogoVersao` já existe).
+- Permissão removida do catálogo: some do efeito na hora (nomes fora do
+  catálogo são ignorados); a lista no banco fica com o nome velho até alguém
+  salvar o perfil.
+- `lojaIds` sem FK: loja não é apagada hoje (só inativada). Se um dia for, limpar
+  o id dos vínculos na mesma transação.
+- Quem cuida da equipe só de algumas lojas vê na Equipe só quem trabalha nelas
+  (e quem tem a rede); o nome de loja fora do alcance aparece como "+N lojas".
+- `listarAcessos` conta tentativas por pessoa (2 consultas cada): trocar por
+  uma consulta agrupada quando a equipe passar de dezenas.
+- O envio do link (0.5) entra em `executar.ts`/`criarAcesso`; a regra do link
+  (decisão 41) já está no servidor.
+
+## Herança da 0.4 (apontada pelos fiscais)
+
+- `validarSessao` (segunda trava por versão) sem teste próprio; entrada pelo rosto durante a limpeza sem teste de ordem forçada.
+- Texto em "Seu acesso": "quando sua senha foi trocada ou apagada" é mais preciso.
+- `abrirSessao` com timeout 10 s < 15 s de `naEquipe`: login atrás de mudança longa de equipe pode virar erro 500.
+- Remover um rosto não derruba sessões abertas por ele (a sessão não guarda o aparelho).
+- Dono de A ainda muda perfil/desativa a pessoa em A depois que ela entra em B (afeta só A).

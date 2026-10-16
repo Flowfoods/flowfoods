@@ -15,7 +15,9 @@ export function Painel({
   children,
   className = '',
   semRespiro = false,
+  id,
 }: {
+  id?: string;
   titulo?: string;
   acessorio?: ReactNode;
   children: ReactNode;
@@ -24,6 +26,7 @@ export function Painel({
 }) {
   return (
     <section
+      id={id}
       className={`min-w-0 rounded-[14px] border border-white/[0.09] border-t-white/[0.16] bg-[#131211] ${className}`}
     >
       {(titulo || acessorio) && (
