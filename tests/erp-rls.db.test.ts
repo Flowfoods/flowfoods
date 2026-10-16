@@ -21,12 +21,13 @@ import { cadastrarInsumo } from '@/lib/erp/insumos';
 import { cadastrarLoja, cadastrarMarca, listarEstrutura } from '@/lib/erp/estrutura';
 import { criarParceiro, mudarStatusParceiro, renomearParceiro } from '@/lib/erp/parceiros';
 import { listarHistorico } from '@/lib/erp/historico';
-import { MODELOS_DE_CREDENCIAL } from '@/lib/erp/modelos';
+import { MODELOS_DE_CREDENCIAL, MODELOS_DE_PEDIDO } from '@/lib/erp/modelos';
 import { ALCANCE_FLOWFOODS } from '@/lib/erp/permissoes';
 import { limparParceiros, perfilDoBanco, TABELAS_DE_TENANT, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const TABELAS_DE_CREDENCIAL = MODELOS_DE_CREDENCIAL.map((m) => m[0].toUpperCase() + m.slice(1)) as string[];
+const TABELAS_DE_PEDIDO = MODELOS_DE_PEDIDO.map((m) => m[0].toUpperCase() + m.slice(1)) as string[];
 const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres real)', () => {
@@ -99,7 +100,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
     const [papel] = await db.$queryRaw<{ rolcanlogin: boolean; rolbypassrls: boolean; rolsuper: boolean }[]>`
       SELECT rolcanlogin, rolbypassrls, rolsuper FROM pg_roles WHERE rolname = ${PAPEL_DE_TENANT}`;
     expect(papel).toEqual({ rolcanlogin: false, rolbypassrls: false, rolsuper: false });
-    for (const t of ['User', 'ParceiroFlow', 'Lead', 'AuditLog', 'PortalCliente', '_prisma_migrations', ...TABELAS_DE_CREDENCIAL]) {
+    for (const t of ['User', 'ParceiroFlow', 'Lead', 'AuditLog', 'PortalCliente', '_prisma_migrations', ...TABELAS_DE_CREDENCIAL, ...TABELAS_DE_PEDIDO]) {
       const [p] = await db.$queryRaw<{ ok: boolean }[]>`
         SELECT has_table_privilege(${PAPEL_DE_TENANT}, quote_ident(${t}), 'SELECT,INSERT,UPDATE,DELETE') AS ok`;
       expect(p.ok, t).toBe(false);
@@ -110,6 +111,16 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
                has_table_privilege(${PAPEL_DE_TENANT}, quote_ident(${t}), 'DELETE') AS del,
                has_table_privilege(${PAPEL_DE_TENANT}, quote_ident(${t}), 'INSERT') AS ins`;
       expect(p, t).toEqual({ upd: false, del: false, ins: true });
+    }
+  });
+
+  it('0.5 · o papel do tenant recebe "permission denied" ao ler o pedido de acesso (mesmo dentro do contexto de um parceiro)', async (ctx) => {
+    if (!perfil.rls) return ctx.skip();
+    const b = doParceiro(B, db);
+    for (const t of TABELAS_DE_PEDIDO) {
+      const texto = `SELECT count(*) FROM "${t}"`;
+      const consulta = Object.assign([texto], { raw: [texto] }) as unknown as TemplateStringsArray;
+      await expect(b.sql(consulta), t).rejects.toThrow(/permission denied/i);
     }
   });
 

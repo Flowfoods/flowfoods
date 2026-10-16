@@ -2,8 +2,10 @@ import { PrismaClient } from '@prisma/client';
 import {
   ErroDeTenant,
   ehModeloDeCredencial,
+  ehModeloDePedido,
   ehModeloDeTenant,
   RELACOES_DE_CREDENCIAL,
+  RELACOES_DE_PEDIDO,
   RELACOES_DE_TENANT,
 } from '@/lib/erp/modelos';
 
@@ -16,14 +18,15 @@ import {
  * relações de tenant (incluir `insumos` ou filtrar por `erpLojas`, por exemplo).
  * Dado de parceiro só por `doParceiro()` (`src/lib/erp/tenant.ts`), que usa
  * um PrismaClient base próprio. O acesso das pessoas do ERP (usuário, vínculo,
- * link, rosto, sessão) também é recusado aqui: só `src/lib/erp/credenciais.ts`.
+ * link, rosto, sessão) também é recusado aqui: só `src/lib/erp/credenciais.ts`;
+ * e o pedido de acesso do onboarding (0.5), só `src/lib/erp/pedidos.ts`.
  *
  * Em dev o Next recarrega o módulo a cada edição; sem o cache no globalThis
  * cada reload abriria um pool novo e o Postgres esgotaria as conexões em poucos
  * minutos de trabalho.
  */
 
-const RELACOES = new Set<string>([...RELACOES_DE_TENANT, ...RELACOES_DE_CREDENCIAL]);
+const RELACOES = new Set<string>([...RELACOES_DE_TENANT, ...RELACOES_DE_CREDENCIAL, ...RELACOES_DE_PEDIDO]);
 
 /** Procura, em qualquer profundidade dos args, uma CHAVE que seja relação de tenant. */
 function citaRelacaoDeTenant(valor: unknown): boolean {
@@ -44,6 +47,9 @@ export function travarTenant(base: PrismaClient) {
           }
           if (ehModeloDeCredencial(model)) {
             throw new ErroDeTenant(`${model} (acesso das pessoas do ERP) só se acessa por src/lib/erp/credenciais.ts.`);
+          }
+          if (ehModeloDePedido(model)) {
+            throw new ErroDeTenant(`${model} (pedido de acesso do onboarding) só se acessa por src/lib/erp/pedidos.ts.`);
           }
           if (model === 'ParceiroFlow' && citaRelacaoDeTenant(args)) {
             throw new ErroDeTenant('relação de tenant (ou de acesso) do ParceiroFlow só se acessa pelo portão do ERP.');

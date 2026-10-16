@@ -8,7 +8,7 @@ import { join } from 'node:path';
 import { Prisma } from '@prisma/client';
 import { describe, expect, it } from 'vitest';
 import { MODELOS_DE_TENANT, RELACOES_DE_TENANT } from '@/lib/erp/tenant';
-import { MODELOS_DE_CREDENCIAL, RELACOES_DE_CREDENCIAL } from '@/lib/erp/modelos';
+import { MODELOS_DE_CREDENCIAL, MODELOS_DE_PEDIDO, RELACOES_DE_CREDENCIAL, RELACOES_DE_PEDIDO } from '@/lib/erp/modelos';
 
 const RAIZES = ['src', 'scripts', 'worker'];
 const PORTAO = join('src', 'lib', 'erp', 'tenant.ts');
@@ -146,15 +146,77 @@ describe('ERP 0.3 · credenciais só em credenciais.ts', () => {
     expect(furos).toEqual([]);
   });
 
-  it('o cliente base sem trava (base.ts) e o fecharComHistorico só aparecem no portão e em credenciais.ts', () => {
+  it('o cliente base sem trava (base.ts) só aparece no portão, em credenciais.ts e em pedidos.ts; o fecharComHistorico, só nos dois primeiros', () => {
     const furos: string[] = [];
     for (const raiz of RAIZES) {
       for (const f of arquivos(raiz)) {
-        if (f === MODULO || f === PORTAO || f === join('src', 'lib', 'erp', 'base.ts')) continue;
+        if (f === MODULO || f === PORTAO || f === join('src', 'lib', 'erp', 'base.ts') || f === join('src', 'lib', 'erp', 'pedidos.ts')) continue;
         const txt = readFileSync(f, 'utf8');
         if (/from\s+['"](\.\/base|@\/lib\/erp\/base)['"]/.test(txt)) furos.push(`${f}: importa base.ts`);
         if (/\bfecharComHistorico\b/.test(txt)) furos.push(`${f}: fecharComHistorico`);
         if (/\bbaseDoErp\b/.test(txt)) furos.push(`${f}: baseDoErp`);
+      }
+    }
+    expect(furos).toEqual([]);
+  });
+});
+
+describe('ERP 0.5 · o pedido de acesso mora fora do tenant e só pedidos.ts e a ativação em credenciais.ts o tocam', () => {
+  const PEDIDOS = join('src', 'lib', 'erp', 'pedidos.ts');
+  const CREDENCIAIS = join('src', 'lib', 'erp', 'credenciais.ts');
+  const modelos = Prisma.dmmf.datamodel.models;
+  const delegate = (nome: string) => nome[0].toLowerCase() + nome.slice(1);
+  const nomesDePedido = new Set<string>(MODELOS_DE_PEDIDO.map((m) => m[0].toUpperCase() + m.slice(1)));
+
+  it('a lista existe no esquema e nenhum modelo de pedido tem parceiroId (não é tenant, não entra na RLS)', () => {
+    const nomes = new Set(modelos.map((m) => delegate(m.name)));
+    expect(MODELOS_DE_PEDIDO.filter((m) => !nomes.has(m))).toEqual([]);
+    const comParceiro = modelos.filter((m) => nomesDePedido.has(m.name) && m.fields.some((f) => f.name === 'parceiroId'));
+    expect(comParceiro.map((m) => m.name)).toEqual([]);
+  });
+
+  it('o pedido só aponta para o ParceiroFlow (o que ele criou) e para si mesmo; nunca para modelo de tenant ou de credencial', () => {
+    const fora: string[] = [];
+    for (const m of modelos) {
+      if (!nomesDePedido.has(m.name)) continue;
+      for (const f of m.fields) {
+        if (f.kind === 'object' && f.type !== 'ParceiroFlow' && !nomesDePedido.has(f.type)) fora.push(`${m.name}.${f.name}`);
+      }
+    }
+    expect(fora).toEqual([]);
+  });
+
+  it('RELACOES_DE_PEDIDO é exatamente o conjunto de relações do ParceiroFlow para os pedidos', () => {
+    const pf = modelos.find((m) => m.name === 'ParceiroFlow')!;
+    const rel = pf.fields.filter((f) => f.kind === 'object' && nomesDePedido.has(f.type)).map((f) => f.name);
+    expect(rel.sort()).toEqual([...RELACOES_DE_PEDIDO].sort());
+  });
+
+  it('nenhum arquivo fora de pedidos.ts e credenciais.ts toca nos modelos de pedido (nem por SQL cru, nem pela relação)', () => {
+    const furos: string[] = [];
+    for (const raiz of RAIZES) {
+      for (const f of arquivos(raiz)) {
+        if (f === PEDIDOS || f === CREDENCIAIS) continue;
+        const txt = readFileSync(f, 'utf8');
+        for (const m of MODELOS_DE_PEDIDO) {
+          const tabela = m[0].toUpperCase() + m.slice(1);
+          if (new RegExp(`\\.\\s*${m}\\s*\\.`).test(txt)) furos.push(`${f}: .${m}.`);
+          if (new RegExp(`\\$(queryRaw|executeRaw)[\\s\\S]{0,400}"${tabela}"`).test(txt)) furos.push(`${f}: SQL cru em "${tabela}"`);
+        }
+        for (const r of RELACOES_DE_PEDIDO) if (new RegExp(`\\b${r}\\s*:`).test(txt)) furos.push(`${f}: relação ${r}`);
+      }
+    }
+    expect(furos).toEqual([]);
+  });
+
+  it('nenhuma rota do /erp (pessoa do parceiro) nem tela compartilhada do parceiro importa o módulo de pedidos', () => {
+    const furos: string[] = [];
+    const donos = [join('src', 'app', 'erp'), join('src', 'app', 'entrar'), join('src', 'components', 'erp', 'telas')];
+    for (const raiz of donos) {
+      for (const f of arquivos(raiz)) {
+        const txt = readFileSync(f, 'utf8');
+        if (/from\s+['"](\.\/pedidos|@\/lib\/erp\/pedidos|@\/lib\/erp\/pedido-campos)['"]/.test(txt)) furos.push(`${f}: importa pedidos`);
+        if (/\b(PedidoParceiro|pedidoParceiro|TentativaPedidoParceiro)\b/.test(txt)) furos.push(`${f}: cita o modelo de pedido`);
       }
     }
     expect(furos).toEqual([]);

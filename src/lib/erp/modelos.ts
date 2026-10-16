@@ -119,6 +119,25 @@ export function ehModeloDeCredencial(model: string | undefined): boolean {
   return !!model && NOMES_DE_CREDENCIAL.has(model);
 }
 
+/**
+ * Onboarding (0.5): o pedido de acesso de um futuro parceiro mora FORA do
+ * tenant — nasce antes de existir parceiro, e spam nunca vira ParceiroFlow.
+ * Só `src/lib/erp/pedidos.ts` e a ativação em `credenciais.ts` tocam nestes
+ * modelos: o `prisma` do portal recusa em runtime, o teste-guarda reprova o
+ * resto e o papel `erp_tenant` não tem GRANT. Nenhum carrega `parceiroId` (o
+ * vínculo com o parceiro criado se chama `parceiroCriadoId`).
+ */
+export const MODELOS_DE_PEDIDO = ['pedidoParceiro', 'pedidoParceiroEvento', 'tentativaPedidoParceiro'] as const;
+
+/** Relações do ParceiroFlow que chegam nos pedidos (mesma trava do portal). */
+export const RELACOES_DE_PEDIDO = ['erpPedidoDeOrigem'] as const;
+
+const NOMES_DE_PEDIDO = new Set<string>(MODELOS_DE_PEDIDO.map((m) => m[0].toUpperCase() + m.slice(1)));
+
+export function ehModeloDePedido(model: string | undefined): boolean {
+  return !!model && NOMES_DE_PEDIDO.has(model);
+}
+
 export class ErroDeTenant extends Error {
   constructor(mensagem: string) {
     super(`[tenant] ${mensagem}`);
