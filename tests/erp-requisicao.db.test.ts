@@ -424,4 +424,27 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     expect(await divergenciasDaLoja(b, DONA(), ids.vp, {}, CFG)).toBeNull();
   });
 
+  it('herança a da 1.8: duas entregas do MESMO insumo em requisições diferentes, juntas, não pulam a confirmação do negativo', async () => {
+    // Queijo prato entra pela nota (loja aberta): 1 kg no livro. Duas requisições de 700 g, cada uma cabe sozinha.
+    const q = await cadastrarInsumo(a, { tipo: 'INGREDIENTE', escala: 'base', nome: 'Queijo prato', unidade: 'KG', conteudo: '1', preco: '30,00', conservacao: 'REFRIGERADO' });
+    expect(q.ok).toBe(true);
+    ids.prato = (q as { id: string }).id;
+    const n = await lancarNota(a, DONA(), { lojaId: ids.vp, fornecedorId: ids.fornecedor, numero: '9001', serie: '', data: hoje, frete: '', total: '30,00', itens: [{ insumoId: ids.prato, embalagem: 'padrao', quantidade: '1', valor: '30,00' }] }, 'Marina');
+    expect(n.ok).toBe(true);
+    expect(await saldo(ids.prato)).toBe(1000);
+    const [p1, p2] = [await pedir(OPERADOR(), 'Ana', [{ insumoId: ids.prato, quantidade: '700', escala: 'menor' }]), await pedir(OPERADOR(), 'Bia', [{ insumoId: ids.prato, quantidade: '700', escala: 'menor' }])];
+    const r1 = (p1 as { id: string }).id;
+    const r2 = (p2 as { id: string }).id;
+    const [x, y] = await Promise.all([entregar(GERENTE(), r1, { 'Queijo prato': '0,7' }), entregar(GERENTE(), r2, { 'Queijo prato': '0,7' })]);
+    // Uma passa; a outra, que leu o saldo travado depois da primeira, pede a confirmação (o livro diz 300 g).
+    expect([x, y].filter((r) => r.ok)).toHaveLength(1);
+    const recusada = [x, y].find((r) => !r.ok)!;
+    expect(recusada).toMatchObject({ ok: false, erros: { confirmarNegativo: expect.stringMatching(/Queijo prato: o livro diz 300 g; com esta saída fica −400 g/) } });
+    expect(await saldo(ids.prato)).toBe(300);
+    // Confirmado, sai e fica negativo (alarme), com o razão coerente.
+    const qual = x.ok ? r2 : r1;
+    expect(await entregar(GERENTE(), qual, { 'Queijo prato': '0,7' }, { confirmarNegativo: true })).toMatchObject({ ok: true });
+    expect(await saldo(ids.prato)).toBe(-400);
+    expect(await razaoCoerente()).toEqual({ divergentes: 0, quebrados: 0 });
+  });
 });

@@ -40,6 +40,7 @@ import {
   lojaDoAlcance,
   movimentoParaTela,
   Recusa,
+  saldosTravados,
   SELECAO_DO_MOVIMENTO,
   travarAberturas,
   type MovimentoDaTela,
@@ -533,8 +534,10 @@ export async function atenderRequisicao(
         if (!lido.ok) throw new Recusa({ ok: false, erros: lido.erros });
         const entregas = lido.entregas;
         const insumoIds = itens.map((i) => i.insumoId);
-        const saldos = await tx.saldoEstoque.findMany({ where: { lojaId, insumoId: { in: insumoIds } }, select: { insumoId: true, quantidadeMilesimos: true } });
-        const negativos = negativosDaEntrega(itens, entregas, new Map(saldos.map((s) => [s.insumoId, s.quantidadeMilesimos])));
+        // Herança a da 1.8: o saldo do negativo é lido TRAVADO — duas entregas do mesmo insumo (requisições diferentes)
+        // se enfileiram aqui, e a segunda confere o saldo que a primeira deixou.
+        const saldos = await saldosTravados(tx, lojaId, entregas.map((e) => itens.find((i) => i.id === e.itemId)!.insumoId));
+        const negativos = negativosDaEntrega(itens, entregas, saldos);
         if (negativos.length && !ehSim(entrada.confirmarNegativo)) {
           throw new Recusa({
             ok: false,
