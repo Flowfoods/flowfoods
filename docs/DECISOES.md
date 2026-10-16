@@ -1141,3 +1141,71 @@ nota é da loja (alcance da 0.4: `compras.ver`/`compras.lancar` com `lojaId`,
 conferidos também dentro da regra, com a loja de antes e a de depois);
 fornecedor é cadastro da rede. CSV de notas e XML de NF-e ficaram como
 pendência: lançar é a importação manual que sempre existe.
+
+### 68. 2026-10-19 · ERP 1.6: a nota entra no estoque da loja aberta, na mesma transação; o razão aponta a nota e estorna com o mesmo tipo
+
+**Alternativas:** nota × abertura — (a) toda nota de data igual ou posterior à
+abertura movimenta; (b) só a nota LANÇADA depois de concluir a abertura e com
+data a partir do dia da abertura. Ligação — (c) movimento aponta o item da
+nota (`notaItemId`, da 0.1); (d) aponta a nota (`notaId`, novo). Estorno — (e)
+`AJUSTE` negativo; (f) o mesmo tipo com sinal contrário e `estornoDeId`.
+
+**Razão:** (b): a contagem é o retrato do que está na loja quando conclui;
+nota lançada antes disso (durante a contagem, ou de data anterior digitada
+depois) é mercadoria que já estava na prateleira e foi contada — movimentar
+de novo dobraria o saldo. A tela diz isso na nota ("lançada antes da
+abertura… a contagem já incluiu") e a conferência avisa das notas de hoje
+("o que veio nelas tem de estar na contagem"). A nota trava a abertura da
+loja (`FOR SHARE`) antes de marcar `lancadaEm`; concluir trava com `FOR
+UPDATE`: as duas se esperam e a ordem decide. (d): editar troca os itens por
+inteiro (1.5) e o item ligado ao razão não poderia sair (FK); a nota nunca se
+apaga (cancela), e o movimento guarda o item no próprio snapshot. (f): Σ
+`ENTRADA_COMPRA` continua sendo a compra líquida (CMV da 2.3); o CHECK do
+sinal passou a inverter para o estorno, `estornoDeId` é único (nada se estorna
+duas vezes) e um trigger confere o espelho exato (loja, insumo, tipo,
+documento, −quantidade, −valor). Editar estorna tudo o que valia e entra o novo
+só se o efeito no estoque mudou (mudar só o número da nota não mexe no razão).
+Entrada = valor do item + frete rateado; `ocorridoEm` = quando entrou no
+sistema (a data da nota fica na nota).
+
+### 69. 2026-10-19 · ERP 1.6: abertura por loja derivada da contagem; concorrência por versão e trava; concluir é idempotente e não se desfaz
+
+**Alternativas:** (a) coluna "estoque aberto em" na Loja; (b) derivar da
+`Contagem` tipo ABERTURA (nenhuma / ABERTA / FECHADA). Reabrir: (c) permitir;
+(d) não, correção é contagem (1.7).
+
+**Razão:** (b), sem número duplicado para discordar; um índice único PARCIAL
+deixa uma abertura não descartada por loja (dois "Abrir estoque" juntos dão a
+mesma contagem). Salvar um número faz `UPDATE Contagem SET versao + 1 WHERE
+ABERTA` (trava e confere) e muda o item só na versão lida: outra pessoa salvou
+antes = conflito com o número e o nome dela, e a pessoa escolhe; o mesmo
+número de novo (rede caiu depois de gravar) = ok. Concluir pega `FOR UPDATE`,
+confere a versão que a pessoa conferiu (mudou = "confira de novo") e grava um
+`ABERTURA` por item com chave única (`abertura:<item>`): concluir duas vezes
+devolve a abertura feita. (d): o razão é imutável; reabrir apagaria
+movimentos. Descartar só vale para a contagem EM ANDAMENTO (nada foi para o
+razão), com motivo. Permissões do catálogo 0.4, sem permissão nova: contar =
+`estoque.contar` (operador conta), abrir/concluir/descartar =
+`estoque.ajustar` (gerente e dona), ver = `estoque.ver`, sempre com a loja.
+
+### 70. 2026-10-19 · ERP 1.6: conta-se em embalagens fechadas + solto; vazio é "não contado"; valor inicial pelo custo de referência, fotografado
+
+**Alternativas:** forma de contar — (a) só a unidade base; (b) embalagens da
+padrão + solto (kg/g, L/ml, un); (c) qualquer embalagem/variante. Não contado
+— (d) vira zero sozinho; (e) bloqueia; (f) entra com zero só com confirmação
+explícita. Valor — (g) gravar o custo no saldo; (h) snapshot no movimento de
+abertura e, na tela, o valor pelo custo de referência de hoje.
+
+**Razão:** (b) é o mínimo útil na câmara fria ("3 caixas + 2,4 kg"); variantes
+ficam para a 1.7. A lista e o fator da embalagem são congelados ao começar
+(Notion: mudança no cadastro não altera o passado); o digitado
+(`embalagensMilesimos`, `soltoMilesimos`, escala) fica separado do
+normalizado (`contadoMilesimos`). (f): Notion — "nenhum item não contado zera
+silenciosamente"; o item fica `null` (verdade: ninguém contou) e o histórico
+diz quantos entraram com zero e quem confirmou. Zero contado ("Não tem") é
+contagem. (h): o movimento de ABERTURA guarda o valor da época (um
+arredondamento por item; o total da contagem é a soma, bate com o razão); o
+`SaldoEstoque` soma quantidade e valor do razão; a tela mostra o valor pelo
+custo de referência de hoje (derivado, como todo custo do ERP). Sem preço ou
+pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
+(no razão entra 0 e a tela conta à parte).

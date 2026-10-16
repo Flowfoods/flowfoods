@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -24,6 +24,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Pré-preparo, fator de correção, custo em cascata (1.3) | `src/lib/erp/{ficha-cascata,ficha-custos}.ts` (conta e grafo puros; leitura por nível); regras em `fichas.ts`; migration `20261016020000_erp_subficha` |
 | Validade por conservação (1.4) | `src/lib/erp/validade.ts` (puro: leitura, dias/horas ↔ minutos, texto, colunas); telas `telas/cadastro/{validade,campos-validade}.tsx`; migration `20261017000000_erp_validade` |
 | Entrada de compra e custo pelo último preço (1.5) | `src/lib/erp/{compra-campos,compras-custo,compras}.ts` (puro / última compra numa consulta / regras com banco); telas em `src/components/erp/telas/compras/`; rotas `/erp/compras` e `/rodolfo/erp/<slug>/compras` (notas, `nova`, `<id>`, `<id>/editar`, `fornecedores`); migrations `20261018000000_erp_validar_checks_insumo` e `20261018010000_erp_compras` |
+| Estoque: abertura do zero, livro-razão + saldo, nota entrando no estoque (1.6) | `src/lib/erp/{estoque-campos,estoque}.ts` (puro / com banco); telas em `src/components/erp/telas/estoque/`; rotas `/erp/estoque` e `/rodolfo/erp/<slug>/estoque` (`<loja>`, `<loja>/abertura`, `<loja>/abertura/conferir`); migration `20261019000000_erp_estoque_abertura` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
@@ -658,6 +659,83 @@ Burger cheddar junto), lança, vê o burger mudar; tenta a mesma nota de novo
 (recusada); cancela e o custo volta; o gerente do Delivery não vê a nota; o
 operador não tem Compras.
 
+## O que a 1.6 entregou — estoque: abertura do zero (1ª contagem = saldo inicial)
+
+Migration `20261019000000_erp_estoque_abertura` (aditiva, sem tabela nova:
+portão e RLS iguais): `Contagem.versao/iniciadaPorNome/fechadaPorNome/
+naoContadosNoFechamento`; `ContagemItem.versao`, snapshot de conservação e
+embalagem padrão (nome + conteúdo), o digitado (`embalagensMilesimos`,
+`soltoMilesimos`, `escalaDigitada`) e `contadoPorNome`;
+`MovimentoEstoque.notaId` (FK composta para a nota) e `estornoDeId` (FK
+composta para o próprio razão, ÚNICA, `NO ACTION` para a limpeza apagar os
+dois no mesmo DELETE). CHECKs: contagem FECHADA ⇔ `fechadaEm`; item contado ⇔
+`contadoEm`; digitado ≥ 0; sinal do tipo INVERTIDO para o estorno; um
+documento (agora com `notaId`); documento pelo tipo (compra tem nota,
+abertura tem o item da contagem). Trigger `MovimentoEstoque_estorno_espelho`
+(estorno = espelho exato). Índice único PARCIAL `Contagem_uma_abertura_por_loja`
+(só no SQL; `migrate diff` vazio). Rodada em banco novo como superusuário, como
+dono não-superusuário com RLS e sem RLS.
+
+1. **Estado da loja, derivado** (decisão 69): sem abertura = "Não aberto";
+   contagem ABERTURA em andamento = "Em contagem"; FECHADA = "Aberto" desde
+   `fechadaEm`. Uma abertura por loja (índice parcial; "Abrir estoque" em
+   corrida devolve a mesma). Loja desativada não abre.
+2. **Lista congelada**: todos os insumos ATIVOS (ingrediente, embalagem e
+   pré-preparo), com nome, unidade, conservação e a embalagem padrão do
+   momento. Insumo criado depois começa em zero na loja.
+3. **Contar** (decisão 70): embalagens fechadas da padrão (quando ela não é 1
+   kg/1 L/1 un) + solto em kg/g, L/ml ou un; normalizado = round(emb ×
+   conteúdo) + solto. Vazio = não contado; "Não tem" grava zero. Salva
+   sozinho; versão por item: outra pessoa salvou antes = conflito com o número
+   e o nome dela ("ficar com o dela / usar o meu"); retentativa do mesmo número
+   = ok; mudar um número já contado deixa antes/depois no histórico
+   (`RECONTOU`).
+4. **Conferir e concluir**: contados, zerados, não contados, sem preço, valor
+   inicial pelo custo de referência (um arredondamento por item; sem preço =
+   pendente), notas de hoje já lançadas. Concluir: `estoque.ajustar`, versão
+   conferida, não contados só com confirmação; um `ABERTURA` por item > 0
+   (chave `abertura:<item>`), saldo de TODOS os itens (zero inclusive),
+   contagem FECHADA com o valor total fotografado e o histórico (`CONCLUIU`,
+   com quantos entraram com zero). Concluir de novo = já feito. Não se reabre:
+   correção é contagem (1.7). Descartar só a contagem em andamento, com motivo.
+5. **Livro-razão + saldo na mesma transação**: `gravarMovimentos` cria o saldo
+   que falta, trava os saldos em ordem (loja, insumo) com `FOR UPDATE`, calcula
+   antes/depois (o CHECK confere), insere o razão e atualiza o saldo pela
+   versão lida. Saldo = soma do razão (quantidade e valor; teste com banco
+   confere). Nunca UPDATE em movimento.
+6. **Nota × estoque** (decisão 68): movimenta = loja aberta ∧ nota lançada
+   depois da conclusão ∧ data da nota ≥ dia da abertura (Rio). Entrada =
+   valor do item + frete rateado, com `notaId`. Editar: estorna o que valia e
+   entra o novo, só se o efeito mudou; mudar de loja estorna na de antes;
+   cancelar estorna. A nota diz o efeito (detalhe: frase + entradas/estornos
+   com o saldo antes/depois; prévia: "Entra no estoque da X ao lançar").
+7. **Telas** (módulo Estoque saiu de "em breve"): Estoque por loja (situação,
+   andamento, valor, abrir); Estoque da loja (não aberto / em contagem /
+   saldo por insumo com custo de referência e valor, filtros por lugar e "com
+   saldo", livro do estoque com estornos); Contagem de abertura para o
+   celular (por conservação, busca, Faltam/Contados/Todos, campo de 48 px,
+   Salvando/Salvo/Falha, quanto falta no rodapé fixo, Enter vai ao próximo);
+   Conferir e concluir; no insumo, "Estoque por loja" (só as lojas do alcance).
+8. **Permissões** (catálogo 0.4, sem permissão nova): `estoque.ver`,
+   `estoque.contar` (operador), `estoque.ajustar` (abrir, concluir,
+   descartar), sempre com a loja; fora do alcance = 404.
+9. **Heranças da 1.5 resolvidas**: campo de data com erro visível ao sair
+   (e o navegador não envia data incompleta/impossível); sem cadastrar
+   fornecedor/insumo, "peça a quem cuida das compras"; "Nota 4521-1" igual no
+   desktop, no celular, no fornecedor e no preço pago (`numeroDaNota`).
+
+## Provar o estoque (1.6)
+
+```bash
+npx vitest run tests/erp-estoque.test.ts       # contar (emb + solto, kg/g, vazio ≠ zero), valor exato, nota × abertura, estorno, saldo antes/depois
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-estoque.db.test.ts
+```
+Na tela: a dona abre o estoque da Vila da Penha; conta no celular (390) em
+duas sessões (ela e o operador), com conflito no mesmo item; confere (não
+contados confirmados) e conclui; vê saldo e valor; lança nota na Penha e o
+saldo sobe; cancela e o saldo volta (estorno no livro); o gerente da Delivery
+não vê a Penha (404); o operador conta, mas não conclui.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -671,16 +749,16 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Insumos | `Insumo` | já existia; ganhou tipo (ingrediente/embalagem/pré-preparo), taxa de entrega, conservação e validade por conservação, mínimo, fornecedor padrão, origem |
 | Insumos | `InsumoVariante` | outras embalagens de compra do mesmo insumo |
 | Compras | `Fornecedor` | quem vende |
-| Compras | `NotaEntrada` / `NotaEntradaItem` | nota de compra e itens com snapshot; LANCADA vale para o custo; movimento de estoque só com o estoque da loja aberto (1.6) |
+| Compras | `NotaEntrada` / `NotaEntradaItem` | nota de compra e itens com snapshot; LANCADA vale para o custo; com o estoque da loja aberto, entra no razão (`MovimentoEstoque.notaId`, 1.6) |
 | Ficha | `FichaTecnica` | prato ou pré-preparo, rendimento; pré-preparo pode produzir um Insumo |
 | Ficha | `FichaItem` | insumo OU subficha, quantidade líquida, fator de correção |
 | Venda | `ProdutoVenda` | item de venda (aponta a ficha) |
 | Venda | `ProdutoCanal` | preço por canal: manual sobrescreve o sugerido; margem-alvo |
 | Venda | `ProdutoEmbalagem` | camada de embalagem por canal (delivery, iFood) |
 | Venda | `CanalConfig` | taxa do canal (%, fixa) e margem-alvo padrão, por parceiro |
-| Estoque | `SaldoEstoque` | saldo e valor por loja × insumo (cache dos movimentos, com versão) |
-| Estoque | `MovimentoEstoque` | livro-razão: entrada, requisição, produção, ajuste, contagem, perda; snapshot e saldo antes/depois |
-| Estoque | `Contagem` / `ContagemItem` | abertura, cíclica, fechamento de período; sistema × contado. O "piso obrigatório no fechamento" (1.7) é regra da lógica da 1.7, não do esquema |
+| Estoque | `SaldoEstoque` | saldo e valor por loja × insumo (soma do razão, atualizada na mesma transação, com versão) |
+| Estoque | `MovimentoEstoque` | livro-razão: abertura, entrada, requisição, produção, ajuste, contagem, perda; snapshot e saldo antes/depois; estorno = mesmo tipo, sinal contrário, `estornoDeId` único (1.6) |
+| Estoque | `Contagem` / `ContagemItem` | abertura (1.6: estado da loja), cíclica, fechamento de período; sistema × contado; versão, lista e fator congelados, digitado × normalizado. O "piso obrigatório no fechamento" (1.7) é regra da lógica da 1.7, não do esquema |
 | Estoque | `Requisicao` / `RequisicaoItem` | pedido do setor; a baixa sai daqui |
 | Produção | `OrdemProducao` | lote: planejado/produzido, custo, responsável (snapshot). Lista do dia = ordens planejadas × saldo (derivada) |
 | Produção | `Etiqueta` | etiqueta impressa: lote do fornecedor, validade, abertura, snapshot |
@@ -995,7 +1073,7 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.5 (para as próximas subfases)
 
-- **1.6 abertura de estoque**: ao abrir o estoque de uma loja (data/hora da
+- ~~**1.6 abertura de estoque**~~ **Feito na 1.6** (decisão 68): ao abrir o estoque de uma loja (data/hora da
   abertura), nota lançada nela daí em diante gera `ENTRADA_COMPRA` na mesma
   transação de `lancarNota`/`editarNota` (editar e cancelar = movimento de
   estorno; o livro-razão não aceita UPDATE). Nota anterior à abertura já está
@@ -1029,5 +1107,31 @@ banco de teste: o operador é recusado pelo servidor.
 ## Herança da 1.5 (apontada pelos fiscais)
 
 - [decisão do Rodolfo] Custo de referência da rede mostra o preço/kg (e a data) que outra loja pagou: aceitável como "custo da rede" ou esconder a data/mostrar só para quem vê compras?
-- UX: campo de data sem erro visível para formato inválido; texto "peça a quem cuida das compras"; padronizar "Nota 4521-1" na lista (desktop × celular).
-- 1.6: nota com data anterior à abertura digitada depois; editar nota com movimento ligado vai precisar de estorno; desconto/bonificação; CSV de notas, XML de NF-e e contas a pagar fora; fornecedor padrão do insumo sem tela; índice único parcial da chave da nota só no SQL.
+- ~~UX: campo de data sem erro visível; "peça a quem cuida das compras"; "Nota 4521-1".~~ **1.6.**
+- ~~1.6: nota com data anterior à abertura digitada depois; editar nota com movimento ligado vai precisar de estorno.~~ **1.6** (decisão 68). Seguem: desconto/bonificação; CSV de notas, XML de NF-e e contas a pagar fora; fornecedor padrão do insumo sem tela; índice único parcial da chave da nota só no SQL.
+
+## Herança da 1.6 (para as próximas subfases)
+
+- **1.7 contagem cíclica**: reaproveita `ContagemItem` (lista e fator
+  congelados, digitado × normalizado, versão por item, conflito), a tela de
+  contar (`TelaContagem`) e `gravarMovimentos`; o acerto entra como
+  `CONTAGEM` (±) com `contagemItemId`. Falta: agenda/fecha sozinha, janela
+  máxima (contagem velha não se aplica como de agora), piso no fechamento do
+  período, recontagem com as duas versões e motivo, variantes de embalagem na
+  contagem.
+- Correção da abertura é pela 1.7 (ajuste/contagem); até lá, número errado na
+  abertura só se corrige com um movimento novo (não há tela de ajuste).
+- Nota de HOJE lançada depois de concluir entra no estoque (assume que chegou
+  depois da contagem); a conferência avisa das notas de hoje já lançadas. Com
+  várias réplicas do app, `lancadaEm` × `fechadaEm` dependem do relógio de
+  cada uma (a trava `FOR SHARE`/`FOR UPDATE` ordena as transações).
+- Valor no razão é o da época (abertura: custo de referência do momento;
+  compra: valor + frete). A tela mostra o valor pelo custo de referência de
+  hoje; o CMV real (2.3) decide qual dos dois usa.
+- Sem preço/pré-preparo incompleto: a abertura grava valor 0 e a tela diz
+  "pendente"; quando o preço chegar, o valor de hoje aparece, o fotografado não muda.
+- `estoqueMinimoMilesimos` e a lista do dia (3.2) seguem sem tela.
+- Saldo da loja lê todos os saldos e custa em memória (centenas): com
+  milhares de insumos, paginar no SQL.
+- Índice parcial `Contagem_uma_abertura_por_loja` só no SQL (como o da nota).
+

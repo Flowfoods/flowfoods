@@ -125,3 +125,19 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   própria tela. No insumo: "Custo de referência" com subtítulo "Último preço
   pago" ou "Preço cadastrado…" e o painel "Preço pago" (compras, canceladas
   riscadas, último preço por fornecedor com "mais barato").
+- **Estoque (1.6)**: estado da loja em selo com palavra ("Não aberto"
+  neutro, "Em contagem" atenção, "Aberto" ok); andamento com a barra fina e
+  "1 de 13 contados · faltam 12". **Contagem no celular**: lista agrupada por
+  conservação (ícone funcional + nome + "3 de 8"), busca e abas
+  Faltam/Contados/Todos fixas sob o topo; item = nome 15/600 + "Não tem" (ou
+  Salvando…/Salvo/Falhou · tentar de novo) à direita; campos de 48 px, número
+  18/600 alinhado à direita, rótulo visível ("Fechadas · de 2,27 kg" /
+  "Solto") e a unidade em segmentado kg|g; embaixo, a conta em 12 px tabular
+  ("= 4,89 kg · Teresa, 06:43"). Conflito = quadro neutro com o número e o
+  nome de quem contou e dois botões. Rodapé fixo: "Faltam N de T" + barra +
+  "Conferir e concluir" (só quem ajusta saldo). **Saldo**: três métricas
+  (valor de hoje em Gelasio, insumos com saldo, valor fotografado na
+  abertura), tabela Corporativo (insumo, onde fica, quantidade, custo de
+  referência, valor; sem preço = selo + "pendente") e o **livro do estoque**
+  (quando, insumo, selo do tipo — "Estorno · compra" em atenção —, quantidade
+  com sinal, saldo "antes › depois", origem com link da nota).
