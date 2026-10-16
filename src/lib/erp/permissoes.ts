@@ -91,7 +91,6 @@ export const CATALOGO = [
   {
     chave: 'estoque',
     rotulo: 'Estoque',
-    emBreve: true,
     permissoes: {
       'estoque.ver': { rotulo: 'Ver o estoque', porLoja: true },
       'estoque.contar': { rotulo: 'Fazer contagem', porLoja: true },

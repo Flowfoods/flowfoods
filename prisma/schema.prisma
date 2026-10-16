@@ -1122,8 +1122,10 @@ model MovimentoEstoque {
   notaId               String?
   nota                 NotaEntrada?     @relation(fields: [parceiroId, notaId], references: [parceiroId, id], onDelete: Restrict)
   // 1.6: o movimento que este desfaz (espelho exato, conferido por trigger). Único.
+  // NoAction (não Restrict): a limpeza administrativa apaga original e estorno no
+  // mesmo DELETE (conferido no fim do comando); UPDATE no razão segue proibido.
   estornoDeId          String?
-  estornoDe            MovimentoEstoque? @relation("EstornoDoMovimento", fields: [parceiroId, estornoDeId], references: [parceiroId, id], onDelete: Restrict)
+  estornoDe            MovimentoEstoque? @relation("EstornoDoMovimento", fields: [parceiroId, estornoDeId], references: [parceiroId, id], onDelete: NoAction)
   estorno              MovimentoEstoque? @relation("EstornoDoMovimento")
 
   @@unique([parceiroId, id])

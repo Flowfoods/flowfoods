@@ -65,8 +65,10 @@ ALTER TABLE "MovimentoEstoque"
 
 ALTER TABLE "MovimentoEstoque" ADD CONSTRAINT "MovimentoEstoque_parceiroId_notaId_fkey"
   FOREIGN KEY ("parceiroId", "notaId") REFERENCES "NotaEntrada"("parceiroId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+-- NO ACTION (e não RESTRICT): a limpeza administrativa/LGPD apaga o original e
+-- o estorno no mesmo DELETE (a FK é conferida no fim do comando).
 ALTER TABLE "MovimentoEstoque" ADD CONSTRAINT "MovimentoEstoque_parceiroId_estornoDeId_fkey"
-  FOREIGN KEY ("parceiroId", "estornoDeId") REFERENCES "MovimentoEstoque"("parceiroId", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+  FOREIGN KEY ("parceiroId", "estornoDeId") REFERENCES "MovimentoEstoque"("parceiroId", "id") ON DELETE NO ACTION ON UPDATE CASCADE;
 
 CREATE UNIQUE INDEX "MovimentoEstoque_parceiroId_estornoDeId_key" ON "MovimentoEstoque"("parceiroId", "estornoDeId");
 CREATE INDEX "MovimentoEstoque_parceiroId_notaId_idx" ON "MovimentoEstoque"("parceiroId", "notaId");
