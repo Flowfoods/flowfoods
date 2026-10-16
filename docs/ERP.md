@@ -626,8 +626,15 @@ portão, RLS e trigger sem mudança. E `20261018000000_erp_validar_checks_insumo
     "Preço pago" com as últimas compras (canceladas riscadas) e o último preço
     de cada fornecedor, do mais barato ao mais caro. A comparação de embalagens
     continua pelo preço cadastrado. Lista: "compra DD/MM" ou "cadastrado" sob o
-    custo. O preço do insumo de outra loja aparece (é custo da rede); o link
-    para a nota só para quem vê aquela loja.
+    custo. **Revisão do Guardião:** o CUSTO de referência (número derivado) é
+    da rede e aparece para quem vê o insumo; número/série da nota, fornecedor,
+    loja, quantidade, valor e frete de cada compra só para quem tem "ver
+    compras e notas" NAQUELA loja (`obterInsumo(cliente, id, alcance)`,
+    `lojasComCompras`) — fora disso nem saem do servidor (teste com banco do
+    gerente de outra loja e do operador; prova visual confere o HTML). O
+    mesmo no detalhe do fornecedor e no Histórico (nota e fornecedor só com
+    "ver compras"). Data da nota em dd/mm/aaaa com máscara própria (o
+    `type="date"` segue o idioma do aparelho).
 11. **Importação**: lançar nota é a importação manual. CSV de notas e XML de
     NF-e ficam como pendência (não entraram: o volume de hoje é digitável e o
     XML pede casar código do fornecedor → insumo com memória).
@@ -1004,10 +1011,15 @@ banco de teste: o operador é recusado pelo servidor.
 - Conta a pagar (Notion Core: "compra vira estoque e conta a pagar no mesmo
   movimento") é da fase financeira.
 - Fornecedor padrão do insumo/embalagem (colunas da 0.1) segue sem tela.
-- O preço pago de outra loja aparece no insumo (custo é da rede); se um dia o
-  custo for por loja, `ultimasCompras` ganha o filtro de loja.
-- `NotaEntrada_chave_da_nota` é índice parcial escrito à mão: migration futura
-  que mexa nele reescreve o SQL.
+- O custo do insumo é o da última compra da REDE (qualquer loja); os detalhes
+  da compra só para quem vê aquela loja. Se um dia o custo for por loja,
+  `ultimasCompras` ganha o filtro de loja.
+- `NotaEntrada_chave_da_nota` é índice parcial escrito à mão (o Prisma não
+  descreve WHERE): migration futura que mexa nele reescreve o SQL. O índice da
+  última compra está declarado no `schema.prisma` (`migrate diff` vazio).
+- Frete rateado é por nota: a mesma compra relançada com outro valor de item
+  muda o rateio (ex.: cheddar R$ 290,00 de R$ 459,50 em itens leva R$ 7,57 dos
+  R$ 12,00; com R$ 278,00 de R$ 447,50, leva R$ 7,45).
 
 ## Herança da 1.5 (apontada na prova)
 
