@@ -1520,3 +1520,11 @@ banco de teste: o operador é recusado pelo servidor.
   50 produtos numa consulta).
 - `ProdutoEmbalagem` não tem ordem própria: a tela ordena pelo nome (o
   retrato também, então a ordem nunca é mudança).
+
+## Herança da 1.9 (apontada pelos fiscais)
+
+- [baixo] Prato com produto de venda pode virar pré-preparo pela edição da ficha (fica produto pendurado): recusar a troca de tipo quando há produto, ou tratar na 1.10.
+- [decisão do Rodolfo] O operador ainda vê o custo da receita no detalhe da ficha (vem da 1.2) — igual à camada "Loja". Esconder também?
+- [decisão do Rodolfo] Hipóteses da taxa do iFood (comissão + pagamento online sobre o preço; mensalidade/entrega fora).
+- UX: aviso discreto em delivery sem embalagem; exemplo "se vender a R$ 30,00…" (1.10); "Camada" → "O que entra"; aviso longo da embalagem vira dica; histórico de embalagens mostrando só o que mudou.
+- Taxas só do iFood (maquininha, 99Food, Keeta depois); mesmo prato em duas marcas; custo por canal na lista de fichas.
