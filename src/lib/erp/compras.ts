@@ -11,9 +11,14 @@
  *   recebe "alguém alterou" e nada é sobrescrito;
  * - a mesma nota (fornecedor + número + série) não entra duas vezes: conferida
  *   antes (frase com link) e garantida pelo índice único parcial (corrida);
- * - a nota NÃO mexe no estoque nesta fase (decisão 64) e o custo do insumo não
- *   é gravado: a última nota lançada passa a valer na próxima leitura
- *   (`compras-custo.ts`, decisão 65). Cancelar a última volta ao preço anterior.
+ * - o custo do insumo não é gravado: a última nota lançada passa a valer na
+ *   próxima leitura (`compras-custo.ts`, decisão 65). Cancelar a última volta
+ *   ao preço anterior;
+ * - estoque (1.6, decisão 68): na loja com o estoque ABERTO, a nota lançada
+ *   depois da abertura (com data a partir dela) entra no razão na MESMA
+ *   transação (`aplicarNotaNoEstoque`); editar e cancelar estornam o que valia
+ *   (nunca UPDATE em movimento). A abertura da loja é travada (`FOR SHARE`)
+ *   antes de marcar `lancadaEm`: lançar e concluir a abertura se esperam.
  */
 
 import type { Prisma } from '@prisma/client';
@@ -42,6 +47,7 @@ import {
   type InsumoDaCompra,
 } from './compra-campos';
 import { lojasComCompras, ultimasCompras, type UltimaCompra } from './compras-custo';
+import { aplicarNotaNoEstoque, efeitoPrevistoDaNota, estoqueDaNota, travarAberturas } from './estoque';
 import { formatarRendimento, porUnidadeDeRendimento, TIPOS_DE_FICHA, type CustoDaFicha } from './ficha-campos';
 import { lerCascata } from './ficha-custos';
 import { cascataDeCusto, PROFUNDIDADE_MAXIMA, type FichaDaCascata } from './ficha-cascata';
@@ -439,7 +445,11 @@ function dadosDosItens(tx: ClienteDoParceiro, notaId: string, d: DadosDaNota): P
 
 const dataDoBanco = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
-/** Lança a nota (status LANCADA): vale para o custo na hora. Não mexe no estoque (decisão 64). */
+/**
+ * Lança a nota (status LANCADA): vale para o custo na hora. No estoque: entra
+ * na mesma transação se a loja já está aberta (decisão 68); senão, não mexe
+ * (a contagem de abertura inclui).
+ */
 export async function lancarNota(cliente: ClienteDoParceiro, alcance: Alcance, entrada: EntradaDaNota, autorNome = 'Sistema'): Promise<ResultadoCompras> {
   try {
     return await cliente.transacao(async (tx) => {
@@ -450,6 +460,8 @@ export async function lancarNota(cliente: ClienteDoParceiro, alcance: Alcance, e
       const negado = recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
       if (negado) throw new Recusa({ ok: false, erros: { lojaId: negado } });
       await conferirDuplicada(tx, alcance, d);
+      // 1.6: trava a abertura da loja ANTES de marcar a hora do lançamento.
+      await travarAberturas(tx, [d.lojaId]);
       const fornecedor = ctx.fornecedores.get(d.fornecedorId)!.nome;
       const nota = await tx.notaEntrada.create({
         data: {
@@ -469,6 +481,7 @@ export async function lancarNota(cliente: ClienteDoParceiro, alcance: Alcance, e
         select: { id: true },
       });
       await tx.notaEntradaItem.createMany({ data: dadosDosItens(tx, nota.id, d) });
+      await aplicarNotaNoEstoque(tx, nota.id, '');
       await tx.historicoAlteracao.create({
         data: {
           parceiroId: tx.parceiroId,
@@ -584,6 +597,7 @@ export async function editarNota(
       const mudanca = diferenca(retratoDaNota(dadosGravados(atual), nomesAntes), retratoDaNota(d, nomesDepois));
       if (!mudanca) return { ok: true as const, id, mudou: [] };
       await conferirDuplicada(tx, alcance, d, id);
+      await travarAberturas(tx, [atual.lojaId, d.lojaId]);
       const r = await tx.notaEntrada.updateMany({
         where: { id, atualizadoEm: versao, status: 'LANCADA' },
         data: {
@@ -600,6 +614,8 @@ export async function editarNota(
       if (r.count === 0) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_NOTA }, conflito: true });
       await tx.notaEntradaItem.deleteMany({ where: { notaId: id } });
       await tx.notaEntradaItem.createMany({ data: dadosDosItens(tx, id, d) });
+      // 1.6: o estoque acompanha — estorna o que valia e entra o novo, se o efeito mudou.
+      await aplicarNotaNoEstoque(tx, id, `${rotuloDaNota(d)} alterada`);
       await tx.historicoAlteracao.create({
         data: { parceiroId: tx.parceiroId, entidade: 'NotaEntrada', entidadeId: id, acao: 'ALTEROU', antes: mudanca.antes, depois: mudanca.depois, autorNome },
       });
@@ -628,12 +644,15 @@ export async function cancelarNota(
       if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true });
       const negado = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
       if (negado) throw new Recusa({ ok: false, erros: { geral: negado } });
+      await travarAberturas(tx, [atual.lojaId]);
       const r = await tx.notaEntrada.updateMany({
         where: { id, status: 'LANCADA' },
         data: { status: 'CANCELADA', canceladaEm: new Date(), motivoCancelamento: motivo },
       });
       if (r.count === 0) throw new Recusa({ ok: false, erros: { geral: 'Esta nota já estava cancelada.' }, conflito: true });
       const nome = rotuloDaNota({ numero: atual.numero, serie: atual.serie });
+      // 1.6: o que a nota tinha posto no estoque sai por estorno (nunca UPDATE no razão).
+      await aplicarNotaNoEstoque(tx, id, `${nome} cancelada: ${motivo}`);
       await tx.historicoAlteracao.create({
         data: {
           parceiroId: tx.parceiroId,
@@ -695,6 +714,8 @@ export interface PreviaDaNota {
   fichas: ImpactoNaFicha[];
   /** Fichas afetadas que ficaram de fora da lista (teto da tela). */
   maisFichas: number;
+  /** 1.6: o que a nota faz no estoque da loja (entra, ou por que não). */
+  estoque: { movimenta: boolean; frase: string };
 }
 
 /** Custo efetivo do insumo: a última compra (do mapa) ou o preço cadastrado. */
@@ -754,6 +775,7 @@ export async function previaDaNota(
     const { fichas, mais } = await fichasAfetadas(tx, mudaram, novos, custos);
 
     const somaItens = d.itens.reduce((s, i) => s + i.valorCentavos, 0);
+    const estoque = await efeitoPrevistoDaNota(tx, { lojaId: d.lojaId, lojaNome: ctx.lojas.get(d.lojaId)?.nome ?? 'loja', lancadaEm: atual?.lancadaEm ?? null, entradaEm: d.entradaEm });
     return {
       ok: true as const,
       previa: {
@@ -771,6 +793,7 @@ export async function previaDaNota(
         custos,
         fichas,
         maisFichas: mais,
+        estoque,
       },
     };
   });
@@ -931,6 +954,7 @@ export async function obterNota(cliente: ClienteDoParceiro, alcance: Pick<Alcanc
     const valem = await ultimasCompras(tx, insumoIds);
     const historico = await listarHistorico(tx, { de: [{ entidade: 'NotaEntrada', ids: [id] }], limite: 10 });
     const somaItens = n.itens.reduce((s, i) => s + i.valorTotalCentavos, 0);
+    const estoque = await estoqueDaNota(tx, { id: n.id, lojaId: n.lojaId, loja: n.loja.nome, status: n.status, lancadaEm: n.lancadaEm, entradaEm: n.entradaEm.toISOString().slice(0, 10) });
     return {
       id: n.id,
       rotulo: rotuloDaNota(n),
@@ -972,6 +996,8 @@ export async function obterNota(cliente: ClienteDoParceiro, alcance: Pick<Alcanc
         };
       }),
       historico,
+      /** 1.6: o que a nota fez no estoque da loja (frase e movimentos, com os estornos). */
+      estoque,
     };
   });
 }
