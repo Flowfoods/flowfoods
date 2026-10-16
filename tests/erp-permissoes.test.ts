@@ -341,8 +341,17 @@ function arquivos(dir: string): string[] {
 describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', () => {
   const ERP = join('src', 'app', 'erp');
   // "Seu acesso" é da própria pessoa (rosto, sair): não depende de permissão.
-  const PAGINAS_LIVRES = new Set([join(ERP, 'acesso', 'page.tsx')]);
-  const ACOES_LIVRES = new Set(['acaoOpcoesDeAtivarRosto', 'acaoConfirmarRosto', 'acaoRemoverRosto']);
+  // O hub (/erp, 1.1) só lista o que `modulosDoParceiro(alcance)` libera e é o
+  // destino de quem abre tela fora do acesso: não pode exigir permissão.
+  const PAGINAS_LIVRES = new Set([join(ERP, 'acesso', 'page.tsx'), join(ERP, 'page.tsx')]);
+  // Escolher a visão (Rede Completa ↔ loja) não é permissão: só filtra DENTRO do
+  // alcance, e a action confere a escolha contra as lojas do alcance (visao.ts).
+  const ACOES_LIVRES = new Set([
+    'acaoOpcoesDeAtivarRosto',
+    'acaoConfirmarRosto',
+    'acaoRemoverRosto',
+    'acaoEscolherVisao',
+  ]);
 
   it('páginas chamam exigirPermissaoNaPagina', () => {
     const faltam = arquivos(ERP)
@@ -371,7 +380,7 @@ describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', 
   });
 
   it('tela não usa jargão técnico como texto principal', () => {
-    const telas = [...arquivos(ERP), ...arquivos(join('src', 'app', 'rodolfo', 'erp', 'equipe'))].filter((f) =>
+    const telas = [...arquivos(ERP), ...arquivos(join('src', 'components', 'erp', 'telas'))].filter((f) =>
       f.endsWith('.tsx'),
     );
     const furos = telas.filter((f) =>

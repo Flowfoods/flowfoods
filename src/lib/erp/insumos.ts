@@ -103,3 +103,18 @@ export async function listarInsumos(cliente: ClienteDoParceiro): Promise<InsumoL
     criadoEm: i.criadoEm,
   }));
 }
+
+/**
+ * Busca do ⌘K: insumos DESTE parceiro (o cliente é do portão) cujo nome
+ * contém o texto, sem diferenciar maiúscula. Desativados vêm marcados.
+ */
+export async function buscarInsumos(cliente: ClienteDoParceiro, texto: string, limite = 8) {
+  const q = texto.trim().slice(0, 80);
+  if (q.length < 2) return [];
+  return cliente.insumo.findMany({
+    where: { nome: { contains: q, mode: 'insensitive' } },
+    orderBy: [{ ativo: 'desc' }, { nome: 'asc' }],
+    take: limite,
+    select: { id: true, nome: true, unidade: true, ativo: true },
+  });
+}

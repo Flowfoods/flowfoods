@@ -9,9 +9,10 @@
  */
 
 import { revalidatePath } from 'next/cache';
-import { exigirParceiroDaSessao, exigirPessoa, recusaDaAcao } from '@/lib/erp/contexto';
+import { cookies } from 'next/headers';
+import { exigirParceiroDaSessao, exigirPessoa, recusaDaAcao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { cadastrarLoja, cadastrarMarca } from '@/lib/erp/estrutura';
-import type { EstadoForm } from '@/app/rodolfo/erp/campos';
+import type { EstadoForm } from '@/components/erp/ui/campos';
 import {
   concluirRegistroDeRosto,
   ERRO_ATIVAR_ROSTO,
@@ -20,10 +21,14 @@ import {
   podeAtivarRosto,
   removerRosto,
 } from '@/lib/erp/credenciais';
-import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { buscarInsumos, cadastrarInsumo } from '@/lib/erp/insumos';
 import type { RegistrationResponseJSON } from '@/lib/erp/rosto';
 import { aparelhoAtual } from '@/lib/erp/sessao';
-import type { EstadoCadastro } from '@/app/rodolfo/erp/[slug]/actions';
+import type { EstadoCadastro } from '@/components/erp/telas/insumos/estado';
+import type { RespostaDaVisao, ResultadoDaBusca } from '@/components/erp/shell/tipos';
+import { UNIDADES } from '@/lib/erp/unidades';
+import { sessaoSegura } from '@/lib/erp/sessao-cookie';
+import { COOKIE_VISAO, escolhaPermitida, valorDoCookieDeVisao } from '@/lib/erp/visao';
 
 export async function acaoCadastrarInsumoDaSessao(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const ctx = await exigirParceiroDaSessao();
@@ -32,7 +37,7 @@ export async function acaoCadastrarInsumoDaSessao(anterior: EstadoCadastro, form
   if (negado) return { ok: false, erros: { geral: negado }, vez };
   if (ctx.bloqueio) return { ok: false, erros: { geral: ctx.bloqueio }, vez };
   const r = await cadastrarInsumo(ctx.cliente, Object.fromEntries(form), ctx.sessao.autorNome);
-  if (r.ok) revalidatePath('/erp');
+  if (r.ok) revalidatePath('/erp/insumos');
   return { ...r, vez };
 }
 
@@ -81,4 +86,43 @@ export async function acaoRemoverRosto(passkeyId: string) {
   const r = await removerRosto(pessoa, String(passkeyId));
   if (r.ok) revalidatePath('/erp/acesso');
   return r;
+}
+
+// ------------------------------------------------------------ shell (1.1)
+
+/**
+ * Busca do ⌘K: insumos do parceiro DA SESSÃO. Confere "ver insumos" aqui —
+ * quem não pode recebe lista vazia, mesmo chamando a action direto.
+ */
+export async function acaoBuscarNoErp(q: string): Promise<ResultadoDaBusca[]> {
+  const ctx = await exigirParceiroDaSessao();
+  if (recusaDaAcao(ctx, 'insumos.ver')) return [];
+  const achados = await buscarInsumos(ctx.cliente, String(q ?? ''));
+  return achados.map((i) => ({
+    tipo: 'insumo' as const,
+    rotulo: i.nome,
+    detalhe: `Insumo · ${UNIDADES[i.unidade].nome}`,
+    href: `/erp/insumos#insumo-${i.id}`,
+    desativado: !i.ativo,
+  }));
+}
+
+/**
+ * Visão do topo (Rede Completa ↔ loja). Não é permissão: só filtra DENTRO do
+ * alcance. A escolha é conferida contra as lojas que o alcance da pessoa já
+ * alcança; loja fora dele é recusada e o cookie nem é gravado.
+ */
+export async function acaoEscolherVisao(valor: string): Promise<RespostaDaVisao> {
+  const ctx = await exigirParceiroDaSessao();
+  const { lojas } = await visaoDaRequisicao(ctx);
+  if (!escolhaPermitida(ctx.alcance, lojas, valor)) return { ok: false, mensagem: 'Essa loja não está no seu acesso.' };
+  cookies().set(COOKIE_VISAO, valorDoCookieDeVisao(ctx.parceiro.id, valor), {
+    path: '/',
+    sameSite: 'lax',
+    httpOnly: true,
+    secure: sessaoSegura(),
+    maxAge: 60 * 60 * 24 * 90,
+  });
+  revalidatePath('/erp', 'layout');
+  return { ok: true };
 }

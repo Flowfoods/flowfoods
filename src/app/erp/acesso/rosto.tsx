@@ -10,6 +10,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { browserSupportsWebAuthn, startRegistration } from '@simplewebauthn/browser';
 import { acaoConfirmarRosto, acaoOpcoesDeAtivarRosto, acaoRemoverRosto } from '../actions';
+import { classeDeBotao } from '@/components/erp/ui/estilos';
 
 /** `secundario`: já há aparelho ativado; ativar outro deixa de ser a ação principal. */
 export function AtivarRosto({ podeAtivar, secundario = false }: { podeAtivar: boolean; secundario?: boolean }) {
@@ -51,7 +52,11 @@ export function AtivarRosto({ podeAtivar, secundario = false }: { podeAtivar: bo
   }
 
   if (suporta === false) {
-    return <p className="text-[13px] text-surface/55">Este navegador não oferece entrada pelo rosto. No celular, use o Safari ou o Chrome.</p>;
+    return (
+      <p className="text-[13px] text-suave">
+        Este navegador não oferece entrada pelo rosto. No celular, use o Safari ou o Chrome.
+      </p>
+    );
   }
 
   return (
@@ -60,21 +65,21 @@ export function AtivarRosto({ podeAtivar, secundario = false }: { podeAtivar: bo
         type="button"
         onClick={ativar}
         disabled={esperando || suporta === null || !podeAtivar}
-        className={`w-full rounded-[7px] px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto ${
-          secundario
-            ? 'border border-white/[0.16] text-surface hover:border-surface/45 hover:bg-white/[0.04]'
-            : 'bg-primary text-white hover:bg-primary-dark'
-        }`}
+        className={classeDeBotao(secundario ? 'secundario' : 'primario', 'w-full sm:w-auto')}
       >
-        {esperando ? 'Olhe para o aparelho…' : secundario ? 'Ativar também neste aparelho' : 'Ativar entrada por rosto neste aparelho'}
+        {esperando
+          ? 'Olhe para o aparelho…'
+          : secundario
+            ? 'Ativar também neste aparelho'
+            : 'Ativar entrada por rosto neste aparelho'}
       </button>
       {!podeAtivar && (
-        <p className="text-[12px] text-surface/50">
+        <p className="text-[12px] text-suave">
           Por segurança, só dá para ativar logo depois de entrar com a senha. Saia e entre de novo com a senha.
         </p>
       )}
       {msg && (
-        <p role={msg.ok ? 'status' : 'alert'} className={`text-[13px] ${msg.ok ? 'text-success' : 'text-bright'}`}>
+        <p role={msg.ok ? 'status' : 'alert'} className={`text-[13px] ${msg.ok ? 'text-ok' : 'text-erro'}`}>
           {msg.texto}
         </p>
       )}
@@ -99,11 +104,11 @@ export function RemoverRosto({ id, aparelho }: { id: string; aparelho: string })
             else setErro(r.erro);
           })
         }
-        className="whitespace-nowrap rounded-[7px] border border-white/[0.14] px-3 py-1.5 text-[12px] text-surface/75 transition hover:border-surface/40 hover:text-surface disabled:opacity-60"
+        className={classeDeBotao('perigo')}
       >
         {pendente ? 'Removendo…' : 'Remover'}
       </button>
-      {erro && <span className="text-[12px] text-bright">{erro}</span>}
+      {erro && <span className="text-[12px] text-erro">{erro}</span>}
     </span>
   );
 }

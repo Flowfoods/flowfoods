@@ -5,7 +5,9 @@
 
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina } from '@/lib/erp/contexto';
 import { listarHistorico } from '@/lib/erp/historico';
-import { entidadeDoFiltro, LIMITE_DO_HISTORICO, TelaHistorico } from '@/app/rodolfo/erp/tela-historico';
+import { COR } from '@/lib/erp/modulos';
+import { PageHeader } from '@/components/erp/ui/cabecalho';
+import { entidadeDoFiltro, LIMITE_DO_HISTORICO, TelaHistorico } from '@/components/erp/telas/historico/tela-historico';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,5 +16,15 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
   exigirPermissaoNaPagina(ctx, 'historico.ver');
   const entidade = entidadeDoFiltro(searchParams.entidade);
   const linhas = await listarHistorico(ctx.cliente, { entidade, limite: LIMITE_DO_HISTORICO });
-  return <TelaHistorico linhas={linhas} entidade={entidade} hrefBase="/erp/historico" />;
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        icone="historico"
+        cor={COR.rede}
+        titulo="Histórico"
+        subtitulo="Rede Completa · toda alteração, com antes, depois, quem e quando"
+      />
+      <TelaHistorico linhas={linhas} entidade={entidade} hrefBase="/erp/historico" />
+    </div>
+  );
 }

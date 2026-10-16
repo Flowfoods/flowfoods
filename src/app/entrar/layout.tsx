@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { MarcaErp } from './marca';
+import { Marca } from '@/components/erp/ui/Marca';
 
 export const metadata: Metadata = {
   title: 'Entrar — FlowFoods ERP',
@@ -16,7 +16,7 @@ export default function EntrarLayout({ children }: { children: React.ReactNode }
       <div className="mx-auto flex min-h-[calc(100vh-3px)] max-w-5xl flex-col px-4 sm:px-6">
         <header className="py-5">
           <Link href="/entrar" aria-label="FlowFoods ERP">
-            <MarcaErp />
+            <Marca rotulo="ERP" />
           </Link>
         </header>
         <main className="flex flex-1 items-start py-4 sm:items-center sm:py-10">{children}</main>

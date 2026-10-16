@@ -6,7 +6,7 @@
 import { redirect } from 'next/navigation';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { sessaoDaRequisicao } from '@/lib/erp/sessao';
-import { Ponto } from '@/app/rodolfo/erp/ui';
+import { Ponto } from '@/components/erp/ui/superficies';
 import { acaoEscolherParceiro, acaoSair } from '../actions';
 
 export const dynamic = 'force-dynamic';

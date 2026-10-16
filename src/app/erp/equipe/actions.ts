@@ -13,7 +13,7 @@
 import { revalidatePath } from 'next/cache';
 import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
 import type { Ator } from '@/lib/erp/credenciais';
-import type { EstadoEquipe } from '@/app/rodolfo/erp/equipe/estado';
+import type { EstadoEquipe } from '@/components/erp/telas/equipe/estado';
 import {
   executarAtualizar,
   executarCriar,
@@ -22,7 +22,7 @@ import {
   executarSalvarPerfil,
   executarStatus,
   recusado,
-} from '@/app/rodolfo/erp/equipe/executar';
+} from '@/components/erp/telas/equipe/executar';
 
 async function contexto(): Promise<{ parceiroId: string; ator: Ator; negado: string | null }> {
   const ctx = await exigirParceiroDaSessao();
