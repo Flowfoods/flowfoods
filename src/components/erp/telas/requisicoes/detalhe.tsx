@@ -43,9 +43,10 @@ export function TelaDetalheDaRequisicao({
   const daLoja = `${base}/${d.loja.id}`;
   const quadro = `${daLoja}/requisicoes`;
   const aqui = `${quadro}/${r.id}`;
-  const saiuAlgo = d.itens.some((i) => i.atendidoMilesimos > 0 || i.devolvidoMilesimos > 0);
   const podeEntregar = pode.atender && !bloqueio && d.aberto && pendente(r.status);
   const corte = r.status === 'ATENDIDA' ? d.itens.filter((i) => i.faltaMilesimos > 0) : [];
+  const podeDevolver = pode.atender && !bloqueio && d.aberto && r.status !== 'CANCELADA' && d.itens.some((i) => i.atendidoMilesimos > 0);
+  const podeCancelar = pode.cancelar && !bloqueio && r.status === 'ABERTA';
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: daLoja }, { rotulo: 'Requisições', href: quadro }, { rotulo: numeroDaRequisicao(r.numero) }]} />
@@ -154,25 +155,28 @@ export function TelaDetalheDaRequisicao({
         </table>
       </Painel>
 
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <Painel titulo="O que saiu do livro" subtitulo="Cada baixa e cada estorno, com o saldo antes e depois" semRespiro>
-          {d.movimentos.length === 0 ? <Vazio>Nada saiu ainda: a baixa acontece na entrega.</Vazio> : <LivroDoEstoque movimentos={[...d.movimentos].reverse()} />}
+      <Painel titulo="O que saiu do livro" subtitulo="Cada baixa e cada estorno, com o saldo antes e depois" semRespiro>
+        {d.movimentos.length === 0 ? <Vazio>Nada saiu ainda: a baixa acontece na entrega.</Vazio> : <LivroDoEstoque movimentos={[...d.movimentos].reverse()} />}
+      </Painel>
+
+      <div className="grid items-start gap-5 lg:grid-cols-2">
+        {(podeDevolver || podeCancelar) && (
+          <div className="space-y-5">
+            {podeDevolver && (
+              <Painel titulo="Voltou para o estoque" subtitulo="A cozinha devolveu o que não usou">
+                <FormDevolver acao={acoes.devolver} versao={r.versao} itens={d.itens} recarregar={aqui} />
+              </Painel>
+            )}
+            {podeCancelar && (
+              <Painel titulo="Cancelar" subtitulo="Só enquanto nada saiu do estoque">
+                <FormCancelarRequisicao acao={acoes.cancelar} />
+              </Painel>
+            )}
+          </div>
+        )}
+        <Painel titulo="Histórico" semRespiro className={podeDevolver || podeCancelar ? '' : 'lg:col-span-2'}>
+          {d.historico.length === 0 ? <Vazio>Sem alterações.</Vazio> : <ListaHistorico linhas={d.historico} compacta doCadastro={`Requisição ${numeroDaRequisicao(r.numero)} · ${d.loja.nome}`} />}
         </Painel>
-        <div className="space-y-5">
-          {pode.atender && !bloqueio && d.aberto && saiuAlgo && r.status !== 'CANCELADA' && d.itens.some((i) => i.atendidoMilesimos > 0) && (
-            <Painel titulo="Voltou para o estoque" subtitulo="A cozinha devolveu o que não usou">
-              <FormDevolver acao={acoes.devolver} versao={r.versao} itens={d.itens} recarregar={aqui} />
-            </Painel>
-          )}
-          {pode.cancelar && !bloqueio && r.status === 'ABERTA' && (
-            <Painel titulo="Cancelar">
-              <FormCancelarRequisicao acao={acoes.cancelar} />
-            </Painel>
-          )}
-          <Painel titulo="Histórico" semRespiro>
-            {d.historico.length === 0 ? <Vazio>Sem alterações.</Vazio> : <ListaHistorico linhas={d.historico} compacta doCadastro={`Requisição ${numeroDaRequisicao(r.numero)} · ${d.loja.nome}`} />}
-          </Painel>
-        </div>
       </div>
     </div>
   );

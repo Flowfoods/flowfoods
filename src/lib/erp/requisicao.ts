@@ -30,7 +30,7 @@
 
 import type { ClienteDoParceiro } from './tenant';
 import { pode, type Alcance, type Permissao } from './permissoes';
-import { hojeNoRio } from './compra-campos';
+import { hojeNoRio, lerData } from './compra-campos';
 import { listarHistorico } from './historico';
 import {
   aberturasDe,
@@ -711,9 +711,10 @@ export async function divergenciasDaLoja(cliente: ClienteDoParceiro, alcance: Al
         if (!a || a.status !== 'FECHADA') return { loja, aberto: false as const };
         const hoje = hojeNoRio(agora);
         const { periodo } = await periodoDe(tx, cfg, hoje);
-        const dataOk = (x: unknown) => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x) && !Number.isNaN(new Date(`${x}T00:00:00Z`).getTime());
-        let de = dataOk(filtro.de) ? (filtro.de as string) : periodo.inicio;
-        let ate = dataOk(filtro.ate) ? (filtro.ate as string) : periodo.fim;
+        // dd/mm/aaaa (o campo da tela) ou aaaa-mm-dd; inválida = a do período de agora.
+        const data = (x: unknown) => (typeof x === 'string' ? lerData(x) : null);
+        let de = data(filtro.de) ?? periodo.inicio;
+        let ate = data(filtro.ate) ?? periodo.fim;
         let aviso: string | null = null;
         if (de > ate) [de, ate] = [ate, de];
         if (diasEntre(de, ate) > JANELA_MAXIMA_DIAS) {

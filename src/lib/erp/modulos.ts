@@ -52,6 +52,12 @@ export interface ItemNav {
   icone: ChaveIcone;
   /** Uma linha, no hub e na busca. */
   subtitulo: string;
+  /**
+   * 1.8: o item também acende nestes caminhos (fonte de RegExp), com
+   * prioridade sobre o prefixo: o quadro de uma loja
+   * (`/estoque/<loja>/requisicoes`) é "Requisições", não "Estoque por loja".
+   */
+  ativoEm?: string;
 }
 
 export interface GrupoNav {
@@ -289,6 +295,7 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
               icone: 'estoque',
               subtitulo: 'O setor pede, o estoque entrega e dá baixa',
               permissao: ['requisicao.pedir', 'requisicao.atender'],
+              ativoEm: `^${base}/estoque/[^/]+/requisicoes(/|$)`,
             },
             {
               href: `${base}/estoque/divergencias`,
@@ -296,6 +303,7 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
               icone: 'estoque',
               subtitulo: 'O que a contagem acusa sem requisição',
               permissao: 'estoque.ajustar',
+              ativoEm: `^${base}/estoque/[^/]+/divergencias(/|$)`,
             },
           ],
         },
@@ -423,6 +431,7 @@ export function itemAtivo(nav: Navegacao, caminho: string): { modulo: ModuloNav;
   for (const modulo of nav.modulos) {
     for (const g of modulo.grupos) {
       for (const item of g.itens) {
+        if (item.ativoEm && new RegExp(item.ativoEm).test(caminho)) return { modulo, item };
         const casa = caminho === item.href || caminho.startsWith(`${item.href}/`);
         if (casa && (!melhor || item.href.length > melhor.item.href.length)) melhor = { modulo, item };
       }

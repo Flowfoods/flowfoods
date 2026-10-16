@@ -20,6 +20,7 @@
  */
 
 import { diasEntre, somarDias } from './contagem-campos';
+import { lerData } from './compra-campos';
 import { valorDaQuantidade, TETO_DA_CONTAGEM, type MovimentoNovo, type TipoDeMovimento } from './estoque-campos';
 import { ehSetor, SETORES, type Setor } from './permissoes';
 import { formatarQuantidade, lerQuantidadeNa, UNIDADES, type Escala, type Fracao, type Unidade } from './unidades';
@@ -128,8 +129,9 @@ export function lerPedido(
   const setor = typeof f.setor === 'string' && ehSetor(f.setor) ? f.setor : null;
   if (!setor) erros.setor = 'Escolha o setor que vai usar (cozinha, salão…).';
   const pd = typeof f.paraDia === 'string' ? f.paraDia.trim() : '';
-  const paraDia = pd === '' || pd === 'hoje' ? hoje : pd === 'amanha' ? somarDias(hoje, 1) : /^\d{4}-\d{2}-\d{2}$/.test(pd) ? pd : null;
-  if (!paraDia || Number.isNaN(new Date(`${paraDia}T00:00:00Z`).getTime()) || new Date(`${paraDia}T00:00:00Z`).toISOString().slice(0, 10) !== paraDia) erros.paraDia = 'Data inválida: use hoje, amanhã ou dd/mm.';
+  // "hoje", "amanha", dd/mm/aaaa (o campo da tela) ou aaaa-mm-dd.
+  const paraDia = pd === '' || pd === 'hoje' ? hoje : pd === 'amanha' ? somarDias(hoje, 1) : lerData(pd);
+  if (!paraDia) erros.paraDia = 'Data inválida: use dd/mm/aaaa.';
   else if (paraDia < hoje) erros.paraDia = 'Para quando: de hoje em diante.';
   else if (paraDia > somarDias(hoje, DIAS_A_FRENTE)) erros.paraDia = `Para quando: até ${DIAS_A_FRENTE} dias à frente.`;
   const obs = typeof f.observacao === 'string' ? f.observacao.trim().replace(/\s+/g, ' ') : '';

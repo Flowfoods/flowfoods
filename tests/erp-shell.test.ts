@@ -104,6 +104,14 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     expect(hrefs(alcance({ perfilBase: null, perfilProprio: ['estoque.ajustar'] }))).toEqual(['/erp/estoque/divergencias', '/erp/acesso']);
   });
 
+  it('1.8: o quadro e as divergências de uma loja acendem o item do menu deles, não "Estoque por loja"', () => {
+    const nav = navegacaoDoParceiro(alcance({ perfilBase: 'DONO' }));
+    expect(itemAtivo(nav, '/erp/estoque/l1/requisicoes')?.item.rotulo).toBe('Requisições');
+    expect(itemAtivo(nav, '/erp/estoque/l1/requisicoes/r9/atender')?.item.rotulo).toBe('Requisições');
+    expect(itemAtivo(nav, '/erp/estoque/l1/divergencias')?.item.rotulo).toBe('Divergências');
+    expect(itemAtivo(nav, '/erp/estoque/l1')?.item.rotulo).toBe('Estoque por loja');
+  });
+
   it('perfil sem "ver insumos": o módulo Insumos nem aparece; Seu acesso sempre aparece', () => {
     const a = alcance({ perfilBase: null, perfilProprio: ['lojas.ver'] });
     const mods = modulosDoParceiro(a);

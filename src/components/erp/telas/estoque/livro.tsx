@@ -17,7 +17,8 @@ const quando = (d: Date) => DATA_HORA.format(d).replace(',', ' às');
 
 function Tipo({ m }: { m: MovimentoDaTela }) {
   if (m.estorno) return <Selo tom="alerta">Estorno · {ROTULO_DO_MOVIMENTO[m.tipo].toLowerCase()}</Selo>;
-  return <Selo tom={m.tipo === 'ABERTURA' ? 'neutro' : 'ok'}>{ROTULO_DO_MOVIMENTO[m.tipo]}</Selo>;
+  // 1.8: a baixa pela requisição é saída comum (neutra), não um "ok" verde.
+  return <Selo tom={m.tipo === 'ABERTURA' || m.tipo === 'REQUISICAO' ? 'neutro' : 'ok'}>{ROTULO_DO_MOVIMENTO[m.tipo]}</Selo>;
 }
 
 function Origem({ m, notasBase, requisicoesBase }: { m: MovimentoDaTela; notasBase?: string; requisicoesBase?: string }) {

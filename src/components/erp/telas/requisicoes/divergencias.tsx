@@ -17,7 +17,8 @@ import { formatarData } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
-import { CAMPO, ROTULO } from '../../ui/campos';
+import { ROTULO } from '../../ui/campos';
+import { CampoData } from '../../ui/campo-data';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
@@ -79,13 +80,13 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
             <label htmlFor="div-de" className={ROTULO}>
               De
             </label>
-            <input id="div-de" type="date" name="de" defaultValue={d.janela.de} className={`${CAMPO} w-[160px]`} />
+            <CampoData id="div-de" name="de" defaultValue={formatarData(d.janela.de)} className="w-[150px]" />
           </div>
           <div>
             <label htmlFor="div-ate" className={ROTULO}>
               Até
             </label>
-            <input id="div-ate" type="date" name="ate" defaultValue={d.janela.ate} className={`${CAMPO} w-[160px]`} />
+            <CampoData id="div-ate" name="ate" defaultValue={formatarData(d.janela.ate)} className="w-[150px]" />
           </div>
           <button type="submit" className={classeDeBotao('secundario')}>
             Ver

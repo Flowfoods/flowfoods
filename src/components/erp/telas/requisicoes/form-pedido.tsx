@@ -17,6 +17,7 @@ import { UNIDADES } from '@/lib/erp/unidades';
 import { CONSERVACOES } from '@/lib/erp/validade';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
+import { CampoData } from '../../ui/campo-data';
 import { classeDeBotao } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
 import type { AcaoDeEstoque, EstadoEstoque } from '../estoque/estado';
@@ -96,7 +97,7 @@ export function FormPedido({
                 ))}
               </div>
               {quando === 'outro' ? (
-                <input type="date" name="paraDia" required className={`${CAMPO} mt-2 min-h-12 text-base sm:text-sm`} aria-label="Dia" aria-invalid={!!erros.paraDia} aria-describedby={erros.paraDia ? 'pedido-dia-erro' : undefined} />
+                <CampoData id="pedido-dia" name="paraDia" required className="mt-2 min-h-12 text-base sm:text-sm" aria-label="Dia (dd/mm/aaaa)" aria-invalid={!!erros.paraDia} aria-describedby={erros.paraDia ? 'pedido-dia-erro' : undefined} />
               ) : (
                 <input type="hidden" name="paraDia" value={quando} />
               )}

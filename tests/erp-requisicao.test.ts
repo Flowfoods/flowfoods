@@ -305,3 +305,11 @@ describe('cruzamento requisição × contagem: consumo apurado × requisitado = 
     expect(ds).toEqual([]);
   });
 });
+
+describe('para quando digitado como no Brasil', () => {
+  it('dd/mm/aaaa vale; data impossível é erro', () => {
+    const base = { setor: 'COZINHA', observacao: '', linhas: [{ insumoId: 'pao', quantidade: '12', escala: 'base' }] };
+    expect(lerPedido({ ...base, paraDia: '18/10/2026' }, INSUMOS, HOJE)).toMatchObject({ ok: true, pedido: { paraDia: '2026-10-18' } });
+    expect(lerPedido({ ...base, paraDia: '31/02/2026' }, INSUMOS, HOJE)).toMatchObject({ ok: false, erros: { paraDia: expect.stringMatching(/dd\/mm\/aaaa/) } });
+  });
+});
