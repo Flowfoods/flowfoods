@@ -96,6 +96,8 @@ describe('ERP 1.6 · ler o que se contou', () => {
     expect(r).toEqual({ total: 4, contados: 2, zerados: 1, naoContados: 2 });
     expect(fraseDoQueFalta(r)).toBe('Faltam 2 de 4');
     expect(fraseDoQueFalta({ total: 3, contados: 3, zerados: 0, naoContados: 0 })).toBe('Todos os 3 contados');
+    expect(fraseDoQueFalta({ total: 1, contados: 1, zerados: 0, naoContados: 0 })).toBe('O insumo foi contado');
+    expect(fraseDoQueFalta({ total: 3, contados: 2, zerados: 0, naoContados: 1 })).toBe('Falta 1 de 3');
   });
 });
 

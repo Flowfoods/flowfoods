@@ -88,7 +88,7 @@ const iguais = (x: ContagemDigitada, y: ContagemDigitada) => x.embalagens.trim()
 /**
  * O que fazer com um rascunho ao abrir a contagem, diante do item como está
  * no servidor: o servidor já tem o mesmo número = descartar (salvou antes de a
- * rede cair); senão, reenviar COM A VERSÃO DO RASCUNHO — se o item andou
+ * rede cair); senão, reenviar com a versão do rascunho: se o item andou
  * (outra pessoa, outra aba), o servidor responde conflito e a pessoa escolhe.
  */
 export function destinoDoRascunho(r: Rascunho, item: { campos: ContagemDigitada; versao: number }): 'descartar' | 'reenviar' {

@@ -1,3 +1,4 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Vila da Penha · prazo 17/10 às 23:59 · começada por Gil" é linha de apoio do cabeçalho, no padrão "A · B" das telas da 1.1–1.6.
 /**
  * Montagem das telas de estoque comuns ao nível 1 e à pessoa do parceiro que
  * juntam cabeçalho + peça de cliente (a contagem). As rotas só resolvem

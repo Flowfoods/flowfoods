@@ -213,8 +213,8 @@ export function resumoDaContagem(itens: readonly { contadoMilesimos: number | nu
 /** "Faltam 12 de 40" / "Todos os 40 contados". */
 export function fraseDoQueFalta(r: ResumoDaContagem): string {
   if (r.total === 0) return 'Nenhum insumo para contar.';
-  if (r.naoContados === 0) return `Todos os ${r.total} contados`;
-  return `Faltam ${r.naoContados} de ${r.total}`;
+  if (r.naoContados === 0) return r.total === 1 ? 'O insumo foi contado' : `Todos os ${r.total} contados`;
+  return `${r.naoContados === 1 ? 'Falta' : 'Faltam'} ${r.naoContados} de ${r.total}`;
 }
 
 // ------------------------------------------------------- nota × estoque
