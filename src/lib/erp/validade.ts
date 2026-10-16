@@ -114,7 +114,7 @@ export function lerValidades(
     if (!l?.marcada) continue;
     const nome = CONSERVACOES[c];
     if (!l.quantidade.trim()) {
-      erros[chaveDaValidade(c)] = `Diga quanto dura em ${nome.toLowerCase()} (ex.: 3 dias) ou desmarque.`;
+      erros[chaveDaValidade(c)] = `Diga quanto dura em ${nome.toLowerCase()} (ex.: ${l.em === 'horas' ? '6 horas' : '3 dias'}) ou desmarque.`;
       continue;
     }
     const m = paraMinutos(l.quantidade, l.em);

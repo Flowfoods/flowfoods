@@ -41,7 +41,7 @@ import {
 } from './fichas';
 import { diferenca } from './insumo-campos';
 import { formatarFracao } from './unidades';
-import { validadesDaLinha } from './validade';
+import { validadesDaLinha, validadesEmTexto } from './validade';
 
 export type SituacaoNaPrevia = 'nova' | 'muda' | 'igual' | 'erro';
 
@@ -58,6 +58,8 @@ export interface FichaNaPrevia {
   /** "R$ 3,09 por porção"; null com erro. */
   custo: string | null;
   incompleto: boolean;
+  /** 1.4: "Refrigerado: 3 dias · Congelado: 30 dias" (como fica depois de importar); null = não informada. */
+  validade: string | null;
   erros: ErroDeLinha[];
   /** Insumos que a planilha cita e não estão cadastrados. */
   faltam: string[];
@@ -160,7 +162,7 @@ function planejarUma(
   preparos: ReadonlyMap<string, PreparoDaFicha>,
   custoDoPreparo: (id: string) => ReturnType<typeof custoDaFicha> | null,
 ): Plano {
-  const base = { nome: f.nome, linhas: intervalo(f.linhas), mudancas: [], itens: f.itens.length, rende: null, custo: null, incompleto: false, faltam };
+  const base = { nome: f.nome, linhas: intervalo(f.linhas), mudancas: [], itens: f.itens.length, rende: null, custo: null, incompleto: false, validade: null, faltam };
   const erros: ErroDeLinha[] = [...f.erros, ...errosDoCasamento];
   if (atual && !atual.ativa) erros.push({ linha: f.primeiraLinha, mensagem: `A ficha “${f.nome}” está desativada: reative antes de importar por cima.` });
   const jaNaFicha = new Set((atual?.itens ?? []).flatMap((i) => [i.insumoId, i.subfichaId]).filter((x): x is string => !!x));
@@ -200,6 +202,7 @@ function planejarUma(
     rende: formatarRendimento(dados.rendimentoMilesimos, dados.unidadeRendimento, dados.tipo),
     custo: `${formatarFracao(custo.porRendimento)} ${porUnidadeDeRendimento(dados.unidadeRendimento, dados.tipo)}`,
     incompleto: custoIncompleto(custo),
+    validade: validadesEmTexto(dados.validades),
   };
   if (!atual) return { previa: { ...comum, situacao: 'nova' }, dados };
   const mudanca = diferenca(

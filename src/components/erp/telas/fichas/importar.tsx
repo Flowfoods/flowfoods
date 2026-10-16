@@ -12,7 +12,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import type { FichaNaPrevia, SituacaoNaPrevia } from '@/lib/erp/ficha-importar';
-import { LIMITE_DE_FICHAS } from '@/lib/erp/ficha-planilha';
+import { CABECALHO_DO_MODELO, LIMITE_DE_FICHAS } from '@/lib/erp/ficha-planilha';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, ROTULO } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
@@ -41,6 +41,7 @@ function LinhaDaPrevia({ f, novoInsumo }: { f: FichaNaPrevia; novoInsumo?: strin
       {f.situacao !== 'erro' && (
         <p className="mt-0.5 text-[13px] tabular-nums text-suave">
           {plural(f.itens, 'insumo', 'insumos')} · rende {f.rende} · {f.custo}
+          {f.validade && <span className="block">{f.validade}</span>}
           {f.incompleto && <span className="text-atencao"> · custo incompleto (insumo sem preço)</span>}
           {f.mudancas.length > 0 && <span> · muda: {f.mudancas.join(', ')}</span>}
         </p>
@@ -118,10 +119,11 @@ export function TelaImportarFichas({
         <div className="space-y-3 text-sm text-suave">
           <p>
             Uma linha por insumo. As colunas da ficha (tipo, rende, descrição e modo de preparo) basta preencher numa das linhas dela. O insumo precisa
-            estar cadastrado com o mesmo nome; a quantidade vai em g, kg, ml, L ou un.
+            estar cadastrado com o mesmo nome; a quantidade vai em g, kg, ml, L ou un. Opcionais: fator, conservação principal e validade em cada
+            conservação (“3 dias”, “6 h”); sem elas, a validade da ficha não muda.
           </p>
           <p className="rounded-[7px] border border-linha bg-campo px-3 py-2 font-mono text-[12px] text-texto [overflow-wrap:anywhere]">
-            ficha;tipo;rende;unidade_rende;descricao;modo_de_preparo;insumo;quantidade;unidade
+            {CABECALHO_DO_MODELO}
           </p>
           <a href="/modelos/fichas-tecnicas.csv" download className={classeDeBotao('secundario')}>
             Baixar o modelo (CSV)

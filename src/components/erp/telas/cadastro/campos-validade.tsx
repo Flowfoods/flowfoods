@@ -91,7 +91,6 @@ export function CamposDeValidade({
                     name={`validade_${c}`}
                     inputMode="numeric"
                     autoComplete="off"
-                    placeholder={c === 'PISTA_FRIA' ? '6' : '3'}
                     value={l.quantidade}
                     onChange={(e) => mudar(c, { quantidade: e.target.value, ...(e.target.value.trim() && !l.marcada ? { marcada: true } : {}) })}
                     className={`${CAMPO} text-right tabular-nums`}
@@ -127,9 +126,11 @@ export function CamposDeValidade({
                       setPrincipal(c);
                       aoMudar?.();
                     }}
-                    className={MARCAR}
+                    className={`${MARCAR} disabled:opacity-40`}
                   />
-                  Principal
+                  {/* A partir de 640 px o cabeçalho da coluna já diz "Principal". */}
+                  <span className="sm:sr-only">Principal</span>
+                  <span className="sr-only"> ({nome.toLowerCase()})</span>
                 </label>
               </div>
               <Erro id={`${idBase}-${chave}-erro`} texto={erro} />
