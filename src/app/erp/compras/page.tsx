@@ -31,9 +31,10 @@ export default async function ErpNotasPage({ searchParams }: { searchParams: Rec
         novaHref={lanca ? `${BASE}/nova` : undefined}
         bloqueio={ctx.bloqueio}
       >
-        <FiltrosDasNotas base={BASE} filtros={filtros} lojas={opcoes.lojas} fornecedores={opcoes.fornecedores} />
+        <FiltrosDasNotas filtrado={temFiltroDeNota(lidos)} base={BASE} filtros={filtros} lojas={opcoes.lojas} fornecedores={opcoes.fornecedores} />
       </CabecalhoDasNotas>
       <TelaListaNotas
+        filtrado={temFiltroDeNota(lidos)}
         base={BASE}
         filtros={filtros}
         {...pagina}

@@ -66,9 +66,12 @@ export function FiltrosDasNotas({
   filtros: f,
   lojas,
   fornecedores,
+  filtrado = temFiltroDeNota(f),
 }: {
   base: string;
   filtros: FiltrosDeNota;
+  /** Filtro da PESSOA (a loja da visão do topo não conta: "Limpar" não a tira). */
+  filtrado?: boolean;
   lojas: { id: string; nome: string }[];
   fornecedores: { id: string; nome: string }[];
 }) {
@@ -131,7 +134,7 @@ export function FiltrosDasNotas({
         <button type="submit" className={classeDeBotao('secundario', 'flex-1 lg:flex-none')}>
           Filtrar
         </button>
-        {temFiltroDeNota(f) && (
+        {filtrado && (
           <Link href={base} className={classeDeBotao('fantasma', 'shrink-0 px-3')}>
             Limpar
           </Link>
@@ -162,9 +165,11 @@ export function TelaListaNotas({
   novaHref,
   temFornecedor,
   fornecedoresHref,
+  filtrado = temFiltroDeNota(f),
 }: {
   base: string;
   filtros: FiltrosDeNota;
+  filtrado?: boolean;
   linhas: LinhaDeNota[];
   total: number;
   pagina: number;
@@ -177,7 +182,7 @@ export function TelaListaNotas({
   if (linhas.length === 0) {
     return (
       <Painel semRespiro>
-        {temFiltroDeNota(f) ? (
+        {filtrado ? (
           <Vazio
             titulo="Nenhuma nota com esses filtros."
             acao={

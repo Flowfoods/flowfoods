@@ -27,9 +27,10 @@ export default async function ParceiroNotasPage({ params, searchParams }: { para
         novaHref={`${base}/nova`}
         bloqueio={ctx.bloqueio}
       >
-        <FiltrosDasNotas base={base} filtros={filtros} lojas={opcoes.lojas} fornecedores={opcoes.fornecedores} />
+        <FiltrosDasNotas filtrado={temFiltroDeNota(lidos)} base={base} filtros={filtros} lojas={opcoes.lojas} fornecedores={opcoes.fornecedores} />
       </CabecalhoDasNotas>
       <TelaListaNotas
+        filtrado={temFiltroDeNota(lidos)}
         base={base}
         filtros={filtros}
         {...pagina}
