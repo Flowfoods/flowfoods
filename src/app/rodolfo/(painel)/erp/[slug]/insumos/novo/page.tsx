@@ -1,4 +1,4 @@
-/** ERP — Novo insumo de um parceiro, pelo nível 1. */
+/** ERP, Novo insumo de um parceiro, pelo nível 1. */
 
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { TelaFormInsumo } from '@/components/erp/telas/insumos/paginas';

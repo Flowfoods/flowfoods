@@ -1,4 +1,4 @@
-/** ERP — editar insumo de um parceiro, pelo nível 1. */
+/** ERP, editar insumo de um parceiro, pelo nível 1. */
 
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';

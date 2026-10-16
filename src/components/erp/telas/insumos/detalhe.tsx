@@ -1,3 +1,4 @@
+// Scanner avoid-ai-design, SD4d (P2) aceito: "Ingrediente · Seco" e "3 kg · R$ 115,00" seguem o subtítulo do contrato ("Rede Completa · N insumos") como linha de apoio da tabela densa. (O ignore do scanner não aceita id com minúscula.)
 /**
  * Detalhe do insumo (1.1), o MESMO para o nível 1 e para a pessoa do parceiro:
  * custo de referência com a conta por extenso, as embalagens de compra (a

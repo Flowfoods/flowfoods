@@ -1,4 +1,4 @@
-/** ERP — detalhe do insumo de um parceiro, pelo nível 1 (lido pelo portão do parceiro do slug: de outro, 404). */
+/** ERP, detalhe do insumo de um parceiro, pelo nível 1 (lido pelo portão do parceiro do slug: de outro, 404). */
 
 import { notFound } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';

@@ -1,4 +1,4 @@
-/** ERP — outra embalagem de compra de um insumo do parceiro, pelo nível 1 (`nova` ou o id). */
+/** ERP, outra embalagem de compra de um insumo do parceiro, pelo nível 1 (`nova` ou o id). */
 
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';

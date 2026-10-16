@@ -1,5 +1,5 @@
 /**
- * ERP — Insumos de um Parceiro Flow, pelo nível 1. Tudo o que esta tela lê
+ * ERP, Insumos de um Parceiro Flow, pelo nível 1. Tudo o que esta tela lê
  * passa pelo cliente de `exigirParceiro` (portão de tenant + RLS); trocar de
  * parceiro é trocar de URL, e a URL só escolhe — o isolamento é o portão.
  */
