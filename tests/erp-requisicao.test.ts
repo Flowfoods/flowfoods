@@ -19,9 +19,11 @@ import {
   porSetor,
   quantidadesDaFicha,
   resumoDasDivergencias,
+  tempoDesde,
   textoDoAtraso,
   textoDoCampo,
   textoDoParaDia,
+  TITULO_NO_HISTORICO_DA_REQUISICAO,
   trechosDoInsumo,
   type InsumoParaPedir,
   type ItemParaEntregar,
@@ -311,5 +313,19 @@ describe('para quando digitado como no Brasil', () => {
     const base = { setor: 'COZINHA', observacao: '', linhas: [{ insumoId: 'pao', quantidade: '12', escala: 'base' }] };
     expect(lerPedido({ ...base, paraDia: '18/10/2026' }, INSUMOS, HOJE)).toMatchObject({ ok: true, pedido: { paraDia: '2026-10-18' } });
     expect(lerPedido({ ...base, paraDia: '31/02/2026' }, INSUMOS, HOJE)).toMatchObject({ ok: false, erros: { paraDia: expect.stringMatching(/dd\/mm\/aaaa/) } });
+  });
+});
+
+describe('herança d da 1.8: tempo no processo e o histórico pelo estado', () => {
+  const agora = new Date('2026-10-16T15:00:00Z');
+  it('"há 3 h" arredonda para baixo; minutos, dias', () => {
+    expect(tempoDesde(new Date(agora.getTime() - 30_000), agora)).toBe('agora');
+    expect(tempoDesde(new Date(agora.getTime() - 12 * 60_000), agora)).toBe('há 12 min');
+    expect(tempoDesde(new Date(agora.getTime() - (3 * 60 + 50) * 60_000), agora)).toBe('há 3 h');
+    expect(tempoDesde(new Date(agora.getTime() - 26 * 3_600_000), agora)).toBe('há 1 dia');
+    expect(tempoDesde(new Date(agora.getTime() - 50 * 3_600_000), agora)).toBe('há 2 dias');
+  });
+  it('dentro da requisição: Pedida, Entregue, Voltou para o estoque, Cancelada', () => {
+    expect(TITULO_NO_HISTORICO_DA_REQUISICAO).toMatchObject({ PEDIU: 'Pedida', ATENDEU: 'Entregue', DEVOLVEU: 'Voltou para o estoque', CANCELOU: 'Cancelada' });
   });
 });

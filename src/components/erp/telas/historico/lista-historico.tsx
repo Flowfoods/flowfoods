@@ -28,16 +28,26 @@ export function ListaHistorico({
   linhas,
   compacta = false,
   doCadastro,
+  titulos,
 }: {
   linhas: LinhaDeHistorico[];
   compacta?: boolean;
   doCadastro?: string;
+  /**
+   * Dentro do detalhe de um documento, a ação vira o estado dele ("Pedida",
+   * "Entregue"): quem lê o histórico da requisição quer saber o que ACONTECEU
+   * com ela; o nome de quem fez já vem embaixo.
+   */
+  titulos?: Readonly<Record<string, string>>;
 }) {
   return (
     <ol>
       {linhas.map((h) => {
         const quando = QUANDO.format(h.ocorridoEm).replace(',', '');
-        const oQue = (
+        const titulo = titulos?.[h.acao];
+        const oQue = titulo ? (
+          <span className="font-medium">{titulo}</span>
+        ) : (
           <>
             <span className="font-medium">{rotuloAcao(h.acao)}</span>{' '}
             <span className="text-suave">{rotuloEntidade(h.entidade).toLowerCase()}</span>

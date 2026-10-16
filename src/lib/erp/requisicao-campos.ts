@@ -31,6 +31,32 @@ export type StatusDaRequisicao = 'ABERTA' | 'PARCIAL' | 'ATENDIDA' | 'CANCELADA'
 
 export const ORDEM_DO_QUADRO: StatusDaRequisicao[] = ['ABERTA', 'PARCIAL', 'ATENDIDA', 'CANCELADA'];
 
+/**
+ * O histórico DENTRO da requisição fala do estado dela, não do verbo de quem
+ * fez (herança d da 1.8): "Pedida", "Entregue", "Voltou para o estoque",
+ * "Cancelada". No Histórico geral continua "Pediu requisição · #12".
+ */
+export const TITULO_NO_HISTORICO_DA_REQUISICAO: Readonly<Record<string, string>> = {
+  PEDIU: 'Pedida',
+  ATENDEU: 'Entregue',
+  DEVOLVEU: 'Voltou para o estoque',
+  CANCELOU: 'Cancelada',
+};
+
+/**
+ * Tempo no processo, para o rodapé do cartão do quadro: "agora", "há 12 min",
+ * "há 3 h", "há 2 dias". Arredonda para baixo (3 h 50 é "há 3 h").
+ */
+export function tempoDesde(de: Date, agora: Date): string {
+  const min = Math.floor((agora.getTime() - de.getTime()) / 60_000);
+  if (min < 1) return 'agora';
+  if (min < 60) return `há ${min} min`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `há ${h} h`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'há 1 dia' : `há ${d} dias`;
+}
+
 export const ROTULO_DA_REQUISICAO: Record<StatusDaRequisicao, string> = {
   ABERTA: 'Pedida',
   PARCIAL: 'Atendida em parte',

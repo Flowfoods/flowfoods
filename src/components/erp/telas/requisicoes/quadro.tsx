@@ -11,7 +11,7 @@
 
 import Link from 'next/link';
 import type { CartaoDaRequisicao, QuadroDeRequisicoes } from '@/lib/erp/requisicao';
-import { COLUNA_DO_QUADRO, numeroDaRequisicao, ORDEM_DO_QUADRO, rotuloDoSetor, textoDoParaDia, type StatusDaRequisicao } from '@/lib/erp/requisicao-campos';
+import { COLUNA_DO_QUADRO, numeroDaRequisicao, ORDEM_DO_QUADRO, rotuloDoSetor, tempoDesde, textoDoParaDia, type StatusDaRequisicao } from '@/lib/erp/requisicao-campos';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
@@ -30,7 +30,7 @@ const COR_DA_COLUNA: Record<StatusDaRequisicao, { texto: string; barra: string }
 
 const ITENS_NO_CARTAO = 3;
 
-function Cartao({ c, aqui, hoje }: { c: CartaoDaRequisicao; aqui: string; hoje: string }) {
+function Cartao({ c, aqui, hoje, agora }: { c: CartaoDaRequisicao; aqui: string; hoje: string; agora: Date }) {
   const atrasada = c.atrasoDias > 0;
   const saiu = c.status === 'PARCIAL' || c.status === 'ATENDIDA';
   const resto = c.itens.length - ITENS_NO_CARTAO;
@@ -39,7 +39,8 @@ function Cartao({ c, aqui, hoje }: { c: CartaoDaRequisicao; aqui: string; hoje: 
       ? `entregue por ${c.atendidaPorNome ?? '—'} · ${quandoCurto(c.atendidaEm, hoje)}`
       : c.status === 'CANCELADA' && c.canceladaEm
         ? `cancelada · ${quandoCurto(c.canceladaEm, hoje)}`
-        : `${c.pedidaPorNome ?? '—'} · ${quandoCurto(c.solicitadaEm, hoje)}`;
+        : // Herança d da 1.8: a pendente diz há quanto tempo está no processo, além da hora.
+          `${c.pedidaPorNome ?? '—'} · ${quandoCurto(c.solicitadaEm, hoje)} · ${tempoDesde(c.solicitadaEm, agora)}`;
   return (
     <li>
       <Link
@@ -71,7 +72,7 @@ function Cartao({ c, aqui, hoje }: { c: CartaoDaRequisicao; aqui: string; hoje: 
   );
 }
 
-function Coluna({ status, cartoes, aqui, hoje }: { status: StatusDaRequisicao; cartoes: CartaoDaRequisicao[]; aqui: string; hoje: string }) {
+function Coluna({ status, cartoes, aqui, hoje, agora }: { status: StatusDaRequisicao; cartoes: CartaoDaRequisicao[]; aqui: string; hoje: string; agora: Date }) {
   const cor = COR_DA_COLUNA[status];
   const id = `coluna-${status.toLowerCase()}`;
   const recente = status === 'ATENDIDA' || status === 'CANCELADA';
@@ -94,7 +95,7 @@ function Coluna({ status, cartoes, aqui, hoje }: { status: StatusDaRequisicao; c
       ) : (
         <ol className="space-y-2">
           {cartoes.map((c) => (
-            <Cartao key={c.id} c={c} aqui={aqui} hoje={hoje} />
+            <Cartao key={c.id} c={c} aqui={aqui} hoje={hoje} agora={agora} />
           ))}
         </ol>
       )}
@@ -118,6 +119,7 @@ export function TelaQuadroDeRequisicoes({
   bloqueio: string | null;
 }) {
   const daLoja = `${base}/${q.loja.id}`;
+  const agora = new Date();
   const aqui = `${daLoja}/requisicoes`;
   const pendentes = q.colunas.ABERTA.length + q.colunas.PARCIAL.length;
   const atrasadas = [...q.colunas.ABERTA, ...q.colunas.PARCIAL].filter((c) => c.atrasoDias > 0).length;
@@ -158,7 +160,7 @@ export function TelaQuadroDeRequisicoes({
 
       <div className="grid gap-x-4 gap-y-7 md:grid-cols-2 xl:grid-cols-4">
         {ORDEM_DO_QUADRO.map((s) => (
-          <Coluna key={s} status={s} cartoes={q.colunas[s]} aqui={aqui} hoje={q.hoje} />
+          <Coluna key={s} status={s} cartoes={q.colunas[s]} aqui={aqui} hoje={q.hoje} agora={agora} />
         ))}
       </div>
     </div>
