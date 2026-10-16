@@ -24,6 +24,7 @@
  */
 
 import { cache } from 'react';
+import { cookies } from 'next/headers';
 import { getServerSession } from 'next-auth';
 import { notFound, redirect } from 'next/navigation';
 import type { ParceiroFlow } from '@prisma/client';
@@ -47,6 +48,8 @@ import {
   type Permissao,
 } from './permissoes';
 import { doParceiro, parceiroPorSlug, type ClienteDoParceiro } from './tenant';
+import { listarLojasDoAlcance } from './estrutura';
+import { COOKIE_VISAO, resolverVisao } from './visao';
 
 export { bloqueioDeEscrita, contextoDaSessao, ErroDePermissao, exigirPermissao, pode, recusaDaAcao };
 export type { ContextoDaPessoa, ContextoDoParceiro, SessaoErp };
@@ -96,9 +99,14 @@ export async function exigirParceiroDaSessao(): Promise<ContextoDaPessoa> {
   return contextoDaSessao(pessoa as SessaoValida & { parceiro: ParceiroFlow });
 }
 
-/** Abas do /erp na ordem: a primeira que a pessoa pode é a casa dela. */
+/**
+ * Telas do /erp. A primeira é o hub "Módulos da Rede" (livre: só a sessão; ele
+ * lista só o que `modulosDoParceiro(alcance)` libera) — é para lá que vai quem
+ * abre uma tela fora do acesso.
+ */
 export const TELAS_DO_ERP: { href: string; rotulo: string; permissao: Permissao | null }[] = [
-  { href: '/erp', rotulo: 'Insumos', permissao: 'insumos.ver' },
+  { href: '/erp', rotulo: 'Módulos da Rede', permissao: null },
+  { href: '/erp/insumos', rotulo: 'Insumos', permissao: 'insumos.ver' },
   { href: '/erp/lojas', rotulo: 'Lojas e marcas', permissao: 'lojas.ver' },
   { href: '/erp/equipe', rotulo: 'Equipe', permissao: 'acessos.gerir' },
   { href: '/erp/historico', rotulo: 'Histórico', permissao: 'historico.ver' },
@@ -111,7 +119,7 @@ export function telasPermitidas(alcance: Alcance) {
 
 /**
  * Página do /erp: confere com a MESMA regra (`exigirPermissao`). Quem não pode
- * vai para a primeira tela que pode ("Seu acesso" sempre pode), com aviso.
+ * volta para o hub (sempre pode), com aviso.
  */
 export function exigirPermissaoNaPagina(ctx: { alcance: Alcance }, permissao: Permissao, opcoes: { lojaId?: string } = {}) {
   try {
@@ -120,4 +128,22 @@ export function exigirPermissaoNaPagina(ctx: { alcance: Alcance }, permissao: Pe
     if (!(e instanceof ErroDePermissao)) throw e;
     redirect(`${telasPermitidas(ctx.alcance)[0].href}?sem-acesso=1`);
   }
+}
+
+// --------------------------------------------------------------- visão (1.1)
+
+/** Lojas do alcance, uma ida ao banco por requisição (layout + página pedem). */
+const lojasDaRequisicao = cache((parceiroId: string, lojas: string) =>
+  listarLojasDoAlcance(leituraDoParceiro(parceiroId), { lojas: lojas === '*' ? 'todas' : lojas.split(',').filter(Boolean) }),
+);
+
+/**
+ * Visão escolhida no topo ("Rede Completa" ou uma loja), conferida AGORA
+ * contra as lojas do alcance: cookie forjado ou velho cai na primeira opção
+ * permitida. Só filtra dentro do alcance; nunca concede (visao.ts).
+ */
+export async function visaoDaRequisicao(ctx: { parceiro: Pick<ParceiroFlow, 'id'>; alcance: Alcance }) {
+  const chave = ctx.alcance.lojas === 'todas' ? '*' : [...ctx.alcance.lojas].sort().join(',');
+  const lojas = await lojasDaRequisicao(ctx.parceiro.id, chave);
+  return { lojas, ...resolverVisao(ctx.parceiro.id, ctx.alcance, lojas, cookies().get(COOKIE_VISAO)?.value) };
 }

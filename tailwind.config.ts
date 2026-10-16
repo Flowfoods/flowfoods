@@ -1,5 +1,12 @@
 import type { Config } from 'tailwindcss';
 
+/**
+ * Cor semântica do shell do ERP: lê o token de `src/components/erp/tokens.css`
+ * (escopo `.ff-app`, claro/escuro). O valor depois da vírgula é o do tema
+ * escuro, para peça do ERP usada fora do shell (o /entrar continua escuro).
+ */
+const token = (nome: string, escuro: string) => `rgb(var(--ff-${nome}, ${escuro}) / <alpha-value>)`;
+
 const config: Config = {
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
@@ -36,6 +43,24 @@ const config: Config = {
 
         // Rodapé e painel privado
         footer: '#0A0A0A',
+
+        // Shell do ERP (/erp e /rodolfo): só tokens, nunca hex na classe.
+        fundo: token('fundo', '14 13 12'),
+        lateral: token('lateral', '10 10 10'),
+        painel: token('painel', '22 21 19'),
+        forte: token('forte', '31 29 27'),
+        campo: token('campo', '9 9 8'),
+        texto: token('texto', '245 240 235'),
+        suave: token('suave', '163 156 149'),
+        acao: token('acao', '196 21 34'),
+        'acao-hover': token('acao-hover', '214 26 39'),
+        acento: token('acento', '234 29 44'),
+        assinatura: token('marca', '242 50 63'),
+        erro: token('erro', '242 50 63'),
+        ok: token('ok', '74 222 128'),
+        atencao: token('atencao', '245 158 11'),
+        linha: 'var(--ff-linha, rgb(245 240 235 / 0.09))',
+        'linha-forte': 'var(--ff-linha-forte, rgb(245 240 235 / 0.18))',
       },
       fontFamily: {
         // Títulos em Gelasio, texto em Libre Franklin — o site inteiro e o portal.

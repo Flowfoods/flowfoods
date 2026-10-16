@@ -3,9 +3,9 @@
 import { useFormState, useFormStatus } from 'react-dom';
 import { acaoDefinirSenha, type EstadoSenha } from '../../actions';
 
-const ROTULO = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-surface/55';
+const ROTULO = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-suave';
 const CAMPO =
-  'w-full rounded-[7px] border border-white/[0.14] bg-black/50 px-3.5 py-3 text-[15px] text-surface outline-none transition placeholder:text-surface/25 focus:border-surface/50 aria-[invalid=true]:border-bright/70';
+  'w-full rounded-[7px] border border-linha-forte bg-campo px-3.5 py-3 text-[15px] text-texto outline-none transition placeholder:text-suave/70 focus:border-texto/50 aria-[invalid=true]:border-erro';
 
 function Botao({ texto }: { texto: string }) {
   const { pending } = useFormStatus();
@@ -13,7 +13,7 @@ function Botao({ texto }: { texto: string }) {
     <button
       type="submit"
       disabled={pending}
-      className="w-full rounded-[7px] bg-primary px-4 py-3 text-[15px] font-semibold text-white transition hover:bg-primary-dark disabled:cursor-wait disabled:opacity-60"
+      className="w-full rounded-[7px] bg-acao px-4 py-3 text-[15px] font-semibold text-white transition hover:bg-acao-hover disabled:cursor-wait disabled:opacity-60"
     >
       {pending ? 'Salvando…' : texto}
     </button>
@@ -41,7 +41,7 @@ export function FormSenha({ token, email, primeiraVez }: { token: string; email:
           aria-invalid={!!estado}
           aria-describedby="senha-dica"
         />
-        <p id="senha-dica" className="mt-1.5 text-[12px] text-surface/45">
+        <p id="senha-dica" className="mt-1.5 text-[12px] text-suave">
           Pelo menos 10 caracteres. Uma frase curta é fácil de lembrar.
         </p>
       </div>
@@ -60,7 +60,7 @@ export function FormSenha({ token, email, primeiraVez }: { token: string; email:
         />
       </div>
       {estado && (
-        <p role="alert" className="text-[13px] text-bright">
+        <p role="alert" className="text-[13px] text-erro">
           {estado.erro}
         </p>
       )}

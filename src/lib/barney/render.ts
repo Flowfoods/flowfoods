@@ -1,3 +1,4 @@
+// avoid-ai-design-ignore-file: CP3 — a seta está em comentário de código (exemplo de conversão), não em botão nem link.
 /**
  * Render das mensagens — porte de `gancho` / `dor` do `montar_pacote.py`,
  * com os textos de `references/mensagens.md` como fonte da verdade.

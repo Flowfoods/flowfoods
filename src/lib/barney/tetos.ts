@@ -11,6 +11,7 @@
  * silêncio que faz o Rodolfo desligar a trava.
  */
 
+import { situacaoDaInstancia } from '@/lib/whatsapp/situacao-da-instancia';
 import type { DateTime } from 'luxon';
 import {
   ENVIOS_MANUAIS_INICIAIS,
@@ -129,7 +130,7 @@ export function podeEnviar(estado: EstadoEnvio, agora: DateTime, opts: OpcoesEnv
   if (estado.estadoInstancia !== STOP_LOSS.estadoInstanciaExigido) {
     return negar(
       'INSTANCIA_FORA_DO_AR',
-      `Instância em "${estado.estadoInstancia}" (esperado "open"). Reconectar antes de retomar.`,
+      `WhatsApp ${situacaoDaInstancia(estado.estadoInstancia).texto.toLowerCase()}: precisa estar conectado. Reconectar antes de retomar.`,
     );
   }
 

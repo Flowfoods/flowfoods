@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3) e permissões (0.4)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -13,13 +13,14 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Contexto de tenant (sessão + parceiro + cliente) | `src/lib/erp/contexto.ts` (`exigirNivel1`, `exigirParceiro`) |
 | RLS no banco (papel `erp_tenant`) | migration `20261015020000_erp_multitenant` |
 | Milésimos e centavos (texto → inteiro, arredondamento) | `src/lib/erp/unidades.ts` |
-| Regras de cadastro | `insumos.ts`, `parceiros.ts` (N1), `estrutura.ts` (lojas e marcas), `historico.ts`, `slug.ts` |
-| Telas | `/rodolfo/erp` (N1: parceiros + novo) e `/rodolfo/erp/<slug>` com abas Insumos · Lojas e marcas (`/estrutura`) · Acessos (`/acessos`) · Histórico (`/historico`) · Cadastro (`/cadastro`) |
+| Regras de cadastro | `insumos.ts` + `variantes.ts` (com banco) e `insumo-campos.ts` (puro), `parceiros.ts` (N1), `estrutura.ts` (lojas e marcas), `historico.ts`, `slug.ts` |
+| Telas | `/rodolfo/erp` (N1: parceiros + novo) e `/rodolfo/erp/<slug>` (hub do parceiro) com `/insumos` · `/lojas` (era `/estrutura`) · `/equipe` (era `/acessos`) · `/historico` · `/cadastro` — os nomes velhos redirecionam |
 | Login das pessoas dos parceiros (0.3) | `UsuarioErp` e companhia (bloco "acesso das pessoas" do esquema) + migration `20261015030000_erp_login` |
 | Acesso ao banco das credenciais (único módulo) | `src/lib/erp/credenciais.ts` (regras puras em `acesso.ts`; rosto em `rosto.ts`; cookie em `sessao.ts`/`sessao-cookie.ts`) |
-| Telas da pessoa do parceiro | `/entrar` (e-mail e senha, entrar com o rosto), `/entrar/primeiro-acesso/<token>`, `/entrar/escolher`, `/erp` (Insumos), `/erp/lojas`, `/erp/equipe`, `/erp/historico` e `/erp/acesso` (Seu acesso: o que a pessoa pode, rosto) — cada aba só aparece para quem pode |
+| Telas da pessoa do parceiro | `/entrar` (e-mail e senha, entrar com o rosto), `/entrar/primeiro-acesso/<token>`, `/entrar/escolher`, `/erp` (hub Módulos da Rede), `/erp/insumos`, `/erp/lojas`, `/erp/equipe`, `/erp/historico` e `/erp/acesso` (Seu acesso: o que a pessoa pode, rosto) — cada aba só aparece para quem pode |
 | Permissões (0.4): catálogo, perfis base, resolução, checagem única, sem escalada | `src/lib/erp/permissoes.ts` (puro) + `equipe.ts` (formulários e retrato do histórico, puro); banco em `credenciais.ts`; migrations `20261015040000_erp_permissoes` e `20261016000000_erp_revogar_meios_de_entrada` |
-| Tela de Equipe (a MESMA no nível 1 e no parceiro) | `src/app/rodolfo/erp/equipe/*` (`TelaEquipe`), usada em `/rodolfo/erp/<slug>/acessos` e `/erp/equipe`; telas compartilhadas `tela-estrutura.tsx`, `tela-historico.tsx`, `tela-insumos.tsx` |
+| Telas compartilhadas (as MESMAS no nível 1 e no parceiro) | `src/components/erp/telas/*`: `equipe/` (`TelaEquipe`), `estrutura/`, `historico/`, `insumos/`, `hub-do-parceiro.tsx` |
+| Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
 ## O que a 0.2 entregou (multi-tenant)
 
@@ -190,6 +191,154 @@ no padrão condicional da 0.2) e o histórico das mudanças no tenant do parceir
    recomeça; o por IP segue). Vínculos que já existiam viram Gerente com rede
    inteira (sem ganhar "cuidar da equipe").
 
+## O que a 1.1 entregou — shell único e design system (Cartão A)
+
+1. **Um shell só para `/erp` e `/rodolfo`** (`AppShell`). Menu LATERAL fixo
+   no desktop (≥ 900 px), recolhível (cookie `ff_menu`); abaixo de 900 px vira
+   gaveta à esquerda (botão Menu, `<dialog>` nativo: Escape, fundo inerte,
+   foco volta ao botão). No topo do menu, o **seletor de módulo**; embaixo, os
+   grupos do módulo (abrem e fecham), item ativo com `aria-current` e o
+   indicador vermelho de 2 px; a fase no rodapé. **Barra superior**: trilha,
+   seletor de visão, busca ⌘K, sino e menu do usuário (nome, papel, iniciais,
+   tema, Sair). As sessões continuam separadas: cada layout resolve a SUA e
+   entrega dados prontos; o shell não decide nada.
+2. **Hub de módulos** como entrada: `/erp` ("Módulos da Rede"),
+   `/rodolfo` ("Módulos da FlowFoods") e `/rodolfo/erp/<slug>` (o hub do
+   parceiro visto pelo N1). Grade 4/3/2 colunas; card = quadrado do ícone na
+   cor do módulo + nome + subtítulo. Módulos do plano sem tela (Ficha 1.2,
+   Compras 1.5, Estoque 1.6, Faturamento e DRE 2.1, Produção 3.1, Etiquetas
+   3.4) aparecem desabilitados com a fase, SÓ para quem vai poder vê-los, e
+   nunca com link. `modulosDoParceiro(alcance)` filtra pela mesma regra de
+   `pode` (0.4); quem abre tela fora do acesso volta para o hub com aviso.
+3. **Barney antigo dentro do shell** (Regra Nº 2): grupo de rota
+   `src/app/rodolfo/(painel)` para Hoje (agora `/rodolfo/hoje`), Leads,
+   Cadência (`/rodolfo/barney`), Inbox, Visitas, Métricas, Portal do cliente,
+   Config e Parceiros Flow; `(acesso)` para login e definição de senha, FORA
+   do shell. Lógica intacta; casca reconstruída com o design system.
+   Descartados sem shim: `rodolfo/ui.tsx`, `rodolfo/botoes.tsx`,
+   `logout-button.tsx`, `rodolfo/erp/{ui,campos,abas}.tsx`, `erp/abas.tsx`,
+   `entrar/marca.tsx`, a métrica "Por unidade kg · L · un" e a cópia de
+   rótulo/campo/botão dentro do formulário de insumo.
+4. **Design system** em `src/components/erp/ui`: `Painel`, `Metrica`,
+   `Numero`, `Selo`, `Ponto`, `Vazio`, `Aviso`, `Barra`, `Linha`, `Citacao`,
+   `PageHeader`/`IconeDoModulo`, `HubDeModulos`, `FiltroEmLinks`,
+   `BuscaEmFormulario`, `Segmentos`, `Dialogo`, `Marca`, botões
+   (`classeDeBotao`, `BotaoEnviar`, `BotaoAcao`) e campos (`ROTULO`, `CAMPO`,
+   `Erro`, `Resultado`). Kit Kairu Dark "pulso" na geometria (menu de altura
+   total, indicador de 2 px, cards 14 px, botões 7 px, foco 3 px, 160/220 ms,
+   gaveta < 900 px, sheet < 600 px) e Corporativo nas tabelas (linha 44 px,
+   cabeçalho em `forte`, números tabulares à direita); cor e tipo FlowFoods.
+5. **Tema claro e escuro, escolhido pela pessoa** (Claro / Escuro / Do
+   aparelho) no menu do usuário: cookie `ff_tema` lido NO SERVIDOR pelos
+   layouts do shell (`data-tema` no wrapper `.ff-app`); "Do aparelho" resolve
+   no CSS. Zero JS para pintar, zero flash. O layout raiz não lê o cookie: o
+   `/` continua estático (○ no build). `/entrar` e `/portal` não mudaram.
+6. **Visão "Rede Completa ↔ loja"** (cookie `ff_visao` =
+   `<parceiroId>:<rede|lojaId>`): opções = lojas que o alcance já alcança;
+   conferida no servidor a cada requisição (`visaoDaRequisicao`); valor
+   forjado, de outro parceiro ou de loja fora do alcance cai na primeira
+   opção. A action recusa loja fora do alcance sem gravar nada. N3 não vê
+   "Rede Completa". Nunca concede: a checagem continua `exigirPermissao`.
+   Insumo é cadastro da rede: com loja escolhida, a tela diz "Loja X ·
+   cadastro da rede: N insumos" em vez de fingir que filtrou.
+7. **Busca ⌘K** (Ctrl+K ou "/"): telas permitidas (a mesma lista do menu),
+   parceiros (N1) e insumos do parceiro atual por nome — no servidor, com
+   "ver insumos" conferido (`acaoBuscarNoErp`, `acaoBuscarNoParceiro`).
+8. **Notificações honestas**: parceiro não tem fonte ainda → sino sem ponto,
+   "Nada novo por aqui."; N1 mostra só "respostas sem classificar" (a mesma
+   contagem de Hoje). Nenhum número inventado.
+9. Telas do N1 conferem a sessão na página (`exigirNivel1`) além do
+   middleware; o layout não substitui a checagem.
+
+## Provar o shell (1.1)
+
+```bash
+npx vitest run tests/erp-shell.test.ts   # módulos por perfil, visão, tema, rotas, guarda
+npm run build                            # "/" tem de sair ○ (estático)
+```
+Na tela: entrar como Dono e como Operador do mesmo parceiro e comparar o
+menu e o hub; abrir `/erp/equipe` como Operador (volta ao hub com aviso);
+trocar o tema no menu do usuário e recarregar com JS desligado.
+
+## O que a 1.1 entregou — cadastro de insumos (Cartão B)
+
+Sem migration: o esquema da 0.1 já tinha `InsumoVariante`, `tipo`,
+`conservacao`, `taxaEntregaCentavos` e `ativo`.
+
+1. **Embalagem digitada como se compra.** "Quanto vem" em kg ou g, L ou ml
+   (un é un); o servidor converte para milésimos da unidade base
+   (`lerQuantidadeNa`: em g/ml só inteiro, 1 g é o menor passo). Preço e frete
+   em centavos, lidos do texto no servidor.
+2. **Custo de referência EXATO = (preço + frete) ÷ conteúdo**, guardado como
+   fração inteira reduzida (`CustoExato { centavos, milesimos }`, em
+   `custoDaEmbalagem`): nada se arredonda antes de usar. A ficha técnica (1.3)
+   usa `custoDaQuantidade(custo, quantidadeMilesimos)`, UM arredondamento
+   (metade para cima) no fim: 180 g a R$ 94,90 por 5 kg = 342 centavos; 30
+   guardanapos a R$ 4,00 o milheiro = 12 centavos. Comparar e ordenar é por
+   multiplicação cruzada exata (`compararCustos`, BigInt por dentro). A tela
+   mostra duas casas a partir de 1 centavo e, abaixo disso, as casas que
+   precisar ("R$ 0,004/un", nunca "R$ 0,00"); em un, a conta ainda diz o
+   milheiro. A conta por extenso é a mesma na prévia, na lista, no detalhe e
+   no histórico: "R$ 89,90 + R$ 5,00 frete ÷ 5 kg = R$ 18,98/kg" /
+   "R$ 4,00 ÷ 1.000 un = R$ 0,004/un (R$ 4,00 o milheiro)". Frete é **por
+   embalagem**. Custo pelas compras reais (último preço) continua sendo a 1.5.
+3. **"Ainda não sei o preço"** grava 0 e a tela diz **"Sem preço"** (custo
+   incompleto, nunca R$ 0,00), com filtro próprio; na ordem por custo fica
+   sempre no fim. Preço 0 digitado sem marcar é recusado.
+4. **Outras embalagens de compra** (`InsumoVariante`, na tela "Embalagem"):
+   caixa, fardo, outra marca — nome único por insumo, conteúdo na unidade do
+   insumo, preço, frete, código de barras opcional, desativar. O detalhe diz
+   em texto qual sai mais barata e por quanto. A do insumo é a padrão.
+5. **Editar com controle de concorrência.** Insumo: `updateMany` condicional ao
+   `atualizadoEm` lido; embalagem (sem `atualizadoEm`): condicional aos valores
+   lidos (impressão na tela + os mesmos valores no `where`). Duas abas: a
+   segunda recebe "Alguém alterou… Recarregue" e nada é sobrescrito.
+6. **Unidade travada** quando o insumo tem outra embalagem ou qualquer uso
+   (ficha, nota, saldo, movimento, contagem, requisição, produção, etiqueta,
+   ficha que o produz), conferido com a linha travada na transação; a
+   embalagem nova trava o insumo em FOR SHARE.
+7. **Desativar/reativar** com motivo opcional (não apaga: há FK de uso). Sai
+   da lista padrão (filtro "Desativados"/"Todos"); nome repetido
+   de um desativado oferece abrir e reativar.
+8. **Histórico** na MESMA transação de toda gravação, só com o que mudou:
+   tipo, conservação, embalagem ("5 kg"), preço ("Sem preço"), frete ("Sem
+   frete"), custo por unidade (a fração exata do momento, não um centavo
+   arredondado), situação, código de barras; cada
+   linha diz de quem é ("Cebola · Caixa 10 kg"). Campos na ordem da tela (o
+   jsonb não guarda ordem). O filtro "Insumos" do histórico inclui as
+   embalagens; o detalhe mostra as últimas 10 alterações do insumo e das
+   embalagens dele.
+9. **Telas** (as MESMAS no N1 e no parceiro, em
+   `src/components/erp/telas/insumos/`): lista densa (kit Corporativo) com
+   cabeçalho "Rede Completa · N insumos" + "Novo insumo", busca e filtros
+   (tipo, conservação, situação, só sem preço) na URL, ordenar por nome ou
+   custo (`aria-sort`), 50 por página com total, cartões no celular; novo,
+   editar e embalagem em **tela própria** (no celular, tela cheia); detalhe
+   com a conta, as embalagens, situação e alterações; voltar preserva os
+   filtros (`?de=`). Resumo de erros quando há mais de um; aviso ao sair com
+   o formulário alterado. Menu ganha "Novo insumo" (só com "cadastrar e
+   editar insumos"); a busca ⌘K abre o detalhe.
+10. **Permissões e tenant.** Páginas: `exigirPermissaoNaPagina(ctx,
+    'insumos.ver' | 'insumos.editar')` (N1: `exigirPermissao`); actions finas
+    (`src/app/erp/insumos/actions.ts` e
+    `src/app/rodolfo/(painel)/erp/[slug]/insumos/actions.ts`): contexto →
+    `recusaDaAcao(ctx, 'insumos.editar')` → bloqueio → lib. Quem só vê não
+    tem botão nenhum; parceiro suspenso vê os botões desabilitados com o
+    motivo, e o portão recusa a escrita do mesmo jeito. Id de outro parceiro na
+    URL é 404 (lido pelo portão). Saíram a tela/form da 0.2 e as actions
+    `acaoCadastrarInsumoDaSessao`/`acaoCadastrarInsumo` velhas.
+
+## Provar os insumos (1.1)
+
+```bash
+npx vitest run tests/erp-insumos.test.ts       # conversão, custo com frete, Sem preço, formulário, histórico
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_shell npx vitest run tests/erp-insumos.db.test.ts
+npm run erp:seed-teste                          # Casa Alfa ganha frete, g/ml, embalagens, Sem preço e desativado
+```
+Na tela: a dona cadastra um insumo com frete, duas embalagens (uma em g),
+edita, desativa e vê em Histórico › Insumos; o operador vê lista e detalhe sem
+botão nenhum e, abrindo `/erp/insumos/novo`, volta ao hub com aviso.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -296,7 +445,7 @@ custo médio sai da divisão (em `unidades.ts`). Nada acumulado é gravado
 # Postgres local com DATABASE_URL apontando para localhost no .env
 npx prisma migrate deploy
 npm run erp:seed-teste        # Casa Alfa e Beta (ativas) e Gama (suspensa), com lojas, marcas, insumos
-npm run build && npm start    # entre em /rodolfo/login → menu ERP
+npm run build && npm start    # entre em /rodolfo/login → hub → Parceiros Flow
 ```
 
 ## Provar o isolamento
@@ -415,3 +564,42 @@ banco de teste: o operador é recusado pelo servidor.
 - `abrirSessao` com timeout 10 s < 15 s de `naEquipe`: login atrás de mudança longa de equipe pode virar erro 500.
 - Remover um rosto não derruba sessões abertas por ele (a sessão não guarda o aparelho).
 - Dono de A ainda muda perfil/desativa a pessoa em A depois que ela entra em B (afeta só A).
+
+## Herança da 1.1 · shell (para as próximas subfases)
+
+- Sino do parceiro sem fonte: quando houver (requisição, contagem, nota), a
+  contagem real entra em `notificacoes` do layout do /erp.
+- Visão por loja ainda não filtra nada (só insumos existem, e são da rede):
+  estoque, compras e faturamento (1.5+) leem `visaoDaRequisicao`.
+- Página do N1 dentro de parceiro usa `exigirPermissao` (lança erro); o /erp
+  usa `exigirPermissaoNaPagina` (volta ao hub). N1 tem tudo, então não
+  aparece; se um dia houver papel restrito no N1, trocar.
+
+## Herança da 1.1 · insumos (para as próximas subfases)
+
+- Fornecedor padrão do insumo e por embalagem: 1.5 (não há cadastro de
+  fornecedor antes; nenhum select vazio na tela).
+- "Tornar padrão" uma embalagem (trocar a do insumo pela de uma variante).
+- Estoque mínimo (rede × loja): 1.6/3.2. Validades por conservação: 1.4.
+- Importar insumos por planilha: 1.2, junto com a planilha de ficha (mesmo
+  parser, prévia e confirmação); `origem` já existe.
+- Preço 0 é a sentinela de "Sem preço". Se aparecer item de fato gratuito,
+  migrar para `precoEmbalagemCentavos` nulo.
+- Ordenar por custo é feito em memória (o custo é derivado, nunca gravado):
+  serve a centenas de insumos; com milhares, levar a comparação exata para o
+  SQL (`cliente.sql`, numeric).
+- Ficha técnica (1.3): custo do item = `custoDaQuantidade(custo, quantidade)`
+  — nunca multiplicar o custo/unidade arredondado da tela.
+- Nome único é sensível a maiúscula ("Cebola" ≠ "cebola"), como na 0.2.
+- O aviso de sair com alterações pega fechar/recarregar, não a navegação
+  interna do Next (link do menu).
+
+## Herança da 1.1 (apontada pelos fiscais)
+
+- `custoDaQuantidade` devolve Number de BigInt: antes da 1.3 usar, recusar acima de 2^53 ou devolver BigInt.
+- Casos irreais de custo minúsculo: milheiro "R$ 0,00" e rótulo "menos de R$ 0,000001" citando casa errada.
+- Ordenar por custo carrega todos os insumos do parceiro (0,8 s com 5 mil): levar para SQL quando crescer.
+- Aviso de sair sem salvar não pega navegação pelo menu; nome do insumo diferencia maiúscula.
+- Texto da comparação: "por unidade" e "embalagem padrão" leem melhor.
+- `/portal/<token>`: erro de hydration antigo (React #418, `Portal.tsx` lê `window` no render).
+- `npm audit`: next 14.2.35 (crítico) e prisma (alto) antigos — planejar atualização.

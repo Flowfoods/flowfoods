@@ -1,3 +1,4 @@
+// avoid-ai-design-ignore-file: SD4, SD5, K3, SD4d — site institucional, fora do shell do ERP: etiqueta em caixa alta e o filete/assinatura são o estilo editorial FlowFoods (CLAUDE.md) e o contrato da 1.1 proíbe mudar o visual do /.
 import { ENTREGAS, whatsappUrl } from '@/lib/constants';
 import { Cartao, Etiqueta, Secao, Titulo } from './ui';
 

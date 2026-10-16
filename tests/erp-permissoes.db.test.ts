@@ -17,6 +17,15 @@ import type { ContextoDaPessoa } from '@/lib/erp/contexto-base';
 // apontado para o banco de teste: o que a action decide é o que vale.
 const atual = vi.hoisted(() => ({ ctx: null as null | (() => unknown) }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
+// Sucesso das actions de insumo termina num redirect para o detalhe.
+vi.mock('next/navigation', () => ({
+  redirect: (url: string) => {
+    throw Object.assign(new Error(`REDIRECT ${url}`), { url });
+  },
+  notFound: () => {
+    throw new Error('NOT_FOUND');
+  },
+}));
 // Cookie, cabeçalhos e endereço do site são do Next (fora de requisição não existem).
 vi.mock('@/lib/erp/sessao', () => ({
   aparelhoAtual: () => 'Teste',
@@ -69,7 +78,8 @@ import { cadastrarInsumo } from '@/lib/erp/insumos';
 import { criarParceiro } from '@/lib/erp/parceiros';
 import { ALCANCE_FLOWFOODS, pode, recusa, TODAS_AS_PERMISSOES, PERFIS_BASE } from '@/lib/erp/permissoes';
 import { doParceiro } from '@/lib/erp/tenant';
-import { acaoCadastrarInsumoDaSessao, acaoCadastrarLojaDaSessao } from '@/app/erp/actions';
+import { acaoCadastrarLojaDaSessao } from '@/app/erp/actions';
+import { acaoCadastrarInsumo as acaoCadastrarInsumoDaSessao } from '@/app/erp/insumos/actions';
 import { acaoCriarPessoa } from '@/app/erp/equipe/actions';
 import { configDoRosto } from '@/lib/erp/rosto';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
@@ -237,11 +247,9 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     expect(await doParceiro(A, db).loja.count()).toBe(2);
 
     atual.ctx = () => ctxDe(dono.s);
-    const ok = await acaoCadastrarInsumoDaSessao(
-      null,
-      form({ nome: 'Pelo dono', unidade: 'KG', conteudo: '1', preco: '1,00' }),
-    );
-    expect(ok?.ok).toBe(true);
+    await expect(
+      acaoCadastrarInsumoDaSessao(null, form({ nome: 'Pelo dono', unidade: 'KG', conteudo: '1', preco: '1,00' })),
+    ).rejects.toThrow(/^REDIRECT \/erp\/insumos\/\w+\?feito=criado$/);
     expect(await doParceiro(A, db).insumo.count()).toBe(antes + 1);
   });
 

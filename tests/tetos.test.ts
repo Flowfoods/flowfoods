@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DateTime } from 'luxon';
 import { podeEnviar, sortearIntervaloSegundos, tetoDiarioVigente } from '@/lib/barney/tetos';
+import { situacaoDaInstancia } from '@/lib/whatsapp/situacao-da-instancia';
 import type { EstadoEnvio } from '@/lib/barney/tetos';
 import { INTERVALO_MIN_S, MAX_POR_DIA, MAX_POR_HORA, TIMEZONE } from '@/lib/barney/regras';
 
@@ -222,5 +223,16 @@ describe('janela', () => {
 
   it('libera às 10h em ponto — a janela abre', () => {
     expect(podeEnviar(estado(), TERCA_14H.set({ hour: 10, minute: 0 })).permitido).toBe(true);
+  });
+});
+
+
+describe('estado da instância em palavra de gente (fiscal UX: "close" cru na tela)', () => {
+  it('open/connecting/close e desconhecido', () => {
+    expect(situacaoDaInstancia('open')).toEqual({ texto: 'Conectado', tom: 'ok' });
+    expect(situacaoDaInstancia('connecting')).toEqual({ texto: 'Conectando', tom: 'alerta' });
+    expect(situacaoDaInstancia('close')).toEqual({ texto: 'Desconectado', tom: 'erro' });
+    expect(situacaoDaInstancia(undefined).texto).toBe('Desconectado');
+    expect(situacaoDaInstancia('refused').texto).toBe('Sem resposta da Evolution');
   });
 });
