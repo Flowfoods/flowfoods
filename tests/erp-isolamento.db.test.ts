@@ -171,8 +171,14 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
     const base = {
       parceiroId: A.id, lojaId: loja.id, insumoId: insumoDeA, insumoNomeSnapshot: 'Cebola roxa', unidadeSnapshot: 'KG' as const,
     };
+    // 1.6: entrada de compra sem a nota é recusada (CHECK do documento pelo tipo); o ajuste é ±.
+    await expect(
+      a.movimentoEstoque.create({
+        data: { ...base, tipo: 'ENTRADA_COMPRA', quantidadeMilesimos: 20000, valorCentavos: 7990, saldoAntesMilesimos: 0, saldoDepoisMilesimos: 20000 },
+      }),
+    ).rejects.toThrow();
     const mov = await a.movimentoEstoque.create({
-      data: { ...base, tipo: 'ENTRADA_COMPRA', quantidadeMilesimos: 20000, valorCentavos: 7990, saldoAntesMilesimos: 0, saldoDepoisMilesimos: 20000 },
+      data: { ...base, tipo: 'AJUSTE', quantidadeMilesimos: 20000, valorCentavos: 7990, saldoAntesMilesimos: 0, saldoDepoisMilesimos: 20000 },
     });
     // Conta que não fecha.
     await expect(
