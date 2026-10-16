@@ -695,3 +695,15 @@ isso só o nível 1 gera, ou o administrador de um parceiro onde a pessoa está
 sozinha (sem vínculo em outro, ativo ou não). "Só redefinir e avisar" não
 serve: ainda não há canal de aviso (0.5). E-mail travado pelo limite: o nível
 1 libera (grava uma "tentativa ok" marcada; o limite por IP segue).
+
+**Revisão (Guardião, volta 1):** a regra só valia na geração do link. Sequência
+provada: o dono de A gera link para quem só está em A; o nível 1 põe essa
+pessoa em B; o link de A seguia valendo e entregava B. Agora: (1) o link
+guarda quem gerou (`doNivel1`) e o de parceiro é reconferido no uso, dentro da
+transação, sob `pg_advisory_xact_lock` da pessoa (a mesma trava de criar
+vínculo e gerar link); (2) vínculo novo revoga links pendentes da pessoa; (3)
+senha criada por link de parceiro fica marcada com o parceiro e não atravessa:
+ao ganhar outro parceiro ela é apagada, as sessões caem e o nível 1 manda
+link novo (custo: a pessoa cria senha de novo uma vez). Só o nível 1 vincula
+e-mail de outro parceiro; para a pessoa do parceiro a recusa é neutra (não
+revela que o e-mail existe). As funções de equipe releem o ator no banco.

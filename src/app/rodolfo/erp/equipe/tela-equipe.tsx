@@ -298,11 +298,14 @@ export function TelaEquipe({
                         </dl>
                         {mexe ? (
                           <AcoesDaPessoa
+                            nome={a.nome}
                             status={a.status}
                             formulario={
                               <FormPessoa
                                 acao={acoes.atualizar.bind(null, a.acessoId)}
                                 modo="editar"
+                                nome={a.nome}
+                                cuidavaDaEquipe={a.alcance.permissoes.has('acessos.gerir')}
                                 idBase={`editar-${a.acessoId}`}
                                 perfis={opcoesDePerfil}
                                 lojas={lojas}
@@ -434,6 +437,7 @@ export function TelaEquipe({
                       <Expansivel rotulo="Editar perfil">
                         <FormPerfil
                           acao={acoes.salvarPerfil}
+                          pessoas={p.pessoas}
                           excluir={acoes.excluirPerfil.bind(null, p.id)}
                           idBase={`perfil-${p.id}`}
                           concediveis={concediveis}

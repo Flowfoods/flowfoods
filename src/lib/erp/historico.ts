@@ -32,6 +32,7 @@ const ACAO: Record<string, string> = {
   REMOVEU_ROSTO: 'Tirou o rosto do',
   EXCLUIU: 'Excluiu',
   LIBEROU_ENTRADA: 'Liberou a entrada do',
+  PEDIU_SENHA_NOVA: 'Pediu senha nova no',
 };
 
 const CAMPO: Record<string, string> = {

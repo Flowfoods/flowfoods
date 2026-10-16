@@ -6,11 +6,11 @@
  * para quais setores ele foi pensado (vira sugestão no cadastro da pessoa).
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { LISTA_DE_SETORES, ORDEM_DOS_PERFIS_BASE, PERFIS_BASE, SETORES, type PerfilBase } from '@/lib/erp/permissoes';
 import { CAMPO, Enviar, Erro, ROTULO, Resultado } from '../campos';
-import { Etiqueta, GradeDePermissoes } from './escolhas';
+import { Confirmacao, Etiqueta, GradeDePermissoes } from './escolhas';
 import type { AcaoDeEquipe, EstadoEquipe } from './estado';
 
 export interface ValoresDoPerfil {
@@ -42,9 +42,12 @@ export function FormPerfil({
   idBase,
   concediveis,
   inicial,
+  pessoas = 0,
 }: {
   acao: AcaoDeEquipe;
   excluir?: AcaoDeEquipe;
+  /** Quantas pessoas usam o perfil: salvar muda o acesso delas na hora (pede confirmação). */
+  pessoas?: number;
   idBase: string;
   concediveis: string[];
   inicial?: ValoresDoPerfil;
@@ -57,8 +60,14 @@ export function FormPerfil({
   const [saiu, pedirExcluir] = useFormState<EstadoEquipe, FormData>(excluir ?? sem, null);
   const [v, setV] = useState<ValoresDoPerfil>(inicial ?? vazio);
   const [chave, setChave] = useState(0);
+  const [pedindo, setPedindo] = useState(false);
+  const confirmado = useRef(false);
+  const formulario = useRef<HTMLFormElement>(null);
+  const avisar = !novo && pessoas > 0;
 
   useEffect(() => {
+    confirmado.current = false;
+    setPedindo(false);
     if (estado?.ok && novo) {
       setV(vazio);
       setChave((c) => c + 1);
@@ -75,7 +84,19 @@ export function FormPerfil({
 
   return (
     <div className="space-y-3">
-      <form key={chave} action={enviar} noValidate className="space-y-5">
+      <form
+        key={chave}
+        ref={formulario}
+        action={enviar}
+        noValidate
+        className="space-y-5"
+        onSubmit={(e) => {
+          if (avisar && !confirmado.current) {
+            e.preventDefault();
+            setPedindo(true);
+          }
+        }}
+      >
         {inicial?.id && <input type="hidden" name="id" value={inicial.id} />}
         <div>
           <label htmlFor={id('nome')} className={ROTULO}>
@@ -162,6 +183,19 @@ export function FormPerfil({
           </p>
         </fieldset>
 
+        {pedindo && avisar && (
+          <Confirmacao
+            titulo={`Muda o acesso de ${pessoas === 1 ? '1 pessoa' : `${pessoas} pessoas`} agora.`}
+            detalhe="Quem usa este perfil passa a poder exatamente o que está marcado, já na próxima tela."
+            confirmar="Salvar perfil"
+            onConfirmar={() => {
+              confirmado.current = true;
+              setPedindo(false);
+              formulario.current?.requestSubmit();
+            }}
+            onCancelar={() => setPedindo(false)}
+          />
+        )}
         <div className="space-y-2">
           <Enviar pendente="Salvando…" className="w-full">
             {novo ? 'Criar perfil' : 'Salvar perfil'}

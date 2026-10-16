@@ -1536,6 +1536,11 @@ model UsuarioErp {
   senhaDefinidaEm DateTime?
   ultimoLogin     DateTime?
   criadoEm        DateTime  @default(now())
+  // 0.4: a senha atual foi criada por link gerado por quem cuida da equipe
+  // DESTE parceiro (não pelo nível 1). Se a pessoa ganhar vínculo em outro
+  // parceiro, essa senha não atravessa: é apagada e o nível 1 gera link novo
+  // (decisão 41). Nulo = senha do nível 1 (ou ainda sem senha).
+  senhaPorLinkDoParceiroId String?
 
   acessos  AcessoParceiro[]
   convites ConviteAcesso[]
@@ -1644,6 +1649,10 @@ model ConviteAcesso {
   usadoEm    DateTime?
   revogadoEm DateTime?
   criadoEm   DateTime     @default(now())
+  // 0.4: gerado pelo nível 1 (true) ou por quem cuida da equipe do parceiro
+  // (false). Link do parceiro só vale, NA HORA DO USO, se a pessoa não tiver
+  // vínculo em nenhum outro parceiro (decisão 41).
+  doNivel1   Boolean
 
   @@index([usuarioId, criadoEm])
 }

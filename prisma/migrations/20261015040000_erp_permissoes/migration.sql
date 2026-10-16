@@ -2,8 +2,9 @@
 -- ajuste por pessoa, setores e lojas de cada pessoa.
 --
 -- Só ADITIVA: 2 enums, 1 tabela nova, 7 colunas novas no vínculo
--- (`AcessoParceiro`), índices, FKs e CHECKs. Nada existente muda de tipo nem
--- some. Os vínculos que já existem (0.3) recebem o perfil base GERENTE com a
+-- (`AcessoParceiro`), 1 no link (`ConviteAcesso.doNivel1`), 1 na pessoa
+-- (`UsuarioErp.senhaPorLinkDoParceiroId`), índices, FKs e CHECKs. Nada
+-- existente muda de tipo nem some. Os vínculos que já existem (0.3) recebem o perfil base GERENTE com a
 -- rede inteira: continuam fazendo o que já faziam (ver e cadastrar insumo), sem
 -- ganhar "cuidar da equipe" — quem vira dono é decisão do nível 1 (decisão 40).
 --
@@ -65,6 +66,12 @@ ALTER TABLE "PerfilAcesso" ADD CONSTRAINT "PerfilAcesso_parceiroId_fkey" FOREIGN
 
 -- Vínculos que já existiam: gerente, rede inteira (o que já podiam, sem cuidar da equipe).
 UPDATE "AcessoParceiro" SET "perfilBase" = 'GERENTE' WHERE "perfilBase" IS NULL AND "perfilId" IS NULL;
+
+-- Link de senha: quem gerou (decisão 41). Os da 0.3 eram todos do nível 1.
+ALTER TABLE "ConviteAcesso" ADD COLUMN "doNivel1" BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE "ConviteAcesso" ALTER COLUMN "doNivel1" DROP DEFAULT;
+-- Senha criada por link de administrador de parceiro não atravessa parceiros.
+ALTER TABLE "UsuarioErp" ADD COLUMN "senhaPorLinkDoParceiroId" TEXT;
 
 -- Regras que o banco também segura.
 -- Um perfil só: base OU próprio.

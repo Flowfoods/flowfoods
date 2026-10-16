@@ -158,3 +158,50 @@ export function GradeDePermissoes({
     </div>
   );
 }
+
+/**
+ * Segundo passo, na própria tela (não `window.confirm`), para o que tira
+ * acesso de alguém. O botão de confirmar é o único vermelho da caixa.
+ */
+export function Confirmacao({
+  titulo,
+  detalhe,
+  confirmar,
+  onConfirmar,
+  onCancelar,
+  tipoConfirmar = 'button',
+}: {
+  titulo: string;
+  detalhe?: string;
+  confirmar: string;
+  onConfirmar?: () => void;
+  onCancelar: () => void;
+  /** 'submit': o botão envia o formulário em volta (ex.: Desativar). */
+  tipoConfirmar?: 'button' | 'submit';
+}) {
+  return (
+    <div role="alertdialog" aria-label={titulo} className="space-y-3 rounded-[11px] border border-white/[0.16] bg-black/50 p-4">
+      <div>
+        <p className="text-[14px] font-semibold text-surface">{titulo}</p>
+        {detalhe && <p className="mt-1 text-[13px] leading-relaxed text-surface/60">{detalhe}</p>}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type={tipoConfirmar}
+          onClick={onConfirmar}
+          autoFocus
+          className="whitespace-nowrap rounded-[7px] bg-primary px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-primary-dark"
+        >
+          {confirmar}
+        </button>
+        <button
+          type="button"
+          onClick={onCancelar}
+          className="whitespace-nowrap rounded-[7px] border border-white/[0.14] px-4 py-2 text-[13px] font-medium text-surface/80 transition hover:border-surface/40 hover:text-surface"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}

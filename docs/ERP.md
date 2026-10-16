@@ -162,7 +162,20 @@ no padrão condicional da 0.2) e o histórico das mudanças no tenant do parceir
    parceiro SÓ da sessão e precisa de vínculo ATIVO nele (sessão adulterada no
    banco morre; teste). **Link de senha** sai do nível 1, ou de quem cuida da
    equipe só se a pessoa não tem vínculo em outro parceiro (a senha vale em
-   todos) — decisão 41. **Liberar tentativas** pelo nível 1 (botão na linha da
+   todos) — decisão 41. **Revisão (Guardião):** o link guarda quem gerou
+   (`ConviteAcesso.doNivel1`); link de parceiro é reconferido NA HORA DO USO
+   (sob trava da pessoa) e morre quando a pessoa ganha vínculo em mais um
+   parceiro (todo vínculo novo revoga links pendentes); senha criada por link
+   de parceiro fica marcada (`UsuarioErp.senhaPorLinkDoParceiroId`) e, se a
+   pessoa ganhar outro parceiro, é apagada (sessões caem) e o nível 1 manda
+   link novo. Só o nível 1 vincula e-mail que já está em outro parceiro (a
+   pessoa do parceiro recebe frase neutra; o nível 1 é avisado quando o e-mail
+   já tem senha). As funções de equipe conferem o ator NO BANCO (vínculo deste
+   parceiro, ativo, parceiro ativo, "cuidar da equipe"), não só a action.
+   Perfil próprio só muda se quem edita cobre cada pessoa que usa o perfil,
+   antes e depois. Na tela: desativar, tirar "cuidar da equipe" e salvar perfil
+   em uso pedem confirmação na própria tela. A lista do nível 1 marca parceiro
+   com pessoas ativas e ninguém cuidando da equipe. **Liberar tentativas** pelo nível 1 (botão na linha da
    pessoa bloqueada; grava "tentativa ok" marcada, o contador por e-mail
    recomeça; o por IP segue). Vínculos que já existiam viram Gerente com rede
    inteira (sem ganhar "cuidar da equipe").

@@ -97,8 +97,11 @@ const ENTIDADE = 'AcessoParceiro';
 // =========================================================== equipe (0.3/0.4)
 //
 // Quem mexe: o nível 1 (FlowFoods, `atorNivel1`) ou uma pessoa do parceiro com
-// "cuidar da equipe" (`acessos.gerir`, conferido pela action com
-// `exigirPermissao`). Aqui dentro, sempre:
+// "cuidar da equipe" (`acessos.gerir`). A action confere com
+// `exigirPermissao`, e AQUI DENTRO de novo, na transação (`conferirAtor`): o
+// vínculo do ator é deste parceiro, está ATIVO, o parceiro está ATIVO e o
+// alcance (relido do banco, não o que veio de fora) inclui cuidar da equipe.
+// Aqui dentro, sempre:
 //   - SEM ESCALADA: o ator precisa cobrir o que a pessoa tem antes (não mexe em
 //     quem está acima) e o que vai ter depois (não sobe ninguém acima de si) —
 //     permissões E lojas (`cobre`, permissoes.ts);
@@ -129,6 +132,9 @@ export const ERRO_ULTIMO_ADMIN =
   'Essa mudança deixaria o parceiro sem ninguém para cuidar da equipe. Dê esse acesso (com a rede inteira) a outra pessoa antes.';
 export const ERRO_ACIMA_DE_VOCE =
   'Essa pessoa tem acesso maior que o seu. Só quem tem o mesmo acesso (ou a FlowFoods) muda.';
+export const ERRO_SEM_GESTAO = 'Seu acesso a este parceiro não inclui cuidar da equipe.';
+/** Mensagem que não diz se o e-mail existe (pessoa do parceiro tentando vincular e-mail de outro parceiro). */
+export const ERRO_EMAIL_NEUTRO = 'Não foi possível criar o acesso com esse e-mail. Fale com a FlowFoods.';
 export const ERRO_LINK_OUTRO_PARCEIRO =
   'Essa pessoa também entra em outro parceiro, e a senha vale para todos. O link de senha nova sai pela FlowFoods.';
 
@@ -179,21 +185,47 @@ async function alcancesAtivos(tx: Prisma.TransactionClient, parceiroId: string):
 }
 
 /**
- * Transação de equipe: trava do parceiro, conta administradores antes e
+ * Quem age pertence a este parceiro e cuida da equipe? Relido do banco, dentro
+ * da transação: não vale o alcance que veio de fora. Nível 1 (`acessoId` nulo,
+ * alcance FLOWFOODS) é a sessão do /rodolfo, conferida por quem chama
+ * (`exigirNivel1`).
+ */
+async function conferirAtor(tx: Prisma.TransactionClient, parceiroId: string, ator: Ator): Promise<Ator> {
+  if (ator.acessoId === null) {
+    if (ator.alcance.nivel !== 'FLOWFOODS') throw new Desfazer({ geral: ERRO_SEM_GESTAO });
+    return ator;
+  }
+  const v = await tx.acessoParceiro.findFirst({
+    where: { id: ator.acessoId, parceiroId, status: 'ATIVO' },
+    include: { ...COM_PERFIL, parceiro: { select: { status: true } } },
+  });
+  if (!v) throw new Desfazer({ geral: ERRO_SEM_GESTAO });
+  if (v.parceiro.status !== 'ATIVO') {
+    throw new Desfazer({ geral: 'Parceiro suspenso ou aguardando liberação: a equipe fica parada até a FlowFoods reativar.' });
+  }
+  const alcance = alcanceDe(v);
+  if (!alcance.permissoes.has('acessos.gerir')) throw new Desfazer({ geral: ERRO_SEM_GESTAO });
+  return { nome: ator.nome, alcance, acessoId: v.id };
+}
+
+/**
+ * Transação de equipe: trava do parceiro, confere o ator, conta administradores antes e
  * depois, histórico no fim. `fn` desfaz com `Desfazer` (validação) — nada fica.
  */
 async function naEquipe<T>(
   db: PrismaClient,
   parceiroId: string,
-  fn: (tx: Prisma.TransactionClient) => Promise<{ resultado: T; historico: RegistroDeHistorico[] }>,
+  quem: Ator,
+  fn: (tx: Prisma.TransactionClient, ator: Ator) => Promise<{ resultado: T; historico: RegistroDeHistorico[] }>,
 ): Promise<T | { ok: false; erros: Erros }> {
   const papel = await papelDisponivel(db);
   try {
     return await db.$transaction(
       async (tx) => {
         await travar(tx, `erp-equipe:${parceiroId}`);
+        const ator = await conferirAtor(tx, parceiroId, quem);
         const antes = await alcancesAtivos(tx, parceiroId);
-        const r = await fn(tx);
+        const r = await fn(tx, ator);
         if (deixaSemAdministrador(antes, await alcancesAtivos(tx, parceiroId))) throw new Desfazer({ geral: ERRO_ULTIMO_ADMIN });
         await fecharComHistorico(tx, parceiroId, r.historico, papel);
         return r.resultado;
@@ -396,6 +428,22 @@ export async function listarAcessos(parceiroId: string, o?: Opcoes): Promise<Lin
   });
 }
 
+/**
+ * Para a lista do nível 1: parceiros com pessoas ativas e NINGUÉM cuidando da
+ * equipe (ativo + cuidar da equipe + rede inteira). Uma ida ao banco.
+ */
+export async function parceirosSemAdministrador(o?: Opcoes): Promise<Set<string>> {
+  const { db } = abrir(o);
+  const vs = await db.acessoParceiro.findMany({ where: { status: 'ATIVO' }, include: COM_PERFIL });
+  const comPessoas = new Set<string>();
+  const comAdmin = new Set<string>();
+  for (const v of vs) {
+    comPessoas.add(v.parceiroId);
+    if (ehAdministrador(alcanceDe(v))) comAdmin.add(v.parceiroId);
+  }
+  return new Set(Array.from(comPessoas).filter((id) => !comAdmin.has(id)));
+}
+
 export interface LinhaDePerfil {
   id: string;
   nome: string;
@@ -430,8 +478,12 @@ export type ResultadoDeAcesso =
   | { ok: true; mensagem: string; link: { token: string; expiraEm: Date } | null }
   | { ok: false; erros: Partial<Record<'nome' | 'email' | 'perfil' | 'lojas' | 'geral', string>> };
 
-/** Revoga os links pendentes da pessoa e cria um novo. Devolve o token (só existe aqui). */
-async function novoConvite(tx: Prisma.TransactionClient, usuarioId: string, parceiroId: string, agora: Date) {
+/**
+ * Revoga os links pendentes da pessoa e cria um novo. Devolve o token (só
+ * existe aqui). `doNivel1`: quem gerou (o link de parceiro é reconferido na
+ * hora do uso, decisão 41).
+ */
+async function novoConvite(tx: Prisma.TransactionClient, usuarioId: string, parceiroId: string, agora: Date, doNivel1: boolean) {
   await tx.conviteAcesso.updateMany({
     where: { usuarioId, usadoEm: null, revogadoEm: null },
     data: { revogadoEm: agora },
@@ -439,7 +491,7 @@ async function novoConvite(tx: Prisma.TransactionClient, usuarioId: string, parc
   const token = gerarToken();
   const expiraEm = new Date(agora.getTime() + VALIDADE_DO_LINK_MS);
   await tx.conviteAcesso.create({
-    data: { usuarioId, parceiroId, tokenHash: hashDoToken(token), expiraEm, criadoEm: agora },
+    data: { usuarioId, parceiroId, tokenHash: hashDoToken(token), expiraEm, criadoEm: agora, doNivel1 },
   });
   return { token, expiraEm };
 }
@@ -449,7 +501,8 @@ async function novoConvite(tx: Prisma.TransactionClient, usuarioId: string, parc
  * isso link de senha (primeiro acesso ou nova) só sai do nível 1 ou de quem
  * cuida da equipe de um parceiro onde a pessoa está SOZINHA (sem vínculo em
  * outro, ativo ou não) — senão o administrador de A poderia tomar a conta e
- * entrar em B (decisão 41).
+ * entrar em B (decisão 41). Conferido aqui, na geração, E na hora do uso
+ * (`conviteValido`), e todo vínculo novo revoga os links pendentes.
  */
 async function podeGerarLink(tx: Prisma.TransactionClient, ator: Ator, usuarioId: string, parceiroId: string) {
   if (ator.alcance.nivel === 'FLOWFOODS') return true;
@@ -469,7 +522,6 @@ export async function criarAcesso(
   quem: Ator | string,
   o?: Opcoes,
 ): Promise<ResultadoDeAcesso> {
-  const ator = atorDe(quem);
   const r = formNovoAcesso.safeParse(entrada);
   const p = lerPermissoesDaPessoa(entrada);
   if (!r.success || !p.ok) {
@@ -481,13 +533,21 @@ export async function criarAcesso(
   const lojas = await lojasDoParceiro(db, parceiroId);
   const nomes = new Map(lojas.map((l) => [l.id, l.nome]));
   try {
-    return await naEquipe<ResultadoDeAcesso>(db, parceiroId, async (tx) => {
+    return await naEquipe<ResultadoDeAcesso>(db, parceiroId, atorDe(quem), async (tx, ator) => {
+      const nivel1 = ator.alcance.nivel === 'FLOWFOODS';
       let usuario = await tx.usuarioErp.findUnique({ where: { email: r.data.email } });
       if (usuario) {
         const ja = await tx.acessoParceiro.findUnique({
           where: { parceiroId_usuarioId: { parceiroId, usuarioId: usuario.id } },
         });
         if (ja) throw new Desfazer({ email: 'Essa pessoa já tem acesso a este parceiro.' });
+        // E-mail de quem já está em OUTRO parceiro: só o nível 1 vincula. A
+        // pessoa do parceiro recebe a mesma frase de qualquer outra recusa (não
+        // fica sabendo que o e-mail existe).
+        if (!nivel1) throw new Desfazer({ email: ERRO_EMAIL_NEUTRO });
+        // Uma mudança de senha/vínculo por pessoa de cada vez (ver definirSenhaPeloLink).
+        await travar(tx, `erp-usuario:${usuario.id}`);
+        usuario = await tx.usuarioErp.findUniqueOrThrow({ where: { id: usuario.id } });
       }
       const prep = await prepararPermissoes(tx, parceiroId, p.dados, lojas, ator);
       const novo = !usuario;
@@ -495,6 +555,25 @@ export async function criarAcesso(
       const acesso = await tx.acessoParceiro.create({
         data: { parceiroId, usuarioId: usuario.id, criadoEm: agora, ...prep.colunas },
       });
+
+      // Vínculo novo em mais um parceiro: link pendente (de qualquer parceiro)
+      // morre; e senha criada por link de administrador de OUTRO parceiro não
+      // atravessa — apaga e a pessoa cria outra pelo link do nível 1 (decisão 41).
+      let senhaApagada = false;
+      if (!novo) {
+        await tx.conviteAcesso.updateMany({
+          where: { usuarioId: usuario.id, usadoEm: null, revogadoEm: null },
+          data: { revogadoEm: agora },
+        });
+        if (usuario.senhaHash && usuario.senhaPorLinkDoParceiroId && usuario.senhaPorLinkDoParceiroId !== parceiroId) {
+          usuario = await tx.usuarioErp.update({
+            where: { id: usuario.id },
+            data: { senhaHash: null, senhaDefinidaEm: null, senhaPorLinkDoParceiroId: null },
+          });
+          await tx.sessaoErp.updateMany({ where: { usuarioId: usuario.id, encerradaEm: null }, data: { encerradaEm: agora } });
+          senhaApagada = true;
+        }
+      }
 
       const historico: RegistroDeHistorico[] = [
         {
@@ -510,9 +589,18 @@ export async function criarAcesso(
           autorNome: ator.nome,
         },
       ];
+      if (senhaApagada) {
+        historico.push({
+          entidade: ENTIDADE,
+          entidadeId: acesso.id,
+          acao: 'PEDIU_SENHA_NOVA',
+          depois: { nome: usuario.nome, senha: 'criada por link de outro parceiro: precisa criar de novo' },
+          autorNome: ator.nome,
+        });
+      }
       let link: { token: string; expiraEm: Date } | null = null;
       if (!usuario.senhaHash && (novo || (await podeGerarLink(tx, ator, usuario.id, parceiroId)))) {
-        link = await novoConvite(tx, usuario.id, parceiroId, agora);
+        link = await novoConvite(tx, usuario.id, parceiroId, agora, nivel1);
         historico.push({
           entidade: ENTIDADE,
           entidadeId: acesso.id,
@@ -521,11 +609,11 @@ export async function criarAcesso(
           autorNome: ator.nome,
         });
       }
-      const mensagem = link
-        ? `Acesso de ${usuario.nome} criado. Copie o link e mande para a pessoa.`
-        : ator.alcance.nivel === 'FLOWFOODS'
-          ? `${usuario.nome} já tinha senha (entra em outro parceiro) e agora vê este também.`
-          : `Acesso de ${usuario.nome} criado. Essa pessoa já tem cadastro no FlowFoods: entra com a senha dela. Se ainda não tiver senha, o link sai pela FlowFoods.`;
+      const mensagem = senhaApagada
+        ? `Acesso de ${usuario.nome} criado. A senha dela tinha sido criada por link de outro parceiro e não vale aqui: mande o link para ela criar uma senha nova.`
+        : link
+          ? `Acesso de ${usuario.nome} criado. Copie o link e mande para a pessoa.`
+          : `Atenção: esse e-mail já tem senha e entra em outro parceiro. ${usuario.nome} agora vê este também, com a mesma senha.`;
       return { resultado: { ok: true, link, mensagem }, historico };
     });
   } catch (e) {
@@ -552,13 +640,12 @@ export async function atualizarAcesso(
   quem: Ator | string,
   o?: Opcoes,
 ): Promise<{ ok: true; mensagem: string } | { ok: false; erros: Erros }> {
-  const ator = atorDe(quem);
   const p = lerPermissoesDaPessoa(entrada);
   if (!p.ok) return { ok: false, erros: p.erros };
   const { db } = abrir(o);
   const lojas = await lojasDoParceiro(db, parceiroId);
   const nomes = new Map(lojas.map((l) => [l.id, l.nome]));
-  return naEquipe(db, parceiroId, async (tx) => {
+  return naEquipe(db, parceiroId, atorDe(quem), async (tx, ator) => {
     const a = await acessoDoParceiro(tx, parceiroId, acessoId);
     if (!a) throw new Desfazer({ geral: 'Acesso não encontrado neste parceiro.' });
     if (!cobre(ator.alcance, alcanceDe(a))) throw new Desfazer({ geral: ERRO_ACIMA_DE_VOCE });
@@ -597,9 +684,8 @@ export async function mudarStatusDoAcesso(
   quem: Ator | string,
   o?: Opcoes,
 ): Promise<ResultadoSimples> {
-  const ator = atorDe(quem);
   const { db, agora } = abrir(o);
-  const r = await naEquipe<ResultadoSimples>(db, parceiroId, async (tx) => {
+  const r = await naEquipe<ResultadoSimples>(db, parceiroId, atorDe(quem), async (tx, ator) => {
     const a = await acessoDoParceiro(tx, parceiroId, acessoId);
     if (!a) throw new Desfazer({ geral: 'Acesso não encontrado neste parceiro.' });
     if (a.status === novo) return { resultado: { ok: true, mensagem: 'Nada mudou.' }, historico: [] };
@@ -646,15 +732,15 @@ export async function gerarNovoLink(
   quem: Ator | string,
   o?: Opcoes,
 ): Promise<{ ok: true; token: string; expiraEm: Date; nome: string } | { ok: false; erro: string }> {
-  const ator = atorDe(quem);
   const { db, agora } = abrir(o);
-  const r = await naEquipe<{ ok: true; token: string; expiraEm: Date; nome: string }>(db, parceiroId, async (tx) => {
+  const r = await naEquipe<{ ok: true; token: string; expiraEm: Date; nome: string }>(db, parceiroId, atorDe(quem), async (tx, ator) => {
     const a = await acessoDoParceiro(tx, parceiroId, acessoId);
     if (!a) throw new Desfazer({ geral: 'Acesso não encontrado neste parceiro.' });
     if (a.status !== 'ATIVO') throw new Desfazer({ geral: 'Reative o acesso antes de gerar um link.' });
     if (!cobre(ator.alcance, alcanceDe(a))) throw new Desfazer({ geral: ERRO_ACIMA_DE_VOCE });
+    await travar(tx, `erp-usuario:${a.usuarioId}`);
     if (!(await podeGerarLink(tx, ator, a.usuarioId, parceiroId))) throw new Desfazer({ geral: ERRO_LINK_OUTRO_PARCEIRO });
-    const link = await novoConvite(tx, a.usuarioId, parceiroId, agora);
+    const link = await novoConvite(tx, a.usuarioId, parceiroId, agora, ator.alcance.nivel === 'FLOWFOODS');
     return {
       resultado: { ok: true, ...link, nome: a.usuario.nome },
       historico: [
@@ -680,9 +766,12 @@ export async function gerarNovoLink(
 export async function liberarEntrada(
   parceiroId: string,
   acessoId: string,
-  autorNome: string,
+  quem: Ator | string,
   o?: Opcoes,
 ): Promise<ResultadoSimples> {
+  const ator = atorDe(quem);
+  if (ator.alcance.nivel !== 'FLOWFOODS' || ator.acessoId !== null) return { ok: false, erro: 'Só a FlowFoods libera as tentativas.' };
+  const autorNome = ator.nome;
   const { db, agora } = abrir(o);
   const papel = await papelDisponivel(db);
   return db.$transaction(async (tx) => {
@@ -737,19 +826,20 @@ export async function salvarPerfil(
   quem: Ator | string,
   o?: Opcoes,
 ): Promise<ResultadoDePerfil> {
-  const ator = atorDe(quem);
-  const rede = soRede(ator);
-  if (rede) return { ok: false, erros: { geral: rede } };
   const d = lerPerfil(entrada);
   if (!d.ok) return { ok: false, erros: d.erros };
-  const faltam = faltamAoAtor(ator, d.dados.permissoes);
-  if (faltam.length) {
-    return { ok: false, erros: { permissoes: `Você não pode dar o que não tem: ${faltam.map((p) => `“${rotuloDaPermissao(p).toLowerCase()}”`).join(', ')}.` } };
-  }
   const id = typeof entrada.id === 'string' && entrada.id ? entrada.id : null;
   const { db } = abrir(o);
   try {
-    return await naEquipe<ResultadoDePerfil>(db, parceiroId, async (tx) => {
+    return await naEquipe<ResultadoDePerfil>(db, parceiroId, atorDe(quem), async (tx, ator) => {
+      const rede = soRede(ator);
+      if (rede) throw new Desfazer({ geral: rede });
+      const faltam = faltamAoAtor(ator, d.dados.permissoes);
+      if (faltam.length) {
+        throw new Desfazer({
+          permissoes: `Você não pode dar o que não tem: ${faltam.map((p) => `“${rotuloDaPermissao(p).toLowerCase()}”`).join(', ')}.`,
+        });
+      }
       const dados = { ...d.dados, catalogoVersao: VERSAO_DO_CATALOGO };
       if (!id) {
         const novo = await tx.perfilAcesso.create({ data: { parceiroId, ...dados } });
@@ -764,6 +854,17 @@ export async function salvarPerfil(
       if (!atual) throw new Desfazer({ geral: 'Esse perfil não existe mais. Recarregue.' });
       if (faltamAoAtor(ator, atual.permissoes).length) {
         throw new Desfazer({ geral: 'Esse perfil tem coisas que o seu acesso não tem. Só quem tem tudo o que ele dá pode mudar.' });
+      }
+      // Quem usa o perfil muda junto: o ator precisa cobrir cada pessoa antes e
+      // depois (não rebaixa nem sobe ninguém que está acima dele).
+      const usam = await tx.acessoParceiro.findMany({ where: { parceiroId, perfilId: atual.id }, include: COM_PERFIL });
+      const acima = usam.some(
+        (v) =>
+          !cobre(ator.alcance, alcanceDe(v)) ||
+          !cobre(ator.alcance, alcanceDe({ ...v, perfil: { nome: d.dados.nome, permissoes: d.dados.permissoes } })),
+      );
+      if (acima) {
+        throw new Desfazer({ geral: 'Quem usa esse perfil tem acesso maior que o seu. Só quem tem o mesmo acesso (ou a FlowFoods) muda o perfil.' });
       }
       const depois = await tx.perfilAcesso.update({ where: { id: atual.id }, data: dados });
       return {
@@ -793,11 +894,10 @@ export async function excluirPerfil(
   quem: Ator | string,
   o?: Opcoes,
 ): Promise<ResultadoSimples> {
-  const ator = atorDe(quem);
-  const rede = soRede(ator);
-  if (rede) return { ok: false, erro: rede };
   const { db } = abrir(o);
-  const r = await naEquipe<ResultadoSimples>(db, parceiroId, async (tx) => {
+  const r = await naEquipe<ResultadoSimples>(db, parceiroId, atorDe(quem), async (tx, ator) => {
+    const rede = soRede(ator);
+    if (rede) throw new Desfazer({ geral: rede });
     const atual = await tx.perfilAcesso.findFirst({ where: { id: perfilId, parceiroId } });
     if (!atual) throw new Desfazer({ geral: 'Esse perfil não existe mais. Recarregue.' });
     if (faltamAoAtor(ator, atual.permissoes).length) {
@@ -833,6 +933,12 @@ async function conviteValido(db: PrismaClient | Prisma.TransactionClient, token:
     where: { parceiroId_usuarioId: { parceiroId: c.parceiroId, usuarioId: c.usuarioId } },
   });
   if (!v || v.status !== 'ATIVO') return null;
+  // Link gerado por administrador de parceiro só vale se, AGORA, a pessoa não
+  // tem vínculo em outro parceiro (a senha vale em todos; decisão 41).
+  if (!c.doNivel1) {
+    const outros = await db.acessoParceiro.count({ where: { usuarioId: c.usuarioId, parceiroId: { not: c.parceiroId } } });
+    if (outros > 0) return null;
+  }
   return { convite: c, acessoId: v.id };
 }
 
@@ -864,6 +970,14 @@ export async function definirSenhaPeloLink(
   const senhaHash = await bcrypt.hash(senha, CUSTO_BCRYPT);
   const papel = await papelDisponivel(db);
   return db.$transaction(async (tx) => {
+    // Sob a trava da pessoa (a mesma de criarAcesso/gerarNovoLink), reconfere o
+    // link inteiro: um vínculo novo em outro parceiro, gravado enquanto o bcrypt
+    // rodava, já revogou o link ou o torna inválido aqui.
+    await travar(tx, `erp-usuario:${antes.convite.usuarioId}`);
+    const agoraValido = await conviteValido(tx, token, agora);
+    if (!agoraValido || agoraValido.convite.id !== antes.convite.id) {
+      return { ok: false as const, erro: 'Este link não vale mais. Peça um novo à FlowFoods.', linkInvalido: true };
+    }
     const { count } = await tx.conviteAcesso.updateMany({
       where: { id: antes.convite.id, usadoEm: null, revogadoEm: null, expiraEm: { gt: agora } },
       data: { usadoEm: agora },
@@ -871,7 +985,12 @@ export async function definirSenhaPeloLink(
     if (count === 0) return { ok: false as const, erro: 'Este link não vale mais. Peça um novo à FlowFoods.', linkInvalido: true };
     const u = await tx.usuarioErp.update({
       where: { id: antes.convite.usuarioId },
-      data: { senhaHash, senhaDefinidaEm: agora },
+      data: {
+        senhaHash,
+        senhaDefinidaEm: agora,
+        // Senha por link de administrador de parceiro fica marcada: não atravessa para outro parceiro.
+        senhaPorLinkDoParceiroId: antes.convite.doNivel1 ? null : antes.convite.parceiroId,
+      },
     });
     await tx.sessaoErp.updateMany({ where: { usuarioId: u.id, encerradaEm: null }, data: { encerradaEm: agora } });
     await fecharComHistorico(

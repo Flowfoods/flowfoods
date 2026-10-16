@@ -7,9 +7,10 @@
  * quem está vendo — e o servidor confere de novo.
  */
 
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import type { AcaoDeEquipe, EstadoEquipe } from './estado';
+import { Confirmacao } from './escolhas';
 import { LinkGerado } from './link-gerado';
 
 const BOTAO =
@@ -27,6 +28,7 @@ function Botao({ children }: { children: ReactNode }) {
 const sem: AcaoDeEquipe = async (e) => e;
 
 export function AcoesDaPessoa({
+  nome,
   status,
   formulario,
   gerarLink,
@@ -34,6 +36,7 @@ export function AcoesDaPessoa({
   liberar,
   avisoDeLink,
 }: {
+  nome: string;
   status: 'ATIVO' | 'DESATIVADO';
   /** Formulário de edição (já montado no servidor); sem ele, não há "Editar". */
   formulario?: ReactNode;
@@ -44,11 +47,14 @@ export function AcoesDaPessoa({
   avisoDeLink?: string;
 }) {
   const [aberto, setAberto] = useState(false);
+  const [confirmando, setConfirmando] = useState(false);
   const [link, pedirLink] = useFormState<EstadoEquipe, FormData>(gerarLink ?? sem, null);
   const [situacao, mudar] = useFormState<EstadoEquipe, FormData>(mudarStatus ?? sem, null);
   const [liberado, pedirLiberar] = useFormState<EstadoEquipe, FormData>(liberar ?? sem, null);
   const erro = [link, situacao, liberado].map((e) => (e && !e.ok ? e.erros?.geral : null)).find(Boolean) ?? null;
   const certo = liberado?.ok ? liberado.mensagem : null;
+  // Respondeu (deu certo ou não): a caixa de confirmação fecha.
+  useEffect(() => setConfirmando(false), [situacao]);
 
   return (
     <div className="space-y-3">
@@ -63,10 +69,15 @@ export function AcoesDaPessoa({
             <Botao>Gerar link de senha</Botao>
           </form>
         )}
-        {mudarStatus && (
+        {mudarStatus && status === 'DESATIVADO' && (
           <form action={mudar}>
-            <Botao>{status === 'ATIVO' ? 'Desativar' : 'Reativar'}</Botao>
+            <Botao>Reativar</Botao>
           </form>
+        )}
+        {mudarStatus && status === 'ATIVO' && (
+          <button type="button" className={BOTAO} aria-expanded={confirmando} onClick={() => setConfirmando(true)}>
+            Desativar
+          </button>
         )}
         {liberar && (
           <form action={pedirLiberar}>
@@ -74,6 +85,17 @@ export function AcoesDaPessoa({
           </form>
         )}
       </div>
+      {mudarStatus && status === 'ATIVO' && confirmando && (
+        <form action={mudar}>
+          <Confirmacao
+            titulo={`Desativar ${nome}?`}
+            detalhe="A pessoa sai na hora e não entra mais neste parceiro até ser reativada."
+            confirmar="Desativar"
+            tipoConfirmar="submit"
+            onCancelar={() => setConfirmando(false)}
+          />
+        </form>
+      )}
       {!gerarLink && avisoDeLink && status === 'ATIVO' && <p className="text-[12px] text-surface/40">{avisoDeLink}</p>}
       {erro && <p className="text-[12px] text-bright">{erro}</p>}
       {certo && <p className="text-[12px] text-success">{certo}</p>}

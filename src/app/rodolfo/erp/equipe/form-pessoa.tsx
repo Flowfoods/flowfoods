@@ -6,11 +6,11 @@
  * escolher: quem confere o que o ator pode dar é o servidor.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFormState } from 'react-dom';
 import { LISTA_DE_SETORES, SETORES } from '@/lib/erp/permissoes';
 import { CAMPO, Enviar, Erro, ROTULO, Resultado } from '../campos';
-import { Cartao, Etiqueta, GradeDePermissoes } from './escolhas';
+import { Cartao, Confirmacao, Etiqueta, GradeDePermissoes } from './escolhas';
 import type { AcaoDeEquipe, EstadoEquipe } from './estado';
 import { LinkGerado } from './link-gerado';
 
@@ -54,6 +54,8 @@ export function FormPessoa({
   concediveis,
   atorRede,
   inicial = NOVA,
+  nome,
+  cuidavaDaEquipe = false,
 }: {
   acao: AcaoDeEquipe;
   modo: 'criar' | 'editar';
@@ -63,6 +65,10 @@ export function FormPessoa({
   concediveis: string[];
   atorRede: boolean;
   inicial?: ValoresDaPessoa;
+  /** Editar: nome da pessoa (para a confirmação). */
+  nome?: string;
+  /** Editar: hoje ela cuida da equipe? Tirar isso pede confirmação. */
+  cuidavaDaEquipe?: boolean;
 }) {
   const [estado, enviar] = useFormState<EstadoEquipe, FormData>(acao, null);
   const podeDar = useMemo(() => new Set(concediveis), [concediveis]);
@@ -77,13 +83,21 @@ export function FormPessoa({
   }));
   const [perfilTocado, setPerfilTocado] = useState(modo === 'editar');
   const [sugerido, setSugerido] = useState<string | null>(null);
+  const [chave, setChave] = useState(0);
+  const [pedindo, setPedindo] = useState(false);
+  const confirmado = useRef(false);
+  const formulario = useRef<HTMLFormElement>(null);
 
-  // Criou: limpa para a próxima pessoa (o link continua visível embaixo).
+  // Criou: limpa TUDO para a próxima pessoa (nome e e-mail também; o link
+  // continua visível embaixo). Qualquer resposta encerra a confirmação.
   useEffect(() => {
+    confirmado.current = false;
+    setPedindo(false);
     if (estado?.ok && modo === 'criar') {
       setV({ ...NOVA, perfil: primeiroQueCabe, redeInteira: atorRede });
       setPerfilTocado(false);
       setSugerido(null);
+      setChave((c) => c + 1);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [estado]);
@@ -97,6 +111,8 @@ export function FormPessoa({
         ? { ...x, removidas: alternarEm(x.removidas, p, !x.removidas.includes(p)) }
         : { ...x, extras: alternarEm(x.extras, p, !x.extras.includes(p)) },
     );
+  // Tirar "cuidar da equipe" de alguém pede um segundo passo, na própria tela.
+  const tiraEquipe = modo === 'editar' && cuidavaDaEquipe && !marcada('acessos.gerir');
   const aMais = v.extras.filter((p) => !doPerfil.has(p)).length;
   const aMenos = v.removidas.filter((p) => doPerfil.has(p)).length;
 
@@ -117,7 +133,19 @@ export function FormPessoa({
 
   return (
     <div className="space-y-4">
-      <form action={enviar} noValidate className="space-y-5">
+      <form
+        key={chave}
+        ref={formulario}
+        action={enviar}
+        noValidate
+        className="space-y-5"
+        onSubmit={(e) => {
+          if (tiraEquipe && !confirmado.current) {
+            e.preventDefault();
+            setPedindo(true);
+          }
+        }}
+      >
         {modo === 'criar' && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <div>
@@ -286,6 +314,19 @@ export function FormPessoa({
           <input key={`r-${p}`} type="hidden" name="removidas" value={p} />
         ))}
 
+        {pedindo && tiraEquipe && (
+          <Confirmacao
+            titulo={`${nome ?? 'Essa pessoa'} deixa de cuidar da equipe.`}
+            detalhe="Não vai mais criar acessos nem mudar perfis. Vale na próxima tela que ela abrir."
+            confirmar="Salvar mesmo assim"
+            onConfirmar={() => {
+              confirmado.current = true;
+              setPedindo(false);
+              formulario.current?.requestSubmit();
+            }}
+            onCancelar={() => setPedindo(false)}
+          />
+        )}
         <div className="space-y-2">
           <Enviar pendente={modo === 'criar' ? 'Criando…' : 'Salvando…'} className="w-full">
             {modo === 'criar' ? 'Criar acesso' : 'Salvar acesso'}

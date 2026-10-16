@@ -35,7 +35,11 @@ vi.mock('@/lib/erp/contexto', async () => {
 
 import {
   atualizarAcesso,
+  consultarLink,
   criarAcesso,
+  ERRO_EMAIL_NEUTRO,
+  ERRO_SEM_GESTAO,
+  parceirosSemAdministrador,
   definirSenhaPeloLink,
   entrarComSenha,
   ERRO_ACIMA_DE_VOCE,
@@ -476,5 +480,107 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     expect((await entrarComSenha({ email: email('gerente'), senha: SENHA, ip: ip() }, o())).ok).toBe(true);
     const h = await listarHistorico(doParceiro(A, db), { entidade: 'AcessoParceiro' });
     expect(h.some((x) => x.acao === 'LIBEROU_ENTRADA')).toBe(true);
+  });
+
+  // ------------------------------------------- revisão da 0.4 (Guardião)
+
+  it('tomada de conta entre parceiros (sequência do Guardião): o link do dono de A morre quando a vítima ganha B', async () => {
+    // Vítima só em A, com senha (link do nível 1).
+    await pessoa(A, 'vitima', { perfil: 'OPERADOR' });
+    const v = (await listarAcessos(A, o())).find((l) => l.email === email('vitima'))!;
+    // (1) dono de A gera link de senha para a vítima (ela só está em A: passa).
+    const l = await gerarNovoLink(A, v.acessoId, ator(dono.s), o());
+    expect(l.ok).toBe(true);
+    if (!l.ok) return;
+    expect((await consultarLink(l.token, o())).valido).toBe(true);
+    // (2) nível 1 põe a vítima em B como dona (já tem senha: nenhum link novo).
+    const emB = await criarAcesso(B, { nome: 'Vítima', email: email('vitima'), perfil: 'DONO' }, 'Rodolfo', o());
+    expect(emB.ok && emB.link).toBe(null);
+    expect(emB.ok && emB.mensagem).toMatch(/Atenção: esse e-mail já tem senha/);
+    // (3) dono de A tenta usar o link: não vale mais (revogado ao ganhar B).
+    expect((await consultarLink(l.token, o())).valido).toBe(false);
+    const usar = await definirSenhaPeloLink(l.token, 'senha do atacante 99', 'senha do atacante 99', o());
+    expect(usar.ok).toBe(false);
+    // E mesmo que a revogação falhasse, o uso reconfere: link de parceiro + vínculo em outro = recusado.
+    await db.$executeRawUnsafe(`UPDATE "ConviteAcesso" SET "revogadoEm" = NULL WHERE "tokenHash" = encode(sha256($1::bytea), 'hex')`, l.token);
+    expect((await consultarLink(l.token, o())).valido).toBe(false);
+    expect((await definirSenhaPeloLink(l.token, 'senha do atacante 99', 'senha do atacante 99', o())).ok).toBe(false);
+    expect((await entrarComSenha({ email: email('vitima'), senha: 'senha do atacante 99', ip: ip() }, o())).ok).toBe(false);
+    expect((await entrarComSenha({ email: email('vitima'), senha: SENHA, ip: ip() }, o())).ok).toBe(true);
+  });
+
+  it('senha criada por link do dono de A não atravessa para B: apagada, sessões derrubadas, link novo do nível 1', async () => {
+    await pessoa(A, 'alvo', { perfil: 'OPERADOR' });
+    const v = (await listarAcessos(A, o())).find((l) => l.email === email('alvo'))!;
+    const l = await gerarNovoLink(A, v.acessoId, ator(dono.s), o());
+    if (!l.ok) throw new Error();
+    // O dono de A usa o link ANTES de a pessoa ganhar B (permitido: ela só estava em A).
+    expect((await definirSenhaPeloLink(l.token, 'senha do dono de a', 'senha do dono de a', o())).ok).toBe(true);
+    const sessaoDoDono = await entrarComSenha({ email: email('alvo'), senha: 'senha do dono de a', ip: ip() }, o());
+    if (!sessaoDoDono.ok) throw new Error();
+    // Nível 1 põe a pessoa em B: a senha "do parceiro A" não vale para B.
+    const emB = await criarAcesso(B, { nome: 'Alvo', email: email('alvo'), perfil: 'DONO' }, 'Rodolfo', o());
+    expect(emB.ok).toBe(true);
+    if (!emB.ok) return;
+    expect(emB.link).not.toBeNull();
+    expect(emB.mensagem).toMatch(/criada por link de outro parceiro/);
+    expect(await validarSessao(sessaoDoDono.token, o())).toBeNull();
+    expect((await entrarComSenha({ email: email('alvo'), senha: 'senha do dono de a', ip: ip() }, o())).ok).toBe(false);
+    // O link do nível 1 vale e a nova senha entra nos dois.
+    expect((await definirSenhaPeloLink(emB.link!.token, SENHA, SENHA, o())).ok).toBe(true);
+    const r = await entrarComSenha({ email: email('alvo'), senha: SENHA, ip: ip() }, o());
+    expect(r.ok && r.escolher).toBe(true);
+  });
+
+  it('e-mail que já está em outro parceiro: só o nível 1 vincula; a pessoa do parceiro recebe frase neutra', async () => {
+    const outro = await criarAcesso(A, { nome: 'Qualquer', email: email('consultora'), perfil: 'OPERADOR' }, ator(dono.s), o());
+    // consultora já está em A; testa com alguém só de B.
+    expect(outro.ok).toBe(false);
+    await pessoa(B, 'sobdeb', { perfil: 'OPERADOR', lojas: 'escolhidas', lojaIds: [Z] });
+    const r = await criarAcesso(A, { nome: 'Fulano', email: email('sobdeb'), perfil: 'OPERADOR' }, ator(dono.s), o());
+    expect(r).toEqual({ ok: false, erros: { email: ERRO_EMAIL_NEUTRO } });
+    // Nem a pessoa nem o vínculo mudaram.
+    expect((await listarAcessos(A, o())).some((l) => l.email === email('sobdeb'))).toBe(false);
+  });
+
+  it('as funções de equipe conferem o ator no banco: alcance forjado, vínculo de outro parceiro, sem "cuidar da equipe"', async () => {
+    const forjado: Ator = { nome: 'Forjado', alcance: ALCANCE_FLOWFOODS, acessoId: operador.s.acessoId };
+    const r1 = await criarAcesso(A, { nome: 'Xis Forjado', email: email('x1'), perfil: 'DONO' }, forjado, o());
+    expect(r1).toEqual({ ok: false, erros: { geral: ERRO_SEM_GESTAO } });
+    const deB: Ator = { ...ator(dono.s), acessoId: (await listarAcessos(B, o()))[0].acessoId };
+    expect((await mudarStatusDoAcesso(A, operador.s.acessoId!, 'DESATIVADO', deB, o())).ok).toBe(false);
+    const semVinculo: Ator = { nome: 'Sem', alcance: { ...ALCANCE_FLOWFOODS, nivel: 'REDE' }, acessoId: null };
+    const p = await salvarPerfil(A, { nome: 'Forjado', base: 'DONO', permissoes: ['insumos.ver'] }, semVinculo, o());
+    expect(p.ok || p.erros.geral).toBe(ERRO_SEM_GESTAO);
+    expect((await liberarEntrada(A, operador.s.acessoId!, ator(dono.s), o())).ok).toBe(false);
+  });
+
+  it('perfil próprio não rebaixa nem sobe quem está acima de quem edita', async () => {
+    const gestor = await pessoa(A, 'gestor', { perfil: 'GERENTE', extras: ['acessos.gerir'] }, ator(dono.s));
+    const caixa = await salvarPerfil(A, { nome: 'Caixa', base: 'OPERADOR', permissoes: ['insumos.ver', 'lojas.ver'] }, ator(dono.s), o());
+    if (!caixa.ok) throw new Error();
+    // Usuária do perfil com um extra que o gestor não tem (dado pelo dono).
+    await pessoa(A, 'caixa', { perfil: `p:${caixa.id}`, extras: ['precos.editar'] }, ator(dono.s));
+    const mexe = await salvarPerfil(
+      A,
+      { id: caixa.id, nome: 'Caixa', base: 'OPERADOR', permissoes: ['insumos.ver'] },
+      ator(gestor.s),
+      o(),
+    );
+    expect(mexe.ok || mexe.erros.geral).toMatch(/Quem usa esse perfil tem acesso maior que o seu/);
+    // O dono (cobre todo mundo) muda.
+    const dono2 = await salvarPerfil(A, { id: caixa.id, nome: 'Caixa', base: 'OPERADOR', permissoes: ['insumos.ver'] }, ator(dono.s), o());
+    expect(dono2.ok).toBe(true);
+  });
+
+  it('nível 1 vê os parceiros com pessoas ativas e ninguém cuidando da equipe', async () => {
+    const c = await criarParceiro({ nome: 'Perm C', slug: `perm-c-${sufixo}`, status: 'ATIVO' }, 'Teste', db);
+    if (!c.ok) throw new Error();
+    ids.push(c.id);
+    expect((await parceirosSemAdministrador(o())).has(c.id)).toBe(false); // ninguém ainda
+    await criarAcesso(c.id, { nome: 'Só gerente', email: email('sogerente'), perfil: 'GERENTE' }, 'Rodolfo', o());
+    const sem = await parceirosSemAdministrador(o());
+    expect(sem.has(c.id)).toBe(true);
+    expect(sem.has(A)).toBe(false);
   });
 });
