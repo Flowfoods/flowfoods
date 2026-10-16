@@ -27,7 +27,8 @@ export function IconeDaConservacao({ conservacao, tamanho = 16 }: { conservacao:
  */
 export function ValidadesDoItem({ validades, vazio }: { validades: Validades | null; vazio: ReactNode }) {
   const lista = validades ? aceitas(validades) : [];
-  if (lista.length === 0) return <div className="text-[13px] text-suave">{vazio}</div>;
+  // 1.5 (herança d): o "não informada" no tamanho do texto, não de nota de rodapé.
+  if (lista.length === 0) return <div className="text-[15px] leading-relaxed text-suave">{vazio}</div>;
   return (
     <ul className="divide-y divide-linha" aria-label="Onde fica e quanto dura">
       {lista.map((a) => (

@@ -15,6 +15,7 @@
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-subfichas.db.test.ts
  */
+import { ALCANCE_FLOWFOODS } from '@/lib/erp/permissoes';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -157,7 +158,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     igual(lista.linhas[0].preparo!.porUnidade, 2509n, 1n);
     // "Só sem preço" não lista o pré-preparo (o custo vem da ficha).
     expect((await listarInsumos(a, { semPreco: true })).linhas.map((l) => l.nome)).toEqual(['Picles']);
-    const ins = (await obterInsumo(a, f.insumoProduzido!.id))!;
+    const ins = (await obterInsumo(a, f.insumoProduzido!.id, ALCANCE_FLOWFOODS))!;
     expect(ins.preparo).toMatchObject({ nome: 'Molho cheddar', incompleto: false });
     const [h] = await listarHistorico(a, { entidade: 'Insumo', limite: 1 });
     expect(h.mudancas.find((m) => m.campo === 'vem da ficha')?.depois).toBe('Molho cheddar');
@@ -178,7 +179,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     expect(f.itens[1].preparo?.itens.map((i) => i.nome)).toEqual(['Cheddar', 'Creme de leite', 'Cebola']);
     expect((await obterFicha(a, ids.molho))!.usadaEm.map((u) => u.nome)).toEqual(['Burger cheddar']);
     // Cheddar sobe para R$ 50,00/kg: molho = 60,18 → 30,09/kg; 40 g = 120,36 c; burger = 270,36 c.
-    const cheddar = (await obterInsumo(a, ids.cheddar))!;
+    const cheddar = (await obterInsumo(a, ids.cheddar, ALCANCE_FLOWFOODS))!;
     const e = await editarInsumo(a, ids.cheddar, { nome: 'Cheddar', tipo: 'INGREDIENTE', unidade: 'KG', conservacao: 'SECO', conteudo: '1', escala: 'base', preco: '50,00', versao: cheddar.versao });
     expect(e.ok).toBe(true);
     f = (await obterFicha(a, r.id))!;
@@ -290,13 +291,13 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     expect((await editarFicha(a, ids.molho, { ...molho({ rendimento: '2,5' }), versao: v })).ok).toBe(true);
     const insumoId = (await obterFicha(a, ids.molho))!.insumoProduzido!.id;
     expect((await mudarSituacaoFicha(a, ids.molho, false, 'saiu do cardápio')).ok).toBe(true);
-    expect((await obterInsumo(a, insumoId))!.ativo).toBe(false);
+    expect((await obterInsumo(a, insumoId, ALCANCE_FLOWFOODS))!.ativo).toBe(false);
     expect((await mudarSituacaoFicha(a, ids.molho, true, null)).ok).toBe(true);
-    expect((await obterInsumo(a, insumoId))!.ativo).toBe(true);
+    expect((await obterInsumo(a, insumoId, ALCANCE_FLOWFOODS))!.ativo).toBe(true);
   });
 
   it('insumo produzido não se edita, não ganha embalagem nem muda de situação pela tela de insumos', async () => {
-    const ins = (await obterInsumo(a, (await obterFicha(a, ids.molho))!.insumoProduzido!.id))!;
+    const ins = (await obterInsumo(a, (await obterFicha(a, ids.molho))!.insumoProduzido!.id, ALCANCE_FLOWFOODS))!;
     const msg = expect.stringMatching(/é pré-preparo/);
     expect(await editarInsumo(a, ins.id, { nome: 'Outro', tipo: 'PRE_PREPARO', unidade: 'KG', conteudo: '1', escala: 'base', preco: '1,00', versao: ins.versao })).toMatchObject({
       ok: false,
@@ -373,7 +374,9 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     const com30 = await medir('Lote');
     expect(com3, JSON.stringify([viu3, vistas])).toBe(com30);
     // contexto, count, página (fichas, itens, insumos), 1 nível de pré-preparo (fichas, itens, insumos)
-    expect(com30).toBe(8);
+    // + 1.5: a última compra de todos os insumos lidos, numa consulta só
+    expect(com30).toBe(9);
+    expect(vistas.filter((q) => q.includes('DISTINCT ON'))).toHaveLength(1);
     expect(vistas.filter((q) => q.includes('"FichaTecnica"."id", "public"."FichaTecnica"."nome"'))).toHaveLength(2);
     await contado.$disconnect();
   });

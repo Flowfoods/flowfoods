@@ -13,6 +13,7 @@ import type { ReactNode } from 'react';
 
 export function Painel({
   titulo,
+  subtitulo,
   acessorio,
   children,
   className = '',
@@ -21,6 +22,8 @@ export function Painel({
 }: {
   id?: string;
   titulo?: string;
+  /** Uma linha de apoio sob o título (12 px, suave): o que o painel quer dizer. */
+  subtitulo?: string;
   acessorio?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -31,7 +34,12 @@ export function Painel({
     <section id={id} className={`min-w-0 rounded-[14px] border border-linha bg-painel ${className}`}>
       {(titulo || acessorio) && (
         <header className="flex min-h-12 items-center justify-between gap-3 border-b border-linha px-4 py-2.5 sm:px-5">
-          {titulo && <h2 className="text-[13px] font-semibold text-texto">{titulo}</h2>}
+          {titulo && (
+            <div className="min-w-0">
+              <h2 className="text-[13px] font-semibold text-texto">{titulo}</h2>
+              {subtitulo && <p className="mt-0.5 text-[12px] leading-snug text-suave">{subtitulo}</p>}
+            </div>
+          )}
           {acessorio}
         </header>
       )}
@@ -82,7 +90,8 @@ export type Tom = 'ok' | 'alerta' | 'erro' | 'neutro';
 
 const TONS: Record<Tom, string> = {
   ok: 'border-ok/35 text-ok',
-  alerta: 'border-atencao/40 text-atencao',
+  // 1.5 (herança d): contorno mais forte — a 40 % sumia no escuro.
+  alerta: 'border-atencao/70 text-atencao',
   erro: 'border-erro/40 text-erro',
   neutro: 'border-linha-forte text-suave',
 };

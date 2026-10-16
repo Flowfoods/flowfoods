@@ -22,6 +22,7 @@ export type ChaveIcone =
   | 'importar'
   | 'fichas'
   | 'compras'
+  | 'fornecedor'
   | 'estoque'
   | 'producao'
   | 'etiquetas'
@@ -83,7 +84,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 1.4';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 1.5';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -224,6 +225,47 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
       ],
     },
     {
+      chave: 'compras',
+      nome: 'Compras',
+      subtitulo: 'Notas, fornecedores e preço pago',
+      icone: 'compras',
+      grupos: [
+        {
+          rotulo: 'Notas',
+          icone: 'compras',
+          telas: [
+            {
+              href: `${base}/compras`,
+              rotulo: 'Notas de compra',
+              icone: 'compras',
+              subtitulo: 'Por loja, com o total conferido',
+              permissao: 'compras.ver',
+            },
+            {
+              href: `${base}/compras/nova`,
+              rotulo: 'Lançar nota',
+              icone: 'novo',
+              subtitulo: 'Itens, frete e o custo que muda',
+              permissao: 'compras.lancar',
+            },
+          ],
+        },
+        {
+          rotulo: 'Fornecedores',
+          icone: 'fornecedor',
+          telas: [
+            {
+              href: `${base}/compras/fornecedores`,
+              rotulo: 'Fornecedores',
+              icone: 'fornecedor',
+              subtitulo: 'Quem vende e por quanto',
+              permissao: 'compras.ver',
+            },
+          ],
+        },
+      ],
+    },
+    {
       chave: 'rede',
       nome: 'Rede e equipe',
       subtitulo: 'Lojas, marcas e pessoas',
@@ -250,14 +292,6 @@ function modulosConstruidos(base: string, nivel1: boolean): DefinicaoDeModulo[] 
 
 /** Do plano (Notion "FlowFoods Barney — ERP"), ainda sem tela. */
 export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [
-  {
-    chave: 'compras',
-    nome: 'Compras',
-    subtitulo: 'Notas, fornecedores e preço pago',
-    icone: 'compras',
-    fase: '1.5',
-    ver: ['compras.ver'],
-  },
   {
     chave: 'estoque',
     nome: 'Estoque',

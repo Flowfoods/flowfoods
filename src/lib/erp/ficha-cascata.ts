@@ -25,7 +25,7 @@ export const PROFUNDIDADE_MAXIMA = 5;
 export interface ItemDaCascata {
   quantidadeMilesimos: number;
   fatorCorrecaoMilesimos: number;
-  insumo: Pick<InsumoDaFicha, 'nome' | 'precoEmbalagemCentavos' | 'taxaEntregaCentavos' | 'conteudoMilesimos'> | null;
+  insumo: Pick<InsumoDaFicha, 'nome' | 'precoEmbalagemCentavos' | 'taxaEntregaCentavos' | 'conteudoMilesimos' | 'ultimaCompra'> | null;
   subfichaId: string | null;
 }
 

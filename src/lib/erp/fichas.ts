@@ -48,6 +48,7 @@ import {
 } from './ficha-campos';
 import { cascataDeCusto, conferirGrafo, grafoDasArestas, type FichaDaCascata } from './ficha-cascata';
 import { custosEmCascata, lerCascata, SELECAO_DO_INSUMO, SELECAO_DO_ITEM, type FichaLida } from './ficha-custos';
+import { anexarUltimasCompras, type ComUltimaCompra } from './compras-custo';
 import { motivoDaUnidadeTravada } from './insumos';
 import { prepararFoto, type FotoPronta } from './foto';
 import { apagarFoto, assumirFotoPendente, devolverFotoPendente, faxinarPendentesDeVezEmQuando, salvarFoto } from './arquivos';
@@ -99,7 +100,10 @@ export async function insumosTravados(tx: ClienteDoParceiro, ids: string[]): Pro
     where: { id: { in: unicos } },
     select: { ...SELECAO_DO_INSUMO, fichaQueProduz: { select: { nome: true } } },
   });
-  return new Map(lidos.map(({ fichaQueProduz, ...i }) => [i.id, { ...i, produzidoPor: fichaQueProduz?.nome ?? null }]));
+  const mapa = new Map<string, InsumoDaFicha>(lidos.map(({ fichaQueProduz, ...i }) => [i.id, { ...i, produzidoPor: fichaQueProduz?.nome ?? null }]));
+  // 1.5: custo pela última compra (a conferência do teto usa o custo de verdade).
+  await anexarUltimasCompras(tx, Array.from(mapa.values()));
+  return mapa;
 }
 
 /** O mesmo para os pré-preparos (fichas) citados: travados, só deste parceiro. */
@@ -696,13 +700,16 @@ async function preparosIncompletos(tx: ClienteDoParceiro): Promise<string[]> {
   return ids.filter((id) => custoIncompleto(c.custo(id)!));
 }
 
+/** Insumo sem preço: nem preço cadastrado nem nota lançada (1.5: a compra dá o preço). */
+const SEM_PRECO_NEM_COMPRA = { precoEmbalagemCentavos: 0, notaItens: { none: { nota: { status: 'LANCADA' as const } } } };
+
 function filtroDoBanco(f: FiltrosDeFicha, incompletos: string[]): Prisma.FichaTecnicaWhereInput {
   const q = f.q.trim().slice(0, 80);
   return {
     ...(q ? { nome: { contains: q, mode: 'insensitive' as const } } : {}),
     ...(f.tipo ? { tipo: f.tipo } : {}),
     ...(f.situacao === 'ativas' ? { ativa: true } : f.situacao === 'desativadas' ? { ativa: false } : {}),
-    ...(f.incompleto ? { itens: { some: { OR: [{ insumo: { precoEmbalagemCentavos: 0 } }, { subfichaId: { in: incompletos } }] } } } : {}),
+    ...(f.incompleto ? { itens: { some: { OR: [{ insumo: SEM_PRECO_NEM_COMPRA }, { subfichaId: { in: incompletos } }] } } } : {}),
   };
 }
 
@@ -872,6 +879,7 @@ export async function insumosParaFicha(cliente: ClienteDoParceiro, jaNaFicha: st
     orderBy: { nome: 'asc' },
     select: SELECAO_DO_INSUMO,
   });
+  await anexarUltimasCompras(cliente, lidos as (typeof lidos[number] & ComUltimaCompra)[]);
   return lidos.map((i) => ({
     id: i.id,
     nome: i.nome,

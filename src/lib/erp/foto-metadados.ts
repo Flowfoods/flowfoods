@@ -80,10 +80,12 @@ function app1SoComOrientacao(v: number): Uint8Array<ArrayBufferLike> {
 
 /**
  * Marcadores que DESENHAM a imagem (lista fechada, herança da 1.3): quadros e
- * tabelas C0–CF (SOFn, DHT, DAC), DQT (DB), DRI (DD), varredura (DA), DNL (DC)
- * e EXP (DF). RST0–7 (D0–D7) não têm tamanho e são tratados à parte.
+ * tabelas C0–CF (SOFn, DHT, DAC) MENOS o C8 (JPG, reservado para extensões:
+ * não desenha nada que um decodificador comum leia — herança b da 1.4), DQT
+ * (DB), DRI (DD), varredura (DA), DNL (DC) e EXP (DF). RST0–7 (D0–D7) não têm
+ * tamanho e são tratados à parte.
  */
-const DESENHA_A_IMAGEM = (m: number) => (m >= 0xc0 && m <= 0xcf) || m === 0xdb || m === 0xdd || m === 0xda || m === 0xdc || m === 0xdf;
+const DESENHA_A_IMAGEM = (m: number) => (m >= 0xc0 && m <= 0xcf && m !== 0xc8) || m === 0xdb || m === 0xdd || m === 0xda || m === 0xdc || m === 0xdf;
 
 /**
  * O que fazer com cada segmento: fica (desenha a imagem ou a cor), sai

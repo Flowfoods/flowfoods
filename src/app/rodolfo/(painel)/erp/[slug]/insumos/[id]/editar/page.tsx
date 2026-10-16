@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export default async function ParceiroEditarInsumoPage({ params }: { params: { slug: string; id: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.editar');
-  const insumo = await obterInsumo(ctx.cliente, params.id);
+  const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);
   if (!insumo) notFound();
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/insumos`;
   // Pré-preparo (1.3) só muda pela ficha técnica.

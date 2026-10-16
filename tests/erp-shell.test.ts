@@ -55,7 +55,7 @@ const futuros = (a: Alcance) =>
     .map((m) => m.chave);
 
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
-  it('Dono: todas as telas construídas (com Ficha técnica, 1.2) e os cinco módulos futuros', () => {
+  it('Dono: todas as telas construídas (com Ficha técnica, 1.2, e Compras, 1.5) e os quatro módulos futuros', () => {
     const a = alcance({ perfilBase: 'DONO' });
     expect(hrefs(a)).toEqual([
       '/erp/insumos',
@@ -63,12 +63,15 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/fichas',
       '/erp/fichas/nova',
       '/erp/fichas/importar',
+      '/erp/compras',
+      '/erp/compras/nova',
+      '/erp/compras/fornecedores',
       '/erp/lojas',
       '/erp/equipe',
       '/erp/historico',
       '/erp/acesso',
     ]);
-    expect(futuros(a)).toEqual(['compras', 'estoque', 'dre', 'producao', 'etiquetas']);
+    expect(futuros(a)).toEqual(['estoque', 'dre', 'producao', 'etiquetas']);
   });
 
   it('Gerente: sem Equipe (não cuida da equipe); com Histórico (rede inteira)', () => {
@@ -104,7 +107,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       expect(m.grupos).toEqual([]);
       expect(m.fase).toMatch(/^\d\.\d$/);
     }
-    expect(MODULOS_FUTUROS.map((f) => f.fase)).toEqual(['1.5', '1.6', '2.1', '3.1', '3.4']);
+    expect(MODULOS_FUTUROS.map((f) => f.fase)).toEqual(['1.6', '2.1', '3.1', '3.4']);
   });
 
   it('nível 1 dentro do parceiro: mesmas telas sob a base dele, com Cadastro e sem "Seu acesso"', () => {
@@ -115,6 +118,9 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/fichas',
       '/rodolfo/erp/valentins/fichas/nova',
       '/rodolfo/erp/valentins/fichas/importar',
+      '/rodolfo/erp/valentins/compras',
+      '/rodolfo/erp/valentins/compras/nova',
+      '/rodolfo/erp/valentins/compras/fornecedores',
       '/rodolfo/erp/valentins/lojas',
       '/rodolfo/erp/valentins/equipe',
       '/rodolfo/erp/valentins/historico',

@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -23,6 +23,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Ficha técnica (1.2): regras, planilha, foto | `src/lib/erp/{fichas,ficha-campos,ficha-planilha,ficha-importar,foto,arquivos,foto-resposta}.ts`; telas em `src/components/erp/telas/fichas/`; peças de cadastro comuns em `telas/cadastro/`; migration `20261016010000_erp_ficha_foto`; modelo `public/modelos/fichas-tecnicas.csv` |
 | Pré-preparo, fator de correção, custo em cascata (1.3) | `src/lib/erp/{ficha-cascata,ficha-custos}.ts` (conta e grafo puros; leitura por nível); regras em `fichas.ts`; migration `20261016020000_erp_subficha` |
 | Validade por conservação (1.4) | `src/lib/erp/validade.ts` (puro: leitura, dias/horas ↔ minutos, texto, colunas); telas `telas/cadastro/{validade,campos-validade}.tsx`; migration `20261017000000_erp_validade` |
+| Entrada de compra e custo pelo último preço (1.5) | `src/lib/erp/{compra-campos,compras-custo,compras}.ts` (puro / última compra numa consulta / regras com banco); telas em `src/components/erp/telas/compras/`; rotas `/erp/compras` e `/rodolfo/erp/<slug>/compras` (notas, `nova`, `<id>`, `<id>/editar`, `fornecedores`); migrations `20261018000000_erp_validar_checks_insumo` e `20261018010000_erp_compras` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
@@ -559,6 +560,104 @@ Na tela: a dona marca o "Molho cheddar" como refrigerado 3 dias e congelado
 Congelado: 30 dias"), importa uma planilha com `validade_pista_fria`; o
 operador vê a validade e não tem botão nenhum.
 
+## O que a 1.5 entregou — entrada de compra (nota) e custo pelo último preço
+
+Migration `20261018010000_erp_compras` (aditiva): `NotaEntrada.serie` (''
+= sem série), `atualizadoEm`, `canceladaEm`, `motivoCancelamento`;
+`NotaEntradaItem.freteRateadoCentavos`, `embalagemSnapshot`, `ordem`;
+`Fornecedor.atualizadoEm`; CHECKs (frete rateado ≥ 0, número/série curtos,
+cancelada ⇔ data de cancelamento, lançada ⇒ data de lançamento); índice único
+PARCIAL `NotaEntrada_chave_da_nota` (parceiro + fornecedor + número + série,
+fora as canceladas — só no SQL, o Prisma não descreve). Nenhuma tabela nova:
+portão, RLS e trigger sem mudança. E `20261018000000_erp_validar_checks_insumo`
+(herança a da 1.4).
+
+1. **A nota NÃO mexe no estoque nesta fase** (decisão 64): o estoque da loja
+   só abre na 1.6 (1ª contagem). Nenhum `MovimentoEstoque`/`SaldoEstoque` é
+   gravado (teste com banco e prova visual conferem). `LANCADA` = conferida,
+   vale para o custo.
+2. **Custo pelo último preço, derivado** (decisão 65): o custo de referência
+   do insumo é o da nota LANÇADA mais recente que o comprou — Σ(valor + frete
+   rateado) ÷ Σ quantidade dos itens dele naquela nota; sem nota, o preço
+   cadastrado da embalagem padrão (1.1). Ordem: **data da nota** (a digitada,
+   não a de digitação); mesma data, a lançada por último (`lancadaEm`); depois
+   o id. Nada é gravado: lançar, editar ou cancelar muda o custo na próxima
+   leitura; `custoDoInsumo` é a única porta da cascata, então fichas,
+   pré-preparos, planilha, lista e detalhe acompanham. Uma consulta
+   `DISTINCT ON` por leitura (`compras-custo.ts`, pelo `cliente.sql`): a lista
+   de fichas passou de 8 para 9 consultas, constante. Filtros "sem preço" e
+   "custo incompleto" enxergam a compra.
+3. **Item da nota** (decisão 66): insumo + embalagem (padrão, outra cadastrada
+   ou "a granel" por kg/L/un) + quantas embalagens (até 3 casas) + o **valor
+   total do item** como está na nota (o unitário sai da divisão, nunca de um
+   campo arredondado). Quantidade base = embalagens × conteúdo, arredondada ao
+   milésimo. Snapshot: nome do insumo, unidade, embalagem ("Caixa · 5 kg").
+   Valor 0 (bonificação) e insumo de pré-preparo recusados; insumo/embalagem
+   desativados só ficam se já estavam na nota.
+4. **Frete da nota rateado pelo valor dos itens** (maior resto; a soma bate ao
+   centavo) e **total conferido no servidor**: Σ itens + frete = total
+   digitado, senão "A soma dá R$ X (itens R$ Y + frete R$ Z), mas a nota diz
+   R$ W". Desconto da nota fica 0 (pendência).
+5. **Idempotência** (decisão 67): a mesma nota (fornecedor + número + série;
+   número só de dígitos perde zeros à esquerda, "000123" = "123") não entra
+   duas vezes — conferida antes (frase com link para a lançada, ou "em outra
+   loja" sem dizer qual) e garantida pelo índice parcial (dois lançamentos
+   simultâneos: um entra, o outro recebe a frase). Cancelada libera a chave.
+6. **Editar** (condicional a `atualizadoEm`, itens trocados por inteiro,
+   histórico com o que entrou e saiu) e **cancelar** (motivo obrigatório; a
+   nota sai do custo e cada insumo volta à compra anterior ou ao cadastrado).
+7. **Por loja e permissões**: nota é da loja; `compras.ver` e
+   `compras.lancar` com `lojaId` (a regra recebe o alcance e confere a loja de
+   antes e a de depois), `fornecedores.editar` para o cadastro. Lista e
+   detalhe só nas lojas do alcance (fora: 404). A visão do topo (loja) filtra
+   a lista; "Limpar" não a tira. Operador não tem compras (o módulo some).
+   Compras saiu de "em breve" no catálogo e no hub.
+8. **Prévia do impacto** ("Conferir o impacto", nada gravado): total
+   conferido, frete por item, custo de cada insumo antes → depois ("sobe",
+   "desce", "não muda: vale a nota de DD/MM, mais nova") e as fichas que
+   mudam em cascata (por porção/kg), até 30. Na tela, a conta ao vivo usa as
+   mesmas funções puras.
+9. **Fornecedor**: nome (único no parceiro), CNPJ/CPF opcional (dígitos
+   verificadores), contato; editar condicional, desativar/reativar com motivo;
+   detalhe com o que já vendeu (último preço por insumo) e as últimas notas das
+   lojas de quem vê. Cadastro da rede.
+10. **No insumo**: "Custo de referência — Último preço pago" com a conta da
+    compra e "Último preço: R$ X em DD/MM (nota N, fornecedor F, loja)"; painel
+    "Preço pago" com as últimas compras (canceladas riscadas) e o último preço
+    de cada fornecedor, do mais barato ao mais caro. A comparação de embalagens
+    continua pelo preço cadastrado. Lista: "compra DD/MM" ou "cadastrado" sob o
+    custo. **Revisão do Guardião:** o CUSTO de referência (número derivado) é
+    da rede e aparece para quem vê o insumo; número/série da nota, fornecedor,
+    loja, quantidade, valor e frete de cada compra só para quem tem "ver
+    compras e notas" NAQUELA loja (`obterInsumo(cliente, id, alcance)`,
+    `lojasComCompras`) — fora disso nem saem do servidor (teste com banco do
+    gerente de outra loja e do operador; prova visual confere o HTML). O
+    mesmo no detalhe do fornecedor e no Histórico (nota e fornecedor só com
+    "ver compras"). Data da nota em dd/mm/aaaa com máscara própria (o
+    `type="date"` segue o idioma do aparelho).
+11. **Importação**: lançar nota é a importação manual. CSV de notas e XML de
+    NF-e ficam como pendência (não entraram: o volume de hoje é digitável e o
+    XML pede casar código do fornecedor → insumo com memória).
+12. **Heranças da 1.4 resolvidas**: (a) migration valida os CHECKs do Insumo
+    (passa nos dados da 1.4 no ff_dev) e o 23514 vira frase
+    (`checkVioladoDe`, `erroDoCheck`); (b) 0xC8 fora dos marcadores JPEG; (c)
+    principal escolhida sem validade é erro na principal; (d) validade da
+    lista de fichas em linha própria, "Principal" desabilitado mais visível,
+    "Validade não informada" em 15 px, "Validade depois de aberto" como
+    subtítulo do painel do insumo, contorno do selo de atenção a 70 %.
+
+## Provar as compras (1.5)
+
+```bash
+npx vitest run tests/erp-compras.test.ts       # rateio, conversão, total conferido, desempate, cancelar, número/série, CNPJ, heranças b e c
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-compras.db.test.ts
+```
+Na tela: a dona cadastra o fornecedor, lança na Vila da Penha uma nota com 3
+itens e frete, confere a prévia ("Queijo cheddar fatiado: R$ 57,27/kg → …",
+Burger cheddar junto), lança, vê o burger mudar; tenta a mesma nota de novo
+(recusada); cancela e o custo volta; o gerente do Delivery não vê a nota; o
+operador não tem Compras.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -572,7 +671,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Insumos | `Insumo` | já existia; ganhou tipo (ingrediente/embalagem/pré-preparo), taxa de entrega, conservação e validade por conservação, mínimo, fornecedor padrão, origem |
 | Insumos | `InsumoVariante` | outras embalagens de compra do mesmo insumo |
 | Compras | `Fornecedor` | quem vende |
-| Compras | `NotaEntrada` / `NotaEntradaItem` | nota de compra e itens com snapshot; só mexe no estoque quando LANCADA |
+| Compras | `NotaEntrada` / `NotaEntradaItem` | nota de compra e itens com snapshot; LANCADA vale para o custo; movimento de estoque só com o estoque da loja aberto (1.6) |
 | Ficha | `FichaTecnica` | prato ou pré-preparo, rendimento; pré-preparo pode produzir um Insumo |
 | Ficha | `FichaItem` | insumo OU subficha, quantidade líquida, fator de correção |
 | Venda | `ProdutoVenda` | item de venda (aponta a ficha) |
@@ -827,7 +926,7 @@ banco de teste: o operador é recusado pelo servidor.
 ## Herança da 1.2 (para as próximas subfases)
 
 - ~~1.3: subficha, fator de correção na tela e custo em cascata; ciclo.~~ **Feito na 1.3.**
-- 1.5: custo pelo último preço de compra troca `custoDoInsumo` (hoje, embalagem padrão); a cascata não muda (ela chama `custoDoInsumo`).
+- ~~1.5: custo pelo último preço de compra troca `custoDoInsumo`.~~ **Feito na 1.5.**
 - 1.9/1.10: preço por canal aponta a ficha (`ProdutoVenda.fichaId`).
 - XLSX: só CSV. Se entrar lib de planilha, trocar só `decodificarPlanilha`/`lerCsv`.
 - Foto: sem faxina de arquivo órfão (processo morto entre gravar o arquivo e a
@@ -849,8 +948,7 @@ banco de teste: o operador é recusado pelo servidor.
 ## Herança da 1.3 (para as próximas subfases)
 
 - ~~1.4: o insumo produzido nasce "Seco" e não se edita.~~ **1.4:** vem da ficha.
-- 1.5: o custo pelo último preço de compra entra em `custoDoInsumo`; a
-  cascata, o fator e o teto de exibição não mudam.
+- ~~1.5: o custo pelo último preço de compra entra em `custoDoInsumo`.~~ **Feito na 1.5.**
 - 1.6/3.1: o insumo produzido é a face de estoque do pré-preparo (produção dá
   entrada nele); a receita aponta a FICHA (`subfichaId`), não o insumo.
 - Planilha: pré-preparo novo usado na mesma planilha exige dois arquivos
@@ -882,8 +980,7 @@ banco de teste: o operador é recusado pelo servidor.
 - Pré-preparo sem validade aparece em atenção ("Validade não informada"); a
   3.4 pode exigir antes de imprimir. Não travamos a gravação para não quebrar
   fichas e planilhas da 1.2/1.3.
-- CHECKs do Insumo entraram `NOT VALID`: quando conferido que nenhuma linha
-  antiga viola, rodar `ALTER TABLE "Insumo" VALIDATE CONSTRAINT …` (sem pressa).
+- ~~CHECKs do Insumo entraram `NOT VALID`.~~ **1.5:** validados por migration.
 - O intervalo da faxina de pendentes é por processo (memória); com várias
   réplicas, cada uma faz a sua (o teto por vez continua valendo).
 - Histórico de itens lê a frase gravada ("Nome 300 g (fator 1,18)"); nome de
@@ -891,7 +988,46 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 1.4 (apontada pelos fiscais)
 
-- [médio] CHECKs de Insumo entraram `NOT VALID`: rodar `VALIDATE CONSTRAINT` numa próxima migration (passa nos dados da 1.3) ou tratar 23514 com mensagem — hoje linha fora da regra dá 500 ao desativar.
-- [baixo] Marcador JPEG 0xC8 (reservado) ainda aceito em `foto-metadados.ts:86`: tirar da lista.
-- [baixo] Ficha com principal marcada e nenhuma validade grava sem principal, em silêncio: avisar.
-- UX: validade na lista de fichas corta no celular (linha própria); botão "Principal" desabilitado com pouco contraste no claro; "Validade não informada" maior; "Depois de aberto" como subtítulo no detalhe do insumo; contorno do selo "Sem preço" no escuro; conferir "Custo incompleto" subindo do molho para o prato.
+- ~~[médio] CHECKs de Insumo `NOT VALID` / 23514 dá 500.~~ **1.5** (a).
+- ~~[baixo] Marcador JPEG 0xC8.~~ **1.5** (b).
+- ~~[baixo] Principal sem validade grava em silêncio.~~ **1.5** (c).
+- UX: ~~validade na lista de fichas, "Principal" desabilitado, "Validade não informada", "Depois de aberto", contorno do selo~~ (1.5, d); conferir "Custo incompleto" subindo do molho para o prato (segue).
+
+## Herança da 1.5 (para as próximas subfases)
+
+- **1.6 abertura de estoque**: ao abrir o estoque de uma loja (data/hora da
+  abertura), nota lançada nela daí em diante gera `ENTRADA_COMPRA` na mesma
+  transação de `lancarNota`/`editarNota` (editar e cancelar = movimento de
+  estorno; o livro-razão não aceita UPDATE). Nota anterior à abertura já está
+  na contagem e não gera movimento. Decidir: nota de DATA anterior à abertura
+  mas digitada depois. Editar hoje troca os itens por inteiro (ids novos): com
+  movimento apontando `notaItemId`, editar precisa estornar e relançar.
+- Desconto da nota (`descontoCentavos`) fica 0: quando entrar, ratear como o
+  frete e mostrar na prévia. Bonificação (item sem valor) é recusada.
+- CSV de notas e XML de NF-e (com memória código do fornecedor → insumo e o
+  fator de conversão, Notion Core) não entraram.
+- Preço com mais de 2 casas por unidade: a pessoa digita o total da linha, que
+  sempre tem 2 casas; não há campo de unitário.
+- Conta a pagar (Notion Core: "compra vira estoque e conta a pagar no mesmo
+  movimento") é da fase financeira.
+- Fornecedor padrão do insumo/embalagem (colunas da 0.1) segue sem tela.
+- O custo do insumo é o da última compra da REDE (qualquer loja); os detalhes
+  da compra só para quem vê aquela loja. Se um dia o custo for por loja,
+  `ultimasCompras` ganha o filtro de loja.
+- `NotaEntrada_chave_da_nota` é índice parcial escrito à mão (o Prisma não
+  descreve WHERE): migration futura que mexa nele reescreve o SQL. O índice da
+  última compra está declarado no `schema.prisma` (`migrate diff` vazio).
+- Frete rateado é por nota: a mesma compra relançada com outro valor de item
+  muda o rateio (ex.: cheddar R$ 290,00 de R$ 459,50 em itens leva R$ 7,57 dos
+  R$ 12,00; com R$ 278,00 de R$ 447,50, leva R$ 7,45).
+
+## Herança da 1.5 (apontada na prova)
+
+- A lista de fichas afetadas na prévia sai inteira em fichas grandes (teto 30
+  e "E mais N fichas"); com centenas de fichas, paginar.
+
+## Herança da 1.5 (apontada pelos fiscais)
+
+- [decisão do Rodolfo] Custo de referência da rede mostra o preço/kg (e a data) que outra loja pagou: aceitável como "custo da rede" ou esconder a data/mostrar só para quem vê compras?
+- UX: campo de data sem erro visível para formato inválido; texto "peça a quem cuida das compras"; padronizar "Nota 4521-1" na lista (desktop × celular).
+- 1.6: nota com data anterior à abertura digitada depois; editar nota com movimento ligado vai precisar de estorno; desconto/bonificação; CSV de notas, XML de NF-e e contas a pagar fora; fornecedor padrão do insumo sem tela; índice único parcial da chave da nota só no SQL.

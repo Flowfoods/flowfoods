@@ -1075,3 +1075,69 @@ reimportada continua "igual". O formulário manda um marcador do bloco
 sem o marcador mantém a validade. Colunas: `conservacao` e
 `validade_seco|pista_fria|refrigerado|congelado` ("3 dias", "3", "6 h"; só
 número = dias). Conservação principal sem validade é erro na linha.
+
+### 64. 2026-10-18 · ERP 1.5: a nota de entrada não movimenta estoque antes da abertura (1.6)
+
+**Alternativas:** (a) gravar a nota já como `ENTRADA_COMPRA` no livro-razão
+(não perde histórico); (b) só registrar a nota e deixar o movimento para quando
+o estoque da loja abrir.
+
+**Razão:** (b). Antes da abertura não existe saldo: só entradas, nenhum
+consumo, então o `SaldoEstoque` seria um número errado na tela. A abertura
+(1.6) é a 1ª contagem, que já inclui o que foi comprado: com (a) ela teria de
+descontar as entradas anteriores (e `ABERTURA` só aceita sinal +), e cancelar
+ou editar uma nota hoje exigiria estorno num razão imutável sem uso nenhum. O
+histórico não se perde: a nota e os itens são o documento, com snapshot, e
+`MovimentoEstoque.notaItemId` deixa a 1.6 ligar o movimento à nota. Regra para
+a 1.6: nota lançada numa loja já aberta gera o movimento na mesma transação;
+as anteriores já estão na contagem. `LANCADA` passa a significar "conferida,
+vale para o custo".
+
+### 65. 2026-10-18 · ERP 1.5: custo pelo último preço de compra, derivado na leitura; desempate pela data da nota
+
+**Alternativas:** (a) gravar o preço da nota no insumo (embalagem padrão) ao
+lançar; (b) guardar um "custo atual" em coluna e recalcular ao cancelar; (c)
+derivar na leitura: a nota lançada mais recente de cada insumo, numa consulta.
+
+**Razão:** (c), como o custo da ficha (decisões 53 e 57). (a) reescreveria o
+cadastro da pessoa e exigiria restaurar o preço anterior ao cancelar; (b) é
+número velho que precisa de gatilho. Com (c), cancelar a última volta ao preço
+anterior sem código nenhum, e a cascata acompanha porque `custoDoInsumo` é a
+única porta (ela prefere `ultimaCompra`; sem compra, o preço cadastrado). A
+última é a de maior **data da nota** (a que a pessoa digita, que é quando a
+mercadoria foi comprada); mesma data, a lançada por último; depois o id. Data
+de digitação não serve: lançar uma nota velha esquecida não pode "baratear" o
+custo de hoje. Mesmo insumo em duas linhas da nota: a soma ÷ a soma. Uma
+consulta `DISTINCT ON` por leitura, debaixo da RLS (`cliente.sql`). Decisão
+travada em 15/10: último preço, não médio nem PEPS (é o do prompt Kairu e é o
+custo de reposição).
+
+### 66. 2026-10-18 · ERP 1.5: item pelo valor total da linha; frete da nota rateado pelo valor; total conferido no servidor
+
+**Alternativas:** (a) preço unitário por embalagem; (b) valor total do item,
+como na nota; frete (c) por item, digitado, ou (d) da nota, rateado.
+
+**Razão:** (b) e (d). A nota impressa sempre traz o total da linha com 2 casas;
+o unitário vem arredondado (às vezes com 4 casas) e é o "erro que apaga a
+diferença de preço" (Notion Core): o custo sai de total ÷ quantidade, exato.
+O frete vem uma vez no rodapé; ratear pelo valor (maior resto, a soma bate ao
+centavo) é como a contabilidade faz e evita a pessoa dividir à mão. O total
+digitado é conferido no servidor (Σ itens + frete): pega item esquecido ou
+vírgula errada antes de virar custo. Embalagem: a padrão, outra cadastrada ou
+"a granel" (por kg/L/un) para o que vem pesado.
+
+### 67. 2026-10-18 · ERP 1.5: a mesma nota não entra duas vezes (índice parcial); nota por loja; importação manual = lançar
+
+**Alternativas:** (a) chave de acesso da NF-e (já única desde a 0.1); (b)
+fornecedor + número + série, único entre as não canceladas.
+
+**Razão:** (b). Feira, atacarejo e recibo não têm chave de 44 dígitos;
+fornecedor + número + série tem sempre. Número só de dígitos perde zeros à
+esquerda ("000123" = "123"). A conferência antes da gravação dá a frase com o
+link (ou "em outra loja", sem dizer qual, para quem não vê aquela loja); o
+índice único parcial garante na corrida (clique duplo, duas pessoas). A
+cancelada sai da chave: a nota digitada errado é cancelada e lançada certa. A
+nota é da loja (alcance da 0.4: `compras.ver`/`compras.lancar` com `lojaId`,
+conferidos também dentro da regra, com a loja de antes e a de depois);
+fornecedor é cadastro da rede. CSV de notas e XML de NF-e ficaram como
+pendência: lançar é a importação manual que sempre existe.

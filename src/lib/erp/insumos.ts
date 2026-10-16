@@ -15,7 +15,7 @@
 
 import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
-import { ehErroDeUnicidade } from './tenant';
+import { checkVioladoDe, ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
 import {
   diferenca,
@@ -30,9 +30,11 @@ import {
   type FiltrosDeInsumo,
   type TipoInsumo,
 } from './insumo-campos';
+import { pode, type Alcance } from './permissoes';
 import { compararFracoes, custoDaEmbalagem, custoPorUnidade, type CustoExato, type Fracao, type Unidade } from './unidades';
 import { contaDaFicha, custoIncompleto, type CustoDaFicha } from './ficha-campos';
 import { custosEmCascata } from './ficha-custos';
+import { comprasDoInsumo, ultimasCompras, type UltimaCompra } from './compras-custo';
 import { colunasDaValidade, COLUNA_DA_VALIDADE, SELECAO_DA_VALIDADE, validadesDaLinha, type ColunasDaValidade, type Validades } from './validade';
 
 export type ResultadoCadastro =
@@ -60,6 +62,20 @@ class Recusa extends Error {
   constructor(readonly resultado: Extract<ResultadoCadastro, { ok: false }>) {
     super('recusa');
   }
+}
+
+/**
+ * O banco recusou por um CHECK (herança a da 1.4): frase em vez de 500. Com os
+ * CHECKs validados (migration 20261018000000) uma linha antiga fora da regra
+ * não existe mais; se aparecer (gravada por fora), a pessoa sabe o que fazer.
+ */
+export function erroDoCheck(e: unknown): Extract<ResultadoCadastro, { ok: false }> | null {
+  const check = checkVioladoDe(e);
+  if (!check) return null;
+  const geral = /validade/i.test(check)
+    ? 'A validade gravada neste insumo está fora da regra (a conservação principal precisa ter validade, até 730 dias). Corrija em Editar, no bloco “Onde guarda e quanto dura”, e tente de novo. Nada foi gravado.'
+    : 'O banco recusou estes valores (fora da faixa permitida). Confira os números e tente de novo. Nada foi gravado.';
+  return { ok: false, erros: { geral } };
 }
 
 async function erroDeNomeRepetido(cliente: ClienteDoParceiro, nome: string): Promise<ResultadoCadastro> {
@@ -119,6 +135,8 @@ export async function cadastrarInsumo(
     return { ok: true, ...criado, mudou: [] };
   } catch (e) {
     if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, d.nome);
+    const check = erroDoCheck(e);
+    if (check) return check;
     throw e;
   }
 }
@@ -251,6 +269,8 @@ export async function editarInsumo(
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
     if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, d.nome);
+    const check = erroDoCheck(e);
+    if (check) return check;
     throw e;
   }
   return { ok: true, id, nome: d.nome, mudou: mudanca.campos };
@@ -299,6 +319,8 @@ export async function mudarSituacaoInsumo(
     });
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
+    const check = erroDoCheck(e);
+    if (check) return check;
     throw e;
   }
 }
@@ -318,8 +340,14 @@ export interface LinhaDeInsumo {
   conteudoMilesimos: number;
   precoEmbalagemCentavos: number;
   taxaEntregaCentavos: number;
-  /** Custo de referência exato; null = "Sem preço" (custo incompleto). Pré-preparo: ver `preparo`. */
+  /**
+   * Custo de referência exato: o da última compra lançada (1.5) ou, sem
+   * compra, o do preço cadastrado; null = "Sem preço" (custo incompleto).
+   * Pré-preparo: ver `preparo`.
+   */
   custo: CustoExato | null;
+  /** 1.5: a data da última compra lançada (de onde vem o custo), quando há. Nota, fornecedor e loja ficam no módulo de compras. */
+  ultimaCompra: { entradaEm: string } | null;
   /** Outras embalagens ativas. */
   variantes: number;
   ativo: boolean;
@@ -336,7 +364,8 @@ function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
     ...(f.conservacao ? { OR: [{ conservacao: f.conservacao }, { [COLUNA_DA_VALIDADE[f.conservacao]]: { not: null } }] } : {}),
     ...(f.situacao === 'ativos' ? { ativo: true } : f.situacao === 'desativados' ? { ativo: false } : {}),
     // "Sem preço" é quem precisa de preço digitado: o pré-preparo tem custo da ficha.
-    ...(f.semPreco ? { precoEmbalagemCentavos: 0, fichaQueProduz: { is: null } } : {}),
+    // 1.5: com nota lançada, o insumo tem o preço da compra.
+    ...(f.semPreco ? { precoEmbalagemCentavos: 0, fichaQueProduz: { is: null }, notaItens: { none: { nota: { status: 'LANCADA' as const } } } } : {}),
   };
 }
 
@@ -361,15 +390,17 @@ type LinhaDoBanco = Prisma.InsumoGetPayload<{ select: typeof SELECAO_DA_LINHA }>
  * rendimento é na unidade do insumo), lido em cascata para a página inteira
  * de uma vez (`custosDosPreparos`).
  */
-function paraLinha(i: LinhaDoBanco, preparos: ReadonlyMap<string, CustoDaFicha>): LinhaDeInsumo {
+function paraLinha(i: LinhaDoBanco, preparos: ReadonlyMap<string, CustoDaFicha>, compras: ReadonlyMap<string, UltimaCompra>): LinhaDeInsumo {
   const { _count, fichaQueProduz, validadeSecoMin: _s, validadePistaFriaMin: _p, validadeRefrigeradoMin: _r, validadeCongeladoMin: _g, ...resto } = i;
   const c = fichaQueProduz ? preparos.get(fichaQueProduz.id) : undefined;
   const validades = validadesDaLinha(i)!;
+  const compra = fichaQueProduz ? undefined : compras.get(i.id);
   return {
     ...resto,
     validades,
     conservacaoInformada: !fichaQueProduz || Object.keys(validades.minutos).length > 0,
-    custo: fichaQueProduz ? null : custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+    custo: fichaQueProduz ? null : (compra?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos)),
+    ultimaCompra: compra ? { entradaEm: compra.entradaEm } : null,
     variantes: _count.variantes,
     preparo: fichaQueProduz && c ? { fichaId: fichaQueProduz.id, porUnidade: c.porRendimento, incompleto: custoIncompleto(c) } : null,
   };
@@ -380,6 +411,14 @@ async function custosDosPreparos(tx: ClienteDoParceiro, linhas: LinhaDoBanco[]):
   if (ids.length === 0) return new Map();
   const c = await custosEmCascata(tx, ids);
   return new Map(ids.map((id) => [id, c.custo(id)!]));
+}
+
+/** 1.5: a última compra de cada insumo comprado da página (uma consulta). */
+function comprasDasLinhas(tx: ClienteDoParceiro, linhas: LinhaDoBanco[]) {
+  return ultimasCompras(
+    tx,
+    linhas.filter((l) => !l.fichaQueProduz).map((l) => l.id),
+  );
 }
 
 /** Custo por unidade para ordenar (exato); null = sem preço (vai para o fim). */
@@ -410,11 +449,13 @@ export async function listarInsumos(
         select: SELECAO_DA_LINHA,
       });
       const preparos = await custosDosPreparos(tx, linhas);
-      return { linhas: linhas.map((l) => paraLinha(l, preparos)), total, pagina, paginas };
+      const compras = await comprasDasLinhas(tx, linhas);
+      return { linhas: linhas.map((l) => paraLinha(l, preparos, compras)), total, pagina, paginas };
     }
     const lidas = await tx.insumo.findMany({ where, orderBy: { nome: 'asc' }, select: SELECAO_DA_LINHA });
     const preparos = await custosDosPreparos(tx, lidas);
-    const todas = lidas.map((l) => paraLinha(l, preparos));
+    const compras = await comprasDasLinhas(tx, lidas);
+    const todas = lidas.map((l) => paraLinha(l, preparos, compras));
     const sinal = f.direcao === 'asc' ? 1 : -1;
     todas.sort((a, b) => {
       const x = custoParaOrdenar(a);
@@ -429,7 +470,13 @@ export async function listarInsumos(
 
 // ---------------------------------------------------------------- obter
 
-export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
+/**
+ * Detalhe do insumo. `alcance`: quem pede. O custo de referência (último
+ * preço, número derivado) é da rede e vem sempre; nota, série, fornecedor,
+ * loja, quantidade, valor e frete de cada compra só nas lojas em que a pessoa
+ * tem "ver compras e notas" (o resto nem sai do servidor).
+ */
+export async function obterInsumo(cliente: ClienteDoParceiro, id: string, alcance: Alcance) {
   return cliente.transacao(async (tx) => {
     const i = await tx.insumo.findUnique({
       where: { id },
@@ -442,6 +489,11 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
     const ficha = i.fichaQueProduz;
     const custoDaFicha = ficha ? (await custosEmCascata(tx, [ficha.id])).custo(ficha.id)! : null;
     const travaDaUnidade = await motivoDaUnidadeTravada(tx, id);
+    // 1.5: o custo vem da última compra lançada, quando há; o histórico de preços e o último de cada fornecedor.
+    const ultima = ficha ? undefined : (await ultimasCompras(tx, [id])).get(id);
+    const compras = ficha ? { compras: [], fornecedores: [] } : await comprasDoInsumo(tx, id, alcance);
+    const veUltima = !!ultima && pode(alcance, 'compras.ver', { lojaId: ultima.lojaId });
+    const lojaDaUltima = ultima && veUltima ? ((await tx.loja.findUnique({ where: { id: ultima.lojaId }, select: { nome: true } }))?.nome ?? null) : null;
     const historico = await listarHistorico(tx, {
       de: [
         { entidade: 'Insumo', ids: [id] },
@@ -459,7 +511,32 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
       conteudoMilesimos: i.conteudoMilesimos,
       precoEmbalagemCentavos: i.precoEmbalagemCentavos,
       taxaEntregaCentavos: i.taxaEntregaCentavos,
-      custo: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+      /** O custo que vale: última compra ou, sem ela, o preço cadastrado. */
+      custo: ultima?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+      /** O do preço cadastrado (embalagem padrão), sempre. */
+      custoCadastrado: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+      ultimaCompra: ultima
+        ? {
+            custo: ultima.custo,
+            entradaEm: ultima.entradaEm,
+            /** De que compra veio: só para quem vê compras naquela loja (null = só o custo). */
+            detalhe: veUltima
+              ? {
+                  notaId: ultima.notaId,
+                  numero: ultima.numero,
+                  serie: ultima.serie,
+                  lojaId: ultima.lojaId,
+                  lojaNome: lojaDaUltima,
+                  fornecedor: ultima.fornecedor,
+                  valorCentavos: ultima.valorCentavos,
+                  freteCentavos: ultima.freteCentavos,
+                  quantidadeMilesimos: ultima.quantidadeMilesimos,
+                }
+              : null,
+          }
+        : null,
+      compras: compras.compras,
+      precoPorFornecedor: compras.fornecedores,
       ativo: i.ativo,
       versao: i.atualizadoEm.toISOString(),
       travaDaUnidade,

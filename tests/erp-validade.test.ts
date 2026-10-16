@@ -87,8 +87,11 @@ describe('ERP 1.4 · validação das conservações e validades', () => {
     expect(r.ok && r.validades).toEqual({ principal: 'CONGELADO', minutos: { CONGELADO: 129_600 } });
   });
 
-  it('ficha sem nenhuma marcada = validade não informada (null), mesmo com a principal escolhida', () => {
-    expect(lerValidades(form({ conservacao: 'SECO' }), 'ficha')).toEqual({ ok: true, validades: null });
+  it('ficha sem nenhuma marcada = validade não informada (null); com a principal escolhida, avisa (1.5, herança c)', () => {
+    expect(lerValidades(form({}), 'ficha')).toEqual({ ok: true, validades: null });
+    const r = lerValidades(form({ conservacao: 'SECO' }), 'ficha');
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.erros.conservacao).toMatch(/nenhuma conservação tem validade/);
   });
 
   it('insumo sem nenhuma marcada: fica a principal, sem validade', () => {

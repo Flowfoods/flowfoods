@@ -79,6 +79,11 @@ export interface InsumoDaFicha {
    * insumo produzido: por ele, o item escaparia da conferência de círculo.
    */
   produzidoPor?: string | null;
+  /**
+   * 1.5: custo exato pela ÚLTIMA nota de compra lançada (anexado na leitura,
+   * `compras-custo.ts`). Ausente ou null = sem compra: vale o preço cadastrado.
+   */
+  ultimaCompra?: CustoExato | null;
 }
 
 /** Pré-preparo como o item da ficha precisa dele (1.3): a ficha que pode entrar em outra. */
@@ -383,7 +388,15 @@ export interface CustoDaFicha {
 
 export const custoIncompleto = (c: Pick<CustoDaFicha, 'faltaPreco'>) => c.faltaPreco.length > 0;
 
-export function custoDoInsumo(i: Pick<InsumoDaFicha, 'precoEmbalagemCentavos' | 'taxaEntregaCentavos' | 'conteudoMilesimos'>): CustoExato | null {
+/**
+ * Custo de referência do insumo: o da última compra lançada (1.5, decisão 65)
+ * ou, sem compra, o preço cadastrado da embalagem padrão (1.1). É a única
+ * porta da cascata para o preço do insumo.
+ */
+export function custoDoInsumo(
+  i: Pick<InsumoDaFicha, 'precoEmbalagemCentavos' | 'taxaEntregaCentavos' | 'conteudoMilesimos' | 'ultimaCompra'>,
+): CustoExato | null {
+  if (i.ultimaCompra) return i.ultimaCompra;
   return custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos);
 }
 

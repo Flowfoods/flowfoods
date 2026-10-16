@@ -131,6 +131,9 @@ export function lerValidades(
   if (marcadas.length === 0) {
     if (para === 'insumo') {
       principal = escolhida ?? 'SECO';
+    } else if (escolhida) {
+      // Herança c da 1.4: principal escolhida sem nenhuma validade não some em silêncio.
+      erros.conservacao = `A principal (${CONSERVACOES[escolhida].toLowerCase()}) foi escolhida, mas nenhuma conservação tem validade. Marque ${CONSERVACOES[escolhida].toLowerCase()} e diga quanto dura, ou deixe sem principal.`;
     }
   } else if (escolhida && marcadas.includes(escolhida)) principal = escolhida;
   else if (marcadas.length === 1 && !escolhida) principal = marcadas[0];

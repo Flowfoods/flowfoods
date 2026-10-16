@@ -3,7 +3,7 @@
  * alterações", que só vale com a rede inteira (o histórico cita toda a rede).
  */
 
-import { exigirParceiroDaSessao, exigirPermissaoNaPagina } from '@/lib/erp/contexto';
+import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { listarHistorico } from '@/lib/erp/historico';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
@@ -15,7 +15,12 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'historico.ver');
   const entidade = entidadeDoFiltro(searchParams.entidade);
-  const linhas = await listarHistorico(ctx.cliente, { entidades: entidadesDoFiltro(entidade), limite: LIMITE_DO_HISTORICO });
+  const linhas = await listarHistorico(ctx.cliente, {
+    entidades: entidadesDoFiltro(entidade),
+    limite: LIMITE_DO_HISTORICO,
+    // 1.5: nota e fornecedor (valores, lojas) só para quem vê compras.
+    semEntidades: pode(ctx.alcance, 'compras.ver') ? [] : ['NotaEntrada', 'Fornecedor'],
+  });
   return (
     <div className="space-y-6">
       <PageHeader
