@@ -28,6 +28,7 @@ import {
 } from './ficha-campos';
 import { casarComInsumos, chaveDeNome, lerPlanilhaDeFichas, type ErroDeLinha, type FichaDaPlanilha } from './ficha-planilha';
 import { custosEmCascata } from './ficha-custos';
+import { anexarUltimasCompras, type ComUltimaCompra } from './compras-custo';
 import {
   cadastroDaEntrada,
   conferirEstrutura,
@@ -114,6 +115,8 @@ async function planejar(tx: ClienteDoParceiro, texto: string, travar: boolean): 
     where: { fichaQueProduz: { is: null } },
     select: { id: true, nome: true, unidade: true, ativo: true, conteudoMilesimos: true, precoEmbalagemCentavos: true, taxaEntregaCentavos: true },
   });
+  // 1.5: custo pela última compra (uma consulta para a planilha inteira).
+  await anexarUltimasCompras(tx, todos as (typeof todos[number] & ComUltimaCompra)[]);
   const preparosLidos = await tx.fichaTecnica.findMany({
     where: { tipo: 'PRE_PREPARO' },
     select: { id: true, nome: true, tipo: true, ativa: true, unidadeRendimento: true },

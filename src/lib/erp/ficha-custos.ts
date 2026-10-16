@@ -14,6 +14,7 @@ import type { ClienteDoParceiro } from './tenant';
 import { cascataDeCusto, PROFUNDIDADE_MAXIMA, type FichaDaCascata } from './ficha-cascata';
 import type { TipoFicha } from './ficha-campos';
 import type { Unidade } from './unidades';
+import { anexarUltimasCompras } from './compras-custo';
 
 export const SELECAO_DO_INSUMO = {
   id: true,
@@ -71,6 +72,9 @@ export async function lerCascata(
     for (const f of lidas) mapa.set(f.id, f);
     faltam = pendentes(lidas);
   }
+  // 1.5: o custo de cada insumo é o da última compra (uma consulta para a leitura inteira).
+  const insumos = Array.from(mapa.values()).flatMap((f) => f.itens.map((i) => i.insumo).filter((x): x is NonNullable<typeof x> => !!x));
+  if (insumos.length > 0) await anexarUltimasCompras(tx, insumos as (typeof insumos[number] & { id: string })[]);
   return mapa;
 }
 

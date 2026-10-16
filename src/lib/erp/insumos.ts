@@ -33,6 +33,7 @@ import {
 import { compararFracoes, custoDaEmbalagem, custoPorUnidade, type CustoExato, type Fracao, type Unidade } from './unidades';
 import { contaDaFicha, custoIncompleto, type CustoDaFicha } from './ficha-campos';
 import { custosEmCascata } from './ficha-custos';
+import { comprasDoInsumo, ultimasCompras, type UltimaCompra } from './compras-custo';
 import { colunasDaValidade, COLUNA_DA_VALIDADE, SELECAO_DA_VALIDADE, validadesDaLinha, type ColunasDaValidade, type Validades } from './validade';
 
 export type ResultadoCadastro =
@@ -338,8 +339,14 @@ export interface LinhaDeInsumo {
   conteudoMilesimos: number;
   precoEmbalagemCentavos: number;
   taxaEntregaCentavos: number;
-  /** Custo de referência exato; null = "Sem preço" (custo incompleto). Pré-preparo: ver `preparo`. */
+  /**
+   * Custo de referência exato: o da última compra lançada (1.5) ou, sem
+   * compra, o do preço cadastrado; null = "Sem preço" (custo incompleto).
+   * Pré-preparo: ver `preparo`.
+   */
   custo: CustoExato | null;
+  /** 1.5: a última compra lançada (de onde vem o custo), quando há. */
+  ultimaCompra: { entradaEm: string; numero: string | null; fornecedor: string | null } | null;
   /** Outras embalagens ativas. */
   variantes: number;
   ativo: boolean;
@@ -356,7 +363,8 @@ function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
     ...(f.conservacao ? { OR: [{ conservacao: f.conservacao }, { [COLUNA_DA_VALIDADE[f.conservacao]]: { not: null } }] } : {}),
     ...(f.situacao === 'ativos' ? { ativo: true } : f.situacao === 'desativados' ? { ativo: false } : {}),
     // "Sem preço" é quem precisa de preço digitado: o pré-preparo tem custo da ficha.
-    ...(f.semPreco ? { precoEmbalagemCentavos: 0, fichaQueProduz: { is: null } } : {}),
+    // 1.5: com nota lançada, o insumo tem o preço da compra.
+    ...(f.semPreco ? { precoEmbalagemCentavos: 0, fichaQueProduz: { is: null }, notaItens: { none: { nota: { status: 'LANCADA' as const } } } } : {}),
   };
 }
 
@@ -381,15 +389,17 @@ type LinhaDoBanco = Prisma.InsumoGetPayload<{ select: typeof SELECAO_DA_LINHA }>
  * rendimento é na unidade do insumo), lido em cascata para a página inteira
  * de uma vez (`custosDosPreparos`).
  */
-function paraLinha(i: LinhaDoBanco, preparos: ReadonlyMap<string, CustoDaFicha>): LinhaDeInsumo {
+function paraLinha(i: LinhaDoBanco, preparos: ReadonlyMap<string, CustoDaFicha>, compras: ReadonlyMap<string, UltimaCompra>): LinhaDeInsumo {
   const { _count, fichaQueProduz, validadeSecoMin: _s, validadePistaFriaMin: _p, validadeRefrigeradoMin: _r, validadeCongeladoMin: _g, ...resto } = i;
   const c = fichaQueProduz ? preparos.get(fichaQueProduz.id) : undefined;
   const validades = validadesDaLinha(i)!;
+  const compra = fichaQueProduz ? undefined : compras.get(i.id);
   return {
     ...resto,
     validades,
     conservacaoInformada: !fichaQueProduz || Object.keys(validades.minutos).length > 0,
-    custo: fichaQueProduz ? null : custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+    custo: fichaQueProduz ? null : (compra?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos)),
+    ultimaCompra: compra ? { entradaEm: compra.entradaEm, numero: compra.numero, fornecedor: compra.fornecedor } : null,
     variantes: _count.variantes,
     preparo: fichaQueProduz && c ? { fichaId: fichaQueProduz.id, porUnidade: c.porRendimento, incompleto: custoIncompleto(c) } : null,
   };
@@ -400,6 +410,14 @@ async function custosDosPreparos(tx: ClienteDoParceiro, linhas: LinhaDoBanco[]):
   if (ids.length === 0) return new Map();
   const c = await custosEmCascata(tx, ids);
   return new Map(ids.map((id) => [id, c.custo(id)!]));
+}
+
+/** 1.5: a última compra de cada insumo comprado da página (uma consulta). */
+function comprasDasLinhas(tx: ClienteDoParceiro, linhas: LinhaDoBanco[]) {
+  return ultimasCompras(
+    tx,
+    linhas.filter((l) => !l.fichaQueProduz).map((l) => l.id),
+  );
 }
 
 /** Custo por unidade para ordenar (exato); null = sem preço (vai para o fim). */
@@ -430,11 +448,13 @@ export async function listarInsumos(
         select: SELECAO_DA_LINHA,
       });
       const preparos = await custosDosPreparos(tx, linhas);
-      return { linhas: linhas.map((l) => paraLinha(l, preparos)), total, pagina, paginas };
+      const compras = await comprasDasLinhas(tx, linhas);
+      return { linhas: linhas.map((l) => paraLinha(l, preparos, compras)), total, pagina, paginas };
     }
     const lidas = await tx.insumo.findMany({ where, orderBy: { nome: 'asc' }, select: SELECAO_DA_LINHA });
     const preparos = await custosDosPreparos(tx, lidas);
-    const todas = lidas.map((l) => paraLinha(l, preparos));
+    const compras = await comprasDasLinhas(tx, lidas);
+    const todas = lidas.map((l) => paraLinha(l, preparos, compras));
     const sinal = f.direcao === 'asc' ? 1 : -1;
     todas.sort((a, b) => {
       const x = custoParaOrdenar(a);
@@ -462,6 +482,10 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
     const ficha = i.fichaQueProduz;
     const custoDaFicha = ficha ? (await custosEmCascata(tx, [ficha.id])).custo(ficha.id)! : null;
     const travaDaUnidade = await motivoDaUnidadeTravada(tx, id);
+    // 1.5: o custo vem da última compra lançada, quando há; o histórico de preços e o último de cada fornecedor.
+    const ultima = ficha ? undefined : (await ultimasCompras(tx, [id])).get(id);
+    const compras = ficha ? { compras: [], fornecedores: [] } : await comprasDoInsumo(tx, id);
+    const lojaDaUltima = ultima ? compras.compras.find((c) => c.notaId === ultima.notaId)?.lojaNome ?? null : null;
     const historico = await listarHistorico(tx, {
       de: [
         { entidade: 'Insumo', ids: [id] },
@@ -479,7 +503,13 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string) {
       conteudoMilesimos: i.conteudoMilesimos,
       precoEmbalagemCentavos: i.precoEmbalagemCentavos,
       taxaEntregaCentavos: i.taxaEntregaCentavos,
-      custo: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+      /** O custo que vale: última compra ou, sem ela, o preço cadastrado. */
+      custo: ultima?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+      /** O do preço cadastrado (embalagem padrão), sempre. */
+      custoCadastrado: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+      ultimaCompra: ultima ? { ...ultima, lojaNome: lojaDaUltima } : null,
+      compras: compras.compras,
+      precoPorFornecedor: compras.fornecedores,
       ativo: i.ativo,
       versao: i.atualizadoEm.toISOString(),
       travaDaUnidade,
