@@ -223,10 +223,12 @@ export function FormNota({
                 ))}
               </select>
               <Erro id={`${idBase}-fornecedorId-erro`} texto={erros.fornecedorId} />
-              {novoFornecedor && (
+              {novoFornecedor ? (
                 <Link href={novoFornecedor} className={`${LINK_DE_TEXTO} mt-1.5 inline-block`}>
                   Fornecedor novo: cadastrar
                 </Link>
+              ) : (
+                <p className={AJUDA}>Fornecedor que não está na lista: peça a quem cuida das compras para cadastrar.</p>
               )}
             </div>
             <div className="grid grid-cols-[minmax(0,1fr)_6rem] gap-3">
@@ -440,10 +442,12 @@ export function FormNota({
               >
                 Adicionar item
               </button>
-              {novoInsumo && (
+              {novoInsumo ? (
                 <Link href={novoInsumo} className={LINK_DE_TEXTO}>
                   Insumo que falta: cadastrar
                 </Link>
+              ) : (
+                <span className="text-[12px] text-suave">Insumo que falta: peça a quem cuida dos insumos.</span>
               )}
             </div>
             <p className="text-sm tabular-nums">

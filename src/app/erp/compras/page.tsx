@@ -41,6 +41,7 @@ export default async function ErpNotasPage({ searchParams }: { searchParams: Rec
         novaHref={lanca && !ctx.bloqueio ? `${BASE}/nova` : undefined}
         temFornecedor={opcoes.fornecedores.length > 0}
         fornecedoresHref={`${BASE}/fornecedores`}
+        cadastraFornecedor={pode(ctx.alcance, 'fornecedores.editar')}
       />
     </div>
   );

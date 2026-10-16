@@ -65,7 +65,7 @@ export function TelaFormNota({
       />
       {opcoes.fornecedores.length === 0 && (
         <Aviso tom="alerta" titulo="Nenhum fornecedor cadastrado.">
-          Cadastre quem vende antes de lançar a nota.
+          {novoFornecedor ? 'Cadastre quem vende antes de lançar a nota.' : 'Peça a quem cuida das compras para cadastrar quem vende; depois a nota entra.'}
         </Aviso>
       )}
       <FormNota

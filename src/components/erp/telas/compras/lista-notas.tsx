@@ -167,6 +167,7 @@ export function TelaListaNotas({
   novaHref,
   temFornecedor,
   fornecedoresHref,
+  cadastraFornecedor = true,
   filtrado = temFiltroDeNota(f),
 }: {
   base: string;
@@ -180,6 +181,8 @@ export function TelaListaNotas({
   /** Sem fornecedor cadastrado, o primeiro passo é cadastrar um. */
   temFornecedor: boolean;
   fornecedoresHref: string;
+  /** Pode cadastrar fornecedor? Sem isso, a frase manda pedir a quem cuida das compras. */
+  cadastraFornecedor?: boolean;
 }) {
   if (linhas.length === 0) {
     return (
@@ -199,7 +202,7 @@ export function TelaListaNotas({
           <Vazio
             titulo="Nenhuma nota lançada ainda."
             acao={
-              novaHref ? (
+              novaHref && (temFornecedor || cadastraFornecedor) ? (
                 <Link href={temFornecedor ? novaHref : `${fornecedoresHref}/novo`} className={classeDeBotao('primario')}>
                   {temFornecedor ? 'Lançar a primeira nota' : 'Cadastrar o primeiro fornecedor'}
                 </Link>
@@ -209,7 +212,9 @@ export function TelaListaNotas({
             {novaHref
               ? temFornecedor
                 ? 'Com a nota lançada, o custo dos insumos passa a ser o último preço pago, e as fichas acompanham.'
-                : 'Para lançar nota, cadastre antes quem vende: nome, CNPJ (se tiver) e contato.'
+                : cadastraFornecedor
+                  ? 'Para lançar nota, cadastre antes quem vende: nome, CNPJ (se tiver) e contato.'
+                  : 'Para lançar nota, falta o fornecedor: peça a quem cuida das compras para cadastrar quem vende.'
               : 'Quem cuida das compras ainda não lançou nenhuma nota nas suas lojas.'}
           </Vazio>
         )}
