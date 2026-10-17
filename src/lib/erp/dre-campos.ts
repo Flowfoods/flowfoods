@@ -12,14 +12,16 @@
  *    cima) em cada loja; sem a configuração a linha é "falta configurar a taxa"
  *    (nunca R$ 0,00) e a receita líquida e os resultados saem com o selo
  *    "sem contar a taxa do iFood";
- *  - o CMV é da 2.3: a linha diz "Em breve" e a margem e os resultados saem
- *    com o selo "sem contar o CMV" (um resultado sem o maior custo da casa não
- *    é o resultado: é o que dá para dizer hoje);
+ *  - o CMV (2.3) é o que vale em cada loja: o real quando apurado, senão o de compra, com o selo da fonte
+ *    (`cmv-campos.ts`); loja sem nota e sem real é NULA e margem e resultados saem "sem contar o CMV" (um
+ *    resultado sem o maior custo da casa não é o resultado: é o que dá para dizer hoje); abaixo da linha
+ *    vão as duas de detalhe, `cmv:compra` e `cmv:real` (fora do plano de contas: sem meta e sem despesa);
  *  - a rede é a soma das lojas + as despesas da rede (sem loja); a visão de uma
  *    loja traz só o que é dela, sem rateio da rede (decisão 141).
  */
 
 import type { CanalVenda } from './canal-campos';
+import { cmvDoEscopo, type CmvDoDre } from './cmv-campos';
 import { CANAIS_EM_ORDEM } from './faturamento-campos';
 import {
   CODIGO,
@@ -60,6 +62,8 @@ export interface EntradaDoDre {
   /** Nulo = a taxa do iFood não foi configurada. */
   taxaIfood: TaxaDoIfood | null;
   despesas: readonly DespesaApropriada[];
+  /** O CMV de cada loja (2.3): compra e real. Sem lojas = nenhum CMV (tudo "sem nota de compra"). */
+  cmv: CmvDoDre;
 }
 
 export type TipoDaLinha = 'receita' | 'taxa' | 'linha' | 'subtotal' | 'cmv' | 'resultado';
@@ -76,13 +80,13 @@ export interface LinhaDoDre {
   tipo: TipoDaLinha;
   /** Recuo na tabela: 0 = linha de grupo ou resultado, 1 = linha dentro do grupo. */
   nivel: 0 | 1;
-  /** Nulo = não dá para calcular (CMV, taxa sem configuração). Zero numa linha de despesa é "sem lançamento". */
+  /** Nulo = não dá para calcular (CMV sem nota nem estoque, taxa sem configuração). Zero numa linha de despesa é "sem lançamento". */
   valorCentavos: number | null;
   /** Pontos-base da receita bruta; nulo se não há receita ou não há valor. */
   percentualBp: number | null;
   /** O que ficou de fora e o leitor precisa saber ("o CMV", "a taxa do iFood"). */
   semContar: string[];
-  /** Frase curta ao lado do valor ("Em breve", "falta configurar a taxa"). */
+  /** Frase curta ao lado do valor ("falta configurar a taxa", o selo da fonte do CMV). */
   nota: string | null;
   oculta: boolean;
 }
@@ -100,6 +104,10 @@ export interface ResultadoDoDre {
 
 const SEM_TAXA = 'a taxa do iFood';
 const SEM_CMV = 'o CMV';
+
+/** As duas linhas de detalhe do CMV: não são do plano de contas (ninguém lança despesa nelas e não têm meta). */
+export const CHAVE_CMV_COMPRA = 'cmv:compra';
+export const CHAVE_CMV_REAL = 'cmv:real';
 
 /** Divisão inteira com arredondamento metade para cima, exata (BigInt), para numerador qualquer e denominador positivo. */
 export function dividirExato(num: bigint, den: bigint): number {
@@ -191,8 +199,13 @@ export function montarDre(e: EntradaDoDre): ResultadoDoDre {
   const liquida = bruta - deducoes;
   empurrar({ ...linhaPlano(doPlano(CODIGO.receitaLiquida)), tipo: 'resultado', nivel: 0, valorCentavos: liquida, semContar: unir(semTaxa), nota: null });
 
-  // --- CMV: chega na 2.3
-  empurrar({ ...linhaPlano(doPlano(CODIGO.cmv)), tipo: 'cmv', nivel: 0, valorCentavos: null, semContar: [], nota: 'Em breve' });
+  // --- CMV (2.3): o que vale em cada loja, e abaixo as duas leituras (compra e real)
+  const receitaDaLoja = (id: string) => e.receitas.filter((r) => r.lojaId === id).reduce((s, r) => s + r.valorCentavos, 0);
+  const cmv = cmvDoEscopo(e.cmv, e.escopo.tipo === 'rede' ? { tipo: 'rede' } : { tipo: 'loja', lojaId: e.escopo.lojaId }, receitaDaLoja);
+  empurrar({ ...linhaPlano(doPlano(CODIGO.cmv)), tipo: 'cmv', nivel: 0, valorCentavos: cmv.centavos, semContar: [], nota: cmv.nota });
+  const detalheDoCmv = { codigo: null, linhaId: null, grupo: 'CMV' as const, sentido: 'MENOR_MELHOR' as const, tipo: 'linha' as const, nivel: 1 as const, semContar: [] as string[] };
+  empurrar({ ...detalheDoCmv, chave: CHAVE_CMV_COMPRA, nome: 'Pelas compras (data da nota)', valorCentavos: cmv.compra.centavos, nota: cmv.compra.nota });
+  empurrar({ ...detalheDoCmv, chave: CHAVE_CMV_REAL, nome: 'Real (contagem)', valorCentavos: cmv.real.centavos, nota: cmv.real.nota });
 
   // --- Variáveis → margem de contribuição
   const bloco = (g: GrupoDoDre) => {
@@ -203,7 +216,7 @@ export function montarDre(e: EntradaDoDre): ResultadoDoDre {
   };
   const variaveis = GRUPOS_ANTES_DA_MARGEM.reduce((s, g) => s + bloco(g), 0);
   const margem = liquida - variaveis;
-  const semAteAqui = unir(semTaxa, [SEM_CMV]);
+  const semAteAqui = unir(semTaxa, cmv.sem ? [SEM_CMV] : []);
   empurrar({ ...linhaPlano(doPlano(CODIGO.margem)), tipo: 'resultado', nivel: 0, valorCentavos: margem, semContar: semAteAqui, nota: null });
 
   // --- Despesas fixas → resultado operacional

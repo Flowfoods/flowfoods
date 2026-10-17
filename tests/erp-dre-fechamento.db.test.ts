@@ -219,7 +219,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       const o = await dre(DONA(), { tipo: 'rede' }, '2026-10-05');
       expect(o!.metas.cmv).toMatchObject({ metaBp: 0, desvioBp: null, semComparacao: 'sem faturamento', metaCentavos: null }); // outubro ainda não tem faturamento
       const d = await dre(DONA(), { tipo: 'rede' }, '2026-09-10');
-      expect(d!.metas.cmv).toMatchObject({ metaBp: 2000, metaCentavos: 200_000, desvioBp: null, desvioTexto: null, palavra: null, semComparacao: 'ainda sem valor' });
+      expect(d!.metas.cmv).toMatchObject({ metaBp: 2000, metaCentavos: 200_000, desvioBp: null, desvioTexto: null, palavra: null, semComparacao: 'sem valor apurado' });
       expect(linha(d!, 'cmv').valorCentavos).toBeNull();
     });
 
@@ -256,7 +256,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       expect(d.metas['resultado-do-periodo']).toMatchObject({ metaBp: 1000 });
       expect(d.metas['resultado-do-periodo'].palavra).toBe(linha(d, 'resultado-do-periodo').percentualBp! > 1000 ? 'melhor que a meta' : 'pior que a meta');
       // Setembro NÃO pega a meta de CMV de outubro (nem a de salários: foi gravada em outubro).
-      expect(d.metas.cmv).toMatchObject({ metaBp: 2000, semComparacao: 'ainda sem valor' });
+      expect(d.metas.cmv).toMatchObject({ metaBp: 2000, semComparacao: 'sem valor apurado' });
       expect(d.metas.salarios).toBeUndefined();
       // Receita não tem meta.
       expect(d.metas['receita-loja']).toBeUndefined();

@@ -631,9 +631,9 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · DRE ao vivo (Postgres real)', { timeout
     expect(com!.ate).toBe('2026-10-16');
   });
 
-  it('critério 12: o CMV diz "Em breve" sem número; margem e resultados com "sem contar o CMV"', async () => {
+  it('critério 12: o CMV sem nota e sem estoque é nulo e diz a frase; margem e resultados com "sem contar o CMV"', async () => {
     const d = await dre(a, DONA(), { tipo: 'loja', lojaId: ids.vp }, '2026-10-10', HOJE);
-    expect(linha(d!, CODIGO.cmv)).toMatchObject({ valorCentavos: null, nota: 'Em breve' });
+    expect(linha(d!, CODIGO.cmv)).toMatchObject({ valorCentavos: null, nota: 'sem nota de compra no período' });
     for (const c of [CODIGO.margem, CODIGO.operacional, CODIGO.resultado]) expect(linha(d!, c).semContar).toEqual(['o CMV']);
   });
 

@@ -196,7 +196,7 @@ export interface CmvDoEscopo {
   real: { centavos: number | null; nota: string | null };
 }
 
-const lista = (nomes: readonly string[]) => (nomes.length <= 1 ? nomes.join('') : nomes.join(', '));
+const lista = (nomes: readonly string[]) => (nomes.length <= 1 ? nomes.join('') : `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`);
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 /**

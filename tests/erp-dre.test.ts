@@ -24,6 +24,7 @@ import {
   tipoDaCompetencia,
   type TextosDaDespesa,
 } from '@/lib/erp/despesa-campos';
+import { SEM_CMV } from '@/lib/erp/cmv-campos';
 import { montarDre, percentualDaReceita, taxaDoIfoodDaLoja, textoDoPercentual, textoDosPontos, type EntradaDoDre } from '@/lib/erp/dre-campos';
 import { CODIGO, PLANO_PADRAO, chaveDaLinha, linhasLancaveisDoGrupo, lerNomeDaLinha, planoEfetivo, type LinhaDoBanco } from '@/lib/erp/dre-plano';
 import { diasEntre, somarDias } from '@/lib/erp/contagem-campos';
@@ -380,7 +381,7 @@ describe('2.2a · o DRE realizado', () => {
     })),
   );
   const idDe = (codigo: string) => `id-${codigo}`;
-  const entrada = (parcial: Partial<EntradaDoDre>): EntradaDoDre => ({ escopo: { tipo: 'rede' }, plano, receitas: [], taxaIfood: null, despesas: [], ...parcial });
+  const entrada = (parcial: Partial<EntradaDoDre>): EntradaDoDre => ({ escopo: { tipo: 'rede' }, plano, receitas: [], taxaIfood: null, despesas: [], cmv: SEM_CMV, ...parcial });
   const valor = (r: ReturnType<typeof montarDre>, codigo: string) => r.linhas.find((l) => l.codigo === codigo)!;
 
   it('taxas do iFood: 23 % + 3,2 % sobre R$ 10.000,00 = R$ 2.620,00; a receita líquida é a diferença', () => {
@@ -407,9 +408,9 @@ describe('2.2a · o DRE realizado', () => {
     expect(valor(r, CODIGO.receitaLiquida).semContar).toEqual([]);
   });
 
-  it('CMV: "Em breve", sem número; margem e resultados "sem contar o CMV"', () => {
+  it('CMV sem nota e sem estoque: nulo com a frase (nunca R$ 0,00); margem e resultados "sem contar o CMV"', () => {
     const r = montarDre(entrada({ receitas: [{ lojaId: 'a', canal: 'LOJA', valorCentavos: 1_000_000 }] }));
-    expect(valor(r, CODIGO.cmv)).toMatchObject({ valorCentavos: null, nota: 'Em breve' });
+    expect(valor(r, CODIGO.cmv)).toMatchObject({ valorCentavos: null, nota: 'sem nota de compra no período' });
     for (const c of [CODIGO.margem, CODIGO.operacional, CODIGO.resultado]) expect(valor(r, c).semContar).toEqual(['o CMV']);
     expect(valor(r, CODIGO.receitaLiquida).semContar).toEqual([]);
   });

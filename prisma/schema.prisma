@@ -1218,6 +1218,9 @@ model Contagem {
   // 1.7: nome do ciclo ("Refrigerado · vencidos") e como terminou.
   titulo                  String?
   desfecho                ContagemDesfecho?
+  // 2.3: quantos insumos com saldo ficaram sem preço no retrato (abertura e fechamento), gravado no
+  // mesmo UPDATE que fecha a contagem. Nulo = contagem de antes do registro ("não registrado"). CHECK >= 0.
+  itensSemPreco           Int?
 
   itens ContagemItem[]
 
@@ -1653,7 +1656,7 @@ model DreFotografia {
   fechadoPorNome    String
   taxaComissaoBp    Int?
   taxaPagamentoBp   Int?
-  // 1 = sem CMV (2.2b); a 2.3 grava versão nova com 2.
+  // 1 = sem CMV (2.2b); 2 = com o CMV de compra e o real (2.3).
   versaoDaConta     Int             @default(1)
   entrada           Json
   ressalvas         Json            @default("[]")

@@ -61,3 +61,32 @@ export function textoDaDiferenca(centavos: number, bp: number | null): string {
   return bp === null ? v : `${v} · ${textoDosPontos(bp)}`;
 }
 
+
+// ================================================================ o painel "compra × real"
+
+export interface LojaSemReal {
+  lojaId: string;
+  lojaNome: string;
+  motivo: string;
+  compraCentavos: number | null;
+}
+
+export interface PainelDoCmv {
+  /** Cada loja com o real apurado: compra, real, diferença e a frase. */
+  comparacoes: ComparacaoDaLoja[];
+  /** A soma das lojas comparadas, quando são duas ou mais. */
+  total: ReturnType<typeof somarComparacoes> | null;
+  /** As lojas que venderam ou compraram e ficaram só pelas compras, com o motivo. */
+  semReal: LojaSemReal[];
+}
+
+/** O painel de um período ENCERRADO. Loja parada (sem venda, sem nota e sem real) não aparece. */
+export function painelDoCmv(cmv: CmvDoDre, receitaDaLoja: (lojaId: string) => number): PainelDoCmv {
+  const comparacoes = compararCmv(cmv, receitaDaLoja);
+  const semReal: LojaSemReal[] = cmv.lojas
+    .filter((l) => !l.real && (receitaDaLoja(l.lojaId) > 0 || l.compraCentavos !== null))
+    .map((l) => ({ lojaId: l.lojaId, lojaNome: l.lojaNome, motivo: l.motivoSemReal ?? 'não apurado', compraCentavos: l.compraCentavos }))
+    .sort((a, b) => a.lojaNome.localeCompare(b.lojaNome, 'pt-BR'));
+  const total = comparacoes.length > 1 ? somarComparacoes(comparacoes, comparacoes.reduce((s, c) => s + receitaDaLoja(c.lojaId), 0)) : null;
+  return { comparacoes, total, semReal };
+}

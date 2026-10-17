@@ -10,6 +10,7 @@
  *  - condições para fechar: justificativa, motivo, impressão, e a ponte entre o DRE e as linhas da fotografia.
  */
 import { describe, expect, it } from 'vitest';
+import { SEM_CMV } from '@/lib/erp/cmv-campos';
 import { montarDre } from '@/lib/erp/dre-campos';
 import {
   impressaoDasCondicoes,
@@ -52,6 +53,7 @@ function dreDeDezMil(pessoal = 260_000) {
       { linhaId: comId.find((l) => l.codigo === 'salarios')!.id!, lojaId: 'vp', centavos: pessoal },
       { linhaId: comId.find((l) => l.codigo === 'aluguel')!.id!, lojaId: null, centavos: 120_000 },
     ],
+    cmv: SEM_CMV,
   });
   void idDe;
 }
@@ -149,15 +151,15 @@ describe('2.2b · realizado × meta (critério 5)', () => {
   it('CMV (valor nulo), receita zero e despesa sem lançamento não comparam: traço, nunca zero', () => {
     const r = dreDeDezMil();
     const cmv = r.linhas.find((l) => l.chave === 'cmv')!;
-    expect(compararComMeta(cmv, 3000, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: null, desvioTexto: null, palavra: null, semComparacao: 'ainda sem valor', metaCentavos: 300_000 });
+    expect(compararComMeta(cmv, 3000, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: null, desvioTexto: null, palavra: null, semComparacao: 'sem valor apurado', metaCentavos: 300_000 });
     const energia = r.linhas.find((l) => l.chave === 'energia')!;
     expect(compararComMeta(energia, 400, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: null, semComparacao: 'sem lançamento', metaCentavos: 40_000 });
-    const semReceita = montarDre({ escopo: { tipo: 'rede' }, plano, receitas: [], taxaIfood: null, despesas: [] });
+    const semReceita = montarDre({ escopo: { tipo: 'rede' }, plano, receitas: [], taxaIfood: null, despesas: [], cmv: SEM_CMV });
     const p = semReceita.linhas.find((l) => l.chave === 'grupo:PESSOAL')!;
     expect(compararComMeta(p, 2500, 0)).toMatchObject({ desvioBp: null, metaCentavos: null, semComparacao: 'sem faturamento' });
   });
   it('um resultado que fechou em zero com receita compara de verdade', () => {
-    const r = montarDre({ escopo: { tipo: 'rede' }, plano: plano.map((l, i) => ({ ...l, id: `L${i}` })), receitas: [{ lojaId: 'x', canal: 'LOJA', valorCentavos: 100_000 }], taxaIfood: null, despesas: [] });
+    const r = montarDre({ escopo: { tipo: 'rede' }, plano: plano.map((l, i) => ({ ...l, id: `L${i}` })), receitas: [{ lojaId: 'x', canal: 'LOJA', valorCentavos: 100_000 }], taxaIfood: null, despesas: [], cmv: SEM_CMV });
     const linha = r.linhas.find((l) => l.chave === 'resultado-do-periodo')!;
     expect(linha.valorCentavos).toBe(100_000);
     const zerado = { valorCentavos: 0, percentualBp: 0, tipo: 'resultado', sentido: 'MAIOR_MELHOR' as const };
@@ -271,7 +273,7 @@ describe('2.2b · justificativa, motivo, impressão e a ponte com a fotografia',
     expect(Object.fromEntries(metasDasLinhas(gravadas))).toEqual({ 'grupo:PESSOAL': 2500, 'resultado-do-periodo': 1000 });
   });
   it('a taxa do iFood não configurada atravessa a fotografia', () => {
-    const r = montarDre({ escopo: { tipo: 'rede' }, plano, receitas: [{ lojaId: 'x', canal: 'IFOOD', valorCentavos: 100_000 }], taxaIfood: null, despesas: [] });
+    const r = montarDre({ escopo: { tipo: 'rede' }, plano, receitas: [{ lojaId: 'x', canal: 'IFOOD', valorCentavos: 100_000 }], taxaIfood: null, despesas: [], cmv: SEM_CMV });
     expect(r.faltaConfigurarTaxa).toBe(true);
     const volta = dreDaFotografia(linhasParaGravar(r, null, null, () => null), { tipo: 'rede' });
     expect(volta.faltaConfigurarTaxa).toBe(true);
