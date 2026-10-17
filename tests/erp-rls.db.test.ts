@@ -112,6 +112,19 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
                has_table_privilege(${PAPEL_DE_TENANT}, quote_ident(${t}), 'INSERT') AS ins`;
       expect(p, t).toEqual({ upd: false, del: false, ins: true });
     }
+    // 2.2b: a fotografia do fechamento só se inclui e se lê; o único UPDATE é nas três colunas da reabertura, nunca DELETE.
+    for (const t of ['DreFotografia', 'DreFotografiaLinha']) {
+      const [p] = await db.$queryRaw<{ upd: boolean; del: boolean; ins: boolean; sel: boolean }[]>`
+        SELECT has_table_privilege(${PAPEL_DE_TENANT}, quote_ident(${t}), 'UPDATE') AS upd,
+               has_table_privilege(${PAPEL_DE_TENANT}, quote_ident(${t}), 'DELETE') AS del,
+               has_table_privilege(${PAPEL_DE_TENANT}, quote_ident(${t}), 'INSERT') AS ins,
+               has_table_privilege(${PAPEL_DE_TENANT}, quote_ident(${t}), 'SELECT') AS sel`;
+      expect(p, t).toEqual({ upd: false, del: false, ins: true, sel: true });
+    }
+    const [col] = await db.$queryRaw<{ ok: boolean; no: boolean }[]>`
+      SELECT has_column_privilege(${PAPEL_DE_TENANT}, '"DreFotografia"', 'substituidaEm', 'UPDATE') AS ok,
+             has_column_privilege(${PAPEL_DE_TENANT}, '"DreFotografia"', 'entrada', 'UPDATE') AS no`;
+    expect(col).toEqual({ ok: true, no: false });
   });
 
   it('0.5 · o papel do tenant recebe "permission denied" ao ler o pedido de acesso (mesmo dentro do contexto de um parceiro)', async (ctx) => {
