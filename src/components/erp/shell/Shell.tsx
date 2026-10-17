@@ -11,8 +11,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Menu } from 'lucide-react';
-import { itemAtivo, telasDaNavegacao } from '@/lib/erp/modulos';
+import { abasDaArea, acoesDaNavegacao, itemAtivo, montarTrilha, telasDaNavegacao } from '@/lib/erp/modulos';
 import { comParceiroAtual, slugNoCaminho } from '@/lib/rodolfo/modulos';
+import { Abas } from '../ui/abas';
 import { Dialogo } from '../ui/Dialogo';
 import { acaoGuardarMenu } from './acoes';
 import { BuscaGlobal } from './BuscaGlobal';
@@ -62,6 +63,13 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
         detalhe: `${t.modulo} · ${t.subtitulo}`,
         href: t.href,
       })),
+      // Ações das áreas que a pessoa vê E pode fazer (o filtro é de `modulosDoParceiro`; aqui só se lista).
+      ...acoesDaNavegacao(nav).map((a) => ({
+        tipo: 'acao' as const,
+        rotulo: a.rotulo,
+        detalhe: `${a.modulo} · ${a.subtitulo}`,
+        href: a.href,
+      })),
     ];
     const dosParceiros: ResultadoDaBusca[] = (parceiros ?? []).map((p) => ({
       tipo: 'parceiro',
@@ -86,12 +94,10 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
     void acaoGuardarMenu(novo);
   }
 
-  // Módulo › tela (› o que a página acrescentar: o insumo aberto, "Editar"...).
+  // Área › aba (› o que a página acrescentar: o insumo aberto, "Novo insumo", "Editar"...). A área leva à entrada dela.
   const extra = useTrilhaExtra();
-  const trilha: ItemDaTrilha[] = [
-    ...(ativo ? [{ rotulo: ativo.modulo.nome }, { rotulo: ativo.item.rotulo, href: extra.length ? ativo.item.href : undefined }] : []),
-    ...extra,
-  ];
+  const trilha: ItemDaTrilha[] = montarTrilha(ativo, extra);
+  const abas = abasDaArea(nav, ativo);
 
   return (
     <div
@@ -171,6 +177,12 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
         </header>
 
         <main id="conteudo" className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+          {abas && (
+            <Abas
+              rotulo={`Seções de ${abas.area}`}
+              abas={abas.abas.map((a) => ({ href: a.href, rotulo: a.rotulo, ativa: a.href === ativo?.item.href }))}
+            />
+          )}
           {children}
         </main>
       </div>

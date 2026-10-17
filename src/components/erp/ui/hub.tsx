@@ -1,11 +1,14 @@
 /**
  * Hub de módulos (Ref.1): a tela de entrada do /erp e do /rodolfo.
  *
- * Grade de 4 colunas no desktop, 3 no tablet, 2 no celular. Card = quadrado
- * do ícone na cor do módulo + nome + subtítulo de uma linha; borda fina, raio
- * 14 px; hover troca borda e fundo (sem pulo). Módulo do plano ainda não
- * construído: mesmo card, sem link, com o selo "Em breve" — nunca leva a uma
- * tela que não existe.
+ * Grade de 4 colunas no desktop, 2 no tablet, 1 abaixo de 600 px (kit Dark:
+ * "abaixo de 600 px, cards vão para uma coluna"). Card = quadrado do ícone na
+ * cor da área + nome + descrição do fluxo e, embaixo, as abas que a pessoa
+ * pode abrir, cada uma um link próprio (UX.9: o hub mostra ÁREAS, nunca ações;
+ * o card inteiro leva à primeira aba); borda
+ * fina, raio 14 px; hover troca borda e fundo (sem pulo). Módulo do plano
+ * ainda não construído: mesmo card, sem link, com o selo "Em breve" — nunca
+ * leva a uma tela que não existe.
  */
 
 import Link from 'next/link';
@@ -20,35 +23,68 @@ export interface CartaoDoHub {
   cor: string;
   href: string | null;
   fase?: string;
+  /** Abas da área que a pessoa pode abrir (sem número, sem R$, sem %): cada uma é um link próprio. */
+  abas?: { rotulo: string; href: string }[];
 }
 
+const CAIXA = 'flex h-full min-w-0 flex-col items-start rounded-[14px] border border-linha bg-painel p-4 sm:p-5';
+const HOVER = 'ff-transicao hover:border-linha-forte hover:bg-forte';
+
 export function CartaoModulo({ c }: { c: CartaoDoHub }) {
-  const corpo = (
+  const cabeca = (
     <>
       <IconeDoModulo icone={c.icone} cor={c.cor} tamanho={40} />
       <span className="mt-3 block min-w-0">
         <span className="block truncate text-[15px] font-semibold text-texto">{c.nome}</span>
         <span className="mt-0.5 block text-[13px] leading-snug text-suave [text-wrap:pretty]">{c.subtitulo}</span>
       </span>
-      {!c.href && c.fase && (
-        <span className="mt-3 inline-flex w-max items-center rounded-[7px] border border-linha-forte px-2 py-0.5 text-[12px] font-medium text-suave">
-          Em breve
-        </span>
-      )}
     </>
   );
-  const caixa = 'flex h-full min-w-0 flex-col items-start rounded-[14px] border border-linha bg-painel p-4 sm:p-5';
   if (!c.href) {
     return (
-      <div aria-disabled="true" className={`${caixa} bg-transparent`}>
-        {corpo}
+      <div aria-disabled="true" className={`${CAIXA} bg-transparent`}>
+        {cabeca}
+        {c.fase && (
+          <span className="mt-3 inline-flex w-max items-center rounded-[7px] border border-linha-forte px-2 py-0.5 text-[12px] font-medium text-suave">
+            Em breve
+          </span>
+        )}
       </div>
     );
   }
+  if (!c.abas || c.abas.length === 0) {
+    return (
+      <Link href={c.href} className={`${CAIXA} ${HOVER}`}>
+        {cabeca}
+      </Link>
+    );
+  }
+  // Card de área: o título é o link principal e estica sobre o card todo (o card inteiro leva à primeira aba); os nomes das
+  // abas são links IRMÃOS, acima da camada esticada (nunca link dentro de link) e chegam por Tab depois do título.
   return (
-    <Link href={c.href} className={`${caixa} ff-transicao hover:border-linha-forte hover:bg-forte`}>
-      {corpo}
-    </Link>
+    <div className={`${CAIXA} relative ${HOVER}`}>
+      <IconeDoModulo icone={c.icone} cor={c.cor} tamanho={40} />
+      <span className="mt-3 block min-w-0">
+        <Link href={c.href} className="ff-cartao-titulo block text-[15px] font-semibold text-texto">
+          {c.nome}
+        </Link>
+        <span className="mt-0.5 block text-[13px] leading-snug text-suave [text-wrap:pretty]">{c.subtitulo}</span>
+      </span>
+      <div className="relative z-10 mt-4 w-full border-t border-linha pt-2">
+        <ul aria-label={`Abas de ${c.nome}`} className="flex flex-wrap items-center gap-x-4 text-[13px] text-suave">
+          {c.abas.map((a) => (
+            <li key={a.href} className="flex items-center">
+              <Link
+                href={a.href}
+                className="ff-transicao inline-flex min-h-8 items-center rounded-[5px] hover:text-texto hover:underline hover:underline-offset-4 [@media(pointer:coarse)]:min-h-11"
+              >
+                {a.rotulo}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 
@@ -61,7 +97,7 @@ export function HubDeModulos({ secoes }: { secoes: { rotulo: string; cartoes: Ca
           <section key={s.rotulo} aria-label={s.rotulo}>
             {/* avoid-ai-design-ignore: SD4 — rótulo de seção em caixa alta só no hub e nos grupos do menu (contrato do shell). */}
             <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-suave">{s.rotulo}</h2>
-            <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+            <ul className="grid grid-cols-1 gap-3 min-[600px]:grid-cols-2 xl:grid-cols-4">
               {s.cartoes.map((c) => (
                 <li key={c.chave} className="min-w-0">
                   <CartaoModulo c={c} />

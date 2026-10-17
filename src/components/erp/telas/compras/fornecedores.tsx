@@ -171,7 +171,7 @@ export function TelaDetalheFornecedor({
   const mensagem = fraseDoFornecedor(feito);
   return (
     <div className="space-y-6">
-      <TrilhaDaPagina itens={[{ rotulo: 'Fornecedores', href: base }, { rotulo: f.nome }]} />
+      <TrilhaDaPagina itens={[{ rotulo: f.nome }]} />
       <Voltar href={base}>Voltar para os fornecedores</Voltar>
       <PageHeader
         icone="fornecedor"

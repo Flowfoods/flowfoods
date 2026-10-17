@@ -31,6 +31,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Preço e margem por canal na ficha: sugerido pela margem-alvo, preço próprio, margem bruta e líquida, farol (1.10) | `src/lib/erp/preco-campos.ts` (puro: a MESMA conta no servidor e na prévia) + `canais.ts` (`contaDosCanais`, `salvarPrecos`, `salvarMargensAlvo`, `precosDaLista`); telas `telas/fichas/{custo-por-canal,form-margens}.tsx` e `ui/dica.tsx`; sem migration |
 | Onboarding (0.5): pedido de acesso (landing ou manual), quadro "Aguardando liberação" e ativação | `src/lib/erp/{pedido-textos,pedido-campos,pedidos,trava}.ts` (textos e limites / regras puras / banco / trava) + `ativarPedido` em `credenciais.ts`; landing `src/components/FormComecar.tsx` + `src/app/comecar/actions.ts`; N1 em `src/app/rodolfo/(painel)/onboarding/` (`/rodolfo/onboarding`, `/<id>`, `/novo`); migration `20261023000000_erp_onboarding` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
+| Navegação por áreas (UX.9): hub de 4 áreas, abas por rota, trilha com a área, ações no ⌘K; rota nova `/estoque/contagens` | `src/lib/erp/modulos.ts` (`areasConstruidas`, `abasDaArea`, `acoesDaNavegacao`, `montarTrilha`) e `src/lib/rodolfo/modulos.ts`; `src/components/erp/ui/{abas,hub}.tsx`, `telas/hub-do-parceiro.tsx`, `shell/Shell.tsx`; sem migration |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
 
 ## O que a 0.2 entregou (multi-tenant)
@@ -1237,6 +1238,72 @@ novo cria a senha, o segundo uso dá "link vencido" e a dona entra no ERP como D
 motivo → cadastrar pedido manual → lista de parceiros com o aviso do rascunho. Prints em 390/820/1440,
 claro e escuro.
 
+## O que a UX.9 entregou — navegação por ÁREAS (seção 9 do plano, antes da 0.6)
+
+Só reorganização: nenhuma regra de negócio, permissão do catálogo, consulta, action, esquema ou migration
+mudou (o diff não toca `prisma/`, nem `src/lib/erp/*` fora de `modulos.ts`, nem `actions.ts`/`executar.ts`).
+Nenhuma URL antiga mudou, sumiu ou redireciona. O servidor continua sendo a autoridade: esconder aba, card
+ou ação é conforto; a página e a action seguem conferindo `exigirPermissaoNaPagina`/`recusaDaAcao`.
+
+**Mapa de navegação (área = módulo, aba = item do menu, ação = `acoes` da área).** Fonte única em
+`src/lib/erp/modulos.ts` (`areasConstruidas`); o hub, o menu, o seletor, as abas e o ⌘K saem dela.
+
+| Área (card do hub) | Abas (rota, permissão) | Ações no cabeçalho da aba e no ⌘K (permissão) |
+|---|---|---|
+| Cadastros e Cardápio | Insumos `/insumos` (insumos.ver) · Fichas e produtos `/fichas` (fichas.ver) · Precificação `/fichas/canais` (precos.ver) | Novo insumo (insumos.editar) · Nova ficha e Importar planilha (fichas.editar) |
+| Compras e Fornecedores | Compras `/compras` · Fornecedores `/compras/fornecedores` (compras.ver) | Lançar nota (compras.lancar) · Novo fornecedor (fornecedores.editar) |
+| Estoque e Movimentações | Visão geral `/estoque` (estoque.ver) · **Contagens `/estoque/contagens` (nova)** (estoque.ver) · Requisições (pedir ou atender) · Divergências (estoque.ajustar) | nenhuma (Nova requisição, Planejar contagem e Abrir estoque são da loja) |
+| Rede e Equipe | Lojas e marcas (lojas.ver) · Equipe (acessos.gerir) · Histórico (historico.ver) · Seu acesso (livre) / Cadastro do parceiro (nível 1) | nenhuma |
+| Futuros (desabilitados, sem link) | Faturamento e DRE 2.1 · Produção 3.1 · Etiquetas 3.4 | |
+
+1. **Hub** (`/erp` "Áreas da Rede" e `/rodolfo/erp/<slug>`): um card por área com acesso (nome, descrição do
+   fluxo e as abas permitidas; sem número, R$ nem %). O título é o link principal e estica sobre o card todo
+   (o card inteiro leva à primeira aba permitida); os nomes das abas são links irmãos acima dessa camada
+   (nunca link dentro de link; chegam por Tab depois do título, e "Contagens" abre `/estoque/contagens`). Não há
+   rota de "visão geral de área". Nenhum card é uma ação. Abaixo de 600 px, uma coluna. O `flatMap` de itens
+   do hub saiu (Regra Nº 2: não há hub novo ao lado do velho).
+2. **Área sem aba permitida some** do hub, do seletor, do menu e do ⌘K; as ações somem com ela. "Rede e
+   Equipe" sempre aparece (Seu acesso é livre). A visão "Rede ↔ loja" nunca muda áreas nem abas.
+3. **Abas** (`src/components/erp/ui/abas.tsx`, montadas pelo `Shell` no topo do conteúdo a partir de
+   `abasDaArea`): `<nav aria-label="Seções de <área>">`, cada aba é um link de rota, a atual leva
+   `aria-current="page"` (não é `role=tablist`: cada aba é uma rota). Indicador de 2 px embaixo, o mesmo do
+   menu; foco por dentro da aba; no celular o trilho rola só dentro dele. Menos de duas abas, sem barra.
+4. **Trilha** `Início › Área (link para a entrada) › Aba › extra`. As telas de ação declaram a própria trilha
+   (Novo insumo, Nova ficha, Importar planilha, Lançar nota, Novo fornecedor) e o "Fornecedores" repetido
+   saiu. No nível 1 a trilha continua `Parceiros Flow › Aba`. Abaixo de 640 px não há trilha: quem dá o
+   contexto são as abas e o h1.
+5. **⌘K** acha as abas ("Área · subtítulo") e as ações, só das áreas visíveis e permitidas. Nenhum resultado
+   traz R$, custo nem margem (`buscarInsumos`/`buscarFichas` não selecionam dinheiro).
+6. **Contagens** é a única rota nova (`/estoque/contagens` e o espelho `/rodolfo/erp/<slug>/estoque/contagens`):
+   escolhe a loja (com Selo do estado do estoque); com uma só loja no acesso vai direto ao período dela.
+   Porta: "ver o estoque". A contagem mora dentro da loja (`<loja>/periodo`, `<loja>/contagens/...`) e acende
+   a aba Contagens (`ativoEm`).
+7. **Precificação** é o nome da aba e o título da tela `/fichas/canais` (taxa do iFood, embalagens, margem-alvo);
+   o link "Margem de cada prato" (só com "ver fichas") leva a `/fichas?tipo=PRATO`, onde preço e margem por ficha já aparecem, filtrados
+   no servidor por "ver preços". Nenhuma lista nova.
+8. **Nível 1**: `comParceiroAtual` monta um grupo por área dentro de "Parceiros Flow" (mais "Áreas do parceiro")
+   e leva as ações para o ⌘K. O seletor do menu diz "Área".
+9. Rótulos: "Fichas e produtos" é só rótulo (não existe entidade "produto" nova); "Lançar nota" continua. O
+   título de cada tela é o da aba: "Compras" (era "Notas de compra") e "Visão geral" (era "Estoque por loja", que
+   passa ao subtítulo). O seletor de área do menu usa um `resumo` curto (até 20 caracteres), não o subtítulo do card.
+10. Kit Kairu: card de 14 px (Dark), um CTA principal por cabeçalho e `aria-current="page"` no destino ativo
+    (Corporativo), vazio com próximo passo. Identidade FlowFoods mantida; scanner do avoid-ai-design com 0 P0 e 0 P1.
+
+## Provar a navegação por áreas (UX.9)
+
+```bash
+npx vitest run tests/erp-navegacao.test.ts tests/erp-shell.test.ts   # papéis × áreas/abas/ações, hub renderizado, itemAtivo em toda rota, trilha, abas, URLs, guardas
+npx prisma validate && npm run typecheck && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run   # duas vezes
+npm run build                                                          # "/" continua ○ (estático)
+```
+Na tela (build de produção local, porta própria, banco de prova): entrar como Dono e como Operador (uma loja) e
+fazer insumo → ficha → nota → estoque → contagem só por cards, abas e botões, sem digitar URL; conferir o hub
+(4 cards; Operador sem Compras e sem Precificação), o menu e o seletor, o ⌘K ("forn": Fornecedores, Lançar nota,
+Novo fornecedor; Operador sem nenhuma ação), a trilha `Início › Cadastros e Cardápio › Insumos › Novo insumo` e
+as abas com `aria-current`, em 390/820/1440, claro e escuro; abrir `/erp/compras/nova` como Operador volta ao hub
+com o aviso.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -1814,3 +1881,31 @@ banco de teste: o operador é recusado pelo servidor.
   saída pelo WhatsApp.
 - O formulário não tem CAPTCHA; a armadilha só pega robô simples. Spam feito à mão passa até 3/h por IP
   e 100/dia no total, e cai no quadro como cartão Novo para recusar com motivo.
+
+## Herança da seção 9 (UX.9, para as próximas subfases)
+
+- **Módulo novo = área nova ou aba nova em `areasConstruidas`** (e uma linha em `ROTAS_ATIVAS` do
+  `tests/erp-navegacao.test.ts`). O teste que varre o disco falha se uma página do `/erp` ou do espelho do
+  nível 1 não acender nenhuma aba. Os módulos futuros (DRE 2.1, Produção 3.1, Etiquetas 3.4) continuam
+  desabilitados e sem link até terem tela; quando chegarem, entram como área (ou aba de área existente).
+- **Ordem do `itemAtivo`**: o primeiro `ativoEm` que casa vence; depois, o maior prefixo. Rota profunda nova
+  dentro de uma loja (`<loja>/algo`) precisa de `ativoEm` ou acende "Visão geral".
+- Fora do escopo, anotado: indicadores ou dashboard por papel (não há dado novo), repassar o filtro da lista
+  pelo formulário de "Novo" (o `?de=` já volta ao detalhe), tirar o custo do insumo do Operador (é permissão:
+  `insumos.ver` é "Ver insumos e custos"), `VERSAO_DO_ERP` e o rodapé do menu.
+- A cor da área (card, seletor) não bate com a de algumas telas (Fichas âmbar dentro da área verde de
+  Cadastros): a cor marca a tela; aceito.
+- Parceiro em RASCUNHO/SUSPENSO: as ações do ⌘K abrem telas que mostram o bloqueio (como os botões hoje).
+- **Hub com 1 coluna no celular**: a régua do plano pede 2 colunas; o kit Dark manda 1 abaixo de 600 px e os cards
+  de área têm texto longo. Decidido por 1 coluna; se o Rodolfo preferir 2, é só a classe da grade em `ui/hub.tsx`.
+- **Grupos do menu com 1 item** (Insumos, Rede, Estoque) repetem a aba logo abaixo; o menu ficou fiel à estrutura
+  de abas. Se incomodar, fundir os grupos de 1 item numa seção só (só configuração, em `areasConstruidas`).
+- **Divergências a 390 px** (lista de lojas) não mostra estado por loja (só o nome), diferente de Requisições
+  (pendentes) e Contagens (selo do estoque). Precisa de uma consulta nova de "divergências abertas por loja".
+- **Equipe a 390 px** passa de 41 mil px de altura (lista de pessoas, perfis e lojas, tudo aberto): paginar ou
+  colapsar por pessoa. Anterior à UX.9 (a tela é da 0.4), não piorou.
+- **Trilha do nível 1 sem a área** (`Parceiros Flow › Aba`): a decisão 105 manteve assim para não alongar a
+  trilha; o contrato pede `Início › Área › Aba`. Se o Rodolfo quiser o literal, `montarTrilha` pode inserir a
+  área (`item.area`) quando ela difere do módulo.
+- **O Operador vê custo de insumo** porque `insumos.ver` é "Ver insumos e custos" (catálogo de permissões da
+  0.4): tirar é regra de permissão, fora da UX.9.

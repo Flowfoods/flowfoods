@@ -37,7 +37,7 @@ export function CabecalhoDasNotas({
     <PageHeader
       icone="compras"
       cor={COR.compras}
-      titulo="Notas de compra"
+      titulo="Compras"
       subtitulo={subtitulo}
       acao={
         novaHref ? (

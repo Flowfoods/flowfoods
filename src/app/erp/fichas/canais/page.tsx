@@ -23,6 +23,7 @@ export default async function ErpCanaisDeVendaPage({ searchParams }: { searchPar
       versao={t.versao}
       historico={t.historico}
       podeEditar={pode(ctx.alcance, 'precos.editar')}
+      podeVerFichas={pode(ctx.alcance, 'fichas.ver')}
       bloqueio={ctx.bloqueio}
       acao={acaoSalvarTaxaDoIfood}
       feito={searchParams.feito}

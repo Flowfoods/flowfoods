@@ -1,5 +1,5 @@
 /**
- * ERP do parceiro — hub "Módulos da Rede", a tela de entrada. Livre (só a
+ * ERP do parceiro — hub "Áreas da Rede", a tela de entrada. Livre (só a
  * sessão): mostra só o que `modulosDoParceiro(alcance)` libera, e é para cá
  * que `exigirPermissaoNaPagina` manda quem abre uma tela fora do acesso.
  */
@@ -16,7 +16,7 @@ export default async function HubDaRede({ searchParams }: { searchParams: { 'sem
   const { visao } = await visaoDaRequisicao(ctx);
   return (
     <HubDoParceiro
-      titulo="Módulos da Rede"
+      titulo="Áreas da Rede"
       subtitulo={`${ctx.parceiro.nome} · ${rotuloDaVisao(visao)} · ${ctx.pessoa.perfilRotulo ?? 'acesso próprio'}`}
       modulos={modulosDoParceiro(ctx.alcance)}
       semAcesso={Boolean(searchParams['sem-acesso'])}

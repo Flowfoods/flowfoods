@@ -1,9 +1,11 @@
 /**
- * Hub "Módulos da Rede": a tela de entrada do ERP de um parceiro, a MESMA
- * para a pessoa do parceiro (/erp) e para o nível 1 dentro do parceiro
- * (/rodolfo/erp/<slug>). Recebe os módulos já filtrados pelo alcance de quem
- * vê (`modulosDoParceiro`): em uso, uma tela por card; os do plano ainda sem
- * tela, desabilitados com a fase.
+ * Hub "Áreas da Rede": a tela de entrada do ERP de um parceiro, a MESMA para a
+ * pessoa do parceiro (/erp) e para o nível 1 dentro do parceiro
+ * (/rodolfo/erp/<slug>). Recebe as áreas já filtradas pelo alcance de quem vê
+ * (`modulosDoParceiro`): em uso, UM CARD POR ÁREA (nome, descrição e as abas
+ * que a pessoa pode abrir, cada uma um link; área sem aba permitida nem chega aqui); as do plano
+ * ainda sem tela, desabilitadas com a fase. O card nunca é uma ação ("Novo
+ * insumo", "Lançar nota"): as ações moram no cabeçalho da aba e no ⌘K.
  */
 
 import type { ModuloNav } from '@/lib/erp/modulos';
@@ -38,18 +40,15 @@ export function HubDoParceiro({
         secoes={[
           {
             rotulo: 'Em uso',
-            cartoes: emUso.flatMap((m) =>
-              m.grupos.flatMap((g) =>
-                g.itens.map((i) => ({
-                  chave: i.href,
-                  nome: i.rotulo,
-                  subtitulo: i.subtitulo,
-                  icone: i.icone,
-                  cor: m.cor,
-                  href: i.href,
-                })),
-              ),
-            ),
+            cartoes: emUso.map((m) => ({
+              chave: m.chave,
+              nome: m.nome,
+              subtitulo: m.subtitulo,
+              icone: m.icone,
+              cor: m.cor,
+              href: m.href,
+              abas: m.grupos.flatMap((g) => g.itens.map((i) => ({ rotulo: i.rotulo, href: i.href }))),
+            })),
           },
           {
             rotulo: 'Chegam nas próximas fases',

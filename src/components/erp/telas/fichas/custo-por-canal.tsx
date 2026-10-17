@@ -55,7 +55,7 @@ interface Props {
   className?: string;
   /** Editar as embalagens por canal (quem edita fichas e vê a precificação). */
   linkDasEmbalagens?: string;
-  /** "Canais de venda" (quem vê a precificação). */
+  /** "Precificação" (canais de venda; quem vê a precificação). */
   linkDosCanais?: string;
   /** Quem muda preços (a dona): "Configurar"/"definir" levam aos canais. */
   podeConfigurar: boolean;
@@ -573,7 +573,7 @@ function Conteudo({
         {linkDosCanais && (
           <p>
             <Link href={linkDosCanais} className={LINK_DE_TEXTO}>
-              Margens-alvo e taxa em Canais de venda
+              Margens-alvo e taxa em Precificação
             </Link>
           </p>
         )}

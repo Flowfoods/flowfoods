@@ -9,7 +9,7 @@ import type { OpcaoDeVisao } from '@/lib/erp/visao';
 import type { Tema } from '@/lib/erp/tema';
 
 export interface ResultadoDaBusca {
-  tipo: 'tela' | 'parceiro' | 'insumo' | 'ficha';
+  tipo: 'tela' | 'acao' | 'parceiro' | 'insumo' | 'ficha';
   rotulo: string;
   detalhe: string;
   href: string;

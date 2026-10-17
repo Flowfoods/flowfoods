@@ -2,8 +2,8 @@
 
 /**
  * Conteúdo do menu lateral (o mesmo na barra fixa do desktop e na gaveta do
- * celular): marca, contexto, SELETOR DE MÓDULO no topo, os grupos do módulo
- * (abrem e fecham), item ativo com `aria-current` e o indicador vermelho de
+ * celular): marca, contexto, SELETOR DE ÁREA no topo, os grupos da área
+ * (abrem e fecham; cada item é uma aba), item ativo com `aria-current` e o indicador vermelho de
  * 2 px, e a versão no rodapé. Recolhido (desktop): só ícones, com nome
  * acessível e dica.
  */
@@ -19,14 +19,14 @@ import { Icone } from './icones';
 import { Popover } from './Popover';
 
 export interface EstadoDaNav {
-  /** Módulo mostrado no menu (o do item ativo; no hub, nenhum). */
+  /** Área mostrada no menu (a do item ativo; no hub, nenhuma). */
   modulo: ModuloNav | null;
   hrefAtivo: string | null;
 }
 
 // 44 px na gaveta (toque); 40 px na barra fixa do desktop (≥ 900 px).
 const ITEM =
-  'ff-nav-item ff-transicao flex min-h-11 min-[900px]:min-h-10 items-center gap-3 rounded-[5px] px-3 text-[14px] text-suave hover:bg-texto/5 hover:text-texto';
+  'ff-nav-item ff-transicao flex min-h-11 min-[900px]:min-h-10 items-center gap-3 rounded-[5px] px-3 py-1.5 text-[14px] text-suave hover:bg-texto/5 hover:text-texto';
 
 export function NavLateral({
   nav,
@@ -143,7 +143,8 @@ function ItemDoMenu({
       className={`${ITEM} ${recolhido ? 'justify-center px-0' : ''}`}
     >
       <Icone nome={icone} size={18} className="shrink-0" />
-      <span className={recolhido ? 'sr-only' : 'truncate'}>{rotulo}</span>
+      {/* O nome de uma área é longo ("Estoque e Movimentações"): quebra em até 2 linhas em vez de cortar. */}
+      <span className={recolhido ? 'sr-only' : 'line-clamp-2 min-w-0 leading-snug'}>{rotulo}</span>
     </Link>
   );
 }
@@ -182,7 +183,7 @@ function Grupo({
       >
         <Icone nome={icone} size={13} aria-hidden className="shrink-0" />
         {/* avoid-ai-design-ignore: SD4 — grupo do menu em caixa alta é pedido do contrato do shell (só aqui e no hub). */}
-        <span className="min-w-0 flex-1 truncate text-left">{rotulo}</span>
+        <span className="min-w-0 flex-1 py-1 text-left leading-snug">{rotulo}</span>
         <ChevronDown size={14} aria-hidden className={`shrink-0 transition-transform ${aberto ? '' : '-rotate-90'}`} />
       </button>
       {aberto && <ul className="mt-1 space-y-0.5">{children}</ul>}
@@ -192,10 +193,10 @@ function Grupo({
 
 function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: ModuloNav | null; recolhido: boolean }) {
   const nome = atual?.nome ?? 'Início';
-  const sub = atual?.subtitulo ?? nav.inicio.titulo;
+  const sub = atual?.resumo ?? atual?.subtitulo ?? nav.inicio.titulo;
   return (
     <Popover
-      rotulo={`Módulo: ${nome}. Trocar de módulo`}
+      rotulo={`Área: ${nome}. Trocar de área`}
       alinhar="esquerda"
       largura="w-[280px]"
       classeDoBotao={`ff-transicao flex w-full items-center gap-3 rounded-[10px] border border-linha bg-painel text-left hover:border-linha-forte aria-expanded:border-linha-forte ${
@@ -207,7 +208,7 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
           {!recolhido && (
             <>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-semibold text-texto">{nome}</span>
+                <span className="line-clamp-2 block text-[14px] font-semibold leading-tight text-texto">{nome}</span>
                 <span className="block truncate text-[12px] text-suave">{sub}</span>
               </span>
               <ChevronsUpDown size={16} aria-hidden className="shrink-0 text-suave" />
@@ -217,12 +218,12 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
       }
     >
       {(fechar) => (
-        <ul aria-label="Módulos" className="max-h-[70vh] overflow-y-auto">
+        <ul aria-label="Áreas" className="max-h-[70vh] overflow-y-auto">
           <li>
             <OpcaoDeModulo
               href={nav.inicio.href}
               nome={nav.inicio.titulo}
-              sub="Todos os módulos"
+              sub="Todas as áreas"
               icone="inicio"
               cor="#57534E"
               atual={!atual}
@@ -234,7 +235,7 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
               <OpcaoDeModulo
                 href={m.href}
                 nome={m.nome}
-                sub={m.href ? m.subtitulo : 'Em breve'}
+                sub={m.href ? (m.resumo ?? m.subtitulo) : 'Em breve'}
                 icone={m.icone}
                 cor={m.cor}
                 atual={atual?.chave === m.chave}
