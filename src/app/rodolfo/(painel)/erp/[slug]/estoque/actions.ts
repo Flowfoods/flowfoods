@@ -84,7 +84,7 @@ export async function acaoConcluirContagem(slug: string, lojaId: string, contage
   const { ctx, negado, base } = await preparar(slug, lojaId, 'estoque.ajustar');
   if (negado) return recusadoNoEstoque(anterior, negado);
   await auditar(ctx, 'erp_estoque_contagem_concluir', lojaId);
-  return executarConcluirContagem(ctx.cliente, ctx.alcance, ctx.parceiro, ctx.sessao.autorNome, String(lojaId), String(contagemId), anterior, form, base);
+  return executarConcluirContagem(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(contagemId), anterior, form, base);
 }
 
 export async function acaoDescartarContagem(slug: string, lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
@@ -98,7 +98,7 @@ export async function acaoIniciarFechamento(slug: string, lojaId: string, anteri
   const { ctx, negado, base } = await preparar(slug, lojaId, 'estoque.ajustar');
   if (negado) return recusadoNoEstoque(anterior, negado);
   await auditar(ctx, 'erp_estoque_fechamento_iniciar', lojaId);
-  return executarIniciarFechamento(ctx.cliente, ctx.alcance, ctx.parceiro, ctx.sessao.autorNome, String(lojaId), anterior, form, base);
+  return executarIniciarFechamento(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, base);
 }
 
 export async function acaoSalvarRegrasDaContagem(slug: string, lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {

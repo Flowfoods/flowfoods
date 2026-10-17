@@ -15,6 +15,7 @@
  */
 
 import { formatarData } from './compra-campos';
+import type { Periodo } from './periodo-campos';
 import { valorDaQuantidade, type MovimentoNovo } from './estoque-campos';
 import { formatarDinheiro, lerDinheiro, type Fracao, type Unidade } from './unidades';
 import type { Conservacao } from './validade';
@@ -35,66 +36,7 @@ export function diasEntre(de: string, ate: string): number {
   return Math.round((paraData(ate).getTime() - paraData(de).getTime()) / DIA_MS);
 }
 
-/** Mesmo dia no mês seguinte (o dia de início vai até 28: sempre existe). */
-function mesSeguinte(ano: number, mes: number): [number, number] {
-  return mes === 12 ? [ano + 1, 1] : [ano, mes + 1];
-}
-const isoDe = (ano: number, mes: number, dia: number) => `${ano}-${String(mes).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
-
-// ================================================================ período de apuração
-
-export type TipoDePeriodo = 'MENSAL' | 'QUINZENAL' | 'SEMANAL' | 'PERSONALIZADO';
-
-export interface Periodo {
-  /** Datas inclusivas, AAAA-MM-DD. */
-  inicio: string;
-  fim: string;
-  nome: string;
-}
-
-const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
-
-const nomePorDatas = (inicio: string, fim: string) => `${formatarData(inicio, true)} a ${formatarData(fim, true)}`;
-
-/**
- * O período de apuração que contém a data, pela configuração do parceiro
- * (`ParceiroFlow.periodoTipo` + `periodoDiaInicio`):
- * - MENSAL: do dia d até o dia d − 1 do mês seguinte (d = 1: o mês civil);
- * - QUINZENAL: d .. d + 14 e d + 15 .. dia d − 1 do mês seguinte;
- * - SEMANAL: a semana começa no dia da semana d (1 = segunda … 7 = domingo;
- *   d > 7 vale segunda);
- * - PERSONALIZADO: os períodos cadastrados (`PeriodoApuracao`, quem chama
- *   procura); sem cadastro, o mês civil (quem chama avisa).
- */
-export function periodoDaData(cfg: { tipo: TipoDePeriodo; diaInicio: number }, data: string): Periodo {
-  const d = Math.min(Math.max(Math.trunc(cfg.diaInicio) || 1, 1), 28);
-  if (cfg.tipo === 'SEMANAL') {
-    const inicioDaSemana = d <= 7 ? d : 1;
-    const diaDaSemana = ((paraData(data).getUTCDay() + 6) % 7) + 1; // 1 = segunda
-    const recua = (diaDaSemana - inicioDaSemana + 7) % 7;
-    const inicio = somarDias(data, -recua);
-    const fim = somarDias(inicio, 6);
-    return { inicio, fim, nome: `Semana de ${nomePorDatas(inicio, fim)}` };
-  }
-  const dia = cfg.tipo === 'PERSONALIZADO' ? 1 : d;
-  const [a, m] = data.split('-').map(Number);
-  // Começo do "mês do parceiro" que contém a data.
-  let ini: [number, number] = [a, m];
-  if (Number(data.slice(8, 10)) < dia) ini = m === 1 ? [a - 1, 12] : [a, m - 1];
-  const inicioDoMes = isoDe(ini[0], ini[1], dia);
-  const [pa, pm] = mesSeguinte(ini[0], ini[1]);
-  const fimDoMes = somarDias(isoDe(pa, pm, dia), -1);
-  if (cfg.tipo === 'QUINZENAL') {
-    const meio = somarDias(inicioDoMes, 15);
-    if (data < meio) {
-      const fim = somarDias(meio, -1);
-      return { inicio: inicioDoMes, fim, nome: `1ª quinzena · ${nomePorDatas(inicioDoMes, fim)}` };
-    }
-    return { inicio: meio, fim: fimDoMes, nome: `2ª quinzena · ${nomePorDatas(meio, fimDoMes)}` };
-  }
-  const nome = dia === 1 ? `${MESES[ini[1] - 1][0].toUpperCase()}${MESES[ini[1] - 1].slice(1)} de ${ini[0]}` : nomePorDatas(inicioDoMes, fimDoMes);
-  return { inicio: inicioDoMes, fim: fimDoMes, nome };
-}
+// ================================================================ período de apuração (a regra mora em periodo-campos.ts)
 
 /** "Cobertura da semana de 10/10 a 16/10" / "de outubro de 2026" / "da 1ª quinzena · …" / "de 15/10 a 14/11". */
 export function coberturaDe(nome: string): string {
@@ -102,11 +44,6 @@ export function coberturaDe(nome: string): string {
   if (/^\dª quinzena/.test(nome)) return `Cobertura da ${nome}`;
   if (/^\d/.test(nome)) return `Cobertura de ${nome}`;
   return `Cobertura de ${nome[0].toLowerCase()}${nome.slice(1)}`;
-}
-
-/** O período anterior (o que contém a véspera do início). */
-export function periodoAnterior(cfg: { tipo: TipoDePeriodo; diaInicio: number }, p: Periodo): Periodo {
-  return periodoDaData(cfg, somarDias(p.inicio, -1));
 }
 
 /** Dias antes do fim em que o fechamento já pode começar (os 3 últimos dias do período). */

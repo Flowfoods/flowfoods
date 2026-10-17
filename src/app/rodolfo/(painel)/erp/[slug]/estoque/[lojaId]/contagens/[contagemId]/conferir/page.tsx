@@ -12,7 +12,7 @@ export default async function ParceiroConferirContagemPage({ params, searchParam
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'estoque.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;
-  const c = await conferenciaDaContagem(ctx.cliente, ctx.alcance, params.lojaId, params.contagemId, ctx.parceiro);
+  const c = await conferenciaDaContagem(ctx.cliente, ctx.alcance, params.lojaId, params.contagemId);
   if (!c) notFound();
   const s = ctx.parceiro.slug;
   return (

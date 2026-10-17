@@ -81,7 +81,7 @@ export async function acaoContarNaContagem(lojaId: string, contagemId: string, i
 export async function acaoConcluirContagem(lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
   const { ctx, negado } = await preparar(lojaId, 'estoque.ajustar');
   if (negado) return recusadoNoEstoque(anterior, negado);
-  return executarConcluirContagem(ctx.cliente, ctx.alcance, ctx.parceiro, ctx.sessao.autorNome, String(lojaId), String(contagemId), anterior, form, BASE);
+  return executarConcluirContagem(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), String(contagemId), anterior, form, BASE);
 }
 
 export async function acaoDescartarContagem(lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
@@ -93,7 +93,7 @@ export async function acaoDescartarContagem(lojaId: string, contagemId: string, 
 export async function acaoIniciarFechamento(lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
   const { ctx, negado } = await preparar(lojaId, 'estoque.ajustar');
   if (negado) return recusadoNoEstoque(anterior, negado);
-  return executarIniciarFechamento(ctx.cliente, ctx.alcance, ctx.parceiro, ctx.sessao.autorNome, String(lojaId), anterior, form, BASE);
+  return executarIniciarFechamento(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(lojaId), anterior, form, BASE);
 }
 
 export async function acaoSalvarRegrasDaContagem(lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {

@@ -151,7 +151,6 @@ export function TelaPeriodo({
         acao={f?.status === 'FECHADA' ? <Selo tom="ok">Período fechado</Selo> : s.cobertura.atinge ? <Selo tom="ok">No piso</Selo> : <Selo tom="alerta">Abaixo do piso</Selo>}
       />
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
-      {s.aviso && <Aviso tom="alerta" titulo={s.aviso} />}
       {s.anterior && (
         <Aviso tom="alerta" titulo={`O período anterior (${s.anterior.periodo.nome}) ficou sem fechar.`}>
           {pode.ajustar && !bloqueio ? (

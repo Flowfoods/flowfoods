@@ -18,7 +18,7 @@ const BASE = '/erp/estoque';
 export default async function ErpConferirContagemPage({ params, searchParams }: { params: { lojaId: string; contagemId: string }; searchParams: { feito?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'estoque.ver');
-  const c = await conferenciaDaContagem(ctx.cliente, ctx.alcance, params.lojaId, params.contagemId, ctx.parceiro);
+  const c = await conferenciaDaContagem(ctx.cliente, ctx.alcance, params.lojaId, params.contagemId);
   if (!c) notFound();
   const lojaId = c.loja.id;
   return (

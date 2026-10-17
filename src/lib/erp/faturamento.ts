@@ -28,6 +28,7 @@
 import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import { hojeNoRio, lerData } from './compra-campos';
+import { somarDias } from './contagem-campos';
 import { CANAIS } from './canal-campos';
 import {
   CANAIS_EM_ORDEM,
@@ -54,7 +55,7 @@ import {
 import { interpretarLinha, lerPlanilhaDeFaturamento, LIMITE_DA_PLANILHA, LIMITES_DA_PLANILHA, type ErroDeLinha, type LojaParaPlanilha } from './faturamento-planilha';
 import { listarHistorico } from './historico';
 import { diferenca } from './insumo-campos';
-import { datasEmPeriodoFechado, fraseDoPeriodoFechado, travarParaEscreverFaturamento } from './periodo-trava';
+import { datasEmPeriodoFechado, fraseDoPeriodoFechado, travarParaEscrever } from './periodo-trava';
 import { alcancaLoja, filtroDeLojas, recusa, type Alcance } from './permissoes';
 import { checkVioladoDe, type ClienteDoParceiro } from './tenant';
 
@@ -206,7 +207,7 @@ function fraseDoConflito(canal: CanalVenda, quem: string, n: NumerosDoCanal | nu
 
 /** Lê e confere as pré-condições de escrita dentro da transação: trava, período, loja e canais. */
 async function prepararEscrita(tx: ClienteDoParceiro, alcance: Alcance, lojaId: string, datas: readonly string[]): Promise<LojaDoFaturamento> {
-  await travarParaEscreverFaturamento(tx);
+  await travarParaEscrever(tx);
   const l = await tx.loja.findUnique({ where: { id: lojaId }, select: SELECAO_DA_LOJA });
   if (!l || !alcancaLoja(alcance, l.id)) throw new Recusa(recusar(MENSAGEM_LOJA_FORA, { naoEncontrado: true }));
   const fechada = await datasEmPeriodoFechado(tx, datas);
@@ -541,6 +542,45 @@ export async function obterMes(cliente: ClienteDoParceiro, alcance: Alcance, fil
   };
 }
 
+// ================================================================ faltas de um intervalo (o DRE)
+
+export interface FaltasDoIntervalo {
+  /** Canal em cada dia sem lançamento, somado (a mesma conta do calendário do mês). */
+  total: number;
+  porLoja: { loja: LojaDoFaturamento; faltas: number }[];
+}
+
+/**
+ * Quantos lançamentos faltam entre `de` e `ate` (datas inclusivas): a MESMA regra do calendário do mês
+ * (`canaisEmFalta`: canal que a loja vende, sem lançamento, do 1º lançamento dela até ontem; loja
+ * desativada não cobra). O DRE usa para dizer "incompleto: N lançamentos faltando". Só as lojas do alcance.
+ */
+export async function faltasDoIntervalo(cliente: ClienteDoParceiro, alcance: Pick<Alcance, 'lojas'>, filtro: { de: string; ate: string; lojaId?: string }, hoje = hojeNoRio()): Promise<FaltasDoIntervalo> {
+  const todas = await lojasDoFaturamento(cliente, alcance);
+  const lojas = filtro.lojaId ? todas.filter((l) => l.id === filtro.lojaId) : todas;
+  if (lojas.length === 0 || filtro.ate < filtro.de) return { total: 0, porLoja: lojas.map((loja) => ({ loja, faltas: 0 })) };
+  const ids = lojas.map((l) => l.id);
+  const [graos, primeiras] = await Promise.all([
+    faturamentoDosGraos(cliente, alcance, { de: filtro.de, ate: filtro.ate }),
+    cliente.faturamentoLancamento.groupBy({ by: ['lojaId'], where: { lojaId: { in: ids } }, _min: { data: true } }),
+  ]);
+  const primeira = new Map(primeiras.map((p) => [p.lojaId, p._min.data ? isoDoDia(p._min.data) : null]));
+  const lancados = new Map<string, Set<CanalVenda>>();
+  for (const g of graos) {
+    const k = `${g.lojaId}|${g.data}`;
+    lancados.set(k, (lancados.get(k) ?? new Set()).add(g.canal));
+  }
+  const ate = filtro.ate < hoje ? filtro.ate : somarDias(hoje, -1);
+  const porLoja = lojas.map((loja) => {
+    let faltas = 0;
+    if (loja.ativa) {
+      for (let d = filtro.de; d <= ate; d = somarDias(d, 1)) faltas += canaisEmFalta(d, hoje, primeira.get(loja.id) ?? null, loja.canais, lancados.get(`${loja.id}|${d}`) ?? new Set()).length;
+    }
+    return { loja, faltas };
+  });
+  return { total: porLoja.reduce((s, l) => s + l.faltas, 0), porLoja };
+}
+
 // ================================================================ planilha
 
 export type SituacaoNaPrevia = 'nova' | 'muda' | 'igual' | 'erro';
@@ -654,7 +694,7 @@ export async function importarPlanilha(cliente: ClienteDoParceiro, alcance: Alca
   try {
     return await cliente.transacao(
       async (tx) => {
-        await travarParaEscreverFaturamento(tx);
+        await travarParaEscrever(tx);
         const { planos, previa, lojas } = await planejarImportacao(tx, alcance, texto, hoje);
         if (previa.impressao !== impressaoVista) {
           throw new Recusa(recusar('Os dados mudaram desde a prévia (alguém lançou ou fechou algo no meio). Veja a prévia de novo; nada foi gravado.', { conflito: true }));

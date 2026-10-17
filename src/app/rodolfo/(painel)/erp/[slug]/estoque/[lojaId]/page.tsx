@@ -19,7 +19,7 @@ export default async function ParceiroEstoqueDaLojaPage({ params, searchParams }
   const e = await obterEstoqueDaLoja(ctx.cliente, ctx.alcance, params.lojaId, filtros);
   if (!e) notFound();
   // 1.7: com o estoque aberto, o período (cobertura × piso) e as contagens do dia a dia.
-  const periodo = e.estado === 'ABERTO' ? await situacaoDoPeriodo(ctx.cliente, ctx.alcance, e.loja.id, ctx.parceiro) : null;
+  const periodo = e.estado === 'ABERTO' ? await situacaoDoPeriodo(ctx.cliente, ctx.alcance, e.loja.id) : null;
   const requisicoes = e.estado === 'ABERTO' ? ((await lojasDasRequisicoes(ctx.cliente, ctx.alcance)).find((l) => l.id === e.loja.id) ?? null) : null;
   return (
     <TelaEstoqueDaLoja
