@@ -1,6 +1,7 @@
 /**
  * Conferência pós-deploy das migrations `20261025000000_erp_faturamento` (2.1),
- * `20261026000000_erp_dre_despesas` (2.2a), `20261027000000_erp_dre_fechamento` (2.2b) e `20261028000000_erp_cmv` (2.3).
+ * `20261026000000_erp_dre_despesas` (2.2a), `20261027000000_erp_dre_fechamento` (2.2b), `20261028000000_erp_cmv` (2.3)
+ * e `20261029000000_erp_producao` (3.1).
  *
  *   npm run erp:conferir-migracao
  *
@@ -55,6 +56,26 @@ export const CHECKS_DA_2_2B = [
 
 /** O CHECK que a 2.3 acrescentou em tabela que já existia (a coluna `itensSemPreco` da contagem). */
 export const CHECKS_DA_2_3 = [['Contagem', 'Contagem_itensSemPreco_nao_negativo']] as const;
+
+/** Os CHECKs que a 3.1 acrescentou em tabelas que já existiam (a ordem de produção e o razão do estoque). */
+export const CHECKS_DA_3_1 = [
+  ['OrdemProducao', 'OrdemProducao_concluida_tem_resultado'],
+  ['OrdemProducao', 'OrdemProducao_versao_naoneg'],
+  ['OrdemProducao', 'OrdemProducao_cancelada_tem_motivo'],
+  ['OrdemProducao', 'OrdemProducao_iniciada_tem_data'],
+  ['OrdemProducao', 'OrdemProducao_quantidades_teto'],
+  ['OrdemProducao', 'OrdemProducao_codigo_do_lote'],
+  ['OrdemProducao', 'OrdemProducao_validade_faixa'],
+  ['OrdemProducao', 'OrdemProducao_sem_preco_naoneg'],
+  ['OrdemProducao', 'OrdemProducao_textos_curtos'],
+  ['MovimentoEstoque', 'MovimentoEstoque_producao_entrada_tem_ordem'],
+] as const;
+
+/** O índice único (parceiro, requisição) da 3.1: não nasce se dado antigo repetir a requisição. */
+export const INDICE_DA_REQUISICAO_DO_LOTE = 'OrdemProducao_parceiroId_requisicaoId_key';
+
+/** Os gatilhos da 3.1: sem eles o lote concluído mudaria e a entrada do lote poderia cair em outra loja. */
+export const GATILHOS_DA_3_1 = ['OrdemProducao_concluida_imutavel', 'MovimentoEstoque_producao_confere'] as const;
 
 /** O que a migration deixou pendente (frases prontas para o terminal); lista vazia = tudo no lugar. */
 export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
@@ -120,6 +141,27 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       }
     }
   }
+  // 3.1: só se a migration dela já rodou (a coluna `versao` existe; o catálogo não passa pela RLS).
+  const producao = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'OrdemProducao' AND column_name = 'versao'`;
+  if (producao[0]?.n) {
+    const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_3_1.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_3_1) {
+      const achado = dela.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration 20261029000000_erp_producao não foi aplicada por inteiro.`);
+      else if (!achado.validado) {
+        pendencias.push(`CHECK ${nome} ficou NOT VALID: corrija a linha antiga que o viola e rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+      }
+    }
+    const indiceDoLote = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_indexes WHERE indexname = ${INDICE_DA_REQUISICAO_DO_LOTE}`;
+    if (!indiceDoLote[0] || indiceDoLote[0].n === 0) {
+      pendencias.push(`Índice ${INDICE_DA_REQUISICAO_DO_LOTE} NÃO existe: duas ordens de produção apontam a mesma requisição. Corrija a repetida e rode o CREATE UNIQUE INDEX da migration 20261029000000_erp_producao.`);
+    }
+    const gatilhos = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_3_1]})`;
+    for (const t of GATILHOS_DA_3_1) {
+      if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261029000000_erp_producao não foi aplicada por inteiro.`);
+    }
+  }
   return pendencias;
 }
 
@@ -128,10 +170,10 @@ async function principal() {
   try {
     const pendencias = await conferirMigracao(db);
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b e da 2.3 conferidas: os CHECKs estão validados, o índice do grão humano e os gatilhos do fechamento existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3 e da 3.1 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote e os gatilhos existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1, da 2.2a, da 2.2b e da 2.3: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3 e da 3.1: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {
