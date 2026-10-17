@@ -1350,7 +1350,7 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Alternativas:** (a) chamar `criarParceiro` e `criarAcesso` em sequência; (b) uma transação só que extrai o miolo de `criarAcesso` (`criarAcessoNaTransacao`) e cria o parceiro dentro dela.
 
-**Razão:** (b): em (a) uma falha entre as duas deixaria parceiro sem dono, ou dono sem link. Trava `erp-pedido:<id>` + `updateMany` condicional à etapa e à versão lida: duas ativações (ou ativar × recusar) deixam um vencedor, e o outro recebe a frase com quem decidiu; nenhum segundo parceiro, dono ou link nasce (teste de corrida). O histórico do parceiro é o ÚLTIMO passo (depois dele a transação roda no papel do tenant, sem acesso a pedido nem a credencial, `tenant.ts`). O dono é o perfil Dono com a rede inteira; e-mail que já existe segue a regra da 0.4 (sem link; senha de link de parceiro é revogada). Só o nível 1 ativa.
+**Razão:** (b): em (a) uma falha entre as duas deixaria parceiro sem dono, ou dono sem link. Trava `erp-pedido:<id>` + `updateMany` condicional à etapa e à versão lida: duas ativações (ou ativar × recusar) deixam um vencedor, e o outro recebe a frase com quem decidiu; nenhum segundo parceiro, dono ou link nasce (teste de corrida). O histórico do parceiro é o ÚLTIMO passo (depois dele a transação roda no papel do tenant, sem acesso a pedido nem a credencial, `tenant.ts`). O dono é o perfil Dono com a rede inteira. Só o nível 1 ativa. **Revisão (veto do Guardião, decisão 99): a ativação só cria pessoa nova; e-mail que já existe é recusado.**
 
 ### 94. 2026-10-16 · ERP 0.5: anti-abuso do formulário — trava e limite por IP, teto global, armadilha e resposta única, sem CAPTCHA de terceiros
 
@@ -1381,3 +1381,16 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) manter o formulário e acrescentar o quadro ao lado; (b) o formulário sai: "Aguardando liberação" é o quadro, "Cadastrar pedido manual" é a entrada de quem não veio do site, e a ativação é a mesma.
 
 **Razão:** (b). Dois caminhos criariam parceiros sem dono e sem link, e deixariam "Aguardando liberação" com dois significados. `criarParceiro` fica como função interna do seed e dos testes. O rótulo de RASCUNHO vira "Rascunho" (legado). O quadro é próprio (não uma generalização do da 1.8): o teste-guarda proíbe as telas compartilhadas de importar pedido.
+
+
+### 99. 2026-10-17 · ERP 0.5 (veto do Guardião): a ativação do pedido só cria pessoa NOVA; e-mail que já existe em `UsuarioErp` é recusado
+
+**Alternativas:** (a) reaproveitar a regra da 0.4 (e-mail existente só ganha o vínculo; senha de link de parceiro é revogada; link do nível 1); (b) recusar, com frase neutra, qualquer e-mail que já exista (com senha, convite pendente, acesso desativado), sem tocar em credencial nenhuma.
+
+**Razão:** (b). Em (a), quem manda o e-mail de outra pessoa no formulário público e o próprio WhatsApp faz a ativação apagar a senha e os rostos dela e mandar o link do nível 1 (`wa.me`) para o atacante, que cria a senha e ganha uma sessão com o parceiro dele E o da vítima; o convite pendente sem senha caía do mesmo jeito. O dado do público não pode chegar a `criarAcesso`/`gerarNovoLink` com poder de revogar credencial. A frase: "Este e-mail já tem acesso ao ERP. Use outro e-mail para o dono ou ligue a pessoa pela Equipe do parceiro depois de ativar." (a Equipe, que é do nível 1 digitando, segue com a regra da 0.4). A conferência é dentro da transação e a corrida com a Equipe criando o mesmo e-mail cai no único do e-mail. Teste de regressão que vai até a sessão do atacante, em quatro variantes, e falha sem a correção. O cartão do pedido avisa e diz o que de fato acontece.
+
+### 100. 2026-10-17 · ERP 0.5: o motivo da recusa mora só no pedido; "Excluir dados pessoais" o troca por "[apagado]"
+
+**Alternativas:** (a) copiar o motivo para o evento RECUSOU (só-inclusão: não dá para apagar); (b) o evento não leva o motivo; o pedido o guarda e a exclusão o anonimiza; (c) afrouxar o gatilho do evento.
+
+**Razão:** (b). O motivo é texto livre e pode citar a pessoa; um registro que não se altera não pode guardá-lo. O histórico mostra "Recusado", quem e quando; o motivo aparece no painel do pedido e some na exclusão (a CHECK pede 3+ letras: "[apagado]"). O gatilho só-inclusão fica como está.

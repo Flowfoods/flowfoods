@@ -182,7 +182,7 @@ describe('ERP 0.5 · apresentação do pedido', () => {
     expect(textoDoEvento({ acao: 'CRIOU', antes: null, depois: { origem: 'MANUAL' }, motivo: null })).toBe('Pedido digitado');
     expect(textoDoEvento({ acao: 'MOVEU', antes: { etapa: 'NOVO' }, depois: { etapa: 'EM_CONVERSA' }, motivo: null })).toBe('Novo → Em conversa');
     expect(textoDoEvento({ acao: 'REENVIOU', antes: null, depois: { reenvios: 2 }, motivo: null })).toBe('Mandou de novo (2ª vez)');
-    expect(textoDoEvento({ acao: 'RECUSOU', antes: { etapa: 'NOVO' }, depois: { etapa: 'RECUSADO' }, motivo: 'fora da região' })).toBe('Recusado: fora da região');
+    expect(textoDoEvento({ acao: 'RECUSOU', antes: { etapa: 'NOVO' }, depois: { etapa: 'RECUSADO' }, motivo: 'fora da região' })).toBe('Recusado');
     expect(textoDoEvento({ acao: 'MOVEU', antes: { etapa: '<script>' }, depois: null, motivo: null })).toBe('— → —');
   });
 });

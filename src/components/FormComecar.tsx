@@ -57,7 +57,7 @@ export default function FormComecar() {
 
   if (estado?.tipo === 'recebido') {
     return (
-      <div id="comecar" className="scroll-mt-24 bg-surface p-6 text-ink md:p-8">
+      <div id="comecar" className="scroll-mt-24 self-start bg-surface p-6 text-ink md:p-8">
         <h3 className="font-display text-2xl font-bold leading-tight">Pedido recebido</h3>
         <p role="status" className="mt-3 text-base leading-relaxed text-ink-3">
           {estado.mensagem}
@@ -68,7 +68,7 @@ export default function FormComecar() {
   }
 
   return (
-    <div id="comecar" className="scroll-mt-24 bg-surface p-6 text-ink md:p-8">
+    <div id="comecar" className="scroll-mt-24 self-start bg-surface p-6 text-ink md:p-8">
       <h3 className="font-display text-2xl font-bold leading-tight">Deixe os dados do seu grupo</h3>
       <p className="mt-2 text-sm leading-relaxed text-ink-3">
         O Rodolfo responde pelo WhatsApp em até 2 dias úteis e combina os próximos passos.
@@ -248,6 +248,19 @@ export default function FormComecar() {
             />
             <span>{CONSENTIMENTO.texto}</span>
           </label>
+          <details className="mt-2 pl-8 text-[13px] leading-relaxed text-ink-3">
+            <summary className="inline cursor-pointer font-semibold text-ink underline decoration-ink/40 underline-offset-4 hover:decoration-ink">
+              (ver como usamos)
+            </summary>
+            <ul className="mt-2 list-disc space-y-1 pl-4">
+              <li>Pedimos: nome do grupo, o seu nome, WhatsApp, e-mail, número de lojas e de marcas, e a cidade.</li>
+              <li>Usamos só para o Rodolfo falar com você sobre a consultoria e o sistema da FlowFoods.</li>
+              <li>Pedido que não seguir adiante fica guardado por até 180 dias.</li>
+              <li>
+                Para apagar os seus dados, peça pelo WhatsApp {CONTACT_INFO.whatsappDisplay}.
+              </li>
+            </ul>
+          </details>
           <Erro id="c-consent-erro" texto={erros.consentimento} />
         </div>
 

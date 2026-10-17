@@ -260,7 +260,8 @@ export function textoDoEvento(e: { acao: string; antes: unknown; depois: unknown
     case 'ATIVOU':
       return 'Ativado: parceiro, dono e link de primeiro acesso criados';
     case 'RECUSOU':
-      return e.motivo ? `Recusado: ${e.motivo}` : 'Recusado';
+      // O motivo fica só no pedido (apagável pela LGPD); o evento não o copia.
+      return 'Recusado';
     case 'EXCLUIU_DADOS':
       return 'Dados pessoais excluídos';
     default:

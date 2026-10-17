@@ -8,7 +8,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { exigirNivel1 } from '@/lib/erp/contexto';
-import { parceirosDoEmail } from '@/lib/erp/credenciais';
+import { contaDoEmail } from '@/lib/erp/credenciais';
 import { COR } from '@/lib/erp/modulos';
 import {
   ROTULO_DA_ETAPA,
@@ -54,7 +54,7 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
   const p = await obterPedido(params.id);
   if (!p) notFound();
 
-  const contasDoEmail = p.email ? await parceirosDoEmail(p.email) : [];
+  const conta = p.email ? await contaDoEmail(p.email) : { existe: false, parceiros: [] };
   const conversa = linkDoWhatsApp(
     p.whatsapp,
     `Oi, ${p.responsavel.split(' ')[0]}! Aqui é o Rodolfo, da FlowFoods. Recebi o pedido de vocês e queria entender melhor a operação.`,
@@ -80,9 +80,10 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
         }
       />
       {searchParams.feito === 'manual' && <Aviso tom="ok" titulo="Pedido cadastrado." />}
-      {contasDoEmail.length > 0 && (
+      {conta.existe && (
         <Aviso tom="alerta" titulo="Este e-mail já tem acesso ao ERP.">
-          {contasDoEmail.join(', ')}. Ao ativar com ele, a pessoa ganha mais um parceiro com a mesma senha.
+          {conta.parceiros.length > 0 ? `${conta.parceiros.join(', ')}. ` : ''}Não dá para ativar o pedido com ele como dono: a ativação só cria pessoa nova e nunca mexe
+          na senha de quem já existe. Troque o e-mail do dono no formulário, ou ative com outro e ligue a pessoa pela Equipe do parceiro depois.
         </Aviso>
       )}
       {p.leadDoBarney && (

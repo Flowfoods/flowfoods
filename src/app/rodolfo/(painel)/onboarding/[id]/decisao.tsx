@@ -15,6 +15,7 @@ import { useFormState } from 'react-dom';
 import { gerarSlug } from '@/lib/erp/slug';
 import { BotaoEnviar } from '@/components/erp/ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '@/components/erp/ui/campos';
+import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { Painel } from '@/components/erp/ui/superficies';
 import { LinkGerado } from '@/components/erp/telas/equipe/link-gerado';
 import type { EstadoDoPedido } from '../actions';
@@ -76,7 +77,7 @@ export function DecisaoDoPedido({
         <form action={enviarMover} className="space-y-2">
           <input type="hidden" name="versao" value={versao} />
           <input type="hidden" name="para" value={status === 'NOVO' ? 'EM_CONVERSA' : 'NOVO'} />
-          <BotaoEnviar variante={status === 'NOVO' ? 'secundario' : 'fantasma'} className="w-full" pendente="Movendo…">
+          <BotaoEnviar variante="secundario" className="w-full" pendente="Movendo…">
             {status === 'NOVO' ? 'Marcar como em conversa' : 'Voltar para Novo'}
           </BotaoEnviar>
           {estMover && (
@@ -183,9 +184,7 @@ export function DecisaoDoPedido({
         </form>
 
         <details className="border-t border-linha pt-5" open={!!estRecusar && !estRecusar.ok}>
-          <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-semibold text-texto sm:min-h-0">
-            Recusar este pedido
-          </summary>
+          <summary className={`${classeDeBotao('perigo', 'w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden')}`}>Recusar este pedido</summary>
           <form action={enviarRecusar} className="mt-3 space-y-3">
             <input type="hidden" name="versao" value={versao} />
             <div>
@@ -223,7 +222,7 @@ export function ExcluirDados({ excluir, jaExcluido }: { excluir: (anterior: Esta
   if (jaExcluido) return <p className="text-[13px] text-suave">Os dados pessoais deste pedido já foram excluídos.</p>;
   return (
     <details>
-      <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-semibold text-texto sm:min-h-0">Excluir dados pessoais</summary>
+      <summary className={classeDeBotao('perigo', 'w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden')}>Excluir dados pessoais</summary>
       <form action={enviar} className="mt-3 space-y-3">
         <p className="text-[13px] text-suave">
           Apaga nome, WhatsApp, e-mail e cidade deste pedido. O cartão e o histórico ficam, sem dado pessoal. Não dá para desfazer.

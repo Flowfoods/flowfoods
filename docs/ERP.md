@@ -1160,7 +1160,7 @@ RLS, e no `ff_dev` com dado.
    1280 px.
 5. **Detalhe do pedido**: quem pediu (WhatsApp `wa.me` só com dígitos, e-mail `mailto` só se válido,
    montados no servidor), a autorização (data e versão do texto), o histórico antes/depois, as marcas
-   só-leitura do nível 1 ("este e-mail já tem acesso ao ERP: Parceiro X"; "este WhatsApp já está no
+   só-leitura do nível 1 ("este e-mail já tem acesso ao ERP", com os parceiros, e por isso não serve de dono; "este WhatsApp já está no
    Barney: status Y" — nada é pausado na cadência) e a decisão: marcar em conversa / voltar a Novo,
    **ativar**, **recusar** (motivo obrigatório, 3–200) e, no recusado, **excluir dados pessoais**.
 6. **Ativar** (decisão 93; só nível 1; `ativarPedido` em `credenciais.ts`): formulário pré-preenchido
@@ -1172,9 +1172,18 @@ RLS, e no `ff_dev` com dado.
    `ATIVOU` → **por último** o histórico do parceiro (CRIOU do parceiro, CRIOU e GEROU_LINK do acesso).
    Duas ativações juntas, ou ativar × recusar: um vence, o outro recebe "Este pedido já foi ativado por
    X em DD/MM. Nada foi criado de novo." (slug repetido vira frase). Falha no meio não deixa nada (teste
-   com gatilho de falha forçada). **E-mail do dono que já tem senha em outro parceiro**: ativa sem
-   link e com a frase da 0.4; senha criada por link de parceiro é revogada e o histórico dos dois
-   parceiros registra.
+   com gatilho de falha forçada). **A ativação só cria pessoa NOVA** (decisão 99, veto do Guardião): se o
+   e-mail do dono já existe em `UsuarioErp` — com senha, com convite pendente, com acesso desativado,
+   em qualquer caixa —, a ativação é RECUSADA com a frase "Este e-mail já tem acesso ao ERP. Use outro
+   e-mail para o dono ou ligue a pessoa pela Equipe do parceiro depois de ativar.", sem criar nada e sem
+   tocar em senha, rosto, sessão ou link de ninguém. Antes isso era um sequestro de conta: o e-mail de
+   outra pessoa no formulário público + o WhatsApp do atacante faziam a ativação apagar a senha e os
+   rostos da vítima e mandar o link do nível 1 para o atacante. A checagem fica dentro da transação
+   (`soPessoaNova` no miolo do acesso) e a corrida com a Equipe criando o mesmo e-mail cai no único do
+   e-mail (P2002 vira a mesma frase). O cartão do pedido avisa (com os parceiros em que a conta entra) e
+   diz o contrário do que dizia: "não dá para ativar com ele como dono". O único caminho em que dado do
+   público chega a `criarAcesso`/`gerarNovoLink` é esta ativação (o pedido manual e o formulário do site
+   só gravam o pedido).
 7. **Convite sem SMTP** (decisão 95): o link aparece UMA vez, na resposta da ativação (estado da tela,
    no topo da coluna de decisão), com **Copiar** e **Abrir no WhatsApp** (`wa.me/<número do pedido>`
    com a mensagem e o link). O token não vai para o banco, o AuditLog, o histórico nem a URL (teste e
@@ -1196,8 +1205,11 @@ RLS, e no `ff_dev` com dado.
    Barney não foi reaproveitado (unicidade do telefone devolveria erro diferente, e o lead entraria na
    cadência automática).
 10. **LGPD** (decisão 96): consentimento versionado; pedido recusado guardado por 180 dias (o detalhe
-    diz até quando); "Excluir dados pessoais" anonimiza o pedido recusado e mantém o cartão e o
-    histórico sem dado pessoal. A rotina que apaga sozinha aos 180 dias NÃO foi feita (pendência).
+    diz até quando); "Excluir dados pessoais" anonimiza o pedido recusado (nome, contato, cidade e o
+    motivo da recusa, que vira "[apagado]") e mantém o cartão e o histórico sem dado pessoal. O motivo
+    mora SÓ no pedido: o evento RECUSOU (só-inclusão) não o copia (decisão 100). O texto público "(ver
+    como usamos)" no formulário promete os 180 dias e o pedido de exclusão pelo WhatsApp: enquanto a
+    rotina automática não existe, a exclusão é manual. A rotina que apaga sozinha aos 180 dias NÃO foi feita (pendência).
 
 ## Provar o onboarding (0.5)
 
@@ -1206,12 +1218,12 @@ npx vitest run tests/erp-onboarding.test.ts tests/erp-tenant-portao.test.ts   # 
 ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev \
   npx vitest run tests/erp-onboarding.db.test.ts tests/erp-rls.db.test.ts tests/erp-acesso.db.test.ts
 ```
-`erp-onboarding.db.test.ts` (29 testes): envio válido, sem caixa, armadilha, enumeração (resposta
+`erp-onboarding.db.test.ts` (33 testes): envio válido, sem caixa, armadilha, enumeração (resposta
 idêntica), reenvio, **20 envios paralelos do mesmo IP = exatamente 3**, 10/dia, teto global, ruído, login
 independente, quadro e atraso, versão, pedido manual, evento só-inclusão, CHECKs, `prisma` do portal
 recusa, ativar (tudo + token ausente do banco + link de uso único + a dona entra no ERP), ativar duas
 vezes, **corrida de ativação dupla = 1 parceiro**, ativar × recusar, atomicidade (falha forçada),
-slug repetido, tela velha, dono com senha em outro parceiro, recusa com e sem motivo, excluir dados,
+slug repetido, tela velha, **sequestro de conta nas variantes com senha+rosto+sessão, convite pendente, senha de link de parceiro e acesso desativado (a cadeia vai até a sessão do atacante e o teste FALHA sem a correção)**, corrida com a Equipe, recusa com e sem motivo, excluir dados,
 **RASCUNHO que não entra** (login, sessão aberta, link, criar acesso) e N2 sem leitura do pedido.
 Rodado como superusuário, como dono não-superusuário com RLS (247 testes) e sem RLS (239 + 8 pulados),
 duas vezes seguidas no `ff_dev`.
@@ -1779,6 +1791,9 @@ banco de teste: o operador é recusado pelo servidor.
   de plano; criar lojas e marcas a partir do número informado (é só informativo); pausar a cadência do
   Barney quando o telefone coincide (hoje só o aviso no cartão); arrastar e soltar; exportar CSV; reabrir
   recusado (novo envio vira novo pedido); trocar o link "/rodolfo/login" do cabeçalho da landing.
+- **Infra (já é pendência):** o IP do limite é o `X-Real-Ip` cru do Traefik (porta 3000 nunca exposta; atrás de
+  CDN o limite vira por proxy); e os testes com banco como dono não-superusuário com RLS precisam rodar em
+  série (`--no-file-parallelism`: a limpeza desliga o FORCE numa transação e dá deadlock em paralelo).
 - O quadro é próprio (`onboarding/quadro.tsx`), não uma generalização de `requisicoes/quadro.tsx`: o
   teste-guarda proíbe `telas/` de importar pedido. Se um terceiro quadro aparecer, extrair o esqueleto
   (coluna, cartão com filete) para `telas/quadro/` sem dado de pedido.

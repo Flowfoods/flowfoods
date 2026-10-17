@@ -349,7 +349,8 @@ export async function recusarPedido(id: string, motivoBruto: unknown, versaoLida
       data: { status: 'RECUSADO', motivoRecusa: m.motivo, etapaDesde: agora, versao: { increment: 1 }, atualizadoEm: agora },
     });
     if (count === 0) throw new Desfazer(FRASE_PEDIDO_MEXIDO);
-    await registrar(tx, id, 'RECUSOU', { antes: { etapa: p.status }, depois: { etapa: 'RECUSADO' }, motivo: m.motivo, autorNome, agora });
+    // O motivo é texto livre (pode citar pessoa): mora SÓ no pedido, que se pode anonimizar. O evento é só-inclusão e não o copia.
+    await registrar(tx, id, 'RECUSOU', { antes: { etapa: p.status }, depois: { etapa: 'RECUSADO' }, autorNome, agora });
     return 'Pedido recusado.';
   });
 }
@@ -374,12 +375,14 @@ export async function excluirDadosDoPedido(id: string, autorNome: string, o?: Op
         whatsapp: '',
         email: '',
         cidade: '',
+        // Texto livre digitado por quem recusou: pode citar a pessoa. A CHECK pede 3+ letras.
+        motivoRecusa: '[apagado]',
         anonimizadoEm: agora,
         versao: { increment: 1 },
       },
     });
     await registrar(tx, id, 'EXCLUIU_DADOS', { autorNome, agora });
-    return 'Dados pessoais excluídos. O cartão e o histórico ficam, sem nome nem contato.';
+    return 'Dados pessoais excluídos. O cartão e o histórico ficam, sem nome, contato nem motivo.';
   });
 }
 

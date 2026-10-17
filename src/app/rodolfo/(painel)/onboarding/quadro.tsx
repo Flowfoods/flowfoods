@@ -12,7 +12,6 @@
 import Link from 'next/link';
 import type { CartaoDoPedido, QuadroDePedidos } from '@/lib/erp/pedidos';
 import { ORDEM_DAS_ETAPAS, ROTULO_DA_ETAPA, textoDaEtapa, type EtapaDoPedido } from '@/lib/erp/pedido-campos';
-import { FiltroEmLinks } from '@/components/erp/ui/filtros';
 import { Selo } from '@/components/erp/ui/superficies';
 
 const COR_DA_COLUNA: Record<EtapaDoPedido, { texto: string; barra: string }> = {
@@ -63,7 +62,7 @@ function Cartao({ c, agora }: { c: CartaoDoPedido; agora: Date }) {
           <span>
             {c.lojas} {c.lojas === 1 ? 'loja' : 'lojas'} · {c.marcas} {c.marcas === 1 ? 'marca' : 'marcas'}
           </span>
-          <span>
+          <span className={atrasado ? 'font-semibold text-erro' : ''}>
             {FECHADA[c.status]} {textoDaEtapa(c.etapaDesde, agora)}
           </span>
         </div>
@@ -112,16 +111,23 @@ export function QuadroDePedidos({ quadro, etapa }: { quadro: QuadroDePedidos; et
   const agora = new Date();
   return (
     <>
-      <div className="md:hidden">
-        <FiltroEmLinks
-          rotulo="Etapa do pedido"
-          opcoes={ORDEM_DAS_ETAPAS.map((e) => ({
-            href: `/rodolfo/onboarding?etapa=${CHAVE_DA_ABA[e]}`,
-            rotulo: `${ROTULO_DA_ETAPA[e]} ${quadro[e].length}`,
-            ativo: e === etapa,
-          }))}
-        />
-      </div>
+      {/* Celular: 4 abas iguais, rótulo e contagem em duas linhas (nada corta, nada rola). */}
+      <nav aria-label="Etapa do pedido" className="md:hidden">
+        <ul className="grid grid-cols-4 gap-1 rounded-[10px] border border-linha bg-painel p-1">
+          {ORDEM_DAS_ETAPAS.map((e) => (
+            <li key={e}>
+              <Link
+                href={`/rodolfo/onboarding?etapa=${CHAVE_DA_ABA[e]}`}
+                aria-current={e === etapa ? 'page' : undefined}
+                className="ff-transicao flex min-h-11 flex-col items-center justify-center rounded-[7px] px-1 text-center text-[12px] leading-tight text-suave hover:bg-texto/5 hover:text-texto aria-[current=page]:bg-forte aria-[current=page]:font-semibold aria-[current=page]:text-texto"
+              >
+                <span>{ROTULO_DA_ETAPA[e]}</span>
+                <span className="tabular-nums">{quadro[e].length}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
       <div className="grid gap-x-4 gap-y-7 md:grid-cols-2 xl:grid-cols-4">
         {ORDEM_DAS_ETAPAS.map((e) => (
           <Coluna key={e} etapa={e} cartoes={quadro[e]} ativa={e === etapa} agora={agora} />

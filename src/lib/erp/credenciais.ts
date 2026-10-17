@@ -608,7 +608,19 @@ interface EntradaDoAcesso {
   lojas: { id: string; nome: string }[];
   nomes: ReadonlyMap<string, string>;
   agora: Date;
+  /**
+   * A ativação de um pedido (dado vindo do PÚBLICO) só cria pessoa NOVA: e-mail
+   * que já existe em `UsuarioErp`, em qualquer estado (com senha, com convite
+   * pendente, sem vínculo ativo), é recusado antes de tocar em qualquer credencial.
+   * Sem isto, quem manda o e-mail de outra pessoa no formulário tomaria a conta
+   * dela (a senha e os rostos caem e o link do nível 1 vai para o WhatsApp do pedido).
+   */
+  soPessoaNova?: boolean;
 }
+
+/** Frase neutra: serve ao nível 1 e não revela mais do que ele já vê. */
+export const ERRO_DONO_JA_TEM_ACESSO =
+  'Este e-mail já tem acesso ao ERP. Use outro e-mail para o dono ou ligue a pessoa pela Equipe do parceiro depois de ativar.';
 
 /**
  * O miolo de `criarAcesso`, dentro de uma transação que já travou a equipe e
@@ -624,6 +636,7 @@ async function criarAcessoNaTransacao(
   await exigirParceiroLiberado(tx, parceiroId);
   const nivel1 = ator.alcance.nivel === 'FLOWFOODS';
   let usuario = await tx.usuarioErp.findUnique({ where: { email: e.email } });
+  if (usuario && e.soPessoaNova) throw new Desfazer({ email: ERRO_DONO_JA_TEM_ACESSO });
   if (usuario) {
     const ja = await tx.acessoParceiro.findUnique({
       where: { parceiroId_usuarioId: { parceiroId, usuarioId: usuario.id } },
@@ -1749,7 +1762,7 @@ export async function ativarPedido(
         await travar(tx, `erp-equipe:${parceiro.id}`);
         const acesso = await criarAcessoNaTransacao(
           tx,
-          { parceiroId: parceiro.id, nome: f.donoNome, email: f.donoEmail, dados: permissoes.dados, lojas: [], nomes: new Map(), agora },
+          { parceiroId: parceiro.id, nome: f.donoNome, email: f.donoEmail, dados: permissoes.dados, lojas: [], nomes: new Map(), agora, soPessoaNova: true },
           ator,
         );
         if (!acesso.resultado.ok) throw new Desfazer(acesso.resultado.erros);
@@ -1802,6 +1815,9 @@ export async function ativarPedido(
     );
   } catch (e) {
     if (e instanceof Desfazer) return { ok: false, erros: erroDaAtivacao(e.erros) };
+    // Corrida: alguém criou o MESMO e-mail (na Equipe de outro parceiro) entre a conferência e a
+    // criação. O único do e-mail decide; o perdedor desfaz tudo e recebe a mesma frase.
+    if (ehErroDeUnicidade(e)) return { ok: false, erros: { donoEmail: ERRO_DONO_JA_TEM_ACESSO } };
     throw e;
   }
 }
@@ -1820,16 +1836,17 @@ function erroDaAtivacao(erros: Erros): Extract<ResultadoDaAtivacao, { ok: false 
 }
 
 /**
- * Para o cartão do pedido (só nível 1 lê): este e-mail já entra no ERP de
- * algum parceiro? Devolve os nomes; a landing nunca vê isto (resposta única).
+ * Para o cartão do pedido (só nível 1 lê): este e-mail já existe em `UsuarioErp`
+ * (com senha, com convite pendente ou sem vínculo ativo)? E em quais parceiros
+ * ele entra? A landing nunca vê isto (resposta única).
  */
-export async function parceirosDoEmail(email: string, o?: Opcoes): Promise<string[]> {
+export async function contaDoEmail(email: string, o?: Opcoes): Promise<{ existe: boolean; parceiros: string[] }> {
   const { db } = abrir(o);
   const u = await db.usuarioErp.findUnique({
     where: { email },
     select: { acessos: { where: { status: 'ATIVO' }, select: { parceiro: { select: { nome: true } } } } },
   });
-  return u ? u.acessos.map((a) => a.parceiro.nome) : [];
+  return { existe: u !== null, parceiros: u ? u.acessos.map((a) => a.parceiro.nome) : [] };
 }
 
 /**

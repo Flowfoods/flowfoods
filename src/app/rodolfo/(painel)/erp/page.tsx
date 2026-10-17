@@ -52,13 +52,14 @@ export default async function ErpPage() {
         <Metrica rotulo="Ativos" valor={porStatus.ATIVO} />
         <Metrica
           rotulo="Aguardando liberação"
-          valor={pedidos.abertos + porStatus.RASCUNHO}
-          detalhe={
-            pedidos.abertos || porStatus.RASCUNHO
-              ? `${pedidos.abertos} ${pedidos.abertos === 1 ? 'pedido' : 'pedidos'}${porStatus.RASCUNHO ? ` · ${porStatus.RASCUNHO} em rascunho` : ''}`
-              : undefined
-          }
-        />
+          valor={pedidos.abertos}
+        >
+          {(pedidos.atrasados > 0 || porStatus.RASCUNHO > 0) && (
+            <div className="mt-1.5 text-[12px] leading-snug text-suave">
+              {[pedidos.atrasados ? `${pedidos.atrasados} com atraso` : null, porStatus.RASCUNHO ? `${porStatus.RASCUNHO} em rascunho` : null].filter(Boolean).join(' · ')}
+            </div>
+          )}
+        </Metrica>
         <Metrica rotulo="Suspensos" valor={porStatus.SUSPENSO} />
       </div>
 
@@ -102,15 +103,18 @@ export default async function ErpPage() {
                         >
                           {p.nome}
                         </Link>
-                        <div className="mt-0.5 flex items-center gap-2 text-[12px] text-suave">
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-suave">
                           <Ponto tom={s.tom} />
                           <span className="truncate">{s.rotulo}</span>
                           {presos.has(p.id) ? (
-                            <span className="truncate text-erro">
-                              · {presos.get(p.id)} {presos.get(p.id) === 1 ? 'pessoa não entra' : 'pessoas não entram'}: ative para liberar o acesso
+                            <span className="basis-full text-erro sm:basis-auto">
+                              <span aria-hidden className="hidden sm:inline">· </span>
+                              {presos.get(p.id)} {presos.get(p.id) === 1 ? 'pessoa não entra' : 'pessoas não entram'}: ative para liberar o acesso
                             </span>
                           ) : (
-                            semAdmin.has(p.id) && <span className="truncate text-erro">· sem ninguém cuidando da equipe</span>
+                            semAdmin.has(p.id) && <span className="basis-full text-erro sm:basis-auto">
+                              <span aria-hidden className="hidden sm:inline">· </span>sem ninguém cuidando da equipe
+                            </span>
                           )}
                         </div>
                       </td>

@@ -17,7 +17,8 @@ import {
   entrarComSenha,
   ERRO_PARCEIRO_NAO_LIBERADO,
   gerarNovoLink,
-  parceirosDoEmail,
+  contaDoEmail,
+  ERRO_DONO_JA_TEM_ACESSO,
   rascunhosComPessoasAtivas,
   validarSessao,
   atorNivel1,
@@ -168,7 +169,8 @@ describe.skipIf(!URL_TESTE)('ERP 0.5 · onboarding: pedido, quadro, ativação e
     expect(novo).toEqual({ tipo: 'recebido' });
     // Quem já tem acesso vira um pedido comum (o nível 1 é quem vê a marca); nada em UsuarioErp mudou.
     expect(await contarPedidos(email('jatenho'))).toBe(1);
-    expect(await parceirosDoEmail(email('jatenho'), { base: db })).toEqual(['Enum A']);
+    expect(await contaDoEmail(email('jatenho'), { base: db })).toEqual({ existe: true, parceiros: ['Enum A'] });
+    expect(await contaDoEmail(email('naoexiste'), { base: db })).toEqual({ existe: false, parceiros: [] });
   });
 
   it('reenvio do mesmo e-mail ou do mesmo WhatsApp: 0 cartões novos, +1 evento REENVIOU, reenvios +1', async () => {
@@ -448,47 +450,138 @@ describe.skipIf(!URL_TESTE)('ERP 0.5 · onboarding: pedido, quadro, ativação e
     expect(await db.parceiroFlow.count({ where: { slug: `velha-${sufixo}` } })).toBe(0);
   });
 
-  it('dono que já tem senha em outro parceiro: ativa SEM link e com a frase da 0.4; senha criada por link de parceiro é revogada nos dois históricos', async () => {
-    // Pessoa que já entra num parceiro A pelo nível 1 (senha vale em todos).
-    const A = await criarParceiro({ nome: 'Dono Antigo A', slug: `antigo-a-${sufixo}`, status: 'ATIVO' }, 'Teste', db);
-    if (!A.ok) throw new Error();
-    ids.push(A.id);
-    const c = await criarAcesso(A.id, { nome: 'Pessoa Antiga', email: email('antiga') }, 'Rodolfo', { base: db });
-    if (!c.ok || !c.link) throw new Error();
+  // ---------------------------------------------- sequestro de conta pelo formulário público
+
+  /** O ataque inteiro, até a sessão: pedido com o e-mail da vítima e o WhatsApp do atacante; Rodolfo ativa com os valores da tela. */
+  async function tentarTomarConta(emailDaVitima: string, apelido: string) {
+    contador++;
+    const envio = await receberPedidoDaLanding(formulario(apelido, { email: emailDaVitima }), ipDe(`${apelido}-${contador}`), o());
+    expect(envio).toEqual({ tipo: 'recebido' });
+    const pedido = await pedidoPorEmail(emailDaVitima.toLowerCase());
+    const SENHA_DO_ATACANTE = 'senha do atacante 99';
+    const r = await ativarPedido(pedido.id, { ...ativacao(pedido, `${apelido}-${sufixo}`, 'x'), donoEmail: emailDaVitima }, 'Rodolfo', { base: db });
+    if (r.ok) ids.push(r.parceiro.id);
+    let sessao: Awaited<ReturnType<typeof validarSessao>> = null;
+    if (r.ok && r.link) {
+      // o atacante usa o link que o wa.me levou ao WhatsApp dele
+      const d = await definirSenhaPeloLink(r.link.token, SENHA_DO_ATACANTE, SENHA_DO_ATACANTE, { base: db });
+      if (d.ok) {
+        const e = await entrarComSenha({ email: emailDaVitima, senha: SENHA_DO_ATACANTE, ip: ipDe(`atk-${apelido}-${contador}`) }, { base: db });
+        if (e.ok) sessao = await validarSessao(e.token, { base: db });
+      }
+    }
+    const donaDoPedido = await db.pedidoParceiro.findUniqueOrThrow({ where: { id: pedido.id } });
+    return { r, sessao, pedido: donaDoPedido, SENHA_DO_ATACANTE };
+  }
+
+  async function vitimaGerente(apelido: string) {
+    const B = await criarParceiro({ nome: `Vítima ${apelido}`, slug: `vitima-${apelido}-${sufixo}`, status: 'ATIVO' }, 'Teste', db);
+    if (!B.ok) throw new Error('setup');
+    ids.push(B.id);
+    const c = await criarAcesso(B.id, { nome: 'Gerente Vítima', email: email(apelido), perfil: 'GERENTE' }, 'Rodolfo', { base: db });
+    if (!c.ok || !c.link) throw new Error('setup acesso');
+    await definirSenhaPeloLink(c.link.token, SENHA, SENHA, { base: db });
+    return { B: B.id, email: email(apelido) };
+  }
+
+  it('SEQUESTRO (com senha): pedido com o e-mail da gerente de outro parceiro e o WhatsApp do atacante — ativar é RECUSADO e a conta dela fica intacta; o atacante não chega a sessão nenhuma', async () => {
+    const v = await vitimaGerente('seq1');
+    // A vítima tem senha, rosto e sessão aberta.
+    const antes = await db.usuarioErp.findUniqueOrThrow({ where: { email: v.email } });
+    await db.$executeRawUnsafe(
+      `INSERT INTO "PasskeyErp"(id, "usuarioId", "credencialId", "chavePublica", transportes, aparelho) VALUES ('pk-seq1-${sufixo}', $1, 'cred-seq1-${sufixo}', '\\x00', ARRAY[]::text[], 'iPhone')`,
+      antes.id,
+    );
+    const logada = await entrarComSenha({ email: v.email, senha: SENHA, ip: ipDe('vit1') }, { base: db });
+    if (!logada.ok) throw new Error('setup login');
+    const convitesAntes = await db.conviteAcesso.count({ where: { usuarioId: antes.id } });
+    const versaoAntes = (await db.usuarioErp.findUniqueOrThrow({ where: { id: antes.id } })).versaoCredencial;
+
+    const { r, sessao, pedido, SENHA_DO_ATACANTE } = await tentarTomarConta(v.email, 'seq1');
+
+    expect(r).toEqual({ ok: false, erros: { donoEmail: ERRO_DONO_JA_TEM_ACESSO } });
+    expect(sessao).toBeNull(); // o atacante não tem link, senha nem sessão
+    expect(pedido).toMatchObject({ status: 'NOVO', parceiroCriadoId: null }); // nada ativado
+    expect(await db.parceiroFlow.count({ where: { slug: `seq1-${sufixo}` } })).toBe(0);
+    // A conta da vítima não mudou: mesma senha (o hash é o mesmo), mesmo rosto, mesma versão, mesma sessão, nenhum link novo.
+    const depois = await db.usuarioErp.findUniqueOrThrow({ where: { id: antes.id } });
+    expect(depois.senhaHash).toBe(antes.senhaHash);
+    expect(depois.versaoCredencial).toBe(versaoAntes);
+    expect(await db.passkeyErp.count({ where: { usuarioId: antes.id } })).toBe(1);
+    expect(await db.conviteAcesso.count({ where: { usuarioId: antes.id } })).toBe(convitesAntes);
+    expect(await db.acessoParceiro.count({ where: { usuarioId: antes.id } })).toBe(1);
+    expect(await validarSessao(logada.token, { base: db })).not.toBeNull();
+    expect((await entrarComSenha({ email: v.email, senha: SENHA, ip: ipDe('vit1b') }, { base: db })).ok).toBe(true);
+    expect((await entrarComSenha({ email: v.email, senha: SENHA_DO_ATACANTE, ip: ipDe('atk1') }, { base: db })).ok).toBe(false);
+    await db.$executeRawUnsafe(`DELETE FROM "PasskeyErp" WHERE "usuarioId" = $1`, antes.id);
+  });
+
+  it('SEQUESTRO (convite pendente, sem senha): a vítima ainda não criou a senha — ativar também é recusado e o link dela continua valendo', async () => {
+    const B = await criarParceiro({ nome: 'Vítima convite', slug: `vitima-conv-${sufixo}`, status: 'ATIVO' }, 'Teste', db);
+    if (!B.ok) throw new Error('setup');
+    ids.push(B.id);
+    const c = await criarAcesso(B.id, { nome: 'Pendente Vítima', email: email('seq2'), perfil: 'GERENTE' }, 'Rodolfo', { base: db });
+    if (!c.ok || !c.link) throw new Error('setup acesso');
+    const { r, sessao } = await tentarTomarConta(email('seq2'), 'seq2');
+    expect(r).toEqual({ ok: false, erros: { donoEmail: ERRO_DONO_JA_TEM_ACESSO } });
+    expect(sessao).toBeNull();
+    // O link original da vítima não foi revogado nem trocado; é ela quem cria a senha.
+    expect(await consultarLink(c.link.token, { base: db })).toMatchObject({ valido: true, nome: 'Pendente Vítima' });
+    expect(await db.conviteAcesso.count({ where: { usuario: { email: email('seq2') } } })).toBe(1);
     expect((await definirSenhaPeloLink(c.link.token, SENHA, SENHA, { base: db })).ok).toBe(true);
-    const p = await novoPedido('semlink');
-    const r = await ativarPedido(p.id, ativacao(p, `semlink-${sufixo}`, 'antiga'), 'Rodolfo', { base: db });
+    const e = await entrarComSenha({ email: email('seq2'), senha: SENHA, ip: ipDe('vit2') }, { base: db });
+    if (!e.ok) throw new Error('a vítima não entrou');
+    expect((await validarSessao(e.token, { base: db }))?.parceiros.map((x) => x.id)).toEqual([B.id]); // só o parceiro dela
+  });
+
+  it('SEQUESTRO (senha criada por link de administrador de parceiro, e acesso desativado): qualquer pessoa que já existe em UsuarioErp é recusada, em qualquer estado', async () => {
+    // senha criada por link de parceiro (a que a 0.4 apagaria ao ganhar outro vínculo)
+    const v = await vitimaGerente('seq3');
+    await db.usuarioErp.update({ where: { email: v.email }, data: { senhaPorLinkDoParceiroId: v.B } });
+    const antes = await db.usuarioErp.findUniqueOrThrow({ where: { email: v.email } });
+    const a = await tentarTomarConta(v.email, 'seq3');
+    expect(a.r).toEqual({ ok: false, erros: { donoEmail: ERRO_DONO_JA_TEM_ACESSO } });
+    expect((await db.usuarioErp.findUniqueOrThrow({ where: { email: v.email } })).senhaHash).toBe(antes.senhaHash);
+    expect(await db.passkeyErp.count({ where: { usuarioId: antes.id } })).toBe(0);
+    // vínculo desativado: a pessoa continua existindo
+    const v4 = await vitimaGerente('seq4');
+    await db.acessoParceiro.updateMany({ where: { parceiroId: v4.B }, data: { status: 'DESATIVADO' } });
+    const b = await tentarTomarConta(v4.email, 'seq4');
+    expect(b.r).toEqual({ ok: false, erros: { donoEmail: ERRO_DONO_JA_TEM_ACESSO } });
+    expect(b.sessao).toBeNull();
+    // e o e-mail digitado com outra caixa, como o login normaliza
+    const c = await tentarTomarConta(v.email.toUpperCase().replace('@TESTE.FLOW', '@teste.flow'), 'seq5');
+    expect(c.r).toMatchObject({ ok: false });
+    expect(c.sessao).toBeNull();
+  });
+
+  it('corrida: ativar com um e-mail novo e a Equipe de outro parceiro criar o MESMO e-mail ao mesmo tempo — uma conta só, e a ativação nunca mexe em credencial existente', async () => {
+    const outro = await criarParceiro({ nome: 'Corrida equipe', slug: `corr-eq-${sufixo}`, status: 'ATIVO' }, 'Teste', db);
+    if (!outro.ok) throw new Error('setup');
+    ids.push(outro.id);
+    for (let i = 0; i < 4; i++) {
+      const alvo = email(`corrida-conta-${i}`);
+      const p = await novoPedido(`cc${i}`, { email: alvo });
+      const [a, c] = await Promise.all([
+        ativarPedido(p.id, { ...ativacao(p, `cc${i}-${sufixo}`, 'x'), donoEmail: alvo }, 'Rodolfo', { base: db }),
+        criarAcesso(outro.id, { nome: 'Pela Equipe', email: alvo, perfil: 'GERENTE' }, 'Rodolfo', { base: db }),
+      ]);
+      if (a.ok) ids.push(a.parceiro.id);
+      expect(await db.usuarioErp.count({ where: { email: alvo } }), `rodada ${i}`).toBe(1);
+      if (!a.ok) expect(a.erros.donoEmail).toBe(ERRO_DONO_JA_TEM_ACESSO);
+      // Quem ativou criou a pessoa NOVA e só ela tem o link: a Equipe (nível 1) apenas liga o vínculo, sem apagar a senha de ninguém.
+      expect(a.ok || c.ok).toBe(true);
+      const u = await db.usuarioErp.findUniqueOrThrow({ where: { email: alvo } });
+      expect(u.versaoCredencial).toBe(0);
+    }
+  });
+
+  it('e-mail NOVO continua ativando normalmente (o caminho feliz não mudou)', async () => {
+    const p = await novoPedido('novo-feliz');
+    const r = await ativarPedido(p.id, ativacao(p, `feliz-${sufixo}`, 'dono-feliz'), 'Rodolfo', { base: db });
     if (!r.ok) throw new Error(JSON.stringify(r.erros));
     ids.push(r.parceiro.id);
-    expect(r.link).toBeNull();
-    expect(r.mensagem).toContain('já tem senha e entra em outro parceiro');
-    expect(await db.acessoParceiro.count({ where: { usuario: { email: email('antiga') } } })).toBe(2);
-
-    // Senha criada por link de administrador do parceiro (não do nível 1): não atravessa.
-    const B = await criarParceiro({ nome: 'Dono Antigo B', slug: `antigo-b-${sufixo}`, status: 'ATIVO' }, 'Teste', db);
-    if (!B.ok) throw new Error();
-    ids.push(B.id);
-    const adminB = await criarAcesso(B.id, { nome: 'Admin B', email: email('adminb'), perfil: 'DONO' }, 'Rodolfo', { base: db });
-    if (!adminB.ok || !adminB.link) throw new Error();
-    await definirSenhaPeloLink(adminB.link.token, SENHA, SENHA, { base: db });
-    const ator = { nome: 'Admin B', acessoId: (await db.acessoParceiro.findFirstOrThrow({ where: { parceiroId: B.id } })).id, alcance: (await validarSessao((await entrarComSenha({ email: email('adminb'), senha: SENHA, ip: ipDe('adminb') }, { base: db }) as { token: string }).token, { base: db }))!.alcance! };
-    const porParceiro = await criarAcesso(B.id, { nome: 'Pessoa Por Link', email: email('porlink'), perfil: 'GERENTE' }, ator, { base: db });
-    if (!porParceiro.ok || !porParceiro.link) throw new Error();
-    await definirSenhaPeloLink(porParceiro.link.token, SENHA, SENHA, { base: db });
-    expect((await db.usuarioErp.findUniqueOrThrow({ where: { email: email('porlink') } })).senhaPorLinkDoParceiroId).toBe(B.id);
-
-    const p2 = await novoPedido('comlink');
-    const r2 = await ativarPedido(p2.id, ativacao(p2, `comlink-${sufixo}`, 'porlink'), 'Rodolfo', { base: db });
-    if (!r2.ok) throw new Error(JSON.stringify(r2.erros));
-    ids.push(r2.parceiro.id);
-    expect(r2.link).not.toBeNull(); // a senha caiu: link novo, pelo nível 1
-    expect(r2.mensagem).toContain('foram desligadas');
-    const u = await db.usuarioErp.findUniqueOrThrow({ where: { email: email('porlink') } });
-    expect(u.senhaHash).toBeNull();
-    const deB = await doParceiro(B.id, db).historicoAlteracao.findMany({ where: { acao: 'PEDIU_SENHA_NOVA' } });
-    const deNovo = await doParceiro(r2.parceiro.id, db).historicoAlteracao.findMany({ where: { acao: 'PEDIU_SENHA_NOVA' } });
-    expect(deB).toHaveLength(1);
-    expect(deNovo).toHaveLength(1);
+    expect(r.link).not.toBeNull();
   });
 
   // ------------------------------------------------------------------ recusar
@@ -503,7 +596,8 @@ describe.skipIf(!URL_TESTE)('ERP 0.5 · onboarding: pedido, quadro, ativação e
     expect(await db.parceiroFlow.count()).toBe(antes);
     const depois = await pedidoPorEmail(email('recusa'));
     expect(depois).toMatchObject({ status: 'RECUSADO', motivoRecusa: 'fora da região', parceiroCriadoId: null });
-    expect(depois.eventos.map((e) => [e.acao, e.motivo])).toEqual([['CRIOU', null], ['RECUSOU', 'fora da região']]);
+    // O motivo mora só no pedido (apagável pela LGPD): o evento, que só se acrescenta, não o copia.
+    expect(depois.eventos.map((e) => [e.acao, e.motivo])).toEqual([['CRIOU', null], ['RECUSOU', null]]);
     expect(await recusarPedido(p.id, 'outra vez', depois.versao, 'Outro', { base: db })).toMatchObject({ ok: false, erro: expect.stringMatching(/já foi recusado por Rodolfo/) });
     expect(await ativarPedido(p.id, ativacao(depois, `recusa-${sufixo}`, 'dono-recusa'), 'Rodolfo', { base: db })).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/já foi recusado/) } });
   });
@@ -515,7 +609,8 @@ describe.skipIf(!URL_TESTE)('ERP 0.5 · onboarding: pedido, quadro, ativação e
     await recusarPedido(p.id, 'sem interesse', p.versao, 'Rodolfo', { base: db });
     expect((await excluirDadosDoPedido(p.id, 'Rodolfo', { base: db })).ok).toBe(true);
     const d = (await obterPedido(p.id, { base: db }))!;
-    expect(d).toMatchObject({ nomeGrupo: '(dados excluídos)', responsavel: '(dados excluídos)', email: '', whatsapp: '', cidade: '', excluido: true, status: 'RECUSADO' });
+    expect(d).toMatchObject({ nomeGrupo: '(dados excluídos)', responsavel: '(dados excluídos)', email: '', whatsapp: '', cidade: '', motivoRecusa: '[apagado]', excluido: true, status: 'RECUSADO' });
+    expect(JSON.stringify(await db.pedidoParceiroEvento.findMany({ where: { pedidoId: p.id } }))).not.toContain('sem interesse');
     expect(d.eventos.map((e) => e.acao)).toEqual(['EXCLUIU_DADOS', 'RECUSOU', 'CRIOU']);
     expect(JSON.stringify(d.eventos)).not.toContain('Resp lgpd');
     // Uma segunda exclusão não faz nada; e o contato antigo já não bate com pedido aberto.
