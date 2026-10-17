@@ -629,14 +629,10 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · produção do pré-preparo pela ficha (P
     const { divergenciasDaLoja } = await import('@/lib/erp/requisicao');
     // O cruzamento só julga insumo que tem trecho entre contagens; aqui basta provar que os tipos entram no fluxo:
     // Σ REQUISICAO (líquido) por insumo é o "requisitado", e PRODUCAO_ENTRADA entra como entrada.
-    const [r] = await db.$queryRawUnsafe<{ cheddar: number; molho: number }[]>(
-      `SELECT
-         (SELECT -coalesce(sum("quantidadeMilesimos"), 0)::int FROM "MovimentoEstoque" WHERE "parceiroId" = $1 AND "insumoId" = $2 AND "tipo" = 'REQUISICAO') AS cheddar,
-         (SELECT coalesce(sum("quantidadeMilesimos"), 0)::int FROM "MovimentoEstoque" WHERE "parceiroId" = $1 AND "insumoId" = $3 AND "tipo" = 'PRODUCAO_ENTRADA') AS molho`,
-      A.id,
-      ids.cheddar,
-      ids.insumoMolho,
-    );
+    // Pelo portão (a leitura crua não vê nada sob RLS forçada).
+    const somar = async (insumoId: string, tipo: 'REQUISICAO' | 'PRODUCAO_ENTRADA') =>
+      Math.abs((await a.movimentoEstoque.aggregate({ _sum: { quantidadeMilesimos: true }, where: { insumoId, tipo } }))._sum.quantidadeMilesimos ?? 0);
+    const r = { cheddar: await somar(ids.cheddar, 'REQUISICAO'), molho: await somar(ids.insumoMolho, 'PRODUCAO_ENTRADA') };
     expect(r.cheddar).toBeGreaterThan(0);
     expect(r.molho).toBeGreaterThan(0);
     const d = await divergenciasDaLoja(a, DONA(), ids.vp, {});

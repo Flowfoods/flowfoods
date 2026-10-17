@@ -64,7 +64,7 @@ export function ColunaDoQuadro({
 
 /**
  * O cartão: o link inteiro abre o detalhe. Atrasado = borda esquerda vermelha (3 px no quadro de requisições e de lotes,
- * 2 px no de pedidos, como cada um foi pedido). `apagado` esmaece o cartão de coisa cancelada.
+ * 2 px no de pedidos, como cada um foi pedido). `apagado` afunda o cartão de coisa cancelada (sem opacidade: o texto mantém o contraste).
  */
 export function CartaoDoQuadro({
   href,
@@ -85,7 +85,7 @@ export function CartaoDoQuadro({
   const borda = atrasado ? (filete === 2 ? 'border-l-2 border-l-erro pl-[13px]' : 'border-l-[3px] border-l-erro pl-[12px]') : '';
   return (
     <li>
-      <Link href={href} aria-label={rotulo} className={`ff-transicao block rounded-[10px] border border-linha bg-painel px-3.5 py-3 hover:border-linha-forte ${borda} ${apagado ? 'opacity-75' : ''}`}>
+      <Link href={href} aria-label={rotulo} className={`ff-transicao block rounded-[10px] border border-linha px-3.5 py-3 hover:border-linha-forte ${borda} ${apagado ? 'bg-fundo' : 'bg-painel'}`}>
         {children}
       </Link>
     </li>
