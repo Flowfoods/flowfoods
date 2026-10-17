@@ -33,7 +33,7 @@ export default async function ErpDrePage({ searchParams }: { searchParams: Recor
       base="/erp/dre"
       raiz="/erp"
       contexto={rotuloDaVisao(visao)}
-      pode={{ lancarDespesa: pode(ctx.alcance, 'despesas.lancar'), definirMetas: pode(ctx.alcance, 'metas.editar'), fecharPeriodo: recusaDoFechamento(ctx.alcance) === null, verFaturamento: pode(ctx.alcance, 'faturamento.ver'), verPrecos: pode(ctx.alcance, 'precos.ver'), veRede: ctx.alcance.lojas === 'todas' }}
+      pode={{ lancarDespesa: pode(ctx.alcance, 'despesas.lancar'), definirMetas: pode(ctx.alcance, 'metas.editar'), fecharPeriodo: recusaDoFechamento(ctx.alcance) === null, verFaturamento: pode(ctx.alcance, 'faturamento.ver'), verPrecos: pode(ctx.alcance, 'precos.ver'), verCompras: pode(ctx.alcance, 'compras.ver'), verEstoque: pode(ctx.alcance, 'estoque.ver'), veRede: ctx.alcance.lojas === 'todas' }}
       bloqueio={ctx.bloqueio}
     />
   );

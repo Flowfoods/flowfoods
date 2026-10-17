@@ -194,12 +194,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/nova', 'compras/[id]/editar'],
     titulo: 'Lançar nota',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Digite o valor total de cada linha, como está na nota.' },
       { texto: 'O frete é dividido entre os itens, e a soma tem que bater com o total da nota.' },
       { texto: '“Conferir o impacto” mostra o que muda de custo antes de lançar.' },
-      { texto: 'A data da nota decide o período dela: se o DRE já fechou esse período, a nota não entra nem se edita.', para: ['compras.lancar'] },
+      { texto: 'A data da nota decide o período dela: se o DRE já fechou esse período, a nota não entra nem se edita. É também essa data que põe a nota no CMV de compra do período.', para: ['compras.lancar'] },
+      { texto: 'Só lance como nota o que é comida e embalagem para vender. Limpeza e descartável da operação vão como despesa, e o pagamento ao fornecedor de uma nota já lançada não é despesa: a nota já é o custo.', para: ['compras.lancar'] },
     ],
   },
   {
@@ -353,12 +354,22 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'estoque',
     rotas: ['estoque/[lojaId]/periodo'],
     titulo: 'Período e contagens',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'Quanto do estoque foi contado no período, por valor e por itens. O período é o mesmo do DRE: mensal, quinzenal ou semanal, definido em Períodos, na área Faturamento e DRE.' },
       { texto: 'O fechamento só vale com a cobertura acima do piso da loja.' },
       { texto: 'Depois que o DRE fecha o período, o fechamento do estoque dele não começa nem se aplica mais, mas descartar um em andamento continua valendo.' },
       { texto: 'As regras da contagem (piso, frequência, tolerância) ficam aqui; só quem cadastra lojas muda.', para: ['lojas.gerir'] },
+    ],
+    secoes: [
+      {
+        id: 'cmv-real',
+        titulo: 'O fechamento e o CMV real',
+        blocos: [
+          { texto: 'O valor do fechamento é o estoque final do período e vira o estoque inicial do seguinte: é a base do CMV real no DRE.' },
+          { texto: 'Contar depois do fim do período não estraga a conta: o que entrou ou saiu entre o fim e a contagem é separado pela data. Insumo sem preço entra com zero, e o DRE avisa quantos são.' },
+        ],
+      },
     ],
   },
   {
@@ -559,14 +570,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre'],
     titulo: 'DRE',
-    versao: 3,
+    versao: 4,
     // A tela da reunião: a tabela fica à vista e a aula abre numa linha.
     recolhida: true,
     aula: [
       { texto: 'O resultado da casa no período: o que entrou, o que saiu e o que sobrou, com o peso de cada linha na receita bruta, até ontem no período em curso.' },
       { texto: 'Com meta definida, a linha mostra o desvio e se está melhor ou pior que a meta; ela vale igual na rede e em cada loja.' },
       { texto: 'Período fechado mostra a fotografia do fechamento, que nunca muda.' },
-      { texto: 'O CMV ainda não entra (em breve): a margem e os resultados saem sem contar o CMV.' },
+      { texto: 'O CMV é o custo da comida: no período em curso é o que a casa comprou até ontem, e vira o real, o que ela consumiu, quando o período termina e a contagem de fechamento do estoque é aplicada.' },
     ],
     secoes: [
       {
@@ -583,7 +594,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'O desvio é o realizado menos a meta, em pontos percentuais. Menos de 0,05 ponto de diferença é na meta.' },
           { texto: 'A palavra segue o lado bom de cada linha: custo e despesa menores são melhores, receita líquida e margem maiores são melhores. A tela não usa cor para isso.' },
-          { texto: 'Sem faturamento, sem lançamento na linha ou sem valor (como o CMV), a linha não compara e mostra traço, nunca zero.' },
+          { texto: 'Sem faturamento, sem lançamento na linha ou sem valor (como o CMV de uma loja sem nota e sem estoque), a linha não compara e mostra traço, nunca zero. A meta do CMV compara com o que vale: o real ou o das compras.' },
           { texto: 'Na visão de uma loja, o resultado operacional e o resultado do período não mostram meta: a loja não carrega as despesas da rede.' },
           { texto: 'Quem define as metas as escreve em Plano e metas.', para: ['metas.editar'] },
         ],
@@ -595,6 +606,18 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'Compara a receita com as mesmas datas um ano antes, no mesmo recorte (29 de fevereiro compara com 28). Só a receita tem comparação.' },
           { texto: 'A variação só aparece quando o ano passado tem lançamento em todos os dias e este período não tem lançamento faltando. Senão ficam os dois números e o motivo.' },
           { texto: 'Sem lançamento no ano passado a tela diz sem lançamento, nunca R$ 0,00.' },
+        ],
+      },
+      {
+        id: 'cmv',
+        titulo: 'Os dois CMVs: compra e real',
+        blocos: [
+          { texto: 'CMV de compra é a soma das notas lançadas pela data da nota. Vale no dia a dia e mede o que a casa gastou comprando, não o que consumiu.' },
+          { texto: 'CMV real é o estoque inicial mais as compras menos o estoque final. Só existe com o período terminado e o fechamento do estoque aplicado nas duas pontas: o do período e o do anterior (ou a abertura, no primeiro).' },
+          { texto: 'Em cada loja entra o real, quando existe; senão a compra, com o motivo escrito ao lado. A rede soma o que vale em cada loja, e fica misto quando as fontes se misturam. Loja sem nota e sem estoque fica sem CMV, nunca com zero, e os resultados avisam que saem sem contar o CMV.' },
+          { texto: 'No painel compra × real a diferença é o real menos a compra. Estoque que sobe quer dizer que se comprou mais do que se consumiu: dinheiro parado na prateleira.' },
+          { texto: 'Com preço subindo, o estoque final vale mais e o real sai menor do que o consumo ao preço antigo. Insumo sem preço entra com zero no estoque, e a tela avisa quantos são.' },
+          { texto: 'Limpeza e descartável da operação não são nota de compra: lance como despesa, ou entram no CMV. O pagamento ao fornecedor de uma nota já lançada também não é despesa. Lojas que dividem estoque sem transferência distorcem o real de cada uma; o da rede continua certo.' },
         ],
       },
       {
@@ -686,12 +709,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/plano'],
     titulo: 'Plano e metas',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Em Metas, escreva quanto cada linha deveria pesar na receita bruta, em %; vazio é sem meta e zero é uma meta de zero.' },
       { texto: 'A meta vale a partir do começo do período de agora, igual na rede e em cada loja; o passado não muda.' },
       { texto: 'No plano de contas, renomear uma linha não perde nada; ocultar tira do formulário de despesa, e linha nunca se apaga.' },
-      { texto: 'As linhas calculadas vêm do sistema: não se renomeiam, mas aceitam meta.' },
+      { texto: 'As linhas calculadas vêm do sistema: não se renomeiam, mas aceitam meta; a do CMV compara com o real ou, sem ele, com as compras.' },
     ],
     secoes: [
       {
@@ -717,7 +740,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/periodos/[inicio]'],
     titulo: 'Fechar o período',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Fechar guarda uma fotografia do DRE do período, e depois nada muda dentro das datas dele: nem faturamento, nem despesa, nem nota de compra, nem fechamento de estoque.' },
       { texto: 'Faturamento faltando, taxa do iFood sem configurar, estoque em contagem de fechamento e rede sem lançamento travam, e não aceitam justificativa.' },
@@ -739,6 +762,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Reabrir deixa o período aberto de novo para lançar e corrigir. A fotografia anterior fica guardada em Versões, com quem reabriu e por quê.' },
           { texto: 'Ao fechar de novo sai a versão seguinte. A dona da casa não reabre: o período fechado é o ponto de controle do consultor.' },
+          { texto: 'A fotografia guarda o CMV de compra e o real de cada loja. Período fechado antes de o CMV existir diz que não apurou: para guardá-lo, reabre e fecha de novo.' },
         ],
       },
     ],

@@ -9,6 +9,7 @@
  * do período no piso. Fechada: o resultado, sem botão.
  */
 
+import { fraseDoSemPreco } from '@/lib/erp/cmv-campos';
 import Link from 'next/link';
 import type { ConferenciaDaContagem, LinhaDaDivergencia } from '@/lib/erp/contagem';
 import { coberturaDe, fraseAbaixoDoPiso, ROTULO_DA_CONTAGEM, textoDoValorDaDiferenca } from '@/lib/erp/contagem-campos';
@@ -428,12 +429,18 @@ export function TelaConferirContagem({
   );
 }
 
+/** "Estoque final sem o valor de 3 insumos sem preço." (ou "não registrado" em contagem de antes da 2.3). */
+function semPreco(n: number | null | undefined): string {
+  const f = fraseDoSemPreco(n ?? null, 'final');
+  return f ? ` ${f.replace(/^./, (x) => x.toUpperCase())}.` : '';
+}
+
 function resultado(c: ConferenciaDaContagem): string {
   const k = c.contagem;
   if (c.estado === 'VENCIDA') return `Fechou sem aplicar: o prazo acabou${k.fechaAutomaticoEm ? ` em ${quando(k.fechaAutomaticoEm)}` : ''}.`;
   if (c.estado === 'DESCARTADA') return 'Contagem descartada: nada foi para o estoque.';
   const em = k.fechadaEm ? ` em ${quando(k.fechadaEm)}` : '';
   if (c.estado === 'APLICADA_SOZINHA') return `Fechou sozinha${em}: tudo bateu dentro da tolerância e os ajustes entraram no livro.`;
-  if (k.tipo === 'FECHAMENTO') return `Período fechado${em}${k.fechadaPorNome ? ` por ${k.fechadaPorNome}` : ''}. Estoque final: ${formatarDinheiro(k.valorTotalCentavos ?? 0)}.`;
+  if (k.tipo === 'FECHAMENTO') return `Período fechado${em}${k.fechadaPorNome ? ` por ${k.fechadaPorNome}` : ''}. Estoque final: ${formatarDinheiro(k.valorTotalCentavos ?? 0)}.${semPreco(k.itensSemPreco)}`;
   return `Aplicada${em}${k.fechadaPorNome ? ` por ${k.fechadaPorNome}` : ''}: os ajustes entraram no livro do estoque.`;
 }

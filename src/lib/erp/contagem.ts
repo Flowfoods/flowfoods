@@ -454,6 +454,7 @@ const SELECAO_DA_CONTAGEM = {
   fechadaPorNome: true,
   fechaAutomaticoEm: true,
   valorTotalCentavos: true,
+  itensSemPreco: true,
   naoContadosNoFechamento: true,
   periodo: { select: { id: true, nome: true, inicio: true, fim: true } },
 } as const;
@@ -922,7 +923,7 @@ export async function situacaoDoPeriodo(cliente: ClienteDoParceiro, alcance: Alc
         if (!reg) return { registro: null, contagem: null };
         const contagem = await tx.contagem.findFirst({
           where: { lojaId, tipo: 'FECHAMENTO', periodoId: reg.id, status: { not: 'CANCELADA' } },
-          select: { id: true, status: true, fechadaEm: true, fechadaPorNome: true, valorTotalCentavos: true, criadoEm: true, iniciadaPorNome: true },
+          select: { id: true, status: true, fechadaEm: true, fechadaPorNome: true, valorTotalCentavos: true, itensSemPreco: true, criadoEm: true, iniciadaPorNome: true },
         });
         return { registro: reg, contagem };
       };
