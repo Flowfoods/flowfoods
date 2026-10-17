@@ -408,7 +408,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       expect(p).toMatchObject({ status: 'FECHADO', fechadoPorNome: 'Ana Dona' });
       expect(p.fechadoEm).not.toBeNull();
       const f = (await a.dreFotografia.findMany({ where: { periodoId: p.id } }))[0];
-      expect(f).toMatchObject({ versao: 1, versaoDaConta: 2, taxaComissaoBp: 1200, taxaPagamentoBp: 320, fechadoPorNome: 'Ana Dona', substituidaEm: null, nomeDoPeriodo: 'Agosto de 2026' });
+      expect(f).toMatchObject({ versao: 1, versaoDaConta: 3, taxaComissaoBp: 1200, taxaPagamentoBp: 320, fechadoPorNome: 'Ana Dona', substituidaEm: null, nomeDoPeriodo: 'Agosto de 2026' });
       expect((f.ressalvas as { id: string }[]).map((x) => x.id).sort()).toEqual([`recorrente:${ids.luz}`, `sem-lancamento:${ids.nova}`].sort());
       expect(f.justificativa).toBe('A luz chega só no mês seguinte e a Loja Nova ainda não abriu.');
       // A entrada agregada (a base do CMV da 2.3) guarda a receita, a despesa e o plano da época.
