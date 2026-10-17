@@ -41,7 +41,7 @@ import { CABECALHO_DO_MODELO } from '@/lib/erp/faturamento-planilha';
 import { travarParaFechar } from '@/lib/erp/periodo-trava';
 import { listarHistorico } from '@/lib/erp/historico';
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
-import { cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { criarPeriodoFechadoDeTeste, cru, limparParceiros, perfilDoBanco, reabrirPeriodoDeTeste, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const HOJE = '2026-10-17';
@@ -311,7 +311,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · faturamento por canal (Postgres real)', 
 
   // ------------------------------------------------------------ período fechado
   it('critério 10: período FECHADO recusa lançar, corrigir, remover e importar naquele intervalo', async () => {
-    const p = await a.periodoApuracao.create({ data: { parceiroId: A.id, nome: 'Setembro de 2026', inicio: dia('2026-09-01'), fim: dia('2026-09-30'), status: 'FECHADO', fechadoEm: new Date() } });
+    const p = await a.transacao((tx) => criarPeriodoFechadoDeTeste(tx, { nome: 'Setembro de 2026', inicio: '2026-09-01', fim: '2026-09-30' }));
     const nada = async (r: Promise<{ ok: boolean }>) => {
       const x = await r;
       expect(x.ok).toBe(false);
@@ -335,7 +335,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · faturamento por canal (Postgres real)', 
     expect(pre.linhas[0].erro).toContain('fechado');
     // Fora do período, tudo normal.
     expect(await lancar(GERENTE_VP(), ids.vp, '2026-10-01', [canal('LOJA', '100,00', '2')])).toMatchObject({ ok: true });
-    await a.periodoApuracao.update({ where: { id: p.id }, data: { status: 'ABERTO', fechadoEm: null } });
+    await reabrirPeriodoDeTeste(a, p.id);
     expect(await lancar(GERENTE_VP(), ids.vp, '2026-09-16', [canal('LOJA', '100,00', '2')])).toMatchObject({ ok: true });
   });
 
@@ -351,7 +351,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · faturamento por canal (Postgres real)', 
       });
       await new Promise((r) => setTimeout(r, 700));
       expect(terminouAntes).toBe(false); // esperando a trava
-      await tx.periodoApuracao.create({ data: { parceiroId: tx.parceiroId, nome: 'Agosto de 2026', inicio: dia('2026-08-01'), fim: dia('2026-08-31'), status: 'FECHADO', fechadoEm: new Date() } });
+      await criarPeriodoFechadoDeTeste(tx, { nome: 'Agosto de 2026', inicio: '2026-08-01', fim: '2026-08-31' });
     });
     const r = (await caixa.lancado) as { ok: boolean; erros: { geral?: string } };
     expect(r.ok).toBe(false);

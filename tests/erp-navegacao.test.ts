@@ -65,7 +65,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos', 'Plano de contas'],
+      'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos', 'Plano e metas'],
       'Rede e Equipe': ['Lojas e marcas', 'Equipe', 'Histórico', 'Seu acesso'],
     });
     expect(acoesPorArea(DONO)).toEqual({
@@ -342,14 +342,16 @@ const ROTAS_ATIVAS: [string, string][] = [
   ['/faturamento/lancar', 'Faturamento'],
   ['/faturamento/importar', 'Faturamento'],
   [`/faturamento/${LOJA}/2026-10-14`, 'Faturamento'],
-  // 2.2a: a área ganhou Despesas, DRE, Períodos e Plano de contas; rota funda acende a aba mais específica.
+  // 2.2a: a área ganhou Despesas, DRE, Períodos e Plano de contas (2.2b: Plano e metas); rota funda acende a aba mais específica.
   ['/dre', 'DRE'],
   ['/dre/despesas', 'Despesas'],
   ['/dre/despesas/nova', 'Despesas'],
   ['/dre/despesas/d1', 'Despesas'],
   ['/dre/despesas/d1/editar', 'Despesas'],
   ['/dre/periodos', 'Períodos'],
-  ['/dre/plano', 'Plano de contas'],
+  ['/dre/plano', 'Plano e metas'],
+  // 2.2b: o período e o fechamento dele acendem a aba Períodos.
+  ['/dre/periodos/2026-10-01', 'Períodos'],
 ];
 
 describe('UX.9 · itemAtivo acende a aba certa em cada rota profunda', () => {

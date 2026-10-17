@@ -52,7 +52,7 @@ import { listarHistorico } from '@/lib/erp/historico';
 import { periodoDe, registrarPeriodo, salvarRegra, situacaoDosPeriodos } from '@/lib/erp/periodos';
 import { criarLinha, garantirPlano, ocultarLinha, planoDoParceiro, renomearLinha } from '@/lib/erp/plano';
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
-import { cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { criarPeriodoFechadoDeTeste, cru, limparParceiros, perfilDoBanco, reabrirPeriodoDeTeste, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const HOJE = '2026-10-17';
@@ -451,7 +451,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · DRE ao vivo (Postgres real)', { timeout
 
   // ------------------------------------------------------------ 4. período fechado
   it('critério 10: com o período FECHADO, pagar passa; editar nos dois sentidos, criar, remover e o intervalo que só encosta são recusados', async () => {
-    const fechado = await a.periodoApuracao.create({ data: { parceiroId: A.id, nome: 'Agosto de 2026', inicio: dia('2026-08-01'), fim: dia('2026-08-31'), status: 'FECHADO', fechadoEm: new Date() } });
+    const fechado = await a.transacao((tx) => criarPeriodoFechadoDeTeste(tx, { nome: 'Agosto de 2026', inicio: '2026-08-01', fim: '2026-08-31' }));
     const dentro = await a.despesa.create({ data: { parceiroId: A.id, linhaId: (await planoDoParceiro(a)).find((l) => l.codigo === 'aluguel')!.id!, descricao: 'Aluguel de agosto', competencia: dia('2026-08-01'), competenciaFim: dia('2026-08-31'), valorCentavos: 100000, vencimento: dia('2026-09-05'), atualizadoPorNome: 'x' } });
     const fora = await lancado(DONA(), { descricao: 'Aluguel de outubro (fora)', linha: 'diversas', valor: '50,00' });
     const frase = /Agosto de 2026 já foi fechado/;
@@ -490,7 +490,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · DRE ao vivo (Postgres real)', { timeout
     expect(d).toMatchObject({ status: 'FECHADO' });
     await a.despesa.deleteMany({ where: { id: { in: [dentro.id, fora, origem.id] } } });
     await a.despesa.deleteMany({ where: { descricao: 'Antes do fechado' } });
-    await a.periodoApuracao.delete({ where: { id: fechado.id } });
+    await reabrirPeriodoDeTeste(a, fechado.id);
   });
 
   it('a trava compartilhada: lançar despesa espera o fechamento em curso e, depois dele, é recusado', async () => {
@@ -504,13 +504,13 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · DRE ao vivo (Postgres real)', { timeout
       });
       await new Promise((r) => setTimeout(r, 700));
       expect(terminouAntes).toBe(false);
-      await tx.periodoApuracao.create({ data: { parceiroId: tx.parceiroId, nome: 'Junho de 2026', inicio: dia('2026-06-01'), fim: dia('2026-06-30'), status: 'FECHADO', fechadoEm: new Date() } });
+      await criarPeriodoFechadoDeTeste(tx, { nome: 'Junho de 2026', inicio: '2026-06-01', fim: '2026-06-30' });
     });
     const r = (await caixa.lancado) as { ok: boolean; erros: { competencia?: string } };
     expect(r.ok).toBe(false);
     expect(JSON.stringify(r)).toContain('Junho de 2026');
     expect(await a.despesa.count({ where: { descricao: 'Corrida' } })).toBe(0);
-    await a.periodoApuracao.deleteMany({ where: { nome: 'Junho de 2026' } });
+    await reabrirPeriodoDeTeste(a, (await a.periodoApuracao.findFirst({ where: { nome: 'Junho de 2026' } }))!.id);
   });
 
   // ------------------------------------------------------------ 5. isolamento, alcance e vazamento
