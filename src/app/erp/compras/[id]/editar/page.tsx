@@ -6,6 +6,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { dadosDoFormularioDeNota, obterNota } from '@/lib/erp/compras';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { TelaFormNota } from '@/components/erp/telas/compras/paginas';
 import { acaoSalvarNota } from '../../actions';
 
@@ -31,6 +32,7 @@ export default async function ErpEditarNotaPage({ params }: { params: { id: stri
       opcoes={opcoes}
       acao={acaoSalvarNota.bind(null, nota.id)}
       bloqueio={ctx.bloqueio}
+      periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')}
       novoFornecedor={pode(ctx.alcance, 'fornecedores.editar') ? '/erp/compras/fornecedores/novo' : undefined}
     />
   );

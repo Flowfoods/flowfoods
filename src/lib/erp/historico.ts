@@ -34,6 +34,10 @@ const ENTIDADE: Record<string, string> = {
   Despesa: 'Despesa',
   DreLinha: 'Linha do DRE',
   RegraDoPeriodo: 'Período do DRE',
+  // 2.2b: metas e fechamento do período (só quem tem `dre.ver` recebe estas linhas).
+  DreMeta: 'Meta do DRE',
+  PeriodoApuracao: 'Fechamento do período',
+  DreFotografia: 'Fotografia do fechamento',
   AcessoParceiro: 'Acesso',
   PerfilAcesso: 'Perfil',
 };
@@ -66,6 +70,9 @@ const ACAO: Record<string, string> = {
   PEDIU: 'Pediu',
   ATENDEU: 'Entregou',
   DEVOLVEU: 'Recebeu de volta',
+  // 2.2b
+  FECHOU: 'Fechou',
+  REABRIU: 'Reabriu',
 };
 
 const CAMPO: Record<string, string> = {
@@ -176,6 +183,12 @@ const CAMPO: Record<string, string> = {
   grupo: 'grupo',
   regra: 'regra',
   valeDesde: 'vale a partir de',
+  // 2.2b: metas e fechamento do período
+  meta: 'meta',
+  versaoDoFechamento: 'versão do fechamento',
+  receitaBruta: 'receita bruta',
+  resultado: 'resultado',
+  ressalvas: 'ressalvas',
 };
 
 /** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. */
@@ -217,6 +230,7 @@ const ORDEM = [
   'vencimento',
   'pagaEm',
   'regra',
+  'meta',
   'valeDesde',
   'modoPreparo',
   'conservacao',
@@ -238,6 +252,10 @@ const ORDEM = [
   'freteNotaCentavos',
   'totalCentavos',
   'situacao',
+  'versaoDoFechamento',
+  'receitaBruta',
+  'resultado',
+  'ressalvas',
   'ativo',
 ];
 const posicao = (c: string) => (ORDEM.includes(c) ? ORDEM.indexOf(c) : ORDEM.length);

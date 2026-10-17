@@ -1,9 +1,9 @@
-/** ERP, Plano de contas de um Parceiro Flow, pelo nível 1. */
+/** ERP, Plano e metas de um Parceiro Flow, pelo nível 1. */
 
 import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { rotuloDaVisao } from '@/lib/erp/visao';
 import { PaginaDoPlano } from '@/components/erp/telas/dre/paginas';
-import { acaoCriarLinhaDoPlano, acaoOcultarLinhaDoPlano, acaoRenomearLinhaDoPlano } from '../actions';
+import { acaoCriarLinhaDoPlano, acaoOcultarLinhaDoPlano, acaoRenomearLinhaDoPlano, acaoSalvarMetas } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +15,7 @@ export default async function ParceiroPlanoPage({ params }: { params: { slug: st
   return (
     <PaginaDoPlano
       c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: `${ctx.parceiro.nome} · ${rotuloDaVisao(visao)}`, raiz: `/rodolfo/erp/${ctx.parceiro.slug}` }}
-      acoes={{ criar: acaoCriarLinhaDoPlano.bind(null, slug), renomear: acaoRenomearLinhaDoPlano.bind(null, slug), ocultar: acaoOcultarLinhaDoPlano.bind(null, slug) }}
+      acoes={{ criar: acaoCriarLinhaDoPlano.bind(null, slug), renomear: acaoRenomearLinhaDoPlano.bind(null, slug), ocultar: acaoOcultarLinhaDoPlano.bind(null, slug), metas: acaoSalvarMetas.bind(null, slug) }}
     />
   );
 }

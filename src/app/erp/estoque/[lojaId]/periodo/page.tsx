@@ -26,7 +26,7 @@ export default async function ErpPeriodoDaLojaPage({ params, searchParams }: { p
       s={s}
       base={BASE}
       feito={searchParams.feito}
-      pode={{ ajustar: pode(ctx.alcance, 'estoque.ajustar', { lojaId }), contar: pode(ctx.alcance, 'estoque.contar', { lojaId }), regras: pode(ctx.alcance, 'lojas.gerir') }}
+      pode={{ ajustar: pode(ctx.alcance, 'estoque.ajustar', { lojaId }), contar: pode(ctx.alcance, 'estoque.contar', { lojaId }), regras: pode(ctx.alcance, 'lojas.gerir'), periodos: pode(ctx.alcance, 'dre.ver') }}
       acoes={{ fechar: acaoIniciarFechamento.bind(null, lojaId), regras: acaoSalvarRegrasDaContagem.bind(null, lojaId) }}
       bloqueio={ctx.bloqueio}
     />

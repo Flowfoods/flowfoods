@@ -194,11 +194,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/nova', 'compras/[id]/editar'],
     titulo: 'Lançar nota',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Digite o valor total de cada linha, como está na nota.' },
       { texto: 'O frete é dividido entre os itens, e a soma tem que bater com o total da nota.' },
       { texto: '“Conferir o impacto” mostra o que muda de custo antes de lançar.' },
+      { texto: 'A data da nota decide o período dela: se o DRE já fechou esse período, a nota não entra nem se edita.', para: ['compras.lancar'] },
     ],
   },
   {
@@ -206,10 +207,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/[id]'],
     titulo: 'Detalhe da nota',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'A nota, o frete de cada item e o que ela fez no estoque.' },
       { texto: 'Errou? Edite ou cancele com o motivo: o custo e o estoque voltam.', para: ['compras.lancar'] },
+      { texto: 'Nota com data em período que o DRE já fechou não se edita nem se cancela.', para: ['compras.lancar'] },
     ],
   },
   {
@@ -351,10 +353,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'estoque',
     rotas: ['estoque/[lojaId]/periodo'],
     titulo: 'Período e contagens',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Quanto do estoque foi contado no período, por valor e por itens. O período é o mesmo do DRE: mensal, quinzenal ou semanal, definido em Períodos, na área Faturamento e DRE.' },
       { texto: 'O fechamento só vale com a cobertura acima do piso da loja.' },
+      { texto: 'Depois que o DRE fecha o período, o fechamento do estoque dele não começa nem se aplica mais, mas descartar um em andamento continua valendo.' },
       { texto: 'As regras da contagem (piso, frequência, tolerância) ficam aqui; só quem cadastra lojas muda.', para: ['lojas.gerir'] },
     ],
   },
@@ -463,7 +466,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['faturamento/[lojaId]/[data]'],
     titulo: 'Faturamento do dia',
-    versao: 2,
+    versao: 4,
     // Tela de lançar no celular: os campos ficam à vista, a aula abre numa linha (como nas telas de contar).
     recolhida: true,
     aula: [
@@ -477,7 +480,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'periodo-fechado',
         titulo: 'Dia de período fechado',
         blocos: [
-          { texto: 'Quando o período do resultado é fechado, os dias dele não aceitam mais lançar, corrigir nem remover. Onde o período começa e termina fica em Períodos, na área Faturamento e DRE.' },
+          { texto: 'Quando o período do resultado é fechado, os dias dele não aceitam mais lançar, corrigir nem remover. Onde o período começa e termina fica em Períodos, na área Faturamento e DRE. Para mexer num dia fechado, peça à FlowFoods para reabrir o período: a tela já diz isso.' },
         ],
       },
     ],
@@ -556,16 +559,44 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre'],
     titulo: 'DRE',
-    versao: 2,
+    versao: 3,
     // A tela da reunião: a tabela fica à vista e a aula abre numa linha.
     recolhida: true,
     aula: [
-      { texto: 'O resultado da casa no período: o que entrou, o que saiu e o que sobrou, com o peso de cada linha na receita bruta.' },
-      { texto: 'No período em curso o número vai até ontem, sem projeção, e a despesa entra dia a dia.' },
-      { texto: 'O CMV ainda não entra no DRE (em breve): até lá, a margem e os resultados saem sem contar o CMV.' },
-      { texto: 'A rede soma as lojas e as despesas da rede; a loja mostra só o que é dela, antes das despesas da rede.' },
+      { texto: 'O resultado da casa no período: o que entrou, o que saiu e o que sobrou, com o peso de cada linha na receita bruta, até ontem no período em curso.' },
+      { texto: 'Com meta definida, a linha mostra o desvio e se está melhor ou pior que a meta; ela vale igual na rede e em cada loja.' },
+      { texto: 'Período fechado mostra a fotografia do fechamento, que nunca muda.' },
+      { texto: 'O CMV ainda não entra (em breve): a margem e os resultados saem sem contar o CMV.' },
     ],
     secoes: [
+      {
+        id: 'rede-e-loja',
+        titulo: 'Rede e loja',
+        blocos: [
+          { texto: 'A rede soma as lojas e as despesas da rede; a loja mostra só o que é dela, antes das despesas da rede.' },
+          { texto: 'No período em curso o número vai até ontem, sem projeção, e a despesa entra dia a dia.' },
+        ],
+      },
+      {
+        id: 'meta',
+        titulo: 'Como ler a meta',
+        blocos: [
+          { texto: 'O desvio é o realizado menos a meta, em pontos percentuais. Menos de 0,05 ponto de diferença é na meta.' },
+          { texto: 'A palavra segue o lado bom de cada linha: custo e despesa menores são melhores, receita líquida e margem maiores são melhores. A tela não usa cor para isso.' },
+          { texto: 'Sem faturamento, sem lançamento na linha ou sem valor (como o CMV), a linha não compara e mostra traço, nunca zero.' },
+          { texto: 'Na visão de uma loja, o resultado operacional e o resultado do período não mostram meta: a loja não carrega as despesas da rede.' },
+          { texto: 'Quem define as metas as escreve em Plano e metas.', para: ['metas.editar'] },
+        ],
+      },
+      {
+        id: 'ano-passado',
+        titulo: 'Receita contra o ano passado',
+        blocos: [
+          { texto: 'Compara a receita com as mesmas datas um ano antes, no mesmo recorte (29 de fevereiro compara com 28). Só a receita tem comparação.' },
+          { texto: 'A variação só aparece quando o ano passado tem lançamento em todos os dias e este período não tem lançamento faltando. Senão ficam os dois números e o motivo.' },
+          { texto: 'Sem lançamento no ano passado a tela diz sem lançamento, nunca R$ 0,00.' },
+        ],
+      },
       {
         id: 'competencia',
         titulo: 'Competência, não caixa',
@@ -578,7 +609,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'taxa-ifood',
         titulo: 'A taxa do iFood é estimada',
         blocos: [
-          { texto: 'Vale o faturamento do iFood vezes a comissão e o pagamento online configurados hoje. É uma estimativa, não o extrato do iFood.' },
+          { texto: 'Vale o faturamento do iFood vezes a comissão e o pagamento online configurados hoje. É uma estimativa, não o extrato do iFood. No período fechado vale a taxa de quando ele fechou.' },
           { texto: 'Sem a taxa configurada, a linha diz que falta configurar e a receita líquida sai avisando.', para: ['precos.ver'] },
         ],
       },
@@ -587,7 +618,15 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Incompleto e falta lançar',
         blocos: [
           { texto: 'Dia de canal sem lançamento de faturamento deixa a receita incompleta. O aviso conta quantos faltam, do mesmo jeito que o calendário do mês.' },
-          { texto: 'Despesa que repete todo mês e ainda não foi lançada neste mês aparece em Falta lançar. Nunca entra valor inventado.', para: ['despesas.lancar'] },
+          { texto: 'Despesa que repete todo mês e ainda não foi lançada neste mês aparece em Falta lançar. Nunca entra valor inventado. A cobrança continua nos meses seguintes até alguém lançar ou marcar que não repete mais.', para: ['despesas.lancar'] },
+        ],
+      },
+      {
+        id: 'fechado',
+        titulo: 'Período fechado e ressalvas',
+        blocos: [
+          { texto: 'Fechado com ressalvas quer dizer que o período foi fechado com algo conhecido em aberto, como uma despesa que repete e não foi lançada. As ressalvas e a justificativa ficam ali para sempre.' },
+          { texto: 'Quem define o plano e as metas fecha o período em Períodos. Só a FlowFoods reabre.', para: ['metas.editar'] },
         ],
       },
     ],
@@ -634,23 +673,74 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/periodos'],
     titulo: 'Períodos',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'O período em que o resultado fecha, mensal, quinzenal ou semanal, com o dia em que começa, é o mesmo da contagem de estoque.' },
       { texto: 'Mudar a regra nunca mexe no passado: ela vale a partir do dia seguinte ao fim do período de agora, e o primeiro período novo nasce cortado no começo.' },
       { texto: 'Quem define o plano de contas e o período, com a rede inteira, muda a regra; os outros só consultam.' },
+      { texto: 'Cada período que já terminou tem a sua página: ali estão as condições para fechar, a fotografia do fechamento e as versões.', para: ['metas.editar'] },
     ],
   },
   {
     chave: 'dre-plano',
     area: 'dre',
     rotas: ['dre/plano'],
-    titulo: 'Plano de contas',
+    titulo: 'Plano e metas',
+    versao: 2,
+    aula: [
+      { texto: 'Em Metas, escreva quanto cada linha deveria pesar na receita bruta, em %; vazio é sem meta e zero é uma meta de zero.' },
+      { texto: 'A meta vale a partir do começo do período de agora, igual na rede e em cada loja; o passado não muda.' },
+      { texto: 'No plano de contas, renomear uma linha não perde nada; ocultar tira do formulário de despesa, e linha nunca se apaga.' },
+      { texto: 'As linhas calculadas vêm do sistema: não se renomeiam, mas aceitam meta.' },
+    ],
+    secoes: [
+      {
+        id: 'metas',
+        titulo: 'Como as metas funcionam',
+        blocos: [
+          { texto: 'Receita bruta e receita por canal não têm meta, porque a base delas é 100 %.' },
+          { texto: 'Cada período usa a meta que valia no começo dele: período antigo ainda aberto não pega meta escrita depois. Salvar de novo no mesmo período troca a meta, e apagar grava sem meta.' },
+          { texto: 'A tabela inteira é salva de uma vez. Se outra pessoa mudou as metas no meio tempo, a tela avisa e nada é gravado.' },
+        ],
+      },
+      {
+        id: 'plano',
+        titulo: 'Ocultar e as despesas já lançadas',
+        blocos: [
+          { texto: 'Linha oculta continua no DRE dos períodos em que tem valor. Renomear mantém a linha: as despesas já lançadas mostram o nome novo.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'dre-periodo',
+    area: 'dre',
+    rotas: ['dre/periodos/[inicio]'],
+    titulo: 'Fechar o período',
     versao: 1,
     aula: [
-      { texto: 'As linhas do DRE e os nomes que a casa usa; renomear não perde nada, as despesas já lançadas mostram o nome novo.' },
-      { texto: 'Ocultar tira a linha do formulário de despesa, mas ela continua no DRE dos períodos em que tem valor; linha nunca se apaga.' },
-      { texto: 'As linhas calculadas, como a receita líquida, a margem e os resultados, vêm do sistema e não se mexem.' },
+      { texto: 'Fechar guarda uma fotografia do DRE do período, e depois nada muda dentro das datas dele: nem faturamento, nem despesa, nem nota de compra, nem fechamento de estoque.' },
+      { texto: 'Faturamento faltando, taxa do iFood sem configurar, estoque em contagem de fechamento e rede sem lançamento travam, e não aceitam justificativa.' },
+      { texto: 'Despesa que repete e não foi lançada, loja sem o estoque fechado e loja sem faturamento são ressalvas: marque cada uma e escreva uma justificativa.' },
+      { texto: 'Só a FlowFoods reabre um período fechado, com o motivo; fechar de novo gera a versão seguinte.' },
+    ],
+    secoes: [
+      {
+        id: 'ressalvas',
+        titulo: 'O que é uma ressalva',
+        blocos: [
+          { texto: 'É algo que a casa sabe que está faltando e decide fechar assim mesmo. A justificativa tem de 10 a 300 letras, vai para a fotografia e para o Histórico, e o DRE fechado mostra Fechado com ressalvas para sempre.' },
+          { texto: 'A despesa que repete e falta lançar pode ser lançada antes, com o valor do mês passado como ponto de partida.', para: ['despesas.lancar'] },
+        ],
+      },
+      {
+        id: 'versoes',
+        titulo: 'Reabrir e as versões',
+        blocos: [
+          { texto: 'Reabrir deixa o período aberto de novo para lançar e corrigir. A fotografia anterior fica guardada em Versões, com quem reabriu e por quê.' },
+          { texto: 'Ao fechar de novo sai a versão seguinte. A dona da casa não reabre: o período fechado é o ponto de controle do consultor.' },
+        ],
+      },
     ],
   },
 ];

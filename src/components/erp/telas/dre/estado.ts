@@ -36,3 +36,10 @@ const FEITO_DO_MES_PASSADO = (feito: string | undefined, criadas: string | undef
   return Number.isInteger(n) && n >= 0 && n < 1000 ? `${n} ${n === 1 ? 'despesa lançada' : 'despesas lançadas'} do mês passado. Confira os valores na lista.` : 'Despesas lançadas do mês passado.';
 };
 export const fraseDoMesPassado = FEITO_DO_MES_PASSADO;
+
+const FEITO_DO_PERIODO: Readonly<Record<string, string>> = {
+  fechado: 'Período fechado. A fotografia está guardada e os números não mudam mais.',
+  'ja-fechado': 'Este período já estava fechado (alguém fechou agora há pouco). Nada foi duplicado.',
+  reaberto: 'Período reaberto. A fotografia anterior fica guardada em Versões; ao fechar de novo sai a versão seguinte.',
+};
+export const fraseDoPeriodo = (feito: string | undefined) => fraseDe(FEITO_DO_PERIODO, feito);

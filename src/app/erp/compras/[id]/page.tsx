@@ -8,6 +8,7 @@ import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { obterNota } from '@/lib/erp/compras';
 import { lerFiltrosDeNota, queryDosFiltrosDeNota } from '@/lib/erp/compra-campos';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { TelaDetalheNota } from '@/components/erp/telas/compras/detalhe-nota';
 import { acaoCancelarNota } from '../actions';
 
@@ -33,6 +34,7 @@ export default async function ErpNotaPage({ params, searchParams }: { params: { 
       fornecedoresBase={`${BASE}/fornecedores`}
       estoqueBase={pode(ctx.alcance, 'estoque.ver', { lojaId: nota.lojaId }) ? '/erp/estoque' : undefined}
       acaoCancelar={acaoCancelarNota.bind(null, nota.id)}
+      periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')}
     />
   );
 }

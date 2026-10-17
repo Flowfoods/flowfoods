@@ -588,6 +588,8 @@ model ParceiroFlow {
   erpDespesas            Despesa[]
   erpPeriodosApuracao    PeriodoApuracao[]
   erpRegrasDoPeriodo     RegraDoPeriodo[]
+  erpDreFotografias      DreFotografia[]
+  erpDreFotografiaLinhas DreFotografiaLinha[]
   erpFarolFaixas         FarolFaixa[]
   erpHistoricoAlteracoes HistoricoAlteracao[]
 
@@ -672,6 +674,7 @@ model Loja {
   etiquetas      Etiqueta[]
   faturamentos   FaturamentoLancamento[]
   despesas       Despesa[]
+  fotografiasDoDre DreFotografiaLinha[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, slug])
@@ -1540,6 +1543,11 @@ model DreMeta {
   percentualBp Int
   vigenteDesde DateTime     @db.Date
   criadoEm     DateTime     @default(now())
+  // 2.2b: "apagar a meta" é uma linha com `semMeta` (percentualBp = 0, CHECK): a meta
+  // anterior não volta sozinha. `canal` fica nulo (meta por canal é da 2.4).
+  semMeta        Boolean    @default(false)
+  criadoPorNome  String     @default("")
+  atualizadoEm   DateTime   @default(now()) @updatedAt
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, linhaId, canal, vigenteDesde])
@@ -1611,11 +1619,87 @@ model PeriodoApuracao {
   status     PeriodoStatus @default(ABERTO)
   fechadoEm  DateTime?
   criadoEm   DateTime      @default(now())
+  // 2.2b: quem fechou (nome da época). FECHADO exige `fechadoEm` (CHECK) e uma
+  // fotografia vigente (gatilho adiado, só no SQL); depois de fechado, início, fim
+  // e nome não mudam (gatilho).
+  fechadoPorNome String?
 
-  contagens Contagem[]
+  contagens   Contagem[]
+  fotografias DreFotografia[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, inicio, fim])
+}
+
+// A fotografia do fechamento do período (2.2b, decisão 153): o DRE como saiu de
+// `montarDre`, com a taxa do iFood, as metas e o plano DAQUELE momento. Imutável (gatilhos
+// no SQL): só `substituidaEm/reabertaPorNome/motivoReabertura` mudam, uma vez, quando o
+// nível 1 reabre. Fechar de novo grava a versão seguinte. O período só fica FECHADO com
+// uma fotografia vigente (gatilho adiado). `entrada` (receita loja×canal, despesa
+// apropriada loja×linha, plano) é a base da conta e nunca vai para uma tela de loja.
+model DreFotografia {
+  id                String          @id @default(cuid())
+  parceiroId        String
+  parceiro          ParceiroFlow    @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  periodoId         String
+  periodo           PeriodoApuracao @relation(fields: [parceiroId, periodoId], references: [parceiroId, id], onDelete: Restrict)
+  versao            Int
+  inicio            DateTime        @db.Date
+  fim               DateTime        @db.Date
+  nomeDoPeriodo     String
+  criadoEm          DateTime        @default(now())
+  // A transação que a gravou (valor do banco): as linhas só entram na mesma transação.
+  criadaNaTransacao BigInt          @default(dbgenerated("txid_current()"))
+  fechadoPorNome    String
+  taxaComissaoBp    Int?
+  taxaPagamentoBp   Int?
+  // 1 = sem CMV (2.2b); a 2.3 grava versão nova com 2.
+  versaoDaConta     Int             @default(1)
+  entrada           Json
+  ressalvas         Json            @default("[]")
+  justificativa     String?
+  substituidaEm     DateTime?
+  reabertaPorNome   String?
+  motivoReabertura  String?
+
+  linhas DreFotografiaLinha[]
+
+  // Uma fotografia VIGENTE por período: índice único parcial, só no SQL.
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, periodoId, versao])
+}
+
+// Uma linha do DRE fotografado: `lojaId` nulo é a rede; senão, a loja (nome da época em
+// `lojaNome`). Só inclusão, na transação da fotografia (gatilhos). Valor em BigInt.
+model DreFotografiaLinha {
+  id            String        @id @default(cuid())
+  parceiroId    String
+  parceiro      ParceiroFlow  @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  fotografiaId  String
+  fotografia    DreFotografia @relation(fields: [parceiroId, fotografiaId], references: [parceiroId, id], onDelete: Restrict)
+  lojaId        String?
+  loja          Loja?         @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  lojaNome      String?
+  ordem         Int
+  chave         String
+  codigo        String?
+  linhaId       String?
+  nome          String
+  grupo         DreGrupo
+  tipo          String
+  nivel         Int
+  sentido       DreSentido
+  valorCentavos BigInt?
+  percentualBp  Int?
+  metaBp        Int?
+  semContar     String[]
+  nota          String?
+  oculta        Boolean       @default(false)
+
+  // (fotografiaId, lojaId, chave) é único com NULLS NOT DISTINCT: só no SQL.
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, fotografiaId, lojaId, chave])
+  @@index([parceiroId, fotografiaId])
 }
 
 // A regra do período do parceiro, versionada (2.2a, decisão 144): mensal,

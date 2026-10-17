@@ -33,6 +33,7 @@ export default async function ErpFaturamentoDoDiaPage({ params, searchParams }: 
       acao={acaoSalvarDia.bind(null, lojaId, data)}
       remover={(canal) => acaoRemoverLancamento.bind(null, lojaId, data, canal)}
       podeLancar={pode(ctx.alcance, 'faturamento.lancar', { lojaId })}
+      verPeriodos={pode(ctx.alcance, 'dre.ver')}
       bloqueio={ctx.bloqueio}
     />
   );

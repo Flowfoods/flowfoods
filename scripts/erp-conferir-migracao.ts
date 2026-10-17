@@ -1,6 +1,6 @@
 /**
- * Conferência pós-deploy das migrations `20261025000000_erp_faturamento` (2.1) e
- * `20261026000000_erp_dre_despesas` (2.2a).
+ * Conferência pós-deploy das migrations `20261025000000_erp_faturamento` (2.1),
+ * `20261026000000_erp_dre_despesas` (2.2a) e `20261027000000_erp_dre_fechamento` (2.2b).
  *
  *   npm run erp:conferir-migracao
  *
@@ -45,6 +45,14 @@ export const CHECKS_DA_2_2A = [
   ['Despesa', 'Despesa_recorrente_de_mes_inteiro'],
 ] as const;
 
+/** Os CHECKs que a 2.2b acrescentou em tabelas que já existiam (as duas tabelas novas têm os dela de nascença). */
+export const CHECKS_DA_2_2B = [
+  ['DreMeta', 'DreMeta_sem_meta_zera'],
+  ['DreMeta', 'DreMeta_nome_curto'],
+  ['PeriodoApuracao', 'PeriodoApuracao_fechado_tem_data'],
+  ['PeriodoApuracao', 'PeriodoApuracao_fechadoPor_curto'],
+] as const;
+
 /** O que a migration deixou pendente (frases prontas para o terminal); lista vazia = tudo no lugar. */
 export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
   const pendencias: string[] = [];
@@ -76,6 +84,26 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       }
     }
   }
+  // 2.2b: só se a migration dela já rodou (o catálogo não passa pela RLS).
+  const fechamento = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_class WHERE relname = 'DreFotografia' AND relkind = 'r'`;
+  if (fechamento[0]?.n) {
+    const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_2_2B.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_2_2B) {
+      const achado = dela.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration 20261027000000_erp_dre_fechamento não foi aplicada por inteiro.`);
+      else if (!achado.validado) {
+        pendencias.push(`CHECK ${nome} ficou NOT VALID: corrija a linha antiga que o viola e rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+      }
+    }
+    // Os gatilhos que fazem a fotografia valer (sem eles o fechado não seria imutável).
+    const gatilhos = await db.$queryRaw<{ nome: string }[]>`
+      SELECT tgname AS nome FROM pg_trigger
+      WHERE NOT tgisinternal AND tgname = ANY(${['DreFotografia_imutavel', 'DreFotografiaLinha_so_inclusao', 'PeriodoApuracao_fechado_imutavel', 'PeriodoApuracao_fechado_tem_fotografia', 'DreFotografia_substituida_reabre_periodo', 'DreFotografia_so_periodo_aberto', 'PeriodoApuracao_aberto_sem_fotografia_vigente', 'DreFotografia_vigente_so_em_periodo_fechado', 'DreFotografia_sem_truncate', 'DreFotografiaLinha_sem_truncate']})`;
+    for (const t of ['DreFotografia_imutavel', 'DreFotografiaLinha_so_inclusao', 'PeriodoApuracao_fechado_imutavel', 'PeriodoApuracao_fechado_tem_fotografia', 'DreFotografia_substituida_reabre_periodo', 'DreFotografia_so_periodo_aberto', 'PeriodoApuracao_aberto_sem_fotografia_vigente', 'DreFotografia_vigente_so_em_periodo_fechado', 'DreFotografia_sem_truncate', 'DreFotografiaLinha_sem_truncate']) {
+      if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261027000000_erp_dre_fechamento não foi aplicada por inteiro.`);
+    }
+  }
   return pendencias;
 }
 
@@ -84,10 +112,10 @@ async function principal() {
   try {
     const pendencias = await conferirMigracao(db);
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1 e da 2.2a conferidas: os CHECKs estão validados e o índice do grão humano existe.');
+      console.log('Migrations da 2.1, da 2.2a e da 2.2b conferidas: os CHECKs estão validados, o índice do grão humano e os gatilhos do fechamento existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1 e da 2.2a: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a e da 2.2b: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {

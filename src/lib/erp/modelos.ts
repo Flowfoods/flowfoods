@@ -38,6 +38,8 @@ export const MODELOS_DE_TENANT = [
   'despesa',
   'periodoApuracao',
   'regraDoPeriodo',
+  'dreFotografia',
+  'dreFotografiaLinha',
   'farolFaixa',
   'historicoAlteracao',
 ] as const;
@@ -80,6 +82,8 @@ export const RELACOES_DE_TENANT = [
   'erpDespesas',
   'erpPeriodosApuracao',
   'erpRegrasDoPeriodo',
+  'erpDreFotografias',
+  'erpDreFotografiaLinhas',
   'erpFarolFaixas',
   'erpHistoricoAlteracoes',
 ] as const;

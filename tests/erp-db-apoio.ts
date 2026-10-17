@@ -4,7 +4,11 @@
  * ou sem a RLS instalada (a migration pula a RLS quando não consegue).
  */
 import type { PrismaClient } from '@prisma/client';
-import { MODELOS_DE_TENANT, PAPEL_DE_TENANT, papelDisponivel } from '@/lib/erp/tenant';
+import { montarDre } from '@/lib/erp/dre-campos';
+import { linhasParaGravar } from '@/lib/erp/dre-fechamento-campos';
+import { gravarFotografia } from '@/lib/erp/dre-fotografia';
+import { planoEfetivo } from '@/lib/erp/dre-plano';
+import { MODELOS_DE_TENANT, PAPEL_DE_TENANT, papelDisponivel, type ClienteDoParceiro } from '@/lib/erp/tenant';
 
 export const TABELAS_DE_TENANT = MODELOS_DE_TENANT.map((m) => m[0].toUpperCase() + m.slice(1));
 
@@ -13,7 +17,7 @@ const ORDEM_DE_LIMPEZA = [
   'HistoricoAlteracao', 'Etiqueta', 'MovimentoEstoque', 'SaldoEstoque', 'ContagemItem', 'Contagem',
   'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
   'ProdutoCanal', 'ProdutoVenda', 'FichaItem', 'FichaTecnica', 'InsumoVariante', 'FaturamentoLancamento',
-  'Despesa', 'DreMeta', 'FarolFaixa', 'DreLinha', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'Fornecedor',
+  'Despesa', 'DreMeta', 'FarolFaixa', 'DreLinha', 'DreFotografiaLinha', 'DreFotografia', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'Fornecedor',
   'Colaborador', 'Marca', 'Loja',
 ];
 
@@ -49,7 +53,10 @@ export async function limparParceiros(db: PrismaClient, p: PerfilDoBanco, ids: s
       if (precisaDeContexto(p)) {
         for (const t of TABELAS_DE_TENANT) await tx.$executeRawUnsafe(`ALTER TABLE "${t}" NO FORCE ROW LEVEL SECURITY`);
       }
+      // 2.2b: a fotografia do fechamento não se apaga (gatilhos). A limpeza do teste os desliga só nesta transação.
+      for (const t of ['DreFotografia', 'DreFotografiaLinha']) await tx.$executeRawUnsafe(`ALTER TABLE "${t}" DISABLE TRIGGER USER`);
       for (const t of ORDEM_DE_LIMPEZA) await tx.$executeRawUnsafe(`DELETE FROM "${t}" WHERE "parceiroId" = ANY($1)`, ids);
+      for (const t of ['DreFotografia', 'DreFotografiaLinha']) await tx.$executeRawUnsafe(`ALTER TABLE "${t}" ENABLE TRIGGER USER`);
       await tx.$executeRawUnsafe(`DELETE FROM "ParceiroFlow" WHERE "id" = ANY($1)`, ids);
       if (precisaDeContexto(p)) {
         for (const t of TABELAS_DE_TENANT) await tx.$executeRawUnsafe(`ALTER TABLE "${t}" FORCE ROW LEVEL SECURITY`);
@@ -57,4 +64,34 @@ export async function limparParceiros(db: PrismaClient, p: PerfilDoBanco, ids: s
     },
     { timeout: 30000 },
   );
+}
+
+const dataIso = (s: string) => new Date(`${s}T00:00:00.000Z`);
+
+/**
+ * 2.2b: um período FECHADO "de teste" dentro da transação `tx` — o período ABERTO, a fotografia mínima (sem linhas) e só então
+ * FECHADO, que é a ordem que o banco exige. Para os testes que simulam o fechamento da 2.2b
+ * mais barato do que fechar de verdade (que tem as suas condições).
+ */
+export async function criarPeriodoFechadoDeTeste(tx: ClienteDoParceiro, p: { nome: string; inicio: string; fim: string }) {
+  const periodo = await tx.periodoApuracao.create({
+    data: { parceiroId: tx.parceiroId, nome: p.nome, inicio: dataIso(p.inicio), fim: dataIso(p.fim) },
+  });
+  // Um DRE sem nenhum número (a conta pura sobre o plano padrão), gravado pelo mesmo caminho do fechamento.
+  const vazio = montarDre({ escopo: { tipo: 'rede' }, plano: planoEfetivo([]), receitas: [], taxaIfood: null, despesas: [] });
+  await gravarFotografia(
+    tx,
+    { periodoId: periodo.id, inicio: p.inicio, fim: p.fim, nomeDoPeriodo: p.nome, fechadoPorNome: 'Teste', taxa: null, entrada: {}, ressalvas: [], justificativa: null, linhas: linhasParaGravar(vazio, null, null, () => null) },
+    1,
+  );
+  // O mesmo caminho do fechamento: a fotografia nasce com o período ABERTO e só depois ele vira FECHADO.
+  return tx.periodoApuracao.update({ where: { id: periodo.id }, data: { status: 'FECHADO', fechadoEm: new Date(), fechadoPorNome: 'Teste' } });
+}
+
+/** O inverso: marca a fotografia como substituída e volta o período a ABERTO (o que a reabertura faz). */
+export async function reabrirPeriodoDeTeste(cliente: ClienteDoParceiro, periodoId: string) {
+  await cliente.transacao(async (tx) => {
+    await tx.dreFotografia.updateMany({ where: { periodoId, substituidaEm: null }, data: { substituidaEm: new Date(), reabertaPorNome: 'Teste', motivoReabertura: 'teste' } });
+    await tx.periodoApuracao.update({ where: { id: periodoId }, data: { status: 'ABERTO', fechadoEm: null, fechadoPorNome: null } });
+  });
 }

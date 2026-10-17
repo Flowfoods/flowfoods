@@ -73,6 +73,8 @@ import {
 } from './contagem-campos';
 import type { Periodo } from './periodo-campos';
 import { periodoAnteriorDe, periodoDe, registrarPeriodo } from './periodos';
+import { saidaDoPeriodoFechado } from './periodo-fechado-campos';
+import { travarParaEscrever } from './periodo-trava';
 import { CONSERVACOES, type Conservacao } from './validade';
 import { formatarDinheiro, type Fracao, type Unidade } from './unidades';
 
@@ -723,6 +725,11 @@ export async function concluirContagem(
   return comRecusa(() =>
     cliente.transacao(
       async (tx) => {
+        // 2.2b (decisão 155): aplicar o FECHAMENTO do estoque cai num período. A trava compartilhada do período é a
+        // PRIMEIRA instrução da transação, antes de ler qualquer coisa e de travar qualquer linha. Ela vale para
+        // toda conclusão: a cíclica não cai em período e não é recusada por ele, só espera, por milissegundos, um
+        // fechamento do DRE que esteja acontecendo (ler o tipo antes para decidir seria ler antes da trava).
+        await travarParaEscrever(tx);
         const loja = await lojaDoAlcance(tx, alcance, lojaId, 'estoque.ajustar');
         const [c] = await tx.sql<{ id: string; tipo: string; status: string; desfecho: string | null; versao: number; titulo: string | null; periodoId: string | null; fechaAutomaticoEm: Date | null }>`
           SELECT "id", "tipo"::text AS "tipo", "status"::text AS "status", "desfecho"::text AS "desfecho", "versao", "titulo", "periodoId", "fechaAutomaticoEm"
@@ -754,7 +761,7 @@ export async function concluirContagem(
         if (c.tipo === 'FECHAMENTO') {
           const p = c.periodoId ? await tx.periodoApuracao.findUnique({ where: { id: c.periodoId }, select: { id: true, nome: true, inicio: true, fim: true, status: true } }) : null;
           if (!p) throw new Recusa({ ok: false, erros: { geral: 'O período deste fechamento não foi encontrado.' } });
-          if (p.status === 'FECHADO') throw new Recusa({ ok: false, erros: { geral: `O período ${p.nome} já foi fechado no DRE: o estoque dele não muda mais.` } });
+          if (p.status === 'FECHADO') throw new Recusa({ ok: false, erros: { geral: `O período ${p.nome} já foi fechado no DRE: o estoque dele não muda mais. ${saidaDoPeriodoFechado(p.nome)}` } });
           const { cobertura, regras } = await coberturaDaLoja(tx, lojaId, agora, c.id, p);
           if (!cobertura.atinge) throw new Recusa({ ok: false, erros: { geral: fraseAbaixoDoPiso(cobertura, regras) } });
         }
@@ -972,6 +979,8 @@ export async function iniciarFechamento(
     comRecusa(() =>
       cliente.transacao(
         async (tx) => {
+          // 2.2b (decisão 155): o período do FECHAMENTO é decidido aqui; a trava compartilhada vem primeiro.
+          await travarParaEscrever(tx);
           const loja = await lojaDoAlcance(tx, alcance, lojaId, 'estoque.ajustar');
           const abertoEm = await exigirAberto(tx, loja);
           const hoje = hojeNoRio(agora);
@@ -994,7 +1003,7 @@ export async function iniciarFechamento(
           const registro = await registrarPeriodo(tx, periodo);
           if (!registro.ok) throw new Recusa({ ok: false, erros: { geral: registro.erro } });
           const reg = registro;
-          if (reg.status === 'FECHADO') throw new Recusa({ ok: false, erros: { geral: `O período ${reg.nome} já foi fechado no DRE: o estoque dele não muda mais.` } });
+          if (reg.status === 'FECHADO') throw new Recusa({ ok: false, erros: { geral: `O período ${reg.nome} já foi fechado no DRE: o estoque dele não muda mais. ${saidaDoPeriodoFechado(reg.nome)}` } });
           const ja = await tx.contagem.findFirst({ where: { lojaId, tipo: 'FECHAMENTO', periodoId: reg.id, status: { not: 'CANCELADA' } }, select: { id: true, status: true, fechadaEm: true } });
           if (ja?.status === 'ABERTA') return { ok: true as const, id: ja.id, jaFeito: true };
           if (ja) throw new Recusa({ ok: false, erros: { geral: `O estoque de ${periodo.nome} já foi fechado${ja.fechadaEm ? ` em ${quando(ja.fechadaEm)}` : ''}.` }, conflito: true });

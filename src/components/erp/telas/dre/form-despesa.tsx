@@ -23,6 +23,8 @@ import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import { Segmentos } from '../../ui/segmentos';
 import { Painel } from '../../ui/superficies';
+import { fechadoNoIntervalo, periodoDaFraseDeRecusa, type AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
+import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 import type { AcaoDeCadastro, EstadoCadastro } from './estado';
 
@@ -75,6 +77,7 @@ export function FormDespesa({
   rotuloDoBotao,
   bloqueio,
   periodoFechado,
+  periodos,
 }: {
   acao: AcaoDeCadastro;
   linhas: LinhaParaOFormulario[];
@@ -91,6 +94,8 @@ export function FormDespesa({
   bloqueio: string | null;
   /** Despesa que cai em período fechado: só o que não muda o DRE (vencimento, descrição, repetir) se edita. */
   periodoFechado?: boolean;
+  /** Os períodos fechados e o de agora: a competência que já cai num fechado é avisada antes de enviar. */
+  periodos: AvisoDePeriodos;
 }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida();
@@ -106,6 +111,9 @@ export function FormDespesa({
   const valor = lerValorDaDespesa(v.valor);
   const comp = lerCompetencia({ tipo: v.tipo, dia: v.dia, mes: v.mes, de: v.de, ate: v.ate }, hoje);
   const dias = comp.ok ? diasDaCompetencia(comp.competencia) : null;
+  // Período fechado: o que a competência digitada já diz, ou o que o servidor acabou de recusar.
+  const fechadoDaCompetencia = periodoFechado ? null : ((comp.ok ? fechadoNoIntervalo(periodos.fechados, comp.competencia.inicio, comp.competencia.fim)?.nome : null) ?? periodoDaFraseDeRecusa(erros.competencia));
+  const fechadoNoGeral = periodoDaFraseDeRecusa(estado?.erros?.geral);
   const porDia = valor.ok && comp.ok ? formatarDinheiro(apropriar(valor.centavos, comp.competencia, { de: comp.competencia.inicio, ate: comp.competencia.inicio })) : null;
   const apoio =
     valor.ok && comp.ok && dias! > 1
@@ -120,7 +128,7 @@ export function FormDespesa({
     <form action={enviar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="envio" value={envio} />
       <input type="hidden" name="versao" value={versao} />
-      <ErroGeral estado={estado} recarregar={voltar} />
+      {fechadoNoGeral ? <AvisoDoPeriodoFechado periodo={fechadoNoGeral} href={periodos.href} frase="Esta despesa é desse período: não dá para corrigir nem remover." /> : <ErroGeral estado={estado} recarregar={voltar} />}
       <ResumoDeErros erros={erros} idBase="desp" rotulos={(c) => ROTULOS[c] ?? c} />
       <fieldset disabled={travado} className="min-w-0 space-y-4">
         <Painel titulo="O que é">
@@ -243,7 +251,17 @@ export function FormDespesa({
                 <input type="hidden" name="ate" value={v.ate} />
               </>
             )}
-            <Erro id="desp-comp-erro" texto={erros.competencia} />
+            <Erro id="desp-comp-erro" texto={fechadoDaCompetencia ? undefined : erros.competencia} />
+            {fechadoDaCompetencia && (
+              <AvisoDoPeriodoFechado
+                id="desp-periodo-fechado"
+                rolar
+                periodo={fechadoDaCompetencia}
+                href={periodos.href}
+                frase="Uma despesa com competência nele não entra."
+                alternativa={periodos.emCurso ? `Ou lance com competência em ${periodos.emCurso}.` : 'Ou lance com competência no período em aberto.'}
+              />
+            )}
             <p aria-live="polite" className="min-h-5 text-[13px] tabular-nums text-suave">
               {apoio}
             </p>

@@ -52,7 +52,6 @@ import {
   type TextosDaDespesa,
 } from './despesa-campos';
 import { garantirPlano, resolverLinha } from './plano';
-import { mesVizinho } from './faturamento-campos';
 import { listarHistorico } from './historico';
 import { diferenca } from './insumo-campos';
 import { fraseDoPeriodoFechado, intervaloEmPeriodoFechado, travarParaEscrever } from './periodo-trava';
@@ -519,16 +518,23 @@ export interface RecorrenteEmFalta {
 }
 
 /**
- * As despesas que repetem todo mês, com competência no mês anterior a `mesAlvo`, que ainda não
- * têm filha. É a lista de "Lançar as do mês passado" e o "falta lançar" do DRE: nunca inventa valor.
+ * As despesas que repetem todo mês e ainda não têm a do mês `mesAlvo`: o ÚLTIMO elo de cada cadeia
+ * (a recorrente sem filha) com competência nos 12 meses anteriores a ele. É a lista de "Lançar as do
+ * mês passado" e o "falta lançar" do DRE: nunca inventa valor.
+ *
+ * 2.2b (decisão 156): antes só a competência do mês imediatamente anterior contava, e um mês sem
+ * lançamento (a luz de agosto que ninguém lançou) fazia a cadeia sumir dali em diante. Agora a
+ * cadeia sobrevive: o elo de agosto continua a ser o último e "falta lançar" segue cobrando
+ * setembro, outubro... até alguém lançar ou apertar "Não repete mais" (que é o fim de verdade).
  */
 export async function recorrentesEmFalta(tx: ClienteDoParceiro, alcance: Alcance, mesAlvo: string): Promise<RecorrenteEmFalta[]> {
   if (!podeVerDespesas(alcance)) return [];
-  const mesAnterior = competenciaDoMes(mesVizinho(mesAlvo, -1));
+  const janelaDe = competenciaDoMes(`${Number(mesAlvo.slice(0, 4)) - 1}${mesAlvo.slice(4)}`).inicio;
+  const antesDoAlvo = competenciaDoMes(mesAlvo).inicio;
   const candidatas = await tx.despesa.findMany({
-    where: { AND: [escopoDasDespesas(alcance), { recorrente: true, competencia: dataDoBanco(mesAnterior.inicio), competenciaFim: dataDoBanco(mesAnterior.fim) }] },
+    where: { AND: [escopoDasDespesas(alcance), { recorrente: true, competencia: { gte: dataDoBanco(janelaDe), lt: dataDoBanco(antesDoAlvo) } }] },
     include: INCLUIR,
-    orderBy: [{ linha: { ordem: 'asc' } }, { descricao: 'asc' }],
+    orderBy: [{ linha: { ordem: 'asc' } }, { descricao: 'asc' }, { competencia: 'asc' }],
   });
   if (candidatas.length === 0) return [];
   const comFilha = new Set((await tx.despesa.findMany({ where: { repeteDeId: { in: candidatas.map((c) => c.id) } }, select: { repeteDeId: true } })).map((f) => f.repeteDeId));
@@ -547,11 +553,21 @@ export async function recorrentesEmFalta(tx: ClienteDoParceiro, alcance: Alcance
     }));
 }
 
-/** O que falta lançar nos meses que o recorte [de, ate] toca, até o mês de hoje (mês futuro não cobra). */
+/**
+ * O que falta lançar nos meses que o recorte [de, ate] toca, até o mês de hoje (mês futuro não cobra).
+ * Cada cadeia aparece uma vez só, no primeiro mês do recorte em que falta.
+ */
 export async function faltaLancar(tx: ClienteDoParceiro, alcance: Alcance, de: string, ate: string, hoje = hojeNoRio()): Promise<RecorrenteEmFalta[]> {
   const ateMes = ate.slice(0, 7) < hoje.slice(0, 7) ? ate.slice(0, 7) : hoje.slice(0, 7);
+  const vistas = new Set<string>();
   const out: RecorrenteEmFalta[] = [];
-  for (const m of mesesDoIntervalo(de, `${ateMes}-01`)) out.push(...(await recorrentesEmFalta(tx, alcance, m)));
+  for (const m of mesesDoIntervalo(de, `${ateMes}-01`)) {
+    for (const f of await recorrentesEmFalta(tx, alcance, m)) {
+      if (vistas.has(f.origemId)) continue;
+      vistas.add(f.origemId);
+      out.push(f);
+    }
+  }
   return out;
 }
 
@@ -621,7 +637,7 @@ export async function lancarDoMesPassado(cliente: ClienteDoParceiro, alcance: Al
           // Não está em falta: ou já tem filha, ou não é do mês anterior ao escolhido.
           const filha = await tx.despesa.findFirst({ where: { repeteDeId: origemId }, select: { id: true } });
           if (filha) jaLancadas++;
-          else erros[origemId] = 'Esta despesa não é do mês anterior ao que você está lançando.';
+          else erros[origemId] = 'Esta despesa não é de um mês anterior ao que você está lançando.';
           continue;
         }
         if (o.lojaId !== null) await conferirLoja(tx, alcance, o.lojaId, true);

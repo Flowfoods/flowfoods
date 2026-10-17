@@ -31,7 +31,7 @@ export default async function ParceiroDrePage({ params, searchParams }: { params
       base={`${raiz}/dre`}
       raiz={raiz}
       contexto={`${ctx.parceiro.nome} · ${rotuloDaVisao(visao)}`}
-      pode={{ lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true }}
+      pode={{ lancarDespesa: true, definirMetas: true, fecharPeriodo: true, verFaturamento: true, verPrecos: true, veRede: true }}
       bloqueio={ctx.bloqueio}
     />
   );

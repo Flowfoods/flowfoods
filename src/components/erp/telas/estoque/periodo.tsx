@@ -15,6 +15,7 @@ import { camposDasRegras, porcento, ROTULO_DA_CONTAGEM } from '@/lib/erp/contage
 import { formatarData } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
+import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Barra, Painel, Selo, Vazio } from '../../ui/superficies';
@@ -131,7 +132,7 @@ export function TelaPeriodo({
   base: string;
   contexto?: string;
   feito?: string;
-  pode: { ajustar: boolean; contar: boolean; regras: boolean };
+  pode: { ajustar: boolean; contar: boolean; regras: boolean; periodos: boolean };
   acoes: { fechar: AcaoDeEstoque; regras: AcaoDeEstoque };
   bloqueio: string | null;
 }) {
@@ -225,7 +226,7 @@ export function TelaPeriodo({
         <aside className="min-w-0 space-y-4 lg:sticky lg:top-20" aria-label="Fechamento e regras">
           <Painel titulo="Fechamento do período" subtitulo="O estoque final fotografado é a base do CMV">
             {s.periodoFechadoNoDre ? (
-              <p className="text-sm text-suave">Este período já foi fechado no DRE.</p>
+              <AvisoDoPeriodoFechado dentro periodo={s.periodo.nome} href={pode.periodos ? `${base.replace(/\/estoque$/, '')}/dre/periodos` : null} frase="O estoque dele não muda mais: a contagem de fechamento não se aplica." />
             ) : f?.status === 'FECHADA' ? (
               <div className="space-y-2 text-sm">
                 <p className="font-semibold text-texto">Fechado{f.fechadaEm ? ` em ${quando(f.fechadaEm)}` : ''}{f.fechadaPorNome ? ` por ${f.fechadaPorNome}` : ''}.</p>

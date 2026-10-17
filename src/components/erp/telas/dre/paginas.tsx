@@ -6,13 +6,18 @@
  */
 
 import { randomBytes } from 'node:crypto';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { dinheiroParaCampo } from '@/lib/erp/unidades';
 import { tipoDaCompetencia, ehFiltroDeSituacao, lerMesDaLista, type FiltroDeSituacao } from '@/lib/erp/despesa-campos';
 import { faltaLancar, lojasParaDespesa, listarDespesas, obterDespesa, podeVerDespesas, recorrentesEmFalta } from '@/lib/erp/despesas';
+import { recusaDoFechamento, situacaoDoFechamento } from '@/lib/erp/dre-fechamento';
+import { situacaoDasMetas } from '@/lib/erp/dre-metas';
 import { chaveDaLinha } from '@/lib/erp/dre-plano';
 import { COR } from '@/lib/erp/modulos';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
+import { fechadoNoIntervalo } from '@/lib/erp/periodo-fechado-campos';
 import { situacaoDosPeriodos } from '@/lib/erp/periodos';
 import { planoDoParceiro } from '@/lib/erp/plano';
 import { pode, type Alcance } from '@/lib/erp/permissoes';
@@ -21,14 +26,17 @@ import type { Visao } from '@/lib/erp/visao';
 import { PageHeader } from '../../ui/cabecalho';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { FiltroEmLinks } from '../../ui/filtros';
+import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
+import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso } from '../../ui/superficies';
 import { Voltar } from '../cadastro/partes';
 import { TelaDaDespesa } from './detalhe-despesa';
 import { TelaDeDespesas } from './despesas';
-import { fraseDaDespesa, fraseDoMesPassado, type AcaoDeCadastro, type AcaoLocal, type AcaoMesPassado } from './estado';
+import { fraseDaDespesa, fraseDoMesPassado, fraseDoPeriodo, type AcaoDeCadastro, type AcaoLocal, type AcaoMesPassado } from './estado';
 import { FormDespesa, type InicialDaDespesa } from './form-despesa';
 import { FormMesPassado } from './form-mes-passado';
 import { TelaDoPlano } from './plano';
+import { TelaDoFechamento } from './periodo-fechamento';
 import { TelaDosPeriodos } from './periodos';
 
 type Query = Record<string, string | string[] | undefined>;
@@ -80,6 +88,7 @@ export async function PaginaDasDespesas({ c, lojasDoAlcance, query }: { c: Conte
 export async function PaginaDeNovaDespesa({ c, visao, query, acoes }: { c: ContextoDaTela; visao: Visao; query: Query; acoes: { lancar: AcaoDeCadastro; mesPassado: AcaoMesPassado } }) {
   const hoje = hojeNoRio();
   const base = `${c.raiz}/dre/despesas`;
+  const periodos = await avisoDePeriodos(c.cliente, c.alcance, c.raiz, hoje);
   const doMesPassado = um(query.modo) === 'mes-passado';
   const escolha = (
     <FiltroEmLinks
@@ -94,7 +103,9 @@ export async function PaginaDeNovaDespesa({ c, visao, query, acoes }: { c: Conte
     const atual = hoje.slice(0, 7);
     const pedido = um(query.mes);
     const mes = pedido && /^\d{4}-(0[1-9]|1[0-2])$/.test(pedido) && pedido <= atual && pedido >= '2020-02' ? pedido : atual;
-    const itens = await c.cliente.transacao((tx) => recorrentesEmFalta(tx, c.alcance, mes));
+    // Mês dentro de período fechado: não há o que lançar (a lista editável só induziria ao erro); a tela já diz a saída.
+    const fechado = fechadoNoIntervalo(periodos.fechados, `${mes}-01`, ultimoDiaDoMes(mes));
+    const itens = fechado ? [] : await c.cliente.transacao((tx) => recorrentesEmFalta(tx, c.alcance, mes));
     const meses = [atual, mesAnterior(atual), mesAnterior(mesAnterior(atual))];
     return (
       <div className="mx-auto max-w-4xl space-y-6">
@@ -106,7 +117,21 @@ export async function PaginaDeNovaDespesa({ c, visao, query, acoes }: { c: Conte
             <FiltroEmLinks rotulo="Mês a lançar" opcoes={meses.map((m) => ({ href: `${base}/nova?modo=mes-passado&mes=${m}`, rotulo: m === atual ? 'Este mês' : mesCurto(m), ativo: m === mes }))} />
           </div>
         </PageHeader>
-        {itens.length === 0 ? (
+        {fechado ? (
+          <div className="space-y-3">
+            <AvisoDoPeriodoFechado
+              periodo={fechado.nome}
+              href={periodos.href}
+              frase={`As despesas que repetem todo mês de ${mesCurto(mes)} não se lançam mais.`}
+              alternativa={`Ou lance as de ${mes === atual ? 'outro mês' : periodos.emCurso ? `${periodos.emCurso}, o período em aberto` : 'este mês'}.`}
+            />
+            {mes !== atual && (
+              <Link href={`${base}/nova?modo=mes-passado`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+                Lançar as deste mês
+              </Link>
+            )}
+          </div>
+        ) : itens.length === 0 ? (
           <Aviso tom="ok" titulo="Nada falta lançar neste mês.">
             As despesas que repetem todo mês já têm o lançamento dele. Para uma despesa nova, use “Uma despesa”.
           </Aviso>
@@ -134,11 +159,15 @@ export async function PaginaDeNovaDespesa({ c, visao, query, acoes }: { c: Conte
       <PageHeader icone="compras" cor={COR.dre} titulo="Lançar despesa" subtitulo={`${c.contexto} · aluguel, salário, luz e outras`}>
         {escolha}
       </PageHeader>
-      <FormDespesa acao={acoes.lancar} linhas={linhas} lojas={lj.lojas} podeRede={lj.podeRede} inicial={inicial} hoje={hoje} envio={randomBytes(16).toString('hex')} versao="" voltar={base} rotuloDoBotao="Lançar despesa" bloqueio={c.bloqueio} />
+      <FormDespesa acao={acoes.lancar} linhas={linhas} lojas={lj.lojas} podeRede={lj.podeRede} inicial={inicial} hoje={hoje} envio={randomBytes(16).toString('hex')} versao="" voltar={base} rotuloDoBotao="Lançar despesa" bloqueio={c.bloqueio} periodos={periodos} />
     </div>
   );
 }
 
+function ultimoDiaDoMes(mes: string): string {
+  const [a, m] = mes.split('-').map(Number);
+  return new Date(Date.UTC(a, m, 0)).toISOString().slice(0, 10);
+}
 function mesAnterior(mes: string): string {
   const [a, m] = mes.split('-').map(Number);
   return m === 1 ? `${a - 1}-12` : `${a}-${String(m - 1).padStart(2, '0')}`;
@@ -153,7 +182,7 @@ export async function PaginaDaDespesa({ c, id, query, acoes }: { c: ContextoDaTe
   return (
     <>
       <TrilhaDaPagina itens={[{ rotulo: d.despesa.descricao }]} />
-      <TelaDaDespesa d={d} base={`${c.raiz}/dre/despesas`} hoje={hoje} feito={fraseDaDespesa(um(query.feito))} podeLancar={pode(c.alcance, 'despesas.lancar')} bloqueio={c.bloqueio} acoes={acoes} />
+      <TelaDaDespesa d={d} base={`${c.raiz}/dre/despesas`} hoje={hoje} feito={fraseDaDespesa(um(query.feito))} podeLancar={pode(c.alcance, 'despesas.lancar')} periodosHref={pode(c.alcance, 'dre.ver') ? `${c.raiz}/dre/periodos` : null} bloqueio={c.bloqueio} acoes={acoes} />
     </>
   );
 }
@@ -183,27 +212,36 @@ export async function PaginaDeEditarDespesa({ c, id, acao }: { c: ContextoDaTela
     vencimento: x.vencimento ? br(x.vencimento) : '',
   };
   const voltar = `${c.raiz}/dre/despesas/${x.id}`;
+  const periodos = await avisoDePeriodos(c.cliente, c.alcance, c.raiz, hoje);
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: x.descricao, href: voltar }, { rotulo: 'Editar' }]} />
       <Voltar href={voltar}>Voltar para a despesa</Voltar>
       <PageHeader icone="compras" cor={COR.dre} titulo="Editar despesa" subtitulo={`${x.descricao} · ${c.contexto}`} />
-      {d.fechado && (
-        <Aviso tom="alerta" titulo={`Esta despesa cai no período ${d.fechado}, já fechado no DRE.`}>
-          Valor, competência, linha e loja não mudam mais; descrição, vencimento e “repete todo mês” sim.
-        </Aviso>
-      )}
-      <FormDespesa acao={acao} linhas={linhas} lojas={lojas} podeRede={lj.podeRede || x.lojaId === null} inicial={inicial} hoje={hoje} envio="" versao={x.versao} voltar={voltar} rotuloDoBotao="Salvar" bloqueio={c.bloqueio} periodoFechado={!!d.fechado} />
+      {d.fechado && <AvisoDoPeriodoFechado periodo={d.fechado} href={periodos.href} frase="Esta despesa cai nele: valor, competência, linha e loja não mudam mais; descrição, vencimento e “repete todo mês” sim." />}
+      <FormDespesa acao={acao} linhas={linhas} lojas={lojas} podeRede={lj.podeRede || x.lojaId === null} inicial={inicial} hoje={hoje} envio="" versao={x.versao} voltar={voltar} rotuloDoBotao="Salvar" bloqueio={c.bloqueio} periodoFechado={!!d.fechado} periodos={periodos} />
     </div>
   );
 }
 
 export async function PaginaDosPeriodos({ c, podeMudar, acao }: { c: ContextoDaTela; podeMudar: boolean; acao: AcaoLocal }) {
   const s = await situacaoDosPeriodos(c.cliente);
-  return <TelaDosPeriodos s={s} raiz={c.raiz} contexto={c.contexto} podeMudar={podeMudar} podeVerDre={pode(c.alcance, 'dre.ver')} acao={acao} bloqueio={c.bloqueio} />;
+  return <TelaDosPeriodos s={s} raiz={c.raiz} contexto={c.contexto} podeMudar={podeMudar} podeVerDre={pode(c.alcance, 'dre.ver')} podeFechar={recusaDoFechamento(c.alcance) === null} acao={acao} bloqueio={c.bloqueio} />;
 }
 
-export async function PaginaDoPlano({ c, acoes }: { c: ContextoDaTela; acoes: { criar: AcaoLocal; renomear: AcaoLocal; ocultar: AcaoLocal } }) {
-  const plano = await planoDoParceiro(c.cliente);
-  return <TelaDoPlano plano={plano} contexto={c.contexto} acoes={acoes} bloqueio={c.bloqueio} />;
+/** Um período: as condições para fechar, a fotografia, reabrir e as versões. Quem não fecha, ou período que não existe: 404. */
+export async function PaginaDoFechamento({ c, inicio, query, acoes }: { c: ContextoDaTela; inicio: string; query: Query; acoes: { fechar: AcaoLocal; reabrir?: AcaoLocal } }) {
+  const s = await situacaoDoFechamento(c.cliente, c.alcance, inicio);
+  if (!s) notFound();
+  return (
+    <>
+      <TrilhaDaPagina itens={[{ rotulo: s.periodo.nome }]} />
+      <TelaDoFechamento s={s} raiz={c.raiz} contexto={c.contexto} feito={fraseDoPeriodo(um(query.feito)) ?? null} acoes={acoes} bloqueio={c.bloqueio} />
+    </>
+  );
+}
+
+export async function PaginaDoPlano({ c, acoes }: { c: ContextoDaTela; acoes: { criar: AcaoLocal; renomear: AcaoLocal; ocultar: AcaoLocal; metas: AcaoLocal } }) {
+  const [plano, metas] = await Promise.all([planoDoParceiro(c.cliente), situacaoDasMetas(c.cliente, c.alcance)]);
+  return <TelaDoPlano plano={plano} metas={metas} contexto={c.contexto} acoes={acoes} bloqueio={c.bloqueio} />;
 }

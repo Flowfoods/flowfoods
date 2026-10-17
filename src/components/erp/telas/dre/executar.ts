@@ -20,6 +20,8 @@ import {
 import type { TextosDaDespesa } from '@/lib/erp/despesa-campos';
 import { criarLinha, ocultarLinha, renomearLinha } from '@/lib/erp/plano';
 import { salvarRegra } from '@/lib/erp/periodos';
+import { salvarMetas } from '@/lib/erp/dre-metas';
+import { fecharPeriodo, reabrirPeriodo } from '@/lib/erp/dre-fechamento';
 import { formatarData } from '@/lib/erp/compra-campos';
 import type { Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
@@ -149,3 +151,40 @@ export async function executarOcultarLinha(cliente: ClienteDoParceiro, alcance: 
   return { ok: true, mensagem: r.mudou ? (form.get('ocultar') === '1' ? 'Linha oculta.' : 'Linha de volta ao formulário.') : 'Nada mudou.', vez: vezDe(anterior) };
 }
 
+
+// ------------------------------------------------------------------ metas, fechar e reabrir (2.2b)
+
+/** Os campos `meta_<chave>` do formulário das metas: chave da linha → o que a pessoa digitou. */
+export async function executarSalvarMetas(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, anterior: EstadoLocal, form: FormData, raiz: string): Promise<EstadoLocal> {
+  const valores: Record<string, string> = {};
+  for (const [campo, v] of form.entries()) if (campo.startsWith('meta_') && typeof v === 'string') valores[campo.slice(5)] = v;
+  const r = await salvarMetas(cliente, alcance, { valores, versao: textoDe(form.get('versao')) }, autorNome);
+  if (!r.ok) return { ok: false, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
+  revalidatePath(raiz, 'layout');
+  if (r.mudou === 0) return { ok: true, mensagem: 'Nada mudou: as metas já eram essas.', vez: vezDe(anterior) };
+  return {
+    ok: true,
+    mensagem: `${r.mudou === 1 ? '1 meta salva' : `${r.mudou} metas salvas`}. Valem a partir de ${formatarData(r.valeDesde)}; os períodos anteriores seguem com as metas que valiam neles.`,
+    vez: vezDe(anterior),
+  };
+}
+
+/** `inicio` vem preso à URL (bind), nunca do formulário. Depois de fechar volta à tela do período. */
+export async function executarFechar(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, inicio: string, anterior: EstadoLocal, form: FormData, raiz: string): Promise<EstadoLocal> {
+  const r = await fecharPeriodo(
+    cliente,
+    alcance,
+    { inicio, ressalvas: form.getAll('ressalva').map(textoDe), justificativa: form.get('justificativa'), impressao: textoDe(form.get('impressao')) },
+    autorNome,
+  );
+  if (!r.ok) return { ok: false, erros: { geral: r.erro, ...(r.erros ?? {}) }, conflito: r.mudou, vez: vezDe(anterior) };
+  revalidatePath(raiz, 'layout');
+  redirect(`${raiz}/dre/periodos/${inicio}?feito=${r.jaFechado ? 'ja-fechado' : 'fechado'}`);
+}
+
+export async function executarReabrir(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, inicio: string, anterior: EstadoLocal, form: FormData, raiz: string): Promise<EstadoLocal> {
+  const r = await reabrirPeriodo(cliente, alcance, { inicio, motivo: form.get('motivo'), fotografia: textoDe(form.get('fotografia')) }, autorNome);
+  if (!r.ok) return { ok: false, erros: { geral: r.erro, ...(r.erro.includes('motivo') || r.erro.includes('letras') ? { motivo: r.erro } : {}) }, conflito: r.mudou, vez: vezDe(anterior) };
+  revalidatePath(raiz, 'layout');
+  redirect(`${raiz}/dre/periodos/${inicio}?feito=reaberto`);
+}
