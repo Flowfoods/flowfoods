@@ -1720,8 +1720,18 @@ export async function gravarPreferenciaDeAjuda(token: unknown, mudanca: MudancaD
   if (mudanca.tipo !== 'fechar') return { ok: false };
   const caixa = fechamentoValido(mudanca.caixa);
   if (!caixa) return { ok: false };
+  await acrescentarCaixaFechada(db, usuarioId, caixa, agora);
+  return { ok: true };
+}
+
+/**
+ * Acrescenta "chave@versão" à lista de quem fechou, numa instrução só (o
+ * ON CONFLICT trava a linha): tira a versão antiga da mesma caixa, mantém as
+ * 300 mais novas e não perde fechamento de outra aba. Exportada para o teste
+ * com banco; quem confere a lista branca é `gravarPreferenciaDeAjuda`.
+ */
+export async function acrescentarCaixaFechada(db: PrismaClient, usuarioId: string, caixa: string, agora: Date): Promise<void> {
   const chave = caixa.split('@')[0];
-  // Atômico: o ON CONFLICT trava a linha; a lista nova tira a versão antiga da mesma caixa e mantém as 300 mais novas.
   await db.$executeRaw`
     INSERT INTO "PreferenciaErp" ("usuarioId", "fechadas", "atualizadoEm")
     VALUES (${usuarioId}, ARRAY[${caixa}]::text[], ${agora})
@@ -1737,7 +1747,6 @@ export async function gravarPreferenciaDeAjuda(token: unknown, mudanca: MudancaD
         ) t
       ),
       "atualizadoEm" = ${agora}`;
-  return { ok: true };
 }
 
 /** Quem tem mais de um parceiro escolhe; o servidor confere o vínculo. */

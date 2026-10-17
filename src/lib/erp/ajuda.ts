@@ -161,3 +161,30 @@ export function problemasDoRegistro(entradas: readonly EntradaDeAjuda[] = ENTRAD
   }
   return erros;
 }
+
+// ------------------------------------------------------------- a cobertura
+
+/**
+ * Toda rota do ERP tem exatamente uma entrada, e toda rota declarada existe.
+ * `doParceiro` = páginas de `src/app/erp`; `doNivel1` = páginas de
+ * `src/app/rodolfo/(painel)/erp/[slug]` (as duas relativas à base, no padrão do Next).
+ * Entrada `soNivel1` só vale para rota que existe só no nível 1; as demais,
+ * para rota que existe no /erp.
+ */
+export function coberturaDasRotas(
+  doParceiro: readonly string[],
+  doNivel1: readonly string[],
+  entradas: readonly EntradaDeAjuda[] = ENTRADAS,
+): { semAjuda: string[]; orfas: string[] } {
+  const parceiro = new Set(doParceiro);
+  const nivel1 = new Set(doNivel1);
+  const declaradas = new Map<string, EntradaDeAjuda>();
+  for (const e of entradas) for (const r of e.rotas) declaradas.set(r, e);
+  const semAjuda = [...new Set([...parceiro, ...nivel1])].filter((r) => !declaradas.has(r)).sort();
+  const orfas: string[] = [];
+  for (const [r, e] of declaradas) {
+    const existe = e.soNivel1 ? nivel1.has(r) && !parceiro.has(r) : parceiro.has(r);
+    if (!existe) orfas.push(`${r} (${e.chave})`);
+  }
+  return { semAjuda, orfas: orfas.sort() };
+}

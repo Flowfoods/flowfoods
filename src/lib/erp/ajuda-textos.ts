@@ -36,7 +36,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     versao: 1,
     aula: [
       { texto: 'Aqui estão os seus dados, o que você pode fazer no ERP e a entrada pelo rosto no celular.' },
-      { texto: 'Trocou de aparelho? Ative o rosto de novo no aparelho novo. Esqueceu a senha? Fale com a FlowFoods.' },
+      { texto: 'Trocou de aparelho? Ative o rosto de novo nele. Senha esquecida: fale com a FlowFoods.' },
     ],
     secoes: [
       {
@@ -44,7 +44,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'As caixas de dica',
         blocos: [
           { texto: 'Cada tela pode abrir uma caixinha explicando como ela funciona. Fechou uma, ela não volta, a não ser que o texto mude.' },
-          { texto: 'Em Dicas, aqui embaixo, você liga e desliga as caixinhas ou pede para ver de novo as que fechou. O botão ? no alto continua sempre à mão.' },
+          { texto: 'No quadro Dicas, desta tela, você liga e desliga as caixinhas ou pede para ver de novo as que fechou. O botão ? no alto continua sempre à mão.' },
         ],
       },
     ],
@@ -295,7 +295,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     versao: 1,
     aula: [
       { texto: 'Conte o que tem na loja agora. Caixa fechada vai em embalagens; o aberto, no solto.' },
-      { texto: 'Deixe vazio o que ainda não contou. O que não tem, marque “Não tem”.' },
+      { texto: 'Deixe vazio o que ainda não contou; o que não tem, marque “Não tem”.' },
       { texto: 'A tela salva sozinha, até sem sinal.' },
     ],
   },
