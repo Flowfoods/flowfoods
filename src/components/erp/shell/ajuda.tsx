@@ -124,6 +124,7 @@ export function CaixaDeAula({
         <button
           type="button"
           hidden={!montado}
+          style={montado ? undefined : { display: 'none' }}
           aria-haspopup="dialog"
           onClick={(e) => aoVerTudo(e.currentTarget)}
           className={classeDeBotao('fantasma')}
@@ -225,8 +226,8 @@ export function GavetaDeAjuda({
             Ainda com dúvida?{' '}
             <a href={contato.url} target="_blank" rel="noopener noreferrer" className="font-semibold text-texto underline decoration-texto/30 underline-offset-4 hover:decoration-texto">
               Fale com a FlowFoods
-            </a>{' '}
-            <span className="whitespace-nowrap tabular-nums">· WhatsApp {contato.display}</span>
+            </a>
+            <span className="mt-0.5 block tabular-nums">WhatsApp {contato.display}</span>
           </p>
           {preferencia && !preferencia.dicasLigadas && acoes && (
             <form action={acoes.dicas} onSubmit={aoReligar} className="flex flex-wrap items-center gap-x-2">

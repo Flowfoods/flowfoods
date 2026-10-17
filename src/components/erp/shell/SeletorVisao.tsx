@@ -20,7 +20,7 @@ import { Popover } from './Popover';
 import type { VisaoDoNivel1, VisaoDoParceiro } from './tipos';
 
 const GATILHO =
-  'ff-transicao flex min-h-11 max-w-[11rem] items-center gap-2 rounded-[7px] border border-linha px-2.5 text-[13px] text-texto hover:border-linha-forte aria-expanded:border-linha-forte sm:max-w-[16rem] sm:px-3';
+  'ff-transicao flex min-h-11 w-full items-center gap-2 rounded-[7px] border border-linha px-2.5 text-[13px] text-texto hover:border-linha-forte aria-expanded:border-linha-forte sm:px-3';
 
 export function SeletorVisao({ visao }: { visao: VisaoDoParceiro | VisaoDoNivel1 }) {
   return visao.modo === 'parceiro' ? <DoParceiro visao={visao} /> : <DoNivel1 visao={visao} />;
@@ -82,6 +82,7 @@ function DoParceiro({ visao }: { visao: VisaoDoParceiro }) {
   }
   return (
     <Popover
+      classeDoWrapper="min-w-0 max-w-[11rem] sm:max-w-[16rem]"
       rotulo={`Visão: ${atual?.rotulo ?? ''}. Trocar`}
       classeDoBotao={GATILHO}
       largura="w-64"
@@ -140,6 +141,7 @@ function DoNivel1({ visao }: { visao: VisaoDoNivel1 }) {
   return (
     <div className="flex min-w-0 items-center gap-1.5">
       <Popover
+        classeDoWrapper="min-w-0 max-w-[11rem] sm:max-w-[16rem]"
         rotulo={`Parceiro: ${parceiro?.nome ?? 'FlowFoods, todos'}. Trocar`}
         classeDoBotao={GATILHO}
         largura="w-72"
@@ -179,6 +181,7 @@ function DoNivel1({ visao }: { visao: VisaoDoNivel1 }) {
       </Popover>
       {parceiro && lojas && lojas.opcoes.length > 1 && (
         <Popover
+          classeDoWrapper="min-w-0 max-w-[11rem] sm:max-w-[16rem]"
           rotulo={`Visão: ${rotuloDaLoja ?? ''}. Trocar`}
           classeDoBotao={`${GATILHO} hidden md:flex`}
           largura="w-64"

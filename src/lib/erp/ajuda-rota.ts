@@ -52,7 +52,7 @@ export function caixaDaTela(
   return { mudou, perguntar: !p.escolhida };
 }
 
-/** `/erp/insumos/abc` → `insumos/abc`; `/rodolfo/erp/casa/estoque` → `estoque`; fora do ERP, null. */
+/** Da URL à rota relativa à base: `/erp/insumos/abc` vira `insumos/abc`, `/rodolfo/erp/casa/estoque` vira `estoque`; fora do ERP, null. */
 export function rotaRelativa(caminho: string): string | null {
   const limpo = caminho.split(/[?#]/)[0].replace(/\/+$/, '');
   let resto: string | null = null;

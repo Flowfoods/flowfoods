@@ -1448,3 +1448,69 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) renomear as abas para os títulos antigos ("Notas de compra", "Estoque por loja"); (b) alinhar os títulos às abas do contrato ("Compras", "Visão geral"); para o card — (c) manter as abas em texto; (d) cada aba um link próprio, com o título como link esticado.
 
 **Razão:** (b) porque as abas são palavras do contrato do dono; "Estoque por loja" passa ao subtítulo da Visão geral. (d) porque o atalho "Contagens" no card poupa um clique: o título é o link principal e estica sobre o card (o card inteiro continua clicável) e as abas são links irmãos acima da camada esticada, sem link dentro de link e com foco por Tab. O seletor de área (estreito) ganha um `resumo` próprio de até 20 caracteres, para não cortar a frase. "Margem de cada prato" só aparece com "ver fichas".
+
+### 110. 2026-10-17 · ERP 0.6: o texto da ajuda mora no código, versionado junto com a tela (`ajuda-textos.ts`), e um teste reprova ajuda desatualizada
+
+**Alternativas:** (a) texto no banco, editável pela tela; (b) texto no Notion; (c) texto em código, uma entrada por tela, com versão por entrada e um `ajuda.lock.json` que guarda o hash do texto.
+
+**Razão:** (c). A ajuda só vale se muda quando a tela muda: no mesmo diff, revisada com ela. Banco e Notion deixariam o texto andar sozinho, sem revisão e sem versão. O teste `tests/erp-ajuda.test.ts` reprova rota do ERP sem entrada, entrada órfã, permissão que não existe, jargão, "!", emoji, HTML e texto alterado sem subir a versão; `npm run ajuda:lock` regrava o lock e se recusa a gravar texto novo com a versão velha. É o "ajuda sempre atualizada" do contrato, em forma de gate. A regra entra no modelo de subfase: "Ajuda: chaves novas/alteradas".
+
+### 111. 2026-10-17 · ERP 0.6: a chave da ajuda é a ROTA (padrão do Next); uma entrada pode cobrir várias rotas; sem variante por estado da tela
+
+**Alternativas:** (a) chave por área ou por módulo; (b) chave por rota, com `variante` para a tela que muda de conteúdo (contagem cíclica × fechamento); (c) chave por rota, uma aula só por tela, com o caso especial escrito num bloco.
+
+**Razão:** (c). A seção 9 manteve todas as URLs, então a rota é a identidade estável e a área só agrupa (o teste confere que a `area` da entrada é a área onde a tela acende no menu). Uma variante exigiria a página avisar o shell (`TrilhaDaPagina` só chega depois da hidratação: a caixa piscaria). Na contagem, um bloco diz "no fechamento do período, conte o que falta...". Novo e editar dividem a entrada. A única rota nova da seção 9, `/estoque/contagens`, tem a dela no `/erp` e no espelho do nível 1.
+
+### 112. 2026-10-17 · ERP 0.6: a preferência é da PESSOA (global), numa tabela própria FORA do tenant, lida junto com a sessão
+
+**Alternativas:** (a) por pessoa × parceiro, dentro do tenant; (b) cookie no aparelho; (c) tabela `PreferenciaErp` por `UsuarioErp`, sem `parceiroId`, como as outras credenciais.
+
+**Razão:** (c). Aprender o sistema é da pessoa: quem está em dois parceiros escolhe uma vez, e a escolha vale em qualquer aparelho (cookie não vale). Vem na MESMA ida ao banco de `validarSessao` (sem consulta extra, sem flash) e fica fora da RLS: nenhuma tabela de tenant muda, `erp_tenant` não tem GRANT (a migration revoga no padrão condicional da 0.3), o `prisma` do portal recusa e só `credenciais.ts` grava. Apagar a pessoa apaga a preferência (CASCADE). `fechadas` guarda `chave@versão`, no máximo 300 (CHECK com função imutável, o mais velho sai), e `escolhidaEm` nulo = ainda não respondeu. Migration aditiva `20261024000000_erp_preferencia_ajuda`, `migrate diff` vazio.
+
+### 113. 2026-10-17 · ERP 0.6: a aula é filtrada pela PERMISSÃO efetiva, não por setor nem por perfil; o filtro é conforto, e o servidor só entrega o que a pessoa pode ler
+
+**Alternativas:** (a) texto por perfil (dono, gerente, operador); (b) por setor; (c) bloco com `para: [permissões]` (qualquer uma).
+
+**Razão:** (c). Perfil próprio existe e setor não concede nada (decisão 39): o que a pessoa faz é o que ela pode. O operador nem recebe o bloco sobre preço, na caixa e na gaveta (o layout entrega ao shell o registro já filtrado). Mas o texto é documentação do produto, sem dado de nenhum parceiro: o filtro não é segurança, e a permissão de verdade continua sendo decidida pela página e pela action. Todo registro precisa de ao menos um bloco para todos.
+
+### 114. 2026-10-17 · ERP 0.6: a caixa é desenhada pelo shell a partir da rota, no HTML do servidor; funciona sem JavaScript
+
+**Alternativas:** (a) cada página pede a sua caixa (80 edições); (b) o shell, cliente com SSR, resolve a rota (`usePathname`) e a preferência vem do layout.
+
+**Razão:** (b). Zero edição nas páginas, nenhuma tela esquece. A caixa é a mesma conta no servidor e no navegador (`caixaDaTela`), então quem fechou ou desligou recebe o HTML SEM a caixa: sem flash e sem diferença de hidratação (provado com CPU 6× e rede lenta). Os botões são `<form action>` de server action: sem JavaScript a caixa vem e "não mostrar de novo" recarrega sem ela; com JavaScript some na hora (otimista, descartada se a preferência do servidor mudar). O botão "Ver tudo", que precisa de JavaScript, nasce escondido.
+
+### 115. 2026-10-17 · ERP 0.6: a pergunta da 1ª vez mora dentro da primeira caixa, sem modal; sem resposta, as dicas ficam ligadas
+
+**Alternativas:** (a) modal na 1ª entrada; (b) pergunta na caixa, "Manter as dicas" ou "Desligar".
+
+**Razão:** (b). Quem conta estoque de luva não pode ser travado por uma janela. A pergunta aparece na caixa de qualquer tela até ser respondida; responder (ou religar em "Seu acesso") grava `escolhidaEm`. Desligar tira só as caixas: o "?" no topo continua sempre à mão, e instrução de campo (microtexto ligado por `aria-describedby`) nunca some.
+
+### 116. 2026-10-17 · ERP 0.6: texto novo sobe a versão e a caixa volta com "Mudou"; "fechar" só aceita `chave@versão` que existe no registro agora
+
+**Alternativas:** (a) fechar guarda só a chave; (b) fechar guarda `chave@versão` e a action aceita qualquer texto; (c) idem, com lista branca contra o registro e teto.
+
+**Razão:** (c). Fechar a versão 1 não cala a versão 2: quem tinha fechado vê a caixa de novo, com a etiqueta Mudou (só quem teve uma versão antiga fechada; quem nunca viu não ganha etiqueta). Chave forjada, de versão que não existe ou gigante é recusada sem gravar. A gravação é uma instrução só (`ON CONFLICT`, trava a linha): duas abas fechando caixas ao mesmo tempo não perdem nenhuma, fechar de novo não duplica, a versão antiga da mesma caixa sai e o teto de 300 tira a mais velha.
+
+### 117. 2026-10-17 · ERP 0.6: a `Dica` morre; um caminho só para explicar (`LinkDeAjuda` abre a gaveta na seção certa)
+
+**Alternativas:** (a) manter a `Dica` ao lado do framework; (b) migrar os textos soltos de aula para o registro e apagar a `Dica`.
+
+**Razão:** (b), Regra Nº 2. "Como a conta é feita" (3 parágrafos) virou a seção `conta` da ficha, só para quem tem `precos.ver`; "Como abre o estoque de uma loja" virou a seção `abertura` do estoque; o texto solto das telas de contar (`explicacao`) virou a aula de `abertura` e `contagens/[id]`. No lugar ficam `LinkDeAjuda` (só abre a gaveta). Ficam como estão, por não serem aula: dicas de campo (`aria-describedby`), `<details>` que mostram dado e subtítulos de painel. "O servidor refaz a conta ao salvar" virou "A conta é refeita na hora de salvar".
+
+### 118. 2026-10-17 · ERP 0.6: o nível 1 dentro do parceiro só tem o "?"; as telas do Barney não têm ajuda
+
+**Alternativas:** (a) o Rodolfo também com caixas e preferência; (b) só o botão "?", lendo o mesmo registro com todas as permissões.
+
+**Razão:** (b). O nível 1 não é uma `UsuarioErp`: não tem onde gravar preferência, e a caixa de aula é para quem usa o ERP todo dia. A gaveta dele não fala de preferência. Telas do Barney (Hoje, Leads, a lista de parceiros, o quadro de onboarding) não casam com nenhuma entrada, então não têm "?".
+
+### 119. 2026-10-17 · ERP 0.6: as ações da preferência são da própria pessoa e nunca recebem quem ela é
+
+**Alternativas:** (a) a action recebe o id da pessoa; (b) o id vem só da sessão validada dentro de `credenciais.ts`.
+
+**Razão:** (b). `acaoAjudaFechar`, `acaoAjudaDicas` e `acaoAjudaReabrir` só leem o texto da caixa ou a escolha; o `usuarioId` sai da sessão do cookie `ff_erp`, revalidada a cada gravação (sessão encerrada não grava). Campo `usuarioId` forjado no formulário é ignorado (teste com banco). O nível 1 (JWT do next-auth) não tem esse cookie: nada grava. Não pedem permissão (é preferência da pessoa) e valem até em parceiro suspenso, porque não tocam dado do tenant.
+
+### 120. 2026-10-17 · ERP 0.6: o "?" fica no topo entre a busca e o sino; a gaveta entra pela direita (desktop) ou vira folha embaixo (< 600 px)
+
+**Alternativas:** (a) popover colado no botão; (b) página de ajuda; (c) `Dialogo` nativo com `lado="direita"`.
+
+**Razão:** (c), estendendo o `Dialogo` (não criando outro): fundo inerte, Esc fecha, foco vai ao título ao abrir e volta a quem abriu (o "?" quando o atalho `?` abriu). O atalho `?` não dispara dentro de campo nem com outra janela aberta. O botão tem alvo de 44 px também no celular (o seletor de visão cede espaço na barra estreita). A gaveta traz a aula, as seções, "Outras telas de {área}" (as abas que a pessoa já pode abrir) e a saída "Fale com a FlowFoods".

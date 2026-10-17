@@ -4,7 +4,7 @@
  * O CONTEÚDO mora no código (`ajuda-textos.ts`), versionado junto com a tela:
  * muda no mesmo diff e é revisado com ele (decisão 110). A aula é filtrada pela
  * PERMISSÃO efetiva de quem lê, não por setor nem por nome de perfil (decisão
- * 112): o operador nem recebe o bloco sobre preço. Isso é conforto, não
+ * 113): o operador nem recebe o bloco sobre preço. Isso é conforto, não
  * segurança: o texto é documentação do produto, sem dado de nenhum parceiro, e
  * quem decide o que a pessoa pode continua sendo a página.
  *

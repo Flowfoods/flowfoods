@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -28,8 +28,9 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Contagem do dia a dia (inventário cíclico que fecha sozinho) e fechamento do período com piso (1.7) | `src/lib/erp/{contagem-campos,contagem}.ts` (puro / com banco; `contarItem` da 1.6 generalizado com ganchos); telas `telas/estoque/{planejar,planejar-form,conferir-contagem,periodo,cobertura,rascunho}.tsx`; rotas `<loja>/contagens/nova`, `<loja>/contagens/<id>`, `<loja>/contagens/<id>/conferir`, `<loja>/periodo` em `/erp/estoque` e `/rodolfo/erp/<slug>/estoque`; migrations `20261020000000_erp_contagem_ciclica` e `20261020010000_erp_contagem_fotografia` |
 | Requisição (o setor pede, o estoque entrega e dá baixa) e divergências requisição × contagem (1.8) | `src/lib/erp/{requisicao-campos,requisicao}.ts` (puro / com banco); telas em `src/components/erp/telas/requisicoes/`; rotas `<loja>/requisicoes` (quadro), `/nova`, `/<id>`, `/<id>/atender`, `<loja>/divergencias`, e `requisicoes`/`divergencias` (escolher a loja) em `/erp/estoque` e `/rodolfo/erp/<slug>/estoque`; migration `20261021000000_erp_requisicao` |
 | Precificação dentro da ficha: custo por canal em camadas (loja · delivery · iFood), embalagens por canal e taxa do iFood (1.9) | `src/lib/erp/{canal-campos,canais}.ts` (puro / com banco); telas `telas/fichas/{custo-por-canal,canais,form-embalagens,form-taxa}.tsx`; rotas `fichas/<id>/canais` (embalagens) e `fichas/canais` (canais de venda e taxa) em `/erp` e `/rodolfo/erp/<slug>`; migration `20261022000000_erp_custo_por_canal` |
-| Preço e margem por canal na ficha: sugerido pela margem-alvo, preço próprio, margem bruta e líquida, farol (1.10) | `src/lib/erp/preco-campos.ts` (puro: a MESMA conta no servidor e na prévia) + `canais.ts` (`contaDosCanais`, `salvarPrecos`, `salvarMargensAlvo`, `precosDaLista`); telas `telas/fichas/{custo-por-canal,form-margens}.tsx` e `ui/dica.tsx`; sem migration |
+| Preço e margem por canal na ficha: sugerido pela margem-alvo, preço próprio, margem bruta e líquida, farol (1.10) | `src/lib/erp/preco-campos.ts` (puro: a MESMA conta no servidor e na prévia) + `canais.ts` (`contaDosCanais`, `salvarPrecos`, `salvarMargensAlvo`, `precosDaLista`); telas `telas/fichas/{custo-por-canal,form-margens}.tsx` (e a `ui/dica.tsx`, que saiu na 0.6); sem migration |
 | Onboarding (0.5): pedido de acesso (landing ou manual), quadro "Aguardando liberação" e ativação | `src/lib/erp/{pedido-textos,pedido-campos,pedidos,trava}.ts` (textos e limites / regras puras / banco / trava) + `ativarPedido` em `credenciais.ts`; landing `src/components/FormComecar.tsx` + `src/app/comecar/actions.ts`; N1 em `src/app/rodolfo/(painel)/onboarding/` (`/rodolfo/onboarding`, `/<id>`, `/novo`); migration `20261023000000_erp_onboarding` |
+| Ajuda contextual (0.6): caixas de aula por tela, botão "?" e gaveta; a preferência de cada pessoa | `src/lib/erp/{ajuda,ajuda-rota,ajuda-textos,ajuda-integridade}.ts` + `ajuda.lock.json` (registro, rota e decisão da caixa, texto, trava de versão); `src/components/erp/shell/ajuda.tsx` e `ui/link-de-ajuda.tsx`; `Shell.tsx`; gravação em `credenciais.ts` (`gravarPreferenciaDeAjuda`) e `acaoAjuda*` em `src/app/erp/actions.ts`; bloco "Dicas" em `/erp/acesso`; `npm run ajuda:lock`; migration `20261024000000_erp_preferencia_ajuda` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Navegação por áreas (UX.9): hub de 4 áreas, abas por rota, trilha com a área, ações no ⌘K; rota nova `/estoque/contagens` | `src/lib/erp/modulos.ts` (`areasConstruidas`, `abasDaArea`, `acoesDaNavegacao`, `montarTrilha`) e `src/lib/rodolfo/modulos.ts`; `src/components/erp/ui/{abas,hub}.tsx`, `telas/hub-do-parceiro.tsx`, `shell/Shell.tsx`; sem migration |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
@@ -1304,6 +1305,96 @@ Novo fornecedor; Operador sem nenhuma ação), a trilha `Início › Cadastros e
 as abas com `aria-current`, em 390/820/1440, claro e escuro; abrir `/erp/compras/nova` como Operador volta ao hub
 com o aviso.
 
+## O que a 0.6 entregou — ajuda contextual (caixas que dão aula por função, "?" sempre à mão)
+
+Migration `20261024000000_erp_preferencia_ajuda` (ADITIVA; 1 tabela, 1 função de apoio ao CHECK; nenhuma tabela
+existente muda; `migrate diff` vazio). Provada em banco novo como superusuário e como dono não-superusuário com RLS e sem
+RLS, e no `ff_dev` copiado com dado. Nenhuma tabela de tenant mudou: portão e RLS iguais.
+
+1. **O texto mora no código** (decisão 110): `src/lib/erp/ajuda-textos.ts` (só texto) + `ajuda.ts` (registro, filtro por
+   permissão, lint). Uma entrada por tela (novo e editar dividem): `chave`, `area`, `rotas` (padrão do Next, relativas à base:
+   `estoque/[lojaId]`), `titulo`, `versao`, `aula` (blocos), `secoes` (o que a gaveta mostra a mais). A chave é a ROTA
+   (decisão 111): a mesma entrada serve o `/erp` e o `/rodolfo/erp/<slug>`. São 36 entradas para 43 rotas, incluindo a única
+   rota nova da seção 9, `/estoque/contagens`, e o Cadastro do parceiro (só nível 1).
+2. **Aula por permissão** (decisão 113): `Bloco = { texto, para?: Permissao[] }`; quem tem QUALQUER uma lê. O layout entrega
+   ao shell o registro já filtrado (`ajudaParaATela(alcance)`): o operador não recebe nada sobre preço, nem na caixa nem na
+   gaveta; a dona e o gerente recebem. Perfil próprio vale pelas permissões; setor não concede.
+3. **Caixa de aula** (`CaixaDeAula`, desenhada pelo `Shell` acima da página): etiqueta "COMO FUNCIONA", título em serifa, 2 a 4
+   frases, "Entendi, não mostrar de novo" e "Ver tudo sobre esta tela". Painel claro com borda fina, nos tokens do tema;
+   sem ícone, gradiente, emoji nem borda colorida. A rota decide a entrada; a preferência vem do layout, então **o HTML do
+   servidor de quem fechou ou desligou já vem sem a caixa** (sem flash, sem diferença de hidratação). Os botões são
+   `<form action>` de server action: **sem JavaScript** a caixa vem e "não mostrar de novo" funciona; com JavaScript ela some
+   na hora. "Ver tudo" precisa de JavaScript e nasce escondido (decisão 114).
+4. **1ª vez** (decisão 115): enquanto a pessoa não respondeu, a caixa de qualquer tela traz "Quer as dicas de como usar cada
+   tela?" com "Manter as dicas" e "Desligar" (sem modal). Sem resposta = ligadas. Desligar tira só as caixas.
+5. **Botão "?" e gaveta** (decisão 120): o "?" fica no topo entre a busca e o sino, sempre (também com as dicas desligadas),
+   com `aria-label`, `aria-haspopup="dialog"` e alvo de 44 px. O atalho `?` abre a gaveta fora de campo. A gaveta
+   (`Dialogo` ganhou `lado="direita"`, `focoNoTitulo` e `voltarPara`) entra pela direita no desktop e vira folha embaixo
+   abaixo de 600 px; traz a aula, as seções, "Outras telas de {área}" (as abas que a pessoa pode abrir), a saída "Fale com a
+   FlowFoods" (WhatsApp, `AJUDA_DE_USO_ERP`) e, com as dicas desligadas, "Religar". O foco vai ao título; Esc fecha e o foco
+   volta a quem abriu (o "?" se foi o atalho); o fundo fica inerte. `LinkDeAjuda` (`ui/link-de-ajuda.tsx`) abre a gaveta já
+   na seção: é o que as telas usam no lugar da `Dica` ("Como a conta é feita", "Como abre o estoque de uma loja").
+6. **Preferência da pessoa** (decisão 112): tabela `PreferenciaErp` (1 linha por `UsuarioErp`, criada na 1ª escolha): `dicasLigadas`,
+   `escolhidaEm`, `fechadas` (`chave@versão`, no máximo 300). **Fora do tenant**, lida na mesma consulta de `validarSessao`
+   (`SessaoValida.ajuda`), gravada só por `gravarPreferenciaDeAjuda(token, mudança)` em `credenciais.ts`; `erp_tenant` sem
+   GRANT; o `prisma` do portal recusa (`MODELOS_DE_CREDENCIAL`); apagar a pessoa apaga a linha. "Seu acesso" tem o bloco
+   **Dicas**: ligar e desligar, e "Mostrar de novo as que fechei" (zera a lista).
+7. **Versão** (decisão 116): mudou a função da tela, sobe a `versao` da entrada e a caixa volta, com "Mudou", para quem
+   tinha fechado a anterior. Fechar só aceita `chave@versão` que existe no registro agora; a gravação é atômica
+   (duas abas, nenhum fechamento se perde), a versão antiga da mesma caixa sai e o 301º tira o mais velho.
+8. **Ações da própria pessoa** (decisão 119): `acaoAjudaFechar`, `acaoAjudaDicas`, `acaoAjudaReabrir`; nenhuma recebe quem é
+   a pessoa (o `usuarioId` sai da sessão, revalidada a cada gravação); campo forjado é ignorado; sem sessão ou com o JWT do
+   nível 1 nada grava; valem em parceiro suspenso (não tocam o tenant).
+9. **Nível 1** (decisão 118): dentro do parceiro tem o "?" (mesmo registro, todas as permissões), sem caixa, sem pergunta e
+   sem preferência. Telas do Barney e a lista de parceiros não têm "?".
+10. **Regra Nº 2** (decisão 117): `ui/dica.tsx` e a prop `explicacao` das telas de contar saíram; "Como a conta é feita" e
+    "Como abre o estoque de uma loja" são seções do registro; "O servidor refaz a conta ao salvar" virou "A conta é refeita na
+    hora de salvar". Ficam: dicas de campo (`aria-describedby`), `<details>` que mostram dado e subtítulos de painel.
+11. **Correções de passagem**: o seletor de visão cede espaço na barra superior estreita (a 390 px o "?" não cabia com 44 px);
+    o `Dialogo` em folha (< 600 px) ganhou `height: auto`; o texto da ajuda diz que as regras da contagem (piso, frequência,
+    tolerância) ficam em Período e contagens, não em Lojas (a análise tinha isso trocado).
+
+### A regra nova: toda subfase atualiza a ajuda
+
+Tela ou rota nova: entrada nova em `ajuda-textos.ts`, no MESMO diff (o teste reprova rota sem ajuda). Função da tela mudou:
+ajuste o texto, suba a `versao` e rode `npm run ajuda:lock` (o script se recusa a gravar texto novo com a versão velha). O modelo
+de "O que a X entregou" ganha a linha obrigatória **"Ajuda: chaves novas/alteradas"**, e o fiscal confere o diff de
+`ajuda-textos.ts` contra as telas mexidas. Texto curto, carioca, sem jargão; permissão no `para` quando o assunto é de quem só
+alguns podem ver.
+
+## Provar a ajuda (0.6)
+
+```bash
+npx vitest run tests/erp-ajuda.test.ts      # gate: rota sem ajuda, órfã, permissão, jargão, versão/lock; rota casa; filtro por permissão; caixa; HTML do servidor; guardas
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-ajuda.db.test.ts   # com banco: preferência, abas, forja, teto, sessão morta, CASCADE
+npm run ajuda:lock                          # regrava ajuda.lock.json (depois de subir a versão de uma entrada)
+```
+`erp-ajuda.test.ts` (35 testes, sem banco): toda página do `/erp` e do espelho do nível 1 tem exatamente uma entrada (remover
+uma reprova com o nome da rota; entrada órfã também); a `area` de cada entrada é a área onde a tela acende no menu; o lint
+reprova jargão, "!", emoji, `<`/`>`, markdown, bloco com mais de 320 caracteres e permissão inexistente; texto alterado
+sem subir a versão reprova (e o script do lock se recusa); o operador não recebe preço, a dona recebe; o HTML do servidor
+(o `AppShell` renderizado) não tem a caixa para quem fechou ou desligou, tem a pergunta só até a 1ª resposta, tem "Mudou" quando
+a versão sobe e não tem "?" fora do ERP; `dangerouslySetInnerHTML` não existe; `Dica` e `explicacao` não existem.
+`erp-ajuda.db.test.ts` (13 testes): pessoa nova ligada e sem resposta; manter e desligar valem em outro aparelho e não mexem na
+colega; fechar some só aquela caixa, nas duas sessões; `usuarioId` forjado é ignorado; chave forjada, gigante, de versão
+inexistente ou com SQL é recusada sem gravar; 36 fechamentos simultâneos de duas abas não perdem nenhum; teto de 300 e o CHECK do banco;
+sem cookie, token lixo, JWT do nível 1 ou sessão encerrada nada grava; a preferência vale nos dois parceiros e o parceiro
+suspenso não impede de ajustá-la; apagar a pessoa apaga a linha; o `prisma` do portal recusa a tabela. E o `erp-rls.db.test.ts`
+confere sozinho que `PreferenciaErp` não tem RLS nem GRANT para `erp_tenant`.
+
+Na tela (build de produção local, porta 3100, banco `ff_06` copiado do `ff_dev`; roteiro `prova06/jornada.mjs` no scratchpad, 74
+conferências): 1ª tela da pessoa nova com a caixa e a pergunta (sem modal) → manter (grava; a pergunta some) → fechar a caixa de
+Insumos (some em menos de 100 ms; o HTML do servidor já vem sem ela; as outras telas seguem com a delas) → "?" abre a gaveta
+(direita no desktop, folha no celular; foco no título; Esc fecha e o foco volta ao "?"; Tab não alcança nada fora dela; o
+atalho `?` abre fora de campo e não dispara dentro de campo) → dona lê sobre preço na caixa e na gaveta, operador não (e o
+link "Como a conta é feita" abre a gaveta já na seção) → desligar (nenhuma caixa em nenhuma tela, em outro aparelho também) →
+religar em Seu acesso e "Mostrar de novo as que fechei" → sem JavaScript (cookie de sessão levado a um contexto sem JS: a
+caixa e a pergunta vêm no HTML, "Manter" e "não mostrar de novo" funcionam e recarregam sem ela) → sem flash (CPU 6× e rede
+lenta, com um observador de mutação que prova o controle positivo: com a caixa aberta ele a enxerga; fechada ou desligada, zero)
+→ nível 1 dentro do parceiro (só o "?"; Barney e lista de parceiros sem "?") → axe (wcag2a/2aa) sem violação no hub com
+caixa e pergunta, em `/estoque/contagens` e com a gaveta aberta, nos dois temas; zero erro de console e de hidratação; zero
+rolagem horizontal a 390, 820 e 1440. Prints em 390/820/1440, claro e escuro, dona e operador, em `shots-0.6/`.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -1336,6 +1427,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | DRE | `PeriodoApuracao` | períodos configuráveis; contagem de fechamento aponta o período |
 | DRE | `FarolFaixa` | 5 faixas por linha do DRE × canal (nulo = rede), sobre o desvio vs meta já com o sentido da linha |
 | Onboarding (0.5, FORA do tenant) | `PedidoParceiro` / `PedidoParceiroEvento` / `TentativaPedidoParceiro` | pedido de acesso (landing ou manual) com consentimento, etapa e versão; evento só-inclusão; tentativas do formulário público. Sem `parceiroId`: o vínculo com o parceiro criado é `parceiroCriadoId` |
+| Ajuda (0.6, FORA do tenant) | `PreferenciaErp` | o que a pessoa escolheu sobre as caixas de ajuda: dicas ligadas, resposta da 1ª vez, caixas fechadas (`chave@versão`, no máximo 300). Por `UsuarioErp`, sem `parceiroId`, lida com a sessão |
 | Auditoria | `HistoricoAlteracao` | antes/depois de todo corte, ajuste ou alteração sensível |
 
 ### Unidades inteiras
@@ -1404,6 +1496,8 @@ custo médio sai da divisão (em `unidades.ts`). Nada acumulado é gravado
 - **Origem.** `origem` MANUAL/IMPORTACAO/INTEGRACAO onde dado pode vir de fora.
 - **Servidor decide.** O formulário manda texto; a conversão e o custo por
   unidade são calculados no servidor. A prévia na tela é só prévia.
+- **Ajuda (0.6).** Toda rota do ERP tem entrada em `ajuda-textos.ts` e texto mudado sobe a `versao`
+  (`tests/erp-ajuda.test.ts` reprova). Ver "A regra nova: toda subfase atualiza a ajuda".
 
 ## Ver funcionando (local, nunca produção)
 
@@ -1909,3 +2003,24 @@ banco de teste: o operador é recusado pelo servidor.
   área (`item.area`) quando ela difere do módulo.
 - **O Operador vê custo de insumo** porque `insumos.ver` é "Ver insumos e custos" (catálogo de permissões da
   0.4): tirar é regra de permissão, fora da UX.9.
+
+## Herança da 0.6 (para as próximas subfases)
+
+- **Toda subfase atualiza a ajuda**: rota nova = entrada nova; função mudada = texto e `versao` (e `npm run ajuda:lock`). A linha
+  "Ajuda: chaves novas/alteradas" é obrigatória no "O que a X entregou". Módulo futuro (DRE 2.1, Produção 3.1, Etiquetas 3.4) entra
+  como área nova: o tipo `AreaDaAjuda` e o teste de área precisam acompanhar.
+- Texto que cita preço ou margem leva `para: ['precos.ver']`; o que é de quem lança leva a permissão da ação. O primeiro bloco da
+  aula é sempre para todos (o teste cobra).
+- Uma aula por tela: estado que muda o texto (contagem cíclica × fechamento) vai num bloco que diz o caso, não numa variante.
+- **Login sem JavaScript dá 500** (herança da 0.3, achada na prova): `/entrar` tem `<meta name="referrer" content="no-referrer">`,
+  então o navegador manda `Origin: null` no POST do formulário e o Next recusa a server action. Com JavaScript funciona. A caixa da
+  ajuda funciona sem JavaScript depois de entrar (a prova leva o cookie de sessão a um contexto sem JS).
+- Outra aba só vê a mudança de preferência ao recarregar (o layout não refaz a cada navegação): fechar de novo é idempotente e
+  nenhum fechamento se perde (provado com banco), mas a caixa fechada em outra aba continua na aba velha até ela recarregar.
+- "Ver tudo sobre esta tela" e o link "Como a conta é feita" precisam de JavaScript (a gaveta é um diálogo nativo aberto por
+  script); sem ele o "?" também não abre. O resto da caixa não depende dele.
+- Fora do escopo, anotado: tour guiado, vídeo e imagem na ajuda, busca dentro da ajuda (o ⌘K não acha ajuda), ajuda nas telas do
+  Barney, em `/entrar` e na landing, edição do texto pela tela, métricas de leitura, ajuda por setor, tradução, preferência própria
+  do nível 1.
+- O hub do nível 1 (`/rodolfo/erp/<slug>`) usa o mesmo texto do hub do parceiro ("Áreas da Rede"); a lista de parceiros
+  (`/rodolfo/erp`) e o quadro de onboarding não têm ajuda.
