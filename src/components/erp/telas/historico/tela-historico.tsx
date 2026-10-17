@@ -20,6 +20,8 @@ export const FILTROS: { valor: string; rotulo: string; entidades?: string[] }[] 
   { valor: 'FichaTecnica', rotulo: 'Fichas técnicas', entidades: ['FichaTecnica', 'CanalConfig'] },
   // 1.5: notas de compra e fornecedores.
   { valor: 'NotaEntrada', rotulo: 'Compras', entidades: ['NotaEntrada', 'Fornecedor'] },
+  // 3.1: os lotes de produção (o custo deles só para quem tem "ver insumos e custos").
+  { valor: 'OrdemProducao', rotulo: 'Produção' },
   // 2.1: faturamento por canal e dia (só para quem tem "ver faturamento").
   { valor: 'FaturamentoLancamento', rotulo: 'Faturamento' },
   // 2.2a: despesas, linhas do plano e a regra do período (só para quem tem "ver DRE").

@@ -266,6 +266,7 @@ export async function gravarMovimentos(
       notaId: m.notaId ?? null,
       contagemItemId: m.contagemItemId ?? null,
       requisicaoItemId: m.requisicaoItemId ?? null,
+      ordemProducaoId: m.ordemProducaoId ?? null,
       estornoDeId: m.estornoDeId ?? null,
     })),
   });
@@ -997,6 +998,8 @@ export interface MovimentoDaTela {
   notaId: string | null;
   /** 1.8: a requisição que gerou a baixa (link no livro). */
   requisicaoId: string | null;
+  /** 3.1: o lote que entrou no estoque (link no livro). */
+  ordemProducaoId: string | null;
   ocorridoEm: Date;
 }
 
@@ -1014,6 +1017,7 @@ export const SELECAO_DO_MOVIMENTO = {
   estornoDeId: true,
   notaId: true,
   ocorridoEm: true,
+  ordemProducaoId: true,
   requisicaoItem: { select: { requisicaoId: true } },
 } as const;
 
@@ -1031,6 +1035,7 @@ export function movimentoParaTela(m: {
   estornoDeId: string | null;
   notaId: string | null;
   ocorridoEm: Date;
+  ordemProducaoId?: string | null;
   requisicaoItem?: { requisicaoId: string } | null;
 }): MovimentoDaTela {
   return {
@@ -1047,6 +1052,7 @@ export function movimentoParaTela(m: {
     estorno: !!m.estornoDeId,
     notaId: m.notaId,
     requisicaoId: m.requisicaoItem?.requisicaoId ?? null,
+    ordemProducaoId: m.ordemProducaoId ?? null,
     ocorridoEm: m.ocorridoEm,
   };
 }
