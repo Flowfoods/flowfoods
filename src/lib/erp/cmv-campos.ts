@@ -266,6 +266,28 @@ export function cmvDoEscopo(cmv: CmvDoDre, escopo: { tipo: 'rede' } | { tipo: 'l
   return { centavos, fonte, nota: nota.slice(0, LIMITE_DA_NOTA), semTexto, compra: { centavos: compraSoma, nota: compraNota }, real: { centavos: realSoma, nota: realNota } };
 }
 
+// ================================================================ o selo da linha CMV
+
+export interface SeloDoCmv {
+  tom: 'ok' | 'alerta' | 'neutro' | 'erro';
+  /** A palavra do selo: completo (real) × parcial × só compras × misto × ausente. */
+  texto: string;
+}
+
+/**
+ * O selo da linha CMV, lido da nota que `cmvDoEscopo` escreveu (a fotografia guarda só a nota, então ao vivo e fechado
+ * mostram o mesmo selo): CMV real é completo; parcial e misto pedem atenção; ausente é erro (resultado sem o maior custo).
+ */
+export function seloDoCmv(l: { valorCentavos: number | null; nota: string | null }): SeloDoCmv {
+  const nota = l.nota ?? '';
+  if (nota.startsWith('não apurado')) return { tom: 'neutro', texto: 'Não apurado' };
+  if (l.valorCentavos === null) return { tom: 'erro', texto: 'Sem CMV' };
+  if (nota.startsWith('misto')) return { tom: 'alerta', texto: 'CMV misto' };
+  if (nota.startsWith('real')) return { tom: nota.includes('sem o CMV de') ? 'alerta' : 'ok', texto: nota.includes('sem o CMV de') ? 'Real, incompleto' : 'CMV real' };
+  if (nota.includes('parcial')) return { tom: 'alerta', texto: 'CMV parcial' };
+  return { tom: 'neutro', texto: nota.includes('sem o CMV de') ? 'Compras, incompleto' : 'CMV pelas compras' };
+}
+
 // ================================================================ compra × real
 
 export interface ComparacaoDaLoja {
@@ -283,8 +305,18 @@ export interface ComparacaoDaLoja {
   /** Compra lançada menos entrada no livro: o que já estava na contagem de abertura. */
   notasNaAberturaCentavos: number;
   frase: string;
+  /** O que fazer com a diferença ("e agora?"); nulo quando o estoque ficou igual. */
+  eAgora: string | null;
+  inicialDe: 'fechamento' | 'abertura';
   semPrecoInicial: number | null;
   semPrecoFinal: number | null;
+}
+
+/** O "e agora?" do painel: o próximo passo para quem lê a diferença. */
+export function eAgoraDaComparacao(c: { inicialCentavos: number; finalCentavos: number }): string | null {
+  if (c.finalCentavos > c.inicialCentavos) return 'Confira se comprou mais do que vendeu no mês.';
+  if (c.finalCentavos < c.inicialCentavos) return 'O estoque está baixando: confira a próxima compra.';
+  return null;
 }
 
 /** "o estoque subiu R$ 1.850,00 (de R$ 11.700,00 para R$ 13.550,00): …" e, se houver, as notas que já estavam na contagem. */
@@ -302,9 +334,12 @@ export function fraseDaComparacao(c: { inicialCentavos: number; finalCentavos: n
 
 // ================================================================ o estoque sem preço
 
-/** "estoque sem o valor de 3 insumos sem preço" · "contagem anterior ao registro" · nulo = nada a avisar. */
-export function fraseDoSemPreco(n: number | null, qual: 'inicial' | 'final'): string | null {
-  if (n === null) return `estoque ${qual}: número de insumos sem preço não registrado`;
+/**
+ * O aviso dos insumos sem preço de um estoque: "estoque final sem o valor de 3 insumos sem preço"; zero não avisa; nulo
+ * é a contagem de antes do registro e diz que a casa não sabe quantos eram.
+ */
+export function fraseDoSemPreco(n: number | null, qual: 'inicial' | 'final', inicialDe: 'abertura' | 'fechamento' = 'fechamento'): string | null {
+  if (n === null) return qual === 'final' ? 'não sabemos quantos insumos estavam sem preço no fechamento' : inicialDe === 'abertura' ? 'não sabemos quantos insumos estavam sem preço na abertura' : 'não sabemos quantos insumos estavam sem preço no fechamento anterior';
   if (n === 0) return null;
   return `estoque ${qual} sem o valor de ${n === 1 ? '1 insumo sem preço' : `${n} insumos sem preço`}`;
 }

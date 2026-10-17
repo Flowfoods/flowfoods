@@ -9,6 +9,7 @@
  */
 
 import Link from 'next/link';
+import { Fragment } from 'react';
 import { fraseDoSemPreco, type ComparacaoDaLoja } from '@/lib/erp/cmv-campos';
 import { textoDaDiferenca, type PainelDoCmv } from '@/lib/erp/cmv-comparacao';
 import { formatarDinheiro } from '@/lib/erp/unidades';
@@ -17,13 +18,16 @@ import { Painel } from '../../ui/superficies';
 
 const dinheiro = (c: number | null) => (c === null ? <span className="font-normal text-suave">sem nota</span> : formatarDinheiro(c));
 
-function Avisos({ c }: { c: ComparacaoDaLoja }) {
-  const itens = [fraseDoSemPreco(c.semPrecoInicial, 'inicial'), fraseDoSemPreco(c.semPrecoFinal, 'final')].filter((x): x is string => !!x);
+/** A explicação de uma loja: o que a diferença quer dizer, o que fazer e os insumos sem preço. */
+function Explicacao({ c }: { c: ComparacaoDaLoja }) {
+  const sem = [fraseDoSemPreco(c.semPrecoInicial, 'inicial', c.inicialDe), fraseDoSemPreco(c.semPrecoFinal, 'final')].filter((x): x is string => !!x);
+  const maiuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
   return (
-    <>
-      <p className="mt-1 text-[12px] leading-snug text-suave">{c.frase.charAt(0).toUpperCase() + c.frase.slice(1)}.</p>
-      {itens.length > 0 && <p className="mt-0.5 text-[12px] leading-snug text-suave">{itens.join('; ').replace(/^./, (x) => x.toUpperCase())}.</p>}
-    </>
+    <div className="space-y-0.5 text-[12px] leading-snug text-suave">
+      <p>{maiuscula(c.frase)}.</p>
+      {c.eAgora && <p className="font-medium text-texto">{c.eAgora}</p>}
+      {sem.length > 0 && <p>{maiuscula(sem.join('; '))}.</p>}
+    </div>
   );
 }
 
@@ -49,15 +53,17 @@ export function PainelDoCmv({
     >
       {comparacoes.length > 0 && (
         <>
-          <ul className="divide-y divide-linha sm:hidden">
+          <ul className="divide-y divide-linha lg:hidden">
             {comparacoes.map((c) => (
               <li key={c.lojaId} className="px-4 py-3">
                 <p className="font-medium text-texto">{c.lojaNome}</p>
                 <p className="mt-1 text-[13px] tabular-nums text-texto">
                   Compra {c.compraCentavos === null ? 'sem nota' : formatarDinheiro(c.compraCentavos)} · Real {formatarDinheiro(c.realCentavos)}
                 </p>
-                <p className="text-[13px] font-semibold tabular-nums text-texto">Diferença {textoDaDiferenca(c.diferencaCentavos, c.diferencaBp)}</p>
-                <Avisos c={c} />
+                <p className="text-[13px] font-semibold tabular-nums text-texto">Diferença (real − compra): {textoDaDiferenca(c.diferencaCentavos, c.diferencaBp)}</p>
+                <div className="mt-1.5">
+                  <Explicacao c={c} />
+                </div>
               </li>
             ))}
             {total && (
@@ -66,12 +72,12 @@ export function PainelDoCmv({
                 <p className="mt-1 text-[13px] tabular-nums text-texto">
                   Compra {total.compraCentavos === null ? 'sem nota' : formatarDinheiro(total.compraCentavos)} · Real {formatarDinheiro(total.realCentavos)}
                 </p>
-                <p className="text-[13px] font-semibold tabular-nums text-texto">Diferença {textoDaDiferenca(total.diferencaCentavos, total.diferencaBp)}</p>
+                <p className="text-[13px] font-semibold tabular-nums text-texto">Diferença (real − compra): {textoDaDiferenca(total.diferencaCentavos, total.diferencaBp)}</p>
               </li>
             )}
           </ul>
-          <div className="hidden overflow-x-auto sm:block">
-            <table className="w-full min-w-[620px] text-sm">
+          <div className="hidden lg:block">
+            <table className="w-full text-sm">
               <caption className="sr-only">CMV de compra e real por loja, com a diferença e o estoque inicial e final</caption>
               <thead>
                 <tr className="bg-forte text-left text-[12px] text-suave">
@@ -85,27 +91,33 @@ export function PainelDoCmv({
                     Real
                   </th>
                   <th scope="col" className="h-10 px-3 text-right font-semibold">
-                    Real menos compra
+                    Diferença (real − compra)
                   </th>
                   <th scope="col" className="h-10 px-5 text-right font-semibold">
-                    Estoque inicial e final
+                    Estoque inicial → final
                   </th>
                 </tr>
               </thead>
               <tbody className="tabular-nums">
                 {comparacoes.map((c) => (
-                  <tr key={c.lojaId} className="border-t border-linha align-top">
-                    <th scope="row" className="min-w-0 px-5 py-2 text-left font-medium">
-                      {c.lojaNome}
-                      <Avisos c={c} />
-                    </th>
-                    <td className="px-3 py-2 text-right">{dinheiro(c.compraCentavos)}</td>
-                    <td className="px-3 py-2 text-right font-semibold">{formatarDinheiro(c.realCentavos)}</td>
-                    <td className="whitespace-nowrap px-3 py-2 text-right">{textoDaDiferenca(c.diferencaCentavos, c.diferencaBp)}</td>
-                    <td className="whitespace-nowrap px-5 py-2 text-right">
-                      {formatarDinheiro(c.inicialCentavos)} → {formatarDinheiro(c.finalCentavos)}
-                    </td>
-                  </tr>
+                  <Fragment key={c.lojaId}>
+                    <tr className="border-t border-linha align-top">
+                      <th scope="row" className="min-w-0 px-5 pb-1 pt-2.5 text-left font-medium">
+                        {c.lojaNome}
+                      </th>
+                      <td className="px-3 pb-1 pt-2.5 text-right">{dinheiro(c.compraCentavos)}</td>
+                      <td className="px-3 pb-1 pt-2.5 text-right font-semibold">{formatarDinheiro(c.realCentavos)}</td>
+                      <td className="whitespace-nowrap px-3 pb-1 pt-2.5 text-right">{textoDaDiferenca(c.diferencaCentavos, c.diferencaBp)}</td>
+                      <td className="whitespace-nowrap px-5 pb-1 pt-2.5 text-right">
+                        {formatarDinheiro(c.inicialCentavos)} → {formatarDinheiro(c.finalCentavos)}
+                      </td>
+                    </tr>
+                    <tr>
+                      <td colSpan={5} className="px-5 pb-3">
+                        <Explicacao c={c} />
+                      </td>
+                    </tr>
+                  </Fragment>
                 ))}
               </tbody>
               {total && (

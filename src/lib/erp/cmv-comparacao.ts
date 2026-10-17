@@ -6,7 +6,7 @@
  */
 
 import { percentualDaReceita, textoDosPontos } from './dre-campos';
-import { fraseDaComparacao, type CmvDoDre, type ComparacaoDaLoja } from './cmv-campos';
+import { eAgoraDaComparacao, fraseDaComparacao, type CmvDoDre, type ComparacaoDaLoja } from './cmv-campos';
 import { formatarDinheiro } from './unidades';
 
 /** A comparação compra × real das lojas que têm o real apurado. */
@@ -28,6 +28,8 @@ export function compararCmv(cmv: CmvDoDre, receitaDaLoja: (lojaId: string) => nu
       finalCentavos: l.real.finalCentavos,
       notasNaAberturaCentavos: notasNaAbertura,
       frase: fraseDaComparacao({ inicialCentavos: l.real.inicialCentavos, finalCentavos: l.real.finalCentavos, notasNaAberturaCentavos: notasNaAbertura }),
+      eAgora: eAgoraDaComparacao({ inicialCentavos: l.real.inicialCentavos, finalCentavos: l.real.finalCentavos }),
+      inicialDe: l.real.inicialDe,
       semPrecoInicial: l.real.semPrecoInicial,
       semPrecoFinal: l.real.semPrecoFinal,
     });
@@ -36,7 +38,7 @@ export function compararCmv(cmv: CmvDoDre, receitaDaLoja: (lojaId: string) => nu
 }
 
 /** Soma de várias lojas na mesma conta (a linha da rede do painel). */
-export function somarComparacoes(cs: readonly ComparacaoDaLoja[], receitaCentavos: number): Omit<ComparacaoDaLoja, 'lojaId' | 'lojaNome' | 'semPrecoInicial' | 'semPrecoFinal'> {
+export function somarComparacoes(cs: readonly ComparacaoDaLoja[], receitaCentavos: number): Omit<ComparacaoDaLoja, 'lojaId' | 'lojaNome' | 'semPrecoInicial' | 'semPrecoFinal' | 'inicialDe'> {
   const soma = (f: (c: ComparacaoDaLoja) => number) => cs.reduce((s, c) => s + f(c), 0);
   const compra = soma((c) => c.compraCentavos ?? 0);
   const real = soma((c) => c.realCentavos);
@@ -52,6 +54,7 @@ export function somarComparacoes(cs: readonly ComparacaoDaLoja[], receitaCentavo
     finalCentavos: final,
     notasNaAberturaCentavos: notas,
     frase: fraseDaComparacao({ inicialCentavos: inicial, finalCentavos: final, notasNaAberturaCentavos: notas }),
+    eAgora: eAgoraDaComparacao({ inicialCentavos: inicial, finalCentavos: final }),
   };
 }
 

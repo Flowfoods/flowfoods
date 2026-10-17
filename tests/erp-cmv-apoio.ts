@@ -67,7 +67,7 @@ export const abertura = (cliente: ClienteDoParceiro, lojaId: string, quando: Dat
   });
 
 /** O fechamento de estoque do período, aplicado em `quando`, com o retrato e (se pedido) um ajuste do próprio fechamento. */
-export const fechamentoDeEstoque = (cliente: ClienteDoParceiro, insumoId: string, lojaId: string, periodoId: string, p: { fim: string; quando: Date; retrato: number; proprioAjuste?: number; semPreco?: number | null }) =>
+export const fechamentoDeEstoque = (cliente: ClienteDoParceiro, insumoId: string, lojaId: string, periodoId: string, p: { fim: string; quando: Date; retrato: number; proprioAjuste?: number; semPreco?: number | null; contados?: readonly string[] }) =>
   cliente.transacao(async (tx) => {
     const c = await tx.contagem.create({ data: { parceiroId: tx.parceiroId, lojaId, periodoId, tipo: 'FECHAMENTO', status: 'ABERTA', referenciaEm: dia(p.fim), iniciadaPorNome: 'Marina', titulo: 'Fechamento' } });
     if (p.proprioAjuste) {

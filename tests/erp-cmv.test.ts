@@ -12,6 +12,8 @@ import {
   cmvLidoDaFotografia,
   cmvParaGravar,
   cmvReal,
+  eAgoraDaComparacao,
+  seloDoCmv,
   estoqueFinalDoPeriodo,
   fraseDaComparacao,
   fraseDoSemPreco,
@@ -286,7 +288,8 @@ describe('2.3 · estoque sem preço e a fotografia', () => {
     expect(fraseDoSemPreco(3, 'final')).toBe('estoque final sem o valor de 3 insumos sem preço');
     expect(fraseDoSemPreco(1, 'inicial')).toBe('estoque inicial sem o valor de 1 insumo sem preço');
     expect(fraseDoSemPreco(0, 'final')).toBeNull();
-    expect(fraseDoSemPreco(null, 'final')).toMatch(/não registrado/);
+    expect(fraseDoSemPreco(null, 'final')).toBe('não sabemos quantos insumos estavam sem preço no fechamento');
+    expect(fraseDoSemPreco(null, 'inicial', 'abertura')).toBe('não sabemos quantos insumos estavam sem preço na abertura');
   });
 
   it('o CMV vai e volta da fotografia sem perder nada; lixo vira "sem CMV", nunca um número inventado', () => {
@@ -346,5 +349,23 @@ describe('2.3 · o CMV é SUBTRAÍDO na margem de contribuição e segue para os
     const soma = ['vp', 'dl', 'ct'].reduce((t, id) => t + linha(montarDre({ escopo: { tipo: 'loja', lojaId: id, nome: id }, plano, receitas, taxaIfood: null, despesas: [], cmv }), 'resultado-do-periodo').valorCentavos!, 0);
     expect(soma).toBe(linha(rede, 'resultado-do-periodo').valorCentavos);
     expect(soma).toBe(R(160_000 - 27_950));
+  });
+});
+
+describe('2.3 · o selo do CMV e o "e agora?"', () => {
+  const e = (nota: string | null, valor: number | null) => seloDoCmv({ valorCentavos: valor, nota });
+  it('completo (real) × parcial × só compras × misto × ausente: cada um com a sua palavra e o seu tom', () => {
+    expect(e('real (contagem)', 1)).toEqual({ tom: 'ok', texto: 'CMV real' });
+    expect(e('pelas compras · parcial', 1)).toEqual({ tom: 'alerta', texto: 'CMV parcial' });
+    expect(e('pelas compras: falta o fechamento de estoque de outubro de 2026', 1)).toEqual({ tom: 'neutro', texto: 'CMV pelas compras' });
+    expect(e('misto: real em A; pelas compras em B; sem o CMV de C', 1)).toEqual({ tom: 'alerta', texto: 'CMV misto' });
+    expect(e('real (contagem); sem o CMV de Centro', 1)).toEqual({ tom: 'alerta', texto: 'Real, incompleto' });
+    expect(e('sem nota de compra no período', null)).toEqual({ tom: 'erro', texto: 'Sem CMV' });
+    expect(e('não apurado neste fechamento (fechado antes do CMV)', null)).toEqual({ tom: 'neutro', texto: 'Não apurado' });
+  });
+  it('estoque que sobe: conferir se comprou mais do que vendeu; que desce: conferir a próxima compra; igual: nada', () => {
+    expect(eAgoraDaComparacao({ inicialCentavos: R(11_700), finalCentavos: R(13_550) })).toBe('Confira se comprou mais do que vendeu no mês.');
+    expect(eAgoraDaComparacao({ inicialCentavos: R(5_000), finalCentavos: R(4_000) })).toBe('O estoque está baixando: confira a próxima compra.');
+    expect(eAgoraDaComparacao({ inicialCentavos: R(5_000), finalCentavos: R(5_000) })).toBeNull();
   });
 });
