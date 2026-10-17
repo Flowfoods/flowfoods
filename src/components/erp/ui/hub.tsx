@@ -71,12 +71,12 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
         <span className="mt-0.5 block text-[13px] leading-snug text-suave [text-wrap:pretty]">{c.subtitulo}</span>
       </span>
       <div className="relative z-10 mt-4 w-full border-t border-linha pt-2">
-        <ul aria-label={`Abas de ${c.nome}`} className="-mx-1.5 flex flex-wrap items-center text-[13px] text-suave">
+        <ul aria-label={`Abas de ${c.nome}`} className="flex flex-wrap items-center gap-x-4 text-[13px] text-suave">
           {c.abas.map((a) => (
-            <li key={a.href} className="flex items-center [&:not(:last-child)]:after:content-['·']">
+            <li key={a.href} className="flex items-center">
               <Link
                 href={a.href}
-                className="ff-transicao inline-flex min-h-9 items-center rounded-[5px] px-1.5 hover:text-texto hover:underline hover:underline-offset-4 [@media(pointer:coarse)]:min-h-11"
+                className="ff-transicao inline-flex min-h-8 items-center rounded-[5px] hover:text-texto hover:underline hover:underline-offset-4 [@media(pointer:coarse)]:min-h-11"
               >
                 {a.rotulo}
               </Link>
