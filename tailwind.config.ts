@@ -56,7 +56,7 @@ const config: Config = {
         'acao-hover': token('acao-hover', '214 26 39'),
         acento: token('acento', '234 29 44'),
         assinatura: token('marca', '242 50 63'),
-        erro: token('erro', '242 50 63'),
+        erro: token('erro', '245 66 77'),
         ok: token('ok', '74 222 128'),
         atencao: token('atencao', '245 158 11'),
         // Farol (2.4): cor SÓ no glifo e na palavra do indicador, nunca em borda de card nem em fundo de linha.

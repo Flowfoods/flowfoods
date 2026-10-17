@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -1789,6 +1789,68 @@ da base da conta no HTML, também por `?rede=1` e pela URL de outra loja); o ope
 estoque diz os insumos sem preço. Axe (wcag2a/2aa) sem violação nos dois temas, zero erro de console, zero rolagem horizontal a 390, 820 e 1440. Prints em
 `shots-2.3/`. Scanner `avoid-ai-design`: 0 P0 e 0 P1 (P2 de "meta strings com ponto médio", o padrão da casa).
 
+## O que a 2.4 entregou — farol por canal, em 5 faixas
+
+Quarta da Prioridade 002. **Nenhuma migration** (`DreMeta` já guarda a meta de crescimento, `entrada` da fotografia é Json, `versaoDaConta` já aceita 3, `FarolFaixa` fica vazia e sem uso; `migrate diff` vazio).
+Decisões 172 a 181. Permissões: o catálogo não ganhou nada (`dre.ver`); `VERSAO_DO_ERP` = fase 2.4.
+
+**Como "por canal em todas as linhas com meta" foi interpretado, e por quê (desvio consciente da letra do plano; o Maestro registra na seção 8 do Notion).** Só é por canal o número que NASCE no canal: a receita de cada canal
+(Loja, Delivery próprio, iFood) tem farol, contra uma meta de crescimento sobre o ano passado. CMV e despesa têm farol só no total (rede ou loja), nunca rateados pela receita. Ratear daria ao iFood o mesmo CMV % do salão por
+construção (três faróis iguais parecem três diagnósticos e são um só), e a margem do iFood sairia pior só pela taxa, escondendo embalagem e motoboy: o dono decidiria em cima de conta inventada. Cor é afirmação, e sem número é hipótese
+(decisão 172). CMV por canal de verdade só com venda por prato × ficha por canal (CMV teórico, fora).
+
+1. **As 5 faixas** (173), `farol-campos.ts`: `FAIXAS_DO_FAROL` v1, fixas e congeladas, iguais para todo parceiro, em pontos percentuais absolutos. `faixaDoDesvio(sentido, desvioBp, escala)`; `s` é o desvio já com o sentido (positivo = melhor).
+   | Faixa | Custo, margem, resultado (pp da receita) | Receita (pp de crescimento) | Palavra |
+   |---|---|---|---|
+   | Azul | s ≥ +3,0 | s ≥ +5,0 | bem melhor que a meta (+ "confira se está tudo lançado" em linha de custo) |
+   | Verde | s ≥ −0,5 | s ≥ −1,0 | na meta |
+   | Amarelo | s ≥ −1,5 | s ≥ −3,0 | um pouco pior |
+   | Laranja | s ≥ −3,0 | s ≥ −6,0 | pior que a meta |
+   | Vermelho | abaixo | abaixo | muito pior que a meta |
+   A palavra substitui a da 2.2b ("melhor/pior que a meta", "na meta" de menos de 5 pontos-base). Os testes da 2.2b que conferiam a palavra foram atualizados.
+2. **Meta de crescimento da receita** (175): as 4 linhas de receita (total e os 3 canais) aceitam UMA meta, de 0 a 100,00 %, de crescimento sobre o mesmo período do ano passado (0 = igualar). `tipoDaMeta(chave)` = `crescimento` | `percentual`; a mesma coluna do `DreMeta`, `canal` nulo.
+   O realizado é a variação do canal (pontos-base, `dividirExato`), só com cobertura completa dos dois lados; meta em R$ = ano passado × (1 + meta). Recusa por `lerMetaDigitada`: 100,01, negativo, notação científica, letra; as duas linhas de detalhe do CMV seguem sem meta.
+   A tela "Plano e metas" ganhou o campo nas linhas de receita, com a explicação, e o Histórico escreve "crescimento sobre o ano passado".
+3. **Sem cor quando o dado não fecha** (176), `farol-dre-campos.ts` (pura, a mesma regra no ao vivo e no fechado): sem comparação (sem faturamento, sem valor, sem lançamento, ano passado incompleto ou zero); falta lançamento de faturamento no escopo (nenhuma linha daquele
+   escopo tem cor, só o desvio em texto); "sem contar o CMV de X"; despesa que repete todo mês sem lançar (a linha, o grupo e os resultados abaixo, não o que não depende dela: o falso azul); período fechado antes do farol (receita "não apurada neste fechamento").
+   O CMV pelas compras, parcial ou misto, tem cor e o selo da fonte ao lado. A despesa recorrente em falta agora leva `linhaId` e `grupo` (`RecorrenteEmFalta` e a ressalva do fechamento).
+4. **Acessibilidade e marca** (177): régua de 5 casas (5 quadrados de 8 px, a casa da faixa cheia; azul à esquerda, vermelho à direita, a posição diz a faixa em escala de cinza), palavra, desvio e `aria-label` com "faixa N de 5". Tokens `--ff-farol-{azul,verde,amarelo,laranja,vermelho}`
+   no `tokens.css` (três blocos de tema) e no Tailwind (`text-farol-*`), dessaturados, com contraste ≥ 4,5:1 sobre `painel`, `fundo` e a linha de resultado nos dois temas (testado lendo o próprio CSS; no escuro o vermelho é #F5424D, e o `erro` do shell subiu para o mesmo tom: o selo "Sem CMV" dava 4,42:1 sobre a linha de grupo). A cor só mora em `text-farol-*` e no glifo (`farol.tsx`);
+   teste-guarda por grep em `src/` contra `border-`, `bg-`, `ring-`, `divide-`, `from-`, `to-`, `fill-`… com `farol-`.
+5. **Onde aparece** (178), nenhuma rota nova: (a) coluna "Farol" na tabela do DRE, depois de Desvio, e a régua + palavra + desvio sob o nome da linha no celular; (b) painel no topo da página do DRE, no kit Bento da Kairu (lido pelo MCP, `library:design-mosaico-bento`; entram a
+   estrutura modular, o equivalente em texto da meta e "N lojas incluídas"; a paleta tonal do kit não entra, a marca manda): "Faróis do período" (as 5 faixas, quantas linhas em cada, as laranja e vermelhas como âncora para a linha, as sem cor com o motivo) e um bloco por canal que o escopo vende
+   (receita, % da receita, pedidos, ticket médio, ano passado, variação, meta de crescimento e farol), com a frase única "compra e despesa são da loja, não do canal". "Meta em R$" aparece a partir de 1280 px para a coluna do farol caber. Fora do hub, do ⌘K, de alerta e de WhatsApp.
+6. **Fechado** (179): a fotografia grava `versaoDaConta = 3`, `entrada.anoPassado` (por loja: os dias com lançamento e o total de cada canal), `entrada.farol = { versao: 1 }`, os pedidos em `entrada.receitas` e a meta de crescimento no `metaBp` das linhas de receita. O fechado lê a faixa, a variação e o ano passado SÓ dela
+   (`lerCanaisDaFotografia` extrai do JSON só as lojas do alcance de quem lê). Editar o faturamento de um período antigo depois não muda o fechado. v1 e v2: o farol de custo sai das linhas gravadas com as faixas v1; a receita diz "não apurado neste fechamento (fechado antes do farol)" e nunca se recalcula;
+   o painel "Receita contra o ano passado" da 2.2b segue lendo ao vivo nesses (herança). Reabrir (só o nível 1) e fechar de novo gera a v3.
+7. **Vazamento** (180): sem `dre.ver` nada de farol (tela, menu, ⌘K, HTML, Histórico e o texto da ajuda: os blocos do farol são `para: ['dre.ver']`); o gerente de uma loja só recebe o escopo dele, também por `?rede=1` e `?loja=<outra>`, ao vivo e no fechado; a contagem de faixas da rede só conta linhas da rede.
+8. **Herança do fiscal pós-deploy da 2.3** (181): a página do período (`/erp/dre/periodos/<data>`) diz "CMV: não apurado neste fechamento (fechado antes do CMV)" no resumo de uma fotografia v1 (e não "sem contar o CMV"), e "Ver o DRE desta versão" mostra a mesma frase na linha do CMV das versões antigas.
+9. **Fora desta subfase**: rateio de CMV e despesa por canal, CMV teórico, `Despesa.canal` no formulário (motoboy e cartão por canal), meta em R$, por loja ou negativa, faixas por parceiro (`FarolFaixa`), alerta, sino, WhatsApp, hub, farol no "Por loja", receita com marca.
+
+**Ajuda: chaves novas/alteradas.** Nenhuma nova (nenhuma rota nova). Alteradas, com `ajuda.lock.json` regravado: `dre` v5 para v6 (a seção "O farol: 5 faixas" e o desvio sem a palavra antiga), `dre-plano` v3 para v4 (a meta de crescimento da receita), `dre-periodo` v2 para v3 (a fotografia guarda o ano passado e as faixas).
+
+## Provar o farol (2.4)
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run   # duas vezes seguidas
+npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+Os arquivos de banco que a 2.4 mexe (`erp-farol.db`, `erp-farol-telas.db`, `erp-dre.db`, `erp-dre-telas.db`, `erp-dre-fechamento.db`, `erp-dre-fechamento-telas.db`, `erp-cmv.db`, `erp-cmv-telas.db`) também rodam num banco com dono NÃO-superusuário (com e sem RLS), em sequência (`--no-file-parallelism`).
+`tests/erp-farol.test.ts` (sem banco, 55): os critérios 1 a 9 (as bordas das duas escalas, o retrato congelado de `FAIXAS_DO_FAROL`, CMV 31,20 % contra 30 % = "+1,2 pp" amarelo, Pessoal 22 % contra 25,5 % = azul com "confira", Resultado 6,9 % contra 10 % vermelho na rede e sem farol na loja,
+iFood −18 % / Loja +4 % / Delivery −5 % = vermelho / verde / laranja, ano passado "12 de 15 dias" ou zero, "sem contar o CMV", faturamento faltando, taxas do iFood só no total, o falso azul), a leitura da meta de crescimento, o ano passado guardado (ida e volta, só as lojas pedidas, igual à leitura ao vivo), o painel por canal,
+o contraste das 5 cores nos três blocos de tema, e a ajuda sem farol para quem não tem `dre.ver`. `tests/erp-farol-tela.test.ts` (8): régua + palavra + `aria-label`, o teste-guarda de cor só no indicador, e a página do período com a fotografia v1 e a v2 (o item 8). `tests/erp-farol.db.test.ts` (14): a Penha com as 5 faixas ao mesmo tempo, a rede, outubro sem cor por faturamento faltando,
+a recorrente que falta e a que se lança, fechar (v3, o ano passado e a versão das faixas gravados, o fechado igual ao ao vivo, editar o ano passado e a meta depois não muda, reabrir e fechar de novo), o gerente, o operador, quem só vê o Histórico, o nível 1, e o fechado antigo (v2); sem a leitura do ano passado pela fotografia o teste do "editar o ano passado depois" cai (verificado com a mutação). `tests/erp-farol-telas.db.test.ts` (5): a página de verdade, o HTML de cada pessoa.
+
+Na tela (build de produção local, porta 3100, banco `ff_24` copiado do `ff_dev`; roteiro `prova24/jornada.mjs` no scratchpad, 89 conferências): a dona abre "Plano e metas" e vê o campo de crescimento nas 4 linhas de receita; 100,01 % e −5 são recusados sem gravar, 8 % no iFood e 0 no Delivery gravam e valem
+de 01/10; setembro com despesa recorrente em falta mostra Utilidades sem cor e o motivo escrito, e depois de "Lançar as do mês passado" a cor volta; a rede em setembro mostra as 5 faixas (régua de 5 casas com uma cheia, palavra, desvio), o painel "Faróis do período" com as contagens e as âncoras, os 3 blocos de canal (pedidos,
+ticket, ano passado, variação, meta de crescimento, farol), a margem e os resultados da rede sem cor por "sem contar o CMV de Vila da Penha · Delivery", o CMV pelas compras com cor e o selo da fonte; a loja não compara o resultado com a meta da rede; outubro (um dia de iFood faltando) não tem nenhuma cor e diz por quê;
+fechar setembro grava a fotografia v3 e o fechado mostra exatamente os mesmos faróis do ao vivo; mexer no ano passado depois não muda o fechado; agosto (v2) diz "não apurado neste fechamento (fechado antes do farol)" na receita e mantém a faixa de custo; julho (v1) e junho (v1 substituída pela v2) dizem "não apurado neste fechamento (fechado antes do CMV)"
+na página do período e em "Ver o DRE desta versão". O gerente da Penha (390 px) só vê a loja dele, também por `?rede=1` e `?loja=<Delivery>` (o HTML não leva a outra loja nem o ano passado da rede); o operador e Hugo (`historico.ver` sem `dre.ver`) não veem farol no HTML, no menu, no ⌘K nem no Histórico; o nível 1 vê o mesmo da dona.
+O contraste das 5 cores foi medido no navegador nos dois temas (palavra ≥ 4,5:1, glifo ≥ 3:1), axe (wcag2a/2aa) sem violação nos dois temas, zero erro de console, zero rolagem horizontal a 360, 390, 820, 1280 e 1440. Prints em `shots-2.4/`. Scanner `avoid-ai-design`: 0 P0 e 0 P1 (P2 de "meta strings com ponto médio", o padrão da casa).
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -2542,4 +2604,17 @@ banco de teste: o operador é recusado pelo servidor.
 - **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) material de limpeza ou descartável lançado como nota infla o CMV; quer um tipo de insumo próprio (fora do
   CMV) ou prefere seguir com a regra "lance como despesa"? (2) Valentin's: as duas unidades dividem estoque? Sem transferência entre lojas, o real por loja
   distorce (quem manda perde, quem recebe sobra); o da rede continua certo.
+- **Frases do desvio quando falta CMV de alguma loja (deixadas pela 2.3, a 2.4 só tirou a cor)**: a rede soma o CMV só das lojas que o têm, então o % do CMV e o desvio dele parecem melhores do que são. A 2.4 tira a cor de margem e resultados nesse caso, mas o desvio do próprio CMV ainda aparece
+  sem uma frase de "desvio otimista: falta o CMV de X"; e falta a frase positiva espelho, "já com o CMV de A e B", dizendo quais lojas ENTRAM na conta (hoje só se diz quais saem).
+- **Tempo da consulta do corte em produção**: acompanhar a duração da consulta de `cmvDasLojas` (o corte do estoque final) com o livro real; se passar de alguns segundos, rodar `ANALYZE` nas tabelas do livro e do estoque e, com milhões de movimentos por loja, a migration aditiva do índice `(parceiroId, lojaId, ocorridoEm)`.
 
+## Herança da 2.4 (para a 2.5 e as próximas)
+
+- **O farol é UM**: `faixaDoDesvio` (`farol-campos.ts`) para a faixa e `farolDoDre` (`farol-dre-campos.ts`) para "vira cor ou não". Qualquer tela que pinte uma meta (a 2.5, o orçamento ao vivo) parte deles; as faixas v1 são congeladas, e mudar um limite é a v2 (e a fotografia guarda a versão: `entrada.farol.versao`).
+- **A 2.5 (orçamento) recebe**: `faixaDoDesvio` com a escala de custo para pintar o orçamento ao vivo; a meta vigente do `cmv` (`metasDoPeriodo`); o desvio do CMV pelas compras no período em curso; e a regra "sem cor quando faltar faturamento" (um orçamento sobre receita incompleta mente igual).
+- **Meta de receita é de crescimento**: `tipoDaMeta(chave)`; `ComparacaoComMeta` ganhou `tipo`, `variacaoBp` e `faixa` (a palavra da 2.2b saiu). Meta por canal em `DreMeta.canal`, em R$ e por loja continuam fora; se um dia entrarem, são aditivas.
+- **Fotografia**: a v3 é o que o fechamento grava. `gravarFotografia` mantém o padrão 2 para os apoios de teste (`criarPeriodoFechadoDeTeste`): quem gravar fotografia na mão e quiser farol passa `versaoDaConta: 3` e `entrada.anoPassado`. A leitura do ano passado e dos pedidos é `lerCanaisDaFotografia` (só as lojas do alcance).
+- **v1 e v2 e o painel do ano passado**: nos períodos fechados antes do farol o painel "Receita contra o ano passado" da 2.2b ainda lê o faturamento do ano passado ao vivo (herança da 2.2b); só o farol e o painel por canal não o recalculam. Uma limpeza própria pode trocar isso por "não apurado".
+- **Ajuda sem vazar**: bloco de ajuda que descreve dado de uma permissão leva `para: [...]`; o layout entrega o registro filtrado ao shell inteiro, então um texto sem `para` chega a quem não pode ver a tela.
+- **`Despesa.canal` e as linhas "Entregas e motoboy" e "Taxas de cartão"** continuam sem canal: quando entrarem no formulário, motoboy e cartão por canal (de verdade, não rateados) ganham farol por canal sem rateio.
+- **Em aberto para o Rodolfo (decisão de negócio, não bloqueia)**: (1) o gerente de uma loja vê o farol de Pessoal da loja dele (herança dos salários, 2.2a); (2) os limites das 5 faixas (3,0 / 0,5 / 1,5 / 3,0 pontos; 5 / 1 / 3 / 6 na receita) são hipótese a validar com o Valentin's; (3) meta de crescimento de 0 a 100 % cobre o cliente ativo, mas uma casa que cai de propósito (fechar um canal) precisa de meta negativa: quer?
