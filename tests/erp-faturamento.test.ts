@@ -3,6 +3,7 @@
  * datas, chaves, planilha (inclusive malícia), leitura única do grão,
  * calendário e faltas, ticket médio, histórico.
  */
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   canaisEmFalta,
@@ -21,7 +22,7 @@ import {
   ticketMedio,
   totalizar,
 } from '@/lib/erp/faturamento-campos';
-import { CABECALHO_DO_MODELO, ecoDaCelula, interpretarLinha, lerCanalDaPlanilha, lerPlanilhaDeFaturamento, normalizarNome, type LojaParaPlanilha } from '@/lib/erp/faturamento-planilha';
+import { CABECALHO_DO_MODELO, decodificarPlanilha, ecoDaCelula, interpretarLinha, lerCanalDaPlanilha, lerPlanilhaDeFaturamento, normalizarNome, type LojaParaPlanilha } from '@/lib/erp/faturamento-planilha';
 import { descreverMudancas, alvoDaLinha } from '@/lib/erp/historico';
 
 const HOJE = '2026-10-17';
@@ -203,6 +204,16 @@ describe('2.1 · planilha', () => {
     const virgula = lerPlanilhaDeFaturamento('Data,Loja,Canal,"Faturamento (R$)",Pedidos\n14/10/2026,Vila,ifood,"3.210,00",41');
     expect(virgula.linhas[0]).toMatchObject({ faturamento: '3.210,00', pedidos: '41' });
     expect(lerPlanilhaDeFaturamento('﻿data;loja;canal;faturamento;pedidos\n1;2;3;4;5').linhas).toHaveLength(1);
+  });
+
+  it('o modelo para baixar (public/modelos/faturamento.csv) é lido sem erro e tem o cabeçalho do código', () => {
+    const texto = decodificarPlanilha(new Uint8Array(readFileSync('public/modelos/faturamento.csv')));
+    expect(texto.split(/\r?\n/)[0]).toBe(CABECALHO_DO_MODELO);
+    const r = lerPlanilhaDeFaturamento(texto);
+    expect(r.erros).toEqual([]);
+    expect(r.linhas).toHaveLength(4);
+    const loja: LojaParaPlanilha = { id: 'l1', nome: 'Minha Loja', ativa: true, canais: ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] };
+    for (const l of r.linhas) expect(interpretarLinha(l, [loja], '2026-10-17'), `linha ${l.linha}`).toMatchObject({ ok: true });
   });
 
   it('cabeçalho sem coluna obrigatória, vazio, linhas demais e colunas demais param o arquivo', () => {

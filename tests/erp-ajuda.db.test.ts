@@ -185,10 +185,10 @@ describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', 
   it('usuarioId forjado no formulário é ignorado: só a pessoa da sessão muda', async () => {
     como(ana.token);
     const antesDaBia = await linhas(bia.s.usuario.id);
-    await acaoAjudaFechar(form({ caixa: 'lojas@1', usuarioId: bia.s.usuario.id, usuario: bia.s.usuario.id, id: bia.s.usuario.id }));
+    await acaoAjudaFechar(form({ caixa: 'lojas@2', usuarioId: bia.s.usuario.id, usuario: bia.s.usuario.id, id: bia.s.usuario.id }));
     await acaoAjudaDicas(form({ dicas: 'desligar', usuarioId: bia.s.usuario.id }));
     expect(await linhas(bia.s.usuario.id)).toEqual(antesDaBia);
-    expect((await ver(ana.token)).fechadas).toContain('lojas@1');
+    expect((await ver(ana.token)).fechadas).toContain('lojas@2');
     expect((await ver(ana.token)).dicasLigadas).toBe(false);
     // volta ao normal
     await acaoAjudaDicas(form({ dicas: 'ligar' }));
@@ -301,7 +301,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', 
   it('apagar a pessoa apaga a preferência (ON DELETE CASCADE)', async () => {
     const x = await pessoa(A, 'cascata');
     como(x.token);
-    await acaoAjudaFechar(form({ caixa: 'lojas@1' }));
+    await acaoAjudaFechar(form({ caixa: 'lojas@2' }));
     expect(await linhas(x.s.usuario.id)).toHaveLength(1);
     await db.$executeRawUnsafe(`DELETE FROM "SessaoErp" WHERE "usuarioId" = $1`, x.s.usuario.id);
     await db.$executeRawUnsafe(`DELETE FROM "ConviteAcesso" WHERE "usuarioId" = $1`, x.s.usuario.id);
