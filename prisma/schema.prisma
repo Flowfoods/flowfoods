@@ -536,7 +536,8 @@ enum ParceiroStatus {
 }
 
 // Como o parceiro fecha o período do DRE (2.2). Os períodos em si ficam em
-// PeriodoApuracao; isto só diz como sugerir o próximo.
+// PeriodoApuracao e a regra, versionada, em RegraDoPeriodo. PERSONALIZADO é
+// legado: não tem tela e a regra nova nunca o aceita.
 enum PeriodoTipo {
   MENSAL
   QUINZENAL
@@ -550,8 +551,10 @@ model ParceiroFlow {
   slug             String         @unique
   status           ParceiroStatus @default(RASCUNHO)
   criadoEm         DateTime       @default(now())
+  // 2.2a: SEM USO. A regra do período mora em `RegraDoPeriodo` (a migration copiou
+  // estes dois valores para a primeira linha). As colunas ficam só porque migration
+  // aditiva não apaga coluna; nada as lê nem as grava.
   periodoTipo      PeriodoTipo    @default(MENSAL)
-  // Dia do mês em que o período começa (1 = mês civil). CHECK 1..28.
   periodoDiaInicio Int            @default(1)
 
   // Relações de tenant: nunca acessadas pelo prisma cru (RELACOES_DE_TENANT).
@@ -584,6 +587,7 @@ model ParceiroFlow {
   erpDreMetas            DreMeta[]
   erpDespesas            Despesa[]
   erpPeriodosApuracao    PeriodoApuracao[]
+  erpRegrasDoPeriodo     RegraDoPeriodo[]
   erpFarolFaixas         FarolFaixa[]
   erpHistoricoAlteracoes HistoricoAlteracao[]
 
@@ -1480,6 +1484,11 @@ enum DreGrupo {
   MARKETING
   FINANCEIRA
   OUTRAS
+  // 2.2a: água, luz, gás e internet têm grupo próprio; RESULTADO são as linhas
+  // calculadas de subtotal e de resultado (receita líquida, margem de
+  // contribuição, resultado operacional e do período, mais o subtotal de cada grupo).
+  UTILIDADES
+  RESULTADO
 }
 
 enum DreSentido {
@@ -1502,6 +1511,11 @@ model DreLinha {
   sentido    DreSentido   @default(MENOR_MELHOR)
   ativa      Boolean      @default(true)
   criadoEm   DateTime     @default(now())
+  // 2.2a: código estável do plano padrão (`aluguel`, `grupo:PESSOAL`): é por ele
+  // que o plano se completa sozinho e que a linha renomeada continua sendo a
+  // mesma. Linha criada pela casa não tem código. Calculada sempre tem (CHECK).
+  codigo     String?
+  atualizadoEm DateTime    @default(now()) @updatedAt
 
   metas       DreMeta[]
   despesas    Despesa[]
@@ -1509,6 +1523,7 @@ model DreLinha {
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, nome])
+  @@unique([parceiroId, codigo])
 }
 
 // Meta % por linha (sobre o faturamento), por parceiro, com vigência: mudar a
@@ -1552,12 +1567,30 @@ model Despesa {
   chaveIdempotencia String?
   criadoEm          DateTime     @default(now())
   atualizadoEm      DateTime     @updatedAt
+  // 2.2a: a competência é um intervalo (dia, mês inteiro ou até 366 dias):
+  // `competencia` é o primeiro dia e `competenciaFim` o último (nulo = um dia só,
+  // como as linhas anteriores à 2.2a). O DRE apropria o valor dia a dia.
+  competenciaFim    DateTime?    @db.Date
+  // Repete todo mês (só vale para competência de mês inteiro): "Lançar as do mês
+  // passado" parte daqui. A filha aponta a de origem (`repeteDeId`), única: a
+  // mesma não se lança duas vezes.
+  recorrente        Boolean      @default(false)
+  repeteDeId        String?
+  // NoAction (não Restrict): a limpeza administrativa apaga a de origem e a filha no mesmo DELETE.
+  repeteDe          Despesa?     @relation("DespesaRepetida", fields: [parceiroId, repeteDeId], references: [parceiroId, id], onDelete: NoAction)
+  repetidaPor       Despesa?     @relation("DespesaRepetida")
+  // Contas a pagar mínimas: quando vence e quando foi paga. Não mudam o DRE.
+  vencimento        DateTime?    @db.Date
+  pagaEm            DateTime?    @db.Date
+  atualizadoPorNome String       @default("")
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, chaveIdempotencia])
+  @@unique([parceiroId, repeteDeId])
   @@index([parceiroId, competencia])
   @@index([parceiroId, lojaId, competencia])
   @@index([parceiroId, linhaId, competencia])
+  @@index([parceiroId, vencimento])
 }
 
 enum PeriodoStatus {
@@ -1566,6 +1599,8 @@ enum PeriodoStatus {
 }
 
 // Período de apuração do DRE/CMV (datas inclusivas). Fechado = números travados.
+// 2.2a: períodos nunca se sobrepõem (gatilho `PeriodoApuracao_sem_sobreposicao`,
+// só no SQL) e só nascem por `registrarPeriodo` (periodos.ts), sob a trava.
 model PeriodoApuracao {
   id         String        @id @default(cuid())
   parceiroId String
@@ -1581,6 +1616,28 @@ model PeriodoApuracao {
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, inicio, fim])
+}
+
+// A regra do período do parceiro, versionada (2.2a, decisão 144): mensal,
+// quinzenal ou semanal, com o dia em que começa. É a ÚNICA fonte do período do
+// DRE e da contagem. Só se inclui (o gatilho recusa UPDATE; só a regra futura
+// pendente se apaga, para ser substituída): mudar a regra nunca reescreve o
+// passado, vale do dia seguinte ao fim do período atual. Sem nenhuma linha, vale
+// o padrão do código (mensal, dia 1). A primeira linha de cada parceiro foi
+// copiada de `ParceiroFlow.periodoTipo/periodoDiaInicio`, que deixaram de ser lidos.
+model RegraDoPeriodo {
+  id             String       @id @default(cuid())
+  parceiroId     String
+  parceiro       ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  vigenteDesde   DateTime     @db.Date
+  tipo           PeriodoTipo
+  // Mensal e quinzenal: dia do mês (1 a 28). Semanal: dia da semana (1 = segunda … 7 = domingo).
+  diaInicio      Int
+  criadoPorNome  String       @default("")
+  criadoEm       DateTime     @default(now())
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, vigenteDesde])
 }
 
 enum FarolCor {
