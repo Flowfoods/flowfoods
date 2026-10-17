@@ -37,6 +37,7 @@ export const MODELOS_DE_TENANT = [
   'dreMeta',
   'despesa',
   'periodoApuracao',
+  'regraDoPeriodo',
   'farolFaixa',
   'historicoAlteracao',
 ] as const;
@@ -78,6 +79,7 @@ export const RELACOES_DE_TENANT = [
   'erpDreMetas',
   'erpDespesas',
   'erpPeriodosApuracao',
+  'erpRegrasDoPeriodo',
   'erpFarolFaixas',
   'erpHistoricoAlteracoes',
 ] as const;

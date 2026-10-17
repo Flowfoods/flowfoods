@@ -12,7 +12,7 @@ export default async function ParceiroPeriodoDaLojaPage({ params, searchParams }
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'estoque.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/estoque`;
-  const s = await situacaoDoPeriodo(ctx.cliente, ctx.alcance, params.lojaId, ctx.parceiro);
+  const s = await situacaoDoPeriodo(ctx.cliente, ctx.alcance, params.lojaId);
   if (!s) notFound();
   if (!s.aberto) redirect(`${base}/${s.loja.id}`);
   return (

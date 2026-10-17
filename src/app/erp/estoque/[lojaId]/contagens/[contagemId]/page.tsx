@@ -18,7 +18,7 @@ const BASE = '/erp/estoque';
 export default async function ErpContagemDoDiaPage({ params, searchParams }: { params: { lojaId: string; contagemId: string }; searchParams: { feito?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'estoque.contar');
-  const c = await obterContagem(ctx.cliente, ctx.alcance, params.lojaId, params.contagemId, ctx.parceiro);
+  const c = await obterContagem(ctx.cliente, ctx.alcance, params.lojaId, params.contagemId);
   if (!c || c.contagem.tipo === 'ABERTURA') notFound();
   const lojaId = c.loja.id;
   if (!pode(ctx.alcance, 'estoque.contar', { lojaId }) || ctx.bloqueio || c.contagem.status !== 'ABERTA') redirect(`${BASE}/${lojaId}/contagens/${c.contagem.id}/conferir`);

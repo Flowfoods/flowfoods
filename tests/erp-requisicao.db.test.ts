@@ -43,7 +43,7 @@ import { cadastrarFornecedor, lancarNota } from '@/lib/erp/compras';
 import { cadastrarFicha } from '@/lib/erp/fichas';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura, obterEstoqueDaLoja } from '@/lib/erp/estoque';
-import { concluirContagem, contarNaContagem, iniciarCiclo, obterContagem, type ConfigDoPeriodo } from '@/lib/erp/contagem';
+import { concluirContagem, contarNaContagem, iniciarCiclo, obterContagem } from '@/lib/erp/contagem';
 import {
   atenderRequisicao,
   cancelarRequisicao,
@@ -75,7 +75,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
   const hoje = hojeNoRio();
   const diaDaSemana = ((new Date(`${hoje}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
   // Semana do parceiro termina hoje: o período de agora começou há 6 dias (a abertura, há 10, fica antes).
-  const CFG: ConfigDoPeriodo = { periodoTipo: 'SEMANAL', periodoDiaInicio: (diaDaSemana % 7) + 1 };
+  const CFG = { tipo: 'SEMANAL' as const, diaInicio: (diaDaSemana % 7) + 1 };
 
   const alcanceDe = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR' | null, lojaIds: string[] | 'rede', proprio: Permissao[] | null = null): Alcance =>
     resolverAlcance({ perfilBase, perfilProprio: proprio, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojaIds === 'rede', lojaIds: lojaIds === 'rede' ? [] : lojaIds });
@@ -110,7 +110,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     const c = await iniciarCiclo(a, GERENTE(), ids.vp, { insumoIds: [insumoId], titulo: '' }, 'Gil Gerente');
     expect(c.ok).toBe(true);
     const cid = (c as { id: string }).id;
-    const item = (await obterContagem(a, GERENTE(), ids.vp, cid, CFG))!.itens[0];
+    const item = (await obterContagem(a, GERENTE(), ids.vp, cid))!.itens[0];
     const r = await contarNaContagem(a, OPERADOR(), ids.vp, cid, { itemId: item.id, embalagens: '', solto: numero, escala: 'base', versao: item.versao }, 'Caio');
     expect(r.ok).toBe(true);
     return { cid, r };
@@ -121,9 +121,12 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     if (!['localhost', '127.0.0.1'].includes(host)) throw new Error('ERP_DB_TESTE precisa ser local.');
     db = new PrismaClient({ datasources: { db: { url: URL_TESTE } } });
     perfil = await perfilDoBanco(db);
-    A = await db.parceiroFlow.create({ data: { nome: 'Requisição A', slug: `requisicao-a-${sufixo}`, status: 'ATIVO', periodoTipo: CFG.periodoTipo, periodoDiaInicio: CFG.periodoDiaInicio } });
-    B = await db.parceiroFlow.create({ data: { nome: 'Requisição B', slug: `requisicao-b-${sufixo}`, status: 'ATIVO' } });
+    A = await db.parceiroFlow.create({ data: { nome: 'Requisição A', slug: `requisicao-a-${sufixo}`, status: 'ATIVO' } });
+    // 2.2a: a regra do período vive em RegraDoPeriodo (a semana do parceiro termina HOJE).
     a = doParceiro(A.id, db);
+    // Pelo portão (como o app): com FORCE RLS, escrever pelo cliente cru em tabela de tenant falha.
+    await a.regraDoPeriodo.create({ data: { parceiroId: A.id, vigenteDesde: new Date('2020-01-01T00:00:00Z'), tipo: CFG.tipo, diaInicio: CFG.diaInicio, criadoPorNome: 'teste' } });
+    B = await db.parceiroFlow.create({ data: { nome: 'Requisição B', slug: `requisicao-b-${sufixo}`, status: 'ATIVO' } });
     b = doParceiro(B.id, db);
     for (const [chave, nome] of [['vp', 'Vila da Penha'], ['delivery', 'Delivery']] as const) {
       const r = await cadastrarLoja(a, { nome }, 'Marina');
@@ -227,7 +230,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     expect(await a.movimentoEstoque.count({ where: { tipo: 'REQUISICAO' } })).toBe(0);
     // Quadro: quem pede vê; divergências, não.
     expect(await quadroDeRequisicoes(a, COZINHA(), ids.vp)).not.toBeNull();
-    expect(await divergenciasDaLoja(a, OPERADOR(), ids.vp, {}, CFG)).toBeNull();
+    expect(await divergenciasDaLoja(a, OPERADOR(), ids.vp, {})).toBeNull();
   });
 
   it('o estoquista entrega parcial (2 kg de cheddar, 600 g de bacon): REQUISICAO com valor exato, saldo antes › depois, atendida em parte', async () => {
@@ -332,7 +335,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     expect(v.status).toBe('ABERTA');
     const [x, y] = await Promise.all([
       entregar(GERENTE(), ids.r5, { 'Cheddar fatiado': '1' }),
-      concluirContagem(a, GERENTE(), ids.vp, c2.cid, { versao: v.versao, confirmarNaoContados: false }, CFG, 'Gil'),
+      concluirContagem(a, GERENTE(), ids.vp, c2.cid, { versao: v.versao, confirmarNaoContados: false }, 'Gil'),
     ]);
     expect(x.ok && y.ok).toBe(true);
     // 8 kg − 500 g (contagem) − 1 kg (requisição) = 6,5 kg, em qualquer ordem.
@@ -391,13 +394,13 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     const { cid } = await contarCiclo(ids.bacon, '1,8');
     const c = (await a.contagem.findUnique({ where: { id: cid } }))!;
     expect(c.status).toBe('ABERTA'); // R$ 21,00 passa da tolerância: não fecha sozinha
-    expect((await concluirContagem(a, GERENTE(), ids.vp, cid, { versao: c.versao, confirmarNaoContados: false }, CFG, 'Gil')).ok).toBe(true);
+    expect((await concluirContagem(a, GERENTE(), ids.vp, cid, { versao: c.versao, confirmarNaoContados: false }, 'Gil')).ok).toBe(true);
     // Cheddar: dois pequenos dentro da tolerância (200 g = R$ 3,80 cada) — fecham sozinhos.
     for (const n of ['6,3', '6,1']) {
       const p = await contarCiclo(ids.cheddar, n);
       expect(p.r.ok && 'fechouSozinha' in p.r && p.r.fechouSozinha).toBe(true);
     }
-    const d = (await divergenciasDaLoja(a, GERENTE(), ids.vp, {}, CFG))!;
+    const d = (await divergenciasDaLoja(a, GERENTE(), ids.vp, {}))!;
     expect(d.aberto).toBe(true);
     if (!d.aberto) return;
     const bacon = d.linhas.find((l) => l.nome === 'Bacon')!;
@@ -416,12 +419,12 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     expect(d.semContagem.map((s) => [s.nome, s.quantidade])).toEqual([['Pão brioche', 30_000]]);
     // É leitura: nada foi gravado pelo relatório.
     const antes = await a.movimentoEstoque.count();
-    await divergenciasDaLoja(a, DONA(), ids.vp, {}, CFG);
+    await divergenciasDaLoja(a, DONA(), ids.vp, {});
     expect(await a.movimentoEstoque.count()).toBe(antes);
     expect(await razaoCoerente()).toEqual({ divergentes: 0, quebrados: 0 });
     // Gerente de outra loja e parceiro B não veem.
-    expect(await divergenciasDaLoja(a, GERENTE_DELIVERY(), ids.vp, {}, CFG)).toBeNull();
-    expect(await divergenciasDaLoja(b, DONA(), ids.vp, {}, CFG)).toBeNull();
+    expect(await divergenciasDaLoja(a, GERENTE_DELIVERY(), ids.vp, {})).toBeNull();
+    expect(await divergenciasDaLoja(b, DONA(), ids.vp, {})).toBeNull();
   });
 
   it('herança a da 1.8: duas entregas do MESMO insumo em requisições diferentes, juntas, não pulam a confirmação do negativo', async () => {

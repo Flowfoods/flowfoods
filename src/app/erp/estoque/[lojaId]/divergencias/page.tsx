@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function ErpDivergenciasDaLojaPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { de?: string; ate?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'estoque.ajustar');
-  const d = await divergenciasDaLoja(ctx.cliente, ctx.alcance, params.lojaId, searchParams, ctx.parceiro);
+  const d = await divergenciasDaLoja(ctx.cliente, ctx.alcance, params.lojaId, searchParams);
   if (!d) notFound();
   return <TelaDivergencias d={d} base="/erp/estoque" />;
 }

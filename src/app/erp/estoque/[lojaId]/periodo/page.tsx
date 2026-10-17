@@ -17,7 +17,7 @@ const BASE = '/erp/estoque';
 export default async function ErpPeriodoDaLojaPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { feito?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'estoque.ver');
-  const s = await situacaoDoPeriodo(ctx.cliente, ctx.alcance, params.lojaId, ctx.parceiro);
+  const s = await situacaoDoPeriodo(ctx.cliente, ctx.alcance, params.lojaId);
   if (!s) notFound();
   if (!s.aberto) redirect(`${BASE}/${s.loja.id}`);
   const lojaId = s.loja.id;

@@ -13,7 +13,7 @@ const ORDEM_DE_LIMPEZA = [
   'HistoricoAlteracao', 'Etiqueta', 'MovimentoEstoque', 'SaldoEstoque', 'ContagemItem', 'Contagem',
   'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
   'ProdutoCanal', 'ProdutoVenda', 'FichaItem', 'FichaTecnica', 'InsumoVariante', 'FaturamentoLancamento',
-  'Despesa', 'DreMeta', 'FarolFaixa', 'DreLinha', 'PeriodoApuracao', 'CanalConfig', 'Insumo', 'Fornecedor',
+  'Despesa', 'DreMeta', 'FarolFaixa', 'DreLinha', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'Fornecedor',
   'Colaborador', 'Marca', 'Loja',
 ];
 

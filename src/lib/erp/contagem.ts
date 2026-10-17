@@ -58,8 +58,6 @@ import {
   fraseAbaixoDoPiso,
   janelaDoFechamento,
   lerRegras,
-  periodoAnterior,
-  periodoDaData,
   prazoDoCiclo,
   regrasDaLoja,
   situacaoDoItem,
@@ -69,12 +67,12 @@ import {
   type Cobertura,
   type Divergencia,
   type EstadoDaContagem,
-  type Periodo,
   type Quais,
   type RegrasDaContagem,
   type SituacaoDoItem,
-  type TipoDePeriodo,
 } from './contagem-campos';
+import type { Periodo } from './periodo-campos';
+import { periodoAnteriorDe, periodoDe, registrarPeriodo } from './periodos';
 import { CONSERVACOES, type Conservacao } from './validade';
 import { formatarDinheiro, type Fracao, type Unidade } from './unidades';
 
@@ -82,12 +80,6 @@ const ID = /^[a-z0-9]{1,64}$/i;
 const motivoLimpo = (t: unknown) => (typeof t === 'string' ? t.trim().replace(/\s+/g, ' ').slice(0, 200) || null : null);
 const DATA_HORA = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 const quando = (d: Date) => DATA_HORA.format(d).replace(',', ' às');
-
-/** Como o parceiro fecha o período (do `ParceiroFlow` do contexto). */
-export interface ConfigDoPeriodo {
-  periodoTipo: TipoDePeriodo;
-  periodoDiaInicio: number;
-}
 
 /** Até quantos insumos num ciclo (uma contagem cabe numa ida à câmara). */
 export const TETO_DO_CICLO = 500;
@@ -125,24 +117,6 @@ async function travarLoja(tx: ClienteDoParceiro, lojaId: string) {
 
 /** Início de um dia do Rio (UTC−3) como instante. */
 const inicioDoDia = (iso: string) => new Date(`${iso}T03:00:00.000Z`);
-
-/**
- * O período de agora (e o registro dele em `PeriodoApuracao`, se já existe).
- * PERSONALIZADO usa o cadastrado que contém a data; sem cadastro, o mês civil
- * (e a frase diz isso).
- */
-export async function periodoDe(tx: ClienteDoParceiro, cfg: ConfigDoPeriodo, data: string): Promise<{ periodo: Periodo; aviso: string | null }> {
-  if (cfg.periodoTipo === 'PERSONALIZADO') {
-    const p = await tx.periodoApuracao.findFirst({
-      where: { inicio: { lte: new Date(`${data}T00:00:00.000Z`) }, fim: { gte: new Date(`${data}T00:00:00.000Z`) } },
-      orderBy: { inicio: 'desc' },
-      select: { inicio: true, fim: true, nome: true },
-    });
-    if (p) return { periodo: { inicio: p.inicio.toISOString().slice(0, 10), fim: p.fim.toISOString().slice(0, 10), nome: p.nome }, aviso: null };
-    return { periodo: periodoDaData({ tipo: 'MENSAL', diaInicio: 1 }, data), aviso: 'Período personalizado sem cadastro para hoje: vale o mês civil.' };
-  }
-  return { periodo: periodoDaData({ tipo: cfg.periodoTipo, diaInicio: cfg.periodoDiaInicio }, data), aviso: null };
-}
 
 /** Contagens APLICADAS (abertura, cíclica, fechamento) por insumo na loja: a última data de cada um, ou só as do intervalo. */
 async function contadosAplicados(tx: ClienteDoParceiro, lojaId: string, intervalo?: { de: Date; ate: Date }): Promise<Map<string, Date>> {
@@ -444,7 +418,7 @@ export async function iniciarCiclo(
 // ================================================================ contar
 
 /** Uma contagem da loja para contar e ver (abertura, cíclica ou fechamento). */
-export async function obterContagem(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, contagemId: string, cfg: ConfigDoPeriodo, agora = new Date()) {
+export async function obterContagem(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, contagemId: string, agora = new Date()) {
   const r = await comRecusa(() =>
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'estoque.ver');
@@ -455,7 +429,7 @@ export async function obterContagem(cliente: ClienteDoParceiro, alcance: Alcance
       const resumo = resumoDaContagem(itens);
       const estado = estadoDaContagem(c, resumo.naoContados, agora);
       // Fechamento: os de maior valor que levam ao piso vêm marcados.
-      const paraOPiso = c.tipo === 'FECHAMENTO' && c.status === 'ABERTA' ? (await coberturaDaLoja(tx, lojaId, cfg, agora, c.id, c.periodo ?? undefined)).cobertura.paraOPiso : [];
+      const paraOPiso = c.tipo === 'FECHAMENTO' && c.status === 'ABERTA' ? (await coberturaDaLoja(tx, lojaId, agora, c.id, c.periodo ?? undefined)).cobertura.paraOPiso : [];
       return { loja, contagem: c, estado, itens, resumo, paraOPiso };
     }),
   );
@@ -583,7 +557,7 @@ export interface LinhaDaDivergencia {
 }
 
 /** A conferência de uma contagem cíclica ou de fechamento (quem vê: `estoque.ver`). */
-export async function conferenciaDaContagem(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, contagemId: string, cfg: ConfigDoPeriodo, agora = new Date()) {
+export async function conferenciaDaContagem(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, contagemId: string, agora = new Date()) {
   const r = await comRecusa(() =>
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'estoque.ver');
@@ -629,7 +603,7 @@ export async function conferenciaDaContagem(cliente: ClienteDoParceiro, alcance:
       const soma = somaDasDivergencias(linhas.map((l) => l.div));
       const acimaDoTeto = linhas.map((l) => valorAcimaDoTeto(l.item.nome, l.valorContadoCentavos)).filter((x): x is string => !!x);
       const estado = estadoDaContagem(c, resumo.naoContados, agora);
-      const cobertura = c.tipo === 'FECHAMENTO' ? await coberturaDaLoja(tx, lojaId, cfg, agora, c.status === 'ABERTA' ? c.id : undefined, c.periodo ?? undefined) : null;
+      const cobertura = c.tipo === 'FECHAMENTO' ? await coberturaDaLoja(tx, lojaId, agora, c.status === 'ABERTA' ? c.id : undefined, c.periodo ?? undefined) : null;
       return { loja, contagem: c, estado, regras, linhas, resumo, soma, acimaDoTeto, cobertura };
     }),
   );
@@ -740,7 +714,6 @@ export async function concluirContagem(
   lojaId: string,
   contagemId: string,
   entrada: { versao: unknown; confirmarNaoContados: unknown },
-  cfg: ConfigDoPeriodo,
   autorNome = 'Sistema',
   agora = new Date(),
 ): Promise<ResultadoEstoque> {
@@ -782,7 +755,7 @@ export async function concluirContagem(
           const p = c.periodoId ? await tx.periodoApuracao.findUnique({ where: { id: c.periodoId }, select: { id: true, nome: true, inicio: true, fim: true, status: true } }) : null;
           if (!p) throw new Recusa({ ok: false, erros: { geral: 'O período deste fechamento não foi encontrado.' } });
           if (p.status === 'FECHADO') throw new Recusa({ ok: false, erros: { geral: `O período ${p.nome} já foi fechado no DRE: o estoque dele não muda mais.` } });
-          const { cobertura, regras } = await coberturaDaLoja(tx, lojaId, cfg, agora, c.id, p);
+          const { cobertura, regras } = await coberturaDaLoja(tx, lojaId, agora, c.id, p);
           if (!cobertura.atinge) throw new Recusa({ ok: false, erros: { geral: fraseAbaixoDoPiso(cobertura, regras) } });
         }
         await aplicar(tx, loja, c, itens, 'APLICADA', autorNome, agora);
@@ -836,15 +809,14 @@ export async function descartarContagem(cliente: ClienteDoParceiro, alcance: Alc
 async function coberturaDaLoja(
   tx: ClienteDoParceiro,
   lojaId: string,
-  cfg: ConfigDoPeriodo,
   agora: Date,
   fechamentoId?: string,
   periodoFixo?: { nome: string; inicio: Date; fim: Date },
-): Promise<{ periodo: Periodo; aviso: string | null; cobertura: Cobertura; regras: RegrasDaContagem; contadosNoPeriodo: Map<string, Date>; valores: Map<string, number | null>; nomes: Map<string, { nome: string; unidade: Unidade; conservacao: Conservacao }> }> {
+): Promise<{ periodo: Periodo; cobertura: Cobertura; regras: RegrasDaContagem; contadosNoPeriodo: Map<string, Date>; valores: Map<string, number | null>; nomes: Map<string, { nome: string; unidade: Unidade; conservacao: Conservacao }> }> {
   const regras = await regrasDe(tx, lojaId);
-  const { periodo, aviso } = periodoFixo
-    ? { periodo: { inicio: periodoFixo.inicio.toISOString().slice(0, 10), fim: periodoFixo.fim.toISOString().slice(0, 10), nome: periodoFixo.nome }, aviso: null }
-    : await periodoDe(tx, cfg, hojeNoRio(agora));
+  const periodo: Periodo = periodoFixo
+    ? { inicio: periodoFixo.inicio.toISOString().slice(0, 10), fim: periodoFixo.fim.toISOString().slice(0, 10), nome: periodoFixo.nome }
+    : await periodoDe(tx, hojeNoRio(agora));
   const intervalo = { de: inicioDoDia(periodo.inicio), ate: inicioDoDia(somarUmDia(periodo.fim)) };
   const contadosNoPeriodo = await contadosAplicados(tx, lojaId, intervalo);
   const saldos = await tx.saldoEstoque.findMany({ where: { lojaId }, select: { insumoId: true, quantidadeMilesimos: true } });
@@ -867,7 +839,7 @@ async function coberturaDaLoja(
   );
   const insumos = await tx.insumo.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, unidade: true, conservacao: true } });
   const nomes = new Map(insumos.map((i) => [i.id, { nome: i.nome, unidade: i.unidade as Unidade, conservacao: i.conservacao as Conservacao }]));
-  return { periodo, aviso, cobertura, regras, contadosNoPeriodo, valores, nomes };
+  return { periodo, cobertura, regras, contadosNoPeriodo, valores, nomes };
 }
 
 const somarUmDia = (iso: string) => new Date(new Date(`${iso}T00:00:00.000Z`).getTime() + 86_400_000).toISOString().slice(0, 10);
@@ -924,7 +896,7 @@ async function contagensDe(tx: ClienteDoParceiro, lojaId: string, agora: Date): 
  * se o fechamento já pode começar, o fechamento em andamento ou feito, o
  * período anterior sem fechar, e as contagens da loja.
  */
-export async function situacaoDoPeriodo(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, cfg: ConfigDoPeriodo, agora = new Date()) {
+export async function situacaoDoPeriodo(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, agora = new Date()) {
   const r = await comRecusa(() =>
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'estoque.ver');
@@ -932,9 +904,9 @@ export async function situacaoDoPeriodo(cliente: ClienteDoParceiro, alcance: Alc
       const abertoEm = a?.status === 'FECHADA' ? a.fechadaEm : null;
       if (!abertoEm) return { loja, aberto: false as const };
       const hoje = hojeNoRio(agora);
-      const atual = await periodoDe(tx, cfg, hoje);
+      const atual = await periodoDe(tx, hoje);
       // O anterior entra se a loja já estava aberta nele e o estoque dele não foi fechado.
-      const anteriorP = cfg.periodoTipo === 'PERSONALIZADO' ? null : periodoAnterior({ tipo: cfg.periodoTipo, diaInicio: cfg.periodoDiaInicio }, atual.periodo);
+      const anteriorP = await periodoAnteriorDe(tx, atual);
       const fechamentoDe = async (p: Periodo) => {
         const reg = await tx.periodoApuracao.findFirst({ where: { inicio: new Date(`${p.inicio}T00:00:00.000Z`), fim: new Date(`${p.fim}T00:00:00.000Z`) }, select: { id: true, status: true } });
         if (!reg) return { registro: null, contagem: null };
@@ -944,14 +916,14 @@ export async function situacaoDoPeriodo(cliente: ClienteDoParceiro, alcance: Alc
         });
         return { registro: reg, contagem };
       };
-      const fechAtual = await fechamentoDe(atual.periodo);
+      const fechAtual = await fechamentoDe(atual);
       let anterior: { periodo: Periodo; janela: ReturnType<typeof janelaDoFechamento> } | null = null;
       if (anteriorP && hojeNoRio(abertoEm) <= anteriorP.fim) {
         const f = await fechamentoDe(anteriorP);
         if (!f.contagem || f.contagem.status !== 'FECHADA') anterior = { periodo: anteriorP, janela: janelaDoFechamento(anteriorP, hoje) };
       }
       const fechamentoAberto = fechAtual.contagem?.status === 'ABERTA' ? fechAtual.contagem.id : undefined;
-      const cob = await coberturaDaLoja(tx, lojaId, cfg, agora, fechamentoAberto);
+      const cob = await coberturaDaLoja(tx, lojaId, agora, fechamentoAberto);
       const paraOPiso = new Set(cob.cobertura.paraOPiso);
       const faltam = Array.from(cob.valores.keys())
         .filter((id) => !cob.contadosNoPeriodo.has(id))
@@ -964,9 +936,8 @@ export async function situacaoDoPeriodo(cliente: ClienteDoParceiro, alcance: Alc
         abertoEm,
         hoje,
         regras: cob.regras,
-        periodo: atual.periodo,
-        aviso: atual.aviso,
-        janela: janelaDoFechamento(atual.periodo, hoje),
+        periodo: atual,
+        janela: janelaDoFechamento(atual, hoje),
         cobertura: cob.cobertura,
         faltam,
         fechamento: fechAtual.contagem,
@@ -993,7 +964,6 @@ export async function iniciarFechamento(
   alcance: Alcance,
   lojaId: string,
   entrada: { inicio: unknown },
-  cfg: ConfigDoPeriodo,
   autorNome = 'Sistema',
   agora = new Date(),
 ): Promise<ResultadoEstoque> {
@@ -1005,8 +975,8 @@ export async function iniciarFechamento(
           const loja = await lojaDoAlcance(tx, alcance, lojaId, 'estoque.ajustar');
           const abertoEm = await exigirAberto(tx, loja);
           const hoje = hojeNoRio(agora);
-          const atual = (await periodoDe(tx, cfg, hoje)).periodo;
-          const anterior = cfg.periodoTipo === 'PERSONALIZADO' ? null : periodoAnterior({ tipo: cfg.periodoTipo, diaInicio: cfg.periodoDiaInicio }, atual);
+          const atual = await periodoDe(tx, hoje);
+          const anterior = await periodoAnteriorDe(tx, atual);
           const periodo = !pedido || pedido === atual.inicio ? atual : anterior && pedido === anterior.inicio ? anterior : null;
           if (!periodo) throw new Recusa({ ok: false, erros: { geral: 'Escolha o período de agora ou o anterior.' } });
           const janela = janelaDoFechamento(periodo, hoje);
@@ -1020,13 +990,15 @@ export async function iniciarFechamento(
           if (ciclo) throw new Recusa({ ok: false, erros: { geral: `Conclua ou descarte a contagem “${ciclo.titulo ?? 'em andamento'}” antes de fechar o período.` }, conflito: true });
           const inicio = new Date(`${periodo.inicio}T00:00:00.000Z`);
           const fim = new Date(`${periodo.fim}T00:00:00.000Z`);
-          await tx.periodoApuracao.createMany({ data: [{ parceiroId: tx.parceiroId, nome: periodo.nome, inicio, fim }], skipDuplicates: true });
-          const reg = (await tx.periodoApuracao.findFirst({ where: { inicio, fim }, select: { id: true, status: true, nome: true } }))!;
+          // 2.2a: o único caminho para registrar período (trava exclusiva e sem cruzar outro).
+          const registro = await registrarPeriodo(tx, periodo);
+          if (!registro.ok) throw new Recusa({ ok: false, erros: { geral: registro.erro } });
+          const reg = registro;
           if (reg.status === 'FECHADO') throw new Recusa({ ok: false, erros: { geral: `O período ${reg.nome} já foi fechado no DRE: o estoque dele não muda mais.` } });
           const ja = await tx.contagem.findFirst({ where: { lojaId, tipo: 'FECHAMENTO', periodoId: reg.id, status: { not: 'CANCELADA' } }, select: { id: true, status: true, fechadaEm: true } });
           if (ja?.status === 'ABERTA') return { ok: true as const, id: ja.id, jaFeito: true };
           if (ja) throw new Recusa({ ok: false, erros: { geral: `O estoque de ${periodo.nome} já foi fechado${ja.fechadaEm ? ` em ${quando(ja.fechadaEm)}` : ''}.` }, conflito: true });
-          const cob = await coberturaDaLoja(tx, lojaId, cfg, agora, undefined, { nome: reg.nome, inicio, fim });
+          const cob = await coberturaDaLoja(tx, lojaId, agora, undefined, { nome: reg.nome, inicio, fim });
           const saldos = await tx.saldoEstoque.findMany({ where: { lojaId }, select: { insumoId: true, quantidadeMilesimos: true, valorCentavos: true } });
           const saldoDe = new Map(saldos.map((s) => [s.insumoId, s]));
           const insumos = await tx.insumo.findMany({ orderBy: { nome: 'asc' }, select: { id: true, nome: true, unidade: true, conservacao: true, conteudoMilesimos: true, tipo: true, ativo: true } });

@@ -11,7 +11,7 @@ import { redirect } from 'next/navigation';
 import type { Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import { concluirAbertura, contarItem, descartarAbertura, iniciarAbertura, type ResultadoDoItem, type ResultadoEstoque } from '@/lib/erp/estoque';
-import { concluirContagem, contarNaContagem, descartarContagem, iniciarCiclo, iniciarFechamento, salvarRegras, type ConfigDoPeriodo } from '@/lib/erp/contagem';
+import { concluirContagem, contarNaContagem, descartarContagem, iniciarCiclo, iniciarFechamento, salvarRegras } from '@/lib/erp/contagem';
 import type { RegrasDaContagem } from '@/lib/erp/contagem-campos';
 import type { EstadoEstoque, ItemParaSalvar } from './estado';
 
@@ -62,8 +62,8 @@ export async function executarContarNaContagem(cliente: ClienteDoParceiro, alcan
   return contarNaContagem(cliente, alcance, lojaId, contagemId, entrada, autorNome);
 }
 
-export async function executarConcluirContagem(cliente: ClienteDoParceiro, alcance: Alcance, cfg: ConfigDoPeriodo, autorNome: string, lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData, base: string) {
-  const r = await concluirContagem(cliente, alcance, lojaId, contagemId, { versao: form.get('versao'), confirmarNaoContados: form.get('confirmarNaoContados') }, cfg, autorNome);
+export async function executarConcluirContagem(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, lojaId: string, contagemId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await concluirContagem(cliente, alcance, lojaId, contagemId, { versao: form.get('versao'), confirmarNaoContados: form.get('confirmarNaoContados') }, autorNome);
   if (!r.ok) return { ok: false as const, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
   revalidatePath(base, 'layout');
   const fechamento = form.get('tipo') === 'FECHAMENTO';
@@ -75,8 +75,8 @@ export async function executarDescartarContagem(cliente: ClienteDoParceiro, alca
   return concluir(r, anterior, base, `${base}/${lojaId}`, 'ciclo-descartado');
 }
 
-export async function executarIniciarFechamento(cliente: ClienteDoParceiro, alcance: Alcance, cfg: ConfigDoPeriodo, autorNome: string, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
-  const r = await iniciarFechamento(cliente, alcance, lojaId, { inicio: form.get('inicio') }, cfg, autorNome);
+export async function executarIniciarFechamento(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await iniciarFechamento(cliente, alcance, lojaId, { inicio: form.get('inicio') }, autorNome);
   if (!r.ok) return { ok: false as const, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
   revalidatePath(base, 'layout');
   redirect(`${base}/${lojaId}/contagens/${r.id}?feito=${r.jaFeito ? 'fechamento-ja' : 'fechamento'}`);

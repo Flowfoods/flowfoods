@@ -22,6 +22,8 @@ export const FILTROS: { valor: string; rotulo: string; entidades?: string[] }[] 
   { valor: 'NotaEntrada', rotulo: 'Compras', entidades: ['NotaEntrada', 'Fornecedor'] },
   // 2.1: faturamento por canal e dia (só para quem tem "ver faturamento").
   { valor: 'FaturamentoLancamento', rotulo: 'Faturamento' },
+  // 2.2a: despesas, linhas do plano e a regra do período (só para quem tem "ver DRE").
+  { valor: 'Despesa', rotulo: 'DRE e despesas', entidades: ['Despesa', 'DreLinha', 'RegraDoPeriodo'] },
   { valor: 'AcessoParceiro', rotulo: 'Acessos' },
   { valor: 'PerfilAcesso', rotulo: 'Perfis' },
 ];
@@ -43,19 +45,22 @@ export function TelaHistorico({
   entidade,
   hrefBase,
   verFaturamento = false,
+  verDre = false,
 }: {
   linhas: LinhaDeHistorico[];
   entidade: string | undefined;
   hrefBase: string;
   /** O filtro "Faturamento" só aparece para quem tem "ver faturamento" (as linhas já vêm filtradas do servidor). */
   verFaturamento?: boolean;
+  /** O filtro "DRE e despesas" só aparece para quem tem "ver DRE" (as linhas já vêm filtradas do servidor). */
+  verDre?: boolean;
 }) {
   const LIMITE = LIMITE_DO_HISTORICO;
   return (
     <div className="space-y-4">
       <FiltroEmLinks
         rotulo="Filtrar alterações"
-        opcoes={FILTROS.filter((f) => verFaturamento || f.valor !== 'FaturamentoLancamento').map((f) => ({
+        opcoes={FILTROS.filter((f) => (verFaturamento || f.valor !== 'FaturamentoLancamento') && (verDre || f.valor !== 'Despesa')).map((f) => ({
           href: f.valor ? `${hrefBase}?entidade=${f.valor}` : hrefBase,
           rotulo: f.rotulo,
           ativo: (entidade ?? '') === f.valor,

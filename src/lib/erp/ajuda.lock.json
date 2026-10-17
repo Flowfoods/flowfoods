@@ -104,8 +104,8 @@
     "hash": "7660796e763878cb"
   },
   "periodo": {
-    "versao": 1,
-    "hash": "4683bc8b2a063a39"
+    "versao": 2,
+    "hash": "7b06094a6e3ddd66"
   },
   "requisicoes": {
     "versao": 2,
@@ -136,8 +136,8 @@
     "hash": "8bc5df4b7032ccbc"
   },
   "faturamento-dia": {
-    "versao": 1,
-    "hash": "8400382df4f80dff"
+    "versao": 2,
+    "hash": "a2dfcfc80dee1cb3"
   },
   "faturamento-importar": {
     "versao": 1,
@@ -158,5 +158,29 @@
   "cadastro-do-parceiro": {
     "versao": 1,
     "hash": "9d803e531e0e9c5c"
+  },
+  "dre": {
+    "versao": 2,
+    "hash": "62dad45d6b03f6d3"
+  },
+  "dre-despesas": {
+    "versao": 1,
+    "hash": "c0f8e63a9ec4e36f"
+  },
+  "dre-despesa": {
+    "versao": 1,
+    "hash": "e6e0a0a996538291"
+  },
+  "dre-despesa-nova": {
+    "versao": 1,
+    "hash": "43a47821e7b38260"
+  },
+  "dre-periodos": {
+    "versao": 1,
+    "hash": "9183d273e3845bbf"
+  },
+  "dre-plano": {
+    "versao": 1,
+    "hash": "aad5f44d1a9067d7"
   }
 }

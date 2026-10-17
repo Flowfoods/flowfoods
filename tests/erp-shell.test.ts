@@ -78,6 +78,10 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/estoque/requisicoes',
       '/erp/estoque/divergencias',
       '/erp/faturamento',
+      '/erp/dre/despesas',
+      '/erp/dre',
+      '/erp/dre/periodos',
+      '/erp/dre/plano',
       '/erp/lojas',
       '/erp/equipe',
       '/erp/historico',
@@ -91,6 +95,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/compras/fornecedores/novo',
       '/erp/faturamento/lancar',
       '/erp/faturamento/importar',
+      '/erp/dre/despesas/nova',
     ]);
     // 2.1: Faturamento e DRE saiu dos futuros e virou área com tela.
     expect(futuros(a)).toEqual(['producao', 'etiquetas']);
@@ -163,6 +168,10 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/estoque/requisicoes',
       '/rodolfo/erp/valentins/estoque/divergencias',
       '/rodolfo/erp/valentins/faturamento',
+      '/rodolfo/erp/valentins/dre/despesas',
+      '/rodolfo/erp/valentins/dre',
+      '/rodolfo/erp/valentins/dre/periodos',
+      '/rodolfo/erp/valentins/dre/plano',
       '/rodolfo/erp/valentins/lojas',
       '/rodolfo/erp/valentins/equipe',
       '/rodolfo/erp/valentins/historico',

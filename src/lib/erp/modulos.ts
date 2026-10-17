@@ -114,7 +114,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 2.1';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 2.2a';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -370,8 +370,8 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
     {
       chave: 'dre',
       nome: 'Faturamento e DRE',
-      subtitulo: 'Venda por loja e canal, dia a dia, com as faltas à vista',
-      resumo: 'Venda por canal',
+      subtitulo: 'Venda, despesas e resultado da rede e de cada loja, do dia a dia ao período',
+      resumo: 'Venda e resultado',
       icone: 'dre',
       cor: COR.dre,
       grupos: [
@@ -385,6 +385,40 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               icone: 'dre',
               subtitulo: 'Venda, pedidos e clientes por loja e canal',
               permissao: 'faturamento.ver',
+            },
+          ],
+        },
+        {
+          rotulo: 'Resultado',
+          icone: 'dre',
+          telas: [
+            {
+              href: `${base}/dre/despesas`,
+              rotulo: 'Despesas',
+              icone: 'compras',
+              subtitulo: 'Aluguel, salário, luz e contas a pagar, por competência',
+              permissao: ['dre.ver', 'despesas.lancar'],
+            },
+            {
+              href: `${base}/dre`,
+              rotulo: 'DRE',
+              icone: 'dre',
+              subtitulo: 'Resultado do período, até ontem, da rede e de cada loja',
+              permissao: 'dre.ver',
+            },
+            {
+              href: `${base}/dre/periodos`,
+              rotulo: 'Períodos',
+              icone: 'estoque',
+              subtitulo: 'Como o período fecha: mensal, quinzenal ou semanal',
+              permissao: 'dre.ver',
+            },
+            {
+              href: `${base}/dre/plano`,
+              rotulo: 'Plano de contas',
+              icone: 'cadastro',
+              subtitulo: 'As linhas do DRE e os nomes que a casa usa',
+              permissao: 'metas.editar',
             },
           ],
         },
@@ -403,6 +437,13 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
           icone: 'importar',
           subtitulo: 'Vários dias de uma vez, com prévia',
           permissao: 'faturamento.lancar',
+        },
+        {
+          href: `${base}/dre/despesas/nova`,
+          rotulo: 'Lançar despesa',
+          icone: 'novo',
+          subtitulo: 'Aluguel, salário, luz e outras, por dia, mês ou período',
+          permissao: 'despesas.lancar',
         },
       ],
     },

@@ -47,7 +47,7 @@ import {
   type ResultadoEstoque,
 } from './estoque';
 import { valorDaQuantidade } from './estoque-campos';
-import { periodoDe, type ConfigDoPeriodo } from './contagem';
+import { periodoDe } from './periodos';
 import { somarDias, diasEntre, regrasDaLoja } from './contagem-campos';
 import {
   baixasDaEntrega,
@@ -712,7 +712,7 @@ export const JANELA_MAXIMA_DIAS = 366;
  * referência de hoje); os sumiços pequenos repetidos dentro da tolerância; por
  * setor; os saldos negativos de agora. Só leitura: nada é gravado.
  */
-export async function divergenciasDaLoja(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, filtro: { de?: unknown; ate?: unknown }, cfg: ConfigDoPeriodo, agora = new Date()) {
+export async function divergenciasDaLoja(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, filtro: { de?: unknown; ate?: unknown }, agora = new Date()) {
   const r = await comRecusa(() =>
     cliente.transacao(
       async (tx) => {
@@ -720,7 +720,7 @@ export async function divergenciasDaLoja(cliente: ClienteDoParceiro, alcance: Al
         const a = (await aberturasDe(tx, [lojaId])).get(lojaId);
         if (!a || a.status !== 'FECHADA') return { loja, aberto: false as const };
         const hoje = hojeNoRio(agora);
-        const { periodo } = await periodoDe(tx, cfg, hoje);
+        const periodo = await periodoDe(tx, hoje);
         // dd/mm/aaaa (o campo da tela) ou aaaa-mm-dd; inválida = a do período de agora.
         const data = (x: unknown) => (typeof x === 'string' ? lerData(x) : null);
         let de = data(filtro.de) ?? periodo.inicio;

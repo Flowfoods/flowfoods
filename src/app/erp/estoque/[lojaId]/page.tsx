@@ -24,7 +24,7 @@ export default async function ErpEstoqueDaLojaPage({ params, searchParams }: { p
   const e = await obterEstoqueDaLoja(ctx.cliente, ctx.alcance, params.lojaId, filtros);
   if (!e) notFound();
   // 1.7: com o estoque aberto, o período (cobertura × piso) e as contagens do dia a dia.
-  const periodo = e.estado === 'ABERTO' ? await situacaoDoPeriodo(ctx.cliente, ctx.alcance, e.loja.id, ctx.parceiro) : null;
+  const periodo = e.estado === 'ABERTO' ? await situacaoDoPeriodo(ctx.cliente, ctx.alcance, e.loja.id) : null;
   const lojaId = e.loja.id;
   // 1.8: requisições pendentes da loja (quem pede ou atende).
   const veRequisicoes = pode(ctx.alcance, 'requisicao.pedir', { lojaId }) || pode(ctx.alcance, 'requisicao.atender', { lojaId });

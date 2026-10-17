@@ -30,6 +30,10 @@ const ENTIDADE: Record<string, string> = {
   Fornecedor: 'Fornecedor',
   // 2.1: o faturamento de um canal num dia. Só quem tem `faturamento.ver` recebe estas linhas.
   FaturamentoLancamento: 'Faturamento',
+  // 2.2a: despesas, linhas do plano e a regra do período. Só quem tem `dre.ver` recebe estas linhas.
+  Despesa: 'Despesa',
+  DreLinha: 'Linha do DRE',
+  RegraDoPeriodo: 'Período do DRE',
   AcessoParceiro: 'Acesso',
   PerfilAcesso: 'Perfil',
 };
@@ -161,6 +165,17 @@ const CAMPO: Record<string, string> = {
   clientes: 'clientes',
   origem: 'origem',
   canaisDeVenda: 'canais de venda',
+  // 2.2a: despesa, plano de contas e regra do período
+  linhaDoDre: 'linha do DRE',
+  linhaVisivel: 'aparece em Lançar despesa',
+  despesaCentavos: 'valor',
+  repeteTodoMes: 'repete todo mês',
+  competencia: 'competência',
+  vencimento: 'vencimento',
+  pagaEm: 'paga em',
+  grupo: 'grupo',
+  regra: 'regra',
+  valeDesde: 'vale a partir de',
 };
 
 /** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. */
@@ -193,6 +208,16 @@ const ORDEM = [
   'clientes',
   'origem',
   'canaisDeVenda',
+  'linhaDoDre',
+  'grupo',
+  'linhaVisivel',
+  'despesaCentavos',
+  'competencia',
+  'repeteTodoMes',
+  'vencimento',
+  'pagaEm',
+  'regra',
+  'valeDesde',
   'modoPreparo',
   'conservacao',
   'validade',
@@ -435,6 +460,14 @@ export const ENTIDADES_DE_PRECIFICACAO: readonly string[] = ['CanalConfig'];
  * servidor, na consulta: o payload não leva a linha.
  */
 export const ENTIDADES_DE_FATURAMENTO: readonly string[] = ['FaturamentoLancamento'];
+
+/**
+ * DRE e despesas (2.2a, lição das decisões 90 e 133): quem não tem `dre.ver` não recebe
+ * NADA disso no histórico — despesa (valor, loja, quem lançou), linha do plano, regra do
+ * período, período e (2.2b) metas e fotografia. Filtro no servidor, na consulta: o payload
+ * não leva a linha. `verDre` ausente = fechado.
+ */
+export const ENTIDADES_DE_DRE: readonly string[] = ['Despesa', 'DreLinha', 'DreMeta', 'RegraDoPeriodo', 'PeriodoApuracao', 'DreFotografia'];
 export const CAMPOS_DE_PRECIFICACAO: ReadonlySet<string> = new Set([
   'precoLoja',
   'precoDelivery',
@@ -484,6 +517,11 @@ export async function listarHistorico(
      * não saem do servidor. Fecha para quem esquece: ausente = não vê.
      */
     verFaturamento?: boolean;
+    /**
+     * 2.2a: quem lê pode ver o DRE (`dre.ver`)? Sem isto, despesas, linhas do plano e a
+     * regra do período não saem do servidor. Fecha para quem esquece: ausente = não vê.
+     */
+    verDre?: boolean;
     /** 2.1: só as alterações de faturamento desta loja neste dia (inclusive de lançamento já removido). */
     faturamentoDoDia?: { lojaId: string; dia: string };
   },
@@ -493,6 +531,7 @@ export async function listarHistorico(
     ...(filtro.semEntidades ?? []),
     ...(filtro.verPrecos ? [] : ENTIDADES_DE_PRECIFICACAO),
     ...(filtro.verFaturamento === true ? [] : ENTIDADES_DE_FATURAMENTO),
+    ...(filtro.verDre === true ? [] : ENTIDADES_DE_DRE),
   ];
   const limite = filtro.limite ?? 100;
   const where = {

@@ -51,7 +51,7 @@ const proprio = (permissoes: string[]) => alcance({ perfilBase: null, perfilProp
 
 const AREAS = ['Cadastros e Cardápio', 'Compras e Fornecedores', 'Estoque e Movimentações', 'Faturamento e DRE', 'Rede e Equipe'];
 const FUTUROS = ['Produção', 'Etiquetas'];
-const ACOES = ['Novo insumo', 'Nova ficha', 'Importar planilha', 'Lançar nota', 'Novo fornecedor', 'Lançar o dia', 'Importar faturamento'];
+const ACOES = ['Novo insumo', 'Nova ficha', 'Importar planilha', 'Lançar nota', 'Novo fornecedor', 'Lançar o dia', 'Importar faturamento', 'Lançar despesa'];
 
 const emUso = (a: Alcance) => modulosDoParceiro(a).filter((m) => m.href);
 const abasPorArea = (a: Alcance) => Object.fromEntries(emUso(a).map((m) => [m.nome, m.grupos.flatMap((g) => g.itens.map((i) => i.rotulo))]));
@@ -65,14 +65,14 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      'Faturamento e DRE': ['Faturamento'],
+      'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos', 'Plano de contas'],
       'Rede e Equipe': ['Lojas e marcas', 'Equipe', 'Histórico', 'Seu acesso'],
     });
     expect(acoesPorArea(DONO)).toEqual({
       'Cadastros e Cardápio': ['Novo insumo', 'Nova ficha', 'Importar planilha'],
       'Compras e Fornecedores': ['Lançar nota', 'Novo fornecedor'],
       'Estoque e Movimentações': [],
-      'Faturamento e DRE': ['Lançar o dia', 'Importar faturamento'],
+      'Faturamento e DRE': ['Lançar o dia', 'Importar faturamento', 'Lançar despesa'],
       'Rede e Equipe': [],
     });
     expect(modulosDoParceiro(DONO).filter((m) => !m.href).map((m) => m.nome)).toEqual(FUTUROS);
@@ -83,7 +83,8 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      'Faturamento e DRE': ['Faturamento'],
+      // 2.2a: o gerente vê e lança despesa, vê o DRE e o período; plano de contas e período são do dono (rede inteira).
+      'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos'],
       'Rede e Equipe': ['Lojas e marcas', 'Histórico', 'Seu acesso'],
     });
     expect(emUso(GERENTE).flatMap((m) => m.acoes.map((a) => a.rotulo))).toEqual(ACOES);
@@ -341,6 +342,14 @@ const ROTAS_ATIVAS: [string, string][] = [
   ['/faturamento/lancar', 'Faturamento'],
   ['/faturamento/importar', 'Faturamento'],
   [`/faturamento/${LOJA}/2026-10-14`, 'Faturamento'],
+  // 2.2a: a área ganhou Despesas, DRE, Períodos e Plano de contas; rota funda acende a aba mais específica.
+  ['/dre', 'DRE'],
+  ['/dre/despesas', 'Despesas'],
+  ['/dre/despesas/nova', 'Despesas'],
+  ['/dre/despesas/d1', 'Despesas'],
+  ['/dre/despesas/d1/editar', 'Despesas'],
+  ['/dre/periodos', 'Períodos'],
+  ['/dre/plano', 'Plano de contas'],
 ];
 
 describe('UX.9 · itemAtivo acende a aba certa em cada rota profunda', () => {
@@ -424,10 +433,10 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     }
   });
 
-  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das da fase 2.1 (faturamento)', () => {
+  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das das fases 2.1 e 2.2a (faturamento, DRE e despesas)', () => {
     const todas = [...emUso(DONO)].flatMap((m) => [...m.grupos.flatMap((g) => g.itens), ...m.acoes]).map((i) => i.href.replace('/erp', ''));
     const novas = todas.filter((r) => !ANTIGAS.includes(r) && r !== '/acesso');
-    expect(novas).toEqual(['/estoque/contagens', '/faturamento', '/faturamento/lancar', '/faturamento/importar']);
+    expect(novas).toEqual(['/estoque/contagens', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
   });
 });
 

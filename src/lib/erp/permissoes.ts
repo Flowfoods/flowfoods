@@ -112,13 +112,14 @@ export const CATALOGO = [
   {
     chave: 'faturamento',
     rotulo: 'Faturamento e DRE',
-    // 2.1: ver e lançar faturamento já têm tela; DRE, despesas e metas chegam nas fases 2.2 a 2.4.
+    // 2.1: faturamento. 2.2a: DRE, despesas, plano de contas e período. Metas e farol chegam nas fases 2.2b a 2.4.
     permissoes: {
       'faturamento.ver': { rotulo: 'Ver faturamento', porLoja: true },
       'faturamento.lancar': { rotulo: 'Lançar faturamento', porLoja: true },
       'dre.ver': { rotulo: 'Ver DRE e CMV', porLoja: true },
       'despesas.lancar': { rotulo: 'Lançar despesas', porLoja: true },
-      'metas.editar': { rotulo: 'Definir metas e farol' },
+      // Plano de contas, período e metas são da REDE inteira (mexem no DRE de todas as lojas): quem tem só lojas não define.
+      'metas.editar': { rotulo: 'Definir metas, plano de contas e período do DRE', exigeRede: true },
     },
   },
   {

@@ -1599,3 +1599,88 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) abas "Lançamentos" e "Importar"; (b) aba única e as ações "Lançar o dia" e "Importar faturamento" no cabeçalho e no ⌘K.
 
 **Razão:** (b), a regra da seção 9 (área → abas → ações): lançar e importar são ações, não seções. Uma aba sozinha não vira barra de abas; o menu e o hub levam a ela. As ações são só de quem tem `faturamento.lancar`; "Importar faturamento" (e não "Importar planilha") para não repetir o rótulo da ação das fichas no ⌘K. Com uma loja só no acesso, "Lançar o dia" vai direto ao dia de hoje (o gerente no celular não escolhe nada).
+
+
+### 135. 2026-10-17 · ERP 2.2a: a 2.2 se divide em 2.2a (DRE ao vivo) e 2.2b; o plano de contas padrão vive em código
+
+**Alternativas:** (a) entregar a 2.2 inteira (metas, comparação, fechamento); (b) 2.2a = o DRE que já funciona no meio do mês; 2.2b = metas, ano passado, fechar e reabrir período.
+
+**Razão:** (b), aprovada pelo Maestro: o dono precisa ver o resultado do mês antes de precisar de meta ou de fechamento, e a fotografia do fechamento só faz sentido sobre um DRE já provado. O plano padrão fica em código (`PLANO_PADRAO`) com `codigo` estável por linha; o parceiro o grava na primeira escrita (idempotente, sob trava) e, até lá, a leitura é virtual (sem gravar). Assim uma mudança do padrão não vira migration de dado e o parceiro novo nunca vê DRE vazio.
+
+### 136. 2026-10-17 · ERP 2.2a: linha do plano se renomeia e se oculta, nunca se apaga; o grupo não muda; só quem tem a rede inteira edita
+
+**Alternativas:** (a) apagar linha sem uso; (b) renomear, ocultar e criar, sem apagar nem mover de grupo; (c) deixar o gerente de uma loja editar.
+
+**Razão:** (b). Apagar quebra histórico e a futura fotografia; mover de grupo muda resultados já vistos. Oculta sai do formulário e continua no DRE dos períodos em que tem valor. Plano e regra do período valem para a casa toda, então `metas.editar` passou a ter `exigeRede` (o gerente de uma loja não edita nem vê o botão). A chave da linha é o `codigo` ou `id:<id>`, nunca o nome (renomear não perde nada).
+
+### 137. 2026-10-17 · ERP 2.2a: despesa é por competência e a apropriação é por arredondamento acumulado, exata ao centavo
+
+**Alternativas:** (a) dividir o valor pelos dias e arredondar cada dia; (b) arredondar o acumulado, `round(V·k/D)`, e tirar a diferença; (c) guardar uma linha por dia.
+
+**Razão:** (b). A soma das fatias fecha o valor ao centavo, o erro de qualquer fatia é menor que 1 centavo e não depende de como os outros períodos cortam o mesmo valor (semana, quinzena, mês). (a) perde ou sobra centavos; (c) infla o banco e torna a edição frágil. A competência é um dia, um mês ou um intervalo de até 366 dias; o valor guardado é o da despesa inteira, a apropriação é conta (BigInt), não coluna. Exemplo da prova: R$ 6.000,00 em outubro, até ontem (16 de 31 dias) = R$ 3.096,77.
+
+### 138. 2026-10-17 · ERP 2.2a: loja ou rede, sem rateio; duplo envio, duas abas e período fechado têm resposta própria
+
+**Alternativas:** (a) ratear a despesa da rede entre as lojas; (b) a despesa é de UMA loja ou da rede, e o DRE mostra o resultado da loja antes das despesas da rede.
+
+**Razão:** (b). Rateio é opinião (por faturamento? por área?) e esconde o que a loja realmente rende; a tabela "Por loja" fecha com a linha "Rede, com as despesas da rede". Lançar leva um `envio` aleatório (duplo clique = uma despesa, "já lançada"); editar, remover, pagar e desfazer são condicionais a `atualizadoEm` (a segunda aba recebe o conflito e nada é sobrescrito); remover exige motivo; despesa em período FECHADO é recusada pela trava compartilhada da 2.1, olhando o intervalo inteiro da competência.
+
+### 139. 2026-10-17 · ERP 2.2a: recorrência é uma cadeia de despesas, e "Lançar as do mês passado" é idempotente e confere o valor
+
+**Alternativas:** (a) uma despesa recorrente que se projeta sozinha nos meses; (b) cada mês é uma despesa própria encadeada (`repeteDeId`), criada quando a pessoa confirma.
+
+**Razão:** (b). O aluguel muda, o salário reajusta e a luz varia: projetar sozinho põe número que ninguém conferiu no DRE. A tela mostra o valor do mês passado só como ponto de partida e cria apenas as que faltam (índice único `parceiroId + repeteDeId`: repetir não duplica); o gerente de uma loja só enxerga e lança as da loja dele. "Repete todo mês" vale só para mês inteiro; "Não repete mais" interrompe a cadeia. O DRE avisa "Falta lançar" quando uma recorrente do mês passado ainda não tem a deste mês.
+
+### 140. 2026-10-17 · ERP 2.2a: contas a pagar mínimas, sem caixa nem conciliação
+
+**Alternativas:** (a) módulo financeiro completo; (b) `vencimento` e `pagaEm` opcionais na despesa, filtro "A pagar" e três números (vencidas, vencem em 7 dias, total).
+
+**Razão:** (b). O dono precisa saber o que vence, não conciliar banco. Pagar não muda o DRE (o DRE é competência) e se desfaz. Conciliação, fornecedor e forma de pagamento ficam fora até alguém pedir.
+
+### 141. 2026-10-17 · ERP 2.2a: o período tem UMA regra por parceiro, versionada, e o DRE e a contagem de estoque leem pelo mesmo módulo
+
+**Alternativas:** (a) deixar `ParceiroFlow.periodoTipo` para o estoque e criar outra regra para o DRE; (b) tabela `RegraDoPeriodo` (mensal, quinzenal, semanal e o dia em que começa, por `vigenteDesde`), lida só por `periodos.ts`.
+
+**Razão:** (b). O CMV só fecha se o DRE e o estoque usam as mesmas datas. A migration copia a regra antiga para a primeira linha (antes de ligar a RLS), a 1.7 passa a ler por `periodoDe`/`periodoAnteriorDe`/`registrarPeriodo`, e as colunas antigas ficam sem uso (limpeza própria depois). `PERSONALIZADO` sai da tela e de regra nova; vira só legado. A tabela é só inclusão (gatilho) e o `parceiroId` é imutável.
+
+### 142. 2026-10-17 · ERP 2.2a: regra nova nunca é retroativa e o banco recusa períodos que se sobrepõem
+
+**Alternativas:** (a) a regra nova vale já e recalcula o passado; (b) vale a partir do dia seguinte ao fim do período de agora, com o primeiro período novo cortado no começo.
+
+**Razão:** (b). Nenhum período passado ou em curso muda de data nem de número; uma regra futura ainda pendente pode ser trocada ou cancelada. Um gatilho (`PeriodoApuracao_sem_sobreposicao`) impede dois períodos que se sobrepõem, mesmo com duas abas ou uma contagem registrando o período ao mesmo tempo (`registrarPeriodo` pega `travarPeriodos`). Período já registrado pela contagem mantém as datas dele. Na prova: regra quinzenal salva em 17/10 vale em 01/11; outubro continua igual.
+
+### 143. 2026-10-17 · ERP 2.2a: o DRE é uma estrutura única, percentuais sobre a receita bruta, zero é "—"
+
+**Alternativas:** (a) DRE só com o que tem valor; (b) estrutura fixa (receita por canal, deduções, CMV, variáveis, pessoal, ocupação, utilidades, administrativas, marketing, outras, financeiras) com as linhas sem valor visíveis; (c) percentual sobre a receita líquida.
+
+**Razão:** (b) com % da receita bruta (em pontos-base, inteiro): é o que o dono de restaurante lê e permite comparar lojas. A estrutura estável mostra o que NÃO foi lançado (ausência de dado é achado). Zero vira "—", nunca "R$ 0,00" nem "0,0 %"; sem faturamento, a receita também é "—". Linha calculada (receita líquida, margem, resultados) é do sistema.
+
+### 144. 2026-10-17 · ERP 2.2a: a taxa do iFood é ESTIMADA pela configuração da loja, um arredondamento por loja
+
+**Alternativas:** (a) esperar o repasse real do iFood; (b) faturamento do iFood × (comissão + pagamento online) do `CanalConfig`, arredondado uma vez por loja; a rede é a soma.
+
+**Razão:** (b), dito na tela ("estimada pela taxa configurada"). O repasse real chega depois e muda; sem estimativa o DRE do mês corrente mente para cima. Um arredondamento por loja faz a rede ser exatamente a soma das lojas. Sem a taxa configurada, a linha diz "falta configurar a taxa" e o resultado diz "sem contar a taxa do iFood". Limite conhecido: usa a taxa de HOJE até existir a fotografia do fechamento (2.2b).
+
+### 145. 2026-10-17 · ERP 2.2a: o CMV aparece como "Em breve", sem número, e tudo que depende dele diz "sem contar o CMV" (sem citar fase interna na tela)
+
+**Alternativas:** (a) usar uma porcentagem fixa de CMV; (b) a linha existe, sem número, e margem e resultados se declaram "sem contar o CMV".
+
+**Razão:** (b). Número inventado vira decisão errada; sem número é hipótese dita como hipótese. A linha `cmv` já está no plano e em `montarDre`: quando a 2.3 trouxer o custo, os avisos saem sozinhos.
+
+### 146. 2026-10-17 · ERP 2.2a: período em curso é parcial, dia a dia até ontem, sem projeção; rede e loja são visões do mesmo cálculo
+
+**Alternativas:** (a) projetar o mês pelo ritmo; (b) só o que já aconteceu, até ontem ("dia 17 de 31"), com a despesa entrando dia a dia.
+
+**Razão:** (b). Hoje ainda está aberto e projeção é promessa de resultado. Faturamento faltando aparece como "Incompleto: N lançamentos", e a receita só conta o que foi lançado. A rede e a loja usam a mesma `montarDre`; a loja nunca recebe despesa da rede. Período encerrado mostra o período inteiro.
+
+### 147. 2026-10-17 · ERP 2.2a: permissões sem catálogo novo; o gerente de uma loja nunca recebe a rede; o Histórico fecha por padrão
+
+**Alternativas:** (a) permissões novas (`despesas.ver`, `plano.editar`); (b) `dre.ver`, `despesas.lancar` (por loja) e `metas.editar` (rede inteira).
+
+**Razão:** (b); `VERSAO_DO_CATALOGO` fica 1. Ver despesa = `dre.ver` OU `despesas.lancar`. A URL (`?rede=1`, `?loja=`) só ESCOLHE dentro do alcance, nunca concede. O Histórico ganha `verDre` (ausente = fechado, como o `verFaturamento`): despesa, plano e regra saem da consulta, do filtro e do HTML de quem não tem `dre.ver`; o ⌘K só mostra o que a pessoa abre. Em aberto para o Rodolfo: o gerente de uma loja vê os salários da loja dele? (hoje sim).
+
+### 148. 2026-10-17 · ERP 2.2a: navegação, ajuda e migration aditiva e verificável
+
+**Alternativas:** (a) abas soltas e migration com CHECKs que reprovam por dado antigo; (b) grupo "Resultado" na área Faturamento e DRE, ação "Lançar despesa" e migration `20261026000000_erp_dre_despesas` NOT VALID + VALIDATE tolerante.
+
+**Razão:** (b). Despesas, DRE, Períodos e Plano de contas formam o grupo "Resultado" ao lado de "Faturamento"; a ação "Lançar despesa" entra no cabeçalho e no ⌘K. Toda rota nova tem ajuda (seis chaves novas; `faturamento-dia` e `periodo` subiram de versão). A migration só adiciona (colunas, tabela, valores de enum, CHECKs, gatilhos), copia a regra antiga antes de ligar a RLS, nunca lê tabela de tenant sob RLS e foi provada nos 3 perfis do banco (superusuário, dono com RLS, dono sem RLS) com dado antigo; o passo pós-deploy é `npm run erp:conferir-migracao`. `limparTexto` saiu de `pedido-campos` para `texto-limpo.ts` (puro) porque o formulário roda no navegador e `node:crypto` quebrava o build.
