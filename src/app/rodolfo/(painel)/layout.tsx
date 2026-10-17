@@ -11,11 +11,14 @@
 import { cache } from 'react';
 import { cookies } from 'next/headers';
 import { prisma } from '@/lib/db';
+import { AJUDA_DE_USO_ERP } from '@/lib/constants';
+import { ajudaParaATela } from '@/lib/erp/ajuda';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 import { VERSAO_DO_ERP } from '@/lib/erp/modulos';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { COOKIE_MENU, COOKIE_TEMA, lerMenuRecolhido, lerTema } from '@/lib/erp/tema';
 import { contarPedidosAbertos } from '@/lib/erp/pedidos';
+import { ALCANCE_FLOWFOODS } from '@/lib/erp/permissoes';
 import { navegacaoDoNivel1 } from '@/lib/rodolfo/modulos';
 import { contarRespostasSemClassificar } from '@/lib/rodolfo/notificacoes';
 import { AppShell } from '@/components/erp/shell/AppShell';
@@ -75,6 +78,8 @@ export default async function PainelLayout({ children }: { children: React.React
       links={[{ rotulo: 'Config do Barney', href: '/rodolfo/config' }]}
       sair={null}
       buscarInsumosDoParceiro={acaoBuscarNoParceiro}
+      // Nível 1: só o botão "?" dentro do parceiro (a ajuda lê o mesmo registro). Sem caixa, sem pergunta e sem preferência.
+      ajuda={{ entradas: ajudaParaATela(ALCANCE_FLOWFOODS), preferencia: null, acoes: null, contato: AJUDA_DE_USO_ERP }}
     >
       {children}
     </AppShell>

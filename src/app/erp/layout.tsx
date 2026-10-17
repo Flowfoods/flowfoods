@@ -11,6 +11,8 @@
 
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
+import { ajudaParaATela } from '@/lib/erp/ajuda';
+import { AJUDA_DE_USO_ERP } from '@/lib/constants';
 import { exigirParceiroDaSessao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { navegacaoDoParceiro, VERSAO_DO_ERP } from '@/lib/erp/modulos';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
@@ -18,7 +20,7 @@ import { COOKIE_MENU, COOKIE_TEMA, lerMenuRecolhido, lerTema } from '@/lib/erp/t
 import { AppShell } from '@/components/erp/shell/AppShell';
 import { Aviso } from '@/components/erp/ui/superficies';
 import { acaoSair } from '../entrar/actions';
-import { acaoBuscarNoErp, acaoEscolherVisao } from './actions';
+import { acaoAjudaDicas, acaoAjudaFechar, acaoBuscarNoErp, acaoEscolherVisao } from './actions';
 
 export const metadata: Metadata = {
   title: 'FlowFoods ERP',
@@ -59,6 +61,12 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       links={links}
       sair={acaoSair}
       buscarInsumos={acaoBuscarNoErp}
+      ajuda={{
+        entradas: ajudaParaATela(alcance),
+        preferencia: pessoa.ajuda,
+        acoes: { fechar: acaoAjudaFechar, dicas: acaoAjudaDicas },
+        contato: AJUDA_DE_USO_ERP,
+      }}
     >
       <div className="space-y-6">
         {bloqueio && (parceiro.status === 'SUSPENSO' || parceiro.status === 'RASCUNHO') && (

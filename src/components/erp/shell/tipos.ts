@@ -4,6 +4,7 @@
  * sessão e permissão de novo no servidor — o shell não decide nada).
  */
 
+import type { EntradaParaATela, PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
 import type { Navegacao } from '@/lib/erp/modulos';
 import type { OpcaoDeVisao } from '@/lib/erp/visao';
 import type { Tema } from '@/lib/erp/tema';
@@ -41,6 +42,19 @@ export interface VisaoDoNivel1 {
   escolher: (slug: string, valor: string) => Promise<RespostaDaVisao>;
 }
 
+/**
+ * Ajuda contextual (0.6). As entradas já vêm do servidor sem os blocos que a
+ * pessoa não pode ler. `preferencia` nula = nível 1 dentro do parceiro: só o
+ * botão "?", sem caixas e sem pergunta (não é uma `UsuarioErp`).
+ */
+export interface AjudaDoShell {
+  entradas: EntradaParaATela[];
+  preferencia: PreferenciaDeAjuda | null;
+  /** Formulários da caixa (funcionam sem JavaScript). Nulo quando não há preferência. */
+  acoes: { fechar: (form: FormData) => Promise<void>; dicas: (form: FormData) => Promise<void> } | null;
+  contato: { url: string; display: string };
+}
+
 export interface PropsDoShell {
   navegacao: Navegacao;
   /** Linha de contexto embaixo da marca (o parceiro na sessão, ou "Nível 1 · FlowFoods"). */
@@ -57,6 +71,8 @@ export interface PropsDoShell {
   sair: (() => Promise<void>) | null;
   /** Busca de insumos no servidor. Sem ela, o ⌘K procura só telas (e parceiros). */
   buscarInsumos?: (q: string) => Promise<ResultadoDaBusca[]>;
+  /** Ajuda contextual (0.6). Sem ela, não há botão "?" nem caixa. */
+  ajuda?: AjudaDoShell;
   /** Nível 1 dentro de um parceiro: busca os insumos DELE. */
   buscarInsumosDoParceiro?: (slug: string, q: string) => Promise<ResultadoDaBusca[]>;
 }

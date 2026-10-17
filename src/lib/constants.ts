@@ -38,6 +38,12 @@ export const AJUDA_DE_ACESSO_ERP = {
   display: '(21) 99641-6060',
 } as const;
 
+/** Dúvida de uso do ERP (0.6, rodapé da gaveta de ajuda): o mesmo WhatsApp, com o assunto certo. */
+export const AJUDA_DE_USO_ERP = {
+  url: `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent('Olá Rodolfo! Tenho uma dúvida no ERP da FlowFoods.')}`,
+  display: '(21) 99641-6060',
+} as const;
+
 export const CONTACT_INFO: ContactInfo = {
   whatsapp: WHATSAPP_NUMERO,
   whatsappUrl: whatsappUrl('flutuante'),

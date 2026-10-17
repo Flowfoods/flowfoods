@@ -14,6 +14,7 @@ import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao } from '../../ui/estilos';
+import { LinkDeAjuda } from '../../ui/link-de-ajuda';
 import { Aviso, Barra, Painel, Selo, Vazio } from '../../ui/superficies';
 import type { AcaoDeEstoque } from './estado';
 import { FormAbrirEstoque } from './formularios';
@@ -210,23 +211,9 @@ export function TelaSituacaoDoEstoque({
       </Painel>
 
       {algumaFechada && (
-        <details className="group rounded-[14px] border border-linha bg-painel" open={abertas.length === 0}>
-          <summary className="ff-transicao flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2.5 text-[13px] font-semibold text-texto sm:px-5 [&::-webkit-details-marker]:hidden">
-            Como abre o estoque de uma loja
-            <span aria-hidden className="text-suave transition-transform group-open:rotate-90">›</span>
-          </summary>
-          <ol className="grid gap-3 border-t border-linha px-4 py-4 text-sm text-suave sm:grid-cols-3 sm:px-5">
-            <li>
-              <span className="font-semibold text-texto">1. Contar.</span> Quem conta abre a lista no celular e digita o que tem: caixas fechadas e o solto. Salva sozinho; dá para contar em várias vezes e em várias pessoas.
-            </li>
-            <li>
-              <span className="font-semibold text-texto">2. Conferir.</span> O gerente vê o que falta, o que deu zero e o valor do estoque pelo custo de referência.
-            </li>
-            <li>
-              <span className="font-semibold text-texto">3. Concluir.</span> A contagem vira o saldo inicial. Daí em diante, nota lançada na loja entra no estoque na hora.
-            </li>
-          </ol>
-        </details>
+        <p>
+          <LinkDeAjuda secao="abertura">Como abre o estoque de uma loja</LinkDeAjuda>
+        </p>
       )}
     </div>
   );

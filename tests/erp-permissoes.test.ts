@@ -353,6 +353,10 @@ describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', 
     'acaoConfirmarRosto',
     'acaoRemoverRosto',
     'acaoEscolherVisao',
+    // 0.6: a preferência de ajuda é da própria pessoa; o usuário sai da sessão, nunca do formulário.
+    'acaoAjudaFechar',
+    'acaoAjudaDicas',
+    'acaoAjudaReabrir',
   ]);
 
   it('páginas chamam exigirPermissaoNaPagina', () => {

@@ -9,12 +9,15 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Menu } from 'lucide-react';
+import { entradaDoCaminho, caixaDaTela } from '@/lib/erp/ajuda-rota';
 import { abasDaArea, acoesDaNavegacao, itemAtivo, montarTrilha, telasDaNavegacao } from '@/lib/erp/modulos';
 import { comParceiroAtual, slugNoCaminho } from '@/lib/rodolfo/modulos';
 import { Abas } from '../ui/abas';
 import { Dialogo } from '../ui/Dialogo';
+import { ContextoDaAjuda } from '../ui/link-de-ajuda';
+import { assinaturaDaPreferencia, CaixaDeAula, GavetaDeAjuda, preferenciaEfetiva, type Otimista } from './ajuda';
 import { acaoGuardarMenu } from './acoes';
 import { BuscaGlobal } from './BuscaGlobal';
 import { MenuUsuario } from './MenuUsuario';
@@ -38,6 +41,11 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
   const [recolhido, setRecolhido] = useState(props.menuRecolhido);
   const [gaveta, setGaveta] = useState(false);
   const botaoMenu = useRef<HTMLButtonElement>(null);
+  const [ajudaAberta, setAjudaAberta] = useState(false);
+  const [secaoDaAjuda, setSecaoDaAjuda] = useState<string | null>(null);
+  const [otimista, setOtimista] = useState<Otimista | null>(null);
+  const botaoAjuda = useRef<HTMLButtonElement>(null);
+  const retornoDaAjuda = useRef<HTMLElement | null>(null);
 
   const parceiros = props.visao.modo === 'nivel1' ? props.visao.parceiros : null;
   const nav = useMemo(
@@ -52,7 +60,43 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
   };
 
   // Trocar de tela fecha a gaveta.
-  useEffect(() => setGaveta(false), [caminho]);
+  useEffect(() => {
+    setGaveta(false);
+    setAjudaAberta(false);
+  }, [caminho]);
+
+  // Ajuda (0.6): a entrada da tela vem da rota; a caixa, da preferência (a mesma conta no servidor e aqui).
+  const ajuda = props.ajuda;
+  const entradaDaTela = ajuda ? entradaDoCaminho(caminho, ajuda.entradas) : null;
+  const preferencia = preferenciaEfetiva(ajuda?.preferencia ?? null, otimista);
+  const estadoDaCaixa = entradaDaTela && ajuda?.acoes ? caixaDaTela(entradaDaTela, preferencia) : null;
+  const assinatura = assinaturaDaPreferencia(ajuda?.preferencia ?? null);
+
+  const abrirAjuda = useCallback(
+    (secao?: string, origem?: HTMLElement | null) => {
+      const ativoNoDocumento = document.activeElement as HTMLElement | null;
+      retornoDaAjuda.current = origem ?? (ativoNoDocumento && ativoNoDocumento !== document.body ? ativoNoDocumento : botaoAjuda.current);
+      setSecaoDaAjuda(secao ?? null);
+      setAjudaAberta(true);
+    },
+    [],
+  );
+
+  // Atalho "?" (Shift+/): fora de campo, sem outra janela aberta.
+  const temAjuda = entradaDaTela !== null;
+  useEffect(() => {
+    if (!temAjuda) return;
+    const tecla = (e: KeyboardEvent) => {
+      if (e.key !== '?' || e.ctrlKey || e.metaKey || e.altKey) return;
+      const alvo = e.target as HTMLElement | null;
+      if (alvo && (['INPUT', 'TEXTAREA', 'SELECT'].includes(alvo.tagName) || alvo.isContentEditable)) return;
+      if (document.querySelector('dialog[open]')) return;
+      e.preventDefault();
+      abrirAjuda(undefined, botaoAjuda.current);
+    };
+    window.addEventListener('keydown', tecla);
+    return () => window.removeEventListener('keydown', tecla);
+  }, [temAjuda, abrirAjuda]);
 
   const locais = useMemo<ResultadoDaBusca[]>(() => {
     const telas: ResultadoDaBusca[] = [
@@ -98,100 +142,151 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
   const extra = useTrilhaExtra();
   const trilha: ItemDaTrilha[] = montarTrilha(ativo, extra);
   const abas = abasDaArea(nav, ativo);
+  const outrasDaArea = abas ? { area: abas.area, telas: abas.abas.filter((a) => a.href !== ativo?.item.href).map((a) => ({ href: a.href, rotulo: a.rotulo })) } : null;
+
+  const contextoDaAjuda = useMemo(() => ({ abrir: abrirAjuda, disponivel: temAjuda }), [abrirAjuda, temAjuda]);
 
   return (
-    <div
-      className={`grid min-h-dvh grid-cols-[minmax(0,1fr)] ${
-        recolhido ? 'min-[900px]:grid-cols-[68px_minmax(0,1fr)]' : 'min-[900px]:grid-cols-[232px_minmax(0,1fr)]'
-      }`}
-    >
-      <aside
-        aria-label="Navegação"
-        className="sticky top-0 hidden h-dvh border-r border-linha bg-lateral min-[900px]:block"
+    <ContextoDaAjuda.Provider value={contextoDaAjuda}>
+      <div
+        className={`grid min-h-dvh grid-cols-[minmax(0,1fr)] ${
+          recolhido ? 'min-[900px]:grid-cols-[68px_minmax(0,1fr)]' : 'min-[900px]:grid-cols-[232px_minmax(0,1fr)]'
+        }`}
       >
-        <NavLateral
-          nav={nav}
-          estado={estado}
-          contexto={props.contexto}
-          versao={props.versao}
-          recolhido={recolhido}
-          aoRecolher={alternarMenu}
-        />
-      </aside>
+        <aside
+          aria-label="Navegação"
+          className="sticky top-0 hidden h-dvh border-r border-linha bg-lateral min-[900px]:block"
+        >
+          <NavLateral
+            nav={nav}
+            estado={estado}
+            contexto={props.contexto}
+            versao={props.versao}
+            recolhido={recolhido}
+            aoRecolher={alternarMenu}
+          />
+        </aside>
 
-      <div className="min-w-0">
-        <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-linha bg-fundo px-2 sm:px-4 lg:px-6">
-          <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-            <button
-              ref={botaoMenu}
-              type="button"
-              onClick={() => setGaveta(true)}
-              aria-label="Abrir o menu"
-              aria-expanded={gaveta}
-              aria-controls="ff-gaveta"
-              className={`${BOTAO_ICONE} min-[900px]:hidden`}
-            >
-              <Menu size={20} aria-hidden />
-            </button>
-            <nav aria-label="Você está em" className="hidden min-w-0 sm:block">
-              <ol className="flex min-w-0 items-center gap-1.5 text-[13px]">
-                <li className="shrink-0">
-                  <Link href={nav.inicio.href} className="ff-transicao rounded-[5px] text-suave hover:text-texto">
-                    Início
-                  </Link>
-                </li>
-                {/* Abaixo de 1024 px (tablet a 820), os níveis do meio dão lugar a "…": fica o pai e a tela atual, sem cortar o nome. */}
-                {trilha.length > 2 && (
-                  <li className="flex shrink-0 items-center gap-1.5 text-suave lg:hidden">
-                    <ChevronRight size={14} aria-hidden className="shrink-0" />
-                    <span title={trilha.slice(0, -2).map((t) => t.rotulo).join(' › ')}>…</span>
+        <div className="min-w-0">
+          <header className="sticky top-0 z-30 flex h-16 items-center justify-between gap-2 border-b border-linha bg-fundo px-2 sm:px-4 lg:px-6">
+            <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+              <button
+                ref={botaoMenu}
+                type="button"
+                onClick={() => setGaveta(true)}
+                aria-label="Abrir o menu"
+                aria-expanded={gaveta}
+                aria-controls="ff-gaveta"
+                className={`${BOTAO_ICONE} min-[900px]:hidden`}
+              >
+                <Menu size={20} aria-hidden />
+              </button>
+              <nav aria-label="Você está em" className="hidden min-w-0 sm:block">
+                <ol className="flex min-w-0 items-center gap-1.5 text-[13px]">
+                  <li className="shrink-0">
+                    <Link href={nav.inicio.href} className="ff-transicao rounded-[5px] text-suave hover:text-texto">
+                      Início
+                    </Link>
                   </li>
-                )}
-                {trilha.map((t, n) => (
-                  <li key={t.rotulo + n} className={`min-w-0 items-center gap-1.5 ${n < trilha.length - 2 ? 'hidden lg:flex' : 'flex'}`}>
-                    <ChevronRight size={14} aria-hidden className="shrink-0 text-suave" />
-                    {t.href && n < trilha.length - 1 ? (
-                      <Link href={t.href} className="ff-transicao truncate rounded-[5px] text-suave hover:text-texto">
-                        {t.rotulo}
-                      </Link>
-                    ) : (
-                      <span
-                        className={`truncate ${n === trilha.length - 1 ? 'font-medium text-texto' : 'text-suave'}`}
-                        aria-current={n === trilha.length - 1 ? 'page' : undefined}
-                      >
-                        {t.rotulo}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ol>
-            </nav>
-          </div>
+                  {/* Abaixo de 1024 px (tablet a 820), os níveis do meio dão lugar a "…": fica o pai e a tela atual, sem cortar o nome. */}
+                  {trilha.length > 2 && (
+                    <li className="flex shrink-0 items-center gap-1.5 text-suave lg:hidden">
+                      <ChevronRight size={14} aria-hidden className="shrink-0" />
+                      <span title={trilha.slice(0, -2).map((t) => t.rotulo).join(' › ')}>…</span>
+                    </li>
+                  )}
+                  {trilha.map((t, n) => (
+                    <li key={t.rotulo + n} className={`min-w-0 items-center gap-1.5 ${n < trilha.length - 2 ? 'hidden lg:flex' : 'flex'}`}>
+                      <ChevronRight size={14} aria-hidden className="shrink-0 text-suave" />
+                      {t.href && n < trilha.length - 1 ? (
+                        <Link href={t.href} className="ff-transicao truncate rounded-[5px] text-suave hover:text-texto">
+                          {t.rotulo}
+                        </Link>
+                      ) : (
+                        <span
+                          className={`truncate ${n === trilha.length - 1 ? 'font-medium text-texto' : 'text-suave'}`}
+                          aria-current={n === trilha.length - 1 ? 'page' : undefined}
+                        >
+                          {t.rotulo}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ol>
+              </nav>
+            </div>
 
-          <div className="flex min-w-0 items-center gap-1 sm:gap-2">
-            <SeletorVisao visao={props.visao} />
-            <BuscaGlobal locais={locais} buscarNoServidor={buscarNoServidor} />
-            <Notificacoes itens={props.notificacoes} />
-            <MenuUsuario usuario={props.usuario} tema={props.tema} links={props.links} sair={props.sair} />
-          </div>
-        </header>
+            <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+              <SeletorVisao visao={props.visao} />
+              <BuscaGlobal locais={locais} buscarNoServidor={buscarNoServidor} />
+              {entradaDaTela && (
+                <button
+                  ref={botaoAjuda}
+                  type="button"
+                  onClick={() => abrirAjuda(undefined, botaoAjuda.current)}
+                  aria-label="Ajuda desta tela"
+                  aria-haspopup="dialog"
+                  aria-expanded={ajudaAberta}
+                  aria-keyshortcuts="?"
+                  title="Ajuda desta tela (?)"
+                  className={BOTAO_ICONE}
+                >
+                  <span aria-hidden className="grid h-6 w-6 place-items-center rounded-full border border-current text-[13px] font-semibold leading-none">
+                    ?
+                  </span>
+                </button>
+              )}
+              <Notificacoes itens={props.notificacoes} />
+              <MenuUsuario usuario={props.usuario} tema={props.tema} links={props.links} sair={props.sair} />
+            </div>
+          </header>
 
-        <main id="conteudo" className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
-          {abas && (
-            <Abas
-              rotulo={`Seções de ${abas.area}`}
-              abas={abas.abas.map((a) => ({ href: a.href, rotulo: a.rotulo, ativa: a.href === ativo?.item.href }))}
-            />
-          )}
-          {children}
-        </main>
-      </div>
-
-      <Dialogo id="ff-gaveta" aberto={gaveta} aoFechar={() => setGaveta(false)} titulo="Menu" gaveta>
-        <div className="min-h-0 flex-1">
-          <NavLateral nav={nav} estado={estado} contexto={props.contexto} versao={props.versao} />
+          <main id="conteudo" className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+            {abas && (
+              <Abas
+                rotulo={`Seções de ${abas.area}`}
+                abas={abas.abas.map((a) => ({ href: a.href, rotulo: a.rotulo, ativa: a.href === ativo?.item.href }))}
+              />
+            )}
+            {entradaDaTela && estadoDaCaixa && ajuda?.acoes && (
+              <CaixaDeAula
+                entrada={entradaDaTela}
+                estado={estadoDaCaixa}
+                acoes={ajuda.acoes}
+                aoFechar={(caixa) =>
+                  setOtimista((o) => ({ assinatura, fechadas: [...(o?.assinatura === assinatura ? o.fechadas : []), caixa], dicasLigadas: o?.assinatura === assinatura ? o.dicasLigadas : undefined, escolhida: o?.assinatura === assinatura ? o.escolhida : undefined }))
+                }
+                aoEscolher={(v) =>
+                  setOtimista((o) => ({ assinatura, fechadas: o?.assinatura === assinatura ? o.fechadas : [], dicasLigadas: v === 'manter', escolhida: true }))
+                }
+                aoVerTudo={(origem) => abrirAjuda(undefined, origem)}
+              />
+            )}
+            {children}
+          </main>
         </div>
-      </Dialogo>
-    </div>
+
+        {entradaDaTela && ajuda && (
+          <GavetaDeAjuda
+            aberta={ajudaAberta}
+            aoFechar={() => setAjudaAberta(false)}
+            entrada={entradaDaTela}
+            secao={secaoDaAjuda}
+            outras={outrasDaArea}
+            preferencia={preferencia}
+            acoes={ajuda.acoes}
+            contato={ajuda.contato}
+            voltarPara={retornoDaAjuda}
+            aoReligar={() => setOtimista({ assinatura, fechadas: [], dicasLigadas: true, escolhida: true })}
+          />
+        )}
+
+        <Dialogo id="ff-gaveta" aberto={gaveta} aoFechar={() => setGaveta(false)} titulo="Menu" gaveta>
+          <div className="min-h-0 flex-1">
+            <NavLateral nav={nav} estado={estado} contexto={props.contexto} versao={props.versao} />
+          </div>
+        </Dialogo>
+      </div>
+    </ContextoDaAjuda.Provider>
   );
 }
