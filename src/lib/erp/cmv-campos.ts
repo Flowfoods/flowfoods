@@ -225,14 +225,19 @@ export function cmvDoEscopo(cmv: CmvDoDre, escopo: { tipo: 'rede' } | { tipo: 'l
     const ehMisto = fonte === 'misto';
     const nomes = (ls: readonly CmvDaLoja[]) => lista(ls.map((l) => l.lojaNome));
     const motivos = Array.from(new Set(dasCompras.map(porque).filter(Boolean)));
-    const partes: string[] = [];
-    if (doReal.length) partes.push(ehMisto ? `real em ${nomes(doReal)}` : 'real (contagem)');
-    if (dasCompras.length) {
-      if (ehMisto) partes.push(`pelas compras em ${nomes(dasCompras)}${motivos.length === 1 ? ` (${motivos[0]})` : ''}`);
-      else partes.push(cmv.parcial ? 'pelas compras · parcial' : `pelas compras${motivos.length === 1 ? `: ${motivos[0]}` : ''}`);
-    }
-    if (semNada.length) partes.push(`sem o CMV de ${nomes(semNada)}`);
-    nota = `${ehMisto ? 'misto: ' : ''}${partes.join('; ')}`;
+    // Do mais completo ao mais curto: com o motivo, só com os nomes, só com as contagens (a nota da fotografia cabe em 120 letras).
+    const montar = (comMotivo: boolean) => {
+      const partes: string[] = [];
+      if (doReal.length) partes.push(ehMisto ? `real em ${nomes(doReal)}` : 'real (contagem)');
+      if (dasCompras.length) {
+        if (ehMisto) partes.push(`pelas compras em ${nomes(dasCompras)}${comMotivo && motivos.length === 1 ? ` (${motivos[0]})` : ''}`);
+        else partes.push(cmv.parcial ? 'pelas compras · parcial' : `pelas compras${comMotivo && motivos.length === 1 ? `: ${motivos[0]}` : ''}`);
+      }
+      if (semNada.length) partes.push(`sem o CMV de ${nomes(semNada)}`);
+      return `${ehMisto ? 'misto: ' : ''}${partes.join('; ')}`;
+    };
+    nota = montar(true);
+    if (nota.length > LIMITE_DA_NOTA) nota = montar(false);
     if (nota.length > LIMITE_DA_NOTA) {
       const c: string[] = [];
       if (doReal.length) c.push(`real em ${plural(doReal.length, 'loja', 'lojas')}`);
@@ -248,8 +253,11 @@ export function cmvDoEscopo(cmv: CmvDoDre, escopo: { tipo: 'rede' } | { tipo: 'l
   const compraNota = relevantes.length === 0 || comCompra.length === 0 ? 'sem nota de compra no período' : comCompra.length < relevantes.length ? `notas em ${comCompra.length} de ${relevantes.length} lojas` : null;
   const realSoma = doReal.length === 0 ? null : doReal.reduce((s, l) => s + l.real!.centavos, 0);
   let realNota: string | null;
-  if (doReal.length === 0) realNota = relevantes.length === 0 ? 'não apurado' : relevantes[0].motivoSemReal ?? 'não apurado';
-  else if (escopo.tipo === 'loja') realNota = `inicial ${formatarDinheiro(doReal[0].real!.inicialCentavos)} + compras ${formatarDinheiro(doReal[0].real!.comprasReaisCentavos)} − final ${formatarDinheiro(doReal[0].real!.finalCentavos)}`;
+  if (doReal.length === 0) {
+    // Uma loja: o motivo dela. A rede: o que vale para todas (o período em curso fecha na contagem), senão que nenhuma tem.
+    const fecha = relevantes.map((l) => l.motivoSemReal ?? '').find((m) => m.startsWith('fecha na contagem'));
+    realNota = relevantes.length === 0 ? 'não apurado' : escopo.tipo === 'loja' ? relevantes[0].motivoSemReal ?? 'não apurado' : fecha ?? 'o real não foi apurado em nenhuma loja';
+  } else if (escopo.tipo === 'loja') realNota = `inicial ${formatarDinheiro(doReal[0].real!.inicialCentavos)} + compras ${formatarDinheiro(doReal[0].real!.comprasReaisCentavos)} − final ${formatarDinheiro(doReal[0].real!.finalCentavos)}`;
   else realNota = doReal.length < relevantes.length ? `apurado em ${doReal.length} de ${relevantes.length} lojas` : null;
   if (realNota && realNota.length > LIMITE_DA_NOTA) realNota = realNota.slice(0, LIMITE_DA_NOTA - 1) + '…';
 

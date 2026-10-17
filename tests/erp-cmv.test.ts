@@ -203,6 +203,17 @@ describe('2.3 · qual CMV entra no resultado (decisão 165)', () => {
     expect(e.real).toEqual({ centavos: null, nota: 'fecha na contagem de fechamento (abre em 29/10)' });
   });
 
+  it('selo comprido: primeiro perde o motivo, mantém os nomes das lojas; só depois vira contagem', () => {
+    const lojas: CmvDaLoja[] = [
+      { ...vp, lojaNome: 'Casa Vila da Penha' },
+      { ...dl, lojaNome: 'Casa Vila da Penha Delivery' },
+      { ...ct, lojaNome: 'Casa Centro' },
+    ];
+    const e = cmvDoEscopo({ lojas, parcial: false }, { tipo: 'rede' }, rec);
+    expect(e.nota).toBe('misto: real em Casa Vila da Penha; pelas compras em Casa Vila da Penha Delivery; sem o CMV de Casa Centro');
+    expect(e.nota.length).toBeLessThanOrEqual(LIMITE_DA_NOTA);
+  });
+
   it('o selo cabe em 120 letras mesmo com 50 lojas (o banco recusa mais)', () => {
     const lojas: CmvDaLoja[] = Array.from({ length: 50 }, (_, i) => ({
       lojaId: `l${i}`,

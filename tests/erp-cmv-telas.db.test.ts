@@ -154,7 +154,8 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · telas do CMV (Postgres real)', { timeout
   it('critério 16: o gerente da Vila da Penha recebe só a loja dele, também pela URL (`?rede=1`, `?loja=<Unidade Entrega>`); nada da Unidade Entrega, do Centro nem da base da conta', async () => {
     como(alcanceDe('GERENTE', [ids.vp]), { tipo: 'loja', lojaId: ids.vp });
     atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }];
-    for (const query of [{ periodo: '2026-09-10' }, { periodo: '2026-09-10', rede: '1' }, { periodo: '2026-09-10', loja: ids.dl }, { periodo: '2026-09-10', loja: ids.ct }]) {
+    const consultas: Record<string, string>[] = [{ periodo: '2026-09-10' }, { periodo: '2026-09-10', rede: '1' }, { periodo: '2026-09-10', loja: ids.dl }, { periodo: '2026-09-10', loja: ids.ct }];
+    for (const query of consultas) {
       const h = await html(query);
       expect(h, JSON.stringify(query)).toContain('R$ 20.300,00');
       expect(h).toContain('CMV: compra × real');
