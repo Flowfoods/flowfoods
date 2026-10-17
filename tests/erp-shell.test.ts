@@ -18,6 +18,7 @@ import { join } from 'node:path';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance, type VinculoDePermissao } from '@/lib/erp/permissoes';
 import {
+  acoesDaNavegacao,
   iniciais,
   itemAtivo,
   modulosDoParceiro,
@@ -47,33 +48,45 @@ const vinculo = (v: Partial<VinculoDePermissao>): VinculoDePermissao => ({
 });
 const alcance = (v: Partial<VinculoDePermissao>) => resolverAlcance(vinculo(v));
 
+// As abas (os itens do menu); as ações das áreas ficam em `acoes`, fora do menu e do hub (UX.9).
 const hrefs = (a: Alcance, base?: string) =>
   modulosDoParceiro(a, base).flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.href)));
+const hrefsDasAcoes = (a: Alcance, base?: string) => modulosDoParceiro(a, base).flatMap((m) => m.acoes.map((i) => i.href));
 const futuros = (a: Alcance) =>
   modulosDoParceiro(a)
     .filter((m) => !m.href)
     .map((m) => m.chave);
 
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
-  it('Dono: todas as telas construídas (com Ficha técnica, 1.2, Compras, 1.5, e Estoque, 1.6) e os três módulos futuros', () => {
+  it('Dono: as abas de cada área (UX.9), as ações fora do menu e os três módulos futuros', () => {
     const a = alcance({ perfilBase: 'DONO' });
+    expect(modulosDoParceiro(a).filter((m) => m.href).map((m) => m.nome)).toEqual([
+      'Cadastros e Cardápio',
+      'Compras e Fornecedores',
+      'Estoque e Movimentações',
+      'Rede e Equipe',
+    ]);
     expect(hrefs(a)).toEqual([
       '/erp/insumos',
-      '/erp/insumos/novo',
       '/erp/fichas',
-      '/erp/fichas/nova',
-      '/erp/fichas/importar',
       '/erp/fichas/canais',
       '/erp/compras',
-      '/erp/compras/nova',
       '/erp/compras/fornecedores',
       '/erp/estoque',
+      '/erp/estoque/contagens',
       '/erp/estoque/requisicoes',
       '/erp/estoque/divergencias',
       '/erp/lojas',
       '/erp/equipe',
       '/erp/historico',
       '/erp/acesso',
+    ]);
+    expect(hrefsDasAcoes(a)).toEqual([
+      '/erp/insumos/novo',
+      '/erp/fichas/nova',
+      '/erp/fichas/importar',
+      '/erp/compras/nova',
+      '/erp/compras/fornecedores/novo',
     ]);
     expect(futuros(a)).toEqual(['dre', 'producao', 'etiquetas']);
   });
@@ -90,8 +103,9 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
   it('Operador: insumos, fichas, estoque (1.6: ele conta), lojas e Seu acesso; sem Equipe e Histórico; futuros só os que ele vai ver', () => {
     const a = alcance({ perfilBase: 'OPERADOR' });
     // Operador VÊ fichas (bate o olho na foto e no preparo), sem criar nem importar.
-    // 1.8: ele pede requisição (o quadro aparece); divergências são de quem confere contagem.
-    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/fichas', '/erp/estoque', '/erp/estoque/requisicoes', '/erp/lojas', '/erp/acesso']);
+    // 1.8: ele pede requisição (o quadro aparece); divergências são de quem confere contagem. UX.9: vê as contagens (estoque.ver), sem Precificação e sem ação nenhuma.
+    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/lojas', '/erp/acesso']);
+    expect(hrefsDasAcoes(a)).toEqual([]);
     expect(futuros(a)).toEqual(['producao', 'etiquetas']);
   });
 
@@ -107,18 +121,18 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     expect(hrefs(alcance({ perfilBase: null, perfilProprio: ['estoque.ajustar'] }))).toEqual(['/erp/estoque/divergencias', '/erp/acesso']);
   });
 
-  it('1.8: o quadro e as divergências de uma loja acendem o item do menu deles, não "Estoque por loja"', () => {
+  it('1.8: o quadro e as divergências de uma loja acendem a aba deles, não a "Visão geral"', () => {
     const nav = navegacaoDoParceiro(alcance({ perfilBase: 'DONO' }));
     expect(itemAtivo(nav, '/erp/estoque/l1/requisicoes')?.item.rotulo).toBe('Requisições');
     expect(itemAtivo(nav, '/erp/estoque/l1/requisicoes/r9/atender')?.item.rotulo).toBe('Requisições');
     expect(itemAtivo(nav, '/erp/estoque/l1/divergencias')?.item.rotulo).toBe('Divergências');
-    expect(itemAtivo(nav, '/erp/estoque/l1')?.item.rotulo).toBe('Estoque por loja');
+    expect(itemAtivo(nav, '/erp/estoque/l1')?.item.rotulo).toBe('Visão geral');
   });
 
-  it('perfil sem "ver insumos": o módulo Insumos nem aparece; Seu acesso sempre aparece', () => {
+  it('perfil sem "ver insumos" nem "ver fichas": a área Cadastros e Cardápio nem aparece; Seu acesso sempre aparece', () => {
     const a = alcance({ perfilBase: null, perfilProprio: ['lojas.ver'] });
     const mods = modulosDoParceiro(a);
-    expect(mods.map((m) => m.chave)).not.toContain('insumo');
+    expect(mods.map((m) => m.chave)).not.toContain('cadastros');
     expect(hrefs(a)).toEqual(['/erp/lojas', '/erp/acesso']);
     expect(futuros(a)).toEqual([]);
   });
@@ -135,15 +149,12 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     const h = hrefs(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins');
     expect(h).toEqual([
       '/rodolfo/erp/valentins/insumos',
-      '/rodolfo/erp/valentins/insumos/novo',
       '/rodolfo/erp/valentins/fichas',
-      '/rodolfo/erp/valentins/fichas/nova',
-      '/rodolfo/erp/valentins/fichas/importar',
       '/rodolfo/erp/valentins/fichas/canais',
       '/rodolfo/erp/valentins/compras',
-      '/rodolfo/erp/valentins/compras/nova',
       '/rodolfo/erp/valentins/compras/fornecedores',
       '/rodolfo/erp/valentins/estoque',
+      '/rodolfo/erp/valentins/estoque/contagens',
       '/rodolfo/erp/valentins/estoque/requisicoes',
       '/rodolfo/erp/valentins/estoque/divergencias',
       '/rodolfo/erp/valentins/lojas',
@@ -153,8 +164,9 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     ]);
   });
 
-  it('cada tela do menu do /erp existe no disco (nenhum destino para tela que não existe)', () => {
-    for (const h of hrefs(alcance({ perfilBase: 'DONO' }))) {
+  it('cada aba e cada ação do /erp existe no disco (nenhum destino para tela que não existe)', () => {
+    const dono = alcance({ perfilBase: 'DONO' });
+    for (const h of [...hrefs(dono), ...hrefsDasAcoes(dono)]) {
       expect(existsSync(join('src', 'app', ...h.split('/').filter(Boolean), 'page.tsx')), h).toBe(true);
     }
     expect(existsSync(join('src', 'app', 'erp', 'page.tsx'))).toBe(true);
@@ -186,8 +198,19 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
     const parceiros = [{ slug: 'valentins', nome: "Grupo Valentin's" }];
     const dentro = comParceiroAtual(nav, '/rodolfo/erp/valentins/insumos', parceiros);
     const grupos = dentro.modulos.find((m) => m.chave === 'parceiros')!.grupos;
-    expect(grupos.map((g) => g.rotulo)).toEqual(['Parceiros', "Grupo Valentin's"]);
-    expect(grupos[1].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
+    // UX.9: o hub do parceiro e UM GRUPO POR ÁREA (cada um com as abas dela).
+    expect(grupos.map((g) => g.rotulo)).toEqual([
+      'Parceiros',
+      "Grupo Valentin's",
+      'Cadastros e Cardápio',
+      'Compras e Fornecedores',
+      'Estoque e Movimentações',
+      'Rede e Equipe',
+    ]);
+    expect(grupos[1].itens.map((i) => i.rotulo)).toEqual(['Áreas do parceiro']);
+    expect(grupos[5].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
+    // As ações das áreas vão junto (o ⌘K do nível 1 as acha), sob a base do parceiro.
+    expect(acoesDaNavegacao(dentro).map((a) => a.href)).toContain('/rodolfo/erp/valentins/compras/nova');
     expect(comParceiroAtual(nav, '/rodolfo/erp/outro/insumos', parceiros)).toBe(nav);
     expect(comParceiroAtual(nav, '/rodolfo/leads', parceiros)).toBe(nav);
     expect(slugNoCaminho('/rodolfo/erp/valentins')).toBe('valentins');
@@ -200,7 +223,7 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
     expect(itemAtivo(nav, '/rodolfo')).toBeNull();
     const dentro = comParceiroAtual(nav, '/rodolfo/erp/v/lojas', [{ slug: 'v', nome: 'V' }]);
     expect(itemAtivo(dentro, '/rodolfo/erp/v/lojas')?.item.href).toBe('/rodolfo/erp/v/lojas');
-    expect(itemAtivo(dentro, '/rodolfo/erp/v')?.item.rotulo).toBe('Módulos do parceiro');
+    expect(itemAtivo(dentro, '/rodolfo/erp/v')?.item.rotulo).toBe('Áreas do parceiro');
   });
 
   it('busca ⌘K do parceiro só lista telas permitidas', () => {

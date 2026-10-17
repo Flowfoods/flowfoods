@@ -22,6 +22,7 @@ export function modulosDoNivel1(): ModuloNav[] {
       icone: 'comercial',
       cor: COR.comercial,
       href: '/rodolfo/hoje',
+      acoes: [],
       grupos: [
         {
           rotulo: 'Prospecção',
@@ -71,6 +72,7 @@ export function modulosDoNivel1(): ModuloNav[] {
       icone: 'clientes',
       cor: COR.clientes,
       href: '/rodolfo/portal',
+      acoes: [],
       grupos: [
         {
           rotulo: 'Diagnóstico',
@@ -93,6 +95,7 @@ export function modulosDoNivel1(): ModuloNav[] {
       icone: 'parceiros',
       cor: COR.parceiros,
       href: '/rodolfo/erp',
+      acoes: [],
       grupos: [
         {
           rotulo: 'Parceiros',
@@ -121,6 +124,7 @@ export function modulosDoNivel1(): ModuloNav[] {
       icone: 'sistema',
       cor: COR.sistema,
       href: '/rodolfo/config',
+      acoes: [],
       grupos: [
         {
           rotulo: 'Ajustes',
@@ -155,8 +159,10 @@ export function slugNoCaminho(caminho: string): string | null {
 
 /**
  * Dentro de um parceiro, o módulo "Parceiros Flow" ganha o ERP DELE: o hub do
- * parceiro e as mesmas telas que a pessoa do parceiro vê em /erp (com o
- * alcance do nível 1). Fora de parceiro, a navegação fica como está.
+ * parceiro e as mesmas áreas que a pessoa do parceiro vê em /erp (com o
+ * alcance do nível 1), UM GRUPO POR ÁREA com as abas dela. As ações das áreas
+ * (Novo insumo, Lançar nota...) vêm junto, para o ⌘K. Fora de parceiro, a
+ * navegação fica como está.
  */
 export function comParceiroAtual(
   nav: Navegacao,
@@ -167,16 +173,18 @@ export function comParceiroAtual(
   const parceiro = slug ? parceiros.find((p) => p.slug === slug) : undefined;
   if (!parceiro) return nav;
   const base = `/rodolfo/erp/${parceiro.slug}`;
+  const areas = modulosDoParceiro(ALCANCE_FLOWFOODS, base).filter((m) => m.href);
   const doParceiro: GrupoNav = {
     rotulo: parceiro.nome,
     icone: 'rede',
-    itens: [
-      { href: base, rotulo: 'Módulos do parceiro', icone: 'inicio', subtitulo: `Hub de ${parceiro.nome}` },
-      ...modulosDoParceiro(ALCANCE_FLOWFOODS, base).flatMap((m) => m.grupos.flatMap((g) => g.itens)),
-    ],
+    itens: [{ href: base, rotulo: 'Áreas do parceiro', icone: 'inicio', subtitulo: `Hub de ${parceiro.nome}` }],
   };
+  const grupos: GrupoNav[] = areas.map((a) => ({ rotulo: a.nome, icone: a.icone, itens: a.grupos.flatMap((g) => g.itens) }));
+  const acoes = areas.flatMap((a) => a.acoes);
   return {
     ...nav,
-    modulos: nav.modulos.map((m) => (m.chave === 'parceiros' ? { ...m, grupos: [...m.grupos, doParceiro] } : m)),
+    modulos: nav.modulos.map((m) =>
+      m.chave === 'parceiros' ? { ...m, grupos: [...m.grupos, doParceiro, ...grupos], acoes } : m,
+    ),
   };
 }
