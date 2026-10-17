@@ -1311,8 +1311,9 @@ model Requisicao {
   fichaNomeSnapshot        String?
   fichaQuantidadeMilesimos Int?
 
-  itens          RequisicaoItem[]
-  ordensProducao OrdemProducao[]
+  itens         RequisicaoItem[]
+  // 3.1: a ordem de produção que pediu esta requisição (no máximo uma; índice único na migration).
+  ordemProducao OrdemProducao?
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, lojaId, numero])
@@ -1385,12 +1386,37 @@ model OrdemProducao {
   observacao              String?
   criadoEm                DateTime       @default(now())
 
+  // 3.1: produzir o pré-preparo pela ficha. A ordem CRIA a requisição dela na mesma transação (a baixa é a
+  // entrega dessa requisição); concluir exige a requisição atendida, grava UM PRODUCAO_ENTRADA no insumo
+  // produzido da mesma loja e fecha o custo do lote (baixas reais ÷ produzido, fração exata, nunca gravada).
+  // Versão (concluir duas vezes = uma entrada), unidade e nomes de quem fez (texto: credencial fora do tenant),
+  // cancelamento com motivo (CANCELADA com concluidaEm = estornada), motivo da diferença de rendimento,
+  // quantos insumos da baixa ficaram sem preço, a conservação escolhida na conclusão e a validade que ela deu.
+  versao                  Int            @default(0)
+  unidadeSnapshot         UnidadeBase?
+  chaveIdempotencia       String?
+  planejadaPorNome        String?
+  iniciadaPorNome         String?
+  concluidaPorNome        String?
+  canceladaPorNome        String?
+  canceladaEm             DateTime?
+  motivoCancelamento      String?
+  motivoRendimento        String?
+  insumosSemPreco         Int?
+  conservacaoSnapshot     Conservacao?
+  validadeMinSnapshot     Int?
+  validadeEm              DateTime?
+  responsavelUsuarioId    String?
+
   movimentos MovimentoEstoque[]
   etiquetas  Etiqueta[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, codigoLote])
+  @@unique([parceiroId, requisicaoId])
+  @@unique([parceiroId, chaveIdempotencia])
   @@index([parceiroId, lojaId, dataPlanejada])
+  @@index([parceiroId, lojaId, status])
   @@index([parceiroId, responsavelId, concluidaEm])
 }
 
