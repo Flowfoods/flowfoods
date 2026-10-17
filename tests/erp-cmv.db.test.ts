@@ -22,7 +22,7 @@ import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { salvarCanaisDaLoja } from '@/lib/erp/faturamento';
 import { cadastrarInsumo } from '@/lib/erp/insumos';
-import { concluirAbertura, contarItem, gravarMovimentos, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
+import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
 import { concluirContagem, iniciarFechamento } from '@/lib/erp/contagem';
 import { lancarDespesa } from '@/lib/erp/despesas';
 import type { TextosDaDespesa } from '@/lib/erp/despesa-campos';
@@ -36,17 +36,13 @@ import { planoEfetivo } from '@/lib/erp/dre-plano';
 import { salvarMetas, situacaoDasMetas } from '@/lib/erp/dre-metas';
 import { cmvDasLojas } from '@/lib/erp/cmv';
 import { SEM_CMV, FRASE_DO_CMV_ANTIGO } from '@/lib/erp/cmv-campos';
-import { periodoDe, registrarPeriodo } from '@/lib/erp/periodos';
+import { periodoDe } from '@/lib/erp/periodos';
 import { travarParaEscrever } from '@/lib/erp/periodo-trava';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
+import { abertura, BRT, ciclica, dia, faturamento, fechamentoDeEstoque, movimento, nota, periodoRegistrado, R, sp } from './erp-cmv-apoio';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
-const dia = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
-/** O Rio é UTC−3: 09:00 em São Paulo = 12:00Z. */
-const BRT = (iso: string, hora: string) => new Date(`${iso}T${hora}:00.000-03:00`);
-const R = (reais: number) => Math.round(reais * 100);
-const sp = (s: string | null | undefined) => (s ?? '').replace(/ /g, ' ');
 
 describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout: 300_000 }, () => {
   let db: PrismaClient;
@@ -67,108 +63,6 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
   const dre = (al: Alcance, escopo: { tipo: 'rede' } | { tipo: 'loja'; lojaId: string }, data: string, hoje: string, cliente = a): Promise<DreDoPeriodo | null> => dreDoPeriodo(cliente, al, escopo, data, hoje);
   const linha = (d: DreDoPeriodo, chave: string) => d.resultado.linhas.find((l) => l.chave === chave)!;
   const periodoReg = (inicio: string, cliente = a) => cliente.periodoApuracao.findFirst({ where: { inicio: dia(inicio) } });
-
-  // ------------------------------------------------------------ o que o teste planta (sempre pelo portão)
-  const nota = (cliente: ClienteDoParceiro, insumoId: string, p: { lojaId: string; numero: string; data: string; centavos: number; frete?: number; lancadaEm: Date; status?: 'LANCADA' | 'CANCELADA'; movimenta?: boolean }) =>
-    cliente.transacao(async (tx) => {
-      const frete = p.frete ?? 0;
-      const cancelada = p.status === 'CANCELADA';
-      const n = await tx.notaEntrada.create({
-        data: {
-          parceiroId: tx.parceiroId,
-          lojaId: p.lojaId,
-          numero: p.numero,
-          entradaEm: dia(p.data),
-          totalCentavos: p.centavos + frete,
-          freteCentavos: frete,
-          status: cancelada ? 'CANCELADA' : 'LANCADA',
-          lancadaEm: p.lancadaEm,
-          ...(cancelada ? { canceladaEm: p.lancadaEm, motivoCancelamento: 'teste' } : {}),
-        },
-      });
-      await tx.notaEntradaItem.create({
-        data: {
-          parceiroId: tx.parceiroId,
-          notaId: n.id,
-          insumoId,
-          descricaoNota: 'Insumo',
-          insumoNomeSnapshot: 'Insumo CMV',
-          unidadeSnapshot: 'KG',
-          embalagensMilesimos: 1000,
-          conteudoMilesimos: 1000,
-          quantidadeMilesimos: p.centavos * 10,
-          valorTotalCentavos: p.centavos,
-          freteRateadoCentavos: frete,
-        },
-      });
-      if (p.movimenta) {
-        await gravarMovimentos(
-          tx,
-          [{ lojaId: p.lojaId, insumoId, tipo: 'ENTRADA_COMPRA', quantidadeMilesimos: (p.centavos + frete) * 10, valorCentavos: p.centavos + frete, insumoNome: 'Insumo CMV', unidade: 'KG', motivo: `Nota ${p.numero}`, chave: `nota:${n.id}`, notaId: n.id }],
-          { ocorridoEm: p.lancadaEm },
-        );
-      }
-      return n.id;
-    });
-
-  /** Uma saída ou ajuste solto no livro (requisição, cíclica, perda): tipo AJUSTE, o dia do Rio é o que conta. */
-  const movimento = (cliente: ClienteDoParceiro, insumoId: string, lojaId: string, centavos: number, quando: Date, motivo: string) =>
-    cliente.transacao((tx) =>
-      gravarMovimentos(tx, [{ lojaId, insumoId, tipo: 'AJUSTE', quantidadeMilesimos: centavos * 10, valorCentavos: centavos, insumoNome: 'Insumo CMV', unidade: 'KG', motivo, chave: `teste:${motivo}:${quando.toISOString()}` }], { ocorridoEm: quando }),
-    );
-
-  const abertura = (cliente: ClienteDoParceiro, lojaId: string, quando: Date, valor: number, semPreco = 0) =>
-    cliente.contagem.create({
-      data: { parceiroId: cliente.parceiroId, lojaId, tipo: 'ABERTURA', status: 'FECHADA', desfecho: 'APLICADA', referenciaEm: dia(quando.toISOString().slice(0, 10)), fechadaEm: quando, fechadaPorNome: 'Marina', valorTotalCentavos: R(valor), itensSemPreco: semPreco },
-    });
-
-  /** O fechamento de estoque do período, aplicado em `quando`, com o retrato e (se pedido) um ajuste do próprio fechamento. */
-  const fechamentoDeEstoque = (cliente: ClienteDoParceiro, insumoId: string, lojaId: string, periodoId: string, p: { fim: string; quando: Date; retrato: number; proprioAjuste?: number; semPreco?: number | null }) =>
-    cliente.transacao(async (tx) => {
-      const c = await tx.contagem.create({ data: { parceiroId: tx.parceiroId, lojaId, periodoId, tipo: 'FECHAMENTO', status: 'ABERTA', referenciaEm: dia(p.fim), iniciadaPorNome: 'Marina', titulo: 'Fechamento' } });
-      if (p.proprioAjuste) {
-        const item = await tx.contagemItem.create({
-          data: { parceiroId: tx.parceiroId, contagemId: c.id, insumoId, insumoNomeSnapshot: 'Insumo CMV', unidadeSnapshot: 'KG', contadoMilesimos: 1000, contadoEm: p.quando, saldoSistemaMilesimos: 1000, valorSistemaCentavos: 0 },
-        });
-        await gravarMovimentos(
-          tx,
-          [{ lojaId, insumoId, tipo: 'CONTAGEM', quantidadeMilesimos: p.proprioAjuste * 10, valorCentavos: p.proprioAjuste, insumoNome: 'Insumo CMV', unidade: 'KG', motivo: 'Ajuste do próprio fechamento', chave: `contagem:${item.id}`, contagemItemId: item.id }],
-          { ocorridoEm: p.quando },
-        );
-      }
-      await tx.contagem.update({ where: { id: c.id }, data: { status: 'FECHADA', desfecho: 'APLICADA', fechadaEm: p.quando, fechadaPorNome: 'Marina', valorTotalCentavos: R(p.retrato), itensSemPreco: p.semPreco === undefined ? 0 : p.semPreco } });
-      return c.id;
-    });
-
-  /** Uma cíclica aplicada em `quando` (ajuste de contagem do dia a dia). */
-  const ciclica = (cliente: ClienteDoParceiro, insumoId: string, lojaId: string, centavos: number, quando: Date) =>
-    cliente.transacao(async (tx) => {
-      const c = await tx.contagem.create({ data: { parceiroId: tx.parceiroId, lojaId, tipo: 'CICLICA', status: 'ABERTA', referenciaEm: dia(quando.toISOString().slice(0, 10)), fechaAutomaticoEm: new Date(quando.getTime() + 86_400_000), iniciadaPorNome: 'Marina', titulo: 'Cíclica' } });
-      const item = await tx.contagemItem.create({
-        data: { parceiroId: tx.parceiroId, contagemId: c.id, insumoId, insumoNomeSnapshot: 'Insumo CMV', unidadeSnapshot: 'KG', contadoMilesimos: 1000, contadoEm: quando, saldoSistemaMilesimos: 1000, valorSistemaCentavos: 0 },
-      });
-      await gravarMovimentos(tx, [{ lojaId, insumoId, tipo: 'CONTAGEM', quantidadeMilesimos: centavos * 10, valorCentavos: centavos, insumoNome: 'Insumo CMV', unidade: 'KG', motivo: 'Contagem · Cíclica', chave: `contagem:${item.id}`, contagemItemId: item.id }], { ocorridoEm: quando });
-      await tx.contagem.update({ where: { id: c.id }, data: { status: 'FECHADA', desfecho: 'APLICADA', fechadaEm: quando, fechadaPorNome: 'Marina' } });
-    });
-
-  /** Faturamento já lançado para todos os dias do intervalo (zero = "não vendeu"), uma linha por loja × dia no único canal da loja. */
-  const faturamento = (cliente: ClienteDoParceiro, lojaId: string, canal: 'LOJA' | 'DELIVERY_PROPRIO', de: string, ate: string, vendas: Record<string, number>) =>
-    cliente.transacao(async (tx) => {
-      const linhas = [];
-      for (let t = dia(de).getTime(); t <= dia(ate).getTime(); t += 86_400_000) {
-        const d = new Date(t).toISOString().slice(0, 10);
-        const v = vendas[d] ?? 0;
-        linhas.push({ parceiroId: tx.parceiroId, lojaId, canal, data: dia(d), valorCentavos: R(v), pedidos: v ? 10 : 0, clientes: v ? 10 : 0, origem: 'MANUAL' as const, chaveIdempotencia: `manual:${lojaId}:-:${canal}:${d}`, atualizadoPorNome: 'Marina' });
-      }
-      await tx.faturamentoLancamento.createMany({ data: linhas });
-    });
-
-  const periodoRegistrado = (cliente: ClienteDoParceiro, data: string) =>
-    cliente.transacao(async (tx) => {
-      const r = await registrarPeriodo(tx, await periodoDe(tx, data));
-      if (!r.ok) throw new Error(r.erro);
-      return r.id;
-    });
 
   const textosDespesa = (p: Partial<TextosDaDespesa>): TextosDaDespesa => ({ envio: globalThis.crypto.randomUUID().replace(/-/g, ''), lojaId: '', linha: 'contabilidade', descricao: 'Contador do grupo', valor: '1.000,00', tipo: 'mes', dia: '', mes: '2026-10', de: '', ate: '', recorrente: false, vencimento: '', ...p });
 
