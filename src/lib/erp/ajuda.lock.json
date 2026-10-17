@@ -1,0 +1,146 @@
+{
+  "inicio": {
+    "versao": 1,
+    "hash": "9e6243060b2c56a4"
+  },
+  "acesso": {
+    "versao": 1,
+    "hash": "453c75510670154f"
+  },
+  "insumos": {
+    "versao": 1,
+    "hash": "d633bcc79c723aed"
+  },
+  "insumo-novo": {
+    "versao": 1,
+    "hash": "9cb2e2a34da74dc6"
+  },
+  "insumo": {
+    "versao": 1,
+    "hash": "ad71942ae8823da0"
+  },
+  "insumo-embalagem": {
+    "versao": 1,
+    "hash": "159348e9284bea54"
+  },
+  "fichas": {
+    "versao": 1,
+    "hash": "935597bdc66b8d45"
+  },
+  "ficha-nova": {
+    "versao": 1,
+    "hash": "52781dba4c664378"
+  },
+  "ficha-importar": {
+    "versao": 1,
+    "hash": "9ad4bc2dc6f5e416"
+  },
+  "ficha": {
+    "versao": 1,
+    "hash": "73d21c9e9bf78d86"
+  },
+  "ficha-embalagens": {
+    "versao": 1,
+    "hash": "744d153472208743"
+  },
+  "precificacao": {
+    "versao": 1,
+    "hash": "45d01d5291ff0691"
+  },
+  "compras": {
+    "versao": 1,
+    "hash": "a2950debd7264c7f"
+  },
+  "compra-nova": {
+    "versao": 1,
+    "hash": "603e6e536de1d2e3"
+  },
+  "compra": {
+    "versao": 1,
+    "hash": "8b725534f8eaf349"
+  },
+  "fornecedores": {
+    "versao": 1,
+    "hash": "b1907ed2116fdddb"
+  },
+  "fornecedor-novo": {
+    "versao": 1,
+    "hash": "73caca948a37816a"
+  },
+  "fornecedor": {
+    "versao": 1,
+    "hash": "dae47225e02a2d1d"
+  },
+  "estoque": {
+    "versao": 1,
+    "hash": "310ee67602965855"
+  },
+  "estoque-contagens": {
+    "versao": 1,
+    "hash": "b494822b3c91cc7d"
+  },
+  "estoque-loja": {
+    "versao": 1,
+    "hash": "80274bf976cca9ee"
+  },
+  "estoque-abertura": {
+    "versao": 1,
+    "hash": "4792e7a131f47a36"
+  },
+  "estoque-abertura-conferir": {
+    "versao": 1,
+    "hash": "0118ec3e7ff48143"
+  },
+  "contagem-nova": {
+    "versao": 1,
+    "hash": "bf3797052faee1e3"
+  },
+  "contagem": {
+    "versao": 1,
+    "hash": "444d73e4151ec90b"
+  },
+  "contagem-conferir": {
+    "versao": 1,
+    "hash": "7660796e763878cb"
+  },
+  "periodo": {
+    "versao": 1,
+    "hash": "4683bc8b2a063a39"
+  },
+  "requisicoes": {
+    "versao": 1,
+    "hash": "48a6fab6f98b3193"
+  },
+  "requisicao-nova": {
+    "versao": 1,
+    "hash": "857222dd9cfe2b0a"
+  },
+  "requisicao": {
+    "versao": 1,
+    "hash": "d40ea05fdaf1aa1c"
+  },
+  "requisicao-atender": {
+    "versao": 1,
+    "hash": "f32d94555c2aeedb"
+  },
+  "divergencias": {
+    "versao": 1,
+    "hash": "0c4f542d977505e3"
+  },
+  "lojas": {
+    "versao": 1,
+    "hash": "d488a5b3f3011296"
+  },
+  "equipe": {
+    "versao": 1,
+    "hash": "15d3af5a44b272be"
+  },
+  "historico": {
+    "versao": 1,
+    "hash": "b3f1b76332041520"
+  },
+  "cadastro-do-parceiro": {
+    "versao": 1,
+    "hash": "9d803e531e0e9c5c"
+  }
+}

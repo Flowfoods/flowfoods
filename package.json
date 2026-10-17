@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "gate": "node scripts/gate-conteudo.mjs",
+    "ajuda:lock": "tsx scripts/ajuda-lock.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",

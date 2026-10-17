@@ -70,6 +70,8 @@ import {
   normalizarEmail,
   tokenTemFormato,
 } from './acesso';
+import { fechamentoValido, normalizarFechadas } from './ajuda';
+import type { PreferenciaDeAjuda } from './ajuda-rota';
 import { ERRO_DONO_JA_TEM_ACESSO, fraseJaDecidido, FRASE_PEDIDO_MEXIDO, lerAtivacao, type EtapaDoPedido } from './pedido-campos';
 import {
   configDoRosto,
@@ -1624,6 +1626,8 @@ export interface SessaoValida {
   perfilRotulo: string | null;
   /** 1.8: setores da pessoa NESTE parceiro (pré-escolhem o setor da requisição; não concedem nada). */
   setores: Setor[];
+  /** 0.6: o que a pessoa escolheu sobre as caixas de ajuda (por pessoa, vale em todo parceiro). */
+  ajuda: PreferenciaDeAjuda;
 }
 
 /**
@@ -1639,7 +1643,8 @@ export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoV
     include: {
       usuario: {
         // Decisão 92: vínculo com parceiro em RASCUNHO não vale (a sessão já aberta morre aqui).
-        include: { acessos: { where: { status: 'ATIVO', parceiro: { status: { not: 'RASCUNHO' } } }, include: { parceiro: true, ...COM_PERFIL } } },
+        // 0.6: a preferência de ajuda vem na mesma ida ao banco (sem consulta extra).
+        include: { preferencia: true, acessos: { where: { status: 'ATIVO', parceiro: { status: { not: 'RASCUNHO' } } }, include: { parceiro: true, ...COM_PERFIL } } },
       },
     },
   });
@@ -1666,7 +1671,73 @@ export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoV
     alcance: atual ? alcanceDe(atual) : null,
     perfilRotulo: atual ? perfilRotuloDe(atual) : null,
     setores: atual ? normalizarSetores(atual.setores ?? []) : [],
+    ajuda: preferenciaDe(s.usuario.preferencia),
   };
+}
+
+// ==================================================== ajuda contextual (0.6)
+//
+// A preferência é da PESSOA (decisão 112) e só muda por aqui. O `usuarioId` vem
+// SEMPRE da sessão validada neste mesmo ponto; nenhuma entrada de fora o
+// carrega (uma action que receba `usuarioId` forjado não tem onde gravá-lo).
+// "Fechar" só aceita `chave@versão` que existe no registro AGORA (lista
+// branca), com teto de 300 (o mais velho sai) e gravação atômica: duas abas
+// fechando caixas ao mesmo tempo não perdem nenhum fechamento.
+
+function preferenciaDe(p: { dicasLigadas: boolean; escolhidaEm: Date | null; fechadas: string[] | null } | null | undefined): PreferenciaDeAjuda {
+  if (!p) return { dicasLigadas: true, escolhida: false, fechadas: [] };
+  return { dicasLigadas: p.dicasLigadas, escolhida: p.escolhidaEm !== null, fechadas: normalizarFechadas(p.fechadas) };
+}
+
+export type MudancaDeAjuda =
+  | { tipo: 'dicas'; ligadas: boolean }
+  | { tipo: 'fechar'; caixa: string }
+  | { tipo: 'reabrir' };
+
+/** `ok: false` = sessão morta ou pedido recusado; nada foi gravado. */
+export async function gravarPreferenciaDeAjuda(token: unknown, mudanca: MudancaDeAjuda, o?: Opcoes): Promise<{ ok: boolean }> {
+  const sessao = await validarSessao(token, o);
+  if (!sessao) return { ok: false };
+  const usuarioId = sessao.usuario.id;
+  const { db, agora } = abrir(o);
+  if (mudanca.tipo === 'dicas') {
+    if (typeof mudanca.ligadas !== 'boolean') return { ok: false };
+    await db.preferenciaErp.upsert({
+      where: { usuarioId },
+      create: { usuarioId, dicasLigadas: mudanca.ligadas, escolhidaEm: agora },
+      update: { dicasLigadas: mudanca.ligadas, escolhidaEm: agora },
+    });
+    return { ok: true };
+  }
+  if (mudanca.tipo === 'reabrir') {
+    await db.preferenciaErp.upsert({
+      where: { usuarioId },
+      create: { usuarioId, fechadas: [] },
+      update: { fechadas: [] },
+    });
+    return { ok: true };
+  }
+  if (mudanca.tipo !== 'fechar') return { ok: false };
+  const caixa = fechamentoValido(mudanca.caixa);
+  if (!caixa) return { ok: false };
+  const chave = caixa.split('@')[0];
+  // Atômico: o ON CONFLICT trava a linha; a lista nova tira a versão antiga da mesma caixa e mantém as 300 mais novas.
+  await db.$executeRaw`
+    INSERT INTO "PreferenciaErp" ("usuarioId", "fechadas", "atualizadoEm")
+    VALUES (${usuarioId}, ARRAY[${caixa}]::text[], ${agora})
+    ON CONFLICT ("usuarioId") DO UPDATE SET
+      "fechadas" = (
+        SELECT coalesce(array_agg(t.x ORDER BY t.n), ARRAY[]::text[])
+        FROM (
+          SELECT u.x, u.n
+          FROM unnest(array_append(array_remove(coalesce("PreferenciaErp"."fechadas", ARRAY[]::text[]), ${caixa}), ${caixa})) WITH ORDINALITY AS u(x, n)
+          WHERE u.x = ${caixa} OR split_part(u.x, '@', 1) <> ${chave}
+          ORDER BY u.n DESC
+          LIMIT 300
+        ) t
+      ),
+      "atualizadoEm" = ${agora}`;
+  return { ok: true };
 }
 
 /** Quem tem mais de um parceiro escolhe; o servidor confere o vínculo. */
