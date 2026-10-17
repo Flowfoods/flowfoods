@@ -1823,3 +1823,76 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Razão:** (b). Era um defeito da primeira entrega da 2.3: o CMV aparecia com valor e a margem continuava igual a antes. A conta mora em `montarDre` (por isso o ao vivo, a fotografia, os cartões do topo, o Histórico e o "Por loja" andam juntos). O aviso passou de "sem contar o CMV" para "sem contar o CMV de Centro" quando só algumas lojas ficam de fora, e segue "o CMV" quando nenhuma tem. Números do cenário (outubro, Casa Alfa): VP receita R$ 120.000,00 − CMV R$ 23.950,00 = margem e resultado R$ 96.050,00; rede R$ 160.000,00 − R$ 27.950,00 = margem R$ 132.050,00 e, com o contador do grupo (R$ 1.000,00), resultado R$ 131.050,00; Centro sem CMV fica em R$ 10.000,00 "sem contar o CMV". Junto: selo da linha CMV por situação (real, parcial, só compras, misto, ausente), painel compra × real em cartões abaixo de 1280 px (a explicação de cada loja em linha própria na tabela larga), "e agora?" no painel, e a contagem de fechamento aplicada mostra o estoque final fotografado no lugar da cobertura contra o piso.
 
+> Numeração: as decisões 172 a 189 ficam reservadas à 2.4 (faróis), retirada da branch no commit 650c43b e pendente (código em d1686ce); a 3.1 segue de 190 para não colidir se a 2.4 voltar.
+
+### 190. 2026-10-17 · ERP 3.1: a produção cria a própria requisição dos insumos, na mesma transação; `PRODUCAO_CONSUMO` fica reservado
+
+**Alternativas:** (a) a produção baixa os insumos direto no livro com o tipo `PRODUCAO_CONSUMO`; (b) a produção cria a requisição (setor Cozinha) junto com o lote, e a saída é a `REQUISICAO` da 1.8, entregue pelo estoque.
+
+**Razão:** (b). Quem guarda o estoque entrega e dá baixa, como em qualquer pedido da cozinha; um caminho só de baixa (a requisição) e uma auditoria só. O lote e a requisição nascem na mesma transação (`criarRequisicaoNaTx`), com `requisicaoId` único na ordem (uma requisição, um lote). A requisição do lote não se cancela pela requisição (cancela-se o lote). `PRODUCAO_CONSUMO` segue no enum, sem uso, para uma fase que queira baixar sem requisição.
+
+### 191. 2026-10-17 · ERP 3.1: planejar: código do lote `AAMMDD-NN`, idempotência pela chave do envio, sem data retroativa
+
+**Alternativas:** (a) código sequencial global; (b) `AAMMDD-NN` por loja e dia, tirado sob trava do dia, nunca reaproveitado; data de hoje a 14 dias; chave de idempotência do envio.
+
+**Razão:** (b). O código diz o dia e dá o número sem buraco, e o lote cancelado mantém o dele. Duplo clique ou reenvio devolve o mesmo lote (`@@unique([parceiroId, chaveIdempotencia])`). Produção retroativa fica fora: mexer no passado pede o período aberto e um motivo, e é decisão de negócio (pendência para o Rodolfo).
+
+### 192. 2026-10-17 · ERP 3.1: concluir exige a requisição ATENDIDA
+
+**Alternativas:** (a) concluir com o que já saiu; (b) concluir só quando a requisição está atendida (entregue ou encerrada).
+
+**Razão:** (b). O custo do lote é o que saiu de fato: concluir com a requisição aberta fecharia um custo que ainda muda. A tela diz o que falta ("Faltam sair 885 g de Cebola branca pela requisição #N: entregue ou encerre o resto."). Sobra de insumo volta pela devolução da requisição, antes de concluir.
+
+### 193. 2026-10-17 · ERP 3.1: rendimento: fora de ±10% pede motivo; produzido 0 é lote perdido
+
+**Alternativas:** (a) aceitar qualquer quantidade; (b) faixa de ±10% do planejado (estrito: exatamente 10% passa), com motivo obrigatório fora dela; zero é lote perdido (motivo obrigatório, sem entrada).
+
+**Razão:** (b). O rendimento real é o dado mais útil da cozinha e a diferença sem explicação some. Teto de 2x o planejado (digitação). A faixa é única para todas as fichas: se um pré-preparo precisar de faixa própria, é campo novo na ficha (pendência para o Rodolfo). No lote perdido o custo dos insumos fica registrado como perda e nada entra no estoque.
+
+### 194. 2026-10-17 · ERP 3.1: custo do lote = baixas reais ÷ quantidade, em fração exata, nunca gravado
+
+**Alternativas:** (a) gravar o custo por unidade na ordem; (b) gravar só o total em centavos que saiu e calcular o custo por unidade na tela, em fração.
+
+**Razão:** (b). Um centavo por kg arredondado e gravado distorce o valor da entrada; a fração exata não. O total é a soma das baixas da requisição (R$ 117,81); 4,6 kg dão R$ 25,61/kg, ao lado dos R$ 23,56/kg que a ficha prevê hoje, com rendimento de 92% e a diferença de 400 g custando R$ 9,42. Insumo que saiu sem preço deixa o custo incompleto (`insumosSemPreco`, com a frase). Só quem tem `insumos.ver` recebe valor: o servidor monta a tela sem ele.
+
+### 195. 2026-10-17 · ERP 3.1: o lote entra no insumo produzido da mesma loja, sem sub-estoque de produção
+
+**Alternativas:** (a) estoque de produção separado do da loja; (b) `PRODUCAO_ENTRADA` no insumo que a ficha produz, na loja da ordem, com `ordemProducaoId`.
+
+**Razão:** (b). O molho pronto é insumo como qualquer outro (a próxima ficha o consome pela requisição). O banco confere por gatilho (`MovimentoEstoque_producao_confere`): entrada só no insumo produzido da ficha e na loja da ordem, até com SQL cru; o CHECK `producao_entrada_tem_ordem` exige a ordem. Concluir duas vezes (duas abas) põe uma entrada só.
+
+### 196. 2026-10-17 · ERP 3.1: a validade é escolhida na conclusão e guardada como retrato
+
+**Alternativas:** (a) a validade segue a ficha; (b) o cozinheiro escolhe a conservação (refrigerado ou congelado) ao concluir e a validade (`validadeEm`) e a conservação ficam gravadas na ordem.
+
+**Razão:** (b). O lote vence quando foi guardado, não quando a ficha diz hoje: mudar a ficha depois não muda o lote. A tela diz quando vence em cada conservação ("vence 20/10 às 10:00" no refrigerado de 3 dias, 16/11 no congelado de 30). Sem conservação na ficha o lote conclui sem validade, e a tela avisa.
+
+### 197. 2026-10-17 · ERP 3.1: cancelar só com saída líquida zero; estornar exige `estoque.ajustar`
+
+**Alternativas:** (a) cancelar a qualquer hora, devolvendo o que saiu; (b) cancelar só quando nada saiu ou tudo voltou pela devolução; estornar o lote concluído por quem ajusta o saldo.
+
+**Razão:** (b). Cancelar com insumo na rua esconderia a perda. Cancela a requisição junto, com motivo. O estorno do lote concluído é o espelho exato da entrada (gatilho do livro da 1.6), pede motivo e deixa a ordem CANCELADA guardando a conclusão ("Estornada"); estoque insuficiente exige confirmação explícita. Ordem concluída ou cancelada não muda por SQL cru (`OrdemProducao_concluida_imutavel`).
+
+### 198. 2026-10-17 · ERP 3.1: a trava do período vale na conclusão, no estorno e também em atender e devolver da requisição
+
+**Alternativas:** (a) só a conclusão respeita o período fechado; (b) toda escrita no livro que a produção provoca respeita o período, inclusive atender e devolver (uma lacuna da 1.8).
+
+**Razão:** (b). Entregar insumo num período fechado do DRE mudaria o CMV já fotografado. Atender e devolver ganharam `conferirPeriodoAberto`; a recusa diz o período e a saída ("peça à FlowFoods para reabrir o período"). Provado com testes mutantes: tirar a conferência de qualquer das quatro operações derruba o teste.
+
+### 199. 2026-10-17 · ERP 3.1: ordem fixa das travas: período → abertura da loja → requisição → ordem → saldos
+
+**Alternativas:** (a) cada operação trava na ordem que lhe convém; (b) uma ordem única, a mesma em todo caminho (a trava do período é compartilhada, a de fechar é exclusiva).
+
+**Razão:** (b). Concluir e entregar disputam a mesma requisição e os mesmos saldos; sem ordem fixa há deadlock. Provado segurando `travarParaFechar` e vendo concluir, atender, devolver e estornar esperarem (cerca de 900 ms) e seguirem ao soltar.
+
+### 200. 2026-10-17 · ERP 3.1: os quadros ganham um esqueleto comum; atraso = borda esquerda vermelha + "Xd de atraso"
+
+**Alternativas:** (a) copiar o quadro da 1.8 para a produção; (b) `telas/quadro/quadro.tsx` (`GradeDoQuadro`, `ColunaDoQuadro`, `CartaoDoQuadro`) e os três quadros (0.5, 1.8, 3.1) usam o mesmo.
+
+**Razão:** (b). Regra Nº 2: um componente só. O quadro da 0.5 segue com filete de 2 px e o da 1.8 e o da produção com 3 px (provado na tela). A cor nunca é o único sinal: o atraso diz "2d de atraso". O cartão cancelado ficou sem opacidade (o texto perdia contraste no axe) e usa o fundo da página.
+
+### 201. 2026-10-17 · ERP 3.1: área Produção ativa, sem permissão nova; o custo do lote só com `insumos.ver`; migration aditiva
+
+**Alternativas:** (a) permissões novas de produção e custo; (b) `producao.ver` e `producao.registrar` (já no catálogo) bastam, o custo segue `insumos.ver`, e o grupo `etiquetas` nasce em breve.
+
+**Razão:** (b). O operador da cozinha produz e não recebe valor. O Histórico fala "Lote" (Planejou, Iniciou, Concluiu, Cancelou, Estornou) e tira os campos de custo de quem não vê custos. A migration `20261029000000_erp_producao` é aditiva e tolerante a dado antigo: CHECKs `NOT VALID` + `VALIDATE` em bloco que avisa, índices únicos em bloco que apanha `unique_violation`, nenhum passo depende de SELECT sob RLS (superusuário, dono com FORCE RLS e dono sem RLS provados com dado antigo). `erp:conferir-migracao` lista o que ficar pendente.
