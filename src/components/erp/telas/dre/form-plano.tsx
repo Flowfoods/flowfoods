@@ -6,10 +6,12 @@
  * único, versão lida): duas abas não se atropelam.
  */
 
+import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import { GRUPOS_DE_DESPESA, ROTULO_DO_GRUPO } from '@/lib/erp/dre-plano';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro, ROTULO } from '../../ui/campos';
+import { classeDeBotao } from '../../ui/estilos';
 import type { AcaoLocal, EstadoLocal } from './estado';
 
 function Retorno({ estado }: { estado: EstadoLocal }) {
@@ -104,5 +106,28 @@ export function FormOcultar({ acao, chave, ocultar, versao, bloqueio, nome }: { 
       </BotaoEnviar>
       <Retorno estado={estado} />
     </form>
+  );
+}
+
+/**
+ * As duas ações de uma linha lado a lado (no celular também): "Renomear" abre o campo logo abaixo, "Ocultar"
+ * age na hora. Devolve dois filhos da grade da linha: os botões e o campo (que ocupa a largura toda).
+ */
+export function AcoesDaLinha({ acaoRenomear, acaoOcultar, chave, nome, ativa, versao, bloqueio }: { acaoRenomear: AcaoLocal; acaoOcultar: AcaoLocal; chave: string; nome: string; ativa: boolean; versao: string; bloqueio: string | null }) {
+  const [aberto, setAberto] = useState(false);
+  const idDoCampo = `renomear-${chave.replace(/[^a-z0-9]/gi, '-')}`;
+  return (
+    <>
+      <div className="flex flex-wrap items-start gap-x-2 gap-y-1 lg:justify-end">
+        <button type="button" onClick={() => setAberto((x) => !x)} aria-expanded={aberto} aria-controls={`${idDoCampo}-area`} className={classeDeBotao('fantasma')}>
+          Renomear
+          <span className="sr-only"> {nome}</span>
+        </button>
+        <FormOcultar acao={acaoOcultar} chave={chave} ocultar={ativa} versao={versao} bloqueio={bloqueio} nome={nome} />
+      </div>
+      <div id={`${idDoCampo}-area`} hidden={!aberto} className="max-w-xl lg:col-span-2">
+        {aberto && <FormRenomear acao={acaoRenomear} chave={chave} nome={nome} versao={versao} bloqueio={bloqueio} />}
+      </div>
+    </>
   );
 }

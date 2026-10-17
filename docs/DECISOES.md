@@ -1661,7 +1661,7 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Razão:** (b), dito na tela ("estimada pela taxa configurada"). O repasse real chega depois e muda; sem estimativa o DRE do mês corrente mente para cima. Um arredondamento por loja faz a rede ser exatamente a soma das lojas. Sem a taxa configurada, a linha diz "falta configurar a taxa" e o resultado diz "sem contar a taxa do iFood". Limite conhecido: usa a taxa de HOJE até existir a fotografia do fechamento (2.2b).
 
-### 145. 2026-10-17 · ERP 2.2a: o CMV "chega na 2.3", sem número, e tudo que depende dele diz "sem contar o CMV"
+### 145. 2026-10-17 · ERP 2.2a: o CMV aparece como "Em breve", sem número, e tudo que depende dele diz "sem contar o CMV" (sem citar fase interna na tela)
 
 **Alternativas:** (a) usar uma porcentagem fixa de CMV; (b) a linha existe, sem número, e margem e resultados se declaram "sem contar o CMV".
 

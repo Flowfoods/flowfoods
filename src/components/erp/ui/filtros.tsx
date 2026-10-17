@@ -9,11 +9,33 @@ import Link from 'next/link';
 export function FiltroEmLinks({
   rotulo,
   opcoes,
+  quebra = false,
 }: {
   /** Nome acessível do grupo ("Filtrar por situação"). */
   rotulo: string;
   opcoes: { href: string; rotulo: string; ativo: boolean }[];
+  /** Nomes longos (lojas): no celular as opções quebram em linhas em vez de rolar de lado e cortar a última. */
+  quebra?: boolean;
 }) {
+  if (quebra) {
+    return (
+      <nav aria-label={rotulo} className="min-w-0 max-w-full">
+        <ul className="flex flex-wrap gap-1 rounded-[10px] border border-linha bg-painel p-1">
+          {opcoes.map((o) => (
+            <li key={o.href + o.rotulo}>
+              <Link
+                href={o.href}
+                aria-current={o.ativo ? 'page' : undefined}
+                className="ff-transicao flex min-h-9 items-center rounded-[7px] px-3 text-[13px] text-suave hover:bg-texto/5 hover:text-texto aria-[current=page]:bg-forte aria-[current=page]:font-semibold aria-[current=page]:text-texto"
+              >
+                {o.rotulo}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
+    );
+  }
   return (
     // No celular o trilho rola de lado: a borda direita esmaece para mostrar
     // que tem mais opção (o espaço no fim deixa a última aparecer inteira).

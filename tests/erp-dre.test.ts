@@ -14,6 +14,7 @@ import {
   ehMesInteiro,
   fatiar,
   frasePagamento,
+  janelaDaCompetencia,
   lerCompetencia,
   lerDespesa,
   lerValorDaDespesa,
@@ -28,6 +29,7 @@ import { CODIGO, PLANO_PADRAO, chaveDaLinha, linhasLancaveisDoGrupo, lerNomeDaLi
 import { diasEntre, somarDias } from '@/lib/erp/contagem-campos';
 import {
   fraseDaRegra,
+  lerPeriodoPedido,
   lerRegraDigitada,
   periodoDaData,
   periodoNaData,
@@ -405,9 +407,9 @@ describe('2.2a · o DRE realizado', () => {
     expect(valor(r, CODIGO.receitaLiquida).semContar).toEqual([]);
   });
 
-  it('CMV: "Chega na 2.3", sem número; margem e resultados "sem contar o CMV"', () => {
+  it('CMV: "Em breve", sem número; margem e resultados "sem contar o CMV"', () => {
     const r = montarDre(entrada({ receitas: [{ lojaId: 'a', canal: 'LOJA', valorCentavos: 1_000_000 }] }));
-    expect(valor(r, CODIGO.cmv)).toMatchObject({ valorCentavos: null, nota: 'Chega na 2.3' });
+    expect(valor(r, CODIGO.cmv)).toMatchObject({ valorCentavos: null, nota: 'Em breve' });
     for (const c of [CODIGO.margem, CODIGO.operacional, CODIGO.resultado]) expect(valor(r, c).semContar).toEqual(['o CMV']);
     expect(valor(r, CODIGO.receitaLiquida).semContar).toEqual([]);
   });
@@ -524,5 +526,26 @@ describe('2.2a · permissões e vazamento', () => {
 
   it('o histórico trata despesa, linha do plano e regra do período como DRE', () => {
     expect(ENTIDADES_DE_DRE).toEqual(expect.arrayContaining(['Despesa', 'DreLinha', 'RegraDoPeriodo', 'PeriodoApuracao']));
+  });
+
+  it('a janela de 12 meses à frente a partir de 29/02 termina em 28/02 do ano seguinte (e não em janeiro)', () => {
+    expect(janelaDaCompetencia('2028-02-29').ate).toBe('2029-02-28');
+    expect(janelaDaCompetencia('2026-10-17').ate).toBe('2027-10-17');
+    expect(janelaDaCompetencia('2027-03-31').ate).toBe('2028-03-31');
+    expect(lerCompetencia({ tipo: 'mes', dia: '', mes: '2029-02', de: '', ate: '' }, '2028-02-29')).toMatchObject({ ok: true });
+    expect(lerCompetencia({ tipo: 'dia', dia: '01/03/2029', mes: '', de: '', ate: '' }, '2028-02-29')).toMatchObject({ ok: false });
+  });
+
+  it('?periodo= inexistente, futuro ou antigo mostra o período de hoje COM frase; a data boa passa', () => {
+    const hoje = '2026-10-17';
+    expect(lerPeriodoPedido(undefined, hoje)).toEqual({ data: hoje, aviso: null });
+    expect(lerPeriodoPedido('2026-09-05', hoje)).toEqual({ data: '2026-09-05', aviso: null });
+    for (const ruim of ['2026-02-31', '2026-13-01', '2026-00-10', 'ontem', '2026-9-5', '']) {
+      const r = lerPeriodoPedido(ruim, hoje);
+      if (ruim === '') expect(r).toEqual({ data: hoje, aviso: null });
+      else expect(r).toEqual({ data: hoje, aviso: expect.stringMatching(/não existe/) });
+    }
+    expect(lerPeriodoPedido('2026-10-18', hoje)).toEqual({ data: hoje, aviso: expect.stringMatching(/só existe até hoje/) });
+    expect(lerPeriodoPedido('2019-12-31', hoje)).toEqual({ data: hoje, aviso: expect.stringMatching(/começa em 01\/01\/2020/) });
   });
 });

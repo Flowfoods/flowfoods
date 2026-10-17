@@ -556,11 +556,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre'],
     titulo: 'DRE',
-    versao: 1,
+    versao: 2,
+    // A tela da reunião: a tabela fica à vista e a aula abre numa linha.
+    recolhida: true,
     aula: [
       { texto: 'O resultado da casa no período: o que entrou, o que saiu e o que sobrou, com o peso de cada linha na receita bruta.' },
       { texto: 'No período em curso o número vai até ontem, sem projeção, e a despesa entra dia a dia.' },
-      { texto: 'O CMV chega na próxima fase: até lá, a margem e os resultados saem sem contar o CMV.' },
+      { texto: 'O CMV ainda não entra no DRE (em breve): até lá, a margem e os resultados saem sem contar o CMV.' },
       { texto: 'A rede soma as lojas e as despesas da rede; a loja mostra só o que é dela, antes das despesas da rede.' },
     ],
     secoes: [

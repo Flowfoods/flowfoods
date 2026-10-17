@@ -1532,7 +1532,7 @@ portão e RLS iguais às outras; `migrate diff` vazio). Decisões 135 a 148. Per
    (`PeriodoApuracao_sem_sobreposicao`) recusa dois períodos que se sobrepõem na mesma loja/parceiro. Tela `dre/periodos`.
 6. **O DRE** (143 a 146). Rede × loja, no período escolhido, em reais e em % da receita bruta (%, em pontos-base). Receita por canal
    (a leitura única da 2.1) → deduções (taxas do iFood ESTIMADAS: faturamento do iFood × (comissão + pagamento online), um
-   arredondamento por loja, rede = soma) → receita líquida → CMV ("Chega na 2.3", sem número) → variáveis → margem → pessoal,
+   arredondamento por loja, rede = soma) → receita líquida → CMV ("Em breve", sem número) → variáveis → margem → pessoal,
    ocupação, utilidades, administrativas, marketing, outras → resultado operacional → financeiras → resultado. Tudo que depende do CMV
    diz "sem contar o CMV"; zero é "—", nunca "R$ 0,00"; sem faturamento a receita é "—". Período em curso é PARCIAL, dia a dia até
    ontem, sem projeção ("dia 17 de 31"); faturamento faltando aparece como "Incompleto" e a despesa recorrente que falta, como "Falta
@@ -1556,8 +1556,8 @@ portão e RLS iguais às outras; `migrate diff` vazio). Decisões 135 a 148. Per
 10. **Fora desta subfase (vai para a 2.2b)**: metas com vigência e realizado × meta, comparação com o ano passado, fechar período com
     fotografia, reabrir, notas e fechamento de estoque obedecendo período fechado, faróis, CMV (2.3).
 
-**Ajuda: chaves novas/alteradas.** Novas (todas v1): `dre`, `dre-despesas`, `dre-despesa`, `dre-despesa-nova` (serve a
-lançar e a editar), `dre-periodos`, `dre-plano`. Alteradas: `faturamento-dia` v1 para v2 (a seção "Dia de período fechado" diz onde
+**Ajuda: chaves novas/alteradas.** Novas: `dre` (v2, nasce recolhida: é a tela da reunião), `dre-despesas`, `dre-despesa`, `dre-despesa-nova` (serve a
+lançar e a editar), `dre-periodos`, `dre-plano` (as demais, v1). Alteradas: `faturamento-dia` v1 para v2 (a seção "Dia de período fechado" diz onde
 se define o período) e `periodo` (estoque) v1 para v2 (o período é o mesmo do DRE, definido em Períodos), com `ajuda.lock.json`
 regravado (46 entradas). Toda rota nova tem entrada.
 
@@ -1585,7 +1585,7 @@ CHECKs só `NOT VALID` onde há violação, gatilhos presentes), e no `ff_dev`.
 Na tela (build de produção local, porta 3100, banco `ff_22a` copiado do `ff_dev`; roteiro `prova22a/jornada.mjs` no scratchpad, 92
 conferências): a dona lança aluguel (R$ 6.000,00, repete), salário (R$ 9.500,00) e luz (R$ 1.240,50, vence em 8 dias, com duplo clique =
 uma despesa) e o DRE do meio do mês (dia 17, até ontem) mostra a receita bruta igual à soma do banco, taxa do iFood estimada, CMV
-"Chega na 2.3", resultado "sem contar o CMV" e as despesas apropriadas ao centavo (3.096,77 · 4.903,23 · 640,26) — conta refeita em
+"Em breve", resultado "sem contar o CMV" e as despesas apropriadas ao centavo (3.096,77 · 4.903,23 · 640,26) — conta refeita em
 BigInt dentro do roteiro; o DRE da loja traz o aluguel dela e a receita dela; "Lançar as do mês passado" cria contador (rede) e
 internet (loja) com o valor conferido e, repetido, não oferece nada; a luz entra em "A pagar" e sai ao ser paga sem mexer no DRE; renomear
 Energia, ocultar Condomínio e criar "Seguro do ponto" refletem no formulário e no DRE; trocar a regra para quinzenal grava a vigência no

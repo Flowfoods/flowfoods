@@ -12,7 +12,7 @@ import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
 import { Aviso, Contagem, Painel, Selo } from '../../ui/superficies';
 import type { AcaoLocal } from './estado';
-import { FormNovaLinha, FormOcultar, FormRenomear } from './form-plano';
+import { AcoesDaLinha, FormNovaLinha } from './form-plano';
 
 export function TelaDoPlano({ plano, contexto, acoes, bloqueio }: { plano: LinhaDoPlano[]; contexto: string; acoes: { criar: AcaoLocal; renomear: AcaoLocal; ocultar: AcaoLocal }; bloqueio: string | null }) {
   const calculadas = plano.filter((l) => l.calculada && !l.codigo?.startsWith('grupo:'));
@@ -43,14 +43,8 @@ export function TelaDoPlano({ plano, contexto, acoes, bloqueio }: { plano: Linha
                       {!l.ativa && <Selo>Oculta</Selo>}
                       {!doPadrao(l) && <Selo>Da casa</Selo>}
                     </div>
-                    <details className="mt-1.5">
-                      <summary className="cursor-pointer text-[13px] text-suave underline decoration-linha-forte underline-offset-4 hover:text-texto">Renomear</summary>
-                      <div className="mt-2 max-w-xl">
-                        <FormRenomear acao={acoes.renomear} chave={chaveDaLinha(l)} nome={l.nome} versao={l.versao} bloqueio={bloqueio} />
-                      </div>
-                    </details>
                   </div>
-                  <FormOcultar acao={acoes.ocultar} chave={chaveDaLinha(l)} ocultar={l.ativa} versao={l.versao} bloqueio={bloqueio} nome={l.nome} />
+                  <AcoesDaLinha acaoRenomear={acoes.renomear} acaoOcultar={acoes.ocultar} chave={chaveDaLinha(l)} nome={l.nome} ativa={l.ativa} versao={l.versao} bloqueio={bloqueio} />
                 </li>
               ))}
             </ul>
@@ -63,7 +57,7 @@ export function TelaDoPlano({ plano, contexto, acoes, bloqueio }: { plano: Linha
           {calculadas.map((l) => (
             <li key={l.codigo} className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm sm:px-5">
               <span>{l.nome}</span>
-              <span className="text-[12px] text-suave">{l.grupo === 'RECEITA' ? 'vem do faturamento' : l.codigo === 'cmv' ? 'chega na 2.3' : l.codigo === 'taxas-ifood' ? 'estimada pela taxa do iFood' : 'resultado calculado'}</span>
+              <span className="text-[12px] text-suave">{l.grupo === 'RECEITA' ? 'vem do faturamento' : l.codigo === 'cmv' ? 'em breve' : l.codigo === 'taxas-ifood' ? 'estimada pela taxa do iFood' : 'resultado calculado'}</span>
             </li>
           ))}
         </ul>

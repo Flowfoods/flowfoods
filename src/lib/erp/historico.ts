@@ -167,7 +167,7 @@ const CAMPO: Record<string, string> = {
   canaisDeVenda: 'canais de venda',
   // 2.2a: despesa, plano de contas e regra do período
   linhaDoDre: 'linha do DRE',
-  linhaVisivel: 'no formulário de despesa',
+  linhaVisivel: 'aparece em Lançar despesa',
   despesaCentavos: 'valor',
   repeteTodoMes: 'repete todo mês',
   competencia: 'competência',

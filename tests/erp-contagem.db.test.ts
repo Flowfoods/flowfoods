@@ -124,9 +124,10 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     perfil = await perfilDoBanco(db);
     A = await db.parceiroFlow.create({ data: { nome: 'Contagem A', slug: `contagem-a-${sufixo}`, status: 'ATIVO' } });
     // 2.2a: a regra do período vive em RegraDoPeriodo (a semana do parceiro termina HOJE).
-    await db.regraDoPeriodo.create({ data: { parceiroId: A.id, vigenteDesde: new Date('2020-01-01T00:00:00Z'), tipo: CFG.tipo, diaInicio: CFG.diaInicio, criadoPorNome: 'teste' } });
-    B = await db.parceiroFlow.create({ data: { nome: 'Contagem B', slug: `contagem-b-${sufixo}`, status: 'ATIVO' } });
     a = doParceiro(A.id, db);
+    // Pelo portão (como o app): com FORCE RLS, escrever pelo cliente cru em tabela de tenant falha.
+    await a.regraDoPeriodo.create({ data: { parceiroId: A.id, vigenteDesde: new Date('2020-01-01T00:00:00Z'), tipo: CFG.tipo, diaInicio: CFG.diaInicio, criadoPorNome: 'teste' } });
+    B = await db.parceiroFlow.create({ data: { nome: 'Contagem B', slug: `contagem-b-${sufixo}`, status: 'ATIVO' } });
     b = doParceiro(B.id, db);
     for (const [chave, nome] of [['vp', 'Vila da Penha'], ['delivery', 'Delivery']] as const) {
       const r = await cadastrarLoja(a, { nome }, 'Marina');

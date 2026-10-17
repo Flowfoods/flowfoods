@@ -136,6 +136,7 @@ export function TelaDeDespesas({
         {lojas.length > 1 && (
           <FiltroEmLinks
             rotulo="Filtrar por loja"
+            quebra
             opcoes={[{ href: query({ loja: null, pagina: 1 }), rotulo: 'Todas as lojas', ativo: !lojaId }, ...lojas.map((l) => ({ href: query({ loja: l.id, pagina: 1 }), rotulo: l.nome, ativo: l.id === lojaId }))]}
           />
         )}

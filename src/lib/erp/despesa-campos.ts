@@ -191,7 +191,7 @@ export function janelaDaCompetencia(hoje: string): { de: string; ate: string } {
   // 12 meses à frente: o mesmo dia do ano que vem (29/02 vira 28/02).
   const [a, m, d] = hoje.split('-').map(Number);
   const aFrente = new Date(Date.UTC(a + 1, m - 1, d));
-  const ate = aFrente.getUTCMonth() !== m - 1 ? new Date(Date.UTC(a + 1, m - 1, 0)) : aFrente;
+  const ate = aFrente.getUTCMonth() !== m - 1 ? new Date(Date.UTC(a + 1, m, 0)) : aFrente;
   return { de: atras > LIMITES_DA_DESPESA.dataMinima ? atras : LIMITES_DA_DESPESA.dataMinima, ate: ate.toISOString().slice(0, 10) };
 }
 

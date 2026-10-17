@@ -631,9 +631,9 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · DRE ao vivo (Postgres real)', { timeout
     expect(com!.ate).toBe('2026-10-16');
   });
 
-  it('critério 12: o CMV diz "Chega na 2.3" sem número; margem e resultados com "sem contar o CMV"', async () => {
+  it('critério 12: o CMV diz "Em breve" sem número; margem e resultados com "sem contar o CMV"', async () => {
     const d = await dre(a, DONA(), { tipo: 'loja', lojaId: ids.vp }, '2026-10-10', HOJE);
-    expect(linha(d!, CODIGO.cmv)).toMatchObject({ valorCentavos: null, nota: 'Chega na 2.3' });
+    expect(linha(d!, CODIGO.cmv)).toMatchObject({ valorCentavos: null, nota: 'Em breve' });
     for (const c of [CODIGO.margem, CODIGO.operacional, CODIGO.resultado]) expect(linha(d!, c).semContar).toEqual(['o CMV']);
   });
 
@@ -800,5 +800,27 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · DRE ao vivo (Postgres real)', { timeout
     await expect(cru(db, perfil, A.id, `UPDATE "DreLinha" SET "codigo" = NULL WHERE "parceiroId" = '${A.id}' AND "codigo" = 'cmv'`)).rejects.toThrow(/calculada_tem_codigo/);
     // O mesmo código não repete no parceiro.
     await expect(cru(db, perfil, A.id, `INSERT INTO "DreLinha"("id","parceiroId","nome","grupo","codigo","atualizadoEm") VALUES ('dup1','${A.id}','Outro nome','OUTRAS','aluguel',now())`)).rejects.toThrow();
+  });
+
+  it('fino do Guardião: o mesmo envio de outra pessoa não devolve id fora do alcance; repetida fora do alcance não vaza', async () => {
+    const mesmo = envio();
+    const dela = await lancarDespesa(a, GERENTE_VP(), textos({ envio: mesmo, lojaId: ids.vp, descricao: 'Fino do envio' }), 'Gil', HOJE);
+    expect(dela.ok).toBe(true);
+    const outra = alcance('GERENTE', [ids.dlv]);
+    const r = await lancarDespesa(a, outra, textos({ envio: mesmo, lojaId: ids.dlv, descricao: 'Fino do envio outro' }), 'Ana', HOJE);
+    expect(r.ok).toBe(false);
+    expect(JSON.stringify(r)).not.toContain(dela.ok ? dela.id : 'x');
+    // O mesmo envio, pela mesma pessoa (dentro do alcance), continua sendo "já lançada".
+    expect(await lancarDespesa(a, GERENTE_VP(), textos({ envio: mesmo, lojaId: ids.vp, descricao: 'Fino do envio' }), 'Gil', HOJE)).toMatchObject({ ok: true, jaLancada: true });
+    // Uma repetida de OUTRA loja (plantada por SQL) impede remover a origem, sem dizer nada sobre ela.
+    const origem = await lancado(GERENTE_VP(), { lojaId: ids.vp, descricao: 'Fino da origem', linha: 'diversas', valor: '10,00', recorrente: true, mes: '2026-10' });
+    const linhaId = (await planoDoParceiro(a)).find((l) => l.codigo === 'diversas')!.id!;
+    await cru(db, perfil, A.id, `INSERT INTO "Despesa"("id","parceiroId","lojaId","linhaId","descricao","competencia","competenciaFim","valorCentavos","recorrente","repeteDeId","atualizadoEm") VALUES ('filhafora1','${A.id}','${ids.dlv}','${linhaId}','Fino da filha','2026-11-01','2026-11-30',1000,true,'${origem}',now())`);
+    const v = (await obterDespesa(a, GERENTE_VP(), origem, HOJE))!.despesa.versao;
+    const rm = await removerDespesa(a, GERENTE_VP(), origem, { motivo: 'Teste da filha fora', versao: v }, 'Gil');
+    expect(rm).toMatchObject({ ok: false, erros: { geral: 'Não foi possível remover esta despesa agora.' } });
+    expect(JSON.stringify(rm)).not.toContain('filhafora1');
+    await cru(db, perfil, A.id, `DELETE FROM "Despesa" WHERE "id" = 'filhafora1'`);
+    await a.despesa.deleteMany({ where: { descricao: { startsWith: 'Fino' } } });
   });
 });

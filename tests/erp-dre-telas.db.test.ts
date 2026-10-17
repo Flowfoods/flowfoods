@@ -8,7 +8,7 @@
  *  - as páginas: a despesa é 404 para quem não a alcança (rede, outra loja, outro parceiro,
  *    inexistente); o operador não entra em nada; o administrativo abre as despesas e não o DRE;
  *    o gerente não abre o plano de contas; o DRE do gerente só traz a loja dele;
- *  - o DRE em HTML: parcial ao vivo (dia 16 de 31, até ontem 15/10), CMV "Chega na 2.3",
+ *  - o DRE em HTML: parcial ao vivo (dia 16 de 31, até ontem 15/10), CMV "Em breve",
  *    "sem contar o CMV", nenhum R$ 0,00 no lugar de dado ausente;
  *  - vazamento: perfil com `historico.ver` sem `dre.ver` abre o Histórico (HTML e payload) sem
  *    uma despesa; quem tem `dre.ver` vê.
@@ -324,14 +324,14 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · telas e actions do DRE (Postgres real)'
     expect(n1.raiz).toBe(`/rodolfo/erp/${A.slug}`);
   });
 
-  it('critérios 5 e 12 no HTML: parcial ao vivo, CMV "Chega na 2.3", "sem contar o CMV" e nenhum R$ 0,00 no lugar de dado ausente', async () => {
+  it('critérios 5 e 12 no HTML: parcial ao vivo, CMV "Em breve", "sem contar o CMV" e nenhum R$ 0,00 no lugar de dado ausente', async () => {
     const d = (await dreDoPeriodo(a, ALCANCE_FLOWFOODS, { tipo: 'loja', lojaId: ids.vp }, '2026-10-16', '2026-10-16'))!;
     const el = createElement(TelaDoDre, { d, base: '/erp/dre', raiz: '/erp', contexto: 'Rede Completa', pode: { lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true }, bloqueio: null });
     const html = renderToStaticMarkup(el).replace(/ /g, ' ');
     expect(html).toContain('16 de 31');
     expect(html).toContain('até ontem, 15/10');
     expect(html).toContain('Parcial');
-    expect(html).toContain('Chega na 2.3');
+    expect(html).toContain('Em breve');
     expect(html).toContain('sem contar o CMV');
     expect(html).toContain('Resultado do período, antes das despesas da rede');
     // A luz da Penha (R$ 400,00 de outubro inteiro) apropriada até ontem: 400 × 15/31 = 193,55; sem R$ 0,00 em linha alguma.

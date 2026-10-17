@@ -7,7 +7,8 @@
  */
 
 import { hojeNoRio } from '@/lib/erp/compra-campos';
-import { dataDoPeriodoPedido, dreDoPeriodo, type DreDoPeriodo, type PedidoDoEscopo } from '@/lib/erp/dre';
+import { dreDoPeriodo, type DreDoPeriodo, type PedidoDoEscopo } from '@/lib/erp/dre';
+import { lerPeriodoPedido } from '@/lib/erp/periodo-campos';
 import type { Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { Visao } from '@/lib/erp/visao';
@@ -28,5 +29,7 @@ export async function carregarDre(cliente: ClienteDoParceiro, alcance: Alcance, 
   const pedido = escopoPedido(alcance, visao, lojasDoAlcance, query);
   if (!pedido) return null;
   const hoje = hojeNoRio();
-  return dreDoPeriodo(cliente, alcance, pedido, dataDoPeriodoPedido(um(query.periodo), hoje), hoje);
+  const pedida = lerPeriodoPedido(um(query.periodo), hoje);
+  const d = await dreDoPeriodo(cliente, alcance, pedido, pedida.data, hoje);
+  return d && { ...d, avisoDaData: pedida.aviso };
 }

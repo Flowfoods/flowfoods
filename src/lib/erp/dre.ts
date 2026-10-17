@@ -45,6 +45,8 @@ export interface ResumoDaLoja {
 }
 
 export interface DreDoPeriodo {
+  /** Frase quando a data pedida na URL não vale e a tela mostrou o período de hoje (preenchida pela página). */
+  avisoDaData?: string | null;
   periodo: Periodo;
   hoje: string;
   /** O último dia que entrou na conta (até ontem no período em curso); nulo = nenhum dia apurado ainda. */
@@ -78,12 +80,6 @@ export function recusaDoDre(alcance: Alcance, escopo: PedidoDoEscopo): string | 
     return recusa(alcance, 'dre.ver');
   }
   return recusa(alcance, 'dre.ver', { lojaId: escopo.lojaId });
-}
-
-/** A data da URL (`?periodo=`) vira uma data dentro do período pedido: válida, entre 2020 e hoje; senão, hoje. */
-export function dataDoPeriodoPedido(texto: string | undefined, hoje: string): string {
-  if (!texto || !/^\d{4}-\d{2}-\d{2}$/.test(texto) || Number.isNaN(Date.parse(texto))) return hoje;
-  return texto > hoje || texto < PRIMEIRO_DIA_DO_ERP ? hoje : texto;
 }
 
 /**

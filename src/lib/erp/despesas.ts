@@ -313,7 +313,7 @@ export async function lancarDespesa(cliente: ClienteDoParceiro, alcance: Alcance
         select: { id: true },
       });
       if (criadas.length === 0) {
-        const ja = await tx.despesa.findFirst({ where: { chaveIdempotencia: chave }, select: { id: true } });
+        const ja = await tx.despesa.findFirst({ where: { AND: [{ chaveIdempotencia: chave }, escopoDasDespesas(alcance)] }, select: { id: true } });
         if (!ja) throw new Recusa(recusar('Não foi possível lançar agora. Tente de novo.'));
         return { ok: true, id: ja.id, jaLancada: true, mudou: false };
       }
@@ -424,8 +424,10 @@ export async function removerDespesa(cliente: ClienteDoParceiro, alcance: Alcanc
       if (entrada.versao !== a.versao) throw new Recusa(recusar(MENSAGEM_CONFLITO_DA_DESPESA, { conflito: true }));
       const fechado = await intervaloEmPeriodoFechado(tx, a.competencia.inicio, a.competencia.fim);
       if (fechado) throw new Recusa(recusar(fraseDoPeriodoFechado(fechado)));
-      const filha = await tx.despesa.findFirst({ where: { repeteDeId: id }, select: { id: true } });
+      const filha = await tx.despesa.findFirst({ where: { AND: [{ repeteDeId: id }, escopoDasDespesas(alcance)] }, select: { id: true } });
       if (filha) throw new Recusa(recusar('Esta despesa já foi repetida no mês seguinte. Remova primeiro a do mês seguinte, ou desmarque “repete todo mês” na outra.'));
+      // Uma repetida fora do seu alcance também impede (a chave estrangeira recusaria), mas sem dizer nada sobre ela.
+      if (await tx.despesa.findFirst({ where: { repeteDeId: id }, select: { id: true } })) throw new Recusa(recusar('Não foi possível remover esta despesa agora.'));
       const r = await tx.despesa.deleteMany({ where: { id, atualizadoEm: antes.atualizadoEm } });
       if (r.count === 0) throw new Recusa(recusar(MENSAGEM_CONFLITO_DA_DESPESA, { conflito: true }));
       await tx.historicoAlteracao.create({ data: { parceiroId: tx.parceiroId, entidade: 'Despesa', entidadeId: id, acao: 'EXCLUIU', antes: paraHistorico(a), motivo, autorNome } });

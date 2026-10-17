@@ -12,7 +12,7 @@
  *    cima) em cada loja; sem a configuração a linha é "falta configurar a taxa"
  *    (nunca R$ 0,00) e a receita líquida e os resultados saem com o selo
  *    "sem contar a taxa do iFood";
- *  - o CMV é da 2.3: a linha diz "Chega na 2.3" e a margem e os resultados saem
+ *  - o CMV é da 2.3: a linha diz "Em breve" e a margem e os resultados saem
  *    com o selo "sem contar o CMV" (um resultado sem o maior custo da casa não
  *    é o resultado: é o que dá para dizer hoje);
  *  - a rede é a soma das lojas + as despesas da rede (sem loja); a visão de uma
@@ -79,7 +79,7 @@ export interface LinhaDoDre {
   percentualBp: number | null;
   /** O que ficou de fora e o leitor precisa saber ("o CMV", "a taxa do iFood"). */
   semContar: string[];
-  /** Frase curta ao lado do valor ("Chega na 2.3", "falta configurar a taxa"). */
+  /** Frase curta ao lado do valor ("Em breve", "falta configurar a taxa"). */
   nota: string | null;
   oculta: boolean;
 }
@@ -189,7 +189,7 @@ export function montarDre(e: EntradaDoDre): ResultadoDoDre {
   empurrar({ ...linhaPlano(doPlano(CODIGO.receitaLiquida)), tipo: 'resultado', nivel: 0, valorCentavos: liquida, semContar: unir(semTaxa), nota: null });
 
   // --- CMV: chega na 2.3
-  empurrar({ ...linhaPlano(doPlano(CODIGO.cmv)), tipo: 'cmv', nivel: 0, valorCentavos: null, semContar: [], nota: 'Chega na 2.3' });
+  empurrar({ ...linhaPlano(doPlano(CODIGO.cmv)), tipo: 'cmv', nivel: 0, valorCentavos: null, semContar: [], nota: 'Em breve' });
 
   // --- Variáveis → margem de contribuição
   const bloco = (g: GrupoDoDre) => {

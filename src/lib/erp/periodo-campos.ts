@@ -195,3 +195,18 @@ export const mesmaRegra = (a: Pick<Regra, 'tipo' | 'diaInicio'>, b: Pick<Regra, 
 
 /** Quantos dias tem o período (inclusivo). */
 export const diasDoPeriodo = (p: Pick<Periodo, 'inicio' | 'fim'>) => diasEntre(p.inicio, p.fim) + 1;
+
+/**
+ * A data da URL (`?periodo=`) vira uma data dentro do período pedido: existente, entre 2020 e hoje. Qualquer outra
+ * (formato errado, "2026-02-31", futura, antiga) mostra o período de hoje COM uma frase, nunca em silêncio.
+ */
+export function lerPeriodoPedido(texto: string | undefined, hoje: string): { data: string; aviso: string | null } {
+  if (!texto) return { data: hoje, aviso: null };
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(texto);
+  const [a, mes, dia] = m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+  const d = new Date(Date.UTC(a, mes - 1, dia));
+  if (!m || d.getUTCFullYear() !== a || d.getUTCMonth() !== mes - 1 || d.getUTCDate() !== dia) return { data: hoje, aviso: 'A data do endereço não existe. Mostrando o período de hoje.' };
+  if (texto > hoje) return { data: hoje, aviso: 'O DRE só existe até hoje. Mostrando o período de hoje.' };
+  if (texto < PRIMEIRO_DIA_DO_ERP) return { data: hoje, aviso: 'O DRE começa em 01/01/2020. Mostrando o período de hoje.' };
+  return { data: texto, aviso: null };
+}

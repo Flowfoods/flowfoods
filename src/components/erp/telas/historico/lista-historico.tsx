@@ -24,6 +24,9 @@ function alvoVisivel(alvo: string | null, doCadastro?: string): string | null {
   return alvo.startsWith(`${doCadastro} · `) ? alvo.slice(doCadastro.length + 3) : alvo;
 }
 
+/** "Linha do DRE" vira "linha do DRE": só a primeira letra desce, as siglas ficam. */
+const minusculaNoComeco = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+
 export function ListaHistorico({
   linhas,
   compacta = false,
@@ -50,7 +53,7 @@ export function ListaHistorico({
         ) : (
           <>
             <span className="font-medium">{rotuloAcao(h.acao)}</span>{' '}
-            <span className="text-suave">{rotuloEntidade(h.entidade).toLowerCase()}</span>
+            <span className="text-suave">{minusculaNoComeco(rotuloEntidade(h.entidade))}</span>
             {alvoVisivel(h.alvo, doCadastro) && <span className="text-texto"> · {alvoVisivel(h.alvo, doCadastro)}</span>}
           </>
         );
@@ -64,7 +67,7 @@ export function ListaHistorico({
             {/* Cabeçalho da linha: o quê à esquerda, quando à direita (celular e modo compacto). */}
             <div className={`flex items-baseline justify-between gap-3 text-texto ${compacta ? '' : 'sm:hidden'}`}>
               {/* Compacta (coluna estreita): o quê quebra linha em vez de cortar. */}
-              <div className={`min-w-0 ${compacta ? '[overflow-wrap:anywhere]' : 'truncate'}`}>{oQue}</div>
+              <div className="min-w-0 [overflow-wrap:anywhere]">{oQue}</div>
               <time dateTime={h.ocorridoEm.toISOString()} className="shrink-0 text-[12px] tabular-nums text-suave">
                 {quando}
               </time>

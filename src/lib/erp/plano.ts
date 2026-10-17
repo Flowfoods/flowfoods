@@ -78,7 +78,7 @@ export async function resolverLinha(tx: ClienteDoParceiro, chave: string): Promi
   return (l as LinhaDoBanco | null) ?? null;
 }
 
-const retrato = (l: { nome: string; grupo: GrupoDoDre; ativa: boolean }) => ({ nome: l.nome, grupo: ROTULO_DO_GRUPO[l.grupo], linhaVisivel: l.ativa ? 'Visível' : 'Oculta' });
+const retrato = (l: { nome: string; grupo: GrupoDoDre; ativa: boolean }) => ({ nome: l.nome, grupo: ROTULO_DO_GRUPO[l.grupo], linhaVisivel: l.ativa ? 'Sim' : 'Não' });
 
 export type ResultadoDoPlano = { ok: true; id: string; mudou: boolean } | { ok: false; erros: Partial<Record<'nome' | 'grupo' | 'geral', string>>; conflito?: boolean };
 
