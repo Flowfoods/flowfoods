@@ -53,7 +53,7 @@ import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { lancarDia, salvarCanaisDaLoja, type EntradaDoCanal } from '@/lib/erp/faturamento';
 import { lancarDespesa } from '@/lib/erp/despesas';
 import type { TextosDaDespesa } from '@/lib/erp/despesa-campos';
-import { fecharPeriodo } from '@/lib/erp/dre-fechamento';
+import { fecharPeriodo, situacaoDoFechamento } from '@/lib/erp/dre-fechamento';
 import { situacaoDasMetas } from '@/lib/erp/dre-metas';
 import { dreDoPeriodo } from '@/lib/erp/dre';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
@@ -68,7 +68,8 @@ import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import ErpHistoricoPage from '@/app/erp/historico/page';
 import NivelUmPeriodoPage from '@/app/rodolfo/(painel)/erp/[slug]/dre/periodos/[inicio]/page';
 import { TelaDoDre } from '@/components/erp/telas/dre/dre';
-import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { TelaDoFechamento } from '@/components/erp/telas/dre/periodo-fechamento';
+import { cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const HOJE = '2026-10-17';
@@ -373,6 +374,32 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     expect(r).toEqual({ redirect: `/rodolfo/erp/${A.slug}/dre/periodos/2026-09-01?feito=reaberto` });
     expect(await a.periodoApuracao.findFirst({ where: { inicio: new Date('2026-09-01T00:00:00Z') } })).toMatchObject({ status: 'ABERTO', fechadoEm: null });
     expect(await a.dreFotografia.findUnique({ where: { id: foto } })).toMatchObject({ reabertaPorNome: 'Rodolfo', motivoReabertura: 'Nota de agosto que ficou de fora' });
+  });
+
+  it('período FECHADO de antes da fotografia: o nível 1 vê o formulário de reabrir (com a explicação), a dona só a frase; reabrir sem fotografia funciona', async () => {
+    // O legado só existe de antes da migration: aqui o gatilho adiado é desligado só para plantar a linha.
+    await db.$executeRawUnsafe(`ALTER TABLE "PeriodoApuracao" DISABLE TRIGGER "PeriodoApuracao_fechado_tem_fotografia"`);
+    try {
+      await cru(db, perfil, A.id, `INSERT INTO "PeriodoApuracao"(id,"parceiroId",nome,inicio,fim,status,"fechadoEm") VALUES ('legado-${sufixo}', $1, 'Janeiro de 2026', '2026-01-01', '2026-01-31', 'FECHADO', now())`, A.id);
+    } finally {
+      await db.$executeRawUnsafe(`ALTER TABLE "PeriodoApuracao" ENABLE TRIGGER "PeriodoApuracao_fechado_tem_fotografia"`);
+    }
+    const tela = async (alcance: Alcance, reabrir: boolean) => {
+      const sit = (await situacaoDoFechamento(a, alcance, '2026-01-01', HOJE))!;
+      expect(sit).toMatchObject({ fotografia: null });
+      return nbsp(renderToStaticMarkup(createElement(TelaDoFechamento, { s: sit as never, raiz: reabrir ? '/rodolfo/erp/x' : '/erp', contexto: 'Rede Completa', feito: null, acoes: { fechar: (async () => null) as never, ...(reabrir ? { reabrir: (async () => null) as never } : {}) }, bloqueio: null })));
+    };
+    const n1 = await tela(ALCANCE_FLOWFOODS, true);
+    expect(n1).toContain('antes de existir a fotografia do fechamento');
+    expect(n1).toContain('Reabrir o período</button>');
+    expect(n1).toContain('id="reabrir-motivo"');
+    const parceiro = await tela(alcanceDe('DONO', 'rede'), false);
+    expect(parceiro).toContain('Só a FlowFoods reabre');
+    expect(parceiro).not.toContain('reabrir-motivo');
+    // E o botão funciona: sem fotografia para conferir, o período volta a ABERTO e o Histórico guarda o motivo.
+    atual.ctx = () => ({ parceiro: A, alcance: ALCANCE_FLOWFOODS, cliente: a, bloqueio: null, podeEscrever: true, sessao: { userId: 'rodolfo', autorNome: 'Rodolfo' } });
+    expect(await rodar(() => dreDoNivel1.acaoReabrirPeriodo(A.slug, '2026-01-01', null, form({ motivo: 'Período antigo, sem fotografia', fotografia: '' })))).toHaveProperty('redirect');
+    expect((await a.periodoApuracao.findFirst({ where: { inicio: new Date('2026-01-01T00:00:00Z') } }))!.status).toBe('ABERTO');
   });
 
   it('critério 17: perfil com historico.ver e sem dre.ver não recebe FECHOU, REABRIU nem meta no Histórico (HTML e payload); quem tem dre.ver recebe', async () => {

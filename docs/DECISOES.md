@@ -1738,3 +1738,16 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) página de fechar solta e migration com CHECKs que reprovam por dado antigo; (b) "Plano e metas" e a página do período no grupo "Resultado", ajuda por tela e migration `20261027000000_erp_dre_fechamento` segura nos três perfis de banco.
 
 **Razão:** (b). `dre-periodo` nasce com ajuda; `dre`, `dre-plano`, `dre-periodos`, `periodo`, `compra` e `compra-nova` sobem de versão. O Histórico ganha FECHOU, REABRIU e a meta atrás de `verDre`. A migration é aditiva, com CHECKs `NOT VALID` + `VALIDATE` que avisa e segue, gatilhos de imutabilidade, RLS condicional e nenhum passo que dependa de SELECT sob RLS; `erp:conferir-migracao` verifica os CHECKs e os gatilhos, e `migrate diff` fica vazio.
+
+### 158. 2026-10-17 · ERP 2.2b (revisão de UX): toda recusa por período fechado diz o que fazer, e a tela avisa antes
+
+**Alternativas:** (a) frases soltas em cada tela ("já foi fechado"); (b) um aviso único com a saída, a alternativa de quem lança e o link para Períodos, que aparece antes de preencher quando a tela já sabe.
+
+**Razão:** (b). Recusar sem dizer o caminho deixa a pessoa parada. O aviso diz o período, o que não dá, "peça à FlowFoods para reabrir o período" (só a FlowFoods reabre, decisão 154) e a alternativa de quem lança: na nota, a data de hoje se a compra entrou agora; na despesa, a competência no período em aberto. A frase que o servidor devolve também carrega a saída. Quem não abre Períodos vê o aviso sem o link. O servidor continua decidindo; a tela só adianta o que já sabe (datas dos períodos fechados).
+
+### 159. 2026-10-17 · ERP 2.2b (revisão do Guardião): a fotografia só nasce com o período aberto, e fechar e reabrir esperam as escritas
+
+**Alternativas:** (a) confiar nos dois gatilhos adiados; (b) mais um gatilho `BEFORE INSERT`: período ABERTO, versão = última + 1, nasce vigente; e `BEFORE TRUNCATE`.
+
+**Razão:** (b). Com só os gatilhos adiados, marcar a vigente como substituída e inserir uma "v999" vigente deixava o período FECHADO, sem REABRIU, lendo uma fotografia falsa. Como a migration ainda não foi para a master, ela foi editada (e o checksum atualizado no `ff_dev`). Fechar e reabrir pegam a trava exclusiva; o teste determinístico segura a trava compartilhada, vê o fechamento esperar e confere que a despesa gravada durante a espera está na fotografia (cai se a trava for removida). A conclusão de contagem pega a trava compartilhada como primeira instrução.
+

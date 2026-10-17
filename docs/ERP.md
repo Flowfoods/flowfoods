@@ -1600,7 +1600,7 @@ Axe (wcag2a/2aa) sem violação nos dois temas, zero erro de console, zero rolag
 ## O que a 2.2b entregou — metas, comparação com o ano passado e fechamento do período
 
 Segunda metade da 2.2. Migration `20261027000000_erp_dre_fechamento` (ADITIVA; duas tabelas novas, `DreFotografia` e `DreFotografiaLinha`,
-colunas novas em `DreMeta` e `PeriodoApuracao`, gatilhos, RLS condicional; `migrate diff` vazio). Decisões 149 a 157. Permissões: o
+colunas novas em `DreMeta` e `PeriodoApuracao`, gatilhos, RLS condicional; `migrate diff` vazio). Decisões 149 a 159 (158 e 159 vieram da revisão de UX e do Guardião). Permissões: o
 catálogo não ganhou nada (`dre.ver`, `metas.editar` com a rede inteira; reabrir exige `alcance.nivel === 'FLOWFOODS'`, que é do
 portal do Rodolfo, não do parceiro); `VERSAO_DO_CATALOGO` continua 1.
 
@@ -1632,11 +1632,15 @@ portal do Rodolfo, não do parceiro); `VERSAO_DO_CATALOGO` continua 1.
    pelo alcance de quem lê) e é idêntico ao ao-vivo de quando fechou; mudar plano, taxa ou meta depois não mexe nele. No banco:
    gatilhos recusam UPDATE/DELETE em fotografia e linha (só se fecha a versão anterior ao reabrir), índice parcial garante UMA vigente
    por período, `NULLS NOT DISTINCT` na unicidade por versão, e um gatilho adiado impede um período FECHADO sem fotografia vigente (o
-   SQL na mão que marcar FECHADO sem fotografia falha no commit).
+   SQL na mão que marcar FECHADO sem fotografia falha no commit). Revisão (Guardião): um gatilho `BEFORE INSERT` só deixa nascer fotografia
+   com o período ABERTO, na versão seguinte à última e vigente (o ataque "marcar a vigente como substituída e inserir uma v999 vigente"
+   deixando o período FECHADO falha na hora, como `erp_tenant` e como dono), e `BEFORE TRUNCATE` recusa esvaziar as duas tabelas. A ordem
+   legítima é a do fechamento: fotografia com o período ABERTO e só depois FECHADO, na mesma transação.
 6. **Reabrir** (154). Só o nível 1 (a FlowFoods), na página do período do portal do Rodolfo, com motivo de 3 a 200 letras. A fotografia
    vigente vira "substituída" (nunca some), o período volta a ABERTO e o Histórico guarda antes e depois. Fechar de novo gera a
    versão 2; a lista "Versões" mostra todas. O dono do parceiro vê a frase "só a FlowFoods reabre" e não recebe formulário nem
-   action (a action de reabrir só existe no espelho do nível 1).
+   action (a action de reabrir só existe no espelho do nível 1). Período FECHADO de antes da fotografia: o nível 1 também vê o formulário
+   (com a explicação de que reabrir e fechar de novo grava a primeira fotografia).
 7. **Notas de compra e fechamento de estoque obedecem o fechamento** (155). Lançar, editar e cancelar nota (`compras.ts`) e iniciar e
    concluir contagem de FECHAMENTO (`contagem.ts`) pegam `travarParaEscrever` e recusam período FECHADO com a mesma frase da despesa.
    **Ordem das travas, a mesma em todo lugar**: chave do período (`erp-faturamento:<parceiro>`, compartilhada na escrita e exclusiva
@@ -1653,13 +1657,24 @@ portal do Rodolfo, não do parceiro); `VERSAO_DO_CATALOGO` continua 1.
     CHECKs, FKs, índices, os gatilhos de imutabilidade (fotografia, linha, período fechado) e de `parceiroId`, os dois gatilhos adiados e a RLS condicional das duas tabelas novas
     (grants mínimos; recusa seguir se as tabelas antigas têm RLS e as novas não puderem ter). Nenhum passo depende de SELECT sob RLS.
     O passo verificável pós-deploy continua sendo `npm run erp:conferir-migracao` (agora com os CHECKs e os gatilhos da 2.2b).
-11. **Fora desta subfase**: CMV e custo real (2.3), metas por canal, por loja e em reais, farol por faixa (2.4), despesa importada,
+11. **Aviso único de período fechado** (revisão de UX, decisão 158). Um componente só (`AvisoDoPeriodoFechado`) para faturamento (dia),
+    despesa (avulsa, editar, detalhe), recorrentes do mês passado, nota (lançar, editar, detalhe) e estoque: diz o período, o que não dá,
+    a saída ("Para mexer em <período>, peça à FlowFoods para reabrir o período"), a alternativa de quem lança (nota: "ou lance com a data de
+    hoje, se a compra entrou agora"; despesa: "ou lance com competência em <período em aberto>") e leva a Períodos (sem link para quem não
+    abre Períodos). A frase do servidor (`fraseDoPeriodoFechado`, em `periodo-fechado-campos.ts`) também traz a saída, então importação e
+    qualquer recusa em texto puro dizem o que fazer. A tela AVISA ANTES: a data da nota e a competência da despesa digitadas já acendem o
+    aviso (os períodos fechados vêm de `avisoDePeriodos`, só nome e datas); as recorrentes de um mês fechado não aparecem como lista
+    editável; o dia de faturamento fechado avisa no topo. O servidor segue sendo quem decide.
+12. **Metas no celular**: grupos recolhidos (abrem sob demanda, de tablet para cima aparecem sempre), "Salvar as metas" fixo embaixo, linha filha
+    sem meta própria diz "meta no grupo <Grupo>" em cinza quando o grupo tem meta; o ano passado leva a variação sob o nome da linha (nenhuma
+    coluna cortada). A cobertura parcial do ano passado já dizia "N de M dias com lançamento" (testado: "12 de 15 dias").
+13. **Fora desta subfase**: CMV e custo real (2.3), metas por canal, por loja e em reais, farol por faixa (2.4), despesa importada,
     reabrir pelo dono (depende do Rodolfo).
 
 **Ajuda: chaves novas/alteradas.** Nova: `dre-periodo` (v1, a página de fechar e reabrir). Alteradas, com `ajuda.lock.json` regravado
 (47 entradas): `dre` v2 para v3 (meta, desvio e ano passado), `dre-plano` v1 para v2 (agora também define as metas), `dre-periodos` v1 para
 v2 (período fechado e a página de cada um), `periodo` (estoque) v2 para v3 (fechamento de estoque recusa período fechado), `compra` v1
-para v2 e `compra-nova` v1 para v2 (a nota em período fechado é recusada).
+para v2 e `compra-nova` v1 para v2 (a nota em período fechado é recusada), `faturamento-dia` v2 para v4 (a saída: peça à FlowFoods).
 
 ## Provar o fechamento (2.2b)
 
@@ -1670,18 +1685,26 @@ npm run build
 npm run erp:conferir-migracao                                           # CHECKs e gatilhos da 2.2a e da 2.2b
 npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
 ```
-Os arquivos de banco que a 2.2b mexe também rodam num banco com dono NÃO-superusuário e FORCE RLS (um de cada vez, em sequência).
+Os arquivos de banco que a 2.2b mexe também rodam num banco com dono NÃO-superusuário e FORCE RLS (um de cada vez, em sequência:
+`npx vitest run --no-file-parallelism`; os 3 arquivos de migração criam bancos e exigem superusuário, e já provam os 3 perfis por dentro).
 `tests/erp-dre-metas.test.ts` (sem banco, 43): leitura da meta (vírgula, ponto, 0 a 100,00, vazio, lixo), "na meta" abaixo de 5 pontos-base
 e a palavra por `sentido`, ano passado (29/02, cobertura, sem lançamento), impressão das condições. `tests/erp-dre-fechamento.db.test.ts`
-(49): metas (vigência, sem meta como linha, conflito, histórico, alcance), condições duras e ressalvas, fotografia igual ao ao-vivo,
+(52): metas (vigência, sem meta como linha, conflito, histórico, alcance), condições duras e ressalvas, fotografia igual ao ao-vivo,
 imutabilidade (UPDATE/DELETE e SQL na mão recusados), período FECHADO sem fotografia recusado no commit, reabrir (só nível 1, motivo,
 versão 2), notas e estoque recusados no período fechado, recorrente que sobrevive, vazamento (sem `dre.ver` nada; gerente de loja nada
-da rede) e as corridas (fechar × despesa, fechar × nota, fechar × faturamento, fechar × concluir contagem, duas pessoas fechando).
+da rede) e as corridas (fechar × despesa, fechar × nota, fechar × faturamento, fechar × concluir contagem, duas pessoas fechando), mais o
+teste DETERMINÍSTICO da trava: uma transação segura `travarParaEscrever`, `fecharPeriodo` (e depois `reabrirPeriodo`) roda em paralelo e
+NÃO termina em 900 ms, a despesa gravada na transação tem de estar na fotografia; sem a linha `await travarParaFechar(tx)` de
+`fecharPeriodo` (ou a de `reabrirPeriodo`) o teste cai, verificado comentando cada uma. Também o ataque da v999 por SQL cru como `erp_tenant`
+e o TRUNCATE.
 `tests/erp-dre-fechamento-migracao.db.test.ts` (7): a migration com dado antigo nos 3 perfis do banco. `tests/erp-dre-fechamento-telas.db.test.ts`
-(9): actions e páginas de verdade (reabrir inexistente no espelho do parceiro, 404, HTML sem dado alheio).
+(11): actions e páginas de verdade (reabrir inexistente no espelho do parceiro, 404, HTML sem dado alheio; o aviso de período fechado nas
+recorrentes de setembro e no dia de faturamento; o período fechado de antes da fotografia). `tests/erp-periodo-fechado.test.ts` (7, sem
+banco): a frase, a leitura de volta, o componente e os formulários da nota e da despesa avisando antes de enviar.
+`tests/erp-dre-metas-tela.test.ts` (3, sem banco): a tabela de metas por grupo no celular.
 
-Na tela (build de produção local, porta 3100, banco `ff_22b_prova` copiado do `ff_dev`; roteiro `prova22b/jornada.mjs` no scratchpad, 50
-conferências): a dona abre "Plano e metas", tenta 101 % (recusado, nada gravado), grava 25,5 % de pessoal e deixa marketing sem meta
+Na tela (build de produção local, porta 3100, banco `ff_22b_prova` copiado do `ff_dev`; roteiro `prova22b/jornada.mjs` no scratchpad, 69
+conferências, com a revisão de UX): a dona abre "Plano e metas", tenta 101 % (recusado, nada gravado), grava 25,5 % de pessoal e deixa marketing sem meta
 (linha `semMeta` gravada); o DRE de outubro mostra Meta, Meta em R$, Desvio e a receita contra o ano passado; ao tentar fechar setembro vê a
 condição dura (um dia de iFood sem lançamento), lança o dia 12 pelo formulário do dia, volta e vê as duas ressalvas (contador da rede e
 internet da loja); fechar sem marcar não fecha, justificativa de 5 letras é recusada sem gravar, com as duas marcadas e a justificativa
@@ -1689,7 +1712,9 @@ fecha ("Fechado com ressalvas", versão 1, uma fotografia); no período fechado,
 consulta, sem botão) e nota de compra são recusados e não criam nenhuma linha; o dono não tem formulário de reabrir. O nível 1 reabre: motivo
 de 2 letras recusado, motivo válido reabre; a dona lança as 2 recorrentes e fecha sem ressalva (versão 2, versão 1 guardada em
 "Versões"). O gerente da Vila da Penha, a 390 px, vê só a loja dele (sem página do período nem plano); o operador não vê nada; Hugo
-(`historico.ver` sem `dre.ver`) não vê fechamento nem meta no Histórico. Axe (wcag2a/2aa) sem violação nos dois temas, zero erro de
+(`historico.ver` sem `dre.ver`) não vê fechamento nem meta no Histórico. Na revisão: o aviso de período fechado aparece antes de enviar (despesa, nota) e nas recorrentes e no dia de faturamento, com a saída e o link, e as
+recusas não criam linha; no celular o ano passado não corta coluna (dona e gerente) e a tabela de metas abre por grupo com "Salvar as metas" fixo.
+Axe (wcag2a/2aa) sem violação nos dois temas, zero erro de
 console, zero rolagem horizontal a 390, 820 e 1440. Prints em `shots-2.2b/`. Scanner `avoid-ai-design`: 0 P0 e 0 P1 (1 P2 de "meta
 strings com ponto médio", o padrão da casa).
 
@@ -2408,3 +2433,11 @@ banco de teste: o operador é recusado pelo servidor.
 - **Em aberto para o Rodolfo**: (1) só a FlowFoods reabre período; o dono pode vir a reabrir? (2) loja que nunca lançou nada é
   ressalva (fecha com justificativa) numa rede que já tem lançamento; é isso mesmo? (3) o gerente de uma loja continua vendo o
   salário da loja dele (herdado da 2.2a).
+- **Deadlock dos testes em paralelo com dono + FORCE RLS** (registrado pelo Guardião, ainda aberto): `tests/erp-db-apoio.ts` (`limparParceiros`) liga
+  e desliga o FORCE por DDL (`ALTER TABLE ... NO FORCE`), que pega `AccessExclusiveLock` em todas as tabelas de tenant e entra em deadlock com
+  os outros arquivos rodando ao mesmo tempo no mesmo banco. Em banco de dono não-superusuário rode `--no-file-parallelism`. A saída barata para
+  uma subfase de testes é a limpeza não usar DDL (apagar com `SET LOCAL role` do dono e sem mexer no FORCE).
+- **Teste mutante de trava**: toda trava nova (`travarParaEscrever`/`travarParaFechar`) precisa de um teste que a segure à mão e prove que a
+  operação ESPERA; teste de corrida sem isso passa mesmo sem a trava.
+- **Fotografia só nasce com o período ABERTO**: quem escrever fotografia (2.3, teste, importação) grava ANTES de marcar FECHADO, na mesma
+  transação (`criarPeriodoFechadoDeTeste` faz assim).

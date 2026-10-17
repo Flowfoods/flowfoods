@@ -69,13 +69,13 @@ export async function limparParceiros(db: PrismaClient, p: PerfilDoBanco, ids: s
 const dataIso = (s: string) => new Date(`${s}T00:00:00.000Z`);
 
 /**
- * 2.2b: um período FECHADO "de teste" dentro da transação `tx` — o período e uma fotografia mínima (sem linhas),
- * que é o que o banco exige para o período ficar FECHADO. Para os testes que simulam o fechamento da 2.2b
+ * 2.2b: um período FECHADO "de teste" dentro da transação `tx` — o período ABERTO, a fotografia mínima (sem linhas) e só então
+ * FECHADO, que é a ordem que o banco exige. Para os testes que simulam o fechamento da 2.2b
  * mais barato do que fechar de verdade (que tem as suas condições).
  */
 export async function criarPeriodoFechadoDeTeste(tx: ClienteDoParceiro, p: { nome: string; inicio: string; fim: string }) {
   const periodo = await tx.periodoApuracao.create({
-    data: { parceiroId: tx.parceiroId, nome: p.nome, inicio: dataIso(p.inicio), fim: dataIso(p.fim), status: 'FECHADO', fechadoEm: new Date(), fechadoPorNome: 'Teste' },
+    data: { parceiroId: tx.parceiroId, nome: p.nome, inicio: dataIso(p.inicio), fim: dataIso(p.fim) },
   });
   // Um DRE sem nenhum número (a conta pura sobre o plano padrão), gravado pelo mesmo caminho do fechamento.
   const vazio = montarDre({ escopo: { tipo: 'rede' }, plano: planoEfetivo([]), receitas: [], taxaIfood: null, despesas: [] });
@@ -84,7 +84,8 @@ export async function criarPeriodoFechadoDeTeste(tx: ClienteDoParceiro, p: { nom
     { periodoId: periodo.id, inicio: p.inicio, fim: p.fim, nomeDoPeriodo: p.nome, fechadoPorNome: 'Teste', taxa: null, entrada: {}, ressalvas: [], justificativa: null, linhas: linhasParaGravar(vazio, null, null, () => null) },
     1,
   );
-  return periodo;
+  // O mesmo caminho do fechamento: a fotografia nasce com o período ABERTO e só depois ele vira FECHADO.
+  return tx.periodoApuracao.update({ where: { id: periodo.id }, data: { status: 'FECHADO', fechadoEm: new Date(), fechadoPorNome: 'Teste' } });
 }
 
 /** O inverso: marca a fotografia como substituída e volta o período a ABERTO (o que a reabertura faz). */

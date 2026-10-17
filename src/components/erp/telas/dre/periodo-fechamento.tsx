@@ -224,8 +224,15 @@ export function TelaDoFechamento({
 
       {fechado && (
         <Painel titulo="Reabrir o período" subtitulo="O período fechado é o ponto de controle do consultor.">
-          {acoes.reabrir && fotografia ? (
-            <FormReabrir acao={acoes.reabrir} fotografia={fotografia.id} bloqueio={bloqueio} />
+          {acoes.reabrir ? (
+            <div className="space-y-4">
+              {!fotografia && (
+                <p className="text-sm text-suave">
+                  Este período foi fechado antes de existir a fotografia do fechamento, então o DRE dele é lido ao vivo. Reabrir e fechar de novo grava a primeira fotografia.
+                </p>
+              )}
+              <FormReabrir acao={acoes.reabrir} fotografia={fotografia?.id ?? ''} bloqueio={bloqueio} />
+            </div>
           ) : (
             <p className="text-sm text-suave">Só a FlowFoods reabre um período fechado. Precisa corrigir algo? Fale com o seu consultor: o motivo fica no Histórico e o fechamento anterior fica guardado.</p>
           )}

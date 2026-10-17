@@ -726,9 +726,10 @@ export async function concluirContagem(
     cliente.transacao(
       async (tx) => {
         // 2.2b (decisão 155): aplicar o FECHAMENTO do estoque cai num período. A trava compartilhada do período é a
-        // PRIMEIRA coisa da transação (antes de qualquer linha travada); a cíclica não cai em período e não a pega.
-        const tipoDela = await tx.contagem.findFirst({ where: { id: contagemId, lojaId }, select: { tipo: true } });
-        if (tipoDela?.tipo === 'FECHAMENTO') await travarParaEscrever(tx);
+        // PRIMEIRA instrução da transação, antes de ler qualquer coisa e de travar qualquer linha. Ela vale para
+        // toda conclusão: a cíclica não cai em período e não é recusada por ele, só espera, por milissegundos, um
+        // fechamento do DRE que esteja acontecendo (ler o tipo antes para decidir seria ler antes da trava).
+        await travarParaEscrever(tx);
         const loja = await lojaDoAlcance(tx, alcance, lojaId, 'estoque.ajustar');
         const [c] = await tx.sql<{ id: string; tipo: string; status: string; desfecho: string | null; versao: number; titulo: string | null; periodoId: string | null; fechaAutomaticoEm: Date | null }>`
           SELECT "id", "tipo"::text AS "tipo", "status"::text AS "status", "desfecho"::text AS "desfecho", "versao", "titulo", "periodoId", "fechaAutomaticoEm"

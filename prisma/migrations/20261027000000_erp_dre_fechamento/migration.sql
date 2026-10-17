@@ -17,7 +17,8 @@
 --     sem DELETE (nem UPDATE na linha) para o papel do tenant.
 --  4. Gatilhos: a fotografia é imutável (só se marca como substituída, uma vez),
 --     a linha só entra na transação da fotografia, o período FECHADO não muda de
---     datas e só fica FECHADO com uma fotografia vigente (gatilho adiado).
+--     datas e só fica FECHADO com uma fotografia vigente (gatilho adiado); a fotografia
+--     só nasce com o período ABERTO, na versão seguinte, e a tabela não se esvazia.
 
 -- ------------------------------------------------------------ colunas novas
 ALTER TABLE "DreMeta"
@@ -266,6 +267,46 @@ $$ LANGUAGE plpgsql;
 
 CREATE CONSTRAINT TRIGGER "DreFotografia_substituida_reabre_periodo" AFTER UPDATE ON "DreFotografia"
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION "erp_fotografia_substituida_reabre_periodo"();
+
+-- Uma fotografia só NASCE com o período ABERTO e na versão seguinte à última. Sem isto, quem marca a
+-- vigente como substituída e insere uma "v999" vigente deixa o período FECHADO, sem REABRIU, lendo uma
+-- fotografia falsa: os dois gatilhos adiados acima ficariam satisfeitos. O fluxo legítimo (fechar) grava a
+-- fotografia com o período ainda ABERTO e só depois o marca FECHADO, na mesma transação; reabrir volta a ABERTO
+-- antes de a versão seguinte nascer.
+CREATE OR REPLACE FUNCTION "erp_dre_fotografia_so_periodo_aberto"() RETURNS trigger AS $$
+DECLARE
+  situacao text;
+  ultima integer;
+BEGIN
+  SELECT p."status"::text INTO situacao FROM "PeriodoApuracao" p WHERE p."parceiroId" = NEW."parceiroId" AND p."id" = NEW."periodoId";
+  IF situacao IS DISTINCT FROM 'ABERTO' THEN
+    RAISE EXCEPTION '[erp] a fotografia só nasce com o período ABERTO: reabra antes (DreFotografia_so_periodo_aberto).' USING ERRCODE = 'check_violation';
+  END IF;
+  SELECT coalesce(max(f."versao"), 0) INTO ultima FROM "DreFotografia" f WHERE f."parceiroId" = NEW."parceiroId" AND f."periodoId" = NEW."periodoId";
+  IF NEW."versao" <> ultima + 1 THEN
+    RAISE EXCEPTION '[erp] a versão da fotografia é a seguinte à última (esperada %, veio %) (DreFotografia_so_periodo_aberto).', ultima + 1, NEW."versao" USING ERRCODE = 'check_violation';
+  END IF;
+  IF NEW."substituidaEm" IS NOT NULL THEN
+    RAISE EXCEPTION '[erp] a fotografia nasce vigente (DreFotografia_so_periodo_aberto).' USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "DreFotografia_so_periodo_aberto" BEFORE INSERT ON "DreFotografia"
+  FOR EACH ROW EXECUTE FUNCTION "erp_dre_fotografia_so_periodo_aberto"();
+
+-- Esvaziar a tabela inteira também não vale (DELETE linha a linha já é recusado acima).
+CREATE OR REPLACE FUNCTION "erp_dre_fotografia_sem_truncate"() RETURNS trigger AS $$
+BEGIN
+  RAISE EXCEPTION '[erp] a fotografia do fechamento não se esvazia (%).', TG_NAME USING ERRCODE = 'check_violation';
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER "DreFotografia_sem_truncate" BEFORE TRUNCATE ON "DreFotografia"
+  FOR EACH STATEMENT EXECUTE FUNCTION "erp_dre_fotografia_sem_truncate"();
+CREATE TRIGGER "DreFotografiaLinha_sem_truncate" BEFORE TRUNCATE ON "DreFotografiaLinha"
+  FOR EACH STATEMENT EXECUTE FUNCTION "erp_dre_fotografia_sem_truncate"();
 
 -- ------------------------------------------------------------ RLS
 -- O mesmo padrão condicional da 0.2 e da 2.2a (só se quem roda pode instalar por

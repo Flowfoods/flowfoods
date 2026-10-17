@@ -30,7 +30,7 @@ import { dreDoPeriodo, type DreDoPeriodo } from '@/lib/erp/dre';
 import { fecharPeriodo, reabrirPeriodo, situacaoDoFechamento } from '@/lib/erp/dre-fechamento';
 import { gravarFotografia } from '@/lib/erp/dre-fotografia';
 import { metasDoPeriodo, salvarMetas, situacaoDasMetas } from '@/lib/erp/dre-metas';
-import { travarParaFechar } from '@/lib/erp/periodo-trava';
+import { travarParaEscrever, travarParaFechar } from '@/lib/erp/periodo-trava';
 import { planoDoParceiro, garantirPlano, renomearLinha, ocultarLinha } from '@/lib/erp/plano';
 import { listarHistorico } from '@/lib/erp/historico';
 import { salvarTaxaDoIfood } from '@/lib/erp/canais';
@@ -557,6 +557,51 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       expect(await a.notaEntrada.count({ where: { numero: 'J-1' } })).toBe(0);
     });
 
+    it('critério 10 (determinístico): fecharPeriodo ESPERA a escrita em curso e a fotografia tem a despesa que ela gravou; reabrir também espera — sem a trava dentro deles estes testes caem', async () => {
+      // Abril completo e fechável sem ressalva.
+      for (const d of diasDe('2026-04')) {
+        expect((await lancarDiaDe(a, ids.vp, d, [canal('LOJA', '10,00', '1'), canal('DELIVERY_PROPRIO', '', '', true), canal('IFOOD', '', '', true)])).ok).toBe(true);
+        expect((await lancarDiaDe(a, ids.dlv, d, [canal('DELIVERY_PROPRIO', '', '', true)])).ok).toBe(true);
+        await lancarDiaDe(a, ids.nova, d, [canal('LOJA', '1,00', '1')]); // se a Loja Nova está ativa, não vira ressalva
+      }
+      const s0 = (await situacao('2026-04-01'))!.condicoes!;
+      expect(s0.duras).toEqual([]);
+      const fecharAbril = () => fechar('2026-04-01', { ressalvas: s0.ressalvas.map((x) => x.id), justificativa: 'Abril fechado só para provar a trava.' });
+
+      // 1) Uma transação segura a trava de escrever; o fechamento começa em paralelo e NÃO pode terminar enquanto ela não confirmar.
+      let terminou = false;
+      let fechamento!: ReturnType<typeof fecharAbril>;
+      await a.transacao(async (tx) => {
+        await travarParaEscrever(tx);
+        fechamento = fecharAbril().then((r) => ((terminou = true), r));
+        await new Promise((r) => setTimeout(r, 900));
+        expect(terminou, 'fecharPeriodo terminou sem esperar a escrita em curso (falta travarParaFechar)').toBe(false);
+        // A despesa nasce nesta transação, depois de o fechamento já ter começado.
+        expect(await lancarDespesa(tx, DONA(), textos({ tipo: 'dia', dia: '20/04/2026', linha: 'diversas', descricao: 'Entrou antes de fechar', valor: '123,00' }), 'Marina', HOJE)).toMatchObject({ ok: true });
+      });
+      expect(await fechamento).toMatchObject({ ok: true, versao: 1, jaFechado: false });
+      const p = (await periodo('2026-04-01'))!;
+      const f = (await a.dreFotografia.findFirst({ where: { periodoId: p.id } }))!;
+      const naFoto = (f.entrada as { despesas: { centavos: number }[] }).despesas.map((x) => x.centavos);
+      expect(naFoto, 'a fotografia ficou sem a despesa gravada durante o fechamento').toContain(12300);
+      const noBanco = (await a.despesa.findMany({ where: { competencia: { lte: dia('2026-04-30') }, competenciaFim: { gte: dia('2026-04-01') } } })).reduce((x, d) => x + d.valorCentavos, 0);
+      expect(naFoto.reduce((x, c) => x + c, 0)).toBe(noBanco);
+
+      // 2) Reabrir também pega a trava exclusiva: com uma escrita em curso ele espera, e a escrita ainda é recusada (o período segue fechado).
+      let reabriu = false;
+      let reabertura!: ReturnType<typeof reabrirPeriodo>;
+      await a.transacao(async (tx) => {
+        await travarParaEscrever(tx);
+        reabertura = reabrirPeriodo(a, N1(), { inicio: '2026-04-01', motivo: 'Conferir abril', fotografia: f.id }, 'Rodolfo').then((r) => ((reabriu = true), r));
+        await new Promise((r) => setTimeout(r, 900));
+        expect(reabriu, 'reabrirPeriodo terminou sem esperar a escrita em curso (falta travarParaFechar)').toBe(false);
+        expect(await lancarDespesa(tx, DONA(), textos({ tipo: 'dia', dia: '21/04/2026', linha: 'diversas', descricao: 'Tarde demais', valor: '5,00' }), 'Marina', HOJE)).toMatchObject({ ok: false });
+      });
+      expect(await reabertura).toMatchObject({ ok: true });
+      expect(await a.despesa.count({ where: { descricao: 'Tarde demais' } })).toBe(0);
+      expect((await periodo('2026-04-01'))!.status).toBe('ABERTO');
+    });
+
     it('critério 10: fechar de verdade × lançar despesa ao mesmo tempo — ou a despesa entra no fechamento, ou é recusada; nunca fica de fora calada', async () => {
       // Maio: faturamento completo e uma despesa pronta para brigar com o fechamento.
       for (const d of diasDe('2026-05')) {
@@ -742,6 +787,45 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
         }),
       ).rejects.toThrow();
       expect(await a.dreFotografia.count({ where: { periodoId: periodoSet } })).toBe(1);
+    });
+
+    it('o ataque da v999: marcar a vigente como substituída e inserir uma fotografia falsa vigente, como o papel do tenant, deixando o período FECHADO — é recusado, e o DRE segue lendo a verdadeira', async () => {
+      // Várias instruções na MESMA transação (os gatilhos adiados só olham no commit), como o papel do tenant quando a RLS existe.
+      const emTransacao = (passos: [string, ...unknown[]][]) =>
+        db.$transaction(async (tx) => {
+          if (perfil.rls) await tx.$queryRaw`SELECT set_config('app.parceiro_id', ${A.id}, true), set_config('role', 'erp_tenant', true)`;
+          for (const [sql, ...valores] of passos) await tx.$executeRawUnsafe(sql, ...valores);
+        });
+      const marcar: [string, ...unknown[]] = [`UPDATE "DreFotografia" SET "substituidaEm" = now(), "reabertaPorNome" = 'x', "motivoReabertura" = 'abc' WHERE "id" = $1`, foto];
+      const inserir = (versao: number): [string, ...unknown[]] => [
+        `INSERT INTO "DreFotografia" ("id","parceiroId","periodoId","versao","inicio","fim","nomeDoPeriodo","fechadoPorNome","versaoDaConta","entrada","ressalvas")
+         VALUES ('falsa-${versao}', $1, $2, ${versao}, '2026-09-01', '2026-09-30', 'Setembro de 2026', 'Falsa', 1, '{}'::jsonb, '[]'::jsonb)`,
+        A.id,
+        periodoSet,
+      ];
+      // v999 vigente e a seguinte (v2), as duas com o período FECHADO: o gatilho do INSERT recusa.
+      for (const v of [999, 2]) await expect(emTransacao([marcar, inserir(v)]), `v${v}`).rejects.toThrow(/só nasce com o período ABERTO/);
+      // Inserir sem marcar nada, também (a vigente já existe, o período está FECHADO).
+      await expect(emTransacao([inserir(2)])).rejects.toThrow();
+      // Reabrir "na mão" (marcar + período ABERTO) e inserir uma versão que pula números: recusado pela versão.
+      await expect(
+        emTransacao([marcar, [`UPDATE "PeriodoApuracao" SET "status" = 'ABERTO', "fechadoEm" = NULL, "fechadoPorNome" = NULL WHERE "id" = $1`, periodoSet], inserir(999)]),
+      ).rejects.toThrow(/versão da fotografia é a seguinte/);
+      // Nasce vigente.
+      await expect(
+        emTransacao([marcar, [`UPDATE "PeriodoApuracao" SET "status" = 'ABERTO', "fechadoEm" = NULL, "fechadoPorNome" = NULL WHERE "id" = $1`, periodoSet], [`INSERT INTO "DreFotografia" ("id","parceiroId","periodoId","versao","inicio","fim","nomeDoPeriodo","fechadoPorNome","versaoDaConta","entrada","ressalvas","substituidaEm") VALUES ('falsa-s', $1, $2, 2, '2026-09-01', '2026-09-30', 'Setembro de 2026', 'Falsa', 1, '{}'::jsonb, '[]'::jsonb, now())`, A.id, periodoSet]]),
+      ).rejects.toThrow(/nasce vigente/);
+      // Nada mudou: a verdadeira segue vigente, o período FECHADO, e o DRE lê a verdadeira.
+      expect((await a.dreFotografia.findUnique({ where: { id: foto } }))!.substituidaEm).toBeNull();
+      expect(await a.dreFotografia.count({ where: { periodoId: periodoSet } })).toBe(1);
+      expect((await periodo('2026-09-01'))!.status).toBe('FECHADO');
+      expect((await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!.status).toBe('FECHADO');
+    });
+
+    it('a fotografia e as linhas não se esvaziam por TRUNCATE (dono da tabela ou superusuário)', async () => {
+      await expect(db.$executeRawUnsafe(`TRUNCATE "DreFotografiaLinha"`)).rejects.toThrow(/não se esvazia/);
+      await expect(db.$executeRawUnsafe(`TRUNCATE "DreFotografia", "DreFotografiaLinha"`)).rejects.toThrow(/não se esvazia/);
+      expect(await a.dreFotografiaLinha.count({ where: { fotografiaId: foto } })).toBeGreaterThan(0);
     });
 
     it('um parceiro não grava fotografia de período do outro (a FK composta recusa), nem a lê', async () => {
@@ -940,8 +1024,8 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
         concluir = concluirContagem(e, DONA(), ids.est, ini.id, { versao, confirmarNaoContados: true }, 'Marina', agora).then((x) => ((terminou = true), x));
         await new Promise((r) => setTimeout(r, 900));
         expect(terminou).toBe(false); // sem a trava, o fechamento do estoque teria sido aplicado antes do DRE fechar
-        await tx.periodoApuracao.update({ where: { id: agosto.id }, data: { status: 'FECHADO', fechadoEm: new Date(), fechadoPorNome: 'Teste' } });
         await gravarFotografia(tx, { periodoId: agosto.id, inicio: '2026-08-01', fim: '2026-08-31', nomeDoPeriodo: 'Agosto de 2026', fechadoPorNome: 'Teste', taxa: null, entrada: {}, ressalvas: [], justificativa: null, linhas: [] }, 1);
+        await tx.periodoApuracao.update({ where: { id: agosto.id }, data: { status: 'FECHADO', fechadoEm: new Date(), fechadoPorNome: 'Teste' } });
       });
       expect(await concluir).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/Agosto de 2026 já foi fechado no DRE/) } });
       expect((await e.contagem.findUnique({ where: { id: ini.id } }))!.status).toBe('ABERTA');
