@@ -35,7 +35,7 @@ import { planoDoParceiro, garantirPlano, renomearLinha, ocultarLinha } from '@/l
 import { listarHistorico } from '@/lib/erp/historico';
 import { salvarTaxaDoIfood } from '@/lib/erp/canais';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
-import { criarPeriodoFechadoDeTeste, cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { criarPeriodoFechadoDeTeste, cru, limparParceiros, perfilDoBanco, reabrirPeriodoDeTeste, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 /** "Hoje" do teste: o relógio do ambiente dos testes de DRE. Outubro está em curso; setembro e agosto terminaram. */
@@ -820,6 +820,28 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       expect(await a.dreFotografia.count({ where: { periodoId: periodoSet } })).toBe(1);
       expect((await periodo('2026-09-01'))!.status).toBe('FECHADO');
       expect((await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!.status).toBe('FECHADO');
+    });
+
+    it('o UPDATE solto FECHADO → ABERTO (sem marcar a fotografia como substituída) e a fotografia vigente num período que não fechou são recusados no commit; reabrir pelo sistema continua passando', async () => {
+      const emTransacao = (passos: [string, ...unknown[]][]) =>
+        db.$transaction(async (tx) => {
+          if (perfil.rls) await tx.$queryRaw`SELECT set_config('app.parceiro_id', ${A.id}, true), set_config('role', 'erp_tenant', true)`;
+          for (const [sql, ...valores] of passos) await tx.$executeRawUnsafe(sql, ...valores);
+        });
+      // Como o papel do tenant: só mudar o status. A fotografia segue vigente, o período ficaria ABERTO: recusado.
+      await expect(emTransacao([[`UPDATE "PeriodoApuracao" SET "status" = 'ABERTO', "fechadoEm" = NULL, "fechadoPorNome" = NULL WHERE "id" = $1`, periodoSet]])).rejects.toThrow(/período ABERTO com fotografia vigente/);
+      expect((await periodo('2026-09-01'))!.status).toBe('FECHADO');
+      expect(await a.historicoAlteracao.count({ where: { entidade: 'PeriodoApuracao', entidadeId: periodoSet, acao: 'REABRIU' } })).toBe(0);
+      // A fotografia vigente que nasce num período que não vira FECHADO na mesma transação (abril foi reaberto): recusada no commit.
+      const abril = (await periodo('2026-04-01'))!;
+      expect(abril.status).toBe('ABERTO');
+      await expect(a.transacao((tx) => gravarFotografia(tx, { periodoId: abril.id, inicio: '2026-04-01', fim: '2026-04-30', nomeDoPeriodo: 'Abril de 2026', fechadoPorNome: 'X', taxa: null, entrada: {}, ressalvas: [], justificativa: null, linhas: [] }, 2))).rejects.toThrow(/período ABERTO com fotografia vigente/);
+      expect(await a.dreFotografia.count({ where: { periodoId: abril.id, versao: 2 } })).toBe(0);
+      // O caminho legítimo segue: fechar (fotografia + FECHADO) e reabrir (substituída + ABERTO) na mesma transação.
+      const dez = await a.transacao((tx) => criarPeriodoFechadoDeTeste(tx, { nome: 'Dezembro de 2025', inicio: '2025-12-01', fim: '2025-12-31' }));
+      expect(dez.status).toBe('FECHADO');
+      await reabrirPeriodoDeTeste(a, dez.id);
+      expect((await a.periodoApuracao.findUnique({ where: { id: dez.id } }))!.status).toBe('ABERTO');
     });
 
     it('a fotografia e as linhas não se esvaziam por TRUNCATE (dono da tabela ou superusuário)', async () => {

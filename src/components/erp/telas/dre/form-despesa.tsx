@@ -255,6 +255,7 @@ export function FormDespesa({
             {fechadoDaCompetencia && (
               <AvisoDoPeriodoFechado
                 id="desp-periodo-fechado"
+                rolar
                 periodo={fechadoDaCompetencia}
                 href={periodos.href}
                 frase="Uma despesa com competência nele não entra."

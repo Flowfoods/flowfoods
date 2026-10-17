@@ -1634,7 +1634,9 @@ portal do Rodolfo, não do parceiro); `VERSAO_DO_CATALOGO` continua 1.
    por período, `NULLS NOT DISTINCT` na unicidade por versão, e um gatilho adiado impede um período FECHADO sem fotografia vigente (o
    SQL na mão que marcar FECHADO sem fotografia falha no commit). Revisão (Guardião): um gatilho `BEFORE INSERT` só deixa nascer fotografia
    com o período ABERTO, na versão seguinte à última e vigente (o ataque "marcar a vigente como substituída e inserir uma v999 vigente"
-   deixando o período FECHADO falha na hora, como `erp_tenant` e como dono), e `BEFORE TRUNCATE` recusa esvaziar as duas tabelas. A ordem
+   deixando o período FECHADO falha na hora, como `erp_tenant` e como dono), `BEFORE TRUNCATE` recusa esvaziar as duas tabelas, e um gatilho
+   ADIADO recusa no commit período ABERTO com fotografia vigente (o UPDATE solto FECHADO → ABERTO sem marcar a fotografia como substituída; a
+   função relê o status de agora, porque o evento adiado traz a linha como era). Fechar e reabrir pelo sistema passam. A ordem
    legítima é a do fechamento: fotografia com o período ABERTO e só depois FECHADO, na mesma transação.
 6. **Reabrir** (154). Só o nível 1 (a FlowFoods), na página do período do portal do Rodolfo, com motivo de 3 a 200 letras. A fotografia
    vigente vira "substituída" (nunca some), o período volta a ABERTO e o Histórico guarda antes e depois. Fechar de novo gera a
@@ -1657,7 +1659,7 @@ portal do Rodolfo, não do parceiro); `VERSAO_DO_CATALOGO` continua 1.
     CHECKs, FKs, índices, os gatilhos de imutabilidade (fotografia, linha, período fechado) e de `parceiroId`, os dois gatilhos adiados e a RLS condicional das duas tabelas novas
     (grants mínimos; recusa seguir se as tabelas antigas têm RLS e as novas não puderem ter). Nenhum passo depende de SELECT sob RLS.
     O passo verificável pós-deploy continua sendo `npm run erp:conferir-migracao` (agora com os CHECKs e os gatilhos da 2.2b).
-11. **Aviso único de período fechado** (revisão de UX, decisão 158). Um componente só (`AvisoDoPeriodoFechado`) para faturamento (dia),
+11. **Aviso único de período fechado** (revisão de UX, decisão 158; o aviso que nasce depois de digitar rola para a vista, acima da barra fixa de salvar). Um componente só (`AvisoDoPeriodoFechado`) para faturamento (dia),
     despesa (avulsa, editar, detalhe), recorrentes do mês passado, nota (lançar, editar, detalhe) e estoque: diz o período, o que não dá,
     a saída ("Para mexer em <período>, peça à FlowFoods para reabrir o período"), a alternativa de quem lança (nota: "ou lance com a data de
     hoje, se a compra entrou agora"; despesa: "ou lance com competência em <período em aberto>") e leva a Períodos (sem link para quem não
@@ -1689,7 +1691,7 @@ Os arquivos de banco que a 2.2b mexe também rodam num banco com dono NÃO-super
 `npx vitest run --no-file-parallelism`; os 3 arquivos de migração criam bancos e exigem superusuário, e já provam os 3 perfis por dentro).
 `tests/erp-dre-metas.test.ts` (sem banco, 43): leitura da meta (vírgula, ponto, 0 a 100,00, vazio, lixo), "na meta" abaixo de 5 pontos-base
 e a palavra por `sentido`, ano passado (29/02, cobertura, sem lançamento), impressão das condições. `tests/erp-dre-fechamento.db.test.ts`
-(52): metas (vigência, sem meta como linha, conflito, histórico, alcance), condições duras e ressalvas, fotografia igual ao ao-vivo,
+(53): metas (vigência, sem meta como linha, conflito, histórico, alcance), condições duras e ressalvas, fotografia igual ao ao-vivo,
 imutabilidade (UPDATE/DELETE e SQL na mão recusados), período FECHADO sem fotografia recusado no commit, reabrir (só nível 1, motivo,
 versão 2), notas e estoque recusados no período fechado, recorrente que sobrevive, vazamento (sem `dre.ver` nada; gerente de loja nada
 da rede) e as corridas (fechar × despesa, fechar × nota, fechar × faturamento, fechar × concluir contagem, duas pessoas fechando), mais o
@@ -2433,10 +2435,19 @@ banco de teste: o operador é recusado pelo servidor.
 - **Em aberto para o Rodolfo**: (1) só a FlowFoods reabre período; o dono pode vir a reabrir? (2) loja que nunca lançou nada é
   ressalva (fecha com justificativa) numa rede que já tem lançamento; é isso mesmo? (3) o gerente de uma loja continua vendo o
   salário da loja dele (herdado da 2.2a).
+- **Troca completa numa transação só, sem REABRIU no Histórico (aceito)**: quem tem o papel do tenant e SQL cru pode, numa única transação,
+  marcar a fotografia vigente como substituída, voltar o período a ABERTO e depois inserir a versão seguinte e marcar FECHADO. Os gatilhos
+  garantem versão, ordem e que nunca sobra período FECHADO sem fotografia nem ABERTO com vigente, mas o Histórico só ganha o REABRIU quando
+  o caminho é o do sistema (é a aplicação que o grava). Está dentro do que a RLS e os gatilhos prometem (isolamento entre parceiros e
+  fotografia imutável por linha); impedir isso exigiria o REABRIU nascer no banco.
 - **Deadlock dos testes em paralelo com dono + FORCE RLS** (registrado pelo Guardião, ainda aberto): `tests/erp-db-apoio.ts` (`limparParceiros`) liga
   e desliga o FORCE por DDL (`ALTER TABLE ... NO FORCE`), que pega `AccessExclusiveLock` em todas as tabelas de tenant e entra em deadlock com
   os outros arquivos rodando ao mesmo tempo no mesmo banco. Em banco de dono não-superusuário rode `--no-file-parallelism`. A saída barata para
   uma subfase de testes é a limpeza não usar DDL (apagar com `SET LOCAL role` do dono e sem mexer no FORCE).
+- **Decisões de negócio em aberto para o Rodolfo**: (1) quem reabre período fechado: hoje só a FlowFoods (nível 1); o dono poderia, com permissão
+  nova; (2) loja que nunca lançou nada no período é ressalva (fecha com justificativa), não bloqueio, numa rede que já tem lançamento; (3) o
+  gerente de uma loja vê os salários da loja dele (herdado da 2.2a; esconder o grupo Pessoal para quem não tem a rede inteira é uma mudança
+  de leitura em `dre.ts` e `despesas.ts`).
 - **Teste mutante de trava**: toda trava nova (`travarParaEscrever`/`travarParaFechar`) precisa de um teste que a segure à mão e prove que a
   operação ESPERA; teste de corrida sem isso passa mesmo sem a trava.
 - **Fotografia só nasce com o período ABERTO**: quem escrever fotografia (2.3, teste, importação) grava ANTES de marcar FECHADO, na mesma

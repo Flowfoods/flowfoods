@@ -99,8 +99,8 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
     // Os gatilhos que fazem a fotografia valer (sem eles o fechado não seria imutável).
     const gatilhos = await db.$queryRaw<{ nome: string }[]>`
       SELECT tgname AS nome FROM pg_trigger
-      WHERE NOT tgisinternal AND tgname = ANY(${['DreFotografia_imutavel', 'DreFotografiaLinha_so_inclusao', 'PeriodoApuracao_fechado_imutavel', 'PeriodoApuracao_fechado_tem_fotografia', 'DreFotografia_substituida_reabre_periodo', 'DreFotografia_so_periodo_aberto', 'DreFotografia_sem_truncate', 'DreFotografiaLinha_sem_truncate']})`;
-    for (const t of ['DreFotografia_imutavel', 'DreFotografiaLinha_so_inclusao', 'PeriodoApuracao_fechado_imutavel', 'PeriodoApuracao_fechado_tem_fotografia', 'DreFotografia_substituida_reabre_periodo', 'DreFotografia_so_periodo_aberto', 'DreFotografia_sem_truncate', 'DreFotografiaLinha_sem_truncate']) {
+      WHERE NOT tgisinternal AND tgname = ANY(${['DreFotografia_imutavel', 'DreFotografiaLinha_so_inclusao', 'PeriodoApuracao_fechado_imutavel', 'PeriodoApuracao_fechado_tem_fotografia', 'DreFotografia_substituida_reabre_periodo', 'DreFotografia_so_periodo_aberto', 'PeriodoApuracao_aberto_sem_fotografia_vigente', 'DreFotografia_vigente_so_em_periodo_fechado', 'DreFotografia_sem_truncate', 'DreFotografiaLinha_sem_truncate']})`;
+    for (const t of ['DreFotografia_imutavel', 'DreFotografiaLinha_so_inclusao', 'PeriodoApuracao_fechado_imutavel', 'PeriodoApuracao_fechado_tem_fotografia', 'DreFotografia_substituida_reabre_periodo', 'DreFotografia_so_periodo_aberto', 'PeriodoApuracao_aberto_sem_fotografia_vigente', 'DreFotografia_vigente_so_em_periodo_fechado', 'DreFotografia_sem_truncate', 'DreFotografiaLinha_sem_truncate']) {
       if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261027000000_erp_dre_fechamento não foi aplicada por inteiro.`);
     }
   }

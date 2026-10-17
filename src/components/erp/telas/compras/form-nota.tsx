@@ -304,6 +304,7 @@ export function FormNota({
               <div className="sm:col-span-2">
                 <AvisoDoPeriodoFechado
                   id={`${idBase}-periodo-fechado`}
+                  rolar={dataDigitada !== inicial.data || !!erros.data}
                   periodo={fechadoDaData}
                   href={periodos.href}
                   frase="Uma nota com essa data não entra."

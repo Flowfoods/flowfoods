@@ -18,7 +18,8 @@
 --  4. Gatilhos: a fotografia é imutável (só se marca como substituída, uma vez),
 --     a linha só entra na transação da fotografia, o período FECHADO não muda de
 --     datas e só fica FECHADO com uma fotografia vigente (gatilho adiado); a fotografia
---     só nasce com o período ABERTO, na versão seguinte, e a tabela não se esvazia.
+--     só nasce com o período ABERTO, na versão seguinte, e a tabela não se esvazia;
+--     período ABERTO com fotografia vigente também não existe (gatilho adiado).
 
 -- ------------------------------------------------------------ colunas novas
 ALTER TABLE "DreMeta"
@@ -295,6 +296,40 @@ $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER "DreFotografia_so_periodo_aberto" BEFORE INSERT ON "DreFotografia"
   FOR EACH ROW EXECUTE FUNCTION "erp_dre_fotografia_so_periodo_aberto"();
+
+-- O outro lado do mesmo cinto: período ABERTO com fotografia vigente não existe. Fecha o UPDATE solto
+-- FECHADO -> ABERTO (sem marcar a fotografia como substituída) que deixaria o DRE lendo ao vivo um período
+-- que tem fotografia, e a fotografia vigente nascida num período que não ficou FECHADO. Adiado até o fim da
+-- transação: fechar (fotografia + FECHADO) e reabrir (substituída + ABERTO) passam; os dois lados soltos, não.
+CREATE OR REPLACE FUNCTION "erp_periodo_aberto_sem_fotografia_vigente"() RETURNS trigger AS $$
+DECLARE
+  alvo text;
+  parceiro text;
+  situacao text;
+BEGIN
+  -- O gatilho adiado recebe a linha COMO ERA no evento (o INSERT do período nasce ABERTO e só depois vira FECHADO,
+  -- na mesma transação): o que vale é o estado de agora, lido aqui.
+  IF TG_TABLE_NAME = 'PeriodoApuracao' THEN
+    alvo := NEW."id"; parceiro := NEW."parceiroId";
+  ELSE
+    IF NEW."substituidaEm" IS NOT NULL THEN RETURN NULL; END IF;
+    alvo := NEW."periodoId"; parceiro := NEW."parceiroId";
+  END IF;
+  SELECT p."status"::text INTO situacao FROM "PeriodoApuracao" p WHERE p."parceiroId" = parceiro AND p."id" = alvo;
+  IF situacao = 'ABERTO' AND EXISTS (
+    SELECT 1 FROM "DreFotografia" f WHERE f."parceiroId" = parceiro AND f."periodoId" = alvo AND f."substituidaEm" IS NULL
+  ) THEN
+    RAISE EXCEPTION '[erp] período ABERTO com fotografia vigente do DRE: reabrir marca a fotografia como substituída, e a fotografia só fica vigente num período FECHADO (%).', TG_NAME
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER "PeriodoApuracao_aberto_sem_fotografia_vigente" AFTER INSERT OR UPDATE ON "PeriodoApuracao"
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION "erp_periodo_aberto_sem_fotografia_vigente"();
+CREATE CONSTRAINT TRIGGER "DreFotografia_vigente_so_em_periodo_fechado" AFTER INSERT ON "DreFotografia"
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION "erp_periodo_aberto_sem_fotografia_vigente"();
 
 -- Esvaziar a tabela inteira também não vale (DELETE linha a linha já é recusado acima).
 CREATE OR REPLACE FUNCTION "erp_dre_fotografia_sem_truncate"() RETURNS trigger AS $$

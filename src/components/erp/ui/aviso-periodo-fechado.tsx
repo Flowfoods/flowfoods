@@ -1,3 +1,5 @@
+'use client';
+
 /**
  * O aviso de período fechado (2.2b): UM só para faturamento, despesa, nota, estoque e o que mais recusar
  * por período fechado. Diz o que não dá, a saída ("peça à FlowFoods para reabrir"), a alternativa de quem
@@ -6,6 +8,7 @@
  */
 
 import Link from 'next/link';
+import { useEffect, useRef } from 'react';
 import { saidaDoPeriodoFechado } from '@/lib/erp/periodo-fechado-campos';
 import { LINK_DE_TEXTO } from './estilos';
 
@@ -16,6 +19,7 @@ export function AvisoDoPeriodoFechado({
   frase,
   id,
   dentro = false,
+  rolar = false,
 }: {
   periodo: string;
   /** A tela Períodos; null quando a pessoa não abre essa tela (o aviso fica sem o link). */
@@ -27,9 +31,15 @@ export function AvisoDoPeriodoFechado({
   id?: string;
   /** Dentro de um painel: sem moldura própria. */
   dentro?: boolean;
+  /** O aviso nasceu agora (a pessoa digitou a data, ou o servidor recusou): traz ele para a vista, acima da barra fixa de salvar. */
+  rolar?: boolean;
 }) {
+  const caixa = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (rolar) caixa.current?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+  }, [rolar]);
   return (
-    <div id={id} role="status" className={`flex items-start gap-3 text-sm ${dentro ? '' : 'rounded-[14px] border border-linha bg-painel px-4 py-3 sm:px-5'}`}>
+    <div ref={caixa} id={id} role="status" className={`scroll-mb-40 flex items-start gap-3 text-sm ${dentro ? '' : 'rounded-[14px] border border-linha bg-painel px-4 py-3 sm:px-5'}`}>
       <span className="flex h-5 shrink-0 items-center">
         <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-atencao" />
       </span>
