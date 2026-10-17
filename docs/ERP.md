@@ -1864,7 +1864,7 @@ segurar `travarParaFechar` e provar que concluir, atender, devolver e estornar E
 derruba o teste. `tests/erp-producao-migracao.db.test.ts` (6): a migration com dado antigo plantado (limpo e ruim) nos 3 perfis do banco. `tests/erp-producao-telas.db.test.ts` (12): o
 HTML por perfil (dona, gerente, cozinheiro, cozinheiro sem custos), o vazamento do custo, o alcance, as actions e o espelho do nível 1.
 
-Na tela (build de produção local, porta 3100, banco `ff_31` copiado do `ff_dev`; roteiro `prova31/jornada.mjs` no scratchpad, 134 conferências): o cozinheiro, a
+Na tela (build de produção local, porta 3100, banco `ff_31` copiado do `ff_dev`; roteiro `prova31/jornada.mjs` no scratchpad, 151 conferências): o cozinheiro, a
 390 px com toque, vê a área Produção no hub, o quadro com o lote de anteontem atrasado (filete de 3 px, "2d de atraso", "Insumos por entregar"), monta a lista da
 ficha (0,885 · 2,5 · 2,5), planeja com duplo clique (um lote só), começa e é barrado ao concluir antes da entrega; o estoquista entrega pela requisição do lote (aviso
 do lote, sem cancelar; baixas de −R$ 117,81); o cozinheiro conclui com 4,6 kg (92%, R$ 25,61/kg contra R$ 23,56/kg, R$ 9,42, validade 3 dias) e o lote aparece no livro do
@@ -2646,7 +2646,16 @@ banco de teste: o operador é recusado pelo servidor.
   (`semCustoDaProducao`, filtro `verCustos`, ausente = fechado). Tela nova com custo de lote segue o mesmo contrato.
 - **Teste de banco que lê com SQL cru** precisa do contexto do parceiro (`cru` do apoio) ou do portão: com dono e FORCE RLS o SELECT cru enxerga 0 linhas.
 - **Teste de migration com dado antigo nos 3 perfis** e `erp:conferir-migracao` com os CHECKs, o índice e os gatilhos da 3.1 continuam obrigatórios.
+- **Resíduo de valor do lote (a mostrar no fechamento do CMV)**: o lote entra no estoque pelo custo REAL (R$ 117,81 por 4,6 kg) e sai pelo custo de referência
+  da ficha (R$ 23,56/kg). Ao esgotar o molho (saldo 0 kg) pode sobrar valor no saldo (no exemplo dos 400 g que faltaram, R$ 9,42). Hoje nenhuma tela
+  mostra esse resíduo; quem mexer no fechamento do CMV (2.4 ou 3.2) o exibe como linha própria, para o CMV real não esconder a diferença.
+- **Quem vê o custo do insumo**: o operador da cozinha vê o custo dos insumos do lote porque `insumos.ver` é "Ver insumos e custos" (uma permissão só para
+  insumo e custo). Separar "ver insumo" de "ver custo" é decisão de negócio (ver abaixo) e mexe no catálogo de permissões.
+- **Nomes na tela**: a aba da área é "Lotes" (a trilha fica "Produção › Lotes › loja › lote", sem repetir "Produção"); o botão "Concluir o lote" fica desabilitado
+  com o motivo ("Falta entregar os insumos (requisição #N)") até a requisição ser atendida; o cartão do quadro diz "Insumos: a entregar (requisição #N)",
+  "rendeu 88%" e, quando o lote vem de outro dia, o dia e a hora ("planejada 15/10 11:09"). Custo de insumo ainda não entregue é "a entregar" ou "—", nunca R$ 0,00.
+  O aviso de período fechado (`AvisoDoPeriodoFechado`) aparece antes de preencher a conclusão e, se o servidor recusar, rola até ele acima da barra fixa.
 - **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) a faixa de ±10% do rendimento serve para todas as fichas ou há pré-preparo (caldo, molho reduzido) que
   precisa de faixa própria? (2) produção sem data retroativa: se o cozinheiro esquece de lançar ontem, hoje não dá para planejar para ontem; vale abrir exceção
   para o gerente? (3) a requisição de produção deve aparecer nas Divergências (requisição × contagem)? Hoje ela conta como requisitado no cruzamento, mas não há
-  filtro para separar a de produção da do salão.
+  filtro para separar a de produção da do salão. (4) `insumos.ver` hoje mistura "ver insumo" e "ver custo": o operador da cozinha vê o custo dos insumos do lote. Vale uma permissão só para custo?

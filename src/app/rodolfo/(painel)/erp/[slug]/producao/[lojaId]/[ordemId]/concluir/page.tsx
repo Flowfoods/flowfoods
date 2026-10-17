@@ -2,6 +2,7 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { obterOrdem } from '@/lib/erp/producao';
 import { pendente } from '@/lib/erp/producao-campos';
 import { TelaConcluir } from '@/components/erp/telas/producao/concluir';
@@ -17,5 +18,5 @@ export default async function ParceiroConcluirLotePage({ params }: { params: { s
   const lojaId = d.loja.id;
   const raiz = `/rodolfo/erp/${ctx.parceiro.slug}`;
   if (!pendente(d.ordem.status) || ctx.bloqueio) redirect(`${raiz}/producao/${lojaId}/${d.ordem.id}`);
-  return <TelaConcluir d={d} base={`${raiz}/producao`} contexto={ctx.parceiro.nome} acao={acaoConcluirProducao.bind(null, ctx.parceiro.slug, lojaId, d.ordem.id)} hrefRequisicao={`${raiz}/estoque/${lojaId}/requisicoes`} bloqueio={ctx.bloqueio} />;
+  return <TelaConcluir d={d} base={`${raiz}/producao`} contexto={ctx.parceiro.nome} acao={acaoConcluirProducao.bind(null, ctx.parceiro.slug, lojaId, d.ordem.id)} hrefRequisicao={`${raiz}/estoque/${lojaId}/requisicoes`} periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, raiz)} bloqueio={ctx.bloqueio} />;
 }

@@ -30,6 +30,12 @@ export function quandoCurto(d: Date, hoje: string): string {
   return dia === hoje ? HORA.format(d) : DIA.format(d);
 }
 
+/** "10:42" se for hoje (Rio), senão o dia e a hora: "14/10 10:42" (cartão de lote que vem de outro dia). */
+export function quandoDoCartao(d: Date, hoje: string): string {
+  const dia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(d);
+  return dia === hoje ? HORA.format(d) : DIA_HORA.format(d).replace(',', '');
+}
+
 /** "14/10 às 10:42". */
 export const quandoLongo = (d: Date) => DIA_HORA.format(d).replace(',', ' às');
 

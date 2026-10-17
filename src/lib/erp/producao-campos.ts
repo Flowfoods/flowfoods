@@ -63,13 +63,13 @@ export const foiEstornado = (l: { status: StatusDaProducao; concluidaEm: Date | 
 
 // ================================================================ o código do lote
 
-/** "2026-10-17" e a sequência do dia → "261017-01". Depois de 99 no dia, 3 e 4 dígitos (o CHECK do banco aceita até 4). */
+/** O dia "2026-10-17" e a sequência do dia dão "261017-01". Depois de 99 no dia, 3 e 4 dígitos (o CHECK do banco aceita até 4). */
 export function codigoDoLote(dia: string, sequencia: number): string {
   const [a, m, d] = dia.split('-');
   return `${a.slice(2)}${m}${d}-${String(sequencia).padStart(2, '0')}`;
 }
 
-/** A sequência de um código de lote ("261017-07" → 7); fora do formato, null. */
+/** A sequência de um código de lote ("261017-07" é a 7); fora do formato, null. */
 export function sequenciaDoLote(codigo: string): number | null {
   const m = /^\d{6}-(\d{2,4})$/.exec(codigo);
   return m ? Number(m[1]) : null;
@@ -253,11 +253,11 @@ export function perdaDoLote(totalCentavos: number, planejadoMilesimos: number, p
 
 /** Qual é a situação da requisição do lote, em palavras (a do cartão do quadro). */
 export function situacaoDosInsumos(status: 'ABERTA' | 'PARCIAL' | 'ATENDIDA' | 'CANCELADA' | null, numero: number | null): string {
-  const n = numero ? ` (#${numero})` : '';
-  if (status === 'ATENDIDA') return `Insumos entregues${n}`;
-  if (status === 'PARCIAL') return `Insumos em entrega${n}`;
-  if (status === 'CANCELADA') return `Requisição cancelada${n}`;
-  return `Insumos por entregar${n}`;
+  const n = numero ? ` (requisição #${numero})` : '';
+  if (status === 'ATENDIDA') return `Insumos: entregues${n}`;
+  if (status === 'PARCIAL') return `Insumos: em entrega${n}`;
+  if (status === 'CANCELADA') return `Requisição${numero ? ` #${numero}` : ''} cancelada`;
+  return `Insumos: a entregar${n}`;
 }
 
 /**

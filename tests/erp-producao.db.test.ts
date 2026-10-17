@@ -362,6 +362,8 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · produção do pré-preparo pela ficha (P
     const item = r.itens.find((i) => i.nome === 'Leite')!;
     const rec = await devolverItem(a, GERENTE(), ids.vp, REQ1, { versao: r.requisicao.versao, itemId: item.id, quantidade: '1', escala: 'base', motivo: '' }, 'Gil');
     expect(rec).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/lote \d{6}-01 já foi concluído/) } });
+    // Entregar também: o custo do lote já fechou (sem a conferência, a requisição ATENDIDA responderia "já feito").
+    expect(await atenderRequisicao(a, GERENTE(), ids.vp, REQ1, { versao: r.requisicao.versao, linhas: [], encerrar: true, confirmarNegativo: false }, 'Gil')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/lote \d{6}-01 já foi concluído.*não recebe mais entrega/) } });
     expect(await cancelarRequisicao(a, GERENTE(), ids.vp, REQ1, { motivo: 'quero cancelar' }, 'Gil')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/é do lote/) } });
     expect(await a.movimentoEstoque.count({ where: { tipo: 'REQUISICAO' } })).toBe(3);
   });
@@ -486,6 +488,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · produção do pré-preparo pela ficha (P
     // A requisição do lote estornado continua fechada para entrega e devolução.
     const r = (await obterRequisicao(a, DONA(), ids.vp, REQ1))!;
     expect(await devolverItem(a, GERENTE(), ids.vp, REQ1, { versao: r.requisicao.versao, itemId: r.itens[0].id, quantidade: '0,1', escala: 'base', motivo: '' }, 'Gil')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/já foi cancelado/) } });
+    expect(await atenderRequisicao(a, GERENTE(), ids.vp, REQ1, { versao: r.requisicao.versao, linhas: [], encerrar: true, confirmarNegativo: false }, 'Gil')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/já foi cancelado.*não recebe mais entrega/) } });
   });
 
   it('estornar quando o lote já foi usado (saldo ficaria abaixo de zero) só com a confirmação; o saldo negativo vira alarme', async () => {

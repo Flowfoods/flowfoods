@@ -216,11 +216,11 @@ describe('o quadro: atraso, estado e frases', () => {
     expect(foiEstornado({ status: 'CONCLUIDA', concluidaEm: new Date() })).toBe(false);
   });
   it('a situação dos insumos no cartão', () => {
-    expect(situacaoDosInsumos('ABERTA', 12)).toBe('Insumos por entregar (#12)');
-    expect(situacaoDosInsumos('PARCIAL', 12)).toBe('Insumos em entrega (#12)');
-    expect(situacaoDosInsumos('ATENDIDA', 12)).toBe('Insumos entregues (#12)');
-    expect(situacaoDosInsumos('CANCELADA', 12)).toBe('Requisição cancelada (#12)');
-    expect(situacaoDosInsumos(null, null)).toBe('Insumos por entregar');
+    expect(situacaoDosInsumos('ABERTA', 12)).toBe('Insumos: a entregar (requisição #12)');
+    expect(situacaoDosInsumos('PARCIAL', 12)).toBe('Insumos: em entrega (requisição #12)');
+    expect(situacaoDosInsumos('ATENDIDA', 12)).toBe('Insumos: entregues (requisição #12)');
+    expect(situacaoDosInsumos('CANCELADA', 12)).toBe('Requisição #12 cancelada');
+    expect(situacaoDosInsumos(null, null)).toBe('Insumos: a entregar');
   });
   it('por que ainda não conclui: o que falta sair pela requisição', () => {
     expect(fraseDoQueFalta([{ nome: 'Cebola', unidade: 'KG', faltaMilesimos: 885 }, { nome: 'Leite', unidade: 'L', faltaMilesimos: 0 }], 12)).toBe('Faltam sair 885 g de Cebola pela requisição #12: entregue ou encerre o resto.');

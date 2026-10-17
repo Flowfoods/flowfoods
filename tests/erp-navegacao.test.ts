@@ -68,7 +68,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      Produção: ['Produção'],
+      Produção: ['Lotes'],
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos', 'Plano e metas'],
       'Rede e Equipe': ['Lojas e marcas', 'Equipe', 'Histórico', 'Seu acesso'],
     });
@@ -88,7 +88,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      Produção: ['Produção'],
+      Produção: ['Lotes'],
       // 2.2a: o gerente vê e lança despesa, vê o DRE e o período; plano de contas e período são do dono (rede inteira).
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos'],
       'Rede e Equipe': ['Lojas e marcas', 'Histórico', 'Seu acesso'],
@@ -108,7 +108,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(abasPorArea(OPERADOR)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições'],
-      Produção: ['Produção'],
+      Produção: ['Lotes'],
       'Rede e Equipe': ['Lojas e marcas', 'Seu acesso'],
     });
     expect(acoesDaNavegacao(navegacaoDoParceiro(OPERADOR)).map((a) => a.rotulo)).toEqual(['Nova produção']);
@@ -360,13 +360,13 @@ const ROTAS_ATIVAS: [string, string][] = [
   ['/dre/plano', 'Plano e metas'],
   // 2.2b: o período e o fechamento dele acendem a aba Períodos.
   ['/dre/periodos/2026-10-01', 'Períodos'],
-  // 3.1: a produção — o quadro da loja, o planejamento, o lote e a conclusão acendem a aba Produção.
-  ['/producao', 'Produção'],
-  ['/producao/nova', 'Produção'],
-  [`/producao/${LOJA}`, 'Produção'],
-  [`/producao/${LOJA}/nova`, 'Produção'],
-  [`/producao/${LOJA}/o1`, 'Produção'],
-  [`/producao/${LOJA}/o1/concluir`, 'Produção'],
+  // 3.1: a produção — o quadro da loja, o planejamento, o lote e a conclusão acendem a aba Lotes (a trilha não repete "Produção › Produção").
+  ['/producao', 'Lotes'],
+  ['/producao/nova', 'Lotes'],
+  [`/producao/${LOJA}`, 'Lotes'],
+  [`/producao/${LOJA}/nova`, 'Lotes'],
+  [`/producao/${LOJA}/o1`, 'Lotes'],
+  [`/producao/${LOJA}/o1/concluir`, 'Lotes'],
 ];
 
 describe('UX.9 · itemAtivo acende a aba certa em cada rota profunda', () => {

@@ -44,7 +44,7 @@ export function FormCancelarLote({ acao, versao, recarregar }: { acao: AcaoDeEst
   const [aberto, setAberto] = useState(false);
   if (!aberto && !estado) {
     return (
-      <button type="button" onClick={() => setAberto(true)} className={classeDeBotao('fantasma', 'w-full sm:w-auto')}>
+      <button type="button" onClick={() => setAberto(true)} className={classeDeBotao('secundario', 'w-full sm:w-auto')}>
         Cancelar este lote
       </button>
     );
@@ -91,7 +91,7 @@ export function FormEstornar({ acao, versao, recarregar, quantoEntrou }: { acao:
   const [aberto, setAberto] = useState(false);
   if (!aberto && !estado) {
     return (
-      <button type="button" onClick={() => setAberto(true)} className={classeDeBotao('fantasma', 'w-full sm:w-auto')}>
+      <button type="button" onClick={() => setAberto(true)} className={classeDeBotao('secundario', 'w-full sm:w-auto')}>
         Estornar este lote
       </button>
     );

@@ -6,6 +6,7 @@
 
 import Link from 'next/link';
 import type { LoteDaLoja } from '@/lib/erp/producao';
+import { fechadoNaData, type AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
 import { fraseDoQueFalta } from '@/lib/erp/producao-campos';
 import { COR } from '@/lib/erp/modulos';
 import { aceitas, CONSERVACOES, formatarValidade } from '@/lib/erp/validade';
@@ -18,8 +19,10 @@ import { Voltar } from '../cadastro/partes';
 import type { AcaoDeEstoque } from '../estoque/estado';
 import { FormConcluir, type ConservacaoParaEscolher } from './form-concluir';
 
-export function TelaConcluir({ d, base, contexto, acao, hrefRequisicao, bloqueio }: { d: LoteDaLoja; base: string; contexto?: string; acao: AcaoDeEstoque; hrefRequisicao: string | null; bloqueio: string | null }) {
+export function TelaConcluir({ d, base, contexto, acao, hrefRequisicao, periodos, bloqueio }: { d: LoteDaLoja; base: string; contexto?: string; acao: AcaoDeEstoque; hrefRequisicao: string | null; periodos: AvisoDePeriodos; bloqueio: string | null }) {
   const o = d.ordem;
+  // A conclusão entra no estoque com a data de hoje: período de hoje fechado no DRE, não dá (o servidor confere de novo).
+  const fechadoHoje = fechadoNaData(periodos.fechados, d.hoje)?.nome ?? null;
   const aqui = `${base}/${d.loja.id}/${o.id}`;
   const falta = d.requisicao?.status === 'ATENDIDA' ? null : d.requisicao ? fraseDoQueFalta(d.itensDoLote.map((i) => ({ nome: i.nome, unidade: i.unidade, faltaMilesimos: i.faltaMilesimos })), d.requisicao.numero) : 'Este lote não tem a requisição dos insumos. Cancele e planeje de novo.';
   const conservacoes: ConservacaoParaEscolher[] = d.validadesAgora
@@ -42,7 +45,7 @@ export function TelaConcluir({ d, base, contexto, acao, hrefRequisicao, bloqueio
           )}
         </Aviso>
       ) : (
-        <FormConcluir acao={acao} versao={o.versao} planejadoMilesimos={o.planejadoMilesimos} unidade={o.unidade} conservacoes={conservacoes} custo={custo} recarregar={aqui} bloqueio={bloqueio ?? (d.aberto ? null : 'O estoque ainda não foi aberto.')} />
+        <FormConcluir acao={acao} versao={o.versao} planejadoMilesimos={o.planejadoMilesimos} unidade={o.unidade} conservacoes={conservacoes} custo={custo} recarregar={aqui} fechadoHoje={fechadoHoje} hrefPeriodos={periodos.href} bloqueio={bloqueio ?? (d.aberto ? null : 'O estoque ainda não foi aberto.')} />
       )}
     </div>
   );

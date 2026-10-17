@@ -18,7 +18,7 @@ import { classeDeBotao } from '../../ui/estilos';
 import { Aviso } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { CartaoDoQuadro, ColunaDoQuadro, GradeDoQuadro, type TomDaColuna } from '../quadro/quadro';
-import { quandoCurto, SeloDoAtraso } from '../requisicoes/partes';
+import { quandoDoCartao, SeloDoAtraso } from '../requisicoes/partes';
 
 const TOM_DA_COLUNA: Record<StatusDaProducao, TomDaColuna> = {
   PLANEJADA: 'atencao',
@@ -34,12 +34,12 @@ function Cartao({ c, aqui, hoje }: { c: CartaoDoLote; aqui: string; hoje: string
   const r = c.status === 'CONCLUIDA' && c.produzidoMilesimos !== null ? rendimentoDoLote(c.planejadoMilesimos, c.produzidoMilesimos) : null;
   const quem =
     c.status === 'CONCLUIDA' && c.concluidaEm
-      ? `concluída por ${c.concluidaPorNome ?? '—'} · ${quandoCurto(c.concluidaEm, hoje)}`
+      ? `concluída por ${c.concluidaPorNome ?? '—'} · ${quandoDoCartao(c.concluidaEm, hoje)}`
       : c.status === 'CANCELADA' && c.canceladaEm
-        ? `${c.estornado ? 'estornada' : 'cancelada'} · ${quandoCurto(c.canceladaEm, hoje)}`
+        ? `${c.estornado ? 'estornada' : 'cancelada'} · ${quandoDoCartao(c.canceladaEm, hoje)}`
         : c.iniciadaEm
-          ? `começou ${quandoCurto(c.iniciadaEm, hoje)}`
-          : `planejada ${quandoCurto(c.criadoEm, hoje)}`;
+          ? `começou ${quandoDoCartao(c.iniciadaEm, hoje)}`
+          : `planejada ${quandoDoCartao(c.criadoEm, hoje)}`;
   return (
     <CartaoDoQuadro
       href={`${aqui}/${c.id}`}
@@ -52,7 +52,7 @@ function Cartao({ c, aqui, hoje }: { c: CartaoDoLote; aqui: string; hoje: string
         {atrasado ? <SeloDoAtraso dias={c.atrasoDias} /> : pendente ? <span className="shrink-0 text-[12px] text-suave">{textoDoParaDia(c.dataPlanejada, hoje)}</span> : null}
       </div>
       <div className="mt-1 text-[13px] tabular-nums text-suave">
-        Lote <span className="text-texto">{c.codigoLote}</span> · {c.status === 'CONCLUIDA' && c.produzidoMilesimos !== null ? `saiu ${formatarQuantidade(c.produzidoMilesimos, c.unidade)} de ${formatarQuantidade(c.planejadoMilesimos, c.unidade)}${r ? ` (${formatarRendimento(r.rendimentoBp)})` : ''}` : formatarQuantidade(c.planejadoMilesimos, c.unidade)}
+        Lote <span className="text-texto">{c.codigoLote}</span> · {c.status === 'CONCLUIDA' && c.produzidoMilesimos !== null ? `${formatarQuantidade(c.produzidoMilesimos, c.unidade)} de ${formatarQuantidade(c.planejadoMilesimos, c.unidade)}${r ? ` · rendeu ${formatarRendimento(r.rendimentoBp)}` : ''}` : formatarQuantidade(c.planejadoMilesimos, c.unidade)}
       </div>
       {pendente && c.requisicao && <div className={`mt-2 text-[12px] ${falta ? 'text-atencao' : 'text-suave'}`}>{situacaoDosInsumos(c.requisicao.status, c.requisicao.numero)}</div>}
       <div className="mt-1 text-[12px] text-suave">{quem}</div>

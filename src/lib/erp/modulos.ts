@@ -381,7 +381,7 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
           telas: [
             {
               href: `${base}/producao`,
-              rotulo: 'Produção',
+              rotulo: 'Lotes',
               icone: 'producao',
               subtitulo: 'Lotes planejados, em produção e concluídos, por loja',
               permissao: 'producao.ver',

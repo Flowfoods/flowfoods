@@ -56,6 +56,10 @@ export function TelaDoLote({
   const quantoEntrou = entrouNoEstoque ? formatarQuantidade(entrouNoEstoque.quantidadeMilesimos, o.unidade) : null;
   const c = d.custo;
   const semPreco = c?.semPreco ?? [];
+  const entregues = d.requisicao?.status === 'ATENDIDA';
+  // Sem baixa não há custo: "—" (ou "a entregar" enquanto o lote ainda espera), nunca R$ 0,00.
+  const custoDoItem = (i: (typeof d.itensDoLote)[number]) =>
+    i.semPreco ? 'Sem preço' : i.saiuMilesimos === 0 || i.valorCentavos === null ? (pend && i.faltaMilesimos > 0 ? 'a entregar' : '—') : formatarDinheiro(i.valorCentavos);
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: quadro }, { rotulo: `Lote ${o.codigoLote}` }]} />
@@ -67,9 +71,20 @@ export function TelaDoLote({
         subtitulo={[contexto, o.fichaNome, formatarQuantidade(o.planejadoMilesimos, o.unidade), textoDoParaDia(o.dataPlanejada, d.hoje), o.planejadaPorNome ? `planejado por ${o.planejadaPorNome}` : null].filter(Boolean).join(' · ')}
         acao={
           podeConcluir ? (
-            <Link href={`${aqui}/concluir`} className={classeDeBotao('primario')}>
-              Concluir o lote
-            </Link>
+            entregues ? (
+              <Link href={`${aqui}/concluir`} className={classeDeBotao('primario')}>
+                Concluir o lote
+              </Link>
+            ) : (
+              <div className="flex flex-col items-start gap-1 sm:items-end">
+                <button type="button" disabled aria-describedby="concluir-falta" className={classeDeBotao('secundario')}>
+                  Concluir o lote
+                </button>
+                <span id="concluir-falta" className="text-[12px] text-suave">
+                  Falta entregar os insumos{d.requisicao ? ` (requisição ${numeroDaRequisicao(d.requisicao.numero)})` : ''}
+                </span>
+              </div>
+            )
           ) : undefined
         }
       >
@@ -111,10 +126,10 @@ export function TelaDoLote({
                     <dt className="text-suave">Falta</dt>
                     <dd className={`font-semibold ${i.faltaMilesimos > 0 ? 'text-atencao' : 'text-texto'}`}>{i.faltaMilesimos ? formatarQuantidade(i.faltaMilesimos, i.unidade) : '—'}</dd>
                   </div>
-                  {i.valorCentavos !== null && (
+                  {c && (
                     <div>
                       <dt className="text-suave">Custo</dt>
-                      <dd className="font-semibold text-texto">{i.semPreco ? 'Sem preço' : formatarDinheiro(i.valorCentavos)}</dd>
+                      <dd className="font-semibold text-texto">{custoDoItem(i)}</dd>
                     </div>
                   )}
                 </dl>
@@ -151,7 +166,7 @@ export function TelaDoLote({
                   <td className="px-3 py-2.5 text-right">{formatarQuantidade(i.pedidoMilesimos, i.unidade)}</td>
                   <td className="px-3 py-2.5 text-right font-semibold">{formatarQuantidade(i.saiuMilesimos, i.unidade)}</td>
                   <td className={`px-3 py-2.5 text-right ${i.faltaMilesimos > 0 ? 'text-atencao' : 'text-suave'}`}>{i.faltaMilesimos ? formatarQuantidade(i.faltaMilesimos, i.unidade) : '—'}</td>
-                  {c && <td className="px-3 py-2.5 pr-5 text-right">{i.semPreco ? <span className="text-atencao">Sem preço</span> : i.valorCentavos !== null ? formatarDinheiro(i.valorCentavos) : '—'}</td>}
+                  {c && <td className={`px-3 py-2.5 pr-5 text-right ${i.semPreco ? 'text-atencao' : ''}`}>{custoDoItem(i)}</td>}
                 </tr>
               ))}
             </tbody>

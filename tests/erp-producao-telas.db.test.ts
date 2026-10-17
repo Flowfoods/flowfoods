@@ -185,7 +185,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     const h = await pagina(ErpProducaoDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} }));
     expect(h).toContain('Produção da Vila da Penha');
     expect(h).toContain('Molho cheddar');
-    expect(h).toContain('Insumos por entregar (#1)');
+    expect(h).toContain('Insumos: a entregar (requisição #1)');
     expect(h).toContain('Nova produção');
     expect(h).toContain('Nenhum lote nesta etapa');
     const o = (await obterOrdem(a, OPERADOR(), ids.vp, LOTE))!;

@@ -2,6 +2,7 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { obterOrdem } from '@/lib/erp/producao';
 import { pendente } from '@/lib/erp/producao-campos';
 import { TelaConcluir } from '@/components/erp/telas/producao/concluir';
@@ -17,5 +18,5 @@ export default async function ErpConcluirLotePage({ params }: { params: { lojaId
   const lojaId = d.loja.id;
   if (!pendente(d.ordem.status) || ctx.bloqueio) redirect(`/erp/producao/${lojaId}/${d.ordem.id}`);
   const veRequisicao = pode(ctx.alcance, 'requisicao.pedir', { lojaId }) || pode(ctx.alcance, 'requisicao.atender', { lojaId });
-  return <TelaConcluir d={d} base="/erp/producao" acao={acaoConcluirProducao.bind(null, lojaId, d.ordem.id)} hrefRequisicao={veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null} bloqueio={ctx.bloqueio} />;
+  return <TelaConcluir d={d} base="/erp/producao" acao={acaoConcluirProducao.bind(null, lojaId, d.ordem.id)} hrefRequisicao={veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null} periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')} bloqueio={ctx.bloqueio} />;
 }

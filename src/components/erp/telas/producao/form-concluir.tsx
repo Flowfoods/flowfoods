@@ -9,8 +9,10 @@
 
 import { useEffect, useState } from 'react';
 import { useFormState } from 'react-dom';
+import { periodoDaFraseDeRecusa } from '@/lib/erp/periodo-fechado-campos';
 import { custoPorUnidadeDoLote, formatarRendimento, quandoVence, rendimentoDoLote, validadeDoLote } from '@/lib/erp/producao-campos';
 import { formatarDinheiro, formatarFracao, formatarQuantidade, lerQuantidadeNa, UNIDADES, type Unidade } from '@/lib/erp/unidades';
+import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { Painel } from '../../ui/superficies';
@@ -33,6 +35,8 @@ export function FormConcluir({
   conservacoes,
   custo,
   recarregar,
+  fechadoHoje,
+  hrefPeriodos,
   bloqueio,
 }: {
   acao: AcaoDeEstoque;
@@ -43,6 +47,9 @@ export function FormConcluir({
   /** Só para quem vê custos: o que saiu do estoque (centavos), os insumos sem preço e o custo da ficha hoje (texto pronto). */
   custo: { totalCentavos: number; semPreco: string[]; previstoTexto: string | null } | null;
   recarregar: string;
+  /** O período de hoje, quando já está fechado no DRE: o aviso vem antes de preencher. */
+  fechadoHoje: string | null;
+  hrefPeriodos: string | null;
   bloqueio: string | null;
 }) {
   const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
@@ -55,6 +62,9 @@ export function FormConcluir({
   const [agoraMs, setAgoraMs] = useState<number | null>(null);
   useEffect(() => setAgoraMs(Date.now()), []);
   const erros = estado?.erros ?? {};
+  // O servidor recusou por período fechado (a tela já tinha avisado, ou o período fechou depois de abrir): o mesmo aviso, trazido para a vista.
+  const fechadoNoServidor = periodoDaFraseDeRecusa(erros.geral);
+  const travado = !!bloqueio || !!fechadoHoje;
   const q = texto.trim() ? lerQuantidadeNa(texto.trim(), unidade, escala) : null;
   const r = q !== null && q >= 0 && q <= planejadoMilesimos * 2 ? rendimentoDoLote(planejadoMilesimos, q) : null;
   const perdido = q === 0;
@@ -66,7 +76,16 @@ export function FormConcluir({
     <form action={enviar} className="space-y-5 pb-28 sm:pb-0">
       <input type="hidden" name="versao" value={versao} />
       <input type="hidden" name="escala" value={escala} />
-      <fieldset disabled={!!bloqueio} className="space-y-5">
+      {(fechadoHoje || fechadoNoServidor) && (
+        <AvisoDoPeriodoFechado
+          id="concluir-periodo-fechado"
+          periodo={(fechadoHoje ?? fechadoNoServidor)!}
+          href={hrefPeriodos}
+          frase="O lote entra no estoque com a data de hoje: não dá para concluir nem estornar lote nele."
+          rolar={!fechadoHoje && !!fechadoNoServidor}
+        />
+      )}
+      <fieldset disabled={travado} className="space-y-5">
         <Painel titulo="Quanto saiu de verdade" subtitulo={`Planejado: ${formatarQuantidade(planejadoMilesimos, unidade)}. Pese ou meça o lote pronto.`}>
           <div className="flex items-stretch gap-2">
             <label htmlFor={idQ} className="sr-only">
@@ -189,7 +208,7 @@ export function FormConcluir({
         )}
       </fieldset>
 
-      {(erros.geral || bloqueio) && (
+      {((erros.geral && !fechadoNoServidor) || bloqueio) && (
         <p role="alert" className="text-[13px] text-erro">
           {erros.geral ?? bloqueio}{' '}
           {estado?.conflito && (
@@ -200,10 +219,10 @@ export function FormConcluir({
         </p>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
+      <div data-barra-fixa className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <span className="text-[13px] tabular-nums text-suave">{q === null ? 'Falta dizer quanto saiu' : perdido ? 'Lote perdido' : `Entra no estoque: ${formatarQuantidade(q, unidade)}`}</span>
-          <BotaoEnviar pendente="Concluindo…" disabled={!!bloqueio} className="min-w-[200px]">
+          <BotaoEnviar pendente="Concluindo…" disabled={travado} className="min-w-[200px]">
             {perdido ? 'Registrar lote perdido' : 'Concluir e pôr no estoque'}
           </BotaoEnviar>
         </div>
