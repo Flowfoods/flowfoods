@@ -279,8 +279,9 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
 
     it('critério 7: receita contra o ano passado — mesmas datas, cobertura parcial (12 de 30 dias) sem variação, e período em curso compara até ontem', async () => {
       const d = (await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!;
-      expect(d.anoPassado).toMatchObject({ de: '2025-09-01', ate: '2025-09-30', diasComLancamento: 12, diasDoRecorte: 30 });
-      expect(d.anoPassado!.semVariacaoPorque).toContain('12 de 30 dias');
+      // 2.4: a cobertura é por loja. A Penha lançou 12 dias; a Delivery e a Loja Nova, nenhum: o pior é zero, e a frase diz quem falta.
+      expect(d.anoPassado).toMatchObject({ de: '2025-09-01', ate: '2025-09-30', diasComLancamento: 0, diasDoRecorte: 30 });
+      expect(d.anoPassado!.semVariacaoPorque).toContain('Vila da Penha 12 de 30');
       const loja = d.anoPassado!.linhas.find((l) => l.chave === 'LOJA')!;
       expect(loja).toMatchObject({ atualCentavos: 600_000, anteriorCentavos: 120_000, variacaoBp: null });
       expect(d.anoPassado!.linhas.find((l) => l.chave === 'IFOOD')).toMatchObject({ anteriorCentavos: 0 }); // "não vendeu" lançado: zero de verdade
@@ -298,11 +299,16 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       for (const d of diasDe('2025-09').slice(12)) expect((await lancarDiaDe(a, ids.vp, d, [canal('LOJA', '100,00', '3'), canal('DELIVERY_PROPRIO', '50,00', '1'), canal('IFOOD', '', '', true)])).ok).toBe(true);
       // A Delivery também (o escopo da rede soma as duas lojas).
       for (const d of diasDe('2025-09')) expect((await lancarDiaDe(a, ids.dlv, d, [canal('DELIVERY_PROPRIO', '', '', true)])).ok).toBe(true);
-      const d = (await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!;
+      // 2.4: a cobertura é POR LOJA e a Loja Nova (ativa, nunca lançou nada) não tem o ano passado: a rede não compara, e a frase diz quem falta.
+      const rede = (await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!;
+      expect(rede.anoPassado).toMatchObject({ diasComLancamento: 0, diasDoRecorte: 30 });
+      expect(rede.anoPassado!.semVariacaoPorque).toContain('Loja Nova 0 de 30');
+      expect(rede.anoPassado!.linhas.filter((l) => l.variacaoBp === null).map((l) => l.chave).sort()).toEqual(['IFOOD', 'LOJA', 'bruta']); // a Loja Nova vende na Loja; o Delivery próprio (Penha e Delivery, completas) compara; o iFood tem base zero
+      // A Penha, completa, compara: LOJA 6.000,00 contra 3.000,00 = +100,0 %; bruta (Loja + Delivery) 9.000,00 contra 4.500,00 = +100,0 %.
+      const d = (await dre(DONA(), { tipo: 'loja', lojaId: ids.vp }, '2026-09-10'))!;
       expect(d.anoPassado).toMatchObject({ diasComLancamento: 30, diasDoRecorte: 30, semVariacaoPorque: null });
-      // LOJA: 6.000,00 contra 3.000,00 = +100,0 %; bruta: 10.000,00 contra 4.500,00.
       expect(d.anoPassado!.linhas.find((l) => l.chave === 'LOJA')).toMatchObject({ anteriorCentavos: 300_000, variacaoBp: 10_000 });
-      expect(d.anoPassado!.linhas.find((l) => l.chave === 'bruta')).toMatchObject({ anteriorCentavos: 450_000, variacaoBp: 12_222 });
+      expect(d.anoPassado!.linhas.find((l) => l.chave === 'bruta')).toMatchObject({ anteriorCentavos: 450_000, variacaoBp: 10_000 });
       expect(d.anoPassado!.linhas.find((l) => l.chave === 'IFOOD')).toMatchObject({ anteriorCentavos: 0, variacaoBp: null }); // base zero: sem variação
     });
   });
