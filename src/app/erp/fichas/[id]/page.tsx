@@ -38,6 +38,7 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
       canais={canais}
       linkDasEmbalagens={pode(ctx.alcance, 'fichas.editar') && verPrecos && !ctx.bloqueio ? `${BASE}/${ficha.id}/canais` : undefined}
       linkDaTaxa={verPrecos ? `${BASE}/canais` : undefined}
+      linkDoProduzir={pode(ctx.alcance, 'producao.registrar') && ficha.ativa && !ctx.bloqueio ? `/erp/producao/nova?ficha=${ficha.id}` : undefined}
       podeConfigurarTaxa={pode(ctx.alcance, 'precos.editar') && !ctx.bloqueio}
       // 1.10: o preço é campo só para quem muda preços (a action confere de novo).
       acaoPrecos={pode(ctx.alcance, 'precos.editar') && !ctx.bloqueio ? acaoSalvarPrecos.bind(null, ficha.id) : undefined}

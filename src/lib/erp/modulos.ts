@@ -114,7 +114,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 2.3';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 3.1';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -368,6 +368,38 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       acoes: [],
     },
     {
+      chave: 'producao',
+      nome: 'Produção',
+      subtitulo: 'Planejar o lote pela ficha, dar baixa nos insumos pela requisição e pôr o pronto no estoque',
+      resumo: 'Lotes e rendimento',
+      icone: 'producao',
+      cor: COR.producao,
+      grupos: [
+        {
+          rotulo: 'Produção',
+          icone: 'producao',
+          telas: [
+            {
+              href: `${base}/producao`,
+              rotulo: 'Produção',
+              icone: 'producao',
+              subtitulo: 'Lotes planejados, em produção e concluídos, por loja',
+              permissao: 'producao.ver',
+            },
+          ],
+        },
+      ],
+      acoes: [
+        {
+          href: `${base}/producao/nova`,
+          rotulo: 'Nova produção',
+          icone: 'novo',
+          subtitulo: 'Planejar um lote pela ficha do pré-preparo',
+          permissao: 'producao.registrar',
+        },
+      ],
+    },
+    {
       chave: 'dre',
       nome: 'Faturamento e DRE',
       subtitulo: 'Venda, despesas e resultado da rede e de cada loja, do dia a dia ao período',
@@ -477,14 +509,6 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
 
 /** Do plano (Notion "FlowFoods Barney — ERP"), ainda sem tela. */
 export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [
-  {
-    chave: 'producao',
-    nome: 'Produção',
-    subtitulo: 'Lista do dia e rendimento',
-    icone: 'producao',
-    fase: '3.1',
-    ver: ['producao.ver'],
-  },
   {
     chave: 'etiquetas',
     nome: 'Etiquetas',

@@ -253,11 +253,11 @@ export function perdaDoLote(totalCentavos: number, planejadoMilesimos: number, p
 
 /** Qual é a situação da requisição do lote, em palavras (a do cartão do quadro). */
 export function situacaoDosInsumos(status: 'ABERTA' | 'PARCIAL' | 'ATENDIDA' | 'CANCELADA' | null, numero: number | null): string {
-  const n = numero ? ` #${numero}` : '';
-  if (status === 'ATENDIDA') return `insumos entregues${n}`;
-  if (status === 'PARCIAL') return `insumos: entrega em parte${n}`;
-  if (status === 'CANCELADA') return `requisição cancelada${n}`;
-  return `insumos: falta entregar${n}`;
+  const n = numero ? ` (#${numero})` : '';
+  if (status === 'ATENDIDA') return `Insumos entregues${n}`;
+  if (status === 'PARCIAL') return `Insumos em entrega${n}`;
+  if (status === 'CANCELADA') return `Requisição cancelada${n}`;
+  return `Insumos por entregar${n}`;
 }
 
 /**

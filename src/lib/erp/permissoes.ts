@@ -100,12 +100,20 @@ export const CATALOGO = [
     },
   },
   {
+    // 3.1: a produção saiu de "em breve" (planejar o lote, dar baixa pela requisição, concluir e pôr no estoque).
     chave: 'producao',
-    rotulo: 'Produção e etiquetas',
-    emBreve: true,
+    rotulo: 'Produção',
     permissoes: {
       'producao.ver': { rotulo: 'Ver a produção e a lista do dia', porLoja: true },
       'producao.registrar': { rotulo: 'Registrar produção', porLoja: true },
+    },
+  },
+  {
+    // A impressão de etiquetas chega na 3.4.
+    chave: 'etiquetas',
+    rotulo: 'Etiquetas',
+    emBreve: true,
+    permissoes: {
       'etiquetas.imprimir': { rotulo: 'Imprimir etiquetas', porLoja: true },
     },
   },

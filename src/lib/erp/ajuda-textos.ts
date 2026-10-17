@@ -132,13 +132,101 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'producao',
+    area: 'producao',
+    rotas: ['producao'],
+    titulo: 'Produção',
+    versao: 1,
+    aula: [
+      { texto: 'Escolha a loja para ver os lotes: planejados, em produção e os concluídos de hoje.' },
+      { texto: 'Lote atrasado ganha uma faixa vermelha.' },
+    ],
+  },
+  {
+    chave: 'producao-quadro',
+    area: 'producao',
+    rotas: ['producao/[lojaId]'],
+    titulo: 'Produção da loja',
+    versao: 1,
+    aula: [
+      { texto: 'Cada cartão é um lote: o pré-preparo, o código, quanto, para quando e se os insumos já saíram do estoque.' },
+      { texto: 'Lote atrasado ganha uma faixa vermelha e os dias de atraso.' },
+      { texto: 'Planeje em “Nova produção”. Quando o lote ficar pronto, abra o cartão e conclua.', para: ['producao.registrar'] },
+    ],
+    secoes: [
+      {
+        id: 'andamento',
+        titulo: 'Como o lote anda',
+        blocos: [
+          { texto: 'Planejada: o lote existe e a requisição dos insumos já foi para o estoque. Em produção: a cozinha começou. Concluída: o lote entrou no estoque.' },
+          { texto: 'Concluídas e canceladas aparecem só no dia. Os lotes antigos ficam no Histórico.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'producao-nova',
+    area: 'producao',
+    rotas: ['producao/nova', 'producao/[lojaId]/nova'],
+    titulo: 'Nova produção',
+    versao: 1,
+    aula: [
+      { texto: 'Escolha o pré-preparo e quanto vai produzir. A lista de insumos sai da receita, já com o fator de correção.' },
+      { texto: 'Confira a lista e mude o que precisar. Ao planejar, a requisição dos insumos vai sozinha para o estoque; nada sai até o estoque entregar.' },
+    ],
+    secoes: [
+      {
+        id: 'codigo',
+        titulo: 'O código do lote',
+        blocos: [{ texto: 'O lote ganha um código com a data e o número do dia, como 261017-01. O código não se repete, mesmo se o lote for cancelado, e é ele que vai na etiqueta.' }],
+      },
+    ],
+  },
+  {
+    chave: 'producao-lote',
+    area: 'producao',
+    rotas: ['producao/[lojaId]/[ordemId]'],
+    titulo: 'Lote',
+    versao: 1,
+    aula: [
+      { texto: 'O que foi planejado, os insumos que saíram pela requisição e, depois de concluído, quanto saiu de verdade.' },
+      { texto: 'Para concluir, os insumos precisam estar entregues. Sobrou insumo? Devolva pela requisição antes de concluir.', para: ['producao.registrar'] },
+      { texto: 'Cancelar só vale se nada saiu do estoque, ou se tudo voltou. Estornar um lote concluído é de quem ajusta o saldo.', para: ['producao.registrar'] },
+      { texto: 'O custo do lote é o que saiu do estoque, dividido pelo que saiu de verdade, ao lado do que a ficha prevê.', para: ['insumos.ver'] },
+    ],
+    secoes: [
+      {
+        id: 'custo',
+        titulo: 'A conta do custo',
+        blocos: [
+          { texto: 'São 117,81 reais de insumos para 4,6 kg de molho: 25,61 reais por quilo. Se algum insumo saiu sem preço, o lote fica com custo incompleto e a tela diz qual, nunca com zero.', para: ['insumos.ver'] },
+          { texto: 'O custo de referência do pré-preparo continua o da ficha. O lote mostra o que custou de verdade e não mexe nele.', para: ['insumos.ver'] },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'producao-concluir',
+    area: 'producao',
+    rotas: ['producao/[lojaId]/[ordemId]/concluir'],
+    titulo: 'Concluir o lote',
+    versao: 1,
+    aula: [
+      { texto: 'Diga quanto saiu de verdade; zero se o lote se perdeu, e então nada entra no estoque.' },
+      { texto: 'Passou de 10% para mais ou para menos, ou perdeu tudo: escreva o motivo.' },
+      { texto: 'Escolha onde o lote vai ficar: a validade nasce daí e não muda se a ficha mudar depois.' },
+      { texto: 'O custo por quilo aparece ao vivo, enquanto você digita.', para: ['insumos.ver'] },
+    ],
+  },
+  {
     chave: 'ficha',
     area: 'cadastros',
     rotas: ['fichas/[id]'],
     titulo: 'Detalhe da ficha',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Foto, receita e custo por porção, com a conta à mostra.' },
+      { texto: 'Pré-preparo: “Produzir” planeja um lote dele, com os insumos tirados da receita.', para: ['producao.registrar'] },
       { texto: 'Em “Preço e margem por canal” estão o custo de cada canal (loja, delivery, iFood), o preço sugerido pela margem-alvo e se o prato está no alvo.', para: ['precos.ver'] },
       { texto: 'Preço em branco vale o sugerido e acompanha o custo. Só quem edita preço muda o preço de venda.', para: ['precos.ver'] },
     ],
@@ -399,10 +487,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'estoque',
     rotas: ['estoque/[lojaId]/requisicoes/[requisicaoId]'],
     titulo: 'Detalhe da requisição',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'O pedido, o que saiu, o que voltou e o que falta.' },
       { texto: 'Sobrou? “Receber de volta” devolve ao estoque.', para: ['requisicao.atender'] },
+      { texto: 'Requisição de produção diz de qual lote é. Ela só se cancela pelo lote, e quando o lote é concluído o custo fecha: não há mais entrega nem devolução.' },
     ],
   },
   {

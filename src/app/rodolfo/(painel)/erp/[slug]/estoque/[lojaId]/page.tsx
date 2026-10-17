@@ -30,6 +30,7 @@ export default async function ParceiroEstoqueDaLojaPage({ params, searchParams }
       filtros={filtros}
       insumosBase={`${base}/insumos`}
       notasBase={`${base}/compras`}
+      producaoBase={`${base}/producao/${e.loja.id}`}
       pode={{ contar: true, ajustar: true, requisicoes: true, pedir: true }}
       acoes={{ abrir: acaoIniciarAbertura.bind(null, ctx.parceiro.slug, e.loja.id), descartar: acaoDescartarAbertura.bind(null, ctx.parceiro.slug, e.loja.id) }}
       bloqueio={ctx.bloqueio}

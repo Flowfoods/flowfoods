@@ -58,12 +58,13 @@ const futuros = (a: Alcance) =>
     .map((m) => m.chave);
 
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
-  it('Dono: as abas de cada área (UX.9), as ações fora do menu e os dois módulos futuros', () => {
+  it('Dono: as abas de cada área (UX.9), as ações fora do menu e o módulo futuro (Etiquetas)', () => {
     const a = alcance({ perfilBase: 'DONO' });
     expect(modulosDoParceiro(a).filter((m) => m.href).map((m) => m.nome)).toEqual([
       'Cadastros e Cardápio',
       'Compras e Fornecedores',
       'Estoque e Movimentações',
+      'Produção',
       'Faturamento e DRE',
       'Rede e Equipe',
     ]);
@@ -77,6 +78,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/estoque/contagens',
       '/erp/estoque/requisicoes',
       '/erp/estoque/divergencias',
+      '/erp/producao',
       '/erp/faturamento',
       '/erp/dre/despesas',
       '/erp/dre',
@@ -93,12 +95,13 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/fichas/importar',
       '/erp/compras/nova',
       '/erp/compras/fornecedores/novo',
+      '/erp/producao/nova',
       '/erp/faturamento/lancar',
       '/erp/faturamento/importar',
       '/erp/dre/despesas/nova',
     ]);
-    // 2.1: Faturamento e DRE saiu dos futuros e virou área com tela.
-    expect(futuros(a)).toEqual(['producao', 'etiquetas']);
+    // 2.1: Faturamento e DRE saiu dos futuros e virou área com tela. 3.1: a Produção também (Etiquetas chega na 3.4).
+    expect(futuros(a)).toEqual(['etiquetas']);
   });
 
   it('Gerente: sem Equipe (não cuida da equipe); com Histórico (rede inteira)', () => {
@@ -114,9 +117,10 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     const a = alcance({ perfilBase: 'OPERADOR' });
     // Operador VÊ fichas (bate o olho na foto e no preparo), sem criar nem importar.
     // 1.8: ele pede requisição (o quadro aparece); divergências são de quem confere contagem. UX.9: vê as contagens (estoque.ver), sem Precificação e sem ação nenhuma.
-    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/lojas', '/erp/acesso']);
-    expect(hrefsDasAcoes(a)).toEqual([]);
-    expect(futuros(a)).toEqual(['producao', 'etiquetas']);
+    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/producao', '/erp/lojas', '/erp/acesso']);
+    // 3.1: o cozinheiro produz, então planejar a produção é a única ação dele.
+    expect(hrefsDasAcoes(a)).toEqual(['/erp/producao/nova']);
+    expect(futuros(a)).toEqual(['etiquetas']);
   });
 
   it('Gerente de uma loja só (N3): Histórico some (exige a rede inteira)', () => {
@@ -152,7 +156,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       expect(m.grupos).toEqual([]);
       expect(m.fase).toMatch(/^\d\.\d$/);
     }
-    expect(MODULOS_FUTUROS.map((f) => f.fase)).toEqual(['3.1', '3.4']);
+    expect(MODULOS_FUTUROS.map((f) => f.fase)).toEqual(['3.4']);
   });
 
   it('nível 1 dentro do parceiro: mesmas telas sob a base dele, com Cadastro e sem "Seu acesso"', () => {
@@ -167,6 +171,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/estoque/contagens',
       '/rodolfo/erp/valentins/estoque/requisicoes',
       '/rodolfo/erp/valentins/estoque/divergencias',
+      '/rodolfo/erp/valentins/producao',
       '/rodolfo/erp/valentins/faturamento',
       '/rodolfo/erp/valentins/dre/despesas',
       '/rodolfo/erp/valentins/dre',
@@ -220,11 +225,12 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
       'Cadastros e Cardápio',
       'Compras e Fornecedores',
       'Estoque e Movimentações',
+      'Produção',
       'Faturamento e DRE',
       'Rede e Equipe',
     ]);
     expect(grupos[1].itens.map((i) => i.rotulo)).toEqual(['Áreas do parceiro']);
-    expect(grupos[6].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
+    expect(grupos[7].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
     // As ações das áreas vão junto (o ⌘K do nível 1 as acha), sob a base do parceiro.
     expect(acoesDaNavegacao(dentro).map((a) => a.href)).toContain('/rodolfo/erp/valentins/compras/nova');
     expect(comParceiroAtual(nav, '/rodolfo/erp/outro/insumos', parceiros)).toBe(nav);

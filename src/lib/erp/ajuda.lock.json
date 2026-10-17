@@ -35,9 +35,29 @@
     "versao": 1,
     "hash": "9ad4bc2dc6f5e416"
   },
+  "producao": {
+    "versao": 1,
+    "hash": "41fea1a55f507b28"
+  },
+  "producao-quadro": {
+    "versao": 1,
+    "hash": "95aa845b71c0c030"
+  },
+  "producao-nova": {
+    "versao": 1,
+    "hash": "6f543f66c49319af"
+  },
+  "producao-lote": {
+    "versao": 1,
+    "hash": "822e367430bdbc47"
+  },
+  "producao-concluir": {
+    "versao": 1,
+    "hash": "0dd52ededf168480"
+  },
   "ficha": {
-    "versao": 2,
-    "hash": "689d547096ae0f4e"
+    "versao": 3,
+    "hash": "6191b0a4c4c30aee"
   },
   "ficha-embalagens": {
     "versao": 1,
@@ -116,8 +136,8 @@
     "hash": "857222dd9cfe2b0a"
   },
   "requisicao": {
-    "versao": 1,
-    "hash": "d40ea05fdaf1aa1c"
+    "versao": 2,
+    "hash": "99abb164de19f6b6"
   },
   "requisicao-atender": {
     "versao": 1,

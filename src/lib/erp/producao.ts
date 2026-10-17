@@ -38,7 +38,7 @@ import {
   type MovimentoDaTela,
   type ResultadoEstoque,
 } from './estoque';
-import { conferirPeriodoAberto, criarRequisicaoNaTx, exigirAberto, listaDaFichaNaTx } from './requisicao';
+import { conferirPeriodoAberto, criarRequisicaoNaTx, exigirAberto, listaDaFichaNaTx, type OpcaoDeInsumo } from './requisicao';
 import { diasDeAtrasoDoLote, codigoDoLote, custoDoLote, custoPorUnidadeDoLote, foiEstornado, fraseDoQueFalta, LIMITE_DA_OBSERVACAO, LOTES_POR_DIA, lerChaveDoEnvio, lerConclusao, lerMotivo, perdaDoLote, rendimentoDoLote, validadeDoLote, formatarRendimento, quandoVence, type BaixaDoInsumo, type StatusDaProducao } from './producao-campos';
 import { faltaDe, lerParaDia, numeroDaRequisicao, textoDoParaDia, type LinhaDigitada, type StatusDaRequisicao } from './requisicao-campos';
 import { formatarDinheiro, formatarFracao, formatarQuantidade, UNIDADES, type Fracao, type Unidade } from './unidades';
@@ -60,16 +60,18 @@ export interface Autor {
 
 // ================================================================ lojas (entrada do menu)
 
-/** Lojas do alcance onde a pessoa vê a produção, com o que está pendente e atrasado. */
-export async function lojasDaProducao(cliente: ClienteDoParceiro, alcance: Alcance, agora = new Date()) {
+/** Lojas do alcance onde a pessoa vê (ou, para planejar, registra) a produção, com o que está pendente e atrasado. */
+export async function lojasDaProducao(cliente: ClienteDoParceiro, alcance: Alcance, opcoes: { agora?: Date; permissao?: 'producao.ver' | 'producao.registrar' } = {}) {
+  const agora = opcoes.agora ?? new Date();
+  const permissao = opcoes.permissao ?? 'producao.ver';
   return cliente.transacao(async (tx) => {
-    const lojas = (await tx.loja.findMany({ where: { ativa: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true } })).filter((l) => pode(alcance, 'producao.ver', { lojaId: l.id }));
+    const lojas = (await tx.loja.findMany({ where: { ativa: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true } })).filter((l) => pode(alcance, permissao, { lojaId: l.id }));
     if (lojas.length === 0) return [];
     const hoje = hojeNoRio(agora);
     const pendentes = await tx.ordemProducao.findMany({ where: { lojaId: { in: lojas.map((l) => l.id) }, status: { in: ['PLANEJADA', 'EM_EXECUCAO'] } }, select: { lojaId: true, status: true, dataPlanejada: true } });
     return lojas.map((l) => {
       const p = pendentes.filter((o) => o.lojaId === l.id);
-      return { ...l, pendentes: p.length, atrasados: p.filter((o) => diasDeAtrasoDoLote({ status: o.status as StatusDaProducao, dataPlanejada: iso(o.dataPlanejada) }, hoje) > 0).length };
+      return { ...l, pendentes: p.length, atrasadas: p.filter((o) => diasDeAtrasoDoLote({ status: o.status as StatusDaProducao, dataPlanejada: iso(o.dataPlanejada) }, hoje) > 0).length };
     });
   });
 }
@@ -199,7 +201,9 @@ export async function opcoesDaProducao(cliente: ClienteDoParceiro, alcance: Alca
         unidade: f.unidadeRendimento as Unidade,
         validade: retratoDaValidade(validadesDaLinha({ ...f, conservacao: f.conservacao as Conservacao | null })),
       }));
-      return { loja, aberto, fichas: lista };
+      // A lista de insumos é editável na tela (como na requisição): todos os ativos entram na escolha.
+      const ativos: OpcaoDeInsumo[] = (await tx.insumo.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, unidade: true, conservacao: true } })).map((i) => ({ ...i, unidade: i.unidade as Unidade, conservacao: i.conservacao as Conservacao }));
+      return { loja, aberto, fichas: lista, ativos };
     }),
   );
   return 'ok' in r ? null : r;
@@ -488,7 +492,7 @@ export async function obterOrdem(cliente: ClienteDoParceiro, alcance: Alcance, l
         : null;
       const baixas = req ? await baixasDaRequisicao(tx, req.id) : [];
       const porInsumo = new Map(baixas.map((b) => [b.insumoId, b]));
-      const insumos: InsumoDoLote[] = (req?.itens ?? []).map((i) => {
+      const itensDoLote: InsumoDoLote[] = (req?.itens ?? []).map((i) => {
         const b = porInsumo.get(i.insumoId);
         const saiu = b ? -b.quantidadeMilesimos : 0;
         return {
@@ -563,7 +567,7 @@ export async function obterOrdem(cliente: ClienteDoParceiro, alcance: Alcance, l
         },
         atrasoDias: diasDeAtrasoDoLote({ status, dataPlanejada }, hoje),
         requisicao: req ? { id: req.id, numero: req.numero, status: req.status as StatusDaRequisicao, versao: req.versao } : null,
-        insumos,
+        itensDoLote,
         // O que a ficha aceita hoje (a escolha de conservação ao concluir); a validade do lote concluído é a fotografada.
         validadesAgora,
         fichaAtiva: ficha?.ativa ?? false,
@@ -610,7 +614,7 @@ export async function concluirProducao(
         if (ordem.status === 'CONCLUIDA') return { ok: true as const, id: ordem.id, jaFeito: true };
         if (ordem.status === 'CANCELADA') throw new Recusa({ ok: false, erros: { geral: `O lote ${ordem.codigoLote} foi cancelado: não se conclui.` }, conflito: true });
         if (!Number.isSafeInteger(versaoLida) || versaoLida !== ordem.versao) throw new Recusa({ ok: false, erros: { geral: MUDOU }, conflito: true });
-        if (!requisicao || !ordem.insumoProduzidoId) throw new Recusa({ ok: false, erros: { geral: `O lote ${ordem.codigoLote} não tem a requisição dos insumos: cancele e planeje de novo.` } });
+        if (!requisicao || !ordem.insumoProduzidoId) throw new Recusa({ ok: false, erros: { geral: `O lote ${ordem.codigoLote} não tem a requisição dos insumos. Cancele e planeje de novo.` } });
         if (requisicao.status === 'CANCELADA') throw new Recusa({ ok: false, erros: { geral: 'A requisição dos insumos foi cancelada: cancele o lote.' } });
         const itens = await tx.requisicaoItem.findMany({ where: { requisicaoId: requisicao.id }, orderBy: { ordem: 'asc' }, select: { insumoNomeSnapshot: true, unidadeSnapshot: true, solicitadoMilesimos: true, atendidoMilesimos: true } });
         if (requisicao.status !== 'ATENDIDA') {

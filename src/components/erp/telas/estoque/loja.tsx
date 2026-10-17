@@ -67,6 +67,7 @@ export function TelaEstoqueDaLoja({
   filtros,
   insumosBase,
   notasBase,
+  producaoBase,
   pode,
   acoes,
   bloqueio,
@@ -82,6 +83,8 @@ export function TelaEstoqueDaLoja({
   insumosBase?: string;
   /** Link da nota (quem vê compras nesta loja). */
   notasBase?: string;
+  /** 3.1: o lote que entrou no estoque leva à produção da loja (quem vê produção nela). */
+  producaoBase?: string;
   pode: { contar: boolean; ajustar: boolean; requisicoes?: boolean; pedir?: boolean };
   acoes: { abrir: AcaoDeEstoque; descartar: AcaoDeEstoque };
   bloqueio: string | null;
@@ -363,7 +366,7 @@ export function TelaEstoqueDaLoja({
           </Painel>
 
           <Painel titulo="Livro do estoque" subtitulo="Só se acrescenta: correção é um lançamento novo (estorno), nunca apagar" semRespiro>
-            <LivroDoEstoque movimentos={e.movimentos} notasBase={notasBase} requisicoesBase={pode.requisicoes ? `${aqui}/requisicoes` : undefined} />
+            <LivroDoEstoque movimentos={e.movimentos} notasBase={notasBase} producaoBase={producaoBase} requisicoesBase={pode.requisicoes ? `${aqui}/requisicoes` : undefined} />
           </Painel>
         </>
       )}

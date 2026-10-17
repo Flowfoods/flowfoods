@@ -37,6 +37,7 @@ export default async function ErpEstoqueDaLojaPage({ params, searchParams }: { p
       filtros={filtros}
       insumosBase={pode(ctx.alcance, 'insumos.ver') ? '/erp/insumos' : undefined}
       notasBase={pode(ctx.alcance, 'compras.ver', { lojaId }) ? '/erp/compras' : undefined}
+      producaoBase={pode(ctx.alcance, 'producao.ver', { lojaId }) ? `/erp/producao/${lojaId}` : undefined}
       pode={{ contar: pode(ctx.alcance, 'estoque.contar', { lojaId }), ajustar: pode(ctx.alcance, 'estoque.ajustar', { lojaId }), requisicoes: veRequisicoes, pedir: pode(ctx.alcance, 'requisicao.pedir', { lojaId }) }}
       acoes={{ abrir: acaoIniciarAbertura.bind(null, lojaId), descartar: acaoDescartarAbertura.bind(null, lojaId) }}
       bloqueio={ctx.bloqueio}

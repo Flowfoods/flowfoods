@@ -309,7 +309,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · produção do pré-preparo pela ficha (P
     expect((await lote(L1)).requisicao?.status).toBe('ATENDIDA');
     // Só quem vê custos recebe o R$ do lote (o operador do perfil próprio não).
     expect((await lote(L1, COZINHA_SEM_CUSTO())).custo).toBeNull();
-    expect((await lote(L1, COZINHA_SEM_CUSTO())).insumos.every((i) => i.valorCentavos === null)).toBe(true);
+    expect((await lote(L1, COZINHA_SEM_CUSTO())).itensDoLote.every((i) => i.valorCentavos === null)).toBe(true);
     expect((await lote(L1)).custo).toMatchObject({ totalCentavos: 11781, semPreco: [] });
   });
 
@@ -427,7 +427,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · produção do pré-preparo pela ficha (P
     const l = await lote(id);
     expect(l.ordem.insumosSemPreco).toBe(1);
     expect(l.custo).toMatchObject({ totalCentavos: 10531, semPreco: ['Leite'] });
-    expect(l.insumos.find((i) => i.nome === 'Leite')).toMatchObject({ semPreco: true, saiuMilesimos: 2500 });
+    expect(l.itensDoLote.find((i) => i.nome === 'Leite')).toMatchObject({ semPreco: true, saiuMilesimos: 2500 });
     // Volta o preço do leite para o resto do roteiro.
     const l2 = (await obterInsumo(a, ids.leite, DONA()))!;
     expect(await editarInsumo(a, ids.leite, { nome: 'Leite', tipo: 'INGREDIENTE', unidade: 'L', conservacao: 'REFRIGERADO', conteudo: '1', escala: 'base', preco: '5,00', versao: l2.versao })).toMatchObject({ ok: true });

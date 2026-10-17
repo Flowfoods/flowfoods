@@ -12,7 +12,7 @@ import { numeroDaRequisicao, pendente, TITULO_NO_HISTORICO_DA_REQUISICAO, quanti
 import { COR } from '@/lib/erp/modulos';
 import { formatarQuantidade } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
-import { classeDeBotao } from '../../ui/estilos';
+import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { Voltar } from '../cadastro/partes';
@@ -30,11 +30,14 @@ export function TelaDetalheDaRequisicao({
   pode,
   acoes,
   bloqueio,
+  hrefProducao,
 }: {
   d: RequisicaoDaLoja;
   base: string;
   contexto?: string;
   feito?: string;
+  /** 3.1: a base do lote (`.../producao/<loja>`), só para quem vê produção nesta loja; sem ela o lote é citado sem link. */
+  hrefProducao?: string | null;
   pode: { atender: boolean; cancelar: boolean };
   acoes: { devolver: AcaoDeEstoque; cancelar: AcaoDeEstoque };
   bloqueio: string | null;
@@ -45,8 +48,11 @@ export function TelaDetalheDaRequisicao({
   const aqui = `${quadro}/${r.id}`;
   const podeEntregar = pode.atender && !bloqueio && d.aberto && pendente(r.status);
   const corte = r.status === 'ATENDIDA' ? d.itens.filter((i) => i.faltaMilesimos > 0) : [];
-  const podeDevolver = pode.atender && !bloqueio && d.aberto && r.status !== 'CANCELADA' && d.itens.some((i) => i.atendidoMilesimos > 0);
-  const podeCancelar = pode.cancelar && !bloqueio && r.status === 'ABERTA';
+  // 3.1: a requisição de um lote só se cancela pelo lote, e quando o lote fecha o custo dele fecha: nada mais entra nem volta por aqui.
+  const doLote = d.producao;
+  const loteFechado = !!doLote && (doLote.status === 'CONCLUIDA' || doLote.status === 'CANCELADA');
+  const podeDevolver = pode.atender && !bloqueio && d.aberto && r.status !== 'CANCELADA' && !loteFechado && d.itens.some((i) => i.atendidoMilesimos > 0);
+  const podeCancelar = pode.cancelar && !bloqueio && r.status === 'ABERTA' && !doLote;
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: quadro }, { rotulo: numeroDaRequisicao(r.numero) }]} />
@@ -71,6 +77,16 @@ export function TelaDetalheDaRequisicao({
         </div>
       </PageHeader>
       {feito && <Aviso tom="ok" titulo={feito} />}
+      {doLote && (
+        <Aviso tom="neutro" titulo={`Requisição do lote ${doLote.codigoLote} (${doLote.fichaNomeSnapshot}, ${formatarQuantidade(doLote.planejadoMilesimos, doLote.unidade)}).`}>
+          {loteFechado ? `O lote já ${doLote.status === 'CONCLUIDA' ? 'foi concluído' : 'foi cancelado'}: o custo dele está fechado e esta requisição não recebe mais entrega nem devolução.` : 'Para cancelar, cancele o lote. Sobrou insumo? Receba de volta aqui antes de concluir o lote.'}{' '}
+          {hrefProducao && (
+            <Link href={`${hrefProducao}/${doLote.id}`} className={LINK_DE_TEXTO}>
+              Abrir o lote
+            </Link>
+          )}
+        </Aviso>
+      )}
       {r.status === 'CANCELADA' && (
         <Aviso tom="neutro" titulo={`Cancelada por ${r.canceladaPorNome ?? '—'}${r.canceladaEm ? ` em ${quandoLongo(r.canceladaEm)}` : ''}.`}>
           {r.motivoCancelamento}

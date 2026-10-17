@@ -26,6 +26,7 @@ export default async function ParceiroRequisicaoPage({ params, searchParams }: {
         cancelar: acaoCancelarRequisicao.bind(null, ctx.parceiro.slug, d.loja.id, d.requisicao.id),
       }}
       bloqueio={ctx.bloqueio}
+      hrefProducao={`/rodolfo/erp/${ctx.parceiro.slug}/producao/${d.loja.id}`}
     />
   );
 }

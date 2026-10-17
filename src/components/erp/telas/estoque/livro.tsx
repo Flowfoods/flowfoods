@@ -21,12 +21,20 @@ function Tipo({ m }: { m: MovimentoDaTela }) {
   return <Selo tom={m.tipo === 'ABERTURA' || m.tipo === 'REQUISICAO' ? 'neutro' : 'ok'}>{ROTULO_DO_MOVIMENTO[m.tipo]}</Selo>;
 }
 
-function Origem({ m, notasBase, requisicoesBase }: { m: MovimentoDaTela; notasBase?: string; requisicoesBase?: string }) {
+function Origem({ m, notasBase, requisicoesBase, producaoBase }: { m: MovimentoDaTela; notasBase?: string; requisicoesBase?: string; producaoBase?: string }) {
   // 1.8: a baixa (e o estorno dela) leva à requisição.
   if (m.requisicaoId && requisicoesBase) {
     return (
       <Link href={`${requisicoesBase}/${m.requisicaoId}`} className={LINK_DE_TEXTO}>
         {m.motivo ?? 'Ver a requisição'}
+      </Link>
+    );
+  }
+  // 3.1: o lote que entrou no estoque (e o estorno dele) leva ao lote.
+  if (m.ordemProducaoId && producaoBase) {
+    return (
+      <Link href={`${producaoBase}/${m.ordemProducaoId}`} className={LINK_DE_TEXTO}>
+        {m.motivo ?? 'Ver o lote'}
       </Link>
     );
   }
@@ -40,7 +48,7 @@ function Origem({ m, notasBase, requisicoesBase }: { m: MovimentoDaTela; notasBa
   return <span>{m.motivo ?? '—'}</span>;
 }
 
-export function LivroDoEstoque({ movimentos, notasBase, requisicoesBase }: { movimentos: MovimentoDaTela[]; notasBase?: string; requisicoesBase?: string }) {
+export function LivroDoEstoque({ movimentos, notasBase, requisicoesBase, producaoBase }: { movimentos: MovimentoDaTela[]; notasBase?: string; requisicoesBase?: string; producaoBase?: string }) {
   if (movimentos.length === 0) return <Vazio>Nenhum movimento ainda.</Vazio>;
   return (
     <>
@@ -60,7 +68,7 @@ export function LivroDoEstoque({ movimentos, notasBase, requisicoesBase }: { mov
               {quando(m.ocorridoEm)} · saldo {formatarQuantidade(m.antes, m.unidade)} para {formatarQuantidade(m.depois, m.unidade)}
             </div>
             <div className="text-[12px] text-suave">
-              <Origem m={m} notasBase={notasBase} requisicoesBase={requisicoesBase} />
+              <Origem m={m} notasBase={notasBase} requisicoesBase={requisicoesBase} producaoBase={producaoBase} />
             </div>
           </li>
         ))}
@@ -96,7 +104,7 @@ export function LivroDoEstoque({ movimentos, notasBase, requisicoesBase }: { mov
               <td className="px-3 py-2.5">
                 <span className="font-medium text-texto">{m.nome}</span>
                 <div className="text-[12px] text-suave lg:hidden">
-                  <Origem m={m} notasBase={notasBase} requisicoesBase={requisicoesBase} />
+                  <Origem m={m} notasBase={notasBase} requisicoesBase={requisicoesBase} producaoBase={producaoBase} />
                 </div>
               </td>
               <td className="px-3 py-2.5">
@@ -111,7 +119,7 @@ export function LivroDoEstoque({ movimentos, notasBase, requisicoesBase }: { mov
                 <span className="sr-only"> passa a </span> <span className="font-semibold text-texto">{formatarQuantidade(m.depois, m.unidade)}</span>
               </td>
               <td className="hidden px-3 py-2.5 pr-5 text-[13px] text-suave lg:table-cell">
-                <Origem m={m} notasBase={notasBase} requisicoesBase={requisicoesBase} />
+                <Origem m={m} notasBase={notasBase} requisicoesBase={requisicoesBase} producaoBase={producaoBase} />
               </td>
             </tr>
           ))}
