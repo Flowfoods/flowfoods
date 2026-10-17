@@ -18,21 +18,22 @@ export function LinkGerado({ link, validade, whatsapp }: { link: string; validad
   }
 
   return (
-    <div className="space-y-2 rounded-[9px] border border-linha-forte bg-campo p-3">
+    <div className="min-w-0 max-w-full space-y-2 rounded-[9px] border border-linha-forte bg-campo p-3">
       <div className="text-[12px] font-semibold text-suave">Link para criar a senha</div>
-      <div className="flex gap-2">
+      {/* A linha quebra em tela estreita; o botão tem largura fixa (Copiar/Copiado não mudam a linha). */}
+      <div className="flex flex-wrap gap-2">
         <input
           ref={campo}
           readOnly
           value={link}
           aria-label="Link para criar a senha"
           onFocus={(e) => e.currentTarget.select()}
-          className="min-w-0 flex-1 truncate rounded-[7px] border border-linha bg-campo px-3 py-2 font-mono text-[12px] text-texto outline-none"
+          className="min-w-[9rem] flex-1 truncate rounded-[7px] border border-linha bg-campo px-3 py-2 font-mono text-[12px] text-texto outline-none"
         />
         <button
           type="button"
           onClick={copiar}
-          className="whitespace-nowrap rounded-[7px] border border-linha-forte px-3 py-2 text-[13px] font-semibold text-texto transition hover:border-texto/40 hover:bg-texto/[0.04]"
+          className="w-[5.5rem] shrink-0 whitespace-nowrap rounded-[7px] border border-linha-forte px-3 py-2 text-center text-[13px] font-semibold text-texto transition hover:border-texto/40 hover:bg-texto/[0.04]"
         >
           {copiado ? 'Copiado' : 'Copiar'}
         </button>
