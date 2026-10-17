@@ -1683,6 +1683,26 @@ model UsuarioErp {
   passkeys PasskeyErp[]
   sessoes  SessaoErp[]
   desafios DesafioWebauthn[]
+  // 0.6: o que a pessoa escolheu sobre as caixas de ajuda (1 linha, criada na 1ª escolha).
+  preferencia PreferenciaErp?
+}
+
+// 0.6 · Preferência de ajuda contextual (decisão 112): por PESSOA, não por
+// pessoa × parceiro (aprender o sistema é da pessoa; quem está em dois parceiros
+// escolhe uma vez). FORA do tenant, como as outras credenciais: é lida junto
+// com a sessão, antes de saber o parceiro. Sem `parceiroId`; o papel
+// `erp_tenant` não tem GRANT; só `credenciais.ts` toca (o `prisma` do portal
+// recusa). `fechadas` guarda "chave@versão" das caixas que a pessoa fechou
+// (no máximo 300; CHECK no banco); `escolhidaEm` nulo = ainda não respondeu à
+// pergunta da 1ª vez (sem resposta = dicas ligadas).
+model PreferenciaErp {
+  usuarioId    String    @id
+  dicasLigadas Boolean   @default(true)
+  escolhidaEm  DateTime?
+  fechadas     String[]  @default([])
+  atualizadoEm DateTime  @updatedAt
+
+  usuario UsuarioErp @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 }
 
 // Vínculo pessoa × parceiro. Desativar aqui derruba a sessão naquele parceiro

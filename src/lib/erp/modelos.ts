@@ -108,6 +108,9 @@ export const MODELOS_DE_CREDENCIAL = [
   // 0.4: perfil próprio do parceiro. Lido na validação da sessão (antes do
   // contexto do parceiro), por isso mora aqui e não no tenant.
   'perfilAcesso',
+  // 0.6: o que a pessoa escolheu sobre as caixas de ajuda. Lida junto com a
+  // sessão (antes de saber o parceiro), por isso mora aqui e não no tenant.
+  'preferenciaErp',
 ] as const;
 
 /** Relações do ParceiroFlow que chegam nas credenciais (mesma trava do portal). */
