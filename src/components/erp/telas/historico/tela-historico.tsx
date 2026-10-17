@@ -20,6 +20,8 @@ export const FILTROS: { valor: string; rotulo: string; entidades?: string[] }[] 
   { valor: 'FichaTecnica', rotulo: 'Fichas técnicas', entidades: ['FichaTecnica', 'CanalConfig'] },
   // 1.5: notas de compra e fornecedores.
   { valor: 'NotaEntrada', rotulo: 'Compras', entidades: ['NotaEntrada', 'Fornecedor'] },
+  // 2.1: faturamento por canal e dia (só para quem tem "ver faturamento").
+  { valor: 'FaturamentoLancamento', rotulo: 'Faturamento' },
   { valor: 'AcessoParceiro', rotulo: 'Acessos' },
   { valor: 'PerfilAcesso', rotulo: 'Perfis' },
 ];
@@ -40,17 +42,20 @@ export function TelaHistorico({
   linhas,
   entidade,
   hrefBase,
+  verFaturamento = false,
 }: {
   linhas: LinhaDeHistorico[];
   entidade: string | undefined;
   hrefBase: string;
+  /** O filtro "Faturamento" só aparece para quem tem "ver faturamento" (as linhas já vêm filtradas do servidor). */
+  verFaturamento?: boolean;
 }) {
   const LIMITE = LIMITE_DO_HISTORICO;
   return (
     <div className="space-y-4">
       <FiltroEmLinks
         rotulo="Filtrar alterações"
-        opcoes={FILTROS.map((f) => ({
+        opcoes={FILTROS.filter((f) => verFaturamento || f.valor !== 'FaturamentoLancamento').map((f) => ({
           href: f.valor ? `${hrefBase}?entidade=${f.valor}` : hrefBase,
           rotulo: f.rotulo,
           ativo: (entidade ?? '') === f.valor,

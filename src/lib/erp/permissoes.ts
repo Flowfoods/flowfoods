@@ -112,7 +112,7 @@ export const CATALOGO = [
   {
     chave: 'faturamento',
     rotulo: 'Faturamento e DRE',
-    emBreve: true,
+    // 2.1: ver e lançar faturamento já têm tela; DRE, despesas e metas chegam nas fases 2.2 a 2.4.
     permissoes: {
       'faturamento.ver': { rotulo: 'Ver faturamento', porLoja: true },
       'faturamento.lancar': { rotulo: 'Lançar faturamento', porLoja: true },

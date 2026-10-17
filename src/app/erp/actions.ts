@@ -13,6 +13,8 @@ import { cookies } from 'next/headers';
 import { exigirParceiroDaSessao, exigirPessoa, recusaDaAcao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { cadastrarLoja, cadastrarMarca } from '@/lib/erp/estrutura';
 import type { EstadoForm } from '@/components/erp/ui/campos';
+import type { EstadoDosCanais } from '@/components/erp/telas/faturamento/estado';
+import { executarCanaisDaLoja } from '@/components/erp/telas/faturamento/executar';
 import {
   concluirRegistroDeRosto,
   ERRO_ATIVAR_ROSTO,
@@ -51,6 +53,14 @@ export async function acaoCadastrarLojaDaSessao(anterior: EstadoForm, form: Form
 
 export async function acaoCadastrarMarcaDaSessao(anterior: EstadoForm, form: FormData) {
   return cadastrarEstruturaDaSessao('marca', anterior, form);
+}
+
+/** 2.1: em quais canais a loja vende. É cadastro da rede: "cadastrar lojas e marcas", que exige a rede inteira. */
+export async function acaoSalvarCanaisDaLojaDaSessao(lojaId: string, anterior: EstadoDosCanais, form: FormData): Promise<EstadoDosCanais> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = recusaDaAcao(ctx, 'lojas.gerir') ?? ctx.bloqueio;
+  if (negado) return { ok: false, erros: { geral: negado }, vez: (anterior?.vez ?? 0) + 1 };
+  return executarCanaisDaLoja(ctx.cliente, ctx.sessao.autorNome, String(lojaId), anterior, form, '/erp');
 }
 
 export async function acaoOpcoesDeAtivarRosto() {

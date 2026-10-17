@@ -110,7 +110,7 @@ export async function listarEstrutura(cliente: ClienteDoParceiro, alcance: Pick<
     cliente.loja.findMany({
       where: { id: filtroDeLojas(alcance) },
       orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
-      select: { id: true, nome: true, slug: true, ativa: true, criadoEm: true },
+      select: { id: true, nome: true, slug: true, ativa: true, criadoEm: true, canaisDeVenda: true },
     }),
     cliente.marca.findMany({
       orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],

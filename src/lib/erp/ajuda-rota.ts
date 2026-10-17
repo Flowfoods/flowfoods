@@ -6,7 +6,7 @@
  * seguro para o navegador: tipos, a decisão da caixa e o casamento da rota.
  */
 
-export type AreaDaAjuda = 'inicio' | 'cadastros' | 'compras' | 'estoque' | 'rede';
+export type AreaDaAjuda = 'inicio' | 'cadastros' | 'compras' | 'estoque' | 'dre' | 'rede';
 
 /** A entrada como a tela a recebe: o servidor já tirou os blocos que a pessoa não pode ler. */
 export interface EntradaParaATela {

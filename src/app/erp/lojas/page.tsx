@@ -9,9 +9,10 @@ import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp
 import { listarEstrutura } from '@/lib/erp/estrutura';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
+import { FormCanais } from '@/components/erp/telas/estrutura/form-canais';
 import { FormNome } from '@/components/erp/telas/estrutura/form-nome';
 import { resumoDaEstrutura, TelaEstrutura } from '@/components/erp/telas/estrutura/tela-estrutura';
-import { acaoCadastrarLojaDaSessao, acaoCadastrarMarcaDaSessao } from '../actions';
+import { acaoCadastrarLojaDaSessao, acaoCadastrarMarcaDaSessao, acaoSalvarCanaisDaLojaDaSessao } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,7 @@ export default async function ErpLojasPage() {
         bloqueio={ctx.bloqueio}
         formLoja={cadastra ? <FormNome acao={acaoCadastrarLojaDaSessao} tipo="loja" /> : undefined}
         formMarca={cadastra ? <FormNome acao={acaoCadastrarMarcaDaSessao} tipo="marca" /> : undefined}
+        formCanais={cadastra && !ctx.bloqueio ? (l) => <FormCanais acao={acaoSalvarCanaisDaLojaDaSessao.bind(null, l.id)} nome={l.nome} canais={l.canais} /> : undefined}
       />
     </div>
   );

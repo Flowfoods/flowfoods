@@ -14,7 +14,8 @@ export const dynamic = 'force-dynamic';
 export default async function ErpHistoricoPage({ searchParams }: { searchParams: { entidade?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'historico.ver');
-  const entidade = entidadeDoFiltro(searchParams.entidade);
+  const verFaturamento = pode(ctx.alcance, 'faturamento.ver');
+  const entidade = verFaturamento || searchParams.entidade !== 'FaturamentoLancamento' ? entidadeDoFiltro(searchParams.entidade) : undefined;
   const linhas = await listarHistorico(ctx.cliente, {
     entidades: entidadesDoFiltro(entidade),
     limite: LIMITE_DO_HISTORICO,
@@ -22,6 +23,8 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
     semEntidades: pode(ctx.alcance, 'compras.ver') ? [] : ['NotaEntrada', 'Fornecedor'],
     // 1.10: taxa, margem-alvo, preço, margem e custo do canal só para quem vê preços.
     verPrecos: pode(ctx.alcance, 'precos.ver'),
+    // 2.1: valores, pedidos e clientes do faturamento só para quem vê faturamento.
+    verFaturamento,
   });
   return (
     <div className="space-y-6">
@@ -31,7 +34,7 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
         titulo="Histórico"
         subtitulo="Rede Completa · toda alteração, com antes, depois, quem e quando"
       />
-      <TelaHistorico linhas={linhas} entidade={entidade} hrefBase="/erp/historico" />
+      <TelaHistorico linhas={linhas} entidade={entidade} hrefBase="/erp/historico" verFaturamento={verFaturamento} />
     </div>
   );
 }
