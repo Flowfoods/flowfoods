@@ -414,14 +414,107 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'faturamento',
+    area: 'dre',
+    rotas: ['faturamento'],
+    titulo: 'Faturamento',
+    versao: 1,
+    aula: [
+      { texto: 'Quanto cada loja vendeu em cada canal, dia a dia: faturamento, pedidos e clientes atendidos.' },
+      { texto: 'O ticket médio é o faturamento dividido pelos pedidos, refeito na hora. Canal que a loja vende e ficou sem lançamento aparece como falta.' },
+      { texto: 'Conta a venda dos produtos dos pedidos concluídos, sem a taxa de entrega e já sem o desconto que a casa pagou.' },
+      { texto: 'Lance o dia em Lançar o dia, ou várias datas de uma vez em Importar planilha. Dia em que a loja não vendeu leva 0, não fica em branco.', para: ['faturamento.lancar'] },
+    ],
+    secoes: [
+      {
+        id: 'o-numero',
+        titulo: 'O que entra no número',
+        blocos: [
+          { texto: 'Entra a venda dos produtos dos pedidos concluídos no dia, depois de tirar o desconto ou cupom que a casa pagou.' },
+          { texto: 'Não entra taxa de entrega cobrada do cliente, gorjeta, 10 % de serviço nem pedido cancelado.' },
+          { texto: 'No iFood, use o total dos itens menos o incentivo que a loja bancou. A comissão do iFood entra depois, no resultado.' },
+          { texto: 'Clientes são atendimentos do dia, não pessoas diferentes. No delivery e no iFood, em branco vale o número de pedidos.' },
+        ],
+      },
+      {
+        id: 'falta',
+        titulo: 'Falta não é zero',
+        blocos: [
+          { texto: 'Falta é canal que a loja vende, sem lançamento, desde que ela começou a lançar até ontem. Hoje ainda está em aberto.' },
+          { texto: 'Dia em que a loja não vendeu conta como lançado: marque Não vendeu e o canal fecha com zero.' },
+          { texto: 'Unidade que só faz delivery: tire a Loja dos canais dela em Lojas e marcas, e a falta de salão para de aparecer.', para: ['lojas.gerir'] },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'faturamento-lancar',
+    area: 'dre',
+    rotas: ['faturamento/lancar'],
+    titulo: 'Lançar o dia',
+    versao: 1,
+    aula: [
+      { texto: 'Escolha a loja e a data, que começa em hoje. Com uma loja só no seu acesso, você já cai no dia dela.' },
+      { texto: 'Só dá para lançar até hoje e até três anos para trás.' },
+    ],
+  },
+  {
+    chave: 'faturamento-dia',
+    area: 'dre',
+    rotas: ['faturamento/[lojaId]/[data]'],
+    titulo: 'Faturamento do dia',
+    versao: 1,
+    // Tela de lançar no celular: os campos ficam à vista, a aula abre numa linha (como nas telas de contar).
+    recolhida: true,
+    aula: [
+      { texto: 'Um bloco por canal da loja, com faturamento, pedidos e clientes; o que ficar em branco continua sem lançamento.' },
+      { texto: 'Canal que não vendeu leva Não vendeu e grava zero.' },
+      { texto: 'Clientes em branco vale o número de pedidos. O ticket médio sai da conta, não é digitado.' },
+      { texto: 'Errou? Salve de novo com o número certo: o antes e o depois ficam guardados. Lançamento do dia ou da loja errada sai com Remover, e o motivo é obrigatório.', para: ['faturamento.lancar'] },
+    ],
+    secoes: [
+      {
+        id: 'periodo-fechado',
+        titulo: 'Dia de período fechado',
+        blocos: [
+          { texto: 'Quando o período do resultado é fechado, os dias dele não aceitam mais lançar, corrigir nem remover.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'faturamento-importar',
+    area: 'dre',
+    rotas: ['faturamento/importar'],
+    titulo: 'Importar planilha de faturamento',
+    versao: 1,
+    aula: [
+      { texto: 'Baixe o modelo, preencha uma linha por loja, canal e dia e envie o arquivo. Antes de gravar você vê a prévia, linha a linha.' },
+      { texto: 'Mandar a mesma planilha de novo não duplica nada: o dia é o mesmo, e só é corrigido se o número mudou.' },
+    ],
+    secoes: [
+      {
+        id: 'colunas',
+        titulo: 'As colunas do modelo',
+        blocos: [
+          { texto: 'data (dd/mm/aaaa), loja (o nome do cadastro), canal (loja, delivery ou ifood), faturamento (4.350,00), pedidos e clientes.' },
+          { texto: 'Dia sem venda: faturamento 0 e pedidos 0. Clientes pode ficar em branco.' },
+          { texto: 'Use ponto e vírgula entre as colunas. Linha com erro fica de fora e diz o motivo; as outras entram.' },
+          { texto: 'Célula que começa com = + - ou @ é recusada: cole só o valor, sem fórmula.' },
+        ],
+      },
+    ],
+  },
+  {
     chave: 'lojas',
     area: 'rede',
     rotas: ['lojas'],
     titulo: 'Lojas e marcas',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'As lojas e as marcas do grupo. Estoque, compras e contagem são sempre de uma loja.' },
+      { texto: 'As lojas e as marcas do grupo. Estoque, compras, contagem e faturamento são sempre de uma loja.' },
       { texto: 'Cadastrar loja ou marca é com quem tem a rede inteira.', para: ['lojas.gerir'] },
+      { texto: 'Cada loja mostra em quais canais vende. Para mudar, abra Canais de venda na linha dela.', para: ['lojas.gerir'] },
     ],
   },
   {

@@ -114,7 +114,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 1.10';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 2.1';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -368,6 +368,45 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       acoes: [],
     },
     {
+      chave: 'dre',
+      nome: 'Faturamento e DRE',
+      subtitulo: 'Venda por loja e canal, dia a dia, com as faltas à vista',
+      resumo: 'Venda por canal',
+      icone: 'dre',
+      cor: COR.dre,
+      grupos: [
+        {
+          rotulo: 'Faturamento',
+          icone: 'dre',
+          telas: [
+            {
+              href: `${base}/faturamento`,
+              rotulo: 'Faturamento',
+              icone: 'dre',
+              subtitulo: 'Venda, pedidos e clientes por loja e canal',
+              permissao: 'faturamento.ver',
+            },
+          ],
+        },
+      ],
+      acoes: [
+        {
+          href: `${base}/faturamento/lancar`,
+          rotulo: 'Lançar o dia',
+          icone: 'novo',
+          subtitulo: 'Faturamento, pedidos e clientes de cada canal',
+          permissao: 'faturamento.lancar',
+        },
+        {
+          href: `${base}/faturamento/importar`,
+          rotulo: 'Importar faturamento',
+          icone: 'importar',
+          subtitulo: 'Vários dias de uma vez, com prévia',
+          permissao: 'faturamento.lancar',
+        },
+      ],
+    },
+    {
       chave: 'rede',
       nome: 'Rede e Equipe',
       subtitulo: 'Lojas, marcas, pessoas, perfis, histórico e acessos',
@@ -397,14 +436,6 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
 
 /** Do plano (Notion "FlowFoods Barney — ERP"), ainda sem tela. */
 export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [
-  {
-    chave: 'dre',
-    nome: 'Faturamento e DRE',
-    subtitulo: 'Venda, CMV e resultado por loja',
-    icone: 'dre',
-    fase: '2.1',
-    ver: ['faturamento.ver', 'dre.ver'],
-  },
   {
     chave: 'producao',
     nome: 'Produção',

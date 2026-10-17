@@ -127,9 +127,25 @@
     "versao": 1,
     "hash": "0c4f542d977505e3"
   },
-  "lojas": {
+  "faturamento": {
     "versao": 1,
-    "hash": "d488a5b3f3011296"
+    "hash": "44a50a22f657d3ba"
+  },
+  "faturamento-lancar": {
+    "versao": 1,
+    "hash": "8bc5df4b7032ccbc"
+  },
+  "faturamento-dia": {
+    "versao": 1,
+    "hash": "8400382df4f80dff"
+  },
+  "faturamento-importar": {
+    "versao": 1,
+    "hash": "5f273fd13764f653"
+  },
+  "lojas": {
+    "versao": 2,
+    "hash": "93da5f04aa8b2505"
   },
   "equipe": {
     "versao": 1,

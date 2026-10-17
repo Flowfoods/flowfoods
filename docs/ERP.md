@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -31,6 +31,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Preço e margem por canal na ficha: sugerido pela margem-alvo, preço próprio, margem bruta e líquida, farol (1.10) | `src/lib/erp/preco-campos.ts` (puro: a MESMA conta no servidor e na prévia) + `canais.ts` (`contaDosCanais`, `salvarPrecos`, `salvarMargensAlvo`, `precosDaLista`); telas `telas/fichas/{custo-por-canal,form-margens}.tsx` (e a `ui/dica.tsx`, que saiu na 0.6); sem migration |
 | Onboarding (0.5): pedido de acesso (landing ou manual), quadro "Aguardando liberação" e ativação | `src/lib/erp/{pedido-textos,pedido-campos,pedidos,trava}.ts` (textos e limites / regras puras / banco / trava) + `ativarPedido` em `credenciais.ts`; landing `src/components/FormComecar.tsx` + `src/app/comecar/actions.ts`; N1 em `src/app/rodolfo/(painel)/onboarding/` (`/rodolfo/onboarding`, `/<id>`, `/novo`); migration `20261023000000_erp_onboarding` |
 | Ajuda contextual (0.6): caixas de aula por tela, botão "?" e gaveta; a preferência de cada pessoa | `src/lib/erp/{ajuda,ajuda-rota,ajuda-textos,ajuda-integridade}.ts` + `ajuda.lock.json` (registro, rota e decisão da caixa, texto, trava de versão); `src/components/erp/shell/ajuda.tsx` e `ui/link-de-ajuda.tsx`; `Shell.tsx`; gravação em `credenciais.ts` (`gravarPreferenciaDeAjuda`) e `acaoAjuda*` em `src/app/erp/actions.ts`; bloco "Dicas" em `/erp/acesso`; `npm run ajuda:lock`; migration `20261024000000_erp_preferencia_ajuda` |
+| Faturamento por canal (2.1): lançar o dia, planilha CSV, mês com faltas, leitura única do grão, trava do período | `src/lib/erp/{faturamento-campos,faturamento-planilha,faturamento,periodo-trava}.ts` (puro / planilha pura / com banco / trava); telas em `src/components/erp/telas/faturamento/`; rotas `faturamento`, `faturamento/lancar`, `faturamento/importar`, `faturamento/<loja>/<aaaa-mm-dd>` em `/erp` e `/rodolfo/erp/<slug>`; canais da loja em `telas/estrutura/form-canais.tsx`; modelo `public/modelos/faturamento.csv`; migration `20261025000000_erp_faturamento` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Navegação por áreas (UX.9): hub de 4 áreas, abas por rota, trilha com a área, ações no ⌘K; rota nova `/estoque/contagens` | `src/lib/erp/modulos.ts` (`areasConstruidas`, `abasDaArea`, `acoesDaNavegacao`, `montarTrilha`) e `src/lib/rodolfo/modulos.ts`; `src/components/erp/ui/{abas,hub}.tsx`, `telas/hub-do-parceiro.tsx`, `shell/Shell.tsx`; sem migration |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
@@ -1255,7 +1256,7 @@ ou ação é conforto; a página e a action seguem conferindo `exigirPermissaoNa
 | Compras e Fornecedores | Compras `/compras` · Fornecedores `/compras/fornecedores` (compras.ver) | Lançar nota (compras.lancar) · Novo fornecedor (fornecedores.editar) |
 | Estoque e Movimentações | Visão geral `/estoque` (estoque.ver) · **Contagens `/estoque/contagens` (nova)** (estoque.ver) · Requisições (pedir ou atender) · Divergências (estoque.ajustar) | nenhuma (Nova requisição, Planejar contagem e Abrir estoque são da loja) |
 | Rede e Equipe | Lojas e marcas (lojas.ver) · Equipe (acessos.gerir) · Histórico (historico.ver) · Seu acesso (livre) / Cadastro do parceiro (nível 1) | nenhuma |
-| Futuros (desabilitados, sem link) | Faturamento e DRE 2.1 · Produção 3.1 · Etiquetas 3.4 | |
+| Futuros (desabilitados, sem link; Faturamento e DRE virou área na 2.1) | Produção 3.1 · Etiquetas 3.4 | |
 
 1. **Hub** (`/erp` "Áreas da Rede" e `/rodolfo/erp/<slug>`): um card por área com acesso (nome, descrição do
    fluxo e as abas permitidas; sem número, R$ nem %). O título é o link principal e estica sobre o card todo
@@ -1403,6 +1404,102 @@ lenta, com um observador de mutação que prova o controle positivo: com a caixa
 caixa e pergunta, em `/estoque/contagens` e com a gaveta aberta, nos dois temas; zero erro de console e de hidratação; zero
 rolagem horizontal a 390, 820 e 1440. Prints em 390/820/1440, claro e escuro, dona e operador, em `shots-0.6/`.
 
+## O que a 2.1 entregou — entrada de faturamento por canal (manual + planilha; integração desenhada)
+
+Primeira da Prioridade 002 (DRE). Migration `20261025000000_erp_faturamento` (ADITIVA; nenhuma tabela nova, portão e RLS iguais;
+`migrate diff` vazio). Decisões 123 a 134. Permissões: as que o catálogo já tinha (`faturamento.ver`, `faturamento.lancar`, por
+loja); `VERSAO_DO_CATALOGO` continua 1 e o módulo deixou de ser `emBreve`.
+
+1. **O grão e o número** (123, 124). Loja × canal (LOJA, DELIVERY_PROPRIO, IFOOD) × dia civil do Rio; `marcaId` nulo. Valor em centavos
+   = venda dos PRODUTOS de pedidos concluídos, já sem o desconto que a casa pagou (sem taxa de entrega cobrada, sem 10 %/gorjeta, sem
+   cancelado; iFood: total dos itens menos o incentivo da loja). Pedidos e clientes (atendimentos) são inteiros; clientes em branco
+   vale os pedidos. Ticket médio = Σ valor ÷ Σ pedidos do recorte, derivado (a tabela nem tem a coluna).
+2. **Uma fonte por grão** (125). Digitado e planilha dividem UMA linha por grão (chave `manual:<loja>:-:<canal>:<dia>`, índice único
+   parcial como cinto): redigitar ou reimportar é correção, nunca soma. Integração usa outro espaço de chave; `faturamentoDosGraos`
+   (a leitura única, que a 2.2 usa) faz a integração vencer e mostra a digitada como conferência com a diferença.
+3. **Lançar o dia** (`faturamento/<loja>/<data>`, pensada para o celular). Um bloco por canal que a loja vende, com faturamento, pedidos,
+   clientes, "Não vendeu" (grava 0/0/0) e o ticket ao vivo (só prévia: o servidor lê o TEXTO e refaz tudo; campo forjado é ignorado).
+   Em branco continua "sem lançamento" (126). Salvar é tudo ou nada; regravar o mesmo número é "igual" (nenhuma linha, nenhum
+   histórico); corrigir é no lugar, condicional ao `atualizadoEm` de cada canal (127): a segunda aba recebe "Fulano lançou o iFood deste
+   dia agora: R$ X · N pedidos" e nada é sobrescrito; 10 criações paralelas = 1 linha. Remover (loja ou dia errado) exige motivo de 3 a
+   200 letras e deixa o antes no histórico. Data: dd/mm/aaaa ou ISO, até hoje no Rio e até 3 anos para trás (o ano passado vale);
+   loja desativada e canal desligado não recebem lançamento novo. "Lançar o dia" (`faturamento/lancar`) pede a loja e a data; com uma
+   loja só no acesso, vai direto ao dia de hoje.
+4. **Planilha** (128; `faturamento/importar`, modelo em `public/modelos/faturamento.csv`: `data;loja;canal;faturamento;pedidos;clientes`).
+   Prévia sem gravar (nova / vai mudar com antes → depois / igual / com erro e o motivo por linha), importar numa transação só com as
+   linhas válidas, impressão da prévia conferida lá dentro (mundo mudou = recusa tudo), reimportar = tudo "igual", zero gravação.
+   Limites: 256 KB, 5.000 linhas, 20 colunas, 200 letras por campo, 30 s. Célula que começa com `= + - @`, tab ou CR é recusada
+   (nunca casa loja ou canal); o eco da célula é cortado em 40 letras, sem controle nem bidi; a prévia mostra no máximo 300 linhas
+   (erros e mudanças primeiro) e todas entram.
+5. **Mês e faltas** (`faturamento?mes=aaaa-mm`). Visão de uma loja: calendário (grade de 7 colunas a partir de 640 px, lista de dias no
+   celular), célula = total do dia e os canais, com a FALTA destacada (filete vermelho de 2 px e a palavra "falta iFood"); falta =
+   canal que a loja vende, sem lançamento, do 1º lançamento dela até ontem (hoje é "em aberto", zero lançado não é falta, loja só
+   delivery não acusa a Loja). Visão rede (quem tem a rede inteira): soma das lojas do alcance e tabela loja × canal com as faltas;
+   o nome da loja abre o calendário dela (`?loja=`, `?rede=1` volta). Totais por canal e do mês (faturamento, pedidos, clientes,
+   ticket). Sem comparação com o ano passado (2.2).
+6. **Canais da loja** (126). Em Lojas e marcas, "Canais de venda" na linha da loja (só `lojas.gerir`): Loja, Delivery próprio, iFood,
+   pelo menos um, antes/depois no histórico; desligar não apaga o que foi lançado.
+7. **Período fechado** (132). Toda escrita pega `pg_advisory_xact_lock_shared('erp-faturamento:<parceiro>')` (`periodo-trava.ts`) e
+   recusa data dentro de `PeriodoApuracao` FECHADO ("O período X já foi fechado no DRE"). A 2.2, ao fechar, usa `travarParaFechar`
+   (a MESMA chave, exclusiva). A 2.1 não cria nem fecha período.
+8. **Navegação e ajuda** (134). A área "Faturamento e DRE" (chave `dre`) saiu de `MODULOS_FUTUROS` e virou área com a aba "Faturamento"
+   (`faturamento.ver`) e as ações "Lançar o dia" e "Importar faturamento" (`faturamento.lancar`), no cabeçalho e no ⌘K (nenhum
+   resultado com R$). `VERSAO_DO_ERP` = fase 2.1. A tela do mês acende a aba em toda rota (`ROTAS_ATIVAS`).
+9. **Quem lança e quem vê** (130). Telas = `faturamento.ver` com a loja; gravar, remover e importar = ver E lançar na loja de CADA
+   linha. Dono e Gerente têm; Operador não. Loja fora do alcance, de outro parceiro, inexistente, dia futuro ou inválido: 404 igual.
+   Quem não tem `faturamento.ver` não recebe nada: nem a área (hub, menu, ⌘K), nem o histórico (133: `verFaturamento` ausente =
+   fechado; HTML e payload conferidos).
+10. **Contrato da integração** (129, SEM implementação). `<fonte>:<tipo>:<idExterno>` (`chaveDeIntegracao`), `origem = INTEGRACAO`,
+    `origemRef = idExterno`, upsert por chave (reenviar atualiza, nunca soma), pedido só CONCLUÍDO e cancelado depois = a mesma
+    chave zerada; o worker grava por `doParceiro`, pega a mesma trava e respeita período fechado. Tipo `EntradaDeIntegracao` em
+    `faturamento.ts`. Mapear a loja do iFood para `Loja` fica para a fase da integração.
+
+11. **Conferência pós-deploy da migration.** Atenção: enquanto um grão tiver duplicada humana antiga (índice ausente), a
+    leitura do mês e da rede SOMA as duas linhas daquele grão (apontado pelo Guardião: 5 + 6 = 11) até alguém remover a
+    duplicada. Gravações novas seguem idempotentes pelo único de `chaveIdempotencia`. Os WARNINGs da migration (CHECK que ficou NOT VALID, índice do grão não criado) só
+    aparecem no terminal de quem a roda, não no log do auto-deploy. Depois de cada deploy que traga a 2.1:
+    `npm run erp:conferir-migracao` (lê `pg_constraint` e `pg_indexes`, que não passam pela RLS; só leitura; sai com código 1 e uma
+    frase por pendência, ou 0 com "conferida"). Sem o script: `SELECT conname FROM pg_constraint WHERE NOT convalidated AND
+    (conname LIKE 'FaturamentoLancamento\_%' OR conname = 'Loja_canais_ao_menos_um');` e
+    `SELECT count(*) FROM pg_indexes WHERE indexname = 'FaturamentoLancamento_grao_humano';` (esperado: zero linhas e 1). Para
+    resolver: corrigir a linha antiga e rodar `ALTER TABLE … VALIDATE CONSTRAINT …` (ou o `CREATE UNIQUE INDEX` da migration).
+
+**Ajuda: chaves novas/alteradas.** Novas: `faturamento` (v1, com seções "O que entra no número" e "Falta não é zero"),
+`faturamento-lancar` (v1), `faturamento-dia` (v1, seção "Dia de período fechado") e `faturamento-importar` (v1, seção "As colunas do
+modelo"); blocos de lançar e remover com `para: ['faturamento.lancar']`. `faturamento-dia` nasce com a caixa recolhida (`recolhida: true`, como nas telas de contar: os campos ficam à vista no celular). Alterada: `lojas` v1 para v2 (faturamento é por loja; os canais
+de venda), com `ajuda.lock.json` regravado. Área nova `dre` em `AreaDaAjuda`.
+
+## Provar o faturamento (2.1)
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run   # duas vezes seguidas
+npm run build                                                          # "/" continua estático
+```
+`tests/erp-faturamento.test.ts` (sem banco): formatos brasileiros, valores extremos, data futura/antiga, chaves, planilha (inclusive
+fórmula e eco), leitura do grão, mês, faltas, ticket, histórico, modelo CSV. `tests/erp-faturamento.db.test.ts`: o roteiro do gerente
+(3 linhas, chaves, histórico na mesma transação), regravar igual, duas abas, 10 criações paralelas, loja fora do alcance/outro
+parceiro/id forjado, CHECKs por SQL cru, canal desligado, remover, período FECHADO (e a trava esperando o fechamento), planilha
+(prévia, reimportar, vai mudar, erros por linha, mundo mudou), integração plantada vencendo, faltas e ticket, vazamento no histórico.
+`tests/erp-faturamento-telas.db.test.ts`: as actions e páginas de verdade (campo forjado, operador, gerente de outra loja, suspenso,
+espelho do nível 1, 404, Histórico de perfil sem `faturamento.ver`). `tests/erp-faturamento-migracao.db.test.ts`: a migration com
+dado antigo plantado (bom e violando cada CHECK, mais duplicidade humana): contagem preservada, CHECK NOT VALID só onde há violação,
+índice ausente com duplicidade.
+
+Migration, em bancos novos como superusuário, dono não-superusuário com RLS e sem RLS (`m21_ff`, `m21_ff_dono`, `m21_ff_semrls`: 2
+linhas antigas preservadas, 0 CHECK inválido, índice criado, CHECKs recusam, `migrate diff` vazio) e no `ff_dev`.
+
+Na tela (build de produção local, porta 3100, banco `ff_21` copiado do `ff_dev`; roteiro `prova21/jornada.mjs` no scratchpad, 112
+conferências): o gerente da Vila da Penha, no celular, abre o mês (com as faltas), "Lançar o dia" vai direto ao dia de hoje, lança
+Loja 4.350,00/62/140, Delivery 1.200,00/30 e iFood "Não vendeu" (3 linhas, histórico CRIOU), corrige o iFood duas vezes (histórico
+3.210,00 → 3.120,00), regrava igual ("Nada mudou", nada novo), duas abas (a segunda recebe o conflito com o número e o nome), lança e
+remove com motivo, importa um CSV com erro de loja, data futura, negativo, fórmula e linha repetida (as válidas entram), reimporta
+(tudo igual, botão desabilitado), uma linha alterada vira "vai mudar" com antes → depois; o total e o ticket do mês batem com a
+soma do banco; a loja de delivery e o dia futuro são 404; operador sem acesso em hub, menu, ⌘K e URL; Hugo (`historico.ver` sem
+`faturamento.ver`) não recebe nada no HTML; a dona vê a rede, a unidade só delivery sem falta de salão, escolhe a loja, edita canais e
+vê o faturamento no Histórico; o nível 1 lança pelo espelho e a loja de outro parceiro é 404. Axe (wcag2a/2aa) sem violação nos dois
+temas, zero erro de console, zero rolagem horizontal a 390, 820 e 1440. Prints em `shots-2.1/`.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -1410,7 +1507,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Bloco | Tabela | Para quê |
 |---|---|---|
 | Estrutura | `ParceiroFlow` | N2, o tenant. Ganhou `periodoTipo`/`periodoDiaInicio` (sugestão de período do DRE) |
-| Estrutura | `Loja` | N3, loja/unidade do parceiro; estoque, produção e faturamento são por loja. 1.7: regras da contagem (piso do fechamento, frequência ABC, tolerância para fechar sozinha) |
+| Estrutura | `Loja` | N3, loja/unidade do parceiro; estoque, produção e faturamento são por loja. 1.7: regras da contagem (piso do fechamento, frequência ABC, tolerância para fechar sozinha). 2.1: `canaisDeVenda` (em quais canais vende; pelo menos um) |
 | Estrutura | `Marca` | marca do grupo; produto e faturamento podem apontar marca |
 | Estrutura | `Colaborador` | pessoa da operação; âncora do histórico por funcionário (login vem na 0.3) |
 | Insumos | `Insumo` | já existia; ganhou tipo (ingrediente/embalagem/pré-preparo), taxa de entrega, conservação e validade por conservação, mínimo, fornecedor padrão, origem |
@@ -1429,7 +1526,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Estoque | `Requisicao` / `RequisicaoItem` | pedido do setor (1.8: número por loja, setor da 0.4, para quando, versão, pedida → atendida em parte → atendida · cancelada, ficha de origem); a baixa sai na entrega (`REQUISICAO` com `requisicaoItemId`), devolução por estorno |
 | Produção | `OrdemProducao` | lote: planejado/produzido, custo, responsável (snapshot). Lista do dia = ordens planejadas × saldo (derivada) |
 | Produção | `Etiqueta` | etiqueta impressa: lote do fornecedor, validade, abertura, snapshot |
-| DRE | `FaturamentoLancamento` | faturamento por loja × marca × canal × dia: valor, pedidos, clientes (= atendimentos do dia, não clientes únicos); chave de idempotência única |
+| DRE | `FaturamentoLancamento` | faturamento por loja × canal × dia (2.1: marca nula): valor, pedidos, clientes (= atendimentos do dia, não clientes únicos); chave de idempotência única; origem MANUAL/IMPORTACAO (uma linha humana por grão) ou INTEGRACAO; `atualizadoPorNome`; CHECKs de teto, espaço de chave e valor com pedido |
 | DRE | `DreLinha` / `DreMeta` | linhas do DRE (com `sentido`: maior ou menor é melhor) e meta % por linha, por canal ou da rede (canal nulo), com vigência |
 | DRE | `Despesa` | despesa manual/importada numa linha; loja nula = rede, canal nulo = rateio; importada exige chave de idempotência |
 | DRE | `PeriodoApuracao` | períodos configuráveis; contagem de fechamento aponta o período |
@@ -1498,6 +1595,8 @@ custo médio sai da divisão (em `unidades.ts`). Nada acumulado é gravado
 - **Idempotência.** `FaturamentoLancamento.chaveIdempotencia` é única por
   parceiro (manual: `manual:<loja>:<marca ou ->:<canal>:<data>`); despesa
   importada e movimento também têm chave única.
+  2.1: o humano (digitado ou planilha) usa a chave `manual:<loja>:-:<canal>:<data>` e tem índice único parcial no grão; a integração
+  usa `<fonte>:<tipo>:<idExterno>` (o CHECK separa os dois espaços).
 - **Nulo que não repete.** Unique com `NULLS NOT DISTINCT` (escrito no SQL, o
   Prisma não descreve): produto sem marca, meta de rede e faixa de rede não
   duplicam.
@@ -2033,3 +2132,32 @@ banco de teste: o operador é recusado pelo servidor.
   do nível 1.
 - O hub do nível 1 (`/rodolfo/erp/<slug>`) usa o mesmo texto do hub do parceiro ("Áreas da Rede"); a lista de parceiros
   (`/rodolfo/erp`) e o quadro de onboarding não têm ajuda.
+
+## Herança da 2.1 (para as próximas subfases)
+
+- **Migration sob RLS**: nenhum passo de migration pode depender de SELECT em tabela de tenant (o dono não-superusuário com FORCE RLS
+  enxerga 0 linhas). Checar dado antigo = tentar a operação (CREATE UNIQUE INDEX, VALIDATE CONSTRAINT) e apanhar `unique_violation`
+  ou `check_violation`; o WARNING não chega ao log do deploy, então toda migration tolerante a dado antigo ganha um passo
+  verificável pós-deploy (`erp:conferir-migracao` é o da 2.1). Teste de migration com dado antigo roda nos 3 perfis do banco.
+- **Instabilidade apontada pelo Guardião** entre os testes com banco de `erp-acesso` e o trigger do onboarding (0.5): fora do escopo
+  da 2.1 e sem falha vista nas rodadas finais (2 vezes seguidas, 60 arquivos); segue anotada para quem mexer em acesso ou onboarding.
+- **A leitura do faturamento é UMA**: `faturamentoDosGraos` / `faturamentoDoGrao` (integração vence; a digitada vira conferência).
+  A 2.2 (DRE) lê só por elas e filtra por `faturamento.ver`/`dre.ver` na página; a função só filtra lojas pelo alcance.
+- **Fechar período é da 2.2**: pegar `travarParaFechar(tx)` (`periodo-trava.ts`) ANTES de ler o faturamento e de marcar o período
+  FECHADO, na mesma transação. A 2.1 só lê `PeriodoApuracao` (nome, início, fim, status).
+- **Receita do DRE = `valorCentavos` do grão** (venda de produtos, líquida de desconto da casa). Comissão e taxa de pagamento do iFood
+  são dedução da 2.2 (`CanalConfig`); taxa de entrega, gorjeta e cancelado não entram. Desconto não é campo: se entrar, bruto =
+  valor + descontos (aditivo).
+- **Marca no faturamento**: entra com a integração por loja do iFood, sob "um grão é sem marca OU por marca, nunca os dois"
+  (hoje o índice parcial usa `COALESCE(marcaId,'-')`).
+- **Integração**: só o contrato existe (`chaveDeIntegracao`, `EntradaDeIntegracao`). Falta o worker, o mapeamento loja do iFood →
+  `Loja` e a decisão de reconciliar a diferença digitado × integração (hoje só aparece como conferência).
+- **Exportar CSV** (fora do escopo): quando existir, prefixar `'` em célula que começa com `= + - @`.
+- **Faltas contam canal-dia** (cada canal em cada dia); o "dia sem lançamento" como sino ou lembrete pelo WhatsApp ficou de fora.
+- **Telas ficam stale por ~1 s depois de salvar** (o roteador do Next atualiza a página depois de a action responder); o dado já
+  está gravado e o histórico aparece em seguida. A prova espera por isso.
+- Fora do escopo, anotado: integrações reais (iFood, Anota AI, Saipos), marca no faturamento, descontos/taxa de entrega/10 % como campos,
+  comparação com o ano passado e metas (2.2), DRE/CMV/farol (2.2 a 2.4), fechar período, exportar CSV, XLSX, faturamento por hora/turno.
+- `Selo` de erro ficou sem tinta de fundo (no tema escuro o texto #F2323F sobre o fundo tingido dava menos de 4,5:1 no axe).
+- Produção: antes do deploy, conferir que não há linha de faturamento violando os CHECKs (esperado: zero linhas; se houver, a migration
+  avisa e deixa o CHECK NOT VALID).

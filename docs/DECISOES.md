@@ -1526,3 +1526,76 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) manter `no-referrer` e aceitar o login sem JavaScript quebrado; (b) `same-origin`.
 
 **Razão:** (b). A intenção da 0.3 (commit 9ac5b61) era o token do link de primeiro acesso, que vai no endereço, não vazar por Referer: com `same-origin` nenhum site de fora recebe o endereço (provado interceptando o WhatsApp). Com `no-referrer` o navegador mandava `Origin: null` no POST e o Next recusava a server action (500 sem JavaScript). Provado: login e senha errada sem JavaScript funcionam.
+
+
+### 123. 2026-10-17 · ERP 2.1: o grão do faturamento é loja × canal × dia civil do Rio, sem marca
+
+**Alternativas:** (a) loja × marca × canal × dia (a coluna `marcaId` já existe); (b) loja × canal × dia, `marcaId` nulo por ora.
+
+**Razão:** (b). Não há vínculo loja × marca no esquema: misturar linhas com e sem marca no mesmo grão somaria em dobro. A marca entra com a integração por loja do iFood, sob a regra "um grão é lançado sem marca OU por marca, nunca os dois". O dia é o civil do Rio (`@db.Date`, `hojeNoRio`), nunca derivado de UTC: o caixa que fecha à meia-noite não muda de dia.
+
+### 124. 2026-10-17 · ERP 2.1: o número é a venda de produtos dos pedidos concluídos, líquida do desconto da casa ("o pedido não é a venda")
+
+**Alternativas:** (a) total do pedido como o canal reporta (com taxa de entrega, gorjeta, cancelados); (b) venda dos produtos, de pedidos concluídos, já sem desconto/cupom pago pela casa.
+
+**Razão:** (b). É o que vira receita do DRE (2.2); taxa de entrega cobrada do cliente, 10 %/gorjeta e pedido cancelado não são venda. No iFood: total dos itens menos o incentivo que a loja bancou; a comissão é dedução da 2.2 (via `CanalConfig`). `pedidos` = pedidos concluídos; `clientes` = atendimentos (salão: pessoas; delivery e iFood: em branco vale os pedidos), não clientes únicos. Desconto não vira campo agora; se entrar, bruto = valor + descontos (aditivo, o significado de `valor` não muda). Ticket médio é Σ valor ÷ Σ pedidos do recorte, derivado: nunca gravado, nunca média de médias.
+
+### 125. 2026-10-17 · ERP 2.1: uma fonte por grão: o humano (digitado ou planilha) divide UMA linha, e a integração vence na leitura
+
+**Alternativas:** (a) somar digitado + planilha + integração; (b) a mesma chave determinística para digitado e planilha (reimportar é correção) e, havendo linha de integração no grão, vale só a soma dela, com a digitada à vista como conferência.
+
+**Razão:** (b). Chave humana `manual:<loja>:-:<canal>:<dia>` (índice único parcial no SQL como cinto); a integração usa outro espaço de chave (`<fonte>:<tipo>:<idExterno>`, o CHECK separa os dois). Somar duplicaria venda quando o digitado e a integração descrevem o mesmo dia. A leitura é UMA, `faturamentoDosGraos`; a 2.2 só lê por ela. Teste com linha de integração plantada prova a precedência e a conferência.
+
+### 126. 2026-10-17 · ERP 2.1: vazio não é zero; "Não vendeu" grava 0/0/0; `Loja.canaisDeVenda` diz o que cobrar
+
+**Alternativas:** (a) canal em branco = zero; (b) em branco = sem lançamento (falta), zero só se a pessoa disser; (c) idem, com os canais que a loja vende configuráveis.
+
+**Razão:** (c). Falta = canal que a loja vende, sem lançamento, de quando ela começou a lançar (1º lançamento) até ontem; hoje fica "em aberto". Unidade 100 % delivery desliga a Loja em `canaisDeVenda` (CHECK: pelo menos um canal), editável em Lojas e marcas por quem tem `lojas.gerir`, com antes/depois no histórico; desligar não apaga o que já foi lançado. A falta conta canal-dia (cada canal em cada dia).
+
+### 127. 2026-10-17 · ERP 2.1: corrigir é no lugar, condicional ao `atualizadoEm`; remover exige motivo
+
+**Alternativas:** (a) estorno e lançamento novo (como o livro-razão do estoque); (b) UPDATE condicional à versão lida de cada canal, antes/depois no histórico; remover = DELETE com motivo.
+
+**Razão:** (b). Faturamento é a fotografia do dia, não movimento. Duas abas: a segunda recebe "Fulano lançou o iFood deste dia agora: R$ X · N pedidos" e nada é sobrescrito; salvar tudo ou nada. Regravar o mesmo número (duplo clique, 10 gravações paralelas iguais) é "igual": uma linha, um histórico. Números diferentes na corrida: 1 vence, N−1 recebem o conflito (`INSERT … ON CONFLICT DO NOTHING`, não a exceção, para a transação não abortar). Remover (3 a 200 letras de motivo) guarda o lançamento inteiro no histórico e o dia volta a "sem lançamento"; linha de integração não se remove à mão.
+
+### 128. 2026-10-17 · ERP 2.1: a planilha é CSV com modelo, prévia sem gravar, erro por linha e proteção contra fórmula
+
+**Alternativas:** (a) importar direto; (b) prévia (nova, vai mudar com antes → depois, igual, com erro) e confirmação que leva a impressão da prévia.
+
+**Razão:** (b). `;` recomendado (a vírgula é o decimal do Brasil); loja pelo nome (sem caixa nem acento), canal por loja | delivery | ifood; limites de 256 KB, 5.000 linhas, 20 colunas, 200 letras por campo, 30 s. Célula que começa com `= + - @`, tab ou CR nunca casa loja ou canal e é recusada no número; o eco é cortado em 40 letras, sem controle nem bidi, e renderizado como texto. A importação refaz a prévia DENTRO da transação, sob a trava, e se a impressão não bate recusa tudo ("mudou desde a prévia"). Linha repetida no arquivo = erro nas duas; loja inexistente, de outro parceiro ou fora do acesso recebem a MESMA frase. Planilha e digitação compartilham a chave: dia lançado à mão e depois importado é a mesma linha (origem passa a IMPORTACAO), sem soma.
+
+### 129. 2026-10-17 · ERP 2.1: o contrato da integração fica desenhado, sem implementação
+
+**Alternativas:** (a) implementar o iFood agora; (b) só o formato e a leitura.
+
+**Razão:** (b). `<fonte>:<tipo>:<idExterno>` (`pedido` ou `dia`), `origem = INTEGRACAO`, `origemRef = idExterno`, upsert por chave (reenviar atualiza, nunca soma), pedido só entra CONCLUÍDO e cancelado depois é a mesma chave zerada. O worker grava por `doParceiro` (o portão confere parceiro ATIVO), pega a mesma trava e respeita período fechado. O mapeamento loja do iFood → `Loja` é da fase da integração. Nada disso grava na 2.1: só `chaveDeIntegracao`, o tipo `EntradaDeIntegracao` e a leitura que já faz a integração vencer.
+
+### 130. 2026-10-17 · ERP 2.1: permissões sem catálogo novo; gravar exige ver e lançar na loja de CADA linha
+
+**Alternativas:** (a) permissão nova (`faturamento.importar`); (b) as que o catálogo já tinha: `faturamento.ver` e `faturamento.lancar`, ambas por loja.
+
+**Razão:** (b); `VERSAO_DO_CATALOGO` fica 1 e o módulo deixa de ser `emBreve`. Telas pedem `faturamento.ver` com a loja; gravar, remover e importar pedem ver e lançar, e a planilha confere a loja de cada linha. Dono e Gerente têm; Operador não (o caixa que fecha o dia ganha as duas como extra no ajuste por pessoa). Loja fora do alcance, de outro parceiro e inexistente são 404 iguais. Quem não tem `faturamento.ver` não recebe nada de faturamento: nem na área, nem no ⌘K, nem no histórico (decisão 133).
+
+### 131. 2026-10-17 · ERP 2.1: migration aditiva, robusta a linha antiga, segura para superusuário e dono não-superusuário
+
+**Alternativas:** (a) CHECKs que podem reprovar a migration por dado antigo; (b) NOT VALID + tentativa de VALIDATE que avisa e segue.
+
+**Razão:** (b). `20261025000000_erp_faturamento`: `FaturamentoLancamento.atualizadoPorNome`, `Loja.canaisDeVenda`, oito CHECKs (tetos de R$ 1 mi, 100 mil pedidos/clientes, valor > 0 exige pedido, data ≥ 2020, espaço de chave, integração com `origemRef`, tamanhos, loja com pelo menos um canal) e o índice único parcial do grão humano. Cada CHECK entra NOT VALID e é validado em seguida; linha antiga que viole deixa o CHECK NOT VALID e um WARNING com o nome (vale para escrita nova). O índice único do grão é criado dentro de `BEGIN … EXCEPTION WHEN unique_violation`: duplicidade humana antiga não cria o índice e avisa. **Veto do Guardião (1ª reprovação):** a primeira versão checava duplicidade com `SELECT … HAVING count(*) > 1`; com dono não-superusuário e FORCE RLS esse SELECT enxerga 0 linhas (a RLS vale para a consulta, não para a construção do índice nem para o VALIDATE, que leem a tabela inteira), "passava" e o `CREATE UNIQUE INDEX` quebrava com 23505, prendendo o deploy (P3018). Agora nenhum passo da migration depende de SELECT sob RLS, e o teste planta duplicada antes da migration como superusuário, dono com RLS forçada e dono sem RLS (rodado contra a migration antiga, os dois cenários do dono com RLS falham). Como o WARNING não aparece no log do deploy automático, `npm run erp:conferir-migracao` lista, depois do deploy, os CHECKs que ficaram NOT VALID e o índice ausente (sai com código 1 se houver pendência). Provado com dado antigo plantado (contagem preservada, `tests/erp-faturamento-migracao.db.test.ts`) e em banco novo como superusuário, dono não-superusuário com RLS e sem RLS; `migrate diff` vazio. Nenhuma tabela nova: portão, RLS e GRANT iguais.
+
+### 132. 2026-10-17 · ERP 2.1: o período FECHADO recusa escrita de faturamento, pela trava compartilhada que a 2.2 usará
+
+**Alternativas:** (a) conferir o período sem trava; (b) trava `pg_advisory_xact_lock_shared('erp-faturamento:'||parceiroId)` em toda escrita, e o fechamento da 2.2 pega a MESMA chave exclusiva.
+
+**Razão:** (b). Sem trava há janela: o fechamento lê o faturamento enquanto alguém ainda grava no período. Com a trava, ou a escrita termina antes e entra no fechamento, ou espera e é recusada ("O período X já foi fechado no DRE"). A 2.1 não cria nem fecha período: só lê `PeriodoApuracao` e expõe `travarParaFechar` (testado: lançar espera o fechamento em curso e depois é recusado).
+
+### 133. 2026-10-17 · ERP 2.1: o histórico só entrega faturamento a quem passa `verFaturamento: true`; ausente é fechado
+
+**Alternativas:** (a) parâmetro obrigatório como o `verPrecos` da 1.10 (editar ~50 chamadas); (b) opcional, e ausente = não vê.
+
+**Razão:** (b) é mais forte que (a): quem esquece de decidir não vaza. As linhas de `FaturamentoLancamento` saem na consulta (lição da decisão 90: o filtro é no servidor, o payload não leva a linha); o filtro "Faturamento" da tela some para quem não pode. Teste monta a página do Histórico de um perfil com `historico.ver` sem `faturamento.ver` e confere HTML e payload; o mesmo teste tem o controle positivo (quem tem as duas vê).
+
+### 134. 2026-10-17 · ERP 2.1: "Faturamento e DRE" é uma área com uma aba ("Faturamento") e duas ações
+
+**Alternativas:** (a) abas "Lançamentos" e "Importar"; (b) aba única e as ações "Lançar o dia" e "Importar faturamento" no cabeçalho e no ⌘K.
+
+**Razão:** (b), a regra da seção 9 (área → abas → ações): lançar e importar são ações, não seções. Uma aba sozinha não vira barra de abas; o menu e o hub levam a ela. As ações são só de quem tem `faturamento.lancar`; "Importar faturamento" (e não "Importar planilha") para não repetir o rótulo da ação das fichas no ⌘K. Com uma loja só no acesso, "Lançar o dia" vai direto ao dia de hoje (o gerente no celular não escolhe nada).

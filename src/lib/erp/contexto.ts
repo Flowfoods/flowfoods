@@ -128,6 +128,7 @@ export const TELAS_DO_ERP: { href: string; rotulo: string; permissao: Permissao 
   { href: '/erp/fichas', rotulo: 'Fichas técnicas', permissao: 'fichas.ver' },
   { href: '/erp/compras', rotulo: 'Notas de compra', permissao: 'compras.ver' },
   { href: '/erp/estoque', rotulo: 'Estoque por loja', permissao: 'estoque.ver' },
+  { href: '/erp/faturamento', rotulo: 'Faturamento', permissao: 'faturamento.ver' },
   { href: '/erp/lojas', rotulo: 'Lojas e marcas', permissao: 'lojas.ver' },
   { href: '/erp/equipe', rotulo: 'Equipe', permissao: 'acessos.gerir' },
   { href: '/erp/historico', rotulo: 'Histórico', permissao: 'historico.ver' },

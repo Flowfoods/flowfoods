@@ -102,7 +102,7 @@ const TONS: Record<Tom, string> = {
  * tingido e a borda inteira — grita mais que o alerta ao lado.
  */
 export function Selo({ tom = 'neutro', cheio = false, children }: { tom?: Tom; cheio?: boolean; children: ReactNode }) {
-  const fundo = cheio ? { ok: 'bg-ok/15 border-ok', alerta: 'bg-atencao/15 border-atencao', erro: 'bg-erro/15 border-erro', neutro: 'bg-texto/10' }[tom] : 'bg-texto/[0.03]';
+  const fundo = cheio ? { ok: 'bg-ok/15 border-ok', alerta: 'bg-atencao/15 border-atencao', erro: 'bg-erro/15 border-erro', neutro: 'bg-texto/10' }[tom] : tom === 'erro' ? '' : 'bg-texto/[0.03]'; // erro sem tinta: no tema escuro #F2323F sobre o fundo tingido cai abaixo de 4,5:1
   return (
     <span
       className={`inline-flex max-w-full items-center gap-1.5 whitespace-nowrap rounded-[7px] border px-2 py-0.5 text-[12px] font-semibold ${TONS[tom]} ${fundo}`}

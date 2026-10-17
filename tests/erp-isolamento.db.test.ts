@@ -158,7 +158,7 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
     const [loja] = await a.loja.findMany();
     const lanc = {
       parceiroId: A.id, lojaId: loja.id, canal: 'IFOOD' as const, data: new Date('2026-10-14'), valorCentavos: 123456,
-      pedidos: 30, clientes: 28, origem: 'INTEGRACAO' as const, chaveIdempotencia: 'ifood:2026-10-14:penha',
+      pedidos: 30, clientes: 28, origem: 'INTEGRACAO' as const, chaveIdempotencia: 'ifood:dia:2026-10-14-penha', origemRef: '2026-10-14-penha', // 2.1: integração usa <fonte>:<tipo>:<idExterno> e diz o id externo
     };
     await a.faturamentoLancamento.create({ data: lanc });
     await expect(a.faturamentoLancamento.create({ data: lanc })).rejects.toMatchObject({ code: 'P2002' });

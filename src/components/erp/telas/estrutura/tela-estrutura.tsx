@@ -6,6 +6,8 @@
  */
 
 import type { ReactNode } from 'react';
+import { CANAIS } from '@/lib/erp/canal-campos';
+import { CANAIS_EM_ORDEM, type CanalVenda } from '@/lib/erp/faturamento-campos';
 import { Contagem, Painel, Vazio } from '../../ui/superficies';
 
 const DATA = new Intl.DateTimeFormat('pt-BR', {
@@ -32,14 +34,19 @@ function InativaNoCelular({ ativa }: { ativa: boolean }) {
   return <span className="ml-2 text-[12px] font-normal text-suave sm:hidden">inativa</span>;
 }
 
+type LinhaDaEstrutura = { id: string; nome: string; slug?: string; ativa: boolean; criadoEm: Date; canaisDeVenda?: CanalVenda[] | null };
+
 function Tabela({
   rotulo,
   linhas,
   mostrarLink,
+  canais,
 }: {
   rotulo: string;
-  linhas: { id: string; nome: string; slug?: string; ativa: boolean; criadoEm: Date }[];
+  linhas: LinhaDaEstrutura[];
   mostrarLink: boolean;
+  /** 2.1: onde cada loja vende, com o controle para quem cadastra lojas (some nas marcas). */
+  canais?: (l: LinhaDaEstrutura) => ReactNode;
 }) {
   return (
     <table className="w-full table-fixed text-sm">
@@ -65,6 +72,12 @@ function Tabela({
                 <InativaNoCelular ativa={l.ativa} />
               </div>
               {mostrarLink && l.slug && <div className="truncate text-[12px] text-suave">{l.slug}</div>}
+              {canais && (
+                <>
+                  <div className="text-[12px] font-normal text-suave">Vende em {CANAIS_EM_ORDEM.filter((c) => (l.canaisDeVenda ?? []).includes(c)).map((c) => CANAIS[c].curto).join(' · ') || '—'}</div>
+                  {canais(l)}
+                </>
+              )}
             </td>
             <td className="hidden px-3 py-2.5 sm:table-cell">
               <Situacao ativa={l.ativa} />
@@ -84,8 +97,9 @@ export function TelaEstrutura({
   formLoja,
   formMarca,
   mostrarLink = false,
+  formCanais,
 }: {
-  lojas: { id: string; nome: string; slug: string; ativa: boolean; criadoEm: Date }[];
+  lojas: { id: string; nome: string; slug: string; ativa: boolean; criadoEm: Date; canaisDeVenda?: CanalVenda[] | null }[];
   marcas: { id: string; nome: string; ativa: boolean; criadoEm: Date }[];
   bloqueio: string | null;
   /** Sem formulário: a pessoa não cadastra lojas/marcas (a linha do campo some). */
@@ -93,6 +107,8 @@ export function TelaEstrutura({
   formMarca?: ReactNode;
   /** Identificador técnico da loja: só o nível 1 vê. */
   mostrarLink?: boolean;
+  /** 2.1: o controle dos canais de venda de uma loja (só para quem cadastra lojas). */
+  formCanais?: (l: { id: string; nome: string; canais: readonly CanalVenda[] }) => ReactNode;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -108,7 +124,12 @@ export function TelaEstrutura({
             Cada endereço que opera vira uma loja: estoque e faturamento são por loja.
           </Vazio>
         ) : (
-          <Tabela rotulo="Loja" linhas={lojas} mostrarLink={mostrarLink} />
+          <Tabela
+            rotulo="Loja"
+            linhas={lojas}
+            mostrarLink={mostrarLink}
+            canais={(l) => formCanais?.({ id: l.id, nome: l.nome, canais: CANAIS_EM_ORDEM.filter((c) => (l.canaisDeVenda ?? []).includes(c)) })}
+          />
         )}
       </Painel>
 
