@@ -12,10 +12,12 @@ import type { NotaDetalhada } from '@/lib/erp/compras';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { formatarDocumento } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
+import { fechadoNaData, type AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
 import { formatarCusto, formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
 import { quantidadeComSinal } from '@/lib/erp/estoque-campos';
 import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
+import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { Aviso, Linha, Painel, Selo, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { ListaHistorico } from '../historico/lista-historico';
@@ -38,6 +40,7 @@ export function TelaDetalheNota({
   fornecedoresBase,
   estoqueBase,
   acaoCancelar,
+  periodos,
 }: {
   nota: NotaDetalhada;
   base: string;
@@ -53,9 +56,12 @@ export function TelaDetalheNota({
   /** 1.6: link do estoque da loja (quem vê o estoque dela). */
   estoqueBase?: string;
   acaoCancelar: AcaoDeNota;
+  /** Os períodos fechados: nota de período fechado não se edita nem se cancela, e a tela já diz. */
+  periodos: AvisoDePeriodos;
 }) {
   const mensagem = fraseDaNota(feito);
-  const edita = podeLancar && !n.cancelada;
+  const fechado = fechadoNaData(periodos.fechados, n.entradaEm);
+  const edita = podeLancar && !n.cancelada && !fechado;
   return (
     <div className="space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: n.rotulo }]} />
@@ -75,6 +81,7 @@ export function TelaDetalheNota({
       />
 
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
+      {fechado && podeLancar && !n.cancelada && <AvisoDoPeriodoFechado periodo={fechado.nome} href={periodos.href} frase="Esta nota é desse período: não dá para editar nem cancelar." />}
       {n.cancelada && feito !== 'cancelada' && (
         <Aviso tom="alerta" titulo="Nota cancelada.">
           {n.motivoCancelamento ? `Motivo: ${n.motivoCancelamento}.` : ''} Não vale para o custo. A mesma nota pode ser lançada de novo, certa.

@@ -25,11 +25,15 @@ import {
   embalagemDoItem,
   formatarData,
   LIMITES_DA_NOTA,
+  lerData,
+  mascararData,
   PREFIXO_DA_EMBALAGEM,
   quantidadeDoItem,
   ratearFrete,
 } from '@/lib/erp/compra-campos';
 import { formatarCusto, formatarDinheiro, formatarQuantidade, lerDinheiro, lerQuantidade, UNIDADES } from '@/lib/erp/unidades';
+import { fechadoNaData, periodoDaFraseDeRecusa, type AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
+import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
@@ -91,6 +95,7 @@ export function FormNota({
   versao,
   hoje,
   bloqueio = null,
+  periodos,
   novoFornecedor,
   novoInsumo,
 }: {
@@ -106,6 +111,8 @@ export function FormNota({
   /** "2026-10-16" (no Rio): a data da nota não passa disso. */
   hoje: string;
   bloqueio?: string | null;
+  /** Os períodos fechados e o de agora: a tela avisa antes de preencher quando a data já cai num fechado. */
+  periodos: AvisoDePeriodos;
   novoFornecedor?: string;
   novoInsumo?: string;
 }) {
@@ -118,6 +125,10 @@ export function FormNota({
   const [total, setTotal] = useState(inicial.total);
   const erros = estado?.erros ?? {};
   const idBase = 'nota';
+  const [dataDigitada, setDataDigitada] = useState(inicial.data);
+  // Período fechado: o que a data digitada já diz, ou o que o servidor acabou de recusar (no campo ou, ao editar, na data antiga).
+  const fechadoDaData = fechadoNaData(periodos.fechados, lerData(dataDigitada) ?? '')?.nome ?? periodoDaFraseDeRecusa(erros.data);
+  const fechadoNoGeral = periodoDaFraseDeRecusa(erros.geral);
   const porId = useMemo(() => new Map(opcoes.insumos.map((i) => [i.id, i])), [opcoes.insumos]);
 
   function mudar(chave: number, m: Partial<LinhaDaNota>) {
@@ -166,7 +177,8 @@ export function FormNota({
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={rotuloDoCampo} />
-      {erros.geral && (
+      {fechadoNoGeral && <AvisoDoPeriodoFechado periodo={fechadoNoGeral} href={periodos.href} frase="Esta nota é desse período: não dá para corrigir nem cancelar." />}
+      {erros.geral && !fechadoNoGeral && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
           <p className="text-erro">{erros.geral}</p>
           {estado?.conflito && (
@@ -279,14 +291,26 @@ export function FormNota({
                 id={`${idBase}-data`}
                 name="data"
                 defaultValue={/^\d{4}-\d{2}-\d{2}$/.test(inicial.data) ? formatarData(inicial.data) : inicial.data}
+                onChange={(e) => setDataDigitada(mascararData(e.target.value))}
                 aria-invalid={!!erros.data}
-                aria-describedby={`${idBase}-data-ajuda${erros.data ? ` ${idBase}-data-erro` : ''}`}
+                aria-describedby={`${idBase}-data-ajuda${erros.data && !fechadoDaData ? ` ${idBase}-data-erro` : ''}${fechadoDaData ? ` ${idBase}-periodo-fechado` : ''}`}
               />
               <p id={`${idBase}-data-ajuda`} className={AJUDA}>
                 A data impressa na nota (dd/mm/aaaa, até {formatarData(hoje)}). É ela que diz qual compra é a mais nova.
               </p>
-              <Erro id={`${idBase}-data-erro`} texto={erros.data} />
+              <Erro id={`${idBase}-data-erro`} texto={fechadoDaData ? undefined : erros.data} />
             </div>
+            {fechadoDaData && (
+              <div className="sm:col-span-2">
+                <AvisoDoPeriodoFechado
+                  id={`${idBase}-periodo-fechado`}
+                  periodo={fechadoDaData}
+                  href={periodos.href}
+                  frase="Uma nota com essa data não entra."
+                  alternativa="Ou lance com a data de hoje, se a compra entrou agora."
+                />
+              </div>
+            )}
           </div>
         </Painel>
 

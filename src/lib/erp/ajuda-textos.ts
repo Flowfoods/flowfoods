@@ -466,7 +466,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['faturamento/[lojaId]/[data]'],
     titulo: 'Faturamento do dia',
-    versao: 2,
+    versao: 3,
     // Tela de lançar no celular: os campos ficam à vista, a aula abre numa linha (como nas telas de contar).
     recolhida: true,
     aula: [
@@ -480,7 +480,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'periodo-fechado',
         titulo: 'Dia de período fechado',
         blocos: [
-          { texto: 'Quando o período do resultado é fechado, os dias dele não aceitam mais lançar, corrigir nem remover. Onde o período começa e termina fica em Períodos, na área Faturamento e DRE.' },
+          { texto: 'Quando o período do resultado é fechado, os dias dele não aceitam mais lançar, corrigir nem remover. Onde o período começa e termina fica em Períodos, na área Faturamento e DRE. Para mexer num dia fechado, peça à FlowFoods para reabrir o período; a tela de cada lançamento (despesa, nota, dia) já diz isso e leva a Períodos.' },
         ],
       },
     ],

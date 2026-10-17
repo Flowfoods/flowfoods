@@ -8,6 +8,7 @@ import type { FormularioDeNota, FornecedorDetalhado, NotaDetalhada } from '@/lib
 import { valoresDaNota } from '@/lib/erp/compras';
 import { formatarDocumento, hojeNoRio } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
+import type { AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
 import { PageHeader } from '../../ui/cabecalho';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { Aviso } from '../../ui/superficies';
@@ -24,6 +25,7 @@ export function TelaFormNota({
   lojaSugerida,
   acao,
   bloqueio,
+  periodos,
   novoFornecedor,
   novoInsumo,
 }: {
@@ -36,6 +38,7 @@ export function TelaFormNota({
   lojaSugerida?: string;
   acao: AcaoDeNota;
   bloqueio: string | null;
+  periodos: AvisoDePeriodos;
   novoFornecedor?: string;
   novoInsumo?: string;
 }) {
@@ -79,6 +82,7 @@ export function TelaFormNota({
         versao={nota?.versao}
         hoje={hoje}
         bloqueio={bloqueio}
+        periodos={periodos}
         novoFornecedor={novoFornecedor}
         novoInsumo={novoInsumo}
       />

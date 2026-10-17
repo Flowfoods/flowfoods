@@ -28,6 +28,7 @@ export default async function ParceiroFaturamentoDoDiaPage({ params, searchParam
       acao={acaoSalvarDia.bind(null, slug, lojaId, data)}
       remover={(canal) => acaoRemoverLancamento.bind(null, slug, lojaId, data, canal)}
       podeLancar
+      verPeriodos
       bloqueio={ctx.bloqueio}
     />
   );

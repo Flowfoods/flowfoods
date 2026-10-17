@@ -3,6 +3,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { dadosDoFormularioDeNota, obterNota } from '@/lib/erp/compras';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { TelaFormNota } from '@/components/erp/telas/compras/paginas';
 import { acaoSalvarNota } from '../../actions';
 
@@ -28,6 +29,7 @@ export default async function ParceiroEditarNotaPage({ params }: { params: { slu
       opcoes={opcoes}
       acao={acaoSalvarNota.bind(null, ctx.parceiro.slug, nota.id)}
       bloqueio={ctx.bloqueio}
+      periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, `/rodolfo/erp/${ctx.parceiro.slug}`)}
       novoFornecedor={`${base}/fornecedores/novo`}
     />
   );

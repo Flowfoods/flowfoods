@@ -21,6 +21,8 @@ const atual = vi.hoisted(() => ({
   lojas: [] as { id: string; nome: string; ativa: boolean }[],
 }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
+// O react-dom estável do vitest não traz os ganchos de formulário do Next: o estado inicial basta para ler o HTML.
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
     throw Object.assign(new Error(`REDIRECT ${url}`), { url });
@@ -60,6 +62,9 @@ import * as dreDoNivel1 from '@/app/rodolfo/(painel)/erp/[slug]/dre/actions';
 import ErpDrePage from '@/app/erp/dre/page';
 import ErpPeriodoPage from '@/app/erp/dre/periodos/[inicio]/page';
 import ErpPlanoPage from '@/app/erp/dre/plano/page';
+import ErpNovaDespesaPage from '@/app/erp/dre/despesas/nova/page';
+import ErpFaturamentoDoDiaPage from '@/app/erp/faturamento/[lojaId]/[data]/page';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import ErpHistoricoPage from '@/app/erp/historico/page';
 import NivelUmPeriodoPage from '@/app/rodolfo/(painel)/erp/[slug]/dre/periodos/[inicio]/page';
 import { TelaDoDre } from '@/components/erp/telas/dre/dre';
@@ -232,6 +237,45 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     // De novo (duplo clique): "já fechado".
     expect(await rodar(() => dreDaSessao.acaoFecharPeriodo('2026-09-01', null, f))).toEqual({ redirect: '/erp/dre/periodos/2026-09-01?feito=ja-fechado' });
     expect(await a.dreFotografia.count()).toBe(1);
+  });
+
+  it('revisão de UX: período fechado AVISA ANTES e diz o que fazer: as recorrentes de setembro não vêm editáveis e o dia de faturamento traz a saída e o link; sem dre.ver não há link', async () => {
+    const dona = alcanceDe('DONO', 'rede');
+    como(dona, 'Marina');
+    atual.visao = { tipo: 'rede' };
+    atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }, { id: ids.mei, nome: 'Loja Meier', ativa: true }];
+    const quem = await avisoDePeriodos(a, dona, '/erp', HOJE);
+    expect(quem.fechados.map((p) => p.nome)).toContain('Setembro de 2026');
+    expect(quem.fechados.find((p) => p.nome === 'Setembro de 2026')).toMatchObject({ inicio: '2026-09-01', fim: '2026-09-30' });
+    expect(quem.emCurso).toBe('Outubro de 2026');
+    expect(quem.href).toBe('/erp/dre/periodos');
+    expect((await avisoDePeriodos(a, alcanceDe('OPERADOR', [ids.vp]), '/erp', HOJE)).href).toBeNull();
+    expect((await avisoDePeriodos(a, ALCANCE_FLOWFOODS, `/rodolfo/erp/${A.slug}`, HOJE)).href).toBe(`/rodolfo/erp/${A.slug}/dre/periodos`);
+    expect((await avisoDePeriodos(b, dona, '/erp', HOJE)).fechados).toEqual([]);
+
+    // As que repetem todo mês, em setembro (fechado): sem lista, sem botão; o aviso com a saída e o caminho para o mês de agora.
+    const recorrentes = nbsp(renderToStaticMarkup(await resolver(await ErpNovaDespesaPage({ searchParams: { modo: 'mes-passado', mes: '2026-09' } }))));
+    expect(recorrentes).toContain('O período Setembro de 2026 já foi fechado no DRE.');
+    expect(recorrentes).toContain('peça à FlowFoods para reabrir o período');
+    expect(recorrentes).toContain('Outubro de 2026, o período em aberto');
+    expect(recorrentes).toContain('href="/erp/dre/periodos"');
+    expect(recorrentes).not.toMatch(/Internet da Penha|Anuidade do contador|Lançar \d+ despesa/);
+    expect(recorrentes).toContain('Lançar as deste mês');
+
+    // O dia de faturamento num período fechado avisa no topo, com a saída.
+    const dia = nbsp(renderToStaticMarkup(await resolver(await ErpFaturamentoDoDiaPage({ params: { lojaId: ids.vp, data: '2026-09-12' }, searchParams: {} }))));
+    expect(dia).toContain('O período Setembro de 2026 já foi fechado no DRE.');
+    expect(dia).toContain('Para mexer em Setembro de 2026, peça à FlowFoods para reabrir o período.');
+    expect(dia).toContain('Este dia só pode ser consultado');
+    expect(dia).toContain('href="/erp/dre/periodos"');
+    expect(dia).not.toContain('Salvar o dia');
+
+    // Quem lança faturamento mas não abre Períodos (gerente da loja sem dre.ver): o aviso sem o link.
+    como(alcanceDe('OPERADOR', [ids.vp], ['faturamento.ver', 'faturamento.lancar']), 'Caio');
+    atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
+    const semLink = nbsp(renderToStaticMarkup(await resolver(await ErpFaturamentoDoDiaPage({ params: { lojaId: ids.vp, data: '2026-09-12' }, searchParams: {} }))));
+    expect(semLink).toContain('peça à FlowFoods para reabrir o período');
+    expect(semLink).not.toContain('Ver os períodos');
   });
 
   it('a página do período: 404 para início forjado, SEM_ACESSO para quem não fecha; a dona não tem o formulário de reabrir e o nível 1 tem', async () => {

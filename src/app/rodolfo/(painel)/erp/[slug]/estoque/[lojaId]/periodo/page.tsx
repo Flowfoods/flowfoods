@@ -21,7 +21,7 @@ export default async function ParceiroPeriodoDaLojaPage({ params, searchParams }
       base={base}
       contexto={ctx.parceiro.nome}
       feito={searchParams.feito}
-      pode={{ ajustar: true, contar: true, regras: true }}
+      pode={{ ajustar: true, contar: true, regras: true, periodos: true }}
       acoes={{ fechar: acaoIniciarFechamento.bind(null, ctx.parceiro.slug, s.loja.id), regras: acaoSalvarRegrasDaContagem.bind(null, ctx.parceiro.slug, s.loja.id) }}
       bloqueio={ctx.bloqueio}
     />

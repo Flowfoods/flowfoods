@@ -73,6 +73,7 @@ import {
 } from './contagem-campos';
 import type { Periodo } from './periodo-campos';
 import { periodoAnteriorDe, periodoDe, registrarPeriodo } from './periodos';
+import { saidaDoPeriodoFechado } from './periodo-fechado-campos';
 import { travarParaEscrever } from './periodo-trava';
 import { CONSERVACOES, type Conservacao } from './validade';
 import { formatarDinheiro, type Fracao, type Unidade } from './unidades';
@@ -759,7 +760,7 @@ export async function concluirContagem(
         if (c.tipo === 'FECHAMENTO') {
           const p = c.periodoId ? await tx.periodoApuracao.findUnique({ where: { id: c.periodoId }, select: { id: true, nome: true, inicio: true, fim: true, status: true } }) : null;
           if (!p) throw new Recusa({ ok: false, erros: { geral: 'O período deste fechamento não foi encontrado.' } });
-          if (p.status === 'FECHADO') throw new Recusa({ ok: false, erros: { geral: `O período ${p.nome} já foi fechado no DRE: o estoque dele não muda mais.` } });
+          if (p.status === 'FECHADO') throw new Recusa({ ok: false, erros: { geral: `O período ${p.nome} já foi fechado no DRE: o estoque dele não muda mais. ${saidaDoPeriodoFechado(p.nome)}` } });
           const { cobertura, regras } = await coberturaDaLoja(tx, lojaId, agora, c.id, p);
           if (!cobertura.atinge) throw new Recusa({ ok: false, erros: { geral: fraseAbaixoDoPiso(cobertura, regras) } });
         }
@@ -1001,7 +1002,7 @@ export async function iniciarFechamento(
           const registro = await registrarPeriodo(tx, periodo);
           if (!registro.ok) throw new Recusa({ ok: false, erros: { geral: registro.erro } });
           const reg = registro;
-          if (reg.status === 'FECHADO') throw new Recusa({ ok: false, erros: { geral: `O período ${reg.nome} já foi fechado no DRE: o estoque dele não muda mais.` } });
+          if (reg.status === 'FECHADO') throw new Recusa({ ok: false, erros: { geral: `O período ${reg.nome} já foi fechado no DRE: o estoque dele não muda mais. ${saidaDoPeriodoFechado(reg.nome)}` } });
           const ja = await tx.contagem.findFirst({ where: { lojaId, tipo: 'FECHAMENTO', periodoId: reg.id, status: { not: 'CANCELADA' } }, select: { id: true, status: true, fechadaEm: true } });
           if (ja?.status === 'ABERTA') return { ok: true as const, id: ja.id, jaFeito: true };
           if (ja) throw new Recusa({ ok: false, erros: { geral: `O estoque de ${periodo.nome} já foi fechado${ja.fechadaEm ? ` em ${quando(ja.fechadaEm)}` : ''}.` }, conflito: true });

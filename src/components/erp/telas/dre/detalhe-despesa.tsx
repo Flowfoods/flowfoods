@@ -11,6 +11,7 @@ import { formatarData } from '@/lib/erp/compra-campos';
 import { diasDaCompetencia, frasePagamento, rotuloDaCompetencia, ROTULO_DO_PAGAMENTO } from '@/lib/erp/despesa-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
+import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Linha, Painel, Selo, Vazio } from '../../ui/superficies';
@@ -25,6 +26,7 @@ export function TelaDaDespesa({
   hoje,
   feito,
   podeLancar,
+  periodosHref,
   bloqueio,
   acoes,
 }: {
@@ -34,6 +36,8 @@ export function TelaDaDespesa({
   hoje: string;
   feito?: string;
   podeLancar: boolean;
+  /** Para onde vai o "Ver os períodos" do aviso de período fechado; null = quem lê não abre Períodos. */
+  periodosHref: string | null;
   bloqueio: string | null;
   acoes: { pagar: AcaoDeCadastro; desfazer: AcaoDeCadastro; parar: AcaoDeCadastro; remover: AcaoDeCadastro };
 }) {
@@ -66,11 +70,7 @@ export function TelaDaDespesa({
         </Aviso>
       )}
       {feito && <Aviso tom="ok" titulo={feito} />}
-      {d.fechado && (
-        <Aviso tom="alerta" titulo={`Esta despesa cai no período ${d.fechado}, já fechado no DRE.`}>
-          Dá para pagar e mudar o vencimento. Valor, competência, linha e loja não mudam mais.
-        </Aviso>
-      )}
+      {d.fechado && <AvisoDoPeriodoFechado periodo={d.fechado} href={periodosHref} frase="Esta despesa cai nele: dá para pagar e mudar o vencimento, mas valor, competência, linha e loja não mudam mais." />}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
         <Painel titulo="Despesa">

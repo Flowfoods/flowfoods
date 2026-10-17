@@ -13,6 +13,7 @@
  */
 
 import { formatarData } from './compra-campos';
+import { fraseDoPeriodoFechado } from './periodo-fechado-campos';
 import type { ClienteDoParceiro } from './tenant';
 
 const chave = (parceiroId: string) => `erp-faturamento:${parceiroId}`;
@@ -40,7 +41,7 @@ export async function travarPeriodos(tx: ClienteDoParceiro): Promise<void> {
   await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp-periodos:${tx.parceiroId}`}, 0))::text AS "trava"`;
 }
 
-export const fraseDoPeriodoFechado = (nome: string) => `O período ${nome} já foi fechado no DRE: não dá para lançar, corrigir nem remover nele.`;
+export { fraseDoPeriodoFechado };
 
 /**
  * Das datas ("aaaa-mm-dd"), as que caem num período FECHADO, com o nome dele.

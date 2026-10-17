@@ -13,6 +13,7 @@ import { fraseDoNumero } from '@/lib/erp/faturamento-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { TrilhaDaPagina } from '../../shell/trilha';
+import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel } from '../../ui/superficies';
@@ -29,6 +30,7 @@ export function TelaDoDia({
   acao,
   remover,
   podeLancar,
+  verPeriodos,
   bloqueio,
 }: {
   dia: DiaDaLojaLido;
@@ -38,6 +40,8 @@ export function TelaDoDia({
   /** A action de remover um canal (já presa à loja e ao dia); ausente = sem permissão. */
   remover?: (canal: string) => AcaoDoDia;
   podeLancar: boolean;
+  /** Abre a tela Períodos (`dre.ver`): o aviso de período fechado só leva até lá se levar a algum lugar. */
+  verPeriodos: boolean;
   bloqueio: string | null;
 }) {
   const hoje = hojeNoRio();
@@ -93,9 +97,7 @@ export function TelaDoDia({
         </Aviso>
       )}
       {dia.fechado && (
-        <Aviso tom="alerta" titulo={`O período ${dia.fechado} já foi fechado no DRE.`}>
-          Este dia só pode ser consultado: não aceita lançar, corrigir nem remover.
-        </Aviso>
+        <AvisoDoPeriodoFechado periodo={dia.fechado} href={verPeriodos ? `${base.replace(/\/faturamento$/, '')}/dre/periodos` : null} frase="Este dia só pode ser consultado: não aceita lançar, corrigir nem remover." />
       )}
       {!podeLancar && !dia.fechado && !bloqueio && (
         <Aviso titulo="Você pode ver este dia.">Lançar é com quem tem “lançar faturamento” nesta loja.</Aviso>
