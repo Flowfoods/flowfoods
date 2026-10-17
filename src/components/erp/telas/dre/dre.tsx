@@ -11,6 +11,8 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { textoDoPercentual, type LinhaDoDre } from '@/lib/erp/dre-campos';
+import { textoDaMeta, textoDaVariacao, type AnoPassado } from '@/lib/erp/dre-metas-campos';
+import { rotuloDaRessalva } from '@/lib/erp/dre-fechamento-campos';
 import { CODIGO, codigoDoSubtotal } from '@/lib/erp/dre-plano';
 import type { DreDoPeriodo } from '@/lib/erp/dre';
 import { COR } from '@/lib/erp/modulos';
@@ -23,6 +25,10 @@ import { dataCurta } from '../faturamento/formato';
 
 export interface PermissoesDaTela {
   lancarDespesa: boolean;
+  /** `metas.editar` com a rede inteira: define as metas (Plano e metas). */
+  definirMetas?: boolean;
+  /** Fecha o período (`metas.editar` e `dre.ver`, com a rede inteira): vê o convite e o link para o fechamento. */
+  fecharPeriodo?: boolean;
   verFaturamento: boolean;
   verPrecos: boolean;
   /** A pessoa tem a rede inteira: pode alternar entre a rede e uma loja. */
@@ -53,6 +59,7 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
   /** Linha de despesa ou grupo sem valor: no celular fica escondida até a pessoa pedir (o DRE inteiro tem mais de 40 linhas). */
   const zerada = (l: LinhaDoDre) => (l.tipo === 'linha' || l.tipo === 'subtotal') && l.valorCentavos === 0 && l.codigo !== codigoDoSubtotal('RECEITA');
   const nZeradas = r.linhas.filter(zerada).length;
+  const temMetas = Object.keys(d.metas).length > 0;
   return (
     <div>
       {nZeradas > 0 && (
@@ -81,6 +88,19 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
               <span className="sm:hidden">% rec.</span>
               <span className="hidden sm:inline">% da receita</span>
             </th>
+            {temMetas && (
+              <>
+                <th scope="col" className="hidden h-10 px-3 text-right font-semibold sm:table-cell">
+                  Meta
+                </th>
+                <th scope="col" className="hidden h-10 px-3 text-right font-semibold lg:table-cell">
+                  Meta em R$
+                </th>
+                <th scope="col" className="hidden h-10 px-3 text-right font-semibold sm:table-cell sm:pr-5">
+                  Desvio
+                </th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody className="tabular-nums">
@@ -92,6 +112,7 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
             if (l.semContar.length) apoio.push(`sem contar ${l.semContar.join(' e ')}`);
             if (l.tipo !== 'cmv' && l.valorCentavos !== null && l.nota && l.tipo !== 'subtotal') apoio.push(l.nota);
             if (l.tipo === 'taxa' && l.valorCentavos === null) apoio.push(l.nota!);
+            const meta = d.metas[l.chave];
             return (
               <tr key={l.chave} data-zerada={zerada(l) ? '' : undefined} className={`${linha} ${l.tipo === 'cmv' ? 'text-suave' : ''}`}>
                 <th scope="row" className={`min-w-0 py-2 text-left align-top ${l.nivel === 1 ? 'pl-8 pr-2 font-normal sm:pl-10' : 'px-4 sm:px-5'} ${resultado || grupo ? '' : 'text-texto'}`}>
@@ -112,6 +133,12 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
                       )}
                     </span>
                   )}
+                  {meta && (
+                    <span className="block text-[12px] font-normal leading-snug text-suave sm:hidden">
+                      Meta {textoDaMeta(meta.metaBp)}
+                      {meta.desvioTexto ? ` · ${meta.desvioTexto} · ${meta.palavra}` : ` · ${meta.semComparacao}`}
+                    </span>
+                  )}
                 </th>
                 <td className="px-3 py-2 text-right align-top">
                   <span className="block min-h-6 leading-6">
@@ -123,6 +150,33 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
                     {l.percentualBp === null || l.valorCentavos === 0 ? <span className="font-normal text-suave">—</span> : <span className={resultado ? '' : 'font-normal'}>{textoDoPercentual(l.percentualBp)}</span>}
                   </span>
                 </td>
+                {temMetas && (
+                  <>
+                    <td className="hidden whitespace-nowrap px-3 py-2 text-right align-top font-normal sm:table-cell">
+                      <span className="block min-h-6 leading-6">{meta ? textoDaMeta(meta.metaBp) : <span className="text-suave">—</span>}</span>
+                    </td>
+                    <td className="hidden whitespace-nowrap px-3 py-2 text-right align-top font-normal lg:table-cell">
+                      <span className="block min-h-6 leading-6">{meta && meta.metaCentavos !== null ? formatarDinheiro(meta.metaCentavos) : <span className="text-suave">—</span>}</span>
+                    </td>
+                    <td className="hidden whitespace-nowrap px-3 py-2 text-right align-top sm:table-cell sm:pr-5">
+                      {meta ? (
+                        meta.desvioTexto ? (
+                          <>
+                            <span className="block min-h-6 leading-6">{meta.desvioTexto}</span>
+                            <span className="block text-[12px] font-normal leading-snug text-suave">{meta.palavra}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="block min-h-6 leading-6 font-normal text-suave">—</span>
+                            <span className="block text-[12px] font-normal leading-snug text-suave">{meta.semComparacao}</span>
+                          </>
+                        )
+                      ) : (
+                        <span className="block min-h-6 leading-6 font-normal text-suave">—</span>
+                      )}
+                    </td>
+                  </>
+                )}
               </tr>
             );
           })}
@@ -222,6 +276,111 @@ function PorLoja({ d, base }: { d: DreDoPeriodo; base: string }) {
   );
 }
 
+const QUANDO = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+
+/** Período fechado: a fotografia que a tela lê, com quem fechou, a versão e as ressalvas. */
+function Fechamento({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: PermissoesDaTela }) {
+  const f = d.fechamento;
+  if (d.status !== 'FECHADO' || !f) return null;
+  const n = f.ressalvas.length;
+  const todas = f.totalDeRessalvas;
+  return (
+    <Painel
+      titulo={`Fechado em ${QUANDO.format(f.fechadoEm).replace(',', ' às')} por ${f.fechadoPorNome} · versão ${f.versao}`}
+      subtitulo="Estes números são a fotografia do fechamento: a taxa do iFood, as metas e os nomes das linhas são os de quando fechou. Nada do que se faz depois muda esta tela."
+      acessorio={
+        pode.fecharPeriodo ? (
+          <Link href={`${raiz}/dre/periodos/${d.periodo.inicio}`} className={`${LINK_DE_TEXTO} text-[13px]`}>
+            Ver o fechamento
+          </Link>
+        ) : undefined
+      }
+    >
+      {n === 0 ? (
+        <p className="text-sm text-texto">Fechado sem ressalvas.</p>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm font-semibold text-texto">
+            <Selo tom="alerta">Fechado com ressalvas</Selo> <span className="ml-1">{n === 1 ? '1 ressalva' : `${n} ressalvas`}{todas !== null && todas !== n ? ` de ${todas}` : ''}</span>
+          </p>
+          <ul className="divide-y divide-linha rounded-[10px] border border-linha">
+            {f.ressalvas.map((r) => (
+              <li key={r.id} className="px-3 py-2.5 text-sm">
+                <span className="block font-medium text-texto">{r.titulo}</span>
+                <span className="block text-[12px] leading-snug text-suave">{rotuloDaRessalva[r.tipo]}. {r.detalhe}</span>
+              </li>
+            ))}
+          </ul>
+          {f.justificativa && (
+            <p className="text-[13px] text-texto">
+              <span className="font-semibold">Justificativa:</span> {f.justificativa}
+            </p>
+          )}
+        </div>
+      )}
+    </Painel>
+  );
+}
+
+/** O período terminou e ainda está aberto: o convite para fechar (só quem fecha). */
+function ConviteParaFechar({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: PermissoesDaTela }) {
+  if (!pode.fecharPeriodo || !d.encerrado || d.status === 'FECHADO') return null;
+  return (
+    <Aviso tom="neutro" titulo={`${d.periodo.nome} terminou e ainda está aberto.`}>
+      Enquanto estiver aberto, os números ainda mudam com cada lançamento. Fechar guarda uma fotografia que não muda mais.{' '}
+      <Link href={`${raiz}/dre/periodos/${d.periodo.inicio}`} className={LINK_DE_TEXTO}>
+        Conferir e fechar o período
+      </Link>
+    </Aviso>
+  );
+}
+
+const NOMES_DA_RECEITA: Record<string, string> = { bruta: 'Receita bruta', LOJA: 'Loja', DELIVERY_PROPRIO: 'Delivery próprio', IFOOD: 'iFood' };
+
+/** A receita contra as mesmas datas um ano antes (só a receita). Sem lançamento nenhum, vira uma frase. */
+function AnoPassadoPainel({ a }: { a: AnoPassado }) {
+  const semNada = a.linhas.every((l) => l.anteriorCentavos === null);
+  if (semNada) return <p className="text-[12px] leading-relaxed text-suave">Ano passado ({dataCurta(a.de)} a {dataCurta(a.ate)}): sem lançamento de faturamento no mesmo período.</p>;
+  return (
+    <Painel titulo="Receita contra o ano passado" subtitulo={`${dataCurta(a.de)} a ${dataCurta(a.ate)} do ano passado, as mesmas datas.`} semRespiro>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <caption className="sr-only">Receita deste período e do mesmo período do ano passado</caption>
+          <thead>
+            <tr className="bg-forte text-left text-[12px] text-suave">
+              <th scope="col" className="h-10 px-4 font-semibold sm:px-5">
+                Receita
+              </th>
+              <th scope="col" className="h-10 px-3 text-right font-semibold">
+                Agora
+              </th>
+              <th scope="col" className="h-10 px-3 text-right font-semibold">
+                Ano passado
+              </th>
+              <th scope="col" className="h-10 px-3 text-right font-semibold sm:px-5">
+                Variação
+              </th>
+            </tr>
+          </thead>
+          <tbody className="tabular-nums">
+            {a.linhas.map((l) => (
+              <tr key={l.chave} className={`border-t border-linha ${l.chave === 'bruta' ? 'font-semibold' : ''}`}>
+                <th scope="row" className={`h-11 text-left ${l.chave === 'bruta' ? 'px-4 sm:px-5' : 'pl-8 pr-2 font-normal sm:pl-10'}`}>
+                  {NOMES_DA_RECEITA[l.chave]}
+                </th>
+                <td className="px-3 text-right">{l.atualCentavos === 0 ? <span className="font-normal text-suave">—</span> : formatarDinheiro(l.atualCentavos)}</td>
+                <td className="px-3 text-right">{l.anteriorCentavos === null ? <span className="font-normal text-suave">sem lançamento</span> : formatarDinheiro(l.anteriorCentavos)}</td>
+                <td className="px-3 text-right sm:px-5">{l.variacaoBp === null ? <span className="font-normal text-suave">—</span> : textoDaVariacao(l.variacaoBp)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {a.semVariacaoPorque && <p className="border-t border-linha px-4 py-2.5 text-[12px] text-suave sm:px-5">{a.semVariacaoPorque}</p>}
+    </Painel>
+  );
+}
+
 export function TelaDoDre({
   d,
   base,
@@ -298,6 +457,7 @@ export function TelaDoDre({
             </Link>
           )}
           {d.emCurso ? <Selo tom="alerta">Parcial · até ontem</Selo> : d.status === 'FECHADO' ? <Selo tom="ok">Período fechado</Selo> : <Selo>Período encerrado</Selo>}
+          {d.fechamento && d.fechamento.ressalvas.length > 0 && <Selo tom="alerta">Fechado com ressalvas</Selo>}
         </div>
       </PageHeader>
 
@@ -360,6 +520,9 @@ export function TelaDoDre({
         </Aviso>
       )}
 
+      <Fechamento d={d} raiz={raiz} pode={pode} />
+      <ConviteParaFechar d={d} raiz={raiz} pode={pode} />
+
       <Painel
         titulo={loja ? `Resultado da loja · ${loja.nome}` : 'Resultado da rede'}
         subtitulo={
@@ -368,15 +531,28 @@ export function TelaDoDre({
             : 'Nenhum dia apurado ainda neste período.'
         }
         semRespiro
-        acessorio={r.faltaConfigurarTaxa ? <Selo tom="alerta">Falta configurar a taxa do iFood</Selo> : undefined}
+        acessorio={
+          r.faltaConfigurarTaxa || pode.definirMetas ? (
+            <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+              {r.faltaConfigurarTaxa && <Selo tom="alerta">Falta configurar a taxa do iFood</Selo>}
+              {pode.definirMetas && (
+                <Link href={`${raiz}/dre/plano`} className={`${LINK_DE_TEXTO} text-[13px]`}>
+                  {Object.keys(d.metas).length > 0 ? 'Metas' : 'Definir metas'}
+                </Link>
+              )}
+            </span>
+          ) : undefined
+        }
       >
         {d.lojasDoEscopo.length === 0 ? <Vazio titulo="Nenhuma loja no seu acesso.">Peça a quem cuida da equipe para incluir as lojas em que você trabalha.</Vazio> : <Tabela d={d} raiz={raiz} pode={pode} />}
       </Painel>
 
       {d.porLoja && <PorLoja d={d} base={base} />}
 
+      {d.anoPassado && <AnoPassadoPainel a={d.anoPassado} />}
+
       <p className="text-[12px] leading-relaxed text-suave">
-        Despesa conta pela competência (o mês a que pertence), não pelo dia em que foi paga. A taxa do iFood é estimada pela taxa configurada hoje. O CMV ainda não entra no DRE (em breve): até lá, margem e resultados saem sem ele.{' '}
+        Despesa conta pela competência (o mês a que pertence), não pelo dia em que foi paga. {d.status === 'FECHADO' ? 'A taxa do iFood é a estimada pela taxa de quando o período fechou.' : 'A taxa do iFood é estimada pela taxa configurada hoje.'} O CMV ainda não entra no DRE (em breve): até lá, margem e resultados saem sem ele.{Object.keys(d.metas).length > 0 ? ' O desvio é o realizado menos a meta, em pontos percentuais (pp); menos de 0,05 pp é “na meta”.' : ''}{' '}
         {loja ? 'A loja não recebe rateio da rede.' : 'Receita por canal nas três primeiras linhas.'}
       </p>
     </div>

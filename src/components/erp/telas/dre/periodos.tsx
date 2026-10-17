@@ -16,12 +16,12 @@ import { ListaHistorico } from '../historico/lista-historico';
 import type { AcaoLocal } from './estado';
 import { FormRegra } from './form-regra';
 
-export function TelaDosPeriodos({ s, raiz, contexto, podeMudar, podeVerDre, acao, bloqueio }: { s: SituacaoDosPeriodos; raiz: string; contexto: string; podeMudar: boolean; podeVerDre: boolean; acao: AcaoLocal; bloqueio: string | null }) {
+export function TelaDosPeriodos({ s, raiz, contexto, podeMudar, podeVerDre, podeFechar, acao, bloqueio }: { s: SituacaoDosPeriodos; raiz: string; contexto: string; podeMudar: boolean; podeVerDre: boolean; podeFechar: boolean; acao: AcaoLocal; bloqueio: string | null }) {
   const efetiva = s.efetiva;
   const desde = s.regras.filter((r) => !r.pendente).slice(-1)[0];
   return (
     <div className="space-y-6">
-      <PageHeader icone="estoque" cor={COR.dre} titulo="Períodos" subtitulo={`${contexto} · como o resultado e o estoque fecham`} />
+      <PageHeader icone="estoque" cor={COR.dre} titulo="Períodos" subtitulo={`${contexto} · como o resultado e o estoque fecham, e o fechamento de cada período`} />
       {bloqueio && (
         <Aviso tom="alerta" titulo="Somente leitura.">
           {bloqueio}
@@ -71,6 +71,12 @@ export function TelaDosPeriodos({ s, raiz, contexto, podeMudar, podeVerDre, acao
                 {podeVerDre && (
                   <Link href={`${raiz}/dre?periodo=${p.inicio}`} className={LINK_DE_TEXTO}>
                     Ver o DRE
+                  </Link>
+                )}
+                {podeFechar && !p.atual && p.inicio < s.hoje && (
+                  <Link href={`${raiz}/dre/periodos/${p.inicio}`} className={LINK_DE_TEXTO}>
+                    {p.status === 'FECHADO' ? 'Ver o fechamento' : 'Fechar'}
+                    <span className="sr-only"> {p.nome}</span>
                   </Link>
                 )}
               </span>

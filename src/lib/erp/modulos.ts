@@ -114,7 +114,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 2.2a';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 2.2b';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -410,14 +410,14 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               href: `${base}/dre/periodos`,
               rotulo: 'Períodos',
               icone: 'estoque',
-              subtitulo: 'Como o período fecha: mensal, quinzenal ou semanal',
+              subtitulo: 'Como o período fecha (mensal, quinzenal ou semanal) e o fechamento de cada um',
               permissao: 'dre.ver',
             },
             {
               href: `${base}/dre/plano`,
-              rotulo: 'Plano de contas',
+              rotulo: 'Plano e metas',
               icone: 'cadastro',
-              subtitulo: 'As linhas do DRE e os nomes que a casa usa',
+              subtitulo: 'As linhas do DRE, os nomes que a casa usa e a meta de cada uma',
               permissao: 'metas.editar',
             },
           ],

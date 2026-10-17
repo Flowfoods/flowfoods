@@ -15,6 +15,8 @@ import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
 import type { EstadoCadastro, EstadoLocal, EstadoMesPassado } from '@/components/erp/telas/dre/estado';
 import {
   executarCriarLinha,
+  executarFechar,
+  executarSalvarMetas,
   executarEditarDespesa,
   executarLancarDespesa,
   executarMesPassado,
@@ -110,4 +112,19 @@ export async function acaoOcultarLinhaDoPlano(anterior: EstadoLocal, form: FormD
   const { ctx, negado } = await paraOPlano();
   if (negado) return recusadoLocal(anterior, negado);
   return executarOcultarLinha(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, anterior, form, RAIZ);
+}
+
+// ------------------------------------------------------------------ metas e fechamento do período (2.2b)
+
+export async function acaoSalvarMetas(anterior: EstadoLocal, form: FormData): Promise<EstadoLocal> {
+  const { ctx, negado } = await paraOPlano();
+  if (negado) return recusadoLocal(anterior, negado);
+  return executarSalvarMetas(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, anterior, form, RAIZ);
+}
+
+/** Fechar o período que começa em `inicio` (preso à URL). Reabrir NÃO existe aqui: é só do nível 1. */
+export async function acaoFecharPeriodo(inicio: string, anterior: EstadoLocal, form: FormData): Promise<EstadoLocal> {
+  const { ctx, negado } = await paraOPlano();
+  if (negado) return recusadoLocal(anterior, negado);
+  return executarFechar(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(inicio), anterior, form, RAIZ);
 }

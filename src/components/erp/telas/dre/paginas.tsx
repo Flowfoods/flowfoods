@@ -11,6 +11,8 @@ import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { dinheiroParaCampo } from '@/lib/erp/unidades';
 import { tipoDaCompetencia, ehFiltroDeSituacao, lerMesDaLista, type FiltroDeSituacao } from '@/lib/erp/despesa-campos';
 import { faltaLancar, lojasParaDespesa, listarDespesas, obterDespesa, podeVerDespesas, recorrentesEmFalta } from '@/lib/erp/despesas';
+import { recusaDoFechamento, situacaoDoFechamento } from '@/lib/erp/dre-fechamento';
+import { situacaoDasMetas } from '@/lib/erp/dre-metas';
 import { chaveDaLinha } from '@/lib/erp/dre-plano';
 import { COR } from '@/lib/erp/modulos';
 import { situacaoDosPeriodos } from '@/lib/erp/periodos';
@@ -25,10 +27,11 @@ import { Aviso } from '../../ui/superficies';
 import { Voltar } from '../cadastro/partes';
 import { TelaDaDespesa } from './detalhe-despesa';
 import { TelaDeDespesas } from './despesas';
-import { fraseDaDespesa, fraseDoMesPassado, type AcaoDeCadastro, type AcaoLocal, type AcaoMesPassado } from './estado';
+import { fraseDaDespesa, fraseDoMesPassado, fraseDoPeriodo, type AcaoDeCadastro, type AcaoLocal, type AcaoMesPassado } from './estado';
 import { FormDespesa, type InicialDaDespesa } from './form-despesa';
 import { FormMesPassado } from './form-mes-passado';
 import { TelaDoPlano } from './plano';
+import { TelaDoFechamento } from './periodo-fechamento';
 import { TelaDosPeriodos } from './periodos';
 
 type Query = Record<string, string | string[] | undefined>;
@@ -200,10 +203,22 @@ export async function PaginaDeEditarDespesa({ c, id, acao }: { c: ContextoDaTela
 
 export async function PaginaDosPeriodos({ c, podeMudar, acao }: { c: ContextoDaTela; podeMudar: boolean; acao: AcaoLocal }) {
   const s = await situacaoDosPeriodos(c.cliente);
-  return <TelaDosPeriodos s={s} raiz={c.raiz} contexto={c.contexto} podeMudar={podeMudar} podeVerDre={pode(c.alcance, 'dre.ver')} acao={acao} bloqueio={c.bloqueio} />;
+  return <TelaDosPeriodos s={s} raiz={c.raiz} contexto={c.contexto} podeMudar={podeMudar} podeVerDre={pode(c.alcance, 'dre.ver')} podeFechar={recusaDoFechamento(c.alcance) === null} acao={acao} bloqueio={c.bloqueio} />;
 }
 
-export async function PaginaDoPlano({ c, acoes }: { c: ContextoDaTela; acoes: { criar: AcaoLocal; renomear: AcaoLocal; ocultar: AcaoLocal } }) {
-  const plano = await planoDoParceiro(c.cliente);
-  return <TelaDoPlano plano={plano} contexto={c.contexto} acoes={acoes} bloqueio={c.bloqueio} />;
+/** Um período: as condições para fechar, a fotografia, reabrir e as versões. Quem não fecha, ou período que não existe: 404. */
+export async function PaginaDoFechamento({ c, inicio, query, acoes }: { c: ContextoDaTela; inicio: string; query: Query; acoes: { fechar: AcaoLocal; reabrir?: AcaoLocal } }) {
+  const s = await situacaoDoFechamento(c.cliente, c.alcance, inicio);
+  if (!s) notFound();
+  return (
+    <>
+      <TrilhaDaPagina itens={[{ rotulo: s.periodo.nome }]} />
+      <TelaDoFechamento s={s} raiz={c.raiz} contexto={c.contexto} feito={fraseDoPeriodo(um(query.feito)) ?? null} acoes={acoes} bloqueio={c.bloqueio} />
+    </>
+  );
+}
+
+export async function PaginaDoPlano({ c, acoes }: { c: ContextoDaTela; acoes: { criar: AcaoLocal; renomear: AcaoLocal; ocultar: AcaoLocal; metas: AcaoLocal } }) {
+  const [plano, metas] = await Promise.all([planoDoParceiro(c.cliente), situacaoDasMetas(c.cliente, c.alcance)]);
+  return <TelaDoPlano plano={plano} metas={metas} contexto={c.contexto} acoes={acoes} bloqueio={c.bloqueio} />;
 }

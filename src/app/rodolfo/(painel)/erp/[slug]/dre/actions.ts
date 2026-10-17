@@ -13,6 +13,9 @@ import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
 import type { EstadoCadastro, EstadoLocal, EstadoMesPassado } from '@/components/erp/telas/dre/estado';
 import {
   executarCriarLinha,
+  executarFechar,
+  executarReabrir,
+  executarSalvarMetas,
   executarEditarDespesa,
   executarLancarDespesa,
   executarMesPassado,
@@ -106,4 +109,25 @@ export async function acaoOcultarLinhaDoPlano(slug: string, anterior: EstadoLoca
   const { ctx, negado, raiz } = await paraOPlano(slug, 'erp_dre_linha_ocultar');
   if (negado) return recusadoLocal(anterior, negado);
   return executarOcultarLinha(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, anterior, form, raiz);
+}
+
+// ------------------------------------------------------------------ metas e fechamento do período (2.2b)
+
+export async function acaoSalvarMetas(slug: string, anterior: EstadoLocal, form: FormData): Promise<EstadoLocal> {
+  const { ctx, negado, raiz } = await paraOPlano(slug, 'erp_dre_metas');
+  if (negado) return recusadoLocal(anterior, negado);
+  return executarSalvarMetas(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, anterior, form, raiz);
+}
+
+export async function acaoFecharPeriodo(slug: string, inicio: string, anterior: EstadoLocal, form: FormData): Promise<EstadoLocal> {
+  const { ctx, negado, raiz } = await paraOPlano(slug, 'erp_dre_fechar_periodo');
+  if (negado) return recusadoLocal(anterior, negado);
+  return executarFechar(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(inicio), anterior, form, raiz);
+}
+
+/** Reabrir é só do nível 1: esta action só existe aqui, e a regra confere `nivel === 'FLOWFOODS'` de novo. */
+export async function acaoReabrirPeriodo(slug: string, inicio: string, anterior: EstadoLocal, form: FormData): Promise<EstadoLocal> {
+  const { ctx, negado, raiz } = await paraOPlano(slug, 'erp_dre_reabrir_periodo');
+  if (negado) return recusadoLocal(anterior, negado);
+  return executarReabrir(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(inicio), anterior, form, raiz);
 }
