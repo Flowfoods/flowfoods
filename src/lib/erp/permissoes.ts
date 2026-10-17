@@ -33,6 +33,18 @@
  */
 export const VERSAO_DO_CATALOGO = 2;
 
+/** O que cada versão do catálogo acrescentou (a 1 é o começo). Perfil próprio é fotografia: não ganha estas sozinho. */
+export const NOVAS_NO_CATALOGO: Readonly<Record<number, readonly string[]>> = { 2: ['producao.planejar'] };
+
+/** Funções que nasceram DEPOIS da versão em que o perfil próprio foi feito e que ele não tem: a Equipe avisa e a pessoa marca à mão. */
+export function novidadesQueOPerfilNaoTem(catalogoVersao: number, permissoes: readonly string[]): string[] {
+  const tem = new Set(permissoes);
+  return Object.entries(NOVAS_NO_CATALOGO)
+    .filter(([v]) => Number(v) > catalogoVersao)
+    .flatMap(([, lista]) => lista)
+    .filter((p) => !tem.has(p));
+}
+
 export interface DefinicaoDePermissao {
   rotulo: string;
   /** Checada com `lojaId`: só passa se a loja estiver no alcance da pessoa. */

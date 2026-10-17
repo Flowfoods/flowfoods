@@ -22,7 +22,7 @@ export default async function ErpLotePage({ params, searchParams }: { params: { 
       d={d}
       base="/erp/producao"
       feito={fraseDoEstoque(searchParams.feito)}
-      pode={{ registrar, estornar: registrar && pode(ctx.alcance, 'estoque.ajustar', { lojaId }) }}
+      pode={{ registrar, estornar: registrar && pode(ctx.alcance, 'estoque.ajustar', { lojaId }), planejar: pode(ctx.alcance, 'producao.planejar', { lojaId }) }}
       hrefs={{ requisicao: veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null, estoque: pode(ctx.alcance, 'estoque.ver', { lojaId }) ? `/erp/estoque/${lojaId}` : null }}
       acoes={{ iniciar: acaoIniciarProducao.bind(null, lojaId, d.ordem.id), cancelar: acaoCancelarProducao.bind(null, lojaId, d.ordem.id), estornar: acaoEstornarProducao.bind(null, lojaId, d.ordem.id) }}
       bloqueio={ctx.bloqueio}

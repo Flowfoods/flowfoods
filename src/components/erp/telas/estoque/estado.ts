@@ -59,6 +59,9 @@ const FEITO: Readonly<Record<string, string>> = {
   'lote-ja-cancelado': 'Este lote já estava cancelado.',
   estornado: 'Lote estornado: o que ele pôs no estoque foi tirado, com o antes e o depois no livro.',
   'ja-estornado': 'Este lote já tinha sido estornado: nada mudou de novo.',
+  // 3.2
+  'lista-confirmada': 'Lista confirmada: os lotes estão no quadro e as requisições dos insumos já estão com o estoque. Nada saiu do estoque ainda.',
+  'lista-ja-confirmada': 'Esta lista já tinha sido confirmada (por outra pessoa ou outra aba): nada foi gravado de novo.',
 };
 
 export const fraseDoEstoque = (feito: string | undefined) => fraseDe(FEITO, feito);

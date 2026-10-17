@@ -41,13 +41,13 @@ export function TelaLojasDoEstoque({
   base: string;
   contexto?: string;
   /** Produção: para onde a loja leva ("nova" = planejar um lote nela; padrão = o quadro). */
-  destino?: 'quadro' | 'nova';
+  destino?: 'quadro' | 'nova' | 'lista';
   /** Produção/nova: o que vai junto ao link da loja ("?ficha=…", vindo do botão Produzir da ficha). */
   consulta?: string;
 }) {
   return (
     <div className="space-y-6">
-      <PageHeader icone={qual === 'producao' ? 'producao' : 'estoque'} cor={qual === 'producao' ? COR.producao : COR.estoque} titulo={destino === 'nova' ? 'Nova produção: em qual loja?' : TITULO[qual]} subtitulo={[contexto, APOIO[qual]].filter(Boolean).join(' · ')} />
+      <PageHeader icone={qual === 'producao' ? 'producao' : 'estoque'} cor={qual === 'producao' ? COR.producao : COR.estoque} titulo={destino === 'nova' ? 'Nova produção: em qual loja?' : destino === 'lista' ? 'Lista do dia: de qual loja?' : TITULO[qual]} subtitulo={[contexto, APOIO[qual]].filter(Boolean).join(' · ')} />
       <Painel semRespiro>
         {lojas.length === 0 ? (
           <Vazio titulo="Nenhuma loja no seu acesso.">Peça a quem cuida da equipe para incluir as lojas em que você trabalha.</Vazio>
@@ -75,8 +75,8 @@ export function TelaLojasDoEstoque({
 }
 
 /** Contagens: `<loja>/periodo` só existe com o estoque aberto; antes disso a loja leva à abertura. */
-function destinoDaLoja(qual: Qual, base: string, l: { id: string; estado?: EstadoDoEstoque }, destino?: 'quadro' | 'nova') {
-  if (qual === 'producao') return destino === 'nova' ? `${base}/${l.id}/nova` : `${base}/${l.id}`;
+function destinoDaLoja(qual: Qual, base: string, l: { id: string; estado?: EstadoDoEstoque }, destino?: 'quadro' | 'nova' | 'lista') {
+  if (qual === 'producao') return destino === 'nova' ? `${base}/${l.id}/nova` : destino === 'lista' ? `${base}/${l.id}/lista` : `${base}/${l.id}`;
   if (qual === 'contagens') return l.estado === 'ABERTO' ? `${base}/${l.id}/periodo` : `${base}/${l.id}`;
   return `${base}/${l.id}/${qual}`;
 }

@@ -36,20 +36,24 @@
     "hash": "9ad4bc2dc6f5e416"
   },
   "producao": {
-    "versao": 1,
-    "hash": "41fea1a55f507b28"
+    "versao": 2,
+    "hash": "3b75e5a40e69a84f"
   },
   "producao-quadro": {
-    "versao": 1,
-    "hash": "95aa845b71c0c030"
+    "versao": 2,
+    "hash": "66df05b3dbd75d38"
   },
   "producao-nova": {
     "versao": 1,
     "hash": "6f543f66c49319af"
   },
-  "producao-lote": {
+  "producao-lista": {
     "versao": 1,
-    "hash": "822e367430bdbc47"
+    "hash": "113eed3e551f09ca"
+  },
+  "producao-lote": {
+    "versao": 2,
+    "hash": "27b58c4e598fcbc9"
   },
   "producao-concluir": {
     "versao": 1,
@@ -168,8 +172,8 @@
     "hash": "93da5f04aa8b2505"
   },
   "equipe": {
-    "versao": 1,
-    "hash": "15d3af5a44b272be"
+    "versao": 2,
+    "hash": "5ffb6200b6bdf937"
   },
   "historico": {
     "versao": 1,

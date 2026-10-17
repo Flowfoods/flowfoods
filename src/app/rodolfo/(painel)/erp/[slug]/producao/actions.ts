@@ -11,11 +11,13 @@ import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
 import type { Permissao } from '@/lib/erp/permissoes';
 import type { EstadoEstoque } from '@/components/erp/telas/estoque/estado';
 import { recusadoNoEstoque } from '@/components/erp/telas/estoque/executar';
-import { executarCancelarLote, executarConcluir, executarEstornar, executarIniciar, executarPlanejar } from '@/components/erp/telas/producao/executar';
+import { executarCancelarLote, executarConcluir, executarConfirmarLista, executarEstornar, executarIniciar, executarPlanejar } from '@/components/erp/telas/producao/executar';
 
-async function preparar(slug: string, lojaId: string, permissao: Permissao) {
+/** `permissao` pode ser uma lista: passa quem tem QUALQUER uma (cancelar: o lote avulso pede "registrar", o da lista pede "definir"). */
+async function preparar(slug: string, lojaId: string, permissao: Permissao | readonly Permissao[]) {
   const ctx = await exigirParceiro(slug);
-  const negado = recusaDaAcao(ctx, permissao, { lojaId: String(lojaId) }) ?? ctx.bloqueio;
+  const recusas = (typeof permissao === 'string' ? [permissao] : permissao).map((p) => recusaDaAcao(ctx, p, { lojaId: String(lojaId) }));
+  const negado = (recusas.every(Boolean) ? recusas[0] : null) ?? ctx.bloqueio;
   return { ctx, negado, base: `/rodolfo/erp/${ctx.parceiro.slug}/producao`, autor: { nome: ctx.sessao.autorNome, userId: ctx.sessao.userId } };
 }
 
@@ -44,8 +46,16 @@ export async function acaoConcluirProducao(slug: string, lojaId: string, id: str
   return executarConcluir(ctx.cliente, ctx.alcance, autor, String(lojaId), String(id), anterior, form, base);
 }
 
+/** Confirmar a lista do dia (3.2): "definir a lista do dia" NA loja. */
+export async function acaoConfirmarLista(slug: string, lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base, autor } = await preparar(slug, lojaId, 'producao.planejar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_producao_confirmar_lista', lojaId);
+  return executarConfirmarLista(ctx.cliente, ctx.alcance, autor, String(lojaId), anterior, form, base);
+}
+
 export async function acaoCancelarProducao(slug: string, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
-  const { ctx, negado, base, autor } = await preparar(slug, lojaId, 'producao.registrar');
+  const { ctx, negado, base, autor } = await preparar(slug, lojaId, ['producao.registrar', 'producao.planejar']);
   if (negado) return recusadoNoEstoque(anterior, negado);
   await auditar(ctx, 'erp_producao_cancelar', lojaId);
   return executarCancelarLote(ctx.cliente, ctx.alcance, autor, String(lojaId), String(id), anterior, form, base);

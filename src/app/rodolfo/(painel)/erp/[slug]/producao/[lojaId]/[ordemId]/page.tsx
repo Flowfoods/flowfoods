@@ -22,7 +22,7 @@ export default async function ParceiroLotePage({ params, searchParams }: { param
       base={`${raiz}/producao`}
       contexto={ctx.parceiro.nome}
       feito={fraseDoEstoque(searchParams.feito)}
-      pode={{ registrar: true, estornar: true }}
+      pode={{ registrar: true, estornar: true, planejar: true }}
       hrefs={{ requisicao: `${raiz}/estoque/${lojaId}/requisicoes`, estoque: `${raiz}/estoque/${lojaId}` }}
       acoes={{
         iniciar: acaoIniciarProducao.bind(null, ctx.parceiro.slug, lojaId, d.ordem.id),

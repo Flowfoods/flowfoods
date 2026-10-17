@@ -10,6 +10,8 @@ import type { Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { ResultadoEstoque } from '@/lib/erp/estoque';
 import { cancelarProducao, concluirProducao, estornarProducao, iniciarProducao, planejarProducao, type Autor } from '@/lib/erp/producao';
+import { confirmarLista } from '@/lib/erp/lista-do-dia';
+import { lerRascunho } from '@/lib/erp/lista-do-dia-campos';
 import { linhasDoPedido } from '../requisicoes/executar';
 import type { EstadoEstoque } from '../estoque/estado';
 
@@ -57,4 +59,20 @@ export async function executarCancelarLote(cliente: ClienteDoParceiro, alcance: 
 export async function executarEstornar(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData, base: string) {
   const r = await estornarProducao(cliente, alcance, lojaId, id, { versao: form.get('versao'), motivo: form.get('motivo'), confirmarNegativo: form.get('confirmarNegativo') }, autor);
   return concluir(r, anterior, base, (x) => `${base}/${lojaId}/${x}`, 'estornado', 'ja-estornado');
+}
+
+/**
+ * Confirmar a lista do dia (3.2): o rascunho vem nos campos `l` (ficha~quanto) e o dia em `dia`. O servidor lê tudo de novo e
+ * grava os lotes numa transação só; ao terminar, volta para a lista do dia (com o aviso de que os lotes estão no quadro).
+ */
+export async function executarConfirmarLista(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const bruto = form.getAll('l').filter((v): v is string => typeof v === 'string');
+  const lido = lerRascunho(bruto);
+  const dia = typeof form.get('dia') === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(String(form.get('dia'))) ? String(form.get('dia')) : '';
+  // Passou de 30 linhas: nada é cortado em silêncio (cortar seria gravar menos do que a pessoa viu).
+  if (lido.excedeu) return { ok: false as const, erros: { geral: 'A lista passa de 30 linhas: tire algumas e confirme o resto depois.' }, vez: vezDe(anterior) };
+  const r = await confirmarLista(cliente, alcance, lojaId, { dia, linhas: lido.linhas, envio: form.get('envio') }, autor);
+  if (!r.ok) return { ok: false as const, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
+  revalidatePath(base, 'layout');
+  redirect(`${base}/${lojaId}/lista?${dia ? `dia=${dia}&` : ''}feito=${r.jaFeito ? 'lista-ja-confirmada' : 'lista-confirmada'}`);
 }

@@ -39,13 +39,13 @@ export function FormComecar({ acao, versao, recarregar }: { acao: AcaoDeEstoque;
   );
 }
 
-export function FormCancelarLote({ acao, versao, recarregar }: { acao: AcaoDeEstoque; versao: number; recarregar: string }) {
+export function FormCancelarLote({ acao, versao, recarregar, daLista = false }: { acao: AcaoDeEstoque; versao: number; recarregar: string; daLista?: boolean }) {
   const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
   if (!aberto && !estado) {
     return (
       <button type="button" onClick={() => setAberto(true)} className={classeDeBotao('secundario', 'w-full sm:w-auto')}>
-        Cancelar este lote
+        {daLista ? 'Tirar da lista' : 'Cancelar este lote'}
       </button>
     );
   }
@@ -54,7 +54,7 @@ export function FormCancelarLote({ acao, versao, recarregar }: { acao: AcaoDeEst
       <input type="hidden" name="versao" value={versao} />
       <div>
         <label htmlFor="cancelar-lote-motivo" className={ROTULO}>
-          Por que o lote sai?
+          {daLista ? 'Por que o lote sai da lista?' : 'Por que o lote sai?'}
         </label>
         <input
           id="cancelar-lote-motivo"
@@ -75,8 +75,8 @@ export function FormCancelarLote({ acao, versao, recarregar }: { acao: AcaoDeEst
       </div>
       <ErroGeral estado={estado} recarregar={recarregar} />
       <div className="flex flex-col gap-2 sm:flex-row">
-        <BotaoEnviar variante="perigo" pendente="Cancelando…">
-          Cancelar o lote
+        <BotaoEnviar variante="perigo" pendente={daLista ? 'Tirando…' : 'Cancelando…'}>
+          {daLista ? 'Tirar da lista' : 'Cancelar o lote'}
         </BotaoEnviar>
         <button type="button" onClick={() => setAberto(false)} className={classeDeBotao('fantasma')}>
           Manter

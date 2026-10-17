@@ -363,3 +363,31 @@ export function fraseDoCoberto(paraFichas: readonly string[]): string {
   const lista = n === 1 ? paraFichas[0] : `${paraFichas.slice(0, -1).join(', ')} e ${paraFichas[n - 1]}`;
   return `Produza antes de ${lista}.`;
 }
+
+// ================================================================ o endereço da tela
+
+/**
+ * O endereço da lista com o dia e o rascunho (`?dia=…&l=ficha~quanto`). O rascunho mora na URL: a prévia é uma página
+ * comum (sem estado escondido), dá para recarregar, voltar e mandar o link. Hoje não precisa de `dia`.
+ */
+export function hrefDaLista(aqui: string, dia: string, hoje: string, linhas: readonly LinhaDoRascunho[]): string {
+  const p: string[] = [];
+  if (dia !== hoje) p.push(`dia=${dia}`);
+  for (const l of linhas) p.push(`l=${encodeURIComponent(linhaNaUrl(l))}`);
+  return p.length ? `${aqui}?${p.join('&')}` : aqui;
+}
+
+/**
+ * O que a página lê da URL: o dia, o rascunho e, quando veio do formulário "Pôr na lista" (`f` e `q`), a linha nova —
+ * a página a junta ao rascunho e redireciona para o endereço limpo (`l` repetido), que é o que os outros links usam.
+ */
+export function lerPaginaDaLista(
+  sp: { dia?: unknown; l?: string | readonly string[]; f?: unknown; q?: unknown },
+  hoje: string,
+): { dia: string; linhas: LinhaDoRascunho[]; excedeu: boolean; nova: LinhaDoRascunho | null } {
+  const { dia } = lerDiaDaLista(sp.dia, hoje);
+  const r = lerRascunho(sp.l);
+  const f = typeof sp.f === 'string' && ID.test(sp.f) ? sp.f : null;
+  const q = typeof sp.q === 'string' ? sp.q.trim().slice(0, 20) : '';
+  return { dia, linhas: r.linhas, excedeu: r.excedeu, nova: f ? { fichaId: f, quantidade: q } : null };
+}

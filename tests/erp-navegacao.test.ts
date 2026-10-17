@@ -68,7 +68,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      Produção: ['Lotes'],
+      Produção: ['Lotes', 'Lista do dia'],
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos', 'Plano e metas'],
       'Rede e Equipe': ['Lojas e marcas', 'Equipe', 'Histórico', 'Seu acesso'],
     });
@@ -88,7 +88,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      Produção: ['Lotes'],
+      Produção: ['Lotes', 'Lista do dia'],
       // 2.2a: o gerente vê e lança despesa, vê o DRE e o período; plano de contas e período são do dono (rede inteira).
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos'],
       'Rede e Equipe': ['Lojas e marcas', 'Histórico', 'Seu acesso'],
@@ -108,7 +108,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(abasPorArea(OPERADOR)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições'],
-      Produção: ['Lotes'],
+      Produção: ['Lotes', 'Lista do dia'],
       'Rede e Equipe': ['Lojas e marcas', 'Seu acesso'],
     });
     expect(acoesDaNavegacao(navegacaoDoParceiro(OPERADOR)).map((a) => a.rotulo)).toEqual(['Nova produção']);
@@ -367,6 +367,9 @@ const ROTAS_ATIVAS: [string, string][] = [
   [`/producao/${LOJA}/nova`, 'Lotes'],
   [`/producao/${LOJA}/o1`, 'Lotes'],
   [`/producao/${LOJA}/o1/concluir`, 'Lotes'],
+  // 3.2: a lista do dia (a escolha da loja e a lista dela) acende a aba própria; "lista" nunca cai no lote (`[ordemId]`).
+  ['/producao/lista', 'Lista do dia'],
+  [`/producao/${LOJA}/lista`, 'Lista do dia'],
 ];
 
 describe('UX.9 · itemAtivo acende a aba certa em cada rota profunda', () => {
@@ -450,10 +453,10 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     }
   });
 
-  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das das fases 2.1, 2.2a e 3.1 (faturamento, DRE, despesas e produção)', () => {
+  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das das fases 2.1, 2.2a, 3.1 e 3.2 (faturamento, DRE, despesas, produção e lista do dia)', () => {
     const todas = [...emUso(DONO)].flatMap((m) => [...m.grupos.flatMap((g) => g.itens), ...m.acoes]).map((i) => i.href.replace('/erp', ''));
     const novas = todas.filter((r) => !ANTIGAS.includes(r) && r !== '/acesso');
-    expect(novas).toEqual(['/estoque/contagens', '/producao', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
+    expect(novas).toEqual(['/estoque/contagens', '/producao', '/producao/lista', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
   });
 });
 

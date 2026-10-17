@@ -39,7 +39,7 @@ export function TelaDoLote({
   base: string;
   contexto?: string;
   feito?: string;
-  pode: { registrar: boolean; estornar: boolean };
+  pode: { registrar: boolean; estornar: boolean; planejar: boolean };
   /** Para onde os links levam; null = a pessoa não vê aquela tela (o link nem aparece). */
   hrefs: { requisicao: string | null; estoque: string | null };
   acoes: { iniciar: AcaoDeEstoque; cancelar: AcaoDeEstoque; estornar: AcaoDeEstoque };
@@ -52,6 +52,10 @@ export function TelaDoLote({
   const pend = pendenteDoLote(o.status);
   const livre = pode.registrar && !bloqueio && d.aberto;
   const podeConcluir = livre && pend;
+  // 3.2: o lote que a lista do dia pôs só sai dela com "definir a lista"; o avulso, com "registrar produção".
+  const podeComecar = livre && o.status === 'PLANEJADA';
+  const podeTirar = pend && !bloqueio && d.aberto && (o.daLista ? pode.planejar : pode.registrar);
+  const soDefineTira = o.daLista && pend && pode.registrar && !pode.planejar && !bloqueio;
   const entrouNoEstoque = d.movimentos.find((m) => m.tipo === 'PRODUCAO_ENTRADA' && !m.estorno);
   const quantoEntrou = entrouNoEstoque ? formatarQuantidade(entrouNoEstoque.quantidadeMilesimos, o.unidade) : null;
   const c = d.custo;
@@ -92,6 +96,7 @@ export function TelaDoLote({
           <SeloDoLote status={o.status} estornado={o.estornado} />
           <SeloDoAtraso dias={d.atrasoDias} />
           {o.status === 'CONCLUIDA' && o.produzidoMilesimos === 0 && <Selo tom="erro">Lote perdido</Selo>}
+          <Selo>{o.daLista ? 'Da lista do dia' : 'Fora da lista do dia'}</Selo>
         </div>
       </PageHeader>
       {feito && <Aviso tom="ok" titulo={feito} />}
@@ -270,13 +275,18 @@ export function TelaDoLote({
         </Painel>
       )}
 
-      {(pend ? livre : pode.estornar && !bloqueio && d.aberto && o.status === 'CONCLUIDA') && (
+      {soDefineTira && <p className="rounded-[10px] border border-linha px-3.5 py-2.5 text-sm text-suave">Este lote veio da lista do dia: só quem define a lista o tira dela.</p>}
+
+      {(pend ? podeComecar || podeTirar : pode.estornar && !bloqueio && d.aberto && o.status === 'CONCLUIDA') && (
         <div className="grid items-start gap-5 lg:grid-cols-2">
-          {pend && livre && (
-            <Painel titulo={o.status === 'PLANEJADA' ? 'Começar ou cancelar' : 'Cancelar'} subtitulo={o.status === 'PLANEJADA' ? 'Começar é opcional: dá para concluir direto' : 'O lote já está em produção'}>
+          {pend && (podeComecar || podeTirar) && (
+            <Painel
+              titulo={podeComecar && podeTirar ? (o.daLista ? 'Começar ou tirar da lista' : 'Começar ou cancelar') : podeComecar ? 'Começar' : o.daLista ? 'Tirar da lista' : 'Cancelar'}
+              subtitulo={o.status === 'PLANEJADA' ? 'Começar é opcional: dá para concluir direto' : 'O lote já está em produção'}
+            >
               <div className="space-y-4">
-                {o.status === 'PLANEJADA' && <FormComecar acao={acoes.iniciar} versao={o.versao} recarregar={aqui} />}
-                <FormCancelarLote acao={acoes.cancelar} versao={o.versao} recarregar={aqui} />
+                {podeComecar && <FormComecar acao={acoes.iniciar} versao={o.versao} recarregar={aqui} />}
+                {podeTirar && <FormCancelarLote acao={acoes.cancelar} versao={o.versao} recarregar={aqui} daLista={o.daLista} />}
               </div>
             </Painel>
           )}
