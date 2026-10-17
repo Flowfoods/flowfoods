@@ -70,6 +70,10 @@ export const abertura = (cliente: ClienteDoParceiro, lojaId: string, quando: Dat
 export const fechamentoDeEstoque = (cliente: ClienteDoParceiro, insumoId: string, lojaId: string, periodoId: string, p: { fim: string; quando: Date; retrato: number; proprioAjuste?: number; semPreco?: number | null; contados?: readonly string[] }) =>
   cliente.transacao(async (tx) => {
     const c = await tx.contagem.create({ data: { parceiroId: tx.parceiroId, lojaId, periodoId, tipo: 'FECHAMENTO', status: 'ABERTA', referenciaEm: dia(p.fim), iniciadaPorNome: 'Marina', titulo: 'Fechamento' } });
+    // Itens contados sem diferença: o "Contados N de N" do resultado fica coerente com o estoque final fotografado.
+    for (const id of p.contados ?? []) {
+      await tx.contagemItem.create({ data: { parceiroId: tx.parceiroId, contagemId: c.id, insumoId: id, insumoNomeSnapshot: 'Insumo', unidadeSnapshot: 'KG', contadoMilesimos: 1000, contadoEm: p.quando, saldoSistemaMilesimos: 1000, valorSistemaCentavos: 0 } });
+    }
     if (p.proprioAjuste) {
       const item = await tx.contagemItem.create({
         data: { parceiroId: tx.parceiroId, contagemId: c.id, insumoId, insumoNomeSnapshot: 'Insumo CMV', unidadeSnapshot: 'KG', contadoMilesimos: 1000, contadoEm: p.quando, saldoSistemaMilesimos: 1000, valorSistemaCentavos: 0 },

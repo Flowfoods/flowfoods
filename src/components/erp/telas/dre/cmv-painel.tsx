@@ -53,7 +53,7 @@ export function PainelDoCmv({
     >
       {comparacoes.length > 0 && (
         <>
-          <ul className="divide-y divide-linha lg:hidden">
+          <ul className="divide-y divide-linha xl:hidden">
             {comparacoes.map((c) => (
               <li key={c.lojaId} className="px-4 py-3">
                 <p className="font-medium text-texto">{c.lojaNome}</p>
@@ -76,7 +76,7 @@ export function PainelDoCmv({
               </li>
             )}
           </ul>
-          <div className="hidden lg:block">
+          <div className="hidden xl:block">
             <table className="w-full text-sm">
               <caption className="sr-only">CMV de compra e real por loja, com a diferença e o estoque inicial e final</caption>
               <thead>
