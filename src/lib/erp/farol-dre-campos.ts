@@ -121,8 +121,8 @@ export function farolDoDre(e: EntradaDoFarol): FarolDoDre {
     }
     if (!c) continue;
     const sem = (motivo: string): FarolDaLinha => ({ tipo: 'sem', motivo, desvioTexto: c.desvioTexto });
-    if (!c.faixa || c.desvioTexto === null) porLinha[l.chave] = sem(c.semComparacao ?? 'sem comparação');
-    else if (motivoGeral) porLinha[l.chave] = sem(motivoGeral);
+    if (motivoGeral) porLinha[l.chave] = sem(motivoGeral);
+    else if (!c.faixa || c.desvioTexto === null) porLinha[l.chave] = sem(c.semComparacao ?? 'sem comparação');
     else if (l.semContar.length > 0) porLinha[l.chave] = sem(`sem contar ${l.semContar.join(' e ')}`);
     else if (e.recorrentes.some((r) => atinge(r, l))) porLinha[l.chave] = sem(MOTIVO_RECORRENTE);
     else porLinha[l.chave] = { tipo: 'cor', escala: c.tipo === 'crescimento' ? 'receita' : 'custo', cor: c.faixa.cor, posicao: c.faixa.posicao, palavra: c.faixa.palavra, confira: c.faixa.confira, desvioTexto: c.desvioTexto, rotulo: rotuloDoFarol(c.faixa, c.desvioTexto) };
