@@ -351,9 +351,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'estoque',
     rotas: ['estoque/[lojaId]/periodo'],
     titulo: 'Período e contagens',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'Quanto do estoque foi contado no período, por valor e por itens.' },
+      { texto: 'Quanto do estoque foi contado no período, por valor e por itens. O período é o mesmo do DRE: mensal, quinzenal ou semanal, definido em Períodos, na área Faturamento e DRE.' },
       { texto: 'O fechamento só vale com a cobertura acima do piso da loja.' },
       { texto: 'As regras da contagem (piso, frequência, tolerância) ficam aqui; só quem cadastra lojas muda.', para: ['lojas.gerir'] },
     ],
@@ -463,7 +463,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['faturamento/[lojaId]/[data]'],
     titulo: 'Faturamento do dia',
-    versao: 1,
+    versao: 2,
     // Tela de lançar no celular: os campos ficam à vista, a aula abre numa linha (como nas telas de contar).
     recolhida: true,
     aula: [
@@ -477,7 +477,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'periodo-fechado',
         titulo: 'Dia de período fechado',
         blocos: [
-          { texto: 'Quando o período do resultado é fechado, os dias dele não aceitam mais lançar, corrigir nem remover.' },
+          { texto: 'Quando o período do resultado é fechado, os dias dele não aceitam mais lançar, corrigir nem remover. Onde o período começa e termina fica em Períodos, na área Faturamento e DRE.' },
         ],
       },
     ],
@@ -549,6 +549,106 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     aula: [
       { texto: 'Nome e situação do parceiro.' },
       { texto: 'Suspender pede o motivo. Parceiro suspenso entra no ERP e só consulta.' },
+    ],
+  },
+  {
+    chave: 'dre',
+    area: 'dre',
+    rotas: ['dre'],
+    titulo: 'DRE',
+    versao: 1,
+    aula: [
+      { texto: 'O resultado da casa no período: o que entrou, o que saiu e o que sobrou, com o peso de cada linha na receita bruta.' },
+      { texto: 'No período em curso o número vai até ontem, sem projeção, e a despesa entra dia a dia.' },
+      { texto: 'O CMV chega na próxima fase: até lá, a margem e os resultados saem sem contar o CMV.' },
+      { texto: 'A rede soma as lojas e as despesas da rede; a loja mostra só o que é dela, antes das despesas da rede.' },
+    ],
+    secoes: [
+      {
+        id: 'competencia',
+        titulo: 'Competência, não caixa',
+        blocos: [
+          { texto: 'A despesa conta no mês a que pertence, não no dia em que foi paga. A luz de outubro é de outubro, mesmo paga em novembro.' },
+          { texto: 'Por isso o aluguel de 31 dias, no dia 16, entra com 15 trinta e um avos: o que já passou até ontem.' },
+        ],
+      },
+      {
+        id: 'taxa-ifood',
+        titulo: 'A taxa do iFood é estimada',
+        blocos: [
+          { texto: 'Vale o faturamento do iFood vezes a comissão e o pagamento online configurados hoje. É uma estimativa, não o extrato do iFood.' },
+          { texto: 'Sem a taxa configurada, a linha diz que falta configurar e a receita líquida sai avisando.', para: ['precos.ver'] },
+        ],
+      },
+      {
+        id: 'incompleto',
+        titulo: 'Incompleto e falta lançar',
+        blocos: [
+          { texto: 'Dia de canal sem lançamento de faturamento deixa a receita incompleta. O aviso conta quantos faltam, do mesmo jeito que o calendário do mês.' },
+          { texto: 'Despesa que repete todo mês e ainda não foi lançada neste mês aparece em Falta lançar. Nunca entra valor inventado.', para: ['despesas.lancar'] },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'dre-despesas',
+    area: 'dre',
+    rotas: ['dre/despesas'],
+    titulo: 'Despesas',
+    versao: 1,
+    aula: [
+      { texto: 'Aluguel, salário, luz e as outras despesas da casa, pela competência: o mês a que a despesa pertence, não o dia em que foi paga.' },
+      { texto: 'A pagar mostra as que têm vencimento e ainda não foram pagas: as vencidas e as que vencem em até 7 dias. Pagar não muda o DRE.' },
+      { texto: 'Despesa da rede, que não é de uma loja, só aparece para quem tem a rede inteira.' },
+      { texto: 'Lance cada despesa uma vez. As que repetem todo mês voltam em Lançar as do mês passado, com o valor para você conferir.', para: ['despesas.lancar'] },
+    ],
+  },
+  {
+    chave: 'dre-despesa',
+    area: 'dre',
+    rotas: ['dre/despesas/[id]'],
+    titulo: 'Despesa',
+    versao: 1,
+    aula: [
+      { texto: 'Os dados da despesa, como o DRE a conta dia a dia e tudo o que mudou nela, com antes e depois.' },
+      { texto: 'Pagar, desfazer o pagamento e parar de repetir valem mesmo em período fechado, porque não mudam o DRE.', para: ['despesas.lancar'] },
+      { texto: 'Lançou errado? Edite. Se foi a despesa que não devia existir, remova: o motivo é obrigatório e o que estava lançado fica no histórico.', para: ['despesas.lancar'] },
+    ],
+  },
+  {
+    chave: 'dre-despesa-nova',
+    area: 'dre',
+    rotas: ['dre/despesas/nova', 'dre/despesas/[id]/editar'],
+    titulo: 'Lançar despesa',
+    versao: 1,
+    aula: [
+      { texto: 'Escolha a linha do DRE, a loja (ou a rede) e a competência: um dia, um mês ou um período de até 366 dias.' },
+      { texto: 'O DRE espalha o valor pelos dias da competência, ao centavo; repete todo mês vale só para o mês inteiro.' },
+      { texto: 'O vencimento é opcional e só põe a despesa em A pagar; mandou duas vezes sem querer, fica uma só.' },
+    ],
+  },
+  {
+    chave: 'dre-periodos',
+    area: 'dre',
+    rotas: ['dre/periodos'],
+    titulo: 'Períodos',
+    versao: 1,
+    aula: [
+      { texto: 'O período em que o resultado fecha, mensal, quinzenal ou semanal, com o dia em que começa, é o mesmo da contagem de estoque.' },
+      { texto: 'Mudar a regra nunca mexe no passado: ela vale a partir do dia seguinte ao fim do período de agora, e o primeiro período novo nasce cortado no começo.' },
+      { texto: 'Quem define o plano de contas e o período, com a rede inteira, muda a regra; os outros só consultam.' },
+    ],
+  },
+  {
+    chave: 'dre-plano',
+    area: 'dre',
+    rotas: ['dre/plano'],
+    titulo: 'Plano de contas',
+    versao: 1,
+    aula: [
+      { texto: 'As linhas do DRE e os nomes que a casa usa; renomear não perde nada, as despesas já lançadas mostram o nome novo.' },
+      { texto: 'Ocultar tira a linha do formulário de despesa, mas ela continua no DRE dos períodos em que tem valor; linha nunca se apaga.' },
+      { texto: 'As linhas calculadas, como a receita líquida, a margem e os resultados, vêm do sistema e não se mexem.' },
     ],
   },
 ];

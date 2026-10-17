@@ -56,7 +56,6 @@ import {
   planejamentoDoCiclo,
   salvarRegras,
   situacaoDoPeriodo,
-  type ConfigDoPeriodo,
 } from '@/lib/erp/contagem';
 import { camposDasRegras, REGRAS_PADRAO } from '@/lib/erp/contagem-campos';
 import { listarHistorico } from '@/lib/erp/historico';
@@ -79,7 +78,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
   const hoje = hojeNoRio();
   // Semana do parceiro termina HOJE: o fechamento do período já pode começar (3 últimos dias).
   const diaDaSemana = ((new Date(`${hoje}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
-  const CFG: ConfigDoPeriodo = { periodoTipo: 'SEMANAL', periodoDiaInicio: (diaDaSemana % 7) + 1 };
+  const CFG = { tipo: 'SEMANAL' as const, diaInicio: (diaDaSemana % 7) + 1 };
 
   const alcanceDe = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR', lojaIds: string[] | 'rede'): Alcance =>
     resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojaIds === 'rede', lojaIds: lojaIds === 'rede' ? [] : lojaIds });
@@ -89,13 +88,13 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
   const GERENTE_DELIVERY = () => alcanceDe('GERENTE', [ids.delivery]);
 
   const saldo = async (insumoId: string, lojaId = ids.vp) => (await a.saldoEstoque.findFirst({ where: { lojaId, insumoId }, select: { quantidadeMilesimos: true, valorCentavos: true } })) ?? null;
-  const itemDe = async (contagemId: string, nome: string) => (await obterContagem(a, DONA(), ids.vp, contagemId, CFG))!.itens.find((i) => i.nome === nome)!;
+  const itemDe = async (contagemId: string, nome: string) => (await obterContagem(a, DONA(), ids.vp, contagemId))!.itens.find((i) => i.nome === nome)!;
   const contar = async (alcance: Alcance, autor: string, contagemId: string, nome: string, solto: string, embalagens = '', agora?: Date) => {
     const i = await itemDe(contagemId, nome);
     return contarNaContagem(a, alcance, ids.vp, contagemId, { itemId: i.id, embalagens, solto, escala: 'base', versao: i.versao }, autor, agora);
   };
   const versaoDe = async (contagemId: string) => (await a.contagem.findUnique({ where: { id: contagemId }, select: { versao: true } }))!.versao;
-  const concluir = async (alcance: Alcance, contagemId: string, confirmar = false) => concluirContagem(a, alcance, ids.vp, contagemId, { versao: await versaoDe(contagemId), confirmarNaoContados: confirmar }, CFG, 'Gil Gerente');
+  const concluir = async (alcance: Alcance, contagemId: string, confirmar = false) => concluirContagem(a, alcance, ids.vp, contagemId, { versao: await versaoDe(contagemId), confirmarNaoContados: confirmar }, 'Gil Gerente');
   const razaoCoerente = async () => {
     const [r] = await db.$queryRawUnsafe<{ divergentes: number; quebrados: number }[]>(
       `SELECT
@@ -123,7 +122,9 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     if (!['localhost', '127.0.0.1'].includes(host)) throw new Error('ERP_DB_TESTE precisa ser local.');
     db = new PrismaClient({ datasources: { db: { url: URL_TESTE } } });
     perfil = await perfilDoBanco(db);
-    A = await db.parceiroFlow.create({ data: { nome: 'Contagem A', slug: `contagem-a-${sufixo}`, status: 'ATIVO', periodoTipo: CFG.periodoTipo, periodoDiaInicio: CFG.periodoDiaInicio } });
+    A = await db.parceiroFlow.create({ data: { nome: 'Contagem A', slug: `contagem-a-${sufixo}`, status: 'ATIVO' } });
+    // 2.2a: a regra do período vive em RegraDoPeriodo (a semana do parceiro termina HOJE).
+    await db.regraDoPeriodo.create({ data: { parceiroId: A.id, vigenteDesde: new Date('2020-01-01T00:00:00Z'), tipo: CFG.tipo, diaInicio: CFG.diaInicio, criadoPorNome: 'teste' } });
     B = await db.parceiroFlow.create({ data: { nome: 'Contagem B', slug: `contagem-b-${sufixo}`, status: 'ATIVO' } });
     a = doParceiro(A.id, db);
     b = doParceiro(B.id, db);
@@ -170,8 +171,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
 
   it('loja sem estoque aberto não planeja ciclo nem fecha período', async () => {
     expect(await iniciarCiclo(a, DONA(), ids.delivery, { insumoIds: [ids.cheddar], titulo: '' }, 'Marina')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/ainda não foi aberto/) } });
-    expect(await iniciarFechamento(a, DONA(), ids.delivery, { inicio: '' }, CFG, 'Marina')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/ainda não foi aberto/) } });
-    expect(await situacaoDoPeriodo(a, DONA(), ids.delivery, CFG)).toMatchObject({ aberto: false });
+    expect(await iniciarFechamento(a, DONA(), ids.delivery, { inicio: '' }, 'Marina')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/ainda não foi aberto/) } });
+    expect(await situacaoDoPeriodo(a, DONA(), ids.delivery)).toMatchObject({ aberto: false });
   });
 
   it('planejamento: curva ABC pelo valor de hoje, vencidos pela frequência, o lugar escolhido', async () => {
@@ -201,7 +202,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     const r = await iniciarCiclo(a, GERENTE(), ids.vp, { insumoIds: [ids.cheddar, ids.presunto, ids.batata], titulo: '' }, 'Gil Gerente');
     expect(r.ok).toBe(true);
     ids.ciclo = (r as { id: string }).id;
-    const c = (await obterContagem(a, OPERADOR(), ids.vp, ids.ciclo, CFG))!;
+    const c = (await obterContagem(a, OPERADOR(), ids.vp, ids.ciclo))!;
     expect(c.contagem).toMatchObject({ tipo: 'CICLICA', status: 'ABERTA', titulo: 'Refrigerado · 3 insumos', iniciadaPorNome: 'Gil Gerente' });
     expect(c.estado).toBe('EM_CONTAGEM');
     expect(c.itens.map((i) => i.nome)).toEqual(['Batata palito', 'Cheddar fatiado', 'Presunto']);
@@ -224,7 +225,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     // Tudo contado, mas fora da tolerância (cheddar −1 kg = R$ 18,98; batata sem preço): não fecha sozinha.
     expect(ultimo).toMatchObject({ ok: true });
     expect('fechouSozinha' in ultimo && ultimo.fechouSozinha).toBeFalsy();
-    const conf = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.ciclo, CFG))!;
+    const conf = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.ciclo))!;
     expect(conf.estado).toBe('PRONTA');
     const ch = conf.linhas.find((l) => l.item.nome === 'Cheddar fatiado')!;
     expect(ch).toMatchObject({ esperadoMilesimos: 10_000, atualMilesimos: 15_000 });
@@ -237,7 +238,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
 
   it('o operador não aplica; versão velha é recusada; o gerente aplica: CONTAGEM ± com valor exato, saldo = atual + diferença', async () => {
     expect(await concluir(OPERADOR(), ids.ciclo)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/ajustar saldo/) } });
-    expect(await concluirContagem(a, GERENTE(), ids.vp, ids.ciclo, { versao: 0, confirmarNaoContados: false }, CFG, 'Gil')).toMatchObject({ ok: false, conflito: true });
+    expect(await concluirContagem(a, GERENTE(), ids.vp, ids.ciclo, { versao: 0, confirmarNaoContados: false }, 'Gil')).toMatchObject({ ok: false, conflito: true });
     const [x, y] = await Promise.all([concluir(GERENTE(), ids.ciclo), concluir(GERENTE(), ids.ciclo)]);
     expect(x.ok && y.ok).toBe(true);
     expect([x, y].filter((r) => 'jaFeito' in r && r.jaFeito)).toHaveLength(1);
@@ -248,7 +249,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     ]);
     expect((await saldo(ids.cheddar))!.quantidadeMilesimos).toBe(14_000);
     // Fechada: o "fica em" é o que o ajuste desta contagem deixou (não soma a diferença de novo).
-    const fechada = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.ciclo, CFG))!;
+    const fechada = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.ciclo))!;
     expect(fechada.linhas.find((l) => l.item.nome === 'Cheddar fatiado')!.div.ficaEmMilesimos).toBe(14_000);
     const c = (await a.contagem.findUnique({ where: { id: ids.ciclo } }))!;
     expect(c).toMatchObject({ status: 'FECHADA', desfecho: 'APLICADA', fechadaPorNome: 'Gil Gerente', naoContadosNoFechamento: 0 });
@@ -287,7 +288,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     const j = await itemDe(ids.meio2, 'Cheddar fatiado');
     // Teto (herança a): 100 mil kg passam na contagem, mas o valor (R$ 1,9 milhão) não passa ao aplicar.
     expect(await contarNaContagem(a, OPERADOR(), ids.vp, ids.meio2, { itemId: j.id, embalagens: '', solto: '100000', escala: 'base', versao: j.versao }, 'Caio')).toMatchObject({ ok: true });
-    const conf = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.meio2, CFG))!;
+    const conf = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.meio2))!;
     expect(conf.acimaDoTeto).toEqual([expect.stringMatching(/“Cheddar fatiado” daria mais de R\$ 1\.000\.000,00/)]);
     expect(await concluir(GERENTE(), ids.meio2)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/daria mais de R\$ 1\.000\.000,00/) } });
     expect(await descartarContagem(a, OPERADOR(), ids.vp, ids.meio2, 'contei errado', 'Caio')).toMatchObject({ ok: false });
@@ -302,7 +303,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     const ult = await contar(OPERADOR(), 'Caio', ids.meio3, 'Presunto', '4,1');
     expect(ult).toMatchObject({ ok: true });
     expect('fechouSozinha' in ult && ult.fechouSozinha).toBeFalsy();
-    const conf3 = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.meio3, CFG))!;
+    const conf3 = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.meio3))!;
     expect(conf3.linhas.find((l) => l.item.nome === 'Cheddar fatiado')!.div).toMatchObject({ diferencaMilesimos: 0, mudouDepoisMilesimos: 5000, ficaEmMilesimos: 24_000 });
     expect(await concluir(GERENTE(), ids.meio3)).toMatchObject({ ok: true });
     expect((await saldo(ids.cheddar))!.quantidadeMilesimos).toBe(24_000);
@@ -313,7 +314,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     const tresDias = new Date(Date.now() - 3 * DIA);
     const r = await iniciarCiclo(a, GERENTE(), ids.vp, { insumoIds: [ids.pao], titulo: 'Seco antigo' }, 'Gil', tresDias);
     ids.vencida = (r as { id: string }).id;
-    const c = (await obterContagem(a, GERENTE(), ids.vp, ids.vencida, CFG))!;
+    const c = (await obterContagem(a, GERENTE(), ids.vp, ids.vencida))!;
     expect(c.estado).toBe('VENCIDA'); // derivado, antes de gravar
     const antes = await a.movimentoEstoque.count();
     expect(await contar(OPERADOR(), 'Caio', ids.vencida, 'Pão brioche', '20')).toMatchObject({ ok: false, fechada: true, erros: { geral: expect.stringMatching(/prazo desta contagem acabou/) } });
@@ -325,7 +326,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
   });
 
   it('período: cobertura × piso; o fechamento não conclui abaixo do piso (nada gravado) e fecha no piso; idempotente', async () => {
-    const s = (await situacaoDoPeriodo(a, GERENTE(), ids.vp, CFG))!;
+    const s = (await situacaoDoPeriodo(a, GERENTE(), ids.vp))!;
     if (!s.aberto) throw new Error('aberto');
     expect(s.periodo.fim).toBe(hoje);
     expect(s.janela.pode).toBe(true);
@@ -336,15 +337,15 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     expect(s.faltam.map((f) => [f.nome, f.paraOPiso])).toEqual([['Carne moída', true], ['Pão brioche', false]]);
     // Ciclo aberto impede começar o fechamento.
     const ciclo = await iniciarCiclo(a, GERENTE(), ids.vp, { insumoIds: [ids.pao], titulo: '' }, 'Gil');
-    expect(await iniciarFechamento(a, GERENTE(), ids.vp, { inicio: s.periodo.inicio }, CFG, 'Gil')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/Conclua ou descarte/) } });
+    expect(await iniciarFechamento(a, GERENTE(), ids.vp, { inicio: s.periodo.inicio }, 'Gil')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/Conclua ou descarte/) } });
     expect((await descartarContagem(a, GERENTE(), ids.vp, (ciclo as { id: string }).id, 'Vai no fechamento', 'Gil')).ok).toBe(true);
     // Operador não começa; duas pessoas juntas dão o mesmo fechamento.
-    expect(await iniciarFechamento(a, OPERADOR(), ids.vp, { inicio: s.periodo.inicio }, CFG, 'Caio')).toMatchObject({ ok: false });
-    const [f1, f2] = await Promise.all([iniciarFechamento(a, GERENTE(), ids.vp, { inicio: s.periodo.inicio }, CFG, 'Gil'), iniciarFechamento(a, DONA(), ids.vp, { inicio: s.periodo.inicio }, CFG, 'Marina')]);
+    expect(await iniciarFechamento(a, OPERADOR(), ids.vp, { inicio: s.periodo.inicio }, 'Caio')).toMatchObject({ ok: false });
+    const [f1, f2] = await Promise.all([iniciarFechamento(a, GERENTE(), ids.vp, { inicio: s.periodo.inicio }, 'Gil'), iniciarFechamento(a, DONA(), ids.vp, { inicio: s.periodo.inicio }, 'Marina')]);
     expect(f1.ok && f2.ok).toBe(true);
     expect((f1 as { id: string }).id).toBe((f2 as { id: string }).id);
     ids.fechamento = (f1 as { id: string }).id;
-    const fc = (await obterContagem(a, GERENTE(), ids.vp, ids.fechamento, CFG))!;
+    const fc = (await obterContagem(a, GERENTE(), ids.vp, ids.fechamento))!;
     expect(fc.contagem).toMatchObject({ tipo: 'FECHAMENTO', titulo: expect.stringMatching(/^Fechamento · Semana de/) });
     // Lista = o que ainda não foi contado no período.
     expect(fc.itens.map((i) => i.nome)).toEqual(['Carne moída', 'Pão brioche']);
@@ -358,11 +359,11 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     expect(abaixo).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/O período não fecha abaixo do piso: com esta contagem, a cobertura fica em .* Conte mais 1 insumo/) } });
     expect(await a.movimentoEstoque.count()).toBe(movsAntes);
     expect((await a.contagem.findUnique({ where: { id: ids.fechamento } }))!.status).toBe('ABERTA');
-    const conf = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.fechamento, CFG))!;
+    const conf = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.fechamento))!;
     expect(conf.cobertura!.cobertura.atinge).toBe(false);
     // Conta a carne (19 kg, esperado 20): agora atinge e fecha.
     await contarNaContagem(a, OPERADOR(), ids.vp, ids.fechamento, { itemId: fc.itens.find((i) => i.nome === 'Carne moída')!.id, embalagens: '', solto: '19', escala: 'base', versao: 0 }, 'Caio');
-    expect((await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.fechamento, CFG))!.cobertura!.cobertura.atinge).toBe(true);
+    expect((await conferenciaDaContagem(a, GERENTE(), ids.vp, ids.fechamento))!.cobertura!.cobertura.atinge).toBe(true);
     expect(await concluir(GERENTE(), ids.fechamento)).toMatchObject({ ok: true });
     expect(await concluir(GERENTE(), ids.fechamento)).toMatchObject({ ok: true, jaFeito: true });
     const f = (await a.contagem.findUnique({ where: { id: ids.fechamento } }))!;
@@ -370,8 +371,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     // Estoque final fotografado: cheddar 24 kg × 18,98 + presunto 4,1 × 30 + carne 19 × 42 + pão 24 × 1,50 + ketchup 100 × 0,20 (batata sem preço fora).
     expect(f.valorTotalCentavos).toBe(45552 + 12300 + 79800 + 3600 + 2000);
     expect(await a.movimentoEstoque.findFirst({ where: { tipo: 'CONTAGEM', insumoId: ids.carne }, select: { quantidadeMilesimos: true, valorCentavos: true } })).toEqual({ quantidadeMilesimos: -1000, valorCentavos: -4200 });
-    expect(await iniciarFechamento(a, GERENTE(), ids.vp, { inicio: s.periodo.inicio }, CFG, 'Gil')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/já foi fechado/) } });
-    const s2 = (await situacaoDoPeriodo(a, GERENTE(), ids.vp, CFG))!;
+    expect(await iniciarFechamento(a, GERENTE(), ids.vp, { inicio: s.periodo.inicio }, 'Gil')).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/já foi fechado/) } });
+    const s2 = (await situacaoDoPeriodo(a, GERENTE(), ids.vp))!;
     if (!s2.aberto) throw new Error('aberto');
     expect(s2.fechamento).toMatchObject({ status: 'FECHADA' });
     expect(s2.cobertura.atinge).toBe(true);
@@ -447,7 +448,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     const r = await rodar(() => estoqueDaSessao.acaoIniciarCiclo(ids.vp, null, form([['insumo', ids.ketchup], ['titulo', 'Sachês']])));
     expect(r).toMatchObject({ redirect: expect.stringMatching(new RegExp(`^/erp/estoque/${ids.vp}/contagens/[a-z0-9]+\\?feito=ciclo$`)) });
     const id = (r as { redirect: string }).redirect.split('/contagens/')[1].split('?')[0];
-    const item = (await obterContagem(a, DONA(), ids.vp, id, CFG))!.itens[0];
+    const item = (await obterContagem(a, DONA(), ids.vp, id))!.itens[0];
     atual.ctx = ctxDe(OPERADOR(), 'Caio');
     expect(await estoqueDaSessao.acaoContarNaContagem(ids.vp, id, { itemId: item.id, embalagens: '', solto: '100', escala: 'base', versao: item.versao })).toMatchObject({ ok: true, fechouSozinha: true });
   });
@@ -470,7 +471,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
     // −100 g × R$ 18,98 = R$ 1,90 cabe na tolerância, mas entrou nota depois de contar: o gerente confere.
     expect(res).toMatchObject({ ok: true });
     expect('fechouSozinha' in res && res.fechouSozinha).toBeFalsy();
-    const conf = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ciclo, CFG))!;
+    const conf = (await conferenciaDaContagem(a, GERENTE(), ids.vp, ciclo))!;
     const ch = conf.linhas[0];
     expect(ch).toMatchObject({ esperadoMilesimos: antes, atualMilesimos: antes + 5000 });
     expect(ch.div).toMatchObject({ diferencaMilesimos: -100, mudouDepoisMilesimos: 5000, ficaEmMilesimos: antes + 4900, dentroDaTolerancia: true });
@@ -508,11 +509,11 @@ describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', 
 
   it('isolamento: o parceiro B não enxerga as contagens, o período nem as regras de A', async () => {
     expect(await b.contagem.count()).toBe(0);
-    expect(await obterContagem(b, DONA(), ids.vp, ids.ciclo, CFG)).toBeNull();
-    expect(await conferenciaDaContagem(b, DONA(), ids.vp, ids.ciclo, CFG)).toBeNull();
-    expect(await situacaoDoPeriodo(b, DONA(), ids.vp, CFG)).toBeNull();
+    expect(await obterContagem(b, DONA(), ids.vp, ids.ciclo)).toBeNull();
+    expect(await conferenciaDaContagem(b, DONA(), ids.vp, ids.ciclo)).toBeNull();
+    expect(await situacaoDoPeriodo(b, DONA(), ids.vp)).toBeNull();
     expect(await iniciarCiclo(b, DONA(), ids.vp, { insumoIds: [ids.cheddar], titulo: '' }, 'Bia')).toMatchObject({ ok: false, naoEncontrado: true });
-    expect(await concluirContagem(b, DONA(), ids.vp, ids.ciclo, { versao: 0, confirmarNaoContados: true }, CFG, 'Bia')).toMatchObject({ ok: false, naoEncontrado: true });
+    expect(await concluirContagem(b, DONA(), ids.vp, ids.ciclo, { versao: 0, confirmarNaoContados: true }, 'Bia')).toMatchObject({ ok: false, naoEncontrado: true });
     expect(await contarNaContagem(b, DONA(), ids.vp, ids.ciclo, { itemId: 'x', embalagens: '', solto: '1', escala: 'base', versao: 0 }, 'Bia')).toMatchObject({ ok: false });
   });
 });

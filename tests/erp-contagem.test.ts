@@ -18,14 +18,13 @@ import {
   fraseAbaixoDoPiso,
   janelaDoFechamento,
   lerRegras,
-  periodoAnterior,
-  periodoDaData,
   prazoDoCiclo,
   REGRAS_PADRAO,
   situacaoDoItem,
   somaDasDivergencias,
   sugerido,
 } from '@/lib/erp/contagem-campos';
+import { periodoAnteriorA, periodoDaData } from '@/lib/erp/periodo-campos';
 import { custoPorUnidade } from '@/lib/erp/unidades';
 
 const sp = (s: string) => s.replace(/ /g, ' ');
@@ -61,7 +60,7 @@ describe('período de apuração (configuração do parceiro)', () => {
 
   it('anterior e janela do fechamento: abre 2 dias antes do fim e segue aberta depois', () => {
     const out = periodoDaData({ tipo: 'MENSAL', diaInicio: 1 }, '2026-10-16');
-    expect(periodoAnterior({ tipo: 'MENSAL', diaInicio: 1 }, out)).toMatchObject({ inicio: '2026-09-01', fim: '2026-09-30' });
+    expect(periodoAnteriorA([{ vigenteDesde: '2020-01-01', tipo: 'MENSAL', diaInicio: 1 }], [], out)).toMatchObject({ inicio: '2026-09-01', fim: '2026-09-30' });
     expect(janelaDoFechamento(out, '2026-10-28')).toEqual({ pode: false, abreEm: '2026-10-29' });
     expect(janelaDoFechamento(out, '2026-10-29').pode).toBe(true);
     expect(janelaDoFechamento(out, '2026-11-03').pode).toBe(true);

@@ -346,3 +346,11 @@ export type FiltroDeSituacao = 'todas' | 'a-pagar' | 'pagas';
 export const ehFiltroDeSituacao = (s: unknown): s is FiltroDeSituacao => s === 'todas' || s === 'a-pagar' || s === 'pagas';
 
 export const DESPESAS_POR_PAGINA = 50;
+
+/** O mês da lista de despesas na URL ("aaaa-mm"): existe e está entre 2020 e 12 meses à frente; senão, o de hoje. */
+export function lerMesDaLista(texto: string | undefined, hoje: string): string {
+  const atual = hoje.slice(0, 7);
+  if (!texto || !/^\d{4}-(0[1-9]|1[0-2])$/.test(texto)) return atual;
+  const limite = janelaDaCompetencia(hoje).ate.slice(0, 7);
+  return texto > limite || texto < LIMITES_DA_DESPESA.dataMinima.slice(0, 7) ? atual : texto;
+}
