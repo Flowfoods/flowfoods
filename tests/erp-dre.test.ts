@@ -493,7 +493,8 @@ describe('2.2a · o DRE realizado', () => {
   it('cada linha calculada do plano aparece uma vez no DRE e na ordem do plano', () => {
     const r = montarDre(entrada({}));
     const codigos = r.linhas.map((l) => l.codigo);
-    expect(new Set(codigos).size).toBe(codigos.length);
+    // As duas linhas de detalhe do CMV (2.3) não são do plano: sem código.
+    expect(new Set(codigos.filter(Boolean)).size).toBe(codigos.filter(Boolean).length);
     expect(codigos.slice(0, 5)).toEqual(['grupo:RECEITA', 'receita-loja', 'receita-delivery', 'receita-ifood', 'grupo:DEDUCAO']);
     expect(codigos.indexOf(CODIGO.cmv)).toBeGreaterThan(codigos.indexOf(CODIGO.receitaLiquida));
     expect(codigos.indexOf(CODIGO.margem)).toBeGreaterThan(codigos.indexOf(CODIGO.cmv));
