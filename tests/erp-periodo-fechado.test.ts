@@ -6,6 +6,8 @@
  *  - o formulário da nota e o da despesa avisam ANTES de enviar quando a data/competência já cai num fechado, e de novo
  *    quando o servidor recusa (e nada do aviso aparece num período aberto).
  */
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -66,12 +68,12 @@ describe('ERP 2.2b · o componente do aviso', () => {
 });
 
 describe('ERP 2.2b · os formulários avisam antes de enviar', () => {
-  const nota = (data: string, p = periodos) =>
+  const nota = (data: string, p = periodos, modo: 'lancar' | 'editar' = 'lancar') =>
     nbsp(
       renderToStaticMarkup(
         createElement(FormNota, {
           acao: async () => null,
-          modo: 'lancar',
+          modo,
           base: '/erp/compras',
           aqui: '/erp/compras/nova',
           cancelar: '/erp/compras',
@@ -127,3 +129,50 @@ describe('ERP 2.2b · os formulários avisam antes de enviar', () => {
     expect(aberto).not.toContain('peça à FlowFoods');
   });
 });
+
+describe('ERP 2.2b (hotfix) · o aviso nunca fica sob a barra fixa de salvar', () => {
+  const nota = (data: string, modo: 'lancar' | 'editar') =>
+    renderToStaticMarkup(
+      createElement(FormNota, {
+        acao: async () => null,
+        modo,
+        base: '/erp/compras',
+        aqui: '/erp/compras/nova',
+        cancelar: '/erp/compras',
+        opcoes: { lojas: [], fornecedores: [], insumos: [] } as never,
+        inicial: { lojaId: '', fornecedorId: '', numero: '', serie: '', data, frete: '', total: '', itens: [] },
+        hoje: '2026-10-17',
+        periodos,
+      }),
+    ).replace(/\u00a0/g, ' ');
+
+  it('o aviso leva a marca que o identifica, e ao editar uma nota de período fechado ele vem NO TOPO, uma vez só (antes de "A nota")', () => {
+    const html = nota('15/09/2026', 'editar');
+    expect(html.match(/data-aviso-periodo-fechado/g)).toHaveLength(1);
+    expect(html.indexOf('Esta nota é desse período')).toBeGreaterThan(-1);
+    expect(html.indexOf('data-aviso-periodo-fechado')).toBeLessThan(html.indexOf('A nota</h2>'));
+    // Lançar uma nota nova: o aviso nasce junto do campo da data (embaixo dele), não no topo.
+    const novo = nota('15/09/2026', 'lancar');
+    expect(novo.match(/data-aviso-periodo-fechado/g)).toHaveLength(1);
+    expect(novo.indexOf('data-aviso-periodo-fechado')).toBeGreaterThan(novo.indexOf('A nota</h2>'));
+  });
+
+  it('toda barra fixa de salvar (sticky bottom-0) declara `data-barra-fixa`: é por ela que o aviso mede onde parar', () => {
+    const achar = (dir: string): string[] =>
+      readdirSync(dir).flatMap((n) => {
+        const f = join(dir, n);
+        return statSync(f).isDirectory() ? achar(f) : f.endsWith('.tsx') ? [f] : [];
+      });
+    const sem: string[] = [];
+    let barras = 0;
+    for (const f of achar(join(__dirname, '..', 'src'))) {
+      for (const m of readFileSync(f, 'utf8').matchAll(/<div([^>]*)className="sticky bottom-0/g)) {
+        barras++;
+        if (!m[1].includes('data-barra-fixa')) sem.push(f);
+      }
+    }
+    expect(barras).toBeGreaterThanOrEqual(6);
+    expect(sem).toEqual([]);
+  });
+});
+
