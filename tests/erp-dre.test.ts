@@ -264,6 +264,14 @@ describe('2.2a · período com regra versionada', () => {
     for (let i = 0; i < lista.length - 1; i++) expect(somarDias(lista[i + 1].fim, 1)).toBe(lista[i].inicio);
   });
 
+  it('parceiro novo que muda a regra (sem a linha-base de 2020): o padrão vale até a vigência da primeira regra gravada', () => {
+    const so: Regra[] = [{ vigenteDesde: '2026-11-01', tipo: 'MENSAL', diaInicio: 15 }];
+    expect(periodoNaData(so, [], '2026-10-10')).toMatchObject({ inicio: '2026-10-01', fim: '2026-10-31', nome: 'Outubro de 2026' });
+    expect(periodoNaData(so, [], '2020-03-10')).toMatchObject({ inicio: '2020-03-01', fim: '2020-03-31' });
+    expect(periodoNaData(so, [], '2026-11-01')).toMatchObject({ inicio: '2026-11-01', fim: '2026-11-14' });
+    expect(vigenciaDaMudanca(so, [], '2026-10-10')).toMatchObject({ vigenteDesde: '2026-11-01', efetiva: { tipo: 'MENSAL', diaInicio: 1 }, pendente: so[0] });
+  });
+
   it('semanal → mensal: o fim da semana atual é o corte', () => {
     const semanal: Regra = { vigenteDesde: '2020-01-01', tipo: 'SEMANAL', diaInicio: 1 };
     const v = vigenciaDaMudanca([semanal], [], '2026-10-14'); // quarta

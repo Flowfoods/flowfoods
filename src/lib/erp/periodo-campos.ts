@@ -88,7 +88,15 @@ export function periodoDaData(cfg: { tipo: TipoDePeriodo | 'PERSONALIZADO'; diaI
   return { inicio: inicioDoMes, fim: fimDoMes, nome };
 }
 
-const porVigencia = (regras: readonly Regra[]) => [...(regras.length ? regras : [REGRA_PADRAO])].sort((x, y) => (x.vigenteDesde < y.vigenteDesde ? -1 : x.vigenteDesde > y.vigenteDesde ? 1 : 0));
+/**
+ * As regras da mais antiga para a mais nova. O padrão (mensal, dia 1) é a base de todo parceiro: quando
+ * a primeira regra gravada começa depois de 2020 (parceiro novo que mudou a regra), o padrão vale até
+ * ela — a regra gravada nunca vale para trás da própria vigência.
+ */
+const porVigencia = (regras: readonly Regra[]): Regra[] => {
+  const lista = [...regras].sort((x, y) => (x.vigenteDesde < y.vigenteDesde ? -1 : x.vigenteDesde > y.vigenteDesde ? 1 : 0));
+  return lista.length === 0 || lista[0].vigenteDesde > REGRA_PADRAO.vigenteDesde ? [REGRA_PADRAO, ...lista] : lista;
+};
 
 /** A regra que vale na data (a primeira vale para trás de tudo) e a vigência da seguinte, se houver. */
 export function regraDaData(regras: readonly Regra[], data: string): { regra: Regra; proximaDesde: string | null; primeira: boolean } {
