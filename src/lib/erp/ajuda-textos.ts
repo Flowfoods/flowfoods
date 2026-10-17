@@ -570,12 +570,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre'],
     titulo: 'DRE',
-    versao: 5,
+    versao: 6,
     // A tela da reunião: a tabela fica à vista e a aula abre numa linha.
     recolhida: true,
     aula: [
       { texto: 'O resultado da casa no período: o que entrou, o que saiu e o que sobrou, com o peso de cada linha na receita bruta, até ontem no período em curso.' },
-      { texto: 'Com meta definida, a linha mostra o desvio e se está melhor ou pior que a meta; ela vale igual na rede e em cada loja.' },
+      { texto: 'Com meta definida, a linha mostra o desvio e o farol: uma de 5 faixas, de bem melhor que a meta a muito pior. A meta vale igual na rede e em cada loja.' },
       { texto: 'Período fechado mostra a fotografia do fechamento, que nunca muda.' },
       { texto: 'O CMV é o custo da comida: no período em curso é o que a casa comprou até ontem, e vira o real, o que ela consumiu, quando o período termina e a contagem de fechamento do estoque é aplicada.' },
     ],
@@ -592,11 +592,25 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'meta',
         titulo: 'Como ler a meta',
         blocos: [
-          { texto: 'O desvio é o realizado menos a meta, em pontos percentuais. Menos de 0,05 ponto de diferença é na meta.' },
-          { texto: 'A palavra segue o lado bom de cada linha: custo e despesa menores são melhores, receita líquida e margem maiores são melhores. A tela não usa cor para isso.' },
+          { texto: 'O desvio é o realizado menos a meta, em pontos percentuais. Na receita, é o crescimento sobre o ano passado menos a meta de crescimento.' },
+          { texto: 'O lado bom segue a linha: custo e despesa menores são melhores, receita, receita líquida e margem maiores são melhores.' },
           { texto: 'Sem faturamento, sem lançamento na linha ou sem valor (como o CMV de uma loja sem nota e sem estoque), a linha não compara e mostra traço, nunca zero. A meta do CMV compara com o que vale: o real ou o das compras.' },
           { texto: 'Na visão de uma loja, o resultado operacional e o resultado do período não mostram meta: a loja não carrega as despesas da rede.' },
           { texto: 'Quem define as metas as escreve em Plano e metas.', para: ['metas.editar'] },
+        ],
+      },
+      {
+        id: 'farol',
+        titulo: 'O farol: 5 faixas',
+        blocos: [
+          { texto: 'O farol põe o desvio de cada linha com meta numa de 5 faixas: azul (bem melhor que a meta), verde (na meta), amarelo (um pouco pior), laranja (pior que a meta) e vermelho (muito pior que a meta). A régua de 5 casas mostra a faixa pela posição, e a palavra e o desvio vêm sempre junto: a cor nunca fala sozinha.' },
+          { texto: 'Em custo, margem e resultado, a conta é em pontos da receita bruta contra a meta: azul com 3 pontos ou mais melhor, verde até 0,5 ponto pior, amarelo até 1,5 ponto pior, laranja até 3 pontos pior e vermelho além disso. Na receita, a escala é de crescimento: azul com 5 pontos ou mais acima da meta, verde até 1 ponto abaixo, amarelo até 3, laranja até 6 e vermelho além disso.' },
+          { texto: 'As faixas são as mesmas para todas as casas e não se configuram: uma régua só, para comparar uma casa com a outra e com ela mesma ao longo do tempo.' },
+          { texto: 'Azul numa despesa ou no CMV pede um olhar: pode ser economia de verdade ou nota e despesa que ainda não foram lançadas. Por isso o azul vem com o aviso confira se está tudo lançado.' },
+          { texto: 'A linha fica sem cor, com o desvio em texto e o motivo escrito, quando o dado não fecha: falta lançamento de faturamento, a despesa que repete ainda não foi lançada, o resultado sai sem contar o CMV de alguma loja, o ano passado está incompleto ou sem lançamento. Cor é uma afirmação, e sem número é hipótese.' },
+          { texto: 'O CMV pelas compras, parcial ou misto, tem cor, com o selo da fonte ao lado.' },
+          { texto: 'O farol por canal é só o da receita: a meta de crescimento do canal contra o mesmo período do ano passado. CMV e despesa são da loja, não do canal, e não são divididos entre os canais.' },
+          { texto: 'O painel Faróis do período, no topo, conta as linhas em cada faixa e leva às que estão em laranja e vermelho. Períodos fechados antes do farol mostram o farol de custo das linhas gravadas e dizem que a receita não foi apurada neste fechamento.' },
         ],
       },
       {
@@ -709,7 +723,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/plano'],
     titulo: 'Plano e metas',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'Em Metas, escreva quanto cada linha deveria pesar na receita bruta, em %; vazio é sem meta e zero é uma meta de zero.' },
       { texto: 'A meta vale a partir do começo do período de agora, igual na rede e em cada loja; o passado não muda.' },
@@ -721,7 +735,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'metas',
         titulo: 'Como as metas funcionam',
         blocos: [
-          { texto: 'Receita bruta e receita por canal não têm meta, porque a base delas é 100 %.' },
+          { texto: 'Na receita (a total e a de cada canal), a meta é de crescimento sobre o mesmo período do ano passado, de 0 a 100 %: zero é igualar o ano passado. Não há meta negativa nem em reais.' },
+          { texto: 'Nas outras linhas a meta é o percentual da receita bruta. O farol compara o realizado com ela em 5 faixas fixas.' },
           { texto: 'Cada período usa a meta que valia no começo dele: período antigo ainda aberto não pega meta escrita depois. Salvar de novo no mesmo período troca a meta, e apagar grava sem meta.' },
           { texto: 'A tabela inteira é salva de uma vez. Se outra pessoa mudou as metas no meio tempo, a tela avisa e nada é gravado.' },
         ],
@@ -740,7 +755,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/periodos/[inicio]'],
     titulo: 'Fechar o período',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Fechar guarda uma fotografia do DRE do período, e depois nada muda dentro das datas dele: nem faturamento, nem despesa, nem nota de compra, nem fechamento de estoque.' },
       { texto: 'Faturamento faltando, taxa do iFood sem configurar, estoque em contagem de fechamento e rede sem lançamento travam, e não aceitam justificativa.' },
@@ -763,6 +778,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'Reabrir deixa o período aberto de novo para lançar e corrigir. A fotografia anterior fica guardada em Versões, com quem reabriu e por quê.' },
           { texto: 'Ao fechar de novo sai a versão seguinte. A dona da casa não reabre: o período fechado é o ponto de controle do consultor.' },
           { texto: 'A fotografia guarda o CMV de compra e o real de cada loja. Período fechado antes de o CMV existir diz que não apurou: para guardá-lo, reabre e fecha de novo.' },
+          { texto: 'Também guarda a receita do ano passado e a versão das faixas do farol. O período fechado lê o farol e a variação só da fotografia: mudar a meta ou o faturamento do ano passado depois não o altera. Fechado antes do farol, a receita diz que não foi apurada neste fechamento.' },
         ],
       },
     ],

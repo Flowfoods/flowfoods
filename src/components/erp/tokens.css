@@ -34,6 +34,11 @@
   --ff-erro: 196 21 34;
   --ff-ok: 22 101 52;
   --ff-atencao: 146 64 14;
+  --ff-farol-azul: 47 93 138;
+  --ff-farol-verde: 22 101 52;
+  --ff-farol-amarelo: 122 92 0;
+  --ff-farol-laranja: 168 75 12;
+  --ff-farol-vermelho: 196 21 34;
   --ff-ativo: rgb(196 21 34 / 0.08);
   --ff-sombra: 0 10px 22px rgb(10 10 10 / 0.12);
   --ff-mistura-icone: 14%;
@@ -58,6 +63,11 @@
   --ff-erro: 242 50 63;
   --ff-ok: 74 222 128;
   --ff-atencao: 245 158 11;
+  --ff-farol-azul: 141 180 220;
+  --ff-farol-verde: 74 222 128;
+  --ff-farol-amarelo: 226 197 90;
+  --ff-farol-laranja: 240 145 58;
+  --ff-farol-vermelho: 245 66 77;
   --ff-ativo: rgb(234 29 44 / 0.12);
   --ff-sombra: 0 10px 22px rgb(0 0 0 / 0.45);
   --ff-mistura-icone: 22%;
@@ -83,6 +93,11 @@
     --ff-erro: 242 50 63;
     --ff-ok: 74 222 128;
     --ff-atencao: 245 158 11;
+    --ff-farol-azul: 141 180 220;
+    --ff-farol-verde: 74 222 128;
+    --ff-farol-amarelo: 226 197 90;
+    --ff-farol-laranja: 240 145 58;
+    --ff-farol-vermelho: 245 66 77;
     --ff-ativo: rgb(234 29 44 / 0.12);
     --ff-sombra: 0 10px 22px rgb(0 0 0 / 0.45);
     --ff-mistura-icone: 22%;

@@ -202,12 +202,15 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       }
     });
 
-    it('critério 4: receita bruta e receita por canal não aceitam meta, nem por campo forjado; CMV aceita; linha de outro parceiro ou inexistente é frase', async () => {
+    it('critério 4 (2.4): a receita aceita só meta de CRESCIMENTO de 0 a 100 %, as linhas de detalhe do CMV não aceitam meta nem por campo forjado; CMV aceita; linha de outro parceiro ou inexistente é frase', async () => {
       const total = await a.dreMeta.count();
       for (const chave of ['grupo:RECEITA', 'receita-loja', 'receita-delivery', 'receita-ifood']) {
-        const r = await metas({ [chave]: '10' }, '2026-10-20');
-        expect(r, chave).toMatchObject({ ok: false, erros: { geral: expect.stringContaining('não tem meta') } });
+        for (const forjado of ['100,01', '-5', '1e2']) {
+          const r = await metas({ [chave]: forjado }, '2026-10-20');
+          expect(r, `${chave} ${forjado}`).toMatchObject({ ok: false, erros: { [chave]: expect.stringMatching(/rescimento/) } });
+        }
       }
+      for (const chave of ['cmv:compra', 'cmv:real']) expect(await metas({ [chave]: '10' }, '2026-10-20'), chave).toMatchObject({ ok: false });
       // Linha de outro parceiro (id forjado) e linha que não existe: frase, não erro de servidor.
       await b.transacao((tx) => garantirPlano(tx));
       const linhaDeB = (await planoDoParceiro(b)).find((l) => l.codigo === 'aluguel')!.id!;
@@ -219,7 +222,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       const o = await dre(DONA(), { tipo: 'rede' }, '2026-10-05');
       expect(o!.metas.cmv).toMatchObject({ metaBp: 0, desvioBp: null, semComparacao: 'sem faturamento', metaCentavos: null }); // outubro ainda não tem faturamento
       const d = await dre(DONA(), { tipo: 'rede' }, '2026-09-10');
-      expect(d!.metas.cmv).toMatchObject({ metaBp: 2000, metaCentavos: 200_000, desvioBp: null, desvioTexto: null, palavra: null, semComparacao: 'sem valor apurado' });
+      expect(d!.metas.cmv).toMatchObject({ metaBp: 2000, metaCentavos: 200_000, desvioBp: null, desvioTexto: null, faixa: null, semComparacao: 'sem valor apurado' });
       expect(linha(d!, 'cmv').valorCentavos).toBeNull();
     });
 
@@ -251,14 +254,16 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       expect(d.status).toBeNull();
       expect(d.resultado.receitaBrutaCentavos).toBe(1_000_000);
       expect(linha(d, 'grupo:PESSOAL').percentualBp).toBe(2600);
-      expect(d.metas['grupo:PESSOAL']).toMatchObject({ metaBp: 2500, metaCentavos: 250_000, desvioBp: 100, desvioTexto: '+1,0 pp', palavra: 'pior que a meta' });
-      // Resultado do período tem meta de 10 % em setembro: o realizado está em outro patamar, a palavra segue o sentido (maior é melhor).
+      expect(d.metas['grupo:PESSOAL']).toMatchObject({ metaBp: 2500, metaCentavos: 250_000, desvioBp: 100, desvioTexto: '+1,0 pp' });
+      expect(d.metas['grupo:PESSOAL'].faixa).toMatchObject({ cor: 'AMARELO', palavra: 'um pouco pior' });
+      // Resultado do período tem meta de 10 % em setembro: o realizado está em outro patamar, a faixa segue o sentido (maior é melhor).
       expect(d.metas['resultado-do-periodo']).toMatchObject({ metaBp: 1000 });
-      expect(d.metas['resultado-do-periodo'].palavra).toBe(linha(d, 'resultado-do-periodo').percentualBp! > 1000 ? 'melhor que a meta' : 'pior que a meta');
+      const desvio = linha(d, 'resultado-do-periodo').percentualBp! - 1000;
+      expect(d.metas['resultado-do-periodo'].faixa?.cor).toBe(desvio >= 300 ? 'AZUL' : desvio >= -50 ? 'VERDE' : desvio >= -150 ? 'AMARELO' : desvio >= -300 ? 'LARANJA' : 'VERMELHO');
       // Setembro NÃO pega a meta de CMV de outubro (nem a de salários: foi gravada em outubro).
       expect(d.metas.cmv).toMatchObject({ metaBp: 2000, semComparacao: 'sem valor apurado' });
       expect(d.metas.salarios).toBeUndefined();
-      // Receita não tem meta.
+      // A receita só tem meta de crescimento se alguém definir (aqui, ninguém definiu).
       expect(d.metas['receita-loja']).toBeUndefined();
     });
 

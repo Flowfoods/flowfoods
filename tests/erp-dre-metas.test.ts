@@ -24,6 +24,7 @@ import {
 } from '@/lib/erp/dre-fechamento-campos';
 import {
   aceitaMeta,
+  tipoDaMeta,
   compararComMeta,
   compararComOAnoPassado,
   compararLinhas,
@@ -92,18 +93,27 @@ describe('2.2b · ler a meta digitada (critério 3)', () => {
 });
 
 describe('2.2b · quem aceita meta (critério 4)', () => {
-  it('receita bruta e receita por canal não aceitam; CMV, subtotais e resultados aceitam', () => {
-    for (const chave of ['grupo:RECEITA', 'receita-loja', 'receita-delivery', 'receita-ifood']) expect(aceitaMeta(chave), chave).toBe(false);
-    for (const chave of ['cmv', 'salarios', 'grupo:PESSOAL', 'receita-liquida', 'margem-contribuicao', 'resultado-do-periodo', 'id:cabc123']) expect(aceitaMeta(chave), chave).toBe(true);
+  it('a receita (bruta e por canal) aceita meta de CRESCIMENTO (2.4); CMV, subtotais e resultados, meta percentual; as duas de detalhe do CMV, nenhuma', () => {
+    for (const chave of ['grupo:RECEITA', 'receita-loja', 'receita-delivery', 'receita-ifood']) {
+      expect(aceitaMeta(chave), chave).toBe(true);
+      expect(tipoDaMeta(chave), chave).toBe('crescimento');
+    }
+    for (const chave of ['cmv', 'salarios', 'grupo:PESSOAL', 'receita-liquida', 'margem-contribuicao', 'resultado-do-periodo', 'id:cabc123']) {
+      expect(aceitaMeta(chave), chave).toBe(true);
+      expect(tipoDaMeta(chave), chave).toBe('percentual');
+    }
+    for (const chave of ['cmv:compra', 'cmv:real']) expect(aceitaMeta(chave), chave).toBe(false);
   });
   it('na visão da loja só os dois resultados ficam sem meta', () => {
     expect(metaApareceNaLoja('resultado-operacional')).toBe(false);
     expect(metaApareceNaLoja('resultado-do-periodo')).toBe(false);
     for (const chave of ['salarios', 'grupo:PESSOAL', 'receita-liquida', 'margem-contribuicao', 'cmv']) expect(metaApareceNaLoja(chave), chave).toBe(true);
   });
-  it('a lista da tela das metas tem todas as linhas na ordem do DRE, a receita sem campo e o CMV com campo', () => {
+  it('a lista da tela das metas tem todas as linhas na ordem do DRE, a receita com campo de crescimento e o CMV com campo', () => {
     const linhas = linhasDeMeta(plano);
-    expect(linhas[0]).toMatchObject({ chave: 'grupo:RECEITA', aceita: false });
+    expect(linhas[0]).toMatchObject({ chave: 'grupo:RECEITA', aceita: true, tipoDaMeta: 'crescimento' });
+    expect(linhas.find((l) => l.chave === 'receita-ifood')).toMatchObject({ aceita: true, tipoDaMeta: 'crescimento' });
+    expect(linhas.find((l) => l.chave === 'cmv')).toMatchObject({ tipoDaMeta: 'percentual' });
     expect(linhas.find((l) => l.chave === 'cmv')).toMatchObject({ aceita: true });
     expect(linhas.find((l) => l.chave === 'grupo:PESSOAL')).toMatchObject({ aceita: true, nivel: 0 });
     expect(linhas.find((l) => l.chave === 'salarios')).toMatchObject({ aceita: true, nivel: 1 });
@@ -122,36 +132,37 @@ describe('2.2b · realizado × meta (critério 5)', () => {
     const pessoal = r.linhas.find((l) => l.chave === 'grupo:PESSOAL')!;
     expect(pessoal.percentualBp).toBe(2600);
     const c = compararComMeta(pessoal, 2500, r.receitaBrutaCentavos);
-    expect(c).toMatchObject({ metaBp: 2500, metaCentavos: 250_000, desvioBp: 100, desvioTexto: '+1,0 pp', palavra: 'pior que a meta', semComparacao: null });
+    expect(c).toMatchObject({ metaBp: 2500, metaCentavos: 250_000, desvioBp: 100, desvioTexto: '+1,0 pp', semComparacao: null });
+    expect(c.faixa).toMatchObject({ cor: 'AMARELO', palavra: 'um pouco pior' });
   });
-  it('a margem com o mesmo desvio é "melhor que a meta" (o lado bom vem do sentido)', () => {
+  it('a margem com o mesmo desvio é "na meta" (o lado bom vem do sentido)', () => {
     const r = dreDeDezMil(260_000);
     const margem = r.linhas.find((l) => l.chave === 'margem-contribuicao')!;
     expect(margem.sentido).toBe('MAIOR_MELHOR');
     const c = compararComMeta(margem, margem.percentualBp! - 100, r.receitaBrutaCentavos);
-    expect(c).toMatchObject({ desvioBp: 100, palavra: 'melhor que a meta' });
+    expect(c).toMatchObject({ desvioBp: 100 });
+    expect(c.faixa).toMatchObject({ cor: 'VERDE', palavra: 'na meta' });
   });
-  it('despesa abaixo da meta é "melhor"; margem abaixo da meta é "pior"', () => {
+  it('despesa 5 pontos abaixo da meta é azul; resultado 22 pontos abaixo da meta é vermelho', () => {
     const r = dreDeDezMil(200_000);
     const pessoal = r.linhas.find((l) => l.chave === 'grupo:PESSOAL')!;
-    expect(compararComMeta(pessoal, 2500, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: -500, desvioTexto: '−5,0 pp', palavra: 'melhor que a meta' });
+    expect(compararComMeta(pessoal, 2500, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: -500, desvioTexto: '−5,0 pp' });
+    expect(compararComMeta(pessoal, 2500, r.receitaBrutaCentavos).faixa).toMatchObject({ cor: 'AZUL', palavra: 'bem melhor que a meta', confira: 'confira se está tudo lançado' });
     const operacional = r.linhas.find((l) => l.chave === 'resultado-operacional')!;
     expect(operacional.percentualBp).toBe(6800);
-    expect(compararComMeta(operacional, 9000, r.receitaBrutaCentavos).palavra).toBe('pior que a meta');
+    expect(compararComMeta(operacional, 9000, r.receitaBrutaCentavos).faixa).toMatchObject({ cor: 'VERMELHO', palavra: 'muito pior que a meta', confira: null });
   });
-  it('desvio de 4 pontos-base é "na meta"; 5 já não é', () => {
+  it('desvio pequeno é verde, "na meta", para os dois lados (a palavra aposentada de 5 pontos-base virou a faixa)', () => {
     const r = dreDeDezMil(260_000);
     const pessoal = r.linhas.find((l) => l.chave === 'grupo:PESSOAL')!;
-    expect(compararComMeta(pessoal, 2596, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: 4, desvioTexto: '+0,0 pp', palavra: 'na meta' });
-    expect(compararComMeta(pessoal, 2604, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: -4, palavra: 'na meta' });
-    expect(compararComMeta(pessoal, 2595, r.receitaBrutaCentavos).palavra).toBe('pior que a meta');
-    expect(compararComMeta(pessoal, 2605, r.receitaBrutaCentavos).palavra).toBe('melhor que a meta');
-    expect(compararComMeta(pessoal, 2600, r.receitaBrutaCentavos).palavra).toBe('na meta');
+    expect(compararComMeta(pessoal, 2596, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: 4, desvioTexto: '+0,0 pp' });
+    for (const meta of [2596, 2604, 2595, 2605, 2600, 2650]) expect(compararComMeta(pessoal, meta, r.receitaBrutaCentavos).faixa, String(meta)).toMatchObject({ cor: 'VERDE', palavra: 'na meta' });
+    expect(compararComMeta(pessoal, 2549, r.receitaBrutaCentavos).faixa?.cor).toBe('AMARELO'); // 0,51 pp acima da meta de custo
   });
   it('CMV (valor nulo), receita zero e despesa sem lançamento não comparam: traço, nunca zero', () => {
     const r = dreDeDezMil();
     const cmv = r.linhas.find((l) => l.chave === 'cmv')!;
-    expect(compararComMeta(cmv, 3000, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: null, desvioTexto: null, palavra: null, semComparacao: 'sem valor apurado', metaCentavos: 300_000 });
+    expect(compararComMeta(cmv, 3000, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: null, desvioTexto: null, faixa: null, semComparacao: 'sem valor apurado', metaCentavos: 300_000 });
     const energia = r.linhas.find((l) => l.chave === 'energia')!;
     expect(compararComMeta(energia, 400, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: null, semComparacao: 'sem lançamento', metaCentavos: 40_000 });
     const semReceita = montarDre({ escopo: { tipo: 'rede' }, plano, receitas: [], taxaIfood: null, despesas: [], cmv: SEM_CMV });
@@ -163,18 +174,21 @@ describe('2.2b · realizado × meta (critério 5)', () => {
     const linha = r.linhas.find((l) => l.chave === 'resultado-do-periodo')!;
     expect(linha.valorCentavos).toBe(100_000);
     const zerado = { valorCentavos: 0, percentualBp: 0, tipo: 'resultado', sentido: 'MAIOR_MELHOR' as const };
-    expect(compararComMeta(zerado, 500, 100_000)).toMatchObject({ desvioBp: -500, palavra: 'pior que a meta' });
+    expect(compararComMeta(zerado, 500, 100_000)).toMatchObject({ desvioBp: -500 });
+    expect(compararComMeta(zerado, 500, 100_000).faixa).toMatchObject({ cor: 'VERMELHO' });
   });
   it('a meta em R$ faz um arredondamento só', () => {
     expect(compararComMeta({ valorCentavos: 100, percentualBp: 100, tipo: 'linha', sentido: 'MENOR_MELHOR' }, 3333, 1_000_01).metaCentavos).toBe(33_330);
   });
-  it('compararLinhas: a visão da loja não traz meta nos dois resultados; linha sem meta não entra; receita não entra mesmo com meta forjada', () => {
+  it('compararLinhas: a visão da loja não traz meta nos dois resultados; linha sem meta não entra; a receita compara o CRESCIMENTO (2.4), e sem ano passado diz por quê', () => {
     const r = dreDeDezMil();
-    const metas = new Map([['grupo:PESSOAL', 2500], ['resultado-do-periodo', 1000], ['resultado-operacional', 1000], ['receita-loja', 5000], ['grupo:RECEITA', 100]]);
+    const metas = new Map([['grupo:PESSOAL', 2500], ['resultado-do-periodo', 1000], ['resultado-operacional', 1000], ['receita-loja', 500], ['grupo:RECEITA', 100], ['cmv:compra', 100]]);
     const rede = compararLinhas(r.linhas, metas, r.receitaBrutaCentavos, false);
-    expect(Object.keys(rede).sort()).toEqual(['grupo:PESSOAL', 'resultado-do-periodo', 'resultado-operacional']);
+    expect(Object.keys(rede).sort()).toEqual(['grupo:PESSOAL', 'grupo:RECEITA', 'receita-loja', 'resultado-do-periodo', 'resultado-operacional']);
+    expect(rede['receita-loja']).toMatchObject({ tipo: 'crescimento', metaBp: 500, desvioBp: null, faixa: null, semComparacao: 'nenhum dia apurado' });
+    expect(rede['grupo:PESSOAL'].tipo).toBe('percentual');
     const loja = compararLinhas(r.linhas, metas, r.receitaBrutaCentavos, true);
-    expect(Object.keys(loja)).toEqual(['grupo:PESSOAL']);
+    expect(Object.keys(loja).sort()).toEqual(['grupo:PESSOAL', 'grupo:RECEITA', 'receita-loja']);
   });
 });
 
