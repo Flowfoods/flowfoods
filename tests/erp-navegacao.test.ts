@@ -168,7 +168,11 @@ const secao = (h: string, rotulo: string) => {
   const m = new RegExp(`<section aria-label="${rotulo}">([\\s\\S]*?)</section>`).exec(h);
   return m ? m[1] : '';
 };
-const cartoes = (s: string) => s.split(/<li[ >]/).slice(1).map((c) => c.replace(/^[^>]*>/, ''));
+// Cada card é um <li class="min-w-0"> da grade (as abas dentro do card também são <li>, com outra classe).
+const cartoes = (s: string) => s.split('<li class="min-w-0">').slice(1);
+const nomeDoCartao = (c: string) => /ff-cartao-titulo[^"]*"[^>]*>([^<]+)</.exec(c)![1];
+const abasDoCartao = (c: string) =>
+  [...(/<ul aria-label="Abas de [^"]*"[^>]*>([\s\S]*?)<\/ul>/.exec(c)?.[1] ?? '').matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]+)<\/a>/g)].map((m) => ({ rotulo: m[2], href: m[1] }));
 const texto = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 
 describe('UX.9 · hub: um card por área, nunca uma ação', () => {
@@ -198,29 +202,59 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     expect(semInsumos[0]).toBe('/erp/fichas');
   });
 
-  it('nenhum card, em nenhum papel, tem rótulo de ação ou de aba solta', () => {
+  it('nenhum card, em nenhum papel, tem rótulo de ação ou de aba solta como NOME', () => {
     const proibidos = [...ACOES, 'Fornecedores', 'Contagens', 'Requisições'];
     for (const a of [DONO, GERENTE, GERENTE_N3, OPERADOR]) {
       for (const c of cartoes(secao(html(a), 'Em uso'))) {
-        // O nome do card (o primeiro texto em negrito) nunca é uma ação nem uma aba: é uma das 4 áreas.
-        const nome = /font-semibold text-texto">([^<]+)</.exec(c)![1];
+        // O nome do card (o título, link principal) nunca é uma ação nem uma aba: é uma das 4 áreas.
+        const nome = nomeDoCartao(c);
         expect(AREAS, nome).toContain(nome);
         expect(proibidos, nome).not.toContain(nome);
       }
     }
   });
 
-  it('o card mostra nome, descrição e a lista em texto das abas permitidas; sem número, R$ nem %', () => {
+  it('o card mostra nome, descrição e as abas permitidas, cada uma um link próprio; sem número, R$ nem %', () => {
     const uso = cartoes(secao(html(OPERADOR), 'Em uso'));
     expect(uso).toHaveLength(3);
     const t = uso.map(texto);
     expect(t[0]).toContain('Cadastros e Cardápio');
     expect(t[0]).toContain('Do insumo à ficha técnica e ao preço de venda');
-    expect(t[0]).toContain('Abas: Insumos · Fichas e produtos');
+    expect(abasDoCartao(uso[0]).map((a) => a.rotulo)).toEqual(['Insumos', 'Fichas e produtos']);
+    expect(abasDoCartao(uso[1]).map((a) => a.rotulo)).toEqual(['Visão geral', 'Contagens', 'Requisições']);
     expect(t[0]).not.toContain('Precificação');
-    expect(t[1]).toContain('Abas: Visão geral · Contagens · Requisições');
     expect(t[1]).not.toContain('Divergências');
     for (const x of cartoes(secao(html(DONO), 'Em uso')).map(texto)) expect(x).not.toMatch(/R\$|%|\d/);
+  });
+
+  it('as abas do card levam direto à aba (Contagens → /estoque/contagens) e o título leva à primeira; nunca link dentro de link', () => {
+    const uso = cartoes(secao(html(DONO), 'Em uso'));
+    const estoque = uso[2];
+    expect(abasDoCartao(estoque)).toEqual([
+      { rotulo: 'Visão geral', href: '/erp/estoque' },
+      { rotulo: 'Contagens', href: '/erp/estoque/contagens' },
+      { rotulo: 'Requisições', href: '/erp/estoque/requisicoes' },
+      { rotulo: 'Divergências', href: '/erp/estoque/divergencias' },
+    ]);
+    expect(/href="([^"]+)"/.exec(estoque)![1]).toBe('/erp/estoque');
+    for (const c of uso) {
+      // Abre e fecha de um em um: o título fecha antes de a primeira aba abrir.
+      expect(c.indexOf('</a>')).toBeLessThan(c.indexOf('<a ', c.indexOf('<a ') + 1));
+      let fundo = 0;
+      for (const m of c.matchAll(/<(\/?)a[ >]/g)) {
+        fundo += m[1] ? -1 : 1;
+        expect(fundo).toBeLessThanOrEqual(1);
+      }
+      expect(c).toContain('aria-label="Abas de ');
+    }
+  });
+
+  it('o resumo do seletor de área é curto (não corta no menu de 232 px) e existe em toda área', () => {
+    for (const m of modulosDoParceiro(DONO).filter((x) => x.href)) {
+      expect(m.resumo, m.nome).toBeTruthy();
+      expect(m.resumo!.length, m.resumo).toBeLessThanOrEqual(20);
+    }
+    for (const m of navegacaoDoNivel1().modulos) expect(m.resumo!.length, m.nome).toBeLessThanOrEqual(20);
   });
 
   it('Operador não vê a área Compras no hub; perfil sem aba de uma área não a vê', () => {
@@ -520,6 +554,25 @@ describe('UX.9 · guardas estáticas', () => {
       }
     }
     expect(repetidos).toEqual([]);
+  });
+
+  it('o título da tela é o da aba (Compras, Visão geral, Precificação)', () => {
+    const lista = readFileSync(join('src', 'components', 'erp', 'telas', 'compras', 'lista-notas.tsx'), 'utf8');
+    expect(lista).toMatch(/titulo="Compras"/);
+    const estoque = readFileSync(join('src', 'components', 'erp', 'telas', 'estoque', 'situacao.tsx'), 'utf8');
+    expect(estoque).toMatch(/titulo="Visão geral"/);
+    const canais = readFileSync(join('src', 'components', 'erp', 'telas', 'fichas', 'canais.tsx'), 'utf8');
+    expect(canais).toMatch(/titulo="Precificação"/);
+  });
+
+  it('"Margem de cada prato" só aparece com "ver fichas" (o atalho leva à lista de fichas, que recusaria)', () => {
+    const canais = readFileSync(join('src', 'components', 'erp', 'telas', 'fichas', 'canais.tsx'), 'utf8');
+    expect(canais).toMatch(/podeVerFichas \? \(\s*<Link href=\{`\$\{base\}\?tipo=PRATO`\}/);
+    expect(readFileSync(join('src', 'app', 'erp', 'fichas', 'canais', 'page.tsx'), 'utf8')).toMatch(/podeVerFichas=\{pode\(ctx\.alcance, 'fichas\.ver'\)\}/);
+  });
+
+  it('o texto do destino de quem abre tela fora do acesso diz "Áreas da Rede" (contexto.ts)', () => {
+    expect(readFileSync(join('src', 'lib', 'erp', 'contexto.ts'), 'utf8')).not.toContain('Módulos da Rede');
   });
 
   it('as telas de ação declaram a própria trilha (eram itens do menu e perderam o rótulo)', () => {

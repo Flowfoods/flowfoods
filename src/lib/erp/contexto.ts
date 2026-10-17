@@ -118,12 +118,12 @@ export async function parceiroDoNivel1OuNada(slug: string): Promise<ContextoDoPa
 }
 
 /**
- * Telas do /erp. A primeira é o hub "Módulos da Rede" (livre: só a sessão; ele
+ * Telas do /erp. A primeira é o hub "Áreas da Rede" (livre: só a sessão; ele
  * lista só o que `modulosDoParceiro(alcance)` libera) — é para lá que vai quem
  * abre uma tela fora do acesso.
  */
 export const TELAS_DO_ERP: { href: string; rotulo: string; permissao: Permissao | null }[] = [
-  { href: '/erp', rotulo: 'Módulos da Rede', permissao: null },
+  { href: '/erp', rotulo: 'Áreas da Rede', permissao: null },
   { href: '/erp/insumos', rotulo: 'Insumos', permissao: 'insumos.ver' },
   { href: '/erp/fichas', rotulo: 'Fichas técnicas', permissao: 'fichas.ver' },
   { href: '/erp/compras', rotulo: 'Notas de compra', permissao: 'compras.ver' },

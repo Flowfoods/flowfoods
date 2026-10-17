@@ -84,6 +84,11 @@ export interface ModuloNav {
   chave: string;
   nome: string;
   subtitulo: string;
+  /**
+   * Texto curto (até uns 18 caracteres) para o seletor de área do menu, que é
+   * estreito e não pode cortar a frase: o `subtitulo` é do card do hub.
+   */
+  resumo?: string;
   icone: ChaveIcone;
   /** Cor do módulo: só no quadrado do ícone (hub, seletor de módulo, cabeçalho). */
   cor: string;
@@ -139,6 +144,7 @@ interface DefinicaoDeArea {
   chave: string;
   nome: string;
   subtitulo: string;
+  resumo: string;
   icone: ChaveIcone;
   cor: string;
   grupos: { rotulo: string; icone: ChaveIcone; telas: Tela[] }[];
@@ -197,6 +203,7 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       chave: 'cadastros',
       nome: 'Cadastros e Cardápio',
       subtitulo: 'Do insumo à ficha técnica e ao preço de venda',
+      resumo: 'Insumos e fichas',
       icone: 'insumo',
       cor: COR.insumo,
       grupos: [
@@ -262,6 +269,7 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       chave: 'compras',
       nome: 'Compras e Fornecedores',
       subtitulo: 'Notas lançadas, quem vende e o preço pago',
+      resumo: 'Compras e preços',
       icone: 'compras',
       cor: COR.compras,
       grupos: [
@@ -307,6 +315,7 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       chave: 'estoque',
       nome: 'Estoque e Movimentações',
       subtitulo: 'Saldo por loja, contagem, requisição e divergência',
+      resumo: 'Saldo e contagem',
       icone: 'estoque',
       cor: COR.estoque,
       grupos: [
@@ -362,6 +371,7 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       chave: 'rede',
       nome: 'Rede e Equipe',
       subtitulo: 'Lojas, marcas, pessoas, perfis, histórico e acessos',
+      resumo: 'Lojas e pessoas',
       icone: 'rede',
       cor: COR.rede,
       grupos: [
@@ -444,6 +454,7 @@ export function modulosDoParceiro(alcance: Alcance, base = '/erp'): ModuloNav[] 
       chave: m.chave,
       nome: m.nome,
       subtitulo: m.subtitulo,
+      resumo: m.resumo,
       icone: m.icone,
       cor: m.cor,
       href: grupos[0].itens[0].href,

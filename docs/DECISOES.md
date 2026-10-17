@@ -1442,3 +1442,9 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) manter todas as telas num grupo só; (b) um módulo do nível 1 por área.
 
 **Razão:** (a) deixaria o menu do nível 1 sem a estrutura que o parceiro vê; (b) misturaria as áreas do parceiro com Comercial e Clientes. Um grupo por área dá o mesmo vocabulário do parceiro, as abas saem de `item.area` e as ações vão para o ⌘K do nível 1.
+
+### 109. 2026-10-17 · UX.9 (aprovação): título da tela = nome da aba; card de área com as abas como links irmãos; seletor com resumo curto
+
+**Alternativas:** (a) renomear as abas para os títulos antigos ("Notas de compra", "Estoque por loja"); (b) alinhar os títulos às abas do contrato ("Compras", "Visão geral"); para o card — (c) manter as abas em texto; (d) cada aba um link próprio, com o título como link esticado.
+
+**Razão:** (b) porque as abas são palavras do contrato do dono; "Estoque por loja" passa ao subtítulo da Visão geral. (d) porque o atalho "Contagens" no card poupa um clique: o título é o link principal e estica sobre o card (o card inteiro continua clicável) e as abas são links irmãos acima da camada esticada, sem link dentro de link e com foco por Tab. O seletor de área (estreito) ganha um `resumo` próprio de até 20 caracteres, para não cortar a frase. "Margem de cada prato" só aparece com "ver fichas".

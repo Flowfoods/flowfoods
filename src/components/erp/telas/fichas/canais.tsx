@@ -81,6 +81,7 @@ export function TelaCanaisDeVenda({
   versao,
   historico,
   podeEditar,
+  podeVerFichas,
   bloqueio,
   acao,
   feito,
@@ -96,6 +97,8 @@ export function TelaCanaisDeVenda({
   historico: LinhaDeHistorico[];
   /** Só quem muda preços (a dona) configura a taxa. */
   podeEditar: boolean;
+  /** O atalho "Margem de cada prato" leva à lista de fichas: só com "ver fichas" (a rota recusaria). */
+  podeVerFichas: boolean;
   bloqueio: string | null;
   acao: AcaoDeCadastro;
   feito?: string;
@@ -114,9 +117,11 @@ export function TelaCanaisDeVenda({
         subtitulo={`${contexto} · canais de venda: o que entra no custo do prato em cada um`}
         acao={
           // O preço e a margem de cada prato já estão na lista de fichas (só para quem vê preços): daqui é um clique.
-          <Link href={`${base}?tipo=PRATO`} className={classeDeBotao('secundario')}>
-            Margem de cada prato
-          </Link>
+          podeVerFichas ? (
+            <Link href={`${base}?tipo=PRATO`} className={classeDeBotao('secundario')}>
+              Margem de cada prato
+            </Link>
+          ) : undefined
         }
       />
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}

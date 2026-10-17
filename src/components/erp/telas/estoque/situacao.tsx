@@ -114,8 +114,8 @@ export function TelaSituacaoDoEstoque({
       <PageHeader
         icone="estoque"
         cor={COR.estoque}
-        titulo="Estoque por loja"
-        subtitulo={`${contexto} · ${abertas.length} de ${lojas.length} ${lojas.length === 1 ? 'loja aberta' : 'lojas abertas'}`}
+        titulo="Visão geral"
+        subtitulo={`${contexto} · estoque por loja · ${abertas.length} de ${lojas.length} ${lojas.length === 1 ? 'loja aberta' : 'lojas abertas'}`}
       />
       {feito && <Aviso tom="ok" titulo={feito} />}
       {bloqueio && <Aviso tom="alerta" titulo="Somente leitura.">{bloqueio}</Aviso>}

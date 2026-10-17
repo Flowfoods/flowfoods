@@ -19,6 +19,7 @@ export default async function ParceiroCanaisDeVendaPage({ params, searchParams }
       versao={t.versao}
       historico={t.historico}
       podeEditar
+      podeVerFichas
       bloqueio={ctx.bloqueio}
       acao={acaoSalvarTaxaDoIfood.bind(null, ctx.parceiro.slug)}
       feito={searchParams.feito}

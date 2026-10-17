@@ -3,7 +3,7 @@
  * pessoa do parceiro (/erp) e para o nível 1 dentro do parceiro
  * (/rodolfo/erp/<slug>). Recebe as áreas já filtradas pelo alcance de quem vê
  * (`modulosDoParceiro`): em uso, UM CARD POR ÁREA (nome, descrição e as abas
- * que a pessoa pode abrir; área sem aba permitida nem chega aqui); as do plano
+ * que a pessoa pode abrir, cada uma um link; área sem aba permitida nem chega aqui); as do plano
  * ainda sem tela, desabilitadas com a fase. O card nunca é uma ação ("Novo
  * insumo", "Lançar nota"): as ações moram no cabeçalho da aba e no ⌘K.
  */
@@ -47,7 +47,7 @@ export function HubDoParceiro({
               icone: m.icone,
               cor: m.cor,
               href: m.href,
-              abas: m.grupos.flatMap((g) => g.itens.map((i) => i.rotulo)),
+              abas: m.grupos.flatMap((g) => g.itens.map((i) => ({ rotulo: i.rotulo, href: i.href }))),
             })),
           },
           {

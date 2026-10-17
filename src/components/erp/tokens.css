@@ -160,6 +160,21 @@ html:has(.ff-app[data-tema='escuro']) {
   outline-offset: -3px;
 }
 
+/* Título do card de área: link esticado sobre o card todo; o anel de foco envolve o CARD, não só o título. */
+.ff-app a.ff-cartao-titulo::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+}
+.ff-app a.ff-cartao-titulo:focus-visible {
+  outline: none;
+}
+.ff-app a.ff-cartao-titulo:focus-visible::after {
+  outline: 3px solid rgb(var(--ff-acento));
+  outline-offset: 2px;
+}
+
 /* Diálogo nativo (busca, drawer, sheet): uma camada de superfície + a única sombra do sistema. */
 .ff-app dialog.ff-dialogo {
   background: rgb(var(--ff-painel));

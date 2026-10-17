@@ -1257,7 +1257,9 @@ ou ação é conforto; a página e a action seguem conferindo `exigirPermissaoNa
 | Futuros (desabilitados, sem link) | Faturamento e DRE 2.1 · Produção 3.1 · Etiquetas 3.4 | |
 
 1. **Hub** (`/erp` "Áreas da Rede" e `/rodolfo/erp/<slug>`): um card por área com acesso (nome, descrição do
-   fluxo e as abas permitidas, em texto; sem número, R$ nem %). O card leva à primeira aba permitida; não há
+   fluxo e as abas permitidas; sem número, R$ nem %). O título é o link principal e estica sobre o card todo
+   (o card inteiro leva à primeira aba permitida); os nomes das abas são links irmãos acima dessa camada
+   (nunca link dentro de link; chegam por Tab depois do título, e "Contagens" abre `/estoque/contagens`). Não há
    rota de "visão geral de área". Nenhum card é uma ação. Abaixo de 600 px, uma coluna. O `flatMap` de itens
    do hub saiu (Regra Nº 2: não há hub novo ao lado do velho).
 2. **Área sem aba permitida some** do hub, do seletor, do menu e do ⌘K; as ações somem com ela. "Rede e
@@ -1277,11 +1279,13 @@ ou ação é conforto; a página e a action seguem conferindo `exigirPermissaoNa
    Porta: "ver o estoque". A contagem mora dentro da loja (`<loja>/periodo`, `<loja>/contagens/...`) e acende
    a aba Contagens (`ativoEm`).
 7. **Precificação** é o nome da aba e o título da tela `/fichas/canais` (taxa do iFood, embalagens, margem-alvo);
-   o link "Margem de cada prato" leva a `/fichas?tipo=PRATO`, onde preço e margem por ficha já aparecem, filtrados
+   o link "Margem de cada prato" (só com "ver fichas") leva a `/fichas?tipo=PRATO`, onde preço e margem por ficha já aparecem, filtrados
    no servidor por "ver preços". Nenhuma lista nova.
 8. **Nível 1**: `comParceiroAtual` monta um grupo por área dentro de "Parceiros Flow" (mais "Áreas do parceiro")
    e leva as ações para o ⌘K. O seletor do menu diz "Área".
-9. Rótulos: "Fichas e produtos" é só rótulo (não existe entidade "produto" nova); "Lançar nota" continua.
+9. Rótulos: "Fichas e produtos" é só rótulo (não existe entidade "produto" nova); "Lançar nota" continua. O
+   título de cada tela é o da aba: "Compras" (era "Notas de compra") e "Visão geral" (era "Estoque por loja", que
+   passa ao subtítulo). O seletor de área do menu usa um `resumo` curto (até 20 caracteres), não o subtítulo do card.
 10. Kit Kairu: card de 14 px (Dark), um CTA principal por cabeçalho e `aria-current="page"` no destino ativo
     (Corporativo), vazio com próximo passo. Identidade FlowFoods mantida; scanner do avoid-ai-design com 0 P0 e 0 P1.
 
@@ -1878,7 +1882,7 @@ banco de teste: o operador é recusado pelo servidor.
 - O formulário não tem CAPTCHA; a armadilha só pega robô simples. Spam feito à mão passa até 3/h por IP
   e 100/dia no total, e cai no quadro como cartão Novo para recusar com motivo.
 
-## Herança da UX.9 (para as próximas subfases)
+## Herança da seção 9 (UX.9, para as próximas subfases)
 
 - **Módulo novo = área nova ou aba nova em `areasConstruidas`** (e uma linha em `ROTAS_ATIVAS` do
   `tests/erp-navegacao.test.ts`). O teste que varre o disco falha se uma página do `/erp` ou do espelho do
@@ -1892,3 +1896,16 @@ banco de teste: o operador é recusado pelo servidor.
 - A cor da área (card, seletor) não bate com a de algumas telas (Fichas âmbar dentro da área verde de
   Cadastros): a cor marca a tela; aceito.
 - Parceiro em RASCUNHO/SUSPENSO: as ações do ⌘K abrem telas que mostram o bloqueio (como os botões hoje).
+- **Hub com 1 coluna no celular**: a régua do plano pede 2 colunas; o kit Dark manda 1 abaixo de 600 px e os cards
+  de área têm texto longo. Decidido por 1 coluna; se o Rodolfo preferir 2, é só a classe da grade em `ui/hub.tsx`.
+- **Grupos do menu com 1 item** (Insumos, Rede, Estoque) repetem a aba logo abaixo; o menu ficou fiel à estrutura
+  de abas. Se incomodar, fundir os grupos de 1 item numa seção só (só configuração, em `areasConstruidas`).
+- **Divergências a 390 px** (lista de lojas) não mostra estado por loja (só o nome), diferente de Requisições
+  (pendentes) e Contagens (selo do estoque). Precisa de uma consulta nova de "divergências abertas por loja".
+- **Equipe a 390 px** passa de 41 mil px de altura (lista de pessoas, perfis e lojas, tudo aberto): paginar ou
+  colapsar por pessoa. Anterior à UX.9 (a tela é da 0.4), não piorou.
+- **Trilha do nível 1 sem a área** (`Parceiros Flow › Aba`): a decisão 105 manteve assim para não alongar a
+  trilha; o contrato pede `Início › Área › Aba`. Se o Rodolfo quiser o literal, `montarTrilha` pode inserir a
+  área (`item.area`) quando ela difere do módulo.
+- **O Operador vê custo de insumo** porque `insumos.ver` é "Ver insumos e custos" (catálogo de permissões da
+  0.4): tirar é regra de permissão, fora da UX.9.

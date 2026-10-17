@@ -193,7 +193,7 @@ function Grupo({
 
 function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: ModuloNav | null; recolhido: boolean }) {
   const nome = atual?.nome ?? 'Início';
-  const sub = atual?.subtitulo ?? nav.inicio.titulo;
+  const sub = atual?.resumo ?? atual?.subtitulo ?? nav.inicio.titulo;
   return (
     <Popover
       rotulo={`Área: ${nome}. Trocar de área`}
@@ -235,7 +235,7 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
               <OpcaoDeModulo
                 href={m.href}
                 nome={m.nome}
-                sub={m.href ? m.subtitulo : 'Em breve'}
+                sub={m.href ? (m.resumo ?? m.subtitulo) : 'Em breve'}
                 icone={m.icone}
                 cor={m.cor}
                 atual={atual?.chave === m.chave}
