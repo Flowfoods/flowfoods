@@ -34,7 +34,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.2 · RLS, status e Parceiro Flow (Postgres re
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
   const avisos = vi.spyOn(console, 'warn').mockImplementation(() => {});
-  const sufixo = Date.now().toString(36);
+  const sufixo = globalThis.crypto.randomUUID().slice(0, 8);
   const ids: string[] = [];
   let A: string;
   let B: string;

@@ -70,7 +70,7 @@ import {
   normalizarEmail,
   tokenTemFormato,
 } from './acesso';
-import { fraseJaDecidido, FRASE_PEDIDO_MEXIDO, lerAtivacao, type EtapaDoPedido } from './pedido-campos';
+import { ERRO_DONO_JA_TEM_ACESSO, fraseJaDecidido, FRASE_PEDIDO_MEXIDO, lerAtivacao, type EtapaDoPedido } from './pedido-campos';
 import {
   configDoRosto,
   desafioDaResposta,
@@ -618,9 +618,8 @@ interface EntradaDoAcesso {
   soPessoaNova?: boolean;
 }
 
-/** Frase neutra: serve ao nível 1 e não revela mais do que ele já vê. */
-export const ERRO_DONO_JA_TEM_ACESSO =
-  'Este e-mail já tem acesso ao ERP. Use outro e-mail para o dono ou ligue a pessoa pela Equipe do parceiro depois de ativar.';
+/** Frase neutra (a mesma que o formulário mostra: `pedido-textos.ts`). */
+export { ERRO_DONO_JA_TEM_ACESSO };
 
 /**
  * O miolo de `criarAcesso`, dentro de uma transação que já travou a equipe e

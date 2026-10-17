@@ -12,6 +12,7 @@
 
 import { useState } from 'react';
 import { useFormState } from 'react-dom';
+import { ERRO_DONO_JA_TEM_ACESSO } from '@/lib/erp/pedido-textos';
 import { gerarSlug } from '@/lib/erp/slug';
 import { BotaoEnviar } from '@/components/erp/ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '@/components/erp/ui/campos';
@@ -26,6 +27,7 @@ export function DecisaoDoPedido({
   status,
   versao,
   padrao,
+  conflito,
   ativar,
   mover,
   recusar,
@@ -33,6 +35,8 @@ export function DecisaoDoPedido({
   status: 'NOVO' | 'EM_CONVERSA' | 'ATIVADO' | 'RECUSADO';
   versao: number;
   padrao: { nomeParceiro: string; donoNome: string; donoEmail: string };
+  /** O e-mail do pedido já existe no ERP: não serve de dono (o servidor confere de novo). */
+  conflito: { email: string } | null;
   ativar: Acao;
   mover: Acao;
   recusar: Acao;
@@ -43,8 +47,12 @@ export function DecisaoDoPedido({
   const [nome, setNome] = useState(padrao.nomeParceiro);
   const [slug, setSlug] = useState('');
   const [slugEditado, setSlugEditado] = useState(false);
+  const [donoEmail, setDonoEmail] = useState(padrao.donoEmail);
   const slugMostrado = slugEditado ? slug : gerarSlug(nome);
   const e = estAtivar && !estAtivar.ok ? (estAtivar.erros ?? {}) : {};
+  const emConflito = !!conflito && donoEmail.trim().toLowerCase() === conflito.email.toLowerCase();
+  // A frase aparece UMA vez, no campo: a que o servidor devolveu, ou a que o cartão já sabe.
+  const erroDoEmail = e.donoEmail ?? (emConflito ? ERRO_DONO_JA_TEM_ACESSO : undefined);
 
   // O link acabou de nascer: fica à vista mesmo que a página já mostre "Ativado".
   if (estAtivar?.ok && estAtivar.ativacao) {
@@ -163,22 +171,23 @@ export function DecisaoDoPedido({
               id="ativar-email"
               name="donoEmail"
               type="email"
-              defaultValue={padrao.donoEmail}
+              value={donoEmail}
+              onChange={(ev) => setDonoEmail(ev.target.value)}
               required
               maxLength={160}
               autoComplete="off"
-              aria-invalid={!!e.donoEmail}
+              aria-invalid={!!erroDoEmail}
               aria-describedby="ativar-email-erro"
               className={CAMPO}
             />
-            <Erro id="ativar-email-erro" texto={e.donoEmail} />
+            <Erro id="ativar-email-erro" texto={erroDoEmail} />
           </div>
           {e.geral && (
             <p role="alert" className="text-[13px] text-erro">
               {e.geral}
             </p>
           )}
-          <BotaoEnviar className="w-full" pendente="Ativando…">
+          <BotaoEnviar className="w-full" pendente="Ativando…" disabled={emConflito}>
             Ativar e criar acesso
           </BotaoEnviar>
         </form>
@@ -228,7 +237,7 @@ export function ExcluirDados({ excluir, jaExcluido }: { excluir: (anterior: Esta
           Apaga nome, WhatsApp, e-mail e cidade deste pedido. O cartão e o histórico ficam, sem dado pessoal. Não dá para desfazer.
         </p>
         <BotaoEnviar variante="perigo" className="w-full" pendente="Excluindo…">
-          Excluir dados pessoais
+          Confirmar exclusão
         </BotaoEnviar>
         {estado && (
           <p role={estado.ok ? 'status' : 'alert'} className={`text-[13px] ${estado.ok ? 'text-ok' : 'text-erro'}`}>

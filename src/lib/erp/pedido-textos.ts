@@ -28,6 +28,13 @@ export const RESPOSTA_BLOQUEADO = 'Muitos pedidos deste endereço. Fale pelo Wha
 export const RESPOSTA_SEM_BANCO = 'O formulário está fora do ar por enquanto. Fale pelo WhatsApp.';
 export const RESPOSTA_DE_ERRO = 'Não deu para enviar agora. Fale pelo WhatsApp.';
 
+/**
+ * A ativação só cria pessoa NOVA (decisão 99): e-mail que já existe no ERP é recusado.
+ * No arquivo sem dependências para o formulário (cliente) mostrar a MESMA frase do servidor.
+ */
+export const ERRO_DONO_JA_TEM_ACESSO =
+  'Este e-mail já tem acesso ao ERP. Use outro e-mail para o dono; depois, em Equipe do parceiro, dê acesso a essa pessoa.';
+
 /** Etapas do quadro (coluna e selo). */
 export type EtapaDoPedido = 'NOVO' | 'EM_CONVERSA' | 'ATIVADO' | 'RECUSADO';
 

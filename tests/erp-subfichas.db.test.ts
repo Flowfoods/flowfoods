@@ -57,7 +57,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
   let pasta: string;
-  const sufixo = `s${Date.now().toString(36)}`;
+  const sufixo = `s${globalThis.crypto.randomUUID().slice(0, 8)}`;
   let A: { id: string; slug: string; nome: string; status: string };
   let B: { id: string; slug: string; nome: string; status: string };
   let a: ClienteDoParceiro;

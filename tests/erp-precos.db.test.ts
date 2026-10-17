@@ -67,7 +67,7 @@ const sp = (t: string) => t.replace(/\s/g, ' ');
 describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres real)', { timeout: 120_000 }, () => {
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
-  const sufixo = `p${Date.now().toString(36)}`;
+  const sufixo = `p${globalThis.crypto.randomUUID().slice(0, 8)}`;
   let A: { id: string };
   let B: { id: string };
   let a: ClienteDoParceiro;

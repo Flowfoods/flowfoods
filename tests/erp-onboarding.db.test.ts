@@ -47,7 +47,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.5 · onboarding: pedido, quadro, ativação e
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
   const avisos = vi.spyOn(console, 'warn').mockImplementation(() => {});
-  const sufixo = Date.now().toString(36);
+  const sufixo = globalThis.crypto.randomUUID().slice(0, 8);
   const email = (n: string) => `${n}.${sufixo}@teste.flow`;
   const ipDe = (n: string) => `10.5.${n}-${sufixo}`;
   let contador = 0;

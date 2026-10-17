@@ -60,7 +60,7 @@ const URL_TESTE = process.env.ERP_DB_TESTE;
 describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { timeout: 60_000 }, () => {
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
-  const sufixo = `i${Date.now().toString(36)}`;
+  const sufixo = `i${globalThis.crypto.randomUUID().slice(0, 8)}`;
   let A: { id: string; slug: string; nome: string };
   let B: { id: string; slug: string; nome: string };
   let S: { id: string; slug: string; nome: string };

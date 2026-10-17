@@ -52,7 +52,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
   const avisos = vi.spyOn(console, 'warn').mockImplementation(() => {});
-  const sufixo = Date.now().toString(36);
+  const sufixo = globalThis.crypto.randomUUID().slice(0, 8);
   const email = (n: string) => `${n}.${sufixo}@teste.flow`;
   const ip = (n: number) => `10.${n}.0.${Math.floor(Math.random() * 250)}-${sufixo}`;
   const ids: string[] = [];

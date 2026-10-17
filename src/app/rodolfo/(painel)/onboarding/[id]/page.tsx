@@ -80,12 +80,6 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
         }
       />
       {searchParams.feito === 'manual' && <Aviso tom="ok" titulo="Pedido cadastrado." />}
-      {conta.existe && (
-        <Aviso tom="alerta" titulo="Este e-mail já tem acesso ao ERP.">
-          {conta.parceiros.length > 0 ? `${conta.parceiros.join(', ')}. ` : ''}Não dá para ativar o pedido com ele como dono: a ativação só cria pessoa nova e nunca mexe
-          na senha de quem já existe. Troque o e-mail do dono no formulário, ou ative com outro e ligue a pessoa pela Equipe do parceiro depois.
-        </Aviso>
-      )}
       {p.leadDoBarney && (
         <Aviso tom="alerta" titulo={`Este WhatsApp já está no Barney: ${SITUACAO_DO_LEAD[p.leadDoBarney] ?? p.leadDoBarney}.`}>
           Só aviso: nada foi pausado na cadência.
@@ -150,6 +144,7 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
             status={p.status}
             versao={p.versao}
             padrao={{ nomeParceiro: p.nomeGrupo, donoNome: p.responsavel, donoEmail: p.email }}
+            conflito={conta.existe ? { email: p.email } : null}
             ativar={acaoAtivarPedido.bind(null, p.id)}
             mover={acaoMoverPedido.bind(null, p.id)}
             recusar={acaoRecusarPedido.bind(null, p.id)}

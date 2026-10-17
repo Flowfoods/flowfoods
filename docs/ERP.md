@@ -1175,13 +1175,14 @@ RLS, e no `ff_dev` com dado.
    com gatilho de falha forçada). **A ativação só cria pessoa NOVA** (decisão 99, veto do Guardião): se o
    e-mail do dono já existe em `UsuarioErp` — com senha, com convite pendente, com acesso desativado,
    em qualquer caixa —, a ativação é RECUSADA com a frase "Este e-mail já tem acesso ao ERP. Use outro
-   e-mail para o dono ou ligue a pessoa pela Equipe do parceiro depois de ativar.", sem criar nada e sem
+   e-mail para o dono; depois, em Equipe do parceiro, dê acesso a essa pessoa.", sem criar nada e sem
    tocar em senha, rosto, sessão ou link de ninguém. Antes isso era um sequestro de conta: o e-mail de
    outra pessoa no formulário público + o WhatsApp do atacante faziam a ativação apagar a senha e os
    rostos da vítima e mandar o link do nível 1 para o atacante. A checagem fica dentro da transação
    (`soPessoaNova` no miolo do acesso) e a corrida com a Equipe criando o mesmo e-mail cai no único do
-   e-mail (P2002 vira a mesma frase). O cartão do pedido avisa (com os parceiros em que a conta entra) e
-   diz o contrário do que dizia: "não dá para ativar com ele como dono". O único caminho em que dado do
+   e-mail (P2002 vira a mesma frase). O formulário de ativação mostra a frase UMA vez, no campo do e-mail, e
+   desabilita "Ativar e criar acesso" enquanto o e-mail do pedido está em conflito (o servidor confere de
+   novo, inclusive quando o e-mail digitado é outro que já existe). O único caminho em que dado do
    público chega a `criarAcesso`/`gerarNovoLink` é esta ativação (o pedido manual e o formulário do site
    só gravam o pedido).
 7. **Convite sem SMTP** (decisão 95): o link aparece UMA vez, na resposta da ativação (estado da tela,
@@ -1791,6 +1792,17 @@ banco de teste: o operador é recusado pelo servidor.
   de plano; criar lojas e marcas a partir do número informado (é só informativo); pausar a cadência do
   Barney quando o telefone coincide (hoje só o aviso no cartão); arrastar e soltar; exportar CSV; reabrir
   recusado (novo envio vira novo pedido); trocar o link "/rodolfo/login" do cabeçalho da landing.
+- **[médio] Pré-sequestro por pedido** (apontado na aprovação): a conta criada pela ativação de um pedido
+  nasce SEM e-mail confirmado (o link vai para o WhatsApp do pedido, não para a caixa do e-mail). Quem manda
+  o e-mail de OUTRA pessoa que ainda não tem conta, e é ativado, cria a conta com a senha dele; se depois
+  o nível 1 ligar esse e-mail à Equipe de outro parceiro (a pessoa de verdade foi contratada), o dono falso
+  entra lá com a senha que escolheu. A ativação já recusa e-mail existente (decisão 99); falta fechar o
+  outro lado: marcar a origem da conta ("criada por pedido", sem e-mail confirmado) e, ao ligar essa
+  pessoa à Equipe de outro parceiro, pedir confirmação explícita do nível 1 (e ele mandar link novo, que
+  apaga a senha do dono falso). Mitigação de hoje: o Rodolfo conversa com a pessoa antes de ativar e vê o
+  WhatsApp do pedido no cartão.
+- **Retenção automática de 180 dias** (a rotina do worker): o texto público já promete "até 180 dias" e
+  pedido de exclusão pelo WhatsApp; até a rotina existir, a exclusão é manual ("Excluir dados pessoais").
 - **Infra (já é pendência):** o IP do limite é o `X-Real-Ip` cru do Traefik (porta 3000 nunca exposta; atrás de
   CDN o limite vira por proxy); e os testes com banco como dono não-superusuário com RLS precisam rodar em
   série (`--no-file-parallelism`: a limpeza desliga o FORCE numa transação e dá deadlock em paralelo).

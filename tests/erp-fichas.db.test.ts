@@ -61,7 +61,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
   let pasta: string;
-  const sufixo = `f${Date.now().toString(36)}`;
+  const sufixo = `f${globalThis.crypto.randomUUID().slice(0, 8)}`;
   let A: { id: string; slug: string; nome: string; status: string };
   let B: { id: string; slug: string; nome: string; status: string };
   let a: ClienteDoParceiro;

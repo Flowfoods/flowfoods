@@ -70,7 +70,7 @@ const DIA = 86_400_000;
 describe.skipIf(!URL_TESTE)('ERP 1.7 · contagem do dia a dia (Postgres real)', { timeout: 120_000 }, () => {
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
-  const sufixo = `c${Date.now().toString(36)}`;
+  const sufixo = `c${globalThis.crypto.randomUUID().slice(0, 8)}`;
   let A: { id: string; slug: string; nome: string; status: string };
   let B: { id: string; slug: string; nome: string; status: string };
   let a: ClienteDoParceiro;
