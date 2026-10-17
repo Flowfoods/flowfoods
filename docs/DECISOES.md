@@ -1896,3 +1896,69 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) permissões novas de produção e custo; (b) `producao.ver` e `producao.registrar` (já no catálogo) bastam, o custo segue `insumos.ver`, e o grupo `etiquetas` nasce em breve.
 
 **Razão:** (b). O operador da cozinha produz e não recebe valor. O Histórico fala "Lote" (Planejou, Iniciou, Concluiu, Cancelou, Estornou) e tira os campos de custo de quem não vê custos. A migration `20261029000000_erp_producao` é aditiva e tolerante a dado antigo: CHECKs `NOT VALID` + `VALIDATE` em bloco que avisa, índices únicos em bloco que apanha `unique_violation`, nenhum passo depende de SELECT sob RLS (superusuário, dono com FORCE RLS e dono sem RLS provados com dado antigo). `erp:conferir-migracao` lista o que ficar pendente.
+
+### 202. 2026-10-17 · ERP 3.2: a lista do dia É o conjunto de lotes do dia (sem tabela de lista)
+
+**Alternativas:** (a) tabela `ListaDoDia` + "gerar ordens", com a quantidade e a ficha duplicadas e dois estados para manter em sincronia; (b) a lista da loja L no dia D = as `OrdemProducao` de L com `dataPlanejada = D`, de qualquer etapa.
+
+**Razão:** (b), Regra Nº 2. Editar a lista depois de gerada seria o bug da alternativa (a). "Quem definiu" é o `planejadaPorNome` de cada lote. Nenhuma tabela nova: portão e RLS ficam como estão.
+
+### 203. 2026-10-17 · ERP 3.2: definir = rascunho na URL com prévia sem gravar + "Confirmar a lista" numa transação só
+
+**Alternativas:** (a) estado do rascunho no navegador (se perde ao recarregar, não se compartilha, pede JS); (b) o rascunho na URL (`?dia=` e `l=ficha~quanto`), prévia calculada no servidor a cada página, e confirmar grava todos os lotes por `planejarProducaoNaTx` (extraída do `planejarProducao` da 3.1: as duas telas chamam a mesma regra).
+
+**Razão:** (b). A prévia é uma página comum, sem estado escondido: recarrega, volta e o link se manda. Confirmar é tudo ou nada (linha ruim ou estoque fechado e nada entra), idempotente (cada lote leva `<envio>:<n>`, única no parceiro; a trava do dia serializa), de 1 a 30 linhas. A lista de insumos de cada lote é a da ficha, sem edição linha a linha (quem quer ajustar usa "Nova produção"). A mesma ficha duas vezes soma; ficha que já tem lote no dia gera lote novo com aviso. Provado com envio repetido em paralelo (5 cliques = 3 lotes), sem chave (2 envios = 6 lotes: a chave é o que protege) e segurando a trava do dia (confirmar espera, mutante).
+
+### 204. 2026-10-17 · ERP 3.2: `OrdemProducao.daLista` distingue o lote da lista do avulso da 3.1
+
+**Alternativas:** (a) inferir pela data ou pelo autor; (b) coluna booleana `daLista`, `NOT NULL DEFAULT false`.
+
+**Razão:** (b). Serve à regra de tirar da lista (205), ao selo "fora da lista" e aos indicadores da 3.3. Lotes antigos são `false`, que é a verdade (eram avulsos). A migration `20261030000000_erp_lista_do_dia` é uma coluna com default constante (sem reescrever a tabela, sem CHECK nem índice que dado antigo possa violar, nenhum SELECT sob RLS); provada com dado antigo nos três perfis do banco e conferida por `erp:conferir-migracao`.
+
+### 205. 2026-10-17 · ERP 3.2: permissão nova `producao.planejar` ("Definir a lista do dia"), catálogo v2
+
+**Alternativas:** (a) reaproveitar `producao.registrar` (o cozinheiro também confirmaria e tiraria da lista); (b) permissão própria, por loja, no Dono e no Gerente (todas as que não estão em `SEM_GERENTE`), fora do Operador.
+
+**Razão:** (b). Sem ela não há como separar "o gerente define" de "a cozinha produz". Exigida para confirmar a lista e para tirar da lista o lote `daLista`; lote avulso segue com `producao.registrar` (3.1 sem mudança). `VERSAO_DO_CATALOGO` 1 para 2. Perfil próprio é fotografia e NÃO ganha sozinho: a Equipe avisa ("Criado antes de “Definir a lista do dia” existir…", `novidadesQueOPerfilNaoTem`) e a ajuda da lista diz onde marcar. Quem tem só `producao.planejar` (sem registrar) também tira da lista; a regra confere, depois de travar o lote, a permissão que vale para ELE. Mudar a quantidade de um lote = tirar e pôr de novo (sem "ajustar" nesta subfase).
+
+### 206. 2026-10-17 · ERP 3.2: "vai usar" é o que ainda vai SAIR do estoque até o dia, não o planejado bruto
+
+**Alternativas:** (a) somar o planejado dos lotes; (b) a falta (`solicitado − atendido`) de cada item das requisições ABERTA/PARCIAL com `paraDia ≤ D` (nulo conta), mais as linhas do rascunho (pela mesma `quantidadesDaFicha`).
+
+**Razão:** (b). Entrega parcial não conta duas vezes (o saldo já caiu E a falta caiu); lote atrasado, lote de dia anterior e pedido do salão entram. A tela separa "Lista do dia" (requisições dos lotes de D) e "Outros pedidos até D" (com o número da requisição e o setor).
+
+### 207. 2026-10-17 · ERP 3.2: "tem" é o saldo do livro agora; negativo conta 0 com alarme; estoque não aberto só mostra "vai usar"
+
+**Razão:** o saldo da loja é o do livro (1.6), lido na hora (a tela diz a hora). Sem linha de saldo = 0. Negativo entra como 0 na conta e a tela mostra "−X no livro" (o alarme da 1.8). Com o estoque da loja não aberto não há "tem" nem "comprar", só "vai usar" e o aviso; confirmar é recusado com a frase da 1.8.
+
+### 208. 2026-10-17 · ERP 3.2: "comprar" = max(0, vai usar − tem) em embalagens padrão, arredondando para cima; variantes fora; a embalagem não tem nome no cadastro
+
+**Alternativas:** (a) a quantidade exata faltante; (b) `ceil(falta ÷ conteúdo da embalagem padrão)`; (c) incluir as variantes (caixa, fardo).
+
+**Razão:** (b). Embalagem de 1 kg/1 L/1 un mostra só a quantidade ("4 kg"); outra mostra "2 × 3 kg (6 kg)" (o total só quando passa de uma). A análise escreveu "saco 3 kg", mas o insumo não guarda nome da embalagem padrão (só as variantes têm nome): o texto é o da contagem da 1.6 ("3 × 5 kg"), sem inventar coluna. Variantes ficam para outra fase. Insumo desativado que ainda é pedido entra com selo.
+
+### 209. 2026-10-17 · ERP 3.2: a cascata nunca explode sozinha; pré-preparo vai para "Falta produzir" com o botão que o põe na lista
+
+**Razão:** coerente com 1.8/3.1 (o sub-pré-preparo vem pronto do estoque). Falta produzir = max(0, vai usar − tem − o que os lotes pendentes até o dia e o rascunho já produzem dele). Com falta, o botão "Pôr na lista: Molho cheddar 500 g" vira linha do rascunho e só então os insumos dele entram na compra; coberto pela lista diz "produza antes de Molho especial".
+
+### 210. 2026-10-17 · ERP 3.2: R$ só com `insumos.ver`; fornecedor só com `compras.ver` na loja da nota; montados no servidor
+
+**Razão:** contrato da 3.1 (o servidor monta a tela sem o valor; não se esconde no navegador). R$ estimado = embalagens × conteúdo × custo de referência, um arredondamento por item, somado em centavos; sem preço de referência o total fica "incompleto" e a tela diz quais insumos (nunca R$ 0,00). O fornecedor é o da última compra lançada (rede inteira) e só sai se a pessoa vê compras na loja DAQUELA nota; senão, "Sem fornecedor conhecido". Tem/comprar (quantidades) exigem `estoque.ver` na loja; sem ele só a lista de lotes.
+
+### 211. 2026-10-17 · ERP 3.2: sem sugestão automática de produção
+
+**Razão:** `estoqueMinimoMilesimos` não tem tela nem dado, e consumo médio seria hipótese. O seletor mostra só o saldo do pré-preparo na loja agora ("tem 300 g"), que é dado.
+
+### 212. 2026-10-17 · ERP 3.2: datas de hoje a 14 dias à frente; passado só leitura; período fechado avisa
+
+**Razão:** o dia de hoje até +14 (a mesma regra da requisição, `lerParaDia`); `?dia=` lixo ou fora de "um ano atrás a 14 dias" volta para hoje. Dia passado mostra os lotes com a etapa e planejado × produzido, sem rascunho, sem tem/comprar. Planejar não escreve no livro, então não trava em período fechado; se hoje cai em período fechado a tela avisa que entregar e concluir serão recusados.
+
+### 213. 2026-10-17 · ERP 3.2: tela, rota e ajuda
+
+**Razão:** rota `producao/[lojaId]/lista` e `producao/lista` (a escolha da loja, como `producao/nova`) mais o espelho do nível 1; o segmento estático `lista` vence o `[ordemId]` (teste). Aba "Lista do dia" na área Produção e atalho no quadro; celular primeiro (cartões por insumo, barra fixa "Confirmar a lista (N)"); a partir de 768 px, tabela. Ajuda: chave nova `producao-lista` (nasce recolhida, tela de trabalho), sobem `producao`, `producao-quadro`, `producao-lote` e `equipe` para v2. `VERSAO_DO_ERP` = fase 3.2. Histórico: PLANEJOU com `origem: Lista do dia DD/MM`.
+
+### 214. 2026-10-17 · ERP 3.2: herança da 3.1 pós-deploy: período fechado avisa ANTES em entregar, devolver e estornar; a barra diz o motivo real
+
+**Alternativas:** (a) deixar só o servidor recusar; (b) o mesmo `AvisoDoPeriodoFechado` do concluir antes de preencher, botão desabilitado e a barra fixa dizendo "Período fechado" (e não "Falta dizer quanto saiu").
+
+**Razão:** (b). O servidor continua decidindo (recusa e o aviso volta, rolado para a vista acima da barra); a tela só adianta. A caixa de ajuda do concluir nasce recolhida (tela de bancada, como as de contar), para o aviso não ficar abaixo da dobra a 390 px.

@@ -185,6 +185,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'producao-lista',
+    // Tela de trabalho no celular: a caixa nasce recolhida para a lista e o rascunho ficarem à vista.
+    recolhida: true,
     area: 'producao',
     rotas: ['producao/lista', 'producao/[lojaId]/lista'],
     titulo: 'Lista do dia',

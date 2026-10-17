@@ -193,7 +193,7 @@ const RASCUNHO: UsoPrevisto[] = [
   U('molho', 800, 'Molho especial'),
   U('maionese', 1200, 'Molho especial'),
 ];
-const conta = (usos: UsoPrevisto[], producoes: { insumoId: string; quantidadeMilesimos: number }[], saldos = SALDOS) => contaDaLista({ insumos: INSUMOS, usos, saldos, producoes });
+const conta = (usos: UsoPrevisto[], producoes: { insumoId: string; quantidadeMilesimos: number }[], saldos = SALDOS) => contaDaLista({ cadastro: INSUMOS, usos, saldos, producoes });
 const de = (c: ReturnType<typeof conta>, id: string) => c.find((x) => x.insumoId === id)!;
 
 describe('3.2 · vai usar · tem · comprar (critérios 1 a 3 da análise)', () => {
@@ -264,7 +264,7 @@ describe('3.2 · vai usar · tem · comprar (critérios 1 a 3 da análise)', () 
   it('7 · entrega parcial: o saldo caiu e a falta caiu, então comprar continua o mesmo (sem contar duas vezes)', () => {
     // Estoquista entregou 885 g de cebola do lote: tem 1,2 − 0,885 = 0,315; a falta do lote de molho zerou (some dos usos).
     const parcial = contaDaLista({
-      insumos: INSUMOS,
+      cadastro: INSUMOS,
       usos: RASCUNHO.filter((u) => !(u.insumoId === 'cebola' && u.de === 'Molho cheddar')),
       saldos: new Map(SALDOS).set('cebola', 315),
       producoes: [],

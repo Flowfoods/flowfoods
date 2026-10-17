@@ -101,7 +101,7 @@ export function TelaQuadroDaProducao({
         subtitulo={[contexto, pendentes ? `${pendentes} ${pendentes === 1 ? 'lote pendente' : 'lotes pendentes'}` : 'nada pendente', atrasadas ? `${atrasadas} com atraso` : null].filter(Boolean).join(' · ')}
         acao={
           <>
-            <Link href={`${aqui}/lista`} className={classeDeBotao(pode.registrar && !bloqueio && q.aberto ? 'secundario' : 'primario')}>
+            <Link href={`${aqui}/lista`} className={classeDeBotao('secundario')}>
               Lista do dia
             </Link>
             {pode.registrar && !bloqueio && q.aberto && (

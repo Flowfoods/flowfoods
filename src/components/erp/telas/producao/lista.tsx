@@ -143,7 +143,7 @@ export function TelaListaDoDia({
         {canceladas.length > 0 && (
           <details className="border-t border-linha px-4 py-3 text-[13px] text-suave sm:px-5">
             <summary className="min-h-8 cursor-pointer py-1">
-              {canceladas.length} {canceladas.length === 1 ? 'lote tirado da lista' : 'lotes tirados da lista'}
+              {canceladas.length} {canceladas.length === 1 ? 'lote cancelado ou tirado da lista' : 'lotes cancelados ou tirados da lista'}
             </summary>
             <ul className="mt-1 divide-y divide-linha">
               {canceladas.map((l) => (
@@ -339,7 +339,13 @@ function Produzir({ l, href, digitadas, dia }: { l: LinhaDaConta; href: (dia: st
       </>
     );
   }
-  if (p.situacao === 'COBERTO') return <span className="text-[13px] font-normal text-texto">{fraseDoCoberto(p.paraFichas)}</span>;
+  if (p.situacao === 'COBERTO') {
+    return (
+      <>
+        <span className="font-semibold">0</span> <span className="text-[13px] font-normal text-texto">· {fraseDoCoberto(p.paraFichas)}</span>
+      </>
+    );
+  }
   return <span className="text-suave">—</span>;
 }
 
@@ -393,7 +399,7 @@ function Conta({ d, href, digitadas, agora }: { d: ListaDoDia; href: (dia: strin
           <Painel
             titulo="Comprar"
             subtitulo={`Estoque de agora, às ${hora}. Embalagens da compra padrão, arredondando para cima`}
-            acessorio={comprar.length ? <span className="text-[12px] tabular-nums text-suave">{comprar.length} {comprar.length === 1 ? 'insumo' : 'insumos'}</span> : undefined}
+            acessorio={comprar.length ? <span className="shrink-0 whitespace-nowrap text-[12px] tabular-nums text-suave">{comprar.length} {comprar.length === 1 ? 'insumo' : 'insumos'}</span> : undefined}
             semRespiro
           >
             {comprar.length === 0 ? (
@@ -483,10 +489,10 @@ function TabelaDaConta({ linhas, ultima, celula }: { linhas: LinhaDaConta[]; ult
             <th scope="col" className="h-10 pl-5 pr-3 font-semibold">
               Insumo
             </th>
-            <th scope="col" className="h-10 px-3 text-right font-semibold">
+            <th scope="col" className="h-10 whitespace-nowrap px-3 text-right font-semibold">
               Vai usar
             </th>
-            <th scope="col" className="h-10 px-3 text-right font-semibold">
+            <th scope="col" className="h-10 whitespace-nowrap px-3 text-right font-semibold">
               Tem
             </th>
             <th scope="col" className="h-10 w-[34%] px-3 pr-5 text-left font-semibold">
@@ -503,8 +509,8 @@ function TabelaDaConta({ linhas, ultima, celula }: { linhas: LinhaDaConta[]; ult
                 </span>
                 <Origens l={l} />
               </td>
-              <td className="px-3 py-2.5 text-right">{qtd(l.vaiUsarMilesimos, l.unidade)}</td>
-              <td className="px-3 py-2.5 text-right">
+              <td className="whitespace-nowrap px-3 py-2.5 text-right">{qtd(l.vaiUsarMilesimos, l.unidade)}</td>
+              <td className="whitespace-nowrap px-3 py-2.5 text-right">
                 <Tem l={l} />
               </td>
               <td className="px-3 py-2.5 pr-5 text-left">{celula(l)}</td>

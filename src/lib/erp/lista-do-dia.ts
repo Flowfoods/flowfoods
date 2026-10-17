@@ -291,7 +291,7 @@ export async function obterListaDoDia(
           ]),
         );
         const saldos = aberto ? await saldosDe(tx, lojaId, ids) : new Map<string, number>();
-        let contas = contaDaLista({ insumos, usos, saldos, producoes });
+        let contas = contaDaLista({ cadastro: insumos, usos, saldos, producoes });
         // Estoque não aberto: só "vai usar" (sem o livro não há "tem" nem "comprar").
         if (!aberto) contas = contas.map((c) => ({ ...c, temMilesimos: 0, noLivroMilesimos: 0, comprar: null, produzir: null }));
 

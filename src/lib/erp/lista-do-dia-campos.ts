@@ -243,10 +243,10 @@ export function compraEmEmbalagens(faltaMilesimos: number, conteudoMilesimos: nu
 /**
  * Vai usar · tem · comprar de cada insumo que a lista toca. `usos` é tudo o que ainda sai do estoque (falta das requisições
  * abertas até o dia + o rascunho); `saldos` o livro da loja agora; `producoes` o que a lista já produz de cada pré-preparo.
- * Ordem: pelo nome. Insumo fora de `insumos` é ignorado (a leitura já trouxe todos).
+ * Ordem: pelo nome. Insumo fora de `cadastro` é ignorado (a leitura já trouxe todos).
  */
 export function contaDaLista(entrada: {
-  insumos: ReadonlyMap<string, InsumoDaConta>;
+  cadastro: ReadonlyMap<string, InsumoDaConta>;
   usos: readonly UsoPrevisto[];
   saldos: ReadonlyMap<string, number>;
   producoes: readonly ProducaoPrevista[];
@@ -262,7 +262,7 @@ export function contaDaLista(entrada: {
   for (const p of entrada.producoes) produz.set(p.insumoId, (produz.get(p.insumoId) ?? 0) + p.quantidadeMilesimos);
   const contas: ContaDoInsumo[] = [];
   for (const [insumoId, usos] of Array.from(porInsumo)) {
-    const i = entrada.insumos.get(insumoId);
+    const i = entrada.cadastro.get(insumoId);
     if (!i) continue;
     const origens = new Map<string, OrigemDoUso>();
     for (const u of usos) {
