@@ -235,6 +235,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/[lojaId]/[ordemId]/concluir'],
     titulo: 'Concluir o lote',
+    // A tela é de bancada, no celular: a caixa nasce recolhida para o aviso e o campo ficarem à vista (como nas telas de contar).
+    recolhida: true,
     versao: 1,
     aula: [
       { texto: 'Diga quanto saiu de verdade; zero se o lote se perdeu, e então nada entra no estoque.' },

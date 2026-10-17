@@ -2,6 +2,7 @@
 
 import { notFound } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { obterOrdem } from '@/lib/erp/producao';
 import { TelaDoLote } from '@/components/erp/telas/producao/lote';
 import { fraseDoEstoque } from '@/components/erp/telas/estoque/estado';
@@ -30,6 +31,7 @@ export default async function ParceiroLotePage({ params, searchParams }: { param
         estornar: acaoEstornarProducao.bind(null, ctx.parceiro.slug, lojaId, d.ordem.id),
       }}
       bloqueio={ctx.bloqueio}
+      periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, `/rodolfo/erp/${ctx.parceiro.slug}`)}
     />
   );
 }

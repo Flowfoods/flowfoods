@@ -2,6 +2,7 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { obterRequisicao } from '@/lib/erp/requisicao';
 import { pendente } from '@/lib/erp/requisicao-campos';
 import { TelaEntregar } from '@/components/erp/telas/requisicoes/atender';
@@ -16,5 +17,5 @@ export default async function ParceiroEntregarRequisicaoPage({ params }: { param
   if (!d) notFound();
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/estoque`;
   if (!pendente(d.requisicao.status) || !d.aberto || ctx.bloqueio) redirect(`${base}/${d.loja.id}/requisicoes/${d.requisicao.id}`);
-  return <TelaEntregar d={d} base={base} contexto={ctx.parceiro.nome} acao={acaoAtenderRequisicao.bind(null, ctx.parceiro.slug, d.loja.id, d.requisicao.id)} />;
+  return <TelaEntregar d={d} base={base} contexto={ctx.parceiro.nome} acao={acaoAtenderRequisicao.bind(null, ctx.parceiro.slug, d.loja.id, d.requisicao.id)} periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, `/rodolfo/erp/${ctx.parceiro.slug}`)} />;
 }

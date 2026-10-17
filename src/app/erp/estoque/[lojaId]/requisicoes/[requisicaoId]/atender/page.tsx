@@ -2,6 +2,7 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina } from '@/lib/erp/contexto';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { obterRequisicao } from '@/lib/erp/requisicao';
 import { pendente } from '@/lib/erp/requisicao-campos';
 import { TelaEntregar } from '@/components/erp/telas/requisicoes/atender';
@@ -16,5 +17,5 @@ export default async function ErpEntregarRequisicaoPage({ params }: { params: { 
   if (!d) notFound();
   const aqui = `/erp/estoque/${d.loja.id}/requisicoes/${d.requisicao.id}`;
   if (!pendente(d.requisicao.status) || !d.aberto || ctx.bloqueio) redirect(aqui);
-  return <TelaEntregar d={d} base="/erp/estoque" acao={acaoAtenderRequisicao.bind(null, d.loja.id, d.requisicao.id)} />;
+  return <TelaEntregar d={d} base="/erp/estoque" acao={acaoAtenderRequisicao.bind(null, d.loja.id, d.requisicao.id)} periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')} />;
 }

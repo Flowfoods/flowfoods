@@ -8,6 +8,7 @@
 
 import Link from 'next/link';
 import type { LoteDaLoja } from '@/lib/erp/producao';
+import { fechadoNaData, type AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
 import { formatarRendimento, fraseSemPreco, pendente as pendenteDoLote, quandoVence, TITULO_NO_HISTORICO_DO_LOTE } from '@/lib/erp/producao-campos';
 import { numeroDaRequisicao, textoDoParaDia } from '@/lib/erp/requisicao-campos';
 import { COR } from '@/lib/erp/modulos';
@@ -34,6 +35,7 @@ export function TelaDoLote({
   hrefs,
   acoes,
   bloqueio,
+  periodos,
 }: {
   d: LoteDaLoja;
   base: string;
@@ -44,8 +46,10 @@ export function TelaDoLote({
   hrefs: { requisicao: string | null; estoque: string | null };
   acoes: { iniciar: AcaoDeEstoque; cancelar: AcaoDeEstoque; estornar: AcaoDeEstoque };
   bloqueio: string | null;
+  periodos?: AvisoDePeriodos;
 }) {
   const o = d.ordem;
+  const fechadoHoje = periodos ? (fechadoNaData(periodos.fechados, d.hoje)?.nome ?? null) : null;
   const u = UNIDADES[o.unidade];
   const quadro = `${base}/${d.loja.id}`;
   const aqui = `${quadro}/${o.id}`;
@@ -292,7 +296,7 @@ export function TelaDoLote({
           )}
           {o.status === 'CONCLUIDA' && (
             <Painel titulo="Estornar" subtitulo="Só quem ajusta o estoque: tira o lote do estoque e deixa o motivo no histórico">
-              <FormEstornar acao={acoes.estornar} versao={o.versao} recarregar={aqui} quantoEntrou={quantoEntrou} />
+              <FormEstornar acao={acoes.estornar} versao={o.versao} recarregar={aqui} quantoEntrou={quantoEntrou} fechadoHoje={fechadoHoje} hrefPeriodos={periodos?.href ?? null} />
             </Painel>
           )}
         </div>

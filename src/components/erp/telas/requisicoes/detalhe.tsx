@@ -19,6 +19,7 @@ import { Voltar } from '../cadastro/partes';
 import { LivroDoEstoque } from '../estoque/livro';
 import { ListaHistorico } from '../historico/lista-historico';
 import type { AcaoDeEstoque } from '../estoque/estado';
+import { fechadoNaData, type AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
 import { FormCancelarRequisicao, FormDevolver } from './formularios';
 import { quandoLongo, SeloDaRequisicao, SeloDoAtraso } from './partes';
 
@@ -31,6 +32,7 @@ export function TelaDetalheDaRequisicao({
   acoes,
   bloqueio,
   hrefProducao,
+  periodos,
 }: {
   d: RequisicaoDaLoja;
   base: string;
@@ -41,8 +43,11 @@ export function TelaDetalheDaRequisicao({
   pode: { atender: boolean; cancelar: boolean };
   acoes: { devolver: AcaoDeEstoque; cancelar: AcaoDeEstoque };
   bloqueio: string | null;
+  /** Os períodos fechados: devolver baixa no livro com a data de hoje, então o aviso vem antes. */
+  periodos?: AvisoDePeriodos;
 }) {
   const r = d.requisicao;
+  const fechadoHoje = periodos ? (fechadoNaData(periodos.fechados, d.hoje)?.nome ?? null) : null;
   const daLoja = `${base}/${d.loja.id}`;
   const quadro = `${daLoja}/requisicoes`;
   const aqui = `${quadro}/${r.id}`;
@@ -180,7 +185,7 @@ export function TelaDetalheDaRequisicao({
           <div className="space-y-5">
             {podeDevolver && (
               <Painel titulo="Voltou para o estoque" subtitulo="A cozinha devolveu o que não usou">
-                <FormDevolver acao={acoes.devolver} versao={r.versao} itens={d.itens} recarregar={aqui} />
+                <FormDevolver acao={acoes.devolver} versao={r.versao} itens={d.itens} recarregar={aqui} fechadoHoje={fechadoHoje} hrefPeriodos={periodos?.href ?? null} />
               </Painel>
             )}
             {podeCancelar && (

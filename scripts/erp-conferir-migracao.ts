@@ -1,7 +1,7 @@
 /**
  * Conferência pós-deploy das migrations `20261025000000_erp_faturamento` (2.1),
  * `20261026000000_erp_dre_despesas` (2.2a), `20261027000000_erp_dre_fechamento` (2.2b), `20261028000000_erp_cmv` (2.3)
- * e `20261029000000_erp_producao` (3.1).
+ * `20261029000000_erp_producao` (3.1) e `20261030000000_erp_lista_do_dia` (3.2).
  *
  *   npm run erp:conferir-migracao
  *
@@ -162,6 +162,15 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261029000000_erp_producao não foi aplicada por inteiro.`);
     }
   }
+  // 3.2: a coluna `daLista` do lote (boolean, obrigatória, padrão false). A migration só acrescenta a coluna; sem CHECK nem índice.
+  if (producao[0]?.n) {
+    const col = await db.$queryRaw<{ tipo: string; anulavel: string; padrao: string | null }[]>`
+      SELECT data_type AS tipo, is_nullable AS anulavel, column_default AS padrao FROM information_schema.columns WHERE table_name = 'OrdemProducao' AND column_name = 'daLista'`;
+    if (!col[0]) pendencias.push('Coluna OrdemProducao.daLista NÃO existe: a migration 20261030000000_erp_lista_do_dia não foi aplicada.');
+    else if (col[0].tipo !== 'boolean' || col[0].anulavel !== 'NO' || col[0].padrao !== 'false') {
+      pendencias.push('Coluna OrdemProducao.daLista existe mas não é boolean NOT NULL DEFAULT false: confira a migration 20261030000000_erp_lista_do_dia.');
+    }
+  }
   return pendencias;
 }
 
@@ -170,10 +179,10 @@ async function principal() {
   try {
     const pendencias = await conferirMigracao(db);
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3 e da 3.1 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1 e da 3.2 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, os gatilhos e a coluna da lista do dia existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3 e da 3.1: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1 e da 3.2: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {

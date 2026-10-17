@@ -7,6 +7,8 @@
 
 import { useState } from 'react';
 import { useFormState } from 'react-dom';
+import { periodoDaFraseDeRecusa } from '@/lib/erp/periodo-fechado-campos';
+import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
@@ -86,19 +88,41 @@ export function FormCancelarLote({ acao, versao, recarregar, daLista = false }: 
   );
 }
 
-export function FormEstornar({ acao, versao, recarregar, quantoEntrou }: { acao: AcaoDeEstoque; versao: number; recarregar: string; quantoEntrou: string | null }) {
+export function FormEstornar({
+  acao,
+  versao,
+  recarregar,
+  quantoEntrou,
+  fechadoHoje = null,
+  hrefPeriodos = null,
+}: {
+  acao: AcaoDeEstoque;
+  versao: number;
+  recarregar: string;
+  quantoEntrou: string | null;
+  /** O período de HOJE está fechado: o estorno entra no livro com a data de hoje, então será recusado (a tela avisa antes). */
+  fechadoHoje?: string | null;
+  hrefPeriodos?: string | null;
+}) {
   const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
+  const fechadoNoServidor = periodoDaFraseDeRecusa(estado?.erros.geral);
+  const fechado = fechadoHoje ?? fechadoNoServidor;
+  const aviso = fechado ? <AvisoDoPeriodoFechado id="estornar-periodo-fechado" periodo={fechado} href={hrefPeriodos} frase="O estorno entra no estoque com a data de hoje: não dá para estornar lote nele." rolar={!fechadoHoje && !!fechadoNoServidor} dentro /> : null;
   if (!aberto && !estado) {
     return (
-      <button type="button" onClick={() => setAberto(true)} className={classeDeBotao('secundario', 'w-full sm:w-auto')}>
-        Estornar este lote
-      </button>
+      <div className="space-y-3">
+        {aviso}
+        <button type="button" onClick={() => setAberto(true)} disabled={!!fechadoHoje} className={classeDeBotao('secundario', 'w-full sm:w-auto')}>
+          Estornar este lote
+        </button>
+      </div>
     );
   }
   return (
     <form action={enviar} className="space-y-3">
       <input type="hidden" name="versao" value={versao} />
+      {aviso}
       <div>
         <label htmlFor="estornar-motivo" className={ROTULO}>
           Por que o lote é estornado?
@@ -131,9 +155,9 @@ export function FormEstornar({ acao, versao, recarregar, quantoEntrou }: { acao:
           <Erro id="estornar-negativo-erro" texto={estado.erros.confirmarNegativo} />
         </div>
       )}
-      <ErroGeral estado={estado} recarregar={recarregar} />
+      {!fechadoNoServidor && <ErroGeral estado={estado} recarregar={recarregar} />}
       <div className="flex flex-col gap-2 sm:flex-row">
-        <BotaoEnviar variante="perigo" pendente="Estornando…">
+        <BotaoEnviar variante="perigo" pendente="Estornando…" disabled={!!fechadoHoje}>
           Estornar o lote
         </BotaoEnviar>
         <button type="button" onClick={() => setAberto(false)} className={classeDeBotao('fantasma')}>

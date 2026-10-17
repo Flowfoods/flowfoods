@@ -221,7 +221,7 @@ export function FormConcluir({
 
       <div data-barra-fixa className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-          <span className="text-[13px] tabular-nums text-suave">{q === null ? 'Falta dizer quanto saiu' : perdido ? 'Lote perdido' : `Entra no estoque: ${formatarQuantidade(q, unidade)}`}</span>
+          <span className="text-[13px] tabular-nums text-suave">{fechadoHoje || fechadoNoServidor ? 'Período fechado' : bloqueio ? 'Somente leitura' : q === null ? 'Falta dizer quanto saiu' : perdido ? 'Lote perdido' : `Entra no estoque: ${formatarQuantidade(q, unidade)}`}</span>
           <BotaoEnviar pendente="Concluindo…" disabled={travado} className="min-w-[200px]">
             {perdido ? 'Registrar lote perdido' : 'Concluir e pôr no estoque'}
           </BotaoEnviar>

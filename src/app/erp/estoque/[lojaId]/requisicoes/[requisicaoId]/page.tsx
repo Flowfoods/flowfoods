@@ -2,6 +2,7 @@
 
 import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
+import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { obterRequisicao } from '@/lib/erp/requisicao';
 import { TelaDetalheDaRequisicao } from '@/components/erp/telas/requisicoes/detalhe';
 import { fraseDoEstoque } from '@/components/erp/telas/estoque/estado';
@@ -24,6 +25,7 @@ export default async function ErpRequisicaoPage({ params, searchParams }: { para
       pode={{ atender, cancelar: atender || pode(ctx.alcance, 'requisicao.pedir', { lojaId }) }}
       acoes={{ devolver: acaoDevolverNaRequisicao.bind(null, lojaId, d.requisicao.id), cancelar: acaoCancelarRequisicao.bind(null, lojaId, d.requisicao.id) }}
       bloqueio={ctx.bloqueio}
+      periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')}
       hrefProducao={pode(ctx.alcance, 'producao.ver', { lojaId }) ? `/erp/producao/${lojaId}` : null}
     />
   );

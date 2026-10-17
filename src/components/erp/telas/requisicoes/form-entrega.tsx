@@ -16,15 +16,35 @@ import type { ItemDoDetalhe } from '@/lib/erp/requisicao';
 import { quantidadeNegativa } from '@/lib/erp/requisicao-campos';
 import { formatarQuantidade, lerQuantidadeNa, UNIDADES } from '@/lib/erp/unidades';
 import { textoDoCampo } from '@/lib/erp/requisicao-campos';
+import { periodoDaFraseDeRecusa } from '@/lib/erp/periodo-fechado-campos';
+import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro, MARCAR } from '../../ui/campos';
 import type { AcaoDeEstoque, EstadoEstoque } from '../estoque/estado';
 
-export function FormEntrega({ acao, versao, itens, recarregar }: { acao: AcaoDeEstoque; versao: number; itens: ItemDoDetalhe[]; recarregar: string }) {
+export function FormEntrega({
+  acao,
+  versao,
+  itens,
+  recarregar,
+  fechadoHoje = null,
+  hrefPeriodos = null,
+}: {
+  acao: AcaoDeEstoque;
+  versao: number;
+  itens: ItemDoDetalhe[];
+  recarregar: string;
+  /** O período de HOJE está fechado no DRE: a baixa entra no livro com a data de hoje, então a entrega será recusada (a tela avisa antes). */
+  fechadoHoje?: string | null;
+  hrefPeriodos?: string | null;
+}) {
   const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
   const [valores, setValores] = useState<Record<string, { q: string; e: 'base' | 'menor' }>>(() => Object.fromEntries(itens.map((i) => [i.id, { q: i.faltaMilesimos > 0 ? textoDoCampo(i.faltaMilesimos) : '', e: 'base' }])));
   const [encerrar, setEncerrar] = useState(false);
   const erros = estado?.erros ?? {};
+  // O servidor recusou por período fechado (a tela já tinha avisado, ou o período fechou depois de abrir): o mesmo aviso, trazido para a vista.
+  const fechadoNoServidor = periodoDaFraseDeRecusa(erros.geral);
+  const fechado = fechadoHoje ?? fechadoNoServidor;
   const saida = (i: ItemDoDetalhe) => {
     const v = valores[i.id];
     if (!v?.q.trim()) return 0;
@@ -36,6 +56,16 @@ export function FormEntrega({ acao, versao, itens, recarregar }: { acao: AcaoDeE
   return (
     <form action={enviar} className="space-y-4 pb-28 sm:pb-0">
       <input type="hidden" name="versao" value={versao} />
+      {fechado && (
+        <AvisoDoPeriodoFechado
+          id="entrega-periodo-fechado"
+          periodo={fechado}
+          href={hrefPeriodos}
+          frase="A baixa entra no estoque com a data de hoje: não dá para entregar nem devolver insumo nele."
+          rolar={!fechadoHoje && !!fechadoNoServidor}
+        />
+      )}
+      <fieldset disabled={!!fechadoHoje} className="space-y-4">
       <ol className="space-y-3">
         {itens.map((i) => {
           const u = UNIDADES[i.unidade];
@@ -127,8 +157,9 @@ export function FormEntrega({ acao, versao, itens, recarregar }: { acao: AcaoDeE
           </div>
         )}
       </div>
+      </fieldset>
 
-      {erros.geral && (
+      {erros.geral && !fechadoNoServidor && (
         <p role="alert" className="text-[13px] text-erro">
           {erros.geral}{' '}
           {estado?.conflito && (
@@ -139,10 +170,10 @@ export function FormEntrega({ acao, versao, itens, recarregar }: { acao: AcaoDeE
         </p>
       )}
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
+      <div data-barra-fixa className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-          <span className="text-[13px] tabular-nums text-suave">{saem === 0 ? (encerrar ? 'só encerrar' : 'nada saindo') : `${saem} de ${itens.length} saindo`}</span>
-          <BotaoEnviar pendente="Dando baixa…" className="min-w-[180px]">
+          <span className="text-[13px] tabular-nums text-suave">{fechado ? 'Período fechado' : saem === 0 ? (encerrar ? 'só encerrar' : 'nada saindo') : `${saem} de ${itens.length} saindo`}</span>
+          <BotaoEnviar pendente="Dando baixa…" disabled={!!fechadoHoje} className="min-w-[180px]">
             {saem === 0 && encerrar ? 'Encerrar a requisição' : 'Entregar e dar baixa'}
           </BotaoEnviar>
         </div>
