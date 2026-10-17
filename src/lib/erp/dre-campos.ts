@@ -13,7 +13,8 @@
  *    (nunca R$ 0,00) e a receita líquida e os resultados saem com o selo
  *    "sem contar a taxa do iFood";
  *  - o CMV (2.3) é o que vale em cada loja: o real quando apurado, senão o de compra, com o selo da fonte
- *    (`cmv-campos.ts`); loja sem nota e sem real é NULA e margem e resultados saem "sem contar o CMV" (um
+ *    (`cmv-campos.ts`); ele é SUBTRAÍDO da receita líquida na margem de contribuição e dali segue para os resultados; loja
+ *    sem nota e sem real é NULA e margem e resultados saem "sem contar o CMV de <lojas>" (um
  *    resultado sem o maior custo da casa não é o resultado: é o que dá para dizer hoje); abaixo da linha
  *    vão as duas de detalhe, `cmv:compra` e `cmv:real` (fora do plano de contas: sem meta e sem despesa);
  *  - a rede é a soma das lojas + as despesas da rede (sem loja); a visão de uma
@@ -103,7 +104,6 @@ export interface ResultadoDoDre {
 }
 
 const SEM_TAXA = 'a taxa do iFood';
-const SEM_CMV = 'o CMV';
 
 /** As duas linhas de detalhe do CMV: não são do plano de contas (ninguém lança despesa nelas e não têm meta). */
 export const CHAVE_CMV_COMPRA = 'cmv:compra';
@@ -139,9 +139,10 @@ export function textoDosPontos(bp: number): string {
   return `${bp < 0 ? '−' : '+'}${v} pp`;
 }
 
+/** O que ficou de fora de um resultado: a taxa primeiro, depois o CMV (inteiro, ou só de algumas lojas: "o CMV de Centro"). */
 const unir = (...listas: readonly (readonly string[])[]) => {
   const s = new Set(listas.flat());
-  return [SEM_TAXA, SEM_CMV].filter((x) => s.has(x));
+  return [...(s.has(SEM_TAXA) ? [SEM_TAXA] : []), ...Array.from(s).filter((x) => x !== SEM_TAXA)];
 };
 
 /** O DRE de um escopo (a rede toda, ou uma loja). */
@@ -215,8 +216,9 @@ export function montarDre(e: EntradaDoDre): ResultadoDoDre {
     return soma;
   };
   const variaveis = GRUPOS_ANTES_DA_MARGEM.reduce((s, g) => s + bloco(g), 0);
-  const margem = liquida - variaveis;
-  const semAteAqui = unir(semTaxa, cmv.sem ? [SEM_CMV] : []);
+  // A margem de contribuição é a receita líquida MENOS o CMV (o que vale em cada loja) menos as variáveis. Loja sem CMV não entra na conta: o aviso diz quais.
+  const margem = liquida - (cmv.centavos ?? 0) - variaveis;
+  const semAteAqui = unir(semTaxa, cmv.semTexto ? [cmv.semTexto] : []);
   empurrar({ ...linhaPlano(doPlano(CODIGO.margem)), tipo: 'resultado', nivel: 0, valorCentavos: margem, semContar: semAteAqui, nota: null });
 
   // --- Despesas fixas → resultado operacional

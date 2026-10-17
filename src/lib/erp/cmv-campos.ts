@@ -190,8 +190,8 @@ export interface CmvDoEscopo {
   fonte: FonteDoCmv | 'misto' | null;
   /** O selo ao lado do valor (até 120 letras). */
   nota: string;
-  /** Algum custo ficou de fora: resultados saem "sem contar o CMV". */
-  sem: boolean;
+  /** Algum custo ficou de fora: resultados saem "sem contar" isto ("o CMV" ou "o CMV de Centro"); nulo = nada de fora. */
+  semTexto: string | null;
   compra: { centavos: number | null; nota: string | null };
   real: { centavos: number | null; nota: string | null };
 }
@@ -261,8 +261,9 @@ export function cmvDoEscopo(cmv: CmvDoDre, escopo: { tipo: 'rede' } | { tipo: 'l
   else realNota = doReal.length < relevantes.length ? `apurado em ${doReal.length} de ${relevantes.length} lojas` : null;
   if (realNota && realNota.length > LIMITE_DA_NOTA) realNota = realNota.slice(0, LIMITE_DA_NOTA - 1) + '…';
 
-  const sem = centavos === null || semNada.length > 0;
-  return { centavos, fonte, nota: nota.slice(0, LIMITE_DA_NOTA), sem, compra: { centavos: compraSoma, nota: compraNota }, real: { centavos: realSoma, nota: realNota } };
+  const nomesSem = lista(semNada.map((l) => l.lojaNome));
+  const semTexto = centavos === null ? 'o CMV' : semNada.length === 0 ? null : nomesSem.length <= 60 ? `o CMV de ${nomesSem}` : `o CMV de ${plural(semNada.length, 'loja', 'lojas')}`;
+  return { centavos, fonte, nota: nota.slice(0, LIMITE_DA_NOTA), semTexto, compra: { centavos: compraSoma, nota: compraNota }, real: { centavos: realSoma, nota: realNota } };
 }
 
 // ================================================================ compra × real

@@ -149,7 +149,8 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     expect(linha(d, 'cmv:real')).toMatchObject({ valorCentavos: null, nota: 'fecha na contagem de fechamento (abre em 29/10)' });
     // Sem o "Em breve", e o CMV conta no resultado (a VP tem nota): a margem sai sem o aviso.
     expect(d.resultado.linhas.some((l) => l.nota === 'Em breve')).toBe(false);
-    expect(linha(d, 'margem-contribuicao').semContar).toEqual([]);
+    expect(linha(d, 'margem-contribuicao')).toMatchObject({ semContar: [], valorCentavos: R(100_000) }); // R$ 120.000,00 − o CMV de R$ 20.000,00
+    expect(linha(d, 'resultado-do-periodo')).toMatchObject({ semContar: [], valorCentavos: R(100_000) });
     expect(d.cmv.painel).toBeNull(); // o painel compra × real é do período encerrado
     // Realizado × meta: o CMV da casa agora tem valor e a meta compara (R$ 20.000,00 de R$ 120.000,00 = 16,7 % contra 21,00 %).
     expect(d.metas.cmv).toMatchObject({ metaBp: 2100, desvioBp: 1667 - 2100, palavra: 'melhor que a meta' });
@@ -178,6 +179,10 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     expect(linha(d, 'cmv:real')).toMatchObject({ valorCentavos: R(23_950) });
     expect(d.metas.cmv).toMatchObject({ metaBp: 2100, desvioBp: -104, desvioTexto: '−1,0 pp', palavra: 'melhor que a meta' });
     for (const c of ['margem-contribuicao', 'resultado-operacional', 'resultado-do-periodo']) expect(linha(d, c).semContar).toEqual([]);
+    // O CMV que vale (o real) é subtraído da receita líquida: 120.000,00 − 23.950,00 = 96.050,00, e o resultado herda.
+    expect(linha(d, 'receita-liquida').valorCentavos).toBe(R(120_000));
+    expect(linha(d, 'margem-contribuicao').valorCentavos).toBe(R(96_050));
+    expect(linha(d, 'resultado-do-periodo').valorCentavos).toBe(R(96_050));
     // A meta é só da linha CMV: as duas de detalhe não têm.
     expect(d.metas['cmv:compra']).toBeUndefined();
     expect(d.metas['cmv:real']).toBeUndefined();
@@ -205,9 +210,12 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     expect(linha(d, 'cmv').nota).toBe('misto: real em Vila da Penha; pelas compras em Delivery (estoque não aberto); sem o CMV de Centro');
     expect(linha(d, 'cmv:compra').valorCentavos).toBe(R(25_800 + 4_000));
     expect(linha(d, 'cmv:real')).toMatchObject({ valorCentavos: R(23_950), nota: 'apurado em 1 de 3 lojas' });
-    // Alguém ficou sem CMV: os resultados avisam.
-    expect(linha(d, 'resultado-do-periodo').semContar).toEqual(['o CMV']);
-    // Rede = Σ lojas − o que é da rede (o contador do grupo, R$ 1.000,00).
+    // Alguém ficou sem CMV: os resultados avisam QUAL loja.
+    expect(linha(d, 'resultado-do-periodo').semContar).toEqual(['o CMV de Centro']);
+    // O CMV da rede sai da margem: 160.000,00 − 27.950,00 = 132.050,00; com o contador do grupo (R$ 1.000,00), o resultado é R$ 131.050,00.
+    expect(linha(d, 'margem-contribuicao').valorCentavos).toBe(R(132_050));
+    expect(linha(d, 'resultado-do-periodo').valorCentavos).toBe(R(131_050));
+    // Rede = Σ lojas − o que é da rede.
     const somaDasLojas = d.porLoja!.reduce((s, l) => s + l.resultadoCentavos, 0);
     expect(linha(d, 'resultado-do-periodo').valorCentavos).toBe(somaDasLojas - R(1_000));
     // O painel: a VP compara; a Delivery e o Centro dizem por que ficaram só pelas compras.
@@ -352,6 +360,10 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
         expect({ chave, v: linha(depois, chave).valorCentavos, n: linha(depois, chave).nota, s: linha(depois, chave).semContar }).toEqual({ chave, v: x.valorCentavos, n: x.nota, s: x.semContar });
       }
     }
+    // O CMV abatido vale também na fotografia (e no que o Histórico guarda).
+    expect(linha(fechado, 'margem-contribuicao').valorCentavos).toBe(R(132_050));
+    expect(linha(fechado, 'resultado-do-periodo').valorCentavos).toBe(R(131_050));
+    expect(linha(fechadoVp, 'resultado-do-periodo').valorCentavos).toBe(R(96_050));
     expect(fechadoVp.cmv.antigo).toBe(false);
     expect(fechadoVp.cmv.painel!.comparacoes[0]).toMatchObject({ diferencaCentavos: R(-1_850), finalCentavos: R(13_550) });
     expect(fechado.cmv.painel!.semReal.map((l) => l.lojaNome)).toEqual(['Centro', 'Delivery']);
@@ -363,6 +375,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     // O Histórico do fechamento ganha o CMV da rede e a fonte.
     const h = await a.historicoAlteracao.findFirst({ where: { entidade: 'PeriodoApuracao', entidadeId: ids.out, acao: 'FECHOU' } });
     expect(sp((h!.depois as Record<string, string>).cmv)).toBe('R$ 27.950,00 (misto)');
+    expect(sp((h!.depois as Record<string, string>).resultado)).toBe('R$ 131.050,00');
 
     // O estoque inicial de novembro, derivado: o final de outubro (R$ 13.550,00), sem reavaliar.
     const novembro = await periodoRegistrado(a, '2026-11-10');

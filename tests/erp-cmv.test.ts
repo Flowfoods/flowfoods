@@ -24,6 +24,8 @@ import {
   type FechoDeEstoque,
 } from '@/lib/erp/cmv-campos';
 import { compararCmv, painelDoCmv, somarComparacoes } from '@/lib/erp/cmv-comparacao';
+import { montarDre } from '@/lib/erp/dre-campos';
+import { planoEfetivo } from '@/lib/erp/dre-plano';
 
 const R = (reais: number) => Math.round(reais * 100);
 
@@ -168,7 +170,7 @@ describe('2.3 · qual CMV entra no resultado (decisão 165)', () => {
 
   it('critério 4: VP = R$ 23.950,00, selo "real (contagem)"; compra R$ 25.800,00', () => {
     const e = cmvDoEscopo(cmv, { tipo: 'loja', lojaId: 'vp' }, rec);
-    expect(e).toMatchObject({ centavos: R(23_950), fonte: 'real', nota: 'real (contagem)', sem: false });
+    expect(e).toMatchObject({ centavos: R(23_950), fonte: 'real', nota: 'real (contagem)', semTexto: null });
     expect(e.compra.centavos).toBe(R(25_800));
     expect(e.real.centavos).toBe(R(23_950));
     expect((e.real.nota ?? '').replace(/\u00a0/g, ' ')).toBe('inicial R$ 11.700,00 + compras R$ 25.800,00 − final R$ 13.550,00');
@@ -176,7 +178,7 @@ describe('2.3 · qual CMV entra no resultado (decisão 165)', () => {
 
   it('critério 4: Centro sem nota e sem estoque é NULO com a frase (nunca R$ 0,00) e fica "sem contar o CMV"', () => {
     const e = cmvDoEscopo(cmv, { tipo: 'loja', lojaId: 'ct' }, rec);
-    expect(e).toMatchObject({ centavos: null, fonte: null, nota: 'sem nota de compra no período', sem: true });
+    expect(e).toMatchObject({ centavos: null, fonte: null, nota: 'sem nota de compra no período', semTexto: 'o CMV' });
     expect(e.compra).toEqual({ centavos: null, nota: 'sem nota de compra no período' });
   });
 
@@ -185,7 +187,7 @@ describe('2.3 · qual CMV entra no resultado (decisão 165)', () => {
     expect(e.centavos).toBe(R(23_950 + 4_000));
     expect(e.fonte).toBe('misto');
     expect(e.nota).toBe('misto: real em Vila da Penha; pelas compras em Delivery (estoque não aberto); sem o CMV de Centro');
-    expect(e.sem).toBe(true);
+    expect(e.semTexto).toBe('o CMV de Centro');
     expect(e.compra).toMatchObject({ centavos: R(25_800 + 4_000) });
     expect(e.real).toMatchObject({ centavos: R(23_950), nota: 'apurado em 1 de 3 lojas' });
   });
@@ -193,7 +195,7 @@ describe('2.3 · qual CMV entra no resultado (decisão 165)', () => {
   it('a rede toda pelo real não é "misto", e loja parada (sem venda, nota nem real) não pesa', () => {
     const parada: CmvDaLoja = { lojaId: 'pr', lojaNome: 'Parada', compraCentavos: null, real: null, motivoSemReal: 'estoque não aberto' };
     const e = cmvDoEscopo({ lojas: [vp, parada], parcial: false }, { tipo: 'rede' }, rec);
-    expect(e).toMatchObject({ centavos: R(23_950), fonte: 'real', nota: 'real (contagem)', sem: false });
+    expect(e).toMatchObject({ centavos: R(23_950), fonte: 'real', nota: 'real (contagem)', semTexto: null });
   });
 
   it('critério 1: no período em curso, só a compra, com o selo "pelas compras · parcial"', () => {
@@ -295,5 +297,54 @@ describe('2.3 · estoque sem preço e a fotografia', () => {
     expect(cmvLidoDaFotografia(gravado)).toEqual(cmv);
     for (const lixo of [null, 'x', 3, {}, { versao: 2, lojas: {} }, { versao: 1, lojas: 'x' }]) expect(cmvLidoDaFotografia(lixo)).toEqual({ lojas: [], parcial: false });
     expect(cmvLidoDaFotografia({ versao: 1, lojas: { a: { lojaNome: 'A', compraCentavos: 'muito', real: null } } }).lojas).toEqual([]);
+  });
+});
+
+describe('2.3 · o CMV é SUBTRAÍDO na margem de contribuição e segue para os resultados', () => {
+  const plano = planoEfetivo([]).map((l, i) => ({ ...l, id: `L${i}` }));
+  const real = { centavos: R(23_950), inicialCentavos: R(11_700), finalCentavos: R(13_550), comprasReaisCentavos: R(25_800), inicialDe: 'fechamento' as const, retratoEm: '', fechamentoId: 'f', aberturaId: 'a', semPrecoInicial: 0, semPrecoFinal: 0 };
+  const cmv: CmvDoDre = {
+    parcial: false,
+    lojas: [
+      { lojaId: 'vp', lojaNome: 'Vila da Penha', compraCentavos: R(25_800), real, motivoSemReal: null },
+      { lojaId: 'dl', lojaNome: 'Delivery', compraCentavos: R(4_000), real: null, motivoSemReal: 'estoque não aberto' },
+      { lojaId: 'ct', lojaNome: 'Centro', compraCentavos: null, real: null, motivoSemReal: 'estoque não aberto' },
+    ],
+  };
+  const receitas = [
+    { lojaId: 'vp', canal: 'LOJA' as const, valorCentavos: R(120_000) },
+    { lojaId: 'dl', canal: 'LOJA' as const, valorCentavos: R(30_000) },
+    { lojaId: 'ct', canal: 'LOJA' as const, valorCentavos: R(10_000) },
+  ];
+  const linha = (r: ReturnType<typeof montarDre>, codigo: string) => r.linhas.find((l) => l.codigo === codigo)!;
+  const aluguel = plano.find((l) => l.codigo === 'aluguel')!.id!;
+
+  it('loja: margem = receita líquida − CMV (R$ 120.000,00 − R$ 23.950,00 = R$ 96.050,00) e o resultado herda, sem aviso', () => {
+    const r = montarDre({ escopo: { tipo: 'loja', lojaId: 'vp', nome: 'Vila da Penha' }, plano, receitas, taxaIfood: null, despesas: [{ linhaId: aluguel, lojaId: 'vp', centavos: R(10_000) }], cmv });
+    expect(linha(r, 'cmv').valorCentavos).toBe(R(23_950));
+    expect(linha(r, 'receita-liquida').valorCentavos).toBe(R(120_000));
+    expect(linha(r, 'margem-contribuicao')).toMatchObject({ valorCentavos: R(96_050), percentualBp: 8004, semContar: [] });
+    expect(linha(r, 'resultado-operacional')).toMatchObject({ valorCentavos: R(86_050), semContar: [] });
+    expect(linha(r, 'resultado-do-periodo')).toMatchObject({ valorCentavos: R(86_050), semContar: [] });
+  });
+
+  it('rede: o que vale em cada loja (R$ 27.950,00) sai da margem (R$ 160.000,00 − R$ 27.950,00 = R$ 132.050,00) e o aviso diz QUAL loja ficou sem CMV', () => {
+    const r = montarDre({ escopo: { tipo: 'rede' }, plano, receitas, taxaIfood: null, despesas: [{ linhaId: aluguel, lojaId: null, centavos: R(1_000) }], cmv });
+    expect(linha(r, 'cmv').valorCentavos).toBe(R(27_950));
+    expect(linha(r, 'margem-contribuicao')).toMatchObject({ valorCentavos: R(132_050), semContar: ['o CMV de Centro'] });
+    expect(linha(r, 'resultado-do-periodo')).toMatchObject({ valorCentavos: R(131_050), semContar: ['o CMV de Centro'] });
+  });
+
+  it('loja sem nota e sem estoque: o CMV não entra (nulo), a margem é a receita líquida e o aviso é "o CMV"', () => {
+    const r = montarDre({ escopo: { tipo: 'loja', lojaId: 'ct', nome: 'Centro' }, plano, receitas, taxaIfood: null, despesas: [], cmv });
+    expect(linha(r, 'cmv').valorCentavos).toBeNull();
+    expect(linha(r, 'margem-contribuicao')).toMatchObject({ valorCentavos: R(10_000), semContar: ['o CMV'] });
+  });
+
+  it('rede × lojas: a soma dos resultados das lojas é o da rede (R$ 27.950,00 de CMV nos dois lados)', () => {
+    const rede = montarDre({ escopo: { tipo: 'rede' }, plano, receitas, taxaIfood: null, despesas: [], cmv });
+    const soma = ['vp', 'dl', 'ct'].reduce((t, id) => t + linha(montarDre({ escopo: { tipo: 'loja', lojaId: id, nome: id }, plano, receitas, taxaIfood: null, despesas: [], cmv }), 'resultado-do-periodo').valorCentavos!, 0);
+    expect(soma).toBe(linha(rede, 'resultado-do-periodo').valorCentavos);
+    expect(soma).toBe(R(160_000 - 27_950));
   });
 });
