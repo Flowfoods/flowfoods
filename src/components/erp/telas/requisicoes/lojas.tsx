@@ -42,7 +42,7 @@ export function TelaLojasDoEstoque({
       <PageHeader icone="estoque" cor={COR.estoque} titulo={TITULO[qual]} subtitulo={[contexto, APOIO[qual]].filter(Boolean).join(' · ')} />
       <Painel semRespiro>
         {lojas.length === 0 ? (
-          <Vazio>Nenhuma loja no seu acesso.</Vazio>
+          <Vazio titulo="Nenhuma loja no seu acesso.">Peça a quem cuida da equipe para incluir as lojas em que você trabalha.</Vazio>
         ) : (
           <ul className="divide-y divide-linha">
             {lojas.map((l) => (

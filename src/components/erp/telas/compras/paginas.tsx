@@ -55,7 +55,7 @@ export function TelaFormNota({
   const volta = nota ? `${base}/${nota.id}` : base;
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      {nota && <TrilhaDaPagina itens={[{ rotulo: nota.rotulo, href: volta }, { rotulo: 'Editar' }]} />}
+      <TrilhaDaPagina itens={nota ? [{ rotulo: nota.rotulo, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Lançar nota' }]} />
       <Voltar href={volta}>{nota ? 'Voltar para a nota' : 'Voltar para as notas'}</Voltar>
       <PageHeader
         icone="compras"
@@ -102,7 +102,7 @@ export function TelaFormFornecedor({
   const volta = fornecedor ? `${base}/${fornecedor.id}` : base;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <TrilhaDaPagina itens={[{ rotulo: 'Fornecedores', href: base }, ...(fornecedor ? [{ rotulo: fornecedor.nome, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo' }])]} />
+      <TrilhaDaPagina itens={fornecedor ? [{ rotulo: fornecedor.nome, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo fornecedor' }]} />
       <Voltar href={volta}>{fornecedor ? `Voltar para ${fornecedor.nome}` : 'Voltar para os fornecedores'}</Voltar>
       <PageHeader
         icone="fornecedor"

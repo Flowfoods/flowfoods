@@ -2,7 +2,8 @@
 
 /**
  * Busca ⌘K no Mac, Ctrl K nos outros (ou "/" fora de campo); no celular, sem dica de tecla. Escopo honesto: as telas que a
- * pessoa pode abrir (a mesma lista do menu), os parceiros (nível 1) e os
+ * pessoa pode abrir (a mesma lista do menu), as ações das áreas que ela vê e
+ * pode fazer ("Novo insumo", "Lançar nota"), os parceiros (nível 1) e os
  * insumos do parceiro atual por nome — estes pelo servidor, que confere
  * "ver insumos" antes de responder. Setas escolhem, Enter abre, Escape fecha.
  * Sem animação ao abrir: é atalho de uso diário.
@@ -17,6 +18,7 @@ import { BOTAO_ICONE } from './Popover';
 
 const ROTULO_DO_TIPO: Record<ResultadoDaBusca['tipo'], string> = {
   tela: 'Tela',
+  acao: 'Ação',
   parceiro: 'Parceiro',
   insumo: 'Insumo',
   ficha: 'Ficha',
@@ -147,8 +149,8 @@ export function BuscaGlobal({
             aria-expanded="true"
             aria-controls={idLista}
             aria-activedescendant={resultados[ativo] ? `${idLista}-${ativo}` : undefined}
-            aria-label="Buscar telas, parceiros, insumos e fichas"
-            placeholder="Telas, parceiros, insumos e fichas"
+            aria-label="Buscar telas, ações, parceiros, insumos e fichas"
+            placeholder="Telas, ações, insumos e fichas"
             onKeyDown={(e) => {
               if (e.key === 'ArrowDown') {
                 e.preventDefault();

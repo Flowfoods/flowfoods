@@ -1,10 +1,11 @@
 /**
  * Telas da precificação dentro da ficha técnica (1.9), comuns ao nível 1 e à
  * pessoa do parceiro: "Embalagens por canal" de uma ficha de prato e "Canais
- * de venda" (como cada canal entra no custo + a taxa do iFood do parceiro). As
+ * de venda", a aba Precificação (como cada canal entra no custo + a taxa do iFood do parceiro). As
  * rotas só resolvem contexto e permissão e passam dados e actions prontos.
  */
 
+import Link from 'next/link';
 import type { CustoPorCanal, EmbalagemDoFormulario } from '@/lib/erp/canais';
 import type { FichaDetalhada } from '@/lib/erp/fichas';
 import type { LinhaDeHistorico } from '@/lib/erp/historico';
@@ -16,6 +17,7 @@ import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import type { AcaoDeCadastro } from '../cadastro/estado';
 import { Voltar } from '../cadastro/partes';
+import { classeDeBotao } from '../../ui/estilos';
 import { ListaHistorico } from '../historico/lista-historico';
 import { fraseDoFeitoDaFicha } from './estado';
 import { FormEmbalagens, type LinhaDaEmbalagem } from './form-embalagens';
@@ -105,8 +107,18 @@ export function TelaCanaisDeVenda({
   const mensagem = fraseDoFeitoDaFicha(feito);
   return (
     <div className="space-y-6">
-      <Voltar href={base}>Voltar para as fichas</Voltar>
-      <PageHeader icone="canais" cor={COR.fichas} titulo="Canais de venda" subtitulo={`${contexto} · o que entra no custo do prato em cada canal`} />
+      <PageHeader
+        icone="canais"
+        cor={COR.fichas}
+        titulo="Precificação"
+        subtitulo={`${contexto} · canais de venda: o que entra no custo do prato em cada um`}
+        acao={
+          // O preço e a margem de cada prato já estão na lista de fichas (só para quem vê preços): daqui é um clique.
+          <Link href={`${base}?tipo=PRATO`} className={classeDeBotao('secundario')}>
+            Margem de cada prato
+          </Link>
+        }
+      />
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-4">

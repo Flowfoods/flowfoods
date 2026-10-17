@@ -98,7 +98,7 @@ export function TelaFormFicha({
   const volta = ficha ? `${base}/${ficha.id}` : base;
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      {ficha && <TrilhaDaPagina itens={[{ rotulo: ficha.nome, href: volta }, { rotulo: 'Editar' }]} />}
+      <TrilhaDaPagina itens={ficha ? [{ rotulo: ficha.nome, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Nova ficha' }]} />
       <Voltar href={volta}>{ficha ? `Voltar para ${ficha.nome}` : 'Voltar para a lista'}</Voltar>
       <PageHeader
         icone="fichas"
@@ -141,6 +141,7 @@ export function TelaImportar({
 }) {
   return (
     <div className="mx-auto max-w-4xl space-y-6">
+      <TrilhaDaPagina itens={[{ rotulo: 'Importar planilha' }]} />
       <Voltar href={base}>Voltar para a lista</Voltar>
       <PageHeader
         icone="fichas"

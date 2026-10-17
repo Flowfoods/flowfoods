@@ -1,11 +1,13 @@
 /**
  * Hub de módulos (Ref.1): a tela de entrada do /erp e do /rodolfo.
  *
- * Grade de 4 colunas no desktop, 3 no tablet, 2 no celular. Card = quadrado
- * do ícone na cor do módulo + nome + subtítulo de uma linha; borda fina, raio
- * 14 px; hover troca borda e fundo (sem pulo). Módulo do plano ainda não
- * construído: mesmo card, sem link, com o selo "Em breve" — nunca leva a uma
- * tela que não existe.
+ * Grade de 4 colunas no desktop, 2 no tablet, 1 abaixo de 600 px (kit Dark:
+ * "abaixo de 600 px, cards vão para uma coluna"). Card = quadrado do ícone na
+ * cor da área + nome + descrição do fluxo e, embaixo, a lista em texto das
+ * abas que a pessoa pode abrir (UX.9: o hub mostra ÁREAS, nunca ações); borda
+ * fina, raio 14 px; hover troca borda e fundo (sem pulo). Módulo do plano
+ * ainda não construído: mesmo card, sem link, com o selo "Em breve" — nunca
+ * leva a uma tela que não existe.
  */
 
 import Link from 'next/link';
@@ -20,6 +22,8 @@ export interface CartaoDoHub {
   cor: string;
   href: string | null;
   fase?: string;
+  /** Rótulos das abas da área, em texto (sem número, sem R$, sem %). */
+  abas?: string[];
 }
 
 export function CartaoModulo({ c }: { c: CartaoDoHub }) {
@@ -30,6 +34,14 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
         <span className="block truncate text-[15px] font-semibold text-texto">{c.nome}</span>
         <span className="mt-0.5 block text-[13px] leading-snug text-suave [text-wrap:pretty]">{c.subtitulo}</span>
       </span>
+      {c.abas && c.abas.length > 0 && (
+        <span className="mt-auto block w-full pt-4">
+          <span className="block border-t border-linha pt-3 text-[13px] leading-snug text-suave [text-wrap:pretty]">
+            <span className="sr-only">Abas: </span>
+            {c.abas.join(' · ')}
+          </span>
+        </span>
+      )}
       {!c.href && c.fase && (
         <span className="mt-3 inline-flex w-max items-center rounded-[7px] border border-linha-forte px-2 py-0.5 text-[12px] font-medium text-suave">
           Em breve
@@ -61,7 +73,7 @@ export function HubDeModulos({ secoes }: { secoes: { rotulo: string; cartoes: Ca
           <section key={s.rotulo} aria-label={s.rotulo}>
             {/* avoid-ai-design-ignore: SD4 — rótulo de seção em caixa alta só no hub e nos grupos do menu (contrato do shell). */}
             <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-suave">{s.rotulo}</h2>
-            <ul className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+            <ul className="grid grid-cols-1 gap-3 min-[600px]:grid-cols-2 xl:grid-cols-4">
               {s.cartoes.map((c) => (
                 <li key={c.chave} className="min-w-0">
                   <CartaoModulo c={c} />

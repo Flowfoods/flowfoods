@@ -1,5 +1,5 @@
 /**
- * ERP — um Parceiro Flow visto pelo nível 1: o MESMO hub "Módulos da Rede" da
+ * ERP — um Parceiro Flow visto pelo nível 1: o MESMO hub "Áreas da Rede" da
  * pessoa do parceiro, com o alcance do nível 1 (tudo) e as telas sob
  * /rodolfo/erp/<slug>. O parceiro vem de `exigirParceiro` (sessão + slug); a
  * URL só escolhe, o portão isola.

@@ -92,7 +92,7 @@ export function TelaFormInsumo({
   const volta = insumo ? `${base}/${insumo.id}` : base;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      {insumo && <TrilhaDaPagina itens={[{ rotulo: insumo.nome, href: volta }, { rotulo: 'Editar' }]} />}
+      <TrilhaDaPagina itens={insumo ? [{ rotulo: insumo.nome, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo insumo' }]} />
       <Voltar href={volta}>{insumo ? `Voltar para ${insumo.nome}` : 'Voltar para a lista'}</Voltar>
       <PageHeader
         icone="insumo"

@@ -2,8 +2,8 @@
 
 /**
  * Conteúdo do menu lateral (o mesmo na barra fixa do desktop e na gaveta do
- * celular): marca, contexto, SELETOR DE MÓDULO no topo, os grupos do módulo
- * (abrem e fecham), item ativo com `aria-current` e o indicador vermelho de
+ * celular): marca, contexto, SELETOR DE ÁREA no topo, os grupos da área
+ * (abrem e fecham; cada item é uma aba), item ativo com `aria-current` e o indicador vermelho de
  * 2 px, e a versão no rodapé. Recolhido (desktop): só ícones, com nome
  * acessível e dica.
  */
@@ -19,7 +19,7 @@ import { Icone } from './icones';
 import { Popover } from './Popover';
 
 export interface EstadoDaNav {
-  /** Módulo mostrado no menu (o do item ativo; no hub, nenhum). */
+  /** Área mostrada no menu (a do item ativo; no hub, nenhuma). */
   modulo: ModuloNav | null;
   hrefAtivo: string | null;
 }
@@ -195,7 +195,7 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
   const sub = atual?.subtitulo ?? nav.inicio.titulo;
   return (
     <Popover
-      rotulo={`Módulo: ${nome}. Trocar de módulo`}
+      rotulo={`Área: ${nome}. Trocar de área`}
       alinhar="esquerda"
       largura="w-[280px]"
       classeDoBotao={`ff-transicao flex w-full items-center gap-3 rounded-[10px] border border-linha bg-painel text-left hover:border-linha-forte aria-expanded:border-linha-forte ${
@@ -217,12 +217,12 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
       }
     >
       {(fechar) => (
-        <ul aria-label="Módulos" className="max-h-[70vh] overflow-y-auto">
+        <ul aria-label="Áreas" className="max-h-[70vh] overflow-y-auto">
           <li>
             <OpcaoDeModulo
               href={nav.inicio.href}
               nome={nav.inicio.titulo}
-              sub="Todos os módulos"
+              sub="Todas as áreas"
               icone="inicio"
               cor="#57534E"
               atual={!atual}
