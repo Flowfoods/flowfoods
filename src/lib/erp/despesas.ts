@@ -83,12 +83,6 @@ export function recusaDeLancar(alcance: Alcance, lojaId: string | null): string 
   return recusa(alcance, 'despesas.lancar', { lojaId });
 }
 
-/** Pode VER a despesa dessa loja (nula = a rede)? */
-function podeVerDaLoja(alcance: Alcance, lojaId: string | null): boolean {
-  if (!podeVerDespesas(alcance)) return false;
-  return lojaId === null ? alcance.lojas === 'todas' : alcancaLoja(alcance, lojaId);
-}
-
 // ================================================================ formas de resposta
 
 export type ResultadoDaDespesa =

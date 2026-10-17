@@ -26,12 +26,10 @@ import {
   codigoDoSubtotal,
   GRUPOS_ANTES_DA_MARGEM,
   GRUPOS_ANTES_DO_OPERACIONAL,
-  GRUPOS_EM_ORDEM,
   ROTULO_DO_GRUPO,
   type GrupoDoDre,
   type LinhaDoPlano,
 } from './dre-plano';
-import type { Periodo } from './periodo-campos';
 
 export type Escopo = { tipo: 'rede' } | { tipo: 'loja'; lojaId: string; nome: string };
 
@@ -216,6 +214,3 @@ export function montarDre(e: EntradaDoDre): ResultadoDoDre {
 
   return { escopo: e.escopo, receitaBrutaCentavos: bruta, semFaturamento: bruta === 0, porCanal, faltaConfigurarTaxa: faltaTaxa, linhas };
 }
-
-/** Conferência: todo grupo do plano aparece uma vez (o teste usa para garantir que a ordem do DRE não perde linha). */
-export const GRUPOS_DO_DRE = GRUPOS_EM_ORDEM;

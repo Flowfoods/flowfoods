@@ -15,7 +15,9 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'historico.ver');
   const verFaturamento = pode(ctx.alcance, 'faturamento.ver');
-  const entidade = verFaturamento || searchParams.entidade !== 'FaturamentoLancamento' ? entidadeDoFiltro(searchParams.entidade) : undefined;
+  const verDre = pode(ctx.alcance, 'dre.ver');
+  const entidade =
+    (verFaturamento || searchParams.entidade !== 'FaturamentoLancamento') && (verDre || searchParams.entidade !== 'Despesa') ? entidadeDoFiltro(searchParams.entidade) : undefined;
   const linhas = await listarHistorico(ctx.cliente, {
     entidades: entidadesDoFiltro(entidade),
     limite: LIMITE_DO_HISTORICO,
@@ -25,6 +27,8 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
     verPrecos: pode(ctx.alcance, 'precos.ver'),
     // 2.1: valores, pedidos e clientes do faturamento só para quem vê faturamento.
     verFaturamento,
+    // 2.2a: despesas, plano de contas e período só para quem vê o DRE.
+    verDre,
   });
   return (
     <div className="space-y-6">
@@ -34,7 +38,7 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
         titulo="Histórico"
         subtitulo="Rede Completa · toda alteração, com antes, depois, quem e quando"
       />
-      <TelaHistorico linhas={linhas} entidade={entidade} hrefBase="/erp/historico" verFaturamento={verFaturamento} />
+      <TelaHistorico linhas={linhas} entidade={entidade} hrefBase="/erp/historico" verFaturamento={verFaturamento} verDre={verDre} />
     </div>
   );
 }

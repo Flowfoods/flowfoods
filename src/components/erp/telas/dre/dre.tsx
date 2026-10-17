@@ -29,8 +29,6 @@ export interface PermissoesDaTela {
   veRede: boolean;
 }
 
-const inteiro = (n: number) => n.toLocaleString('pt-BR');
-
 const CUSTOS = new Set(['DEDUCAO', 'CMV', 'DESPESA_VARIAVEL', 'PESSOAL', 'OCUPACAO', 'UTILIDADES', 'ADMINISTRATIVA', 'MARKETING', 'OUTRAS', 'FINANCEIRA']);
 
 /** "−" na frente do nome das linhas que se subtraem, "=" nos resultados: a leitura de um DRE em papel. */
