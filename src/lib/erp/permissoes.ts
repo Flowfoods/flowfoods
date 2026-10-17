@@ -26,8 +26,12 @@
  * quem decide é o servidor.
  */
 
-/** Sobe quando o catálogo ganha permissão nova (perfil próprio guarda em que versão nasceu). */
-export const VERSAO_DO_CATALOGO = 1;
+/**
+ * Sobe quando o catálogo ganha permissão nova (perfil próprio guarda em que versão nasceu).
+ * 2 (3.2): `producao.planejar`. Os perfis base (dono e gerente) ganham sozinhos; perfil próprio é fotografia e NÃO ganha
+ * (menor privilégio): a Equipe avisa os que nasceram na versão 1.
+ */
+export const VERSAO_DO_CATALOGO = 2;
 
 export interface DefinicaoDePermissao {
   rotulo: string;
@@ -106,6 +110,9 @@ export const CATALOGO = [
     permissoes: {
       'producao.ver': { rotulo: 'Ver a produção e a lista do dia', porLoja: true },
       'producao.registrar': { rotulo: 'Registrar produção', porLoja: true },
+      // 3.2: definir o que produzir no dia (confirmar a lista) e tirar da lista o lote que ela pôs. O cozinheiro segue
+      // planejando lote avulso com `producao.registrar`; o que o gerente definiu, só quem define tira.
+      'producao.planejar': { rotulo: 'Definir a lista do dia', porLoja: true },
     },
   },
   {
