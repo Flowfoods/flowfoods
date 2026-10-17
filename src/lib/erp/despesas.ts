@@ -51,7 +51,6 @@ import {
   type SituacaoDoPagamento,
   type TextosDaDespesa,
 } from './despesa-campos';
-import type { GrupoDoDre } from './dre-plano';
 import { garantirPlano, resolverLinha } from './plano';
 import { listarHistorico } from './historico';
 import { diferenca } from './insumo-campos';
@@ -141,7 +140,7 @@ export interface DespesaLida {
 
 const INCLUIR = {
   loja: { select: { nome: true } },
-  linha: { select: { nome: true, codigo: true, ativa: true, grupo: true } },
+  linha: { select: { nome: true, codigo: true, ativa: true } },
 } as const;
 
 type DoBanco = Prisma.DespesaGetPayload<{ include: typeof INCLUIR }>;
@@ -510,9 +509,6 @@ export interface RecorrenteEmFalta {
   mesAlvo: string;
   descricao: string;
   linhaNome: string;
-  /** A linha do plano e o grupo dela: o farol (2.4) tira a cor da linha e dos resultados abaixo dela. */
-  linhaId: string;
-  grupo: GrupoDoDre;
   lojaId: string | null;
   lojaNome: string | null;
   linhaOculta: boolean;
@@ -549,8 +545,6 @@ export async function recorrentesEmFalta(tx: ClienteDoParceiro, alcance: Alcance
       mesAlvo,
       descricao: c.descricao,
       linhaNome: c.linha.nome,
-      linhaId: c.linhaId,
-      grupo: c.linha.grupo as GrupoDoDre,
       lojaId: c.lojaId,
       lojaNome: c.loja?.nome ?? null,
       linhaOculta: !c.linha.ativa,

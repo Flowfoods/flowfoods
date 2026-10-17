@@ -12,7 +12,7 @@ import { Fragment } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { textoDoPercentual, type LinhaDoDre } from '@/lib/erp/dre-campos';
-import { textoDaMeta, textoDaMetaDeCrescimento, textoDaVariacao, type AnoPassado } from '@/lib/erp/dre-metas-campos';
+import { textoDaMeta, textoDaVariacao, type AnoPassado } from '@/lib/erp/dre-metas-campos';
 import { rotuloDaRessalva } from '@/lib/erp/dre-fechamento-campos';
 import { CODIGO, codigoDoSubtotal } from '@/lib/erp/dre-plano';
 import type { DreDoPeriodo } from '@/lib/erp/dre';
@@ -24,8 +24,6 @@ import { Aviso, Barra, Contagem, Metrica, Painel, Selo, Vazio } from '../../ui/s
 import { seloDoCmv } from '@/lib/erp/cmv-campos';
 import { PainelDoCmv } from './cmv-painel';
 import { BotaoOuMotivo } from '../cadastro/partes';
-import { Farol, idDaLinha } from './farol';
-import { PainelDeFaroisDoDre } from './farol-painel';
 import { dataCurta } from '../faturamento/formato';
 
 export interface PermissoesDaTela {
@@ -67,7 +65,7 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
   /** Linha de despesa ou grupo sem valor: no celular fica escondida até a pessoa pedir (o DRE inteiro tem mais de 40 linhas). */
   const zerada = (l: LinhaDoDre) => (l.tipo === 'linha' || l.tipo === 'subtotal') && l.valorCentavos === 0 && l.codigo !== codigoDoSubtotal('RECEITA');
   const nZeradas = r.linhas.filter(zerada).length;
-  const temMetas = Object.keys(d.metas).length > 0 || Object.keys(d.farol.porLinha).length > 0;
+  const temMetas = Object.keys(d.metas).length > 0;
   return (
     <div>
       {nZeradas > 0 && (
@@ -101,14 +99,11 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
                 <th scope="col" className="hidden h-10 px-3 text-right font-semibold sm:table-cell">
                   Meta
                 </th>
-                <th scope="col" className="hidden h-10 px-3 text-right font-semibold xl:table-cell">
+                <th scope="col" className="hidden h-10 px-3 text-right font-semibold lg:table-cell">
                   Meta em R$
                 </th>
-                <th scope="col" className="hidden h-10 px-3 text-right font-semibold sm:table-cell">
+                <th scope="col" className="hidden h-10 px-3 text-right font-semibold sm:table-cell sm:pr-5">
                   Desvio
-                </th>
-                <th scope="col" className="hidden h-10 w-44 px-3 text-left font-semibold sm:table-cell sm:pr-5">
-                  Farol
                 </th>
               </>
             )}
@@ -126,12 +121,10 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
             if (!doCmv && l.valorCentavos !== null && l.nota && l.tipo !== 'subtotal') apoio.push(l.nota);
             if (l.tipo === 'taxa' && l.valorCentavos === null) apoio.push(l.nota!);
             const meta = d.metas[l.chave];
-            const farol = d.farol.porLinha[l.chave];
-            const colunas = 3 + (temMetas ? 4 : 0);
-            const crescimento = meta?.tipo === 'crescimento';
+            const colunas = 3 + (temMetas ? 3 : 0);
             return (
               <Fragment key={l.chave}>
-              <tr id={idDaLinha(l.chave)} data-zerada={zerada(l) ? '' : undefined} className={doCmv && l.nota ? `${linha} [&>*]:pb-1` : linha}>
+              <tr data-zerada={zerada(l) ? '' : undefined} className={doCmv && l.nota ? `${linha} [&>*]:pb-1` : linha}>
                 <th scope="row" className={`min-w-0 py-2 text-left align-top ${l.nivel === 1 ? 'pl-8 pr-2 font-normal sm:pl-10' : 'px-4 sm:px-5'} ${resultado || grupo ? '' : 'text-texto'}`}>
                   <span className="block min-h-6 leading-6">
                     {prefixo(l)}
@@ -150,20 +143,10 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
                       )}
                     </span>
                   )}
-                  {(meta || farol) && (
-                    <span className="mt-0.5 block text-[12px] font-normal leading-snug text-suave sm:hidden">
-                      {meta && (
-                        <>
-                          {crescimento ? `Meta de crescimento ${textoDaMetaDeCrescimento(meta.metaBp)}` : `Meta ${textoDaMeta(meta.metaBp)}`}
-                          {meta.desvioTexto ? ` · desvio ${meta.desvioTexto}` : ''}
-                          {crescimento && meta.variacaoBp !== null ? ` · variação ${textoDaVariacao(meta.variacaoBp)}` : ''}
-                        </>
-                      )}
-                      {farol && (
-                        <span className="mt-1 block">
-                          <Farol f={farol} forma="linha" />
-                        </span>
-                      )}
+                  {meta && (
+                    <span className="block text-[12px] font-normal leading-snug text-suave sm:hidden">
+                      Meta {textoDaMeta(meta.metaBp)}
+                      {meta.desvioTexto ? ` · ${meta.desvioTexto} · ${meta.palavra}` : ` · ${meta.semComparacao}`}
                     </span>
                   )}
                 </th>
@@ -180,27 +163,26 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
                 {temMetas && (
                   <>
                     <td className="hidden whitespace-nowrap px-3 py-2 text-right align-top font-normal sm:table-cell">
-                      <span className="block min-h-6 leading-6">{meta ? crescimento ? textoDaMetaDeCrescimento(meta.metaBp) : textoDaMeta(meta.metaBp) : <span className="text-suave">—</span>}</span>
-                      {crescimento && <span className="block text-[12px] leading-snug text-suave">sobre o ano passado</span>}
+                      <span className="block min-h-6 leading-6">{meta ? textoDaMeta(meta.metaBp) : <span className="text-suave">—</span>}</span>
                     </td>
-                    <td className="hidden whitespace-nowrap px-3 py-2 text-right align-top font-normal xl:table-cell">
+                    <td className="hidden whitespace-nowrap px-3 py-2 text-right align-top font-normal lg:table-cell">
                       <span className="block min-h-6 leading-6">{meta && meta.metaCentavos !== null ? formatarDinheiro(meta.metaCentavos) : <span className="text-suave">—</span>}</span>
                     </td>
-                    <td className="hidden whitespace-nowrap px-3 py-2 text-right align-top sm:table-cell">
-                      {meta?.desvioTexto ? (
-                        <>
-                          <span className="block min-h-6 leading-6">{meta.desvioTexto}</span>
-                          {crescimento && meta.variacaoBp !== null && <span className="block text-[12px] font-normal leading-snug text-suave">variação {textoDaVariacao(meta.variacaoBp)}</span>}
-                        </>
+                    <td className="hidden whitespace-nowrap px-3 py-2 text-right align-top sm:table-cell sm:pr-5">
+                      {meta ? (
+                        meta.desvioTexto ? (
+                          <>
+                            <span className="block min-h-6 leading-6">{meta.desvioTexto}</span>
+                            <span className="block text-[12px] font-normal leading-snug text-suave">{meta.palavra}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="block min-h-6 leading-6 font-normal text-suave">—</span>
+                            <span className="block text-[12px] font-normal leading-snug text-suave">{meta.semComparacao}</span>
+                          </>
+                        )
                       ) : (
                         <span className="block min-h-6 leading-6 font-normal text-suave">—</span>
-                      )}
-                    </td>
-                    <td className="hidden px-3 py-2 text-left align-top font-normal sm:table-cell sm:pr-5">
-                      {farol ? (
-                        <Farol f={farol} />
-                      ) : (
-                        <span className="block min-h-6 leading-6 text-suave">—</span>
                       )}
                     </td>
                   </>
@@ -565,8 +547,6 @@ export function TelaDoDre({
       <Fechamento d={d} raiz={raiz} pode={pode} />
       <ConviteParaFechar d={d} raiz={raiz} pode={pode} />
 
-      <PainelDeFaroisDoDre d={d} raiz={raiz} definirMetas={pode.definirMetas === true} />
-
       <Painel
         titulo={loja ? `Resultado da loja · ${loja.nome}` : 'Resultado da rede'}
         subtitulo={
@@ -603,7 +583,7 @@ export function TelaDoDre({
       {d.anoPassado && <AnoPassadoPainel a={d.anoPassado} />}
 
       <p className="text-[12px] leading-relaxed text-suave">
-        Despesa conta pela competência (o mês a que pertence), não pelo dia em que foi paga. {d.status === 'FECHADO' ? 'A taxa do iFood é a estimada pela taxa de quando o período fechou.' : 'A taxa do iFood é estimada pela taxa configurada hoje.'} O CMV é o real (estoque inicial mais compras menos estoque final) quando o período terminou e a contagem de fechamento foi aplicada; senão, o das compras pela data da nota. Loja sem nota e sem estoque fica sem CMV, e margem e resultados saem sem contar o CMV.{Object.keys(d.metas).length > 0 ? ' O desvio é o realizado menos a meta, em pontos percentuais (pp); na receita, a meta é de crescimento sobre o mesmo período do ano passado. O farol põe o desvio numa de 5 faixas fixas, as mesmas para todas as casas; a cor sempre vem com a régua, a palavra e o desvio, e some quando o dado ainda não fecha.' : ''}{' '}
+        Despesa conta pela competência (o mês a que pertence), não pelo dia em que foi paga. {d.status === 'FECHADO' ? 'A taxa do iFood é a estimada pela taxa de quando o período fechou.' : 'A taxa do iFood é estimada pela taxa configurada hoje.'} O CMV é o real (estoque inicial mais compras menos estoque final) quando o período terminou e a contagem de fechamento foi aplicada; senão, o das compras pela data da nota. Loja sem nota e sem estoque fica sem CMV, e margem e resultados saem sem contar o CMV.{Object.keys(d.metas).length > 0 ? ' O desvio é o realizado menos a meta, em pontos percentuais (pp); menos de 0,05 pp é “na meta”.' : ''}{' '}
         {loja ? 'A loja não recebe rateio da rede.' : 'Receita por canal nas três primeiras linhas.'}
       </p>
     </div>

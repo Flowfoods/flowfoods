@@ -10,7 +10,6 @@ import { formatarData } from '@/lib/erp/compra-campos';
 import type { SituacaoDoFechamento } from '@/lib/erp/dre-fechamento';
 import { rotuloDaRessalva } from '@/lib/erp/dre-fechamento-campos';
 import type { FotografiaLida } from '@/lib/erp/dre-fotografia';
-import { FRASE_DO_CMV_ANTIGO } from '@/lib/erp/cmv-campos';
 import { textoDoPercentual } from '@/lib/erp/dre-campos';
 import { CODIGO, codigoDoSubtotal } from '@/lib/erp/dre-plano';
 import { COR } from '@/lib/erp/modulos';
@@ -32,9 +31,6 @@ function Numeros({ f }: { f: FotografiaLida }) {
   const receita = valorDe(f, codigoDoSubtotal('RECEITA'));
   const resultado = valorDe(f, CODIGO.resultado);
   const linhaResultado = f.linhas.find((l) => l.lojaId === null && l.chave === CODIGO.resultado);
-  // Fotografia de antes do CMV (v1): ela guardou "sem contar o CMV" porque o CMV não existia; hoje a frase honesta é "não apurado".
-  const antesDoCmv = f.versaoDaConta < 2;
-  const semContar = (linhaResultado?.semContar ?? []).filter((x) => !(antesDoCmv && x === 'o CMV'));
   return (
     <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
       <div>
@@ -47,8 +43,7 @@ function Numeros({ f }: { f: FotografiaLida }) {
           {dinheiro(resultado)}
           {linhaResultado?.percentualBp != null && <span className="ml-2 text-[12px] font-normal text-suave">{textoDoPercentual(linhaResultado.percentualBp)} da receita</span>}
         </dd>
-        {semContar.length > 0 && <dd className="text-[12px] text-suave">sem contar {semContar.join(' e ')}</dd>}
-        {antesDoCmv && <dd className="text-[12px] text-suave">CMV: {FRASE_DO_CMV_ANTIGO}</dd>}
+        {linhaResultado && linhaResultado.semContar.length > 0 && <dd className="text-[12px] text-suave">sem contar {linhaResultado.semContar.join(' e ')}</dd>}
       </div>
       <div>
         <dt className="text-[12px] text-suave">Taxa do iFood congelada</dt>
@@ -131,7 +126,7 @@ function Versao({ f, vigente }: { f: FotografiaLida; vigente: boolean }) {
                     <th scope="row" className={`py-1.5 text-left ${l.nivel === 1 ? 'pl-7 pr-2 font-normal' : 'px-3'}`}>
                       {l.nome}
                     </th>
-                    <td className="px-3 text-right">{l.tipo === 'cmv' && f.versaoDaConta < 2 ? <span className="text-[12px] font-normal text-suave">{FRASE_DO_CMV_ANTIGO}</span> : l.valorCentavos === null ? <span className="font-normal text-suave">—</span> : l.valorCentavos === 0 && l.tipo !== 'resultado' ? <span className="font-normal text-suave">—</span> : formatarDinheiro(l.valorCentavos)}</td>
+                    <td className="px-3 text-right">{l.valorCentavos === null ? <span className="font-normal text-suave">—</span> : l.valorCentavos === 0 && l.tipo !== 'resultado' ? <span className="font-normal text-suave">—</span> : formatarDinheiro(l.valorCentavos)}</td>
                     <td className="px-3 text-right font-normal">{l.percentualBp === null || l.valorCentavos === 0 ? <span className="text-suave">—</span> : textoDoPercentual(l.percentualBp)}</td>
                   </tr>
                 ))}

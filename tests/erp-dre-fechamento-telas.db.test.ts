@@ -187,9 +187,8 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
       { criadoPorNome: 'Marina Dona', parceiroId: A.id, percentualBp: 3000 },
     ]);
     expect(await b.dreMeta.count()).toBe(0);
-    // Receita (2.4: meta de crescimento, 0 a 100 %) por campo forjado: 100,01 é frase, e as linhas de detalhe do CMV não existem como meta; nada de novo.
-    expect(await rodar(async () => dreDaSessao.acaoSalvarMetas(null, form({ versao: await v(), 'meta_receita-loja': '100,01' })))).toMatchObject({ ok: false, erros: { 'receita-loja': expect.stringMatching(/rescimento/) } });
-    expect(await rodar(async () => dreDaSessao.acaoSalvarMetas(null, form({ versao: await v(), 'meta_cmv:compra': '10' })))).toMatchObject({ ok: false });
+    // Receita por campo forjado: frase, e nada de novo.
+    expect(await rodar(async () => dreDaSessao.acaoSalvarMetas(null, form({ versao: await v(), 'meta_receita-loja': '10' })))).toMatchObject({ ok: false, erros: { geral: expect.stringContaining('não tem meta') } });
     // Texto inválido: a frase vai no campo da linha.
     expect(await rodar(async () => dreDaSessao.acaoSalvarMetas(null, form({ versao: await v(), 'meta_grupo:PESSOAL': '100,01' })))).toMatchObject({ ok: false, erros: { 'grupo:PESSOAL': expect.any(String) } });
     // Versão velha: conflito, nada grava.
@@ -207,7 +206,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     como(alcanceDe('DONO', 'rede'), 'Marina');
     const p = await props(await ErpPlanoPage());
     expect(p.metas.linhas.some((l: { chave: string; metaBp: number | null }) => l.chave === 'grupo:PESSOAL' && l.metaBp === 2500)).toBe(true);
-    expect(p.metas.linhas.find((l: { chave: string }) => l.chave === 'grupo:RECEITA')).toMatchObject({ aceita: true, tipoDaMeta: 'crescimento' }); // 2.4: a receita tem meta de crescimento
+    expect(p.metas.linhas.find((l: { chave: string }) => l.chave === 'grupo:RECEITA').aceita).toBe(false);
     expect(p.acoes.metas).toBeTypeOf('function');
   });
 

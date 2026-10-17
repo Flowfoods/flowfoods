@@ -160,8 +160,8 @@
     "hash": "9d803e531e0e9c5c"
   },
   "dre": {
-    "versao": 6,
-    "hash": "edb054da0acc2058"
+    "versao": 5,
+    "hash": "a495291763ef5d6d"
   },
   "dre-despesas": {
     "versao": 1,
@@ -180,11 +180,11 @@
     "hash": "dad1fd99acf3f852"
   },
   "dre-plano": {
-    "versao": 4,
-    "hash": "daa237a907ffe01a"
+    "versao": 3,
+    "hash": "177c238a966d36ac"
   },
   "dre-periodo": {
-    "versao": 3,
-    "hash": "335efa23341f21b8"
+    "versao": 2,
+    "hash": "b3b90b7403d2c99b"
   }
 }

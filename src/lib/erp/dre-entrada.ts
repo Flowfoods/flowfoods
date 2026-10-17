@@ -44,15 +44,13 @@ export interface LeituraDoDre {
   cmv: CmvDoDre;
 }
 
-export function somarReceitas(graos: readonly { lojaId: string; canal: ReceitaLida['canal']; valorCentavos: number; pedidos?: number }[]): ReceitaLida[] {
+export function somarReceitas(graos: readonly { lojaId: string; canal: ReceitaLida['canal']; valorCentavos: number }[]): ReceitaLida[] {
   const soma = new Map<string, ReceitaLida>();
   for (const g of graos) {
     const k = `${g.lojaId}|${g.canal}`;
     const atual = soma.get(k);
-    if (atual) {
-      atual.valorCentavos += g.valorCentavos;
-      if (g.pedidos !== undefined) atual.pedidos = (atual.pedidos ?? 0) + g.pedidos;
-    } else soma.set(k, { lojaId: g.lojaId, canal: g.canal, valorCentavos: g.valorCentavos, ...(g.pedidos !== undefined ? { pedidos: g.pedidos } : {}) });
+    if (atual) atual.valorCentavos += g.valorCentavos;
+    else soma.set(k, { lojaId: g.lojaId, canal: g.canal, valorCentavos: g.valorCentavos });
   }
   return Array.from(soma.values()).sort((a, b) => a.lojaId.localeCompare(b.lojaId) || a.canal.localeCompare(b.canal));
 }

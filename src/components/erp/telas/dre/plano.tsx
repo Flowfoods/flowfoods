@@ -45,7 +45,7 @@ export function TelaDoPlano({
       {metas && (
         <Painel
           titulo="Metas"
-          subtitulo="Nas despesas, no CMV e nos resultados, o percentual da receita bruta que a linha deveria ter. Na receita (total e cada canal), o quanto ela deveria crescer sobre o mesmo período do ano passado. A mesma meta vale para a rede e para cada loja, e o DRE compara o realizado com ela."
+          subtitulo="O percentual da receita bruta que cada linha deveria ter. A mesma meta vale para a rede e para cada loja, e o DRE compara o realizado com ela."
           acessorio={<Contagem>{metas.linhas.filter((l) => l.metaBp !== null).length} com meta</Contagem>}
           semRespiro
         >

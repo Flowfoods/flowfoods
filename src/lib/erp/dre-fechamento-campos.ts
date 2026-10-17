@@ -50,9 +50,6 @@ export interface Ressalva {
   origemId?: string;
   mesAlvo?: string;
   valorCentavos?: number;
-  /** Só na recorrente, a partir da 2.4: a linha e o grupo que ficam sem o mês (o farol tira a cor deles e dos resultados abaixo). */
-  linhaId?: string;
-  grupo?: GrupoDoDre;
 }
 
 export interface CondicoesParaFechar {

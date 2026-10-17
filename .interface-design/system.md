@@ -28,7 +28,7 @@ tabelas do Kairu Corporativo; cor e tipo FlowFoods (CLAUDE.md).
 | `acao` / `acao-hover` | #C41522 / #D61A27 | #C41522 / #A8111C | botão principal (branco ≈ 6:1) |
 | `acento` | #EA1D2C | #EA1D2C | indicador ativo, filete do topo, foco |
 | `assinatura` | #F2323F | #C41522 | o "Foods" da marca |
-| `erro` / `ok` / `atencao` | #F5424D / #4ADE80 / #F59E0B | #C41522 / #166534 / #92400E | só em selo e texto, sempre com palavra |
+| `erro` / `ok` / `atencao` | #F2323F / #4ADE80 / #F59E0B | #C41522 / #166534 / #92400E | só em selo e texto, sempre com palavra |
 
 Tema: cookie `ff_tema` (claro | escuro | sistema) lido no servidor → `data-tema`.
 Cor de módulo (paleta em `src/lib/erp/modulos.ts`) SÓ no quadrado do ícone:
@@ -208,10 +208,3 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   próprio = cinza sem farol; abaixo do alvo = palavra em atenção embaixo.
   **Margens-alvo**: linha = canal + ajuda, campo de 96 px + "%", e o exemplo ao
   vivo "Prato de R$ 10,00: sai a R$ 33,34" à direita (14rem).
-- **Farol (2.4)**: 5 faixas fixas (azul · verde · amarelo · laranja · vermelho), cor SÓ no glifo e na palavra
-  do indicador (nunca borda de card, fundo de linha, cabeçalho ou botão). Glifo = régua de 5 quadrados de 8 px
-  com a casa da faixa cheia (a posição diz a faixa em cinza); palavra e desvio sempre juntos; sem dado que feche,
-  régua vazia e o motivo escrito. Tokens `--ff-farol-*` (claro #2F5D8A #166534 #7A5C00 #A84B0C #C41522; escuro
-  #8DB4DC #4ADE80 #E2C55A #F0913A #F5424D), contraste ≥ 4,5:1 sobre painel, fundo e linha de resultado.
-  `erro` no escuro subiu de #F2323F para #F5424D (o selo "Sem CMV" sobre a linha de grupo dava 4,42:1).
-  Painel no topo do DRE no kit Bento da Kairu: estrutura modular, sem a paleta tonal do kit.

@@ -1656,7 +1656,7 @@ model DreFotografia {
   fechadoPorNome    String
   taxaComissaoBp    Int?
   taxaPagamentoBp   Int?
-  // 1 = sem CMV (2.2b); 2 = com o CMV de compra e o real (2.3); 3 = com o ano passado e a versão do farol (2.4).
+  // 1 = sem CMV (2.2b); 2 = com o CMV de compra e o real (2.3).
   versaoDaConta     Int             @default(1)
   entrada           Json
   ressalvas         Json            @default("[]")

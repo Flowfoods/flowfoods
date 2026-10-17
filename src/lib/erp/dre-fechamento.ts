@@ -36,9 +36,7 @@ import {
   type Ressalva,
 } from './dre-fechamento-campos';
 import { gravarFotografia, lerFotografiaVigente, lerVersoesDoPeriodo, proximaVersao, type FotografiaLida } from './dre-fotografia';
-import { aceitaMeta, anoPassadoParaGravar, mesmaDataNoAnoPassado, metaApareceNaLoja } from './dre-metas-campos';
-import { VERSAO_DAS_FAIXAS } from './farol-campos';
-import { faturamentoDosGraos } from './faturamento';
+import { aceitaMeta, metaApareceNaLoja } from './dre-metas-campos';
 import { metasDoPeriodo } from './dre-metas';
 import { CODIGO, codigoDoSubtotal } from './dre-plano';
 import { garantirPlano } from './plano';
@@ -146,8 +144,6 @@ async function condicoesDe(tx: ClienteDoParceiro, periodo: Periodo, registroId: 
       origemId: f.origemId,
       mesAlvo: f.mesAlvo,
       valorCentavos: f.valorCentavos,
-      linhaId: f.linhaId,
-      grupo: f.grupo,
     });
   }
   const ativas = leitura.lojas.filter((l) => l.ativa);
@@ -322,9 +318,6 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
           linhas.push(...linhasParaGravar(r, loja.id, loja.nome, metaDa(metas, true)));
         }
 
-        const deAnoPassado = mesmaDataNoAnoPassado(periodo.inicio);
-        const ateAnoPassado = mesmaDataNoAnoPassado(periodo.fim);
-        const anoPassado = anoPassadoParaGravar(deAnoPassado, ateAnoPassado, await faturamentoDosGraos(tx, ALCANCE_FLOWFOODS, { de: deAnoPassado, ate: ateAnoPassado }), leitura.lojas);
         const versao = await proximaVersao(tx, registro.id);
         const agora = new Date();
         await gravarFotografia(
@@ -336,9 +329,9 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
             nomeDoPeriodo: periodo.nome,
             fechadoPorNome: autorNome,
             taxa: leitura.taxaIfood,
-            versaoDaConta: 3,
+            versaoDaConta: 2,
             entrada: {
-              versaoDaConta: 3,
+              versaoDaConta: 2,
               periodo: { inicio: periodo.inicio, fim: periodo.fim, nome: periodo.nome },
               ate: leitura.ate,
               lojas: leitura.lojas.map((l) => ({ id: l.id, nome: l.nome, ativa: l.ativa })),
@@ -348,9 +341,6 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
               taxaIfood: leitura.taxaIfood,
               cmv: cmvParaGravar(leitura.cmv),
               metas: Object.fromEntries(metas),
-              // 2.4: o ano passado por loja e canal (o fechado lê a variação SÓ daqui) e a versão das faixas do farol com que foi lido.
-              anoPassado,
-              farol: { versao: VERSAO_DAS_FAIXAS },
             } as unknown as Prisma.InputJsonValue,
             ressalvas: cond.ressalvas,
             justificativa,

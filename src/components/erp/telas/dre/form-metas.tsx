@@ -20,8 +20,6 @@ export interface LinhaDoCampoDeMeta {
   tipo: string;
   nivel: 0 | 1;
   aceita: boolean;
-  /** Receita: crescimento sobre o ano passado; o resto, % da receita bruta (2.4). Ausente = percentual. */
-  tipoDaMeta?: 'percentual' | 'crescimento';
   oculta: boolean;
   campo: string;
   metaBp: number | null;
@@ -79,10 +77,9 @@ export function FormMetas({
         autoComplete="off"
         maxLength={12}
         placeholder="sem meta"
-        aria-label={l.tipoDaMeta === 'crescimento' ? `${l.nome}: meta de crescimento sobre o ano passado, em %` : undefined}
         aria-invalid={!!erro}
         aria-describedby={erro ? `${id}-erro` : undefined}
-        className={`${CAMPO} ml-auto w-28 scroll-mb-28 text-right font-normal tabular-nums sm:w-32`}
+        className={`${CAMPO} ml-auto w-28 text-right font-normal tabular-nums sm:w-32`}
       />
     ) : (
       <span className="block min-h-6 text-[12px] font-normal leading-6 text-suave">base: 100 %</span>
@@ -100,9 +97,8 @@ export function FormMetas({
         ) : (
           <span className="block min-h-6 leading-6">{l.nome}</span>
         )}
-        {l.aceita && l.tipoDaMeta === 'crescimento' && <span className="block text-[12px] font-normal leading-snug text-suave">crescimento sobre o ano passado (0 = igualar)</span>}
         {l.aceita && l.desde && l.metaBp !== null && <span className="block text-[12px] font-normal leading-snug text-suave">vale desde {formatarData(l.desde)}</span>}
-        {l.aceita && l.metaBp === null && grupoComMeta && l.tipoDaMeta !== 'crescimento' && <span className="block text-[12px] font-normal leading-snug text-suave">meta no grupo {grupoComMeta}</span>}
+        {l.aceita && l.metaBp === null && grupoComMeta && <span className="block text-[12px] font-normal leading-snug text-suave">meta no grupo {grupoComMeta}</span>}
         {erro && (
           <span id={`${id}-erro`} className="mt-1 block text-[13px] font-normal text-erro">
             {erro}
@@ -125,7 +121,7 @@ export function FormMetas({
         </div>
       )}
       <fieldset disabled={!!bloqueio} className="min-w-0">
-        <legend className="sr-only">Meta de cada linha: % da receita bruta, ou crescimento sobre o ano passado na receita</legend>
+        <legend className="sr-only">Meta de cada linha, em % da receita bruta</legend>
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-forte text-left text-[12px] text-suave">
@@ -133,7 +129,7 @@ export function FormMetas({
                 Linha
               </th>
               <th scope="col" className="h-10 w-40 px-3 text-right font-semibold sm:w-56 sm:px-5">
-                Meta, % <span className="hidden sm:inline">(da receita; na receita, de crescimento)</span>
+                Meta, % da receita
               </th>
             </tr>
           </thead>
