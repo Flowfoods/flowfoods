@@ -86,7 +86,7 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
         </Aviso>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)] lg:grid-rows-[auto_1fr]">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-4 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)] lg:grid-rows-[auto_1fr]">
         <Painel titulo="Quem pediu" className="self-start lg:col-start-1">
           {p.excluido ? (
             <p className="text-sm text-suave">Os dados pessoais deste pedido foram excluídos.</p>
@@ -139,7 +139,7 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
           )}
         </Painel>
 
-        <div className="space-y-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">
+        <div className="min-w-0 space-y-4 lg:col-start-2 lg:row-span-2 lg:row-start-1">
           <DecisaoDoPedido
             status={p.status}
             versao={p.versao}
