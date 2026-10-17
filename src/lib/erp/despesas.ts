@@ -52,7 +52,6 @@ import {
   type TextosDaDespesa,
 } from './despesa-campos';
 import { garantirPlano, resolverLinha } from './plano';
-import { mesVizinho } from './faturamento-campos';
 import { listarHistorico } from './historico';
 import { diferenca } from './insumo-campos';
 import { fraseDoPeriodoFechado, intervaloEmPeriodoFechado, travarParaEscrever } from './periodo-trava';

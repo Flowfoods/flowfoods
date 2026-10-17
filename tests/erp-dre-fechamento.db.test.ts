@@ -19,7 +19,7 @@ import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
-import { lancarDia, removerLancamento, salvarCanaisDaLoja, type EntradaDoCanal } from '@/lib/erp/faturamento';
+import { lancarDia, salvarCanaisDaLoja, type EntradaDoCanal } from '@/lib/erp/faturamento';
 import { cadastrarInsumo } from '@/lib/erp/insumos';
 import { cadastrarFornecedor, cancelarNota, editarNota, lancarNota } from '@/lib/erp/compras';
 import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
@@ -35,16 +35,12 @@ import { planoDoParceiro, garantirPlano, renomearLinha, ocultarLinha } from '@/l
 import { listarHistorico } from '@/lib/erp/historico';
 import { salvarTaxaDoIfood } from '@/lib/erp/canais';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
-import { montarDre } from '@/lib/erp/dre-campos';
-import { linhasParaGravar } from '@/lib/erp/dre-fechamento-campos';
 import { criarPeriodoFechadoDeTeste, cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 /** "Hoje" do teste: o relógio do ambiente dos testes de DRE. Outubro está em curso; setembro e agosto terminaram. */
 const HOJE = '2026-10-17';
 const dia = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
-const DIA_MS = 86_400_000;
-const brl = (centavos: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(centavos / 100);
 
 describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { timeout: 300_000 }, () => {
   let db: PrismaClient;

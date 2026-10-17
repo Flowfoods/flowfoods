@@ -357,7 +357,7 @@ function AnoPassadoPainel({ a }: { a: AnoPassado }) {
               <th scope="col" className="h-10 px-3 text-right font-semibold">
                 Ano passado
               </th>
-              <th scope="col" className="h-10 px-3 text-right font-semibold sm:px-5">
+              <th scope="col" className="hidden h-10 px-3 text-right font-semibold sm:table-cell sm:px-5">
                 Variação
               </th>
             </tr>
@@ -367,10 +367,11 @@ function AnoPassadoPainel({ a }: { a: AnoPassado }) {
               <tr key={l.chave} className={`border-t border-linha ${l.chave === 'bruta' ? 'font-semibold' : ''}`}>
                 <th scope="row" className={`h-11 text-left ${l.chave === 'bruta' ? 'px-4 sm:px-5' : 'pl-8 pr-2 font-normal sm:pl-10'}`}>
                   {NOMES_DA_RECEITA[l.chave]}
+                  {l.variacaoBp !== null && <span className="block text-[12px] font-normal text-suave sm:hidden">Variação {textoDaVariacao(l.variacaoBp)}</span>}
                 </th>
                 <td className="px-3 text-right">{l.atualCentavos === 0 ? <span className="font-normal text-suave">—</span> : formatarDinheiro(l.atualCentavos)}</td>
                 <td className="px-3 text-right">{l.anteriorCentavos === null ? <span className="font-normal text-suave">sem lançamento</span> : formatarDinheiro(l.anteriorCentavos)}</td>
-                <td className="px-3 text-right sm:px-5">{l.variacaoBp === null ? <span className="font-normal text-suave">—</span> : textoDaVariacao(l.variacaoBp)}</td>
+                <td className="hidden px-3 text-right sm:table-cell sm:px-5">{l.variacaoBp === null ? <span className="font-normal text-suave">—</span> : textoDaVariacao(l.variacaoBp)}</td>
               </tr>
             ))}
           </tbody>

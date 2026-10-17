@@ -126,12 +126,6 @@ export type ResultadoDasMetas =
 
 const falha = (geral: string, conflito?: boolean): ResultadoDasMetas => ({ ok: false, erros: { geral }, ...(conflito ? { conflito } : {}) });
 
-class Recusa extends Error {
-  constructor(readonly resultado: ResultadoDasMetas) {
-    super('recusa');
-  }
-}
-
 /**
  * Grava a tabela inteira de uma vez. `valores` = chave da linha → texto digitado (só as que o
  * formulário mandou; vazio é "sem meta"). Linha que não existe neste parceiro, ou que não aceita
@@ -150,60 +144,55 @@ export async function salvarMetas(
   const chaves = Object.keys(entrada.valores);
   if (chaves.length === 0) return falha('Nenhuma meta para salvar.');
   if (chaves.length > 200) return falha('Linhas demais de uma vez.');
-  try {
-    return await cliente.transacao(
-      async (tx): Promise<ResultadoDasMetas> => {
-        await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp-metas:${tx.parceiroId}`}, 0))::text AS "trava"`;
-        const periodo = await periodoDe(tx, hoje);
-        await garantirPlano(tx);
-        const plano = await planoDoParceiro(tx);
-        const todas = await lerTodasAsMetas(tx);
-        if (String(entrada.versao ?? '') !== impressaoDasMetas(todas)) return falha(MENSAGEM_CONFLITO_DAS_METAS, true);
+  return await cliente.transacao(
+    async (tx): Promise<ResultadoDasMetas> => {
+      await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp-metas:${tx.parceiroId}`}, 0))::text AS "trava"`;
+      const periodo = await periodoDe(tx, hoje);
+      await garantirPlano(tx);
+      const plano = await planoDoParceiro(tx);
+      const todas = await lerTodasAsMetas(tx);
+      if (String(entrada.versao ?? '') !== impressaoDasMetas(todas)) return falha(MENSAGEM_CONFLITO_DAS_METAS, true);
 
-        const porChave = new Map(plano.filter((l) => l.id).map((l) => [chaveDaLinha(l), l]));
-        // Primeiro tudo é lido e conferido: nada grava se uma linha for forjada ou inválida.
-        const erros: Record<string, string> = {};
-        const lidas = new Map<string, number | null>();
-        for (const chave of chaves) {
-          const linha = porChave.get(chave);
-          if (!linha) return falha('Uma das linhas não existe mais no plano de contas. Recarregue a página; nada foi gravado.', true);
-          if (!aceitaMeta(chave)) return falha(`“${linha.nome}” não tem meta: a base dela é a própria receita. Recarregue a página; nada foi gravado.`);
-          const l = lerMetaDigitada(entrada.valores[chave]);
-          if (!l.ok) erros[chave] = l.erro;
-          else lidas.set(chave, l.bp);
-        }
-        if (Object.keys(erros).length > 0) return { ok: false, erros: { ...erros, geral: 'Confira as metas marcadas; nada foi gravado.' } };
+      const porChave = new Map(plano.filter((l) => l.id).map((l) => [chaveDaLinha(l), l]));
+      // Primeiro tudo é lido e conferido: nada grava se uma linha for forjada ou inválida.
+      const erros: Record<string, string> = {};
+      const lidas = new Map<string, number | null>();
+      for (const chave of chaves) {
+        const linha = porChave.get(chave);
+        if (!linha) return falha('Uma das linhas não existe mais no plano de contas. Recarregue a página; nada foi gravado.', true);
+        if (!aceitaMeta(chave)) return falha(`“${linha.nome}” não tem meta: a base dela é a própria receita. Recarregue a página; nada foi gravado.`);
+        const l = lerMetaDigitada(entrada.valores[chave]);
+        if (!l.ok) erros[chave] = l.erro;
+        else lidas.set(chave, l.bp);
+      }
+      if (Object.keys(erros).length > 0) return { ok: false, erros: { ...erros, geral: 'Confira as metas marcadas; nada foi gravado.' } };
 
-        const efetivas = efetivasEm(todas, periodo.inicio);
-        const doPeriodo = new Map(todas.filter((m) => m.vigenteDesde === periodo.inicio).map((m) => [m.linhaId, m]));
-        let mudou = 0;
-        for (const [chave, novo] of lidas) {
-          const linha = porChave.get(chave)!;
-          const efetiva = efetivas.get(linha.id!);
-          const antes = efetiva && !efetiva.semMeta ? efetiva.percentualBp : null;
-          if (antes === novo) continue;
-          const dados = { percentualBp: novo ?? 0, semMeta: novo === null, criadoPorNome: autorNome.slice(0, 120) };
-          const existente = doPeriodo.get(linha.id!);
-          let id: string;
-          if (existente) {
-            await tx.dreMeta.update({ where: { id: existente.id }, data: dados });
-            id = existente.id;
-          } else {
-            const criada = await tx.dreMeta.create({ data: { parceiroId: tx.parceiroId, linhaId: linha.id!, canal: null, vigenteDesde: dataDoBanco(periodo.inicio), ...dados }, select: { id: true } });
-            id = criada.id;
-          }
-          const retrato = (bp: number | null) => ({ alvo: linha.nome, meta: bp === null ? 'Sem meta' : textoDaMeta(bp), valeDesde: formatarData(periodo.inicio) });
-          await tx.historicoAlteracao.create({
-            data: { parceiroId: tx.parceiroId, entidade: 'DreMeta', entidadeId: id, acao: antes === null && !efetiva ? 'CRIOU' : 'ALTEROU', antes: antes === null && !efetiva ? undefined : retrato(antes), depois: retrato(novo), autorNome },
-          });
-          mudou++;
+      const efetivas = efetivasEm(todas, periodo.inicio);
+      const doPeriodo = new Map(todas.filter((m) => m.vigenteDesde === periodo.inicio).map((m) => [m.linhaId, m]));
+      let mudou = 0;
+      for (const [chave, novo] of lidas) {
+        const linha = porChave.get(chave)!;
+        const efetiva = efetivas.get(linha.id!);
+        const antes = efetiva && !efetiva.semMeta ? efetiva.percentualBp : null;
+        if (antes === novo) continue;
+        const dados = { percentualBp: novo ?? 0, semMeta: novo === null, criadoPorNome: autorNome.slice(0, 120) };
+        const existente = doPeriodo.get(linha.id!);
+        let id: string;
+        if (existente) {
+          await tx.dreMeta.update({ where: { id: existente.id }, data: dados });
+          id = existente.id;
+        } else {
+          const criada = await tx.dreMeta.create({ data: { parceiroId: tx.parceiroId, linhaId: linha.id!, canal: null, vigenteDesde: dataDoBanco(periodo.inicio), ...dados }, select: { id: true } });
+          id = criada.id;
         }
-        return { ok: true, mudou, valeDesde: periodo.inicio };
-      },
-      { timeout: 20_000 },
-    );
-  } catch (e) {
-    if (e instanceof Recusa) return e.resultado;
-    throw e;
-  }
+        const retrato = (bp: number | null) => ({ alvo: linha.nome, meta: bp === null ? 'Sem meta' : textoDaMeta(bp), valeDesde: formatarData(periodo.inicio) });
+        await tx.historicoAlteracao.create({
+          data: { parceiroId: tx.parceiroId, entidade: 'DreMeta', entidadeId: id, acao: antes === null && !efetiva ? 'CRIOU' : 'ALTEROU', antes: antes === null && !efetiva ? undefined : retrato(antes), depois: retrato(novo), autorNome },
+        });
+        mudou++;
+      }
+      return { ok: true, mudou, valeDesde: periodo.inicio };
+    },
+    { timeout: 20_000 },
+  );
 }

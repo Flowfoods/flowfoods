@@ -14,7 +14,6 @@ import { PageHeader } from '../../ui/cabecalho';
 import { Aviso, Contagem, Painel, Selo } from '../../ui/superficies';
 import type { AcaoLocal } from './estado';
 import type { SituacaoDasMetas } from '@/lib/erp/dre-metas';
-import { formatarData } from '@/lib/erp/compra-campos';
 import { FormMetas } from './form-metas';
 import { AcoesDaLinha, FormNovaLinha } from './form-plano';
 import { ListaHistorico } from '../historico/lista-historico';

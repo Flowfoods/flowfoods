@@ -1684,3 +1684,57 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) abas soltas e migration com CHECKs que reprovam por dado antigo; (b) grupo "Resultado" na área Faturamento e DRE, ação "Lançar despesa" e migration `20261026000000_erp_dre_despesas` NOT VALID + VALIDATE tolerante.
 
 **Razão:** (b). Despesas, DRE, Períodos e Plano de contas formam o grupo "Resultado" ao lado de "Faturamento"; a ação "Lançar despesa" entra no cabeçalho e no ⌘K. Toda rota nova tem ajuda (seis chaves novas; `faturamento-dia` e `periodo` subiram de versão). A migration só adiciona (colunas, tabela, valores de enum, CHECKs, gatilhos), copia a regra antiga antes de ligar a RLS, nunca lê tabela de tenant sob RLS e foi provada nos 3 perfis do banco (superusuário, dono com RLS, dono sem RLS) com dado antigo; o passo pós-deploy é `npm run erp:conferir-migracao`. `limparTexto` saiu de `pedido-campos` para `texto-limpo.ts` (puro) porque o formulário roda no navegador e `node:crypto` quebrava o build.
+
+### 149. 2026-10-17 · ERP 2.2b: meta é um percentual da receita bruta por linha, com vigência; "sem meta" também é uma linha
+
+**Alternativas:** (a) uma meta por parceiro que vale para sempre e apaga a anterior; (b) meta em pontos-base de 0 a 100,00 % por linha do DRE, com `vigenteDesde`; vazio grava "sem meta" como linha vigente.
+
+**Razão:** (b). O período fechado e o histórico precisam saber QUAL meta valia, então cada gravação nasce valendo do começo do período em curso e a efetiva de um período é a última com `vigenteDesde` menor ou igual ao começo dele. Apagar a meta é decisão (a casa deixou de acompanhar a linha), por isso vira uma linha `semMeta` com histórico, não um DELETE. A receita não tem meta (é a base do percentual). Salvar é tudo ou nada sob uma trava própria, e o que não mudou não grava. Meta por canal, por loja e em reais ficam para a 2.4.
+
+### 150. 2026-10-17 · ERP 2.2b: realizado × meta em pontos percentuais, a palavra vem do `sentido` e não tem cor
+
+**Alternativas:** (a) farol verde/amarelo/vermelho; (b) coluna Meta, Meta em R$ e Desvio em pp, com "melhor que a meta", "pior que a meta" ou "na meta" (diferença menor que 5 pontos-base), pela direção que a linha diz ser boa.
+
+**Razão:** (b). Pessoal acima da meta é ruim e resultado acima da meta é bom; quem diz isso é o `sentido` da linha, não a cor. Faixas e farol dependem de um acordo com o dono que ainda não existe (2.4). Linha sem meta fica sem comparação, não ganha uma meta inventada; a meta também mede o DRE de cada loja, em % da receita da loja.
+
+### 151. 2026-10-17 · ERP 2.2b: ano passado só para a receita, nas mesmas datas, com a cobertura dita
+
+**Alternativas:** (a) comparar tudo com o ano passado; (b) só a receita (bruta e por canal), nas mesmas datas menos um ano (29/02 vira 28/02), dizendo "N de M dias".
+
+**Razão:** (b). Despesa, plano e taxa mudaram de um ano para o outro e a comparação enganaria; a receita é o dado que existe nos dois lados. Sem lançamento no ano passado vira uma frase ("sem lançamento"), não uma coluna de traços, e a variação não é calculada contra um período incompleto sem avisar.
+
+### 152. 2026-10-17 · ERP 2.2b: condições duras travam; ressalvas se confirmam uma a uma com justificativa de 10 a 300 letras
+
+**Alternativas:** (a) fechar sempre e avisar; (b) travar tudo; (c) o que deixaria o número errado para sempre trava, o que é omissão consciente se confirma.
+
+**Razão:** (c). Duras: período não terminou, faturamento faltando, iFood vendido sem taxa configurada, contagem de fechamento do estoque em andamento, rede sem nenhum lançamento. Ressalvas: recorrente não lançada, estoque não aplicado, loja sem nenhum lançamento. A confirmação é marcar cada ressalva e escrever UMA justificativa; o servidor reconfere as condições dentro da transação (impressão das condições) e o DRE fechado diz "Fechado com ressalvas" para sempre. Em aberto para o Rodolfo: "loja nunca lançou" como ressalva (e não bloqueio) é o certo?
+
+### 153. 2026-10-17 · ERP 2.2b: o fechamento grava uma fotografia imutável, pela mesma leitura do DRE ao vivo
+
+**Alternativas:** (a) fechar só muda o status e o DRE recalcula; (b) guardar o resultado pronto; (c) guardar a ENTRADA e o resultado em BigInt, lidos por `entradaDoDre` (a mesma do ao vivo), imutáveis no banco.
+
+**Razão:** (c). Recalcular um período fechado com plano, taxa ou meta de hoje muda o passado; um resultado sem a entrada não prova de onde veio. Gatilhos recusam UPDATE e DELETE, a linha só se inclui na transação da fotografia, um índice parcial garante uma vigente por período e um gatilho adiado impede período FECHADO sem fotografia vigente (nem SQL na mão cria um). O DRE fechado lê só a fotografia, filtrada pelo alcance de quem lê. Período FECHADO de antes da 2.2b, sem fotografia, é lido ao vivo até alguém reabrir e fechar de novo.
+
+### 154. 2026-10-17 · ERP 2.2b: só o nível 1 reabre, com motivo, e a versão anterior nunca se perde
+
+**Alternativas:** (a) o dono reabre; (b) qualquer pessoa com `metas.editar`; (c) só a FlowFoods (`alcance.nivel === 'FLOWFOODS'`), com motivo de 3 a 200 letras.
+
+**Razão:** (c). Fechamento é o ponto de controle do consultor; se o dono reabre sozinho, o período fechado deixa de ser prova. A action de reabrir só existe no espelho do nível 1. Reabrir marca a fotografia como substituída (nunca apaga), guarda antes e depois no Histórico, e fechar de novo gera a versão seguinte. O dono vê a frase "só a FlowFoods reabre". Em aberto para o Rodolfo: se o dono passar a poder reabrir, é uma permissão nova.
+
+### 155. 2026-10-17 · ERP 2.2b: nota de compra e fechamento de estoque obedecem o período fechado; uma ordem de travas só
+
+**Alternativas:** (a) deixar nota e estoque fora do fechamento; (b) as duas escritas pegam a trava compartilhada e recusam período fechado.
+
+**Razão:** (b). Lançar, editar e cancelar nota, e iniciar e concluir a contagem de fechamento, pegam `travarParaEscrever` PRIMEIRO. Ordem fixa: chave do período → loja/aberturas → períodos; ninguém pega na ordem contrária, então não há deadlock, e fechar espera as escritas em curso. Cada teste de corrida falha se a trava for removida.
+
+### 156. 2026-10-17 · ERP 2.2b: a despesa recorrente sobrevive a um mês pulado
+
+**Alternativas:** (a) a cadeia some quando um mês não é lançado; (b) olhar o último elo da cadeia numa janela de 12 meses e desduplicar pela origem.
+
+**Razão:** (b). Era um defeito da 2.2a: quem esquecia um mês perdia a recorrente para sempre e o fechamento não avisava. Agora a recorrente que falta aparece em "Falta lançar" e vira ressalva do fechamento até ser lançada ou parar de repetir.
+
+### 157. 2026-10-17 · ERP 2.2b: navegação, ajuda, histórico e migration aditiva e verificável
+
+**Alternativas:** (a) página de fechar solta e migration com CHECKs que reprovam por dado antigo; (b) "Plano e metas" e a página do período no grupo "Resultado", ajuda por tela e migration `20261027000000_erp_dre_fechamento` segura nos três perfis de banco.
+
+**Razão:** (b). `dre-periodo` nasce com ajuda; `dre`, `dre-plano`, `dre-periodos`, `periodo`, `compra` e `compra-nova` sobem de versão. O Histórico ganha FECHOU, REABRIU e a meta atrás de `verDre`. A migration é aditiva, com CHECKs `NOT VALID` + `VALIDATE` que avisa e segue, gatilhos de imutabilidade, RLS condicional e nenhum passo que dependa de SELECT sob RLS; `erp:conferir-migracao` verifica os CHECKs e os gatilhos, e `migrate diff` fica vazio.
