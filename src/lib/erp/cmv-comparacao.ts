@@ -1,5 +1,5 @@
 /**
- * Compra × real (2.3, decisão 164) — a comparação que o dono lê no fechamento, pura.
+ * Compra × real (2.3, decisão 166) — a comparação que o dono lê no fechamento, pura.
  *
  * diferença = real − compra = (estoque inicial − estoque final) + (entradas do livro − notas lançadas).
  * O estoque que SOBE (diferença negativa) é compra que não virou consumo: dinheiro parado na prateleira.

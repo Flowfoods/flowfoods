@@ -1750,3 +1750,69 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) confiar nos dois gatilhos adiados; (b) mais um gatilho `BEFORE INSERT`: período ABERTO, versão = última + 1, nasce vigente; e `BEFORE TRUNCATE`.
 
 **Razão:** (b). Com só os gatilhos adiados, marcar a vigente como substituída e inserir uma "v999" vigente deixava o período FECHADO, sem REABRIU, lendo uma fotografia falsa. Como a migration ainda não foi para a master, ela foi editada (e o checksum atualizado no `ff_dev`). Fechar e reabrir pegam a trava exclusiva; o teste determinístico segura a trava compartilhada, vê o fechamento esperar e confere que a despesa gravada durante a espera está na fotografia (cai se a trava for removida). A conclusão de contagem pega a trava compartilhada como primeira instrução. Um gatilho adiado fecha o outro lado: período ABERTO com fotografia vigente não existe (o UPDATE solto FECHADO → ABERTO é recusado no commit; reabrir pelo sistema segue passando).
+
+### 160. 2026-10-17 · ERP 2.3: o CMV de compra é a soma das notas lançadas, pela data da nota
+
+**Alternativas:** (a) pela data em que a nota foi digitada; (b) pela data da nota (`entradaEm`), só notas LANÇADAS (cancelada e rascunho fora), com frete rateado, no recorte do DRE (até ontem no período em curso).
+
+**Razão:** (b). É a mesma data que trava o período (155) e que ordena o último preço (65): período fechado não muda de compra. Vale sem estoque aberto (é o CMV de quem ainda não conta) e a rede é a soma das lojas do alcance. Embalagem entra (é custo do prato). Limpeza e descartável da operação não deviam ser nota: a ajuda diz "lance como despesa"; sem tipo novo nesta fase.
+
+### 161. 2026-10-17 · ERP 2.3: o CMV real é estoque inicial + compras − estoque final, só com o período encerrado e os dois estoques
+
+**Alternativas:** (a) real parcial no meio do período; (b) só com `fim < hoje`, estoque inicial e final apurados, compras = o que o livro registrou das notas do período (`ENTRADA_COMPRA` pela data da nota, estornos com sinal).
+
+**Razão:** (b). Período em curso nunca tem real, mesmo com o fechamento aplicado no dia 29. As compras do real vêm do livro, não das notas: igual à compra em todo período depois do da abertura; difere só quando uma nota lançada antes de concluir a abertura já está na contagem (não conta duas vezes).
+
+### 162. 2026-10-17 · ERP 2.3: o estoque final é o retrato do fechamento corrigido pelos movimentos, por dia de competência (responde a pergunta aberta da 1.7)
+
+**Alternativas:** (a) o retrato como está (inclui o que entrou depois do fim, ou deixa de fora o que saiu antes do fechamento); (b) retrato + movimentos depois do retrato com competência até o fim do período − movimentos até o retrato com competência depois do fim, fora os ajustes do próprio fechamento.
+
+**Razão:** (b). Competência do movimento = data da nota (compra e o estorno dela) ou dia do Rio em que entrou no livro (o resto). Ajuste de cíclica, requisição ou devolução aplicado depois do fim cai no período em que foi aplicado, nunca reabre o anterior; o ajuste do fechamento é de P mesmo aplicado em P+1. Nota de data de P lançada depois do retrato soma na compra e no estoque final (o livro assume que chegou depois da contagem, decisão 73): o real não muda, a diferença muda. Derivado de dado imutável, somado no banco numa consulta só. Premissa: a data da nota nunca é depois do dia do lançamento. Limite conhecido: editar a data de uma nota de um período para outro depois do retrato move os dois lados do par entrada/estorno de lugar; período fechado no DRE já recusa isso (155).
+
+### 163. 2026-10-17 · ERP 2.3: o estoque inicial é sempre o estoque final do período anterior, pela mesma regra
+
+**Alternativas:** (a) reavaliar o estoque inicial a cada leitura; (b) EF(P−1) derivado, nunca reavaliado, um caminho só; a abertura concluída no primeiro dia do período vale como inicial dele.
+
+**Razão:** (b). É o que faz o real de períodos seguidos encadear ao centavo (a soma dos reais é o inicial do primeiro + compras − final do último; teste para N períodos). Sem o fechamento anterior aplicado, "não apurado" com a frase. Abertura no meio do período: o período não tem real ("o estoque abriu em dd/mm; o real começa em …").
+
+### 164. 2026-10-17 · ERP 2.3: valoração pelo último preço do instante do retrato; sem preço vale zero e vira aviso
+
+**Alternativas:** (a) reavaliar o estoque inicial pelo preço de hoje; (b) final pelo custo de referência do instante do retrato (o que a 1.7 já fotografa, coerente com 65 e 70), movimentos do corte pelo valor do livro, inicial nunca reavaliado; `Contagem.itensSemPreco` gravada ao aplicar abertura e fechamento.
+
+**Razão:** (b). Nota nova muda o custo de hoje, não o passado. Limitação dita na ajuda: com preço subindo, o estoque valorizado puxa o real para baixo. Insumo sem preço entra com zero e a tela diz quantos ("estoque sem o valor de N insumos sem preço"); nulo (contagem de antes da 2.3) é "não registrado". Saldo negativo segue fora do retrato (limitação anotada). A coluna é a única mudança de esquema: gravada no mesmo UPDATE que fecha a contagem, CHECK ≥ 0.
+
+### 165. 2026-10-17 · ERP 2.3: em cada loja entra o real, senão a compra, senão nulo; a rede soma o que vale em cada loja
+
+**Alternativas:** (a) zero quando não há nota; (b) nulo com a frase ("sem nota de compra no período"), nunca R$ 0,00.
+
+**Razão:** (b). Uma casa que não lança nota teria resultado inflado; margem e resultados seguem "sem contar o CMV". A rede soma o que vale em cada loja (rede = Σ lojas, decisão 146) e o selo diz as fontes ("misto: real em …; pelas compras em …; sem o CMV de …"), cabendo nas 120 letras que o banco aceita (perde o motivo, depois os nomes). Loja parada (sem venda, nota nem real) não pesa nem avisa. Sob a linha `cmv` ficam duas de detalhe, `cmv:compra` e `cmv:real`, de tipo `linha` e fora do plano de contas (`garantirPlano` adota linha da casa pelo nome e quebraria); não têm meta.
+
+### 166. 2026-10-17 · ERP 2.3: o painel "compra × real" fica dentro do DRE e diz o que a diferença significa
+
+**Alternativas:** (a) rota nova de CMV; (b) painel na página do DRE, por loja, com a soma das lojas comparadas, só no período encerrado.
+
+**Razão:** (b). Diferença = real − compra = (inicial − final) + (entradas do livro − notas lançadas), em R$ e em pontos da receita. Estoque que sobe: "comprou mais do que consumiu, é dinheiro parado na prateleira"; que desce: "consumiu do que já tinha"; notas que já estavam na contagem de abertura aparecem à parte. Lojas que ficaram só pelas compras dizem o motivo.
+
+### 167. 2026-10-17 · ERP 2.3: fechar grava a fotografia na versão da conta 2, com o CMV; a v1 nunca é recalculada
+
+**Alternativas:** (a) recalcular o CMV das fotografias v1; (b) v2 grava as linhas `cmv`, `cmv:compra`, `cmv:real` da rede e de cada loja e `entrada.cmv` (compra, real, inicial, final, compras do real, instante do retrato, ids do fechamento e da abertura, motivo, sem preço); a v1 mostra "não apurado neste fechamento (fechado antes do CMV)".
+
+**Razão:** (b). Fechado lê só a fotografia (153); para ter CMV, o nível 1 reabre e fecha de novo (154), e a v1 fica nas versões. A leitura do painel numa fotografia extrai do JSON só as lojas do alcance de quem lê. O Histórico do fechamento ganha "cmv: R$ X (real|compras|misto)" atrás de `verDre`. Nenhuma ressalva nova: a de estoque (2.2b) já cobre o que ainda dá para consertar.
+
+### 168. 2026-10-17 · ERP 2.3: a meta da linha CMV compara com o que vale (real ou compras)
+
+**Alternativas:** (a) meta separada para compra e real; (b) uma meta só, na linha `cmv` (já existia desde a 2.2b), comparada com o valor que vale e com o selo da fonte.
+
+**Razão:** (b). A meta é do custo da casa, não da fonte. As duas linhas de detalhe não aceitam meta (`aceitaMeta`) e nem aparecem no formulário de metas. Sem valor (nulo), a linha diz "sem valor apurado", nunca compara com zero.
+
+### 169. 2026-10-17 · ERP 2.3: sem permissão nova; vazamento fechado
+
+**Alternativas:** (a) permissão própria do CMV; (b) `dre.ver` (já é "Ver DRE e CMV"), com o servidor entregando só o alcance.
+
+**Razão:** (b). Sem `dre.ver` nada de CMV; gerente de uma loja só recebe a loja dele (a leitura filtra pelo alcance, também na fotografia, e a base da conta nunca vai para a tela); operador não vê nada. "Ver as notas" só com `compras.ver` e "Ver o estoque" só com `estoque.ver`. CMV não aparece nas telas de estoque. Ajuda: `dre` v3→v4, `dre-plano` v2→v3, `dre-periodo` v1→v2, `periodo` v3→v4, `compra-nova` v2→v3; migration `20261028000000_erp_cmv` aditiva, segura nos três perfis do banco, com o CHECK no `erp:conferir-migracao`; `VERSAO_DO_ERP` "fase 2.3".
+
+### 170. 2026-10-17 · ERP 2.3: transferência entre lojas não existe, e isso é um risco conhecido
+
+**Alternativas:** (a) criar transferência agora; (b) fora desta fase, anotado.
+
+**Razão:** (b). O real da REDE fecha certo; loja a loja distorce (quem manda perde, quem recebe "sobra"). Risco para o Valentin's, onde o endereço só delivery pode abastecer-se do salão. Também fora: CMV teórico (ficha × venda), CMV por canal ou marca, PEPS/médio, desconto e bonificação, tipo "limpeza", perda à mão.

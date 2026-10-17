@@ -229,7 +229,7 @@ describe('2.3 · qual CMV entra no resultado (decisão 165)', () => {
   });
 });
 
-describe('2.3 · compra × real (decisão 164)', () => {
+describe('2.3 · compra × real (decisão 166)', () => {
   const real = (centavos: number, ini: number, fim: number, c: number) => ({ centavos, inicialCentavos: R(ini), finalCentavos: R(fim), comprasReaisCentavos: R(c), inicialDe: 'fechamento' as const, retratoEm: '', fechamentoId: 'f', aberturaId: 'a', semPrecoInicial: 0, semPrecoFinal: 3 });
   const outubro: CmvDaLoja = { lojaId: 'vp', lojaNome: 'Vila da Penha', compraCentavos: R(25_800), real: real(R(23_950), 11_700, 13_550, 25_800), motivoSemReal: null };
   const setembro: CmvDaLoja = { lojaId: 'vp', lojaNome: 'Vila da Penha', compraCentavos: R(22_500), real: real(R(20_300), 10_000, 11_700, 22_000), motivoSemReal: null };

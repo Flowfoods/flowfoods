@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -34,6 +34,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Faturamento por canal (2.1): lançar o dia, planilha CSV, mês com faltas, leitura única do grão, trava do período | `src/lib/erp/{faturamento-campos,faturamento-planilha,faturamento,periodo-trava}.ts` (puro / planilha pura / com banco / trava); telas em `src/components/erp/telas/faturamento/`; rotas `faturamento`, `faturamento/lancar`, `faturamento/importar`, `faturamento/<loja>/<aaaa-mm-dd>` em `/erp` e `/rodolfo/erp/<slug>`; canais da loja em `telas/estrutura/form-canais.tsx`; modelo `public/modelos/faturamento.csv`; migration `20261025000000_erp_faturamento` |
 | DRE ao vivo (2.2a): plano de contas por parceiro, despesas por competência, contas a pagar, regra do período, DRE rede × loja | `src/lib/erp/{periodo-campos,periodos,dre-plano,plano,despesa-campos,despesas,dre-campos,dre,texto-limpo}.ts` (período puro / período com banco / plano padrão puro / plano com banco / despesa pura / despesa com banco / DRE puro / DRE com banco); telas em `src/components/erp/telas/dre/`; rotas `dre`, `dre/despesas`, `dre/despesas/nova`, `dre/despesas/<id>`, `dre/despesas/<id>/editar`, `dre/periodos`, `dre/plano` em `/erp` e `/rodolfo/erp/<slug>`; migration `20261026000000_erp_dre_despesas` |
 | Metas e fechamento do período (2.2b): meta % por linha com vigência, realizado × meta, receita contra o ano passado, fechar com fotografia imutável, reabrir só pelo nível 1, notas e estoque obedecendo o fechamento | `src/lib/erp/{dre-metas-campos,dre-metas,dre-entrada,dre-fechamento-campos,dre-fotografia,dre-fechamento}.ts` (meta pura / meta com banco / leitura única do DRE / fechamento puro / fotografia com banco / fechar e reabrir); telas `telas/dre/{form-metas,form-fechar,form-reabrir,periodo-fechamento}.tsx`; rota `dre/periodos/<inicio>` em `/erp` e `/rodolfo/erp/<slug>`; migration `20261027000000_erp_dre_fechamento` |
+| Dois CMVs (2.3): compra (dia a dia, data da nota) e real (inicial + compras − final, fecha na contagem), corte do estoque final, compra × real, fotografia v2 | `src/lib/erp/{cmv-campos,cmv-comparacao,cmv}.ts` (conta pura / comparação pura / leitura com banco, chamada só por `entradaDoDre`); `dre-campos.ts` (`cmv` e as linhas `cmv:compra`, `cmv:real`), `dre.ts`, `dre-fotografia.ts` (`lerCmvDaFotografia`), `dre-fechamento.ts`; tela `telas/dre/cmv-painel.tsx` dentro do DRE; migration `20261028000000_erp_cmv` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Navegação por áreas (UX.9): hub de 4 áreas, abas por rota, trilha com a área, ações no ⌘K; rota nova `/estoque/contagens` | `src/lib/erp/modulos.ts` (`areasConstruidas`, `abasDaArea`, `acoesDaNavegacao`, `montarTrilha`) e `src/lib/rodolfo/modulos.ts`; `src/components/erp/ui/{abas,hub}.tsx`, `telas/hub-do-parceiro.tsx`, `shell/Shell.tsx`; sem migration |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
@@ -1720,6 +1721,74 @@ Axe (wcag2a/2aa) sem violação nos dois temas, zero erro de
 console, zero rolagem horizontal a 390, 820 e 1440. Prints em `shots-2.2b/`. Scanner `avoid-ai-design`: 0 P0 e 0 P1 (1 P2 de "meta
 strings com ponto médio", o padrão da casa).
 
+## O que a 2.3 entregou — dois CMVs: o de compra (dia a dia) e o real (fecha na contagem), e a comparação no fechamento
+
+Terceira da Prioridade 002. Migration `20261028000000_erp_cmv` (ADITIVA; uma coluna, `Contagem.itensSemPreco`, e um CHECK; nenhuma tabela nova, portão e
+RLS iguais; `migrate diff` vazio). Decisões 160 a 170. O CMV em si é DERIVADO (notas + livro + retrato do fechamento de estoque); a fotografia usa
+`versaoDaConta` e a `chave` livre das linhas, que já existiam. Permissões: o catálogo não ganhou nada (`dre.ver` já é "Ver DRE e CMV");
+`VERSAO_DO_ERP` = fase 2.3.
+
+1. **CMV de compra** (160). Σ (valor + frete rateado) dos itens das notas LANÇADAS da loja, pela data da nota (`entradaEm`), no recorte do DRE (até ontem
+   no período em curso). Vale sem estoque aberto. Rede = soma das lojas do alcance.
+2. **CMV real** (161). Estoque inicial + compras do livro (`ENTRADA_COMPRA` das notas do período, pela data da nota) − estoque final. Só com o período
+   encerrado e os dois estoques apurados. Período em curso nunca tem real. Sem o real, o motivo vem escrito ("falta o fechamento de estoque de setembro
+   de 2026 (estoque inicial)", "o estoque abriu em 15/10; o real começa em novembro de 2026", "estoque não aberto", "fecha na contagem de fechamento
+   (abre em 29/10)").
+3. **O corte do estoque final** (162, a pergunta aberta da 1.7). EF(P) = retrato do fechamento de P + Σ movimentos depois do retrato com competência até o
+   fim de P − Σ movimentos até o retrato com competência depois do fim, fora os ajustes do próprio fechamento. Competência = data da nota (compra e
+   estorno) ou dia do Rio do `ocorridoEm`. Somado no banco numa consulta só (`cmv.ts`). Provado com mutantes: sem a exclusão dos ajustes do próprio
+   fechamento e sem a trava exclusiva do fechamento os testes caem.
+4. **Estoque inicial** (163) = EF do período anterior, pela mesma regra, nunca reavaliado; no primeiro período, a abertura concluída no primeiro dia. O real
+   de períodos seguidos encadeia (teste para N períodos, e com dado: R$ 20.300,00 + R$ 23.950,00 = R$ 44.250,00).
+5. **Valoração e itens sem preço** (164). `Contagem.itensSemPreco` é gravada no mesmo UPDATE que fecha a abertura e o fechamento; a tela diz "estoque final
+   sem o valor de N insumos sem preço", e "não registrado" para a contagem de antes da 2.3. Aparece no painel e nas telas do fechamento do estoque.
+6. **O que entra no resultado** (165). Por loja: real, senão compra com o selo, senão nulo com a frase (nunca R$ 0,00; resultados "sem contar o CMV"). A
+   rede soma o que vale em cada loja e o selo diz as fontes ("misto: real em …; pelas compras em …; sem o CMV de …"), em até 120 letras (CHECK da
+   fotografia). A linha `cmv` tem abaixo as de detalhe `cmv:compra` e `cmv:real` (tipo `linha`, fora do plano, sem meta, fora do formulário de metas).
+7. **Compra × real** (166), painel dentro da página do DRE (nenhuma rota nova), só no período encerrado: por loja com o real, a diferença em R$ e em pontos
+   da receita, "o estoque subiu R$ X (de A para B): comprou mais do que consumiu, é dinheiro parado na prateleira", e as notas que já estavam na contagem de
+   abertura; a soma das lojas comparadas; quem ficou só pelas compras, com o motivo; "Ver as notas" só com `compras.ver` e "Ver o estoque" só com `estoque.ver`.
+8. **Fotografia v2** (167). Fechar grava `versaoDaConta = 2`, as linhas do CMV de cada escopo e `entrada.cmv` por loja (compra, real, inicial, final, compras
+   do real, instante do retrato, ids, motivo, sem preço). O fechado lê só a fotografia; o painel dele extrai do JSON apenas as lojas que a pessoa alcança. A
+   v1, de antes do CMV, mostra "não apurado neste fechamento (fechado antes do CMV)" e nunca é recalculada: reabrir (só nível 1) e fechar de novo gera a v2.
+   O Histórico do FECHOU ganha "CMV: R$ X (real|compras|misto)", atrás de `verDre`.
+9. **Meta** (168). A linha `cmv` compara com o que vale; sem valor, "sem valor apurado".
+10. **Vazamento** (169). Sem `dre.ver` nada de CMV; gerente de uma loja só recebe a loja dele (`?rede=1` e `?loja=<outra>` não trazem nada, o HTML não leva a base
+    da conta); o operador não vê nada (menu, ⌘K, URL).
+11. **Migration** (aditiva, segura para superusuário e dono não-superusuário com e sem FORCE RLS): coluna nova e CHECK `NOT VALID` + `VALIDATE` que avisa e
+    segue; nenhum passo lê tabela de tenant sob RLS. `npm run erp:conferir-migracao` passou a olhar o CHECK.
+12. **Fora desta subfase** (170): transferência entre lojas, CMV teórico, CMV por canal ou marca, PEPS/médio, desconto e bonificação, tipo "limpeza", perda à mão.
+
+**Ajuda: chaves novas/alteradas.** Nenhuma nova (nenhuma rota nova). Alteradas, com `ajuda.lock.json` regravado: `dre` v3 para v4 (o CMV e a seção "Os dois CMVs: compra e real"), `dre-plano` v2 para v3 (a meta do CMV), `dre-periodo` v1 para v2 (a fotografia leva o CMV, e a v1 antiga), `periodo` (estoque) v3 para v4 (o valor do fechamento é a base do real; contar depois do fim não estraga), `compra-nova` v2 para v3 (a data da nota decide o período do CMV; limpeza e pagamento a fornecedor não são nota nem despesa duplicada).
+
+## Provar o CMV (2.3)
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run   # duas vezes seguidas
+npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+Os arquivos de banco que a 2.3 mexe também rodam num banco com dono NÃO-superusuário e FORCE RLS, em sequência (`npx vitest run --no-file-parallelism`).
+`tests/erp-cmv.test.ts` (sem banco, 26): o corte, o real, o encadeamento (200 sorteios), o que vale, o selo (inclusive o comprido), compra × real, o
+sem preço, a fotografia de ida e volta. `tests/erp-cmv.db.test.ts` (16): o cenário da análise (Casa Alfa: Vila da Penha, Delivery, Centro; setembro e
+outubro) com os critérios 1 a 15: R$ 20.000,00 parcial; estoque final de setembro R$ 11.700,00 e de outubro R$ 13.550,00; real R$ 23.950,00 contra
+compra R$ 25.800,00 (−R$ 1.850,00); rede "misto" R$ 27.950,00 com a soma do "Por loja" mais a despesa da rede igual ao resultado; nota tardia (o real não
+muda); cíclica tardia; setembro com a nota na abertura (R$ 20.300,00); sem fechamento; estoque que abre no meio; itens sem preço pelo fluxo de verdade;
+fechar com a fotografia v2 igual ao ao vivo; v1 e a v2 por reabrir; a corrida fechar × nota (espera a trava); e as consultas constantes (1 ou 50 lojas).
+`tests/erp-cmv-telas.db.test.ts` (5): o HTML da dona, do gerente (também por `?rede=1` e `?loja=`), do operador, de quem não tem compras e estoque, e o
+Histórico. `tests/erp-cmv-migracao.db.test.ts` (3): a migration com dado antigo nos 3 perfis do banco. Apoio do cenário: `tests/erp-cmv-apoio.ts`.
+
+Na tela (build de produção local, porta 3100, banco `ff_23` copiado do `ff_dev`; roteiro `prova23/jornada.mjs` no scratchpad, 57 conferências): a dona abre
+outubro (em curso: "pelas compras · parcial", o real diz que abre em 29/10, "sem o CMV de Centro" na rede); setembro encerrado (painel compra × real com
+as duas lojas, a soma, a frase, "não registrado", insumos sem preço e quem ficou só pelas compras); fecha setembro com as duas ressalvas (fotografia v2 com
+as 15 linhas do CMV e R$ 63.500,00 de real na Vila da Penha) e lê o fechado igual ao ao vivo; o gerente da Vila da Penha, a 390 px, só vê a loja dele (e nada
+da base da conta no HTML, também por `?rede=1` e pela URL de outra loja); o operador volta ao hub sem CMV, fora do menu e do ⌘K; Hugo (`historico.ver` sem
+`dre.ver`) não vê o fechamento nem o CMV no Histórico, e a dona vê "CMV … (misto)"; o nível 1 vê o mesmo painel pelo espelho; a contagem de fechamento do
+estoque diz os insumos sem preço. Axe (wcag2a/2aa) sem violação nos dois temas, zero erro de console, zero rolagem horizontal a 390, 820 e 1440. Prints em
+`shots-2.3/`. Scanner `avoid-ai-design`: 0 P0 e 0 P1 (P2 de "meta strings com ponto médio", o padrão da casa).
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -1742,7 +1811,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Venda | `CanalConfig` | taxa do canal por parceiro: comissão (`taxaBp`) + pagamento online (`taxaPagamentoBp`, 1.9) sobre o preço; taxa fixa (sem uso: é do pedido) e margem-alvo (líquida) do canal (`margemAlvoPadraoBp`, 1.10; a linha do iFood nasce com a taxa) |
 | Estoque | `SaldoEstoque` | saldo e valor por loja × insumo (soma do razão, atualizada na mesma transação, com versão) |
 | Estoque | `MovimentoEstoque` | livro-razão: abertura, entrada, requisição, produção, ajuste, contagem, perda; snapshot e saldo antes/depois; estorno = mesmo tipo, sinal contrário, `estornoDeId` único (1.6) |
-| Estoque | `Contagem` / `ContagemItem` | abertura (1.6: estado da loja), cíclica e fechamento de período (1.7: título, prazo, desfecho aplicada/fechou sozinha/venceu; fechamento aponta o `PeriodoApuracao`, um por loja); esperado (livro na hora de contar) × contado; versão, lista e fator congelados, digitado × normalizado. O piso é regra da lógica com os números na `Loja` |
+| Estoque | `Contagem` / `ContagemItem` | 2.3: `itensSemPreco` (quantos insumos sem preço no retrato da abertura e do fechamento; nulo = antes da 2.3); abertura (1.6: estado da loja), cíclica e fechamento de período (1.7: título, prazo, desfecho aplicada/fechou sozinha/venceu; fechamento aponta o `PeriodoApuracao`, um por loja); esperado (livro na hora de contar) × contado; versão, lista e fator congelados, digitado × normalizado. O piso é regra da lógica com os números na `Loja` |
 | Estoque | `Requisicao` / `RequisicaoItem` | pedido do setor (1.8: número por loja, setor da 0.4, para quando, versão, pedida → atendida em parte → atendida · cancelada, ficha de origem); a baixa sai na entrega (`REQUISICAO` com `requisicaoItemId`), devolução por estorno |
 | Produção | `OrdemProducao` | lote: planejado/produzido, custo, responsável (snapshot). Lista do dia = ordens planejadas × saldo (derivada) |
 | Produção | `Etiqueta` | etiqueta impressa: lote do fornecedor, validade, abertura, snapshot |
@@ -1751,7 +1820,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | DRE | `Despesa` | despesa manual/importada numa linha; loja nula = rede, canal nulo = rateio; importada exige chave de idempotência. 2.2a: competência de um dia, mês ou intervalo (`competencia`..`competenciaFim`, até 366 dias), `recorrente` e `repeteDeId` (cadeia mensal, única por parceiro), `vencimento`/`pagaEm`, `atualizadoPorNome`; valor da despesa inteira (a apropriação é conta, não coluna) |
 | DRE | `PeriodoApuracao` | períodos configuráveis; contagem de fechamento aponta o período; 2.2a: gatilho recusa sobreposição; 2.2b: `fechadoPorNome`, só vira FECHADO com fotografia vigente |
 | DRE | `RegraDoPeriodo` | 2.2a: regra do período do parceiro (mensal, quinzenal ou semanal, dia em que começa), versionada por `vigenteDesde`; só inclusão (gatilho), `parceiroId` imutável; fonte única do DRE e da contagem de estoque |
-| DRE | `DreFotografia` / `DreFotografiaLinha` | 2.2b: a fotografia imutável de um período fechado (versão, taxa do iFood congelada, ressalvas, justificativa, quem fechou e quem reabriu e por quê) e suas linhas em BigInt (`valorCentavos`) com a `entrada` de que saíram; só inclusão por gatilho; uma vigente por período (índice parcial); período FECHADO exige fotografia vigente (gatilho adiado) |
+| DRE | `DreFotografia` / `DreFotografiaLinha` | 2.2b: a fotografia imutável de um período fechado (versão, taxa do iFood congelada, ressalvas, justificativa, quem fechou e quem reabriu e por quê) e suas linhas em BigInt (`valorCentavos`) com a `entrada` de que saíram (2.3: `versaoDaConta` 2 traz o CMV; `entrada.cmv` por loja); só inclusão por gatilho; uma vigente por período (índice parcial); período FECHADO exige fotografia vigente (gatilho adiado) |
 | DRE | `FarolFaixa` | 5 faixas por linha do DRE × canal (nulo = rede), sobre o desvio vs meta já com o sentido da linha |
 | Onboarding (0.5, FORA do tenant) | `PedidoParceiro` / `PedidoParceiroEvento` / `TentativaPedidoParceiro` | pedido de acesso (landing ou manual) com consentimento, etapa e versão; evento só-inclusão; tentativas do formulário público. Sem `parceiroId`: o vínculo com o parceiro criado é `parceiroCriadoId` |
 | Ajuda (0.6, FORA do tenant) | `PreferenciaErp` | o que a pessoa escolheu sobre as caixas de ajuda: dicas ligadas, resposta da 1ª vez, caixas fechadas (`chave@versão`, no máximo 300). Por `UsuarioErp`, sem `parceiroId`, lida com a sessão |
@@ -2137,7 +2206,7 @@ banco de teste: o operador é recusado pelo servidor.
 - ~~**1.8 requisição**~~ **Feito na 1.8** (decisões 77–80): a baixa entra no
   livro na entrega; a conferência mostra a baixa depois de contar em "depois
   de contar"; o cruzamento está em Divergências.
-- **2.3 CMV real**: inicial = estoque final fotografado do fechamento
+- ~~**2.3 CMV real**~~ **Feito na 2.3** (decisões 160–170): inicial = estoque final fotografado do fechamento
   anterior (ou a abertura, no 1º período); final = `valorTotalCentavos` do
   FECHAMENTO aplicado; compras pela data da nota. Fechamento aplicado DEPOIS
   do fim do período inclui o que se moveu entre o fim e o fechamento: a 2.3
@@ -2452,3 +2521,25 @@ banco de teste: o operador é recusado pelo servidor.
   operação ESPERA; teste de corrida sem isso passa mesmo sem a trava.
 - **Fotografia só nasce com o período ABERTO**: quem escrever fotografia (2.3, teste, importação) grava ANTES de marcar FECHADO, na mesma
   transação (`criarPeriodoFechadoDeTeste` faz assim).
+
+## Herança da 2.3 (para a 2.4, a 2.5 e as próximas)
+
+- **A leitura do CMV é UMA**: `cmvDasLojas` (`cmv.ts`), chamada só por `entradaDoDre`; o ao vivo e o fechamento leem o mesmo. A conta mora em `cmv-campos.ts`
+  (puro: corte, real, o que vale, selo, fotografia de ida e volta) e `cmv-comparacao.ts` (compra × real). Qualquer tela nova de CMV parte de `CmvDoDre`.
+- **A 2.4 (faróis) recebe**: a linha `cmv` com valor, fonte (real | compras | misto | nulo) e meta com desvio. O CMV NÃO existe por canal (a compra é da loja):
+  a 2.4 decide se o farol do CMV fica só na visão sem canal ou rateia pela receita (e então diz que é hipótese).
+- **A 2.5 (orçamento) recebe**: a compra por loja e dia (`cmvDasLojas` e a mesma consulta agrupada por loja; extrair por dia é uma mudança local), a meta vigente
+  do `cmv`, a receita até ontem e o estoque final do período anterior (estoque disponível, `estoqueFinalDe`).
+- **Fotografia**: a v2 tem o CMV; a v1 nunca é recalculada. Quem gravar fotografia nova usa `versaoDaConta` explícita em `gravarFotografia` (o padrão é 2).
+  O nome de loja e o motivo estão em `entrada.cmv`; a tela de loja nunca recebe a `entrada` inteira.
+- **Linha de detalhe do CMV** (`cmv:compra`, `cmv:real`) é tipo `linha` com chave fora do plano (o CHECK da fotografia limita o tipo e `nota` a 120 letras). Linha nova
+  de CMV (por exemplo, o teórico) segue o mesmo padrão e entra em `aceitaMeta` conforme couber.
+- **Premissa da conta do corte**: a data da nota nunca é depois do dia em que ela é lançada. Editar a data de uma nota de um período para outro, depois do retrato
+  do fechamento, move os dois lados do par entrada/estorno; período fechado no DRE já recusa isso (155). Saldo negativo segue fora do retrato.
+- **O índice do livro** é `(parceiroId, lojaId, tipo, ocorridoEm)`; a consulta do corte lista todos os tipos para usá-lo. Com milhões de movimentos por loja, um índice
+  `(parceiroId, lojaId, ocorridoEm)` é uma migration aditiva pequena.
+- **Teste de migration com dado antigo nos 3 perfis** e `erp:conferir-migracao` com o CHECK novo; toda migration tolerante a dado antigo continua precisando dos dois.
+- **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) material de limpeza ou descartável lançado como nota infla o CMV; quer um tipo de insumo próprio (fora do
+  CMV) ou prefere seguir com a regra "lance como despesa"? (2) Valentin's: as duas unidades dividem estoque? Sem transferência entre lojas, o real por loja
+  distorce (quem manda perde, quem recebe sobra); o da rede continua certo.
+

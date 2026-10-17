@@ -1,4 +1,4 @@
--- ERP 2.3 — Dois CMVs (compra e real). Decisão 170.
+-- ERP 2.3 — Dois CMVs (compra e real). Decisões 164 e 167.
 --
 -- ADITIVA: uma coluna nova em "Contagem" (nenhuma tabela nova, então portão e RLS não mudam) e um CHECK.
 -- O CMV em si é DERIVADO (notas + livro + retrato do fechamento de estoque) e a fotografia do DRE usa as

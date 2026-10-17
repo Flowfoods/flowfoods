@@ -1,5 +1,5 @@
 /**
- * O painel "CMV: compra × real" (2.3, decisão 164), dentro da página do DRE (nenhuma rota nova).
+ * O painel "CMV: compra × real" (2.3, decisão 166), dentro da página do DRE (nenhuma rota nova).
  *
  * Só no período ENCERRADO. A compra é o que a casa comprou (data da nota); o real é o que ela consumiu
  * (estoque inicial + compras − estoque final, na contagem de fechamento). A diferença diz se o estoque
