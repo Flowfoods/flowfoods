@@ -83,7 +83,7 @@ export function FormMesPassado({ acao, itens, mes, envio, voltar, bloqueio }: { 
           </ul>
         </fieldset>
       </Painel>
-      <div className="sticky bottom-0 z-20 -mx-4 flex flex-col gap-2 border-t border-linha bg-fundo px-4 py-3 sm:-mx-6 sm:flex-row sm:justify-end sm:px-6 lg:-mx-8 lg:px-8">
+      <div data-barra-fixa className="sticky bottom-0 z-20 -mx-4 flex flex-col gap-2 border-t border-linha bg-fundo px-4 py-3 sm:-mx-6 sm:flex-row sm:justify-end sm:px-6 lg:-mx-8 lg:px-8">
         <Link href={voltar} className={classeDeBotao('fantasma', 'w-full sm:w-auto')}>
           Voltar sem lançar
         </Link>

@@ -12,6 +12,9 @@ import { useEffect, useRef } from 'react';
 import { saidaDoPeriodoFechado } from '@/lib/erp/periodo-fechado-campos';
 import { LINK_DE_TEXTO } from './estilos';
 
+/** Espaço entre o pé do aviso e o topo da barra fixa de salvar. */
+const FOLGA_SOBRE_A_BARRA = 16;
+
 export function AvisoDoPeriodoFechado({
   periodo,
   href,
@@ -36,10 +39,29 @@ export function AvisoDoPeriodoFechado({
 }) {
   const caixa = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (rolar) caixa.current?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    if (!rolar) return;
+    // A barra fixa de salvar (`data-barra-fixa`, em toda tela que tem uma) cobre o pé da tela e a altura dela varia (121 px no
+    // celular da despesa): em vez de uma margem chumbada, mede a barra de verdade e rola até o aviso, com o link, ficar acima dela.
+    // Duas passadas: depois do layout e depois de o que muda por baixo (fonte, texto de apoio) assentar.
+    const ajustar = () => {
+      const el = caixa.current;
+      if (!el) return;
+      const barras = Array.from(document.querySelectorAll('[data-barra-fixa]'))
+        .map((b) => b.getBoundingClientRect())
+        .filter((r) => r.height > 0 && r.top < window.innerHeight);
+      const limite = barras.length ? Math.min(...barras.map((r) => r.top)) : window.innerHeight;
+      const sobra = el.getBoundingClientRect().bottom - (limite - FOLGA_SOBRE_A_BARRA);
+      if (sobra > 0) window.scrollBy({ top: sobra, behavior: 'auto' });
+    };
+    const quadro = requestAnimationFrame(ajustar);
+    const depois = setTimeout(ajustar, 250);
+    return () => {
+      cancelAnimationFrame(quadro);
+      clearTimeout(depois);
+    };
   }, [rolar]);
   return (
-    <div ref={caixa} id={id} role="status" className={`scroll-mb-40 flex items-start gap-3 text-sm ${dentro ? '' : 'rounded-[14px] border border-linha bg-painel px-4 py-3 sm:px-5'}`}>
+    <div ref={caixa} id={id} role="status" data-aviso-periodo-fechado className={`flex items-start gap-3 text-sm ${dentro ? '' : 'rounded-[14px] border border-linha bg-painel px-4 py-3 sm:px-5'}`}>
       <span className="flex h-5 shrink-0 items-center">
         <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-atencao" />
       </span>

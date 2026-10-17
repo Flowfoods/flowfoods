@@ -129,6 +129,8 @@ export function FormNota({
   // Período fechado: o que a data digitada já diz, ou o que o servidor acabou de recusar (no campo ou, ao editar, na data antiga).
   const fechadoDaData = fechadoNaData(periodos.fechados, lerData(dataDigitada) ?? '')?.nome ?? periodoDaFraseDeRecusa(erros.data);
   const fechadoNoGeral = periodoDaFraseDeRecusa(erros.geral);
+  // Editar uma nota que já é de período fechado: o aviso vai no TOPO (já está assim ao abrir a tela, não depende de digitar nada).
+  const avisoNoTopo = modo === 'editar' && !!fechadoDaData && dataDigitada === inicial.data && !erros.data;
   const porId = useMemo(() => new Map(opcoes.insumos.map((i) => [i.id, i])), [opcoes.insumos]);
 
   function mudar(chave: number, m: Partial<LinhaDaNota>) {
@@ -177,6 +179,7 @@ export function FormNota({
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={rotuloDoCampo} />
+      {avisoNoTopo && <AvisoDoPeriodoFechado id={`${idBase}-periodo-fechado`} periodo={fechadoDaData!} href={periodos.href} frase="Esta nota é desse período: não dá para corrigir nem cancelar." />}
       {fechadoNoGeral && <AvisoDoPeriodoFechado periodo={fechadoNoGeral} href={periodos.href} frase="Esta nota é desse período: não dá para corrigir nem cancelar." />}
       {erros.geral && !fechadoNoGeral && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
@@ -300,7 +303,7 @@ export function FormNota({
               </p>
               <Erro id={`${idBase}-data-erro`} texto={fechadoDaData ? undefined : erros.data} />
             </div>
-            {fechadoDaData && (
+            {fechadoDaData && !avisoNoTopo && (
               <div className="sm:col-span-2">
                 <AvisoDoPeriodoFechado
                   id={`${idBase}-periodo-fechado`}

@@ -178,7 +178,7 @@ export function FormMetas({
       <p className="border-t border-linha px-4 py-3 text-[13px] text-texto sm:px-5">
         As metas valem <strong className="font-semibold">a partir de {formatarData(valeDesde)}</strong>, o começo de {periodoAtual}. Os períodos anteriores seguem com as metas que valiam neles.
       </p>
-      <div className="sticky bottom-0 z-20 flex flex-wrap items-center gap-3 rounded-b-[14px] border-t border-linha bg-painel px-4 py-3 sm:px-5">
+      <div data-barra-fixa className="sticky bottom-0 z-20 flex flex-wrap items-center gap-3 rounded-b-[14px] border-t border-linha bg-painel px-4 py-3 sm:px-5">
         <BotaoEnviar pendente="Salvando…" disabled={!!bloqueio} className="w-full sm:w-auto">
           Salvar as metas
         </BotaoEnviar>

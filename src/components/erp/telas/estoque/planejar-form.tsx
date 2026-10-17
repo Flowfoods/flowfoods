@@ -110,7 +110,7 @@ export function FormPlanejarCiclo({ linhas, lugar, acao, bloqueio }: { linhas: L
         );
       })}
 
-      <div className="sticky bottom-0 z-20 -mx-4 border-t border-linha bg-fundo px-4 py-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div data-barra-fixa className="sticky bottom-0 z-20 -mx-4 border-t border-linha bg-fundo px-4 py-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         {bloqueio ? (
           <p className="text-sm text-suave">{bloqueio}</p>
         ) : (
