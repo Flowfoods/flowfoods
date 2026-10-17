@@ -38,9 +38,10 @@ function prefixo(l: LinhaDoDre): string {
   return '';
 }
 
-function Celula({ l }: { l: LinhaDoDre }) {
+function Celula({ l, semFaturamento }: { l: LinhaDoDre; semFaturamento: boolean }) {
   if (l.valorCentavos === null) return <span className="text-[13px] font-normal text-suave">{l.nota}</span>;
-  if (l.valorCentavos === 0 && l.tipo !== 'resultado') return <span className="font-normal text-suave">—</span>;
+  // Zero é "nada lançado" (nunca R$ 0,00 no lugar de dado ausente); só um resultado que fechou em zero com receita mostra o zero.
+  if (l.valorCentavos === 0 && (l.tipo !== 'resultado' || semFaturamento)) return <span className="font-normal text-suave">—</span>;
   const negativo = l.valorCentavos < 0;
   return <span className={negativo && l.tipo === 'resultado' ? 'text-erro' : undefined}>{formatarDinheiro(l.valorCentavos)}</span>;
 }
@@ -101,7 +102,7 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
                 </th>
                 <td className="px-3 py-2 text-right align-top">
                   <span className="block min-h-6 leading-6">
-                    <Celula l={l} />
+                    <Celula l={l} semFaturamento={r.semFaturamento} />
                   </span>
                 </td>
                 <td className="px-4 py-2 text-right align-top sm:px-5">
@@ -144,7 +145,7 @@ function PorLoja({ d, base }: { d: DreDoPeriodo; base: string }) {
                   <span className="shrink-0 text-[15px] font-semibold tabular-nums">{l.receitaBrutaCentavos === 0 ? '—' : formatarDinheiro(l.resultadoCentavos)}</span>
                 </div>
                 <p className="mt-1 text-[12px] leading-snug tabular-nums text-suave">
-                  Receita {formatarDinheiro(l.receitaBrutaCentavos)}
+                  Receita {l.receitaBrutaCentavos === 0 ? 'sem faturamento' : formatarDinheiro(l.receitaBrutaCentavos)}
                   {l.resultadoBp !== null && ` · ${textoDoPercentual(l.resultadoBp)}`}
                 </p>
                 {l.faltas > 0 && <p className="mt-0.5 text-[12px] font-semibold text-erro">{l.faltas} {l.faltas === 1 ? 'lançamento faltando' : 'lançamentos faltando'}</p>}
@@ -192,8 +193,8 @@ function PorLoja({ d, base }: { d: DreDoPeriodo; base: string }) {
                   <th scope="row" className="h-11 px-5 text-left">
                     Rede, com as despesas da rede
                   </th>
-                  <td className="px-3 text-right">{formatarDinheiro(d.resultado.receitaBrutaCentavos)}</td>
-                  <td className="px-3 text-right">{total.valorCentavos === null ? '—' : formatarDinheiro(total.valorCentavos)}</td>
+                  <td className="px-3 text-right">{d.resultado.receitaBrutaCentavos === 0 ? '—' : formatarDinheiro(d.resultado.receitaBrutaCentavos)}</td>
+                  <td className="px-3 text-right">{total.valorCentavos === null || (d.resultado.semFaturamento && total.valorCentavos === 0) ? '—' : formatarDinheiro(total.valorCentavos)}</td>
                   <td className="px-3 text-right">{total.percentualBp === null ? '—' : textoDoPercentual(total.percentualBp)}</td>
                   <td className="px-5 text-right">{d.faltas.total}</td>
                 </tr>
@@ -294,7 +295,7 @@ export function TelaDoDre({
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <div className="col-span-2 flex lg:col-span-1 [&>div]:w-full">
-          <Metrica rotulo="Receita bruta" valor={formatarDinheiro(r.receitaBrutaCentavos)} detalhe={d.ate ? (d.encerrado ? 'período inteiro' : `apurada até ontem, ${formatarData(d.ate, true)}`) : 'nenhum dia apurado ainda'} />
+          <Metrica rotulo="Receita bruta" valor={r.semFaturamento ? '—' : formatarDinheiro(r.receitaBrutaCentavos)} detalhe={r.semFaturamento ? (d.ate ? 'sem faturamento lançado no período' : 'nenhum dia apurado ainda') : d.encerrado ? 'período inteiro' : `apurada até ontem, ${formatarData(d.ate!, true)}`} />
         </div>
         <Metrica
           rotulo={loja ? 'Resultado da loja' : 'Resultado do período'}
