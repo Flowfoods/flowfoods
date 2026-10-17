@@ -279,8 +279,8 @@ describe('2.1 · planilha', () => {
 });
 
 describe('2.1 · histórico', () => {
-  const depois = retratoDoLancamento({ lojaNome: 'Vila da Penha', canal: 'IFOOD', data: '2026-10-14', origem: 'MANUAL', valorCentavos: 312000, pedidos: 40, clientes: 40 });
-  const antes = retratoDoLancamento({ lojaNome: 'Vila da Penha', canal: 'IFOOD', data: '2026-10-14', origem: 'MANUAL', valorCentavos: 321000, pedidos: 41, clientes: 41 });
+  const depois = retratoDoLancamento({ lojaId: 'l1', lojaNome: 'Vila da Penha', canal: 'IFOOD', data: '2026-10-14', origem: 'MANUAL', valorCentavos: 312000, pedidos: 40, clientes: 40 });
+  const antes = retratoDoLancamento({ lojaId: 'l1', lojaNome: 'Vila da Penha', canal: 'IFOOD', data: '2026-10-14', origem: 'MANUAL', valorCentavos: 321000, pedidos: 41, clientes: 41 });
   it('antes e depois legíveis, só com o que mudou; o alvo diz de quem é', () => {
     expect(alvoDaLinha(antes, depois)).toBe('Vila da Penha · iFood · 14/10/2026');
     const m = descreverMudancas({ ...antes, alvo: undefined } as never, depois as never);

@@ -338,7 +338,7 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     if (!criacao && JSON.stringify(antes[c]) === JSON.stringify(depois[c])) continue;
     if (c === 'unidade' && juntarUnidade && criacao) continue;
     // De quem é a embalagem (ou o lançamento de faturamento) já está no "alvo" da linha.
-    if (c === 'insumo' || c === 'alvo') continue;
+    if (c === 'insumo' || c === 'alvo' || c === 'faturamentoLojaId' || c === 'faturamentoDia') continue;
     // Itens da nota (1.5): o que entrou e o que saiu (uma linha mudada sai e entra de novo).
     if (c === 'itensDaNota' && typeof depois[c] === 'string') {
       const a = new Set(criacao || typeof antes[c] !== 'string' ? [] : (antes[c] as string).split(SEPARADOR_DE_ITENS));
@@ -484,6 +484,8 @@ export async function listarHistorico(
      * não saem do servidor. Fecha para quem esquece: ausente = não vê.
      */
     verFaturamento?: boolean;
+    /** 2.1: só as alterações de faturamento desta loja neste dia (inclusive de lançamento já removido). */
+    faturamentoDoDia?: { lojaId: string; dia: string };
   },
 ) {
   const entidades = filtro.entidades ?? (filtro.entidade ? [filtro.entidade] : null);
@@ -497,6 +499,17 @@ export async function listarHistorico(
     ...(entidades ? { entidade: { in: entidades } } : {}),
     ...(fora.length ? { NOT: { entidade: { in: fora } } } : {}),
     ...(filtro.de ? { OR: filtro.de.map((d) => ({ entidade: d.entidade, entidadeId: { in: d.ids } })) } : {}),
+    ...(filtro.faturamentoDoDia
+      ? {
+          entidade: 'FaturamentoLancamento',
+          OR: ['antes', 'depois'].map((lado) => ({
+            AND: [
+              { [lado]: { path: ['faturamentoLojaId'], equals: filtro.faturamentoDoDia!.lojaId } },
+              { [lado]: { path: ['faturamentoDia'], equals: filtro.faturamentoDoDia!.dia } },
+            ],
+          })),
+        }
+      : {}),
   };
   const out: ReturnType<typeof paraTela>[] = [];
   // Sem `precos.ver`, linhas que só tinham preço somem: lê mais um lote até completar o limite (no máximo 5 voltas).

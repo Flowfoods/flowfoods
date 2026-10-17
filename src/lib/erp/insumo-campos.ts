@@ -211,7 +211,7 @@ export function retratoDaVariante(v: DadosVariante, insumo: { nome: string; unid
 }
 
 /** Campos que identificam a linha no histórico: vão nos dois lados mesmo sem mudar. */
-const CONTEXTO = ['insumo', 'nome', 'unidade', 'alvo'];
+const CONTEXTO = ['insumo', 'nome', 'unidade', 'alvo', 'faturamentoLojaId', 'faturamentoDia'];
 
 /**
  * Antes e depois só com o que mudou (mais o contexto: nome e unidade, para a

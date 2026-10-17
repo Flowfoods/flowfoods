@@ -189,9 +189,12 @@ export const ROTULO_DA_ORIGEM: Record<OrigemDoLancamento, string> = {
  * é a linha ("Vila da Penha · iFood · 14/10/2026"); `faturamentoCentavos`
  * acaba em "Centavos" e a tela do histórico o escreve em reais.
  */
-export function retratoDoLancamento(l: { lojaNome: string; canal: CanalVenda; data: string; origem: OrigemDoLancamento } & NumerosDoCanal): Record<string, string | number | null> {
+export function retratoDoLancamento(l: { lojaId: string; lojaNome: string; canal: CanalVenda; data: string; origem: OrigemDoLancamento } & NumerosDoCanal): Record<string, string | number | null> {
   return {
     alvo: `${l.lojaNome} · ${CANAIS[l.canal].curto} · ${formatarData(l.data)}`,
+    // Para achar as alterações de um dia na tela dele (sobrevive a loja renomeada e a lançamento removido); não aparecem na lista.
+    faturamentoLojaId: l.lojaId,
+    faturamentoDia: l.data,
     faturamentoCentavos: l.valorCentavos,
     pedidos: l.pedidos,
     clientes: l.clientes,
