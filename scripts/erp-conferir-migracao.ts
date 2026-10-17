@@ -1,6 +1,6 @@
 /**
  * Conferência pós-deploy das migrations `20261025000000_erp_faturamento` (2.1),
- * `20261026000000_erp_dre_despesas` (2.2a) e `20261027000000_erp_dre_fechamento` (2.2b).
+ * `20261026000000_erp_dre_despesas` (2.2a), `20261027000000_erp_dre_fechamento` (2.2b) e `20261028000000_erp_cmv` (2.3).
  *
  *   npm run erp:conferir-migracao
  *
@@ -53,6 +53,9 @@ export const CHECKS_DA_2_2B = [
   ['PeriodoApuracao', 'PeriodoApuracao_fechadoPor_curto'],
 ] as const;
 
+/** O CHECK que a 2.3 acrescentou em tabela que já existia (a coluna `itensSemPreco` da contagem). */
+export const CHECKS_DA_2_3 = [['Contagem', 'Contagem_itensSemPreco_nao_negativo']] as const;
+
 /** O que a migration deixou pendente (frases prontas para o terminal); lista vazia = tudo no lugar. */
 export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
   const pendencias: string[] = [];
@@ -104,6 +107,19 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261027000000_erp_dre_fechamento não foi aplicada por inteiro.`);
     }
   }
+  // 2.3: só se a migration dela já rodou (a coluna existe; o catálogo não passa pela RLS).
+  const cmv = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'Contagem' AND column_name = 'itensSemPreco'`;
+  if (cmv[0]?.n) {
+    const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_2_3.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_2_3) {
+      const achado = dela.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration 20261028000000_erp_cmv não foi aplicada por inteiro.`);
+      else if (!achado.validado) {
+        pendencias.push(`CHECK ${nome} ficou NOT VALID: corrija a linha antiga que o viola e rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+      }
+    }
+  }
   return pendencias;
 }
 
@@ -112,10 +128,10 @@ async function principal() {
   try {
     const pendencias = await conferirMigracao(db);
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a e da 2.2b conferidas: os CHECKs estão validados, o índice do grão humano e os gatilhos do fechamento existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b e da 2.3 conferidas: os CHECKs estão validados, o índice do grão humano e os gatilhos do fechamento existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1, da 2.2a e da 2.2b: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a, da 2.2b e da 2.3: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {

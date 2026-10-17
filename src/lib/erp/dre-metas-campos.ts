@@ -15,7 +15,8 @@
  */
 
 import { diasEntre } from './contagem-campos';
-import { dividirExato, montarDre, textoDosPontos, type LinhaDoDre } from './dre-campos';
+import { CHAVE_CMV_COMPRA, CHAVE_CMV_REAL, dividirExato, montarDre, textoDosPontos, type LinhaDoDre } from './dre-campos';
+import { SEM_CMV } from './cmv-campos';
 import { CODIGO, codigoDoSubtotal, type LinhaDoPlano, type SentidoDaLinha } from './dre-plano';
 import type { CanalVenda } from './canal-campos';
 import { lerPontosBase } from './unidades';
@@ -26,8 +27,8 @@ export const META_MAXIMA_BP = 10_000;
 /** Abaixo disto, em pontos-base, o realizado está "na meta" (a tela mostra 0,0 pp). */
 export const NA_META_ABAIXO_DE_BP = 5;
 
-/** As linhas em que a base é 100 %: receita bruta e a receita de cada canal. */
-const SEM_META_POR_DEFINICAO: ReadonlySet<string> = new Set([codigoDoSubtotal('RECEITA'), CODIGO.receitaLoja, CODIGO.receitaDelivery, CODIGO.receitaIfood]);
+/** As linhas em que a base é 100 % (receita bruta e por canal) e as duas de detalhe do CMV (2.3): a meta é da linha CMV. */
+const SEM_META_POR_DEFINICAO: ReadonlySet<string> = new Set([codigoDoSubtotal('RECEITA'), CODIGO.receitaLoja, CODIGO.receitaDelivery, CODIGO.receitaIfood, CHAVE_CMV_COMPRA, CHAVE_CMV_REAL]);
 
 /** A linha (pela chave: `codigo` ou `id:<id>`) aceita meta? */
 export const aceitaMeta = (chave: string) => !SEM_META_POR_DEFINICAO.has(chave);
@@ -81,7 +82,7 @@ export interface ComparacaoComMeta {
   /** "+1,0 pp" · "−0,5 pp". */
   desvioTexto: string | null;
   palavra: PalavraDaMeta | null;
-  /** Por que não compara ("sem lançamento", "sem faturamento", "ainda sem valor"). */
+  /** Por que não compara ("sem lançamento", "sem faturamento", "sem valor apurado"). */
   semComparacao: string | null;
 }
 
@@ -101,7 +102,7 @@ export function compararComMeta(linha: LinhaParaComparar, metaBp: number, receit
   const metaCentavos = receitaBrutaCentavos > 0 ? dividirExato(BigInt(metaBp) * BigInt(receitaBrutaCentavos), 10_000n) : null;
   const sem = (motivo: string): ComparacaoComMeta => ({ metaBp, metaCentavos, desvioBp: null, desvioTexto: null, palavra: null, semComparacao: motivo });
   if (receitaBrutaCentavos <= 0) return sem('sem faturamento');
-  if (linha.valorCentavos === null || linha.percentualBp === null) return sem('ainda sem valor');
+  if (linha.valorCentavos === null || linha.percentualBp === null) return sem('sem valor apurado');
   // Zero numa linha de despesa ou subtotal é "nada lançado"; só o resultado pode fechar em zero de verdade.
   if (linha.valorCentavos === 0 && linha.tipo !== 'resultado') return sem('sem lançamento');
   const desvioBp = linha.percentualBp - metaBp;
@@ -223,9 +224,9 @@ export interface LinhaDeMeta {
  */
 export function linhasDeMeta(plano: readonly LinhaDoPlano[]): LinhaDeMeta[] {
   const todasVisiveis = plano.map((l) => ({ ...l, ativa: true }));
-  const vazio = montarDre({ escopo: { tipo: 'rede' }, plano: todasVisiveis, receitas: [], taxaIfood: null, despesas: [] });
+  const vazio = montarDre({ escopo: { tipo: 'rede' }, plano: todasVisiveis, receitas: [], taxaIfood: null, despesas: [], cmv: SEM_CMV });
   const oculta = new Map(plano.map((l) => [l.codigo ?? `id:${l.id}`, !l.ativa]));
-  return vazio.linhas.map((l) => ({ chave: l.chave, nome: l.nome, tipo: l.tipo, nivel: l.nivel, aceita: aceitaMeta(l.chave), oculta: oculta.get(l.chave) === true }));
+  return vazio.linhas.filter((l) => l.chave !== CHAVE_CMV_COMPRA && l.chave !== CHAVE_CMV_REAL).map((l) => ({ chave: l.chave, nome: l.nome, tipo: l.tipo, nivel: l.nivel, aceita: aceitaMeta(l.chave), oculta: oculta.get(l.chave) === true }));
 }
 
 /**

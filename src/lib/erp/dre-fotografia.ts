@@ -9,6 +9,7 @@
  */
 
 import type { Prisma } from '@prisma/client';
+import { cmvLidoDaFotografia, type CmvDoDre } from './cmv-campos';
 import type { LinhaGravada, Ressalva } from './dre-fechamento-campos';
 import type { TaxaDoIfood } from './dre-campos';
 import type { GrupoDoDre, SentidoDaLinha } from './dre-plano';
@@ -157,6 +158,23 @@ export async function lerVersoesDoPeriodo(tx: ClienteDoParceiro, periodoId: stri
   return todas;
 }
 
+/**
+ * O CMV por loja que a fotografia guardou (`entrada.cmv`, 2.3), só das lojas que a pessoa alcança: a consulta
+ * já extrai do JSON apenas essas lojas, então a base da conta das outras nunca sai do banco (nem a `entrada`
+ * inteira, que a tela nunca recebe). Fotografia de antes do CMV: sem lojas.
+ */
+export async function lerCmvDaFotografia(tx: ClienteDoParceiro, alcance: Pick<Alcance, 'lojas'>, fotografiaId: string): Promise<CmvDoDre> {
+  const todas = alcance.lojas === 'todas';
+  const ids = todas ? [] : [...alcance.lojas];
+  const linhas = await tx.sql<{ lojaId: string; v: unknown }>`
+    SELECT e."key" AS "lojaId", e."value" AS "v"
+    FROM "DreFotografia" f, jsonb_each(CASE WHEN jsonb_typeof(f."entrada"->'cmv'->'lojas') = 'object' THEN f."entrada"->'cmv'->'lojas' ELSE '{}'::jsonb END) e
+    WHERE f."parceiroId" = ${tx.parceiroId} AND f."id" = ${fotografiaId} AND (${todas} OR e."key" = ANY(${ids}::text[]))`;
+  const [p] = await tx.sql<{ parcial: boolean | null }>`
+    SELECT (f."entrada"->'cmv'->>'parcial')::boolean AS "parcial" FROM "DreFotografia" f WHERE f."parceiroId" = ${tx.parceiroId} AND f."id" = ${fotografiaId}`;
+  return cmvLidoDaFotografia({ versao: 1, parcial: p?.parcial ?? false, lojas: Object.fromEntries(linhas.map((l) => [l.lojaId, l.v])) });
+}
+
 export interface FotografiaParaGravar {
   periodoId: string;
   inicio: string;
@@ -164,7 +182,9 @@ export interface FotografiaParaGravar {
   nomeDoPeriodo: string;
   fechadoPorNome: string;
   taxa: TaxaDoIfood | null;
-  /** O que a conta leu: a base da fotografia e do CMV que a 2.3 vai apurar. */
+  /** 1 = sem CMV (2.2b); 2 = com o CMV de compra e o real (2.3, o padrão). */
+  versaoDaConta?: number;
+  /** O que a conta leu: a base da fotografia (a receita, a despesa e o CMV de cada loja). */
   entrada: Prisma.InputJsonValue;
   ressalvas: readonly Ressalva[];
   justificativa: string | null;
@@ -193,7 +213,7 @@ export async function gravarFotografia(tx: ClienteDoParceiro, f: FotografiaParaG
       fechadoPorNome: f.fechadoPorNome.slice(0, 120),
       taxaComissaoBp: f.taxa?.comissaoBp ?? null,
       taxaPagamentoBp: f.taxa?.pagamentoBp ?? null,
-      versaoDaConta: 1,
+      versaoDaConta: f.versaoDaConta ?? 2,
       entrada: f.entrada,
       ressalvas: f.ressalvas as unknown as Prisma.InputJsonValue,
       justificativa: f.justificativa,

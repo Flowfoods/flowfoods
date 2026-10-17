@@ -92,7 +92,7 @@ export function TelaDoPlano({
           {calculadas.map((l) => (
             <li key={l.codigo} className="flex items-baseline justify-between gap-3 px-4 py-2.5 text-sm sm:px-5">
               <span>{l.nome}</span>
-              <span className="text-[12px] text-suave">{l.grupo === 'RECEITA' ? 'vem do faturamento' : l.codigo === 'cmv' ? 'em breve' : l.codigo === 'taxas-ifood' ? 'estimada pela taxa do iFood' : 'resultado calculado'}</span>
+              <span className="text-[12px] text-suave">{l.grupo === 'RECEITA' ? 'vem do faturamento' : l.codigo === 'cmv' ? 'real ou compras, calculado' : l.codigo === 'taxas-ifood' ? 'estimada pela taxa do iFood' : 'resultado calculado'}</span>
             </li>
           ))}
         </ul>

@@ -20,6 +20,7 @@
 
 import type { Prisma } from '@prisma/client';
 import { hojeNoRio, formatarData } from './compra-campos';
+import { cmvDoEscopo, cmvParaGravar } from './cmv-campos';
 import { montarDre, type EntradaDoDre, type LinhaDoDre } from './dre-campos';
 import { entradaDoDre, type LeituraDoDre } from './dre-entrada';
 import {
@@ -47,6 +48,12 @@ import { periodoDe, registrarPeriodo } from './periodos';
 import { ALCANCE_FLOWFOODS, recusa, type Alcance } from './permissoes';
 import type { ClienteDoParceiro } from './tenant';
 import { formatarDinheiro } from './unidades';
+
+/** "R$ 27.950,00 (misto)" para o Histórico do fechamento; sem CMV, "não apurado". */
+function textoDoCmvDaRede(leitura: Pick<LeituraDoDre, 'cmv' | 'receitas'>): string {
+  const c = cmvDoEscopo(leitura.cmv, { tipo: 'rede' }, (id) => leitura.receitas.filter((r) => r.lojaId === id).reduce((t, r) => t + r.valorCentavos, 0));
+  return c.centavos === null ? 'não apurado' : `${formatarDinheiro(c.centavos)} (${c.fonte})`;
+}
 
 const dataDoBanco = (s: string) => new Date(`${s}T00:00:00.000Z`);
 const ehData = (s: unknown): s is string => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00.000Z`)) && new Date(`${s}T00:00:00.000Z`).toISOString().slice(0, 10) === s;
@@ -300,7 +307,7 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
 
         // Uma leitura de plano, taxa e metas; a conta é a MESMA do DRE ao vivo.
         const metas = await metasDoPeriodo(tx, leitura.plano, periodo.inicio);
-        const base: Omit<EntradaDoDre, 'escopo'> = { plano: leitura.plano, receitas: leitura.receitas, taxaIfood: leitura.taxaIfood, despesas: leitura.despesas };
+        const base: Omit<EntradaDoDre, 'escopo'> = { plano: leitura.plano, receitas: leitura.receitas, taxaIfood: leitura.taxaIfood, despesas: leitura.despesas, cmv: leitura.cmv };
         const rede = montarDre({ ...base, escopo: { tipo: 'rede' } });
         const linhas: LinhaGravada[] = linhasParaGravar(rede, null, null, metaDa(metas, false));
         for (const loja of leitura.lojas) {
@@ -322,8 +329,9 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
             nomeDoPeriodo: periodo.nome,
             fechadoPorNome: autorNome,
             taxa: leitura.taxaIfood,
+            versaoDaConta: 2,
             entrada: {
-              versaoDaConta: 1,
+              versaoDaConta: 2,
               periodo: { inicio: periodo.inicio, fim: periodo.fim, nome: periodo.nome },
               ate: leitura.ate,
               lojas: leitura.lojas.map((l) => ({ id: l.id, nome: l.nome, ativa: l.ativa })),
@@ -331,6 +339,7 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
               receitas: leitura.receitas,
               despesas: leitura.despesas,
               taxaIfood: leitura.taxaIfood,
+              cmv: cmvParaGravar(leitura.cmv),
               metas: Object.fromEntries(metas),
             } as unknown as Prisma.InputJsonValue,
             ressalvas: cond.ressalvas,
@@ -358,6 +367,7 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
               receitaBruta: formatarDinheiro(receita),
               resultado: final.valorCentavos === null ? 'não apurado' : formatarDinheiro(final.valorCentavos),
               ressalvas: String(cond.ressalvas.length),
+              cmv: textoDoCmvDaRede(leitura),
             },
             motivo: justificativa,
             autorNome,

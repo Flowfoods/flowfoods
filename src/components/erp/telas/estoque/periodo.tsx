@@ -9,6 +9,7 @@
  * `PainelDaContagem` é o resumo que aparece no estoque da loja.
  */
 
+import { fraseDoSemPreco } from '@/lib/erp/cmv-campos';
 import Link from 'next/link';
 import type { ResumoDaContagemDaLoja, SituacaoDoPeriodo } from '@/lib/erp/contagem';
 import { camposDasRegras, porcento, ROTULO_DA_CONTAGEM } from '@/lib/erp/contagem-campos';
@@ -233,6 +234,7 @@ export function TelaPeriodo({
                 <p className="text-suave">
                   Estoque final: <span className="font-semibold tabular-nums text-texto">{formatarDinheiro(f.valorTotalCentavos ?? 0)}</span>
                 </p>
+                {fraseDoSemPreco(f.itensSemPreco, 'final') && <p className="text-[12px] leading-snug text-suave">{fraseDoSemPreco(f.itensSemPreco, 'final')!.replace(/^./, (x) => x.toUpperCase())}.</p>}
                 <Link href={`${aqui}/contagens/${f.id}/conferir`} className={LINK_DE_TEXTO}>
                   Ver o fechamento
                 </Link>

@@ -8,6 +8,7 @@
  */
 
 import Link from 'next/link';
+import { Fragment } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { textoDoPercentual, type LinhaDoDre } from '@/lib/erp/dre-campos';
@@ -20,6 +21,8 @@ import { formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Barra, Contagem, Metrica, Painel, Selo, Vazio } from '../../ui/superficies';
+import { seloDoCmv } from '@/lib/erp/cmv-campos';
+import { PainelDoCmv } from './cmv-painel';
 import { BotaoOuMotivo } from '../cadastro/partes';
 import { dataCurta } from '../faturamento/formato';
 
@@ -31,6 +34,9 @@ export interface PermissoesDaTela {
   fecharPeriodo?: boolean;
   verFaturamento: boolean;
   verPrecos: boolean;
+  /** `compras.ver` e `estoque.ver`: só quem vê as notas e o estoque ganha o link do painel do CMV (2.3). */
+  verCompras?: boolean;
+  verEstoque?: boolean;
   /** A pessoa tem a rede inteira: pode alternar entre a rede e uma loja. */
   veRede: boolean;
 }
@@ -110,11 +116,15 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
             const linha = resultado ? 'border-t-2 border-linha-forte bg-forte font-semibold' : grupo ? 'border-t border-linha bg-forte/50 font-semibold' : 'border-t border-linha';
             const apoio: string[] = [];
             if (l.semContar.length) apoio.push(`sem contar ${l.semContar.join(' e ')}`);
-            if (l.tipo !== 'cmv' && l.valorCentavos !== null && l.nota && l.tipo !== 'subtotal') apoio.push(l.nota);
+            // O CMV e as duas leituras abaixo dele (compra e real) dizem a fonte numa linha própria, em largura total (o selo e a nota são compridos).
+            const doCmv = l.tipo === 'cmv' || l.chave.startsWith('cmv:');
+            if (!doCmv && l.valorCentavos !== null && l.nota && l.tipo !== 'subtotal') apoio.push(l.nota);
             if (l.tipo === 'taxa' && l.valorCentavos === null) apoio.push(l.nota!);
             const meta = d.metas[l.chave];
+            const colunas = 3 + (temMetas ? 3 : 0);
             return (
-              <tr key={l.chave} data-zerada={zerada(l) ? '' : undefined} className={`${linha} ${l.tipo === 'cmv' ? 'text-suave' : ''}`}>
+              <Fragment key={l.chave}>
+              <tr data-zerada={zerada(l) ? '' : undefined} className={doCmv && l.nota ? `${linha} [&>*]:pb-1` : linha}>
                 <th scope="row" className={`min-w-0 py-2 text-left align-top ${l.nivel === 1 ? 'pl-8 pr-2 font-normal sm:pl-10' : 'px-4 sm:px-5'} ${resultado || grupo ? '' : 'text-texto'}`}>
                   <span className="block min-h-6 leading-6">
                     {prefixo(l)}
@@ -178,6 +188,19 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
                   </>
                 )}
               </tr>
+              {(l.tipo === 'cmv' || (doCmv && l.nota && l.valorCentavos !== null)) && (
+                <tr className={l.tipo === 'cmv' ? 'bg-forte/50' : ''}>
+                  <td colSpan={colunas} className={`pb-2.5 text-[12px] leading-snug text-suave ${l.nivel === 1 ? 'pl-8 pr-4 sm:pl-10 sm:pr-5' : 'px-4 sm:px-5'}`}>
+                    {l.tipo === 'cmv' && (
+                      <span className="mr-2 inline-block align-middle">
+                        <Selo tom={seloDoCmv(l).tom}>{seloDoCmv(l).texto}</Selo>
+                      </span>
+                    )}
+                    {l.valorCentavos !== null && <span className="align-middle">{l.nota}</span>}
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             );
           })}
         </tbody>
@@ -550,10 +573,17 @@ export function TelaDoDre({
 
       {d.porLoja && <PorLoja d={d} base={base} />}
 
+      {d.cmv.painel && <PainelDoCmv painel={d.cmv.painel} raiz={raiz} verCompras={pode.verCompras === true} verEstoque={pode.verEstoque === true} />}
+      {d.cmv.antigo && (
+        <p className="text-[12px] leading-relaxed text-suave">
+          Este período foi fechado antes de o CMV existir no DRE, então o CMV e o painel compra × real não foram apurados nele. A FlowFoods pode reabrir o período e fechar de novo para guardar o CMV.
+        </p>
+      )}
+
       {d.anoPassado && <AnoPassadoPainel a={d.anoPassado} />}
 
       <p className="text-[12px] leading-relaxed text-suave">
-        Despesa conta pela competência (o mês a que pertence), não pelo dia em que foi paga. {d.status === 'FECHADO' ? 'A taxa do iFood é a estimada pela taxa de quando o período fechou.' : 'A taxa do iFood é estimada pela taxa configurada hoje.'} O CMV ainda não entra no DRE (em breve): até lá, margem e resultados saem sem ele.{Object.keys(d.metas).length > 0 ? ' O desvio é o realizado menos a meta, em pontos percentuais (pp); menos de 0,05 pp é “na meta”.' : ''}{' '}
+        Despesa conta pela competência (o mês a que pertence), não pelo dia em que foi paga. {d.status === 'FECHADO' ? 'A taxa do iFood é a estimada pela taxa de quando o período fechou.' : 'A taxa do iFood é estimada pela taxa configurada hoje.'} O CMV é o real (estoque inicial mais compras menos estoque final) quando o período terminou e a contagem de fechamento foi aplicada; senão, o das compras pela data da nota. Loja sem nota e sem estoque fica sem CMV, e margem e resultados saem sem contar o CMV.{Object.keys(d.metas).length > 0 ? ' O desvio é o realizado menos a meta, em pontos percentuais (pp); menos de 0,05 pp é “na meta”.' : ''}{' '}
         {loja ? 'A loja não recebe rateio da rede.' : 'Receita por canal nas três primeiras linhas.'}
       </p>
     </div>

@@ -15,6 +15,10 @@
  * comparável no meio do mês. SEM projeção: ritmo × dias restantes ignora fim
  * de semana e dia de pagamento, e não é honesto.
  *
+ * CMV (2.3): em cada loja vale o real (período encerrado, com os dois estoques) ou o de compra, com o selo da fonte;
+ * o painel "compra × real" sai do mesmo `CmvDoDre` (ao vivo, ou lido da fotografia v2). A fotografia v1, de antes do
+ * CMV, diz "não apurado neste fechamento" e nunca é recalculada.
+ *
  * FECHADO (2.2b, decisão 153): o período FECHADO é lido SÓ da fotografia vigente (a conta, a
  * taxa do iFood, a meta e o plano da época); nada é recalculado. Aberto ou em curso é ao vivo, pela
  * mesma leitura (`entradaDoDre`) que o fechamento usa: por isso o fechado bate centavo a centavo.
@@ -26,12 +30,14 @@
  */
 
 import { hojeNoRio } from './compra-campos';
+import { FRASE_DO_CMV_ANTIGO } from './cmv-campos';
+import { painelDoCmv, type PainelDoCmv } from './cmv-comparacao';
 import { diasEntre, somarDias } from './contagem-campos';
 import type { RecorrenteEmFalta } from './despesas';
 import { montarDre, type Escopo, type ResultadoDoDre } from './dre-campos';
 import { entradaDoDre } from './dre-entrada';
 import { dreDaFotografia, metasDasLinhas, type Ressalva } from './dre-fechamento-campos';
-import { lerFotografiaVigente } from './dre-fotografia';
+import { lerCmvDaFotografia, lerFotografiaVigente } from './dre-fotografia';
 import { metasDoPeriodo } from './dre-metas';
 import { compararComOAnoPassado, compararLinhas, mesmaDataNoAnoPassado, type AnoPassado, type ComparacaoComMeta } from './dre-metas-campos';
 import { CODIGO, codigoDoSubtotal } from './dre-plano';
@@ -50,6 +56,14 @@ export interface ResumoDaLoja {
   resultadoBp: number | null;
   semContar: string[];
   faltas: number;
+}
+
+/** O CMV do período para a tela (2.3): o painel compra × real e se a fotografia é de antes do CMV. */
+export interface CmvDoPeriodo {
+  /** Só no período encerrado e com a fotografia nova; nulo caso contrário. */
+  painel: PainelDoCmv | null;
+  /** Fotografia v1: fechada antes do CMV. */
+  antigo: boolean;
 }
 
 /** O que a tela diz de um período fechado: a fotografia que ela lê (nada mais). */
@@ -98,6 +112,8 @@ export interface DreDoPeriodo {
   anoPassado: AnoPassado | null;
   /** Período FECHADO lido da fotografia; nulo no DRE ao vivo. */
   fechamento: FechamentoDoPeriodo | null;
+  /** O painel compra × real (2.3). */
+  cmv: CmvDoPeriodo;
 }
 
 /** A frase da recusa de abrir o DRE do escopo, ou null se pode. Rede: rede inteira. Loja: `dre.ver` na loja. */
@@ -161,7 +177,13 @@ export async function dreDoPeriodo(cliente: ClienteDoParceiro, alcance: Alcance,
       if (foto) {
         const doEscopo = foto.linhas.filter((l) => l.lojaId === (pedido.tipo === 'loja' ? pedido.lojaId : null));
         if (doEscopo.length === 0) return null;
-        const resultado = dreDaFotografia(doEscopo, escopo);
+        const antigo = foto.versaoDaConta < 2;
+        const lida = dreDaFotografia(doEscopo, escopo);
+        // Fotografia de antes do CMV guardou "Em breve": hoje a tela diz a verdade, sem inventar número.
+        const resultado = antigo ? { ...lida, linhas: lida.linhas.map((l) => (l.tipo === 'cmv' ? { ...l, nota: FRASE_DO_CMV_ANTIGO } : l)) } : lida;
+        // A visão de UMA loja recebe só aquela loja (o alcance pode ter outras): o painel do fechado é igual ao do ao vivo.
+        const cmvFoto = antigo ? null : await lerCmvDaFotografia(tx, pedido.tipo === 'loja' ? { lojas: [pedido.lojaId] } : alcance, foto.id);
+        const receitaFoto = (id: string) => Number(foto.linhas.find((l) => l.lojaId === id && l.chave === codigoDoSubtotal('RECEITA'))?.valorCentavos ?? 0);
         let porLoja: ResumoDaLoja[] | null = null;
         if (pedido.tipo === 'rede') {
           const ids = Array.from(new Set(foto.linhas.filter((l) => l.lojaId !== null).map((l) => l.lojaId!)));
@@ -193,6 +215,7 @@ export async function dreDoPeriodo(cliente: ClienteDoParceiro, alcance: Alcance,
           lojasDoEscopo,
           metas: compararLinhas(resultado.linhas, metasDasLinhas(doEscopo), resultado.receitaBrutaCentavos, daLoja),
           anoPassado: await anoPassadoDe(tx, alcance, periodo, periodo.fim, resultado, 0, lojaId),
+          cmv: { antigo, painel: cmvFoto ? painelDoCmv(cmvFoto, receitaFoto) : null },
           fechamento: { versao: foto.versao, fechadoEm: foto.criadoEm, fechadoPorNome: foto.fechadoPorNome, ressalvas: foto.ressalvas, totalDeRessalvas: foto.totalDeRessalvas, justificativa: foto.justificativa },
         } satisfies DreDoPeriodo;
       }
@@ -201,7 +224,7 @@ export async function dreDoPeriodo(cliente: ClienteDoParceiro, alcance: Alcance,
     // ---- ao vivo
     const leitura = await entradaDoDre(tx, alcance, periodo, ate, { hoje, lojaId });
     const metas = await metasDoPeriodo(tx, leitura.plano, periodo.inicio);
-    const entrada = (e: Escopo) => ({ escopo: e, plano: leitura.plano, receitas: leitura.receitas, taxaIfood: leitura.taxaIfood, despesas: leitura.despesas });
+    const entrada = (e: Escopo) => ({ escopo: e, plano: leitura.plano, receitas: leitura.receitas, taxaIfood: leitura.taxaIfood, despesas: leitura.despesas, cmv: leitura.cmv });
     const resultado = montarDre(entrada(escopo));
 
     let porLoja: ResumoDaLoja[] | null = null;
@@ -236,6 +259,7 @@ export async function dreDoPeriodo(cliente: ClienteDoParceiro, alcance: Alcance,
       metas: compararLinhas(resultado.linhas, metas, resultado.receitaBrutaCentavos, daLoja),
       anoPassado: ate ? await anoPassadoDe(tx, alcance, periodo, ate, resultado, leitura.faltas.total, lojaId) : null,
       fechamento: null,
+      cmv: { antigo: false, painel: encerrado ? painelDoCmv(leitura.cmv, (id) => leitura.receitas.filter((r) => r.lojaId === id).reduce((t, r) => t + r.valorCentavos, 0)) : null },
     } satisfies DreDoPeriodo;
   });
 }

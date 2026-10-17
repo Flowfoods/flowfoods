@@ -454,6 +454,7 @@ const SELECAO_DA_CONTAGEM = {
   fechadaPorNome: true,
   fechaAutomaticoEm: true,
   valorTotalCentavos: true,
+  itensSemPreco: true,
   naoContadosNoFechamento: true,
   periodo: { select: { id: true, nome: true, inicio: true, fim: true } },
 } as const;
@@ -662,6 +663,8 @@ async function aplicar(
   await gravarMovimentos(tx, movimentos, { ocorridoEm: agora });
   // Valor fotografado: na cíclica, o que foi contado; no fechamento, o estoque final inteiro da loja (base do CMV real, 2.3).
   let valorTotal = valoresContados.reduce((s, v) => s + Math.max(0, v.valor ?? 0), 0);
+  // 2.3: quantos insumos com saldo ficaram sem preço no retrato do fechamento (o CMV real avisa); só o fechamento registra.
+  let itensSemPreco: number | undefined;
   if (c.tipo === 'FECHAMENTO') {
     const saldos = await tx.saldoEstoque.findMany({ where: { lojaId: loja.id, quantidadeMilesimos: { gt: 0 } }, select: { insumoId: true, quantidadeMilesimos: true } });
     const todos = await custosDeReferencia(
@@ -669,13 +672,14 @@ async function aplicar(
       saldos.map((s) => s.insumoId),
     );
     valorTotal = saldos.reduce((s, x) => s + (valorDaQuantidade(todos.get(x.insumoId)?.porUnidade ?? null, x.quantidadeMilesimos) ?? 0), 0);
+    itensSemPreco = saldos.filter((x) => (todos.get(x.insumoId)?.porUnidade ?? null) === null).length;
   }
   const estouro = totalAcimaDoLimite(valorTotal);
   if (estouro) throw new Recusa({ ok: false, erros: { geral: estouro } });
   const naoContados = itens.length - contados.length;
   await tx.contagem.updateMany({
     where: { id: c.id, status: 'ABERTA' },
-    data: { status: 'FECHADA', desfecho, fechadaEm: agora, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: naoContados },
+    data: { status: 'FECHADA', desfecho, fechadaEm: agora, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: naoContados, ...(itensSemPreco === undefined ? {} : { itensSemPreco }) },
   });
   const sobra = movimentos.filter((m) => m.valorCentavos > 0).reduce((s, m) => s + m.valorCentavos, 0);
   const falta = movimentos.filter((m) => m.valorCentavos < 0).reduce((s, m) => s - m.valorCentavos, 0);
@@ -919,7 +923,7 @@ export async function situacaoDoPeriodo(cliente: ClienteDoParceiro, alcance: Alc
         if (!reg) return { registro: null, contagem: null };
         const contagem = await tx.contagem.findFirst({
           where: { lojaId, tipo: 'FECHAMENTO', periodoId: reg.id, status: { not: 'CANCELADA' } },
-          select: { id: true, status: true, fechadaEm: true, fechadaPorNome: true, valorTotalCentavos: true, criadoEm: true, iniciadaPorNome: true },
+          select: { id: true, status: true, fechadaEm: true, fechadaPorNome: true, valorTotalCentavos: true, itensSemPreco: true, criadoEm: true, iniciadaPorNome: true },
         });
         return { registro: reg, contagem };
       };

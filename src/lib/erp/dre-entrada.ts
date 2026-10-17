@@ -6,6 +6,7 @@
  *  - a RECEITA, só de `faturamentoDosGraos` (a integração vence a digitação), somada por
  *    loja e canal;
  *  - as DESPESAS apropriadas dia a dia ao recorte apurado, somadas por loja e linha;
+ *  - o CMV de cada loja (2.3), compra e real, de `cmv.ts` (a data da nota e o fechamento de estoque);
  *  - a taxa do iFood, de `CanalConfig` (a de AGORA: a fotografia a congela);
  *  - o plano, do banco completado pelo padrão (nada é gravado para ler).
  *
@@ -13,11 +14,14 @@
  * já foi pega antes de chamar. O `alcance` filtra as lojas; `lojaId` lê só uma loja.
  */
 
+import type { CmvDoDre } from './cmv-campos';
+import { cmvDasLojas } from './cmv';
 import { despesasApropriadas, faltaLancar, type RecorrenteEmFalta } from './despesas';
 import type { DespesaApropriada, ReceitaLida, TaxaDoIfood } from './dre-campos';
 import type { LinhaDoPlano } from './dre-plano';
 import { faltasDoIntervalo, faturamentoDosGraos, lojasDoFaturamento, type FaltasDoIntervalo, type LojaDoFaturamento } from './faturamento';
-import type { Periodo } from './periodo-campos';
+import { PRIMEIRO_DIA_DO_ERP, type Periodo } from './periodo-campos';
+import { periodoAnteriorDe } from './periodos';
 import { planoDoParceiro } from './plano';
 import type { Alcance } from './permissoes';
 import type { ClienteDoParceiro } from './tenant';
@@ -36,6 +40,8 @@ export interface LeituraDoDre {
   taxaIfood: TaxaDoIfood | null;
   faltas: FaltasDoIntervalo;
   faltaLancar: RecorrenteEmFalta[];
+  /** O CMV de cada loja do alcance (2.3). */
+  cmv: CmvDoDre;
 }
 
 export function somarReceitas(graos: readonly { lojaId: string; canal: ReceitaLida['canal']; valorCentavos: number }[]): ReceitaLida[] {
@@ -81,6 +87,8 @@ export async function entradaDoDre(
   const despesas = ate ? await despesasApropriadas(tx, alcance, { de: periodo.inicio, ate }, lojaId) : [];
   const faltas = ate ? await faltasDoIntervalo(tx, alcance, { de: periodo.inicio, ate, lojaId }, opcoes.hoje) : { total: 0, porLoja: [] as { loja: LojaDoFaturamento; faltas: number }[] };
   const aFalta = await faltaLancar(tx, alcance, periodo.inicio, ate ?? periodo.inicio, opcoes.hoje);
+  const anterior = periodo.inicio > PRIMEIRO_DIA_DO_ERP ? await periodoAnteriorDe(tx, periodo) : null;
+  const cmv = await cmvDasLojas(tx, lojaId ? lojas.filter((l) => l.id === lojaId) : lojas, periodo, ate, opcoes.hoje, anterior);
   return {
     periodo,
     ate,
@@ -91,5 +99,6 @@ export async function entradaDoDre(
     taxaIfood: taxaLinha ? { comissaoBp: taxaLinha.taxaBp, pagamentoBp: taxaLinha.taxaPagamentoBp } : null,
     faltas,
     faltaLancar: aFalta,
+    cmv,
   };
 }

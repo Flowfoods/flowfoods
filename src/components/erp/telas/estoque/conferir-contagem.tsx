@@ -9,6 +9,7 @@
  * do período no piso. Fechada: o resultado, sem botão.
  */
 
+import { fraseDoSemPreco } from '@/lib/erp/cmv-campos';
 import Link from 'next/link';
 import type { ConferenciaDaContagem, LinhaDaDivergencia } from '@/lib/erp/contagem';
 import { coberturaDe, fraseAbaixoDoPiso, ROTULO_DA_CONTAGEM, textoDoValorDaDiferenca } from '@/lib/erp/contagem-campos';
@@ -289,7 +290,14 @@ export function TelaConferirContagem({
           <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{c.soma.foraDaTolerancia}</div>
           <div className="mt-1.5 text-[12px] text-suave">acima de {formatarDinheiro(c.regras.toleranciaCentavos)} por item, ou sem preço</div>
         </div>
-        {fechamento && cob && (
+        {fechamento && !aberta && c.contagem.valorTotalCentavos !== null && c.estado === 'APLICADA' && (
+          <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
+            <div className="text-[12px] font-medium text-suave">Estoque final fotografado</div>
+            <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(c.contagem.valorTotalCentavos)}</div>
+            <div className="mt-1.5 text-[12px] text-suave">base do CMV real do período{fraseDoSemPreco(c.contagem.itensSemPreco ?? null, 'final') ? ` · ${fraseDoSemPreco(c.contagem.itensSemPreco ?? null, 'final')}` : ''}</div>
+          </div>
+        )}
+        {fechamento && cob && aberta && (
           <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
             <div className="text-[12px] font-medium text-suave">{coberturaDe(cob.periodo.nome)}</div>
             <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{Math.floor(cob.cobertura.valor.bp / 100)} %</div>
@@ -374,8 +382,8 @@ export function TelaConferirContagem({
         </div>
 
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-20" aria-label={fechamento ? 'Fechar o período' : 'Aplicar'}>
-          {fechamento && cob && (
-            <Painel titulo={coberturaDe(cob.periodo.nome)} subtitulo={aberta ? 'Com o que já foi contado nesta contagem' : 'No fechamento'}>
+          {fechamento && cob && aberta && (
+            <Painel titulo={coberturaDe(cob.periodo.nome)} subtitulo="Com o que já foi contado nesta contagem">
               <CoberturaComPiso c={cob.cobertura} regras={cob.regras} />
             </Painel>
           )}

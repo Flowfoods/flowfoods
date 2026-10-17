@@ -4,6 +4,7 @@
  * ou sem a RLS instalada (a migration pula a RLS quando não consegue).
  */
 import type { PrismaClient } from '@prisma/client';
+import { SEM_CMV } from '@/lib/erp/cmv-campos';
 import { montarDre } from '@/lib/erp/dre-campos';
 import { linhasParaGravar } from '@/lib/erp/dre-fechamento-campos';
 import { gravarFotografia } from '@/lib/erp/dre-fotografia';
@@ -78,7 +79,7 @@ export async function criarPeriodoFechadoDeTeste(tx: ClienteDoParceiro, p: { nom
     data: { parceiroId: tx.parceiroId, nome: p.nome, inicio: dataIso(p.inicio), fim: dataIso(p.fim) },
   });
   // Um DRE sem nenhum número (a conta pura sobre o plano padrão), gravado pelo mesmo caminho do fechamento.
-  const vazio = montarDre({ escopo: { tipo: 'rede' }, plano: planoEfetivo([]), receitas: [], taxaIfood: null, despesas: [] });
+  const vazio = montarDre({ escopo: { tipo: 'rede' }, plano: planoEfetivo([]), receitas: [], taxaIfood: null, despesas: [], cmv: SEM_CMV });
   await gravarFotografia(
     tx,
     { periodoId: periodo.id, inicio: p.inicio, fim: p.fim, nomeDoPeriodo: p.nome, fechadoPorNome: 'Teste', taxa: null, entrada: {}, ressalvas: [], justificativa: null, linhas: linhasParaGravar(vazio, null, null, () => null) },

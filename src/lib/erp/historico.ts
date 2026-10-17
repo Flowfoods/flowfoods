@@ -189,6 +189,7 @@ const CAMPO: Record<string, string> = {
   receitaBruta: 'receita bruta',
   resultado: 'resultado',
   ressalvas: 'ressalvas',
+  cmv: 'CMV',
 };
 
 /** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. */
@@ -255,6 +256,7 @@ const ORDEM = [
   'versaoDoFechamento',
   'receitaBruta',
   'resultado',
+  'cmv',
   'ressalvas',
   'ativo',
 ];

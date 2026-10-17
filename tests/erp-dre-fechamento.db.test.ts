@@ -219,7 +219,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       const o = await dre(DONA(), { tipo: 'rede' }, '2026-10-05');
       expect(o!.metas.cmv).toMatchObject({ metaBp: 0, desvioBp: null, semComparacao: 'sem faturamento', metaCentavos: null }); // outubro ainda não tem faturamento
       const d = await dre(DONA(), { tipo: 'rede' }, '2026-09-10');
-      expect(d!.metas.cmv).toMatchObject({ metaBp: 2000, metaCentavos: 200_000, desvioBp: null, desvioTexto: null, palavra: null, semComparacao: 'ainda sem valor' });
+      expect(d!.metas.cmv).toMatchObject({ metaBp: 2000, metaCentavos: 200_000, desvioBp: null, desvioTexto: null, palavra: null, semComparacao: 'sem valor apurado' });
       expect(linha(d!, 'cmv').valorCentavos).toBeNull();
     });
 
@@ -256,7 +256,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       expect(d.metas['resultado-do-periodo']).toMatchObject({ metaBp: 1000 });
       expect(d.metas['resultado-do-periodo'].palavra).toBe(linha(d, 'resultado-do-periodo').percentualBp! > 1000 ? 'melhor que a meta' : 'pior que a meta');
       // Setembro NÃO pega a meta de CMV de outubro (nem a de salários: foi gravada em outubro).
-      expect(d.metas.cmv).toMatchObject({ metaBp: 2000, semComparacao: 'ainda sem valor' });
+      expect(d.metas.cmv).toMatchObject({ metaBp: 2000, semComparacao: 'sem valor apurado' });
       expect(d.metas.salarios).toBeUndefined();
       // Receita não tem meta.
       expect(d.metas['receita-loja']).toBeUndefined();
@@ -403,7 +403,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       expect(p).toMatchObject({ status: 'FECHADO', fechadoPorNome: 'Ana Dona' });
       expect(p.fechadoEm).not.toBeNull();
       const f = (await a.dreFotografia.findMany({ where: { periodoId: p.id } }))[0];
-      expect(f).toMatchObject({ versao: 1, versaoDaConta: 1, taxaComissaoBp: 1200, taxaPagamentoBp: 320, fechadoPorNome: 'Ana Dona', substituidaEm: null, nomeDoPeriodo: 'Agosto de 2026' });
+      expect(f).toMatchObject({ versao: 1, versaoDaConta: 2, taxaComissaoBp: 1200, taxaPagamentoBp: 320, fechadoPorNome: 'Ana Dona', substituidaEm: null, nomeDoPeriodo: 'Agosto de 2026' });
       expect((f.ressalvas as { id: string }[]).map((x) => x.id).sort()).toEqual([`recorrente:${ids.luz}`, `sem-lancamento:${ids.nova}`].sort());
       expect(f.justificativa).toBe('A luz chega só no mês seguinte e a Loja Nova ainda não abriu.');
       // A entrada agregada (a base do CMV da 2.3) guarda a receita, a despesa e o plano da época.

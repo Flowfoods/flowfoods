@@ -939,7 +939,7 @@ export async function concluirAbertura(
         const semCusto = movimentos.filter((m) => custos.get(m.insumoId)?.porUnidade == null).length;
         await tx.contagem.updateMany({
           where: { id: c.id, status: 'ABERTA' },
-          data: { status: 'FECHADA', desfecho: 'APLICADA', fechadaEm: abertoEm, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: resumo.naoContados },
+          data: { status: 'FECHADA', desfecho: 'APLICADA', fechadaEm: abertoEm, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: resumo.naoContados, itensSemPreco: semCusto },
         });
         await tx.historicoAlteracao.create({
           data: {
