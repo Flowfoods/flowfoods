@@ -39,6 +39,7 @@ export default async function ParceiroFichaPage({
       canais={canais}
       linkDasEmbalagens={ctx.bloqueio ? undefined : `${base}/fichas/${ficha.id}/canais`}
       linkDaTaxa={`${base}/fichas/canais`}
+      linkDoProduzir={ficha.ativa && !ctx.bloqueio ? `/rodolfo/erp/${ctx.parceiro.slug}/producao/nova?ficha=${ficha.id}` : undefined}
       podeConfigurarTaxa={!ctx.bloqueio}
       acaoPrecos={ctx.bloqueio ? undefined : acaoSalvarPrecos.bind(null, ctx.parceiro.slug, ficha.id)}
     />

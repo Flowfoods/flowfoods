@@ -48,6 +48,7 @@ import {
 } from './estoque';
 import { valorDaQuantidade } from './estoque-campos';
 import { periodoDe } from './periodos';
+import { datasEmPeriodoFechado, fraseDoPeriodoFechado, travarParaEscrever } from './periodo-trava';
 import { somarDias, diasEntre, regrasDaLoja } from './contagem-campos';
 import {
   baixasDaEntrega,
@@ -99,7 +100,7 @@ async function lojaComAlguma(tx: ClienteDoParceiro, alcance: Alcance, lojaId: st
 const VER: Permissao[] = ['requisicao.pedir', 'requisicao.atender'];
 
 /** O estoque da loja está aberto (abertura concluída)? A requisição baixa do estoque aberto. */
-async function exigirAberto(tx: ClienteDoParceiro, loja: { id: string; nome: string }, travar = false) {
+export async function exigirAberto(tx: ClienteDoParceiro, loja: { id: string; nome: string }, travar = false) {
   const a = travar ? (await travarAberturas(tx, [loja.id])).get(loja.id) : (await aberturasDe(tx, [loja.id])).get(loja.id);
   if (!a || a.status !== 'FECHADA' || !a.fechadaEm) {
     throw new Recusa({ ok: false, erros: { geral: `O estoque da ${loja.nome} ainda não foi aberto: a requisição baixa do estoque, que começa depois da contagem de abertura.` } });
@@ -126,6 +127,36 @@ async function travarRequisicao(tx: ClienteDoParceiro, lojaId: string, id: strin
     FOR UPDATE`;
   if (!r) throw new Recusa({ ok: false, erros: { geral: NAO_ENCONTRADA }, naoEncontrado: true });
   return r;
+}
+
+/** A ordem de produção que pediu esta requisição, se houver. Lida com a requisição já travada (quem muda a ordem trava a requisição antes). */
+export async function ordemDaRequisicao(tx: ClienteDoParceiro, requisicaoId: string): Promise<{ id: string; codigoLote: string; status: 'PLANEJADA' | 'EM_EXECUCAO' | 'CONCLUIDA' | 'CANCELADA' } | null> {
+  const [o] = await tx.sql<{ id: string; codigoLote: string; status: 'PLANEJADA' | 'EM_EXECUCAO' | 'CONCLUIDA' | 'CANCELADA' }>`
+    SELECT "id", "codigoLote", "status"::text AS "status" FROM "OrdemProducao" WHERE "parceiroId" = ${tx.parceiroId} AND "requisicaoId" = ${requisicaoId}`;
+  return o ?? null;
+}
+
+/**
+ * Entregar e devolver baixam no livro com a data de agora: pegam a trava do período (compartilhada, como nota e despesa;
+ * herança da 2.2b, lacuna da 1.8) e recusam hoje dentro de período FECHADO. A ordem fixa das travas é esta: período →
+ * abertura da loja → requisição (FOR UPDATE) → ordem → saldos.
+ */
+export async function conferirPeriodoAberto(tx: ClienteDoParceiro, agora: Date) {
+  await travarParaEscrever(tx);
+  const hoje = hojeNoRio(agora);
+  const fechado = (await datasEmPeriodoFechado(tx, [hoje])).get(hoje);
+  if (fechado) throw new Recusa({ ok: false, erros: { geral: fraseDoPeriodoFechado(fechado) }, conflito: true });
+}
+
+/** O custo do lote já fechou (concluído ou cancelado): a requisição dele não recebe mais entrega nem devolução. */
+function recusarSeOLoteFechou(o: { codigoLote: string; status: string } | null) {
+  if (o && (o.status === 'CONCLUIDA' || o.status === 'CANCELADA')) {
+    throw new Recusa({
+      ok: false,
+      erros: { geral: `O lote ${o.codigoLote} já ${o.status === 'CONCLUIDA' ? 'foi concluído' : 'foi cancelado'}: o custo dele está fechado e esta requisição não recebe mais entrega nem devolução.` },
+      conflito: true,
+    });
+  }
 }
 
 const SELECAO_DO_ITEM = { id: true, insumoId: true, insumoNomeSnapshot: true, unidadeSnapshot: true, solicitadoMilesimos: true, atendidoMilesimos: true, devolvidoMilesimos: true, ordem: true } as const;
@@ -169,6 +200,8 @@ export interface CartaoDaRequisicao {
   pedidaPorNome: string | null;
   atendidaPorNome: string | null;
   fichaNome: string | null;
+  /** 3.1: o lote que pediu esta requisição (a produção cria a dela). */
+  lote: string | null;
   atrasoDias: number;
   itens: { nome: string; unidade: Unidade; solicitadoMilesimos: number; atendidoMilesimos: number }[];
 }
@@ -198,6 +231,7 @@ export async function quadroDeRequisicoes(cliente: ClienteDoParceiro, alcance: A
         pedidaPorNome: true,
         atendidaPorNome: true,
         fichaNomeSnapshot: true,
+        ordemProducao: { select: { codigoLote: true } },
         itens: { orderBy: { ordem: 'asc' as const }, select: { insumoNomeSnapshot: true, unidadeSnapshot: true, solicitadoMilesimos: true, atendidoMilesimos: true } },
       } as const;
       const [pendentes, atendidas, canceladas] = await Promise.all([
@@ -220,6 +254,7 @@ export async function quadroDeRequisicoes(cliente: ClienteDoParceiro, alcance: A
           pedidaPorNome: x.pedidaPorNome,
           atendidaPorNome: x.atendidaPorNome,
           fichaNome: x.fichaNomeSnapshot,
+          lote: x.ordemProducao?.codigoLote ?? null,
           atrasoDias: diasDeAtraso({ status, paraDia }, hoje),
           itens: x.itens.map((i) => ({ nome: i.insumoNomeSnapshot, unidade: i.unidadeSnapshot as Unidade, solicitadoMilesimos: i.solicitadoMilesimos, atendidoMilesimos: i.atendidoMilesimos ?? 0 })),
         };
@@ -290,46 +325,59 @@ export async function listaDaFicha(cliente: ClienteDoParceiro, alcance: Alcance,
     cliente.transacao(async (tx) => {
       await lojaDoAlcance(tx, alcance, lojaId, 'requisicao.pedir');
       if (!pode(alcance, 'fichas.ver')) throw new Recusa({ ok: false, erros: { ficha: 'Seu acesso não inclui ver fichas técnicas: peça item a item.' } });
-      const id = typeof fichaId === 'string' && ID.test(fichaId) ? fichaId : '';
-      const ficha = id
-        ? await tx.fichaTecnica.findFirst({
-            where: { id, ativa: true },
-            select: {
-              id: true,
-              nome: true,
-              tipo: true,
-              rendimentoMilesimos: true,
-              unidadeRendimento: true,
-              itens: { orderBy: { ordem: 'asc' }, select: { insumoId: true, quantidadeMilesimos: true, fatorCorrecaoMilesimos: true, subficha: { select: { nome: true, insumoProduzidoId: true } } } },
-            },
-          })
-        : null;
-      if (!ficha) throw new Recusa({ ok: false, erros: { ficha: 'Escolha a ficha técnica.' } });
-      const unidade = ficha.unidadeRendimento as Unidade;
-      const prato = ficha.tipo === 'PRATO';
-      const txt = typeof quantidadeTexto === 'string' ? quantidadeTexto.trim() : '';
-      const q = txt ? lerQuantidadeNa(txt, prato ? 'UN' : unidade, 'base') : null;
-      if (q === null || q <= 0 || (prato && q % 1000 !== 0) || q > TETO_DA_QUANTIDADE_DA_FICHA) {
-        throw new Recusa({ ok: false, erros: { quantidade: prato ? 'Quantas porções: número inteiro (ex.: 20).' : `Quanto vai produzir: número em ${formatarQuantidade(1000, unidade).replace(/^1 /, '')} (ex.: 2 ou 1,5).` } });
-      }
-      const r = quantidadesDaFicha(
-        ficha,
-        ficha.itens.map((i) => ({ insumoId: i.insumoId ?? i.subficha?.insumoProduzidoId ?? null, quantidadeMilesimos: i.quantidadeMilesimos, fatorCorrecaoMilesimos: i.fatorCorrecaoMilesimos })),
-        q,
-      );
-      const insumos = await tx.insumo.findMany({ where: { id: { in: r.itens.map((i) => i.insumoId) } }, select: { id: true, nome: true, ativo: true } });
-      const porId = new Map(insumos.map((i) => [i.id, i]));
-      const avisos: string[] = [];
-      if (r.semInsumo) avisos.push(`${r.semInsumo} ${r.semInsumo === 1 ? 'pré-preparo da receita ainda não aparece' : 'pré-preparos da receita ainda não aparecem'} como insumo: salve a ficha dele de novo e peça à parte.`);
-      const inativos = r.itens.filter((i) => porId.get(i.insumoId)?.ativo === false).map((i) => porId.get(i.insumoId)!.nome);
-      if (inativos.length) avisos.push(`Desativados, ficaram de fora: ${inativos.join(', ')}.`);
-      const linhas: LinhaDigitada[] = r.itens
-        .filter((i) => porId.get(i.insumoId)?.ativo)
-        .sort((a, b) => porId.get(a.insumoId)!.nome.localeCompare(porId.get(b.insumoId)!.nome, 'pt-BR'))
-        .map((i) => ({ insumoId: i.insumoId, quantidade: textoDoCampo(i.quantidadeMilesimos), escala: 'base' }));
-      return { ok: true as const, id: ficha.id, ficha: { id: ficha.id, nome: ficha.nome, prato, unidade, quantidadeMilesimos: q }, linhas, avisos };
+      return listaDaFichaNaTx(tx, fichaId, quantidadeTexto);
     }),
   );
+}
+
+/**
+ * O miolo de `listaDaFicha`, sem a permissão (quem chama já conferiu a dele: a requisição confere `requisicao.pedir`
+ * e `fichas.ver`; a produção, `producao.registrar`). `soPreparo` (3.1): só ficha Pré-preparo ativa que tem o insumo que produz.
+ * Recusa em `Recusa`.
+ */
+export async function listaDaFichaNaTx(tx: ClienteDoParceiro, fichaId: unknown, quantidadeTexto: unknown, opcoes: { soPreparo?: boolean } = {}) {
+  const id = typeof fichaId === 'string' && ID.test(fichaId) ? fichaId : '';
+  const ficha = id
+    ? await tx.fichaTecnica.findFirst({
+        where: { id, ativa: true },
+        select: {
+          id: true,
+          nome: true,
+          tipo: true,
+          rendimentoMilesimos: true,
+          unidadeRendimento: true,
+          insumoProduzidoId: true,
+          itens: { orderBy: { ordem: 'asc' }, select: { insumoId: true, quantidadeMilesimos: true, fatorCorrecaoMilesimos: true, subficha: { select: { nome: true, insumoProduzidoId: true } } } },
+        },
+      })
+    : null;
+  if (!ficha) throw new Recusa({ ok: false, erros: { ficha: 'Escolha a ficha técnica.' } });
+  if (opcoes.soPreparo && (ficha.tipo !== 'PRE_PREPARO' || !ficha.insumoProduzidoId)) {
+    throw new Recusa({ ok: false, erros: { ficha: ficha.tipo === 'PRE_PREPARO' ? `“${ficha.nome}” ainda não vira insumo do estoque: salve a ficha dele de novo.` : 'Só se produz pré-preparo: escolha um dos pré-preparos.' } });
+  }
+  const unidade = ficha.unidadeRendimento as Unidade;
+  const prato = ficha.tipo === 'PRATO';
+  const txt = typeof quantidadeTexto === 'string' ? quantidadeTexto.trim() : '';
+  const q = txt ? lerQuantidadeNa(txt, prato ? 'UN' : unidade, 'base') : null;
+  if (q === null || q <= 0 || (prato && q % 1000 !== 0) || q > TETO_DA_QUANTIDADE_DA_FICHA) {
+    throw new Recusa({ ok: false, erros: { quantidade: prato ? 'Quantas porções: número inteiro (ex.: 20).' : `Quanto vai produzir: número em ${formatarQuantidade(1000, unidade).replace(/^1 /, '')} (ex.: 2 ou 1,5).` } });
+  }
+  const r = quantidadesDaFicha(
+    ficha,
+    ficha.itens.map((i) => ({ insumoId: i.insumoId ?? i.subficha?.insumoProduzidoId ?? null, quantidadeMilesimos: i.quantidadeMilesimos, fatorCorrecaoMilesimos: i.fatorCorrecaoMilesimos })),
+    q,
+  );
+  const insumos = await tx.insumo.findMany({ where: { id: { in: r.itens.map((i) => i.insumoId) } }, select: { id: true, nome: true, ativo: true } });
+  const porId = new Map(insumos.map((i) => [i.id, i]));
+  const avisos: string[] = [];
+  if (r.semInsumo) avisos.push(`${r.semInsumo} ${r.semInsumo === 1 ? 'pré-preparo da receita ainda não aparece' : 'pré-preparos da receita ainda não aparecem'} como insumo: salve a ficha dele de novo e peça à parte.`);
+  const inativos = r.itens.filter((i) => porId.get(i.insumoId)?.ativo === false).map((i) => porId.get(i.insumoId)!.nome);
+  if (inativos.length) avisos.push(`Desativados, ficaram de fora: ${inativos.join(', ')}.`);
+  const linhas: LinhaDigitada[] = r.itens
+    .filter((i) => porId.get(i.insumoId)?.ativo)
+    .sort((a, b) => porId.get(a.insumoId)!.nome.localeCompare(porId.get(b.insumoId)!.nome, 'pt-BR'))
+    .map((i) => ({ insumoId: i.insumoId, quantidade: textoDoCampo(i.quantidadeMilesimos), escala: 'base' }));
+  return { ok: true as const, id: ficha.id, ficha: { id: ficha.id, nome: ficha.nome, prato, unidade, quantidadeMilesimos: q, insumoProduzidoId: ficha.insumoProduzidoId }, linhas, avisos };
 }
 
 /**
@@ -348,63 +396,83 @@ export async function criarRequisicao(
   return comRecusa(() =>
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'requisicao.pedir');
-      if (!loja.ativa) throw new Recusa({ ok: false, erros: { geral: `A ${loja.nome} está desativada.` } });
-      await exigirAberto(tx, loja);
-      const ids = Array.from(new Set(entrada.linhas.map((l) => l.insumoId).filter((x) => typeof x === 'string' && ID.test(x))));
-      const insumos = await tx.insumo.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, unidade: true, ativo: true } });
-      const mapa = new Map<string, InsumoParaPedir>(insumos.map((i) => [i.id, { ...i, unidade: i.unidade as Unidade }]));
-      const hoje = hojeNoRio(agora);
-      const lido = lerPedido({ setor: entrada.setor, paraDia: entrada.paraDia, observacao: entrada.observacao, linhas: entrada.linhas }, mapa, hoje);
-      if (!lido.ok) throw new Recusa({ ok: false, erros: lido.erros });
-      const p = lido.pedido;
-      // De uma ficha: guarda qual e quanto se ia produzir (a lista já veio editável).
-      let ficha: { id: string; nome: string; q: number } | null = null;
-      if (typeof entrada.fichaId === 'string' && ID.test(entrada.fichaId)) {
-        const f = await tx.fichaTecnica.findFirst({ where: { id: entrada.fichaId }, select: { id: true, nome: true } });
-        const q = Number(entrada.fichaQuantidade);
-        if (f && Number.isSafeInteger(q) && q > 0 && q <= TETO_DA_QUANTIDADE_DA_FICHA) ficha = { id: f.id, nome: f.nome, q };
-      }
-      await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp:requisicao:${tx.parceiroId}:${lojaId}`}, 0))::text AS "trava"`;
-      const [{ proximo }] = await tx.sql<{ proximo: number }>`
-        SELECT (coalesce(max("numero"), 0) + 1)::int AS "proximo" FROM "Requisicao" WHERE "parceiroId" = ${tx.parceiroId} AND "lojaId" = ${lojaId}`;
-      const req = await tx.requisicao.create({
-        data: {
-          parceiroId: tx.parceiroId,
-          lojaId,
-          status: 'ABERTA',
-          setor: p.setor,
-          observacao: p.observacao,
-          solicitadaEm: agora,
-          numero: proximo,
-          paraDia: new Date(`${p.paraDia}T00:00:00.000Z`),
-          pedidaPorNome: autorNome,
-          ...(ficha ? { fichaId: ficha.id, fichaNomeSnapshot: ficha.nome, fichaQuantidadeMilesimos: ficha.q } : {}),
-        },
-        select: { id: true },
-      });
-      await tx.requisicaoItem.createMany({
-        data: p.itens.map((i, ordem) => ({ parceiroId: tx.parceiroId, requisicaoId: req.id, insumoId: i.insumoId, insumoNomeSnapshot: i.nome, unidadeSnapshot: i.unidade, solicitadoMilesimos: i.solicitadoMilesimos, ordem })),
-      });
-      await tx.historicoAlteracao.create({
-        data: {
-          parceiroId: tx.parceiroId,
-          entidade: 'Requisicao',
-          entidadeId: req.id,
-          acao: 'PEDIU',
-          depois: {
-            nome: `Requisição ${numeroDaRequisicao(proximo)} · ${loja.nome}`,
-            setor: rotuloDoSetor(p.setor),
-            paraQuando: textoDoParaDia(p.paraDia, hoje).replace(/^para /, ''),
-            pedido: listaEmTexto(p.itens.map((i) => ({ nome: i.nome, unidade: i.unidade, q: i.solicitadoMilesimos }))),
-            ...(ficha ? { ficha: ficha.nome } : {}),
-            ...(p.observacao ? { observacao: p.observacao } : {}),
-          },
-          autorNome,
-        },
-      });
-      return { ok: true as const, id: req.id };
+      const r = await criarRequisicaoNaTx(tx, loja, entrada, autorNome, agora);
+      return { ok: true as const, id: r.id };
     }),
   );
+}
+
+/**
+ * A regra de pedir, na transação de quem chama (Regra Nº 2: uma regra só). A requisição da PRODUÇÃO (3.1) nasce aqui, na
+ * mesma transação da ordem. Quem chama já conferiu a permissão dele e entrega a loja lida pelo portão; aqui se confere
+ * o que é da requisição: loja ativa e estoque aberto, setor, dia, itens ativos. Recusa em `Recusa`. `lote` (só a produção)
+ * marca de onde ela veio no histórico.
+ */
+export async function criarRequisicaoNaTx(
+  tx: ClienteDoParceiro,
+  loja: { id: string; nome: string; ativa: boolean },
+  entrada: { setor: unknown; paraDia: unknown; observacao: unknown; linhas: readonly LinhaDigitada[]; fichaId?: unknown; fichaQuantidade?: unknown },
+  autorNome: string,
+  agora: Date,
+  extra: { lote?: string } = {},
+) {
+  const lojaId = loja.id;
+  if (!loja.ativa) throw new Recusa({ ok: false, erros: { geral: `A ${loja.nome} está desativada.` } });
+  await exigirAberto(tx, loja);
+  const ids = Array.from(new Set(entrada.linhas.map((l) => l.insumoId).filter((x) => typeof x === 'string' && ID.test(x))));
+  const insumos = await tx.insumo.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, unidade: true, ativo: true } });
+  const mapa = new Map<string, InsumoParaPedir>(insumos.map((i) => [i.id, { ...i, unidade: i.unidade as Unidade }]));
+  const hoje = hojeNoRio(agora);
+  const lido = lerPedido({ setor: entrada.setor, paraDia: entrada.paraDia, observacao: entrada.observacao, linhas: entrada.linhas }, mapa, hoje);
+  if (!lido.ok) throw new Recusa({ ok: false, erros: lido.erros });
+  const p = lido.pedido;
+  // De uma ficha: guarda qual e quanto se ia produzir (a lista já veio editável).
+  let ficha: { id: string; nome: string; q: number } | null = null;
+  if (typeof entrada.fichaId === 'string' && ID.test(entrada.fichaId)) {
+    const f = await tx.fichaTecnica.findFirst({ where: { id: entrada.fichaId }, select: { id: true, nome: true } });
+    const q = Number(entrada.fichaQuantidade);
+    if (f && Number.isSafeInteger(q) && q > 0 && q <= TETO_DA_QUANTIDADE_DA_FICHA) ficha = { id: f.id, nome: f.nome, q };
+  }
+  await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp:requisicao:${tx.parceiroId}:${lojaId}`}, 0))::text AS "trava"`;
+  const [{ proximo }] = await tx.sql<{ proximo: number }>`
+    SELECT (coalesce(max("numero"), 0) + 1)::int AS "proximo" FROM "Requisicao" WHERE "parceiroId" = ${tx.parceiroId} AND "lojaId" = ${lojaId}`;
+  const req = await tx.requisicao.create({
+    data: {
+      parceiroId: tx.parceiroId,
+      lojaId,
+      status: 'ABERTA',
+      setor: p.setor,
+      observacao: p.observacao,
+      solicitadaEm: agora,
+      numero: proximo,
+      paraDia: new Date(`${p.paraDia}T00:00:00.000Z`),
+      pedidaPorNome: autorNome,
+      ...(ficha ? { fichaId: ficha.id, fichaNomeSnapshot: ficha.nome, fichaQuantidadeMilesimos: ficha.q } : {}),
+    },
+    select: { id: true },
+  });
+  await tx.requisicaoItem.createMany({
+    data: p.itens.map((i, ordem) => ({ parceiroId: tx.parceiroId, requisicaoId: req.id, insumoId: i.insumoId, insumoNomeSnapshot: i.nome, unidadeSnapshot: i.unidade, solicitadoMilesimos: i.solicitadoMilesimos, ordem })),
+  });
+  await tx.historicoAlteracao.create({
+    data: {
+      parceiroId: tx.parceiroId,
+      entidade: 'Requisicao',
+      entidadeId: req.id,
+      acao: 'PEDIU',
+      depois: {
+        nome: `Requisição ${numeroDaRequisicao(proximo)} · ${loja.nome}`,
+        setor: rotuloDoSetor(p.setor),
+        paraQuando: textoDoParaDia(p.paraDia, hoje).replace(/^para /, ''),
+        pedido: listaEmTexto(p.itens.map((i) => ({ nome: i.nome, unidade: i.unidade, q: i.solicitadoMilesimos }))),
+        ...(ficha ? { ficha: ficha.nome } : {}),
+        ...(extra.lote ? { lote: extra.lote } : {}),
+        ...(p.observacao ? { observacao: p.observacao } : {}),
+      },
+      autorNome,
+    },
+  });
+  return { id: req.id, numero: proximo, paraDia: p.paraDia, itens: p.itens };
 }
 
 // ================================================================ detalhe
@@ -453,6 +521,8 @@ export async function obterRequisicao(cliente: ClienteDoParceiro, alcance: Alcan
         },
       });
       if (!req) throw new Recusa({ ok: false, erros: { geral: NAO_ENCONTRADA }, naoEncontrado: true });
+      // 3.1: requisição de produção diz de qual lote é (e o custo dele já fechou, ou não).
+      const producao = await tx.ordemProducao.findFirst({ where: { requisicaoId: req.id }, select: { id: true, codigoLote: true, status: true, fichaNomeSnapshot: true, planejadoMilesimos: true, unidadeSnapshot: true } });
       const insumoIds = req.itens.map((i) => i.insumoId);
       const [saldos, custos, movs, aberturas] = await Promise.all([
         tx.saldoEstoque.findMany({ where: { lojaId, insumoId: { in: insumoIds } }, select: { insumoId: true, quantidadeMilesimos: true } }),
@@ -487,6 +557,7 @@ export async function obterRequisicao(cliente: ClienteDoParceiro, alcance: Alcan
         atrasoDias: diasDeAtraso({ status, paraDia }, hoje),
         movimentos,
         historico,
+        producao: producao ? { ...producao, unidade: (producao.unidadeSnapshot ?? 'KG') as Unidade } : null,
       };
     }),
   );
@@ -521,8 +592,10 @@ export async function atenderRequisicao(
     cliente.transacao(
       async (tx) => {
         const loja = await lojaDoAlcance(tx, alcance, lojaId, 'requisicao.atender');
+        await conferirPeriodoAberto(tx, agora);
         await exigirAberto(tx, loja, true);
         const r = await travarRequisicao(tx, lojaId, id);
+        recusarSeOLoteFechou(await ordemDaRequisicao(tx, r.id));
         if (r.status === 'CANCELADA') throw new Recusa({ ok: false, erros: { geral: 'Esta requisição foi cancelada: nada sai por ela.' }, conflito: true });
         // A mesma entrega de novo (clique duplo, outra aba, rede que caiu depois de gravar): a que valeu fica.
         if (r.status === 'ATENDIDA') return { ok: true as const, id: r.id, jaFeito: true };
@@ -614,8 +687,10 @@ export async function devolverItem(
     cliente.transacao(
       async (tx) => {
         const loja = await lojaDoAlcance(tx, alcance, lojaId, 'requisicao.atender');
+        await conferirPeriodoAberto(tx, agora);
         await exigirAberto(tx, loja, true);
         const r = await travarRequisicao(tx, lojaId, id);
+        recusarSeOLoteFechou(await ordemDaRequisicao(tx, r.id));
         if (r.status === 'CANCELADA' || r.status === 'ABERTA') throw new Recusa({ ok: false, erros: { geral: 'Nada saiu por esta requisição: não há o que devolver.' }, conflito: true });
         if (!Number.isSafeInteger(versaoLida) || versaoLida !== r.versao) {
           throw new Recusa({ ok: false, erros: { geral: 'Alguém mexeu nesta requisição agora há pouco. Confira de novo; nada voltou para o estoque.' }, conflito: true });
@@ -678,6 +753,8 @@ export async function cancelarRequisicao(
       const loja = await lojaComAlguma(tx, alcance, lojaId, VER);
       const r = await travarRequisicao(tx, lojaId, id);
       if (r.status === 'CANCELADA') return { ok: true as const, id: r.id, jaFeito: true };
+      const doLote = await ordemDaRequisicao(tx, r.id);
+      if (doLote) throw new Recusa({ ok: false, erros: { geral: `Esta requisição é do lote ${doLote.codigoLote}: para cancelá-la, cancele o lote.` }, conflito: true });
       if (r.status !== 'ABERTA') throw new Recusa({ ok: false, erros: { geral: 'Já saiu estoque por esta requisição: não se cancela. Receba de volta o que voltou e encerre o resto.' }, conflito: true });
       await tx.requisicao.updateMany({ where: { id: r.id, status: 'ABERTA' }, data: { status: 'CANCELADA', canceladaEm: agora, canceladaPorNome: autorNome, motivoCancelamento: motivo, versao: { increment: 1 } } });
       await tx.historicoAlteracao.create({

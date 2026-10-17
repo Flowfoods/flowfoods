@@ -17,7 +17,7 @@ import { COR } from '@/lib/erp/modulos';
 import { formatarFracao, formatarQuantidade, UNIDADES } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
 import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
-import { LINK_DE_TEXTO } from '../../ui/estilos';
+import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import type { AcaoDeCadastro } from '../cadastro/estado';
 import { FormSituacao } from '../cadastro/form-situacao';
@@ -60,6 +60,7 @@ export function TelaDetalheFicha({
   linkDaTaxa,
   podeConfigurarTaxa = false,
   acaoPrecos,
+  linkDoProduzir,
 }: {
   ficha: FichaDetalhada;
   base: string;
@@ -80,6 +81,8 @@ export function TelaDetalheFicha({
   podeConfigurarTaxa?: boolean;
   /** 1.10: só quem muda preços (a dona), com a ficha ativa e o parceiro livre: o preço vira campo. */
   acaoPrecos?: AcaoDeCadastro;
+  /** 3.1: "Produzir" leva ao planejamento do lote deste pré-preparo; só para quem registra produção e com a ficha ativa. */
+  linkDoProduzir?: string;
 }) {
   const quantidade = (q: number, fator: number, unidade: Parameters<typeof formatarQuantidade>[1]) =>
     fator === 1000 ? null : `bruto ${formatarQuantidade(quantidadeBruta(q, fator), unidade)} · fator ${formatarFator(fator)}`;
@@ -316,6 +319,11 @@ export function TelaDetalheFicha({
                     'Vira insumo na próxima vez que a ficha for salva.'
                   )}
                 </p>
+                {linkDoProduzir && f.insumoProduzido && (
+                  <Link href={linkDoProduzir} className={classeDeBotao('secundario', 'w-full')}>
+                    Produzir este pré-preparo
+                  </Link>
+                )}
                 <div>
                   <h3 className="text-[13px] font-semibold text-suave">Usado em</h3>
                   {f.usadaEm.length === 0 ? (

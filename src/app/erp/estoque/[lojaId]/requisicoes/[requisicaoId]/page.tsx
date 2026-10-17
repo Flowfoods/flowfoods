@@ -24,6 +24,7 @@ export default async function ErpRequisicaoPage({ params, searchParams }: { para
       pode={{ atender, cancelar: atender || pode(ctx.alcance, 'requisicao.pedir', { lojaId }) }}
       acoes={{ devolver: acaoDevolverNaRequisicao.bind(null, lojaId, d.requisicao.id), cancelar: acaoCancelarRequisicao.bind(null, lojaId, d.requisicao.id) }}
       bloqueio={ctx.bloqueio}
+      hrefProducao={pode(ctx.alcance, 'producao.ver', { lojaId }) ? `/erp/producao/${lojaId}` : null}
     />
   );
 }

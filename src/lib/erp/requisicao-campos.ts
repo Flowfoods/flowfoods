@@ -137,6 +137,19 @@ export interface PedidoLido {
   itens: ItemPedido[];
 }
 
+/**
+ * O "para quando" do pedido (e do lote, 3.1): "hoje", "amanha", dd/mm/aaaa (o campo da tela) ou aaaa-mm-dd; de hoje até
+ * 14 dias à frente. Uma regra só para a requisição e para a produção.
+ */
+export function lerParaDia(texto: unknown, hoje: string): { dia: string } | { erro: string } {
+  const pd = typeof texto === 'string' ? texto.trim() : '';
+  const paraDia = pd === '' || pd === 'hoje' ? hoje : pd === 'amanha' ? somarDias(hoje, 1) : lerData(pd);
+  if (!paraDia) return { erro: 'Data inválida: use dd/mm/aaaa.' };
+  if (paraDia < hoje) return { erro: 'Para quando: de hoje em diante.' };
+  if (paraDia > somarDias(hoje, DIAS_A_FRENTE)) return { erro: `Para quando: até ${DIAS_A_FRENTE} dias à frente.` };
+  return { dia: paraDia };
+}
+
 const escalaDe = (e: string, u: Unidade): Escala => (e === 'menor' && u !== 'UN' ? 'menor' : 'base');
 
 /**
@@ -154,12 +167,9 @@ export function lerPedido(
   const erros: Record<string, string> = {};
   const setor = typeof f.setor === 'string' && ehSetor(f.setor) ? f.setor : null;
   if (!setor) erros.setor = 'Escolha o setor que vai usar (cozinha, salão…).';
-  const pd = typeof f.paraDia === 'string' ? f.paraDia.trim() : '';
-  // "hoje", "amanha", dd/mm/aaaa (o campo da tela) ou aaaa-mm-dd.
-  const paraDia = pd === '' || pd === 'hoje' ? hoje : pd === 'amanha' ? somarDias(hoje, 1) : lerData(pd);
-  if (!paraDia) erros.paraDia = 'Data inválida: use dd/mm/aaaa.';
-  else if (paraDia < hoje) erros.paraDia = 'Para quando: de hoje em diante.';
-  else if (paraDia > somarDias(hoje, DIAS_A_FRENTE)) erros.paraDia = `Para quando: até ${DIAS_A_FRENTE} dias à frente.`;
+  const dia = lerParaDia(f.paraDia, hoje);
+  const paraDia = 'dia' in dia ? dia.dia : null;
+  if ('erro' in dia) erros.paraDia = dia.erro;
   const obs = typeof f.observacao === 'string' ? f.observacao.trim().replace(/\s+/g, ' ') : '';
   if (obs.length > 280) erros.observacao = 'Observação: até 280 letras.';
   const itens: ItemPedido[] = [];

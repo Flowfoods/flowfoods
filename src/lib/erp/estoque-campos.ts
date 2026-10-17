@@ -323,6 +323,8 @@ export interface MovimentoNovo {
   contagemItemId?: string | null;
   /** 1.8: o item da requisição que gerou a baixa (o estorno aponta o mesmo). */
   requisicaoItemId?: string | null;
+  /** 3.1: a ordem de produção cujo lote entrou no estoque (`PRODUCAO_ENTRADA`; o estorno aponta a mesma). */
+  ordemProducaoId?: string | null;
   estornoDeId?: string | null;
 }
 
@@ -350,7 +352,7 @@ export function entradasDaNota(
 
 /** O estorno de um movimento: espelho exato (o banco confere por trigger). */
 export function estornoDe(
-  m: { id: string; lojaId: string; insumoId: string; tipo: TipoDeMovimento; quantidadeMilesimos: number; valorCentavos: number; insumoNomeSnapshot: string; unidadeSnapshot: Unidade; notaId: string | null; contagemItemId: string | null; requisicaoItemId?: string | null },
+  m: { id: string; lojaId: string; insumoId: string; tipo: TipoDeMovimento; quantidadeMilesimos: number; valorCentavos: number; insumoNomeSnapshot: string; unidadeSnapshot: Unidade; notaId: string | null; contagemItemId: string | null; requisicaoItemId?: string | null; ordemProducaoId?: string | null },
   motivo: string,
 ): MovimentoNovo {
   return {
@@ -366,6 +368,7 @@ export function estornoDe(
     notaId: m.notaId,
     contagemItemId: m.contagemItemId,
     requisicaoItemId: m.requisicaoItemId ?? null,
+    ordemProducaoId: m.ordemProducaoId ?? null,
     estornoDeId: m.id,
   };
 }

@@ -25,6 +25,8 @@ const ENTIDADE: Record<string, string> = {
   ContagemItem: 'Contagem',
   // 1.8
   Requisicao: 'Requisição',
+  // 3.1: o lote de produção (quantidades para quem vê produção; o custo dele só para quem vê custos).
+  OrdemProducao: 'Lote',
   // 1.9: a taxa do iFood do parceiro.
   CanalConfig: 'Canal de venda',
   Fornecedor: 'Fornecedor',
@@ -73,6 +75,9 @@ const ACAO: Record<string, string> = {
   // 2.2b
   FECHOU: 'Fechou',
   REABRIU: 'Reabriu',
+  // 3.1
+  PLANEJOU: 'Planejou',
+  ESTORNOU: 'Estornou',
 };
 
 const CAMPO: Record<string, string> = {
@@ -150,6 +155,18 @@ const CAMPO: Record<string, string> = {
   corte: 'encerrada sem sair (corte)',
   negativo: 'saldo negativo (entregue mesmo assim)',
   voltou: 'voltou para o estoque',
+  // 3.1: produção (lote)
+  lote: 'lote',
+  requisicaoDoLote: 'requisição dos insumos',
+  planejado: 'planejado',
+  produzido: 'saiu',
+  rendimentoDoLote: 'rendimento',
+  motivoDaDiferenca: 'motivo da diferença',
+  validadeDoLote: 'validade do lote',
+  entrouNoEstoque: 'entrou no estoque',
+  estornoDoLote: 'voltou do estoque',
+  custoDoLote: 'custo do lote',
+  perdaEmReais: 'o que a diferença custou',
   // 1.9: custo por canal
   embalagensDelivery: 'embalagens do delivery',
   embalagensIfood: 'embalagens do iFood',
@@ -199,6 +216,16 @@ const NA_HORA = new Set(['custoLoja', 'custoDelivery', 'custoIfood']);
 const ORDEM = [
   'nome',
   'tipo',
+  'planejado',
+  'requisicaoDoLote',
+  'produzido',
+  'rendimentoDoLote',
+  'motivoDaDiferenca',
+  'custoDoLote',
+  'perdaEmReais',
+  'validadeDoLote',
+  'entrouNoEstoque',
+  'estornoDoLote',
   'rendimento',
   'descricao',
   'foto',
@@ -488,6 +515,23 @@ export const ENTIDADES_DE_FATURAMENTO: readonly string[] = ['FaturamentoLancamen
  * não leva a linha. `verDre` ausente = fechado.
  */
 export const ENTIDADES_DE_DRE: readonly string[] = ['Despesa', 'DreLinha', 'DreMeta', 'RegraDoPeriodo', 'PeriodoApuracao', 'DreFotografia'];
+
+/**
+ * Custo do lote (3.1, lição da decisão 90): o histórico do lote cita o custo e o que a diferença de rendimento custou. Só
+ * quem tem `insumos.ver` ("Ver insumos e custos") os recebe; sem ele, esses campos saem da linha no servidor, antes de
+ * montar a tela, e a alteração que só tinha isso some. `verCustos` ausente = fechado.
+ */
+export const CAMPOS_DE_CUSTO_DA_PRODUCAO: ReadonlySet<string> = new Set(['custoDoLote', 'perdaEmReais']);
+
+/** O retrato do lote sem o custo; null = só tinha isso (a linha some). */
+export function semCustoDaProducao(antes: Prisma.JsonValue | null, depois: Prisma.JsonValue | null): { antes: Prisma.JsonValue | null; depois: Prisma.JsonValue | null } | null {
+  const a = objeto(antes);
+  const d = objeto(depois);
+  if (![...Object.keys(a), ...Object.keys(d)].some((k) => CAMPOS_DE_CUSTO_DA_PRODUCAO.has(k))) return { antes, depois };
+  const limpar = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([k]) => !CAMPOS_DE_CUSTO_DA_PRODUCAO.has(k))) as Prisma.JsonObject;
+  const r = { antes: antes === null ? null : limpar(a), depois: depois === null ? null : limpar(d) };
+  return descreverMudancas(r.antes, r.depois).length ? r : null;
+}
 export const CAMPOS_DE_PRECIFICACAO: ReadonlySet<string> = new Set([
   'precoLoja',
   'precoDelivery',
@@ -542,6 +586,11 @@ export async function listarHistorico(
      * regra do período não saem do servidor. Fecha para quem esquece: ausente = não vê.
      */
     verDre?: boolean;
+    /**
+     * 3.1: quem lê pode ver custos (`insumos.ver`)? Sem isto, o custo do lote e o que a diferença de rendimento custou não saem
+     * do servidor. Fecha para quem esquece: ausente = não vê.
+     */
+    verCustos?: boolean;
     /** 2.1: só as alterações de faturamento desta loja neste dia (inclusive de lançamento já removido). */
     faturamentoDoDia?: { lojaId: string; dia: string };
   },
@@ -576,10 +625,11 @@ export async function listarHistorico(
     const lote = await cliente.historicoAlteracao.findMany({ where, orderBy: [{ ocorridoEm: 'desc' }, { id: 'desc' }], skip: pular, take: limite });
     pular += lote.length;
     for (const h of lote) {
-      const r = filtro.verPrecos ? { antes: h.antes, depois: h.depois } : semPrecificacao(h.antes, h.depois);
+      let r = filtro.verPrecos ? { antes: h.antes, depois: h.depois } : semPrecificacao(h.antes, h.depois);
+      if (r && filtro.verCustos !== true && h.entidade === 'OrdemProducao') r = semCustoDaProducao(r.antes, r.depois);
       if (r && out.length < limite) out.push(paraTela(h, r.antes, r.depois));
     }
-    if (lote.length < limite || filtro.verPrecos) break;
+    if (lote.length < limite || (filtro.verPrecos && filtro.verCustos === true)) break;
   }
   return out;
 }

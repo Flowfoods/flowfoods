@@ -35,6 +35,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | DRE ao vivo (2.2a): plano de contas por parceiro, despesas por competência, contas a pagar, regra do período, DRE rede × loja | `src/lib/erp/{periodo-campos,periodos,dre-plano,plano,despesa-campos,despesas,dre-campos,dre,texto-limpo}.ts` (período puro / período com banco / plano padrão puro / plano com banco / despesa pura / despesa com banco / DRE puro / DRE com banco); telas em `src/components/erp/telas/dre/`; rotas `dre`, `dre/despesas`, `dre/despesas/nova`, `dre/despesas/<id>`, `dre/despesas/<id>/editar`, `dre/periodos`, `dre/plano` em `/erp` e `/rodolfo/erp/<slug>`; migration `20261026000000_erp_dre_despesas` |
 | Metas e fechamento do período (2.2b): meta % por linha com vigência, realizado × meta, receita contra o ano passado, fechar com fotografia imutável, reabrir só pelo nível 1, notas e estoque obedecendo o fechamento | `src/lib/erp/{dre-metas-campos,dre-metas,dre-entrada,dre-fechamento-campos,dre-fotografia,dre-fechamento}.ts` (meta pura / meta com banco / leitura única do DRE / fechamento puro / fotografia com banco / fechar e reabrir); telas `telas/dre/{form-metas,form-fechar,form-reabrir,periodo-fechamento}.tsx`; rota `dre/periodos/<inicio>` em `/erp` e `/rodolfo/erp/<slug>`; migration `20261027000000_erp_dre_fechamento` |
 | Dois CMVs (2.3): compra (dia a dia, data da nota) e real (inicial + compras − final, fecha na contagem), corte do estoque final, compra × real, fotografia v2 | `src/lib/erp/{cmv-campos,cmv-comparacao,cmv}.ts` (conta pura / comparação pura / leitura com banco, chamada só por `entradaDoDre`); `dre-campos.ts` (`cmv` e as linhas `cmv:compra`, `cmv:real`), `dre.ts`, `dre-fotografia.ts` (`lerCmvDaFotografia`), `dre-fechamento.ts`; tela `telas/dre/cmv-painel.tsx` dentro do DRE; migration `20261028000000_erp_cmv` |
+| Produção de intermediários (3.1): planejar o lote pela ficha, requisição dos insumos criada junto, concluir com rendimento e validade, o lote entra no estoque, cancelar e estornar, quadro kanban | `src/lib/erp/{producao-campos,producao}.ts` (puro / com banco) + `criarRequisicaoNaTx` e `listaDaFichaNaTx` em `requisicao.ts`; telas em `src/components/erp/telas/producao/` e o esqueleto comum dos quadros em `telas/quadro/`; rotas `/erp/producao` e `/rodolfo/erp/<slug>/producao` (`<loja>`, `<loja>/nova`, `<loja>/<lote>`, `<loja>/<lote>/concluir`); migration `20261029000000_erp_producao` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Navegação por áreas (UX.9): hub de 4 áreas, abas por rota, trilha com a área, ações no ⌘K; rota nova `/estoque/contagens` | `src/lib/erp/modulos.ts` (`areasConstruidas`, `abasDaArea`, `acoesDaNavegacao`, `montarTrilha`) e `src/lib/rodolfo/modulos.ts`; `src/components/erp/ui/{abas,hub}.tsx`, `telas/hub-do-parceiro.tsx`, `shell/Shell.tsx`; sem migration |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
@@ -1789,6 +1790,91 @@ da base da conta no HTML, também por `?rede=1` e pela URL de outra loja); o ope
 estoque diz os insumos sem preço. Axe (wcag2a/2aa) sem violação nos dois temas, zero erro de console, zero rolagem horizontal a 390, 820 e 1440. Prints em
 `shots-2.3/`. Scanner `avoid-ai-design`: 0 P0 e 0 P1 (P2 de "meta strings com ponto médio", o padrão da casa).
 
+## O que a 3.1 entregou — produção de intermediários: o lote nasce da ficha, os insumos saem pela requisição, o lote entra no estoque
+
+Primeira da Prioridade 003 (a 2.4, faróis, foi retirada no commit 650c43b e segue PENDENTE: nada daqui depende dela). Migration
+`20261029000000_erp_producao` (ADITIVA: colunas e CHECKs novos em `OrdemProducao`, dois gatilhos, dois índices; nenhuma tabela nova, portão e RLS
+iguais; `migrate diff` vazio). Decisões 190 a 201. A tabela `OrdemProducao` e o tipo `PRODUCAO_ENTRADA` já existiam desde a 0.1; o tipo
+`PRODUCAO_CONSUMO` continua RESERVADO e sem uso (a saída dos insumos é a `REQUISICAO` da própria ordem). `VERSAO_DO_ERP` = fase 3.1.
+
+1. **Planejar** (190, 191). Da ficha de um pré-preparo (ex.: molho cheddar, rende 2 kg): a pessoa diz quanto quer (5 kg) e a tela monta a lista pela
+   ficha (cheddar 2,5 kg, leite 2,5 L, cebola 885 g, já com o fator de correção), que ela pode ajustar. Planejar grava o lote E a requisição dos insumos
+   (setor Cozinha) na MESMA transação (`criarRequisicaoNaTx`); nada sai do estoque ainda. Código do lote `AAMMDD-NN`, por loja e dia, nunca reaproveitado
+   (nem o do lote cancelado). Idempotente pela chave do envio (duplo clique = 1 lote). A data é de hoje a 14 dias (sem produção retroativa).
+2. **Começar a produzir.** Muda a etapa (Planejada → Em produção), com versão lida e histórico.
+3. **Entregar os insumos.** É a tela de entregar da 1.8, sem mudança de fluxo: a requisição do lote diz "do lote AAMMDD-NN", não se cancela por ela
+   (cancela-se o lote) e a entrega dá baixa no livro item a item, com o preço do saldo. As baixas do exemplo somam −R$ 117,81.
+4. **Concluir** (192, 193, 194, 195, 196). Só com a requisição ATENDIDA (senão: "Faltam sair 885 g de Cebola branca pela requisição #N: entregue ou
+   encerre o resto."). O cozinheiro diz quanto saiu de verdade (kg|g, L|ml, un); fora de ±10% do planejado (estrito: exatamente 10% passa) pede MOTIVO;
+   produzido 0 é lote PERDIDO (motivo obrigatório, nenhuma entrada no estoque, o custo dos insumos fica como perda do lote). A conservação escolhida
+   (refrigerado ou congelado) dá a validade, gravada como retrato (mudar a ficha depois não muda o lote). O lote entra no estoque da MESMA loja como
+   `PRODUCAO_ENTRADA` (com `ordemProducaoId`), no insumo que a ficha produz, valorizado pelo que de fato saiu. Concluir duas vezes (outra aba) = uma
+   entrada só ("já concluído").
+5. **Custo do lote** (194). Baixas reais ÷ quantidade que saiu, em fração exata (nunca gravado: o custo por kg é calculado na tela). 5 kg planejados,
+   4,6 kg de verdade: R$ 117,81 ÷ 4,6 = R$ 25,61/kg contra R$ 23,56/kg que a ficha prevê hoje; rendimento 92%; os 400 g que faltaram custaram R$ 9,42.
+   Insumo que saiu sem preço deixa o custo "incompleto" (com a frase dos insumos). Só quem tem `insumos.ver` recebe R$: o cozinheiro sem a permissão
+   produz, vê quanto saiu e o rendimento, e o HTML não leva valor nenhum (também fora do Histórico).
+6. **Cancelar e estornar** (197). Cancelar só com saída LÍQUIDA ZERO da requisição (nada saiu, ou tudo voltou pela devolução da 1.8); cancela a requisição
+   junto, com motivo. Estornar um lote concluído exige `estoque.ajustar` e motivo; grava o espelho exato da entrada (conferido por gatilho) e deixa a ordem
+   CANCELADA guardando a conclusão ("Estornada"). Ordem concluída não muda por SQL cru (gatilho).
+7. **Trava do período** (198, 199). Concluir e estornar respeitam o período fechado do DRE, e a lacuna da 1.8 foi fechada: atender e devolver itens de
+   requisição também. Ordem fixa das travas, a mesma em todo caminho: período (compartilhada) → abertura da loja → requisição FOR UPDATE → ordem FOR UPDATE
+   → saldos.
+8. **Quadro kanban** (200). Planejadas · Em produção · Concluídas hoje · Canceladas hoje; atrasado = filete vermelho à esquerda (3 px) + "Xd de atraso" (a
+   cor nunca é o único sinal). O esqueleto (`telas/quadro/quadro.tsx`: `GradeDoQuadro`, `ColunaDoQuadro`, `CartaoDoQuadro`) é COMUM e já serve os três
+   quadros (pedidos de acesso da 0.5 com filete de 2 px, requisições da 1.8 e produção), sem mudar o que eles faziam. O cartão cancelado deixou a
+   opacidade (o texto perdia contraste) e fica sobre o fundo da página.
+9. **Menu, permissões e histórico** (201). Área Produção ativa no hub, nas abas e no ⌘K ("Nova produção"); a ficha de pré-preparo ganhou "Produzir este
+   pré-preparo". Catálogo de permissões sem novidade: `producao.ver` e `producao.registrar` (o operador da cozinha produz); o grupo `etiquetas` nasce
+   `emBreve`. O Histórico fala "Lote" (Planejou, Iniciou, Concluiu, Cancelou, Estornou) e tira os campos de custo de quem não vê custos. O livro do
+   estoque liga a entrada ao lote.
+10. **Migration** (aditiva, segura para superusuário e para dono não-superusuário com e sem FORCE RLS). Colunas novas (versão, retratos de unidade,
+    conservação e validade, quem planejou/iniciou/concluiu/cancelou, motivos, `insumosSemPreco`, `chaveIdempotencia`), nove CHECKs em `OrdemProducao` e o
+    da entrada, todos `NOT VALID` + `VALIDATE` em bloco que avisa em vez de quebrar; índices únicos `(parceiroId, requisicaoId)` e
+    `(parceiroId, chaveIdempotencia)` criados em bloco que apanha `unique_violation`; gatilhos `OrdemProducao_concluida_imutavel` e
+    `MovimentoEstoque_producao_confere`. Nenhum passo depende de SELECT sob RLS. `npm run erp:conferir-migracao` lista, depois do deploy, o que ficou
+    pendente (CHECK `NOT VALID`, índice ausente, gatilho ausente).
+11. **Fora desta subfase**: etiqueta do lote (grupo `etiquetas`, em breve), produção em lote sobre vários pré-preparos, sub-estoque de produção (o lote entra no
+    estoque da loja), sobra de insumo devolvida pela tela do lote (devolve-se pela requisição, como na 1.8), ordem retroativa e a requisição de produção
+    nas Divergências (ver a herança).
+
+**Ajuda: chaves novas/alteradas.** Novas (`ajuda.lock.json` regravado, 52 entradas): `producao`, `producao-quadro`, `producao-nova` (rotas `producao/nova` e
+`producao/[lojaId]/nova`), `producao-lote`, `producao-concluir`. Alteradas: `requisicao` v1 para v2 (a requisição do lote) e `ficha` v2 para v3 ("Produzir este
+pré-preparo").
+
+## Provar a produção (3.1)
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run   # duas vezes seguidas
+npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+Os arquivos de banco que a 3.1 mexe também rodam num banco com dono NÃO-superusuário e FORCE RLS, e com dono sem RLS (`ff_dono` e `ff_semrls`, bancos novos com
+todas as migrations aplicadas por `psql` como o dono), em sequência: `npx vitest run --no-file-parallelism <arquivos *.db.test.ts, menos *-migracao>`. Nos dois a
+suíte de banco inteira passou (26 arquivos; no dono com FORCE RLS o teste do papel `erp_tenant` precisa da tabela `_prisma_migrations`, que um banco montado por
+`psql` não tem). Teste que lê com SQL cru precisa do contexto do parceiro ou do portão: sob FORCE RLS o SELECT cru enxerga 0 linhas (o critério 17 foi
+reescrito pelo portão por isso).
+`tests/erp-producao.test.ts` (sem banco, 30): código do lote, rendimento (±10% estrito, 0 = perdido), leitura da conclusão em kg|g, L|ml e un, validade, custo
+em fração exata (R$ 25,61/kg, R$ 9,42), insumo sem preço, atraso, situação dos insumos. `tests/erp-producao.db.test.ts` (26): os critérios da análise com o
+molho cheddar (lista 2,5 kg / 2,5 L / 885 g, baixas de −R$ 117,81, 4,6 kg, 92%, validade de 3 dias refrigerado e 30 dias congelado), idempotência, o banco recusando
+(entrada em outra loja ou outro insumo, ordem concluída por SQL cru, estorno que não é espelho), alcance e outro parceiro, e os testes MUTANTES das travas:
+segurar `travarParaFechar` e provar que concluir, atender, devolver e estornar ESPERAM (cerca de 900 ms); tirar `conferirPeriodoAberto` de qualquer um dos quatro
+derruba o teste. `tests/erp-producao-migracao.db.test.ts` (6): a migration com dado antigo plantado (limpo e ruim) nos 3 perfis do banco. `tests/erp-producao-telas.db.test.ts` (12): o
+HTML por perfil (dona, gerente, cozinheiro, cozinheiro sem custos), o vazamento do custo, o alcance, as actions e o espelho do nível 1.
+
+Na tela (build de produção local, porta 3100, banco `ff_31` copiado do `ff_dev`; roteiro `prova31/jornada.mjs` no scratchpad, 151 conferências): o cozinheiro, a
+390 px com toque, vê a área Produção no hub, o quadro com o lote de anteontem atrasado (filete de 3 px, "2d de atraso", "Insumos por entregar"), monta a lista da
+ficha (0,885 · 2,5 · 2,5), planeja com duplo clique (um lote só), começa e é barrado ao concluir antes da entrega; o estoquista entrega pela requisição do lote (aviso
+do lote, sem cancelar; baixas de −R$ 117,81); o cozinheiro conclui com 4,6 kg (92%, R$ 25,61/kg contra R$ 23,56/kg, R$ 9,42, validade 3 dias) e o lote aparece no livro do
+estoque; 4,4 kg (88%) pede motivo, o servidor também recusa sem ele, congelado vence em 30 dias; duas abas concluindo põem uma entrada só; o cozinheiro sem custos
+produz e não recebe R$ no HTML; cancelar sem saída passa, com 2,5 kg de cheddar entregue recusa e depois de devolver passa (saída líquida zero); o gerente estorna (só
+quem ajusta o saldo); com o período fechado concluir e entregar são recusados e, reaberto, passam; o gerente da Delivery recebe 404 no que é da Penha e vê o aviso de
+estoque não aberto; a dona de outro parceiro recebe 404; o nível 1 vê o mesmo pelo espelho; os quadros da 0.5 (filete de 2 px) e da 1.8 (3 px) seguem iguais. Axe
+(wcag2a/2aa) sem violação nos dois temas, zero erro de console, zero rolagem horizontal a 390, 820, 1280 e 1440. Prints em `shots-3.1/`. Scanner `avoid-ai-design`: 0 P0 e 0
+P1 (P2 de "meta strings com ponto médio", o padrão da casa).
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -1813,7 +1899,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Estoque | `MovimentoEstoque` | livro-razão: abertura, entrada, requisição, produção, ajuste, contagem, perda; snapshot e saldo antes/depois; estorno = mesmo tipo, sinal contrário, `estornoDeId` único (1.6) |
 | Estoque | `Contagem` / `ContagemItem` | 2.3: `itensSemPreco` (quantos insumos sem preço no retrato da abertura e do fechamento; nulo = antes da 2.3); abertura (1.6: estado da loja), cíclica e fechamento de período (1.7: título, prazo, desfecho aplicada/fechou sozinha/venceu; fechamento aponta o `PeriodoApuracao`, um por loja); esperado (livro na hora de contar) × contado; versão, lista e fator congelados, digitado × normalizado. O piso é regra da lógica com os números na `Loja` |
 | Estoque | `Requisicao` / `RequisicaoItem` | pedido do setor (1.8: número por loja, setor da 0.4, para quando, versão, pedida → atendida em parte → atendida · cancelada, ficha de origem); a baixa sai na entrega (`REQUISICAO` com `requisicaoItemId`), devolução por estorno |
-| Produção | `OrdemProducao` | lote: planejado/produzido, custo, responsável (snapshot). Lista do dia = ordens planejadas × saldo (derivada) |
+| Produção | `OrdemProducao` | lote: planejado/produzido, custo, responsável (snapshot). 3.1: código `AAMMDD-NN` por loja e dia, `requisicaoId` único (a requisição dos insumos), `chaveIdempotencia`, `versao`, retratos da unidade, da conservação e da validade (`validadeEm`), quem planejou/iniciou/concluiu/cancelou, motivos (rendimento e cancelamento), `insumosSemPreco`; o custo por kg nunca é gravado; concluída só muda para CANCELADA (gatilho) |
 | Produção | `Etiqueta` | etiqueta impressa: lote do fornecedor, validade, abertura, snapshot |
 | DRE | `FaturamentoLancamento` | faturamento por loja × canal × dia (2.1: marca nula): valor, pedidos, clientes (= atendimentos do dia, não clientes únicos); chave de idempotência única; origem MANUAL/IMPORTACAO (uma linha humana por grão) ou INTEGRACAO; `atualizadoPorNome`; CHECKs de teto, espaço de chave e valor com pedido |
 | DRE | `DreLinha` / `DreMeta` | linhas do DRE (com `sentido`: maior ou menor é melhor; 2.2a: `codigo` estável das linhas do padrão, único por parceiro, nulo nas da casa) e meta % por linha, por canal ou da rede (canal nulo), com vigência; 2.2b: `semMeta` (a ausência de meta também é uma linha vigente), `criadoPorNome`, `atualizadoEm` |
@@ -2543,3 +2629,33 @@ banco de teste: o operador é recusado pelo servidor.
   CMV) ou prefere seguir com a regra "lance como despesa"? (2) Valentin's: as duas unidades dividem estoque? Sem transferência entre lojas, o real por loja
   distorce (quem manda perde, quem recebe sobra); o da rede continua certo.
 
+## Herança da 3.1 (para a 3.2 e as próximas)
+
+- **A produção é UMA**: `planejarProducao`, `iniciarProducao`, `concluirProducao`, `cancelarProducao` e `estornarProducao` em `producao.ts`; a conta pura
+  (rendimento, custo, validade, atraso, situação dos insumos) em `producao-campos.ts`. A requisição do lote nasce por `criarRequisicaoNaTx` e a lista da ficha
+  por `listaDaFichaNaTx` (`requisicao.ts`); outra fonte de requisição automática usa as mesmas duas.
+- **Ordem das travas** (não trocar): período (compartilhada) → abertura da loja → requisição FOR UPDATE → ordem FOR UPDATE → saldos. Quem escrever movimento novo
+  chama `conferirPeriodoAberto` antes de qualquer SELECT FOR UPDATE; o teste mutante (segurar `travarParaFechar`) é o modelo para provar.
+- **A 3.2 recebe**: o lote concluído com custo real (baixas ÷ quantidade, em fração) e o `PRODUCAO_ENTRADA` com `ordemProducaoId` no livro; o custo do pré-preparo na
+  ficha continua o de referência (a ficha), e o do lote mostra o real ao lado, sem mexer nele. Se a 3.2 quiser que o custo do insumo produzido siga o lote, é decisão
+  nova (hoje o valor da entrada já é o real, e o saldo valoriza por ele).
+- **`PRODUCAO_CONSUMO` está reservado**: não use para a saída dos insumos de uma ordem; ela é `REQUISICAO` com o documento da requisição do lote.
+- **Esqueleto dos quadros**: `telas/quadro/quadro.tsx`. Quadro novo usa os três componentes (filete de 2 ou 3 px, `apagado` sem opacidade) e a coluna vazia diz
+  "Nenhum item nesta etapa" (ou o texto que a etapa pedir).
+- **Custo só com `insumos.ver`**: o servidor monta a tela sem o valor (não esconde no navegador); o Histórico tira os campos de custo da produção
+  (`semCustoDaProducao`, filtro `verCustos`, ausente = fechado). Tela nova com custo de lote segue o mesmo contrato.
+- **Teste de banco que lê com SQL cru** precisa do contexto do parceiro (`cru` do apoio) ou do portão: com dono e FORCE RLS o SELECT cru enxerga 0 linhas.
+- **Teste de migration com dado antigo nos 3 perfis** e `erp:conferir-migracao` com os CHECKs, o índice e os gatilhos da 3.1 continuam obrigatórios.
+- **Resíduo de valor do lote (a mostrar no fechamento do CMV)**: o lote entra no estoque pelo custo REAL (R$ 117,81 por 4,6 kg) e sai pelo custo de referência
+  da ficha (R$ 23,56/kg). Ao esgotar o molho (saldo 0 kg) pode sobrar valor no saldo (no exemplo dos 400 g que faltaram, R$ 9,42). Hoje nenhuma tela
+  mostra esse resíduo; quem mexer no fechamento do CMV (2.4 ou 3.2) o exibe como linha própria, para o CMV real não esconder a diferença.
+- **Quem vê o custo do insumo**: o operador da cozinha vê o custo dos insumos do lote porque `insumos.ver` é "Ver insumos e custos" (uma permissão só para
+  insumo e custo). Separar "ver insumo" de "ver custo" é decisão de negócio (ver abaixo) e mexe no catálogo de permissões.
+- **Nomes na tela**: a aba da área é "Lotes" (a trilha fica "Produção › Lotes › loja › lote", sem repetir "Produção"); o botão "Concluir o lote" fica desabilitado
+  com o motivo ("Falta entregar os insumos (requisição #N)") até a requisição ser atendida; o cartão do quadro diz "Insumos: a entregar (requisição #N)",
+  "rendeu 88%" e, quando o lote vem de outro dia, o dia e a hora ("planejada 15/10 11:09"). Custo de insumo ainda não entregue é "a entregar" ou "—", nunca R$ 0,00.
+  O aviso de período fechado (`AvisoDoPeriodoFechado`) aparece antes de preencher a conclusão e, se o servidor recusar, rola até ele acima da barra fixa.
+- **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) a faixa de ±10% do rendimento serve para todas as fichas ou há pré-preparo (caldo, molho reduzido) que
+  precisa de faixa própria? (2) produção sem data retroativa: se o cozinheiro esquece de lançar ontem, hoje não dá para planejar para ontem; vale abrir exceção
+  para o gerente? (3) a requisição de produção deve aparecer nas Divergências (requisição × contagem)? Hoje ela conta como requisitado no cruzamento, mas não há
+  filtro para separar a de produção da do salão. (4) `insumos.ver` hoje mistura "ver insumo" e "ver custo": o operador da cozinha vê o custo dos insumos do lote. Vale uma permissão só para custo?

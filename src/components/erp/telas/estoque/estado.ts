@@ -49,6 +49,16 @@ const FEITO: Readonly<Record<string, string>> = {
   devolvida: 'Devolução registrada: a saída foi estornada no livro e saiu de novo só o que ficou.',
   cancelada: 'Requisição cancelada. Nada saiu do estoque por ela.',
   'ja-cancelada': 'Esta requisição já estava cancelada.',
+  // 3.1
+  planejado: 'Lote planejado. A requisição dos insumos já está com o estoque; quando os insumos chegarem, comece a produzir.',
+  iniciado: 'Produção começada. Quando o lote ficar pronto, conclua dizendo quanto saiu de verdade.',
+  'ja-iniciado': 'Este lote já estava em produção.',
+  concluido: 'Lote concluído: ele entrou no estoque da loja e o custo ficou fechado pelo que saiu do estoque.',
+  'ja-concluido': 'Este lote já tinha sido concluído (por outra pessoa ou outra aba): nada entrou no estoque de novo.',
+  'lote-cancelado': 'Lote cancelado. A requisição dos insumos foi cancelada junto.',
+  'lote-ja-cancelado': 'Este lote já estava cancelado.',
+  estornado: 'Lote estornado: o que ele pôs no estoque foi tirado, com o antes e o depois no livro.',
+  'ja-estornado': 'Este lote já tinha sido estornado: nada mudou de novo.',
 };
 
 export const fraseDoEstoque = (feito: string | undefined) => fraseDe(FEITO, feito);

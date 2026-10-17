@@ -13,6 +13,7 @@ import Link from 'next/link';
 import type { CartaoDaRequisicao, QuadroDeRequisicoes } from '@/lib/erp/requisicao';
 import { COLUNA_DO_QUADRO, numeroDaRequisicao, ORDEM_DO_QUADRO, rotuloDoSetor, tempoDesde, textoDoParaDia, type StatusDaRequisicao } from '@/lib/erp/requisicao-campos';
 import { COR } from '@/lib/erp/modulos';
+import { CartaoDoQuadro, ColunaDoQuadro, GradeDoQuadro, type TomDaColuna } from '../quadro/quadro';
 import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso } from '../../ui/superficies';
@@ -20,12 +21,12 @@ import { TrilhaDaPagina } from '../../shell/trilha';
 import { Voltar } from '../cadastro/partes';
 import { quandoCurto, quantoDoItem, SeloDoAtraso } from './partes';
 
-/** Cor do título e da barra de cada coluna (estado), sempre com a palavra ao lado. */
-const COR_DA_COLUNA: Record<StatusDaRequisicao, { texto: string; barra: string }> = {
-  ABERTA: { texto: 'text-atencao', barra: 'bg-atencao' },
-  PARCIAL: { texto: 'text-texto', barra: 'bg-texto/70' },
-  ATENDIDA: { texto: 'text-ok', barra: 'bg-ok' },
-  CANCELADA: { texto: 'text-suave', barra: 'bg-suave/60' },
+/** Tom do título e da barra de cada coluna (estado), sempre com a palavra ao lado. */
+const TOM_DA_COLUNA: Record<StatusDaRequisicao, TomDaColuna> = {
+  ABERTA: 'atencao',
+  PARCIAL: 'neutro',
+  ATENDIDA: 'ok',
+  CANCELADA: 'suave',
 };
 
 const ITENS_NO_CARTAO = 3;
@@ -42,64 +43,43 @@ function Cartao({ c, aqui, hoje, agora }: { c: CartaoDaRequisicao; aqui: string;
         : // Herança d da 1.8: a pendente diz há quanto tempo está no processo, além da hora.
           `${c.pedidaPorNome ?? '—'} · ${quandoCurto(c.solicitadaEm, hoje)} · ${tempoDesde(c.solicitadaEm, agora)}`;
   return (
-    <li>
-      <Link
-        href={`${aqui}/${c.id}`}
-        className={`ff-transicao block rounded-[10px] border border-linha bg-painel px-3.5 py-3 hover:border-linha-forte ${atrasada ? 'border-l-[3px] border-l-erro pl-[12px]' : ''} ${c.status === 'CANCELADA' ? 'opacity-75' : ''}`}
-        aria-label={`Requisição ${numeroDaRequisicao(c.numero)}, ${rotuloDoSetor(c.setor)}${atrasada ? `, ${c.atrasoDias} dias de atraso` : ''}`}
-      >
-        <div className="flex items-start justify-between gap-2">
-          <span className="min-w-0 text-[14px] font-semibold text-texto">
-            <span className="tabular-nums">{numeroDaRequisicao(c.numero)}</span> · {rotuloDoSetor(c.setor)}
-          </span>
-          {atrasada ? <SeloDoAtraso dias={c.atrasoDias} /> : c.status === 'ABERTA' || c.status === 'PARCIAL' ? <span className="shrink-0 text-[12px] text-suave">{textoDoParaDia(c.paraDia, hoje)}</span> : null}
-        </div>
-        <ul className="mt-2 space-y-0.5 text-[13px]">
-          {c.itens.slice(0, ITENS_NO_CARTAO).map((i) => (
-            <li key={i.nome} className="flex justify-between gap-3">
-              <span className="min-w-0 truncate text-texto">{i.nome}</span>
-              <span className={`shrink-0 tabular-nums ${saiu && i.atendidoMilesimos < i.solicitadoMilesimos ? 'text-atencao' : 'text-suave'}`}>{quantoDoItem(i, saiu)}</span>
-            </li>
-          ))}
-          {resto > 0 && <li className="text-[12px] text-suave">e mais {resto === 1 ? '1 insumo' : `${resto} insumos`}</li>}
-        </ul>
-        <div className="mt-2 text-[12px] text-suave">
-          {quem}
-          {c.fichaNome ? ` · da ficha ${c.fichaNome}` : ''}
-        </div>
-      </Link>
-    </li>
+    <CartaoDoQuadro
+      href={`${aqui}/${c.id}`}
+      atrasado={atrasada}
+      apagado={c.status === 'CANCELADA'}
+      rotulo={`Requisição ${numeroDaRequisicao(c.numero)}, ${rotuloDoSetor(c.setor)}${atrasada ? `, ${c.atrasoDias} dias de atraso` : ''}`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="min-w-0 text-[14px] font-semibold text-texto">
+          <span className="tabular-nums">{numeroDaRequisicao(c.numero)}</span> · {rotuloDoSetor(c.setor)}
+        </span>
+        {atrasada ? <SeloDoAtraso dias={c.atrasoDias} /> : c.status === 'ABERTA' || c.status === 'PARCIAL' ? <span className="shrink-0 text-[12px] text-suave">{textoDoParaDia(c.paraDia, hoje)}</span> : null}
+      </div>
+      <ul className="mt-2 space-y-0.5 text-[13px]">
+        {c.itens.slice(0, ITENS_NO_CARTAO).map((i) => (
+          <li key={i.nome} className="flex justify-between gap-3">
+            <span className="min-w-0 truncate text-texto">{i.nome}</span>
+            <span className={`shrink-0 tabular-nums ${saiu && i.atendidoMilesimos < i.solicitadoMilesimos ? 'text-atencao' : 'text-suave'}`}>{quantoDoItem(i, saiu)}</span>
+          </li>
+        ))}
+        {resto > 0 && <li className="text-[12px] text-suave">e mais {resto === 1 ? '1 insumo' : `${resto} insumos`}</li>}
+      </ul>
+      <div className="mt-2 text-[12px] text-suave">
+        {quem}
+        {c.lote ? ` · do lote ${c.lote}` : c.fichaNome ? ` · da ficha ${c.fichaNome}` : ''}
+      </div>
+    </CartaoDoQuadro>
   );
 }
 
 function Coluna({ status, cartoes, aqui, hoje, agora }: { status: StatusDaRequisicao; cartoes: CartaoDaRequisicao[]; aqui: string; hoje: string; agora: Date }) {
-  const cor = COR_DA_COLUNA[status];
-  const id = `coluna-${status.toLowerCase()}`;
   const recente = status === 'ATENDIDA' || status === 'CANCELADA';
   return (
-    <section aria-labelledby={id} className="min-w-0">
-      <header className="pb-2.5">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 id={id} className={`text-[13px] font-semibold ${cor.texto}`}>
-            {COLUNA_DO_QUADRO[status]}
-          </h2>
-          <span className="text-[12px] tabular-nums text-suave">
-            {cartoes.length}
-            {recente ? ' · 7 dias' : ''}
-          </span>
-        </div>
-        <div aria-hidden className={`mt-2 h-0.5 rounded-full ${cor.barra}`} />
-      </header>
-      {cartoes.length === 0 ? (
-        <p className="rounded-[10px] border border-dashed border-linha px-3.5 py-5 text-center text-[13px] text-suave">Nenhum item nesta etapa</p>
-      ) : (
-        <ol className="space-y-2">
-          {cartoes.map((c) => (
-            <Cartao key={c.id} c={c} aqui={aqui} hoje={hoje} agora={agora} />
-          ))}
-        </ol>
-      )}
-    </section>
+    <ColunaDoQuadro id={`coluna-${status.toLowerCase()}`} titulo={COLUNA_DO_QUADRO[status]} contador={`${cartoes.length}${recente ? ' · 7 dias' : ''}`} tom={TOM_DA_COLUNA[status]} vazio="Nenhum item nesta etapa" vazia={cartoes.length === 0}>
+      {cartoes.map((c) => (
+        <Cartao key={c.id} c={c} aqui={aqui} hoje={hoje} agora={agora} />
+      ))}
+    </ColunaDoQuadro>
   );
 }
 
@@ -158,11 +138,11 @@ export function TelaQuadroDeRequisicoes({
         )}
       </p>
 
-      <div className="grid gap-x-4 gap-y-7 md:grid-cols-2 xl:grid-cols-4">
+      <GradeDoQuadro>
         {ORDEM_DO_QUADRO.map((s) => (
           <Coluna key={s} status={s} cartoes={q.colunas[s]} aqui={aqui} hoje={q.hoje} agora={agora} />
         ))}
-      </div>
+      </GradeDoQuadro>
     </div>
   );
 }

@@ -12,17 +12,19 @@ import { PageHeader } from '../../ui/cabecalho';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { SeloDoEstado } from '../estoque/situacao';
 
-type Qual = 'requisicoes' | 'divergencias' | 'contagens';
+type Qual = 'requisicoes' | 'divergencias' | 'contagens' | 'producao';
 
 const TITULO: Record<Qual, string> = {
   requisicoes: 'Requisições por loja',
   divergencias: 'Divergências por loja',
   contagens: 'Contagens por loja',
+  producao: 'Produção por loja',
 };
 const APOIO: Record<Qual, string> = {
   requisicoes: 'o setor pede, o estoque entrega',
   divergencias: 'requisição × contagem',
   contagens: 'período, cobertura e contagem do dia a dia',
+  producao: 'planeje o lote pela ficha; os insumos saem pela requisição',
 };
 
 export function TelaLojasDoEstoque({
@@ -30,16 +32,22 @@ export function TelaLojasDoEstoque({
   lojas,
   base,
   contexto,
+  destino,
+  consulta = '',
 }: {
   qual: Qual;
   /** `estado` só nas contagens: sem o estoque aberto não há período; a loja leva à abertura. */
   lojas: { id: string; nome: string; pendentes?: number; atrasadas?: number; estado?: EstadoDoEstoque }[];
   base: string;
   contexto?: string;
+  /** Produção: para onde a loja leva ("nova" = planejar um lote nela; padrão = o quadro). */
+  destino?: 'quadro' | 'nova';
+  /** Produção/nova: o que vai junto ao link da loja ("?ficha=…", vindo do botão Produzir da ficha). */
+  consulta?: string;
 }) {
   return (
     <div className="space-y-6">
-      <PageHeader icone="estoque" cor={COR.estoque} titulo={TITULO[qual]} subtitulo={[contexto, APOIO[qual]].filter(Boolean).join(' · ')} />
+      <PageHeader icone={qual === 'producao' ? 'producao' : 'estoque'} cor={qual === 'producao' ? COR.producao : COR.estoque} titulo={destino === 'nova' ? 'Nova produção: em qual loja?' : TITULO[qual]} subtitulo={[contexto, APOIO[qual]].filter(Boolean).join(' · ')} />
       <Painel semRespiro>
         {lojas.length === 0 ? (
           <Vazio titulo="Nenhuma loja no seu acesso.">Peça a quem cuida da equipe para incluir as lojas em que você trabalha.</Vazio>
@@ -47,9 +55,9 @@ export function TelaLojasDoEstoque({
           <ul className="divide-y divide-linha">
             {lojas.map((l) => (
               <li key={l.id}>
-                <Link href={destinoDaLoja(qual, base, l)} className="ff-transicao flex min-h-14 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-texto/[0.03] sm:px-5">
+                <Link href={`${destinoDaLoja(qual, base, l, destino)}${destino === 'nova' ? consulta : ''}`} className="ff-transicao flex min-h-14 items-center justify-between gap-3 px-4 py-3 text-sm hover:bg-texto/[0.03] sm:px-5">
                   <span className="font-medium text-texto">{l.nome}</span>
-                  {qual === 'requisicoes' && (
+                  {(qual === 'requisicoes' || qual === 'producao') && (
                     <span className="flex shrink-0 items-center gap-2 text-[13px] tabular-nums text-suave">
                       {l.atrasadas ? <Selo tom="erro">{l.atrasadas} com atraso</Selo> : null}
                       {l.pendentes ? `${l.pendentes} ${l.pendentes === 1 ? 'pendente' : 'pendentes'}` : 'nada pendente'}
@@ -67,7 +75,8 @@ export function TelaLojasDoEstoque({
 }
 
 /** Contagens: `<loja>/periodo` só existe com o estoque aberto; antes disso a loja leva à abertura. */
-function destinoDaLoja(qual: Qual, base: string, l: { id: string; estado?: EstadoDoEstoque }) {
+function destinoDaLoja(qual: Qual, base: string, l: { id: string; estado?: EstadoDoEstoque }, destino?: 'quadro' | 'nova') {
+  if (qual === 'producao') return destino === 'nova' ? `${base}/${l.id}/nova` : `${base}/${l.id}`;
   if (qual === 'contagens') return l.estado === 'ABERTO' ? `${base}/${l.id}/periodo` : `${base}/${l.id}`;
   return `${base}/${l.id}/${qual}`;
 }
