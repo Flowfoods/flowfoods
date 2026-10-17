@@ -1759,7 +1759,7 @@ RLS iguais; `migrate diff` vazio). Decisões 160 a 171. O CMV em si é DERIVADO 
     segue; nenhum passo lê tabela de tenant sob RLS. `npm run erp:conferir-migracao` passou a olhar o CHECK.
 12. **Fora desta subfase** (170): transferência entre lojas, CMV teórico, CMV por canal ou marca, PEPS/médio, desconto e bonificação, tipo "limpeza", perda à mão.
 
-**Ajuda: chaves novas/alteradas.** Nenhuma nova (nenhuma rota nova). Alteradas, com `ajuda.lock.json` regravado: `dre` v3 para v4 (o CMV e a seção "Os dois CMVs: compra e real"), `dre-plano` v2 para v3 (a meta do CMV), `dre-periodo` v1 para v2 (a fotografia leva o CMV, e a v1 antiga), `periodo` (estoque) v3 para v4 (o valor do fechamento é a base do real; contar depois do fim não estraga), `compra-nova` v2 para v3 (a data da nota decide o período do CMV; limpeza e pagamento a fornecedor não são nota nem despesa duplicada).
+**Ajuda: chaves novas/alteradas.** Nenhuma nova (nenhuma rota nova). Alteradas, com `ajuda.lock.json` regravado: `dre` v3 para v5 (o CMV, o desconto na margem e a seção "Os dois CMVs: compra e real"), `dre-plano` v2 para v3 (a meta do CMV), `dre-periodo` v1 para v2 (a fotografia leva o CMV, e a v1 antiga), `periodo` (estoque) v3 para v4 (o valor do fechamento é a base do real; contar depois do fim não estraga), `compra-nova` v2 para v3 (a data da nota decide o período do CMV; limpeza e pagamento a fornecedor não são nota nem despesa duplicada).
 
 ## Provar o CMV (2.3)
 
@@ -1771,8 +1771,8 @@ npm run erp:conferir-migracao
 npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
 ```
 Os arquivos de banco que a 2.3 mexe também rodam num banco com dono NÃO-superusuário e FORCE RLS, em sequência (`npx vitest run --no-file-parallelism`).
-`tests/erp-cmv.test.ts` (sem banco, 26): o corte, o real, o encadeamento (200 sorteios), o que vale, o selo (inclusive o comprido), compra × real, o
-sem preço, a fotografia de ida e volta. `tests/erp-cmv.db.test.ts` (16): o cenário da análise (Casa Alfa: Vila da Penha, Delivery, Centro; setembro e
+`tests/erp-cmv.test.ts` (sem banco, 32; inclui o CMV abatido na margem e nos resultados): o corte, o real, o encadeamento (200 sorteios), o que vale, o selo (inclusive o comprido), compra × real, o
+sem preço, a fotografia de ida e volta. `tests/erp-cmv.db.test.ts` (20; inclui a data da nota trocada de mês nos dois sentidos, com e sem mudança de valor, contra o consumo de verdade, e o gerente de duas lojas): o cenário da análise (Casa Alfa: Vila da Penha, Delivery, Centro; setembro e
 outubro) com os critérios 1 a 15: R$ 20.000,00 parcial; estoque final de setembro R$ 11.700,00 e de outubro R$ 13.550,00; real R$ 23.950,00 contra
 compra R$ 25.800,00 (−R$ 1.850,00); rede "misto" R$ 27.950,00 com a soma do "Por loja" mais a despesa da rede igual ao resultado; nota tardia (o real não
 muda); cíclica tardia; setembro com a nota na abertura (R$ 20.300,00); sem fechamento; estoque que abre no meio; itens sem preço pelo fluxo de verdade;
@@ -1780,8 +1780,8 @@ fechar com a fotografia v2 igual ao ao vivo; v1 e a v2 por reabrir; a corrida fe
 `tests/erp-cmv-telas.db.test.ts` (5): o HTML da dona, do gerente (também por `?rede=1` e `?loja=`), do operador, de quem não tem compras e estoque, e o
 Histórico. `tests/erp-cmv-migracao.db.test.ts` (3): a migration com dado antigo nos 3 perfis do banco. Apoio do cenário: `tests/erp-cmv-apoio.ts`.
 
-Na tela (build de produção local, porta 3100, banco `ff_23` copiado do `ff_dev`; roteiro `prova23/jornada.mjs` no scratchpad, 57 conferências): a dona abre
-outubro (em curso: "pelas compras · parcial", o real diz que abre em 29/10, "sem o CMV de Centro" na rede); setembro encerrado (painel compra × real com
+Na tela (build de produção local, porta 3100, banco `ff_23` copiado do `ff_dev`; roteiro `prova23/jornada.mjs` no scratchpad, 74 conferências, com a margem conferida como receita líquida menos CMV, o painel medido sem corte a 768, 820, 1024, 1280 e 1440 e a conta de fechamento aplicada sem "abaixo do piso"): a dona abre
+outubro (em curso: "pelas compras · parcial", o real diz que abre em 29/10, "sem o CMV de Centro" na rede); setembro encerrado (painel compra × real (cartões abaixo de 1280 px) com
 as duas lojas, a soma, a frase, "não registrado", insumos sem preço e quem ficou só pelas compras); fecha setembro com as duas ressalvas (fotografia v2 com
 as 15 linhas do CMV e R$ 63.500,00 de real na Vila da Penha) e lê o fechado igual ao ao vivo; o gerente da Vila da Penha, a 390 px, só vê a loja dele (e nada
 da base da conta no HTML, também por `?rede=1` e pela URL de outra loja); o operador volta ao hub sem CMV, fora do menu e do ⌘K; Hugo (`historico.ver` sem
