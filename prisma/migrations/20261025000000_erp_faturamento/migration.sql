@@ -1,5 +1,5 @@
 -- ERP 2.1 — Entrada de faturamento por canal (manual + planilha; integração
--- desenhada). Decisão 129.
+-- desenhada). Decisão 131.
 --
 -- ADITIVA. "FaturamentoLancamento" existe desde a 0.1 (portão, RLS, GRANT,
 -- FK composta com parceiro e trigger de parceiro imutável): nenhuma tabela

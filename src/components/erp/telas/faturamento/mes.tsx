@@ -44,7 +44,7 @@ function Totais({ por, total }: { por: Record<CanalVenda, TotaisDoRecorte>; tota
   return (
     <Painel titulo="Por canal" subtitulo="Faturamento, pedidos e clientes atendidos no mês. O ticket médio é a conta, não um número lançado." semRespiro>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[360px] text-sm">
+        <table className="w-full text-sm sm:min-w-[360px]">
           <thead>
             <tr className="bg-forte text-left text-[12px] text-suave">
               <th scope="col" className="h-10 px-4 font-semibold sm:px-5">
@@ -59,21 +59,22 @@ function Totais({ por, total }: { por: Record<CanalVenda, TotaisDoRecorte>; tota
               <th scope="col" className="hidden h-10 px-3 text-right font-semibold sm:table-cell">
                 Clientes
               </th>
-              <th scope="col" className="h-10 px-4 text-right font-semibold sm:px-5">
-                Ticket médio
+              <th scope="col" className="h-10 px-3 text-right font-semibold sm:px-5">
+                <span className="sm:hidden">Ticket</span>
+                <span className="hidden sm:inline">Ticket médio</span>
               </th>
             </tr>
           </thead>
           <tbody className="tabular-nums">
             {linhas.map(({ chave, rotulo, t, destaque }) => (
               <tr key={chave} className={`border-t ${destaque ? 'border-linha-forte font-semibold' : 'border-linha'}`}>
-                <th scope="row" className="h-11 px-4 text-left font-medium text-texto sm:px-5">
+                <th scope="row" className="h-11 px-3 text-left font-medium text-texto sm:px-5">
                   {rotulo}
                 </th>
                 <td className="px-3 text-right">{t.pedidos === 0 && t.valorCentavos === 0 ? <span className="font-normal text-suave">—</span> : formatarDinheiro(t.valorCentavos)}</td>
                 <td className="px-3 text-right">{inteiro(t.pedidos)}</td>
                 <td className="hidden px-3 text-right sm:table-cell">{inteiro(t.clientes)}</td>
-                <td className="px-4 text-right sm:px-5">{textoDoTicket(t.ticketMedioCentavos)}</td>
+                <td className="px-3 text-right sm:px-5">{textoDoTicket(t.ticketMedioCentavos)}</td>
               </tr>
             ))}
           </tbody>
@@ -102,7 +103,7 @@ function CelulaDoDia({ d, lojaId, base, canais }: { d: DiaDaLojaNoMes; lojaId: s
         ) : d.total ? (
           <span className="flex flex-wrap gap-x-2 text-suave">
             {canais.map((c) => (
-              <span key={c} className={d.canais[c] ? 'text-texto' : 'text-suave/70'}>
+              <span key={c} className={d.canais[c] ? 'text-texto' : 'text-suave'}>
                 {CANAIS[c].curto === 'Delivery' ? 'Dlv' : CANAIS[c].curto}
               </span>
             ))}
@@ -112,7 +113,7 @@ function CelulaDoDia({ d, lojaId, base, canais }: { d: DiaDaLojaNoMes; lojaId: s
     </>
   );
   const classe = `flex min-h-[96px] min-w-0 flex-col justify-between gap-1 border-t-2 p-2 ${falta ? 'border-erro' : 'border-transparent'}`;
-  if (d.futuro) return <div className={`${classe} text-suave/60`} aria-hidden>{miolo}</div>;
+  if (d.futuro) return <div className={`${classe} text-suave`} aria-hidden>{miolo}</div>;
   return (
     <Link href={`${base}/${lojaId}/${d.data}`} aria-label={rotuloAcessivel} className={`${classe} ff-transicao hover:bg-texto/[0.04]`}>
       {miolo}
@@ -159,7 +160,7 @@ function Calendario({ l, base, mes }: { l: LojaNoMes; base: string; mes: string 
                       {dataCurta(d.data)}
                       {d.emAberto && <span className="ml-2 text-[12px] font-normal text-suave">hoje, em aberto</span>}
                     </span>
-                    <span className="block truncate text-[12px] tabular-nums text-suave">
+                    <span className="block text-[12px] leading-snug tabular-nums text-suave">
                       {falta ? (
                         <span className="font-semibold text-erro">{frasesDeFalta(d.faltam)}</span>
                       ) : d.total ? (
@@ -169,7 +170,7 @@ function Calendario({ l, base, mes }: { l: LojaNoMes; base: string; mes: string 
                       )}
                     </span>
                     {falta && d.total && (
-                      <span className="block truncate text-[12px] tabular-nums text-suave">
+                      <span className="block text-[12px] leading-snug tabular-nums text-suave">
                         {l.loja.canais.filter((c) => d.canais[c]).map((c) => `${CANAIS[c].curto} ${formatarDinheiro(d.canais[c]!.valorCentavos)}`).join(' · ')}
                       </span>
                     )}
@@ -188,7 +189,7 @@ function Calendario({ l, base, mes }: { l: LojaNoMes; base: string; mes: string 
 
 function TabelaDaRede({ m, base }: { m: MesDoFaturamento; base: string }) {
   return (
-    <Painel titulo="Por loja" subtitulo="Soma do que cada loja do seu acesso lançou no mês. Faltas: canal que a loja vende, sem lançamento, até ontem." semRespiro acessorio={<Contagem>{m.lojas.length}</Contagem>}>
+    <Painel titulo="Por loja" subtitulo="Soma do que cada loja do seu acesso lançou no mês. Falta é canal que a loja vende, sem lançamento, até ontem (cada canal em cada dia conta uma)." semRespiro acessorio={<Contagem>{m.lojas.length}</Contagem>}>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
@@ -219,14 +220,14 @@ function TabelaDaRede({ m, base }: { m: MesDoFaturamento; base: string }) {
                 </th>
                 {CANAIS_EM_ORDEM.map((c) => (
                   <td key={c} className="px-3 text-right">
-                    {!l.loja.canais.includes(c) && l.porCanal[c].pedidos === 0 ? <span className="text-suave/70">não vende</span> : l.porCanal[c].pedidos === 0 && l.porCanal[c].valorCentavos === 0 ? <span className="text-suave">—</span> : formatarDinheiro(l.porCanal[c].valorCentavos)}
+                    {!l.loja.canais.includes(c) && l.porCanal[c].pedidos === 0 ? <span className="text-suave">não vende</span> : l.porCanal[c].pedidos === 0 && l.porCanal[c].valorCentavos === 0 ? <span className="text-suave">—</span> : formatarDinheiro(l.porCanal[c].valorCentavos)}
                   </td>
                 ))}
                 <td className="px-3 text-right font-semibold">{formatarDinheiro(l.total.valorCentavos)}</td>
                 <td className="px-4 text-right sm:px-5">
                   {l.faltas > 0 ? (
                     <span className="font-semibold text-erro">
-                      {l.faltas} {l.faltas === 1 ? 'dia' : 'dias'}
+                      {l.faltas} {l.faltas === 1 ? 'falta' : 'faltas'}
                     </span>
                   ) : (
                     <span className="text-suave">0</span>
@@ -353,7 +354,9 @@ export function TelaDoMes({
               const t = lojaAberta ? lojaAberta.total : m.total;
               return (
                 <>
-                  <Metrica rotulo="Faturamento" valor={formatarDinheiro(t.valorCentavos)} detalhe="venda dos pedidos concluídos" />
+                  <div className="col-span-2 flex lg:col-span-1 [&>div]:w-full">
+                    <Metrica rotulo="Faturamento" valor={formatarDinheiro(t.valorCentavos)} detalhe="venda dos pedidos concluídos" />
+                  </div>
                   <Metrica rotulo="Pedidos" valor={inteiro(t.pedidos)} detalhe={frasePedidos(t.pedidos)} />
                   <Metrica rotulo="Clientes atendidos" valor={inteiro(t.clientes)} detalhe="atendimentos, não pessoas diferentes" />
                   <Metrica rotulo="Ticket médio" valor={textoDoTicket(t.ticketMedioCentavos)} detalhe="faturamento ÷ pedidos" />

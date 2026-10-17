@@ -5,14 +5,14 @@
  * calendário do mês e as faltas. O que vale é sempre o que o servidor lê do
  * TEXTO; a tela só mostra prévia.
  *
- * O número (decisão 122, "o pedido não é a venda"): `valorCentavos` é a venda
+ * O número (decisão 124, "o pedido não é a venda"): `valorCentavos` é a venda
  * de PRODUTOS de pedidos CONCLUÍDOS no dia, já líquida de desconto/cupom pago
  * pela casa; sem taxa de entrega cobrada do cliente, sem 10 %/gorjeta, sem
  * pedido cancelado. `pedidos` = pedidos concluídos. `clientes` = atendimentos
  * (salão: pessoas; delivery e iFood: vazio = pedidos), não clientes únicos.
  * Ticket médio = Σ valor ÷ Σ pedidos do recorte: derivado, nunca gravado.
  *
- * O grão (decisão 121): loja × canal × dia civil do Rio. O humano (digitado ou
+ * O grão (decisão 123): loja × canal × dia civil do Rio. O humano (digitado ou
  * planilha) divide UMA linha por grão, com a chave `manual:<loja>:-:<canal>:<dia>`.
  */
 
@@ -53,11 +53,11 @@ export function lerDataDoLancamento(texto: string, hoje = hojeNoRio()): { ok: tr
 
 // ------------------------------------------------------------------ chaves
 
-/** A chave do humano (digitado ou planilha): uma por loja × canal × dia, sem marca (decisão 121/123). */
+/** A chave do humano (digitado ou planilha): uma por loja × canal × dia, sem marca (decisão 123/125). */
 export const chaveHumana = (lojaId: string, canal: CanalVenda, data: string) => `manual:${lojaId}:-:${canal}:${data}`;
 
 /**
- * O contrato da integração (decisão 127): `<fonte>:<tipo>:<idExterno>`, outro
+ * O contrato da integração (decisão 129): `<fonte>:<tipo>:<idExterno>`, outro
  * espaço de chave que o humano ("manual:" é só dele; o banco confere). `tipo`
  * é 'pedido' (um por pedido) ou 'dia' (o fechamento do dia do canal). Null se
  * a fonte, o tipo ou o id não servem. Reenviar o mesmo pedido gera a MESMA
@@ -109,7 +109,7 @@ function lerQuantidadeDigitada(bruto: string, rotulo: string): { ok: true; n: nu
 
 /**
  * Lê os 3 campos de UM canal num dia. Em branco e sem "Não vendeu" = não mexe
- * (vazio ≠ zero, decisão 124: o canal segue "sem lançamento"). "Não vendeu"
+ * (vazio ≠ zero, decisão 126: o canal segue "sem lançamento"). "Não vendeu"
  * grava 0/0/0. Clientes em branco = pedidos. Valor com pedidos, e pedidos com
  * valor, andam juntos (o ticket médio divide por pedidos).
  */
@@ -216,7 +216,7 @@ export interface GraoLido extends NumerosDoCanal {
 }
 
 /**
- * A leitura única do grão (decisão 123): havendo linha de INTEGRACAO, vale a
+ * A leitura única do grão (decisão 125): havendo linha de INTEGRACAO, vale a
  * SOMA dela (um pedido por linha); senão, a humana. Nunca soma humano com
  * integração. A humana que fica por baixo é a conferência (diferença à vista).
  * A 2.2 (DRE) só lê o faturamento por aqui.
@@ -271,7 +271,7 @@ export const diaDaSemana = (iso: string) => new Date(`${iso}T00:00:00Z`).getUTCD
 export const nomeDoDiaDaSemana = (iso: string) => SEMANA[diaDaSemana(iso)];
 
 /**
- * Falta (decisão 124): canal que a loja vende, sem lançamento, de quando a loja
+ * Falta (decisão 126): canal que a loja vende, sem lançamento, de quando a loja
  * começou a lançar (a data do 1º lançamento dela) até ONTEM. Hoje é "em
  * aberto"; antes do 1º lançamento a casa ainda não usava o módulo. Zero
  * lançado ("Não vendeu") é lançamento, não falta.

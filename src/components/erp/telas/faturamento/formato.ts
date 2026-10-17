@@ -5,7 +5,7 @@ import { nomeDoDiaDaSemana, ROTULO_DA_ORIGEM, type OrigemDoLancamento } from '@/
 
 const SEM_R$ = new Intl.NumberFormat('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
-/** 435000 → "4.350,00" (o que o campo de faturamento mostra e o servidor lê de volta). */
+/** 435000 vira "4.350,00" (o que o campo de faturamento mostra e o servidor lê de volta). */
 export const textoDoValor = (centavos: number) => SEM_R$.format(centavos / 100);
 
 const SEMANA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];

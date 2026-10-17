@@ -206,7 +206,7 @@ export function FormRemover({ acao, rotulo, versao, voltar }: { acao: AcaoDoDia;
   return (
     <details className="group rounded-[10px] border border-linha px-4 py-3">
       <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-texto">
-        Remover o lançamento do {rotulo}
+        Remover o lançamento de {rotulo}
         <span className="text-[12px] font-normal text-suave group-open:hidden">abrir</span>
       </summary>
       <form action={enviar} className="mt-3 space-y-3">

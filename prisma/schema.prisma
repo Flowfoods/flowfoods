@@ -1435,8 +1435,8 @@ model Etiqueta {
 // (manual:<loja>:<marca ou ->:<canal>:<data>), então redigitar ou reimportar é
 // correção, não soma; na 2.1 a marca fica nula. A integração usa outro espaço
 // de chave (<fonte>:<tipo>:<idExterno>) e, na leitura, vence a digitação
-// (decisão 123). Valor = venda de produtos de pedidos concluídos, líquida do
-// desconto pago pela casa (decisão 122). Ticket médio é derivado, nunca gravado.
+// (decisão 125). Valor = venda de produtos de pedidos concluídos, líquida do
+// desconto pago pela casa (decisão 124). Ticket médio é derivado, nunca gravado.
 // CHECKs e o índice parcial do grão humano estão só no SQL da migration
 // 20261025000000_erp_faturamento (o Prisma não descreve).
 model FaturamentoLancamento {

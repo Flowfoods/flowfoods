@@ -8,19 +8,19 @@
  *
  * - UMA linha humana por loja × canal × dia (MANUAL ou IMPORTACAO), com a
  *   chave `manual:<loja>:-:<canal>:<dia>`: redigitar ou reimportar é correção,
- *   não soma (decisões 121 e 123). Regravar igual não cria linha nem histórico;
+ *   não soma (decisões 123 e 125). Regravar igual não cria linha nem histórico;
  *   a corrida de criação cai no único (INSERT … ON CONFLICT DO NOTHING) e quem
  *   perde recebe "Fulano lançou este dia agora: R$ X · N pedidos";
  * - corrigir é no lugar, condicional ao `atualizadoEm` lido de cada canal
  *   (duas abas: a segunda recebe o conflito e nada é sobrescrito); toda
  *   gravação leva o antes/depois ao histórico na MESMA transação; remover
- *   exige motivo e grava o antes (decisão 125);
+ *   exige motivo e grava o antes (decisão 127);
  * - período FECHADO recusa gravar: toda escrita pega a trava compartilhada do
  *   faturamento e confere o período (`periodo-trava.ts`; a 2.2 fecha com a
  *   mesma chave em modo exclusivo);
  * - a leitura é UMA: `faturamentoDosGraos`. Havendo linha de INTEGRACAO no
  *   grão, vale a soma dela e a digitada vira conferência (nunca soma as duas).
- *   A integração em si NÃO existe na 2.1: só o contrato (decisão 127);
+ *   A integração em si NÃO existe na 2.1: só o contrato (decisão 129);
  * - ticket médio, total do dia e do mês são derivados na leitura; nada disso
  *   é gravado.
  */
@@ -88,7 +88,7 @@ export async function lojasDoFaturamento(cliente: ClienteDoParceiro, alcance: Pi
 
 /** `faturamento.ver` na loja (a regra única da 0.4): a frase da recusa, ou null. */
 const semAcessoParaVer = (alcance: Alcance, lojaId: string) => recusa(alcance, 'faturamento.ver', { lojaId });
-/** Gravar exige ver E lançar, na loja de CADA linha (decisão 128). */
+/** Gravar exige ver E lançar, na loja de CADA linha (decisão 130). */
 const semAcessoParaLancar = (alcance: Alcance, lojaId: string) => recusa(alcance, 'faturamento.ver', { lojaId }) ?? recusa(alcance, 'faturamento.lancar', { lojaId });
 
 // ================================================================ ler o dia
@@ -366,7 +366,7 @@ export async function removerLancamento(cliente: ClienteDoParceiro, alcance: Alc
 export type ResultadoDosCanais = { ok: true; mudou: boolean } | { ok: false; erro: string };
 
 /**
- * Em quais canais a loja vende (`Loja.canaisDeVenda`, decisão 124). É cadastro
+ * Em quais canais a loja vende (`Loja.canaisDeVenda`, decisão 126). É cadastro
  * da rede: o chamador exige `lojas.gerir` (rede inteira). Condicional aos
  * canais lidos (duas abas); antes/depois no histórico. Desligar um canal não
  * apaga o que já foi lançado nele.
@@ -399,7 +399,7 @@ export interface GraoDeFaturamento extends GraoLido {
 }
 
 /**
- * A leitura ÚNICA do faturamento (decisão 123): por loja × canal × dia, vale
+ * A leitura ÚNICA do faturamento (decisão 125): por loja × canal × dia, vale
  * a integração quando ela existe no grão, senão a digitada/importada. É por
  * aqui que a 2.2 (DRE) lê. Só traz as lojas do alcance (e opcionalmente uma).
  * Datas inclusivas, "aaaa-mm-dd".
@@ -719,7 +719,7 @@ export async function importarPlanilha(cliente: ClienteDoParceiro, alcance: Alca
 // ================================================================ contrato de integração (SEM implementação)
 
 /**
- * O contrato da integração futura (decisão 127) — só o formato, nada grava
+ * O contrato da integração futura (decisão 129) — só o formato, nada grava
  * aqui. Quando a integração do iFood (ou Anota AI, Saipos) existir, um
  * worker chama `doParceiro(parceiroId)` (o portão confere o parceiro ATIVO) e
  * grava com:

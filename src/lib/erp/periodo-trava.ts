@@ -7,7 +7,7 @@
  * ou a escrita de faturamento termina antes do fechamento (e entra nele), ou
  * espera o fechamento terminar (e é recusada). Não existe janela de corrida.
  *
- * As duas travas vivem até o fim da transação (`pg_advisory_xact_lock*`), então
+ * Decisão 132. As duas travas vivem até o fim da transação (`pg_advisory_xact_lock*`), então
  * têm de ser pegas DENTRO de `cliente.transacao`, antes de ler o período.
  */
 

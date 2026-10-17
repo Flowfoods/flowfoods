@@ -13,7 +13,7 @@
  * `clientes` pode ficar em branco (= pedidos). Dia que a loja não vendeu vai
  * com 0 em faturamento e pedidos.
  *
- * Proteção (decisão 126): só números e nomes são lidos. Célula que começa com
+ * Proteção (decisão 128): só números e nomes são lidos. Célula que começa com
  * `= + - @` ou tab/CR (fórmula para a planilha de quem abrir depois) nunca casa
  * loja ou canal e é recusada no número; o eco da célula na mensagem é cortado e
  * sem controle/bidi. Teto de tamanho, linhas, colunas e caracteres por campo.
