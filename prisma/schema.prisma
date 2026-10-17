@@ -653,6 +653,11 @@ model Loja {
   contagemFreqCDias          Int @default(30)
   contagemToleranciaCentavos Int @default(500)
 
+  // 2.1: em quais canais esta loja vende (CHECK: pelo menos um). A unidade só
+  // delivery desliga a LOJA; sem isso o calendário acusaria falta de salão todo
+  // dia. Muda com "cadastrar lojas" (rede inteira), com antes/depois no histórico.
+  canaisDeVenda CanalVenda[] @default([LOJA, DELIVERY_PROPRIO, IFOOD])
+
   colaboradores  Colaborador[]
   notasEntrada   NotaEntrada[]
   saldos         SaldoEstoque[]
@@ -1425,9 +1430,15 @@ model Etiqueta {
 
 // Faturamento por canal por dia (2.1). Cada lançamento tem chave de
 // idempotência ÚNICA no parceiro: reprocessar integração ou reenviar
-// planilha não duplica venda. Manual usa chave determinística
-// (manual:<loja>:<marca ou ->:<canal>:<data>), então redigitar é correção, não
-// soma, e duas marcas na mesma loja não se sobrescrevem.
+// planilha não duplica venda. O humano (MANUAL ou IMPORTACAO) divide UMA linha
+// por loja × canal × dia, com chave determinística
+// (manual:<loja>:<marca ou ->:<canal>:<data>), então redigitar ou reimportar é
+// correção, não soma; na 2.1 a marca fica nula. A integração usa outro espaço
+// de chave (<fonte>:<tipo>:<idExterno>) e, na leitura, vence a digitação
+// (decisão 123). Valor = venda de produtos de pedidos concluídos, líquida do
+// desconto pago pela casa (decisão 122). Ticket médio é derivado, nunca gravado.
+// CHECKs e o índice parcial do grão humano estão só no SQL da migration
+// 20261025000000_erp_faturamento (o Prisma não descreve).
 model FaturamentoLancamento {
   id                String       @id @default(cuid())
   parceiroId        String
@@ -1447,6 +1458,8 @@ model FaturamentoLancamento {
   chaveIdempotencia String
   // Id externo (pedido/relatório iFood, nome do arquivo importado).
   origemRef         String?
+  // 2.1: quem lançou ou corrigiu por último (nome na hora, como o histórico).
+  atualizadoPorNome String       @default("")
   criadoEm          DateTime     @default(now())
   atualizadoEm      DateTime     @updatedAt
 
