@@ -324,7 +324,7 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
 
         const deAnoPassado = mesmaDataNoAnoPassado(periodo.inicio);
         const ateAnoPassado = mesmaDataNoAnoPassado(periodo.fim);
-        const anoPassado = anoPassadoParaGravar(deAnoPassado, ateAnoPassado, await faturamentoDosGraos(tx, ALCANCE_FLOWFOODS, { de: deAnoPassado, ate: ateAnoPassado }));
+        const anoPassado = anoPassadoParaGravar(deAnoPassado, ateAnoPassado, await faturamentoDosGraos(tx, ALCANCE_FLOWFOODS, { de: deAnoPassado, ate: ateAnoPassado }), leitura.lojas);
         const versao = await proximaVersao(tx, registro.id);
         const agora = new Date();
         await gravarFotografia(

@@ -27,12 +27,12 @@ describe('2.4 · o glifo: régua de 5 casas + palavra + aria-label', () => {
     expect(h).toContain('muito pior que a meta');
     expect(h.match(/fill="currentColor"/g)).toHaveLength(1);
     expect(h.match(/<rect/g)).toHaveLength(5);
-    expect(h).toContain('x="40"'); // a quinta casa
+    expect(h).toContain('x="52"'); // a quinta casa
     expect(h).toContain('text-farol-vermelho');
   });
   it('azul enche a primeira casa e traz o "confira se está tudo lançado"', () => {
     const h = html(createElement(Farol, { f: { tipo: 'cor', escala: 'custo', cor: 'AZUL', posicao: 1, palavra: 'bem melhor que a meta', confira: 'confira se está tudo lançado', desvioTexto: '−3,5 pp', rotulo: 'x' } }));
-    expect(h).toContain('x="0" y="0" width="8"');
+    expect(h).toContain('x="0" y="0" width="10"');
     expect(h).toContain('confira se está tudo lançado');
     expect(h).toContain('text-farol-azul');
   });

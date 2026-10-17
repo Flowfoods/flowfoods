@@ -36,8 +36,8 @@
   --ff-atencao: 146 64 14;
   --ff-farol-azul: 47 93 138;
   --ff-farol-verde: 22 101 52;
-  --ff-farol-amarelo: 122 92 0;
-  --ff-farol-laranja: 168 75 12;
+  --ff-farol-amarelo: 111 99 0;
+  --ff-farol-laranja: 176 68 0;
   --ff-farol-vermelho: 196 21 34;
   --ff-ativo: rgb(196 21 34 / 0.08);
   --ff-sombra: 0 10px 22px rgb(10 10 10 / 0.12);
@@ -64,7 +64,7 @@
   --ff-ok: 74 222 128;
   --ff-atencao: 245 158 11;
   --ff-farol-azul: 141 180 220;
-  --ff-farol-verde: 74 222 128;
+  --ff-farol-verde: 93 187 132;
   --ff-farol-amarelo: 226 197 90;
   --ff-farol-laranja: 240 145 58;
   --ff-farol-vermelho: 245 66 77;
@@ -94,7 +94,7 @@
     --ff-ok: 74 222 128;
     --ff-atencao: 245 158 11;
     --ff-farol-azul: 141 180 220;
-    --ff-farol-verde: 74 222 128;
+    --ff-farol-verde: 93 187 132;
     --ff-farol-amarelo: 226 197 90;
     --ff-farol-laranja: 240 145 58;
     --ff-farol-vermelho: 245 66 77;

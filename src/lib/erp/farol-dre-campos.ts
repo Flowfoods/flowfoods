@@ -56,6 +56,10 @@ export interface EntradaDoFarol {
   recorrentes: readonly RecorrenteSemMes[];
   /** Período fechado antes do farol (fotografia v1 ou v2): a receita não tem farol e não se recalcula. */
   receitaNaoApurada: boolean;
+  /** A versão das faixas com que o fechado foi lido; no ao vivo, a de hoje. */
+  versaoDasFaixas?: number;
+  /** Versão que este código não conhece (fotografia de uma versão futura): nada pode virar cor. */
+  faixasDesconhecidas?: boolean;
 }
 
 export interface FaixaContada {
@@ -121,8 +125,12 @@ export function farolDoDre(e: EntradaDoFarol): FarolDoDre {
     }
     if (!c) continue;
     const sem = (motivo: string): FarolDaLinha => ({ tipo: 'sem', motivo, desvioTexto: c.desvioTexto });
-    if (motivoGeral) porLinha[l.chave] = sem(motivoGeral);
+    // O CMV da rede dividido pela receita de lojas que não têm CMV sai baixo: com "sem o CMV de X" na nota (Compras ou Real, incompleto) não há cor.
+    const cmvIncompleto = l.tipo === 'cmv' ? /sem o CMV de ([^;]+)/.exec(l.nota ?? '') : null;
+    if (e.faixasDesconhecidas) porLinha[l.chave] = sem(`as faixas do farol deste fechamento são da versão ${e.versaoDasFaixas}, que este sistema não conhece`);
+    else if (motivoGeral) porLinha[l.chave] = sem(motivoGeral);
     else if (!c.faixa || c.desvioTexto === null) porLinha[l.chave] = sem(c.semComparacao ?? 'sem comparação');
+    else if (cmvIncompleto) porLinha[l.chave] = sem(`sem o CMV de ${cmvIncompleto[1].trim()}`);
     else if (l.semContar.length > 0) porLinha[l.chave] = sem(`sem contar ${l.semContar.join(' e ')}`);
     else if (e.recorrentes.some((r) => atinge(r, l))) porLinha[l.chave] = sem(MOTIVO_RECORRENTE);
     else porLinha[l.chave] = { tipo: 'cor', escala: c.tipo === 'crescimento' ? 'receita' : 'custo', cor: c.faixa.cor, posicao: c.faixa.posicao, palavra: c.faixa.palavra, confira: c.faixa.confira, desvioTexto: c.desvioTexto, rotulo: rotuloDoFarol(c.faixa, c.desvioTexto) };
@@ -135,7 +143,7 @@ export function farolDoDre(e: EntradaDoFarol): FarolDoDre {
     if (f.tipo === 'cor') contagem.find((x) => x.cor === f.cor)!.linhas.push({ chave: l.chave, nome: nomeNoPainel(l) });
     else if (e.metas[l.chave]) semCor.push({ chave: l.chave, nome: nomeNoPainel(l), motivo: f.motivo });
   }
-  return { versaoDasFaixas: VERSAO_DAS_FAIXAS, porLinha, contagem, semCor, motivoGeral };
+  return { versaoDasFaixas: e.versaoDasFaixas ?? VERSAO_DAS_FAIXAS, porLinha, contagem, semCor, motivoGeral };
 }
 
 // ============================================================ o painel por canal
@@ -206,9 +214,17 @@ export function canaisDoPeriodo(p: {
   return out;
 }
 
-/** Os pedidos somados por canal; nulo quando nenhuma linha trazia o número. */
-export function pedidosPorCanal(receitas: readonly { canal: CanalVenda; pedidos?: number }[]): Record<CanalVenda, number | null> {
+/**
+ * Os pedidos somados por canal. Nulo quando ninguém informou, e também quando QUALQUER loja que vendeu no canal não informou
+ * (valor sem pedidos): senão o ticket dividiria a receita de todas as lojas pelos pedidos de algumas.
+ */
+export function pedidosPorCanal(receitas: readonly { canal: CanalVenda; pedidos?: number; valorCentavos?: number }[]): Record<CanalVenda, number | null> {
   const out: Record<CanalVenda, number | null> = { LOJA: null, DELIVERY_PROPRIO: null, IFOOD: null };
-  for (const r of receitas) if (r.pedidos !== undefined) out[r.canal] = (out[r.canal] ?? 0) + r.pedidos;
+  const faltou: Record<CanalVenda, boolean> = { LOJA: false, DELIVERY_PROPRIO: false, IFOOD: false };
+  for (const r of receitas) {
+    if (r.pedidos !== undefined) out[r.canal] = (out[r.canal] ?? 0) + r.pedidos;
+    if ((r.valorCentavos ?? 0) > 0 && !(r.pedidos !== undefined && r.pedidos > 0)) faltou[r.canal] = true;
+  }
+  for (const c of ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] as const) if (faltou[c]) out[c] = null;
   return out;
 }

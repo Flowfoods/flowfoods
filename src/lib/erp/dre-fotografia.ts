@@ -180,7 +180,7 @@ export async function lerCmvDaFotografia(tx: ClienteDoParceiro, alcance: Pick<Al
  * canal com os pedidos, e o ano passado (`entrada.anoPassado`). Como no CMV, a consulta já extrai do JSON só essas lojas:
  * a base da conta das outras nunca sai do banco. Fotografia de antes da v3: nada (receitas sem pedidos, sem ano passado).
  */
-export async function lerCanaisDaFotografia(tx: ClienteDoParceiro, alcance: Pick<Alcance, 'lojas'>, fotografiaId: string): Promise<{ receitas: ReceitaLida[]; anoPassado: unknown }> {
+export async function lerCanaisDaFotografia(tx: ClienteDoParceiro, alcance: Pick<Alcance, 'lojas'>, fotografiaId: string): Promise<{ receitas: ReceitaLida[]; anoPassado: unknown; versaoDasFaixas: number | null }> {
   const todas = alcance.lojas === 'todas';
   const ids = todas ? [] : [...alcance.lojas];
   const linhas = await tx.sql<{ lojaId: string; canal: string; valorCentavos: number; pedidos: number | null }>`
@@ -189,6 +189,9 @@ export async function lerCanaisDaFotografia(tx: ClienteDoParceiro, alcance: Pick
       jsonb_to_recordset(CASE WHEN jsonb_typeof(f."entrada"->'receitas') = 'array' THEN f."entrada"->'receitas' ELSE '[]'::jsonb END)
         AS r("lojaId" text, "canal" text, "valorCentavos" bigint, "pedidos" int)
     WHERE f."parceiroId" = ${tx.parceiroId} AND f."id" = ${fotografiaId} AND (${todas} OR r."lojaId" = ANY(${ids}::text[]))`;
+  const [ver] = await tx.sql<{ v: number | null }>`
+    SELECT CASE WHEN jsonb_typeof(f."entrada"->'farol'->'versao') = 'number' THEN (f."entrada"->'farol'->>'versao')::int ELSE NULL END AS "v"
+    FROM "DreFotografia" f WHERE f."parceiroId" = ${tx.parceiroId} AND f."id" = ${fotografiaId}`;
   const [ano] = await tx.sql<{ ano: unknown }>`
     SELECT CASE WHEN jsonb_typeof(f."entrada"->'anoPassado') = 'object' AND jsonb_typeof(f."entrada"->'anoPassado'->'lojas') = 'object' THEN
       jsonb_build_object(
@@ -199,6 +202,7 @@ export async function lerCanaisDaFotografia(tx: ClienteDoParceiro, alcance: Pick
   return {
     receitas: linhas.map((l) => ({ lojaId: l.lojaId, canal: l.canal as ReceitaLida['canal'], valorCentavos: Number(l.valorCentavos), ...(l.pedidos !== null ? { pedidos: l.pedidos } : {}) })),
     anoPassado: ano?.ano ?? null,
+    versaoDasFaixas: ver?.v ?? null,
   };
 }
 

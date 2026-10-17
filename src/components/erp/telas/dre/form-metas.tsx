@@ -82,7 +82,7 @@ export function FormMetas({
         aria-label={l.tipoDaMeta === 'crescimento' ? `${l.nome}: meta de crescimento sobre o ano passado, em %` : undefined}
         aria-invalid={!!erro}
         aria-describedby={erro ? `${id}-erro` : undefined}
-        className={`${CAMPO} ml-auto w-28 text-right font-normal tabular-nums sm:w-32`}
+        className={`${CAMPO} ml-auto w-28 scroll-mb-28 text-right font-normal tabular-nums sm:w-32`}
       />
     ) : (
       <span className="block min-h-6 text-[12px] font-normal leading-6 text-suave">base: 100 %</span>

@@ -19,13 +19,16 @@ const TEXTO_DA_COR: Record<CorDoFarol, string> = {
 
 const CASAS = [0, 1, 2, 3, 4];
 
-/** Cinco quadrados de 8 px; a casa da faixa cheia (azul à esquerda, vermelho à direita), as outras só o contorno. */
-export function Regua({ posicao, cor, rotulo }: { posicao: number | null; cor?: CorDoFarol; rotulo?: string }) {
+/**
+ * Cinco quadrados de 10 px; a casa da faixa cheia (azul à esquerda, vermelho à direita), as outras só o contorno.
+ * `largura` encolhe a régua inteira (o painel no celular usa 44 px): o desenho escala junto.
+ */
+export function Regua({ posicao, cor, rotulo, largura = 62 }: { posicao: number | null; cor?: CorDoFarol; rotulo?: string; largura?: number }) {
   return (
     <svg
-      width="48"
-      height="8"
-      viewBox="0 0 48 8"
+      width={largura}
+      height={Math.round((largura * 10) / 62)}
+      viewBox="0 0 62 10"
       role={rotulo ? 'img' : undefined}
       aria-label={rotulo}
       aria-hidden={rotulo ? undefined : true}
@@ -34,9 +37,9 @@ export function Regua({ posicao, cor, rotulo }: { posicao: number | null; cor?: 
     >
       {CASAS.map((i) =>
         posicao === i + 1 ? (
-          <rect key={i} x={i * 10} y="0" width="8" height="8" rx="1.5" fill="currentColor" />
+          <rect key={i} x={i * 13} y="0" width="10" height="10" rx="2" fill="currentColor" />
         ) : (
-          <rect key={i} x={i * 10 + 0.5} y="0.5" width="7" height="7" rx="1" fill="none" className="stroke-suave" strokeWidth="1" />
+          <rect key={i} x={i * 13 + 0.5} y="0.5" width="9" height="9" rx="1.5" fill="none" className="stroke-suave" strokeWidth="1" />
         ),
       )}
     </svg>

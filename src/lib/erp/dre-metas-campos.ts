@@ -15,7 +15,7 @@
  */
 
 import { diasEntre } from './contagem-campos';
-import { faixaDoDesvio, type FaixaDoDesvio } from './farol-campos';
+import { faixaDoDesvio, FAIXAS_DO_FAROL, type FaixaDoDesvio, type FaixasDoFarol } from './farol-campos';
 import { CHAVE_CMV_COMPRA, CHAVE_CMV_REAL, dividirExato, montarDre, textoDosPontos, type LinhaDoDre } from './dre-campos';
 import { SEM_CMV } from './cmv-campos';
 import { CODIGO, codigoDoSubtotal, type LinhaDoPlano, type SentidoDaLinha } from './dre-plano';
@@ -114,7 +114,7 @@ interface LinhaParaComparar {
  * linha de despesa sem lançamento NÃO comparam: o desvio e a meta em R$ ficam em "—", nunca em zero
  * (ausência de dado não é um resultado bom).
  */
-export function compararComMeta(linha: LinhaParaComparar, metaBp: number, receitaBrutaCentavos: number): ComparacaoComMeta {
+export function compararComMeta(linha: LinhaParaComparar, metaBp: number, receitaBrutaCentavos: number, faixas: FaixasDoFarol = FAIXAS_DO_FAROL): ComparacaoComMeta {
   const metaCentavos = receitaBrutaCentavos > 0 ? dividirExato(BigInt(metaBp) * BigInt(receitaBrutaCentavos), 10_000n) : null;
   const sem = (motivo: string): ComparacaoComMeta => ({ metaBp, tipo: 'percentual', metaCentavos, desvioBp: null, desvioTexto: null, variacaoBp: null, faixa: null, semComparacao: motivo });
   if (receitaBrutaCentavos <= 0) return sem('sem faturamento');
@@ -122,7 +122,7 @@ export function compararComMeta(linha: LinhaParaComparar, metaBp: number, receit
   // Zero numa linha de despesa ou subtotal é "nada lançado"; só o resultado pode fechar em zero de verdade.
   if (linha.valorCentavos === 0 && linha.tipo !== 'resultado') return sem('sem lançamento');
   const desvioBp = linha.percentualBp - metaBp;
-  return { metaBp, tipo: 'percentual', metaCentavos, desvioBp, desvioTexto: textoDosPontos(desvioBp), variacaoBp: null, faixa: faixaDoDesvio(linha.sentido, desvioBp, 'custo'), semComparacao: null };
+  return { metaBp, tipo: 'percentual', metaCentavos, desvioBp, desvioTexto: textoDosPontos(desvioBp), variacaoBp: null, faixa: faixaDoDesvio(linha.sentido, desvioBp, 'custo', faixas), semComparacao: null };
 }
 
 // ============================================================ ano passado
@@ -146,15 +146,18 @@ export interface LinhaDoAnoPassado {
   anteriorCentavos: number | null;
   /** Variação em pontos-base; nula quando falta dado dos dois lados. */
   variacaoBp: number | null;
+  /** Por que ESTA linha não tem variação (a cobertura é por loja e, na receita de um canal, por canal); nulo quando tem. */
+  semVariacaoPorque: string | null;
+  motivoCurto: string | null;
 }
 
 export interface AnoPassado {
   de: string;
   ate: string;
-  /** Dias do recorte do ano passado com algum lançamento no escopo, e quantos dias o recorte tem. */
+  /** Dias do recorte do ano passado: o pior que uma loja exigida cobre (o que sobra de menos), e quantos dias o recorte tem. */
   diasComLancamento: number;
   diasDoRecorte: number;
-  /** A frase que explica por que não há variação (nula quando há). */
+  /** A frase que explica por que não há variação na receita bruta (nula quando há). */
   semVariacaoPorque: string | null;
   /** O mesmo motivo em poucas palavras, para a célula do farol ("ano passado: 12 de 15 dias"). */
   motivoCurto: string | null;
@@ -165,72 +168,106 @@ export interface GraoDoAnoPassado {
   data: string;
   canal: CanalVenda;
   valorCentavos: number;
+  /** Sem loja (testes antigos): vale como uma loja só. */
+  lojaId?: string;
 }
 
-/** O ano passado já somado: os dias com lançamento (sem repetir) e o total de cada canal (nulo = nenhum lançamento). */
-export interface AnoPassadoSomado {
+/**
+ * O ano passado de UMA loja, já somado. `dias` é quantos dias do recorte têm algum lançamento (a receita bruta); `canais[c].dias`,
+ * quantos têm lançamento naquele canal (a receita do canal). `exigida` = a loja está ativa: ela precisa ter todos os dias, e o canal
+ * que ela vende hoje precisa ter todos os dias (decisão 176: uma loja com buraco no ano passado não deixa a rede ter cor).
+ */
+export interface LojaDoAnoPassado {
+  lojaId: string;
+  nome: string;
+  exigida: boolean;
+  vende: readonly CanalVenda[];
   dias: number;
-  porCanal: Record<CanalVenda, number | null>;
+  canais: Record<CanalVenda, { centavos: number | null; dias: number }>;
 }
 
 const CANAIS_DA_RECEITA: readonly CanalVenda[] = ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'];
+const NOME_DO_CANAL_NA_FRASE: Record<CanalVenda, string> = { LOJA: 'Loja', DELIVERY_PROPRIO: 'Delivery próprio', IFOOD: 'iFood' };
 
 /**
- * Compara a receita do recorte [de, ate] com as mesmas datas um ano antes, a partir do ano passado já somado. A variação
- * em % só sai quando o ano passado tem lançamento em TODOS os dias do recorte e o período atual não tem lançamento
- * faltando; senão ficam os dois números e a razão ("ano passado: 12 de 31 dias").
+ * Compara a receita do recorte [de, ate] com as mesmas datas um ano antes, loja por loja. A variação em % só sai quando CADA loja
+ * exigida do escopo tem lançamento em todos os dias do recorte (e, na receita de um canal, cada loja que vende o canal tem todos
+ * os dias dele) e o período atual não tem lançamento faltando; senão ficam os dois números e a razão com o nome de quem falta
+ * ("ano passado incompleto: Delivery 29 de 30 dias"). Somar as lojas esconderia o buraco de uma atrás da outra.
  */
-export function compararComOAnoPassadoSomado(entrada: {
+export function compararComOAnoPassadoPorLoja(entrada: {
   de: string;
   ate: string;
   atual: Record<CanalVenda, number>;
-  anterior: AnoPassadoSomado;
+  lojas: readonly LojaDoAnoPassado[];
   faltasNoPeriodoAtual: number;
 }): AnoPassado {
   const de = mesmaDataNoAnoPassado(entrada.de);
   const ate = mesmaDataNoAnoPassado(entrada.ate);
   const diasDoRecorte = ate < de ? 0 : diasEntre(de, ate) + 1;
-  const diasComLancamento = entrada.anterior.dias;
-  const total = diasDoRecorte > 0 && diasComLancamento >= diasDoRecorte;
-  const antes = entrada.anterior.porCanal;
+  const exigidas = entrada.lojas.filter((l) => l.exigida);
+  const umaSo = exigidas.length === 1;
+  const antes: Record<CanalVenda, number | null> = { LOJA: null, DELIVERY_PROPRIO: null, IFOOD: null };
+  for (const l of entrada.lojas) for (const c of CANAIS_DA_RECEITA) if (l.canais[c].centavos !== null) antes[c] = (antes[c] ?? 0) + l.canais[c].centavos!;
   const temAlgum = CANAIS_DA_RECEITA.some((c) => antes[c] !== null);
   const bruta = temAlgum ? (antes.LOJA ?? 0) + (antes.DELIVERY_PROPRIO ?? 0) + (antes.IFOOD ?? 0) : null;
   const atualBruta = entrada.atual.LOJA + entrada.atual.DELIVERY_PROPRIO + entrada.atual.IFOOD;
+  const diasComLancamento = exigidas.length === 0 ? 0 : Math.min(...exigidas.map((l) => l.dias));
 
-  let semVariacaoPorque: string | null = null;
-  let motivoCurto: string | null = null;
-  if (!temAlgum) {
-    semVariacaoPorque = 'Sem lançamento de faturamento no mesmo período do ano passado.';
-    motivoCurto = 'sem lançamento no ano passado';
-  } else if (!total) {
-    semVariacaoPorque = `Ano passado: ${diasComLancamento} de ${diasDoRecorte} dias com lançamento. Sem a cobertura inteira a variação não é justa.`;
-    motivoCurto = `ano passado: ${diasComLancamento} de ${diasDoRecorte} dias`;
-  } else if (entrada.faltasNoPeriodoAtual > 0) {
-    semVariacaoPorque = 'O período de agora tem lançamento de faturamento faltando: a variação sai quando ele estiver completo.';
-    motivoCurto = 'faltam lançamentos de faturamento neste período';
-  }
-
-  const variacao = (atual: number, anterior: number | null): number | null =>
-    semVariacaoPorque === null && anterior !== null && anterior > 0 ? dividirExato(BigInt(atual - anterior) * 10_000n, BigInt(anterior)) : null;
+  const SEM_LANCAMENTO = { porque: 'Sem lançamento de faturamento no mesmo período do ano passado.', curto: 'sem lançamento no ano passado' };
+  /** O motivo de uma linha: nulo = a variação vale. `pares` = (loja, dias lançados) que a linha exige. */
+  const motivoDe = (pares: readonly { nome: string; dias: number }[], rotulo: string | null): { porque: string; curto: string } | null => {
+    if (!temAlgum) return SEM_LANCAMENTO;
+    const faltam = pares.filter((p) => p.dias < diasDoRecorte);
+    if (faltam.length > 0 && !(rotulo !== null && pares.every((p) => p.dias === 0))) {
+      const quem = umaSo ? `${faltam[0].dias} de ${diasDoRecorte} dias` : faltam.map((p) => `${p.nome} ${p.dias} de ${diasDoRecorte}`).join(', ');
+      const onde = rotulo ? ` no canal ${rotulo}` : '';
+      return {
+        porque: `Ano passado${umaSo ? '' : ' incompleto'}${onde}: ${quem}${umaSo ? ' com lançamento' : ''}. Sem a cobertura inteira a variação não é justa.`,
+        curto: `ano passado${umaSo ? '' : ' incompleto'}${onde}: ${quem}`,
+      };
+    }
+    if (entrada.faltasNoPeriodoAtual > 0) return { porque: 'O período de agora tem lançamento de faturamento faltando: a variação sai quando ele estiver completo.', curto: 'faltam lançamentos de faturamento neste período' };
+    return null;
+  };
+  const doCanal = (c: CanalVenda) => exigidas.filter((l) => l.vende.includes(c)).map((l) => ({ nome: l.nome, dias: l.canais[c].dias }));
+  const daBruta = motivoDe(exigidas.map((l) => ({ nome: l.nome, dias: l.dias })), null);
+  const variacao = (atual: number, anterior: number | null, m: ReturnType<typeof motivoDe>): number | null => (m === null && anterior !== null && anterior > 0 ? dividirExato(BigInt(atual - anterior) * 10_000n, BigInt(anterior)) : null);
   return {
     de,
     ate,
     diasComLancamento,
     diasDoRecorte,
-    semVariacaoPorque,
-    motivoCurto,
+    semVariacaoPorque: daBruta?.porque ?? null,
+    motivoCurto: daBruta?.curto ?? null,
     linhas: [
-      { chave: 'bruta', atualCentavos: atualBruta, anteriorCentavos: bruta, variacaoBp: variacao(atualBruta, bruta) },
-      ...CANAIS_DA_RECEITA.map((c) => ({ chave: c, atualCentavos: entrada.atual[c], anteriorCentavos: antes[c], variacaoBp: variacao(entrada.atual[c], antes[c]) })),
+      { chave: 'bruta', atualCentavos: atualBruta, anteriorCentavos: bruta, variacaoBp: variacao(atualBruta, bruta, daBruta), semVariacaoPorque: daBruta?.porque ?? null, motivoCurto: daBruta?.curto ?? null },
+      ...CANAIS_DA_RECEITA.map((c) => {
+        // Um canal que NENHUMA loja lançou no ano passado "não vendia": a frase é a do canal (sem lançamento), não a de buraco.
+        const m = motivoDe(doCanal(c), NOME_DO_CANAL_NA_FRASE[c]);
+        return { chave: c as ChaveDaReceita, atualCentavos: entrada.atual[c], anteriorCentavos: antes[c], variacaoBp: variacao(entrada.atual[c], antes[c], m), semVariacaoPorque: m?.porque ?? null, motivoCurto: m?.curto ?? null };
+      }),
     ],
   };
 }
 
-/** Os grãos do ano passado (um por dia e canal) somados: dias distintos e total por canal. */
-export function somarOAnoPassado(graos: readonly GraoDoAnoPassado[]): AnoPassadoSomado {
-  const porCanal: Record<CanalVenda, number | null> = { LOJA: null, DELIVERY_PROPRIO: null, IFOOD: null };
-  for (const g of graos) porCanal[g.canal] = (porCanal[g.canal] ?? 0) + g.valorCentavos;
-  return { dias: new Set(graos.map((g) => g.data)).size, porCanal };
+/** Os grãos do ano passado (um por dia e canal) somados por loja: dias distintos e total por canal. `lojas` = as do escopo (nome, ativa, canais que vende). */
+export function somarOAnoPassadoPorLoja(graos: readonly GraoDoAnoPassado[], lojas?: readonly { id: string; nome: string; ativa: boolean; canais: readonly CanalVenda[] }[]): LojaDoAnoPassado[] {
+  const porLoja = new Map<string, GraoDoAnoPassado[]>();
+  for (const g of graos) porLoja.set(g.lojaId ?? '', [...(porLoja.get(g.lojaId ?? '') ?? []), g]);
+  const base = lojas ? lojas.map((l) => ({ id: l.id, nome: l.nome, exigida: l.ativa, vende: l.canais })) : Array.from(porLoja.keys()).map((id) => ({ id, nome: '', exigida: true, vende: CANAIS_DA_RECEITA.filter((c) => porLoja.get(id)!.some((g) => g.canal === c)) }));
+  // Loja com lançamento mas fora da lista (desativada): entra na soma, não é exigida.
+  for (const id of porLoja.keys()) if (!base.some((b) => b.id === id)) base.push({ id, nome: '', exigida: false, vende: [] });
+  return base.map((b) => {
+    const gs = porLoja.get(b.id) ?? [];
+    const canais = Object.fromEntries(
+      CANAIS_DA_RECEITA.map((c) => {
+        const dc = gs.filter((g) => g.canal === c);
+        return [c, { centavos: dc.length ? dc.reduce((t, g) => t + g.valorCentavos, 0) : null, dias: new Set(dc.map((g) => g.data)).size }];
+      }),
+    ) as LojaDoAnoPassado['canais'];
+    return { lojaId: b.id, nome: b.nome, exigida: b.exigida, vende: b.vende, dias: new Set(gs.map((g) => g.data)).size, canais };
+  });
 }
 
 /** O mesmo, a partir dos grãos do ano passado (a leitura ao vivo). */
@@ -240,54 +277,49 @@ export function compararComOAnoPassado(entrada: {
   atual: Record<CanalVenda, number>;
   graosDoAnoPassado: readonly GraoDoAnoPassado[];
   faltasNoPeriodoAtual: number;
+  /** As lojas do escopo: sem elas, cada `lojaId` dos grãos vale como uma loja exigida (e sem `lojaId`, uma loja só). */
+  lojas?: readonly { id: string; nome: string; ativa: boolean; canais: readonly CanalVenda[] }[];
 }): AnoPassado {
-  return compararComOAnoPassadoSomado({ de: entrada.de, ate: entrada.ate, atual: entrada.atual, anterior: somarOAnoPassado(entrada.graosDoAnoPassado), faltasNoPeriodoAtual: entrada.faltasNoPeriodoAtual });
+  return compararComOAnoPassadoPorLoja({ de: entrada.de, ate: entrada.ate, atual: entrada.atual, lojas: somarOAnoPassadoPorLoja(entrada.graosDoAnoPassado, entrada.lojas), faltasNoPeriodoAtual: entrada.faltasNoPeriodoAtual });
 }
 
-// ============================================================ o ano passado guardado na fotografia (2.4, decisão 178)
+// ============================================================ o ano passado guardado na fotografia (2.4, decisão 179)
 
 /**
- * O que a fotografia v3 guarda do ano passado: por loja, os dias com lançamento (o índice de cada dia a partir de `de`,
- * a data do ano passado em que o recorte começa) e o total de cada canal (ausente = nenhum lançamento). O fechado lê
- * o ano passado SÓ daqui: editar o faturamento de um período antigo depois não muda a variação do fechado.
+ * O que a fotografia v3 guarda do ano passado, por loja: o nome, se era exigida (ativa), os canais que vendia, os dias com lançamento
+ * (qualquer canal) e, por canal, o total e os dias. O fechado lê o ano passado e a cobertura SÓ daqui: editar o faturamento de um
+ * período antigo depois não muda a variação do fechado, e a regra "cada loja com todos os dias" vale igual ao vivo e no fechado.
  */
 export interface AnoPassadoGuardado {
   versao: 1;
   de: string;
   ate: string;
-  lojas: Record<string, { dias: number[]; canais: Partial<Record<CanalVenda, number>> }>;
+  lojas: Record<string, { nome: string; exigida: boolean; vende: CanalVenda[]; dias: number; canais: Partial<Record<CanalVenda, { centavos: number; dias: number }>> }>;
 }
 
-export function anoPassadoParaGravar(de: string, ate: string, graos: readonly (GraoDoAnoPassado & { lojaId: string })[]): AnoPassadoGuardado {
-  const lojas: AnoPassadoGuardado['lojas'] = {};
-  const dias = new Map<string, Set<number>>();
-  for (const g of graos) {
-    const l = (lojas[g.lojaId] ??= { dias: [], canais: {} });
-    l.canais[g.canal] = (l.canais[g.canal] ?? 0) + g.valorCentavos;
-    const set = dias.get(g.lojaId) ?? new Set<number>();
-    set.add(diasEntre(de, g.data));
-    dias.set(g.lojaId, set);
+export function anoPassadoParaGravar(de: string, ate: string, graos: readonly (GraoDoAnoPassado & { lojaId: string })[], lojas: readonly { id: string; nome: string; ativa: boolean; canais: readonly CanalVenda[] }[]): AnoPassadoGuardado {
+  const out: AnoPassadoGuardado['lojas'] = {};
+  for (const l of somarOAnoPassadoPorLoja(graos, lojas)) {
+    const canais: AnoPassadoGuardado['lojas'][string]['canais'] = {};
+    for (const c of CANAIS_DA_RECEITA) if (l.canais[c].centavos !== null) canais[c] = { centavos: l.canais[c].centavos!, dias: l.canais[c].dias };
+    const dados = lojas.find((x) => x.id === l.lojaId);
+    out[l.lojaId] = { nome: dados?.nome ?? '', exigida: l.exigida, vende: [...l.vende], dias: l.dias, canais };
   }
-  for (const [id, set] of dias) lojas[id].dias = Array.from(set).sort((a, b) => a - b);
-  return { versao: 1, de, ate, lojas };
+  return { versao: 1, de, ate, lojas: out };
 }
 
 /** Lê o que `anoPassadoParaGravar` guardou (e devolve null se o JSON não é isso), só das lojas pedidas. */
-export function lerAnoPassadoGuardado(bruto: unknown, lojas: readonly string[] | 'todas'): AnoPassadoSomado | null {
+export function lerAnoPassadoGuardado(bruto: unknown, lojas: readonly string[] | 'todas'): LojaDoAnoPassado[] | null {
   if (typeof bruto !== 'object' || bruto === null) return null;
   const g = bruto as Partial<AnoPassadoGuardado>;
   if (g.versao !== 1 || typeof g.lojas !== 'object' || g.lojas === null) return null;
-  const dias = new Set<number>();
-  const porCanal: Record<CanalVenda, number | null> = { LOJA: null, DELIVERY_PROPRIO: null, IFOOD: null };
+  const out: LojaDoAnoPassado[] = [];
   for (const [id, l] of Object.entries(g.lojas)) {
     if (lojas !== 'todas' && !lojas.includes(id)) continue;
-    for (const d of l.dias ?? []) dias.add(d);
-    for (const c of CANAIS_DA_RECEITA) {
-      const v = l.canais?.[c];
-      if (typeof v === 'number') porCanal[c] = (porCanal[c] ?? 0) + v;
-    }
+    const canais = Object.fromEntries(CANAIS_DA_RECEITA.map((c) => [c, { centavos: typeof l.canais?.[c]?.centavos === 'number' ? l.canais[c]!.centavos : null, dias: Number(l.canais?.[c]?.dias ?? 0) }])) as LojaDoAnoPassado['canais'];
+    out.push({ lojaId: id, nome: String(l.nome ?? ''), exigida: l.exigida === true, vende: (l.vende ?? []).filter((c) => CANAIS_DA_RECEITA.includes(c)), dias: Number(l.dias ?? 0), canais });
   }
-  return { dias: dias.size, porCanal };
+  return out;
 }
 
 /** "+12,5 %" · "−3,0 %" (variação da receita, em pontos-base). */
@@ -328,15 +360,15 @@ export function linhasDeMeta(plano: readonly LinhaDoPlano[]): LinhaDeMeta[] {
  * ano passado (`AnoPassado`), o desvio é variação menos meta, e a faixa usa a escala da receita. Sem dado dos dois lados
  * (sem dia apurado, ano passado sem lançamento ou incompleto, canal que não vendia) NÃO compara, e diz por quê.
  */
-export function compararCrescimento(chave: ChaveDaReceita, metaBp: number, anoPassado: AnoPassado | null): ComparacaoComMeta {
+export function compararCrescimento(chave: ChaveDaReceita, metaBp: number, anoPassado: AnoPassado | null, faixas: FaixasDoFarol = FAIXAS_DO_FAROL): ComparacaoComMeta {
   const linha = anoPassado?.linhas.find((l) => l.chave === chave);
   const metaCentavos = linha && linha.anteriorCentavos !== null && linha.anteriorCentavos > 0 ? dividirExato(BigInt(linha.anteriorCentavos) * BigInt(10_000 + metaBp), 10_000n) : null;
   const sem = (motivo: string, variacaoBp: number | null = null): ComparacaoComMeta => ({ metaBp, tipo: 'crescimento', metaCentavos, desvioBp: null, desvioTexto: null, variacaoBp, faixa: null, semComparacao: motivo });
   if (!anoPassado || !linha) return sem('nenhum dia apurado');
-  if (anoPassado.semVariacaoPorque !== null) return sem(anoPassado.motivoCurto ?? 'sem variação');
+  if (linha.motivoCurto !== null) return sem(linha.motivoCurto);
   if (linha.anteriorCentavos === null || linha.anteriorCentavos <= 0 || linha.variacaoBp === null) return sem(chave === 'bruta' ? 'sem lançamento no ano passado' : 'o canal não vendia no ano passado');
   const desvioBp = linha.variacaoBp - metaBp;
-  return { metaBp, tipo: 'crescimento', metaCentavos, desvioBp, desvioTexto: textoDosPontos(desvioBp), variacaoBp: linha.variacaoBp, faixa: faixaDoDesvio('MAIOR_MELHOR', desvioBp, 'receita'), semComparacao: null };
+  return { metaBp, tipo: 'crescimento', metaCentavos, desvioBp, desvioTexto: textoDosPontos(desvioBp), variacaoBp: linha.variacaoBp, faixa: faixaDoDesvio('MAIOR_MELHOR', desvioBp, 'receita', faixas), semComparacao: null };
 }
 
 /**
@@ -350,12 +382,13 @@ export function compararLinhas(
   receitaBrutaCentavos: number,
   daLoja: boolean,
   anoPassado: AnoPassado | null = null,
+  faixas: FaixasDoFarol = FAIXAS_DO_FAROL,
 ): Record<string, ComparacaoComMeta> {
   const out: Record<string, ComparacaoComMeta> = {};
   for (const l of linhas) {
     const bp = metas.get(l.chave);
     if (bp === undefined || !aceitaMeta(l.chave) || (daLoja && !metaApareceNaLoja(l.chave))) continue;
-    out[l.chave] = tipoDaMeta(l.chave) === 'crescimento' ? compararCrescimento(CHAVE_DA_RECEITA[l.chave], bp, anoPassado) : compararComMeta(l, bp, receitaBrutaCentavos);
+    out[l.chave] = tipoDaMeta(l.chave) === 'crescimento' ? compararCrescimento(CHAVE_DA_RECEITA[l.chave], bp, anoPassado, faixas) : compararComMeta(l, bp, receitaBrutaCentavos, faixas);
   }
   return out;
 }

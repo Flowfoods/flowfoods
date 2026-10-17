@@ -16,7 +16,7 @@ import {
   anoPassadoParaGravar,
   compararComMeta,
   compararComOAnoPassado,
-  compararComOAnoPassadoSomado,
+  compararComOAnoPassadoPorLoja,
   compararCrescimento,
   compararLinhas,
   lerAnoPassadoGuardado,
@@ -26,7 +26,7 @@ import {
 import { ajudaParaATela } from '@/lib/erp/ajuda';
 import { planoEfetivo } from '@/lib/erp/dre-plano';
 import { pode, resolverAlcance } from '@/lib/erp/permissoes';
-import { CORES_DO_FAROL, FAIXAS_DO_FAROL, faixaDoDesvio, posicaoDaCor, VERSAO_DAS_FAIXAS } from '@/lib/erp/farol-campos';
+import { CORES_DO_FAROL, FAIXAS_DO_FAROL, faixaDoDesvio, faixasDaVersao, posicaoDaCor, VERSAO_DAS_FAIXAS } from '@/lib/erp/farol-campos';
 import { canaisDoPeriodo, farolDoDre, pedidosPorCanal, type EntradaDoFarol } from '@/lib/erp/farol-dre-campos';
 
 // ------------------------------------------------------------------ as faixas
@@ -180,7 +180,7 @@ describe('2.4 · receita por canal contra o ano passado (critérios 5 e 6)', () 
     const doze = Array.from({ length: 12 }, (_, i) => grao('LOJA', 1_000, i + 1));
     const parcial = ano(doze, { LOJA: R(15_000), DELIVERY_PROPRIO: 0, IFOOD: 0 }, '2026-10-15');
     expect(parcial.motivoCurto).toBe('ano passado: 12 de 15 dias');
-    expect(compararCrescimento('LOJA', 500, parcial)).toMatchObject({ desvioBp: null, faixa: null, semComparacao: 'ano passado: 12 de 15 dias' });
+    expect(compararCrescimento('LOJA', 500, parcial)).toMatchObject({ desvioBp: null, faixa: null, semComparacao: 'ano passado no canal Loja: 12 de 15 dias' });
     const zero = ano([], { LOJA: R(15_000), DELIVERY_PROPRIO: 0, IFOOD: 0 });
     expect(compararCrescimento('LOJA', 500, zero)).toMatchObject({ desvioBp: null, faixa: null, semComparacao: 'sem lançamento no ano passado' });
     // Um canal que não vendia no ano passado não tem crescimento (não existe divisão por zero).
@@ -286,35 +286,147 @@ describe('2.4 · meta de crescimento: o que se aceita (ataque 5)', () => {
   });
 });
 
-describe('2.4 · o ano passado que a fotografia guarda (decisão 178)', () => {
+describe('2.4 · o ano passado que a fotografia guarda (decisão 179)', () => {
+  const lojasDoEscopo = [
+    { id: 'vp', nome: 'Vila da Penha', ativa: true, canais: ['LOJA', 'IFOOD'] as ('LOJA' | 'IFOOD')[] },
+    { id: 'ct', nome: 'Centro', ativa: true, canais: ['LOJA'] as ('LOJA')[] },
+  ];
   const graos = [
     { lojaId: 'vp', data: '2025-10-01', canal: 'LOJA' as const, valorCentavos: 10_000 },
     { lojaId: 'vp', data: '2025-10-02', canal: 'LOJA' as const, valorCentavos: 20_000 },
     { lojaId: 'vp', data: '2025-10-02', canal: 'IFOOD' as const, valorCentavos: 5_000 },
+    { lojaId: 'vp', data: '2025-10-03', canal: 'LOJA' as const, valorCentavos: 0 },
     { lojaId: 'ct', data: '2025-10-02', canal: 'LOJA' as const, valorCentavos: 7_000 },
     { lojaId: 'ct', data: '2025-10-03', canal: 'LOJA' as const, valorCentavos: 1_000 },
   ];
-  const g = anoPassadoParaGravar('2025-10-01', '2025-10-03', graos);
+  const g = anoPassadoParaGravar('2025-10-01', '2025-10-03', graos, lojasDoEscopo);
 
-  it('guarda por loja os dias (índice a partir do começo) e o total de cada canal; ida e volta pelo JSON', () => {
-    expect(g.lojas.vp).toEqual({ dias: [0, 1], canais: { LOJA: 30_000, IFOOD: 5_000 } });
-    expect(g.lojas.ct).toEqual({ dias: [1, 2], canais: { LOJA: 8_000 } });
-    const volta = JSON.parse(JSON.stringify(g));
-    expect(lerAnoPassadoGuardado(volta, 'todas')).toEqual({ dias: 3, porCanal: { LOJA: 38_000, DELIVERY_PROPRIO: null, IFOOD: 5_000 } });
+  it('guarda por loja o nome, se era exigida, os canais que vendia, os dias e, por canal, o total e os dias; ida e volta pelo JSON', () => {
+    expect(g.lojas.vp).toEqual({ nome: 'Vila da Penha', exigida: true, vende: ['LOJA', 'IFOOD'], dias: 3, canais: { LOJA: { centavos: 30_000, dias: 3 }, IFOOD: { centavos: 5_000, dias: 1 } } });
+    expect(g.lojas.ct).toEqual({ nome: 'Centro', exigida: true, vende: ['LOJA'], dias: 2, canais: { LOJA: { centavos: 8_000, dias: 2 } } });
+    const volta = lerAnoPassadoGuardado(JSON.parse(JSON.stringify(g)), 'todas')!;
+    expect(volta.map((l) => [l.lojaId, l.dias, l.canais.LOJA.dias, l.canais.IFOOD.centavos])).toEqual([['vp', 3, 3, 5_000], ['ct', 2, 2, null]]);
   });
-  it('lê SÓ as lojas pedidas (o gerente de uma loja nunca soma a outra) e os dias não se repetem', () => {
-    expect(lerAnoPassadoGuardado(g, ['ct'])).toEqual({ dias: 2, porCanal: { LOJA: 8_000, DELIVERY_PROPRIO: null, IFOOD: null } });
-    expect(lerAnoPassadoGuardado(g, ['vp', 'ct'])?.dias).toBe(3);
-    expect(lerAnoPassadoGuardado(g, [])).toEqual({ dias: 0, porCanal: { LOJA: null, DELIVERY_PROPRIO: null, IFOOD: null } });
+  it('lê SÓ as lojas pedidas (o gerente de uma loja nunca recebe a outra)', () => {
+    expect(lerAnoPassadoGuardado(g, ['ct'])!.map((l) => l.lojaId)).toEqual(['ct']);
+    expect(lerAnoPassadoGuardado(g, [])).toEqual([]);
   });
-  it('a variação do guardado é a mesma da leitura ao vivo', () => {
+  it('a variação do guardado é a mesma da leitura ao vivo, loja por loja', () => {
     const atual = { LOJA: 45_000, DELIVERY_PROPRIO: 0, IFOOD: 4_000 };
-    const vivo = compararComOAnoPassado({ de: '2026-10-01', ate: '2026-10-03', atual, graosDoAnoPassado: graos.map((x) => ({ data: x.data, canal: x.canal, valorCentavos: x.valorCentavos })), faltasNoPeriodoAtual: 0 });
-    const guardado = compararComOAnoPassadoSomado({ de: '2026-10-01', ate: '2026-10-03', atual, anterior: lerAnoPassadoGuardado(JSON.parse(JSON.stringify(g)), 'todas')!, faltasNoPeriodoAtual: 0 });
+    const vivo = compararComOAnoPassado({ de: '2026-10-01', ate: '2026-10-03', atual, graosDoAnoPassado: graos, faltasNoPeriodoAtual: 0, lojas: lojasDoEscopo });
+    const guardado = compararComOAnoPassadoPorLoja({ de: '2026-10-01', ate: '2026-10-03', atual, lojas: lerAnoPassadoGuardado(JSON.parse(JSON.stringify(g)), 'todas')!, faltasNoPeriodoAtual: 0 });
     expect(guardado).toEqual(vivo);
   });
   it('JSON que não é o guardado vira nulo, nunca erro', () => {
     for (const lixo of [null, 3, 'x', {}, { versao: 2, lojas: {} }, { versao: 1, lojas: null }]) expect(lerAnoPassadoGuardado(lixo, 'todas')).toBeNull();
+  });
+});
+
+describe('2.4 · a cobertura do ano passado é POR LOJA (veto do Guardião, bloqueante 2)', () => {
+  const lojas = [
+    { id: 'vp', nome: 'Vila da Penha', ativa: true, canais: ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] as ('LOJA' | 'DELIVERY_PROPRIO' | 'IFOOD')[] },
+    { id: 'dl', nome: 'Delivery', ativa: true, canais: ['DELIVERY_PROPRIO', 'IFOOD'] as ('DELIVERY_PROPRIO' | 'IFOOD')[] },
+  ];
+  const dias = (n: number) => Array.from({ length: n }, (_, i) => `2025-09-${String(i + 1).padStart(2, '0')}`);
+  const doze = (lojaId: string, canal: 'LOJA' | 'DELIVERY_PROPRIO' | 'IFOOD', n: number, v: number) => dias(n).map((data) => ({ lojaId, data, canal, valorCentavos: v }));
+  const atual = { LOJA: R(1_000), DELIVERY_PROPRIO: R(900), IFOOD: R(500) };
+  const cobrir = (graos: ReturnType<typeof doze>, faltas = 0) => compararComOAnoPassado({ de: '2026-09-01', ate: '2026-09-05', atual, graosDoAnoPassado: graos, faltasNoPeriodoAtual: faltas, lojas });
+  const completo = [...doze('vp', 'LOJA', 5, R(200)), ...doze('vp', 'DELIVERY_PROPRIO', 5, R(100)), ...doze('vp', 'IFOOD', 5, R(100)), ...doze('dl', 'DELIVERY_PROPRIO', 5, R(100)), ...doze('dl', 'IFOOD', 5, R(100))];
+
+  it('as duas lojas com todos os dias: variação em todas as linhas', () => {
+    const a = cobrir(completo);
+    expect(a.semVariacaoPorque).toBeNull();
+    expect(a.linhas.every((l) => l.variacaoBp !== null && l.motivoCurto === null)).toBe(true);
+  });
+  it('o Delivery sem o dia 1 (todos os canais): a receita bruta e a dos canais DELE ficam sem variação, com o nome e a conta; a da Loja (só a Penha vende) segue', () => {
+    const a = cobrir(completo.filter((g) => !(g.lojaId === 'dl' && g.data === '2025-09-01')));
+    expect(a.motivoCurto).toBe('ano passado incompleto: Delivery 4 de 5');
+    expect(a.linhas.find((l) => l.chave === 'bruta')).toMatchObject({ variacaoBp: null, motivoCurto: 'ano passado incompleto: Delivery 4 de 5' });
+    expect(a.linhas.find((l) => l.chave === 'DELIVERY_PROPRIO')).toMatchObject({ variacaoBp: null, motivoCurto: 'ano passado incompleto no canal Delivery próprio: Delivery 4 de 5' });
+    expect(a.linhas.find((l) => l.chave === 'IFOOD')).toMatchObject({ variacaoBp: null });
+    expect(a.linhas.find((l) => l.chave === 'LOJA')).toMatchObject({ variacaoBp: expect.any(Number), motivoCurto: null });
+    // Sem essa regra, a rede "completa" porque a Penha lançou o dia 1 (o defeito provado pelo Guardião: +5,5 % na rede, +47,5 % no Delivery).
+    const meta = compararCrescimento('bruta', 0, a);
+    expect(meta).toMatchObject({ desvioBp: null, faixa: null, semComparacao: 'ano passado incompleto: Delivery 4 de 5' });
+  });
+  it('só um canal incompleto numa loja que o vende: a receita daquele canal e a bruta ficam sem variação; os outros canais seguem', () => {
+    const a = cobrir(completo.filter((g) => !(g.lojaId === 'vp' && g.canal === 'IFOOD' && g.data === '2025-09-03')));
+    expect(a.linhas.find((l) => l.chave === 'IFOOD')).toMatchObject({ variacaoBp: null, motivoCurto: 'ano passado incompleto no canal iFood: Vila da Penha 4 de 5' });
+    expect(a.linhas.find((l) => l.chave === 'LOJA')!.variacaoBp).not.toBeNull();
+    expect(a.linhas.find((l) => l.chave === 'DELIVERY_PROPRIO')!.variacaoBp).not.toBeNull();
+    expect(a.linhas.find((l) => l.chave === 'bruta')!.variacaoBp).not.toBeNull(); // nenhum dia da Penha ficou sem lançamento algum: o buraco é só do iFood
+  });
+  it('a visão de UMA loja diz a conta dela: "4 de 5 dias"', () => {
+    const a = compararComOAnoPassado({ de: '2026-09-01', ate: '2026-09-05', atual, graosDoAnoPassado: completo.filter((g) => g.lojaId === 'dl' && g.data !== '2025-09-01'), faltasNoPeriodoAtual: 0, lojas: [lojas[1]] });
+    expect(a.motivoCurto).toBe('ano passado: 4 de 5 dias');
+    expect(a.diasComLancamento).toBe(4);
+  });
+  it('loja desativada com buraco não impede a rede (só as lojas ativas são exigidas); a receita dela continua na soma', () => {
+    const a = compararComOAnoPassado({ de: '2026-09-01', ate: '2026-09-05', atual, graosDoAnoPassado: completo.filter((g) => !(g.lojaId === 'dl' && g.data === '2025-09-01')), faltasNoPeriodoAtual: 0, lojas: [lojas[0], { ...lojas[1], ativa: false }] });
+    expect(a.semVariacaoPorque).toBeNull();
+    expect(a.linhas.find((l) => l.chave === 'DELIVERY_PROPRIO')!.anteriorCentavos).toBe(R(500) + R(400));
+  });
+  it('uma loja ativa que vende um canal e não lançou NADA dele no ano passado deixa a rede sem variação naquele canal (e a rede inteira, se outra loja lançou)', () => {
+    const semIfoodDoDl = completo.filter((g) => !(g.lojaId === 'dl' && g.canal === 'IFOOD'));
+    const a = cobrir(semIfoodDoDl);
+    expect(a.linhas.find((l) => l.chave === 'IFOOD')).toMatchObject({ variacaoBp: null, motivoCurto: 'ano passado incompleto no canal iFood: Delivery 0 de 5' });
+    // Todas as lojas sem NENHUM dia do canal: o canal "não vendia" (frase do canal, sem buraco).
+    const nenhuma = cobrir(completo.filter((g) => g.canal !== 'IFOOD'));
+    expect(nenhuma.linhas.find((l) => l.chave === 'IFOOD')).toMatchObject({ anteriorCentavos: null, variacaoBp: null, motivoCurto: null });
+    expect(compararCrescimento('IFOOD', 0, nenhuma)).toMatchObject({ semComparacao: 'o canal não vendia no ano passado' });
+  });
+});
+
+describe('2.4 · CMV incompleto não tem cor (veto do Guardião, bloqueante 1)', () => {
+  const dl = loja('dl', 'Delivery', null);
+  const doisLojas = (cmv: { lojas: CmvDaLoja[]; parcial: boolean }) =>
+    dreDe({ receitas: [{ lojaId: 'vp', canal: 'LOJA', valorCentavos: R(10_000) }, { lojaId: 'dl', canal: 'LOJA', valorCentavos: R(5_000) }], cmv });
+  it('rede: a Penha em +1,5 pp e o Delivery sem nota: o CMV da rede dá "−0,4 pp, na meta", mas a linha fica sem cor com "sem o CMV de Delivery"', () => {
+    // Penha: R$ 2.000,00 sobre R$ 10.000,00 = 20 %; meta 18,5 % → +1,5 pp. A rede: R$ 2.000,00 sobre R$ 15.000,00 = 13,3 %: parece abaixo da meta por conta do Delivery.
+    const r = doisLojas({ lojas: [loja('vp', 'Vila da Penha', R(2_000)), dl], parcial: false });
+    const cmv = r.linhas.find((l) => l.chave === 'cmv')!;
+    expect(cmv.nota).toContain('sem o CMV de Delivery');
+    const f = farolDe(r, { cmv: 1850 }).porLinha.cmv;
+    expect(f).toMatchObject({ tipo: 'sem', motivo: 'sem o CMV de Delivery' });
+    expect(f.desvioTexto).toMatch(/^−/); // o desvio segue em texto, e é o otimista
+    // A visão da Penha sozinha tem cor: +1,5 pp contra a meta é amarelo.
+    const lojaVp = montarDre({ escopo: { tipo: 'loja', lojaId: 'vp', nome: 'Vila da Penha' }, plano, receitas: [{ lojaId: 'vp', canal: 'LOJA', valorCentavos: R(10_000) }, { lojaId: 'dl', canal: 'LOJA', valorCentavos: R(5_000) }], taxaIfood: null, despesas: [], cmv: { lojas: [loja('vp', 'Vila da Penha', R(2_000)), dl], parcial: false } });
+    expect(farolDe(lojaVp, { cmv: 1850 }, { daLoja: true }).porLinha.cmv).toMatchObject({ tipo: 'cor', cor: 'AMARELO', desvioTexto: '+1,5 pp' });
+  });
+  it('rede com todas as lojas com CMV tem cor (misto também)', () => {
+    const r = doisLojas({ lojas: [loja('vp', 'Vila da Penha', R(2_000)), loja('dl', 'Delivery', R(1_000))], parcial: false });
+    expect(farolDe(r, { cmv: 1850 }).porLinha.cmv.tipo).toBe('cor');
+  });
+  it('"Real, incompleto" e a nota curta ("sem o CMV de 2") também tiram a cor; o Real completo e o das compras completo não', () => {
+    const linhaDeCmv = (nota: string) => ({ chave: 'cmv', codigo: 'cmv', linhaId: null, nome: 'CMV', grupo: 'CMV' as const, sentido: 'MENOR_MELHOR' as const, tipo: 'cmv' as const, nivel: 0 as const, valorCentavos: 100, percentualBp: 1000, semContar: [], nota, oculta: false });
+    const cor = (nota: string) => {
+      const l = linhaDeCmv(nota);
+      return farolDoDre({ linhas: [l], metas: { cmv: compararComMeta(l, 1000, 10_000) }, faltasDeFaturamento: 0, recorrentes: [], receitaNaoApurada: false }).porLinha.cmv.tipo;
+    };
+    expect(cor('real em Vila da Penha; sem o CMV de Centro')).toBe('sem');
+    expect(cor('misto: real em A; pelas compras em B; sem o CMV de 2')).toBe('sem');
+    expect(cor('pelas compras: estoque não aberto; sem o CMV de Centro')).toBe('sem');
+    expect(cor('real (contagem)')).toBe('cor');
+    expect(cor('pelas compras · parcial')).toBe('cor');
+    expect(cor('misto: real em A; pelas compras em B')).toBe('cor');
+  });
+});
+
+describe('2.4 · a versão das faixas gravada é a que vale no fechado, e os pedidos só valem se todas as lojas informaram', () => {
+  it('versão que este código não conhece: nenhuma linha vira cor, e o motivo diz a versão', () => {
+    const r = dreDe({ despesas: [{ linhaId: idDe('salarios'), lojaId: 'vp', centavos: R(2_000) }] });
+    const f = farolDe(r, { 'grupo:PESSOAL': 1000 }, { faixasDesconhecidas: true, versaoDasFaixas: 2 });
+    expect(f.porLinha['grupo:PESSOAL']).toMatchObject({ tipo: 'sem', motivo: expect.stringContaining('versão 2') });
+    expect(f.versaoDasFaixas).toBe(2);
+    expect(faixasDaVersao(1)).toBe(FAIXAS_DO_FAROL);
+    expect(faixasDaVersao(2)).toBeNull();
+  });
+  it('uma loja que vendeu sem informar os pedidos zera o ticket do canal (senão a receita de todas dividiria os pedidos de algumas)', () => {
+    expect(pedidosPorCanal([{ canal: 'LOJA', pedidos: 100, valorCentavos: 1_000 }, { canal: 'LOJA', pedidos: 50, valorCentavos: 500 }]).LOJA).toBe(150);
+    expect(pedidosPorCanal([{ canal: 'LOJA', pedidos: 100, valorCentavos: 1_000 }, { canal: 'LOJA', pedidos: 0, valorCentavos: 500 }]).LOJA).toBeNull();
+    expect(pedidosPorCanal([{ canal: 'LOJA', pedidos: 100, valorCentavos: 1_000 }, { canal: 'LOJA', valorCentavos: 500 }]).LOJA).toBeNull();
+    expect(pedidosPorCanal([{ canal: 'LOJA', pedidos: 100, valorCentavos: 1_000 }, { canal: 'LOJA', pedidos: 0, valorCentavos: 0 }]).LOJA).toBe(100); // "não vendeu" não conta
+    expect(pedidosPorCanal([{ canal: 'IFOOD', valorCentavos: 0 }]).IFOOD).toBeNull();
   });
 });
 

@@ -28,7 +28,9 @@ import { planoEfetivo } from '@/lib/erp/dre-plano';
 import { salvarTaxaDoIfood } from '@/lib/erp/canais';
 import { MOTIVO_DE_ANTES_DO_FAROL } from '@/lib/erp/farol-dre-campos';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
+import { cadastrarInsumo } from '@/lib/erp/insumos';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { BRT, nota, R } from './erp-cmv-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const HOJE = '2026-10-17';
@@ -105,10 +107,14 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · o farol por canal (Postgres real)', { ti
     await despesa({ linha: 'salarios', valor: '20.000,00' }); // 14,0 %
     await despesa({ linha: 'energia', valor: '4.000,00' }); // 2,8 %
     await despesa({ linha: 'impostos', valor: '9.000,00' }); // + a taxa do iFood estimada
+    // ---- o CMV: só a Penha tem nota em setembro (R$ 28.640,00 = 20,0 % do que ela vendeu); o Centro vendeu e não tem nota
+    const insumo = await cadastrarInsumo(f, { tipo: 'INGREDIENTE', escala: 'base', nome: 'Insumo da prova', unidade: 'KG', conteudo: '1', preco: '10,00', conservacao: 'SECO' });
+    if (!insumo.ok) throw new Error(JSON.stringify(insumo));
+    await nota(f, insumo.id, { lojaId: ids.vp, numero: 'VP-24', data: '2026-09-10', centavos: R(28_640), lancadaEm: BRT('2026-09-10', '12:00'), movimenta: false });
     // ---- as metas, valendo em setembro
     expect(
       await metas(
-        { 'receita-loja': '5', 'receita-delivery': '0', 'receita-ifood': '5', 'grupo:RECEITA': '0', 'grupo:OCUPACAO': '8', 'grupo:MARKETING': '2', 'grupo:PESSOAL': '12,5', 'grupo:UTILIDADES': '0,5', 'grupo:DEDUCAO': '2', 'margem-contribuicao': '60', 'resultado-do-periodo': '10' },
+        { 'receita-loja': '5', 'receita-delivery': '0', 'receita-ifood': '5', 'grupo:RECEITA': '0', 'grupo:OCUPACAO': '8', 'grupo:MARKETING': '2', 'grupo:PESSOAL': '12,5', 'grupo:UTILIDADES': '0,5', 'grupo:DEDUCAO': '2', cmv: '18,5', 'margem-contribuicao': '60', 'resultado-do-periodo': '10' },
         '2026-09-05',
       ),
     ).toMatchObject({ ok: true });
@@ -139,8 +145,9 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · o farol por canal (Postgres real)', { ti
       expect(d.farol.contagem.map((c) => [c.cor, c.linhas.length > 0])).toEqual([['AZUL', true], ['VERDE', true], ['AMARELO', true], ['LARANJA', true], ['VERMELHO', true]]);
       // O azul de uma despesa pede conferência; o de crescimento não.
       expect(d.farol.porLinha['grupo:OCUPACAO']).toMatchObject({ confira: 'confira se está tudo lançado', desvioTexto: '−4,5 pp' });
-      // Sem CMV: a margem e o resultado têm meta mas ficam sem cor, com o desvio em texto.
-      expect(cor(d, 'margem-contribuicao')).toBe('sem:sem contar o CMV');
+      // A Penha tem nota de compra: o CMV dela (20,0 % contra 18,5 %) é amarelo, com o selo da fonte; a margem dela tem cor.
+      expect(d.farol.porLinha.cmv).toMatchObject({ tipo: 'cor', cor: 'AMARELO', desvioTexto: '+1,5 pp' });
+      expect(cor(d, 'margem-contribuicao')).toMatch(/^[A-Z]+$/);
       // O resultado da loja não compara com a meta da rede (a loja não carrega as despesas da rede).
       expect(d.farol.porLinha['resultado-do-periodo']).toBeUndefined();
     });
@@ -164,6 +171,48 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · o farol por canal (Postgres real)', { ti
       expect(d.canais.find((c) => c.canal === 'LOJA')).toMatchObject({ receitaCentavos: 9_320_000, anteriorCentavos: 9_000_000 });
     });
 
+    it('veto, bloqueante 2: o Centro sem o dia 01/09/2025 (a Penha lançou): a rede e a Loja ficam sem cor com o nome de quem falta; a Penha, que está completa, segue com cor; o Centro diz "29 de 30"', async () => {
+      const buraco = async (ate: boolean) => {
+        if (ate) await f.faturamentoLancamento.deleteMany({ where: { lojaId: ids.ct, data: dia('2025-09-01') } });
+        else expect((await lancarDiaDe(ids.ct, '2025-09-01', [canal('LOJA', '10.000,00', '250')])).ok).toBe(true);
+      };
+      await buraco(true);
+      try {
+        const rede = (await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!;
+        // Sem a regra por loja a rede "completaria" (a Penha lançou o dia 1) e mostraria uma variação de uma receita pela metade.
+        expect(rede.anoPassado!.motivoCurto).toBe('ano passado incompleto: Centro 29 de 30');
+        expect(cor(rede, 'grupo:RECEITA')).toBe('sem:ano passado incompleto: Centro 29 de 30');
+        expect(cor(rede, 'receita-loja')).toBe('sem:ano passado incompleto no canal Loja: Centro 29 de 30');
+        expect(rede.metas['grupo:RECEITA'].variacaoBp).toBeNull();
+        expect(rede.metas['receita-loja'].variacaoBp).toBeNull();
+        // Os canais que o Centro não vende não dependem dele: o do iFood e o do Delivery (só a Penha) seguem com cor.
+        expect(cor(rede, 'receita-ifood')).toBe('VERMELHO');
+        expect(cor(rede, 'receita-delivery')).toBe('LARANJA');
+        const penha = (await dre(DONA(), { tipo: 'loja', lojaId: ids.vp }, '2026-09-10'))!;
+        expect(cor(penha, 'grupo:RECEITA')).toBe('LARANJA');
+        expect(cor(penha, 'receita-loja')).toBe('VERDE');
+        const centro = (await dre(DONA(), { tipo: 'loja', lojaId: ids.ct }, '2026-09-10'))!;
+        expect(cor(centro, 'receita-loja')).toBe('sem:ano passado no canal Loja: 29 de 30 dias');
+        expect(cor(centro, 'grupo:RECEITA')).toBe('sem:ano passado: 29 de 30 dias');
+      } finally {
+        await buraco(false);
+      }
+      const volta = (await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!;
+      expect(cor(volta, 'receita-loja')).toBe('AMARELO');
+    });
+
+    it('veto, bloqueante 1: na rede, o CMV com a Penha em +1,5 pp e o Centro sem nota NÃO tem cor ("sem o CMV de Centro"); a margem da rede também não', async () => {
+      const d = (await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!;
+      const cmv = d.resultado.linhas.find((l) => l.chave === 'cmv')!;
+      expect(cmv.nota).toContain('sem o CMV de Centro');
+      // A rede divide o CMV da Penha pela receita das duas lojas: 18,7 % parece "na meta" (+0,2 pp) e é só o Centro faltando.
+      expect(d.metas.cmv.desvioBp!).toBeLessThan(100);
+      expect(d.metas.cmv.faixa?.cor).toBe('VERDE');
+      expect(d.farol.porLinha.cmv).toMatchObject({ tipo: 'sem', motivo: 'sem o CMV de Centro' });
+      expect(d.farol.contagem.flatMap((c) => c.linhas.map((l) => l.chave))).not.toContain('cmv');
+      expect(cor(d, 'margem-contribuicao')).toBe('sem:sem contar o CMV de Centro');
+    });
+
     it('faturamento faltando (outubro, sem nenhum lançamento): nenhuma linha tem cor, o desvio segue em texto', async () => {
       expect(await metas({ 'grupo:PESSOAL': '12', 'receita-loja': '5' }, '2026-10-05')).toMatchObject({ ok: true });
       await despesa({ linha: 'salarios', valor: '3.100,00', mes: '2026-10' });
@@ -184,7 +233,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · o farol por canal (Postgres real)', { ti
       expect(cor(sem, 'grupo:UTILIDADES')).toBe('sem:falta lançar despesa que repete todo mês');
       expect(cor(sem, 'grupo:PESSOAL')).toBe('AMARELO'); // quem não depende dela segue com cor
       expect(cor(sem, 'grupo:OCUPACAO')).toBe('AZUL');
-      expect(cor(sem, 'margem-contribuicao')).toMatch(/^sem:/);
+      expect(cor(sem, 'margem-contribuicao')).toMatch(/^[A-Z]+$/); // a margem é antes das despesas fixas: a internet não mexe nela
       const feita = await lancarDoMesPassado(f, DONA(), { envio: envio(), mes: '2026-09', itens: [{ origemId: origem, valor: '200,00' }] }, 'Marina', HOJE);
       expect(feita).toMatchObject({ ok: true, criadas: 1 });
       const com = (await dre(DONA(), { tipo: 'loja', lojaId: ids.vp }, '2026-09-10'))!;
@@ -205,12 +254,12 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · o farol por canal (Postgres real)', { ti
       expect(r).toMatchObject({ ok: true, versao: 1 });
       const foto = (await f.dreFotografia.findFirst({ where: { periodo: { inicio: dia('2026-09-01') }, substituidaEm: null }, select: { id: true, versaoDaConta: true, entrada: true } }))!;
       expect(foto.versaoDaConta).toBe(3);
-      const entrada = foto.entrada as { versaoDaConta: number; farol: { versao: number }; anoPassado: { versao: number; de: string; ate: string; lojas: Record<string, { dias: number[]; canais: Record<string, number> }> }; receitas: { lojaId: string; canal: string; pedidos?: number }[] };
+      const entrada = foto.entrada as { versaoDaConta: number; farol: { versao: number }; anoPassado: { versao: number; de: string; ate: string; lojas: Record<string, { nome: string; exigida: boolean; vende: string[]; dias: number; canais: Record<string, { centavos: number; dias: number }> }> }; receitas: { lojaId: string; canal: string; pedidos?: number }[] };
       expect(entrada.versaoDaConta).toBe(3);
       expect(entrada.farol).toEqual({ versao: 1 });
       expect(entrada.anoPassado).toMatchObject({ versao: 1, de: '2025-09-01', ate: '2025-09-30' });
-      expect(entrada.anoPassado.lojas[ids.vp].canais).toEqual({ LOJA: 8_000_000, DELIVERY_PROPRIO: 2_000_000, IFOOD: 5_000_000 });
-      expect(entrada.anoPassado.lojas[ids.vp].dias).toHaveLength(30);
+      expect(entrada.anoPassado.lojas[ids.vp]).toMatchObject({ nome: 'Vila da Penha', exigida: true, dias: 30, vende: ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] });
+      expect(entrada.anoPassado.lojas[ids.vp].canais).toEqual({ LOJA: { centavos: 8_000_000, dias: 30 }, DELIVERY_PROPRIO: { centavos: 2_000_000, dias: 30 }, IFOOD: { centavos: 5_000_000, dias: 30 } });
       expect(entrada.receitas.find((x) => x.lojaId === ids.vp && x.canal === 'IFOOD')!.pedidos).toBe(1025);
       const linhas = await f.dreFotografiaLinha.findMany({ where: { fotografiaId: foto.id, lojaId: null, chave: { in: ['receita-ifood', 'receita-loja', 'grupo:RECEITA'] } }, select: { chave: true, metaBp: true } });
       expect(Object.fromEntries(linhas.map((l) => [l.chave, l.metaBp]))).toEqual({ 'receita-ifood': 500, 'receita-loja': 500, 'grupo:RECEITA': 0 });
@@ -254,6 +303,34 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · o farol por canal (Postgres real)', { ti
       // Agora o ano passado do iFood é R$ 10.000,00: R$ 41.000,00 é +310,0 %. A meta é a de setembro (5 %): a de 90 %, de outubro, não vale para ele.
       expect(d.metas['receita-ifood']).toMatchObject({ metaBp: 500, variacaoBp: 31_000 });
       expect(cor(d, 'receita-ifood')).toBe('AZUL');
+    });
+  });
+
+  describe('fechar com o buraco do ano passado (veto, bloqueante 2, no fechado)', () => {
+    it('a fotografia guarda a cobertura por loja: o fechado da rede lê o buraco do Centro e fica sem cor na receita; a Penha, não', async () => {
+      await f.faturamentoLancamento.deleteMany({ where: { lojaId: ids.ct, data: dia('2025-09-01') } });
+      const antes = (await f.dreFotografia.findFirst({ where: { periodo: { inicio: dia('2026-09-01') }, substituidaEm: null } }))!;
+      expect(await reabrirPeriodo(f, N1(), { inicio: '2026-09-01', motivo: 'Fechar com o buraco do Centro', fotografia: antes.id }, 'Rodolfo')).toMatchObject({ ok: true });
+      expect(await fecharPeriodo(f, N1(), { inicio: '2026-09-01', ressalvas: [], justificativa: '' }, 'Ana Dona', HOJE)).toMatchObject({ ok: true });
+      const guardada = (await f.dreFotografia.findFirst({ where: { periodo: { inicio: dia('2026-09-01') }, substituidaEm: null }, select: { entrada: true } }))!.entrada as { anoPassado: { lojas: Record<string, { dias: number }> } };
+      expect(guardada.anoPassado.lojas[ids.ct].dias).toBe(29);
+      const rede = (await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!;
+      expect(rede.status).toBe('FECHADO');
+      expect(cor(rede, 'grupo:RECEITA')).toBe('sem:ano passado incompleto: Centro 29 de 30');
+      expect(cor(rede, 'receita-loja')).toBe('sem:ano passado incompleto no canal Loja: Centro 29 de 30');
+      expect(cor(rede, 'receita-ifood')).toMatch(/^[A-Z]+$/);
+      const penha = (await dre(DONA(), { tipo: 'loja', lojaId: ids.vp }, '2026-09-10'))!;
+      expect(cor(penha, 'receita-loja')).toBe('VERDE');
+      // O gerente da Penha lê só a loja dele: o buraco do Centro não lhe diz respeito nem aparece.
+      const g = (await dre(GERENTE_VP(), { tipo: 'loja', lojaId: ids.vp }, '2026-09-10'))!;
+      expect(cor(g, 'receita-loja')).toBe('VERDE');
+      expect(JSON.stringify(g)).not.toContain('Centro');
+      // Conserta o ano passado e fecha de novo: a v seguinte volta a ter cor (nada ficou preso).
+      expect((await lancarDiaDe(ids.ct, '2025-09-01', [canal('LOJA', '10.000,00', '250')])).ok).toBe(true);
+      const atual = (await f.dreFotografia.findFirst({ where: { periodo: { inicio: dia('2026-09-01') }, substituidaEm: null } }))!;
+      expect(await reabrirPeriodo(f, N1(), { inicio: '2026-09-01', motivo: 'Buraco do Centro corrigido', fotografia: atual.id }, 'Rodolfo')).toMatchObject({ ok: true });
+      expect(await fecharPeriodo(f, N1(), { inicio: '2026-09-01', ressalvas: [], justificativa: '' }, 'Ana Dona', HOJE)).toMatchObject({ ok: true });
+      expect(cor((await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!, 'receita-loja')).toBe('AMARELO');
     });
   });
 

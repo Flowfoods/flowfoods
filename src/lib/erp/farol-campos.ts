@@ -45,6 +45,12 @@ export const FAIXAS_DO_FAROL = congelar({
 /** Num custo, azul pode ser sinal de lançamento esquecido: a faixa avisa. */
 export const FRASE_CONFIRA = 'confira se está tudo lançado';
 
+/** As faixas de cada versão: a fotografia guarda a versão com que foi lida, e o fechado lê com ela (não com a de hoje). Só existe a 1. */
+export type FaixasDoFarol = typeof FAIXAS_DO_FAROL;
+const FAIXAS_POR_VERSAO: Readonly<Record<number, FaixasDoFarol>> = { 1: FAIXAS_DO_FAROL };
+/** As faixas da versão pedida; nulo = versão que este código não conhece (o farol fica sem cor e diz isso). */
+export const faixasDaVersao = (versao: number): FaixasDoFarol | null => FAIXAS_POR_VERSAO[versao] ?? null;
+
 export interface FaixaDoDesvio {
   cor: CorDoFarol;
   /** 1 (azul) a 5 (vermelho): a casa que a régua enche. */
@@ -60,11 +66,11 @@ export const posicaoDaCor = (cor: CorDoFarol): 1 | 2 | 3 | 4 | 5 => (CORES_DO_FA
  * A faixa de um desvio (realizado menos meta, em pontos-base) numa escala. `sentido` diz para que lado o desvio é bom:
  * em MENOR_MELHOR, desvio negativo (gastou menos que a meta) é o lado bom.
  */
-export function faixaDoDesvio(sentido: SentidoDaLinha, desvioBp: number, escala: EscalaDoFarol): FaixaDoDesvio {
+export function faixaDoDesvio(sentido: SentidoDaLinha, desvioBp: number, escala: EscalaDoFarol, faixas: FaixasDoFarol = FAIXAS_DO_FAROL): FaixaDoDesvio {
   const s = sentido === 'MAIOR_MELHOR' ? desvioBp : -desvioBp;
-  const limites = FAIXAS_DO_FAROL.escalas[escala];
+  const limites = faixas.escalas[escala];
   const cor: CorDoFarol = s >= limites.AZUL ? 'AZUL' : s >= limites.VERDE ? 'VERDE' : s >= limites.AMARELO ? 'AMARELO' : s >= limites.LARANJA ? 'LARANJA' : 'VERMELHO';
-  return { cor, posicao: posicaoDaCor(cor), palavra: FAIXAS_DO_FAROL.palavras[cor], confira: cor === 'AZUL' && sentido === 'MENOR_MELHOR' ? FRASE_CONFIRA : null };
+  return { cor, posicao: posicaoDaCor(cor), palavra: faixas.palavras[cor], confira: cor === 'AZUL' && sentido === 'MENOR_MELHOR' ? FRASE_CONFIRA : null };
 }
 
 /** A palavra com que o leitor de tela lê o farol: a faixa, o desvio e a casa da régua. */
