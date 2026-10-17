@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Menu } from 'lucide-react';
-import { abasDaArea, acoesDaNavegacao, itemAtivo, telasDaNavegacao } from '@/lib/erp/modulos';
+import { abasDaArea, acoesDaNavegacao, itemAtivo, montarTrilha, telasDaNavegacao } from '@/lib/erp/modulos';
 import { comParceiroAtual, slugNoCaminho } from '@/lib/rodolfo/modulos';
 import { Abas } from '../ui/abas';
 import { Dialogo } from '../ui/Dialogo';
@@ -96,15 +96,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
 
   // Área › aba (› o que a página acrescentar: o insumo aberto, "Novo insumo", "Editar"...). A área leva à entrada dela.
   const extra = useTrilhaExtra();
-  const trilha: ItemDaTrilha[] = [
-    ...(ativo
-      ? [
-          { rotulo: ativo.modulo.nome, href: ativo.modulo.href ?? undefined },
-          { rotulo: ativo.item.rotulo, href: extra.length ? ativo.item.href : undefined },
-        ]
-      : []),
-    ...extra,
-  ];
+  const trilha: ItemDaTrilha[] = montarTrilha(ativo, extra);
   const abas = abasDaArea(nav, ativo);
 
   return (

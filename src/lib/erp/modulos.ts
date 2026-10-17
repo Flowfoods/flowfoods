@@ -518,6 +518,26 @@ export function itemAtivo(nav: Navegacao, caminho: string): { modulo: ModuloNav;
   return melhor;
 }
 
+/** Um passo da trilha do topo (o "Início" vem de fora). */
+export interface PassoDaTrilha {
+  rotulo: string;
+  href?: string;
+}
+
+/**
+ * Trilha do topo: Área (link para a entrada dela) › aba (› o que a página
+ * acrescenta: o insumo aberto, "Novo insumo", "Editar"...). A aba só vira link
+ * quando há um passo depois dela; a página não repete a aba no que acrescenta.
+ */
+export function montarTrilha(ativo: { modulo: ModuloNav; item: ItemNav } | null, extra: readonly PassoDaTrilha[]): PassoDaTrilha[] {
+  if (!ativo) return [...extra];
+  return [
+    { rotulo: ativo.modulo.nome, href: ativo.modulo.href ?? undefined },
+    { rotulo: ativo.item.rotulo, href: extra.length ? ativo.item.href : undefined },
+    ...extra,
+  ];
+}
+
 /** Iniciais para o avatar: "Rodolfo Cavalcante" → "RC". */
 export function iniciais(nome: string): string {
   const partes = nome.trim().split(/\s+/).filter(Boolean);
