@@ -14,7 +14,7 @@
 
 import { createHash } from 'node:crypto';
 import { hojeNoRio, formatarData } from './compra-campos';
-import { aceitaMeta, linhasDeMeta, lerMetaDigitada, metaParaCampo, textoDaMeta, type LinhaDeMeta } from './dre-metas-campos';
+import { aceitaMeta, linhasDeMeta, lerMetaDigitada, metaParaCampo, textoDaMeta, textoDaMetaDeCrescimento, tipoDaMeta, type LinhaDeMeta } from './dre-metas-campos';
 import { chaveDaLinha, type LinhaDoPlano } from './dre-plano';
 import { listarHistorico } from './historico';
 import { periodoDe } from './periodos';
@@ -160,8 +160,8 @@ export async function salvarMetas(
       for (const chave of chaves) {
         const linha = porChave.get(chave);
         if (!linha) return falha('Uma das linhas não existe mais no plano de contas. Recarregue a página; nada foi gravado.', true);
-        if (!aceitaMeta(chave)) return falha(`“${linha.nome}” não tem meta: a base dela é a própria receita. Recarregue a página; nada foi gravado.`);
-        const l = lerMetaDigitada(entrada.valores[chave]);
+        if (!aceitaMeta(chave)) return falha(`“${linha.nome}” não tem meta própria. Recarregue a página; nada foi gravado.`);
+        const l = lerMetaDigitada(entrada.valores[chave], tipoDaMeta(chave));
         if (!l.ok) erros[chave] = l.erro;
         else lidas.set(chave, l.bp);
       }
@@ -185,7 +185,8 @@ export async function salvarMetas(
           const criada = await tx.dreMeta.create({ data: { parceiroId: tx.parceiroId, linhaId: linha.id!, canal: null, vigenteDesde: dataDoBanco(periodo.inicio), ...dados }, select: { id: true } });
           id = criada.id;
         }
-        const retrato = (bp: number | null) => ({ alvo: linha.nome, meta: bp === null ? 'Sem meta' : textoDaMeta(bp), valeDesde: formatarData(periodo.inicio) });
+        const crescimento = tipoDaMeta(chave) === 'crescimento';
+        const retrato = (bp: number | null) => ({ alvo: crescimento ? `${linha.nome} · crescimento sobre o ano passado` : linha.nome, meta: bp === null ? 'Sem meta' : crescimento ? textoDaMetaDeCrescimento(bp) : textoDaMeta(bp), valeDesde: formatarData(periodo.inicio) });
         await tx.historicoAlteracao.create({
           data: { parceiroId: tx.parceiroId, entidade: 'DreMeta', entidadeId: id, acao: antes === null && !efetiva ? 'CRIOU' : 'ALTEROU', antes: antes === null && !efetiva ? undefined : retrato(antes), depois: retrato(novo), autorNome },
         });

@@ -3,18 +3,19 @@
  * banco e sem Next): ler a meta digitada, comparar o realizado com a meta, e comparar
  * a receita com o mesmo período do ano passado.
  *
- * Decisões 149 a 151:
- *  - a meta é um percentual (pontos-base) da RECEITA BRUTA, de 0 a 100,00 %, com até
- *    duas casas; vazio é "sem meta" e "0" é uma meta (de zero);
- *  - receita bruta e receita por canal não recebem meta: a base é 100 %;
- *  - o desvio é realizado menos meta, em pontos-base; a palavra sai do SENTIDO da linha
- *    ("melhor que a meta" / "pior que a meta"), e menos de 5 pontos-base é "na meta";
- *  - sem cor: o farol e as cores são da 2.4;
+ * Decisões 149 a 151 (2.2b) e 172 a 175 (2.4):
+ *  - a meta é um percentual (pontos-base) de 0 a 100,00 %, com até duas casas; vazio é "sem meta"
+ *    e "0" é uma meta (de zero). Nas linhas de custo, margem e resultado é % da RECEITA BRUTA; nas
+ *    de receita (bruta e dos 3 canais) é o CRESCIMENTO sobre o mesmo período do ano passado
+ *    (0 = igualar o ano passado), `tipoDaMeta`;
+ *  - o desvio é realizado menos meta, em pontos-base; a faixa do farol (`farol-campos.ts`) sai do
+ *    desvio e do SENTIDO da linha; a palavra da 2.2b ("melhor/pior que a meta") foi aposentada;
  *  - o ano passado só existe na RECEITA, com as mesmas datas menos um ano (29/02 compara
  *    com 28/02), e a variação só aparece quando há dado completo dos dois lados.
  */
 
 import { diasEntre } from './contagem-campos';
+import { faixaDoDesvio, type FaixaDoDesvio } from './farol-campos';
 import { CHAVE_CMV_COMPRA, CHAVE_CMV_REAL, dividirExato, montarDre, textoDosPontos, type LinhaDoDre } from './dre-campos';
 import { SEM_CMV } from './cmv-campos';
 import { CODIGO, codigoDoSubtotal, type LinhaDoPlano, type SentidoDaLinha } from './dre-plano';
@@ -24,14 +25,24 @@ import { lerPontosBase } from './unidades';
 /** A meta vai de 0 a 100,00 % (pontos-base). */
 export const META_MAXIMA_BP = 10_000;
 
-/** Abaixo disto, em pontos-base, o realizado está "na meta" (a tela mostra 0,0 pp). */
-export const NA_META_ABAIXO_DE_BP = 5;
-
-/** As linhas em que a base é 100 % (receita bruta e por canal) e as duas de detalhe do CMV (2.3): a meta é da linha CMV. */
-const SEM_META_POR_DEFINICAO: ReadonlySet<string> = new Set([codigoDoSubtotal('RECEITA'), CODIGO.receitaLoja, CODIGO.receitaDelivery, CODIGO.receitaIfood, CHAVE_CMV_COMPRA, CHAVE_CMV_REAL]);
+/** As duas linhas de detalhe do CMV (2.3): a meta é da linha CMV. */
+const SEM_META_POR_DEFINICAO: ReadonlySet<string> = new Set([CHAVE_CMV_COMPRA, CHAVE_CMV_REAL]);
 
 /** A linha (pela chave: `codigo` ou `id:<id>`) aceita meta? */
 export const aceitaMeta = (chave: string) => !SEM_META_POR_DEFINICAO.has(chave);
+
+/**
+ * As linhas de receita (bruta e dos 3 canais) têm meta de CRESCIMENTO sobre o mesmo período do ano passado (2.4,
+ * decisão 174). Todas as outras, meta em % da receita bruta (2.2b). O número guardado é o mesmo: pontos-base, 0 a 10.000.
+ */
+export type TipoDaMeta = 'percentual' | 'crescimento';
+const CHAVE_DA_RECEITA: Readonly<Record<string, ChaveDaReceita>> = {
+  [codigoDoSubtotal('RECEITA')]: 'bruta',
+  [CODIGO.receitaLoja]: 'LOJA',
+  [CODIGO.receitaDelivery]: 'DELIVERY_PROPRIO',
+  [CODIGO.receitaIfood]: 'IFOOD',
+};
+export const tipoDaMeta = (chave: string): TipoDaMeta => (chave in CHAVE_DA_RECEITA ? 'crescimento' : 'percentual');
 
 /**
  * Na visão de UMA loja, estas duas linhas não mostram meta: a loja não carrega as
@@ -41,6 +52,7 @@ const SEM_META_NA_LOJA: ReadonlySet<string> = new Set([CODIGO.operacional, CODIG
 export const metaApareceNaLoja = (chave: string) => !SEM_META_NA_LOJA.has(chave);
 
 export const FRASE_DA_META = 'Meta de 0 a 100 %, com até duas casas (ex.: 12,5). Deixe em branco para ficar sem meta.';
+export const FRASE_DA_META_DE_CRESCIMENTO = 'Crescimento sobre o mesmo período do ano passado, de 0 a 100 % (0 = igualar o ano passado), com até duas casas. Deixe em branco para ficar sem meta.';
 
 export type LeituraDaMeta = { ok: true; bp: number | null } | { ok: false; erro: string };
 
@@ -48,14 +60,15 @@ export type LeituraDaMeta = { ok: true; bp: number | null } | { ok: false; erro:
  * O texto do campo → pontos-base. "12,5" e "12,55 %" valem; vazio é "sem meta" (null); "0" é meta.
  * Negativo, notação científica, letra, terceira casa e mais de 100 % são recusados com frase.
  */
-export function lerMetaDigitada(texto: unknown): LeituraDaMeta {
-  if (typeof texto !== 'string') return { ok: false, erro: FRASE_DA_META };
+export function lerMetaDigitada(texto: unknown, tipo: TipoDaMeta = 'percentual'): LeituraDaMeta {
+  const frase = tipo === 'crescimento' ? FRASE_DA_META_DE_CRESCIMENTO : FRASE_DA_META;
+  if (typeof texto !== 'string') return { ok: false, erro: frase };
   const t = texto.trim();
   if (t === '') return { ok: true, bp: null };
-  if (t.length > 12) return { ok: false, erro: FRASE_DA_META };
+  if (t.length > 12) return { ok: false, erro: frase };
   const bp = lerPontosBase(t);
-  if (bp === null) return { ok: false, erro: FRASE_DA_META };
-  if (bp > META_MAXIMA_BP) return { ok: false, erro: 'A meta vai até 100 %.' };
+  if (bp === null) return { ok: false, erro: frase };
+  if (bp > META_MAXIMA_BP) return { ok: false, erro: tipo === 'crescimento' ? 'A meta de crescimento vai até 100 %.' : 'A meta vai até 100 %.' };
   return { ok: true, bp };
 }
 
@@ -71,18 +84,21 @@ export function metaParaCampo(bp: number): string {
 
 // ============================================================ realizado × meta
 
-export type PalavraDaMeta = 'melhor que a meta' | 'pior que a meta' | 'na meta';
-
 export interface ComparacaoComMeta {
   metaBp: number;
-  /** Meta × receita bruta, um arredondamento. Nulo sem receita. */
+  /** Percentual da receita bruta (custo, margem, resultado) ou crescimento sobre o ano passado (receita). */
+  tipo: TipoDaMeta;
+  /** Percentual: meta × receita bruta. Crescimento: o ano passado × (1 + meta). Um arredondamento. Nulo quando falta a base. */
   metaCentavos: number | null;
   /** Realizado menos meta, em pontos-base. Nulo quando não há realizado para comparar. */
   desvioBp: number | null;
   /** "+1,0 pp" · "−0,5 pp". */
   desvioTexto: string | null;
-  palavra: PalavraDaMeta | null;
-  /** Por que não compara ("sem lançamento", "sem faturamento", "sem valor apurado"). */
+  /** Só no crescimento: a variação da receita sobre o ano passado, em pontos-base. */
+  variacaoBp: number | null;
+  /** A faixa do farol que o desvio dá, sozinho; o contexto do dado (falta lançamento, CMV ausente…) decide se vira cor (`farol-dre-campos.ts`). */
+  faixa: FaixaDoDesvio | null;
+  /** Por que não compara ("sem lançamento", "sem faturamento", "sem valor apurado", "ano passado: 12 de 15 dias"). */
   semComparacao: string | null;
 }
 
@@ -100,18 +116,13 @@ interface LinhaParaComparar {
  */
 export function compararComMeta(linha: LinhaParaComparar, metaBp: number, receitaBrutaCentavos: number): ComparacaoComMeta {
   const metaCentavos = receitaBrutaCentavos > 0 ? dividirExato(BigInt(metaBp) * BigInt(receitaBrutaCentavos), 10_000n) : null;
-  const sem = (motivo: string): ComparacaoComMeta => ({ metaBp, metaCentavos, desvioBp: null, desvioTexto: null, palavra: null, semComparacao: motivo });
+  const sem = (motivo: string): ComparacaoComMeta => ({ metaBp, tipo: 'percentual', metaCentavos, desvioBp: null, desvioTexto: null, variacaoBp: null, faixa: null, semComparacao: motivo });
   if (receitaBrutaCentavos <= 0) return sem('sem faturamento');
   if (linha.valorCentavos === null || linha.percentualBp === null) return sem('sem valor apurado');
   // Zero numa linha de despesa ou subtotal é "nada lançado"; só o resultado pode fechar em zero de verdade.
   if (linha.valorCentavos === 0 && linha.tipo !== 'resultado') return sem('sem lançamento');
   const desvioBp = linha.percentualBp - metaBp;
-  let palavra: PalavraDaMeta = 'na meta';
-  if (Math.abs(desvioBp) >= NA_META_ABAIXO_DE_BP) {
-    const acima = desvioBp > 0;
-    palavra = (linha.sentido === 'MAIOR_MELHOR') === acima ? 'melhor que a meta' : 'pior que a meta';
-  }
-  return { metaBp, metaCentavos, desvioBp, desvioTexto: textoDosPontos(desvioBp), palavra, semComparacao: null };
+  return { metaBp, tipo: 'percentual', metaCentavos, desvioBp, desvioTexto: textoDosPontos(desvioBp), variacaoBp: null, faixa: faixaDoDesvio(linha.sentido, desvioBp, 'custo'), semComparacao: null };
 }
 
 // ============================================================ ano passado
@@ -145,6 +156,8 @@ export interface AnoPassado {
   diasDoRecorte: number;
   /** A frase que explica por que não há variação (nula quando há). */
   semVariacaoPorque: string | null;
+  /** O mesmo motivo em poucas palavras, para a célula do farol ("ano passado: 12 de 15 dias"). */
+  motivoCurto: string | null;
   linhas: LinhaDoAnoPassado[];
 }
 
@@ -154,11 +167,73 @@ export interface GraoDoAnoPassado {
   valorCentavos: number;
 }
 
+/** O ano passado já somado: os dias com lançamento (sem repetir) e o total de cada canal (nulo = nenhum lançamento). */
+export interface AnoPassadoSomado {
+  dias: number;
+  porCanal: Record<CanalVenda, number | null>;
+}
+
+const CANAIS_DA_RECEITA: readonly CanalVenda[] = ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'];
+
 /**
- * Compara a receita do recorte [de, ate] com as mesmas datas um ano antes. A variação em % só sai
- * quando o ano passado tem lançamento em TODOS os dias do recorte e o período atual não tem
- * lançamento faltando; senão ficam os dois números e a razão ("ano passado: 12 de 31 dias").
+ * Compara a receita do recorte [de, ate] com as mesmas datas um ano antes, a partir do ano passado já somado. A variação
+ * em % só sai quando o ano passado tem lançamento em TODOS os dias do recorte e o período atual não tem lançamento
+ * faltando; senão ficam os dois números e a razão ("ano passado: 12 de 31 dias").
  */
+export function compararComOAnoPassadoSomado(entrada: {
+  de: string;
+  ate: string;
+  atual: Record<CanalVenda, number>;
+  anterior: AnoPassadoSomado;
+  faltasNoPeriodoAtual: number;
+}): AnoPassado {
+  const de = mesmaDataNoAnoPassado(entrada.de);
+  const ate = mesmaDataNoAnoPassado(entrada.ate);
+  const diasDoRecorte = ate < de ? 0 : diasEntre(de, ate) + 1;
+  const diasComLancamento = entrada.anterior.dias;
+  const total = diasDoRecorte > 0 && diasComLancamento >= diasDoRecorte;
+  const antes = entrada.anterior.porCanal;
+  const temAlgum = CANAIS_DA_RECEITA.some((c) => antes[c] !== null);
+  const bruta = temAlgum ? (antes.LOJA ?? 0) + (antes.DELIVERY_PROPRIO ?? 0) + (antes.IFOOD ?? 0) : null;
+  const atualBruta = entrada.atual.LOJA + entrada.atual.DELIVERY_PROPRIO + entrada.atual.IFOOD;
+
+  let semVariacaoPorque: string | null = null;
+  let motivoCurto: string | null = null;
+  if (!temAlgum) {
+    semVariacaoPorque = 'Sem lançamento de faturamento no mesmo período do ano passado.';
+    motivoCurto = 'sem lançamento no ano passado';
+  } else if (!total) {
+    semVariacaoPorque = `Ano passado: ${diasComLancamento} de ${diasDoRecorte} dias com lançamento. Sem a cobertura inteira a variação não é justa.`;
+    motivoCurto = `ano passado: ${diasComLancamento} de ${diasDoRecorte} dias`;
+  } else if (entrada.faltasNoPeriodoAtual > 0) {
+    semVariacaoPorque = 'O período de agora tem lançamento de faturamento faltando: a variação sai quando ele estiver completo.';
+    motivoCurto = 'faltam lançamentos de faturamento neste período';
+  }
+
+  const variacao = (atual: number, anterior: number | null): number | null =>
+    semVariacaoPorque === null && anterior !== null && anterior > 0 ? dividirExato(BigInt(atual - anterior) * 10_000n, BigInt(anterior)) : null;
+  return {
+    de,
+    ate,
+    diasComLancamento,
+    diasDoRecorte,
+    semVariacaoPorque,
+    motivoCurto,
+    linhas: [
+      { chave: 'bruta', atualCentavos: atualBruta, anteriorCentavos: bruta, variacaoBp: variacao(atualBruta, bruta) },
+      ...CANAIS_DA_RECEITA.map((c) => ({ chave: c, atualCentavos: entrada.atual[c], anteriorCentavos: antes[c], variacaoBp: variacao(entrada.atual[c], antes[c]) })),
+    ],
+  };
+}
+
+/** Os grãos do ano passado (um por dia e canal) somados: dias distintos e total por canal. */
+export function somarOAnoPassado(graos: readonly GraoDoAnoPassado[]): AnoPassadoSomado {
+  const porCanal: Record<CanalVenda, number | null> = { LOJA: null, DELIVERY_PROPRIO: null, IFOOD: null };
+  for (const g of graos) porCanal[g.canal] = (porCanal[g.canal] ?? 0) + g.valorCentavos;
+  return { dias: new Set(graos.map((g) => g.data)).size, porCanal };
+}
+
+/** O mesmo, a partir dos grãos do ano passado (a leitura ao vivo). */
 export function compararComOAnoPassado(entrada: {
   de: string;
   ate: string;
@@ -166,36 +241,53 @@ export function compararComOAnoPassado(entrada: {
   graosDoAnoPassado: readonly GraoDoAnoPassado[];
   faltasNoPeriodoAtual: number;
 }): AnoPassado {
-  const de = mesmaDataNoAnoPassado(entrada.de);
-  const ate = mesmaDataNoAnoPassado(entrada.ate);
-  const diasDoRecorte = ate < de ? 0 : diasEntre(de, ate) + 1;
-  const diasComLancamento = new Set(entrada.graosDoAnoPassado.map((g) => g.data)).size;
-  const total = diasDoRecorte > 0 && diasComLancamento >= diasDoRecorte;
-  const temAlgum = entrada.graosDoAnoPassado.length > 0;
-  const antes: Record<CanalVenda, number | null> = { LOJA: null, DELIVERY_PROPRIO: null, IFOOD: null };
-  for (const g of entrada.graosDoAnoPassado) antes[g.canal] = (antes[g.canal] ?? 0) + g.valorCentavos;
-  const bruta = temAlgum ? (antes.LOJA ?? 0) + (antes.DELIVERY_PROPRIO ?? 0) + (antes.IFOOD ?? 0) : null;
-  const atualBruta = entrada.atual.LOJA + entrada.atual.DELIVERY_PROPRIO + entrada.atual.IFOOD;
+  return compararComOAnoPassadoSomado({ de: entrada.de, ate: entrada.ate, atual: entrada.atual, anterior: somarOAnoPassado(entrada.graosDoAnoPassado), faltasNoPeriodoAtual: entrada.faltasNoPeriodoAtual });
+}
 
-  let semVariacaoPorque: string | null = null;
-  if (!temAlgum) semVariacaoPorque = 'Sem lançamento de faturamento no mesmo período do ano passado.';
-  else if (!total) semVariacaoPorque = `Ano passado: ${diasComLancamento} de ${diasDoRecorte} dias com lançamento. Sem a cobertura inteira a variação não é justa.`;
-  else if (entrada.faltasNoPeriodoAtual > 0) semVariacaoPorque = 'O período de agora tem lançamento de faturamento faltando: a variação sai quando ele estiver completo.';
+// ============================================================ o ano passado guardado na fotografia (2.4, decisão 178)
 
-  const variacao = (atual: number, anterior: number | null): number | null =>
-    semVariacaoPorque === null && anterior !== null && anterior > 0 ? dividirExato(BigInt(atual - anterior) * 10_000n, BigInt(anterior)) : null;
-  const canais: CanalVenda[] = ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'];
-  return {
-    de,
-    ate,
-    diasComLancamento,
-    diasDoRecorte,
-    semVariacaoPorque,
-    linhas: [
-      { chave: 'bruta', atualCentavos: atualBruta, anteriorCentavos: bruta, variacaoBp: variacao(atualBruta, bruta) },
-      ...canais.map((c) => ({ chave: c, atualCentavos: entrada.atual[c], anteriorCentavos: antes[c], variacaoBp: variacao(entrada.atual[c], antes[c]) })),
-    ],
-  };
+/**
+ * O que a fotografia v3 guarda do ano passado: por loja, os dias com lançamento (o índice de cada dia a partir de `de`,
+ * a data do ano passado em que o recorte começa) e o total de cada canal (ausente = nenhum lançamento). O fechado lê
+ * o ano passado SÓ daqui: editar o faturamento de um período antigo depois não muda a variação do fechado.
+ */
+export interface AnoPassadoGuardado {
+  versao: 1;
+  de: string;
+  ate: string;
+  lojas: Record<string, { dias: number[]; canais: Partial<Record<CanalVenda, number>> }>;
+}
+
+export function anoPassadoParaGravar(de: string, ate: string, graos: readonly (GraoDoAnoPassado & { lojaId: string })[]): AnoPassadoGuardado {
+  const lojas: AnoPassadoGuardado['lojas'] = {};
+  const dias = new Map<string, Set<number>>();
+  for (const g of graos) {
+    const l = (lojas[g.lojaId] ??= { dias: [], canais: {} });
+    l.canais[g.canal] = (l.canais[g.canal] ?? 0) + g.valorCentavos;
+    const set = dias.get(g.lojaId) ?? new Set<number>();
+    set.add(diasEntre(de, g.data));
+    dias.set(g.lojaId, set);
+  }
+  for (const [id, set] of dias) lojas[id].dias = Array.from(set).sort((a, b) => a - b);
+  return { versao: 1, de, ate, lojas };
+}
+
+/** Lê o que `anoPassadoParaGravar` guardou (e devolve null se o JSON não é isso), só das lojas pedidas. */
+export function lerAnoPassadoGuardado(bruto: unknown, lojas: readonly string[] | 'todas'): AnoPassadoSomado | null {
+  if (typeof bruto !== 'object' || bruto === null) return null;
+  const g = bruto as Partial<AnoPassadoGuardado>;
+  if (g.versao !== 1 || typeof g.lojas !== 'object' || g.lojas === null) return null;
+  const dias = new Set<number>();
+  const porCanal: Record<CanalVenda, number | null> = { LOJA: null, DELIVERY_PROPRIO: null, IFOOD: null };
+  for (const [id, l] of Object.entries(g.lojas)) {
+    if (lojas !== 'todas' && !lojas.includes(id)) continue;
+    for (const d of l.dias ?? []) dias.add(d);
+    for (const c of CANAIS_DA_RECEITA) {
+      const v = l.canais?.[c];
+      if (typeof v === 'number') porCanal[c] = (porCanal[c] ?? 0) + v;
+    }
+  }
+  return { dias: dias.size, porCanal };
 }
 
 /** "+12,5 %" · "−3,0 %" (variação da receita, em pontos-base). */
@@ -212,8 +304,10 @@ export interface LinhaDeMeta {
   nome: string;
   tipo: LinhaDoDre['tipo'];
   nivel: 0 | 1;
-  /** A linha aceita meta? (receita bruta e por canal, não.) */
+  /** A linha aceita meta? (só as duas de detalhe do CMV não.) */
   aceita: boolean;
+  /** Receita: crescimento sobre o ano passado; o resto, % da receita bruta. */
+  tipoDaMeta: TipoDaMeta;
   /** A linha está oculta do formulário de despesa (continua no DRE se tem valor). */
   oculta: boolean;
 }
@@ -226,24 +320,47 @@ export function linhasDeMeta(plano: readonly LinhaDoPlano[]): LinhaDeMeta[] {
   const todasVisiveis = plano.map((l) => ({ ...l, ativa: true }));
   const vazio = montarDre({ escopo: { tipo: 'rede' }, plano: todasVisiveis, receitas: [], taxaIfood: null, despesas: [], cmv: SEM_CMV });
   const oculta = new Map(plano.map((l) => [l.codigo ?? `id:${l.id}`, !l.ativa]));
-  return vazio.linhas.filter((l) => l.chave !== CHAVE_CMV_COMPRA && l.chave !== CHAVE_CMV_REAL).map((l) => ({ chave: l.chave, nome: l.nome, tipo: l.tipo, nivel: l.nivel, aceita: aceitaMeta(l.chave), oculta: oculta.get(l.chave) === true }));
+  return vazio.linhas.filter((l) => l.chave !== CHAVE_CMV_COMPRA && l.chave !== CHAVE_CMV_REAL).map((l) => ({ chave: l.chave, nome: l.nome, tipo: l.tipo, nivel: l.nivel, aceita: aceitaMeta(l.chave), tipoDaMeta: tipoDaMeta(l.chave), oculta: oculta.get(l.chave) === true }));
+}
+
+/**
+ * Compara o CRESCIMENTO da receita com a meta de crescimento (2.4): o realizado é a variação sobre o mesmo período do
+ * ano passado (`AnoPassado`), o desvio é variação menos meta, e a faixa usa a escala da receita. Sem dado dos dois lados
+ * (sem dia apurado, ano passado sem lançamento ou incompleto, canal que não vendia) NÃO compara, e diz por quê.
+ */
+export function compararCrescimento(chave: ChaveDaReceita, metaBp: number, anoPassado: AnoPassado | null): ComparacaoComMeta {
+  const linha = anoPassado?.linhas.find((l) => l.chave === chave);
+  const metaCentavos = linha && linha.anteriorCentavos !== null && linha.anteriorCentavos > 0 ? dividirExato(BigInt(linha.anteriorCentavos) * BigInt(10_000 + metaBp), 10_000n) : null;
+  const sem = (motivo: string, variacaoBp: number | null = null): ComparacaoComMeta => ({ metaBp, tipo: 'crescimento', metaCentavos, desvioBp: null, desvioTexto: null, variacaoBp, faixa: null, semComparacao: motivo });
+  if (!anoPassado || !linha) return sem('nenhum dia apurado');
+  if (anoPassado.semVariacaoPorque !== null) return sem(anoPassado.motivoCurto ?? 'sem variação');
+  if (linha.anteriorCentavos === null || linha.anteriorCentavos <= 0 || linha.variacaoBp === null) return sem(chave === 'bruta' ? 'sem lançamento no ano passado' : 'o canal não vendia no ano passado');
+  const desvioBp = linha.variacaoBp - metaBp;
+  return { metaBp, tipo: 'crescimento', metaCentavos, desvioBp, desvioTexto: textoDosPontos(desvioBp), variacaoBp: linha.variacaoBp, faixa: faixaDoDesvio('MAIOR_MELHOR', desvioBp, 'receita'), semComparacao: null };
 }
 
 /**
  * O realizado × meta de cada linha do DRE de um escopo. `metas` = chave → pontos-base (só as que
  * têm meta). Na visão de uma loja, os dois "Resultado" ficam sem meta. Linha sem meta não entra.
+ * As linhas de receita comparam o crescimento sobre o ano passado (`anoPassado`), as outras o % da receita.
  */
 export function compararLinhas(
   linhas: readonly LinhaDoDre[],
   metas: ReadonlyMap<string, number>,
   receitaBrutaCentavos: number,
   daLoja: boolean,
+  anoPassado: AnoPassado | null = null,
 ): Record<string, ComparacaoComMeta> {
   const out: Record<string, ComparacaoComMeta> = {};
   for (const l of linhas) {
     const bp = metas.get(l.chave);
     if (bp === undefined || !aceitaMeta(l.chave) || (daLoja && !metaApareceNaLoja(l.chave))) continue;
-    out[l.chave] = compararComMeta(l, bp, receitaBrutaCentavos);
+    out[l.chave] = tipoDaMeta(l.chave) === 'crescimento' ? compararCrescimento(CHAVE_DA_RECEITA[l.chave], bp, anoPassado) : compararComMeta(l, bp, receitaBrutaCentavos);
   }
   return out;
+}
+
+/** "+5,0 %" · "0,0 %": a meta de crescimento escrita (o sinal vai junto, é um acréscimo). */
+export function textoDaMetaDeCrescimento(bp: number): string {
+  return `${bp > 0 ? '+' : ''}${(bp / 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 2 })} %`;
 }
