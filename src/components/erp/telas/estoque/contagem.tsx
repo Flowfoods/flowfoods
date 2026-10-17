@@ -343,7 +343,7 @@ export function TelaContagem({
         ))}
 
       {/* Rodapé fixo: quanto falta e o próximo passo. */}
-      <div className="sticky bottom-0 z-20 -mx-4 border-t border-linha bg-fundo px-4 py-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <div data-barra-fixa className="sticky bottom-0 z-20 -mx-4 border-t border-linha bg-fundo px-4 py-3 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold tabular-nums text-texto" aria-live="polite">

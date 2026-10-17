@@ -1659,7 +1659,7 @@ portal do Rodolfo, não do parceiro); `VERSAO_DO_CATALOGO` continua 1.
     CHECKs, FKs, índices, os gatilhos de imutabilidade (fotografia, linha, período fechado) e de `parceiroId`, os dois gatilhos adiados e a RLS condicional das duas tabelas novas
     (grants mínimos; recusa seguir se as tabelas antigas têm RLS e as novas não puderem ter). Nenhum passo depende de SELECT sob RLS.
     O passo verificável pós-deploy continua sendo `npm run erp:conferir-migracao` (agora com os CHECKs e os gatilhos da 2.2b).
-11. **Aviso único de período fechado** (revisão de UX, decisão 158; o aviso que nasce depois de digitar rola para a vista, acima da barra fixa de salvar). Um componente só (`AvisoDoPeriodoFechado`) para faturamento (dia),
+11. **Aviso único de período fechado** (revisão de UX, decisão 158; o aviso que nasce depois de digitar rola para a vista, acima da barra fixa de salvar: ele MEDE a barra real (`data-barra-fixa`, que toda barra `sticky bottom-0` declara, com teste de guarda) em vez de usar margem chumbada; ao editar uma nota de período fechado o aviso vem no topo. Medido em 360, 375, 390, 414, 820 e 1440, nos dois temas, em despesa nova/editar, recorrentes, nota nova/editar/detalhe e faturamento: link inteiro na tela e o toque acerta o link). Um componente só (`AvisoDoPeriodoFechado`) para faturamento (dia),
     despesa (avulsa, editar, detalhe), recorrentes do mês passado, nota (lançar, editar, detalhe) e estoque: diz o período, o que não dá,
     a saída ("Para mexer em <período>, peça à FlowFoods para reabrir o período"), a alternativa de quem lança (nota: "ou lance com a data de
     hoje, se a compra entrou agora"; despesa: "ou lance com competência em <período em aberto>") e leva a Períodos (sem link para quem não
