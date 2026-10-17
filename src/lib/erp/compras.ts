@@ -48,6 +48,7 @@ import {
 } from './compra-campos';
 import { lojasComCompras, ultimasCompras, type UltimaCompra } from './compras-custo';
 import { aplicarNotaNoEstoque, efeitoPrevistoDaNota, estoqueDaNota, travarAberturas } from './estoque';
+import { datasEmPeriodoFechado, fraseDoPeriodoFechado, travarParaEscrever } from './periodo-trava';
 import { ErroDeTeto } from './estoque-campos';
 import { formatarRendimento, porUnidadeDeRendimento, TIPOS_DE_FICHA, type CustoDaFicha } from './ficha-campos';
 import { lerCascata } from './ficha-custos';
@@ -456,12 +457,17 @@ const dataDoBanco = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 export async function lancarNota(cliente: ClienteDoParceiro, alcance: Alcance, entrada: EntradaDaNota, autorNome = 'Sistema'): Promise<ResultadoCompras> {
   try {
     return await cliente.transacao(async (tx) => {
+      // 2.2b (decisão 155): a nota cai num período pela data de entrada. A trava compartilhada do período
+      // é a PRIMEIRA coisa da transação: ou a nota termina antes do fechamento (e entra nele), ou espera e é recusada.
+      await travarParaEscrever(tx);
       const { lido, ctx } = await lerNota(tx, alcance, entrada, true);
       if (!lido.ok) throw new Recusa(lido);
       const d = lido.dados;
       // Segunda trava (a action já conferiu sem a loja): lançar NESTA loja.
       const negado = recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
       if (negado) throw new Recusa({ ok: false, erros: { lojaId: negado } });
+      const fechado = (await datasEmPeriodoFechado(tx, [d.entradaEm])).get(d.entradaEm);
+      if (fechado) throw new Recusa({ ok: false, erros: { data: fraseDoPeriodoFechado(fechado) } });
       await conferirDuplicada(tx, alcance, d);
       // 1.6: trava a abertura da loja ANTES de marcar a hora do lançamento.
       await travarAberturas(tx, [d.lojaId]);
@@ -584,6 +590,7 @@ export async function editarNota(
   if (Number.isNaN(versao.getTime())) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_NOTA }, conflito: true };
   try {
     return await cliente.transacao(async (tx) => {
+      await travarParaEscrever(tx);
       const atual = await notaVisivel(tx, alcance, id);
       if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true });
       const negadoAntes = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
@@ -595,6 +602,11 @@ export async function editarNota(
       const d = lido.dados;
       const negado = recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
       if (negado) throw new Recusa({ ok: false, erros: { lojaId: negado } });
+      // 2.2b: a data de ANTES e a de DEPOIS não podem cair em período fechado (mover para dentro ou para fora).
+      const dataAntes = atual.entradaEm.toISOString().slice(0, 10);
+      const fechadas = await datasEmPeriodoFechado(tx, [dataAntes, d.entradaEm]);
+      if (fechadas.has(dataAntes)) throw new Recusa({ ok: false, erros: { geral: fraseDoPeriodoFechado(fechadas.get(dataAntes)!) } });
+      if (fechadas.has(d.entradaEm)) throw new Recusa({ ok: false, erros: { data: fraseDoPeriodoFechado(fechadas.get(d.entradaEm)!) } });
       const fornecedor = ctx.fornecedores.get(d.fornecedorId)!.nome;
       const nomesAntes = { loja: atual.loja.nome, fornecedor: atual.fornecedorNomeSnapshot ?? '' };
       const nomesDepois = { loja: ctx.lojas.get(d.lojaId)!.nome, fornecedor };
@@ -645,10 +657,14 @@ export async function cancelarNota(
   if (!motivo || motivo.length < 3) return { ok: false, erros: { motivo: 'Diga por que a nota sai (ex.: digitada em dobro, devolvida).' } };
   try {
     return await cliente.transacao(async (tx) => {
+      await travarParaEscrever(tx);
       const atual = await notaVisivel(tx, alcance, id);
       if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true });
       const negado = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
       if (negado) throw new Recusa({ ok: false, erros: { geral: negado } });
+      const dataDaNota = atual.entradaEm.toISOString().slice(0, 10);
+      const fechado = (await datasEmPeriodoFechado(tx, [dataDaNota])).get(dataDaNota);
+      if (fechado) throw new Recusa({ ok: false, erros: { geral: fraseDoPeriodoFechado(fechado) } });
       await travarAberturas(tx, [atual.lojaId]);
       const r = await tx.notaEntrada.updateMany({
         where: { id, status: 'LANCADA' },

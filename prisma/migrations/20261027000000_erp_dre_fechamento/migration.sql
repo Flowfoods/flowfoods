@@ -243,6 +243,30 @@ $$ LANGUAGE plpgsql;
 CREATE CONSTRAINT TRIGGER "PeriodoApuracao_fechado_tem_fotografia" AFTER INSERT OR UPDATE ON "PeriodoApuracao"
   DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION "erp_periodo_fechado_tem_fotografia"();
 
+-- E o outro lado do mesmo cinto: marcar a fotografia como substituída (a reabertura) sem voltar o
+-- período a ABERTO deixaria um período FECHADO sem fotografia vigente. Também adiado: a reabertura
+-- marca a fotografia e muda o período na mesma transação.
+CREATE OR REPLACE FUNCTION "erp_fotografia_substituida_reabre_periodo"() RETURNS trigger AS $$
+BEGIN
+  IF NEW."substituidaEm" IS NOT NULL
+     AND EXISTS (
+       SELECT 1 FROM "PeriodoApuracao" p
+       WHERE p."parceiroId" = NEW."parceiroId" AND p."id" = NEW."periodoId" AND p."status" = 'FECHADO'
+     )
+     AND NOT EXISTS (
+       SELECT 1 FROM "DreFotografia" f
+       WHERE f."parceiroId" = NEW."parceiroId" AND f."periodoId" = NEW."periodoId" AND f."substituidaEm" IS NULL
+     ) THEN
+    RAISE EXCEPTION '[erp] a fotografia só é substituída quando o período volta a ser ABERTO (DreFotografia_substituida_reabre_periodo).'
+      USING ERRCODE = 'check_violation';
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE CONSTRAINT TRIGGER "DreFotografia_substituida_reabre_periodo" AFTER UPDATE ON "DreFotografia"
+  DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION "erp_fotografia_substituida_reabre_periodo"();
+
 -- ------------------------------------------------------------ RLS
 -- O mesmo padrão condicional da 0.2 e da 2.2a (só se quem roda pode instalar por
 -- inteiro). Se as tabelas antigas JÁ têm RLS e estas não puderem ser instaladas,
