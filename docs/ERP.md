@@ -1724,7 +1724,7 @@ strings com ponto médio", o padrão da casa).
 ## O que a 2.3 entregou — dois CMVs: o de compra (dia a dia) e o real (fecha na contagem), e a comparação no fechamento
 
 Terceira da Prioridade 002. Migration `20261028000000_erp_cmv` (ADITIVA; uma coluna, `Contagem.itensSemPreco`, e um CHECK; nenhuma tabela nova, portão e
-RLS iguais; `migrate diff` vazio). Decisões 160 a 170. O CMV em si é DERIVADO (notas + livro + retrato do fechamento de estoque); a fotografia usa
+RLS iguais; `migrate diff` vazio). Decisões 160 a 171. O CMV em si é DERIVADO (notas + livro + retrato do fechamento de estoque); a fotografia usa
 `versaoDaConta` e a `chave` livre das linhas, que já existiam. Permissões: o catálogo não ganhou nada (`dre.ver` já é "Ver DRE e CMV");
 `VERSAO_DO_ERP` = fase 2.3.
 
@@ -1742,9 +1742,9 @@ RLS iguais; `migrate diff` vazio). Decisões 160 a 170. O CMV em si é DERIVADO 
    de períodos seguidos encadeia (teste para N períodos, e com dado: R$ 20.300,00 + R$ 23.950,00 = R$ 44.250,00).
 5. **Valoração e itens sem preço** (164). `Contagem.itensSemPreco` é gravada no mesmo UPDATE que fecha a abertura e o fechamento; a tela diz "estoque final
    sem o valor de N insumos sem preço", e "não registrado" para a contagem de antes da 2.3. Aparece no painel e nas telas do fechamento do estoque.
-6. **O que entra no resultado** (165). Por loja: real, senão compra com o selo, senão nulo com a frase (nunca R$ 0,00; resultados "sem contar o CMV"). A
+6. **O que entra no resultado** (165, 171). O CMV que vale é SUBTRAÍDO da receita líquida na margem de contribuição e dali segue para os resultados (cenário: VP R$ 120.000,00 − R$ 23.950,00 = R$ 96.050,00; rede R$ 160.000,00 − R$ 27.950,00 = R$ 132.050,00 e, com a despesa da rede, R$ 131.050,00). Por loja: real, senão compra com o selo, senão nulo com a frase (nunca R$ 0,00; resultados "sem contar o CMV"). A
    rede soma o que vale em cada loja e o selo diz as fontes ("misto: real em …; pelas compras em …; sem o CMV de …"), em até 120 letras (CHECK da
-   fotografia). A linha `cmv` tem abaixo as de detalhe `cmv:compra` e `cmv:real` (tipo `linha`, fora do plano, sem meta, fora do formulário de metas).
+   fotografia); o aviso dos resultados diz QUAIS lojas ficaram sem CMV ("sem contar o CMV de Centro"). A linha `cmv` tem abaixo as de detalhe `cmv:compra` e `cmv:real` (tipo `linha`, fora do plano, sem meta, fora do formulário de metas).
 7. **Compra × real** (166), painel dentro da página do DRE (nenhuma rota nova), só no período encerrado: por loja com o real, a diferença em R$ e em pontos
    da receita, "o estoque subiu R$ X (de A para B): comprou mais do que consumiu, é dinheiro parado na prateleira", e as notas que já estavam na contagem de
    abertura; a soma das lojas comparadas; quem ficou só pelas compras, com o motivo; "Ver as notas" só com `compras.ver` e "Ver o estoque" só com `estoque.ver`.
@@ -2534,8 +2534,8 @@ banco de teste: o operador é recusado pelo servidor.
   O nome de loja e o motivo estão em `entrada.cmv`; a tela de loja nunca recebe a `entrada` inteira.
 - **Linha de detalhe do CMV** (`cmv:compra`, `cmv:real`) é tipo `linha` com chave fora do plano (o CHECK da fotografia limita o tipo e `nota` a 120 letras). Linha nova
   de CMV (por exemplo, o teórico) segue o mesmo padrão e entra em `aceitaMeta` conforme couber.
-- **Premissa da conta do corte**: a data da nota nunca é depois do dia em que ela é lançada. Editar a data de uma nota de um período para outro, depois do retrato
-  do fechamento, move os dois lados do par entrada/estorno; período fechado no DRE já recusa isso (155). Saldo negativo segue fora do retrato.
+- **Data da nota trocada de mês depois do retrato** (veto do Guardião): a conta do corte não supõe nada sobre a data da nota; a consulta junta os movimentos de instante recente e os de
+  nota com data depois do fim (de qualquer instante). Testado nos dois sentidos, com e sem mudança de valor. Saldo negativo segue fora do retrato.
 - **O índice do livro** é `(parceiroId, lojaId, tipo, ocorridoEm)`; a consulta do corte lista todos os tipos para usá-lo. Com milhões de movimentos por loja, um índice
   `(parceiroId, lojaId, ocorridoEm)` é uma migration aditiva pequena.
 - **Teste de migration com dado antigo nos 3 perfis** e `erp:conferir-migracao` com o CHECK novo; toda migration tolerante a dado antigo continua precisando dos dois.

@@ -181,7 +181,8 @@ export async function dreDoPeriodo(cliente: ClienteDoParceiro, alcance: Alcance,
         const lida = dreDaFotografia(doEscopo, escopo);
         // Fotografia de antes do CMV guardou "Em breve": hoje a tela diz a verdade, sem inventar número.
         const resultado = antigo ? { ...lida, linhas: lida.linhas.map((l) => (l.tipo === 'cmv' ? { ...l, nota: FRASE_DO_CMV_ANTIGO } : l)) } : lida;
-        const cmvFoto = antigo ? null : await lerCmvDaFotografia(tx, alcance, foto.id);
+        // A visão de UMA loja recebe só aquela loja (o alcance pode ter outras): o painel do fechado é igual ao do ao vivo.
+        const cmvFoto = antigo ? null : await lerCmvDaFotografia(tx, pedido.tipo === 'loja' ? { lojas: [pedido.lojaId] } : alcance, foto.id);
         const receitaFoto = (id: string) => Number(foto.linhas.find((l) => l.lojaId === id && l.chave === codigoDoSubtotal('RECEITA'))?.valorCentavos ?? 0);
         let porLoja: ResumoDaLoja[] | null = null;
         if (pedido.tipo === 'rede') {

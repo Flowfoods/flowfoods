@@ -14,8 +14,9 @@
  * movimento = a data da nota (compra, e o estorno dela) ou o dia do Rio em que entrou no livro (o resto).
  * Os ajustes do próprio fechamento não entram em nenhum dos dois lados.
  *
- * Premissa: a data da nota nunca é depois do dia em que ela é lançada (`compra-campos`), então todo
- * movimento do lado "até o retrato, do período seguinte" aconteceu a partir do dia anterior ao fim do período.
+ * A data da nota pode ser trocada de mês DEPOIS do retrato (nota editada com o DRE ainda aberto): o movimento fica com o instante de
+ * quando entrou no livro, mas conta para o mês da data de agora. Por isso a lista de movimentos do corte tem duas partes (ver a
+ * consulta): os de instante recente e os de nota com data depois do fim, de qualquer instante. Sem premissa sobre a data da nota.
  */
 
 import { hojeNoRio } from './compra-campos';
@@ -112,19 +113,33 @@ export async function cmvDasLojas(
     const validos = fechos.filter((f) => f.fechadaEm && f.valorTotalCentavos !== null);
     const cortes = new Map<string, { depois: number; antes: number }>();
     if (validos.length > 0) {
+      // Os movimentos que podem mexer no corte, por fechamento: (1) os de instante a partir de ~um dia antes do fim (ou do retrato, o que vier primeiro),
+      // e (2) os de NOTA cuja data é depois do fim, mesmo de instante antigo (a data da nota pode ser trocada de mês depois do retrato: o
+      // movimento fica com o instante de quando entrou no livro, mas conta para o mês da data de agora). UNION: um movimento nas duas listas conta uma vez.
       const linhas = await tx.sql<{ fechamentoId: string; depois: bigint; antes: bigint }>`
-        SELECT f."id" AS "fechamentoId",
-          coalesce(sum(CASE WHEN m."ocorridoEm" > f."fechadaEm" AND c."dia" <= f."fim" THEN m."valorCentavos" ELSE 0 END), 0)::bigint AS "depois",
-          coalesce(sum(CASE WHEN m."ocorridoEm" <= f."fechadaEm" AND c."dia" > f."fim" AND ci."id" IS NULL THEN m."valorCentavos" ELSE 0 END), 0)::bigint AS "antes"
-        FROM (
+        WITH f AS (
           SELECT k."id", k."lojaId", k."fechadaEm", p."fim"
           FROM "Contagem" k
           JOIN "PeriodoApuracao" p ON p."parceiroId" = k."parceiroId" AND p."id" = k."periodoId"
           WHERE k."parceiroId" = ${tx.parceiroId} AND k."id" = ANY(${validos.map((f) => f.id)}::text[])
-        ) f
-        JOIN "MovimentoEstoque" m ON m."parceiroId" = ${tx.parceiroId} AND m."lojaId" = f."lojaId"
-          AND m."tipo" = ANY(${TIPOS_DE_MOVIMENTO}::"MovimentoTipo"[])
-          AND m."ocorridoEm" >= LEAST(f."fechadaEm", f."fim"::timestamp - interval '1 day')
+        ), mov AS (
+          SELECT f."id" AS "fid", m."id" AS "mid"
+          FROM f
+          JOIN "MovimentoEstoque" m ON m."parceiroId" = ${tx.parceiroId} AND m."lojaId" = f."lojaId"
+            AND m."tipo" = ANY(${TIPOS_DE_MOVIMENTO}::"MovimentoTipo"[])
+            AND m."ocorridoEm" >= LEAST(f."fechadaEm", f."fim"::timestamp - interval '1 day')
+          UNION
+          SELECT f."id", m."id"
+          FROM f
+          JOIN "NotaEntrada" n ON n."parceiroId" = ${tx.parceiroId} AND n."entradaEm" > f."fim"
+          JOIN "MovimentoEstoque" m ON m."parceiroId" = n."parceiroId" AND m."notaId" = n."id" AND m."lojaId" = f."lojaId" AND m."ocorridoEm" <= f."fechadaEm"
+        )
+        SELECT f."id" AS "fechamentoId",
+          coalesce(sum(CASE WHEN m."ocorridoEm" > f."fechadaEm" AND c."dia" <= f."fim" THEN m."valorCentavos" ELSE 0 END), 0)::bigint AS "depois",
+          coalesce(sum(CASE WHEN m."ocorridoEm" <= f."fechadaEm" AND c."dia" > f."fim" AND ci."id" IS NULL THEN m."valorCentavos" ELSE 0 END), 0)::bigint AS "antes"
+        FROM f
+        JOIN mov ON mov."fid" = f."id"
+        JOIN "MovimentoEstoque" m ON m."parceiroId" = ${tx.parceiroId} AND m."id" = mov."mid"
         LEFT JOIN "NotaEntrada" n ON n."parceiroId" = m."parceiroId" AND n."id" = m."notaId"
         CROSS JOIN LATERAL (SELECT CASE WHEN m."notaId" IS NOT NULL THEN n."entradaEm" ELSE (m."ocorridoEm" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date END AS "dia") c
         LEFT JOIN "ContagemItem" ci ON ci."parceiroId" = m."parceiroId" AND ci."id" = m."contagemItemId" AND ci."contagemId" = f."id"

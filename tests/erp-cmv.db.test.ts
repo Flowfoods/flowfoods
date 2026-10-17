@@ -22,7 +22,8 @@ import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { salvarCanaisDaLoja } from '@/lib/erp/faturamento';
 import { cadastrarInsumo } from '@/lib/erp/insumos';
-import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
+import { estornoDe } from '@/lib/erp/estoque-campos';
+import { concluirAbertura, contarItem, gravarMovimentos, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
 import { concluirContagem, iniciarFechamento } from '@/lib/erp/contagem';
 import { lancarDespesa } from '@/lib/erp/despesas';
 import type { TextosDaDespesa } from '@/lib/erp/despesa-campos';
@@ -339,6 +340,11 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     const hoje = '2026-11-05';
     const aoVivo = (await dre(DONA(), { tipo: 'rede' }, '2026-10-10', hoje))!;
     const aoVivoVp = (await dre(DONA(), { tipo: 'loja', lojaId: ids.vp }, '2026-10-10', hoje))!;
+    // Gerente de DUAS lojas (Vila da Penha e Delivery) olhando a Vila da Penha: o painel é só da loja pedida, ao vivo e depois de fechado.
+    const GERENTE_DUAS = () => alcance('GERENTE', [ids.vp, ids.dl]);
+    const aoVivoDuas = (await dre(GERENTE_DUAS(), { tipo: 'loja', lojaId: ids.vp }, '2026-10-10', hoje))!;
+    expect(aoVivoDuas.cmv.painel!.comparacoes.map((c) => c.lojaId)).toEqual([ids.vp]);
+    expect(aoVivoDuas.cmv.painel!.semReal).toEqual([]);
     const r = await fecharPeriodo(a, N1(), { inicio: '2026-10-01', ressalvas: [], justificativa: '' }, 'Ana Dona', hoje);
     expect(r).toEqual({ ok: true, versao: 1, jaFechado: false, ressalvas: 0 });
 
@@ -365,6 +371,9 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     expect(linha(fechado, 'resultado-do-periodo').valorCentavos).toBe(R(131_050));
     expect(linha(fechadoVp, 'resultado-do-periodo').valorCentavos).toBe(R(96_050));
     expect(fechadoVp.cmv.antigo).toBe(false);
+    const fechadoDuas = (await dre(GERENTE_DUAS(), { tipo: 'loja', lojaId: ids.vp }, '2026-10-10', hoje))!;
+    expect(fechadoDuas.cmv.painel).toEqual(aoVivoDuas.cmv.painel); // ao vivo = fechado, e nada da Delivery
+    expect(JSON.stringify(fechadoDuas.cmv)).not.toContain(ids.dl);
     expect(fechadoVp.cmv.painel!.comparacoes[0]).toMatchObject({ diferencaCentavos: R(-1_850), finalCentavos: R(13_550) });
     expect(fechado.cmv.painel!.semReal.map((l) => l.lojaNome)).toEqual(['Centro', 'Delivery']);
     // O gerente lê a fotografia filtrada: só a VP no painel, nada da base da conta das outras lojas.
@@ -422,6 +431,87 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     // (14.150 + a N5 de R$ 1.000,00 − os R$ 15.000,00 do retrato = R$ 150,00), nunca no de outubro.
     const nov = (await cmvAoVivo(a, '2026-11-10', '2026-12-05')).lojas.find((l) => l.lojaId === ids.vp)!.real!;
     expect(nov).toMatchObject({ inicialCentavos: R(14_150), finalCentavos: R(15_000), comprasReaisCentavos: R(1_000), centavos: R(150) });
+  });
+
+  // ------------------------------------------------------------ a data da nota trocada de mês depois do retrato (veto do Guardião)
+  describe('nota com a data trocada de mês depois do retrato (DRE ainda aberto)', () => {
+    /**
+     * Cada loja é um caso. A verdade física é o consumo: R$ 1.600,00 em setembro e R$ 500,00 em outubro, e os retratos (setembro em 29/09
+     * 18:00, outubro em 02/11 15:00) são o estoque de verdade naquele instante. A nota M (R$ 600,00) muda de mês em 17/10, com ou sem mudança
+     * de valor (R$ 700,00: estorno do que valia e entrada do novo). O CMV real tem de voltar a achar o consumo, e o estoque final de setembro
+     * é a conta de cabeça: abertura + compras de setembro (pela data de AGORA da nota) − consumo.
+     */
+    const casos = [
+      { chave: 'sepOut', de: '2026-09-10', para: '2026-10-01', valor: 600 },
+      { chave: 'sepOutItens', de: '2026-09-10', para: '2026-10-01', valor: 700 },
+      { chave: 'outSep', de: '2026-10-05', para: '2026-09-20', valor: 600 },
+      { chave: 'outSepItens', de: '2026-10-05', para: '2026-09-20', valor: 700 },
+    ] as const;
+    let D: { id: string };
+    let d: ClienteDoParceiro;
+    const lojas: Record<string, string> = {};
+
+    beforeAll(async () => {
+      D = await db.parceiroFlow.create({ data: { nome: 'Data da nota CMV', slug: `cmv-d-${sufixo}`, status: 'ATIVO' } });
+      criados.push(D.id);
+      d = doParceiro(D.id, db);
+      const i = await cadastrarInsumo(d, { tipo: 'INGREDIENTE', escala: 'base', nome: 'Insumo CMV', unidade: 'KG', conteudo: '1', preco: '10,00', conservacao: 'SECO' });
+      if (!i.ok) throw new Error(JSON.stringify(i));
+      const set = await periodoRegistrado(d, '2026-09-10');
+      const out = await periodoRegistrado(d, '2026-10-10');
+      for (const c of casos) {
+        const l = await d.loja.create({ data: { parceiroId: D.id, nome: c.chave, slug: c.chave } });
+        lojas[c.chave] = l.id;
+        const naSetembro = c.de.startsWith('2026-09'); // a nota M já estava no estoque no retrato de setembro?
+        await abertura(d, l.id, BRT('2026-09-01', '09:00'), 5_000);
+        await nota(d, i.id, { lojaId: l.id, numero: 'S2', data: '2026-09-15', centavos: R(2_000), lancadaEm: BRT('2026-09-15', '12:00'), movimenta: true });
+        const m = await nota(d, i.id, { lojaId: l.id, numero: 'M', data: c.de, centavos: R(600), lancadaEm: BRT(c.de, '12:00'), movimenta: true });
+        const retratoSet = 5_000 + 2_000 + (naSetembro ? 600 : 0) - 1_600;
+        await fechamentoDeEstoque(d, i.id, l.id, set, { fim: '2026-09-30', quando: BRT('2026-09-29', '18:00'), retrato: retratoSet });
+        await nota(d, i.id, { lojaId: l.id, numero: 'O1', data: '2026-10-05', centavos: R(1_000), lancadaEm: BRT('2026-10-05', '13:00'), movimenta: true });
+        // A edição de 17/10: a data troca de mês e, nos casos "Itens", o valor vai a R$ 700,00 (estorno do que valia + entrada do novo, pelo livro).
+        await d.transacao(async (tx) => {
+          await tx.notaEntrada.update({ where: { id: m }, data: { entradaEm: dia(c.para), ...(c.valor !== 600 ? { totalCentavos: R(c.valor) } : {}) } });
+          if (c.valor !== 600) {
+            await tx.notaEntradaItem.updateMany({ where: { notaId: m }, data: { valorTotalCentavos: R(c.valor), quantidadeMilesimos: R(c.valor) * 10 } });
+            const original = (await tx.movimentoEstoque.findFirst({ where: { notaId: m, estornoDeId: null } }))!;
+            await gravarMovimentos(
+              tx,
+              [
+                estornoDe({ ...original, tipo: 'ENTRADA_COMPRA', unidadeSnapshot: original.unidadeSnapshot as 'KG' }, 'Nota editada'),
+                { lojaId: l.id, insumoId: i.id, tipo: 'ENTRADA_COMPRA', quantidadeMilesimos: R(c.valor) * 10, valorCentavos: R(c.valor), insumoNome: 'Insumo CMV', unidade: 'KG', motivo: 'Nota M editada', chave: `nota:${m}:2`, notaId: m },
+              ],
+              { ocorridoEm: BRT('2026-10-17', '10:00') },
+            );
+          }
+        });
+        // Outubro: o estoque de verdade em 02/11 = o de 30/09 (de verdade) + o que entrou em outubro − o consumo de R$ 500,00.
+        const estoqueSetDeVerdade = 5_000 + 2_000 + (c.para.startsWith('2026-09') ? c.valor : 0) - 1_600;
+        const entrouEmOutubro = 1_000 + (c.para.startsWith('2026-10') ? c.valor : 0);
+        // (a nota M, nos casos "Out→Set", entrou no livro em 05/10: o estoque de verdade de 30/09 é o que a conta de cabeça diz, e M já estava no físico)
+        await fechamentoDeEstoque(d, i.id, l.id, out, { fim: '2026-10-31', quando: BRT('2026-11-02', '15:00'), retrato: estoqueSetDeVerdade + entrouEmOutubro - 500 });
+      }
+    });
+
+    for (const c of casos) {
+      it(`${c.chave}: a data da nota vai de ${c.de.slice(5)} para ${c.para.slice(5)}${c.valor !== 600 ? ' e o valor muda' : ''} — o real de cada mês volta ao consumo (R$ 1.600,00 e R$ 500,00) e o estoque final de setembro é o de cabeça`, async () => {
+        const cmv = await cmvAoVivo(d, '2026-09-10', '2026-11-05', [lojas[c.chave]]);
+        const out = await cmvAoVivo(d, '2026-10-10', '2026-11-05', [lojas[c.chave]]);
+        const s = cmv.lojas[0].real!;
+        const o = out.lojas[0].real!;
+        const moveuParaOutubro = c.para.startsWith('2026-10');
+        const finalSet = 5_000 + 2_000 + (moveuParaOutubro ? 0 : c.valor) - 1_600;
+        expect(s.finalCentavos).toBe(R(finalSet));
+        expect(s.comprasReaisCentavos).toBe(R(2_000 + (moveuParaOutubro ? 0 : c.valor)));
+        expect(s.centavos).toBe(R(1_600));
+        expect(o.inicialCentavos).toBe(R(finalSet));
+        expect(o.comprasReaisCentavos).toBe(R(1_000 + (moveuParaOutubro ? c.valor : 0)));
+        expect(o.centavos).toBe(R(500));
+        // A compra (pela data de AGORA da nota) acompanha.
+        expect(cmv.lojas[0].compraCentavos).toBe(R(2_000 + (moveuParaOutubro ? 0 : c.valor)));
+        expect(out.lojas[0].compraCentavos).toBe(R(1_000 + (moveuParaOutubro ? c.valor : 0)));
+      });
+    }
   });
 
   // ------------------------------------------------------------ 15. consultas constantes
