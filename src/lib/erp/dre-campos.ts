@@ -29,6 +29,7 @@ import {
   ROTULO_DO_GRUPO,
   type GrupoDoDre,
   type LinhaDoPlano,
+  type SentidoDaLinha,
 } from './dre-plano';
 
 export type Escopo = { tipo: 'rede' } | { tipo: 'loja'; lojaId: string; nome: string };
@@ -70,6 +71,8 @@ export interface LinhaDoDre {
   linhaId: string | null;
   nome: string;
   grupo: GrupoDoDre;
+  /** Para que lado o desvio da meta é bom (2.2b): receita e resultados, maior; custo e despesa, menor. */
+  sentido: SentidoDaLinha;
   tipo: TipoDaLinha;
   /** Recuo na tabela: 0 = linha de grupo ou resultado, 1 = linha dentro do grupo. */
   nivel: 0 | 1;
@@ -99,7 +102,7 @@ const SEM_TAXA = 'a taxa do iFood';
 const SEM_CMV = 'o CMV';
 
 /** Divisão inteira com arredondamento metade para cima, exata (BigInt), para numerador qualquer e denominador positivo. */
-function dividirExato(num: bigint, den: bigint): number {
+export function dividirExato(num: bigint, den: bigint): number {
   const negativo = num < 0n;
   const abs = negativo ? -num : num;
   const q = (2n * abs + den) / (2n * den);
@@ -156,7 +159,7 @@ export function montarDre(e: EntradaDoDre): ResultadoDoDre {
   const pct = (v: number | null) => (v === null ? null : percentualDaReceita(v, bruta));
   const empurrar = (l: Omit<LinhaDoDre, 'percentualBp' | 'oculta'> & { oculta?: boolean }) => linhas.push({ oculta: false, ...l, percentualBp: pct(l.valorCentavos) });
   const doPlano = (codigo: string) => e.plano.find((l) => l.codigo === codigo)!;
-  const linhaPlano = (l: LinhaDoPlano) => ({ chave: l.codigo ?? `id:${l.id}`, codigo: l.codigo, linhaId: l.id, nome: l.nome, grupo: l.grupo });
+  const linhaPlano = (l: LinhaDoPlano) => ({ chave: l.codigo ?? `id:${l.id}`, codigo: l.codigo, linhaId: l.id, nome: l.nome, grupo: l.grupo, sentido: l.sentido });
 
   /** As linhas lançáveis de um grupo, as com valor e (se a casa não as ocultou) as sem. */
   const lancaveis = (g: GrupoDoDre) => e.plano.filter((l) => l.grupo === g && !l.calculada && (l.ativa || valorDe(l) > 0));
