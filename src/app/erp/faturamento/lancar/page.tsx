@@ -19,6 +19,8 @@ const BASE = '/erp/faturamento';
 
 export default async function ErpLancarODiaPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const ctx = await exigirParceiroDaSessao();
+  // Lançar sem ver não existe: a tela do dia, o mês e o histórico são de quem vê.
+  exigirPermissaoNaPagina(ctx, 'faturamento.ver');
   exigirPermissaoNaPagina(ctx, 'faturamento.lancar');
   const { visao } = await visaoDaRequisicao(ctx);
   const lojas = (await lojasDoFaturamento(ctx.cliente, ctx.alcance)).filter((l) => l.ativa && pode(ctx.alcance, 'faturamento.lancar', { lojaId: l.id }) && pode(ctx.alcance, 'faturamento.ver', { lojaId: l.id }));

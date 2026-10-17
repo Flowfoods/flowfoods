@@ -570,6 +570,8 @@ export interface PreviaDoFaturamento {
 interface PlanoDaLinha extends LinhaDaPrevia {
   idAtual?: string;
   versaoAtual?: Date;
+  /** De onde era o número que a planilha corrige (digitado ou outra planilha): vai no "antes" do histórico. */
+  origemAtual?: OrigemDoLancamento;
 }
 
 /** Tamanho e nome do arquivo antes de ler (a action usa). */
@@ -589,14 +591,14 @@ async function planejarImportacao(tx: ClienteDoParceiro, alcance: Alcance, texto
 
   const boas = interpretadas.flatMap(({ r }) => (r.ok ? [r] : []));
   const fechadas = await datasEmPeriodoFechado(tx, Array.from(new Set(boas.map((b) => b.data))));
-  const atuais = new Map<string, { id: string; atualizadoEm: Date } & NumerosDoCanal>();
+  const atuais = new Map<string, { id: string; atualizadoEm: Date; origem: OrigemDoLancamento } & NumerosDoCanal>();
   if (boas.length > 0) {
     const datas = boas.map((b) => b.data).sort();
     const linhas = await tx.faturamentoLancamento.findMany({
       where: { lojaId: { in: Array.from(new Set(boas.map((b) => b.lojaId))) }, data: { gte: dataDoBanco(datas[0]), lte: dataDoBanco(datas[datas.length - 1]) }, origem: { in: [...HUMANAS] } },
-      select: { id: true, lojaId: true, canal: true, data: true, valorCentavos: true, pedidos: true, clientes: true, atualizadoEm: true },
+      select: { id: true, lojaId: true, canal: true, data: true, valorCentavos: true, pedidos: true, clientes: true, atualizadoEm: true, origem: true },
     });
-    for (const x of linhas) atuais.set(`${x.lojaId}|${x.canal}|${isoDoDia(x.data)}`, { id: x.id, atualizadoEm: x.atualizadoEm, valorCentavos: x.valorCentavos, pedidos: x.pedidos, clientes: x.clientes });
+    for (const x of linhas) atuais.set(`${x.lojaId}|${x.canal}|${isoDoDia(x.data)}`, { id: x.id, atualizadoEm: x.atualizadoEm, origem: x.origem, valorCentavos: x.valorCentavos, pedidos: x.pedidos, clientes: x.clientes });
   }
 
   const planos: PlanoDaLinha[] = interpretadas.map(({ l, r }) => {
@@ -613,12 +615,12 @@ async function planejarImportacao(tx: ClienteDoParceiro, alcance: Alcance, texto
     if (!a) return { ...base, situacao: 'nova' };
     const antes = { valorCentavos: a.valorCentavos, pedidos: a.pedidos, clientes: a.clientes };
     if (mesmosNumeros(antes, base.depois)) return { ...base, situacao: 'igual', antes };
-    return { ...base, situacao: 'muda', antes, idAtual: a.id, versaoAtual: a.atualizadoEm };
+    return { ...base, situacao: 'muda', antes, idAtual: a.id, versaoAtual: a.atualizadoEm, origemAtual: a.origem };
   });
 
   const contagem: Record<SituacaoNaPrevia, number> = { nova: 0, muda: 0, igual: 0, erro: leitura.erros.length };
   for (const p of planos) contagem[p.situacao]++;
-  const linhasDaPrevia: LinhaDaPrevia[] = planos.map(({ idAtual: _a, versaoAtual: _v, ...p }) => p);
+  const linhasDaPrevia: LinhaDaPrevia[] = planos.map(({ idAtual: _a, versaoAtual: _v, origemAtual: _o, ...p }) => p);
   const impressao = createHash('sha256')
     .update(JSON.stringify(planos.map((p) => [p.linha, p.situacao, p.lojaId, p.canal, p.data, p.depois, p.antes, p.erro])))
     .update(JSON.stringify(leitura.erros))
@@ -701,7 +703,7 @@ export async function importarPlanilha(cliente: ClienteDoParceiro, alcance: Alca
             data: { ...p.depois!, origem: 'IMPORTACAO', origemRef: `${nomeDoArquivo}#${p.linha}`, atualizadoPorNome: autorNome.slice(0, 120) },
           });
           if (r.count === 0) throw new Recusa(recusar('Alguém corrigiu um destes dias agora há pouco. Veja a prévia de novo; nada foi gravado.', { conflito: true }));
-          const d = diferenca(retrato(p, p.antes!, 'MANUAL'), retrato(p, p.depois!, 'IMPORTACAO'));
+          const d = diferenca(retrato(p, p.antes!, p.origemAtual ?? 'MANUAL'), retrato(p, p.depois!, 'IMPORTACAO'));
           historico.push({ parceiroId: tx.parceiroId, entidade: 'FaturamentoLancamento', entidadeId: p.idAtual!, acao: 'ALTEROU', antes: d!.antes as Prisma.InputJsonObject, depois: d!.depois as Prisma.InputJsonObject, motivo, autorNome });
         }
         for (let i = 0; i < historico.length; i += 1000) await tx.historicoAlteracao.createMany({ data: historico.slice(i, i + 1000) });

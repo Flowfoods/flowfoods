@@ -464,6 +464,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     rotas: ['faturamento/[lojaId]/[data]'],
     titulo: 'Faturamento do dia',
     versao: 1,
+    // Tela de lançar no celular: os campos ficam à vista, a aula abre numa linha (como nas telas de contar).
+    recolhida: true,
     aula: [
       { texto: 'Um bloco por canal da loja, com faturamento, pedidos e clientes; o que ficar em branco continua sem lançamento.' },
       { texto: 'Canal que não vendeu leva Não vendeu e grava zero.' },

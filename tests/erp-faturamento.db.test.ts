@@ -404,6 +404,11 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · faturamento por canal (Postgres real)', 
     const hAlt = (await historicoDoDia(ids.vp, '2026-10-01')).filter((h) => h.acao === 'ALTEROU' && h.alvo?.includes('iFood'));
     expect(hAlt).toHaveLength(1);
     expect(nbsp(hAlt[0].mudancas.find((m) => m.campo === 'faturamento')!.antes!)).toBe('R$ 3.210,00');
+    // O "antes" leva a origem REAL (planilha corrigindo planilha): não aparece uma troca falsa de "Digitado" para "Planilha".
+    expect(hAlt[0].mudancas.some((m) => m.campo === 'origem')).toBe(false);
+    // Já a digitada que a planilha corrige mostra a troca verdadeira.
+    const hLoja = (await historicoDoDia(ids.vp, '2026-10-01')).filter((h) => h.acao === 'ALTEROU' && h.alvo?.includes('Loja'));
+    expect(hLoja[0].mudancas.find((m) => m.campo === 'origem')).toMatchObject({ antes: 'Digitado', depois: 'Planilha' });
   });
 
   it('critério 4b: linha repetida, loja fora do alcance, canal desligado, data futura, negativo e fórmula = erro na linha; as válidas entram', async () => {

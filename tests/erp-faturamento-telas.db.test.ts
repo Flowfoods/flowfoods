@@ -210,6 +210,15 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · telas e actions de faturamento (Postgres
     expect(await rodar(() => ErpImportarPage())).toEqual({ erro: 'SEM_ACESSO' });
   });
 
+  it('quem lança e não vê não entra em lançar nem em importar (ver + lançar, as duas)', async () => {
+    como(alcanceDe('OPERADOR', 'rede', ['faturamento.lancar']), 'Lia');
+    expect(await rodar(() => ErpLancarPage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpImportarPage())).toEqual({ erro: 'SEM_ACESSO' });
+    const r = (await rodar(() => faturamentoDaSessao.acaoSalvarDia(ids.vp, D, null, form({ valor_LOJA: '1,00', pedidos_LOJA: '1' })))) as { erros: { geral: string } };
+    expect(r.erros.geral).toContain('Seu acesso não inclui');
+    expect(await rodar(() => faturamentoDaSessao.acaoPreviaDoFaturamento(null, new FormData()))).toMatchObject({ erro: expect.stringContaining('Seu acesso não inclui') });
+  });
+
   it('quem vê e não lança abre o dia só para consulta', async () => {
     como(alcanceDe('OPERADOR', 'rede', ['faturamento.ver']), 'Vera');
     const p = (await ErpDiaPage({ params: { lojaId: ids.vp, data: D }, searchParams: {} })) as { props: { podeLancar: boolean } };

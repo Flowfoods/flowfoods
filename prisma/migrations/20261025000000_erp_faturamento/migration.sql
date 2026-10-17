@@ -17,7 +17,10 @@
 -- (convalidated = false em pg_constraint mostra quais ficaram). Mesma ideia
 -- para o índice único do grão humano: com duplicidade antiga ele não é criado
 -- (WARNING) e a chave determinística + a trava da regra seguem garantindo as
--- gravações novas.
+-- gravações novas. Nenhum passo depende de SELECT sob RLS (ver o índice, no fim).
+-- O WARNING só aparece no terminal de quem roda a migration; depois do deploy,
+-- `npm run erp:conferir-migracao` lista os CHECKs que ficaram NOT VALID e o
+-- índice ausente.
 
 -- ------------------------------------------------------------ colunas novas
 -- Quem lançou ou corrigiu por último (nome na hora, como o histórico).
@@ -88,18 +91,21 @@ END $$;
 -- parcial: o Prisma não descreve WHERE em índice (migration futura que mexa
 -- nele reescreve à mão), como "NotaEntrada_chave_da_nota". A linha de integração
 -- fica de fora de propósito: vários pedidos no mesmo grão.
+--
+-- Sem pré-checagem com SELECT: com o dono NÃO-superusuário e FORCE RLS o SELECT
+-- da migration enxerga 0 linhas (a RLS vale para a consulta, não para a
+-- construção do índice, que lê a tabela inteira) e a pré-checagem "passaria"
+-- com duplicada antiga. Quem decide é o próprio CREATE UNIQUE INDEX: se houver
+-- duplicidade antiga ele falha com 23505 (unique_violation), o bloco apanha, avisa
+-- e a migration segue (a chave determinística + a regra seguem garantindo as
+-- gravações novas). VALIDATE CONSTRAINT acima também lê a tabela inteira (não
+-- passa pela RLS), então o mesmo vale lá: nenhum passo desta migration depende de
+-- SELECT sob RLS. Conferência pós-deploy: `npm run erp:conferir-migracao`.
 DO $$
 BEGIN
-  IF EXISTS (
-    SELECT 1 FROM "FaturamentoLancamento"
-    WHERE "origem" IN ('MANUAL', 'IMPORTACAO')
-    GROUP BY "parceiroId", "lojaId", COALESCE("marcaId", '-'), "canal", "data"
-    HAVING count(*) > 1
-  ) THEN
-    RAISE WARNING 'ERP 2.1: o índice "FaturamentoLancamento_grao_humano" NÃO foi criado: há mais de uma linha humana no mesmo loja × canal × dia. Corrija as duplicadas e crie o índice (ver a migration).';
-  ELSE
-    CREATE UNIQUE INDEX "FaturamentoLancamento_grao_humano"
-      ON "FaturamentoLancamento"("parceiroId", "lojaId", COALESCE("marcaId", '-'), "canal", "data")
-      WHERE "origem" IN ('MANUAL', 'IMPORTACAO');
-  END IF;
+  CREATE UNIQUE INDEX "FaturamentoLancamento_grao_humano"
+    ON "FaturamentoLancamento"("parceiroId", "lojaId", COALESCE("marcaId", '-'), "canal", "data")
+    WHERE "origem" IN ('MANUAL', 'IMPORTACAO');
+EXCEPTION WHEN unique_violation THEN
+  RAISE WARNING 'ERP 2.1: o índice "FaturamentoLancamento_grao_humano" NÃO foi criado: há mais de uma linha humana no mesmo loja × canal × dia. Corrija as duplicadas e crie o índice (ver a migration); `npm run erp:conferir-migracao` lista o que ficou pendente.';
 END $$;

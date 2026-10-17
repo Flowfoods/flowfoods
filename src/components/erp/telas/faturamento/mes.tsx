@@ -104,7 +104,7 @@ function CelulaDoDia({ d, lojaId, base, canais }: { d: DiaDaLojaNoMes; lojaId: s
           <span className="flex flex-wrap gap-x-2 text-suave">
             {canais.map((c) => (
               <span key={c} className={d.canais[c] ? 'text-texto' : 'text-suave'}>
-                {CANAIS[c].curto === 'Delivery' ? 'Dlv' : CANAIS[c].curto}
+                {CANAIS[c].curto}
               </span>
             ))}
           </span>
@@ -188,9 +188,33 @@ function Calendario({ l, base, mes }: { l: LojaNoMes; base: string; mes: string 
 // ------------------------------------------------------------------ rede: loja × canal
 
 function TabelaDaRede({ m, base }: { m: MesDoFaturamento; base: string }) {
+  const faltas = (n: number) => (n > 0 ? <span className="font-semibold text-erro">{n} {n === 1 ? 'falta' : 'faltas'}</span> : <span className="text-suave">0 faltas</span>);
   return (
     <Painel titulo="Por loja" subtitulo="Soma do que cada loja do seu acesso lançou no mês. Falta é canal que a loja vende, sem lançamento, até ontem (cada canal em cada dia conta uma)." semRespiro acessorio={<Contagem>{m.lojas.length}</Contagem>}>
-      <div className="overflow-x-auto">
+      {/* No celular: um cartão por loja (nome, total, faltas e o que cada canal fez). */}
+      <ul className="divide-y divide-linha sm:hidden">
+        {m.lojas.map((l) => (
+          <li key={l.loja.id} className="px-4 py-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <Link href={`${base}?mes=${m.mes}&loja=${l.loja.id}`} className={`${LINK_DE_TEXTO} min-w-0 truncate font-medium`}>
+                {l.loja.nome}
+              </Link>
+              <span className="shrink-0 text-[15px] font-semibold tabular-nums">{formatarDinheiro(l.total.valorCentavos)}</span>
+            </div>
+            <p className="mt-1 text-[12px] leading-snug tabular-nums text-suave">
+              {CANAIS_EM_ORDEM.map((c) => `${CANAIS[c].curto} ${!l.loja.canais.includes(c) && l.porCanal[c].pedidos === 0 ? 'não vende' : l.porCanal[c].pedidos === 0 && l.porCanal[c].valorCentavos === 0 ? '—' : formatarDinheiro(l.porCanal[c].valorCentavos)}`).join(' · ')}
+            </p>
+            <p className="mt-0.5 text-[12px]">{faltas(l.faltas)}</p>
+          </li>
+        ))}
+        <li className="flex items-baseline justify-between gap-3 border-t border-linha-forte px-4 py-3 font-semibold">
+          <span>Rede</span>
+          <span className="tabular-nums">
+            {formatarDinheiro(m.total.valorCentavos)} <span className="text-[12px] font-normal text-suave">· {m.faltas} {m.faltas === 1 ? 'falta' : 'faltas'}</span>
+          </span>
+        </li>
+      </ul>
+      <div className="hidden overflow-x-auto sm:block">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="bg-forte text-left text-[12px] text-suave">
@@ -224,15 +248,7 @@ function TabelaDaRede({ m, base }: { m: MesDoFaturamento; base: string }) {
                   </td>
                 ))}
                 <td className="px-3 text-right font-semibold">{formatarDinheiro(l.total.valorCentavos)}</td>
-                <td className="px-4 text-right sm:px-5">
-                  {l.faltas > 0 ? (
-                    <span className="font-semibold text-erro">
-                      {l.faltas} {l.faltas === 1 ? 'falta' : 'faltas'}
-                    </span>
-                  ) : (
-                    <span className="text-suave">0</span>
-                  )}
-                </td>
+                <td className="px-4 text-right sm:px-5">{l.faltas > 0 ? faltas(l.faltas) : <span className="text-suave">0</span>}</td>
               </tr>
             ))}
           </tbody>

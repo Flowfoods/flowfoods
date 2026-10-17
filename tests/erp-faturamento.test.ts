@@ -280,6 +280,11 @@ describe('2.1 · planilha', () => {
     expect(erro({ loja: '=HYPERLINK("http://x")' })).toContain('fórmula não entra');
     expect(erro({ canal: '-2+3' })).toContain('fórmula não entra');
     expect(erro({ pedidos: '\t5' })).toContain('fórmula não entra');
+    // A célula que começa com tab não mostra o tab: a mensagem o aponta.
+    expect(erro({ pedidos: '\t5' })).toContain('um tab');
+    expect(erro({ pedidos: '\r5' })).toContain('retorno de linha');
+    expect(erro({ faturamento: '=1+1' })).toContain('“=”');
+    expect(erro({ loja: '  =Penha' })).toContain('espaço e depois');
     expect(erro({ loja: '  =Penha' })).toContain('fórmula não entra');
     const eco = ecoDaCelula(`Vila‮${'a'.repeat(100)}\u0000\n`);
     expect(eco.length).toBeLessThanOrEqual(41);

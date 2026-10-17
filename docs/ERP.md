@@ -1454,9 +1454,17 @@ loja); `VERSAO_DO_CATALOGO` continua 1 e o módulo deixou de ser `emBreve`.
     chave zerada; o worker grava por `doParceiro`, pega a mesma trava e respeita período fechado. Tipo `EntradaDeIntegracao` em
     `faturamento.ts`. Mapear a loja do iFood para `Loja` fica para a fase da integração.
 
+11. **Conferência pós-deploy da migration.** Os WARNINGs da migration (CHECK que ficou NOT VALID, índice do grão não criado) só
+    aparecem no terminal de quem a roda, não no log do auto-deploy. Depois de cada deploy que traga a 2.1:
+    `npm run erp:conferir-migracao` (lê `pg_constraint` e `pg_indexes`, que não passam pela RLS; só leitura; sai com código 1 e uma
+    frase por pendência, ou 0 com "conferida"). Sem o script: `SELECT conname FROM pg_constraint WHERE NOT convalidated AND
+    (conname LIKE 'FaturamentoLancamento\_%' OR conname = 'Loja_canais_ao_menos_um');` e
+    `SELECT count(*) FROM pg_indexes WHERE indexname = 'FaturamentoLancamento_grao_humano';` (esperado: zero linhas e 1). Para
+    resolver: corrigir a linha antiga e rodar `ALTER TABLE … VALIDATE CONSTRAINT …` (ou o `CREATE UNIQUE INDEX` da migration).
+
 **Ajuda: chaves novas/alteradas.** Novas: `faturamento` (v1, com seções "O que entra no número" e "Falta não é zero"),
 `faturamento-lancar` (v1), `faturamento-dia` (v1, seção "Dia de período fechado") e `faturamento-importar` (v1, seção "As colunas do
-modelo"); blocos de lançar e remover com `para: ['faturamento.lancar']`. Alterada: `lojas` v1 para v2 (faturamento é por loja; os canais
+modelo"); blocos de lançar e remover com `para: ['faturamento.lancar']`. `faturamento-dia` nasce com a caixa recolhida (`recolhida: true`, como nas telas de contar: os campos ficam à vista no celular). Alterada: `lojas` v1 para v2 (faturamento é por loja; os canais
 de venda), com `ajuda.lock.json` regravado. Área nova `dre` em `AreaDaAjuda`.
 
 ## Provar o faturamento (2.1)
@@ -2125,6 +2133,12 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 2.1 (para as próximas subfases)
 
+- **Migration sob RLS**: nenhum passo de migration pode depender de SELECT em tabela de tenant (o dono não-superusuário com FORCE RLS
+  enxerga 0 linhas). Checar dado antigo = tentar a operação (CREATE UNIQUE INDEX, VALIDATE CONSTRAINT) e apanhar `unique_violation`
+  ou `check_violation`; o WARNING não chega ao log do deploy, então toda migration tolerante a dado antigo ganha um passo
+  verificável pós-deploy (`erp:conferir-migracao` é o da 2.1). Teste de migration com dado antigo roda nos 3 perfis do banco.
+- **Instabilidade apontada pelo Guardião** entre os testes com banco de `erp-acesso` e o trigger do onboarding (0.5): fora do escopo
+  da 2.1 e sem falha vista nas rodadas finais (2 vezes seguidas, 60 arquivos); segue anotada para quem mexer em acesso ou onboarding.
 - **A leitura do faturamento é UMA**: `faturamentoDosGraos` / `faturamentoDoGrao` (integração vence; a digitada vira conferência).
   A 2.2 (DRE) lê só por elas e filtra por `faturamento.ver`/`dre.ver` na página; a função só filtra lojas pelo alcance.
 - **Fechar período é da 2.2**: pegar `travarParaFechar(tx)` (`periodo-trava.ts`) ANTES de ler o faturamento e de marcar o período

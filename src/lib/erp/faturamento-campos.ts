@@ -40,7 +40,7 @@ export const ehCanal = (c: unknown): c is CanalVenda => typeof c === 'string' &&
 
 // ------------------------------------------------------------------ data
 
-/** Data do lançamento (texto → "aaaa-mm-dd"): válida, não futura (no Rio) e dentro da janela. */
+/** Data do lançamento (texto vira "aaaa-mm-dd"): válida, não futura (no Rio) e dentro da janela. */
 export function lerDataDoLancamento(texto: string, hoje = hojeNoRio()): { ok: true; data: string } | { ok: false; erro: string } {
   const d = lerData(texto);
   if (!d) return { ok: false, erro: 'Data inválida: use dd/mm/aaaa (ex.: 14/10/2026).' };

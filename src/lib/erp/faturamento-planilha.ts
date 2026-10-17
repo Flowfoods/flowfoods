@@ -55,6 +55,15 @@ export function ecoDaCelula(t: string): string {
   return limpo.length > 40 ? `${limpo.slice(0, 40)}…` : limpo;
 }
 
+/** Quem abre a célula como fórmula, dito de forma que a pessoa ache no Excel: "tab" e "retorno de linha" não se veem. */
+export function comoComecaAFormula(v: string): string {
+  const nome = (c: string) => (c === '\t' ? 'um tab (espaço de tabulação)' : c === '\r' ? 'um retorno de linha (CR)' : `“${c}”`);
+  const primeiro = v[0];
+  if (primeiro && /[=+\-@\t\r]/.test(primeiro)) return nome(primeiro);
+  const depois = v.trimStart()[0];
+  return depois ? `espaço e depois ${nome(depois)}` : 'um sinal de fórmula';
+}
+
 export interface LinhaLida {
   linha: number;
   data: string;
@@ -150,7 +159,7 @@ export function interpretarLinha(l: LinhaLida, lojas: readonly LojaParaPlanilha[
     // Número negativo ("-10,00") é lido adiante e recusado como negativo; qualquer outro "-" é fórmula.
     const numerico = rotulo === 'faturamento' || rotulo === 'pedidos' || rotulo === 'clientes';
     if (comecaComoFormula(v) && !(numerico && /^-\s*\d/.test(v.trim()))) {
-      return { ok: false, erro: `A célula de ${rotulo} começa com “${ecoDaCelula(v).slice(0, 1) || 'sinal'}”: fórmula não entra. Cole só o valor.` };
+      return { ok: false, erro: `A célula de ${rotulo} começa com ${comoComecaAFormula(v)}: fórmula não entra. Cole só o valor.` };
     }
   }
   const data = lerDataDoLancamento(l.data, hoje);

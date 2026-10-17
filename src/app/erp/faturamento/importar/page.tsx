@@ -12,6 +12,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function ErpImportarFaturamentoPage() {
   const ctx = await exigirParceiroDaSessao();
+  // Lançar sem ver não existe: a tela do dia, o mês e o histórico são de quem vê.
+  exigirPermissaoNaPagina(ctx, 'faturamento.ver');
   exigirPermissaoNaPagina(ctx, 'faturamento.lancar');
   return (
     <div className="mx-auto max-w-3xl space-y-6">

@@ -128,6 +128,17 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(acoesDaNavegacao(b)).toEqual([]);
   });
 
+  it('"Lançar o dia" e "Importar faturamento" só com ver E lançar: lançar sozinho não abre a área nem a ação', () => {
+    const lancaSo = navegacaoDoParceiro(proprio(['faturamento.lancar', 'lojas.ver']));
+    expect(lancaSo.modulos.map((m) => m.nome)).not.toContain('Faturamento e DRE');
+    expect(acoesDaNavegacao(lancaSo).map((x) => x.rotulo)).toEqual([]);
+    const ve = navegacaoDoParceiro(proprio(['faturamento.ver']));
+    expect(telasDaNavegacao(ve).map((t) => t.href)).toContain('/erp/faturamento');
+    expect(acoesDaNavegacao(ve).map((x) => x.rotulo)).toEqual([]);
+    const ambos = navegacaoDoParceiro(proprio(['faturamento.ver', 'faturamento.lancar']));
+    expect(acoesDaNavegacao(ambos).map((x) => x.rotulo)).toEqual(['Lançar o dia', 'Importar faturamento']);
+  });
+
   it('ação só com a área visível E a permissão dela: ver sem editar não traz ação', () => {
     const verSo = navegacaoDoParceiro(proprio(['insumos.ver', 'fichas.ver']));
     expect(acoesDaNavegacao(verSo)).toEqual([]);
