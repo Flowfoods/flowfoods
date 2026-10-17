@@ -359,6 +359,8 @@ describe('ERP 1.1 · actions do shell no servidor', () => {
       { tipo: 'ficha', rotulo: 'Arroz da casa', detalhe: 'Ficha técnica · Pré-preparo', href: '/erp/fichas/f1', desativado: false },
     ]);
     expect(consultas).toHaveLength(2);
+    // UX.9: achar não mostra dinheiro: nenhum resultado traz R$, custo, preço nem margem.
+    expect(JSON.stringify(await acaoBuscarNoErp('arroz'))).not.toMatch(/R\$|custo|pre[cç]o|margem/i);
   });
 });
 
