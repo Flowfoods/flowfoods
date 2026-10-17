@@ -66,7 +66,7 @@ const DIA = 86_400_000;
 describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem (Postgres real)', { timeout: 120_000 }, () => {
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
-  const sufixo = `r${Date.now().toString(36)}`;
+  const sufixo = `r${globalThis.crypto.randomUUID().slice(0, 8)}`;
   let A: { id: string };
   let B: { id: string };
   let a: ClienteDoParceiro;

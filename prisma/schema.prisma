@@ -594,6 +594,9 @@ model ParceiroFlow {
   erpSessoes             SessaoErp[]
   // Perfis próprios do parceiro (0.4): mesma trava das credenciais.
   erpPerfis              PerfilAcesso[]
+  // Pedido que originou este parceiro (0.5): FORA do tenant, só por
+  // `pedidos.ts` e `credenciais.ts` (RELACOES_DE_PEDIDO; o prisma do portal recusa).
+  erpPedidoDeOrigem      PedidoParceiro?        @relation("PedidoParceiroCriado")
 }
 
 // ------------------------------------------------- ERP · comuns
@@ -1865,4 +1868,103 @@ model TentativaEntradaErp {
 
   @@index([email, criadoEm])
   @@index([ip, criadoEm])
+}
+
+// ------------------------------------------------- ERP · onboarding (0.5)
+//
+// Pedido de acesso de um futuro Parceiro Flow: chega pela landing (ou o
+// Rodolfo digita). FORA do tenant de propósito (decisão 91): o pedido nasce
+// ANTES de existir parceiro, e spam nunca pode virar um ParceiroFlow (que não se
+// apaga: o histórico tem FK Restrict). O Parceiro Flow só nasce na ativação,
+// já ATIVO e com dono. Só `src/lib/erp/pedidos.ts` e `credenciais.ts` (a
+// ativação) tocam estes modelos: o `prisma` do portal recusa em runtime, o
+// teste-guarda reprova uso fora deles e o papel `erp_tenant` não tem GRANT.
+// O vínculo com o parceiro se chama `parceiroCriadoId` (e não `parceiroId`) de
+// propósito: `parceiroId` é a marca de tabela de tenant.
+
+enum PedidoParceiroStatus {
+  NOVO
+  EM_CONVERSA
+  ATIVADO
+  RECUSADO
+}
+
+enum PedidoOrigem {
+  LANDING
+  MANUAL
+}
+
+enum TentativaPedidoResultado {
+  ACEITO
+  REENVIO
+  ARMADILHA
+  INVALIDO
+  BLOQUEADO
+}
+
+model PedidoParceiro {
+  id                  String               @id @default(cuid())
+  origem              PedidoOrigem
+  nomeGrupo           String
+  responsavel         String
+  // E.164 sem o "+" (5521999998888), como o Barney normaliza.
+  whatsapp            String
+  // Minúsculo (CHECK).
+  email               String
+  lojas               Int
+  marcas              Int
+  cidade              String
+  // LGPD: o texto aceito e a versão dele. Obrigatório para quem veio da landing.
+  consentimentoEm     DateTime?
+  consentimentoVersao String?
+  status              PedidoParceiroStatus @default(NOVO)
+  // Quando entrou na etapa de agora: o atraso conta daqui.
+  etapaDesde          DateTime             @default(now())
+  // Condicional em toda decisão: duas pessoas no mesmo cartão não se atropelam.
+  versao              Int                  @default(1)
+  // Quantas vezes o mesmo contato mandou de novo (entra no mesmo cartão).
+  reenvios            Int                  @default(0)
+  motivoRecusa        String?
+  // ATIVADO ⇔ parceiro criado (CHECK). Único: um pedido gera um parceiro só.
+  parceiroCriadoId    String?              @unique
+  parceiroCriado      ParceiroFlow?        @relation("PedidoParceiroCriado", fields: [parceiroCriadoId], references: [id], onDelete: Restrict)
+  anonimizadoEm       DateTime?
+  criadoEm            DateTime             @default(now())
+  atualizadoEm        DateTime             @updatedAt
+
+  eventos PedidoParceiroEvento[]
+
+  @@index([status, etapaDesde])
+  @@index([email])
+  @@index([whatsapp])
+  @@index([criadoEm])
+}
+
+// Só se acrescenta (trigger recusa UPDATE): etapa antes/depois, motivo e autor,
+// sem copiar dado pessoal.
+model PedidoParceiroEvento {
+  id         String         @id @default(cuid())
+  pedidoId   String
+  pedido     PedidoParceiro @relation(fields: [pedidoId], references: [id], onDelete: Restrict)
+  acao       String
+  antes      Json?
+  depois     Json?
+  motivo     String?
+  autorNome  String
+  ocorridoEm DateTime       @default(now())
+
+  @@index([pedidoId, ocorridoEm])
+}
+
+// Limite do formulário público (3/h e 10/dia por IP, teto global por dia).
+// Tabela própria: pedido que falha não pode travar o login de quem divide o IP
+// (`TentativaEntradaErp`).
+model TentativaPedidoParceiro {
+  id        String                   @id @default(cuid())
+  ip        String
+  resultado TentativaPedidoResultado
+  criadoEm  DateTime                 @default(now())
+
+  @@index([ip, criadoEm])
+  @@index([criadoEm])
 }

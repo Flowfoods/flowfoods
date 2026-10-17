@@ -23,6 +23,7 @@
 import bcrypt from 'bcryptjs';
 import type { AcessoStatus, ParceiroFlow, Prisma, PrismaClient } from '@prisma/client';
 import { baseDoErp } from './base';
+import { travar } from './trava';
 import { doParceiro, ehErroDeUnicidade, fecharComHistorico, papelDisponivel, type RegistroDeHistorico } from './tenant';
 import {
   ALCANCE_FLOWFOODS,
@@ -69,6 +70,7 @@ import {
   normalizarEmail,
   tokenTemFormato,
 } from './acesso';
+import { ERRO_DONO_JA_TEM_ACESSO, fraseJaDecidido, FRASE_PEDIDO_MEXIDO, lerAtivacao, type EtapaDoPedido } from './pedido-campos';
 import {
   configDoRosto,
   desafioDaResposta,
@@ -574,6 +576,15 @@ export function textoDosRostosRemovidos(n: number): string {
   return n === 1 ? '1 aparelho com rosto removido' : `${n} aparelhos com rosto removidos`;
 }
 
+export const ERRO_PARCEIRO_NAO_LIBERADO =
+  'Este parceiro ainda não foi liberado (rascunho): ninguém dele entra. Ative o parceiro primeiro (aba Cadastro) e depois dê o acesso.';
+
+/** Decisão 92: nem acesso nem link para parceiro em RASCUNHO. */
+async function exigirParceiroLiberado(tx: Prisma.TransactionClient, parceiroId: string) {
+  const par = await tx.parceiroFlow.findUnique({ where: { id: parceiroId }, select: { status: true } });
+  if (par?.status === 'RASCUNHO') throw new Desfazer({ geral: ERRO_PARCEIRO_NAO_LIBERADO });
+}
+
 /**
  * A senha é da PESSOA, não do vínculo: vale em todos os parceiros dela. Por
  * isso link de senha (primeiro acesso ou nova) só sai do nível 1 ou de quem
@@ -586,6 +597,147 @@ async function podeGerarLink(tx: Prisma.TransactionClient, ator: Ator, usuarioId
   if (ator.alcance.nivel === 'FLOWFOODS') return true;
   const outros = await tx.acessoParceiro.count({ where: { usuarioId, parceiroId: { not: parceiroId } } });
   return outros === 0;
+}
+
+/** Entrada já validada do acesso: serve a `criarAcesso` e à ativação do pedido (0.5). */
+interface EntradaDoAcesso {
+  parceiroId: string;
+  nome: string;
+  email: string;
+  dados: PermissoesDaPessoa;
+  lojas: { id: string; nome: string }[];
+  nomes: ReadonlyMap<string, string>;
+  agora: Date;
+  /**
+   * A ativação de um pedido (dado vindo do PÚBLICO) só cria pessoa NOVA: e-mail
+   * que já existe em `UsuarioErp`, em qualquer estado (com senha, com convite
+   * pendente, sem vínculo ativo), é recusado antes de tocar em qualquer credencial.
+   * Sem isto, quem manda o e-mail de outra pessoa no formulário tomaria a conta
+   * dela (a senha e os rostos caem e o link do nível 1 vai para o WhatsApp do pedido).
+   */
+  soPessoaNova?: boolean;
+}
+
+/** Frase neutra (a mesma que o formulário mostra: `pedido-textos.ts`). */
+export { ERRO_DONO_JA_TEM_ACESSO };
+
+/**
+ * O miolo de `criarAcesso`, dentro de uma transação que já travou a equipe e
+ * conferiu o ator. A ativação do pedido (0.5) o chama na MESMA transação que
+ * cria o parceiro: dono, vínculo e link nascem juntos ou não nascem.
+ */
+async function criarAcessoNaTransacao(
+  tx: Prisma.TransactionClient,
+  e: EntradaDoAcesso,
+  ator: Ator,
+): Promise<{ resultado: ResultadoDeAcesso; historico: RegistroDeHistorico[]; outrosParceiros: HistoricoEmOutroParceiro[] }> {
+  const { parceiroId, lojas, nomes, agora } = e;
+  await exigirParceiroLiberado(tx, parceiroId);
+  const nivel1 = ator.alcance.nivel === 'FLOWFOODS';
+  let usuario = await tx.usuarioErp.findUnique({ where: { email: e.email } });
+  if (usuario && e.soPessoaNova) throw new Desfazer({ email: ERRO_DONO_JA_TEM_ACESSO });
+  if (usuario) {
+    const ja = await tx.acessoParceiro.findUnique({
+      where: { parceiroId_usuarioId: { parceiroId, usuarioId: usuario.id } },
+    });
+    if (ja) throw new Desfazer({ email: 'Essa pessoa já tem acesso a este parceiro.' });
+    // E-mail de quem já está em OUTRO parceiro: só o nível 1 vincula. A
+    // pessoa do parceiro recebe a mesma frase de qualquer outra recusa (não
+    // fica sabendo que o e-mail existe).
+    if (!nivel1) throw new Desfazer({ email: ERRO_EMAIL_NEUTRO });
+    // Uma mudança de senha/vínculo por pessoa de cada vez (ver definirSenhaPeloLink).
+    await travar(tx, `erp-usuario:${usuario.id}`);
+    usuario = await tx.usuarioErp.findUniqueOrThrow({ where: { id: usuario.id } });
+  }
+  const prep = await prepararPermissoes(tx, parceiroId, e.dados, lojas, ator);
+  const novo = !usuario;
+  usuario ??= await tx.usuarioErp.create({ data: { email: e.email, nome: e.nome, criadoEm: agora } });
+  const acesso = await tx.acessoParceiro.create({
+    data: { parceiroId, usuarioId: usuario.id, criadoEm: agora, ...prep.colunas },
+  });
+
+  // Vínculo novo em mais um parceiro: link pendente (de qualquer parceiro)
+  // morre; e senha criada por link de administrador de OUTRO parceiro não
+  // atravessa — apaga e a pessoa cria outra pelo link do nível 1 (decisão 41).
+  let revogacao: Revogacao | null = null;
+  if (!novo) {
+    await tx.conviteAcesso.updateMany({
+      where: { usuarioId: usuario.id, usadoEm: null, revogadoEm: null },
+      data: { revogadoEm: agora },
+    });
+    if (usuario.senhaHash && usuario.senhaPorLinkDoParceiroId && usuario.senhaPorLinkDoParceiroId !== parceiroId) {
+      // TUDO que deixa entrar sem a senha nova sai junto (Guardião, voltas
+      // 2 e 3): quem conhecia a senha do link pode ter ativado o rosto ou
+      // ter um login em voo. Inventário em `revogarMeiosDeEntrada`.
+      revogacao = await revogarMeiosDeEntrada(tx, usuario.id, 'SENHA_DE_OUTRO_PARCEIRO', agora);
+      usuario = await tx.usuarioErp.findUniqueOrThrow({ where: { id: usuario.id } });
+    }
+  }
+  const senhaApagada = revogacao !== null;
+
+  const historico: RegistroDeHistorico[] = [
+    {
+      entidade: ENTIDADE,
+      entidadeId: acesso.id,
+      acao: 'CRIOU',
+      depois: {
+        nome: usuario.nome,
+        email: usuario.email,
+        status: acesso.status,
+        ...retratoDePrep(prep, nomes),
+      },
+      autorNome: ator.nome,
+    },
+  ];
+  if (senhaApagada) {
+    historico.push({
+      entidade: ENTIDADE,
+      entidadeId: acesso.id,
+      acao: 'PEDIU_SENHA_NOVA',
+      depois: {
+        nome: usuario.nome,
+        senha: 'criada por link de outro parceiro: precisa criar de novo',
+        aparelho: textoDosRostosRemovidos(revogacao!.rostos),
+      },
+      autorNome: ator.nome,
+    });
+  }
+  // A senha e os rostos valiam nos outros parceiros dela também: fica lá.
+  const outrosParceiros: HistoricoEmOutroParceiro[] = (revogacao?.vinculos ?? [])
+    .filter((v) => v.parceiroId !== parceiroId)
+    .map((v) => ({
+      parceiroId: v.parceiroId,
+      registros: [
+        {
+          entidade: ENTIDADE,
+          entidadeId: v.acessoId,
+          acao: 'PEDIU_SENHA_NOVA',
+          depois: {
+            nome: usuario!.nome,
+            senha: 'apagada ao ganhar acesso a outro parceiro: precisa criar de novo',
+            aparelho: textoDosRostosRemovidos(revogacao!.rostos),
+          },
+          autorNome: ator.nome,
+        },
+      ],
+    }));
+  let link: { token: string; expiraEm: Date } | null = null;
+  if (!usuario.senhaHash && (novo || (await podeGerarLink(tx, ator, usuario.id, parceiroId)))) {
+    link = await novoConvite(tx, usuario.id, parceiroId, agora, nivel1);
+    historico.push({
+      entidade: ENTIDADE,
+      entidadeId: acesso.id,
+      acao: 'GEROU_LINK',
+      depois: { linkValeAte: link.expiraEm.toISOString() },
+      autorNome: ator.nome,
+    });
+  }
+  const mensagem = senhaApagada
+    ? `Acesso de ${usuario.nome} criado. A senha dela tinha sido criada por link de outro parceiro e não vale aqui: a senha e a entrada pelo rosto foram desligadas. Mande o link para ela criar uma senha nova.`
+    : link
+      ? `Acesso de ${usuario.nome} criado. Copie o link e mande para a pessoa.`
+      : `Atenção: esse e-mail já tem senha e entra em outro parceiro. ${usuario.nome} agora vê este também, com a mesma senha.`;
+  return { resultado: { ok: true, link, mensagem }, historico, outrosParceiros };
 }
 
 /**
@@ -611,112 +763,9 @@ export async function criarAcesso(
   const lojas = await lojasDoParceiro(db, parceiroId);
   const nomes = new Map(lojas.map((l) => [l.id, l.nome]));
   try {
-    return await naEquipe<ResultadoDeAcesso>(db, parceiroId, atorDe(quem), async (tx, ator) => {
-      const nivel1 = ator.alcance.nivel === 'FLOWFOODS';
-      let usuario = await tx.usuarioErp.findUnique({ where: { email: r.data.email } });
-      if (usuario) {
-        const ja = await tx.acessoParceiro.findUnique({
-          where: { parceiroId_usuarioId: { parceiroId, usuarioId: usuario.id } },
-        });
-        if (ja) throw new Desfazer({ email: 'Essa pessoa já tem acesso a este parceiro.' });
-        // E-mail de quem já está em OUTRO parceiro: só o nível 1 vincula. A
-        // pessoa do parceiro recebe a mesma frase de qualquer outra recusa (não
-        // fica sabendo que o e-mail existe).
-        if (!nivel1) throw new Desfazer({ email: ERRO_EMAIL_NEUTRO });
-        // Uma mudança de senha/vínculo por pessoa de cada vez (ver definirSenhaPeloLink).
-        await travar(tx, `erp-usuario:${usuario.id}`);
-        usuario = await tx.usuarioErp.findUniqueOrThrow({ where: { id: usuario.id } });
-      }
-      const prep = await prepararPermissoes(tx, parceiroId, p.dados, lojas, ator);
-      const novo = !usuario;
-      usuario ??= await tx.usuarioErp.create({ data: { email: r.data.email, nome: r.data.nome, criadoEm: agora } });
-      const acesso = await tx.acessoParceiro.create({
-        data: { parceiroId, usuarioId: usuario.id, criadoEm: agora, ...prep.colunas },
-      });
-
-      // Vínculo novo em mais um parceiro: link pendente (de qualquer parceiro)
-      // morre; e senha criada por link de administrador de OUTRO parceiro não
-      // atravessa — apaga e a pessoa cria outra pelo link do nível 1 (decisão 41).
-      let revogacao: Revogacao | null = null;
-      if (!novo) {
-        await tx.conviteAcesso.updateMany({
-          where: { usuarioId: usuario.id, usadoEm: null, revogadoEm: null },
-          data: { revogadoEm: agora },
-        });
-        if (usuario.senhaHash && usuario.senhaPorLinkDoParceiroId && usuario.senhaPorLinkDoParceiroId !== parceiroId) {
-          // TUDO que deixa entrar sem a senha nova sai junto (Guardião, voltas
-          // 2 e 3): quem conhecia a senha do link pode ter ativado o rosto ou
-          // ter um login em voo. Inventário em `revogarMeiosDeEntrada`.
-          revogacao = await revogarMeiosDeEntrada(tx, usuario.id, 'SENHA_DE_OUTRO_PARCEIRO', agora);
-          usuario = await tx.usuarioErp.findUniqueOrThrow({ where: { id: usuario.id } });
-        }
-      }
-      const senhaApagada = revogacao !== null;
-
-      const historico: RegistroDeHistorico[] = [
-        {
-          entidade: ENTIDADE,
-          entidadeId: acesso.id,
-          acao: 'CRIOU',
-          depois: {
-            nome: usuario.nome,
-            email: usuario.email,
-            status: acesso.status,
-            ...retratoDePrep(prep, nomes),
-          },
-          autorNome: ator.nome,
-        },
-      ];
-      if (senhaApagada) {
-        historico.push({
-          entidade: ENTIDADE,
-          entidadeId: acesso.id,
-          acao: 'PEDIU_SENHA_NOVA',
-          depois: {
-            nome: usuario.nome,
-            senha: 'criada por link de outro parceiro: precisa criar de novo',
-            aparelho: textoDosRostosRemovidos(revogacao!.rostos),
-          },
-          autorNome: ator.nome,
-        });
-      }
-      // A senha e os rostos valiam nos outros parceiros dela também: fica lá.
-      const outrosParceiros: HistoricoEmOutroParceiro[] = (revogacao?.vinculos ?? [])
-        .filter((v) => v.parceiroId !== parceiroId)
-        .map((v) => ({
-          parceiroId: v.parceiroId,
-          registros: [
-            {
-              entidade: ENTIDADE,
-              entidadeId: v.acessoId,
-              acao: 'PEDIU_SENHA_NOVA',
-              depois: {
-                nome: usuario!.nome,
-                senha: 'apagada ao ganhar acesso a outro parceiro: precisa criar de novo',
-                aparelho: textoDosRostosRemovidos(revogacao!.rostos),
-              },
-              autorNome: ator.nome,
-            },
-          ],
-        }));
-      let link: { token: string; expiraEm: Date } | null = null;
-      if (!usuario.senhaHash && (novo || (await podeGerarLink(tx, ator, usuario.id, parceiroId)))) {
-        link = await novoConvite(tx, usuario.id, parceiroId, agora, nivel1);
-        historico.push({
-          entidade: ENTIDADE,
-          entidadeId: acesso.id,
-          acao: 'GEROU_LINK',
-          depois: { linkValeAte: link.expiraEm.toISOString() },
-          autorNome: ator.nome,
-        });
-      }
-      const mensagem = senhaApagada
-        ? `Acesso de ${usuario.nome} criado. A senha dela tinha sido criada por link de outro parceiro e não vale aqui: a senha e a entrada pelo rosto foram desligadas. Mande o link para ela criar uma senha nova.`
-        : link
-          ? `Acesso de ${usuario.nome} criado. Copie o link e mande para a pessoa.`
-          : `Atenção: esse e-mail já tem senha e entra em outro parceiro. ${usuario.nome} agora vê este também, com a mesma senha.`;
-      return { resultado: { ok: true, link, mensagem }, historico, outrosParceiros };
-    });
+    return await naEquipe<ResultadoDeAcesso>(db, parceiroId, atorDe(quem), (tx, ator) =>
+      criarAcessoNaTransacao(tx, { parceiroId, nome: r.data.nome, email: r.data.email, dados: p.dados, lojas, nomes, agora }, ator),
+    );
   } catch (e) {
     if (ehErroDeUnicidade(e)) return { ok: false, erros: { email: 'Esse e-mail acabou de ser cadastrado. Recarregue.' } };
     throw e;
@@ -837,6 +886,7 @@ export async function gerarNovoLink(
   const r = await naEquipe<{ ok: true; token: string; expiraEm: Date; nome: string }>(db, parceiroId, atorDe(quem), async (tx, ator) => {
     const a = await acessoDoParceiro(tx, parceiroId, acessoId);
     if (!a) throw new Desfazer({ geral: 'Acesso não encontrado neste parceiro.' });
+    await exigirParceiroLiberado(tx, parceiroId);
     if (a.status !== 'ATIVO') throw new Desfazer({ geral: 'Reative o acesso antes de gerar um link.' });
     if (!cobre(ator.alcance, alcanceDe(a))) throw new Desfazer({ geral: ERRO_ACIMA_DE_VOCE });
     await travar(tx, `erp-usuario:${a.usuarioId}`);
@@ -1032,8 +1082,11 @@ async function conviteValido(db: PrismaClient | Prisma.TransactionClient, token:
   // Link de um parceiro em que a pessoa foi desativada não vale.
   const v = await db.acessoParceiro.findUnique({
     where: { parceiroId_usuarioId: { parceiroId: c.parceiroId, usuarioId: c.usuarioId } },
+    include: { parceiro: { select: { status: true } } },
   });
   if (!v || v.status !== 'ATIVO') return null;
+  // Decisão 92: link de parceiro que ainda não foi liberado (RASCUNHO) não vale.
+  if (v.parceiro.status === 'RASCUNHO') return null;
   // Link gerado por administrador de parceiro só vale se, AGORA, a pessoa não
   // tem vínculo em outro parceiro (a senha vale em todos; decisão 41).
   if (!c.doNivel1) {
@@ -1158,13 +1211,8 @@ export async function falhasRecentes(email: string | null, ip: string, o?: Opcoe
   return contarFalhas(db, email, ip, agora);
 }
 
-/**
- * Trava por chave até o fim da transação (pg_advisory_xact_lock). Ordem fixa:
- * e-mail antes de IP, e ninguém trava IP antes de e-mail — sem deadlock.
- */
-async function travar(tx: Prisma.TransactionClient, chave: string) {
-  await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${chave}, 0))::text AS "trava"`;
-}
+// Trava por chave (`./trava`). Ordem fixa: e-mail antes de IP, e ninguém trava
+// IP antes de e-mail — sem deadlock.
 
 type Tentativa = { email: string | null; ip: string; metodo: 'SENHA' | 'ROSTO' };
 
@@ -1230,7 +1278,11 @@ async function abrirSessao(
       if (!u || u.versaoCredencial !== versaoLida) return { ok: false as const, motivo: 'CREDENCIAL_REVOGADA' };
       const recusa = naTrava ? await naTrava(tx) : null;
       if (recusa) return { ok: false as const, motivo: recusa };
-      const ativos = await tx.acessoParceiro.findMany({ where: { usuarioId, status: 'ATIVO' }, select: { parceiroId: true } });
+      // Decisão 92: parceiro em RASCUNHO (ainda não liberado) não entra. Suspenso entra e só lê.
+      const ativos = await tx.acessoParceiro.findMany({
+        where: { usuarioId, status: 'ATIVO', parceiro: { status: { not: 'RASCUNHO' } } },
+        select: { parceiroId: true },
+      });
       if (ativos.length === 0) return { ok: false as const, motivo: 'SEM_ACESSO' };
       await tx.sessaoErp.create({
         data: {
@@ -1586,7 +1638,8 @@ export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoV
     where: { tokenHash: hashDoToken(token) },
     include: {
       usuario: {
-        include: { acessos: { where: { status: 'ATIVO' }, include: { parceiro: true, ...COM_PERFIL } } },
+        // Decisão 92: vínculo com parceiro em RASCUNHO não vale (a sessão já aberta morre aqui).
+        include: { acessos: { where: { status: 'ATIVO', parceiro: { status: { not: 'RASCUNHO' } } }, include: { parceiro: true, ...COM_PERFIL } } },
       },
     },
   });
@@ -1632,4 +1685,180 @@ export async function encerrarSessao(token: unknown, o?: Opcoes): Promise<void> 
   if (!tokenTemFormato(token)) return;
   const { db, agora } = abrir(o);
   await db.sessaoErp.updateMany({ where: { tokenHash: hashDoToken(token), encerradaEm: null }, data: { encerradaEm: agora } });
+}
+
+// ================================================= ativar o pedido (0.5)
+//
+// O pedido de acesso (`PedidoParceiro`, fora do tenant) vira Parceiro Flow aqui,
+// e só aqui: numa transação SÓ nascem o parceiro (já ATIVO), a pessoa dona (perfil
+// Dono, rede inteira), o convite de primeiro acesso (72 h, uso único, só o hash
+// no banco), a marca ATIVADO no pedido e o histórico do parceiro. Falhou em
+// qualquer ponto, não fica nada. A trava `erp-pedido:<id>` serializa quem decide o
+// mesmo pedido (ativar × ativar, ativar × recusar) e a gravação do pedido é
+// condicional à etapa e à versão lida: o segundo recebe a frase e não cria nada.
+// O histórico do parceiro é o ÚLTIMO passo (depois dele a transação está no
+// papel do tenant, sem acesso a pedido nem a credencial).
+
+export type ResultadoDaAtivacao =
+  | {
+      ok: true;
+      parceiro: { id: string; slug: string; nome: string };
+      dono: { nome: string; email: string };
+      whatsapp: string;
+      link: { token: string; expiraEm: Date } | null;
+      mensagem: string;
+    }
+  | { ok: false; erros: Partial<Record<'nomeParceiro' | 'slug' | 'donoNome' | 'donoEmail' | 'geral', string>> };
+
+const ETAPAS_ABERTAS: EtapaDoPedido[] = ['NOVO', 'EM_CONVERSA'];
+
+/** O dono nasce com tudo e a rede inteira (inclusive lojas que vierem depois). */
+const DONO_DA_REDE = { perfil: 'DONO', lojas: 'rede' } as const;
+
+/**
+ * Ativa o pedido: cria o Parceiro Flow ATIVO, o dono e o link de primeiro acesso.
+ * Só o nível 1 chama (a action confere a sessão do /rodolfo). O token só existe
+ * no retorno: quem chama mostra uma vez e não grava em lugar nenhum.
+ */
+export async function ativarPedido(
+  pedidoId: string,
+  entrada: Record<string, unknown>,
+  autorNome: string,
+  o?: Opcoes,
+): Promise<ResultadoDaAtivacao> {
+  const lido = lerAtivacao(entrada);
+  if (!lido.ok) return { ok: false, erros: lido.erros };
+  const f = lido.dados;
+  const permissoes = lerPermissoesDaPessoa({ ...DONO_DA_REDE });
+  if (!permissoes.ok) throw new Error('perfil Dono inválido');
+  const { db, agora } = abrir(o);
+  const papel = await papelDisponivel(db);
+  const ator = atorNivel1(autorNome);
+
+  try {
+    return await db.$transaction(
+      async (tx): Promise<ResultadoDaAtivacao> => {
+        await travar(tx, `erp-pedido:${pedidoId}`);
+        const pedido = await tx.pedidoParceiro.findUnique({ where: { id: pedidoId } });
+        if (!pedido) throw new Desfazer({ geral: 'Pedido não encontrado.' });
+        if (!ETAPAS_ABERTAS.includes(pedido.status)) {
+          const ev = await tx.pedidoParceiroEvento.findFirst({
+            where: { pedidoId, acao: { in: ['ATIVOU', 'RECUSOU'] } },
+            orderBy: { ocorridoEm: 'desc' },
+          });
+          throw new Desfazer({ geral: fraseJaDecidido(pedido.status, ev?.autorNome ?? null, ev?.ocorridoEm ?? null) });
+        }
+        if (pedido.versao !== f.versao) throw new Desfazer({ geral: FRASE_PEDIDO_MEXIDO });
+
+        let parceiro: ParceiroFlow;
+        try {
+          parceiro = await tx.parceiroFlow.create({ data: { nome: f.nomeParceiro, slug: f.slug, status: 'ATIVO' } });
+        } catch (e) {
+          if (ehErroDeUnicidade(e)) throw new Desfazer({ slug: 'Esse link já é de outro parceiro. Escolha outro.' });
+          throw e;
+        }
+
+        await travar(tx, `erp-equipe:${parceiro.id}`);
+        const acesso = await criarAcessoNaTransacao(
+          tx,
+          { parceiroId: parceiro.id, nome: f.donoNome, email: f.donoEmail, dados: permissoes.dados, lojas: [], nomes: new Map(), agora, soPessoaNova: true },
+          ator,
+        );
+        if (!acesso.resultado.ok) throw new Desfazer(acesso.resultado.erros);
+
+        const { count } = await tx.pedidoParceiro.updateMany({
+          where: { id: pedidoId, status: { in: ETAPAS_ABERTAS }, versao: pedido.versao },
+          data: { status: 'ATIVADO', parceiroCriadoId: parceiro.id, etapaDesde: agora, versao: { increment: 1 }, atualizadoEm: agora },
+        });
+        if (count === 0) throw new Desfazer({ geral: FRASE_PEDIDO_MEXIDO });
+        await tx.pedidoParceiroEvento.create({
+          data: {
+            pedidoId,
+            acao: 'ATIVOU',
+            antes: { etapa: pedido.status },
+            depois: { etapa: 'ATIVADO' },
+            autorNome,
+            ocorridoEm: agora,
+          },
+        });
+
+        // ÚLTIMO passo: o histórico do parceiro novo (e de outros parceiros da pessoa, se a senha caiu).
+        await fecharComHistorico(
+          tx,
+          parceiro.id,
+          [
+            {
+              entidade: 'ParceiroFlow',
+              entidadeId: parceiro.id,
+              acao: 'CRIOU',
+              depois: { nome: parceiro.nome, slug: parceiro.slug, status: parceiro.status, origem: `pedido ${pedidoId}` },
+              autorNome,
+            },
+            ...acesso.historico,
+          ],
+          papel,
+        );
+        for (const h of acesso.outrosParceiros) await fecharComHistorico(tx, h.parceiroId, h.registros, papel);
+
+        const r = acesso.resultado;
+        return {
+          ok: true,
+          parceiro: { id: parceiro.id, slug: parceiro.slug, nome: parceiro.nome },
+          dono: { nome: f.donoNome, email: f.donoEmail },
+          whatsapp: pedido.whatsapp,
+          link: r.link,
+          mensagem: r.mensagem,
+        };
+      },
+      { maxWait: 10_000, timeout: 20_000 },
+    );
+  } catch (e) {
+    if (e instanceof Desfazer) return { ok: false, erros: erroDaAtivacao(e.erros) };
+    // Corrida: alguém criou o MESMO e-mail (na Equipe de outro parceiro) entre a conferência e a
+    // criação. O único do e-mail decide; o perdedor desfaz tudo e recebe a mesma frase.
+    if (ehErroDeUnicidade(e)) return { ok: false, erros: { donoEmail: ERRO_DONO_JA_TEM_ACESSO } };
+    throw e;
+  }
+}
+
+/** Erros do miolo do acesso (campos de `criarAcesso`) → campos do formulário de ativação. */
+function erroDaAtivacao(erros: Erros): Extract<ResultadoDaAtivacao, { ok: false }>['erros'] {
+  const r: Extract<ResultadoDaAtivacao, { ok: false }>['erros'] = {};
+  for (const [campo, texto] of Object.entries(erros)) {
+    if (!texto) continue;
+    if (campo === 'slug' || campo === 'geral') r[campo] = texto;
+    else if (campo === 'email') r.donoEmail = texto;
+    else if (campo === 'nome') r.donoNome = texto;
+    else r.geral ??= texto;
+  }
+  return r;
+}
+
+/**
+ * Para o cartão do pedido (só nível 1 lê): este e-mail já existe em `UsuarioErp`
+ * (com senha, com convite pendente ou sem vínculo ativo)? E em quais parceiros
+ * ele entra? A landing nunca vê isto (resposta única).
+ */
+export async function contaDoEmail(email: string, o?: Opcoes): Promise<{ existe: boolean; parceiros: string[] }> {
+  const { db } = abrir(o);
+  const u = await db.usuarioErp.findUnique({
+    where: { email },
+    select: { acessos: { where: { status: 'ATIVO' }, select: { parceiro: { select: { nome: true } } } } },
+  });
+  return { existe: u !== null, parceiros: u ? u.acessos.map((a) => a.parceiro.nome) : [] };
+}
+
+/**
+ * Lista do nível 1 (decisão 92): parceiros em RASCUNHO com pessoas ATIVAS. Elas
+ * não entram enquanto o parceiro não for ativado: o aviso diz "ative para
+ * liberar o acesso". Devolve parceiroId → quantas pessoas.
+ */
+export async function rascunhosComPessoasAtivas(o?: Opcoes): Promise<Map<string, number>> {
+  const { db } = abrir(o);
+  const linhas = await db.acessoParceiro.groupBy({
+    by: ['parceiroId'],
+    where: { status: 'ATIVO', parceiro: { status: 'RASCUNHO' } },
+    _count: { _all: true },
+  });
+  return new Map(linhas.map((l) => [l.parceiroId, l._count._all]));
 }

@@ -206,7 +206,7 @@ const posicao = (c: string) => (ORDEM.includes(c) ? ORDEM.indexOf(c) : ORDEM.len
 
 const STATUS: Record<string, string> = {
   ATIVO: 'Ativo',
-  RASCUNHO: 'Aguardando liberação',
+  RASCUNHO: 'Rascunho',
   SUSPENSO: 'Suspenso',
   DESATIVADO: 'Desativado',
 };

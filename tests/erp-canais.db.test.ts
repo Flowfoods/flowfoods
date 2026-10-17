@@ -54,7 +54,7 @@ const igual = (a: Fracao | null, num: bigint, den: bigint) => expect(a && compar
 describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { timeout: 120_000 }, () => {
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
-  const sufixo = `c${Date.now().toString(36)}`;
+  const sufixo = `c${globalThis.crypto.randomUUID().slice(0, 8)}`;
   let A: { id: string };
   let B: { id: string };
   let a: ClienteDoParceiro;

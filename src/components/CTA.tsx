@@ -1,4 +1,5 @@
 import { CONTACT_INFO, TAGLINE, whatsappUrl } from '@/lib/constants';
+import FormComecar from './FormComecar';
 import { Etiqueta, Secao } from './ui';
 
 const COMO_COMECA = [
@@ -18,7 +19,7 @@ export default function CTA() {
             Conte como está a sua casa.
           </h2>
           <p className="mt-6 max-w-lg text-lg leading-relaxed text-surface/75">
-            Uma mensagem no WhatsApp basta para começar. Assim funciona daí em diante:
+            Uma mensagem no WhatsApp, ou o formulário, bastam para começar. Assim funciona daí em diante:
           </p>
           <ol className="mt-8 divide-y divide-surface/15 border-y border-surface/15">
             {COMO_COMECA.map((e, i) => (
@@ -48,10 +49,12 @@ export default function CTA() {
           </div>
         </div>
 
-        <div className="flex flex-col justify-end lg:items-end lg:text-right">
-          <p className="font-display text-2xl italic leading-snug text-surface/80 md:text-3xl">{TAGLINE}</p>
-          <p className="mt-4 text-sm text-surface/50">FlowFoods · Rio de Janeiro</p>
-        </div>
+        <FormComecar />
+      </div>
+
+      <div className="mt-14 border-t border-surface/15 pt-8 lg:flex lg:items-end lg:justify-between lg:gap-8">
+        <p className="font-display text-2xl italic leading-snug text-surface/80 md:text-3xl">{TAGLINE}</p>
+        <p className="mt-4 text-sm text-surface/50 lg:mt-0">FlowFoods · Rio de Janeiro</p>
       </div>
     </Secao>
   );

@@ -60,7 +60,7 @@ const sp = (t: string) => t.replace(/ /g, ' ');
 describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120_000 }, () => {
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
-  const sufixo = `c${Date.now().toString(36)}`;
+  const sufixo = `c${globalThis.crypto.randomUUID().slice(0, 8)}`;
   let A: { id: string; slug: string; nome: string; status: string };
   let B: { id: string; slug: string; nome: string; status: string };
   let a: ClienteDoParceiro;

@@ -1,8 +1,8 @@
 'use server';
 
 /**
- * Ações do nível 1 (FlowFoods) sobre o Parceiro Flow: criar, renomear,
- * ativar/suspender. Sessão e parceiro resolvidos por `src/lib/erp/contexto.ts`;
+ * Ações do nível 1 (FlowFoods) sobre o Parceiro Flow: renomear e
+ * ativar/suspender (criar é a ativação de um pedido, em `onboarding/actions.ts`). Sessão e parceiro resolvidos por `src/lib/erp/contexto.ts`;
  * o formulário só manda texto. Cada mudança grava antes/depois no histórico do
  * parceiro (em `src/lib/erp/parceiros.ts`, na mesma transação).
  */
@@ -10,7 +10,7 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/db';
 import { exigirNivel1, exigirParceiro } from '@/lib/erp/contexto';
-import { criarParceiro, mudarStatusParceiro, renomearParceiro, type ResultadoParceiro } from '@/lib/erp/parceiros';
+import { mudarStatusParceiro, renomearParceiro, type ResultadoParceiro } from '@/lib/erp/parceiros';
 import type { EstadoForm } from '@/components/erp/ui/campos';
 
 function paraEstado(r: ResultadoParceiro, vez: number): NonNullable<EstadoForm> {
@@ -19,19 +19,6 @@ function paraEstado(r: ResultadoParceiro, vez: number): NonNullable<EstadoForm> 
 
 async function auditar(userId: string, evento: string, dados: Record<string, string>) {
   await prisma.auditLog.create({ data: { userId, evento, dados } });
-}
-
-export async function acaoCriarParceiro(anterior: EstadoForm, form: FormData): Promise<EstadoForm & { slug?: string }> {
-  const { userId, autorNome } = await exigirNivel1();
-  const vez = (anterior?.vez ?? 0) + 1;
-  const r = await criarParceiro(Object.fromEntries(form), autorNome);
-  if (r.ok) {
-    await auditar(userId, 'erp_parceiro_criado', { parceiroId: r.id, slug: r.slug });
-    // O shell do nível 1 lista os parceiros (seletor do topo, busca): o layout todo.
-    revalidatePath('/rodolfo', 'layout');
-    return { ...paraEstado(r, vez), slug: r.slug };
-  }
-  return paraEstado(r, vez);
 }
 
 export async function acaoRenomearParceiro(slug: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {

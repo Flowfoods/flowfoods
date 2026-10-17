@@ -92,7 +92,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
   const avisos = vi.spyOn(console, 'warn').mockImplementation(() => {});
-  const sufixo = `p${Date.now().toString(36)}`;
+  const sufixo = `p${globalThis.crypto.randomUUID().slice(0, 8)}`;
   const email = (n: string) => `${n}.${sufixo}@teste.flow`;
   const ip = () => `10.4.${Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 250)}-${sufixo}`;
   const o = () => ({ base: db });

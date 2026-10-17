@@ -7,20 +7,23 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
 import { exigirNivel1, leituraDoParceiro } from '@/lib/erp/contexto';
-import { parceirosSemAdministrador } from '@/lib/erp/credenciais';
+import { parceirosSemAdministrador, rascunhosComPessoasAtivas } from '@/lib/erp/credenciais';
 import { COR } from '@/lib/erp/modulos';
+import { contarPedidosAbertos } from '@/lib/erp/pedidos';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
+import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { Contagem, Metrica, Painel, Ponto, Vazio } from '@/components/erp/ui/superficies';
-import { FormParceiro } from './form-parceiro';
 
 export const dynamic = 'force-dynamic';
 
 export default async function ErpPage() {
   await exigirNivel1();
-  const [parceiros, semAdmin] = await Promise.all([
+  const [parceiros, semAdmin, presos, pedidos] = await Promise.all([
     prisma.parceiroFlow.findMany({ orderBy: [{ status: 'asc' }, { nome: 'asc' }] }),
     parceirosSemAdministrador(),
+    rascunhosComPessoasAtivas(),
+    contarPedidosAbertos(),
   ]);
   const linhas = await Promise.all(
     parceiros.map(async (p) => {
@@ -47,7 +50,16 @@ export default async function ErpPage() {
 
       <div className="grid grid-cols-3 gap-3">
         <Metrica rotulo="Ativos" valor={porStatus.ATIVO} />
-        <Metrica rotulo="Aguardando liberação" valor={porStatus.RASCUNHO} />
+        <Metrica
+          rotulo="Aguardando liberação"
+          valor={pedidos.abertos}
+        >
+          {(pedidos.atrasados > 0 || porStatus.RASCUNHO > 0) && (
+            <div className="mt-1.5 text-[12px] leading-snug text-suave">
+              {[pedidos.atrasados ? `${pedidos.atrasados} com atraso` : null, porStatus.RASCUNHO ? `${porStatus.RASCUNHO} em rascunho` : null].filter(Boolean).join(' · ')}
+            </div>
+          )}
+        </Metrica>
         <Metrica rotulo="Suspensos" valor={porStatus.SUSPENSO} />
       </div>
 
@@ -59,7 +71,7 @@ export default async function ErpPage() {
           className="self-start"
         >
           {linhas.length === 0 ? (
-            <Vazio titulo="Nenhum Parceiro Flow ainda.">Crie o primeiro no formulário ao lado.</Vazio>
+            <Vazio titulo="Nenhum Parceiro Flow ainda.">O primeiro nasce quando você ativa um pedido em “Aguardando liberação”.</Vazio>
           ) : (
             <table className="w-full text-sm">
               <thead>
@@ -91,11 +103,18 @@ export default async function ErpPage() {
                         >
                           {p.nome}
                         </Link>
-                        <div className="mt-0.5 flex items-center gap-2 text-[12px] text-suave">
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[12px] text-suave">
                           <Ponto tom={s.tom} />
                           <span className="truncate">{s.rotulo}</span>
-                          {semAdmin.has(p.id) && (
-                            <span className="truncate text-erro">· sem ninguém cuidando da equipe</span>
+                          {presos.has(p.id) ? (
+                            <span className="basis-full text-erro sm:basis-auto">
+                              <span aria-hidden className="hidden sm:inline">· </span>
+                              {presos.get(p.id)} {presos.get(p.id) === 1 ? 'pessoa não entra' : 'pessoas não entram'}: ative para liberar o acesso
+                            </span>
+                          ) : (
+                            semAdmin.has(p.id) && <span className="basis-full text-erro sm:basis-auto">
+                              <span aria-hidden className="hidden sm:inline">· </span>sem ninguém cuidando da equipe
+                            </span>
                           )}
                         </div>
                       </td>
@@ -112,8 +131,21 @@ export default async function ErpPage() {
           )}
         </Painel>
 
-        <Painel id="novo-parceiro" titulo="Novo parceiro" className="scroll-mt-24 self-start">
-          <FormParceiro />
+        <Painel titulo="Novo parceiro" className="self-start">
+          <div className="space-y-4 text-sm">
+            <p className="text-suave">
+              Um parceiro nasce de um pedido: o que chega pelo site ou o que você digita. Ao ativar, nascem o parceiro, o dono e o link de primeiro
+              acesso.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Link href="/rodolfo/onboarding/novo" className={classeDeBotao('primario', 'w-full')}>
+                Cadastrar pedido manual
+              </Link>
+              <Link href="/rodolfo/onboarding" className={classeDeBotao('secundario', 'w-full')}>
+                {pedidos.abertos ? `Ver ${pedidos.abertos} ${pedidos.abertos === 1 ? 'pedido aberto' : 'pedidos abertos'}` : 'Ver o quadro de pedidos'}
+              </Link>
+            </div>
+          </div>
         </Painel>
       </div>
     </div>

@@ -70,7 +70,7 @@ const URL_TESTE = process.env.ERP_DB_TESTE;
 describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { timeout: 120_000 }, () => {
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
-  const sufixo = `e${Date.now().toString(36)}`;
+  const sufixo = `e${globalThis.crypto.randomUUID().slice(0, 8)}`;
   let A: { id: string; slug: string; nome: string; status: string };
   let B: { id: string; slug: string; nome: string; status: string };
   let a: ClienteDoParceiro;

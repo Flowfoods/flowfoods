@@ -162,7 +162,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
 });
 
 describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () => {
-  it('Hoje, Leads, Cadência, Inbox, Visitas, Métricas, Portal, Parceiros e Config, todas com tela', () => {
+  it('Hoje, Leads, Cadência, Inbox, Visitas, Métricas, Portal, Parceiros, Aguardando liberação (0.5) e Config, todas com tela', () => {
     const h = modulosDoNivel1().flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.href)));
     expect(h).toEqual([
       '/rodolfo/hoje',
@@ -173,6 +173,7 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
       '/rodolfo/metricas',
       '/rodolfo/portal',
       '/rodolfo/erp',
+      '/rodolfo/onboarding',
       '/rodolfo/config',
     ]);
     for (const x of h)

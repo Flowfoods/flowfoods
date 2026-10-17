@@ -1332,3 +1332,65 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Razão:** (b). (a) cobriria só o preço e deixaria as embalagens e qualquer campo futuro na ficha; (b) é uma regra só, num lugar só, e o tipo obriga todo leitor (os 12 de hoje e os próximos) a decidir — esquecer não compila. O corte é no servidor, antes de virar texto da tela: o payload não leva. `obterFicha` nega por padrão. Os campos de precificação são uma lista (`CAMPOS_DE_PRECIFICACAO`) ao lado dos rótulos do histórico: campo novo de preço entra nela.
 
+
+
+### 91. 2026-10-16 · ERP 0.5: o pedido de acesso mora FORA do tenant; o Parceiro Flow só nasce na ativação, já ATIVO e com dono
+
+**Alternativas:** (a) criar o `ParceiroFlow` em RASCUNHO no envio da landing (a letra do contrato); (b) pedido em tabela própria (`PedidoParceiro`) fora do tenant, e o parceiro nasce quando o Rodolfo ativa; (c) reaproveitar o `Lead` do Barney.
+
+**Razão:** (b). Spam nunca vira tenant: o `ParceiroFlow` não se apaga (o histórico tem FK Restrict), aparece na lista, na busca e no seletor do shell, e o slug (fixo depois de criado, decisão 33) seria escolhido por um desconhecido. Com (a) seria preciso slug editável em RASCUNHO, status RECUSADO no enum, um caminho para apagar spam e filtros em três lugares; e o RASCUNHO não recebe escrita (decisão 32), então não teria uso. (c) não serve: a unicidade do telefone do Lead devolveria um erro diferente (enumeração) e o lead entraria na cadência automática. O papel `erp_tenant` não lê o pedido (migration revoga; teste confere "permission denied"), o `prisma` do portal recusa os modelos e só `pedidos.ts` e a ativação em `credenciais.ts` os tocam. Na tela, o pedido aberto é "Aguardando liberação". **Desvio da letra do contrato, mesmo objetivo: registrar na seção 8 do Notion para o Rodolfo validar.**
+
+### 92. 2026-10-16 · ERP 0.5: parceiro em RASCUNHO não entra; suspenso entra e lê (revoga a decisão 38 só para RASCUNHO)
+
+**Alternativas:** (a) manter a 38 (rascunho entra e só lê); (b) rascunho não entra: login, sessão, escolha de parceiro e convite o ignoram, e criar acesso/link recusa nele.
+
+**Razão:** (b). Com a ativação, quem deve ter acesso é parceiro ATIVO; um rascunho que "já entra" abre porta para quem ainda não foi liberado. A sessão já aberta morre na próxima requisição (`validarSessao` filtra o vínculo). Suspenso segue como na 38: entra e só lê (ele já foi cliente). Sem acesso à produção para contar quem ficaria de fora, a lista de parceiros do nível 1 avisa na linha de cada RASCUNHO com pessoas ativas: "ative para liberar o acesso". Ativar é a transição RASCUNHO → ATIVO que já existe.
+
+### 93. 2026-10-16 · ERP 0.5: ativação atômica (parceiro + dono + convite + pedido + histórico) numa função de `credenciais.ts`, com trava e gravação condicional
+
+**Alternativas:** (a) chamar `criarParceiro` e `criarAcesso` em sequência; (b) uma transação só que extrai o miolo de `criarAcesso` (`criarAcessoNaTransacao`) e cria o parceiro dentro dela.
+
+**Razão:** (b): em (a) uma falha entre as duas deixaria parceiro sem dono, ou dono sem link. Trava `erp-pedido:<id>` + `updateMany` condicional à etapa e à versão lida: duas ativações (ou ativar × recusar) deixam um vencedor, e o outro recebe a frase com quem decidiu; nenhum segundo parceiro, dono ou link nasce (teste de corrida). O histórico do parceiro é o ÚLTIMO passo (depois dele a transação roda no papel do tenant, sem acesso a pedido nem a credencial, `tenant.ts`). O dono é o perfil Dono com a rede inteira. Só o nível 1 ativa. **Revisão (veto do Guardião, decisão 99): a ativação só cria pessoa nova; e-mail que já existe é recusado.**
+
+### 94. 2026-10-16 · ERP 0.5: anti-abuso do formulário — trava e limite por IP, teto global, armadilha e resposta única, sem CAPTCHA de terceiros
+
+**Alternativas:** (a) CAPTCHA de terceiros; (b) só armadilha; (c) limite por IP (3/h, 10/dia) + teto global (100 cartões/dia) em tabela própria, sob `pg_advisory_xact_lock`, + armadilha + resposta idêntica.
+
+**Razão:** (c), a técnica da 0.3 (contar e anotar numa transação sob trava: 20 envios paralelos do mesmo IP dão exatamente 3). Tabela própria: pedido que falha não pode travar o login de quem divide o IP. CAPTCHA de terceiros mandaria dado do visitante para fora e exige conta e chave; o volume de hoje não justifica. A resposta é a mesma para pedido novo, reenvio (mesmo e-mail ou WhatsApp com pedido aberto: entra no mesmo cartão, que NÃO é reescrito) e armadilha, e o formulário nunca lê `UsuarioErp`: não dá para descobrir quem é cliente. Um teto de ruído por IP (40 linhas/hora) impede a tabela de crescer sem fim.
+
+### 95. 2026-10-16 · ERP 0.5: convite sem SMTP — o link aparece uma vez, com "Copiar" e "Abrir no WhatsApp"; o token nunca é gravado
+
+**Alternativas:** (a) enviar e-mail (não há SMTP); (b) enviar pela Evolution API (instância sem conexão); (c) mostrar o link uma vez, com wa.me para o número do pedido.
+
+**Razão:** (c). Fecha a herança "o envio do link entra em `criarAcesso`" sem servidor de envio. O token vive só na resposta da ativação (estado da tela); não vai para o banco (só o SHA-256), o AuditLog, o histórico nem a URL (teste procura o token em 7 tabelas). Perdeu: "Gerar link novo" na Equipe, que já existe.
+
+### 96. 2026-10-16 · ERP 0.5: LGPD — consentimento versionado e guarda de 180 dias do recusado; a rotina de expurgo fica como pendência
+
+**Alternativas:** (a) guardar tudo sem prazo; (b) apagar o recusado sozinho aos 180 dias; (c) registrar o prazo e dar o botão "Excluir dados pessoais"; rotina automática depois.
+
+**Razão:** (c). Caixa obrigatória com o texto decidido ("Autorizo a FlowFoods a usar estes dados só para falar comigo sobre a consultoria e o sistema.", versão `v1`, data gravada). O recusado fica guardado por 180 dias (o detalhe diz até quando); "Excluir dados pessoais" anonimiza o pedido recusado (nome, contato, cidade) e mantém o cartão e o histórico sem dado pessoal. O worker que apaga sozinho fica para a rotina de retenção (herança da 0.3).
+
+### 97. 2026-10-16 · ERP 0.5: atraso do pedido — Novo > 2 dias, Em conversa > 7 dias sem movimento; filete de 2 px, não borda colorida
+
+**Alternativas:** (a) prazo único; (b) por etapa; contagem — (c) 24 h corridas; (d) dias de calendário no Rio.
+
+**Razão:** (b)+(d): Novo precisa de resposta rápida; conversa em andamento pode esperar uma semana. Dia de calendário no Rio (23:00 de ontem e 01:00 de hoje são dias diferentes). "Movimento" é mudar de etapa: o lead mandar de novo é sinal de interesse, não ação do Rodolfo, e não esconde o atraso. O sinal é o filete vermelho de 2 px à esquerda + "Xd de atraso" (a cor nunca é o único sinal); a identidade proíbe card com borda colorida, então é o filete pedido, como na 1.8 (que usa 3 px).
+
+### 98. 2026-10-16 · ERP 0.5 (Regra Nº 2): um caminho só para criar parceiro — o formulário "Novo parceiro" sai; o pedido manual e a ativação o substituem
+
+**Alternativas:** (a) manter o formulário e acrescentar o quadro ao lado; (b) o formulário sai: "Aguardando liberação" é o quadro, "Cadastrar pedido manual" é a entrada de quem não veio do site, e a ativação é a mesma.
+
+**Razão:** (b). Dois caminhos criariam parceiros sem dono e sem link, e deixariam "Aguardando liberação" com dois significados. `criarParceiro` fica como função interna do seed e dos testes. O rótulo de RASCUNHO vira "Rascunho" (legado). O quadro é próprio (não uma generalização do da 1.8): o teste-guarda proíbe as telas compartilhadas de importar pedido.
+
+
+### 99. 2026-10-17 · ERP 0.5 (veto do Guardião): a ativação do pedido só cria pessoa NOVA; e-mail que já existe em `UsuarioErp` é recusado
+
+**Alternativas:** (a) reaproveitar a regra da 0.4 (e-mail existente só ganha o vínculo; senha de link de parceiro é revogada; link do nível 1); (b) recusar, com frase neutra, qualquer e-mail que já exista (com senha, convite pendente, acesso desativado), sem tocar em credencial nenhuma.
+
+**Razão:** (b). Em (a), quem manda o e-mail de outra pessoa no formulário público e o próprio WhatsApp faz a ativação apagar a senha e os rostos dela e mandar o link do nível 1 (`wa.me`) para o atacante, que cria a senha e ganha uma sessão com o parceiro dele E o da vítima; o convite pendente sem senha caía do mesmo jeito. O dado do público não pode chegar a `criarAcesso`/`gerarNovoLink` com poder de revogar credencial. A frase: "Este e-mail já tem acesso ao ERP. Use outro e-mail para o dono; depois, em Equipe do parceiro, dê acesso a essa pessoa." (a Equipe, que é do nível 1 digitando, segue com a regra da 0.4). A conferência é dentro da transação e a corrida com a Equipe criando o mesmo e-mail cai no único do e-mail. Teste de regressão que vai até a sessão do atacante, em quatro variantes, e falha sem a correção. O formulário de ativação mostra a frase uma vez, no campo, e desabilita o botão enquanto o e-mail está em conflito.
+
+### 100. 2026-10-17 · ERP 0.5: o motivo da recusa mora só no pedido; "Excluir dados pessoais" o troca por "[apagado]"
+
+**Alternativas:** (a) copiar o motivo para o evento RECUSOU (só-inclusão: não dá para apagar); (b) o evento não leva o motivo; o pedido o guarda e a exclusão o anonimiza; (c) afrouxar o gatilho do evento.
+
+**Razão:** (b). O motivo é texto livre e pode citar a pessoa; um registro que não se altera não pode guardá-lo. O histórico mostra "Recusado", quem e quando; o motivo aparece no painel do pedido e some na exclusão (a CHECK pede 3+ letras: "[apagado]"). O gatilho só-inclusão fica como está.

@@ -21,7 +21,7 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
   // Criado no beforeAll: o corpo do describe roda mesmo quando ele é pulado.
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
-  const sufixo = Date.now().toString(36);
+  const sufixo = globalThis.crypto.randomUUID().slice(0, 8);
   let A: { id: string };
   let B: { id: string };
   let insumoDeA: string;
