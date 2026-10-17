@@ -23,7 +23,9 @@ import {
   lerMetaDigitada,
   textoDaMetaDeCrescimento,
 } from '@/lib/erp/dre-metas-campos';
+import { ajudaParaATela } from '@/lib/erp/ajuda';
 import { planoEfetivo } from '@/lib/erp/dre-plano';
+import { pode, resolverAlcance } from '@/lib/erp/permissoes';
 import { CORES_DO_FAROL, FAIXAS_DO_FAROL, faixaDoDesvio, posicaoDaCor, VERSAO_DAS_FAIXAS } from '@/lib/erp/farol-campos';
 import { canaisDoPeriodo, farolDoDre, pedidosPorCanal, type EntradaDoFarol } from '@/lib/erp/farol-dre-campos';
 
@@ -383,4 +385,18 @@ describe('2.4 · o contraste das 5 cores nos dois temas (critério 10)', () => {
       }
     });
   }
+});
+
+// ------------------------------------------------------------------ vazamento pela ajuda
+
+describe('2.4 · sem `dre.ver` nada de farol, nem no texto da ajuda que o layout entrega (decisão 179)', () => {
+  const alcance = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR') =>
+    resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] });
+  const textoDaAjuda = (a: ReturnType<typeof alcance>) => JSON.stringify(ajudaParaATela(a));
+  it('o operador não recebe uma palavra do farol; a dona e o gerente (que têm dre.ver) recebem', () => {
+    expect(pode(alcance('OPERADOR'), 'dre.ver')).toBe(false);
+    expect(textoDaAjuda(alcance('OPERADOR'))).not.toMatch(/farol|Faróis|faixas/i);
+    expect(pode(alcance('DONO'), 'dre.ver')).toBe(true);
+    expect(textoDaAjuda(alcance('DONO'))).toMatch(/O farol: 5 faixas/);
+  });
 });

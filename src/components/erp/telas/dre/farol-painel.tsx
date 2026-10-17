@@ -45,7 +45,9 @@ function Faixas({ d }: { d: DreDoPeriodo }) {
             const quais = c.cor === 'LARANJA' || c.cor === 'VERMELHO';
             return (
               <li key={c.cor} className="min-w-0 rounded-[10px] border border-linha px-3 py-3">
-                <FaixaComPalavra cor={c.cor} posicao={posicaoDaCor(c.cor)} palavra={palavra} />
+                <div className="min-h-9">
+                  <FaixaComPalavra cor={c.cor} posicao={posicaoDaCor(c.cor)} palavra={palavra} />
+                </div>
                 <p className="mt-2 font-display text-[26px] font-bold leading-none tabular-nums">
                   {c.linhas.length}
                   <span className="ml-1.5 font-sans text-[12px] font-normal text-suave">{c.linhas.length === 1 ? 'linha' : 'linhas'}</span>
