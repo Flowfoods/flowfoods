@@ -35,7 +35,7 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
         <span className="mt-0.5 block text-[13px] leading-snug text-suave [text-wrap:pretty]">{c.subtitulo}</span>
       </span>
       {c.abas && c.abas.length > 0 && (
-        <span className="mt-auto block w-full pt-4">
+        <span className="mt-4 block w-full">
           <span className="block border-t border-linha pt-3 text-[13px] leading-snug text-suave [text-wrap:pretty]">
             <span className="sr-only">Abas: </span>
             {c.abas.join(' · ')}

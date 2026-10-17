@@ -26,7 +26,7 @@ export interface EstadoDaNav {
 
 // 44 px na gaveta (toque); 40 px na barra fixa do desktop (≥ 900 px).
 const ITEM =
-  'ff-nav-item ff-transicao flex min-h-11 min-[900px]:min-h-10 items-center gap-3 rounded-[5px] px-3 text-[14px] text-suave hover:bg-texto/5 hover:text-texto';
+  'ff-nav-item ff-transicao flex min-h-11 min-[900px]:min-h-10 items-center gap-3 rounded-[5px] px-3 py-1.5 text-[14px] text-suave hover:bg-texto/5 hover:text-texto';
 
 export function NavLateral({
   nav,
@@ -143,7 +143,8 @@ function ItemDoMenu({
       className={`${ITEM} ${recolhido ? 'justify-center px-0' : ''}`}
     >
       <Icone nome={icone} size={18} className="shrink-0" />
-      <span className={recolhido ? 'sr-only' : 'truncate'}>{rotulo}</span>
+      {/* O nome de uma área é longo ("Estoque e Movimentações"): quebra em até 2 linhas em vez de cortar. */}
+      <span className={recolhido ? 'sr-only' : 'line-clamp-2 min-w-0 leading-snug'}>{rotulo}</span>
     </Link>
   );
 }
@@ -182,7 +183,7 @@ function Grupo({
       >
         <Icone nome={icone} size={13} aria-hidden className="shrink-0" />
         {/* avoid-ai-design-ignore: SD4 — grupo do menu em caixa alta é pedido do contrato do shell (só aqui e no hub). */}
-        <span className="min-w-0 flex-1 truncate text-left">{rotulo}</span>
+        <span className="min-w-0 flex-1 py-1 text-left leading-snug">{rotulo}</span>
         <ChevronDown size={14} aria-hidden className={`shrink-0 transition-transform ${aberto ? '' : '-rotate-90'}`} />
       </button>
       {aberto && <ul className="mt-1 space-y-0.5">{children}</ul>}
@@ -207,7 +208,7 @@ function SeletorDeModulo({ nav, atual, recolhido }: { nav: Navegacao; atual: Mod
           {!recolhido && (
             <>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-semibold text-texto">{nome}</span>
+                <span className="line-clamp-2 block text-[14px] font-semibold leading-tight text-texto">{nome}</span>
                 <span className="block truncate text-[12px] text-suave">{sub}</span>
               </span>
               <ChevronsUpDown size={16} aria-hidden className="shrink-0 text-suave" />
