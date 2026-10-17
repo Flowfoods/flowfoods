@@ -1394,3 +1394,51 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) copiar o motivo para o evento RECUSOU (só-inclusão: não dá para apagar); (b) o evento não leva o motivo; o pedido o guarda e a exclusão o anonimiza; (c) afrouxar o gatilho do evento.
 
 **Razão:** (b). O motivo é texto livre e pode citar a pessoa; um registro que não se altera não pode guardá-lo. O histórico mostra "Recusado", quem e quando; o motivo aparece no painel do pedido e some na exclusão (a CHECK pede 3+ letras: "[apagado]"). O gatilho só-inclusão fica como está.
+
+### 101. 2026-10-17 · UX.9: navegação por áreas — área = módulo, aba = item do menu (1:1), ações em `acoes[]`
+
+**Alternativas:** (a) manter um item de menu por tela e só mudar o hub; (b) criar uma estrutura de abas separada do menu; (c) a mesma estrutura de `modulos.ts` serve o hub (área), o menu e as abas (aba), e as ações ("Novo insumo", "Lançar nota"...) saem do menu e vão para `acoes` da área.
+
+**Razão:** (c). Uma fonte só: menu, abas, hub e ⌘K nunca divergem, e o hub deixa de mostrar 16 cards (5 deles ações) para mostrar 4 áreas. A ação fica no cabeçalho da aba (os botões "Novo" já existiam) e no ⌘K. Só configuração mudou; as telas são as mesmas.
+
+### 102. 2026-10-17 · UX.9: nenhuma URL antiga muda e não há rota de "visão geral de área"; a entrada da área é a primeira aba permitida; única rota nova `/estoque/contagens`
+
+**Alternativas:** (a) criar `/erp/cadastros`, `/erp/compras-e-fornecedores`... como visão geral; (b) redirecionar as URLs antigas; (c) o card do hub é a visão geral e leva à primeira aba permitida.
+
+**Razão:** (c). `/erp/compras` e `/erp/estoque` já são telas e a visão geral as quebraria; `/erp/cadastros` ficaria ambígua com o Cadastro do parceiro do nível 1; um resumo pediria consultas e indicadores novos ("sem inventar indicadores"). Favoritos, `?de=`, `?feito=`, `?sem-acesso=1` e o histórico seguem iguais. A única rota nova é `/estoque/contagens` (escolhe a loja; uma só vai direto ao período), no `/erp` e no espelho do nível 1, porque as contagens só tinham entrada dentro da loja.
+
+### 103. 2026-10-17 · UX.9: Precificação = aba sobre `/fichas/canais` (precos.ver); preço e margem por ficha ficam na lista e no detalhe
+
+**Alternativas:** (a) uma lista de preços nova; (b) uma aba na mesma rota `/fichas` filtrada (inviável: `itemAtivo` lê só o caminho, sem a query); (c) a aba é a tela dos canais (taxa do iFood, embalagens, margem-alvo) e ganha o link "Margem de cada prato" para `/fichas?tipo=PRATO`.
+
+**Razão:** (c). Preço e margem por ficha já estão nas colunas da lista, filtrados no servidor por "ver preços" (1.10); nenhuma lista nova, nenhuma permissão nova. O título da tela passa a ser o da aba ("Precificação").
+
+### 104. 2026-10-17 · UX.9: abas como links de rota (`<nav>` + `aria-current`), em `src/components/erp/ui/abas.tsx`, montadas pelo shell
+
+**Alternativas:** (a) `role=tablist` com painéis; (b) cada tela renderiza as próprias abas; (c) o shell renderiza, acima do conteúdo, as abas da área do item ativo (`abasDaArea`), como links.
+
+**Razão:** (c). Cada aba é uma rota (voltar, link e prefetch funcionam), então `tablist` seria mentira semântica. Gerar no shell evita tocar 25 telas e garante que toda rota profunda mostre onde está. Visual de abas (sublinhado de 2 px, como o menu), distinto das pílulas de filtro. O teste de 1.1 que proíbe `src/app/erp/abas.tsx` continua valendo.
+
+### 105. 2026-10-17 · UX.9: trilha `Início › Área › Aba › extra`, com a área como link; as telas de ação declaram a própria trilha
+
+**Alternativas:** (a) deixar a área sem link; (b) mostrar também a área no nível 1; (c) área com link para a entrada dela; nível 1 como estava.
+
+**Razão:** (c). A área sem link era um beco; no nível 1 as abas já dizem a área, então a trilha continua `Parceiros Flow › Aba` (menos níveis no tablet). As telas que eram itens do menu (Novo insumo, Nova ficha, Importar, Lançar nota, Novo fornecedor) agora dizem o próprio nome, e o "Fornecedores" repetido saiu; o teste proíbe a repetição.
+
+### 106. 2026-10-17 · UX.9: rótulos — "Lançar nota" continua; "Fichas e produtos" é só rótulo; "Visão geral" é o `/estoque`; o hub e o seletor dizem "Áreas"
+
+**Alternativas:** (a) "Nova compra" e "Produtos" como entidade; (b) manter os rótulos antigos nas abas.
+
+**Razão:** "Lançar nota" é o termo das telas e do histórico da 1.5. "Produto" não existe como entidade nova (a ficha continua sendo a receita; `ProdutoVenda` é preço por canal): é rótulo da aba. O hub vira "Áreas da Rede" e o seletor "Área"; o nome longo de área quebra em duas linhas no menu em vez de cortar.
+
+### 107. 2026-10-17 · UX.9: ação no ⌘K só com a área visível E a permissão da ação; achar nunca mostra dinheiro
+
+**Alternativas:** (a) listar todas as ações e deixar o servidor recusar; (b) filtrar só pela permissão da ação; (c) a área precisa ter alguma aba permitida e a ação precisa da própria permissão.
+
+**Razão:** (c). Quem só tem "lançar nota" sem "ver compras" não vê a área, então não vê a ação (perfil custom). O servidor segue recusando a tela e a action. Os resultados de busca de insumo e ficha não selecionam custo, preço nem margem (teste estático).
+
+### 108. 2026-10-17 · UX.9: nível 1 — um grupo por área dentro de "Parceiros Flow"; Cadastro do parceiro fica em Rede e Equipe
+
+**Alternativas:** (a) manter todas as telas num grupo só; (b) um módulo do nível 1 por área.
+
+**Razão:** (a) deixaria o menu do nível 1 sem a estrutura que o parceiro vê; (b) misturaria as áreas do parceiro com Comercial e Clientes. Um grupo por área dá o mesmo vocabulário do parceiro, as abas saem de `item.area` e as ações vão para o ⌘K do nível 1.
