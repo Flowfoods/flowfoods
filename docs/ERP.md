@@ -1350,7 +1350,15 @@ RLS, e no `ff_dev` copiado com dado. Nenhuma tabela de tenant mudou: portão e R
 10. **Regra Nº 2** (decisão 117): `ui/dica.tsx` e a prop `explicacao` das telas de contar saíram; "Como a conta é feita" e
     "Como abre o estoque de uma loja" são seções do registro; "O servidor refaz a conta ao salvar" virou "A conta é refeita na
     hora de salvar". Ficam: dicas de campo (`aria-describedby`), `<details>` que mostram dado e subtítulos de painel.
-11. **Correções de passagem**: o seletor de visão cede espaço na barra superior estreita (a 390 px o "?" não cabia com 44 px);
+11. **Telas de contar** (decisão 121): a caixa de `estoque/[lojaId]/abertura` e `contagens/[contagemId]` nasce RECOLHIDA (`recolhida: true`
+    na entrada): uma linha "Como funciona · Contagem de abertura" (46 px) que abre (`<details>`, funciona sem JS). Aberta, ela ocupava 313 px e
+    empurrava o 1º campo de contagem para 931 px de uma tela de 844 (operador a 390 px); recolhida, o campo fica em 665 px, e depois de
+    "Entendi" sobe para 603 px. Com a pergunta da 1ª vez pendente ela nasce aberta.
+12. **Finos da aprovação**: o gate enxerga `page.(t|j)sx?`; `LinkDeAjuda` nasce escondido até montar (sem JS não faria nada); no celular o
+    seletor de visão diz "Rede" (não corta); "Outras telas" na gaveta tem a cor do texto principal e sublinha no hover e no foco;
+    textos: "cobre a perda da limpeza", "faixa vermelha" no lugar de "filete" e a conta de preço em palavras (versões de montar a ficha, da ficha e das
+    requisições subiram para 2, com o lock regravado).
+13. **Correções de passagem**: o seletor de visão cede espaço na barra superior estreita (a 390 px o "?" não cabia com 44 px);
     o `Dialogo` em folha (< 600 px) ganhou `height: auto`; o texto da ajuda diz que as regras da contagem (piso, frequência,
     tolerância) ficam em Período e contagens, não em Lojas (a análise tinha isso trocado).
 
@@ -1369,7 +1377,7 @@ npx vitest run tests/erp-ajuda.test.ts      # gate: rota sem ajuda, órfã, perm
 ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-ajuda.db.test.ts   # com banco: preferência, abas, forja, teto, sessão morta, CASCADE
 npm run ajuda:lock                          # regrava ajuda.lock.json (depois de subir a versão de uma entrada)
 ```
-`erp-ajuda.test.ts` (35 testes, sem banco): toda página do `/erp` e do espelho do nível 1 tem exatamente uma entrada (remover
+`erp-ajuda.test.ts` (40 testes, sem banco): toda página do `/erp` e do espelho do nível 1 tem exatamente uma entrada (remover
 uma reprova com o nome da rota; entrada órfã também); a `area` de cada entrada é a área onde a tela acende no menu; o lint
 reprova jargão, "!", emoji, `<`/`>`, markdown, bloco com mais de 320 caracteres e permissão inexistente; texto alterado
 sem subir a versão reprova (e o script do lock se recusa); o operador não recebe preço, a dona recebe; o HTML do servidor
@@ -1382,7 +1390,7 @@ sem cookie, token lixo, JWT do nível 1 ou sessão encerrada nada grava; a prefe
 suspenso não impede de ajustá-la; apagar a pessoa apaga a linha; o `prisma` do portal recusa a tabela. E o `erp-rls.db.test.ts`
 confere sozinho que `PreferenciaErp` não tem RLS nem GRANT para `erp_tenant`.
 
-Na tela (build de produção local, porta 3100, banco `ff_06` copiado do `ff_dev`; roteiro `prova06/jornada.mjs` no scratchpad, 74
+Na tela (build de produção local, porta 3100, banco `ff_06` copiado do `ff_dev`; roteiro `prova06/jornada.mjs` no scratchpad, 94
 conferências): 1ª tela da pessoa nova com a caixa e a pergunta (sem modal) → manter (grava; a pergunta some) → fechar a caixa de
 Insumos (some em menos de 100 ms; o HTML do servidor já vem sem ela; as outras telas seguem com a delas) → "?" abre a gaveta
 (direita no desktop, folha no celular; foco no título; Esc fecha e o foco volta ao "?"; Tab não alcança nada fora dela; o
@@ -2012,9 +2020,10 @@ banco de teste: o operador é recusado pelo servidor.
 - Texto que cita preço ou margem leva `para: ['precos.ver']`; o que é de quem lança leva a permissão da ação. O primeiro bloco da
   aula é sempre para todos (o teste cobra).
 - Uma aula por tela: estado que muda o texto (contagem cíclica × fechamento) vai num bloco que diz o caso, não numa variante.
-- **Login sem JavaScript dá 500** (herança da 0.3, achada na prova): `/entrar` tem `<meta name="referrer" content="no-referrer">`,
-  então o navegador manda `Origin: null` no POST do formulário e o Next recusa a server action. Com JavaScript funciona. A caixa da
-  ajuda funciona sem JavaScript depois de entrar (a prova leva o cookie de sessão a um contexto sem JS).
+- ~~**Login sem JavaScript dá 500**~~ **Resolvido na própria 0.6** (decisão 122): `/entrar` usava `referrer: 'no-referrer'`, o navegador mandava
+  `Origin: null` no POST e o Next recusava a server action. Passou a `same-origin`: nenhum site de fora recebe o endereço (o token do link
+  não vaza, que era a intenção da 0.3), e o Origin do próprio site chega. Provado com `javaScriptEnabled: false` (login e senha errada) e com
+  o WhatsApp interceptado (sem Referer).
 - Outra aba só vê a mudança de preferência ao recarregar (o layout não refaz a cada navegação): fechar de novo é idempotente e
   nenhum fechamento se perde (provado com banco), mas a caixa fechada em outra aba continua na aba velha até ela recarregar.
 - "Ver tudo sobre esta tela" e o link "Como a conta é feita" precisam de JavaScript (a gaveta é um diálogo nativo aberto por

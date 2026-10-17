@@ -89,7 +89,17 @@ function DoParceiro({ visao }: { visao: VisaoDoParceiro }) {
       conteudoDoBotao={
         <>
           <Store size={16} aria-hidden className="shrink-0 text-suave" />
-          <span className="truncate">{pendente ? 'Trocando…' : atual?.rotulo}</span>
+          <span className="truncate">
+            {pendente ? (
+              'Trocando…'
+            ) : (
+              <>
+                {/* No celular, "Rede Completa" vira "Rede": o nome inteiro não cabe ao lado dos botões e cortava. */}
+                <span className="sm:hidden">{atual?.rotulo === 'Rede Completa' ? 'Rede' : atual?.rotulo}</span>
+                <span className="hidden sm:inline">{atual?.rotulo}</span>
+              </>
+            )}
+          </span>
           <ChevronDown size={14} aria-hidden className="shrink-0 text-suave" />
         </>
       }

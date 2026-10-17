@@ -56,12 +56,12 @@ function paginas(dir: string): string[] {
   for (const n of readdirSync(dir)) {
     const p = join(dir, n);
     if (statSync(p).isDirectory()) out = out.concat(paginas(p));
-    else if (n === 'page.tsx') out.push(p);
+    else if (/^page\.[jt]sx?$/.test(n)) out.push(p);
   }
   return out;
 }
 const relativas = (raiz: string) =>
-  paginas(raiz).map((f) => f.slice(raiz.length).replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/?page\.tsx$/, ''));
+  paginas(raiz).map((f) => f.slice(raiz.length).replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/?page\.[jt]sx?$/, ''));
 const ROTAS_DO_PARCEIRO = relativas(join('src', 'app', 'erp'));
 const ROTAS_DO_NIVEL1 = relativas(join('src', 'app', 'rodolfo', '(painel)', 'erp', '[slug]'));
 
@@ -72,6 +72,11 @@ describe('0.6 · o gate: ajuda sempre atualizada', () => {
     const c = coberturaDasRotas(ROTAS_DO_PARCEIRO, ROTAS_DO_NIVEL1);
     expect(c.semAjuda).toEqual([]);
     expect(c.orfas).toEqual([]);
+  });
+
+  it('o gate enxerga page.tsx, page.ts, page.jsx e page.js (rota em .ts também precisa de ajuda)', () => {
+    for (const n of ['page.tsx', 'page.ts', 'page.jsx', 'page.js']) expect(/^page\.[jt]sx?$/.test(n), n).toBe(true);
+    for (const n of ['pagina.tsx', 'page.test.ts', 'layout.tsx', 'route.ts']) expect(/^page\.[jt]sx?$/.test(n), n).toBe(false);
   });
 
   it('rota nova sem ajuda reprova (e entrada órfã também)', () => {
@@ -336,6 +341,36 @@ describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fec
     expect(await html('/erp/insumos', PREF({ fechadas: ['insumos@2'] }), DONO, { insumos: 2 })).not.toContain('data-ajuda-caixa');
   });
 
+  it('telas de contar: a caixa nasce recolhida (<details> fechado, funciona sem JS); as outras nascem abertas', async () => {
+    const h = await html('/erp/estoque/loja1/abertura', PREF());
+    expect(h).toContain('data-ajuda-caixa="estoque-abertura"');
+    expect(h).toMatch(/<details class="group"><summary[\s\S]*Como funciona[\s\S]*Contagem de abertura/);
+    expect(h).not.toMatch(/<details[^>]* open/);
+    expect(h).toContain('Entendi, não mostrar de novo');
+    expect(await html('/erp/estoque/loja1/contagens/c1', PREF())).toMatch(/<details class="group">/);
+    expect(await html('/erp/insumos', PREF())).not.toContain('<details');
+    // a pergunta da 1ª vez pendente abre a caixa recolhida
+    expect(await html('/erp/estoque/loja1/abertura', PREF({ escolhida: false }))).toMatch(/<details open="" class="group">/);
+    // fechada: nenhuma caixa, recolhida ou não
+    expect(await html('/erp/estoque/loja1/abertura', PREF({ fechadas: ['estoque-abertura@1'] }))).not.toContain('data-ajuda-caixa');
+  });
+
+  it('o seletor de visão mostra "Rede" no celular e "Rede Completa" a partir de sm', async () => {
+    caminhoAtual = '/erp';
+    const { SeletorVisao } = await import('@/components/erp/shell/SeletorVisao');
+    const h = renderToStaticMarkup(
+      createElement(SeletorVisao, { visao: { modo: 'parceiro', opcoes: [{ valor: 'rede', rotulo: 'Rede Completa', ativa: true }, { valor: 'l1', rotulo: 'Penha', ativa: true }] as never, valor: 'rede', escolher: async () => ({ ok: true as const }) } }),
+    );
+    expect(h).toMatch(/<span class="sm:hidden">Rede<\/span><span class="hidden sm:inline">Rede Completa<\/span>/);
+  });
+
+  it('o LinkDeAjuda sem JavaScript nasce escondido (como o "Ver tudo")', async () => {
+    const { LinkDeAjuda, ContextoDaAjuda } = await import('@/components/erp/ui/link-de-ajuda');
+    const h = renderToStaticMarkup(createElement(ContextoDaAjuda.Provider, { value: { abrir: () => {}, disponivel: true } }, createElement(LinkDeAjuda as never, { secao: 'conta' }, 'Como a conta é feita')));
+    expect(h).toMatch(/<button[^>]*hidden=""[^>]*style="display:none"[^>]*>Como a conta é feita/);
+    expect(renderToStaticMarkup(createElement(LinkDeAjuda as never, { secao: 'conta' }, 'x'))).toBe('');
+  });
+
   it('o botão e os formulários funcionam sem JavaScript: são <form> e <button type="submit">', async () => {
     const h = await html('/erp/insumos', PREF());
     expect(h).toMatch(/<form[^>]*>[\s\S]*name="caixa" value="insumos@1"[\s\S]*Entendi, não mostrar de novo<\/button><\/form>/);
@@ -403,6 +438,12 @@ describe('0.6 · guardas estáticas', () => {
 
   it('a frase com jargão saiu da tela de preço', () => {
     expect(sem(/O servidor refaz/)).toEqual([]);
+  });
+
+  it('o /entrar não usa no-referrer (Origin: null derrubava o login sem JS); usa same-origin e mantém o token longe de sites de fora', () => {
+    const layout = readFileSync(join('src', 'app', 'entrar', 'layout.tsx'), 'utf8');
+    expect(layout).toMatch(/referrer: 'same-origin'/);
+    expect(layout).not.toMatch(/referrer: 'no-referrer'/);
   });
 
   it('só as actions da ajuda gravam a preferência, e só pela credenciais (o usuário vem da sessão)', () => {

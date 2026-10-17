@@ -42,6 +42,11 @@ export interface EntradaDeAjuda {
   secoes?: Secao[];
   /** Tela que só existe no nível 1 (Cadastro do parceiro): o parceiro nem recebe o texto. */
   soNivel1?: true;
+  /**
+   * A caixa nasce recolhida (uma linha "Como funciona" que abre): telas de contar, onde a lista precisa
+   * ficar à vista no celular. Só muda o desenho; a lista de fechadas e a versão valem igual.
+   */
+  recolhida?: true;
 }
 
 export { ENTRADAS };
@@ -65,6 +70,7 @@ export function ajudaParaATela(alcance: Alcance): EntradaParaATela[] {
     titulo: e.titulo,
     versao: e.versao,
     area: e.area,
+    recolhida: e.recolhida === true,
     rotas: e.rotas,
     aula: e.aula.filter((b) => lido(b, alcance)).map((b) => b.texto),
     secoes: (e.secoes ?? [])

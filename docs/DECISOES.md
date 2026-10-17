@@ -1514,3 +1514,15 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) popover colado no botão; (b) página de ajuda; (c) `Dialogo` nativo com `lado="direita"`.
 
 **Razão:** (c), estendendo o `Dialogo` (não criando outro): fundo inerte, Esc fecha, foco vai ao título ao abrir e volta a quem abriu (o "?" quando o atalho `?` abriu). O atalho `?` não dispara dentro de campo nem com outra janela aberta. O botão tem alvo de 44 px também no celular (o seletor de visão cede espaço na barra estreita). A gaveta traz a aula, as seções, "Outras telas de {área}" (as abas que a pessoa já pode abrir) e a saída "Fale com a FlowFoods".
+
+### 121. 2026-10-17 · ERP 0.6 (aprovação): a caixa das telas de contar nasce recolhida
+
+**Alternativas:** (a) caixa aberta em toda tela; (b) caixa recolhida (uma linha que abre) onde a lista precisa ficar à vista no celular.
+
+**Razão:** (b) para `abertura` e `contagens/[id]`. Medido a 390 × 844: aberta, a caixa tem 313 px e leva o 1º campo de contagem a 931 px (fora da tela); recolhida tem 46 px e o campo fica em 665 px. É um `<details>` (funciona sem JavaScript), só muda o desenho: fechar, "Mudou", versão e a pergunta da 1ª vez (que a deixa aberta) valem igual. Marca `recolhida: true` na entrada.
+
+### 122. 2026-10-17 · ERP 0.6 (aprovação): `/entrar` passa de `no-referrer` para `same-origin`
+
+**Alternativas:** (a) manter `no-referrer` e aceitar o login sem JavaScript quebrado; (b) `same-origin`.
+
+**Razão:** (b). A intenção da 0.3 (commit 9ac5b61) era o token do link de primeiro acesso, que vai no endereço, não vazar por Referer: com `same-origin` nenhum site de fora recebe o endereço (provado interceptando o WhatsApp). Com `no-referrer` o navegador mandava `Origin: null` no POST e o Next recusava a server action (500 sem JavaScript). Provado: login e senha errada sem JavaScript funcionam.

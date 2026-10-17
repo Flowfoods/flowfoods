@@ -14,6 +14,8 @@ export interface EntradaParaATela {
   titulo: string;
   versao: number;
   area: AreaDaAjuda;
+  /** A caixa nasce recolhida (tela de contar). */
+  recolhida: boolean;
   rotas: string[];
   aula: string[];
   secoes: { id: string; titulo: string; blocos: string[] }[];

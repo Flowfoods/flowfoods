@@ -74,19 +74,19 @@ export function CaixaDeAula({
     if (quem === 'manter' || quem === 'desligar') aoEscolher(quem);
   }
 
-  return (
-    <section aria-labelledby={id} data-ajuda-caixa={entrada.chave} className="mb-6 rounded-[14px] border border-linha bg-painel px-4 py-4 sm:px-5">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-suave">
-        <span>Como funciona</span>
-        {estado.mudou && (
-          <Selo tom="alerta">
-            Mudou<span className="sr-only"> desde a última vez que você leu</span>
-          </Selo>
-        )}
-      </div>
-      <h2 id={id} className="mt-1 font-display text-[18px] font-bold leading-snug">
-        {entrada.titulo}
-      </h2>
+  const etiqueta = (
+    <>
+      <span>Como funciona</span>
+      {estado.mudou && (
+        <Selo tom="alerta">
+          Mudou<span className="sr-only"> desde a última vez que você leu</span>
+        </Selo>
+      )}
+    </>
+  );
+
+  const corpo = (
+    <>
       <div className="mt-2 max-w-prose space-y-1.5 text-[14px] leading-relaxed text-suave">
         {entrada.aula.map((t, n) => (
           <p key={n}>{t}</p>
@@ -132,6 +132,43 @@ export function CaixaDeAula({
           Ver tudo sobre esta tela
         </button>
       </div>
+    </>
+  );
+
+  // Tela de contar (celular, de luva): a caixa nasce recolhida, uma linha que abre (<details>: funciona sem
+  // JavaScript), para a lista de insumos ficar à vista. Com a pergunta da 1ª vez pendente ela nasce aberta.
+  if (entrada.recolhida) {
+    return (
+      <section aria-labelledby={id} data-ajuda-caixa={entrada.chave} className="mb-4 rounded-[14px] border border-linha bg-painel">
+        <details open={estado.perguntar || undefined} className="group">
+          <summary className="ff-transicao flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 sm:px-5 [&::-webkit-details-marker]:hidden">
+            <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <h2 id={id} className="text-[13px] font-semibold text-texto">
+                {`Como funciona · ${entrada.titulo}`}
+              </h2>
+              {estado.mudou && (
+                <Selo tom="alerta">
+                  Mudou<span className="sr-only"> desde a última vez que você leu</span>
+                </Selo>
+              )}
+            </span>
+            <span aria-hidden className="shrink-0 text-suave transition-transform group-open:rotate-90">
+              ›
+            </span>
+          </summary>
+          <div className="border-t border-linha px-4 pb-4 pt-1 sm:px-5">{corpo}</div>
+        </details>
+      </section>
+    );
+  }
+
+  return (
+    <section aria-labelledby={id} data-ajuda-caixa={entrada.chave} className="mb-6 rounded-[14px] border border-linha bg-painel px-4 py-4 sm:px-5">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-suave">{etiqueta}</div>
+      <h2 id={id} className="mt-1 font-display text-[18px] font-bold leading-snug">
+        {entrada.titulo}
+      </h2>
+      {corpo}
     </section>
   );
 }
@@ -212,7 +249,7 @@ export function GavetaDeAjuda({
             <ul className="mt-1">
               {outras.telas.map((t) => (
                 <li key={t.href}>
-                  <Link href={t.href} className="ff-transicao flex min-h-11 items-center text-[14px] text-suave hover:text-texto sm:min-h-9">
+                  <Link href={t.href} className="ff-transicao flex min-h-11 items-center text-[14px] text-texto underline-offset-4 hover:underline focus-visible:underline sm:min-h-9">
                     {t.rotulo}
                   </Link>
                 </li>

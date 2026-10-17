@@ -114,9 +114,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/nova', 'fichas/[id]/editar'],
     titulo: 'Montar a ficha',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'Monte a receita com a quantidade limpa, sem casca e sem osso. O fator de correção paga a perda da limpeza: cebola 1,18 quer dizer que 354 g sujas dão 300 g limpas.' },
+      { texto: 'Monte a receita com a quantidade limpa, sem casca e sem osso. O fator de correção cobre a perda da limpeza: cebola 1,18 quer dizer que 354 g sujas dão 300 g limpas.' },
       { texto: 'Pré-preparo diz quanto rende pronto. Diga também onde guarda e quanto dura.' },
     ],
   },
@@ -136,7 +136,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/[id]'],
     titulo: 'Detalhe da ficha',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Foto, receita e custo por porção, com a conta à mostra.' },
       { texto: 'Em “Preço e margem por canal” estão o custo de cada canal (loja, delivery, iFood), o preço sugerido pela margem-alvo e se o prato está no alvo.', para: ['precos.ver'] },
@@ -148,8 +148,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Como a conta é feita',
         blocos: [
           { texto: 'Embalagem entra inteira, pelo custo de referência (o último preço pago). A taxa do iFood é comissão mais pagamento online, sobre o preço.', para: ['precos.ver'] },
-          { texto: 'Margem bruta = preço − insumos − embalagens. Margem líquida = bruta − taxa do canal: o que sobra para pagar a casa e o lucro. Despesa fixa não entra nesta conta.', para: ['precos.ver'] },
-          { texto: 'Preço sugerido = custo ÷ (1 − taxa − margem-alvo), arredondado para cima no centavo: é o menor preço que atinge o alvo. Campo vazio vale o sugerido e acompanha o custo.', para: ['precos.ver'] },
+          { texto: 'A margem bruta é o preço menos os insumos e as embalagens. A margem líquida é a bruta menos a taxa do canal: o que sobra para pagar a casa e o lucro. Despesa fixa não entra nesta conta.', para: ['precos.ver'] },
+          { texto: 'O preço sugerido é o custo dividido pelo que sobra depois da taxa e da margem-alvo, arredondado para cima no centavo: é o menor preço que atinge o alvo. Campo vazio vale o sugerido e acompanha o custo.', para: ['precos.ver'] },
         ],
       },
     ],
@@ -289,6 +289,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'estoque-abertura',
+    recolhida: true,
     area: 'estoque',
     rotas: ['estoque/[lojaId]/abertura'],
     titulo: 'Contagem de abertura',
@@ -323,6 +324,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   },
   {
     chave: 'contagem',
+    recolhida: true,
     area: 'estoque',
     rotas: ['estoque/[lojaId]/contagens/[contagemId]'],
     titulo: 'Contagem',
@@ -361,10 +363,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'estoque',
     rotas: ['estoque/requisicoes', 'estoque/[lojaId]/requisicoes'],
     titulo: 'Requisições',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'O setor pede, o estoque entrega e o saldo baixa na entrega.' },
-      { texto: 'Pedido atrasado ganha um filete vermelho.' },
+      { texto: 'Pedido atrasado ganha uma faixa vermelha.' },
     ],
   },
   {

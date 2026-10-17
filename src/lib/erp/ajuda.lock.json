@@ -28,16 +28,16 @@
     "hash": "935597bdc66b8d45"
   },
   "ficha-nova": {
-    "versao": 1,
-    "hash": "52781dba4c664378"
+    "versao": 2,
+    "hash": "2a923e725c0ad8dc"
   },
   "ficha-importar": {
     "versao": 1,
     "hash": "9ad4bc2dc6f5e416"
   },
   "ficha": {
-    "versao": 1,
-    "hash": "73d21c9e9bf78d86"
+    "versao": 2,
+    "hash": "689d547096ae0f4e"
   },
   "ficha-embalagens": {
     "versao": 1,
@@ -108,8 +108,8 @@
     "hash": "4683bc8b2a063a39"
   },
   "requisicoes": {
-    "versao": 1,
-    "hash": "48a6fab6f98b3193"
+    "versao": 2,
+    "hash": "80ff16c81b77ca4a"
   },
   "requisicao-nova": {
     "versao": 1,

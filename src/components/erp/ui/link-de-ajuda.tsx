@@ -7,7 +7,7 @@
  * ela. Fora do shell (sem gaveta), não desenha nada.
  */
 
-import { createContext, useContext, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { LINK_DE_TEXTO } from './estilos';
 
 interface Contexto {
@@ -25,9 +25,12 @@ export function useAjuda() {
 
 export function LinkDeAjuda({ secao, children, className = '' }: { secao?: string; children: ReactNode; className?: string }) {
   const { abrir, disponivel } = useAjuda();
+  // Sem JavaScript o botão não abriria nada: nasce escondido e aparece depois de montar.
+  const [montado, setMontado] = useState(false);
+  useEffect(() => setMontado(true), []);
   if (!disponivel) return null;
   return (
-    <button type="button" aria-haspopup="dialog" onClick={(e) => abrir(secao, e.currentTarget)} className={`${LINK_DE_TEXTO} min-h-11 text-left sm:min-h-8 ${className}`}>
+    <button type="button" hidden={!montado} style={montado ? undefined : { display: 'none' }} aria-haspopup="dialog" onClick={(e) => abrir(secao, e.currentTarget)} className={`${LINK_DE_TEXTO} min-h-11 text-left sm:min-h-8 ${className}`}>
       {children}
     </button>
   );
