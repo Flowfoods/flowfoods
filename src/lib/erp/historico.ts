@@ -28,6 +28,8 @@ const ENTIDADE: Record<string, string> = {
   // 1.9: a taxa do iFood do parceiro.
   CanalConfig: 'Canal de venda',
   Fornecedor: 'Fornecedor',
+  // 2.1: o faturamento de um canal num dia. Só quem tem `faturamento.ver` recebe estas linhas.
+  FaturamentoLancamento: 'Faturamento',
   AcessoParceiro: 'Acesso',
   PerfilAcesso: 'Perfil',
 };
@@ -153,6 +155,12 @@ const CAMPO: Record<string, string> = {
   custoDelivery: 'custo do delivery na hora',
   custoIfood: 'custo do iFood na hora',
   margemAlvo: 'margem-alvo',
+  // 2.1: faturamento por canal e dia, e os canais em que a loja vende
+  faturamentoCentavos: 'faturamento',
+  pedidos: 'pedidos',
+  clientes: 'clientes',
+  origem: 'origem',
+  canaisDeVenda: 'canais de venda',
 };
 
 /** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. */
@@ -180,6 +188,11 @@ const ORDEM = [
   'precoIfood',
   'margemIfood',
   'custoIfood',
+  'faturamentoCentavos',
+  'pedidos',
+  'clientes',
+  'origem',
+  'canaisDeVenda',
   'modoPreparo',
   'conservacao',
   'validade',
@@ -324,8 +337,8 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     }
     if (!criacao && JSON.stringify(antes[c]) === JSON.stringify(depois[c])) continue;
     if (c === 'unidade' && juntarUnidade && criacao) continue;
-    // De quem é a embalagem já está no "alvo" da linha.
-    if (c === 'insumo') continue;
+    // De quem é a embalagem (ou o lançamento de faturamento) já está no "alvo" da linha.
+    if (c === 'insumo' || c === 'alvo') continue;
     // Itens da nota (1.5): o que entrou e o que saiu (uma linha mudada sai e entra de novo).
     if (c === 'itensDaNota' && typeof depois[c] === 'string') {
       const a = new Set(criacao || typeof antes[c] !== 'string' ? [] : (antes[c] as string).split(SEPARADOR_DE_ITENS));
@@ -401,7 +414,7 @@ export function mudancasDosItens(antes: string, depois: string): Mudanca[] | nul
  */
 export function alvoDaLinha(antesJ: Prisma.JsonValue | null, depoisJ: Prisma.JsonValue | null): string | null {
   const o = { ...objeto(antesJ), ...objeto(depoisJ) };
-  const partes = [o.insumo, o.nome].filter((x): x is string => typeof x === 'string' && x.length > 0);
+  const partes = [o.insumo, o.nome, o.alvo].filter((x): x is string => typeof x === 'string' && x.length > 0);
   return partes.length ? partes.join(' · ') : null;
 }
 
@@ -415,6 +428,13 @@ export function alvoDaLinha(antesJ: Prisma.JsonValue | null, depoisJ: Prisma.Jso
  * de montar a tela: o payload não leva o que foi tirado.
  */
 export const ENTIDADES_DE_PRECIFICACAO: readonly string[] = ['CanalConfig'];
+
+/**
+ * Faturamento (2.1, lição da decisão 90): quem não tem `faturamento.ver` não
+ * recebe NADA de faturamento no histórico, em lista nenhuma. O filtro é no
+ * servidor, na consulta: o payload não leva a linha.
+ */
+export const ENTIDADES_DE_FATURAMENTO: readonly string[] = ['FaturamentoLancamento'];
 export const CAMPOS_DE_PRECIFICACAO: ReadonlySet<string> = new Set([
   'precoLoja',
   'precoDelivery',
@@ -458,10 +478,20 @@ export async function listarHistorico(
      * leitor decide. false = sem taxa, alvo, preço, margem, custo do canal.
      */
     verPrecos: boolean;
+    /**
+     * 2.1: quem lê pode ver faturamento (`faturamento.ver`)? Sem isto, as
+     * linhas de `FaturamentoLancamento` (valor, pedidos, clientes, quem lançou)
+     * não saem do servidor. Fecha para quem esquece: ausente = não vê.
+     */
+    verFaturamento?: boolean;
   },
 ) {
   const entidades = filtro.entidades ?? (filtro.entidade ? [filtro.entidade] : null);
-  const fora = [...(filtro.semEntidades ?? []), ...(filtro.verPrecos ? [] : ENTIDADES_DE_PRECIFICACAO)];
+  const fora = [
+    ...(filtro.semEntidades ?? []),
+    ...(filtro.verPrecos ? [] : ENTIDADES_DE_PRECIFICACAO),
+    ...(filtro.verFaturamento === true ? [] : ENTIDADES_DE_FATURAMENTO),
+  ];
   const limite = filtro.limite ?? 100;
   const where = {
     ...(entidades ? { entidade: { in: entidades } } : {}),
