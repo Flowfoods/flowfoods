@@ -11,6 +11,8 @@ import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { Contagem, Painel, Vazio } from '@/components/erp/ui/superficies';
 import { AjudaDeAcesso } from '@/app/entrar/ajuda';
+import { classeDeBotao } from '@/components/erp/ui/estilos';
+import { acaoAjudaDicas, acaoAjudaReabrir } from '../actions';
 import { configDoRosto, rostoPossivel } from '@/lib/erp/rosto';
 import { AtivarRosto, RemoverRosto } from './rosto';
 
@@ -123,6 +125,37 @@ export default async function SeuAcessoPage() {
                   A entrada pelo rosto liga quando o site estiver em endereço seguro (https).
                 </p>
               )}
+            </div>
+          </Painel>
+
+          <Painel titulo="Dicas" subtitulo="As caixinhas que explicam como cada tela funciona">
+            <div className="space-y-4">
+              <p className="text-[14px] leading-relaxed text-suave">
+                {pessoa.ajuda.dicasLigadas ? (
+                  <>
+                    As dicas estão <span className="font-semibold text-texto">ligadas</span>. Fechou uma caixinha, ela só volta se o texto mudar.
+                  </>
+                ) : (
+                  <>
+                    As dicas estão <span className="font-semibold text-texto">desligadas</span>. O botão ? no alto continua mostrando a ajuda de cada tela.
+                  </>
+                )}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <form action={acaoAjudaDicas}>
+                  <input type="hidden" name="dicas" value={pessoa.ajuda.dicasLigadas ? 'desligar' : 'ligar'} />
+                  <button type="submit" className={classeDeBotao('secundario')}>
+                    {pessoa.ajuda.dicasLigadas ? 'Desligar as dicas' : 'Ligar as dicas'}
+                  </button>
+                </form>
+                {pessoa.ajuda.dicasLigadas && pessoa.ajuda.fechadas.length > 0 && (
+                  <form action={acaoAjudaReabrir}>
+                    <button type="submit" className={classeDeBotao('fantasma')}>
+                      Mostrar de novo as que fechei
+                    </button>
+                  </form>
+                )}
+              </div>
             </div>
           </Painel>
 

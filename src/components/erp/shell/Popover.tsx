@@ -17,6 +17,7 @@ export function Popover({
   alinhar = 'direita',
   largura = 'w-72',
   acima = false,
+  classeDoWrapper = '',
 }: {
   /** Nome acessível do botão. */
   rotulo: string;
@@ -26,6 +27,8 @@ export function Popover({
   alinhar?: 'esquerda' | 'direita';
   largura?: string;
   acima?: boolean;
+  /** Para o wrapper encolher na barra estreita (o seletor de visão cede espaço aos botões-ícone). */
+  classeDoWrapper?: string;
 }) {
   const [aberto, setAberto] = useState(false);
   const caixa = useRef<HTMLDivElement>(null);
@@ -55,7 +58,7 @@ export function Popover({
   }, [aberto]);
 
   return (
-    <div ref={caixa} className="relative">
+    <div ref={caixa} className={`relative ${classeDoWrapper}`}>
       <button
         ref={botao}
         type="button"
@@ -86,4 +89,4 @@ export function Popover({
 
 /** Classe do botão-ícone da barra superior (44 px de alvo). */
 export const BOTAO_ICONE =
-  'ff-transicao relative inline-grid h-11 w-11 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto aria-expanded:bg-texto/5 aria-expanded:text-texto';
+  'ff-transicao relative inline-grid h-11 w-11 shrink-0 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto aria-expanded:bg-texto/5 aria-expanded:text-texto';

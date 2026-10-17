@@ -35,7 +35,7 @@ import {
 import { ACIMA_DO_LIMITE, dinheiroParaCampo, formatarDinheiro, formatarFracao, formatarPontosBase, formatarQuantidade, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO } from '../../ui/campos';
-import { Dica } from '../../ui/dica';
+import { LinkDeAjuda } from '../../ui/link-de-ajuda';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel, Selo } from '../../ui/superficies';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
@@ -556,17 +556,13 @@ function Conteudo({
           </p>
         )}
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-          <Dica rotulo="Como a conta é feita">
-            <p>Embalagem entra inteira, pelo custo de referência (o último preço pago). A taxa do iFood é comissão + pagamento online, sobre o preço.</p>
-            <p>Margem bruta = preço − insumos − embalagens. Margem líquida = bruta − taxa do canal: o que sobra para pagar a casa e o lucro. Despesa fixa fica no DRE.</p>
-            <p>Preço sugerido = custo ÷ (1 − taxa − margem-alvo), arredondado para cima no centavo: é o menor preço que atinge o alvo. Campo vazio vale o sugerido e acompanha o custo.</p>
-          </Dica>
+          <LinkDeAjuda secao="conta">Como a conta é feita</LinkDeAjuda>
           {editavel && (
             <div className="flex flex-col items-stretch gap-1 sm:items-end">
               <BotaoEnviar variante="secundario" className="sm:min-w-40">
                 Salvar preços
               </BotaoEnviar>
-              <span className="text-right">O servidor refaz a conta ao salvar.</span>
+              <span className="text-right">A conta é refeita na hora de salvar.</span>
             </div>
           )}
         </div>

@@ -32,7 +32,6 @@ function TelaDeContar({
   pessoa,
   titulo,
   subtitulo,
-  explicacao,
   aviso,
   feito,
   itens,
@@ -48,7 +47,6 @@ function TelaDeContar({
   pessoa: string;
   titulo: string;
   subtitulo: string;
-  explicacao: ReactNode;
   aviso?: ReactNode;
   feito?: string;
   itens: ItemDaContagem[];
@@ -67,7 +65,6 @@ function TelaDeContar({
       <PageHeader icone="estoque" cor={COR.estoque} titulo={titulo} subtitulo={subtitulo} />
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
       {aviso}
-      <p className="text-sm text-suave">{explicacao}</p>
       <TelaContagem
         contagemId={contagemId}
         pessoa={pessoa}
@@ -93,7 +90,6 @@ export function TelaPaginaDaContagem({ c, base, contexto, feito, acao, podeConcl
       pessoa={pessoa}
       titulo="Contagem de abertura"
       subtitulo={[contexto, c.loja.nome, c.contagem ? `começada ${quando(c.contagem.criadoEm)}${c.contagem.iniciadaPorNome ? ` por ${c.contagem.iniciadaPorNome}` : ''}` : null].filter(Boolean).join(' · ')}
-      explicacao="Conte o que tem na loja agora. Caixa fechada vai em embalagens; o aberto, no solto (kg ou g). Deixe vazio o que ainda não contou; o que não tem, marque “Não tem”."
       feito={feito}
       itens={c.itens}
       acao={acao}
@@ -116,11 +112,6 @@ export function TelaPaginaDaContagemDoDia({ c, base, contexto, feito, acao, pode
       pessoa={pessoa}
       titulo={c.contagem.titulo ?? (fechamento ? 'Fechamento do período' : 'Contagem')}
       subtitulo={[contexto, c.loja.nome, prazo ? `prazo ${quando(prazo)}` : null, c.contagem.iniciadaPorNome ? `começada por ${c.contagem.iniciadaPorNome}` : null].filter(Boolean).join(' · ')}
-      explicacao={
-        fechamento
-          ? 'Conte o que ainda não foi contado no período. Os marcados “para o piso” são os de maior valor: com eles, a cobertura chega ao mínimo para fechar. Vazio = não contado (fica como está no livro).'
-          : 'Conte o que tem agora. O número é comparado com o que o livro dizia na hora em que você contou; nota que chegar depois continua no estoque. Se tudo bater, a contagem fecha sozinha.'
-      }
       aviso={
         c.estado === 'VENCIDA' ? (
           <Aviso tom="alerta" titulo={`${ROTULO_DA_CONTAGEM.VENCIDA}: o prazo acabou.`}>

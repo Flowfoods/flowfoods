@@ -201,6 +201,18 @@ html:has(.ff-app[data-tema='escuro']) {
   animation: ff-gaveta 220ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+/* Gaveta da ajuda (0.6): entra pela direita no desktop; abaixo de 600 px é sheet (regra mais abaixo). */
+.ff-app dialog.ff-gaveta.ff-gaveta-direita {
+  margin: 0 0 0 auto;
+  width: min(440px, 92vw);
+  border-radius: 14px 0 0 14px;
+  border-left: 1px solid var(--ff-linha-forte);
+  border-right: 0;
+}
+.ff-app dialog.ff-gaveta.ff-gaveta-direita[open] {
+  animation: ff-gaveta-direita 220ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
 /* Linha alvo de um link (busca ⌘K leva ao insumo na lista). */
 .ff-app :target.ff-alvo {
   background-color: var(--ff-ativo);
@@ -210,6 +222,16 @@ html:has(.ff-app[data-tema='escuro']) {
   from {
     opacity: 0;
     transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ff-gaveta-direita {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
   }
   to {
     opacity: 1;
@@ -233,8 +255,11 @@ html:has(.ff-app[data-tema='escuro']) {
     margin: auto auto 0;
     width: 100%;
     max-width: 100%;
+    height: auto;
     max-height: 88dvh;
     border-radius: 14px 14px 0 0;
+    border: 1px solid var(--ff-linha-forte);
+    border-bottom: 0;
     padding-bottom: env(safe-area-inset-bottom);
   }
   /* Campo com 16 px no celular: o iOS não dá zoom ao focar. */

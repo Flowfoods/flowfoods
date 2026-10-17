@@ -16,6 +16,7 @@ import type { EstadoForm } from '@/components/erp/ui/campos';
 import {
   concluirRegistroDeRosto,
   ERRO_ATIVAR_ROSTO,
+  gravarPreferenciaDeAjuda,
   iniciarRegistroDeRosto,
   LimiteDoRosto,
   podeAtivarRosto,
@@ -25,7 +26,7 @@ import { buscarInsumos } from '@/lib/erp/insumos';
 import { buscarFichas } from '@/lib/erp/fichas';
 import { TIPOS_DE_FICHA } from '@/lib/erp/ficha-campos';
 import type { RegistrationResponseJSON } from '@/lib/erp/rosto';
-import { aparelhoAtual } from '@/lib/erp/sessao';
+import { aparelhoAtual, tokenDoCookie } from '@/lib/erp/sessao';
 import type { RespostaDaVisao, ResultadoDaBusca } from '@/components/erp/shell/tipos';
 import { UNIDADES } from '@/lib/erp/unidades';
 import { sessaoSegura } from '@/lib/erp/sessao-cookie';
@@ -125,4 +126,33 @@ export async function acaoEscolherVisao(valor: string): Promise<RespostaDaVisao>
   });
   revalidatePath('/erp', 'layout');
   return { ok: true };
+}
+
+// ------------------------------------------------------- ajuda contextual (0.6)
+//
+// As três ações são da PRÓPRIA pessoa (preferência dela, não dado do parceiro):
+// não pedem permissão e valem até em parceiro suspenso. Nenhuma recebe quem é a
+// pessoa: o `usuarioId` sai da sessão validada dentro de `credenciais.ts`; um
+// campo forjado no formulário não tem onde entrar. Recusa (sessão morta, caixa
+// que não existe) não grava nada e não quebra a tela.
+
+/** "Entendi, não mostrar de novo": fecha ESTA caixa nesta versão do texto. */
+export async function acaoAjudaFechar(form: FormData): Promise<void> {
+  await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'fechar', caixa: String(form.get('caixa') ?? '') });
+  revalidatePath('/erp', 'layout');
+}
+
+/** Manter, desligar ou religar as dicas (a pergunta da 1ª vez e "Seu acesso"). */
+export async function acaoAjudaDicas(form: FormData): Promise<void> {
+  const v = String(form.get('dicas') ?? '');
+  if (v === 'manter' || v === 'ligar' || v === 'desligar') {
+    await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'dicas', ligadas: v !== 'desligar' });
+  }
+  revalidatePath('/erp', 'layout');
+}
+
+/** "Mostrar de novo as que fechei": zera a lista. */
+export async function acaoAjudaReabrir(): Promise<void> {
+  await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'reabrir' });
+  revalidatePath('/erp', 'layout');
 }

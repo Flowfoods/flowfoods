@@ -8,8 +8,11 @@ import { Marca } from '@/components/erp/ui/Marca';
 export const metadata: Metadata = {
   title: 'Entrar — FlowFoods ERP',
   robots: 'noindex, nofollow, noarchive',
-  // O link de primeiro acesso leva o token no endereço: não vaza por Referer.
-  referrer: 'no-referrer',
+  // O link de primeiro acesso leva o token no endereço: não vaza por Referer para fora do site.
+  // `same-origin` mantém essa intenção (nenhum site de fora recebe o endereço) e, ao contrário de
+  // `no-referrer`, deixa o navegador mandar o Origin do próprio site nos formulários: sem ele o login
+  // sem JavaScript dava 500 (Origin: null recusado pelo Next).
+  referrer: 'same-origin',
 };
 
 /**
