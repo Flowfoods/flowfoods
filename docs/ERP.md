@@ -1454,7 +1454,9 @@ loja); `VERSAO_DO_CATALOGO` continua 1 e o módulo deixou de ser `emBreve`.
     chave zerada; o worker grava por `doParceiro`, pega a mesma trava e respeita período fechado. Tipo `EntradaDeIntegracao` em
     `faturamento.ts`. Mapear a loja do iFood para `Loja` fica para a fase da integração.
 
-11. **Conferência pós-deploy da migration.** Os WARNINGs da migration (CHECK que ficou NOT VALID, índice do grão não criado) só
+11. **Conferência pós-deploy da migration.** Atenção: enquanto um grão tiver duplicada humana antiga (índice ausente), a
+    leitura do mês e da rede SOMA as duas linhas daquele grão (apontado pelo Guardião: 5 + 6 = 11) até alguém remover a
+    duplicada. Gravações novas seguem idempotentes pelo único de `chaveIdempotencia`. Os WARNINGs da migration (CHECK que ficou NOT VALID, índice do grão não criado) só
     aparecem no terminal de quem a roda, não no log do auto-deploy. Depois de cada deploy que traga a 2.1:
     `npm run erp:conferir-migracao` (lê `pg_constraint` e `pg_indexes`, que não passam pela RLS; só leitura; sai com código 1 e uma
     frase por pendência, ou 0 com "conferida"). Sem o script: `SELECT conname FROM pg_constraint WHERE NOT convalidated AND
