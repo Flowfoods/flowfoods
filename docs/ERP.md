@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -32,6 +32,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Onboarding (0.5): pedido de acesso (landing ou manual), quadro "Aguardando liberação" e ativação | `src/lib/erp/{pedido-textos,pedido-campos,pedidos,trava}.ts` (textos e limites / regras puras / banco / trava) + `ativarPedido` em `credenciais.ts`; landing `src/components/FormComecar.tsx` + `src/app/comecar/actions.ts`; N1 em `src/app/rodolfo/(painel)/onboarding/` (`/rodolfo/onboarding`, `/<id>`, `/novo`); migration `20261023000000_erp_onboarding` |
 | Ajuda contextual (0.6): caixas de aula por tela, botão "?" e gaveta; a preferência de cada pessoa | `src/lib/erp/{ajuda,ajuda-rota,ajuda-textos,ajuda-integridade}.ts` + `ajuda.lock.json` (registro, rota e decisão da caixa, texto, trava de versão); `src/components/erp/shell/ajuda.tsx` e `ui/link-de-ajuda.tsx`; `Shell.tsx`; gravação em `credenciais.ts` (`gravarPreferenciaDeAjuda`) e `acaoAjuda*` em `src/app/erp/actions.ts`; bloco "Dicas" em `/erp/acesso`; `npm run ajuda:lock`; migration `20261024000000_erp_preferencia_ajuda` |
 | Faturamento por canal (2.1): lançar o dia, planilha CSV, mês com faltas, leitura única do grão, trava do período | `src/lib/erp/{faturamento-campos,faturamento-planilha,faturamento,periodo-trava}.ts` (puro / planilha pura / com banco / trava); telas em `src/components/erp/telas/faturamento/`; rotas `faturamento`, `faturamento/lancar`, `faturamento/importar`, `faturamento/<loja>/<aaaa-mm-dd>` em `/erp` e `/rodolfo/erp/<slug>`; canais da loja em `telas/estrutura/form-canais.tsx`; modelo `public/modelos/faturamento.csv`; migration `20261025000000_erp_faturamento` |
+| DRE ao vivo (2.2a): plano de contas por parceiro, despesas por competência, contas a pagar, regra do período, DRE rede × loja | `src/lib/erp/{periodo-campos,periodos,dre-plano,plano,despesa-campos,despesas,dre-campos,dre,texto-limpo}.ts` (período puro / período com banco / plano padrão puro / plano com banco / despesa pura / despesa com banco / DRE puro / DRE com banco); telas em `src/components/erp/telas/dre/`; rotas `dre`, `dre/despesas`, `dre/despesas/nova`, `dre/despesas/<id>`, `dre/despesas/<id>/editar`, `dre/periodos`, `dre/plano` em `/erp` e `/rodolfo/erp/<slug>`; migration `20261026000000_erp_dre_despesas` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Navegação por áreas (UX.9): hub de 4 áreas, abas por rota, trilha com a área, ações no ⌘K; rota nova `/estoque/contagens` | `src/lib/erp/modulos.ts` (`areasConstruidas`, `abasDaArea`, `acoesDaNavegacao`, `montarTrilha`) e `src/lib/rodolfo/modulos.ts`; `src/components/erp/ui/{abas,hub}.tsx`, `telas/hub-do-parceiro.tsx`, `shell/Shell.tsx`; sem migration |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
@@ -1500,13 +1501,108 @@ soma do banco; a loja de delivery e o dia futuro são 404; operador sem acesso e
 vê o faturamento no Histórico; o nível 1 lança pelo espelho e a loja de outro parceiro é 404. Axe (wcag2a/2aa) sem violação nos dois
 temas, zero erro de console, zero rolagem horizontal a 390, 820 e 1440. Prints em `shots-2.1/`.
 
+## O que a 2.2a entregou — DRE ao vivo (plano de contas, despesas por competência, contas a pagar, regra do período)
+
+Segunda da Prioridade 002, primeira metade da 2.2 (a divisão foi aprovada pelo Maestro: 2.2a = o DRE que já funciona no meio do mês;
+2.2b = metas, comparação e fechamento). Migration `20261026000000_erp_dre_despesas` (ADITIVA; uma tabela nova, `RegraDoPeriodo`, com
+portão e RLS iguais às outras; `migrate diff` vazio). Decisões 135 a 148. Permissões: o catálogo não ganhou nada (`dre.ver`,
+`despesas.lancar` por loja; `metas.editar` passou a exigir a rede inteira); `VERSAO_DO_CATALOGO` continua 1.
+
+1. **Plano de contas padrão, editável por parceiro** (135, 136). Vive em código (`PLANO_PADRAO`, cada linha com `codigo` estável:
+   `aluguel`, `salarios`, `energia`…). O parceiro o grava na primeira escrita (`garantirPlano`, idempotente sob trava); antes disso a
+   leitura é virtual (sem `id`, nada gravado). Pode renomear, ocultar e criar linha em grupo de despesa; nunca apagar. Linha oculta sai
+   do formulário e continua no DRE dos períodos em que tem valor. Linhas calculadas (receita por canal, taxas do iFood, subtotais, CMV,
+   margem, resultados) são do sistema. Tela `dre/plano`, só `metas.editar` com a rede inteira.
+2. **Despesa por competência** (137, 138). Um dia, um mês ou um intervalo de até 366 dias; valor da despesa INTEIRA em centavos. O
+   DRE apropria dia a dia por arredondamento ACUMULADO: a parte até o dia k de D é `round(V·k/D)`; a soma fecha o valor ao centavo e
+   o erro de qualquer fatia é menor que 1 centavo, qualquer que seja o corte dos outros períodos (aluguel de R$ 6.000,00 em outubro, até
+   ontem 16/31 = R$ 3.096,77). Loja ou rede, nunca rateio. Lançar tem `envio` aleatório (duplo clique = uma despesa, "já lançada");
+   editar e remover são condicionais ao `atualizadoEm` (duas abas: a segunda recebe o conflito). Remover exige motivo. Despesa em
+   período FECHADO é recusada pela trava compartilhada da 2.1 (`travarParaEscrever`).
+3. **Recorrentes** (139). "Repete todo mês" vale só para mês inteiro; cada mês é uma despesa própria encadeada (`repeteDeId`,
+   único por parceiro). "Lançar as do mês passado" mostra o valor de cada uma para conferir, cria só as que faltam (idempotente:
+   repetir não oferece nada) e respeita o alcance (gerente de uma loja só vê e lança as da loja dele). "Não repete mais" para a cadeia.
+4. **Contas a pagar mínimas** (140). `vencimento` e `pagaEm` opcionais; filtro "A pagar" por ordem de vencimento, com vencidas e
+   "vencem em até 7 dias". Pagar não muda o DRE (é caixa, e o DRE é competência).
+5. **Regra do período, fonte única** (141, 142). `RegraDoPeriodo` (mensal, quinzenal ou semanal, com o dia em que começa, versionada por
+   `vigenteDesde`). O DRE e a contagem de estoque (1.7) leem pelo MESMO módulo, `periodos.ts` (`periodoDe`, `periodoAnteriorDe`,
+   `registrarPeriodo`); `ParceiroFlow.periodoTipo/periodoDiaInicio` ficaram sem uso (a migration copiou o valor antigo para a primeira
+   regra) e `PERSONALIZADO` deixou de existir na tela. Regra nova nunca é retroativa: vale do dia seguinte ao fim do período de agora;
+   o primeiro período novo nasce cortado no começo; uma regra futura pendente pode ser trocada ou cancelada. Um gatilho no banco
+   (`PeriodoApuracao_sem_sobreposicao`) recusa dois períodos que se sobrepõem na mesma loja/parceiro. Tela `dre/periodos`.
+6. **O DRE** (143 a 146). Rede × loja, no período escolhido, em reais e em % da receita bruta (%, em pontos-base). Receita por canal
+   (a leitura única da 2.1) → deduções (taxas do iFood ESTIMADAS: faturamento do iFood × (comissão + pagamento online), um
+   arredondamento por loja, rede = soma) → receita líquida → CMV ("Chega na 2.3", sem número) → variáveis → margem → pessoal,
+   ocupação, utilidades, administrativas, marketing, outras → resultado operacional → financeiras → resultado. Tudo que depende do CMV
+   diz "sem contar o CMV"; zero é "—", nunca "R$ 0,00"; sem faturamento a receita é "—". Período em curso é PARCIAL, dia a dia até
+   ontem, sem projeção ("dia 17 de 31"); faturamento faltando aparece como "Incompleto" e a despesa recorrente que falta, como "Falta
+   lançar". A tabela "Por loja" mostra o resultado de cada loja ANTES das despesas da rede e a linha da rede com elas.
+7. **Quem vê o quê** (147). Despesas e DRE: `dre.ver` (ver despesas = `dre.ver` OU `despesas.lancar`). Despesa da rede só a quem tem a
+   rede inteira; o gerente de uma loja nunca recebe despesa, linha nem total da rede, nem pela URL (`?rede=1` e `?loja=` só escolhem
+   dentro do alcance). Plano e regra do período: `metas.editar` exigindo a rede inteira. Histórico: `verDre` (ausente = fechado) tira
+   despesa, plano e regra da consulta; quem não tem `dre.ver` não recebe nada nem pelo filtro da URL nem no HTML. O ⌘K só mostra o que
+   a pessoa abre.
+8. **Navegação** (148). A área "Faturamento e DRE" ganhou o grupo "Resultado" (Despesas, DRE, Períodos, Plano de contas) ao lado de
+   "Faturamento"; ação nova "Lançar despesa" no cabeçalho e no ⌘K; `VERSAO_DO_ERP = 'Barney ERP · fase 2.2a'`. A limpeza de texto
+   (`limparTexto`) saiu de `pedido-campos` para `texto-limpo.ts` (puro, sem Node) porque o formulário roda no navegador.
+9. **Migration** (aditiva, robusta a dado antigo, segura para superusuário e dono não-superusuário com e sem FORCE RLS). Colunas novas
+   (`DreLinha.codigo/atualizadoEm`, `Despesa.competenciaFim/recorrente/repeteDeId/vencimento/pagaEm/atualizadoPorNome`), valores novos de
+   `DreGrupo` (UTILIDADES, RESULTADO), CHECKs `NOT VALID` + `VALIDATE` que avisa e segue (valor 1..R$ 10 mi, competência ≥ 2020 e
+   ≤ 365 dias, textos curtos, recorrente de mês inteiro, linha calculada tem código, regra: dia na faixa e sem PERSONALIZADO),
+   `RegraDoPeriodo` (só inclusão por gatilho, `parceiroId` imutável) com a regra antiga copiada ANTES de ligar a RLS, RLS condicional
+   que se recusa a seguir se as tabelas antigas têm RLS e a nova não puder ter, e o gatilho anti-sobreposição. Nenhum passo lê tabela de
+   tenant sob RLS. O passo verificável pós-deploy é `npm run erp:conferir-migracao` (agora com os CHECKs da 2.2a, só quando a tabela
+   `RegraDoPeriodo` existe).
+10. **Fora desta subfase (vai para a 2.2b)**: metas com vigência e realizado × meta, comparação com o ano passado, fechar período com
+    fotografia, reabrir, notas e fechamento de estoque obedecendo período fechado, faróis, CMV (2.3).
+
+**Ajuda: chaves novas/alteradas.** Novas (todas v1): `dre`, `dre-despesas`, `dre-despesa`, `dre-despesa-nova` (serve a
+lançar e a editar), `dre-periodos`, `dre-plano`. Alteradas: `faturamento-dia` v1 para v2 (a seção "Dia de período fechado" diz onde
+se define o período) e `periodo` (estoque) v1 para v2 (o período é o mesmo do DRE, definido em Períodos), com `ajuda.lock.json`
+regravado (46 entradas). Toda rota nova tem entrada.
+
+## Provar o DRE (2.2a)
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run   # duas vezes seguidas
+npm run build                                                          # "/" continua estático
+npm run erp:conferir-migracao                                           # CHECKs validados e índice do grão
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+`tests/erp-dre.test.ts` (sem banco, 42): apropriação exata ao centavo (soma fecha, fatias independentes do corte, ano bissexto,
+intervalo de 366 dias), competência (dia, mês, intervalo, limites), períodos semanal/quinzenal/mensal com dia de início, troca de regra
+(vigência, primeiro período cortado, regra futura trocada ou cancelada), plano padrão, `montarDre` (taxa do iFood, CMV, "sem contar",
+zero, percentuais). `tests/erp-dre.db.test.ts` (30): lançar, duplo envio, corrida, duas abas, editar/remover/pagar, recorrentes
+(idempotência e alcance), plano (renomear, ocultar, criar, parceiro virgem), regra do período e gatilho de sobreposição, período
+FECHADO recusado e a trava esperando o fechamento, isolamento entre parceiros, gerente de uma loja sem despesa da rede, vazamento no
+Histórico. `tests/erp-dre-telas.db.test.ts` (11): actions e páginas de verdade (404, acesso, HTML do DRE sem dado alheio, Histórico de
+perfil sem `dre.ver`). `tests/erp-dre-migracao.db.test.ts` (7): a migration com dado antigo nos 3 perfis do banco.
+
+Migration provada em banco novo como superusuário, dono não-superusuário com RLS e sem RLS (dado antigo preservado, regra copiada,
+CHECKs só `NOT VALID` onde há violação, gatilhos presentes), e no `ff_dev`.
+
+Na tela (build de produção local, porta 3100, banco `ff_22a` copiado do `ff_dev`; roteiro `prova22a/jornada.mjs` no scratchpad, 92
+conferências): a dona lança aluguel (R$ 6.000,00, repete), salário (R$ 9.500,00) e luz (R$ 1.240,50, vence em 8 dias, com duplo clique =
+uma despesa) e o DRE do meio do mês (dia 17, até ontem) mostra a receita bruta igual à soma do banco, taxa do iFood estimada, CMV
+"Chega na 2.3", resultado "sem contar o CMV" e as despesas apropriadas ao centavo (3.096,77 · 4.903,23 · 640,26) — conta refeita em
+BigInt dentro do roteiro; o DRE da loja traz o aluguel dela e a receita dela; "Lançar as do mês passado" cria contador (rede) e
+internet (loja) com o valor conferido e, repetido, não oferece nada; a luz entra em "A pagar" e sai ao ser paga sem mexer no DRE; renomear
+Energia, ocultar Condomínio e criar "Seguro do ponto" refletem no formulário e no DRE; trocar a regra para quinzenal grava a vigência no
+dia 01/11 e outubro não muda; setembro aparece encerrado. O gerente da Vila da Penha, no celular, vê só o DRE e as despesas da loja
+(`?rede=1` e a loja de fora não dão nada), não tem "Rede" no formulário, lança uma despesa da loja, não abre plano nem Histórico (que
+exige a rede inteira); o operador não vê nada em menu, ⌘K, URL nem HTML; Hugo (`historico.ver` sem `dre.ver`) não recebe despesa,
+plano nem regra no HTML, nem pelo filtro da URL; o nível 1 vê o DRE, as despesas e o plano do parceiro e a loja de outro parceiro não abre.
+Axe (wcag2a/2aa) sem violação nos dois temas, zero erro de console, zero rolagem horizontal a 390, 820 e 1440. Prints em
+`shots-2.2a/`. Scanner `avoid-ai-design`: 0 P0 e 0 P1 (3 P2 de "meta strings com ponto médio", já existentes no padrão da casa).
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 
 | Bloco | Tabela | Para quê |
 |---|---|---|
-| Estrutura | `ParceiroFlow` | N2, o tenant. Ganhou `periodoTipo`/`periodoDiaInicio` (sugestão de período do DRE) |
+| Estrutura | `ParceiroFlow` | N2, o tenant. Ganhou `periodoTipo`/`periodoDiaInicio` (sugestão de período do DRE; desde a 2.2a sem uso: a regra vive em `RegraDoPeriodo`) |
 | Estrutura | `Loja` | N3, loja/unidade do parceiro; estoque, produção e faturamento são por loja. 1.7: regras da contagem (piso do fechamento, frequência ABC, tolerância para fechar sozinha). 2.1: `canaisDeVenda` (em quais canais vende; pelo menos um) |
 | Estrutura | `Marca` | marca do grupo; produto e faturamento podem apontar marca |
 | Estrutura | `Colaborador` | pessoa da operação; âncora do histórico por funcionário (login vem na 0.3) |
@@ -1527,9 +1623,10 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Produção | `OrdemProducao` | lote: planejado/produzido, custo, responsável (snapshot). Lista do dia = ordens planejadas × saldo (derivada) |
 | Produção | `Etiqueta` | etiqueta impressa: lote do fornecedor, validade, abertura, snapshot |
 | DRE | `FaturamentoLancamento` | faturamento por loja × canal × dia (2.1: marca nula): valor, pedidos, clientes (= atendimentos do dia, não clientes únicos); chave de idempotência única; origem MANUAL/IMPORTACAO (uma linha humana por grão) ou INTEGRACAO; `atualizadoPorNome`; CHECKs de teto, espaço de chave e valor com pedido |
-| DRE | `DreLinha` / `DreMeta` | linhas do DRE (com `sentido`: maior ou menor é melhor) e meta % por linha, por canal ou da rede (canal nulo), com vigência |
-| DRE | `Despesa` | despesa manual/importada numa linha; loja nula = rede, canal nulo = rateio; importada exige chave de idempotência |
-| DRE | `PeriodoApuracao` | períodos configuráveis; contagem de fechamento aponta o período |
+| DRE | `DreLinha` / `DreMeta` | linhas do DRE (com `sentido`: maior ou menor é melhor; 2.2a: `codigo` estável das linhas do padrão, único por parceiro, nulo nas da casa) e meta % por linha, por canal ou da rede (canal nulo), com vigência (a meta é da 2.2b) |
+| DRE | `Despesa` | despesa manual/importada numa linha; loja nula = rede, canal nulo = rateio; importada exige chave de idempotência. 2.2a: competência de um dia, mês ou intervalo (`competencia`..`competenciaFim`, até 366 dias), `recorrente` e `repeteDeId` (cadeia mensal, única por parceiro), `vencimento`/`pagaEm`, `atualizadoPorNome`; valor da despesa inteira (a apropriação é conta, não coluna) |
+| DRE | `PeriodoApuracao` | períodos configuráveis; contagem de fechamento aponta o período; 2.2a: gatilho recusa sobreposição |
+| DRE | `RegraDoPeriodo` | 2.2a: regra do período do parceiro (mensal, quinzenal ou semanal, dia em que começa), versionada por `vigenteDesde`; só inclusão (gatilho), `parceiroId` imutável; fonte única do DRE e da contagem de estoque |
 | DRE | `FarolFaixa` | 5 faixas por linha do DRE × canal (nulo = rede), sobre o desvio vs meta já com o sentido da linha |
 | Onboarding (0.5, FORA do tenant) | `PedidoParceiro` / `PedidoParceiroEvento` / `TentativaPedidoParceiro` | pedido de acesso (landing ou manual) com consentimento, etapa e versão; evento só-inclusão; tentativas do formulário público. Sem `parceiroId`: o vínculo com o parceiro criado é `parceiroCriadoId` |
 | Ajuda (0.6, FORA do tenant) | `PreferenciaErp` | o que a pessoa escolheu sobre as caixas de ajuda: dicas ligadas, resposta da 1ª vez, caixas fechadas (`chave@versão`, no máximo 300). Por `UsuarioErp`, sem `parceiroId`, lida com a sessão |
@@ -2161,3 +2258,32 @@ banco de teste: o operador é recusado pelo servidor.
 - `Selo` de erro ficou sem tinta de fundo (no tema escuro o texto #F2323F sobre o fundo tingido dava menos de 4,5:1 no axe).
 - Produção: antes do deploy, conferir que não há linha de faturamento violando os CHECKs (esperado: zero linhas; se houver, a migration
   avisa e deixa o CHECK NOT VALID).
+
+## Herança da 2.2a (para a 2.2b e as próximas)
+
+- **A regra do período é UMA**: ler sempre por `periodos.ts` (`periodoDe`, `periodoAnteriorDe`, `situacaoDosPeriodos`,
+  `registrarPeriodo`); nunca por `ParceiroFlow.periodoTipo/periodoDiaInicio` (colunas sem uso, ficam até uma limpeza própria) nem
+  montar período na mão. `PERSONALIZADO` existe só no enum e em dado legado: não aparece em tela nem em regra nova.
+- **Fechar período é da 2.2b** e pega `travarParaFechar` (`periodo-trava.ts`; a escrita pega a trava compartilhada
+  `travarParaEscrever`) ANTES de ler faturamento e despesa, na mesma transação. Despesa e faturamento já recusam escrita em
+  período FECHADO (`intervaloEmPeriodoFechado`, que olha o intervalo inteiro da competência). A 2.2b liga a mesma regra em notas de
+  compra e fechamento de estoque.
+- **A fotografia do fechamento** deve gravar o DRE como ele saiu de `montarDre` (puro): é a mesma função, com `EntradaDoDre`; guardar
+  a entrada e o resultado, não recalcular depois com plano ou taxa que mudaram.
+- **Metas** (`DreMeta`) e farol (`FarolFaixa`) ligam em `LinhaDoDre.chave` (`codigo` ou `id:<id>`), não no nome. `metas.editar` já
+  exige a rede inteira.
+- **Taxa do iFood é estimada pela configuração de HOJE** (`CanalConfig`): o DRE de um período antigo recalcula com a taxa atual até a
+  fotografia existir. Despesas financeiras reais (tarifas, antecipação) entram como despesa lançada, não na taxa estimada.
+- **CMV chega na 2.3** como linha calculada `cmv` do plano: `montarDre` já deixa o lugar e a mensagem "sem contar o CMV" em margem e
+  resultados; quando o CMV vier, os `semContar` saem sozinhos.
+- **Plano de contas**: linha nova de parceiro tem `codigo` nulo e chave `id:<id>`; o grupo não muda depois de criada. Se um dia houver
+  importação de despesa (planilha ou integração), ela casa por `chaveDaLinha`, nunca pelo nome.
+- **Despesa importada/integrada** (`origem`, chave de idempotência já existem no esquema) fica para depois; a 2.2a só grava MANUAL.
+- **Gerente vê salário da loja?** Hoje vê (as linhas de Pessoal da loja dele entram no DRE e na lista de despesas). É decisão de
+  negócio do Rodolfo; trocar é esconder o grupo PESSOAL para quem não tem a rede inteira, na leitura (`dre.ts`/`despesas.ts`).
+- **Quem reabre período fechado** (2.2b): só nível 1? Só o dono? Em aberto para o Rodolfo.
+- **Telas ficam stale por ~1 s depois de salvar** (herdado da 2.1); a prova espera por isso.
+- **Apropriação**: a soma de várias fatias do mesmo valor fecha ao centavo, mas a soma de duas despesas diferentes apropriadas na
+  mesma fatia pode diferir em 1 centavo da apropriação da soma (cada despesa arredonda a dela; a tela soma o que cada uma arredondou).
+- **Produção**: antes do deploy rodar `npm run erp:conferir-migracao` depois da migration (esperado: mensagem de CHECKs validados). Se
+  houver despesa antiga violando algum CHECK, a migration avisa e deixa o CHECK `NOT VALID`; corrigir a linha e `VALIDATE CONSTRAINT`.
