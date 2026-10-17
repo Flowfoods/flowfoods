@@ -9,6 +9,7 @@
  * (WhatsApp) ou com o e-mail já validado (mailto).
  */
 
+import { limparTexto } from './texto-limpo';
 import { normalizarEmail } from './acesso';
 import { normalizarTelefone } from '../barney/telefone';
 import { hojeNoRio } from './compra-campos';
@@ -28,23 +29,7 @@ export * from './pedido-textos';
 
 // ----------------------------------------------------------------- limpar
 
-/** Tamanho máximo lido de qualquer campo antes de limpar (o resto é lixo). */
-const LEITURA_MAXIMA = 500;
-
-/**
- * Texto de uma linha: quebra e tabulação viram espaço; caracteres de controle
- * (\p{Cc}) e de formato (\p{Cf}: zero-width, marcas e isolantes bidi) somem;
- * espaços repetidos viram um; aparado.
- */
-export function limparTexto(bruto: unknown): string {
-  if (typeof bruto !== 'string') return '';
-  return bruto
-    .slice(0, LEITURA_MAXIMA)
-    .replace(/[\t\n\r\f\v\u2028\u2029]/g, ' ')
-    .replace(/[\p{Cc}\p{Cf}]/gu, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+export { limparTexto };
 
 // ---------------------------------------------------------------- validar
 

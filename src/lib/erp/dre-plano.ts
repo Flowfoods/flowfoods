@@ -17,7 +17,7 @@
  * oculta. A linha criada pela casa não tem código e nunca é calculada.
  */
 
-import { limparTexto } from './pedido-campos';
+import { limparTexto } from './texto-limpo';
 
 export type GrupoDoDre =
   | 'RECEITA'

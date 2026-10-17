@@ -21,7 +21,7 @@
 
 import { formatarData } from './compra-campos';
 import { diasEntre, somarDias } from './contagem-campos';
-import { limparTexto } from './pedido-campos';
+import { limparTexto } from './texto-limpo';
 import { diasDoMes, mesVizinho, rotuloDoMes } from './faturamento-campos';
 import { formatarDinheiro, lerDinheiro, temFormaDeDinheiro } from './unidades';
 
