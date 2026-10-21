@@ -34,6 +34,11 @@
   --ff-erro: 196 21 34;
   --ff-ok: 22 101 52;
   --ff-atencao: 146 64 14;
+  --ff-farol-azul: 47 93 138;
+  --ff-farol-verde: 22 101 52;
+  --ff-farol-amarelo: 111 99 0;
+  --ff-farol-laranja: 176 68 0;
+  --ff-farol-vermelho: 196 21 34;
   --ff-ativo: rgb(196 21 34 / 0.08);
   --ff-sombra: 0 10px 22px rgb(10 10 10 / 0.12);
   --ff-mistura-icone: 14%;
@@ -55,9 +60,14 @@
   --ff-acao-hover: 214 26 39;
   --ff-acento: 234 29 44;
   --ff-marca: 242 50 63;
-  --ff-erro: 242 50 63;
+  --ff-erro: 245 82 90;
   --ff-ok: 74 222 128;
   --ff-atencao: 245 158 11;
+  --ff-farol-azul: 141 180 220;
+  --ff-farol-verde: 93 187 132;
+  --ff-farol-amarelo: 226 197 90;
+  --ff-farol-laranja: 240 145 58;
+  --ff-farol-vermelho: 245 66 77;
   --ff-ativo: rgb(234 29 44 / 0.12);
   --ff-sombra: 0 10px 22px rgb(0 0 0 / 0.45);
   --ff-mistura-icone: 22%;
@@ -80,9 +90,14 @@
     --ff-acao-hover: 214 26 39;
     --ff-acento: 234 29 44;
     --ff-marca: 242 50 63;
-    --ff-erro: 242 50 63;
+    --ff-erro: 245 82 90;
     --ff-ok: 74 222 128;
     --ff-atencao: 245 158 11;
+    --ff-farol-azul: 141 180 220;
+    --ff-farol-verde: 93 187 132;
+    --ff-farol-amarelo: 226 197 90;
+    --ff-farol-laranja: 240 145 58;
+    --ff-farol-vermelho: 245 66 77;
     --ff-ativo: rgb(234 29 44 / 0.12);
     --ff-sombra: 0 10px 22px rgb(0 0 0 / 0.45);
     --ff-mistura-icone: 22%;
@@ -265,6 +280,25 @@ html:has(.ff-app[data-tema='escuro']) {
   /* Campo com 16 px no celular: o iOS não dá zoom ao focar. */
   .ff-app :is(input, select, textarea) {
     font-size: 16px;
+  }
+}
+
+/*
+ * Tablet e celular (dedo, não mouse): todo alvo que encolhe para 40/42/36/32 px
+ * a partir de 600/900 px volta para 44 px. A largura não diz se a tela é de
+ * toque — um tablet a 1180 px deitado recebia o tamanho do mouse.
+ */
+@media (pointer: coarse) {
+  .ff-app :is(.sm\:min-h-10, .sm\:min-h-\[42px\], .sm\:min-h-9, .sm\:min-h-8, .min-\[900px\]\:min-h-10, .min-\[900px\]\:min-h-8, .min-h-9) {
+    min-height: 44px;
+  }
+  /* Link de texto em tabela e na trilha do topo: a área de toque cresce para 44 px
+     sem mudar o desenho nem a altura da linha (folga invisível compensada pela margem). */
+  /* 2.5: também o link dentro de um aviso ("Ver o orçamento") e o link de texto marcado com `ff-toque`. */
+  .ff-app :is(table a, nav[aria-label='Você está em'] a, [role='status'] a, a.ff-toque):not(.flex, .inline-flex, .grid, .block) {
+    display: inline-block;
+    padding-block: 14px;
+    margin-block: -14px;
   }
 }
 

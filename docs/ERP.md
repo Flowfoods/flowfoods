@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2), a cozinha pega a tarefa: histórico e indicadores por pessoa (3.3)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -36,6 +36,8 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Metas e fechamento do período (2.2b): meta % por linha com vigência, realizado × meta, receita contra o ano passado, fechar com fotografia imutável, reabrir só pelo nível 1, notas e estoque obedecendo o fechamento | `src/lib/erp/{dre-metas-campos,dre-metas,dre-entrada,dre-fechamento-campos,dre-fotografia,dre-fechamento}.ts` (meta pura / meta com banco / leitura única do DRE / fechamento puro / fotografia com banco / fechar e reabrir); telas `telas/dre/{form-metas,form-fechar,form-reabrir,periodo-fechamento}.tsx`; rota `dre/periodos/<inicio>` em `/erp` e `/rodolfo/erp/<slug>`; migration `20261027000000_erp_dre_fechamento` |
 | Dois CMVs (2.3): compra (dia a dia, data da nota) e real (inicial + compras − final, fecha na contagem), corte do estoque final, compra × real, fotografia v2 | `src/lib/erp/{cmv-campos,cmv-comparacao,cmv}.ts` (conta pura / comparação pura / leitura com banco, chamada só por `entradaDoDre`); `dre-campos.ts` (`cmv` e as linhas `cmv:compra`, `cmv:real`), `dre.ts`, `dre-fotografia.ts` (`lerCmvDaFotografia`), `dre-fechamento.ts`; tela `telas/dre/cmv-painel.tsx` dentro do DRE; migration `20261028000000_erp_cmv` |
 | Produção de intermediários (3.1): planejar o lote pela ficha, requisição dos insumos criada junto, concluir com rendimento e validade, o lote entra no estoque, cancelar e estornar, quadro kanban | `src/lib/erp/{producao-campos,producao}.ts` (puro / com banco) + `criarRequisicaoNaTx` e `listaDaFichaNaTx` em `requisicao.ts`; telas em `src/components/erp/telas/producao/` e o esqueleto comum dos quadros em `telas/quadro/`; rotas `/erp/producao` e `/rodolfo/erp/<slug>/producao` (`<loja>`, `<loja>/nova`, `<loja>/<lote>`, `<loja>/<lote>/concluir`); migration `20261029000000_erp_producao` |
+| Lista do dia (3.2): o gerente define o que a loja produz no dia; a tela cruza com o estoque (vai usar / tem / comprar, com a cascata dos pré-preparos) e cada linha vira lote pela regra da 3.1 | `src/lib/erp/{producao-lista-campos,producao-lista}.ts` (conta pura / com banco) + `planejarProducaoNaTx` em `producao.ts`; telas `telas/producao/{lista,form-lista}.tsx`; rotas `/erp/producao/lista` e `/rodolfo/erp/<slug>/producao/lista` (`<loja>?dia=aaaa-mm-dd`); migration `20261030000000_erp_lista_do_dia` |
+| A cozinha pega a tarefa (3.3): pegar o lote (ou a linha da lista de hoje), soltar, passar para outra pessoa, concluir pela tela da cozinha; histórico da produção e indicadores por pessoa | regras de escrita em `producao.ts` (`pegarNaTx`, `pegarProducao`, `soltarProducao`, `passarProducao`) e `producao-lista.ts` (`pegarDaLista`); leituras em `producao-equipe.ts` (`tarefasDoDia`, `historicoDaProducao`, `indicadoresDaProducao`); conta pura em `producao-equipe-campos.ts`; quem pode receber em `credenciais.ts` (`pessoasQueProduzem`); telas `telas/producao/{tarefas,form-tarefas,historico-producao,indicadores,periodo}.tsx`; rotas `/erp/producao/{tarefas,historico,indicadores}` (`/<loja>`) e o espelho `/rodolfo/erp/<slug>/producao/...`; migration `20261031000000_erp_producao_equipe` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Navegação por áreas (UX.9): hub de 4 áreas, abas por rota, trilha com a área, ações no ⌘K; rota nova `/estoque/contagens` | `src/lib/erp/modulos.ts` (`areasConstruidas`, `abasDaArea`, `acoesDaNavegacao`, `montarTrilha`) e `src/lib/rodolfo/modulos.ts`; `src/components/erp/ui/{abas,hub}.tsx`, `telas/hub-do-parceiro.tsx`, `shell/Shell.tsx`; sem migration |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
@@ -1790,9 +1792,160 @@ da base da conta no HTML, também por `?rede=1` e pela URL de outra loja); o ope
 estoque diz os insumos sem preço. Axe (wcag2a/2aa) sem violação nos dois temas, zero erro de console, zero rolagem horizontal a 390, 820 e 1440. Prints em
 `shots-2.3/`. Scanner `avoid-ai-design`: 0 P0 e 0 P1 (P2 de "meta strings com ponto médio", o padrão da casa).
 
+## O que a 2.4 entregou — farol por canal, em 5 faixas
+
+Quarta da Prioridade 002. **Nenhuma migration** (`DreMeta` já guarda a meta de crescimento, `entrada` da fotografia é Json, `versaoDaConta` já aceita 3, `FarolFaixa` fica vazia e sem uso; `migrate diff` vazio).
+Decisões 172 a 181. Permissões: o catálogo não ganhou nada (`dre.ver`); `VERSAO_DO_ERP` = fase 2.4.
+
+**Como "por canal em todas as linhas com meta" foi interpretado, e por quê (desvio consciente da letra do plano; o Maestro registra na seção 8 do Notion).** Só é por canal o número que NASCE no canal: a receita de cada canal
+(Loja, Delivery próprio, iFood) tem farol, contra uma meta de crescimento sobre o ano passado. CMV e despesa têm farol só no total (rede ou loja), nunca rateados pela receita. Ratear daria ao iFood o mesmo CMV % do salão por
+construção (três faróis iguais parecem três diagnósticos e são um só), e a margem do iFood sairia pior só pela taxa, escondendo embalagem e motoboy: o dono decidiria em cima de conta inventada. Cor é afirmação, e sem número é hipótese
+(decisão 172). CMV por canal de verdade só com venda por prato × ficha por canal (CMV teórico, fora).
+
+1. **As 5 faixas** (173), `farol-campos.ts`: `FAIXAS_DO_FAROL` v1, fixas e congeladas, iguais para todo parceiro, em pontos percentuais absolutos. `faixaDoDesvio(sentido, desvioBp, escala)`; `s` é o desvio já com o sentido (positivo = melhor).
+   | Faixa | Custo, margem, resultado (pp da receita) | Receita (pp de crescimento) | Palavra |
+   |---|---|---|---|
+   | Azul | s ≥ +3,0 | s ≥ +5,0 | bem melhor que a meta (+ "confira se está tudo lançado" em linha de custo) |
+   | Verde | s ≥ −0,5 | s ≥ −1,0 | na meta |
+   | Amarelo | s ≥ −1,5 | s ≥ −3,0 | um pouco pior |
+   | Laranja | s ≥ −3,0 | s ≥ −6,0 | pior que a meta |
+   | Vermelho | abaixo | abaixo | muito pior que a meta |
+   A palavra substitui a da 2.2b ("melhor/pior que a meta", "na meta" de menos de 5 pontos-base). Os testes da 2.2b que conferiam a palavra foram atualizados.
+2. **Meta de crescimento da receita** (175): as 4 linhas de receita (total e os 3 canais) aceitam UMA meta, de 0 a 100,00 %, de crescimento sobre o mesmo período do ano passado (0 = igualar). `tipoDaMeta(chave)` = `crescimento` | `percentual`; a mesma coluna do `DreMeta`, `canal` nulo.
+   O realizado é a variação do canal (pontos-base, `dividirExato`), só com cobertura completa dos dois lados; meta em R$ = ano passado × (1 + meta). Recusa por `lerMetaDigitada`: 100,01, negativo, notação científica, letra; as duas linhas de detalhe do CMV seguem sem meta.
+   A tela "Plano e metas" ganhou o campo nas linhas de receita, com a explicação, e o Histórico escreve "crescimento sobre o ano passado".
+3. **Sem cor quando o dado não fecha** (176), `farol-dre-campos.ts` (pura, a mesma regra no ao vivo e no fechado): sem comparação (sem faturamento, sem valor, sem lançamento, ano passado incompleto ou zero); falta lançamento de faturamento no escopo (nenhuma linha daquele
+   escopo tem cor, só o desvio em texto); "sem contar o CMV de X"; despesa que repete todo mês sem lançar (a linha, o grupo e os resultados abaixo, não o que não depende dela: o falso azul); período fechado antes do farol (receita "não apurada neste fechamento").
+   O CMV pelas compras, parcial ou misto, tem cor e o selo da fonte ao lado, mas o CMV de um escopo com mais de uma loja fica sem cor quando falta o CMV de alguma que vendeu ("Compras, incompleto", "Real, incompleto": "sem o CMV de X"). A cobertura do ano passado é por loja (cada loja ativa com todos os dias; na receita do canal, cada loja que vende o canal com todos os dias dele), e o motivo diz quem falta. Loja que fechou sem nenhum lançamento (ressalva) também tira a cor. A despesa recorrente em falta agora leva `linhaId` e `grupo` (`RecorrenteEmFalta` e a ressalva do fechamento).
+4. **Acessibilidade e marca** (177): régua de 5 casas (5 quadrados de 10 px, a casa da faixa cheia; azul à esquerda, vermelho à direita, a posição diz a faixa em escala de cinza), palavra, desvio e `aria-label` com "faixa N de 5". Tokens `--ff-farol-{azul,verde,amarelo,laranja,vermelho}`
+   no `tokens.css` (três blocos de tema) e no Tailwind (`text-farol-*`), dessaturados, com contraste ≥ 4,5:1 sobre `painel`, `fundo` e a linha de resultado nos dois temas (testado lendo o próprio CSS; claro: amarelo #6F6300 e laranja #B04400, escuro: verde #5DBB84 e vermelho #F5424D, e o `erro` do shell subiu para o mesmo tom: o selo "Sem CMV" dava 4,42:1 sobre a linha de grupo). A cor só mora em `text-farol-*` e no glifo (`farol.tsx`);
+   teste-guarda por grep em `src/` contra `border-`, `bg-`, `ring-`, `divide-`, `from-`, `to-`, `fill-`… com `farol-`.
+5. **Onde aparece** (178), nenhuma rota nova: (a) coluna "Farol" na tabela do DRE, depois de Desvio, e a régua + palavra + desvio sob o nome da linha no celular; (b) painel no topo da página do DRE, no kit Bento da Kairu (lido pelo MCP, `library:design-mosaico-bento`; entram a
+   estrutura modular, o equivalente em texto da meta e "N lojas incluídas"; a paleta tonal do kit não entra, a marca manda): "Faróis do período" (as 5 faixas, quantas linhas em cada, as laranja e vermelhas como âncora para a linha, as sem cor com o motivo) e um bloco por canal que o escopo vende
+   (receita, % da receita, pedidos, ticket médio, ano passado, variação, meta de crescimento e farol), com a frase única "compra e despesa são da loja, não do canal". "Meta em R$" aparece a partir de 1280 px para a coluna do farol caber. Fora do hub, do ⌘K, de alerta e de WhatsApp.
+6. **Fechado** (179): a fotografia grava `versaoDaConta = 3`, `entrada.anoPassado` (por loja: o nome, se era exigida, os canais que vendia, os dias com lançamento e, por canal, o total e os dias), `entrada.farol = { versao: 1 }` (o fechado lê as faixas por essa versão), os pedidos em `entrada.receitas` e a meta de crescimento no `metaBp` das linhas de receita. O fechado lê a faixa, a variação e o ano passado SÓ dela
+   (`lerCanaisDaFotografia` extrai do JSON só as lojas do alcance de quem lê). Editar o faturamento de um período antigo depois não muda o fechado. v1 e v2: o farol de custo sai das linhas gravadas com as faixas v1; a receita diz "não apurado neste fechamento (fechado antes do farol)" e nunca se recalcula;
+   o painel "Receita contra o ano passado" da 2.2b segue lendo ao vivo nesses (herança). Reabrir (só o nível 1) e fechar de novo gera a v3.
+7. **Vazamento** (180): sem `dre.ver` nada de farol (tela, menu, ⌘K, HTML, Histórico e o texto da ajuda: os blocos do farol são `para: ['dre.ver']`); o gerente de uma loja só recebe o escopo dele, também por `?rede=1` e `?loja=<outra>`, ao vivo e no fechado; a contagem de faixas da rede só conta linhas da rede.
+8. **Herança do fiscal pós-deploy da 2.3** (181): a página do período (`/erp/dre/periodos/<data>`) diz "CMV: não apurado neste fechamento (fechado antes do CMV)" no resumo de uma fotografia v1 (e não "sem contar o CMV"), e "Ver o DRE desta versão" mostra a mesma frase na linha do CMV das versões antigas.
+9. **Fora desta subfase**: rateio de CMV e despesa por canal, CMV teórico, `Despesa.canal` no formulário (motoboy e cartão por canal), meta em R$, por loja ou negativa, faixas por parceiro (`FarolFaixa`), alerta, sino, WhatsApp, hub, farol no "Por loja", receita com marca.
+
+**Ajuda: chaves novas/alteradas.** Nenhuma nova (nenhuma rota nova). Alteradas, com `ajuda.lock.json` regravado: `dre` v5 para v6 (a seção "O farol: 5 faixas" e o desvio sem a palavra antiga), `dre-plano` v3 para v4 (a meta de crescimento da receita), `dre-periodo` v2 para v3 (a fotografia guarda o ano passado e as faixas).
+
+### A 2.4 volta (21/10/2026)
+
+Retirada em 17/10 (commit 650c43b) depois da 2ª reprovação, voltou pelo revert desse commit, por cima da 3.1 e da revisão visual. A correção
+apontada pelo Guardião entrou (decisão 207): na receita bruta, o dia de cada loja só conta se todos os canais que ela precisa cobrir têm
+lançamento. Teste novo com o caso exato (salão lançado, iFood do dia 1 não) e o canal novo que não trava. Conflitos resolvidos: o vermelho de
+erro do escuro fica o da revisão visual (#F5525A, mais contraste que o #F5424D da 2.4); `VERSAO_DO_ERP` segue "fase 3.1". Prova: 1.673 testes
+com banco; na tela (build de produção, dados de outubro/2025 e 2026 com o iFood de 01/10/2025 da Penha faltando), a receita bruta mostra "—"
+e "Ano passado incompleto: Vila da Penha (iFood) 19 de 20", Loja e Delivery seguem com −3,9 % e −4,0 %; DRE, Plano e metas e Faturamento sem
+rolagem lateral e sem violação do axe nos 4 formatos e 2 temas.
+
+## O que a 2.5 entregou — orçamento de compra ao vivo (quanto ainda cabe sem furar o CMV meta)
+
+Quinta da Prioridade 002. **Nenhuma migration** (tudo é derivado: meta do CMV, faturamento e notas que já existiam; `migrate diff` vazio). Decisões 208 a 212, e 213 a 216 na
+rodada de correção 1 (veto do Guardião e revisão de UX; ver "Rodada de correção 1" abaixo).
+Permissões: o catálogo não ganhou nada (ver = `compras.ver` ou `compras.lancar` na loja; a conta inteira = `dre.ver` na loja); `VERSAO_DO_ERP` continua
+"fase 3.1" (a fase mais alta no ar; decisão 212).
+
+1. **A conta** (208), `orcamento-campos.ts` (pura): teto = meta do CMV × receita prevista do período; cabe = teto − já comprado (negativo = passou). Já comprado =
+   notas LANÇADAS com data no período INTEIRO, valor + frete rateado (a soma do CMV de compra da 2.3, agora até o fim do período: a nota de hoje conta; cancelada e
+   nota de outro período não). Só o período em curso (a regra do período de `periodos.ts`: mensal, quinzenal ou semanal). Loja desativada fica fora.
+2. **A receita prevista** (209), por loja: o vendido nos dias do período com faturamento completo (cada canal que a loja vende lançado, "Não vendeu" conta) + cada dia
+   que falta (hoje até o fim) e cada dia sem lançamento completo pela média do mesmo dia da semana nas últimas 4 semanas completas da loja. Dia antes do primeiro
+   lançamento da loja não existe; dia da semana sem nenhum dia completo nas 4 semanas conta só o que já foi lançado nele (zero nos dias que faltam), com a frase ("sábado sem dia completo nas últimas 4 semanas: conta só o que já foi lançado";
+   decisão 214). Menos de 14 dias completos na janela = sem número ("poucos dias com faturamento completo nas últimas 4 semanas: 9 de 14 necessários").
+   Sem meta do CMV = sem número ("falta a meta do CMV", com o link para Plano e metas a quem define metas). Nunca R$ 0,00 para dado ausente. É a única tela que
+   projeta (o DRE segue até ontem, decisão 145); a conta por dia da semana acerta o mês de 5 sábados (R$ 41.000,00 contra R$ 40.300,00 da linear, no teste).
+3. **Cobertura por loja e o farol** (211). A rede só tem número quando cada loja ativa tem ("sem o orçamento de Centro"). O farol é o "ritmo das compras": CMV pelas
+   compras até ontem ÷ receita até ontem contra a meta, `faixaDoDesvio` na escala de custo, o `Farol` da 2.4 (cor só no glifo e na palavra). Sem cor: dia do período sem
+   lançamento completo em alguma loja do escopo (`faltam lançamentos de faturamento`; o número segue, pela média) ou loja que vendeu sem nota até ontem.
+4. **Quem vê o quê** (210). O servidor monta a vista (`orcamento.ts`). Com `dre.ver` na loja: cabe, teto, já comprado, receita prevista (vendido + pela média, os dias),
+   a conta por extenso e o ritmo com o farol. Sem `dre.ver` (o comprador, ou quem só vê faturamento): só o "cabe" = TETO arredondado para baixo em degraus por faixa
+   (R$ 500 / R$ 1.000 / R$ 5.000) − já comprado, o motivo e os avisos; nem a meta, nem o percentual, nem a receita (decisão 213: arredonda-se o teto, nunca o saldo).
+   A linha da rede só para quem tem a rede inteira. Gerente de uma loja: só a dele, por `lojaId` de outra = nada. Operador: não abre. Outro parceiro: o portão não enxerga.
+5. **Onde aparece** (212): aba **Orçamento** na área Compras (`/compras/orcamento` e o espelho do nível 1): o bloco da rede (ou da loja escolhida no topo) com o número
+   grande, a conta por extenso e o ritmo; a tabela "Por loja" (Corporativo; cartões abaixo de 1024 px). Na nota: a prévia "Conferir o impacto" ganhou "Orçamento de
+   compra" ("antes desta nota, cabe R$ 2.300,00 · Com esta nota, passa R$ 700,00 do orçamento. É um aviso: a nota pode ser lançada."); o detalhe da nota lançada do
+   período em curso diz como ficou, com link para a aba. **Aviso, nunca bloqueio**: lançar a nota que passa grava igual (teste).
+6. **A soma única das compras**: `comprasPorLoja` (`cmv.ts`) agora serve o CMV de compra do DRE e o orçamento; `semNotaId` tira a versão gravada de uma nota em edição.
+7. **Fora desta subfase**: meta do CMV por loja (a meta é do parceiro e mede todas as lojas, como no DRE), dia de pagamento e sazonalidade na previsão, orçamento por
+   fornecedor ou por grupo de insumo, "comprar na semana" (Kairu "Da Ficha ao Fornecedor": consultado, fora do escopo), alerta, sino e WhatsApp, orçamento de período passado.
+
+**Ajuda: chaves novas/alteradas.** Nova: `compras-orcamento` (v2 depois da rodada de correção, recolhida; os blocos da conta e do ritmo são `para: ['dre.ver']`, o do arredondado vale para todos).
+Alteradas, com `ajuda.lock.json` regravado (53 entradas): `compra-nova` v3 para v4 ("Conferir o impacto" mostra o orçamento; passar é aviso) e `compra` v2 para v3
+(o detalhe diz como ficou o orçamento).
+
+### Rodada de correção 1 (21/10/2026): o veto do Guardião e a revisão de UX
+
+| Achado | O que mudou | Decisão |
+|---|---|---|
+| Guardião B1 (veto): o "cabe" arredondado a R$ 100 vazava o centavo (15 prévias de edição → faixa de R$ 8,29; 14 notas lançadas e canceladas → centavo exato) | arredonda-se o TETO para baixo em degraus por faixa (R$ 500 abaixo de R$ 10.000; R$ 1.000 até R$ 50.000; R$ 5.000 daí para cima); "cabe" = teto arredondado − já comprado; a prévia e o detalhe partem dele; rede = soma dos tetos arredondados (bate com o "Por loja", achado M6). Os dois ataques refeitos no banco devolvem sempre R$ 12.000,00 para um teto real de R$ 12.300,00 | 213 |
+| Guardião I2: "não a realizada" e ±R$ 333 estavam errados | hipótese reescrita: com meta de 30 %, quem vê só o limite seguro sabe a receita prevista com erro de ±1 % a ±5 % (teto a partir de R$ 6 mil; ±1,4 % numa loja de R$ 120 mil por mês), e no fim do período a prevista é quase a realizada; alternativa "só status, sem número" para o Rodolfo | 210, 213 |
+| Guardião I3: loja que abriu no meio do período ganhava receita dos dias em que não existia | dia antes do 1º lançamento fica fora do vendido, da projeção e dos "sem lançamento" (loja de 05/10: 4 dias fora, R$ 35.000,00) | 214 |
+| Guardião I4: loja que vendeu sem nota mostrava "já comprado R$ 0,00" e "cabe o teto inteiro" sem aviso | "sem nota de compra" no lugar de R$ 0,00 e o aviso, também para o comprador e na rede; a prévia da 1ª nota avisa | 215 |
+| Guardião M5: dia da semana sem amostra entrava pela média geral | conta ZERO, com a frase (na rodada extra: o dia lançado em parte vale o que foi lançado, e a frase é "sem dia completo nas últimas 4 semanas") | 214, 217 |
+| UX B1: a sobra de uma loja escondia a que passou | abaixo do número da rede, em `erro`: "<Loja> já passou R$ X: a sobra de outra loja não cobre"; número e "Por loja" no mesmo painel (lado a lado a partir de 1280 px) e a caixa recolhida: em 1440 × 900, com a caixa ABERTA (1ª visita), a última loja termina em 886 px (dona) e 858 px (comprador) | 216 |
+| UX I2 a I6, M7 a M13 | nome em linha própria no celular e "arredondado" dito uma vez (subtítulo); tabela Corporativo de uma linha (44 px) e lista para quem não vê a receita; o orçamento logo abaixo de "Itens + frete = …" na prévia; a linha que explica o farol × o número; "Ver o orçamento" e "Definir a meta" com 48 px no toque; espaço que não quebra em "pp" e "%" (`dre-campos.ts`, o DRE inteiro); "= passou R$ X"; sem o rodapé repetido; "Vale combinar…" só para quem não define metas; "Hoje, …" no detalhe de nota antiga; sem meta, a receita prevista (também da rede) e o link para Plano e metas; sem faturamento, "Lançar o faturamento" | 216 |
+
+Ajuda: `compras-orcamento` v1 → v2 (recolhida; a sobra que não cobre; o teto arredondado; os dias fora e o zero); lock regravado (53 entradas).
+
+### Rodada extra de correção (21/10/2026): "limite seguro" para quem não vê o DRE, sem rolagem lateral
+
+| Achado | O que mudou | Decisão |
+|---|---|---|
+| UX B1: o teto arredondado fazia a tela do comprador afirmar estouro que não existe, e ele lia "teto" sem definição | para quem não vê o DRE o número é o LIMITE SEGURO: "cabe R$ X no limite seguro" / "acima do limite seguro em R$ X", tom de atenção, subtítulo "Valor aproximado, sempre para menos: a conta exata pode ter mais folga e fica com quem vê o DRE."; o mesmo na prévia, no detalhe e na linha da rede ("<Loja> está acima do limite seguro em R$ X"); valores exibidos em degraus de R$ 100 para menos folga (sem centavos); "orçamento", "passou" e "teto" não aparecem para essa pessoa | 217 |
+| UX B2: rolagem lateral com uma loja sem número | célula "sem número", o motivo uma vez sob o nome (12 px, quebra linha), farol sem `whitespace-nowrap` | 217 |
+| UX I3, M4 a M8 | a prévia vem para a vista depois de "Conferir o impacto" (respeita `prefers-reduced-motion`); "sem número" no detalhe começa pelo nome da loja; na rede, o link "Lançar o faturamento" segue quando a loja sem número é por falta de faturamento; "Como a conta chega aqui" diz por quê, sem espaço em branco; "Prevista" no cabeçalho (nome inteiro no `title` e para o leitor de tela); sem número, sem o subtítulo do "aproximado" | 217 |
+| Guardião (textos e menor) | o erro da receita para quem vê o limite seguro é ±1 % a ±5 % (não ~±8 %); o risco "quem vê faturamento descobre a meta em ~14 dias" foi aceito pelo Maestro; dia incompleto num dia da semana sem amostra vale o lançado (piso) | 213, 217 |
+
+Ajuda: `compras-orcamento` v2 → v3 (o limite seguro em uma frase; o piso do dia sem amostra); lock regravado.
+
+Prova da rodada extra (build de produção do último commit; bancos `ff_25x` e `ff_25sf` (Delivery sem faturamento) copiados do `ff_25`; roteiros `pw/rx.mjs`,
+`pw/rxlat.mjs` e `pw/shots.mjs` no scratchpad, prints em `pw/rx/`): a dona confere e lança R$ 15.300,00 na Vila da Penha (no celular, depois de "Conferir o
+impacto" a prévia sobe para a vista: topo dela a 114 px de 844); ela vê "cabe R$ 303,00" e o comprador, "Vila da Penha em Outubro de 2026: acima do limite
+seguro em R$ 300,00. Valor aproximado, sempre para menos…" (tom de atenção, "Ver o limite seguro"), sem "orçamento", "passou" nem "teto" nos textos do número;
+a prévia do comprador (1440, menos movimento) chega à vista e diz "Limite seguro de compra … fica acima do limite seguro em R$ 400,00". Orçamento e detalhe
+(cenário do limite) e orçamento (loja sem faturamento), dona e comprador, em 390, 820, 1180 e 1440, claro e escuro: 48 telas, zero rolagem lateral, zero
+violação do axe; sem faturamento também a 1024 e a 1280, na rede e na loja: zero rolagem, e a dona tem "Lançar o faturamento".
+
+## Provar o orçamento de compra (2.5)
+
+```bash
+npx tsc --noEmit && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism
+npm run build
+```
+`tests/erp-orcamento.test.ts` (sem banco, 28 depois da rodada de correção; inclui os degraus do teto, o teto que nunca cresce nem passa do real, o ataque refeito na conta pura, a loja de 05/10 e o sábado sem amostra): a previsão por dia da semana (5 sábados, dia sem um canal pela média, "Não vendeu" é zero, dia da semana sem amostra,
+o mínimo de 14 dias, o 1º dia do período, semanal e quinzenal), o teto com um arredondamento, o passou, sem meta, as 5 faixas do ritmo, sem cor por falta de faturamento e
+por loja sem nota, a cobertura por loja da rede, o arredondamento prudente e a prévia arredondada. `tests/erp-orcamento-tela.test.ts` (sem banco, 7): a linha da prévia,
+o aviso do detalhe, a tela de quem não vê a receita (nenhuma palavra da conta, nenhum R$ 0,00). `tests/erp-orcamento.db.test.ts` (23; na rodada de correção: os dois ataques do Guardião refeitos pelo comprador, a loja de 05/10, a loja sem nota e a rede dizendo quem passou): o cenário da Casa Orçamento
+(Penha R$ 41.000,00 × 30 % − R$ 10.000,00 = cabe R$ 2.300,00; Delivery R$ 4.150,00; rede R$ 6.450,00; cancelada e setembro fora; ritmo amarelo e azul), a outra casa
+isolada, o comprador (só R$ 2.300,00 / R$ 4.100,00 / R$ 6.400,00 no JSON, nada da conta), quem só vê faturamento, gerente de uma loja, loja fora do alcance, operador,
+nível 1, a página de verdade (HTML da dona com a conta, do comprador sem receita), a nota que passa (prévia, lança igual, o detalhe avisa), a edição sem contar duas
+vezes, a prévia do comprador arredondada, a loja nova que tira o número da rede e o dia sem iFood que tira a cor e não o número.
+
+Na tela, 1ª rodada (substituída pela prova da rodada de correção 1, abaixo; build de produção local, porta 3100, banco `ff_25` copiado do `ff`, com meta do CMV de 30 %, 4 notas de outubro lançadas pela regra e um comprador =
+gerente sem `faturamento.ver`, `faturamento.lancar`, `dre.ver` e `despesas.lancar`; roteiros `pw/shots.mjs` e `pw/previa25.mjs` no scratchpad): a dona vê a rede
+(cabe R$ 13.887,00 = 30 % × R$ 241.290,00 − R$ 58.500,00, ritmo 37,6 % contra 30 %, vermelho), a Penha cabendo e o Delivery "passou R$ 1.716,00"; o comprador vê
+R$ 13.800,00 / R$ 15.600,00 / passou R$ 1.800,00, "arredondado a R$ 100", sem receita, teto, já comprado nem farol; a prévia de uma nota de R$ 1.500,00 no Delivery
+diz "passa R$ 3.216,00" (dona) e "passa R$ 3.300,00" (comprador, arredondado); a nota é lançada igual e o detalhe avisa "passou R$ 3.216,00 … o orçamento avisa,
+não bloqueia"; o operador volta ao hub sem nenhum valor no HTML. Orçamento e detalhe da nota com dona, gerente e comprador em 390, 820, 1180 (toque) e 1440, claro e
+escuro, e a prévia em 390 e 1440 nos dois temas: zero rolagem lateral e zero violação do axe (wcag2a/2aa). Erros de console só os já conhecidos (prefetch de RSC
+abortado na troca de página e um 404 de recurso do shell, iguais nas outras telas).
+
+Na tela, rodada de correção 1 (build de produção do último commit, portas 3100 e 3101; bancos `ff_25r1` e `ff_25sm` (sem meta) copiados do `ff_25`; roteiros
+`pw/shots.mjs` e `pw/r1.mjs` no scratchpad, prints em `pw/r1/`): orçamento e detalhe de nota com dona e comprador em 390, 820, 1180 (toque) e 1440, claro e escuro
+(32 telas): zero rolagem lateral, zero violação do axe. Em 1440 × 900 com a caixa aberta (1ª visita), a última loja do "Por loja" termina em 886 px (dona) e 858 px
+(comprador), linhas de 44 px, e "Vila da Penha · Delivery já passou … a sobra de outra loja não cobre" logo abaixo do número. A prévia (390 e 1440, claro e escuro,
+dona e comprador) traz o orçamento antes do bloco do estoque; o comprador lê "pelo teto arredondado para baixo (sem a receita)" e "Vale combinar com quem define as
+metas" (a dona, que define, não); lançada a nota, o detalhe diz "A nota está lançada…", e a nota antiga diz "Hoje, …". "Ver o orçamento" e "Definir a meta do CMV"
+medem 48 px no toque. Sem meta: a dona vê a receita prevista e o link; o comprador, "sem número" com o motivo.
+
 ## O que a 3.1 entregou — produção de intermediários: o lote nasce da ficha, os insumos saem pela requisição, o lote entra no estoque
 
-Primeira da Prioridade 003 (a 2.4, faróis, foi retirada no commit 650c43b e segue PENDENTE: nada daqui depende dela). Migration
+Primeira da Prioridade 003 (a 2.4, faróis, foi retirada no commit 650c43b em 17/10 e voltou em 21/10, ver "A 2.4 volta"; nada daqui depende dela). Migration
 `20261029000000_erp_producao` (ADITIVA: colunas e CHECKs novos em `OrdemProducao`, dois gatilhos, dois índices; nenhuma tabela nova, portão e RLS
 iguais; `migrate diff` vazio). Decisões 190 a 201. A tabela `OrdemProducao` e o tipo `PRODUCAO_ENTRADA` já existiam desde a 0.1; o tipo
 `PRODUCAO_CONSUMO` continua RESERVADO e sem uso (a saída dos insumos é a `REQUISICAO` da própria ordem). `VERSAO_DO_ERP` = fase 3.1.
@@ -1875,6 +2028,346 @@ estoque não aberto; a dona de outro parceiro recebe 404; o nível 1 vê o mesmo
 (wcag2a/2aa) sem violação nos dois temas, zero erro de console, zero rolagem horizontal a 390, 820, 1280 e 1440. Prints em `shots-3.1/`. Scanner `avoid-ai-design`: 0 P0 e 0
 P1 (P2 de "meta strings com ponto médio", o padrão da casa).
 
+## O que a 3.2 entregou — lista do dia: o gerente define o que produzir, a tela cruza com o estoque (vai usar / tem / comprar) e cada linha vira lote
+
+Segunda da Prioridade 003. Migration `20261030000000_erp_lista_do_dia` (ADITIVA: duas tabelas novas de tenant, `ListaProducao` e
+`ListaProducaoItem`, com `parceiroId`, FKs compostas, CHECKs de nascença, RLS + FORCE + política e GRANT no padrão condicional da 0.2/2.2a/2.2b;
+nenhuma coluna mexida nas antigas; `migrate diff` vazio). Decisões 218 a 227. Permissão nova `producao.planejar` ("Definir a lista do dia
+(o que a loja produz)", catálogo na versão 2). `VERSAO_DO_ERP` = fase 3.2.
+
+1. **A lista** (218, 219). Uma por LOJA e DIA (de hoje a 14 dias à frente; dia que passou é consulta). Quem tem "definir a lista do dia" (dono e
+   gerente pelo perfil base; o operador não) escolhe os pré-preparos (os mesmos da "Nova produção": ficha Pré-preparo ativa que vira insumo) e
+   quanto produzir, na unidade do rendimento ("5" = 5 kg de molho). A cozinha (`producao.ver`) lê a lista e os lotes dela, sem formulário.
+   Salvar refaz a conta; o mesmo pré-preparo não fica em duas linhas abertas (some numa só). Salvar a lista vazia a apaga (fica sem linhas,
+   e a versão segue: decisão 229, rodada 1).
+2. **A conta** (220, 223), `producao-lista-campos.ts` (pura). Vai usar = a receita de cada linha, BRUTA (fator de correção), arredondada como a
+   requisição do lote vai pedir (`quantidadesDaFicha`, a mesma conta da 1.8/3.1); na unidade do insumo, sem converter (a embalagem padrão só
+   aparece como apoio quando tem conteúdo declarado diferente de 1 kg/1 L/1 un: "≈ 2 embalagens de 900 ml"). Tem = o saldo da loja agora.
+   Comprar = max(0, vai usar − tem), com a palavra ("falta 500 ml", em vermelho; "dá", em verde). Saldo negativo é alarme e entra na conta
+   ("−550 ml, abaixo de zero"; o comprar cobre o buraco). Loja sem saldo apurado (estoque não aberto ou em contagem de abertura): o "tem" e o
+   "comprar" viram a frase do motivo, nunca 0.
+3. **A cascata** (221). Pré-preparo dentro da receita (a cebola caramelizada na maionese) vem do estoque, pelo insumo que ele produz:
+   primeiro o que tem, depois o que a própria lista produz dele; o que ainda falta é "falta produzir" e entra pela receita dele na matéria-prima
+   (ordem topológica, até o fundo; círculo forçado no banco vira aviso e não entra em laço). "Pôr na lista" põe o pré-preparo com o que falta
+   (se já há linha aberta dele, soma nela; o segundo clique com a mesma versão não soma de novo).
+4. **Vira lote, sem segunda baixa** (222). "Gerar os lotes" transforma as linhas abertas em lotes PLANEJADOS pela regra da 3.1
+   (`planejarProducaoNaTx`, extraída de `planejarProducao`: código `AAMMDD-NN`, a requisição dos insumos nasce junto; nada sai do estoque),
+   todas ou nenhuma, numa transação; a linha guarda o lote (único). Depois disso a linha conta só o que ainda falta SAIR pela requisição do lote
+   (o que saiu já está no saldo); o lote concluído não conta. Provado: entregar a requisição do molho baixa uma vez e o "comprar" de todos os
+   insumos fica igual; o insumo que o lote deixou abaixo de zero continua na conta (vai usar 0, comprar = o buraco). Os lotes do mesmo dia
+   planejados fora da lista (Nova produção) aparecem ("Também planejados para este dia") e entram na conta.
+5. **A linha que virou lote não muda** (224). Nem sai da lista: regra e gatilho `ListaProducaoItem_lote_confere` (até por SQL cru). Cancelar o
+   lote (3.1) devolve a linha à lista (editável; "lote X cancelado"), e ela pode virar outro lote. O lote de uma linha é da mesma loja, do
+   mesmo dia e da mesma ficha (gatilho); a lista não muda de loja nem de dia (gatilho).
+6. **Idempotência, travas e período** (224). Uma lista por loja e dia (índice único; criar = `createMany` com `skipDuplicates` e ler
+   `FOR UPDATE`). Toda escrita confere a versão lida; o MESMO conteúdo já gravado volta "já feito" (duplo clique, outra aba). Ordem das travas:
+   período (compartilhada) → a lista (`FOR UPDATE`) → as da 3.1 dentro de planejar (dia do lote, requisição da loja). Dia da lista em período
+   FECHADO do DRE: salvar, pôr e gerar são recusados com a frase de sempre, e a tela mostra o `AvisoDoPeriodoFechado` antes.
+7. **Para quem compra** (226). A lista não faz pedido: "Lançar nota" leva a Compras. Custo estimado do que falta (último preço pago, fração
+   exata, "sem contar X (sem preço)") só para quem tem `insumos.ver` E define a lista ou compra (rodada 1: a cozinha lê só quantidades),
+   montado no servidor. O orçamento de compra da 2.5 entra por
+   `orcamentoNaNota` com a compra estimada somada, na vista de quem lê (quem não vê o DRE lê o limite seguro; quem não vê custos não leva o
+   valor nem para a conta, que parte de zero).
+8. **Tela** (225). Aba "Lista do dia" (a primeira da área Produção: o card da área abre nela); escolha da loja quando há mais de uma; o dia
+   (Ontem · Hoje · Amanhã + outro dia); "O que produzir" (as que viraram lote, com a etapa e o link do lote; as em aberto, no formulário de
+   celular: seletor em largura cheia, quantidade de 48 px com teclado de números e a unidade ao lado); "Pré-preparos que entram nas receitas";
+   "Matéria-prima: vai usar, tem e comprar" (tabela Corporativo a partir de 768 px, cartões abaixo); "Para quem compra"; histórico da lista.
+   O mesmo no espelho do nível 1 (com rastro no `auditLog`).
+9. **Histórico** (227). Entidade "Lista do dia": Montada (CRIOU), Mudou (ALTEROU, o que entrou, saiu e mudou de quantidade), Apagada (EXCLUIU),
+   Lotes gerados (GEROU_LOTES, com os códigos); sem R$. O lote diz de qual lista veio ("da lista"). O filtro "Produção" do Histórico geral
+   inclui a lista; quem não vê produção não recebe nada dela.
+10. **Migration** (aditiva, segura para superusuário e para dono não-superusuário com e sem FORCE RLS; nenhum passo lê tabela de tenant).
+    `npm run erp:conferir-migracao` confere as tabelas (e a RLS forçada quando as antigas têm), os dois índices únicos e os quatro gatilhos.
+11. **Fora desta subfase**: o robô do cronograma (demanda por dia da semana, política de lote, lote mínimo, embalagem fechada, capacidade por
+    turno), sugerir quantidades pelas vendas, exportar a lista em PDF, comparação de preço por fornecedor e cotações, pedido de compra
+    automático, estoque mínimo e requisições pendentes de outros setores no "tem", "pegar da lista" com histórico e indicadores por funcionário
+    (3.3), etiqueta do lote (3.4). Motivos na seção Kairu abaixo e na herança.
+
+**Ajuda: chaves novas** (`ajuda.lock.json` regravado, 55 entradas): `producao-lista` (a escolha da loja) e `producao-lista-loja` (a lista: aula
+sem R$ para todos, um bloco para quem define a lista e outro para quem registra produção; seções "Como a conta é feita" e "Para quem compra",
+esta com blocos `para` de Compras e de custos).
+
+### Referências Kairu consultadas (regra do plano)
+
+Lidas pelo MCP da Kairu em 21/10/2026, conteúdo integral (não só o título):
+
+| Material | O que foi lido | Aplicado | Adaptado | Deixado para outra fase (motivo) |
+|---|---|---|---|---|
+| `prompt:b3592b7c-e37b-4b1d-bffb-9053848afe28` "Da Ficha ao Fornecedor" (comunidade, Fill · Empada da Casa) | descrição e Full Prompt inteiros; os 3 prints NÃO foram abertos (só a legenda) | a tela "Pedido de produção" em três colunas (vai usar / tem / comprar; verde dá, vermelho falta — aqui sempre com a palavra); estoque negativo permitido e mostrado como alarme; quantidade sempre com a unidade; custo incompleto ≠ custo baixo ("sem contar X"); a cascata das fichas; "ninguém precisa abrir o estoque para saber se a produção para por falta" | "botão recalcula" = Salvar a lista refaz a conta no servidor; o pedido vira LOTE da 3.1 com requisição (a baixa é a entrega), não baixa direta; a trava de duplicidade de 2 dias virou versão lida + um lote por linha + linhas abertas sem ficha repetida; a ponte para a compra é o link para Compras e o orçamento da 2.5, sem lista de fornecedores | robô do cronograma (demanda por dia da semana, tendência com piso, curva ABC, política de lote, lote mínimo, embalagem fechada, teto, capacidade por turno): é "cronograma", não "lista do dia", e o próprio material pede 2 semanas em paralelo com a decisão humana antes; PDF para o mercado; comparação de preço e cotações (fase de compras); vínculo código do fornecedor × fator (já há variantes na 1.1) |
+| `pass:producao-lotes-e-consumo` "Produção da cozinha" (oficial Kairu/Nina) | `read_material` inteiro, `blueprint.md` e `nina-origin.md`; `reference.mjs`, `fixtures.json`, testes e `demo.html` não foram abertos | "planejar não produz, não baixa ingrediente" (dito na tela ao gerar); criação idempotente (duplo clique não duplica OP); "custo desconhecido não é zero"; estados de tela (vazio, sem permissão, parcial = sem saldo com a frase); loja e período (o dia) como filtro; status e ação principal em 390 × 844 | `requestKey`/fingerprint = versão lida + "mesmo conteúdo = já feito" (a chave da 3.1 continua na Nova produção) | versão aprovada e imutável da ficha no lote (snapshot da receita), equipamentos, ciclos, consumo, tarifas e qualidade: fora do escopo do ERP agora (a 3.1 já retrata nome, unidade e validade do lote) |
+
+## Provar a lista do dia (3.2)
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism
+npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+`tests/erp-producao-lista.test.ts` (sem banco, 22): a conta do molho cheddar (2,5 kg · 2,5 L · 885 g, a mesma da requisição), unidade e
+embalagem padrão, negativo, sem saldo, a cascata (base que falta, base na lista, três níveis, círculo, ficha desativada), insumo desativado,
+linha em lote (só o que falta sair), o negativo que o lote deixou (o comprar não some), o estado da linha, o custo exato, a leitura do
+formulário, o dia e as frases. `tests/erp-producao-lista.db.test.ts` (16): o cenário inteiro (molho cheddar 5 kg + molho especial 4 kg:
+cebola falta 1,565 kg, leite 500 ml, óleo 100 ml, base falta produzir 1 kg, compra estimada R$ 12,89), duplo clique e duas abas, edição com
+histórico, apagar, permissões e alcance (cozinha, sem produção, gerente de outra loja, outro parceiro), custo e orçamento por perfil, gerar
+(lotes da 3.1, nada no livro, conta igual), gerar em paralelo, sem segunda baixa (entregar a requisição: comprar igual), a linha travada (regra
+e gatilho por SQL cru), cancelar e refazer, concluir, pôr na lista, lote fora da lista, loja sem estoque, dia fora, RLS e o teste MUTANTE do
+período (segurar `travarParaFechar`: salvar espera ~900 ms e é recusado). Mutantes conferidos à mão: tirar a trava do período, a conferência
+de versão ou o `FOR UPDATE` da lista derruba os testes. `tests/erp-producao-lista-telas.db.test.ts` (9): o HTML por perfil (gerente, cozinha,
+chefe sem custos sem R$, comprador com o limite seguro e sem "orçamento"), as actions (lista-salva, lista-ja, lotes-gerados, lotes-ja, recusa
+da cozinha), 404 de outra loja e de outro parceiro, a loja sem estoque, o dia que passou, o espelho do nível 1 e o Histórico geral.
+`tests/erp-producao-lista-migracao.db.test.ts` (3): a migration com dado antigo nos 3 perfis do banco (superusuário, dono com FORCE RLS, dono
+sem RLS), CHECKs, FKs, índices, gatilhos, RLS, o outro parceiro, e o conferidor acusando o gatilho e a RLS que faltarem.
+
+Rodada final no código de `7ba31ba`: `prisma validate`, `tsc`, lint e portão de conteúdo limpos; `erp:conferir-migracao` e `migrate diff`
+vazio no `ff_32`. Suíte inteira com banco, como superusuário: 89 arquivos e 1809 testes passando. Como dono com FORCE RLS (`ff_dono_32`;
+arquivos da lista, da produção, da RLS e do isolamento): 101 de 102 passando. A única falha é a já registrada na 3.1: o banco montado por
+psql não tem `_prisma_migrations`, que o teste da 0.2 lê. Sem RLS (`ff_semrls`, rodada da implementação): 523 passando e 9 pulados.
+
+Na tela (build de produção do último commit de código, `7ba31ba`, com o `BUILD_ID` gerado às 17:26:45, depois do commit das 17:25:37;
+porta 3100; banco `ff_32p` copiado do `ff_32`, com os dados feitos pelas regras do sistema em `.local-scripts/lista32.ts` e `lista32b.ts`,
+fora do git: estoque da Vila da Penha aberto há 10 dias, fichas Molho cheddar, Cebola caramelizada e Maionese de bacon (com a cebola
+dentro), o óleo abaixo de zero por uma requisição do salão entregue, a lista de amanhã, a da Delivery sem estoque aberto, meta do CMV de
+30 %, um chefe = operador + "definir a lista do dia" − custos e um comprador = gerente sem DRE, despesas, faturamento e lista; roteiro
+`prova32/jornada.mjs` no scratchpad, 32 conferências, 0 falha). O card da área Produção abre a Lista do dia; com duas lojas no acesso,
+a escolha da loja; hoje ainda sem lista. O gerente, a 390 px com toque, monta Molho cheddar 5 kg e Maionese de bacon 2 kg (campo de
+48 px, `inputmode=decimal`, o aviso "Há mudança por salvar"), salva e lê "falta 500 ml" no leite, o óleo "abaixo de zero", "falta
+produzir 400 g" da cebola caramelizada e a compra estimada em R$. "Pôr na lista" põe a cebola (3 pré-preparos). Gerar com duplo toque
+cria 3 lotes, não 6; as linhas mostram o lote planejado; nenhuma baixa no livro (a baixa é a entrega). A cozinha (operador) vê os 3
+pré-preparos sem "Salvar" nem "Gerar", abre o lote pelo link, e o quadro de Lotes mostra os lotes da lista. O chefe sem custos monta a
+lista e não recebe R$ nem "compra estimada" no conteúdo. O comprador vê "Para quem compra", "Lançar nota" e o limite seguro, sem
+"orçamento" nem "passou", e não monta a lista. A Delivery mostra a frase do estoque não aberto, nunca "tem 0", e o gerar fica desabilitado
+com o motivo escrito. Matriz: dona, gerente e operador × escolha da loja, lista de hoje, lista de amanhã e Delivery × 390, 820, 1180 e
+1440 × claro e escuro (32 telas cada), mais chefe e comprador × 2 páginas × 390 e 1440 × 2 temas (8 cada). São 112 telas, com zero
+rolagem lateral e zero violação do axe (wcag2a/2aa). Alvos abaixo de 44 px só no shell e no rastro (pular para o conteúdo, logo, links do
+rastro, "Seu acesso"), que já existiam. O vão no topo de "O que produzir" mede 20 px, que é o padding do painel. Prints em
+`pw/prova32/jornada/` (10, da jornada) e `pw/prova32/matriz-*/`. Observações: o console só registrou "Failed to fetch RSC payload" de
+prefetch do Next abortado quando o roteiro navega (links do menu, com o navegador caindo na navegação normal), nada da lista. O "R$"
+que aparece no HTML inteiro do chefe é o texto da ajuda do shell ("nunca R$ 0,00", da 0.6), não da lista; por isso a conferência olha o
+`main`.
+
+## Rodada de correção 1 da 3.2 (fiscais: Guardião e UX)
+
+Decisões 228 a 230, e correções na 219, 224 e 226. Migration nova `20261030010000_erp_catalogo_v2` (só DADO: `PerfilAcesso`, fora do
+tenant). Nenhuma estrutura mudou; `migrate diff` vazio.
+
+| Achado | Correção | Teste |
+|---|---|---|
+| B1 (bloqueante): lote de fora da lista com pré-preparo dentro não entrava na cascata ("sem ficha", "ficha desativada" falso, sem "Pôr na lista") | fichas e insumos da conta lidos até fechar: as das linhas e dos lotes de fora, o que cada ficha usa e a ficha que produz cada pré-preparo que aparece (na receita ou saindo pela requisição) | `erp-producao-lista.db`: "lote de FORA… (revisão B1)", dois e três níveis iguais à conta como linha; adversarial A1 |
+| I1: cancelar o lote não mudava a versão; a aba velha apagava a linha devolvida e o Gerar dela recriava o lote cancelado | cancelar e estornar travam a lista antes do lote e sobem a versão; o salvar manda `vistas` (linha não vista = conflito com a frase); o gerar manda `linha` (só essas) | "cancelar ou estornar… (revisão I1)", "cancelar e salvar ao mesmo tempo: sem deadlock"; telas (action sem `linha` = nada); adversariais A2 e A3 |
+| M1: lista apagada e montada de novo voltava à versão 1; a aba velha sobrescrevia | a linha da lista fica (apagar = sem linhas), a versão segue | "editar…" (apagar, montar de novo, abas velhas em conflito, gerar numa apagada); adversarial A4 |
+| M2: sócio de perfil próprio v1 ("copiado do Dono") deixava de cobrir Gerente e Dono base | migration de dado + regra pela versão gravada; os demais perfis v1 não ganham nada e a Equipe pede para revisar | `erp-permissoes` (puro: cobre, ninguém ganha indevido, SQL = catálogo); `erp-permissoes.db` (desativa, reativa e gera link do gerente; parcial com "revisar"; salvar leva à v2); migration com dado antigo nos 3 perfis do banco, duas vezes; adversarial A8 |
+| UX I1: "Pôr na lista" apagava o que foi digitado e não salvo | desabilitado com o motivo enquanto há mudança por salvar (estado compartilhado no cliente) | jornada na tela |
+| UX I2: confirmação fora da vista; "Salvar" vermelho de uma linha vazia depois de gerar | o aviso vem para a vista e recebe o foco (respeita `prefers-reduced-motion`); sem linha vazia com tudo em lote, "Salvar" secundário | telas ("depois de gerar…"); jornada |
+| UX I3: a cozinha via R$ na lista | custo e "Para quem compra" só para `insumos.ver` E (planejar OU ver/lançar nota); bloco da ajuda só para quem compra | telas: HTML do operador padrão sem R$ |
+| UX menores | quantidade em negrito na leitura; "use vírgula: 2,5 kg" e "maior que zero"; "nesta tela"; plural do Gerar; "com a requisição" no singular; dia fora do prazo sem frase repetida nem "Monte a lista"; fileira única a partir de 640 px; atalho "N insumos faltam · M abaixo de zero" | `erp-producao-lista` (frases); telas (fora do prazo, atalho, negrito) |
+
+Mutantes conferidos (cada um derruba o teste dele): só as fichas das linhas (B1); sem subir a versão no cancelar; no estornar; sem a
+conferência das `vistas`; gerar todas as em aberto em vez das pedidas; apagar a linha da lista; custo para todo `insumos.ver`; sem a regra
+do catálogo.
+
+Provas da rodada 1, no código de `a807000`:
+- **Estáticos.** `prisma validate`, `tsc`, lint e portão limpos; `erp:conferir-migracao` ok e `migrate diff` vazio no `ff_32`.
+- **Suíte com banco, superusuário.** 89 arquivos e 1816 testes passando.
+- **Dono com FORCE RLS** (`ff_dono_32`; lista, telas da lista, produção, telas da produção, RLS, isolamento e permissões). 130 de 131
+  passando. A única falha é a conhecida: o banco montado por psql não tem `_prisma_migrations`. O teste de migration precisa da URL de
+  superusuário, porque cria os bancos; ele mesmo cobre os três perfis do banco e passou na suíte do superusuário.
+- **Testes adversariais do Guardião.** 8 de 8 sem nenhuma mudança neles, como superusuário e como dono com FORCE RLS. Antes da correção
+  falhavam A1, A2, A3, A4 e A8.
+
+Na tela, rodada 1:
+- **Build.** Produção de `a807000`, com o `BUILD_ID` gerado às 18:23:01, depois do commit das 18:21:20. Porta 3100, banco `ff_32r1`
+  copiado do `ff_32`. Dados de `.local-scripts/lista32.ts`, `lista32b.ts` e `lista32r1.ts` (o lote de fora da lista, daqui a dois dias).
+- **Jornada.** Roteiro `prova32r1/jornada.mjs` no scratchpad: 38 conferências, 0 falha. O gerente, a 390 px com toque, monta Molho
+  cheddar 5 kg e Maionese de bacon 2 kg ("Gerar os 2 lotes" no plural) e salva: "Lista salva." vem para a vista com o foco. Ao digitar
+  sem salvar, "Pôr na lista" e o Gerar ficam desabilitados com o motivo; ao voltar ao número salvo, liberam. Salva o 6, põe a cebola
+  caramelizada na lista (o aviso na vista e com o foco) e gera com duplo toque: 3 lotes, o aviso "Lotes gerados." na vista, nenhuma
+  linha vazia, "Salvar a lista" secundário e a frase de tudo em lote. O atalho "4 insumos faltam · 1 abaixo de zero: ver a
+  matéria-prima" (44 px) leva ao painel. A cozinha (operador padrão, com "ver insumos e custos") lê vai usar / tem / falta, sem R$, sem
+  "compra estimada" e sem "Para quem compra", com a quantidade em 600 na cor do texto.
+- **B1 na tela.** Daqui a dois dias só existe a maionese de fora da lista, e a tela mostra a cebola caramelizada "falta produzir 300 g"
+  com "Pôr na lista", sem "ficha desativada", e a cebola roxa em cascata. Fora do prazo, a frase aparece uma vez só, sem "Monte a lista".
+  A 820 px, a linha cabe numa fileira (quantidade de 112 px). Chefe sem custos, comprador e Delivery como na 1ª rodada.
+- **Matriz.** Dona, gerente e operador × escolha da loja, hoje, amanhã e Delivery × 390, 820, 1180 e 1440 × claro e escuro: 96 telas, zero
+  rolagem lateral, zero violação do axe. R$ no `main` só para dona e gerente, nas páginas da Penha; nunca para o operador. Alvos abaixo de
+  44 px só no shell e no rastro, que já existiam. No console, só o prefetch do Next abortado pela navegação do roteiro.
+- **Prints.** Em `pw/prova32r1/jornada/` (12) e `pw/prova32r1/matriz-*/`.
+
+## O que a 3.3 entregou — a cozinha pega a tarefa: quem fez, quanto e quando; histórico da produção e indicadores por pessoa
+
+Terceira da Prioridade 003. Fecha o ciclo do lado da COZINHA: a gerência define a lista (3.2), a cozinha pega o que vai fazer,
+executa e conclui pela regra da 3.1, e isso vira histórico e indicadores por pessoa. Migration `20261031000000_erp_producao_equipe`
+(ADITIVA: uma coluna, quatro CHECKs e dois índices em `OrdemProducao`; nenhuma tabela nova; `migrate diff` vazio). Decisões 231 a
+240. Nenhuma permissão nova (catálogo segue na versão 2). `VERSAO_DO_ERP` = fase 3.3.
+
+1. **Quem é o funcionário** (231). A pessoa do login: `responsavelUsuarioId` (texto, sem FK: a credencial mora fora do tenant) e
+   `responsavelNomeSnapshot`, que já existiam, e `responsavelDesde` (nova). No tablet compartilhado cada um entra com o próprio
+   acesso: a tela diz "Você está como Caio" e tem "Não é você? Trocar de pessoa". O `Colaborador` da 0.1 continua sem uso,
+   reservado para quem trabalha sem login (o freelancer da fase tardia). O nível 1 não pega.
+2. **Pegar é começar** (232, 233). Na tela da cozinha (aba Tarefas), "Pegar" leva o lote de Planejada a Em produção com o nome e
+   a hora (`pegarProducao`, que é o `iniciarProducao` da 3.1). A linha da lista de HOJE que ainda não virou lote vira o lote dela
+   na hora em que alguém pega (`pegarDaLista`: `planejarProducaoNaTx` + `pegarNaTx`, numa transação, travando período → lista → as
+   da 3.1). Duplo toque = "já feito"; duas pessoas ao mesmo tempo = uma pega e a outra lê "Este lote está com Caio (pegou às
+   09:12)"; a linha que a gerência mudou depois que a tela abriu é conflito. Pegar não toca no livro do estoque: nada de segunda
+   produção nem de segunda baixa (a baixa continua sendo a entrega da requisição).
+3. **Soltar e passar** (234). Quem pegou solta o próprio lote (com motivo): ele fica Em produção, sem ninguém, e volta para "Para
+   pegar". A gerência (`producao.planejar`) solta o de qualquer pessoa e passa para outra — só quem registra produção na loja,
+   lido das credenciais no servidor (`pessoasQueProduzem`); a hora de quem recebe começa agora. Histórico: Pegou, Soltou, Passou.
+4. **Concluir** (235). A conclusão da 3.1 (rendimento real, motivo fora de ±10%, validade), aberta pela tela da cozinha
+   (`?de=tarefas` volta para ela). O lote com outra pessoa só ela ou a gerência conclui ou cancela. Quem pegou fica como "quem
+   fez" mesmo se a gerência concluir ("quem fez: Duda" no histórico da conclusão); sem pegar, quem conclui é quem fez; o nível 1
+   nunca é. O banco não deixa concluir antes de pegar nem dar dono a lote planejado.
+5. **Histórico da produção** (238). Aba Histórico: os lotes encerrados da loja no período (Hoje · 7 dias · 30 dias, ou de/até, até
+   92 dias), com filtros de pessoa e pré-preparo: o quê, quanto (produzido de planejado), rendimento ("fora de ±10%" escrito),
+   quem fez e quem concluiu, quando pegou e quando terminou, o tempo e o motivo. Concluídos, perdidos, estornados e cancelados. O
+   custo do lote só para quem tem `insumos.ver` (o servidor não manda). Sem dado é frase ("sem hora de pegar", "cancelado antes de
+   produzir"), nunca zero.
+6. **Indicadores por pessoa** (236, 237). Aba Indicadores, da gerência: de cada pessoa, lotes concluídos, quanto produziu de cada
+   ficha, rendimento médio contra o planejado (cada lote pesa igual; os perdidos à parte), fora de ±10%, tempo médio (de pegar, ou
+   da entrega dos insumos se foi depois, até concluir), perdidos, cancelados com ela e estornados. Sempre com o período e a
+   amostra ("1 lote: amostra pequena, ainda não diz muito"); ordem alfabética, sem nota, sem cor por pessoa e sem R$. HIPÓTESE a
+   validar com a casa (decisão 237).
+7. **Telas** (240). Tarefas: celular e tablet primeiro, botões de 56 px (`classeDeBotaoDaCozinha`), cartões "Com você" (Concluir,
+   desabilitado com o motivo enquanto os insumos não saem; Soltar), "Para pegar", "Com outras pessoas" (a gerência solta e passa)
+   e "Feitas hoje". A cozinha entra na área Produção pelas Tarefas; a gerência continua entrando pela Lista do dia. Histórico e
+   Indicadores: tabela Corporativo a partir de 1280 px e cartões abaixo. O lote mostra quem está com ele (e "Quem fez" depois);
+   o quadro de Lotes diz "com Caio · pegou 09:12"; a lista mostra "com Caio" no lote em produção e tem "Pegar na cozinha". O mesmo
+   no espelho do nível 1 (que vê, solta e passa, com rastro no `auditLog`, mas não pega). De quebra, para todas as telas: o
+   "Voltar para…" (componente `Voltar`) fica com 44 px no toque em qualquer largura (antes, 20 px no tablet a partir de 640 px).
+8. **Migration** (239, aditiva, segura para superusuário e para dono não-superusuário com e sem FORCE RLS; nenhum passo lê tabela de
+   tenant): `responsavelDesde`, os CHECKs `OrdemProducao_responsavel_{com_pessoa,so_em_producao,antes_do_fim,nome_curto}` (`NOT VALID`
+   + `VALIDATE` em bloco que avisa) e os índices `(parceiroId, lojaId, concluidaEm)` e `(parceiroId, lojaId, canceladaEm)`. O gatilho
+   `OrdemProducao_concluida_imutavel` (3.1) já cobre a coluna nova. `npm run erp:conferir-migracao` confere os CHECKs e os índices.
+9. **Fora desta subfase**: freelancers (cadastro por QR Code, termo, check-in, diária: fase tardia, `library:controle-freelancers`;
+   o `Colaborador` fica para eles); escala de tarefas (pré-atribuir um lote planejado a alguém); "só os meus" no histórico da
+   cozinha; ranking ou meta por pessoa; R$ por pessoa; tempo por etapa (apontamento); produção retroativa; etiqueta do lote (3.4).
+
+**Ajuda: chaves novas/alteradas** (`ajuda.lock.json` regravado, 61 entradas). Novas: `producao-tarefas`, `producao-tarefas-loja`,
+`producao-historico`, `producao-historico-loja`, `producao-indicadores`, `producao-indicadores-loja`. Alteradas: `producao-lista-loja`
+v2 → v3 (a cozinha pega em Tarefas), `producao-quadro` v1 → v2 (o cartão diz quem pegou), `producao-lote` v1 → v2 (quem está com o
+lote) e `producao-concluir` v1 → v2 (quem pegou fica como quem fez).
+
+### Referências Kairu consultadas (regra do plano)
+
+Lidas pelo MCP da Kairu em 21/10/2026, conteúdo integral (não só o título); a página do Notion "Fase tardia · Controle de freelancers"
+lida pelo MCP do Notion (só para não fechar a porta). Buscas "desempenho funcionário", "indicadores equipe" e "equipe cozinha
+produtividade" na biblioteca: nenhum material; "freelancer": o oficial abaixo e um da comunidade sobre pagamento (Santander, não lido:
+fora do tema).
+
+| Material | O que foi lido | Aplicado | Adaptado | Deixado para outra fase (motivo) |
+|---|---|---|---|---|
+| `prompt:b3592b7c-e37b-4b1d-bffb-9053848afe28` "Da Ficha ao Fornecedor" (comunidade, Fill · Empada da Casa) | descrição e Full Prompt inteiros, de novo nesta subfase (os 3 prints NÃO foram abertos) | a tela da cozinha como "outra coisa": fonte grande, poucos botões, alvo de toque generoso (56 px), que funcione com a mão suja e confirme visualmente cada registro (o aviso do que aconteceu vem para a vista); "todo movimento guarda tipo, referência e autor" (quem pegou, soltou, passou e concluiu, com motivo); "registrar o que saiu" = a conclusão da 3.1 | "perfil de acesso próprio: quem opera aqui não navega no resto do sistema" virou entrada da área pelas Tarefas para quem produz e não define a lista, sem esconder o resto (as permissões da 0.4 já recortam o que cada um vê); "categorias em caixa alta" não entra (o contrato visual do ERP só usa caixa alta no hub e no menu) | o lançamento de produção sem ordem (o tablet registra o que saiu direto): aqui a produção nasce na lista/lote, para a baixa ser a da requisição; a trava de duplicidade de 2 dias (a idempotência da 3.1/3.2 já cobre); busca por número de lote (etiqueta, 3.4) |
+| `pass:producao-lotes-e-consumo` "Produção da cozinha" (oficial Kairu/Nina) | `read_material` inteiro, `blueprint.md` e `nina-origin.md` (pelo `read_design_file`); `reference.mjs`, `fixtures.json`, testes e `demo.html` não foram abertos | "planejado × realizado" sempre lado a lado (histórico: "5,6 kg de 6 kg"); "operador inicia o trabalho e, ao terminar, informa a quantidade" (pegar = iniciar, concluir da 3.1); `ProductionEvent` com ator, de/para e motivo, só acrescentando (o histórico do lote); estados com transições sem volta por clique (soltar não volta a Planejada); "custo por kg só se a quantidade real é conhecida e positiva; não dividir pelo planejado" (o custo do lote da 3.1 no histórico); "status e ação principal em 390 × 844"; estados de tela (vazio, sem permissão, parcial) | `expectedVersion` = a versão lida do lote em pegar, soltar e passar; "reatribuição exige evento explícito" (do ciclo do forno) virou "passar para outra pessoa" com motivo e histórico | equipamentos, ciclos, consumo, tarifas e qualidade (fora do ERP agora); versão aprovada da ficha no lote (a 3.1 já retrata nome, unidade e validade) |
+| `library:controle-freelancers` "Organize freelancers do QR Code ao plantão" (oficial Kairu, v1.0.0) e a página do Notion | prompt inteiro e a documentação; o print não foi aberto | nada implementado (fase tardia, por pedido) | "quem fez" ficou aberto a quem não tem login: o `Colaborador` e `OrdemProducao.responsavelId` seguem reservados; o check-in (presença) não é "quem fez" — a 3.3 também separa pegar (quem) de concluir (o resultado) | o módulo inteiro: cadastro por QR, termo, check-in, quadro do dia, diária e pagamento |
+
+## Provar a cozinha (3.3)
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism
+npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+`tests/erp-producao-equipe.test.ts` (sem banco, 13): o período (7 dias por padrão, hoje e 30 dias, de/até trocados, futuro e mais de 92
+dias sempre com o aviso), o desfecho (concluído, perdido, estornado, cancelado), o dia do lote pelo relógio do Rio (23:30 de 20/10 é de
+20/10), o rendimento em palavras, o tempo (de pegar ou da entrega, se foi depois; sem hora de pegar, nada), o resumo, a frase de quem
+pegou e a recusa a quem tenta pegar, concluir ou cancelar o lote de outra pessoa, e os indicadores (Caio: 3 concluídos, 1 perdido, 1
+cancelado, 14 kg de 15 kg = 93,3 %, um fora da faixa; Duda: amostra pequena, o estornado fora da média; a mesma pessoa com nome novo
+aparece uma vez). `tests/erp-producao-equipe.db.test.ts` (15): a tela da cozinha; pegar da lista (o lote nasce pela regra do Gerar, com
+a requisição e nada no livro, já com Caio e a hora; duplo toque = o mesmo lote); duas pessoas na mesma linha ao mesmo tempo (um lote
+só, a outra lê quem pegou); a linha que a gerência mudou depois que a tela abriu (conflito); pegar o lote planejado em paralelo; soltar
+(só quem pegou ou a gerência, com motivo); passar (só a gerência, só para quem registra produção na loja, o planejado não se passa, a
+hora de quem recebe começa agora); concluir e cancelar o lote de outra pessoa (só ela ou a gerência; quem pegou fica como quem fez;
+sem segunda baixa); o nível 1 não pega; alcance e isolamento (gerente de outra loja, outro parceiro, loja sem estoque); histórico (R$
+só com `insumos.ver`); indicadores (só a gerência, sem R$); o banco recusando por SQL cru (dono em lote planejado, dono sem pessoa, troca
+de dono no concluído); o estorno guarda quem fez; e o MUTANTE do período (segurar o fechamento: pegar da lista espera e é recusado com
+a frase; o lote que já existe ainda se pega). `tests/erp-producao-equipe-telas.db.test.ts` (9): o HTML por perfil (a cozinha com quem
+está usando, o botão de 56 px, sem gerência e sem R$; a Duda vendo o lote do Caio sem pegar nem passar e a action de soltar recusada;
+a gerência passando só para quem está na lista), as actions voltando às tarefas, o concluir vindo das tarefas, o histórico com e sem
+custo, os indicadores só da gerência, 404 de outra loja e de outro parceiro nas três telas, o nível 1 que vê e passa mas não pega, e
+"quem fez" no lote concluído. `tests/erp-producao-equipe-migracao.db.test.ts` (3): a migration com dado antigo nos 3 perfis do banco
+(superusuário, dono com FORCE RLS, dono sem RLS): nada some, sem aviso, coluna, CHECKs validados, índices, as regras pelo papel do
+tenant e o conferidor sem pendência. Mutantes conferidos à mão (6 de 6 derrubam testes): tirar a trava do período em `pegarDaLista`,
+tirar o `FOR UPDATE` da lista, deixar pegar o lote de outra pessoa, deixar concluir o lote de outra pessoa, deixar soltar o lote de
+outra pessoa e deixar a conclusão sobrescrever quem fez.
+
+Rodada final no código de `159e6fd`: `prisma validate`, `tsc`, lint e portão de conteúdo limpos; `erp:conferir-migracao` e `migrate diff`
+vazio no `ff_33`. Suíte inteira com banco, como superusuário: 93 arquivos e 1862 testes passando. Como dono com FORCE RLS (`ff_dono_32`; arquivos da produção,
+da lista, da equipe, da RLS, do isolamento e das permissões, 9 arquivos): 154 de 155 passando; a única falha é a já registrada na 3.1 (o
+banco montado por psql não tem `_prisma_migrations`, que o teste da 0.2 lê). Sem RLS (`ff_semrls_32`, 7 arquivos): 107 passando e 1
+pulado.
+
+Na tela (build de produção do último commit de código, `159e6fd`, com o `BUILD_ID` gerado às 21:02:26, depois do commit das 21:01:16;
+porta 3100; banco `ff_33` copiado do `ff_32r1`, com os dados feitos pelas regras do sistema em `.local-scripts/equipe33.ts`, fora do git:
+a Duda Lima (Operador, cozinha) e uma semana de produção da Vila da Penha, de 15/10 a 20/10, com o relógio de cada dia — a pessoa
+pega, o estoque entrega e a pessoa conclui; um fora da faixa, um perdido, um cancelado com a Duda e um concluído sem pegar —; roteiro
+`prova33/jornada.mjs` no scratchpad, 41 conferências, 0 falha). O gerente gera 1 lote na Lista do dia (a Produção abre nela, como na
+3.2). O Otto, no celular (390 px com toque), entra na área pelas Tarefas, escolhe a loja (a escolha diz quantas tarefas há para pegar),
+lê "Você está como Otto Operador" e "Trocar de pessoa", vê "Para pegar 5" sem R$, e pega o molho de 6 kg com o botão de 56 px: o lote
+vai a Em produção com ele, o livro do estoque não muda e o aviso "Lote pego" vem para a vista com o foco. O Concluir fica desabilitado
+com o motivo até o estoque entregar. A Duda vê "com Otto Operador · pegou HH:MM", sem Passar; as duas tocam ao mesmo tempo na
+maionese e só uma fica com ela; quem perdeu lê "Este lote está com Duda Lima (pegou às 17:47)…"; no lote do Otto, o Concluir dela
+diz "Está com Otto Operador". O estoque entrega a requisição, o Concluir vira link, a conclusão diz "Voltar para as tarefas" e volta
+para elas; "Feitas hoje" mostra "5,6 kg de 6 kg · rendeu 93,3 % · Otto". O Otto pega a linha de 2 kg da lista: ela vira o lote naquela
+hora, já com ele. A gerência, no desktop, passa esse lote para a Duda com motivo (o histórico guarda o motivo e quem passou) e o
+formulário fecha. Histórico (7 dias): o resumo do período, o custo do lote para o gerente, "sem hora de pegar" (nunca 0) no concluído
+sem pegar, o cancelado com o motivo e o filtro do Otto. Indicadores: Chico, Duda e Otto em ordem alfabética, o aviso de que é retrato e
+não nota, a amostra pequena dita e nenhum R$; a cozinha que tenta abrir os indicadores volta para o hub. Matriz (`prova33/matriz.mjs`, axe wcag2a/2aa): dona e gerente × Tarefas (escolha e loja), Histórico, Indicadores, lote em
+produção, lote com a requisição e quadro de Lotes; a Duda (cozinha) × Tarefas (escolha e loja), Histórico, lote, Concluir vindo das
+tarefas e quadro; × 390, 820, 1180 e 1440 × claro e escuro. São 160 telas, com zero rolagem lateral e zero violação do axe. Alvos abaixo
+de 32 px no toque só no shell (pular para o conteúdo, logo, "Seu acesso"), que já existiam, e o "Ver o estoque" do cabeçalho do painel
+do lote (3.1, 20 px no tablet: fica para a revisão de UX). Prints em
+`pw/prova33/jornada/` (10, da jornada) e `pw/prova33/matriz-{dona,gerente,cozinha}/`.
+
+Observações: (1) o console só registrou o 404 do `favicon.ico` (já existia) e "Failed to fetch RSC payload" de prefetch do Next abortado
+quando o roteiro navega; nada das telas da 3.3. (2) A matriz abre uma página nova por endereço: o print `fullPage` do Playwright desliga
+a emulação de toque da página (`pointer: coarse` passa a não casar) e, nas rodadas anteriores, todo alvo que depende do toque (o rastro,
+"Ver os lotes", "Abrir a requisição") aparecia como pequeno depois do primeiro print — medido à parte, 44 a 48 px. (3) O "R$" que aparece
+no `main` do histórico da cozinha é o custo do lote: o Operador tem `insumos.ver` no perfil padrão; sem essa permissão o servidor nem
+manda o custo (teste de telas). (4) Na revisão das telas saíram quatro acertos, já no código: a hora do histórico pelo dia da linha
+(no lote encerrado em 21/10, "pegou 20/10 às 23:50 · fim 00:30"), o botão da cozinha que quebra a linha em vez de vazar e os botões do formulário um embaixo do
+outro no cartão, "Trocar de pessoa" alinhado no celular, e o formulário de passar/soltar que fecha depois de gravar (antes, o lote
+passado ficava no mesmo lugar com o formulário aberto e um segundo toque passaria de novo).
+
+## Polimento da 3.3 (depois da aprovação dos fiscais)
+
+Rodada curta, sem mexer no que foi aprovado (concorrência, travas, permissões, isolamento). Sem migration. Decisões 241 e 242;
+ajuste na 237. Ajuda: `producao-indicadores-loja` v1 → v2 ("Cancelou" e a FlowFoods fora das pessoas); `producao-concluir`
+ganhou a rota nova (lock regravado, 61 entradas).
+
+| Item | O que mudou |
+|---|---|
+| Nível 1 como pessoa (Guardião M1) | O lote que o nível 1 concluiu na 3.1 tem o login dele gravado. Na LEITURA, quem não tem vínculo com o parceiro (`idsDaEquipe`, credenciais) é a FlowFoods: fora dos indicadores (nota "concluído pela FlowFoods"), do filtro de pessoa e do "quem fez" do histórico ("FlowFoods · concluiu: Rodolfo"). A linha não muda. |
+| Cancelados (UX) | "Cancelou" conta só o que a própria pessoa cancelou; os da gerência ficam à parte e não contam para ela. No histórico, o cancelado diz "estava com X" e "cancelou: Gil Gerente (gerência)". |
+| Recebeu × pegou (UX) | O lote que a gerência passou diz "recebeu 18:14 (passado por Gil Gerente)" no cartão das Tarefas, no quadro, no lote e no histórico (`passadosPor`, do histórico do lote). |
+| Passar relê o acesso (Guardião M2) | `passarProducao` chama `aindaPode` DENTRO da gravação, com o lote travado: a pessoa escolhida tem de continuar ativa, da loja e com "registrar produção" (`aindaProduzNaLoja`). Senão, recusa em "Para quem" e nada é gravado. |
+| "Manter" depois do erro | Fecha o formulário de soltar e de passar; o erro dispensado não volta ao reabrir. |
+| Abas no celular | Componente comum: a aba atual vem para a vista dentro do trilho (só o trilho rola, sem animação). Vale para o ERP todo. |
+| Indicadores no celular | Abaixo de 640 px, o valor embaixo do rótulo; "Ver os lotes" sem quebrar. |
+| Perdeu a corrida | O "Pegar" some do cartão; ficam a frase de quem pegou e "Ver de novo". |
+| Textos | Subtítulo da escolha de loja com maiúscula; aviso de estoque não aberto (e de período fechado) uma vez só, no alto; o Concluir das Tarefas em `/producao/tarefas/<loja>/<lote>/concluir`, com a aba Tarefas marcada (o endereço antigo continua). |
+| "Ver o estoque" (3.1) | Folga de toque: 48 px no tablet. |
+| Fica para o Rodolfo | O operador vê R$ no Histórico e no Concluir porque tem `insumos.ver`; na Lista do dia a 3.2 escondeu. Nada mudou: pendência na Herança da 3.3. |
+
+**Provas** (código de `52ecd91`; build com o `BUILD_ID` gerado às 21:51:38, depois do commit das 21:50:30). Testes novos ou
+mexidos: `tests/erp-producao-equipe-polimento.test.ts` (5, sem banco: "recebeu", quem cancelou, "Manter" com erro, perder a
+corrida, a rolagem da aba); `tests/erp-producao-equipe.db.test.ts` (+2: o lote legado montado como a 3.1 gravava, com o gatilho
+desligado só na transação, fora das pessoas, do filtro e dos indicadores; a releitura do passar provada SOB a trava — outra
+conexão tenta travar o lote com NOWAIT e não consegue — e "recebeu" nas tarefas, no lote e no quadro); telas (+1 e asserções
+novas) e navegação (a rota nova acende Tarefas). Mutantes: tirar o filtro da equipe e reler antes da transação derrubam os
+testes. tsc, lint e portão de conteúdo limpos. Suíte inteira com banco, como superusuário: 94 arquivos e 1871 testes passando. Como dono com FORCE RLS (`ff_dono_32`, 9 arquivos): 157 de 158 (a
+falha é a conhecida do `_prisma_migrations`); sem RLS (`ff_semrls_32`, 7 arquivos): 110 passando e 1 pulado. O teste do lote
+legado desliga o FORCE e o gatilho só na transação dele, como a limpeza (sem isso, com a RLS forçada, o UPDATE do dono não
+achava a linha). Na tela, banco `ff_33`
+recriado da base com `.local-scripts/legado33p.ts` (um lote de ontem concluído pelo nível 1 com o login gravado, fora do git):
+a jornada da 3.3 (`prova33/jornada.mjs`, 41 conferências) e a do polimento (`prova33p/jornada-p.mjs`, 25 conferências), 0
+falha. Matriz das telas mexidas (Tarefas e a escolha, Histórico, Indicadores, lote em produção, lote solto, lote concluído,
+quadro, Concluir pelas Tarefas, Delivery) × gerente, cozinha (Duda) e dona × 390 e 1180 com toque e 1440 × claro e escuro:
+108 telas, zero rolagem lateral e zero violação do axe; alvos abaixo de 32 px só no shell. Console: só o 404 do `favicon.ico`
+e o prefetch do Next abortado. Prints em `pw/prova33p/jornada/` (8) e `pw/prova33p/matriz-{gerente,cozinha,dona}/`.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -1900,6 +2393,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Estoque | `Contagem` / `ContagemItem` | 2.3: `itensSemPreco` (quantos insumos sem preço no retrato da abertura e do fechamento; nulo = antes da 2.3); abertura (1.6: estado da loja), cíclica e fechamento de período (1.7: título, prazo, desfecho aplicada/fechou sozinha/venceu; fechamento aponta o `PeriodoApuracao`, um por loja); esperado (livro na hora de contar) × contado; versão, lista e fator congelados, digitado × normalizado. O piso é regra da lógica com os números na `Loja` |
 | Estoque | `Requisicao` / `RequisicaoItem` | pedido do setor (1.8: número por loja, setor da 0.4, para quando, versão, pedida → atendida em parte → atendida · cancelada, ficha de origem); a baixa sai na entrega (`REQUISICAO` com `requisicaoItemId`), devolução por estorno |
 | Produção | `OrdemProducao` | lote: planejado/produzido, custo, responsável (snapshot). 3.1: código `AAMMDD-NN` por loja e dia, `requisicaoId` único (a requisição dos insumos), `chaveIdempotencia`, `versao`, retratos da unidade, da conservação e da validade (`validadeEm`), quem planejou/iniciou/concluiu/cancelou, motivos (rendimento e cancelamento), `insumosSemPreco`; o custo por kg nunca é gravado; concluída só muda para CANCELADA (gatilho) |
+| Produção | `ListaProducao` / `ListaProducaoItem` | 3.2: a lista do dia de uma loja (única por loja e dia, `versao`, quem criou e mudou) e as linhas (pré-preparo, quanto, retrato do nome e da unidade, `ordemProducaoId` único = o lote que a linha virou). Linha com lote vivo não muda nem sai; o lote é da mesma loja, dia e ficha; a lista não muda de loja nem de dia (gatilhos). A conta (vai usar / tem / comprar) nunca é gravada |
 | Produção | `Etiqueta` | etiqueta impressa: lote do fornecedor, validade, abertura, snapshot |
 | DRE | `FaturamentoLancamento` | faturamento por loja × canal × dia (2.1: marca nula): valor, pedidos, clientes (= atendimentos do dia, não clientes únicos); chave de idempotência única; origem MANUAL/IMPORTACAO (uma linha humana por grão) ou INTEGRACAO; `atualizadoPorNome`; CHECKs de teto, espaço de chave e valor com pedido |
 | DRE | `DreLinha` / `DreMeta` | linhas do DRE (com `sentido`: maior ou menor é melhor; 2.2a: `codigo` estável das linhas do padrão, único por parceiro, nulo nas da casa) e meta % por linha, por canal ou da rede (canal nulo), com vigência; 2.2b: `semMeta` (a ausência de meta também é uma linha vigente), `criadoPorNome`, `atualizadoEm` |
@@ -2628,6 +3122,41 @@ banco de teste: o operador é recusado pelo servidor.
 - **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) material de limpeza ou descartável lançado como nota infla o CMV; quer um tipo de insumo próprio (fora do
   CMV) ou prefere seguir com a regra "lance como despesa"? (2) Valentin's: as duas unidades dividem estoque? Sem transferência entre lojas, o real por loja
   distorce (quem manda perde, quem recebe sobra); o da rede continua certo.
+- **Frases do desvio quando falta CMV de alguma loja (deixadas pela 2.3, a 2.4 só tirou a cor)**: a rede soma o CMV só das lojas que o têm, então o % do CMV e o desvio dele parecem melhores do que são. A 2.4 tira a cor de margem e resultados nesse caso, mas o desvio do próprio CMV ainda aparece
+  sem uma frase de "desvio otimista: falta o CMV de X"; e falta a frase positiva espelho, "já com o CMV de A e B", dizendo quais lojas ENTRAM na conta (hoje só se diz quais saem).
+- **Tempo da consulta do corte em produção**: acompanhar a duração da consulta de `cmvDasLojas` (o corte do estoque final) com o livro real; se passar de alguns segundos, rodar `ANALYZE` nas tabelas do livro e do estoque e, com milhões de movimentos por loja, a migration aditiva do índice `(parceiroId, lojaId, ocorridoEm)`.
+
+## Herança da 2.4 (para a 2.5 e as próximas)
+
+- **O farol é UM**: `faixaDoDesvio` (`farol-campos.ts`) para a faixa e `farolDoDre` (`farol-dre-campos.ts`) para "vira cor ou não". Qualquer tela que pinte uma meta (a 2.5, o orçamento ao vivo) parte deles; as faixas v1 são congeladas, e mudar um limite é a v2 (e a fotografia guarda a versão: `entrada.farol.versao`).
+- **A 2.5 (orçamento) recebe**: `faixaDoDesvio` com a escala de custo para pintar o orçamento ao vivo; a meta vigente do `cmv` (`metasDoPeriodo`); o desvio do CMV pelas compras no período em curso; e a regra "sem cor quando faltar faturamento" (um orçamento sobre receita incompleta mente igual).
+- **Meta de receita é de crescimento**: `tipoDaMeta(chave)`; `ComparacaoComMeta` ganhou `tipo`, `variacaoBp` e `faixa` (a palavra da 2.2b saiu). Meta por canal em `DreMeta.canal`, em R$ e por loja continuam fora; se um dia entrarem, são aditivas.
+- **Fotografia**: a v3 é o que o fechamento grava. `gravarFotografia` mantém o padrão 2 para os apoios de teste (`criarPeriodoFechadoDeTeste`): quem gravar fotografia na mão e quiser farol passa `versaoDaConta: 3` e `entrada.anoPassado`. A leitura do ano passado e dos pedidos é `lerCanaisDaFotografia` (só as lojas do alcance).
+- **Cobertura por loja**: qualquer comparação nova que agregue a rede (orçamento da 2.5, por exemplo) checa a completude POR LOJA antes de pintar, como o ano passado, o CMV e as despesas que repetem; somar primeiro esconde o buraco de uma loja atrás da outra. Despesa lançada de menos numa loja (que não repete todo mês) ainda não tem como ser detectada.
+- **v1 e v2 e o painel do ano passado**: nos períodos fechados antes do farol o painel "Receita contra o ano passado" da 2.2b ainda lê o faturamento do ano passado ao vivo (herança da 2.2b); só o farol e o painel por canal não o recalculam. Uma limpeza própria pode trocar isso por "não apurado".
+- **Ajuda sem vazar**: bloco de ajuda que descreve dado de uma permissão leva `para: [...]`; o layout entrega o registro filtrado ao shell inteiro, então um texto sem `para` chega a quem não pode ver a tela.
+- **`Despesa.canal` e as linhas "Entregas e motoboy" e "Taxas de cartão"** continuam sem canal: quando entrarem no formulário, motoboy e cartão por canal (de verdade, não rateados) ganham farol por canal sem rateio.
+- **Em aberto para o Rodolfo (decisão de negócio, não bloqueia)**: (1) o gerente de uma loja vê o farol de Pessoal da loja dele (herança dos salários, 2.2a); (2) os limites das 5 faixas (3,0 / 0,5 / 1,5 / 3,0 pontos; 5 / 1 / 3 / 6 na receita) são hipótese a validar com o Valentin's; (3) uma loja ativa que ainda não tem um ano de lançamentos (loja nova) deixa a receita da rede sem cor até completar o ano, com o nome dela na frase; quer comparar só as lojas que já existiam (mesmo critério dos dois lados)? (4) meta de crescimento de 0 a 100 % cobre o cliente ativo, mas uma casa que cai de propósito (fechar um canal) precisa de meta negativa: quer?
+
+## Herança da 2.5 (para a 2.6, a 3.x e as próximas)
+
+- **O orçamento é UM**: `orcamentoDeCompra` (a tela) e `orcamentoNaNota` (a prévia e o detalhe da nota), em `orcamento.ts`; a conta em `orcamento-campos.ts`.
+  Qualquer lugar novo que fale de "quanto cabe" (lista de compras da semana, sugestão de pedido, alerta) parte deles, nunca refaz a conta.
+- **A soma das compras é UMA**: `comprasPorLoja` (`cmv.ts`), a mesma do CMV de compra. Mudar o que conta como compra (bonificação, desconto, tipo "limpeza" fora do
+  CMV) muda o DRE e o orçamento juntos.
+- **A vista é montada no servidor**: quem não tem `dre.ver` na loja recebe `VistaResumida` (só o "cabe" pelo teto arredondado, o motivo e os avisos), e a tela
+  fala com ela em "limite seguro" (nunca "orçamento", "passou" ou "teto"; valores em degraus de R$ 100; tom de atenção; decisão 217). Arredonda-se o
+  TETO, nunca o saldo (decisão 213): qualquer número novo para quem não vê a receita parte de `tetoArredondado`, ou um comprador acha o centavo comparando notas. Campo novo no orçamento que dependa
+  da receita entra só na `VistaCompleta`; o teste de banco confere o JSON inteiro do comprador.
+- **A previsão é hipótese** (decisão 209): média por dia da semana nas últimas 4 semanas, mínimo de 14 dias completos. Se o Rodolfo quiser o dia de pagamento ou a
+  sazonalidade, a mudança é só em `preverReceita` (pura, com teste).
+- **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) o comprador vê o "cabe" em R$, pelo teto arredondado para baixo em degraus por faixa; quem souber a
+  meta do CMV sabe a receita prevista com erro de ±1 % a ±5 % com meta de 30 % (teto a partir de R$ 6 mil; ±1,4 % numa loja de R$ 120 mil por mês), e no fim
+  do período a prevista é quase a realizada. Risco aceito (Maestro): quem vê faturamento sem ver o DRE descobre a meta do CMV em ~14 dias. Serve, ou o comprador do
+  Valentin's deve ver só "cabe com folga / cabe pouco / passou", sem número? (2) A meta do CMV é uma só para todas as lojas;
+  salão e 100 % delivery têm CMV diferente: vale meta por loja (aditiva em `DreMeta`)? (3) 4 semanas e 14 dias: é a régua certa? (4) O frete entra no "já comprado"
+  (igual ao CMV de compra). (5) A loja nova sem 14 dias de faturamento deixa a rede sem número até completar; prefere a rede somar só as lojas com número, dizendo
+  quais ficaram de fora?
 
 ## Herança da 3.1 (para a 3.2 e as próximas)
 
@@ -2659,3 +3188,125 @@ banco de teste: o operador é recusado pelo servidor.
   precisa de faixa própria? (2) produção sem data retroativa: se o cozinheiro esquece de lançar ontem, hoje não dá para planejar para ontem; vale abrir exceção
   para o gerente? (3) a requisição de produção deve aparecer nas Divergências (requisição × contagem)? Hoje ela conta como requisitado no cruzamento, mas não há
   filtro para separar a de produção da do salão. (4) `insumos.ver` hoje mistura "ver insumo" e "ver custo": o operador da cozinha vê o custo dos insumos do lote. Vale uma permissão só para custo?
+
+## Herança da 3.2 (para a 3.3 e as próximas)
+
+- **Revisão final do Guardião (21/10, aprovado), dois pontos para depois**: (N1) `permissoesDoPerfil` / `permissoesNoCatalogoAtual` tratam a versão do
+  catálogo AUSENTE como v1 — hoje é inexplorável (a coluna é NOT NULL e todas as leituras trazem a versão), mas código novo que monte o acesso
+  sem passar a versão daria `producao.planejar` a um perfil v2 salvo sem ela: passe sempre a versão (ou torne-a obrigatória no tipo). (N2) A
+  migration de dado `20261030010000_erp_catalogo_v2` promove o perfil v1 completo sem linha no Histórico (a migration não tem contexto de
+  parceiro); o motivo fica registrado na decisão 219. Polimento de UX para depois: seletor de ficha com pelo menos 240 px em telas largas,
+  "a conta desta tela" no rodapé do formulário, esconder "Salvar a lista" quando tudo já virou lote, tirar o aviso antigo quando o formulário
+  mostra erro.
+
+- **A lista é UMA**: `obterListaDoDia`, `salvarListaDoDia`, `porNaListaDoDia` e `gerarLotesDaLista` em `producao-lista.ts`; a conta pura (vai usar /
+  tem / comprar, cascata, custo, frases) em `producao-lista-campos.ts`. Quem precisar de "o que falta para a produção do dia" (sugestão de
+  compra, alerta, PDF) parte de `contaDaLista`, nunca refaz a explosão.
+- **Planejar é UMA regra**: `planejarProducaoNaTx` (`producao.ts`) serve a Nova produção e a lista. A 3.3 ("funcionário pega da lista") usa a
+  mesma: pegar a linha = `gerarLotesDaLista` com `linhas: [id]` (o servidor já aceita um subconjunto) ou um caminho novo que chame
+  `planejarProducaoNaTx` e grave `ordemProducaoId` na linha, travando a lista antes. Quem fez cada etapa já está no lote (planejou, iniciou,
+  concluiu: nomes e `responsavelUsuarioId` na conclusão) — é a base do histórico por funcionário.
+- **A linha guarda o lote, não o contrário**: `ListaProducaoItem.ordemProducaoId` (único). Lote cancelado devolve a linha (estado derivado,
+  `estadoDaLinha`); o gatilho `ListaProducaoItem_lote_confere` não deixa a linha com lote vivo mudar ou sair. Quem precisar apagar uma lista com
+  lote (limpeza de teste) desliga o gatilho na transação (`SEM_GATILHO_NA_LIMPEZA` em `tests/erp-db-apoio.ts`).
+- **Ordem das travas** (não trocar): período (compartilhada) → a lista (`FOR UPDATE`) → as da 3.1 (dia do lote, requisição da loja; e, nas
+  outras escritas, abertura → requisição → ordem → saldos). Nenhum caminho trava a lista depois de travar requisição ou ordem: cancelar e
+  estornar o lote travam a lista do lote ANTES dele (`travarListaDoLote` em `producao.ts`) e sobem a versão dela (decisão 228). Escrita nova
+  da 3.1 que mude o estado de um lote da lista (devolver a linha, por exemplo) faz o mesmo.
+- **O formulário manda o que viu**: salvar leva `vistas` (as linhas em aberto da tela) e gerar leva `linha` (só essas viram lote). A 3.3
+  ("pegar da lista") pega pela linha (`linhas: [id]`), nunca "todas as em aberto".
+- **A lista apagada fica no banco** (sem linhas): a versão por loja e dia nunca recomeça (decisão 229). Lista "existe" = tem linhas; quem
+  contar listas conta as com linhas.
+- **Sem segunda baixa na conta**: linha em lote conta o que falta SAIR pela requisição dele (`faltaDe` com a requisição aberta ou em parte);
+  concluído não conta; o insumo que o lote tocou e ficou abaixo de zero continua na conta (`tocados`). Mudar o que a requisição pede muda a
+  conta junto — de propósito.
+- **Custo e orçamento**: custo estimado só para quem tem `insumos.ver` E define a lista ou compra (decisão 226, corrigida na rodada 1: a
+  cozinha lê só quantidades); orçamento pela `orcamentoNaNota` da 2.5 (a vista de quem lê; sem custo = parte de zero). Campo novo com valor
+  entra no mesmo contrato e nos testes do HTML do "chefe sem custos" e do operador padrão (que tem `insumos.ver`).
+- **Catálogo versionado de verdade**: permissão nova entra em `NOVAS_NA_VERSAO` (`permissoes.ts`) com `VERSAO_DO_CATALOGO` + 1 e uma migration
+  de dado como a `20261030010000_erp_catalogo_v2` (o "copiado do Dono" ganha; os demais, a Equipe pede para revisar). O teste confere a
+  lista do SQL contra o catálogo.
+- **Ajuda do shell manda texto de todas as telas** (0.6, achado na prova): blocos sem `para` vão a todos, inclusive "nunca R$ 0,00" do DRE para
+  quem não vê o DRE. Não é valor nem vem da lista, mas um teste que procure "R$" no HTML inteiro acha; procure no `main`. Vale rever na 0.6.
+- **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) quem monta a lista é a gerência (`producao.planejar`); a cozinha só lê e executa.
+  Serve, ou o cozinheiro-chefe também monta? (dá para dar a permissão por pessoa). (2) Saldo negativo entra no "comprar" (compra-se o buraco
+  do livro também); se o negativo for quase sempre nota esquecida, o comprador vai comprar a mais — preferem que o negativo conte como zero e
+  só avise? (3) "Pôr na lista" sugere exatamente o que falta (300 g), sem lote mínimo nem embalagem fechada; querem uma regra de lote por
+  ficha (ex.: base de cebola sempre de 2 kg)? (4) O "tem" é o saldo da loja agora: não desconta requisições abertas de outros setores (salão)
+  nem o estoque mínimo. (5) A lista vai até 14 dias à frente e não volta no tempo (como o lote). (6) Resolvido na rodada 1 (decisão do Maestro):
+  a cozinha não vê R$ na lista, mesmo com `insumos.ver`; o lote (3.1) continua mostrando custo a quem tem `insumos.ver` — separar "ver insumo"
+  de "ver custo" no catálogo inteiro segue como decisão de catálogo. (7) Perfil próprio antigo (catálogo v1) que não tinha tudo não ganha
+  "definir a lista do dia": a Equipe avisa para revisar.
+
+## Herança da 3.3 (para a 3.4 e as próximas)
+
+- **A produção continua UMA**: pegar, soltar e passar moram em `producao.ts` (`pegarNaTx` é a regra; `pegarProducao` é o
+  `iniciarProducao` da 3.1, que ficou como apelido); pegar uma linha da lista mora em `producao-lista.ts` (`pegarDaLista`). As
+  leituras da cozinha, do histórico e dos indicadores ficam em `producao-equipe.ts`; a conta pura em `producao-equipe-campos.ts`.
+  Quem precisar de "quem fez", "tempo" ou "indicador por pessoa" (etiqueta com o nome de quem fez, relatório mensal) parte de
+  `lotesEncerrados`/`indicadoresPorPessoa`, nunca refaz a conta.
+- **Quem fez = `responsavelUsuarioId` + `responsavelNomeSnapshot`, SE o login é da equipe**; `responsavelDesde` nulo = não pegou
+  pelo ERP (lote da 3.1 ou concluído direto: sem tempo). O nível 1 nunca é quem fez: o lote que ele concluiu na 3.1 tem o login
+  dele gravado, e a leitura o tira (`idsDaEquipe` das credenciais, passado a `historicoDaProducao`/`indicadoresDaProducao`;
+  polimento, decisão 241). Leitura nova de "quem fez" recebe a equipe também. Freelancer (fase tardia) entra por `responsavelId` (Colaborador): aí
+  "quem fez" passa a ser pessoa do login OU colaborador, e os indicadores agrupam pelos dois.
+- **Lote com outra pessoa**: só ela ou a gerência (`producao.planejar`) conclui, cancela ou solta; escrita nova sobre um lote
+  pendente (etiqueta impressa antes de concluir, por exemplo) decide se respeita o dono e diz por quê. A gerência passa só para
+  quem `pessoasQueProduzem` devolve (credenciais, no servidor), e `passarProducao` relê na gravação, com o lote travado, se a
+  escolhida ainda pode (`QuemPodeReceber.aindaPode` = `aindaProduzNaLoja`; decisão 241). "Recebeu × pegou": `passadosPor` (o
+  último "pegou"/"passou" do histórico do lote).
+- **Pegar não mexe no livro nem no DRE**: vale com período fechado. Qualquer escrita nova que mexa (baixa, entrada) chama
+  `conferirPeriodoAberto` e segue a ordem das travas da 3.1/3.2 (período → lista → abertura → requisição → ordem → saldos).
+- **A ordem fixa vale no pegar**: `pegarNaTx` trava requisição → ordem (`travarOrdem`); `pegarDaLista` trava período → lista →
+  as de planejar → as de pegar. Não trave a lista depois da ordem.
+- **Entrada da área por perfil**: `Tela.entradaPara` (`modulos.ts`) — a cozinha entra na Produção pelas Tarefas. Outra área que
+  precise de entrada por perfil usa o mesmo campo (sem mudar a ordem das abas).
+- **Botão da tela da cozinha**: `classeDeBotaoDaCozinha` / `BotaoEnviar cozinha` (56 px em qualquer largura). Tela de bancada nova
+  (etiqueta, contagem rápida) usa o mesmo.
+- **Testes**: a conclusão com relógio fixo precisa pegar antes (o CHECK `responsavel_antes_do_fim`); página que renderiza o lote em
+  produção para a gerência chama `pessoasQueProduzem` (credenciais, outro banco no teste): mocke (`tests/erp-producao-equipe-telas`).
+- **Formulário de lote que fica no mesmo lugar depois de gravar** (passar, soltar, pegar): `key` com a versão do lote, para fechar
+  depois de gravar (sem isso, a escolha velha ficava na tela com a versão nova e um segundo toque gravava de novo).
+- **Concluir pelas Tarefas**: `/producao/tarefas/<loja>/<lote>/concluir` (a aba vem do caminho; decisão 242). Tela nova aberta a
+  partir de uma aba que não é a "dona" do recurso faz o mesmo: endereço debaixo da aba, não `?de=`.
+- **Matriz de telas**: uma página nova por endereço. O print `fullPage` do Playwright desliga a emulação de toque da página e, dali em
+  diante, todo alvo que só cresce com `pointer: coarse` aparece pequeno (falso alarme).
+- **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) no tablet compartilhado cada um entra com o próprio acesso (senha ou
+  rosto) — a cozinha do Valentin's topa? Se o tablet ficar logado numa pessoa só, o histórico mente; (2) a cozinha vê no histórico o
+  que cada colega fez (como já via no quadro): serve, ou cada um só o seu?; (3) os indicadores são hipótese: amostra pequena abaixo
+  de 5 lotes; tempo de pegar (ou da entrega dos insumos) até concluir; rendimento médio com cada lote pesando igual; "Cancelou"
+  conta só o que a própria pessoa cancelou e o da gerência fica à parte (ajuste da 237, pelo nome gravado) — de acordo?; (4) passar para
+  outra pessoa é só da gerência; o próprio cozinheiro pode passar para um colega?; (5) a gerência não pré-escala lote planejado
+  ("a Duda faz o molho amanhã"): quer escala de tarefas numa fase própria?; (6) pegar e soltar valem com o período fechado (não
+  mexem em dinheiro nem em estoque): de acordo?; (7) **pendência de decisão (polimento, fiscal de UX):** o operador vê R$ no
+  Histórico da produção e no Concluir porque o perfil padrão do Operador tem `insumos.ver` (custos); na Lista do dia a 3.2
+  escondeu a estimativa de compra dele. A regra do sistema é a permissão (quem tem `insumos.ver` vê custo), e a incoerência fica
+  para o Rodolfo decidir: tirar `insumos.ver` do Operador padrão (a cozinha deixa de ver custo em toda parte) ou aceitar que a
+  cozinha veja o custo do lote. Nada foi mudado.
+
+## Revisão visual de 21/10/2026 (antes das próximas funcionalidades)
+
+**O que foi feito.** Diagnóstico no build de produção com dados de teste, em 10 telas × 4 formatos (celular 390, tablet em pé 820, tablet deitado
+1180, desktop 1440) × 2 temas = 80 telas, com toque ligado no celular e no tablet, axe (WCAG 2 A/AA), rolagem lateral e alvos de toque. Depois,
+varredura de todas as telas alcançáveis: 70 com a dona no tablet deitado, 25 com o operador no celular.
+
+**Referências Kairu realmente consultadas** (MCP, 21/10): Editorial v1.2.0, Corporativo v1.2.0 e Dark v2.0.0 (prompt completo, DESIGN.md e
+código). Escolha e motivos na decisão 202. As prévias em imagem não abriram (rede da sessão bloqueia portal.kairulabs.com.br: proxy 403).
+
+**Achados e correções.**
+
+| Achado | Correção | Onde |
+|---|---|---|
+| Caixa "Como funciona" acima do título: na 1ª visita o título aparecia depois de uma dobra inteira | caixa dentro do `PageHeader`, abaixo do título; sem o título repetido em serifa | `ui/caixa-da-tela.tsx`, `ui/cabecalho.tsx`, `shell/Shell.tsx`, `shell/ajuda.tsx` |
+| Filtros dos insumos estouravam a 1180 px com o menu (53 px de rolagem lateral) | linha única só a partir de 1280; em 1024–1279, busca em cima e 4 filtros embaixo | `telas/insumos/lista.tsx` |
+| Tablet recebia alvos de mouse (40/36 px) | `pointer: coarse` devolve 44 px; links de texto ganham área de toque | `tokens.css` |
+| Grupo do menu com um item só ("INSUMOS › Insumos") | vira o item direto | `shell/NavLateral.tsx` |
+| Selo "Sem CMV" no DRE escuro com 4,42:1 | erro escuro #F5525A | `tokens.css`, `tailwind.config.ts` |
+| Hub em 1 coluna no celular (herança da UX.5) | 2 colunas, card compacto | `ui/hub.tsx` |
+
+**Resultado.** 80 de 80 telas sem rolagem lateral e sem violação do axe; 95 telas varridas com um h1 cada e a caixa de ajuda abaixo dele. Testes:
+1.575 passaram (com banco, `--no-file-parallelism`), typecheck e lint limpos. Nenhuma regra, dado, permissão ou rota mudou.
+
+**Herança (para as próximas).** Tela nova usa `PageHeader` (é ele que traz a caixa de ajuda). Alvo novo que encolhe acima de 600 px usa as classes
+já cobertas pela regra de toque (`sm:min-h-10`, `sm:min-h-[42px]`…) ou entra na lista em `tokens.css`. Fica para depois: Equipe longa no celular e
+"Ver tudo sobre esta tela" como link de texto em vez de botão fantasma.

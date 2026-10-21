@@ -66,9 +66,9 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(emUso(DONO).map((m) => m.nome)).toEqual(AREAS);
     expect(abasPorArea(DONO)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
-      'Compras e Fornecedores': ['Compras', 'Fornecedores'],
+      'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      Produção: ['Lotes'],
+      Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos', 'Plano e metas'],
       'Rede e Equipe': ['Lojas e marcas', 'Equipe', 'Histórico', 'Seu acesso'],
     });
@@ -86,9 +86,9 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Gerente (rede): Precificação visível (ver preços), sem Equipe; ações de cadastro e de compra', () => {
     expect(abasPorArea(GERENTE)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
-      'Compras e Fornecedores': ['Compras', 'Fornecedores'],
+      'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      Produção: ['Lotes'],
+      Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
       // 2.2a: o gerente vê e lança despesa, vê o DRE e o período; plano de contas e período são do dono (rede inteira).
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos'],
       'Rede e Equipe': ['Lojas e marcas', 'Histórico', 'Seu acesso'],
@@ -108,10 +108,16 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(abasPorArea(OPERADOR)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições'],
-      Produção: ['Lotes'],
+      // 3.3: a cozinha pega as tarefas e lê o histórico; os indicadores por pessoa são da gerência.
+      Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico'],
       'Rede e Equipe': ['Lojas e marcas', 'Seu acesso'],
     });
     expect(acoesDaNavegacao(navegacaoDoParceiro(OPERADOR)).map((a) => a.rotulo)).toEqual(['Nova produção']);
+    // 3.3: a cozinha entra na Produção pelas Tarefas; a gerência continua entrando pela Lista do dia (decisão 225).
+    expect(modulosDoParceiro(OPERADOR).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/tarefas');
+    expect(modulosDoParceiro(GERENTE).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/lista');
+    // Um chefe (operador + "definir a lista do dia") entra pela lista, como a gerência.
+    expect(modulosDoParceiro(proprio(['producao.ver', 'producao.registrar', 'producao.planejar'])).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/lista');
     expect(modulosDoParceiro(OPERADOR).filter((m) => !m.href).map((m) => m.nome)).toEqual(['Etiquetas']);
   });
 
@@ -219,7 +225,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
 
   it('o card é a entrada da área: leva à primeira aba permitida', () => {
     const uso = cartoes(secao(html(DONO), 'Em uso')).map((c) => /href="([^"]+)"/.exec(c)![1]);
-    expect(uso).toEqual(['/erp/insumos', '/erp/compras', '/erp/estoque', '/erp/producao', '/erp/faturamento', '/erp/lojas']);
+    expect(uso).toEqual(['/erp/insumos', '/erp/compras', '/erp/estoque', '/erp/producao/lista', '/erp/faturamento', '/erp/lojas']);
     // Sem "ver insumos", a entrada de Cadastros é a ficha.
     const semInsumos = cartoes(secao(html(proprio(['fichas.ver'])), 'Em uso')).map((c) => /href="([^"]+)"/.exec(c)![1]);
     expect(semInsumos[0]).toBe('/erp/fichas');
@@ -294,7 +300,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
       '/rodolfo/erp/valentins/insumos',
       '/rodolfo/erp/valentins/compras',
       '/rodolfo/erp/valentins/estoque',
-      '/rodolfo/erp/valentins/producao',
+      '/rodolfo/erp/valentins/producao/lista',
       '/rodolfo/erp/valentins/faturamento',
       '/rodolfo/erp/valentins/lojas',
     ]);
@@ -367,6 +373,18 @@ const ROTAS_ATIVAS: [string, string][] = [
   [`/producao/${LOJA}/nova`, 'Lotes'],
   [`/producao/${LOJA}/o1`, 'Lotes'],
   [`/producao/${LOJA}/o1/concluir`, 'Lotes'],
+  // 3.2: a lista do dia (a entrada e a de uma loja) acende a aba dela, não a de Lotes.
+  ['/producao/lista', 'Lista do dia'],
+  [`/producao/lista/${LOJA}`, 'Lista do dia'],
+  // 3.3: as tarefas da cozinha, o histórico e os indicadores da produção acendem as abas deles (não a de Lotes).
+  ['/producao/tarefas', 'Tarefas'],
+  [`/producao/tarefas/${LOJA}`, 'Tarefas'],
+  // Polimento da 3.3: quem chega ao Concluir pelas Tarefas continua na aba Tarefas.
+  [`/producao/tarefas/${LOJA}/o1/concluir`, 'Tarefas'],
+  ['/producao/historico', 'Histórico'],
+  [`/producao/historico/${LOJA}`, 'Histórico'],
+  ['/producao/indicadores', 'Indicadores'],
+  [`/producao/indicadores/${LOJA}`, 'Indicadores'],
 ];
 
 describe('UX.9 · itemAtivo acende a aba certa em cada rota profunda', () => {
@@ -431,7 +449,7 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
   const parceiro = (r: string) => join('src', 'app', 'erp', ...r.split('/').filter(Boolean), 'page.tsx');
   const espelho = (r: string) => join('src', 'app', 'rodolfo', '(painel)', 'erp', '[slug]', ...r.split('/').filter(Boolean), 'page.tsx');
 
-  it.each([...ANTIGAS, ...profundas, '/estoque/contagens'])('%s existe no /erp e no nível 1', (r) => {
+  it.each([...ANTIGAS, ...profundas, '/estoque/contagens', '/compras/orcamento'])('%s existe no /erp e no nível 1', (r) => {
     expect(existsSync(parceiro(r)), `/erp${r}`).toBe(true);
     expect(existsSync(espelho(r)), `/rodolfo/erp/<slug>${r}`).toBe(true);
   });
@@ -450,10 +468,11 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     }
   });
 
-  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das das fases 2.1, 2.2a e 3.1 (faturamento, DRE, despesas e produção)', () => {
+  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das das fases 2.1, 2.2a, 2.5, 3.1, 3.2 e 3.3 (faturamento, DRE, despesas, orçamento, produção, a lista do dia, as tarefas, o histórico e os indicadores da produção)', () => {
     const todas = [...emUso(DONO)].flatMap((m) => [...m.grupos.flatMap((g) => g.itens), ...m.acoes]).map((i) => i.href.replace('/erp', ''));
     const novas = todas.filter((r) => !ANTIGAS.includes(r) && r !== '/acesso');
-    expect(novas).toEqual(['/estoque/contagens', '/producao', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
+    // 2.5: o orçamento de compra é aba da área Compras.
+    expect(novas).toEqual(['/compras/orcamento', '/estoque/contagens', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
   });
 });
 

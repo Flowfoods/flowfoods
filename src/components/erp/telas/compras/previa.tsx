@@ -8,6 +8,7 @@
 import type { PreviaDaNota } from '@/lib/erp/compras';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { Painel } from '../../ui/superficies';
+import { OrcamentoNaPrevia, tituloNaPrevia } from './orcamento';
 
 const EFEITO = {
   sobe: 'sobe',
@@ -45,6 +46,13 @@ export function PreviaDoImpacto({ previa: p }: { previa: PreviaDaNota }) {
           Itens {formatarDinheiro(p.somaItensCentavos)} + frete {formatarDinheiro(p.freteCentavos)} = <span className="font-semibold">{formatarDinheiro(p.somaItensCentavos + p.freteCentavos)}</span>
           {confere ? <span className="text-ok"> · confere com o total da nota</span> : null}
         </p>
+        {/* 2.5 (revisão de UX): o orçamento logo abaixo do total, visível depois do clique sem rolar. */}
+        {p.orcamento && (
+          <div className="mt-3 border-t border-linha pt-3">
+            <h3 className="text-[13px] font-semibold text-texto">{tituloNaPrevia(p.orcamento)}</h3>
+            <OrcamentoNaPrevia o={p.orcamento} />
+          </div>
+        )}
         <ul className="mt-3 divide-y divide-linha border-y border-linha">
           {p.custos.map((i) => (
             <li key={i.insumoId} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-0.5 py-2.5 text-sm">

@@ -16,11 +16,14 @@ export const TABELAS_DE_TENANT = MODELOS_DE_TENANT.map((m) => m[0].toUpperCase()
 /** Filhos antes dos pais. */
 const ORDEM_DE_LIMPEZA = [
   'HistoricoAlteracao', 'Etiqueta', 'MovimentoEstoque', 'SaldoEstoque', 'ContagemItem', 'Contagem',
-  'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
+  'ListaProducaoItem', 'ListaProducao', 'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
   'ProdutoCanal', 'ProdutoVenda', 'FichaItem', 'FichaTecnica', 'InsumoVariante', 'FaturamentoLancamento',
   'Despesa', 'DreMeta', 'FarolFaixa', 'DreLinha', 'DreFotografiaLinha', 'DreFotografia', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'Fornecedor',
   'Colaborador', 'Marca', 'Loja',
 ];
+
+/** Tabelas com gatilho que recusa o DELETE (a limpeza desliga só na transação dela). */
+const SEM_GATILHO_NA_LIMPEZA = ['DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem'];
 
 export interface PerfilDoBanco {
   superusuario: boolean;
@@ -54,10 +57,11 @@ export async function limparParceiros(db: PrismaClient, p: PerfilDoBanco, ids: s
       if (precisaDeContexto(p)) {
         for (const t of TABELAS_DE_TENANT) await tx.$executeRawUnsafe(`ALTER TABLE "${t}" NO FORCE ROW LEVEL SECURITY`);
       }
-      // 2.2b: a fotografia do fechamento não se apaga (gatilhos). A limpeza do teste os desliga só nesta transação.
-      for (const t of ['DreFotografia', 'DreFotografiaLinha']) await tx.$executeRawUnsafe(`ALTER TABLE "${t}" DISABLE TRIGGER USER`);
+      // 2.2b: a fotografia do fechamento não se apaga (gatilhos). 3.2: a linha da lista que virou lote também não. A
+      // limpeza do teste desliga esses gatilhos só nesta transação.
+      for (const t of SEM_GATILHO_NA_LIMPEZA) await tx.$executeRawUnsafe(`ALTER TABLE "${t}" DISABLE TRIGGER USER`);
       for (const t of ORDEM_DE_LIMPEZA) await tx.$executeRawUnsafe(`DELETE FROM "${t}" WHERE "parceiroId" = ANY($1)`, ids);
-      for (const t of ['DreFotografia', 'DreFotografiaLinha']) await tx.$executeRawUnsafe(`ALTER TABLE "${t}" ENABLE TRIGGER USER`);
+      for (const t of SEM_GATILHO_NA_LIMPEZA) await tx.$executeRawUnsafe(`ALTER TABLE "${t}" ENABLE TRIGGER USER`);
       await tx.$executeRawUnsafe(`DELETE FROM "ParceiroFlow" WHERE "id" = ANY($1)`, ids);
       if (precisaDeContexto(p)) {
         for (const t of TABELAS_DE_TENANT) await tx.$executeRawUnsafe(`ALTER TABLE "${t}" FORCE ROW LEVEL SECURITY`);

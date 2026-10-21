@@ -581,6 +581,8 @@ model ParceiroFlow {
   erpRequisicoes         Requisicao[]
   erpRequisicaoItens     RequisicaoItem[]
   erpOrdensProducao      OrdemProducao[]
+  erpListasProducao      ListaProducao[]
+  erpListaProducaoItens  ListaProducaoItem[]
   erpEtiquetas           Etiqueta[]
   erpFaturamentos        FaturamentoLancamento[]
   erpDreLinhas           DreLinha[]
@@ -671,6 +673,7 @@ model Loja {
   contagens      Contagem[]
   requisicoes    Requisicao[]
   ordensProducao OrdemProducao[]
+  listasProducao ListaProducao[]
   etiquetas      Etiqueta[]
   faturamentos   FaturamentoLancamento[]
   despesas       Despesa[]
@@ -965,6 +968,7 @@ model FichaTecnica {
   produtos       ProdutoVenda[]
   ordensProducao OrdemProducao[]
   requisicoes    Requisicao[]
+  itensDeLista   ListaProducaoItem[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, nome])
@@ -1354,8 +1358,9 @@ enum ProducaoStatus {
   CANCELADA
 }
 
-// Ordem de produção = lote (3.1/3.3). A lista do dia (3.2) é derivada das
-// ordens PLANEJADAS da data × saldo: não tem tabela própria.
+// Ordem de produção = lote (3.1/3.3; a 3.3 acrescenta quem pegou e desde quando). A lista do dia (3.2) ganhou tabela própria
+// (`ListaProducao`, decisão 218): o gerente define o que produzir ANTES de virar
+// lote; cada linha que vira lote aponta a ordem (`ListaProducaoItem.ordemProducaoId`).
 model OrdemProducao {
   id                      String         @id @default(cuid())
   parceiroId              String
@@ -1407,9 +1412,16 @@ model OrdemProducao {
   validadeMinSnapshot     Int?
   validadeEm              DateTime?
   responsavelUsuarioId    String?
+  // 3.3: a cozinha PEGA o lote (pegar = começar): quem está fazendo vai em `responsavelUsuarioId` (a pessoa do login, texto
+  // sem FK: a credencial mora fora do tenant) e `responsavelNomeSnapshot`, e desde quando aqui. Soltar zera os três; a
+  // gerência passa para outra pessoa (a hora recomeça). Nulo com responsável = lote concluído sem pegar (3.1): quem
+  // concluiu fica como quem fez, sem hora de início. `responsavelId` (Colaborador) fica para quem não tem login.
+  responsavelDesde        DateTime?
 
   movimentos MovimentoEstoque[]
   etiquetas  Etiqueta[]
+  // 3.2: a linha da lista do dia que virou este lote (no máximo uma).
+  itemDaLista ListaProducaoItem?
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, codigoLote])
@@ -1418,6 +1430,59 @@ model OrdemProducao {
   @@index([parceiroId, lojaId, dataPlanejada])
   @@index([parceiroId, lojaId, status])
   @@index([parceiroId, responsavelId, concluidaEm])
+  // 3.3: o histórico e os indicadores da produção leem os lotes encerrados da loja num período.
+  @@index([parceiroId, lojaId, concluidaEm])
+  @@index([parceiroId, lojaId, canceladaEm])
+}
+
+// 3.2: a lista do dia — o que a LOJA vai produzir num DIA, definido por quem tem
+// "definir a lista do dia" (o gerente). Uma por loja e dia (índice único: dois
+// cliques ou duas abas caem na mesma). Versão lida em toda escrita. Cruza com o
+// saldo do estoque na leitura (vai usar / tem / comprar): nada disso é gravado.
+// Não mexe no estoque: quem baixa é a requisição de cada lote (3.1).
+model ListaProducao {
+  id                String       @id @default(cuid())
+  parceiroId        String
+  parceiro          ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId            String
+  loja              Loja         @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  dia               DateTime     @db.Date
+  versao            Int          @default(0)
+  criadaEm          DateTime     @default(now())
+  criadaPorNome     String
+  atualizadaEm      DateTime     @default(now())
+  atualizadaPorNome String
+
+  itens ListaProducaoItem[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, lojaId, dia])
+}
+
+// Linha da lista: um pré-preparo e quanto produzir (na unidade do rendimento da
+// ficha, retrato do nome e da unidade). Vira lote pela regra da 3.1
+// (`planejarProducao`): a linha guarda a ordem (única: uma linha, um lote).
+// Linha com lote cancelado volta a ser só "na lista" (pode virar outro lote).
+model ListaProducaoItem {
+  id                  String         @id @default(cuid())
+  parceiroId          String
+  parceiro            ParceiroFlow   @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  listaId             String
+  lista               ListaProducao  @relation(fields: [parceiroId, listaId], references: [parceiroId, id], onDelete: Cascade)
+  fichaId             String
+  ficha               FichaTecnica   @relation(fields: [parceiroId, fichaId], references: [parceiroId, id], onDelete: Restrict)
+  fichaNomeSnapshot   String
+  unidadeSnapshot     UnidadeBase
+  quantidadeMilesimos Int
+  ordem               Int            @default(0)
+  ordemProducaoId     String?
+  ordemProducao       OrdemProducao? @relation(fields: [parceiroId, ordemProducaoId], references: [parceiroId, id], onDelete: Restrict)
+  criadoEm            DateTime       @default(now())
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, ordemProducaoId])
+  @@index([parceiroId, listaId])
+  @@index([parceiroId, fichaId])
 }
 
 enum EtiquetaFormato {
@@ -1682,7 +1747,7 @@ model DreFotografia {
   fechadoPorNome    String
   taxaComissaoBp    Int?
   taxaPagamentoBp   Int?
-  // 1 = sem CMV (2.2b); 2 = com o CMV de compra e o real (2.3).
+  // 1 = sem CMV (2.2b); 2 = com o CMV de compra e o real (2.3); 3 = com o ano passado e a versão do farol (2.4).
   versaoDaConta     Int             @default(1)
   entrada           Json
   ressalvas         Json            @default("[]")

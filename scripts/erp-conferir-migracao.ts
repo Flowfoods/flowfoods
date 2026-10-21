@@ -1,7 +1,7 @@
 /**
  * Conferência pós-deploy das migrations `20261025000000_erp_faturamento` (2.1),
- * `20261026000000_erp_dre_despesas` (2.2a), `20261027000000_erp_dre_fechamento` (2.2b), `20261028000000_erp_cmv` (2.3)
- * e `20261029000000_erp_producao` (3.1).
+ * `20261026000000_erp_dre_despesas` (2.2a), `20261027000000_erp_dre_fechamento` (2.2b), `20261028000000_erp_cmv` (2.3),
+ * `20261029000000_erp_producao` (3.1), `20261030000000_erp_lista_do_dia` (3.2) e `20261031000000_erp_producao_equipe` (3.3).
  *
  *   npm run erp:conferir-migracao
  *
@@ -76,6 +76,26 @@ export const INDICE_DA_REQUISICAO_DO_LOTE = 'OrdemProducao_parceiroId_requisicao
 
 /** Os gatilhos da 3.1: sem eles o lote concluído mudaria e a entrada do lote poderia cair em outra loja. */
 export const GATILHOS_DA_3_1 = ['OrdemProducao_concluida_imutavel', 'MovimentoEstoque_producao_confere'] as const;
+
+/** As duas tabelas da 3.2 (nascem com os CHECKs validados; o que se confere é a RLS, os índices únicos e os gatilhos). */
+export const TABELAS_DA_3_2 = ['ListaProducao', 'ListaProducaoItem'] as const;
+
+/** Uma lista por loja e dia; uma linha por lote. Sem eles, dois cliques duplicariam a lista ou dois itens o mesmo lote. */
+export const INDICES_DA_3_2 = ['ListaProducao_parceiroId_lojaId_dia_key', 'ListaProducaoItem_parceiroId_ordemProducaoId_key'] as const;
+
+/** Os gatilhos da 3.2: sem eles a linha que virou lote mudaria (ou apontaria lote de outra loja) e a lista mudaria de loja ou de dia. */
+export const GATILHOS_DA_3_2 = ['ListaProducao_parceiro_imutavel', 'ListaProducaoItem_parceiro_imutavel', 'ListaProducao_loja_dia_imutaveis', 'ListaProducaoItem_lote_confere'] as const;
+
+/** Os CHECKs que a 3.3 acrescentou na ordem de produção (quem pegou o lote e desde quando). */
+export const CHECKS_DA_3_3 = [
+  ['OrdemProducao', 'OrdemProducao_responsavel_com_pessoa'],
+  ['OrdemProducao', 'OrdemProducao_responsavel_so_em_producao'],
+  ['OrdemProducao', 'OrdemProducao_responsavel_antes_do_fim'],
+  ['OrdemProducao', 'OrdemProducao_responsavel_nome_curto'],
+] as const;
+
+/** Os índices da 3.3: o histórico e os indicadores leem os lotes encerrados da loja por período. */
+export const INDICES_DA_3_3 = ['OrdemProducao_parceiroId_lojaId_concluidaEm_idx', 'OrdemProducao_parceiroId_lojaId_canceladaEm_idx'] as const;
 
 /** O que a migration deixou pendente (frases prontas para o terminal); lista vazia = tudo no lugar. */
 export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
@@ -162,6 +182,44 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261029000000_erp_producao não foi aplicada por inteiro.`);
     }
   }
+  // 3.2: só se a migration dela já rodou (a tabela existe; o catálogo não passa pela RLS).
+  const lista = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_class WHERE relname = 'ListaProducao' AND relkind = 'r'`;
+  if (lista[0]?.n) {
+    const tabelas = await db.$queryRaw<{ nome: string; rls: boolean; forcada: boolean }[]>`
+      SELECT relname AS nome, relrowsecurity AS rls, relforcerowsecurity AS forcada FROM pg_class WHERE relkind = 'r' AND relname = ANY(${[...TABELAS_DA_3_2, 'Loja']})`;
+    const loja = tabelas.find((t) => t.nome === 'Loja');
+    for (const t of TABELAS_DA_3_2) {
+      const achada = tabelas.find((x) => x.nome === t);
+      if (!achada) pendencias.push(`Tabela ${t} NÃO existe: a migration 20261030000000_erp_lista_do_dia não foi aplicada por inteiro.`);
+      // As antigas com RLS e a nova sem: o papel do tenant não alcançaria a tabela (o ERP quebraria) ou ela ficaria sem o cinto.
+      else if (loja?.rls && !(achada.rls && achada.forcada)) pendencias.push(`Tabela ${t} sem RLS forçada (as outras têm): rode o bloco da RLS da migration 20261030000000_erp_lista_do_dia como dono das tabelas.`);
+    }
+    const indices = await db.$queryRaw<{ nome: string }[]>`SELECT indexname AS nome FROM pg_indexes WHERE indexname = ANY(${[...INDICES_DA_3_2]})`;
+    for (const i of INDICES_DA_3_2) {
+      if (!indices.some((x) => x.nome === i)) pendencias.push(`Índice ${i} NÃO existe: a migration 20261030000000_erp_lista_do_dia não foi aplicada por inteiro.`);
+    }
+    const gatilhos = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_3_2]})`;
+    for (const t of GATILHOS_DA_3_2) {
+      if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261030000000_erp_lista_do_dia não foi aplicada por inteiro.`);
+    }
+  }
+  // 3.3: só se a migration dela já rodou (a coluna existe; o catálogo não passa pela RLS).
+  const equipe = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'OrdemProducao' AND column_name = 'responsavelDesde'`;
+  if (equipe[0]?.n) {
+    const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_3_3.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_3_3) {
+      const achado = dela.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration 20261031000000_erp_producao_equipe não foi aplicada por inteiro.`);
+      else if (!achado.validado) {
+        pendencias.push(`CHECK ${nome} ficou NOT VALID: corrija a linha antiga que o viola e rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+      }
+    }
+    const indices = await db.$queryRaw<{ nome: string }[]>`SELECT indexname AS nome FROM pg_indexes WHERE indexname = ANY(${[...INDICES_DA_3_3]})`;
+    for (const i of INDICES_DA_3_3) {
+      if (!indices.some((x) => x.nome === i)) pendencias.push(`Índice ${i} NÃO existe: a migration 20261031000000_erp_producao_equipe não foi aplicada por inteiro.`);
+    }
+  }
   return pendencias;
 }
 
@@ -170,10 +228,10 @@ async function principal() {
   try {
     const pendencias = await conferirMigracao(db);
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3 e da 3.1 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2 e da 3.3 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia (com RLS), os índices e os gatilhos existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3 e da 3.1: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2 e da 3.3: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {

@@ -290,8 +290,10 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · produção do pré-preparo pela ficha (P
 
   it('iniciar (opcional): vai para EM_EXECUCAO; iniciar de novo é "já feito"', async () => {
     const l = await lote(L1);
-    expect(await iniciarProducao(a, OPERADOR(), ids.vp, L1, { versao: l.ordem.versao }, AUTOR_COZINHA)).toMatchObject({ ok: true });
-    expect(await iniciarProducao(a, OPERADOR(), ids.vp, L1, { versao: l.ordem.versao }, AUTOR_COZINHA)).toMatchObject({ ok: true, jaFeito: true });
+    // 3.3: começar é pegar; a conclusão (critério 5, relógio fixo em 17/10 10:00) não pode vir antes de pegar: pega às 09:00.
+    const pegouEm = new Date('2026-10-17T12:00:00Z');
+    expect(await iniciarProducao(a, OPERADOR(), ids.vp, L1, { versao: l.ordem.versao }, AUTOR_COZINHA, pegouEm)).toMatchObject({ ok: true });
+    expect(await iniciarProducao(a, OPERADOR(), ids.vp, L1, { versao: l.ordem.versao }, AUTOR_COZINHA, pegouEm)).toMatchObject({ ok: true, jaFeito: true });
     const depois = await lote(L1);
     expect(depois.ordem).toMatchObject({ status: 'EM_EXECUCAO', iniciadaPorNome: 'Caio Cozinha' });
     expect(depois.ordem.iniciadaEm).toBeInstanceOf(Date);

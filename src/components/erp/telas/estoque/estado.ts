@@ -59,6 +59,19 @@ const FEITO: Readonly<Record<string, string>> = {
   'lote-ja-cancelado': 'Este lote já estava cancelado.',
   estornado: 'Lote estornado: o que ele pôs no estoque foi tirado, com o antes e o depois no livro.',
   'ja-estornado': 'Este lote já tinha sido estornado: nada mudou de novo.',
+  // 3.2: a lista do dia
+  'lista-salva': 'Lista salva. A conta de vai usar, tem e comprar já é a da lista nova.',
+  'lista-ja': 'A lista já estava assim (outra aba ou o mesmo clique): nada mudou.',
+  'lotes-gerados': 'Lotes gerados. Cada um já está na produção com a requisição dos insumos; nada sai do estoque até o estoque entregar.',
+  'lotes-ja': 'Os lotes desta lista já tinham sido gerados (outra aba ou o mesmo clique): nenhum lote novo.',
+  'posto-na-lista': 'Pré-preparo posto na lista. A conta já conta com ele.',
+  // 3.3: a cozinha pega a tarefa
+  pegou: 'Lote pego: está com você. Quando os insumos chegarem e o lote ficar pronto, conclua.',
+  'ja-pegou': 'Este lote já estava com você (o mesmo toque, ou outra aba): nada mudou.',
+  soltou: 'Lote solto: continua em produção, sem ninguém, e volta para alguém pegar.',
+  'ja-soltou': 'Este lote já estava sem ninguém: nada mudou.',
+  passou: 'Lote passado: a hora de quem recebeu começa agora.',
+  'ja-passou': 'Este lote já estava com essa pessoa: nada mudou.',
 };
 
 export const fraseDoEstoque = (feito: string | undefined) => fraseDe(FEITO, feito);

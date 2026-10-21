@@ -27,6 +27,8 @@ const ENTIDADE: Record<string, string> = {
   Requisicao: 'Requisição',
   // 3.1: o lote de produção (quantidades para quem vê produção; o custo dele só para quem vê custos).
   OrdemProducao: 'Lote',
+  // 3.2: a lista do dia de uma loja (o que produzir; nenhum valor em R$).
+  ListaProducao: 'Lista do dia',
   // 1.9: a taxa do iFood do parceiro.
   CanalConfig: 'Canal de venda',
   Fornecedor: 'Fornecedor',
@@ -78,6 +80,12 @@ const ACAO: Record<string, string> = {
   // 3.1
   PLANEJOU: 'Planejou',
   ESTORNOU: 'Estornou',
+  // 3.2
+  GEROU_LOTES: 'Gerou os lotes da',
+  // 3.3: a cozinha pega o lote; quem pegou (ou a gerência) solta; a gerência passa para outra pessoa.
+  PEGOU: 'Pegou',
+  SOLTOU: 'Soltou',
+  REATRIBUIU: 'Passou',
 };
 
 const CAMPO: Record<string, string> = {
@@ -167,6 +175,14 @@ const CAMPO: Record<string, string> = {
   estornoDoLote: 'voltou do estoque',
   custoDoLote: 'custo do lote',
   perdaEmReais: 'o que a diferença custou',
+  // 3.2: a lista do dia
+  producaoDoDia: 'o que produzir',
+  lotesGerados: 'lotes gerados',
+  daLista: 'da lista',
+  // 3.3: quem está com o lote
+  responsavel: 'quem faz',
+  feitoPor: 'quem fez',
+  pegoPor: 'pego por',
   // 1.9: custo por canal
   embalagensDelivery: 'embalagens do delivery',
   embalagensIfood: 'embalagens do iFood',
@@ -209,12 +225,17 @@ const CAMPO: Record<string, string> = {
   cmv: 'CMV',
 };
 
-/** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. */
-const NA_HORA = new Set(['custoLoja', 'custoDelivery', 'custoIfood']);
+/** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. 3.3: quem fez o lote, na conclusão. */
+const NA_HORA = new Set(['custoLoja', 'custoDelivery', 'custoIfood', 'feitoPor']);
 
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */
 const ORDEM = [
   'nome',
+  'producaoDoDia',
+  'lotesGerados',
+  'pegoPor',
+  'responsavel',
+  'feitoPor',
   'tipo',
   'planejado',
   'requisicaoDoLote',
@@ -433,8 +454,8 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
         continue;
       }
     }
-    // Itens da ficha (1.4): o que entrou, saiu e mudou, em vez de lista velha × lista nova.
-    if (c === 'itens' && !criacao && typeof antes[c] === 'string' && typeof depois[c] === 'string') {
+    // Itens da ficha (1.4): o que entrou, saiu e mudou, em vez de lista velha × lista nova. 3.2: a lista do dia também.
+    if ((c === 'itens' || c === 'producaoDoDia') && !criacao && typeof antes[c] === 'string' && typeof depois[c] === 'string') {
       const itens = mudancasDosItens(antes[c] as string, depois[c] as string);
       if (itens) {
         out.push(...itens);

@@ -291,7 +291,7 @@ export function TelaListaFichas({
                     >
                       {l.nome}
                     </Link>
-                    <div className="max-w-[15rem] truncate text-[12px] text-suave lg:max-w-[28rem]">
+                    <div className="max-w-[15rem] truncate text-[12px] text-suave lg:max-w-[19rem]">
                       {TIPOS_DE_FICHA[l.tipo]}
                       {l.preparos > 0 ? ` · com ${l.preparos === 1 ? '1 pré-preparo' : `${l.preparos} pré-preparos`}` : ''}
                       {l.descricao ? ` · ${l.descricao}` : ''}

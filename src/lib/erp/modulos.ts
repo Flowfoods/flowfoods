@@ -114,7 +114,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 3.1';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 3.3';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -138,6 +138,11 @@ export type ChaveDeCor = keyof typeof COR;
 interface Tela extends ItemNav {
   /** null = livre; lista = qualquer uma delas (1.8: requisições = quem pede OU quem atende). */
   permissao: Permissao | readonly Permissao[] | null;
+  /**
+   * 3.3: esta aba é a ENTRADA da área para quem tem `tem` e não tem `semTer` (a cozinha entra na Produção pelas Tarefas; a
+   * gerência, pela Lista do dia, a primeira aba). Não muda a ordem das abas.
+   */
+  entradaPara?: { tem: Permissao; semTer: Permissao };
 }
 
 interface DefinicaoDeArea {
@@ -285,6 +290,13 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               permissao: 'compras.ver',
             },
             {
+              href: `${base}/compras/orcamento`,
+              rotulo: 'Orçamento',
+              icone: 'metricas',
+              subtitulo: 'Quanto ainda cabe comprar sem furar a meta do CMV',
+              permissao: 'compras.ver',
+            },
+            {
               href: `${base}/compras/fornecedores`,
               rotulo: 'Fornecedores',
               icone: 'fornecedor',
@@ -370,8 +382,8 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
     {
       chave: 'producao',
       nome: 'Produção',
-      subtitulo: 'Planejar o lote pela ficha, dar baixa nos insumos pela requisição e pôr o pronto no estoque',
-      resumo: 'Lotes e rendimento',
+      subtitulo: 'A lista do dia, a cozinha pegando as tarefas, o lote pela ficha, o histórico e os indicadores por pessoa',
+      resumo: 'Lista e tarefas',
       icone: 'producao',
       cor: COR.producao,
       grupos: [
@@ -379,12 +391,43 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
           rotulo: 'Produção',
           icone: 'producao',
           telas: [
+            // 3.2: a lista do dia vem primeiro (o dia começa por ela: o que produzir e o que falta comprar; decisão 225).
+            {
+              href: `${base}/producao/lista`,
+              rotulo: 'Lista do dia',
+              icone: 'producao',
+              subtitulo: 'O que produzir no dia e o que falta comprar, por loja',
+              permissao: 'producao.ver',
+            },
+            // 3.3: a tela da cozinha (pegar, concluir, soltar). É a entrada da área para quem produz e não define a lista.
+            {
+              href: `${base}/producao/tarefas`,
+              rotulo: 'Tarefas',
+              icone: 'producao',
+              subtitulo: 'A cozinha pega o que vai fazer hoje e conclui',
+              permissao: 'producao.registrar',
+              entradaPara: { tem: 'producao.registrar', semTer: 'producao.planejar' },
+            },
             {
               href: `${base}/producao`,
               rotulo: 'Lotes',
               icone: 'producao',
               subtitulo: 'Lotes planejados, em produção e concluídos, por loja',
               permissao: 'producao.ver',
+            },
+            {
+              href: `${base}/producao/historico`,
+              rotulo: 'Histórico',
+              icone: 'historico',
+              subtitulo: 'O que foi produzido, quanto, por quem e quando',
+              permissao: 'producao.ver',
+            },
+            {
+              href: `${base}/producao/indicadores`,
+              rotulo: 'Indicadores',
+              icone: 'metricas',
+              subtitulo: 'Por pessoa: lotes, rendimento e tempo, com a amostra',
+              permissao: 'producao.planejar',
             },
           ],
         },
@@ -542,10 +585,12 @@ export function modulosDoParceiro(alcance: Alcance, base = '/erp'): ModuloNav[] 
       .map((g) => ({
         rotulo: g.rotulo,
         icone: g.icone,
-        itens: g.telas.filter((t) => liberada(alcance, t)).map(({ permissao: _p, ...item }) => ({ ...item, area: m.nome })),
+        itens: g.telas.filter((t) => liberada(alcance, t)).map(({ permissao: _p, entradaPara: _e, ...item }) => ({ ...item, area: m.nome })),
       }))
       .filter((g) => g.itens.length > 0);
     if (grupos.length === 0) continue;
+    // A entrada da área: a aba marcada para o perfil de quem lê (3.3: a cozinha entra pelas Tarefas); senão, a primeira.
+    const entrada = m.grupos.flatMap((g) => g.telas).find((t) => t.entradaPara && liberada(alcance, t) && pode(alcance, t.entradaPara.tem) && !pode(alcance, t.entradaPara.semTer));
     construidos.push({
       chave: m.chave,
       nome: m.nome,
@@ -553,9 +598,9 @@ export function modulosDoParceiro(alcance: Alcance, base = '/erp'): ModuloNav[] 
       resumo: m.resumo,
       icone: m.icone,
       cor: m.cor,
-      href: grupos[0].itens[0].href,
+      href: entrada?.href ?? grupos[0].itens[0].href,
       grupos,
-      acoes: m.acoes.filter((t) => liberada(alcance, t)).map(({ permissao: _p, ...item }) => ({ ...item, area: m.nome })),
+      acoes: m.acoes.filter((t) => liberada(alcance, t)).map(({ permissao: _p, entradaPara: _e, ...item }) => ({ ...item, area: m.nome })),
     });
   }
   const futuros: ModuloNav[] = MODULOS_FUTUROS.filter((f) => f.ver.some((p) => pode(alcance, p))).map((f) => ({

@@ -48,6 +48,10 @@ export const TITULO_NO_HISTORICO_DO_LOTE: Readonly<Record<string, string>> = {
   CONCLUIU: 'Concluído',
   CANCELOU: 'Cancelado',
   ESTORNOU: 'Estornado',
+  // 3.3
+  PEGOU: 'Pego',
+  SOLTOU: 'Solto',
+  REATRIBUIU: 'Passado para outra pessoa',
 };
 
 export const pendente = (s: StatusDaProducao) => s === 'PLANEJADA' || s === 'EM_EXECUCAO';

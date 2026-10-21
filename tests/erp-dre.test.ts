@@ -426,7 +426,7 @@ describe('2.2a · o DRE realizado', () => {
     const r = montarDre(entrada({ receitas: [{ lojaId: 'a', canal: 'LOJA', valorCentavos: 1_000_000 }], despesas }));
     expect(r.receitaBrutaCentavos).toBe(1_000_000);
     expect(valor(r, 'grupo:PESSOAL')).toMatchObject({ valorCentavos: 260_000, percentualBp: 2600 });
-    expect(textoDoPercentual(2600)).toBe('26,0 %');
+    expect(textoDoPercentual(2600)).toBe('26,0\u00a0%');
     expect(valor(r, 'grupo:DEDUCAO').valorCentavos).toBe(60_000);
     expect(valor(r, CODIGO.receitaLiquida).valorCentavos).toBe(940_000);
     expect(valor(r, CODIGO.margem).valorCentavos).toBe(840_000); // 940 − variáveis 100
@@ -486,8 +486,8 @@ describe('2.2a · o DRE realizado', () => {
   it('negativo: arredondamento simétrico e texto dos pontos', () => {
     expect(percentualDaReceita(-1, 3)).toBe(-3333);
     expect(percentualDaReceita(1, 3)).toBe(3333);
-    expect(textoDosPontos(100)).toBe('+1,0 pp');
-    expect(textoDosPontos(-50)).toBe('−0,5 pp');
+    expect(textoDosPontos(100)).toBe('+1,0\u00a0pp');
+    expect(textoDosPontos(-50)).toBe('−0,5\u00a0pp');
   });
 
   it('cada linha calculada do plano aparece uma vez no DRE e na ordem do plano', () => {

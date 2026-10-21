@@ -1,8 +1,11 @@
 /**
  * Hub de módulos (Ref.1): a tela de entrada do /erp e do /rodolfo.
  *
- * Grade de 4 colunas no desktop, 2 no tablet, 1 abaixo de 600 px (kit Dark:
- * "abaixo de 600 px, cards vão para uma coluna"). Card = quadrado do ícone na
+ * Grade de 4 colunas no desktop e 2 no tablet e no celular (Ref.1 do plano:
+ * "4 colunas no desktop, caindo pra 2 no celular"; vence o kit, que pedia 1).
+ * Abaixo de 600 px o card fica compacto: ícone, nome e a descrição em até 3
+ * linhas; os links das abas somem (a área abre na 1ª aba e as abas estão no
+ * topo dela). Card = quadrado do ícone na
  * cor da área + nome + descrição do fluxo e, embaixo, as abas que a pessoa
  * pode abrir, cada uma um link próprio (UX.9: o hub mostra ÁREAS, nunca ações;
  * o card inteiro leva à primeira aba); borda
@@ -27,7 +30,7 @@ export interface CartaoDoHub {
   abas?: { rotulo: string; href: string }[];
 }
 
-const CAIXA = 'flex h-full min-w-0 flex-col items-start rounded-[14px] border border-linha bg-painel p-4 sm:p-5';
+const CAIXA = 'flex h-full min-w-0 flex-col items-start rounded-[14px] border border-linha bg-painel p-3.5 sm:p-5';
 const HOVER = 'ff-transicao hover:border-linha-forte hover:bg-forte';
 
 export function CartaoModulo({ c }: { c: CartaoDoHub }) {
@@ -35,8 +38,8 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
     <>
       <IconeDoModulo icone={c.icone} cor={c.cor} tamanho={40} />
       <span className="mt-3 block min-w-0">
-        <span className="block truncate text-[15px] font-semibold text-texto">{c.nome}</span>
-        <span className="mt-0.5 block text-[13px] leading-snug text-suave [text-wrap:pretty]">{c.subtitulo}</span>
+        <span className="block text-[14px] font-semibold leading-snug text-texto [overflow-wrap:anywhere] sm:truncate sm:text-[15px]">{c.nome}</span>
+        <span className="mt-0.5 line-clamp-3 block text-[13px] leading-snug text-suave [text-wrap:pretty] sm:line-clamp-none">{c.subtitulo}</span>
       </span>
     </>
   );
@@ -65,12 +68,12 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
     <div className={`${CAIXA} relative ${HOVER}`}>
       <IconeDoModulo icone={c.icone} cor={c.cor} tamanho={40} />
       <span className="mt-3 block min-w-0">
-        <Link href={c.href} className="ff-cartao-titulo block text-[15px] font-semibold text-texto">
+        <Link href={c.href} className="ff-cartao-titulo block text-[14px] font-semibold leading-snug text-texto [overflow-wrap:anywhere] sm:text-[15px]">
           {c.nome}
         </Link>
-        <span className="mt-0.5 block text-[13px] leading-snug text-suave [text-wrap:pretty]">{c.subtitulo}</span>
+        <span className="mt-0.5 line-clamp-3 block text-[13px] leading-snug text-suave [text-wrap:pretty] sm:line-clamp-none">{c.subtitulo}</span>
       </span>
-      <div className="relative z-10 mt-4 w-full border-t border-linha pt-2">
+      <div className="relative z-10 mt-4 hidden w-full border-t border-linha pt-2 min-[600px]:block">
         <ul aria-label={`Abas de ${c.nome}`} className="flex flex-wrap items-center gap-x-4 text-[13px] text-suave">
           {c.abas.map((a) => (
             <li key={a.href} className="flex items-center">
@@ -97,7 +100,7 @@ export function HubDeModulos({ secoes }: { secoes: { rotulo: string; cartoes: Ca
           <section key={s.rotulo} aria-label={s.rotulo}>
             {/* avoid-ai-design-ignore: SD4 — rótulo de seção em caixa alta só no hub e nos grupos do menu (contrato do shell). */}
             <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-suave">{s.rotulo}</h2>
-            <ul className="grid grid-cols-1 gap-3 min-[600px]:grid-cols-2 xl:grid-cols-4">
+            <ul className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
               {s.cartoes.map((c) => (
                 <li key={c.chave} className="min-w-0">
                   <CartaoModulo c={c} />

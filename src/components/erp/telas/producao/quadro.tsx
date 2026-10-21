@@ -37,9 +37,11 @@ function Cartao({ c, aqui, hoje }: { c: CartaoDoLote; aqui: string; hoje: string
       ? `concluída por ${c.concluidaPorNome ?? '—'} · ${quandoDoCartao(c.concluidaEm, hoje)}`
       : c.status === 'CANCELADA' && c.canceladaEm
         ? `${c.estornado ? 'estornada' : 'cancelada'} · ${quandoDoCartao(c.canceladaEm, hoje)}`
-        : c.iniciadaEm
-          ? `começou ${quandoDoCartao(c.iniciadaEm, hoje)}`
-          : `planejada ${quandoDoCartao(c.criadoEm, hoje)}`;
+        : c.responsavel
+          ? `com ${c.responsavel.nome} · ${c.responsavel.passadoPor ? `recebeu ${quandoDoCartao(c.responsavel.desde, hoje)} (passado por ${c.responsavel.passadoPor})` : `pegou ${quandoDoCartao(c.responsavel.desde, hoje)}`}`
+          : c.iniciadaEm
+            ? `começou ${quandoDoCartao(c.iniciadaEm, hoje)} · sem ninguém`
+            : `planejada ${quandoDoCartao(c.criadoEm, hoje)}`;
   return (
     <CartaoDoQuadro
       href={`${aqui}/${c.id}`}
@@ -55,7 +57,7 @@ function Cartao({ c, aqui, hoje }: { c: CartaoDoLote; aqui: string; hoje: string
         Lote <span className="text-texto">{c.codigoLote}</span> · {c.status === 'CONCLUIDA' && c.produzidoMilesimos !== null ? `${formatarQuantidade(c.produzidoMilesimos, c.unidade)} de ${formatarQuantidade(c.planejadoMilesimos, c.unidade)}${r ? ` · rendeu ${formatarRendimento(r.rendimentoBp)}` : ''}` : formatarQuantidade(c.planejadoMilesimos, c.unidade)}
       </div>
       {pendente && c.requisicao && <div className={`mt-2 text-[12px] ${falta ? 'text-atencao' : 'text-suave'}`}>{situacaoDosInsumos(c.requisicao.status, c.requisicao.numero)}</div>}
-      <div className="mt-1 text-[12px] text-suave">{quem}</div>
+      <div className={`mt-1 text-[12px] ${c.responsavel && pendente ? 'font-semibold text-texto' : 'text-suave'}`}>{quem}</div>
     </CartaoDoQuadro>
   );
 }
@@ -98,9 +100,14 @@ export function TelaQuadroDaProducao({
         subtitulo={[contexto, pendentes ? `${pendentes} ${pendentes === 1 ? 'lote pendente' : 'lotes pendentes'}` : 'nada pendente', atrasadas ? `${atrasadas} com atraso` : null].filter(Boolean).join(' · ')}
         acao={
           pode.registrar && !bloqueio && q.aberto ? (
-            <Link href={`${aqui}/nova`} className={classeDeBotao('primario')}>
-              Nova produção
-            </Link>
+            <>
+              <Link href={`${base}/tarefas/${q.loja.id}`} className={classeDeBotao('secundario')}>
+                Tarefas da cozinha
+              </Link>
+              <Link href={`${aqui}/nova`} className={classeDeBotao('primario')}>
+                Nova produção
+              </Link>
+            </>
           ) : undefined
         }
       />
@@ -109,7 +116,7 @@ export function TelaQuadroDaProducao({
       {bloqueio && <Aviso tom="alerta" titulo={bloqueio} />}
 
       <p className="max-w-3xl text-sm text-suave">
-        Planeje o lote pela ficha: os insumos saem do estoque pela requisição, que o estoque entrega. Quando o lote ficar pronto, conclua dizendo quanto saiu de verdade e ele entra no estoque da loja.
+        Planeje o lote pela ficha: os insumos saem do estoque pela requisição, que o estoque entrega. Quem vai fazer pega o lote em Tarefas; quando ficar pronto, conclui dizendo quanto saiu de verdade e ele entra no estoque da loja.
       </p>
 
       <GradeDoQuadro>

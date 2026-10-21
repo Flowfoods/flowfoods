@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * Formulários pequenos do lote (3.1): começar a produzir, cancelar o lote que ainda não saiu e estornar o lote concluído.
+ * Formulários pequenos do lote (3.1): cancelar o lote que ainda não saiu e estornar o lote concluído (começar virou "pegar"
+ * na 3.3: `form-tarefas.tsx`).
  * Cada um leva a versão lida (duas abas não se atropelam). O servidor decide; aqui só se mostra o que ele respondeu.
  */
 
@@ -23,19 +24,6 @@ function ErroGeral({ estado, recarregar }: { estado: EstadoEstoque; recarregar?:
         </a>
       )}
     </p>
-  );
-}
-
-export function FormComecar({ acao, versao, recarregar }: { acao: AcaoDeEstoque; versao: number; recarregar: string }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
-  return (
-    <form action={enviar} className="space-y-2">
-      <input type="hidden" name="versao" value={versao} />
-      <BotaoEnviar variante="secundario" pendente="Começando…" className="w-full sm:w-auto">
-        Começar a produzir
-      </BotaoEnviar>
-      <ErroGeral estado={estado} recarregar={recarregar} />
-    </form>
   );
 }
 

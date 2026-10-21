@@ -29,6 +29,7 @@ export interface ConservacaoParaEscolher {
 
 export function FormConcluir({
   acao,
+  voltar,
   versao,
   planejadoMilesimos,
   unidade,
@@ -40,6 +41,8 @@ export function FormConcluir({
   bloqueio,
 }: {
   acao: AcaoDeEstoque;
+  /** 3.3: veio da tela da cozinha (volta para ela). */
+  voltar?: 'tarefas';
   versao: number;
   planejadoMilesimos: number;
   unidade: Unidade;
@@ -76,6 +79,7 @@ export function FormConcluir({
     <form action={enviar} className="space-y-5 pb-28 sm:pb-0">
       <input type="hidden" name="versao" value={versao} />
       <input type="hidden" name="escala" value={escala} />
+      {voltar && <input type="hidden" name="voltar" value={voltar} />}
       {(fechadoHoje || fechadoNoServidor) && (
         <AvisoDoPeriodoFechado
           id="concluir-periodo-fechado"
