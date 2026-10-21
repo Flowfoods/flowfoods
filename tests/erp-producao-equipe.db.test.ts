@@ -475,12 +475,15 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)'
     expect((await entregarTudo(id)).ok).toBe(true);
     expect(await concluir(id, ALCANCE_FLOWFOODS, RODOLFO, '1')).toMatchObject({ ok: true });
     // O que a 3.1 gravava: o login do nível 1 como responsável. O gatilho do concluído não deixa mudar a linha, então o teste
-    // monta o legado com o gatilho desligado só nesta transação (como dono da tabela).
+    // monta o legado com o gatilho desligado só nesta transação (como dono da tabela; com a RLS forçada, como na limpeza, o
+    // FORCE também sai só nesta transação).
     await db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT set_config('app.parceiro_id', ${A.id}, true)`;
+      if (!perfil.superusuario && perfil.rls) await tx.$executeRawUnsafe('ALTER TABLE "OrdemProducao" NO FORCE ROW LEVEL SECURITY');
       await tx.$executeRawUnsafe('ALTER TABLE "OrdemProducao" DISABLE TRIGGER "OrdemProducao_concluida_imutavel"');
-      await tx.$executeRawUnsafe(`UPDATE "OrdemProducao" SET "responsavelUsuarioId" = 'user-n1', "responsavelNomeSnapshot" = 'Rodolfo (FlowFoods)' WHERE id = $1`, id);
+      const n = await tx.$executeRawUnsafe(`UPDATE "OrdemProducao" SET "responsavelUsuarioId" = 'user-n1', "responsavelNomeSnapshot" = 'Rodolfo (FlowFoods)' WHERE id = $1`, id);
+      if (n !== 1) throw new Error(`o legado não foi montado (${n} linhas)`);
       await tx.$executeRawUnsafe('ALTER TABLE "OrdemProducao" ENABLE TRIGGER "OrdemProducao_concluida_imutavel"');
+      if (!perfil.superusuario && perfil.rls) await tx.$executeRawUnsafe('ALTER TABLE "OrdemProducao" FORCE ROW LEVEL SECURITY');
     });
     expect(await ordem(id)).toMatchObject({ status: 'CONCLUIDA', responsavelUsuarioId: 'user-n1', responsavelNomeSnapshot: 'Rodolfo (FlowFoods)' });
     const h = (await historicoDaProducao(a, DONA(), ids.vp, { periodo: 'hoje' }, EQUIPE))!;
