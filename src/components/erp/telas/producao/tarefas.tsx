@@ -118,7 +118,7 @@ export function TelaTarefas({
             </p>
             {acoes.sair && (
               <form action={acoes.sair} className="self-start sm:self-auto">
-                <button type="submit" className={classeDeBotaoDaCozinha('fantasma', 'px-0 text-[15px] underline decoration-linha-forte underline-offset-4 sm:px-3')}>
+                <button type="submit" className={classeDeBotaoDaCozinha('fantasma', '!px-0 text-[15px] underline decoration-linha-forte underline-offset-4 sm:!px-3')}>
                   Não é você? Trocar de pessoa
                 </button>
               </form>

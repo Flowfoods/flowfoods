@@ -113,7 +113,8 @@ export function FormSoltar({ acao, lote, versao, recarregar, voltar, deOutro, co
           <Erro id={`${id}-erro`} texto={estado?.erros.motivo} />
         </div>
         <ErroGeral estado={estado} recarregar={recarregar} />
-        <div className="flex flex-col gap-2 sm:flex-row">
+        {/* Na cozinha, um embaixo do outro: na coluna de 240 px do cartão, lado a lado o texto quebrava. */}
+        <div className={cozinha ? 'flex flex-col gap-2' : 'flex flex-col gap-2 sm:flex-row'}>
           <BotaoEnviar variante="secundario" cozinha={cozinha} pendente="Soltando…">
             Soltar o lote
           </BotaoEnviar>
@@ -204,7 +205,7 @@ export function FormPassar({
           <Erro id={`${id}-erro`} texto={estado?.erros.motivo} />
         </div>
         <ErroGeral estado={estado} recarregar={recarregar} />
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className={cozinha ? 'flex flex-col gap-2' : 'flex flex-col gap-2 sm:flex-row'}>
           <BotaoEnviar variante="secundario" cozinha={cozinha} pendente="Passando…">
             Passar o lote
           </BotaoEnviar>
