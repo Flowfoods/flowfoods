@@ -3016,6 +3016,14 @@ banco de teste: o operador é recusado pelo servidor.
 
 ## Herança da 3.2 (para a 3.3 e as próximas)
 
+- **Revisão final do Guardião (21/10, aprovado), dois pontos para depois**: (N1) `permissoesDoPerfil` / `permissoesNoCatalogoAtual` tratam a versão do
+  catálogo AUSENTE como v1 — hoje é inexplorável (a coluna é NOT NULL e todas as leituras trazem a versão), mas código novo que monte o acesso
+  sem passar a versão daria `producao.planejar` a um perfil v2 salvo sem ela: passe sempre a versão (ou torne-a obrigatória no tipo). (N2) A
+  migration de dado `20261030010000_erp_catalogo_v2` promove o perfil v1 completo sem linha no Histórico (a migration não tem contexto de
+  parceiro); o motivo fica registrado na decisão 219. Polimento de UX para depois: seletor de ficha com pelo menos 240 px em telas largas,
+  "a conta desta tela" no rodapé do formulário, esconder "Salvar a lista" quando tudo já virou lote, tirar o aviso antigo quando o formulário
+  mostra erro.
+
 - **A lista é UMA**: `obterListaDoDia`, `salvarListaDoDia`, `porNaListaDoDia` e `gerarLotesDaLista` em `producao-lista.ts`; a conta pura (vai usar /
   tem / comprar, cascata, custo, frases) em `producao-lista-campos.ts`. Quem precisar de "o que falta para a produção do dia" (sugestão de
   compra, alerta, PDF) parte de `contaDaLista`, nunca refaz a explosão.
