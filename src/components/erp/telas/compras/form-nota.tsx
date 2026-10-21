@@ -14,7 +14,7 @@
  */
 
 import Link from 'next/link';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import type { FormularioDeNota } from '@/lib/erp/compras';
@@ -174,6 +174,14 @@ export function FormNota({
 
   const diferenca = conta.total !== null && conta.frete !== null ? conta.total - (conta.soma + conta.frete) : null;
   const previa = estado?.previa;
+  // 2.5 (revisão de UX): depois de "Conferir o impacto", a prévia vem para a vista (sem animação para quem pediu menos movimento).
+  const refDaPrevia = useRef<HTMLDivElement>(null);
+  const vezDaPrevia = previa ? estado?.vez : undefined;
+  useEffect(() => {
+    if (vezDaPrevia === undefined || !refDaPrevia.current) return;
+    const menosMovimento = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    refDaPrevia.current.scrollIntoView({ behavior: menosMovimento ? 'auto' : 'smooth', block: 'start' });
+  }, [vezDaPrevia]);
 
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
@@ -539,7 +547,11 @@ export function FormNota({
           </div>
         </Painel>
 
-        {previa && <PreviaDoImpacto previa={previa} />}
+        {previa && (
+          <div ref={refDaPrevia} className="scroll-mt-20">
+            <PreviaDoImpacto previa={previa} />
+          </div>
+        )}
       </fieldset>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">

@@ -278,15 +278,51 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'compras-orcamento',
+    area: 'compras',
+    rotas: ['compras/orcamento'],
+    titulo: 'Orçamento de compra',
+    versao: 3,
+    // A loja que passou precisa ficar à vista: a aula abre numa linha (com a pergunta da 1ª vez, abre sozinha).
+    recolhida: true,
+    aula: [
+      { texto: 'Quanto ainda dá para comprar neste período sem furar a meta do CMV, loja por loja.' },
+      { texto: 'É um aviso, não um bloqueio: a nota que passa do orçamento é lançada igual, e a prévia da nota mostra quanto ela passa.' },
+      { texto: 'Sem número, o motivo vem escrito: falta a meta do CMV ou faturamento lançado nas últimas 4 semanas.' },
+      { texto: 'Cada nota é de uma loja e a sobra de uma não cobre a que passou; quem não vê o DRE vê o limite seguro, um valor aproximado e sempre para menos.' },
+    ],
+    secoes: [
+      {
+        id: 'conta',
+        titulo: 'Como a conta é feita',
+        blocos: [
+          { texto: 'O teto é a meta do CMV vezes a receita prevista do período. O que cabe é o teto menos o que a loja já comprou no período, pela data da nota, com o frete.', para: ['dre.ver'] },
+          { texto: 'A receita prevista é o que a loja já vendeu nos dias com faturamento completo, mais cada dia que falta pela média do mesmo dia da semana nas últimas 4 semanas. Sábado entra como sábado, segunda como segunda.', para: ['dre.ver'] },
+          { texto: 'Dia sem todos os canais lançados não conta como zero: entra pela média. Dia antes do primeiro lançamento da loja fica fora. Dia da semana sem nenhum dia completo nas 4 semanas conta só o que já foi lançado. Com menos de 14 dias completos, a loja fica sem número.', para: ['dre.ver'] },
+          { texto: 'É a única tela que projeta: o DRE vai até ontem, sem projeção.', para: ['dre.ver'] },
+          { texto: 'A rede só tem número quando cada loja ativa tem. Uma loja sem número deixa a rede sem número, com o nome dela, para o buraco de uma não ficar escondido atrás da outra.', para: ['dre.ver'] },
+        ],
+      },
+      {
+        id: 'ritmo',
+        titulo: 'O ritmo das compras',
+        blocos: [
+          { texto: 'O ritmo é o CMV pelas compras até ontem contra a meta, com o farol do DRE: as mesmas 5 faixas da linha do CMV. Comprar muito no começo do mês acende o farol mesmo cabendo no orçamento: o farol fala do ritmo, o orçamento fala do período.', para: ['dre.ver'] },
+          { texto: 'Sem cor quando falta faturamento em algum dia do período, ou quando uma loja que vendeu ainda não tem nota.', para: ['dre.ver'] },
+        ],
+      },
+    ],
+  },
+  {
     chave: 'compra-nova',
     area: 'compras',
     rotas: ['compras/nova', 'compras/[id]/editar'],
     titulo: 'Lançar nota',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'Digite o valor total de cada linha, como está na nota.' },
       { texto: 'O frete é dividido entre os itens, e a soma tem que bater com o total da nota.' },
-      { texto: '“Conferir o impacto” mostra o que muda de custo antes de lançar.' },
+      { texto: '“Conferir o impacto” mostra o que muda de custo e no orçamento de compra da loja antes de lançar: passar do orçamento é aviso, a nota entra igual.' },
       { texto: 'A data da nota decide o período dela: se o DRE já fechou esse período, a nota não entra nem se edita. É também essa data que põe a nota no CMV de compra do período.', para: ['compras.lancar'] },
       { texto: 'Só lance como nota o que é comida e embalagem para vender. Limpeza e descartável da operação vão como despesa, e o pagamento ao fornecedor de uma nota já lançada não é despesa: a nota já é o custo.', para: ['compras.lancar'] },
     ],
@@ -296,9 +332,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/[id]'],
     titulo: 'Detalhe da nota',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'A nota, o frete de cada item e o que ela fez no estoque.' },
+      { texto: 'Nota do período em curso mostra como ficou o orçamento de compra da loja: quanto ainda cabe, ou quanto passou. É só aviso.' },
       { texto: 'Errou? Edite ou cancele com o motivo: o custo e o estoque voltam.', para: ['compras.lancar'] },
       { texto: 'Nota com data em período que o DRE já fechou não se edita nem se cancela.', para: ['compras.lancar'] },
     ],

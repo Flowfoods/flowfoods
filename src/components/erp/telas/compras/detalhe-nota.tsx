@@ -25,6 +25,8 @@ import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import type { AcaoDeNota } from './estado';
 import { fraseDaNota } from './estado';
 import { FormCancelarNota } from './form-cancelar';
+import type { OrcamentoNaNota } from '@/lib/erp/orcamento';
+import { AvisoDoOrcamento } from './orcamento';
 
 const DATA_HORA = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
@@ -41,6 +43,8 @@ export function TelaDetalheNota({
   estoqueBase,
   acaoCancelar,
   periodos,
+  orcamento,
+  orcamentoHref,
 }: {
   nota: NotaDetalhada;
   base: string;
@@ -58,6 +62,10 @@ export function TelaDetalheNota({
   acaoCancelar: AcaoDeNota;
   /** Os períodos fechados: nota de período fechado não se edita nem se cancela, e a tela já diz. */
   periodos: AvisoDePeriodos;
+  /** 2.5: como ficou o orçamento de compra da loja (nota do período em curso); nulo = não mostra. */
+  orcamento?: OrcamentoNaNota | null;
+  /** Link da tela do orçamento (quem vê compras). */
+  orcamentoHref?: string;
 }) {
   const mensagem = fraseDaNota(feito);
   const fechado = fechadoNaData(periodos.fechados, n.entradaEm);
@@ -81,6 +89,7 @@ export function TelaDetalheNota({
       />
 
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
+      {orcamento && <AvisoDoOrcamento o={orcamento} href={orcamentoHref} agora={feito === 'lancada' || feito === 'editada'} />}
       {fechado && podeLancar && !n.cancelada && <AvisoDoPeriodoFechado periodo={fechado.nome} href={periodos.href} frase="Esta nota é desse período: não dá para editar nem cancelar." />}
       {n.cancelada && feito !== 'cancelada' && (
         <Aviso tom="alerta" titulo="Nota cancelada.">

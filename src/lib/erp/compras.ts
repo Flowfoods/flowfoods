@@ -52,6 +52,7 @@ import { datasEmPeriodoFechado, fraseDoPeriodoFechado, travarParaEscrever } from
 import { ErroDeTeto } from './estoque-campos';
 import { formatarRendimento, porUnidadeDeRendimento, TIPOS_DE_FICHA, type CustoDaFicha } from './ficha-campos';
 import { lerCascata } from './ficha-custos';
+import { orcamentoNaNota, type OrcamentoNaNota } from './orcamento';
 import { cascataDeCusto, PROFUNDIDADE_MAXIMA, type FichaDaCascata } from './ficha-cascata';
 import { diferenca, type Erros } from './insumo-campos';
 import { centavosDaFracao, compararCustos, compararFracoes, custoDaEmbalagem, formatarCusto, formatarFracao, formatarQuantidade as formatarQtd, type CustoExato, type Unidade } from './unidades';
@@ -738,6 +739,8 @@ export interface PreviaDaNota {
   maisFichas: number;
   /** 1.6: o que a nota faz no estoque da loja (entra, ou por que não). */
   estoque: { movimenta: boolean; frase: string };
+  /** 2.5: o que a nota faz no orçamento de compra da loja (aviso, nunca bloqueio); nulo = a pessoa não vê o orçamento. */
+  orcamento: OrcamentoNaNota | null;
 }
 
 /** Custo efetivo do insumo: a última compra (do mapa) ou o preço cadastrado. */
@@ -756,6 +759,8 @@ export async function previaDaNota(
   alcance: Alcance,
   entrada: EntradaDaNota,
   notaId?: string,
+  /** O dia de hoje para o orçamento (2.5); os testes fixam. */
+  hoje?: string,
 ): Promise<{ ok: true; previa: PreviaDaNota } | Recusada> {
   return cliente.transacao(async (tx) => {
     const atual = notaId ? await notaVisivel(tx, alcance, notaId) : null;
@@ -798,6 +803,8 @@ export async function previaDaNota(
 
     const somaItens = d.itens.reduce((s, i) => s + i.valorCentavos, 0);
     const estoque = await efeitoPrevistoDaNota(tx, { lojaId: d.lojaId, lojaNome: ctx.lojas.get(d.lojaId)?.nome ?? 'loja', lancadaEm: atual?.lancadaEm ?? null, entradaEm: d.entradaEm });
+    // 2.5: o orçamento da loja SEM a versão gravada desta nota (na edição) e com ela como está na tela. Aviso, nunca bloqueio.
+    const orcamento = await orcamentoNaNota(tx, alcance, { lojaId: d.lojaId, entradaEm: d.entradaEm, notaCentavos: somaItens + d.freteCentavos, semNotaId: atual?.id, hoje });
     return {
       ok: true as const,
       previa: {
@@ -816,6 +823,7 @@ export async function previaDaNota(
         fichas,
         maisFichas: mais,
         estoque,
+        orcamento,
       },
     };
   });

@@ -124,17 +124,17 @@ describe('2.4 · custo, margem e resultado (critérios 2, 3 e 4)', () => {
     const cmv = r.linhas.find((l) => l.chave === 'cmv')!;
     expect(cmv.percentualBp).toBe(3120);
     const c = compararComMeta(cmv, 3000, r.receitaBrutaCentavos);
-    expect(c.desvioTexto).toBe('+1,2 pp');
+    expect(c.desvioTexto).toBe('+1,2\u00a0pp');
     expect(c.faixa).toMatchObject({ cor: 'AMARELO', palavra: 'um pouco pior' });
     // O CMV pelas compras TEM cor (o selo da fonte fica ao lado dele na tela).
-    expect(farolDe(r, { cmv: 3000 }).porLinha.cmv).toMatchObject({ tipo: 'cor', cor: 'AMARELO', palavra: 'um pouco pior', desvioTexto: '+1,2 pp' });
+    expect(farolDe(r, { cmv: 3000 }).porLinha.cmv).toMatchObject({ tipo: 'cor', cor: 'AMARELO', palavra: 'um pouco pior', desvioTexto: '+1,2\u00a0pp' });
   });
 
   it('critério 3: Pessoal com meta 25,50 % e realizado 22,00 % é AZUL "bem melhor que a meta" + "confira se está tudo lançado"', () => {
     const r = dreDe({ despesas: [{ linhaId: idDe('salarios'), lojaId: 'vp', centavos: R(2_200) }], cmv: cmvDeCompra(R(100)) });
     const f = farolDe(r, { 'grupo:PESSOAL': 2550 }).porLinha['grupo:PESSOAL'];
-    expect(f).toMatchObject({ tipo: 'cor', cor: 'AZUL', palavra: 'bem melhor que a meta', confira: 'confira se está tudo lançado', desvioTexto: '−3,5 pp', posicao: 1 });
-    expect(f.tipo === 'cor' && f.rotulo).toBe('Farol: bem melhor que a meta, confira se está tudo lançado, −3,5 pp, faixa 1 de 5');
+    expect(f).toMatchObject({ tipo: 'cor', cor: 'AZUL', palavra: 'bem melhor que a meta', confira: 'confira se está tudo lançado', desvioTexto: '−3,5\u00a0pp', posicao: 1 });
+    expect(f.tipo === 'cor' && f.rotulo).toBe('Farol: bem melhor que a meta, confira se está tudo lançado, −3,5\u00a0pp, faixa 1 de 5');
   });
 
   it('critério 4: Resultado com meta 10,00 % e realizado 6,90 % é VERMELHO na rede; na visão da loja não há farol', () => {
@@ -144,7 +144,7 @@ describe('2.4 · custo, margem e resultado (critérios 2, 3 e 4)', () => {
     const fim = r.linhas.find((l) => l.chave === 'resultado-do-periodo')!;
     expect(fim.percentualBp).toBe(690);
     const f = farolDe(r, { 'resultado-do-periodo': 1000 }).porLinha['resultado-do-periodo'];
-    expect(f).toMatchObject({ tipo: 'cor', cor: 'VERMELHO', palavra: 'muito pior que a meta', desvioTexto: '−3,1 pp' });
+    expect(f).toMatchObject({ tipo: 'cor', cor: 'VERMELHO', palavra: 'muito pior que a meta', desvioTexto: '−3,1\u00a0pp' });
     const rl = dreDe({ despesas, cmv: cmvDeCompra(R(100)) }, { tipo: 'loja', lojaId: 'vp', nome: 'Vila da Penha' });
     expect(farolDe(rl, { 'resultado-do-periodo': 1000, 'resultado-operacional': 1000 }, { daLoja: true }).porLinha).toEqual({});
   });
@@ -159,7 +159,7 @@ describe('2.4 · receita por canal contra o ano passado (critérios 5 e 6)', () 
     const a = ano([grao('IFOOD', 50_000), grao('LOJA', 80_000), grao('DELIVERY_PROPRIO', 20_000)], { IFOOD: R(41_000), LOJA: R(83_200), DELIVERY_PROPRIO: R(19_000) });
     expect(a.linhas.find((l) => l.chave === 'IFOOD')).toMatchObject({ anteriorCentavos: R(50_000), variacaoBp: -1800 });
     const ifood = compararCrescimento('IFOOD', 500, a);
-    expect(ifood).toMatchObject({ tipo: 'crescimento', desvioBp: -2300, desvioTexto: '−23,0 pp', variacaoBp: -1800, metaCentavos: R(52_500) });
+    expect(ifood).toMatchObject({ tipo: 'crescimento', desvioBp: -2300, desvioTexto: '−23,0\u00a0pp', variacaoBp: -1800, metaCentavos: R(52_500) });
     expect(ifood.faixa).toMatchObject({ cor: 'VERMELHO', palavra: 'muito pior que a meta' });
     const lojaC = compararCrescimento('LOJA', 500, a);
     expect(lojaC).toMatchObject({ variacaoBp: 400, desvioBp: -100 });
@@ -221,7 +221,7 @@ describe('2.4 · quando o dado não fecha, não há cor (critérios 7, 8 e 9; de
     const f = farolDe(r, { 'grupo:PESSOAL': 1000, cmv: 2000, 'resultado-do-periodo': 1000 }, { faltasDeFaturamento: 1 });
     expect(f.motivoGeral).toBe('faltam lançamentos de faturamento');
     for (const l of Object.values(f.porLinha)) expect(l).toMatchObject({ tipo: 'sem', motivo: 'faltam lançamentos de faturamento' });
-    expect(f.porLinha.cmv.desvioTexto).toBe('+5,0 pp');
+    expect(f.porLinha.cmv.desvioTexto).toBe('+5,0\u00a0pp');
     expect(f.contagem.every((c) => c.linhas.length === 0)).toBe(true);
     expect(f.semCor).toHaveLength(3);
   });
@@ -411,7 +411,7 @@ describe('2.4 · CMV incompleto não tem cor (veto do Guardião, bloqueante 1)',
     expect(f.desvioTexto).toMatch(/^−/); // o desvio segue em texto, e é o otimista
     // A visão da Penha sozinha tem cor: +1,5 pp contra a meta é amarelo.
     const lojaVp = montarDre({ escopo: { tipo: 'loja', lojaId: 'vp', nome: 'Vila da Penha' }, plano, receitas: [{ lojaId: 'vp', canal: 'LOJA', valorCentavos: R(10_000) }, { lojaId: 'dl', canal: 'LOJA', valorCentavos: R(5_000) }], taxaIfood: null, despesas: [], cmv: { lojas: [loja('vp', 'Vila da Penha', R(2_000)), dl], parcial: false } });
-    expect(farolDe(lojaVp, { cmv: 1850 }, { daLoja: true }).porLinha.cmv).toMatchObject({ tipo: 'cor', cor: 'AMARELO', desvioTexto: '+1,5 pp' });
+    expect(farolDe(lojaVp, { cmv: 1850 }, { daLoja: true }).porLinha.cmv).toMatchObject({ tipo: 'cor', cor: 'AMARELO', desvioTexto: '+1,5\u00a0pp' });
   });
   it('rede com todas as lojas com CMV tem cor (misto também)', () => {
     const r = doisLojas({ lojas: [loja('vp', 'Vila da Penha', R(2_000)), loja('dl', 'Delivery', R(1_000))], parcial: false });
@@ -470,7 +470,7 @@ describe('2.4 · o painel por canal', () => {
     expect(canais[1]).toMatchObject({ pedidos: null, ticketCentavos: null, anteriorCentavos: null, farol: null });
   });
   it('o farol do canal é o de crescimento (2,9 pontos acima da meta é verde)', () => {
-    expect(canais[0].farol).toMatchObject({ tipo: 'cor', cor: 'VERDE', desvioTexto: '+4,3 pp' });
+    expect(canais[0].farol).toMatchObject({ tipo: 'cor', cor: 'VERDE', desvioTexto: '+4,3\u00a0pp' });
   });
   it('um canal configurado para vender aparece mesmo sem venda', () => {
     const com = canaisDoPeriodo({ porCanal: r.porCanal, receitaBrutaCentavos: r.receitaBrutaCentavos, pedidos: pedidosPorCanal([]), anoPassado: a, metas, farol, vendidos: ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] });

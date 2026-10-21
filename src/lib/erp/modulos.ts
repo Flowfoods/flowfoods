@@ -285,6 +285,13 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               permissao: 'compras.ver',
             },
             {
+              href: `${base}/compras/orcamento`,
+              rotulo: 'Orçamento',
+              icone: 'metricas',
+              subtitulo: 'Quanto ainda cabe comprar sem furar a meta do CMV',
+              permissao: 'compras.ver',
+            },
+            {
               href: `${base}/compras/fornecedores`,
               rotulo: 'Fornecedores',
               icone: 'fornecedor',

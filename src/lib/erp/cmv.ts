@@ -39,6 +39,27 @@ export interface LojaParaOCmv {
 const TIPOS_DE_MOVIMENTO = ['ABERTURA', 'ENTRADA_COMPRA', 'REQUISICAO', 'PRODUCAO_ENTRADA', 'PRODUCAO_CONSUMO', 'AJUSTE', 'CONTAGEM', 'PERDA'];
 
 /**
+ * O CMV de compra de cada loja (2.3): Σ (valor + frete rateado) dos itens das notas LANÇADAS, pela data da nota, de `de` a `ate`
+ * (inclusive). Loja sem nota fica FORA do mapa (o DRE diz "sem nota de compra", nunca zero). É a soma ÚNICA: o DRE e o orçamento
+ * de compra da 2.5 (que lê o período inteiro, e na prévia de uma nota em edição tira a versão gravada dela: `semNotaId`) passam por aqui.
+ */
+export async function comprasPorLoja(tx: ClienteDoParceiro, ids: readonly string[], de: string, ate: string, opcoes: { semNotaId?: string } = {}): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  if (ids.length === 0 || ate < de) return out;
+  const semNota = opcoes.semNotaId ?? '';
+  const linhas = await tx.sql<{ lojaId: string; centavos: bigint }>`
+    SELECT n."lojaId", sum(i."valorTotalCentavos" + i."freteRateadoCentavos")::bigint AS "centavos"
+    FROM "NotaEntrada" n
+    JOIN "NotaEntradaItem" i ON i."parceiroId" = n."parceiroId" AND i."notaId" = n."id"
+    WHERE n."parceiroId" = ${tx.parceiroId} AND n."lojaId" = ANY(${[...ids]}::text[])
+      AND n."status" = 'LANCADA' AND n."entradaEm" >= ${de}::date AND n."entradaEm" <= ${ate}::date
+      AND n."id" <> ${semNota}
+    GROUP BY n."lojaId"`;
+  for (const l of linhas) out.set(l.lojaId, numero(l.centavos));
+  return out;
+}
+
+/**
  * O CMV de cada loja no recorte [periodo.inicio, ate]. `ate` é o último dia apurado (ontem, no período em
  * curso; o último dia, no encerrado); nulo = nenhum dia apurado (sem compra, sem real).
  */
@@ -56,17 +77,7 @@ export async function cmvDasLojas(
   const ids = lojas.map((l) => l.id);
 
   // ---- 1. o CMV de compra: notas lançadas, pela data da nota
-  const compras = new Map<string, number>();
-  if (ate) {
-    const linhas = await tx.sql<{ lojaId: string; centavos: bigint }>`
-      SELECT n."lojaId", sum(i."valorTotalCentavos" + i."freteRateadoCentavos")::bigint AS "centavos"
-      FROM "NotaEntrada" n
-      JOIN "NotaEntradaItem" i ON i."parceiroId" = n."parceiroId" AND i."notaId" = n."id"
-      WHERE n."parceiroId" = ${tx.parceiroId} AND n."lojaId" = ANY(${ids}::text[])
-        AND n."status" = 'LANCADA' AND n."entradaEm" >= ${periodo.inicio}::date AND n."entradaEm" <= ${ate}::date
-      GROUP BY n."lojaId"`;
-    for (const l of linhas) compras.set(l.lojaId, numero(l.centavos));
-  }
+  const compras = ate ? await comprasPorLoja(tx, ids, periodo.inicio, ate) : new Map<string, number>();
 
   // ---- 2 a 5: só o período encerrado tem real
   const comprasReais = new Map<string, number>();

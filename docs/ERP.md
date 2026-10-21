@@ -1840,6 +1840,107 @@ com banco; na tela (build de produção, dados de outubro/2025 e 2026 com o iFoo
 e "Ano passado incompleto: Vila da Penha (iFood) 19 de 20", Loja e Delivery seguem com −3,9 % e −4,0 %; DRE, Plano e metas e Faturamento sem
 rolagem lateral e sem violação do axe nos 4 formatos e 2 temas.
 
+## O que a 2.5 entregou — orçamento de compra ao vivo (quanto ainda cabe sem furar o CMV meta)
+
+Quinta da Prioridade 002. **Nenhuma migration** (tudo é derivado: meta do CMV, faturamento e notas que já existiam; `migrate diff` vazio). Decisões 208 a 212, e 213 a 216 na
+rodada de correção 1 (veto do Guardião e revisão de UX; ver "Rodada de correção 1" abaixo).
+Permissões: o catálogo não ganhou nada (ver = `compras.ver` ou `compras.lancar` na loja; a conta inteira = `dre.ver` na loja); `VERSAO_DO_ERP` continua
+"fase 3.1" (a fase mais alta no ar; decisão 212).
+
+1. **A conta** (208), `orcamento-campos.ts` (pura): teto = meta do CMV × receita prevista do período; cabe = teto − já comprado (negativo = passou). Já comprado =
+   notas LANÇADAS com data no período INTEIRO, valor + frete rateado (a soma do CMV de compra da 2.3, agora até o fim do período: a nota de hoje conta; cancelada e
+   nota de outro período não). Só o período em curso (a regra do período de `periodos.ts`: mensal, quinzenal ou semanal). Loja desativada fica fora.
+2. **A receita prevista** (209), por loja: o vendido nos dias do período com faturamento completo (cada canal que a loja vende lançado, "Não vendeu" conta) + cada dia
+   que falta (hoje até o fim) e cada dia sem lançamento completo pela média do mesmo dia da semana nas últimas 4 semanas completas da loja. Dia antes do primeiro
+   lançamento da loja não existe; dia da semana sem nenhum dia completo nas 4 semanas conta só o que já foi lançado nele (zero nos dias que faltam), com a frase ("sábado sem dia completo nas últimas 4 semanas: conta só o que já foi lançado";
+   decisão 214). Menos de 14 dias completos na janela = sem número ("poucos dias com faturamento completo nas últimas 4 semanas: 9 de 14 necessários").
+   Sem meta do CMV = sem número ("falta a meta do CMV", com o link para Plano e metas a quem define metas). Nunca R$ 0,00 para dado ausente. É a única tela que
+   projeta (o DRE segue até ontem, decisão 145); a conta por dia da semana acerta o mês de 5 sábados (R$ 41.000,00 contra R$ 40.300,00 da linear, no teste).
+3. **Cobertura por loja e o farol** (211). A rede só tem número quando cada loja ativa tem ("sem o orçamento de Centro"). O farol é o "ritmo das compras": CMV pelas
+   compras até ontem ÷ receita até ontem contra a meta, `faixaDoDesvio` na escala de custo, o `Farol` da 2.4 (cor só no glifo e na palavra). Sem cor: dia do período sem
+   lançamento completo em alguma loja do escopo (`faltam lançamentos de faturamento`; o número segue, pela média) ou loja que vendeu sem nota até ontem.
+4. **Quem vê o quê** (210). O servidor monta a vista (`orcamento.ts`). Com `dre.ver` na loja: cabe, teto, já comprado, receita prevista (vendido + pela média, os dias),
+   a conta por extenso e o ritmo com o farol. Sem `dre.ver` (o comprador, ou quem só vê faturamento): só o "cabe" = TETO arredondado para baixo em degraus por faixa
+   (R$ 500 / R$ 1.000 / R$ 5.000) − já comprado, o motivo e os avisos; nem a meta, nem o percentual, nem a receita (decisão 213: arredonda-se o teto, nunca o saldo).
+   A linha da rede só para quem tem a rede inteira. Gerente de uma loja: só a dele, por `lojaId` de outra = nada. Operador: não abre. Outro parceiro: o portão não enxerga.
+5. **Onde aparece** (212): aba **Orçamento** na área Compras (`/compras/orcamento` e o espelho do nível 1): o bloco da rede (ou da loja escolhida no topo) com o número
+   grande, a conta por extenso e o ritmo; a tabela "Por loja" (Corporativo; cartões abaixo de 1024 px). Na nota: a prévia "Conferir o impacto" ganhou "Orçamento de
+   compra" ("antes desta nota, cabe R$ 2.300,00 · Com esta nota, passa R$ 700,00 do orçamento. É um aviso: a nota pode ser lançada."); o detalhe da nota lançada do
+   período em curso diz como ficou, com link para a aba. **Aviso, nunca bloqueio**: lançar a nota que passa grava igual (teste).
+6. **A soma única das compras**: `comprasPorLoja` (`cmv.ts`) agora serve o CMV de compra do DRE e o orçamento; `semNotaId` tira a versão gravada de uma nota em edição.
+7. **Fora desta subfase**: meta do CMV por loja (a meta é do parceiro e mede todas as lojas, como no DRE), dia de pagamento e sazonalidade na previsão, orçamento por
+   fornecedor ou por grupo de insumo, "comprar na semana" (Kairu "Da Ficha ao Fornecedor": consultado, fora do escopo), alerta, sino e WhatsApp, orçamento de período passado.
+
+**Ajuda: chaves novas/alteradas.** Nova: `compras-orcamento` (v2 depois da rodada de correção, recolhida; os blocos da conta e do ritmo são `para: ['dre.ver']`, o do arredondado vale para todos).
+Alteradas, com `ajuda.lock.json` regravado (53 entradas): `compra-nova` v3 para v4 ("Conferir o impacto" mostra o orçamento; passar é aviso) e `compra` v2 para v3
+(o detalhe diz como ficou o orçamento).
+
+### Rodada de correção 1 (21/10/2026): o veto do Guardião e a revisão de UX
+
+| Achado | O que mudou | Decisão |
+|---|---|---|
+| Guardião B1 (veto): o "cabe" arredondado a R$ 100 vazava o centavo (15 prévias de edição → faixa de R$ 8,29; 14 notas lançadas e canceladas → centavo exato) | arredonda-se o TETO para baixo em degraus por faixa (R$ 500 abaixo de R$ 10.000; R$ 1.000 até R$ 50.000; R$ 5.000 daí para cima); "cabe" = teto arredondado − já comprado; a prévia e o detalhe partem dele; rede = soma dos tetos arredondados (bate com o "Por loja", achado M6). Os dois ataques refeitos no banco devolvem sempre R$ 12.000,00 para um teto real de R$ 12.300,00 | 213 |
+| Guardião I2: "não a realizada" e ±R$ 333 estavam errados | hipótese reescrita: com meta de 30 %, quem vê só o limite seguro sabe a receita prevista com erro de ±1 % a ±5 % (teto a partir de R$ 6 mil; ±1,4 % numa loja de R$ 120 mil por mês), e no fim do período a prevista é quase a realizada; alternativa "só status, sem número" para o Rodolfo | 210, 213 |
+| Guardião I3: loja que abriu no meio do período ganhava receita dos dias em que não existia | dia antes do 1º lançamento fica fora do vendido, da projeção e dos "sem lançamento" (loja de 05/10: 4 dias fora, R$ 35.000,00) | 214 |
+| Guardião I4: loja que vendeu sem nota mostrava "já comprado R$ 0,00" e "cabe o teto inteiro" sem aviso | "sem nota de compra" no lugar de R$ 0,00 e o aviso, também para o comprador e na rede; a prévia da 1ª nota avisa | 215 |
+| Guardião M5: dia da semana sem amostra entrava pela média geral | conta ZERO, com a frase (na rodada extra: o dia lançado em parte vale o que foi lançado, e a frase é "sem dia completo nas últimas 4 semanas") | 214, 217 |
+| UX B1: a sobra de uma loja escondia a que passou | abaixo do número da rede, em `erro`: "<Loja> já passou R$ X: a sobra de outra loja não cobre"; número e "Por loja" no mesmo painel (lado a lado a partir de 1280 px) e a caixa recolhida: em 1440 × 900, com a caixa ABERTA (1ª visita), a última loja termina em 886 px (dona) e 858 px (comprador) | 216 |
+| UX I2 a I6, M7 a M13 | nome em linha própria no celular e "arredondado" dito uma vez (subtítulo); tabela Corporativo de uma linha (44 px) e lista para quem não vê a receita; o orçamento logo abaixo de "Itens + frete = …" na prévia; a linha que explica o farol × o número; "Ver o orçamento" e "Definir a meta" com 48 px no toque; espaço que não quebra em "pp" e "%" (`dre-campos.ts`, o DRE inteiro); "= passou R$ X"; sem o rodapé repetido; "Vale combinar…" só para quem não define metas; "Hoje, …" no detalhe de nota antiga; sem meta, a receita prevista (também da rede) e o link para Plano e metas; sem faturamento, "Lançar o faturamento" | 216 |
+
+Ajuda: `compras-orcamento` v1 → v2 (recolhida; a sobra que não cobre; o teto arredondado; os dias fora e o zero); lock regravado (53 entradas).
+
+### Rodada extra de correção (21/10/2026): "limite seguro" para quem não vê o DRE, sem rolagem lateral
+
+| Achado | O que mudou | Decisão |
+|---|---|---|
+| UX B1: o teto arredondado fazia a tela do comprador afirmar estouro que não existe, e ele lia "teto" sem definição | para quem não vê o DRE o número é o LIMITE SEGURO: "cabe R$ X no limite seguro" / "acima do limite seguro em R$ X", tom de atenção, subtítulo "Valor aproximado, sempre para menos: a conta exata pode ter mais folga e fica com quem vê o DRE."; o mesmo na prévia, no detalhe e na linha da rede ("<Loja> está acima do limite seguro em R$ X"); valores exibidos em degraus de R$ 100 para menos folga (sem centavos); "orçamento", "passou" e "teto" não aparecem para essa pessoa | 217 |
+| UX B2: rolagem lateral com uma loja sem número | célula "sem número", o motivo uma vez sob o nome (12 px, quebra linha), farol sem `whitespace-nowrap` | 217 |
+| UX I3, M4 a M8 | a prévia vem para a vista depois de "Conferir o impacto" (respeita `prefers-reduced-motion`); "sem número" no detalhe começa pelo nome da loja; na rede, o link "Lançar o faturamento" segue quando a loja sem número é por falta de faturamento; "Como a conta chega aqui" diz por quê, sem espaço em branco; "Prevista" no cabeçalho (nome inteiro no `title` e para o leitor de tela); sem número, sem o subtítulo do "aproximado" | 217 |
+| Guardião (textos e menor) | o erro da receita para quem vê o limite seguro é ±1 % a ±5 % (não ~±8 %); o risco "quem vê faturamento descobre a meta em ~14 dias" foi aceito pelo Maestro; dia incompleto num dia da semana sem amostra vale o lançado (piso) | 213, 217 |
+
+Ajuda: `compras-orcamento` v2 → v3 (o limite seguro em uma frase; o piso do dia sem amostra); lock regravado.
+
+Prova da rodada extra (build de produção do último commit; bancos `ff_25x` e `ff_25sf` (Delivery sem faturamento) copiados do `ff_25`; roteiros `pw/rx.mjs`,
+`pw/rxlat.mjs` e `pw/shots.mjs` no scratchpad, prints em `pw/rx/`): a dona confere e lança R$ 15.300,00 na Vila da Penha (no celular, depois de "Conferir o
+impacto" a prévia sobe para a vista: topo dela a 114 px de 844); ela vê "cabe R$ 303,00" e o comprador, "Vila da Penha em Outubro de 2026: acima do limite
+seguro em R$ 300,00. Valor aproximado, sempre para menos…" (tom de atenção, "Ver o limite seguro"), sem "orçamento", "passou" nem "teto" nos textos do número;
+a prévia do comprador (1440, menos movimento) chega à vista e diz "Limite seguro de compra … fica acima do limite seguro em R$ 400,00". Orçamento e detalhe
+(cenário do limite) e orçamento (loja sem faturamento), dona e comprador, em 390, 820, 1180 e 1440, claro e escuro: 48 telas, zero rolagem lateral, zero
+violação do axe; sem faturamento também a 1024 e a 1280, na rede e na loja: zero rolagem, e a dona tem "Lançar o faturamento".
+
+## Provar o orçamento de compra (2.5)
+
+```bash
+npx tsc --noEmit && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism
+npm run build
+```
+`tests/erp-orcamento.test.ts` (sem banco, 28 depois da rodada de correção; inclui os degraus do teto, o teto que nunca cresce nem passa do real, o ataque refeito na conta pura, a loja de 05/10 e o sábado sem amostra): a previsão por dia da semana (5 sábados, dia sem um canal pela média, "Não vendeu" é zero, dia da semana sem amostra,
+o mínimo de 14 dias, o 1º dia do período, semanal e quinzenal), o teto com um arredondamento, o passou, sem meta, as 5 faixas do ritmo, sem cor por falta de faturamento e
+por loja sem nota, a cobertura por loja da rede, o arredondamento prudente e a prévia arredondada. `tests/erp-orcamento-tela.test.ts` (sem banco, 7): a linha da prévia,
+o aviso do detalhe, a tela de quem não vê a receita (nenhuma palavra da conta, nenhum R$ 0,00). `tests/erp-orcamento.db.test.ts` (23; na rodada de correção: os dois ataques do Guardião refeitos pelo comprador, a loja de 05/10, a loja sem nota e a rede dizendo quem passou): o cenário da Casa Orçamento
+(Penha R$ 41.000,00 × 30 % − R$ 10.000,00 = cabe R$ 2.300,00; Delivery R$ 4.150,00; rede R$ 6.450,00; cancelada e setembro fora; ritmo amarelo e azul), a outra casa
+isolada, o comprador (só R$ 2.300,00 / R$ 4.100,00 / R$ 6.400,00 no JSON, nada da conta), quem só vê faturamento, gerente de uma loja, loja fora do alcance, operador,
+nível 1, a página de verdade (HTML da dona com a conta, do comprador sem receita), a nota que passa (prévia, lança igual, o detalhe avisa), a edição sem contar duas
+vezes, a prévia do comprador arredondada, a loja nova que tira o número da rede e o dia sem iFood que tira a cor e não o número.
+
+Na tela, 1ª rodada (substituída pela prova da rodada de correção 1, abaixo; build de produção local, porta 3100, banco `ff_25` copiado do `ff`, com meta do CMV de 30 %, 4 notas de outubro lançadas pela regra e um comprador =
+gerente sem `faturamento.ver`, `faturamento.lancar`, `dre.ver` e `despesas.lancar`; roteiros `pw/shots.mjs` e `pw/previa25.mjs` no scratchpad): a dona vê a rede
+(cabe R$ 13.887,00 = 30 % × R$ 241.290,00 − R$ 58.500,00, ritmo 37,6 % contra 30 %, vermelho), a Penha cabendo e o Delivery "passou R$ 1.716,00"; o comprador vê
+R$ 13.800,00 / R$ 15.600,00 / passou R$ 1.800,00, "arredondado a R$ 100", sem receita, teto, já comprado nem farol; a prévia de uma nota de R$ 1.500,00 no Delivery
+diz "passa R$ 3.216,00" (dona) e "passa R$ 3.300,00" (comprador, arredondado); a nota é lançada igual e o detalhe avisa "passou R$ 3.216,00 … o orçamento avisa,
+não bloqueia"; o operador volta ao hub sem nenhum valor no HTML. Orçamento e detalhe da nota com dona, gerente e comprador em 390, 820, 1180 (toque) e 1440, claro e
+escuro, e a prévia em 390 e 1440 nos dois temas: zero rolagem lateral e zero violação do axe (wcag2a/2aa). Erros de console só os já conhecidos (prefetch de RSC
+abortado na troca de página e um 404 de recurso do shell, iguais nas outras telas).
+
+Na tela, rodada de correção 1 (build de produção do último commit, portas 3100 e 3101; bancos `ff_25r1` e `ff_25sm` (sem meta) copiados do `ff_25`; roteiros
+`pw/shots.mjs` e `pw/r1.mjs` no scratchpad, prints em `pw/r1/`): orçamento e detalhe de nota com dona e comprador em 390, 820, 1180 (toque) e 1440, claro e escuro
+(32 telas): zero rolagem lateral, zero violação do axe. Em 1440 × 900 com a caixa aberta (1ª visita), a última loja do "Por loja" termina em 886 px (dona) e 858 px
+(comprador), linhas de 44 px, e "Vila da Penha · Delivery já passou … a sobra de outra loja não cobre" logo abaixo do número. A prévia (390 e 1440, claro e escuro,
+dona e comprador) traz o orçamento antes do bloco do estoque; o comprador lê "pelo teto arredondado para baixo (sem a receita)" e "Vale combinar com quem define as
+metas" (a dona, que define, não); lançada a nota, o detalhe diz "A nota está lançada…", e a nota antiga diz "Hoje, …". "Ver o orçamento" e "Definir a meta do CMV"
+medem 48 px no toque. Sem meta: a dona vê a receita prevista e o link; o comprador, "sem número" com o motivo.
+
 ## O que a 3.1 entregou — produção de intermediários: o lote nasce da ficha, os insumos saem pela requisição, o lote entra no estoque
 
 Primeira da Prioridade 003 (a 2.4, faróis, foi retirada no commit 650c43b em 17/10 e voltou em 21/10, ver "A 2.4 volta"; nada daqui depende dela). Migration
@@ -2693,6 +2794,26 @@ banco de teste: o operador é recusado pelo servidor.
 - **Ajuda sem vazar**: bloco de ajuda que descreve dado de uma permissão leva `para: [...]`; o layout entrega o registro filtrado ao shell inteiro, então um texto sem `para` chega a quem não pode ver a tela.
 - **`Despesa.canal` e as linhas "Entregas e motoboy" e "Taxas de cartão"** continuam sem canal: quando entrarem no formulário, motoboy e cartão por canal (de verdade, não rateados) ganham farol por canal sem rateio.
 - **Em aberto para o Rodolfo (decisão de negócio, não bloqueia)**: (1) o gerente de uma loja vê o farol de Pessoal da loja dele (herança dos salários, 2.2a); (2) os limites das 5 faixas (3,0 / 0,5 / 1,5 / 3,0 pontos; 5 / 1 / 3 / 6 na receita) são hipótese a validar com o Valentin's; (3) uma loja ativa que ainda não tem um ano de lançamentos (loja nova) deixa a receita da rede sem cor até completar o ano, com o nome dela na frase; quer comparar só as lojas que já existiam (mesmo critério dos dois lados)? (4) meta de crescimento de 0 a 100 % cobre o cliente ativo, mas uma casa que cai de propósito (fechar um canal) precisa de meta negativa: quer?
+
+## Herança da 2.5 (para a 2.6, a 3.x e as próximas)
+
+- **O orçamento é UM**: `orcamentoDeCompra` (a tela) e `orcamentoNaNota` (a prévia e o detalhe da nota), em `orcamento.ts`; a conta em `orcamento-campos.ts`.
+  Qualquer lugar novo que fale de "quanto cabe" (lista de compras da semana, sugestão de pedido, alerta) parte deles, nunca refaz a conta.
+- **A soma das compras é UMA**: `comprasPorLoja` (`cmv.ts`), a mesma do CMV de compra. Mudar o que conta como compra (bonificação, desconto, tipo "limpeza" fora do
+  CMV) muda o DRE e o orçamento juntos.
+- **A vista é montada no servidor**: quem não tem `dre.ver` na loja recebe `VistaResumida` (só o "cabe" pelo teto arredondado, o motivo e os avisos), e a tela
+  fala com ela em "limite seguro" (nunca "orçamento", "passou" ou "teto"; valores em degraus de R$ 100; tom de atenção; decisão 217). Arredonda-se o
+  TETO, nunca o saldo (decisão 213): qualquer número novo para quem não vê a receita parte de `tetoArredondado`, ou um comprador acha o centavo comparando notas. Campo novo no orçamento que dependa
+  da receita entra só na `VistaCompleta`; o teste de banco confere o JSON inteiro do comprador.
+- **A previsão é hipótese** (decisão 209): média por dia da semana nas últimas 4 semanas, mínimo de 14 dias completos. Se o Rodolfo quiser o dia de pagamento ou a
+  sazonalidade, a mudança é só em `preverReceita` (pura, com teste).
+- **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) o comprador vê o "cabe" em R$, pelo teto arredondado para baixo em degraus por faixa; quem souber a
+  meta do CMV sabe a receita prevista com erro de ±1 % a ±5 % com meta de 30 % (teto a partir de R$ 6 mil; ±1,4 % numa loja de R$ 120 mil por mês), e no fim
+  do período a prevista é quase a realizada. Risco aceito (Maestro): quem vê faturamento sem ver o DRE descobre a meta do CMV em ~14 dias. Serve, ou o comprador do
+  Valentin's deve ver só "cabe com folga / cabe pouco / passou", sem número? (2) A meta do CMV é uma só para todas as lojas;
+  salão e 100 % delivery têm CMV diferente: vale meta por loja (aditiva em `DreMeta`)? (3) 4 semanas e 14 dias: é a régua certa? (4) O frete entra no "já comprado"
+  (igual ao CMV de compra). (5) A loja nova sem 14 dias de faturamento deixa a rede sem número até completar; prefere a rede somar só as lojas com número, dizendo
+  quais ficaram de fora?
 
 ## Herança da 3.1 (para a 3.2 e as próximas)
 

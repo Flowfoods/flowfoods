@@ -5,6 +5,7 @@ import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { obterNota } from '@/lib/erp/compras';
 import { lerFiltrosDeNota, queryDosFiltrosDeNota } from '@/lib/erp/compra-campos';
 import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
+import { orcamentoDaNotaLancada } from '@/lib/erp/orcamento';
 import { TelaDetalheNota } from '@/components/erp/telas/compras/detalhe-nota';
 import { acaoCancelarNota } from '../actions';
 
@@ -31,6 +32,8 @@ export default async function ParceiroNotaPage({ params, searchParams }: { param
       estoqueBase={`${base}/estoque`}
       acaoCancelar={acaoCancelarNota.bind(null, ctx.parceiro.slug, nota.id)}
       periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, `/rodolfo/erp/${ctx.parceiro.slug}`)}
+      orcamento={await orcamentoDaNotaLancada(ctx.cliente, ctx.alcance, nota)}
+      orcamentoHref={`${base}/compras/orcamento`}
     />
   );
 }
