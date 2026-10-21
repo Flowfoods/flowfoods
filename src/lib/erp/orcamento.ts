@@ -57,6 +57,8 @@ export interface VistaCompleta {
   conta: ContaDoOrcamento | null;
   motivo: string | null;
   previsao: PrevisaoDaLoja | null;
+  /** A receita prevista (da loja, ou a soma das lojas na rede), mesmo sem meta; nula sem previsão. */
+  previstaCentavos: number | null;
   ritmo: FarolDaLinha | null;
   cmvAteOntemBp: number | null;
   compradoCentavos: number;
@@ -110,6 +112,7 @@ function vistaDaLoja(o: OrcamentoDaLoja, veReceita: boolean): VistaDoOrcamento {
     conta: o.conta,
     motivo: o.motivo,
     previsao: o.previsao,
+    previstaCentavos: o.previsao?.previstaCentavos ?? null,
     ritmo: o.ritmo,
     cmvAteOntemBp: o.cmvAteOntemBp,
     compradoCentavos: o.compradoCentavos,
@@ -196,6 +199,7 @@ export async function orcamentoDeCompra(cliente: ClienteDoParceiro, alcance: Alc
             conta: e.conta,
             motivo: e.motivo,
             previsao: null,
+            previstaCentavos: e.previstaCentavos,
             ritmo: e.ritmo,
             cmvAteOntemBp: e.cmvAteOntemBp,
             compradoCentavos: porLoja.reduce((s, l) => s + l.compradoCentavos, 0),

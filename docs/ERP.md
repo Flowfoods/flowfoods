@@ -1875,6 +1875,20 @@ Permissões: o catálogo não ganhou nada (ver = `compras.ver` ou `compras.lanca
 Alteradas, com `ajuda.lock.json` regravado (53 entradas): `compra-nova` v3 para v4 ("Conferir o impacto" mostra o orçamento; passar é aviso) e `compra` v2 para v3
 (o detalhe diz como ficou o orçamento).
 
+### Rodada de correção 1 (21/10/2026): o veto do Guardião e a revisão de UX
+
+| Achado | O que mudou | Decisão |
+|---|---|---|
+| Guardião B1 (veto): o "cabe" arredondado a R$ 100 vazava o centavo (15 prévias de edição → faixa de R$ 8,29; 14 notas lançadas e canceladas → centavo exato) | arredonda-se o TETO para baixo em degraus por faixa (R$ 500 abaixo de R$ 10.000; R$ 1.000 até R$ 50.000; R$ 5.000 daí para cima); "cabe" = teto arredondado − já comprado; a prévia e o detalhe partem dele; rede = soma dos tetos arredondados (bate com o "Por loja", achado M6). Os dois ataques refeitos no banco devolvem sempre R$ 12.000,00 para um teto real de R$ 12.300,00 | 213 |
+| Guardião I2: "não a realizada" e ±R$ 333 estavam errados | hipótese reescrita: erro de até ~±8 % na receita com meta de 30 %, e no fim do período a prevista é quase a realizada; alternativa "só status, sem número" para o Rodolfo | 210, 213 |
+| Guardião I3: loja que abriu no meio do período ganhava receita dos dias em que não existia | dia antes do 1º lançamento fica fora do vendido, da projeção e dos "sem lançamento" (loja de 05/10: 4 dias fora, R$ 35.000,00) | 214 |
+| Guardião I4: loja que vendeu sem nota mostrava "já comprado R$ 0,00" e "cabe o teto inteiro" sem aviso | "sem nota de compra" no lugar de R$ 0,00 e o aviso, também para o comprador e na rede; a prévia da 1ª nota avisa | 215 |
+| Guardião M5: dia da semana sem amostra entrava pela média geral | conta ZERO, com a frase ("segunda sem venda lançada nas últimas 4 semanas: conta como zero") | 214 |
+| UX B1: a sobra de uma loja escondia a que passou | abaixo do número da rede, em `erro`: "<Loja> já passou R$ X: a sobra de outra loja não cobre"; número e "Por loja" no mesmo painel (lado a lado a partir de 1280 px) e a caixa recolhida: em 1440 × 900, com a caixa ABERTA (1ª visita), a última loja termina em 886 px (dona) e 858 px (comprador) | 216 |
+| UX I2 a I6, M7 a M13 | nome em linha própria no celular e "arredondado" dito uma vez (subtítulo); tabela Corporativo de uma linha (44 px) e lista para quem não vê a receita; o orçamento logo abaixo de "Itens + frete = …" na prévia; a linha que explica o farol × o número; "Ver o orçamento" e "Definir a meta" com 48 px no toque; espaço que não quebra em "pp" e "%" (`dre-campos.ts`, o DRE inteiro); "= passou R$ X"; sem o rodapé repetido; "Vale combinar…" só para quem não define metas; "Hoje, …" no detalhe de nota antiga; sem meta, a receita prevista (também da rede) e o link para Plano e metas; sem faturamento, "Lançar o faturamento" | 216 |
+
+Ajuda: `compras-orcamento` v1 → v2 (recolhida; a sobra que não cobre; o teto arredondado; os dias fora e o zero); lock regravado (53 entradas).
+
 ## Provar o orçamento de compra (2.5)
 
 ```bash
@@ -1882,10 +1896,10 @@ npx tsc --noEmit && npm run lint && npm run gate && npx vitest run
 ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism
 npm run build
 ```
-`tests/erp-orcamento.test.ts` (sem banco, 23): a previsão por dia da semana (5 sábados, dia sem um canal pela média, "Não vendeu" é zero, dia da semana sem amostra,
+`tests/erp-orcamento.test.ts` (sem banco, 28 depois da rodada de correção; inclui os degraus do teto, o teto que nunca cresce nem passa do real, o ataque refeito na conta pura, a loja de 05/10 e o sábado sem amostra): a previsão por dia da semana (5 sábados, dia sem um canal pela média, "Não vendeu" é zero, dia da semana sem amostra,
 o mínimo de 14 dias, o 1º dia do período, semanal e quinzenal), o teto com um arredondamento, o passou, sem meta, as 5 faixas do ritmo, sem cor por falta de faturamento e
-por loja sem nota, a cobertura por loja da rede, o arredondamento prudente e a prévia arredondada. `tests/erp-orcamento-tela.test.ts` (sem banco, 5): a linha da prévia,
-o aviso do detalhe, a tela de quem não vê a receita (nenhuma palavra da conta, nenhum R$ 0,00). `tests/erp-orcamento.db.test.ts` (18): o cenário da Casa Orçamento
+por loja sem nota, a cobertura por loja da rede, o arredondamento prudente e a prévia arredondada. `tests/erp-orcamento-tela.test.ts` (sem banco, 7): a linha da prévia,
+o aviso do detalhe, a tela de quem não vê a receita (nenhuma palavra da conta, nenhum R$ 0,00). `tests/erp-orcamento.db.test.ts` (23; na rodada de correção: os dois ataques do Guardião refeitos pelo comprador, a loja de 05/10, a loja sem nota e a rede dizendo quem passou): o cenário da Casa Orçamento
 (Penha R$ 41.000,00 × 30 % − R$ 10.000,00 = cabe R$ 2.300,00; Delivery R$ 4.150,00; rede R$ 6.450,00; cancelada e setembro fora; ritmo amarelo e azul), a outra casa
 isolada, o comprador (só R$ 2.300,00 / R$ 4.100,00 / R$ 6.400,00 no JSON, nada da conta), quem só vê faturamento, gerente de uma loja, loja fora do alcance, operador,
 nível 1, a página de verdade (HTML da dona com a conta, do comprador sem receita), a nota que passa (prévia, lança igual, o detalhe avisa), a edição sem contar duas
@@ -1899,6 +1913,14 @@ diz "passa R$ 3.216,00" (dona) e "passa R$ 3.300,00" (comprador, arredondado); a
 não bloqueia"; o operador volta ao hub sem nenhum valor no HTML. Orçamento e detalhe da nota com dona, gerente e comprador em 390, 820, 1180 (toque) e 1440, claro e
 escuro, e a prévia em 390 e 1440 nos dois temas: zero rolagem lateral e zero violação do axe (wcag2a/2aa). Erros de console só os já conhecidos (prefetch de RSC
 abortado na troca de página e um 404 de recurso do shell, iguais nas outras telas).
+
+Na tela, rodada de correção 1 (build de produção do último commit, portas 3100 e 3101; bancos `ff_25r1` e `ff_25sm` (sem meta) copiados do `ff_25`; roteiros
+`pw/shots.mjs` e `pw/r1.mjs` no scratchpad, prints em `pw/r1/`): orçamento e detalhe de nota com dona e comprador em 390, 820, 1180 (toque) e 1440, claro e escuro
+(32 telas): zero rolagem lateral, zero violação do axe. Em 1440 × 900 com a caixa aberta (1ª visita), a última loja do "Por loja" termina em 886 px (dona) e 858 px
+(comprador), linhas de 44 px, e "Vila da Penha · Delivery já passou … a sobra de outra loja não cobre" logo abaixo do número. A prévia (390 e 1440, claro e escuro,
+dona e comprador) traz o orçamento antes do bloco do estoque; o comprador lê "pelo teto arredondado para baixo (sem a receita)" e "Vale combinar com quem define as
+metas" (a dona, que define, não); lançada a nota, o detalhe diz "A nota está lançada…", e a nota antiga diz "Hoje, …". "Ver o orçamento" e "Definir a meta do CMV"
+medem 48 px no toque. Sem meta: a dona vê a receita prevista e o link; o comprador, "sem número" com o motivo.
 
 ## O que a 3.1 entregou — produção de intermediários: o lote nasce da ficha, os insumos saem pela requisição, o lote entra no estoque
 

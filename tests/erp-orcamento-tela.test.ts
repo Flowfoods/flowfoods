@@ -101,6 +101,7 @@ describe('2.5 · a tela', () => {
       conta: null,
       motivo: null,
       previsao: { realizadoCentavos: 2_600_000, projetadoCentavos: 1_500_000, previstaCentavos: 4_100_000, diasCompletos: 20, diasSemLancamento: 0, diasRestantes: 11, diasNaJanela: 28, diasAntesDeAbrir: 0, frasesDoZero: [] },
+      previstaCentavos: 4_100_000,
       ritmo: { tipo: 'cor', escala: 'custo', cor: 'VERMELHO', posicao: 5, palavra: 'muito pior que a meta', confira: null, desvioTexto: '+7,6 pp', rotulo: 'Farol' },
       cmvAteOntemBp: 3760,
       compradoCentavos: 1_000_000,
@@ -143,5 +144,8 @@ describe('2.5 · a tela', () => {
     );
     expect(semMeta).toContain('Receita prevista R$ 41.000,00');
     expect(semMeta).toContain('Definir a meta do CMV em Plano e metas');
+    // a rede sem meta também mostra a receita prevista (soma das lojas)
+    const redeSemMeta = html(createElement(TelaOrcamento, { dados: { ...dados, metaBp: null, rede: vista({ conta: null, motivo: 'falta a meta do CMV', ritmo: null, previsao: null, previstaCentavos: 6_150_000 }) }, contexto: 'Rede Completa', bloqueio: null }));
+    expect(redeSemMeta).toContain('Receita prevista R$ 61.500,00 (a soma das lojas). Sem a meta do CMV não há teto.');
   });
 });

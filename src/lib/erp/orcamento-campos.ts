@@ -244,6 +244,8 @@ export interface OrcamentoDoEscopo {
   cmvAteOntemBp: number | null;
   /** Lojas do escopo com dias do período sem lançamento completo (entraram pela média). */
   diasSemLancamento: number;
+  /** A receita prevista do escopo (soma das lojas), mesmo sem meta; nula se alguma loja não tem previsão. */
+  previstaCentavos: number | null;
 }
 
 /** teto = meta × prevista ÷ 10.000, um arredondamento. */
@@ -317,16 +319,17 @@ export function orcamentoDoEscopo(lojas: readonly OrcamentoDaLoja[], metaBp: num
   const ateOntem = lojas.reduce((s, l) => s + l.compradoAteOntemCentavos, 0);
   const semNota = lojas.filter((l) => (l.receitaAteOntemCentavos ?? 0) > 0 && l.compradoAteOntemCentavos === 0).map((l) => l.nome);
   const { farol, cmvBp } = ritmoDasCompras({ metaBp, receitaAteOntemCentavos: lojas.length === 0 ? null : receita, compradoAteOntemCentavos: ateOntem, lojasSemNota: semNota });
-  if (metaBp === null) return { conta: null, motivo: MOTIVO_SEM_META, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento };
-  if (lojas.length === 0) return { conta: null, motivo: 'nenhuma loja ativa', ritmo: null, cmvAteOntemBp: null, diasSemLancamento };
+  const previstaCentavos = lojas.length > 0 && lojas.every((l) => l.previsao) ? lojas.reduce((s, l) => s + l.previsao!.previstaCentavos, 0) : null;
+  if (metaBp === null) return { conta: null, motivo: MOTIVO_SEM_META, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento, previstaCentavos };
+  if (lojas.length === 0) return { conta: null, motivo: 'nenhuma loja ativa', ritmo: null, cmvAteOntemBp: null, diasSemLancamento, previstaCentavos };
   if (semNumero.length > 0) {
-    return { conta: null, motivo: `sem o orçamento de ${semNumero.map((l) => l.nome).join(' e ')}`, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento };
+    return { conta: null, motivo: `sem o orçamento de ${semNumero.map((l) => l.nome).join(' e ')}`, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento, previstaCentavos };
   }
   const prevista = lojas.reduce((s, l) => s + l.conta!.previstaCentavos, 0);
   const comprado = lojas.reduce((s, l) => s + l.compradoCentavos, 0);
   // O teto da rede é a SOMA dos tetos das lojas (um arredondamento por loja), para a rede bater com o "Por loja".
   const teto = lojas.reduce((s, l) => s + l.conta!.tetoCentavos, 0);
-  return { conta: { previstaCentavos: prevista, metaBp, tetoCentavos: teto, compradoCentavos: comprado, saldoCentavos: teto - comprado }, motivo: null, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento };
+  return { conta: { previstaCentavos: prevista, metaBp, tetoCentavos: teto, compradoCentavos: comprado, saldoCentavos: teto - comprado }, motivo: null, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento, previstaCentavos };
 }
 
 // ================================================================ quem não vê a receita

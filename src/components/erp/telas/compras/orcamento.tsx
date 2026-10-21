@@ -115,15 +115,20 @@ function CelulaDoSaldo({ v }: { v: VistaDoOrcamento }) {
 const jaComprado = (v: VistaCompleta) => (v.semNota.length > 0 ? <span className="text-[12px] text-atencao">sem nota de compra</span> : formatarDinheiro(v.compradoCentavos));
 
 /** O "Por loja": tabela Corporativo para quem vê a receita (≥ 1024 px), lista para quem não vê e no celular. */
-function PorLoja({ dados }: { dados: OrcamentoDeCompra }) {
+function PorLoja({ dados, compacto = false }: { dados: OrcamentoDeCompra; compacto?: boolean }) {
   const completa = dados.lojas.every((l) => l.vista.veReceita);
   const lista = (
     <ul className={`divide-y divide-linha border-y border-linha ${completa ? 'lg:hidden' : 'max-w-xl'}`}>
       {dados.lojas.map((l) => (
         <li key={l.lojaId} className="py-2.5">
-          <p className="font-medium text-texto">{l.nome}</p>
-          <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-3 text-sm tabular-nums">
-            <CelulaDoSaldo v={l.vista} />
+          {/* Celular: o nome em linha própria; do tablet para cima, nome e número na mesma linha. */}
+          <div className="flex flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-baseline sm:justify-between sm:gap-x-3">
+            <p className="font-medium text-texto">{l.nome}</p>
+            <span className="text-sm tabular-nums">
+              <CelulaDoSaldo v={l.vista} />
+            </span>
+          </div>
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-sm tabular-nums">
             {l.vista.veReceita && l.vista.conta && (
               <span className="text-[12px] text-suave">
                 teto {formatarDinheiro(l.vista.conta.tetoCentavos)} · já comprado {l.vista.semNota.length > 0 ? 'sem nota' : formatarDinheiro(l.vista.compradoCentavos)}
@@ -143,12 +148,13 @@ function PorLoja({ dados }: { dados: OrcamentoDeCompra }) {
   );
   return (
     <section aria-labelledby="orcamento-por-loja" className="min-w-0">
-      <h2 id="orcamento-por-loja" className="mb-2 text-[13px] font-semibold text-texto">
+      {/* Ao lado do número (≥ 1280 px) o título fica só para o leitor de tela: a linha que ele ocupava é a da loja que passou. */}
+      <h2 id="orcamento-por-loja" className={compacto ? 'mb-2 text-[13px] font-semibold text-texto xl:sr-only' : 'mb-2 text-[13px] font-semibold text-texto'}>
         Por loja <span className="font-normal text-suave">· cada nota é de uma loja: o orçamento também</span>
       </h2>
       {lista}
       {completa && (
-        <table className="hidden w-full text-sm lg:table">
+        <table className="hidden w-full text-[13px] lg:table">
           <caption className="sr-only">Orçamento de compra por loja no período em curso.</caption>
           <thead>
             <tr className="bg-forte text-left text-[12px] text-suave">
@@ -177,14 +183,14 @@ function PorLoja({ dados }: { dados: OrcamentoDeCompra }) {
               const v = l.vista as VistaCompleta;
               return (
                 <tr key={l.lojaId} className="border-t border-linha">
-                  <td className="h-11 py-1.5 pl-3 pr-3 font-medium text-texto">{l.nome}</td>
-                  <td className="px-3 py-1.5 text-right">
+                  <td className="h-11 whitespace-nowrap py-1 pl-3 pr-3 font-medium text-texto">{l.nome}</td>
+                  <td className="px-3 py-1 text-right">
                     <CelulaDoSaldo v={v} />
                   </td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-right">{jaComprado(v)}</td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-right">{v.conta ? formatarDinheiro(v.conta.tetoCentavos) : <span className="text-[12px] text-suave">{v.motivo ?? 'sem número'}</span>}</td>
-                  <td className="whitespace-nowrap px-3 py-1.5 text-right">{v.previsao ? formatarDinheiro(v.previsao.previstaCentavos) : <span className="text-[12px] text-suave">sem número</span>}</td>
-                  <td className="px-3 py-1.5">{v.ritmo ? <Farol f={v.ritmo} forma="linha" /> : <span className="text-[12px] text-suave">sem meta</span>}</td>
+                  <td className="whitespace-nowrap px-3 py-1 text-right">{jaComprado(v)}</td>
+                  <td className="whitespace-nowrap px-3 py-1 text-right">{v.conta ? formatarDinheiro(v.conta.tetoCentavos) : <span className="text-[12px] text-suave">{v.motivo ?? 'sem número'}</span>}</td>
+                  <td className="whitespace-nowrap px-3 py-1 text-right">{v.previsao ? formatarDinheiro(v.previsao.previstaCentavos) : <span className="text-[12px] text-suave">sem número</span>}</td>
+                  <td className="whitespace-nowrap px-3 py-1">{v.ritmo ? <Farol f={v.ritmo} forma="linha" /> : <span className="text-[12px] text-suave">sem meta</span>}</td>
                 </tr>
               );
             })}
@@ -216,6 +222,9 @@ function AConta({ v }: { v: VistaCompleta }) {
           {p.diasSemLancamento > 0 ? ` (${dias(p.diasSemLancamento)} sem lançamento completo entraram pela média)` : ''}
           {p.diasAntesDeAbrir > 0 ? `; ${dias(p.diasAntesDeAbrir)} antes do primeiro lançamento da loja ficaram fora` : ''}.
         </p>
+      )}
+      {!c && !p && v.previstaCentavos !== null && (
+        <p className="tabular-nums">Receita prevista {formatarDinheiro(v.previstaCentavos)} (a soma das lojas). Sem a meta do CMV não há teto.</p>
       )}
       {p && p.frasesDoZero.length > 0 && (
         <ul className="space-y-0.5">
@@ -250,23 +259,23 @@ function Ritmo({ v, metaBp }: { v: VistaCompleta; metaBp: number | null }) {
 
 function BlocoPrincipal({ titulo, v, dados, saidas, varias }: { titulo: string; v: VistaDoOrcamento; dados: OrcamentoDeCompra; saidas: Saidas; varias: boolean }) {
   return (
-    <Painel titulo={titulo} subtitulo={v.veReceita ? SUBTITULO_COMPLETO : SUBTITULO_RESUMIDO}>
-      <div className={varias ? 'grid gap-5 xl:grid-cols-[minmax(0,300px)_minmax(0,1fr)]' : ''}>
+    <Painel titulo={titulo} subtitulo={v.veReceita ? undefined : SUBTITULO_RESUMIDO}>
+      <div className={varias ? 'grid gap-5 xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)]' : ''}>
         <div className="min-w-0 space-y-3">
           <NumeroGrande v={v} />
           <Alertas v={v} escopoDeVarias={varias} />
           <SaidaDoMotivo motivo={v.motivo} saidas={saidas} />
         </div>
-        {varias && <PorLoja dados={dados} />}
+        {varias && <PorLoja dados={dados} compacto />}
       </div>
     </Painel>
   );
 }
 
 function PainelDaConta({ v, metaBp }: { v: VistaCompleta; metaBp: number | null }) {
-  if (!v.conta && !v.previsao && !v.ritmo) return null;
+  if (!v.conta && !v.previsao && !v.ritmo && v.previstaCentavos === null) return null;
   return (
-    <Painel titulo="Como a conta chega aqui" subtitulo="A receita prevista, o teto e o ritmo das compras">
+    <Painel titulo="Como a conta chega aqui" subtitulo={SUBTITULO_COMPLETO}>
       <div className="space-y-3">
         <AConta v={v} />
         <Ritmo v={v} metaBp={metaBp} />
