@@ -21,7 +21,9 @@ import {
   filtroDeLojas,
   LISTA_DE_SETORES,
   normalizarPermissoes,
+  novasDesdeOPerfil,
   PERFIS_BASE,
+  permissoesNoCatalogoAtual,
   pode,
   recusa,
   recusaDaAcao,
@@ -393,6 +395,47 @@ describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', 
       />[^<{]*\b(RBAC|escopo|insumos\.editar|acessos\.gerir)\b/i.test(readFileSync(f, 'utf8')),
     );
     expect(furos).toEqual([]);
+  });
+});
+
+describe('catálogo v2 (3.2): perfil próprio salvo na v1 (decisão 219)', () => {
+  const V1 = TODAS_AS_PERMISSOES.filter((p) => p !== 'producao.planejar');
+  const proprio = (permissoes: readonly string[], catalogoVersao: number | null, lojas: 'rede' | string[] = 'rede') =>
+    resolverAlcance({ perfilBase: null, perfilProprio: permissoes, perfilCatalogoVersao: catalogoVersao, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojas === 'rede', lojaIds: lojas === 'rede' ? [] : lojas });
+  const base = (perfilBase: 'DONO' | 'GERENTE', lojas: 'rede' | string[]) => resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojas === 'rede', lojaIds: lojas === 'rede' ? [] : lojas });
+
+  it('o "copiado do Dono" da v1 (todas as da v1) ganha a nova e volta a cobrir o Gerente e o Dono base (sem escalada: já tinha tudo)', () => {
+    const socio = proprio(V1, 1);
+    expect(socio.permissoes.has('producao.planejar')).toBe(true);
+    expect(cobre(socio, base('GERENTE', ['l1']))).toBe(true);
+    expect(cobre(socio, base('DONO', 'rede'))).toBe(true);
+    // Sem a versão gravada (perfil antigo), a mesma regra.
+    expect(cobre(proprio(V1, null), base('GERENTE', ['l1']))).toBe(true);
+    expect(permissoesNoCatalogoAtual(V1, 1)).toEqual(TODAS_AS_PERMISSOES);
+    expect(novasDesdeOPerfil(permissoesNoCatalogoAtual(V1, 1), 1)).toEqual([]);
+  });
+
+  it('ninguém ganha o que não tinha: perfil parcial da v1 fica como está (e a Equipe pede para revisar); perfil salvo na v2 sem a nova fica sem', () => {
+    const semPrecos = V1.filter((p) => p !== 'precos.editar');
+    expect(permissoesNoCatalogoAtual(semPrecos, 1)).toEqual(semPrecos);
+    expect(proprio(semPrecos, 1).permissoes.has('producao.planejar')).toBe(false);
+    expect(novasDesdeOPerfil(semPrecos, 1)).toEqual(['producao.planejar']);
+    const cozinha = ['producao.ver', 'producao.registrar', 'insumos.ver'];
+    expect(proprio(cozinha, 1).permissoes.has('producao.planejar')).toBe(false);
+    expect(novasDesdeOPerfil(normalizarPermissoes(cozinha), 1)).toEqual(['producao.planejar']);
+    // Salvo na v2 com tudo menos "definir a lista": foi escolha de quem salvou, nada entra e nada a revisar.
+    expect(permissoesNoCatalogoAtual(V1, 2)).toEqual(V1);
+    expect(proprio(V1, 2).permissoes.has('producao.planejar')).toBe(false);
+    expect(novasDesdeOPerfil(V1, 2)).toEqual([]);
+    // Lojas e "exige rede" continuam valendo: o sócio de UMA loja não passa a cobrir quem tem a rede.
+    expect(cobre(proprio(V1, 1, ['l1']), base('DONO', 'rede'))).toBe(false);
+  });
+
+  it('a migration 20261030010000_erp_catalogo_v2 confere exatamente o catálogo da v1 (todas menos producao.planejar)', () => {
+    const sql = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261030010000_erp_catalogo_v2', 'migration.sql'), 'utf8');
+    const lista = sql.slice(sql.indexOf('ARRAY['), sql.indexOf(']::text[]'));
+    const nomes = Array.from(lista.matchAll(/'([a-z]+\.[a-z]+)'/g)).map((m) => m[1]);
+    expect(nomes).toEqual(V1);
   });
 });
 

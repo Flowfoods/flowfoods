@@ -26,8 +26,8 @@
  * quem decide é o servidor.
  */
 
-/** Sobe quando o catálogo ganha permissão nova (perfil próprio guarda em que versão nasceu). */
-export const VERSAO_DO_CATALOGO = 1;
+/** Sobe quando o catálogo ganha permissão nova (perfil próprio guarda em que versão nasceu). 2 = 3.2, `producao.planejar`. */
+export const VERSAO_DO_CATALOGO = 2;
 
 export interface DefinicaoDePermissao {
   rotulo: string;
@@ -101,11 +101,15 @@ export const CATALOGO = [
   },
   {
     // 3.1: a produção saiu de "em breve" (planejar o lote, dar baixa pela requisição, concluir e pôr no estoque).
+    // 3.2: a lista do dia. Quem DEFINE o que a loja produz no dia (e transforma a lista em lotes) é o gerente, não a
+    // cozinha: "registrar produção" é do operador, então a lista ganhou permissão própria (decisão 219). Fica fora do
+    // operador; dono e gerente recebem pelo perfil base; perfil próprio só se alguém der.
     chave: 'producao',
     rotulo: 'Produção',
     permissoes: {
       'producao.ver': { rotulo: 'Ver a produção e a lista do dia', porLoja: true },
       'producao.registrar': { rotulo: 'Registrar produção', porLoja: true },
+      'producao.planejar': { rotulo: 'Definir a lista do dia (o que a loja produz)', porLoja: true },
     },
   },
   {
@@ -269,16 +273,50 @@ export interface VinculoDePermissao {
   perfilBase: PerfilBase | null;
   /** Permissões do perfil próprio (quando `perfilBase` é nulo). */
   perfilProprio: readonly string[] | null;
+  /** Versão do catálogo em que o perfil próprio foi salvo (ausente = 1; ver `permissoesNoCatalogoAtual`). */
+  perfilCatalogoVersao?: number | null;
   permissoesExtras: readonly string[];
   permissoesRemovidas: readonly string[];
   redeInteira: boolean;
   lojaIds: readonly string[];
 }
 
-/** Permissões do perfil (base ou próprio), já filtradas pelo catálogo. */
-export function permissoesDoPerfil(v: Pick<VinculoDePermissao, 'perfilBase' | 'perfilProprio'>): Permissao[] {
+/** O que entrou no catálogo em cada versão (a 1 é a de nascença). */
+const NOVAS_NA_VERSAO: Readonly<Record<number, readonly Permissao[]>> = { 2: ['producao.planejar'] };
+
+/** O catálogo como era na versão `versao`: o de hoje menos o que entrou depois. */
+function catalogoNaVersao(versao: number): Permissao[] {
+  const depois = new Set<Permissao>();
+  for (let v = versao + 1; v <= VERSAO_DO_CATALOGO; v++) for (const p of NOVAS_NA_VERSAO[v] ?? []) depois.add(p);
+  return TODAS_AS_PERMISSOES.filter((p) => !depois.has(p));
+}
+
+/** O que entrou no catálogo depois da versão em que o perfil foi salvo (e que ele não tem): o que a Equipe pede para revisar. */
+export function novasDesdeOPerfil(permissoes: readonly Permissao[], catalogoVersao: number): Permissao[] {
+  const tem = new Set(permissoes);
+  const fora = new Set(catalogoNaVersao(catalogoVersao));
+  return TODAS_AS_PERMISSOES.filter((p) => !fora.has(p) && !tem.has(p));
+}
+
+/**
+ * Perfil próprio salvo num catálogo antigo (decisão 219): o que tinha TODAS as permissões daquele catálogo (o "copiado do
+ * Dono") ganha o que entrou depois — sem escalada, porque já tinha tudo, e sem isso deixaria de cobrir o Gerente e o Dono
+ * base. Os demais ficam como estão (permissão nova não entra sozinha) e a Equipe avisa para revisar. A migration
+ * `20261030010000_erp_catalogo_v2` grava isso no banco; a regra aqui cobre o perfil que o app antigo salvar durante o deploy.
+ * `catalogoVersao` ausente = a versão 1 (o perfil gravado sem versão é anterior ao catálogo versionado).
+ */
+export function permissoesNoCatalogoAtual(lista: readonly unknown[], catalogoVersao = 1): Permissao[] {
+  const atuais = normalizarPermissoes(lista);
+  if (catalogoVersao >= VERSAO_DO_CATALOGO) return atuais;
+  const tem = new Set(atuais);
+  if (!catalogoNaVersao(catalogoVersao).every((p) => tem.has(p))) return atuais;
+  return [...TODAS_AS_PERMISSOES];
+}
+
+/** Permissões do perfil (base ou próprio), já filtradas pelo catálogo (o próprio, levado ao catálogo de hoje). */
+export function permissoesDoPerfil(v: Pick<VinculoDePermissao, 'perfilBase' | 'perfilProprio' | 'perfilCatalogoVersao'>): Permissao[] {
   if (v.perfilBase) return [...PERFIS_BASE[v.perfilBase].permissoes];
-  return normalizarPermissoes(v.perfilProprio ?? []);
+  return permissoesNoCatalogoAtual(v.perfilProprio ?? [], v.perfilCatalogoVersao ?? 1);
 }
 
 /**

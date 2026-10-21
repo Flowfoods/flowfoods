@@ -114,7 +114,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 3.1';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 3.2';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -377,8 +377,8 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
     {
       chave: 'producao',
       nome: 'Produção',
-      subtitulo: 'Planejar o lote pela ficha, dar baixa nos insumos pela requisição e pôr o pronto no estoque',
-      resumo: 'Lotes e rendimento',
+      subtitulo: 'A lista do dia, o lote pela ficha, a baixa dos insumos pela requisição e o pronto no estoque',
+      resumo: 'Lista e lotes',
       icone: 'producao',
       cor: COR.producao,
       grupos: [
@@ -386,6 +386,14 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
           rotulo: 'Produção',
           icone: 'producao',
           telas: [
+            // 3.2: a lista do dia vem primeiro (o dia começa por ela: o que produzir e o que falta comprar; decisão 225).
+            {
+              href: `${base}/producao/lista`,
+              rotulo: 'Lista do dia',
+              icone: 'producao',
+              subtitulo: 'O que produzir no dia e o que falta comprar, por loja',
+              permissao: 'producao.ver',
+            },
             {
               href: `${base}/producao`,
               rotulo: 'Lotes',

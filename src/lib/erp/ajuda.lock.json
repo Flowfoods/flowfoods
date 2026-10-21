@@ -39,6 +39,14 @@
     "versao": 1,
     "hash": "41fea1a55f507b28"
   },
+  "producao-lista": {
+    "versao": 1,
+    "hash": "849e5418c3ebfc54"
+  },
+  "producao-lista-loja": {
+    "versao": 2,
+    "hash": "a017717c2b63e53f"
+  },
   "producao-quadro": {
     "versao": 1,
     "hash": "95aa845b71c0c030"

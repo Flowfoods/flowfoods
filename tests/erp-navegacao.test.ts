@@ -68,7 +68,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      Produção: ['Lotes'],
+      Produção: ['Lista do dia', 'Lotes'],
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos', 'Plano e metas'],
       'Rede e Equipe': ['Lojas e marcas', 'Equipe', 'Histórico', 'Seu acesso'],
     });
@@ -88,7 +88,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
-      Produção: ['Lotes'],
+      Produção: ['Lista do dia', 'Lotes'],
       // 2.2a: o gerente vê e lança despesa, vê o DRE e o período; plano de contas e período são do dono (rede inteira).
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos'],
       'Rede e Equipe': ['Lojas e marcas', 'Histórico', 'Seu acesso'],
@@ -108,7 +108,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(abasPorArea(OPERADOR)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições'],
-      Produção: ['Lotes'],
+      Produção: ['Lista do dia', 'Lotes'],
       'Rede e Equipe': ['Lojas e marcas', 'Seu acesso'],
     });
     expect(acoesDaNavegacao(navegacaoDoParceiro(OPERADOR)).map((a) => a.rotulo)).toEqual(['Nova produção']);
@@ -219,7 +219,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
 
   it('o card é a entrada da área: leva à primeira aba permitida', () => {
     const uso = cartoes(secao(html(DONO), 'Em uso')).map((c) => /href="([^"]+)"/.exec(c)![1]);
-    expect(uso).toEqual(['/erp/insumos', '/erp/compras', '/erp/estoque', '/erp/producao', '/erp/faturamento', '/erp/lojas']);
+    expect(uso).toEqual(['/erp/insumos', '/erp/compras', '/erp/estoque', '/erp/producao/lista', '/erp/faturamento', '/erp/lojas']);
     // Sem "ver insumos", a entrada de Cadastros é a ficha.
     const semInsumos = cartoes(secao(html(proprio(['fichas.ver'])), 'Em uso')).map((c) => /href="([^"]+)"/.exec(c)![1]);
     expect(semInsumos[0]).toBe('/erp/fichas');
@@ -294,7 +294,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
       '/rodolfo/erp/valentins/insumos',
       '/rodolfo/erp/valentins/compras',
       '/rodolfo/erp/valentins/estoque',
-      '/rodolfo/erp/valentins/producao',
+      '/rodolfo/erp/valentins/producao/lista',
       '/rodolfo/erp/valentins/faturamento',
       '/rodolfo/erp/valentins/lojas',
     ]);
@@ -367,6 +367,9 @@ const ROTAS_ATIVAS: [string, string][] = [
   [`/producao/${LOJA}/nova`, 'Lotes'],
   [`/producao/${LOJA}/o1`, 'Lotes'],
   [`/producao/${LOJA}/o1/concluir`, 'Lotes'],
+  // 3.2: a lista do dia (a entrada e a de uma loja) acende a aba dela, não a de Lotes.
+  ['/producao/lista', 'Lista do dia'],
+  [`/producao/lista/${LOJA}`, 'Lista do dia'],
 ];
 
 describe('UX.9 · itemAtivo acende a aba certa em cada rota profunda', () => {
@@ -450,11 +453,11 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     }
   });
 
-  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das das fases 2.1, 2.2a, 2.5 e 3.1 (faturamento, DRE, despesas, orçamento e produção)', () => {
+  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das das fases 2.1, 2.2a, 2.5, 3.1 e 3.2 (faturamento, DRE, despesas, orçamento, produção e a lista do dia)', () => {
     const todas = [...emUso(DONO)].flatMap((m) => [...m.grupos.flatMap((g) => g.itens), ...m.acoes]).map((i) => i.href.replace('/erp', ''));
     const novas = todas.filter((r) => !ANTIGAS.includes(r) && r !== '/acesso');
     // 2.5: o orçamento de compra é aba da área Compras.
-    expect(novas).toEqual(['/compras/orcamento', '/estoque/contagens', '/producao', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
+    expect(novas).toEqual(['/compras/orcamento', '/estoque/contagens', '/producao/lista', '/producao', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
   });
 });
 

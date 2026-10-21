@@ -33,7 +33,9 @@ import {
   faltaParaCobrir,
   normalizarPermissoes,
   normalizarSetores,
+  novasDesdeOPerfil,
   permissoesDoPerfil,
+  permissoesNoCatalogoAtual,
   resolverAlcance,
   rotuloDaPermissao,
   rotuloDoPerfil,
@@ -154,7 +156,7 @@ class Desfazer extends Error {
 /** Vínculo gravado → regra pura. Colunas de lista podem vir nulas de linha antiga. */
 type LinhaDeVinculo = {
   perfilBase: PerfilBase | null;
-  perfil: { nome: string; permissoes: string[] } | null;
+  perfil: { nome: string; permissoes: string[]; catalogoVersao: number } | null;
   permissoesExtras: string[] | null;
   permissoesRemovidas: string[] | null;
   redeInteira: boolean;
@@ -165,6 +167,7 @@ function vinculoDe(a: LinhaDeVinculo): VinculoDePermissao {
   return {
     perfilBase: a.perfilBase,
     perfilProprio: a.perfil?.permissoes ?? null,
+    perfilCatalogoVersao: a.perfil?.catalogoVersao ?? null,
     permissoesExtras: a.permissoesExtras ?? [],
     permissoesRemovidas: a.permissoesRemovidas ?? [],
     redeInteira: a.redeInteira,
@@ -180,7 +183,7 @@ function perfilRotuloDe(a: LinhaDeVinculo): string {
   return rotuloDoPerfil({ perfilBase: a.perfilBase, perfilNome: a.perfil?.nome });
 }
 
-const COM_PERFIL = { perfil: { select: { nome: true, permissoes: true } } } as const;
+const COM_PERFIL = { perfil: { select: { nome: true, permissoes: true, catalogoVersao: true } } } as const;
 
 /** Alcance de cada pessoa ATIVA do parceiro (para a regra do último administrador). */
 async function alcancesAtivos(tx: Prisma.TransactionClient, parceiroId: string): Promise<Alcance[]> {
@@ -283,11 +286,11 @@ async function prepararPermissoes(
   lojas: { id: string; nome: string }[],
   ator: Ator,
 ) {
-  let perfilProprio: { id: string; nome: string; permissoes: string[] } | null = null;
+  let perfilProprio: { id: string; nome: string; permissoes: string[]; catalogoVersao: number } | null = null;
   if ('proprioId' in dados.perfil) {
     perfilProprio = await tx.perfilAcesso.findFirst({
       where: { id: dados.perfil.proprioId, parceiroId },
-      select: { id: true, nome: true, permissoes: true },
+      select: { id: true, nome: true, permissoes: true, catalogoVersao: true },
     });
     if (!perfilProprio) throw new Desfazer({ perfil: 'Esse perfil não existe mais neste parceiro. Recarregue.' });
   }
@@ -296,7 +299,7 @@ async function prepararPermissoes(
   if (dados.lojaIds.some((id) => !ordem.has(id))) throw new Desfazer({ lojas: 'Loja não encontrada neste parceiro. Recarregue.' });
   const lojaIds = [...dados.lojaIds].sort((a, b) => ordem.get(a)! - ordem.get(b)!);
 
-  const doPerfil = permissoesDoPerfil({ perfilBase, perfilProprio: perfilProprio?.permissoes ?? null });
+  const doPerfil = permissoesDoPerfil({ perfilBase, perfilProprio: perfilProprio?.permissoes ?? null, perfilCatalogoVersao: perfilProprio?.catalogoVersao ?? null });
   const ajuste = ajusteMinimo(doPerfil, dados.extras, dados.removidas);
   const colunas = {
     perfilBase,
@@ -460,6 +463,8 @@ export interface LinhaDePerfil {
   permissoes: Permissao[];
   setores: Setor[];
   catalogoVersao: number;
+  /** Permissões que entraram no catálogo depois que o perfil foi salvo e que ele não tem: a Equipe pede para revisar. */
+  revisar: Permissao[];
   pessoas: number;
   atualizadoEm: Date;
 }
@@ -471,16 +476,21 @@ export async function listarPerfis(parceiroId: string, o?: Opcoes): Promise<Linh
     include: { _count: { select: { acessos: true } } },
     orderBy: { nome: 'asc' },
   });
-  return perfis.map((p) => ({
-    id: p.id,
-    nome: p.nome,
-    base: p.base,
-    permissoes: normalizarPermissoes(p.permissoes ?? []),
-    setores: normalizarSetores(p.setores ?? []),
-    catalogoVersao: p.catalogoVersao,
-    pessoas: p._count.acessos,
-    atualizadoEm: p.atualizadoEm,
-  }));
+  return perfis.map((p) => {
+    // O que vale de verdade (o "copiado do Dono" de um catálogo antigo já leva o que entrou depois: decisão 219).
+    const permissoes = permissoesNoCatalogoAtual(p.permissoes ?? [], p.catalogoVersao);
+    return {
+      id: p.id,
+      nome: p.nome,
+      base: p.base,
+      permissoes,
+      setores: normalizarSetores(p.setores ?? []),
+      catalogoVersao: p.catalogoVersao,
+      revisar: novasDesdeOPerfil(permissoes, p.catalogoVersao),
+      pessoas: p._count.acessos,
+      atualizadoEm: p.atualizadoEm,
+    };
+  });
 }
 
 export type ResultadoDeAcesso =
@@ -1014,7 +1024,7 @@ export async function salvarPerfil(
       const acima = usam.some(
         (v) =>
           !cobre(ator.alcance, alcanceDe(v)) ||
-          !cobre(ator.alcance, alcanceDe({ ...v, perfil: { nome: d.dados.nome, permissoes: d.dados.permissoes } })),
+          !cobre(ator.alcance, alcanceDe({ ...v, perfil: { nome: d.dados.nome, permissoes: d.dados.permissoes, catalogoVersao: VERSAO_DO_CATALOGO } })),
       );
       if (acima) {
         throw new Desfazer({ geral: 'Quem usa esse perfil tem acesso maior que o seu. Só quem tem o mesmo acesso (ou a FlowFoods) muda o perfil.' });

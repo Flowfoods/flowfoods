@@ -238,76 +238,95 @@ export async function planejarProducao(
     cliente.transacao(
       async (tx) => {
         const loja = await lojaDoAlcance(tx, alcance, lojaId, 'producao.registrar');
-        const hoje = hojeNoRio(agora);
-        const dia = lerParaDia(entrada.paraDia, hoje);
-        if ('erro' in dia) throw new Recusa({ ok: false, erros: { paraDia: dia.erro } });
-        const obs = typeof entrada.observacao === 'string' ? entrada.observacao.trim().replace(/\s+/g, ' ') : '';
-        if (obs.length > LIMITE_DA_OBSERVACAO) throw new Recusa({ ok: false, erros: { observacao: `Observação: até ${LIMITE_DA_OBSERVACAO} letras.` } });
-        const chave = lerChaveDoEnvio(entrada.envio);
-        // O código do lote e o envio repetido se resolvem sob a trava do dia: quem chega junto espera.
-        await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp:lote:${tx.parceiroId}:${dia.dia}`}, 0))::text AS "trava"`;
-        if (chave) {
-          const feita = await tx.ordemProducao.findFirst({ where: { chaveIdempotencia: chave }, select: { id: true, lojaId: true } });
-          if (feita) {
-            if (feita.lojaId !== lojaId) throw new Recusa({ ok: false, erros: { geral: 'Este envio já foi usado: recarregue a tela e planeje de novo.' } });
-            return { ok: true as const, id: feita.id, jaFeito: true };
-          }
-        }
-        const lista = await listaDaFichaNaTx(tx, entrada.fichaId, entrada.quantidade, { soPreparo: true });
-        const prefixo = codigoDoLote(dia.dia, 0).slice(0, 7);
-        const [{ proximo }] = await tx.sql<{ proximo: number }>`
-          SELECT (coalesce(max(split_part("codigoLote", '-', 2)::int), 0) + 1)::int AS "proximo" FROM "OrdemProducao"
-          WHERE "parceiroId" = ${tx.parceiroId} AND "codigoLote" LIKE ${`${prefixo}%`}`;
-        if (proximo > LOTES_POR_DIA) throw new Recusa({ ok: false, erros: { geral: `Passou de ${LOTES_POR_DIA.toLocaleString('pt-BR')} lotes num dia só: escolha outro dia.` } });
-        const codigo = codigoDoLote(dia.dia, proximo);
-        const req = await criarRequisicaoNaTx(
-          tx,
-          loja,
-          { setor: 'COZINHA', paraDia: dia.dia, observacao: obs, linhas: entrada.linhas, fichaId: lista.ficha.id, fichaQuantidade: lista.ficha.quantidadeMilesimos },
-          autor.nome,
-          agora,
-          { lote: codigo },
-        );
-        const ordem = await tx.ordemProducao.create({
-          data: {
-            parceiroId: tx.parceiroId,
-            lojaId,
-            fichaId: lista.ficha.id,
-            insumoProduzidoId: lista.ficha.insumoProduzidoId,
-            codigoLote: codigo,
-            status: 'PLANEJADA',
-            dataPlanejada: new Date(`${dia.dia}T00:00:00.000Z`),
-            planejadoMilesimos: lista.ficha.quantidadeMilesimos,
-            fichaNomeSnapshot: lista.ficha.nome,
-            unidadeSnapshot: lista.ficha.unidade,
-            requisicaoId: req.id,
-            planejadaPorNome: autor.nome,
-            chaveIdempotencia: chave,
-            observacao: obs || null,
-          },
-          select: { id: true },
-        });
-        await tx.historicoAlteracao.create({
-          data: {
-            parceiroId: tx.parceiroId,
-            entidade: 'OrdemProducao',
-            entidadeId: ordem.id,
-            acao: 'PLANEJOU',
-            depois: {
-              nome: `Lote ${codigo} · ${lista.ficha.nome}`,
-              planejado: formatarQuantidade(lista.ficha.quantidadeMilesimos, lista.ficha.unidade),
-              paraQuando: textoDoParaDia(dia.dia, hoje).replace(/^para /, ''),
-              requisicaoDoLote: `Requisição ${numeroDaRequisicao(req.numero)} · ${loja.nome}`,
-              ...(obs ? { observacao: obs } : {}),
-            },
-            autorNome: autor.nome,
-          },
-        });
-        return { ok: true as const, id: ordem.id };
+        const r = await planejarProducaoNaTx(tx, loja, { ...entrada, chave: lerChaveDoEnvio(entrada.envio) }, autor, agora);
+        return { ok: true as const, id: r.id, ...(r.jaFeito ? { jaFeito: true } : {}) };
       },
       { timeout: 20_000, maxWait: 10_000 },
     ),
   );
+}
+
+/**
+ * A regra de planejar, na transação de quem chama (Regra Nº 2: uma regra só). Planejar pela tela (acima) e transformar a
+ * linha da lista do dia em lote (3.2, `producao-lista.ts`) passam por aqui. Quem chama já conferiu a permissão dele e entrega
+ * a loja lida pelo portão. `linhas` ausente = a lista da ficha, sem mudança (a da lista do dia). `daLista` (3.2) marca de onde
+ * o lote veio no histórico. Recusa em `Recusa`.
+ */
+export async function planejarProducaoNaTx(
+  tx: ClienteDoParceiro,
+  loja: { id: string; nome: string; ativa: boolean },
+  entrada: { fichaId: unknown; quantidade: unknown; paraDia: unknown; observacao: unknown; linhas?: readonly LinhaDigitada[]; chave: string | null; daLista?: string },
+  autor: Autor,
+  agora: Date,
+): Promise<{ id: string; codigo: string; jaFeito?: true }> {
+  const lojaId = loja.id;
+  const hoje = hojeNoRio(agora);
+  const dia = lerParaDia(entrada.paraDia, hoje);
+  if ('erro' in dia) throw new Recusa({ ok: false, erros: { paraDia: dia.erro } });
+  const obs = typeof entrada.observacao === 'string' ? entrada.observacao.trim().replace(/\s+/g, ' ') : '';
+  if (obs.length > LIMITE_DA_OBSERVACAO) throw new Recusa({ ok: false, erros: { observacao: `Observação: até ${LIMITE_DA_OBSERVACAO} letras.` } });
+  const chave = entrada.chave;
+  // O código do lote e o envio repetido se resolvem sob a trava do dia: quem chega junto espera.
+  await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp:lote:${tx.parceiroId}:${dia.dia}`}, 0))::text AS "trava"`;
+  if (chave) {
+    const feita = await tx.ordemProducao.findFirst({ where: { chaveIdempotencia: chave }, select: { id: true, lojaId: true, codigoLote: true } });
+    if (feita) {
+      if (feita.lojaId !== lojaId) throw new Recusa({ ok: false, erros: { geral: 'Este envio já foi usado: recarregue a tela e planeje de novo.' } });
+      return { id: feita.id, codigo: feita.codigoLote, jaFeito: true };
+    }
+  }
+  const lista = await listaDaFichaNaTx(tx, entrada.fichaId, entrada.quantidade, { soPreparo: true });
+  const prefixo = codigoDoLote(dia.dia, 0).slice(0, 7);
+  const [{ proximo }] = await tx.sql<{ proximo: number }>`
+    SELECT (coalesce(max(split_part("codigoLote", '-', 2)::int), 0) + 1)::int AS "proximo" FROM "OrdemProducao"
+    WHERE "parceiroId" = ${tx.parceiroId} AND "codigoLote" LIKE ${`${prefixo}%`}`;
+  if (proximo > LOTES_POR_DIA) throw new Recusa({ ok: false, erros: { geral: `Passou de ${LOTES_POR_DIA.toLocaleString('pt-BR')} lotes num dia só: escolha outro dia.` } });
+  const codigo = codigoDoLote(dia.dia, proximo);
+  const req = await criarRequisicaoNaTx(
+    tx,
+    loja,
+    { setor: 'COZINHA', paraDia: dia.dia, observacao: obs, linhas: entrada.linhas ?? lista.linhas, fichaId: lista.ficha.id, fichaQuantidade: lista.ficha.quantidadeMilesimos },
+    autor.nome,
+    agora,
+    { lote: codigo },
+  );
+  const ordem = await tx.ordemProducao.create({
+    data: {
+      parceiroId: tx.parceiroId,
+      lojaId,
+      fichaId: lista.ficha.id,
+      insumoProduzidoId: lista.ficha.insumoProduzidoId,
+      codigoLote: codigo,
+      status: 'PLANEJADA',
+      dataPlanejada: new Date(`${dia.dia}T00:00:00.000Z`),
+      planejadoMilesimos: lista.ficha.quantidadeMilesimos,
+      fichaNomeSnapshot: lista.ficha.nome,
+      unidadeSnapshot: lista.ficha.unidade,
+      requisicaoId: req.id,
+      planejadaPorNome: autor.nome,
+      chaveIdempotencia: chave,
+      observacao: obs || null,
+    },
+    select: { id: true },
+  });
+  await tx.historicoAlteracao.create({
+    data: {
+      parceiroId: tx.parceiroId,
+      entidade: 'OrdemProducao',
+      entidadeId: ordem.id,
+      acao: 'PLANEJOU',
+      depois: {
+        nome: `Lote ${codigo} · ${lista.ficha.nome}`,
+        planejado: formatarQuantidade(lista.ficha.quantidadeMilesimos, lista.ficha.unidade),
+        paraQuando: textoDoParaDia(dia.dia, hoje).replace(/^para /, ''),
+        requisicaoDoLote: `Requisição ${numeroDaRequisicao(req.numero)} · ${loja.nome}`,
+        ...(entrada.daLista ? { daLista: entrada.daLista } : {}),
+        ...(obs ? { observacao: obs } : {}),
+      },
+      autorNome: autor.nome,
+    },
+  });
+  return { id: ordem.id, codigo };
 }
 
 // ================================================================ travas
@@ -366,6 +385,26 @@ async function travarOrdem(tx: ClienteDoParceiro, lojaId: string, id: string): P
 }
 
 const MUDOU = 'Alguém mexeu neste lote agora há pouco. Confira de novo; nada foi gravado.';
+
+/**
+ * A lista do dia (3.2) que tem este lote numa linha, travada ANTES do lote (a ordem das travas da lista: período → lista →
+ * abertura e lote). Cancelar ou estornar devolve a linha à lista; a versão dela sobe junto (`subirVersaoDaLista`), e a aba
+ * que leu a lista antes não apaga a linha nem gera de novo o lote cancelado sem ver (decisão 228). O vínculo linha × lote vivo
+ * não muda (gatilho `ListaProducaoItem_lote_confere`), então a lista lida aqui é a do lote até o fim da transação.
+ */
+async function travarListaDoLote(tx: ClienteDoParceiro, lojaId: string, ordemId: string): Promise<string | null> {
+  if (!ID.test(ordemId)) return null;
+  const [l] = await tx.sql<{ id: string }>`
+    SELECT l."id" FROM "ListaProducao" l
+    JOIN "ListaProducaoItem" i ON i."listaId" = l."id" AND i."parceiroId" = l."parceiroId"
+    WHERE l."parceiroId" = ${tx.parceiroId} AND l."lojaId" = ${lojaId} AND i."ordemProducaoId" = ${ordemId}
+    FOR UPDATE OF l`;
+  return l?.id ?? null;
+}
+
+async function subirVersaoDaLista(tx: ClienteDoParceiro, listaId: string | null) {
+  if (listaId) await tx.listaProducao.update({ where: { id: listaId }, data: { versao: { increment: 1 } } });
+}
 
 /** O líquido que saiu pela requisição, por insumo (baixas + estornos do livro): a verdade do custo do lote. */
 async function baixasDaRequisicao(tx: ClienteDoParceiro, requisicaoId: string): Promise<BaixaDoInsumo[]> {
@@ -732,6 +771,7 @@ export async function cancelarProducao(
   return comRecusa(() =>
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'producao.registrar');
+      const daLista = await travarListaDoLote(tx, lojaId, id);
       const { ordem, requisicao } = await travarOrdem(tx, lojaId, id);
       if (ordem.status === 'CANCELADA') return { ok: true as const, id: ordem.id, jaFeito: true };
       if (ordem.status === 'CONCLUIDA') throw new Recusa({ ok: false, erros: { geral: `O lote ${ordem.codigoLote} já foi concluído: para desfazer, estorne o lote (quem ajusta o estoque).` }, conflito: true });
@@ -768,6 +808,7 @@ export async function cancelarProducao(
         data: { status: 'CANCELADA', canceladaEm: agora, canceladaPorNome: autor.nome, motivoCancelamento: motivo.motivo, versao: { increment: 1 } },
       });
       if (mudou.count !== 1) throw new Error('[erp] lote mudou no meio do cancelamento.');
+      await subirVersaoDaLista(tx, daLista);
       await tx.historicoAlteracao.create({
         data: {
           parceiroId: tx.parceiroId,
@@ -812,6 +853,7 @@ export async function estornarProducao(
         const negado = recusa(alcance, 'estoque.ajustar', { lojaId });
         if (negado) throw new Recusa({ ok: false, erros: { geral: `Estornar um lote concluído mexe no saldo do estoque: ${negado}` } });
         await conferirPeriodoAberto(tx, agora);
+        const daLista = await travarListaDoLote(tx, lojaId, id);
         await exigirAberto(tx, loja, true);
         const { ordem } = await travarOrdem(tx, lojaId, id);
         if (ordem.status === 'CANCELADA' && ordem.concluidaEm) return { ok: true as const, id: ordem.id, jaFeito: true };
@@ -844,6 +886,7 @@ export async function estornarProducao(
           data: { status: 'CANCELADA', canceladaEm: agora, canceladaPorNome: autor.nome, motivoCancelamento: motivo.motivo, versao: { increment: 1 } },
         });
         if (mudou.count !== 1) throw new Error('[erp] lote mudou no meio do estorno.');
+        await subirVersaoDaLista(tx, daLista);
         await tx.historicoAlteracao.create({
           data: {
             parceiroId: tx.parceiroId,
