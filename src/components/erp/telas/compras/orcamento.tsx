@@ -167,7 +167,7 @@ function PorLoja({ dados, compacto = false }: { dados: OrcamentoDeCompra; compac
     <section aria-labelledby="orcamento-por-loja" className="min-w-0">
       {/* Ao lado do número (≥ 1280 px) o título fica só para o leitor de tela: a linha que ele ocupava é a da loja que passou. */}
       <h2 id="orcamento-por-loja" className={compacto ? 'mb-2 text-[13px] font-semibold text-texto xl:sr-only' : 'mb-2 text-[13px] font-semibold text-texto'}>
-        Por loja <span className="font-normal text-suave">· cada nota é de uma loja: o orçamento também</span>
+        Por loja <span className="font-normal text-suave">· cada nota é de uma loja: {completa ? 'o orçamento' : 'o limite'} também</span>
       </h2>
       {lista}
       {completa && (
@@ -398,7 +398,7 @@ export function OrcamentoNaPrevia({ o }: { o: OrcamentoNaNota }) {
         <p className={`tabular-nums font-semibold ${i.passa ? 'text-atencao' : 'text-texto'}`}>
           {i.passa ? `Com esta nota, fica ${fraseDoLimite(i.depoisCentavos)}.` : `Com esta nota, ainda ${fraseDoLimite(i.depoisCentavos)}.`}
         </p>
-        <p className="text-[12px] text-suave">Limite seguro: {SUBTITULO_DO_LIMITE.charAt(0).toLowerCase() + SUBTITULO_DO_LIMITE.slice(1)}</p>
+        <p className="text-[12px] text-suave">O limite seguro é um {SUBTITULO_DO_LIMITE.charAt(0).toLowerCase() + SUBTITULO_DO_LIMITE.slice(1)}</p>
         {o.semNota && <p className="text-[13px] text-atencao">A loja vendeu no período e ainda não tem nota de compra: confira se falta lançar nota.</p>}
         {aviso}
       </div>
@@ -424,11 +424,12 @@ export function OrcamentoNaPrevia({ o }: { o: OrcamentoNaNota }) {
  */
 export function AvisoDoOrcamento({ o, href, agora = false }: { o: OrcamentoNaNota; href?: string; agora?: boolean }) {
   if (o.tipo === 'fora') return null;
+  const limite = o.tipo === 'sem' ? o.arredondado : o.impacto.arredondado;
   const link = href ? (
     <>
       {' '}
       <Link href={href} className={LINK_DE_TEXTO}>
-        Ver o orçamento
+        {limite ? 'Ver o limite seguro' : 'Ver o orçamento'}
       </Link>
     </>
   ) : null;
@@ -461,4 +462,11 @@ export function AvisoDoOrcamento({ o, href, agora = false }: { o: OrcamentoNaNot
   }
   const titulo = `${agora ? 'O' : 'Hoje, o'} orçamento de compra de ${o.lojaNome} em ${o.periodoNome}: ${fraseDoSaldo(saldo)}.`;
   return <Aviso titulo={titulo}>{link}</Aviso>;
+}
+
+/** O título do bloco na prévia: quem não vê o DRE lê "Limite seguro de compra"; nota de outro período, "Quanto ainda cabe". */
+export function tituloNaPrevia(o: OrcamentoNaNota): string {
+  if (o.tipo === 'fora') return 'Quanto ainda cabe';
+  const limite = o.tipo === 'sem' ? o.arredondado : o.impacto.arredondado;
+  return limite ? 'Limite seguro de compra' : 'Orçamento de compra';
 }

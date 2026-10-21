@@ -6,7 +6,7 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
-import { AvisoDoOrcamento, OrcamentoNaPrevia, TelaOrcamento } from '@/components/erp/telas/compras/orcamento';
+import { AvisoDoOrcamento, OrcamentoNaPrevia, TelaOrcamento, tituloNaPrevia } from '@/components/erp/telas/compras/orcamento';
 import type { OrcamentoDeCompra, OrcamentoNaNota, VistaCompleta } from '@/lib/erp/orcamento';
 import { fraseAcimaDoLimite, fraseDeQuemPassou } from '@/lib/erp/orcamento-campos';
 
@@ -38,7 +38,7 @@ describe('2.5 · a nota: aviso, nunca bloqueio', () => {
     const h = html(createElement(OrcamentoNaPrevia, { o: conta({ antesCentavos: 1_376_544, depoisCentavos: 1_226_544, passa: false, arredondado: true }) }));
     expect(h).toContain('antes desta nota, cabe R$ 13.700,00 no limite seguro.');
     expect(h).toContain('Com esta nota, ainda cabe R$ 12.200,00 no limite seguro.');
-    expect(h).toContain('Limite seguro: valor aproximado, sempre para menos');
+    expect(h).toContain('O limite seguro é um valor aproximado, sempre para menos');
     expect(h).not.toContain('aviso');
     const acima = html(createElement(OrcamentoNaPrevia, { o: conta({ antesCentavos: 30_000, depoisCentavos: -120_000, passa: true, arredondado: true }) }));
     expect(acima).toContain('Com esta nota, fica acima do limite seguro em R$ 1.200,00.');
@@ -52,7 +52,10 @@ describe('2.5 · a nota: aviso, nunca bloqueio', () => {
     const d = html(createElement(AvisoDoOrcamento, { o }));
     expect(d).toContain('Hoje, Vila da Penha em Outubro de 2026: acima do limite seguro em R$ 300,00.');
     expect(d).toContain('bg-atencao');
-    expect(d).not.toMatch(/orçamento de compra|passou/);
+    expect(d).not.toMatch(/orçamento|passou/); // nem no link: "Ver o limite seguro"
+    expect(html(createElement(AvisoDoOrcamento, { o, href: '/erp/compras/orcamento' }))).toContain('Ver o limite seguro');
+    expect(tituloNaPrevia(o)).toBe('Limite seguro de compra');
+    expect(tituloNaPrevia({ tipo: 'fora', periodoNome: 'Outubro de 2026' })).toBe('Quanto ainda cabe');
     const sem = html(createElement(AvisoDoOrcamento, { o: { tipo: 'sem', lojaNome: 'Centro', periodoNome: 'Outubro de 2026', motivo: 'falta a meta do CMV', arredondado: false } }));
     expect(sem).toContain('Hoje, Centro em Outubro de 2026: orçamento de compra sem número.');
     expect(sem).toContain('Falta a meta do CMV.');
@@ -108,6 +111,7 @@ describe('2.5 · a tela', () => {
     expect(h).toContain('Delivery está acima do limite seguro em R$ 1.000,00');
     expect(h).toContain('acima em R$ 1.000,00');
     expect(h).not.toMatch(/passou|teto|já passou/);
+    expect(h).toContain('cada nota é de uma loja: o limite também');
     expect(h).toContain('sem faturamento lançado nas últimas 4 semanas');
     expect(h).toContain('1 dia sem lançamento completo de faturamento');
     expect(h.match(/Valor aproximado/g)).toHaveLength(1); // dito uma vez, no subtítulo
