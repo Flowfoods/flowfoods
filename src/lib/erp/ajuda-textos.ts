@@ -143,6 +143,51 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'producao-lista',
+    area: 'producao',
+    rotas: ['producao/lista'],
+    titulo: 'Lista do dia',
+    versao: 1,
+    aula: [
+      { texto: 'Escolha a loja para ver a lista do dia: o que ela vai produzir e o que isso pede do estoque.' },
+      { texto: 'Ao lado de cada loja, quantos pré-preparos a lista de hoje tem e quantos ainda não viraram lote.' },
+    ],
+  },
+  {
+    chave: 'producao-lista-loja',
+    area: 'producao',
+    rotas: ['producao/lista/[lojaId]'],
+    titulo: 'Lista do dia da loja',
+    versao: 1,
+    aula: [
+      { texto: 'O que a loja vai produzir no dia, e o que isso pede do estoque: quanto vai usar de cada insumo, quanto tem e quanto falta.' },
+      { texto: 'Falta escrito em vermelho quer dizer que o estoque não dá. Abaixo de zero quer dizer que o estoque está errado ou que falta lançar nota.' },
+      { texto: 'Monte a lista, salve e confira o que falta. Depois, gere os lotes: cada pré-preparo vira um lote, com a requisição dos insumos.', para: ['producao.planejar'] },
+      { texto: 'Quem define a lista é a gerência. Os lotes dela aparecem em Lotes, para começar e concluir como sempre.', para: ['producao.registrar'] },
+    ],
+    secoes: [
+      {
+        id: 'conta',
+        titulo: 'Como a conta é feita',
+        blocos: [
+          { texto: 'O vai usar sai da receita de cada ficha, já com o fator de correção, igual ao que a requisição do lote vai pedir.' },
+          { texto: 'Se a receita usa outro pré-preparo, como a base do molho, conta primeiro o que tem dele no estoque e o que a lista produz. O que ainda falta entra pela receita dele.' },
+          { texto: 'Depois que vira lote, conta só o que ainda falta sair pela requisição. O que já saiu está no estoque, então nada é contado duas vezes.' },
+          { texto: 'Loja sem a contagem de abertura não tem saldo: a lista mostra só o que vai usar.' },
+        ],
+      },
+      {
+        id: 'compra',
+        titulo: 'Para quem compra',
+        blocos: [
+          { texto: 'A lista não faz pedido. Quem compra vê o que falta e lança a nota em Compras.', para: ['compras.ver', 'compras.lancar'] },
+          { texto: 'A compra estimada usa o último preço pago. Insumo sem preço fica de fora, e a tela diz qual.', para: ['insumos.ver'] },
+          { texto: 'O quanto ainda cabe é o mesmo do Orçamento de compra, com a compra estimada somada.', para: ['compras.ver', 'compras.lancar'] },
+        ],
+      },
+    ],
+  },
+  {
     chave: 'producao-quadro',
     area: 'producao',
     rotas: ['producao/[lojaId]'],

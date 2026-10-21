@@ -10,6 +10,7 @@ import type { Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { ResultadoEstoque } from '@/lib/erp/estoque';
 import { cancelarProducao, concluirProducao, estornarProducao, iniciarProducao, planejarProducao, type Autor } from '@/lib/erp/producao';
+import { gerarLotesDaLista, porNaListaDoDia, salvarListaDoDia } from '@/lib/erp/producao-lista';
 import { linhasDoPedido } from '../requisicoes/executar';
 import type { EstadoEstoque } from '../estoque/estado';
 
@@ -57,4 +58,36 @@ export async function executarCancelarLote(cliente: ClienteDoParceiro, alcance: 
 export async function executarEstornar(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData, base: string) {
   const r = await estornarProducao(cliente, alcance, lojaId, id, { versao: form.get('versao'), motivo: form.get('motivo'), confirmarNegativo: form.get('confirmarNegativo') }, autor);
   return concluir(r, anterior, base, (x) => `${base}/${lojaId}/${x}`, 'estornado', 'ja-estornado');
+}
+
+// ================================================================ a lista do dia (3.2)
+
+/** Volta para a lista do mesmo dia (a tela é por loja e dia). `base` = `/erp/producao` ou o espelho do nível 1. */
+const naLista = (base: string, lojaId: string, dia: unknown) => `${base}/lista/${lojaId}${typeof dia === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dia) ? `?dia=${dia}&` : '?'}`;
+
+function voltarParaALista(r: ResultadoEstoque, anterior: EstadoEstoque, base: string, lojaId: string, dia: unknown, feito: string, jaFeito: string): EstadoEstoque {
+  if (!r.ok) return { ok: false, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
+  revalidatePath(base, 'layout');
+  redirect(`${naLista(base, lojaId, dia)}feito=${r.jaFeito ? jaFeito : feito}`);
+}
+
+export async function executarSalvarLista(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await salvarListaDoDia(
+    cliente,
+    alcance,
+    lojaId,
+    { dia: form.get('dia'), versao: form.get('versao'), linhaIds: form.getAll('linhaId'), fichaIds: form.getAll('fichaId'), quantidades: form.getAll('quantidade') },
+    autor,
+  );
+  return voltarParaALista(r, anterior, base, lojaId, form.get('dia'), 'lista-salva', 'lista-ja');
+}
+
+export async function executarGerarLotes(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await gerarLotesDaLista(cliente, alcance, lojaId, { dia: form.get('dia'), versao: form.get('versao') }, autor);
+  return voltarParaALista(r, anterior, base, lojaId, form.get('dia'), 'lotes-gerados', 'lotes-ja');
+}
+
+export async function executarPorNaLista(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await porNaListaDoDia(cliente, alcance, lojaId, { dia: form.get('dia'), versao: form.get('versao'), fichaId: form.get('fichaId'), quantidade: form.get('quantidade') }, autor);
+  return voltarParaALista(r, anterior, base, lojaId, form.get('dia'), 'posto-na-lista', 'posto-na-lista');
 }

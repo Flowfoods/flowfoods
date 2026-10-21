@@ -12,19 +12,21 @@ import { PageHeader } from '../../ui/cabecalho';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { SeloDoEstado } from '../estoque/situacao';
 
-type Qual = 'requisicoes' | 'divergencias' | 'contagens' | 'producao';
+type Qual = 'requisicoes' | 'divergencias' | 'contagens' | 'producao' | 'lista';
 
 const TITULO: Record<Qual, string> = {
   requisicoes: 'Requisições por loja',
   divergencias: 'Divergências por loja',
   contagens: 'Contagens por loja',
   producao: 'Produção por loja',
+  lista: 'Lista do dia por loja',
 };
 const APOIO: Record<Qual, string> = {
   requisicoes: 'o setor pede, o estoque entrega',
   divergencias: 'requisição × contagem',
   contagens: 'período, cobertura e contagem do dia a dia',
   producao: 'planeje o lote pela ficha; os insumos saem pela requisição',
+  lista: 'o que produzir hoje e o que falta comprar',
 };
 
 export function TelaLojasDoEstoque({
@@ -37,7 +39,7 @@ export function TelaLojasDoEstoque({
 }: {
   qual: Qual;
   /** `estado` só nas contagens: sem o estoque aberto não há período; a loja leva à abertura. */
-  lojas: { id: string; nome: string; pendentes?: number; atrasadas?: number; estado?: EstadoDoEstoque }[];
+  lojas: { id: string; nome: string; pendentes?: number; atrasadas?: number; estado?: EstadoDoEstoque; naLista?: number; semLote?: number }[];
   base: string;
   contexto?: string;
   /** Produção: para onde a loja leva ("nova" = planejar um lote nela; padrão = o quadro). */
@@ -47,7 +49,7 @@ export function TelaLojasDoEstoque({
 }) {
   return (
     <div className="space-y-6">
-      <PageHeader icone={qual === 'producao' ? 'producao' : 'estoque'} cor={qual === 'producao' ? COR.producao : COR.estoque} titulo={destino === 'nova' ? 'Nova produção: em qual loja?' : TITULO[qual]} subtitulo={[contexto, APOIO[qual]].filter(Boolean).join(' · ')} />
+      <PageHeader icone={qual === 'producao' || qual === 'lista' ? 'producao' : 'estoque'} cor={qual === 'producao' || qual === 'lista' ? COR.producao : COR.estoque} titulo={destino === 'nova' ? 'Nova produção: em qual loja?' : TITULO[qual]} subtitulo={[contexto, APOIO[qual]].filter(Boolean).join(' · ')} />
       <Painel semRespiro>
         {lojas.length === 0 ? (
           <Vazio titulo="Nenhuma loja no seu acesso.">Peça a quem cuida da equipe para incluir as lojas em que você trabalha.</Vazio>
@@ -64,6 +66,11 @@ export function TelaLojasDoEstoque({
                     </span>
                   )}
                   {qual === 'contagens' && l.estado && <SeloDoEstado l={{ estado: l.estado }} />}
+                  {qual === 'lista' && (
+                    <span className="shrink-0 text-[13px] tabular-nums text-suave">
+                      {l.naLista ? `hoje: ${l.naLista} ${l.naLista === 1 ? 'pré-preparo' : 'pré-preparos'}${l.semLote ? ` · ${l.semLote} sem lote` : ''}` : 'sem lista hoje'}
+                    </span>
+                  )}
                 </Link>
               </li>
             ))}
@@ -77,6 +84,7 @@ export function TelaLojasDoEstoque({
 /** Contagens: `<loja>/periodo` só existe com o estoque aberto; antes disso a loja leva à abertura. */
 function destinoDaLoja(qual: Qual, base: string, l: { id: string; estado?: EstadoDoEstoque }, destino?: 'quadro' | 'nova') {
   if (qual === 'producao') return destino === 'nova' ? `${base}/${l.id}/nova` : `${base}/${l.id}`;
+  if (qual === 'lista') return `${base}/${l.id}`;
   if (qual === 'contagens') return l.estado === 'ABERTO' ? `${base}/${l.id}/periodo` : `${base}/${l.id}`;
   return `${base}/${l.id}/${qual}`;
 }

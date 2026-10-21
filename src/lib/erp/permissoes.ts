@@ -26,8 +26,8 @@
  * quem decide é o servidor.
  */
 
-/** Sobe quando o catálogo ganha permissão nova (perfil próprio guarda em que versão nasceu). */
-export const VERSAO_DO_CATALOGO = 1;
+/** Sobe quando o catálogo ganha permissão nova (perfil próprio guarda em que versão nasceu). 2 = 3.2, `producao.planejar`. */
+export const VERSAO_DO_CATALOGO = 2;
 
 export interface DefinicaoDePermissao {
   rotulo: string;
@@ -101,11 +101,15 @@ export const CATALOGO = [
   },
   {
     // 3.1: a produção saiu de "em breve" (planejar o lote, dar baixa pela requisição, concluir e pôr no estoque).
+    // 3.2: a lista do dia. Quem DEFINE o que a loja produz no dia (e transforma a lista em lotes) é o gerente, não a
+    // cozinha: "registrar produção" é do operador, então a lista ganhou permissão própria (decisão 219). Fica fora do
+    // operador; dono e gerente recebem pelo perfil base; perfil próprio só se alguém der.
     chave: 'producao',
     rotulo: 'Produção',
     permissoes: {
       'producao.ver': { rotulo: 'Ver a produção e a lista do dia', porLoja: true },
       'producao.registrar': { rotulo: 'Registrar produção', porLoja: true },
+      'producao.planejar': { rotulo: 'Definir a lista do dia (o que a loja produz)', porLoja: true },
     },
   },
   {

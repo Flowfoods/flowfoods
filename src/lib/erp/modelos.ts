@@ -31,6 +31,9 @@ export const MODELOS_DE_TENANT = [
   'requisicao',
   'requisicaoItem',
   'ordemProducao',
+  // 3.2: a lista do dia e as linhas dela.
+  'listaProducao',
+  'listaProducaoItem',
   'etiqueta',
   'faturamentoLancamento',
   'dreLinha',
@@ -75,6 +78,8 @@ export const RELACOES_DE_TENANT = [
   'erpRequisicoes',
   'erpRequisicaoItens',
   'erpOrdensProducao',
+  'erpListasProducao',
+  'erpListaProducaoItens',
   'erpEtiquetas',
   'erpFaturamentos',
   'erpDreLinhas',
