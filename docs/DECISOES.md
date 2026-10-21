@@ -2053,3 +2053,60 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Razão:** só texto e apresentação, sem tocar na conta, nas permissões nem no isolamento. Na vista resumida a palavra é "limite seguro": "cabe R$ X no limite seguro" / "acima do limite seguro em R$ X", tom de ATENÇÃO (nunca erro), e o subtítulo "Valor aproximado, sempre para menos: a conta exata pode ter mais folga e fica com quem vê o DRE." (só quando há número). O mesmo na tela, na prévia ("Com esta nota, fica acima do limite seguro em R$ X"), no aviso do detalhe e na linha da rede ("<Loja> está acima do limite seguro em R$ X"); "orçamento", "passou" e "teto" não aparecem para essa pessoa nos textos do número (teste): o bloco da prévia se chama "Limite seguro de compra", o link do detalhe "Ver o limite seguro" e o "Por loja" diz "o limite também" (o nome da tela, "Orçamento de compra", fica). **Escolha dos centavos:** os valores dessa vista são EXIBIDOS em degraus de R$ 100 para o lado de menos folga (cabe: para baixo; acima: para cima; "cabe menos de R$ 100,00"), em vez de "aprox.": coerente com "sempre para menos" e sem centavos que pareçam exatos (`aproximado`, `fraseDoLimite`; é só exibição, a conta segue a da decisão 213). A ajuda explica em uma frase: "quem não vê o DRE vê o limite seguro, um valor aproximado e sempre para menos" (`compras-orcamento` v3). Tabela: a célula de quem não tem número diz só "sem número", o motivo vai uma vez sob o nome da loja, em 12 px, quebrando linha; o farol sem cor não tem mais `whitespace-nowrap`; o cabeçalho "Receita prevista" virou "Prevista" (o nome inteiro no `title` e para o leitor de tela). Na rede, a loja sem faturamento é nomeada e o link "Lançar o faturamento" segue (os motivos das lojas também acendem a saída); "Como a conta chega aqui" com a rede sem número diz por quê, em vez de um espaço em branco; o aviso "sem número" do detalhe começa pelo nome da loja; a prévia vem para a vista depois de "Conferir o impacto" (`scrollIntoView`, sem animação com `prefers-reduced-motion`). Revisão do Guardião (menor): dia incompleto num dia da semana sem nenhuma amostra completa vale o que foi lançado nele (piso), e a frase passou a "sábado sem dia completo nas últimas 4 semanas: conta só o que já foi lançado" (a anterior, "sem venda lançada", era falsa quando um canal foi lançado).
 
+### 218. 2026-10-21 · ERP 3.2: a lista do dia tem tabela própria (uma por loja e dia); a "lista derivada das ordens" da 0.1 fica superada
+
+**Alternativas:** (a) a lista do dia é derivada das ordens PLANEJADAS da data × saldo, sem tabela (o comentário da 0.1 em `OrdemProducao`); (b) tabelas `ListaProducao` (loja × dia, única) e `ListaProducaoItem` (pré-preparo, quanto, retrato do nome e da unidade, e o lote que a linha virou).
+
+**Razão:** (b). Com (a), montar a lista seria planejar lotes: cada linha já mandaria uma requisição ao estoque e mudar uma quantidade seria cancelar e planejar de novo. O gerente precisa de um rascunho do dia que cruze com o estoque ANTES de virar lote ("o que falta comprar para a produção de amanhã"). A linha guarda o lote (`ordemProducaoId` único): um lote por linha, e o lote não sabe da lista (a 3.1 não muda). Migration aditiva, com `parceiroId`, FKs compostas, CHECKs de nascença, RLS + FORCE + política, gatilhos e o conferidor pós-deploy; o comentário do esquema foi reescrito.
+
+### 219. 2026-10-21 · ERP 3.2: permissão nova `producao.planejar` ("Definir a lista do dia"), fora do operador
+
+**Alternativas:** (a) usar `producao.registrar` para montar a lista; (b) usar uma permissão sem relação (`estoque.ajustar`, `requisicao.atender`); (c) permissão nova `producao.planejar`, por loja.
+
+**Razão:** (c), inevitável: `producao.registrar` é do operador (a cozinha planeja e conclui lotes na 3.1), e o plano diz "gerente/permitido define o que produzir"; com (a) o operador montaria a lista; (b) daria a lista a quem ajusta saldo ou entrega requisição, sem ligação com produzir. Dono e gerente recebem pelo perfil base (que deriva do catálogo); o operador não; perfil próprio só se alguém der (menor privilégio, regra da 0.4). `VERSAO_DO_CATALOGO` subiu para 2. Ver a lista continua `producao.ver` (o rótulo da 0.4 já dizia "Ver a produção e a lista do dia"): a cozinha lê. Gerar os lotes também é `producao.planejar` (decisão do gerente); a 3.3 pode abrir "pegar da lista" a quem registra produção.
+
+### 220. 2026-10-21 · ERP 3.2: vai usar = a receita BRUTA arredondada como a requisição do lote; comprar = max(0, vai usar − tem), na unidade do insumo
+
+**Alternativas:** (a) custo/quantidade da ficha em fração exata, arredondada só no total; (b) a mesma conta da requisição (`quantidadesDaFicha`: líquido × fator × quanto ÷ rendimento, um arredondamento por insumo e linha).
+
+**Razão:** (b). O "vai usar" tem de ser o que a requisição do lote vai pedir: quando a linha vira lote, nada muda na tela (provado no banco: a conta antes e depois de gerar é igual). Tudo na unidade base do insumo (kg/g, L/ml, un), com a unidade ao lado; caixa não se converte sem fator: a embalagem padrão aparece só como apoio quando o conteúdo é declarado e diferente de 1 kg/1 L/1 un ("≈ 2 embalagens de 900 ml"). Comprar com a palavra ("falta 500 ml" em vermelho; "dá" em verde): a cor nunca é o único sinal.
+
+### 221. 2026-10-21 · ERP 3.2: pré-preparo dentro da receita: primeiro o que tem, depois o que a lista produz; o que falta entra em cascata
+
+**Alternativas:** (a) sem cascata (o pré-preparo da receita conta como insumo, como na requisição da 1.8); (b) cascata cega até o fundo, ignorando o estoque do pré-preparo; (c) cascata com estoque: o pré-preparo usado vem do saldo dele e do que a própria lista produz; só o que ainda falta entra pela receita dele (ordem topológica das fichas, até o fundo).
+
+**Razão:** (c). (a) esconde a cebola que falta para fazer a base que o molho usa; (b) manda comprar cebola para uma base que já está pronta na câmara. A tela mostra o pré-preparo à parte ("vai usar · tem · na lista · falta produzir") e o botão "Pôr na lista" o transforma em linha (aí a conta passa a vir da linha, com o mesmo total). Círculo forçado no banco não entra em laço (aviso). Hipótese para o Rodolfo: "Pôr na lista" sugere exatamente o que falta, sem lote mínimo nem embalagem fechada (a política de lote do Kairu é do robô do cronograma, fora desta subfase).
+
+### 222. 2026-10-21 · ERP 3.2: sem segunda baixa: a linha que virou lote conta só o que falta sair pela requisição dele
+
+**Alternativas:** (a) a linha conta a receita inteira até o lote ser concluído; (b) a linha em lote conta o que ainda falta SAIR pela requisição (pedido − saído líquido, com a requisição aberta ou em parte); concluído não conta.
+
+**Razão:** (b). O que já saiu está no saldo; com (a) o mesmo cheddar contaria no "tem" (a menos) e no "vai usar" (a mais), e o comprar dobraria. Provado no banco: entregar a requisição do molho baixa uma vez e o "comprar" de todos os insumos fica igual. O insumo que o lote tirou e deixou abaixo de zero continua na conta (vai usar 0, comprar = o buraco), senão o "comprar" sumiria na entrega. Os lotes do mesmo dia planejados fora da lista (Nova produção) aparecem na tela e entram na conta pela mesma regra: a lista do dia mostra a produção do dia inteira.
+
+### 223. 2026-10-21 · ERP 3.2: saldo negativo é alarme e entra na conta; loja sem saldo apurado = frase, nunca "tem 0"
+
+**Alternativas:** (a) travar ou zerar o negativo; (b) negativo como está: comprar = vai usar − (−X), com "abaixo de zero" escrito; (c) sem abertura de estoque, mostrar 0.
+
+**Razão:** (b), como pede o Kairu ("o negativo é o alarme"): o livro abaixo de zero fica à vista no "tem", no resumo ("1 abaixo de zero no livro") e na compra. Hipótese para o Rodolfo: se o negativo for quase sempre nota esquecida, o comprador compra a mais; a alternativa é contar o negativo como zero e só avisar (muda uma linha de `contaDaLista`). (c) foi recusada: loja sem abertura (ou em contagem de abertura) mostra a frase do motivo, sem cascata nem comprar; a lista se monta igual, e gerar os lotes espera o estoque abrir (a requisição baixa do estoque).
+
+### 224. 2026-10-21 · ERP 3.2: idempotência pela versão lida e pelo conteúdo; a linha com lote vivo não muda; ordem das travas período → lista → 3.1
+
+**Alternativas:** (a) chave do envio por formulário (como a Nova produção); (b) versão lida da lista + "o mesmo conteúdo já gravado = já feito" + índice único (loja, dia) + `FOR UPDATE` da lista em toda escrita.
+
+**Razão:** (b). A lista é um documento editável (não um "criar"): duas abas com conteúdos diferentes precisam de conflito com frase, e o duplo clique do mesmo conteúdo precisa voltar "já feito". Criar = `createMany` com `skipDuplicates` e ler `FOR UPDATE` (duas transações juntas criam uma lista). Gerar os lotes: tudo ou nada, a linha travada que já tem lote não vira outro (duas abas: um lote por linha). A linha com lote planejado, em produção ou concluído não muda nem sai (regra e gatilho `ListaProducaoItem_lote_confere`, até por SQL cru); cancelar o lote devolve a linha. Ordem das travas: período (compartilhada) → lista → as da 3.1 dentro de `planejarProducaoNaTx`. O DIA da lista em período fechado do DRE recusa salvar, pôr e gerar (teste mutante: salvar espera o fechamento ~900 ms). Mutantes conferidos: tirar a trava do período, a versão ou o `FOR UPDATE` derruba os testes.
+
+### 225. 2026-10-21 · ERP 3.2: aba "Lista do dia" é a primeira da área Produção; celular primeiro
+
+**Alternativas:** (a) "Lotes" continua a entrada da área e a lista vira a segunda aba; (b) a lista é a primeira aba (o card da área abre nela).
+
+**Razão:** (b). O dia da cozinha começa pela lista (o que produzir e o que falta), e a 3.3 ("funcionário pega da lista") faz dela a tela central; "Lotes" segue ao lado. Tela: o dia (Ontem · Hoje · Amanhã + outro dia), "O que produzir" (as que viraram lote com a etapa e o link; as abertas no formulário de celular: seletor em largura cheia, quantidade de 48 px com `inputmode=decimal` e a unidade ao lado), "Pré-preparos que entram nas receitas", "Matéria-prima" (tabela Corporativo a partir de 768 px, cartões abaixo; números sem quebra), "Para quem compra" e o histórico. Lado a lado a partir de 1280 px. Provado em 390, 820, 1180 e 1440, claro e escuro, dona, gerente e operador: zero rolagem lateral, zero violação do axe.
+
+### 226. 2026-10-21 · ERP 3.2: a lista não faz pedido; custo estimado só com `insumos.ver`; orçamento pela vista da 2.5
+
+**Alternativas:** (a) gerar pedido de compra; (b) mostrar o que falta, o custo estimado (para quem vê custos) e o orçamento de compra, com o link para lançar a nota.
+
+**Razão:** (b): pedido automático está fora do plano. Custo = falta × último preço pago (fração exata; insumo sem preço fica de fora e a tela diz qual), montado no servidor só para `insumos.ver`. O orçamento entra por `orcamentoNaNota` (a regra única da 2.5) com a compra estimada somada: quem vê o DRE lê "cabe/passa"; quem não vê lê o limite seguro (decisões 210, 213, 217); quem não vê custos não leva o valor nem para a conta (parte de zero, só o "cabe"). Nenhum número novo depende da receita.
+
+### 227. 2026-10-21 · ERP 3.2: histórico da lista sem R$, ajuda nova, Histórico geral e versão
+
+**Razão:** entidade "Lista do dia" no histórico: Montada (CRIOU), Mudou (ALTEROU, o que entrou, saiu e mudou de quantidade, pela mesma leitura dos itens da ficha), Apagada (EXCLUIU), Lotes gerados (GEROU_LOTES, com os códigos); nenhum valor. O lote diz "da lista". O filtro "Produção" do Histórico geral inclui a lista, e quem não vê produção não recebe nada dela. Ajuda nova: `producao-lista` e `producao-lista-loja` (aula sem R$; blocos por permissão; lock com 55 entradas). `VERSAO_DO_ERP` = "Barney ERP · fase 3.2".

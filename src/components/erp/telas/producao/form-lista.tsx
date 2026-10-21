@@ -72,110 +72,115 @@ export function FormListaDoDia({
   const motivoDeNaoGerar = bloqueio ?? (mudou ? 'Salve a lista antes de gerar os lotes: os lotes saem do que está salvo.' : salvas === 0 ? null : naoGera);
   return (
     <div className="space-y-4">
-      <form action={enviar} className="space-y-3" aria-label="Pré-preparos em aberto">
-        {/* Sem <legend> e com os campos ocultos no FIM: no começo, o `space-y` dava margem ao primeiro bloco visível (vão no topo do painel). */}
-        <fieldset disabled={!!bloqueio} className="space-y-3">
-          <ol className="space-y-3">
-            {linhas.map((l, n) => {
-              const o = porId.get(l.fichaId);
-              const u = o ? UNIDADES[o.unidade] : null;
-              const erro = erros[`linha:${n}`];
-              const idF = `lista-f-${l.chave}`;
-              const idQ = `lista-q-${l.chave}`;
-              const outras = new Set(linhas.filter((x) => x.chave !== l.chave).map((x) => x.fichaId));
-              return (
-                <li key={l.chave} className="rounded-[10px] border border-linha p-3">
-                  <input type="hidden" name="linhaId" value={l.id} />
-                  <label htmlFor={idF} className="sr-only">
-                    Pré-preparo da linha {n + 1}
-                  </label>
-                  <select
-                    id={idF}
-                    name="fichaId"
-                    value={l.fichaId}
-                    onChange={(e) => muda(l.chave, { fichaId: e.target.value })}
-                    className={`${CAMPO} min-h-12 text-base sm:text-sm`}
-                    aria-invalid={!!erro}
-                    aria-describedby={erro ? `${idQ}-erro` : undefined}
-                  >
-                    <option value="">Escolha o pré-preparo</option>
-                    {opcoes.map((x) => (
-                      <option key={x.id} value={x.id} disabled={outras.has(x.id)}>
-                        {x.nome}
-                        {outras.has(x.id) ? ' (já na lista)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-2 flex items-stretch gap-2">
-                    <label htmlFor={idQ} className="sr-only">
-                      Quanto produzir{o ? ` de ${o.nome}` : ''}
+      {/* O espaçamento mora numa div interna: o React põe os campos ocultos da action no começo do <form>, e um `space-y` no
+          próprio formulário dava margem ao primeiro bloco visível (vão no topo do painel). Sem <legend> pelo mesmo motivo. */}
+      <form action={enviar} aria-label="Pré-preparos em aberto">
+        <div className="space-y-3">
+          <fieldset disabled={!!bloqueio} className="space-y-3">
+            <ol className="space-y-3">
+              {linhas.map((l, n) => {
+                const o = porId.get(l.fichaId);
+                const u = o ? UNIDADES[o.unidade] : null;
+                const erro = erros[`linha:${n}`];
+                const idF = `lista-f-${l.chave}`;
+                const idQ = `lista-q-${l.chave}`;
+                const outras = new Set(linhas.filter((x) => x.chave !== l.chave).map((x) => x.fichaId));
+                return (
+                  <li key={l.chave} className="rounded-[10px] border border-linha p-3">
+                    <input type="hidden" name="linhaId" value={l.id} />
+                    <label htmlFor={idF} className="sr-only">
+                      Pré-preparo da linha {n + 1}
                     </label>
-                    <input
-                      id={idQ}
-                      name="quantidade"
-                      inputMode="decimal"
-                      autoComplete="off"
-                      placeholder="Quanto"
-                      value={l.quantidade}
-                      onChange={(e) => muda(l.chave, { quantidade: e.target.value })}
-                      className={`${CAMPO} min-h-12 flex-1 text-right text-[18px] font-semibold tabular-nums`}
+                    <select
+                      id={idF}
+                      name="fichaId"
+                      value={l.fichaId}
+                      onChange={(e) => muda(l.chave, { fichaId: e.target.value })}
+                      className={`${CAMPO} min-h-12 text-base sm:text-sm`}
                       aria-invalid={!!erro}
-                      aria-describedby={erro ? `${idQ}-erro` : `${idQ}-unidade`}
-                    />
-                    <span id={`${idQ}-unidade`} className="flex w-[72px] shrink-0 items-center justify-center rounded-[10px] border border-linha text-[14px] text-suave">
-                      {u ? u.sigla : '—'}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setLinhas((ls) => (ls.length > 1 ? ls.filter((x) => x.chave !== l.chave) : [nova()]))}
-                      className={classeDeBotao('fantasma', 'min-h-12 shrink-0 px-3')}
-                      aria-label={`Tirar a linha ${n + 1}${o ? ` (${o.nome})` : ''}`}
+                      aria-describedby={erro ? `${idQ}-erro` : undefined}
                     >
-                      Tirar
-                    </button>
-                  </div>
-                  <Erro id={`${idQ}-erro`} texto={erro} />
-                </li>
-              );
-            })}
-          </ol>
-          <button type="button" onClick={() => setLinhas((ls) => [...ls, nova()])} className={classeDeBotao('secundario', 'min-h-12 w-full sm:w-auto')}>
-            Mais um pré-preparo
-          </button>
-        </fieldset>
-        {(erros.geral || errosDeLinha > 1) && (
-          <p role="alert" className="text-[13px] text-erro">
-            {erros.geral ?? `${errosDeLinha} linhas precisam de ajuste: veja embaixo de cada uma.`}
-          </p>
-        )}
-        <div className="flex flex-col gap-2 border-t border-linha pt-3 sm:flex-row sm:items-center sm:justify-between">
-          <p className="text-[12px] text-suave">{mudou ? 'Há mudança por salvar: a conta embaixo é a da lista salva.' : 'Na unidade do rendimento da ficha: 5 é cinco quilos de molho.'}</p>
-          <BotaoEnviar variante={mudou || salvas === 0 ? 'primario' : 'secundario'} pendente="Salvando…" disabled={!!bloqueio} className="min-h-12 w-full sm:w-auto sm:min-w-[160px]">
-            Salvar a lista
-          </BotaoEnviar>
+                      <option value="">Escolha o pré-preparo</option>
+                      {opcoes.map((x) => (
+                        <option key={x.id} value={x.id} disabled={outras.has(x.id)}>
+                          {x.nome}
+                          {outras.has(x.id) ? ' (já na lista)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="mt-2 flex items-stretch gap-2">
+                      <label htmlFor={idQ} className="sr-only">
+                        Quanto produzir{o ? ` de ${o.nome}` : ''}
+                      </label>
+                      <input
+                        id={idQ}
+                        name="quantidade"
+                        inputMode="decimal"
+                        autoComplete="off"
+                        placeholder="Quanto"
+                        value={l.quantidade}
+                        onChange={(e) => muda(l.chave, { quantidade: e.target.value })}
+                        className={`${CAMPO} min-h-12 flex-1 text-right text-[18px] font-semibold tabular-nums`}
+                        aria-invalid={!!erro}
+                        aria-describedby={erro ? `${idQ}-erro` : `${idQ}-unidade`}
+                      />
+                      <span id={`${idQ}-unidade`} className="flex w-[72px] shrink-0 items-center justify-center rounded-[10px] border border-linha text-[14px] text-suave">
+                        {u ? u.sigla : '—'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setLinhas((ls) => (ls.length > 1 ? ls.filter((x) => x.chave !== l.chave) : [nova()]))}
+                        className={classeDeBotao('fantasma', 'min-h-12 shrink-0 px-3')}
+                        aria-label={`Tirar a linha ${n + 1}${o ? ` (${o.nome})` : ''}`}
+                      >
+                        Tirar
+                      </button>
+                    </div>
+                    <Erro id={`${idQ}-erro`} texto={erro} />
+                  </li>
+                );
+              })}
+            </ol>
+            <button type="button" onClick={() => setLinhas((ls) => [...ls, nova()])} className={classeDeBotao('secundario', 'min-h-12 w-full sm:w-auto')}>
+              Mais um pré-preparo
+            </button>
+          </fieldset>
+          {(erros.geral || errosDeLinha > 1) && (
+            <p role="alert" className="text-[13px] text-erro">
+              {erros.geral ?? `${errosDeLinha} linhas precisam de ajuste: veja embaixo de cada uma.`}
+            </p>
+          )}
+          <div className="flex flex-col gap-2 border-t border-linha pt-3 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-[12px] text-suave">{mudou ? 'Há mudança por salvar: a conta embaixo é a da lista salva.' : 'Na unidade do rendimento da ficha: 5 é cinco quilos de molho.'}</p>
+            <BotaoEnviar variante={mudou || salvas === 0 ? 'primario' : 'secundario'} pendente="Salvando…" disabled={!!bloqueio} className="min-h-12 w-full sm:w-auto sm:min-w-[160px]">
+              Salvar a lista
+            </BotaoEnviar>
+          </div>
         </div>
         <input type="hidden" name="dia" value={dia} />
         <input type="hidden" name="versao" value={versao ?? ''} />
       </form>
 
       {(salvas > 0 || emLote === 0) && (
-        <form action={enviarGerar} className="space-y-2 rounded-[10px] border border-linha p-3" aria-label="Gerar os lotes">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[13px] text-suave">
-              {salvas === 0
-                ? 'Monte e salve a lista; depois cada pré-preparo vira um lote da produção.'
-                : `${salvas === 1 ? 'O pré-preparo em aberto vira um lote' : `Os ${salvas} pré-preparos em aberto viram lotes`} da produção, cada um com a requisição dos insumos. Nada sai do estoque até o estoque entregar.`}
-            </p>
-            <BotaoEnviar variante={mudou || salvas === 0 ? 'secundario' : 'primario'} pendente="Gerando…" disabled={salvas === 0 || !!motivoDeNaoGerar} className="min-h-12 w-full shrink-0 sm:w-auto sm:min-w-[180px]">
-              {salvas > 1 ? `Gerar os ${salvas} lotes` : 'Gerar o lote'}
-            </BotaoEnviar>
+        <form action={enviarGerar} className="rounded-[10px] border border-linha p-3" aria-label="Gerar os lotes">
+          <div className="space-y-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-[13px] text-suave">
+                {salvas === 0
+                  ? 'Monte e salve a lista; depois cada pré-preparo vira um lote da produção.'
+                  : `${salvas === 1 ? 'O pré-preparo em aberto vira um lote' : `Os ${salvas} pré-preparos em aberto viram lotes`} da produção, cada um com a requisição dos insumos. Nada sai do estoque até o estoque entregar.`}
+              </p>
+              <BotaoEnviar variante={mudou || salvas === 0 ? 'secundario' : 'primario'} pendente="Gerando…" disabled={salvas === 0 || !!motivoDeNaoGerar} className="min-h-12 w-full shrink-0 sm:w-auto sm:min-w-[180px]">
+                {salvas > 1 ? `Gerar os ${salvas} lotes` : 'Gerar o lote'}
+              </BotaoEnviar>
+            </div>
+            {motivoDeNaoGerar && salvas > 0 && <p className="text-[13px] text-atencao">{motivoDeNaoGerar}</p>}
+            {estadoGerar?.erros.geral && (
+              <p role="alert" className="text-[13px] text-erro">
+                {estadoGerar.erros.geral}
+              </p>
+            )}
           </div>
-          {motivoDeNaoGerar && salvas > 0 && <p className="text-[13px] text-atencao">{motivoDeNaoGerar}</p>}
-          {estadoGerar?.erros.geral && (
-            <p role="alert" className="text-[13px] text-erro">
-              {estadoGerar.erros.geral}
-            </p>
-          )}
           <input type="hidden" name="dia" value={dia} />
           <input type="hidden" name="versao" value={versao ?? ''} />
         </form>

@@ -241,3 +241,18 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   rede, em `erro`, quem já passou ("a sobra de outra loja não cobre"); número e "Por loja" lado a lado a partir de 1280 px. "Por loja" em tabela Corporativo a partir de
   1024 px, cartões abaixo. Na prévia da nota, um subtítulo "Orçamento de compra" no mesmo painel; no detalhe, `Aviso`
   (tom alerta só quando passou). Nunca bloqueia: o botão de lançar segue.
+- **Lista do dia (3.2)**: o dia num segmentado de links (Ontem · Hoje · Amanhã, `aria-current`) + "Outro dia" (campo de data e
+  "Abrir", GET). Dois painéis lado a lado a partir de 1280 px ("O que produzir" + "Pré-preparos que entram nas receitas" à esquerda,
+  5 fr; "Matéria-prima" + "Para quem compra" à direita, 6 fr). **Matéria-prima em três colunas** (vai usar · tem · comprar), tabela
+  Corporativo a partir de 768 px (números `whitespace-nowrap`, à direita), cartão por insumo abaixo (nome 15/600 + "falta X" à direita;
+  `dl` de 2 colunas em 13 px). Comprar SEMPRE com a palavra: "falta 500 ml" (600, `erro`) ou "dá" (600, `ok`); saldo negativo
+  "−550 ml" + "abaixo de zero" (12 px, `erro`) embaixo do número; sem saldo apurado = "—" (com texto para o leitor de tela) e a frase
+  do motivo UMA vez no topo do painel, nunca "0". Embaixo do nome, em 12 px suave: "em <pré-preparos>", "≈ 2 embalagens de 900 ml"
+  (só com conteúdo declarado) e, para quem vê custos, "≈ R$ X"; "sem preço" no lugar do valor. Resumo do painel em uma linha ("3
+  insumos faltam · 3 dão · 1 abaixo de zero no livro"). **Pré-preparos que entram nas receitas**: nome 15/600, "vai usar · tem · na
+  lista" em 13 px, "falta produzir X" (600, `atencao`) ou "dá", e "Pôr na lista" (secundário, 44 px). **O que produzir**: as linhas que
+  viraram lote em lista de leitura (nome + quantidade, "no estoque agora", selo da etapa e "Lote AAMMDD-NN" sublinhado, o conjunto é o
+  link de 44 px); as em aberto no formulário de celular (seletor em largura cheia; quantidade de 48 px, 18/600, `inputmode=decimal`,
+  unidade em caixa de 72 px; "Tirar" fantasma), "Salvar a lista" e, numa caixa de borda, "Gerar os N lotes" (o primário quando não há
+  mudança por salvar; com mudança, espera e diz por quê). **Formulário com server action**: o espaçamento (`space-y`) mora numa div
+  interna, nunca no `<form>` (o React põe os campos ocultos da action no começo dele e o primeiro bloco ganhava margem).
