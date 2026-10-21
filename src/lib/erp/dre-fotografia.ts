@@ -11,7 +11,7 @@
 import type { Prisma } from '@prisma/client';
 import { cmvLidoDaFotografia, type CmvDoDre } from './cmv-campos';
 import type { LinhaGravada, Ressalva } from './dre-fechamento-campos';
-import type { TaxaDoIfood } from './dre-campos';
+import type { ReceitaLida, TaxaDoIfood } from './dre-campos';
 import type { GrupoDoDre, SentidoDaLinha } from './dre-plano';
 import type { Alcance } from './permissoes';
 import type { ClienteDoParceiro } from './tenant';
@@ -175,6 +175,37 @@ export async function lerCmvDaFotografia(tx: ClienteDoParceiro, alcance: Pick<Al
   return cmvLidoDaFotografia({ versao: 1, parcial: p?.parcial ?? false, lojas: Object.fromEntries(linhas.map((l) => [l.lojaId, l.v])) });
 }
 
+/**
+ * O que a fotografia v3 (2.4) guardou para o painel por canal, só das lojas que a pessoa alcança: a receita de cada loja e
+ * canal com os pedidos, e o ano passado (`entrada.anoPassado`). Como no CMV, a consulta já extrai do JSON só essas lojas:
+ * a base da conta das outras nunca sai do banco. Fotografia de antes da v3: nada (receitas sem pedidos, sem ano passado).
+ */
+export async function lerCanaisDaFotografia(tx: ClienteDoParceiro, alcance: Pick<Alcance, 'lojas'>, fotografiaId: string): Promise<{ receitas: ReceitaLida[]; anoPassado: unknown; versaoDasFaixas: number | null }> {
+  const todas = alcance.lojas === 'todas';
+  const ids = todas ? [] : [...alcance.lojas];
+  const linhas = await tx.sql<{ lojaId: string; canal: string; valorCentavos: number; pedidos: number | null }>`
+    SELECT r."lojaId", r."canal", r."valorCentavos", r."pedidos"
+    FROM "DreFotografia" f,
+      jsonb_to_recordset(CASE WHEN jsonb_typeof(f."entrada"->'receitas') = 'array' THEN f."entrada"->'receitas' ELSE '[]'::jsonb END)
+        AS r("lojaId" text, "canal" text, "valorCentavos" bigint, "pedidos" int)
+    WHERE f."parceiroId" = ${tx.parceiroId} AND f."id" = ${fotografiaId} AND (${todas} OR r."lojaId" = ANY(${ids}::text[]))`;
+  const [ver] = await tx.sql<{ v: number | null }>`
+    SELECT CASE WHEN jsonb_typeof(f."entrada"->'farol'->'versao') = 'number' THEN (f."entrada"->'farol'->>'versao')::int ELSE NULL END AS "v"
+    FROM "DreFotografia" f WHERE f."parceiroId" = ${tx.parceiroId} AND f."id" = ${fotografiaId}`;
+  const [ano] = await tx.sql<{ ano: unknown }>`
+    SELECT CASE WHEN jsonb_typeof(f."entrada"->'anoPassado') = 'object' AND jsonb_typeof(f."entrada"->'anoPassado'->'lojas') = 'object' THEN
+      jsonb_build_object(
+        'versao', f."entrada"->'anoPassado'->'versao', 'de', f."entrada"->'anoPassado'->'de', 'ate', f."entrada"->'anoPassado'->'ate',
+        'lojas', COALESCE((SELECT jsonb_object_agg(e."key", e."value") FROM jsonb_each(f."entrada"->'anoPassado'->'lojas') e WHERE (${todas} OR e."key" = ANY(${ids}::text[]))), '{}'::jsonb))
+      ELSE NULL END AS "ano"
+    FROM "DreFotografia" f WHERE f."parceiroId" = ${tx.parceiroId} AND f."id" = ${fotografiaId}`;
+  return {
+    receitas: linhas.map((l) => ({ lojaId: l.lojaId, canal: l.canal as ReceitaLida['canal'], valorCentavos: Number(l.valorCentavos), ...(l.pedidos !== null ? { pedidos: l.pedidos } : {}) })),
+    anoPassado: ano?.ano ?? null,
+    versaoDasFaixas: ver?.v ?? null,
+  };
+}
+
 export interface FotografiaParaGravar {
   periodoId: string;
   inicio: string;
@@ -182,7 +213,7 @@ export interface FotografiaParaGravar {
   nomeDoPeriodo: string;
   fechadoPorNome: string;
   taxa: TaxaDoIfood | null;
-  /** 1 = sem CMV (2.2b); 2 = com o CMV de compra e o real (2.3, o padrão). */
+  /** 1 = sem CMV (2.2b); 2 = com o CMV de compra e o real (2.3, o padrão); 3 = com o ano passado e a versão do farol (2.4, o que o fechamento grava). */
   versaoDaConta?: number;
   /** O que a conta leu: a base da fotografia (a receita, a despesa e o CMV de cada loja). */
   entrada: Prisma.InputJsonValue;

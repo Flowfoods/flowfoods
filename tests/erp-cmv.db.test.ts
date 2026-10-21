@@ -154,7 +154,8 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     expect(linha(d, 'resultado-do-periodo')).toMatchObject({ semContar: [], valorCentavos: R(100_000) });
     expect(d.cmv.painel).toBeNull(); // o painel compra × real é do período encerrado
     // Realizado × meta: o CMV da casa agora tem valor e a meta compara (R$ 20.000,00 de R$ 120.000,00 = 16,7 % contra 21,00 %).
-    expect(d.metas.cmv).toMatchObject({ metaBp: 2100, desvioBp: 1667 - 2100, palavra: 'melhor que a meta' });
+    expect(d.metas.cmv).toMatchObject({ metaBp: 2100, desvioBp: 1667 - 2100 });
+    expect(d.metas.cmv.faixa).toMatchObject({ cor: 'AZUL', palavra: 'bem melhor que a meta' });
   });
 
   // ------------------------------------------------------------ 2 e 3. o corte
@@ -178,7 +179,8 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     expect(linha(d, 'cmv')).toMatchObject({ valorCentavos: R(23_950), percentualBp: 1996, nota: 'real (contagem)' });
     expect(linha(d, 'cmv:compra')).toMatchObject({ valorCentavos: R(25_800), percentualBp: 2150 });
     expect(linha(d, 'cmv:real')).toMatchObject({ valorCentavos: R(23_950) });
-    expect(d.metas.cmv).toMatchObject({ metaBp: 2100, desvioBp: -104, desvioTexto: '−1,0 pp', palavra: 'melhor que a meta' });
+    expect(d.metas.cmv).toMatchObject({ metaBp: 2100, desvioBp: -104, desvioTexto: '−1,0 pp' });
+    expect(d.metas.cmv.faixa).toMatchObject({ cor: 'VERDE', palavra: 'na meta' });
     for (const c of ['margem-contribuicao', 'resultado-operacional', 'resultado-do-periodo']) expect(linha(d, c).semContar).toEqual([]);
     // O CMV que vale (o real) é subtraído da receita líquida: 120.000,00 − 23.950,00 = 96.050,00, e o resultado herda.
     expect(linha(d, 'receita-liquida').valorCentavos).toBe(R(120_000));
@@ -349,9 +351,9 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     expect(r).toEqual({ ok: true, versao: 1, jaFechado: false, ressalvas: 0 });
 
     const foto = await a.dreFotografia.findFirst({ where: { periodoId: ids.out, substituidaEm: null }, select: { id: true, versaoDaConta: true, entrada: true } });
-    expect(foto!.versaoDaConta).toBe(2);
+    expect(foto!.versaoDaConta).toBe(3); // 2.4: o fechamento grava a versão 3 (a v2 trazia o CMV; a v3, o ano passado e as faixas)
     const entrada = foto!.entrada as { versaoDaConta: number; cmv: { lojas: Record<string, { compraCentavos: number | null; real: { finalCentavos: number; inicialCentavos: number; comprasReaisCentavos: number } | null; motivoSemReal: string | null }> } };
-    expect(entrada.versaoDaConta).toBe(2);
+    expect(entrada.versaoDaConta).toBe(3);
     expect(entrada.cmv.lojas[ids.vp].real!.finalCentavos).toBe(1_355_000);
     expect(entrada.cmv.lojas[ids.vp].real!.inicialCentavos).toBe(1_170_000);
     expect(entrada.cmv.lojas[ids.dl]).toMatchObject({ compraCentavos: R(4_000), real: null, motivoSemReal: 'estoque não aberto' });

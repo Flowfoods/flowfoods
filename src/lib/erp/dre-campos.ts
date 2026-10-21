@@ -41,6 +41,8 @@ export interface ReceitaLida {
   lojaId: string;
   canal: CanalVenda;
   valorCentavos: number;
+  /** Pedidos do canal no recorte (2.4, para o ticket do painel). Ausente nas fotografias de antes da v3. */
+  pedidos?: number;
 }
 
 export interface DespesaApropriada {

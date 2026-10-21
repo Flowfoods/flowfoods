@@ -228,3 +228,9 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   próprio = cinza sem farol; abaixo do alvo = palavra em atenção embaixo.
   **Margens-alvo**: linha = canal + ajuda, campo de 96 px + "%", e o exemplo ao
   vivo "Prato de R$ 10,00: sai a R$ 33,34" à direita (14rem).
+- **Farol (2.4)**: 5 faixas fixas (azul · verde · amarelo · laranja · vermelho), cor SÓ no glifo e na palavra
+  do indicador (nunca borda de card, fundo de linha, cabeçalho ou botão). Glifo = régua de 5 quadrados de 8 px
+  com a casa da faixa cheia (a posição diz a faixa em cinza); palavra e desvio sempre juntos; sem dado que feche,
+  régua vazia e o motivo escrito. Tokens `--ff-farol-*` (claro #2F5D8A #166534 #6F6300 #B04400 #C41522; escuro
+  #8DB4DC #5DBB84 #E2C55A #F0913A #F5424D), contraste ≥ 4,5:1 sobre painel, fundo e linha de resultado.
+  Painel no topo do DRE no kit Bento da Kairu: estrutura modular, sem a paleta tonal do kit.
