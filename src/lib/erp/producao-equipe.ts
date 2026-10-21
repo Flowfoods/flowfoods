@@ -310,6 +310,8 @@ export interface LinhaDoHistoricoDaProducao extends LoteEncerrado {
   tempoMin: number | null;
   /** R$ que saíram do estoque pelos insumos (só concluídos e estornados, só para quem vê custos); `incompleto` = algum sem preço. */
   custo?: { totalCentavos: number; incompleto: boolean } | null;
+  /** Polimento: a pessoa RECEBEU o lote da gerência (quem passou), em vez de pegar; null = pegou (ou não pegou pelo ERP). */
+  passadoPor: string | null;
 }
 
 /** Quantas linhas a tela mostra (o resumo conta todas). */
@@ -341,13 +343,19 @@ export async function historicoDaProducao(
       const ficha = lerFiltroId(filtro.ficha);
       const filtrados = lotes.filter((l) => (!pessoa || l.lote.responsavel?.id === pessoa) && (!ficha || l.lote.fichaId === ficha));
       const verCustos = pode(alcance, 'insumos.ver');
-      const linhas: LinhaDoHistoricoDaProducao[] = filtrados.slice(0, LINHAS_NA_TELA).map(({ lote, custoTotalCentavos, insumosSemPreco }) => {
+      const naTela = filtrados.slice(0, LINHAS_NA_TELA);
+      const passados = await passadosPor(
+        tx,
+        naTela.filter((l) => l.lote.responsavel && l.lote.responsavelDesde).map((l) => l.lote.id),
+      );
+      const linhas: LinhaDoHistoricoDaProducao[] = naTela.map(({ lote, custoTotalCentavos, insumosSemPreco }) => {
         const desfecho = desfechoDoLote(lote);
         return {
           ...lote,
           dia: diaDoEncerramento(lote),
           desfecho,
           tempoMin: tempoDoLote(lote),
+          passadoPor: passados.get(lote.id) ?? null,
           ...(verCustos ? { custo: desfecho === 'CANCELADO' || custoTotalCentavos === null ? null : { totalCentavos: custoTotalCentavos, incompleto: insumosSemPreco > 0 } } : {}),
         };
       });

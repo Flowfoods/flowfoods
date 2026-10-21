@@ -75,7 +75,8 @@ function Tempo({ l }: { l: LinhaDoHistoricoDaProducao }) {
       <span>{l.tempoMin === null ? <span className="text-suave">sem hora de pegar</span> : formatarTempo(l.tempoMin)}</span>
       <span className="block text-[12px] text-suave">
         {/* A hora basta quando é o dia da linha; outro dia leva a data (pegou ontem, concluiu hoje). */}
-        {l.responsavelDesde ? `pegou ${horaDoDia(l.responsavelDesde, l.dia)} · ` : ''}fim {horaDoDia(l.concluidaEm!, l.dia)}
+        {l.responsavelDesde ? `${l.passadoPor ? 'recebeu' : 'pegou'} ${horaDoDia(l.responsavelDesde, l.dia)}${l.passadoPor ? ` (passado por ${l.passadoPor})` : ''} · ` : ''}fim{' '}
+        {horaDoDia(l.concluidaEm!, l.dia)}
       </span>
     </>
   );

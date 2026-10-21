@@ -277,6 +277,8 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     expect(t).toContain('4,6 kg de 5 kg');
     expect(t).toContain('92%');
     expect(t).toContain('Duda Lima');
+    // Polimento: a Duda recebeu o lote da gerência — o histórico diz "recebeu", não "pegou".
+    expect(t).toMatch(/recebeu \d\d:\d\d \(passado por Gil Gerente\) · fim \d\d:\d\d/);
     expect(h).not.toContain('R$');
     expect(t).not.toContain('Custo do lote');
     como(DONA());

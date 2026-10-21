@@ -373,6 +373,9 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)'
     expect(h.resumo).toMatchObject({ concluidos: 3, perdidos: 1, cancelados: 1, estornados: 0 });
     const molho = h.linhas.find((x) => x.id === ids.loteMolho)!;
     expect(molho).toMatchObject({ desfecho: 'CONCLUIDO', planejadoMilesimos: 5000, produzidoMilesimos: 4600, responsavel: { id: 'u-duda', nome: 'Duda Lima' }, concluidaPorNome: 'Gil Gerente', dia: hoje });
+    // Polimento: a Duda recebeu o molho da gerência (não pegou); a base, quem pegou foi a própria pessoa.
+    expect(molho.passadoPor).toBe('Gil Gerente');
+    expect(h.linhas.find((x) => x.id === ids.loteBase)!.passadoPor).toBeNull();
     expect(molho.tempoMin).not.toBeNull();
     expect(molho.custo).toMatchObject({ incompleto: false });
     expect(molho.custo!.totalCentavos).toBeGreaterThan(0);
