@@ -2117,6 +2117,33 @@ da cozinha), 404 de outra loja e de outro parceiro, a loja sem estoque, o dia qu
 `tests/erp-producao-lista-migracao.db.test.ts` (3): a migration com dado antigo nos 3 perfis do banco (superusuário, dono com FORCE RLS, dono
 sem RLS), CHECKs, FKs, índices, gatilhos, RLS, o outro parceiro, e o conferidor acusando o gatilho e a RLS que faltarem.
 
+Rodada final no código de `7ba31ba`: `prisma validate`, `tsc`, lint e portão de conteúdo limpos; `erp:conferir-migracao` e `migrate diff`
+vazio no `ff_32`. Suíte inteira com banco, como superusuário: 89 arquivos e 1809 testes passando. Como dono com FORCE RLS (`ff_dono_32`;
+arquivos da lista, da produção, da RLS e do isolamento): 101 de 102 passando. A única falha é a já registrada na 3.1: o banco montado por
+psql não tem `_prisma_migrations`, que o teste da 0.2 lê. Sem RLS (`ff_semrls`, rodada da implementação): 523 passando e 9 pulados.
+
+Na tela (build de produção do último commit de código, `7ba31ba`, com o `BUILD_ID` gerado às 17:26:45, depois do commit das 17:25:37;
+porta 3100; banco `ff_32p` copiado do `ff_32`, com os dados feitos pelas regras do sistema em `.local-scripts/lista32.ts` e `lista32b.ts`,
+fora do git: estoque da Vila da Penha aberto há 10 dias, fichas Molho cheddar, Cebola caramelizada e Maionese de bacon (com a cebola
+dentro), o óleo abaixo de zero por uma requisição do salão entregue, a lista de amanhã, a da Delivery sem estoque aberto, meta do CMV de
+30 %, um chefe = operador + "definir a lista do dia" − custos e um comprador = gerente sem DRE, despesas, faturamento e lista; roteiro
+`prova32/jornada.mjs` no scratchpad, 32 conferências, 0 falha). O card da área Produção abre a Lista do dia; com duas lojas no acesso,
+a escolha da loja; hoje ainda sem lista. O gerente, a 390 px com toque, monta Molho cheddar 5 kg e Maionese de bacon 2 kg (campo de
+48 px, `inputmode=decimal`, o aviso "Há mudança por salvar"), salva e lê "falta 500 ml" no leite, o óleo "abaixo de zero", "falta
+produzir 400 g" da cebola caramelizada e a compra estimada em R$. "Pôr na lista" põe a cebola (3 pré-preparos). Gerar com duplo toque
+cria 3 lotes, não 6; as linhas mostram o lote planejado; nenhuma baixa no livro (a baixa é a entrega). A cozinha (operador) vê os 3
+pré-preparos sem "Salvar" nem "Gerar", abre o lote pelo link, e o quadro de Lotes mostra os lotes da lista. O chefe sem custos monta a
+lista e não recebe R$ nem "compra estimada" no conteúdo. O comprador vê "Para quem compra", "Lançar nota" e o limite seguro, sem
+"orçamento" nem "passou", e não monta a lista. A Delivery mostra a frase do estoque não aberto, nunca "tem 0", e o gerar fica desabilitado
+com o motivo escrito. Matriz: dona, gerente e operador × escolha da loja, lista de hoje, lista de amanhã e Delivery × 390, 820, 1180 e
+1440 × claro e escuro (32 telas cada), mais chefe e comprador × 2 páginas × 390 e 1440 × 2 temas (8 cada). São 112 telas, com zero
+rolagem lateral e zero violação do axe (wcag2a/2aa). Alvos abaixo de 44 px só no shell e no rastro (pular para o conteúdo, logo, links do
+rastro, "Seu acesso"), que já existiam. O vão no topo de "O que produzir" mede 20 px, que é o padding do painel. Prints em
+`pw/prova32/jornada/` (10, da jornada) e `pw/prova32/matriz-*/`. Observações: o console só registrou "Failed to fetch RSC payload" de
+prefetch do Next abortado quando o roteiro navega (links do menu, com o navegador caindo na navegação normal), nada da lista. O "R$"
+que aparece no HTML inteiro do chefe é o texto da ajuda do shell ("nunca R$ 0,00", da 0.6), não da lista; por isso a conferência olha o
+`main`.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
