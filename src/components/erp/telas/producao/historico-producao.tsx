@@ -56,13 +56,14 @@ function QuemFez({ l }: { l: LinhaDoHistoricoDaProducao }) {
   );
 }
 
-function Tempo({ l, hoje }: { l: LinhaDoHistoricoDaProducao; hoje: string }) {
+function Tempo({ l }: { l: LinhaDoHistoricoDaProducao }) {
   if (l.desfecho === 'CANCELADO') return <span className="text-suave">—</span>;
   return (
     <>
       <span>{l.tempoMin === null ? <span className="text-suave">sem hora de pegar</span> : formatarTempo(l.tempoMin)}</span>
       <span className="block text-[12px] text-suave">
-        {l.responsavelDesde ? `pegou ${horaDoDia(l.responsavelDesde, hoje)} · ` : ''}fim {horaDoDia(l.concluidaEm!, hoje)}
+        {/* A hora basta quando é o dia da linha; outro dia leva a data (pegou ontem, concluiu hoje). */}
+        {l.responsavelDesde ? `pegou ${horaDoDia(l.responsavelDesde, l.dia)} · ` : ''}fim {horaDoDia(l.concluidaEm!, l.dia)}
       </span>
     </>
   );
@@ -127,7 +128,7 @@ export function TelaHistoricoDaProducao({ h, base, contexto }: { h: HistoricoDaP
                     <div>
                       <dt className="text-suave">Tempo</dt>
                       <dd>
-                        <Tempo l={l} hoje={h.hoje} />
+                        <Tempo l={l} />
                       </dd>
                     </div>
                     {h.verCustos && (
@@ -196,7 +197,7 @@ export function TelaHistoricoDaProducao({ h, base, contexto }: { h: HistoricoDaP
                       <QuemFez l={l} />
                     </td>
                     <td className={`px-3 py-2.5 text-right ${h.verCustos ? '' : 'pr-5'}`}>
-                      <Tempo l={l} hoje={h.hoje} />
+                      <Tempo l={l} />
                     </td>
                     {h.verCustos && (
                       <td className="whitespace-nowrap px-3 py-2.5 pr-5 text-right">

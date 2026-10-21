@@ -66,7 +66,7 @@ export function TelaConcluir({
       ) : falta ? (
         <Aviso tom="alerta" titulo={falta}>
           {hrefRequisicao && d.requisicao ? (
-            <Link href={`${hrefRequisicao}/${d.requisicao.id}`} className={LINK_DE_TEXTO}>
+            <Link href={`${hrefRequisicao}/${d.requisicao.id}`} className={`${LINK_DE_TEXTO} ff-toque`}>
               Abrir a requisição
             </Link>
           ) : (

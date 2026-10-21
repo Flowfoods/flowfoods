@@ -204,7 +204,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     expect(t).not.toContain('Passar para outra pessoa');
     expect(t).not.toContain('Soltar o lote de');
     const l = texto(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: ids.lote }, searchParams: {} })));
-    expect(l).toContain('Está com Caio Cozinha: só ele ou a gerência conclui');
+    expect(l).toContain('Está com Caio Cozinha: só quem pegou ou a gerência conclui');
     expect(l).toMatch(/Caio Cozinha pegou às \d\d:\d\d/);
     expect(l).toContain('Se for para você terminar, peça para a gerência passar o lote para você.');
     const versao = (await obterOrdem(a, DONA(), ids.vp, ids.lote))!.ordem.versao;

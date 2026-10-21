@@ -26,7 +26,8 @@ export function classeDeBotao(variante: Variante = 'secundario', extra = ''): st
  * qualquer largura e texto de 16 px. Mesmas cores e estados do botão normal.
  */
 export function classeDeBotaoDaCozinha(variante: Variante = 'secundario', extra = ''): string {
-  return `ff-transicao inline-flex min-h-14 items-center justify-center gap-2 whitespace-nowrap rounded-[7px] px-5 text-base font-semibold disabled:cursor-not-allowed disabled:opacity-55 ${VARIANTES[variante]} ${extra}`;
+  // Quebra a linha em vez de vazar: o nome de quem está com o lote pode ser longo.
+  return `ff-transicao inline-flex min-h-14 items-center justify-center gap-2 rounded-[7px] px-5 py-2 text-center text-base font-semibold disabled:cursor-not-allowed disabled:opacity-55 ${VARIANTES[variante]} ${extra}`;
 }
 
 /** Link de texto (canto de painel, "ver tudo"): sublinhado discreto, sem seta colada. */

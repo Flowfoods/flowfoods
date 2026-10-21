@@ -87,7 +87,7 @@ export function TelaDoLote({
                   Concluir o lote
                 </button>
                 <span id="concluir-com-outro" className="text-[12px] text-suave">
-                  Está com {comOutro!.nome}: só ele ou a gerência conclui
+                  Está com {comOutro!.nome}: só quem pegou ou a gerência conclui
                 </span>
               </div>
             ) : entregues ? (
@@ -195,7 +195,7 @@ export function TelaDoLote({
           {hrefs.requisicao && (
             <p className="border-t border-linha px-4 py-3 text-[13px] text-suave sm:px-5">
               {pend && d.requisicao.status !== 'ATENDIDA' ? 'Quem entrega abre a requisição para dar a baixa. ' : ''}
-              <Link href={`${hrefs.requisicao}/${d.requisicao.id}`} className={LINK_DE_TEXTO}>
+              <Link href={`${hrefs.requisicao}/${d.requisicao.id}`} className={`${LINK_DE_TEXTO} ff-toque`}>
                 Abrir a requisição {numeroDaRequisicao(d.requisicao.numero)}
               </Link>
               {pend ? '. Sobrou insumo? Devolva por lá antes de concluir.' : '.'}

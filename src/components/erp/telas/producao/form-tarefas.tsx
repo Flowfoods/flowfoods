@@ -56,7 +56,7 @@ export function FormPegar({
           <input key={k} type="hidden" name={k} value={v} />
         ))}
         {voltar && <input type="hidden" name="voltar" value={voltar} />}
-        <BotaoEnviar variante={variante} cozinha={cozinha} pendente="Pegando…" className="w-full sm:w-auto sm:min-w-[11rem]">
+        <BotaoEnviar variante={variante} cozinha={cozinha} pendente="Pegando…" className={cozinha ? 'w-full' : 'w-full sm:w-auto'}>
           <span aria-hidden>Pegar</span>
           <span className="sr-only">{rotulo}</span>
         </BotaoEnviar>
@@ -75,7 +75,13 @@ export function FormSoltar({ acao, lote, versao, recarregar, voltar, deOutro, co
   if (!aberto && !estado) {
     return (
       <button type="button" onClick={() => setAberto(true)} className={classe('secundario', 'w-full sm:w-auto')}>
-        {deOutro ? `Soltar o lote de ${deOutro}` : 'Soltar'}
+        {deOutro ? (
+          <>
+            Soltar o lote<span className="sr-only"> de {deOutro}</span>
+          </>
+        ) : (
+          'Soltar'
+        )}
       </button>
     );
   }
@@ -87,7 +93,7 @@ export function FormSoltar({ acao, lote, versao, recarregar, voltar, deOutro, co
         {voltar && <input type="hidden" name="voltar" value={voltar} />}
         <div>
           <label htmlFor={`${id}-motivo`} className={ROTULO}>
-            Por que {deOutro ? 'soltar' : 'você vai soltar'}?
+            {deOutro ? `Por que soltar o lote de ${deOutro}?` : 'Por que você vai soltar?'}
           </label>
           <input
             id={`${id}-motivo`}
