@@ -2233,7 +2233,8 @@ executa e conclui pela regra da 3.1, e isso vira histórico e indicadores por pe
    e "Feitas hoje". A cozinha entra na área Produção pelas Tarefas; a gerência continua entrando pela Lista do dia. Histórico e
    Indicadores: tabela Corporativo a partir de 1280 px e cartões abaixo. O lote mostra quem está com ele (e "Quem fez" depois);
    o quadro de Lotes diz "com Caio · pegou 09:12"; a lista mostra "com Caio" no lote em produção e tem "Pegar na cozinha". O mesmo
-   no espelho do nível 1 (que vê, solta e passa, com rastro no `auditLog`, mas não pega).
+   no espelho do nível 1 (que vê, solta e passa, com rastro no `auditLog`, mas não pega). De quebra, para todas as telas: o
+   "Voltar para…" (componente `Voltar`) fica com 44 px no toque em qualquer largura (antes, 20 px no tablet a partir de 640 px).
 8. **Migration** (239, aditiva, segura para superusuário e para dono não-superusuário com e sem FORCE RLS; nenhum passo lê tabela de
    tenant): `responsavelDesde`, os CHECKs `OrdemProducao_responsavel_{com_pessoa,so_em_producao,antes_do_fim,nome_curto}` (`NOT VALID`
    + `VALIDATE` em bloco que avisa) e os índices `(parceiroId, lojaId, concluidaEm)` e `(parceiroId, lojaId, canceladaEm)`. O gatilho
@@ -2269,7 +2270,66 @@ npm run build
 npm run erp:conferir-migracao
 npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
 ```
-PROVAS_33
+`tests/erp-producao-equipe.test.ts` (sem banco, 13): o período (7 dias por padrão, hoje e 30 dias, de/até trocados, futuro e mais de 92
+dias sempre com o aviso), o desfecho (concluído, perdido, estornado, cancelado), o dia do lote pelo relógio do Rio (23:30 de 20/10 é de
+20/10), o rendimento em palavras, o tempo (de pegar ou da entrega, se foi depois; sem hora de pegar, nada), o resumo, a frase de quem
+pegou e a recusa a quem tenta pegar, concluir ou cancelar o lote de outra pessoa, e os indicadores (Caio: 3 concluídos, 1 perdido, 1
+cancelado, 14 kg de 15 kg = 93,3 %, um fora da faixa; Duda: amostra pequena, o estornado fora da média; a mesma pessoa com nome novo
+aparece uma vez). `tests/erp-producao-equipe.db.test.ts` (15): a tela da cozinha; pegar da lista (o lote nasce pela regra do Gerar, com
+a requisição e nada no livro, já com Caio e a hora; duplo toque = o mesmo lote); duas pessoas na mesma linha ao mesmo tempo (um lote
+só, a outra lê quem pegou); a linha que a gerência mudou depois que a tela abriu (conflito); pegar o lote planejado em paralelo; soltar
+(só quem pegou ou a gerência, com motivo); passar (só a gerência, só para quem registra produção na loja, o planejado não se passa, a
+hora de quem recebe começa agora); concluir e cancelar o lote de outra pessoa (só ela ou a gerência; quem pegou fica como quem fez;
+sem segunda baixa); o nível 1 não pega; alcance e isolamento (gerente de outra loja, outro parceiro, loja sem estoque); histórico (R$
+só com `insumos.ver`); indicadores (só a gerência, sem R$); o banco recusando por SQL cru (dono em lote planejado, dono sem pessoa, troca
+de dono no concluído); o estorno guarda quem fez; e o MUTANTE do período (segurar o fechamento: pegar da lista espera e é recusado com
+a frase; o lote que já existe ainda se pega). `tests/erp-producao-equipe-telas.db.test.ts` (9): o HTML por perfil (a cozinha com quem
+está usando, o botão de 56 px, sem gerência e sem R$; a Duda vendo o lote do Caio sem pegar nem passar e a action de soltar recusada;
+a gerência passando só para quem está na lista), as actions voltando às tarefas, o concluir vindo das tarefas, o histórico com e sem
+custo, os indicadores só da gerência, 404 de outra loja e de outro parceiro nas três telas, o nível 1 que vê e passa mas não pega, e
+"quem fez" no lote concluído. `tests/erp-producao-equipe-migracao.db.test.ts` (3): a migration com dado antigo nos 3 perfis do banco
+(superusuário, dono com FORCE RLS, dono sem RLS): nada some, sem aviso, coluna, CHECKs validados, índices, as regras pelo papel do
+tenant e o conferidor sem pendência. Mutantes conferidos à mão (6 de 6 derrubam testes): tirar a trava do período em `pegarDaLista`,
+tirar o `FOR UPDATE` da lista, deixar pegar o lote de outra pessoa, deixar concluir o lote de outra pessoa, deixar soltar o lote de
+outra pessoa e deixar a conclusão sobrescrever quem fez.
+
+Rodada final no código de `159e6fd`: `prisma validate`, `tsc`, lint e portão de conteúdo limpos; `erp:conferir-migracao` e `migrate diff`
+vazio no `ff_33`. Suíte inteira com banco, como superusuário: 93 arquivos e 1862 testes passando. Como dono com FORCE RLS (`ff_dono_32`; arquivos da produção,
+da lista, da equipe, da RLS, do isolamento e das permissões, 9 arquivos): 154 de 155 passando; a única falha é a já registrada na 3.1 (o
+banco montado por psql não tem `_prisma_migrations`, que o teste da 0.2 lê). Sem RLS (`ff_semrls_32`, 7 arquivos): 107 passando e 1
+pulado.
+
+Na tela (build de produção do último commit de código, `159e6fd`, com o `BUILD_ID` gerado às 21:02:26, depois do commit das 21:01:16;
+porta 3100; banco `ff_33` copiado do `ff_32r1`, com os dados feitos pelas regras do sistema em `.local-scripts/equipe33.ts`, fora do git:
+a Duda Lima (Operador, cozinha) e uma semana de produção da Vila da Penha, de 15/10 a 20/10, com o relógio de cada dia — a pessoa
+pega, o estoque entrega e a pessoa conclui; um fora da faixa, um perdido, um cancelado com a Duda e um concluído sem pegar —; roteiro
+`prova33/jornada.mjs` no scratchpad, 41 conferências, 0 falha). O gerente gera 1 lote na Lista do dia (a Produção abre nela, como na
+3.2). O Otto, no celular (390 px com toque), entra na área pelas Tarefas, escolhe a loja (a escolha diz quantas tarefas há para pegar),
+lê "Você está como Otto Operador" e "Trocar de pessoa", vê "Para pegar 5" sem R$, e pega o molho de 6 kg com o botão de 56 px: o lote
+vai a Em produção com ele, o livro do estoque não muda e o aviso "Lote pego" vem para a vista com o foco. O Concluir fica desabilitado
+com o motivo até o estoque entregar. A Duda vê "com Otto Operador · pegou HH:MM", sem Passar; as duas tocam ao mesmo tempo na
+maionese e só uma fica com ela; quem perdeu lê "Este lote está com Duda Lima (pegou às 17:47)…"; no lote do Otto, o Concluir dela
+diz "Está com Otto Operador". O estoque entrega a requisição, o Concluir vira link, a conclusão diz "Voltar para as tarefas" e volta
+para elas; "Feitas hoje" mostra "5,6 kg de 6 kg · rendeu 93,3 % · Otto". O Otto pega a linha de 2 kg da lista: ela vira o lote naquela
+hora, já com ele. A gerência, no desktop, passa esse lote para a Duda com motivo (o histórico guarda o motivo e quem passou) e o
+formulário fecha. Histórico (7 dias): o resumo do período, o custo do lote para o gerente, "sem hora de pegar" (nunca 0) no concluído
+sem pegar, o cancelado com o motivo e o filtro do Otto. Indicadores: Chico, Duda e Otto em ordem alfabética, o aviso de que é retrato e
+não nota, a amostra pequena dita e nenhum R$; a cozinha que tenta abrir os indicadores volta para o hub. Matriz (`prova33/matriz.mjs`, axe wcag2a/2aa): dona e gerente × Tarefas (escolha e loja), Histórico, Indicadores, lote em
+produção, lote com a requisição e quadro de Lotes; a Duda (cozinha) × Tarefas (escolha e loja), Histórico, lote, Concluir vindo das
+tarefas e quadro; × 390, 820, 1180 e 1440 × claro e escuro. São 160 telas, com zero rolagem lateral e zero violação do axe. Alvos abaixo
+de 32 px no toque só no shell (pular para o conteúdo, logo, "Seu acesso"), que já existiam, e o "Ver o estoque" do cabeçalho do painel
+do lote (3.1, 20 px no tablet: fica para a revisão de UX). Prints em
+`pw/prova33/jornada/` (10, da jornada) e `pw/prova33/matriz-{dona,gerente,cozinha}/`.
+
+Observações: (1) o console só registrou o 404 do `favicon.ico` (já existia) e "Failed to fetch RSC payload" de prefetch do Next abortado
+quando o roteiro navega; nada das telas da 3.3. (2) A matriz abre uma página nova por endereço: o print `fullPage` do Playwright desliga
+a emulação de toque da página (`pointer: coarse` passa a não casar) e, nas rodadas anteriores, todo alvo que depende do toque (o rastro,
+"Ver os lotes", "Abrir a requisição") aparecia como pequeno depois do primeiro print — medido à parte, 44 a 48 px. (3) O "R$" que aparece
+no `main` do histórico da cozinha é o custo do lote: o Operador tem `insumos.ver` no perfil padrão; sem essa permissão o servidor nem
+manda o custo (teste de telas). (4) Na revisão das telas saíram quatro acertos, já no código: a hora do histórico pelo dia da linha
+(no lote encerrado em 21/10, "pegou 20/10 às 23:50 · fim 00:30"), o botão da cozinha que quebra a linha em vez de vazar e os botões do formulário um embaixo do
+outro no cartão, "Trocar de pessoa" alinhado no celular, e o formulário de passar/soltar que fecha depois de gravar (antes, o lote
+passado ficava no mesmo lugar com o formulário aberto e um segundo toque passaria de novo).
 
 ## Mapa do esquema (0.1)
 
@@ -3164,6 +3224,10 @@ banco de teste: o operador é recusado pelo servidor.
   (etiqueta, contagem rápida) usa o mesmo.
 - **Testes**: a conclusão com relógio fixo precisa pegar antes (o CHECK `responsavel_antes_do_fim`); página que renderiza o lote em
   produção para a gerência chama `pessoasQueProduzem` (credenciais, outro banco no teste): mocke (`tests/erp-producao-equipe-telas`).
+- **Formulário de lote que fica no mesmo lugar depois de gravar** (passar, soltar, pegar): `key` com a versão do lote, para fechar
+  depois de gravar (sem isso, a escolha velha ficava na tela com a versão nova e um segundo toque gravava de novo).
+- **Matriz de telas**: uma página nova por endereço. O print `fullPage` do Playwright desliga a emulação de toque da página e, dali em
+  diante, todo alvo que só cresce com `pointer: coarse` aparece pequeno (falso alarme).
 - **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) no tablet compartilhado cada um entra com o próprio acesso (senha ou
   rosto) — a cozinha do Valentin's topa? Se o tablet ficar logado numa pessoa só, o histórico mente; (2) a cozinha vê no histórico o
   que cada colega fez (como já via no quadro): serve, ou cada um só o seu?; (3) os indicadores são hipótese: amostra pequena abaixo

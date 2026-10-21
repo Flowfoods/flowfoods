@@ -264,3 +264,22 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   e recebe o foco (`LevarParaVista`, `scroll-mt-24` para o topo fixo; sem animação com `prefers-reduced-motion`). **Atalho da conta**:
   logo abaixo do Gerar, até 1280 px, o resumo "4 insumos faltam · 1 abaixo de zero: ver a matéria-prima" é um link de 44 px para o
   painel (`#materia-prima`). Dia fora do prazo: a frase uma vez só (no aviso de cima), o vazio só com o título.
+- **Tela da cozinha (3.3, Tarefas)**: celular e tablet primeiro (coluna de até 1024 px). **Botão da cozinha** de 56 px
+  (`classeDeBotaoDaCozinha`: 16/600, padding 20, quebra a linha em vez de vazar), um por ação, em largura cheia até 768 px e numa
+  coluna de 240 px à direita do cartão a partir dela. No alto, dentro do `PageHeader`, "Você está como **Caio**." e "Não é você?
+  Trocar de pessoa" (fantasma sublinhado, 56 px): o tablet é compartilhado e cada um entra com o próprio acesso. Seções sem caixa
+  (título 15/600 + contagem 13 tabular à direita + separador): **Com você** · **Para pegar** · **Com outras pessoas** · **Feitas
+  hoje**; vazia = frase em borda tracejada. **Cartão da tarefa** = `painel` raio 14, o pré-preparo em 18/600 e o quanto em Gelasio
+  26/700 tabular (o que a pessoa procura de longe), apoio em 13 suave ("Lote 261021-01 · da lista · pegou 09:12"), selos (atraso
+  em `erro` com a palavra + o mesmo filete de 3 px do quadro de requisições, exceção já registrada; "Insumos: entregues" em `ok` ou
+  "Insumos: a entregar" em `atencao`). **Exceção a "um primário por tela"**: cada cartão de "Com você" tem o seu Concluir primário (é
+  a ação daquele lote; a tela não tem outra ação principal); enquanto os insumos não saem, Concluir secundário desabilitado com o
+  motivo ligado por `aria-describedby` ("Falta o estoque entregar os insumos."). "Pegar" mostra só "Pegar" e diz o lote inteiro ao
+  leitor de tela ("Pegar Molho cheddar, 6 kg"); com outra pessoa, o cartão diz "com Duda · pegou 09:12" e, para a gerência, "Passar
+  para outra pessoa" e "Soltar o lote", ambos pedem o motivo antes de gravar. O aviso do que acabou de acontecer vem para a vista com
+  o foco (`LevarParaVista`). **Histórico da produção e Indicadores**: período por segmentado (Hoje · 7 dias · 30 dias) + de/até e
+  filtros de pessoa e pré-preparo num GET; histórico em tabela Corporativo a partir de 1280 px (Dia · Pré-preparo · Quanto ·
+  Rendimento · Quem fez · Tempo · Custo, este só para quem vê custos), cartões com `dl` de 2/4 colunas abaixo; sem dado = frase
+  ("sem hora de pegar", "ninguém pegou"), nunca 0. Indicadores: um painel por pessoa em ordem alfabética, sem cor por pessoa,
+  sem nota e sem R$, a amostra sempre escrita ("1 lote: amostra pequena"). **Voltar para…** (`Voltar`) com 44 px em toque em
+  qualquer largura (`[@media(pointer:coarse)]:min-h-11`).
