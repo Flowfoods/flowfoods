@@ -441,6 +441,20 @@ export async function listarAcessos(parceiroId: string, o?: Opcoes): Promise<Lin
 }
 
 /**
+ * 3.3: quem pode receber um lote da gerência ("passar para outra pessoa"): pessoa ATIVA deste parceiro com "registrar
+ * produção" NA loja (o alcance resolvido do vínculo, com a versão do catálogo do perfil próprio). Só nome e o id do login:
+ * nada de e-mail ou acesso. Ordem alfabética.
+ */
+export async function pessoasQueProduzem(parceiroId: string, lojaId: string, o?: Opcoes): Promise<{ usuarioId: string; nome: string }[]> {
+  const { db } = abrir(o);
+  const vs = await db.acessoParceiro.findMany({ where: { parceiroId, status: 'ATIVO' }, include: { ...COM_PERFIL, usuario: { select: { id: true, nome: true } } } });
+  return vs
+    .filter((v) => resolverAlcance(vinculoDe(v)).permissoes.has('producao.registrar') && (v.redeInteira || (v.lojaIds ?? []).includes(lojaId)))
+    .map((v) => ({ usuarioId: v.usuario.id, nome: v.usuario.nome }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+}
+
+/**
  * Para a lista do nível 1: parceiros com pessoas ativas e NINGUÉM cuidando da
  * equipe (ativo + cuidar da equipe + rede inteira). Uma ida ao banco.
  */

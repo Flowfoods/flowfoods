@@ -2,13 +2,15 @@
 /**
  * Um lote (3.1): o que foi planejado, os insumos (pedido × saiu × falta, pela requisição que a produção criou), o resultado
  * quando concluído (quanto saiu, rendimento, motivo, validade), o custo do lote para quem vê custos (as baixas reais ÷ o que
- * saiu, ao lado do previsto pela ficha e do que a diferença custou), o que entrou no estoque, as saídas possíveis (começar,
- * concluir, cancelar, estornar) e o histórico. A mesma tela no nível 1 e na pessoa do parceiro.
+ * saiu, ao lado do previsto pela ficha e do que a diferença custou), o que entrou no estoque, as saídas possíveis (pegar,
+ * concluir, soltar, passar, cancelar, estornar) e o histórico. A mesma tela no nível 1 e na pessoa do parceiro. 3.3: quem
+ * está com o lote e desde quando; o lote com outra pessoa só ela ou a gerência conclui, solta ou cancela.
  */
 
 import Link from 'next/link';
 import type { LoteDaLoja } from '@/lib/erp/producao';
 import { formatarRendimento, fraseSemPreco, pendente as pendenteDoLote, quandoVence, TITULO_NO_HISTORICO_DO_LOTE } from '@/lib/erp/producao-campos';
+import { fraseDeQuemPegou, horaDoDia } from '@/lib/erp/producao-equipe-campos';
 import { numeroDaRequisicao, textoDoParaDia } from '@/lib/erp/requisicao-campos';
 import { COR } from '@/lib/erp/modulos';
 import { CONSERVACOES, formatarValidade } from '@/lib/erp/validade';
@@ -22,7 +24,8 @@ import { LivroDoEstoque } from '../estoque/livro';
 import { ListaHistorico } from '../historico/lista-historico';
 import type { AcaoDeEstoque } from '../estoque/estado';
 import { SeloDaRequisicao, quandoLongo, SeloDoAtraso } from '../requisicoes/partes';
-import { FormCancelarLote, FormComecar, FormEstornar } from './formularios';
+import { FormCancelarLote, FormEstornar } from './formularios';
+import { FormPassar, FormPegar, FormSoltar } from './form-tarefas';
 import { SeloDoLote } from './partes';
 
 export function TelaDoLote({
@@ -33,16 +36,20 @@ export function TelaDoLote({
   pode,
   hrefs,
   acoes,
+  pessoas,
   bloqueio,
 }: {
   d: LoteDaLoja;
   base: string;
   contexto?: string;
   feito?: string;
-  pode: { registrar: boolean; estornar: boolean };
+  /** `gerenciar` (3.3) = "definir a lista do dia": solta e passa o lote de qualquer pessoa, conclui e cancela por ela. `pegar` = é uma pessoa da equipe (o nível 1 não pega). */
+  pode: { registrar: boolean; estornar: boolean; gerenciar: boolean; pegar: boolean };
   /** Para onde os links levam; null = a pessoa não vê aquela tela (o link nem aparece). */
   hrefs: { requisicao: string | null; estoque: string | null };
-  acoes: { iniciar: AcaoDeEstoque; cancelar: AcaoDeEstoque; estornar: AcaoDeEstoque };
+  acoes: { pegar: AcaoDeEstoque; soltar: AcaoDeEstoque; passar: AcaoDeEstoque; cancelar: AcaoDeEstoque; estornar: AcaoDeEstoque };
+  /** Quem pode receber o lote (só para a gerência). */
+  pessoas: readonly { usuarioId: string; nome: string }[];
   bloqueio: string | null;
 }) {
   const o = d.ordem;
@@ -51,6 +58,9 @@ export function TelaDoLote({
   const aqui = `${quadro}/${o.id}`;
   const pend = pendenteDoLote(o.status);
   const livre = pode.registrar && !bloqueio && d.aberto;
+  // 3.3: o lote com outra pessoa: só ela ou a gerência mexe.
+  const comOutro = d.responsavel && !d.responsavel.comigo ? d.responsavel : null;
+  const mexe = !comOutro || pode.gerenciar;
   const podeConcluir = livre && pend;
   const entrouNoEstoque = d.movimentos.find((m) => m.tipo === 'PRODUCAO_ENTRADA' && !m.estorno);
   const quantoEntrou = entrouNoEstoque ? formatarQuantidade(entrouNoEstoque.quantidadeMilesimos, o.unidade) : null;
@@ -71,7 +81,16 @@ export function TelaDoLote({
         subtitulo={[contexto, o.fichaNome, formatarQuantidade(o.planejadoMilesimos, o.unidade), textoDoParaDia(o.dataPlanejada, d.hoje), o.planejadaPorNome ? `planejado por ${o.planejadaPorNome}` : null].filter(Boolean).join(' · ')}
         acao={
           podeConcluir ? (
-            entregues ? (
+            !mexe ? (
+              <div className="flex flex-col items-start gap-1 sm:items-end">
+                <button type="button" disabled aria-describedby="concluir-com-outro" className={classeDeBotao('secundario')}>
+                  Concluir o lote
+                </button>
+                <span id="concluir-com-outro" className="text-[12px] text-suave">
+                  Está com {comOutro!.nome}: só quem pegou ou a gerência conclui
+                </span>
+              </div>
+            ) : entregues ? (
               <Link href={`${aqui}/concluir`} className={classeDeBotao('primario')}>
                 Concluir o lote
               </Link>
@@ -92,6 +111,8 @@ export function TelaDoLote({
           <SeloDoLote status={o.status} estornado={o.estornado} />
           <SeloDoAtraso dias={d.atrasoDias} />
           {o.status === 'CONCLUIDA' && o.produzidoMilesimos === 0 && <Selo tom="erro">Lote perdido</Selo>}
+          {pend && d.responsavel && <span className="text-[13px] font-semibold text-texto">{d.responsavel.comigo ? `Com você desde ${horaDoDia(d.responsavel.desde, d.hoje)}` : fraseDeQuemPegou(d.responsavel.nome, d.responsavel.desde, d.hoje)}</span>}
+          {pend && !d.responsavel && o.status === 'EM_EXECUCAO' && <span className="text-[13px] text-suave">Em produção, sem ninguém</span>}
         </div>
       </PageHeader>
       {feito && <Aviso tom="ok" titulo={feito} />}
@@ -174,7 +195,7 @@ export function TelaDoLote({
           {hrefs.requisicao && (
             <p className="border-t border-linha px-4 py-3 text-[13px] text-suave sm:px-5">
               {pend && d.requisicao.status !== 'ATENDIDA' ? 'Quem entrega abre a requisição para dar a baixa. ' : ''}
-              <Link href={`${hrefs.requisicao}/${d.requisicao.id}`} className={LINK_DE_TEXTO}>
+              <Link href={`${hrefs.requisicao}/${d.requisicao.id}`} className={`${LINK_DE_TEXTO} ff-toque`}>
                 Abrir a requisição {numeroDaRequisicao(d.requisicao.numero)}
               </Link>
               {pend ? '. Sobrou insumo? Devolva por lá antes de concluir.' : '.'}
@@ -187,6 +208,7 @@ export function TelaDoLote({
         <div className="grid items-start gap-5 lg:grid-cols-2">
           <Painel titulo="O que saiu" subtitulo={`Concluído por ${o.concluidaPorNome ?? '—'}${o.concluidaEm ? ` em ${quandoLongo(o.concluidaEm)}` : ''}`}>
             <dl className="space-y-2 text-sm">
+              <Linha rotulo="Quem fez">{o.feitoPor ?? 'sem quem fez'}</Linha>
               <Linha rotulo="Planejado">
                 <span className="tabular-nums">{formatarQuantidade(o.planejadoMilesimos, o.unidade)}</span>
               </Linha>
@@ -273,10 +295,15 @@ export function TelaDoLote({
       {(pend ? livre : pode.estornar && !bloqueio && d.aberto && o.status === 'CONCLUIDA') && (
         <div className="grid items-start gap-5 lg:grid-cols-2">
           {pend && livre && (
-            <Painel titulo={o.status === 'PLANEJADA' ? 'Começar ou cancelar' : 'Cancelar'} subtitulo={o.status === 'PLANEJADA' ? 'Começar é opcional: dá para concluir direto' : 'O lote já está em produção'}>
+            <Painel
+              titulo={!d.responsavel ? 'Quem vai fazer' : d.responsavel.comigo ? 'Com você' : `Com ${d.responsavel.nome}`}
+              subtitulo={!d.responsavel ? (pode.pegar ? 'Pegar é começar: o lote fica com você, com a hora' : 'Quem pega é a equipe da loja') : d.responsavel.comigo ? 'Soltar devolve o lote para alguém pegar' : mexe ? 'A gerência solta ou passa para outra pessoa' : 'Só quem pegou ou a gerência mexe neste lote'}
+            >
               <div className="space-y-4">
-                {o.status === 'PLANEJADA' && <FormComecar acao={acoes.iniciar} versao={o.versao} recarregar={aqui} />}
-                <FormCancelarLote acao={acoes.cancelar} versao={o.versao} recarregar={aqui} />
+                {!d.responsavel && pode.pegar && <FormPegar key={`pegar-${o.versao}`} acao={acoes.pegar} campos={{ lote: o.id, versao: String(o.versao) }} rotulo={`Pegar o lote ${o.codigoLote}`} recarregar={aqui} cozinha={false} variante="secundario" />}
+                {pode.gerenciar && o.status === 'EM_EXECUCAO' && <FormPassar key={`passar-${o.versao}`} acao={acoes.passar} lote={o.id} versao={o.versao} pessoas={pessoas} atual={d.responsavel?.nome ?? null} recarregar={aqui} cozinha={false} />}
+                {d.responsavel && mexe && <FormSoltar key={`soltar-${o.versao}`} acao={acoes.soltar} lote={o.id} versao={o.versao} recarregar={aqui} cozinha={false} deOutro={d.responsavel.comigo ? undefined : d.responsavel.nome} />}
+                {mexe ? <FormCancelarLote acao={acoes.cancelar} versao={o.versao} recarregar={aqui} /> : <p className="text-[13px] text-suave">Se for para você terminar, peça para a gerência passar o lote para você.</p>}
               </div>
             </Painel>
           )}

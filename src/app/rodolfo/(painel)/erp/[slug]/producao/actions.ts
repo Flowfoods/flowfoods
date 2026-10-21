@@ -11,7 +11,8 @@ import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
 import type { Permissao } from '@/lib/erp/permissoes';
 import type { EstadoEstoque } from '@/components/erp/telas/estoque/estado';
 import { recusadoNoEstoque } from '@/components/erp/telas/estoque/executar';
-import { executarCancelarLote, executarConcluir, executarEstornar, executarGerarLotes, executarIniciar, executarPlanejar, executarPorNaLista, executarSalvarLista } from '@/components/erp/telas/producao/executar';
+import { pessoasQueProduzem } from '@/lib/erp/credenciais';
+import { executarCancelarLote, executarConcluir, executarEstornar, executarGerarLotes, executarPassar, executarPegarDaLista, executarPegarLote, executarPlanejar, executarPorNaLista, executarSalvarLista, executarSoltar } from '@/components/erp/telas/producao/executar';
 
 async function preparar(slug: string, lojaId: string, permissao: Permissao) {
   const ctx = await exigirParceiro(slug);
@@ -30,11 +31,35 @@ export async function acaoPlanejarProducao(slug: string, lojaId: string, anterio
   return executarPlanejar(ctx.cliente, ctx.alcance, autor, String(lojaId), anterior, form, base);
 }
 
-export async function acaoIniciarProducao(slug: string, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+// ================================================================ a cozinha pega a tarefa (3.3): o nível 1 não pega (a regra recusa), mas começa, solta e passa
+
+export async function acaoPegarLote(slug: string, lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
   const { ctx, negado, base, autor } = await preparar(slug, lojaId, 'producao.registrar');
   if (negado) return recusadoNoEstoque(anterior, negado);
-  await auditar(ctx, 'erp_producao_iniciar', lojaId);
-  return executarIniciar(ctx.cliente, ctx.alcance, autor, String(lojaId), String(id), anterior, form, base);
+  await auditar(ctx, 'erp_producao_pegar', lojaId);
+  return executarPegarLote(ctx.cliente, ctx.alcance, autor, String(lojaId), anterior, form, base);
+}
+
+export async function acaoPegarDaLista(slug: string, lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base, autor } = await preparar(slug, lojaId, 'producao.registrar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_producao_pegar_da_lista', lojaId);
+  return executarPegarDaLista(ctx.cliente, ctx.alcance, autor, String(lojaId), anterior, form, base);
+}
+
+export async function acaoSoltarLote(slug: string, lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base, autor } = await preparar(slug, lojaId, 'producao.registrar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_producao_soltar', lojaId);
+  return executarSoltar(ctx.cliente, ctx.alcance, autor, String(lojaId), anterior, form, base);
+}
+
+export async function acaoPassarLote(slug: string, lojaId: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {
+  const { ctx, negado, base, autor } = await preparar(slug, lojaId, 'producao.planejar');
+  if (negado) return recusadoNoEstoque(anterior, negado);
+  await auditar(ctx, 'erp_producao_passar', lojaId);
+  const pessoas = await pessoasQueProduzem(ctx.parceiro.id, String(lojaId));
+  return executarPassar(ctx.cliente, ctx.alcance, autor, String(lojaId), pessoas, anterior, form, base);
 }
 
 export async function acaoConcluirProducao(slug: string, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {

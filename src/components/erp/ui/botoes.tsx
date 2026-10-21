@@ -12,7 +12,7 @@
 
 import { useState, useTransition, type ReactNode } from 'react';
 import { useFormStatus } from 'react-dom';
-import { classeDeBotao, type Variante } from './estilos';
+import { classeDeBotao, classeDeBotaoDaCozinha, type Variante } from './estilos';
 
 /** Envio de formulário: sabe se o form está em voo e impede duplo envio. */
 export function BotaoEnviar({
@@ -21,12 +21,15 @@ export function BotaoEnviar({
   variante = 'primario',
   className = '',
   disabled = false,
+  cozinha = false,
 }: {
   children: ReactNode;
   pendente?: string;
   variante?: Variante;
   className?: string;
   disabled?: boolean;
+  /** 3.3: o botão grande da tela da cozinha (56 px). */
+  cozinha?: boolean;
 }) {
   const { pending } = useFormStatus();
   return (
@@ -34,7 +37,7 @@ export function BotaoEnviar({
       type="submit"
       disabled={pending || disabled}
       aria-busy={pending}
-      className={classeDeBotao(variante, className)}
+      className={cozinha ? classeDeBotaoDaCozinha(variante, className) : classeDeBotao(variante, className)}
     >
       {pending ? pendente : children}
     </button>

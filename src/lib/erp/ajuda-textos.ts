@@ -158,12 +158,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/lista/[lojaId]'],
     titulo: 'Lista do dia da loja',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'O que a loja vai produzir no dia, e o que isso pede do estoque: quanto vai usar de cada insumo, quanto tem e quanto falta.' },
       { texto: 'Falta escrito em vermelho quer dizer que o estoque não dá. Abaixo de zero quer dizer que o estoque está errado ou que falta lançar nota.' },
       { texto: 'Monte a lista, salve e confira o que falta. Depois, gere os lotes: cada pré-preparo vira um lote, com a requisição dos insumos.', para: ['producao.planejar'] },
-      { texto: 'Quem define a lista é a gerência. Os lotes dela aparecem em Lotes, para começar e concluir como sempre.', para: ['producao.registrar'] },
+      { texto: 'Quem define a lista é a gerência. Para fazer, pegue o pré-preparo em Tarefas: ele vira lote com o seu nome e a hora.', para: ['producao.registrar'] },
     ],
     secoes: [
       {
@@ -192,7 +192,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/[lojaId]'],
     titulo: 'Produção da loja',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Cada cartão é um lote: o pré-preparo, o código, quanto, para quando e se os insumos já saíram do estoque.' },
       { texto: 'Lote atrasado ganha uma faixa vermelha e os dias de atraso.' },
@@ -203,7 +203,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'andamento',
         titulo: 'Como o lote anda',
         blocos: [
-          { texto: 'Planejada: o lote existe e a requisição dos insumos já foi para o estoque. Em produção: a cozinha começou. Concluída: o lote entrou no estoque.' },
+          { texto: 'Planejada: o lote existe e a requisição dos insumos já foi para o estoque. Em produção: alguém pegou, e o cartão diz quem. Concluída: o lote entrou no estoque.' },
           { texto: 'Concluídas e canceladas aparecem só no dia. Os lotes antigos ficam no Histórico.' },
         ],
       },
@@ -232,10 +232,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/[lojaId]/[ordemId]'],
     titulo: 'Lote',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'O que foi planejado, os insumos que saíram pela requisição e, depois de concluído, quanto saiu de verdade.' },
-      { texto: 'Para concluir, os insumos precisam estar entregues. Sobrou insumo? Devolva pela requisição antes de concluir.', para: ['producao.registrar'] },
+      { texto: 'O que foi planejado, os insumos que saíram pela requisição, quem está fazendo e, depois de concluído, quanto saiu de verdade.' },
+      { texto: 'O lote que outra pessoa pegou só ela ou a gerência conclui, solta ou cancela.', para: ['producao.registrar'] },
+      { texto: 'Para concluir, os insumos precisam estar entregues; se sobrou insumo, devolva pela requisição antes.', para: ['producao.registrar'] },
       { texto: 'Cancelar só vale se nada saiu do estoque, ou se tudo voltou. Estornar um lote concluído é de quem ajusta o saldo.', para: ['producao.registrar'] },
       { texto: 'O custo do lote é o que saiu do estoque, dividido pelo que saiu de verdade, ao lado do que a ficha prevê.', para: ['insumos.ver'] },
     ],
@@ -255,12 +256,106 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/[lojaId]/[ordemId]/concluir'],
     titulo: 'Concluir o lote',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Diga quanto saiu de verdade; zero se o lote se perdeu, e então nada entra no estoque.' },
       { texto: 'Passou de 10% para mais ou para menos, ou perdeu tudo: escreva o motivo.' },
       { texto: 'Escolha onde o lote vai ficar: a validade nasce daí e não muda se a ficha mudar depois.' },
       { texto: 'O custo por quilo aparece ao vivo, enquanto você digita.', para: ['insumos.ver'] },
+      { texto: 'Quem pegou o lote fica como quem fez, mesmo se a gerência concluir por ele.', para: ['producao.planejar'] },
+    ],
+  },
+  {
+    chave: 'producao-tarefas',
+    area: 'producao',
+    rotas: ['producao/tarefas'],
+    titulo: 'Tarefas da cozinha',
+    versao: 1,
+    aula: [
+      { texto: 'Escolha a loja para ver as tarefas de hoje da cozinha.' },
+      { texto: 'Ao lado de cada loja, quantas tarefas estão para pegar e quantas já estão em produção.' },
+    ],
+  },
+  {
+    chave: 'producao-tarefas-loja',
+    area: 'producao',
+    rotas: ['producao/tarefas/[lojaId]'],
+    titulo: 'Tarefas da cozinha da loja',
+    versao: 1,
+    aula: [
+      { texto: 'As tarefas de hoje da loja: pegue a que você vai fazer e o lote fica com você, com o seu nome e a hora.' },
+      { texto: 'Com os insumos entregues e o lote pronto, toque em Concluir e diga quanto saiu de verdade.' },
+      { texto: 'Se não for terminar, solte o lote com o motivo: ele volta para alguém pegar.' },
+      { texto: 'No tablet da cozinha, cada um entra com o próprio acesso: confira o seu nome no alto antes de pegar.' },
+      { texto: 'A gerência solta o lote de qualquer pessoa ou passa para outra, sempre com o motivo.', para: ['producao.planejar'] },
+    ],
+    secoes: [
+      {
+        id: 'pegar',
+        titulo: 'Como funciona o pegar',
+        blocos: [
+          { texto: 'Pegar é começar: o lote passa para Em produção. Duas pessoas não pegam o mesmo lote: quem chega depois vê quem pegou.' },
+          { texto: 'O pré-preparo da lista que ainda não virou lote vira lote na hora em que alguém pega, com a requisição dos insumos. Nada sai do estoque até o estoque entregar.' },
+          { texto: 'Pegar e soltar não mexem no estoque. Quem conclui é quem pegou, ou a gerência.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'producao-historico',
+    area: 'producao',
+    rotas: ['producao/historico'],
+    titulo: 'Histórico da produção',
+    versao: 1,
+    aula: [{ texto: 'Escolha a loja para ver o que a cozinha produziu, quanto, quem fez e quando.' }],
+  },
+  {
+    chave: 'producao-historico-loja',
+    area: 'producao',
+    rotas: ['producao/historico/[lojaId]'],
+    titulo: 'Histórico da produção da loja',
+    versao: 1,
+    aula: [
+      { texto: 'Os lotes encerrados no período: o que foi feito, quanto saiu contra o planejado, quem fez e quanto tempo levou.' },
+      { texto: 'Filtre por pessoa, pré-preparo e dia. Quem fez é quem pegou o lote; sem pegar, quem concluiu.' },
+      { texto: 'O custo do lote é o que saiu do estoque pelos insumos. Insumo sem preço deixa o custo incompleto, nunca zero.', para: ['insumos.ver'] },
+    ],
+    secoes: [
+      {
+        id: 'tempo',
+        titulo: 'O tempo de cada lote',
+        blocos: [{ texto: 'Conta de quando a pessoa pegou o lote, ou de quando os insumos saíram do estoque se foi depois, até a conclusão. Lote concluído sem pegar pela tela da cozinha fica sem tempo.' }],
+      },
+    ],
+  },
+  {
+    chave: 'producao-indicadores',
+    area: 'producao',
+    rotas: ['producao/indicadores'],
+    titulo: 'Indicadores da produção',
+    versao: 1,
+    aula: [{ texto: 'Escolha a loja para ver os indicadores da produção de cada pessoa.' }],
+  },
+  {
+    chave: 'producao-indicadores-loja',
+    area: 'producao',
+    rotas: ['producao/indicadores/[lojaId]'],
+    titulo: 'Indicadores da produção da loja',
+    versao: 1,
+    aula: [
+      { texto: 'De cada pessoa, no período: lotes concluídos, quanto produziu de cada pré-preparo, rendimento contra o planejado, tempo, perdidos e cancelados.' },
+      { texto: 'É um retrato para conversar com a equipe, não uma nota. Com menos de 5 lotes, a amostra é pequena e ainda não diz muito.' },
+    ],
+    secoes: [
+      {
+        id: 'conta',
+        titulo: 'Como a conta é feita',
+        blocos: [
+          { texto: 'Rendimento médio: cada lote pesa igual, e os perdidos ficam à parte. Por pré-preparo: o que saiu somado, dividido pelo planejado somado.' },
+          { texto: 'Fora de 10%: lote que saiu mais de 10% acima ou abaixo do planejado. Tempo: de pegar, ou da entrega dos insumos, até concluir.' },
+          { texto: 'Cancelados com a pessoa: os que ela estava fazendo quando alguém cancelou. O motivo está no histórico.' },
+        ],
+      },
     ],
   },
   {
