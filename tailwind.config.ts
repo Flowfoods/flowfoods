@@ -56,7 +56,7 @@ const config: Config = {
         'acao-hover': token('acao-hover', '214 26 39'),
         acento: token('acento', '234 29 44'),
         assinatura: token('marca', '242 50 63'),
-        erro: token('erro', '242 50 63'),
+        erro: token('erro', '245 82 90'),
         ok: token('ok', '74 222 128'),
         atencao: token('atencao', '245 158 11'),
         linha: 'var(--ff-linha, rgb(245 240 235 / 0.09))',

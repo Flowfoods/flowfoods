@@ -1896,3 +1896,31 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) permissões novas de produção e custo; (b) `producao.ver` e `producao.registrar` (já no catálogo) bastam, o custo segue `insumos.ver`, e o grupo `etiquetas` nasce em breve.
 
 **Razão:** (b). O operador da cozinha produz e não recebe valor. O Histórico fala "Lote" (Planejou, Iniciou, Concluiu, Cancelou, Estornou) e tira os campos de custo de quem não vê custos. A migration `20261029000000_erp_producao` é aditiva e tolerante a dado antigo: CHECKs `NOT VALID` + `VALIDATE` em bloco que avisa, índices únicos em bloco que apanha `unique_violation`, nenhum passo depende de SELECT sob RLS (superusuário, dono com FORCE RLS e dono sem RLS provados com dado antigo). `erp:conferir-migracao` lista o que ficar pendente.
+
+### 202. 2026-10-21 · Revisão visual: referência principal Kairu Editorial; Dark v2 descartado como base; Corporativo nas tabelas
+
+**Alternativas:** (a) seguir o Kairu Dark como base, como dizia o plano; (b) trocar a base para o Kairu Editorial (o mais perto da identidade FlowFoods) e manter o Corporativo nas tabelas densas.
+
+**Razão:** (b). Lido pelo MCP da Kairu em 21/10 (material real, não só o nome): o Dark agora é a versão 2.0.0, com vidro (blur), luz violeta, gradientes e raio 24 — conflita com a identidade FlowFoods (gradiente proibido) e com o fiscal anti-"cara de IA". O Editorial pede o que a FlowFoods já é: título serifado, tons naturais, separadores delicados, sidebar creme de 208–240 px, números de tabela sem serifa, unidade ao lado do número, nada de texto introdutório empurrando o trabalho. A cor do Editorial (verde floresta) não entra: o kit manda preservar a marca do projeto, e o acento segue o vermelho FlowFoods. As prévias em imagem dos kits não abriram nesta sessão (rede bloqueada, proxy 403): a escolha usou o texto, o DESIGN.md e o código do kit.
+
+### 203. 2026-10-21 · A caixa "Como funciona" mora abaixo do título da tela, não acima
+
+**Alternativas:** (a) caixa no topo do `<main>` (antes do título); (b) caixa dentro do `PageHeader`, entre o título e a busca/filtros.
+
+**Razão:** (b). Na 1ª visita a caixa (com a pergunta das dicas) ocupava a primeira dobra inteira e o título da tela aparecia depois dela. O título vem primeiro, a aula depois. O shell continua montando a caixa (conhece a rota e a preferência); o `PageHeader` a desenha por um contexto (`ContextoDaCaixa`). As 151 telas usam o `PageHeader`; a varredura de 70 telas (dona) e 25 (operador) confirmou caixa presente e abaixo do h1 em todas. O título em serifa dentro da caixa saiu (repetia o h1 logo acima): fica o rótulo "Como funciona" e o nome da tela para o leitor de tela.
+
+### 204. 2026-10-21 · Tablet é toque: alvos de 44 px por `pointer: coarse`, não pela largura
+
+**Alternativas:** (a) tamanhos só pela largura (44 px abaixo de 600 px; 40/42/36 acima); (b) a largura decide o desenho e o tipo de ponteiro decide o tamanho do alvo.
+
+**Razão:** (b). Um tablet deitado (1180 px) recebia o botão de 40 px e o link do filtro de 36 px, feitos para mouse. Uma regra só em `tokens.css` devolve 44 px a tudo que encolhe a partir de 600/900 px quando o ponteiro é o dedo; link de texto na tabela e na trilha ganha área de toque invisível de 44 px sem mudar a altura da linha.
+
+### 205. 2026-10-21 · Hub em 2 colunas também no celular (Ref.1 vence o kit)
+
+**Alternativas:** (a) 1 coluna abaixo de 600 px (kit); (b) 2 colunas, como pede a Ref.1 do plano ("4 no desktop, caindo pra 2 no celular").
+
+**Razão:** (b). No celular o card fica compacto (ícone, nome, descrição em até 3 linhas) e os links das abas somem: o card abre a área, e as abas estão no topo dela. A tela inicial do celular caiu de 2.369 px para 1.519 px de altura.
+
+### 206. 2026-10-21 · Menu sem grupo de um item só; vermelho de erro mais claro no escuro
+
+**Razão:** "INSUMOS › Insumos" repetia o item no cabeçalho do grupo: grupo com um item vira o item direto. O vermelho de erro no tema escuro (#F2323F) dava 4,42:1 sobre a linha destacada da tabela (selo "Sem CMV" no DRE), abaixo de AA; passou a #F5525A (≥ 4,99:1 em todas as superfícies escuras). A marca ("Foods") não muda.

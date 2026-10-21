@@ -13,6 +13,15 @@ Fontes: geometria e comportamento do kit Kairu Dark "pulso"
 (`library:design-central-escura`, `src/design-kit.css` + `src/DesignKit.tsx`);
 tabelas do Kairu Corporativo; cor e tipo FlowFoods (CLAUDE.md).
 
+**Revisão de 21/10/2026 (kits lidos pelo MCP da Kairu):** a referência
+principal passa a ser o **Kairu Editorial** (`library:design-estoque-editorial`
+v1.2.0): título serifado, tons naturais, separadores delicados, sidebar creme,
+número de tabela sem serifa, unidade ao lado do número, trabalho útil na
+primeira dobra. **Corporativo** (`library:design-precisao-corporativo` v1.2.0)
+segue nas tabelas densas. O **Dark** virou v2.0.0 (vidro, violeta, gradiente,
+raio 24) e não é mais base: a geometria "pulso" já adotada fica, o resto não
+entra. Acento continua o vermelho FlowFoods (o kit manda preservar a marca).
+
 ## Tokens (`src/components/erp/tokens.css`, escopo `.ff-app`)
 
 | Token | Escuro | Claro | Uso |
@@ -28,7 +37,7 @@ tabelas do Kairu Corporativo; cor e tipo FlowFoods (CLAUDE.md).
 | `acao` / `acao-hover` | #C41522 / #D61A27 | #C41522 / #A8111C | botão principal (branco ≈ 6:1) |
 | `acento` | #EA1D2C | #EA1D2C | indicador ativo, filete do topo, foco |
 | `assinatura` | #F2323F | #C41522 | o "Foods" da marca |
-| `erro` / `ok` / `atencao` | #F2323F / #4ADE80 / #F59E0B | #C41522 / #166534 / #92400E | só em selo e texto, sempre com palavra |
+| `erro` / `ok` / `atencao` | #F5525A / #4ADE80 / #F59E0B | #C41522 / #166534 / #92400E | só em selo e texto, sempre com palavra |
 
 Tema: cookie `ff_tema` (claro | escuro | sistema) lido no servidor → `data-tema`.
 Cor de módulo (paleta em `src/lib/erp/modulos.ts`) SÓ no quadrado do ícone:
@@ -65,8 +74,14 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   apoio.
 - **Cabeçalho de página** quadrado do ícone 40 + h1 Gelasio 26/30 +
   subtítulo com contexto e contagem + ação à direita + busca/filtros abaixo.
-- **Hub** grade 4/3/2; card com ícone, nome 15/600, subtítulo 13; futuro sem
-  link, com "Chega na fase X".
+- **Hub** grade 4 (≥ 1280) e 2 no tablet e no celular; card com ícone, nome
+  15/600, subtítulo 13; no celular, compacto (nome 14, descrição em até 3
+  linhas, sem os links das abas); futuro sem link, com "Em breve".
+- **Caixa "Como funciona"** dentro do `PageHeader`, entre o título e a busca
+  (`ContextoDaCaixa`): rótulo 13/600, sem repetir o nome da tela em serifa.
+- **Toque** (`pointer: coarse`, tablet e celular): todo alvo volta a 44 px; link
+  de texto em tabela e na trilha ganha área de toque de 44 px invisível.
+- **Menu**: grupo com um item só vira o item direto (sem cabeçalho).
 - **A conta** (assinatura do ERP de custo): custo por unidade em Gelasio +
   a conta por extenso em 12 px tabular ("R$ 89,90 + R$ 5,00 frete ÷ 5 kg =
   R$ 18,98/kg"), igual na prévia, na lista, no detalhe e no histórico. Sem
@@ -95,6 +110,11 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
 | #C41522 no botão, #EA1D2C no acento | #EA1D2C com branco dá 4,47:1, abaixo de AA em 14 px | 2026-10-16 |
 | Sem vidro, gradiente, glow, Inter do kit | identidade FlowFoods e avoid-ai-design (K3, C1) | 2026-10-16 |
 | Formulários em tela própria, não painel lateral | sem JS, tela cheia no celular, voltar funciona | 2026-10-16 |
+| Referência principal Kairu Editorial; Dark v2 fora | Dark v2 tem vidro e gradiente; Editorial é a identidade FlowFoods | 2026-10-21 |
+| Caixa de ajuda abaixo do título | o título vem primeiro; a aula não empurra a tela | 2026-10-21 |
+| 44 px por `pointer: coarse` | tablet deitado é dedo, não mouse | 2026-10-21 |
+| Hub 2 colunas no celular | Ref.1 do plano vence o kit | 2026-10-21 |
+| Erro escuro #F5525A | #F2323F dava 4,42:1 na linha destacada | 2026-10-21 |
 | Máscara na borda do trilho de filtros no celular | indício de rolagem (funcional, não decorativa) | 2026-10-16 |
 - **A cascata (1.3)**: item de pré-preparo = nome com link + selo neutro
   "Pré-preparo"; embaixo, "De onde vem: R$ X por kg (R$ total ÷ rende)" em

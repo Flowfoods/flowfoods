@@ -11,7 +11,7 @@
  */
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { createElement } from 'react';
+import { createElement, Fragment } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -30,6 +30,7 @@ import { divergenciasDoLock, hashDaEntrada, lockNovo, type Lock } from '@/lib/er
 import { itemAtivo, modulosDoParceiro, navegacaoDoParceiro } from '@/lib/erp/modulos';
 import { ALCANCE_FLOWFOODS, resolverAlcance, TODAS_AS_PERMISSOES, type Alcance, type VinculoDePermissao } from '@/lib/erp/permissoes';
 import lockSalvo from '@/lib/erp/ajuda.lock.json';
+import { PageHeader } from '@/components/erp/ui/cabecalho';
 
 let caminhoAtual = '/erp';
 vi.mock('next/navigation', () => ({
@@ -290,7 +291,13 @@ async function html(caminho: string, preferencia: PreferenciaDeAjuda | null, alc
           acoes: preferencia ? { fechar: acao, dicas: acao } : null,
           contato: { url: 'https://wa.me/5521', display: '(21) 90000-0000' },
         },
-        children: createElement('div', { id: 'pagina' }, 'conteúdo da página'),
+        // A página de verdade: o PageHeader (onde a caixa mora, abaixo do h1) e o conteúdo.
+        children: createElement(
+          Fragment,
+          null,
+          createElement(PageHeader, { icone: 'insumo', cor: '#4D7C0F', titulo: 'Título da tela' }),
+          createElement('div', { id: 'pagina' }, 'conteúdo da página'),
+        ),
       },
     ),
   );
@@ -298,11 +305,12 @@ async function html(caminho: string, preferencia: PreferenciaDeAjuda | null, alc
 const PREF = (p: Partial<PreferenciaDeAjuda> = {}): PreferenciaDeAjuda => ({ dicasLigadas: true, escolhida: true, fechadas: [], ...p });
 
 describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fechou ou desligou', () => {
-  it('ligada: caixa acima da página, com o botão de fechar e o "?" no topo', async () => {
+  it('ligada: caixa logo abaixo do título e acima do conteúdo, com o botão de fechar e o "?" no topo', async () => {
     const h = await html('/erp/insumos', PREF());
     expect(h).toContain('data-ajuda-caixa="insumos"');
     expect(h).toContain('Como funciona');
     expect(h).toContain('Entendi, não mostrar de novo');
+    expect(h.indexOf('<h1')).toBeLessThan(h.indexOf('data-ajuda-caixa'));
     expect(h.indexOf('data-ajuda-caixa')).toBeLessThan(h.indexOf('conteúdo da página'));
     expect(h).toContain('aria-label="Ajuda desta tela"');
     expect(h).not.toContain('Quer as dicas de como usar cada tela?');

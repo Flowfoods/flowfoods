@@ -139,7 +139,7 @@ export function CaixaDeAula({
   // JavaScript), para a lista de insumos ficar à vista. Com a pergunta da 1ª vez pendente ela nasce aberta.
   if (entrada.recolhida) {
     return (
-      <section aria-labelledby={id} data-ajuda-caixa={entrada.chave} className="mb-4 rounded-[14px] border border-linha bg-painel">
+      <section aria-labelledby={id} data-ajuda-caixa={entrada.chave} className="rounded-[14px] border border-linha bg-painel">
         <details open={estado.perguntar || undefined} className="group">
           <summary className="ff-transicao flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 sm:px-5 [&::-webkit-details-marker]:hidden">
             <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -163,10 +163,11 @@ export function CaixaDeAula({
   }
 
   return (
-    <section aria-labelledby={id} data-ajuda-caixa={entrada.chave} className="mb-6 rounded-[14px] border border-linha bg-painel px-4 py-4 sm:px-5">
-      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-suave">{etiqueta}</div>
-      <h2 id={id} className="mt-1 font-display text-[18px] font-bold leading-snug">
-        {entrada.titulo}
+    <section aria-labelledby={id} data-ajuda-caixa={entrada.chave} className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
+      {/* O título da tela já está logo acima (h1): aqui só o rótulo, sem repetir o nome em destaque. */}
+      <h2 id={id} className="flex flex-wrap items-center gap-2 text-[13px] font-semibold text-texto">
+        {etiqueta}
+        <span className="sr-only">{` · ${entrada.titulo}`}</span>
       </h2>
       {corpo}
     </section>

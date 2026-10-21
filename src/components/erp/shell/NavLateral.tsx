@@ -84,7 +84,21 @@ export function NavLateral({
               ))}
           </ul>
         ) : (
-          modulo.grupos.map((g) => (
+          modulo.grupos.map((g) =>
+            // Grupo de um item só ("INSUMOS › Insumos"): o cabeçalho repete o item. Fica só o item, sem o rótulo que abre e fecha.
+            g.itens.length === 1 ? (
+              <ul key={g.rotulo} className="mt-3 space-y-0.5">
+                <li>
+                  <ItemDoMenu
+                    href={g.itens[0].href}
+                    rotulo={g.itens[0].rotulo}
+                    icone={g.itens[0].icone}
+                    ativo={hrefAtivo === g.itens[0].href}
+                    recolhido={recolhido}
+                  />
+                </li>
+              </ul>
+            ) : (
             <Grupo key={g.rotulo} rotulo={g.rotulo} icone={g.icone} recolhido={recolhido}>
               {g.itens.map((i) => (
                 <li key={i.href}>
@@ -98,7 +112,8 @@ export function NavLateral({
                 </li>
               ))}
             </Grupo>
-          ))
+            ),
+          )
         )}
       </nav>
 

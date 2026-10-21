@@ -55,7 +55,7 @@
   --ff-acao-hover: 214 26 39;
   --ff-acento: 234 29 44;
   --ff-marca: 242 50 63;
-  --ff-erro: 242 50 63;
+  --ff-erro: 245 82 90;
   --ff-ok: 74 222 128;
   --ff-atencao: 245 158 11;
   --ff-ativo: rgb(234 29 44 / 0.12);
@@ -80,7 +80,7 @@
     --ff-acao-hover: 214 26 39;
     --ff-acento: 234 29 44;
     --ff-marca: 242 50 63;
-    --ff-erro: 242 50 63;
+    --ff-erro: 245 82 90;
     --ff-ok: 74 222 128;
     --ff-atencao: 245 158 11;
     --ff-ativo: rgb(234 29 44 / 0.12);
@@ -265,6 +265,24 @@ html:has(.ff-app[data-tema='escuro']) {
   /* Campo com 16 px no celular: o iOS não dá zoom ao focar. */
   .ff-app :is(input, select, textarea) {
     font-size: 16px;
+  }
+}
+
+/*
+ * Tablet e celular (dedo, não mouse): todo alvo que encolhe para 40/42/36/32 px
+ * a partir de 600/900 px volta para 44 px. A largura não diz se a tela é de
+ * toque — um tablet a 1180 px deitado recebia o tamanho do mouse.
+ */
+@media (pointer: coarse) {
+  .ff-app :is(.sm\:min-h-10, .sm\:min-h-\[42px\], .sm\:min-h-9, .sm\:min-h-8, .min-\[900px\]\:min-h-10, .min-\[900px\]\:min-h-8, .min-h-9) {
+    min-height: 44px;
+  }
+  /* Link de texto em tabela e na trilha do topo: a área de toque cresce para 44 px
+     sem mudar o desenho nem a altura da linha (folga invisível compensada pela margem). */
+  .ff-app :is(table a, nav[aria-label='Você está em'] a):not(.flex, .inline-flex, .grid, .block) {
+    display: inline-block;
+    padding-block: 14px;
+    margin-block: -14px;
   }
 }
 

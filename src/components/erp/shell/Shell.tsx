@@ -17,6 +17,7 @@ import { comParceiroAtual, slugNoCaminho } from '@/lib/rodolfo/modulos';
 import { Abas } from '../ui/abas';
 import { Dialogo } from '../ui/Dialogo';
 import { ContextoDaAjuda } from '../ui/link-de-ajuda';
+import { ContextoDaCaixa } from '../ui/caixa-da-tela';
 import { assinaturaDaPreferencia, CaixaDeAula, GavetaDeAjuda, preferenciaEfetiva, type Otimista } from './ajuda';
 import { acaoGuardarMenu } from './acoes';
 import { BuscaGlobal } from './BuscaGlobal';
@@ -144,6 +145,22 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
   const abas = abasDaArea(nav, ativo);
   const outrasDaArea = abas ? { area: abas.area, telas: abas.abas.filter((a) => a.href !== ativo?.item.href).map((a) => ({ href: a.href, rotulo: a.rotulo })) } : null;
 
+  // Caixa "Como funciona" da tela: desenhada pelo PageHeader, abaixo do título (ContextoDaCaixa).
+  const caixa = entradaDaTela && estadoDaCaixa && ajuda?.acoes && (
+    <CaixaDeAula
+      entrada={entradaDaTela}
+      estado={estadoDaCaixa}
+      acoes={ajuda.acoes}
+      aoFechar={(fechada) =>
+        setOtimista((o) => ({ assinatura, fechadas: [...(o?.assinatura === assinatura ? o.fechadas : []), fechada], dicasLigadas: o?.assinatura === assinatura ? o.dicasLigadas : undefined, escolhida: o?.assinatura === assinatura ? o.escolhida : undefined }))
+      }
+      aoEscolher={(v) =>
+        setOtimista((o) => ({ assinatura, fechadas: o?.assinatura === assinatura ? o.fechadas : [], dicasLigadas: v === 'manter', escolhida: true }))
+      }
+      aoVerTudo={(origem) => abrirAjuda(undefined, origem)}
+    />
+  );
+
   const contextoDaAjuda = useMemo(() => ({ abrir: abrirAjuda, disponivel: temAjuda }), [abrirAjuda, temAjuda]);
 
   return (
@@ -248,21 +265,8 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
                 abas={abas.abas.map((a) => ({ href: a.href, rotulo: a.rotulo, ativa: a.href === ativo?.item.href }))}
               />
             )}
-            {entradaDaTela && estadoDaCaixa && ajuda?.acoes && (
-              <CaixaDeAula
-                entrada={entradaDaTela}
-                estado={estadoDaCaixa}
-                acoes={ajuda.acoes}
-                aoFechar={(caixa) =>
-                  setOtimista((o) => ({ assinatura, fechadas: [...(o?.assinatura === assinatura ? o.fechadas : []), caixa], dicasLigadas: o?.assinatura === assinatura ? o.dicasLigadas : undefined, escolhida: o?.assinatura === assinatura ? o.escolhida : undefined }))
-                }
-                aoEscolher={(v) =>
-                  setOtimista((o) => ({ assinatura, fechadas: o?.assinatura === assinatura ? o.fechadas : [], dicasLigadas: v === 'manter', escolhida: true }))
-                }
-                aoVerTudo={(origem) => abrirAjuda(undefined, origem)}
-              />
-            )}
-            {children}
+            {/* A caixa "Como funciona" vai para baixo do título (PageHeader): o título vem primeiro. */}
+            <ContextoDaCaixa.Provider value={caixa}>{children}</ContextoDaCaixa.Provider>
           </main>
         </div>
 
