@@ -583,6 +583,7 @@ model ParceiroFlow {
   erpOrdensProducao      OrdemProducao[]
   erpListasProducao      ListaProducao[]
   erpListaProducaoItens  ListaProducaoItem[]
+  erpCategoriasInsumo    CategoriaInsumo[]
   erpEtiquetas           Etiqueta[]
   erpFaturamentos        FaturamentoLancamento[]
   erpDreLinhas           DreLinha[]
@@ -787,6 +788,23 @@ model Insumo {
   ativo                  Boolean     @default(true)
   origem                 OrigemDado  @default(MANUAL)
 
+  // I.1a — Categoria gerencial (natureza do insumo, para o CMV; NÃO é conservação nem setor). Nula no banco de
+  // propósito: o insumo antigo continua legível até a classificação assistida; a regra (categoria obrigatória) é do
+  // servidor, em todo insumo novo e em toda edição. FK composta: categoria de outro parceiro não entra.
+  categoriaId            String?
+  categoria              CategoriaInsumo? @relation(fields: [parceiroId, categoriaId], references: [parceiroId, id], onDelete: Restrict)
+  // Como a categoria foi escolhida: MANUAL (a pessoa), SUGESTAO (a sugestão pelo nome, aceita) ou MIGRACAO (classificação assistida).
+  classificadoPor        String?
+  // Por que ficou em "Outros / a classificar" (ambíguo), em uma frase.
+  classificacaoMotivo    String?
+  // O lote da classificação assistida que pôs a categoria; nulo quando uma pessoa mexeu depois (só o intocado se reverte).
+  classificacaoLote      String?
+  classificadoEm         DateTime?
+  // Idempotência de criar: a chave que o formulário mandou e a impressão do conteúdo. Mesma chave + mesmo conteúdo =
+  // o mesmo insumo (sucesso); mesma chave + conteúdo diferente = recusa.
+  chaveEnvio             String?
+  hashEnvio              String?
+
   variantes         InsumoVariante[]
   fichaQueProduz    FichaTecnica?      @relation("FichaProduzInsumo")
   usosEmFichas      FichaItem[]
@@ -802,8 +820,37 @@ model Insumo {
   // O nome repete entre parceiros (todo mundo tem "Cebola"), nunca dentro de um.
   @@unique([parceiroId, nome])
   @@unique([parceiroId, id])
+  @@unique([parceiroId, chaveEnvio])
   @@index([parceiroId, criadoEm])
   @@index([parceiroId, tipo])
+  @@index([parceiroId, categoriaId])
+}
+
+// I.1a — Categoria de insumo da REDE (do parceiro): a natureza do insumo para o CMV gerencial (Proteína, Hortifruti...).
+// As dez padrão nascem por script idempotente (`erp:semear-categorias`, nunca pela migration) com `chave` estável; a casa
+// cria, renomeia, reordena, desativa (com uso) e exclui (sem uso). "Outros / a classificar" é do sistema: não se
+// renomeia, desativa nem exclui (gatilho). Desativar não apaga: o insumo que já está nela continua nela. A loja personaliza
+// só a meta (I.2, `CategoriaNaLoja`), nunca a natureza do insumo.
+model CategoriaInsumo {
+  id           String       @id @default(cuid())
+  parceiroId   String
+  parceiro     ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  // PROTEINA, HORTIFRUTI, ... OUTROS: a identidade da padrão, que sobrevive ao renomear. Nula nas criadas pela casa.
+  chave        String?
+  nome         String
+  ordem        Int          @default(0)
+  sistema      Boolean      @default(false)
+  ativa        Boolean      @default(true)
+  criadaEm     DateTime     @default(now())
+  desativadaEm DateTime?
+  atualizadoEm DateTime     @updatedAt
+
+  insumos Insumo[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, nome])
+  @@unique([parceiroId, chave])
+  @@index([parceiroId, ordem])
 }
 
 // Outras embalagens de compra do mesmo insumo (fardo, caixa, marca B...).

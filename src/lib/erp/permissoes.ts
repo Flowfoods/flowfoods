@@ -26,8 +26,11 @@
  * quem decide é o servidor.
  */
 
-/** Sobe quando o catálogo ganha permissão nova (perfil próprio guarda em que versão nasceu). 2 = 3.2, `producao.planejar`. */
-export const VERSAO_DO_CATALOGO = 2;
+/**
+ * Sobe quando o catálogo ganha permissão nova (perfil próprio guarda em que versão nasceu). 2 = 3.2, `producao.planejar`.
+ * 3 = I.1a, `insumos.categorias`.
+ */
+export const VERSAO_DO_CATALOGO = 3;
 
 export interface DefinicaoDePermissao {
   rotulo: string;
@@ -52,6 +55,10 @@ export const CATALOGO = [
     permissoes: {
       'insumos.ver': { rotulo: 'Ver insumos e custos' },
       'insumos.editar': { rotulo: 'Cadastrar e editar insumos' },
+      // I.1a: a categoria é da REDE inteira (muda o CMV de todas as lojas): quem tem só lojas não gere. Classificar UM insumo
+      // continua sendo `insumos.editar`; criar, renomear, reordenar, desativar e excluir categoria, e aplicar ou desfazer a
+      // classificação assistida de todos, são desta.
+      'insumos.categorias': { rotulo: 'Gerir categorias de insumos', exigeRede: true },
     },
   },
   {
@@ -175,7 +182,7 @@ export function normalizarPermissoes(lista: readonly unknown[]): Permissao[] {
 
 export type PerfilBase = 'DONO' | 'GERENTE' | 'OPERADOR';
 
-const SEM_GERENTE = new Set<Permissao>(['acessos.gerir', 'lojas.gerir', 'metas.editar', 'precos.editar']);
+const SEM_GERENTE = new Set<Permissao>(['acessos.gerir', 'lojas.gerir', 'metas.editar', 'precos.editar', 'insumos.categorias']);
 
 const DO_OPERADOR: Permissao[] = [
   'insumos.ver',
@@ -282,7 +289,7 @@ export interface VinculoDePermissao {
 }
 
 /** O que entrou no catálogo em cada versão (a 1 é a de nascença). */
-const NOVAS_NA_VERSAO: Readonly<Record<number, readonly Permissao[]>> = { 2: ['producao.planejar'] };
+const NOVAS_NA_VERSAO: Readonly<Record<number, readonly Permissao[]>> = { 2: ['producao.planejar'], 3: ['insumos.categorias'] };
 
 /** O catálogo como era na versão `versao`: o de hoje menos o que entrou depois. */
 function catalogoNaVersao(versao: number): Permissao[] {

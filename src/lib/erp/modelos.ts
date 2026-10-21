@@ -11,6 +11,8 @@
  */
 export const MODELOS_DE_TENANT = [
   'insumo',
+  // I.1a: a categoria de insumo da rede (natureza do insumo para o CMV).
+  'categoriaInsumo',
   'loja',
   'marca',
   'colaborador',
@@ -58,6 +60,7 @@ export type ModeloDeTenant = (typeof MODELOS_DE_TENANT)[number];
  */
 export const RELACOES_DE_TENANT = [
   'insumos',
+  'erpCategoriasInsumo',
   'erpLojas',
   'erpMarcas',
   'erpColaboradores',

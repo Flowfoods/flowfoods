@@ -18,12 +18,12 @@ const ORDEM_DE_LIMPEZA = [
   'HistoricoAlteracao', 'Etiqueta', 'MovimentoEstoque', 'SaldoEstoque', 'ContagemItem', 'Contagem',
   'ListaProducaoItem', 'ListaProducao', 'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
   'ProdutoCanal', 'ProdutoVenda', 'FichaItem', 'FichaTecnica', 'InsumoVariante', 'FaturamentoLancamento',
-  'Despesa', 'DreMeta', 'FarolFaixa', 'DreLinha', 'DreFotografiaLinha', 'DreFotografia', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'Fornecedor',
+  'Despesa', 'DreMeta', 'FarolFaixa', 'DreLinha', 'DreFotografiaLinha', 'DreFotografia', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'CategoriaInsumo', 'Fornecedor',
   'Colaborador', 'Marca', 'Loja',
 ];
 
 /** Tabelas com gatilho que recusa o DELETE (a limpeza desliga só na transação dela). */
-const SEM_GATILHO_NA_LIMPEZA = ['DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem'];
+const SEM_GATILHO_NA_LIMPEZA = ['DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem', 'CategoriaInsumo'];
 
 export interface PerfilDoBanco {
   superusuario: boolean;
