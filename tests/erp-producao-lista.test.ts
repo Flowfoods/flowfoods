@@ -313,7 +313,7 @@ describe('ERP 3.2 · ler o formulário da lista', () => {
     expect(ler([])).toEqual({ ok: true, linhas: [] });
   });
 
-  it('recusa com a frase na linha (contando as vazias): sem pré-preparo, pré-preparo indisponível, número inválido, zero, acima de 10 mil e repetido', () => {
+  it('recusa com a frase na linha (contando as vazias): sem pré-preparo, pré-preparo indisponível, número inválido, zero, ponto no lugar da vírgula, acima de 10 mil e repetido', () => {
     const r = ler([['', '', '2'], ['', 'outro', '1'], ['', 'molho', 'dois'], ['', 'base', '0'], ['', 'caldo', '10000,001'], ['', 'molho', '3'], ['', 'pao', '']]);
     expect(r).toEqual({
       ok: false,
@@ -321,10 +321,15 @@ describe('ERP 3.2 · ler o formulário da lista', () => {
         'linha:0': 'Escolha o pré-preparo.',
         'linha:1': 'Esse pré-preparo não está mais disponível (desativado ou sem ficha ativa): escolha outro.',
         'linha:2': 'Quanto produzir de Molho cheddar: número em kg (ex.: 2 ou 1,5).',
-        'linha:3': 'Quanto produzir de Base de cebola: número em kg (ex.: 2 ou 1,5).',
+        'linha:3': 'Quanto produzir de Base de cebola: maior que zero.',
         'linha:4': 'Caldo: até 10.000 L numa linha.',
         'linha:6': 'Diga quanto produzir de Pão: número em un (ex.: 2 ou 1,5).',
       },
+    });
+    // O ponto como vírgula: a frase devolve o número escrito certo. "0,0" também é zero; "1.000" é mil (separador de milhar).
+    expect(ler([['', 'molho', '2.5'], ['', 'base', '0,0'], ['', 'caldo', '1.000']])).toEqual({
+      ok: false,
+      erros: { 'linha:0': 'Quanto produzir de Molho cheddar: use vírgula: 2,5 kg.', 'linha:1': 'Quanto produzir de Base de cebola: maior que zero.' },
     });
     expect(ler([['', 'molho', '2'], ['', 'molho', '3']])).toEqual({ ok: false, erros: { 'linha:1': '“Molho cheddar” já está na lista: some as quantidades numa linha só.' } });
   });

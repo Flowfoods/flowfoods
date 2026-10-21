@@ -201,6 +201,14 @@ describe.skipIf(!URL_TESTE)('ERP 3.2 · telas da lista do dia (Postgres real)', 
     expect(t).toContain('compra estimada do que falta, pelo último preço pago');
     expect(t).toContain('R$');
     expect(t).toContain('Gerar o lote');
+    // O formulário leva as linhas em aberto que mostrou: no salvar (`vistas`) e no gerar (`linha`).
+    const aberta = (await obterListaDoDia(a, GERENTE(), ids.vp, hoje))!.linhas[0].id;
+    expect(h).toContain(`name="vistas" value="${aberta}"`);
+    expect(h).toContain(`name="linha" value="${aberta}"`);
+    // O resumo da conta como atalho logo abaixo do Gerar (no celular a matéria-prima fica lá embaixo).
+    expect(h).toContain('href="#materia-prima"');
+    expect(h).toContain('id="materia-prima"');
+    expect(t).toMatch(/\d+ insumos? falta(m)?( · \d+ abaixo de zero)?: ver a matéria-prima/);
   });
 
   it('a cozinha (Operador) lê a lista sem formulário; a action dela é recusada com a frase; o chefe sem custos monta sem receber R$', async () => {
@@ -213,6 +221,18 @@ describe.skipIf(!URL_TESTE)('ERP 3.2 · telas da lista do dia (Postgres real)', 
     expect(h).not.toContain('Salvar a lista');
     expect(t).not.toContain('Pôr na lista');
     expect(t).not.toContain('Gerar o lote');
+    // O operador padrão TEM "ver insumos e custos", mas na lista do dia a cozinha lê só quantidades: o servidor monta sem o
+    // valor e sem o painel "Para quem compra" (decisão 226).
+    expect(OPERADOR().permissoes.has('insumos.ver')).toBe(true);
+    expect(h).not.toContain('R$');
+    expect(t).not.toContain('compra estimada');
+    expect(t).not.toContain('Para quem compra');
+    expect(t).not.toContain('pelo último preço');
+    const daCozinha = (await obterListaDoDia(a, OPERADOR(), ids.vp, hoje))!;
+    expect(daCozinha.custo).toBeNull();
+    expect(daCozinha.pode.verCustos).toBe(false);
+    // A quantidade da linha, para quem lê, vem na cor do texto e em negrito (sem o cinza de apoio).
+    expect(h).toMatch(/Molho cheddar <span class="whitespace-nowrap tabular-nums">· 5 kg<\/span>/);
     const r = await rodar(() => daSessao.acaoSalvarListaDoDia(ids.vp, null, formDe({ dia: hoje, versao: '1', linhaId: [''], fichaId: [ids.molho], quantidade: ['1'] })));
     expect(r).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/definir a lista do dia/) } });
     // O chefe sem "ver insumos e custos": monta, e o HTML não leva R$ nem "compra estimada".
@@ -239,17 +259,30 @@ describe.skipIf(!URL_TESTE)('ERP 3.2 · telas da lista do dia (Postgres real)', 
 
   it('gerar os lotes pela action: volta "lotes-gerados", a linha mostra o lote e a etapa; o segundo envio volta "lotes-ja", sem lote novo', async () => {
     como(GERENTE());
-    const v = (await obterListaDoDia(a, GERENTE(), ids.vp, hoje))!.lista!.versao;
-    const r = await rodar(() => daSessao.acaoGerarLotesDaLista(ids.vp, null, formDe({ dia: hoje, versao: String(v) })));
+    const l = (await obterListaDoDia(a, GERENTE(), ids.vp, hoje))!;
+    const v = l.lista!.versao;
+    // O formulário manda as linhas em aberto que mostrou (`linha`): sem nenhuma, nada vira lote (decisão 228).
+    expect(await rodar(() => daSessao.acaoGerarLotesDaLista(ids.vp, null, formDe({ dia: hoje, versao: String(v) })))).toMatchObject({ ok: false, erros: { geral: 'Nenhum pré-preparo em aberto para virar lote.' } });
+    expect(await a.ordemProducao.count()).toBe(0);
+    const vistas = l.linhas.filter((x) => x.estado === 'NA_LISTA').map((x) => x.id);
+    const r = await rodar(() => daSessao.acaoGerarLotesDaLista(ids.vp, null, formDe({ dia: hoje, versao: String(v), linha: vistas })));
     expect(r).toMatchObject({ url: `/erp/producao/lista/${ids.vp}?dia=${hoje}&feito=lotes-gerados` });
-    const de_novo = await rodar(() => daSessao.acaoGerarLotesDaLista(ids.vp, null, formDe({ dia: hoje, versao: String(v) })));
+    const de_novo = await rodar(() => daSessao.acaoGerarLotesDaLista(ids.vp, null, formDe({ dia: hoje, versao: String(v), linha: vistas })));
     expect(de_novo).toMatchObject({ url: expect.stringMatching(/feito=lotes-ja$/) });
     expect(await a.ordemProducao.count()).toBe(1);
-    const t = texto(await lista(ids.vp, hoje, 'lotes-gerados'));
+    const hg = await lista(ids.vp, hoje, 'lotes-gerados');
+    const t = texto(hg);
     expect(t).toContain('Lotes gerados.');
     expect(t).toContain('Já viraram lote');
     expect(t).toMatch(/Planejada Lote \d{6}-01/);
     expect(t).toContain('Lotes gerados');
+    // Depois de gerar, o aviso vem para a vista (a tela volta na mesma rolagem) e o formulário não abre linha vazia:
+    // só "Mais um pré-preparo", com "Salvar" secundário.
+    expect(hg).toMatch(/<div tabindex="-1" class="scroll-mt-24 outline-none"><div role="status"[^>]*>.*?Lotes gerados\./);
+    expect(hg).not.toContain('<select');
+    expect(t).toContain('Mais um pré-preparo');
+    expect(t).toContain('Tudo o que estava na lista já virou lote.');
+    expect(hg).not.toContain('Gerar o lote');
     // A cozinha vê o lote da lista (link para o lote), ainda sem formulário.
     como(OPERADOR(), A, a, 'Caio Cozinha');
     const h = await lista();
@@ -286,6 +319,12 @@ describe.skipIf(!URL_TESTE)('ERP 3.2 · telas da lista do dia (Postgres real)', 
     const ontem = texto(await lista(ids.vp, somarDias(hoje, -1)));
     expect(ontem).toContain('Dia que já passou: a lista fica para consulta.');
     expect(ontem).not.toContain('Salvar a lista');
+    // Fora do prazo: a frase uma vez só (no aviso de cima), e nada de "Monte a lista" para quem não pode montar nesse dia.
+    const longe = texto(await lista(ids.vp, somarDias(hoje, 20)));
+    expect(longe.split('A lista se monta de hoje até 14 dias à frente.').length - 1).toBe(1);
+    expect(longe).toContain('Sem lista neste dia.');
+    expect(longe).not.toContain('Monte a lista');
+    expect(longe).toContain('Sem lista, nada a tirar do estoque.');
   });
 
   it('o espelho do nível 1 abre a mesma lista, com as ações dele (salvar pelo espelho volta ao espelho)', async () => {

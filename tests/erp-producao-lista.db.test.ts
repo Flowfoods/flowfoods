@@ -31,7 +31,7 @@ import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { somarDias } from '@/lib/erp/contagem-campos';
 import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
 import { atenderRequisicao, obterRequisicao } from '@/lib/erp/requisicao';
-import { cancelarProducao, concluirProducao, obterOrdem, planejarProducao, listaDaProducao } from '@/lib/erp/producao';
+import { cancelarProducao, concluirProducao, estornarProducao, iniciarProducao, obterOrdem, planejarProducao, listaDaProducao } from '@/lib/erp/producao';
 import { gerarLotesDaLista, lojasDaListaDoDia, obterListaDoDia, porNaListaDoDia, salvarListaDoDia } from '@/lib/erp/producao-lista';
 import { listarHistorico } from '@/lib/erp/historico';
 import { travarParaFechar } from '@/lib/erp/periodo-trava';
@@ -219,13 +219,34 @@ describe.skipIf(!URL_TESTE)('ERP 3.2 · a lista do dia (Postgres real)', { timeo
     expect(h.mudancas).toEqual(expect.arrayContaining([{ campo: 'entrou', antes: null, depois: 'Base de cebola 500 g' }, { campo: 'Molho cheddar', antes: expect.stringMatching(/kg$/), depois: '6 kg' }]));
     // A frase na linha certa (contando as vazias) e nada gravado.
     expect(await salvar(GERENTE(), amanha, d.lista!.versao, [['', ids.molho, '1'], ['', ids.molho, '2']])).toMatchObject({ ok: false, erros: { 'linha:1': expect.stringMatching(/já está na lista/) } });
-    // Vazia: a lista some, e o histórico guarda o que ela tinha.
+    // Vazia: a lista fica sem linhas (apagada), e o histórico guarda o que ela tinha. A linha da lista no banco FICA, e a versão
+    // continua (decisão 229): não recomeça em 1 quando alguém monta de novo.
     const listaId = d.lista!.id;
+    const versaoAntesDeApagar = d.lista!.versao;
     expect(await salvar(GERENTE(), amanha, d.lista!.versao, [])).toMatchObject({ ok: true });
-    expect((await ver(DONA(), amanha)).lista).toBeNull();
+    const apagada = await ver(DONA(), amanha);
+    expect(apagada.linhas).toEqual([]);
+    expect(apagada.lista).toMatchObject({ id: listaId, versao: versaoAntesDeApagar + 1 });
     const ex = await listarHistorico(a, { de: [{ entidade: 'ListaProducao', ids: [listaId] }], limite: 1, verPrecos: false });
     expect(ex[0]).toMatchObject({ acao: 'EXCLUIU' });
     expect(ex[0].mudancas).toEqual(expect.arrayContaining([expect.objectContaining({ campo: 'o que produzir', antes: 'Molho cheddar 6 kg · Base de cebola 500 g' })]));
+    // Salvar vazio de novo: nada a fazer.
+    expect(await salvar(GERENTE(), amanha, apagada.lista!.versao, [])).toMatchObject({ ok: true, jaFeito: true });
+    // Outra pessoa monta de novo (a tela dela não tinha lista: versão vazia) → "Montada", com a versão seguindo.
+    expect(await salvar(GERENTE(), amanha, null, [['', ids.base, '3']])).toMatchObject({ ok: true });
+    const remontada = await ver(DONA(), amanha);
+    expect(remontada.lista).toMatchObject({ id: listaId, versao: versaoAntesDeApagar + 2 });
+    expect(remontada.historico[0]).toMatchObject({ acao: 'CRIOU' });
+    // A aba que leu a lista ANTES de apagar (a versão velha) não sobrescreve a montada de novo: conflito, nada gravado.
+    expect(await salvar(GERENTE(), amanha, versaoAntesDeApagar, [[linha.id, ids.molho, '9']])).toMatchObject({ ok: false, conflito: true });
+    expect(await salvar(GERENTE(), amanha, versaoAntesDeApagar, [['', ids.molho, '9']])).toMatchObject({ ok: false, conflito: true });
+    // A aba da lista apagada (versão de apagada) que tenta montar depois que outra pessoa já montou: conflito ("apagada…").
+    expect(await salvar(GERENTE(), amanha, apagada.lista!.versao, [['', ids.molho, '1']])).toMatchObject({ ok: false, conflito: true });
+    // "Pôr na lista" com a versão velha também não soma; e gerar não acha nada numa lista apagada.
+    expect(await porNaListaDoDia(a, GERENTE(), ids.vp, { dia: amanha, versao: String(versaoAntesDeApagar), fichaId: ids.molho, quantidade: '1000' }, GIL)).toMatchObject({ ok: false, conflito: true });
+    expect((await ver(DONA(), amanha)).linhas.map((x) => [x.nome, x.quantidadeMilesimos])).toEqual([['Base de cebola', 3000]]);
+    expect(await salvar(GERENTE(), amanha, remontada.lista!.versao, [])).toMatchObject({ ok: true });
+    expect(await gerarLotesDaLista(a, GERENTE(), ids.vp, { dia: amanha, versao: String(remontada.lista!.versao + 1) }, GIL)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/foi apagada/) } });
   });
 
   it('permissões e alcance: a cozinha VÊ a lista e não monta nem gera; quem não vê produção não abre; gerente de outra loja e outro parceiro não enxergam', async () => {
@@ -429,6 +450,118 @@ describe.skipIf(!URL_TESTE)('ERP 3.2 · a lista do dia (Postgres real)', { timeo
     expect(l.foraDaLista.map((x) => [x.nome, x.quantidadeMilesimos, x.status])).toEqual([['Molho cheddar', 1000, 'PLANEJADA']]);
     expect(antes.conta.materiaPrima.find((i) => i.nome === 'Leite')).toMatchObject({ vaiUsarMilesimos: 0, comprarMilesimos: 500 });
     expect(l.conta.materiaPrima.find((i) => i.nome === 'Leite')).toMatchObject({ vaiUsarMilesimos: 500, comprarMilesimos: 1000, deOnde: ['Molho cheddar'] });
+  });
+
+  it('lote de FORA da lista com pré-preparo dentro (revisão B1): a cascata é a mesma de quando ele é linha, até o fundo (três níveis), e "Pôr na lista" aparece', async () => {
+    // Molho da casa: rende 1 kg com 500 g do molho especial (que leva a base): três níveis de pré-preparo.
+    const casa = await cadastrarFicha(a, { nome: 'Molho da casa', tipo: 'PRE_PREPARO', rendimento: '1', rendimentoUnidade: 'kg', itens: [{ subfichaId: ids.especial, quantidade: '500', unidade: 'g' }], validade: { principal: 'REFRIGERADO', linhas: { REFRIGERADO: { marcada: true, quantidade: '3', em: 'dias' } } } } as never, { tipo: 'manter' }, 'Marina');
+    if (!casa.ok) throw new Error(JSON.stringify(casa));
+    const comoLinha = async (dia: string, fichaId: string, q: string) => {
+      expect(await salvar(GERENTE(), dia, null, [['', fichaId, q]])).toMatchObject({ ok: true });
+      return ver(DONA(), dia);
+    };
+    const deFora = async (dia: string, fichaId: string, q: string) => {
+      const l = await listaDaProducao(a, OPERADOR(), ids.vp, fichaId, q);
+      if (!l.ok) throw new Error('lista');
+      expect(await planejarProducao(a, OPERADOR(), ids.vp, { fichaId, quantidade: q, paraDia: dia, observacao: '', linhas: l.linhas, envio: `b1-${dia}-${sufixo}` }, CAIO)).toMatchObject({ ok: true });
+      return ver(DONA(), dia);
+    };
+    // Dois níveis: o molho especial 4 kg (a base vai pela requisição do lote de fora).
+    const linha2 = await comoLinha(somarDias(hoje, 3), ids.especial, '4');
+    const fora2 = await deFora(somarDias(hoje, 4), ids.especial, '4');
+    expect(fora2.linhas).toEqual([]);
+    expect(fora2.foraDaLista.map((x) => x.nome)).toEqual(['Molho especial']);
+    expect(comoNumeros(fora2)).toEqual(comoNumeros(linha2));
+    expect(comoNumeros(fora2).map((x) => x[0])).toEqual(expect.arrayContaining(['Cebola', 'Óleo']));
+    const base = fora2.conta.preparos.find((x) => x.nome === 'Base de cebola')!;
+    expect(base).toMatchObject({ fichaId: ids.base, semFicha: false, faltaProduzirMilesimos: 1000 });
+    expect(fora2.opcoes.map((o) => o.id)).toContain(ids.base);
+    // Três níveis: o molho da casa 2 kg de fora → o especial que ele leva → a base que o especial leva.
+    const linha3 = await comoLinha(somarDias(hoje, 5), casa.id, '2');
+    const fora3 = await deFora(somarDias(hoje, 6), casa.id, '2');
+    expect(comoNumeros(fora3)).toEqual(comoNumeros(linha3));
+    expect(fora3.conta.preparos.map((x) => [x.nome, x.faltaProduzirMilesimos, x.semFicha])).toEqual([
+      ['Base de cebola', 250, false],
+      ['Molho especial', 1000, false],
+    ]);
+    expect(fora3.conta.avisos).toEqual([]);
+  });
+
+  it('cancelar ou estornar um lote da lista sobe a versão dela (revisão I1): a aba velha não apaga a linha que voltou nem gera de novo o lote cancelado; o Gerar só gera as linhas vistas', async () => {
+    const dia = somarDias(hoje, 7);
+    expect(await salvar(GERENTE(), dia, null, [['', ids.molho, '2'], ['', ids.base, '1']])).toMatchObject({ ok: true });
+    let l = await ver(DONA(), dia);
+    const [molho, base] = l.linhas;
+    // Só a linha pedida vira lote (o formulário manda as que mostrou); a base fica na lista.
+    expect(await gerarLotesDaLista(a, GERENTE(), ids.vp, { dia, versao: String(l.lista!.versao), linhas: [molho.id] }, GIL)).toMatchObject({ ok: true });
+    const aba = await ver(DONA(), dia);
+    expect(aba.linhas.map((x) => [x.nome, x.estado])).toEqual([['Molho cheddar', 'EM_LOTE'], ['Base de cebola', 'NA_LISTA']]);
+    // Outra pessoa cancela o lote do molho pela tela do lote: a linha volta e a versão da lista sobe.
+    const loteMolho = aba.linhas[0].lote!;
+    const o = (await obterOrdem(a, DONA(), ids.vp, loteMolho.id))!;
+    expect(await cancelarProducao(a, DONA(), ids.vp, loteMolho.id, { versao: o.ordem.versao, motivo: 'hoje não' }, GIL)).toMatchObject({ ok: true });
+    l = await ver(DONA(), dia);
+    expect(l.lista!.versao).toBe(aba.lista!.versao + 1);
+    expect(l.linhas.map((x) => [x.nome, x.estado])).toEqual([['Molho cheddar', 'NA_LISTA'], ['Base de cebola', 'NA_LISTA']]);
+    // A aba velha muda a base e salva: pelo formulário (com as linhas que ela viu) a frase diz o que voltou; sem elas, a versão barra.
+    const daAbaVelha = { dia, versao: String(aba.lista!.versao), linhaIds: [base.id], fichaIds: [ids.base], quantidades: ['1,5'] };
+    expect(await salvarListaDoDia(a, GERENTE(), ids.vp, { ...daAbaVelha, vistas: base.id }, GIL)).toMatchObject({
+      ok: false,
+      conflito: true,
+      erros: { geral: `Molho cheddar voltou para a lista agora há pouco (o lote ${loteMolho.codigo} foi cancelado). Confira a lista de novo; nada foi gravado.` },
+    });
+    expect(await salvarListaDoDia(a, GERENTE(), ids.vp, daAbaVelha, GIL)).toMatchObject({ ok: false, conflito: true });
+    // Mesmo com a versão de agora, a linha que a pessoa não viu não some em silêncio.
+    expect(await salvarListaDoDia(a, GERENTE(), ids.vp, { ...daAbaVelha, versao: String(l.lista!.versao), vistas: base.id }, GIL)).toMatchObject({ ok: false, conflito: true });
+    expect((await ver(DONA(), dia)).linhas.map((x) => [x.nome, x.quantidadeMilesimos])).toEqual([['Molho cheddar', 2000], ['Base de cebola', 1000]]);
+    // O Gerar da aba velha não recria o lote cancelado (nem com as linhas dela, nem sem).
+    const vivos = () => a.ordemProducao.count({ where: { dataPlanejada: new Date(`${dia}T00:00:00Z`), status: { not: 'CANCELADA' } } });
+    expect(await gerarLotesDaLista(a, GERENTE(), ids.vp, { dia, versao: String(aba.lista!.versao), linhas: [base.id] }, GIL)).toMatchObject({ ok: false, conflito: true });
+    expect(await gerarLotesDaLista(a, GERENTE(), ids.vp, { dia, versao: String(aba.lista!.versao) }, GIL)).toMatchObject({ ok: false, conflito: true });
+    expect(await vivos()).toBe(0);
+    // Linha pedida que não está na lista: conflito. Com a versão de agora e só a base pedida: só a base vira lote.
+    expect(await gerarLotesDaLista(a, GERENTE(), ids.vp, { dia, versao: String(l.lista!.versao), linhas: [base.id, 'naoexiste1'] }, GIL)).toMatchObject({ ok: false, conflito: true });
+    expect(await gerarLotesDaLista(a, GERENTE(), ids.vp, { dia, versao: String(l.lista!.versao), linhas: [base.id] }, GIL)).toMatchObject({ ok: true });
+    l = await ver(DONA(), dia);
+    expect(l.linhas.map((x) => [x.nome, x.estado])).toEqual([['Molho cheddar', 'NA_LISTA'], ['Base de cebola', 'EM_LOTE']]);
+    expect(await vivos()).toBe(1);
+    // Estornar o lote concluído também devolve a linha e sobe a versão.
+    const loteBase = l.linhas[1].lote!;
+    const ob = (await obterOrdem(a, DONA(), ids.vp, loteBase.id))!;
+    expect(await entregarTudo(ob.requisicao!.id)).toMatchObject({ ok: true });
+    const iniciar = (await obterOrdem(a, DONA(), ids.vp, loteBase.id))!;
+    expect(await iniciarProducao(a, OPERADOR(), ids.vp, loteBase.id, { versao: iniciar.ordem.versao }, CAIO)).toMatchObject({ ok: true });
+    const concluir = (await obterOrdem(a, DONA(), ids.vp, loteBase.id))!;
+    expect(await concluirProducao(a, OPERADOR(), ids.vp, loteBase.id, { versao: concluir.ordem.versao, produzido: '1', escala: 'base', motivo: '', conservacao: '' }, CAIO)).toMatchObject({ ok: true });
+    const antesDoEstorno = await ver(DONA(), dia);
+    expect(antesDoEstorno.linhas[1].estado).toBe('FEITA');
+    const oe = (await obterOrdem(a, DONA(), ids.vp, loteBase.id))!;
+    expect(await estornarProducao(a, DONA(), ids.vp, loteBase.id, { versao: oe.ordem.versao, motivo: 'lote errado', confirmarNegativo: 'sim' }, GIL)).toMatchObject({ ok: true });
+    const depois = await ver(DONA(), dia);
+    expect(depois.lista!.versao).toBe(antesDoEstorno.lista!.versao + 1);
+    expect(depois.linhas[1]).toMatchObject({ nome: 'Base de cebola', estado: 'NA_LISTA' });
+    expect(await gerarLotesDaLista(a, GERENTE(), ids.vp, { dia, versao: String(antesDoEstorno.lista!.versao) }, GIL)).toMatchObject({ ok: false, conflito: true });
+  });
+
+  it('cancelar o lote e salvar a lista ao mesmo tempo: sem deadlock (a lista é travada antes do lote nos dois caminhos), e quem chega depois vê a versão nova', async () => {
+    const dia = somarDias(hoje, 8);
+    expect(await salvar(GERENTE(), dia, null, [['', ids.molho, '2'], ['', ids.base, '1']])).toMatchObject({ ok: true });
+    let l = await ver(DONA(), dia);
+    expect(await gerarLotesDaLista(a, GERENTE(), ids.vp, { dia, versao: String(l.lista!.versao), linhas: [l.linhas[0].id] }, GIL)).toMatchObject({ ok: true });
+    l = await ver(DONA(), dia);
+    const lote = l.linhas[0].lote!;
+    const o = (await obterOrdem(a, DONA(), ids.vp, lote.id))!;
+    const base = l.linhas[1];
+    const [c, s2] = await Promise.all([
+      cancelarProducao(a, DONA(), ids.vp, lote.id, { versao: o.ordem.versao, motivo: 'juntos' }, GIL),
+      salvarListaDoDia(a, GERENTE(), ids.vp, { dia, versao: String(l.lista!.versao), linhaIds: [base.id], fichaIds: [ids.base], quantidades: ['2'], vistas: base.id }, GIL),
+    ]);
+    expect(c).toMatchObject({ ok: true });
+    // O salvar ou passou antes do cancelamento (a base vira 2 kg) ou chegou depois e foi barrado — nunca apaga o molho que voltou.
+    const fim = await ver(DONA(), dia);
+    expect(fim.linhas.map((x) => x.nome)).toEqual(['Molho cheddar', 'Base de cebola']);
+    if (s2.ok) expect(fim.linhas[1].quantidadeMilesimos).toBe(2000);
+    else expect(s2).toMatchObject({ conflito: true });
   });
 
   it('loja sem estoque aberto (Delivery): a lista se monta, o "tem" é a frase (nunca 0) e gerar os lotes é recusado com o motivo', async () => {

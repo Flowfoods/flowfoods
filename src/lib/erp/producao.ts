@@ -386,6 +386,26 @@ async function travarOrdem(tx: ClienteDoParceiro, lojaId: string, id: string): P
 
 const MUDOU = 'Alguém mexeu neste lote agora há pouco. Confira de novo; nada foi gravado.';
 
+/**
+ * A lista do dia (3.2) que tem este lote numa linha, travada ANTES do lote (a ordem das travas da lista: período → lista →
+ * abertura e lote). Cancelar ou estornar devolve a linha à lista; a versão dela sobe junto (`subirVersaoDaLista`), e a aba
+ * que leu a lista antes não apaga a linha nem gera de novo o lote cancelado sem ver (decisão 228). O vínculo linha × lote vivo
+ * não muda (gatilho `ListaProducaoItem_lote_confere`), então a lista lida aqui é a do lote até o fim da transação.
+ */
+async function travarListaDoLote(tx: ClienteDoParceiro, lojaId: string, ordemId: string): Promise<string | null> {
+  if (!ID.test(ordemId)) return null;
+  const [l] = await tx.sql<{ id: string }>`
+    SELECT l."id" FROM "ListaProducao" l
+    JOIN "ListaProducaoItem" i ON i."listaId" = l."id" AND i."parceiroId" = l."parceiroId"
+    WHERE l."parceiroId" = ${tx.parceiroId} AND l."lojaId" = ${lojaId} AND i."ordemProducaoId" = ${ordemId}
+    FOR UPDATE OF l`;
+  return l?.id ?? null;
+}
+
+async function subirVersaoDaLista(tx: ClienteDoParceiro, listaId: string | null) {
+  if (listaId) await tx.listaProducao.update({ where: { id: listaId }, data: { versao: { increment: 1 } } });
+}
+
 /** O líquido que saiu pela requisição, por insumo (baixas + estornos do livro): a verdade do custo do lote. */
 async function baixasDaRequisicao(tx: ClienteDoParceiro, requisicaoId: string): Promise<BaixaDoInsumo[]> {
   const linhas = await tx.sql<{ insumoId: string; nome: string; unidade: Unidade; quantidade: number; valor: number }>`
@@ -751,6 +771,7 @@ export async function cancelarProducao(
   return comRecusa(() =>
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'producao.registrar');
+      const daLista = await travarListaDoLote(tx, lojaId, id);
       const { ordem, requisicao } = await travarOrdem(tx, lojaId, id);
       if (ordem.status === 'CANCELADA') return { ok: true as const, id: ordem.id, jaFeito: true };
       if (ordem.status === 'CONCLUIDA') throw new Recusa({ ok: false, erros: { geral: `O lote ${ordem.codigoLote} já foi concluído: para desfazer, estorne o lote (quem ajusta o estoque).` }, conflito: true });
@@ -787,6 +808,7 @@ export async function cancelarProducao(
         data: { status: 'CANCELADA', canceladaEm: agora, canceladaPorNome: autor.nome, motivoCancelamento: motivo.motivo, versao: { increment: 1 } },
       });
       if (mudou.count !== 1) throw new Error('[erp] lote mudou no meio do cancelamento.');
+      await subirVersaoDaLista(tx, daLista);
       await tx.historicoAlteracao.create({
         data: {
           parceiroId: tx.parceiroId,
@@ -831,6 +853,7 @@ export async function estornarProducao(
         const negado = recusa(alcance, 'estoque.ajustar', { lojaId });
         if (negado) throw new Recusa({ ok: false, erros: { geral: `Estornar um lote concluído mexe no saldo do estoque: ${negado}` } });
         await conferirPeriodoAberto(tx, agora);
+        const daLista = await travarListaDoLote(tx, lojaId, id);
         await exigirAberto(tx, loja, true);
         const { ordem } = await travarOrdem(tx, lojaId, id);
         if (ordem.status === 'CANCELADA' && ordem.concluidaEm) return { ok: true as const, id: ordem.id, jaFeito: true };
@@ -863,6 +886,7 @@ export async function estornarProducao(
           data: { status: 'CANCELADA', canceladaEm: agora, canceladaPorNome: autor.nome, motivoCancelamento: motivo.motivo, versao: { increment: 1 } },
         });
         if (mudou.count !== 1) throw new Error('[erp] lote mudou no meio do estorno.');
+        await subirVersaoDaLista(tx, daLista);
         await tx.historicoAlteracao.create({
           data: {
             parceiroId: tx.parceiroId,

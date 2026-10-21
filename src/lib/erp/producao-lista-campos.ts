@@ -124,7 +124,15 @@ export function lerLinhasDaLista(
     const exemplo = `número em ${u.sigla} (ex.: 2 ou 1,5)`;
     const lido = q ? lerQuantidadeNa(q, ficha.unidade, 'base') : null;
     if (lido === null || lido <= 0) {
-      erros[`linha:${i}`] = q ? `Quanto produzir de ${ficha.nome}: ${exemplo}.` : `Diga quanto produzir de ${ficha.nome}: ${exemplo}.`;
+      // A frase diz o que corrigir: o ponto como vírgula ("2.5" → "use vírgula: 2,5 kg") e o zero ("maior que zero").
+      const comPonto = /^\d+\.\d+$/.test(q) && lido === null;
+      erros[`linha:${i}`] = !q
+        ? `Diga quanto produzir de ${ficha.nome}: ${exemplo}.`
+        : comPonto
+          ? `Quanto produzir de ${ficha.nome}: use vírgula: ${q.replace('.', ',')} ${u.sigla}.`
+          : lido !== null && lido <= 0
+            ? `Quanto produzir de ${ficha.nome}: maior que zero.`
+            : `Quanto produzir de ${ficha.nome}: ${exemplo}.`;
       continue;
     }
     if (lido > TETO_DA_LINHA) {

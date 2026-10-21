@@ -426,6 +426,11 @@ export function TelaEquipe({
                     <p className="text-[12px] leading-relaxed text-suave">
                       {p.permissoes.map(rotuloDaPermissao).join(' · ')}
                     </p>
+                    {p.revisar.length > 0 && (
+                      <p className="text-[12px] text-atencao">
+                        Perfil do catálogo antigo: revise se ele deve {p.revisar.map((x) => rotuloDaPermissao(x).charAt(0).toLowerCase() + rotuloDaPermissao(x).slice(1)).join(', ')}.
+                      </p>
+                    )}
                     {p.setores.length > 0 && (
                       <p className="text-[12px] text-suave">
                         Pensado para: {p.setores.map((s) => SETORES[s]).join(', ')}

@@ -8,7 +8,10 @@
  *  - com RLS (superusuário e dono com FORCE): RLS ligada, FORÇADA e com a política nas duas; sem RLS: nenhuma das duas tem;
  *  - depois da migration, pelo papel do tenant: a lista e a linha entram; a mesma loja e dia não repetem; a linha que virou lote
  *    não muda nem sai, e com o lote cancelado volta a mudar; o lote tem de ser da mesma loja, dia e ficha; o outro parceiro não
- *    enxerga; o conferidor pós-deploy não lista pendência — e lista quando falta um gatilho.
+ *    enxerga; o conferidor pós-deploy não lista pendência — e lista quando falta um gatilho;
+ *  - a `20261030010000_erp_catalogo_v2` (só dado, `PerfilAcesso` fora do tenant): o perfil próprio "copiado do Dono" da v1
+ *    ganha `producao.planejar` e volta a cobrir o Gerente e o Dono base; o parcial, o da cozinha e o salvo na v2 não ganham
+ *    nada; rodar de novo não muda nada.
  * Nenhum passo da migration depende de SELECT sob RLS.
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-producao-lista-migracao.db.test.ts
@@ -19,10 +22,12 @@ import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, describe, expect, it } from 'vitest';
 import { conferirMigracao } from '../scripts/erp-conferir-migracao';
+import { cobre, resolverAlcance, TODAS_AS_PERMISSOES } from '../src/lib/erp/permissoes';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const MIGRACOES = join(process.cwd(), 'prisma', 'migrations');
 const DA_3_2 = '20261030000000_erp_lista_do_dia';
+const CATALOGO_V2 = '20261030010000_erp_catalogo_v2';
 const temPsql = spawnSync('psql', ['--version']).status === 0;
 
 function urlDe(banco: string, papel?: string): string {
@@ -103,6 +108,19 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP 3.2 · migration da lista do dia co
           ),
         ]);
         expect(plantado.ok, plantado.aviso).toBe(true);
+        // Perfis próprios salvos no catálogo v1 (fora do tenant: sem RLS): o "copiado do Dono" (todas as da v1), um parcial,
+        // o da cozinha e um salvo na v2 sem "definir a lista" (escolha de quem salvou).
+        const V1 = TODAS_AS_PERMISSOES.filter((p) => p !== 'producao.planejar');
+        const arr = (l: readonly string[]) => `ARRAY[${l.map((x) => `'${x}'`).join(',')}]::text[]`;
+        const perfis = psql(dono, [
+          '-c',
+          `INSERT INTO "PerfilAcesso"(id,"parceiroId",nome,base,permissoes,"catalogoVersao","atualizadoEm") VALUES
+             ('pa1','p1','Sócio','DONO',${arr(V1)},1,now()),
+             ('pa2','p1','Sócio sem preços','DONO',${arr(V1.filter((p) => p !== 'precos.editar'))},1,now()),
+             ('pa3','p2','Cozinha','OPERADOR',${arr(['producao.ver', 'producao.registrar', 'insumos.ver'])},1,now()),
+             ('pa4','p2','Sócio v2','DONO',${arr(V1)},2,now());`,
+        ]);
+        expect(perfis.ok, perfis.aviso).toBe(true);
         const conta = () => psql(superuser, ['-c', `SELECT (SELECT count(*) FROM "OrdemProducao")::text || '/' || (SELECT count(*) FROM "FichaTecnica")::text || '/' || (SELECT count(*) FROM "Loja")::text`]).saida;
         expect(conta()).toBe('4/2/2');
 
@@ -110,6 +128,22 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP 3.2 · migration da lista do dia co
         expect(r.ok, r.aviso).toBe(true);
         expect(r.aviso).not.toContain('WARNING');
         expect(conta()).toBe('4/2/2');
+
+        // O catálogo v2 (decisão 219): só o "copiado do Dono" da v1 ganha "definir a lista" (e passa para a v2); os demais ficam.
+        const lerPerfis = () =>
+          psql(superuser, ['-c', `SELECT id || ':' || "catalogoVersao" || ':' || ('producao.planejar' = ANY(permissoes))::text || ':' || cardinality(permissoes) FROM "PerfilAcesso" ORDER BY id`]).saida.split('\n');
+        for (let vez = 0; vez < 2; vez++) {
+          // Duas vezes: rodar de novo não muda nada.
+          const c = psql(dono, ['-f', join(MIGRACOES, CATALOGO_V2, 'migration.sql')]);
+          expect(c.ok, c.aviso).toBe(true);
+          expect(lerPerfis()).toEqual([`pa1:2:true:${TODAS_AS_PERMISSOES.length}`, `pa2:1:false:${V1.length - 1}`, 'pa3:1:false:3', `pa4:2:false:${V1.length}`]);
+        }
+        // O sócio volta a cobrir o Gerente e o Dono base (lido do banco, como a sessão lê).
+        const socio = psql(superuser, ['-c', `SELECT array_to_string(permissoes, ',') || '|' || "catalogoVersao" FROM "PerfilAcesso" WHERE id = 'pa1'`]).saida.split('|');
+        const alcance = resolverAlcance({ perfilBase: null, perfilProprio: socio[0].split(','), perfilCatalogoVersao: Number(socio[1]), permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] });
+        const gerente = resolverAlcance({ perfilBase: 'GERENTE', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: false, lojaIds: ['l1'] });
+        const donoBase = resolverAlcance({ perfilBase: 'DONO', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] });
+        expect([cobre(alcance, gerente), cobre(alcance, donoBase)]).toEqual([true, true]);
 
         // As tabelas, os CHECKs (validados de nascença), os índices e os gatilhos.
         const tabelas = psql(superuser, ['-c', `SELECT relname || ':' || relrowsecurity || ':' || relforcerowsecurity FROM pg_class WHERE relname IN ('ListaProducao','ListaProducaoItem') AND relkind = 'r' ORDER BY 1`]).saida.split('\n');

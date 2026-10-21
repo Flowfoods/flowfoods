@@ -6,9 +6,10 @@
  *
  * Permissões (sempre com a LOJA; fora do alcance = não encontrado): ver = `producao.ver` (a cozinha vê a lista); montar,
  * mudar e transformar em lotes = `producao.planejar` (o gerente; decisão 219). O custo estimado da compra só sai do servidor
- * para quem tem `insumos.ver`; o orçamento de compra (2.5) só para quem vê ou lança nota na loja, pela vista dele
- * (`orcamentoNaNota`: quem não vê o DRE recebe o limite seguro, nunca a receita — decisões 210, 213 e 217). Quem não vê
- * custos não leva o valor nem para a conta do orçamento (ela parte de zero).
+ * para quem tem `insumos.ver` E define a lista ou compra (vê ou lança nota): a cozinha lê só quantidades (decisão 226). O
+ * orçamento de compra (2.5) só para quem vê ou lança nota na loja, pela vista dele (`orcamentoNaNota`: quem não vê o DRE
+ * recebe o limite seguro, nunca a receita — decisões 210, 213 e 217). Quem não recebe o custo não leva o valor nem para a
+ * conta do orçamento (ela parte de zero).
  *
  * Concorrência (decisões 222 e 223):
  * - uma lista por loja e dia (índice único); criar = `createMany` com `skipDuplicates` e depois ler `FOR UPDATE`: dois cliques
@@ -18,7 +19,10 @@
  * - ordem das travas: período (compartilhada) → a lista (FOR UPDATE) → a do dia do lote e a da requisição da loja (as da 3.1,
  *   dentro de `planejarProducaoNaTx`). Nenhum caminho trava a lista depois de travar requisição ou ordem;
  * - a linha que virou lote não muda nem sai da lista (regra aqui, gatilho `ListaProducaoItem_lote_confere` no banco): para
- *   tirar, cancela-se o lote; aí a linha volta a ser só "na lista" e pode virar outro lote.
+ *   tirar, cancela-se o lote; aí a linha volta a ser só "na lista" e pode virar outro lote. Cancelar ou estornar o lote
+ *   (3.1) trava a lista antes do lote e sobe a versão dela; e o formulário manda as linhas em aberto que mostrou: salvar não
+ *   apaga e gerar não gera a linha que a pessoa não viu (decisão 228);
+ * - a lista apagada (sem linhas) fica no banco: a versão por loja e dia nunca recomeça (decisão 229).
  */
 
 import type { ClienteDoParceiro } from './tenant';
@@ -125,6 +129,19 @@ async function itensDaLista(tx: ClienteDoParceiro, listaId: string): Promise<Ite
   }));
 }
 
+/** As linhas em aberto que a tela mostrou ("id1,id2"; vazio = nenhuma). Ausente = quem chama não diz (uso por código). */
+function idsVistos(texto: unknown): Set<string> | null {
+  if (typeof texto !== 'string') return null;
+  return new Set(texto.split(',').map((x) => x.trim()).filter((x) => ID.test(x)));
+}
+
+/** A linha em aberto que a pessoa não viu: a que voltou do lote cancelado, ou a que outra aba pôs. */
+function fraseDaLinhaQueVoltou(i: ItemGravado): string {
+  return i.codigoLote
+    ? `${i.nome} voltou para a lista agora há pouco (o lote ${i.codigoLote} foi cancelado). Confira a lista de novo; nada foi gravado.`
+    : MUDOU;
+}
+
 /** O que se pode pôr na lista: pré-preparo ativo que vira insumo do estoque (o mesmo que "Nova produção" oferece). */
 async function fichasEscolhiveis(tx: ClienteDoParceiro): Promise<Map<string, FichaEscolhivel>> {
   const fichas = await tx.fichaTecnica.findMany({ where: { tipo: 'PRE_PREPARO', ativa: true, insumoProduzidoId: { not: null } }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, unidadeRendimento: true } });
@@ -210,7 +227,9 @@ export async function obterListaDoDia(cliente: ClienteDoParceiro, alcance: Alcan
         const hoje = hojeNoRio(agora);
         const dia = diaDaLista(diaTexto, hoje);
         const podePlanejar = pode(alcance, 'producao.planejar', { lojaId });
-        const verCustos = pode(alcance, 'insumos.ver');
+        // O custo estimado (R$) e o painel "Para quem compra": quem vê custos E define a lista ou compra (vê ou lança nota). A
+        // cozinha, mesmo com "ver insumos e custos", lê só as quantidades: o servidor monta sem o valor (decisão 226).
+        const verCustos = pode(alcance, 'insumos.ver') && (podePlanejar || pode(alcance, 'compras.ver', { lojaId }) || pode(alcance, 'compras.lancar', { lojaId }));
         const abertura = (await aberturasDe(tx, [lojaId])).get(lojaId);
         const estoque: EstadoDoEstoqueDaLista = !abertura ? 'NAO_ABERTO' : abertura.status === 'FECHADA' && abertura.fechadaEm ? 'ABERTO' : 'EM_CONTAGEM';
         const periodoFechado = (await datasEmPeriodoFechado(tx, [dia])).get(dia) ?? null;
@@ -244,16 +263,44 @@ export async function obterListaDoDia(cliente: ClienteDoParceiro, alcance: Alcan
         };
         const tocadosDe = (requisicaoId: string | null) => itensDasReqs.filter((i) => i.requisicaoId === requisicaoId).map((i) => i.insumoId);
 
-        // As fichas: as das linhas e tudo o que elas usam, por nível (uma consulta por nível, até o fundo).
+        // As fichas e os insumos da conta, até fechar: as fichas das linhas E dos lotes de fora da lista; o que cada ficha usa
+        // (subficha e insumo); e a ficha que produz cada pré-preparo que aparece — na receita ou ainda saindo pela requisição de
+        // um lote. Sem isso, o lote planejado fora da lista (Nova produção) levava a base na requisição e a cascata dela sumia
+        // ("sem ficha"; revisão da 3.2, B1). Cada volta lê só o que ainda não foi pedido; o laço para quando nada novo aparece.
         const fichas = new Map<string, FichaDaConta & { tipo: string }>();
-        let faltam = Array.from(new Set(itens.map((i) => i.fichaId)));
-        for (let nivel = 0; nivel <= PROFUNDIDADE_MAXIMA && faltam.length > 0; nivel++) {
-          const lidas = await tx.fichaTecnica.findMany({
-            where: { id: { in: faltam } },
-            select: { id: true, nome: true, tipo: true, ativa: true, rendimentoMilesimos: true, unidadeRendimento: true, insumoProduzidoId: true, itens: { orderBy: { ordem: 'asc' }, select: { insumoId: true, subfichaId: true, quantidadeMilesimos: true, fatorCorrecaoMilesimos: true } } },
-          });
-          for (const f of lidas) fichas.set(f.id, { id: f.id, nome: f.nome, tipo: f.tipo, ativa: f.ativa, rendimentoMilesimos: f.rendimentoMilesimos, unidade: f.unidadeRendimento as Unidade, insumoProduzidoId: f.insumoProduzidoId, itens: f.itens });
-          faltam = Array.from(new Set(lidas.flatMap((f) => f.itens.map((i) => i.subfichaId).filter((x): x is string => !!x && !fichas.has(x)))));
+        const insumos = new Map<string, InsumoDaConta>();
+        const fichasPedidas = new Set<string>();
+        const insumosPedidos = new Set<string>();
+        let proximasFichas = [...itens.map((i) => i.fichaId), ...fora.map((o) => o.fichaId)];
+        let proximosInsumos = [...itensDasReqs.map((i) => i.insumoId), ...comLote.map((o) => o.insumoProduzidoId).filter((x): x is string => !!x)];
+        for (let volta = 0; volta <= 2 * PROFUNDIDADE_MAXIMA + 2 && (proximasFichas.length > 0 || proximosInsumos.length > 0); volta++) {
+          const fichasDaVolta = Array.from(new Set(proximasFichas)).filter((x) => !fichasPedidas.has(x));
+          const insumosDaVolta = Array.from(new Set(proximosInsumos)).filter((x) => !insumosPedidos.has(x));
+          proximasFichas = [];
+          proximosInsumos = [];
+          for (const x of fichasDaVolta) fichasPedidas.add(x);
+          for (const x of insumosDaVolta) insumosPedidos.add(x);
+          const [lidas, lidos] = await Promise.all([
+            fichasDaVolta.length
+              ? tx.fichaTecnica.findMany({
+                  where: { id: { in: fichasDaVolta } },
+                  select: { id: true, nome: true, tipo: true, ativa: true, rendimentoMilesimos: true, unidadeRendimento: true, insumoProduzidoId: true, itens: { orderBy: { ordem: 'asc' }, select: { insumoId: true, subfichaId: true, quantidadeMilesimos: true, fatorCorrecaoMilesimos: true } } },
+                })
+              : Promise.resolve([]),
+            insumosDaVolta.length ? tx.insumo.findMany({ where: { id: { in: insumosDaVolta } }, select: { id: true, nome: true, unidade: true, ativo: true, conteudoMilesimos: true, fichaQueProduz: { select: { id: true } } } }) : Promise.resolve([]),
+          ]);
+          for (const f of lidas) {
+            fichas.set(f.id, { id: f.id, nome: f.nome, tipo: f.tipo, ativa: f.ativa, rendimentoMilesimos: f.rendimentoMilesimos, unidade: f.unidadeRendimento as Unidade, insumoProduzidoId: f.insumoProduzidoId, itens: f.itens });
+            if (f.insumoProduzidoId) proximosInsumos.push(f.insumoProduzidoId);
+            for (const it of f.itens) {
+              if (it.subfichaId) proximasFichas.push(it.subfichaId);
+              if (it.insumoId) proximosInsumos.push(it.insumoId);
+            }
+          }
+          for (const i of lidos) {
+            insumos.set(i.id, { id: i.id, nome: i.nome, unidade: i.unidade as Unidade, ativo: i.ativo, conteudoMilesimos: i.conteudoMilesimos, fichaQueProduzId: i.fichaQueProduz?.id ?? null });
+            if (i.fichaQueProduz) proximasFichas.push(i.fichaQueProduz.id);
+          }
         }
 
         // O que a loja produz no dia: as linhas (sem lote = a receita; com lote vivo = o que falta sair) e os lotes de fora.
@@ -282,19 +329,8 @@ export async function obterListaDoDia(cliente: ClienteDoParceiro, alcance: Alcan
           });
         }
 
-        // Os insumos que aparecem: os das receitas, os que as fichas produzem e os que ainda saem pelos lotes.
-        const insumoIds = new Set<string>();
-        for (const f of fichas.values()) {
-          if (f.insumoProduzidoId) insumoIds.add(f.insumoProduzidoId);
-          for (const it of f.itens) if (it.insumoId) insumoIds.add(it.insumoId);
-        }
-        for (const x of producao) {
-          if (x.insumoProduzidoId) insumoIds.add(x.insumoProduzidoId);
-          for (const k of Array.from(x.aSair?.keys() ?? [])) insumoIds.add(k);
-        }
-        const ids = Array.from(insumoIds);
-        const lidos = ids.length ? await tx.insumo.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, unidade: true, ativo: true, conteudoMilesimos: true, fichaQueProduz: { select: { id: true } } } }) : [];
-        const insumos = new Map<string, InsumoDaConta>(lidos.map((i) => [i.id, { id: i.id, nome: i.nome, unidade: i.unidade as Unidade, ativo: i.ativo, conteudoMilesimos: i.conteudoMilesimos, fichaQueProduzId: i.fichaQueProduz?.id ?? null }]));
+        // Os insumos que aparecem (os das receitas, os que as fichas produzem e os que ainda saem pelos lotes) já foram lidos.
+        const ids = Array.from(insumos.keys());
         let saldo: SaldoDaLoja;
         if (estoque === 'ABERTO') {
           const saldos = ids.length ? await tx.saldoEstoque.findMany({ where: { lojaId, insumoId: { in: ids } }, select: { insumoId: true, quantidadeMilesimos: true } }) : [];
@@ -383,18 +419,22 @@ export type ListaDoDiaNaTela = NonNullable<Awaited<ReturnType<typeof obterListaD
 
 /**
  * Salva a lista do dia (as linhas que ainda não viraram lote; as que viraram ficam como estão): `producao.planejar` na loja,
- * dia de hoje a 14 dias, fora de período fechado. Cria a lista na primeira vez; lista que fica sem nenhuma linha é apagada.
- * Versão lida; o mesmo conteúdo = "já feito". Histórico com o antes e o depois do que produzir.
+ * dia de hoje a 14 dias, fora de período fechado. Cria a lista na primeira vez. Lista que fica sem nenhuma linha está
+ * APAGADA, mas a linha dela no banco fica: a versão nunca recomeça, e a aba que leu a lista apagada não sobrescreve a lista
+ * montada de novo por outra pessoa (decisão 229). Versão lida; o mesmo conteúdo = "já feito". `vistas` = as linhas em aberto
+ * que a tela mostrou (o formulário manda): linha em aberto que a pessoa não viu (o lote dela foi cancelado em outra tela e
+ * ela voltou) é conflito, nunca apagada em silêncio (decisão 228). Histórico com o antes e o depois do que produzir.
  */
 export async function salvarListaDoDia(
   cliente: ClienteDoParceiro,
   alcance: Alcance,
   lojaId: string,
-  entrada: { dia: unknown; versao: unknown; linhaIds: readonly unknown[]; fichaIds: readonly unknown[]; quantidades: readonly unknown[] },
+  entrada: { dia: unknown; versao: unknown; linhaIds: readonly unknown[]; fichaIds: readonly unknown[]; quantidades: readonly unknown[]; vistas?: unknown },
   autor: Autor,
   agora = new Date(),
 ): Promise<ResultadoEstoque> {
   const versaoLida = typeof entrada.versao === 'string' && entrada.versao.trim() !== '' ? Number(entrada.versao) : typeof entrada.versao === 'number' ? entrada.versao : null;
+  const vistas = idsVistos(entrada.vistas);
   return comRecusa(() =>
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'producao.planejar');
@@ -409,14 +449,18 @@ export async function salvarListaDoDia(
       if (!existia && lido.linhas.length === 0) return { ok: true as const, id: lojaId, jaFeito: true };
       const lista = existia ?? (await criarOuTravar(tx, lojaId, dia, autor, agora));
       const itens = await itensDaLista(tx, lista.id);
-      const nova = lista.versao === 0 && itens.length === 0;
+      // Vazia = nunca montada ou apagada: quem não viu lista (versão vazia) ou viu esta mesma versão monta de novo.
+      const vazia = itens.length === 0;
       const editaveis = itens.filter((i) => i.estado === 'NA_LISTA');
       const fixos = itens.filter((i) => i.estado !== 'NA_LISTA');
-      if (nova) {
-        if (versaoLida !== null) throw new Recusa({ ok: false, erros: { geral: APAGADA }, conflito: true });
+      if (vazia) {
+        if (lido.linhas.length === 0) return { ok: true as const, id: lista.id, jaFeito: true };
+        if (versaoLida !== null && versaoLida !== lista.versao) throw new Recusa({ ok: false, erros: { geral: APAGADA }, conflito: true });
       } else {
         // O mesmo conteúdo que já está gravado: o duplo clique, ou outra aba que salvou igual.
         if (mesmoConteudo(editaveis, lido.linhas)) return { ok: true as const, id: lista.id, jaFeito: true };
+        const naoVista = vistas ? editaveis.find((i) => !vistas.has(i.id)) : undefined;
+        if (naoVista) throw new Recusa({ ok: false, erros: { geral: fraseDaLinhaQueVoltou(naoVista) }, conflito: true });
         if (versaoLida === null || !Number.isSafeInteger(versaoLida) || versaoLida !== lista.versao) throw new Recusa({ ok: false, erros: { geral: MUDOU }, conflito: true });
       }
       const porId = new Map(editaveis.map((i) => [i.id, i]));
@@ -450,19 +494,19 @@ export async function salvarListaDoDia(
       const nome = nomeDaLista(dia, loja.nome);
       const antesTexto = textoDaProducao(itens);
       const depois = [...fixos, ...lido.linhas];
+      await tx.listaProducao.update({ where: { id: lista.id }, data: { versao: { increment: 1 }, atualizadaEm: agora, atualizadaPorNome: autor.nome } });
       if (depois.length === 0) {
-        await tx.listaProducao.delete({ where: { id: lista.id } });
+        // Apagar = tirar todas as linhas; a lista (e a versão dela) fica.
         await tx.historicoAlteracao.create({ data: { parceiroId: tx.parceiroId, entidade: 'ListaProducao', entidadeId: lista.id, acao: 'EXCLUIU', antes: { nome, producaoDoDia: antesTexto }, autorNome: autor.nome } });
         return { ok: true as const, id: lista.id };
       }
-      await tx.listaProducao.update({ where: { id: lista.id }, data: { versao: { increment: 1 }, atualizadaEm: agora, atualizadaPorNome: autor.nome } });
       await tx.historicoAlteracao.create({
         data: {
           parceiroId: tx.parceiroId,
           entidade: 'ListaProducao',
           entidadeId: lista.id,
-          acao: nova ? 'CRIOU' : 'ALTEROU',
-          ...(nova ? {} : { antes: { nome, producaoDoDia: antesTexto } }),
+          acao: vazia ? 'CRIOU' : 'ALTEROU',
+          ...(vazia ? {} : { antes: { nome, producaoDoDia: antesTexto } }),
           depois: { nome, producaoDoDia: textoDaProducao(depois) },
           autorNome: autor.nome,
         },
@@ -502,9 +546,9 @@ export async function porNaListaDoDia(
       const existia = await travarLista(tx, lojaId, dia);
       const lista = existia ?? (await criarOuTravar(tx, lojaId, dia, autor, agora));
       const itens = await itensDaLista(tx, lista.id);
-      const nova = lista.versao === 0 && itens.length === 0;
-      if (nova ? versaoLida !== null : versaoLida === null || versaoLida !== lista.versao) {
-        throw new Recusa({ ok: false, erros: { geral: nova ? APAGADA : 'A lista mudou agora há pouco (talvez por este mesmo clique). Confira de novo; nada foi somado.' }, conflito: true });
+      const vazia = itens.length === 0;
+      if (vazia ? versaoLida !== null && versaoLida !== lista.versao : versaoLida === null || versaoLida !== lista.versao) {
+        throw new Recusa({ ok: false, erros: { geral: vazia ? APAGADA : 'A lista mudou agora há pouco (talvez por este mesmo clique). Confira de novo; nada foi somado.' }, conflito: true });
       }
       const aberta = itens.find((i) => i.estado === 'NA_LISTA' && i.fichaId === ficha.id);
       if (aberta) {
@@ -526,8 +570,8 @@ export async function porNaListaDoDia(
           parceiroId: tx.parceiroId,
           entidade: 'ListaProducao',
           entidadeId: lista.id,
-          acao: nova ? 'CRIOU' : 'ALTEROU',
-          ...(nova ? {} : { antes: { nome, producaoDoDia: textoDaProducao(itens) } }),
+          acao: vazia ? 'CRIOU' : 'ALTEROU',
+          ...(vazia ? {} : { antes: { nome, producaoDoDia: textoDaProducao(itens) } }),
           depois: { nome, producaoDoDia: textoDaProducao(depois) },
           autorNome: autor.nome,
         },
@@ -540,10 +584,12 @@ export async function porNaListaDoDia(
 // ================================================================ gerar os lotes
 
 /**
- * Transforma as linhas da lista que ainda não viraram lote (todas, ou as pedidas em `linhas`) em lotes PLANEJADOS, cada um
- * pela regra da 3.1 (`planejarProducaoNaTx`: a requisição dos insumos nasce junto; nada sai do estoque aqui), na mesma
- * transação: ou viram todas, ou nenhuma. `producao.planejar` na loja, estoque aberto, dia de hoje a 14 dias, fora de período
- * fechado, versão lida. Gerar de novo (duplo clique, outra aba) = "já feito": a linha travada que já tem lote não vira outro.
+ * Transforma as linhas da lista que ainda não viraram lote em lotes PLANEJADOS, cada um pela regra da 3.1
+ * (`planejarProducaoNaTx`: a requisição dos insumos nasce junto; nada sai do estoque aqui), na mesma transação: ou viram
+ * todas, ou nenhuma. `linhas` = as linhas em aberto que a tela mostrou (o formulário manda): só elas viram lote, e linha que
+ * a pessoa não pediu nunca vira lote sozinha (sem `linhas`, todas as em aberto: o uso por código). `producao.planejar` na
+ * loja, estoque aberto, dia de hoje a 14 dias, fora de período fechado, versão lida (cancelar um lote da lista sobe a versão:
+ * a aba velha não gera de novo o lote que alguém acabou de cancelar). Gerar de novo (duplo clique, outra aba) = "já feito".
  */
 export async function gerarLotesDaLista(
   cliente: ClienteDoParceiro,
@@ -554,7 +600,7 @@ export async function gerarLotesDaLista(
   agora = new Date(),
 ): Promise<ResultadoEstoque> {
   const versaoLida = typeof entrada.versao === 'string' && entrada.versao.trim() !== '' ? Number(entrada.versao) : typeof entrada.versao === 'number' ? entrada.versao : null;
-  const pedidas = entrada.linhas?.length ? new Set(entrada.linhas.filter((x): x is string => typeof x === 'string' && ID.test(x))) : null;
+  const pedidas = entrada.linhas ? new Set(entrada.linhas.filter((x): x is string => typeof x === 'string' && ID.test(x))) : null;
   return comRecusa(() =>
     cliente.transacao(
       async (tx) => {
@@ -564,8 +610,11 @@ export async function gerarLotesDaLista(
         const dia = diaDaEscrita(entrada.dia, hoje);
         await conferirDiaAberto(tx, dia);
         const lista = await travarLista(tx, lojaId, dia);
-        if (!lista) throw new Recusa({ ok: false, erros: { geral: 'A lista deste dia não existe mais. Confira de novo; nenhum lote foi gerado.' }, conflito: true });
-        const itens = await itensDaLista(tx, lista.id);
+        const itens = lista ? await itensDaLista(tx, lista.id) : [];
+        if (!lista || itens.length === 0) throw new Recusa({ ok: false, erros: { geral: 'A lista deste dia não existe mais (foi apagada). Confira de novo; nenhum lote foi gerado.' }, conflito: true });
+        if (pedidas && pedidas.size === 0) throw new Recusa({ ok: false, erros: { geral: 'Nenhum pré-preparo em aberto para virar lote.' } });
+        // Linha pedida que nem está mais na lista: alguém mudou a lista no meio.
+        if (pedidas && Array.from(pedidas).some((id) => !itens.some((i) => i.id === id))) throw new Recusa({ ok: false, erros: { geral: MUDOU }, conflito: true });
         const alvo = itens.filter((i) => i.estado === 'NA_LISTA' && (!pedidas || pedidas.has(i.id)));
         // Nada mais a gerar (o clique de antes já gerou): a que valeu fica.
         if (alvo.length === 0) return { ok: true as const, id: lista.id, jaFeito: true };

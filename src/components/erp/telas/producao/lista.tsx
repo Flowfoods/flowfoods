@@ -26,7 +26,7 @@ import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { ListaHistorico } from '../historico/lista-historico';
 import type { AcaoDeEstoque } from '../estoque/estado';
-import { FormListaDoDia, FormPorNaLista } from './form-lista';
+import { FormListaDoDia, FormPorNaLista, LevarParaVista } from './form-lista';
 import { TOM_DO_LOTE } from './partes';
 
 const primeiraMaiuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
@@ -94,7 +94,7 @@ function LinhaParaLer({ l, aqui, apurado }: { l: LinhaDaLista; aqui: string; apu
     <li className="flex items-start justify-between gap-3 px-4 py-3 sm:px-5">
       <div className="min-w-0">
         <p className="text-[15px] font-semibold text-texto [overflow-wrap:anywhere]">
-          {l.nome} <span className="font-normal tabular-nums text-suave">· {q(l.quantidadeMilesimos, l.unidade)}</span>
+          {l.nome} <span className="whitespace-nowrap tabular-nums">· {q(l.quantidadeMilesimos, l.unidade)}</span>
         </p>
         {apurado && l.emEstoqueMilesimos !== null && (
           <p className={`mt-0.5 text-[12px] tabular-nums ${l.emEstoqueMilesimos < 0 ? 'text-erro' : 'text-suave'}`}>
@@ -141,7 +141,7 @@ function Apoio({ i, custo }: { i: InsumoNaConta; custo: string | null | undefine
   );
 }
 
-function MateriaPrima({ d }: { d: ListaDoDiaNaTela }) {
+function MateriaPrima({ d, podeMontar }: { d: ListaDoDiaNaTela; podeMontar: boolean }) {
   const c = d.conta;
   const custoDe = (insumoId: string): string | null | undefined => {
     if (!d.custo) return undefined;
@@ -150,9 +150,9 @@ function MateriaPrima({ d }: { d: ListaDoDiaNaTela }) {
   };
   const resumo = resumoDaConta(c.resumo);
   return (
-    <Painel titulo="Matéria-prima: vai usar, tem e comprar" subtitulo={c.apurado ? 'Pelo estoque da loja agora, na unidade de cada insumo' : 'Sem saldo para cruzar: só o que vai usar'} semRespiro>
+    <Painel id="materia-prima" className="scroll-mt-24" titulo="Matéria-prima: vai usar, tem e comprar" subtitulo={c.apurado ? 'Pelo estoque da loja agora, na unidade de cada insumo' : 'Sem saldo para cruzar: só o que vai usar'} semRespiro>
       {c.materiaPrima.length === 0 ? (
-        <Vazio>{d.linhas.length === 0 && d.foraDaLista.length === 0 ? 'Monte a lista para ver o que ela pede do estoque.' : 'Nada a tirar do estoque para o que falta produzir.'}</Vazio>
+        <Vazio>{d.linhas.length === 0 && d.foraDaLista.length === 0 ? (podeMontar ? 'Monte a lista para ver o que ela pede do estoque.' : 'Sem lista, nada a tirar do estoque.') : 'Nada a tirar do estoque para o que falta produzir.'}</Vazio>
       ) : (
         <>
           {(c.motivoSemSaldo || resumo) && <p className="border-b border-linha px-4 py-2.5 text-[13px] text-suave sm:px-5">{c.motivoSemSaldo ?? resumo}</p>}
@@ -234,6 +234,18 @@ function MateriaPrima({ d }: { d: ListaDoDiaNaTela }) {
         </ul>
       )}
     </Painel>
+  );
+}
+
+/** "4 insumos faltam · 1 abaixo de zero": atalho, logo abaixo do Gerar, para a matéria-prima (no celular ela fica lá embaixo). */
+function AtalhoDaConta({ d }: { d: ListaDoDiaNaTela }) {
+  const r = d.conta.resumo;
+  if (!d.conta.apurado || d.conta.materiaPrima.length === 0) return null;
+  const partes = [r.faltaComprar ? `${r.faltaComprar} ${r.faltaComprar === 1 ? 'insumo falta' : 'insumos faltam'}` : null, r.negativos ? `${r.negativos} abaixo de zero` : null].filter(Boolean);
+  return (
+    <a href="#materia-prima" className={`${LINK_DE_TEXTO} ff-toque mt-2 inline-flex min-h-11 items-center tabular-nums xl:hidden`}>
+      {partes.length ? partes.join(' · ') : 'Tudo dá'}: ver a matéria-prima
+    </a>
   );
 }
 
@@ -376,20 +388,26 @@ export function TelaListaDoDia({
   const edita = d.pode.planejar && !d.naoEdita && !bloqueio;
   const contagem = d.linhas.length ? `${d.linhas.length} ${d.linhas.length === 1 ? 'pré-preparo' : 'pré-preparos'}${fixas.length ? ` · ${fixas.length} ${fixas.length === 1 ? 'virou lote' : 'viraram lote'}` : ''}` : 'sem lista';
   const historico = d.historico.map((h) => ({ ...h, mudancas: h.mudancas.filter((m) => m.campo !== 'nome') }));
+  // Cada volta do servidor é uma "vez" nova: o aviso do que acabou de acontecer vem para a vista mesmo repetido.
+  const vez = String(Date.now());
   return (
     <div className="space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: d.loja.nome }]} />
       <PageHeader icone="producao" cor={COR.producao} titulo="Lista do dia" subtitulo={[contexto, d.loja.nome, primeiraMaiuscula(d.rotuloDoDia), contagem].filter(Boolean).join(' · ')}>
         <SeletorDoDia aqui={aqui} dia={d.dia} hoje={d.hoje} />
       </PageHeader>
-      {feito && <Aviso tom="ok" titulo={feito} />}
+      {feito && (
+        <LevarParaVista vez={`${feito}:${d.lista?.versao ?? 0}:${vez}`}>
+          <Aviso tom="ok" titulo={feito} />
+        </LevarParaVista>
+      )}
       {bloqueio && <Aviso tom="alerta" titulo={bloqueio} />}
       {d.periodoFechado && <AvisoDoPeriodoFechado periodo={d.periodoFechado} href={periodosHref} frase="Esta lista é desse período: não dá para montar nem gerar lotes nela." />}
       {d.naoEdita && !d.periodoFechado && d.pode.planejar && <Aviso titulo={d.naoEdita} />}
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] xl:items-start">
         <div className="min-w-0 space-y-5">
-          <Painel titulo="O que produzir" subtitulo={edita ? 'Escolha o pré-preparo e quanto; salve para refazer a conta ao lado' : 'O que a loja produz neste dia'} semRespiro={!edita || fixas.length > 0}>
+          <Painel titulo="O que produzir" subtitulo={edita ? 'Escolha o pré-preparo e quanto; salve para refazer a conta nesta tela' : 'O que a loja produz neste dia'} semRespiro={!edita || fixas.length > 0}>
             {fixas.length > 0 && (
               <>
                 <p className={`text-[12px] font-semibold text-suave ${edita ? '' : 'sr-only'} px-4 pt-3 sm:px-5`}>Já viraram lote</p>
@@ -416,6 +434,7 @@ export function TelaListaDoDia({
                   bloqueio={bloqueio}
                 />
                 {d.opcoes.length === 0 && <p className="mt-3 text-[13px] text-suave">Nenhum pré-preparo para produzir: cadastre a ficha técnica dele (molho, base, calda…) em Fichas e produtos.</p>}
+                <AtalhoDaConta d={d} />
               </div>
             ) : abertas.length > 0 ? (
               <ul className={`divide-y divide-linha ${fixas.length ? 'border-t border-linha' : ''}`}>
@@ -424,7 +443,7 @@ export function TelaListaDoDia({
                 ))}
               </ul>
             ) : (
-              fixas.length === 0 && <Vazio titulo="Sem lista neste dia.">{d.pode.planejar ? (d.naoEdita ?? 'Monte a lista do dia.') : 'Quem define a lista é a gerência: ela aparece aqui quando for montada.'}</Vazio>
+              fixas.length === 0 && <Vazio titulo="Sem lista neste dia.">{d.pode.planejar ? (d.naoEdita || bloqueio ? null : 'Monte a lista do dia.') : 'Quem define a lista é a gerência: ela aparece aqui quando for montada.'}</Vazio>
             )}
             {d.foraDaLista.length > 0 && (
               <div className="border-t border-linha px-4 py-3 sm:px-5">
@@ -447,7 +466,7 @@ export function TelaListaDoDia({
           <Preparos d={d} porNaLista={acoes.por} podePor={edita} />
         </div>
         <div className="min-w-0 space-y-5">
-          <MateriaPrima d={d} />
+          <MateriaPrima d={d} podeMontar={edita} />
           <ParaQuemCompra d={d} raiz={raiz} />
         </div>
       </div>

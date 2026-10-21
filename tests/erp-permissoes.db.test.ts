@@ -588,6 +588,30 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     expect(dono2.ok).toBe(true);
   });
 
+  it('catálogo v2 (3.2, decisão 219): o sócio de perfil próprio salvo na v1 com tudo (o "copiado do Dono") continua cuidando do Gerente; o parcial não ganha nada e a Equipe pede para revisar', async () => {
+    const V1 = TODAS_AS_PERMISSOES.filter((p) => p !== 'producao.planejar');
+    // Como estava no banco antes da 3.2 (se o app antigo salvar durante o deploy, a migration não pega: a regra pega).
+    const socioV1 = await db.perfilAcesso.create({ data: { parceiroId: A, nome: `Sócio v1 ${sufixo}`, base: 'DONO', permissoes: V1, catalogoVersao: 1 } });
+    const parcialV1 = await db.perfilAcesso.create({ data: { parceiroId: A, nome: `Sem preços v1 ${sufixo}`, base: 'DONO', permissoes: V1.filter((p) => p !== 'precos.editar'), catalogoVersao: 1 } });
+    const socio = await pessoa(A, 'sociov1', { perfil: `p:${socioV1.id}` }, ator(dono.s));
+    expect(socio.s.alcance!.permissoes.has('producao.planejar')).toBe(true);
+    const gerente = await pessoa(A, 'gerentev1', { perfil: 'GERENTE', lojas: 'escolhidas', lojaIds: [X] }, ator(dono.s));
+    // O sócio cobre o gerente base (que tem "definir a lista"): desativa, reativa e gera o link de senha.
+    expect((await mudarStatusDoAcesso(A, gerente.s.acessoId!, 'DESATIVADO', ator(socio.s), o())).ok).toBe(true);
+    expect((await mudarStatusDoAcesso(A, gerente.s.acessoId!, 'ATIVO', ator(socio.s), o())).ok).toBe(true);
+    expect((await gerarNovoLink(A, gerente.s.acessoId!, ator(socio.s), o())).ok).toBe(true);
+    // O parcial da v1 não ganha "definir a lista": a Equipe mostra o que revisar.
+    const parcial = await pessoa(A, 'parcialv1', { perfil: `p:${parcialV1.id}` }, ator(dono.s));
+    expect(parcial.s.alcance!.permissoes.has('producao.planejar')).toBe(false);
+    const ps = await listarPerfis(A, o());
+    expect(ps.find((p) => p.id === socioV1.id)).toMatchObject({ permissoes: TODAS_AS_PERMISSOES, revisar: [] });
+    expect(ps.find((p) => p.id === parcialV1.id)).toMatchObject({ revisar: ['producao.planejar'] });
+    // Salvar o perfil leva para a v2 (o que foi marcado vale, e nada mais a revisar).
+    const salvo = await salvarPerfil(A, { id: parcialV1.id, nome: parcialV1.nome, base: 'DONO', permissoes: V1.filter((p) => p !== 'precos.editar') }, ator(dono.s), o());
+    expect(salvo.ok).toBe(true);
+    expect((await listarPerfis(A, o())).find((p) => p.id === parcialV1.id)).toMatchObject({ catalogoVersao: 2, revisar: [] });
+  });
+
   it('nível 1 vê os parceiros com pessoas ativas e ninguém cuidando da equipe', async () => {
     const c = await criarParceiro({ nome: 'Perm C', slug: `perm-c-${sufixo}`, status: 'ATIVO' }, 'Teste', db);
     if (!c.ok) throw new Error();

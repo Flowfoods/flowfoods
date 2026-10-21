@@ -2037,7 +2037,8 @@ nenhuma coluna mexida nas antigas; `migrate diff` vazio). Decisões 218 a 227. P
 1. **A lista** (218, 219). Uma por LOJA e DIA (de hoje a 14 dias à frente; dia que passou é consulta). Quem tem "definir a lista do dia" (dono e
    gerente pelo perfil base; o operador não) escolhe os pré-preparos (os mesmos da "Nova produção": ficha Pré-preparo ativa que vira insumo) e
    quanto produzir, na unidade do rendimento ("5" = 5 kg de molho). A cozinha (`producao.ver`) lê a lista e os lotes dela, sem formulário.
-   Salvar refaz a conta; o mesmo pré-preparo não fica em duas linhas abertas (some numa só). Salvar a lista vazia a apaga.
+   Salvar refaz a conta; o mesmo pré-preparo não fica em duas linhas abertas (some numa só). Salvar a lista vazia a apaga (fica sem linhas,
+   e a versão segue: decisão 229, rodada 1).
 2. **A conta** (220, 223), `producao-lista-campos.ts` (pura). Vai usar = a receita de cada linha, BRUTA (fator de correção), arredondada como a
    requisição do lote vai pedir (`quantidadesDaFicha`, a mesma conta da 1.8/3.1); na unidade do insumo, sem converter (a embalagem padrão só
    aparece como apoio quando tem conteúdo declarado diferente de 1 kg/1 L/1 un: "≈ 2 embalagens de 900 ml"). Tem = o saldo da loja agora.
@@ -2062,7 +2063,8 @@ nenhuma coluna mexida nas antigas; `migrate diff` vazio). Decisões 218 a 227. P
    período (compartilhada) → a lista (`FOR UPDATE`) → as da 3.1 dentro de planejar (dia do lote, requisição da loja). Dia da lista em período
    FECHADO do DRE: salvar, pôr e gerar são recusados com a frase de sempre, e a tela mostra o `AvisoDoPeriodoFechado` antes.
 7. **Para quem compra** (226). A lista não faz pedido: "Lançar nota" leva a Compras. Custo estimado do que falta (último preço pago, fração
-   exata, "sem contar X (sem preço)") só para quem tem `insumos.ver`, montado no servidor. O orçamento de compra da 2.5 entra por
+   exata, "sem contar X (sem preço)") só para quem tem `insumos.ver` E define a lista ou compra (rodada 1: a cozinha lê só quantidades),
+   montado no servidor. O orçamento de compra da 2.5 entra por
    `orcamentoNaNota` com a compra estimada somada, na vista de quem lê (quem não vê o DRE lê o limite seguro; quem não vê custos não leva o
    valor nem para a conta, que parte de zero).
 8. **Tela** (225). Aba "Lista do dia" (a primeira da área Produção: o card da área abre nela); escolha da loja quando há mais de uma; o dia
@@ -2143,6 +2145,26 @@ rastro, "Seu acesso"), que já existiam. O vão no topo de "O que produzir" mede
 prefetch do Next abortado quando o roteiro navega (links do menu, com o navegador caindo na navegação normal), nada da lista. O "R$"
 que aparece no HTML inteiro do chefe é o texto da ajuda do shell ("nunca R$ 0,00", da 0.6), não da lista; por isso a conferência olha o
 `main`.
+
+## Rodada de correção 1 da 3.2 (fiscais: Guardião e UX)
+
+Decisões 228 a 230, e correções na 219, 224 e 226. Migration nova `20261030010000_erp_catalogo_v2` (só DADO: `PerfilAcesso`, fora do
+tenant). Nenhuma estrutura mudou; `migrate diff` vazio.
+
+| Achado | Correção | Teste |
+|---|---|---|
+| B1 (bloqueante): lote de fora da lista com pré-preparo dentro não entrava na cascata ("sem ficha", "ficha desativada" falso, sem "Pôr na lista") | fichas e insumos da conta lidos até fechar: as das linhas e dos lotes de fora, o que cada ficha usa e a ficha que produz cada pré-preparo que aparece (na receita ou saindo pela requisição) | `erp-producao-lista.db`: "lote de FORA… (revisão B1)", dois e três níveis iguais à conta como linha; adversarial A1 |
+| I1: cancelar o lote não mudava a versão; a aba velha apagava a linha devolvida e o Gerar dela recriava o lote cancelado | cancelar e estornar travam a lista antes do lote e sobem a versão; o salvar manda `vistas` (linha não vista = conflito com a frase); o gerar manda `linha` (só essas) | "cancelar ou estornar… (revisão I1)", "cancelar e salvar ao mesmo tempo: sem deadlock"; telas (action sem `linha` = nada); adversariais A2 e A3 |
+| M1: lista apagada e montada de novo voltava à versão 1; a aba velha sobrescrevia | a linha da lista fica (apagar = sem linhas), a versão segue | "editar…" (apagar, montar de novo, abas velhas em conflito, gerar numa apagada); adversarial A4 |
+| M2: sócio de perfil próprio v1 ("copiado do Dono") deixava de cobrir Gerente e Dono base | migration de dado + regra pela versão gravada; os demais perfis v1 não ganham nada e a Equipe pede para revisar | `erp-permissoes` (puro: cobre, ninguém ganha indevido, SQL = catálogo); `erp-permissoes.db` (desativa, reativa e gera link do gerente; parcial com "revisar"; salvar leva à v2); migration com dado antigo nos 3 perfis do banco, duas vezes; adversarial A8 |
+| UX I1: "Pôr na lista" apagava o que foi digitado e não salvo | desabilitado com o motivo enquanto há mudança por salvar (estado compartilhado no cliente) | jornada na tela |
+| UX I2: confirmação fora da vista; "Salvar" vermelho de uma linha vazia depois de gerar | o aviso vem para a vista e recebe o foco (respeita `prefers-reduced-motion`); sem linha vazia com tudo em lote, "Salvar" secundário | telas ("depois de gerar…"); jornada |
+| UX I3: a cozinha via R$ na lista | custo e "Para quem compra" só para `insumos.ver` E (planejar OU ver/lançar nota); bloco da ajuda só para quem compra | telas: HTML do operador padrão sem R$ |
+| UX menores | quantidade em negrito na leitura; "use vírgula: 2,5 kg" e "maior que zero"; "nesta tela"; plural do Gerar; "com a requisição" no singular; dia fora do prazo sem frase repetida nem "Monte a lista"; fileira única a partir de 640 px; atalho "N insumos faltam · M abaixo de zero" | `erp-producao-lista` (frases); telas (fora do prazo, atalho, negrito) |
+
+Mutantes conferidos (cada um derruba o teste dele): só as fichas das linhas (B1); sem subir a versão no cancelar; no estornar; sem a
+conferência das `vistas`; gerar todas as em aberto em vez das pedidas; apagar a linha da lista; custo para todo `insumos.ver`; sem a regra
+do catálogo.
 
 ## Mapa do esquema (0.1)
 
@@ -2978,12 +3000,22 @@ banco de teste: o operador é recusado pelo servidor.
   `estadoDaLinha`); o gatilho `ListaProducaoItem_lote_confere` não deixa a linha com lote vivo mudar ou sair. Quem precisar apagar uma lista com
   lote (limpeza de teste) desliga o gatilho na transação (`SEM_GATILHO_NA_LIMPEZA` em `tests/erp-db-apoio.ts`).
 - **Ordem das travas** (não trocar): período (compartilhada) → a lista (`FOR UPDATE`) → as da 3.1 (dia do lote, requisição da loja; e, nas
-  outras escritas, abertura → requisição → ordem → saldos). Nenhum caminho trava a lista depois de travar requisição ou ordem.
+  outras escritas, abertura → requisição → ordem → saldos). Nenhum caminho trava a lista depois de travar requisição ou ordem: cancelar e
+  estornar o lote travam a lista do lote ANTES dele (`travarListaDoLote` em `producao.ts`) e sobem a versão dela (decisão 228). Escrita nova
+  da 3.1 que mude o estado de um lote da lista (devolver a linha, por exemplo) faz o mesmo.
+- **O formulário manda o que viu**: salvar leva `vistas` (as linhas em aberto da tela) e gerar leva `linha` (só essas viram lote). A 3.3
+  ("pegar da lista") pega pela linha (`linhas: [id]`), nunca "todas as em aberto".
+- **A lista apagada fica no banco** (sem linhas): a versão por loja e dia nunca recomeça (decisão 229). Lista "existe" = tem linhas; quem
+  contar listas conta as com linhas.
 - **Sem segunda baixa na conta**: linha em lote conta o que falta SAIR pela requisição dele (`faltaDe` com a requisição aberta ou em parte);
   concluído não conta; o insumo que o lote tocou e ficou abaixo de zero continua na conta (`tocados`). Mudar o que a requisição pede muda a
   conta junto — de propósito.
-- **Custo e orçamento**: custo estimado só com `insumos.ver` (montado no servidor); orçamento pela `orcamentoNaNota` da 2.5 (a vista de quem lê;
-  sem custo = parte de zero). Campo novo com valor entra no mesmo contrato e no teste do HTML do "chefe sem custos".
+- **Custo e orçamento**: custo estimado só para quem tem `insumos.ver` E define a lista ou compra (decisão 226, corrigida na rodada 1: a
+  cozinha lê só quantidades); orçamento pela `orcamentoNaNota` da 2.5 (a vista de quem lê; sem custo = parte de zero). Campo novo com valor
+  entra no mesmo contrato e nos testes do HTML do "chefe sem custos" e do operador padrão (que tem `insumos.ver`).
+- **Catálogo versionado de verdade**: permissão nova entra em `NOVAS_NA_VERSAO` (`permissoes.ts`) com `VERSAO_DO_CATALOGO` + 1 e uma migration
+  de dado como a `20261030010000_erp_catalogo_v2` (o "copiado do Dono" ganha; os demais, a Equipe pede para revisar). O teste confere a
+  lista do SQL contra o catálogo.
 - **Ajuda do shell manda texto de todas as telas** (0.6, achado na prova): blocos sem `para` vão a todos, inclusive "nunca R$ 0,00" do DRE para
   quem não vê o DRE. Não é valor nem vem da lista, mas um teste que procure "R$" no HTML inteiro acha; procure no `main`. Vale rever na 0.6.
 - **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) quem monta a lista é a gerência (`producao.planejar`); a cozinha só lê e executa.
@@ -2991,8 +3023,10 @@ banco de teste: o operador é recusado pelo servidor.
   do livro também); se o negativo for quase sempre nota esquecida, o comprador vai comprar a mais — preferem que o negativo conte como zero e
   só avise? (3) "Pôr na lista" sugere exatamente o que falta (300 g), sem lote mínimo nem embalagem fechada; querem uma regra de lote por
   ficha (ex.: base de cebola sempre de 2 kg)? (4) O "tem" é o saldo da loja agora: não desconta requisições abertas de outros setores (salão)
-  nem o estoque mínimo. (5) A lista vai até 14 dias à frente e não volta no tempo (como o lote). (6) Herança da 3.1: o operador tem `insumos.ver`
-  e por isso vê a compra estimada em R$ na lista; separar "ver insumo" de "ver custo" é decisão de catálogo.
+  nem o estoque mínimo. (5) A lista vai até 14 dias à frente e não volta no tempo (como o lote). (6) Resolvido na rodada 1 (decisão do Maestro):
+  a cozinha não vê R$ na lista, mesmo com `insumos.ver`; o lote (3.1) continua mostrando custo a quem tem `insumos.ver` — separar "ver insumo"
+  de "ver custo" no catálogo inteiro segue como decisão de catálogo. (7) Perfil próprio antigo (catálogo v1) que não tinha tudo não ganha
+  "definir a lista do dia": a Equipe avisa para revisar.
 
 ## Revisão visual de 21/10/2026 (antes das próximas funcionalidades)
 

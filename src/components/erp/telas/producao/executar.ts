@@ -76,14 +76,15 @@ export async function executarSalvarLista(cliente: ClienteDoParceiro, alcance: A
     cliente,
     alcance,
     lojaId,
-    { dia: form.get('dia'), versao: form.get('versao'), linhaIds: form.getAll('linhaId'), fichaIds: form.getAll('fichaId'), quantidades: form.getAll('quantidade') },
+    { dia: form.get('dia'), versao: form.get('versao'), linhaIds: form.getAll('linhaId'), fichaIds: form.getAll('fichaId'), quantidades: form.getAll('quantidade'), vistas: form.get('vistas') },
     autor,
   );
   return voltarParaALista(r, anterior, base, lojaId, form.get('dia'), 'lista-salva', 'lista-ja');
 }
 
 export async function executarGerarLotes(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
-  const r = await gerarLotesDaLista(cliente, alcance, lojaId, { dia: form.get('dia'), versao: form.get('versao') }, autor);
+  // Só as linhas em aberto que a tela mostrou viram lote (decisão 228).
+  const r = await gerarLotesDaLista(cliente, alcance, lojaId, { dia: form.get('dia'), versao: form.get('versao'), linhas: form.getAll('linha') }, autor);
   return voltarParaALista(r, anterior, base, lojaId, form.get('dia'), 'lotes-gerados', 'lotes-ja');
 }
 

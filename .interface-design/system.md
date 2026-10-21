@@ -256,3 +256,11 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   unidade em caixa de 72 px; "Tirar" fantasma), "Salvar a lista" e, numa caixa de borda, "Gerar os N lotes" (o primário quando não há
   mudança por salvar; com mudança, espera e diz por quê). **Formulário com server action**: o espaçamento (`space-y`) mora numa div
   interna, nunca no `<form>` (o React põe os campos ocultos da action no começo dele e o primeiro bloco ganhava margem).
+  Rodada 1 dos fiscais: a partir de 640 px a linha em aberto é UMA fileira (seletor flexível; quantidade de 112 px; unidade de 56 px;
+  "Tirar"). Quem lê a lista vê a quantidade na cor do texto e no mesmo 600 do nome ("Molho cheddar · 5 kg"). Com tudo já em lote, o
+  formulário abre sem linha vazia (só "Mais um pré-preparo", "Salvar" secundário). "Pôr na lista" espera, com o motivo em 12 px
+  `atencao`, enquanto "O que produzir" tem mudança por salvar (as duas ações gravam na lista; a segunda apagaria o que foi digitado).
+  **Aviso do que acabou de acontecer** (salvo, gerado, posto): a tela volta do servidor na mesma rolagem, então o aviso vem para a vista
+  e recebe o foco (`LevarParaVista`, `scroll-mt-24` para o topo fixo; sem animação com `prefers-reduced-motion`). **Atalho da conta**:
+  logo abaixo do Gerar, até 1280 px, o resumo "4 insumos faltam · 1 abaixo de zero: ver a matéria-prima" é um link de 44 px para o
+  painel (`#materia-prima`). Dia fora do prazo: a frase uma vez só (no aviso de cima), o vazio só com o título.
