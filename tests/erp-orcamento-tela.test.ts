@@ -204,6 +204,10 @@ describe('2.5 · a tela', () => {
     expect(tabela).not.toMatch(/whitespace-nowrap[^>]*>\s*(<[^>]+>)*sem cor/);
     expect(h).toContain('Lançar o faturamento');
     // M6: a rede sem número não deixa espaço em branco na conta
-    expect(h).toContain('Sem a conta da rede: sem o orçamento de Delivery.');
+    expect(h).toContain('Sem a conta da rede: sem o orçamento de Delivery. Ela aparece quando todas as lojas tiverem número. O ritmo abaixo já vale.');
+    // na visão de UMA loja sem número, a frase não fala em rede
+    const loja = html(createElement(TelaOrcamento, { dados: { ...dados, rede: null, lojas: [dados.lojas[1]] }, contexto: 'Delivery', bloqueio: null }));
+    expect(loja).toContain('Sem a conta: sem faturamento lançado nas últimas 4 semanas.');
+    expect(loja).not.toContain('da rede');
   });
 });

@@ -1900,6 +1900,14 @@ Ajuda: `compras-orcamento` v1 → v2 (recolhida; a sobra que não cobre; o teto 
 
 Ajuda: `compras-orcamento` v2 → v3 (o limite seguro em uma frase; o piso do dia sem amostra); lock regravado.
 
+Prova da rodada extra (build de produção do último commit; bancos `ff_25x` e `ff_25sf` (Delivery sem faturamento) copiados do `ff_25`; roteiros `pw/rx.mjs`,
+`pw/rxlat.mjs` e `pw/shots.mjs` no scratchpad, prints em `pw/rx/`): a dona confere e lança R$ 15.300,00 na Vila da Penha (no celular, depois de "Conferir o
+impacto" a prévia sobe para a vista: topo dela a 114 px de 844); ela vê "cabe R$ 303,00" e o comprador, "Vila da Penha em Outubro de 2026: acima do limite
+seguro em R$ 300,00. Valor aproximado, sempre para menos…" (tom de atenção, "Ver o limite seguro"), sem "orçamento", "passou" nem "teto" nos textos do número;
+a prévia do comprador (1440, menos movimento) chega à vista e diz "Limite seguro de compra … fica acima do limite seguro em R$ 400,00". Orçamento e detalhe
+(cenário do limite) e orçamento (loja sem faturamento), dona e comprador, em 390, 820, 1180 e 1440, claro e escuro: 48 telas, zero rolagem lateral, zero
+violação do axe; sem faturamento também a 1024 e a 1280, na rede e na loja: zero rolagem, e a dona tem "Lançar o faturamento".
+
 ## Provar o orçamento de compra (2.5)
 
 ```bash

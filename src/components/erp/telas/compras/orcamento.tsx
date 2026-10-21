@@ -224,7 +224,7 @@ function PorLoja({ dados, compacto = false }: { dados: OrcamentoDeCompra; compac
 }
 
 /** A conta por extenso (assinatura do ERP): só para quem vê a receita. */
-function AConta({ v }: { v: VistaCompleta }) {
+function AConta({ v, rede }: { v: VistaCompleta; rede: boolean }) {
   const c = v.conta;
   const p = v.previsao;
   return (
@@ -249,7 +249,10 @@ function AConta({ v }: { v: VistaCompleta }) {
         <p className="tabular-nums">Receita prevista {formatarDinheiro(v.previstaCentavos)} (a soma das lojas). Sem a meta do CMV não há teto.</p>
       )}
       {!c && !p && v.previstaCentavos === null && (
-        <p>Sem a conta da rede: {v.motivo ?? 'falta dado'}. Ela aparece quando todas as lojas tiverem número; o ritmo abaixo já vale.</p>
+        <p>
+          {rede ? `Sem a conta da rede: ${v.motivo ?? 'falta dado'}. Ela aparece quando todas as lojas tiverem número.` : `Sem a conta: ${v.motivo ?? 'falta dado'}.`}
+          {v.ritmo ? ' O ritmo abaixo já vale.' : ''}
+        </p>
       )}
       {p && p.frasesDoZero.length > 0 && (
         <ul className="space-y-0.5">
@@ -299,12 +302,12 @@ function BlocoPrincipal({ titulo, v, dados, saidas, varias }: { titulo: string; 
   );
 }
 
-function PainelDaConta({ v, metaBp }: { v: VistaCompleta; metaBp: number | null }) {
+function PainelDaConta({ v, metaBp, rede }: { v: VistaCompleta; metaBp: number | null; rede: boolean }) {
   if (!v.conta && !v.previsao && !v.ritmo && v.previstaCentavos === null) return null;
   return (
     <Painel titulo="Como a conta chega aqui" subtitulo={SUBTITULO_COMPLETO}>
       <div className="space-y-3">
-        <AConta v={v} />
+        <AConta v={v} rede={rede} />
         <Ritmo v={v} metaBp={metaBp} />
       </div>
     </Painel>
@@ -358,7 +361,7 @@ export function TelaOrcamento({
       ) : principal ? (
         <>
           <BlocoPrincipal titulo={titulo} v={principal} dados={dados} saidas={saidas} varias={varias} />
-          {principal.veReceita && <PainelDaConta v={principal} metaBp={dados.metaBp} />}
+          {principal.veReceita && <PainelDaConta v={principal} metaBp={dados.metaBp} rede={dados.rede !== null} />}
         </>
       ) : (
         <Painel titulo={titulo} subtitulo={dados.lojas.every((l) => l.vista.veReceita) ? SUBTITULO_COMPLETO : SUBTITULO_DO_LIMITE}>
