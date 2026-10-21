@@ -2166,6 +2166,33 @@ Mutantes conferidos (cada um derruba o teste dele): só as fichas das linhas (B1
 conferência das `vistas`; gerar todas as em aberto em vez das pedidas; apagar a linha da lista; custo para todo `insumos.ver`; sem a regra
 do catálogo.
 
+Provas da rodada 1, no código de `a807000`:
+- **Estáticos.** `prisma validate`, `tsc`, lint e portão limpos; `erp:conferir-migracao` ok e `migrate diff` vazio no `ff_32`.
+- **Suíte com banco, superusuário.** 89 arquivos e 1816 testes passando.
+- **Dono com FORCE RLS** (`ff_dono_32`; lista, telas da lista, produção, telas da produção, RLS, isolamento e permissões). 130 de 131
+  passando. A única falha é a conhecida: o banco montado por psql não tem `_prisma_migrations`. O teste de migration precisa da URL de
+  superusuário, porque cria os bancos; ele mesmo cobre os três perfis do banco e passou na suíte do superusuário.
+- **Testes adversariais do Guardião.** 8 de 8 sem nenhuma mudança neles, como superusuário e como dono com FORCE RLS. Antes da correção
+  falhavam A1, A2, A3, A4 e A8.
+
+Na tela, rodada 1:
+- **Build.** Produção de `a807000`, com o `BUILD_ID` gerado às 18:23:01, depois do commit das 18:21:20. Porta 3100, banco `ff_32r1`
+  copiado do `ff_32`. Dados de `.local-scripts/lista32.ts`, `lista32b.ts` e `lista32r1.ts` (o lote de fora da lista, daqui a dois dias).
+- **Jornada.** Roteiro `prova32r1/jornada.mjs` no scratchpad: 38 conferências, 0 falha. O gerente, a 390 px com toque, monta Molho
+  cheddar 5 kg e Maionese de bacon 2 kg ("Gerar os 2 lotes" no plural) e salva: "Lista salva." vem para a vista com o foco. Ao digitar
+  sem salvar, "Pôr na lista" e o Gerar ficam desabilitados com o motivo; ao voltar ao número salvo, liberam. Salva o 6, põe a cebola
+  caramelizada na lista (o aviso na vista e com o foco) e gera com duplo toque: 3 lotes, o aviso "Lotes gerados." na vista, nenhuma
+  linha vazia, "Salvar a lista" secundário e a frase de tudo em lote. O atalho "4 insumos faltam · 1 abaixo de zero: ver a
+  matéria-prima" (44 px) leva ao painel. A cozinha (operador padrão, com "ver insumos e custos") lê vai usar / tem / falta, sem R$, sem
+  "compra estimada" e sem "Para quem compra", com a quantidade em 600 na cor do texto.
+- **B1 na tela.** Daqui a dois dias só existe a maionese de fora da lista, e a tela mostra a cebola caramelizada "falta produzir 300 g"
+  com "Pôr na lista", sem "ficha desativada", e a cebola roxa em cascata. Fora do prazo, a frase aparece uma vez só, sem "Monte a lista".
+  A 820 px, a linha cabe numa fileira (quantidade de 112 px). Chefe sem custos, comprador e Delivery como na 1ª rodada.
+- **Matriz.** Dona, gerente e operador × escolha da loja, hoje, amanhã e Delivery × 390, 820, 1180 e 1440 × claro e escuro: 96 telas, zero
+  rolagem lateral, zero violação do axe. R$ no `main` só para dona e gerente, nas páginas da Penha; nunca para o operador. Alvos abaixo de
+  44 px só no shell e no rastro, que já existiam. No console, só o prefetch do Next abortado pela navegação do roteiro.
+- **Prints.** Em `pw/prova32r1/jornada/` (12) e `pw/prova32r1/matriz-*/`.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
