@@ -282,14 +282,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/orcamento'],
     titulo: 'Orçamento de compra',
-    versao: 2,
+    versao: 3,
     // A loja que passou precisa ficar à vista: a aula abre numa linha (com a pergunta da 1ª vez, abre sozinha).
     recolhida: true,
     aula: [
       { texto: 'Quanto ainda dá para comprar neste período sem furar a meta do CMV, loja por loja.' },
       { texto: 'É um aviso, não um bloqueio: a nota que passa do orçamento é lançada igual, e a prévia da nota mostra quanto ela passa.' },
       { texto: 'Sem número, o motivo vem escrito: falta a meta do CMV ou faturamento lançado nas últimas 4 semanas.' },
-      { texto: 'Cada nota é de uma loja e a sobra de uma não cobre a que passou; quem não vê o DRE recebe o que cabe pelo teto arredondado para baixo, sem a receita.' },
+      { texto: 'Cada nota é de uma loja e a sobra de uma não cobre a que passou; quem não vê o DRE vê o limite seguro, um valor aproximado e sempre para menos.' },
     ],
     secoes: [
       {
@@ -298,7 +298,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'O teto é a meta do CMV vezes a receita prevista do período. O que cabe é o teto menos o que a loja já comprou no período, pela data da nota, com o frete.', para: ['dre.ver'] },
           { texto: 'A receita prevista é o que a loja já vendeu nos dias com faturamento completo, mais cada dia que falta pela média do mesmo dia da semana nas últimas 4 semanas. Sábado entra como sábado, segunda como segunda.', para: ['dre.ver'] },
-          { texto: 'Dia sem todos os canais lançados não conta como zero: entra pela média. Dia antes do primeiro lançamento da loja fica fora. Dia da semana sem venda lançada nas 4 semanas conta como zero. Com menos de 14 dias completos, a loja fica sem número.', para: ['dre.ver'] },
+          { texto: 'Dia sem todos os canais lançados não conta como zero: entra pela média. Dia antes do primeiro lançamento da loja fica fora. Dia da semana sem nenhum dia completo nas 4 semanas conta só o que já foi lançado. Com menos de 14 dias completos, a loja fica sem número.', para: ['dre.ver'] },
           { texto: 'É a única tela que projeta: o DRE vai até ontem, sem projeção.', para: ['dre.ver'] },
           { texto: 'A rede só tem número quando cada loja ativa tem. Uma loja sem número deixa a rede sem número, com o nome dela, para o buraco de uma não ficar escondido atrás da outra.', para: ['dre.ver'] },
         ],

@@ -118,8 +118,11 @@ function dias(de: string, ate: string): string[] {
   return out;
 }
 
-/** A frase do dia da semana sem amostra: "segunda sem venda lançada nas últimas 4 semanas: conta como zero". */
-export const fraseDoZero = (w: number) => `${NOME_DO_DIA[w]} sem venda lançada nas últimas 4 semanas: conta como zero`;
+/**
+ * A frase do dia da semana sem amostra (nenhum dia completo nas 4 semanas): o dia já lançado em parte vale o que foi lançado
+ * (piso), o dia que falta vale zero (revisão do Guardião: "sem venda lançada" seria falso quando um canal foi lançado).
+ */
+export const fraseDoZero = (w: number) => `${NOME_DO_DIA[w]} sem dia completo nas últimas 4 semanas: conta só o que já foi lançado`;
 
 /**
  * A receita prevista de uma loja no período. Um dia é COMPLETO quando a loja já lançava (a partir do primeiro lançamento)
@@ -170,6 +173,9 @@ export function preverReceita(loja: LojaDoOrcamento, periodo: Pick<PeriodoDoOrca
   let diasSemLancamento = 0;
   let diasAntesDeAbrir = 0;
   const aProjetar = [0, 0, 0, 0, 0, 0, 0];
+  // Dia incompleto num dia da semana SEM amostra: vale o que foi lançado nele (piso), nunca zero por cima de venda lançada.
+  let piso = 0;
+  const semAmostra = [false, false, false, false, false, false, false];
   for (const d of apurados) {
     if (!primeiro || d < primeiro) diasAntesDeAbrir += 1;
     else if (completo(d)) {
@@ -177,17 +183,21 @@ export function preverReceita(loja: LojaDoOrcamento, periodo: Pick<PeriodoDoOrca
       diasCompletos += 1;
     } else {
       diasSemLancamento += 1;
-      aProjetar[diaDaSemana(d)] += 1;
+      const w = diaDaSemana(d);
+      if (nPorDia[w] === 0) {
+        piso += valor(d);
+        semAmostra[w] = true;
+      } else aProjetar[w] += 1;
     }
   }
   const restantes = hoje <= periodo.fim ? dias(hoje > periodo.inicio ? hoje : periodo.inicio, periodo.fim) : [];
   for (const d of restantes) aProjetar[diaDaSemana(d)] += 1;
 
-  let projetado = 0;
+  let projetado = piso;
   const frasesDoZero: string[] = [];
   // Na ordem da semana a partir de segunda (a frase fica na ordem em que o dono pensa a semana).
   for (const w of [1, 2, 3, 4, 5, 6, 0]) {
-    if (aProjetar[w] === 0) continue;
+    if (aProjetar[w] === 0 && !semAmostra[w]) continue;
     if (nPorDia[w] === 0) frasesDoZero.push(fraseDoZero(w));
     else projetado += dividirExato(BigInt(somaPorDia[w]) * BigInt(aProjetar[w]), BigInt(nPorDia[w]));
   }
@@ -337,7 +347,8 @@ export function orcamentoDoEscopo(lojas: readonly OrcamentoDaLoja[], metaBp: num
 /**
  * O degrau do teto de quem não vê a receita (decisão 213, do Maestro): fixo por faixa do teto, para a receita não sair
  * do teto com precisão de 1 %. Teto abaixo de R$ 10.000,00: R$ 500,00; de R$ 10.000,00 a menos de R$ 50.000,00: R$ 1.000,00;
- * de R$ 50.000,00 para cima: R$ 5.000,00. Com meta de 30 %, a receita prevista fica com erro de ±8 % em vez de ±0,8 %.
+ * de R$ 50.000,00 para cima: R$ 5.000,00. Com meta de 30 %, quem vê só o limite seguro sabe a receita prevista com erro de ±1 % a ±5 % (teto
+ * a partir de R$ 6 mil; ±1,4 % numa loja de R$ 120 mil por mês). Na tela essa pessoa lê "limite seguro", nunca "orçamento" nem "teto".
  */
 export function degrauDoTeto(tetoCentavos: number): number {
   if (tetoCentavos < 1_000_000) return 50_000;
@@ -360,6 +371,31 @@ export function fraseDoSaldo(saldoCentavos: number): string {
 
 /** Quem passou do orçamento (cada nota é de uma loja só: a sobra de uma não cobre o estouro de outra). */
 export const fraseDeQuemPassou = (nome: string, passouCentavos: number) => `${nome} já passou ${formatarDinheiro(passouCentavos)}: a sobra de outra loja não cobre`;
+
+// ---------------------------------------------------------------- o "limite seguro" (quem não vê o DRE)
+
+/**
+ * Para quem não vê a receita, o número é um LIMITE SEGURO, não o orçamento (rodada extra da UX): o teto arredondado para
+ * baixo pode afirmar um estouro que a conta exata não tem, então a tela nunca diz "orçamento", "teto" nem "passou" para
+ * essa pessoa. O valor exibido também vai em degraus de R$ 100 para o lado de menos folga (cabe: para baixo; acima: para
+ * cima), sem centavos que pareçam exatos; é só exibição, a conta continua a de `impactoDaNota`.
+ */
+export const DEGRAU_DE_EXIBICAO = 10_000;
+export function aproximado(saldoCentavos: number): number {
+  if (saldoCentavos >= 0) return Math.floor(saldoCentavos / DEGRAU_DE_EXIBICAO) * DEGRAU_DE_EXIBICAO;
+  return -Math.ceil(-saldoCentavos / DEGRAU_DE_EXIBICAO) * DEGRAU_DE_EXIBICAO;
+}
+/** "cabe R$ 4.300,00 no limite seguro" / "cabe menos de R$ 100,00 no limite seguro" / "acima do limite seguro em R$ 200,00". */
+export function fraseDoLimite(saldoCentavos: number): string {
+  const a = aproximado(saldoCentavos);
+  if (saldoCentavos < 0) return `acima do limite seguro em ${formatarDinheiro(-a)}`;
+  if (a === 0 && saldoCentavos > 0) return `cabe menos de ${formatarDinheiro(DEGRAU_DE_EXIBICAO)} no limite seguro`;
+  return `cabe ${formatarDinheiro(a)} no limite seguro`;
+}
+/** A loja acima do limite seguro, na linha da rede de quem não vê a receita. */
+export const fraseAcimaDoLimite = (nome: string, saldoCentavos: number) => `${nome} está acima do limite seguro em ${formatarDinheiro(-aproximado(saldoCentavos))}`;
+export const SUBTITULO_DO_LIMITE = 'Valor aproximado, sempre para menos: a conta exata pode ter mais folga e fica com quem vê o DRE.';
+export const AVISO_SEM_NOTA_NO_LIMITE = 'vendeu no período e não tem nota de compra: confira se falta lançar nota';
 
 // ================================================================ a nota (prévia e depois de lançar)
 

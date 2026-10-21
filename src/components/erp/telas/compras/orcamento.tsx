@@ -16,7 +16,7 @@
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import type { OrcamentoDeCompra, OrcamentoNaNota, VistaCompleta, VistaDoOrcamento } from '@/lib/erp/orcamento';
-import { AVISO_SEM_NOTA, fraseDoSaldo, MOTIVO_SEM_META } from '@/lib/erp/orcamento-campos';
+import { aproximado, AVISO_SEM_NOTA, AVISO_SEM_NOTA_NO_LIMITE, fraseDoLimite, fraseDoSaldo, MOTIVO_SEM_META, SUBTITULO_DO_LIMITE } from '@/lib/erp/orcamento-campos';
 import { textoDoPercentual } from '@/lib/erp/dre-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
@@ -27,7 +27,6 @@ import { BotaoOuMotivo } from '../cadastro/partes';
 import { Farol } from '../dre/farol';
 
 const dias = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`;
-const SUBTITULO_RESUMIDO = 'Pelo teto arredondado para baixo, sem a receita';
 const SUBTITULO_COMPLETO = 'Meta do CMV × receita prevista − já comprado';
 
 const saldoDe = (v: VistaDoOrcamento) => (v.veReceita ? v.conta?.saldoCentavos ?? null : v.saldoCentavos);
@@ -38,8 +37,9 @@ interface Saidas {
   faturamentoHref?: string;
 }
 
-function SaidaDoMotivo({ motivo, saidas }: { motivo: string | null; saidas: Saidas }) {
-  if (motivo === MOTIVO_SEM_META && saidas.planoHref) {
+/** `motivos`: o do escopo e os das lojas (na rede, "sem o orçamento de X" esconde o porquê: o da loja diz). */
+function SaidaDoMotivo({ motivos, saidas }: { motivos: readonly (string | null)[]; saidas: Saidas }) {
+  if (motivos.includes(MOTIVO_SEM_META) && saidas.planoHref) {
     return (
       <p className="text-[13px]">
         <Link href={saidas.planoHref} className={`${LINK_DE_TEXTO} ff-toque`}>
@@ -48,7 +48,7 @@ function SaidaDoMotivo({ motivo, saidas }: { motivo: string | null; saidas: Said
       </p>
     );
   }
-  if (motivo && /faturamento/.test(motivo) && saidas.faturamentoHref) {
+  if (motivos.some((m) => m && /faturamento/.test(m)) && saidas.faturamentoHref) {
     return (
       <p className="text-[13px]">
         <Link href={saidas.faturamentoHref} className={`${LINK_DE_TEXTO} ff-toque`}>
@@ -72,6 +72,18 @@ function NumeroGrande({ v }: { v: VistaDoOrcamento }) {
     );
   }
   const passou = saldo < 0;
+  if (!v.veReceita) {
+    // Limite seguro (quem não vê o DRE): nunca "orçamento" nem "passou", tom de atenção, valor aproximado sem centavos.
+    const a = aproximado(saldo);
+    return (
+      <div className="min-w-0">
+        <p className={`font-display text-[30px] font-bold leading-none tabular-nums ${passou ? 'text-atencao' : 'text-texto'}`}>
+          {!passou && a === 0 && saldo > 0 ? `menos de ${formatarDinheiro(10_000)}` : formatarDinheiro(passou ? -a : a)}
+        </p>
+        <p className={`mt-1.5 text-[13px] font-medium ${passou ? 'text-atencao' : 'text-suave'}`}>{passou ? 'acima do limite seguro' : 'cabe no limite seguro'}</p>
+      </div>
+    );
+  }
   return (
     <div className="min-w-0">
       <p className={`font-display text-[30px] font-bold leading-none tabular-nums ${passou ? 'text-erro' : 'text-texto'}`}>{formatarDinheiro(passou ? -saldo : saldo)}</p>
@@ -88,13 +100,13 @@ function Alertas({ v, escopoDeVarias }: { v: VistaDoOrcamento; escopoDeVarias: b
   return (
     <ul className="space-y-1 text-[13px] leading-snug">
       {passaram.map((p) => (
-        <li key={p.nome} className="font-semibold text-erro">
+        <li key={p.nome} className={`font-semibold ${v.veReceita ? 'text-erro' : 'text-atencao'}`}>
           {p.frase}
         </li>
       ))}
       {semNota.map((n) => (
         <li key={n} className="text-atencao">
-          {escopoDeVarias ? `${n} ${AVISO_SEM_NOTA}` : `Esta loja ${AVISO_SEM_NOTA}`}
+          {`${escopoDeVarias ? n : 'Esta loja'} ${v.veReceita ? AVISO_SEM_NOTA : AVISO_SEM_NOTA_NO_LIMITE}`}
         </li>
       ))}
       {v.diasSemLancamento > 0 && (
@@ -108,6 +120,11 @@ function Alertas({ v, escopoDeVarias }: { v: VistaDoOrcamento; escopoDeVarias: b
 function CelulaDoSaldo({ v }: { v: VistaDoOrcamento }) {
   const saldo = saldoDe(v);
   if (saldo === null) return <span className="text-[12px] text-suave">sem número</span>;
+  if (!v.veReceita) {
+    const a = aproximado(saldo);
+    if (saldo < 0) return <span className="whitespace-nowrap font-semibold text-atencao">acima em {formatarDinheiro(-a)}</span>;
+    return <span className="whitespace-nowrap font-semibold text-texto">{a === 0 && saldo > 0 ? `menos de ${formatarDinheiro(10_000)}` : formatarDinheiro(a)}</span>;
+  }
   if (saldo < 0) return <span className="whitespace-nowrap font-semibold text-erro">passou {formatarDinheiro(-saldo)}</span>;
   return <span className="whitespace-nowrap font-semibold text-texto">{formatarDinheiro(saldo)}</span>;
 }
@@ -170,8 +187,9 @@ function PorLoja({ dados, compacto = false }: { dados: OrcamentoDeCompra; compac
               <th scope="col" className="h-10 px-3 text-right font-semibold">
                 Teto
               </th>
-              <th scope="col" className="h-10 px-3 text-right font-semibold">
-                Receita prevista
+              <th scope="col" className="h-10 whitespace-nowrap px-3 text-right font-semibold" title="Receita prevista">
+                <span aria-hidden>Prevista</span>
+                <span className="sr-only">Receita prevista</span>
               </th>
               <th scope="col" className="h-10 px-3 font-semibold">
                 Ritmo até ontem
@@ -183,14 +201,18 @@ function PorLoja({ dados, compacto = false }: { dados: OrcamentoDeCompra; compac
               const v = l.vista as VistaCompleta;
               return (
                 <tr key={l.lojaId} className="border-t border-linha">
-                  <td className="h-11 whitespace-nowrap py-1 pl-3 pr-3 font-medium text-texto">{l.nome}</td>
+                  <td className="h-11 py-1 pl-3 pr-3">
+                    <span className="whitespace-nowrap font-medium text-texto">{l.nome}</span>
+                    {/* Sem número: o motivo vai UMA vez, aqui, e quebra linha (nunca alarga a tabela). */}
+                    {!v.conta && v.motivo && <span className="block max-w-[16rem] text-[12px] font-normal leading-snug text-suave">{v.motivo}</span>}
+                  </td>
                   <td className="px-3 py-1 text-right">
                     <CelulaDoSaldo v={v} />
                   </td>
                   <td className="whitespace-nowrap px-3 py-1 text-right">{jaComprado(v)}</td>
-                  <td className="whitespace-nowrap px-3 py-1 text-right">{v.conta ? formatarDinheiro(v.conta.tetoCentavos) : <span className="text-[12px] text-suave">{v.motivo ?? 'sem número'}</span>}</td>
+                  <td className="whitespace-nowrap px-3 py-1 text-right">{v.conta ? formatarDinheiro(v.conta.tetoCentavos) : <span className="text-[12px] text-suave">sem número</span>}</td>
                   <td className="whitespace-nowrap px-3 py-1 text-right">{v.previsao ? formatarDinheiro(v.previsao.previstaCentavos) : <span className="text-[12px] text-suave">sem número</span>}</td>
-                  <td className="whitespace-nowrap px-3 py-1">{v.ritmo ? <Farol f={v.ritmo} forma="linha" /> : <span className="text-[12px] text-suave">sem meta</span>}</td>
+                  <td className="px-3 py-1">{v.ritmo ? <Farol f={v.ritmo} forma="linha" /> : <span className="text-[12px] text-suave">sem meta</span>}</td>
                 </tr>
               );
             })}
@@ -226,6 +248,9 @@ function AConta({ v }: { v: VistaCompleta }) {
       {!c && !p && v.previstaCentavos !== null && (
         <p className="tabular-nums">Receita prevista {formatarDinheiro(v.previstaCentavos)} (a soma das lojas). Sem a meta do CMV não há teto.</p>
       )}
+      {!c && !p && v.previstaCentavos === null && (
+        <p>Sem a conta da rede: {v.motivo ?? 'falta dado'}. Ela aparece quando todas as lojas tiverem número; o ritmo abaixo já vale.</p>
+      )}
       {p && p.frasesDoZero.length > 0 && (
         <ul className="space-y-0.5">
           {p.frasesDoZero.map((f) => (
@@ -258,13 +283,15 @@ function Ritmo({ v, metaBp }: { v: VistaCompleta; metaBp: number | null }) {
 }
 
 function BlocoPrincipal({ titulo, v, dados, saidas, varias }: { titulo: string; v: VistaDoOrcamento; dados: OrcamentoDeCompra; saidas: Saidas; varias: boolean }) {
+  // Limite seguro: o subtítulo só quando há número (sem número, a frase do "aproximado" não explica nada).
+  const subtitulo = v.veReceita || saldoDe(v) === null ? undefined : SUBTITULO_DO_LIMITE;
   return (
-    <Painel titulo={titulo} subtitulo={v.veReceita ? undefined : SUBTITULO_RESUMIDO}>
+    <Painel titulo={titulo} subtitulo={subtitulo}>
       <div className={varias ? 'grid gap-5 xl:grid-cols-[minmax(0,240px)_minmax(0,1fr)]' : ''}>
         <div className="min-w-0 space-y-3">
           <NumeroGrande v={v} />
           <Alertas v={v} escopoDeVarias={varias} />
-          <SaidaDoMotivo motivo={v.motivo} saidas={saidas} />
+          <SaidaDoMotivo motivos={[v.motivo, ...dados.lojas.map((l) => l.vista.motivo)]} saidas={saidas} />
         </div>
         {varias && <PorLoja dados={dados} compacto />}
       </div>
@@ -334,8 +361,11 @@ export function TelaOrcamento({
           {principal.veReceita && <PainelDaConta v={principal} metaBp={dados.metaBp} />}
         </>
       ) : (
-        <Painel titulo={titulo} subtitulo={dados.lojas.every((l) => l.vista.veReceita) ? SUBTITULO_COMPLETO : SUBTITULO_RESUMIDO}>
-          <PorLoja dados={dados} />
+        <Painel titulo={titulo} subtitulo={dados.lojas.every((l) => l.vista.veReceita) ? SUBTITULO_COMPLETO : SUBTITULO_DO_LIMITE}>
+          <div className="space-y-3">
+            <PorLoja dados={dados} />
+            <SaidaDoMotivo motivos={dados.lojas.map((l) => l.vista.motivo)} saidas={saidas} />
+          </div>
         </Painel>
       )}
     </div>
@@ -347,7 +377,7 @@ export function TelaOrcamento({
 /** A frase do orçamento na nota: "Com esta nota, cabe R$ X" / "Com esta nota, passa R$ X". */
 export function OrcamentoNaPrevia({ o }: { o: OrcamentoNaNota }) {
   if (o.tipo === 'fora') {
-    return <p className="mt-1 text-sm text-suave">A data da nota não é do período em curso ({o.periodoNome}): o orçamento de compra é só dele.</p>;
+    return <p className="mt-1 text-sm text-suave">A data da nota não é do período em curso ({o.periodoNome}): o quanto ainda cabe vale só para ele.</p>;
   }
   if (o.tipo === 'sem') {
     return (
@@ -357,17 +387,33 @@ export function OrcamentoNaPrevia({ o }: { o: OrcamentoNaNota }) {
     );
   }
   const i = o.impacto;
+  const aviso = i.passa && <p className="text-[13px] text-suave">É um aviso: a nota pode ser lançada.{o.defineMetas ? '' : ' Vale combinar com quem define as metas.'}</p>;
+  if (i.arredondado) {
+    // Limite seguro (quem não vê o DRE): nunca "orçamento" nem "passou"; valores aproximados, sem centavos; tom de atenção.
+    return (
+      <div className="mt-1 space-y-1 text-sm">
+        <p className="tabular-nums text-suave">
+          {o.lojaNome} em {o.periodoNome}: antes desta nota, {fraseDoLimite(i.antesCentavos)}.
+        </p>
+        <p className={`tabular-nums font-semibold ${i.passa ? 'text-atencao' : 'text-texto'}`}>
+          {i.passa ? `Com esta nota, fica ${fraseDoLimite(i.depoisCentavos)}.` : `Com esta nota, ainda ${fraseDoLimite(i.depoisCentavos)}.`}
+        </p>
+        <p className="text-[12px] text-suave">Limite seguro: {SUBTITULO_DO_LIMITE.charAt(0).toLowerCase() + SUBTITULO_DO_LIMITE.slice(1)}</p>
+        {o.semNota && <p className="text-[13px] text-atencao">A loja vendeu no período e ainda não tem nota de compra: confira se falta lançar nota.</p>}
+        {aviso}
+      </div>
+    );
+  }
   return (
     <div className="mt-1 space-y-1 text-sm">
       <p className="tabular-nums text-suave">
-        {o.lojaNome} em {o.periodoNome}: antes desta nota, {fraseDoSaldo(i.antesCentavos)}
-        {i.arredondado ? ', pelo teto arredondado para baixo (sem a receita)' : ''}.
+        {o.lojaNome} em {o.periodoNome}: antes desta nota, {fraseDoSaldo(i.antesCentavos)}.
       </p>
       <p className={`tabular-nums font-semibold ${i.passa ? 'text-erro' : 'text-texto'}`}>
         {i.passa ? `Com esta nota, passa ${formatarDinheiro(-i.depoisCentavos)} do orçamento.` : `Com esta nota, ainda ${fraseDoSaldo(i.depoisCentavos)}.`}
       </p>
       {o.semNota && <p className="text-[13px] text-atencao">A loja vendeu no período e ainda não tem nota de compra: o “antes” é o teto inteiro.</p>}
-      {i.passa && <p className="text-[13px] text-suave">É um aviso: a nota pode ser lançada.{o.defineMetas ? '' : ' Vale combinar com quem define as metas.'}</p>}
+      {aviso}
     </div>
   );
 }
@@ -389,21 +435,30 @@ export function AvisoDoOrcamento({ o, href, agora = false }: { o: OrcamentoNaNot
   const quando = agora ? '' : 'Hoje, ';
   if (o.tipo === 'sem') {
     return (
-      <Aviso titulo={`${quando}o orçamento de compra de ${o.lojaNome} em ${o.periodoNome} está sem número.`}>
+      <Aviso titulo={`${quando}${o.lojaNome} em ${o.periodoNome}: ${o.arredondado ? 'limite seguro' : 'orçamento de compra'} sem número.`}>
         {o.motivo.charAt(0).toUpperCase() + o.motivo.slice(1)}.{link}
       </Aviso>
     );
   }
   const saldo = o.impacto.depoisCentavos;
-  const arredondado = o.impacto.arredondado ? ' (pelo teto arredondado para baixo)' : '';
+  if (o.impacto.arredondado) {
+    // Limite seguro: tom de atenção, nunca "passou do orçamento" (a conta exata pode ter folga).
+    const titulo = `${quando}${o.lojaNome} em ${o.periodoNome}: ${fraseDoLimite(saldo)}.`;
+    return (
+      <Aviso tom={saldo < 0 ? 'alerta' : 'neutro'} titulo={titulo}>
+        {SUBTITULO_DO_LIMITE}
+        {link}
+      </Aviso>
+    );
+  }
   if (saldo < 0) {
     return (
-      <Aviso tom="alerta" titulo={`${quando}${o.lojaNome} passou ${formatarDinheiro(-saldo)} do orçamento de compra de ${o.periodoNome}${arredondado}.`}>
+      <Aviso tom="alerta" titulo={`${quando}${o.lojaNome} passou ${formatarDinheiro(-saldo)} do orçamento de compra de ${o.periodoNome}.`}>
         {agora ? 'A nota está lançada: o orçamento avisa, não bloqueia.' : 'O orçamento avisa, não bloqueia.'}
         {link}
       </Aviso>
     );
   }
-  const titulo = `${agora ? 'O' : 'Hoje, o'} orçamento de compra de ${o.lojaNome} em ${o.periodoNome}: ${fraseDoSaldo(saldo)}${arredondado}.`;
+  const titulo = `${agora ? 'O' : 'Hoje, o'} orçamento de compra de ${o.lojaNome} em ${o.periodoNome}: ${fraseDoSaldo(saldo)}.`;
   return <Aviso titulo={titulo}>{link}</Aviso>;
 }

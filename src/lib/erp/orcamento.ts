@@ -28,6 +28,7 @@ import {
   inicioDaLeitura,
   orcamentoDaLoja,
   orcamentoDoEscopo,
+  fraseAcimaDoLimite,
   fraseDeQuemPassou,
   tetoArredondado,
   type ContaDoOrcamento,
@@ -129,7 +130,7 @@ function quemPassouNa(porLoja: readonly OrcamentoDaLoja[], veReceita: boolean): 
   const out: LojaQuePassou[] = [];
   for (const o of porLoja) {
     const saldo = veReceita ? o.conta?.saldoCentavos ?? null : saldoResumido(o);
-    if (saldo !== null && saldo < 0) out.push({ nome: o.nome, passouCentavos: -saldo, frase: fraseDeQuemPassou(o.nome, -saldo) });
+    if (saldo !== null && saldo < 0) out.push({ nome: o.nome, passouCentavos: -saldo, frase: veReceita ? fraseDeQuemPassou(o.nome, -saldo) : fraseAcimaDoLimite(o.nome, saldo) });
   }
   return out;
 }
@@ -229,7 +230,8 @@ export type OrcamentoNaNota =
       /** Quem lê define as metas (a frase "vale combinar com quem define as metas" não é para essa pessoa). */
       defineMetas: boolean;
     }
-  | { tipo: 'sem'; lojaNome: string; periodoNome: string; motivo: string }
+  /** `arredondado`: quem lê não vê a receita (a tela fala em "limite seguro", nunca em "orçamento"). */
+  | { tipo: 'sem'; lojaNome: string; periodoNome: string; motivo: string; arredondado: boolean }
   /** A data da nota não é do período em curso: o orçamento é só dele. */
   | { tipo: 'fora'; periodoNome: string };
 
@@ -248,7 +250,7 @@ export async function orcamentoNaNota(
   if (p.entradaEm < periodo.inicio || p.entradaEm > periodo.fim) return { tipo: 'fora', periodoNome: periodo.nome };
   const o = porLoja[0];
   if (!o) return null;
-  if (!o.conta) return { tipo: 'sem', lojaNome: o.nome, periodoNome: periodo.nome, motivo: o.motivo ?? 'sem número' };
+  if (!o.conta) return { tipo: 'sem', lojaNome: o.nome, periodoNome: periodo.nome, motivo: o.motivo ?? 'sem número', arredondado: !pode(alcance, 'dre.ver', { lojaId: p.lojaId }) };
   const veReceita = pode(alcance, 'dre.ver', { lojaId: p.lojaId });
   return {
     tipo: 'conta',

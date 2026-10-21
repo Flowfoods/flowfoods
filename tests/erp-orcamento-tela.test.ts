@@ -8,7 +8,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { AvisoDoOrcamento, OrcamentoNaPrevia, TelaOrcamento } from '@/components/erp/telas/compras/orcamento';
 import type { OrcamentoDeCompra, OrcamentoNaNota, VistaCompleta } from '@/lib/erp/orcamento';
-import { fraseDeQuemPassou } from '@/lib/erp/orcamento-campos';
+import { fraseAcimaDoLimite, fraseDeQuemPassou } from '@/lib/erp/orcamento-campos';
 
 vi.mock('next/navigation', () => ({ usePathname: () => '/erp/compras/orcamento' }));
 
@@ -34,11 +34,28 @@ describe('2.5 · a nota: aviso, nunca bloqueio', () => {
     expect(html(createElement(OrcamentoNaPrevia, { o: conta(i, { defineMetas: true }) }))).not.toContain('Vale combinar');
   });
 
-  it('a prévia do comprador diz que parte do teto arredondado para baixo; a que cabe não fala em aviso', () => {
-    const h = html(createElement(OrcamentoNaPrevia, { o: conta({ antesCentavos: 230_000, depoisCentavos: 220_000, passa: false, arredondado: true }) }));
-    expect(h).toContain('pelo teto arredondado para baixo (sem a receita)');
-    expect(h).toContain('Com esta nota, ainda cabe R$ 2.200,00.');
+  it('a prévia do comprador fala em limite seguro, aproximado e sem centavos; a que cabe não fala em aviso; nunca "orçamento", "passou" nem "teto"', () => {
+    const h = html(createElement(OrcamentoNaPrevia, { o: conta({ antesCentavos: 1_376_544, depoisCentavos: 1_226_544, passa: false, arredondado: true }) }));
+    expect(h).toContain('antes desta nota, cabe R$ 13.700,00 no limite seguro.');
+    expect(h).toContain('Com esta nota, ainda cabe R$ 12.200,00 no limite seguro.');
+    expect(h).toContain('Limite seguro: valor aproximado, sempre para menos');
     expect(h).not.toContain('aviso');
+    const acima = html(createElement(OrcamentoNaPrevia, { o: conta({ antesCentavos: 30_000, depoisCentavos: -120_000, passa: true, arredondado: true }) }));
+    expect(acima).toContain('Com esta nota, fica acima do limite seguro em R$ 1.200,00.');
+    expect(acima).toContain('text-atencao');
+    expect(acima).not.toContain('text-erro');
+    for (const p of [h, acima]) expect(p).not.toMatch(/orçamento|passou|passa |teto/);
+  });
+
+  it('o detalhe para quem não vê a receita: limite seguro, tom de atenção, "Hoje," numa nota antiga; "sem" começa com o nome da loja (maiúscula)', () => {
+    const o = conta({ antesCentavos: -30_000, depoisCentavos: -30_000, passa: true, arredondado: true });
+    const d = html(createElement(AvisoDoOrcamento, { o }));
+    expect(d).toContain('Hoje, Vila da Penha em Outubro de 2026: acima do limite seguro em R$ 300,00.');
+    expect(d).toContain('bg-atencao');
+    expect(d).not.toMatch(/orçamento de compra|passou/);
+    const sem = html(createElement(AvisoDoOrcamento, { o: { tipo: 'sem', lojaNome: 'Centro', periodoNome: 'Outubro de 2026', motivo: 'falta a meta do CMV', arredondado: false } }));
+    expect(sem).toContain('Hoje, Centro em Outubro de 2026: orçamento de compra sem número.');
+    expect(sem).toContain('Falta a meta do CMV.');
   });
 
   it('loja sem nota no período: a prévia diz que o "antes" é o teto inteiro', () => {
@@ -46,9 +63,9 @@ describe('2.5 · a nota: aviso, nunca bloqueio', () => {
   });
 
   it('sem número e fora do período dizem o motivo, nunca R$ 0,00', () => {
-    expect(html(createElement(OrcamentoNaPrevia, { o: { tipo: 'sem', lojaNome: 'Centro', periodoNome: 'Outubro de 2026', motivo: 'falta a meta do CMV' } }))).toContain('Centro em Outubro de 2026: sem número (falta a meta do CMV).');
+    expect(html(createElement(OrcamentoNaPrevia, { o: { tipo: 'sem', lojaNome: 'Centro', periodoNome: 'Outubro de 2026', motivo: 'falta a meta do CMV', arredondado: true } }))).toContain('Centro em Outubro de 2026: sem número (falta a meta do CMV).');
     const fora = html(createElement(OrcamentoNaPrevia, { o: { tipo: 'fora', periodoNome: 'Outubro de 2026' } }));
-    expect(fora).toContain('o orçamento de compra é só dele');
+    expect(fora).toContain('o quanto ainda cabe vale só para ele');
     expect(fora).not.toContain('R$ 0,00');
   });
 
@@ -67,12 +84,13 @@ describe('2.5 · a nota: aviso, nunca bloqueio', () => {
 
 describe('2.5 · a tela', () => {
   const quemPassou = [{ nome: 'Delivery', passouCentavos: 100_000, frase: fraseDeQuemPassou('Delivery', 100_000) }];
+  const acimaDoLimite = [{ nome: 'Delivery', passouCentavos: 100_000, frase: fraseAcimaDoLimite('Delivery', -100_000) }];
   const resumida: OrcamentoDeCompra = {
     periodo: PERIODO,
     hoje: '2026-10-21',
     dia: { dia: 21, de: 31 },
     metaBp: null,
-    rede: { veReceita: false, saldoCentavos: 640_000, motivo: null, diasSemLancamento: 1, semNota: [], quemPassou },
+    rede: { veReceita: false, saldoCentavos: 640_044, motivo: null, diasSemLancamento: 1, semNota: [], quemPassou: acimaDoLimite },
     lojas: [
       { lojaId: 'vp', nome: 'Vila da Penha', vista: { veReceita: false, saldoCentavos: 740_000, motivo: null, diasSemLancamento: 1, semNota: [], quemPassou: [] } },
       { lojaId: 'dl', nome: 'Delivery', vista: { veReceita: false, saldoCentavos: -100_000, motivo: null, diasSemLancamento: 0, semNota: [], quemPassou: [] } },
@@ -83,13 +101,17 @@ describe('2.5 · a tela', () => {
   it('quem não vê a receita: o "cabe", o "passou", quem passou abaixo do número, o motivo; nenhuma palavra da conta nem rodapé repetido', () => {
     const h = html(createElement(TelaOrcamento, { dados: resumida, contexto: 'Rede Completa', bloqueio: null, lancarHref: '/erp/compras/nova', faturamentoHref: '/erp/faturamento/lancar' }));
     expect(h).toContain('Rede Completa · Outubro de 2026 · dia 21 de 31');
-    expect(h).toContain('R$ 6.400,00');
-    expect(h).toContain('Pelo teto arredondado para baixo, sem a receita');
-    expect(h).toContain('Delivery já passou R$ 1.000,00: a sobra de outra loja não cobre');
-    expect(h).toContain('passou R$ 1.000,00');
+    expect(h).toContain('R$ 6.400,00'); // R$ 6.400,44 aparece sem os centavos que parecem exatos
+    expect(h).not.toContain('6.400,44');
+    expect(h).toContain('Valor aproximado, sempre para menos: a conta exata pode ter mais folga e fica com quem vê o DRE.');
+    expect(h).toContain('cabe no limite seguro');
+    expect(h).toContain('Delivery está acima do limite seguro em R$ 1.000,00');
+    expect(h).toContain('acima em R$ 1.000,00');
+    expect(h).not.toMatch(/passou|teto|já passou/);
     expect(h).toContain('sem faturamento lançado nas últimas 4 semanas');
     expect(h).toContain('1 dia sem lançamento completo de faturamento');
-    expect(h.match(/arredondado/g)).toHaveLength(1); // dito uma vez, no subtítulo
+    expect(h.match(/Valor aproximado/g)).toHaveLength(1); // dito uma vez, no subtítulo
+    expect(h).toContain('Lançar o faturamento'); // a loja sem faturamento leva ao lançamento (quem lança)
     for (const p of ['Receita prevista', 'Meta do CMV', 'Teto', 'Já comprado', 'Ritmo', 'R$ 0,00', 'É um aviso, não um bloqueio: a nota que passa']) expect(h, p).not.toContain(p);
     expect(h).not.toContain('<table'); // lista, não uma tabela de 2 colunas esticada
     expect(h.match(/<h1/g)).toHaveLength(1);
@@ -132,6 +154,7 @@ describe('2.5 · a tela', () => {
     expect(h).toContain('O farol olha o ritmo das compras até ontem; o número de cima olha o período inteiro.');
     expect(h).toContain('<table');
     expect(h).toContain('h-11');
+    expect(h).toContain('title="Receita prevista"');
     expect(h).not.toContain('ainda cabe no período</span></td>');
     // sem meta, a previsão aparece para quem vê a receita
     const semMeta = html(
@@ -147,5 +170,36 @@ describe('2.5 · a tela', () => {
     // a rede sem meta também mostra a receita prevista (soma das lojas)
     const redeSemMeta = html(createElement(TelaOrcamento, { dados: { ...dados, metaBp: null, rede: vista({ conta: null, motivo: 'falta a meta do CMV', ritmo: null, previsao: null, previstaCentavos: 6_150_000 }) }, contexto: 'Rede Completa', bloqueio: null }));
     expect(redeSemMeta).toContain('Receita prevista R$ 61.500,00 (a soma das lojas). Sem a meta do CMV não há teto.');
+  });
+
+  it('comprador sem meta (sem número): nada de "Valor aproximado" em cima de "Sem número" (M8)', () => {
+    const semNumero: OrcamentoDeCompra = { ...resumida, rede: { veReceita: false, saldoCentavos: null, motivo: 'falta a meta do CMV', diasSemLancamento: 0, semNota: [], quemPassou: [] } };
+    const h = html(createElement(TelaOrcamento, { dados: semNumero, contexto: 'Rede Completa', bloqueio: null }));
+    expect(h).toContain('Sem número');
+    expect(h).not.toContain('Valor aproximado');
+  });
+
+  it('loja sem número na tabela: a célula diz "sem número" e o motivo vai uma vez, sob o nome, sem nowrap (B2: sem rolagem lateral)', () => {
+    const v = (p: Partial<VistaCompleta>): VistaCompleta => ({ veReceita: true, conta: null, motivo: null, previsao: null, previstaCentavos: null, ritmo: null, cmvAteOntemBp: null, compradoCentavos: 0, compradoAteOntemCentavos: 0, receitaAteOntemCentavos: null, diasSemLancamento: 0, semNota: [], quemPassou: [], ...p });
+    const motivo = 'sem faturamento lançado nas últimas 4 semanas';
+    const dados: OrcamentoDeCompra = {
+      periodo: PERIODO,
+      hoje: '2026-10-21',
+      dia: { dia: 21, de: 31 },
+      metaBp: 3000,
+      rede: v({ motivo: 'sem o orçamento de Delivery', ritmo: { tipo: 'sem', motivo: 'faltam lançamentos de faturamento', desvioTexto: null } }),
+      lojas: [
+        { lojaId: 'vp', nome: 'Vila da Penha', vista: v({ conta: { previstaCentavos: 1, metaBp: 3000, tetoCentavos: 1, compradoCentavos: 0, saldoCentavos: 1 } }) },
+        { lojaId: 'dl', nome: 'Delivery', vista: v({ motivo, ritmo: { tipo: 'sem', motivo: 'faltam lançamentos de faturamento', desvioTexto: null } }) },
+      ],
+    };
+    const h = html(createElement(TelaOrcamento, { dados, contexto: 'Rede Completa', bloqueio: null, faturamentoHref: '/erp/faturamento/lancar' }));
+    const tabela = h.slice(h.indexOf('<table'), h.indexOf('</table>'));
+    expect(tabela.split(motivo)).toHaveLength(2); // uma vez só, na tabela
+    expect(tabela).toMatch(/<span class="block max-w-\[16rem\][^"]*">sem faturamento lançado/);
+    expect(tabela).not.toMatch(/whitespace-nowrap[^>]*>\s*(<[^>]+>)*sem cor/);
+    expect(h).toContain('Lançar o faturamento');
+    // M6: a rede sem número não deixa espaço em branco na conta
+    expect(h).toContain('Sem a conta da rede: sem o orçamento de Delivery.');
   });
 });

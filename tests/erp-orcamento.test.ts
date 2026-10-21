@@ -7,8 +7,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  aproximado,
   AVISO_SEM_NOTA,
   degrauDoTeto,
+  fraseAcimaDoLimite,
+  fraseDoLimite,
   fraseDeQuemPassou,
   MINIMO_DE_DIAS_COMPLETOS,
   MOTIVO_SEM_META,
@@ -101,7 +104,19 @@ describe('a receita prevista (por dia da semana, nas últimas 4 semanas)', () =>
     expect(r.previsao.realizadoCentavos).toBe(R(17_000));
     // 9 dias de semana a projetar (R$ 1.000,00 cada) e os 5 sábados como zero.
     expect(r.previsao.previstaCentavos).toBe(R(26_000));
-    expect(r.previsao.frasesDoZero).toEqual(['sábado sem venda lançada nas últimas 4 semanas: conta como zero']);
+    expect(r.previsao.frasesDoZero).toEqual(['sábado sem dia completo nas últimas 4 semanas: conta só o que já foi lançado']);
+  });
+
+  it('dia incompleto num dia da semana sem nenhuma amostra completa vale o que foi lançado (piso), não zero (revisão do Guardião)', () => {
+    // Todo sábado só o salão é lançado (o iFood nunca): nenhum sábado completo nas 4 semanas. Os 3 sábados até ontem têm R$ 2.100,00 lançados.
+    const g = graos('2026-09-01', '2026-10-20', { LOJA: 700, IFOOD: 300 }).filter((x) => !(sabado(x.data) && x.canal === 'IFOOD'));
+    const r = preverReceita(loja({ canais: ['LOJA', 'IFOOD'], graos: g }), OUTUBRO, HOJE);
+    if (!r.ok) throw new Error(r.motivo);
+    expect(r.previsao.diasSemLancamento).toBe(3);
+    expect(r.previsao.realizadoCentavos).toBe(R(17_000));
+    // 9 dias de semana a projetar (R$ 9.000,00) + o piso dos 3 sábados lançados em parte (R$ 6.300,00); os 2 sábados que faltam, zero.
+    expect(r.previsao.projetadoCentavos).toBe(R(15_300));
+    expect(r.previsao.frasesDoZero).toEqual(['sábado sem dia completo nas últimas 4 semanas: conta só o que já foi lançado']);
   });
 
   it('loja que abriu no meio do período (05/10): os dias antes do 1º lançamento não existem (decisão 214)', () => {
@@ -263,6 +278,18 @@ describe('quem não vê a receita: o TETO arredondado para baixo, por faixa (dec
     expect(fraseDoSaldo(R(2_300)).replace(/\u00a0/g, ' ')).toBe('cabe R$ 2.300,00');
     expect(fraseDoSaldo(-R(700)).replace(/\u00a0/g, ' ')).toBe('passou R$ 700,00');
     expect(fraseDeQuemPassou('Delivery', R(1_716)).replace(/\u00a0/g, ' ')).toBe('Delivery já passou R$ 1.716,00: a sobra de outra loja não cobre');
+  });
+
+  it('limite seguro: o que a tela mostra a quem não vê o DRE vai em degraus de R$ 100 para menos folga, sem "orçamento" nem "passou"', () => {
+    const t = (x: string) => x.replace(/\u00a0/g, ' ');
+    expect(aproximado(R(13_765.44))).toBe(R(13_700));
+    expect(aproximado(-R(300))).toBe(-R(300));
+    expect(aproximado(-R(250.01))).toBe(-R(300));
+    expect(t(fraseDoLimite(R(13_765.44)))).toBe('cabe R$ 13.700,00 no limite seguro');
+    expect(t(fraseDoLimite(R(50)))).toBe('cabe menos de R$ 100,00 no limite seguro');
+    expect(t(fraseDoLimite(-R(250.01)))).toBe('acima do limite seguro em R$ 300,00');
+    expect(t(fraseAcimaDoLimite('Vila da Penha', -R(300)))).toBe('Vila da Penha está acima do limite seguro em R$ 300,00');
+    for (const f of [fraseDoLimite(-1), fraseDoLimite(1), fraseAcimaDoLimite('X', -1)]) expect(f).not.toMatch(/orçamento|passou|teto/);
   });
 
   it('o ataque do Guardião não acha nada: compras e prévias de edição só deslocam um número que já não tem o centavo do teto', () => {

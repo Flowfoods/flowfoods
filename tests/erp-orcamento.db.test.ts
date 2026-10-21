@@ -289,7 +289,9 @@ describe.skipIf(!URL_TESTE)('ERP 2.5 · orçamento de compra (Postgres real)', {
       como(COMPRADOR());
       const h = await html();
       expect(h).toContain('R$ 6.000,00');
-      expect(h).toContain('Pelo teto arredondado para baixo');
+      expect(h).toContain('Valor aproximado, sempre para menos');
+      expect(h).toContain('cabe no limite seguro');
+      for (const p of ['orçamento de compra de', 'passou do orçamento', 'teto']) expect(h, p).not.toContain(p);
       for (const proibido of ['Receita prevista', 'R$ 41.000,00', 'R$ 61.500,00', 'R$ 18.450,00', 'R$ 12.300,00', 'Meta do CMV', '30,0 %', 'Ritmo', 'Já comprado', 'Teto']) expect(h, proibido).not.toContain(proibido);
     });
 
@@ -418,6 +420,8 @@ describe.skipIf(!URL_TESTE)('ERP 2.5 · orçamento de compra (Postgres real)', {
       expect(d.rede!.quemPassou.map((q) => [q.nome, q.passouCentavos])).toEqual([['Vila da Penha', R(700)]]);
       const c = (await orc(COMPRADOR()))!;
       expect(c.rede!.quemPassou.map((q) => [q.nome, q.passouCentavos])).toEqual([['Vila da Penha', R(1_000)]]);
+      // Para o comprador, a frase é do limite seguro (a conta exata pode ter folga): nunca "já passou".
+      expect(c.rede!.quemPassou[0].frase.replace(/\u00a0/g, ' ')).toBe('Vila da Penha está acima do limite seguro em R$ 1.000,00');
     });
   });
 

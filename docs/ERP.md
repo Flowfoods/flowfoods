@@ -1852,7 +1852,7 @@ Permissões: o catálogo não ganhou nada (ver = `compras.ver` ou `compras.lanca
    nota de outro período não). Só o período em curso (a regra do período de `periodos.ts`: mensal, quinzenal ou semanal). Loja desativada fica fora.
 2. **A receita prevista** (209), por loja: o vendido nos dias do período com faturamento completo (cada canal que a loja vende lançado, "Não vendeu" conta) + cada dia
    que falta (hoje até o fim) e cada dia sem lançamento completo pela média do mesmo dia da semana nas últimas 4 semanas completas da loja. Dia antes do primeiro
-   lançamento da loja não existe; dia da semana sem amostra nas 4 semanas conta zero, com a frase ("segunda sem venda lançada nas últimas 4 semanas: conta como zero";
+   lançamento da loja não existe; dia da semana sem nenhum dia completo nas 4 semanas conta só o que já foi lançado nele (zero nos dias que faltam), com a frase ("sábado sem dia completo nas últimas 4 semanas: conta só o que já foi lançado";
    decisão 214). Menos de 14 dias completos na janela = sem número ("poucos dias com faturamento completo nas últimas 4 semanas: 9 de 14 necessários").
    Sem meta do CMV = sem número ("falta a meta do CMV", com o link para Plano e metas a quem define metas). Nunca R$ 0,00 para dado ausente. É a única tela que
    projeta (o DRE segue até ontem, decisão 145); a conta por dia da semana acerta o mês de 5 sábados (R$ 41.000,00 contra R$ 40.300,00 da linear, no teste).
@@ -1880,14 +1880,25 @@ Alteradas, com `ajuda.lock.json` regravado (53 entradas): `compra-nova` v3 para 
 | Achado | O que mudou | Decisão |
 |---|---|---|
 | Guardião B1 (veto): o "cabe" arredondado a R$ 100 vazava o centavo (15 prévias de edição → faixa de R$ 8,29; 14 notas lançadas e canceladas → centavo exato) | arredonda-se o TETO para baixo em degraus por faixa (R$ 500 abaixo de R$ 10.000; R$ 1.000 até R$ 50.000; R$ 5.000 daí para cima); "cabe" = teto arredondado − já comprado; a prévia e o detalhe partem dele; rede = soma dos tetos arredondados (bate com o "Por loja", achado M6). Os dois ataques refeitos no banco devolvem sempre R$ 12.000,00 para um teto real de R$ 12.300,00 | 213 |
-| Guardião I2: "não a realizada" e ±R$ 333 estavam errados | hipótese reescrita: erro de até ~±8 % na receita com meta de 30 %, e no fim do período a prevista é quase a realizada; alternativa "só status, sem número" para o Rodolfo | 210, 213 |
+| Guardião I2: "não a realizada" e ±R$ 333 estavam errados | hipótese reescrita: com meta de 30 %, quem vê só o limite seguro sabe a receita prevista com erro de ±1 % a ±5 % (teto a partir de R$ 6 mil; ±1,4 % numa loja de R$ 120 mil por mês), e no fim do período a prevista é quase a realizada; alternativa "só status, sem número" para o Rodolfo | 210, 213 |
 | Guardião I3: loja que abriu no meio do período ganhava receita dos dias em que não existia | dia antes do 1º lançamento fica fora do vendido, da projeção e dos "sem lançamento" (loja de 05/10: 4 dias fora, R$ 35.000,00) | 214 |
 | Guardião I4: loja que vendeu sem nota mostrava "já comprado R$ 0,00" e "cabe o teto inteiro" sem aviso | "sem nota de compra" no lugar de R$ 0,00 e o aviso, também para o comprador e na rede; a prévia da 1ª nota avisa | 215 |
-| Guardião M5: dia da semana sem amostra entrava pela média geral | conta ZERO, com a frase ("segunda sem venda lançada nas últimas 4 semanas: conta como zero") | 214 |
+| Guardião M5: dia da semana sem amostra entrava pela média geral | conta ZERO, com a frase (na rodada extra: o dia lançado em parte vale o que foi lançado, e a frase é "sem dia completo nas últimas 4 semanas") | 214, 217 |
 | UX B1: a sobra de uma loja escondia a que passou | abaixo do número da rede, em `erro`: "<Loja> já passou R$ X: a sobra de outra loja não cobre"; número e "Por loja" no mesmo painel (lado a lado a partir de 1280 px) e a caixa recolhida: em 1440 × 900, com a caixa ABERTA (1ª visita), a última loja termina em 886 px (dona) e 858 px (comprador) | 216 |
 | UX I2 a I6, M7 a M13 | nome em linha própria no celular e "arredondado" dito uma vez (subtítulo); tabela Corporativo de uma linha (44 px) e lista para quem não vê a receita; o orçamento logo abaixo de "Itens + frete = …" na prévia; a linha que explica o farol × o número; "Ver o orçamento" e "Definir a meta" com 48 px no toque; espaço que não quebra em "pp" e "%" (`dre-campos.ts`, o DRE inteiro); "= passou R$ X"; sem o rodapé repetido; "Vale combinar…" só para quem não define metas; "Hoje, …" no detalhe de nota antiga; sem meta, a receita prevista (também da rede) e o link para Plano e metas; sem faturamento, "Lançar o faturamento" | 216 |
 
 Ajuda: `compras-orcamento` v1 → v2 (recolhida; a sobra que não cobre; o teto arredondado; os dias fora e o zero); lock regravado (53 entradas).
+
+### Rodada extra de correção (21/10/2026): "limite seguro" para quem não vê o DRE, sem rolagem lateral
+
+| Achado | O que mudou | Decisão |
+|---|---|---|
+| UX B1: o teto arredondado fazia a tela do comprador afirmar estouro que não existe, e ele lia "teto" sem definição | para quem não vê o DRE o número é o LIMITE SEGURO: "cabe R$ X no limite seguro" / "acima do limite seguro em R$ X", tom de atenção, subtítulo "Valor aproximado, sempre para menos: a conta exata pode ter mais folga e fica com quem vê o DRE."; o mesmo na prévia, no detalhe e na linha da rede ("<Loja> está acima do limite seguro em R$ X"); valores exibidos em degraus de R$ 100 para menos folga (sem centavos); "orçamento", "passou" e "teto" não aparecem para essa pessoa | 217 |
+| UX B2: rolagem lateral com uma loja sem número | célula "sem número", o motivo uma vez sob o nome (12 px, quebra linha), farol sem `whitespace-nowrap` | 217 |
+| UX I3, M4 a M8 | a prévia vem para a vista depois de "Conferir o impacto" (respeita `prefers-reduced-motion`); "sem número" no detalhe começa pelo nome da loja; na rede, o link "Lançar o faturamento" segue quando a loja sem número é por falta de faturamento; "Como a conta chega aqui" diz por quê, sem espaço em branco; "Prevista" no cabeçalho (nome inteiro no `title` e para o leitor de tela); sem número, sem o subtítulo do "aproximado" | 217 |
+| Guardião (textos e menor) | o erro da receita para quem vê o limite seguro é ±1 % a ±5 % (não ~±8 %); o risco "quem vê faturamento descobre a meta em ~14 dias" foi aceito pelo Maestro; dia incompleto num dia da semana sem amostra vale o lançado (piso) | 213, 217 |
+
+Ajuda: `compras-orcamento` v2 → v3 (o limite seguro em uma frase; o piso do dia sem amostra); lock regravado.
 
 ## Provar o orçamento de compra (2.5)
 
@@ -2782,13 +2793,15 @@ banco de teste: o operador é recusado pelo servidor.
   Qualquer lugar novo que fale de "quanto cabe" (lista de compras da semana, sugestão de pedido, alerta) parte deles, nunca refaz a conta.
 - **A soma das compras é UMA**: `comprasPorLoja` (`cmv.ts`), a mesma do CMV de compra. Mudar o que conta como compra (bonificação, desconto, tipo "limpeza" fora do
   CMV) muda o DRE e o orçamento juntos.
-- **A vista é montada no servidor**: quem não tem `dre.ver` na loja recebe `VistaResumida` (só o "cabe" pelo teto arredondado, o motivo e os avisos). Arredonda-se o
+- **A vista é montada no servidor**: quem não tem `dre.ver` na loja recebe `VistaResumida` (só o "cabe" pelo teto arredondado, o motivo e os avisos), e a tela
+  fala com ela em "limite seguro" (nunca "orçamento", "passou" ou "teto"; valores em degraus de R$ 100; tom de atenção; decisão 217). Arredonda-se o
   TETO, nunca o saldo (decisão 213): qualquer número novo para quem não vê a receita parte de `tetoArredondado`, ou um comprador acha o centavo comparando notas. Campo novo no orçamento que dependa
   da receita entra só na `VistaCompleta`; o teste de banco confere o JSON inteiro do comprador.
 - **A previsão é hipótese** (decisão 209): média por dia da semana nas últimas 4 semanas, mínimo de 14 dias completos. Se o Rodolfo quiser o dia de pagamento ou a
   sazonalidade, a mudança é só em `preverReceita` (pura, com teste).
 - **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) o comprador vê o "cabe" em R$, pelo teto arredondado para baixo em degraus por faixa; quem souber a
-  meta do CMV estima a receita prevista com erro de até ~±8 % (com meta de 30 %), e no fim do período a prevista é quase a realizada. Serve, ou o comprador do
+  meta do CMV sabe a receita prevista com erro de ±1 % a ±5 % com meta de 30 % (teto a partir de R$ 6 mil; ±1,4 % numa loja de R$ 120 mil por mês), e no fim
+  do período a prevista é quase a realizada. Risco aceito (Maestro): quem vê faturamento sem ver o DRE descobre a meta do CMV em ~14 dias. Serve, ou o comprador do
   Valentin's deve ver só "cabe com folga / cabe pouco / passou", sem número? (2) A meta do CMV é uma só para todas as lojas;
   salão e 100 % delivery têm CMV diferente: vale meta por loja (aditiva em `DreMeta`)? (3) 4 semanas e 14 dias: é a régua certa? (4) O frete entra no "já comprado"
   (igual ao CMV de compra). (5) A loja nova sem 14 dias de faturamento deixa a rede sem número até completar; prefere a rede somar só as lojas com número, dizendo
