@@ -73,9 +73,7 @@ export function FormListaDoDia({
   return (
     <div className="space-y-4">
       <form action={enviar} className="space-y-3" aria-label="Pré-preparos em aberto">
-        <input type="hidden" name="dia" value={dia} />
-        <input type="hidden" name="versao" value={versao ?? ''} />
-        {/* Sem <legend> (o nome vem do formulário): a legenda invisível ganhava a margem e abria um vão no topo do painel. */}
+        {/* Sem <legend> e com os campos ocultos no FIM: no começo, o `space-y` dava margem ao primeiro bloco visível (vão no topo do painel). */}
         <fieldset disabled={!!bloqueio} className="space-y-3">
           <ol className="space-y-3">
             {linhas.map((l, n) => {
@@ -156,12 +154,12 @@ export function FormListaDoDia({
             Salvar a lista
           </BotaoEnviar>
         </div>
+        <input type="hidden" name="dia" value={dia} />
+        <input type="hidden" name="versao" value={versao ?? ''} />
       </form>
 
       {(salvas > 0 || emLote === 0) && (
         <form action={enviarGerar} className="space-y-2 rounded-[10px] border border-linha p-3" aria-label="Gerar os lotes">
-          <input type="hidden" name="dia" value={dia} />
-          <input type="hidden" name="versao" value={versao ?? ''} />
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-[13px] text-suave">
               {salvas === 0
@@ -178,6 +176,8 @@ export function FormListaDoDia({
               {estadoGerar.erros.geral}
             </p>
           )}
+          <input type="hidden" name="dia" value={dia} />
+          <input type="hidden" name="versao" value={versao ?? ''} />
         </form>
       )}
     </div>
