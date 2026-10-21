@@ -16,6 +16,9 @@ type Qual = 'requisicoes' | 'divergencias' | 'contagens' | 'producao' | 'lista' 
 
 const DA_PRODUCAO = new Set<Qual>(['producao', 'lista', 'tarefas', 'historico', 'indicadores']);
 
+/** O subtítulo começa com maiúscula também quando não há contexto (polimento da 3.3). */
+const primeiraMaiuscula = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
+
 const TITULO: Record<Qual, string> = {
   requisicoes: 'Requisições por loja',
   divergencias: 'Divergências por loja',
@@ -57,7 +60,7 @@ export function TelaLojasDoEstoque({
 }) {
   return (
     <div className="space-y-6">
-      <PageHeader icone={DA_PRODUCAO.has(qual) ? 'producao' : 'estoque'} cor={DA_PRODUCAO.has(qual) ? COR.producao : COR.estoque} titulo={destino === 'nova' ? 'Nova produção: em qual loja?' : TITULO[qual]} subtitulo={[contexto, APOIO[qual]].filter(Boolean).join(' · ')} />
+      <PageHeader icone={DA_PRODUCAO.has(qual) ? 'producao' : 'estoque'} cor={DA_PRODUCAO.has(qual) ? COR.producao : COR.estoque} titulo={destino === 'nova' ? 'Nova produção: em qual loja?' : TITULO[qual]} subtitulo={primeiraMaiuscula([contexto, APOIO[qual]].filter(Boolean).join(' · '))} />
       <Painel semRespiro>
         {lojas.length === 0 ? (
           <Vazio titulo="Nenhuma loja no seu acesso.">Peça a quem cuida da equipe para incluir as lojas em que você trabalha.</Vazio>

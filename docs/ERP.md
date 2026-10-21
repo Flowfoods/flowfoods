@@ -2331,6 +2331,43 @@ manda o custo (teste de telas). (4) Na revisão das telas saíram quatro acertos
 outro no cartão, "Trocar de pessoa" alinhado no celular, e o formulário de passar/soltar que fecha depois de gravar (antes, o lote
 passado ficava no mesmo lugar com o formulário aberto e um segundo toque passaria de novo).
 
+## Polimento da 3.3 (depois da aprovação dos fiscais)
+
+Rodada curta, sem mexer no que foi aprovado (concorrência, travas, permissões, isolamento). Sem migration. Decisões 241 e 242;
+ajuste na 237. Ajuda: `producao-indicadores-loja` v1 → v2 ("Cancelou" e a FlowFoods fora das pessoas); `producao-concluir`
+ganhou a rota nova (lock regravado, 61 entradas).
+
+| Item | O que mudou |
+|---|---|
+| Nível 1 como pessoa (Guardião M1) | O lote que o nível 1 concluiu na 3.1 tem o login dele gravado. Na LEITURA, quem não tem vínculo com o parceiro (`idsDaEquipe`, credenciais) é a FlowFoods: fora dos indicadores (nota "concluído pela FlowFoods"), do filtro de pessoa e do "quem fez" do histórico ("FlowFoods · concluiu: Rodolfo"). A linha não muda. |
+| Cancelados (UX) | "Cancelou" conta só o que a própria pessoa cancelou; os da gerência ficam à parte e não contam para ela. No histórico, o cancelado diz "estava com X" e "cancelou: Gil Gerente (gerência)". |
+| Recebeu × pegou (UX) | O lote que a gerência passou diz "recebeu 18:14 (passado por Gil Gerente)" no cartão das Tarefas, no quadro, no lote e no histórico (`passadosPor`, do histórico do lote). |
+| Passar relê o acesso (Guardião M2) | `passarProducao` chama `aindaPode` DENTRO da gravação, com o lote travado: a pessoa escolhida tem de continuar ativa, da loja e com "registrar produção" (`aindaProduzNaLoja`). Senão, recusa em "Para quem" e nada é gravado. |
+| "Manter" depois do erro | Fecha o formulário de soltar e de passar; o erro dispensado não volta ao reabrir. |
+| Abas no celular | Componente comum: a aba atual vem para a vista dentro do trilho (só o trilho rola, sem animação). Vale para o ERP todo. |
+| Indicadores no celular | Abaixo de 640 px, o valor embaixo do rótulo; "Ver os lotes" sem quebrar. |
+| Perdeu a corrida | O "Pegar" some do cartão; ficam a frase de quem pegou e "Ver de novo". |
+| Textos | Subtítulo da escolha de loja com maiúscula; aviso de estoque não aberto (e de período fechado) uma vez só, no alto; o Concluir das Tarefas em `/producao/tarefas/<loja>/<lote>/concluir`, com a aba Tarefas marcada (o endereço antigo continua). |
+| "Ver o estoque" (3.1) | Folga de toque: 48 px no tablet. |
+| Fica para o Rodolfo | O operador vê R$ no Histórico e no Concluir porque tem `insumos.ver`; na Lista do dia a 3.2 escondeu. Nada mudou: pendência na Herança da 3.3. |
+
+**Provas** (código de `52ecd91`; build com o `BUILD_ID` gerado às 21:51:38, depois do commit das 21:50:30). Testes novos ou
+mexidos: `tests/erp-producao-equipe-polimento.test.ts` (5, sem banco: "recebeu", quem cancelou, "Manter" com erro, perder a
+corrida, a rolagem da aba); `tests/erp-producao-equipe.db.test.ts` (+2: o lote legado montado como a 3.1 gravava, com o gatilho
+desligado só na transação, fora das pessoas, do filtro e dos indicadores; a releitura do passar provada SOB a trava — outra
+conexão tenta travar o lote com NOWAIT e não consegue — e "recebeu" nas tarefas, no lote e no quadro); telas (+1 e asserções
+novas) e navegação (a rota nova acende Tarefas). Mutantes: tirar o filtro da equipe e reler antes da transação derrubam os
+testes. tsc, lint e portão de conteúdo limpos. Suíte inteira com banco, como superusuário: 94 arquivos e 1871 testes passando. Como dono com FORCE RLS (`ff_dono_32`, 9 arquivos): 157 de 158 (a
+falha é a conhecida do `_prisma_migrations`); sem RLS (`ff_semrls_32`, 7 arquivos): 110 passando e 1 pulado. O teste do lote
+legado desliga o FORCE e o gatilho só na transação dele, como a limpeza (sem isso, com a RLS forçada, o UPDATE do dono não
+achava a linha). Na tela, banco `ff_33`
+recriado da base com `.local-scripts/legado33p.ts` (um lote de ontem concluído pelo nível 1 com o login gravado, fora do git):
+a jornada da 3.3 (`prova33/jornada.mjs`, 41 conferências) e a do polimento (`prova33p/jornada-p.mjs`, 25 conferências), 0
+falha. Matriz das telas mexidas (Tarefas e a escolha, Histórico, Indicadores, lote em produção, lote solto, lote concluído,
+quadro, Concluir pelas Tarefas, Delivery) × gerente, cozinha (Duda) e dona × 390 e 1180 com toque e 1440 × claro e escuro:
+108 telas, zero rolagem lateral e zero violação do axe; alvos abaixo de 32 px só no shell. Console: só o 404 do `favicon.ico`
+e o prefetch do Next abortado. Prints em `pw/prova33p/jornada/` (8) e `pw/prova33p/matriz-{gerente,cozinha,dona}/`.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -3208,12 +3245,16 @@ banco de teste: o operador é recusado pelo servidor.
   leituras da cozinha, do histórico e dos indicadores ficam em `producao-equipe.ts`; a conta pura em `producao-equipe-campos.ts`.
   Quem precisar de "quem fez", "tempo" ou "indicador por pessoa" (etiqueta com o nome de quem fez, relatório mensal) parte de
   `lotesEncerrados`/`indicadoresPorPessoa`, nunca refaz a conta.
-- **Quem fez = `responsavelUsuarioId` + `responsavelNomeSnapshot`**; `responsavelDesde` nulo = não pegou pelo ERP (lote da 3.1 ou
-  concluído direto: sem tempo). O nível 1 nunca é quem fez. Freelancer (fase tardia) entra por `responsavelId` (Colaborador): aí
+- **Quem fez = `responsavelUsuarioId` + `responsavelNomeSnapshot`, SE o login é da equipe**; `responsavelDesde` nulo = não pegou
+  pelo ERP (lote da 3.1 ou concluído direto: sem tempo). O nível 1 nunca é quem fez: o lote que ele concluiu na 3.1 tem o login
+  dele gravado, e a leitura o tira (`idsDaEquipe` das credenciais, passado a `historicoDaProducao`/`indicadoresDaProducao`;
+  polimento, decisão 241). Leitura nova de "quem fez" recebe a equipe também. Freelancer (fase tardia) entra por `responsavelId` (Colaborador): aí
   "quem fez" passa a ser pessoa do login OU colaborador, e os indicadores agrupam pelos dois.
 - **Lote com outra pessoa**: só ela ou a gerência (`producao.planejar`) conclui, cancela ou solta; escrita nova sobre um lote
   pendente (etiqueta impressa antes de concluir, por exemplo) decide se respeita o dono e diz por quê. A gerência passa só para
-  quem `pessoasQueProduzem` devolve (credenciais, no servidor).
+  quem `pessoasQueProduzem` devolve (credenciais, no servidor), e `passarProducao` relê na gravação, com o lote travado, se a
+  escolhida ainda pode (`QuemPodeReceber.aindaPode` = `aindaProduzNaLoja`; decisão 241). "Recebeu × pegou": `passadosPor` (o
+  último "pegou"/"passou" do histórico do lote).
 - **Pegar não mexe no livro nem no DRE**: vale com período fechado. Qualquer escrita nova que mexa (baixa, entrada) chama
   `conferirPeriodoAberto` e segue a ordem das travas da 3.1/3.2 (período → lista → abertura → requisição → ordem → saldos).
 - **A ordem fixa vale no pegar**: `pegarNaTx` trava requisição → ordem (`travarOrdem`); `pegarDaLista` trava período → lista →
@@ -3226,16 +3267,22 @@ banco de teste: o operador é recusado pelo servidor.
   produção para a gerência chama `pessoasQueProduzem` (credenciais, outro banco no teste): mocke (`tests/erp-producao-equipe-telas`).
 - **Formulário de lote que fica no mesmo lugar depois de gravar** (passar, soltar, pegar): `key` com a versão do lote, para fechar
   depois de gravar (sem isso, a escolha velha ficava na tela com a versão nova e um segundo toque gravava de novo).
+- **Concluir pelas Tarefas**: `/producao/tarefas/<loja>/<lote>/concluir` (a aba vem do caminho; decisão 242). Tela nova aberta a
+  partir de uma aba que não é a "dona" do recurso faz o mesmo: endereço debaixo da aba, não `?de=`.
 - **Matriz de telas**: uma página nova por endereço. O print `fullPage` do Playwright desliga a emulação de toque da página e, dali em
   diante, todo alvo que só cresce com `pointer: coarse` aparece pequeno (falso alarme).
 - **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) no tablet compartilhado cada um entra com o próprio acesso (senha ou
   rosto) — a cozinha do Valentin's topa? Se o tablet ficar logado numa pessoa só, o histórico mente; (2) a cozinha vê no histórico o
   que cada colega fez (como já via no quadro): serve, ou cada um só o seu?; (3) os indicadores são hipótese: amostra pequena abaixo
-  de 5 lotes; tempo de pegar (ou da entrega dos insumos) até concluir; rendimento médio com cada lote pesando igual; "cancelado com
-  a pessoa" conta o que a gerência cancelou enquanto estava com ela — prefere contar só o que a pessoa cancelou?; (4) passar para
+  de 5 lotes; tempo de pegar (ou da entrega dos insumos) até concluir; rendimento médio com cada lote pesando igual; "Cancelou"
+  conta só o que a própria pessoa cancelou e o da gerência fica à parte (ajuste da 237, pelo nome gravado) — de acordo?; (4) passar para
   outra pessoa é só da gerência; o próprio cozinheiro pode passar para um colega?; (5) a gerência não pré-escala lote planejado
   ("a Duda faz o molho amanhã"): quer escala de tarefas numa fase própria?; (6) pegar e soltar valem com o período fechado (não
-  mexem em dinheiro nem em estoque): de acordo?
+  mexem em dinheiro nem em estoque): de acordo?; (7) **pendência de decisão (polimento, fiscal de UX):** o operador vê R$ no
+  Histórico da produção e no Concluir porque o perfil padrão do Operador tem `insumos.ver` (custos); na Lista do dia a 3.2
+  escondeu a estimativa de compra dele. A regra do sistema é a permissão (quem tem `insumos.ver` vê custo), e a incoerência fica
+  para o Rodolfo decidir: tirar `insumos.ver` do Operador padrão (a cozinha deixa de ver custo em toda parte) ou aceitar que a
+  cozinha veja o custo do lote. Nada foi mudado.
 
 ## Revisão visual de 21/10/2026 (antes das próximas funcionalidades)
 

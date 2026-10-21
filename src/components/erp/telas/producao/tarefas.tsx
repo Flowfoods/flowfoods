@@ -11,7 +11,7 @@
 import Link from 'next/link';
 import type { LinhaDaTarefa, LoteDaTarefa, TarefasDoDia } from '@/lib/erp/producao-equipe';
 import { formatarRendimento, rendimentoDoLote, situacaoDosInsumos } from '@/lib/erp/producao-campos';
-import { horaDoDia } from '@/lib/erp/producao-equipe-campos';
+import { horaDoDia, quandoPegou } from '@/lib/erp/producao-equipe-campos';
 import { textoDoAtraso } from '@/lib/erp/requisicao-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarQuantidade } from '@/lib/erp/unidades';
@@ -151,7 +151,7 @@ export function TelaTarefas({
                     key={l.id}
                     nome={l.nome}
                     quanto={formatarQuantidade(l.planejadoMilesimos, l.unidade)}
-                    apoio={[...apoioDoLote(l), `pegou ${horaDoDia(l.responsavel!.desde, t.hoje)}`]}
+                    apoio={[...apoioDoLote(l), quandoPegou(l.responsavel!.desde, t.hoje, l.responsavel!.passadoPor)]}
                     atrasado={l.atrasoDias > 0}
                     selos={
                       <>
@@ -161,7 +161,7 @@ export function TelaTarefas({
                     }
                   >
                     {pega && entregues ? (
-                      <Link href={`${doLote}/${l.id}/concluir?de=tarefas`} className={classeDeBotaoDaCozinha('primario', 'w-full')}>
+                      <Link href={`${aqui}/${l.id}/concluir`} className={classeDeBotaoDaCozinha('primario', 'w-full')}>
                         Concluir
                       </Link>
                     ) : pega ? (
@@ -187,7 +187,8 @@ export function TelaTarefas({
       )}
 
       <Secao id="tarefas-pegar" titulo="Para pegar" contagem={t.paraPegar.length}>
-        {t.naoGeraLinha && linhas.length > 0 && <Aviso tom="alerta" titulo={t.naoGeraLinha} />}
+        {/* Estoque não aberto e período fechado: o aviso do alto já diz (uma vez só); aqui, só a loja desativada. */}
+        {t.naoGeraLinha && t.aberto && !t.periodoFechado && linhas.length > 0 && <Aviso tom="alerta" titulo={t.naoGeraLinha} />}
         {t.paraPegar.length === 0 ? (
           <div className="rounded-[14px] border border-dashed border-linha">
             <Vazio titulo="Nada para pegar agora.">Quem define o que produzir é a gerência, na Lista do dia.</Vazio>
@@ -244,7 +245,7 @@ export function TelaTarefas({
                 selos={
                   <>
                     <span className="text-[14px] font-semibold text-texto">
-                      com {l.responsavel!.nome} · pegou {horaDoDia(l.responsavel!.desde, t.hoje)}
+                      com {l.responsavel!.nome} · {quandoPegou(l.responsavel!.desde, t.hoje, l.responsavel!.passadoPor)}
                     </span>
                     {l.atrasoDias > 0 && <Selo tom="erro">{textoDoAtraso(l.atrasoDias)}</Selo>}
                     <Insumos l={l} />

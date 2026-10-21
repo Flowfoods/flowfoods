@@ -46,7 +46,12 @@ vi.mock('@/lib/erp/contexto', async () => {
   };
 });
 // Quem pode receber o lote vem das credenciais (fora do tenant, outro banco no teste): a lista fixa da loja.
-vi.mock('@/lib/erp/credenciais', async (orig) => ({ ...(await orig<typeof import('@/lib/erp/credenciais')>()), pessoasQueProduzem: async () => PESSOAS }));
+vi.mock('@/lib/erp/credenciais', async (orig) => ({
+  ...(await orig<typeof import('@/lib/erp/credenciais')>()),
+  pessoasQueProduzem: async () => PESSOAS,
+  aindaProduzNaLoja: async (_p: string, _l: string, id: string) => PESSOAS.some((x) => x.usuarioId === id),
+  idsDaEquipe: async () => new Set(PESSOAS.map((x) => x.usuarioId)),
+}));
 vi.mock('@/app/entrar/actions', () => ({ acaoSair: async () => {} }));
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
 vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
@@ -67,6 +72,7 @@ import ErpHistoricoDaLojaPage from '@/app/erp/producao/historico/[lojaId]/page';
 import ErpIndicadoresDaLojaPage from '@/app/erp/producao/indicadores/[lojaId]/page';
 import ErpLotePage from '@/app/erp/producao/[lojaId]/[ordemId]/page';
 import ErpConcluirLotePage from '@/app/erp/producao/[lojaId]/[ordemId]/concluir/page';
+import ErpConcluirDasTarefasPage from '@/app/erp/producao/tarefas/[lojaId]/[ordemId]/concluir/page';
 import ParceiroTarefasDaLojaPage from '@/app/rodolfo/(painel)/erp/[slug]/producao/tarefas/[lojaId]/page';
 import * as daSessao from '@/app/erp/producao/actions';
 import * as doNivel1 from '@/app/rodolfo/(painel)/erp/[slug]/producao/actions';
@@ -221,9 +227,18 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     const versao = (await obterOrdem(a, DONA(), ids.vp, ids.lote))!.ordem.versao;
     expect(await rodar(() => daSessao.acaoPassarLote(ids.vp, null, formDe({ lote: ids.lote, versao: String(versao), motivo: 'troca', para: 'u-fora', voltar: 'tarefas' })))).toMatchObject({ ok: false, erros: { para: expect.any(String) } });
     expect(await rodar(() => daSessao.acaoPassarLote(ids.vp, null, formDe({ lote: ids.lote, versao: String(versao), motivo: 'Caio foi para a chapa', para: 'u-duda', voltar: 'tarefas' })))).toMatchObject({ url: `/erp/producao/tarefas/${ids.vp}?feito=passou` });
-    expect(texto(await tarefas('passou'))).toContain('Lote passado: a hora de quem recebeu começa agora.');
+    const passou = texto(await tarefas('passou'));
+    expect(passou).toContain('Lote passado: a hora de quem recebeu começa agora.');
+    // Polimento: quem recebeu não "pegou" — o cartão diz quem passou.
+    expect(passou).toMatch(/com Duda Lima · recebeu \d\d:\d\d \(passado por Gil Gerente\)/);
     como(OPERADOR(), DUDA);
-    expect(texto(await tarefas())).toMatch(/Com você 1/);
+    const daDuda = texto(await tarefas());
+    expect(daDuda).toMatch(/Com você 1/);
+    expect(daDuda).toMatch(/recebeu \d\d:\d\d \(passado por Gil Gerente\)/);
+    expect(daDuda).not.toMatch(/pegou \d\d:\d\d/);
+    expect(texto(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: ids.lote }, searchParams: {} })))).toMatch(/Com você desde \d\d:\d\d \(passado por Gil Gerente\)/);
+    como(DONA());
+    expect(texto(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: ids.lote }, searchParams: {} })))).toMatch(/Duda Lima recebeu às \d\d:\d\d \(passado por Gil Gerente\)/);
   });
 
   it('concluir vindo das tarefas: a tela diz "Voltar para as tarefas" e a action volta para elas', async () => {
@@ -234,9 +249,11 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     ).toBe(true);
     como(OPERADOR(), DUDA);
     const tela = await tarefas();
-    expect(tela).toContain(`/erp/producao/${ids.vp}/${ids.lote}/concluir?de=tarefas`);
-    const h = await pagina(ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: ids.lote }, searchParams: { de: 'tarefas' } }));
+    // Polimento: o Concluir das tarefas mora debaixo de Tarefas (a aba "Tarefas" fica marcada); o endereço antigo continua.
+    expect(tela).toContain(`/erp/producao/tarefas/${ids.vp}/${ids.lote}/concluir`);
+    const h = await pagina(ErpConcluirDasTarefasPage({ params: { lojaId: ids.vp, ordemId: ids.lote } }));
     expect(texto(h)).toContain('Voltar para as tarefas');
+    expect(texto(await pagina(ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: ids.lote }, searchParams: { de: 'tarefas' } })))).toContain('Voltar para as tarefas');
     expect(texto(h)).toContain('Este lote está com você.');
     expect(h).toContain('name="voltar" value="tarefas"');
     // O Caio (o lote está com a Duda) não conclui pela tela.
@@ -260,6 +277,8 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     expect(t).toContain('4,6 kg de 5 kg');
     expect(t).toContain('92%');
     expect(t).toContain('Duda Lima');
+    // Polimento: a Duda recebeu o lote da gerência — o histórico diz "recebeu", não "pegou".
+    expect(t).toMatch(/recebeu \d\d:\d\d \(passado por Gil Gerente\) · fim \d\d:\d\d/);
     expect(h).not.toContain('R$');
     expect(t).not.toContain('Custo do lote');
     como(DONA());
@@ -286,6 +305,12 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     expect(t).toContain('Molho cheddar: 4,6 kg em 1 lote · rendeu 92%');
     expect(h).toContain(`pessoa=u-duda`);
     expect(h).not.toContain('R$');
+    // Polimento: "Cancelou" (o que a pessoa cancelou); o da gerência fica à parte. "Ver os lotes" não quebra.
+    expect(t).toContain('Cancelou');
+    expect(t).not.toContain('Cancelados com a pessoa');
+    expect(h).toMatch(/class="[^"]*whitespace-nowrap[^"]*"[^>]*>Ver os lotes</);
+    // No celular, o valor embaixo do rótulo (lado a lado só a partir de 640 px).
+    expect(h).toContain('flex flex-col gap-0.5 sm:flex-row sm:justify-between');
   });
 
   it('gerente de outra loja e outro parceiro: 404 nas três telas; o nível 1 vê e passa, mas não pega', async () => {
@@ -312,5 +337,18 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     como(DONA());
     const l = texto(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: ids.lote }, searchParams: {} })));
     expect(l).toMatch(/Quem fez\s+Duda Lima/);
+    // Polimento: "Ver o estoque" com a folga de toque (44 px no tablet).
+    expect(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: ids.lote }, searchParams: {} }))).toMatch(/class="[^"]*ff-toque[^"]*"[^>]*>Ver o estoque</);
+  });
+
+  it('polimento: a escolha da loja começa com maiúscula; na Delivery (estoque não aberto) o aviso aparece uma vez só', async () => {
+    como(DONA());
+    const escolha = texto(await pagina(ErpTarefasPage()));
+    expect(escolha).toContain('Pegue o que vai fazer hoje e conclua quando ficar pronto');
+    expect(await salvarListaDoDia(a, GERENTE_DELIVERY(), ids.delivery, { dia: hoje, versao: '', linhaIds: [''], fichaIds: [ids.molho], quantidades: ['2'] }, { nome: 'Gil Gerente', userId: 'u-gil' })).toMatchObject({ ok: true });
+    como(GERENTE_DELIVERY());
+    const t = texto(await tarefas(undefined, ids.delivery));
+    expect(t.match(/ainda não foi aberto/g)).toHaveLength(1);
+    expect(t).toContain('vira lote ao pegar');
   });
 });

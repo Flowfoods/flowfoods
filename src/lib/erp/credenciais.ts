@@ -455,6 +455,26 @@ export async function pessoasQueProduzem(parceiroId: string, lojaId: string, o?:
 }
 
 /**
+ * Polimento da 3.3 (Guardião M2): relê, na hora de gravar "passar o lote", se a pessoa AINDA pode receber — vínculo ATIVO
+ * neste parceiro, com "registrar produção" NA loja (a mesma regra de `pessoasQueProduzem`, para uma pessoa só).
+ */
+export async function aindaProduzNaLoja(parceiroId: string, lojaId: string, usuarioId: string, o?: Opcoes): Promise<boolean> {
+  const { db } = abrir(o);
+  const v = await db.acessoParceiro.findFirst({ where: { parceiroId, usuarioId, status: 'ATIVO' }, include: { ...COM_PERFIL } });
+  return !!v && resolverAlcance(vinculoDe(v)).permissoes.has('producao.registrar') && (v.redeInteira || (v.lojaIds ?? []).includes(lojaId));
+}
+
+/**
+ * Polimento da 3.3 (Guardião M1): os logins que TÊM ou TIVERAM vínculo com o parceiro (qualquer situação: quem saiu da
+ * equipe continua sendo quem fez o lote dele). Quem fez um lote e não está aqui é a FlowFoods (o nível 1 da 3.1, que
+ * gravava o próprio login como responsável): o histórico e os indicadores não o contam como pessoa da equipe.
+ */
+export async function idsDaEquipe(parceiroId: string, o?: Opcoes): Promise<Set<string>> {
+  const { db } = abrir(o);
+  return new Set((await db.acessoParceiro.findMany({ where: { parceiroId }, select: { usuarioId: true } })).map((v) => v.usuarioId));
+}
+
+/**
  * Para a lista do nível 1: parceiros com pessoas ativas e NINGUÉM cuidando da
  * equipe (ativo + cuidar da equipe + rede inteira). Uma ida ao banco.
  */

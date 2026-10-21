@@ -379,6 +379,8 @@ const ROTAS_ATIVAS: [string, string][] = [
   // 3.3: as tarefas da cozinha, o histórico e os indicadores da produção acendem as abas deles (não a de Lotes).
   ['/producao/tarefas', 'Tarefas'],
   [`/producao/tarefas/${LOJA}`, 'Tarefas'],
+  // Polimento da 3.3: quem chega ao Concluir pelas Tarefas continua na aba Tarefas.
+  [`/producao/tarefas/${LOJA}/o1/concluir`, 'Tarefas'],
   ['/producao/historico', 'Histórico'],
   [`/producao/historico/${LOJA}`, 'Histórico'],
   ['/producao/indicadores', 'Indicadores'],
