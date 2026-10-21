@@ -1842,7 +1842,8 @@ rolagem lateral e sem violação do axe nos 4 formatos e 2 temas.
 
 ## O que a 2.5 entregou — orçamento de compra ao vivo (quanto ainda cabe sem furar o CMV meta)
 
-Quinta da Prioridade 002. **Nenhuma migration** (tudo é derivado: meta do CMV, faturamento e notas que já existiam; `migrate diff` vazio). Decisões 208 a 212.
+Quinta da Prioridade 002. **Nenhuma migration** (tudo é derivado: meta do CMV, faturamento e notas que já existiam; `migrate diff` vazio). Decisões 208 a 212, e 213 a 216 na
+rodada de correção 1 (veto do Guardião e revisão de UX; ver "Rodada de correção 1" abaixo).
 Permissões: o catálogo não ganhou nada (ver = `compras.ver` ou `compras.lancar` na loja; a conta inteira = `dre.ver` na loja); `VERSAO_DO_ERP` continua
 "fase 3.1" (a fase mais alta no ar; decisão 212).
 
@@ -1850,16 +1851,17 @@ Permissões: o catálogo não ganhou nada (ver = `compras.ver` ou `compras.lanca
    notas LANÇADAS com data no período INTEIRO, valor + frete rateado (a soma do CMV de compra da 2.3, agora até o fim do período: a nota de hoje conta; cancelada e
    nota de outro período não). Só o período em curso (a regra do período de `periodos.ts`: mensal, quinzenal ou semanal). Loja desativada fica fora.
 2. **A receita prevista** (209), por loja: o vendido nos dias do período com faturamento completo (cada canal que a loja vende lançado, "Não vendeu" conta) + cada dia
-   que falta (hoje até o fim) e cada dia sem lançamento completo pela média do mesmo dia da semana nas últimas 4 semanas completas da loja (dia da semana sem amostra:
-   média geral da janela). Menos de 14 dias completos na janela = sem número ("poucos dias com faturamento completo nas últimas 4 semanas: 9 de 14 necessários").
+   que falta (hoje até o fim) e cada dia sem lançamento completo pela média do mesmo dia da semana nas últimas 4 semanas completas da loja. Dia antes do primeiro
+   lançamento da loja não existe; dia da semana sem amostra nas 4 semanas conta zero, com a frase ("segunda sem venda lançada nas últimas 4 semanas: conta como zero";
+   decisão 214). Menos de 14 dias completos na janela = sem número ("poucos dias com faturamento completo nas últimas 4 semanas: 9 de 14 necessários").
    Sem meta do CMV = sem número ("falta a meta do CMV", com o link para Plano e metas a quem define metas). Nunca R$ 0,00 para dado ausente. É a única tela que
    projeta (o DRE segue até ontem, decisão 145); a conta por dia da semana acerta o mês de 5 sábados (R$ 41.000,00 contra R$ 40.300,00 da linear, no teste).
 3. **Cobertura por loja e o farol** (211). A rede só tem número quando cada loja ativa tem ("sem o orçamento de Centro"). O farol é o "ritmo das compras": CMV pelas
    compras até ontem ÷ receita até ontem contra a meta, `faixaDoDesvio` na escala de custo, o `Farol` da 2.4 (cor só no glifo e na palavra). Sem cor: dia do período sem
    lançamento completo em alguma loja do escopo (`faltam lançamentos de faturamento`; o número segue, pela média) ou loja que vendeu sem nota até ontem.
 4. **Quem vê o quê** (210). O servidor monta a vista (`orcamento.ts`). Com `dre.ver` na loja: cabe, teto, já comprado, receita prevista (vendido + pela média, os dias),
-   a conta por extenso e o ritmo com o farol. Sem `dre.ver` (o comprador, ou quem só vê faturamento): só o "cabe" ARREDONDADO a R$ 100 para o lado prudente (cabe
-   arredonda para baixo, passou para cima) e o motivo; nem a meta, nem o percentual, nem o já comprado. A prévia dele parte do arredondado (digitar notas não acha o centavo).
+   a conta por extenso e o ritmo com o farol. Sem `dre.ver` (o comprador, ou quem só vê faturamento): só o "cabe" = TETO arredondado para baixo em degraus por faixa
+   (R$ 500 / R$ 1.000 / R$ 5.000) − já comprado, o motivo e os avisos; nem a meta, nem o percentual, nem a receita (decisão 213: arredonda-se o teto, nunca o saldo).
    A linha da rede só para quem tem a rede inteira. Gerente de uma loja: só a dele, por `lojaId` de outra = nada. Operador: não abre. Outro parceiro: o portão não enxerga.
 5. **Onde aparece** (212): aba **Orçamento** na área Compras (`/compras/orcamento` e o espelho do nível 1): o bloco da rede (ou da loja escolhida no topo) com o número
    grande, a conta por extenso e o ritmo; a tabela "Por loja" (Corporativo; cartões abaixo de 1024 px). Na nota: a prévia "Conferir o impacto" ganhou "Orçamento de
@@ -1869,7 +1871,7 @@ Permissões: o catálogo não ganhou nada (ver = `compras.ver` ou `compras.lanca
 7. **Fora desta subfase**: meta do CMV por loja (a meta é do parceiro e mede todas as lojas, como no DRE), dia de pagamento e sazonalidade na previsão, orçamento por
    fornecedor ou por grupo de insumo, "comprar na semana" (Kairu "Da Ficha ao Fornecedor": consultado, fora do escopo), alerta, sino e WhatsApp, orçamento de período passado.
 
-**Ajuda: chaves novas/alteradas.** Nova: `compras-orcamento` (v1; os blocos da conta e do ritmo são `para: ['dre.ver']`, o do arredondado vale para todos).
+**Ajuda: chaves novas/alteradas.** Nova: `compras-orcamento` (v2 depois da rodada de correção, recolhida; os blocos da conta e do ritmo são `para: ['dre.ver']`, o do arredondado vale para todos).
 Alteradas, com `ajuda.lock.json` regravado (53 entradas): `compra-nova` v3 para v4 ("Conferir o impacto" mostra o orçamento; passar é aviso) e `compra` v2 para v3
 (o detalhe diz como ficou o orçamento).
 
@@ -1889,7 +1891,7 @@ isolada, o comprador (só R$ 2.300,00 / R$ 4.100,00 / R$ 6.400,00 no JSON, nada 
 nível 1, a página de verdade (HTML da dona com a conta, do comprador sem receita), a nota que passa (prévia, lança igual, o detalhe avisa), a edição sem contar duas
 vezes, a prévia do comprador arredondada, a loja nova que tira o número da rede e o dia sem iFood que tira a cor e não o número.
 
-Na tela (build de produção local, porta 3100, banco `ff_25` copiado do `ff`, com meta do CMV de 30 %, 4 notas de outubro lançadas pela regra e um comprador =
+Na tela, 1ª rodada (substituída pela prova da rodada de correção 1, abaixo; build de produção local, porta 3100, banco `ff_25` copiado do `ff`, com meta do CMV de 30 %, 4 notas de outubro lançadas pela regra e um comprador =
 gerente sem `faturamento.ver`, `faturamento.lancar`, `dre.ver` e `despesas.lancar`; roteiros `pw/shots.mjs` e `pw/previa25.mjs` no scratchpad): a dona vê a rede
 (cabe R$ 13.887,00 = 30 % × R$ 241.290,00 − R$ 58.500,00, ritmo 37,6 % contra 30 %, vermelho), a Penha cabendo e o Delivery "passou R$ 1.716,00"; o comprador vê
 R$ 13.800,00 / R$ 15.600,00 / passou R$ 1.800,00, "arredondado a R$ 100", sem receita, teto, já comprado nem farol; a prévia de uma nota de R$ 1.500,00 no Delivery
@@ -2758,12 +2760,14 @@ banco de teste: o operador é recusado pelo servidor.
   Qualquer lugar novo que fale de "quanto cabe" (lista de compras da semana, sugestão de pedido, alerta) parte deles, nunca refaz a conta.
 - **A soma das compras é UMA**: `comprasPorLoja` (`cmv.ts`), a mesma do CMV de compra. Mudar o que conta como compra (bonificação, desconto, tipo "limpeza" fora do
   CMV) muda o DRE e o orçamento juntos.
-- **A vista é montada no servidor**: quem não tem `dre.ver` na loja recebe `VistaResumida` (só o "cabe" arredondado e o motivo). Campo novo no orçamento que dependa
+- **A vista é montada no servidor**: quem não tem `dre.ver` na loja recebe `VistaResumida` (só o "cabe" pelo teto arredondado, o motivo e os avisos). Arredonda-se o
+  TETO, nunca o saldo (decisão 213): qualquer número novo para quem não vê a receita parte de `tetoArredondado`, ou um comprador acha o centavo comparando notas. Campo novo no orçamento que dependa
   da receita entra só na `VistaCompleta`; o teste de banco confere o JSON inteiro do comprador.
 - **A previsão é hipótese** (decisão 209): média por dia da semana nas últimas 4 semanas, mínimo de 14 dias completos. Se o Rodolfo quiser o dia de pagamento ou a
   sazonalidade, a mudança é só em `preverReceita` (pura, com teste).
-- **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) o comprador vê o "cabe" em R$ arredondado; quem souber a meta do CMV deduz a receita prevista
-  (±R$ 333 num mês com meta de 30 %). Serve, ou o comprador do Valentin's deve ver só "cabe / passou" sem número? (2) A meta do CMV é uma só para todas as lojas;
+- **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) o comprador vê o "cabe" em R$, pelo teto arredondado para baixo em degraus por faixa; quem souber a
+  meta do CMV estima a receita prevista com erro de até ~±8 % (com meta de 30 %), e no fim do período a prevista é quase a realizada. Serve, ou o comprador do
+  Valentin's deve ver só "cabe com folga / cabe pouco / passou", sem número? (2) A meta do CMV é uma só para todas as lojas;
   salão e 100 % delivery têm CMV diferente: vale meta por loja (aditiva em `DreMeta`)? (3) 4 semanas e 14 dias: é a régua certa? (4) O frete entra no "já comprado"
   (igual ao CMV de compra). (5) A loja nova sem 14 dias de faturamento deixa a rede sem número até completar; prefere a rede somar só as lojas com número, dizendo
   quais ficaram de fora?

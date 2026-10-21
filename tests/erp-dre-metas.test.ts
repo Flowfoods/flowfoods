@@ -132,7 +132,7 @@ describe('2.2b · realizado × meta (critério 5)', () => {
     const pessoal = r.linhas.find((l) => l.chave === 'grupo:PESSOAL')!;
     expect(pessoal.percentualBp).toBe(2600);
     const c = compararComMeta(pessoal, 2500, r.receitaBrutaCentavos);
-    expect(c).toMatchObject({ metaBp: 2500, metaCentavos: 250_000, desvioBp: 100, desvioTexto: '+1,0 pp', semComparacao: null });
+    expect(c).toMatchObject({ metaBp: 2500, metaCentavos: 250_000, desvioBp: 100, desvioTexto: '+1,0\u00a0pp', semComparacao: null });
     expect(c.faixa).toMatchObject({ cor: 'AMARELO', palavra: 'um pouco pior' });
   });
   it('a margem com o mesmo desvio é "na meta" (o lado bom vem do sentido)', () => {
@@ -146,7 +146,7 @@ describe('2.2b · realizado × meta (critério 5)', () => {
   it('despesa 5 pontos abaixo da meta é azul; resultado 22 pontos abaixo da meta é vermelho', () => {
     const r = dreDeDezMil(200_000);
     const pessoal = r.linhas.find((l) => l.chave === 'grupo:PESSOAL')!;
-    expect(compararComMeta(pessoal, 2500, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: -500, desvioTexto: '−5,0 pp' });
+    expect(compararComMeta(pessoal, 2500, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: -500, desvioTexto: '−5,0\u00a0pp' });
     expect(compararComMeta(pessoal, 2500, r.receitaBrutaCentavos).faixa).toMatchObject({ cor: 'AZUL', palavra: 'bem melhor que a meta', confira: 'confira se está tudo lançado' });
     const operacional = r.linhas.find((l) => l.chave === 'resultado-operacional')!;
     expect(operacional.percentualBp).toBe(6800);
@@ -155,7 +155,7 @@ describe('2.2b · realizado × meta (critério 5)', () => {
   it('desvio pequeno é verde, "na meta", para os dois lados (a palavra aposentada de 5 pontos-base virou a faixa)', () => {
     const r = dreDeDezMil(260_000);
     const pessoal = r.linhas.find((l) => l.chave === 'grupo:PESSOAL')!;
-    expect(compararComMeta(pessoal, 2596, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: 4, desvioTexto: '+0,0 pp' });
+    expect(compararComMeta(pessoal, 2596, r.receitaBrutaCentavos)).toMatchObject({ desvioBp: 4, desvioTexto: '+0,0\u00a0pp' });
     for (const meta of [2596, 2604, 2595, 2605, 2600, 2650]) expect(compararComMeta(pessoal, meta, r.receitaBrutaCentavos).faixa, String(meta)).toMatchObject({ cor: 'VERDE', palavra: 'na meta' });
     expect(compararComMeta(pessoal, 2549, r.receitaBrutaCentavos).faixa?.cor).toBe('AMARELO'); // 0,51 pp acima da meta de custo
   });

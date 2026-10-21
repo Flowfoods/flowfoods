@@ -294,7 +294,8 @@ html:has(.ff-app[data-tema='escuro']) {
   }
   /* Link de texto em tabela e na trilha do topo: a área de toque cresce para 44 px
      sem mudar o desenho nem a altura da linha (folga invisível compensada pela margem). */
-  .ff-app :is(table a, nav[aria-label='Você está em'] a):not(.flex, .inline-flex, .grid, .block) {
+  /* 2.5: também o link dentro de um aviso ("Ver o orçamento") e o link de texto marcado com `ff-toque`. */
+  .ff-app :is(table a, nav[aria-label='Você está em'] a, [role='status'] a, a.ff-toque):not(.flex, .inline-flex, .grid, .block) {
     display: inline-block;
     padding-block: 14px;
     margin-block: -14px;

@@ -89,7 +89,7 @@ export function TelaDetalheNota({
       />
 
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
-      {orcamento && <AvisoDoOrcamento o={orcamento} href={orcamentoHref} />}
+      {orcamento && <AvisoDoOrcamento o={orcamento} href={orcamentoHref} agora={feito === 'lancada' || feito === 'editada'} />}
       {fechado && podeLancar && !n.cancelada && <AvisoDoPeriodoFechado periodo={fechado.nome} href={periodos.href} frase="Esta nota é desse período: não dá para editar nem cancelar." />}
       {n.cancelada && feito !== 'cancelada' && (
         <Aviso tom="alerta" titulo="Nota cancelada.">

@@ -237,6 +237,7 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
 - **Orçamento de compra (2.5)**: bloco com o número grande em Gelasio ("ainda cabe no período" em suave, "passou do
   orçamento" em `erro` com a palavra), a conta por extenso em 13 px tabular ("Meta do CMV 30,0 % × R$ 41.000,00 de receita
   prevista = R$ 12.300,00 de teto − R$ 10.000,00 já comprados = R$ 2.300,00") e o ritmo com o `Farol` da 2.4 abaixo de um
-  separador. Quem não vê a receita: só o número com "arredondado a R$ 100". "Por loja" em tabela Corporativo a partir de
+  separador. Quem não vê a receita: só o número, com "Pelo teto arredondado para baixo" uma vez no subtítulo. Abaixo do número da
+  rede, em `erro`, quem já passou ("a sobra de outra loja não cobre"); número e "Por loja" lado a lado a partir de 1280 px. "Por loja" em tabela Corporativo a partir de
   1024 px, cartões abaixo. Na prévia da nota, um subtítulo "Orçamento de compra" no mesmo painel; no detalhe, `Aviso`
   (tom alerta só quando passou). Nunca bloqueia: o botão de lançar segue.

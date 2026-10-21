@@ -179,7 +179,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     expect(linha(d, 'cmv')).toMatchObject({ valorCentavos: R(23_950), percentualBp: 1996, nota: 'real (contagem)' });
     expect(linha(d, 'cmv:compra')).toMatchObject({ valorCentavos: R(25_800), percentualBp: 2150 });
     expect(linha(d, 'cmv:real')).toMatchObject({ valorCentavos: R(23_950) });
-    expect(d.metas.cmv).toMatchObject({ metaBp: 2100, desvioBp: -104, desvioTexto: '−1,0 pp' });
+    expect(d.metas.cmv).toMatchObject({ metaBp: 2100, desvioBp: -104, desvioTexto: '−1,0\u00a0pp' });
     expect(d.metas.cmv.faixa).toMatchObject({ cor: 'VERDE', palavra: 'na meta' });
     for (const c of ['margem-contribuicao', 'resultado-operacional', 'resultado-do-periodo']) expect(linha(d, c).semContar).toEqual([]);
     // O CMV que vale (o real) é subtraído da receita líquida: 120.000,00 − 23.950,00 = 96.050,00, e o resultado herda.

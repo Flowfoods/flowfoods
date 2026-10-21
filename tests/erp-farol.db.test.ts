@@ -144,9 +144,9 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · o farol por canal (Postgres real)', { ti
       // Todas as 5 cores aparecem na contagem do painel.
       expect(d.farol.contagem.map((c) => [c.cor, c.linhas.length > 0])).toEqual([['AZUL', true], ['VERDE', true], ['AMARELO', true], ['LARANJA', true], ['VERMELHO', true]]);
       // O azul de uma despesa pede conferência; o de crescimento não.
-      expect(d.farol.porLinha['grupo:OCUPACAO']).toMatchObject({ confira: 'confira se está tudo lançado', desvioTexto: '−4,5 pp' });
+      expect(d.farol.porLinha['grupo:OCUPACAO']).toMatchObject({ confira: 'confira se está tudo lançado', desvioTexto: '−4,5\u00a0pp' });
       // A Penha tem nota de compra: o CMV dela (20,0 % contra 18,5 %) é amarelo, com o selo da fonte; a margem dela tem cor.
-      expect(d.farol.porLinha.cmv).toMatchObject({ tipo: 'cor', cor: 'AMARELO', desvioTexto: '+1,5 pp' });
+      expect(d.farol.porLinha.cmv).toMatchObject({ tipo: 'cor', cor: 'AMARELO', desvioTexto: '+1,5\u00a0pp' });
       expect(cor(d, 'margem-contribuicao')).toMatch(/^[A-Z]+$/);
       // O resultado da loja não compara com a meta da rede (a loja não carrega as despesas da rede).
       expect(d.farol.porLinha['resultado-do-periodo']).toBeUndefined();

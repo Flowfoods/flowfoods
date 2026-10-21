@@ -8,22 +8,25 @@
  *
  *  - "Já comprado" é o CMV de compra do período INTEIRO (notas LANÇADAS, valor + frete rateado, pela data da nota), a
  *    mesma soma do DRE (2.3), só que até o fim do período: a nota de hoje já conta.
- *  - A receita prevista (decisão 209) é POR LOJA: o que a loja vendeu nos dias do período com faturamento completo (cada
- *    canal que ela vende lançado, a regra da 2.1 e da decisão 207), mais cada dia que falta (hoje até o fim) e cada dia
- *    sem lançamento completo pela MÉDIA DO MESMO DIA DA SEMANA nas últimas 4 semanas completas da loja. Dia sem
- *    lançamento nunca vale zero (receita a menos = orçamento a menos, e o número mentiria igual).
+ *  - A receita prevista (decisões 209 e 214) é POR LOJA: o que a loja vendeu nos dias do período com faturamento completo
+ *    (cada canal que ela vende lançado, a regra da 2.1 e da decisão 207), mais cada dia que falta (hoje até o fim) e cada
+ *    dia sem lançamento completo pela MÉDIA DO MESMO DIA DA SEMANA nas últimas 4 semanas completas da loja. Dia sem
+ *    lançamento nunca vale zero (receita a menos = orçamento a menos, e o número mentiria igual). Dia ANTES do primeiro
+ *    lançamento da loja não existe (a loja ainda não vendia): nem realizado, nem projetado, nem "sem lançamento". Dia da
+ *    semana sem nenhuma amostra nas 4 semanas conta como ZERO (lado prudente), com a frase do motivo.
  *  - Sem faturamento suficiente (menos de 14 dias completos nas últimas 4 semanas) ou sem meta do CMV: SEM NÚMERO, com o
  *    motivo escrito. Nunca R$ 0,00 no lugar de dado ausente.
  *  - Cobertura POR LOJA (herança da 2.4): a rede só tem número quando CADA loja ativa tem; somar primeiro esconde o
- *    buraco de uma loja atrás da outra.
+ *    buraco de uma loja atrás da outra. E a sobra de uma loja não cobre o estouro de outra: a tela diz quem passou.
  *  - O farol (o "ritmo das compras") é o da 2.4, na escala de custo: o CMV pelas compras ATÉ ONTEM contra a meta, sobre a
  *    receita até ontem. Sem cor quando falta faturamento em algum dia do período de alguma loja do escopo, ou quando uma
  *    loja que vendeu não tem nota (a mesma regra do DRE: o CMV de uma loja dividido pela receita de todas sai baixo).
  *  - É AVISO, nunca bloqueio: a nota que passa do orçamento entra igual; a tela só diz quanto passou.
  *
- * Quem não vê a receita (sem `dre.ver` na loja) recebe só o "cabe" ARREDONDADO a R$ 100 para o lado prudente (para baixo
- * quando cabe, para cima quando passou), sem receita, meta, teto, percentual ou farol (decisão 210). A prévia da nota
- * dessa pessoa também parte do número arredondado: digitar notas de valores diferentes não revela o centavo.
+ * Quem não vê a receita (sem `dre.ver` na loja) recebe o TETO arredondado PARA BAIXO em degraus por faixa (decisão 213),
+ * e o "cabe" = teto arredondado − já comprado. Arredonda-se o teto, nunca o saldo: o teto é o único termo que depende da
+ * receita, e as compras (que o comprador conhece e muda) só deslocam um número que já não tem o centavo. Comparar
+ * prévias, lançar e cancelar notas não acha nada além do teto arredondado.
  */
 
 import { CODIGO } from './dre-plano';
@@ -39,13 +42,15 @@ import { formatarDinheiro } from './unidades';
 export const DIAS_DA_JANELA = 28;
 /** Menos que isso de dias completos na janela, a média não diz nada: sem número. */
 export const MINIMO_DE_DIAS_COMPLETOS = 14;
-/** Quem não vê a receita recebe o "cabe" em degraus de R$ 100. */
-export const DEGRAU_SEM_RECEITA = 10_000;
 /** A chave da meta do CMV no plano. */
 export const CHAVE_DA_META = CODIGO.cmv;
 
 export const MOTIVO_SEM_META = 'falta a meta do CMV';
 export const MOTIVO_LOJA_SEM_NOTA = (nome: string) => `sem nota de compra de ${nome} até ontem`;
+/** A loja vendeu no período e não tem nota nenhuma: "cabe o teto inteiro" não pode aparecer sem isto. */
+export const AVISO_SEM_NOTA = 'vendeu no período e não tem nota de compra: o que cabe é o teto inteiro, confira se falta lançar nota';
+
+const NOME_DO_DIA = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'] as const;
 
 // ================================================================ a entrada
 
@@ -92,12 +97,16 @@ export interface PrevisaoDaLoja {
   previstaCentavos: number;
   /** Dias do período até ontem com faturamento completo. */
   diasCompletos: number;
-  /** Dias do período até ontem sem faturamento completo (entraram pela média). */
+  /** Dias do período até ontem (a partir do 1º lançamento da loja) sem faturamento completo: entraram pela média. */
   diasSemLancamento: number;
   /** Hoje até o fim do período. */
   diasRestantes: number;
   /** Dias completos na janela das últimas 4 semanas. */
   diasNaJanela: number;
+  /** Dias do período antes do 1º lançamento da loja (ela ainda não vendia): ficam fora da conta. */
+  diasAntesDeAbrir: number;
+  /** Dias da semana a projetar sem nenhuma amostra nas 4 semanas: contaram como zero ("segunda sem venda…"). */
+  frasesDoZero: string[];
 }
 
 export type ResultadoDaPrevisao = { ok: true; previsao: PrevisaoDaLoja } | { ok: false; motivo: string; diasNaJanela: number };
@@ -109,11 +118,14 @@ function dias(de: string, ate: string): string[] {
   return out;
 }
 
+/** A frase do dia da semana sem amostra: "segunda sem venda lançada nas últimas 4 semanas: conta como zero". */
+export const fraseDoZero = (w: number) => `${NOME_DO_DIA[w]} sem venda lançada nas últimas 4 semanas: conta como zero`;
+
 /**
  * A receita prevista de uma loja no período. Um dia é COMPLETO quando a loja já lançava (a partir do primeiro lançamento)
  * e cada canal que ela vende tem lançamento ("Não vendeu" é lançamento). O dia incompleto não vale zero: entra pela média.
- * A média é do mesmo dia da semana nos dias completos das últimas 4 semanas; um dia da semana sem amostra usa a média geral
- * da janela. Um arredondamento por dia da semana (até 7, menos de 4 centavos no total).
+ * Dia antes do primeiro lançamento não existe. A média é do mesmo dia da semana nos dias completos das últimas 4 semanas;
+ * um dia da semana sem amostra conta como zero (decisão 214). Um arredondamento por dia da semana (até 7, menos de 4 centavos).
  */
 export function preverReceita(loja: LojaDoOrcamento, periodo: Pick<PeriodoDoOrcamento, 'inicio' | 'fim'>, hoje: string): ResultadoDaPrevisao {
   const ontem = somarDias(hoje, -1);
@@ -124,9 +136,10 @@ export function preverReceita(loja: LojaDoOrcamento, periodo: Pick<PeriodoDoOrca
     d.canais.add(g.canal);
     porDia.set(g.data, d);
   }
+  const primeiro = loja.primeiroLancamento;
   const completo = (d: string) => {
-    if (!loja.primeiroLancamento || d < loja.primeiroLancamento || d >= hoje) return false;
-    return canaisEmFalta(d, hoje, loja.primeiroLancamento, loja.canais, porDia.get(d)?.canais ?? new Set()).length === 0;
+    if (!primeiro || d < primeiro || d >= hoje) return false;
+    return canaisEmFalta(d, hoje, primeiro, loja.canais, porDia.get(d)?.canais ?? new Set()).length === 0;
   };
   const valor = (d: string) => porDia.get(d)?.centavos ?? 0;
 
@@ -150,29 +163,33 @@ export function preverReceita(loja: LojaDoOrcamento, periodo: Pick<PeriodoDoOrca
     };
   }
 
-  // ---- o período: o realizado e os dias a projetar, por dia da semana
+  // ---- o período: o realizado e os dias a projetar, por dia da semana (antes do 1º lançamento a loja não existia)
   const apurados = periodo.inicio <= ontem ? dias(periodo.inicio, ontem < periodo.fim ? ontem : periodo.fim) : [];
   let realizado = 0;
   let diasCompletos = 0;
+  let diasSemLancamento = 0;
+  let diasAntesDeAbrir = 0;
   const aProjetar = [0, 0, 0, 0, 0, 0, 0];
   for (const d of apurados) {
-    if (completo(d)) {
+    if (!primeiro || d < primeiro) diasAntesDeAbrir += 1;
+    else if (completo(d)) {
       realizado += valor(d);
       diasCompletos += 1;
-    } else aProjetar[diaDaSemana(d)] += 1;
+    } else {
+      diasSemLancamento += 1;
+      aProjetar[diaDaSemana(d)] += 1;
+    }
   }
-  const diasSemLancamento = apurados.length - diasCompletos;
   const restantes = hoje <= periodo.fim ? dias(hoje > periodo.inicio ? hoje : periodo.inicio, periodo.fim) : [];
   for (const d of restantes) aProjetar[diaDaSemana(d)] += 1;
 
-  const somaGeral = somaPorDia.reduce((s, v) => s + v, 0);
   let projetado = 0;
-  for (let w = 0; w < 7; w++) {
+  const frasesDoZero: string[] = [];
+  // Na ordem da semana a partir de segunda (a frase fica na ordem em que o dono pensa a semana).
+  for (const w of [1, 2, 3, 4, 5, 6, 0]) {
     if (aProjetar[w] === 0) continue;
-    projetado +=
-      nPorDia[w] > 0
-        ? dividirExato(BigInt(somaPorDia[w]) * BigInt(aProjetar[w]), BigInt(nPorDia[w]))
-        : dividirExato(BigInt(somaGeral) * BigInt(aProjetar[w]), BigInt(diasNaJanela));
+    if (nPorDia[w] === 0) frasesDoZero.push(fraseDoZero(w));
+    else projetado += dividirExato(BigInt(somaPorDia[w]) * BigInt(aProjetar[w]), BigInt(nPorDia[w]));
   }
   return {
     ok: true,
@@ -184,6 +201,8 @@ export function preverReceita(loja: LojaDoOrcamento, periodo: Pick<PeriodoDoOrca
       diasSemLancamento,
       diasRestantes: restantes.length,
       diasNaJanela,
+      diasAntesDeAbrir,
+      frasesDoZero,
     },
   };
 }
@@ -214,6 +233,8 @@ export interface OrcamentoDaLoja {
   /** Receita dos dias do período até ontem (todos completos, senão nulo). */
   receitaAteOntemCentavos: number | null;
   compradoAteOntemCentavos: number;
+  /** A loja vendeu no período e não tem nota nenhuma no período: o "cabe" é o teto inteiro, e isso vem dito (decisão 215). */
+  semNota: boolean;
 }
 
 export interface OrcamentoDoEscopo {
@@ -262,9 +283,22 @@ export function orcamentoDaLoja(loja: LojaDoOrcamento, periodo: PeriodoDoOrcamen
   const previsao = prev.ok ? prev.previsao : null;
   const completoAteOntem = previsao !== null && previsao.diasSemLancamento === 0;
   const receitaAteOntem = completoAteOntem ? previsao!.realizadoCentavos : null;
-  const semNota = receitaAteOntem !== null && receitaAteOntem > 0 && loja.compradoAteOntemCentavos === 0 ? [loja.nome] : [];
-  const { farol, cmvBp } = ritmoDasCompras({ metaBp, receitaAteOntemCentavos: receitaAteOntem, compradoAteOntemCentavos: loja.compradoAteOntemCentavos, lojasSemNota: semNota });
-  const base = { lojaId: loja.lojaId, nome: loja.nome, compradoCentavos: loja.compradoCentavos, previsao, ritmo: farol, cmvAteOntemBp: cmvBp, receitaAteOntemCentavos: receitaAteOntem, compradoAteOntemCentavos: loja.compradoAteOntemCentavos };
+  const semNotaAteOntem = receitaAteOntem !== null && receitaAteOntem > 0 && loja.compradoAteOntemCentavos === 0 ? [loja.nome] : [];
+  const { farol, cmvBp } = ritmoDasCompras({ metaBp, receitaAteOntemCentavos: receitaAteOntem, compradoAteOntemCentavos: loja.compradoAteOntemCentavos, lojasSemNota: semNotaAteOntem });
+  // Vendeu no período (algum dia com venda lançada) e nenhuma nota com data no período: nunca "já comprado R$ 0,00" calado.
+  const vendeu = previsao !== null && previsao.realizadoCentavos > 0;
+  const semNota = vendeu && loja.compradoCentavos === 0;
+  const base = {
+    lojaId: loja.lojaId,
+    nome: loja.nome,
+    compradoCentavos: loja.compradoCentavos,
+    previsao,
+    ritmo: farol,
+    cmvAteOntemBp: cmvBp,
+    receitaAteOntemCentavos: receitaAteOntem,
+    compradoAteOntemCentavos: loja.compradoAteOntemCentavos,
+    semNota,
+  };
   if (metaBp === null) return { ...base, conta: null, motivo: MOTIVO_SEM_META };
   if (!prev.ok) return { ...base, conta: null, motivo: prev.motivo };
   return { ...base, conta: contaDe(prev.previsao.previstaCentavos, metaBp, loja.compradoCentavos), motivo: null };
@@ -290,45 +324,61 @@ export function orcamentoDoEscopo(lojas: readonly OrcamentoDaLoja[], metaBp: num
   }
   const prevista = lojas.reduce((s, l) => s + l.conta!.previstaCentavos, 0);
   const comprado = lojas.reduce((s, l) => s + l.compradoCentavos, 0);
-  return { conta: contaDe(prevista, metaBp, comprado), motivo: null, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento };
+  // O teto da rede é a SOMA dos tetos das lojas (um arredondamento por loja), para a rede bater com o "Por loja".
+  const teto = lojas.reduce((s, l) => s + l.conta!.tetoCentavos, 0);
+  return { conta: { previstaCentavos: prevista, metaBp, tetoCentavos: teto, compradoCentavos: comprado, saldoCentavos: teto - comprado }, motivo: null, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento };
 }
 
 // ================================================================ quem não vê a receita
 
 /**
- * O "cabe" de quem não vê a receita, em degraus de R$ 100, para o lado prudente: o que cabe arredonda para BAIXO,
- * o que passou arredonda para CIMA (R$ 0,01 passado vira "passou R$ 100,00"). Zero cabe = "menos de R$ 100,00".
+ * O degrau do teto de quem não vê a receita (decisão 213, do Maestro): fixo por faixa do teto, para a receita não sair
+ * do teto com precisão de 1 %. Teto abaixo de R$ 10.000,00: R$ 500,00; de R$ 10.000,00 a menos de R$ 50.000,00: R$ 1.000,00;
+ * de R$ 50.000,00 para cima: R$ 5.000,00. Com meta de 30 %, a receita prevista fica com erro de ±8 % em vez de ±0,8 %.
  */
-export function saldoArredondado(saldoCentavos: number): number {
-  if (saldoCentavos >= 0) return Math.floor(saldoCentavos / DEGRAU_SEM_RECEITA) * DEGRAU_SEM_RECEITA;
-  return -Math.ceil(-saldoCentavos / DEGRAU_SEM_RECEITA) * DEGRAU_SEM_RECEITA;
+export function degrauDoTeto(tetoCentavos: number): number {
+  if (tetoCentavos < 1_000_000) return 50_000;
+  if (tetoCentavos < 5_000_000) return 100_000;
+  return 500_000;
 }
 
-/** A frase do saldo: "cabe R$ 4.300,00" / "passou R$ 200,00" / "cabe menos de R$ 100,00" (só no arredondado). */
-export function fraseDoSaldo(saldoCentavos: number, arredondado: boolean): string {
+/** O teto de quem não vê a receita: arredondado PARA BAIXO no degrau da faixa (nunca maior que o real). */
+export function tetoArredondado(tetoCentavos: number): number {
+  if (tetoCentavos <= 0) return 0;
+  const d = degrauDoTeto(tetoCentavos);
+  return Math.floor(tetoCentavos / d) * d;
+}
+
+/** A frase do saldo: "cabe R$ 4.300,00" / "passou R$ 200,00". */
+export function fraseDoSaldo(saldoCentavos: number): string {
   if (saldoCentavos < 0) return `passou ${formatarDinheiro(-saldoCentavos)}`;
-  if (arredondado && saldoCentavos < DEGRAU_SEM_RECEITA) return `cabe menos de ${formatarDinheiro(DEGRAU_SEM_RECEITA)}`;
   return `cabe ${formatarDinheiro(saldoCentavos)}`;
 }
+
+/** Quem passou do orçamento (cada nota é de uma loja só: a sobra de uma não cobre o estouro de outra). */
+export const fraseDeQuemPassou = (nome: string, passouCentavos: number) => `${nome} já passou ${formatarDinheiro(passouCentavos)}: a sobra de outra loja não cobre`;
 
 // ================================================================ a nota (prévia e depois de lançar)
 
 export interface ImpactoDaNota {
-  /** O saldo sem esta nota (exato para quem vê a receita; arredondado para quem não vê). */
+  /** O saldo sem esta nota (o teto exato para quem vê a receita; o teto arredondado para quem não vê). */
   antesCentavos: number;
   /** O saldo com esta nota. */
   depoisCentavos: number;
   /** A nota faz o orçamento passar (ou passar mais). */
   passa: boolean;
+  /** A conta partiu do teto arredondado (quem não vê a receita). */
   arredondado: boolean;
 }
 
 /**
- * O que uma nota faz no orçamento da loja. `saldoSemEstaCentavos` é o saldo de agora SEM a nota (na edição, a versão
- * gravada dela já saiu do "já comprado"). Para quem não vê a receita, a conta parte do saldo arredondado.
+ * O que uma nota faz no orçamento da loja. `compradoSemEstaCentavos` é o já comprado de agora SEM a nota (na edição, a
+ * versão gravada dela já saiu). Para quem não vê a receita, a conta parte do TETO arredondado: as compras deslocam o número
+ * mas não acham o centavo do teto (decisão 213).
  */
-export function impactoDaNota(saldoSemEstaCentavos: number, notaCentavos: number, veReceita: boolean): ImpactoDaNota {
-  const antes = veReceita ? saldoSemEstaCentavos : saldoArredondado(saldoSemEstaCentavos);
+export function impactoDaNota(conta: Pick<ContaDoOrcamento, 'tetoCentavos'>, compradoSemEstaCentavos: number, notaCentavos: number, veReceita: boolean): ImpactoDaNota {
+  const teto = veReceita ? conta.tetoCentavos : tetoArredondado(conta.tetoCentavos);
+  const antes = teto - compradoSemEstaCentavos;
   const depois = antes - notaCentavos;
   return { antesCentavos: antes, depoisCentavos: depois, passa: depois < 0, arredondado: !veReceita };
 }

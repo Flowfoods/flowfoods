@@ -22,6 +22,7 @@ export default async function ParceiroOrcamentoPage({ params }: { params: { slug
       lancarHref={`${base}/compras/nova`}
       bloqueio={ctx.bloqueio}
       planoHref={`${base}/dre/plano`}
+      faturamentoHref={`${base}/faturamento/lancar`}
     />
   );
 }

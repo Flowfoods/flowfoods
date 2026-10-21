@@ -254,7 +254,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       expect(d.status).toBeNull();
       expect(d.resultado.receitaBrutaCentavos).toBe(1_000_000);
       expect(linha(d, 'grupo:PESSOAL').percentualBp).toBe(2600);
-      expect(d.metas['grupo:PESSOAL']).toMatchObject({ metaBp: 2500, metaCentavos: 250_000, desvioBp: 100, desvioTexto: '+1,0 pp' });
+      expect(d.metas['grupo:PESSOAL']).toMatchObject({ metaBp: 2500, metaCentavos: 250_000, desvioBp: 100, desvioTexto: '+1,0\u00a0pp' });
       expect(d.metas['grupo:PESSOAL'].faixa).toMatchObject({ cor: 'AMARELO', palavra: 'um pouco pior' });
       // Resultado do período tem meta de 10 % em setembro: o realizado está em outro patamar, a faixa segue o sentido (maior é melhor).
       expect(d.metas['resultado-do-periodo']).toMatchObject({ metaBp: 1000 });

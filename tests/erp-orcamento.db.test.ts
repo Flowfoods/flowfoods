@@ -52,11 +52,12 @@ import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { salvarCanaisDaLoja } from '@/lib/erp/faturamento';
 import { cadastrarInsumo } from '@/lib/erp/insumos';
-import { cadastrarFornecedor, lancarNota, obterNota, previaDaNota } from '@/lib/erp/compras';
+import { cadastrarFornecedor, cancelarNota, lancarNota, obterNota, previaDaNota } from '@/lib/erp/compras';
 import type { EntradaDaNota } from '@/lib/erp/compra-campos';
 import { salvarMetas, situacaoDasMetas } from '@/lib/erp/dre-metas';
 import { orcamentoDaNotaLancada, orcamentoDeCompra, type OrcamentoDeCompra, type VistaCompleta } from '@/lib/erp/orcamento';
-import { MOTIVO_SEM_META } from '@/lib/erp/orcamento-campos';
+import { MOTIVO_SEM_META, tetoArredondado } from '@/lib/erp/orcamento-campos';
+import type { VistaResumida } from '@/lib/erp/orcamento';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import { somarDias } from '@/lib/erp/contagem-campos';
 import ErpOrcamentoPage from '@/app/erp/compras/orcamento/page';
@@ -191,7 +192,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.5 · orçamento de compra (Postgres real)', {
       // Ritmo: R$ 8.100,00 até ontem ÷ R$ 26.000,00 = 31,2 % contra 30 %: +1,2 pp, amarelo.
       expect(vp.compradoAteOntemCentavos).toBe(R(8_100));
       expect(vp.cmvAteOntemBp).toBe(3115);
-      expect(vp.ritmo).toMatchObject({ tipo: 'cor', cor: 'AMARELO', desvioTexto: '+1,2 pp' });
+      expect(vp.ritmo).toMatchObject({ tipo: 'cor', cor: 'AMARELO', desvioTexto: '+1,2\u00a0pp' });
     });
 
     it('Delivery e a rede: cabe R$ 4.150,00 e R$ 6.450,00; o ritmo da rede é a soma das compras sobre a soma da receita', async () => {
@@ -217,12 +218,13 @@ describe.skipIf(!URL_TESTE)('ERP 2.5 · orçamento de compra (Postgres real)', {
 
   // ================================================================ quem vê o quê
   describe('quem vê o quê', () => {
-    it('o comprador sem dre.ver recebe só o "cabe" arredondado a R$ 100: sem receita, meta, teto, já comprado nem farol', async () => {
+    it('o comprador sem dre.ver recebe só o "cabe" pelo TETO arredondado para baixo (R$ 12.300,00 → R$ 12.000,00): sem receita, meta, teto, já comprado nem farol', async () => {
       const o = (await orc(COMPRADOR()))!;
       expect(o.metaBp).toBeNull();
-      expect(loja(o, ids.vp).vista).toEqual({ veReceita: false, saldoCentavos: R(2_300), motivo: null, diasSemLancamento: 0 });
-      expect(loja(o, ids.dl).vista).toEqual({ veReceita: false, saldoCentavos: R(4_100), motivo: null, diasSemLancamento: 0 });
-      expect(o.rede).toEqual({ veReceita: false, saldoCentavos: R(6_400), motivo: null, diasSemLancamento: 0 });
+      expect(loja(o, ids.vp).vista).toEqual({ veReceita: false, saldoCentavos: R(2_000), motivo: null, diasSemLancamento: 0, semNota: [], quemPassou: [] });
+      expect(loja(o, ids.dl).vista).toEqual({ veReceita: false, saldoCentavos: R(4_000), motivo: null, diasSemLancamento: 0, semNota: [], quemPassou: [] });
+      // A rede é a soma dos tetos arredondados das lojas: bate com o "Por loja" (R$ 2.000,00 + R$ 4.000,00).
+      expect(o.rede).toEqual({ veReceita: false, saldoCentavos: R(6_000), motivo: null, diasSemLancamento: 0, semNota: [], quemPassou: [] });
       const texto = json(o);
       for (const proibido of [String(R(41_000)), String(R(26_000)), String(R(12_300)), String(R(61_500)), String(R(10_000)), '"metaBp":3000', 'previsao', 'ritmo', 'conta']) expect(texto).not.toContain(proibido);
     });
@@ -286,8 +288,8 @@ describe.skipIf(!URL_TESTE)('ERP 2.5 · orçamento de compra (Postgres real)', {
     it('o HTML do comprador não leva receita, meta, teto nem já comprado', async () => {
       como(COMPRADOR());
       const h = await html();
-      expect(h).toContain('R$ 6.400,00');
-      expect(h).toContain('arredondado a R$ 100');
+      expect(h).toContain('R$ 6.000,00');
+      expect(h).toContain('Pelo teto arredondado para baixo');
       for (const proibido of ['Receita prevista', 'R$ 41.000,00', 'R$ 61.500,00', 'R$ 18.450,00', 'R$ 12.300,00', 'Meta do CMV', '30,0 %', 'Ritmo', 'Já comprado', 'Teto']) expect(h, proibido).not.toContain(proibido);
     });
 
@@ -309,7 +311,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.5 · orçamento de compra (Postgres real)', {
       const entrada = entradaDaNota({ valor: '3.000,00', numero: 'GRANDE-1' });
       const p = await previaDaNota(a, DONA(), entrada, undefined, HOJE);
       if (!p.ok) throw new Error(JSON.stringify(p));
-      expect(p.previa.orcamento).toEqual({ tipo: 'conta', lojaNome: 'Vila da Penha', periodoNome: expect.any(String), impacto: { antesCentavos: R(2_300), depoisCentavos: -R(700), passa: true, arredondado: false } });
+      expect(p.previa.orcamento).toEqual({ tipo: 'conta', lojaNome: 'Vila da Penha', periodoNome: expect.any(String), impacto: { antesCentavos: R(2_300), depoisCentavos: -R(700), passa: true, arredondado: false }, semNota: false, defineMetas: true });
 
       const r = await lancarNota(a, DONA(), entrada, 'Marina');
       expect(r.ok).toBe(true);
@@ -327,16 +329,95 @@ describe.skipIf(!URL_TESTE)('ERP 2.5 · orçamento de compra (Postgres real)', {
       expect(p.previa.orcamento).toMatchObject({ tipo: 'conta', impacto: { antesCentavos: R(2_300), depoisCentavos: -R(700) } });
     });
 
-    it('o comprador vê a prévia pelo número arredondado (passou R$ 700,00 → a conta parte de −R$ 700,00, múltiplo de R$ 100)', async () => {
+    it('o comprador vê a prévia pelo teto arredondado (R$ 12.000,00 − R$ 13.000,00 = passou R$ 1.000,00)', async () => {
       const p = await previaDaNota(a, COMPRADOR(), entradaDaNota({ valor: '50,00' }), undefined, HOJE);
       if (!p.ok) throw new Error(JSON.stringify(p));
-      expect(p.previa.orcamento).toMatchObject({ tipo: 'conta', impacto: { antesCentavos: -R(700), depoisCentavos: -R(750), passa: true, arredondado: true } });
+      expect(p.previa.orcamento).toMatchObject({ tipo: 'conta', impacto: { antesCentavos: -R(1_000), depoisCentavos: -R(1_050), passa: true, arredondado: true } });
       expect(json(p.previa.orcamento)).not.toContain(String(R(12_300)));
     });
 
     it('o comprador de uma loja não recebe orçamento da nota de outra (a nota nem passa da leitura)', async () => {
       const p = await previaDaNota(a, COMPRADOR_VP(), entradaDaNota({ valor: '10,00', lojaId: ids.dl }), undefined, HOJE);
       expect(p.ok).toBe(false);
+    });
+  });
+
+  // ================================================================ os ataques do Guardião (1ª rodada), refeitos pelo comprador
+  describe('o comprador não acha o centavo do teto (decisão 213)', () => {
+    const reais = (c: number) => (c / 100).toFixed(2).replace('.', ',');
+
+    it('ataque 1: prévias de EDIÇÃO de cada nota do mês só devolvem o teto arredondado (R$ 12.000,00), nunca o real (R$ 12.300,00)', async () => {
+      const dona = completa(loja((await orc(DONA()))!, ids.vp).vista);
+      const comprado = dona.compradoCentavos;
+      const notas = await a.notaEntrada.findMany({ where: { lojaId: ids.vp, status: 'LANCADA', entradaEm: { gte: dia('2026-10-01') } }, select: { id: true, totalCentavos: true } });
+      expect(notas.length).toBeGreaterThanOrEqual(3);
+      const tetos = new Set<number>();
+      for (const n of notas) {
+        const p = await previaDaNota(a, COMPRADOR(), entradaDaNota({ valor: '1,00' }), n.id, HOJE);
+        if (!p.ok) throw new Error(JSON.stringify(p));
+        const o = p.previa.orcamento!;
+        if (o.tipo !== 'conta') throw new Error(o.tipo);
+        // O que o comprador consegue tirar: antes + (já comprado − valor gravado da nota) = o teto que ele vê.
+        tetos.add(o.impacto.antesCentavos + comprado - n.totalCentavos);
+      }
+      expect([...tetos]).toEqual([tetoArredondado(R(12_300))]);
+      expect([...tetos]).toEqual([R(12_000)]);
+    });
+
+    it('ataque 2: lançar notas de valores escolhidos e ler o detalhe (e cancelar) não muda o teto que ele vê', async () => {
+      const tetos = new Set<number>();
+      for (const valor of [1, 99, 4_321, 9_999]) {
+        const r = await lancarNota(a, COMPRADOR(), entradaDaNota({ valor: reais(valor) }), 'Comprador');
+        if (!r.ok) throw new Error(JSON.stringify(r));
+        const det = await orcamentoDaNotaLancada(a, COMPRADOR(), { lojaId: ids.vp, entradaEm: HOJE, cancelada: false }, HOJE);
+        if (det?.tipo !== 'conta') throw new Error(String(det?.tipo));
+        const comprado = completa(loja((await orc(DONA()))!, ids.vp).vista).compradoCentavos;
+        tetos.add(det.impacto.depoisCentavos + comprado);
+        const c = await cancelarNota(a, COMPRADOR(), r.id, 'digitada errada', 'Comprador');
+        if (!c.ok) throw new Error(JSON.stringify(c));
+      }
+      expect([...tetos]).toEqual([R(12_000)]);
+    });
+  });
+
+  // ================================================================ a loja que abriu no meio e a loja sem nota
+  describe('loja nova e loja sem nota', () => {
+    it('loja que abriu em 05/10: os dias 01 a 04 não existem (nem vendido, nem pela média, nem "sem lançamento")', async () => {
+      const r = await cadastrarLoja(a, { nome: 'Nova' }, 'Marina');
+      if (!r.ok) throw new Error(JSON.stringify(r));
+      ids.nova = r.id;
+      expect((await salvarCanaisDaLoja(a, r.id, ['LOJA'], ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'], 'Marina')).ok).toBe(true);
+      await faturar(a, ids.nova, '2026-10-05', '2026-10-20', { LOJA: 1_000 });
+      await nota(a, ids.insumo, { lojaId: ids.nova, numero: 'NV-1', data: '2026-10-06', centavos: R(1_000), lancadaEm: BRT('2026-10-06', '10:00') });
+      const v = completa((await orc(DONA(), ids.nova))!.lojas[0].vista);
+      expect(v.previsao).toMatchObject({ diasAntesDeAbrir: 4, diasSemLancamento: 0, diasCompletos: 16, realizadoCentavos: R(20_000), previstaCentavos: R(35_000) });
+      expect(v.diasSemLancamento).toBe(0);
+      expect(((await orc(COMPRADOR(), ids.nova))!.lojas[0].vista as VistaResumida).diasSemLancamento).toBe(0);
+      await a.loja.update({ where: { id: ids.nova }, data: { ativa: false } });
+    });
+
+    it('loja que vendeu e não tem nota: "sem nota de compra" para a dona e para o comprador, e na rede', async () => {
+      const r = await cadastrarLoja(a, { nome: 'Sem Nota' }, 'Marina');
+      if (!r.ok) throw new Error(JSON.stringify(r));
+      ids.semNota = r.id;
+      expect((await salvarCanaisDaLoja(a, r.id, ['LOJA'], ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'], 'Marina')).ok).toBe(true);
+      await faturar(a, r.id, '2026-09-01', '2026-10-20', { LOJA: 1_000 });
+      const d = (await orc(DONA()))!;
+      expect(completa(loja(d, r.id).vista)).toMatchObject({ compradoCentavos: 0, semNota: ['Sem Nota'] });
+      expect(completa(d.rede).semNota).toEqual(['Sem Nota']);
+      const c = (await orc(COMPRADOR()))!;
+      expect(loja(c, r.id).vista).toMatchObject({ veReceita: false, semNota: ['Sem Nota'] });
+      expect((c.rede as VistaResumida).semNota).toEqual(['Sem Nota']);
+      await a.loja.update({ where: { id: r.id }, data: { ativa: false } });
+    });
+
+    it('a rede diz quem passou: a sobra de uma loja não cobre a outra (dona exato, comprador pelo teto arredondado)', async () => {
+      const d = (await orc(DONA()))!;
+      // A Penha passou R$ 700,00 (nota de R$ 3.000,00 acima); o Delivery cabe R$ 4.150,00; a rede ainda "cabe" R$ 3.450,00.
+      expect(completa(d.rede).conta?.saldoCentavos).toBe(R(3_450));
+      expect(d.rede!.quemPassou.map((q) => [q.nome, q.passouCentavos])).toEqual([['Vila da Penha', R(700)]]);
+      const c = (await orc(COMPRADOR()))!;
+      expect(c.rede!.quemPassou.map((q) => [q.nome, q.passouCentavos])).toEqual([['Vila da Penha', R(1_000)]]);
     });
   });
 
@@ -353,7 +434,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.5 · orçamento de compra (Postgres real)', {
       expect(completa(o.rede)).toMatchObject({ conta: null, motivo: 'sem o orçamento de Centro' });
       expect(completa(loja(o, ids.dl).vista).conta?.saldoCentavos).toBe(R(4_150));
       const c = (await orc(COMPRADOR()))!;
-      expect(c.rede).toEqual({ veReceita: false, saldoCentavos: null, motivo: 'sem o orçamento de Centro', diasSemLancamento: 0 });
+      expect(c.rede).toMatchObject({ veReceita: false, saldoCentavos: null, motivo: 'sem o orçamento de Centro', diasSemLancamento: 0 });
     });
 
     it('um dia sem o iFood na Penha: o número segue (o dia entra pela média), o ritmo da rede perde a cor', async () => {

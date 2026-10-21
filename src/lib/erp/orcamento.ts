@@ -7,10 +7,12 @@
  *    ontem, e o primeiro lançamento de cada loja (para saber se um dia é falta ou se a loja ainda não lançava);
  *  - as compras pela soma ÚNICA do CMV de compra (`comprasPorLoja`): o período inteiro e até ontem.
  *
- * QUEM VÊ O QUÊ (decisão 210): ver o orçamento pede `compras.ver` ou `compras.lancar` na loja. Só quem tem `dre.ver` NA LOJA recebe
- * a receita prevista, a meta, o teto, o já comprado e o farol; os outros recebem o "cabe" arredondado a R$ 100 e o motivo quando
- * não há número. A filtragem é AQUI, no servidor: a página nunca recebe o que a pessoa não vê (nem no HTML, nem no payload).
- * A linha da rede só existe para quem tem a rede inteira, e mostra a receita só com `dre.ver`.
+ * QUEM VÊ O QUÊ (decisões 210 e 213): ver o orçamento pede `compras.ver` ou `compras.lancar` na loja. Só quem tem `dre.ver` NA LOJA
+ * recebe a receita prevista, a meta, o teto exato, o já comprado e o farol; os outros recebem o "cabe" = teto ARREDONDADO PARA BAIXO
+ * (degrau por faixa) − já comprado, e o motivo quando não há número. Arredonda-se o teto, nunca o saldo (o ataque do Guardião achava o
+ * centavo comparando prévias e notas). A filtragem é AQUI, no servidor: a página nunca recebe o que a pessoa não vê (nem no HTML,
+ * nem no payload). A linha da rede só existe para quem tem a rede inteira, e mostra a receita só com `dre.ver`; para quem não vê, o
+ * teto da rede é a SOMA dos tetos arredondados das lojas (a rede bate com o "Por loja").
  */
 
 import { hojeNoRio } from './compra-campos';
@@ -26,7 +28,8 @@ import {
   inicioDaLeitura,
   orcamentoDaLoja,
   orcamentoDoEscopo,
-  saldoArredondado,
+  fraseDeQuemPassou,
+  tetoArredondado,
   type ContaDoOrcamento,
   type ImpactoDaNota,
   type LojaDoOrcamento,
@@ -41,6 +44,13 @@ import type { ClienteDoParceiro } from './tenant';
 
 const isoDoDia = (d: Date) => d.toISOString().slice(0, 10);
 
+/** Uma loja que já passou do orçamento (a rede diz quem: a sobra de outra loja não cobre). */
+export interface LojaQuePassou {
+  nome: string;
+  passouCentavos: number;
+  frase: string;
+}
+
 /** O que quem vê a receita recebe de uma loja (ou da rede). */
 export interface VistaCompleta {
   veReceita: true;
@@ -53,14 +63,20 @@ export interface VistaCompleta {
   compradoAteOntemCentavos: number;
   receitaAteOntemCentavos: number | null;
   diasSemLancamento: number;
+  /** Lojas que venderam e não têm nota no período (na loja: ela mesma, ou vazio). */
+  semNota: string[];
+  /** Só na rede: as lojas que já passaram. */
+  quemPassou: LojaQuePassou[];
 }
 
-/** O que quem NÃO vê a receita recebe: o "cabe" arredondado (nulo = sem número) e o motivo. Nada mais. */
+/** O que quem NÃO vê a receita recebe: o "cabe" pelo teto arredondado (nulo = sem número), o motivo e os avisos. Nada mais. */
 export interface VistaResumida {
   veReceita: false;
   saldoCentavos: number | null;
   motivo: string | null;
   diasSemLancamento: number;
+  semNota: string[];
+  quemPassou: LojaQuePassou[];
 }
 
 export type VistaDoOrcamento = VistaCompleta | VistaResumida;
@@ -82,9 +98,13 @@ export interface OrcamentoDeCompra {
   lojas: OrcamentoDaLojaNaTela[];
 }
 
+/** O "cabe" de quem não vê a receita: teto arredondado para baixo − já comprado (decisão 213). */
+const saldoResumido = (o: OrcamentoDaLoja) => (o.conta ? tetoArredondado(o.conta.tetoCentavos) - o.compradoCentavos : null);
+
 function vistaDaLoja(o: OrcamentoDaLoja, veReceita: boolean): VistaDoOrcamento {
   const diasSemLancamento = o.previsao?.diasSemLancamento ?? 0;
-  if (!veReceita) return { veReceita: false, saldoCentavos: o.conta ? saldoArredondado(o.conta.saldoCentavos) : null, motivo: o.motivo, diasSemLancamento };
+  const semNota = o.semNota ? [o.nome] : [];
+  if (!veReceita) return { veReceita: false, saldoCentavos: saldoResumido(o), motivo: o.motivo, diasSemLancamento, semNota, quemPassou: [] };
   return {
     veReceita: true,
     conta: o.conta,
@@ -96,7 +116,19 @@ function vistaDaLoja(o: OrcamentoDaLoja, veReceita: boolean): VistaDoOrcamento {
     compradoAteOntemCentavos: o.compradoAteOntemCentavos,
     receitaAteOntemCentavos: o.receitaAteOntemCentavos,
     diasSemLancamento,
+    semNota,
+    quemPassou: [],
   };
+}
+
+/** As lojas que já passaram, cada uma pelo número que a pessoa vê (exato com `dre.ver`, pelo teto arredondado sem). */
+function quemPassouNa(porLoja: readonly OrcamentoDaLoja[], veReceita: boolean): LojaQuePassou[] {
+  const out: LojaQuePassou[] = [];
+  for (const o of porLoja) {
+    const saldo = veReceita ? o.conta?.saldoCentavos ?? null : saldoResumido(o);
+    if (saldo !== null && saldo < 0) out.push({ nome: o.nome, passouCentavos: -saldo, frase: fraseDeQuemPassou(o.nome, -saldo) });
+  }
+  return out;
 }
 
 /** Pode ver o orçamento da loja: quem vê ou lança nota nela. */
@@ -154,6 +186,10 @@ export async function orcamentoDeCompra(cliente: ClienteDoParceiro, alcance: Alc
     if (!opcoes.lojaId && alcance.lojas === 'todas') {
       const e = orcamentoDoEscopo(porLoja, metaBp);
       const veReceita = pode(alcance, 'dre.ver');
+      const semNota = porLoja.filter((l) => l.semNota).map((l) => l.nome);
+      const quemPassou = quemPassouNa(porLoja, veReceita);
+      // Sem `dre.ver`: o teto da rede é a soma dos tetos ARREDONDADOS das lojas (a rede bate com o "Por loja").
+      const saldoResumidoDaRede = e.conta ? porLoja.reduce((s, l) => s + (saldoResumido(l) ?? 0), 0) : null;
       rede = veReceita
         ? {
             veReceita: true,
@@ -166,8 +202,10 @@ export async function orcamentoDeCompra(cliente: ClienteDoParceiro, alcance: Alc
             compradoAteOntemCentavos: porLoja.reduce((s, l) => s + l.compradoAteOntemCentavos, 0),
             receitaAteOntemCentavos: porLoja.some((l) => l.receitaAteOntemCentavos === null) ? null : porLoja.reduce((s, l) => s + (l.receitaAteOntemCentavos ?? 0), 0),
             diasSemLancamento: e.diasSemLancamento,
+            semNota,
+            quemPassou,
           }
-        : { veReceita: false, saldoCentavos: e.conta ? saldoArredondado(e.conta.saldoCentavos) : null, motivo: e.motivo, diasSemLancamento: e.diasSemLancamento };
+        : { veReceita: false, saldoCentavos: saldoResumidoDaRede, motivo: e.motivo, diasSemLancamento: e.diasSemLancamento, semNota, quemPassou };
     }
     const algumaComReceita = lojas.some((l) => l.vista.veReceita) || rede?.veReceita === true;
     return { periodo, hoje, dia: diaDoPeriodo(periodo, hoje), metaBp: algumaComReceita ? metaBp : null, rede, lojas };
@@ -177,7 +215,16 @@ export async function orcamentoDeCompra(cliente: ClienteDoParceiro, alcance: Alc
 // ================================================================ a nota
 
 export type OrcamentoNaNota =
-  | { tipo: 'conta'; lojaNome: string; periodoNome: string; impacto: ImpactoDaNota }
+  | {
+      tipo: 'conta';
+      lojaNome: string;
+      periodoNome: string;
+      impacto: ImpactoDaNota;
+      /** A loja vendeu e não tem nota no período (sem contar a nota em edição). */
+      semNota: boolean;
+      /** Quem lê define as metas (a frase "vale combinar com quem define as metas" não é para essa pessoa). */
+      defineMetas: boolean;
+    }
   | { tipo: 'sem'; lojaNome: string; periodoNome: string; motivo: string }
   /** A data da nota não é do período em curso: o orçamento é só dele. */
   | { tipo: 'fora'; periodoNome: string };
@@ -198,7 +245,16 @@ export async function orcamentoNaNota(
   const o = porLoja[0];
   if (!o) return null;
   if (!o.conta) return { tipo: 'sem', lojaNome: o.nome, periodoNome: periodo.nome, motivo: o.motivo ?? 'sem número' };
-  return { tipo: 'conta', lojaNome: o.nome, periodoNome: periodo.nome, impacto: impactoDaNota(o.conta.saldoCentavos, p.notaCentavos, pode(alcance, 'dre.ver', { lojaId: p.lojaId })) };
+  const veReceita = pode(alcance, 'dre.ver', { lojaId: p.lojaId });
+  return {
+    tipo: 'conta',
+    lojaNome: o.nome,
+    periodoNome: periodo.nome,
+    // `o.conta.compradoCentavos` já está SEM a versão gravada da nota em edição (`semNotaId`).
+    impacto: impactoDaNota(o.conta, o.conta.compradoCentavos, p.notaCentavos, veReceita),
+    semNota: o.semNota,
+    defineMetas: pode(alcance, 'metas.editar'),
+  };
 }
 
 /** O orçamento da loja de uma nota já lançada (a página da nota): numa transação própria. */

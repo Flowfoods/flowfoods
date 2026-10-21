@@ -7,7 +7,9 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
-  DEGRAU_SEM_RECEITA,
+  AVISO_SEM_NOTA,
+  degrauDoTeto,
+  fraseDeQuemPassou,
   MINIMO_DE_DIAS_COMPLETOS,
   MOTIVO_SEM_META,
   fraseDoSaldo,
@@ -17,7 +19,7 @@ import {
   orcamentoDoEscopo,
   preverReceita,
   ritmoDasCompras,
-  saldoArredondado,
+  tetoArredondado,
   tetoDe,
   type GraoDoOrcamento,
   type LojaDoOrcamento,
@@ -64,7 +66,7 @@ describe('a receita prevista (por dia da semana, nas últimas 4 semanas)', () =>
     const r = preverReceita(loja(), OUTUBRO, HOJE);
     expect(r.ok).toBe(true);
     if (!r.ok) return;
-    expect(r.previsao).toEqual({ realizadoCentavos: R(26_000), projetadoCentavos: R(15_000), previstaCentavos: R(41_000), diasCompletos: 20, diasSemLancamento: 0, diasRestantes: 11, diasNaJanela: 28 });
+    expect(r.previsao).toEqual({ realizadoCentavos: R(26_000), projetadoCentavos: R(15_000), previstaCentavos: R(41_000), diasCompletos: 20, diasSemLancamento: 0, diasRestantes: 11, diasNaJanela: 28, diasAntesDeAbrir: 0, frasesDoZero: [] });
   });
 
   it('dia sem um canal não vale zero: entra pela média do mesmo dia da semana', () => {
@@ -89,16 +91,24 @@ describe('a receita prevista (por dia da semana, nas últimas 4 semanas)', () =>
     expect(r.previsao.previstaCentavos).toBe(R(37_000));
   });
 
-  it('dia da semana sem amostra usa a média geral da janela', () => {
-    // Sem nenhum sábado lançado: o sábado é falta (incompleto) e nunca tem amostra; os 3 até ontem e os 2 que faltam entram pela média geral.
+  it('dia da semana sem amostra nas 4 semanas conta como ZERO, com a frase (decisão 214: o lado prudente)', () => {
+    // Nenhum sábado lançado: os 3 sábados até ontem são "sem lançamento" e, com os 2 que faltam, contam zero (não a média geral).
     const g = graos('2026-09-01', '2026-10-20', { LOJA: 1000 }).filter((x) => !sabado(x.data));
     const r = preverReceita(loja({ graos: g }), OUTUBRO, HOJE);
     if (!r.ok) throw new Error(r.motivo);
     expect(r.previsao.diasNaJanela).toBe(24);
     expect(r.previsao.diasSemLancamento).toBe(3);
     expect(r.previsao.realizadoCentavos).toBe(R(17_000));
-    // 9 dias de semana a projetar (R$ 1.000,00) + 5 sábados pela média geral (R$ 1.000,00).
-    expect(r.previsao.previstaCentavos).toBe(R(31_000));
+    // 9 dias de semana a projetar (R$ 1.000,00 cada) e os 5 sábados como zero.
+    expect(r.previsao.previstaCentavos).toBe(R(26_000));
+    expect(r.previsao.frasesDoZero).toEqual(['sábado sem venda lançada nas últimas 4 semanas: conta como zero']);
+  });
+
+  it('loja que abriu no meio do período (05/10): os dias antes do 1º lançamento não existem (decisão 214)', () => {
+    const r = preverReceita(loja({ primeiroLancamento: '2026-10-05', graos: graos('2026-10-05', '2026-10-20', { LOJA: 1000 }) }), OUTUBRO, HOJE);
+    if (!r.ok) throw new Error(r.motivo);
+    // 01 a 04/10 ficam fora: nem realizado, nem projetado, nem "sem lançamento". Vendeu R$ 20.000,00 (05 a 20, 2 sábados) + R$ 15.000,00 (21 a 31).
+    expect(r.previsao).toMatchObject({ diasAntesDeAbrir: 4, diasSemLancamento: 0, diasCompletos: 16, realizadoCentavos: R(20_000), projetadoCentavos: R(15_000), previstaCentavos: R(35_000) });
   });
 
   it(`sem ${MINIMO_DE_DIAS_COMPLETOS} dias completos nas últimas 4 semanas: sem número, com o motivo`, () => {
@@ -156,7 +166,7 @@ describe('o ritmo das compras (o farol da 2.4, escala de custo)', () => {
   it('CMV pelas compras até ontem contra a meta: R$ 8.000,00 sobre R$ 26.000,00 = 30,8 % contra 30 % → amarelo (um pouco pior)', () => {
     const o = orcamentoDaLoja(loja(), OUTUBRO, HOJE, 3000);
     expect(o.cmvAteOntemBp).toBe(3077);
-    expect(o.ritmo).toMatchObject({ tipo: 'cor', cor: 'AMARELO', desvioTexto: '+0,8 pp' });
+    expect(o.ritmo).toMatchObject({ tipo: 'cor', cor: 'AMARELO', desvioTexto: '+0,8\u00a0pp' });
   });
 
   it('as 5 faixas saem de faixaDoDesvio (menos é melhor)', () => {
@@ -179,7 +189,7 @@ describe('o ritmo das compras (o farol da 2.4, escala de custo)', () => {
 
   it('loja que vendeu sem nota até ontem: sem cor (CMV zero não é "bem melhor")', () => {
     const o = orcamentoDaLoja(loja({ compradoAteOntemCentavos: 0 }), OUTUBRO, HOJE, 3000);
-    expect(o.ritmo).toMatchObject({ tipo: 'sem', motivo: 'sem nota de compra de Vila da Penha até ontem', desvioTexto: '−30,0 pp' });
+    expect(o.ritmo).toMatchObject({ tipo: 'sem', motivo: 'sem nota de compra de Vila da Penha até ontem', desvioTexto: '−30,0\u00a0pp' });
   });
 });
 
@@ -214,31 +224,70 @@ describe('cobertura por loja: a rede só tem número quando cada loja tem', () =
   });
 });
 
-describe('quem não vê a receita: o "cabe" em degraus de R$ 100, para o lado prudente', () => {
-  it('arredonda para baixo o que cabe e para cima o que passou', () => {
-    expect(DEGRAU_SEM_RECEITA).toBe(10_000);
-    expect(saldoArredondado(R(4_399.99))).toBe(R(4_300));
-    expect(saldoArredondado(R(4_300))).toBe(R(4_300));
-    expect(saldoArredondado(R(99.99))).toBe(0);
-    expect(saldoArredondado(0)).toBe(0);
-    expect(saldoArredondado(-1)).toBe(-R(100));
-    expect(saldoArredondado(-R(100.01))).toBe(-R(200));
+describe('a loja que vendeu sem nota no período (decisão 215)', () => {
+  it('nunca "já comprado R$ 0,00" calado: a loja vem marcada e o aviso existe', () => {
+    const o = orcamentoDaLoja(loja({ compradoCentavos: 0, compradoAteOntemCentavos: 0 }), OUTUBRO, HOJE, 3000);
+    expect(o.semNota).toBe(true);
+    expect(o.conta?.saldoCentavos).toBe(R(12_300)); // o teto inteiro…
+    expect(AVISO_SEM_NOTA).toContain('não tem nota de compra'); // …com o aviso
+    expect(orcamentoDaLoja(loja(), OUTUBRO, HOJE, 3000).semNota).toBe(false);
+    // nota só de hoje: não é "sem nota" (o já comprado não é zero)
+    expect(orcamentoDaLoja(loja({ compradoCentavos: R(100), compradoAteOntemCentavos: 0 }), OUTUBRO, HOJE, 3000).semNota).toBe(false);
+  });
+});
+
+describe('quem não vê a receita: o TETO arredondado para baixo, por faixa (decisão 213)', () => {
+  it('os degraus do Maestro: R$ 500 abaixo de R$ 10.000, R$ 1.000 até R$ 50.000, R$ 5.000 daí para cima', () => {
+    expect(degrauDoTeto(R(9_999.99))).toBe(R(500));
+    expect(degrauDoTeto(R(10_000))).toBe(R(1_000));
+    expect(degrauDoTeto(R(49_999.99))).toBe(R(1_000));
+    expect(degrauDoTeto(R(50_000))).toBe(R(5_000));
+    expect(tetoArredondado(R(9_999.99))).toBe(R(9_500));
+    expect(tetoArredondado(R(12_300))).toBe(R(12_000));
+    expect(tetoArredondado(R(54_999.99))).toBe(R(50_000));
+    expect(tetoArredondado(R(499.99))).toBe(0);
+    expect(tetoArredondado(-5)).toBe(0);
+  });
+
+  it('nunca maior que o real e nunca diminui quando o teto sobe (também na virada das faixas)', () => {
+    let antes = 0;
+    for (let t = 0; t <= R(120_000); t += 37_123) {
+      const a = tetoArredondado(t);
+      expect(a).toBeLessThanOrEqual(t);
+      expect(a).toBeGreaterThanOrEqual(antes);
+      antes = a;
+    }
   });
 
   it('a frase', () => {
-    expect(fraseDoSaldo(R(2_300), false).replace(/\u00a0/g, ' ')).toBe('cabe R$ 2.300,00');
-    expect(fraseDoSaldo(R(50), true).replace(/ /g, ' ')).toBe('cabe menos de R$ 100,00');
-    expect(fraseDoSaldo(R(50), false).replace(/ /g, ' ')).toBe('cabe R$ 50,00');
-    expect(fraseDoSaldo(-R(700), false).replace(/ /g, ' ')).toBe('passou R$ 700,00');
+    expect(fraseDoSaldo(R(2_300)).replace(/\u00a0/g, ' ')).toBe('cabe R$ 2.300,00');
+    expect(fraseDoSaldo(-R(700)).replace(/\u00a0/g, ' ')).toBe('passou R$ 700,00');
+    expect(fraseDeQuemPassou('Delivery', R(1_716)).replace(/\u00a0/g, ' ')).toBe('Delivery já passou R$ 1.716,00: a sobra de outra loja não cobre');
   });
 
-  it('a prévia de quem não vê a receita parte do arredondado: testar valores de nota não revela o centavo', () => {
-    // Saldo real R$ 2.345,67: só se descobre que fica entre R$ 2.300,00 e R$ 2.399,99.
-    const saldo = R(2_345.67);
-    expect(impactoDaNota(saldo, R(2_300), false)).toEqual({ antesCentavos: R(2_300), depoisCentavos: 0, passa: false, arredondado: true });
-    expect(impactoDaNota(saldo, R(2_300.01), false).passa).toBe(true);
-    expect(impactoDaNota(saldo, R(2_345.67), false).passa).toBe(true); // a fronteira real não aparece
-    expect(impactoDaNota(saldo, R(2_345.67), true)).toEqual({ antesCentavos: saldo, depoisCentavos: 0, passa: false, arredondado: false });
-    expect(impactoDaNota(saldo, R(2_345.68), true).passa).toBe(true);
+  it('o ataque do Guardião não acha nada: compras e prévias de edição só deslocam um número que já não tem o centavo do teto', () => {
+    // Teto real R$ 12.345,67 (segredo). O comprador conhece as compras e escolhe as notas; o que ele vê é teto arredondado − compras.
+    const conta = { tetoCentavos: R(12_345.67) };
+    const vistos = new Set<number>();
+    for (const comprado of [0, R(98.76), R(1_234.5), R(4_321.09), R(9_999.99)]) {
+      for (const nota of [1, R(10), R(2_345.67), R(12_000)]) {
+        const i = impactoDaNota(conta, comprado, nota, false);
+        expect(i.arredondado).toBe(true);
+        vistos.add(i.antesCentavos + comprado); // o que ele consegue tirar: sempre o mesmo teto arredondado
+        vistos.add(i.depoisCentavos + comprado + nota);
+      }
+    }
+    expect([...vistos]).toEqual([R(12_000)]);
+  });
+
+  it('quem vê a receita recebe a conta exata; na edição, o comprado já vem sem a versão gravada da nota', () => {
+    expect(impactoDaNota({ tetoCentavos: R(12_300) }, R(10_000), R(3_000), true)).toEqual({ antesCentavos: R(2_300), depoisCentavos: -R(700), passa: true, arredondado: false });
+    expect(impactoDaNota({ tetoCentavos: R(12_300) }, R(10_000), R(3_000), false)).toEqual({ antesCentavos: R(2_000), depoisCentavos: -R(1_000), passa: true, arredondado: true });
+  });
+
+  it('a rede: o teto é a soma dos tetos das lojas', () => {
+    const a = orcamentoDaLoja(loja(), OUTUBRO, HOJE, 3000);
+    const b = orcamentoDaLoja(loja({ lojaId: 'dl', nome: 'Delivery' }), OUTUBRO, HOJE, 3000);
+    expect(orcamentoDoEscopo([a, b], 3000).conta?.tetoCentavos).toBe(a.conta!.tetoCentavos + b.conta!.tetoCentavos);
   });
 });

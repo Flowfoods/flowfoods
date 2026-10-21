@@ -25,6 +25,7 @@ export default async function ErpOrcamentoPage() {
       lancarHref={pode(ctx.alcance, 'compras.lancar') ? '/erp/compras/nova' : undefined}
       bloqueio={ctx.bloqueio}
       planoHref={pode(ctx.alcance, 'metas.editar') ? '/erp/dre/plano' : undefined}
+      faturamentoHref={pode(ctx.alcance, 'faturamento.lancar') ? '/erp/faturamento/lancar' : undefined}
     />
   );
 }

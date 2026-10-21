@@ -132,13 +132,13 @@ export function taxaDoIfoodDaLoja(receitaIfoodCentavos: number, taxa: TaxaDoIfoo
 
 /** "26,0 %" a partir de pontos-base (uma casa). */
 export function textoDoPercentual(bp: number): string {
-  return `${(bp / 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`;
+  return `${(bp / 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}\u00a0%`;
 }
 
 /** "+1,0 pp" / "−0,5 pp" (diferença entre dois percentuais, em pontos-base). */
 export function textoDosPontos(bp: number): string {
   const v = (Math.abs(bp) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-  return `${bp < 0 ? '−' : '+'}${v} pp`;
+  return `${bp < 0 ? '−' : '+'}${v}\u00a0pp`;
 }
 
 /** O que ficou de fora de um resultado: a taxa primeiro, depois o CMV (inteiro, ou só de algumas lojas: "o CMV de Centro"). */
