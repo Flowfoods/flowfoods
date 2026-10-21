@@ -5,7 +5,6 @@
  */
 
 import type { RequisicaoDaLoja } from '@/lib/erp/requisicao';
-import { fechadoNaData, type AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
 import { numeroDaRequisicao, rotuloDoSetor, textoDoParaDia } from '@/lib/erp/requisicao-campos';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
@@ -16,13 +15,11 @@ import type { AcaoDeEstoque } from '../estoque/estado';
 import { FormEntrega } from './form-entrega';
 import { SeloDoAtraso } from './partes';
 
-export function TelaEntregar({ d, base, contexto, acao, periodos }: { d: RequisicaoDaLoja; base: string; contexto?: string; acao: AcaoDeEstoque; periodos?: AvisoDePeriodos }) {
+export function TelaEntregar({ d, base, contexto, acao }: { d: RequisicaoDaLoja; base: string; contexto?: string; acao: AcaoDeEstoque }) {
   const r = d.requisicao;
   const daLoja = `${base}/${d.loja.id}`;
   const quadro = `${daLoja}/requisicoes`;
   const aqui = `${quadro}/${r.id}`;
-  // A entrega baixa no livro com a data de hoje: período de hoje fechado no DRE, não dá (o servidor confere de novo).
-  const fechadoHoje = periodos ? (fechadoNaData(periodos.fechados, d.hoje)?.nome ?? null) : null;
   return (
     <div className="mx-auto max-w-3xl space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: quadro }, { rotulo: numeroDaRequisicao(r.numero), href: aqui }, { rotulo: 'Entregar' }]} />
@@ -36,7 +33,7 @@ export function TelaEntregar({ d, base, contexto, acao, periodos }: { d: Requisi
       />
       {r.observacao && <Aviso tom="neutro" titulo="Observação de quem pediu:">{r.observacao}</Aviso>}
       <p className="text-sm text-suave">Confira e diga quanto sai de cada um agora. A baixa no livro acontece ao entregar, pelo custo de hoje. Saiu menos? O resto fica pendente, ou encerre.</p>
-      <FormEntrega acao={acao} versao={r.versao} itens={d.itens} recarregar={`${aqui}/atender`} fechadoHoje={fechadoHoje} hrefPeriodos={periodos?.href ?? null} />
+      <FormEntrega acao={acao} versao={r.versao} itens={d.itens} recarregar={`${aqui}/atender`} />
     </div>
   );
 }

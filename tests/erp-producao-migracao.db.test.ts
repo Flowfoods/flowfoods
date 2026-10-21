@@ -165,8 +165,7 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP 3.1 · migration com dado antigo (P
 
         const db = new PrismaClient({ datasources: { db: { url: superuser } } });
         try {
-          // A 3.2 (coluna `daLista`) ainda não foi aplicada neste banco: o conferidor a cobra, e aqui só interessa a 3.1.
-          expect((await conferirMigracao(db)).filter((p) => !p.includes('daLista'))).toEqual([]);
+          expect(await conferirMigracao(db)).toEqual([]);
         } finally {
           await db.$disconnect();
         }
@@ -198,7 +197,7 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP 3.1 · migration com dado antigo (P
         // O conferidor lista cada pendência com a frase de como resolver.
         const db = new PrismaClient({ datasources: { db: { url: superuser } } });
         try {
-          const pend = (await conferirMigracao(db)).filter((p) => !p.includes('daLista'));
+          const pend = await conferirMigracao(db);
           const texto = pend.join('\n');
           for (const c of CHECKS_QUE_O_DADO_RUIM_VIOLA) expect(texto, c).toContain(c);
           expect(texto).toContain('OrdemProducao_parceiroId_requisicaoId_key');

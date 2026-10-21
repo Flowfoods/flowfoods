@@ -17,7 +17,6 @@ import {
   ORDEM_DOS_PERFIS_BASE,
   PERFIS_BASE,
   rotuloDaPermissao,
-  novidadesQueOPerfilNaoTem,
   SETORES,
   TODAS_AS_PERMISSOES,
   type Alcance,
@@ -430,12 +429,6 @@ export function TelaEquipe({
                     {p.setores.length > 0 && (
                       <p className="text-[12px] text-suave">
                         Pensado para: {p.setores.map((s) => SETORES[s]).join(', ')}
-                      </p>
-                    )}
-                    {novidadesQueOPerfilNaoTem(p.catalogoVersao, p.permissoes).length > 0 && (
-                      <p className="text-[12px] leading-relaxed text-atencao">
-                        Criado antes de {novidadesQueOPerfilNaoTem(p.catalogoVersao, p.permissoes).map((x) => `“${rotuloDaPermissao(x)}”`).join(', ')} existir: este perfil não tem essa função e não ganha sozinho. Se a função dele
-                        é essa, marque em Editar perfil.
                       </p>
                     )}
                     {mexe && (

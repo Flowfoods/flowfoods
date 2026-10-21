@@ -55,10 +55,7 @@ function Cartao({ c, aqui, hoje }: { c: CartaoDoLote; aqui: string; hoje: string
         Lote <span className="text-texto">{c.codigoLote}</span> · {c.status === 'CONCLUIDA' && c.produzidoMilesimos !== null ? `${formatarQuantidade(c.produzidoMilesimos, c.unidade)} de ${formatarQuantidade(c.planejadoMilesimos, c.unidade)}${r ? ` · rendeu ${formatarRendimento(r.rendimentoBp)}` : ''}` : formatarQuantidade(c.planejadoMilesimos, c.unidade)}
       </div>
       {pendente && c.requisicao && <div className={`mt-2 text-[12px] ${falta ? 'text-atencao' : 'text-suave'}`}>{situacaoDosInsumos(c.requisicao.status, c.requisicao.numero)}</div>}
-      <div className="mt-1 text-[12px] text-suave">
-        {quem}
-        {c.daLista ? ' · da lista do dia' : ''}
-      </div>
+      <div className="mt-1 text-[12px] text-suave">{quem}</div>
     </CartaoDoQuadro>
   );
 }
@@ -100,16 +97,11 @@ export function TelaQuadroDaProducao({
         titulo={`Produção da ${q.loja.nome}`}
         subtitulo={[contexto, pendentes ? `${pendentes} ${pendentes === 1 ? 'lote pendente' : 'lotes pendentes'}` : 'nada pendente', atrasadas ? `${atrasadas} com atraso` : null].filter(Boolean).join(' · ')}
         acao={
-          <>
-            <Link href={`${aqui}/lista`} className={classeDeBotao('secundario')}>
-              Lista do dia
+          pode.registrar && !bloqueio && q.aberto ? (
+            <Link href={`${aqui}/nova`} className={classeDeBotao('primario')}>
+              Nova produção
             </Link>
-            {pode.registrar && !bloqueio && q.aberto && (
-              <Link href={`${aqui}/nova`} className={classeDeBotao('primario')}>
-                Nova produção
-              </Link>
-            )}
-          </>
+          ) : undefined
         }
       />
       {feito && <Aviso tom="ok" titulo={feito} />}

@@ -10,8 +10,6 @@ import { useState } from 'react';
 import { useFormState } from 'react-dom';
 import type { ItemDoDetalhe } from '@/lib/erp/requisicao';
 import { formatarQuantidade, UNIDADES } from '@/lib/erp/unidades';
-import { periodoDaFraseDeRecusa } from '@/lib/erp/periodo-fechado-campos';
-import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
@@ -77,22 +75,7 @@ export function FormCancelarRequisicao({ acao }: { acao: AcaoDeEstoque }) {
   );
 }
 
-export function FormDevolver({
-  acao,
-  versao,
-  itens,
-  recarregar,
-  fechadoHoje = null,
-  hrefPeriodos = null,
-}: {
-  acao: AcaoDeEstoque;
-  versao: number;
-  itens: ItemDoDetalhe[];
-  recarregar: string;
-  /** O período de HOJE está fechado: a devolução entra no livro com a data de hoje, então será recusada (a tela avisa antes). */
-  fechadoHoje?: string | null;
-  hrefPeriodos?: string | null;
-}) {
+export function FormDevolver({ acao, versao, itens, recarregar }: { acao: AcaoDeEstoque; versao: number; itens: ItemDoDetalhe[]; recarregar: string }) {
   const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
   const comSaida = itens.filter((i) => i.atendidoMilesimos > 0);
   const [itemId, setItemId] = useState(comSaida[0]?.id ?? '');
@@ -100,13 +83,10 @@ export function FormDevolver({
   const item = comSaida.find((i) => i.id === itemId);
   const u = item ? UNIDADES[item.unidade] : null;
   const erro = estado?.erros.devolver;
-  const fechadoNoServidor = periodoDaFraseDeRecusa(estado?.erros.geral);
-  const fechado = fechadoHoje ?? fechadoNoServidor;
   return (
     <form action={enviar} className="space-y-3">
       <input type="hidden" name="versao" value={versao} />
       <input type="hidden" name="escala" value={escala} />
-      {fechado && <AvisoDoPeriodoFechado id="devolver-periodo-fechado" periodo={fechado} href={hrefPeriodos} frase="A devolução entra no estoque com a data de hoje: não dá para devolver insumo nele." rolar={!fechadoHoje && !!fechadoNoServidor} dentro />}
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_200px]">
         <div>
           <label htmlFor="devolver-item" className={ROTULO}>
@@ -147,9 +127,9 @@ export function FormDevolver({
         <input id="devolver-motivo" name="motivo" maxLength={200} autoComplete="off" placeholder="Ex.: sobrou do almoço" className={CAMPO} />
       </div>
       <Erro id="devolver-erro" texto={erro} />
-      {!fechadoNoServidor && <ErroGeral estado={estado} recarregar={recarregar} />}
+      <ErroGeral estado={estado} recarregar={recarregar} />
       <p className={AJUDA}>No livro, a saída é estornada e sai de novo só o que ficou: nenhuma linha é apagada.</p>
-      <BotaoEnviar variante="secundario" pendente="Registrando…" disabled={!!fechadoHoje}>
+      <BotaoEnviar variante="secundario" pendente="Registrando…">
         Receber de volta
       </BotaoEnviar>
     </form>

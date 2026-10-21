@@ -136,11 +136,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao'],
     titulo: 'Produção',
-    versao: 2,
+    versao: 1,
     aula: [
       { texto: 'Escolha a loja para ver os lotes: planejados, em produção e os concluídos de hoje.' },
       { texto: 'Lote atrasado ganha uma faixa vermelha.' },
-      { texto: 'A aba Lista do dia mostra o que produzir em cada dia e o que falta comprar.' },
     ],
   },
   {
@@ -148,11 +147,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/[lojaId]'],
     titulo: 'Produção da loja',
-    versao: 2,
+    versao: 1,
     aula: [
       { texto: 'Cada cartão é um lote: o pré-preparo, o código, quanto, para quando e se os insumos já saíram do estoque.' },
-      { texto: 'Lote atrasado ganha uma faixa vermelha e os dias de atraso. “Da lista do dia” marca o lote que o gerente definiu.' },
-      { texto: 'Planeje em “Nova produção” o lote avulso. Quando o lote ficar pronto, abra o cartão e conclua.', para: ['producao.registrar'] },
+      { texto: 'Lote atrasado ganha uma faixa vermelha e os dias de atraso.' },
+      { texto: 'Planeje em “Nova produção”. Quando o lote ficar pronto, abra o cartão e conclua.', para: ['producao.registrar'] },
     ],
     secoes: [
       {
@@ -184,41 +183,15 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
-    chave: 'producao-lista',
-    // Tela de trabalho no celular: a caixa nasce recolhida para a lista e o rascunho ficarem à vista.
-    recolhida: true,
-    area: 'producao',
-    rotas: ['producao/lista', 'producao/[lojaId]/lista'],
-    titulo: 'Lista do dia',
-    versao: 1,
-    aula: [
-      { texto: 'Aqui está o que vai ser produzido no dia, lote por lote. As setas trocam de dia, de hoje até 14 dias à frente; dia que já passou é só consulta.' },
-      { texto: 'Depois vem a conta do estoque: o que vai usar, o que tem agora e o que comprar, em embalagens inteiras.', para: ['estoque.ver'] },
-      { texto: 'Escolha o pré-preparo e quanto, e toque em “Pôr na lista”. Só grava quando você confirmar, e aí todos os lotes nascem juntos.', para: ['producao.planejar'] },
-      { texto: 'Perfil próprio criado antes não ganha “Definir a lista do dia” sozinho: marque em Equipe, Editar perfil.', para: ['acessos.gerir'] },
-    ],
-    secoes: [
-      {
-        id: 'conta',
-        titulo: 'Como a conta é feita',
-        blocos: [
-          { texto: 'O que já saiu do estoque não conta de novo: se o estoque entregou parte de um lote, só o que falta entra em “vai usar”. Saldo negativo no livro conta como zero e fica avisado.', para: ['estoque.ver'] },
-          { texto: 'Pré-preparo que a lista usa e não tem no estoque não vai para “comprar”: vai para “Falta produzir”, com o botão que o põe na lista. Aí os insumos dele entram na conta.', para: ['estoque.ver'] },
-          { texto: 'O valor da compra e o fornecedor da última nota só aparecem para quem pode ver custos e compras.', para: ['insumos.ver', 'compras.ver'] },
-        ],
-      },
-    ],
-  },
-  {
     chave: 'producao-lote',
     area: 'producao',
     rotas: ['producao/[lojaId]/[ordemId]'],
     titulo: 'Lote',
-    versao: 2,
+    versao: 1,
     aula: [
       { texto: 'O que foi planejado, os insumos que saíram pela requisição e, depois de concluído, quanto saiu de verdade.' },
       { texto: 'Para concluir, os insumos precisam estar entregues. Sobrou insumo? Devolva pela requisição antes de concluir.', para: ['producao.registrar'] },
-      { texto: 'Cancelar só vale se nada saiu do estoque, ou se tudo voltou. Lote da lista do dia só sai dela por quem define a lista; estornar é de quem ajusta o saldo.', para: ['producao.registrar', 'producao.planejar'] },
+      { texto: 'Cancelar só vale se nada saiu do estoque, ou se tudo voltou. Estornar um lote concluído é de quem ajusta o saldo.', para: ['producao.registrar'] },
       { texto: 'O custo do lote é o que saiu do estoque, dividido pelo que saiu de verdade, ao lado do que a ficha prevê.', para: ['insumos.ver'] },
     ],
     secoes: [
@@ -237,8 +210,6 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/[lojaId]/[ordemId]/concluir'],
     titulo: 'Concluir o lote',
-    // A tela é de bancada, no celular: a caixa nasce recolhida para o aviso e o campo ficarem à vista (como nas telas de contar).
-    recolhida: true,
     versao: 1,
     aula: [
       { texto: 'Diga quanto saiu de verdade; zero se o lote se perdeu, e então nada entra no estoque.' },
@@ -654,11 +625,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['equipe'],
     titulo: 'Equipe',
-    versao: 2,
+    versao: 1,
     aula: [
       { texto: 'Quem entra, com que perfil e em quais lojas.' },
       { texto: 'O setor só organiza, não dá acesso. O link de primeiro acesso aparece uma vez: copie ou mande no WhatsApp.' },
-      { texto: 'Função nova do sistema entra sozinha no Dono e no Gerente, mas não nos perfis próprios: o aviso na lista de perfis diz o que falta marcar.' },
     ],
   },
   {

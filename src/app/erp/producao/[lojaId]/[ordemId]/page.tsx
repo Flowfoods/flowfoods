@@ -2,7 +2,6 @@
 
 import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
-import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { obterOrdem } from '@/lib/erp/producao';
 import { TelaDoLote } from '@/components/erp/telas/producao/lote';
 import { fraseDoEstoque } from '@/components/erp/telas/estoque/estado';
@@ -23,11 +22,10 @@ export default async function ErpLotePage({ params, searchParams }: { params: { 
       d={d}
       base="/erp/producao"
       feito={fraseDoEstoque(searchParams.feito)}
-      pode={{ registrar, estornar: registrar && pode(ctx.alcance, 'estoque.ajustar', { lojaId }), planejar: pode(ctx.alcance, 'producao.planejar', { lojaId }) }}
+      pode={{ registrar, estornar: registrar && pode(ctx.alcance, 'estoque.ajustar', { lojaId }) }}
       hrefs={{ requisicao: veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null, estoque: pode(ctx.alcance, 'estoque.ver', { lojaId }) ? `/erp/estoque/${lojaId}` : null }}
       acoes={{ iniciar: acaoIniciarProducao.bind(null, lojaId, d.ordem.id), cancelar: acaoCancelarProducao.bind(null, lojaId, d.ordem.id), estornar: acaoEstornarProducao.bind(null, lojaId, d.ordem.id) }}
       bloqueio={ctx.bloqueio}
-      periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')}
     />
   );
 }
