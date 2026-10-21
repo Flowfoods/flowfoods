@@ -127,7 +127,11 @@ export function FormSoltar({ acao, lote, versao, recarregar, voltar, deOutro, co
   );
 }
 
-/** "Passar para outra pessoa" (a gerência): quem recebe (quem registra produção na loja) e o motivo. */
+/**
+ * "Passar para outra pessoa" (a gerência): quem recebe (quem registra produção na loja) e o motivo.
+ * Quem usa os formulários de lote passa `key` com a versão do lote: depois de gravar, o formulário fecha. Sem isso, o lote que fica
+ * no mesmo lugar da tela manteria o formulário aberto com a escolha velha e a versão nova, e um segundo toque gravaria de novo.
+ */
 export function FormPassar({
   acao,
   lote,

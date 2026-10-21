@@ -300,9 +300,9 @@ export function TelaDoLote({
               subtitulo={!d.responsavel ? (pode.pegar ? 'Pegar é começar: o lote fica com você, com a hora' : 'Quem pega é a equipe da loja') : d.responsavel.comigo ? 'Soltar devolve o lote para alguém pegar' : mexe ? 'A gerência solta ou passa para outra pessoa' : 'Só quem pegou ou a gerência mexe neste lote'}
             >
               <div className="space-y-4">
-                {!d.responsavel && pode.pegar && <FormPegar acao={acoes.pegar} campos={{ lote: o.id, versao: String(o.versao) }} rotulo={`Pegar o lote ${o.codigoLote}`} recarregar={aqui} cozinha={false} variante="secundario" />}
-                {pode.gerenciar && o.status === 'EM_EXECUCAO' && <FormPassar acao={acoes.passar} lote={o.id} versao={o.versao} pessoas={pessoas} atual={d.responsavel?.nome ?? null} recarregar={aqui} cozinha={false} />}
-                {d.responsavel && mexe && <FormSoltar acao={acoes.soltar} lote={o.id} versao={o.versao} recarregar={aqui} cozinha={false} deOutro={d.responsavel.comigo ? undefined : d.responsavel.nome} />}
+                {!d.responsavel && pode.pegar && <FormPegar key={`pegar-${o.versao}`} acao={acoes.pegar} campos={{ lote: o.id, versao: String(o.versao) }} rotulo={`Pegar o lote ${o.codigoLote}`} recarregar={aqui} cozinha={false} variante="secundario" />}
+                {pode.gerenciar && o.status === 'EM_EXECUCAO' && <FormPassar key={`passar-${o.versao}`} acao={acoes.passar} lote={o.id} versao={o.versao} pessoas={pessoas} atual={d.responsavel?.nome ?? null} recarregar={aqui} cozinha={false} />}
+                {d.responsavel && mexe && <FormSoltar key={`soltar-${o.versao}`} acao={acoes.soltar} lote={o.id} versao={o.versao} recarregar={aqui} cozinha={false} deOutro={d.responsavel.comigo ? undefined : d.responsavel.nome} />}
                 {mexe ? <FormCancelarLote acao={acoes.cancelar} versao={o.versao} recarregar={aqui} /> : <p className="text-[13px] text-suave">Se for para você terminar, peça para a gerência passar o lote para você.</p>}
               </div>
             </Painel>

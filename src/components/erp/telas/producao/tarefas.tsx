@@ -174,7 +174,7 @@ export function TelaTarefas({
                         </span>
                       </>
                     ) : null}
-                    {pega && <FormSoltar acao={acoes.soltar} lote={l.id} versao={l.versao} recarregar={aqui} voltar="tarefas" />}
+                    {pega && <FormSoltar key={`soltar-${l.id}-${l.versao}`} acao={acoes.soltar} lote={l.id} versao={l.versao} recarregar={aqui} voltar="tarefas" />}
                     <Link href={`${doLote}/${l.id}`} className={`${LINK_DE_TEXTO} ff-toque inline-flex min-h-11 items-center self-start text-[14px]`}>
                       Abrir o lote {l.codigo}
                     </Link>
@@ -209,8 +209,8 @@ export function TelaTarefas({
                     </>
                   }
                 >
-                  {pega && <FormPegar acao={acoes.pegarLote} campos={{ lote: x.id, versao: String(x.versao) }} rotulo={`Pegar ${x.nome}, ${formatarQuantidade(x.planejadoMilesimos, x.unidade)}`} recarregar={aqui} voltar="tarefas" />}
-                  {gerencia && x.status === 'EM_EXECUCAO' && <FormPassar acao={acoes.passar} lote={x.id} versao={x.versao} pessoas={pessoas} atual={null} recarregar={aqui} voltar="tarefas" />}
+                  {pega && <FormPegar key={`pegar-${x.id}-${x.versao}`} acao={acoes.pegarLote} campos={{ lote: x.id, versao: String(x.versao) }} rotulo={`Pegar ${x.nome}, ${formatarQuantidade(x.planejadoMilesimos, x.unidade)}`} recarregar={aqui} voltar="tarefas" />}
+                  {gerencia && x.status === 'EM_EXECUCAO' && <FormPassar key={`passar-${x.id}-${x.versao}`} acao={acoes.passar} lote={x.id} versao={x.versao} pessoas={pessoas} atual={null} recarregar={aqui} voltar="tarefas" />}
                   <Link href={`${doLote}/${x.id}`} className={`${LINK_DE_TEXTO} ff-toque inline-flex min-h-11 items-center self-start text-[14px]`}>
                     Abrir o lote {x.codigo}
                   </Link>
@@ -253,8 +253,8 @@ export function TelaTarefas({
               >
                 {gerencia && (
                   <>
-                    <FormPassar acao={acoes.passar} lote={l.id} versao={l.versao} pessoas={pessoas} atual={l.responsavel!.nome} recarregar={aqui} voltar="tarefas" />
-                    <FormSoltar acao={acoes.soltar} lote={l.id} versao={l.versao} recarregar={aqui} voltar="tarefas" deOutro={l.responsavel!.nome} />
+                    <FormPassar key={`passar-${l.id}-${l.versao}`} acao={acoes.passar} lote={l.id} versao={l.versao} pessoas={pessoas} atual={l.responsavel!.nome} recarregar={aqui} voltar="tarefas" />
+                    <FormSoltar key={`soltar-${l.id}-${l.versao}`} acao={acoes.soltar} lote={l.id} versao={l.versao} recarregar={aqui} voltar="tarefas" deOutro={l.responsavel!.nome} />
                   </>
                 )}
                 <Link href={`${doLote}/${l.id}`} className={`${LINK_DE_TEXTO} ff-toque inline-flex min-h-11 items-center self-start text-[14px]`}>
