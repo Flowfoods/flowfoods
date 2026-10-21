@@ -2659,3 +2659,30 @@ banco de teste: o operador é recusado pelo servidor.
   precisa de faixa própria? (2) produção sem data retroativa: se o cozinheiro esquece de lançar ontem, hoje não dá para planejar para ontem; vale abrir exceção
   para o gerente? (3) a requisição de produção deve aparecer nas Divergências (requisição × contagem)? Hoje ela conta como requisitado no cruzamento, mas não há
   filtro para separar a de produção da do salão. (4) `insumos.ver` hoje mistura "ver insumo" e "ver custo": o operador da cozinha vê o custo dos insumos do lote. Vale uma permissão só para custo?
+
+## Revisão visual de 21/10/2026 (antes das próximas funcionalidades)
+
+**O que foi feito.** Diagnóstico no build de produção com dados de teste, em 10 telas × 4 formatos (celular 390, tablet em pé 820, tablet deitado
+1180, desktop 1440) × 2 temas = 80 telas, com toque ligado no celular e no tablet, axe (WCAG 2 A/AA), rolagem lateral e alvos de toque. Depois,
+varredura de todas as telas alcançáveis: 70 com a dona no tablet deitado, 25 com o operador no celular.
+
+**Referências Kairu realmente consultadas** (MCP, 21/10): Editorial v1.2.0, Corporativo v1.2.0 e Dark v2.0.0 (prompt completo, DESIGN.md e
+código). Escolha e motivos na decisão 202. As prévias em imagem não abriram (rede da sessão bloqueia portal.kairulabs.com.br: proxy 403).
+
+**Achados e correções.**
+
+| Achado | Correção | Onde |
+|---|---|---|
+| Caixa "Como funciona" acima do título: na 1ª visita o título aparecia depois de uma dobra inteira | caixa dentro do `PageHeader`, abaixo do título; sem o título repetido em serifa | `ui/caixa-da-tela.tsx`, `ui/cabecalho.tsx`, `shell/Shell.tsx`, `shell/ajuda.tsx` |
+| Filtros dos insumos estouravam a 1180 px com o menu (53 px de rolagem lateral) | linha única só a partir de 1280; em 1024–1279, busca em cima e 4 filtros embaixo | `telas/insumos/lista.tsx` |
+| Tablet recebia alvos de mouse (40/36 px) | `pointer: coarse` devolve 44 px; links de texto ganham área de toque | `tokens.css` |
+| Grupo do menu com um item só ("INSUMOS › Insumos") | vira o item direto | `shell/NavLateral.tsx` |
+| Selo "Sem CMV" no DRE escuro com 4,42:1 | erro escuro #F5525A | `tokens.css`, `tailwind.config.ts` |
+| Hub em 1 coluna no celular (herança da UX.5) | 2 colunas, card compacto | `ui/hub.tsx` |
+
+**Resultado.** 80 de 80 telas sem rolagem lateral e sem violação do axe; 95 telas varridas com um h1 cada e a caixa de ajuda abaixo dele. Testes:
+1.575 passaram (com banco, `--no-file-parallelism`), typecheck e lint limpos. Nenhuma regra, dado, permissão ou rota mudou.
+
+**Herança (para as próximas).** Tela nova usa `PageHeader` (é ele que traz a caixa de ajuda). Alvo novo que encolhe acima de 600 px usa as classes
+já cobertas pela regra de toque (`sm:min-h-10`, `sm:min-h-[42px]`…) ou entra na lista em `tokens.css`. Fica para depois: Equipe longa no celular e
+"Ver tudo sobre esta tela" como link de texto em vez de botão fantasma.

@@ -66,10 +66,10 @@ const ROTULO_DA_SITUACAO = { ativos: 'Ativos', desativados: 'Desativados', todos
 export function FiltrosDaLista({ base, filtros: f }: { base: string; filtros: FiltrosDeInsumo }) {
   const SELECT = `${CAMPO} pr-8`;
   return (
-    <form role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(18rem,1fr)_repeat(3,minmax(10.5rem,auto))_auto]">
+    <form role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-4 xl:grid-cols-[minmax(18rem,1fr)_repeat(3,minmax(10.5rem,auto))_auto]">
       {f.ordem !== 'nome' && <input type="hidden" name="ordem" value={f.ordem} />}
       {f.direcao !== 'asc' && <input type="hidden" name="dir" value={f.direcao} />}
-      <div className="col-span-2 flex gap-2 lg:col-span-1">
+      <div className="col-span-2 flex gap-2 lg:col-span-4 xl:col-span-1">
         <label htmlFor="insumos-q" className="sr-only">
           Buscar insumo pelo nome
         </label>
