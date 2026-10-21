@@ -44,24 +44,48 @@
     "hash": "849e5418c3ebfc54"
   },
   "producao-lista-loja": {
-    "versao": 2,
-    "hash": "a017717c2b63e53f"
+    "versao": 3,
+    "hash": "774889db50eb97e8"
   },
   "producao-quadro": {
-    "versao": 1,
-    "hash": "95aa845b71c0c030"
+    "versao": 2,
+    "hash": "26fdc94da6886838"
   },
   "producao-nova": {
     "versao": 1,
     "hash": "6f543f66c49319af"
   },
   "producao-lote": {
-    "versao": 1,
-    "hash": "822e367430bdbc47"
+    "versao": 2,
+    "hash": "7c7c09b7a4965440"
   },
   "producao-concluir": {
+    "versao": 2,
+    "hash": "73d0e381bd09706e"
+  },
+  "producao-tarefas": {
     "versao": 1,
-    "hash": "0dd52ededf168480"
+    "hash": "2b61d65d9e429be7"
+  },
+  "producao-tarefas-loja": {
+    "versao": 1,
+    "hash": "eb8232470f52b73d"
+  },
+  "producao-historico": {
+    "versao": 1,
+    "hash": "15fa39db41cf1088"
+  },
+  "producao-historico-loja": {
+    "versao": 1,
+    "hash": "d0014d3cd6c8b4e0"
+  },
+  "producao-indicadores": {
+    "versao": 1,
+    "hash": "bf838b088efcc1b5"
+  },
+  "producao-indicadores-loja": {
+    "versao": 1,
+    "hash": "6070254e5729f8ba"
   },
   "ficha": {
     "versao": 3,

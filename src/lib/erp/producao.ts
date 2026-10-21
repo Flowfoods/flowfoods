@@ -5,8 +5,13 @@
  * (`PRODUCAO_ENTRADA`), com o custo fechado pelas baixas reais.
  *
  * Recebe sempre o `ClienteDoParceiro` (parceiro da sessão) e o `Alcance`, com a LOJA: ver = `producao.ver`; planejar,
- * iniciar, concluir e cancelar = `producao.registrar`; estornar o lote concluído = `producao.registrar` E `estoque.ajustar`
- * (mexe no saldo). O custo do lote só sai do servidor para quem tem `insumos.ver` ("Ver insumos e custos").
+ * pegar (começar), concluir e cancelar = `producao.registrar`; estornar o lote concluído = `producao.registrar` E
+ * `estoque.ajustar` (mexe no saldo). O custo do lote só sai do servidor para quem tem `insumos.ver` ("Ver insumos e custos").
+ *
+ * 3.3 (decisões 231 a 240): PEGAR é começar — a mesma transição da 3.1 (Planejada → Em produção), agora com quem pegou e
+ * desde quando (`responsavel*`). O lote que está com alguém só é concluído ou cancelado por essa pessoa ou pela gerência
+ * (`producao.planejar`); soltar é de quem pegou ou da gerência; passar para outra pessoa, só da gerência. Nenhuma dessas
+ * mexe no estoque: não há segunda produção nem segunda baixa (a baixa continua sendo a entrega da requisição).
  *
  * Concorrência (decisões 190 a 201):
  * - a ORDEM FIXA das travas, em todo lugar: período (compartilhada) → abertura da loja → requisição (FOR UPDATE) → ordem
@@ -41,6 +46,7 @@ import {
 import { conferirPeriodoAberto, criarRequisicaoNaTx, exigirAberto, listaDaFichaNaTx, type OpcaoDeInsumo } from './requisicao';
 import { diasDeAtrasoDoLote, codigoDoLote, custoDoLote, custoPorUnidadeDoLote, foiEstornado, fraseDoQueFalta, LIMITE_DA_OBSERVACAO, LOTES_POR_DIA, lerChaveDoEnvio, lerConclusao, lerMotivo, perdaDoLote, rendimentoDoLote, validadeDoLote, formatarRendimento, quandoVence, type BaixaDoInsumo, type StatusDaProducao } from './producao-campos';
 import { faltaDe, lerParaDia, numeroDaRequisicao, textoDoParaDia, type LinhaDigitada, type StatusDaRequisicao } from './requisicao-campos';
+import { fraseDoLoteComOutro } from './producao-equipe-campos';
 import { formatarDinheiro, formatarFracao, formatarQuantidade, UNIDADES, type Fracao, type Unidade } from './unidades';
 import { CONSERVACOES, formatarValidade, retratoDaValidade, SELECAO_DA_VALIDADE, validadesDaLinha, type Conservacao, type Validades } from './validade';
 
@@ -94,6 +100,8 @@ export interface CartaoDoLote {
   concluidaPorNome: string | null;
   canceladaEm: Date | null;
   estornado: boolean;
+  /** 3.3: quem está fazendo (pegou) e desde quando; null = ninguém pegou. */
+  responsavel: { nome: string; desde: Date } | null;
   /** Os insumos pedem a requisição: a situação dela (null = sem requisição). */
   requisicao: { id: string; numero: number | null; status: StatusDaRequisicao } | null;
 }
@@ -125,6 +133,8 @@ export async function quadroDaProducao(cliente: ClienteDoParceiro, alcance: Alca
         concluidaEm: true,
         concluidaPorNome: true,
         canceladaEm: true,
+        responsavelNomeSnapshot: true,
+        responsavelDesde: true,
         requisicao: { select: { id: true, numero: true, status: true } },
       } as const;
       const [pendentes, concluidas, canceladas] = await Promise.all([
@@ -151,6 +161,7 @@ export async function quadroDaProducao(cliente: ClienteDoParceiro, alcance: Alca
           concluidaPorNome: x.concluidaPorNome,
           canceladaEm: x.canceladaEm,
           estornado: foiEstornado({ status, concluidaEm: x.concluidaEm }),
+          responsavel: x.responsavelDesde && x.responsavelNomeSnapshot ? { nome: x.responsavelNomeSnapshot, desde: x.responsavelDesde } : null,
           requisicao: x.requisicao ? { id: x.requisicao.id, numero: x.requisicao.numero, status: x.requisicao.status as StatusDaRequisicao } : null,
         };
       };
@@ -349,6 +360,9 @@ interface OrdemTravada {
   concluidaEm: Date | null;
   produzidoMilesimos: number | null;
   custoTotalCentavos: number | null;
+  responsavelUsuarioId: string | null;
+  responsavelNomeSnapshot: string | null;
+  responsavelDesde: Date | null;
 }
 
 interface RequisicaoTravada {
@@ -377,7 +391,7 @@ async function travarOrdem(tx: ClienteDoParceiro, lojaId: string, id: string): P
   const linhas = await tx.sql<OrdemTravada>`
     SELECT "id", "lojaId", "status"::text AS "status", "versao", "codigoLote", "requisicaoId", "fichaId", "fichaNomeSnapshot", "insumoProduzidoId",
            "unidadeSnapshot"::text AS "unidadeSnapshot", "planejadoMilesimos", "dataPlanejada", "iniciadaEm", "iniciadaPorNome", "concluidaEm",
-           "produzidoMilesimos", "custoTotalCentavos"
+           "produzidoMilesimos", "custoTotalCentavos", "responsavelUsuarioId", "responsavelNomeSnapshot", "responsavelDesde"
     FROM "OrdemProducao"
     WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ${id} AND "lojaId" = ${lojaId} FOR UPDATE`;
   if (!linhas[0]) throw naoEncontrado();
@@ -419,28 +433,217 @@ async function baixasDaRequisicao(tx: ClienteDoParceiro, requisicaoId: string): 
   return linhas.map((l) => ({ insumoId: l.insumoId, nome: l.nome, unidade: l.unidade, quantidadeMilesimos: l.quantidade, valorCentavos: l.valor }));
 }
 
-// ================================================================ iniciar
+// ================================================================ pegar, soltar e passar (3.3)
 
-/** Começa a produzir (opcional: concluir direto da planejada também vale). Idempotente. */
-export async function iniciarProducao(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, id: string, entrada: { versao: unknown }, autor: Autor, agora = new Date()): Promise<ResultadoEstoque> {
+/** Quem está fazendo o lote, para quem lê: a pessoa (o id só para comparar com quem lê), o nome e desde quando. */
+export interface ResponsavelDoLote {
+  usuarioId: string;
+  nome: string;
+  desde: Date;
+}
+
+/** O lote está com alguém (pegou pelo ERP)? */
+function comQuem(o: Pick<OrdemTravada, 'responsavelUsuarioId' | 'responsavelNomeSnapshot' | 'responsavelDesde'>): ResponsavelDoLote | null {
+  return o.responsavelDesde && o.responsavelUsuarioId && o.responsavelNomeSnapshot ? { usuarioId: o.responsavelUsuarioId, nome: o.responsavelNomeSnapshot, desde: o.responsavelDesde } : null;
+}
+
+/**
+ * Quem age é uma pessoa da equipe (decisão 231): o login dela (`userId`) é quem fez. O nível 1 (FlowFoods, `/rodolfo`) não é
+ * da cozinha: não pega, e o lote que ele conclui fica sem "quem fez".
+ */
+function ehPessoa(alcance: Alcance, autor: Autor): autor is Autor & { userId: string } {
+  return alcance.nivel !== 'FLOWFOODS' && typeof autor.userId === 'string' && autor.userId.length > 0;
+}
+
+export const NIVEL1_NAO_PEGA = 'Pegar é de quem está na cozinha: a FlowFoods não pega lote. Para dar o lote a alguém, passe para uma pessoa da equipe.';
+
+/** O lote está com OUTRA pessoa (não com quem age)? */
+function comOutraPessoa(o: OrdemTravada, alcance: Alcance, autor: Autor): ResponsavelDoLote | null {
+  const r = comQuem(o);
+  if (!r) return null;
+  return ehPessoa(alcance, autor) && r.usuarioId === autor.userId ? null : r;
+}
+
+const nomeDoLote = (o: Pick<OrdemTravada, 'codigoLote' | 'fichaNomeSnapshot'>) => `Lote ${o.codigoLote} · ${o.fichaNomeSnapshot}`;
+const encerrado = (o: Pick<OrdemTravada, 'status' | 'codigoLote'>) =>
+  new Recusa({ ok: false, erros: { geral: `O lote ${o.codigoLote} já ${o.status === 'CONCLUIDA' ? 'foi concluído' : 'foi cancelado'}.` }, conflito: true });
+
+/**
+ * Pegar o lote, na transação de quem chama (a tela da cozinha e a linha da lista, `producao-lista.ts`, passam por aqui).
+ * Pegar é COMEÇAR: Planejada → Em produção (a transição da 3.1), com o nome e a hora de quem pegou; o lote em produção sem
+ * ninguém (soltou, ou começou antes da 3.3) ganha dono. Ordem travada (requisição → ordem, a ordem fixa): dois pegando juntos,
+ * o segundo lê o dono e recebe "Caio pegou às 09:12"; a mesma pessoa de novo (duplo toque) = "já feito". O nível 1 só começa
+ * (sem dono), como na 3.1. `versaoLida` null = quem chama acabou de criar o lote (a lista).
+ */
+export async function pegarNaTx(tx: ClienteDoParceiro, lojaId: string, id: string, versaoLida: number | null, alcance: Alcance, autor: Autor, agora: Date): Promise<{ id: string; jaFeito?: true }> {
+  const { ordem } = await travarOrdem(tx, lojaId, id);
+  const hoje = hojeNoRio(agora);
+  if (ordem.status === 'CONCLUIDA' || ordem.status === 'CANCELADA') throw encerrado(ordem);
+  const pessoa = ehPessoa(alcance, autor);
+  const dono = comQuem(ordem);
+  if (dono) {
+    if (pessoa && dono.usuarioId === autor.userId) return { id: ordem.id, jaFeito: true };
+    if (!pessoa) return { id: ordem.id, jaFeito: true };
+    throw new Recusa({ ok: false, erros: { geral: fraseDoLoteComOutro(dono.nome, dono.desde, hoje, 'pegar') }, conflito: true });
+  }
+  if (!pessoa && ordem.status === 'EM_EXECUCAO') return { id: ordem.id, jaFeito: true };
+  if (versaoLida !== null && versaoLida !== ordem.versao) throw new Recusa({ ok: false, erros: { geral: MUDOU }, conflito: true });
+  const comeca = ordem.status === 'PLANEJADA';
+  const mudou = await tx.ordemProducao.updateMany({
+    where: { id: ordem.id, versao: ordem.versao, status: ordem.status },
+    data: {
+      ...(comeca ? { status: 'EM_EXECUCAO' as const, iniciadaEm: agora, iniciadaPorNome: autor.nome } : {}),
+      ...(pessoa ? { responsavelUsuarioId: autor.userId, responsavelNomeSnapshot: autor.nome, responsavelDesde: agora } : {}),
+      versao: { increment: 1 },
+    },
+  });
+  if (mudou.count !== 1) throw new Error('[erp] lote mudou no meio de pegar.');
+  await tx.historicoAlteracao.create({
+    data: pessoa
+      ? {
+          parceiroId: tx.parceiroId,
+          entidade: 'OrdemProducao',
+          entidadeId: ordem.id,
+          acao: 'PEGOU',
+          antes: { nome: nomeDoLote(ordem), situacao: comeca ? 'Planejada' : 'Em produção', responsavel: 'ninguém' },
+          depois: { nome: nomeDoLote(ordem), situacao: 'Em produção', responsavel: autor.nome },
+          autorNome: autor.nome,
+        }
+      : {
+          parceiroId: tx.parceiroId,
+          entidade: 'OrdemProducao',
+          entidadeId: ordem.id,
+          acao: 'INICIOU',
+          antes: { nome: nomeDoLote(ordem), situacao: 'Planejada' },
+          depois: { nome: nomeDoLote(ordem), situacao: 'Em produção' },
+          autorNome: autor.nome,
+        },
+  });
+  return { id: ordem.id };
+}
+
+/**
+ * Pegar o lote (3.3; na 3.1 era "Começar a produzir"): `producao.registrar` na loja. Ver `pegarNaTx`. Não mexe no estoque
+ * nem no DRE: vale também com o período fechado, como começar valia (decisão 233).
+ */
+export async function pegarProducao(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, id: string, entrada: { versao: unknown }, autor: Autor, agora = new Date()): Promise<ResultadoEstoque> {
   const versaoLida = Number(entrada.versao);
   return comRecusa(() =>
     cliente.transacao(async (tx) => {
       await lojaDoAlcance(tx, alcance, lojaId, 'producao.registrar');
+      if (!Number.isSafeInteger(versaoLida)) throw new Recusa({ ok: false, erros: { geral: MUDOU }, conflito: true });
+      const r = await pegarNaTx(tx, lojaId, id, versaoLida, alcance, autor, agora);
+      return { ok: true as const, id: r.id, ...(r.jaFeito ? { jaFeito: true } : {}) };
+    }),
+  );
+}
+
+/** 3.1: "começar a produzir" é pegar (3.3). O nome antigo continua valendo para quem já chamava. */
+export const iniciarProducao = pegarProducao;
+
+/**
+ * Soltar o lote (3.3): quem pegou solta o próprio; a gerência (`producao.planejar` na loja) solta o de qualquer pessoa.
+ * Motivo de 3 a 200 letras. O lote continua Em produção (o começo é fato), sem ninguém: volta para "pegar" na tela da
+ * cozinha. Soltar de novo = "já feito". Lote concluído ou cancelado não muda (regra e gatilho da 3.1).
+ */
+export async function soltarProducao(
+  cliente: ClienteDoParceiro,
+  alcance: Alcance,
+  lojaId: string,
+  id: string,
+  entrada: { versao: unknown; motivo: unknown },
+  autor: Autor,
+  agora = new Date(),
+): Promise<ResultadoEstoque> {
+  const versaoLida = Number(entrada.versao);
+  const motivo = lerMotivo(entrada.motivo);
+  if (!motivo.ok) return { ok: false, erros: { motivo: motivo.erro } };
+  return comRecusa(() =>
+    cliente.transacao(async (tx) => {
+      await lojaDoAlcance(tx, alcance, lojaId, 'producao.registrar');
       const { ordem } = await travarOrdem(tx, lojaId, id);
-      if (ordem.status === 'EM_EXECUCAO') return { ok: true as const, id: ordem.id, jaFeito: true };
-      if (ordem.status !== 'PLANEJADA') throw new Recusa({ ok: false, erros: { geral: `O lote ${ordem.codigoLote} já ${ordem.status === 'CONCLUIDA' ? 'foi concluído' : 'foi cancelado'}.` }, conflito: true });
+      if (ordem.status === 'CONCLUIDA' || ordem.status === 'CANCELADA') throw encerrado(ordem);
+      const dono = comQuem(ordem);
+      if (!dono) return { ok: true as const, id: ordem.id, jaFeito: true };
+      const dele = ehPessoa(alcance, autor) && dono.usuarioId === autor.userId;
+      if (!dele && !pode(alcance, 'producao.planejar', { lojaId })) {
+        throw new Recusa({ ok: false, erros: { geral: `Este lote está com ${dono.nome}: só ${dono.nome} ou a gerência solta.` }, conflito: true });
+      }
       if (!Number.isSafeInteger(versaoLida) || versaoLida !== ordem.versao) throw new Recusa({ ok: false, erros: { geral: MUDOU }, conflito: true });
-      const mudou = await tx.ordemProducao.updateMany({ where: { id: ordem.id, versao: ordem.versao, status: 'PLANEJADA' }, data: { status: 'EM_EXECUCAO', iniciadaEm: agora, iniciadaPorNome: autor.nome, versao: { increment: 1 } } });
-      if (mudou.count !== 1) throw new Error('[erp] lote mudou no meio do início.');
+      const mudou = await tx.ordemProducao.updateMany({
+        where: { id: ordem.id, versao: ordem.versao, status: 'EM_EXECUCAO' },
+        data: { responsavelUsuarioId: null, responsavelNomeSnapshot: null, responsavelDesde: null, versao: { increment: 1 } },
+      });
+      if (mudou.count !== 1) throw new Error('[erp] lote mudou no meio de soltar.');
       await tx.historicoAlteracao.create({
         data: {
           parceiroId: tx.parceiroId,
           entidade: 'OrdemProducao',
           entidadeId: ordem.id,
-          acao: 'INICIOU',
-          antes: { nome: `Lote ${ordem.codigoLote} · ${ordem.fichaNomeSnapshot}`, situacao: 'Planejada' },
-          depois: { nome: `Lote ${ordem.codigoLote} · ${ordem.fichaNomeSnapshot}`, situacao: 'Em produção' },
+          acao: 'SOLTOU',
+          antes: { nome: nomeDoLote(ordem), responsavel: dono.nome },
+          depois: { nome: nomeDoLote(ordem), responsavel: 'ninguém (voltou para pegar)' },
+          motivo: motivo.motivo,
+          autorNome: autor.nome,
+        },
+      });
+      return { ok: true as const, id: ordem.id };
+    }),
+  );
+}
+
+/** Uma pessoa da equipe que pode receber o lote: ativa e com "registrar produção" na loja (lida das credenciais por quem chama). */
+export interface PessoaDaCozinha {
+  usuarioId: string;
+  nome: string;
+}
+
+/**
+ * Passar o lote para outra pessoa (3.3): só a gerência (`producao.planejar` na loja), com motivo. O lote tem de estar Em
+ * produção (o planejado ninguém pegou ainda: quem vai fazer pega na tela da cozinha). `pessoas` = quem pode receber
+ * (`pessoasQueProduzem`, das credenciais, montado no servidor): ninguém de fora delas. A hora de quem recebe começa agora.
+ * Passar para quem já está = "já feito".
+ */
+export async function passarProducao(
+  cliente: ClienteDoParceiro,
+  alcance: Alcance,
+  lojaId: string,
+  id: string,
+  entrada: { versao: unknown; motivo: unknown; para: unknown },
+  pessoas: readonly PessoaDaCozinha[],
+  autor: Autor,
+  agora = new Date(),
+): Promise<ResultadoEstoque> {
+  const versaoLida = Number(entrada.versao);
+  const alvo = typeof entrada.para === 'string' ? pessoas.find((p) => p.usuarioId === entrada.para) : undefined;
+  if (!alvo) return { ok: false, erros: { para: 'Escolha uma pessoa desta loja que registra produção.' } };
+  const motivo = lerMotivo(entrada.motivo);
+  if (!motivo.ok) return { ok: false, erros: { motivo: motivo.erro } };
+  return comRecusa(() =>
+    cliente.transacao(async (tx) => {
+      await lojaDoAlcance(tx, alcance, lojaId, 'producao.planejar');
+      const { ordem } = await travarOrdem(tx, lojaId, id);
+      if (ordem.status === 'CONCLUIDA' || ordem.status === 'CANCELADA') throw encerrado(ordem);
+      if (ordem.status === 'PLANEJADA') {
+        throw new Recusa({ ok: false, erros: { geral: `O lote ${ordem.codigoLote} ainda não começou: quem vai fazer pega pela tela da cozinha (Tarefas).` }, conflito: true });
+      }
+      const dono = comQuem(ordem);
+      if (dono?.usuarioId === alvo.usuarioId) return { ok: true as const, id: ordem.id, jaFeito: true };
+      if (!Number.isSafeInteger(versaoLida) || versaoLida !== ordem.versao) throw new Recusa({ ok: false, erros: { geral: MUDOU }, conflito: true });
+      const mudou = await tx.ordemProducao.updateMany({
+        where: { id: ordem.id, versao: ordem.versao, status: 'EM_EXECUCAO' },
+        data: { responsavelUsuarioId: alvo.usuarioId, responsavelNomeSnapshot: alvo.nome, responsavelDesde: agora, versao: { increment: 1 } },
+      });
+      if (mudou.count !== 1) throw new Error('[erp] lote mudou no meio de passar.');
+      await tx.historicoAlteracao.create({
+        data: {
+          parceiroId: tx.parceiroId,
+          entidade: 'OrdemProducao',
+          entidadeId: ordem.id,
+          acao: 'REATRIBUIU',
+          antes: { nome: nomeDoLote(ordem), responsavel: dono?.nome ?? 'ninguém' },
+          depois: { nome: nomeDoLote(ordem), responsavel: alvo.nome },
+          motivo: motivo.motivo,
           autorNome: autor.nome,
         },
       });
@@ -478,8 +681,11 @@ export interface CustoDaTela {
   perda: Fracao | null;
 }
 
-/** O lote, com a requisição dos insumos, o que saiu, o rendimento, a validade, o custo (quem vê custos) e o histórico. */
-export async function obterOrdem(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, id: string, agora = new Date()) {
+/**
+ * O lote, com a requisição dos insumos, o que saiu, o rendimento, a validade, o custo (quem vê custos) e o histórico. 3.3:
+ * quem está com o lote (e se é quem lê: `eu` = o login de quem lê) e o que essa pessoa pode fazer com ele.
+ */
+export async function obterOrdem(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, id: string, agora = new Date(), eu: string | null = null) {
   const r = await comRecusa(() =>
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'producao.ver');
@@ -515,6 +721,9 @@ export async function obterOrdem(cliente: ClienteDoParceiro, alcance: Alcance, l
           validadeMinSnapshot: true,
           validadeEm: true,
           requisicaoId: true,
+          responsavelUsuarioId: true,
+          responsavelNomeSnapshot: true,
+          responsavelDesde: true,
         },
       });
       if (!o) throw naoEncontrado();
@@ -603,7 +812,11 @@ export async function obterOrdem(cliente: ClienteDoParceiro, alcance: Alcance, l
           validadeEm: o.validadeEm,
           estornado: foiEstornado({ status, concluidaEm: o.concluidaEm }),
           insumosSemPreco: o.insumosSemPreco,
+          /** Quem fez (pegou, ou concluiu sem pegar); null = ninguém. */
+          feitoPor: o.responsavelNomeSnapshot,
         },
+        /** 3.3: quem está com o lote agora (pegou pelo ERP) e desde quando; `comigo` = é quem lê. */
+        responsavel: o.responsavelDesde && o.responsavelNomeSnapshot ? { nome: o.responsavelNomeSnapshot, desde: o.responsavelDesde, comigo: !!eu && eu === o.responsavelUsuarioId } : null,
         atrasoDias: diasDeAtrasoDoLote({ status, dataPlanejada }, hoje),
         requisicao: req ? { id: req.id, numero: req.numero, status: req.status as StatusDaRequisicao, versao: req.versao } : null,
         itensDoLote,
@@ -652,7 +865,13 @@ export async function concluirProducao(
         // O mesmo "concluir" de novo (clique duplo, outra aba, rede que caiu depois de gravar): a que valeu fica.
         if (ordem.status === 'CONCLUIDA') return { ok: true as const, id: ordem.id, jaFeito: true };
         if (ordem.status === 'CANCELADA') throw new Recusa({ ok: false, erros: { geral: `O lote ${ordem.codigoLote} foi cancelado: não se conclui.` }, conflito: true });
+        // 3.3: o lote que está com outra pessoa só ela ou a gerência conclui (o colega não fecha a tarefa do outro).
+        const outro = comOutraPessoa(ordem, alcance, autor);
+        if (outro && !pode(alcance, 'producao.planejar', { lojaId })) {
+          throw new Recusa({ ok: false, erros: { geral: fraseDoLoteComOutro(outro.nome, outro.desde, hojeNoRio(agora), 'concluir') }, conflito: true });
+        }
         if (!Number.isSafeInteger(versaoLida) || versaoLida !== ordem.versao) throw new Recusa({ ok: false, erros: { geral: MUDOU }, conflito: true });
+        if (ordem.responsavelDesde && agora < ordem.responsavelDesde) throw new Recusa({ ok: false, erros: { geral: 'A conclusão não pode ser antes de alguém pegar o lote.' }, conflito: true });
         if (!requisicao || !ordem.insumoProduzidoId) throw new Recusa({ ok: false, erros: { geral: `O lote ${ordem.codigoLote} não tem a requisição dos insumos. Cancele e planeje de novo.` } });
         if (requisicao.status === 'CANCELADA') throw new Recusa({ ok: false, erros: { geral: 'A requisição dos insumos foi cancelada: cancele o lote.' } });
         const itens = await tx.requisicaoItem.findMany({ where: { requisicaoId: requisicao.id }, orderBy: { ordem: 'asc' }, select: { insumoNomeSnapshot: true, unidadeSnapshot: true, solicitadoMilesimos: true, atendidoMilesimos: true } });
@@ -710,8 +929,8 @@ export async function concluirProducao(
             insumosSemPreco: custo.semPreco.length,
             concluidaEm: agora,
             concluidaPorNome: autor.nome,
-            responsavelNomeSnapshot: autor.nome,
-            responsavelUsuarioId: autor.userId ?? null,
+            // Quem fez: quem pegou fica (3.3); sem pegar, quem concluiu (a pessoa; a FlowFoods não é "quem fez").
+            ...(comQuem(ordem) ? {} : ehPessoa(alcance, autor) ? { responsavelNomeSnapshot: autor.nome, responsavelUsuarioId: autor.userId } : { responsavelNomeSnapshot: null, responsavelUsuarioId: null }),
             motivoRendimento: c.motivo,
             ...(c.conservacao && c.validadeMin && validadeEm ? { conservacaoSnapshot: c.conservacao, validadeMinSnapshot: c.validadeMin, validadeEm } : {}),
             ...(ordem.iniciadaEm ? {} : { iniciadaEm: agora, iniciadaPorNome: autor.nome }),
@@ -731,6 +950,7 @@ export async function concluirProducao(
             depois: {
               nome: `Lote ${ordem.codigoLote} · ${ordem.fichaNomeSnapshot}`,
               situacao: c.produzidoMilesimos === 0 ? 'Lote perdido' : 'Concluída',
+              ...(comQuem(ordem) && comQuem(ordem)!.nome !== autor.nome ? { feitoPor: comQuem(ordem)!.nome } : {}),
               planejado: formatarQuantidade(ordem.planejadoMilesimos, unidade),
               produzido: formatarQuantidade(c.produzidoMilesimos, unidade),
               rendimentoDoLote: formatarRendimento(r.rendimentoBp),
@@ -775,6 +995,11 @@ export async function cancelarProducao(
       const { ordem, requisicao } = await travarOrdem(tx, lojaId, id);
       if (ordem.status === 'CANCELADA') return { ok: true as const, id: ordem.id, jaFeito: true };
       if (ordem.status === 'CONCLUIDA') throw new Recusa({ ok: false, erros: { geral: `O lote ${ordem.codigoLote} já foi concluído: para desfazer, estorne o lote (quem ajusta o estoque).` }, conflito: true });
+      // 3.3: o lote que está com outra pessoa só ela ou a gerência cancela.
+      const outro = comOutraPessoa(ordem, alcance, autor);
+      if (outro && !pode(alcance, 'producao.planejar', { lojaId })) {
+        throw new Recusa({ ok: false, erros: { geral: fraseDoLoteComOutro(outro.nome, outro.desde, hojeNoRio(agora), 'cancelar') }, conflito: true });
+      }
       if (!Number.isSafeInteger(versaoLida) || versaoLida !== ordem.versao) throw new Recusa({ ok: false, erros: { geral: MUDOU }, conflito: true });
       if (requisicao) {
         const baixas = await baixasDaRequisicao(tx, requisicao.id);

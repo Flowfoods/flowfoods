@@ -82,6 +82,10 @@ const ACAO: Record<string, string> = {
   ESTORNOU: 'Estornou',
   // 3.2
   GEROU_LOTES: 'Gerou os lotes da',
+  // 3.3: a cozinha pega o lote; quem pegou (ou a gerência) solta; a gerência passa para outra pessoa.
+  PEGOU: 'Pegou',
+  SOLTOU: 'Soltou',
+  REATRIBUIU: 'Passou',
 };
 
 const CAMPO: Record<string, string> = {
@@ -175,6 +179,10 @@ const CAMPO: Record<string, string> = {
   producaoDoDia: 'o que produzir',
   lotesGerados: 'lotes gerados',
   daLista: 'da lista',
+  // 3.3: quem está com o lote
+  responsavel: 'quem faz',
+  feitoPor: 'quem fez',
+  pegoPor: 'pego por',
   // 1.9: custo por canal
   embalagensDelivery: 'embalagens do delivery',
   embalagensIfood: 'embalagens do iFood',
@@ -217,14 +225,17 @@ const CAMPO: Record<string, string> = {
   cmv: 'CMV',
 };
 
-/** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. */
-const NA_HORA = new Set(['custoLoja', 'custoDelivery', 'custoIfood']);
+/** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. 3.3: quem fez o lote, na conclusão. */
+const NA_HORA = new Set(['custoLoja', 'custoDelivery', 'custoIfood', 'feitoPor']);
 
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */
 const ORDEM = [
   'nome',
   'producaoDoDia',
   'lotesGerados',
+  'pegoPor',
+  'responsavel',
+  'feitoPor',
   'tipo',
   'planejado',
   'requisicaoDoLote',

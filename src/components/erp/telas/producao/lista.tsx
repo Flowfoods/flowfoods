@@ -85,6 +85,7 @@ function SeloDaLinha({ l, aqui }: { l: LinhaDaLista; aqui: string }) {
     <Link href={`${aqui}/${lote.id}`} className="ff-transicao -my-1 flex min-h-11 flex-col items-end justify-center gap-1 rounded-[7px] px-1 hover:bg-texto/[0.03]" aria-label={`Lote ${lote.codigo}, ${ROTULO_DA_PRODUCAO[lote.status].toLowerCase()}: abrir o lote`}>
       <Selo tom={TOM_DO_LOTE[lote.status]}>{ROTULO_DA_PRODUCAO[lote.status]}</Selo>
       <span className="text-[12px] tabular-nums text-texto underline decoration-linha-forte underline-offset-4">Lote {lote.codigo}</span>
+      {lote.status === 'EM_EXECUCAO' && <span className="text-[12px] text-suave">{lote.responsavel ? `com ${lote.responsavel.nome}` : 'sem ninguém'}</span>}
     </Link>
   );
 }
@@ -393,7 +394,20 @@ export function TelaListaDoDia({
   return (
     <div className="space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: d.loja.nome }]} />
-      <PageHeader icone="producao" cor={COR.producao} titulo="Lista do dia" subtitulo={[contexto, d.loja.nome, primeiraMaiuscula(d.rotuloDoDia), contagem].filter(Boolean).join(' · ')}>
+      <PageHeader
+        icone="producao"
+        cor={COR.producao}
+        titulo="Lista do dia"
+        subtitulo={[contexto, d.loja.nome, primeiraMaiuscula(d.rotuloDoDia), contagem].filter(Boolean).join(' · ')}
+        acao={
+          // 3.3: quem produz pega pela tela da cozinha (a lista é de hoje: as linhas viram lote ao pegar).
+          d.pode.registrar && d.dia === d.hoje && d.linhas.length > 0 ? (
+            <Link href={`${base}/tarefas/${d.loja.id}`} className={classeDeBotao(d.pode.planejar ? 'secundario' : 'primario')}>
+              Pegar na cozinha
+            </Link>
+          ) : undefined
+        }
+      >
         <SeletorDoDia aqui={aqui} dia={d.dia} hoje={d.hoje} />
       </PageHeader>
       {feito && (

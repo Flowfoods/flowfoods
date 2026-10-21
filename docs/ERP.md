@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2), a cozinha pega a tarefa: histórico e indicadores por pessoa (3.3)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -37,6 +37,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Dois CMVs (2.3): compra (dia a dia, data da nota) e real (inicial + compras − final, fecha na contagem), corte do estoque final, compra × real, fotografia v2 | `src/lib/erp/{cmv-campos,cmv-comparacao,cmv}.ts` (conta pura / comparação pura / leitura com banco, chamada só por `entradaDoDre`); `dre-campos.ts` (`cmv` e as linhas `cmv:compra`, `cmv:real`), `dre.ts`, `dre-fotografia.ts` (`lerCmvDaFotografia`), `dre-fechamento.ts`; tela `telas/dre/cmv-painel.tsx` dentro do DRE; migration `20261028000000_erp_cmv` |
 | Produção de intermediários (3.1): planejar o lote pela ficha, requisição dos insumos criada junto, concluir com rendimento e validade, o lote entra no estoque, cancelar e estornar, quadro kanban | `src/lib/erp/{producao-campos,producao}.ts` (puro / com banco) + `criarRequisicaoNaTx` e `listaDaFichaNaTx` em `requisicao.ts`; telas em `src/components/erp/telas/producao/` e o esqueleto comum dos quadros em `telas/quadro/`; rotas `/erp/producao` e `/rodolfo/erp/<slug>/producao` (`<loja>`, `<loja>/nova`, `<loja>/<lote>`, `<loja>/<lote>/concluir`); migration `20261029000000_erp_producao` |
 | Lista do dia (3.2): o gerente define o que a loja produz no dia; a tela cruza com o estoque (vai usar / tem / comprar, com a cascata dos pré-preparos) e cada linha vira lote pela regra da 3.1 | `src/lib/erp/{producao-lista-campos,producao-lista}.ts` (conta pura / com banco) + `planejarProducaoNaTx` em `producao.ts`; telas `telas/producao/{lista,form-lista}.tsx`; rotas `/erp/producao/lista` e `/rodolfo/erp/<slug>/producao/lista` (`<loja>?dia=aaaa-mm-dd`); migration `20261030000000_erp_lista_do_dia` |
+| A cozinha pega a tarefa (3.3): pegar o lote (ou a linha da lista de hoje), soltar, passar para outra pessoa, concluir pela tela da cozinha; histórico da produção e indicadores por pessoa | regras de escrita em `producao.ts` (`pegarNaTx`, `pegarProducao`, `soltarProducao`, `passarProducao`) e `producao-lista.ts` (`pegarDaLista`); leituras em `producao-equipe.ts` (`tarefasDoDia`, `historicoDaProducao`, `indicadoresDaProducao`); conta pura em `producao-equipe-campos.ts`; quem pode receber em `credenciais.ts` (`pessoasQueProduzem`); telas `telas/producao/{tarefas,form-tarefas,historico-producao,indicadores,periodo}.tsx`; rotas `/erp/producao/{tarefas,historico,indicadores}` (`/<loja>`) e o espelho `/rodolfo/erp/<slug>/producao/...`; migration `20261031000000_erp_producao_equipe` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Navegação por áreas (UX.9): hub de 4 áreas, abas por rota, trilha com a área, ações no ⌘K; rota nova `/estoque/contagens` | `src/lib/erp/modulos.ts` (`areasConstruidas`, `abasDaArea`, `acoesDaNavegacao`, `montarTrilha`) e `src/lib/rodolfo/modulos.ts`; `src/components/erp/ui/{abas,hub}.tsx`, `telas/hub-do-parceiro.tsx`, `shell/Shell.tsx`; sem migration |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
@@ -2193,6 +2194,83 @@ Na tela, rodada 1:
   44 px só no shell e no rastro, que já existiam. No console, só o prefetch do Next abortado pela navegação do roteiro.
 - **Prints.** Em `pw/prova32r1/jornada/` (12) e `pw/prova32r1/matriz-*/`.
 
+## O que a 3.3 entregou — a cozinha pega a tarefa: quem fez, quanto e quando; histórico da produção e indicadores por pessoa
+
+Terceira da Prioridade 003. Fecha o ciclo do lado da COZINHA: a gerência define a lista (3.2), a cozinha pega o que vai fazer,
+executa e conclui pela regra da 3.1, e isso vira histórico e indicadores por pessoa. Migration `20261031000000_erp_producao_equipe`
+(ADITIVA: uma coluna, quatro CHECKs e dois índices em `OrdemProducao`; nenhuma tabela nova; `migrate diff` vazio). Decisões 231 a
+240. Nenhuma permissão nova (catálogo segue na versão 2). `VERSAO_DO_ERP` = fase 3.3.
+
+1. **Quem é o funcionário** (231). A pessoa do login: `responsavelUsuarioId` (texto, sem FK: a credencial mora fora do tenant) e
+   `responsavelNomeSnapshot`, que já existiam, e `responsavelDesde` (nova). No tablet compartilhado cada um entra com o próprio
+   acesso: a tela diz "Você está como Caio" e tem "Não é você? Trocar de pessoa". O `Colaborador` da 0.1 continua sem uso,
+   reservado para quem trabalha sem login (o freelancer da fase tardia). O nível 1 não pega.
+2. **Pegar é começar** (232, 233). Na tela da cozinha (aba Tarefas), "Pegar" leva o lote de Planejada a Em produção com o nome e
+   a hora (`pegarProducao`, que é o `iniciarProducao` da 3.1). A linha da lista de HOJE que ainda não virou lote vira o lote dela
+   na hora em que alguém pega (`pegarDaLista`: `planejarProducaoNaTx` + `pegarNaTx`, numa transação, travando período → lista → as
+   da 3.1). Duplo toque = "já feito"; duas pessoas ao mesmo tempo = uma pega e a outra lê "Este lote está com Caio (pegou às
+   09:12)"; a linha que a gerência mudou depois que a tela abriu é conflito. Pegar não toca no livro do estoque: nada de segunda
+   produção nem de segunda baixa (a baixa continua sendo a entrega da requisição).
+3. **Soltar e passar** (234). Quem pegou solta o próprio lote (com motivo): ele fica Em produção, sem ninguém, e volta para "Para
+   pegar". A gerência (`producao.planejar`) solta o de qualquer pessoa e passa para outra — só quem registra produção na loja,
+   lido das credenciais no servidor (`pessoasQueProduzem`); a hora de quem recebe começa agora. Histórico: Pegou, Soltou, Passou.
+4. **Concluir** (235). A conclusão da 3.1 (rendimento real, motivo fora de ±10%, validade), aberta pela tela da cozinha
+   (`?de=tarefas` volta para ela). O lote com outra pessoa só ela ou a gerência conclui ou cancela. Quem pegou fica como "quem
+   fez" mesmo se a gerência concluir ("quem fez: Duda" no histórico da conclusão); sem pegar, quem conclui é quem fez; o nível 1
+   nunca é. O banco não deixa concluir antes de pegar nem dar dono a lote planejado.
+5. **Histórico da produção** (238). Aba Histórico: os lotes encerrados da loja no período (Hoje · 7 dias · 30 dias, ou de/até, até
+   92 dias), com filtros de pessoa e pré-preparo: o quê, quanto (produzido de planejado), rendimento ("fora de ±10%" escrito),
+   quem fez e quem concluiu, quando pegou e quando terminou, o tempo e o motivo. Concluídos, perdidos, estornados e cancelados. O
+   custo do lote só para quem tem `insumos.ver` (o servidor não manda). Sem dado é frase ("sem hora de pegar", "cancelado antes de
+   produzir"), nunca zero.
+6. **Indicadores por pessoa** (236, 237). Aba Indicadores, da gerência: de cada pessoa, lotes concluídos, quanto produziu de cada
+   ficha, rendimento médio contra o planejado (cada lote pesa igual; os perdidos à parte), fora de ±10%, tempo médio (de pegar, ou
+   da entrega dos insumos se foi depois, até concluir), perdidos, cancelados com ela e estornados. Sempre com o período e a
+   amostra ("1 lote: amostra pequena, ainda não diz muito"); ordem alfabética, sem nota, sem cor por pessoa e sem R$. HIPÓTESE a
+   validar com a casa (decisão 237).
+7. **Telas** (240). Tarefas: celular e tablet primeiro, botões de 56 px (`classeDeBotaoDaCozinha`), cartões "Com você" (Concluir,
+   desabilitado com o motivo enquanto os insumos não saem; Soltar), "Para pegar", "Com outras pessoas" (a gerência solta e passa)
+   e "Feitas hoje". A cozinha entra na área Produção pelas Tarefas; a gerência continua entrando pela Lista do dia. Histórico e
+   Indicadores: tabela Corporativo a partir de 1280 px e cartões abaixo. O lote mostra quem está com ele (e "Quem fez" depois);
+   o quadro de Lotes diz "com Caio · pegou 09:12"; a lista mostra "com Caio" no lote em produção e tem "Pegar na cozinha". O mesmo
+   no espelho do nível 1 (que vê, solta e passa, com rastro no `auditLog`, mas não pega).
+8. **Migration** (239, aditiva, segura para superusuário e para dono não-superusuário com e sem FORCE RLS; nenhum passo lê tabela de
+   tenant): `responsavelDesde`, os CHECKs `OrdemProducao_responsavel_{com_pessoa,so_em_producao,antes_do_fim,nome_curto}` (`NOT VALID`
+   + `VALIDATE` em bloco que avisa) e os índices `(parceiroId, lojaId, concluidaEm)` e `(parceiroId, lojaId, canceladaEm)`. O gatilho
+   `OrdemProducao_concluida_imutavel` (3.1) já cobre a coluna nova. `npm run erp:conferir-migracao` confere os CHECKs e os índices.
+9. **Fora desta subfase**: freelancers (cadastro por QR Code, termo, check-in, diária: fase tardia, `library:controle-freelancers`;
+   o `Colaborador` fica para eles); escala de tarefas (pré-atribuir um lote planejado a alguém); "só os meus" no histórico da
+   cozinha; ranking ou meta por pessoa; R$ por pessoa; tempo por etapa (apontamento); produção retroativa; etiqueta do lote (3.4).
+
+**Ajuda: chaves novas/alteradas** (`ajuda.lock.json` regravado, 61 entradas). Novas: `producao-tarefas`, `producao-tarefas-loja`,
+`producao-historico`, `producao-historico-loja`, `producao-indicadores`, `producao-indicadores-loja`. Alteradas: `producao-lista-loja`
+v2 → v3 (a cozinha pega em Tarefas), `producao-quadro` v1 → v2 (o cartão diz quem pegou), `producao-lote` v1 → v2 (quem está com o
+lote) e `producao-concluir` v1 → v2 (quem pegou fica como quem fez).
+
+### Referências Kairu consultadas (regra do plano)
+
+Lidas pelo MCP da Kairu em 21/10/2026, conteúdo integral (não só o título); a página do Notion "Fase tardia · Controle de freelancers"
+lida pelo MCP do Notion (só para não fechar a porta). Buscas "desempenho funcionário", "indicadores equipe" e "equipe cozinha
+produtividade" na biblioteca: nenhum material; "freelancer": o oficial abaixo e um da comunidade sobre pagamento (Santander, não lido:
+fora do tema).
+
+| Material | O que foi lido | Aplicado | Adaptado | Deixado para outra fase (motivo) |
+|---|---|---|---|---|
+| `prompt:b3592b7c-e37b-4b1d-bffb-9053848afe28` "Da Ficha ao Fornecedor" (comunidade, Fill · Empada da Casa) | descrição e Full Prompt inteiros, de novo nesta subfase (os 3 prints NÃO foram abertos) | a tela da cozinha como "outra coisa": fonte grande, poucos botões, alvo de toque generoso (56 px), que funcione com a mão suja e confirme visualmente cada registro (o aviso do que aconteceu vem para a vista); "todo movimento guarda tipo, referência e autor" (quem pegou, soltou, passou e concluiu, com motivo); "registrar o que saiu" = a conclusão da 3.1 | "perfil de acesso próprio: quem opera aqui não navega no resto do sistema" virou entrada da área pelas Tarefas para quem produz e não define a lista, sem esconder o resto (as permissões da 0.4 já recortam o que cada um vê); "categorias em caixa alta" não entra (o contrato visual do ERP só usa caixa alta no hub e no menu) | o lançamento de produção sem ordem (o tablet registra o que saiu direto): aqui a produção nasce na lista/lote, para a baixa ser a da requisição; a trava de duplicidade de 2 dias (a idempotência da 3.1/3.2 já cobre); busca por número de lote (etiqueta, 3.4) |
+| `pass:producao-lotes-e-consumo` "Produção da cozinha" (oficial Kairu/Nina) | `read_material` inteiro, `blueprint.md` e `nina-origin.md` (pelo `read_design_file`); `reference.mjs`, `fixtures.json`, testes e `demo.html` não foram abertos | "planejado × realizado" sempre lado a lado (histórico: "5,6 kg de 6 kg"); "operador inicia o trabalho e, ao terminar, informa a quantidade" (pegar = iniciar, concluir da 3.1); `ProductionEvent` com ator, de/para e motivo, só acrescentando (o histórico do lote); estados com transições sem volta por clique (soltar não volta a Planejada); "custo por kg só se a quantidade real é conhecida e positiva; não dividir pelo planejado" (o custo do lote da 3.1 no histórico); "status e ação principal em 390 × 844"; estados de tela (vazio, sem permissão, parcial) | `expectedVersion` = a versão lida do lote em pegar, soltar e passar; "reatribuição exige evento explícito" (do ciclo do forno) virou "passar para outra pessoa" com motivo e histórico | equipamentos, ciclos, consumo, tarifas e qualidade (fora do ERP agora); versão aprovada da ficha no lote (a 3.1 já retrata nome, unidade e validade) |
+| `library:controle-freelancers` "Organize freelancers do QR Code ao plantão" (oficial Kairu, v1.0.0) e a página do Notion | prompt inteiro e a documentação; o print não foi aberto | nada implementado (fase tardia, por pedido) | "quem fez" ficou aberto a quem não tem login: o `Colaborador` e `OrdemProducao.responsavelId` seguem reservados; o check-in (presença) não é "quem fez" — a 3.3 também separa pegar (quem) de concluir (o resultado) | o módulo inteiro: cadastro por QR, termo, check-in, quadro do dia, diária e pagamento |
+
+## Provar a cozinha (3.3)
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate && npx vitest run
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism
+npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+PROVAS_33
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -3062,6 +3140,38 @@ banco de teste: o operador é recusado pelo servidor.
   a cozinha não vê R$ na lista, mesmo com `insumos.ver`; o lote (3.1) continua mostrando custo a quem tem `insumos.ver` — separar "ver insumo"
   de "ver custo" no catálogo inteiro segue como decisão de catálogo. (7) Perfil próprio antigo (catálogo v1) que não tinha tudo não ganha
   "definir a lista do dia": a Equipe avisa para revisar.
+
+## Herança da 3.3 (para a 3.4 e as próximas)
+
+- **A produção continua UMA**: pegar, soltar e passar moram em `producao.ts` (`pegarNaTx` é a regra; `pegarProducao` é o
+  `iniciarProducao` da 3.1, que ficou como apelido); pegar uma linha da lista mora em `producao-lista.ts` (`pegarDaLista`). As
+  leituras da cozinha, do histórico e dos indicadores ficam em `producao-equipe.ts`; a conta pura em `producao-equipe-campos.ts`.
+  Quem precisar de "quem fez", "tempo" ou "indicador por pessoa" (etiqueta com o nome de quem fez, relatório mensal) parte de
+  `lotesEncerrados`/`indicadoresPorPessoa`, nunca refaz a conta.
+- **Quem fez = `responsavelUsuarioId` + `responsavelNomeSnapshot`**; `responsavelDesde` nulo = não pegou pelo ERP (lote da 3.1 ou
+  concluído direto: sem tempo). O nível 1 nunca é quem fez. Freelancer (fase tardia) entra por `responsavelId` (Colaborador): aí
+  "quem fez" passa a ser pessoa do login OU colaborador, e os indicadores agrupam pelos dois.
+- **Lote com outra pessoa**: só ela ou a gerência (`producao.planejar`) conclui, cancela ou solta; escrita nova sobre um lote
+  pendente (etiqueta impressa antes de concluir, por exemplo) decide se respeita o dono e diz por quê. A gerência passa só para
+  quem `pessoasQueProduzem` devolve (credenciais, no servidor).
+- **Pegar não mexe no livro nem no DRE**: vale com período fechado. Qualquer escrita nova que mexa (baixa, entrada) chama
+  `conferirPeriodoAberto` e segue a ordem das travas da 3.1/3.2 (período → lista → abertura → requisição → ordem → saldos).
+- **A ordem fixa vale no pegar**: `pegarNaTx` trava requisição → ordem (`travarOrdem`); `pegarDaLista` trava período → lista →
+  as de planejar → as de pegar. Não trave a lista depois da ordem.
+- **Entrada da área por perfil**: `Tela.entradaPara` (`modulos.ts`) — a cozinha entra na Produção pelas Tarefas. Outra área que
+  precise de entrada por perfil usa o mesmo campo (sem mudar a ordem das abas).
+- **Botão da tela da cozinha**: `classeDeBotaoDaCozinha` / `BotaoEnviar cozinha` (56 px em qualquer largura). Tela de bancada nova
+  (etiqueta, contagem rápida) usa o mesmo.
+- **Testes**: a conclusão com relógio fixo precisa pegar antes (o CHECK `responsavel_antes_do_fim`); página que renderiza o lote em
+  produção para a gerência chama `pessoasQueProduzem` (credenciais, outro banco no teste): mocke (`tests/erp-producao-equipe-telas`).
+- **Para o Rodolfo (decisão de negócio, não bloqueia)**: (1) no tablet compartilhado cada um entra com o próprio acesso (senha ou
+  rosto) — a cozinha do Valentin's topa? Se o tablet ficar logado numa pessoa só, o histórico mente; (2) a cozinha vê no histórico o
+  que cada colega fez (como já via no quadro): serve, ou cada um só o seu?; (3) os indicadores são hipótese: amostra pequena abaixo
+  de 5 lotes; tempo de pegar (ou da entrega dos insumos) até concluir; rendimento médio com cada lote pesando igual; "cancelado com
+  a pessoa" conta o que a gerência cancelou enquanto estava com ela — prefere contar só o que a pessoa cancelou?; (4) passar para
+  outra pessoa é só da gerência; o próprio cozinheiro pode passar para um colega?; (5) a gerência não pré-escala lote planejado
+  ("a Duda faz o molho amanhã"): quer escala de tarefas numa fase própria?; (6) pegar e soltar valem com o período fechado (não
+  mexem em dinheiro nem em estoque): de acordo?
 
 ## Revisão visual de 21/10/2026 (antes das próximas funcionalidades)
 

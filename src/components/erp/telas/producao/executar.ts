@@ -1,5 +1,5 @@
 /**
- * O miolo das actions de produção (3.1), comum ao nível 1 e à pessoa do parceiro: quem chama já resolveu o contexto,
+ * O miolo das actions de produção (3.1; 3.3: pegar, soltar e passar), comum ao nível 1 e à pessoa do parceiro: quem chama já resolveu o contexto,
  * conferiu a permissão (com a loja) e o bloqueio. A regra por LOJA mora em `src/lib/erp/producao.ts`, que recebe o
  * alcance e confere a loja de novo. Aqui só se lê o formulário e se traduz o resultado.
  */
@@ -9,8 +9,8 @@ import { redirect } from 'next/navigation';
 import type { Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { ResultadoEstoque } from '@/lib/erp/estoque';
-import { cancelarProducao, concluirProducao, estornarProducao, iniciarProducao, planejarProducao, type Autor } from '@/lib/erp/producao';
-import { gerarLotesDaLista, porNaListaDoDia, salvarListaDoDia } from '@/lib/erp/producao-lista';
+import { cancelarProducao, concluirProducao, estornarProducao, passarProducao, pegarProducao, planejarProducao, soltarProducao, type Autor, type PessoaDaCozinha } from '@/lib/erp/producao';
+import { gerarLotesDaLista, pegarDaLista, porNaListaDoDia, salvarListaDoDia } from '@/lib/erp/producao-lista';
 import { linhasDoPedido } from '../requisicoes/executar';
 import type { EstadoEstoque } from '../estoque/estado';
 
@@ -33,9 +33,33 @@ export async function executarPlanejar(cliente: ClienteDoParceiro, alcance: Alca
   return concluir(r, anterior, base, (id) => `${base}/${lojaId}/${id}`, 'planejado', 'planejado');
 }
 
-export async function executarIniciar(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData, base: string) {
-  const r = await iniciarProducao(cliente, alcance, lojaId, id, { versao: form.get('versao') }, autor);
-  return concluir(r, anterior, base, (x) => `${base}/${lojaId}/${x}`, 'iniciado', 'ja-iniciado');
+// ================================================================ a cozinha pega a tarefa (3.3)
+
+/** Para onde volta: a tela da cozinha (`voltar=tarefas`, só esse valor) ou o lote. */
+const destinoDaCozinha = (base: string, lojaId: string, form: FormData) => (id: string) => (form.get('voltar') === 'tarefas' ? `${base}/tarefas/${lojaId}` : `${base}/${lojaId}/${id}`);
+
+/** O lote vem no formulário (`lote`): a regra confere a loja e o lote de novo. */
+const loteDo = (form: FormData) => String(form.get('lote') ?? '');
+
+export async function executarPegarLote(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await pegarProducao(cliente, alcance, lojaId, loteDo(form), { versao: form.get('versao') }, autor);
+  return concluir(r, anterior, base, destinoDaCozinha(base, lojaId, form), 'pegou', 'ja-pegou');
+}
+
+export async function executarPegarDaLista(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await pegarDaLista(cliente, alcance, lojaId, { linha: form.get('linha'), ficha: form.get('ficha'), quantidade: form.get('quantidade') }, autor);
+  return concluir(r, anterior, base, destinoDaCozinha(base, lojaId, form), 'pegou', 'ja-pegou');
+}
+
+export async function executarSoltar(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await soltarProducao(cliente, alcance, lojaId, loteDo(form), { versao: form.get('versao'), motivo: form.get('motivo') }, autor);
+  return concluir(r, anterior, base, destinoDaCozinha(base, lojaId, form), 'soltou', 'ja-soltou');
+}
+
+/** `pessoas` = quem pode receber (das credenciais, montado no servidor pela action). */
+export async function executarPassar(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, pessoas: readonly PessoaDaCozinha[], anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await passarProducao(cliente, alcance, lojaId, loteDo(form), { versao: form.get('versao'), motivo: form.get('motivo'), para: form.get('para') }, pessoas, autor);
+  return concluir(r, anterior, base, destinoDaCozinha(base, lojaId, form), 'passou', 'ja-passou');
 }
 
 export async function executarConcluir(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData, base: string) {
@@ -47,7 +71,7 @@ export async function executarConcluir(cliente: ClienteDoParceiro, alcance: Alca
     { versao: form.get('versao'), produzido: form.get('produzido'), escala: form.get('escala'), motivo: form.get('motivo'), conservacao: form.get('conservacao') },
     autor,
   );
-  return concluir(r, anterior, base, (x) => `${base}/${lojaId}/${x}`, 'concluido', 'ja-concluido');
+  return concluir(r, anterior, base, destinoDaCozinha(base, lojaId, form), 'concluido', 'ja-concluido');
 }
 
 export async function executarCancelarLote(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData, base: string) {

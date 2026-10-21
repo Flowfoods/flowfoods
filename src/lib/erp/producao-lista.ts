@@ -23,6 +23,10 @@
  *   (3.1) trava a lista antes do lote e sobe a versão dela; e o formulário manda as linhas em aberto que mostrou: salvar não
  *   apaga e gerar não gera a linha que a pessoa não viu (decisão 228);
  * - a lista apagada (sem linhas) fica no banco: a versão por loja e dia nunca recomeça (decisão 229).
+ *
+ * 3.3 (decisão 232): a cozinha (`producao.registrar`) PEGA uma linha de HOJE que ainda não virou lote: a linha vira o lote
+ * dela pela mesma regra do "Gerar" (`planejarProducaoNaTx`) e o lote já sai com quem pegou (`pegarNaTx`, `producao.ts`), numa
+ * transação, travando período → lista → as da 3.1. Nada sai do estoque aqui.
  */
 
 import type { ClienteDoParceiro } from './tenant';
@@ -31,7 +35,7 @@ import { hojeNoRio } from './compra-campos';
 import { listarHistorico } from './historico';
 import { aberturasDe, comRecusa, custosDeReferencia, lojaDoAlcance, Recusa, type ResultadoEstoque } from './estoque';
 import { exigirAberto } from './requisicao';
-import { planejarProducaoNaTx, type Autor } from './producao';
+import { NIVEL1_NAO_PEGA, pegarNaTx, planejarProducaoNaTx, type Autor } from './producao';
 import { datasEmPeriodoFechado, fraseDoPeriodoFechado, travarParaEscrever } from './periodo-trava';
 import { PROFUNDIDADE_MAXIMA } from './ficha-cascata';
 import { faltaDe, textoDoCampo } from './requisicao-campos';
@@ -195,7 +199,7 @@ export interface LinhaDaLista {
   quantidadeMilesimos: number;
   estado: EstadoDaLinha;
   /** O lote da linha: o vivo (planejado, em produção, concluído) ou o último cancelado (a linha voltou para a lista). */
-  lote: { id: string; codigo: string; status: StatusDaProducao; estornado: boolean } | null;
+  lote: { id: string; codigo: string; status: StatusDaProducao; estornado: boolean; responsavel: { nome: string; desde: Date } | null } | null;
   /** O que tem do pré-preparo no estoque agora (null sem saldo apurado). */
   emEstoqueMilesimos: number | null;
   /** A ficha ainda vira lote (pré-preparo ativo que vira insumo, na mesma unidade da linha). */
@@ -237,7 +241,7 @@ export async function obterListaDoDia(cliente: ClienteDoParceiro, alcance: Alcan
         const lista = await tx.listaProducao.findFirst({ where: { lojaId, dia: dataDe(dia) }, select: { id: true, versao: true, criadaPorNome: true, criadaEm: true, atualizadaEm: true, atualizadaPorNome: true } });
         const itens = lista ? await itensDaLista(tx, lista.id) : [];
         const ordensIds = itens.map((i) => i.ordemProducaoId).filter((x): x is string => !!x);
-        const selecaoDaOrdem = { id: true, codigoLote: true, status: true, concluidaEm: true, planejadoMilesimos: true, insumoProduzidoId: true, requisicaoId: true, fichaId: true, fichaNomeSnapshot: true, unidadeSnapshot: true } as const;
+        const selecaoDaOrdem = { id: true, codigoLote: true, status: true, concluidaEm: true, planejadoMilesimos: true, insumoProduzidoId: true, requisicaoId: true, fichaId: true, fichaNomeSnapshot: true, unidadeSnapshot: true, responsavelNomeSnapshot: true, responsavelDesde: true } as const;
         const [ordensDaLista, fora] = await Promise.all([
           ordensIds.length ? tx.ordemProducao.findMany({ where: { id: { in: ordensIds } }, select: selecaoDaOrdem }) : Promise.resolve([]),
           // Lotes do mesmo dia planejados FORA da lista (Nova produção, ou a ficha): entram na conta (vão consumir e produzir).
@@ -366,7 +370,7 @@ export async function obterListaDoDia(cliente: ClienteDoParceiro, alcance: Alcan
             unidade: i.unidade,
             quantidadeMilesimos: i.quantidadeMilesimos,
             estado: i.estado,
-            lote: o && status ? { id: o.id, codigo: o.codigoLote, status, estornado: foiEstornado({ status, concluidaEm: o.concluidaEm }) } : null,
+            lote: o && status ? { id: o.id, codigo: o.codigoLote, status, estornado: foiEstornado({ status, concluidaEm: o.concluidaEm }), responsavel: o.responsavelDesde && o.responsavelNomeSnapshot ? { nome: o.responsavelNomeSnapshot, desde: o.responsavelDesde } : null } : null,
             emEstoqueMilesimos: saldoDe(f?.insumoProduzidoId ?? null),
             fichaDisponivel: !!escolha && escolha.unidade === i.unidade,
           };
@@ -394,6 +398,8 @@ export async function obterListaDoDia(cliente: ClienteDoParceiro, alcance: Alcan
           historico,
           pode: {
             planejar: podePlanejar,
+            /** 3.3: quem registra produção pega as tarefas do dia (a tela da cozinha). */
+            registrar: pode(alcance, 'producao.registrar', { lojaId }),
             verCustos,
             lancarNota: pode(alcance, 'compras.lancar', { lojaId }),
             verOrcamento: pode(alcance, 'compras.ver', { lojaId }),
@@ -649,6 +655,74 @@ export async function gerarLotesDaLista(
         return { ok: true as const, id: lista.id };
       },
       { timeout: 30_000, maxWait: 10_000 },
+    ),
+  );
+}
+
+// ================================================================ pegar uma linha da lista (3.3)
+
+/**
+ * A cozinha pega uma linha de HOJE da lista (3.3, decisão 232): `producao.registrar` na loja; a pessoa do login (o nível 1
+ * não pega). A linha que ainda não virou lote vira o lote dela pela regra do "Gerar" (`planejarProducaoNaTx`: a requisição
+ * dos insumos nasce junto; nada sai do estoque) e o lote já sai com quem pegou (`pegarNaTx`). A tela manda a linha que
+ * mostrou com a ficha e a quantidade: se a gerência mudou a linha nesse meio-tempo, é conflito (ninguém produz o que não
+ * viu). Duas pessoas pegando a mesma linha ao mesmo tempo: a lista travada faz uma esperar, e ela lê "Caio pegou às 09:12";
+ * a mesma pessoa de novo (duplo toque) = "já feito". A linha que virou lote pelo "Gerar" e está sem ninguém é pega como
+ * qualquer lote. Travas: período (o dia da lista, compartilhada) → a lista → as da 3.1.
+ */
+export async function pegarDaLista(
+  cliente: ClienteDoParceiro,
+  alcance: Alcance,
+  lojaId: string,
+  entrada: { linha: unknown; ficha: unknown; quantidade: unknown },
+  autor: Autor,
+  agora = new Date(),
+): Promise<ResultadoEstoque> {
+  const linhaId = typeof entrada.linha === 'string' && ID.test(entrada.linha) ? entrada.linha : null;
+  const quantidadeVista = typeof entrada.quantidade === 'string' && /^\d{1,9}$/.test(entrada.quantidade) ? Number(entrada.quantidade) : NaN;
+  return comRecusa(() =>
+    cliente.transacao(
+      async (tx) => {
+        const loja = await lojaDoAlcance(tx, alcance, lojaId, 'producao.registrar');
+        if (alcance.nivel === 'FLOWFOODS' || !autor.userId) throw new Recusa({ ok: false, erros: { geral: NIVEL1_NAO_PEGA } });
+        if (!loja.ativa) throw new Recusa({ ok: false, erros: { geral: `A ${loja.nome} está desativada.` } });
+        const hoje = hojeNoRio(agora);
+        await conferirDiaAberto(tx, hoje);
+        const lista = await travarLista(tx, lojaId, hoje);
+        const itens = lista ? await itensDaLista(tx, lista.id) : [];
+        const linha = linhaId ? itens.find((i) => i.id === linhaId) : undefined;
+        if (!lista || !linha) throw new Recusa({ ok: false, erros: { geral: 'Este pré-preparo saiu da lista de hoje agora há pouco. Confira as tarefas de novo; nada foi gravado.' }, conflito: true });
+        if (linha.estado === 'FEITA') throw new Recusa({ ok: false, erros: { geral: `${linha.nome} já foi feito hoje (lote ${linha.codigoLote}).` }, conflito: true });
+        if (linha.estado === 'EM_LOTE') {
+          // Virou lote nesse meio-tempo (outra pessoa pegou, ou a gerência gerou): pega o lote, como qualquer outro.
+          const r = await pegarNaTx(tx, lojaId, linha.ordemProducaoId!, null, alcance, autor, agora);
+          return { ok: true as const, id: r.id, ...(r.jaFeito ? { jaFeito: true } : {}) };
+        }
+        if (linha.fichaId !== entrada.ficha || linha.quantidadeMilesimos !== quantidadeVista) {
+          throw new Recusa({ ok: false, erros: { geral: `A gerência mudou ${linha.nome} na lista agora há pouco. Confira as tarefas de novo; nada foi gravado.` }, conflito: true });
+        }
+        await exigirAberto(tx, loja);
+        const ficha = (await fichasEscolhiveis(tx)).get(linha.fichaId);
+        if (!ficha) throw new Recusa({ ok: false, erros: { geral: `${linha.nome}: a ficha não está mais disponível (desativada ou sem o insumo que produz). Fale com a gerência.` } });
+        if (ficha.unidade !== linha.unidade) throw new Recusa({ ok: false, erros: { geral: `${linha.nome}: a ficha passou a render em ${UNIDADES[ficha.unidade].sigla} e a lista está em ${UNIDADES[linha.unidade].sigla}. Fale com a gerência.` } });
+        const nome = nomeDaLista(hoje, loja.nome);
+        const r = await planejarProducaoNaTx(tx, loja, { fichaId: linha.fichaId, quantidade: textoDoCampo(linha.quantidadeMilesimos), paraDia: hoje, observacao: '', chave: null, daLista: nome }, autor, agora);
+        await tx.listaProducaoItem.update({ where: { id: linha.id }, data: { ordemProducaoId: r.id } });
+        await tx.listaProducao.update({ where: { id: lista.id }, data: { versao: { increment: 1 }, atualizadaEm: agora, atualizadaPorNome: autor.nome } });
+        await tx.historicoAlteracao.create({
+          data: {
+            parceiroId: tx.parceiroId,
+            entidade: 'ListaProducao',
+            entidadeId: lista.id,
+            acao: 'GEROU_LOTES',
+            depois: { nome, lotesGerados: textoDosLotes([{ codigo: r.codigo, nome: linha.nome, unidade: linha.unidade, quantidadeMilesimos: linha.quantidadeMilesimos }]), pegoPor: autor.nome },
+            autorNome: autor.nome,
+          },
+        });
+        await pegarNaTx(tx, lojaId, r.id, null, alcance, autor, agora);
+        return { ok: true as const, id: r.id };
+      },
+      { timeout: 20_000, maxWait: 10_000 },
     ),
   );
 }
