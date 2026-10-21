@@ -9,7 +9,7 @@ import { redirect } from 'next/navigation';
 import type { Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { ResultadoEstoque } from '@/lib/erp/estoque';
-import { cancelarProducao, concluirProducao, estornarProducao, passarProducao, pegarProducao, planejarProducao, soltarProducao, type Autor, type PessoaDaCozinha } from '@/lib/erp/producao';
+import { cancelarProducao, concluirProducao, estornarProducao, passarProducao, pegarProducao, planejarProducao, soltarProducao, type Autor, type QuemPodeReceber } from '@/lib/erp/producao';
 import { gerarLotesDaLista, pegarDaLista, porNaListaDoDia, salvarListaDoDia } from '@/lib/erp/producao-lista';
 import { linhasDoPedido } from '../requisicoes/executar';
 import type { EstadoEstoque } from '../estoque/estado';
@@ -56,9 +56,9 @@ export async function executarSoltar(cliente: ClienteDoParceiro, alcance: Alcanc
   return concluir(r, anterior, base, destinoDaCozinha(base, lojaId, form), 'soltou', 'ja-soltou');
 }
 
-/** `pessoas` = quem pode receber (das credenciais, montado no servidor pela action). */
-export async function executarPassar(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, pessoas: readonly PessoaDaCozinha[], anterior: EstadoEstoque, form: FormData, base: string) {
-  const r = await passarProducao(cliente, alcance, lojaId, loteDo(form), { versao: form.get('versao'), motivo: form.get('motivo'), para: form.get('para') }, pessoas, autor);
+/** `quem` = quem pode receber (das credenciais, montado no servidor pela action) e a releitura na gravação. */
+export async function executarPassar(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, quem: QuemPodeReceber, anterior: EstadoEstoque, form: FormData, base: string) {
+  const r = await passarProducao(cliente, alcance, lojaId, loteDo(form), { versao: form.get('versao'), motivo: form.get('motivo'), para: form.get('para') }, quem, autor);
   return concluir(r, anterior, base, destinoDaCozinha(base, lojaId, form), 'passou', 'ja-passou');
 }
 

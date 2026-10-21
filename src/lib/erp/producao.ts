@@ -100,8 +100,8 @@ export interface CartaoDoLote {
   concluidaPorNome: string | null;
   canceladaEm: Date | null;
   estornado: boolean;
-  /** 3.3: quem está fazendo (pegou) e desde quando; null = ninguém pegou. */
-  responsavel: { nome: string; desde: Date } | null;
+  /** 3.3: quem está fazendo (pegou) e desde quando; null = ninguém pegou. `passadoPor` = recebeu da gerência (quem passou). */
+  responsavel: { nome: string; desde: Date; passadoPor: string | null } | null;
   /** Os insumos pedem a requisição: a situação dela (null = sem requisição). */
   requisicao: { id: string; numero: number | null; status: StatusDaRequisicao } | null;
 }
@@ -142,6 +142,10 @@ export async function quadroDaProducao(cliente: ClienteDoParceiro, alcance: Alca
         tx.ordemProducao.findMany({ where: { lojaId, status: 'CONCLUIDA', concluidaEm: { gte: deHoje } }, orderBy: { concluidaEm: 'desc' }, take: RECENTES_NO_QUADRO, select }),
         tx.ordemProducao.findMany({ where: { lojaId, status: 'CANCELADA', canceladaEm: { gte: deHoje } }, orderBy: { canceladaEm: 'desc' }, take: RECENTES_NO_QUADRO, select }),
       ]);
+      const passados = await passadosPor(
+        tx,
+        pendentes.filter((x) => x.responsavelDesde).map((x) => x.id),
+      );
       const cartao = (x: (typeof pendentes)[number]): CartaoDoLote => {
         const status = x.status as StatusDaProducao;
         const dataPlanejada = iso(x.dataPlanejada)!;
@@ -161,7 +165,7 @@ export async function quadroDaProducao(cliente: ClienteDoParceiro, alcance: Alca
           concluidaPorNome: x.concluidaPorNome,
           canceladaEm: x.canceladaEm,
           estornado: foiEstornado({ status, concluidaEm: x.concluidaEm }),
-          responsavel: x.responsavelDesde && x.responsavelNomeSnapshot ? { nome: x.responsavelNomeSnapshot, desde: x.responsavelDesde } : null,
+          responsavel: x.responsavelDesde && x.responsavelNomeSnapshot ? { nome: x.responsavelNomeSnapshot, desde: x.responsavelDesde, passadoPor: passados.get(x.id) ?? null } : null,
           requisicao: x.requisicao ? { id: x.requisicao.id, numero: x.requisicao.numero, status: x.requisicao.status as StatusDaRequisicao } : null,
         };
       };
@@ -599,6 +603,16 @@ export interface PessoaDaCozinha {
 }
 
 /**
+ * Quem pode receber um lote passado pela gerência. `pessoas` = a lista que a tela mostrou (das credenciais, antes da
+ * gravação); `aindaPode` RELÊ das credenciais, dentro da gravação (com o lote travado), se a escolhida continua ativa, da
+ * loja e com "registrar produção" (polimento da 3.3, Guardião M2): o acesso que mudou entre abrir a tela e tocar não recebe.
+ */
+export interface QuemPodeReceber {
+  pessoas: readonly PessoaDaCozinha[];
+  aindaPode: (usuarioId: string) => Promise<boolean>;
+}
+
+/**
  * Passar o lote para outra pessoa (3.3): só a gerência (`producao.planejar` na loja), com motivo. O lote tem de estar Em
  * produção (o planejado ninguém pegou ainda: quem vai fazer pega na tela da cozinha). `pessoas` = quem pode receber
  * (`pessoasQueProduzem`, das credenciais, montado no servidor): ninguém de fora delas. A hora de quem recebe começa agora.
@@ -610,12 +624,12 @@ export async function passarProducao(
   lojaId: string,
   id: string,
   entrada: { versao: unknown; motivo: unknown; para: unknown },
-  pessoas: readonly PessoaDaCozinha[],
+  quem: QuemPodeReceber,
   autor: Autor,
   agora = new Date(),
 ): Promise<ResultadoEstoque> {
   const versaoLida = Number(entrada.versao);
-  const alvo = typeof entrada.para === 'string' ? pessoas.find((p) => p.usuarioId === entrada.para) : undefined;
+  const alvo = typeof entrada.para === 'string' ? quem.pessoas.find((p) => p.usuarioId === entrada.para) : undefined;
   if (!alvo) return { ok: false, erros: { para: 'Escolha uma pessoa desta loja que registra produção.' } };
   const motivo = lerMotivo(entrada.motivo);
   if (!motivo.ok) return { ok: false, erros: { motivo: motivo.erro } };
@@ -630,6 +644,10 @@ export async function passarProducao(
       const dono = comQuem(ordem);
       if (dono?.usuarioId === alvo.usuarioId) return { ok: true as const, id: ordem.id, jaFeito: true };
       if (!Number.isSafeInteger(versaoLida) || versaoLida !== ordem.versao) throw new Recusa({ ok: false, erros: { geral: MUDOU }, conflito: true });
+      // Relê o acesso de quem recebe AGORA, com o lote travado (a lista da tela foi lida antes da gravação).
+      if (!(await quem.aindaPode(alvo.usuarioId))) {
+        throw new Recusa({ ok: false, erros: { para: `${alvo.nome} não pode mais receber lote nesta loja: o acesso mudou agora há pouco. Escolha outra pessoa; nada foi gravado.` }, conflito: true });
+      }
       const mudou = await tx.ordemProducao.updateMany({
         where: { id: ordem.id, versao: ordem.versao, status: 'EM_EXECUCAO' },
         data: { responsavelUsuarioId: alvo.usuarioId, responsavelNomeSnapshot: alvo.nome, responsavelDesde: agora, versao: { increment: 1 } },
@@ -650,6 +668,28 @@ export async function passarProducao(
       return { ok: true as const, id: ordem.id };
     }),
   );
+}
+
+/**
+ * Polimento da 3.3: dos lotes `ids`, os que a pessoa de agora RECEBEU da gerência (o último "pegou"/"passou" do histórico do
+ * lote é um "passou"): id → quem passou. A tela diz "recebeu 18:14 (passado por Gil)" em vez de "pegou". Só leitura do
+ * histórico (índice parceiro + entidade + id + quando).
+ */
+export async function passadosPor(tx: ClienteDoParceiro, ids: readonly string[]): Promise<Map<string, string>> {
+  const quem = new Map<string, string>();
+  if (ids.length === 0) return quem;
+  const eventos = await tx.historicoAlteracao.findMany({
+    where: { entidade: 'OrdemProducao', entidadeId: { in: [...ids] }, acao: { in: ['PEGOU', 'REATRIBUIU'] } },
+    orderBy: [{ ocorridoEm: 'desc' }, { id: 'desc' }],
+    select: { entidadeId: true, acao: true, autorNome: true },
+  });
+  const vistos = new Set<string>();
+  for (const e of eventos) {
+    if (vistos.has(e.entidadeId)) continue;
+    vistos.add(e.entidadeId);
+    if (e.acao === 'REATRIBUIU') quem.set(e.entidadeId, e.autorNome);
+  }
+  return quem;
 }
 
 // ================================================================ o lote (detalhe)
@@ -815,8 +855,16 @@ export async function obterOrdem(cliente: ClienteDoParceiro, alcance: Alcance, l
           /** Quem fez (pegou, ou concluiu sem pegar); null = ninguém. */
           feitoPor: o.responsavelNomeSnapshot,
         },
-        /** 3.3: quem está com o lote agora (pegou pelo ERP) e desde quando; `comigo` = é quem lê. */
-        responsavel: o.responsavelDesde && o.responsavelNomeSnapshot ? { nome: o.responsavelNomeSnapshot, desde: o.responsavelDesde, comigo: !!eu && eu === o.responsavelUsuarioId } : null,
+        /** 3.3: quem está com o lote agora (pegou pelo ERP) e desde quando; `comigo` = é quem lê; `passadoPor` = recebeu da gerência. */
+        responsavel:
+          o.responsavelDesde && o.responsavelNomeSnapshot
+            ? {
+                nome: o.responsavelNomeSnapshot,
+                desde: o.responsavelDesde,
+                comigo: !!eu && eu === o.responsavelUsuarioId,
+                passadoPor: (await passadosPor(tx, [o.id])).get(o.id) ?? null,
+              }
+            : null,
         atrasoDias: diasDeAtrasoDoLote({ status, dataPlanejada }, hoje),
         requisicao: req ? { id: req.id, numero: req.numero, status: req.status as StatusDaRequisicao, versao: req.versao } : null,
         itensDoLote,

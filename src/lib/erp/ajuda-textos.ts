@@ -254,7 +254,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
   {
     chave: 'producao-concluir',
     area: 'producao',
-    rotas: ['producao/[lojaId]/[ordemId]/concluir'],
+    rotas: ['producao/[lojaId]/[ordemId]/concluir', 'producao/tarefas/[lojaId]/[ordemId]/concluir'],
     titulo: 'Concluir o lote',
     versao: 2,
     aula: [
@@ -341,7 +341,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/indicadores/[lojaId]'],
     titulo: 'Indicadores da produção da loja',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'De cada pessoa, no período: lotes concluídos, quanto produziu de cada pré-preparo, rendimento contra o planejado, tempo, perdidos e cancelados.' },
       { texto: 'É um retrato para conversar com a equipe, não uma nota. Com menos de 5 lotes, a amostra é pequena e ainda não diz muito.' },
@@ -353,7 +353,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Rendimento médio: cada lote pesa igual, e os perdidos ficam à parte. Por pré-preparo: o que saiu somado, dividido pelo planejado somado.' },
           { texto: 'Fora de 10%: lote que saiu mais de 10% acima ou abaixo do planejado. Tempo: de pegar, ou da entrega dos insumos, até concluir.' },
-          { texto: 'Cancelados com a pessoa: os que ela estava fazendo quando alguém cancelou. O motivo está no histórico.' },
+          { texto: 'Cancelou: os que a própria pessoa cancelou. Os que a gerência cancelou enquanto estavam com ela ficam à parte e não contam para ela.' },
+          { texto: 'Lote concluído pela FlowFoods, sem pessoa da equipe, fica fora das pessoas.' },
         ],
       },
     ],

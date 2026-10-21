@@ -12,40 +12,47 @@ import { fraseDaAmostra, fraseDaFicha, fraseDoResumo, fraseDoRendimentoMedio, fr
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
-import { Aviso, Linha, Painel, Vazio } from '../../ui/superficies';
+import { Aviso, Painel, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { FiltroDoPeriodo } from './periodo';
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
+/** Rótulo e valor: lado a lado a partir de 640 px; no celular, o valor embaixo do rótulo (não quebra em 4 linhas). */
+function Metrica({ rotulo, children }: { rotulo: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:justify-between sm:gap-4">
+      <dt className="text-suave sm:shrink-0">{rotulo}</dt>
+      <dd className="min-w-0 font-medium tabular-nums text-texto sm:text-right sm:font-normal">{children}</dd>
+    </div>
+  );
+}
+
 function DaPessoa({ p, historico }: { p: IndicadoresDaPessoa; historico: string }) {
   return (
-    <Painel titulo={p.nome} subtitulo={fraseDaAmostra(p.amostra)} acessorio={<Link href={historico} className={`${LINK_DE_TEXTO} ff-toque`}>Ver os lotes</Link>}>
-      <dl className="space-y-2 text-sm">
-        <Linha rotulo="Lotes concluídos">
-          <span className="tabular-nums">{p.concluidos}</span>
-        </Linha>
-        <Linha rotulo="Rendimento contra o planejado">
-          <span className="tabular-nums">{fraseDoRendimentoMedio(p)}</span>
-        </Linha>
-        <Linha rotulo="Fora de ±10%">
-          <span className="tabular-nums">{p.concluidos ? `${p.foraDaFaixa} de ${p.concluidos}` : '—'}</span>
-        </Linha>
-        <Linha rotulo="Tempo de produção">
-          <span className="tabular-nums">{fraseDoTempo(p)}</span>
-        </Linha>
-        <Linha rotulo="Perdidos">
-          <span className="tabular-nums">{p.perdidos}</span>
-        </Linha>
-        <Linha rotulo="Cancelados com a pessoa">
-          <span className="tabular-nums">{p.cancelados}</span>
-        </Linha>
-        {p.estornados > 0 && (
-          <Linha rotulo="Estornados">
-            <span className="tabular-nums">{p.estornados}</span>
-          </Linha>
-        )}
+    <Painel
+      titulo={p.nome}
+      subtitulo={fraseDaAmostra(p.amostra)}
+      acessorio={
+        <Link href={historico} className={`${LINK_DE_TEXTO} ff-toque whitespace-nowrap`}>
+          Ver os lotes
+        </Link>
+      }
+    >
+      <dl className="space-y-3 text-sm sm:space-y-2">
+        <Metrica rotulo="Lotes concluídos">{p.concluidos}</Metrica>
+        <Metrica rotulo="Rendimento contra o planejado">{fraseDoRendimentoMedio(p)}</Metrica>
+        <Metrica rotulo="Fora de ±10%">{p.concluidos ? `${p.foraDaFaixa} de ${p.concluidos}` : '—'}</Metrica>
+        <Metrica rotulo="Tempo de produção">{fraseDoTempo(p)}</Metrica>
+        <Metrica rotulo="Perdidos">{p.perdidos}</Metrica>
+        <Metrica rotulo="Cancelou">{p.cancelou}</Metrica>
+        {p.estornados > 0 && <Metrica rotulo="Estornados">{p.estornados}</Metrica>}
       </dl>
+      {p.canceladosPelaGerencia > 0 && (
+        <p className="mt-3 text-[13px] text-suave">
+          {`${plural(p.canceladosPelaGerencia, 'lote cancelado', 'lotes cancelados')} pela gerência enquanto estava${p.canceladosPelaGerencia === 1 ? '' : 'm'} com a pessoa: não conta${p.canceladosPelaGerencia === 1 ? '' : 'm'} para ela (o motivo está no histórico).`}
+        </p>
+      )}
       <div className="mt-4 border-t border-linha pt-3">
         <p className="text-[12px] font-semibold text-suave">Quanto produziu</p>
         {p.porFicha.length === 0 ? (
@@ -70,6 +77,7 @@ export function TelaIndicadores({ d, base, contexto }: { d: IndicadoresDaProduca
   const notas = [
     d.semHoraDePegar ? `${plural(d.semHoraDePegar, 'lote concluído sem pegar pela tela da cozinha', 'lotes concluídos sem pegar pela tela da cozinha')}: entra${d.semHoraDePegar === 1 ? '' : 'm'} em tudo, menos no tempo.` : null,
     d.semPessoa ? `${plural(d.semPessoa, 'lote cancelado', 'lotes cancelados')} antes de alguém pegar: fica${d.semPessoa === 1 ? '' : 'm'} fora das pessoas.` : null,
+    d.daFlowFoods ? `${plural(d.daFlowFoods, 'lote concluído', 'lotes concluídos')} pela FlowFoods, sem pessoa da equipe: fica${d.daFlowFoods === 1 ? '' : 'm'} fora das pessoas.` : null,
   ].filter(Boolean);
   return (
     <div className="space-y-5">

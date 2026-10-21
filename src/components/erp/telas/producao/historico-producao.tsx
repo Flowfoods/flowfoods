@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import type { HistoricoDaProducao, LinhaDoHistoricoDaProducao } from '@/lib/erp/producao-equipe';
-import { formatarTempo, fraseDoResumo, fraseDoRendimentoDoLote, horaDoDia, rotuloDoPeriodo, ROTULO_DO_DESFECHO } from '@/lib/erp/producao-equipe-campos';
+import { canceladoPelaPessoa, formatarTempo, fraseDoResumo, fraseDoRendimentoDoLote, horaDoDia, rotuloDoPeriodo, ROTULO_DO_DESFECHO } from '@/lib/erp/producao-equipe-campos';
 import { rendimentoDoLote } from '@/lib/erp/producao-campos';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
@@ -46,12 +46,24 @@ function Rendimento({ l }: { l: LinhaDoHistoricoDaProducao }) {
   );
 }
 
+/**
+ * Quem fez. Polimento da 3.3: sem pessoa da equipe, o lote concluído é da FlowFoods (o nível 1 nunca é "quem fez"); no
+ * cancelado ninguém fez — diz com quem estava e quem cancelou: a própria pessoa ou a gerência (que não é culpa dela).
+ */
 function QuemFez({ l }: { l: LinhaDoHistoricoDaProducao }) {
+  if (l.desfecho === 'CANCELADO') {
+    const ela = canceladoPelaPessoa(l);
+    return (
+      <>
+        <span>{l.responsavel ? `estava com ${l.responsavel.nome}` : 'ninguém pegou'}</span>
+        {l.canceladaPorNome && <span className="block text-[12px] text-suave">{ela ? 'cancelou: a própria pessoa' : l.responsavel ? `cancelou: ${l.canceladaPorNome} (gerência)` : `cancelou: ${l.canceladaPorNome}`}</span>}
+      </>
+    );
+  }
   return (
     <>
-      <span>{l.responsavel?.nome ?? (l.desfecho === 'CANCELADO' ? 'ninguém pegou' : 'sem quem fez')}</span>
+      <span>{l.responsavel?.nome ?? 'FlowFoods'}</span>
       {l.concluidaPorNome && l.concluidaPorNome !== l.responsavel?.nome && <span className="block text-[12px] text-suave">concluiu: {l.concluidaPorNome}</span>}
-      {l.desfecho === 'CANCELADO' && l.canceladaPorNome && <span className="block text-[12px] text-suave">cancelou: {l.canceladaPorNome}</span>}
     </>
   );
 }

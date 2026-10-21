@@ -11,7 +11,7 @@ import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
 import type { Permissao } from '@/lib/erp/permissoes';
 import type { EstadoEstoque } from '@/components/erp/telas/estoque/estado';
 import { recusadoNoEstoque } from '@/components/erp/telas/estoque/executar';
-import { pessoasQueProduzem } from '@/lib/erp/credenciais';
+import { aindaProduzNaLoja, pessoasQueProduzem } from '@/lib/erp/credenciais';
 import { executarCancelarLote, executarConcluir, executarEstornar, executarGerarLotes, executarPassar, executarPegarDaLista, executarPegarLote, executarPlanejar, executarPorNaLista, executarSalvarLista, executarSoltar } from '@/components/erp/telas/producao/executar';
 
 async function preparar(slug: string, lojaId: string, permissao: Permissao) {
@@ -59,7 +59,9 @@ export async function acaoPassarLote(slug: string, lojaId: string, anterior: Est
   if (negado) return recusadoNoEstoque(anterior, negado);
   await auditar(ctx, 'erp_producao_passar', lojaId);
   const pessoas = await pessoasQueProduzem(ctx.parceiro.id, String(lojaId));
-  return executarPassar(ctx.cliente, ctx.alcance, autor, String(lojaId), pessoas, anterior, form, base);
+  // A lista da tela e, na gravação (com o lote travado), a releitura do acesso de quem recebe.
+  const aindaPode = (usuarioId: string) => aindaProduzNaLoja(ctx.parceiro.id, String(lojaId), usuarioId);
+  return executarPassar(ctx.cliente, ctx.alcance, autor, String(lojaId), { pessoas, aindaPode }, anterior, form, base);
 }
 
 export async function acaoConcluirProducao(slug: string, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData): Promise<EstadoEstoque> {

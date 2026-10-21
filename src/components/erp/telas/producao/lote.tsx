@@ -111,7 +111,9 @@ export function TelaDoLote({
           <SeloDoLote status={o.status} estornado={o.estornado} />
           <SeloDoAtraso dias={d.atrasoDias} />
           {o.status === 'CONCLUIDA' && o.produzidoMilesimos === 0 && <Selo tom="erro">Lote perdido</Selo>}
-          {pend && d.responsavel && <span className="text-[13px] font-semibold text-texto">{d.responsavel.comigo ? `Com você desde ${horaDoDia(d.responsavel.desde, d.hoje)}` : fraseDeQuemPegou(d.responsavel.nome, d.responsavel.desde, d.hoje)}</span>}
+          {pend && d.responsavel && <span className="text-[13px] font-semibold text-texto">{d.responsavel.comigo
+                ? `Com você desde ${horaDoDia(d.responsavel.desde, d.hoje)}${d.responsavel.passadoPor ? ` (passado por ${d.responsavel.passadoPor})` : ''}`
+                : fraseDeQuemPegou(d.responsavel.nome, d.responsavel.desde, d.hoje, d.responsavel.passadoPor)}</span>}
           {pend && !d.responsavel && o.status === 'EM_EXECUCAO' && <span className="text-[13px] text-suave">Em produção, sem ninguém</span>}
         </div>
       </PageHeader>
@@ -281,7 +283,7 @@ export function TelaDoLote({
           subtitulo={d.saldoNaLoja !== null ? `${o.fichaNome} na ${d.loja.nome} agora: ${formatarQuantidade(d.saldoNaLoja, o.unidade)}` : undefined}
           acessorio={
             hrefs.estoque ? (
-              <Link href={hrefs.estoque} className={LINK_DE_TEXTO}>
+              <Link href={hrefs.estoque} className={`${LINK_DE_TEXTO} ff-toque`}>
                 Ver o estoque
               </Link>
             ) : undefined

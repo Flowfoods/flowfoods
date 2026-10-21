@@ -38,7 +38,7 @@ function Cartao({ c, aqui, hoje }: { c: CartaoDoLote; aqui: string; hoje: string
       : c.status === 'CANCELADA' && c.canceladaEm
         ? `${c.estornado ? 'estornada' : 'cancelada'} · ${quandoDoCartao(c.canceladaEm, hoje)}`
         : c.responsavel
-          ? `com ${c.responsavel.nome} · pegou ${quandoDoCartao(c.responsavel.desde, hoje)}`
+          ? `com ${c.responsavel.nome} · ${c.responsavel.passadoPor ? `recebeu ${quandoDoCartao(c.responsavel.desde, hoje)} (passado por ${c.responsavel.passadoPor})` : `pegou ${quandoDoCartao(c.responsavel.desde, hoje)}`}`
           : c.iniciadaEm
             ? `começou ${quandoDoCartao(c.iniciadaEm, hoje)} · sem ninguém`
             : `planejada ${quandoDoCartao(c.criadoEm, hoje)}`;

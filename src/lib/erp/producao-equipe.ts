@@ -18,6 +18,7 @@ import { somarDias } from './contagem-campos';
 import { aberturasDe, comRecusa, lojaDoAlcance } from './estoque';
 import { datasEmPeriodoFechado } from './periodo-trava';
 import { diasDeAtrasoDoLote, type StatusDaProducao } from './producao-campos';
+import { passadosPor } from './producao';
 import { estadoDaLinha, rotuloDoDia } from './producao-lista-campos';
 import { desfechoDoLote, diaDoEncerramento, indicadoresPorPessoa, lerFiltroId, lerPeriodoDoHistorico, resumoDoHistorico, tempoDoLote, type LoteEncerrado, type PeriodoDoHistorico } from './producao-equipe-campos';
 import type { StatusDaRequisicao } from './requisicao-campos';
@@ -64,8 +65,8 @@ export interface LoteDaTarefa {
   versao: number;
   dataPlanejada: string;
   atrasoDias: number;
-  /** Quem pegou; `comigo` = é quem lê. */
-  responsavel: { nome: string; desde: Date; comigo: boolean } | null;
+  /** Quem pegou; `comigo` = é quem lê; `passadoPor` = recebeu da gerência (quem passou), em vez de pegar. */
+  responsavel: { nome: string; desde: Date; comigo: boolean; passadoPor: string | null } | null;
   /** A requisição dos insumos (concluir só com ela atendida). */
   requisicaoDoLote: { status: StatusDaRequisicao; numero: number | null } | null;
   daLista: boolean;
@@ -139,6 +140,10 @@ export async function tarefasDoDia(cliente: ClienteDoParceiro, alcance: Alcance,
         }),
         tx.ordemProducao.count({ where: { lojaId, status: { in: ['PLANEJADA', 'EM_EXECUCAO'] }, dataPlanejada: { gt: dataDe(hoje) } } }),
       ]);
+      const passados = await passadosPor(
+        tx,
+        pendentes.filter((o) => o.responsavelDesde).map((o) => o.id),
+      );
       const lotes: LoteDaTarefa[] = pendentes.map((o) => {
         const status = o.status as LoteDaTarefa['status'];
         const dataPlanejada = iso(o.dataPlanejada);
@@ -153,7 +158,10 @@ export async function tarefasDoDia(cliente: ClienteDoParceiro, alcance: Alcance,
           versao: o.versao,
           dataPlanejada,
           atrasoDias: diasDeAtrasoDoLote({ status, dataPlanejada }, hoje),
-          responsavel: o.responsavelDesde && o.responsavelNomeSnapshot ? { nome: o.responsavelNomeSnapshot, desde: o.responsavelDesde, comigo: !!eu && eu === o.responsavelUsuarioId } : null,
+          responsavel:
+            o.responsavelDesde && o.responsavelNomeSnapshot
+              ? { nome: o.responsavelNomeSnapshot, desde: o.responsavelDesde, comigo: !!eu && eu === o.responsavelUsuarioId, passadoPor: passados.get(o.id) ?? null }
+              : null,
           requisicaoDoLote: o.requisicao ? { status: o.requisicao.status as StatusDaRequisicao, numero: o.requisicao.numero } : null,
           daLista: !!o.itemDaLista,
         };
@@ -222,8 +230,13 @@ export type TarefasDoDia = NonNullable<Awaited<ReturnType<typeof tarefasDoDia>>>
 /** Até quantos lotes uma leitura traz (92 dias de uma cozinha cabem com folga). */
 const TETO_DA_LEITURA = 3000;
 
-/** Os lotes encerrados da loja no período: concluídos (e estornados) pela data da conclusão; cancelados pela do cancelamento. */
-async function lotesEncerrados(tx: ClienteDoParceiro, lojaId: string, p: PeriodoDoHistorico) {
+/**
+ * Os lotes encerrados da loja no período: concluídos (e estornados) pela data da conclusão; cancelados pela do cancelamento.
+ * `equipe` = os logins com vínculo (qualquer situação) com o parceiro (`idsDaEquipe`, das credenciais): o responsável gravado
+ * que não está nela é a FlowFoods (o nível 1 da 3.1 gravava o próprio login ao concluir; o gatilho do lote concluído não deixa
+ * corrigir a linha) e NÃO vira pessoa — nem nos indicadores, nem no filtro (polimento da 3.3, Guardião M1).
+ */
+async function lotesEncerrados(tx: ClienteDoParceiro, lojaId: string, p: PeriodoDoHistorico, equipe: ReadonlySet<string>) {
   const de = inicioDoDia(p.de);
   const ate = inicioDoDia(somarDias(p.ate, 1));
   const linhas = await tx.ordemProducao.findMany({
@@ -271,7 +284,7 @@ async function lotesEncerrados(tx: ClienteDoParceiro, lojaId: string, p: Periodo
       status: o.status as 'CONCLUIDA' | 'CANCELADA',
       planejadoMilesimos: o.planejadoMilesimos,
       produzidoMilesimos: o.produzidoMilesimos,
-      responsavel: o.responsavelUsuarioId && o.responsavelNomeSnapshot ? { id: o.responsavelUsuarioId, nome: o.responsavelNomeSnapshot } : null,
+      responsavel: o.responsavelUsuarioId && o.responsavelNomeSnapshot && equipe.has(o.responsavelUsuarioId) ? { id: o.responsavelUsuarioId, nome: o.responsavelNomeSnapshot } : null,
       responsavelDesde: o.responsavelDesde,
       insumosEntreguesEm: o.requisicao?.atendidaEm ?? null,
       iniciadaEm: o.iniciadaEm,
@@ -307,13 +320,21 @@ export const LINHAS_NA_TELA = 300;
  * fez, quem concluiu, quando pegou e quando terminou), com os filtros de pessoa e ficha, as opções dos filtros (as pessoas
  * e as fichas que aparecem no período) e o resumo. `producao.ver` na loja. Custo só para `insumos.ver`.
  */
-export async function historicoDaProducao(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, filtro: { periodo?: unknown; de?: unknown; ate?: unknown; pessoa?: unknown; ficha?: unknown }, agora = new Date()) {
+export async function historicoDaProducao(
+  cliente: ClienteDoParceiro,
+  alcance: Alcance,
+  lojaId: string,
+  filtro: { periodo?: unknown; de?: unknown; ate?: unknown; pessoa?: unknown; ficha?: unknown },
+  /** Os logins com vínculo com o parceiro (`idsDaEquipe`): quem fez e não está aqui é a FlowFoods, não uma pessoa. */
+  equipe: ReadonlySet<string>,
+  agora = new Date(),
+) {
   const r = await comRecusa(() =>
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'producao.ver');
       const hoje = hojeNoRio(agora);
       const periodo = lerPeriodoDoHistorico(filtro, hoje);
-      const { lotes, cortado } = await lotesEncerrados(tx, lojaId, periodo);
+      const { lotes, cortado } = await lotesEncerrados(tx, lojaId, periodo, equipe);
       const pessoas = opcoes(lotes.map((l) => l.lote.responsavel).filter((x): x is { id: string; nome: string } => !!x));
       const fichas = opcoes(lotes.map((l) => ({ id: l.lote.fichaId, nome: l.lote.fichaNome })));
       const pessoa = lerFiltroId(filtro.pessoa);
@@ -366,15 +387,23 @@ function opcoes(itens: readonly { id: string; nome: string }[]): { id: string; n
  * amostra (`indicadoresPorPessoa`). Sem R$. Também diz quantos lotes concluídos não têm hora de pegar (o tempo deles não
  * existe) e quantos encerrados ficaram sem ninguém.
  */
-export async function indicadoresDaProducao(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, filtro: { periodo?: unknown; de?: unknown; ate?: unknown }, agora = new Date()) {
+export async function indicadoresDaProducao(
+  cliente: ClienteDoParceiro,
+  alcance: Alcance,
+  lojaId: string,
+  filtro: { periodo?: unknown; de?: unknown; ate?: unknown },
+  /** Os logins com vínculo com o parceiro (`idsDaEquipe`): quem fez e não está aqui é a FlowFoods, fora das pessoas. */
+  equipe: ReadonlySet<string>,
+  agora = new Date(),
+) {
   const r = await comRecusa(() =>
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'producao.planejar');
       const hoje = hojeNoRio(agora);
       const periodo = lerPeriodoDoHistorico(filtro, hoje);
-      const { lotes, cortado } = await lotesEncerrados(tx, lojaId, periodo);
+      const { lotes, cortado } = await lotesEncerrados(tx, lojaId, periodo, equipe);
       const encerrados = lotes.map((l) => l.lote);
-      const { pessoas, semPessoa } = indicadoresPorPessoa(encerrados);
+      const { pessoas, semPessoa, daFlowFoods } = indicadoresPorPessoa(encerrados);
       const concluidos = encerrados.filter((l) => l.concluidaEm && l.status === 'CONCLUIDA');
       return {
         loja,
@@ -382,9 +411,10 @@ export async function indicadoresDaProducao(cliente: ClienteDoParceiro, alcance:
         periodo,
         pessoas,
         semPessoa,
+        daFlowFoods,
         resumo: resumoDoHistorico(encerrados),
-        /** Concluídos sem hora de pegar (lote da 3.1, ou concluído direto): entram em tudo, menos no tempo. */
-        semHoraDePegar: concluidos.filter((l) => !l.responsavelDesde).length,
+        /** Concluídos por uma pessoa da equipe sem hora de pegar (lote da 3.1, ou concluído direto): entram em tudo, menos no tempo. */
+        semHoraDePegar: concluidos.filter((l) => !l.responsavelDesde && l.responsavel).length,
         cortado,
       };
     }),

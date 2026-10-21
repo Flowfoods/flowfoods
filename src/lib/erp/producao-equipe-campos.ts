@@ -33,9 +33,17 @@ function desdeQuando(desde: Date, hoje: string): string {
   return quando.includes(' às ') ? `em ${quando}` : `às ${quando}`;
 }
 
-/** "Caio Cozinha pegou às 09:12" / "… pegou em 20/10 às 09:12". */
-export function fraseDeQuemPegou(nome: string, desde: Date, hoje: string): string {
-  return `${nome} pegou ${desdeQuando(desde, hoje)}`;
+/**
+ * "Caio Cozinha pegou às 09:12" / "… pegou em 20/10 às 09:12"; o lote que a gerência passou: "Duda Lima recebeu às 18:14
+ * (passado por Gil Gerente)" — quem recebeu não pegou (polimento da 3.3).
+ */
+export function fraseDeQuemPegou(nome: string, desde: Date, hoje: string, passadoPor: string | null = null): string {
+  return passadoPor ? `${nome} recebeu ${desdeQuando(desde, hoje)} (passado por ${passadoPor})` : `${nome} pegou ${desdeQuando(desde, hoje)}`;
+}
+
+/** O "desde quando" curto do cartão: "pegou 09:12" ou "recebeu 18:14 (passado por Gil Gerente)". */
+export function quandoPegou(desde: Date, hoje: string, passadoPor: string | null): string {
+  return passadoPor ? `recebeu ${horaDoDia(desde, hoje)} (passado por ${passadoPor})` : `pegou ${horaDoDia(desde, hoje)}`;
 }
 
 /** A recusa de quem tenta pegar (ou concluir, ou cancelar) o lote que está com outra pessoa. */
@@ -139,7 +147,11 @@ export interface LoteEncerrado {
   status: 'CONCLUIDA' | 'CANCELADA';
   planejadoMilesimos: number;
   produzidoMilesimos: number | null;
-  /** Quem fez: quem pegou (ou para quem a gerência passou) ou, sem pegar, quem concluiu. Null = ninguém pegou (cancelado sem dono). */
+  /**
+   * Quem fez, se é PESSOA DA EQUIPE: quem pegou (ou para quem a gerência passou) ou, sem pegar, quem concluiu. Null =
+   * ninguém da equipe: cancelado antes de alguém pegar, ou concluído pela FlowFoods (o nível 1 nunca é "quem fez"; o lote
+   * da 3.1 que ele concluiu tem o login dele gravado, e a leitura o tira — polimento da 3.3).
+   */
   responsavel: { id: string; nome: string } | null;
   /** Desde quando estava com a pessoa (null = não pegou pelo ERP: lote da 3.1 ou concluído direto). */
   responsavelDesde: Date | null;
@@ -251,8 +263,10 @@ export interface IndicadoresDaPessoa {
   concluidos: number;
   perdidos: number;
   estornados: number;
-  /** Cancelados enquanto estavam com a pessoa (o motivo e quem cancelou estão no histórico). */
-  cancelados: number;
+  /** Cancelados PELA PRÓPRIA pessoa enquanto estavam com ela (polimento da 3.3: só estes contam para ela). */
+  cancelou: number;
+  /** Cancelados pela gerência (ou pela FlowFoods) enquanto estavam com a pessoa: à parte, não contam para ela. */
+  canceladosPelaGerencia: number;
   porFicha: ProduzidoPorFicha[];
   /** Média dos rendimentos dos concluídos (cada lote pesa igual); null sem concluído. */
   rendimentoMedioBp: number | null;
@@ -267,15 +281,18 @@ export interface IndicadoresDaPessoa {
 
 /**
  * Os indicadores de cada pessoa nos lotes encerrados do período: lotes, quanto produziu de cada ficha, rendimento médio
- * contra o planejado pela ficha, fora da faixa, tempo médio, perdidos, cancelados com ela e estornados. Ordem alfabética
- * (nada de ranking). `semPessoa` = lotes encerrados sem ninguém que os fez (cancelados antes de alguém pegar).
+ * contra o planejado pela ficha, fora da faixa, tempo médio, perdidos, cancelados por ela (os da gerência à parte) e
+ * estornados. Ordem alfabética (nada de ranking). Fora das pessoas: `semPessoa` = cancelados antes de alguém pegar;
+ * `daFlowFoods` = encerrados sem pessoa da equipe (concluídos pela FlowFoods — o nível 1 nunca é "quem fez").
  */
-export function indicadoresPorPessoa(lotes: readonly LoteEncerrado[]): { pessoas: IndicadoresDaPessoa[]; semPessoa: number } {
+export function indicadoresPorPessoa(lotes: readonly LoteEncerrado[]): { pessoas: IndicadoresDaPessoa[]; semPessoa: number; daFlowFoods: number } {
   const grupos = new Map<string, { nome: string; lotes: LoteEncerrado[] }>();
   let semPessoa = 0;
+  let daFlowFoods = 0;
   for (const l of lotes) {
     if (!l.responsavel) {
-      semPessoa++;
+      if (desfechoDoLote(l) === 'CANCELADO') semPessoa++;
+      else daFlowFoods++;
       continue;
     }
     const g = grupos.get(l.responsavel.id) ?? { nome: l.responsavel.nome, lotes: [] };
@@ -309,7 +326,10 @@ export function indicadoresPorPessoa(lotes: readonly LoteEncerrado[]): { pessoas
       concluidos: concluidos.length,
       perdidos: perdidos.length,
       estornados: g.lotes.filter((l) => desfechoDoLote(l) === 'ESTORNADO').length,
-      cancelados: g.lotes.filter((l) => desfechoDoLote(l) === 'CANCELADO').length,
+      // Quem cancelou: a própria pessoa (o nome gravado no cancelamento é o dela) ou a gerência (só ela ou a gerência cancela
+      // o lote com outra pessoa, decisão 235). O cancelamento da gerência não conta para a pessoa.
+      cancelou: g.lotes.filter((l) => desfechoDoLote(l) === 'CANCELADO' && canceladoPelaPessoa(l)).length,
+      canceladosPelaGerencia: g.lotes.filter((l) => desfechoDoLote(l) === 'CANCELADO' && !canceladoPelaPessoa(l)).length,
       porFicha,
       rendimentoMedioBp: rendimentos.length ? Math.round(rendimentos.reduce((s, r) => s + r.rendimentoBp, 0) / rendimentos.length) : null,
       foraDaFaixa: rendimentos.filter((r) => r.foraDaFaixa).length,
@@ -319,7 +339,12 @@ export function indicadoresPorPessoa(lotes: readonly LoteEncerrado[]): { pessoas
     });
   }
   pessoas.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.id.localeCompare(b.id));
-  return { pessoas, semPessoa };
+  return { pessoas, semPessoa, daFlowFoods };
+}
+
+/** O lote cancelado foi cancelado pela pessoa que estava com ele (e não pela gerência)? */
+export function canceladoPelaPessoa(l: Pick<LoteEncerrado, 'responsavel' | 'canceladaPorNome'>): boolean {
+  return !!l.responsavel && !!l.canceladaPorNome && l.canceladaPorNome === l.responsavel.nome;
 }
 
 const fimDe = (l: Pick<LoteEncerrado, 'concluidaEm' | 'canceladaEm'>) => (l.canceladaEm ?? l.concluidaEm ?? new Date(0)).getTime();

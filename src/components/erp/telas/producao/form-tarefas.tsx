@@ -14,6 +14,19 @@ import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao, classeDeBotaoDaCozinha } from '../../ui/estilos';
 import type { AcaoDeEstoque, EstadoEstoque } from '../estoque/estado';
 
+/**
+ * Polimento da 3.3: o que um formulário que abre e fecha (soltar, passar) mostra. "Manter" fecha MESMO depois de um erro
+ * (antes, o erro da ação mantinha o formulário aberto); o erro já dispensado não volta quando a pessoa abre de novo.
+ */
+export function vistaDoFormulario(aberto: boolean, estado: EstadoEstoque, dispensado: EstadoEstoque): { aberto: boolean; erro: EstadoEstoque } {
+  return { aberto, erro: estado && estado !== dispensado ? estado : null };
+}
+
+/** Polimento da 3.3: quem perdeu a corrida (o lote ficou com outra pessoa, ou mudou) não vê mais o "Pegar": só a frase e "Ver de novo". */
+export function perdeuACorrida(estado: EstadoEstoque): boolean {
+  return !!estado?.conflito;
+}
+
 function ErroGeral({ estado, recarregar }: { estado: EstadoEstoque; recarregar: string }) {
   if (!estado?.erros.geral) return null;
   return (
@@ -56,10 +69,13 @@ export function FormPegar({
           <input key={k} type="hidden" name={k} value={v} />
         ))}
         {voltar && <input type="hidden" name="voltar" value={voltar} />}
-        <BotaoEnviar variante={variante} cozinha={cozinha} pendente="Pegando…" className={cozinha ? 'w-full' : 'w-full sm:w-auto'}>
-          <span aria-hidden>Pegar</span>
-          <span className="sr-only">{rotulo}</span>
-        </BotaoEnviar>
+        {/* Perdeu a corrida: o botão some (tocar de novo só repetiria a recusa); fica a frase de quem pegou e "Ver de novo". */}
+        {!perdeuACorrida(estado) && (
+          <BotaoEnviar variante={variante} cozinha={cozinha} pendente="Pegando…" className={cozinha ? 'w-full' : 'w-full sm:w-auto'}>
+            <span aria-hidden>Pegar</span>
+            <span className="sr-only">{rotulo}</span>
+          </BotaoEnviar>
+        )}
         <ErroGeral estado={estado} recarregar={recarregar} />
       </div>
     </form>
@@ -70,9 +86,12 @@ export function FormPegar({
 export function FormSoltar({ acao, lote, versao, recarregar, voltar, deOutro, cozinha = true }: { acao: AcaoDeEstoque; lote: string; versao: number; recarregar: string; voltar?: 'tarefas'; deOutro?: string; cozinha?: boolean }) {
   const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
+  const [dispensado, setDispensado] = useState<EstadoEstoque>(null);
   const id = useId();
   const classe = cozinha ? classeDeBotaoDaCozinha : classeDeBotao;
-  if (!aberto && !estado) {
+  const vista = vistaDoFormulario(aberto, estado, dispensado);
+  const erro = vista.erro;
+  if (!vista.aberto) {
     return (
       <button type="button" onClick={() => setAberto(true)} className={classe('secundario', 'w-full sm:w-auto')}>
         {deOutro ? (
@@ -104,21 +123,28 @@ export function FormSoltar({ acao, lote, versao, recarregar, voltar, deOutro, co
             autoComplete="off"
             placeholder="Ex.: acabou o turno"
             className={`${CAMPO} min-h-12 text-base`}
-            aria-invalid={!!estado?.erros.motivo}
-            aria-describedby={`${id}-ajuda${estado?.erros.motivo ? ` ${id}-erro` : ''}`}
+            aria-invalid={!!erro?.erros.motivo}
+            aria-describedby={`${id}-ajuda${erro?.erros.motivo ? ` ${id}-erro` : ''}`}
           />
           <p id={`${id}-ajuda`} className={AJUDA}>
             O lote continua em produção, sem ninguém: volta para alguém pegar. Fica no histórico, com o seu nome.
           </p>
-          <Erro id={`${id}-erro`} texto={estado?.erros.motivo} />
+          <Erro id={`${id}-erro`} texto={erro?.erros.motivo} />
         </div>
-        <ErroGeral estado={estado} recarregar={recarregar} />
+        <ErroGeral estado={erro} recarregar={recarregar} />
         {/* Na cozinha, um embaixo do outro: na coluna de 240 px do cartão, lado a lado o texto quebrava. */}
         <div className={cozinha ? 'flex flex-col gap-2' : 'flex flex-col gap-2 sm:flex-row'}>
           <BotaoEnviar variante="secundario" cozinha={cozinha} pendente="Soltando…">
             Soltar o lote
           </BotaoEnviar>
-          <button type="button" onClick={() => setAberto(false)} className={classe('fantasma')}>
+          <button
+            type="button"
+            onClick={() => {
+              setAberto(false);
+              setDispensado(estado);
+            }}
+            className={classe('fantasma')}
+          >
             Manter
           </button>
         </div>
@@ -154,11 +180,14 @@ export function FormPassar({
 }) {
   const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
+  const [dispensado, setDispensado] = useState<EstadoEstoque>(null);
   const id = useId();
+  const vista = vistaDoFormulario(aberto, estado, dispensado);
+  const erro = vista.erro;
   const classe = cozinha ? classeDeBotaoDaCozinha : classeDeBotao;
   const escolhas = pessoas.filter((p) => p.nome !== atual);
   if (escolhas.length === 0) return <p className="text-[13px] text-suave">Ninguém mais nesta loja registra produção para receber o lote.</p>;
-  if (!aberto && !estado) {
+  if (!vista.aberto) {
     return (
       <button type="button" onClick={() => setAberto(true)} className={classe('secundario', 'w-full sm:w-auto')}>
         Passar para outra pessoa
@@ -175,7 +204,7 @@ export function FormPassar({
           <label htmlFor={`${id}-para`} className={ROTULO}>
             Para quem
           </label>
-          <select id={`${id}-para`} name="para" required defaultValue="" className={`${CAMPO} min-h-12 text-base`} aria-invalid={!!estado?.erros.para} aria-describedby={estado?.erros.para ? `${id}-para-erro` : undefined}>
+          <select id={`${id}-para`} name="para" required defaultValue="" className={`${CAMPO} min-h-12 text-base`} aria-invalid={!!erro?.erros.para} aria-describedby={erro?.erros.para ? `${id}-para-erro` : undefined}>
             <option value="" disabled>
               Escolha quem vai fazer
             </option>
@@ -185,7 +214,7 @@ export function FormPassar({
               </option>
             ))}
           </select>
-          <Erro id={`${id}-para-erro`} texto={estado?.erros.para} />
+          <Erro id={`${id}-para-erro`} texto={erro?.erros.para} />
         </div>
         <div>
           <label htmlFor={`${id}-motivo`} className={ROTULO}>
@@ -200,20 +229,27 @@ export function FormPassar({
             autoComplete="off"
             placeholder="Ex.: Caio foi para a chapa"
             className={`${CAMPO} min-h-12 text-base`}
-            aria-invalid={!!estado?.erros.motivo}
-            aria-describedby={`${id}-ajuda${estado?.erros.motivo ? ` ${id}-erro` : ''}`}
+            aria-invalid={!!erro?.erros.motivo}
+            aria-describedby={`${id}-ajuda${erro?.erros.motivo ? ` ${id}-erro` : ''}`}
           />
           <p id={`${id}-ajuda`} className={AJUDA}>
             A hora de quem recebe começa agora. Fica no histórico do lote, com o seu nome.
           </p>
-          <Erro id={`${id}-erro`} texto={estado?.erros.motivo} />
+          <Erro id={`${id}-erro`} texto={erro?.erros.motivo} />
         </div>
-        <ErroGeral estado={estado} recarregar={recarregar} />
+        <ErroGeral estado={erro} recarregar={recarregar} />
         <div className={cozinha ? 'flex flex-col gap-2' : 'flex flex-col gap-2 sm:flex-row'}>
           <BotaoEnviar variante="secundario" cozinha={cozinha} pendente="Passando…">
             Passar o lote
           </BotaoEnviar>
-          <button type="button" onClick={() => setAberto(false)} className={classe('fantasma')}>
+          <button
+            type="button"
+            onClick={() => {
+              setAberto(false);
+              setDispensado(estado);
+            }}
+            className={classe('fantasma')}
+          >
             Manter
           </button>
         </div>

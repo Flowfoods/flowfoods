@@ -45,6 +45,10 @@ const PESSOAS = [
   { usuarioId: 'u-duda', nome: 'Duda Lima' },
   { usuarioId: 'u-gil', nome: 'Gil Gerente' },
 ];
+/** Quem pode receber: a lista da tela e a releitura na gravação (aqui, a mesma lista; o teste da releitura troca). */
+const RECEBEM = { pessoas: PESSOAS, aindaPode: async (id: string) => PESSOAS.some((p) => p.usuarioId === id) };
+/** Os logins da equipe do parceiro (`idsDaEquipe`): o nível 1 (`user-n1`) não está. */
+const EQUIPE: ReadonlySet<string> = new Set(PESSOAS.map((p) => p.usuarioId));
 
 describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)', { timeout: 240_000 }, () => {
   let db: PrismaClient;
@@ -280,21 +284,21 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)'
   it('passar: só a gerência, para quem registra produção na loja, com motivo; o planejado não se passa; a hora de quem recebe começa agora', async () => {
     const id = ids.loteMolho;
     const v = await versao(id);
-    expect(await passarProducao(a, OPERADOR(), ids.vp, id, { versao: v, motivo: 'troca', para: 'u-duda' }, PESSOAS, CAIO)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/definir a lista do dia/) } });
-    expect(await passarProducao(a, GERENTE(), ids.vp, id, { versao: v, motivo: 'troca', para: 'u-fora' }, PESSOAS, GIL)).toMatchObject({ ok: false, erros: { para: expect.stringMatching(/Escolha uma pessoa/) } });
-    expect(await passarProducao(a, GERENTE(), ids.vp, id, { versao: v, motivo: '', para: 'u-duda' }, PESSOAS, GIL)).toMatchObject({ ok: false, erros: { motivo: expect.any(String) } });
+    expect(await passarProducao(a, OPERADOR(), ids.vp, id, { versao: v, motivo: 'troca', para: 'u-duda' }, RECEBEM, CAIO)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/definir a lista do dia/) } });
+    expect(await passarProducao(a, GERENTE(), ids.vp, id, { versao: v, motivo: 'troca', para: 'u-fora' }, RECEBEM, GIL)).toMatchObject({ ok: false, erros: { para: expect.stringMatching(/Escolha uma pessoa/) } });
+    expect(await passarProducao(a, GERENTE(), ids.vp, id, { versao: v, motivo: '', para: 'u-duda' }, RECEBEM, GIL)).toMatchObject({ ok: false, erros: { motivo: expect.any(String) } });
     const antes = Date.now();
-    expect(await passarProducao(a, GERENTE(), ids.vp, id, { versao: v, motivo: 'Caio foi para a chapa', para: 'u-duda' }, PESSOAS, GIL)).toMatchObject({ ok: true });
+    expect(await passarProducao(a, GERENTE(), ids.vp, id, { versao: v, motivo: 'Caio foi para a chapa', para: 'u-duda' }, RECEBEM, GIL)).toMatchObject({ ok: true });
     const o = (await ordem(id))!;
     expect(o).toMatchObject({ status: 'EM_EXECUCAO', responsavelUsuarioId: 'u-duda', responsavelNomeSnapshot: 'Duda Lima' });
     expect(o.responsavelDesde!.getTime()).toBeGreaterThanOrEqual(antes - 5);
-    expect(await passarProducao(a, GERENTE(), ids.vp, id, { versao: await versao(id), motivo: 'de novo', para: 'u-duda' }, PESSOAS, GIL)).toMatchObject({ ok: true, jaFeito: true });
+    expect(await passarProducao(a, GERENTE(), ids.vp, id, { versao: await versao(id), motivo: 'de novo', para: 'u-duda' }, RECEBEM, GIL)).toMatchObject({ ok: true, jaFeito: true });
     const h = (await lote(id)).historico[0];
     expect(h).toMatchObject({ acao: 'REATRIBUIU', motivo: 'Caio foi para a chapa', autorNome: 'Gil Gerente' });
     expect(h.mudancas).toEqual([{ campo: 'quem faz', antes: 'ninguém', depois: 'Duda Lima' }]);
     // O lote planejado ninguém pegou: não se passa.
     const novo = await planejar(ids.base, '1');
-    expect(await passarProducao(a, GERENTE(), ids.vp, novo, { versao: await versao(novo), motivo: 'é seu', para: 'u-caio' }, PESSOAS, GIL)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/ainda não começou: quem vai fazer pega pela tela da cozinha/) } });
+    expect(await passarProducao(a, GERENTE(), ids.vp, novo, { versao: await versao(novo), motivo: 'é seu', para: 'u-caio' }, RECEBEM, GIL)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/ainda não começou: quem vai fazer pega pela tela da cozinha/) } });
     ids.loteParaCancelar = novo;
   });
 
@@ -349,8 +353,8 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)'
     expect(await pegarProducao(a, GERENTE_DELIVERY(), ids.vp, ids.lotePlanejado, { versao: 0 }, GIL)).toMatchObject({ ok: false, naoEncontrado: true });
     expect(await tarefasDoDia(b, DONA(), ids.vp, GIL.userId)).toBeNull();
     expect(await pegarProducao(b, DONA(), ids.vp, ids.lotePlanejado, { versao: 0 }, GIL)).toMatchObject({ ok: false, naoEncontrado: true });
-    expect(await historicoDaProducao(b, DONA(), ids.vp, {})).toBeNull();
-    expect(await indicadoresDaProducao(b, DONA(), ids.vp, {})).toBeNull();
+    expect(await historicoDaProducao(b, DONA(), ids.vp, {}, EQUIPE)).toBeNull();
+    expect(await indicadoresDaProducao(b, DONA(), ids.vp, {}, EQUIPE)).toBeNull();
     // Só vê: nem a tela da cozinha (é de quem registra).
     expect(await tarefasDoDia(a, SO_VE(), ids.vp, 'u-x')).toBeNull();
     // A Delivery (estoque não aberto) tem lista, mas a linha não vira lote.
@@ -364,7 +368,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)'
   });
 
   it('histórico da produção: o quê, quanto, por quem, quando; filtros de pessoa e ficha; R$ só para quem vê custos', async () => {
-    const h = (await historicoDaProducao(a, DONA(), ids.vp, { periodo: 'hoje' }))!;
+    const h = (await historicoDaProducao(a, DONA(), ids.vp, { periodo: 'hoje' }, EQUIPE))!;
     expect(h.periodo).toMatchObject({ de: hoje, ate: hoje, atalho: 'hoje' });
     expect(h.resumo).toMatchObject({ concluidos: 3, perdidos: 1, cancelados: 1, estornados: 0 });
     const molho = h.linhas.find((x) => x.id === ids.loteMolho)!;
@@ -375,19 +379,19 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)'
     // Quem fez: Caio e Duda (o lote do nível 1 fica sem ninguém); as fichas do período.
     expect(h.pessoas.map((p) => p.nome)).toEqual(['Caio Cozinha', 'Duda Lima']);
     expect(h.fichas.map((f) => f.nome)).toEqual(['Base de cebola', 'Molho cheddar']);
-    const daDuda = (await historicoDaProducao(a, DONA(), ids.vp, { periodo: 'hoje', pessoa: 'u-duda' }))!;
+    const daDuda = (await historicoDaProducao(a, DONA(), ids.vp, { periodo: 'hoje', pessoa: 'u-duda' }, EQUIPE))!;
     expect(daDuda.linhas.every((x) => x.responsavel?.id === 'u-duda')).toBe(true);
-    const daBase = (await historicoDaProducao(a, DONA(), ids.vp, { periodo: 'hoje', ficha: ids.base }))!;
+    const daBase = (await historicoDaProducao(a, DONA(), ids.vp, { periodo: 'hoje', ficha: ids.base }, EQUIPE))!;
     expect(daBase.linhas.every((x) => x.fichaId === ids.base)).toBe(true);
     expect(daBase.linhas.length).toBeGreaterThan(0);
     // Sem `insumos.ver`: nenhum custo sai do servidor (nem a chave).
-    const semCusto = (await historicoDaProducao(a, COZINHA_SEM_CUSTO(), ids.vp, { periodo: 'hoje' }))!;
+    const semCusto = (await historicoDaProducao(a, COZINHA_SEM_CUSTO(), ids.vp, { periodo: 'hoje' }, EQUIPE))!;
     expect(semCusto.verCustos).toBe(false);
     expect(semCusto.linhas.every((x) => !('custo' in x))).toBe(true);
     expect(JSON.stringify(semCusto)).not.toMatch(/totalCentavos|custoTotal/);
     // A cozinha (producao.ver) lê o histórico; o dia sem lote é frase, não zero.
-    expect(await historicoDaProducao(a, SO_VE(), ids.vp, { periodo: 'hoje' })).not.toBeNull();
-    const ontem = (await historicoDaProducao(a, DONA(), ids.vp, { de: '2026-01-01', ate: '2026-01-01' }))!;
+    expect(await historicoDaProducao(a, SO_VE(), ids.vp, { periodo: 'hoje' }, EQUIPE)).not.toBeNull();
+    const ontem = (await historicoDaProducao(a, DONA(), ids.vp, { de: '2026-01-01', ate: '2026-01-01' }, EQUIPE))!;
     expect(ontem.resumo.total).toBe(0);
     // O histórico geral (filtro Produção) também mostra quem pegou, soltou e passou; sem custos para quem não vê.
     const geral = await listarHistorico(a, { entidades: ['OrdemProducao'], verPrecos: false, verCustos: false, limite: 200 });
@@ -396,8 +400,8 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)'
   });
 
   it('indicadores por pessoa: só a gerência; com amostra e sem R$', async () => {
-    expect(await indicadoresDaProducao(a, OPERADOR(), ids.vp, { periodo: 'hoje' })).toBeNull();
-    const ind = (await indicadoresDaProducao(a, GERENTE(), ids.vp, { periodo: 'hoje' }))!;
+    expect(await indicadoresDaProducao(a, OPERADOR(), ids.vp, { periodo: 'hoje' }, EQUIPE)).toBeNull();
+    const ind = (await indicadoresDaProducao(a, GERENTE(), ids.vp, { periodo: 'hoje' }, EQUIPE))!;
     expect(ind.pessoas.map((p) => p.nome)).toEqual(['Caio Cozinha', 'Duda Lima']);
     const duda = ind.pessoas.find((p) => p.id === 'u-duda')!;
     expect(duda.porFicha.find((f) => f.nome === 'Molho cheddar')).toMatchObject({ produzidoMilesimos: 4600, planejadoMilesimos: 5000, rendimentoBp: 9200 });
@@ -422,8 +426,75 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)'
     expect(await concluir(id, OPERADOR(), DUDA, '3')).toMatchObject({ ok: true });
     expect(await estornarProducao(a, GERENTE(), ids.vp, id, { versao: await versao(id), motivo: 'contaminado', confirmarNegativo: 'sim' }, GIL)).toMatchObject({ ok: true });
     expect(await ordem(id)).toMatchObject({ status: 'CANCELADA', responsavelUsuarioId: 'u-duda' });
-    const ind = (await indicadoresDaProducao(a, GERENTE(), ids.vp, { periodo: 'hoje' }))!;
+    const ind = (await indicadoresDaProducao(a, GERENTE(), ids.vp, { periodo: 'hoje' }, EQUIPE))!;
     expect(ind.pessoas.find((p) => p.id === 'u-duda')!.estornados).toBe(1);
+  });
+
+  it('polimento (M2): passar relê, NA gravação e com o lote travado, se quem recebe ainda pode; quem recebeu aparece como "recebeu (passado por)"', async () => {
+    const id = await planejar(ids.base, '1');
+    expect((await pegarProducao(a, OPERADOR(), ids.vp, id, { versao: await versao(id) }, CAIO)).ok).toBe(true);
+    const v = await versao(id);
+    // A Duda saiu da equipe entre abrir a tela e tocar: a lista da tela ainda a mostra, a releitura não.
+    let lidoComOLoteTravado: boolean | null = null;
+    const saiu = {
+      pessoas: PESSOAS,
+      aindaPode: async () => {
+        // Outra conexão tenta travar o lote: está travado (a releitura acontece dentro da gravação, não antes).
+        lidoComOLoteTravado = await cru(db, perfil, A.id, `SELECT 1 FROM "OrdemProducao" WHERE id = $1 FOR UPDATE NOWAIT`, id).then(
+          () => false,
+          (e) => /lock|55P03/i.test(String(e)),
+        );
+        return false;
+      },
+    };
+    expect(await passarProducao(a, GERENTE(), ids.vp, id, { versao: v, motivo: 'troca de turno', para: 'u-duda' }, saiu, GIL)).toMatchObject({ ok: false, conflito: true, erros: { para: 'Duda Lima não pode mais receber lote nesta loja: o acesso mudou agora há pouco. Escolha outra pessoa; nada foi gravado.' } });
+    expect(lidoComOLoteTravado).toBe(true);
+    expect(await ordem(id)).toMatchObject({ responsavelUsuarioId: 'u-caio', versao: v });
+    // Com o acesso em dia, passa; quem recebeu aparece como "recebeu", com quem passou (tarefas, lote e quadro).
+    expect(await passarProducao(a, GERENTE(), ids.vp, id, { versao: v, motivo: 'troca de turno', para: 'u-duda' }, RECEBEM, GIL)).toMatchObject({ ok: true });
+    const t = (await tarefasDoDia(a, OPERADOR(), ids.vp, DUDA.userId))!;
+    expect(t.comigo.find((x) => x.id === id)!.responsavel).toMatchObject({ nome: 'Duda Lima', comigo: true, passadoPor: 'Gil Gerente' });
+    expect((await lote(id, DONA(), DUDA.userId)).responsavel).toMatchObject({ nome: 'Duda Lima', passadoPor: 'Gil Gerente' });
+    const q = (await quadroDaProducao(a, DONA(), ids.vp))!;
+    expect(q.colunas.EM_EXECUCAO.find((c) => c.id === id)!.responsavel).toMatchObject({ nome: 'Duda Lima', passadoPor: 'Gil Gerente' });
+    // Soltou e pegou de novo: "pegou", sem "passado por".
+    expect((await soltarProducao(a, OPERADOR(), ids.vp, id, { versao: await versao(id), motivo: 'acabou o turno' }, DUDA)).ok).toBe(true);
+    expect((await pegarProducao(a, OPERADOR(), ids.vp, id, { versao: await versao(id) }, CAIO)).ok).toBe(true);
+    expect((await lote(id, DONA(), CAIO.userId)).responsavel).toMatchObject({ nome: 'Caio Cozinha', passadoPor: null });
+    // Fica com o Caio, cancelado por ele mesmo (para o próximo teste: "cancelou" é dele).
+    expect(await cancelarProducao(a, OPERADOR(), ids.vp, id, { versao: await versao(id), motivo: 'faltou gás' }, CAIO)).toMatchObject({ ok: true });
+    ids.canceladoPeloCaio = id;
+  });
+
+  it('polimento (M1): o lote da 3.1 concluído pelo nível 1 (com o login dele gravado) é da FlowFoods: fora das pessoas, do filtro e dos indicadores', async () => {
+    const id = await planejar(ids.base, '1');
+    expect((await pegarProducao(a, ALCANCE_FLOWFOODS, ids.vp, id, { versao: await versao(id) }, RODOLFO)).ok).toBe(true);
+    expect((await entregarTudo(id)).ok).toBe(true);
+    expect(await concluir(id, ALCANCE_FLOWFOODS, RODOLFO, '1')).toMatchObject({ ok: true });
+    // O que a 3.1 gravava: o login do nível 1 como responsável. O gatilho do concluído não deixa mudar a linha, então o teste
+    // monta o legado com o gatilho desligado só nesta transação (como dono da tabela).
+    await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT set_config('app.parceiro_id', ${A.id}, true)`;
+      await tx.$executeRawUnsafe('ALTER TABLE "OrdemProducao" DISABLE TRIGGER "OrdemProducao_concluida_imutavel"');
+      await tx.$executeRawUnsafe(`UPDATE "OrdemProducao" SET "responsavelUsuarioId" = 'user-n1', "responsavelNomeSnapshot" = 'Rodolfo (FlowFoods)' WHERE id = $1`, id);
+      await tx.$executeRawUnsafe('ALTER TABLE "OrdemProducao" ENABLE TRIGGER "OrdemProducao_concluida_imutavel"');
+    });
+    expect(await ordem(id)).toMatchObject({ status: 'CONCLUIDA', responsavelUsuarioId: 'user-n1', responsavelNomeSnapshot: 'Rodolfo (FlowFoods)' });
+    const h = (await historicoDaProducao(a, DONA(), ids.vp, { periodo: 'hoje' }, EQUIPE))!;
+    expect(h.linhas.find((x) => x.id === id)).toMatchObject({ responsavel: null, concluidaPorNome: 'Rodolfo (FlowFoods)' });
+    expect(h.pessoas.map((p) => p.id)).not.toContain('user-n1');
+    expect((await historicoDaProducao(a, DONA(), ids.vp, { periodo: 'hoje', pessoa: 'user-n1' }, EQUIPE))!.linhas).toEqual([]);
+    const ind = (await indicadoresDaProducao(a, GERENTE(), ids.vp, { periodo: 'hoje' }, EQUIPE))!;
+    expect(ind.pessoas.map((p) => p.id)).not.toContain('user-n1');
+    expect(ind.daFlowFoods).toBeGreaterThanOrEqual(2); // este e o concluído pelo nível 1 na 3.3 (já sem login)
+    // Sem a equipe (o erro que o Guardião achou): o nível 1 virava pessoa. O teste pega a regressão.
+    const semFiltro = (await indicadoresDaProducao(a, GERENTE(), ids.vp, { periodo: 'hoje' }, new Set([...EQUIPE, 'user-n1'])))!;
+    expect(semFiltro.pessoas.map((p) => p.id)).toContain('user-n1');
+    // Cancelados (UX): o que o Caio cancelou conta para ele; o que a gerência cancelou com outra pessoa, à parte.
+    const caio = ind.pessoas.find((p) => p.id === 'u-caio')!;
+    expect(caio.cancelou).toBeGreaterThanOrEqual(1);
+    const linhaDoCaio = h.linhas.find((x) => x.id === ids.canceladoPeloCaio)!;
+    expect(linhaDoCaio).toMatchObject({ desfecho: 'CANCELADO', responsavel: { id: 'u-caio' }, canceladaPorNome: 'Caio Cozinha' });
   });
 
   it('período fechado (mutante): pegar da lista ESPERA o fechamento e é recusado com a frase; o lote que já existe ainda se pega (não mexe no livro)', async () => {

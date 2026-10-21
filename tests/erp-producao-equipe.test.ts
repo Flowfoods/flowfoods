@@ -145,21 +145,26 @@ describe('os indicadores por pessoa', () => {
     lote({ quem: CAIO, produzidoMilesimos: 5000, responsavelDesde: as('2026-10-20', '14:00'), insumosEntreguesEm: as('2026-10-20', '13:00'), concluidaEm: as('2026-10-20', '14:30') }),
     lote({ quem: CAIO, produzidoMilesimos: 4400, responsavelDesde: null, concluidaEm: as('2026-10-19', '10:00'), motivoRendimento: 'queimou o fundo' }),
     lote({ quem: CAIO, produzidoMilesimos: 0, fichaId: 'f-base', fichaNome: 'Base de cebola', planejadoMilesimos: 2000, responsavelDesde: as(HOJE, '07:00'), insumosEntreguesEm: as(HOJE, '06:00'), concluidaEm: as(HOJE, '08:00'), motivoRendimento: 'caiu no chão' }),
-    lote({ quem: CAIO, status: 'CANCELADA', concluidaEm: null, produzidoMilesimos: null, canceladaEm: as(HOJE, '11:00'), motivoCancelamento: 'mudou o cardápio' }),
+    lote({ quem: CAIO, status: 'CANCELADA', concluidaEm: null, produzidoMilesimos: null, canceladaEm: as(HOJE, '11:00'), canceladaPorNome: 'Gil Gerente', motivoCancelamento: 'mudou o cardápio' }),
+    // Polimento: um cancelado pelo próprio Caio (o da gerência acima não conta para ele).
+    lote({ quem: CAIO, status: 'CANCELADA', concluidaEm: null, produzidoMilesimos: null, canceladaEm: as(HOJE, '11:30'), canceladaPorNome: 'Caio Cozinha', motivoCancelamento: 'faltou gás' }),
     // Duda: uma base concluída (2,1 de 2 kg) e um molho estornado.
     lote({ quem: DUDA, fichaId: 'f-base', fichaNome: 'Base de cebola', planejadoMilesimos: 2000, produzidoMilesimos: 2100 }),
     lote({ quem: DUDA, status: 'CANCELADA', canceladaEm: as(HOJE, '12:00'), produzidoMilesimos: 5000 }),
     // Um cancelado antes de alguém pegar.
     lote({ quem: null, status: 'CANCELADA', concluidaEm: null, produzidoMilesimos: null, responsavelDesde: null, canceladaEm: as(HOJE, '10:00') }),
+    // Polimento: um concluído sem pessoa da equipe (a FlowFoods; a leitura tira o login do nível 1 da 3.1).
+    lote({ quem: null, responsavelDesde: null, concluidaPorNome: 'Rodolfo Cavalcante' }),
   ];
 
   it('Caio: 3 concluídos, 1 perdido, 1 cancelado; 14 kg de 15 kg de molho (93,3%); média 93,3% (cada lote pesa igual); 1 fora da faixa; tempo médio dos 3 com hora de pegar', () => {
-    const { pessoas, semPessoa } = indicadoresPorPessoa(lotes);
+    const { pessoas, semPessoa, daFlowFoods } = indicadoresPorPessoa(lotes);
     expect(semPessoa).toBe(1);
+    expect(daFlowFoods).toBe(1);
     // Ordem alfabética, nunca por desempenho.
     expect(pessoas.map((p) => p.nome)).toEqual(['Caio Cozinha', 'Duda Lima']);
     const caio = pessoas[0];
-    expect(caio).toMatchObject({ id: 'u-caio', concluidos: 3, perdidos: 1, cancelados: 1, estornados: 0, foraDaFaixa: 1, amostra: 4, amostraPequena: true });
+    expect(caio).toMatchObject({ id: 'u-caio', concluidos: 3, perdidos: 1, cancelou: 1, canceladosPelaGerencia: 1, estornados: 0, foraDaFaixa: 1, amostra: 4, amostraPequena: true });
     expect(caio.porFicha).toEqual([{ fichaId: 'f-molho', nome: 'Molho cheddar', unidade: 'KG', lotes: 3, planejadoMilesimos: 15000, produzidoMilesimos: 14000, rendimentoBp: 9333 }]);
     expect(caio.rendimentoMedioBp).toBe(9333);
     // 60 min (pegou 09:00, insumos 09:30, concluiu 10:30), 30 min (pegou 14:00) e o perdido 60 min (pegou 07:00): média 50 min.
@@ -171,7 +176,7 @@ describe('os indicadores por pessoa', () => {
 
   it('Duda: 1 concluído (105%), 1 estornado (fora da conta de rendimento); amostra pequena', () => {
     const duda = indicadoresPorPessoa(lotes).pessoas[1];
-    expect(duda).toMatchObject({ concluidos: 1, perdidos: 0, cancelados: 0, estornados: 1, rendimentoMedioBp: 10500, foraDaFaixa: 0, amostra: 1, amostraPequena: true });
+    expect(duda).toMatchObject({ concluidos: 1, perdidos: 0, cancelou: 0, canceladosPelaGerencia: 0, estornados: 1, rendimentoMedioBp: 10500, foraDaFaixa: 0, amostra: 1, amostraPequena: true });
     expect(duda.porFicha.map((f) => [f.nome, f.produzidoMilesimos, f.rendimentoBp])).toEqual([['Base de cebola', 2100, 10500]]);
   });
 
