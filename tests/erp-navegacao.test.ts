@@ -66,7 +66,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(emUso(DONO).map((m) => m.nome)).toEqual(AREAS);
     expect(abasPorArea(DONO)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
-      'Compras e Fornecedores': ['Compras', 'Fornecedores'],
+      'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
       Produção: ['Lotes'],
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos', 'Plano e metas'],
@@ -86,7 +86,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Gerente (rede): Precificação visível (ver preços), sem Equipe; ações de cadastro e de compra', () => {
     expect(abasPorArea(GERENTE)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
-      'Compras e Fornecedores': ['Compras', 'Fornecedores'],
+      'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
       Produção: ['Lotes'],
       // 2.2a: o gerente vê e lança despesa, vê o DRE e o período; plano de contas e período são do dono (rede inteira).
@@ -431,7 +431,7 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
   const parceiro = (r: string) => join('src', 'app', 'erp', ...r.split('/').filter(Boolean), 'page.tsx');
   const espelho = (r: string) => join('src', 'app', 'rodolfo', '(painel)', 'erp', '[slug]', ...r.split('/').filter(Boolean), 'page.tsx');
 
-  it.each([...ANTIGAS, ...profundas, '/estoque/contagens'])('%s existe no /erp e no nível 1', (r) => {
+  it.each([...ANTIGAS, ...profundas, '/estoque/contagens', '/compras/orcamento'])('%s existe no /erp e no nível 1', (r) => {
     expect(existsSync(parceiro(r)), `/erp${r}`).toBe(true);
     expect(existsSync(espelho(r)), `/rodolfo/erp/<slug>${r}`).toBe(true);
   });
@@ -450,10 +450,11 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     }
   });
 
-  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das das fases 2.1, 2.2a e 3.1 (faturamento, DRE, despesas e produção)', () => {
+  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das das fases 2.1, 2.2a, 2.5 e 3.1 (faturamento, DRE, despesas, orçamento e produção)', () => {
     const todas = [...emUso(DONO)].flatMap((m) => [...m.grupos.flatMap((g) => g.itens), ...m.acoes]).map((i) => i.href.replace('/erp', ''));
     const novas = todas.filter((r) => !ANTIGAS.includes(r) && r !== '/acesso');
-    expect(novas).toEqual(['/estoque/contagens', '/producao', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
+    // 2.5: o orçamento de compra é aba da área Compras.
+    expect(novas).toEqual(['/compras/orcamento', '/estoque/contagens', '/producao', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
   });
 });
 

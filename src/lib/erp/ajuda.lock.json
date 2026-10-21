@@ -71,13 +71,17 @@
     "versao": 1,
     "hash": "a2950debd7264c7f"
   },
+  "compras-orcamento": {
+    "versao": 1,
+    "hash": "96cc708b5e70093e"
+  },
   "compra-nova": {
-    "versao": 3,
-    "hash": "a0637507d9e6d929"
+    "versao": 4,
+    "hash": "8a708c7d8d14f72f"
   },
   "compra": {
-    "versao": 2,
-    "hash": "698214de2500862a"
+    "versao": 3,
+    "hash": "2594b3de930e4918"
   },
   "fornecedores": {
     "versao": 1,

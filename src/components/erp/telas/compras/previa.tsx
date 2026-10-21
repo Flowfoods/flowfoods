@@ -8,6 +8,7 @@
 import type { PreviaDaNota } from '@/lib/erp/compras';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { Painel } from '../../ui/superficies';
+import { OrcamentoNaPrevia } from './orcamento';
 
 const EFEITO = {
   sobe: 'sobe',
@@ -69,6 +70,12 @@ export function PreviaDoImpacto({ previa: p }: { previa: PreviaDaNota }) {
           <h3 className="text-[13px] font-semibold text-texto">Estoque</h3>
           <p className="mt-1 text-sm text-suave">{p.estoque.frase}</p>
         </div>
+        {p.orcamento && (
+          <div className="mt-4">
+            <h3 className="text-[13px] font-semibold text-texto">Orçamento de compra</h3>
+            <OrcamentoNaPrevia o={p.orcamento} />
+          </div>
+        )}
         <div className="mt-4">
           <h3 className="text-[13px] font-semibold text-texto">Fichas que mudam junto</h3>
           {p.fichas.length === 0 ? (

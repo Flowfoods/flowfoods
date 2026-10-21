@@ -234,3 +234,9 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   régua vazia e o motivo escrito. Tokens `--ff-farol-*` (claro #2F5D8A #166534 #6F6300 #B04400 #C41522; escuro
   #8DB4DC #5DBB84 #E2C55A #F0913A #F5424D), contraste ≥ 4,5:1 sobre painel, fundo e linha de resultado.
   Painel no topo do DRE no kit Bento da Kairu: estrutura modular, sem a paleta tonal do kit.
+- **Orçamento de compra (2.5)**: bloco com o número grande em Gelasio ("ainda cabe no período" em suave, "passou do
+  orçamento" em `erro` com a palavra), a conta por extenso em 13 px tabular ("Meta do CMV 30,0 % × R$ 41.000,00 de receita
+  prevista = R$ 12.300,00 de teto − R$ 10.000,00 já comprados = R$ 2.300,00") e o ritmo com o `Farol` da 2.4 abaixo de um
+  separador. Quem não vê a receita: só o número com "arredondado a R$ 100". "Por loja" em tabela Corporativo a partir de
+  1024 px, cartões abaixo. Na prévia da nota, um subtítulo "Orçamento de compra" no mesmo painel; no detalhe, `Aviso`
+  (tom alerta só quando passou). Nunca bloqueia: o botão de lançar segue.
