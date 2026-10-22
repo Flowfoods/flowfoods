@@ -281,6 +281,9 @@ function Ritmo({ v }: { v: VistaCompleta }) {
         </div>
         <Farol f={v.ritmo} />
       </div>
+      {v.ritmo.tipo === 'cor' && v.ritmo.posicao >= 3 && (
+        <p className="text-[13px] font-medium text-texto">Próximo passo: espace as próximas compras e confira se alguma nota entrou duas vezes, para o ritmo voltar à meta.</p>
+      )}
       <p className="text-[12px] text-suave">O farol olha o ritmo das compras até ontem; o número de cima olha o período inteiro. Comprar muito no começo acende o farol mesmo cabendo no orçamento.</p>
     </div>
   );

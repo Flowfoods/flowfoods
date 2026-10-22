@@ -185,6 +185,12 @@ describe.skipIf(!URL_TESTE)('ERP I.2b · telas do CMV real por categoria (Postgr
     expect(m).toContain('CMV do DRE');
     const e = await painel({ rede: '1', periodo: SET, vista: 'evolucao' });
     expect(e).toContain('Evolução por categoria');
+    // Abaixo de 1180 px cada categoria é um cartão com UMA linha por período (nenhum período some); setembro, o mais novo, vem por último.
+    expect(e).toContain('do período mais antigo ao mais novo');
+    expect(e.indexOf('Abr 26')).toBeGreaterThan(-1);
+    expect(e.indexOf('Abr 26')).toBeLessThan(e.lastIndexOf('Set 26'));
+    expect(e).toMatch(/Ago 26<\/span><span class="text-right">[^<]*R\$ 3\.000,00/);
+    expect(e).toContain('Como ler esta tela');
     const tabela = e.slice(e.indexOf('Evolução por categoria'));
     expect(tabela.indexOf('Agosto de 2026')).toBeGreaterThan(-1);
     expect(tabela.indexOf('Agosto de 2026')).toBeLessThan(tabela.indexOf('Setembro de 2026'));

@@ -27,7 +27,6 @@ import { textoDaMeta } from '@/lib/erp/dre-metas-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
-import { FiltroEmLinks } from '../../ui/filtros';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Contagem, Metrica, Painel, Selo } from '../../ui/superficies';
 import { Farol, Regua } from './farol';
@@ -165,6 +164,8 @@ export function TelaDoCmvPorCategoria({
   const linha = total.linha;
   const selo = seloDoCmv(linha);
   const semFaturamento = d.resultado.semFaturamento;
+  // Parte das categorias vem do real (estoque contado por insumo) e parte das compras: o selo diz "misto" e de quem é cada parte.
+  const misto = painel && painel.lojasSemRealAberto.length > 0 && painel.compraReal ? { real: painel.compraReal.lojasComparadas.join(', '), compras: painel.lojasSemRealAberto.map((l) => l.nome).join(', ') } : null;
   return (
     <div className="space-y-6">
       <PageHeader
@@ -205,32 +206,44 @@ export function TelaDoCmvPorCategoria({
             )}
           </nav>
           {!d.emCurso && (
-            <Link href={`${base}?${escopoQuery.slice(1)}`} className={classeDeBotao('secundario')}>
+            <Link href={`${base}?${escopoQuery.slice(1)}`} className={LINK_TOQUE}>
               Voltar para o período de agora
             </Link>
           )}
           {loja && pode.veRede && (
-            <Link href={`${base}?periodo=${d.periodo.inicio}&rede=1`} className={classeDeBotao('secundario')}>
+            <Link href={`${base}?periodo=${d.periodo.inicio}&rede=1`} className={LINK_TOQUE}>
               Ver a rede
             </Link>
           )}
-          <Link href={`${raiz}/dre?periodo=${d.periodo.inicio}${escopoQuery}`} className={classeDeBotao('secundario')}>
+          <Link href={`${raiz}/dre?periodo=${d.periodo.inicio}${escopoQuery}`} className={LINK_TOQUE}>
             Ver o DRE
           </Link>
           {d.emCurso ? <Selo tom="alerta">Parcial · até ontem</Selo> : d.status === 'FECHADO' ? <Selo tom="ok">Período fechado</Selo> : <Selo>Período encerrado</Selo>}
         </div>
       </PageHeader>
 
-      <FiltroEmLinks
-        rotulo="O que ver do CMV por categoria"
-        quebra
-        opcoes={[
-          { href: linkDaVista('categorias'), rotulo: 'Categorias', ativo: vista === 'categorias' },
-          { href: linkDaVista('compra-real'), rotulo: 'Compra × real', ativo: vista === 'compra-real' },
-          { href: linkDaVista('evolucao'), rotulo: 'Evolução', ativo: vista === 'evolucao' },
-          ...(!loja && r.painel?.matriz ? [{ href: linkDaVista('matriz'), rotulo: 'Por loja', ativo: vista === 'matriz' }] : []),
-        ]}
-      />
+      <nav aria-label="O que ver do CMV por categoria" className="min-w-0 max-w-full overflow-x-auto rounded-[10px] border border-linha bg-painel p-1">
+        <ul className="flex min-w-max gap-1">
+          {(
+            [
+              ['categorias', 'Categorias'],
+              ['compra-real', 'Compra × real'],
+              ['evolucao', 'Evolução'],
+              ...(!loja && r.painel?.matriz ? [['matriz', 'Por loja']] : []),
+            ] as [VistaDoPainel, string][]
+          ).map(([v, rotulo]) => (
+            <li key={v}>
+              <Link
+                href={linkDaVista(v)}
+                aria-current={vista === v ? 'page' : undefined}
+                className="ff-transicao flex min-h-9 items-center whitespace-nowrap rounded-[7px] px-2.5 text-[13px] text-suave hover:bg-texto/5 hover:text-texto aria-[current=page]:bg-forte aria-[current=page]:font-semibold aria-[current=page]:text-texto [@media(pointer:coarse)]:min-h-11"
+              >
+                {rotulo}
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </nav>
 
       {bloqueio && (
         <Aviso tom="alerta" titulo="Somente leitura.">
@@ -246,8 +259,9 @@ export function TelaDoCmvPorCategoria({
             valor={linha.valorCentavos === null ? '—' : formatarDinheiro(linha.valorCentavos)}
             detalhe={linha.valorCentavos === null ? linha.nota : linha.percentualBp === null ? undefined : `${percentualComDuasCasas(linha.percentualBp)} da receita bruta`}
           >
-            <div className="mt-2">
-              <Selo tom={selo.tom}>{selo.texto}</Selo>
+            <div className="mt-2 space-y-1">
+              {misto ? <Selo tom="alerta">CMV misto</Selo> : <Selo tom={selo.tom}>{selo.texto}</Selo>}
+              {misto && <p className="text-[12px] leading-snug text-suave">Categorias pelo real em {misto.real}; pelas compras em {misto.compras}.</p>}
             </div>
           </Metrica>
         </div>
@@ -377,12 +391,15 @@ export function TelaDoCmvPorCategoria({
         </>
       )}
 
-      <p className="text-[12px] leading-relaxed text-suave">
+      <details className="rounded-[10px] border border-linha bg-painel px-4 py-1 sm:px-5">
+        <summary className="flex min-h-11 cursor-pointer items-center text-[13px] font-medium text-texto">Como ler esta tela</summary>
+      <p className="mt-2 text-[12px] leading-relaxed text-suave">
         A meta é o percentual da receita bruta, a mesma base do DRE. O desvio é o realizado menos a meta, em pontos percentuais (pp): positivo é custo acima da meta; o percentual da própria meta, embaixo, ajuda a ler a categoria pequena (0,20 pp em Limpeza pode ser 40% da meta) e nunca muda a cor.{' '}
         {!loja && 'Na rede, o percentual de cada categoria é sobre a receita das lojas que a usam: a loja que marcou a categoria como não usa fica fora dessa conta, e por isso a coluna não precisa somar o percentual do CMV total. '}
         {d.status === 'FECHADO' ? 'Esta tela é a fotografia do fechamento: a categoria e a meta são as daquele dia.' : 'A conta usa a categoria de hoje do insumo em todas as parcelas do período: reclassificar um insumo muda o período inteiro, e o total não muda.'}{' '}
         O estoque que saiu de uma loja para outra não existe no sistema (não há transferência entre lojas): o real de cada loja não a desconta, e o da rede continua certo.
       </p>
+      </details>
     </div>
   );
 }
@@ -588,6 +605,12 @@ function MatrizEmPainel({ m, periodoNome, celula }: { m: MatrizDoPainel; periodo
 
 // ================================================================ evolução
 
+/** "Maio de 2026" → "Mai 26": o rótulo curto das linhas do celular. Outro formato de nome (semana, quinzena) fica como está. */
+function rotuloCurto(nome: string): string {
+  const m = /^(\p{L}+) de (\d{4})$/u.exec(nome);
+  return m ? `${m[1].slice(0, 3)} ${m[2].slice(2)}` : nome;
+}
+
 function VistaDaEvolucao({ e, escopoNome }: { e: EvolucaoDeCategorias | null; escopoNome: string }) {
   if (!e || e.periodos.length === 0) {
     return (
@@ -596,8 +619,11 @@ function VistaDaEvolucao({ e, escopoNome }: { e: EvolucaoDeCategorias | null; es
       </Aviso>
     );
   }
-  const celula = (c: EvolucaoDeCategorias['linhas'][number]['celulas'][number]) => {
-    if (!c) return <span className="text-suave">—</span>;
+  type Celula = EvolucaoDeCategorias['linhas'][number]['celulas'][number];
+  /** Sem dado (nulo) ou sem valor no período: "—", nunca R$ 0,00. */
+  const semValor = (c: Celula) => !c || c.realizadoCentavos === 0;
+  const celula = (c: Celula) => {
+    if (!c || semValor(c)) return <span className="text-suave">—</span>;
     return (
       <>
         <span className="block min-h-6 leading-6">{c.realizadoBp === null ? moeda(c.realizadoCentavos) : `${c.realizadoBp < 0 ? '−' : ''}${percentualComDuasCasas(Math.abs(c.realizadoBp))}`}</span>
@@ -611,12 +637,23 @@ function VistaDaEvolucao({ e, escopoNome }: { e: EvolucaoDeCategorias | null; es
       </>
     );
   };
+  /** A mesma célula em uma linha curta: "4,00% · R$ 4.000,00 · meta 11,00% · −7,00 pp". */
+  const linhaCurta = (c: Celula) => {
+    if (!c || semValor(c)) return '—';
+    const partes = [c.realizadoBp === null ? moeda(c.realizadoCentavos) : `${c.realizadoBp < 0 ? '−' : ''}${percentualComDuasCasas(Math.abs(c.realizadoBp))}`];
+    if (c.realizadoBp !== null) partes.push(moeda(c.realizadoCentavos));
+    if (c.metaBp !== null) partes.push(`meta ${percentualComDuasCasas(c.metaBp)}`);
+    if (c.metaBp !== null && c.desvioBp !== null) partes.push(pontosComDuasCasas(c.desvioBp));
+    return partes.join(' · ');
+  };
   const rotulo = (p: EvolucaoDeCategorias['periodos'][number]) => `${p.nome}${p.situacao === 'em-curso' ? ' (parcial)' : ''}`;
+  const rotuloDoCartao = (p: EvolucaoDeCategorias['periodos'][number]) => `${rotuloCurto(p.nome)}${p.situacao === 'em-curso' ? ' (parcial)' : ''}`;
+  const vazioNoPeriodo = (p: EvolucaoDeCategorias['periodos'][number], l: EvolucaoDeCategorias['linhas'][number]) => !!p.semDado && l.tipo !== 'total';
   const comAviso = e.periodos.filter((p) => p.semDado);
   return (
     <div className="space-y-4">
       <Painel titulo="Evolução por categoria" subtitulo={`Os últimos ${e.periodos.length} períodos ${escopoNome}, do mais antigo ao mais novo: % da receita bruta, valor, meta que valia na época e desvio. Sem cor: a cor é do painel de cada período.`} semRespiro>
-        <div className="hidden overflow-x-auto lg:block">
+        <div className="hidden overflow-x-auto min-[1180px]:block">
           <table className="w-full text-sm">
             <caption className="sr-only">Evolução do CMV por categoria nos últimos períodos</caption>
             <thead>
@@ -632,30 +669,28 @@ function VistaDaEvolucao({ e, escopoNome }: { e: EvolucaoDeCategorias | null; es
                 <tr key={l.chave} className={`border-t border-linha ${l.tipo === 'total' ? 'border-t-2 border-linha-forte bg-forte font-semibold' : l.tipo === 'preparos' ? 'bg-forte/30' : ''}`}>
                   <th scope="row" className={`px-5 py-2 text-left align-top ${l.tipo === 'preparos' ? 'font-normal text-suave' : 'font-medium text-texto'}`}>{l.nome}</th>
                   {l.celulas.map((c, i) => (
-                    <td key={e.periodos[i].inicio} className="px-3 py-2 text-right align-top">{e.periodos[i].semDado && l.tipo !== 'total' ? <span className="text-suave">—</span> : celula(c)}</td>
+                    <td key={e.periodos[i].inicio} className="px-3 py-2 text-right align-top">{vazioNoPeriodo(e.periodos[i], l) ? <span className="text-suave">—</span> : celula(c)}</td>
                   ))}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <ul className="divide-y divide-linha lg:hidden">
+        <ul className="divide-y divide-linha min-[1180px]:hidden">
           {e.linhas.map((l) => (
-            <li key={l.chave} className="px-4 py-3">
-              <details>
-                <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm font-medium text-texto">
-                  <span className="min-w-0">{l.nome}</span>
-                  <span className="text-[12px] font-normal tabular-nums text-suave">{(() => { const ultima = l.celulas[l.celulas.length - 1]; return ultima ? moeda(ultima.realizadoCentavos) : '—'; })()}</span>
-                </summary>
-                <dl className="mt-1 space-y-2 tabular-nums">
-                  {l.celulas.map((c, i) => (
-                    <div key={e.periodos[i].inicio} className="flex items-baseline justify-between gap-3 text-sm">
-                      <dt className="min-w-0 text-[13px] text-suave">{rotulo(e.periodos[i])}</dt>
-                      <dd className="text-right">{e.periodos[i].semDado && l.tipo !== 'total' ? <span className="text-suave">—</span> : celula(c)}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </details>
+            <li key={l.chave} className={`px-4 py-3 ${l.tipo === 'total' ? 'bg-forte' : ''}`}>
+              <p className={`text-sm ${l.tipo === 'total' ? 'font-semibold' : l.tipo === 'preparos' ? 'text-suave' : 'font-medium text-texto'}`}>{l.nome}</p>
+              <ol className="mt-1 space-y-1 tabular-nums" aria-label={`${l.nome}, do período mais antigo ao mais novo`}>
+                {l.celulas.map((c, i) => {
+                  const ultimo = i === l.celulas.length - 1;
+                  return (
+                    <li key={e.periodos[i].inicio} className={`flex flex-wrap items-baseline justify-between gap-x-3 text-[13px] leading-snug ${ultimo ? 'font-semibold text-texto' : ''}`}>
+                      <span className="font-normal text-suave">{rotuloDoCartao(e.periodos[i])}</span>
+                      <span className="text-right">{vazioNoPeriodo(e.periodos[i], l) ? '—' : linhaCurta(c)}</span>
+                    </li>
+                  );
+                })}
+              </ol>
             </li>
           ))}
         </ul>

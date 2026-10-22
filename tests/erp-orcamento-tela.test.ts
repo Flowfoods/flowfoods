@@ -160,6 +160,7 @@ describe('2.5 · a tela', () => {
     expect(h).toContain('sem nota de compra');
     expect(h).toContain('Delivery já passou R$ 1.000,00');
     expect(h).toContain('O farol olha o ritmo das compras até ontem; o número de cima olha o período inteiro.');
+    expect(h).toContain('Próximo passo: espace as próximas compras'); // farol pior que a meta: a frase de ação
     expect(h).toContain('<table');
     expect(h).toContain('h-11');
     expect(h).toContain('title="Receita prevista"');
