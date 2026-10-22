@@ -25,7 +25,7 @@ export const FILTROS: { valor: string; rotulo: string; entidades?: string[] }[] 
   // 2.1: faturamento por canal e dia (só para quem tem "ver faturamento").
   { valor: 'FaturamentoLancamento', rotulo: 'Faturamento' },
   // 2.2a: despesas, linhas do plano e a regra do período (só para quem tem "ver DRE").
-  { valor: 'Despesa', rotulo: 'DRE e despesas', entidades: ['Despesa', 'DreLinha', 'RegraDoPeriodo', 'DreMeta', 'PeriodoApuracao', 'DreFotografia'] },
+  { valor: 'Despesa', rotulo: 'DRE e despesas', entidades: ['Despesa', 'DreLinha', 'RegraDoPeriodo', 'DreMeta', 'MetaCmvConjunto', 'CategoriaNaLoja', 'PeriodoApuracao', 'DreFotografia'] },
   { valor: 'AcessoParceiro', rotulo: 'Acessos' },
   { valor: 'PerfilAcesso', rotulo: 'Perfis' },
 ];

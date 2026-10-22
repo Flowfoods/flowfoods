@@ -576,16 +576,17 @@ export function TelaDoDre({
         }
         semRespiro
         acessorio={
-          r.faltaConfigurarTaxa || pode.definirMetas ? (
-            <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
-              {r.faltaConfigurarTaxa && <Selo tom="alerta">Falta configurar a taxa do iFood</Selo>}
-              {pode.definirMetas && (
-                <Link href={`${raiz}/dre/plano`} className={`${LINK_DE_TEXTO} text-[13px]`}>
-                  {Object.keys(d.metas).length > 0 ? 'Metas' : 'Definir metas'}
-                </Link>
-              )}
-            </span>
-          ) : undefined
+          <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+            {r.faltaConfigurarTaxa && <Selo tom="alerta">Falta configurar a taxa do iFood</Selo>}
+            <Link href={`${raiz}/dre/cmv-categorias?periodo=${d.periodo.inicio}${escopoQuery}`} className={`${LINK_DE_TEXTO} text-[13px]`}>
+              CMV por categoria
+            </Link>
+            {pode.definirMetas && (
+              <Link href={`${raiz}/dre/plano`} className={`${LINK_DE_TEXTO} text-[13px]`}>
+                {Object.keys(d.metas).length > 0 ? 'Metas' : 'Definir metas'}
+              </Link>
+            )}
+          </span>
         }
       >
         {d.lojasDoEscopo.length === 0 ? <Vazio titulo="Nenhuma loja no seu acesso.">Peça a quem cuida da equipe para incluir as lojas em que você trabalha.</Vazio> : <Tabela d={d} raiz={raiz} pode={pode} />}

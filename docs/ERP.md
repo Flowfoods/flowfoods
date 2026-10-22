@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2), a cozinha pega a tarefa: histórico e indicadores por pessoa (3.3), categorias de insumo, categoria obrigatória, confirmação ao salvar e idempotência (I.1a)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2), a cozinha pega a tarefa: histórico e indicadores por pessoa (3.3), categorias de insumo, categoria obrigatória, confirmação ao salvar e idempotência (I.1a), cadastro de insumos claro (I.1b), metas por categoria e CMV por categoria pelas compras (I.2a)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -39,6 +39,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Lista do dia (3.2): o gerente define o que a loja produz no dia; a tela cruza com o estoque (vai usar / tem / comprar, com a cascata dos pré-preparos) e cada linha vira lote pela regra da 3.1 | `src/lib/erp/{producao-lista-campos,producao-lista}.ts` (conta pura / com banco) + `planejarProducaoNaTx` em `producao.ts`; telas `telas/producao/{lista,form-lista}.tsx`; rotas `/erp/producao/lista` e `/rodolfo/erp/<slug>/producao/lista` (`<loja>?dia=aaaa-mm-dd`); migration `20261030000000_erp_lista_do_dia` |
 | A cozinha pega a tarefa (3.3): pegar o lote (ou a linha da lista de hoje), soltar, passar para outra pessoa, concluir pela tela da cozinha; histórico da produção e indicadores por pessoa | regras de escrita em `producao.ts` (`pegarNaTx`, `pegarProducao`, `soltarProducao`, `passarProducao`) e `producao-lista.ts` (`pegarDaLista`); leituras em `producao-equipe.ts` (`tarefasDoDia`, `historicoDaProducao`, `indicadoresDaProducao`); conta pura em `producao-equipe-campos.ts`; quem pode receber em `credenciais.ts` (`pessoasQueProduzem`); telas `telas/producao/{tarefas,form-tarefas,historico-producao,indicadores,periodo}.tsx`; rotas `/erp/producao/{tarefas,historico,indicadores}` (`/<loja>`) e o espelho `/rodolfo/erp/<slug>/producao/...`; migration `20261031000000_erp_producao_equipe` |
 | Categorias de insumo (I.1a): tabela da rede, categoria obrigatória no cadastro, sugestão pelo nome, classificação assistida, retorno ao salvar e chave de envio | `src/lib/erp/{categoria-campos,categoria-sugestao}.ts` (puros) + `{categorias,classificar}.ts` (com banco) + `insumos.ts` (cadastrar e editar); telas `telas/insumos/{categorias,classificar,form-categorias,form-classificar,aviso-classificar,executar-categorias}.tsx` e `telas/cadastro/anuncio.tsx`; rotas `insumos/categorias` e `insumos/classificar` em `/erp` e `/rodolfo/erp/<slug>`; scripts `erp:semear-categorias` e `erp:classificar-insumos`; migrations `20261101000000_erp_insumo_categorias` e `20261101010000_erp_catalogo_v3` |
+| Metas por categoria e CMV por categoria pelas compras (I.2a): conjunto de metas por rede e loja com vigência, modelo de 32%, retrato do estoque por insumo, painel com farol e maiores desvios, fotografia v4 | `src/lib/erp/{cmv-categorias-campos,metas-categorias,cmv-categorias,retrato-estoque}.ts` (o primeiro é puro) e as mudanças em `dre.ts` (`dreDoPeriodoNaTx`), `dre-metas.ts`, `dre-fechamento.ts`, `contagem.ts`, `estoque.ts` e `categorias.ts`; telas `telas/dre/{cmv-categorias,metas-categorias,form-metas-categorias}.tsx`; rotas `dre/cmv-categorias` e `dre/metas-categorias` em `/erp` e `/rodolfo/erp/<slug>`; migration `20261103000000_erp_cmv_categorias` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Navegação por áreas (UX.9): hub de 4 áreas, abas por rota, trilha com a área, ações no ⌘K; rota nova `/estoque/contagens` | `src/lib/erp/modulos.ts` (`areasConstruidas`, `abasDaArea`, `acoesDaNavegacao`, `montarTrilha`) e `src/lib/rodolfo/modulos.ts`; `src/components/erp/ui/{abas,hub}.tsx`, `telas/hub-do-parceiro.tsx`, `shell/Shell.tsx`; sem migration |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
@@ -2613,6 +2614,128 @@ lista não acompanhava o link "Ver quais são".
   rede (243, herdada); (4) o rótulo "Material de limpeza e uso" e "Seco (ambiente)"; (5) conservação obrigatória também ao editar um insumo
   antigo (262); (6) `VERSAO_DO_ERP` segue "fase 3.3" (a I.1 não é uma fase numerada).
 
+## O que a I.2a entregou — metas por categoria e CMV por categoria, pelas compras
+
+Prioridade do Rodolfo (decisões de 19 e 21/10/2026), primeira metade da I.2 (a análise foi dividida: a I.2b traz o real por categoria). Uma
+migration ADITIVA, `20261103000000_erp_cmv_categorias`: `Contagem.retratoGravadoEm` e quatro tabelas novas (`ContagemRetratoItem`,
+`CategoriaNaLoja`, `MetaCmvConjunto`, `MetaCmvCategoria`), todas com `parceiroId`, FK compostas, RLS condicional e `erp_tenant`. Nenhum dado
+antigo é reescrito. Decisões 270 a 285. Segunda migration `20261103010000_erp_cmv_categorias_endurecimento` (só gatilhos: conjunto de metas sem vigência retroativa e contagem que não fecha com retrato solto). Sem permissão nova: ver o painel é `dre.ver`, editar as metas é `metas.editar` com a rede inteira.
+
+1. **Metas por categoria** (271, 272, 273). Tela `dre/metas-categorias` (aba "Metas por categoria"): na rede, a meta total do CMV (a MESMA
+   `DreMeta` da linha CMV do DRE: uma fonte só, gravada junto sob a trava `erp-metas:<parceiro>`) e a meta de cada categoria, em % da receita
+   BRUTA, com duas casas e pontos-base inteiros. Cada loja **segue a rede** ou **personaliza o conjunto inteiro** (e marca quais categorias usa);
+   mudar a rede só atinge quem segue a rede e a tela diz quais lojas; mudar uma loja não toca outra. Vigência: o começo do período em curso; os
+   períodos anteriores seguem com as metas que valiam neles. Histórico em "Metas por categoria" e "Categoria na loja" (atrás de `dre.ver`).
+2. **Modelo de 32%** (274). "Usar o modelo de 32%" preenche os dez campos e o total e **não grava**; o aviso "Confira a divisão" aparece quando
+   a soma das categorias difere do total (aviso, não bloqueio). Categoria renomeada mantém; excluída ou desativada fica de fora e a frase diz.
+3. **Painel "CMV por categoria"** (275, 277, 279, 280). Tela `dre/cmv-categorias` (aba "CMV por categoria", link também no DRE): escopo rede ou
+   loja e período; pelas COMPRAS (data da nota, até ontem no período em curso, "parcial"). Por categoria: realizado em R$ e %, meta em % e R$,
+   desvio em pp e R$ (realizado menos meta, o sinal da DRE) e o farol das cinco faixas de custo da 2.4. Maiores desvios (até 3 categorias que SAÍRAM da meta, em R$; quem está "na meta" não entra). Linhas sem
+   meta nem farol: Outros / a classificar, Sem categoria e **Pré-preparos (variação do estoque)**. **Sem cor** quando o dado não fecha (falta
+   faturamento, "sem o CMV de X", sem contar) ou quando Outros mais Sem categoria passam de 2% do CMV (hipótese a validar), com o motivo escrito e o
+   atalho "Classificar N insumos". Período encerrado: a diferença para o CMV real do DRE vai na linha "Variação do estoque, ainda não aberta por
+   categoria"; a linha final soma tudo e **é a linha CMV do DRE, ao centavo** (a DRE não muda).
+4. **Categoria de hoje** (270). Toda conta ao vivo usa a categoria atual do insumo em todas as compras do período: reclassificar um insumo muda
+   o período em curso inteiro e o total não muda. O fechado lê só a fotografia.
+5. **Retrato do estoque por insumo** (281). Todo fechamento do período e toda abertura de estoque NOVOS (a cíclica não: é um pedaço do estoque) gravam, na MESMA transação que fecha a
+   contagem, uma linha por insumo com saldo (quantidade e valor; nulo para insumo sem preço); a soma é o `valorTotalCentavos` ao centavo (código e
+   gatilho do banco recusam diferente). Só inclusão e só em contagem aberta. `Contagem.retratoGravadoEm` nulo = "fechado antes da I.2", nunca
+   reconstruído. É o que a I.2b usa para o real por categoria.
+6. **Fotografia v4** (283). Fechar o período grava `versaoDaConta = 4` e as categorias por loja em `entrada.categorias`; v1 a v3 dizem "Não
+   apurado por categoria (fechado antes da I.2)". Reclassificar depois não muda o fechado.
+7. **Excluir categoria** (281). Recusa se houver meta ou retrato (e a FK composta impede por SQL); o apagar da `CategoriaNaLoja` vem antes.
+8. **Ajuda contextual.** `dre-cmv-categorias` e `dre-metas-categorias` novas; `periodo` (5), `insumo-categorias` (2), `dre-plano` (5), `dre` (7) e
+   `dre-periodo` (4) sobem de versão; `ajuda.lock.json` regravado (65 entradas).
+
+**Ficou para a I.2b:** CMV real por categoria (usa o retrato), compra × real por categoria, evolução de 6 períodos, matriz categoria × loja, meta
+total por loja no DRE e no orçamento (resolve a pendência 2.5-(2), salão × delivery). **Ficou para a I.2c (só se o Rodolfo pedir):** limpeza e
+descartáveis numa linha própria da DRE.
+
+### Referências Kairu consultadas (regra do plano)
+
+Materiais da análise da I.2 (MCP da Kairu, 22/10/2026): `pass:cmv-fichas-e-margem` (lido inteiro), "Da Ficha ao Fornecedor" e "Estoque unificado"
+(Notion, snapshot de 14/10). Buscas "CMV por categoria metas" e "estoque inventário transferência entre lojas" não acharam material próprio.
+
+| Material | Aplicado na I.2a | Adaptado | Deixado para depois |
+|---|---|---|---|
+| CMV, fichas e margem (`pass:cmv-fichas-e-margem`) | CMV parcial com selo e cobertura dita; `null` é desconhecido, nunca 0 ("sem compra no período", "sem cor"); fotografia de período fechado não muda com compra mais cara amanhã; nomes distintos para CMV de compra, real e gerente | o CMV "gerencial" é o próprio CMV do DRE aberto em categorias (nada de CMV novo) | CMV teórico por categoria e comparação com o real (I.2b) |
+| Da Ficha ao Fornecedor | custo ausente é pendência, não 0: insumo sem categoria vai para "Sem categoria", a classificar | a meta de cada categoria é do dono, com um modelo ilustrativo (32%) que nunca grava sozinho | política de lote e cotação |
+| Estoque unificado | não unir por nome: pré-preparo tem linha própria, o ingrediente fica na categoria do ingrediente; saldo final bate com o livro (o retrato soma o total) | retrato por insumo gravado na transação que fecha a contagem | transferência entre lojas (não existe; termo da fórmula = 0) |
+
+## Provar a I.2a
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate
+npx vitest run                                              # sem banco
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism   # com banco, 2x
+npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+`tests/erp-cmv-categorias.test.ts` (sem banco): modelo de 32%, aviso de soma, leitura do formulário (100,01, negativo e 3,155 recusados), a
+montagem do painel (desvio com o sinal da DRE, farol, maiores desvios, "sem cor" e o limiar de 2%, variação do estoque, soma = DRE) e o JSON da
+fotografia. `tests/erp-cmv-categorias.db.test.ts`: o cenário da análise (Vila da Penha e Delivery, outubro em curso e setembro encerrado), metas
+por vigência e herança, `CategoriaNaLoja`, reclassificar, excluir categoria com meta, fotografia v4, histórico, nº de consultas constante com 1 e
+50 lojas e o isolamento entre parceiros. `tests/erp-retrato-estoque.db.test.ts`: o retrato do fechamento e da abertura, e a cíclica sem retrato (soma = total ao
+centavo, sem preço = valor nulo, só inclusão, 2ª aplicação não duplica) com mutante (sem a trava, o teste cai). `tests/erp-cmv-categorias-telas.db.test.ts`:
+a página e a action de verdade (dona, gerente, comprador, operador). `tests/erp-cmv-categorias-migracao.db.test.ts`: a migration com dado antigo
+como superusuário, dono com FORCE RLS e dono sem RLS.
+
+**Resultado da prova (2026-10-22).** `prisma validate`, `typecheck`, `lint`, `gate` e `build` limpos; `erp:conferir-migracao` limpo e `migrate diff`
+vazio no `ff_dev`. `npx vitest run` sem banco: 58 arquivos, 1418 testes passando (os de banco pulados). Com banco (`ff_dev`, superusuário), duas
+rodadas seguidas: 107 arquivos, 2127 testes, todos passando. Como dono NÃO-superusuário com FORCE RLS e como dono sem RLS (bancos novos, todas as
+migrations aplicadas pelo dono, `--no-file-parallelism`): os 17 arquivos de banco tocados ou vizinhos (metas e CMV por categoria, telas, retrato,
+CMV, fechamento do DRE, DRE, farol, categorias, contagem, estoque, insumos, isolamento, permissões, RLS, compras, orçamento e ajuda), 375 testes
+cada: sem RLS, 368 passando e 7 pulados; com FORCE RLS, 374 passando e 1 falha que já existia e é do banco criado por psql (o teste da 0.2 lê
+`_prisma_migrations`, que o psql não cria). O teste da migration cria os próprios bancos nos 3 perfis. Mutantes: tirar `travarParaEscrever` de
+`concluirContagem` e `travarMetas` de `salvarMetasPorCategoria` derruba os testes (restaurados). Jornada no navegador (build de produção, porta 3100,
+banco novo copiado do `ff_dev`, 87 conferências na jornada e 48 de axe e tamanho na matriz, todas ok): a dona aplica o modelo de 32% (nada gravado),
+edita Proteína e vê o aviso de soma, conserta e salva (conjunto da rede com 10 metas, vigência 01/10, meta do CMV do DRE em 32%); personaliza a
+Delivery (Proteína 14%) e a Vila da Penha segue a rede em 12%; o painel da rede (R$ 39.350,00, igual à DRE), da Vila da Penha (R$ 34.250,00, Panificação
+"um pouco pior", Sem categoria e Pré-preparos) e da Delivery (meta "da loja", "sem compra no período"); reclassifica Pão para Mercearias e o total não
+muda; manda o Molho para Outros e as categorias ficam sem cor com o motivo (6,86% a classificar); o estoque de setembro fecha pela tela e grava o
+retrato (8 insumos, soma igual ao total do fechamento; a abertura antiga segue sem retrato); setembro com "Variação do estoque, ainda não aberta por
+categoria"; fechar setembro no DRE grava a v4 e reclassificar depois não o muda; gerente (só a Vila da Penha, também por `?rede=1` e `?loja=<Delivery>`,
+nada da outra no HTML, sem as metas nem no ⌘K), operador e quem só vê o histórico (nada do painel nem das metas). Matriz de 6 páginas x 4 tamanhos
+(1440, 1180, 820, 390) x 2 temas: sem rolagem lateral, sem violação do axe, sem erro de console e, com ponteiro de toque real, nenhum alvo abaixo
+de 44 px Depois do veto do Guardião (realizado e meta no mesmo conjunto de lojas, com teste de propriedade e a jornada com a Delivery marcando Bebidas como "não usa"; gatilhos de vigência e de retrato; maiores desvios só de quem saiu da meta) a bateria inteira rodou de novo: jornada com 90 conferências e matriz com 48, também com a barra de salvar nunca cobrindo o campo a 390 e 820 px. (A jornada achou e fez corrigir: a mensagem de "salvo" sumia por o formulário remontar quando a versão muda; os links e as setas do período
+abaixo de 44 px; o texto do painel fechado dizia "categoria de hoje"). Prints em `scratchpad/shots-I2a`. Scanner avoid-ai-design nos arquivos de
+código tocados: 0 P0 e 0 P1 (só P2 de "meta strings com ponto médio", já existentes no padrão da casa). Também entrou a herança do pós-deploy da I.1b: o
+aviso de insumos sem categoria diz "sem saldo" em vez de R$ 0,00 (teste novo `erp-aviso-classificar.test.ts`).
+
+## Herança da I.2a (para a I.2b e as próximas)
+
+- **A I.2b recebe**: o real por categoria (estoque inicial e final pelo retrato por insumo, com a abertura antiga lida pelos movimentos
+  `ABERTURA` só se a soma bater ao centavo; o corte por categoria; a linha "Pré-preparos" ganha valor), compra × real por categoria, evolução de
+  6 períodos, matriz categoria × loja (só a rede inteira) e a meta total por loja no DRE e no orçamento. A linha "Variação do estoque, ainda
+  não aberta por categoria" some quando o real abrir por categoria.
+- **Quem lê o painel** usa `cmvPorCategoria` (`cmv-categorias.ts`), que roda na MESMA transação que o DRE (`dreDoPeriodoNaTx`): a soma bate com o
+  DRE sem dois relógios. `comprasPorLojaECategoria` é o único lugar que junta nota e categoria; item sem insumo ou insumo sem categoria vai para
+  "Sem categoria".
+- **Meta efetiva** de uma loja: `conjuntosVigentes` e `metasDaLoja` (`metas-categorias.ts`). Quem criar outra tela de meta por categoria não
+  recalcula a herança: chama essas funções.
+- **Salvar metas** passa por `salvarMetasPorCategoria` (uma transação: conjunto, metas, uso por loja, `DreMeta` do CMV e histórico). A trava
+  `erp-metas:<parceiro>` é pega UMA vez; o teste tem mutante.
+- **Retrato**: `gravarRetrato` recusa antes de o banco recusar. Quem criar outro jeito de fechar contagem (importação, integração) precisa
+  gravar o retrato na mesma transação, senão `retratoGravadoEm` fica nulo e a I.2b trata como "antes da I.2".
+- **Fotografia v4**: qualquer mudança no JSON de `entrada.categorias` precisa subir `versao` do bloco (hoje 1) e manter a leitura das versões
+  antigas.
+- **Lições de código**: formulário com `useFormState` que remonta quando a versão muda perde a mensagem de "salvo" (o `key` do formulário é só a
+  loja; a versão chega por prop e o campo oculto acompanha); o teste-guarda barra a chave `insumos:` em objeto de tenant (use `nInsumos`) e a palavra
+  "escopo" em texto de tela; texto de aviso do painel muda com o período fechado (a categoria é a do dia do fechamento).
+- **Realizado e meta no mesmo conjunto de lojas** (284): quem mexer na linha de categoria do painel mantém a regra: o desvio em R$ sai dos
+  centavos e o pp sobre a mesma receita; a loja que "não usa" e comprou deixa a linha sem cor com o motivo. Há teste de propriedade.
+- **Para a I.2b**: o uso da categoria por loja (`CategoriaNaLoja`) não tem vigência (285); desvio RELATIVO (% da própria meta) para categorias
+  pequenas, onde 0,2 pp é muito (Limpeza em 0,70% contra 0,50% é 40% acima da meta e aparece como "na meta"); as abas do DRE a 390 px rolam e a
+  última (Metas por categoria) fica fora da tela até rolar (é do shell, `Abas`, não da I.2a).
+- **Defeito que já existia, fora da I.2a**: a tela `/erp/estoque/<loja>/periodo` com o período anterior por fechar loga erro de hidratação do
+  React (#418) porque o `Aviso` põe o formulário dentro de um `<p>`; virou tarefa à parte.
+- **Decisões para o Rodolfo**: (1) base BRUTA ou líquida (273); (2) a DRE fica inalterada (padrão) ou limpeza e descartáveis ganham linha própria,
+  a I.2c (275); (3) o limiar de 2% de Outros mais Sem categoria que tira a cor (279); (4) só o Dono personaliza a loja, o gerente não (282);
+  (5) a loja personaliza o conjunto inteiro, não categoria por categoria (272); (6) pré-preparo em linha própria, sem meta (277); (7) a categoria
+  única da rede (243, herdada). O desvio do painel segue o sinal da DRE (realizado menos meta): o "-1,30 pp" do cenário da análise tinha o sinal
+  invertido (279).
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -2648,6 +2771,9 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | DRE | `RegraDoPeriodo` | 2.2a: regra do período do parceiro (mensal, quinzenal ou semanal, dia em que começa), versionada por `vigenteDesde`; só inclusão (gatilho), `parceiroId` imutável; fonte única do DRE e da contagem de estoque |
 | DRE | `DreFotografia` / `DreFotografiaLinha` | 2.2b: a fotografia imutável de um período fechado (versão, taxa do iFood congelada, ressalvas, justificativa, quem fechou e quem reabriu e por quê) e suas linhas em BigInt (`valorCentavos`) com a `entrada` de que saíram (2.3: `versaoDaConta` 2 traz o CMV; `entrada.cmv` por loja); só inclusão por gatilho; uma vigente por período (índice parcial); período FECHADO exige fotografia vigente (gatilho adiado) |
 | DRE | `FarolFaixa` | 5 faixas por linha do DRE × canal (nulo = rede), sobre o desvio vs meta já com o sentido da linha |
+| Insumos | `CategoriaNaLoja` | I.2a: o USO da categoria por loja (`usa`, padrão = usa), com versão; único por loja e categoria; categoria sem uso sai do formulário e do painel daquela loja, salvo se tiver valor |
+| DRE | `MetaCmvConjunto` / `MetaCmvCategoria` | I.2a: o conjunto de metas por categoria de um escopo (rede = `lojaId` nulo, ou uma loja; `segueARede`; `aplicouModelo`; `vigenteDesde` única por escopo) e a meta de cada categoria em pontos-base (0 a 10000, FK RESTRICT para a categoria: categoria com meta não se exclui); só o conjunto mais novo do escopo muda (gatilho) |
+| Estoque | `ContagemRetratoItem` | I.2a: o retrato do estoque por insumo de uma contagem fechada (quantidade, valor nulo = sem preço); só inclusão, só em contagem aberta; Σ valores = `Contagem.valorTotalCentavos` (gatilho) |
 | Onboarding (0.5, FORA do tenant) | `PedidoParceiro` / `PedidoParceiroEvento` / `TentativaPedidoParceiro` | pedido de acesso (landing ou manual) com consentimento, etapa e versão; evento só-inclusão; tentativas do formulário público. Sem `parceiroId`: o vínculo com o parceiro criado é `parceiroCriadoId` |
 | Ajuda (0.6, FORA do tenant) | `PreferenciaErp` | o que a pessoa escolheu sobre as caixas de ajuda: dicas ligadas, resposta da 1ª vez, caixas fechadas (`chave@versão`, no máximo 300). Por `UsuarioErp`, sem `parceiroId`, lida com a sessão |
 | Auditoria | `HistoricoAlteracao` | antes/depois de todo corte, ajuste ou alteração sensível |

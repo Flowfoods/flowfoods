@@ -213,7 +213,7 @@ export interface FotografiaParaGravar {
   nomeDoPeriodo: string;
   fechadoPorNome: string;
   taxa: TaxaDoIfood | null;
-  /** 1 = sem CMV (2.2b); 2 = com o CMV de compra e o real (2.3, o padrão); 3 = com o ano passado e a versão do farol (2.4, o que o fechamento grava). */
+  /** 1 = sem CMV (2.2b); 2 = com o CMV de compra e o real (2.3, o padrão); 3 = com o ano passado e a versão do farol (2.4); 4 = com o CMV por categoria (I.2a, o que o fechamento grava). */
   versaoDaConta?: number;
   /** O que a conta leu: a base da fotografia (a receita, a despesa e o CMV de cada loja). */
   entrada: Prisma.InputJsonValue;

@@ -584,6 +584,10 @@ model ParceiroFlow {
   erpListasProducao      ListaProducao[]
   erpListaProducaoItens  ListaProducaoItem[]
   erpCategoriasInsumo    CategoriaInsumo[]
+  erpCategoriasNaLoja    CategoriaNaLoja[]
+  erpMetasCmvConjuntos   MetaCmvConjunto[]
+  erpMetasCmvCategorias  MetaCmvCategoria[]
+  erpContagemRetratoItens ContagemRetratoItem[]
   erpEtiquetas           Etiqueta[]
   erpFaturamentos        FaturamentoLancamento[]
   erpDreLinhas           DreLinha[]
@@ -679,6 +683,8 @@ model Loja {
   faturamentos   FaturamentoLancamento[]
   despesas       Despesa[]
   fotografiasDoDre DreFotografiaLinha[]
+  categoriasNaLoja CategoriaNaLoja[]
+  conjuntosDeMetaCmv MetaCmvConjunto[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, slug])
@@ -823,6 +829,7 @@ model Insumo {
   saldos            SaldoEstoque[]
   movimentos        MovimentoEstoque[]
   contagemItens     ContagemItem[]
+  retratos          ContagemRetratoItem[]
   requisicaoItens   RequisicaoItem[]
   producoes         OrdemProducao[]
   etiquetas         Etiqueta[]
@@ -856,11 +863,100 @@ model CategoriaInsumo {
   atualizadoEm DateTime     @updatedAt
 
   insumos Insumo[]
+  usosNaLoja CategoriaNaLoja[]
+  metasCmv MetaCmvCategoria[]
+  retratos ContagemRetratoItem[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, nome])
   @@unique([parceiroId, chave])
   @@index([parceiroId, ordem])
+}
+
+// I.2a — Retrato do estoque POR INSUMO de uma abertura ou de um fechamento concluídos: uma linha por insumo com saldo, com a
+// categoria e o tipo DA HORA. Só inclusão (gatilho), gravado na MESMA transação que fecha a contagem; a soma dos valores é o
+// `valorTotalCentavos` dela, ao centavo (o gatilho de `Contagem.retratoGravadoEm` confere). Valor nulo = insumo sem preço.
+// É a base do CMV real por categoria (I.2b); contagem de antes da I.2 não tem e não é reconstruída.
+model ContagemRetratoItem {
+  id                  String           @id @default(cuid())
+  parceiroId          String
+  parceiro            ParceiroFlow     @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  contagemId          String
+  contagem            Contagem         @relation(fields: [parceiroId, contagemId], references: [parceiroId, id], onDelete: Restrict)
+  insumoId            String
+  insumo              Insumo           @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  categoriaIdNaHora   String?
+  categoriaNaHora     CategoriaInsumo? @relation(fields: [parceiroId, categoriaIdNaHora], references: [parceiroId, id], onDelete: Restrict)
+  tipoNaHora          InsumoTipo
+  quantidadeMilesimos Int
+  valorCentavos       Int?
+  criadoEm            DateTime         @default(now())
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, contagemId, insumoId])
+  @@index([parceiroId, insumoId])
+  @@index([parceiroId, categoriaIdNaHora])
+}
+
+// I.2a — Quais categorias a LOJA usa. Padrão: usa (herda a rede). Categoria não usada sai do formulário de metas e do painel
+// daquela loja, salvo se tiver valor ("não usada nesta loja, mas teve R$ X"): custo nunca some. Não muda a natureza do insumo.
+model CategoriaNaLoja {
+  id                String          @id @default(cuid())
+  parceiroId        String
+  parceiro          ParceiroFlow    @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId            String
+  loja              Loja            @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  categoriaId       String
+  categoria         CategoriaInsumo @relation(fields: [parceiroId, categoriaId], references: [parceiroId, id], onDelete: Restrict)
+  usa               Boolean         @default(true)
+  versao            Int             @default(1)
+  atualizadoPorNome String          @default("")
+  atualizadoEm      DateTime        @default(now()) @updatedAt
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, lojaId, categoriaId])
+}
+
+// I.2a — Conjunto de metas por categoria, por escopo (rede = lojaId nulo; ou uma loja) e vigência (começo do período em curso).
+// A loja SEGUE a rede (sem conjunto próprio, ou conjunto com `segueARede`) ou PERSONALIZA o conjunto inteiro. Só o conjunto mais
+// novo do escopo muda (gatilho): o passado não é reescrito. A meta TOTAL do CMV é a `DreMeta` da linha `cmv` (uma fonte só).
+model MetaCmvConjunto {
+  id            String       @id @default(cuid())
+  parceiroId    String
+  parceiro      ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId        String?
+  loja          Loja?        @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  vigenteDesde  DateTime     @db.Date
+  segueARede    Boolean      @default(false)
+  // MODELO_32 quando o modelo ilustrativo de 32 % foi aplicado no formulário que gerou este conjunto; nulo caso contrário.
+  aplicouModelo String?
+  versao        Int          @default(1)
+  criadoPorNome String       @default("")
+  criadoEm      DateTime     @default(now())
+  atualizadoEm  DateTime     @default(now()) @updatedAt
+
+  metas MetaCmvCategoria[]
+
+  @@unique([parceiroId, id])
+  // Um conjunto por escopo e vigência; no SQL é NULLS NOT DISTINCT (a rede tem loja nula e não pode repetir).
+  @@unique([parceiroId, lojaId, vigenteDesde])
+}
+
+model MetaCmvCategoria {
+  id           String          @id @default(cuid())
+  parceiroId   String
+  parceiro     ParceiroFlow    @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  conjuntoId   String
+  conjunto     MetaCmvConjunto @relation(fields: [parceiroId, conjuntoId], references: [parceiroId, id], onDelete: Cascade)
+  categoriaId  String
+  // Restrict: a categoria com meta não se exclui, nem por SQL.
+  categoria    CategoriaInsumo @relation(fields: [parceiroId, categoriaId], references: [parceiroId, id], onDelete: Restrict)
+  // Pontos-base da receita bruta, 0 a 10.000.
+  percentualBp Int
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, conjuntoId, categoriaId])
+  @@index([parceiroId, categoriaId])
 }
 
 // Outras embalagens de compra do mesmo insumo (fardo, caixa, marca B...).
@@ -1282,8 +1378,12 @@ model Contagem {
   // 2.3: quantos insumos com saldo ficaram sem preço no retrato (abertura e fechamento), gravado no
   // mesmo UPDATE que fecha a contagem. Nulo = contagem de antes do registro ("não registrado"). CHECK >= 0.
   itensSemPreco           Int?
+  // I.2a: quando o retrato POR INSUMO (`ContagemRetratoItem`) foi gravado, no mesmo UPDATE que fecha a abertura e o fechamento.
+  // Nulo = contagem de antes da I.2 (ou cíclica/vencida): sem retrato por insumo, nunca reconstruído. CHECK e gatilho no SQL.
+  retratoGravadoEm        DateTime?
 
-  itens ContagemItem[]
+  itens   ContagemItem[]
+  retrato ContagemRetratoItem[]
 
   @@unique([parceiroId, id])
   @@index([parceiroId, lojaId, referenciaEm])

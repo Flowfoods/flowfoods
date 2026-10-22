@@ -247,15 +247,15 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · o farol por canal (Postgres real)', { ti
     let aoVivoVp: DreDoPeriodo;
     const resumo = (d: DreDoPeriodo) => ({ porLinha: d.farol.porLinha, contagem: d.farol.contagem, canais: d.canais, metas: d.metas });
 
-    it('o fechado grava a versão da conta 3, o ano passado por loja e a versão das faixas, e a meta de crescimento nas linhas de receita', async () => {
+    it('o fechado grava a versão da conta 4 (a 3 trouxe o ano passado e as faixas), o ano passado por loja e a versão das faixas, e a meta de crescimento nas linhas de receita', async () => {
       aoVivoRede = (await dre(DONA(), { tipo: 'rede' }, '2026-09-10'))!;
       aoVivoVp = (await dre(DONA(), { tipo: 'loja', lojaId: ids.vp }, '2026-09-10'))!;
       const r = await fecharPeriodo(f, N1(), { inicio: '2026-09-01', ressalvas: [], justificativa: '' }, 'Ana Dona', HOJE);
       expect(r).toMatchObject({ ok: true, versao: 1 });
       const foto = (await f.dreFotografia.findFirst({ where: { periodo: { inicio: dia('2026-09-01') }, substituidaEm: null }, select: { id: true, versaoDaConta: true, entrada: true } }))!;
-      expect(foto.versaoDaConta).toBe(3);
+      expect(foto.versaoDaConta).toBe(4);
       const entrada = foto.entrada as { versaoDaConta: number; farol: { versao: number }; anoPassado: { versao: number; de: string; ate: string; lojas: Record<string, { nome: string; exigida: boolean; vende: string[]; dias: number; canais: Record<string, { centavos: number; dias: number }> }> }; receitas: { lojaId: string; canal: string; pedidos?: number }[] };
-      expect(entrada.versaoDaConta).toBe(3);
+      expect(entrada.versaoDaConta).toBe(4);
       expect(entrada.farol).toEqual({ versao: 1 });
       expect(entrada.anoPassado).toMatchObject({ versao: 1, de: '2025-09-01', ate: '2025-09-30' });
       expect(entrada.anoPassado.lojas[ids.vp]).toMatchObject({ nome: 'Vila da Penha', exigida: true, dias: 30, vende: ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] });

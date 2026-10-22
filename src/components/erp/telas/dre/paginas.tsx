@@ -14,6 +14,10 @@ import { tipoDaCompetencia, ehFiltroDeSituacao, lerMesDaLista, type FiltroDeSitu
 import { faltaLancar, lojasParaDespesa, listarDespesas, obterDespesa, podeVerDespesas, recorrentesEmFalta } from '@/lib/erp/despesas';
 import { recusaDoFechamento, situacaoDoFechamento } from '@/lib/erp/dre-fechamento';
 import { situacaoDasMetas } from '@/lib/erp/dre-metas';
+import { cmvPorCategoria } from '@/lib/erp/cmv-categorias';
+import { garantirCategoriasPadrao } from '@/lib/erp/categorias';
+import { situacaoDasMetasPorCategoria } from '@/lib/erp/metas-categorias';
+import { lerPeriodoPedido } from '@/lib/erp/periodo-campos';
 import { chaveDaLinha } from '@/lib/erp/dre-plano';
 import { COR } from '@/lib/erp/modulos';
 import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
@@ -28,13 +32,16 @@ import { TrilhaDaPagina } from '../../shell/trilha';
 import { FiltroEmLinks } from '../../ui/filtros';
 import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
-import { Aviso } from '../../ui/superficies';
+import { Aviso, Painel, Vazio } from '../../ui/superficies';
 import { Voltar } from '../cadastro/partes';
 import { TelaDaDespesa } from './detalhe-despesa';
 import { TelaDeDespesas } from './despesas';
 import { fraseDaDespesa, fraseDoMesPassado, fraseDoPeriodo, type AcaoDeCadastro, type AcaoLocal, type AcaoMesPassado } from './estado';
 import { FormDespesa, type InicialDaDespesa } from './form-despesa';
 import { FormMesPassado } from './form-mes-passado';
+import { escopoPedido } from './carregar';
+import { TelaDoCmvPorCategoria, type PermissoesDoPainelDeCategorias } from './cmv-categorias';
+import { TelaDasMetasPorCategoria } from './metas-categorias';
 import { TelaDoPlano } from './plano';
 import { TelaDoFechamento } from './periodo-fechamento';
 import { TelaDosPeriodos } from './periodos';
@@ -244,4 +251,32 @@ export async function PaginaDoFechamento({ c, inicio, query, acoes }: { c: Conte
 export async function PaginaDoPlano({ c, acoes }: { c: ContextoDaTela; acoes: { criar: AcaoLocal; renomear: AcaoLocal; ocultar: AcaoLocal; metas: AcaoLocal } }) {
   const [plano, metas] = await Promise.all([planoDoParceiro(c.cliente), situacaoDasMetas(c.cliente, c.alcance)]);
   return <TelaDoPlano plano={plano} metas={metas} contexto={c.contexto} acoes={acoes} bloqueio={c.bloqueio} />;
+}
+
+/**
+ * O painel de CMV por categoria (I.2a). A rede ou a loja e o período vêm da URL e só ESCOLHEM dentro do alcance (a regra confere de novo):
+ * o gerente de uma loja nunca recebe a rede nem outra loja, nem por `?rede=1` nem por `?loja=`.
+ */
+export async function PaginaDoCmvPorCategoria({ c, visao, lojasDoAlcance, query, pode: p }: { c: ContextoDaTela; visao: Visao; lojasDoAlcance: readonly { id: string }[]; query: Query; pode: PermissoesDoPainelDeCategorias }) {
+  const pedido = escopoPedido(c.alcance, visao, lojasDoAlcance, query);
+  const vazio = (
+    <Painel>
+      <Vazio titulo="Nenhuma loja no seu acesso.">Peça a quem cuida da equipe para incluir as lojas em que você trabalha.</Vazio>
+    </Painel>
+  );
+  if (!pedido) return vazio;
+  const hoje = hojeNoRio();
+  const pedida = lerPeriodoPedido(um(query.periodo), hoje);
+  const r = await cmvPorCategoria(c.cliente, c.alcance, pedido, pedida.data, hoje);
+  if (!r) return vazio;
+  return <TelaDoCmvPorCategoria r={{ ...r, d: { ...r.d, avisoDaData: pedida.aviso } }} base={`${c.raiz}/dre/cmv-categorias`} raiz={c.raiz} contexto={c.contexto} pode={p} bloqueio={c.bloqueio} />;
+}
+
+/** As metas por categoria da rede (sem `?loja=`) ou de uma loja. Quem não define metas, ou loja que não existe: 404. */
+export async function PaginaDasMetasPorCategoria({ c, query, acoes }: { c: ContextoDaTela; query: Query; acoes: { salvar: (lojaId: string) => AcaoLocal } }) {
+  await garantirCategoriasPadrao(c.cliente);
+  const lojaId = um(query.loja);
+  const s = await situacaoDasMetasPorCategoria(c.cliente, c.alcance, lojaId ? lojaId : null);
+  if (!s) notFound();
+  return <TelaDasMetasPorCategoria s={s} base={`${c.raiz}/dre/metas-categorias`} raiz={c.raiz} contexto={c.contexto} acao={acoes.salvar(s.escopo.tipo === 'loja' ? s.escopo.lojaId : '')} bloqueio={c.bloqueio} />;
 }

@@ -69,7 +69,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
-      'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos', 'Plano e metas'],
+      'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'CMV por categoria', 'Períodos', 'Plano e metas', 'Metas por categoria'],
       'Rede e Equipe': ['Lojas e marcas', 'Equipe', 'Histórico', 'Seu acesso'],
     });
     expect(acoesPorArea(DONO)).toEqual({
@@ -90,7 +90,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
       // 2.2a: o gerente vê e lança despesa, vê o DRE e o período; plano de contas e período são do dono (rede inteira).
-      'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'Períodos'],
+      'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'CMV por categoria', 'Períodos'],
       'Rede e Equipe': ['Lojas e marcas', 'Histórico', 'Seu acesso'],
     });
     expect(emUso(GERENTE).flatMap((m) => m.acoes.map((a) => a.rotulo))).toEqual(ACOES);
@@ -364,6 +364,9 @@ const ROTAS_ATIVAS: [string, string][] = [
   ['/dre/despesas/d1/editar', 'Despesas'],
   ['/dre/periodos', 'Períodos'],
   ['/dre/plano', 'Plano e metas'],
+  // I.2a: o CMV por categoria e as metas por categoria têm aba própria.
+  ['/dre/cmv-categorias', 'CMV por categoria'],
+  ['/dre/metas-categorias', 'Metas por categoria'],
   // 2.2b: o período e o fechamento dele acendem a aba Períodos.
   ['/dre/periodos/2026-10-01', 'Períodos'],
   // 3.1: a produção — o quadro da loja, o planejamento, o lote e a conclusão acendem a aba Lotes (a trilha não repete "Produção › Produção").
@@ -472,7 +475,7 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     const todas = [...emUso(DONO)].flatMap((m) => [...m.grupos.flatMap((g) => g.itens), ...m.acoes]).map((i) => i.href.replace('/erp', ''));
     const novas = todas.filter((r) => !ANTIGAS.includes(r) && r !== '/acesso');
     // 2.5: o orçamento de compra é aba da área Compras.
-    expect(novas).toEqual(['/insumos/categorias', '/insumos/classificar', '/compras/orcamento', '/estoque/contagens', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
+    expect(novas).toEqual(['/insumos/categorias', '/insumos/classificar', '/compras/orcamento', '/estoque/contagens', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/cmv-categorias', '/dre/periodos', '/dre/plano', '/dre/metas-categorias', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
   });
 });
 

@@ -2315,3 +2315,83 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 ### 269. 2026-10-22 · ERP I.1b (veto do Guardião): o rascunho é de quem o fez e some ao sair
 
 **Razão:** a chave `ff-rascunho:<caminho>` era a mesma para todo mundo no navegador: num tablet compartilhado, a nota que a dona da Alfa deixou pela metade aparecia, por 20 minutos, para a dona da Beta (e para outra pessoa do mesmo parceiro). Agora: (1) a chave leva parceiro e pessoa vindos do servidor (`EscopoDoRascunho` nos dois layouts; sem escopo, a tela não guarda nem recupera nada); (2) todo `ff-rascunho:*` é apagado ao Sair (parceiro e nível 1), ao "Trocar de pessoa" da cozinha e ao abrir a tela de entrar (a do parceiro e a do /rodolfo), para o caso da sessão que expirou; (3) o rascunho guarda a versão lida da ficha, da nota ou das embalagens e, se a tela mudou desde então (outra pessoa salvou), é descartado com o aviso "mudou desde o seu rascunho"; (4) Cancelar e "Voltar" do cadastro que veio de uma nota ou ficha recarregam a página de origem (o roteador guarda a anterior por uns segundos, com a versão velha). Provado no navegador, na mesma aba: dona da Alfa deixa o rascunho, sai, a dona da Beta entra e abre a nota e a ficha sem nada; rascunho plantado com a chave de outra pessoa do mesmo parceiro não volta; o do próprio gerente volta; abrir a tela de entrar apaga tudo; o nível 1 tem a chave `n1` e também some ao sair; ficha alterada por outra pessoa descarta o rascunho. Também: `caminhoDeVolta` recusa `//` no caminho (`/erp//x`, `%2f`); editar insumo antigo só confirma a conservação se a pessoa a trocou ou marcou "Confirmo que a conservação é esta"; os dois avisos laranja da lista viraram um; "sem preço" virou "custo não informado" nas telas de estoque, produção, requisição, ficha e canais (as frases montadas na regra, em ficha, canais, CMV e contagem, ficam como herança).
+
+### 270. 2026-10-22 · ERP I.2a: toda conta ao vivo por categoria usa a categoria DE HOJE do insumo; o período fechado lê a fotografia
+
+**Alternativas:** (a) categoria "da época" gravada em cada nota e movimento; (b) categoria de hoje em todas as parcelas (compras, estoque inicial, estoque final, corte).
+
+**Razão:** (b). Com a categoria da época, o bacon comprado em Laticínios e contado no estoque final já em Proteína gera um consumo fantasma (mais numa categoria, menos na outra): a soma fecha e as categorias mentem. O painel diz, na tela e na ajuda, que reclassificar um insumo muda o período em curso inteiro e que o total não muda (provado na jornada: Pão de Panificação para Mercearias, total R$ 34.250,00 antes e depois). O período FECHADO não recalcula: lê só a fotografia v4 (decisão 283), com a categoria e a meta daquele dia; reclassificar depois não o altera (provado: setembro idêntico, caractere a caractere, depois de reclassificar o Blend). Insumo sem categoria (antigo) cai em "Sem categoria", linha separada de "Outros / a classificar".
+
+### 271. 2026-10-22 · ERP I.2a: `CategoriaNaLoja` guarda só o USO da categoria por loja
+
+**Alternativas:** (a) categoria própria por loja; (b) só marcar se a loja usa (padrão: usa).
+
+**Razão:** (b). A categoria continua uma só na rede (decisão 243), e a natureza do insumo não muda por loja. Categoria que a loja não usa sai do formulário de metas e do painel DAQUELA loja, salvo se tiver valor no período ("não usada nesta loja, mas teve R$ X"): custo nunca some. Gravada junto com as metas da loja, na mesma transação, com histórico ("Categoria na loja").
+
+### 272. 2026-10-22 · ERP I.2a: meta por categoria é um CONJUNTO versionado; a loja segue a rede ou personaliza o conjunto inteiro
+
+**Alternativas:** (a) meta por categoria e por loja, campo a campo, herdando o que falta; (b) conjunto inteiro por escopo (rede ou loja), com vigência.
+
+**Razão:** (b). Misturar meta herdada e própria na mesma tela confunde o dono. `MetaCmvConjunto` (`lojaId` nulo = rede; `segueARede`; `vigenteDesde` = começo do período em curso, como a 2.2b, decisão 149) e `MetaCmvCategoria` (pontos-base inteiros 0 a 10000; FK composta RESTRICT para a categoria). A meta efetiva de um período P numa loja é o último conjunto da loja com `vigenteDesde <= início de P`; sem conjunto ou com `segueARede`, o da rede. Mudar a rede só afeta as lojas que seguem a rede (a tela diz quais) e mudar uma loja não toca outra (provado na jornada: Delivery em 14% de Proteína, rede em 12%, Vila da Penha segue 12%). Gatilhos do banco: só o conjunto mais novo do escopo muda; os anteriores são história. A versão (impressão do estado) barra o salvar de duas pessoas em cima da outra.
+
+### 273. 2026-10-22 · ERP I.2a: a meta TOTAL do painel é a meta do CMV do DRE; base é a receita BRUTA (desvio do texto do plano, para o Rodolfo confirmar)
+
+**Alternativas:** (a) meta total própria do painel; (b) a mesma `DreMeta` da linha `cmv`, gravada na mesma transação; (c) base líquida, como diz o roteiro.
+
+**Razão:** (b) e base bruta. O CMV % do DRE, o farol e o orçamento já usam a receita bruta; duas bases para o mesmo número seriam dois CMVs. Salvar as metas por categoria na rede grava as categorias e a `DreMeta` do CMV juntas, sob a trava `erp-metas:<parceiro>` (uma fonte só: mudar a meta do CMV em "Plano e metas" muda o total do painel e vice-versa). Na I.2a a loja personaliza a DIVISÃO, não o total (total por loja mexe no DRE e no orçamento: I.2b). Pergunta ao Rodolfo: base bruta ou líquida? O roteiro diz "% da receita líquida".
+
+### 274. 2026-10-22 · ERP I.2a: "Usar o modelo de 32%" PREENCHE, não grava; soma diferente do total é aviso, não bloqueio
+
+**Razão:** o botão preenche os dez campos pela `chave` da categoria (Proteína 11, Hortifruti 3, Mercearias 5, Laticínios 4, Congelados 2, Panificação 2, Bebidas 3, Descartáveis 1,5, Limpeza 0,5, Outros 0; total 32) e diz "referência ilustrativa, não limite". Categoria renomeada mantém; categoria da casa sem chave fica vazia; padrão excluída ou desativada não entra e a frase diz ("Bebidas (3%) não existe nesta casa"). Nada é gravado até "Salvar as metas" (provado: 0 linhas depois do toque). Se a soma das categorias difere do total, aparece "Confira a divisão" com a diferença em pontos percentuais e dá para salvar assim (a casa pode ter metas que não fecham de propósito); sem total, sem aviso. Meta 0 em "Outros / a classificar" quer dizer "tudo que cair aqui é fila para classificar", não "sem custo".
+
+### 275. 2026-10-22 · ERP I.2a: a DRE NÃO muda; a linha CMV do DRE é o CMV gerencial, a soma das categorias (corrige a redação da 267)
+
+**Alternativas:** (a) separar limpeza e descartáveis numa linha própria do DRE (visão do contador); (b) o painel abre o CMV do DRE em categorias, sem linha nova.
+
+**Razão:** (b). Cada item de nota cai em UMA categoria e a DRE tem UMA linha de CMV, então não há dupla contagem; a soma das categorias mais as linhas de variação é a linha `cmv` do DRE ao centavo (teste de invariante, e na jornada o painel e a DRE mostram R$ 39.350,00 na rede e R$ 34.250,00 na Vila da Penha). **Corrige a 267:** pelo plano, limpeza e descartáveis ENTRAM no CMV gerencial, com meta própria (0,5% e 1,5% no modelo). Separar essas duas categorias numa linha à parte muda o resultado do CMV, a meta e o orçamento juntos: fica para a I.2c, só se o Rodolfo pedir. Pergunta ao Rodolfo: DRE inalterada (padrão) ou separar limpeza e descartáveis?
+
+### 276. 2026-10-22 · ERP I.2a: a embalagem do custo por canal (1.9) fica fora do painel
+
+**Razão:** a 1.9 é o custo TEÓRICO do prato por canal, para preço e margem; nunca entrou no DRE. "Descartáveis e embalagens" no painel vem só de nota e estoque. Para o futuro CMV teórico, a regra é comparar com Descartáveis, nunca somar. Teste-guarda: o painel e `cmv.ts` não leem `ProdutoEmbalagem`.
+
+### 277. 2026-10-22 · ERP I.2a: pré-preparo tem linha própria, "Pré-preparos (variação do estoque)", sem meta e sem farol
+
+**Alternativas:** (a) transferir a produção para a categoria do nome do pré-preparo; (b) linha própria; o ingrediente consumido fica na categoria do ingrediente.
+
+**Razão:** (b). O queijo do molho é Laticínios, não "Mercearias" pelo nome "molho"; transferir por nome joga o consumo na categoria errada. A linha aparece no painel, vazia, com o texto "Sem meta e sem farol. Entra quando o CMV real for aberto por categoria": o valor dela só nasce com o CMV real por categoria (I.2b). Pergunta ao Rodolfo: pré-preparo em linha própria (padrão) ou distribuído?
+
+### 278. 2026-10-22 · ERP I.2a: transferência entre lojas não existe, e o painel não finge que existe
+
+**Razão:** o termo da fórmula do plano vale 0 e não é mostrado. Quando a transferência nascer, entra como movimento com par loja para loja. O real por loja da 2.3 já distorce sem ela; a rede fica certa.
+
+### 279. 2026-10-22 · ERP I.2a: o painel, o farol e quando a categoria fica "sem cor" (limiar de 2% é hipótese)
+
+**Razão:** painel em `dre/cmv-categorias`: escopo rede ou loja (dentro do alcance) e período; por categoria, meta em %, meta em R$ (meta vezes a receita bruta do escopo, por linha), realizado em R$ e %, desvio e farol. **O desvio tem o sinal da DRE: realizado menos meta** (positivo é custo acima da meta, em pontos percentuais e em R$), não o "-1,30 pp" do cenário da análise, que invertia o sinal. Farol com as faixas de custo da 2.4 (`faixaDoDesvio('MENOR_MELHOR', desvioBp, 'custo')`, as cinco faixas, com a régua e a palavra). **Sem cor** quando o dado não fecha: falta faturamento, "sem o CMV de X", "sem contar", faixas desconhecidas, ou "Outros / a classificar" mais "Sem categoria" passam de 2,00% do CMV do escopo (nenhuma categoria tem cor e o aviso diz "R$ X ainda a classificar (Y% do CMV)", com o atalho para classificar só para quem edita insumos). O 2% é uma hipótese a validar com a casa. Outros e Sem categoria nunca têm farol; categoria com meta e sem compra no período diz "sem compra no período" (nunca zero com cor). "Maiores desvios": até 3 categorias que SAÍRAM da meta (faixa "um pouco pior" ou pior), em ordem do que passaram em R$; quem está "na meta" não entra, e sem ninguém fora o painel diz "Nenhuma categoria saiu da meta neste recorte". Período fechado ou encerrado sem meta (as metas valem a partir da vigência) diz "não havia meta neste período". Pergunta ao Rodolfo: o limiar de 2%.
+
+### 280. 2026-10-22 · ERP I.2a: período encerrado sem o estoque aberto por categoria mostra a "Variação do estoque, ainda não aberta por categoria"
+
+**Razão:** nas lojas e períodos em que o CMV da DRE é o real (estoque inicial mais compras menos estoque final), as categorias do painel saem das compras e a diferença para o real vai numa linha própria, para o total nunca divergir do DRE em silêncio (provado na jornada: setembro, compras R$ 12.200,00 mais variação de R$ 263,00 = R$ 12.463,00 do DRE). No período em curso, uma diferença que o painel não explica aparece como "Diferença que o painel não explica". O real por categoria, que dissolve essa linha, é da I.2b e depende do retrato (decisão 281).
+
+### 281. 2026-10-22 · ERP I.2a: todo fechamento e abertura de estoque NOVOS gravam o retrato por insumo na mesma transação
+
+**Alternativas:** (a) esperar a I.2b e reconstruir; (b) gravar desde já, sem tela.
+
+**Razão:** (b): cada fechamento sem o retrato atrasa o real por categoria em um período. `ContagemRetratoItem` (um por insumo com saldo, quantidade, valor, nulo para insumo sem preço) é gravado antes do UPDATE que fecha a contagem, na transação de `aplicar` do FECHAMENTO do período e na de `concluirAbertura` (a contagem cíclica NÃO grava: é um pedaço do estoque, não o estoque, e `retratoGravadoEm` fica nulo; o banco recusa o retrato dela); o gatilho do banco recusa fechar com Σ valores diferente de `valorTotalCentavos`, e o código recusa antes de tentar (soma igual ao total ao centavo). Só inclusão (UPDATE, DELETE e TRUNCATE recusados, como a fotografia) e só em contagem aberta. `Contagem.retratoGravadoEm` nulo quer dizer "fechado antes da I.2": nunca reconstruído (o preço da época não existe, reconstruir seria inventar). Excluir categoria agora confere meta e retrato; a FK composta impede por SQL também.
+
+### 282. 2026-10-22 · ERP I.2a: permissões e vazamento
+
+**Razão:** ver o painel é `dre.ver` (na loja); editar metas e "categoria na loja" é `metas.editar` com a rede inteira; nenhuma permissão nova, catálogo segue na versão 3. Pergunta ao Rodolfo: só o Dono personaliza a loja (o gerente não). Gerente de uma loja recebe só a loja dele, também por `?rede=1` e `?loja=<outra>` (nada da outra no HTML nem no JSON da página; o Next só ecoa o parâmetro que a pessoa mesma pediu); comprador sem `dre.ver` e operador não abrem o painel; quem só tem `historico.ver` não vê as metas por categoria no Histórico (as entidades do DRE ficam atrás de `dre.ver`); as telas somem do menu e do ⌘K de quem não pode (provado na jornada com dona, gerente, operador e uma pessoa só com histórico). Ajuda contextual com `para: ['dre.ver']` e `['metas.editar']`.
+
+### 283. 2026-10-22 · ERP I.2a: a fotografia do fechamento passa à versão 4 e guarda as categorias por loja
+
+**Razão:** fechar o período grava `versaoDaConta = 4` e `entrada.categorias` (JSON por loja: categoria, nome da época, compra, meta efetiva e de onde veio), sem linha nova na DRE e sem mudar o CHECK de tipo de linha. A leitura filtra pelo alcance (como `lerCmvDaFotografia`, via `jsonb_each`). Fotografia v1 a v3 diz "Não apurado por categoria (fechado antes da I.2)" e nunca é recalculada; reabrir (só a FlowFoods) e fechar de novo gera v4. Setembro fechado na jornada vira v4 e não muda quando se reclassifica um insumo.
+
+### 284. 2026-10-22 · ERP I.2a (veto do Guardião): realizado e meta de uma categoria são comparados sobre o MESMO conjunto de lojas e a MESMA receita
+
+**Alternativas:** (a) manter o realizado de todas as lojas contra a meta só de quem usa a categoria; (b) comparar só quem usa; (c) ratear a compra de quem não usa.
+
+**Razão:** (a) dava desvio em pp e em R$ com sinais opostos e farol errado (provado pelo Guardião: o Bairro marca Bebidas como "não usa" e compra R$ 1.000; a rede mostrava R$ 800,00 ACIMA da meta e "-0,47 pp, na meta"). Agora o realizado, a receita e a meta de uma categoria saem das lojas que a USAM, e o desvio em R$ sai dos centavos (o pp é esse valor sobre a mesma receita), então os dois têm sempre o mesmo sinal (propriedade testada para qualquer combinação de lojas, usos, receitas, compras e metas). Se uma loja que "não usa" a categoria comprou nela (c descartado: não se adivinha a regra da casa), a linha fica SEM cor, sem desvio, com o motivo escrito ("Bairro comprou Bebidas, marcada como não usa") e o valor entra no total: a soma continua sendo o CMV do DRE e custo nunca some.
+
+### 285. 2026-10-22 · ERP I.2a (veto do Guardião): endurecimentos do banco e da ajuda
+
+**Razão:** migration `20261103010000_erp_cmv_categorias_endurecimento` (só função e gatilho, sem SELECT nem DDL de tabela, entra limpa nos três perfis): (1) conjunto de metas por categoria NÃO nasce com vigência anterior à do mais novo do escopo (`MetaCmvConjunto_sem_retroativo`); (2) a contagem não fecha com itens de retrato soltos sem `retratoGravadoEm` (`Contagem_retrato_confere` ganhou a segunda regra). Migration ainda não vista em produção, mas a primeira já estava aplicada nos bancos locais: por isso um arquivo novo, nunca reescrever o aplicado. Ajuda: o único bloco livre de `dre-cmv-categorias` e de `dre-metas-categorias` não traz número, hipótese nem plano; o texto do painel e das metas só vai para quem tem `dre.ver` ou `metas.editar` (as duas entradas subiram para a versão 2). **Herança registrada:** o uso da categoria por loja (`CategoriaNaLoja`) NÃO tem vigência: valer hoje vale para o período em curso e para os períodos encerrados ainda abertos (o fechado lê a fotografia). Se o dono precisar do passado fiel, a I.2b dá vigência ao uso, como as metas têm.

@@ -27,7 +27,7 @@ const dataDoBanco = (s: string) => new Date(`${s}T00:00:00.000Z`);
 
 export const MENSAGEM_CONFLITO_DAS_METAS = 'Alguém mudou as metas agora há pouco. Recarregue a página para ver as metas de agora; nada foi gravado.';
 
-interface MetaGravada {
+export interface MetaGravada {
   id: string;
   linhaId: string;
   percentualBp: number;
@@ -37,7 +37,7 @@ interface MetaGravada {
 }
 
 /** Todas as metas da casa (canal nulo), da mais antiga para a mais nova. */
-async function lerTodasAsMetas(tx: ClienteDoParceiro): Promise<MetaGravada[]> {
+export async function lerTodasAsMetas(tx: ClienteDoParceiro): Promise<MetaGravada[]> {
   const linhas = await tx.dreMeta.findMany({
     where: { canal: null },
     orderBy: [{ vigenteDesde: 'asc' }, { id: 'asc' }],
@@ -47,7 +47,7 @@ async function lerTodasAsMetas(tx: ClienteDoParceiro): Promise<MetaGravada[]> {
 }
 
 /** A meta que vale numa data: por linha, a de maior `vigenteDesde` até ela. */
-function efetivasEm(todas: readonly MetaGravada[], inicio: string): Map<string, MetaGravada> {
+export function efetivasEm(todas: readonly MetaGravada[], inicio: string): Map<string, MetaGravada> {
   const out = new Map<string, MetaGravada>();
   for (const m of todas) if (m.vigenteDesde <= inicio) out.set(m.linhaId, m);
   return out;
@@ -120,6 +120,51 @@ export async function situacaoDasMetas(cliente: ClienteDoParceiro, alcance: Alca
 
 // ================================================================ gravar
 
+/** A trava das metas do parceiro: quem grava meta (a tabela do DRE ou as metas por categoria) a pega UMA vez, e só ela. */
+export async function travarMetas(tx: ClienteDoParceiro) {
+  await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp-metas:${tx.parceiroId}`}, 0))::text AS "trava"`;
+}
+
+/**
+ * Grava a meta de cada linha pedida (chave da linha → pontos-base, ou nulo para "sem meta") com vigência no começo do período
+ * em curso; devolve quantas mudaram. O que não mudou não grava nem entra no histórico. Quem chama já tem a trava `erp-metas`,
+ * já conferiu a impressão e já validou as chaves: aqui só se escreve (a meta TOTAL do CMV, das metas por categoria, passa por aqui).
+ */
+export async function gravarMetasDasLinhas(
+  tx: ClienteDoParceiro,
+  base: { periodo: { inicio: string }; porChave: ReadonlyMap<string, LinhaDoPlano>; todas: readonly MetaGravada[] },
+  lidas: ReadonlyMap<string, number | null>,
+  autorNome: string,
+): Promise<number> {
+  const { periodo, porChave, todas } = base;
+  const efetivas = efetivasEm(todas, periodo.inicio);
+  const doPeriodo = new Map(todas.filter((m) => m.vigenteDesde === periodo.inicio).map((m) => [m.linhaId, m]));
+  let mudou = 0;
+  for (const [chave, novo] of lidas) {
+    const linha = porChave.get(chave)!;
+    const efetiva = efetivas.get(linha.id!);
+    const antes = efetiva && !efetiva.semMeta ? efetiva.percentualBp : null;
+    if (antes === novo) continue;
+    const dados = { percentualBp: novo ?? 0, semMeta: novo === null, criadoPorNome: autorNome.slice(0, 120) };
+    const existente = doPeriodo.get(linha.id!);
+    let id: string;
+    if (existente) {
+      await tx.dreMeta.update({ where: { id: existente.id }, data: dados });
+      id = existente.id;
+    } else {
+      const criada = await tx.dreMeta.create({ data: { parceiroId: tx.parceiroId, linhaId: linha.id!, canal: null, vigenteDesde: dataDoBanco(periodo.inicio), ...dados }, select: { id: true } });
+      id = criada.id;
+    }
+    const crescimento = tipoDaMeta(chave) === 'crescimento';
+    const retrato = (bp: number | null) => ({ alvo: crescimento ? `${linha.nome} · crescimento sobre o ano passado` : linha.nome, meta: bp === null ? 'Sem meta' : crescimento ? textoDaMetaDeCrescimento(bp) : textoDaMeta(bp), valeDesde: formatarData(periodo.inicio) });
+    await tx.historicoAlteracao.create({
+      data: { parceiroId: tx.parceiroId, entidade: 'DreMeta', entidadeId: id, acao: antes === null && !efetiva ? 'CRIOU' : 'ALTEROU', antes: antes === null && !efetiva ? undefined : retrato(antes), depois: retrato(novo), autorNome },
+    });
+    mudou++;
+  }
+  return mudou;
+}
+
 export type ResultadoDasMetas =
   | { ok: true; mudou: number; valeDesde: string }
   | { ok: false; erros: Record<string, string>; conflito?: boolean };
@@ -146,7 +191,7 @@ export async function salvarMetas(
   if (chaves.length > 200) return falha('Linhas demais de uma vez.');
   return await cliente.transacao(
     async (tx): Promise<ResultadoDasMetas> => {
-      await tx.sql`SELECT pg_advisory_xact_lock(hashtextextended(${`erp-metas:${tx.parceiroId}`}, 0))::text AS "trava"`;
+      await travarMetas(tx);
       const periodo = await periodoDe(tx, hoje);
       await garantirPlano(tx);
       const plano = await planoDoParceiro(tx);
@@ -167,31 +212,7 @@ export async function salvarMetas(
       }
       if (Object.keys(erros).length > 0) return { ok: false, erros: { ...erros, geral: 'Confira as metas marcadas; nada foi gravado.' } };
 
-      const efetivas = efetivasEm(todas, periodo.inicio);
-      const doPeriodo = new Map(todas.filter((m) => m.vigenteDesde === periodo.inicio).map((m) => [m.linhaId, m]));
-      let mudou = 0;
-      for (const [chave, novo] of lidas) {
-        const linha = porChave.get(chave)!;
-        const efetiva = efetivas.get(linha.id!);
-        const antes = efetiva && !efetiva.semMeta ? efetiva.percentualBp : null;
-        if (antes === novo) continue;
-        const dados = { percentualBp: novo ?? 0, semMeta: novo === null, criadoPorNome: autorNome.slice(0, 120) };
-        const existente = doPeriodo.get(linha.id!);
-        let id: string;
-        if (existente) {
-          await tx.dreMeta.update({ where: { id: existente.id }, data: dados });
-          id = existente.id;
-        } else {
-          const criada = await tx.dreMeta.create({ data: { parceiroId: tx.parceiroId, linhaId: linha.id!, canal: null, vigenteDesde: dataDoBanco(periodo.inicio), ...dados }, select: { id: true } });
-          id = criada.id;
-        }
-        const crescimento = tipoDaMeta(chave) === 'crescimento';
-        const retrato = (bp: number | null) => ({ alvo: crescimento ? `${linha.nome} · crescimento sobre o ano passado` : linha.nome, meta: bp === null ? 'Sem meta' : crescimento ? textoDaMetaDeCrescimento(bp) : textoDaMeta(bp), valeDesde: formatarData(periodo.inicio) });
-        await tx.historicoAlteracao.create({
-          data: { parceiroId: tx.parceiroId, entidade: 'DreMeta', entidadeId: id, acao: antes === null && !efetiva ? 'CRIOU' : 'ALTEROU', antes: antes === null && !efetiva ? undefined : retrato(antes), depois: retrato(novo), autorNome },
-        });
-        mudou++;
-      }
+      const mudou = await gravarMetasDasLinhas(tx, { periodo, porChave, todas }, lidas, autorNome);
       return { ok: true, mudou, valeDesde: periodo.inicio };
     },
     { timeout: 20_000 },

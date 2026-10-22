@@ -33,6 +33,7 @@ import { ultimasCompras } from './compras-custo';
 import { custosEmCascata } from './ficha-custos';
 import { custoIncompleto } from './ficha-campos';
 import { hojeNoRio, numeroDaNota } from './compra-campos';
+import { gravarRetrato, type ItemDoRetrato } from './retrato-estoque';
 import {
   aplicarNosSaldos,
   camposDaContagem,
@@ -938,9 +939,12 @@ export async function concluirAbertura(
         if (teto) throw new Recusa({ ok: false, erros: { geral: teto } });
         await gravarMovimentos(tx, movimentos, { ocorridoEm: abertoEm, garantir: itens.map((i) => ({ lojaId, insumoId: i.insumoId })) });
         const semCusto = movimentos.filter((m) => custos.get(m.insumoId)?.porUnidade == null).length;
+        // I.2a: o retrato do estoque por insumo (só quem tem saldo), na mesma transação; sem preço = valor nulo, e a soma é o valorTotal.
+        const retrato: ItemDoRetrato[] = movimentos.map((m) => ({ insumoId: m.insumoId, quantidadeMilesimos: m.quantidadeMilesimos, valorCentavos: custos.get(m.insumoId)?.porUnidade == null ? null : m.valorCentavos }));
+        const nRetrato = await gravarRetrato(tx, c.id, retrato, valorTotal);
         await tx.contagem.updateMany({
           where: { id: c.id, status: 'ABERTA' },
-          data: { status: 'FECHADA', desfecho: 'APLICADA', fechadaEm: abertoEm, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: resumo.naoContados, itensSemPreco: semCusto },
+          data: { status: 'FECHADA', desfecho: 'APLICADA', fechadaEm: abertoEm, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: resumo.naoContados, itensSemPreco: semCusto, retratoGravadoEm: abertoEm },
         });
         await tx.historicoAlteracao.create({
           data: {
@@ -956,6 +960,7 @@ export async function concluirAbertura(
               zerados: resumo.zerados,
               naoContados: resumo.naoContados,
               valorCentavos: valorTotal,
+              retratoPorInsumo: `${nRetrato} ${nRetrato === 1 ? 'insumo' : 'insumos'}`,
               ...(semCusto ? { semCusto } : {}),
             },
             motivo: resumo.naoContados ? `${resumo.naoContados} não contados entraram com zero (confirmado).` : null,
