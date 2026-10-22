@@ -533,4 +533,33 @@ describe.skipIf(!URL_TESTE)('ERP I.2b · CMV real por categoria (Postgres real)'
     expect(JSON.stringify(fechado.painel!.linhas)).toBe(JSON.stringify(r.painel!.linhas));
     expect(JSON.stringify(fechado.painel!.compraReal)).toBe(JSON.stringify(r.painel!.compraReal));
   });
+
+  // ------------------------------------------------------------ 11. hotfix pós-deploy: ritmo da rede com metas diferentes e sem receita para ponderar
+  it('rede com a Penha em meta própria de 30 % e a Delivery seguindo a rede (32 %), sem faturamento completo até ontem: o ritmo não usa a meta da Penha, diz que as metas diferem e as mostra', async () => {
+    const P = await db.parceiroFlow.create({ data: { nome: 'Casa Ritmo I2b', slug: `i2b-ritmo-${sufixo}`, status: 'ATIVO' } });
+    criados.push(P.id);
+    const b = doParceiro(P.id, db);
+    await garantirCategoriasPadrao(b);
+    const lojaIds: Record<string, string> = {};
+    for (const nome of ['Penha', 'Delivery']) {
+      const l = await b.loja.create({ data: { parceiroId: P.id, nome, slug: `${nome.toLowerCase()}-${sufixo}`, criadoEm: new Date('2026-01-10T12:00:00Z'), canaisDeVenda: ['LOJA'] } });
+      lojaIds[nome] = l.id;
+    }
+    const campos = aplicarModelo32(await listarCategorias(b)).campos;
+    const sr = (await situacaoDasMetasPorCategoria(b, DONA(), null, HOJE))!;
+    expect(await salvarMetasPorCategoria(b, DONA(), { lojaId: null, versao: sr.versao, total: '32', campos }, 'Marina', HOJE)).toMatchObject({ ok: true });
+    const sl = (await situacaoDasMetasPorCategoria(b, DONA(), lojaIds.Penha, HOJE))!;
+    expect(await salvarMetasPorCategoria(b, DONA(), { lojaId: lojaIds.Penha, versao: sl.versao, total: '30', campos, segue: 'nao', usa: {} }, 'Marina', HOJE)).toMatchObject({ ok: true });
+
+    const o = (await orcamentoDeCompra(b, DONA(), { hoje: HOJE }))!;
+    const rede = o.rede as VistaCompleta;
+    expect(rede.metaMista).toBe(true);
+    expect(rede.ritmoMetaBp).toBeNull(); // nada de "30,0 %" da Penha para a rede inteira
+    expect([...rede.metasPorLoja].sort((x, y) => x.bp - y.bp)).toEqual([{ nome: 'Penha', bp: 3000 }, { nome: 'Delivery', bp: 3200 }]);
+    expect(rede.ritmo).toMatchObject({ tipo: 'sem' });
+    // As lojas, sozinhas, seguem cada uma a sua meta.
+    const porNome = (nome: string) => o.lojas.find((l) => l.nome === nome)!.vista as VistaCompleta;
+    expect(porNome('Penha').ritmoMetaBp).toBe(3000);
+    expect(porNome('Delivery').ritmoMetaBp).toBe(3200);
+  });
 });

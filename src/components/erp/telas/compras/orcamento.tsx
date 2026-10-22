@@ -231,7 +231,7 @@ function AConta({ v, rede }: { v: VistaCompleta; rede: boolean }) {
     <div className="space-y-2 text-[13px] leading-relaxed text-suave">
       {c && (
         <p className="tabular-nums">
-          Meta do CMV {c.metaMista ? `média de ${textoDoPercentual(c.metaBp)} (cada loja usa a sua${v.comMetaPropria.length > 0 ? `; ${v.comMetaPropria.join(', ')} ${v.comMetaPropria.length === 1 ? 'tem' : 'têm'} meta própria` : ''})` : textoDoPercentual(c.metaBp)} × {formatarDinheiro(c.previstaCentavos)} de receita prevista = <span className="font-semibold text-texto">{formatarDinheiro(c.tetoCentavos)}</span> de teto
+          Meta do CMV {v.metaMista ? `média de ${textoDoPercentual(c.metaBp)} (cada loja usa a sua${v.comMetaPropria.length > 0 ? `; ${v.comMetaPropria.join(', ')} ${v.comMetaPropria.length === 1 ? 'tem' : 'têm'} meta própria` : ''})` : textoDoPercentual(c.metaBp)} × {formatarDinheiro(c.previstaCentavos)} de receita prevista = <span className="font-semibold text-texto">{formatarDinheiro(c.tetoCentavos)}</span> de teto
           {' − '}
           {v.semNota.length > 0 && v.compradoCentavos === 0 ? 'nenhuma nota de compra' : `${formatarDinheiro(c.compradoCentavos)} já comprados`} ={' '}
           <span className={`font-semibold ${c.saldoCentavos < 0 ? 'text-erro' : 'text-texto'}`}>{c.saldoCentavos < 0 ? `passou ${formatarDinheiro(-c.saldoCentavos)}` : formatarDinheiro(c.saldoCentavos)}</span>
@@ -268,16 +268,21 @@ function AConta({ v, rede }: { v: VistaCompleta; rede: boolean }) {
 /** O ritmo das compras até ontem: o CMV pelas compras contra a meta, com o farol da 2.4, e o que ele NÃO diz. */
 function Ritmo({ v }: { v: VistaCompleta }) {
   const metaBp = v.ritmoMetaBp;
-  if (!v.ritmo || metaBp === null) return null;
+  if (!v.ritmo || (metaBp === null && !v.metaMista)) return null;
+  // Metas diferentes por loja: o aviso aparece em TODOS os ramos; quando há uma média ponderada ela vem escrita como média, e sem receita
+  // para ponderar não há número único (nenhuma loja é escolhida no lugar das outras): as metas de cada loja vêm lado a lado.
+  const porLoja = v.metasPorLoja.map((l) => `${l.nome} ${textoDoPercentual(l.bp)}`).join(' · ');
+  const contra = metaBp === null ? 'metas diferentes por loja' : `a meta de ${textoDoPercentual(metaBp)}${v.metaMista ? ' (média das lojas)' : ''}`;
   return (
     <div className="space-y-1 border-t border-linha pt-3">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-        <div className="min-w-0 flex-1 text-[13px] text-suave">
+        <div className="min-w-[14rem] flex-1 text-[13px] text-suave">
           <p className="font-semibold text-texto">Ritmo das compras até ontem</p>
           <p className="tabular-nums">
-            {v.cmvAteOntemBp !== null ? `CMV pelas compras ${textoDoPercentual(v.cmvAteOntemBp)} contra a meta de ${textoDoPercentual(metaBp)}${v.metaMista ? ' (média das lojas)' : ''}` : `Meta de ${textoDoPercentual(metaBp)}`}
+            {v.cmvAteOntemBp !== null ? `CMV pelas compras ${textoDoPercentual(v.cmvAteOntemBp)} contra ${contra}` : metaBp === null ? `Contra ${contra}` : `Meta de ${textoDoPercentual(metaBp)}${v.metaMista ? ' (média das lojas)' : ''}`}
             {v.ritmo.desvioTexto ? ` (${v.ritmo.desvioTexto})` : ''}
           </p>
+          {v.metaMista && porLoja && <p className="tabular-nums">Cada loja usa a sua meta: {porLoja}.</p>}
         </div>
         <Farol f={v.ritmo} />
       </div>

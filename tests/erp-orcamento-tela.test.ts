@@ -127,6 +127,7 @@ describe('2.5 · a tela', () => {
       metaBp: 3000,
       ritmoMetaBp: 3000,
       metaMista: false,
+      metasPorLoja: [],
       comMetaPropria: [],
       conta: null,
       motivo: null,
@@ -188,8 +189,50 @@ describe('2.5 · a tela', () => {
     expect(h).not.toContain('Valor aproximado');
   });
 
+  it('metas diferentes por loja (hotfix pós-deploy da I.2b): o ritmo da rede nunca mostra a meta de uma loja como se fosse a de todas, em nenhum ramo', () => {
+    const base: VistaCompleta = {
+      veReceita: true,
+      metaBp: null,
+      ritmoMetaBp: null,
+      metaMista: true,
+      metasPorLoja: [{ nome: 'Vila da Penha', bp: 3000 }, { nome: 'Delivery', bp: 3200 }],
+      comMetaPropria: ['Vila da Penha'],
+      conta: null,
+      motivo: 'sem o orçamento de Vila da Penha e Delivery',
+      previsao: null,
+      previstaCentavos: null,
+      ritmo: { tipo: 'sem', motivo: 'metas diferentes por loja e sem receita até ontem para fazer a média', desvioTexto: null },
+      cmvAteOntemBp: null,
+      compradoCentavos: 0,
+      compradoAteOntemCentavos: 0,
+      receitaAteOntemCentavos: null,
+      diasSemLancamento: 0,
+      semNota: [],
+      quemPassou: [],
+    };
+    const tela = (rede: VistaCompleta) =>
+      html(createElement(TelaOrcamento, { dados: { periodo: PERIODO, hoje: '2026-10-21', dia: { dia: 21, de: 31 }, metaBp: 3200, rede, lojas: [{ lojaId: 'vp', nome: 'Vila da Penha', vista: base }] }, contexto: 'Rede Completa', bloqueio: null }));
+    // Peso zero (sem receita até ontem para ponderar): nenhuma loja é escolhida; as duas metas vêm lado a lado.
+    const semPeso = tela(base);
+    expect(semPeso).toContain('Contra metas diferentes por loja');
+    expect(semPeso).toContain('Cada loja usa a sua meta: Vila da Penha 30,0 % · Delivery 32,0 %.');
+    expect(semPeso).not.toContain('Meta de 30,0 %');
+    expect(semPeso).not.toContain('Meta de 32,0 %');
+    // Com a média ponderada: o número vem escrito como média, com ou sem CMV a comparar.
+    const comMedia = tela({ ...base, ritmoMetaBp: 3100, ritmo: { tipo: 'sem', motivo: 'faltam lançamentos de faturamento', desvioTexto: null } });
+    expect(comMedia).toContain('Meta de 31,0 % (média das lojas)');
+    expect(comMedia).toContain('Cada loja usa a sua meta');
+    const comCmv = tela({ ...base, ritmoMetaBp: 3100, cmvAteOntemBp: 3300, ritmo: { tipo: 'cor', escala: 'custo', cor: 'AMARELO', posicao: 3, palavra: 'um pouco pior', confira: null, desvioTexto: '+2,0 pp', rotulo: 'Farol' } });
+    expect(comCmv).toContain('CMV pelas compras 33,0 % contra a meta de 31,0 % (média das lojas)');
+    // Metas iguais: nada de aviso de média.
+    const iguais = tela({ ...base, metaMista: false, metasPorLoja: [], ritmoMetaBp: 3000, cmvAteOntemBp: 3300, ritmo: comCmv.includes('x') ? base.ritmo : { tipo: 'cor', escala: 'custo', cor: 'AMARELO', posicao: 3, palavra: 'um pouco pior', confira: null, desvioTexto: '+3,0 pp', rotulo: 'Farol' } });
+    expect(iguais).toContain('contra a meta de 30,0 %');
+    expect(iguais).not.toContain('média das lojas');
+    expect(iguais).not.toContain('Cada loja usa a sua meta');
+  });
+
   it('loja sem número na tabela: a célula diz "sem número" e o motivo vai uma vez, sob o nome, sem nowrap (B2: sem rolagem lateral)', () => {
-    const v = (p: Partial<VistaCompleta>): VistaCompleta => ({ veReceita: true, metaBp: null, ritmoMetaBp: null, metaMista: false, comMetaPropria: [], conta: null, motivo: null, previsao: null, previstaCentavos: null, ritmo: null, cmvAteOntemBp: null, compradoCentavos: 0, compradoAteOntemCentavos: 0, receitaAteOntemCentavos: null, diasSemLancamento: 0, semNota: [], quemPassou: [], ...p });
+    const v = (p: Partial<VistaCompleta>): VistaCompleta => ({ veReceita: true, metaBp: null, ritmoMetaBp: null, metaMista: false, metasPorLoja: [], comMetaPropria: [], conta: null, motivo: null, previsao: null, previstaCentavos: null, ritmo: null, cmvAteOntemBp: null, compradoCentavos: 0, compradoAteOntemCentavos: 0, receitaAteOntemCentavos: null, diasSemLancamento: 0, semNota: [], quemPassou: [], ...p });
     const motivo = 'sem faturamento lançado nas últimas 4 semanas';
     const dados: OrcamentoDeCompra = {
       periodo: PERIODO,
