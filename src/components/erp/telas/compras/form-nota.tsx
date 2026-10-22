@@ -29,6 +29,7 @@ import {
   mascararData,
   PREFIXO_DA_EMBALAGEM,
   quantidadeDoItem,
+  raizDoCnpj,
   ratearFrete,
 } from '@/lib/erp/compra-campos';
 import { formatarCusto, formatarDinheiro, formatarQuantidade, lerDinheiro, lerQuantidade, UNIDADES } from '@/lib/erp/unidades';
@@ -98,6 +99,8 @@ export function FormNota(props: PropsDoFormNota) {
   const fornecedorNovo = !descartou && r.fornecedorCriado ? props.opcoes.fornecedores.find((f) => f.id === r.fornecedorCriado) : undefined;
   let valores = recuperado ?? props.inicial;
   if (fornecedorNovo) valores = { ...valores, fornecedorId: fornecedorNovo.id };
+  const raizDoNovo = raizDoCnpj(fornecedorNovo?.documento ?? null);
+  const outrosDaMesmaEmpresa = fornecedorNovo && raizDoNovo ? props.opcoes.fornecedores.filter((f) => f.id !== fornecedorNovo.id && raizDoCnpj(f.documento) === raizDoNovo) : [];
   let escolhido = false;
   if (criado) {
     const vaga = valores.itens.findIndex((l) => !l.insumoId);
@@ -121,11 +124,17 @@ export function FormNota(props: PropsDoFormNota) {
               <div role="status" className="rounded-[10px] border border-linha-forte px-4 py-3 text-sm">
                 <p className="font-semibold text-texto">Fornecedor salvo com sucesso: {fornecedorNovo.nome}</p>
                 <p className="mt-0.5 text-suave">Ele já está na lista e foi escolhido nesta nota. Confira e siga.</p>
+                {outrosDaMesmaEmpresa.length > 0 && (
+                  <p className="mt-0.5 text-suave">
+                    Mesma empresa, outro estabelecimento: já existe {outrosDaMesmaEmpresa.map((o) => `“${o.nome}”`).join(', ')} com a mesma raiz de CNPJ. São cadastros separados: nada é unido.
+                  </p>
+                )}
               </div>
             )}
             <AvisoDeRascunhoVelho quando={r.versaoMudou} oQue="A nota" />
             <AvisoDeRascunho
               quando={!!recuperado}
+              cadastrou={fornecedorNovo ? 'fornecedor' : 'insumo'}
               aoDescartar={() => {
                 r.descartar();
                 setDescartou(true);

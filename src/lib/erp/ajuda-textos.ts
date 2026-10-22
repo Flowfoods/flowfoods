@@ -543,10 +543,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/fornecedores'],
     titulo: 'Fornecedores',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Quem vende para a casa e o último preço de cada insumo.' },
-      { texto: 'Selo A completar é cadastro antigo sem e-mail ou WhatsApp: abra e complete. As notas dele continuam valendo.' },
+      { texto: 'Selo A completar mostra o que falta no cadastro (e-mail, WhatsApp, razão social, CNPJ): abra e complete, e as notas dele continuam valendo.' },
+      { texto: 'Documento a conferir é CNPJ ou CPF gravado com número errado.' },
       { texto: 'Os contatos são só para consulta: o sistema não manda mensagem a eles sozinho.' },
     ],
   },

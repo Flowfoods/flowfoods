@@ -138,12 +138,12 @@ export function AvisoDeRascunhoVelho({ quando, oQue }: { quando: boolean; oQue: 
 }
 
 /** "Recuperamos o que você tinha preenchido" + "Descartar". Região viva: o leitor de tela anuncia. */
-export function AvisoDeRascunho({ quando, aoDescartar, observacao }: { quando: boolean; aoDescartar: () => void; observacao?: string }) {
+export function AvisoDeRascunho({ quando, aoDescartar, observacao, cadastrou = 'insumo' }: { quando: boolean; aoDescartar: () => void; observacao?: string; cadastrou?: 'insumo' | 'fornecedor' }) {
   if (!quando) return null;
   return (
     <div role="status" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-linha-forte px-4 py-3 text-sm">
       <p className="text-texto">
-        Recuperamos o que você tinha preenchido antes de ir cadastrar o insumo.
+        Recuperamos o que você tinha preenchido antes de ir cadastrar {cadastrou === 'fornecedor' ? 'o fornecedor' : 'o insumo'}.
         {observacao && <span className="block text-[13px] text-suave">{observacao}</span>}
       </p>
       <button type="button" onClick={aoDescartar} className="ff-transicao min-h-11 rounded-[7px] px-3 text-[13px] font-medium text-suave underline underline-offset-4 hover:text-texto sm:min-h-9 [@media(pointer:coarse)]:min-h-11">

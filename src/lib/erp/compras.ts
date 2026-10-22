@@ -518,7 +518,7 @@ export async function dadosDoFormularioDeNota(cliente: ClienteDoParceiro, alcanc
     const fornecedores = await tx.fornecedor.findMany({
       where: { OR: [{ ativo: true }, ...(ja.fornecedorId ? [{ id: ja.fornecedorId }] : [])] },
       orderBy: { nome: 'asc' },
-      select: { id: true, nome: true, ativo: true },
+      select: { id: true, nome: true, ativo: true, documento: true },
     });
     const lidos = await tx.insumo.findMany({
       where: { fichaQueProduz: { is: null }, OR: [{ ativo: true }, { id: { in: ja.insumoIds ?? [] } }] },

@@ -181,6 +181,9 @@ const ROTULOS_DO_FORNECEDOR: Record<string, string> = {
 };
 export const rotuloDoCampoDoFornecedor = (c: string) => ROTULOS_DO_FORNECEDOR[c] ?? c;
 
+/** Letra ou símbolo no meio de um CNPJ/CPF ou de um telefone: recusa em vez de descartar em silêncio (só números, espaço e ( ) + . - / valem). */
+const CARACTER_DE_NUMERO_ESTRANHO = /[^0-9 ()+.\-/]/;
+
 const formFornecedor = z.object({ nome: nomeObrigatorio(LIMITES_DO_FORNECEDOR.nome) });
 
 /** Texto livre do cadastro: NFC, sem invisíveis, espaços colapsados; vazio = null; acima do teto = erro. */
@@ -210,7 +213,7 @@ export function lerFormFornecedor(entrada: Record<string, unknown>): Leitura<Dad
 
   const docTxt = texto(entrada.documento).trim();
   const documento = docTxt ? digitos(docTxt) : null;
-  if (docTxt && (!documento || !documentoValido(documento))) erros.documento = 'CNPJ ou CPF inválido. Confira os números.';
+  if (docTxt && (CARACTER_DE_NUMERO_ESTRANHO.test(docTxt) || !documento || !documentoValido(documento))) erros.documento = 'CNPJ ou CPF inválido. Confira os números.';
   else if (!docTxt && !semNotaFiscal) {
     erros.documento = 'Informe o CNPJ ou CPF: é por ele que o sistema reconhece o fornecedor nas notas fiscais. Sem nota (feira, atacarejo)? Marque “Compras sem nota fiscal”.';
   }
@@ -250,7 +253,7 @@ export function lerFormFornecedor(entrada: Record<string, unknown>): Leitura<Dad
   const zapTxt = texto(entrada.whatsapp).trim();
   let whatsapp: string | null = null;
   if (zapTxt) {
-    whatsapp = normalizarWhatsapp(zapTxt);
+    whatsapp = CARACTER_DE_NUMERO_ESTRANHO.test(zapTxt) ? null : normalizarWhatsapp(zapTxt);
     if (!whatsapp) erros.whatsapp = 'WhatsApp inválido: use o DDD e o número. Ex.: (21) 99641-6060.';
   } else erros.whatsapp = 'Informe o WhatsApp com DDD. Ex.: (21) 99641-6060.';
 

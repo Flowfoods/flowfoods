@@ -26,6 +26,7 @@ import {
   UFS,
 } from '@/lib/erp/compra-campos';
 import { caminhoDeVolta, voltaComFornecedor } from '@/lib/erp/volta';
+import { documentoParaSaida } from '../scripts/erp-conferir-migracao';
 
 const COMPLETO = {
   nome: 'Laticínios Exemplo',
@@ -85,6 +86,14 @@ describe('F.1a · o formulário do fornecedor', () => {
     expect(lido({ ...COMPLETO, whatsapp: '(21) 99641-6060' })).toMatchObject({ ok: true, dados: { whatsapp: '21996416060' } });
     expect(lido({ ...COMPLETO, whatsapp: '+55 21 99641-6060' })).toMatchObject({ ok: true, dados: { whatsapp: '21996416060' } });
     expect(lido({ ...COMPLETO, whatsapp: '5521996416060' })).toMatchObject({ ok: true, dados: { whatsapp: '21996416060' } });
+  });
+
+  it('polimento: letra no CNPJ/CPF ou no WhatsApp é recusada, não descartada em silêncio', () => {
+    expect(erros({ ...COMPLETO, documento: '11.222.333/0001-81 matriz' }).documento).toMatch(/inválido/);
+    expect(erros({ ...COMPLETO, documento: 'A11222333000181' }).documento).toMatch(/inválido/);
+    expect(erros({ ...COMPLETO, whatsapp: '(21) 99641-6060 ramal 2' }).whatsapp).toMatch(/inválido/);
+    expect(erros({ ...COMPLETO, whatsapp: '2199641x6060' }).whatsapp).toMatch(/inválido/);
+    expect(lido({ ...COMPLETO, documento: ' 11 222 333/0001-81 ', whatsapp: '+55 (21) 99641-6060' }).ok).toBe(true);
   });
 
   it('critério 4: "Compras sem nota fiscal" salva só com nome e WhatsApp; o resto vale se vier', () => {
@@ -204,6 +213,13 @@ describe('F.1a · o que falta no cadastro (uma regra só)', () => {
     expect(documentoAConferir('123')).toBe(true);
     expect(documentoAConferir('11222333000181')).toBe(false);
     expect(documentoAConferir(null)).toBe(false);
+  });
+});
+
+describe('F.1a · o conferidor da migração não imprime CPF inteiro', () => {
+  it('CPF sai mascarado, CNPJ (empresa) sai inteiro', () => {
+    expect(documentoParaSaida('52998224725')).toBe('***.982.247-**');
+    expect(documentoParaSaida('11222333000181')).toBe('11.222.333/0001-81');
   });
 });
 

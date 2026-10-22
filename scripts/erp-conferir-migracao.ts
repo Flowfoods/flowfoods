@@ -168,6 +168,11 @@ export const CHECKS_DA_F_1A = [
 ] as const;
 
 /** Os índices únicos da F.1a: a chave de envio (reenvio não duplica) e o documento fiscal (um fornecedor por CNPJ/CPF e parceiro). */
+/** CPF é dado de pessoa: na saída do conferidor só aparece o miolo ("***.982.247-**"). CNPJ (empresa) aparece inteiro. */
+export function documentoParaSaida(d: string): string {
+  return d.length === 11 ? `***.${d.slice(3, 6)}.${d.slice(6, 9)}-**` : (formatarDocumento(d) ?? d);
+}
+
 export const INDICE_DO_DOCUMENTO_DO_FORNECEDOR = 'Fornecedor_parceiroId_documento_key';
 export const INDICES_DA_F_1A = ['Fornecedor_parceiroId_chaveEnvio_key', INDICE_DO_DOCUMENTO_DO_FORNECEDOR] as const;
 
@@ -439,7 +444,7 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       // O objeto de teste só com `$queryRaw` (sem cliente completo) não lista os pares; o cliente de verdade lista.
       const rel = typeof (db as Partial<PrismaClient>).$transaction === 'function' ? await relatorioDeFornecedores(db as PrismaClient) : null;
       for (const r of rel?.repetidos ?? []) {
-        pendencias.push(`  CNPJ/CPF repetido no parceiro ${r.parceiro}: ${formatarDocumento(r.documento)} em ${r.nomes.map((n) => `“${n}”`).join(' e ')}.`);
+        pendencias.push(`  CNPJ/CPF repetido no parceiro ${r.parceiro}: ${documentoParaSaida(r.documento)} em ${r.nomes.map((n) => `“${n}”`).join(' e ')}.`);
       }
     }
   }
@@ -451,10 +456,13 @@ async function principal() {
   try {
     const pendencias = await conferirMigracao(db);
     // F.1a: o que NÃO é pendência da migration, mas é dado antigo que a equipe precisa resolver (não muda o código de saída).
-    const rel = await relatorioDeFornecedores(db).catch(() => null);
+    const rel = await relatorioDeFornecedores(db).catch((e: unknown) => {
+      console.error(`Não consegui montar o relatório de fornecedores (a conferência da migration segue): ${e instanceof Error ? e.message : String(e)}`);
+      return null;
+    });
     if (rel && (rel.aCompletar > 0 || rel.documentosAConferir.length > 0)) {
       console.log(`Fornecedores: ${rel.aCompletar} a completar (cadastro anterior à F.1a: falta e-mail, WhatsApp e, se for o caso, razão social).`);
-      for (const d of rel.documentosAConferir) console.log(`  Documento a conferir no parceiro ${d.parceiro}: “${d.nome}” tem ${d.documento}, que não passa nos dígitos verificadores.`);
+      for (const d of rel.documentosAConferir) console.log(`  Documento a conferir no parceiro ${d.parceiro}: “${d.nome}” tem ${documentoParaSaida(d.documento)}, que não passa nos dígitos verificadores.`);
     }
     if (pendencias.length === 0) {
       console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b e da F.1a conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias e das metas por categoria (com RLS), os índices e os gatilhos existem.');

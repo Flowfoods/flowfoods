@@ -8,7 +8,7 @@
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import type { CadastroDoFornecedor, FornecedorDetalhado, LinhaDeFornecedor, SituacaoDoFornecedor } from '@/lib/erp/compras';
-import { formatarCep, formatarData, formatarDocumento, formatarWhatsapp, numeroDaNota } from '@/lib/erp/compra-campos';
+import { documentoAConferir, formatarCep, formatarData, formatarDocumento, formatarWhatsapp, numeroDaNota } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarCusto, formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
@@ -64,7 +64,7 @@ export function TelaListaFornecedores({
           ) : undefined
         }
       >
-        <form role="search" action={base} className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(16rem,28rem)_10rem_11rem_auto_auto]">
+        <form role="search" action={base} className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(14rem,26rem)_10rem_14rem_auto_auto]">
           <label htmlFor="fornecedores-q" className="sr-only">
             Buscar fornecedor pelo nome ou CNPJ
           </label>
@@ -124,11 +124,12 @@ export function TelaListaFornecedores({
               <li key={f.id}>
                 <Link href={`${base}/${f.id}`} className="ff-transicao flex min-h-14 items-center justify-between gap-3 px-4 py-3 hover:bg-texto/[0.03] sm:px-5">
                   <span className="min-w-0">
-                    <span className={`flex items-center gap-2 font-medium ${f.ativo ? 'text-texto' : 'text-suave'}`}>
+                    <span className={`flex flex-wrap items-center gap-x-2 gap-y-1 font-medium ${f.ativo ? 'text-texto' : 'text-suave'}`}>
                       <span className="truncate">{f.nome}</span>
                       {!f.ativo && <Selo>Desativado</Selo>}
                       {f.situacaoCadastro === 'A_COMPLETAR' && <Selo tom="alerta">A completar</Selo>}
                       {f.semNotaFiscal && <Selo>Sem nota fiscal</Selo>}
+                      {documentoAConferir(f.documento) && <Selo tom="alerta">Documento a conferir</Selo>}
                     </span>
                     <span className="block truncate text-[12px] tabular-nums text-suave">
                       {[formatarDocumento(f.documento) ?? 'sem CNPJ', formatarWhatsapp(f.whatsapp), f.whatsapp ? null : f.contato].filter(Boolean).join(' · ')}
@@ -146,7 +147,7 @@ export function TelaListaFornecedores({
                         última {formatarData(f.ultimaNota!, true)}
                       </>
                     ) : (
-                      'sem nota'
+                      'nenhuma nota lançada'
                     )}
                   </span>
                 </Link>
