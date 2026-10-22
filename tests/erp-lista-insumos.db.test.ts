@@ -246,7 +246,6 @@ describe.skipIf(!URL_TESTE)('ERP L.1 · lista de insumos (Postgres real)', { tim
       await a.insumo.update({ where: { id: ids.antigo }, data: { categoriaId: null, classificadoPor: null, classificadoEm: null } });
       await a.insumo.update({ where: { id: ids.frango }, data: { conservacaoConfirmadaEm: null } });
       await mudarSituacaoInsumo(a, ids.desativado, false, 'saiu do cardápio', 'Marina');
-      void db;
     });
 
     it('proteína congelada = categoria + conservação (o AND de dois filtros)', async () => {
