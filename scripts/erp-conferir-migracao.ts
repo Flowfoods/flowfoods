@@ -190,7 +190,8 @@ export async function relatorioDeFornecedores(db: Pick<PrismaClient, '$queryRaw'
   const papel = await db.$queryRaw<{ ok: boolean }[]>`
     SELECT (EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_tenant')
             AND CASE WHEN current_setting('server_version_num')::int >= 160000
-                     THEN pg_has_role(current_user, 'erp_tenant', 'SET') ELSE pg_has_role(current_user, 'erp_tenant', 'MEMBER') END) AS "ok"`;
+                     THEN pg_has_role(current_user, 'erp_tenant', 'SET') ELSE pg_has_role(current_user, 'erp_tenant', 'MEMBER') END
+            AND has_table_privilege('erp_tenant', '"Fornecedor"', 'SELECT')) AS "ok"`;
   const comPapel = !!papel[0]?.ok;
   for (const p of parceiros) {
     const linhas = await db.$transaction(async (tx) => {

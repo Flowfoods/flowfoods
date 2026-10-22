@@ -10,7 +10,8 @@
 -- de UPDATE em massa). Os CHECKs entram NOT VALID e se tenta o VALIDATE logo depois (a validação lê a tabela fora da RLS do papel);
 -- linha antiga que viole um deles não reprova a migration: o CHECK fica NOT VALID e avisa (WARNING). O índice único do documento é
 -- criado dentro de um bloco que captura a violação: se já houver dois fornecedores do mesmo parceiro com o mesmo CNPJ/CPF, a migration
--- termina, o índice NÃO é criado, o primeiro par aparece no WARNING e `npm run erp:conferir-migracao` lista todos os pares. A regra do
+-- termina, o índice NÃO é criado, o WARNING avisa (o PostgreSQL não diz qual é o par ao criar um índice) e `npm run erp:conferir-migracao`
+-- lista todos os pares, parceiro por parceiro. A regra do
 -- servidor já recusa o documento repetido antes (e a corrida, quando o índice existe).
 -- Depois do deploy, `npm run erp:conferir-migracao` confere colunas, CHECKs, índices e a lista de documentos repetidos.
 
@@ -106,15 +107,12 @@ END $$;
 -- ------------------------------------------------------------ o documento fiscal é único por parceiro
 -- Só onde existe documento (o fornecedor de feira não tem). A filial tem OUTRO CNPJ: é outro cadastro e passa. Nada se funde por
 -- nome. Se já houver dois fornecedores do mesmo parceiro com o mesmo documento, o índice não é criado e a migration segue (o aviso
--- traz o primeiro par; `npm run erp:conferir-migracao` lista todos). Nenhum SELECT: quem diz o par é o erro do próprio CREATE INDEX.
+-- manda rodar `npm run erp:conferir-migracao`, que lista todos os pares). Nenhum SELECT: a migration só tenta criar o índice.
 DO $$
-DECLARE
-  detalhe text;
 BEGIN
   BEGIN
     CREATE UNIQUE INDEX "Fornecedor_parceiroId_documento_key" ON "Fornecedor"("parceiroId", "documento") WHERE "documento" IS NOT NULL;
   EXCEPTION WHEN unique_violation THEN
-    GET STACKED DIAGNOSTICS detalhe = PG_EXCEPTION_DETAIL;
-    RAISE WARNING 'ERP F.1a: o índice Fornecedor_parceiroId_documento_key NÃO foi criado: há fornecedores do mesmo parceiro com o mesmo CNPJ/CPF (%). Rode npm run erp:conferir-migracao para a lista, corrija o cadastro (o documento certo de cada um, ou "Compras sem nota fiscal") e crie o índice (CREATE UNIQUE INDEX da migration 20261105000000_erp_fornecedor_cadastro). Enquanto isso o servidor já recusa documento repetido.', detalhe;
+    RAISE WARNING 'ERP F.1a: o índice Fornecedor_parceiroId_documento_key NÃO foi criado: há fornecedores do mesmo parceiro com o mesmo CNPJ/CPF. Rode npm run erp:conferir-migracao para a lista, corrija o cadastro (o documento certo de cada um, ou "Compras sem nota fiscal") e crie o índice (CREATE UNIQUE INDEX da migration 20261105000000_erp_fornecedor_cadastro). Enquanto isso o servidor já recusa documento repetido.';
   END;
 END $$;
