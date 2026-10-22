@@ -5,7 +5,7 @@
  */
 
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode, visaoDaRequisicao } from '@/lib/erp/contexto';
-import { listarFornecedores, type SituacaoDoFornecedor } from '@/lib/erp/compras';
+import { listarFornecedores, type CadastroDoFornecedor, type SituacaoDoFornecedor } from '@/lib/erp/compras';
 import { rotuloDaVisao } from '@/lib/erp/visao';
 import { TelaListaFornecedores } from '@/components/erp/telas/compras/fornecedores';
 
@@ -20,7 +20,9 @@ export default async function ErpFornecedoresPage({ searchParams }: { searchPara
   const q = um(searchParams.q).slice(0, 80);
   const s = um(searchParams.situacao);
   const situacao: SituacaoDoFornecedor = s === 'desativados' || s === 'todos' ? s : 'ativos';
-  const [linhas, { visao }] = await Promise.all([listarFornecedores(ctx.cliente, ctx.alcance, { q, situacao }), visaoDaRequisicao(ctx)]);
+  const c = um(searchParams.cadastro);
+  const cadastro: CadastroDoFornecedor = c === 'a-completar' || c === 'completos' ? c : 'todos';
+  const [linhas, { visao }] = await Promise.all([listarFornecedores(ctx.cliente, ctx.alcance, { q, situacao, cadastro }), visaoDaRequisicao(ctx)]);
   return (
     <TelaListaFornecedores
       base={BASE}
@@ -29,6 +31,7 @@ export default async function ErpFornecedoresPage({ searchParams }: { searchPara
       linhas={linhas}
       q={q}
       situacao={situacao}
+      cadastro={cadastro}
       novoHref={pode(ctx.alcance, 'fornecedores.editar') ? `${BASE}/novo` : undefined}
       bloqueio={ctx.bloqueio}
     />

@@ -10,6 +10,8 @@ const ORIGEM_FALSA = 'http://erp.interno';
 
 /** O parâmetro que a página de origem lê para dizer "o insumo que você cadastrou já está na lista". */
 export const PARAMETRO_INSUMO_CRIADO = 'insumoCriado';
+/** F.1a: o mesmo para o fornecedor que a nota pediu para cadastrar ("Fornecedor novo: cadastrar"). */
+export const PARAMETRO_FORNECEDOR_CRIADO = 'fornecedorCriado';
 
 /** `prefixo`: onde a volta tem de estar ("/erp/" ou "/rodolfo/erp/<slug>/"). Devolve o caminho limpo (com a busca) ou null. */
 export function caminhoDeVolta(valor: unknown, prefixo: string): string | null {
@@ -29,9 +31,10 @@ export function caminhoDeVolta(valor: unknown, prefixo: string): string | null {
   if (/\/\/|%2f|%5c/i.test(valor.split('?')[0])) return null;
   // Depois de normalizar ("/erp/../rodolfo"), continua dentro da área.
   if (!u.pathname.startsWith(prefixo)) return null;
-  // Voltar para o cadastro de insumo faria um laço.
-  if (/\/insumos\/novo(\/|$)/.test(u.pathname)) return null;
+  // Voltar para o cadastro de insumo ou de fornecedor faria um laço.
+  if (/\/(insumos|fornecedores)\/novo(\/|$)/.test(u.pathname)) return null;
   u.searchParams.delete(PARAMETRO_INSUMO_CRIADO);
+  u.searchParams.delete(PARAMETRO_FORNECEDOR_CRIADO);
   return `${u.pathname}${u.search}`;
 }
 
@@ -39,6 +42,13 @@ export function caminhoDeVolta(valor: unknown, prefixo: string): string | null {
 export function voltaComInsumo(caminho: string, insumoId: string): string {
   const u = new URL(caminho, ORIGEM_FALSA);
   u.searchParams.set(PARAMETRO_INSUMO_CRIADO, insumoId);
+  return `${u.pathname}${u.search}`;
+}
+
+/** O caminho de volta com o fornecedor criado (a nota o lê para escolhê-lo no lugar certo). */
+export function voltaComFornecedor(caminho: string, fornecedorId: string): string {
+  const u = new URL(caminho, ORIGEM_FALSA);
+  u.searchParams.set(PARAMETRO_FORNECEDOR_CRIADO, fornecedorId);
   return `${u.pathname}${u.search}`;
 }
 

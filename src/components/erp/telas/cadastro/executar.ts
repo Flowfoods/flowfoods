@@ -8,7 +8,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { voltaComInsumo } from '@/lib/erp/volta';
+import { voltaComFornecedor, voltaComInsumo } from '@/lib/erp/volta';
 import type { EstadoCadastro } from './estado';
 
 /** O que toda regra de cadastro devolve (insumo, variante, ficha). */
@@ -43,6 +43,8 @@ export function concluir(
   alvoId?: string,
   /** I.1b: o caminho de volta JÁ VALIDADO (`caminhoDeVolta`): cadastrou a partir de uma nota ou ficha, volta para lá com o insumo na lista. */
   voltar?: string | null,
+  /** F.1a: o que foi criado na volta: o insumo (padrão) ou o fornecedor. */
+  oQueVolta: 'insumo' | 'fornecedor' = 'insumo',
 ): EstadoCadastro {
   if (!r.ok) {
     return {
@@ -58,7 +60,7 @@ export function concluir(
   if (voltar) {
     // O destino também mostra o que mudou (a página de origem lê o insumo do banco, não da URL).
     revalidatePath(voltar.split('?')[0], 'page');
-    redirect(voltaComInsumo(voltar, alvoId ?? r.id));
+    redirect((oQueVolta === 'fornecedor' ? voltaComFornecedor : voltaComInsumo)(voltar, alvoId ?? r.id));
   }
   // I.1a: o envio repetido (mesma chave) volta como o insumo que já existe; a frase diz isso (`feito.repetido`).
   const frase = r.repetido && feito.repetido ? feito.repetido : r.mudou.length === 0 && feito.igual ? feito.igual : feito.mudou;

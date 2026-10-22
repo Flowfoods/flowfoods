@@ -13,7 +13,9 @@ import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarFornecedor, editarFornecedor, mudarSituacaoFornecedor } from '@/lib/erp/compras';
 import type { EstadoNota } from '@/components/erp/telas/compras/estado';
 import { concluirCompra, executarCancelamento, executarNota, recusadoNaNota } from '@/components/erp/telas/compras/executar';
-import { entradaDe, querAtivo } from '@/components/erp/telas/cadastro/executar';
+import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
+import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
+import { caminhoDeVolta } from '@/lib/erp/volta';
 
 const NOTAS = '/erp/compras';
 const FORNECEDORES = '/erp/compras/fornecedores';
@@ -43,18 +45,19 @@ export async function acaoCancelarNota(notaId: string, anterior: EstadoNota, for
   return executarCancelamento(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(notaId), anterior, form, NOTAS);
 }
 
-export async function acaoCadastrarFornecedor(anterior: EstadoNota, form: FormData): Promise<EstadoNota> {
+export async function acaoCadastrarFornecedor(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraFornecedor();
-  if (negado) return recusadoNaNota(anterior, negado);
-  const r = await cadastrarFornecedor(ctx.cliente, entradaDe(form), ctx.sessao.autorNome);
-  return concluirCompra(r, anterior, FORNECEDORES, { mudou: 'criado' });
+  if (negado) return recusado(anterior, negado);
+  const r = await cadastrarFornecedor(ctx.cliente, entradaDe(form), ctx.sessao.autorNome, ctx.sessao.userId);
+  // Veio de uma nota ("Fornecedor novo: cadastrar")? Volta para lá, só por caminho interno da área do ERP.
+  return concluir(r, anterior, FORNECEDORES, { mudou: 'criado', repetido: 'criado-repetido' }, undefined, caminhoDeVolta(form.get('volta'), '/erp/'), 'fornecedor');
 }
 
-export async function acaoEditarFornecedor(id: string, anterior: EstadoNota, form: FormData): Promise<EstadoNota> {
+export async function acaoEditarFornecedor(id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraFornecedor();
-  if (negado) return recusadoNaNota(anterior, negado);
+  if (negado) return recusado(anterior, negado);
   const r = await editarFornecedor(ctx.cliente, String(id), entradaDe(form), ctx.sessao.autorNome);
-  return concluirCompra(r, anterior, FORNECEDORES, { mudou: 'editado', igual: 'igual' });
+  return concluir(r, anterior, FORNECEDORES, { mudou: 'editado', igual: 'igual' });
 }
 
 export async function acaoSituacaoFornecedor(id: string, anterior: EstadoNota, form: FormData): Promise<EstadoNota> {

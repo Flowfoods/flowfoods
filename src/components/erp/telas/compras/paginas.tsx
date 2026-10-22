@@ -6,7 +6,8 @@
 
 import type { FormularioDeNota, FornecedorDetalhado, NotaDetalhada } from '@/lib/erp/compras';
 import { valoresDaNota } from '@/lib/erp/compras';
-import { formatarDocumento, hojeNoRio } from '@/lib/erp/compra-campos';
+import { formatarCep, formatarDocumento, formatarWhatsapp, hojeNoRio } from '@/lib/erp/compra-campos';
+import { rotuloDaVolta } from '@/lib/erp/volta';
 import { COR } from '@/lib/erp/modulos';
 import type { AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
 import { PageHeader } from '../../ui/cabecalho';
@@ -14,7 +15,8 @@ import { TrilhaDaPagina } from '../../shell/trilha';
 import { Aviso } from '../../ui/superficies';
 import { Voltar } from '../cadastro/partes';
 import type { AcaoDeNota } from './estado';
-import { FormFornecedor } from './form-fornecedor';
+import type { AcaoDeCadastro } from '../cadastro/estado';
+import { FormFornecedor, type ValoresDoFornecedor } from './form-fornecedor';
 import { FormNota, type ValoresDaNota } from './form-nota';
 
 export function TelaFormNota({
@@ -96,18 +98,41 @@ export function TelaFormFornecedor({
   contexto,
   acao,
   bloqueio,
+  envio,
+  volta,
 }: {
   fornecedor?: FornecedorDetalhado;
   base: string;
   contexto: string;
-  acao: AcaoDeNota;
+  acao: AcaoDeCadastro;
   bloqueio: string | null;
+  /** Novo: a chave deste envio (um UUID por abertura do formulário). */
+  envio?: string;
+  /** Novo: o caminho de volta JÁ VALIDADO, quando veio de "Fornecedor novo: cadastrar" numa nota. */
+  volta?: string | null;
 }) {
-  const volta = fornecedor ? `${base}/${fornecedor.id}` : base;
+  const retorno = fornecedor ? `${base}/${fornecedor.id}` : volta ?? base;
+  const inicial: ValoresDoFornecedor | undefined = fornecedor
+    ? {
+        nome: fornecedor.nome,
+        razaoSocial: fornecedor.razaoSocial ?? '',
+        documento: formatarDocumento(fornecedor.documento) ?? '',
+        inscricaoEstadual: fornecedor.inscricaoEstadual ?? '',
+        endereco: fornecedor.endereco ?? '',
+        municipio: fornecedor.municipio ?? '',
+        uf: fornecedor.uf ?? '',
+        cep: formatarCep(fornecedor.cep) ?? '',
+        email: fornecedor.email ?? '',
+        whatsapp: formatarWhatsapp(fornecedor.whatsapp) ?? '',
+        contatoComercial: fornecedor.contatoComercial ?? '',
+        prazoPagamentoDias: fornecedor.prazoPagamentoDias === null ? '' : String(fornecedor.prazoPagamentoDias),
+        semNotaFiscal: fornecedor.semNotaFiscal,
+      }
+    : undefined;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <TrilhaDaPagina itens={fornecedor ? [{ rotulo: fornecedor.nome, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo fornecedor' }]} />
-      <Voltar href={volta}>{fornecedor ? `Voltar para ${fornecedor.nome}` : 'Voltar para os fornecedores'}</Voltar>
+      <TrilhaDaPagina itens={fornecedor ? [{ rotulo: fornecedor.nome, href: retorno }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo fornecedor' }]} />
+      <Voltar href={retorno}>{fornecedor ? `Voltar para ${fornecedor.nome}` : volta ? `Voltar para ${rotuloDaVolta(volta)}` : 'Voltar para os fornecedores'}</Voltar>
       <PageHeader
         icone="fornecedor"
         cor={COR.compras}
@@ -119,10 +144,14 @@ export function TelaFormFornecedor({
         modo={fornecedor ? 'editar' : 'criar'}
         base={base}
         aqui={fornecedor ? `${base}/${fornecedor.id}/editar` : `${base}/novo`}
-        cancelar={volta}
-        inicial={fornecedor ? { nome: fornecedor.nome, documento: formatarDocumento(fornecedor.documento) ?? '', contato: fornecedor.contato ?? '' } : undefined}
+        cancelar={retorno}
+        inicial={inicial}
         versao={fornecedor?.versao}
         bloqueio={bloqueio}
+        envio={envio}
+        volta={fornecedor ? null : volta}
+        falta={fornecedor && fornecedor.situacaoCadastro === 'A_COMPLETAR' ? fornecedor.falta : []}
+        contatoAntigo={fornecedor?.contato ?? null}
       />
     </div>
   );

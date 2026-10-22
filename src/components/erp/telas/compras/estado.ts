@@ -28,12 +28,27 @@ const FEITO_DA_NOTA: Readonly<Record<string, string>> = {
 };
 
 const FEITO_DO_FORNECEDOR: Readonly<Record<string, string>> = {
-  criado: 'Fornecedor cadastrado. Já dá para lançar nota dele.',
-  editado: 'Alterações salvas.',
   igual: 'Nada mudou: os valores já eram esses.',
   desativado: 'Fornecedor desativado. As notas dele continuam; nota nova não pode escolher.',
   reativado: 'Fornecedor reativado.',
 };
+
+/**
+ * F.1a: o retorno de quem cadastra ou edita o fornecedor diz O QUE foi salvo, com o nome lido do BANCO (a URL só escolhe a chave).
+ *  - criado: "Fornecedor salvo com sucesso: Laticínios Rio";
+ *  - criado-repetido: o mesmo envio chegou duas vezes e o fornecedor existe uma vez só;
+ *  - editado: "Fornecedor atualizado com sucesso: Laticínios Rio".
+ */
+const SALVO_DO_FORNECEDOR: Readonly<Record<string, (nome: string) => { titulo: string; apoio?: string }>> = {
+  criado: (nome) => ({ titulo: `Fornecedor salvo com sucesso: ${nome}`, apoio: 'Já dá para lançar nota dele.' }),
+  'criado-repetido': (nome) => ({ titulo: `Fornecedor salvo com sucesso: ${nome}`, apoio: 'O envio chegou mais de uma vez; o fornecedor foi cadastrado uma vez só.' }),
+  editado: (nome) => ({ titulo: `Fornecedor atualizado com sucesso: ${nome}`, apoio: 'O antes e o depois estão em Alterações.' }),
+};
+
+export function fraseDoSalvoDoFornecedor(feito: string | undefined, nome: string): { titulo: string; apoio?: string; criou: boolean } | undefined {
+  if (!feito || !Object.hasOwn(SALVO_DO_FORNECEDOR, feito)) return undefined;
+  return { ...SALVO_DO_FORNECEDOR[feito](nome), criou: feito !== 'editado' };
+}
 
 export const fraseDaNota = (feito: string | undefined) => fraseDe(FEITO_DA_NOTA, feito);
 export const fraseDoFornecedor = (feito: string | undefined) => fraseDe(FEITO_DO_FORNECEDOR, feito);

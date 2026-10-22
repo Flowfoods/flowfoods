@@ -7,8 +7,8 @@
 
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
-import type { FornecedorDetalhado, LinhaDeFornecedor, SituacaoDoFornecedor } from '@/lib/erp/compras';
-import { formatarData, formatarDocumento, numeroDaNota } from '@/lib/erp/compra-campos';
+import type { CadastroDoFornecedor, FornecedorDetalhado, LinhaDeFornecedor, SituacaoDoFornecedor } from '@/lib/erp/compras';
+import { formatarCep, formatarData, formatarDocumento, formatarWhatsapp, numeroDaNota } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarCusto, formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
@@ -20,9 +20,11 @@ import { ListaHistorico } from '../historico/lista-historico';
 import type { AcaoDeCadastro } from '../cadastro/estado';
 import { FormSituacao } from '../cadastro/form-situacao';
 import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
-import { fraseDoFornecedor } from './estado';
+import { AvisoDeSalvo } from '../cadastro/anuncio';
+import { fraseDoFornecedor, fraseDoSalvoDoFornecedor } from './estado';
 
 const SITUACOES: Record<SituacaoDoFornecedor, string> = { ativos: 'Ativos', desativados: 'Desativados', todos: 'Todos' };
+const CADASTROS: Record<CadastroDoFornecedor, string> = { todos: 'Qualquer cadastro', 'a-completar': 'A completar', completos: 'Completos' };
 
 export function TelaListaFornecedores({
   base,
@@ -31,6 +33,7 @@ export function TelaListaFornecedores({
   linhas,
   q,
   situacao,
+  cadastro = 'todos',
   novoHref,
   bloqueio,
 }: {
@@ -40,10 +43,11 @@ export function TelaListaFornecedores({
   linhas: LinhaDeFornecedor[];
   q: string;
   situacao: SituacaoDoFornecedor;
+  cadastro?: CadastroDoFornecedor;
   novoHref?: string;
   bloqueio: string | null;
 }) {
-  const filtrado = !!q || situacao !== 'ativos';
+  const filtrado = !!q || situacao !== 'ativos' || cadastro !== 'todos';
   return (
     <div className="space-y-6">
       <PageHeader
@@ -60,7 +64,7 @@ export function TelaListaFornecedores({
           ) : undefined
         }
       >
-        <form role="search" action={base} className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(16rem,28rem)_10rem_auto_auto]">
+        <form role="search" action={base} className="grid grid-cols-2 gap-2 sm:grid-cols-[minmax(16rem,28rem)_10rem_11rem_auto_auto]">
           <label htmlFor="fornecedores-q" className="sr-only">
             Buscar fornecedor pelo nome ou CNPJ
           </label>
@@ -72,6 +76,16 @@ export function TelaListaFornecedores({
             {(Object.keys(SITUACOES) as SituacaoDoFornecedor[]).map((k) => (
               <option key={k} value={k}>
                 {SITUACOES[k]}
+              </option>
+            ))}
+          </select>
+          <label htmlFor="fornecedores-cadastro" className="sr-only">
+            Cadastro
+          </label>
+          <select id="fornecedores-cadastro" name="cadastro" defaultValue={cadastro} className={`${CAMPO} pr-8`}>
+            {(Object.keys(CADASTROS) as CadastroDoFornecedor[]).map((k) => (
+              <option key={k} value={k}>
+                {CADASTROS[k]}
               </option>
             ))}
           </select>
@@ -113,10 +127,15 @@ export function TelaListaFornecedores({
                     <span className={`flex items-center gap-2 font-medium ${f.ativo ? 'text-texto' : 'text-suave'}`}>
                       <span className="truncate">{f.nome}</span>
                       {!f.ativo && <Selo>Desativado</Selo>}
+                      {f.situacaoCadastro === 'A_COMPLETAR' && <Selo tom="alerta">A completar</Selo>}
+                      {f.semNotaFiscal && <Selo>Sem nota fiscal</Selo>}
                     </span>
                     <span className="block truncate text-[12px] tabular-nums text-suave">
-                      {[formatarDocumento(f.documento) ?? 'sem CNPJ', f.contato].filter(Boolean).join(' · ')}
+                      {[formatarDocumento(f.documento) ?? 'sem CNPJ', formatarWhatsapp(f.whatsapp), f.whatsapp ? null : f.contato].filter(Boolean).join(' · ')}
                     </span>
+                    {f.situacaoCadastro === 'A_COMPLETAR' && f.falta.length > 0 && (
+                      <span className="block truncate text-[12px] text-suave">Falta: {f.falta.join(', ')}</span>
+                    )}
                   </span>
                   <span className="shrink-0 text-right text-[12px] tabular-nums text-suave">
                     {f.notas > 0 ? (
@@ -169,6 +188,9 @@ export function TelaDetalheFornecedor({
   acaoSituacao: AcaoDeCadastro;
 }) {
   const mensagem = fraseDoFornecedor(feito);
+  // F.1a: criado e editado dizem O QUE foi salvo, com o nome lido do banco (nunca da URL).
+  const salvo = fraseDoSalvoDoFornecedor(feito, f.nome);
+  const aCompletar = f.situacaoCadastro === 'A_COMPLETAR';
   return (
     <div className="space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: f.nome }]} />
@@ -177,16 +199,55 @@ export function TelaDetalheFornecedor({
         icone="fornecedor"
         cor={COR.compras}
         titulo={f.nome}
-        subtitulo={<PartesSemQuebra partes={[contexto, formatarDocumento(f.documento) ?? 'sem CNPJ', f.contato]} />}
+        aviso={
+          salvo ? (
+            <AvisoDeSalvo titulo={salvo.titulo} apoio={salvo.apoio}>
+              {salvo.criou && podeEditar && !bloqueio && (
+                <Link href={`${base}/novo`} className={classeDeBotao('secundario')}>
+                  Cadastrar outro fornecedor
+                </Link>
+              )}
+              <Link href={base} className={classeDeBotao('secundario')}>
+                Ver todos os fornecedores
+              </Link>
+            </AvisoDeSalvo>
+          ) : undefined
+        }
+        subtitulo={<PartesSemQuebra partes={[contexto, f.razaoSocial, formatarDocumento(f.documento) ?? 'sem CNPJ', formatarWhatsapp(f.whatsapp) ?? f.contato]} />}
         acao={
           podeEditar && f.ativo ? (
             <BotaoOuMotivo href={`${base}/${f.id}/editar`} bloqueio={bloqueio} variante="primario">
-              Editar fornecedor
+              {aCompletar ? 'Completar o cadastro' : 'Editar fornecedor'}
             </BotaoOuMotivo>
           ) : undefined
         }
       />
-      {mensagem && <Aviso tom="ok" titulo={mensagem} />}
+      {mensagem && !salvo && <Aviso tom="ok" titulo={mensagem} />}
+      {aCompletar && (
+        <Aviso tom="alerta" titulo="Cadastro a completar.">
+          Falta: {f.falta.join(', ')}. {podeEditar && f.ativo ? 'Complete em Editar fornecedor.' : 'Quem cuida do cadastro de fornecedores completa.'} As notas dele continuam valendo.
+        </Aviso>
+      )}
+      {f.documentoAConferir && (
+        <Aviso tom="alerta" titulo="Documento a conferir.">
+          O CNPJ/CPF gravado ({f.documento}) não passa na conferência dos dígitos verificadores. Confira com a nota e corrija em Editar fornecedor.
+        </Aviso>
+      )}
+      {f.mesmaEmpresa.length > 0 && (
+        <Aviso tom="neutro" titulo="Mesma empresa, outro estabelecimento.">
+          Outros cadastros com a mesma raiz de CNPJ:{' '}
+          {f.mesmaEmpresa.map((o, n) => (
+            <span key={o.id}>
+              {n > 0 && ', '}
+              <Link href={`${base}/${o.id}`} className={LINK_DE_TEXTO}>
+                {o.nome}
+              </Link>
+              {' '}({formatarDocumento(o.documento)}{o.ativo ? '' : ', desativado'})
+            </span>
+          ))}
+          . São cadastros separados: nada é unido.
+        </Aviso>
+      )}
       {!f.ativo && feito !== 'desativado' && <Aviso tom="alerta" titulo="Fornecedor desativado.">As notas dele continuam; nota nova não pode escolher.</Aviso>}
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
@@ -251,8 +312,19 @@ export function TelaDetalheFornecedor({
         <aside className="min-w-0 space-y-4" aria-label="Cadastro, situação e alterações">
           <Painel titulo="Cadastro">
             <dl className="space-y-2 text-sm">
+              <Linha rotulo="Razão social">{f.razaoSocial ?? 'não informada'}</Linha>
               <Linha rotulo="CNPJ/CPF">{formatarDocumento(f.documento) ?? 'não informado'}</Linha>
-              <Linha rotulo="Contato">{f.contato ?? 'não informado'}</Linha>
+              <Linha rotulo="Inscrição estadual">{f.inscricaoEstadual ?? 'não informada'}</Linha>
+              <Linha rotulo="Compras sem nota fiscal">{f.semNotaFiscal ? 'Sim' : 'Não'}</Linha>
+              <Linha rotulo="Endereço">
+                {[f.endereco, [f.municipio, f.uf].filter(Boolean).join('/'), formatarCep(f.cep)].filter(Boolean).join(' · ') || 'não informado'}
+              </Linha>
+              <Linha rotulo="Contato comercial">{f.contatoComercial ?? 'não informado'}</Linha>
+              <Linha rotulo="WhatsApp">{formatarWhatsapp(f.whatsapp) ?? 'não informado'}</Linha>
+              <Linha rotulo="E-mail">{f.email ? <span className="break-all">{f.email}</span> : 'não informado'}</Linha>
+              <Linha rotulo="Prazo de pagamento">{f.prazoPagamentoDias === null ? 'não informado' : `${f.prazoPagamentoDias} ${f.prazoPagamentoDias === 1 ? 'dia' : 'dias'}`}</Linha>
+              {f.contato && <Linha rotulo="Contato (cadastro antigo)">{f.contato}</Linha>}
+              <Linha rotulo="Cadastro">{aCompletar ? 'A completar' : 'Completo'}</Linha>
               <Linha rotulo="Situação">{f.ativo ? 'Ativo' : 'Desativado'}</Linha>
             </dl>
           </Painel>

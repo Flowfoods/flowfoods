@@ -1,7 +1,7 @@
 /** ERP, fornecedores de um Parceiro Flow, pelo nível 1. */
 
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
-import { listarFornecedores, type SituacaoDoFornecedor } from '@/lib/erp/compras';
+import { listarFornecedores, type CadastroDoFornecedor, type SituacaoDoFornecedor } from '@/lib/erp/compras';
 import { TelaListaFornecedores } from '@/components/erp/telas/compras/fornecedores';
 
 export const dynamic = 'force-dynamic';
@@ -15,7 +15,9 @@ export default async function ParceiroFornecedoresPage({ params, searchParams }:
   const q = um(searchParams.q).slice(0, 80);
   const s = um(searchParams.situacao);
   const situacao: SituacaoDoFornecedor = s === 'desativados' || s === 'todos' ? s : 'ativos';
-  const linhas = await listarFornecedores(ctx.cliente, ctx.alcance, { q, situacao });
+  const c = um(searchParams.cadastro);
+  const cadastro: CadastroDoFornecedor = c === 'a-completar' || c === 'completos' ? c : 'todos';
+  const linhas = await listarFornecedores(ctx.cliente, ctx.alcance, { q, situacao, cadastro });
   return (
     <TelaListaFornecedores
       base={`${base}/fornecedores`}
@@ -24,6 +26,7 @@ export default async function ParceiroFornecedoresPage({ params, searchParams }:
       linhas={linhas}
       q={q}
       situacao={situacao}
+      cadastro={cadastro}
       novoHref={`${base}/fornecedores/novo`}
       bloqueio={ctx.bloqueio}
     />

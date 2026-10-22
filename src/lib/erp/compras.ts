@@ -24,7 +24,7 @@
 import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
-import { ehErroDeUnicidade } from './tenant';
+import { checkVioladoDe, ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
 import { filtroDeLojas, pode, recusa, type Alcance } from './permissoes';
 import {
@@ -100,32 +100,139 @@ export const MENSAGEM_NOTA_CANCELADA = 'Esta nota está cancelada: não se edita
 
 // ================================================================ fornecedor
 
-async function erroDeNomeRepetido(cliente: ClienteDoParceiro, nome: string): Promise<ResultadoCompras> {
-  const existente = await cliente.fornecedor.findFirst({ where: { nome }, select: { id: true, ativo: true } });
-  if (existente && !existente.ativo) {
-    return { ok: false, erros: { nome: `Já existe “${nome}” desativado. Reative em vez de cadastrar de novo.` }, desativadoId: existente.id };
-  }
-  return { ok: false, erros: { nome: 'Já existe um fornecedor com esse nome.' } };
+const FRASE_ENVIO_TORTO = 'O envio deste formulário não tem uma chave válida. Recarregue a página e tente de novo; nada foi gravado.';
+const FRASE_ENVIO_DIFERENTE = (nome: string) =>
+  `Este envio já cadastrou “${nome}” e agora chegou com dados diferentes. Recarregue a página para cadastrar de novo; nada foi gravado.`;
+const DICA_DE_FILIAL = 'Se é outro estabelecimento da mesma empresa, acrescente o bairro ou a cidade ao nome.';
+
+/** A impressão do conteúdo do envio: mesma chave com impressão diferente é outro pedido, não um reenvio. */
+export function hashDoEnvioDoFornecedor(d: DadosFornecedor): string {
+  return createHash('sha256')
+    .update(JSON.stringify([d.nome, d.razaoSocial, d.documento, d.inscricaoEstadual, d.endereco, d.municipio, d.uf, d.cep, d.email, d.whatsapp, d.contatoComercial, d.prazoPagamentoDias, d.semNotaFiscal]))
+    .digest('hex');
 }
 
-export async function cadastrarFornecedor(cliente: ClienteDoParceiro, entrada: Record<string, unknown>, autorNome = 'Sistema'): Promise<ResultadoCompras> {
+/** Cadastrar e editar fornecedor esperam um ao outro (nome parecido e documento repetido se conferem sem corrida). */
+async function travarFornecedores(tx: ClienteDoParceiro) {
+  await tx.sql`SELECT 1 AS "ok" FROM (SELECT pg_advisory_xact_lock(hashtextextended(${`ff:fornecedor-cadastro:${tx.parceiroId}`}, 0))) AS "trava"`;
+}
+
+/**
+ * O que impede gravar este cadastro (null = livre): o MESMO CNPJ/CPF em outro fornecedor, ou o mesmo nome (também escrito de outro
+ * jeito: caixa, acento). Filial tem outro CNPJ e passa; nada se funde, nem por documento nem por nome. `exceto`: o próprio, ao editar.
+ */
+async function conflitoDoFornecedor(tx: ClienteDoParceiro, d: DadosFornecedor, exceto: string | null): Promise<Recusada | null> {
+  if (d.documento) {
+    const outro = await tx.fornecedor.findFirst({
+      where: { documento: d.documento, ...(exceto ? { id: { not: exceto } } : {}) },
+      orderBy: [{ ativo: 'desc' }, { criadoEm: 'asc' }],
+      select: { id: true, nome: true, ativo: true },
+    });
+    if (outro) {
+      const que = d.documento.length === 14 ? 'CNPJ' : 'CPF';
+      return outro.ativo
+        ? { ok: false, erros: { documento: `Já existe “${outro.nome}” com este ${que}. Abra esse cadastro em vez de cadastrar de novo.` }, existenteId: outro.id }
+        : { ok: false, erros: { documento: `Já existe “${outro.nome}” desativado com este ${que}. Reative em vez de cadastrar de novo.` }, desativadoId: outro.id };
+    }
+  }
+  const achados = await tx.sql<{ id: string; nome: string; ativo: boolean }>`
+    SELECT "id", "nome", "ativo" FROM "Fornecedor"
+    WHERE "parceiroId" = ${tx.parceiroId}
+      AND lower(translate(normalize("nome", NFC), ${ACENTUADAS}, ${SEM_ACENTO})) = ${chaveDoNome(d.nome)}
+      AND "id" <> ${exceto ?? ''}
+    ORDER BY ("nome" = ${d.nome}) DESC, "ativo" DESC
+    LIMIT 1`;
+  const a = achados[0];
+  if (!a) return null;
+  const igual = a.nome === d.nome;
+  if (!a.ativo) {
+    return {
+      ok: false,
+      erros: { nome: `Já existe “${a.nome}” desativado${igual ? '' : ' (o mesmo nome, escrito de outro jeito)'}. Reative em vez de cadastrar de novo.` },
+      desativadoId: a.id,
+    };
+  }
+  return {
+    ok: false,
+    erros: { nome: igual ? `Já existe um fornecedor com esse nome. ${DICA_DE_FILIAL}` : `Já existe “${a.nome}” (o mesmo nome, escrito de outro jeito). ${DICA_DE_FILIAL}` },
+    existenteId: a.id,
+  };
+}
+
+/** O banco recusou por CHECK (gravado por fora das regras): frase no lugar do erro cru. */
+function erroDoCheckDoFornecedor(e: unknown): Recusada | null {
+  return checkVioladoDe(e) ? { ok: false, erros: { geral: 'O banco recusou estes valores (fora da regra do cadastro). Confira os campos e tente de novo. Nada foi gravado.' } } : null;
+}
+
+const COLUNAS_DO_CADASTRO = (d: DadosFornecedor) => ({
+  nome: d.nome,
+  razaoSocial: d.razaoSocial,
+  documento: d.documento,
+  inscricaoEstadual: d.inscricaoEstadual,
+  endereco: d.endereco,
+  municipio: d.municipio,
+  uf: d.uf,
+  cep: d.cep,
+  email: d.email,
+  whatsapp: d.whatsapp,
+  contatoComercial: d.contatoComercial,
+  prazoPagamentoDias: d.prazoPagamentoDias,
+  semNotaFiscal: d.semNotaFiscal,
+});
+
+/**
+ * Cadastra o fornecedor (F.1a). Tudo o que o formulário tem de obrigatório é conferido aqui (`lerFormFornecedor`); o cadastro que
+ * sai daqui é sempre COMPLETO: o "a completar" só nasce do sistema. `entrada.envio` (a chave do formulário, por pessoa) faz o
+ * reenvio voltar como o mesmo fornecedor, sem criar outro.
+ */
+export async function cadastrarFornecedor(
+  cliente: ClienteDoParceiro,
+  entrada: Record<string, unknown>,
+  autorNome = 'Sistema',
+  /** Quem envia (id do usuário): a chave de envio é POR PESSOA, então a chave de um não reconhece nem revela o envio de outro. */
+  pessoaId = '',
+): Promise<ResultadoCompras> {
   const lido = lerFormFornecedor(entrada);
+  const envio = lerChaveDeEnvio(entrada.envio);
   if (!lido.ok) return lido;
+  if (!envio.ok) return { ok: false, erros: { geral: FRASE_ENVIO_TORTO }, conflito: true };
   const d = lido.dados;
+  const chave = envio.chave ? createHash('sha256').update(`${pessoaId}|${envio.chave}`).digest('hex').slice(0, 40) : null;
+  const hash = chave ? hashDoEnvioDoFornecedor(d) : null;
   try {
-    const id = await cliente.transacao(async (tx) => {
+    return await cliente.transacao(async (tx) => {
+      await travarFornecedores(tx);
+      if (chave) {
+        const j = await tx.fornecedor.findFirst({ where: { chaveEnvio: chave }, select: { id: true, nome: true, hashEnvio: true } });
+        if (j) {
+          if (j.hashEnvio === hash) return { ok: true as const, id: j.id, mudou: [], repetido: true };
+          throw new Recusa({ ok: false, erros: { geral: FRASE_ENVIO_DIFERENTE(j.nome) }, conflito: true });
+        }
+      }
+      const conflito = await conflitoDoFornecedor(tx, d, null);
+      if (conflito) throw new Recusa(conflito);
       const f = await tx.fornecedor.create({
-        data: { parceiroId: tx.parceiroId, nome: d.nome, documento: d.documento, contato: d.contato },
+        data: { parceiroId: tx.parceiroId, ...COLUNAS_DO_CADASTRO(d), situacaoCadastro: 'COMPLETO', ...(chave ? { chaveEnvio: chave, hashEnvio: hash } : {}) },
         select: { id: true },
       });
       await tx.historicoAlteracao.create({
-        data: { parceiroId: tx.parceiroId, entidade: 'Fornecedor', entidadeId: f.id, acao: 'CRIOU', depois: retratoDoFornecedor(d), autorNome },
+        data: { parceiroId: tx.parceiroId, entidade: 'Fornecedor', entidadeId: f.id, acao: 'CRIOU', depois: retratoDoFornecedor({ ...d, situacaoCadastro: 'COMPLETO' }), autorNome },
       });
-      return f.id;
+      return { ok: true as const, id: f.id, mudou: [] };
     });
-    return { ok: true, id, mudou: [] };
   } catch (e) {
-    if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, d.nome);
+    if (e instanceof Recusa) return e.resultado;
+    if (ehErroDeUnicidade(e)) {
+      // A chave, o documento ou o nome já existiam (outra aba, ao mesmo tempo): se é o mesmo envio, é sucesso; senão, a frase certa.
+      if (chave) {
+        const j = await cliente.fornecedor.findFirst({ where: { chaveEnvio: chave }, select: { id: true, hashEnvio: true } });
+        if (j && j.hashEnvio === hash) return { ok: true, id: j.id, mudou: [], repetido: true };
+      }
+      const conflito = await cliente.transacao((tx) => conflitoDoFornecedor(tx, d, null));
+      return conflito ?? { ok: false, erros: { geral: 'Já existe um fornecedor com estes dados. Recarregue a página e confira; nada foi gravado.' }, conflito: true };
+    }
+    const check = erroDoCheckDoFornecedor(e);
+    if (check) return check;
     throw e;
   }
 }
@@ -142,16 +249,20 @@ export async function editarFornecedor(
   if (!atual) return { ok: false, erros: { geral: 'Fornecedor não encontrado.' }, naoEncontrado: true };
   if (!atual.ativo) return { ok: false, erros: { geral: 'Fornecedor desativado: reative antes de editar.' } };
   if (atual.atualizadoEm.getTime() !== versao.getTime()) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_FORNECEDOR }, conflito: true };
+  // Editar é completar: as mesmas obrigações de cadastrar valem aqui, para o "a completar" também.
   const lido = lerFormFornecedor(entrada);
   if (!lido.ok) return lido;
   const d = lido.dados;
-  const mudanca = diferenca(retratoDoFornecedor(atual), retratoDoFornecedor(d));
+  const mudanca = diferenca(retratoDoFornecedor(atual), retratoDoFornecedor({ ...d, situacaoCadastro: 'COMPLETO' }));
   if (!mudanca) return { ok: true, id, mudou: [] };
   try {
     await cliente.transacao(async (tx) => {
+      await travarFornecedores(tx);
+      const conflito = await conflitoDoFornecedor(tx, d, id);
+      if (conflito) throw new Recusa(conflito);
       const r = await tx.fornecedor.updateMany({
         where: { id, atualizadoEm: versao, ativo: true },
-        data: { nome: d.nome, documento: d.documento, contato: d.contato },
+        data: { ...COLUNAS_DO_CADASTRO(d), situacaoCadastro: 'COMPLETO' },
       });
       if (r.count === 0) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_FORNECEDOR }, conflito: true });
       await tx.historicoAlteracao.create({
@@ -161,7 +272,12 @@ export async function editarFornecedor(
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
     if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
-    if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, d.nome);
+    if (ehErroDeUnicidade(e)) {
+      const conflito = await cliente.transacao((tx) => conflitoDoFornecedor(tx, d, id));
+      return conflito ?? { ok: false, erros: { geral: MENSAGEM_CONFLITO_FORNECEDOR }, conflito: true };
+    }
+    const check = erroDoCheckDoFornecedor(e);
+    if (check) return check;
     throw e;
   }
   return { ok: true, id, mudou: mudanca.campos };
@@ -204,24 +320,47 @@ export async function mudarSituacaoFornecedor(
 }
 
 export type SituacaoDoFornecedor = 'ativos' | 'desativados' | 'todos';
+/** F.1a: o filtro do cadastro: todos, só os "a completar" ou só os completos. */
+export type CadastroDoFornecedor = 'todos' | 'a-completar' | 'completos';
 
 /** Fornecedores com quantas notas lançadas (nas lojas do alcance) e a data da última. */
 export async function listarFornecedores(
   cliente: ClienteDoParceiro,
   alcance: Alcance,
-  filtros: { q?: string; situacao?: SituacaoDoFornecedor } = {},
+  filtros: { q?: string; situacao?: SituacaoDoFornecedor; cadastro?: CadastroDoFornecedor } = {},
 ) {
   const q = (filtros.q ?? '').trim().slice(0, 80);
   const situacao = filtros.situacao ?? 'ativos';
+  const cadastro = filtros.cadastro ?? 'todos';
   return cliente.transacao(async (tx) => {
     const lidos = await tx.fornecedor.findMany({
       where: {
-        ...(q ? { OR: [{ nome: { contains: q, mode: 'insensitive' as const } }, { documento: { contains: q.replace(/\D/g, '') || q } }] } : {}),
+        ...(q
+          ? {
+              OR: [
+                { nome: { contains: q, mode: 'insensitive' as const } },
+                { razaoSocial: { contains: q, mode: 'insensitive' as const } },
+                { documento: { contains: q.replace(/\D/g, '') || q } },
+              ],
+            }
+          : {}),
         ...(situacao === 'ativos' ? { ativo: true } : situacao === 'desativados' ? { ativo: false } : {}),
+        ...(cadastro === 'a-completar' ? { situacaoCadastro: 'A_COMPLETAR' as const } : cadastro === 'completos' ? { situacaoCadastro: 'COMPLETO' as const } : {}),
       },
       orderBy: [{ nome: 'asc' }],
       take: 500,
-      select: { id: true, nome: true, documento: true, contato: true, ativo: true },
+      select: {
+        id: true,
+        nome: true,
+        razaoSocial: true,
+        documento: true,
+        contato: true,
+        whatsapp: true,
+        email: true,
+        semNotaFiscal: true,
+        situacaoCadastro: true,
+        ativo: true,
+      },
     });
     const ids = lidos.map((f) => f.id);
     const lojas = lojasComCompras(alcance);
@@ -236,6 +375,7 @@ export async function listarFornecedores(
     const porId = new Map(notas.map((n) => [n.fornecedorId, n]));
     return lidos.map((f) => ({
       ...f,
+      falta: faltaNoCadastro(f),
       notas: porId.get(f.id)?._count._all ?? 0,
       ultimaNota: porId.get(f.id)?._max.entradaEm?.toISOString().slice(0, 10) ?? null,
     }));
@@ -287,10 +427,35 @@ export async function obterFornecedor(cliente: ClienteDoParceiro, alcance: Alcan
       }))
       .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
     const historico = await listarHistorico(tx, { de: [{ entidade: 'Fornecedor', ids: [id] }], limite: 10, verPrecos: false });
+    // Outros estabelecimentos da mesma empresa (mesma raiz de CNPJ, CNPJ diferente): só aviso, nada se funde.
+    const raiz = raizDoCnpj(f.documento);
+    const mesmaEmpresa = raiz
+      ? await tx.fornecedor.findMany({
+          where: { documento: { startsWith: raiz }, id: { not: id } },
+          orderBy: [{ ativo: 'desc' }, { nome: 'asc' }],
+          take: 20,
+          select: { id: true, nome: true, documento: true, ativo: true },
+        })
+      : [];
     return {
       id: f.id,
       nome: f.nome,
+      razaoSocial: f.razaoSocial,
       documento: f.documento,
+      inscricaoEstadual: f.inscricaoEstadual,
+      endereco: f.endereco,
+      municipio: f.municipio,
+      uf: f.uf,
+      cep: f.cep,
+      email: f.email,
+      whatsapp: f.whatsapp,
+      contatoComercial: f.contatoComercial,
+      prazoPagamentoDias: f.prazoPagamentoDias,
+      semNotaFiscal: f.semNotaFiscal,
+      situacaoCadastro: f.situacaoCadastro,
+      falta: faltaNoCadastro(f),
+      documentoAConferir: documentoAConferir(f.documento),
+      mesmaEmpresa: mesmaEmpresa.filter((o) => raizDoCnpj(o.documento) === raiz),
       contato: f.contato,
       ativo: f.ativo,
       versao: f.atualizadoEm.toISOString(),

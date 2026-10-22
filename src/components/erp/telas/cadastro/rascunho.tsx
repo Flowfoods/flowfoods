@@ -13,7 +13,7 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { PARAMETRO_INSUMO_CRIADO } from '@/lib/erp/volta';
+import { PARAMETRO_FORNECEDOR_CRIADO, PARAMETRO_INSUMO_CRIADO } from '@/lib/erp/volta';
 
 const PREFIXO = 'ff-rascunho:';
 const VALE_MS = 20 * 60 * 1000;
@@ -87,6 +87,8 @@ export interface RascunhoDaTela<T> {
   versaoMudou: boolean;
   /** O insumo que acabou de ser cadastrado e voltou na URL (`?insumoCriado=`), quando veio de lá. */
   insumoCriado: string | null;
+  /** F.1a: o fornecedor que acabou de ser cadastrado e voltou na URL (`?fornecedorCriado=`), quando veio de lá. */
+  fornecedorCriado: string | null;
   /** Esquece o rascunho (descartar, ou depois de gravar). */
   descartar: () => void;
 }
@@ -104,6 +106,7 @@ export function useRascunhoDaTela<T>(versaoAtual?: string): RascunhoDaTela<T> {
   const busca = useSearchParams();
   // Capturado no primeiro desenho: depois a barra de endereço é limpa e o parâmetro some, mas a tela já o aplicou.
   const [insumoCriado] = useState(() => busca?.get(PARAMETRO_INSUMO_CRIADO) ?? null);
+  const [fornecedorCriado] = useState(() => busca?.get(PARAMETRO_FORNECEDOR_CRIADO) ?? null);
   const [valores, setValores] = useState<T | null | undefined>(undefined);
   const [versaoMudou, setVersaoMudou] = useState(false);
   useEffect(() => {
@@ -112,15 +115,16 @@ export function useRascunhoDaTela<T>(versaoAtual?: string): RascunhoDaTela<T> {
     setVersaoMudou(r.versaoMudou);
     descartarRascunho(chave);
     // Limpa o parâmetro da barra de endereço: recarregar a página não repete o aviso nem a escolha.
-    if (pathname && new URLSearchParams(window.location.search).has(PARAMETRO_INSUMO_CRIADO)) {
+    if (pathname && [PARAMETRO_INSUMO_CRIADO, PARAMETRO_FORNECEDOR_CRIADO].some((k) => new URLSearchParams(window.location.search).has(k))) {
       const p = new URLSearchParams(window.location.search);
       p.delete(PARAMETRO_INSUMO_CRIADO);
+      p.delete(PARAMETRO_FORNECEDOR_CRIADO);
       window.history.replaceState(window.history.state, '', p.toString() ? `${pathname}?${p}` : pathname);
     }
     // Só no primeiro desenho da página: o rascunho é desta visita.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return { chave, valores, versaoMudou, insumoCriado, descartar: () => descartarRascunho(chave) };
+  return { chave, valores, versaoMudou, insumoCriado, fornecedorCriado, descartar: () => descartarRascunho(chave) };
 }
 
 /** A tela mudou desde o rascunho: ele foi descartado. */

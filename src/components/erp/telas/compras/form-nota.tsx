@@ -40,6 +40,8 @@ import { Painel } from '../../ui/superficies';
 import { CampoData } from '../../ui/campo-data';
 import { ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
+import { usePathname, useSearchParams } from 'next/navigation';
+import { PARAMETRO_FORNECEDOR_CRIADO, PARAMETRO_INSUMO_CRIADO } from '@/lib/erp/volta';
 import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
 import type { AcaoDeNota, EstadoNota } from './estado';
 import { PreviaDoImpacto } from './previa';
@@ -92,7 +94,10 @@ export function FormNota(props: PropsDoFormNota) {
   const [descartou, setDescartou] = useState(false);
   const recuperado = !descartou && r.valores ? r.valores : null;
   const criado = !descartou && r.insumoCriado ? props.opcoes.insumos.find((i) => i.id === r.insumoCriado) : undefined;
+  // F.1a: voltou de "Fornecedor novo: cadastrar"? O fornecedor novo já está na lista e vem escolhido.
+  const fornecedorNovo = !descartou && r.fornecedorCriado ? props.opcoes.fornecedores.find((f) => f.id === r.fornecedorCriado) : undefined;
   let valores = recuperado ?? props.inicial;
+  if (fornecedorNovo) valores = { ...valores, fornecedorId: fornecedorNovo.id };
   let escolhido = false;
   if (criado) {
     const vaga = valores.itens.findIndex((l) => !l.insumoId);
@@ -112,6 +117,12 @@ export function FormNota(props: PropsDoFormNota) {
         avisos={
           <>
             {criado && <AvisoInsumoCriado nome={criado.nome} escolhido={escolhido} />}
+            {fornecedorNovo && (
+              <div role="status" className="rounded-[10px] border border-linha-forte px-4 py-3 text-sm">
+                <p className="font-semibold text-texto">Fornecedor salvo com sucesso: {fornecedorNovo.nome}</p>
+                <p className="mt-0.5 text-suave">Ele já está na lista e foi escolhido nesta nota. Confira e siga.</p>
+              </div>
+            )}
             <AvisoDeRascunhoVelho quando={r.versaoMudou} oQue="A nota" />
             <AvisoDeRascunho
               quando={!!recuperado}
@@ -165,6 +176,15 @@ function FormNotaBase({
 }: PropsDoFormNota & { chaveDoRascunho: string; avisos: ReactNode }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [estado, enviar] = useFormState<EstadoNota, FormData>(acao, null);
+  // F.1a: esta mesma tela, sem os avisos de "criado" que a trouxeram, é para onde o cadastro do fornecedor volta.
+  const pathname = usePathname() ?? '';
+  const busca = useSearchParams();
+  const caminhoDaVolta = (() => {
+    const daqui = new URLSearchParams(busca?.toString() ?? '');
+    daqui.delete(PARAMETRO_INSUMO_CRIADO);
+    daqui.delete(PARAMETRO_FORNECEDOR_CRIADO);
+    return daqui.toString() ? `${pathname}?${daqui}` : pathname;
+  })();
   const saida = useAvisoDeSaida();
   // A primeira chave livre: a nota nova já nasce com uma linha vazia (chave 0).
   const proxima = useRef(Math.max(1, inicial.itens.length));
@@ -314,7 +334,7 @@ function FormNotaBase({
               </select>
               <Erro id={`${idBase}-fornecedorId-erro`} texto={erros.fornecedorId} />
               {novoFornecedor ? (
-                <Link href={novoFornecedor} className={`${LINK_DE_TEXTO} mt-1.5 inline-flex min-h-0 items-center [@media(pointer:coarse)]:min-h-11`}>
+                <Link href={`${novoFornecedor}?volta=${encodeURIComponent(caminhoDaVolta)}`} onClick={guardarOQueFoiPreenchido} className={`${LINK_DE_TEXTO} mt-1.5 inline-flex min-h-0 items-center [@media(pointer:coarse)]:min-h-11`}>
                   Fornecedor novo: cadastrar
                 </Link>
               ) : (
