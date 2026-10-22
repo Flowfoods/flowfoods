@@ -7,7 +7,7 @@
 
 import Link from 'next/link';
 import type { InsumoParaRemover } from '@/lib/erp/insumo-remocao';
-import { TIPOS, type TipoInsumo } from '@/lib/erp/insumo-campos';
+import { comDe, TIPOS, type TipoInsumo } from '@/lib/erp/insumo-campos';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
@@ -106,7 +106,7 @@ export function TelaRemoverInsumo({
       {semVinculo && (
         <Painel titulo="Excluir de vez" subtitulo="Só porque nada usa este insumo">
           <fieldset disabled={!!bloqueio} className="min-w-0">
-            <FormExcluir acao={acaoExcluir} nome={i.nome} de={de} recarregar={`${aqui}/remover${de ? `?de=${encodeURIComponent(de)}` : ''}`} />
+            <FormExcluir acao={acaoExcluir} nome={i.nome} de={de} recarregar={comDe(`${aqui}/remover`, de)} />
           </fieldset>
         </Painel>
       )}

@@ -77,7 +77,9 @@ export function concluir(
     u.set('ref', id);
     redirect(`${base}?${u.toString()}`);
   }
-  redirect(`${base}/${id}?feito=${frase}${lista?.de ? `&de=${encodeURIComponent(lista.de)}` : ''}`);
+  const u = new URLSearchParams({ feito: frase });
+  if (lista?.de) u.set('de', lista.de);
+  redirect(`${base}/${id}?${u.toString()}`);
 }
 
 /** "sim" no campo `ativo` = reativar; qualquer outra coisa = desativar. */

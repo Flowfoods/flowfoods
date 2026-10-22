@@ -291,7 +291,7 @@ Padrão para as próximas listas de cadastro (fichas, fornecedores...), tirado d
 Editorial (separadores delicados, número de tabela sem serifa):
 
 - **Estado na URL**: busca, filtros, ordem, página e tamanho. Mudar filtro ou tamanho volta à página 1; ordem sempre com desempate por id.
-- **Dois totais, dois rótulos**: "No cadastro: N" (tudo o que a pessoa pode ver) e "Nesta lista: N" / "Com os filtros: N". Nunca a quantidade da página
+- **Dois totais, dois rótulos**: "No cadastro: N" (tudo o que a pessoa pode ver) e "Nesta lista: N" ("Nesta lista (com os filtros): N" quando há filtro). Nunca a quantidade da página
   como se fosse total. O subtítulo do cabeçalho é o do cadastro ("… no cadastro").
 - **Filtros ativos**: faixa "Filtros ativos:" com um chip por filtro (o X tira só aquele; 36 px com mouse, 44 px em toque) e "Limpar filtros", que
   mantém o tamanho da página. Estado vazio útil: diz quantos há no cadastro e como sair.

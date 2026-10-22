@@ -359,7 +359,10 @@ describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fec
     expect(h).not.toMatch(/<details[^>]* open/);
     expect(h).toContain('Entendi, não mostrar de novo');
     expect(await html('/erp/estoque/loja1/contagens/c1', PREF())).toMatch(/<details class="group">/);
-    expect(await html('/erp/insumos', PREF())).not.toContain('<details');
+    expect(await html('/erp/fichas', PREF())).not.toContain('<details');
+    // L.1: a lista de insumos também nasce recolhida (no celular a lista e os filtros ficam na primeira dobra); o detalhe do insumo não.
+    expect(await html('/erp/insumos', PREF())).toMatch(/<details class="group"><summary[\s\S]*Como funciona/);
+    expect(await html('/erp/insumos/abc', PREF())).not.toContain('<details');
     // a pergunta da 1ª vez pendente abre a caixa recolhida
     expect(await html('/erp/estoque/loja1/abertura', PREF({ escolhida: false }))).toMatch(/<details open="" class="group">/);
     // fechada: nenhuma caixa, recolhida ou não

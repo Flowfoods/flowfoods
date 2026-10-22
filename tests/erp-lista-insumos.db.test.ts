@@ -32,7 +32,7 @@ import { editarInsumo, excluirInsumo, listarInsumos, marcasEmUso, mudarSituacaoI
 import { lerRemocao, vinculosDoInsumo } from '@/lib/erp/insumo-remocao';
 import { lerFiltros, OPCOES_POR_PAGINA } from '@/lib/erp/insumo-campos';
 import { cadastrarVariante } from '@/lib/erp/variantes';
-import { cadastrarFicha } from '@/lib/erp/fichas';
+import { cadastrarFicha, editarFicha, FRASE_INSUMO_EXCLUIDO } from '@/lib/erp/fichas';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { cadastrarFornecedor, lancarNota } from '@/lib/erp/compras';
 import { descreverMudancas } from '@/lib/erp/historico';
@@ -470,6 +470,71 @@ describe.skipIf(!URL_TESTE)('ERP L.1 · lista de insumos (Postgres real)', { tim
       const cobertas = ['"ContagemRetratoItem"', '"InsumoVariante"', '"NotaEntradaItem"', '"DocumentoFiscalItem"', '"VinculoItemFornecedor"', '"FichaTecnica"', '"FichaItem"', '"ProdutoEmbalagem"', '"SaldoEstoque"', '"MovimentoEstoque"', '"ContagemItem"', '"RequisicaoItem"', '"OrdemProducao"', '"Etiqueta"'].map((t) => t.replaceAll('"', ''));
       const noBanco = r.map((x) => x.t.replaceAll('"', '')).sort();
       expect(noBanco).toEqual([...cobertas].sort());
+    });
+  });
+
+  // ------------------------------------------------- ficha com insumo excluído agora há pouco
+
+  describe('ficha técnica com um insumo excluído no mesmo instante', () => {
+    const ficha = (nome: string, itens: { insumoId: string; quantidade: string; unidade: string }[]) => ({ nome, tipo: 'PRATO', rendimento: '1', descricao: '', modoPreparo: '', itens });
+    const depois = (ms: number) => new Promise((ok) => setTimeout(ok, ms));
+
+    it('o insumo foi excluído antes de salvar: frase amigável no item (nunca 500), nada gravado; id que nunca existiu segue com a frase de sempre', async () => {
+      const id = await novo(a, 'Excluído antes da ficha', { categoriaId: cat.OUTROS });
+      expect((await excluirInsumo(a, id, true, 'Marina')).ok).toBe(true);
+      const r = await cadastrarFicha(a, ficha('Ficha com excluído', [{ insumoId: id, quantidade: '100', unidade: 'g' }]), { tipo: 'manter' }, 'Marina');
+      expect(r).toMatchObject({ ok: false, erros: { 'item-0': FRASE_INSUMO_EXCLUIDO } });
+      expect(FRASE_INSUMO_EXCLUIDO).toMatch(/^Este insumo acabou de ser excluído/);
+      expect(await a.fichaTecnica.count({ where: { nome: 'Ficha com excluído' } })).toBe(0);
+      const nunca = await cadastrarFicha(a, ficha('Ficha com id torto', [{ insumoId: 'id-que-nunca-existiu', quantidade: '100', unidade: 'g' }]), { tipo: 'manter' }, 'Marina');
+      expect(nunca).toMatchObject({ ok: false, erros: { 'item-0': 'Insumo não encontrado neste cadastro.' } });
+    });
+
+    it('o insumo de OUTRO parceiro não é confirmado nem como "excluído": a frase de sempre', async () => {
+      const idB = await novo(b, 'Do B para a ficha de A');
+      expect((await excluirInsumo(b, idB, true, 'Bia')).ok).toBe(true);
+      const r = await cadastrarFicha(a, ficha('Ficha com excluído de B', [{ insumoId: idB, quantidade: '100', unidade: 'g' }]), { tipo: 'manter' }, 'Marina');
+      expect(r).toMatchObject({ ok: false, erros: { 'item-0': 'Insumo não encontrado neste cadastro.' } });
+    });
+
+    it('a ficha estava salvando e a exclusão venceu no meio: a ficha espera a trava, vê o insumo sumido e responde com a frase', async () => {
+      const id = await novo(a, 'Corrida da ficha', { categoriaId: cat.OUTROS });
+      let soltar!: () => void;
+      const segura = new Promise<void>((ok) => (soltar = ok));
+      // Quem exclui trava a linha e demora; no fim apaga e deixa o rastro, como `excluirInsumo`.
+      const exclui = a.transacao(async (tx) => {
+        await tx.sql`SELECT "id" FROM "Insumo" WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ${id} FOR UPDATE`;
+        await segura;
+        await tx.insumo.deleteMany({ where: { id } });
+        await tx.historicoAlteracao.create({ data: { parceiroId: tx.parceiroId, entidade: 'Insumo', entidadeId: id, acao: 'EXCLUIU', antes: { nome: 'Corrida da ficha' }, autorNome: 'Marina' } });
+      });
+      await depois(300);
+      const salva = cadastrarFicha(a, ficha('Ficha da corrida', [{ insumoId: id, quantidade: '100', unidade: 'g' }]), { tipo: 'manter' }, 'Gil');
+      await depois(600);
+      soltar();
+      await exclui;
+      expect(await salva).toMatchObject({ ok: false, erros: { 'item-0': FRASE_INSUMO_EXCLUIDO } });
+      expect(await a.fichaTecnica.count({ where: { nome: 'Ficha da corrida' } })).toBe(0);
+    });
+
+    it('a ficha vence: segura o insumo em uso e a exclusão depois recusa (a ficha continua inteira)', async () => {
+      const id = await novo(a, 'Corrida da ficha 2', { categoriaId: cat.OUTROS });
+      const f = await cadastrarFicha(a, ficha('Ficha que venceu', [{ insumoId: id, quantidade: '100', unidade: 'g' }]), { tipo: 'manter' }, 'Marina');
+      expect(f.ok).toBe(true);
+      expect(await excluirInsumo(a, id, true, 'Marina')).toMatchObject({ ok: false });
+      expect(await a.fichaItem.count({ where: { insumoId: id } })).toBe(1);
+    });
+
+    it('editar uma ficha para incluir um insumo excluído também responde com a frase', async () => {
+      const ok1 = await novo(a, 'Fica na ficha', { categoriaId: cat.OUTROS });
+      const f = await cadastrarFicha(a, ficha('Ficha para editar', [{ insumoId: ok1, quantidade: '100', unidade: 'g' }]), { tipo: 'manter' }, 'Marina');
+      if (!f.ok) throw new Error(JSON.stringify(f));
+      const id = await novo(a, 'Excluído antes da edição', { categoriaId: cat.OUTROS });
+      expect((await excluirInsumo(a, id, true, 'Marina')).ok).toBe(true);
+      const versao = (await a.fichaTecnica.findUniqueOrThrow({ where: { id: f.id } })).atualizadoEm.toISOString();
+      const r = await editarFicha(a, f.id, { ...ficha('Ficha para editar', [{ insumoId: ok1, quantidade: '100', unidade: 'g' }, { insumoId: id, quantidade: '50', unidade: 'g' }]), versao }, { tipo: 'manter' }, 'Marina');
+      expect(r).toMatchObject({ ok: false, erros: { 'item-1': FRASE_INSUMO_EXCLUIDO } });
+      expect(await a.fichaItem.count({ where: { fichaId: f.id } })).toBe(1);
     });
   });
 

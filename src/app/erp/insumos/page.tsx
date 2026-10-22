@@ -13,7 +13,7 @@ import { AvisosDaLista } from '@/components/erp/telas/insumos/aviso-classificar'
 import { lerFiltros, temFiltro } from '@/lib/erp/insumo-campos';
 import { FiltrosAtivos, FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
 import { AvisoDaListaDeInsumos } from '@/components/erp/telas/insumos/aviso-da-lista';
-import { queryDosFiltros } from '@/lib/erp/insumo-campos';
+import { comDe, queryDosFiltros } from '@/lib/erp/insumo-campos';
 import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
 import { INSUMOS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtitulo';
 
@@ -39,7 +39,7 @@ export default async function ErpInsumosPage({ searchParams }: { searchParams: R
       <CabecalhoDaLista
         // L.1: o subtítulo é o do CADASTRO (todos, ativos e desativados); o que os filtros deixaram aparece acima da tabela, com outro rótulo.
         subtitulo={`${subtituloDaLista(visao, pagina.totalDoCadastro.todos, INSUMOS, false)} no cadastro`}
-        novoHref={cadastra ? `${BASE}/novo${queryDosFiltros(filtros) ? `?de=${encodeURIComponent(queryDosFiltros(filtros))}` : ''}` : undefined}
+        novoHref={cadastra ? comDe(`${BASE}/novo`, queryDosFiltros(filtros)) : undefined}
         bloqueio={ctx.bloqueio}
       >
         <div className="space-y-3">

@@ -506,6 +506,19 @@ function lerMarcaDoFiltro(v: unknown): string | null {
 }
 
 /**
+ * L.1: o endereço com o "de onde vim" (`de` = a query da lista) e mais alguns parâmetros, SEMPRE montado por `URLSearchParams`: o valor
+ * de `de` (que tem `&` e `=` dentro) é codificado inteiro e volta igual em `searchParams.get('de')`. Nenhum link de insumo monta isso
+ * à mão.
+ */
+export function comDe(caminho: string, de: string, extras: Record<string, string> = {}): string {
+  const p = new URLSearchParams();
+  if (de) p.set('de', de);
+  for (const [k, v] of Object.entries(extras)) p.set(k, v);
+  const q = p.toString();
+  return q ? `${caminho}?${q}` : caminho;
+}
+
+/**
  * L.1: o "de volta para a lista" que viaja num formulário ou numa URL (`de=`). É dado de fora: só os filtros que a lista
  * conhece voltam (os outros somem), então nunca vira endereço, só texto de busca já normalizado.
  */

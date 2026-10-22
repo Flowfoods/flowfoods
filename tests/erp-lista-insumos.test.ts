@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  comDe,
   deSeguro,
   FILTRO_SEM_MARCA,
   FILTROS_PADRAO,
@@ -197,5 +198,38 @@ describe('L.1 · frases dos vínculos', () => {
         { chave: 'movimentos', n: 1, frase: '1 movimento de estoque (entradas, saídas, perdas, ajustes)' },
       ]),
     ).toBe('usado em 2 fichas técnicas; 1 movimento de estoque (entradas, saídas, perdas, ajustes)');
+  });
+});
+
+describe('L.1 · o "de onde vim" nos links: ida e volta', () => {
+  const casos = [
+    { q: 'farinha', por: '25', pagina: '3' },
+    { q: 'açúcar & sal = 100% +mais #1', marca: 'Marca & Filha', incompleto: '1', situacao: 'todos' },
+    { q: 'a=b&c=d', categoria: 'abc_123-X', tipo: 'EMBALAGEM', conservacao: 'REFRIGERADO', preco: 'sem', ordem: 'custo', dir: 'desc', por: '100', pagina: '2' },
+    { q: "'; DROP TABLE x; --", por: '10' },
+    {},
+  ];
+  it.each(casos.map((c, i) => [i, c] as const))('caso %i: o valor de `de` volta igual e `origem` não se mistura com ele', (_i, c) => {
+    const f = lerFiltros(c);
+    const de = queryDosFiltros(f);
+    for (const href of [comDe('/erp/insumos/abc/editar', de, { origem: 'lista' }), comDe('/erp/insumos/abc/remover', de), comDe('/rodolfo/erp/casa/insumos/abc', de), comDe('/erp/insumos/novo', de, { tipo: 'INGREDIENTE', unidade: 'KG' })]) {
+      const u = new URL(href, 'http://erp.interno');
+      expect(u.pathname.startsWith('/erp') || u.pathname.startsWith('/rodolfo'), href).toBe(true);
+      expect(u.searchParams.get('de') ?? '', href).toBe(de);
+      expect(deSeguro(u.searchParams.get('de')), href).toBe(de);
+      expect(lerFiltros(Object.fromEntries(new URLSearchParams(u.searchParams.get('de') ?? ''))), href).toEqual(f);
+      // O que não é `de` nunca vaza para dentro dele e `de` nunca vira parâmetro solto.
+      for (const k of u.searchParams.keys()) expect(['de', 'origem', 'tipo', 'unidade'], `${href}: ${k}`).toContain(k);
+      expect(href.includes('?de=') ? /^[^?]*\?de=[^&]*(&|$)/.test(href) : true, href).toBe(true);
+    }
+  });
+
+  it('sem `de` o endereço fica limpo; com `origem` só, sem `de=` vazio', () => {
+    expect(comDe('/erp/insumos/x', '')).toBe('/erp/insumos/x');
+    expect(comDe('/erp/insumos/x/editar', '', { origem: 'lista' })).toBe('/erp/insumos/x/editar?origem=lista');
+  });
+
+  it('o `de` com & e = vira UM parâmetro codificado (nunca "?de=por=25&pagina=3")', () => {
+    expect(comDe('/erp/insumos/x/editar', 'por=25&pagina=3', { origem: 'lista' })).toBe('/erp/insumos/x/editar?de=por%3D25%26pagina%3D3&origem=lista');
   });
 });

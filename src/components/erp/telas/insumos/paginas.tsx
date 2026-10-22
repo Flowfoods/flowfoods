@@ -9,7 +9,7 @@ import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
-import { TIPOS } from '@/lib/erp/insumo-campos';
+import { comDe, TIPOS } from '@/lib/erp/insumo-campos';
 import { rotuloDaVolta } from '@/lib/erp/volta';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, dinheiroParaCampo, quantidadeParaCampo } from '@/lib/erp/unidades';
@@ -113,16 +113,11 @@ export function TelaFormInsumo({
   const aqui = insumo ? `${base}/${insumo.id}` : base;
   // L.1: da caneta da lista, "voltar" e "cancelar" levam à lista como estava; do detalhe, ao detalhe (que também guarda a lista).
   const daLista = `${base}${de ? `?${de}` : ''}`;
-  const doDetalhe = `${aqui}${insumo && de ? `?de=${encodeURIComponent(de)}` : ''}`;
+  const doDetalhe = insumo ? comDe(aqui, de) : aqui;
   const destinoDoCancelar = insumo ? (origemLista ? daLista : doDetalhe) : daLista;
   const paraVoltar = !insumo && volta ? volta : destinoDoCancelar;
   // "Recarregar" (depois de um conflito) não pode perder de onde a pessoa veio.
-  const recarregarComEstado = (() => {
-    const q = new URLSearchParams();
-    if (de) q.set('de', de);
-    if (insumo && origemLista) q.set('origem', 'lista');
-    return q.size ? `?${q.toString()}` : '';
-  })();
+  const recarregarComEstado = (caminho: string) => comDe(caminho, de, insumo && origemLista ? { origem: 'lista' } : {});
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <TrilhaDaPagina itens={insumo ? [{ rotulo: insumo.nome, href: aqui }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo insumo' }]} />
@@ -137,7 +132,7 @@ export function TelaFormInsumo({
         acao={acao}
         modo={insumo ? 'editar' : 'criar'}
         base={base}
-        aqui={`${insumo ? `${base}/${insumo.id}/editar` : `${base}/novo`}${recarregarComEstado}`}
+        aqui={recarregarComEstado(insumo ? `${base}/${insumo.id}/editar` : `${base}/novo`)}
         cancelar={destinoDoCancelar}
         volta={volta}
         de={de}

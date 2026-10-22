@@ -15,6 +15,7 @@ import { formatarValidade, ROTULO_DA_OPCAO } from '@/lib/erp/validade';
 import type { LinhaDeInsumo, TotalDoCadastro } from '@/lib/erp/insumos';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
 import {
+  comDe,
   CONSERVACOES,
   FILTRO_A_CONFIRMAR,
   FILTRO_SEM_MARCA,
@@ -30,6 +31,7 @@ import { faixaDaPagina } from '@/lib/erp/paginacao';
 import { UNIDADES, formatarDinheiro, formatarFracao, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
 import { CAMPO, MARCAR } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
+import { FiltrosRecolhiveis } from './filtros-recolhiveis';
 import { PaginacaoNumerada } from '../../ui/paginacao-numerada';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 
@@ -40,20 +42,17 @@ function hrefCom(base: string, f: FiltrosDeInsumo, mudar: Partial<FiltrosDeInsum
 }
 
 function hrefDoDetalhe(base: string, id: string, f: FiltrosDeInsumo): string {
-  const q = queryDosFiltros(f);
-  return q ? `${base}/${id}?de=${encodeURIComponent(q)}` : `${base}/${id}`;
+  return comDe(`${base}/${id}`, queryDosFiltros(f));
 }
 
 /** L.1: a caneta leva à edição e a edição volta para ESTA lista (mesma página, filtros e tamanho). */
 function hrefDeEditar(base: string, id: string, f: FiltrosDeInsumo): string {
-  const q = queryDosFiltros(f);
-  return `${base}/${id}/editar?${q ? `de=${encodeURIComponent(q)}&` : ''}origem=lista`;
+  return comDe(`${base}/${id}/editar`, queryDosFiltros(f), { origem: 'lista' });
 }
 
 /** L.1: a lixeira leva à tela "Remover insumo" (que mostra os vínculos antes de qualquer coisa). */
 function hrefDeRemover(base: string, id: string, f: FiltrosDeInsumo): string {
-  const q = queryDosFiltros(f);
-  return `${base}/${id}/remover${q ? `?de=${encodeURIComponent(q)}` : ''}`;
+  return comDe(`${base}/${id}/remover`, queryDosFiltros(f));
 }
 
 /** Os motivos do cadastro incompleto de uma linha, ou null (a linha completa não ganha nada). */
@@ -157,16 +156,18 @@ export function FiltrosDaLista({
   marcas?: readonly { marca: string; n: number }[];
 }) {
   const SELECT = `${CAMPO} pr-8`;
+  // Quantos filtros (fora a busca, que fica à vista) estão valendo: o número do botão "Filtros (n)" do celular.
+  const filtrosAtivos = [f.categoria, f.tipo, f.conservacao, f.situacao !== 'ativos', f.marca, f.semPreco, f.incompleto].filter(Boolean).length;
   // A marca do filtro pode não estar entre as 100 mais usadas (link antigo): ela continua escolhível, para o filtro não "sumir".
   const marcaForaDaLista = f.marca && f.marca !== FILTRO_SEM_MARCA && !marcas.some((m) => m.marca.toLowerCase() === f.marca!.toLowerCase());
   return (
     // `key` = os filtros de agora: depois de um link que muda o filtro sem recarregar ("Ver quais são" no aviso), os campos nascem de novo
     // com o valor da URL (um <select defaultValue> não acompanha a mudança sozinho).
-    <form key={queryDosFiltros(f)} role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-5">
+    <form key={queryDosFiltros(f)} role="search" action={base} className="space-y-2">
       {f.ordem !== 'nome' && <input type="hidden" name="ordem" value={f.ordem} />}
       {f.direcao !== 'asc' && <input type="hidden" name="dir" value={f.direcao} />}
       {f.porPagina !== POR_PAGINA_PADRAO && <input type="hidden" name="por" value={f.porPagina} />}
-      <div className="col-span-2 flex gap-2 lg:col-span-3 xl:col-span-5">
+      <div className="flex gap-2">
         <label htmlFor="insumos-q" className="sr-only">
           Buscar insumo pelo nome ou pela marca
         </label>
@@ -175,7 +176,7 @@ export function FiltrosDaLista({
           name="q"
           type="search"
           defaultValue={f.q}
-          placeholder="Buscar pelo nome ou pela marca"
+          placeholder="Buscar nome ou marca"
           className={`${CAMPO} min-w-0 flex-1`}
         />
         <button type="submit" className={classeDeBotao('secundario', 'shrink-0')}>
@@ -187,6 +188,7 @@ export function FiltrosDaLista({
           </Link>
         )}
       </div>
+      <FiltrosRecolhiveis ativos={filtrosAtivos}>
       <div className="col-span-2 lg:col-span-1">
         <label htmlFor="insumos-categoria" className="sr-only">
           Categoria
@@ -268,6 +270,7 @@ export function FiltrosDaLista({
       <p id="insumos-incompleto-ajuda" className="col-span-2 text-[12px] text-suave lg:col-span-2 xl:col-span-3">
         Cadastro incompleto: sem categoria, em “Outros / a classificar”, com a conservação a confirmar ou, no pré-preparo, sem validade na ficha. Custo não informado é outra coisa: use “Só sem custo”.
       </p>
+      </FiltrosRecolhiveis>
     </form>
   );
 }
@@ -337,7 +340,7 @@ export function ResumoDaLista({ total, totalDoCadastro, filtrado }: { total: num
       <span aria-hidden> · </span>
       <span className="sr-only">. </span>
       <span>
-        {filtrado ? 'Com os filtros' : 'Nesta lista'}: <strong className="font-semibold text-texto">{n(total)}</strong>
+        Nesta lista{filtrado ? ' (com os filtros)' : ''}: <strong className="font-semibold text-texto">{n(total)}</strong>
       </span>
     </p>
   );

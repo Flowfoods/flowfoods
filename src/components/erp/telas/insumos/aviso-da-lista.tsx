@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
-import { queryDosFiltros, type FiltrosDeInsumo } from '@/lib/erp/insumo-campos';
+import { comDe, queryDosFiltros, type FiltrosDeInsumo } from '@/lib/erp/insumo-campos';
 import { classeDeBotao } from '../../ui/estilos';
 import { AvisoDeSalvo } from '../cadastro/anuncio';
 
@@ -51,8 +51,7 @@ export async function AvisoDaListaDeInsumos({
   const nome = await nomeDoAviso(cliente, f, ref);
   if (!nome) return null;
   const q = queryDosFiltros(filtros);
-  const de = q ? `de=${encodeURIComponent(q)}` : '';
-  const detalhe = `${base}/${ref}${de ? `?${de}` : ''}`;
+  const detalhe = comDe(`${base}/${ref}`, q);
   const frases: Record<Feito, { titulo: string; apoio?: string }> = {
     editado: { titulo: `Insumo atualizado com sucesso: ${nome}`, apoio: 'O antes e o depois estão em Últimas alterações, no detalhe do insumo.' },
     igual: { titulo: `Nada mudou em ${nome}`, apoio: 'Os valores já eram esses.' },
@@ -68,7 +67,7 @@ export async function AvisoDaListaDeInsumos({
   return (
     <AvisoDeSalvo titulo={titulo} apoio={apoio}>
       {comAcoes && podeEditar && (f === 'editado' || f === 'igual') && (
-        <Link href={`${base}/${ref}/editar?${de ? `${de}&` : ''}origem=lista`} className={classeDeBotao('secundario')}>
+        <Link href={comDe(`${base}/${ref}/editar`, q, { origem: 'lista' })} className={classeDeBotao('secundario')}>
           Continuar editando
         </Link>
       )}

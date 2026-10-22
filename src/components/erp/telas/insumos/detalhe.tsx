@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
-import { AJUDA_DO_TIPO, compararEmbalagens, CONSERVACOES, TIPOS } from '@/lib/erp/insumo-campos';
+import { AJUDA_DO_TIPO, compararEmbalagens, comDe, CONSERVACOES, TIPOS } from '@/lib/erp/insumo-campos';
 import { ROTULO_DA_OPCAO, temValidade } from '@/lib/erp/validade';
 import { IconeDaConservacao, ValidadesDoItem } from '../cadastro/validade';
 import { COR } from '@/lib/erp/modulos';
@@ -70,7 +70,6 @@ export function TelaDetalheInsumo({
 }) {
   const u = UNIDADES[i.unidade];
   const aqui = `${base}/${i.id}`;
-  const comDe = de ? `?de=${encodeURIComponent(de)}` : '';
   const uc = i.ultimaCompra;
   const ud = uc?.detalhe ?? null;
   const notaDaUltima = ud && linkDaNota ? linkDaNota(ud.notaId, ud.lojaId) : null;
@@ -122,7 +121,7 @@ export function TelaDetalheInsumo({
               {salvo.criou && podeEditar && !bloqueio && (
                 // Quem cadastra em série quase sempre repete tipo e unidade: o próximo já abre com os do último. A conservação é escolhida a cada insumo.
                 <Link
-                  href={`${base}/novo?${new URLSearchParams({ tipo: i.tipo, unidade: i.unidade, ...(de ? { de } : {}) }).toString()}`}
+                  href={comDe(`${base}/novo`, de, { tipo: i.tipo, unidade: i.unidade })}
                   className={classeDeBotao('secundario')}
                 >
                   Cadastrar outro insumo
@@ -139,7 +138,7 @@ export function TelaDetalheInsumo({
           .join(' · ')}
         acao={
           editaAqui && i.ativo ? (
-            <BotaoOuMotivo href={`${aqui}/editar${comDe}`} bloqueio={bloqueio} variante="primario">
+            <BotaoOuMotivo href={comDe(`${aqui}/editar`, de)} bloqueio={bloqueio} variante="primario">
               Editar insumo
             </BotaoOuMotivo>
           ) : p && podeEditar ? (
@@ -403,7 +402,7 @@ export function TelaDetalheInsumo({
                   <FormSituacao acao={acaoSituacao} ativo={i.ativo} oQue="insumo" idBase="situacao-insumo" ocultos={de ? { de } : undefined} />
                   <p className="mt-3 border-t border-linha pt-3 text-[13px] text-suave">
                     Quer tirar o insumo do cadastro?{' '}
-                    <Link href={`${aqui}/remover${comDe}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`}>
+                    <Link href={comDe(`${aqui}/remover`, de)} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`}>
                       Ver o que está ligado a ele e remover
                     </Link>
                   </p>

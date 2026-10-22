@@ -84,6 +84,30 @@ export class RecusaDaFicha extends Error {
   }
 }
 
+/** L.1: o insumo escolhido foi excluído de vez agora há pouco (o cadastro dele sumiu depois de a tela ser aberta). */
+export const FRASE_INSUMO_EXCLUIDO = 'Este insumo acabou de ser excluído do cadastro. Tire-o da ficha ou escolha outro e salve de novo; nada foi gravado.';
+
+/**
+ * L.1: "Insumo não encontrado neste cadastro" para um insumo que existia e foi EXCLUÍDO DE VEZ (o histórico guarda `EXCLUIU`) vira a
+ * frase que diz isso; para um id que nunca foi deste cadastro (ou de outro parceiro) a frase continua a de sempre, sem confirmar nada.
+ */
+async function explicarInsumoExcluido(tx: ClienteDoParceiro, entrada: EntradaDaFicha, erros: Erros): Promise<Erros> {
+  const novos: Erros = { ...erros };
+  for (const [chave, msg] of Object.entries(erros)) {
+    if (msg !== 'Insumo não encontrado neste cadastro.') continue;
+    const id = entrada.itens[Number(chave.replace('item-', ''))]?.insumoId;
+    if (!id || id.length > 64) continue;
+    if ((await tx.historicoAlteracao.count({ where: { entidade: 'Insumo', entidadeId: id, acao: 'EXCLUIU' } })) > 0) novos[chave] = FRASE_INSUMO_EXCLUIDO;
+  }
+  return novos;
+}
+
+/** A FK do banco é a última palavra: o insumo foi excluído entre a conferência e a gravação (nada foi gravado). */
+function erroDeInsumoExcluidoNaFk(e: unknown): Extract<ResultadoFicha, { ok: false }> | null {
+  const msg = e instanceof Error ? `${e.message} ${(e as { code?: string }).code ?? ''}` : '';
+  return /FichaItem_parceiroId_insumoId_fkey|ProdutoEmbalagem_parceiroId_insumoId_fkey/.test(msg) ? { ok: false, erros: { geral: FRASE_INSUMO_EXCLUIDO } } : null;
+}
+
 const recusar = (erros: Erros): never => {
   throw new RecusaDaFicha({ ok: false, erros });
 };
@@ -587,7 +611,7 @@ export async function cadastrarFicha(
         await travarGrafoDeFichas(tx);
         const { doCadastro, preparos } = await cadastroDaEntrada(tx, entrada, null);
         const lido = lerFormFicha(entrada, doCadastro, new Set(), { preparos });
-        if (!lido.ok) throw new RecusaDaFicha(lido);
+        if (!lido.ok) throw new RecusaDaFicha({ ...lido, erros: await explicarInsumoExcluido(tx, entrada, lido.erros) });
         nome = lido.dados.nome;
         await conferirEstrutura(tx, lido.dados, null, doCadastro);
         const r = await gravarFicha(tx, {
@@ -604,6 +628,8 @@ export async function cadastrarFicha(
   } catch (e) {
     if (e instanceof RecusaDaFicha) return e.resultado;
     if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, nome);
+    const fk = erroDeInsumoExcluidoNaFk(e);
+    if (fk) return fk;
     throw e;
   }
 }
@@ -638,7 +664,7 @@ export async function editarFicha(
         }
         const { doCadastro, preparos, jaNaFicha } = await cadastroDaEntrada(tx, entrada, atual);
         const lido = lerFormFicha(entrada, doCadastro, jaNaFicha, { preparos, propriaId: atual.id });
-        if (!lido.ok) throw new RecusaDaFicha(lido);
+        if (!lido.ok) throw new RecusaDaFicha({ ...lido, erros: await explicarInsumoExcluido(tx, entrada, lido.erros) });
         // Envio sem o bloco de validade (1.4) não apaga a que a ficha tem.
         if (entrada.validade === undefined) lido.dados.validades = validadesDaLinha(atual);
         nome = lido.dados.nome;
@@ -659,6 +685,8 @@ export async function editarFicha(
   } catch (e) {
     if (e instanceof RecusaDaFicha) return e.resultado;
     if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, nome);
+    const fk = erroDeInsumoExcluidoNaFk(e);
+    if (fk) return fk;
     throw e;
   }
   // Depois do commit: a foto velha já não é de ninguém.

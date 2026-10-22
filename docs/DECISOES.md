@@ -2619,7 +2619,7 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 ### 339. 2026-10-22 · ERP L.1: paginação 10/25/50/100 (padrão 50), validada no servidor, na URL, com dois totais de rótulos diferentes
 
-**Razão:** `por` só vale 10, 25, 50 ou 100; qualquer outra coisa (texto, negativo, 1000, 25,5, lista) cai em 50, no servidor e na leitura da URL. A página fora da faixa é ajustada à última (a remoção de itens não deixa página inexistente); zero resultado é "0 insumos", uma página vazia, Anterior e Próxima desabilitadas. A ordem tem desempate por id (também na ordem por custo, que continua em memória e segue o nome e o id). O rodapé (`PaginacaoNumerada`, reaproveitável) diz "Mostrando 1–25 de 137 insumos · Página 1 de 6", Anterior, números compactos e Próxima, com "Itens por página" como QUATRO LINKS (funcionam sem JavaScript, voltam à página 1 e levam os filtros). No celular os números saem e fica "Página x de y". Acima da tabela: "No cadastro: N insumos (X ativos, Y desativados) · Nesta lista: M" (ou "Com os filtros: M"); o subtítulo do cabeçalho passou a ser o do cadastro ("… no cadastro"), porque antes ele mostrava só os ativos como se fosse o total. Não existe exportação de insumos hoje; quando existir, cobre todos os filtrados.
+**Razão:** `por` só vale 10, 25, 50 ou 100; qualquer outra coisa (texto, negativo, 1000, 25,5, lista) cai em 50, no servidor e na leitura da URL. A página fora da faixa é ajustada à última (a remoção de itens não deixa página inexistente); zero resultado é "0 insumos", uma página vazia, Anterior e Próxima desabilitadas. A ordem tem desempate por id (também na ordem por custo, que continua em memória e segue o nome e o id). O rodapé (`PaginacaoNumerada`, reaproveitável) diz "Mostrando 1–25 de 137 insumos · Página 1 de 6", Anterior, números compactos e Próxima, com "Itens por página" como QUATRO LINKS (funcionam sem JavaScript, voltam à página 1 e levam os filtros). No celular os números saem e fica "Página x de y". Acima da tabela: "No cadastro: N insumos (X ativos, Y desativados) · Nesta lista: M" (com "(com os filtros)" quando há filtro); o subtítulo do cabeçalho passou a ser o do cadastro ("… no cadastro"), porque antes ele mostrava só os ativos como se fosse o total. Não existe exportação de insumos hoje; quando existir, cobre todos os filtrados.
 
 ### 340. 2026-10-22 · ERP L.1: caneta e lixeira na linha, 44 x 44, com o nome no rótulo; quem não edita, o pré-preparo e o desativado não ganham o que não podem
 
@@ -2656,3 +2656,28 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 ### 348. 2026-10-22 · ERP L.1: perguntas para o Rodolfo (não bloqueiam; o padrão adotado está em negrito)
 
 **Razão:** (1) Quem pode excluir de vez? **Quem edita insumos (Dono e Gerente), porque só passa sem nenhum registro ligado; sem permissão nova.** (2) Mudar só o nome de um insumo, ou cadastrar e corrigir, conta como "histórico de preço" para impedir a exclusão? **Não; só mudança de custo, embalagem ou frete.** (3) Marca de referência vira lista própria (com nome padronizado) um dia? **Não agora; o filtro agrupa grafias iguais sem diferenciar caixa.** (4) "Cadastro incompleto" deve incluir marca ou prazo de uso não informados? **Não: são opcionais por decisão do Rodolfo.** (5) A lista deve ter exportação? **Não existe hoje; quando existir, cobre todos os filtrados.**
+
+
+### 349. 2026-10-22 · ERP L.1 (ajustes dos fiscais): um rótulo só, "Nesta lista", com "(com os filtros)" quando há filtro
+
+**Razão:** A tela dizia "Com os filtros" e a ajuda dizia "Nesta lista". Agora é sempre "Nesta lista: N insumos", e com filtro "Nesta lista (com os filtros): N insumos", ao lado de "No cadastro: N". A ajuda já falava em "Nesta lista" e ficou como estava (a versão da ajuda não mudou); decisão 339 e o contrato de design foram alinhados.
+
+### 350. 2026-10-22 · ERP L.1 (ajustes dos fiscais): todo link de insumo com a lista na memória nasce de `comDe` (URLSearchParams)
+
+**Razão:** Os endereços com "de onde vim" eram montados à mão em seis lugares. Agora `comDe(caminho, de, extras)` (em `insumo-campos.ts`) é o único: o valor de `de` (que tem `&` e `=` dentro) vai inteiro codificado como UM parâmetro (`?de=por%3D25%26pagina%3D3&origem=lista`), nunca solto, e volta igual em `searchParams.get('de')`. Teste de ida e volta com busca cheia de símbolos (`&`, `=`, `%`, `+`, `#`, aspas, acento), os quatro endereços (editar, remover, detalhe, novo) e o redirecionamento depois de salvar; no navegador, a conferência dos `href` da lista a 390 px.
+
+### 351. 2026-10-22 · ERP L.1 (ajustes dos fiscais): no celular os filtros ficam num botão "Filtros (n)" e a ajuda nasce recolhida (pelo mecanismo que já existia)
+
+**Razão:** A 390 px a primeira linha da lista aparecia depois da ajuda aberta e de sete filtros. Agora: a busca fica sempre à vista (placeholder "Buscar nome ou marca", que cabe no campo); "Filtros (n)" abre e fecha os selects e as caixas de marcar (abaixo de 640 px; de 640 px para cima o bloco é sempre mostrado), nasce fechado (sem piscar) e o `n` conta os filtros valendo fora a busca; os chips dizem quais são. Os campos seguem no formulário mesmo fechados. A caixa "Como funciona" usa o `recolhida: true` que as telas de contar já usavam (uma linha que abre, sem mexer na versão nem no lock; a pergunta da 1ª vez continua abrindo a caixa). Resultado: a primeira linha da lista já aparece na primeira tela do celular (topo a 732 px de 844, com o aviso de pendências ainda no caminho).
+
+### 352. 2026-10-22 · ERP L.1 (ajustes dos fiscais): o aviso de pendências não termina mais com "· sem saldo" solto
+
+**Razão:** "16 insumos ainda sem categoria definitiva: 13 sem categoria · 3 em Outros / a classificar · sem saldo." deixava o "sem saldo" sem assunto. Agora o valor só entra quando existe ("… · R$ 1.234,56 em estoque nas lojas que você acessa") e, sem valor, a frase termina em "3 em Outros / a classificar." A fila de classificar (coluna por insumo) continua dizendo "sem saldo" na própria linha. Teste do aviso atualizado.
+
+### 353. 2026-10-22 · ERP L.1 (ajustes dos fiscais): ficha técnica com um insumo excluído no mesmo instante responde com frase amigável
+
+**Razão:** A ficha trava os insumos com `FOR SHARE` antes de conferir, então a exclusão (`FOR UPDATE`) espera ou recusa por vínculo; mesmo assim, se o insumo sumiu entre a abertura da tela e o salvar, a ficha dizia "Insumo não encontrado neste cadastro". Agora, quando o histórico guarda `EXCLUIU` para aquele id, a frase é "Este insumo acabou de ser excluído do cadastro. Tire-o da ficha ou escolha outro e salve de novo; nada foi gravado." (no item certo, ao criar e ao editar); id que nunca foi do cadastro ou é de outro parceiro continua com a frase de sempre (não confirma nem nega a existência de nada). Como rede de proteção, uma violação da FK de `FichaItem`/`ProdutoEmbalagem` por insumo também vira essa frase em vez de 500 (o caminho não é alcançável pelo desenho, então não há teste que o force). Testes: excluído antes, de outro parceiro, a corrida de verdade (a ficha espera a trava e vê o insumo sumido), a ficha que vence (a exclusão recusa) e a edição. Compras e notas fiscais por XML seguem com a frase de sempre (fora do pedido).
+
+### 354. 2026-10-22 · ERP L.1 (ajustes dos fiscais): `npm run typecheck` com a mesma memória do build
+
+**Razão:** O `tsc` estoura a heap padrão nesta base, como o build. O script passou a `NODE_OPTIONS=--max-old-space-size=6144 tsc --noEmit`.

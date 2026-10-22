@@ -55,6 +55,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     rotas: ['insumos'],
     titulo: 'Insumos',
     versao: 4,
+    // L.1: a caixa nasce recolhida (uma linha "Como funciona"): no celular a lista e os filtros ficam na primeira dobra.
+    recolhida: true,
     aula: [
       { texto: 'Tudo o que a casa compra e usa: ingrediente, embalagem, material de limpeza e uso e pré-preparo.' },
       { texto: 'Antes da primeira compra vale o custo inicial de referência; depois, o último preço da nota lançada.' },

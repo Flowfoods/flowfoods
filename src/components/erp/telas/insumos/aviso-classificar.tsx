@@ -24,7 +24,7 @@ export function AvisoDaClassificacao({ resumo, href }: { resumo: ResumoDoQueFalt
   return (
     <Aviso tom="alerta" titulo={`${plural(resumo.total, 'insumo ativo ainda sem categoria definitiva', 'insumos ativos ainda sem categoria definitiva')}.`}>
       {partes.join(' · ')}
-      {resumo.valorCentavos !== null && ` · ${textoDoEstoque(resumo.valorCentavos)}`}
+      {resumo.valorCentavos !== null && resumo.valorCentavos > 0 && ` · ${textoDoEstoque(resumo.valorCentavos)}`}
       {'. '}
       {href && (
         <Link href={href} className={LINK_DE_TEXTO}>
@@ -70,7 +70,7 @@ export function AvisosDaLista({
           <span className="block">
             {resumo.total > 0 && aConfirmar > 0 && `${plural(resumo.total, 'insumo ainda sem categoria definitiva', 'insumos ainda sem categoria definitiva')}: `}
             {partes.join(' · ')}
-            {resumo.valorCentavos !== null && ` · ${textoDoEstoque(resumo.valorCentavos)}`}
+            {resumo.valorCentavos !== null && resumo.valorCentavos > 0 && ` · ${textoDoEstoque(resumo.valorCentavos)}`}
             {'. '}
             {hrefClassificar && (
               <Link href={hrefClassificar} className={LINK_DE_TEXTO}>
