@@ -21,6 +21,7 @@ import { formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Barra, Contagem, Metrica, Painel, Selo, Vazio } from '../../ui/superficies';
+import { percentualComDuasCasas } from '@/lib/erp/cmv-categorias-campos';
 import { seloDoCmv } from '@/lib/erp/cmv-campos';
 import { PainelDoCmv } from './cmv-painel';
 import { BotaoOuMotivo } from '../cadastro/partes';
@@ -602,6 +603,14 @@ export function TelaDoDre({
       )}
 
       {d.anoPassado && <AnoPassadoPainel a={d.anoPassado} />}
+
+      {(d.lojasComMetaPropria.length > 0 || d.metaDoCmvDaLoja === 'loja') && (
+        <p className="text-[12px] leading-relaxed text-suave">
+          {loja
+            ? 'A meta do CMV desta loja é a própria dela (a rede tem outra): vale na linha CMV do DRE e no orçamento de compra da loja.'
+            : `A meta do CMV da rede é a da rede. ${d.lojasComMetaPropria.map((l) => `${l.nome} tem a própria (${percentualComDuasCasas(l.bp)})`).join('; ')}, que vale no DRE e no orçamento de compra ${d.lojasComMetaPropria.length === 1 ? 'dela' : 'delas'}.`}
+        </p>
+      )}
 
       <p className="text-[12px] leading-relaxed text-suave">
         Despesa conta pela competência (o mês a que pertence), não pelo dia em que foi paga. {d.status === 'FECHADO' ? 'A taxa do iFood é a estimada pela taxa de quando o período fechou.' : 'A taxa do iFood é estimada pela taxa configurada hoje.'} O CMV é o real (estoque inicial mais compras menos estoque final) quando o período terminou e a contagem de fechamento foi aplicada; senão, o das compras pela data da nota. Loja sem nota e sem estoque fica sem CMV, e margem e resultados saem sem contar o CMV.{Object.keys(d.metas).length > 0 ? ' O desvio é o realizado menos a meta, em pontos percentuais (pp); na receita, a meta é de crescimento sobre o mesmo período do ano passado. O farol põe o desvio numa de 5 faixas fixas, as mesmas para todas as casas; a cor sempre vem com a régua, a palavra e o desvio, e some quando o dado ainda não fecha.' : ''}{' '}

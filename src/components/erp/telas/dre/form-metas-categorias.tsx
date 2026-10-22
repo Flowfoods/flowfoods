@@ -37,7 +37,7 @@ export function FormMetasPorCategoria({
   alvo,
   categorias,
   totalCampo,
-  totalBp,
+  totalDaRedeBp,
   segueInicial,
   versao,
   periodoAtual,
@@ -47,10 +47,10 @@ export function FormMetasPorCategoria({
   acao: AcaoLocal;
   alvo: 'rede' | 'loja';
   categorias: CategoriaNoFormulario[];
-  /** Na rede, o campo da meta total (a do CMV do DRE). */
+  /** Na rede, o campo da meta total (a do CMV do DRE). Na loja, o total PRÓPRIO dela (vazio = vale o da rede). */
   totalCampo: string;
-  /** Na loja, o total do DRE, só para o aviso de soma. */
-  totalBp: number | null;
+  /** O total da rede (a meta do CMV do DRE): na loja, o que vale quando ela não define o dela, e o do aviso de soma. */
+  totalDaRedeBp: number | null;
   segueInicial: boolean;
   versao: string;
   periodoAtual: string;
@@ -82,7 +82,8 @@ export function FormMetasPorCategoria({
     }
     return { soma: s, comValor: n };
   }, [categorias, valores, usa, daLoja, lendoARede]);
-  const totalLido = daLoja ? totalBp : bpDe(total);
+  // Na loja que personaliza, o total que vale é o dela (se digitou) ou o da rede; na que segue, o da rede.
+  const totalLido = daLoja ? (lendoARede ? totalDaRedeBp : (bpDe(total) ?? totalDaRedeBp)) : bpDe(total);
   const aviso = comValor > 0 ? avisoDaSoma(soma, totalLido) : null;
 
   const usarOModelo = () => {
@@ -130,10 +131,16 @@ export function FormMetasPorCategoria({
           </div>
         )}
 
-        {!daLoja && (
+        {daLoja && lendoARede && (
+          <p className="text-[13px] text-suave">
+            {totalDaRedeBp === null ? 'A rede ainda não tem meta total do CMV.' : `Vale a meta total da rede, ${percentualComDuasCasas(totalDaRedeBp)}, no DRE e no orçamento de compra desta loja.`}
+          </p>
+        )}
+
+        {(!daLoja || !lendoARede) && (
           <div>
             <label htmlFor="meta-total" className={ROTULO}>
-              Meta total do CMV (% da receita bruta)
+              {daLoja ? 'Meta total do CMV desta loja (% da receita bruta)' : 'Meta total do CMV (% da receita bruta)'}
             </label>
             <input
               id="meta-total"
@@ -143,13 +150,15 @@ export function FormMetasPorCategoria({
               inputMode="decimal"
               autoComplete="off"
               maxLength={12}
-              placeholder="sem meta"
+              placeholder={daLoja ? (totalDaRedeBp === null ? 'sem meta' : `a da rede, ${percentualComDuasCasas(totalDaRedeBp)}`) : 'sem meta'}
               aria-invalid={!!erros.total}
               aria-describedby={`meta-total-ajuda${erros.total ? ' meta-total-erro' : ''}`}
               className={`${CAMPO} w-full max-w-[12rem] scroll-mb-28 text-right tabular-nums`}
             />
             <p id="meta-total-ajuda" className="mt-1.5 text-[12px] text-suave">
-              É a meta da linha CMV do DRE: mudar aqui muda lá. As categorias dividem esse total.
+              {daLoja
+                ? 'Vale na linha CMV do DRE e no orçamento de compra só desta loja. Vazio: vale a meta total da rede. As categorias dividem esse total.'
+                : 'É a meta da linha CMV do DRE: mudar aqui muda lá. A rede e as lojas que seguem a rede usam esta meta. As categorias dividem esse total.'}
             </p>
             {erros.total && (
               <p id="meta-total-erro" className="mt-1 text-[13px] text-erro">
@@ -262,7 +271,7 @@ export function FormMetasPorCategoria({
             <span className="font-semibold">Confira a divisão.</span> {aviso}. Dá para salvar assim: é só um aviso de que as categorias não fecham no total.
           </p>
         )}
-        {daLoja && totalBp === null && <p className="text-[12px] text-suave">O total do CMV não tem meta definida; ele se define na tela da rede.</p>}
+        {daLoja && totalLido === null && <p className="text-[12px] text-suave">Nenhuma meta total do CMV vale para esta loja: defina a dela acima ou a da rede.</p>}
       </fieldset>
 
       <p className="border-t border-linha px-4 py-3 text-[13px] text-texto sm:px-5">

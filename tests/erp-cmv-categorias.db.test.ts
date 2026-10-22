@@ -470,9 +470,9 @@ describe.skipIf(!URL_TESTE)('ERP I.2a · metas e CMV por categoria (Postgres rea
     const r = await fecharPeriodo(a, N1(), { inicio: '2026-09-01', ressalvas: [], justificativa: '' }, 'Ana Dona', HOJE);
     expect(r).toMatchObject({ ok: true, versao: 1 });
     const foto = (await a.dreFotografia.findFirst({ where: { periodoId: ids.set, substituidaEm: null }, select: { versaoDaConta: true, entrada: true } }))!;
-    expect(foto.versaoDaConta).toBe(4);
+    expect(foto.versaoDaConta).toBe(5);
     const entrada = foto.entrada as { categorias: { versao: number; lojas: Record<string, { nome: string; origem: string | null; semCategoriaCentavos: number; categorias: { id: string; nome: string; compraCentavos: number; metaBp: number | null }[] }> } };
-    expect(entrada.categorias.versao).toBe(1);
+    expect(entrada.categorias.versao).toBe(2);
     expect(Object.keys(entrada.categorias.lojas).sort()).toEqual([ids.dl, ids.vp].sort());
     const vp = entrada.categorias.lojas[ids.vp];
     expect(vp).toMatchObject({ nome: 'Vila da Penha', origem: 'rede' });

@@ -227,8 +227,7 @@ describe.skipIf(!URL_TESTE)('ERP I.2b · CMV real por categoria (Postgres real)'
       if (l.diferencaCentavos === null || l.diferencaBp === null) continue;
       expect(Math.sign(l.diferencaBp) === 0 || Math.sign(l.diferencaBp) === Math.sign(l.diferencaCentavos)).toBe(true);
     }
-    const comCompra = c.linhas.filter((l) => l.diferencaCentavos !== null);
-    expect(comCompra.reduce((s, l) => s + l.diferencaCentavos!, 0) + c.linhas.find((l) => l.tipo === 'preparos')!.realCentavos).toBe(c.totalDiferencaCentavos);
+    expect(c.linhas.reduce((s, l) => s + (l.diferencaCentavos ?? 0), 0)).toBe(c.totalDiferencaCentavos);
   });
 
   // ------------------------------------------------------------ 3. matriz

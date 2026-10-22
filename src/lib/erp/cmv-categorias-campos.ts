@@ -302,10 +302,10 @@ export interface LinhaCompraReal {
   chave: string;
   tipo: TipoDaLinhaDoPainel;
   nome: string;
-  /** Notas lançadas (pré-preparo: nulo, não se compra). */
+  /** Notas lançadas da categoria (pré-preparo: o que se comprou de insumo pré-preparo, quase sempre zero). */
   compraCentavos: number | null;
   realCentavos: number;
-  /** Real menos compra: o mesmo sinal da 2.3. Nulo nos pré-preparos (sem compra para comparar). */
+  /** Real menos compra: o mesmo sinal da 2.3. */
   diferencaCentavos: number | null;
   /** A diferença em pontos-base da receita das lojas comparadas; sempre com o sinal da diferença (zero quando arredonda a 0,00). */
   diferencaBp: number | null;
@@ -561,14 +561,14 @@ export function montarPainelDeCategorias(e: EntradaDoPainel): PainelDeCategorias
     aClassificarCentavos,
     aClassificarBp,
     insumosAClassificar: e.insumosAClassificar ?? null,
-    compraReal: montarCompraReal(e, linhas),
+    compraReal: montarCompraReal(e),
     matriz: montarMatriz(e, linhas),
     lojasSemRealAberto: semReal,
   };
 }
 
 /** A diferença entre o real e a compra, por categoria, nas lojas que têm o real aberto. Real menos compra, o sinal da 2.3. */
-function montarCompraReal(e: EntradaDoPainel, linhas: readonly LinhaDoPainel[]): CompraXRealDoPainel | null {
+function montarCompraReal(e: EntradaDoPainel): CompraXRealDoPainel | null {
   const reais = e.lojas.filter((l) => l.real);
   if (reais.length === 0) return null;
   const receita = reais.reduce((s, l) => s + l.receitaBrutaCentavos, 0);
@@ -599,11 +599,13 @@ function montarCompraReal(e: EntradaDoPainel, linhas: readonly LinhaDoPainel[]):
       frase,
     });
   };
-  for (const l of linhas) {
-    if (l.tipo === 'categoria') montar(l.chave, 'categoria', l.nome, reais.reduce((s, x) => s + (x.compras.get(l.categoriaId) ?? 0), 0), montantes((x) => x.real!.categorias.get(l.categoriaId)));
-    else if (l.tipo === 'sem-categoria') montar(l.chave, 'sem-categoria', l.nome, reais.reduce((s, x) => s + (x.compras.get(null) ?? 0), 0), montantes((x) => x.real!.categorias.get(null)));
+  // Todas as categorias da casa (não só as que o painel mostra): a compra de uma categoria sem consumo também entra na diferença.
+  const ordenadas = [...e.categorias].sort((a, b) => a.ordem - b.ordem || a.nome.localeCompare(b.nome, 'pt-BR'));
+  for (const c of ordenadas) {
+    montar(`cat:${c.id}`, 'categoria', c.nome, reais.reduce((s, x) => s + (x.compras.get(c.id) ?? 0), 0), montantes((x) => x.real!.categorias.get(c.id)));
   }
-  montar('preparos', 'preparos', NOME_DOS_PREPARADOS, null, montantes((x) => x.real!.preparos));
+  montar('sem-categoria', 'sem-categoria', NOME_DE_SEM_CATEGORIA, reais.reduce((s, x) => s + (x.compras.get(null) ?? 0), 0), montantes((x) => x.real!.categorias.get(null)));
+  montar('preparos', 'preparos', NOME_DOS_PREPARADOS, reais.reduce((s, x) => s + (x.compras.get(CHAVE_DOS_PREPARADOS) ?? 0), 0), montantes((x) => x.real!.preparos));
   const totalCompra = reais.reduce((s, l) => s + Array.from(l.compras.values()).reduce((a, v) => a + v, 0), 0);
   const totalReal = reais.reduce((s, l) => s + valorTotalDoReal(l), 0);
   return {
