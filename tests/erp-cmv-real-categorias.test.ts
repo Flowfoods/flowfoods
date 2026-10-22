@@ -393,6 +393,42 @@ describe('I.2b · meta total por loja no orçamento (campos)', () => {
     expect(rede.ritmoMetaBp).not.toBeNull();
   });
 
+  it('hotfix: metas diferentes e sem receita até ontem para ponderar — nenhuma loja é escolhida: sem meta única, sem cor, e o aviso de metas diferentes vale mesmo sem conta', () => {
+    const vazia = (id: string, nome: string, meta: number | null): LojaDoOrcamento => ({ ...loja(id, nome, 31_000), graos: [] });
+    const penha = orcamentoDaLoja(vazia('vp', 'Vila da Penha', 0), periodo, '2026-10-22', 3000);
+    const delivery = orcamentoDaLoja(vazia('dl', 'Delivery', 0), periodo, '2026-10-22', 3200);
+    expect(penha.receitaAteOntemCentavos).toBeNull();
+    const r = orcamentoDoEscopo([penha, delivery]);
+    expect(r.conta).toBeNull();
+    expect(r.metasDiferentes).toBe(true);
+    expect(r.metasPorLoja).toEqual([{ nome: 'Vila da Penha', bp: 3000 }, { nome: 'Delivery', bp: 3200 }]);
+    expect(r.ritmoMetaBp).toBeNull(); // nada de "comMeta[0]": a meta da Penha não vale para a rede
+    expect(r.ritmo).toMatchObject({ tipo: 'sem' });
+    expect(r.ritmo && r.ritmo.tipo === 'sem' ? r.ritmo.motivo : '').toContain('faturamento');
+  });
+
+  it('hotfix: peso zero só por receita zero (não nula) também não escolhe loja; metas iguais sem receita seguem com a meta única', () => {
+    const semVenda = (id: string, nome: string): LojaDoOrcamento => ({ ...loja(id, nome, 31_000), graos: Array.from({ length: 21 }, (_, k) => ({ data: `2026-10-${String(k + 1).padStart(2, '0')}`, canal: 'LOJA' as const, valorCentavos: 0 })) });
+    const a = orcamentoDaLoja(semVenda('vp', 'Vila da Penha'), periodo, '2026-10-22', 3000);
+    const b = orcamentoDaLoja(semVenda('dl', 'Delivery'), periodo, '2026-10-22', 3200);
+    const mista = orcamentoDoEscopo([a, b]);
+    expect(mista.metasDiferentes).toBe(true);
+    expect(mista.ritmoMetaBp).toBeNull();
+    const iguais = orcamentoDoEscopo([a, orcamentoDaLoja(semVenda('dl', 'Delivery'), periodo, '2026-10-22', 3000)]);
+    expect(iguais.metasDiferentes).toBe(false);
+    expect(iguais.ritmoMetaBp).toBe(3000);
+    expect(iguais.metasPorLoja).toEqual([]);
+  });
+
+  it('hotfix: uma loja sem meta e outra com: o ritmo da rede não usa a meta da que tem (falta a meta de uma)', () => {
+    const a = orcamentoDaLoja(loja('vp', 'Vila da Penha', 62_000), periodo, '2026-10-22', 3000);
+    const b = orcamentoDaLoja(loja('dl', 'Delivery', 31_000), periodo, '2026-10-22', null);
+    const r = orcamentoDoEscopo([a, b]);
+    expect(r.metasDiferentes).toBe(true);
+    expect(r.ritmoMetaBp).toBeNull();
+    expect(r.ritmo && r.ritmo.tipo === 'sem' ? r.ritmo.motivo : '').toBe('falta a meta do CMV de Delivery');
+  });
+
   it('metas iguais: a rede não é mista e o resultado é o de sempre; sem meta em nenhuma, sem número', () => {
     const a = orcamentoDaLoja(loja('vp', 'Vila da Penha', 62_000), periodo, '2026-10-22', 3000);
     const b = orcamentoDaLoja(loja('dl', 'Delivery', 31_000), periodo, '2026-10-22', 3000);
