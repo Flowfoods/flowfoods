@@ -16,7 +16,7 @@ describe('aviso de insumos sem categoria · estoque', () => {
     const a = sp(renderToStaticMarkup(createElement(AvisoDaClassificacao, { resumo: resumo(0), href: '/x' })));
     const b = sp(renderToStaticMarkup(createElement(AvisosDaLista, { resumo: resumo(0), hrefClassificar: '/x', aConfirmar: 0, base: '/erp/insumos', jaFiltrado: false })));
     for (const h of [a, b]) {
-      expect(h).toContain('sem saldo nas lojas que você acessa');
+      expect(h).toContain(' · sem saldo');
       expect(h).not.toContain('R$ 0,00');
       expect(h).not.toContain('em estoque');
     }

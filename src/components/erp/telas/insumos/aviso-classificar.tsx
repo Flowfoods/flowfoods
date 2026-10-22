@@ -13,7 +13,7 @@ import { LINK_DE_TEXTO } from '../../ui/estilos';
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 /** Sem saldo é "sem saldo", nunca R$ 0,00 (igual à fila de classificar). */
-export const textoDoEstoque = (valorCentavos: number) => (valorCentavos > 0 ? `${formatarDinheiro(valorCentavos)} em estoque nas lojas que você acessa` : 'sem saldo nas lojas que você acessa');
+export const textoDoEstoque = (valorCentavos: number) => (valorCentavos > 0 ? `${formatarDinheiro(valorCentavos)} em estoque nas lojas que você acessa` : 'sem saldo');
 
 export function AvisoDaClassificacao({ resumo, href }: { resumo: ResumoDoQueFalta; /** Onde se classifica (só para quem edita insumos). */ href?: string }) {
   if (resumo.total === 0) return null;
