@@ -10,11 +10,12 @@
 
 import Link from 'next/link';
 import { formatarData } from '@/lib/erp/compra-campos';
-import { validadesEmTexto } from '@/lib/erp/validade';
+import { formatarValidade } from '@/lib/erp/validade';
 import type { LinhaDeInsumo } from '@/lib/erp/insumos';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
 import {
   CONSERVACOES,
+  FILTRO_A_CONFIRMAR,
   queryDosFiltros,
   temFiltro,
   TIPOS,
@@ -23,6 +24,7 @@ import {
 } from '@/lib/erp/insumo-campos';
 import { UNIDADES, formatarDinheiro, formatarFracao, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
 import { CAMPO, MARCAR } from '../../ui/campos';
+import { ROTULO_DA_OPCAO } from './campos-conservacao';
 import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
@@ -38,6 +40,21 @@ function hrefDoDetalhe(base: string, id: string, f: FiltrosDeInsumo): string {
   return q ? `${base}/${id}?de=${encodeURIComponent(q)}` : `${base}/${id}`;
 }
 
+/**
+ * Onde fica e, no insumo comprado, o prazo de uso depois de aberto (o da conservação principal). Pré-preparo mantém a validade da
+ * ficha. I.1b: o insumo antigo em Seco que ninguém confirmou, numa categoria que costuma ser fria, diz "a confirmar".
+ */
+function conservacaoDaLinha(i: LinhaDeInsumo): string {
+  if (!i.conservacaoInformada) return 'validade não informada';
+  if (i.preparo) return validadesDaFicha(i);
+  const prazo = i.validades.minutos[i.conservacao];
+  return `${ROTULO_DA_OPCAO[i.conservacao]}${prazo ? ` · após aberto: ${formatarValidade(prazo)}` : ''}`;
+}
+function validadesDaFicha(i: LinhaDeInsumo): string {
+  const lista = Object.entries(i.validades.minutos).map(([c, m]) => `${CONSERVACOES[c as keyof typeof CONSERVACOES]}: ${formatarValidade(m)}`);
+  return lista.length ? lista.join(' · ') : CONSERVACOES[i.conservacao];
+}
+
 function Custo({ i }: { i: LinhaDeInsumo }) {
   // Pré-preparo (1.3): o custo é o da ficha que o produz, por unidade do rendimento.
   if (i.preparo) {
@@ -49,13 +66,13 @@ function Custo({ i }: { i: LinhaDeInsumo }) {
       </span>
     );
   }
-  if (i.custo === null) return <Selo tom="alerta">Sem preço</Selo>;
+  if (i.custo === null) return <Selo tom="alerta">Custo não informado</Selo>;
   return (
     <span className="whitespace-nowrap">
       <span className="font-semibold text-texto">{valorDoCusto(i.custo)}</span>
       <span className="ml-0.5 text-[12px] text-suave">/{UNIDADES[i.unidade].sigla}</span>
       {/* 1.5: o custo é o da última compra; sem ela, o do preço cadastrado. */}
-      <span className="block text-[12px] font-normal text-suave">{i.ultimaCompra ? `compra ${formatarData(i.ultimaCompra.entradaEm, true)}` : 'cadastrado'}</span>
+      <span className="block text-[12px] font-normal text-suave">{i.ultimaCompra ? `compra ${formatarData(i.ultimaCompra.entradaEm, true)}` : 'referência inicial'}</span>
     </span>
   );
 }
@@ -138,12 +155,13 @@ export function FiltrosDaLista({ base, filtros: f, categorias }: { base: string;
           Conservação
         </label>
         <select id="insumos-conservacao" name="conservacao" defaultValue={f.conservacao ?? ''} className={SELECT}>
-          <option value="">Conservação</option>
-          {Object.entries(CONSERVACOES).map(([k, r]) => (
+          <option value="">Todas as conservações</option>
+          {(Object.keys(CONSERVACOES) as (keyof typeof CONSERVACOES)[]).map((k) => (
             <option key={k} value={k}>
-              {r}
+              {ROTULO_DA_OPCAO[k]}
             </option>
           ))}
+          <option value={FILTRO_A_CONFIRMAR}>Conservação a confirmar</option>
         </select>
       </div>
       <div>
@@ -160,7 +178,7 @@ export function FiltrosDaLista({ base, filtros: f, categorias }: { base: string;
       </div>
       <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[7px] border border-linha-forte bg-campo px-3 text-sm text-texto sm:min-h-[42px]">
         <input type="checkbox" name="preco" value="sem" defaultChecked={f.semPreco} className={MARCAR} />
-        <span className="whitespace-nowrap">Só sem preço</span>
+        <span className="whitespace-nowrap">Só sem custo</span>
       </label>
     </form>
   );
@@ -276,7 +294,10 @@ export function TelaListaInsumos({
                   {!i.ativo && ' · Desativado'}
                 </span>
                 <span className={`block truncate text-[12px] ${i.categoria && i.categoria.chave !== 'OUTROS' ? 'text-suave' : 'text-atencao'}`}>{i.categoria?.nome ?? 'Sem categoria'}</span>
-                {validadesEmTexto(i.validades) && <span className="block truncate text-[12px] text-suave">{validadesEmTexto(i.validades)}</span>}
+                <span className="block truncate text-[12px] text-suave">
+                  {conservacaoDaLinha(i)}
+                  {i.conservacaoAConfirmar && <span className="text-atencao"> · a confirmar</span>}
+                </span>
               </span>
               <span className="shrink-0 text-right text-sm tabular-nums">
                 <Custo i={i} />
@@ -288,7 +309,7 @@ export function TelaListaInsumos({
 
       <table className="hidden w-full text-sm sm:table">
         <caption className="sr-only">
-          Insumos, {total} no total. Custo por unidade = preço mais frete, dividido pelo que vem na embalagem.
+          Insumos, {total} no total. Custo inicial = o que se informou no cadastro, antes da primeira compra. Custo por unidade = o último preço de compra lançado ou, sem compra, o custo inicial mais frete, dividido pelo que vem na embalagem.
         </caption>
         <thead>
           <tr className="bg-forte text-left text-[12px] text-suave">
@@ -302,7 +323,7 @@ export function TelaListaInsumos({
               Embalagem
             </th>
             <th scope="col" className="h-10 px-3 text-right font-semibold">
-              Preço cadastrado
+              Custo inicial
             </th>
             <Ordenar base={base} f={f} coluna="custo" alinhar="right">
               Custo por unidade
@@ -330,7 +351,8 @@ export function TelaListaInsumos({
                 <div className="text-[12px] text-suave">
                   {i.preparo ? 'Custo da ficha técnica' : TIPOS[i.tipo]}
                   {' · '}
-                  {i.conservacaoInformada ? (validadesEmTexto(i.validades) ?? CONSERVACOES[i.conservacao]) : 'validade não informada'}
+                  {conservacaoDaLinha(i)}
+                  {i.conservacaoAConfirmar && <span className="text-atencao"> · conservação a confirmar</span>}
                   <span className="lg:hidden">{!i.ativo && ' · Desativado'}</span>
                 </div>
               </td>
@@ -339,7 +361,7 @@ export function TelaListaInsumos({
               </td>
               <td className="px-3 py-2 text-right text-suave">{i.preparo ? '—' : formatarQuantidade(i.conteudoMilesimos, i.unidade)}</td>
               <td className="px-3 py-2 text-right">
-                <div className={i.preparo ? 'text-suave' : 'text-texto'}>{i.precoEmbalagemCentavos > 0 ? formatarDinheiro(i.precoEmbalagemCentavos) : i.preparo ? 'da ficha' : '—'}</div>
+                <div className={i.preparo ? 'text-suave' : 'text-texto'}>{i.precoEmbalagemCentavos > 0 ? formatarDinheiro(i.precoEmbalagemCentavos) : i.preparo ? 'da ficha' : 'não informado'}</div>
                 {i.taxaEntregaCentavos > 0 && (
                   <div className="text-[12px] text-suave">+ {formatarDinheiro(i.taxaEntregaCentavos)} frete</div>
                 )}

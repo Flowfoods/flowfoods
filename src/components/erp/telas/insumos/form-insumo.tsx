@@ -11,7 +11,8 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFormState } from 'react-dom';
-import { TIPOS, TIPOS_DO_FORM, type TipoInsumo } from '@/lib/erp/insumo-campos';
+import { AJUDA_DO_TIPO, MARCA_MAXIMA, TIPOS, TIPOS_DO_FORM, type TipoInsumo } from '@/lib/erp/insumo-campos';
+import { rotuloDaVolta } from '@/lib/erp/volta';
 import { CHAVE_DO_SISTEMA } from '@/lib/erp/categoria-campos';
 import { nomeDaChave, sugerirCategoria } from '@/lib/erp/categoria-sugestao';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
@@ -22,7 +23,7 @@ import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Segmentos } from '../../ui/segmentos';
 import { Painel } from '../../ui/superficies';
-import { CamposDeValidade } from '../cadastro/campos-validade';
+import { CamposDeConservacao } from './campos-conservacao';
 import { CamposDaEmbalagem, EMBALAGEM_VAZIA, type ValoresDaEmbalagem } from './campos-embalagem';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
@@ -35,30 +36,36 @@ export interface ValoresDoInsumo extends ValoresDaEmbalagem {
   unidade: Unidade | '';
   /** I.1a: a categoria escolhida ('' = nenhuma ainda). */
   categoriaId: string;
-  conservacao: Conservacao;
-  /** 1.4: principal + validade depois de aberto em cada conservação (opcional). */
+  /** I.1b: '' = ainda não escolhida (cadastro novo): a conservação não tem valor padrão. */
+  conservacao: Conservacao | '';
+  /** I.1b: a marca de referência (texto informativo, opcional). */
+  marcaReferencia: string;
+  /** 1.4: principal + prazo de uso depois de aberto em cada conservação (opcional). */
   validades: Validades | null;
 }
 
-export const INSUMO_NOVO: ValoresDoInsumo = { nome: '', tipo: 'INGREDIENTE', unidade: '', categoriaId: '', conservacao: 'SECO', validades: null, ...EMBALAGEM_VAZIA };
+export const INSUMO_NOVO: ValoresDoInsumo = { nome: '', tipo: 'INGREDIENTE', unidade: '', categoriaId: '', conservacao: '', marcaReferencia: '', validades: null, ...EMBALAGEM_VAZIA };
 
-/** Só valor que existe na lista passa: a URL nunca escolhe mais que isso. */
-function valoresLembrados(l?: { tipo?: string; unidade?: string; conservacao?: string }): Partial<ValoresDoInsumo> {
+/**
+ * "Cadastrar outro insumo": tipo e unidade do último (só valores da lista valem: a URL nunca escolhe mais que isso). A
+ * conservação NÃO é lembrada (I.1b): ela é escolhida a cada insumo, para o frango não herdar o Seco da farinha.
+ */
+function valoresLembrados(l?: { tipo?: string; unidade?: string }): Partial<ValoresDoInsumo> {
   const v: Partial<ValoresDoInsumo> = {};
   if (l?.tipo && (TIPOS_DO_FORM as readonly string[]).includes(l.tipo)) v.tipo = l.tipo as TipoInsumo;
   if (l?.unidade && Object.hasOwn(UNIDADES, l.unidade)) v.unidade = l.unidade as Unidade;
-  if (l?.conservacao && Object.hasOwn(CONSERVACOES, l.conservacao)) v.conservacao = l.conservacao as Conservacao;
   return v;
 }
 
 const ROTULO_DO_CAMPO: Record<string, string> = {
   nome: 'Nome',
-  tipo: 'Tipo',
+  tipo: 'Tipo de item',
   categoriaId: 'Categoria',
+  marcaReferencia: 'Marca de referência',
   unidade: 'Unidade base',
-  conservacao: 'Conservação principal',
+  conservacao: 'Conservação',
   conteudo: 'Quanto vem na embalagem',
-  preco: 'Preço',
+  preco: 'Custo inicial de referência',
   frete: 'Frete',
 };
 
@@ -84,6 +91,8 @@ export function FormInsumo({
   bloqueio = null,
   categorias,
   envio,
+  volta,
+  aConfirmar = false,
 }: {
   acao: AcaoDeCadastro;
   modo: 'criar' | 'editar';
@@ -95,8 +104,8 @@ export function FormInsumo({
   inicial?: ValoresDoInsumo;
   /** Novo vindo da importação de fichas ("Cadastrar “Picles”"): o nome já vem escrito. */
   nomeSugerido?: string;
-  /** "Cadastrar outro insumo": tipo, unidade e conservação do último (da URL; só valores da lista valem). */
-  lembrado?: { tipo?: string; unidade?: string; conservacao?: string };
+  /** "Cadastrar outro insumo": tipo e unidade do último (da URL; só valores da lista valem). */
+  lembrado?: { tipo?: string; unidade?: string };
   /** Editar: `atualizadoEm` lido (a gravação só passa se ainda for ele). */
   versao?: string;
   /** Editar: por que a unidade não pode mudar. */
@@ -106,6 +115,10 @@ export function FormInsumo({
   categorias: readonly OpcaoDeCategoria[];
   /** I.1a: a chave deste envio (um UUID por abertura do formulário): o servidor reconhece o reenvio e não cria outro. */
   envio?: string;
+  /** I.1b: o caminho de volta JÁ VALIDADO (veio de "Insumo que falta: cadastrar" numa nota ou ficha): salvar leva de volta para lá. */
+  volta?: string | null;
+  /** I.1b: Seco antigo que ninguém confirmou, numa categoria que costuma ser fria: o campo pede para conferir. */
+  aConfirmar?: boolean;
 }) {
   const inicial: ValoresDoInsumo = inicialDado ?? { ...INSUMO_NOVO, ...valoresLembrados(lembrado), nome: (nomeSugerido ?? '').slice(0, 80) };
   const acaoSegura = useAcaoSegura(acao);
@@ -135,7 +148,7 @@ export function FormInsumo({
   // Erro do servidor: o foco vai para o primeiro campo com problema (teclado e leitor de tela não ficam procurando).
   const vez = estado?.vez;
   // Na ordem em que os campos aparecem na tela (não na ordem em que o servidor os listou).
-  const ORDEM_NA_TELA = ['nome', 'tipo', 'categoriaId', 'conservacao', 'unidade', 'conteudo', 'preco', 'frete'];
+  const ORDEM_NA_TELA = ['nome', 'tipo', 'categoriaId', 'marcaReferencia', 'conservacao', 'validade-SECO', 'validade-PISTA_FRIA', 'validade-REFRIGERADO', 'validade-CONGELADO', 'unidade', 'conteudo', 'preco', 'frete'];
   const comErro = Object.keys(erros).filter((c) => c !== 'geral' && erros[c]);
   const primeiroErro = [...comErro].sort((x, y) => (ORDEM_NA_TELA.indexOf(x) + 1 || 99) - (ORDEM_NA_TELA.indexOf(y) + 1 || 99))[0];
   const campoDoErro = useRef(primeiroErro);
@@ -165,7 +178,8 @@ export function FormInsumo({
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
       {modo === 'criar' && chaveDeEnvio && <input type="hidden" name="envio" value={chaveDeEnvio} />}
-      <ResumoDeErros erros={erros} idBase={idBase} rotulos={(c) => ROTULO_DO_CAMPO[c] ?? (c.startsWith('validade-') ? `Validade em ${CONSERVACOES[c.slice(9) as Conservacao]?.toLowerCase() ?? c}` : c)} />
+      {modo === 'criar' && volta && <input type="hidden" name="volta" value={volta} />}
+      <ResumoDeErros erros={erros} idBase={idBase} rotulos={(c) => ROTULO_DO_CAMPO[c] ?? (c.startsWith('validade-') ? `Prazo de uso após abertura em ${CONSERVACOES[c.slice(9) as Conservacao]?.toLowerCase() ?? c}` : c)} />
       <ErroGeral estado={estado} recarregar={aqui} />
       <SalvandoAnunciado />
 
@@ -206,23 +220,29 @@ export function FormInsumo({
             <div>
               {prePreparo ? (
                 <div>
-                  <span className={ROTULO}>Tipo</span>
+                  <span className={ROTULO}>Tipo de item</span>
                   <p className="flex min-h-11 items-center text-sm text-texto sm:min-h-[42px]">{TIPOS.PRE_PREPARO}</p>
                   <p className={AJUDA}>Pré-preparo nasce da ficha técnica e continua pré-preparo.</p>
                   <input type="hidden" name="tipo" value="PRE_PREPARO" />
                 </div>
               ) : (
-                <div className="sm:max-w-sm">
+                <div className="sm:max-w-xl">
                   <Segmentos
                     nome="tipo"
-                    legenda="Tipo"
-                    opcoes={[
-                      ['INGREDIENTE', TIPOS.INGREDIENTE],
-                      ['EMBALAGEM', TIPOS.EMBALAGEM],
-                    ]}
+                    legenda="Tipo de item"
+                    descritoPor={`${idBase}-tipo-ajuda`}
+                    opcoes={TIPOS_DO_FORM.map((k) => [k, TIPOS[k]] as const)}
                     valor={tipo}
                     aoMudar={setTipo}
                   />
+                  <p id={`${idBase}-tipo-ajuda`} aria-live="polite" className={AJUDA}>
+                    {AJUDA_DO_TIPO[tipo as keyof typeof AJUDA_DO_TIPO] ?? ''} O tipo é o papel do item; a categoria é a natureza dele para o CMV; a conservação é onde fica guardado.
+                  </p>
+                  {tipo === 'MATERIAL' && (
+                    <p className="mt-1.5 text-[13px] text-atencao">
+                      Material de limpeza e uso não aparece na lista de ingredientes da ficha. Por enquanto, as compras dele ainda entram na soma de compras do CMV; a separação por categoria vem depois.
+                    </p>
+                  )}
                   <Erro id={`${idBase}-tipo-erro`} texto={erros.tipo} />
                 </div>
               )}
@@ -276,20 +296,42 @@ export function FormInsumo({
                 <p className="mt-1.5 text-[13px] text-atencao">A casa ainda não tem categorias. Abra Categorias, no menu, para criar as dez padrão.</p>
               )}
             </div>
+
+            <div className="sm:max-w-md">
+              <label htmlFor={`${idBase}-marcaReferencia`} className={ROTULO}>
+                Marca de referência <span className="font-normal text-suave">(opcional)</span>
+              </label>
+              <input
+                id={`${idBase}-marcaReferencia`}
+                name="marcaReferencia"
+                maxLength={MARCA_MAXIMA}
+                autoComplete="off"
+                defaultValue={inicial.marcaReferencia}
+                placeholder="Ex.: Camil"
+                className={CAMPO}
+                aria-invalid={!!erros.marcaReferencia}
+                aria-describedby={[`${idBase}-marcaReferencia-ajuda`, erros.marcaReferencia ? `${idBase}-marcaReferencia-erro` : ''].filter(Boolean).join(' ')}
+              />
+              <p id={`${idBase}-marcaReferencia-ajuda`} className={AJUDA}>
+                A marca comercial que você costuma comprar. É só uma informação: não trava compra nem cotação e não é o fornecedor (a mesma marca pode vir de vários).
+              </p>
+              <Erro id={`${idBase}-marcaReferencia-erro`} texto={erros.marcaReferencia} />
+            </div>
           </div>
         </Painel>
 
-        <Painel titulo="Onde guarda e quanto dura">
-          <CamposDeValidade
-            para="insumo"
-            inicial={inicial.validades ?? { principal: inicial.conservacao, minutos: {} }}
+        <Painel titulo="Conservação e prazo de uso após abertura">
+          <CamposDeConservacao
+            principalInicial={inicial.conservacao}
+            validadesIniciais={inicial.validades}
             erros={erros}
             idBase={idBase}
             aoMudar={saida.aoMudar}
+            aConfirmar={aConfirmar}
           />
         </Painel>
 
-        <Painel titulo="Como você compra">
+        <Painel titulo="Unidade, embalagem de compra e custo" subtitulo="Três coisas diferentes: a unidade em que você controla, quanto vem em cada embalagem que compra e quanto paga por ela.">
           <div className="space-y-4">
             <div>
               {travaDaUnidade && unidade ? (
@@ -312,15 +354,15 @@ export function FormInsumo({
                 />
               )}
               <p id={`${idBase}-unidade-ajuda`} className={AJUDA}>
-                Como você controla o estoque e como a ficha usa o insumo.
+                A medida em que você controla o estoque e que a ficha usa (kg, L ou un). Não é a embalagem: a caixa de 5 kg é medida em kg.
               </p>
               <Erro id={`${idBase}-unidade-erro`} texto={erros.unidade} />
             </div>
             {unidade ? (
-              <CamposDaEmbalagem unidade={unidade} inicial={inicial} erros={erros} idBase={idBase} />
+              <CamposDaEmbalagem unidade={unidade} inicial={inicial} erros={erros} idBase={idBase} modo="insumo" />
             ) : (
               <p className="rounded-[10px] border border-dashed border-linha-forte px-4 py-3 text-[13px] text-suave">
-                Escolha a unidade base para informar quanto vem na embalagem e o preço.
+                Escolha a unidade base para informar quanto vem na embalagem de compra e o custo inicial de referência.
               </p>
             )}
           </div>
@@ -328,11 +370,11 @@ export function FormInsumo({
       </fieldset>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-        <Link href={cancelar} className={classeDeBotao('fantasma')}>
+        <Link href={modo === 'criar' && volta ? volta : cancelar} className={classeDeBotao('fantasma')}>
           Cancelar
         </Link>
         <BotaoEnviar disabled={!!bloqueio} className="sm:min-w-44">
-          {modo === 'criar' ? 'Cadastrar insumo' : 'Salvar alterações'}
+          {modo === 'criar' ? (volta ? `Cadastrar e voltar para ${rotuloDaVolta(volta)}` : 'Cadastrar insumo') : 'Salvar alterações'}
         </BotaoEnviar>
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}

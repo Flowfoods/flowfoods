@@ -9,7 +9,7 @@ import { obterInsumo } from '@/lib/erp/insumos';
 import { saldosDoInsumo } from '@/lib/erp/estoque';
 import { lerFiltros, queryDosFiltros } from '@/lib/erp/insumo-campos';
 import { TelaDetalheInsumo } from '@/components/erp/telas/insumos/detalhe';
-import { acaoSituacaoInsumo } from '../actions';
+import { acaoConfirmarConservacao, acaoSituacaoInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +37,7 @@ export default async function ErpInsumoPage({
       feito={searchParams.feito}
       podeEditar={pode(ctx.alcance, 'insumos.editar')}
       bloqueio={ctx.bloqueio}
+      acaoConfirmar={acaoConfirmarConservacao.bind(null, insumo.id)}
       acaoSituacao={acaoSituacaoInsumo.bind(null, insumo.id)}
       linkDaNota={(notaId, lojaId) => (pode(ctx.alcance, 'compras.ver', { lojaId }) ? `/erp/compras/${notaId}` : null)}
       estoque={{ saldos, base: '/erp/estoque' }}

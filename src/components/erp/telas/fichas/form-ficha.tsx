@@ -12,7 +12,7 @@
  */
 
 import Link from 'next/link';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFormState } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import {
@@ -50,9 +50,11 @@ import { Segmentos } from '../../ui/segmentos';
 import { Painel } from '../../ui/superficies';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
+import { AvisoDeRascunho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
+import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
 import { CampoFoto } from './campo-foto';
 import { CamposDeValidade } from '../cadastro/campos-validade';
-import { CONSERVACOES, type Conservacao, type Validades } from '@/lib/erp/validade';
+import { CONSERVACOES, entradaDoFormulario, lerValidades, type Conservacao, type Validades } from '@/lib/erp/validade';
 import { PREFIXO_DO_PREPARO } from './prefixo';
 
 export interface LinhaDoItem {
@@ -124,20 +126,45 @@ function contaDaLinha(l: LinhaDoItem, e: Escolhido | undefined) {
   return { q, fator: f.milesimos, bruta: quantidadeBruta(q, f.milesimos), custo: e.porUnidade ? custoDoUso(e.porUnidade, q, f.milesimos) : null };
 }
 
-export function FormFicha({
-  acao,
-  modo,
-  base,
-  aqui,
-  cancelar,
-  opcoes,
-  preparos = [],
-  inicial = NOVA,
-  fotoAtual = null,
-  versao,
-  bloqueio = null,
-  novoInsumo,
-}: {
+export function FormFicha(props: PropsDoFormFicha) {
+  // I.1b: voltou de "Insumo que falta: cadastrar"? O que estava preenchido volta junto, e o insumo novo já está na lista.
+  const r = useRascunhoDaTela<ValoresDaFicha>();
+  const [descartou, setDescartou] = useState(false);
+  const recuperado = !descartou && r.valores ? r.valores : null;
+  const criado = !descartou && r.insumoCriado ? props.opcoes.find((i) => i.id === r.insumoCriado) : undefined;
+  let valores = recuperado ?? props.inicial ?? NOVA;
+  let escolhido = false;
+  if (criado) {
+    const vaga = valores.itens.findIndex((l) => !l.escolha);
+    if (vaga >= 0) {
+      valores = { ...valores, itens: valores.itens.map((l, n) => (n === vaga ? { ...l, escolha: criado.id, unidade: SIGLAS_DIGITAVEIS[criado.unidade][0] } : l)) };
+      escolhido = true;
+    }
+  }
+  return (
+    <FormFichaBase
+      key={recuperado || criado ? 'voltou' : 'inicial'}
+      {...props}
+      inicial={valores}
+      chaveDoRascunho={r.chave}
+      avisos={
+        <>
+          {criado && <AvisoInsumoCriado nome={criado.nome} escolhido={escolhido} />}
+          <AvisoDeRascunho
+            quando={!!recuperado}
+            observacao="A foto que você tinha escolhido não é guardada: se for trocar a foto, escolha de novo."
+            aoDescartar={() => {
+              r.descartar();
+              setDescartou(true);
+            }}
+          />
+        </>
+      }
+    />
+  );
+}
+
+type PropsDoFormFicha = {
   acao: AcaoDeCadastro;
   modo: 'criar' | 'editar';
   /** Lista de fichas de quem usa a tela (link da desativada). */
@@ -153,7 +180,25 @@ export function FormFicha({
   bloqueio?: string | null;
   /** Link para cadastrar insumo (só para quem pode). */
   novoInsumo?: string;
-}) {
+};
+
+function FormFichaBase({
+  acao,
+  modo,
+  base,
+  aqui,
+  cancelar,
+  opcoes,
+  preparos = [],
+  inicial = NOVA,
+  fotoAtual = null,
+  versao,
+  bloqueio = null,
+  novoInsumo,
+  chaveDoRascunho,
+  avisos,
+}: PropsDoFormFicha & { chaveDoRascunho: string; avisos: ReactNode }) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida();
   const [tipo, setTipo] = useState<TipoFicha>(inicial.tipo);
@@ -222,12 +267,32 @@ export function FormFicha({
     return { total, semPreco, incompletos, porLinha, porRende: rende ? porRendimento(total, rende) : null };
   }, [linhas, porEscolha, tipo, rendimento, rendeEm]);
 
+  /** I.1b: antes de ir cadastrar o insumo que falta, guarda o que está na tela (a ficha inteira, menos a foto) para recuperar na volta. */
+  function guardarOQueFoiPreenchido() {
+    if (!formRef.current) return;
+    const f = new FormData(formRef.current);
+    const t = (k: string) => (typeof f.get(k) === 'string' ? (f.get(k) as string) : '');
+    const v = lerValidades(entradaDoFormulario((k) => f.get(k)), 'ficha');
+    const valores: ValoresDaFicha = {
+      nome: t('nome'),
+      tipo,
+      descricao: t('descricao'),
+      modoPreparo: t('modoPreparo'),
+      rendimento,
+      rendimentoUnidade: rendeEm,
+      itens: linhas.map(({ chave: _c, ...l }) => l),
+      validades: v.ok ? v.validades : null,
+    };
+    guardarRascunho(chaveDoRascunho, valores);
+  }
+
   // O custo da prévia é por unidade BASE (kg, L, un), mesmo com o rendimento digitado em g ou ml (como no servidor).
   const unidadeDoRende = tipo === 'PRATO' ? 'porção' : UNIDADES[RENDE_EM[rendeEm].unidade].sigla;
 
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <form ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
+      {avisos}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={rotuloDoCampo} />
       <ErroGeral estado={estado} recarregar={aqui} />
 
@@ -406,7 +471,7 @@ export function FormFicha({
                             <option key={i.id} value={i.id}>
                               {i.nome}
                               {i.ativo ? '' : ' (desativado)'}
-                              {i.custo ? '' : ' · sem preço'}
+                              {i.custo ? '' : ' · custo não informado'}
                             </option>
                           ))}
                         </optgroup>
@@ -465,7 +530,7 @@ export function FormFicha({
                       aria-live="polite"
                     >
                       <span className="mr-1 sm:hidden">Custo</span>
-                      {!c ? '—' : c.custo ? formatarFracao(c.custo) : <span className="text-atencao">sem preço</span>}
+                      {!c ? '—' : c.custo ? formatarFracao(c.custo) : <span className="text-atencao">não informado</span>}
                     </p>
                     <button
                       type="button"
@@ -513,11 +578,7 @@ export function FormFicha({
               >
                 Adicionar item
               </button>
-              {novoInsumo && (
-                <Link href={novoInsumo} className={LINK_DE_TEXTO}>
-                  Insumo que falta: cadastrar
-                </Link>
-              )}
+              {novoInsumo && <AtalhoNovoInsumo href={novoInsumo} aoSair={guardarOQueFoiPreenchido} />}
             </div>
             <p className="text-right text-sm tabular-nums" aria-live="polite">
               <span className="text-suave">Prévia: </span>
@@ -528,7 +589,7 @@ export function FormFicha({
                   {formatarFracao(previa.porRende)} por {unidadeDoRende}
                 </span>
               )}
-              {previa.semPreco.length > 0 && <span className="block text-[12px] text-atencao">Custo incompleto: falta preço em {previa.semPreco.join(', ')}.</span>}
+              {previa.semPreco.length > 0 && <span className="block text-[12px] text-atencao">Custo incompleto: falta o custo de {previa.semPreco.join(', ')}.</span>}
               {previa.incompletos.length > 0 && (
                 <span className="block text-[12px] text-atencao">Custo incompleto dentro de {previa.incompletos.join(', ')}.</span>
               )}

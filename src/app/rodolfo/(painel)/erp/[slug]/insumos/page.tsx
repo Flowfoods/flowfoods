@@ -5,10 +5,10 @@
  */
 
 import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/contexto';
-import { listarInsumos } from '@/lib/erp/insumos';
+import { contarConservacaoAConfirmar, listarInsumos } from '@/lib/erp/insumos';
 import { categoriasParaEscolher } from '@/lib/erp/categorias';
 import { resumoDoQueFalta } from '@/lib/erp/classificar';
-import { AvisoDaClassificacao } from '@/components/erp/telas/insumos/aviso-classificar';
+import { AvisoConservacaoAConfirmar, AvisoDaClassificacao } from '@/components/erp/telas/insumos/aviso-classificar';
 import { lerFiltros, temFiltro } from '@/lib/erp/insumo-campos';
 import { FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
 import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
@@ -27,11 +27,12 @@ export default async function ParceiroInsumosPage({
   exigirPermissao(ctx, 'insumos.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/insumos`;
   const filtros = lerFiltros(searchParams);
-  const [pagina, { visao }, categorias, faltam] = await Promise.all([
+  const [pagina, { visao }, categorias, faltam, aConfirmar] = await Promise.all([
     listarInsumos(ctx.cliente, filtros),
     visaoDaRequisicao(ctx),
     categoriasParaEscolher(ctx.cliente, null, true),
     resumoDoQueFalta(ctx.cliente, ctx.alcance),
+    contarConservacaoAConfirmar(ctx.cliente),
   ]);
   return (
     <div className="space-y-6">
@@ -42,6 +43,7 @@ export default async function ParceiroInsumosPage({
       >
         <FiltrosDaLista base={base} filtros={filtros} categorias={categorias} />
       </CabecalhoDaLista>
+      <AvisoConservacaoAConfirmar quantos={aConfirmar} base={base} jaFiltrado={filtros.conservacao === 'confirmar'} />
       <AvisoDaClassificacao resumo={faltam} href={`${base}/classificar`} />
       <TelaListaInsumos base={base} filtros={filtros} {...pagina} novoHref={ctx.bloqueio ? undefined : `${base}/novo`} />
     </div>

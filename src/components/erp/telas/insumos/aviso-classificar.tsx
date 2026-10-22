@@ -31,3 +31,22 @@ export function AvisoDaClassificacao({ resumo, href }: { resumo: ResumoDoQueFalt
     </Aviso>
   );
 }
+
+/**
+ * I.1b: "N insumos com a conservação a confirmar". Até a I.1a o servidor assumia Seco quando ninguém escolhia; o que ficou em Seco
+ * numa categoria que costuma ser fria (Proteína, Laticínios, Hortifruti) pode estar certo ou ser esse padrão antigo. Nada foi
+ * alterado: o aviso só leva à lista desses insumos, para uma pessoa conferir.
+ */
+export function AvisoConservacaoAConfirmar({ quantos, base, jaFiltrado }: { quantos: number; base: string; jaFiltrado: boolean }) {
+  if (quantos === 0) return null;
+  return (
+    <Aviso tom="alerta" titulo={`${plural(quantos, 'insumo ativo com a conservação a confirmar', 'insumos ativos com a conservação a confirmar')}.`}>
+      Estão em Seco e ninguém confirmou, em categorias que costumam ficar no frio. Nada foi alterado.{' '}
+      {!jaFiltrado && (
+        <Link href={`${base}?conservacao=confirmar`} className={LINK_DE_TEXTO}>
+          Ver quais são
+        </Link>
+      )}
+    </Aviso>
+  );
+}

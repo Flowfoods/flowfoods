@@ -6,7 +6,7 @@ import { obterInsumo } from '@/lib/erp/insumos';
 import { saldosDoInsumo } from '@/lib/erp/estoque';
 import { lerFiltros, queryDosFiltros } from '@/lib/erp/insumo-campos';
 import { TelaDetalheInsumo } from '@/components/erp/telas/insumos/detalhe';
-import { acaoSituacaoInsumo } from '../actions';
+import { acaoConfirmarConservacao, acaoSituacaoInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +33,7 @@ export default async function ParceiroInsumoPage({
       contexto={ctx.parceiro.nome}
       podeEditar
       bloqueio={ctx.bloqueio}
+      acaoConfirmar={acaoConfirmarConservacao.bind(null, ctx.parceiro.slug, insumo.id)}
       acaoSituacao={acaoSituacaoInsumo.bind(null, ctx.parceiro.slug, insumo.id)}
       linkDaNota={(notaId) => `/rodolfo/erp/${ctx.parceiro.slug}/compras/${notaId}`}
       estoque={{ saldos, base: `/rodolfo/erp/${ctx.parceiro.slug}/estoque` }}
