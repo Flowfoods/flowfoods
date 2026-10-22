@@ -11,7 +11,7 @@
  *  - o substantivo que abre o nome manda ("molho de tomate" é molho, "pão de queijo" é pão): as palavras depois de "de",
  *    "com", "sem"... só valem quando o começo do nome não diz nada;
  *  - vários grupos diferentes ou nenhum vão para "Outros / a classificar", com o motivo, nunca um chute calado;
- *  - o tipo "Embalagem" já é Descartáveis e embalagens.
+ *  - o tipo "Embalagem" já é Descartáveis e embalagens; o tipo "Material de limpeza e uso" (I.1b), Limpeza e higienização.
  *
  * O dicionário abaixo é conhecimento de cozinha, e é só uma sugestão: a pessoa vê, confere e troca.
  */
@@ -164,6 +164,8 @@ const ehIgual = (a: string[], b: string[], de: number) => b.every((p, i) => a[de
 /** Pelo nome (e pelo tipo do item, se for embalagem), a categoria que o insumo provavelmente tem. */
 export function sugerirCategoria(nome: string, tipo?: string | null): SugestaoDeCategoria {
   if (tipo === 'EMBALAGEM') return { chave: 'DESCARTAVEIS', motivo: null, origem: 'tipo', termos: [] };
+  // I.1b: material de limpeza e uso é Limpeza e higienização pelo tipo (a pessoa troca, se o item for outro).
+  if (tipo === 'MATERIAL') return { chave: 'LIMPEZA', motivo: null, origem: 'tipo', termos: [] };
   const palavras = palavrasDoNome(nome);
   const usada = new Array<boolean>(palavras.length).fill(false);
   const acertos: Acerto[] = [];

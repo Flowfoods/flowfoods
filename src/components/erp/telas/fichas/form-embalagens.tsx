@@ -10,7 +10,7 @@
  */
 
 import Link from 'next/link';
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFormState } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import type { EmbalagemDoFormulario } from '@/lib/erp/canais';
@@ -22,6 +22,8 @@ import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
+import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
+import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
 
 export interface LinhaDaEmbalagem {
   canal: CanalComEmbalagem;
@@ -35,17 +37,46 @@ const AJUDA_DO_CANAL: Record<CanalComEmbalagem, string> = {
   IFOOD: 'O que vai junto no pedido do iFood (pode ser diferente do delivery: sacola lacrada, por exemplo).',
 };
 
-export function FormEmbalagens({
-  acao,
-  aqui,
-  cancelar,
-  opcoes,
-  inicial,
-  impressao,
-  porcao,
-  bloqueio,
-  novoInsumo,
-}: {
+export function FormEmbalagens(props: PropsDoFormEmbalagens) {
+  // I.1b: voltou de "Cadastrar em Insumos"? O que estava preenchido volta junto, e a embalagem nova já está na lista.
+  const r = useRascunhoDaTela<LinhaDaEmbalagem[]>(props.impressao);
+  const [descartou, setDescartou] = useState(false);
+  const recuperado = !descartou && Array.isArray(r.valores) ? r.valores : null;
+  const criado = !descartou && r.insumoCriado ? props.opcoes.find((o) => o.id === r.insumoCriado && o.embalagem) : undefined;
+  let linhas = recuperado ?? props.inicial;
+  let escolhido = false;
+  if (criado) {
+    const vaga = linhas.findIndex((l) => !l.insumoId);
+    if (vaga >= 0) {
+      linhas = linhas.map((l, n) => (n === vaga ? { ...l, insumoId: criado.id, unidade: SIGLAS_DIGITAVEIS[criado.unidade].includes(l.unidade) ? l.unidade : SIGLAS_DIGITAVEIS[criado.unidade][0] } : l));
+      escolhido = true;
+    }
+  }
+  return (
+    <FormEmbalagensBase
+      // O rascunho só é lido depois do primeiro desenho: quando chega (ou se descarta), o formulário nasce de novo com os valores certos.
+        key={r.valores === undefined ? 'carregando' : descartou ? 'descartado' : 'pronto'}
+      {...props}
+      inicial={linhas}
+      chaveDoRascunho={r.chave}
+      avisos={
+        <>
+          {criado && <AvisoInsumoCriado nome={criado.nome} escolhido={escolhido} />}
+          <AvisoDeRascunhoVelho quando={r.versaoMudou} oQue="A lista de embalagens da ficha" />
+          <AvisoDeRascunho
+            quando={!!recuperado}
+            aoDescartar={() => {
+              r.descartar();
+              setDescartou(true);
+            }}
+          />
+        </>
+      }
+    />
+  );
+}
+
+type PropsDoFormEmbalagens = {
   acao: AcaoDeCadastro;
   aqui: string;
   cancelar: string;
@@ -58,7 +89,22 @@ export function FormEmbalagens({
   bloqueio: string | null;
   /** Link para cadastrar insumo (só para quem pode). */
   novoInsumo?: string;
-}) {
+};
+
+function FormEmbalagensBase({
+  acao,
+  aqui,
+  cancelar,
+  opcoes,
+  inicial,
+  impressao,
+  porcao,
+  bloqueio,
+  novoInsumo,
+  chaveDoRascunho,
+  avisos,
+}: PropsDoFormEmbalagens & { chaveDoRascunho: string; avisos: ReactNode }) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida();
   const proxima = useRef(inicial.length);
@@ -108,6 +154,10 @@ export function FormEmbalagens({
   for (const canal of CANAIS_COM_EMBALAGEM) {
     linhas.filter((l) => l.canal === canal && (l.insumoId || l.quantidade.trim())).forEach((l, i) => posicaoNoCanal.set(l.chave, i));
   }
+  /** I.1b: antes de ir cadastrar a embalagem que falta, guarda as linhas da tela para recuperar na volta. */
+  function guardarOQueFoiPreenchido() {
+    guardarRascunho(chaveDoRascunho, linhas.map(({ chave: _c, ...l }) => l), impressao);
+  }
   const idBase = 'embalagens';
   const rotuloDoErro = (campo: string) => {
     const m = /^emb-(DELIVERY_PROPRIO|IFOOD)-(\d+)$/.exec(campo);
@@ -115,8 +165,9 @@ export function FormEmbalagens({
   };
 
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <form ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="impressao" value={impressao} />
+      {avisos}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={rotuloDoErro} />
       <ErroGeral estado={estado} recarregar={aqui} />
 
@@ -139,7 +190,7 @@ export function FormEmbalagens({
               acessorio={
                 <span className="shrink-0 text-right text-[12px] tabular-nums text-suave">
                   <span className="block text-[13px] font-semibold text-texto">{formatarFracao(total)}</span>
-                  {semPreco > 0 ? <span className="text-atencao">+ {semPreco} sem preço</span> : 'por porção'}
+                  {semPreco > 0 ? <span className="text-atencao">+ {semPreco} sem custo informado</span> : 'por porção'}
                 </span>
               }
             >
@@ -223,7 +274,7 @@ export function FormEmbalagens({
                               conta.valor ? (
                                 <span className="text-texto">{formatarFracao(conta.valor)}</span>
                               ) : (
-                                <span className="text-atencao">sem preço</span>
+                                <span className="text-atencao">custo não informado</span>
                               )
                             ) : null}
                           </span>
@@ -281,9 +332,7 @@ export function FormEmbalagens({
           <p className={AJUDA}>
             Nenhum insumo do tipo Embalagem no cadastro.{' '}
             {novoInsumo ? (
-              <Link href={novoInsumo} className={LINK_DE_TEXTO}>
-                Cadastrar em Insumos
-              </Link>
+              <AtalhoNovoInsumo href={novoInsumo} tipo="EMBALAGEM" rotulo="Cadastrar em Insumos" aoSair={guardarOQueFoiPreenchido} />
             ) : (
               'Peça a quem cuida dos insumos.'
             )}

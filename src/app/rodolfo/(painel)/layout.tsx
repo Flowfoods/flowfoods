@@ -22,6 +22,7 @@ import { ALCANCE_FLOWFOODS } from '@/lib/erp/permissoes';
 import { navegacaoDoNivel1 } from '@/lib/rodolfo/modulos';
 import { contarRespostasSemClassificar } from '@/lib/rodolfo/notificacoes';
 import { AppShell } from '@/components/erp/shell/AppShell';
+import { EscopoDoRascunho } from '@/components/erp/telas/cadastro/rascunho';
 import type { Notificacao } from '@/components/erp/shell/tipos';
 import { acaoBuscarNoParceiro, acaoEscolherVisaoDoParceiro, acaoVisaoDoParceiro } from './acoes-do-shell';
 
@@ -81,7 +82,7 @@ export default async function PainelLayout({ children }: { children: React.React
       // Nível 1: só o botão "?" dentro do parceiro (a ajuda lê o mesmo registro). Sem caixa, sem pergunta e sem preferência.
       ajuda={{ entradas: ajudaParaATela(ALCANCE_FLOWFOODS), preferencia: null, acoes: null, contato: AJUDA_DE_USO_ERP }}
     >
-      {children}
+      <EscopoDoRascunho escopo={`n1:${sessao.userId}`}>{children}</EscopoDoRascunho>
     </AppShell>
   );
 }

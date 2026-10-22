@@ -31,3 +31,63 @@ export function AvisoDaClassificacao({ resumo, href }: { resumo: ResumoDoQueFalt
     </Aviso>
   );
 }
+
+/**
+ * I.1b: os dois avisos do alto da lista de Insumos (sem categoria definitiva e conservação a confirmar) num só, para não empilhar
+ * duas caixas laranja. Cada linha continua dizendo o seu assunto e levando ao seu caminho.
+ */
+export function AvisosDaLista({
+  resumo,
+  hrefClassificar,
+  aConfirmar,
+  base,
+  jaFiltrado,
+}: {
+  resumo: ResumoDoQueFalta;
+  hrefClassificar?: string;
+  aConfirmar: number;
+  base: string;
+  jaFiltrado: boolean;
+}) {
+  if (resumo.total === 0 && aConfirmar === 0) return null;
+  const partes = [
+    resumo.semCategoria > 0 ? `${resumo.semCategoria} sem categoria` : null,
+    resumo.emOutros > 0 ? `${resumo.emOutros} em Outros / a classificar` : null,
+  ].filter(Boolean);
+  const titulo =
+    resumo.total > 0 && aConfirmar > 0
+      ? 'O cadastro tem pendências.'
+      : resumo.total > 0
+        ? `${plural(resumo.total, 'insumo ativo ainda sem categoria definitiva', 'insumos ativos ainda sem categoria definitiva')}.`
+        : `${plural(aConfirmar, 'insumo ativo com a conservação a confirmar', 'insumos ativos com a conservação a confirmar')}.`;
+  return (
+    <Aviso tom="alerta" titulo={titulo}>
+      <span className="block space-y-1">
+        {resumo.total > 0 && (
+          <span className="block">
+            {resumo.total > 0 && aConfirmar > 0 && `${plural(resumo.total, 'insumo ainda sem categoria definitiva', 'insumos ainda sem categoria definitiva')}: `}
+            {partes.join(' · ')}
+            {resumo.valorCentavos !== null && ` · ${formatarDinheiro(resumo.valorCentavos)} em estoque nas lojas que você acessa`}
+            {'. '}
+            {hrefClassificar && (
+              <Link href={hrefClassificar} className={LINK_DE_TEXTO}>
+                Classificar agora
+              </Link>
+            )}
+          </span>
+        )}
+        {aConfirmar > 0 && (
+          <span className="block">
+            {resumo.total > 0 && `${plural(aConfirmar, 'insumo com a conservação a confirmar', 'insumos com a conservação a confirmar')}: `}
+            Estão em Seco e ninguém confirmou, em categorias que costumam ficar no frio. Nada foi alterado.{' '}
+            {!jaFiltrado && (
+              <Link href={`${base}?conservacao=confirmar`} className={LINK_DE_TEXTO}>
+                Ver quais são
+              </Link>
+            )}
+          </span>
+        )}
+      </span>
+    </Aviso>
+  );
+}

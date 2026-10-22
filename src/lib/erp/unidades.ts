@@ -103,7 +103,7 @@ function mdc(a: number, b: number): number {
 
 /**
  * Custo de referência de uma embalagem: (preço + frete) por conteúdo. Preço 0
- * = "Sem preço": o custo está incompleto, e a resposta é null — nunca R$ 0,00.
+ * = custo NÃO INFORMADO: o custo está incompleto, e a resposta é null — nunca R$ 0,00.
  */
 export function custoDaEmbalagem(
   precoEmbalagemCentavos: number,
@@ -294,9 +294,12 @@ export function valorDoCusto(custo: CustoExato): string {
   return formatarReaisDaFracao(BigInt(custo.centavos) * 1000n, BigInt(custo.milesimos));
 }
 
-/** Custo por unidade para a tela: "R$ 18,98/kg", "R$ 0,004/un", ou "Sem preço" (nunca R$ 0,00). */
+/** I.1b: a palavra do custo que ninguém informou (a tela, o histórico e as frases dizem a MESMA). Nunca "R$ 0,00". */
+export const CUSTO_NAO_INFORMADO = 'Custo não informado';
+
+/** Custo por unidade para a tela: "R$ 18,98/kg", "R$ 0,004/un", ou "Custo não informado" (nunca R$ 0,00). */
 export function formatarCusto(custo: CustoExato | null, unidade: Unidade): string {
-  return custo === null ? 'Sem preço' : `${valorDoCusto(custo)}/${UNIDADES[unidade].sigla}`;
+  return custo === null ? CUSTO_NAO_INFORMADO : `${valorDoCusto(custo)}/${UNIDADES[unidade].sigla}`;
 }
 
 /** Abaixo de 1 centavo por un, quanto sai o milheiro (como esse item se vende): "R$ 4,00". */
@@ -317,7 +320,7 @@ export function contaDoCusto(e: {
   unidade: Unidade;
 }): string {
   const custo = custoDaEmbalagem(e.precoEmbalagemCentavos, e.taxaEntregaCentavos, e.conteudoMilesimos);
-  if (custo === null) return 'Sem preço: o custo fica incompleto até alguém informar o preço.';
+  if (custo === null) return `${CUSTO_NAO_INFORMADO}: as fichas e a margem ficam incompletas até haver um custo inicial de referência ou uma compra lançada.`;
   const frete = e.taxaEntregaCentavos > 0 ? ` + ${formatarDinheiro(e.taxaEntregaCentavos)} frete` : '';
   const mil = milheiro(custo, e.unidade);
   return `${formatarDinheiro(e.precoEmbalagemCentavos)}${frete} ÷ ${formatarQuantidade(e.conteudoMilesimos, e.unidade)} = ${formatarCusto(custo, e.unidade)}${mil ? ` (${mil} o milheiro)` : ''}`;

@@ -235,7 +235,7 @@ export function TelaDetalheFicha({
                                     {x.fatorCorrecaoMilesimos !== 1000 ? ` (fator ${formatarFator(x.fatorCorrecaoMilesimos)})` : ''}
                                     {x.preparo ? ' · pré-preparo' : ''}
                                   </span>
-                                  <span className="tabular-nums">{x.custo ? formatarFracao(x.custo) : 'sem preço'}</span>
+                                  <span className="tabular-nums">{x.custo ? formatarFracao(x.custo) : 'custo não informado'}</span>
                                 </li>
                               ))}
                             </ul>
@@ -247,7 +247,7 @@ export function TelaDetalheFicha({
                         {bruto && <span className="block text-[12px]">{bruto}</span>}
                       </td>
                       <td className="whitespace-nowrap py-2.5 pl-3 pr-4 text-right sm:pr-5">
-                        {i.custo ? <span className="text-texto">{formatarFracao(i.custo)}</span> : <Selo tom="alerta">Sem preço</Selo>}
+                        {i.custo ? <span className="text-texto">{formatarFracao(i.custo)}</span> : <Selo tom="alerta">Custo não informado</Selo>}
                         {p && custoIncompleto(p.custo) && (
                           <span className="mt-1 block">
                             <Selo tom="alerta">Incompleto</Selo>
@@ -266,7 +266,7 @@ export function TelaDetalheFicha({
                   <td className="hidden sm:table-cell" />
                   <td className="whitespace-nowrap py-2 pl-3 pr-4 text-right font-semibold tabular-nums sm:pr-5">
                     {formatarFracao(f.custo.total)}
-                    {incompleto && <span className="font-normal text-suave"> + sem preço</span>}
+                    {incompleto && <span className="font-normal text-suave"> + custo não informado</span>}
                   </td>
                 </tr>
               </tfoot>

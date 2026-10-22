@@ -45,18 +45,20 @@ const PARCEIROS: {
     lojas: ['Vila da Penha', 'Vila da Penha · Delivery'],
     marcas: ['Alfa Burger', 'Alfa Gourmet'],
     itens: [
-      { nome: 'Blend bovino 180 g', unidade: 'UN', conteudo: '20', preco: '119,80' },
-      { nome: 'Pão brioche', unidade: 'UN', conteudo: '12', preco: '18,00' },
-      { nome: 'Queijo cheddar fatiado', unidade: 'KG', conteudo: '2,27', preco: '96,50' },
-      { nome: 'Bacon em cubos', unidade: 'KG', conteudo: '1', preco: '42,90' },
+      { nome: 'Blend bovino 180 g', unidade: 'UN', conservacao: 'CONGELADO', conteudo: '20', preco: '119,80' },
+      { nome: 'Pão brioche', unidade: 'UN', conservacao: 'SECO', conteudo: '12', preco: '18,00' },
+      { nome: 'Queijo cheddar fatiado', unidade: 'KG', conservacao: 'REFRIGERADO', conteudo: '2,27', preco: '96,50' },
+      { nome: 'Bacon em cubos', unidade: 'KG', conservacao: 'REFRIGERADO', conteudo: '1', preco: '42,90' },
       { nome: 'Cebola roxa', unidade: 'KG', conservacao: 'SECO', conteudo: '20', preco: '79,90', frete: '6,00' },
       { nome: 'Molho especial da casa', unidade: 'KG', conservacao: 'REFRIGERADO', conteudo: '750', escala: 'menor', preco: '28,50' },
       { nome: 'Óleo de soja', unidade: 'L', conservacao: 'SECO', conteudo: '900', escala: 'menor', preco: '8,49', frete: '0,40' },
-      { nome: 'Caixa kraft hambúrguer', tipo: 'EMBALAGEM', unidade: 'UN', conteudo: '100', preco: '74,00', frete: '4,00' },
+      { nome: 'Caixa kraft hambúrguer', tipo: 'EMBALAGEM', unidade: 'UN', conservacao: 'SECO', conteudo: '100', preco: '74,00', frete: '4,00' },
       { nome: 'Picles de pepino', unidade: 'KG', conservacao: 'REFRIGERADO', conteudo: '2', preco: '', semPreco: 'on' },
-      { nome: 'Batata palha', unidade: 'KG', conteudo: '1', preco: '24,90' },
+      { nome: 'Batata palha', unidade: 'KG', conservacao: 'SECO', conteudo: '1', preco: '24,90' },
       // Custo abaixo de 1 centavo por unidade: R$ 0,004/un (R$ 4,00 o milheiro).
-      { nome: 'Guardanapo de papel', tipo: 'EMBALAGEM', unidade: 'UN', conteudo: '1000', preco: '4,00' },
+      { nome: 'Guardanapo de papel', tipo: 'EMBALAGEM', unidade: 'UN', conservacao: 'SECO', conteudo: '1000', preco: '4,00' },
+      // I.1b: material de limpeza e uso (não entra em ficha), com marca de referência.
+      { nome: 'Detergente neutro', tipo: 'MATERIAL', unidade: 'L', conservacao: 'SECO', conteudo: '5', preco: '18,90', marcaReferencia: 'Ypê' },
     ],
     embalagens: {
       'Cebola roxa': [{ nome: 'Saco 10 kg (feira)', conteudo: '10', preco: '35,00', frete: '3,00' }],
@@ -72,9 +74,9 @@ const PARCEIROS: {
     lojas: ['Tijuca'],
     marcas: ['Beta Açaí'],
     itens: [
-      { nome: 'Polpa de açaí', unidade: 'KG', conteudo: '10', preco: '189,00' },
-      { nome: 'Leite integral', unidade: 'L', conteudo: '12', preco: '59,88' },
-      { nome: 'Granola', unidade: 'KG', conteudo: '0,800', preco: '21,40' },
+      { nome: 'Polpa de açaí', unidade: 'KG', conservacao: 'CONGELADO', conteudo: '10', preco: '189,00' },
+      { nome: 'Leite integral', unidade: 'L', conservacao: 'REFRIGERADO', conteudo: '12', preco: '59,88' },
+      { nome: 'Granola', unidade: 'KG', conservacao: 'SECO', marcaReferencia: 'Jasmine', conteudo: '0,800', preco: '21,40' },
     ],
   },
   {
@@ -83,7 +85,7 @@ const PARCEIROS: {
     lojas: ['Botafogo'],
     marcas: ['Gama Poke'],
     suspender: 'Teste de parceiro suspenso',
-    itens: [{ nome: 'Salmão', unidade: 'KG', conteudo: '1', preco: '89,90' }],
+    itens: [{ nome: 'Salmão', unidade: 'KG', conservacao: 'REFRIGERADO', conteudo: '1', preco: '89,90' }],
   },
 ];
 

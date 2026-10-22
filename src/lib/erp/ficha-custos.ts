@@ -19,6 +19,7 @@ import { anexarUltimasCompras } from './compras-custo';
 export const SELECAO_DO_INSUMO = {
   id: true,
   nome: true,
+  tipo: true,
   unidade: true,
   ativo: true,
   conteudoMilesimos: true,

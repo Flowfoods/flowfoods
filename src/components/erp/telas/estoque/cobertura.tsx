@@ -46,7 +46,7 @@ export function CoberturaComPiso({ c, regras }: { c: Cobertura; regras: Pick<Reg
         bp={c.valor.bp}
         pisoBp={regras.pisoValorBp}
         atinge={c.atingeValor}
-        detalhe={`${formatarDinheiro(c.valor.contadoCentavos)} de ${formatarDinheiro(c.valor.totalCentavos)} contados${c.semPreco ? ` (${c.semPreco} sem preço fora)` : ''}`}
+        detalhe={`${formatarDinheiro(c.valor.contadoCentavos)} de ${formatarDinheiro(c.valor.totalCentavos)} contados${c.semPreco ? ` (${c.semPreco} sem custo informado fora)` : ''}`}
       />
       <BarraDoPiso rotulo="Dos insumos" bp={c.itens.bp} pisoBp={regras.pisoItensBp} atinge={c.atingeItens} detalhe={`${c.itens.contados} de ${c.itens.total} contados`} />
     </div>

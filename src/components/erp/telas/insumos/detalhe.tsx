@@ -9,8 +9,8 @@
 
 import Link from 'next/link';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
-import { compararEmbalagens, CONSERVACOES, TIPOS } from '@/lib/erp/insumo-campos';
-import { temValidade } from '@/lib/erp/validade';
+import { AJUDA_DO_TIPO, compararEmbalagens, CONSERVACOES, TIPOS } from '@/lib/erp/insumo-campos';
+import { ROTULO_DA_OPCAO, temValidade } from '@/lib/erp/validade';
 import { IconeDaConservacao, ValidadesDoItem } from '../cadastro/validade';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, contaDoCusto, formatarCusto, formatarDinheiro, formatarFracao, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
@@ -22,6 +22,7 @@ import type { AcaoDeCadastro } from '../cadastro/estado';
 import { FormSituacao } from '../cadastro/form-situacao';
 import { BotaoOuMotivo } from '../cadastro/partes';
 import { fraseDoFeito, fraseDoSalvo } from './estado';
+import { FormConfirmarConservacao } from './form-confirmar-conservacao';
 import { AvisoDeSalvo } from '../cadastro/anuncio';
 import { COMO_CLASSIFICOU } from '@/lib/erp/categoria-campos';
 import { TrilhaDaPagina } from '../../shell/trilha';
@@ -39,6 +40,7 @@ export function TelaDetalheInsumo({
   podeEditar,
   bloqueio,
   acaoSituacao,
+  acaoConfirmar,
   linkDaNota,
   estoque,
 }: {
@@ -60,6 +62,8 @@ export function TelaDetalheInsumo({
   podeEditar: boolean;
   bloqueio: string | null;
   acaoSituacao: AcaoDeCadastro;
+  /** I.1b: confirmar a conservação de um insumo antigo (só para quem edita). */
+  acaoConfirmar?: AcaoDeCadastro;
 }) {
   const u = UNIDADES[i.unidade];
   const aqui = `${base}/${i.id}`;
@@ -101,7 +105,7 @@ export function TelaDetalheInsumo({
   return (
     <div className="space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: i.nome }]} />
-      <Link href={voltar} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+      <Link href={voltar} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`}>
         Voltar para a lista
       </Link>
       <PageHeader
@@ -112,15 +116,15 @@ export function TelaDetalheInsumo({
           salvo ? (
             <AvisoDeSalvo titulo={salvo.titulo} apoio={salvo.apoio}>
               {salvo.criou && podeEditar && !bloqueio && (
-                // Quem cadastra em série quase sempre repete tipo, unidade e conservação: o próximo já abre com os do último.
+                // Quem cadastra em série quase sempre repete tipo e unidade: o próximo já abre com os do último. A conservação é escolhida a cada insumo.
                 <Link
-                  href={`${base}/novo?${new URLSearchParams({ tipo: i.tipo, unidade: i.unidade, conservacao: i.conservacao }).toString()}`}
+                  href={`${base}/novo?${new URLSearchParams({ tipo: i.tipo, unidade: i.unidade }).toString()}`}
                   className={classeDeBotao('secundario')}
                 >
                   Cadastrar outro insumo
                 </Link>
               )}
-              <Link href={voltar} className={classeDeBotao('fantasma')}>
+              <Link href={voltar} className={classeDeBotao('secundario')}>
                 Ver todos os insumos
               </Link>
             </AvisoDeSalvo>
@@ -174,7 +178,7 @@ export function TelaDetalheInsumo({
             </Painel>
           ) : (
             <>
-          <Painel titulo="Custo de referência" subtitulo={uc ? 'Último preço pago' : 'Preço cadastrado da embalagem padrão'}>
+          <Painel titulo="Custo de referência" subtitulo={uc ? 'Origem: último preço de compra lançado' : i.custo === null ? 'Origem: nenhuma. Custo inicial de referência não informado' : 'Origem: custo inicial de referência (nenhuma compra lançada)'}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
               <div className={`font-display text-[32px] font-bold leading-none ${i.custo === null ? 'text-atencao' : ''}`}>
                 {formatarCusto(i.custo, i.unidade)}
@@ -199,14 +203,16 @@ export function TelaDetalheInsumo({
                     `nota ${ud.numero}`
                   )}
                   , {ud.fornecedor ?? 'sem fornecedor'}
-                  {ud.lojaNome ? `, ${ud.lojaNome}` : ''}). É o que as fichas usam; o preço cadastrado ({formatarCusto(i.custoCadastrado, i.unidade)}) só vale sem nota.
+                  {ud.lojaNome ? `, ${ud.lojaNome}` : ''}). É o que as fichas usam; o custo inicial de referência ({formatarCusto(i.custoCadastrado, i.unidade)}) só vale enquanto não há nota lançada.
                 </>
               ) : uc ? (
                 <>
                   Último preço pago na rede, em {formatarData(uc.entradaEm, true)}: é o que as fichas usam. A nota é de uma loja fora do seu acesso a compras.
                 </>
+              ) : i.custo === null ? (
+                'Ninguém informou o custo inicial de referência e ainda não há compra lançada: as fichas que usam este insumo ficam incompletas e a margem delas não é confiável. Informe o custo em Editar ou lance uma nota de compra.'
               ) : (
-                'Pelo preço cadastrado. Quando houver nota de compra lançada, vale o último preço pago.'
+                'Pelo custo inicial de referência, informado no cadastro. Ele não é uma compra: não criou nota, movimento de estoque, despesa nem conta a pagar. Quando houver nota de compra lançada, vale o último preço pago.'
               )}
             </p>
           </Painel>
@@ -238,14 +244,14 @@ export function TelaDetalheInsumo({
                       <span className="block text-[12px] tabular-nums text-suave">
                         {formatarQuantidade(e.conteudoMilesimos, i.unidade)}
                         {' · '}
-                        {e.precoEmbalagemCentavos > 0 ? formatarDinheiro(e.precoEmbalagemCentavos) : 'sem preço'}
+                        {e.precoEmbalagemCentavos > 0 ? formatarDinheiro(e.precoEmbalagemCentavos) : e.padrao ? 'custo não informado' : 'sem preço'}
                         {e.taxaEntregaCentavos > 0 && ` + ${formatarDinheiro(e.taxaEntregaCentavos)} frete`}
                         {e.codigoBarras && ` · código ${e.codigoBarras}`}
                       </span>
                     </span>
                     <span className="shrink-0 text-right text-sm tabular-nums">
                       {e.custo === null ? (
-                        <Selo tom="alerta">Sem preço</Selo>
+                        <Selo tom="alerta">{e.padrao ? 'Custo não informado' : 'Sem preço'}</Selo>
                       ) : (
                         <>
                           <span className="font-semibold text-texto">{valorDoCusto(e.custo)}</span>
@@ -285,7 +291,13 @@ export function TelaDetalheInsumo({
           )}
         </div>
 
-        <aside className="min-w-0 space-y-4" aria-label="Validade, situação e alterações">
+        <aside className="min-w-0 space-y-4" aria-label="Tipo, categoria, conservação, situação e alterações">
+          <Painel titulo="Tipo de item" subtitulo="O papel do item no ERP">
+            <p className="text-sm font-semibold text-texto">{TIPOS[i.tipo]}</p>
+            <p className="mt-1 text-[12px] text-suave">
+              {AJUDA_DO_TIPO[i.tipo as keyof typeof AJUDA_DO_TIPO] ?? 'Pré-preparo nasce da ficha técnica e continua pré-preparo.'}
+            </p>
+          </Painel>
           <Painel titulo="Categoria" subtitulo="A natureza do insumo para o CMV">
             {i.categoria ? (
               <div className="space-y-1">
@@ -316,10 +328,39 @@ export function TelaDetalheInsumo({
               )}
             </p>
           </Painel>
+          {!p && (
+            <Painel titulo="Marca de referência" subtitulo="Informação opcional">
+              {i.marcaReferencia ? (
+                <p className="text-sm font-semibold text-texto">{i.marcaReferencia}</p>
+              ) : (
+                <p className="text-sm text-suave">Não informada.</p>
+              )}
+              <p className="mt-1 text-[12px] text-suave">
+                Marca comercial que a casa costuma comprar. Não trava compra nem cotação e não é o fornecedor.
+              </p>
+            </Painel>
+          )}
           <Painel
-            titulo={p ? 'Onde fica e quanto dura' : 'Onde guarda e quanto dura'}
-            subtitulo={p ? undefined : 'Validade depois de aberto ou manipulado'}
+            titulo={p ? 'Onde fica e quanto dura' : 'Conservação e prazo de uso após abertura'}
+            subtitulo={p ? undefined : 'O prazo é depois de aberto, não o vencimento do lote'}
           >
+            {!p && i.conservacaoAConfirmar && (
+              <div className="mb-3 rounded-[10px] border border-atencao/40 px-3 py-2.5">
+                <p className="text-sm font-semibold text-atencao">Conservação a confirmar</p>
+                <p className="mt-0.5 text-[13px] text-suave">
+                  Este insumo está em Seco, mas o sistema antigo assumia Seco quando ninguém escolhia, e {i.categoria?.nome ?? 'a categoria'} costuma ficar no frio. Nada foi alterado.
+                  {editaAqui && i.ativo && !bloqueio ? ' Se for outra, troque em Editar; se for mesmo seco, confirme.' : ''}
+                </p>
+                {editaAqui && i.ativo && !bloqueio && (
+                  <>
+                    <Link href={`${aqui}/editar#insumo-conservacao`} className={`${LINK_DE_TEXTO} mt-1 inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`}>
+                      Escolher a conservação
+                    </Link>
+                    {acaoConfirmar && <FormConfirmarConservacao acao={acaoConfirmar} rotulo={CONSERVACOES[i.conservacao]} />}
+                  </>
+                )}
+              </div>
+            )}
             <ValidadesDoItem
               validades={i.validades}
               vazio={
@@ -329,7 +370,7 @@ export function TelaDetalheInsumo({
                   <span className="flex items-center gap-2.5">
                     <IconeDaConservacao conservacao={i.conservacao} />
                     <span>
-                      <span className="text-texto">{CONSERVACOES[i.conservacao]}</span> · validade depois de aberto não informada.
+                      <span className="text-texto">{ROTULO_DA_OPCAO[i.conservacao]}</span> · prazo de uso após abertura não informado.
                     </span>
                   </span>
                 )
@@ -345,7 +386,7 @@ export function TelaDetalheInsumo({
                   .
                 </>
               ) : (
-                'A validade do fabricante vem no lote de cada compra.'
+                'O vencimento impresso no lote e a data de abertura entram no recebimento e no controle de lote (ainda não existem no ERP).'
               )}
             </p>
           </Painel>

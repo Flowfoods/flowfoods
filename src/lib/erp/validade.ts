@@ -11,10 +11,12 @@
  * aceitas. Nenhuma aceita = validade não informada (nunca um prazo inventado).
  *
  * - Ficha: tudo opcional; sem nenhuma, a principal fica nula.
- * - Insumo: a principal sempre existe (é onde se guarda; coluna NOT NULL);
- *   as validades são opcionais. Para o insumo COMPRADO, a validade é a de
- *   depois de aberto ou manipulado — a do fabricante vem no lote (etiqueta,
- *   fase 3.4).
+ * - Insumo: a principal sempre existe (é onde se guarda; coluna NOT NULL) e,
+ *   desde a I.1b, é ESCOLHIDA: nenhum valor é assumido (antes o servidor
+ *   assumia Seco quando nada vinha). As validades são opcionais. Para o
+ *   insumo COMPRADO, a validade é o "Prazo de uso após abertura" (depois de
+ *   aberto ou manipulado) — o vencimento do fabricante vem no lote
+ *   (etiqueta, fase 3.4), nunca no cadastro.
  *
  * Na tela, a pessoa digita dias ou horas INTEIROS (pista fria costuma ser em
  * horas); grava minutos (3 dias = 4320). Teto: 730 dias.
@@ -29,6 +31,18 @@ export const CONSERVACOES = {
   CONGELADO: 'Congelado',
 } as const;
 export type Conservacao = keyof typeof CONSERVACOES;
+
+/**
+ * Como a conservação aparece na ESCOLHA e nas linhas do cadastro do insumo: Seco é "ambiente" no dia a dia da cozinha, então a
+ * opção diz as duas palavras. Mora aqui (e não no componente do formulário) porque a lista e o detalhe, que são de servidor, também a
+ * leem — valor exportado de arquivo "use client" não chega ao servidor.
+ */
+export const ROTULO_DA_OPCAO: Record<Conservacao, string> = {
+  SECO: 'Seco (ambiente)',
+  PISTA_FRIA: 'Pista fria',
+  REFRIGERADO: 'Refrigerado',
+  CONGELADO: 'Congelado',
+};
 
 type Erros = Record<string, string>;
 
@@ -48,6 +62,10 @@ export const MINUTOS = { hora: 60, dia: 1440 } as const;
 export const VALIDADE_MAXIMA_MIN = 730 * MINUTOS.dia;
 
 export type EmQue = 'dias' | 'horas';
+
+/** I.1b: a conservação do insumo é escolhida; "Selecione a conservação" é orientação do campo, não um valor que se salva. */
+export const FRASE_SEM_CONSERVACAO = 'Escolha a conservação: onde o insumo fica guardado (seco, pista fria, refrigerado ou congelado).';
+
 
 /** Validades de um item: a principal e os minutos de cada conservação aceita. */
 export interface Validades {
@@ -109,32 +127,41 @@ export function lerValidades(
 ): { ok: true; validades: Validades | null } | { ok: false; erros: Erros } {
   const erros: Erros = {};
   const minutos: Partial<Record<Conservacao, number>> = {};
+  // Insumo: o que se digita é o prazo de uso depois de aberto; ficha: quanto dura.
+  const oQue = para === 'insumo' ? 'o prazo de uso após abertura' : 'quanto dura';
   for (const c of ORDEM_DAS_CONSERVACOES) {
     const l = entrada.linhas[c];
     if (!l?.marcada) continue;
     const nome = CONSERVACOES[c];
     if (!l.quantidade.trim()) {
-      erros[chaveDaValidade(c)] = `Diga quanto dura em ${nome.toLowerCase()} (ex.: ${l.em === 'horas' ? '6 horas' : '3 dias'}) ou desmarque.`;
+      erros[chaveDaValidade(c)] = `Diga ${oQue} em ${nome.toLowerCase()} (ex.: ${l.em === 'horas' ? '6 horas' : '3 dias'}) ou desmarque.`;
       continue;
     }
     const m = paraMinutos(l.quantidade, l.em);
     if (m === null) erros[chaveDaValidade(c)] = `Em ${nome.toLowerCase()}: número inteiro de ${l.em}. Ex.: ${l.em === 'dias' ? '3' : '12'}.`;
-    else if (m === 0) erros[chaveDaValidade(c)] = `A validade em ${nome.toLowerCase()} precisa ser maior que zero.`;
+    else if (m === 0) erros[chaveDaValidade(c)] = `${para === 'insumo' ? 'O prazo' : 'A validade'} em ${nome.toLowerCase()} precisa ser maior que zero.`;
     else if (m > VALIDADE_MAXIMA_MIN) erros[chaveDaValidade(c)] = `Mais de 730 dias em ${nome.toLowerCase()}? Confira o número.`;
     else minutos[c] = m;
   }
   const marcadas = ORDEM_DAS_CONSERVACOES.filter((c) => entrada.linhas[c]?.marcada);
   const escolhida = ehConservacao(entrada.principal) ? entrada.principal : null;
-  if (entrada.principal !== undefined && entrada.principal !== '' && !escolhida) erros.conservacao = 'Conservação principal desconhecida.';
+  if (para === 'insumo') {
+    // I.1b: nada de "assumir Seco". Vazio, "Selecione a conservação", "Conservação" ou qualquer texto fora da lista: recusa.
+    if (!escolhida) erros.conservacao = FRASE_SEM_CONSERVACAO;
+  } else if (entrada.principal !== undefined && entrada.principal !== '' && !escolhida) erros.conservacao = 'Conservação principal desconhecida.';
 
   let principal: Conservacao | null = null;
   if (marcadas.length === 0) {
     if (para === 'insumo') {
-      principal = escolhida ?? 'SECO';
+      principal = escolhida;
     } else if (escolhida) {
       // Herança c da 1.4: principal escolhida sem nenhuma validade não some em silêncio.
       erros.conservacao = `A principal (${CONSERVACOES[escolhida].toLowerCase()}) foi escolhida, mas nenhuma conservação tem validade. Marque ${CONSERVACOES[escolhida].toLowerCase()} e diga quanto dura, ou deixe sem principal.`;
     }
+  } else if (para === 'insumo') {
+    // O banco exige que, havendo algum prazo, a conservação principal tenha o seu (CHECK Insumo_validade_principal).
+    if (escolhida && marcadas.includes(escolhida)) principal = escolhida;
+    else if (escolhida) erros.conservacao ??= `Você informou prazo em outra conservação. Informe também o prazo em ${CONSERVACOES[escolhida].toLowerCase()} (a conservação principal) ou desmarque as outras.`;
   } else if (escolhida && marcadas.includes(escolhida)) principal = escolhida;
   else if (marcadas.length === 1 && !escolhida) principal = marcadas[0];
   else if (escolhida) erros.conservacao ??= `A principal (${CONSERVACOES[escolhida].toLowerCase()}) precisa estar marcada, com a validade.`;

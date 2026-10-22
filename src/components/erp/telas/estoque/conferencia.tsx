@@ -100,7 +100,7 @@ export function TelaConferencia({
           <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(c.valorCentavos)}</div>
           <div className="mt-1.5 text-[12px] text-suave">
             Pelo custo de referência de agora (último preço pago ou o cadastrado), um arredondamento por item. Fica fotografado na abertura.
-            {c.semCusto.length > 0 && ` ${c.semCusto.length} ${c.semCusto.length === 1 ? 'insumo está' : 'insumos estão'} sem preço: entra a quantidade, o valor fica pendente.`}
+            {c.semCusto.length > 0 && ` ${c.semCusto.length} ${c.semCusto.length === 1 ? 'insumo está' : 'insumos estão'} sem custo informado: entra a quantidade, o valor fica pendente.`}
           </div>
         </div>
       </div>

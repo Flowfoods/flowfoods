@@ -69,7 +69,7 @@ export function TelaDoLote({
   const entregues = d.requisicao?.status === 'ATENDIDA';
   // Sem baixa não há custo: "—" (ou "a entregar" enquanto o lote ainda espera), nunca R$ 0,00.
   const custoDoItem = (i: (typeof d.itensDoLote)[number]) =>
-    i.semPreco ? 'Sem preço' : i.saiuMilesimos === 0 || i.valorCentavos === null ? (pend && i.faltaMilesimos > 0 ? 'a entregar' : '—') : formatarDinheiro(i.valorCentavos);
+    i.semPreco ? 'Custo não informado' : i.saiuMilesimos === 0 || i.valorCentavos === null ? (pend && i.faltaMilesimos > 0 ? 'a entregar' : '—') : formatarDinheiro(i.valorCentavos);
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: quadro }, { rotulo: `Lote ${o.codigoLote}` }]} />

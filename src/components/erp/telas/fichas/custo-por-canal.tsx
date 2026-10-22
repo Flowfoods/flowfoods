@@ -87,7 +87,7 @@ function ValorDaEmbalagem({ e }: { e: Embalagem | undefined }) {
   if (!e) return TRACO;
   return (
     <>
-      {e.valor ? <span className="text-texto">{formatarFracao(e.valor)}</span> : <Selo tom="alerta">Sem preço</Selo>}
+      {e.valor ? <span className="text-texto">{formatarFracao(e.valor)}</span> : <Selo tom="alerta">Custo não informado</Selo>}
       <span className="block text-[12px] text-suave">{formatarQuantidade(e.quantidadeMilesimos, e.unidade)}</span>
     </>
   );
@@ -342,7 +342,7 @@ function Conteudo({
             {camadas.map((c) => (
               <td key={c.canal} className={`${td} last:pr-5`}>
                 {formatarFracao(c.daFicha)}
-                {c.insumosSemPreco.length > 0 && <span className="block text-[12px] text-atencao">+ sem preço</span>}
+                {c.insumosSemPreco.length > 0 && <span className="block text-[12px] text-atencao">+ custo não informado</span>}
               </td>
             ))}
           </tr>

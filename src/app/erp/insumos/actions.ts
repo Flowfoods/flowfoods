@@ -11,7 +11,8 @@
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
-import { cadastrarInsumo, editarInsumo, mudarSituacaoInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumo, confirmarConservacao, editarInsumo, mudarSituacaoInsumo } from '@/lib/erp/insumos';
+import { caminhoDeVolta } from '@/lib/erp/volta';
 import { cadastrarVariante, editarVariante, mudarSituacaoVariante } from '@/lib/erp/variantes';
 import { criarCategoria, excluirCategoria, moverCategoria, mudarSituacaoCategoria, renomearCategoria } from '@/lib/erp/categorias';
 import { aceitarSugestoes, aplicarClassificacao, classificarEmLote, reverterLote } from '@/lib/erp/classificar';
@@ -34,7 +35,8 @@ export async function acaoCadastrarInsumo(anterior: EstadoCadastro, form: FormDa
   const { ctx, negado } = await paraEditar();
   if (negado) return recusado(anterior, negado);
   const r = await cadastrarInsumo(ctx.cliente, entradaDe(form), ctx.sessao.autorNome, ctx.sessao.userId);
-  return concluir(r, anterior, BASE, { mudou: 'criado', repetido: 'criado-repetido' });
+  // I.1b: veio de uma nota ou ficha ("Insumo que falta: cadastrar")? Volta para lá, só por caminho interno da área do ERP.
+  return concluir(r, anterior, BASE, { mudou: 'criado', repetido: 'criado-repetido' }, undefined, caminhoDeVolta(form.get('volta'), '/erp/'));
 }
 
 export async function acaoEditarInsumo(id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -42,6 +44,14 @@ export async function acaoEditarInsumo(id: string, anterior: EstadoCadastro, for
   if (negado) return recusado(anterior, negado);
   const r = await editarInsumo(ctx.cliente, String(id), entradaDe(form), ctx.sessao.autorNome);
   return concluir(r, anterior, BASE, { mudou: 'editado', igual: 'igual' });
+}
+
+/** I.1b: "Confirmar a conservação" de um insumo antigo (Seco que ninguém confirmou): não muda nada, só registra a confirmação. */
+export async function acaoConfirmarConservacao(id: string, anterior: EstadoCadastro): Promise<EstadoCadastro> {
+  const { ctx, negado } = await paraEditar();
+  if (negado) return recusado(anterior, negado);
+  const r = await confirmarConservacao(ctx.cliente, String(id), ctx.sessao.autorNome);
+  return concluir(r, anterior, BASE, { mudou: 'conservacao-confirmada', igual: 'conservacao-confirmada' });
 }
 
 export async function acaoSituacaoInsumo(id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {

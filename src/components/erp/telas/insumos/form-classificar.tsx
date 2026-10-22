@@ -84,6 +84,8 @@ export function FormDaFila({
   useEffect(() => setMarcados(new Set()), [linhas]);
   const todos = marcados.size === linhas.length && linhas.length > 0;
   const mostraValor = useMemo(() => linhas.some((l) => l.valorCentavos !== null), [linhas]);
+  // "Aceitar a sugestão" classifica só o que o nome decide: os marcados que estão "sem certeza" ficam na fila.
+  const semCerteza = useMemo(() => linhas.filter((l) => marcados.has(l.id) && l.sugestao.ambigua).length, [linhas, marcados]);
   const alternar = (id: string) =>
     setMarcados((m) => {
       const n = new Set(m);
@@ -107,6 +109,8 @@ export function FormDaFila({
       <BarraDeAcao posicao="topo" categorias={categorias} categoriaId={categoriaId} aoEscolher={setCategoriaId} marcados={marcados.size} bloqueio={bloqueio} />
       <p aria-live="polite" className="px-4 pb-2 text-[12px] tabular-nums text-suave sm:px-5">
         {marcados.size === 0 ? 'Nenhum insumo marcado.' : `${marcados.size} de ${linhas.length} marcados.`}
+        {semCerteza > 0 &&
+          ` Pela sugestão do nome, ${semCerteza} ${semCerteza === 1 ? 'está' : 'estão'} “sem certeza” e ${semCerteza === 1 ? 'fica' : 'ficam'} na fila: escolha a categoria para ${semCerteza === 1 ? 'ele' : 'eles'}.`}
       </p>
 
       <div className="border-t border-linha">

@@ -6,10 +6,10 @@
  */
 
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode, visaoDaRequisicao } from '@/lib/erp/contexto';
-import { listarInsumos } from '@/lib/erp/insumos';
+import { contarConservacaoAConfirmar, listarInsumos } from '@/lib/erp/insumos';
 import { categoriasParaEscolher } from '@/lib/erp/categorias';
 import { resumoDoQueFalta } from '@/lib/erp/classificar';
-import { AvisoDaClassificacao } from '@/components/erp/telas/insumos/aviso-classificar';
+import { AvisosDaLista } from '@/components/erp/telas/insumos/aviso-classificar';
 import { lerFiltros, temFiltro } from '@/lib/erp/insumo-campos';
 import { FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
 import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
@@ -23,11 +23,12 @@ export default async function ErpInsumosPage({ searchParams }: { searchParams: R
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.ver');
   const filtros = lerFiltros(searchParams);
-  const [pagina, { visao }, categorias, faltam] = await Promise.all([
+  const [pagina, { visao }, categorias, faltam, aConfirmar] = await Promise.all([
     listarInsumos(ctx.cliente, filtros),
     visaoDaRequisicao(ctx),
     categoriasParaEscolher(ctx.cliente, null, true),
     resumoDoQueFalta(ctx.cliente, ctx.alcance),
+    contarConservacaoAConfirmar(ctx.cliente),
   ]);
   const cadastra = pode(ctx.alcance, 'insumos.editar');
   return (
@@ -39,7 +40,7 @@ export default async function ErpInsumosPage({ searchParams }: { searchParams: R
       >
         <FiltrosDaLista base={BASE} filtros={filtros} categorias={categorias} />
       </CabecalhoDaLista>
-      <AvisoDaClassificacao resumo={faltam} href={cadastra ? `${BASE}/classificar` : undefined} />
+      <AvisosDaLista resumo={faltam} hrefClassificar={cadastra ? `${BASE}/classificar` : undefined} aConfirmar={aConfirmar} base={BASE} jaFiltrado={filtros.conservacao === 'confirmar'} />
       <TelaListaInsumos
         base={BASE}
         filtros={filtros}

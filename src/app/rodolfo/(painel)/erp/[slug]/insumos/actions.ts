@@ -13,7 +13,8 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/db';
 import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
-import { cadastrarInsumo, editarInsumo, mudarSituacaoInsumo, type ResultadoCadastro } from '@/lib/erp/insumos';
+import { cadastrarInsumo, confirmarConservacao, editarInsumo, mudarSituacaoInsumo, type ResultadoCadastro } from '@/lib/erp/insumos';
+import { caminhoDeVolta } from '@/lib/erp/volta';
 import { cadastrarVariante, editarVariante, mudarSituacaoVariante, type ResultadoVariante } from '@/lib/erp/variantes';
 import { criarCategoria, excluirCategoria, moverCategoria, mudarSituacaoCategoria, renomearCategoria, type ResultadoCategoria } from '@/lib/erp/categorias';
 import { aceitarSugestoes, aplicarClassificacao, classificarEmLote, reverterLote } from '@/lib/erp/classificar';
@@ -41,7 +42,8 @@ export async function acaoCadastrarInsumo(slug: string, anterior: EstadoCadastro
   if (negado) return recusado(anterior, negado);
   const r = await cadastrarInsumo(ctx.cliente, entradaDe(form), ctx.sessao.autorNome, ctx.sessao.userId);
   await auditar(ctx, 'erp_insumo_criado', r);
-  return concluir(r, anterior, base, { mudou: 'criado', repetido: 'criado-repetido' });
+  // I.1b: veio de uma nota ou ficha? Volta para lá, só por caminho interno desta área (/rodolfo/erp/<slug>/...).
+  return concluir(r, anterior, base, { mudou: 'criado', repetido: 'criado-repetido' }, undefined, caminhoDeVolta(form.get('volta'), `/rodolfo/erp/${ctx.parceiro.slug}/`));
 }
 
 export async function acaoEditarInsumo(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -50,6 +52,15 @@ export async function acaoEditarInsumo(slug: string, id: string, anterior: Estad
   const r = await editarInsumo(ctx.cliente, String(id), entradaDe(form), ctx.sessao.autorNome);
   await auditar(ctx, 'erp_insumo_alterado', r);
   return concluir(r, anterior, base, { mudou: 'editado', igual: 'igual' });
+}
+
+/** I.1b: "Confirmar a conservação" de um insumo antigo (Seco que ninguém confirmou): não muda nada, só registra a confirmação. */
+export async function acaoConfirmarConservacao(slug: string, id: string, anterior: EstadoCadastro): Promise<EstadoCadastro> {
+  const { ctx, negado, base } = await paraEditar(slug);
+  if (negado) return recusado(anterior, negado);
+  const r = await confirmarConservacao(ctx.cliente, String(id), ctx.sessao.autorNome);
+  await auditar(ctx, 'erp_insumo_conservacao_confirmada', r);
+  return concluir(r, anterior, base, { mudou: 'conservacao-confirmada', igual: 'conservacao-confirmada' });
 }
 
 export async function acaoSituacaoInsumo(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {

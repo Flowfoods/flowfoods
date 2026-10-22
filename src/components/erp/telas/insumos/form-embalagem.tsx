@@ -39,7 +39,10 @@ export function FormEmbalagem({
   inicial = { nome: '', codigoBarras: '', ...EMBALAGEM_VAZIA },
   versao,
   bloqueio = null,
+  insumoNome,
 }: {
+  /** O nome do INSUMO (que não se pede de novo aqui): a ajuda do nome da embalagem o repete. */
+  insumoNome?: string;
   acao: AcaoDeCadastro;
   unidade: Unidade;
   aqui: string;
@@ -63,7 +66,7 @@ export function FormEmbalagem({
           <div className="space-y-4">
             <div>
               <label htmlFor={`${idBase}-nome`} className={ROTULO}>
-                Nome da embalagem
+                Nome desta embalagem de compra
               </label>
               <input
                 id={`${idBase}-nome`}
@@ -71,11 +74,15 @@ export function FormEmbalagem({
                 maxLength={60}
                 autoComplete="off"
                 defaultValue={inicial.nome}
-                placeholder="Ex.: Caixa 10 kg, marca B"
+                placeholder="Ex.: caixa de 5 kg"
                 className={CAMPO}
                 aria-invalid={!!erros.nome}
-                aria-describedby={erros.nome ? `${idBase}-nome-erro` : undefined}
+                aria-describedby={[`${idBase}-nome-ajuda`, erros.nome ? `${idBase}-nome-erro` : ''].filter(Boolean).join(' ')}
               />
+              <p id={`${idBase}-nome-ajuda`} className={AJUDA}>
+                {insumoNome ? `O insumo continua sendo “${insumoNome}”: este nome só diferencia` : 'Este nome só diferencia'} esta forma de comprar das outras (caixa,
+                fardo, outra marca) nas notas e no estoque.
+              </p>
               <Erro id={`${idBase}-nome-erro`} texto={erros.nome} />
             </div>
             <CamposDaEmbalagem unidade={unidade} inicial={inicial} erros={erros} idBase={idBase} />

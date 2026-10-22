@@ -113,7 +113,7 @@ async function planejar(tx: ClienteDoParceiro, texto: string, travar: boolean): 
   const todos = await tx.insumo.findMany({
     // O insumo que um pré-preparo produz não entra: na receita, vale o pré-preparo (mesmo nome).
     where: { fichaQueProduz: { is: null } },
-    select: { id: true, nome: true, unidade: true, ativo: true, conteudoMilesimos: true, precoEmbalagemCentavos: true, taxaEntregaCentavos: true },
+    select: { id: true, nome: true, tipo: true, unidade: true, ativo: true, conteudoMilesimos: true, precoEmbalagemCentavos: true, taxaEntregaCentavos: true },
   });
   // 1.5: custo pela última compra (uma consulta para a planilha inteira).
   await anexarUltimasCompras(tx, todos as (typeof todos[number] & ComUltimaCompra)[]);

@@ -15,6 +15,7 @@ import { signOut } from 'next-auth/react';
 import { iniciais } from '@/lib/erp/modulos';
 import { ROTULO_DO_TEMA, TEMAS, type Tema } from '@/lib/erp/tema';
 import { acaoTrocarTema } from './acoes';
+import { limparRascunhos } from '../telas/cadastro/rascunho';
 import { Popover } from './Popover';
 
 const ICONE_DO_TEMA = { claro: Sun, escuro: Moon, sistema: Monitor } as const;
@@ -105,7 +106,7 @@ export function MenuUsuario({
           )}
           <div className="pt-1">
             {sair ? (
-              <form action={sair}>
+              <form action={sair} onSubmit={limparRascunhos}>
                 <button
                   type="submit"
                   className="ff-transicao flex min-h-11 w-full items-center gap-2 rounded-[8px] px-3 text-left text-[14px] hover:bg-texto/5"
@@ -117,7 +118,10 @@ export function MenuUsuario({
               <button
                 type="button"
                 disabled={saindo}
-                onClick={() => iniciarSaida(() => signOut({ callbackUrl: '/rodolfo/login' }))}
+                onClick={() => {
+                  limparRascunhos();
+                  iniciarSaida(() => signOut({ callbackUrl: '/rodolfo/login' }));
+                }}
                 className="ff-transicao flex min-h-11 w-full items-center gap-2 rounded-[8px] px-3 text-left text-[14px] hover:bg-texto/5"
               >
                 <LogOut size={16} aria-hidden /> {saindo ? 'Saindo…' : 'Sair'}

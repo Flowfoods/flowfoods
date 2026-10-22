@@ -22,11 +22,44 @@ import {
 export const TIPOS = {
   INGREDIENTE: 'Ingrediente',
   EMBALAGEM: 'Embalagem',
+  MATERIAL: 'Material de limpeza e uso',
   PRE_PREPARO: 'Pré-preparo',
 } as const;
 export type TipoInsumo = keyof typeof TIPOS;
 /** Pré-preparo nasce da ficha técnica (fase 1.3): no formulário, só estes. */
-export const TIPOS_DO_FORM = ['INGREDIENTE', 'EMBALAGEM'] as const;
+export const TIPOS_DO_FORM = ['INGREDIENTE', 'EMBALAGEM', 'MATERIAL'] as const;
+
+/**
+ * I.1b: o que cada tipo FAZ no ERP (o papel do item), dito ao lado da escolha. Tipo não é categoria (a natureza para o CMV) nem
+ * conservação (onde fica guardado): é o papel dele na ficha técnica e nas embalagens por canal.
+ */
+export const AJUDA_DO_TIPO: Readonly<Record<'INGREDIENTE' | 'EMBALAGEM' | 'MATERIAL', string>> = {
+  INGREDIENTE: 'Entra nas fichas técnicas e no custo dos pratos.',
+  EMBALAGEM: 'Vai na embalagem do delivery e do iFood (custo por canal), não na receita.',
+  MATERIAL: 'Detergente, luva, pano, saco de lixo: comprado e estocado, mas não entra em ficha técnica.',
+};
+
+/**
+ * I.1b: "conservação a confirmar". Até a I.1a o servidor assumia Seco quando nada vinha, então um insumo antigo em Seco pode ser
+ * Seco de verdade ou um padrão que ninguém escolheu. Nada é reinterpretado: só aparece na lista, para uma PESSOA confirmar, o
+ * que é Seco, ainda sem confirmação, numa categoria que costuma ficar no frio (Proteína, Laticínios, frios e embutidos,
+ * Hortifruti). Pré-preparo não conta: a conservação dele vem da ficha.
+ */
+export const CATEGORIAS_QUE_COSTUMAM_SER_FRIAS = ['PROTEINA', 'LATICINIOS', 'HORTIFRUTI'] as const;
+export function conservacaoAConfirmar(i: { tipo: string; conservacao: string; conservacaoConfirmadaEm: Date | string | null; categoriaChave: string | null }): boolean {
+  return (
+    i.tipo !== 'PRE_PREPARO' &&
+    i.conservacao === 'SECO' &&
+    !i.conservacaoConfirmadaEm &&
+    i.categoriaChave !== null &&
+    (CATEGORIAS_QUE_COSTUMAM_SER_FRIAS as readonly string[]).includes(i.categoriaChave)
+  );
+}
+/** O valor do filtro "Conservação" da lista que lista só esses. */
+export const FILTRO_A_CONFIRMAR = 'confirmar';
+
+/** I.1b: o limite da marca de referência (texto informativo). */
+export const MARCA_MAXIMA = 80;
 
 // Conservações e validade (1.4) moram em `validade.ts`; daqui seguem exportadas para quem já usava.
 import { CONSERVACOES, entradaDoFormulario, lerValidades, retratoDaValidade, type Conservacao, type Validades } from './validade';
@@ -81,10 +114,12 @@ export interface Embalagem {
 
 /**
  * Conteúdo, preço e frete de uma embalagem (a padrão do insumo ou outra).
- * Texto → inteiro só aqui. Preço vazio sem "Ainda não sei o preço" é erro;
- * marcado, grava 0 (a tela mostra "Sem preço").
+ * Texto → inteiro só aqui. Preço vazio sem "Ainda não sei" é erro; marcado,
+ * grava 0 (a tela mostra "Custo não informado": 0 é só o sinal de que ninguém
+ * informou, nenhuma conta o trata como custo). `oQue`: no insumo o valor é o
+ * "custo inicial de referência"; na outra embalagem, o "preço".
  */
-export function lerEmbalagem(entrada: Record<string, unknown>, unidade: Unidade, erros: Erros): Embalagem | null {
+export function lerEmbalagem(entrada: Record<string, unknown>, unidade: Unidade, erros: Erros, oQue: 'custo' | 'preço' = 'preço'): Embalagem | null {
   const escala: Escala = entrada.escala === 'menor' ? 'menor' : 'base';
   const u = UNIDADES[unidade];
   const naMenor = escala === 'menor' && unidade !== 'UN';
@@ -100,9 +135,10 @@ export function lerEmbalagem(entrada: Record<string, unknown>, unidade: Unidade,
   if (!marcado(entrada.semPreco)) {
     const precoTxt = texto(entrada.preco).trim();
     precoEmbalagemCentavos = precoTxt ? lerDinheiro(precoTxt) : null;
-    if (!precoTxt) erros.preco = 'Informe o preço ou marque “Ainda não sei o preço”.';
-    else if (precoEmbalagemCentavos === null) erros.preco = 'Preço inválido. Ex.: 89,90.';
-    else if (precoEmbalagemCentavos === 0) erros.preco = 'Preço zero? Se ainda não sabe, marque “Ainda não sei o preço”.';
+    const nao = oQue === 'custo' ? 'Ainda não sei o custo' : 'Ainda não sei o preço';
+    if (!precoTxt) erros.preco = oQue === 'custo' ? `Informe o custo inicial de referência (o que você paga pela embalagem) ou marque “${nao}”.` : `Informe o preço ou marque “${nao}”.`;
+    else if (precoEmbalagemCentavos === null) erros.preco = `${oQue === 'custo' ? 'Custo' : 'Preço'} inválido. Ex.: 89,90.`;
+    else if (precoEmbalagemCentavos === 0) erros.preco = `${oQue === 'custo' ? 'Custo zero' : 'Preço zero'}? Se ainda não sabe, marque “${nao}”.`;
   }
 
   const freteTxt = texto(entrada.frete).trim();
@@ -122,13 +158,25 @@ export const FRASE_SEM_UNIDADE = 'Escolha a unidade base: como você controla o 
 
 const formInsumo = z.object({
   nome: nomeObrigatorio(80),
-  tipo: z.enum(['INGREDIENTE', 'EMBALAGEM', 'PRE_PREPARO'], { message: 'Escolha o tipo.' }).default('INGREDIENTE'),
+  tipo: z.enum(['INGREDIENTE', 'EMBALAGEM', 'MATERIAL', 'PRE_PREPARO'], { message: 'Escolha o tipo.' }).default('INGREDIENTE'),
   unidade: z.enum(['KG', 'L', 'UN'], { message: FRASE_SEM_UNIDADE }),
   categoriaId: z
     .string({ message: FRASE_SEM_CATEGORIA })
     .trim()
     .min(1, FRASE_SEM_CATEGORIA)
     .max(60, FRASE_SEM_CATEGORIA),
+  // I.1b: marca de referência, opcional. Vazia = sem marca; só espaços ou invisíveis também. Nunca bloqueia nada.
+  marcaReferencia: z
+    .string()
+    .transform(limparTexto)
+    .pipe(
+      z
+        .string()
+        .transform((s) => s.replace(/\s+/g, ' ').trim())
+        .pipe(z.string().max(MARCA_MAXIMA, `Marca longa demais (máx. ${MARCA_MAXIMA} letras).`)),
+    )
+    .optional()
+    .transform((s) => (s ? s : null)),
 });
 
 /** A chave que o formulário manda para o servidor reconhecer o reenvio (um UUID por montagem do formulário). */
@@ -147,6 +195,8 @@ export interface DadosInsumo extends Embalagem {
   categoriaId?: string;
   /** I.1a: o nome da categoria, só para o retrato do histórico. */
   categoriaNome?: string | null;
+  /** I.1b: a marca de referência (texto informativo, opcional); null = sem marca. */
+  marcaReferencia?: string | null;
   /** A principal (onde se guarda); é `validades.principal`. */
   conservacao: Conservacao;
   /** 1.4: validade por conservação (minutos); sem nenhuma = não informada. */
@@ -167,9 +217,10 @@ export function lerFormInsumo(entrada: Record<string, unknown>, tipoAtual?: Tipo
     tipo: vazio(entrada.tipo),
     unidade: vazio(entrada.unidade),
     categoriaId: entrada.categoriaId,
+    marcaReferencia: typeof entrada.marcaReferencia === 'string' ? entrada.marcaReferencia : undefined,
   });
   const erros: Erros = r.success ? {} : primeiroErroPorCampo(r.error.issues);
-  // 1.4: conservação principal + validade em cada uma que o insumo aceita (opcionais).
+  // 1.4: conservação principal + validade em cada uma que o insumo aceita (opcionais). I.1b: a principal é escolhida, nunca assumida.
   const v = lerValidades(entradaDoFormulario((k) => (k === 'conservacao' ? vazio(entrada.conservacao) : entrada[k])), 'insumo');
   if (!v.ok) Object.assign(erros, v.erros);
   if (r.success) {
@@ -180,7 +231,7 @@ export function lerFormInsumo(entrada: Record<string, unknown>, tipoAtual?: Tipo
     }
   }
   const unidade = r.success ? r.data.unidade : (['KG', 'L', 'UN'] as const).find((u) => u === entrada.unidade);
-  const embalagem = unidade ? lerEmbalagem(entrada, unidade, erros) : null;
+  const embalagem = unidade ? lerEmbalagem(entrada, unidade, erros, 'custo') : null;
   if (!r.success || !embalagem || !v.ok || !v.validades || Object.keys(erros).length > 0) return { ok: false, erros };
   return { ok: true, dados: { ...r.data, ...embalagem, conservacao: v.validades.principal, validades: v.validades } };
 }
@@ -231,11 +282,14 @@ export function retratoDoInsumo(i: DadosInsumo & { ativo?: boolean }): Retrato {
     ...(i.categoriaId ? { categoria: i.categoriaNome ?? null, categoriaId: i.categoriaId } : {}),
     unidade: i.unidade,
     conservacao: i.conservacao,
-    validade: retratoDaValidade(i.validades),
+    // I.1b: no insumo COMPRADO é o prazo de uso após abertura (a validade do pré-preparo é a da ficha: outra chave, outro rótulo).
+    prazoAposAbertura: retratoDaValidade(i.validades),
     conteudoMilesimos: i.conteudoMilesimos,
     precoEmbalagemCentavos: i.precoEmbalagemCentavos,
     taxaEntregaCentavos: i.taxaEntregaCentavos,
     custoPorUnidade: custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+    // I.1b: sempre no retrato (null = sem marca): tirar a marca também é uma mudança que o histórico mostra.
+    marcaReferencia: i.marcaReferencia ?? null,
   };
 }
 
@@ -340,7 +394,8 @@ export interface FiltrosDeInsumo {
    * os dessa categoria. Valor torto na URL cai em null (todas).
    */
   categoria: string | null;
-  conservacao: Conservacao | null;
+  /** Uma conservação, ou `FILTRO_A_CONFIRMAR` (os Seco ainda não confirmados de Proteína, Laticínios e Hortifruti). */
+  conservacao: Conservacao | typeof FILTRO_A_CONFIRMAR | null;
   situacao: Situacao;
   semPreco: boolean;
   ordem: 'nome' | 'custo';
@@ -377,7 +432,7 @@ export function lerFiltros(sp: Record<string, string | string[] | undefined>): F
     q: (v('q') ?? '').trim().slice(0, 80),
     tipo: um(v('tipo'), Object.keys(TIPOS) as TipoInsumo[]),
     categoria: ((c) => (c && /^[A-Za-z0-9_-]{1,40}$/.test(c) ? c : null))(v('categoria')),
-    conservacao: um(v('conservacao'), Object.keys(CONSERVACOES) as Conservacao[]),
+    conservacao: um(v('conservacao'), [...(Object.keys(CONSERVACOES) as Conservacao[]), FILTRO_A_CONFIRMAR]),
     situacao: um(v('situacao'), ['ativos', 'desativados', 'todos'] as const) ?? 'ativos',
     semPreco: v('preco') === 'sem',
     ordem: um(v('ordem'), ['nome', 'custo'] as const) ?? 'nome',

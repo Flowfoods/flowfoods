@@ -125,12 +125,12 @@ describe('ERP 1.1 · custo por unidade = (preço + frete) ÷ conteúdo, exato (f
     expect(compararCustos(a, custoDaEmbalagem(800, 0, 2_000_000)!)).toBe(0);
   });
 
-  it('preço 0 é "Sem preço": custo incompleto, nunca R$ 0,00 (mesmo com frete)', () => {
+  it('preço 0 é "Custo não informado": custo incompleto, nunca R$ 0,00 (mesmo com frete)', () => {
     expect(custoDaEmbalagem(0, 500, 1000)).toBeNull();
-    expect(formatarCusto(null, 'KG')).toBe('Sem preço');
+    expect(formatarCusto(null, 'KG')).toBe('Custo não informado');
     expect(n(formatarCusto(custoDaEmbalagem(8990, 500, 5000), 'KG'))).toBe('R$ 18,98/kg');
     const conta = contaDoCusto({ precoEmbalagemCentavos: 0, taxaEntregaCentavos: 500, conteudoMilesimos: 1000, unidade: 'KG' });
-    expect(conta).toMatch(/^Sem preço/);
+    expect(conta).toMatch(/^Custo não informado/);
     expect(conta).not.toMatch(/0,00/);
   });
 });
@@ -147,6 +147,7 @@ describe('ERP 1.1 · formulário do insumo (o servidor converte)', () => {
         tipo: 'INGREDIENTE',
         unidade: 'KG',
         categoriaId: 'cat1',
+        marcaReferencia: null,
         conservacao: 'SECO',
         validades: { principal: 'SECO', minutos: {} },
         conteudoMilesimos: 5000,
@@ -175,14 +176,14 @@ describe('ERP 1.1 · formulário do insumo (o servidor converte)', () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(r.erros.frete).toMatch(/Frete inválido/);
-    expect(r.erros.preco).toMatch(/Preço inválido/);
+    expect(r.erros.preco).toMatch(/Custo inválido/);
     expect(r.erros.conteudo).toMatch(/mais que zero/);
   });
 
-  it('preço vazio ou zero sem marcar pede "Ainda não sei o preço"; marcado, grava 0', () => {
+  it('custo vazio ou zero sem marcar pede "Ainda não sei o custo"; marcado, grava 0 (= custo não informado)', () => {
     for (const preco of ['', '0', '0,00']) {
       const r = lerFormInsumo({ ...base, preco });
-      expect(!r.ok && r.erros.preco, preco).toMatch(/Ainda não sei o preço/);
+      expect(!r.ok && r.erros.preco, preco).toMatch(/Ainda não sei o custo/);
     }
     const r = lerFormInsumo({ ...base, preco: '', semPreco: 'on' });
     expect(r.ok && r.dados.precoEmbalagemCentavos).toBe(0);
@@ -260,30 +261,30 @@ describe('ERP 1.1 · histórico: só o que mudou, legível', () => {
     expect(diferenca(retratoDoInsumo(cebola), retratoDoInsumo(cebola))).toBeNull();
   });
 
-  it('a frase do histórico usa o mesmo custo da tela, e "Sem preço" no lugar de R$ 0,00', () => {
+  it('a frase do histórico usa o mesmo custo da tela, e "Custo não informado" no lugar de R$ 0,00', () => {
     const d = diferenca(retratoDoInsumo(cebola), retratoDoInsumo({ ...cebola, taxaEntregaCentavos: 500, conservacao: 'REFRIGERADO' }))!;
-    expect(n(descreverMudancas(d.antes, d.depois))).toEqual([
+    expect(n(descreverMudancas(d.antes, d.depois, 'Insumo'))).toEqual([
       { campo: 'conservação', antes: 'Seco', depois: 'Refrigerado' },
       { campo: 'frete', antes: 'Sem frete', depois: 'R$ 5,00' },
-      { campo: 'custo por unidade', antes: 'R$ 17,98/kg', depois: 'R$ 18,98/kg' },
+      { campo: 'custo de referência por unidade', antes: 'R$ 17,98/kg', depois: 'R$ 18,98/kg' },
     ]);
     const semPreco = diferenca(retratoDoInsumo(cebola), retratoDoInsumo({ ...cebola, precoEmbalagemCentavos: 0 }))!;
-    expect(n(descreverMudancas(semPreco.antes, semPreco.depois))).toEqual([
-      { campo: 'preço', antes: 'R$ 89,90', depois: 'Sem preço' },
-      { campo: 'custo por unidade', antes: 'R$ 17,98/kg', depois: 'Sem preço' },
+    expect(n(descreverMudancas(semPreco.antes, semPreco.depois, 'Insumo'))).toEqual([
+      { campo: 'custo inicial de referência', antes: 'R$ 89,90', depois: 'Custo não informado' },
+      { campo: 'custo de referência por unidade', antes: 'R$ 17,98/kg', depois: 'Custo não informado' },
     ]);
   });
 
   it('criação mostra embalagem com unidade, tipo e custo; desativar mostra a situação', () => {
-    const m = descreverMudancas(null, retratoDoInsumo({ ...cebola, conteudoMilesimos: 750 }));
+    const m = descreverMudancas(null, retratoDoInsumo({ ...cebola, conteudoMilesimos: 750 }), 'Insumo');
     expect(n(m.map((x) => [x.campo, x.depois]))).toEqual([
       ['nome', 'Cebola'],
       ['tipo', 'Ingrediente'],
       ['conservação', 'Seco'],
       ['embalagem', '750 g'],
-      ['preço', 'R$ 89,90'],
+      ['custo inicial de referência', 'R$ 89,90'],
       ['frete', 'Sem frete'],
-      ['custo por unidade', 'R$ 119,87/kg'],
+      ['custo de referência por unidade', 'R$ 119,87/kg'],
     ]);
     expect(n(descreverMudancas({ nome: 'Cebola', ativo: true }, { nome: 'Cebola', ativo: false }))).toEqual([
       { campo: 'situação', antes: 'Ativo', depois: 'Desativado' },
@@ -293,7 +294,7 @@ describe('ERP 1.1 · histórico: só o que mudou, legível', () => {
   it('guardanapo (1000 un por R$ 4,00): o histórico mostra R$ 0,004/un, não R$ 0,00', () => {
     const r = retratoDoInsumo({ ...cebola, nome: 'Guardanapo de papel', tipo: 'EMBALAGEM', unidade: 'UN', conteudoMilesimos: 1_000_000, precoEmbalagemCentavos: 400 });
     expect(r.custoPorUnidade).toEqual({ centavos: 1, milesimos: 2500 });
-    const custo = n(descreverMudancas(null, r)).find((m) => m.campo === 'custo por unidade');
+    const custo = n(descreverMudancas(null, r, 'Insumo')).find((m) => m.campo === 'custo de referência por unidade');
     expect(custo?.depois).toBe('R$ 0,004/un');
     // Linha antiga (antes desta correção) com o custo em centavos inteiros continua legível.
     expect(n(descreverMudancas(null, { unidade: 'KG', custoPorUnidadeCentavos: 1898 })).find((m) => m.campo === 'custo por unidade')?.depois).toBe('R$ 18,98/kg');

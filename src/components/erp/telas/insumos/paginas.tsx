@@ -10,6 +10,7 @@ import type { ReactNode } from 'react';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
 import { TIPOS } from '@/lib/erp/insumo-campos';
+import { rotuloDaVolta } from '@/lib/erp/volta';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, dinheiroParaCampo, quantidadeParaCampo } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
@@ -75,6 +76,7 @@ export function TelaFormInsumo({
   lembrado,
   categorias,
   envio,
+  volta,
 }: {
   /** Ausente = novo. */
   insumo?: InsumoDetalhado;
@@ -84,8 +86,10 @@ export function TelaFormInsumo({
   envio?: string;
   /** Novo vindo da importação de fichas ("Cadastrar “Picles”"): o nome já vem escrito. */
   nomeSugerido?: string;
-  /** "Cadastrar outro insumo": tipo, unidade e conservação do último, vindos da URL (só valores da lista valem). */
-  lembrado?: { tipo?: string; unidade?: string; conservacao?: string };
+  /** "Cadastrar outro insumo": tipo e unidade do último, vindos da URL (só valores da lista valem). */
+  lembrado?: { tipo?: string; unidade?: string };
+  /** I.1b: o caminho de volta JÁ VALIDADO (vindo de "Insumo que falta: cadastrar" numa nota ou ficha); só no cadastro novo. */
+  volta?: string | null;
   base: string;
   contexto: string;
   acao: AcaoDeCadastro;
@@ -97,26 +101,30 @@ export function TelaFormInsumo({
     unidade: insumo.unidade,
     categoriaId: insumo.categoria?.id ?? '',
     conservacao: insumo.conservacao,
+    marcaReferencia: insumo.marcaReferencia ?? '',
     validades: insumo.validades,
     ...embalagemParaCampo(insumo, insumo.unidade),
   } : undefined;
-  const volta = insumo ? `${base}/${insumo.id}` : base;
+  const aqui = insumo ? `${base}/${insumo.id}` : base;
+  const paraVoltar = !insumo && volta ? volta : aqui;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
-      <TrilhaDaPagina itens={insumo ? [{ rotulo: insumo.nome, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo insumo' }]} />
-      <Voltar href={volta}>{insumo ? `Voltar para ${insumo.nome}` : 'Voltar para a lista'}</Voltar>
+      <TrilhaDaPagina itens={insumo ? [{ rotulo: insumo.nome, href: aqui }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo insumo' }]} />
+      <Voltar href={paraVoltar} recarregar={!insumo && !!volta}>{insumo ? `Voltar para ${insumo.nome}` : volta ? `Voltar para ${rotuloDaVolta(volta)}` : 'Voltar para a lista'}</Voltar>
       <PageHeader
         icone="insumo"
         cor={COR.insumo}
         titulo={insumo ? 'Editar insumo' : 'Novo insumo'}
-        subtitulo={insumo ? `${contexto} · ${insumo.nome}` : `${contexto} · cadastro da rede, vale para todas as lojas`}
+        subtitulo={insumo ? `${contexto} · ${insumo.nome}` : volta ? `${contexto} · depois de salvar, você volta para ${rotuloDaVolta(volta)}` : `${contexto} · cadastro da rede, vale para todas as lojas`}
       />
       <FormInsumo
         acao={acao}
         modo={insumo ? 'editar' : 'criar'}
         base={base}
         aqui={insumo ? `${base}/${insumo.id}/editar` : `${base}/novo`}
-        cancelar={volta}
+        cancelar={aqui}
+        volta={volta}
+        aConfirmar={!!insumo?.conservacaoAConfirmar}
         inicial={inicial}
         nomeSugerido={nomeSugerido}
         lembrado={lembrado}
@@ -168,6 +176,7 @@ export function TelaEmbalagem({
           <FormEmbalagem
             acao={acaoSalvar}
             unidade={insumo.unidade}
+            insumoNome={insumo.nome}
             aqui={v ? `${volta}/embalagens/${v.id}` : `${volta}/embalagens/nova`}
             cancelar={volta}
             versao={v?.versao}

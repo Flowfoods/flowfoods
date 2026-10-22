@@ -22,10 +22,14 @@ import type { ClienteDoParceiro } from './tenant';
 import { checkVioladoDe, ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
 import {
+  CATEGORIAS_QUE_COSTUMAM_SER_FRIAS,
+  conservacaoAConfirmar,
   diferenca,
+  FILTRO_A_CONFIRMAR,
   FILTROS_PADRAO,
   lerChaveDeEnvio,
   lerFormInsumo,
+  marcado,
   POR_PAGINA,
   retratoDoInsumo,
   versaoDaVariante,
@@ -90,7 +94,7 @@ export function erroDoCheck(e: unknown): Extract<ResultadoCadastro, { ok: false 
   const check = checkVioladoDe(e);
   if (!check) return null;
   const geral = /validade/i.test(check)
-    ? 'A validade gravada neste insumo está fora da regra (a conservação principal precisa ter validade, até 730 dias). Corrija em Editar, no bloco “Onde guarda e quanto dura”, e tente de novo. Nada foi gravado.'
+    ? 'A validade gravada neste insumo está fora da regra (a conservação principal precisa ter validade, até 730 dias). Corrija em Editar, no bloco “Conservação e prazo de uso após abertura”, e tente de novo. Nada foi gravado.'
     : 'O banco recusou estes valores (fora da faixa permitida). Confira os números e tente de novo. Nada foi gravado.';
   return { ok: false, erros: { geral } };
 }
@@ -129,6 +133,9 @@ function erroDeNomeRepetido(achado: { id: string; nome: string; ativo: boolean }
   };
 }
 
+/** I.1b: o insumo já está numa receita ou na embalagem de um prato; virar material de limpeza e uso quebraria essas fichas. */
+export const FRASE_MATERIAL_EM_USO = 'Este insumo já está em uma ficha técnica ou na embalagem de um prato, e material de limpeza e uso não entra em ficha. Tire-o de lá antes de mudar o tipo.';
+
 const FRASE_ENVIO_TORTO = 'O envio deste formulário não tem uma chave válida. Recarregue a página e tente de novo; nada foi gravado.';
 const FRASE_ENVIO_DIFERENTE = (nome: string) =>
   `Este envio já cadastrou “${nome}” e agora chegou com dados diferentes. Recarregue a página para cadastrar de novo; nada foi gravado.`;
@@ -136,7 +143,7 @@ const FRASE_ENVIO_DIFERENTE = (nome: string) =>
 /** A impressão do conteúdo do envio: mesma chave com impressão diferente é outro pedido, não um reenvio. */
 export function hashDoEnvio(d: DadosInsumo): string {
   const r = retratoDoInsumo(d);
-  return createHash('sha256').update(JSON.stringify([d.nome, d.tipo, d.unidade, d.categoriaId ?? null, r.conservacao, r.validade, d.conteudoMilesimos, d.precoEmbalagemCentavos, d.taxaEntregaCentavos])).digest('hex');
+  return createHash('sha256').update(JSON.stringify([d.nome, d.tipo, d.unidade, d.categoriaId ?? null, r.conservacao, r.prazoAposAbertura, d.conteudoMilesimos, d.precoEmbalagemCentavos, d.taxaEntregaCentavos, d.marcaReferencia])).digest('hex');
 }
 
 /**
@@ -201,6 +208,9 @@ export async function cadastrarInsumo(
           conteudoMilesimos: d.conteudoMilesimos,
           precoEmbalagemCentavos: d.precoEmbalagemCentavos,
           taxaEntregaCentavos: d.taxaEntregaCentavos,
+          marcaReferencia: d.marcaReferencia,
+          // A conservação foi ESCOLHIDA (o servidor não assume mais Seco): já nasce confirmada por uma pessoa.
+          conservacaoConfirmadaEm: new Date(),
           categoriaId: cat.categoria.id,
           ...como,
           classificadoEm: new Date(),
@@ -286,11 +296,13 @@ function dadosDe(
     taxaEntregaCentavos: number;
     categoriaId?: string | null;
     categoria?: { nome: string } | null;
+    marcaReferencia?: string | null;
   } & ColunasDaValidade,
 ): DadosInsumo {
   return {
     nome: i.nome,
     tipo: i.tipo,
+    marcaReferencia: i.marcaReferencia ?? null,
     ...(i.categoriaId ? { categoriaId: i.categoriaId, categoriaNome: i.categoria?.nome ?? null } : {}),
     unidade: i.unidade,
     conservacao: i.conservacao,
@@ -329,10 +341,18 @@ export async function editarInsumo(
   // I.1a: o insumo antigo sem categoria também a recebe ao ser editado (o formulário já vem com a sugestão marcada). Quem chama
   // sem o campo `categoriaId` (importação, rotina de preço) e edita um insumo que JÁ tem categoria a mantém; mandar o campo
   // vazio, ou editar um insumo sem categoria sem mandá-la, é recusado com a frase.
-  const lido = lerFormInsumo('categoriaId' in entrada || !atual.categoriaId ? entrada : { ...entrada, categoriaId: atual.categoriaId }, atual.tipo);
+  // I.1b: o mesmo vale para a conservação e a marca de referência: o campo AUSENTE mantém o que está gravado (nunca vira Seco);
+  // o campo presente e vazio é recusado (conservação) ou apaga a marca.
+  const completa: Record<string, unknown> = { ...entrada };
+  if (!('categoriaId' in entrada) && atual.categoriaId) completa.categoriaId = atual.categoriaId;
+  if (!('conservacao' in entrada)) completa.conservacao = atual.conservacao;
+  if (!('marcaReferencia' in entrada) && atual.marcaReferencia) completa.marcaReferencia = atual.marcaReferencia;
+  const lido = lerFormInsumo(completa, atual.tipo);
   if (!lido.ok) return lido;
   const d = lido.dados;
   const trocouDeCategoria = d.categoriaId !== atual.categoriaId;
+  // I.1b: salvar NÃO confirma a conservação sozinho. Só confirma quem a trocou ou marcou "Confirmo que a conservação é esta".
+  const confirma = marcado(entrada.conservacaoConfirmada) || d.conservacao !== atual.conservacao;
 
   try {
     return await cliente.transacao(async (tx) => {
@@ -353,7 +373,11 @@ export async function editarInsumo(
         depoisRetrato.classificadoPor = como.classificadoPor;
       }
       const mudanca = diferenca(antesRetrato, depoisRetrato);
-      if (!mudanca) return { ok: true as const, id, nome: atual.nome, mudou: [] };
+      if (!mudanca) {
+        // I.1b: sem mudar nada, só marcar "Confirmo que a conservação é esta" confirma a de um insumo que ninguém confirmou.
+        if (!atual.conservacaoConfirmadaEm && confirma) return confirmarNaTransacao(tx, id, atual.nome, d.conservacao, versao, autorNome);
+        return { ok: true as const, id, nome: atual.nome, mudou: [] };
+      }
 
       // Condicional: a linha só muda se ainda está na versão que a tela leu.
       // O UPDATE trava a linha até o fim da transação.
@@ -369,6 +393,8 @@ export async function editarInsumo(
           conteudoMilesimos: d.conteudoMilesimos,
           precoEmbalagemCentavos: d.precoEmbalagemCentavos,
           taxaEntregaCentavos: d.taxaEntregaCentavos,
+          marcaReferencia: d.marcaReferencia,
+          ...(atual.conservacaoConfirmadaEm || !confirma ? {} : { conservacaoConfirmadaEm: new Date() }),
           // Mexeu na categoria: a classificação passa a ser desta pessoa e sai do lote da classificação assistida (a reversão
           // do lote não a desfaz mais). Salvou outra coisa, sem trocar a categoria: o insumo também sai do lote (uma pessoa o
           // revisou depois da máquina), mas a categoria e o "como foi classificada" ficam como estavam.
@@ -380,6 +406,12 @@ export async function editarInsumo(
         },
       });
       if (r.count === 0) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true });
+      if (d.tipo === 'MATERIAL' && atual.tipo !== 'MATERIAL') {
+        // I.1b: material de limpeza e uso não entra em ficha nem na embalagem de um prato. Com a linha travada pelo UPDATE
+        // (a ficha que cita o insumo o trava em FOR SHARE), conferir o uso aqui não perde uma ficha que está sendo salva agora.
+        const usos = await tx.insumo.findUnique({ where: { id }, select: { _count: { select: { usosEmFichas: true, usosComoEmbalagem: true } } } });
+        if (usos && usos._count.usosEmFichas + usos._count.usosComoEmbalagem > 0) throw new Recusa({ ok: false, erros: { tipo: FRASE_MATERIAL_EM_USO } });
+      }
       if (d.unidade !== atual.unidade) {
         // Com a linha travada: uma embalagem nova (que trava a linha em FOR
         // SHARE) ou um uso não entra no meio desta conferência.
@@ -410,6 +442,67 @@ export async function editarInsumo(
     if (check) return check;
     throw e;
   }
+}
+
+// ------------------------------------------------ conservação a confirmar
+
+/** Dentro da transação: grava a confirmação (só se ainda não houver) e o registro no histórico. */
+async function confirmarNaTransacao(tx: ClienteDoParceiro, id: string, nome: string, conservacao: Conservacao, versao: Date | null, autorNome: string) {
+  const r = await tx.insumo.updateMany({
+    where: { id, ativo: true, conservacaoConfirmadaEm: null, ...(versao ? { atualizadoEm: versao } : {}) },
+    data: { conservacaoConfirmadaEm: new Date() },
+  });
+  if (r.count === 0) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true });
+  await tx.historicoAlteracao.create({
+    data: {
+      parceiroId: tx.parceiroId,
+      entidade: 'Insumo',
+      entidadeId: id,
+      acao: 'CONFIRMOU',
+      antes: { nome, conservacao },
+      depois: { nome, conservacao },
+      autorNome,
+    },
+  });
+  return { ok: true as const, id, nome, mudou: ['conservacao'] };
+}
+
+/**
+ * I.1b: "Confirmar Seco" (ou a conservação que está gravada): uma pessoa diz que o que está lá é o certo. Não muda a
+ * conservação nem o prazo; só grava a confirmação e o registro. Confirmar de novo o que já foi confirmado é sem efeito.
+ */
+export async function confirmarConservacao(cliente: ClienteDoParceiro, id: string, autorNome = 'Sistema'): Promise<ResultadoCadastro> {
+  try {
+    return await cliente.transacao(async (tx) => {
+      const atual = await tx.insumo.findUnique({
+        where: { id },
+        select: { nome: true, ativo: true, conservacao: true, conservacaoConfirmadaEm: true, fichaQueProduz: { select: { nome: true } } },
+      });
+      if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Insumo não encontrado.' }, naoEncontrado: true });
+      if (atual.fichaQueProduz) throw new Recusa({ ok: false, erros: { geral: mensagemDoPreparo(atual.nome, atual.fichaQueProduz.nome) } });
+      if (!atual.ativo) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_DESATIVADO } });
+      if (atual.conservacaoConfirmadaEm) return { ok: true as const, id, nome: atual.nome, mudou: [] };
+      return confirmarNaTransacao(tx, id, atual.nome, atual.conservacao as Conservacao, null, autorNome);
+    });
+  } catch (e) {
+    if (e instanceof Recusa) return e.resultado;
+    throw e;
+  }
+}
+
+/** Quantos insumos ativos estão com a conservação a confirmar (a lista mostra o aviso e o filtro). */
+export async function contarConservacaoAConfirmar(cliente: ClienteDoParceiro): Promise<number> {
+  return cliente.insumo.count({ where: filtroDaConfirmacao() });
+}
+
+function filtroDaConfirmacao(): Prisma.InsumoWhereInput {
+  return {
+    ativo: true,
+    tipo: { not: 'PRE_PREPARO' },
+    conservacao: 'SECO',
+    conservacaoConfirmadaEm: null,
+    categoria: { is: { chave: { in: [...CATEGORIAS_QUE_COSTUMAM_SER_FRIAS] } } },
+  };
 }
 
 // --------------------------------------------------- desativar/reativar
@@ -472,6 +565,10 @@ export interface LinhaDeInsumo {
   categoria: { id: string; nome: string; ativa: boolean; chave: string | null } | null;
   /** Por que está em "Outros / a classificar" (ambíguo), quando está. */
   classificacaoMotivo: string | null;
+  /** I.1b: marca de referência (texto informativo), quando tem. */
+  marcaReferencia: string | null;
+  /** I.1b: Seco que ninguém confirmou, numa categoria que costuma ser fria: a conservação precisa ser confirmada. */
+  conservacaoAConfirmar: boolean;
   conservacao: Conservacao;
   /** 1.4: principal + validade em cada conservação aceita (minutos). */
   validades: Validades;
@@ -497,21 +594,24 @@ export interface LinhaDeInsumo {
 
 function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
   const q = f.q.trim().slice(0, 80);
+  // Os filtros que se combinam vão em AND (cada um com o seu OR/campo), para um nunca apagar o outro.
+  const e: Prisma.InsumoWhereInput[] = [];
+  // I.1a: 'sem' = sem categoria; 'revisar' = sem categoria ou em "Outros / a classificar"; senão, uma categoria.
+  if (f.categoria === 'sem') e.push({ categoriaId: null });
+  else if (f.categoria === 'revisar') e.push({ OR: [{ categoriaId: null }, { categoria: { is: { chave: CHAVE_DO_SISTEMA } } }] });
+  else if (f.categoria) e.push({ categoriaId: f.categoria });
+  // 1.4: "conservação X" = os que ficam em X (a principal ou com validade nela). I.1b: "a confirmar" = os Seco que ninguém
+  // confirmou, em Proteína, Laticínios ou Hortifruti (a situação escolhida na lista continua valendo).
+  if (f.conservacao === FILTRO_A_CONFIRMAR) {
+    const { ativo: _ativo, ...resto } = filtroDaConfirmacao();
+    e.push(resto);
+  } else if (f.conservacao) e.push({ OR: [{ conservacao: f.conservacao }, { [COLUNA_DA_VALIDADE[f.conservacao]]: { not: null } }] });
   return {
     ...(q ? { nome: { contains: q, mode: 'insensitive' as const } } : {}),
     ...(f.tipo ? { tipo: f.tipo } : {}),
-    // I.1a: 'sem' = sem categoria; 'revisar' = sem categoria ou em "Outros / a classificar"; senão, uma categoria.
-    ...(f.categoria === 'sem'
-      ? { categoriaId: null }
-      : f.categoria === 'revisar'
-        ? { AND: [{ OR: [{ categoriaId: null }, { categoria: { is: { chave: CHAVE_DO_SISTEMA } } }] }] }
-        : f.categoria
-          ? { categoriaId: f.categoria }
-          : {}),
-    // 1.4: "conservação X" = os que ficam em X (a principal ou com validade nela).
-    ...(f.conservacao ? { OR: [{ conservacao: f.conservacao }, { [COLUNA_DA_VALIDADE[f.conservacao]]: { not: null } }] } : {}),
+    ...(e.length ? { AND: e } : {}),
     ...(f.situacao === 'ativos' ? { ativo: true } : f.situacao === 'desativados' ? { ativo: false } : {}),
-    // "Sem preço" é quem precisa de preço digitado: o pré-preparo tem custo da ficha.
+    // "Sem custo informado" é quem precisa de custo digitado: o pré-preparo tem custo da ficha.
     // 1.5: com nota lançada, o insumo tem o preço da compra.
     ...(f.semPreco ? { precoEmbalagemCentavos: 0, fichaQueProduz: { is: null }, notaItens: { none: { nota: { status: 'LANCADA' as const } } } } : {}),
   };
@@ -525,6 +625,8 @@ const SELECAO_DA_LINHA = {
   // I.1a: a categoria que a lista mostra (a coluna e o filtro) e o motivo de estar em "Outros".
   categoria: { select: { id: true, nome: true, ativa: true, chave: true } },
   classificacaoMotivo: true,
+  marcaReferencia: true,
+  conservacaoConfirmadaEm: true,
   ...SELECAO_DA_VALIDADE,
   conteudoMilesimos: true,
   precoEmbalagemCentavos: true,
@@ -542,13 +644,14 @@ type LinhaDoBanco = Prisma.InsumoGetPayload<{ select: typeof SELECAO_DA_LINHA }>
  * de uma vez (`custosDosPreparos`).
  */
 function paraLinha(i: LinhaDoBanco, preparos: ReadonlyMap<string, CustoDaFicha>, compras: ReadonlyMap<string, UltimaCompra>): LinhaDeInsumo {
-  const { _count, fichaQueProduz, validadeSecoMin: _s, validadePistaFriaMin: _p, validadeRefrigeradoMin: _r, validadeCongeladoMin: _g, ...resto } = i;
+  const { _count, fichaQueProduz, validadeSecoMin: _s, validadePistaFriaMin: _p, validadeRefrigeradoMin: _r, validadeCongeladoMin: _g, conservacaoConfirmadaEm, ...resto } = i;
   const c = fichaQueProduz ? preparos.get(fichaQueProduz.id) : undefined;
   const validades = validadesDaLinha(i)!;
   const compra = fichaQueProduz ? undefined : compras.get(i.id);
   return {
     ...resto,
     validades,
+    conservacaoAConfirmar: conservacaoAConfirmar({ tipo: i.tipo, conservacao: i.conservacao, conservacaoConfirmadaEm, categoriaChave: i.categoria?.chave ?? null }),
     conservacaoInformada: !fichaQueProduz || Object.keys(validades.minutos).length > 0,
     custo: fichaQueProduz ? null : (compra?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos)),
     ultimaCompra: compra ? { entradaEm: compra.entradaEm } : null,
@@ -664,7 +767,11 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string, alcanc
       categoria: i.categoria,
       classificadoPor: i.classificadoPor,
       classificacaoMotivo: i.classificacaoMotivo,
+      /** I.1b: marca de referência (texto informativo; não é fornecedor nem bloqueia compra). */
+      marcaReferencia: i.marcaReferencia,
       conservacao: i.conservacao,
+      /** I.1b: Seco que ninguém confirmou, numa categoria que costuma ser fria. */
+      conservacaoAConfirmar: conservacaoAConfirmar({ tipo: i.tipo, conservacao: i.conservacao, conservacaoConfirmadaEm: i.conservacaoConfirmadaEm, categoriaChave: i.categoria?.chave ?? null }),
       validades: validadesDaLinha(i)!,
       conteudoMilesimos: i.conteudoMilesimos,
       precoEmbalagemCentavos: i.precoEmbalagemCentavos,

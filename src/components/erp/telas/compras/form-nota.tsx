@@ -14,7 +14,7 @@
  */
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import type { FormularioDeNota } from '@/lib/erp/compras';
@@ -39,6 +39,8 @@ import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
 import { CampoData } from '../../ui/campo-data';
 import { ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
+import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
+import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
 import type { AcaoDeNota, EstadoNota } from './estado';
 import { PreviaDoImpacto } from './previa';
 
@@ -84,21 +86,48 @@ function Enviar({ intencao, variante, children, disabled }: { intencao: 'conferi
   );
 }
 
-export function FormNota({
-  acao,
-  modo,
-  base,
-  aqui,
-  cancelar,
-  opcoes,
-  inicial,
-  versao,
-  hoje,
-  bloqueio = null,
-  periodos,
-  novoFornecedor,
-  novoInsumo,
-}: {
+export function FormNota(props: PropsDoFormNota) {
+  // I.1b: voltou de "Insumo que falta: cadastrar"? O que estava preenchido volta junto, e o insumo novo já está na lista.
+  const r = useRascunhoDaTela<ValoresDaNota>(props.modo === 'editar' ? props.versao : undefined);
+  const [descartou, setDescartou] = useState(false);
+  const recuperado = !descartou && r.valores ? r.valores : null;
+  const criado = !descartou && r.insumoCriado ? props.opcoes.insumos.find((i) => i.id === r.insumoCriado) : undefined;
+  let valores = recuperado ?? props.inicial;
+  let escolhido = false;
+  if (criado) {
+    const vaga = valores.itens.findIndex((l) => !l.insumoId);
+    if (vaga >= 0) {
+      valores = { ...valores, itens: valores.itens.map((l, n) => (n === vaga ? { ...l, insumoId: criado.id, embalagem: EMBALAGEM_PADRAO } : l)) };
+      escolhido = true;
+    }
+  }
+  return (
+    <>
+      <FormNotaBase
+        // O rascunho só é lido depois do primeiro desenho: quando chega (ou se descarta), o formulário nasce de novo com os valores certos.
+        key={r.valores === undefined ? 'carregando' : descartou ? 'descartado' : 'pronto'}
+        {...props}
+        inicial={valores}
+        chaveDoRascunho={r.chave}
+        avisos={
+          <>
+            {criado && <AvisoInsumoCriado nome={criado.nome} escolhido={escolhido} />}
+            <AvisoDeRascunhoVelho quando={r.versaoMudou} oQue="A nota" />
+            <AvisoDeRascunho
+              quando={!!recuperado}
+              aoDescartar={() => {
+                r.descartar();
+                setDescartou(true);
+              }}
+            />
+          </>
+        }
+      />
+    </>
+  );
+}
+
+type PropsDoFormNota = {
   acao: AcaoDeNota;
   modo: 'lancar' | 'editar';
   /** Lista de notas de quem usa a tela (link da nota repetida). */
@@ -115,7 +144,26 @@ export function FormNota({
   periodos: AvisoDePeriodos;
   novoFornecedor?: string;
   novoInsumo?: string;
-}) {
+};
+
+function FormNotaBase({
+  acao,
+  modo,
+  base,
+  aqui,
+  cancelar,
+  opcoes,
+  inicial,
+  versao,
+  hoje,
+  bloqueio = null,
+  periodos,
+  novoFornecedor,
+  novoInsumo,
+  chaveDoRascunho,
+  avisos,
+}: PropsDoFormNota & { chaveDoRascunho: string; avisos: ReactNode }) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [estado, enviar] = useFormState<EstadoNota, FormData>(acao, null);
   const saida = useAvisoDeSaida();
   // A primeira chave livre: a nota nova já nasce com uma linha vazia (chave 0).
@@ -172,6 +220,24 @@ export function FormNota({
     };
   }, [linhas, porId, frete, total]);
 
+  /** I.1b: antes de ir cadastrar o insumo que falta, guarda o que está na tela (a nota inteira) para recuperar na volta. */
+  function guardarOQueFoiPreenchido() {
+    if (!formRef.current) return;
+    const f = new FormData(formRef.current);
+    const t = (k: string) => (typeof f.get(k) === 'string' ? (f.get(k) as string) : '');
+    const valores: ValoresDaNota = {
+      lojaId: t('lojaId'),
+      fornecedorId: t('fornecedorId'),
+      numero: t('numero'),
+      serie: t('serie'),
+      data: t('data'),
+      frete,
+      total,
+      itens: linhas.map(({ chave: _c, ...l }) => l),
+    };
+    guardarRascunho(chaveDoRascunho, valores, modo === 'editar' ? versao : undefined);
+  }
+
   const diferenca = conta.total !== null && conta.frete !== null ? conta.total - (conta.soma + conta.frete) : null;
   const previa = estado?.previa;
   // 2.5 (revisão de UX): depois de "Conferir o impacto", a prévia vem para a vista (sem animação para quem pediu menos movimento).
@@ -184,8 +250,9 @@ export function FormNota({
   }, [vezDaPrevia]);
 
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <form ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
+      {avisos}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={rotuloDoCampo} />
       {avisoNoTopo && <AvisoDoPeriodoFechado id={`${idBase}-periodo-fechado`} periodo={fechadoDaData!} href={periodos.href} frase="Esta nota é desse período: não dá para corrigir nem cancelar." />}
       {fechadoNoGeral && <AvisoDoPeriodoFechado periodo={fechadoNoGeral} href={periodos.href} frase="Esta nota é desse período: não dá para corrigir nem cancelar." />}
@@ -247,7 +314,7 @@ export function FormNota({
               </select>
               <Erro id={`${idBase}-fornecedorId-erro`} texto={erros.fornecedorId} />
               {novoFornecedor ? (
-                <Link href={novoFornecedor} className={`${LINK_DE_TEXTO} mt-1.5 inline-block`}>
+                <Link href={novoFornecedor} className={`${LINK_DE_TEXTO} mt-1.5 inline-flex min-h-0 items-center [@media(pointer:coarse)]:min-h-11`}>
                   Fornecedor novo: cadastrar
                 </Link>
               ) : (
@@ -457,7 +524,7 @@ export function FormNota({
                         </>
                       ) : null}
                       {' · hoje '}
-                      {formatarCusto(ins.custo, ins.unidade)}
+                      {ins.custo ? formatarCusto(ins.custo, ins.unidade) : 'sem custo informado'}
                     </p>
                   )}
                   <Erro id={`${idBase}-item-${n}-erro`} texto={erro} />
@@ -479,9 +546,7 @@ export function FormNota({
                 Adicionar item
               </button>
               {novoInsumo ? (
-                <Link href={novoInsumo} className={LINK_DE_TEXTO}>
-                  Insumo que falta: cadastrar
-                </Link>
+                <AtalhoNovoInsumo href={novoInsumo} aoSair={guardarOQueFoiPreenchido} />
               ) : (
                 <span className="text-[12px] text-suave">Insumo que falta: peça a quem cuida dos insumos.</span>
               )}

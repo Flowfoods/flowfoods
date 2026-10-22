@@ -178,7 +178,7 @@ export function TelaEstoqueDaLoja({
             <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
               <div className="text-[12px] font-medium text-suave">Valor em estoque</div>
               <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(e.total.centavos)}</div>
-              <div className="mt-1.5 text-[12px] text-suave">{e.total.pendentes > 0 ? `custo de referência de hoje · ${e.total.pendentes} sem preço fora da soma` : 'pelo custo de referência de hoje'}</div>
+              <div className="mt-1.5 text-[12px] text-suave">{e.total.pendentes > 0 ? `custo de referência de hoje · ${e.total.pendentes} sem custo informado fora da soma` : 'pelo custo de referência de hoje'}</div>
             </div>
             <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
               <div className="text-[12px] font-medium text-suave">Insumos com saldo</div>
@@ -298,7 +298,7 @@ export function TelaEstoqueDaLoja({
                         <span className="min-w-0">
                           <NomeDoInsumo l={l} insumosBase={insumosBase} />
                           <span className="block text-[12px] tabular-nums text-suave">
-                            {l.porUnidade ? `${formatarFracao(l.porUnidade)}/${UNIDADES[l.unidade].sigla}` : 'Sem preço'}
+                            {l.porUnidade ? `${formatarFracao(l.porUnidade)}/${UNIDADES[l.unidade].sigla}` : 'Custo não informado'}
                           </span>
                         </span>
                       </span>
@@ -348,7 +348,7 @@ export function TelaEstoqueDaLoja({
                           </span>
                         </td>
                         <td className={`px-3 py-2 text-right font-semibold ${l.quantidadeMilesimos < 0 ? 'text-erro' : ''}`}>{formatarQuantidadeComSinal(l.quantidadeMilesimos, l.unidade)}</td>
-                        <td className="px-3 py-2 text-right text-suave">{l.porUnidade ? `${formatarFracao(l.porUnidade)}/${UNIDADES[l.unidade].sigla}` : <Selo tom="alerta">Sem preço</Selo>}</td>
+                        <td className="px-3 py-2 text-right text-suave">{l.porUnidade ? `${formatarFracao(l.porUnidade)}/${UNIDADES[l.unidade].sigla}` : <Selo tom="alerta">Custo não informado</Selo>}</td>
                         <td className={`px-3 py-2 text-right ${pode.ajustar && !bloqueio ? '' : 'pr-5'}`}>{l.valorCentavos === null ? <span className="text-suave">pendente</span> : formatarDinheiro(l.valorCentavos)}</td>
                         {pode.ajustar && !bloqueio && (
                           <td className="px-3 py-2 pr-5 text-right">

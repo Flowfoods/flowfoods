@@ -303,7 +303,7 @@ Sem migration: o esquema da 0.1 já tinha `InsumoVariante`, `tipo`,
    no histórico: "R$ 89,90 + R$ 5,00 frete ÷ 5 kg = R$ 18,98/kg" /
    "R$ 4,00 ÷ 1.000 un = R$ 0,004/un (R$ 4,00 o milheiro)". Frete é **por
    embalagem**. Custo pelas compras reais (último preço) continua sendo a 1.5.
-3. **"Ainda não sei o preço"** grava 0 e a tela diz **"Sem preço"** (custo
+3. **"Ainda não sei o preço"** grava 0 e a tela diz **"Sem preço"** (desde a I.1b: "Ainda não sei o custo" e **"Custo não informado"**) (custo
    incompleto, nunca R$ 0,00), com filtro próprio; na ordem por custo fica
    sempre no fim. Preço 0 digitado sem marcar é recusado.
 4. **Outras embalagens de compra** (`InsumoVariante`, na tela "Embalagem"):
@@ -2484,6 +2484,135 @@ tocados: 0 P0, 0 P1 e 5 P2 (metadado com ponto médio, padrão já usado nas out
 - **Ajuda**: `insumos` e `insumo-novo` e `insumo` subiram para a versão 2; as chaves novas são `insumo-categorias` e `insumo-classificar`.
   Os testes não fixam o número da versão de `insumos`.
 
+## O que a I.1b entregou — clareza e correções do cadastro de insumos
+
+Prioridade do Rodolfo de 21/10/2026 (cadastro de insumos), segunda metade. Duas migrations ADITIVAS: `20261102000000_erp_insumo_clareza`
+(valor `MATERIAL` em `InsumoTipo` e `Insumo.marcaReferencia`, com CHECK) e `20261102010000_erp_insumo_conservacao_confirmada`
+(`Insumo.conservacaoConfirmadaEm`). Nenhum valor antigo é reescrito: o Seco que ninguém escolheu, o custo 0 ("ainda não sei") e a validade
+gravada continuam exatamente como estavam. Decisões 259 a 269. Sem permissão nova (tudo é `insumos.editar`).
+
+1. **Nome uma vez só** (259, 260). "Insumo que falta: cadastrar" (nota de compra, ficha, embalagens por canal) abre um campo opcional de nome
+   e leva `?nome=` (que o cadastro mostra preenchido, já com a categoria sugerida) e `?volta=` (só caminho interno da área de quem está logado,
+   conferido na página e de novo na action: nada de open redirect). Salvou, volta para a tela de origem com `?insumoCriado=<id>`: aviso
+   "Insumo salvo com sucesso: <nome>" (lido do banco), o insumo já na lista e escolhido na primeira linha vazia, e o que estava preenchido
+   recuperado (guardado só no navegador, 20 minutos, **por parceiro e pessoa**, apagado ao sair, ao trocar de pessoa e ao abrir a tela de entrar, e descartado se a ficha ou a nota mudou desde então; "Descartar e começar de novo"; a foto da ficha não é guardada). O rótulo da outra
+   embalagem passou a "Nome desta embalagem de compra", com a ajuda dizendo que o insumo continua o mesmo. O nome do insumo, no formulário,
+   já era pedido uma vez só: as causas reais do relato eram o atalho sem nome nem volta e esse rótulo.
+2. **Tipo de item** (261). Ingrediente, Embalagem e **Material de limpeza e uso** (`MATERIAL`), com o papel de cada um dito na tela e a
+   frase "tipo é o papel, categoria é a natureza para o CMV, conservação é onde fica guardado". Material não entra no seletor da ficha, o
+   servidor recusa o item de material numa receita, insumo já usado numa ficha ou na embalagem de um prato não vira material, e a categoria
+   sugerida é Limpeza e higienização. Estoque, compra, contagem, requisição e histórico o tratam como qualquer insumo.
+3. **Unidade base × embalagem de compra × custo** (265). Três blocos com um rótulo para cada coisa; **Custo inicial de referência (R$ por
+   embalagem de compra)** com o texto do plano e o exemplo na unidade escolhida (saco de 5 kg por R$ 25,00 → R$ 5,00/kg), mais a conta ao
+   vivo e "Origem: referência inicial, sem compra registrada". "Ainda não sei o custo" = **Custo não informado** em toda a tela do insumo
+   (lista, detalhe, prévia, histórico, frases), nunca R$ 0,00; a ficha fica incompleta e a precificação espera o custo. O detalhe diz a
+   origem do custo (último preço de compra × custo inicial de referência). Cadastrar não cria nota, movimento, saldo, despesa nem conta.
+4. **Conservação separada da categoria** (262, 263). Select obrigatório "Selecione a conservação" (opção desabilitada, não salvável: o servidor
+   recusa vazio, espaços, o placeholder e qualquer valor fora de Seco/ambiente, Pista fria, Refrigerado, Congelado, e não grava nada); o
+   servidor deixou de assumir Seco; editar sem o campo mantém a gravada; "Cadastrar outro insumo" não lembra mais a conservação. O filtro da lista
+   diz "Todas as conservações" e ganhou **Conservação a confirmar**: os Seco antigos, sem confirmação, em Proteína, Laticínios e Hortifruti
+   (UM aviso no alto da lista, junto com o de categoria; selo na linha; painel no detalhe com "Confirmar que é seco"). Nada é alterado pelo sistema;
+   confirmar (botão, marcador "Confirmo que a conservação é esta" no editar, ou trocar a conservação) grava `conservacaoConfirmadaEm` e um `CONFIRMOU` no
+   histórico; salvar sem olhar o campo não confirma.
+5. **Prazo de uso após abertura** (264). O campo da validade do insumo comprado (que já era "depois de aberto") tem o nome e o texto do plano,
+   em horas ou dias, por conservação; vazio = "não informado", sem padrão nem sugestão. Vencimento do lote e data/hora de abertura **não
+   existem no ERP ainda** (o modelo `Etiqueta` tem os campos, mas nada grava, e `NotaEntradaItem` não tem lote): ficam para a 3.4, sem simular.
+6. **Marca de referência** (266). Texto opcional (até 80), informativo: não bloqueia compra nem cotação e não é fornecedor; entra no
+   histórico como "marca de referência".
+7. **Acabamentos da I.1a** (268). "Ver todos os insumos" com forma de botão; a fila diz quantos dos marcados estão "sem certeza" antes de
+   "Aceitar a sugestão"; a conservação lembrada saiu do "Cadastrar outro insumo". Ajuda contextual: `insumos`, `insumo-novo` e `insumo` na
+   versão 3 e `insumo-embalagem` na 2 (lock regravado).
+
+**Efeito conhecido no CMV (267).** O material de limpeza e uso comprado por nota ainda entra na soma de compras do CMV (o CMV 2.3 não lê tipo nem
+categoria); a tela do cadastro avisa. A separação por tipo/categoria é da I.2, sem reescrever fotografia de período fechado.
+
+### Referências Kairu consultadas (regra do plano)
+
+As mesmas da análise da I.1 (MCP da Kairu, 21/10/2026, conteúdo integral; buscas "cadastro de insumos categorias", "estoque insumos" e
+"compras fornecedor" não acharam prompt sobre cadastro de insumo): `prompt:b3592b7c…` "Da Ficha ao Fornecedor", "Estoque unificado" (Notion,
+snapshot de 14/10), `library:inventario-ciclico`, `pass:inventario-contagem-divergencias` e `pass:cmv-fichas-e-margem` (só o prompt). O que a
+I.1b aplicou delas:
+
+| Material | Aplicado na I.1b | Adaptado | Deixado para depois |
+|---|---|---|---|
+| Da Ficha ao Fornecedor | custo ausente é pendência, nunca 0: "Custo não informado" em toda tela e no histórico; custo incompleto não é custo baixo (ficha incompleta, margem espera o custo) | o 0 do banco segue como sinal interno, nenhuma conta o trata como custo | cronograma e política de lote (fase 3.x) |
+| Estoque unificado | não unir por nome: a marca de referência é texto informativo e não identifica insumo nem fornecedor | marca ≠ fornecedor virou regra de tela e de dado | cotação com marca alternativa |
+| Inventário cíclico e divergências | "grupo" é diferente de setor físico: tipo × categoria × conservação são três campos com ajuda lado a lado | — | contagem por categoria (I.2) |
+| CMV, fichas e margem | fotografia de período fechado não muda: o material no CMV não reescreve nada | aviso no cadastro em vez de mexer na conta | CMV por categoria (I.2) |
+| Idempotência (pacotes de inventário) | reenvio com a mesma chave devolve o mesmo insumo, agora também quando o cadastro veio de uma nota | — | — |
+
+## Provar a I.1b
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate
+npx vitest run                                              # sem banco
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism   # com banco, 2x
+npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+`tests/erp-insumo-clareza.test.ts` (sem banco): conservação escolhida (vazio, placeholder, valor torto), tipo e sugestão, marca (limpeza e limite),
+"a confirmar", custo inicial (exemplo 5 kg por R$ 25, texto do plano, "Custo não informado"), o caminho de volta (aceita só o interno; 19
+recusas, entre elas `https://`, `//`, `\\`, `..`, outro parceiro e o laço do próprio cadastro). `tests/erp-insumo-clareza.db.test.ts`: o servidor
+recusa a conservação sem escolha e não grava, editar sem o campo mantém, material (fora da ficha e do seletor; insumo em uso não vira
+material), marca (salva, edita, apaga, histórico), custo inicial sem nota/movimento/saldo/despesa, sem custo = nulo na lista, no detalhe e
+na ficha incompleta, "a confirmar" sem alterar nada, isolamento entre parceiros e as actions com volta (pessoa do parceiro e nível 1).
+`tests/erp-insumo-clareza-migracao.db.test.ts`: as duas migrations com dado antigo como superusuário, dono com FORCE RLS e dono sem RLS (sem WARNING,
+nada muda, colunas nulas, material e marca funcionam pelo papel do tenant, o conferidor acusa o que faltar).
+
+**Resultado da prova (2026-10-22).** `prisma validate`, `typecheck`, `lint`, `gate` e `build` limpos; `erp:conferir-migracao` limpo e `migrate diff`
+vazio no `ff_dev`. `npx vitest run` sem banco: 56 arquivos, 1372 testes passando (os de banco pulados). Com banco (`ff_dev`, superusuário), duas
+rodadas seguidas: 101 arquivos, 2031 testes, todos passando. Como dono não-superusuário com FORCE RLS e como dono sem RLS (bancos novos, todas as
+migrations aplicadas pelo dono): os 9 arquivos de banco tocados ou vizinhos (clareza, insumos, validade, permissões, categorias, isolamento,
+compras, fichas e o apoio) com 160 testes cada, passando; o teste das duas migrations (`erp-insumo-clareza-migracao.db.test.ts`) cria os próprios bancos
+nos 3 perfis. Jornada no navegador (build de produção, porta 3100, banco novo copiado do `ff_dev` com os insumos antigos em Seco, 189
+conferências, todas ok): conservação sem escolher (recusa no campo, foco nele, formulário preservado, "Conservação" forjado também recusado
+no servidor, nada gravado), cadastro completo com custo inicial (5 kg por R$ 25 = R$ 5,00/kg ao vivo e no detalhe, sem nota, item, movimento,
+saldo nem despesa), sem custo ("Custo não informado" no cadastro, no detalhe, na lista e na ficha incompleta; o banco guarda só o 0 interno),
+material de limpeza e uso (categoria Limpeza sugerida pelo tipo, marca de referência, fora do seletor da ficha), prazo de uso após abertura
+(3 dias e 30 dias, edição para 48 horas, erro de prazo cruzado, histórico com antes e depois), nome repetido preservando o formulário, duplo
+clique com um insumo só, "Insumo que falta: cadastrar" da nota e da ficha (nome levado, volta à tela de origem, insumo escolhido na linha vazia,
+nota e ficha recuperadas, barra de endereço limpa, aviso que não repete ao recarregar, Cancelar volta sem criar, volta externa ignorada e salvar
+vai ao detalhe), o mesmo no nível 1 (e a volta para outra casa ignorada), "conservação a confirmar" (aviso com a contagem, filtro, painel, confirmar
+sem alterar nada e com histórico, editar para Refrigerado, operador sem o botão), isolamento da outra casa; **o rascunho é de quem o fez** (dona da Alfa deixa a nota, sai, a dona da Beta entra na mesma aba e não recebe nada; rascunho de
+outra pessoa do mesmo parceiro plantado no navegador não volta; o do próprio gerente volta; a tela de entrar e o Sair apagam tudo, no parceiro e no nível 1;
+ficha alterada por outra pessoa descarta o rascunho velho); um aviso só na lista; a fila diz quantos estão "sem certeza"; "Cadastrar outro insumo" abre sem
+conservação. Matriz de 9 páginas x 4 tamanhos
+(1440, 1180, 820, 390) x 2 temas: sem rolagem lateral, sem violação do axe (79 verificações) e sem erro de console. Com ponteiro de toque real, o
+que sobra abaixo de 44 px são só os cabeçalhos ordenáveis da lista, que já eram assim. Prints em `scratchpad/shots-I1b`. Scanner avoid-ai-design nos
+39 arquivos de código tocados: 0 P0, 0 P1 e 0 P2. A jornada achou e fez corrigir três defeitos que os testes não pegam: o rótulo da conservação
+exportado de arquivo de cliente quebrava o detalhe em produção; o formulário de nota/ficha só recuperava os campos não controlados; o filtro da
+lista não acompanhava o link "Ver quais são".
+
+## Herança da I.1b (para a I.2 e as próximas)
+
+- **A I.2 recebe**: separar o material de limpeza e uso do CMV (por tipo ou por categoria) sem reescrever fotografia de período fechado
+  (decisão 267); `CategoriaNaLoja`, metas e painéis por categoria (herança da I.1a).
+- **A 3.4 recebe**: Data de vencimento do lote no recebimento e Data/hora de abertura no controle de lote, com a regra de não prolongar o
+  vencimento original ao abrir (o modelo `Etiqueta` tem `abertoEm`/`validadeEm`/`loteFornecedor`, mas nada grava; `NotaEntradaItem` não tem
+  lote nem vencimento). O cadastro do insumo nunca guarda data de lote.
+- **A cotação (futura) recebe**: marca alternativa do fornecedor ao lado da marca de referência, sem trava e sem homologação automática;
+  "fornecedor homologado" é outra configuração, possível depois.
+- **Quem cria insumo fora de `cadastrarInsumo`** (importação, integração) precisa mandar `conservacao` (o servidor não assume mais Seco) e,
+  se quiser idempotência, `envio`; `marcaReferencia` é opcional. Teste que só precisa de um insumo usa `cadastrarInsumoDeTeste`, que diz
+  Seco quando a chave não vem.
+- **Texto do custo ausente**: "Custo não informado" (ou "sem custo informado") vale nas telas: cadastro, lista, detalhe, histórico, ficha, canais,
+  estoque, produção e requisição. Ficam com "sem preço" só as frases MONTADAS na regra e cobertas por teste (custo da ficha, canais, CMV, contagem,
+  precificação): dizem a mesma coisa, nunca R$ 0,00 e margem que espera o custo. Trocá-las é redação, com teste junto.
+- **Rascunho**: a chave é parceiro + pessoa (ids do servidor) e some ao sair, entrar e trocar de pessoa (decisão 269); o de ficha, nota ou embalagens
+  guarda a versão lida e não volta sobre uma versão nova.
+- **Lições de código**: valor exportado de um arquivo `'use client'` NÃO chega a componente de servidor (o rótulo da opção de conservação
+  quebrou o detalhe em produção até ir para `validade.ts`); `<select defaultValue>` não acompanha mudança de URL sem recarregar (o formulário de
+  filtros ganhou `key` com os filtros); formulário que lê o rascunho depois do primeiro desenho precisa nascer de novo (`key`) quando ele chega,
+  senão só os campos não controlados mudam.
+- **O que não tem volta**: a importação de fichas ("Cadastrar “Picles”") continua indo ao cadastro sem `?volta=` (o texto da planilha vive
+  só na tela); "Cadastrar em Insumos" das embalagens por canal só aparece quando não há nenhuma embalagem (provado por leitura do código e do
+  formulário, não no navegador); `CamposDeValidade para="insumo"` ficou sem uso (o insumo usa `CamposDeConservacao`).
+- **Decisões para o Rodolfo**: (1) o material de limpeza e uso comprado por nota ainda entra no CMV de compra até a I.2 (267); (2) Hortifruti
+  entra na lista "a confirmar" mesmo quando o Seco é verdadeiro (batata, alho): confirma-se com um toque (263); (3) a categoria única da
+  rede (243, herdada); (4) o rótulo "Material de limpeza e uso" e "Seco (ambiente)"; (5) conservação obrigatória também ao editar um insumo
+  antigo (262); (6) `VERSAO_DO_ERP` segue "fase 3.3" (a I.1 não é uma fase numerada).
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -2495,7 +2624,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Estrutura | `Marca` | marca do grupo; produto e faturamento podem apontar marca |
 | Estrutura | `Colaborador` | pessoa da operação; âncora do histórico por funcionário (login vem na 0.3) |
 | Insumos | `Insumo` | já existia; ganhou tipo (ingrediente/embalagem/pré-preparo), taxa de entrega, conservação e validade por conservação, mínimo, fornecedor padrão, origem |
-| Insumos | `CategoriaInsumo` | I.1a: a categoria da REDE (natureza do insumo para o CMV): `chave` estável das dez padrão, `sistema` ("Outros / a classificar"), `ativa`/`desativadaEm`, `ordem`. `Insumo` ganhou `categoriaId` (nula no banco, obrigatória na regra; FK composta), como foi classificada (`classificadoPor`), o motivo, o lote da classificação assistida e a `chaveEnvio` + `hashEnvio` do cadastro |
+| Insumos | `CategoriaInsumo` | I.1a: a categoria da REDE (natureza do insumo para o CMV): `chave` estável das dez padrão, `sistema` ("Outros / a classificar"), `ativa`/`desativadaEm`, `ordem`. `Insumo` ganhou `categoriaId` (nula no banco, obrigatória na regra; FK composta), como foi classificada (`classificadoPor`), o motivo, o lote da classificação assistida e a `chaveEnvio` + `hashEnvio` do cadastro. I.1b: `marcaReferencia` (texto informativo, opcional), `conservacaoConfirmadaEm` (quando uma pessoa confirmou a conservação; nulo no antigo) e o valor `MATERIAL` em `InsumoTipo` |
 | Insumos | `InsumoVariante` | outras embalagens de compra do mesmo insumo |
 | Compras | `Fornecedor` | quem vende |
 | Compras | `NotaEntrada` / `NotaEntradaItem` | nota de compra e itens com snapshot; LANCADA vale para o custo; com o estoque da loja aberto, entra no razão (`MovimentoEstoque.notaId`, 1.6) |

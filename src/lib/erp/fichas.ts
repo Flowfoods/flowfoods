@@ -905,7 +905,8 @@ export async function fotoDaFicha(cliente: ClienteDoParceiro, id: string) {
  */
 export async function insumosParaFicha(cliente: ClienteDoParceiro, jaNaFicha: string[] = []) {
   const lidos = await cliente.insumo.findMany({
-    where: { fichaQueProduz: { is: null }, OR: [{ ativo: true }, { id: { in: jaNaFicha } }] },
+    // I.1b: material de limpeza e uso não é ingrediente: não é oferecido na ficha (o que já estivesse nela continua).
+    where: { fichaQueProduz: { is: null }, OR: [{ ativo: true, NOT: { tipo: 'MATERIAL' } }, { id: { in: jaNaFicha } }] },
     orderBy: { nome: 'asc' },
     select: SELECAO_DO_INSUMO,
   });

@@ -754,6 +754,7 @@ enum InsumoTipo {
   INGREDIENTE
   EMBALAGEM // embalagem é item de estoque (custo do delivery/iFood)
   PRE_PREPARO // intermediário produzido pela casa (tem FichaTecnica que o produz)
+  MATERIAL // I.1b: material de limpeza e uso: comprado e estocado, mas não entra em ficha técnica como ingrediente
 }
 
 model Insumo {
@@ -804,6 +805,15 @@ model Insumo {
   // o mesmo insumo (sucesso); mesma chave + conteúdo diferente = recusa.
   chaveEnvio             String?
   hashEnvio              String?
+
+  // I.1b — Marca de referência: a marca comercial/fabricante que a casa tem em mente para o insumo. Texto informativo e
+  // opcional: não bloqueia compra nem cotação e não é fornecedor (a mesma marca é vendida por vários fornecedores).
+  marcaReferencia        String?
+
+  // I.1b — Quando uma PESSOA confirmou a conservação. Nulo no insumo antigo (o servidor assumia Seco quando nada vinha:
+  // ninguém "escolheu"); preenchido ao cadastrar (a conservação é escolhida), ao salvar o formulário e no "Confirmar".
+  // "Conservação a confirmar" = Seco, sem confirmação, em Proteína, Laticínios ou Hortifruti. Nada é reinterpretado.
+  conservacaoConfirmadaEm DateTime?
 
   variantes         InsumoVariante[]
   fichaQueProduz    FichaTecnica?      @relation("FichaProduzInsumo")
