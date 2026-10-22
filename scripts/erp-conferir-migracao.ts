@@ -1,7 +1,8 @@
 /**
  * Conferência pós-deploy das migrations `20261025000000_erp_faturamento` (2.1),
  * `20261026000000_erp_dre_despesas` (2.2a), `20261027000000_erp_dre_fechamento` (2.2b), `20261028000000_erp_cmv` (2.3),
- * `20261029000000_erp_producao` (3.1), `20261030000000_erp_lista_do_dia` (3.2) e `20261031000000_erp_producao_equipe` (3.3).
+ * `20261029000000_erp_producao` (3.1), `20261030000000_erp_lista_do_dia` (3.2), `20261031000000_erp_producao_equipe` (3.3) e
+ * `20261101000000_erp_insumo_categorias` (I.1a).
  *
  *   npm run erp:conferir-migracao
  *
@@ -96,6 +97,21 @@ export const CHECKS_DA_3_3 = [
 
 /** Os índices da 3.3: o histórico e os indicadores leem os lotes encerrados da loja por período. */
 export const INDICES_DA_3_3 = ['OrdemProducao_parceiroId_lojaId_concluidaEm_idx', 'OrdemProducao_parceiroId_lojaId_canceladaEm_idx'] as const;
+
+/** Os CHECKs que a I.1a acrescentou em "Insumo" (a tabela nova nasce com os dela validados). */
+export const CHECKS_DA_I_1A = [
+  ['Insumo', 'Insumo_classificadoPor_valido'],
+  ['Insumo', 'Insumo_classificacaoMotivo_curto'],
+  ['Insumo', 'Insumo_classificacao_so_com_categoria'],
+  ['Insumo', 'Insumo_classificacaoLote_da_migracao'],
+  ['Insumo', 'Insumo_chaveEnvio_completa'],
+] as const;
+
+/** Os índices da I.1a: a chave de envio é o que faz o reenvio do cadastro não duplicar; a chave da categoria, a semeadura repetida. */
+export const INDICES_DA_I_1A = ['Insumo_parceiroId_chaveEnvio_key', 'Insumo_parceiroId_categoriaId_idx', 'CategoriaInsumo_parceiroId_chave_key', 'CategoriaInsumo_parceiroId_nome_key'] as const;
+
+/** Os gatilhos da I.1a: sem eles a categoria do sistema poderia ser renomeada, desativada ou excluída. */
+export const GATILHOS_DA_I_1A = ['CategoriaInsumo_parceiro_imutavel', 'CategoriaInsumo_sistema_protegida'] as const;
 
 /** O que a migration deixou pendente (frases prontas para o terminal); lista vazia = tudo no lugar. */
 export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
@@ -220,6 +236,35 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       if (!indices.some((x) => x.nome === i)) pendencias.push(`Índice ${i} NÃO existe: a migration 20261031000000_erp_producao_equipe não foi aplicada por inteiro.`);
     }
   }
+  // I.1a: só se a migration dela já rodou (a tabela existe; o catálogo não passa pela RLS).
+  const categorias = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_class WHERE relname = 'CategoriaInsumo' AND relkind = 'r'`;
+  if (categorias[0]?.n) {
+    const tabelas = await db.$queryRaw<{ nome: string; rls: boolean; forcada: boolean }[]>`
+      SELECT relname AS nome, relrowsecurity AS rls, relforcerowsecurity AS forcada FROM pg_class WHERE relkind = 'r' AND relname = ANY(${['CategoriaInsumo', 'Loja']})`;
+    const loja = tabelas.find((t) => t.nome === 'Loja');
+    const dela = tabelas.find((t) => t.nome === 'CategoriaInsumo');
+    // As antigas com RLS e a nova sem: o papel do tenant não alcançaria a tabela (o ERP quebraria) ou ela ficaria sem o cinto.
+    if (loja?.rls && !(dela?.rls && dela.forcada)) {
+      pendencias.push('Tabela CategoriaInsumo sem RLS forçada (as outras têm): rode o bloco da RLS da migration 20261101000000_erp_insumo_categorias como dono das tabelas.');
+    }
+    const checks = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_I_1A.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_I_1A) {
+      const achado = checks.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration 20261101000000_erp_insumo_categorias não foi aplicada por inteiro.`);
+      else if (!achado.validado) {
+        pendencias.push(`CHECK ${nome} ficou NOT VALID: corrija a linha antiga que o viola e rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+      }
+    }
+    const indices = await db.$queryRaw<{ nome: string }[]>`SELECT indexname AS nome FROM pg_indexes WHERE indexname = ANY(${[...INDICES_DA_I_1A]})`;
+    for (const i of INDICES_DA_I_1A) {
+      if (!indices.some((x) => x.nome === i)) pendencias.push(`Índice ${i} NÃO existe: a migration 20261101000000_erp_insumo_categorias não foi aplicada por inteiro.`);
+    }
+    const gatilhos = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_I_1A]})`;
+    for (const t of GATILHOS_DA_I_1A) {
+      if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261101000000_erp_insumo_categorias não foi aplicada por inteiro.`);
+    }
+  }
   return pendencias;
 }
 
@@ -228,10 +273,10 @@ async function principal() {
   try {
     const pendencias = await conferirMigracao(db);
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2 e da 3.3 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia (com RLS), os índices e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3 e da I.1a conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia e das categorias (com RLS), os índices e os gatilhos existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2 e da 3.3: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3 e da I.1a: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {

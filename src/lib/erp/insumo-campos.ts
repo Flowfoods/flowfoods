@@ -38,14 +38,31 @@ const MARCADO = new Set(['on', 'sim', 'true', '1']);
 export const marcado = (v: unknown) => typeof v === 'string' && MARCADO.has(v);
 const texto = (v: unknown) => (typeof v === 'string' ? v : '');
 
-/** Nome obrigatório (2..max letras, espaços colapsados): insumo, embalagem, ficha. */
+/**
+ * O texto como a pessoa o vê: forma composta (NFC, "í" é uma letra só e não "i" + acento) e sem caracteres invisíveis
+ * (largura zero, soft hyphen, marcas de direção, BOM) nem de controle. Sem isso "Farínha" decomposto e "Proteína" com um
+ * espaço de largura zero passavam por nomes diferentes dos que parecem iguais.
+ */
+export function limparTexto(s: string): string {
+  return s
+    .normalize('NFC')
+    .replace(/[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0]/g, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '');
+}
+
+/** Nome obrigatório (2..max letras, espaços colapsados, sem invisíveis): insumo, embalagem, ficha. */
 export function nomeObrigatorio(max: number) {
   return z
     .string({ message: 'Dê um nome.' })
-    .trim()
-    .min(2, 'Dê um nome com pelo menos 2 letras.')
-    .max(max, `Nome longo demais (máx. ${max}).`)
-    .transform((s) => s.replace(/\s+/g, ' '));
+    .transform(limparTexto)
+    .pipe(
+      z
+        .string()
+        .trim()
+        .min(2, 'Dê um nome com pelo menos 2 letras.')
+        .max(max, `Nome longo demais (máx. ${max}).`)
+        .transform((s) => s.replace(/\s+/g, ' ')),
+    );
 }
 
 export function primeiroErroPorCampo(issues: readonly { path: PropertyKey[]; message: string }[]): Erros {
@@ -99,16 +116,37 @@ export function lerEmbalagem(entrada: Record<string, unknown>, unidade: Unidade,
 
 // --------------------------------------------------------------- insumo
 
+/** I.1a: o que falta é dito campo a campo; a categoria não tem valor padrão (a pessoa escolhe, ou aceita a sugestão). */
+export const FRASE_SEM_CATEGORIA = 'Escolha a categoria do insumo: é ela que diz onde o custo dele entra no CMV.';
+export const FRASE_SEM_UNIDADE = 'Escolha a unidade base: como você controla o estoque e como a ficha usa o insumo.';
+
 const formInsumo = z.object({
   nome: nomeObrigatorio(80),
   tipo: z.enum(['INGREDIENTE', 'EMBALAGEM', 'PRE_PREPARO'], { message: 'Escolha o tipo.' }).default('INGREDIENTE'),
-  unidade: z.enum(['KG', 'L', 'UN'], { message: 'Escolha a unidade.' }),
+  unidade: z.enum(['KG', 'L', 'UN'], { message: FRASE_SEM_UNIDADE }),
+  categoriaId: z
+    .string({ message: FRASE_SEM_CATEGORIA })
+    .trim()
+    .min(1, FRASE_SEM_CATEGORIA)
+    .max(60, FRASE_SEM_CATEGORIA),
 });
+
+/** A chave que o formulário manda para o servidor reconhecer o reenvio (um UUID por montagem do formulário). */
+const CHAVE_DE_ENVIO = /^[A-Za-z0-9_-]{8,80}$/;
+/** Chave ausente = quem chama não pediu idempotência (seed, testes); presente mas torta é erro. */
+export function lerChaveDeEnvio(v: unknown): { ok: true; chave: string | null } | { ok: false } {
+  if (v === undefined || v === null || v === '') return { ok: true, chave: null };
+  return typeof v === 'string' && CHAVE_DE_ENVIO.test(v) ? { ok: true, chave: v } : { ok: false };
+}
 
 export interface DadosInsumo extends Embalagem {
   nome: string;
   tipo: TipoInsumo;
   unidade: Unidade;
+  /** I.1a: a categoria (id) que o formulário escolheu; o servidor confere que existe, é do parceiro e está ativa. */
+  categoriaId?: string;
+  /** I.1a: o nome da categoria, só para o retrato do histórico. */
+  categoriaNome?: string | null;
   /** A principal (onde se guarda); é `validades.principal`. */
   conservacao: Conservacao;
   /** 1.4: validade por conservação (minutos); sem nenhuma = não informada. */
@@ -127,7 +165,8 @@ export function lerFormInsumo(entrada: Record<string, unknown>, tipoAtual?: Tipo
   const r = formInsumo.safeParse({
     nome: entrada.nome,
     tipo: vazio(entrada.tipo),
-    unidade: entrada.unidade,
+    unidade: vazio(entrada.unidade),
+    categoriaId: entrada.categoriaId,
   });
   const erros: Erros = r.success ? {} : primeiroErroPorCampo(r.error.issues);
   // 1.4: conservação principal + validade em cada uma que o insumo aceita (opcionais).
@@ -187,6 +226,9 @@ export function retratoDoInsumo(i: DadosInsumo & { ativo?: boolean }): Retrato {
   return {
     nome: i.nome,
     tipo: i.tipo,
+    // I.1a: a categoria no nome (o que a tela mostra) e no id (o que o "excluir categoria" confere); fora do retrato
+    // quando o insumo ainda não tem (o antigo): a ausência não é uma mudança.
+    ...(i.categoriaId ? { categoria: i.categoriaNome ?? null, categoriaId: i.categoriaId } : {}),
     unidade: i.unidade,
     conservacao: i.conservacao,
     validade: retratoDaValidade(i.validades),
@@ -293,6 +335,11 @@ export type Situacao = 'ativos' | 'desativados' | 'todos';
 export interface FiltrosDeInsumo {
   q: string;
   tipo: TipoInsumo | null;
+  /**
+   * I.1a: 'sem' = ainda sem categoria; 'revisar' = sem categoria ou em "Outros / a classificar" (a fila de revisão); um id =
+   * os dessa categoria. Valor torto na URL cai em null (todas).
+   */
+  categoria: string | null;
   conservacao: Conservacao | null;
   situacao: Situacao;
   semPreco: boolean;
@@ -306,6 +353,7 @@ export const POR_PAGINA = 50;
 export const FILTROS_PADRAO: FiltrosDeInsumo = {
   q: '',
   tipo: null,
+  categoria: null,
   conservacao: null,
   situacao: 'ativos',
   semPreco: false,
@@ -328,6 +376,7 @@ export function lerFiltros(sp: Record<string, string | string[] | undefined>): F
   return {
     q: (v('q') ?? '').trim().slice(0, 80),
     tipo: um(v('tipo'), Object.keys(TIPOS) as TipoInsumo[]),
+    categoria: ((c) => (c && /^[A-Za-z0-9_-]{1,40}$/.test(c) ? c : null))(v('categoria')),
     conservacao: um(v('conservacao'), Object.keys(CONSERVACOES) as Conservacao[]),
     situacao: um(v('situacao'), ['ativos', 'desativados', 'todos'] as const) ?? 'ativos',
     semPreco: v('preco') === 'sem',
@@ -342,6 +391,7 @@ export function queryDosFiltros(f: FiltrosDeInsumo): string {
   const p = new URLSearchParams();
   if (f.q) p.set('q', f.q);
   if (f.tipo) p.set('tipo', f.tipo);
+  if (f.categoria) p.set('categoria', f.categoria);
   if (f.conservacao) p.set('conservacao', f.conservacao);
   if (f.situacao !== 'ativos') p.set('situacao', f.situacao);
   if (f.semPreco) p.set('preco', 'sem');
@@ -353,5 +403,5 @@ export function queryDosFiltros(f: FiltrosDeInsumo): string {
 
 /** Há algum filtro (além da ordem e da página)? Serve ao "Limpar filtros". */
 export function temFiltro(f: FiltrosDeInsumo): boolean {
-  return !!(f.q || f.tipo || f.conservacao || f.situacao !== 'ativos' || f.semPreco);
+  return !!(f.q || f.tipo || f.categoria || f.conservacao || f.situacao !== 'ativos' || f.semPreco);
 }

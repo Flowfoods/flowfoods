@@ -46,7 +46,7 @@ vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } 
 vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
-import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { cadastrarFicha } from '@/lib/erp/fichas';
 import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';

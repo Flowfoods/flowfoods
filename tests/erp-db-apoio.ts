@@ -10,6 +10,8 @@ import { linhasParaGravar } from '@/lib/erp/dre-fechamento-campos';
 import { gravarFotografia } from '@/lib/erp/dre-fotografia';
 import { planoEfetivo } from '@/lib/erp/dre-plano';
 import { MODELOS_DE_TENANT, PAPEL_DE_TENANT, papelDisponivel, type ClienteDoParceiro } from '@/lib/erp/tenant';
+import { garantirCategoriasPadrao, sugestaoParaInsumo } from '@/lib/erp/categorias';
+import { cadastrarInsumo } from '@/lib/erp/insumos';
 
 export const TABELAS_DE_TENANT = MODELOS_DE_TENANT.map((m) => m[0].toUpperCase() + m.slice(1));
 
@@ -18,12 +20,12 @@ const ORDEM_DE_LIMPEZA = [
   'HistoricoAlteracao', 'Etiqueta', 'MovimentoEstoque', 'SaldoEstoque', 'ContagemItem', 'Contagem',
   'ListaProducaoItem', 'ListaProducao', 'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
   'ProdutoCanal', 'ProdutoVenda', 'FichaItem', 'FichaTecnica', 'InsumoVariante', 'FaturamentoLancamento',
-  'Despesa', 'DreMeta', 'FarolFaixa', 'DreLinha', 'DreFotografiaLinha', 'DreFotografia', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'Fornecedor',
+  'Despesa', 'DreMeta', 'FarolFaixa', 'DreLinha', 'DreFotografiaLinha', 'DreFotografia', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'CategoriaInsumo', 'Fornecedor',
   'Colaborador', 'Marca', 'Loja',
 ];
 
 /** Tabelas com gatilho que recusa o DELETE (a limpeza desliga só na transação dela). */
-const SEM_GATILHO_NA_LIMPEZA = ['DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem'];
+const SEM_GATILHO_NA_LIMPEZA = ['DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem', 'CategoriaInsumo'];
 
 export interface PerfilDoBanco {
   superusuario: boolean;
@@ -99,4 +101,16 @@ export async function reabrirPeriodoDeTeste(cliente: ClienteDoParceiro, periodoI
     await tx.dreFotografia.updateMany({ where: { periodoId, substituidaEm: null }, data: { substituidaEm: new Date(), reabertaPorNome: 'Teste', motivoReabertura: 'teste' } });
     await tx.periodoApuracao.update({ where: { id: periodoId }, data: { status: 'ABERTO', fechadoEm: null, fechadoPorNome: null } });
   });
+}
+
+/**
+ * I.1a: a categoria é obrigatória no cadastro de insumo, então os testes que só precisam de um insumo para o resto do cenário
+ * o cadastram por aqui: as dez padrão nascem (idempotente) e a categoria que o nome sugere entra sozinha. Quem passa
+ * `categoriaId` (inclusive vazio) fala com o servidor sem intermediário.
+ */
+export async function cadastrarInsumoDeTeste(cliente: ClienteDoParceiro, entrada: Record<string, unknown>, autorNome?: string) {
+  if (entrada.categoriaId !== undefined) return cadastrarInsumo(cliente, entrada, autorNome);
+  await garantirCategoriasPadrao(cliente);
+  const sugestao = await sugestaoParaInsumo(cliente, String(entrada.nome ?? ''), typeof entrada.tipo === 'string' ? entrada.tipo : undefined);
+  return cadastrarInsumo(cliente, { ...entrada, categoriaId: sugestao.categoriaId ?? '' }, autorNome);
 }

@@ -10,9 +10,13 @@
  *   segunda recebe "alguém alterou" e nada é sobrescrito;
  * - desativar não apaga (insumo tem uso em ficha, nota, estoque...);
  * - trocar a unidade só sem outra embalagem e sem uso (conferido com a linha
- *   travada, dentro da transação).
+ *   travada, dentro da transação);
+ * - I.1a: categoria obrigatória no servidor (criar e editar), conferida dentro da transação (existe, é do parceiro, está
+ *   ativa); nome único sem diferenciar maiúscula nem acento; e idempotência de criar pela chave de envio (reenvio com a mesma
+ *   chave e o mesmo conteúdo devolve o insumo já criado como sucesso).
  */
 
+import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
 import { checkVioladoDe, ehErroDeUnicidade } from './tenant';
@@ -20,6 +24,7 @@ import { listarHistorico } from './historico';
 import {
   diferenca,
   FILTROS_PADRAO,
+  lerChaveDeEnvio,
   lerFormInsumo,
   POR_PAGINA,
   retratoDoInsumo,
@@ -31,6 +36,9 @@ import {
   type TipoInsumo,
 } from './insumo-campos';
 import { pode, type Alcance } from './permissoes';
+import { ACENTUADAS, CHAVE_DO_SISTEMA, chaveDoNome, SEM_ACENTO } from './categoria-campos';
+import { sugerirCategoria } from './categoria-sugestao';
+import { categoriaParaClassificar } from './categorias';
 import { compararFracoes, custoDaEmbalagem, custoPorUnidade, type CustoExato, type Fracao, type Unidade } from './unidades';
 import { contaDaFicha, custoIncompleto, type CustoDaFicha } from './ficha-campos';
 import { custosEmCascata } from './ficha-custos';
@@ -38,7 +46,14 @@ import { comprasDoInsumo, ultimasCompras, type UltimaCompra } from './compras-cu
 import { colunasDaValidade, COLUNA_DA_VALIDADE, SELECAO_DA_VALIDADE, validadesDaLinha, type ColunasDaValidade, type Validades } from './validade';
 
 export type ResultadoCadastro =
-  | { ok: true; id: string; nome: string; mudou: string[] }
+  | {
+      ok: true;
+      id: string;
+      nome: string;
+      mudou: string[];
+      /** I.1a: o mesmo envio chegou de novo (clique repetido, resposta perdida): devolve o insumo que já existe, sem criar outro. */
+      repetido?: boolean;
+    }
   | {
       ok: false;
       erros: Erros;
@@ -46,6 +61,8 @@ export type ResultadoCadastro =
       conflito?: boolean;
       /** Nome repetido de um insumo desativado: dá para reativar em vez de criar. */
       desativadoId?: string;
+      /** I.1a: o insumo ATIVO que já tem este nome (ou um escrito de outro jeito): abrir em vez de cadastrar de novo. */
+      existenteId?: string;
       naoEncontrado?: boolean;
     };
 
@@ -78,16 +95,60 @@ export function erroDoCheck(e: unknown): Extract<ResultadoCadastro, { ok: false 
   return { ok: false, erros: { geral } };
 }
 
-async function erroDeNomeRepetido(cliente: ClienteDoParceiro, nome: string): Promise<ResultadoCadastro> {
-  const existente = await cliente.insumo.findFirst({ where: { nome }, select: { id: true, ativo: true } });
-  if (existente && !existente.ativo) {
+/** Trava os nomes de insumo deste parceiro: duas pessoas cadastrando "Farinha" e "farinha" ao mesmo tempo esperam uma à outra. */
+async function travarNomes(tx: ClienteDoParceiro) {
+  await tx.sql`SELECT 1 AS "ok" FROM (SELECT pg_advisory_xact_lock(hashtextextended(${`ff:insumo-nomes:${tx.parceiroId}`}, 0))) AS "trava"`;
+}
+
+/** O insumo que já tem este nome sem diferenciar maiúscula nem acento (fora o próprio, ao renomear). */
+async function insumoComNomeParecido(tx: ClienteDoParceiro, nome: string, exceto: string | null) {
+  const achados = await tx.sql<{ id: string; nome: string; ativo: boolean }>`
+    SELECT "id", "nome", "ativo" FROM "Insumo"
+    WHERE "parceiroId" = ${tx.parceiroId}
+      AND lower(translate(normalize("nome", NFC), ${ACENTUADAS}, ${SEM_ACENTO})) = ${chaveDoNome(nome)}
+      AND "id" <> ${exceto ?? ''}
+    ORDER BY ("nome" = ${nome}) DESC, "ativo" DESC
+    LIMIT 1`;
+  return achados[0] ?? null;
+}
+
+/** A frase do nome que já existe: o mesmo nome, ou o mesmo nome escrito de outro jeito (caixa, acento). */
+function erroDeNomeRepetido(achado: { id: string; nome: string; ativo: boolean }, digitado: string): Extract<ResultadoCadastro, { ok: false }> {
+  const igual = achado.nome === digitado;
+  if (!achado.ativo) {
     return {
       ok: false,
-      erros: { nome: `Já existe “${nome}” desativado. Reative em vez de cadastrar de novo.` },
-      desativadoId: existente.id,
+      erros: { nome: `Já existe “${achado.nome}” desativado${igual ? '' : ' (o mesmo nome, escrito de outro jeito)'}. Reative em vez de cadastrar de novo.` },
+      desativadoId: achado.id,
     };
   }
-  return { ok: false, erros: { nome: 'Já existe um insumo com esse nome.' } };
+  return {
+    ok: false,
+    erros: { nome: igual ? 'Já existe um insumo com esse nome.' : `Já existe “${achado.nome}” (o mesmo nome, escrito de outro jeito). Abra esse insumo em vez de cadastrar de novo.` },
+    existenteId: achado.id,
+  };
+}
+
+const FRASE_ENVIO_TORTO = 'O envio deste formulário não tem uma chave válida. Recarregue a página e tente de novo; nada foi gravado.';
+const FRASE_ENVIO_DIFERENTE = (nome: string) =>
+  `Este envio já cadastrou “${nome}” e agora chegou com dados diferentes. Recarregue a página para cadastrar de novo; nada foi gravado.`;
+
+/** A impressão do conteúdo do envio: mesma chave com impressão diferente é outro pedido, não um reenvio. */
+export function hashDoEnvio(d: DadosInsumo): string {
+  const r = retratoDoInsumo(d);
+  return createHash('sha256').update(JSON.stringify([d.nome, d.tipo, d.unidade, d.categoriaId ?? null, r.conservacao, r.validade, d.conteudoMilesimos, d.precoEmbalagemCentavos, d.taxaEntregaCentavos])).digest('hex');
+}
+
+/**
+ * Como a categoria foi escolhida: igual à sugestão pelo nome = SUGESTAO (e, se a sugestão foi "Outros" por dúvida, o motivo
+ * fica para a fila de revisão); qualquer outra = MANUAL. A conta é refeita aqui, na gravação: o que o navegador diz não vale.
+ */
+function comoClassificou(nome: string, tipo: TipoInsumo, chaveDaEscolhida: string | null) {
+  const s = sugerirCategoria(nome, tipo);
+  if (chaveDaEscolhida !== null && chaveDaEscolhida === s.chave) {
+    return { classificadoPor: 'SUGESTAO' as const, classificacaoMotivo: s.chave === CHAVE_DO_SISTEMA ? s.motivo : null };
+  }
+  return { classificadoPor: 'MANUAL' as const, classificacaoMotivo: null };
 }
 
 // ------------------------------------------------------------ cadastrar
@@ -95,17 +156,40 @@ async function erroDeNomeRepetido(cliente: ClienteDoParceiro, nome: string): Pro
 /**
  * Valida o texto do formulário e grava. Toda conversão para inteiro acontece no
  * servidor: o navegador manda texto, nunca o número já calculado.
+ *
+ * I.1a: nome, categoria e unidade base são obrigatórios (cada falta volta no campo dela); a categoria é conferida dentro da
+ * transação; o nome não repete nem por maiúscula ou acento; e `entrada.envio` (a chave do formulário) faz o reenvio voltar
+ * como o mesmo insumo, sem criar outro.
  */
 export async function cadastrarInsumo(
   cliente: ClienteDoParceiro,
   entrada: Record<string, unknown>,
   autorNome = 'Sistema',
+  /** Quem envia (id do usuário): a chave de envio é POR PESSOA, então a chave de um não reconhece nem revela o envio de outro. */
+  pessoaId = '',
 ): Promise<ResultadoCadastro> {
   const lido = lerFormInsumo(entrada);
+  const envio = lerChaveDeEnvio(entrada.envio);
   if (!lido.ok) return lido;
+  if (!envio.ok) return { ok: false, erros: { geral: FRASE_ENVIO_TORTO }, conflito: true };
   const d = lido.dados;
+  const chave = envio.chave ? createHash('sha256').update(`${pessoaId}|${envio.chave}`).digest('hex').slice(0, 40) : null;
+  const hash = chave ? hashDoEnvio(d) : null;
   try {
-    const criado = await cliente.transacao(async (tx) => {
+    return await cliente.transacao(async (tx) => {
+      await travarNomes(tx);
+      if (chave) {
+        const j = await tx.insumo.findFirst({ where: { chaveEnvio: chave }, select: { id: true, nome: true, hashEnvio: true } });
+        if (j) {
+          if (j.hashEnvio === hash) return { ok: true as const, id: j.id, nome: j.nome, mudou: [], repetido: true };
+          throw new Recusa({ ok: false, erros: { geral: FRASE_ENVIO_DIFERENTE(j.nome) }, conflito: true });
+        }
+      }
+      const cat = await categoriaParaClassificar(tx, d.categoriaId!);
+      if (!cat.ok) throw new Recusa({ ok: false, erros: { categoriaId: cat.erro } });
+      const parecido = await insumoComNomeParecido(tx, d.nome, null);
+      if (parecido) throw new Recusa(erroDeNomeRepetido(parecido, d.nome));
+      const como = comoClassificou(d.nome, d.tipo, cat.categoria.chave);
       const novo = await tx.insumo.create({
         data: {
           parceiroId: tx.parceiroId,
@@ -117,6 +201,10 @@ export async function cadastrarInsumo(
           conteudoMilesimos: d.conteudoMilesimos,
           precoEmbalagemCentavos: d.precoEmbalagemCentavos,
           taxaEntregaCentavos: d.taxaEntregaCentavos,
+          categoriaId: cat.categoria.id,
+          ...como,
+          classificadoEm: new Date(),
+          ...(chave ? { chaveEnvio: chave, hashEnvio: hash } : {}),
         },
         select: { id: true, nome: true },
       });
@@ -126,15 +214,24 @@ export async function cadastrarInsumo(
           entidade: 'Insumo',
           entidadeId: novo.id,
           acao: 'CRIOU',
-          depois: retratoDoInsumo(d),
+          depois: { ...retratoDoInsumo({ ...d, categoriaId: cat.categoria.id, categoriaNome: cat.categoria.nome }), classificadoPor: como.classificadoPor },
           autorNome,
         },
       });
-      return novo;
+      return { ok: true as const, ...novo, mudou: [] };
     });
-    return { ok: true, ...criado, mudou: [] };
   } catch (e) {
-    if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, d.nome);
+    if (e instanceof Recusa) return e.resultado;
+    if (ehErroDeUnicidade(e)) {
+      // A chave ou o nome já existiam (outra aba, ao mesmo tempo): se é o mesmo envio, é sucesso; senão, o nome.
+      if (chave) {
+        const j = await cliente.insumo.findFirst({ where: { chaveEnvio: chave }, select: { id: true, nome: true, hashEnvio: true } });
+        if (j && j.hashEnvio === hash) return { ok: true, id: j.id, nome: j.nome, mudou: [], repetido: true };
+      }
+      const existente = await cliente.insumo.findFirst({ where: { nome: d.nome }, select: { id: true, nome: true, ativo: true } });
+      if (existente) return erroDeNomeRepetido(existente, d.nome);
+      return { ok: false, erros: { nome: 'Já existe um insumo com esse nome.' } };
+    }
     const check = erroDoCheck(e);
     if (check) return check;
     throw e;
@@ -187,11 +284,14 @@ function dadosDe(
     conteudoMilesimos: number;
     precoEmbalagemCentavos: number;
     taxaEntregaCentavos: number;
+    categoriaId?: string | null;
+    categoria?: { nome: string } | null;
   } & ColunasDaValidade,
 ): DadosInsumo {
   return {
     nome: i.nome,
     tipo: i.tipo,
+    ...(i.categoriaId ? { categoriaId: i.categoriaId, categoriaNome: i.categoria?.nome ?? null } : {}),
     unidade: i.unidade,
     conservacao: i.conservacao,
     validades: validadesDaLinha(i)!,
@@ -214,7 +314,10 @@ export async function editarInsumo(
   const versao = new Date(typeof entrada.versao === 'string' ? entrada.versao : '');
   if (Number.isNaN(versao.getTime())) return { ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true };
 
-  const atual = await cliente.insumo.findUnique({ where: { id }, include: { fichaQueProduz: { select: { nome: true } } } });
+  const atual = await cliente.insumo.findUnique({
+    where: { id },
+    include: { fichaQueProduz: { select: { nome: true } }, categoria: { select: { nome: true } } },
+  });
   if (!atual) return { ok: false, erros: { geral: 'Insumo não encontrado.' }, naoEncontrado: true };
   if (atual.fichaQueProduz) return { ok: false, erros: { geral: mensagemDoPreparo(atual.nome, atual.fichaQueProduz.nome) } };
   // A tela esconde "Editar" de desativado; quem decide é aqui.
@@ -223,14 +326,35 @@ export async function editarInsumo(
     return { ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true };
   }
 
-  const lido = lerFormInsumo(entrada, atual.tipo);
+  // I.1a: o insumo antigo sem categoria também a recebe ao ser editado (o formulário já vem com a sugestão marcada). Quem chama
+  // sem o campo `categoriaId` (importação, rotina de preço) e edita um insumo que JÁ tem categoria a mantém; mandar o campo
+  // vazio, ou editar um insumo sem categoria sem mandá-la, é recusado com a frase.
+  const lido = lerFormInsumo('categoriaId' in entrada || !atual.categoriaId ? entrada : { ...entrada, categoriaId: atual.categoriaId }, atual.tipo);
   if (!lido.ok) return lido;
   const d = lido.dados;
-  const mudanca = diferenca(retratoDoInsumo(dadosDe(atual)), retratoDoInsumo(d));
-  if (!mudanca) return { ok: true, id, nome: atual.nome, mudou: [] };
+  const trocouDeCategoria = d.categoriaId !== atual.categoriaId;
 
   try {
-    await cliente.transacao(async (tx) => {
+    return await cliente.transacao(async (tx) => {
+      if (d.nome !== atual.nome) await travarNomes(tx);
+      const cat = await categoriaParaClassificar(tx, d.categoriaId!, atual.categoriaId);
+      if (!cat.ok) throw new Recusa({ ok: false, erros: { categoriaId: cat.erro } });
+      d.categoriaNome = cat.categoria.nome;
+      if (d.nome !== atual.nome) {
+        const parecido = await insumoComNomeParecido(tx, d.nome, id);
+        if (parecido) throw new Recusa(erroDeNomeRepetido(parecido, d.nome));
+      }
+      const como = trocouDeCategoria ? comoClassificou(d.nome, d.tipo, cat.categoria.chave) : null;
+      const antesRetrato = retratoDoInsumo(dadosDe(atual));
+      const depoisRetrato = retratoDoInsumo(d);
+      if (como) {
+        // O "como foi classificado" entra no histórico só quando a categoria mudou.
+        antesRetrato.classificadoPor = atual.classificadoPor ?? null;
+        depoisRetrato.classificadoPor = como.classificadoPor;
+      }
+      const mudanca = diferenca(antesRetrato, depoisRetrato);
+      if (!mudanca) return { ok: true as const, id, nome: atual.nome, mudou: [] };
+
       // Condicional: a linha só muda se ainda está na versão que a tela leu.
       // O UPDATE trava a linha até o fim da transação.
       const r = await tx.insumo.updateMany({
@@ -245,6 +369,14 @@ export async function editarInsumo(
           conteudoMilesimos: d.conteudoMilesimos,
           precoEmbalagemCentavos: d.precoEmbalagemCentavos,
           taxaEntregaCentavos: d.taxaEntregaCentavos,
+          // Mexeu na categoria: a classificação passa a ser desta pessoa e sai do lote da classificação assistida (a reversão
+          // do lote não a desfaz mais). Salvou outra coisa, sem trocar a categoria: o insumo também sai do lote (uma pessoa o
+          // revisou depois da máquina), mas a categoria e o "como foi classificada" ficam como estavam.
+          ...(como
+            ? { categoriaId: cat.categoria.id, ...como, classificacaoLote: null, classificadoEm: new Date() }
+            : atual.classificacaoLote
+              ? { classificacaoLote: null }
+              : {}),
         },
       });
       if (r.count === 0) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true });
@@ -265,15 +397,19 @@ export async function editarInsumo(
           autorNome,
         },
       });
+      return { ok: true as const, id, nome: d.nome, mudou: mudanca.campos };
     });
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
-    if (ehErroDeUnicidade(e)) return erroDeNomeRepetido(cliente, d.nome);
+    if (ehErroDeUnicidade(e)) {
+      const existente = await cliente.insumo.findFirst({ where: { nome: d.nome, NOT: { id } }, select: { id: true, nome: true, ativo: true } });
+      if (existente) return erroDeNomeRepetido(existente, d.nome);
+      return { ok: false, erros: { nome: 'Já existe um insumo com esse nome.' } };
+    }
     const check = erroDoCheck(e);
     if (check) return check;
     throw e;
   }
-  return { ok: true, id, nome: d.nome, mudou: mudanca.campos };
 }
 
 // --------------------------------------------------- desativar/reativar
@@ -332,6 +468,10 @@ export interface LinhaDeInsumo {
   nome: string;
   tipo: TipoInsumo;
   unidade: Unidade;
+  /** I.1a: nula = o insumo antigo ainda sem categoria. */
+  categoria: { id: string; nome: string; ativa: boolean; chave: string | null } | null;
+  /** Por que está em "Outros / a classificar" (ambíguo), quando está. */
+  classificacaoMotivo: string | null;
   conservacao: Conservacao;
   /** 1.4: principal + validade em cada conservação aceita (minutos). */
   validades: Validades;
@@ -360,6 +500,14 @@ function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
   return {
     ...(q ? { nome: { contains: q, mode: 'insensitive' as const } } : {}),
     ...(f.tipo ? { tipo: f.tipo } : {}),
+    // I.1a: 'sem' = sem categoria; 'revisar' = sem categoria ou em "Outros / a classificar"; senão, uma categoria.
+    ...(f.categoria === 'sem'
+      ? { categoriaId: null }
+      : f.categoria === 'revisar'
+        ? { AND: [{ OR: [{ categoriaId: null }, { categoria: { is: { chave: CHAVE_DO_SISTEMA } } }] }] }
+        : f.categoria
+          ? { categoriaId: f.categoria }
+          : {}),
     // 1.4: "conservação X" = os que ficam em X (a principal ou com validade nela).
     ...(f.conservacao ? { OR: [{ conservacao: f.conservacao }, { [COLUNA_DA_VALIDADE[f.conservacao]]: { not: null } }] } : {}),
     ...(f.situacao === 'ativos' ? { ativo: true } : f.situacao === 'desativados' ? { ativo: false } : {}),
@@ -374,6 +522,9 @@ const SELECAO_DA_LINHA = {
   nome: true,
   tipo: true,
   unidade: true,
+  // I.1a: a categoria que a lista mostra (a coluna e o filtro) e o motivo de estar em "Outros".
+  categoria: { select: { id: true, nome: true, ativa: true, chave: true } },
+  classificacaoMotivo: true,
   ...SELECAO_DA_VALIDADE,
   conteudoMilesimos: true,
   precoEmbalagemCentavos: true,
@@ -483,6 +634,7 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string, alcanc
       include: {
         variantes: { orderBy: [{ ativo: 'desc' }, { nome: 'asc' }] },
         fichaQueProduz: { select: { id: true, nome: true, tipo: true, rendimentoMilesimos: true, unidadeRendimento: true } },
+        categoria: { select: { id: true, nome: true, ativa: true, chave: true } },
       },
     });
     if (!i) return null;
@@ -508,6 +660,10 @@ export async function obterInsumo(cliente: ClienteDoParceiro, id: string, alcanc
       nome: i.nome,
       tipo: i.tipo,
       unidade: i.unidade,
+      /** I.1a: a categoria (nula = ainda sem), como foi escolhida e, se ficou em "Outros", por quê. */
+      categoria: i.categoria,
+      classificadoPor: i.classificadoPor,
+      classificacaoMotivo: i.classificacaoMotivo,
       conservacao: i.conservacao,
       validades: validadesDaLinha(i)!,
       conteudoMilesimos: i.conteudoMilesimos,

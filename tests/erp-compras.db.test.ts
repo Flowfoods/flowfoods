@@ -41,7 +41,8 @@ vi.mock('@/lib/erp/contexto', async () => {
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
-import { cadastrarInsumo, mudarSituacaoInsumo, motivoDaUnidadeTravada, obterInsumo, listarInsumos } from '@/lib/erp/insumos';
+import { mudarSituacaoInsumo, motivoDaUnidadeTravada, obterInsumo, listarInsumos } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { cadastrarVariante } from '@/lib/erp/variantes';
 import { cadastrarFicha, obterFicha } from '@/lib/erp/fichas';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
@@ -396,7 +397,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
     const doOperador = (await obterInsumo(a, ids.cheddar, operador))!;
     expect(doOperador.compras).toEqual([]);
     expect(doOperador.precoPorFornecedor).toEqual([]);
-    expect(JSON.stringify(doOperador)).not.toContain('Laticínios');
+    // O fornecedor da nota ("Laticínios Rio"); a CATEGORIA "Laticínios, frios e embutidos" (I.1a) é da rede e aparece para todos.
+    expect(JSON.stringify(doOperador)).not.toContain('Laticínios Rio');
     // Fornecedor: sem "ver compras", nenhuma nota nem preço; o gerente só as do Centro.
     const fOp = (await obterFornecedor(a, operador, ids.laticinios))!;
     expect([fOp.notas, fOp.insumos]).toEqual([[], []]);

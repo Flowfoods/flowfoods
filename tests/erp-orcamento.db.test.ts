@@ -51,7 +51,7 @@ vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { salvarCanaisDaLoja } from '@/lib/erp/faturamento';
-import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { cadastrarFornecedor, cancelarNota, lancarNota, obterNota, previaDaNota } from '@/lib/erp/compras';
 import type { EntradaDaNota } from '@/lib/erp/compra-campos';
 import { salvarMetas, situacaoDasMetas } from '@/lib/erp/dre-metas';

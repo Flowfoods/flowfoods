@@ -9,6 +9,7 @@ import { CONSERVACOES, TIPOS } from './insumo-campos';
 import { TIPOS_DE_FICHA } from './ficha-campos';
 import { SEPARADOR_DE_ITENS } from './compra-campos';
 import { SEM_EMBALAGEM } from './canal-campos';
+import { COMO_CLASSIFICOU } from './categoria-campos';
 import { UNIDADES, formatarCusto, formatarDinheiro, formatarQuantidade, type CustoExato, type Unidade } from './unidades';
 
 const ENTIDADE: Record<string, string> = {
@@ -16,6 +17,8 @@ const ENTIDADE: Record<string, string> = {
   Loja: 'Loja',
   Marca: 'Marca',
   Insumo: 'Insumo',
+  // I.1a: a categoria de insumo da rede (criar, renomear, reordenar, desativar, excluir).
+  CategoriaInsumo: 'Categoria de insumo',
   // "Variante" é palavra de sistema; na tela é outra embalagem de compra do insumo.
   InsumoVariante: 'Embalagem',
   FichaTecnica: 'Ficha técnica',
@@ -86,6 +89,11 @@ const ACAO: Record<string, string> = {
   PEGOU: 'Pegou',
   SOLTOU: 'Soltou',
   REATRIBUIU: 'Passou',
+  // I.1a: categorias de insumo e a classificação dos insumos.
+  RENOMEOU: 'Renomeou',
+  REORDENOU: 'Reordenou',
+  CLASSIFICOU: 'Classificou',
+  RECLASSIFICOU: 'Reclassificou',
 };
 
 const CAMPO: Record<string, string> = {
@@ -100,6 +108,11 @@ const CAMPO: Record<string, string> = {
   // Linhas gravadas antes do custo exato (centavos inteiros por unidade).
   custoPorUnidadeCentavos: 'custo por unidade',
   tipo: 'tipo',
+  // I.1a
+  categoria: 'categoria',
+  posicao: 'posição na lista',
+  classificadoPor: 'como foi classificada',
+  loteDaClassificacao: 'lote da classificação',
   conservacao: 'conservação',
   validade: 'validade',
   codigoBarras: 'código de barras',
@@ -231,6 +244,10 @@ const NA_HORA = new Set(['custoLoja', 'custoDelivery', 'custoIfood', 'feitoPor']
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */
 const ORDEM = [
   'nome',
+  'categoria',
+  'posicao',
+  'classificadoPor',
+  'loteDaClassificacao',
   'producaoDoDia',
   'lotesGerados',
   'pegoPor',
@@ -347,6 +364,8 @@ function valor(campo: string, v: unknown): string {
   if (campo === 'conservacao' && typeof v === 'string') return CONSERVACOES[v as keyof typeof CONSERVACOES] ?? v;
   if (campo === 'unidade' && typeof v === 'string') return UNIDADES[v as Unidade]?.nome ?? v;
   if (campo === 'ativo' && typeof v === 'boolean') return v ? 'Ativo' : 'Desativado';
+  if (campo === 'classificadoPor' && typeof v === 'string') return COMO_CLASSIFICOU[v] ?? v;
+  if (campo === 'posicao' && typeof v === 'number') return `${v}ª`;
   if (campo === 'status' && typeof v === 'string') return STATUS[v] ?? v;
   if (campo.endsWith('Ate') && typeof v === 'string' && !Number.isNaN(Date.parse(v))) {
     return DATA_HORA.format(new Date(v)).replace(',', ' às');
@@ -432,6 +451,8 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     if (c === 'unidade' && juntarUnidade && criacao) continue;
     // De quem é a embalagem (ou o lançamento de faturamento) já está no "alvo" da linha.
     if (c === 'insumo' || c === 'alvo' || c === 'faturamentoLojaId' || c === 'faturamentoDia') continue;
+    // I.1a: o id da categoria é técnico (o "excluir categoria" o confere); a tela mostra o nome.
+    if (c === 'categoriaId') continue;
     // Itens da nota (1.5): o que entrou e o que saiu (uma linha mudada sai e entra de novo).
     if (c === 'itensDaNota' && typeof depois[c] === 'string') {
       const a = new Set(criacao || typeof antes[c] !== 'string' ? [] : (antes[c] as string).split(SEPARADOR_DE_ITENS));

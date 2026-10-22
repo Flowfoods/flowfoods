@@ -17,7 +17,7 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { doParceiro, ErroDeTenant, gravarParceiroFlow, PAPEL_DE_TENANT } from '@/lib/erp/tenant';
-import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { cadastrarLoja, cadastrarMarca, listarEstrutura } from '@/lib/erp/estrutura';
 import { criarParceiro, mudarStatusParceiro, renomearParceiro } from '@/lib/erp/parceiros';
 import { listarHistorico } from '@/lib/erp/historico';

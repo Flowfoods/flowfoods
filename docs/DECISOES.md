@@ -2195,3 +2195,71 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Razão:** pedidos do fiscal de UX. A aba ativa vem do CAMINHO (`itemAtivo`), não da query: quem chegava ao Concluir pelas Tarefas (`/producao/<loja>/<lote>/concluir?de=tarefas`) via a aba "Lotes" marcada. O Concluir das Tarefas ganhou o endereço `/producao/tarefas/<loja>/<lote>/concluir` (no ERP e no espelho do nível 1), com a MESMA tela e a mesma action; o endereço antigo continua valendo. Abas (componente comum, vale para o ERP todo): ao abrir, a aba atual vem para a vista dentro do trilho — só o trilho rola, sem animação (o salto é instantâneo com ou sem `prefers-reduced-motion`). "Manter" fecha o formulário de soltar e de passar mesmo depois de um erro, e o erro dispensado não volta ao reabrir. Quem perdeu a corrida não vê mais o "Pegar" (tocar de novo só repetiria a recusa): fica a frase de quem pegou e "Ver de novo". Indicadores no celular: valor embaixo do rótulo abaixo de 640 px. Na Delivery (estoque não aberto) e com o período fechado, o aviso aparece uma vez, no alto.
 
+
+### 243. 2026-10-22 · ERP I.1a: a categoria de insumo é da REDE; o insumo tem UMA; a loja personaliza só a meta (I.2)
+
+**Alternativas:** (a) categoria por loja (cada loja classifica o insumo como quer, com herança da rede); (b) categoria da rede, uma por insumo, e a camada por loja só para meta e uso (`CategoriaNaLoja`, I.2).
+
+**Razão:** (b). Categoria é a natureza do insumo (farinha é Mercearias e secos em qualquer loja); o insumo já é cadastro da rede. Classificar a mesma farinha diferente por loja quebraria o CMV consolidado e a comparação entre lojas. O plano diz "configuração por loja, com herança opcional": isso vale para a META por categoria e a ativação dela, que nascem na I.2 sem tocar no que a I.1a guarda. **Desvio do texto do plano, para o Rodolfo confirmar.** Tabela `CategoriaInsumo` do parceiro (RLS, FK composta); `Insumo.categoriaId`.
+
+### 244. 2026-10-22 · ERP I.1a: "Outros / a classificar" é do sistema: não se renomeia, desativa nem exclui; as outras nove são da casa
+
+**Razão:** é o destino do que o nome não decide e a fila de revisão; sem ela a classificação assistida não teria onde pôr o ambíguo. `sistema = true` com `chave = OUTROS`, travada na regra e no banco (gatilho `CategoriaInsumo_sistema_protegida`, que recusa nome, situação, chave e exclusão, até por SQL cru). As nove padrão (e as que a casa criar) renomeiam, reordenam, desativam (com uso) e excluem (sem uso). Cada padrão tem `chave` estável (`PROTEINA`…): renomear não faz a sugestão perdê-la, e semear de novo não recria a que a casa renomeou. Excluir só sem insumo e sem passagem de insumo por ela no histórico (uma classificação desfeita também conta); com uso, a frase manda desativar. Desativar não apaga: o insumo continua nela, ela sai das opções do cadastro novo.
+
+### 245. 2026-10-22 · ERP I.1a: a sugestão pelo nome é determinística, por dicionário, e a conservação não conta
+
+**Alternativas:** (a) IA externa; (b) dicionário de cozinha em arquivo puro, com teste.
+
+**Razão:** (b): mesma entrada, mesma saída, cada resposta diz de qual palavra veio ou por que não decidiu; sem custo, sem dado saindo do ERP. Regras: palavras de conservação ("congelado", "resfriado", "IQF") nunca decidem (coxa de frango congelada é Proteína); o substantivo que abre o nome manda ("molho de tomate" é molho, "pão de queijo" é pão); frases valem antes de palavras ("batata palha" é Mercearias, "batata" é Hortifruti); Proteína, Laticínios, Panificação e Hortifruti vencem "Congelados e industrializados", que só aparece quando nada mais cabe pela natureza; vários grupos ou nenhum → Outros com o motivo ("Ambíguo: o nome lembra Proteína e Panificação"); tipo Embalagem → Descartáveis. É só sugestão: a pessoa confere e troca, e o servidor refaz a conta para gravar se foi SUGESTAO ou MANUAL (não confia no navegador). Efeito conhecido: "Nuggets de frango" cai em Congelados (o nome que abre manda); a pessoa troca.
+
+### 246. 2026-10-22 · ERP I.1a: `categoriaId` é nulo no banco e obrigatório na regra (criar e editar)
+
+**Razão:** o insumo antigo continua legível e nenhuma migration reprova por dado antigo; a obrigatoriedade é do servidor: insumo novo sem categoria é recusado com a frase no campo (e o formulário fica como estava); editar um insumo sem categoria também a pede (o formulário já abre com a sugestão marcada); editar um que já tem categoria sem mandar o campo a mantém (importação, rotina de preço), mas campo vazio é recusado. Nome, categoria e unidade base são obrigatórios; a unidade deixou de vir marcada em KG (quem nunca escolheu a unidade não "escolheu"). Conservação e custo inicial não viram obrigatórios aqui (I.1b).
+
+### 247. 2026-10-22 · ERP I.1a: a classificação dos insumos antigos é por script e tela, com prévia, lote e reversão; nunca SQL cego, nunca na migration
+
+**Razão:** prévia lista cada insumo, a sugestão, o motivo e o valor em estoque sem gravar nada; aplicar classifica só onde `categoriaId IS NULL`, numa transação, com um registro CLASSIFICOU antes/depois por insumo e o lote no registro e no insumo; rodar de novo muda 0; ambíguo vai para "Outros / a classificar" com `classificacaoMotivo`. Reverter volta a "sem categoria" só os que ainda são do lote: qualquer classificação por pessoa (edição ou lote da fila) tira o insumo do lote (`classificacaoLote` nulo). Nada além da categoria muda (id, nome, preço, unidade, embalagem, saldo, ficha, movimento: provado por retrato antes/depois). O CMV e o DRE de período fechado não leem categoria: nada de fotografia antiga muda. Tela "Classificar insumos" (mesmas regras do script `erp:classificar-insumos`) com a contagem e o valor sem categoria visíveis também na lista de Insumos.
+
+### 248. 2026-10-22 · ERP I.1a: permissão nova `insumos.categorias` (rede inteira); aplicar e desfazer a classificação são dela; classificar insumos continua `insumos.editar`
+
+**Razão:** mudar categoria muda o CMV de todas as lojas (`exigeRede`). Dono tem pelo perfil base; Gerente e Operador não (Gerente entra em `SEM_GERENTE`). Classificar UM insumo, ou vários pela fila, é cadastro de insumo (`insumos.editar`). Catálogo v3 (`VERSAO_DO_CATALOGO` 3) com a migration de dado `20261101010000_erp_catalogo_v3`, no padrão da v2: o perfil próprio "copiado do Dono" da v2 ganha a nova; os parciais não (a Equipe pede para revisar). A aba "Classificar insumos" pede `insumos.editar` E `insumos.ver` (`Tela.tambem`): quem só pode editar não abre a área por causa dela.
+
+### 249. 2026-10-22 · ERP I.1a: sem categoria nova fora de "Outros" quando a padrão sumiu
+
+**Razão:** a sugestão acha a categoria pela chave na casa; se a padrão foi excluída ou está desativada, o insumo vai para "Outros / a classificar" e o motivo diz "a categoria X não está ativa nesta casa". Nada é recriado calado.
+
+### 250. 2026-10-22 · ERP I.1a: as dez padrão nascem por script e UMA vez, na primeira abertura de casa sem categoria; abrir tela nunca recria o que a casa excluiu
+
+**Razão:** migration não lê nem grava dado de tenant (lição da 2.1: o dono com FORCE RLS enxerga 0 linhas). `npm run erp:semear-categorias` semeia todo parceiro ativo; só ele, por ato explícito (`completar`), devolve a padrão que faltar. Telas, ficha e classificação chamam `garantirCategoriasPadrao` sem `completar`: semeia as dez apenas quando a casa não tem categoria nenhuma (como "Outros / a classificar" não se exclui, casa sem nenhuma é casa nunca semeada) e, de resto, só garante "Outros". Corrige o veto do Guardião: a Dona excluía "Bebidas" (sem uso), o Operador abria o formulário e ela voltava, com `CRIOU` no nome dele (sem `insumos.categorias`). Agora o histórico da criação automática sai em nome do "Sistema", nunca de quem abriu a tela. Escolhido em vez de uma marca no parceiro porque "Outros" já é a marca (imutável por regra e gatilho) e a migration segue aditiva e sem dado. Parceiro somente leitura não semeia. Categoria da casa sem chave com o nome de uma padrão é adotada, não duplicada.
+
+### 251. 2026-10-22 · ERP I.1a: nome de insumo único sem diferenciar maiúscula, acento nem espaço, só para o que entra daqui em diante; o que já existe é reportado, não mexido
+
+**Razão:** o índice único não mudou (migration aditiva, nenhuma colisão a quebrar). A regra nova (cadastro e renomeação) compara `lower(translate(nome))` com a mesma tabela de acentos do código (teste confere as duas listas), com trava por parceiro: "Fubá", "fuba" e "FUBÁ" ao mesmo tempo dão um só. Recusa com o link do insumo que existe ("o mesmo nome, escrito de outro jeito") ou do desativado, para reativar. Os pares que já eram parecidos ("Cebola" e "cebola") continuam editáveis; aparecem em Classificar › Nomes parecidos e na prévia do script para a casa juntar ou renomear.
+
+### 252. 2026-10-22 · ERP I.1a: idempotência do cadastro pela chave de envio (`chaveEnvio` + impressão do conteúdo), conferida no servidor
+
+**Razão:** o botão desabilitado não basta (resposta perdida, duas abas). O formulário novo leva um UUID sorteado no servidor a cada abertura; `Insumo.chaveEnvio` é único por parceiro e `hashEnvio` é a impressão do conteúdo. Mesma chave e mesmo conteúdo devolve o insumo que já existe como sucesso (a tela diz "Insumo salvo com sucesso: <nome>" e que foi cadastrado uma vez só). A chave é POR PESSOA: o servidor guarda a impressão de `pessoa|chave`, então a chave de um nunca reconhece nem revela ("já cadastrou X") o envio de outro; mesma chave com conteúdo diferente é recusada ("já cadastrou X e agora chegou com dados diferentes"); chave torta é recusada. Cinco pedidos em paralelo dão um insumo só (trava por parceiro + índice como cinto). Falha de rede no envio volta como "não deu para confirmar" com o formulário intacto; tocar de novo reconcilia em vez de duplicar. Quem chama sem chave (seed, importação) não ganha idempotência, mas continua valendo a regra do nome.
+
+### 253. 2026-10-22 · ERP I.1a: retorno ao salvar anunciado e sem cobrir nada
+
+**Razão:** "Salvando…" vira região viva no formulário e no botão (que já travava); depois do redirect, o detalhe mostra "Insumo salvo com sucesso: <nome>" (criado) ou "Insumo atualizado com sucesso: <nome>" (atualizado), com o nome lido do banco (a URL só escolhe a chave do mapa). A região `role=status` nasce VAZIA e é preenchida depois da montagem, porque região que já nasce com texto não é anunciada pelo leitor de tela. O aviso fica na página (não some, não cobre ação), com "Cadastrar outro insumo" e "Ver todos os insumos". Erro de validação leva o foco ao primeiro campo com problema, na ordem da tela.
+
+### 254. 2026-10-22 · ERP I.1a: o que ficou para a I.1b e a I.2, e o que não tem prompt Kairu
+
+**Razão:** I.1b: conservação sem valor padrão, "Prazo de uso após abertura", custo inicial de referência, marca de referência, tipo MATERIAL, "nome duas vezes" (links `?nome=`/volta e rótulo da embalagem) e o filtro "Conservação". I.2: meta por categoria, `CategoriaNaLoja` e painéis de CMV por categoria. Não há prompt Kairu sobre categoria ou cadastro de insumo: o que foi aproveitado de "Da Ficha ao Fornecedor", "Estoque unificado" e dos pacotes de inventário e CMV está na seção da I.1a de `docs/ERP.md`.
+
+### 255. 2026-10-22 · ERP I.1a: nome na forma composta e sem caracteres invisíveis (insumo e categoria)
+
+**Razão:** "Farínha" decomposto (i + acento combinante) e "Proteína" com um espaço de largura zero passavam por nomes diferentes dos que parecem iguais. `limparTexto` normaliza para NFC e tira largura zero, soft hyphen, marcas de direção, seletores de variação, BOM e controles, antes do `trim`; vale em `nomeObrigatorio` (insumo, embalagem, ficha), no nome da categoria e em `chaveDoNome`. No banco a comparação usa `normalize("nome", NFC)`. Nome só de invisíveis é "nome vazio". Nomes antigos não foram mexidos.
+
+### 256. 2026-10-22 · ERP I.1a: desfazer um lote não tira a categoria do que uma pessoa salvou depois
+
+**Razão:** vale a mão da pessoa, não a da máquina. Salvar o insumo (mesmo sem trocar a categoria), reclassificar à mão ou aceitar a sugestão em lote tira o insumo do lote (`classificacaoLote` = nulo); a categoria e o "como foi classificada" ficam. Desfazer o lote devolve a "sem categoria" só o que ninguém tocou.
+
+### 257. 2026-10-22 · ERP I.1a: "Classificar os N insumos" fica preso à prévia mostrada
+
+**Razão:** entre ver a prévia e clicar, alguém pode cadastrar, classificar ou desativar a categoria. A prévia leva uma impressão (`assinatura`: quais insumos e para qual categoria); o botão a devolve e o servidor recalcula dentro da transação, sob trava. Se mudou, nada é gravado e a tela diz para conferir a prévia de agora. O script (sem prévia a conferir) não manda a impressão.
+
+### 258. 2026-10-22 · ERP I.1a: acabamento da fila e do cadastro em série
+
+**Razão:** "Aceitar a sugestão dos marcados" classifica pelo nome o que o nome decide e deixa na fila o que não decide (ambíguo, ou categoria sugerida não ativa), dizendo quantos ficaram; fica como "sugestão pelo nome, aceita" e sai do lote. "Cadastrar outro insumo" abre o formulário com tipo, unidade e conservação do último (só valores da lista; nome e categoria seguem em branco, porque a categoria depende do nome). Erro de categoria vazia diz "A sugestão era <X>" e oferece "Voltar à sugestão". O aviso de salvo vem antes da caixa "Como funciona" (propriedade `aviso` do cabeçalho). Atualizar diz "Insumo atualizado com sucesso: <nome>". A página Classificar exige `insumos.ver` além de `insumos.editar` (sem ver insumos ninguém vê a área só por poder classificar). A prévia diz "N insumos estão sem categoria, sendo M desativados". O filtro de categoria ocupa a largura toda no celular.

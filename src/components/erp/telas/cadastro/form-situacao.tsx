@@ -17,6 +17,7 @@ const O_QUE = {
   embalagem: { nome: 'embalagem', fem: true },
   ficha: { nome: 'ficha', fem: true },
   fornecedor: { nome: 'fornecedor', fem: false },
+  categoria: { nome: 'categoria', fem: true },
 } as const;
 
 export function FormSituacao({
@@ -24,12 +25,15 @@ export function FormSituacao({
   ativo,
   oQue,
   idBase,
+  textos,
 }: {
   acao: AcaoDeCadastro;
   /** Situação de agora: ativo → o botão desativa. */
   ativo: boolean;
   oQue: keyof typeof O_QUE;
   idBase: string;
+  /** A frase de cada situação, quando a padrão não serve (a categoria mantém os insumos que já estão nela). */
+  textos?: { desativar: string; reativar: string };
 }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   const { nome, fem } = O_QUE[oQue];
@@ -38,7 +42,11 @@ export function FormSituacao({
     <form action={enviar} className="space-y-3">
       <input type="hidden" name="ativo" value={ativo ? 'nao' : 'sim'} />
       <p className="text-sm text-suave">
-        {ativo
+        {textos
+          ? ativo
+            ? textos.desativar
+            : textos.reativar
+          : ativo
           ? `Desativar tira ${o} ${nome} da lista e da busca padrão. Nada é apagado: o histórico continua e dá para reativar.`
           : `${este} ${nome} está ${desativ}. Reativar devolve ${ele} à lista.`}
       </p>

@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { validadesEmTexto } from '@/lib/erp/validade';
 import type { LinhaDeInsumo } from '@/lib/erp/insumos';
+import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
 import {
   CONSERVACOES,
   queryDosFiltros,
@@ -59,17 +60,30 @@ function Custo({ i }: { i: LinhaDeInsumo }) {
   );
 }
 
+/** I.1a: a categoria na lista; sem ela, o selo diz; em "Outros / a classificar", a palavra e o porquê no título. */
+function CategoriaDaLinha({ i }: { i: LinhaDeInsumo }) {
+  if (!i.categoria) return <Selo tom="alerta">Sem categoria</Selo>;
+  if (i.categoria.chave === 'OUTROS') {
+    return (
+      <span className="block text-atencao" title={i.classificacaoMotivo ?? undefined}>
+        {i.categoria.nome}
+      </span>
+    );
+  }
+  return <span className={`block ${i.categoria.ativa ? 'text-texto' : 'text-suave'}`}>{i.categoria.nome}{i.categoria.ativa ? '' : ' (desativada)'}</span>;
+}
+
 // Curtos: cabem em meia largura de 390 px sem cortar (o rótulo completo vai para o leitor de tela).
 const ROTULO_DA_SITUACAO = { ativos: 'Ativos', desativados: 'Desativados', todos: 'Todos' } as const;
 
 /** Barra de busca e filtros (GET: o estado vai para a URL). */
-export function FiltrosDaLista({ base, filtros: f }: { base: string; filtros: FiltrosDeInsumo }) {
+export function FiltrosDaLista({ base, filtros: f, categorias }: { base: string; filtros: FiltrosDeInsumo; categorias: readonly OpcaoDeCategoria[] }) {
   const SELECT = `${CAMPO} pr-8`;
   return (
-    <form role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-4 xl:grid-cols-[minmax(18rem,1fr)_repeat(3,minmax(10.5rem,auto))_auto]">
+    <form role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-5 xl:grid-cols-[minmax(16rem,1fr)_repeat(4,minmax(9.5rem,auto))_auto]">
       {f.ordem !== 'nome' && <input type="hidden" name="ordem" value={f.ordem} />}
       {f.direcao !== 'asc' && <input type="hidden" name="dir" value={f.direcao} />}
-      <div className="col-span-2 flex gap-2 lg:col-span-4 xl:col-span-1">
+      <div className="col-span-2 flex gap-2 lg:col-span-5 xl:col-span-1">
         <label htmlFor="insumos-q" className="sr-only">
           Buscar insumo pelo nome
         </label>
@@ -85,10 +99,26 @@ export function FiltrosDaLista({ base, filtros: f }: { base: string; filtros: Fi
           Filtrar
         </button>
         {temFiltro(f) && (
-          <Link href={hrefCom(base, { ...f, q: '', tipo: null, conservacao: null, situacao: 'ativos', semPreco: false }, {})} className={classeDeBotao('fantasma', 'shrink-0 px-3')}>
+          <Link href={hrefCom(base, { ...f, q: '', tipo: null, categoria: null, conservacao: null, situacao: 'ativos', semPreco: false }, {})} className={classeDeBotao('fantasma', 'shrink-0 px-3')}>
             Limpar
           </Link>
         )}
+      </div>
+      <div className="col-span-2 xl:col-span-1">
+        <label htmlFor="insumos-categoria" className="sr-only">
+          Categoria
+        </label>
+        <select id="insumos-categoria" name="categoria" defaultValue={f.categoria ?? ''} className={SELECT}>
+          <option value="">Todas as categorias</option>
+          <option value="sem">Sem categoria</option>
+          <option value="revisar">A revisar (sem categoria ou Outros)</option>
+          {categorias.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.nome}
+              {c.ativa ? '' : ' (desativada)'}
+            </option>
+          ))}
+        </select>
       </div>
       <div>
         <label htmlFor="insumos-tipo" className="sr-only">
@@ -245,6 +275,7 @@ export function TelaListaInsumos({
                   {i.preparo ? 'Pré-preparo · custo da ficha' : `${TIPOS[i.tipo]} · ${formatarQuantidade(i.conteudoMilesimos, i.unidade)}`}
                   {!i.ativo && ' · Desativado'}
                 </span>
+                <span className={`block truncate text-[12px] ${i.categoria && i.categoria.chave !== 'OUTROS' ? 'text-suave' : 'text-atencao'}`}>{i.categoria?.nome ?? 'Sem categoria'}</span>
                 {validadesEmTexto(i.validades) && <span className="block truncate text-[12px] text-suave">{validadesEmTexto(i.validades)}</span>}
               </span>
               <span className="shrink-0 text-right text-sm tabular-nums">
@@ -264,6 +295,9 @@ export function TelaListaInsumos({
             <Ordenar base={base} f={f} coluna="nome">
               Insumo
             </Ordenar>
+            <th scope="col" className="hidden h-10 px-3 font-semibold md:table-cell">
+              Categoria
+            </th>
             <th scope="col" className="h-10 px-3 text-right font-semibold">
               Embalagem
             </th>
@@ -299,6 +333,9 @@ export function TelaListaInsumos({
                   {i.conservacaoInformada ? (validadesEmTexto(i.validades) ?? CONSERVACOES[i.conservacao]) : 'validade não informada'}
                   <span className="lg:hidden">{!i.ativo && ' · Desativado'}</span>
                 </div>
+              </td>
+              <td className="hidden px-3 py-2 md:table-cell">
+                <CategoriaDaLinha i={i} />
               </td>
               <td className="px-3 py-2 text-right text-suave">{i.preparo ? '—' : formatarQuantidade(i.conteudoMilesimos, i.unidade)}</td>
               <td className="px-3 py-2 text-right">

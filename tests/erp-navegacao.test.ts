@@ -65,7 +65,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Dono: 6 áreas, as abas de cada uma e as 9 ações; 1 futuro', () => {
     expect(emUso(DONO).map((m) => m.nome)).toEqual(AREAS);
     expect(abasPorArea(DONO)).toEqual({
-      'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
+      'Cadastros e Cardápio': ['Insumos', 'Categorias', 'Classificar insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
@@ -85,7 +85,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
 
   it('Gerente (rede): Precificação visível (ver preços), sem Equipe; ações de cadastro e de compra', () => {
     expect(abasPorArea(GERENTE)).toEqual({
-      'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
+      'Cadastros e Cardápio': ['Insumos', 'Categorias', 'Classificar insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
@@ -106,7 +106,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Operador: sem a área Compras, sem Precificação, sem Divergências, e a única ação dele é planejar a produção', () => {
     expect(emUso(OPERADOR).map((m) => m.nome)).toEqual(['Cadastros e Cardápio', 'Estoque e Movimentações', 'Produção', 'Rede e Equipe']);
     expect(abasPorArea(OPERADOR)).toEqual({
-      'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos'],
+      'Cadastros e Cardápio': ['Insumos', 'Categorias', 'Fichas e produtos'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições'],
       // 3.3: a cozinha pega as tarefas e lê o histórico; os indicadores por pessoa são da gerência.
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico'],
@@ -249,7 +249,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     const t = uso.map(texto);
     expect(t[0]).toContain('Cadastros e Cardápio');
     expect(t[0]).toContain('Do insumo à ficha técnica e ao preço de venda');
-    expect(abasDoCartao(uso[0]).map((a) => a.rotulo)).toEqual(['Insumos', 'Fichas e produtos']);
+    expect(abasDoCartao(uso[0]).map((a) => a.rotulo)).toEqual(['Insumos', 'Categorias', 'Fichas e produtos']);
     expect(abasDoCartao(uso[1]).map((a) => a.rotulo)).toEqual(['Visão geral', 'Contagens', 'Requisições']);
     expect(t[0]).not.toContain('Precificação');
     expect(t[1]).not.toContain('Divergências');
@@ -449,7 +449,7 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
   const parceiro = (r: string) => join('src', 'app', 'erp', ...r.split('/').filter(Boolean), 'page.tsx');
   const espelho = (r: string) => join('src', 'app', 'rodolfo', '(painel)', 'erp', '[slug]', ...r.split('/').filter(Boolean), 'page.tsx');
 
-  it.each([...ANTIGAS, ...profundas, '/estoque/contagens', '/compras/orcamento'])('%s existe no /erp e no nível 1', (r) => {
+  it.each([...ANTIGAS, ...profundas, '/estoque/contagens', '/compras/orcamento', '/insumos/categorias', '/insumos/classificar'])('%s existe no /erp e no nível 1', (r) => {
     expect(existsSync(parceiro(r)), `/erp${r}`).toBe(true);
     expect(existsSync(espelho(r)), `/rodolfo/erp/<slug>${r}`).toBe(true);
   });
@@ -468,11 +468,11 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     }
   });
 
-  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens e das das fases 2.1, 2.2a, 2.5, 3.1, 3.2 e 3.3 (faturamento, DRE, despesas, orçamento, produção, a lista do dia, as tarefas, o histórico e os indicadores da produção)', () => {
+  it('as abas e as ações nascem de modulos.ts: nenhuma rota nova além de /estoque/contagens, das categorias e da classificação (I.1a) e das das fases 2.1, 2.2a, 2.5, 3.1, 3.2 e 3.3 (faturamento, DRE, despesas, orçamento, produção, a lista do dia, as tarefas, o histórico e os indicadores da produção)', () => {
     const todas = [...emUso(DONO)].flatMap((m) => [...m.grupos.flatMap((g) => g.itens), ...m.acoes]).map((i) => i.href.replace('/erp', ''));
     const novas = todas.filter((r) => !ANTIGAS.includes(r) && r !== '/acesso');
     // 2.5: o orçamento de compra é aba da área Compras.
-    expect(novas).toEqual(['/compras/orcamento', '/estoque/contagens', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
+    expect(novas).toEqual(['/insumos/categorias', '/insumos/classificar', '/compras/orcamento', '/estoque/contagens', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/periodos', '/dre/plano', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
   });
 });
 

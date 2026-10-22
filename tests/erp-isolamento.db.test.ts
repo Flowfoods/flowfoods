@@ -12,7 +12,8 @@ import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { doParceiro, ErroDeTenant } from '@/lib/erp/tenant';
 import { travarTenant } from '@/lib/db';
-import { cadastrarInsumo, listarInsumos } from '@/lib/erp/insumos';
+import { listarInsumos } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
@@ -87,7 +88,7 @@ describe.skipIf(!URL_TESTE)('ERP · isolamento entre Parceiros Flow (Postgres re
     const repetidoEmA = await cadastrarInsumo(doParceiro(A.id, db), {
       nome: 'Cebola roxa', unidade: 'KG', conteudo: '1', preco: '5,00',
     });
-    expect(repetidoEmA).toEqual({ ok: false, erros: { nome: 'Já existe um insumo com esse nome.' } });
+    expect(repetidoEmA).toMatchObject({ ok: false, erros: { nome: 'Já existe um insumo com esse nome.' }, existenteId: expect.any(String) });
   });
 
   it('o banco recusa quantidade zero ou negativa, mesmo se a tela falhar', async () => {

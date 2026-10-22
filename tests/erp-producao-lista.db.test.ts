@@ -24,7 +24,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
-import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { cadastrarFicha } from '@/lib/erp/fichas';
 import { hojeNoRio } from '@/lib/erp/compra-campos';

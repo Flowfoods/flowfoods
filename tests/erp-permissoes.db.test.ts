@@ -74,7 +74,8 @@ import {
 import { contextoDaSessao } from '@/lib/erp/contexto-base';
 import { cadastrarLoja, listarEstrutura, listarLojasDoAlcance } from '@/lib/erp/estrutura';
 import { listarHistorico } from '@/lib/erp/historico';
-import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
+import { garantirCategoriasPadrao } from '@/lib/erp/categorias';
 import { criarParceiro } from '@/lib/erp/parceiros';
 import { ALCANCE_FLOWFOODS, pode, recusa, TODAS_AS_PERMISSOES, PERFIS_BASE } from '@/lib/erp/permissoes';
 import { doParceiro } from '@/lib/erp/tenant';
@@ -247,8 +248,11 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     expect(await doParceiro(A, db).loja.count()).toBe(2);
 
     atual.ctx = () => ctxDe(dono.s);
+    // I.1a: a categoria é obrigatória; a da casa vem das dez padrão.
+    await garantirCategoriasPadrao(doParceiro(A, db));
+    const categoria = (await doParceiro(A, db).categoriaInsumo.findFirstOrThrow({ where: { chave: 'MERCEARIA' } })).id;
     await expect(
-      acaoCadastrarInsumoDaSessao(null, form({ nome: 'Pelo dono', unidade: 'KG', conteudo: '1', preco: '1,00' })),
+      acaoCadastrarInsumoDaSessao(null, form({ nome: 'Pelo dono', unidade: 'KG', categoriaId: categoria, conteudo: '1', preco: '1,00' })),
     ).rejects.toThrow(/^REDIRECT \/erp\/insumos\/\w+\?feito=criado$/);
     expect(await doParceiro(A, db).insumo.count()).toBe(antes + 1);
   });
@@ -589,7 +593,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
   });
 
   it('catálogo v2 (3.2, decisão 219): o sócio de perfil próprio salvo na v1 com tudo (o "copiado do Dono") continua cuidando do Gerente; o parcial não ganha nada e a Equipe pede para revisar', async () => {
-    const V1 = TODAS_AS_PERMISSOES.filter((p) => p !== 'producao.planejar');
+    const V1 = TODAS_AS_PERMISSOES.filter((p) => p !== 'producao.planejar' && p !== 'insumos.categorias');
     // Como estava no banco antes da 3.2 (se o app antigo salvar durante o deploy, a migration não pega: a regra pega).
     const socioV1 = await db.perfilAcesso.create({ data: { parceiroId: A, nome: `Sócio v1 ${sufixo}`, base: 'DONO', permissoes: V1, catalogoVersao: 1 } });
     const parcialV1 = await db.perfilAcesso.create({ data: { parceiroId: A, nome: `Sem preços v1 ${sufixo}`, base: 'DONO', permissoes: V1.filter((p) => p !== 'precos.editar'), catalogoVersao: 1 } });
@@ -605,11 +609,11 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     expect(parcial.s.alcance!.permissoes.has('producao.planejar')).toBe(false);
     const ps = await listarPerfis(A, o());
     expect(ps.find((p) => p.id === socioV1.id)).toMatchObject({ permissoes: TODAS_AS_PERMISSOES, revisar: [] });
-    expect(ps.find((p) => p.id === parcialV1.id)).toMatchObject({ revisar: ['producao.planejar'] });
-    // Salvar o perfil leva para a v2 (o que foi marcado vale, e nada mais a revisar).
+    expect(ps.find((p) => p.id === parcialV1.id)).toMatchObject({ revisar: ['insumos.categorias', 'producao.planejar'] });
+    // Salvar o perfil leva para a versão de hoje (o que foi marcado vale, e nada mais a revisar).
     const salvo = await salvarPerfil(A, { id: parcialV1.id, nome: parcialV1.nome, base: 'DONO', permissoes: V1.filter((p) => p !== 'precos.editar') }, ator(dono.s), o());
     expect(salvo.ok).toBe(true);
-    expect((await listarPerfis(A, o())).find((p) => p.id === parcialV1.id)).toMatchObject({ catalogoVersao: 2, revisar: [] });
+    expect((await listarPerfis(A, o())).find((p) => p.id === parcialV1.id)).toMatchObject({ catalogoVersao: 3, revisar: [] });
   });
 
   it('nível 1 vê os parceiros com pessoas ativas e ninguém cuidando da equipe', async () => {

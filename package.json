@@ -18,7 +18,9 @@
     "worker": "tsx worker/index.ts",
     "worker:estado": "tsx worker/index.ts --estado",
     "erp:seed-teste": "tsx scripts/erp-seed-teste.ts",
-    "erp:conferir-migracao": "tsx scripts/erp-conferir-migracao.ts"
+    "erp:conferir-migracao": "tsx scripts/erp-conferir-migracao.ts",
+    "erp:semear-categorias": "tsx scripts/erp-semear-categorias.ts",
+    "erp:classificar-insumos": "tsx scripts/erp-classificar-insumos.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

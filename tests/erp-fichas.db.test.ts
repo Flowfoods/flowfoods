@@ -40,7 +40,7 @@ vi.mock('@/lib/erp/contexto', async () => {
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
-import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { cadastrarFicha, editarFicha, MENSAGEM_CONFLITO_FICHA, MENSAGEM_FOTO_SUMIU, mudarSituacaoFicha, obterFicha } from '@/lib/erp/fichas';
 import { importarFichas, MENSAGEM_IMPORTACAO_DEMOROU, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { responderFoto } from '@/lib/erp/foto-resposta';

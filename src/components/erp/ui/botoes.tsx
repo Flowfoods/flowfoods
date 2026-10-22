@@ -22,8 +22,13 @@ export function BotaoEnviar({
   className = '',
   disabled = false,
   cozinha = false,
+  nome,
+  valor,
 }: {
   children: ReactNode;
+  /** Quando há mais de um botão de envio no mesmo formulário, qual deles foi apertado (`name`/`value` do botão). */
+  nome?: string;
+  valor?: string;
   pendente?: string;
   variante?: Variante;
   className?: string;
@@ -35,6 +40,8 @@ export function BotaoEnviar({
   return (
     <button
       type="submit"
+      name={nome}
+      value={valor}
       disabled={pending || disabled}
       aria-busy={pending}
       className={cozinha ? classeDeBotaoDaCozinha(variante, className) : classeDeBotao(variante, className)}

@@ -8,6 +8,7 @@
 import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
+import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
 import { TIPOS } from '@/lib/erp/insumo-campos';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, dinheiroParaCampo, quantidadeParaCampo } from '@/lib/erp/unidades';
@@ -16,7 +17,7 @@ import { Painel } from '../../ui/superficies';
 import type { AcaoDeCadastro } from '../cadastro/estado';
 import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { FormEmbalagem } from './form-embalagem';
-import { FormInsumo, INSUMO_NOVO, type ValoresDoInsumo } from './form-insumo';
+import { FormInsumo, type ValoresDoInsumo } from './form-insumo';
 import { FormSituacao } from '../cadastro/form-situacao';
 import { TrilhaDaPagina } from '../../shell/trilha';
 
@@ -71,11 +72,20 @@ export function TelaFormInsumo({
   acao,
   bloqueio,
   nomeSugerido,
+  lembrado,
+  categorias,
+  envio,
 }: {
   /** Ausente = novo. */
   insumo?: InsumoDetalhado;
+  /** I.1a: as categorias que a casa oferece (as ativas, mais a que o insumo já tem). */
+  categorias: readonly OpcaoDeCategoria[];
+  /** I.1a: a chave deste envio, sorteada no servidor a cada abertura do formulário novo. */
+  envio?: string;
   /** Novo vindo da importação de fichas ("Cadastrar “Picles”"): o nome já vem escrito. */
   nomeSugerido?: string;
+  /** "Cadastrar outro insumo": tipo, unidade e conservação do último, vindos da URL (só valores da lista valem). */
+  lembrado?: { tipo?: string; unidade?: string; conservacao?: string };
   base: string;
   contexto: string;
   acao: AcaoDeCadastro;
@@ -85,10 +95,11 @@ export function TelaFormInsumo({
     nome: insumo.nome,
     tipo: insumo.tipo,
     unidade: insumo.unidade,
+    categoriaId: insumo.categoria?.id ?? '',
     conservacao: insumo.conservacao,
     validades: insumo.validades,
     ...embalagemParaCampo(insumo, insumo.unidade),
-  } : nomeSugerido ? { ...INSUMO_NOVO, nome: nomeSugerido.slice(0, 80) } : undefined;
+  } : undefined;
   const volta = insumo ? `${base}/${insumo.id}` : base;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -107,9 +118,13 @@ export function TelaFormInsumo({
         aqui={insumo ? `${base}/${insumo.id}/editar` : `${base}/novo`}
         cancelar={volta}
         inicial={inicial}
+        nomeSugerido={nomeSugerido}
+        lembrado={lembrado}
         versao={insumo?.versao}
         travaDaUnidade={insumo?.travaDaUnidade ?? null}
         bloqueio={bloqueio}
+        categorias={categorias}
+        envio={envio}
       />
     </div>
   );

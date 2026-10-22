@@ -24,7 +24,7 @@ import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
-import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
 import { iniciarFechamento, situacaoDoPeriodo } from '@/lib/erp/contagem';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
