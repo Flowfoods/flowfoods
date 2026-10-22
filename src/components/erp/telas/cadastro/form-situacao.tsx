@@ -26,7 +26,10 @@ export function FormSituacao({
   oQue,
   idBase,
   textos,
+  ocultos,
 }: {
+  /** L.1: campos escondidos que vão junto (de onde a pessoa veio na lista: `de`, `origem`). */
+  ocultos?: Readonly<Record<string, string>>;
   acao: AcaoDeCadastro;
   /** Situação de agora: ativo → o botão desativa. */
   ativo: boolean;
@@ -41,6 +44,7 @@ export function FormSituacao({
   return (
     <form action={enviar} className="space-y-3">
       <input type="hidden" name="ativo" value={ativo ? 'nao' : 'sim'} />
+      {ocultos && Object.entries(ocultos).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       <p className="text-sm text-suave">
         {textos
           ? ativo

@@ -54,15 +54,24 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['insumos'],
     titulo: 'Insumos',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'Tudo o que a casa compra e usa: ingrediente, embalagem, material de limpeza e uso e pré-preparo.' },
       { texto: 'Antes da primeira compra vale o custo inicial de referência; depois, o último preço da nota lançada.' },
       { texto: '“Custo não informado” quer dizer que falta o custo e que as fichas que usam o insumo ficam incompletas.' },
-      { texto: 'Tipo, categoria e conservação são três coisas diferentes, e dá para filtrar por elas.' },
+      { texto: 'Os filtros se combinam e os que estão valendo aparecem abaixo, cada um com o seu X; em “No cadastro” está tudo o que a casa tem e em “Nesta lista” só o que sobrou, com 10, 25, 50 ou 100 itens por página.' },
+      { texto: 'A caneta edita e volta para esta mesma página; a lixeira mostra o que está ligado ao insumo antes de qualquer coisa.', para: ['insumos.editar'] },
       { texto: 'Cadastre do jeito que você compra: a caixa de 5 kg, não o grama.', para: ['insumos.editar'] },
     ],
     secoes: [
+      {
+        id: 'incompleto',
+        titulo: 'Cadastro incompleto',
+        blocos: [
+          { texto: 'Aparece quando falta a categoria, quando ela é “Outros / a classificar”, quando a conservação está a confirmar ou quando falta a quantidade da embalagem. Cada insumo diz o motivo na própria linha.' },
+          { texto: 'Custo não informado é outra coisa: tem o seu filtro, “Só sem custo”. A unidade base é obrigatória, então nenhum insumo fica sem ela.' },
+        ],
+      },
       {
         id: 'conservacao',
         titulo: 'Conservação a confirmar',
@@ -78,9 +87,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['insumos/novo', 'insumos/[id]/editar'],
     titulo: 'Cadastrar insumo',
-    versao: 3,
+    versao: 4,
     aula: [
-      { texto: 'O nome do insumo se digita uma vez só, e quem veio de uma nota ou ficha volta para lá ao salvar.' },
+      { texto: 'O nome do insumo se digita uma vez só; quem veio de uma nota ou ficha volta para lá ao salvar, e quem veio da caneta da lista volta para a mesma página dela.' },
       { texto: 'Nome, categoria, conservação e unidade base são obrigatórios; o que faltar aparece junto do campo.' },
       { texto: 'Tipo é o papel do item, categoria é a natureza dele para o CMV e conservação é onde ele fica guardado.' },
       { texto: 'O custo inicial de referência vale até a primeira compra lançada e não cria nota nem despesa.' },
@@ -111,6 +120,18 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Conservação e prazo de uso após abertura ficam lado a lado, sem confundir com o vencimento do lote.' },
       { texto: 'A categoria fica ao lado, com a forma como foi escolhida; em “Outros / a classificar” o insumo espera revisão.' },
       { texto: 'Mais embaixo, o que você pagou em cada nota e qual fornecedor saiu mais barato.', para: ['compras.ver'] },
+    ],
+  },
+  {
+    chave: 'insumo-remover',
+    area: 'cadastros',
+    rotas: ['insumos/[id]/remover'],
+    titulo: 'Remover insumo',
+    versao: 1,
+    aula: [
+      { texto: 'Antes de remover, a tela mostra tudo o que usa o insumo: fichas, notas de compra, estoque, produção e mudanças de custo.' },
+      { texto: 'Com algum registro ligado, o insumo só pode ser desativado: ele sai da lista e da busca, e tudo o que já aconteceu fica como está.' },
+      { texto: 'Sem nenhum registro ligado, dá para excluir de vez, marcando que você entendeu que não dá para desfazer.' },
     ],
   },
   {

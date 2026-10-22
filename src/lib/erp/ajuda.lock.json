@@ -8,16 +8,20 @@
     "hash": "ed5dd1d05ab343e1"
   },
   "insumos": {
-    "versao": 3,
-    "hash": "415422f1a7d40857"
+    "versao": 4,
+    "hash": "1bf093b6218cc811"
   },
   "insumo-novo": {
-    "versao": 3,
-    "hash": "0325bf9012c88ba9"
+    "versao": 4,
+    "hash": "7f7dddf2ba0ddf03"
   },
   "insumo": {
     "versao": 3,
     "hash": "547d8cf5c44a5cf6"
+  },
+  "insumo-remover": {
+    "versao": 1,
+    "hash": "e44339b11139b115"
   },
   "insumo-categorias": {
     "versao": 2,

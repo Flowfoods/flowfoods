@@ -45,6 +45,12 @@ export function concluir(
   voltar?: string | null,
   /** F.1a: o que foi criado na volta: o insumo (padrão) ou o fornecedor. */
   oQueVolta: 'insumo' | 'fornecedor' = 'insumo',
+  /**
+   * L.1: de onde a pessoa veio na LISTA. `de` = a lista como estava (filtros, página e tamanho, já filtrados por `deSeguro`);
+   * `aLista` = voltar para a lista (caneta da linha) em vez de abrir o detalhe. O detalhe também leva `de`, para o "Ver todos os
+   * insumos" e o "Editar" seguintes continuarem na mesma página.
+   */
+  lista?: { de: string; aLista: boolean },
 ): EstadoCadastro {
   if (!r.ok) {
     return {
@@ -64,7 +70,14 @@ export function concluir(
   }
   // I.1a: o envio repetido (mesma chave) volta como o insumo que já existe; a frase diz isso (`feito.repetido`).
   const frase = r.repetido && feito.repetido ? feito.repetido : r.mudou.length === 0 && feito.igual ? feito.igual : feito.mudou;
-  redirect(`${base}/${alvoId ?? r.id}?feito=${frase}`);
+  const id = alvoId ?? r.id;
+  if (lista?.aLista) {
+    const u = new URLSearchParams(lista.de);
+    u.set('feito', frase);
+    u.set('ref', id);
+    redirect(`${base}?${u.toString()}`);
+  }
+  redirect(`${base}/${id}?feito=${frase}${lista?.de ? `&de=${encodeURIComponent(lista.de)}` : ''}`);
 }
 
 /** "sim" no campo `ativo` = reativar; qualquer outra coisa = desativar. */

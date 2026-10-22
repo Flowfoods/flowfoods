@@ -35,6 +35,7 @@ export default async function ErpInsumoPage({
       base={BASE}
       voltar={de ? `${BASE}?${de}` : BASE}
       feito={searchParams.feito}
+      de={de}
       podeEditar={pode(ctx.alcance, 'insumos.editar')}
       bloqueio={ctx.bloqueio}
       acaoConfirmar={acaoConfirmarConservacao.bind(null, insumo.id)}

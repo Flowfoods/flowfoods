@@ -4,12 +4,13 @@ import { randomUUID } from 'node:crypto';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina } from '@/lib/erp/contexto';
 import { categoriasDoFormulario } from '@/lib/erp/categorias';
 import { caminhoDeVolta } from '@/lib/erp/volta';
+import { deSeguro } from '@/lib/erp/insumo-campos';
 import { TelaFormInsumo } from '@/components/erp/telas/insumos/paginas';
 import { acaoCadastrarInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpNovoInsumoPage({ searchParams }: { searchParams: { nome?: string; tipo?: string; unidade?: string; volta?: string } }) {
+export default async function ErpNovoInsumoPage({ searchParams }: { searchParams: { nome?: string; tipo?: string; unidade?: string; volta?: string; de?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.editar');
   const categorias = await categoriasDoFormulario(ctx.cliente);
@@ -25,6 +26,7 @@ export default async function ErpNovoInsumoPage({ searchParams }: { searchParams
       volta={caminhoDeVolta(searchParams.volta, '/erp/')}
       categorias={categorias}
       envio={randomUUID()}
+      de={deSeguro(searchParams.de)}
     />
   );
 }

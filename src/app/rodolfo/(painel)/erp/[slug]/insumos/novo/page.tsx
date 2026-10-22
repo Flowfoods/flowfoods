@@ -4,12 +4,13 @@ import { randomUUID } from 'node:crypto';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { categoriasDoFormulario } from '@/lib/erp/categorias';
 import { caminhoDeVolta } from '@/lib/erp/volta';
+import { deSeguro } from '@/lib/erp/insumo-campos';
 import { TelaFormInsumo } from '@/components/erp/telas/insumos/paginas';
 import { acaoCadastrarInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroNovoInsumoPage({ params, searchParams }: { params: { slug: string }; searchParams: { nome?: string; tipo?: string; unidade?: string; volta?: string } }) {
+export default async function ParceiroNovoInsumoPage({ params, searchParams }: { params: { slug: string }; searchParams: { nome?: string; tipo?: string; unidade?: string; volta?: string; de?: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.editar');
   const categorias = await categoriasDoFormulario(ctx.cliente);
@@ -24,6 +25,7 @@ export default async function ParceiroNovoInsumoPage({ params, searchParams }: {
       nomeSugerido={searchParams.nome}
       lembrado={{ tipo: searchParams.tipo, unidade: searchParams.unidade }}
       volta={caminhoDeVolta(searchParams.volta, `/rodolfo/erp/${ctx.parceiro.slug}/`)}
+      de={deSeguro(searchParams.de)}
     />
   );
 }

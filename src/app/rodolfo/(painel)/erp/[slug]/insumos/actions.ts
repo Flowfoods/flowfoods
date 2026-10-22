@@ -13,7 +13,8 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/db';
 import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
-import { cadastrarInsumo, confirmarConservacao, editarInsumo, mudarSituacaoInsumo, type ResultadoCadastro } from '@/lib/erp/insumos';
+import { cadastrarInsumo, confirmarConservacao, editarInsumo, excluirInsumo, mudarSituacaoInsumo, type ResultadoCadastro } from '@/lib/erp/insumos';
+import { marcado } from '@/lib/erp/insumo-campos';
 import { caminhoDeVolta } from '@/lib/erp/volta';
 import { cadastrarVariante, editarVariante, mudarSituacaoVariante, type ResultadoVariante } from '@/lib/erp/variantes';
 import { criarCategoria, excluirCategoria, moverCategoria, mudarSituacaoCategoria, renomearCategoria, type ResultadoCategoria } from '@/lib/erp/categorias';
@@ -21,6 +22,7 @@ import { aceitarSugestoes, aplicarClassificacao, classificarEmLote, reverterLote
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import { concluirNaTela, voltarDaClassificacao, voltarDoMover } from '@/components/erp/telas/insumos/executar-categorias';
+import { retornoDaLista } from '@/components/erp/telas/insumos/retorno-da-lista';
 
 async function paraEditar(slug: string) {
   const ctx = await exigirParceiro(slug);
@@ -43,7 +45,7 @@ export async function acaoCadastrarInsumo(slug: string, anterior: EstadoCadastro
   const r = await cadastrarInsumo(ctx.cliente, entradaDe(form), ctx.sessao.autorNome, ctx.sessao.userId);
   await auditar(ctx, 'erp_insumo_criado', r);
   // I.1b: veio de uma nota ou ficha? Volta para lá, só por caminho interno desta área (/rodolfo/erp/<slug>/...).
-  return concluir(r, anterior, base, { mudou: 'criado', repetido: 'criado-repetido' }, undefined, caminhoDeVolta(form.get('volta'), `/rodolfo/erp/${ctx.parceiro.slug}/`));
+  return concluir(r, anterior, base, { mudou: 'criado', repetido: 'criado-repetido' }, undefined, caminhoDeVolta(form.get('volta'), `/rodolfo/erp/${ctx.parceiro.slug}/`), 'insumo', { ...retornoDaLista(form), aLista: false });
 }
 
 export async function acaoEditarInsumo(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -51,7 +53,7 @@ export async function acaoEditarInsumo(slug: string, id: string, anterior: Estad
   if (negado) return recusado(anterior, negado);
   const r = await editarInsumo(ctx.cliente, String(id), entradaDe(form), ctx.sessao.autorNome);
   await auditar(ctx, 'erp_insumo_alterado', r);
-  return concluir(r, anterior, base, { mudou: 'editado', igual: 'igual' });
+  return concluir(r, anterior, base, { mudou: 'editado', igual: 'igual' }, undefined, undefined, 'insumo', retornoDaLista(form));
 }
 
 /** I.1b: "Confirmar a conservação" de um insumo antigo (Seco que ninguém confirmou): não muda nada, só registra a confirmação. */
@@ -69,7 +71,16 @@ export async function acaoSituacaoInsumo(slug: string, id: string, anterior: Est
   const ativo = querAtivo(form);
   const r = await mudarSituacaoInsumo(ctx.cliente, String(id), ativo, form.get('motivo'), ctx.sessao.autorNome);
   await auditar(ctx, ativo ? 'erp_insumo_reativado' : 'erp_insumo_desativado', r);
-  return concluir(r, anterior, base, { mudou: ativo ? 'reativado' : 'desativado' });
+  return concluir(r, anterior, base, { mudou: ativo ? 'reativado' : 'desativado' }, undefined, undefined, 'insumo', retornoDaLista(form));
+}
+
+/** L.1: excluir de vez (só sem nenhum vínculo e com a confirmação marcada; a regra confere dentro da transação). */
+export async function acaoExcluirInsumo(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+  const { ctx, negado, base } = await paraEditar(slug);
+  if (negado) return recusado(anterior, negado);
+  const r = await excluirInsumo(ctx.cliente, String(id), marcado(form.get('confirmo')), ctx.sessao.autorNome);
+  await auditar(ctx, 'erp_insumo_excluido', r);
+  return concluir(r, anterior, base, { mudou: 'excluido' }, undefined, undefined, 'insumo', { ...retornoDaLista(form), aLista: true });
 }
 
 /** `varianteId` vazio = embalagem nova. */

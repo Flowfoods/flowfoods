@@ -93,6 +93,8 @@ export function FormInsumo({
   envio,
   volta,
   aConfirmar = false,
+  de = '',
+  origemLista = false,
 }: {
   acao: AcaoDeCadastro;
   modo: 'criar' | 'editar';
@@ -119,6 +121,10 @@ export function FormInsumo({
   volta?: string | null;
   /** I.1b: Seco antigo que ninguém confirmou, numa categoria que costuma ser fria: o campo pede para conferir. */
   aConfirmar?: boolean;
+  /** L.1: a lista como estava (filtros, página e tamanho), já filtrada: vai e volta junto, para salvar não perder o lugar. */
+  de?: string;
+  /** L.1: veio da caneta da lista: salvar volta para a LISTA, não para o detalhe. */
+  origemLista?: boolean;
 }) {
   const inicial: ValoresDoInsumo = inicialDado ?? { ...INSUMO_NOVO, ...valoresLembrados(lembrado), nome: (nomeSugerido ?? '').slice(0, 80) };
   const acaoSegura = useAcaoSegura(acao);
@@ -179,6 +185,8 @@ export function FormInsumo({
       {versao && <input type="hidden" name="versao" value={versao} />}
       {modo === 'criar' && chaveDeEnvio && <input type="hidden" name="envio" value={chaveDeEnvio} />}
       {modo === 'criar' && volta && <input type="hidden" name="volta" value={volta} />}
+      {de && <input type="hidden" name="de" value={de} />}
+      {origemLista && <input type="hidden" name="origem" value="lista" />}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={(c) => ROTULO_DO_CAMPO[c] ?? (c.startsWith('validade-') ? `Prazo de uso após abertura em ${CONSERVACOES[c.slice(9) as Conservacao]?.toLowerCase() ?? c}` : c)} />
       <ErroGeral estado={estado} recarregar={aqui} />
       <SalvandoAnunciado />

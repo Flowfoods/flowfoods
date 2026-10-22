@@ -30,6 +30,7 @@ export default async function ParceiroInsumoPage({
       base={base}
       voltar={de ? `${base}?${de}` : base}
       feito={searchParams.feito}
+      de={de}
       contexto={ctx.parceiro.nome}
       podeEditar
       bloqueio={ctx.bloqueio}

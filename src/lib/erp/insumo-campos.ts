@@ -398,12 +398,60 @@ export interface FiltrosDeInsumo {
   conservacao: Conservacao | typeof FILTRO_A_CONFIRMAR | null;
   situacao: Situacao;
   semPreco: boolean;
+  /** L.1: a marca de referência (sem diferenciar caixa) ou `FILTRO_SEM_MARCA` (os que não têm marca informada). */
+  marca: string | null;
+  /** L.1: só os de cadastro incompleto (ver `motivosDoCadastro`). Custo não informado NÃO conta: tem o filtro dele (`semPreco`). */
+  incompleto: boolean;
   ordem: 'nome' | 'custo';
   direcao: 'asc' | 'desc';
   pagina: number;
+  /** L.1: itens por página, só um dos valores de `OPCOES_POR_PAGINA` (o servidor valida; valor torto cai no padrão). */
+  porPagina: number;
 }
 
-export const POR_PAGINA = 50;
+/** L.1: as quantidades por página que a lista oferece. São quantidades (10 itens, 25 itens...), não intervalos. */
+export const OPCOES_POR_PAGINA = [10, 25, 50, 100] as const;
+export const POR_PAGINA_PADRAO = 50;
+
+/** O valor do filtro "Marca" que lista só os insumos sem marca informada. */
+export const FILTRO_SEM_MARCA = 'sem-marca';
+
+/** `por` da URL ou do formulário -> uma das opções; qualquer outra coisa (texto, negativo, 1000, 25.5) cai no padrão. */
+export function lerPorPagina(v: unknown): number {
+  const n = typeof v === 'string' && /^\d{1,4}$/.test(v) ? Number(v) : typeof v === 'number' ? v : NaN;
+  return (OPCOES_POR_PAGINA as readonly number[]).includes(n) ? n : POR_PAGINA_PADRAO;
+}
+
+/**
+ * L.1: por que um insumo está com o cadastro incompleto (derivado na leitura; nada é gravado). Custo não informado é outra coisa e
+ * NÃO entra aqui. "Sem unidade" não existe: a unidade base é coluna obrigatória no banco, então nenhum insumo fica sem ela.
+ * O filtro do banco (`insumos.ts`) e esta função saem da mesma lista; um teste confere que concordam insumo a insumo.
+ */
+export const MOTIVOS_DE_CADASTRO_INCOMPLETO = {
+  'sem-categoria': 'Sem categoria',
+  'a-classificar': 'Categoria a classificar (Outros)',
+  conservacao: 'Conservação a confirmar',
+  embalagem: 'Sem quanto vem na embalagem',
+} as const;
+export type MotivoIncompleto = keyof typeof MOTIVOS_DE_CADASTRO_INCOMPLETO;
+/** A chave da categoria do sistema "Outros / a classificar" (a mesma de `CHAVE_DO_SISTEMA`; aqui por causa da ordem dos imports). */
+const CHAVE_OUTROS = 'OUTROS';
+
+export function motivosDoCadastro(i: {
+  tipo: string;
+  categoriaChave: string | null;
+  temCategoria: boolean;
+  conservacao: string;
+  conservacaoConfirmadaEm: Date | string | null;
+  conteudoMilesimos: number;
+}): MotivoIncompleto[] {
+  const m: MotivoIncompleto[] = [];
+  if (!i.temCategoria) m.push('sem-categoria');
+  else if (i.categoriaChave === CHAVE_OUTROS) m.push('a-classificar');
+  if (conservacaoAConfirmar({ tipo: i.tipo, conservacao: i.conservacao, conservacaoConfirmadaEm: i.conservacaoConfirmadaEm, categoriaChave: i.categoriaChave })) m.push('conservacao');
+  if (i.tipo !== 'PRE_PREPARO' && i.conteudoMilesimos <= 0) m.push('embalagem');
+  return m;
+}
 
 export const FILTROS_PADRAO: FiltrosDeInsumo = {
   q: '',
@@ -412,9 +460,12 @@ export const FILTROS_PADRAO: FiltrosDeInsumo = {
   conservacao: null,
   situacao: 'ativos',
   semPreco: false,
+  marca: null,
+  incompleto: false,
   ordem: 'nome',
   direcao: 'asc',
   pagina: 1,
+  porPagina: POR_PAGINA_PADRAO,
 };
 
 
@@ -435,10 +486,30 @@ export function lerFiltros(sp: Record<string, string | string[] | undefined>): F
     conservacao: um(v('conservacao'), [...(Object.keys(CONSERVACOES) as Conservacao[]), FILTRO_A_CONFIRMAR]),
     situacao: um(v('situacao'), ['ativos', 'desativados', 'todos'] as const) ?? 'ativos',
     semPreco: v('preco') === 'sem',
+    marca: lerMarcaDoFiltro(v('marca')),
+    incompleto: v('incompleto') === '1',
     ordem: um(v('ordem'), ['nome', 'custo'] as const) ?? 'nome',
     direcao: um(v('dir'), ['asc', 'desc'] as const) ?? 'asc',
-    pagina: Math.max(1, Math.trunc(Number(v('pagina'))) || 1),
+    // Página absurda (texto, negativa, gigante) vira número seguro; o servidor ainda ajusta à última página que existe.
+    pagina: ((n) => (Number.isSafeInteger(n) && n > 0 ? Math.min(n, 1_000_000) : 1))(Math.trunc(Number(v('pagina')))),
+    porPagina: lerPorPagina(v('por')),
   };
+}
+
+/** A marca do filtro: texto limpo (sem invisíveis, espaços colapsados, até `MARCA_MAXIMA`); vazio = sem filtro. */
+function lerMarcaDoFiltro(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const t = limparTexto(v).replace(/\s+/g, ' ').trim().slice(0, MARCA_MAXIMA);
+  return t || null;
+}
+
+/**
+ * L.1: o "de volta para a lista" que viaja num formulário ou numa URL (`de=`). É dado de fora: só os filtros que a lista
+ * conhece voltam (os outros somem), então nunca vira endereço, só texto de busca já normalizado.
+ */
+export function deSeguro(valor: unknown): string {
+  if (typeof valor !== 'string' || valor.length > 600) return '';
+  return queryDosFiltros(lerFiltros(Object.fromEntries(new URLSearchParams(valor))));
 }
 
 /** Os filtros de volta para a URL, só o que difere do padrão. */
@@ -450,13 +521,16 @@ export function queryDosFiltros(f: FiltrosDeInsumo): string {
   if (f.conservacao) p.set('conservacao', f.conservacao);
   if (f.situacao !== 'ativos') p.set('situacao', f.situacao);
   if (f.semPreco) p.set('preco', 'sem');
+  if (f.marca) p.set('marca', f.marca);
+  if (f.incompleto) p.set('incompleto', '1');
   if (f.ordem !== 'nome') p.set('ordem', f.ordem);
   if (f.direcao !== 'asc') p.set('dir', f.direcao);
+  if (f.porPagina !== POR_PAGINA_PADRAO) p.set('por', String(f.porPagina));
   if (f.pagina > 1) p.set('pagina', String(f.pagina));
   return p.toString();
 }
 
 /** Há algum filtro (além da ordem e da página)? Serve ao "Limpar filtros". */
 export function temFiltro(f: FiltrosDeInsumo): boolean {
-  return !!(f.q || f.tipo || f.categoria || f.conservacao || f.situacao !== 'ativos' || f.semPreco);
+  return !!(f.q || f.tipo || f.categoria || f.conservacao || f.situacao !== 'ativos' || f.semPreco || f.marca || f.incompleto);
 }

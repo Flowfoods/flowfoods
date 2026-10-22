@@ -77,7 +77,12 @@ export function TelaFormInsumo({
   categorias,
   envio,
   volta,
+  de = '',
+  origemLista = false,
 }: {
+  /** L.1: a lista como estava (filtros, página e tamanho, já filtrados) e se a pessoa veio da caneta da linha. */
+  de?: string;
+  origemLista?: boolean;
   /** Ausente = novo. */
   insumo?: InsumoDetalhado;
   /** I.1a: as categorias que a casa oferece (as ativas, mais a que o insumo já tem). */
@@ -106,11 +111,22 @@ export function TelaFormInsumo({
     ...embalagemParaCampo(insumo, insumo.unidade),
   } : undefined;
   const aqui = insumo ? `${base}/${insumo.id}` : base;
-  const paraVoltar = !insumo && volta ? volta : aqui;
+  // L.1: da caneta da lista, "voltar" e "cancelar" levam à lista como estava; do detalhe, ao detalhe (que também guarda a lista).
+  const daLista = `${base}${de ? `?${de}` : ''}`;
+  const doDetalhe = `${aqui}${insumo && de ? `?de=${encodeURIComponent(de)}` : ''}`;
+  const destinoDoCancelar = insumo ? (origemLista ? daLista : doDetalhe) : daLista;
+  const paraVoltar = !insumo && volta ? volta : destinoDoCancelar;
+  // "Recarregar" (depois de um conflito) não pode perder de onde a pessoa veio.
+  const recarregarComEstado = (() => {
+    const q = new URLSearchParams();
+    if (de) q.set('de', de);
+    if (insumo && origemLista) q.set('origem', 'lista');
+    return q.size ? `?${q.toString()}` : '';
+  })();
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <TrilhaDaPagina itens={insumo ? [{ rotulo: insumo.nome, href: aqui }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo insumo' }]} />
-      <Voltar href={paraVoltar} recarregar={!insumo && !!volta}>{insumo ? `Voltar para ${insumo.nome}` : volta ? `Voltar para ${rotuloDaVolta(volta)}` : 'Voltar para a lista'}</Voltar>
+      <Voltar href={paraVoltar} recarregar={!insumo && !!volta}>{insumo ? (origemLista ? 'Voltar para a lista' : `Voltar para ${insumo.nome}`) : volta ? `Voltar para ${rotuloDaVolta(volta)}` : 'Voltar para a lista'}</Voltar>
       <PageHeader
         icone="insumo"
         cor={COR.insumo}
@@ -121,9 +137,11 @@ export function TelaFormInsumo({
         acao={acao}
         modo={insumo ? 'editar' : 'criar'}
         base={base}
-        aqui={insumo ? `${base}/${insumo.id}/editar` : `${base}/novo`}
-        cancelar={aqui}
+        aqui={`${insumo ? `${base}/${insumo.id}/editar` : `${base}/novo`}${recarregarComEstado}`}
+        cancelar={destinoDoCancelar}
         volta={volta}
+        de={de}
+        origemLista={origemLista}
         aConfirmar={!!insumo?.conservacaoAConfirmar}
         inicial={inicial}
         nomeSugerido={nomeSugerido}

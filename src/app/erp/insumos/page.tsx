@@ -6,12 +6,14 @@
  */
 
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode, visaoDaRequisicao } from '@/lib/erp/contexto';
-import { contarConservacaoAConfirmar, listarInsumos } from '@/lib/erp/insumos';
+import { contarConservacaoAConfirmar, listarInsumos, marcasEmUso } from '@/lib/erp/insumos';
 import { categoriasParaEscolher } from '@/lib/erp/categorias';
 import { resumoDoQueFalta } from '@/lib/erp/classificar';
 import { AvisosDaLista } from '@/components/erp/telas/insumos/aviso-classificar';
 import { lerFiltros, temFiltro } from '@/lib/erp/insumo-campos';
-import { FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
+import { FiltrosAtivos, FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
+import { AvisoDaListaDeInsumos } from '@/components/erp/telas/insumos/aviso-da-lista';
+import { queryDosFiltros } from '@/lib/erp/insumo-campos';
 import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
 import { INSUMOS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtitulo';
 
@@ -23,29 +25,36 @@ export default async function ErpInsumosPage({ searchParams }: { searchParams: R
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.ver');
   const filtros = lerFiltros(searchParams);
-  const [pagina, { visao }, categorias, faltam, aConfirmar] = await Promise.all([
+  const [pagina, { visao }, categorias, faltam, aConfirmar, marcas] = await Promise.all([
     listarInsumos(ctx.cliente, filtros),
     visaoDaRequisicao(ctx),
     categoriasParaEscolher(ctx.cliente, null, true),
     resumoDoQueFalta(ctx.cliente, ctx.alcance),
     contarConservacaoAConfirmar(ctx.cliente),
+    marcasEmUso(ctx.cliente),
   ]);
   const cadastra = pode(ctx.alcance, 'insumos.editar');
   return (
     <div className="space-y-6">
       <CabecalhoDaLista
-        subtitulo={subtituloDaLista(visao, pagina.total, INSUMOS, temFiltro(filtros))}
-        novoHref={cadastra ? `${BASE}/novo` : undefined}
+        // L.1: o subtítulo é o do CADASTRO (todos, ativos e desativados); o que os filtros deixaram aparece acima da tabela, com outro rótulo.
+        subtitulo={`${subtituloDaLista(visao, pagina.totalDoCadastro.todos, INSUMOS, false)} no cadastro`}
+        novoHref={cadastra ? `${BASE}/novo${queryDosFiltros(filtros) ? `?de=${encodeURIComponent(queryDosFiltros(filtros))}` : ''}` : undefined}
         bloqueio={ctx.bloqueio}
       >
-        <FiltrosDaLista base={BASE} filtros={filtros} categorias={categorias} />
+        <div className="space-y-3">
+          <FiltrosDaLista base={BASE} filtros={filtros} categorias={categorias} marcas={marcas} />
+          <FiltrosAtivos base={BASE} filtros={filtros} categorias={categorias} />
+        </div>
       </CabecalhoDaLista>
+      <AvisoDaListaDeInsumos cliente={ctx.cliente} base={BASE} filtros={filtros} feito={searchParams.feito} referencia={searchParams.ref} podeEditar={cadastra} />
       <AvisosDaLista resumo={faltam} hrefClassificar={cadastra ? `${BASE}/classificar` : undefined} aConfirmar={aConfirmar} base={BASE} jaFiltrado={filtros.conservacao === 'confirmar'} />
       <TelaListaInsumos
         base={BASE}
         filtros={filtros}
         {...pagina}
         novoHref={cadastra && !ctx.bloqueio ? `${BASE}/novo` : undefined}
+        comAcoes={cadastra && !ctx.bloqueio}
       />
     </div>
   );

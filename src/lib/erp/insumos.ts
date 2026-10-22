@@ -28,15 +28,18 @@ import {
   FILTRO_A_CONFIRMAR,
   FILTROS_PADRAO,
   lerChaveDeEnvio,
+  FILTRO_SEM_MARCA,
   lerFormInsumo,
+  lerPorPagina,
   marcado,
-  POR_PAGINA,
+  motivosDoCadastro,
   retratoDoInsumo,
   versaoDaVariante,
   type Conservacao,
   type DadosInsumo,
   type Erros,
   type FiltrosDeInsumo,
+  type MotivoIncompleto,
   type TipoInsumo,
 } from './insumo-campos';
 import { pode, type Alcance } from './permissoes';
@@ -46,6 +49,7 @@ import { categoriaParaClassificar } from './categorias';
 import { compararFracoes, custoDaEmbalagem, custoPorUnidade, type CustoExato, type Fracao, type Unidade } from './unidades';
 import { contaDaFicha, custoIncompleto, type CustoDaFicha } from './ficha-campos';
 import { custosEmCascata } from './ficha-custos';
+import { resumoDosVinculos, vinculosDoInsumo } from './insumo-remocao';
 import { comprasDoInsumo, ultimasCompras, type UltimaCompra } from './compras-custo';
 import { colunasDaValidade, COLUNA_DA_VALIDADE, SELECAO_DA_VALIDADE, validadesDaLinha, type ColunasDaValidade, type Validades } from './validade';
 
@@ -313,6 +317,18 @@ function dadosDe(
   };
 }
 
+/** L.1: o que a tela mandou já é exatamente o que está gravado (e não pede uma confirmação de conservação que ainda falta)? */
+function jaEstaGravado(
+  atual: Parameters<typeof dadosDe>[0] & { categoriaId: string | null; conservacaoConfirmadaEm: Date | null },
+  d: DadosInsumo,
+  pedeConfirmar: boolean,
+): boolean {
+  if (pedeConfirmar && !atual.conservacaoConfirmadaEm) return false;
+  const mesmaCategoria = d.categoriaId === atual.categoriaId;
+  const recebido = { ...d, categoriaNome: mesmaCategoria ? (atual.categoria?.nome ?? null) : d.categoriaNome };
+  return mesmaCategoria && diferenca(retratoDoInsumo(dadosDe(atual)), retratoDoInsumo(recebido)) === null;
+}
+
 /**
  * `entrada.versao` = o `atualizadoEm` que a tela leu (ISO). A gravação só
  * acontece se a linha ainda estiver nessa versão.
@@ -334,9 +350,7 @@ export async function editarInsumo(
   if (atual.fichaQueProduz) return { ok: false, erros: { geral: mensagemDoPreparo(atual.nome, atual.fichaQueProduz.nome) } };
   // A tela esconde "Editar" de desativado; quem decide é aqui.
   if (!atual.ativo) return { ok: false, erros: { geral: MENSAGEM_DESATIVADO } };
-  if (atual.atualizadoEm.getTime() !== versao.getTime()) {
-    return { ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true };
-  }
+  const versaoVelha = atual.atualizadoEm.getTime() !== versao.getTime();
 
   // I.1a: o insumo antigo sem categoria também a recebe ao ser editado (o formulário já vem com a sugestão marcada). Quem chama
   // sem o campo `categoriaId` (importação, rotina de preço) e edita um insumo que JÁ tem categoria a mantém; mandar o campo
@@ -348,6 +362,12 @@ export async function editarInsumo(
   if (!('conservacao' in entrada)) completa.conservacao = atual.conservacao;
   if (!('marcaReferencia' in entrada) && atual.marcaReferencia) completa.marcaReferencia = atual.marcaReferencia;
   const lido = lerFormInsumo(completa, atual.tipo);
+  if (versaoVelha) {
+    // L.1: a resposta da edição se perdeu e a pessoa salvou de novo (ou duas abas mandaram o mesmo): se o que chegou É o que já está
+    // gravado, o resultado que ela queria existe, então é sucesso ("Nada mudou"), não "alguém alterou". Qualquer diferença segue conflito.
+    if (lido.ok && jaEstaGravado(atual, lido.dados, marcado(entrada.conservacaoConfirmada))) return { ok: true, id, nome: atual.nome, mudou: [] };
+    return { ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true };
+  }
   if (!lido.ok) return lido;
   const d = lido.dados;
   const trocouDeCategoria = d.categoriaId !== atual.categoriaId;
@@ -496,12 +516,28 @@ export async function contarConservacaoAConfirmar(cliente: ClienteDoParceiro): P
 }
 
 function filtroDaConfirmacao(): Prisma.InsumoWhereInput {
+  return { ativo: true, ...filtroDaConfirmacaoDaSituacao() };
+}
+
+/** A confirmação pendente em si, sem olhar se o insumo está ativo (a situação escolhida na lista é outro filtro). */
+function filtroDaConfirmacaoDaSituacao(): Prisma.InsumoWhereInput {
   return {
-    ativo: true,
     tipo: { not: 'PRE_PREPARO' },
     conservacao: 'SECO',
     conservacaoConfirmadaEm: null,
     categoria: { is: { chave: { in: [...CATEGORIAS_QUE_COSTUMAM_SER_FRIAS] } } },
+  };
+}
+
+/** L.1: cadastro incompleto = qualquer motivo de `motivosDoCadastro` (a mesma lista, em SQL). Um teste confere os dois lados. */
+function filtroDoIncompleto(): Prisma.InsumoWhereInput {
+  return {
+    OR: [
+      { categoriaId: null },
+      { categoria: { is: { chave: CHAVE_DO_SISTEMA } } },
+      filtroDaConfirmacaoDaSituacao(),
+      { tipo: { not: 'PRE_PREPARO' }, conteudoMilesimos: { lte: 0 } },
+    ],
   };
 }
 
@@ -554,6 +590,70 @@ export async function mudarSituacaoInsumo(
   }
 }
 
+// ------------------------------------------------------------------ excluir
+
+export const FRASE_CONFIRMAR_EXCLUSAO = 'Marque que você entendeu: excluir de vez apaga o cadastro e não dá para desfazer.';
+
+/**
+ * L.1: exclusão DEFINITIVA, só de insumo sem NENHUM vínculo (ficha, embalagem de prato, nota, nota fiscal, memória do fornecedor,
+ * estoque, movimento, contagem, requisição, produção, etiqueta, outra embalagem, mudança de custo no histórico). Com vínculo a
+ * resposta é a frase que manda desativar e nada é apagado.
+ *
+ * Seguro contra a corrida: a linha é travada com `FOR UPDATE` e os vínculos são contados DEPOIS da trava. Quem está vinculando
+ * agora (a FK pede `FOR KEY SHARE`) termina antes de a contagem rodar e então a vê; quem tentar vincular depois da trava espera, e
+ * se a exclusão vence a FK dele recusa (nada fica apontando para um insumo que não existe). Movimentos e fichas nunca são apagados:
+ * o `DELETE` só roda com zero referências, e as FKs `Restrict` do banco são a última palavra.
+ */
+export async function excluirInsumo(
+  cliente: ClienteDoParceiro,
+  id: string,
+  confirmou: boolean,
+  autorNome = 'Sistema',
+): Promise<ResultadoCadastro> {
+  if (!confirmou) return { ok: false, erros: { confirmo: FRASE_CONFIRMAR_EXCLUSAO } };
+  try {
+    return await cliente.transacao(async (tx) => {
+      const trava = await tx.sql<{ id: string }>`
+        SELECT "id" FROM "Insumo" WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ${id} FOR UPDATE`;
+      if (trava.length === 0) throw new Recusa({ ok: false, erros: { geral: 'Insumo não encontrado. Pode ser que ele já tenha sido excluído.' }, naoEncontrado: true });
+      const atual = await tx.insumo.findUnique({ where: { id }, include: { categoria: { select: { nome: true } } } });
+      if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Insumo não encontrado.' }, naoEncontrado: true });
+      const v = await vinculosDoInsumo(tx, id);
+      if (v?.preparo) throw new Recusa({ ok: false, erros: { geral: mensagemDoPreparo(atual.nome, v.preparo.nome) } });
+      if (v && v.total > 0) {
+        throw new Recusa({
+          ok: false,
+          erros: {
+            geral: `“${atual.nome}” tem registros ligados a ele (${resumoDosVinculos(v.vinculos)}): não dá para excluir de vez. Desative o insumo: ele sai da lista e da busca padrão e tudo o que já aconteceu fica como está.`,
+          },
+          conflito: true,
+        });
+      }
+      const apagou = await tx.insumo.deleteMany({ where: { id } });
+      if (apagou.count !== 1) throw new Recusa({ ok: false, erros: { geral: 'Não deu para excluir agora. Nada foi apagado; abra a lista e tente de novo.' }, conflito: true });
+      await tx.historicoAlteracao.create({
+        data: {
+          parceiroId: tx.parceiroId,
+          entidade: 'Insumo',
+          entidadeId: id,
+          acao: 'EXCLUIU',
+          antes: { ...retratoDoInsumo(dadosDe(atual)), ativo: atual.ativo },
+          motivo: 'Excluído de vez (sem nenhum registro ligado a ele)',
+          autorNome,
+        },
+      });
+      return { ok: true as const, id, nome: atual.nome, mudou: ['excluido'] };
+    });
+  } catch (e) {
+    if (e instanceof Recusa) return e.resultado;
+    // A FK (Restrict) é a última palavra: algo passou a apontar para o insumo no meio do caminho.
+    if (/foreign key|violates|23001|23503|P2003/i.test(e instanceof Error ? e.message + ((e as { code?: string }).code ?? '') : '')) {
+      return { ok: false, erros: { geral: 'Este insumo passou a ter registros ligados a ele agora há pouco: não dá para excluir. Nada foi apagado. Desative o insumo, se for o caso.' }, conflito: true };
+    }
+    throw e;
+  }
+}
+
 // --------------------------------------------------------------- listar
 
 export interface LinhaDeInsumo {
@@ -569,6 +669,8 @@ export interface LinhaDeInsumo {
   marcaReferencia: string | null;
   /** I.1b: Seco que ninguém confirmou, numa categoria que costuma ser fria: a conservação precisa ser confirmada. */
   conservacaoAConfirmar: boolean;
+  /** L.1: por que o cadastro está incompleto (vazio = completo). Custo não informado não conta: é `custo === null`. */
+  motivosIncompleto: MotivoIncompleto[];
   conservacao: Conservacao;
   /** 1.4: principal + validade em cada conservação aceita (minutos). */
   validades: Validades;
@@ -602,12 +704,14 @@ function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
   else if (f.categoria) e.push({ categoriaId: f.categoria });
   // 1.4: "conservação X" = os que ficam em X (a principal ou com validade nela). I.1b: "a confirmar" = os Seco que ninguém
   // confirmou, em Proteína, Laticínios ou Hortifruti (a situação escolhida na lista continua valendo).
-  if (f.conservacao === FILTRO_A_CONFIRMAR) {
-    const { ativo: _ativo, ...resto } = filtroDaConfirmacao();
-    e.push(resto);
-  } else if (f.conservacao) e.push({ OR: [{ conservacao: f.conservacao }, { [COLUNA_DA_VALIDADE[f.conservacao]]: { not: null } }] });
+  if (f.conservacao === FILTRO_A_CONFIRMAR) e.push(filtroDaConfirmacaoDaSituacao());
+  else if (f.conservacao) e.push({ OR: [{ conservacao: f.conservacao }, { [COLUNA_DA_VALIDADE[f.conservacao]]: { not: null } }] });
+  // L.1: a busca acha pelo nome OU pela marca de referência; "marca" é filtro à parte (sem diferenciar caixa).
+  if (q) e.push({ OR: [{ nome: { contains: q, mode: 'insensitive' } }, { marcaReferencia: { contains: q, mode: 'insensitive' } }] });
+  if (f.marca === FILTRO_SEM_MARCA) e.push({ marcaReferencia: null });
+  else if (f.marca) e.push({ marcaReferencia: { equals: f.marca, mode: 'insensitive' } });
+  if (f.incompleto) e.push(filtroDoIncompleto());
   return {
-    ...(q ? { nome: { contains: q, mode: 'insensitive' as const } } : {}),
     ...(f.tipo ? { tipo: f.tipo } : {}),
     ...(e.length ? { AND: e } : {}),
     ...(f.situacao === 'ativos' ? { ativo: true } : f.situacao === 'desativados' ? { ativo: false } : {}),
@@ -652,6 +756,14 @@ function paraLinha(i: LinhaDoBanco, preparos: ReadonlyMap<string, CustoDaFicha>,
     ...resto,
     validades,
     conservacaoAConfirmar: conservacaoAConfirmar({ tipo: i.tipo, conservacao: i.conservacao, conservacaoConfirmadaEm, categoriaChave: i.categoria?.chave ?? null }),
+    motivosIncompleto: motivosDoCadastro({
+      tipo: i.tipo,
+      categoriaChave: i.categoria?.chave ?? null,
+      temCategoria: !!i.categoria,
+      conservacao: i.conservacao,
+      conservacaoConfirmadaEm,
+      conteudoMilesimos: i.conteudoMilesimos,
+    }),
     conservacaoInformada: !fichaQueProduz || Object.keys(validades.minutos).length > 0,
     custo: fichaQueProduz ? null : (compra?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos)),
     ultimaCompra: compra ? { entradaEm: compra.entradaEm } : null,
@@ -678,39 +790,53 @@ function comprasDasLinhas(tx: ClienteDoParceiro, linhas: LinhaDoBanco[]) {
 /** Custo por unidade para ordenar (exato); null = sem preço (vai para o fim). */
 const custoParaOrdenar = (l: LinhaDeInsumo): Fracao | null => l.preparo?.porUnidade ?? (l.custo ? custoPorUnidade(l.custo) : null);
 
+/** L.1: quantos insumos o parceiro tem no cadastro (todos e só os ativos), para a lista dizer "no cadastro" × "nos filtros". */
+export interface TotalDoCadastro {
+  todos: number;
+  ativos: number;
+}
+
 /**
- * Página da lista com o total. Filtros e ordem vêm da URL (`lerFiltros`), o
- * servidor filtra. Por custo: o custo é derivado (nunca gravado), então a
- * ordenação é feita aqui pelo custo exato (multiplicação cruzada), e "Sem
- * preço" fica sempre no fim. Contagem e página na mesma transação (o total bate com a página).
+ * Página da lista com o total. Filtros, ordem e tamanho da página vêm da URL (`lerFiltros`), o servidor filtra e valida. Por
+ * custo: o custo é derivado (nunca gravado), então a ordenação é feita aqui pelo custo exato (multiplicação cruzada), e "Sem
+ * preço" fica sempre no fim. Contagens e página na mesma transação (o total bate com a página).
+ *
+ * L.1: `porPagina` só vale 10, 25, 50 ou 100 (outro valor volta ao padrão); a página pedida além da última é ajustada à última
+ * e 0 resultado dá 1 página vazia (nunca divide por zero). A ordem tem desempate por id: nenhuma linha pula nem repete entre
+ * páginas. `totalDoCadastro` é o do parceiro (nunca de outro): "no cadastro" × "correspondem aos filtros" são números diferentes.
  */
 export async function listarInsumos(
   cliente: ClienteDoParceiro,
   filtros: Partial<FiltrosDeInsumo> = {},
-): Promise<{ linhas: LinhaDeInsumo[]; total: number; pagina: number; paginas: number }> {
+): Promise<{ linhas: LinhaDeInsumo[]; total: number; pagina: number; paginas: number; porPagina: number; totalDoCadastro: TotalDoCadastro }> {
   const f: FiltrosDeInsumo = { ...FILTROS_PADRAO, ...filtros };
+  const porPagina = lerPorPagina(f.porPagina);
   const where = filtroDoBanco(f);
   return cliente.transacao(async (tx) => {
     const total = await tx.insumo.count({ where });
-    const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+    const todos = await tx.insumo.count();
+    const ativos = await tx.insumo.count({ where: { ativo: true } });
+    const totalDoCadastro = { todos, ativos };
+    const paginas = Math.max(1, Math.ceil(total / porPagina));
     const pagina = Math.min(Math.max(1, Math.trunc(f.pagina) || 1), paginas);
     if (f.ordem === 'nome') {
       const linhas = await tx.insumo.findMany({
         where,
         orderBy: [{ nome: f.direcao }, { id: 'asc' }],
-        skip: (pagina - 1) * POR_PAGINA,
-        take: POR_PAGINA,
+        skip: (pagina - 1) * porPagina,
+        take: porPagina,
         select: SELECAO_DA_LINHA,
       });
       const preparos = await custosDosPreparos(tx, linhas);
       const compras = await comprasDasLinhas(tx, linhas);
-      return { linhas: linhas.map((l) => paraLinha(l, preparos, compras)), total, pagina, paginas };
+      return { linhas: linhas.map((l) => paraLinha(l, preparos, compras)), total, pagina, paginas, porPagina, totalDoCadastro };
     }
-    const lidas = await tx.insumo.findMany({ where, orderBy: { nome: 'asc' }, select: SELECAO_DA_LINHA });
+    const lidas = await tx.insumo.findMany({ where, orderBy: [{ nome: 'asc' }, { id: 'asc' }], select: SELECAO_DA_LINHA });
     const preparos = await custosDosPreparos(tx, lidas);
     const compras = await comprasDasLinhas(tx, lidas);
     const todas = lidas.map((l) => paraLinha(l, preparos, compras));
     const sinal = f.direcao === 'asc' ? 1 : -1;
+    // Empate de custo: nome e id (a lista já vem nessa ordem e o sort é estável), então a ordem é a mesma em toda página.
     todas.sort((a, b) => {
       const x = custoParaOrdenar(a);
       const y = custoParaOrdenar(b);
@@ -718,8 +844,21 @@ export async function listarInsumos(
       // Exato (multiplicação cruzada): R$ 0,004/un vem antes de R$ 0,005/un.
       return sinal * compararFracoes(x, y);
     });
-    return { linhas: todas.slice((pagina - 1) * POR_PAGINA, pagina * POR_PAGINA), total, pagina, paginas };
+    return { linhas: todas.slice((pagina - 1) * porPagina, pagina * porPagina), total, pagina, paginas, porPagina, totalDoCadastro };
   });
+}
+
+/**
+ * L.1: as marcas de referência em uso no cadastro do parceiro (para o filtro "Marca"): a grafia mais comum de cada uma, sem
+ * diferenciar caixa, da mais usada para a menos. No máximo 100.
+ */
+export async function marcasEmUso(cliente: ClienteDoParceiro): Promise<{ marca: string; n: number }[]> {
+  return cliente.sql<{ marca: string; n: number }>`
+    SELECT min("marcaReferencia") AS "marca", count(*)::int AS "n" FROM "Insumo"
+    WHERE "parceiroId" = ${cliente.parceiroId} AND "marcaReferencia" IS NOT NULL
+    GROUP BY lower("marcaReferencia")
+    ORDER BY count(*) DESC, lower(min("marcaReferencia")) ASC
+    LIMIT 100`;
 }
 
 // ---------------------------------------------------------------- obter

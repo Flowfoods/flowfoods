@@ -36,6 +36,7 @@ export function TelaDetalheInsumo({
   base,
   voltar,
   feito,
+  de = '',
   contexto,
   podeEditar,
   bloqueio,
@@ -57,6 +58,8 @@ export function TelaDetalheInsumo({
   voltar: string;
   /** `?feito=` depois de gravar. */
   feito?: string;
+  /** L.1: a lista como a pessoa deixou (filtros, página e tamanho, já filtrados): "Editar", "Remover" e "Cadastrar outro" a levam junto. */
+  de?: string;
   /** Antes do tipo no subtítulo (o N1 põe o nome do parceiro). */
   contexto?: string;
   podeEditar: boolean;
@@ -67,6 +70,7 @@ export function TelaDetalheInsumo({
 }) {
   const u = UNIDADES[i.unidade];
   const aqui = `${base}/${i.id}`;
+  const comDe = de ? `?de=${encodeURIComponent(de)}` : '';
   const uc = i.ultimaCompra;
   const ud = uc?.detalhe ?? null;
   const notaDaUltima = ud && linkDaNota ? linkDaNota(ud.notaId, ud.lojaId) : null;
@@ -118,7 +122,7 @@ export function TelaDetalheInsumo({
               {salvo.criou && podeEditar && !bloqueio && (
                 // Quem cadastra em série quase sempre repete tipo e unidade: o próximo já abre com os do último. A conservação é escolhida a cada insumo.
                 <Link
-                  href={`${base}/novo?${new URLSearchParams({ tipo: i.tipo, unidade: i.unidade }).toString()}`}
+                  href={`${base}/novo?${new URLSearchParams({ tipo: i.tipo, unidade: i.unidade, ...(de ? { de } : {}) }).toString()}`}
                   className={classeDeBotao('secundario')}
                 >
                   Cadastrar outro insumo
@@ -135,7 +139,7 @@ export function TelaDetalheInsumo({
           .join(' · ')}
         acao={
           editaAqui && i.ativo ? (
-            <BotaoOuMotivo href={`${aqui}/editar`} bloqueio={bloqueio} variante="primario">
+            <BotaoOuMotivo href={`${aqui}/editar${comDe}`} bloqueio={bloqueio} variante="primario">
               Editar insumo
             </BotaoOuMotivo>
           ) : p && podeEditar ? (
@@ -395,7 +399,15 @@ export function TelaDetalheInsumo({
               {bloqueio ? (
                 <p className="text-sm text-suave">{bloqueio}</p>
               ) : (
-                <FormSituacao acao={acaoSituacao} ativo={i.ativo} oQue="insumo" idBase="situacao-insumo" />
+                <>
+                  <FormSituacao acao={acaoSituacao} ativo={i.ativo} oQue="insumo" idBase="situacao-insumo" ocultos={de ? { de } : undefined} />
+                  <p className="mt-3 border-t border-linha pt-3 text-[13px] text-suave">
+                    Quer tirar o insumo do cadastro?{' '}
+                    <Link href={`${aqui}/remover${comDe}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`}>
+                      Ver o que está ligado a ele e remover
+                    </Link>
+                  </p>
+                </>
               )}
             </Painel>
           )}
