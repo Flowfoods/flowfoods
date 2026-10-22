@@ -426,7 +426,7 @@ export async function listarDocumentos(cliente: ClienteDoParceiro, alcance: Alca
   const f: FiltrosDeDocumento = { ...FILTROS_DE_DOCUMENTO_PADRAO, ...filtros };
   return cliente.transacao(async (tx) => {
     const visivel = await ondeVisivel(tx, alcance);
-    if (visivel === null) return { linhas: [], total: 0, pagina: 1, paginas: 1, naFila: 0 };
+    if (visivel === null) return { linhas: [], total: 0, pagina: 1, paginas: 1, naFila: 0, temAlguma: false };
     const doAlcance = filtroDeLojas(alcance);
     const lojaPedida = f.lojaId && doAlcance && !doAlcance.in.includes(f.lojaId) ? { in: [] as string[] } : f.lojaId || undefined;
     const situacao: Prisma.DocumentoFiscalWhereInput =
@@ -442,6 +442,7 @@ export async function listarDocumentos(cliente: ClienteDoParceiro, alcance: Alca
     };
     const total = await tx.documentoFiscal.count({ where });
     const naFila = await tx.documentoFiscal.count({ where: { AND: [visivel, { situacao: { in: ['AGUARDANDO_CONFERENCIA', 'RECEBIDO', 'ERRO'] } }] } });
+    const temAlguma = total > 0 || (await tx.documentoFiscal.count({ where: visivel })) > 0;
     const paginas = Math.max(1, Math.ceil(total / DOCUMENTOS_POR_PAGINA));
     const pagina = Math.min(Math.max(1, f.pagina), paginas);
     const lidas = await tx.documentoFiscal.findMany({
@@ -484,17 +485,19 @@ export async function listarDocumentos(cliente: ClienteDoParceiro, alcance: Alca
       pagina,
       paginas,
       naFila,
+      /** Há alguma nota recebida (em qualquer situação) que a pessoa veja? Sem nenhuma, a tela convida a importar a primeira. */
+      temAlguma,
     };
   });
 }
 
 export type LinhaDeDocumento = Awaited<ReturnType<typeof listarDocumentos>>['linhas'][number];
 
-/** Os filtros da lista: lojas do alcance e fornecedores que têm documento. */
+/** Os filtros da lista: lojas do alcance e os fornecedores (cadastro da rede, como no filtro das notas de compra). */
 export async function opcoesDosFiltrosDeDocumento(cliente: ClienteDoParceiro, alcance: Alcance) {
   return cliente.transacao(async (tx) => ({
     lojas: await tx.loja.findMany({ where: { id: filtroDeLojas(alcance) }, orderBy: { nome: 'asc' }, select: { id: true, nome: true } }),
-    fornecedores: await tx.fornecedor.findMany({ where: { documentosFiscais: { some: {} } }, orderBy: { nome: 'asc' }, select: { id: true, nome: true } }),
+    fornecedores: await tx.fornecedor.findMany({ orderBy: { nome: 'asc' }, select: { id: true, nome: true } }),
   }));
 }
 

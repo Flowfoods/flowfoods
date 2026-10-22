@@ -28,13 +28,13 @@ export default async function ErpNotasRecebidasPage({ searchParams }: { searchPa
         <FiltrosDosDocumentos filtrado={temFiltroDeDocumento(lidos)} base={BASE} filtros={filtros} lojas={opcoes.lojas} fornecedores={opcoes.fornecedores} />
       </CabecalhoDosDocumentos>
       <TelaListaDocumentos
-        filtrado={temFiltroDeDocumento(lidos)}
         base={BASE}
         filtros={filtros}
         linhas={pagina.linhas}
         total={pagina.total}
         pagina={pagina.pagina}
         paginas={pagina.paginas}
+        temAlguma={pagina.temAlguma}
         importarHref={lanca && !ctx.bloqueio ? `${BASE}/importar` : undefined}
       />
     </div>

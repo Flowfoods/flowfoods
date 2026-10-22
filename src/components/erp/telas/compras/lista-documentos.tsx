@@ -138,30 +138,38 @@ export function TelaListaDocumentos({
   total,
   pagina,
   importarHref,
-  filtrado = temFiltroDeDocumento(f),
+  temAlguma,
 }: {
   base: string;
   filtros: FiltrosDeDocumento;
-  filtrado?: boolean;
   linhas: LinhaDeDocumento[];
   total: number;
   pagina: number;
   paginas: number;
   importarHref?: string;
+  /** Há nota recebida em alguma situação? Sem nenhuma, o vazio convida a importar a primeira. */
+  temAlguma: boolean;
 }) {
   if (linhas.length === 0) {
+    const filaVazia = f.situacao === 'fila' && !f.lojaId && !f.fornecedorId;
     return (
       <Painel semRespiro>
-        {filtrado ? (
+        {temAlguma ? (
           <Vazio
-            titulo={f.situacao === 'fila' && !f.lojaId && !f.fornecedorId ? 'Nenhuma nota na fila.' : 'Nenhuma nota com esses filtros.'}
+            titulo={filaVazia ? 'Nenhuma nota na fila.' : 'Nenhuma nota com esses filtros.'}
             acao={
-              <Link href={base} className={classeDeBotao('secundario')}>
-                Limpar filtros
-              </Link>
+              filaVazia ? (
+                <Link href={`${base}?situacao=todas`} className={classeDeBotao('secundario')}>
+                  Ver todas as notas recebidas
+                </Link>
+              ) : (
+                <Link href={base} className={classeDeBotao('secundario')}>
+                  Limpar filtros
+                </Link>
+              )
             }
           >
-            {f.situacao === 'fila' && !f.lojaId && !f.fornecedorId ? 'Todas as notas recebidas já foram conferidas.' : 'Os filtros continuam acima, como você deixou.'}
+            {filaVazia ? 'Todas as notas recebidas já foram conferidas.' : 'Os filtros continuam acima, como você deixou.'}
           </Vazio>
         ) : (
           <Vazio

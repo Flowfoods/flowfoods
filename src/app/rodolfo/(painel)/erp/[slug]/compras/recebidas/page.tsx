@@ -25,13 +25,13 @@ export default async function ParceiroNotasRecebidasPage({ params, searchParams 
         <FiltrosDosDocumentos filtrado={temFiltroDeDocumento(lidos)} base={base} filtros={filtros} lojas={opcoes.lojas} fornecedores={opcoes.fornecedores} />
       </CabecalhoDosDocumentos>
       <TelaListaDocumentos
-        filtrado={temFiltroDeDocumento(lidos)}
         base={base}
         filtros={filtros}
         linhas={pagina.linhas}
         total={pagina.total}
         pagina={pagina.pagina}
         paginas={pagina.paginas}
+        temAlguma={pagina.temAlguma}
         importarHref={ctx.bloqueio ? undefined : `${base}/importar`}
       />
     </div>
