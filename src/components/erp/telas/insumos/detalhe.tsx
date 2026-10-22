@@ -43,6 +43,7 @@ export function TelaDetalheInsumo({
   acaoSituacao,
   acaoConfirmar,
   linkDaNota,
+  historicoHref,
   estoque,
 }: {
   /** 1.6: o saldo nas lojas em que a pessoa vê o estoque (vazio = painel não aparece). */
@@ -52,6 +53,8 @@ export function TelaDetalheInsumo({
    * a pessoa vê o preço, que é custo da rede, mas não a nota).
    */
   linkDaNota?: (notaId: string, lojaId: string) => string | null;
+  /** L.2: link do histórico de compras deste insumo (relatório); ausente = quem não vê compras. */
+  historicoHref?: string;
   insumo: InsumoDetalhado;
   base: string;
   /** A lista como a pessoa deixou (filtros e página). */
@@ -220,7 +223,7 @@ export function TelaDetalheInsumo({
             </p>
           </Painel>
 
-          <PrecosPagos insumo={i} linkDaNota={linkDaNota} />
+          <PrecosPagos insumo={i} linkDaNota={linkDaNota} historicoHref={historicoHref} />
 
           {estoque && <PainelEstoqueDoInsumo saldos={estoque.saldos} unidade={i.unidade} estoqueBase={estoque.base} />}
 

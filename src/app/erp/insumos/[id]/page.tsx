@@ -41,6 +41,7 @@ export default async function ErpInsumoPage({
       acaoConfirmar={acaoConfirmarConservacao.bind(null, insumo.id)}
       acaoSituacao={acaoSituacaoInsumo.bind(null, insumo.id)}
       linkDaNota={(notaId, lojaId) => (pode(ctx.alcance, 'compras.ver', { lojaId }) ? `/erp/compras/${notaId}` : null)}
+      historicoHref={pode(ctx.alcance, 'compras.ver') ? `/erp/compras/relatorios/insumo?insumo=${insumo.id}` : undefined}
       estoque={{ saldos, base: '/erp/estoque' }}
     />
   );

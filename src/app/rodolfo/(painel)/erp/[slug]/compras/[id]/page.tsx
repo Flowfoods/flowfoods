@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { obterNota } from '@/lib/erp/compras';
 import { lerFiltrosDeNota, queryDosFiltrosDeNota } from '@/lib/erp/compra-campos';
+import { caminhoDeVolta, rotuloDaVolta } from '@/lib/erp/volta';
 import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { orcamentoDaNotaLancada } from '@/lib/erp/orcamento';
 import { TelaDetalheNota } from '@/components/erp/telas/compras/detalhe-nota';
@@ -11,18 +12,21 @@ import { acaoCancelarNota } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroNotaPage({ params, searchParams }: { params: { slug: string; id: string }; searchParams: { de?: string; feito?: string } }) {
+export default async function ParceiroNotaPage({ params, searchParams }: { params: { slug: string; id: string }; searchParams: { de?: string; feito?: string; volta?: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'compras.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;
   const nota = await obterNota(ctx.cliente, ctx.alcance, params.id);
   if (!nota) notFound();
   const de = queryDosFiltrosDeNota(lerFiltrosDeNota(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));
+  // L.2: veio de um relatório de compras? Volta para ele, com o recorte que estava (só caminho interno da área: nunca endereço de fora).
+  const dosRelatorios = caminhoDeVolta(searchParams.volta, `${base}/`, 2000);
   return (
     <TelaDetalheNota
       nota={nota}
       base={`${base}/compras`}
-      voltar={de ? `${base}/compras?${de}` : `${base}/compras`}
+      voltar={dosRelatorios ?? (de ? `${base}/compras?${de}` : `${base}/compras`)}
+      voltarRotulo={dosRelatorios ? rotuloDaVolta(dosRelatorios) : undefined}
       feito={searchParams.feito}
       contexto={ctx.parceiro.nome}
       podeLancar

@@ -116,12 +116,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['insumos/[id]'],
     titulo: 'Detalhe do insumo',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'O custo de hoje e a origem dele (o último preço de compra ou o custo inicial de referência), e quanto tem em cada loja do seu acesso.' },
       { texto: 'Conservação e prazo de uso após abertura ficam lado a lado, sem confundir com o vencimento do lote.' },
       { texto: 'A categoria fica ao lado, com a forma como foi escolhida; em “Outros / a classificar” o insumo espera revisão.' },
       { texto: 'Mais embaixo, o que você pagou em cada nota e qual fornecedor saiu mais barato.', para: ['compras.ver'] },
+      { texto: 'Para o histórico completo, com período, lojas e preço médio, use “Ver o histórico de compras”.', para: ['compras.ver'] },
     ],
   },
   {
@@ -490,12 +491,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras'],
     titulo: 'Compras',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'As notas de compra de cada loja.' },
       { texto: 'Nota lançada muda o custo do insumo e entra no estoque, se a loja já abriu o estoque.' },
       { texto: 'A mesma nota não entra duas vezes.', para: ['compras.lancar'] },
       { texto: 'Tem o XML da nota fiscal? Em Notas recebidas o sistema lê os itens para você.', para: ['compras.lancar'] },
+      { texto: 'Em Relatórios você vê o histórico de um insumo e tudo o que foi comprado num dia ou período, e leva para a planilha ou para o PDF.' },
     ],
   },
   {
@@ -531,6 +533,83 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'O ritmo é o CMV pelas compras até ontem contra a meta, com o farol do DRE: as mesmas 5 faixas da linha do CMV. Comprar muito no começo do mês acende o farol mesmo cabendo no orçamento: o farol fala do ritmo, o orçamento fala do período.', para: ['dre.ver'] },
           { texto: 'Sem cor quando falta faturamento em algum dia do período, ou quando uma loja que vendeu ainda não tem nota.', para: ['dre.ver'] },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'compras-relatorio-insumo',
+    area: 'compras',
+    rotas: ['compras/relatorios/insumo'],
+    titulo: 'Histórico de um insumo',
+    versao: 1,
+    // A lista e os números precisam ficar à vista no celular: a aula abre numa linha.
+    recolhida: true,
+    aula: [
+      { texto: 'Escolha um insumo e o período para ver o que você comprou dele, de quem, em que embalagem e a que preço.' },
+      { texto: 'O preço médio é ponderado: o valor total dividido pelo total comprado. Não é a média dos preços das notas.' },
+      { texto: 'Cada número abre as linhas que o formam, e cada linha abre a nota (e a nota fiscal, quando ela veio de XML).' },
+    ],
+    secoes: [
+      {
+        id: 'datas',
+        titulo: 'A data e as lojas',
+        blocos: [
+          { texto: 'Em “Data usada” você escolhe: a entrada da nota, a emissão da nota fiscal (só as notas que vieram de XML têm) ou o dia em que a nota foi lançada no ERP, pelo relógio do Rio.' },
+          { texto: 'Só aparecem as lojas do seu acesso. Para o mês inteiro, use “Este mês” ou “Mês passado”, ou digite do dia 1 ao último dia.' },
+        ],
+      },
+      {
+        id: 'sem-base',
+        titulo: 'Quando o sistema não calcula',
+        blocos: [
+          { texto: 'Se a nota não guardou a unidade, ou o valor da linha é zero, a linha fica “sem base”: entra no dinheiro, mas fica fora do preço médio. Preço que não dá para calcular nunca vira R$ 0,00.' },
+          { texto: 'kg, L e un nunca são somados num número só: cada unidade tem a sua linha.' },
+          { texto: 'Nota cancelada não conta como compra. Nota fiscal que só chegou por XML e ainda não foi conferida também não.' },
+        ],
+      },
+      {
+        id: 'historico',
+        titulo: 'O que mudou no cadastro',
+        blocos: [{ texto: 'Quantidade, embalagem, valor e frete são os que foram gravados quando a nota foi lançada. Mudar o cadastro do insumo depois não muda compra antiga.' }],
+      },
+    ],
+  },
+  {
+    chave: 'compras-relatorio-periodo',
+    area: 'compras',
+    rotas: ['compras/relatorios/periodo'],
+    titulo: 'Compras do período',
+    versao: 1,
+    recolhida: true,
+    aula: [
+      { texto: 'Tudo o que foi comprado num dia ou período, nas lojas do seu acesso, com filtro por fornecedor, insumo e categoria.' },
+      { texto: 'Agrupe por insumo, fornecedor ou dia. Cada grupo abre as compras dele, e cada compra abre a nota de origem.' },
+      { texto: 'A planilha e a impressão saem com o mesmo período, a mesma data usada, as mesmas unidades e os mesmos totais da tela.' },
+    ],
+    secoes: [
+      {
+        id: 'saida',
+        titulo: 'Planilha e PDF',
+        blocos: [
+          { texto: 'A planilha traz cada linha de compra, ou o resumo do agrupamento. Abre no Excel; texto que começaria com = + - ou @ ganha um apóstrofo na frente, para a planilha não tratar como fórmula.' },
+          { texto: 'Imprimir abre uma versão sem menu. Na janela de impressão, escolha “Salvar como PDF”. Se as linhas não couberem numa folha, a página avisa e a planilha leva todas.' },
+        ],
+      },
+      {
+        id: 'datas',
+        titulo: 'A data e as lojas',
+        blocos: [
+          { texto: 'A data usada vale para o filtro, os totais, a planilha e a impressão: entrada da nota, emissão da nota fiscal (só as de XML) ou o dia do lançamento no ERP, pelo relógio do Rio.' },
+          { texto: 'Notas canceladas ficam fora dos totais e aparecem à parte. Nota fiscal que só aguarda conferência não é compra.' },
+        ],
+      },
+      {
+        id: 'preco',
+        titulo: 'Preço médio',
+        blocos: [
+          { texto: 'O preço médio só aparece para um insumo por vez (agrupando por insumo, ou escolhendo um): kg de coisas diferentes não têm um preço só. Linha sem unidade ou sem valor fica “sem base” e fora da média.' },
+          { texto: 'kg, L e un nunca se somam: cada unidade tem a sua linha.' },
         ],
       },
     ],

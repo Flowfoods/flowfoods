@@ -16,8 +16,8 @@
     "hash": "7f7dddf2ba0ddf03"
   },
   "insumo": {
-    "versao": 3,
-    "hash": "547d8cf5c44a5cf6"
+    "versao": 4,
+    "hash": "be0bba5b9473975f"
   },
   "insumo-remover": {
     "versao": 1,
@@ -112,12 +112,20 @@
     "hash": "45d01d5291ff0691"
   },
   "compras": {
-    "versao": 2,
-    "hash": "32f98572a12c08ff"
+    "versao": 3,
+    "hash": "6922e1c6a1a6477f"
   },
   "compras-orcamento": {
     "versao": 4,
     "hash": "8185c301a55ffd2b"
+  },
+  "compras-relatorio-insumo": {
+    "versao": 1,
+    "hash": "00296ad5f4a493aa"
+  },
+  "compras-relatorio-periodo": {
+    "versao": 1,
+    "hash": "baa6b602f574c7a1"
   },
   "compra-nova": {
     "versao": 4,

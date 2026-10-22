@@ -23,6 +23,7 @@ import { ligarDocumento, obterDocumento, receberXml } from '@/lib/erp/documentos
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import { relatorioCompleto, relatorioDaTela, linhasDoRecorte, gruposDoRecorte, totaisDoRecorte, resolverRecorte } from '@/lib/erp/compras-relatorio';
 import {
+  abreComoFormula,
   custoMedioEntregue,
   lerFiltrosDoRelatorio,
   precoMedioPonderado,
@@ -31,6 +32,7 @@ import {
   type TotalPorUnidade,
 } from '@/lib/erp/compras-relatorio-campos';
 import { formatarCusto } from '@/lib/erp/unidades';
+import { COLUNAS_DAS_LINHAS, planilhaDoRelatorio, responderPlanilha } from '@/lib/erp/compras-relatorio-planilha';
 import { cadastrarInsumoDeTeste as cadastrarInsumo, cru, limparParceiros, perfilDoBanco, SEM_NOTA_FISCAL, type PerfilDoBanco } from './erp-db-apoio';
 import { bytes, montarCenario, xmlDe } from './erp-documento-fiscal-apoio';
 
@@ -409,5 +411,143 @@ describe.skipIf(!URL_TESTE)('ERP L.2 · relatórios de compras (Postgres real)',
     const recorte = (await resolverRecorte(a, DONA(), filtros())).recorte!;
     const t = await totaisDoRecorte(a, recorte);
     expect(t.totalCentavos).toBe(r.totais!.totalCentavos);
+  });
+
+  // ------------------------------------------------------------- planilha
+
+  /** Lê o CSV como uma planilha leria: `;`, aspas dobradas, linhas por CRLF (sem quebra de linha dentro de célula). */
+  function lerCsv(corpo: string): string[][] {
+    return corpo.replace(/^\uFEFF/, '').split('\r\n').filter((l, i, a) => !(i === a.length - 1 && l === '')).map((linha) => {
+      const cel: string[] = [];
+      let atual = '';
+      let aspas = false;
+      for (let i = 0; i < linha.length; i++) {
+        const c = linha[i];
+        if (aspas) {
+          if (c === '"' && linha[i + 1] === '"') { atual += '"'; i++; } else if (c === '"') aspas = false; else atual += c;
+        } else if (c === '"') aspas = true;
+        else if (c === ';') { cel.push(atual); atual = ''; } else atual += c;
+      }
+      cel.push(atual);
+      return cel;
+    });
+  }
+  const reais = (c: number) => `${Math.trunc(c / 100)},${String(c % 100).padStart(2, '0')}`;
+
+  it('a planilha das compras é igual à tela: mesmas linhas, mesmos totais, mesma data e período, em reais com vírgula', async () => {
+    const f = filtros({ ver: 'linhas' });
+    const tela = await relatorioDaTela(a, DONA(), f, 'periodo');
+    const r = await planilhaDoRelatorio(a, DONA(), f, { titulo: 'Compras do período', parte: 'linhas' });
+    if (!r.ok) throw new Error(JSON.stringify(r));
+    expect(r.nome).toBe('compras-2026-10-01_a_2026-10-31.csv');
+    expect(r.corpo.startsWith('\uFEFF')).toBe(true);
+    const linhas = lerCsv(r.corpo);
+    const cab = linhas.findIndex((l) => l[0] === COLUNAS_DAS_LINHAS[0]);
+    expect(cab).toBeGreaterThan(0);
+    const dados = linhas.slice(cab + 1, linhas.findIndex((l, i) => i > cab && l.length === 1 && l[0] === ''));
+    expect(dados).toHaveLength(tela.totais!.linhas);
+    const col = (nome: string) => COLUNAS_DAS_LINHAS.indexOf(nome as (typeof COLUNAS_DAS_LINHAS)[number]);
+    const soma = (nome: string) => dados.reduce((s, l) => s + Number(l[col(nome)].replace(',', '.')) * 100, 0);
+    expect(Math.round(soma('Valor dos itens (R$)'))).toBe(tela.totais!.valorCentavos);
+    expect(Math.round(soma('Frete atribuído (R$)'))).toBe(tela.totais!.freteCentavos);
+    expect(Math.round(soma('Total (R$)'))).toBe(tela.totais!.totalCentavos);
+    // O cabeçalho repete o que a tela diz: data usada e período, e o rodapé tem os mesmos totais.
+    const topo = Object.fromEntries(linhas.slice(0, cab).filter((l) => l.length >= 2).map((l) => [l[0], l[1]]));
+    expect(topo['Período e data usada']).toBe('Data da entrada da nota, de 01/10/2026 a 31/10/2026');
+    expect(topo['Lojas']).toContain('Vila da Penha');
+    const rodape = Object.fromEntries(linhas.filter((l) => l.length === 2).map((l) => [l[0], l[1]]));
+    expect(rodape['Total (R$)']).toBe(reais(tela.totais!.totalCentavos));
+    expect(rodape['Valor dos itens (R$)']).toBe(reais(tela.totais!.valorCentavos));
+    expect(rodape['Quantidade em kg']).toBe('26');
+    expect(rodape['Quantidade em sem unidade']).toMatch(/não se soma/);
+    expect(rodape['Canceladas no mesmo recorte (FORA dos totais)']).toMatch(/^1 nota/);
+    // A linha sem base não tem preço unitário e diz o porquê; a de preço tem 4 casas.
+    const bacon = dados.find((l) => l[col('Insumo')] === 'Bacon')!;
+    expect(bacon[col('Preço unitário (R$/un base)')]).toBe('');
+    expect(bacon[col('Sem base para o preço médio porque')]).toMatch(/unidade não foi gravada/);
+    const l3 = dados.find((l) => l[col('Nota')] === '102')!;
+    expect(l3[col('Preço unitário (R$/un base)')]).toBe('47,0000');
+    expect(l3[col('Quantidade convertida')]).toBe('10');
+  });
+
+  it('o resumo em planilha confere com os grupos da tela, e o preço médio vem da mesma conta', async () => {
+    const f = filtros({ agrupar: 'insumo' });
+    const tela = await relatorioDaTela(a, DONA(), f, 'periodo');
+    const r = await planilhaDoRelatorio(a, DONA(), f, { titulo: 'Compras do período', parte: 'resumo' });
+    if (!r.ok) throw new Error(JSON.stringify(r));
+    const linhas = lerCsv(r.corpo);
+    const cab = linhas.findIndex((l) => l[0] === 'Grupo');
+    const grupos = linhas.slice(cab + 1, linhas.findIndex((l, i) => i > cab && l.length === 1 && l[0] === ''));
+    expect(grupos).toHaveLength(tela.grupos!.grupos.length);
+    const muc = grupos.find((l) => l[0] === 'Muçarela')!;
+    expect(muc.slice(1, 8)).toEqual(['kg', '26', '4', '4', '1186,00', '5,00', '1191,00']);
+    expect(muc[8]).toBe('45,6154'); // 118.600 ÷ 26.000 g: o ponderado, com 4 casas
+    expect(muc[9]).toBe('45,8077');
+  });
+
+  it('planilha segura: nome com fórmula (insumo, fornecedor, embalagem) sai com apóstrofo e NENHUMA célula de texto abre como fórmula', async () => {
+    await sql(`UPDATE "Insumo" SET "nome" = $2 WHERE id = $1`, ids.guardanapo, '=HYPERLINK("http://x.test";"clique")');
+    await sql(`UPDATE "NotaEntradaItem" SET "insumoNomeSnapshot" = $2 WHERE "notaId" = $1 AND "insumoId" = $3`, notas.Z2, '=HYPERLINK("http://x.test";"clique")', ids.guardanapo);
+    await sql(`UPDATE "NotaEntrada" SET "fornecedorNomeSnapshot" = $2 WHERE id = $1`, notas.Z3, '+cmd|\'/C calc\'!A0');
+    await sql(`UPDATE "NotaEntradaItem" SET "embalagemSnapshot" = $2 WHERE "notaId" = $1 AND "insumoId" = $3`, notas.Z2, '@SOMA(1+1)', ids.bacon);
+    await sql(`UPDATE "Fornecedor" SET "nome" = $2 WHERE id = $1`, ids.ze, '-2+3 Frios');
+    try {
+      for (const [parte, agrupar] of [['linhas', 'fornecedor'], ['resumo', 'fornecedor'], ['resumo', 'insumo']] as const) {
+        const r = await planilhaDoRelatorio(a, DONA(), filtros({ agrupar }), { titulo: 'Compras do período', parte });
+        if (!r.ok) throw new Error(JSON.stringify(r));
+        const celulas = lerCsv(r.corpo).flat();
+        const rotulo = `${parte}/${agrupar}`;
+        expect(celulas.filter(abreComoFormula), `${rotulo}: células que abrem como fórmula`).toEqual([]);
+        // O texto original continua legível atrás do apóstrofo; cada parte leva o que mostra.
+        if (parte === 'linhas') {
+          expect(celulas, rotulo).toContain(`'=HYPERLINK("http://x.test";"clique")`);
+          expect(celulas, rotulo).toContain(`'@SOMA(1+1)`);
+          expect(celulas.some((c) => c.startsWith("'+cmd|")), rotulo).toBe(true);
+        } else if (agrupar === 'fornecedor') {
+          // O resumo rotula o grupo pelo nome de hoje.
+          expect(celulas, rotulo).toContain(`'-2+3 Frios`);
+        } else {
+          expect(celulas, rotulo).toContain(`'=HYPERLINK("http://x.test";"clique")`);
+        }
+      }
+    } finally {
+      await sql(`UPDATE "Insumo" SET "nome" = 'Guardanapo' WHERE id = $1`, ids.guardanapo);
+      await sql(`UPDATE "NotaEntradaItem" SET "insumoNomeSnapshot" = 'Guardanapo' WHERE "notaId" = $1 AND "insumoId" = $2`, notas.Z2, ids.guardanapo);
+      await sql(`UPDATE "NotaEntrada" SET "fornecedorNomeSnapshot" = 'Frios do Zé' WHERE id = $1`, notas.Z3);
+      await sql(`UPDATE "NotaEntradaItem" SET "embalagemSnapshot" = 'A granel (kg)' WHERE "notaId" = $1 AND "insumoId" = $2`, notas.Z2, ids.bacon);
+      await sql(`UPDATE "Fornecedor" SET "nome" = 'Frios do Zé' WHERE id = $1`, ids.ze);
+    }
+  });
+
+  it('a rota de download: 401 sem sessão, 403 sem "ver compras" ou sem loja do acesso, 413 acima do teto; cabeçalhos seguros; nada de A para B', async () => {
+    const url = (q: string) => new Request(`http://x/erp/compras/relatorios/periodo/exportar?${q}`);
+    const q = 'de=2026-10-01&ate=2026-10-31&parte=linhas';
+    const sem = await responderPlanilha(null, null, url(q));
+    expect(sem.status).toBe(401);
+    expect(await sem.text()).not.toMatch(/Muçarela|\d+,\d{2}/);
+    const op = await responderPlanilha(a, alcanceDe('OPERADOR', [ids.vp]), url(q));
+    expect(op.status).toBe(403);
+    expect(await op.text()).not.toMatch(/Muçarela|Laticínios/);
+    const gerente = alcanceDe('GERENTE', [ids.vp]);
+    const fora = await responderPlanilha(a, gerente, url(`${q}&loja=${ids.centro}`));
+    expect(fora.status).toBe(403);
+    const ok = await responderPlanilha(a, gerente, url(q));
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get('Content-Type')).toBe('text/csv; charset=utf-8');
+    expect(ok.headers.get('Content-Disposition')).toMatch(/^attachment; filename="compras-.*\.csv"$/);
+    expect(ok.headers.get('X-Content-Type-Options')).toBe('nosniff');
+    expect(ok.headers.get('Cache-Control')).toBe('no-store');
+    const corpo = await ok.text();
+    expect(corpo).not.toContain('Centro'); // a loja que ele não tem nem aparece
+    expect(corpo).not.toContain('999,00'); // nota de B
+    // B baixando com o id de loja de A: nada.
+    const b403 = await responderPlanilha(b, alcanceDe('DONO', 'rede'), url(`${q}&loja=${ids.vp}`));
+    expect(b403.status).toBe(403);
+    const bProprio = await responderPlanilha(b, alcanceDe('DONO', 'rede'), url(q));
+    const t = await bProprio.text();
+    expect(t).toContain('Fornecedor B');
+    expect(t).not.toMatch(/Laticínios|Frios do Zé|Penha/);
+    // Período torto: 400 em frase.
+    expect((await responderPlanilha(a, DONA(), url('de=2026-10-31&ate=2026-10-01'))).status).toBe(400);
   });
 });

@@ -332,6 +332,27 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
             },
           ],
         },
+        {
+          // L.2: os relatórios de compras (a leitura do que já foi lançado; nada aqui lança nem muda nota).
+          rotulo: 'Relatórios',
+          icone: 'metricas',
+          telas: [
+            {
+              href: `${base}/compras/relatorios/insumo`,
+              rotulo: 'Histórico do insumo',
+              icone: 'insumo',
+              subtitulo: 'O que você comprou de um insumo, de quem e a que preço',
+              permissao: 'compras.ver',
+            },
+            {
+              href: `${base}/compras/relatorios/periodo`,
+              rotulo: 'Compras do período',
+              icone: 'metricas',
+              subtitulo: 'Tudo o que foi comprado num dia ou período, com planilha',
+              permissao: 'compras.ver',
+            },
+          ],
+        },
       ],
       acoes: [
         {

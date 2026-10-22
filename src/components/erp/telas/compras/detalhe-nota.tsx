@@ -34,6 +34,7 @@ export function TelaDetalheNota({
   nota: n,
   base,
   voltar,
+  voltarRotulo = 'as notas',
   feito,
   contexto,
   podeLancar,
@@ -50,6 +51,8 @@ export function TelaDetalheNota({
   nota: NotaDetalhada;
   base: string;
   voltar: string;
+  /** L.2: para onde o "voltar" leva (as notas ou o relatório de onde a pessoa veio). */
+  voltarRotulo?: string;
   feito?: string;
   contexto?: string;
   /** Lança/edita/cancela NESTA loja. */
@@ -78,7 +81,7 @@ export function TelaDetalheNota({
   return (
     <div className="space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: n.rotulo }]} />
-      <Voltar href={voltar}>Voltar para as notas</Voltar>
+      <Voltar href={voltar}>Voltar para {voltarRotulo}</Voltar>
       <PageHeader
         icone="compras"
         cor={COR.compras}

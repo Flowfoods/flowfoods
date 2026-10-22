@@ -37,6 +37,7 @@ export default async function ParceiroInsumoPage({
       acaoConfirmar={acaoConfirmarConservacao.bind(null, ctx.parceiro.slug, insumo.id)}
       acaoSituacao={acaoSituacaoInsumo.bind(null, ctx.parceiro.slug, insumo.id)}
       linkDaNota={(notaId) => `/rodolfo/erp/${ctx.parceiro.slug}/compras/${notaId}`}
+      historicoHref={`/rodolfo/erp/${ctx.parceiro.slug}/compras/relatorios/insumo?insumo=${insumo.id}`}
       estoque={{ saldos, base: `/rodolfo/erp/${ctx.parceiro.slug}/estoque` }}
     />
   );

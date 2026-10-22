@@ -1,0 +1,79 @@
+/**
+ * Relatórios de compras (L.2) — o miolo das páginas, igual nas duas árvores (`/erp` e `/rodolfo/erp/<slug>`): a página resolve a
+ * sessão e a permissão (`compras.ver`) e entrega o contexto; aqui se lê o recorte da URL, aplica a loja do topo (só quando a
+ * pessoa não marcou nenhuma), busca no banco e escolhe entre a tela e a versão para imprimir.
+ */
+
+import { visaoDaRequisicao } from '@/lib/erp/contexto';
+import type { Alcance } from '@/lib/erp/permissoes';
+import type { ClienteDoParceiro } from '@/lib/erp/tenant';
+import { relatorioCompleto, relatorioDaTela } from '@/lib/erp/compras-relatorio';
+import { lerFiltrosDoRelatorio, somarDias, TETO_DA_IMPRESSAO } from '@/lib/erp/compras-relatorio-campos';
+import { hojeNoRio } from '@/lib/erp/compra-campos';
+import { Vazio, Painel } from '../../ui/superficies';
+import { TelaDeImpressao, TelaDoRelatorio, type Modo } from './relatorio-tela';
+
+type Params = Record<string, string | string[] | undefined>;
+
+export async function PaginaDoRelatorio({
+  ctx,
+  modo,
+  caminho,
+  comprasBase,
+  insumosBase,
+  searchParams,
+}: {
+  ctx: { parceiro: { id: string; nome: string }; alcance: Alcance; cliente: ClienteDoParceiro };
+  modo: Modo;
+  caminho: string;
+  comprasBase: string;
+  insumosBase?: string;
+  searchParams: Params;
+}) {
+  const { visao } = await visaoDaRequisicao(ctx);
+  const hoje = hojeNoRio();
+  // O histórico de um insumo olha mais longe que o mês: sem datas na URL, os últimos 90 dias. O período é sempre dito na tela.
+  let f = lerFiltrosDoRelatorio(searchParams, hoje, modo === 'insumo' ? { de: somarDias(hoje, -89) } : {});
+  // A loja escolhida no topo decide o recorte só quando a pessoa não marcou nenhuma: a visão filtra, nunca concede.
+  let visaoDaLoja: string | null = null;
+  if (f.lojaIds.length === 0 && visao.tipo === 'loja') {
+    f = { ...f, lojaIds: [visao.lojaId] };
+    visaoDaLoja = visao.nome;
+  }
+  if (searchParams.imprimir === '1') {
+    if (modo === 'insumo' && !f.insumoId) {
+      return (
+        <Painel semRespiro>
+          <Vazio titulo="Escolha um insumo antes de imprimir.">Volte ao histórico, escolha o insumo e depois use “Imprimir ou salvar em PDF”.</Vazio>
+        </Painel>
+      );
+    }
+    const d = await relatorioCompleto(ctx.cliente, ctx.alcance, f, TETO_DA_IMPRESSAO);
+    if (!d.totais || !d.grupos || !d.linhas) {
+      return (
+        <Painel semRespiro>
+          <Vazio titulo="Nada para imprimir.">{f.periodoInvalido ?? 'Nenhuma loja do seu acesso entra neste relatório.'}</Vazio>
+        </Painel>
+      );
+    }
+    return (
+      <TelaDeImpressao
+        modo={modo}
+        caminho={caminho}
+        contexto={ctx.parceiro.nome}
+        f={f}
+        dados={{ lojasUsadas: d.lojasUsadas, totais: d.totais, grupos: d.grupos, linhas: d.linhas, canceladas: d.canceladas, semEmissao: d.semEmissao }}
+        geradoEm={new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' })}
+      />
+    );
+  }
+  let r = await relatorioDaTela(ctx.cliente, ctx.alcance, f, modo);
+  // Procurou pelo nome e só um insumo com compra tem esse nome: é ele (a pessoa não precisa escolher de uma lista de um).
+  if (modo === 'insumo' && !f.insumoId && f.q && r.opcoes.insumos.length === 1) {
+    f = { ...f, insumoId: r.opcoes.insumos[0].id };
+    r = await relatorioDaTela(ctx.cliente, ctx.alcance, f, modo);
+  }
+  return (
+    <TelaDoRelatorio modo={modo} caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} insumosBase={insumosBase} visaoDaLoja={visaoDaLoja} />
+  );
+}

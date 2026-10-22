@@ -311,3 +311,49 @@ html:has(.ff-app[data-tema='escuro']) {
     scroll-behavior: auto !important;
   }
 }
+
+/*
+ * Impressão (L.2): "Imprimir ou salvar em PDF" dos relatórios de compras. Papel é claro, sem menu, sem barra do topo, sem filete,
+ * sem caixa de ajuda e sem botão; o conteúdo corre em UMA coluna e cada linha de tabela não parte no meio da folha. Vale para
+ * qualquer tema da tela (o papel não sai escuro).
+ */
+@media print {
+  .ff-app,
+  .ff-app[data-tema] {
+    --ff-fundo: 255 255 255;
+    --ff-lateral: 255 255 255;
+    --ff-painel: 255 255 255;
+    --ff-forte: 240 240 240;
+    --ff-campo: 255 255 255;
+    --ff-texto: 0 0 0;
+    --ff-suave: 60 60 60;
+    --ff-linha: rgb(0 0 0 / 0.25);
+    --ff-linha-forte: rgb(0 0 0 / 0.45);
+    color-scheme: light;
+    background: #fff;
+    color: #000;
+  }
+  .ff-app aside,
+  .ff-app header.sticky,
+  .ff-app .fixed,
+  .ff-app [role='dialog'],
+  .ff-app .ff-nao-imprime {
+    display: none !important;
+  }
+  .ff-app .min-h-dvh {
+    display: block !important;
+  }
+  .ff-app main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+  .ff-app table {
+    font-size: 10px;
+  }
+  .ff-app thead {
+    display: table-header-group;
+  }
+  .ff-app tr {
+    break-inside: avoid;
+  }
+}

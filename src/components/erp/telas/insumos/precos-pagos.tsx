@@ -12,7 +12,16 @@ import { formatarData } from '@/lib/erp/compra-campos';
 import { formatarCusto, formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
 import { Painel, Selo } from '../../ui/superficies';
 
-export function PrecosPagos({ insumo: i, linkDaNota }: { insumo: InsumoDetalhado; linkDaNota?: (notaId: string, lojaId: string) => string | null }) {
+export function PrecosPagos({
+  insumo: i,
+  linkDaNota,
+  historicoHref,
+}: {
+  insumo: InsumoDetalhado;
+  linkDaNota?: (notaId: string, lojaId: string) => string | null;
+  /** L.2: o histórico completo deste insumo (período, lojas, preço médio, planilha); só para quem vê compras. */
+  historicoHref?: string;
+}) {
   if (i.compras.length === 0) {
     return (
       <Painel titulo="Preço pago">
@@ -26,7 +35,18 @@ export function PrecosPagos({ insumo: i, linkDaNota }: { insumo: InsumoDetalhado
   }
   const varios = i.precoPorFornecedor.length > 1;
   return (
-    <Painel titulo="Preço pago" subtitulo="Últimas compras, com o frete rateado" semRespiro>
+    <Painel
+      titulo="Preço pago"
+      subtitulo="Últimas compras, com o frete rateado"
+      semRespiro
+      acessorio={
+        historicoHref ? (
+          <Link href={historicoHref} className="ff-transicao inline-flex min-h-11 items-center rounded-[5px] text-[13px] font-medium text-texto underline decoration-linha-forte underline-offset-4 hover:decoration-texto sm:min-h-9">
+            Ver o histórico de compras
+          </Link>
+        ) : undefined
+      }
+    >
       {varios && (
         <div className="border-b border-linha px-4 py-3 sm:px-5">
           <h3 className="text-[12px] font-semibold text-suave">Último preço de cada fornecedor</h3>

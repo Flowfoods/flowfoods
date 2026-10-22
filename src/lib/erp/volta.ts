@@ -13,9 +13,9 @@ export const PARAMETRO_INSUMO_CRIADO = 'insumoCriado';
 /** F.1a: o mesmo para o fornecedor que a nota pediu para cadastrar ("Fornecedor novo: cadastrar"). */
 export const PARAMETRO_FORNECEDOR_CRIADO = 'fornecedorCriado';
 
-/** `prefixo`: onde a volta tem de estar ("/erp/" ou "/rodolfo/erp/<slug>/"). Devolve o caminho limpo (com a busca) ou null. */
-export function caminhoDeVolta(valor: unknown, prefixo: string): string | null {
-  if (typeof valor !== 'string' || valor.length === 0 || valor.length > 300) return null;
+/** `maximo`: o tamanho do endereço (300; o relatório de compras com muitas lojas marcadas pede mais). `prefixo`: onde a volta tem de estar ("/erp/" ou "/rodolfo/erp/<slug>/"). Devolve o caminho limpo (com a busca) ou null. */
+export function caminhoDeVolta(valor: unknown, prefixo: string, maximo = 300): string | null {
+  if (typeof valor !== 'string' || valor.length === 0 || valor.length > maximo) return null;
   if (!prefixo.startsWith('/') || prefixo.startsWith('//') || !prefixo.endsWith('/')) return null;
   if (!valor.startsWith(prefixo)) return null;
   // Barra invertida, controle, espaço e invisíveis: o navegador os trata como outra coisa.
@@ -54,6 +54,7 @@ export function voltaComFornecedor(caminho: string, fornecedorId: string): strin
 
 /** Para o botão e o texto: de onde a pessoa veio. */
 export function rotuloDaVolta(caminho: string): string {
+  if (/\/compras\/relatorios\//.test(caminho)) return 'o relatório de compras';
   if (/\/compras\/recebidas\//.test(caminho)) return 'a conferência da nota fiscal';
   if (/\/compras\//.test(caminho)) return 'a nota de compra';
   if (/\/fichas\/[^/]+\/canais/.test(caminho)) return 'as embalagens da ficha';

@@ -325,7 +325,8 @@ export async function linhasDoRecorte(tx: ClienteDoParceiro, r: Recorte, pagina:
     lojaId: l.lojaId,
     loja: l.loja,
     fornecedorId: l.fornecedorId,
-    fornecedor: l.fornecedorNome ?? l.fornecedorNomeSnapshot ?? 'Sem fornecedor',
+    // O nome como a nota guardou (histórico); o cadastro de hoje só entra se a nota não guardou.
+    fornecedor: l.fornecedorNomeSnapshot ?? l.fornecedorNome ?? 'Sem fornecedor',
     numero: l.numero,
     serie: l.serie,
     rotuloDaNota: numeroDaNota(l),

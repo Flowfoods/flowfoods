@@ -11,22 +11,36 @@ import { ChevronDown } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { classeDeBotao } from '../../ui/estilos';
 
-export function FiltrosRecolhiveis({ ativos, children }: { ativos: number; children: ReactNode }) {
-  const [aberto, setAberto] = useState(false);
+export function FiltrosRecolhiveis({
+  ativos,
+  children,
+  id = 'insumos-filtros',
+  grade = 'grid-cols-2 lg:grid-cols-3 xl:grid-cols-5',
+  abertoNoInicio = false,
+}: {
+  ativos: number;
+  children: ReactNode;
+  /** L.2: os relatórios reaproveitam o bloco (outro id e outra grade); o padrão é o da lista de insumos. */
+  id?: string;
+  grade?: string;
+  /** L.2: a tela que ainda não tem o que mostrar (nenhum insumo escolhido) nasce com os filtros abertos no celular. */
+  abertoNoInicio?: boolean;
+}) {
+  const [aberto, setAberto] = useState(abertoNoInicio);
   return (
     <div>
       <button
         type="button"
         onClick={() => setAberto((a) => !a)}
         aria-expanded={aberto}
-        aria-controls="insumos-filtros"
+        aria-controls={id}
         className={classeDeBotao('secundario', 'w-full justify-between sm:hidden')}
       >
         <span>{ativos > 0 ? `Filtros (${ativos})` : 'Filtros'}</span>
         <ChevronDown size={16} aria-hidden className={aberto ? 'rotate-180' : ''} />
       </button>
       {/* Fechado só no celular: de 640 px para cima o `sm:grid` mostra sempre. */}
-      <div id="insumos-filtros" className={`${aberto ? 'grid' : 'hidden'} mt-2 grid-cols-2 gap-2 sm:mt-0 sm:grid lg:grid-cols-3 xl:grid-cols-5`}>
+      <div id={id} className={`${aberto ? 'grid' : 'hidden'} mt-2 ${grade} gap-2 sm:mt-0 sm:grid`}>
         {children}
       </div>
     </div>
