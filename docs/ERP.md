@@ -2465,6 +2465,14 @@ tocados: 0 P0, 0 P1 e 5 P2 (metadado com ponto médio, padrão já usado nas out
 - **A I.2 recebe**: `CategoriaNaLoja` (meta e ativação por loja, herdando da rede), painéis de CMV por categoria e a vigência. `CategoriaInsumo`
   já tem `criadaEm`/`desativadaEm`; a classificação passada do insumo está no histórico (`categoria`/`categoriaId`). Ao somar CMV por categoria,
   use a categoria vigente do insumo e NÃO reescreva fotografia de período fechado; "excluir categoria" passa a conferir também as metas.
+- **Script de semear** (`erp:semear-categorias`): sem argumento só semeia casa sem categoria nenhuma; devolver a padrão que a casa excluiu é
+  ato explícito, `--completar` (teste em `tests/erp-semear-script.db.test.ts`).
+- **Baixa — categoria forjada em casa que nunca abriu tela**: a action de criar categoria chamada direto numa casa sem nenhuma deixa só ela e
+  "Outros"; as outras nove voltam pelo script com `--completar`.
+- **Baixa — nome antigo com invisível**: um insumo já gravado com caractere invisível no nome ainda deixa cadastrar o mesmo nome limpo, porque
+  o SQL compara `normalize(nome, NFC)` mas não tira invisíveis. Só vale para o que já existia; o que entra daqui em diante sai limpo.
+- **Para a I.1b (UX)**: conferir a conservação lembrada no "Cadastrar outro insumo" com Refrigerado; "Aceitar a sugestão dos marcados" dizer
+  quantos "sem certeza" ficaram de fora; "Ver todos os insumos" com forma de botão; print da lista a 390 px com o filtro de categoria.
 - **Categoria única da rede** é desvio do "configuração por loja" do plano (decisão 243): fica para o Rodolfo confirmar.
 - **Insumo sem categoria existe** (nulo no banco): toda leitura nova trata nulo como "sem categoria", nunca como erro.
 - **Cadastro por outro caminho** (importação de insumos, integração) precisa mandar `categoriaId` (ou `entrada.categoriaId` ausente só edita
