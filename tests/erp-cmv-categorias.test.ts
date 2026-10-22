@@ -52,23 +52,22 @@ const COMPRAS_DA_ANALISE: [string, number][] = [
   ['OUTROS', 300],
 ];
 
-function loja(p: Partial<LojaNoPainel> & { compras?: [string | null, number][] } = {}): LojaNoPainel {
+function loja(p: Omit<Partial<LojaNoPainel>, 'compras'> & { compras?: [string | null, number][] } = {}): LojaNoPainel {
   const compras = new Map<string | null, number>((p.compras ?? COMPRAS_DA_ANALISE.map(([c, v]) => [id(c), v] as [string | null, number])).map(([c, v]) => [c, R(v)]));
   return {
     lojaId: 'vp',
     nome: 'Vila da Penha',
     receitaBrutaCentavos: R(100_000),
-    compras,
     naoUsa: new Set(),
     metas: modelo(),
     metaVemDe: 'rede',
     ...p,
     // `compras` do parâmetro vira Map acima; o resto do Partial prevalece.
-    ...(p.compras ? { compras } : {}),
+    compras,
   };
 }
 
-function entrada(p: Partial<EntradaDoPainel> & { lojas?: LojaNoPainel[] } = {}): EntradaDoPainel {
+function entrada(p: Partial<EntradaDoPainel> = {}): EntradaDoPainel {
   const lojas = p.lojas ?? [loja()];
   const total = lojas.reduce((s, l) => s + Array.from(l.compras.values()).reduce((a, b) => a + b, 0), 0);
   return {

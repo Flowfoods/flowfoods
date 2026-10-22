@@ -177,7 +177,7 @@ describe.skipIf(!URL_TESTE)('ERP I.2a · telas do CMV por categoria e das metas 
   it('o gerente da Vila da Penha recebe só a loja dele, também por `?rede=1` e `?loja=<Unidade Tijuca>`: nada da outra loja no HTML', async () => {
     como(alcanceDe('GERENTE', [ids.vp]), { tipo: 'loja', lojaId: ids.vp });
     atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }];
-    for (const query of [{ periodo: '2026-10-10' }, { periodo: '2026-10-10', rede: '1' }, { periodo: '2026-10-10', loja: ids.dl }, { periodo: '2026-09-10', rede: '1' }]) {
+    for (const query of [{ periodo: '2026-10-10' }, { periodo: '2026-10-10', rede: '1' }, { periodo: '2026-10-10', loja: ids.dl }, { periodo: '2026-09-10', rede: '1' }] as Record<string, string>[]) {
       const h = await painel(query);
       expect(h, JSON.stringify(query)).toContain('Vila da Penha');
       expect(h).toContain('R$ 12.000,00'.replace('12.000', query.periodo === '2026-09-10' ? '8.000' : '12.000'));
