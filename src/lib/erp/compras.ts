@@ -26,6 +26,7 @@ import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
 import { checkVioladoDe, ehDeadlock, ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
+import { idsDeFornecedorPelaBusca } from './busca';
 import { filtroDeLojas, pode, recusa, type Alcance } from './permissoes';
 import {
   A_GRANEL,
@@ -334,13 +335,14 @@ export async function listarFornecedores(
   const situacao = filtros.situacao ?? 'ativos';
   const cadastro = filtros.cadastro ?? 'todos';
   return cliente.transacao(async (tx) => {
+    // L.3: nome e razão social sem ligar para caixa nem acento (`busca.ts`); o documento segue por trecho dos dígitos.
+    const idsDaBusca = q ? await idsDeFornecedorPelaBusca(tx, q) : null;
     const lidos = await tx.fornecedor.findMany({
       where: {
         ...(q
           ? {
               OR: [
-                { nome: { contains: q, mode: 'insensitive' as const } },
-                { razaoSocial: { contains: q, mode: 'insensitive' as const } },
+                ...(idsDaBusca ? [{ id: { in: idsDaBusca } }] : [{ nome: { contains: q, mode: 'insensitive' as const } }, { razaoSocial: { contains: q, mode: 'insensitive' as const } }]),
                 { documento: { contains: q.replace(/\D/g, '') || q } },
               ],
             }
