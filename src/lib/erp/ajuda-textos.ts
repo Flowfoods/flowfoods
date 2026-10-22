@@ -1087,7 +1087,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/cmv-categorias'],
     titulo: 'CMV por categoria',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'Esta tela mostra para onde foi o custo, categoria por categoria, para quem acompanha o resultado.' },
       { texto: 'É o CMV do DRE aberto em categorias: quanto foi para Proteína, Hortifruti, Bebidas e as outras, e quanto isso pesa na receita bruta.', para: ['dre.ver'] },
@@ -1134,6 +1134,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Falta faturamento, falta o CMV de alguma loja, ou Outros mais Sem categoria passam de 2% do CMV: a meta ainda não é confiável, então o desvio fica em texto e o motivo vem escrito. O 2% é uma hipótese a validar com a casa.', para: ['dre.ver'] },
           { texto: 'Outros / a classificar e Sem categoria são fila de classificação: não têm farol. Classificar os insumos devolve as cores.', para: ['dre.ver'] },
+          { texto: 'Se o painel não fecha com o CMV do DRE e nenhuma loja explica a diferença, aparece a linha “Diferença que o painel não explica” e as categorias ficam sem cor: o dado não fecha.', para: ['dre.ver'] },
           { texto: 'A cor usa pontos da receita, a régua do DRE. Embaixo do desvio, o percentual da própria meta ajuda a ler a categoria pequena (0,20 pp em Limpeza pode ser 40% da meta), mas nunca muda a cor nem a ordem.', para: ['dre.ver'] },
         ],
       },

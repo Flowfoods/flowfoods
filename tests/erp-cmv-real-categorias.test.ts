@@ -146,6 +146,36 @@ describe('I.2b · o real por categoria no painel', () => {
   });
 });
 
+describe('I.2b · o painel que não fecha com o DRE não tem cor (veto do Guardião)', () => {
+  it('diferença que nenhuma loja explica (em curso, ou encerrado sem loja pelas compras): "Diferença que o painel não explica" e NENHUMA categoria com cor', () => {
+    const compras = new Map<string | null, number>([[id('PROTEINA'), R(400)], [CHAVE_DOS_PREPARADOS, R(200)]]);
+    // O DRE diz R$ 700,00 e o painel só acha R$ 600,00: R$ 100,00 não explicados.
+    const p = montarPainelDeCategorias(entrada([lojaVp({ real: null, compras, cmvCentavos: R(700) })], { encerrado: false }));
+    expect(p.linhas.find((l) => l.tipo === 'variacao')).toMatchObject({ nome: 'Diferença que o painel não explica', realizadoCentavos: R(100) });
+    expect(sp(p.semCor)).toContain('o painel não fecha com o CMV do DRE (diferença de R$ 100,00');
+    expect(p.linhas.filter((l) => l.farol?.tipo === 'cor')).toEqual([]);
+    expect(p.maioresDesvios).toEqual([]);
+    // Encerrado sem nenhuma loja que explique (nenhuma ficou pelas compras com motivo): também não fecha.
+    expect(montarPainelDeCategorias(entrada([lojaVp({ real: null, compras, cmvCentavos: R(700) })], { encerrado: true })).semCor).not.toBeNull();
+    // Encerrado COM a loja que ficou pelas compras e diz por quê: é variação do estoque, e as cores valem.
+    const explicada = montarPainelDeCategorias(entrada([lojaVp({ real: null, compras, cmvCentavos: R(700), motivoSemRealPorCategoria: 'sem retrato' })], { encerrado: true }));
+    expect(explicada.semCor).toBeNull();
+    expect(explicada.linhas.some((l) => l.farol?.tipo === 'cor')).toBe(true);
+  });
+
+  it('matriz: a linha de variação aparece quando alguma loja tem variação, mesmo que a da rede some zero, e cada coluna fecha no CMV da loja', () => {
+    const a: LojaNoPainel = lojaVp({ lojaId: 'a', nome: 'A', real: null, compras: new Map([[id('PROTEINA'), R(1_000)]]), cmvCentavos: R(1_100), motivoSemRealPorCategoria: 'sem retrato' });
+    const b: LojaNoPainel = lojaVp({ lojaId: 'b', nome: 'B', real: null, compras: new Map([[id('PROTEINA'), R(1_000)]]), cmvCentavos: R(900), motivoSemRealPorCategoria: 'sem retrato' });
+    const p = montarPainelDeCategorias(entrada([a, b]));
+    expect(p.variacaoCentavos).toBe(0); // +100 e −100: a rede não tem variação
+    expect(p.linhas.find((l) => l.tipo === 'variacao')).toBeUndefined();
+    const m = p.matriz!;
+    const v = m.linhas.find((l) => l.tipo === 'variacao')!;
+    expect(v.celulas.map((c) => c?.centavos)).toEqual([R(100), -R(100)]);
+    m.lojas.forEach((l, i) => expect(m.linhas.reduce((s, x) => s + (x.celulas[i]?.centavos ?? 0), 0)).toBe(l.cmvCentavos));
+  });
+});
+
 describe('I.2b · desvio relativo (percentual da própria meta)', () => {
   it('Limpeza em 0,70 % contra 0,50 %: +0,20 pp é "na meta" pela régua em pontos, e +40,0% da meta pelo relativo — só leitura, a cor não muda', () => {
     const compras = new Map<string | null, number>([[id('LIMPEZA'), R(700)]]);

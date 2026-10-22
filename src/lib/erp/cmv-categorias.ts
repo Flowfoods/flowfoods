@@ -66,8 +66,11 @@ export async function comprasPorLojaECategoria(tx: ClienteDoParceiro, ids: reado
     GROUP BY n."lojaId", i."categoriaId", coalesce(i."tipo" = 'PRE_PREPARO', false)`;
   for (const l of linhas) {
     if (!out.has(l.lojaId)) out.set(l.lojaId, new Map());
-    // Insumo pré-preparo vai à linha própria (I.2b), qualquer que seja a categoria dele.
-    out.get(l.lojaId)!.set(l.preparo ? CHAVE_DOS_PREPARADOS : l.categoriaId, Number(l.centavos));
+    // Insumo pré-preparo vai à linha própria (I.2b), qualquer que seja a categoria dele. O SQL agrupa também pela categoria, então
+    // dois pré-preparos de categorias diferentes chegam em duas linhas com a MESMA chave: SOMA, nunca substitui.
+    const chave = l.preparo ? CHAVE_DOS_PREPARADOS : l.categoriaId;
+    const mapa = out.get(l.lojaId)!;
+    mapa.set(chave, (mapa.get(chave) ?? 0) + Number(l.centavos));
   }
   return out;
 }
@@ -229,7 +232,7 @@ export async function cmvPorCategoriaNaTx(tx: ClienteDoParceiro, alcance: Alcanc
   const categorias = await categoriasDoPainel(tx);
   const lojas = await lerAsLojas(tx, d.lojasDoEscopo.map((l) => ({ id: l.id, nome: nomeDe(l.id) })), d.periodo, d.ate, receitaDe, d.cmvDasLojas);
   const outros = categorias.find((c) => c.chave === CHAVE_DO_SISTEMA)?.id ?? null;
-  const aClassificar = d.ate ? await insumosAClassificar(tx, d.lojasDoEscopo.map((l) => l.id), d.periodo.inicio, d.ate, outros) : 0;
+  const aClassificar = d.ate ? await insumosAClassificar(tx, d.lojasDoEscopo.map((l) => l.id), d.periodo.inicio, d.ate, outros) : null; // sem dia apurado nada foi lido (nulo, como no fechado)
   return montar(categorias, lojas, aClassificar);
 }
 

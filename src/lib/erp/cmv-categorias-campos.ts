@@ -381,12 +381,14 @@ export const pontosComSinalDaDiferenca = (bp: number) => (bp === 0 ? '0,00 pp' :
  * "sem contar …") mais a da I.2 (decisão 278): Outros e Sem categoria somados acima de 2,0 % do CMV do escopo. A meta só é
  * confiável depois da classificação: com a fila grande, a cor de cada categoria seria uma afirmação sobre dado que não fecha.
  */
-export function motivoQueTiraACor(e: { faixas: FaixasDoFarol | null; motivoGeral: string | null; notaDoCmv: string | null; semContarDoCmv: readonly string[]; aClassificarCentavos: number; totalCentavos: number | null }): string | null {
+export function motivoQueTiraACor(e: { faixas: FaixasDoFarol | null; motivoGeral: string | null; notaDoCmv: string | null; semContarDoCmv: readonly string[]; aClassificarCentavos: number; totalCentavos: number | null; naoExplicadoCentavos?: number }): string | null {
   if (e.faixas === null) return 'as faixas do farol deste fechamento são de uma versão que este sistema não conhece';
   if (e.motivoGeral) return e.motivoGeral;
   const incompleto = /sem o CMV de ([^;]+)/.exec(e.notaDoCmv ?? '');
   if (incompleto) return `sem o CMV de ${incompleto[1].trim()}`;
   if (e.semContarDoCmv.length > 0) return `sem contar ${e.semContarDoCmv.join(' e ')}`;
+  // O painel não fecha com o DRE e nada explica a diferença: o dado não fecha, então nenhuma categoria tem cor.
+  if (e.naoExplicadoCentavos) return `o painel não fecha com o CMV do DRE (diferença de ${formatarDinheiro(Math.abs(e.naoExplicadoCentavos))} que nenhuma loja explica)`;
   if (e.totalCentavos !== null && e.totalCentavos > 0 && e.aClassificarCentavos * 10_000 > LIMIAR_A_CLASSIFICAR_BP * e.totalCentavos) {
     const bp = dividirExato(BigInt(e.aClassificarCentavos) * 10_000n, BigInt(e.totalCentavos));
     return `${formatarDinheiro(e.aClassificarCentavos)} ainda a classificar (${percentualComDuasCasas(bp)} do CMV)`;
@@ -438,7 +440,12 @@ export function montarPainelDeCategorias(e: EntradaDoPainel): PainelDeCategorias
   const semCategoria = somaDe(null);
   const aClassificarCentavos = semCategoria + (sistema ? somaDe(sistema.id) : 0);
   const aClassificarBp = e.totalCentavos !== null && e.totalCentavos > 0 ? dividirExato(BigInt(aClassificarCentavos) * 10_000n, BigInt(e.totalCentavos)) : null;
-  const semCor = motivoQueTiraACor({ faixas: e.faixas, motivoGeral: e.motivoGeral, notaDoCmv: e.notaDoCmv, semContarDoCmv: e.semContarDoCmv, aClassificarCentavos, totalCentavos: e.totalCentavos });
+  // A soma de tudo o que o painel mostra (categorias, sem categoria e pré-preparos) contra o CMV do DRE: a diferença só é "variação do
+  // estoque" quando uma loja com o real no DRE ficou pelas compras (e diz qual); qualquer outra diferença é dado que não fecha.
+  const somaDoPainel = e.categorias.reduce((s, c) => s + somaDe(c.id), 0) + semCategoria + e.lojas.reduce((s, l) => s + valorDosPreparos(l), 0);
+  const diferenca = e.totalCentavos === null ? 0 : e.totalCentavos - somaDoPainel;
+  const explicada = e.encerrado && e.lojas.some((l) => l.motivoSemRealPorCategoria);
+  const semCor = motivoQueTiraACor({ faixas: e.faixas, motivoGeral: e.motivoGeral, notaDoCmv: e.notaDoCmv, semContarDoCmv: e.semContarDoCmv, aClassificarCentavos, totalCentavos: e.totalCentavos, naoExplicadoCentavos: diferenca !== 0 && !explicada ? diferenca : 0 });
   const receita = e.receitaBrutaCentavos;
   const bpDe = (centavos: number) => percentualDaReceita(centavos, receita);
   // De onde vem o valor de uma linha: as lojas que têm valor nela dizem se é real, compras ou as duas.
@@ -648,18 +655,21 @@ function montarMatriz(e: EntradaDoPainel, linhas: readonly LinhaDoPainel[]): Mat
     if (l.tipo === 'categoria') linhasDaMatriz.push(por((x) => valorDaCategoria(x, l.categoriaId), (x) => x.metas?.get(l.categoriaId!) ?? null, (x) => x.naoUsa.has(l.categoriaId!)));
     else if (l.tipo === 'sem-categoria') linhasDaMatriz.push(por((x) => valorDaCategoria(x, null), () => null, () => false));
     else if (l.tipo === 'preparos') linhasDaMatriz.push(por(valorDosPreparos, () => null, () => false));
-    else if (l.tipo === 'variacao') {
-      linhasDaMatriz.push(
-        por(
-          (x) => {
-            if (x.cmvCentavos == null) return 0;
-            return x.cmvCentavos - (e.categorias.reduce((s, c) => s + valorDaCategoria(x, c.id), 0) + valorDaCategoria(x, null) + valorDosPreparos(x));
-          },
-          () => null,
-          () => false,
-        ),
-      );
-    }
+    // A variação do estoque entra mais abaixo, por loja: a coluna de cada loja fecha no CMV dela mesmo quando a rede, somada, não tem variação.
+  }
+  const semVariacao = (x: LojaNoPainel) => e.categorias.reduce((acc, c) => acc + valorDaCategoria(x, c.id), 0) + valorDaCategoria(x, null) + valorDosPreparos(x);
+  const variacaoDaLoja = lojas.map((x) => (x.cmvCentavos == null ? 0 : x.cmvCentavos - semVariacao(x)));
+  if (variacaoDaLoja.some((v) => v !== 0)) {
+    const soma = variacaoDaLoja.reduce((acc, v) => acc + v, 0);
+    const linhaDaVariacao: LinhaDaMatriz = {
+      chave: 'variacao',
+      tipo: 'variacao',
+      nome: e.encerrado ? NOME_DA_VARIACAO : 'Diferença que o painel não explica',
+      celulas: lojas.map((x, i) => celula(x, variacaoDaLoja[i], null, false)),
+      rede: { centavos: soma, bp: percentualDaReceita(soma, e.receitaBrutaCentavos), metaBp: null, desvioBp: null, naoUsa: false },
+    };
+    const iPreparos = linhasDaMatriz.findIndex((x) => x.tipo === 'preparos');
+    linhasDaMatriz.splice(iPreparos === -1 ? linhasDaMatriz.length : iPreparos, 0, linhaDaVariacao);
   }
   return {
     lojas: lojas.map((x) => ({ lojaId: x.lojaId, nome: x.nome, receitaCentavos: x.receitaBrutaCentavos, cmvCentavos: x.cmvCentavos ?? null })),

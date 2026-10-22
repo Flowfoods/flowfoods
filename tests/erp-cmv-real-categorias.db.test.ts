@@ -24,8 +24,8 @@ import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { salvarCanaisDaLoja } from '@/lib/erp/faturamento';
 import { garantirCategoriasPadrao, listarCategorias } from '@/lib/erp/categorias';
-import { aplicarModelo32, realDoMontante } from '@/lib/erp/cmv-categorias-campos';
-import { cmvPorCategoria, evolucaoDeCategorias, type CmvPorCategoria } from '@/lib/erp/cmv-categorias';
+import { aplicarModelo32, CHAVE_DOS_PREPARADOS, realDoMontante } from '@/lib/erp/cmv-categorias-campos';
+import { cmvPorCategoria, comprasPorLojaECategoria, evolucaoDeCategorias, type CmvPorCategoria } from '@/lib/erp/cmv-categorias';
 import { realPorCategoria } from '@/lib/erp/cmv-categorias-real';
 import { dreDoPeriodo } from '@/lib/erp/dre';
 import { fecharPeriodo } from '@/lib/erp/dre-fechamento';
@@ -463,5 +463,74 @@ describe.skipIf(!URL_TESTE)('ERP I.2b · CMV real por categoria (Postgres real)'
     } finally {
       await contado.$disconnect();
     }
+  });
+
+  // ------------------------------------------------------------ 10. dois pré-preparos de categorias diferentes (veto do Guardião)
+  it('dois pré-preparos em categorias diferentes e um insumo sem categoria: o painel, a compra × real (contra a 2.3) e a fotografia fecham com o DRE', async () => {
+    const P = await db.parceiroFlow.create({ data: { nome: 'Casa Prep I2b', slug: `i2b-prep-${sufixo}`, status: 'ATIVO' } });
+    criados.push(P.id);
+    const b = doParceiro(P.id, db);
+    await garantirCategoriasPadrao(b);
+    const categorias = Object.fromEntries((await listarCategorias(b)).filter((c) => c.chave).map((c) => [c.chave!, c.id]));
+    const loja = await b.loja.create({ data: { parceiroId: P.id, nome: 'Loja Prep', slug: `lp-${sufixo}`, criadoEm: new Date('2026-01-10T12:00:00Z'), canaisDeVenda: ['LOJA'] } });
+    await faturamento(b, loja.id, 'LOJA', '2026-09-01', '2026-10-31', { '2026-09-10': 100_000, '2026-10-10': 100_000 });
+    const novo = async (chave: string, nome: string) => {
+      const r = await cadastrarInsumo(b, { tipo: 'INGREDIENTE', escala: 'base', nome, unidade: 'KG', conteudo: '1', preco: '10,00', conservacao: 'SECO', categoriaId: categorias[chave] });
+      if (!r.ok) throw new Error(JSON.stringify(r));
+      return r.id;
+    };
+    const reaisDaCasa = (x: CmvPorCategoria) => Object.fromEntries(x.painel!.linhas.map((l) => [l.categoriaId ? Object.entries(categorias).find(([, cid]) => cid === l.categoriaId)![0] : l.chave, l.realizadoCentavos]));
+    const prepA = await novo('MERCEARIA', 'Molho A');
+    const prepB = await novo('LATICINIOS', 'Creme B');
+    const avulso = await novo('OUTROS', 'Avulso P');
+    const frango = await novo('PROTEINA', 'Frango P');
+    for (const id of [prepA, prepB]) await b.insumo.update({ where: { id }, data: { tipo: 'PRE_PREPARO' } });
+    await b.insumo.update({ where: { id: avulso }, data: { categoriaId: null, classificadoPor: null, classificacaoMotivo: null, classificacaoLote: null, classificadoEm: null } });
+    const n = (insumoId: string, numero: string, data: string, reais: number, movimenta: boolean) => nota(b, insumoId, { lojaId: loja.id, numero, data, centavos: R(reais), lancadaEm: BRT(data, '12:00'), movimenta });
+    const set = await periodoRegistrado(b, SETEMBRO);
+    await aberturaComItens(b, loja.id, BRT('2026-09-01', '09:00'), [{ insumoId: prepA, centavos: R(100) }, { insumoId: prepB, centavos: R(100) }]);
+    await n(prepA, 'PA', '2026-09-05', 200, true);
+    await n(prepB, 'PB', '2026-09-06', 300, true);
+    await n(frango, 'PF', '2026-09-07', 400, true);
+    await n(avulso, 'PV', '2026-09-08', 100, true);
+    await fechamentoComRetrato(b, loja.id, set, { fim: '2026-09-30', quando: BRT('2026-09-30', '18:00'), itens: [{ insumoId: prepA, centavos: R(150) }, { insumoId: prepB, centavos: R(250) }, { insumoId: frango, centavos: R(300) }, { insumoId: avulso, centavos: R(100) }] });
+    // Outubro (em curso): as mesmas quatro compras, sem movimento no livro.
+    await n(prepA, 'OA', '2026-10-05', 200, false);
+    await n(prepB, 'OB', '2026-10-06', 300, false);
+    await n(frango, 'OF', '2026-10-07', 400, false);
+    await n(avulso, 'OV', '2026-10-08', 10, false);
+
+    // ---- em curso: o painel é o DRE (R$ 910,00); o pré-preparo soma os DOIS (R$ 500,00), sem "diferença que o painel não explica" e com as cores
+    const vivo = (await painel(DONA(), { tipo: 'loja', lojaId: loja.id }, OUTUBRO, b))!;
+    expect(vivo.total.linha.valorCentavos).toBe(R(910));
+    expect(reaisDaCasa(vivo)).toMatchObject({ preparos: R(500), PROTEINA: R(400), 'sem-categoria': R(10) });
+    expect(vivo.painel!.linhas.find((l) => l.tipo === 'variacao')).toBeUndefined();
+    expect(vivo.painel!.linhas.reduce((s, l) => s + (l.realizadoCentavos ?? 0), 0)).toBe(R(910));
+    expect(vivo.painel!.semCor).toBeNull();
+    const compras = await comprasPorLojaECategoria(b, [loja.id], '2026-10-01', '2026-10-31');
+    expect(compras.get(loja.id)!.get(CHAVE_DOS_PREPARADOS)).toBe(R(500));
+
+    // ---- setembro (encerrado, real aberto): compra × real contra a 2.3 e o real por categoria somando o DRE
+    const r = (await painel(DONA(), { tipo: 'loja', lojaId: loja.id }, SETEMBRO, b))!;
+    expect(r.total.linha.valorCentavos).toBe(R(400)); // real: 200 + 1.000 − 800
+    expect(r.painel!.linhas.reduce((s, l) => s + (l.realizadoCentavos ?? 0), 0)).toBe(R(400));
+    expect(reaisDaCasa(r)).toMatchObject({ preparos: R(300), PROTEINA: R(100) });
+    const c = r.painel!.compraReal!;
+    const antigo = r.d.cmv.painel!.comparacoes[0];
+    expect(c.totalCompraCentavos).toBe(R(1_000));
+    expect(c.totalCompraCentavos).toBe(antigo.compraCentavos);
+    expect(c.linhas.find((l) => l.tipo === 'preparos')).toMatchObject({ compraCentavos: R(500), realCentavos: R(300), diferencaCentavos: -R(200) });
+    expect(c.totalDiferencaCentavos).toBe(antigo.diferencaCentavos);
+    expect(c.linhas.reduce((s, l) => s + (l.diferencaCentavos ?? 0), 0)).toBe(c.totalDiferencaCentavos);
+
+    // ---- a fotografia v5 guarda a compra de pré-preparo SOMADA e o fechado lê o mesmo painel
+    const fechou = await fecharPeriodo(b, N1(), { inicio: '2026-09-01', ressalvas: [], justificativa: '' }, 'Ana Dona', HOJE);
+    expect(fechou).toMatchObject({ ok: true });
+    const foto = (await b.dreFotografia.findFirst({ where: { periodoId: set, substituidaEm: null }, select: { entrada: true } }))!;
+    const gravado = (foto.entrada as { categorias: { lojas: Record<string, { preparosCompraCentavos: number }> } }).categorias.lojas[loja.id];
+    expect(gravado.preparosCompraCentavos).toBe(R(500));
+    const fechado = (await painel(DONA(), { tipo: 'loja', lojaId: loja.id }, SETEMBRO, b))!;
+    expect(JSON.stringify(fechado.painel!.linhas)).toBe(JSON.stringify(r.painel!.linhas));
+    expect(JSON.stringify(fechado.painel!.compraReal)).toBe(JSON.stringify(r.painel!.compraReal));
   });
 });
