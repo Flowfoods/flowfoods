@@ -19,6 +19,7 @@ import { hojeNoRio } from './compra-campos';
 import { comprasPorLoja } from './cmv';
 import { somarDias } from './contagem-campos';
 import { metasDoPeriodo } from './dre-metas';
+import { conjuntosVigentes, metaTotalDaLoja } from './metas-categorias';
 import { faturamentoDosGraos, lojasDoFaturamento } from './faturamento';
 import type { FarolDaLinha } from './farol-dre-campos';
 import {
@@ -55,6 +56,14 @@ export interface LojaQuePassou {
 /** O que quem vê a receita recebe de uma loja (ou da rede). */
 export interface VistaCompleta {
   veReceita: true;
+  /** A meta do CMV que vale nesta vista: da loja (a própria ou a da rede) ou, na rede, a média das lojas quando cada uma tem a sua. */
+  metaBp: number | null;
+  /** A meta contra a qual o ritmo foi medido. */
+  ritmoMetaBp: number | null;
+  /** Na rede: as lojas têm metas diferentes (I.2b). */
+  metaMista: boolean;
+  /** Nomes das lojas com meta própria diferente da rede (só a vista da rede). */
+  comMetaPropria: string[];
   conta: ContaDoOrcamento | null;
   motivo: string | null;
   previsao: PrevisaoDaLoja | null;
@@ -110,6 +119,10 @@ function vistaDaLoja(o: OrcamentoDaLoja, veReceita: boolean): VistaDoOrcamento {
   if (!veReceita) return { veReceita: false, saldoCentavos: saldoResumido(o), motivo: o.motivo, diasSemLancamento, semNota, quemPassou: [] };
   return {
     veReceita: true,
+    metaBp: o.metaBp,
+    ritmoMetaBp: o.metaBp,
+    metaMista: false,
+    comMetaPropria: [],
     conta: o.conta,
     motivo: o.motivo,
     previsao: o.previsao,
@@ -153,6 +166,7 @@ async function lerOrcamento(tx: ClienteDoParceiro, alcance: Alcance, hoje: strin
   const lojas = (await lojasDoFaturamento(tx, alcance)).filter((l) => l.ativa && (!opcoes.lojaId || l.id === opcoes.lojaId));
   if (lojas.length === 0) return { periodo, metaBp, porLoja: [] };
   const ids = lojas.map((l) => l.id);
+  const vigentes = await conjuntosVigentes(tx, ids, periodo.inicio);
   const ontem = somarDias(hoje, -1);
   const de = inicioDaLeitura(periodo, hoje);
   const graos = de <= ontem ? await faturamentoDosGraos(tx, alcance, { de, ate: ontem }) : [];
@@ -170,7 +184,8 @@ async function lerOrcamento(tx: ClienteDoParceiro, alcance: Alcance, hoje: strin
       compradoCentavos: doPeriodo.get(l.id) ?? 0,
       compradoAteOntemCentavos: ateOntem.get(l.id) ?? 0,
     };
-    return orcamentoDaLoja(entrada, periodo, hoje, metaBp);
+    // I.2b: a loja que personalizou a meta total do CMV tem a dela no orçamento; as outras, a da rede.
+    return orcamentoDaLoja(entrada, periodo, hoje, metaTotalDaLoja(vigentes, l.id, metaBp).bp);
   });
   return { periodo, metaBp, porLoja };
 }
@@ -188,7 +203,7 @@ export async function orcamentoDeCompra(cliente: ClienteDoParceiro, alcance: Alc
     const lojas = porLoja.filter((o) => veOrcamento(alcance, o.lojaId)).map((o) => ({ lojaId: o.lojaId, nome: o.nome, vista: vistaDaLoja(o, pode(alcance, 'dre.ver', { lojaId: o.lojaId })) }));
     let rede: VistaDoOrcamento | null = null;
     if (!opcoes.lojaId && alcance.lojas === 'todas') {
-      const e = orcamentoDoEscopo(porLoja, metaBp);
+      const e = orcamentoDoEscopo(porLoja);
       const veReceita = pode(alcance, 'dre.ver');
       const semNota = porLoja.filter((l) => l.semNota).map((l) => l.nome);
       const quemPassou = quemPassouNa(porLoja, veReceita);
@@ -197,6 +212,10 @@ export async function orcamentoDeCompra(cliente: ClienteDoParceiro, alcance: Alc
       rede = veReceita
         ? {
             veReceita: true,
+            metaBp: e.conta?.metaBp ?? (porLoja.find((l) => l.metaBp !== null)?.metaBp ?? null),
+            ritmoMetaBp: e.ritmoMetaBp,
+            metaMista: e.conta?.metaMista === true,
+            comMetaPropria: porLoja.filter((l) => l.metaBp !== null && l.metaBp !== metaBp).map((l) => l.nome),
             conta: e.conta,
             motivo: e.motivo,
             previsao: null,

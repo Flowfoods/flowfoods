@@ -4,6 +4,7 @@
  */
 
 import Link from 'next/link';
+import { percentualComDuasCasas } from '@/lib/erp/cmv-categorias-campos';
 import type { SituacaoDasMetasPorCategoria } from '@/lib/erp/metas-categorias';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
@@ -84,6 +85,11 @@ export function TelaDasMetasPorCategoria({
                   Não muda {lista(s.personalizadas.map((l) => l.nome))}, que {s.personalizadas.length === 1 ? 'tem' : 'têm'} metas próprias.
                 </p>
               )}
+              {s.comTotalProprio.length > 0 && (
+                <p className="text-suave">
+                  A meta total do CMV da rede vale para a rede. {lista(s.comTotalProprio.map((l) => `${l.nome} (${percentualComDuasCasas(l.bp)})`))} {s.comTotalProprio.length === 1 ? 'tem' : 'têm'} a própria, no DRE e no orçamento de compra {s.comTotalProprio.length === 1 ? 'dela' : 'delas'}.
+                </p>
+              )}
             </div>
           )}
           <div className={!loja && s.lojas.length > 0 ? '' : 'pt-4'}>
@@ -93,7 +99,7 @@ export function TelaDasMetasPorCategoria({
               alvo={loja ? 'loja' : 'rede'}
               categorias={s.categorias.map((c) => ({ id: c.id, chave: c.chave, nome: c.nome, ordem: c.ordem, ativa: c.ativa, sistema: c.sistema, usa: c.usa, campo: c.campo, campoDaRede: c.campoDaRede }))}
               totalCampo={s.totalCampo}
-              totalBp={s.totalBp}
+              totalDaRedeBp={s.totalDaRedeBp}
               segueInicial={s.segueARede}
               versao={s.versao}
               valeDesde={s.periodoAtual.inicio}
@@ -113,7 +119,7 @@ export function TelaDasMetasPorCategoria({
       )}
 
       <p className="text-[12px] leading-relaxed text-suave">
-        A meta é o percentual da receita bruta, a mesma base do DRE e do farol.{' '}
+        A meta é o percentual da receita bruta, a mesma base do DRE e do farol. Na rede, o percentual de cada categoria é sobre a receita das lojas que a usam.{' '}
         <Link href={`${raiz}/dre/cmv-categorias`} className={LINK_DE_TEXTO}>
           Ver o CMV por categoria
         </Link>

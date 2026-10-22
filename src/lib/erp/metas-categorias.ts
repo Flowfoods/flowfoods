@@ -50,6 +50,8 @@ export interface ConjuntoLido {
   vigenteDesde: string;
   segueARede: boolean;
   aplicouModelo: string | null;
+  /** I.2b: a meta total do CMV da loja que personaliza (nula = vale a da rede). Sempre nula no conjunto da rede (lá é a `DreMeta`). */
+  metaTotalBp: number | null;
   versao: number;
   atualizadoEm: Date;
   /** categoriaId → pontos-base. */
@@ -61,8 +63,8 @@ export interface ConjuntoLido {
  * lojas forem (o número não cresce com elas): os conjuntos, as metas deles.
  */
 export async function conjuntosVigentes(tx: ClienteDoParceiro, lojaIds: readonly string[], inicio: string): Promise<{ rede: ConjuntoLido | null; porLoja: Map<string, ConjuntoLido> }> {
-  const linhas = await tx.sql<{ id: string; lojaId: string | null; vigenteDesde: string; segueARede: boolean; aplicouModelo: string | null; versao: number; atualizadoEm: Date }>`
-    SELECT DISTINCT ON (c."lojaId") c."id", c."lojaId", to_char(c."vigenteDesde", 'YYYY-MM-DD') AS "vigenteDesde", c."segueARede", c."aplicouModelo", c."versao", c."atualizadoEm"
+  const linhas = await tx.sql<{ id: string; lojaId: string | null; vigenteDesde: string; segueARede: boolean; aplicouModelo: string | null; metaTotalBp: number | null; versao: number; atualizadoEm: Date }>`
+    SELECT DISTINCT ON (c."lojaId") c."id", c."lojaId", to_char(c."vigenteDesde", 'YYYY-MM-DD') AS "vigenteDesde", c."segueARede", c."aplicouModelo", c."metaTotalBp", c."versao", c."atualizadoEm"
     FROM "MetaCmvConjunto" c
     WHERE c."parceiroId" = ${tx.parceiroId} AND c."vigenteDesde" <= ${inicio}::date AND (c."lojaId" IS NULL OR c."lojaId" = ANY(${[...lojaIds]}::text[]))
     ORDER BY c."lojaId", c."vigenteDesde" DESC`;
@@ -97,6 +99,24 @@ export function metasDaLoja(v: { rede: ConjuntoLido | null; porLoja: ReadonlyMap
   return { origem: null, metas: null, conjunto: null };
 }
 
+export interface MetaTotalDaLoja {
+  /** Pontos-base da receita bruta; nulo = nenhuma meta total vale para a loja. */
+  bp: number | null;
+  /** De onde vem: a meta própria da loja (conjunto personalizado com total), a da rede (a `DreMeta` do CMV), ou nenhuma. */
+  origem: 'loja' | 'rede' | null;
+}
+
+/**
+ * A meta TOTAL do CMV que vale numa loja (I.2b, decisão 290): a da loja que personaliza e definiu o total dela; senão a da rede
+ * (`redeBp`, a `DreMeta` da linha CMV). É a que vale na linha CMV do DRE da loja, no orçamento de compra e no fechamento dela. A rede
+ * segue sempre a meta da rede.
+ */
+export function metaTotalDaLoja(v: { rede: ConjuntoLido | null; porLoja: ReadonlyMap<string, ConjuntoLido> }, lojaId: string, redeBp: number | null): MetaTotalDaLoja {
+  const m = metasDaLoja(v, lojaId);
+  if (m.origem === 'loja' && m.conjunto && m.conjunto.metaTotalBp !== null) return { bp: m.conjunto.metaTotalBp, origem: 'loja' };
+  return redeBp === null ? { bp: null, origem: null } : { bp: redeBp, origem: 'rede' };
+}
+
 /** As categorias que cada loja NÃO usa (padrão: todas as usam). Uma consulta. */
 export async function categoriasQueNaoUsa(tx: ClienteDoParceiro, lojaIds: readonly string[]): Promise<Map<string, Set<string>>> {
   const out = new Map<string, Set<string>>();
@@ -126,10 +146,15 @@ export interface SituacaoDasMetasPorCategoria {
   escopo: { tipo: 'rede' } | { tipo: 'loja'; lojaId: string; nome: string };
   lojas: { id: string; nome: string }[];
   categorias: CategoriaDoFormulario[];
-  /** A meta total (a do CMV do DRE) de agora; vazio = sem meta. */
+  /** A meta total de agora: na rede, a do CMV do DRE; na loja, a PRÓPRIA dela (vazio = vale a da rede, I.2b). Vazio = sem meta. */
   totalCampo: string;
+  /** O total que vale no escopo (na loja, o próprio ou o da rede), para o aviso de soma. */
   totalBp: number | null;
   totalDesde: string | null;
+  /** Visão da loja: a meta total da rede (o que vale quando a loja não define a dela). */
+  totalDaRedeBp: number | null;
+  /** Visão da rede: lojas com meta total própria diferente da rede (a rede segue a da rede; elas, a delas). */
+  comTotalProprio: { id: string; nome: string; bp: number }[];
   /** Visão da loja: ela segue a rede? */
   segueARede: boolean;
   /** Desde quando valem as metas que a tela mostra (o conjunto efetivo do escopo); nulo = nenhuma. */
@@ -146,7 +171,7 @@ export interface SituacaoDasMetasPorCategoria {
 /** A impressão do que a tela leu: conjuntos, metas, uso por loja e a tabela de metas do DRE. Qualquer mudança nelas é conflito. */
 async function impressaoDeTudo(tx: ClienteDoParceiro): Promise<string> {
   const [conjuntos, metas, usos, dre] = await Promise.all([
-    tx.metaCmvConjunto.findMany({ orderBy: { id: 'asc' }, select: { id: true, versao: true, atualizadoEm: true, segueARede: true } }),
+    tx.metaCmvConjunto.findMany({ orderBy: { id: 'asc' }, select: { id: true, versao: true, atualizadoEm: true, segueARede: true, metaTotalBp: true } }),
     tx.metaCmvCategoria.findMany({ orderBy: { id: 'asc' }, select: { id: true, percentualBp: true } }),
     tx.categoriaNaLoja.findMany({ orderBy: { id: 'asc' }, select: { id: true, versao: true, usa: true } }),
     lerTodasAsMetas(tx),
@@ -154,7 +179,7 @@ async function impressaoDeTudo(tx: ClienteDoParceiro): Promise<string> {
   return createHash('sha256')
     .update(
       [
-        conjuntos.map((c) => `${c.id}:${c.versao}:${c.atualizadoEm.getTime()}:${c.segueARede ? 1 : 0}`).join('|'),
+        conjuntos.map((c) => `${c.id}:${c.versao}:${c.atualizadoEm.getTime()}:${c.segueARede ? 1 : 0}:${c.metaTotalBp ?? 'n'}`).join('|'),
         metas.map((m) => `${m.id}:${m.percentualBp}`).join('|'),
         usos.map((u) => `${u.id}:${u.versao}:${u.usa ? 1 : 0}`).join('|'),
         dre.map((m) => `${m.id}:${m.atualizadoEm.getTime()}:${m.percentualBp}:${m.semMeta ? 1 : 0}`).join('|'),
@@ -195,6 +220,11 @@ export async function situacaoDasMetasPorCategoria(cliente: ClienteDoParceiro, a
     const naoUsa = loja ? ((await categoriasQueNaoUsa(tx, [loja.id])).get(loja.id) ?? new Set<string>()) : new Set<string>();
     const efetivas = loja ? metasDaLoja(vigentes, loja.id) : { origem: vigentes.rede ? ('rede' as const) : null, metas: vigentes.rede?.metas ?? null, conjunto: vigentes.rede };
     const total = await metaTotalDeAgora(tx, periodoAtual.inicio);
+    const totalDaLoja = loja ? metaTotalDaLoja(vigentes, loja.id, total.bp) : null;
+    const comTotalProprio = lojas.flatMap((l) => {
+      const t = metaTotalDaLoja(vigentes, l.id, total.bp);
+      return t.origem === 'loja' && t.bp !== null && t.bp !== total.bp ? [{ id: l.id, nome: l.nome, bp: t.bp }] : [];
+    });
     // Mostra as ativas e as desativadas que ainda têm meta (a meta continua valendo; apagar o campo a tira).
     const categorias: CategoriaDoFormulario[] = todas
       .filter((c) => c.ativa || efetivas.metas?.has(c.id) || vigentes.rede?.metas.has(c.id))
@@ -213,9 +243,11 @@ export async function situacaoDasMetasPorCategoria(cliente: ClienteDoParceiro, a
       escopo: loja ? { tipo: 'loja' as const, lojaId: loja.id, nome: loja.nome } : { tipo: 'rede' as const },
       lojas,
       categorias,
-      totalCampo: total.bp === null ? '' : metaParaCampo(total.bp),
-      totalBp: total.bp,
+      totalCampo: loja ? (efetivas.origem === 'loja' && efetivas.conjunto?.metaTotalBp != null ? metaParaCampo(efetivas.conjunto.metaTotalBp) : '') : total.bp === null ? '' : metaParaCampo(total.bp),
+      totalBp: loja ? totalDaLoja!.bp : total.bp,
       totalDesde: total.desde,
+      totalDaRedeBp: total.bp,
+      comTotalProprio,
       segueARede: loja ? efetivas.origem !== 'loja' : false,
       valeDesde: efetivas.conjunto?.vigenteDesde ?? null,
       seguem,
@@ -239,7 +271,7 @@ export interface EntradaDasMetasPorCategoria {
   /** A loja do formulário (preso à URL); nulo = a rede. */
   lojaId: string | null;
   versao: unknown;
-  /** Só na rede: o texto da meta total. Ausente na loja (o total é do DRE e não muda por loja). */
+  /** O texto da meta total. Na rede é a meta do CMV do DRE; na loja que personaliza é o total PRÓPRIO dela (vazio = vale o da rede, I.2b). */
   total?: unknown;
   /** categoriaId → texto da meta. */
   campos: Readonly<Record<string, unknown>>;
@@ -254,8 +286,9 @@ const igual = (a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>) =
 const textoDaMetaDoHistorico = (bp: number) => percentualComDuasCasas(bp);
 
 /** O retrato de um conjunto para o histórico: quem é, desde quando, de onde vem a meta e uma linha por categoria com meta. */
-function retratoDoConjunto(escopoNome: string, valeDesde: string, segue: boolean, metas: ReadonlyMap<string, number>, nomes: ReadonlyMap<string, string>): Prisma.InputJsonObject {
+function retratoDoConjunto(escopoNome: string, valeDesde: string, segue: boolean, metas: ReadonlyMap<string, number>, nomes: ReadonlyMap<string, string>, totalBp: number | null = null): Prisma.InputJsonObject {
   const o: Record<string, string> = { alvo: `Metas por categoria · ${escopoNome}`, valeDesde: formatarData(valeDesde), metas: segue ? 'segue a rede' : metas.size === 0 ? 'nenhuma meta própria' : 'metas próprias' };
+  if (totalBp !== null) o['meta total do CMV da loja'] = textoDaMetaDoHistorico(totalBp);
   for (const [id, bp] of Array.from(metas).sort((a, b) => (nomes.get(a[0]) ?? '').localeCompare(nomes.get(b[0]) ?? '', 'pt-BR'))) o[`meta · ${nomes.get(id) ?? id}`] = textoDaMetaDoHistorico(bp);
   return o;
 }
@@ -281,9 +314,9 @@ export async function salvarMetasPorCategoria(cliente: ClienteDoParceiro, alcanc
       if (entrada.lojaId !== null && !loja) return falha('Essa loja não existe mais ou está desativada. Recarregue a página; nada foi gravado.', true);
       const categorias = await categoriasDaCasa(tx);
       const nomes = new Map(categorias.map((c) => [c.id, c.nome]));
-      const lido = lerMetasDoFormulario({ total: loja ? '' : entrada.total ?? '', campos: entrada.campos }, new Set(categorias.map((c) => c.id)));
+      const lido = lerMetasDoFormulario({ total: entrada.total ?? '', campos: entrada.campos }, new Set(categorias.map((c) => c.id)));
       if (!lido.ok) return { ok: false, erros: lido.erros };
-      const { totalBp } = lido.lidas;
+      const { totalBp: totalLido } = lido.lidas;
 
       const escopoNome = loja ? loja.nome : 'Rede';
       const vigentes = await conjuntosVigentes(tx, lojas.map((l) => l.id), periodo.inicio);
@@ -302,8 +335,24 @@ export async function salvarMetasPorCategoria(cliente: ClienteDoParceiro, alcanc
       const segue = loja ? entrada.segue === true || entrada.segue === 'sim' || entrada.segue === 'on' : false;
 
       // O modelo de 32 %: marcado SÓ quando os campos mandados são exatamente o que o modelo preenche nesta casa.
+      const totalBp = loja ? null : totalLido;
       const modeloBate = !loja && totalBp === TOTAL_DO_MODELO_32_BP && igual(metas, metasDoModelo32(categorias));
       const aplicouModelo = modeloBate ? MODELO_32 : null;
+      // I.2b: a loja que personaliza pode ter a meta TOTAL dela (vazio = vale a da rede); a que segue a rede não tem.
+      const totalProprio = loja && !segue ? totalLido : null;
+
+      // O que vai mudar no conjunto, conferido ANTES de qualquer gravação (recusar depois deixaria gravação pela metade).
+      const atual = loja ? metasDaLoja(vigentes, loja.id) : { origem: vigentes.rede ? ('rede' as const) : null, metas: vigentes.rede?.metas ?? null, conjunto: vigentes.rede };
+      const estavaSeguindo = loja ? atual.origem !== 'loja' : false;
+      const totalAntes = loja && !estavaSeguindo ? (atual.conjunto?.metaTotalBp ?? null) : null;
+      const mudouConjunto = loja ? (segue ? !estavaSeguindo : estavaSeguindo || !igual(atual.metas ?? new Map(), metas) || totalProprio !== totalAntes) : !igual(atual.metas ?? new Map(), metas);
+      if (mudouConjunto) {
+        // Já existe conjunto deste escopo com vigência depois do período de agora (relógio mudou, ou regra do período): o banco recusaria; aqui vem a frase.
+        const futuro = await tx.metaCmvConjunto.findFirst({ where: { lojaId: loja ? loja.id : null, vigenteDesde: { gt: dataDoBanco(periodo.inicio) } }, orderBy: { vigenteDesde: 'desc' }, select: { vigenteDesde: true } });
+        if (futuro) {
+          return falha(`${loja ? `${loja.nome} já tem` : 'A rede já tem'} um conjunto de metas que passa a valer em ${formatarData(futuro.vigenteDesde.toISOString().slice(0, 10))}, depois de ${periodo.nome}. Uma meta nunca vale para trás de uma que já foi marcada: nada foi gravado. Se a data de agora está errada, avise a FlowFoods.`);
+        }
+      }
 
       let mudou = 0;
       // ---- a meta total (a linha CMV do DRE): só pela rede, pela MESMA função que grava a tabela de metas do DRE
@@ -336,9 +385,6 @@ export async function salvarMetasPorCategoria(cliente: ClienteDoParceiro, alcanc
       }
 
       // ---- o conjunto de metas do escopo
-      const atual = loja ? metasDaLoja(vigentes, loja.id) : { origem: vigentes.rede ? ('rede' as const) : null, metas: vigentes.rede?.metas ?? null, conjunto: vigentes.rede };
-      const estavaSeguindo = loja ? atual.origem !== 'loja' : false;
-      const mudouConjunto = loja ? (segue ? !estavaSeguindo : estavaSeguindo || !igual(atual.metas ?? new Map(), metas)) : !igual(atual.metas ?? new Map(), metas);
       if (mudouConjunto) {
         const proprio = loja ? vigentes.porLoja.get(loja.id) : vigentes.rede;
         const doPeriodo = proprio && proprio.vigenteDesde === periodo.inicio ? proprio : null;
@@ -350,7 +396,7 @@ export async function salvarMetasPorCategoria(cliente: ClienteDoParceiro, alcanc
           const sobra = linhas.filter((l) => !metasGravadas.has(l.categoriaId));
           // Segue a rede: as metas próprias saem ANTES de o conjunto passar a seguir (o banco recusa meta em conjunto que segue).
           if (sobra.length) await tx.metaCmvCategoria.deleteMany({ where: { id: { in: sobra.map((l) => l.id) } } });
-          await tx.metaCmvConjunto.update({ where: { id: conjuntoId }, data: { segueARede: segue, aplicouModelo, versao: doPeriodo.versao + 1, criadoPorNome: autorNome.slice(0, 120) } });
+          await tx.metaCmvConjunto.update({ where: { id: conjuntoId }, data: { segueARede: segue, aplicouModelo, metaTotalBp: totalProprio, versao: doPeriodo.versao + 1, criadoPorNome: autorNome.slice(0, 120) } });
           const existentes = new Map(linhas.map((l) => [l.categoriaId, l]));
           const novas: { parceiroId: string; conjuntoId: string; categoriaId: string; percentualBp: number }[] = [];
           for (const [categoriaId, bp] of metasGravadas) {
@@ -362,21 +408,21 @@ export async function salvarMetasPorCategoria(cliente: ClienteDoParceiro, alcanc
         } else {
           conjuntoId = (
             await tx.metaCmvConjunto.create({
-              data: { parceiroId: tx.parceiroId, lojaId: loja ? loja.id : null, vigenteDesde: dataDoBanco(periodo.inicio), segueARede: segue, aplicouModelo, criadoPorNome: autorNome.slice(0, 120) },
+              data: { parceiroId: tx.parceiroId, lojaId: loja ? loja.id : null, vigenteDesde: dataDoBanco(periodo.inicio), segueARede: segue, aplicouModelo, metaTotalBp: totalProprio, criadoPorNome: autorNome.slice(0, 120) },
               select: { id: true },
             })
           ).id;
           if (metasGravadas.size) await tx.metaCmvCategoria.createMany({ data: Array.from(metasGravadas).map(([categoriaId, bp]) => ({ parceiroId: tx.parceiroId, conjuntoId, categoriaId, percentualBp: bp })) });
         }
-        const antesDo = atual.conjunto ? retratoDoConjunto(escopoNome, atual.conjunto.vigenteDesde, loja ? estavaSeguindo : false, atual.metas ?? new Map(), nomes) : undefined;
+        const antesDo = atual.conjunto ? retratoDoConjunto(escopoNome, atual.conjunto.vigenteDesde, loja ? estavaSeguindo : false, atual.metas ?? new Map(), nomes, totalAntes) : undefined;
         await tx.historicoAlteracao.create({
-          data: { parceiroId: tx.parceiroId, entidade: 'MetaCmvConjunto', entidadeId: conjuntoId, acao: antesDo ? 'ALTEROU' : 'CRIOU', antes: antesDo, depois: retratoDoConjunto(escopoNome, periodo.inicio, segue, metasGravadas, nomes), autorNome },
+          data: { parceiroId: tx.parceiroId, entidade: 'MetaCmvConjunto', entidadeId: conjuntoId, acao: antesDo ? 'ALTEROU' : 'CRIOU', antes: antesDo, depois: retratoDoConjunto(escopoNome, periodo.inicio, segue, metasGravadas, nomes, totalProprio), autorNome },
         });
         mudou++;
       }
 
       // ---- o aviso de que a divisão não fecha no total (aviso, nunca bloqueio)
-      const totalParaAviso = loja ? (await metaTotalDeAgora(tx, periodo.inicio)).bp : totalBp;
+      const totalParaAviso = loja ? (totalProprio ?? (await metaTotalDeAgora(tx, periodo.inicio)).bp) : totalBp;
       const somaParaAviso = loja && segue ? somaDasMetas(new Map(Array.from(vigentes.rede?.metas ?? new Map<string, number>()).filter(([id]) => usaDepois(id)))) : somaDasMetas(metas);
       return { ok: true, mudou, valeDesde: periodo.inicio, aviso: avisoDaSoma(somaParaAviso, totalParaAviso) };
     },

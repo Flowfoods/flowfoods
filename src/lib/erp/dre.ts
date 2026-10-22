@@ -30,7 +30,7 @@
  */
 
 import { hojeNoRio } from './compra-campos';
-import { FRASE_DO_CMV_ANTIGO } from './cmv-campos';
+import { FRASE_DO_CMV_ANTIGO, SEM_CMV, type CmvDoDre } from './cmv-campos';
 import { painelDoCmv, type PainelDoCmv } from './cmv-comparacao';
 import { diasEntre, somarDias } from './contagem-campos';
 import type { RecorrenteEmFalta } from './despesas';
@@ -39,6 +39,7 @@ import { entradaDoDre } from './dre-entrada';
 import { dreDaFotografia, metasDasLinhas, type Ressalva } from './dre-fechamento-campos';
 import { lerCanaisDaFotografia, lerCmvDaFotografia, lerFotografiaVigente } from './dre-fotografia';
 import { metasDoPeriodo } from './dre-metas';
+import { conjuntosVigentes, metaTotalDaLoja } from './metas-categorias';
 import { compararComOAnoPassado, compararComOAnoPassadoPorLoja, compararLinhas, lerAnoPassadoGuardado, mesmaDataNoAnoPassado, type AnoPassado, type ComparacaoComMeta } from './dre-metas-campos';
 import { faixasDaVersao, FAIXAS_DO_FAROL, VERSAO_DAS_FAIXAS } from './farol-campos';
 import { canaisDoPeriodo, farolDoDre, pedidosPorCanal, type CanalDoPeriodo, type FarolDoDre, type RecorrenteSemMes } from './farol-dre-campos';
@@ -119,6 +120,12 @@ export interface DreDoPeriodo {
   fechamento: FechamentoDoPeriodo | null;
   /** O painel compra × real (2.3). */
   cmv: CmvDoPeriodo;
+  /** O CMV de cada loja do escopo (compra e real), ao vivo ou lido da fotografia; vazio na fotografia de antes do CMV. A I.2b abre o real por categoria daqui. */
+  cmvDasLojas: CmvDoDre;
+  /** I.2b: na visão de UMA loja ao vivo, de onde vem a meta do CMV dela (a própria, que a loja personalizou, ou a da rede); nulo na rede e no fechado. */
+  metaDoCmvDaLoja: 'loja' | 'rede' | null;
+  /** I.2b: na visão da rede, as lojas com meta própria do CMV diferente da meta da rede (a rede segue a da rede; elas, a delas). */
+  lojasComMetaPropria: { nome: string; bp: number }[];
   /** O farol de cada linha com meta e a contagem por faixa (2.4). Sem `dre.ver` ninguém chega aqui. */
   farol: FarolDoDre;
   /** Um bloco por canal que o escopo vende (2.4). */
@@ -256,6 +263,9 @@ export async function dreDoPeriodoNaTx(tx: ClienteDoParceiro, alcance: Alcance, 
         metas,
         anoPassado,
         cmv: { antigo, painel: cmvFoto ? painelDoCmv(cmvFoto, receitaFoto) : null },
+        cmvDasLojas: cmvFoto ?? SEM_CMV,
+        metaDoCmvDaLoja: null,
+        lojasComMetaPropria: pedido.tipo === 'rede' ? lojasComMetaPropriaDaFotografia(foto.linhas) : [],
         fechamento: { versao: foto.versao, fotografiaId: foto.id, versaoDaConta: foto.versaoDaConta, fechadoEm: foto.criadoEm, fechadoPorNome: foto.fechadoPorNome, ressalvas: foto.ressalvas, totalDeRessalvas: foto.totalDeRessalvas, justificativa: foto.justificativa },
         farol,
         // No fechado só entra o canal com receita (ou ano passado): a configuração de hoje não reescreve o passado.
@@ -268,6 +278,18 @@ export async function dreDoPeriodoNaTx(tx: ClienteDoParceiro, alcance: Alcance, 
   // ---- ao vivo
   const leitura = await entradaDoDre(tx, alcance, periodo, ate, { hoje, lojaId });
   const metas = await metasDoPeriodo(tx, leitura.plano, periodo.inicio);
+  // I.2b: a loja que personalizou a meta TOTAL do CMV a tem na linha CMV do DRE dela (e no orçamento); a rede segue a meta da rede.
+  const metaDaRede = metas.get(CODIGO.cmv) ?? null;
+  const vigentes = await conjuntosVigentes(tx, lojasDoEscopo.map((l) => l.id), periodo.inicio);
+  const metaDoCmvDaLoja = pedido.tipo === 'loja' ? metaTotalDaLoja(vigentes, pedido.lojaId, metaDaRede) : null;
+  if (metaDoCmvDaLoja?.origem === 'loja') metas.set(CODIGO.cmv, metaDoCmvDaLoja.bp!);
+  const lojasComMetaPropria =
+    pedido.tipo === 'rede'
+      ? lojasDoEscopo.flatMap((l) => {
+          const t = metaTotalDaLoja(vigentes, l.id, metaDaRede);
+          return t.origem === 'loja' && t.bp !== null && t.bp !== metaDaRede ? [{ nome: l.nome, bp: t.bp }] : [];
+        })
+      : [];
   const entrada = (e: Escopo) => ({ escopo: e, plano: leitura.plano, receitas: leitura.receitas, taxaIfood: leitura.taxaIfood, despesas: leitura.despesas, cmv: leitura.cmv });
   const resultado = montarDre(entrada(escopo));
 
@@ -313,6 +335,9 @@ export async function dreDoPeriodoNaTx(tx: ClienteDoParceiro, alcance: Alcance, 
     metas: metasComparadas,
     anoPassado,
     fechamento: null,
+    cmvDasLojas: leitura.cmv,
+    metaDoCmvDaLoja: metaDoCmvDaLoja?.origem ?? null,
+    lojasComMetaPropria,
     cmv: { antigo: false, painel: encerrado ? painelDoCmv(leitura.cmv, (id) => leitura.receitas.filter((r) => r.lojaId === id).reduce((t, r) => t + r.valorCentavos, 0)) : null },
     farol,
     canais: canaisDoPeriodo({
@@ -327,4 +352,13 @@ export async function dreDoPeriodoNaTx(tx: ClienteDoParceiro, alcance: Alcance, 
     farolAntigo: false,
   } satisfies DreDoPeriodo;
 
+}
+
+/** Fechado: as lojas cuja linha CMV foi fotografada com meta diferente da da rede (a rede segue a da rede; elas, a delas). */
+function lojasComMetaPropriaDaFotografia(linhas: readonly { lojaId: string | null; lojaNome: string | null; chave: string; metaBp: number | null }[]): { nome: string; bp: number }[] {
+  const rede = linhas.find((l) => l.lojaId === null && l.chave === CODIGO.cmv)?.metaBp ?? null;
+  return linhas
+    .filter((l) => l.lojaId !== null && l.chave === CODIGO.cmv && l.metaBp !== null && l.metaBp !== rede)
+    .map((l) => ({ nome: l.lojaNome ?? '', bp: l.metaBp! }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 }

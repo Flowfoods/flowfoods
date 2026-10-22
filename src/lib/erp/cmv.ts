@@ -59,6 +59,60 @@ export async function comprasPorLoja(tx: ClienteDoParceiro, ids: readonly string
   return out;
 }
 
+export interface CorteDoFechamento {
+  fechamentoId: string;
+  /** Categoria de HOJE do insumo (nula = sem categoria). */
+  categoriaId: string | null;
+  /** O insumo é pré-preparo (a I.2b abre o estoque dele em linha própria). */
+  preparo: boolean;
+  /** Movimentos depois do retrato que são do período. */
+  depois: number;
+  /** Movimentos até o retrato que são do período seguinte. */
+  antes: number;
+}
+
+/**
+ * O corte do estoque final (decisão 162) de cada fechamento, aberto por categoria (de hoje) e por pré-preparo; a soma de todas as linhas de
+ * um fechamento é o corte dele. É a ÚNICA conta do corte: o CMV real do DRE soma as linhas, e o real por categoria (I.2b) as usa abertas.
+ *
+ * Os movimentos que podem mexer no corte, por fechamento: (1) os de instante a partir de ~um dia antes do fim (ou do retrato, o que vier primeiro),
+ * e (2) os de NOTA cuja data é depois do fim, mesmo de instante antigo (a data da nota pode ser trocada de mês depois do retrato: o
+ * movimento fica com o instante de quando entrou no livro, mas conta para o mês da data de agora). UNION: um movimento nas duas listas conta uma vez.
+ */
+export async function cortesDosFechamentos(tx: ClienteDoParceiro, fechamentoIds: readonly string[]): Promise<CorteDoFechamento[]> {
+  if (fechamentoIds.length === 0) return [];
+  const linhas = await tx.sql<{ fechamentoId: string; categoriaId: string | null; preparo: boolean; depois: bigint; antes: bigint }>`
+    WITH f AS (
+      SELECT k."id", k."lojaId", k."fechadaEm", p."fim"
+      FROM "Contagem" k
+      JOIN "PeriodoApuracao" p ON p."parceiroId" = k."parceiroId" AND p."id" = k."periodoId"
+      WHERE k."parceiroId" = ${tx.parceiroId} AND k."id" = ANY(${[...fechamentoIds]}::text[])
+    ), mov AS (
+      SELECT f."id" AS "fid", m."id" AS "mid"
+      FROM f
+      JOIN "MovimentoEstoque" m ON m."parceiroId" = ${tx.parceiroId} AND m."lojaId" = f."lojaId"
+        AND m."tipo" = ANY(${TIPOS_DE_MOVIMENTO}::"MovimentoTipo"[])
+        AND m."ocorridoEm" >= LEAST(f."fechadaEm", f."fim"::timestamp - interval '1 day')
+      UNION
+      SELECT f."id", m."id"
+      FROM f
+      JOIN "NotaEntrada" n ON n."parceiroId" = ${tx.parceiroId} AND n."entradaEm" > f."fim"
+      JOIN "MovimentoEstoque" m ON m."parceiroId" = n."parceiroId" AND m."notaId" = n."id" AND m."lojaId" = f."lojaId" AND m."ocorridoEm" <= f."fechadaEm"
+    )
+    SELECT f."id" AS "fechamentoId", ins."categoriaId", (ins."tipo" = 'PRE_PREPARO') AS "preparo",
+      coalesce(sum(CASE WHEN m."ocorridoEm" > f."fechadaEm" AND c."dia" <= f."fim" THEN m."valorCentavos" ELSE 0 END), 0)::bigint AS "depois",
+      coalesce(sum(CASE WHEN m."ocorridoEm" <= f."fechadaEm" AND c."dia" > f."fim" AND ci."id" IS NULL THEN m."valorCentavos" ELSE 0 END), 0)::bigint AS "antes"
+    FROM f
+    JOIN mov ON mov."fid" = f."id"
+    JOIN "MovimentoEstoque" m ON m."parceiroId" = ${tx.parceiroId} AND m."id" = mov."mid"
+    JOIN "Insumo" ins ON ins."parceiroId" = m."parceiroId" AND ins."id" = m."insumoId"
+    LEFT JOIN "NotaEntrada" n ON n."parceiroId" = m."parceiroId" AND n."id" = m."notaId"
+    CROSS JOIN LATERAL (SELECT CASE WHEN m."notaId" IS NOT NULL THEN n."entradaEm" ELSE (m."ocorridoEm" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date END AS "dia") c
+    LEFT JOIN "ContagemItem" ci ON ci."parceiroId" = m."parceiroId" AND ci."id" = m."contagemItemId" AND ci."contagemId" = f."id"
+    GROUP BY f."id", ins."categoriaId", (ins."tipo" = 'PRE_PREPARO')`;
+  return linhas.map((l) => ({ fechamentoId: l.fechamentoId, categoriaId: l.categoriaId, preparo: l.preparo, depois: numero(l.depois), antes: numero(l.antes) }));
+}
+
 /**
  * O CMV de cada loja no recorte [periodo.inicio, ate]. `ate` é o último dia apurado (ontem, no período em
  * curso; o último dia, no encerrado); nulo = nenhum dia apurado (sem compra, sem real).
@@ -124,38 +178,10 @@ export async function cmvDasLojas(
     const validos = fechos.filter((f) => f.fechadaEm && f.valorTotalCentavos !== null);
     const cortes = new Map<string, { depois: number; antes: number }>();
     if (validos.length > 0) {
-      // Os movimentos que podem mexer no corte, por fechamento: (1) os de instante a partir de ~um dia antes do fim (ou do retrato, o que vier primeiro),
-      // e (2) os de NOTA cuja data é depois do fim, mesmo de instante antigo (a data da nota pode ser trocada de mês depois do retrato: o
-      // movimento fica com o instante de quando entrou no livro, mas conta para o mês da data de agora). UNION: um movimento nas duas listas conta uma vez.
-      const linhas = await tx.sql<{ fechamentoId: string; depois: bigint; antes: bigint }>`
-        WITH f AS (
-          SELECT k."id", k."lojaId", k."fechadaEm", p."fim"
-          FROM "Contagem" k
-          JOIN "PeriodoApuracao" p ON p."parceiroId" = k."parceiroId" AND p."id" = k."periodoId"
-          WHERE k."parceiroId" = ${tx.parceiroId} AND k."id" = ANY(${validos.map((f) => f.id)}::text[])
-        ), mov AS (
-          SELECT f."id" AS "fid", m."id" AS "mid"
-          FROM f
-          JOIN "MovimentoEstoque" m ON m."parceiroId" = ${tx.parceiroId} AND m."lojaId" = f."lojaId"
-            AND m."tipo" = ANY(${TIPOS_DE_MOVIMENTO}::"MovimentoTipo"[])
-            AND m."ocorridoEm" >= LEAST(f."fechadaEm", f."fim"::timestamp - interval '1 day')
-          UNION
-          SELECT f."id", m."id"
-          FROM f
-          JOIN "NotaEntrada" n ON n."parceiroId" = ${tx.parceiroId} AND n."entradaEm" > f."fim"
-          JOIN "MovimentoEstoque" m ON m."parceiroId" = n."parceiroId" AND m."notaId" = n."id" AND m."lojaId" = f."lojaId" AND m."ocorridoEm" <= f."fechadaEm"
-        )
-        SELECT f."id" AS "fechamentoId",
-          coalesce(sum(CASE WHEN m."ocorridoEm" > f."fechadaEm" AND c."dia" <= f."fim" THEN m."valorCentavos" ELSE 0 END), 0)::bigint AS "depois",
-          coalesce(sum(CASE WHEN m."ocorridoEm" <= f."fechadaEm" AND c."dia" > f."fim" AND ci."id" IS NULL THEN m."valorCentavos" ELSE 0 END), 0)::bigint AS "antes"
-        FROM f
-        JOIN mov ON mov."fid" = f."id"
-        JOIN "MovimentoEstoque" m ON m."parceiroId" = ${tx.parceiroId} AND m."id" = mov."mid"
-        LEFT JOIN "NotaEntrada" n ON n."parceiroId" = m."parceiroId" AND n."id" = m."notaId"
-        CROSS JOIN LATERAL (SELECT CASE WHEN m."notaId" IS NOT NULL THEN n."entradaEm" ELSE (m."ocorridoEm" AT TIME ZONE 'UTC' AT TIME ZONE 'America/Sao_Paulo')::date END AS "dia") c
-        LEFT JOIN "ContagemItem" ci ON ci."parceiroId" = m."parceiroId" AND ci."id" = m."contagemItemId" AND ci."contagemId" = f."id"
-        GROUP BY f."id"`;
-      for (const l of linhas) cortes.set(l.fechamentoId, { depois: numero(l.depois), antes: numero(l.antes) });
+      for (const l of await cortesDosFechamentos(tx, validos.map((f) => f.id))) {
+        const atual = cortes.get(l.fechamentoId) ?? { depois: 0, antes: 0 };
+        cortes.set(l.fechamentoId, { depois: atual.depois + l.depois, antes: atual.antes + l.antes });
+      }
     }
     for (const f of validos) {
       const corte = cortes.get(f.id) ?? { depois: 0, antes: 0 };

@@ -479,7 +479,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/orcamento'],
     titulo: 'Orçamento de compra',
-    versao: 3,
+    versao: 4,
     // A loja que passou precisa ficar à vista: a aula abre numa linha (com a pergunta da 1ª vez, abre sozinha).
     recolhida: true,
     aula: [
@@ -493,6 +493,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'conta',
         titulo: 'Como a conta é feita',
         blocos: [
+          { texto: 'A meta é a da loja: a própria, quando ela definiu a dela nas metas por categoria; senão, a da rede. Na rede com metas diferentes, o teto é a soma dos tetos das lojas.', para: ['dre.ver'] },
           { texto: 'O teto é a meta do CMV vezes a receita prevista do período. O que cabe é o teto menos o que a loja já comprou no período, pela data da nota, com o frete.', para: ['dre.ver'] },
           { texto: 'A receita prevista é o que a loja já vendeu nos dias com faturamento completo, mais cada dia que falta pela média do mesmo dia da semana nas últimas 4 semanas. Sábado entra como sábado, segunda como segunda.', para: ['dre.ver'] },
           { texto: 'Dia sem todos os canais lançados não conta como zero: entra pela média. Dia antes do primeiro lançamento da loja fica fora. Dia da semana sem nenhum dia completo nas 4 semanas conta só o que já foi lançado. Com menos de 14 dias completos, a loja fica sem número.', para: ['dre.ver'] },
@@ -894,13 +895,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre'],
     titulo: 'DRE',
-    versao: 7,
+    versao: 8,
     // A tela da reunião: a tabela fica à vista e a aula abre numa linha.
     recolhida: true,
     aula: [
       { texto: 'O resultado da casa no período: o que entrou, o que saiu e o que sobrou, com o peso de cada linha na receita bruta, até ontem no período em curso.' },
       { texto: 'Com meta definida, a linha mostra o desvio e o farol, uma de 5 faixas de bem melhor a muito pior que a meta, igual na rede e em cada loja.', para: ['dre.ver'] },
       { texto: 'Período fechado mostra a fotografia do fechamento, que nunca muda.' },
+      { texto: 'A loja que definiu a própria meta do CMV a vê na linha do CMV dela; a rede segue a meta da rede.', para: ['dre.ver'] },
       { texto: 'O CMV é o custo da comida: no período em curso é o que a casa comprou até ontem, e vira o real, o que ela consumiu, quando o período termina e a contagem de fechamento do estoque é aplicada.' },
     ],
     secoes: [
@@ -1085,19 +1087,44 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/cmv-categorias'],
     titulo: 'CMV por categoria',
-    versao: 2,
+    versao: 4,
     aula: [
       { texto: 'Esta tela mostra para onde foi o custo, categoria por categoria, para quem acompanha o resultado.' },
-      { texto: 'É o CMV do DRE aberto em categorias: quanto da compra foi para Proteína, Hortifruti, Bebidas e as outras, e quanto isso pesa na receita bruta.', para: ['dre.ver'] },
-      { texto: 'A soma das categorias é a linha do CMV do DRE, ao centavo; no período que já terminou, a diferença para o real aparece numa linha à parte.', para: ['dre.ver'] },
+      { texto: 'É o CMV do DRE aberto em categorias: quanto foi para Proteína, Hortifruti, Bebidas e as outras, e quanto isso pesa na receita bruta.', para: ['dre.ver'] },
+      { texto: 'A soma das categorias é a linha do CMV do DRE, ao centavo. Onde o estoque foi contado por insumo no começo e no fim do período, a categoria mostra o que foi consumido de verdade (o real); onde não foi, as compras, e a diferença aparece numa linha à parte.', para: ['dre.ver'] },
       { texto: 'Cada categoria com meta tem o desvio e o farol, as mesmas 5 faixas do DRE. Os maiores desvios mostram as categorias que saíram da meta, a que mais passou primeiro.', para: ['dre.ver'] },
     ],
     secoes: [
       {
+        id: 'real-por-categoria',
+        titulo: 'O real por categoria',
+        blocos: [
+          { texto: 'Real da categoria = estoque inicial + entradas de compra − estoque final, com o mesmo corte do real do DRE. O estoque de cada categoria sai do retrato por insumo que o fechamento do estoque guarda; só abre por categoria a loja que tem esse retrato no início e no fim do período.', para: ['dre.ver'] },
+          { texto: 'Fechamento feito antes do retrato por insumo não abre por categoria, e não é reconstruído: o preço da época não existe. A loja fica pelas compras e a linha “Variação do estoque, ainda não aberta por categoria” explica a diferença, dizendo qual loja.', para: ['dre.ver'] },
+          { texto: 'O estoque de pré-preparo fica na linha dele, sem meta e sem farol: negativo quer dizer que o estoque dele subiu no período. Os ingredientes ficam na categoria do ingrediente.', para: ['dre.ver'] },
+        ],
+      },
+      {
+        id: 'compra-x-real',
+        titulo: 'Compra × real',
+        blocos: [
+          { texto: 'A diferença é o real menos a compra, em R$ e em pontos da receita, com o mesmo sinal. Negativa: a casa comprou mais do que consumiu, e o estoque daquela categoria subiu, dinheiro parado na prateleira. Positiva: consumiu do que já tinha.', para: ['dre.ver'] },
+          { texto: 'Só entram as lojas com o real aberto por categoria; as outras aparecem como “ficaram de fora”, com o motivo.', para: ['dre.ver'] },
+        ],
+      },
+      {
+        id: 'evolucao-e-por-loja',
+        titulo: 'Evolução e por loja',
+        blocos: [
+          { texto: 'A evolução mostra os últimos 6 períodos, do mais antigo ao mais novo, com a meta que valia em cada um. Período fechado vem da fotografia como ela está; o que não tem dado fica vazio, nunca zero.', para: ['dre.ver'] },
+          { texto: 'Por loja (só na rede) põe cada categoria ao lado de cada loja, contra a receita da própria loja. A coluna de cada loja fecha no CMV do DRE dela.', para: ['dre.ver'] },
+        ],
+      },
+      {
         id: 'categoria-de-hoje',
         titulo: 'A categoria de hoje',
         blocos: [
-          { texto: 'A conta usa a categoria que o insumo tem hoje, em todas as compras do período. Passar o bacon de Laticínios para Proteína muda o período em curso inteiro de uma vez, e o total não muda.', para: ['dre.ver'] },
+          { texto: 'A conta usa a categoria que o insumo tem hoje, em todas as parcelas do período (compras, estoque inicial e final). Passar o bacon de Laticínios para Proteína muda o período em curso inteiro de uma vez, e o total não muda.', para: ['dre.ver'] },
           { texto: 'Período fechado mostra a fotografia: a categoria e a meta daquele dia. Reclassificar depois não o altera.', para: ['dre.ver'] },
         ],
       },
@@ -1107,13 +1134,16 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Falta faturamento, falta o CMV de alguma loja, ou Outros mais Sem categoria passam de 2% do CMV: a meta ainda não é confiável, então o desvio fica em texto e o motivo vem escrito. O 2% é uma hipótese a validar com a casa.', para: ['dre.ver'] },
           { texto: 'Outros / a classificar e Sem categoria são fila de classificação: não têm farol. Classificar os insumos devolve as cores.', para: ['dre.ver'] },
+          { texto: 'Se o painel não fecha com o CMV do DRE e nenhuma loja explica a diferença, aparece a linha “Diferença que o painel não explica” e as categorias ficam sem cor: o dado não fecha.', para: ['dre.ver'] },
+          { texto: 'A cor usa pontos da receita, a régua do DRE. Embaixo do desvio, o percentual da própria meta ajuda a ler a categoria pequena (0,20 pp em Limpeza pode ser 40% da meta), mas nunca muda a cor nem a ordem.', para: ['dre.ver'] },
         ],
       },
       {
         id: 'limites',
         titulo: 'O que ainda não está aqui',
         blocos: [
-          { texto: 'Por enquanto o painel é pelas compras. O CMV real por categoria, a comparação entre compra e real, a evolução e a matriz por loja vêm depois. Pré-preparos têm linha própria, sem meta.', para: ['dre.ver'] },
+          { texto: 'Não existe transferência de estoque entre lojas no sistema: o real de uma loja não desconta o que ela mandou para outra. O da rede continua certo; o de cada loja pode distorcer enquanto isso não existir.', para: ['dre.ver'] },
+          { texto: 'Na rede, o percentual de cada categoria é sobre a receita das lojas que a usam.', para: ['dre.ver'] },
         ],
       },
     ],
@@ -1123,7 +1153,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/metas-categorias'],
     titulo: 'Metas por categoria',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Aqui quem define as metas diz quanto cada categoria pode pesar, em % da receita bruta.' },
       { texto: 'Vazio é sem meta e zero é uma meta de zero. A meta total é a do CMV do DRE; a divisão pode não fechar nela, e a tela só avisa a diferença.', para: ['metas.editar'] },
@@ -1137,6 +1167,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'A rede define as metas de todas as lojas. Cada loja segue a rede ou personaliza o conjunto inteiro, sem misturar meta herdada com meta própria.', para: ['metas.editar'] },
           { texto: 'Mudar a rede só afeta as lojas que a seguem, e a tela diz quais. Mudar uma loja não toca nenhuma outra.', para: ['metas.editar'] },
           { texto: 'A categoria que a loja não usa sai das metas e do painel dela, a não ser que tenha valor: custo nunca some.', para: ['metas.editar'] },
+          { texto: 'A loja que personaliza pode ter a meta total do CMV dela. Ela vale na linha CMV do DRE da loja e no orçamento de compra dela; deixar vazio usa a meta total da rede. A rede continua com a meta da rede.', para: ['metas.editar'] },
+          { texto: 'Na rede, o percentual de cada categoria é sobre a receita das lojas que a usam.', para: ['metas.editar'] },
         ],
       },
       {

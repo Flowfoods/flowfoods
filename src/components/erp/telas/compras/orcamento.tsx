@@ -231,7 +231,7 @@ function AConta({ v, rede }: { v: VistaCompleta; rede: boolean }) {
     <div className="space-y-2 text-[13px] leading-relaxed text-suave">
       {c && (
         <p className="tabular-nums">
-          Meta do CMV {textoDoPercentual(c.metaBp)} × {formatarDinheiro(c.previstaCentavos)} de receita prevista = <span className="font-semibold text-texto">{formatarDinheiro(c.tetoCentavos)}</span> de teto
+          Meta do CMV {c.metaMista ? `média de ${textoDoPercentual(c.metaBp)} (cada loja usa a sua${v.comMetaPropria.length > 0 ? `; ${v.comMetaPropria.join(', ')} ${v.comMetaPropria.length === 1 ? 'tem' : 'têm'} meta própria` : ''})` : textoDoPercentual(c.metaBp)} × {formatarDinheiro(c.previstaCentavos)} de receita prevista = <span className="font-semibold text-texto">{formatarDinheiro(c.tetoCentavos)}</span> de teto
           {' − '}
           {v.semNota.length > 0 && v.compradoCentavos === 0 ? 'nenhuma nota de compra' : `${formatarDinheiro(c.compradoCentavos)} já comprados`} ={' '}
           <span className={`font-semibold ${c.saldoCentavos < 0 ? 'text-erro' : 'text-texto'}`}>{c.saldoCentavos < 0 ? `passou ${formatarDinheiro(-c.saldoCentavos)}` : formatarDinheiro(c.saldoCentavos)}</span>
@@ -266,7 +266,8 @@ function AConta({ v, rede }: { v: VistaCompleta; rede: boolean }) {
 }
 
 /** O ritmo das compras até ontem: o CMV pelas compras contra a meta, com o farol da 2.4, e o que ele NÃO diz. */
-function Ritmo({ v, metaBp }: { v: VistaCompleta; metaBp: number | null }) {
+function Ritmo({ v }: { v: VistaCompleta }) {
+  const metaBp = v.ritmoMetaBp;
   if (!v.ritmo || metaBp === null) return null;
   return (
     <div className="space-y-1 border-t border-linha pt-3">
@@ -274,12 +275,15 @@ function Ritmo({ v, metaBp }: { v: VistaCompleta; metaBp: number | null }) {
         <div className="min-w-0 flex-1 text-[13px] text-suave">
           <p className="font-semibold text-texto">Ritmo das compras até ontem</p>
           <p className="tabular-nums">
-            {v.cmvAteOntemBp !== null ? `CMV pelas compras ${textoDoPercentual(v.cmvAteOntemBp)} contra a meta de ${textoDoPercentual(metaBp)}` : `Meta de ${textoDoPercentual(metaBp)}`}
+            {v.cmvAteOntemBp !== null ? `CMV pelas compras ${textoDoPercentual(v.cmvAteOntemBp)} contra a meta de ${textoDoPercentual(metaBp)}${v.metaMista ? ' (média das lojas)' : ''}` : `Meta de ${textoDoPercentual(metaBp)}`}
             {v.ritmo.desvioTexto ? ` (${v.ritmo.desvioTexto})` : ''}
           </p>
         </div>
         <Farol f={v.ritmo} />
       </div>
+      {v.ritmo.tipo === 'cor' && v.ritmo.posicao >= 3 && (
+        <p className="text-[13px] font-medium text-texto">Próximo passo: espace as próximas compras e confira se alguma nota entrou duas vezes, para o ritmo voltar à meta.</p>
+      )}
       <p className="text-[12px] text-suave">O farol olha o ritmo das compras até ontem; o número de cima olha o período inteiro. Comprar muito no começo acende o farol mesmo cabendo no orçamento.</p>
     </div>
   );
@@ -302,13 +306,13 @@ function BlocoPrincipal({ titulo, v, dados, saidas, varias }: { titulo: string; 
   );
 }
 
-function PainelDaConta({ v, metaBp, rede }: { v: VistaCompleta; metaBp: number | null; rede: boolean }) {
+function PainelDaConta({ v, rede }: { v: VistaCompleta; rede: boolean }) {
   if (!v.conta && !v.previsao && !v.ritmo && v.previstaCentavos === null) return null;
   return (
     <Painel titulo="Como a conta chega aqui" subtitulo={SUBTITULO_COMPLETO}>
       <div className="space-y-3">
         <AConta v={v} rede={rede} />
-        <Ritmo v={v} metaBp={metaBp} />
+        <Ritmo v={v} />
       </div>
     </Painel>
   );
@@ -361,7 +365,7 @@ export function TelaOrcamento({
       ) : principal ? (
         <>
           <BlocoPrincipal titulo={titulo} v={principal} dados={dados} saidas={saidas} varias={varias} />
-          {principal.veReceita && <PainelDaConta v={principal} metaBp={dados.metaBp} rede={dados.rede !== null} />}
+          {principal.veReceita && <PainelDaConta v={principal} rede={dados.rede !== null} />}
         </>
       ) : (
         <Painel titulo={titulo} subtitulo={dados.lojas.every((l) => l.vista.veReceita) ? SUBTITULO_COMPLETO : SUBTITULO_DO_LIMITE}>

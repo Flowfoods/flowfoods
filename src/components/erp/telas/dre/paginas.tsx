@@ -14,7 +14,7 @@ import { tipoDaCompetencia, ehFiltroDeSituacao, lerMesDaLista, type FiltroDeSitu
 import { faltaLancar, lojasParaDespesa, listarDespesas, obterDespesa, podeVerDespesas, recorrentesEmFalta } from '@/lib/erp/despesas';
 import { recusaDoFechamento, situacaoDoFechamento } from '@/lib/erp/dre-fechamento';
 import { situacaoDasMetas } from '@/lib/erp/dre-metas';
-import { cmvPorCategoria } from '@/lib/erp/cmv-categorias';
+import { cmvPorCategoria, evolucaoDeCategorias } from '@/lib/erp/cmv-categorias';
 import { garantirCategoriasPadrao } from '@/lib/erp/categorias';
 import { situacaoDasMetasPorCategoria } from '@/lib/erp/metas-categorias';
 import { lerPeriodoPedido } from '@/lib/erp/periodo-campos';
@@ -40,7 +40,7 @@ import { fraseDaDespesa, fraseDoMesPassado, fraseDoPeriodo, type AcaoDeCadastro,
 import { FormDespesa, type InicialDaDespesa } from './form-despesa';
 import { FormMesPassado } from './form-mes-passado';
 import { escopoPedido } from './carregar';
-import { TelaDoCmvPorCategoria, type PermissoesDoPainelDeCategorias } from './cmv-categorias';
+import { TelaDoCmvPorCategoria, type PermissoesDoPainelDeCategorias, type VistaDoPainel } from './cmv-categorias';
 import { TelaDasMetasPorCategoria } from './metas-categorias';
 import { TelaDoPlano } from './plano';
 import { TelaDoFechamento } from './periodo-fechamento';
@@ -269,7 +269,11 @@ export async function PaginaDoCmvPorCategoria({ c, visao, lojasDoAlcance, query,
   const pedida = lerPeriodoPedido(um(query.periodo), hoje);
   const r = await cmvPorCategoria(c.cliente, c.alcance, pedido, pedida.data, hoje);
   if (!r) return vazio;
-  return <TelaDoCmvPorCategoria r={{ ...r, d: { ...r.d, avisoDaData: pedida.aviso } }} base={`${c.raiz}/dre/cmv-categorias`} raiz={c.raiz} contexto={c.contexto} pode={p} bloqueio={c.bloqueio} />;
+  // A vista vem da URL e só escolhe o que mostrar; a matriz só existe com duas ou mais lojas, e a evolução lê os períodos só quando é pedida.
+  const pedidaVista = um(query.vista);
+  const vista: VistaDoPainel = pedidaVista === 'compra-real' || pedidaVista === 'evolucao' || (pedidaVista === 'matriz' && r.painel?.matriz) ? (pedidaVista as VistaDoPainel) : 'categorias';
+  const evolucao = vista === 'evolucao' ? await evolucaoDeCategorias(c.cliente, c.alcance, pedido, pedida.data, hoje) : null;
+  return <TelaDoCmvPorCategoria vista={vista} evolucao={evolucao} r={{ ...r, d: { ...r.d, avisoDaData: pedida.aviso } }} base={`${c.raiz}/dre/cmv-categorias`} raiz={c.raiz} contexto={c.contexto} pode={p} bloqueio={c.bloqueio} />;
 }
 
 /** As metas por categoria da rede (sem `?loja=`) ou de uma loja. Quem não define metas, ou loja que não existe: 404. */

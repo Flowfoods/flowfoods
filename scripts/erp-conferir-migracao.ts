@@ -3,7 +3,7 @@
  * `20261026000000_erp_dre_despesas` (2.2a), `20261027000000_erp_dre_fechamento` (2.2b), `20261028000000_erp_cmv` (2.3),
  * `20261029000000_erp_producao` (3.1), `20261030000000_erp_lista_do_dia` (3.2), `20261031000000_erp_producao_equipe` (3.3) e
  * `20261101000000_erp_insumo_categorias` (I.1a), `20261102000000_erp_insumo_clareza` + `20261102010000_erp_insumo_conservacao_confirmada` (I.1b) e
- * `20261103000000_erp_cmv_categorias` (I.2a).
+ * `20261103000000_erp_cmv_categorias` (I.2a) + `20261103010000_erp_cmv_categorias_endurecimento` e `20261104000000_erp_cmv_real_categorias` (I.2b).
  *
  *   npm run erp:conferir-migracao
  *
@@ -130,6 +130,9 @@ export const INDICES_DA_I_2A = [
   'ContagemRetratoItem_parceiroId_contagemId_insumoId_key',
   'CategoriaNaLoja_parceiroId_lojaId_categoriaId_key',
 ] as const;
+
+/** O CHECK que a I.2b acrescentou em "MetaCmvConjunto" (a meta total da loja, de 0 a 100 %, só na loja que não segue a rede). */
+export const CHECKS_DA_I_2B = [['MetaCmvConjunto', 'MetaCmvConjunto_total_proprio']] as const;
 
 /** Os gatilhos da I.2a: sem eles o retrato mudaria, a soma dele não conferiria com a contagem e o conjunto de metas do passado seria reescrito. */
 export const GATILHOS_DA_I_2A = [
@@ -346,6 +349,19 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261103000000_erp_cmv_categorias (e a 20261103010000_erp_cmv_categorias_endurecimento) não foi aplicada por inteiro.`);
     }
   }
+  // I.2b: só se a migration dela já rodou (a coluna existe; o catálogo não passa pela RLS).
+  const metaTotal = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'MetaCmvConjunto' AND column_name = 'metaTotalBp'`;
+  if (metaTotal[0]?.n) {
+    const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_I_2B.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_I_2B) {
+      const achado = dela.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration 20261104000000_erp_cmv_real_categorias não foi aplicada por inteiro.`);
+      else if (!achado.validado) {
+        pendencias.push(`CHECK ${nome} ficou NOT VALID: corrija a linha antiga que o viola e rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+      }
+    }
+  }
   return pendencias;
 }
 
@@ -354,10 +370,10 @@ async function principal() {
   try {
     const pendencias = await conferirMigracao(db);
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b e da I.2a conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias e das metas por categoria (com RLS), os índices e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a e da I.2b conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias e das metas por categoria (com RLS), os índices e os gatilhos existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b e da I.2a: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a e da I.2b: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {

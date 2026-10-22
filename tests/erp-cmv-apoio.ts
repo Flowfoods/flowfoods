@@ -118,3 +118,40 @@ export const periodoRegistrado = (cliente: ClienteDoParceiro, data: string) =>
     return r.id;
   });
 
+
+// ================================================================ I.2b: o retrato por insumo
+
+export interface ItemDoRetratoDeTeste {
+  insumoId: string;
+  centavos: number;
+}
+
+/**
+ * A abertura de estoque COM o retrato por insumo (como `concluirAbertura` grava hoje): uma linha de retrato e um movimento ABERTURA
+ * por insumo, e a contagem fecha com `retratoGravadoEm` e o valor total igual à soma. Com `antiga`, nasce como a de antes da I.2a:
+ * só os movimentos ABERTURA (e os itens da contagem), sem o retrato.
+ */
+export const aberturaComItens = (cliente: ClienteDoParceiro, lojaId: string, quando: Date, itens: readonly ItemDoRetratoDeTeste[], opcoes: { antiga?: boolean } = {}) =>
+  cliente.transacao(async (tx) => {
+    const total = itens.reduce((s, i) => s + i.centavos, 0);
+    const c = await tx.contagem.create({ data: { parceiroId: tx.parceiroId, lojaId, tipo: 'ABERTURA', status: 'ABERTA', referenciaEm: dia(quando.toISOString().slice(0, 10)), iniciadaPorNome: 'Marina' } });
+    for (const i of itens) {
+      const item = await tx.contagemItem.create({ data: { parceiroId: tx.parceiroId, contagemId: c.id, insumoId: i.insumoId, insumoNomeSnapshot: 'Insumo', unidadeSnapshot: 'KG', contadoMilesimos: i.centavos * 10, contadoEm: quando, saldoSistemaMilesimos: 0, valorSistemaCentavos: 0 } });
+      await gravarMovimentos(tx, [{ lojaId, insumoId: i.insumoId, tipo: 'ABERTURA', quantidadeMilesimos: i.centavos * 10, valorCentavos: i.centavos, insumoNome: 'Insumo', unidade: 'KG', motivo: 'Abertura do estoque (1ª contagem)', chave: `abertura:${item.id}`, contagemItemId: item.id }], { ocorridoEm: quando });
+      if (!opcoes.antiga) await tx.contagemRetratoItem.create({ data: { parceiroId: tx.parceiroId, contagemId: c.id, insumoId: i.insumoId, categoriaIdNaHora: null, tipoNaHora: 'INGREDIENTE', quantidadeMilesimos: i.centavos * 10, valorCentavos: i.centavos } });
+    }
+    await tx.contagem.update({ where: { id: c.id }, data: { status: 'FECHADA', desfecho: 'APLICADA', fechadaEm: quando, fechadaPorNome: 'Marina', valorTotalCentavos: total, itensSemPreco: 0, ...(opcoes.antiga ? {} : { retratoGravadoEm: quando }) } });
+    return c.id;
+  });
+
+/** O fechamento de estoque do período COM o retrato por insumo (a soma é o valor total que o fechamento fotografa). */
+export const fechamentoComRetrato = (cliente: ClienteDoParceiro, lojaId: string, periodoId: string, p: { fim: string; quando: Date; itens: readonly ItemDoRetratoDeTeste[] }) =>
+  cliente.transacao(async (tx) => {
+    const c = await tx.contagem.create({ data: { parceiroId: tx.parceiroId, lojaId, periodoId, tipo: 'FECHAMENTO', status: 'ABERTA', referenciaEm: dia(p.fim), iniciadaPorNome: 'Marina', titulo: 'Fechamento' } });
+    for (const i of p.itens) {
+      await tx.contagemRetratoItem.create({ data: { parceiroId: tx.parceiroId, contagemId: c.id, insumoId: i.insumoId, categoriaIdNaHora: null, tipoNaHora: 'INGREDIENTE', quantidadeMilesimos: i.centavos * 10, valorCentavos: i.centavos } });
+    }
+    const total = p.itens.reduce((s, i) => s + i.centavos, 0);
+    await tx.contagem.update({ where: { id: c.id }, data: { status: 'FECHADA', desfecho: 'APLICADA', fechadaEm: p.quando, fechadaPorNome: 'Marina', valorTotalCentavos: total, itensSemPreco: 0, retratoGravadoEm: p.quando } });
+    return c.id;
+  });

@@ -33,6 +33,8 @@ export interface RealApurado {
   /** Quando o fechamento de estoque tirou o retrato (ISO). */
   retratoEm: string;
   fechamentoId: string;
+  /** I.2b: o fechamento do período anterior de onde o estoque inicial saiu (nulo quando saiu da abertura); o real por categoria lê o retrato dele. */
+  fechamentoAnteriorId?: string | null;
   aberturaId: string | null;
   /** Insumos sem preço nos dois retratos; nulo = contagem de antes do registro ("não registrado"). */
   semPrecoInicial: number | null;
@@ -159,6 +161,7 @@ export function apurarReal(d: DadosParaOReal, c: ContextoDoReal): { real: RealAp
       inicialDe: inicial.de,
       retratoEm: d.fechoDoPeriodo.fechadaEm,
       fechamentoId: d.fechoDoPeriodo.id,
+      fechamentoAnteriorId: inicial.de === 'fechamento' ? d.fechoAnterior!.id : null,
       aberturaId: a.id,
       semPrecoInicial: inicial.semPreco,
       semPrecoFinal: d.fechoDoPeriodo.itensSemPreco,
@@ -381,6 +384,7 @@ export function cmvLidoDaFotografia(json: unknown): CmvDoDre {
             inicialDe: r.inicialDe === 'abertura' ? 'abertura' : 'fechamento',
             retratoEm: String(r.retratoEm ?? ''),
             fechamentoId: String(r.fechamentoId ?? ''),
+            ...(typeof r.fechamentoAnteriorId === 'string' ? { fechamentoAnteriorId: r.fechamentoAnteriorId } : {}),
             aberturaId: r.aberturaId ? String(r.aberturaId) : null,
             semPrecoInicial: r.semPrecoInicial ?? null,
             semPrecoFinal: r.semPrecoFinal ?? null,

@@ -182,7 +182,7 @@ export async function executarSalvarMetasPorCategoria(cliente: ClienteDoParceiro
     if (campo.startsWith('cat_') && typeof v === 'string') campos[campo.slice(4)] = v;
     if (campo.startsWith('viu_')) usa[campo.slice(4)] = form.get(`usa_${campo.slice(4)}`) === 'on';
   }
-  const r = await salvarMetasPorCategoria(cliente, alcance, { lojaId, versao: textoDe(form.get('versao')), total: lojaId === null ? textoDe(form.get('total')) : undefined, campos, segue: textoDe(form.get('segue')), ...(lojaId === null ? {} : { usa }) }, autorNome);
+  const r = await salvarMetasPorCategoria(cliente, alcance, { lojaId, versao: textoDe(form.get('versao')), total: textoDe(form.get('total')), campos, segue: textoDe(form.get('segue')), ...(lojaId === null ? {} : { usa }) }, autorNome);
   if (!r.ok) return { ok: false, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
   revalidatePath(raiz, 'layout');
   const aviso = r.aviso ? ` Confira a divisão: ${r.aviso}.` : '';

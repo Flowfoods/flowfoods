@@ -930,6 +930,8 @@ model MetaCmvConjunto {
   segueARede    Boolean      @default(false)
   // MODELO_32 quando o modelo ilustrativo de 32 % foi aplicado no formulário que gerou este conjunto; nulo caso contrário.
   aplicouModelo String?
+  // I.2b: a meta TOTAL do CMV desta loja (pontos-base, 0 a 10.000), só na loja que personaliza; nulo = vale o total da rede (a meta do CMV do DRE).
+  metaTotalBp   Int?
   versao        Int          @default(1)
   criadoPorNome String       @default("")
   criadoEm      DateTime     @default(now())

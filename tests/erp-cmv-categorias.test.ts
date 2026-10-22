@@ -411,7 +411,7 @@ describe('I.2a · a fotografia v4 (critério 10)', () => {
 
   it('lixo no JSON nunca vira número: formato desconhecido é descartado', () => {
     expect(categoriasLidasDaFotografia(null, () => 0)).toBeNull();
-    expect(categoriasLidasDaFotografia({ versao: 2, lojas: {} }, () => 0)).toBeNull();
+    expect(categoriasLidasDaFotografia({ versao: 3, lojas: {} }, () => 0)).toBeNull();
     const l = categoriasLidasDaFotografia({ versao: 1, lojas: { x: { nome: 'X', origem: 'rede', semCategoriaCentavos: 'abc', categorias: [] }, y: { nome: 'Y', origem: null, semCategoriaCentavos: 0, categorias: [{ id: 'a', nome: 'A', compraCentavos: 1.5 }, { id: 'b', nome: 'B', compraCentavos: 100, metaBp: 'x' }] } } }, () => 0)!;
     expect(l.lojas.map((x) => x.lojaId)).toEqual(['y']);
     expect(l.lojas[0].compras.get('b')).toBe(100);

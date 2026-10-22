@@ -112,8 +112,8 @@
     "hash": "a2950debd7264c7f"
   },
   "compras-orcamento": {
-    "versao": 3,
-    "hash": "a5d0e98f813c9164"
+    "versao": 4,
+    "hash": "8185c301a55ffd2b"
   },
   "compra-nova": {
     "versao": 4,
@@ -224,8 +224,8 @@
     "hash": "9d803e531e0e9c5c"
   },
   "dre": {
-    "versao": 7,
-    "hash": "7e9340dce9b98841"
+    "versao": 8,
+    "hash": "bc95544a9b04c320"
   },
   "dre-despesas": {
     "versao": 1,
@@ -248,12 +248,12 @@
     "hash": "953c405e5732d320"
   },
   "dre-cmv-categorias": {
-    "versao": 2,
-    "hash": "a9aff08dfde7b8da"
+    "versao": 4,
+    "hash": "b036148aa4763544"
   },
   "dre-metas-categorias": {
-    "versao": 2,
-    "hash": "98922bf4a338e714"
+    "versao": 3,
+    "hash": "70db086f5c14d56b"
   },
   "dre-periodo": {
     "versao": 4,

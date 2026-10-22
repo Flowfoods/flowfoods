@@ -222,6 +222,8 @@ export function preverReceita(loja: LojaDoOrcamento, periodo: Pick<PeriodoDoOrca
 export interface ContaDoOrcamento {
   previstaCentavos: number;
   metaBp: number;
+  /** I.2b: na rede, as lojas têm metas diferentes (cada uma a sua) e `metaBp` é a média ponderada pela receita prevista. */
+  metaMista?: boolean;
   tetoCentavos: number;
   compradoCentavos: number;
   /** teto − comprado; negativo = passou. */
@@ -231,6 +233,8 @@ export interface ContaDoOrcamento {
 export interface OrcamentoDaLoja {
   lojaId: string;
   nome: string;
+  /** A meta do CMV que vale NESTA loja (a própria, se ela personalizou o total; senão a da rede). Nulo = sem meta. */
+  metaBp: number | null;
   compradoCentavos: number;
   /** Nulo = sem número (o motivo diz por quê). */
   conta: ContaDoOrcamento | null;
@@ -251,6 +255,8 @@ export interface OrcamentoDoEscopo {
   conta: ContaDoOrcamento | null;
   motivo: string | null;
   ritmo: FarolDaLinha | null;
+  /** A meta contra a qual o ritmo foi medido (média ponderada pela receita até ontem quando cada loja tem a sua); nulo sem meta. */
+  ritmoMetaBp: number | null;
   cmvAteOntemBp: number | null;
   /** Lojas do escopo com dias do período sem lançamento completo (entraram pela média). */
   diasSemLancamento: number;
@@ -303,6 +309,7 @@ export function orcamentoDaLoja(loja: LojaDoOrcamento, periodo: PeriodoDoOrcamen
   const base = {
     lojaId: loja.lojaId,
     nome: loja.nome,
+    metaBp,
     compradoCentavos: loja.compradoCentavos,
     previsao,
     ritmo: farol,
@@ -321,25 +328,34 @@ export function orcamentoDaLoja(loja: LojaDoOrcamento, periodo: PeriodoDoOrcamen
  * sem número, com o nome dela. O ritmo do escopo só tem cor quando cada loja tem o período completo até ontem e cada loja
  * que vendeu tem nota.
  */
-export function orcamentoDoEscopo(lojas: readonly OrcamentoDaLoja[], metaBp: number | null): OrcamentoDoEscopo {
+export function orcamentoDoEscopo(lojas: readonly OrcamentoDaLoja[]): OrcamentoDoEscopo {
   const diasSemLancamento = lojas.reduce((s, l) => s + (l.previsao?.diasSemLancamento ?? 0), 0);
   const semNumero = lojas.filter((l) => l.conta === null);
   const algumaIncompleta = lojas.some((l) => l.receitaAteOntemCentavos === null);
   const receita = algumaIncompleta ? null : lojas.reduce((s, l) => s + (l.receitaAteOntemCentavos ?? 0), 0);
   const ateOntem = lojas.reduce((s, l) => s + l.compradoAteOntemCentavos, 0);
   const semNota = lojas.filter((l) => (l.receitaAteOntemCentavos ?? 0) > 0 && l.compradoAteOntemCentavos === 0).map((l) => l.nome);
-  const { farol, cmvBp } = ritmoDasCompras({ metaBp, receitaAteOntemCentavos: lojas.length === 0 ? null : receita, compradoAteOntemCentavos: ateOntem, lojasSemNota: semNota });
+  // I.2b: cada loja tem a sua meta (a própria ou a da rede). Sem meta em nenhuma, o escopo não tem; com metas diferentes, o ritmo da
+  // rede é medido contra a média das metas ponderada pela receita até ontem (a mesma conta que a soma dos tetos faz com a prevista).
+  const comMeta = lojas.filter((l) => l.metaBp !== null);
+  const semMeta = comMeta.length === 0;
+  const pesoDoRitmo = (l: OrcamentoDaLoja) => l.receitaAteOntemCentavos ?? 0;
+  const pesoTotal = comMeta.reduce((s, l) => s + pesoDoRitmo(l), 0);
+  const metaDoRitmo = semMeta ? null : pesoTotal > 0 ? dividirExato(comMeta.reduce((s, l) => s + BigInt(l.metaBp!) * BigInt(pesoDoRitmo(l)), 0n), BigInt(pesoTotal)) : comMeta[0].metaBp;
+  const { farol, cmvBp } = ritmoDasCompras({ metaBp: metaDoRitmo, receitaAteOntemCentavos: lojas.length === 0 ? null : receita, compradoAteOntemCentavos: ateOntem, lojasSemNota: semNota });
   const previstaCentavos = lojas.length > 0 && lojas.every((l) => l.previsao) ? lojas.reduce((s, l) => s + l.previsao!.previstaCentavos, 0) : null;
-  if (metaBp === null) return { conta: null, motivo: MOTIVO_SEM_META, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento, previstaCentavos };
-  if (lojas.length === 0) return { conta: null, motivo: 'nenhuma loja ativa', ritmo: null, cmvAteOntemBp: null, diasSemLancamento, previstaCentavos };
+  if (semMeta) return { conta: null, motivo: MOTIVO_SEM_META, ritmo: farol, ritmoMetaBp: metaDoRitmo, cmvAteOntemBp: cmvBp, diasSemLancamento, previstaCentavos };
+  if (lojas.length === 0) return { conta: null, motivo: 'nenhuma loja ativa', ritmo: null, ritmoMetaBp: null, cmvAteOntemBp: null, diasSemLancamento, previstaCentavos };
   if (semNumero.length > 0) {
-    return { conta: null, motivo: `sem o orçamento de ${semNumero.map((l) => l.nome).join(' e ')}`, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento, previstaCentavos };
+    return { conta: null, motivo: `sem o orçamento de ${semNumero.map((l) => l.nome).join(' e ')}`, ritmo: farol, ritmoMetaBp: metaDoRitmo, cmvAteOntemBp: cmvBp, diasSemLancamento, previstaCentavos };
   }
   const prevista = lojas.reduce((s, l) => s + l.conta!.previstaCentavos, 0);
   const comprado = lojas.reduce((s, l) => s + l.compradoCentavos, 0);
   // O teto da rede é a SOMA dos tetos das lojas (um arredondamento por loja), para a rede bater com o "Por loja".
   const teto = lojas.reduce((s, l) => s + l.conta!.tetoCentavos, 0);
-  return { conta: { previstaCentavos: prevista, metaBp, tetoCentavos: teto, compradoCentavos: comprado, saldoCentavos: teto - comprado }, motivo: null, ritmo: farol, cmvAteOntemBp: cmvBp, diasSemLancamento, previstaCentavos };
+  const iguais = lojas.every((l) => l.metaBp === lojas[0].metaBp);
+  const metaBp = iguais ? lojas[0].metaBp! : prevista > 0 ? dividirExato(BigInt(teto) * 10_000n, BigInt(prevista)) : lojas[0].metaBp!;
+  return { conta: { previstaCentavos: prevista, metaBp, ...(iguais ? {} : { metaMista: true }), tetoCentavos: teto, compradoCentavos: comprado, saldoCentavos: teto - comprado }, motivo: null, ritmo: farol, ritmoMetaBp: metaDoRitmo, cmvAteOntemBp: cmvBp, diasSemLancamento, previstaCentavos };
 }
 
 // ================================================================ quem não vê a receita
