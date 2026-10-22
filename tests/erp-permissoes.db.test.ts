@@ -252,7 +252,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
     await garantirCategoriasPadrao(doParceiro(A, db));
     const categoria = (await doParceiro(A, db).categoriaInsumo.findFirstOrThrow({ where: { chave: 'MERCEARIA' } })).id;
     await expect(
-      acaoCadastrarInsumoDaSessao(null, form({ nome: 'Pelo dono', unidade: 'KG', categoriaId: categoria, conteudo: '1', preco: '1,00' })),
+      acaoCadastrarInsumoDaSessao(null, form({ nome: 'Pelo dono', unidade: 'KG', categoriaId: categoria, conservacao: 'SECO', conteudo: '1', preco: '1,00' })),
     ).rejects.toThrow(/^REDIRECT \/erp\/insumos\/\w+\?feito=criado$/);
     expect(await doParceiro(A, db).insumo.count()).toBe(antes + 1);
   });

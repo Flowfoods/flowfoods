@@ -140,7 +140,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     const [h] = await listarHistorico(a, { entidade: 'Insumo', verPrecos: true });
     expect(h.acao).toBe('CRIOU');
     expect(h.alvo).toBe('Cebola');
-    expect(h.mudancas.find((m) => m.campo === 'custo por unidade')?.depois.replace(/ /g, ' ')).toBe('R$ 18,98/kg');
+    expect(h.mudancas.find((m) => m.campo === 'custo de referência por unidade')?.depois.replace(/ /g, ' ')).toBe('R$ 18,98/kg');
   });
 
   it('"Ainda não sei o preço": grava 0, lista diz Sem preço (custo null) e o filtro acha', async () => {
@@ -163,7 +163,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     expect(h.mudancas.map((m) => [m.campo, m.antes, m.depois].map((x) => x?.replace(/ /g, ' ')))).toEqual([
       ['conservação', 'Seco', 'Refrigerado'],
       ['frete', 'R$ 5,00', 'R$ 7,50'],
-      ['custo por unidade', 'R$ 18,98/kg', 'R$ 19,48/kg'],
+      ['custo de referência por unidade', 'R$ 18,98/kg', 'R$ 19,48/kg'],
     ]);
     const antes = await a.historicoAlteracao.count();
     const nova = (await obterInsumo(a, i.id, ALCANCE_FLOWFOODS))!;
@@ -239,7 +239,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     const ordem = (await listarInsumos(a, { ordem: 'custo' })).linhas.map((l) => l.nome);
     expect(ordem.indexOf('Guardanapo de papel')).toBeLessThan(ordem.indexOf('Palito'));
     const [h] = await listarHistorico(a, { de: [{ entidade: 'Insumo', ids: [r.id] }], verPrecos: true });
-    expect(h.mudancas.find((m) => m.campo === 'custo por unidade')?.depois.replace(/\u00a0/g, ' ')).toBe('R$ 0,004/un');
+    expect(h.mudancas.find((m) => m.campo === 'custo de referência por unidade')?.depois.replace(/\u00a0/g, ' ')).toBe('R$ 0,004/un');
     const gravado = await a.historicoAlteracao.findFirstOrThrow({ where: { entidadeId: r.id } });
     expect((gravado.depois as Record<string, unknown>).custoPorUnidade).toEqual({ centavos: 1, milesimos: 2500 });
     // Duas embalagens: 1000 un por R$ 4,00 (padrão) e 5000 un por R$ 15,00.

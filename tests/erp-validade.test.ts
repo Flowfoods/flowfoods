@@ -94,9 +94,16 @@ describe('ERP 1.4 · validação das conservações e validades', () => {
     expect(!r.ok && r.erros.conservacao).toMatch(/nenhuma conservação tem validade/);
   });
 
-  it('insumo sem nenhuma marcada: fica a principal, sem validade', () => {
+  it('insumo sem nenhuma marcada: fica a principal ESCOLHIDA, sem prazo; sem escolha, recusa (I.1b: nada de assumir Seco)', () => {
     expect(lerValidades(form({ conservacao: 'REFRIGERADO' }), 'insumo')).toEqual({ ok: true, validades: { principal: 'REFRIGERADO', minutos: {} } });
-    expect(lerValidades({ linhas: {} }, 'insumo')).toEqual({ ok: true, validades: { principal: 'SECO', minutos: {} } });
+    for (const sem of [undefined, '', 'Conservação', 'Selecione a conservação', 'seco', 'FRIO']) {
+      const r = lerValidades({ principal: sem, linhas: {} }, 'insumo');
+      expect(r.ok, String(sem)).toBe(false);
+      expect(!r.ok && r.erros.conservacao).toMatch(/Escolha a conservação/);
+    }
+    // Prazo digitado sem escolher a conservação também não escolhe por ela.
+    const soPrazo = lerValidades(form({ aceita_REFRIGERADO: 'on', validade_REFRIGERADO: '3' }), 'insumo');
+    expect(!soPrazo.ok && soPrazo.erros.conservacao).toMatch(/Escolha a conservação/);
   });
 
   it('marcada exige validade > 0 e ≤ 730 dias, inteira', () => {
@@ -188,7 +195,7 @@ describe('ERP 1.4 · formulário da ficha e do insumo com validade', () => {
     const comValidade = lerFormInsumo({ ...antigo, aceita_REFRIGERADO: 'on', validade_REFRIGERADO: '5', validadeEm_REFRIGERADO: 'dias' });
     expect(comValidade.ok && comValidade.dados).toMatchObject({ conservacao: 'REFRIGERADO', validades: { principal: 'REFRIGERADO', minutos: { REFRIGERADO: 7200 } } });
     const errado = lerFormInsumo({ ...antigo, aceita_CONGELADO: 'on', validade_CONGELADO: '30' });
-    expect(!errado.ok && errado.erros.conservacao).toMatch(/principal \(refrigerado\) precisa estar marcada/);
+    expect(!errado.ok && errado.erros.conservacao).toMatch(/prazo em refrigerado \(a conservação principal\)/);
   });
 });
 

@@ -2,7 +2,7 @@
  * Conferência pós-deploy das migrations `20261025000000_erp_faturamento` (2.1),
  * `20261026000000_erp_dre_despesas` (2.2a), `20261027000000_erp_dre_fechamento` (2.2b), `20261028000000_erp_cmv` (2.3),
  * `20261029000000_erp_producao` (3.1), `20261030000000_erp_lista_do_dia` (3.2), `20261031000000_erp_producao_equipe` (3.3) e
- * `20261101000000_erp_insumo_categorias` (I.1a).
+ * `20261101000000_erp_insumo_categorias` (I.1a) e `20261102000000_erp_insumo_clareza` + `20261102010000_erp_insumo_conservacao_confirmada` (I.1b).
  *
  *   npm run erp:conferir-migracao
  *
@@ -112,6 +112,9 @@ export const INDICES_DA_I_1A = ['Insumo_parceiroId_chaveEnvio_key', 'Insumo_parc
 
 /** Os gatilhos da I.1a: sem eles a categoria do sistema poderia ser renomeada, desativada ou excluída. */
 export const GATILHOS_DA_I_1A = ['CategoriaInsumo_parceiro_imutavel', 'CategoriaInsumo_sistema_protegida'] as const;
+
+/** O CHECK que a I.1b acrescentou em "Insumo" (a marca de referência). */
+export const CHECKS_DA_I_1B = [['Insumo', 'Insumo_marcaReferencia_curta']] as const;
 
 /** O que a migration deixou pendente (frases prontas para o terminal); lista vazia = tudo no lugar. */
 export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
@@ -265,6 +268,24 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261101000000_erp_insumo_categorias não foi aplicada por inteiro.`);
     }
   }
+  // I.1b: só se a migration dela já rodou (a coluna existe; o catálogo não passa pela RLS).
+  const clareza = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'Insumo' AND column_name = 'marcaReferencia'`;
+  if (clareza[0]?.n) {
+    const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_I_1B.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_I_1B) {
+      const achado = dela.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration 20261102000000_erp_insumo_clareza não foi aplicada por inteiro.`);
+      else if (!achado.validado) {
+        pendencias.push(`CHECK ${nome} ficou NOT VALID: corrija a linha antiga que o viola e rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+      }
+    }
+    // O valor novo do tipo (material de limpeza e uso) e a coluna da confirmação da conservação.
+    const material = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = 'InsumoTipo' AND e.enumlabel = 'MATERIAL'`;
+    if (!material[0]?.n) pendencias.push('O tipo MATERIAL NÃO existe em InsumoTipo: a migration 20261102000000_erp_insumo_clareza não foi aplicada por inteiro.');
+    const confirmada = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'Insumo' AND column_name = 'conservacaoConfirmadaEm'`;
+    if (!confirmada[0]?.n) pendencias.push('A coluna Insumo.conservacaoConfirmadaEm NÃO existe: a migration 20261102010000_erp_insumo_conservacao_confirmada não foi aplicada.');
+  }
   return pendencias;
 }
 
@@ -273,10 +294,10 @@ async function principal() {
   try {
     const pendencias = await conferirMigracao(db);
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3 e da I.1a conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia e das categorias (com RLS), os índices e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a e da I.1b conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia e das categorias (com RLS), os índices e os gatilhos existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3 e da I.1a: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a e da I.1b: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {

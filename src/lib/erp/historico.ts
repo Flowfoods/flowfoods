@@ -10,7 +10,7 @@ import { TIPOS_DE_FICHA } from './ficha-campos';
 import { SEPARADOR_DE_ITENS } from './compra-campos';
 import { SEM_EMBALAGEM } from './canal-campos';
 import { COMO_CLASSIFICOU } from './categoria-campos';
-import { UNIDADES, formatarCusto, formatarDinheiro, formatarQuantidade, type CustoExato, type Unidade } from './unidades';
+import { CUSTO_NAO_INFORMADO, UNIDADES, formatarCusto, formatarDinheiro, formatarQuantidade, type CustoExato, type Unidade } from './unidades';
 
 const ENTIDADE: Record<string, string> = {
   ParceiroFlow: 'Parceiro',
@@ -96,6 +96,19 @@ const ACAO: Record<string, string> = {
   RECLASSIFICOU: 'Reclassificou',
 };
 
+/** I.1b: a palavra do custo que ninguém informou. Nunca "R$ 0,00": custo incompleto não é custo baixo. */
+const SEM_CUSTO = CUSTO_NAO_INFORMADO;
+
+/**
+ * I.1b: no INSUMO, o que fica gravado nele é o custo INICIAL DE REFERÊNCIA (o que vale até a primeira compra lançada) e o
+ * prazo de uso depois de aberto; o preço efetivamente pago mora nas notas de compra, não aqui. Os rótulos dizem isso.
+ */
+const CAMPO_DO_INSUMO: Record<string, string> = {
+  precoEmbalagemCentavos: 'custo inicial de referência',
+  custoPorUnidade: 'custo de referência por unidade',
+  custoPorUnidadeCentavos: 'custo de referência por unidade',
+};
+
 const CAMPO: Record<string, string> = {
   nome: 'nome',
   slug: 'link',
@@ -115,14 +128,18 @@ const CAMPO: Record<string, string> = {
   loteDaClassificacao: 'lote da classificação',
   conservacao: 'conservação',
   validade: 'validade',
+  // I.1b: o insumo comprado guarda o prazo depois de aberto (o pré-preparo e a ficha seguem em `validade`).
+  prazoAposAbertura: 'prazo de uso após abertura',
   codigoBarras: 'código de barras',
+  // I.1b
+  marcaReferencia: 'marca de referência',
   ativo: 'situação',
   insumo: 'insumo',
   contado: 'contado',
   contados: 'contados',
   zerados: 'contados com zero',
   naoContados: 'não contados (entraram com zero)',
-  semCusto: 'sem preço (valor pendente)',
+  semCusto: 'sem custo informado (valor pendente)',
   valorCentavos: 'valor do estoque',
   email: 'e-mail',
   linkValeAte: 'link vale até',
@@ -301,12 +318,14 @@ const ORDEM = [
   'modoPreparo',
   'conservacao',
   'validade',
+  'prazoAposAbertura',
   'unidade',
   'conteudoMilesimos',
   'precoEmbalagemCentavos',
   'taxaEntregaCentavos',
   'custoPorUnidade',
   'custoPorUnidadeCentavos',
+  'marcaReferencia',
   'codigoBarras',
   'fichaQueProduz',
   'documento',
@@ -354,7 +373,7 @@ export function rotuloAcao(acao: string): string {
 
 function valor(campo: string, v: unknown): string {
   // Preço 0 é "ainda não sei o preço": nunca R$ 0,00 (custo incompleto ≠ custo baixo).
-  if (campo === 'precoEmbalagemCentavos' && v === 0) return 'Sem preço';
+  if (campo === 'precoEmbalagemCentavos' && v === 0) return SEM_CUSTO;
   if ((campo === 'taxaEntregaCentavos' || campo === 'freteNotaCentavos') && v === 0) return 'Sem frete';
   if (campo === 'situacao' && typeof v === 'string') return SITUACAO_DA_NOTA[v] ?? v;
   if (v === null || v === undefined || v === '') return '—';
@@ -400,11 +419,14 @@ export interface Mudanca {
 }
 
 /** Só os campos que mudaram (ou, numa criação, o que nasceu). */
-export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Prisma.JsonValue | null): Mudanca[] {
+export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Prisma.JsonValue | null, entidade?: string): Mudanca[] {
   const antes = objeto(antesJ);
   const depois = objeto(depoisJ);
   const campos = Array.from(new Set([...Object.keys(antes), ...Object.keys(depois)]));
   const criacao = Object.keys(antes).length === 0;
+  // I.1b: só no histórico do INSUMO (não no da outra embalagem nem no da ficha) os rótulos de custo e prazo mudam.
+  const doInsumo = entidade === 'Insumo';
+  const rotulo = (c: string) => (doInsumo ? CAMPO_DO_INSUMO[c] : undefined) ?? CAMPO[c] ?? c;
   // Quantidade com unidade junto ("1,5 kg") quando a linha diz a unidade; aí a
   // unidade não precisa de linha própria.
   const unidade = (o: Record<string, unknown>) =>
@@ -416,10 +438,10 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     }
     // Foto: o nome do arquivo é sorteado, não é informação. Diz se tem e se trocou.
     if (c === 'foto') return typeof o[c] === 'string' ? (o === antes && !criacao ? 'foto anterior' : criacao ? 'com foto' : 'foto nova') : 'sem foto';
-    // Custo de referência: a MESMA frase da tela ("R$ 18,98/kg", "R$ 0,004/un" ou "Sem preço").
+    // Custo de referência: a MESMA frase da tela ("R$ 18,98/kg", "R$ 0,004/un" ou "Custo não informado").
     if (c === 'custoPorUnidade' && unidade(o)) return formatarCusto(custoExato(o[c]), unidade(o)!);
     if (c === 'custoPorUnidadeCentavos' && unidade(o) && (o[c] === null || typeof o[c] === 'number')) {
-      return o[c] === null ? 'Sem preço' : `${formatarDinheiro(o[c] as number)}/${UNIDADES[unidade(o)!].sigla}`;
+      return o[c] === null ? SEM_CUSTO : `${formatarDinheiro(o[c] as number)}/${UNIDADES[unidade(o)!].sigla}`;
     }
     return valor(c, o[c]);
   };
@@ -484,7 +506,7 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
       }
     }
     out.push({
-      campo: CAMPO[c] ?? c,
+      campo: rotulo(c),
       antes: criacao ? null : fmt(c, antes),
       depois: fmt(c, depois),
     });
@@ -689,7 +711,7 @@ function paraTela(
     autorNome: h.autorNome,
     ocorridoEm: h.ocorridoEm,
     alvo: alvoDaLinha(antes, depois),
-    mudancas: descreverMudancas(antes, depois),
+    mudancas: descreverMudancas(antes, depois, h.entidade),
   };
 }
 

@@ -109,8 +109,11 @@ export async function reabrirPeriodoDeTeste(cliente: ClienteDoParceiro, periodoI
  * `categoriaId` (inclusive vazio) fala com o servidor sem intermediário.
  */
 export async function cadastrarInsumoDeTeste(cliente: ClienteDoParceiro, entrada: Record<string, unknown>, autorNome?: string) {
-  if (entrada.categoriaId !== undefined) return cadastrarInsumo(cliente, entrada, autorNome);
+  // I.1b: a conservação também é escolhida (o servidor não assume mais Seco). O teste que só precisa de um insumo diz Seco;
+  // quem passa a chave `conservacao` (inclusive vazia) fala com o servidor sem intermediário.
+  const comConservacao = 'conservacao' in entrada ? entrada : { ...entrada, conservacao: 'SECO' };
+  if (comConservacao.categoriaId !== undefined) return cadastrarInsumo(cliente, comConservacao, autorNome);
   await garantirCategoriasPadrao(cliente);
-  const sugestao = await sugestaoParaInsumo(cliente, String(entrada.nome ?? ''), typeof entrada.tipo === 'string' ? entrada.tipo : undefined);
-  return cadastrarInsumo(cliente, { ...entrada, categoriaId: sugestao.categoriaId ?? '' }, autorNome);
+  const sugestao = await sugestaoParaInsumo(cliente, String(comConservacao.nome ?? ''), typeof comConservacao.tipo === 'string' ? comConservacao.tipo : undefined);
+  return cadastrarInsumo(cliente, { ...comConservacao, categoriaId: sugestao.categoriaId ?? '' }, autorNome);
 }

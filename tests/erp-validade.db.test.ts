@@ -240,7 +240,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.4 · validade por conservação (Postgres rea
     expect(await rodar(() => insumosDaSessao.acaoEditarInsumo(ids.cheddar, null, fi))).toMatchObject({ redirect: expect.stringContaining(ids.cheddar) });
     expect((await obterInsumo(a, ids.cheddar, ALCANCE_FLOWFOODS))!.validades).toEqual({ principal: 'REFRIGERADO', minutos: { REFRIGERADO: 7200 } });
     const [h] = await listarHistorico(a, { de: [{ entidade: 'Insumo', ids: [ids.cheddar] }], limite: 1, verPrecos: true });
-    expect(h.mudancas.map((m) => [m.campo, m.antes, m.depois])).toEqual([['validade', '—', 'Refrigerado 5 dias']]);
+    expect(h.mudancas.map((m) => [m.campo, m.antes, m.depois])).toEqual([['prazo de uso após abertura', '—', 'Refrigerado 5 dias']]);
   });
 
   it('o banco recusa por fora: principal sem validade, sem principal com validade, acima do teto, zero', async () => {

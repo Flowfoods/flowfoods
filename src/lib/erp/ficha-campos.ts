@@ -79,6 +79,8 @@ export interface InsumoDaFicha {
    * insumo produzido: por ele, o item escaparia da conferência de círculo.
    */
   produzidoPor?: string | null;
+  /** I.1b: o tipo do insumo; "material de limpeza e uso" não entra em receita. Ausente (leitura antiga) = ingrediente. */
+  tipo?: string;
   /**
    * 1.5: custo exato pela ÚLTIMA nota de compra lançada (anexado na leitura,
    * `compras-custo.ts`). Ausente ou null = sem compra: vale o preço cadastrado.
@@ -270,6 +272,9 @@ export function lerFormFicha(
       if (!insumo) return void (erros[chave] = 'Insumo não encontrado neste cadastro.');
       if (insumo.produzidoPor) {
         return void (erros[chave] = `“${insumo.nome}” é o pré-preparo “${insumo.produzidoPor}”: escolha-o em “Pré-preparos”, não em “Insumos”.`);
+      }
+      if (insumo.tipo === 'MATERIAL' && !jaNaFicha.has(insumo.id)) {
+        return void (erros[chave] = `“${insumo.nome}” é material de limpeza e uso: não entra em ficha técnica. Em Insumos, o tipo dele diz isso.`);
       }
       if (!insumo.ativo && !jaNaFicha.has(insumo.id)) {
         return void (erros[chave] = `“${insumo.nome}” está desativado: reative em Insumos para usar.`);
