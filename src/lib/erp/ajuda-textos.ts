@@ -467,11 +467,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras'],
     titulo: 'Compras',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'As notas de compra de cada loja.' },
       { texto: 'Nota lançada muda o custo do insumo e entra no estoque, se a loja já abriu o estoque.' },
       { texto: 'A mesma nota não entra duas vezes.', para: ['compras.lancar'] },
+      { texto: 'Tem o XML da nota fiscal? Em Notas recebidas o sistema lê os itens para você.', para: ['compras.lancar'] },
     ],
   },
   {
@@ -530,9 +531,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/[id]'],
     titulo: 'Detalhe da nota',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'A nota, o frete de cada item e o que ela fez no estoque.' },
+      { texto: 'Nota que veio do XML da nota fiscal não se edita: cancele e concilie a nota fiscal de novo.', para: ['compras.lancar'] },
       { texto: 'Nota do período em curso mostra como ficou o orçamento de compra da loja: quanto ainda cabe, ou quanto passou. É só aviso.' },
       { texto: 'Errou? Edite ou cancele com o motivo: o custo e o estoque voltam.', para: ['compras.lancar'] },
       { texto: 'Nota com data em período que o DRE já fechou não se edita nem se cancela.', para: ['compras.lancar'] },
@@ -567,10 +569,59 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/fornecedores/[id]'],
     titulo: 'Detalhe do fornecedor',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'O cadastro, o que esse fornecedor já vendeu, com o último preço de cada insumo, e as últimas notas das lojas que você vê.' },
+      { texto: 'Fornecedor que chega por uma nota fiscal nasce com os dados da nota e fica a completar.' },
       { texto: 'Cadastro a completar mostra o que falta. Outro cadastro com a mesma raiz de CNPJ aparece como outro estabelecimento da mesma empresa: nada é unido.' },
+    ],
+  },
+  {
+    chave: 'compras-documentos',
+    area: 'compras',
+    rotas: ['compras/recebidas'],
+    titulo: 'Notas recebidas',
+    versao: 1,
+    aula: [
+      { texto: 'As notas fiscais que chegaram por XML e esperam a sua conferência.' },
+      { texto: 'Receber a nota não lança nada: o custo e o estoque só mudam depois que você confere os itens e concilia.' },
+      { texto: 'A mesma nota fiscal não entra duas vezes.' },
+    ],
+  },
+  {
+    chave: 'compras-documento-importar',
+    area: 'compras',
+    rotas: ['compras/recebidas/importar'],
+    titulo: 'Importar XML',
+    versao: 1,
+    aula: [
+      { texto: 'Envie o arquivo .xml que o fornecedor mandou com a nota, não o PDF.' },
+      { texto: 'O sistema só lê o arquivo: não pede senha, certificado nem acesso à SEFAZ.' },
+      { texto: 'Nota de outra empresa, cupom fiscal, nota sem autorização e arquivo grande demais são recusados, com o motivo.' },
+    ],
+  },
+  {
+    chave: 'compras-documento',
+    area: 'compras',
+    rotas: ['compras/recebidas/[id]'],
+    titulo: 'Conferir a nota',
+    versao: 1,
+    aula: [
+      { texto: 'Para cada item, escolha o insumo, a embalagem e quantas embalagens vêm em uma unidade da nota: 1 caixa de 10 pacotes é fator 10.' },
+      { texto: 'O que você escolhe fica lembrado para este fornecedor: na próxima nota o item já vem pronto.' },
+      { texto: 'Conciliar lança a nota de compra: cada item entra pelo valor que você paga, o frete é dividido e o total tem que fechar ao centavo.' },
+      { texto: 'Já lançou esta nota à mão? Use Ligar a esta nota: nada é lançado de novo.', para: ['compras.lancar'] },
+    ],
+    secoes: [
+      {
+        id: 'conta',
+        titulo: 'O que vale e o que não vale',
+        blocos: [
+          { texto: 'O valor de cada item é o da nota menos o desconto, mais seguro, outras despesas, IPI e imposto retido, porque custo é o que se paga.' },
+          { texto: 'A assinatura digital da nota não é conferida: confira os itens e os valores antes de conciliar.' },
+          { texto: 'Mudar o que o sistema lembra de um item pede acesso a editar fornecedores e não altera notas já conciliadas.', para: ['fornecedores.editar'] },
+        ],
+      },
     ],
   },
   {

@@ -15,7 +15,8 @@ export default async function ParceiroEditarNotaPage({ params }: { params: { slu
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/compras`;
   const nota = await obterNota(ctx.cliente, ctx.alcance, params.id);
   if (!nota) notFound();
-  if (nota.cancelada) redirect(`${base}/${nota.id}`);
+  // F.1b: a nota que veio do XML não se edita (a tela da nota explica); cancelada também não.
+  if (nota.cancelada || nota.chaveAcesso) redirect(`${base}/${nota.id}`);
   const opcoes = await dadosDoFormularioDeNota(ctx.cliente, ctx.alcance, {
     lojaId: nota.lojaId,
     fornecedorId: nota.fornecedor?.id,

@@ -34,6 +34,7 @@ export default async function ParceiroNotaPage({ params, searchParams }: { param
       periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, `/rodolfo/erp/${ctx.parceiro.slug}`)}
       orcamento={await orcamentoDaNotaLancada(ctx.cliente, ctx.alcance, nota)}
       orcamentoHref={`${base}/compras/orcamento`}
+      documentoHref={nota.documentoId ? `${base}/compras/recebidas/${nota.documentoId}` : undefined}
     />
   );
 }

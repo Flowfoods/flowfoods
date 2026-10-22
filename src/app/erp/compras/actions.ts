@@ -16,9 +16,12 @@ import { concluirCompra, executarCancelamento, executarNota, recusadoNaNota } fr
 import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { caminhoDeVolta } from '@/lib/erp/volta';
+import type { EstadoDocumento } from '@/components/erp/telas/compras/documentos-estado';
+import { executarCancelamentoDoDocumento, executarConferencia, executarImportacao, recusadoNoDocumento } from '@/components/erp/telas/compras/documentos-executar';
 
 const NOTAS = '/erp/compras';
 const FORNECEDORES = '/erp/compras/fornecedores';
+const RECEBIDAS = '/erp/compras/recebidas';
 
 async function paraLancar() {
   const ctx = await exigirParceiroDaSessao();
@@ -66,4 +69,24 @@ export async function acaoSituacaoFornecedor(id: string, anterior: EstadoNota, f
   const ativo = querAtivo(form);
   const r = await mudarSituacaoFornecedor(ctx.cliente, String(id), ativo, form.get('motivo'), ctx.sessao.autorNome);
   return concluirCompra(r, anterior, FORNECEDORES, { mudou: ativo ? 'reativado' : 'desativado' });
+}
+
+/** F.1b: receber o XML da nota fiscal (grava o documento; não lança nada). */
+export async function acaoImportarXml(anterior: EstadoDocumento, form: FormData): Promise<EstadoDocumento> {
+  const { ctx, negado } = await paraLancar();
+  if (negado) return recusadoNoDocumento(anterior, negado);
+  return executarImportacao(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, anterior, form, RECEBIDAS);
+}
+
+/** F.1b: salvar as escolhas, conferir o impacto, conciliar ou ligar à nota já lançada (conforme o botão). */
+export async function acaoConferirDocumento(documentoId: string, anterior: EstadoDocumento, form: FormData): Promise<EstadoDocumento> {
+  const { ctx, negado } = await paraLancar();
+  if (negado) return recusadoNoDocumento(anterior, negado);
+  return executarConferencia(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(documentoId), anterior, form, RECEBIDAS);
+}
+
+export async function acaoCancelarDocumento(documentoId: string, anterior: EstadoDocumento, form: FormData): Promise<EstadoDocumento> {
+  const { ctx, negado } = await paraLancar();
+  if (negado) return recusadoNoDocumento(anterior, negado);
+  return executarCancelamentoDoDocumento(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(documentoId), anterior, form, RECEBIDAS);
 }

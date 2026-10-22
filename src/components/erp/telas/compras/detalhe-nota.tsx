@@ -45,6 +45,7 @@ export function TelaDetalheNota({
   periodos,
   orcamento,
   orcamentoHref,
+  documentoHref,
 }: {
   nota: NotaDetalhada;
   base: string;
@@ -66,10 +67,14 @@ export function TelaDetalheNota({
   orcamento?: OrcamentoNaNota | null;
   /** Link da tela do orçamento (quem vê compras). */
   orcamentoHref?: string;
+  /** F.1b: link da nota fiscal (XML) de onde a nota veio ou a que foi ligada; ausente = quem não vê notas recebidas. */
+  documentoHref?: string;
 }) {
   const mensagem = fraseDaNota(feito);
   const fechado = fechadoNaData(periodos.fechados, n.entradaEm);
-  const edita = podeLancar && !n.cancelada && !fechado;
+  const cancela = podeLancar && !n.cancelada && !fechado;
+  // F.1b: a nota que veio do XML (ou foi ligada a ele) é o que a nota fiscal diz: não se edita, se cancela e se concilia de novo.
+  const edita = cancela && !n.chaveAcesso;
   return (
     <div className="space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: n.rotulo }]} />
@@ -90,6 +95,16 @@ export function TelaDetalheNota({
 
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
       {orcamento && <AvisoDoOrcamento o={orcamento} href={orcamentoHref} agora={feito === 'lancada' || feito === 'editada'} />}
+      {n.chaveAcesso && !n.cancelada && (
+        <Aviso tom="neutro" titulo="Esta nota veio da nota fiscal (XML).">
+          Ela não se edita. Para corrigir, cancele esta nota (o estoque e o custo voltam) e concilie a nota fiscal de novo.{' '}
+          {documentoHref && (
+            <Link href={documentoHref} className={LINK_DE_TEXTO}>
+              Abrir a nota fiscal
+            </Link>
+          )}
+        </Aviso>
+      )}
       {fechado && podeLancar && !n.cancelada && <AvisoDoPeriodoFechado periodo={fechado.nome} href={periodos.href} frase="Esta nota é desse período: não dá para editar nem cancelar." />}
       {n.cancelada && feito !== 'cancelada' && (
         <Aviso tom="alerta" titulo="Nota cancelada.">
@@ -234,7 +249,7 @@ export function TelaDetalheNota({
               </ul>
             </Painel>
           )}
-          {edita && (
+          {cancela && (
             <Painel titulo="Situação">{bloqueio ? <p className="text-sm text-suave">{bloqueio}</p> : <FormCancelarNota acao={acaoCancelar} />}</Painel>
           )}
           <Painel titulo="Alterações" semRespiro>

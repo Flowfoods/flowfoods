@@ -108,8 +108,8 @@
     "hash": "45d01d5291ff0691"
   },
   "compras": {
-    "versao": 1,
-    "hash": "a2950debd7264c7f"
+    "versao": 2,
+    "hash": "32f98572a12c08ff"
   },
   "compras-orcamento": {
     "versao": 4,
@@ -120,8 +120,8 @@
     "hash": "8a708c7d8d14f72f"
   },
   "compra": {
-    "versao": 3,
-    "hash": "2594b3de930e4918"
+    "versao": 4,
+    "hash": "f881c9e8e64de6c1"
   },
   "fornecedores": {
     "versao": 3,
@@ -132,8 +132,20 @@
     "hash": "ff79249a2e37f208"
   },
   "fornecedor": {
-    "versao": 2,
-    "hash": "f1224ef4156f90cc"
+    "versao": 3,
+    "hash": "1b5e92fb87619c65"
+  },
+  "compras-documentos": {
+    "versao": 1,
+    "hash": "277f805c4e3d4229"
+  },
+  "compras-documento-importar": {
+    "versao": 1,
+    "hash": "809767dd60ed3720"
+  },
+  "compras-documento": {
+    "versao": 1,
+    "hash": "06a0a552da36b37f"
   },
   "estoque": {
     "versao": 1,

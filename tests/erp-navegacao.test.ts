@@ -52,7 +52,7 @@ const proprio = (permissoes: string[]) => alcance({ perfilBase: null, perfilProp
 // 3.1: Produção virou área (a de Etiquetas segue "em breve", 3.4).
 const AREAS = ['Cadastros e Cardápio', 'Compras e Fornecedores', 'Estoque e Movimentações', 'Produção', 'Faturamento e DRE', 'Rede e Equipe'];
 const FUTUROS = ['Etiquetas'];
-const ACOES = ['Novo insumo', 'Nova ficha', 'Importar planilha', 'Lançar nota', 'Novo fornecedor', 'Nova produção', 'Lançar o dia', 'Importar faturamento', 'Lançar despesa'];
+const ACOES = ['Novo insumo', 'Nova ficha', 'Importar planilha', 'Lançar nota', 'Importar XML', 'Novo fornecedor', 'Nova produção', 'Lançar o dia', 'Importar faturamento', 'Lançar despesa'];
 // O operador produz (planeja o lote), então "Nova produção" é a única ação que ele tem.
 const ACOES_SEM_O_OPERADOR = ACOES.filter((a) => a !== 'Nova produção');
 
@@ -62,11 +62,11 @@ const acoesPorArea = (a: Alcance) => Object.fromEntries(emUso(a).map((m) => [m.n
 
 // ---------------------------------------------------------------- papéis × áreas
 describe('UX.9 · papéis × áreas, abas e ações', () => {
-  it('Dono: 6 áreas, as abas de cada uma e as 9 ações; 1 futuro', () => {
+  it('Dono: 6 áreas, as abas de cada uma e as 10 ações; 1 futuro', () => {
     expect(emUso(DONO).map((m) => m.nome)).toEqual(AREAS);
     expect(abasPorArea(DONO)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Categorias', 'Classificar insumos', 'Fichas e produtos', 'Precificação'],
-      'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
+      'Compras e Fornecedores': ['Compras', 'Notas recebidas', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'CMV por categoria', 'Períodos', 'Plano e metas', 'Metas por categoria'],
@@ -74,7 +74,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     });
     expect(acoesPorArea(DONO)).toEqual({
       'Cadastros e Cardápio': ['Novo insumo', 'Nova ficha', 'Importar planilha'],
-      'Compras e Fornecedores': ['Lançar nota', 'Novo fornecedor'],
+      'Compras e Fornecedores': ['Lançar nota', 'Importar XML', 'Novo fornecedor'],
       'Estoque e Movimentações': [],
       Produção: ['Nova produção'],
       'Faturamento e DRE': ['Lançar o dia', 'Importar faturamento', 'Lançar despesa'],
@@ -86,7 +86,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Gerente (rede): Precificação visível (ver preços), sem Equipe; ações de cadastro e de compra', () => {
     expect(abasPorArea(GERENTE)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Categorias', 'Classificar insumos', 'Fichas e produtos', 'Precificação'],
-      'Compras e Fornecedores': ['Compras', 'Orçamento', 'Fornecedores'],
+      'Compras e Fornecedores': ['Compras', 'Notas recebidas', 'Orçamento', 'Fornecedores'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
       // 2.2a: o gerente vê e lança despesa, vê o DRE e o período; plano de contas e período são do dono (rede inteira).
@@ -156,7 +156,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     const verSo = navegacaoDoParceiro(proprio(['insumos.ver', 'fichas.ver']));
     expect(acoesDaNavegacao(verSo)).toEqual([]);
     const lanca = navegacaoDoParceiro(proprio(['compras.ver', 'compras.lancar']));
-    expect(acoesDaNavegacao(lanca).map((x) => x.rotulo)).toEqual(['Lançar nota']);
+    expect(acoesDaNavegacao(lanca).map((x) => x.rotulo)).toEqual(['Lançar nota', 'Importar XML']);
   });
 
   it('⌘K: o Dono acha "Novo fornecedor", "Lançar nota" e "Lançar o dia"; o Operador só acha "Nova produção"; cada ação diz a área', () => {
@@ -452,7 +452,7 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
   const parceiro = (r: string) => join('src', 'app', 'erp', ...r.split('/').filter(Boolean), 'page.tsx');
   const espelho = (r: string) => join('src', 'app', 'rodolfo', '(painel)', 'erp', '[slug]', ...r.split('/').filter(Boolean), 'page.tsx');
 
-  it.each([...ANTIGAS, ...profundas, '/estoque/contagens', '/compras/orcamento', '/insumos/categorias', '/insumos/classificar'])('%s existe no /erp e no nível 1', (r) => {
+  it.each([...ANTIGAS, ...profundas, '/estoque/contagens', '/compras/orcamento', '/compras/recebidas', '/compras/recebidas/importar', '/insumos/categorias', '/insumos/classificar'])('%s existe no /erp e no nível 1', (r) => {
     expect(existsSync(parceiro(r)), `/erp${r}`).toBe(true);
     expect(existsSync(espelho(r)), `/rodolfo/erp/<slug>${r}`).toBe(true);
   });
@@ -475,7 +475,7 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     const todas = [...emUso(DONO)].flatMap((m) => [...m.grupos.flatMap((g) => g.itens), ...m.acoes]).map((i) => i.href.replace('/erp', ''));
     const novas = todas.filter((r) => !ANTIGAS.includes(r) && r !== '/acesso');
     // 2.5: o orçamento de compra é aba da área Compras.
-    expect(novas).toEqual(['/insumos/categorias', '/insumos/classificar', '/compras/orcamento', '/estoque/contagens', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/cmv-categorias', '/dre/periodos', '/dre/plano', '/dre/metas-categorias', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
+    expect(novas).toEqual(['/insumos/categorias', '/insumos/classificar', '/compras/recebidas', '/compras/orcamento', '/compras/recebidas/importar', '/estoque/contagens', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/cmv-categorias', '/dre/periodos', '/dre/plano', '/dre/metas-categorias', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
   });
 });
 

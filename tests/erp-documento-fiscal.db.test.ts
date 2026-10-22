@@ -83,7 +83,7 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)',
   const receber = (xml: string, alcance = DONA(), cliente = a) => receberXml(cliente, alcance, bytes(xml), 'Marina Dona');
   const idDe = (r: { ok: boolean }) => {
     if (!r.ok) throw new Error(JSON.stringify(r));
-    return (r as { id: string }).id;
+    return (r as unknown as { id: string }).id;
   };
   const contagens = async () => ({
     docs: await a.documentoFiscal.count(),

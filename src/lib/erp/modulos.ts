@@ -310,6 +310,13 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               permissao: 'compras.ver',
             },
             {
+              href: `${base}/compras/recebidas`,
+              rotulo: 'Notas recebidas',
+              icone: 'importar',
+              subtitulo: 'XML da nota fiscal: conferir e lançar',
+              permissao: 'compras.ver',
+            },
+            {
               href: `${base}/compras/orcamento`,
               rotulo: 'Orçamento',
               icone: 'metricas',
@@ -332,6 +339,13 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
           rotulo: 'Lançar nota',
           icone: 'novo',
           subtitulo: 'Itens, frete e o custo que muda',
+          permissao: 'compras.lancar',
+        },
+        {
+          href: `${base}/compras/recebidas/importar`,
+          rotulo: 'Importar XML',
+          icone: 'importar',
+          subtitulo: 'Receber a nota fiscal do fornecedor',
           permissao: 'compras.lancar',
         },
         {

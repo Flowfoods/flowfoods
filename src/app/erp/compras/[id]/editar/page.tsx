@@ -18,7 +18,8 @@ export default async function ErpEditarNotaPage({ params }: { params: { id: stri
   const nota = await obterNota(ctx.cliente, ctx.alcance, params.id);
   if (!nota) notFound();
   exigirPermissaoNaPagina(ctx, 'compras.lancar', { lojaId: nota.lojaId });
-  if (nota.cancelada) redirect(`/erp/compras/${nota.id}`);
+  // F.1b: a nota que veio do XML não se edita (a tela da nota explica); cancelada também não.
+  if (nota.cancelada || nota.chaveAcesso) redirect(`/erp/compras/${nota.id}`);
   const opcoes = await dadosDoFormularioDeNota(ctx.cliente, ctx.alcance, {
     lojaId: nota.lojaId,
     fornecedorId: nota.fornecedor?.id,
