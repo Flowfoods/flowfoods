@@ -536,7 +536,7 @@ function filtroDoIncompleto(): Prisma.InsumoWhereInput {
       { categoriaId: null },
       { categoria: { is: { chave: CHAVE_DO_SISTEMA } } },
       filtroDaConfirmacaoDaSituacao(),
-      { tipo: { not: 'PRE_PREPARO' }, conteudoMilesimos: { lte: 0 } },
+      { fichaQueProduz: { isNot: null }, validadeSecoMin: null, validadePistaFriaMin: null, validadeRefrigeradoMin: null, validadeCongeladoMin: null },
     ],
   };
 }
@@ -695,7 +695,8 @@ export interface LinhaDeInsumo {
 }
 
 function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
-  const q = f.q.trim().slice(0, 80);
+  // O texto da busca é literal: `%` e `_` não são curingas do LIKE (o Prisma não os escapa em `contains`).
+  const q = f.q.trim().slice(0, 80).replace(/[\\%_]/g, '\\$&');
   // Os filtros que se combinam vão em AND (cada um com o seu OR/campo), para um nunca apagar o outro.
   const e: Prisma.InsumoWhereInput[] = [];
   // I.1a: 'sem' = sem categoria; 'revisar' = sem categoria ou em "Outros / a classificar"; senão, uma categoria.
@@ -762,7 +763,7 @@ function paraLinha(i: LinhaDoBanco, preparos: ReadonlyMap<string, CustoDaFicha>,
       temCategoria: !!i.categoria,
       conservacao: i.conservacao,
       conservacaoConfirmadaEm,
-      conteudoMilesimos: i.conteudoMilesimos,
+      preparoSemValidade: !!fichaQueProduz && Object.keys(validades.minutos).length === 0,
     }),
     conservacaoInformada: !fichaQueProduz || Object.keys(validades.minutos).length > 0,
     custo: fichaQueProduz ? null : (compra?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos)),

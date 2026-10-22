@@ -68,7 +68,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'incompleto',
         titulo: 'Cadastro incompleto',
         blocos: [
-          { texto: 'Aparece quando falta a categoria, quando ela é “Outros / a classificar”, quando a conservação está a confirmar ou quando falta a quantidade da embalagem. Cada insumo diz o motivo na própria linha.' },
+          { texto: 'Aparece quando falta a categoria, quando ela é “Outros / a classificar”, quando a conservação está a confirmar ou, no pré-preparo, quando a ficha não diz a validade. Cada insumo diz o motivo na própria linha.' },
           { texto: 'Custo não informado é outra coisa: tem o seu filtro, “Só sem custo”. A unidade base é obrigatória, então nenhum insumo fica sem ela.' },
         ],
       },

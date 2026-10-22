@@ -424,14 +424,15 @@ export function lerPorPagina(v: unknown): number {
 
 /**
  * L.1: por que um insumo está com o cadastro incompleto (derivado na leitura; nada é gravado). Custo não informado é outra coisa e
- * NÃO entra aqui. "Sem unidade" não existe: a unidade base é coluna obrigatória no banco, então nenhum insumo fica sem ela.
- * O filtro do banco (`insumos.ts`) e esta função saem da mesma lista; um teste confere que concordam insumo a insumo.
+ * NÃO entra aqui. "Sem unidade" e "sem a quantidade da embalagem" não existem: a unidade base é coluna obrigatória e a quantidade
+ * tem CHECK maior que zero no banco, então nenhum insumo fica sem elas. O filtro do banco (`insumos.ts`) e esta função saem da
+ * mesma lista; um teste confere que concordam insumo a insumo.
  */
 export const MOTIVOS_DE_CADASTRO_INCOMPLETO = {
   'sem-categoria': 'Sem categoria',
   'a-classificar': 'Categoria a classificar (Outros)',
   conservacao: 'Conservação a confirmar',
-  embalagem: 'Sem quanto vem na embalagem',
+  validade: 'Validade do pré-preparo não informada (na ficha)',
 } as const;
 export type MotivoIncompleto = keyof typeof MOTIVOS_DE_CADASTRO_INCOMPLETO;
 /** A chave da categoria do sistema "Outros / a classificar" (a mesma de `CHAVE_DO_SISTEMA`; aqui por causa da ordem dos imports). */
@@ -443,13 +444,14 @@ export function motivosDoCadastro(i: {
   temCategoria: boolean;
   conservacao: string;
   conservacaoConfirmadaEm: Date | string | null;
-  conteudoMilesimos: number;
+  /** Pré-preparo cuja ficha ainda não diz a validade (a conservação dele vem da ficha). */
+  preparoSemValidade: boolean;
 }): MotivoIncompleto[] {
   const m: MotivoIncompleto[] = [];
   if (!i.temCategoria) m.push('sem-categoria');
   else if (i.categoriaChave === CHAVE_OUTROS) m.push('a-classificar');
   if (conservacaoAConfirmar({ tipo: i.tipo, conservacao: i.conservacao, conservacaoConfirmadaEm: i.conservacaoConfirmadaEm, categoriaChave: i.categoriaChave })) m.push('conservacao');
-  if (i.tipo !== 'PRE_PREPARO' && i.conteudoMilesimos <= 0) m.push('embalagem');
+  if (i.preparoSemValidade) m.push('validade');
   return m;
 }
 

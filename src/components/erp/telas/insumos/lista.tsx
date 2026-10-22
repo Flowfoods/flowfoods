@@ -266,7 +266,7 @@ export function FiltrosDaLista({
         <span className="whitespace-nowrap">Cadastro incompleto</span>
       </label>
       <p id="insumos-incompleto-ajuda" className="col-span-2 text-[12px] text-suave lg:col-span-3">
-        Cadastro incompleto: sem categoria, em “Outros / a classificar”, com a conservação a confirmar ou sem a quantidade da embalagem. Custo não informado é outra coisa: use “Só sem custo”.
+        Cadastro incompleto: sem categoria, em “Outros / a classificar”, com a conservação a confirmar ou, no pré-preparo, sem validade na ficha. Custo não informado é outra coisa: use “Só sem custo”.
       </p>
     </form>
   );
