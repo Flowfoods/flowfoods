@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2), a cozinha pega a tarefa: histórico e indicadores por pessoa (3.3), categorias de insumo, categoria obrigatória, confirmação ao salvar e idempotência (I.1a), cadastro de insumos claro (I.1b), metas por categoria e CMV por categoria pelas compras (I.2a), CMV real por categoria, compra × real, evolução, matriz e meta total por loja (I.2b)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2), a cozinha pega a tarefa: histórico e indicadores por pessoa (3.3), categorias de insumo, categoria obrigatória, confirmação ao salvar e idempotência (I.1a), cadastro de insumos claro (I.1b), metas por categoria e CMV por categoria pelas compras (I.2a), CMV real por categoria, compra × real, evolução, matriz e meta total por loja (I.2b), cadastro de fornecedor evoluído e CNPJ da loja (F.1a)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -634,7 +634,7 @@ portão, RLS e trigger sem mudança. E `20261018000000_erp_validar_checks_insumo
    "desce", "não muda: vale a nota de DD/MM, mais nova") e as fichas que
    mudam em cascata (por porção/kg), até 30. Na tela, a conta ao vivo usa as
    mesmas funções puras.
-9. **Fornecedor**: nome (único no parceiro), CNPJ/CPF opcional (dígitos
+9. **Fornecedor** (evoluído na F.1a, ver "O que a F.1a entregou"): nome (único no parceiro), CNPJ/CPF opcional (dígitos
    verificadores), contato; editar condicional, desativar/reativar com motivo;
    detalhe com o que já vendeu (último preço por insumo) e as últimas notas das
    lojas de quem vê. Cadastro da rede.
@@ -2792,6 +2792,56 @@ npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.p
 - **Lições de código**: o mock de `hojeNoRio` dos testes de tela precisa deixar passar a data de um instante dado (o dia da abertura), senão o real nunca abre; um insumo sem categoria precisa limpar os campos de classificação (CHECK); o preenchimento de uma conta que pode falhar tem de ser conferido ANTES de gravar (o `transacao` só desfaz se lançar erro).
 - **Para o Rodolfo (não bloqueia; padrão em negrito)**: (1) o desvio relativo é só leitura (**sim**) ou vira faixa de verdade (v2 do farol)? (2) a Delivery que tem meta total própria: o orçamento da rede mostra a **média** das metas ou prefere só a soma dos tetos? (3) o uso da categoria por loja sem vigência (**ok**) ou com? (4) a evolução fica em **6** períodos? (5) as lojas que fecharam estoque antes da I.2a só abrem por categoria a partir do **primeiro** período com os dois retratos (o anterior fica com compras + variação): é aceitável ou quer refazer a contagem do mês? (6) as decisões da I.2a seguem abertas: base bruta × líquida, limiar de 2 %, só o Dono personaliza a loja, o conjunto inteiro, pré-preparo em linha própria, categoria única da rede.
 
+## O que a F.1a entregou — cadastro de fornecedor evoluído e CNPJ da loja
+
+Primeira metade da prioridade "evolução do cadastro de fornecedores, preparado para notas fiscais automáticas" (Rodolfo, 21/10/2026). Fica para a F.1b: documento fiscal, vínculo de item, parser de XML, fila de conferência, conciliação e o índice parcial da chave. Uma migration ADITIVA, `20261105000000_erp_fornecedor_cadastro` (colunas em `Fornecedor` e `Loja`, um tipo, CHECKs e dois índices; nenhuma tabela nova). Decisões 300 a 313. Sem permissão nova: `fornecedores.editar` (rede) para o cadastro, `compras.ver` para ver, `lojas.gerir` para o CNPJ da loja. Ajuda: `fornecedores`, `fornecedor-novo` e `fornecedor` na versão 2, `lojas` na 3.
+
+1. **Cadastro** (300, 301). Nome fantasia, razão social, CNPJ ou CPF (dígitos verificadores, `documentoValido` de `compra-campos.ts`), inscrição estadual (ISENTO ou 2 a 14 dígitos: só formato, 306), endereço, município, UF (27 siglas), CEP, contato comercial, WhatsApp com DDD, e-mail e prazo de pagamento (0 a 180 dias, só guardado, 307). Obrigatórios, ditos em palavras e com `aria-required`: nome fantasia, razão social, CNPJ/CPF, e-mail e WhatsApp. Uma exceção: "Compras sem nota fiscal" (nome e WhatsApp; nunca casa com documento fiscal). A regra de "completo" é uma só (`faltaNoCadastro`) e o banco a repete num CHECK.
+2. **"A completar"** (302). Só nasce do sistema. A migração põe os fornecedores existentes nele pelo DEFAULT da coluna (mesmos ids, notas, vínculos; o contato em texto livre fica como está, sem virar WhatsApp). A lista mostra o selo e "Falta: ..."; filtro "A completar"; o detalhe tem "Completar o cadastro"; editar exige tudo. Recebe nota normalmente.
+3. **Duplicidade** (303). O mesmo CNPJ/CPF normalizado no mesmo parceiro é recusado com o link do que existe (ou de reativar, se desativado). A filial (outro CNPJ) passa e as duas telas avisam "mesma empresa, outro estabelecimento" (raiz de oito dígitos). Nunca funde. Nome repetido (também com outra caixa ou acento) recusado, com a dica de acrescentar bairro ou cidade. Índice único parcial `Fornecedor_parceiroId_documento_key` e bloqueio por parceiro contra a corrida (cinco cadastros simultâneos do mesmo CNPJ: um entra).
+4. **Migração com dado antigo** (304, 305). Segura nos 3 perfis do banco; nenhum SELECT sob RLS. CNPJ repetido no banco antigo: a migration termina com WARNING, o índice não nasce e `npm run erp:conferir-migracao` lista os pares por parceiro (pelo portão). Documento antigo inválido fica e vira "Documento a conferir".
+5. **Salvar** (309). "Salvando…" no botão (desabilitado) e região viva; confirmação "Fornecedor salvo com sucesso: <nome>" / "atualizado com sucesso" com "Cadastrar outro fornecedor"; erro volta no campo, com resumo e foco, sem perder o digitado; chave de envio por pessoa (clique repetido, 5 pedidos paralelos e resposta perdida: um fornecedor só); duas abas: a segunda recebe o conflito com "Recarregar".
+6. **Da nota** (311). "Fornecedor novo: cadastrar" leva com `?volta=` e traz de volta para a nota, com o preenchido e o fornecedor já escolhido.
+7. **CNPJ da loja** (310). `Loja.cnpj`, validado, em "CNPJ da loja" na linha da loja (`lojas.gerir`; o gerente vê e não muda), nas duas árvores; não único; histórico antes/depois; condicional ao lido.
+8. **Contatos nunca recebem mensagem** (308): sem caminho de envio; teste-guarda por varredura do código.
+9. **Conferidor pós-deploy**: `npm run erp:conferir-migracao` confere as 11 CHECKs, os dois índices, lista CNPJ repetido (só quando o índice falta), os "a completar" e os documentos a conferir (estes últimos não mudam o código de saída).
+10. **Histórico**: `Fornecedor` e `Loja` mostram razão social, documento, WhatsApp, e-mail, prazo, "cadastro: a completar → completo" e CNPJ com antes e depois.
+
+### Referências Kairu consultadas (regra do plano)
+
+As da análise da F.1 (22/10/2026, MCP Kairu): `library:sefaz` (inteira), `library:compras-cotacoes` e `pass:compras-cotacao-comparavel` (cotação: fora), "Nota Certa" (emissão de venda: fora), "Da Ficha ao Fornecedor". Buscas "nota fiscal", "XML" e "fornecedor".
+
+| Material | Aplicado na F.1a | Adaptado | Deixado para a F.1b |
+|---|---|---|---|
+| `library:sefaz` | fornecedor reconhecido pelo documento normalizado e validado, nunca pelo nome; nada de manifestação nem ação automática | "nada automático" valeu também para mensagens aos contatos (308) | parser sem entidade externa e com limite, dedup pela chave de 44 dígitos, "resumo não é nota completa" |
+| Da Ficha ao Fornecedor | "um clique, um pedido": chave de envio por pessoa + impressão do conteúdo; histórico preservado, mesma tabela e mesmos ids | a memória de código do fornecedor ficou para a F.1b | memória código → insumo com fator auditado |
+| `library:compras-cotacoes`, `pass:compras-cotacao-comparavel` | nada (cotação é outro assunto) | — | — |
+
+## Provar a F.1a
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate
+npx vitest run                                              # sem banco
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run   # com banco, 2x
+npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+`tests/erp-fornecedor.test.ts` (sem banco, 21): o formulário (critérios 1, 2, 3, 4 e 8), WhatsApp, inscrição, e-mail, CEP, prazo, NFC e invisíveis, `faltaNoCadastro`, CNPJ e raiz, CNPJ da loja, o retrato do histórico, a volta da nota e o teste-guarda dos contatos. `tests/erp-fornecedor.db.test.ts` (21, pelas actions de verdade): os critérios 1 a 5, 8, 9 e 10, a idempotência (clique repetido, 5 paralelos, mesma chave com outro conteúdo, chave de outra pessoa), 5 cadastros simultâneos do mesmo CNPJ, o "a completar" que recebe nota e só se edita completando, o antigo sem documento que completa como "sem nota fiscal", permissões (operador, gerente), isolamento, as barreiras do banco (índice, CHECKs) e o CNPJ da loja. `tests/erp-fornecedor-migracao.db.test.ts` (6): critérios 6 e 7 nos 3 perfis do banco, com e sem CNPJ repetido.
+
+**Cenário de números conferíveis (jornada):** a Casa Alfa tem 3 fornecedores de antes (Laticínios Rio com CNPJ 11.222.333/0001-81 e a nota 4501; Feira do Zé sem documento e com contato em texto livre; Frigorífico Velho com CNPJ de dígito errado). A lista mostra "3 fornecedores", os três "A completar"; cadastrar outro com o CNPJ do Laticínios Rio é recusado; a filial 11.222.333/0002-62 entra e as duas se avisam; completar o Laticínios Rio muda o selo e mantém a nota 4501; o Frigorífico só salva com o CNPJ certo; a loja Vila da Penha recebe 11.444.777/0001-61.
+
+**Resultado da prova (2026-10-22).** RESULTADO_PENDENTE
+
+## Herança da F.1a (para a F.1b e as próximas)
+
+- **A F.1b usa o que a F.1a deixou**: identificar o emitente por `Fornecedor.documento` (só `COMPLETO` ou `A_COMPLETAR` ativos, nunca `semNotaFiscal`), o destinatário por `Loja.cnpj` (pode repetir em duas lojas: a pessoa escolhe a loja na conferência), e criar o emitente desconhecido como `A_COMPLETAR` com o que vier no XML (razão, fantasia, CNPJ, IE, endereço, UF; e-mail e WhatsApp vazios). Dois fornecedores ativos com o mesmo CNPJ só existem se o índice não nasceu: a conferência nunca escolhe sozinha.
+- **Uma regra de obrigatoriedade**: `faltaNoCadastro` (e o CHECK `Fornecedor_completo_tem_o_basico`). Mudar o que é obrigatório muda os dois e a migração dos antigos.
+- **Cadastro que só o sistema cria** (`A_COMPLETAR`) precisa de `chaveEnvio` nula: o formulário nunca o produz.
+- **Teste-guarda dos contatos**: nova tela de fornecedor ou de compras que importe envio de mensagem reprova o teste. Mudar isso é decisão nova.
+- **Lições de código**: o portão veta SQL cru em tabela de tenant até em script (o conferidor lê por `doParceiro`); o aviso de índice que não nasceu não traz o par (o Postgres não o informa); texto livre antigo em subtítulo não pode ficar em `whitespace-nowrap`; a aula da ajuda para todos tem no máximo 4 frases (o teste da ajuda reprova mais).
+- **Para o Rodolfo (não bloqueia; padrão em negrito)**: ver a decisão 313: e-mail do fornecedor de feira com CNPJ (**precisa, salvo "sem nota fiscal"**); o "Cepai" é a SEFAZ? (**sem resposta; nada depende**); prazo de pagamento vazio por padrão (**sim**).
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -2799,13 +2849,13 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Bloco | Tabela | Para quê |
 |---|---|---|
 | Estrutura | `ParceiroFlow` | N2, o tenant. Ganhou `periodoTipo`/`periodoDiaInicio` (sugestão de período do DRE; desde a 2.2a sem uso: a regra vive em `RegraDoPeriodo`) |
-| Estrutura | `Loja` | N3, loja/unidade do parceiro; estoque, produção e faturamento são por loja. 1.7: regras da contagem (piso do fechamento, frequência ABC, tolerância para fechar sozinha). 2.1: `canaisDeVenda` (em quais canais vende; pelo menos um) |
+| Estrutura | `Loja` | N3, loja/unidade do parceiro; estoque, produção e faturamento são por loja. F.1a: `cnpj` (destinatário das notas fiscais; opcional, não único). 1.7: regras da contagem (piso do fechamento, frequência ABC, tolerância para fechar sozinha). 2.1: `canaisDeVenda` (em quais canais vende; pelo menos um) |
 | Estrutura | `Marca` | marca do grupo; produto e faturamento podem apontar marca |
 | Estrutura | `Colaborador` | pessoa da operação; âncora do histórico por funcionário (login vem na 0.3) |
 | Insumos | `Insumo` | já existia; ganhou tipo (ingrediente/embalagem/pré-preparo), taxa de entrega, conservação e validade por conservação, mínimo, fornecedor padrão, origem |
 | Insumos | `CategoriaInsumo` | I.1a: a categoria da REDE (natureza do insumo para o CMV): `chave` estável das dez padrão, `sistema` ("Outros / a classificar"), `ativa`/`desativadaEm`, `ordem`. `Insumo` ganhou `categoriaId` (nula no banco, obrigatória na regra; FK composta), como foi classificada (`classificadoPor`), o motivo, o lote da classificação assistida e a `chaveEnvio` + `hashEnvio` do cadastro. I.1b: `marcaReferencia` (texto informativo, opcional), `conservacaoConfirmadaEm` (quando uma pessoa confirmou a conservação; nulo no antigo) e o valor `MATERIAL` em `InsumoTipo` |
 | Insumos | `InsumoVariante` | outras embalagens de compra do mesmo insumo |
-| Compras | `Fornecedor` | quem vende |
+| Compras | `Fornecedor` | quem vende. F.1a: `nome` = nome fantasia (único), `razaoSocial`, `documento` (CNPJ/CPF, único por parceiro onde existe), `inscricaoEstadual`, `endereco`/`municipio`/`uf`/`cep`, `email`, `whatsapp` (dígitos com DDD), `contatoComercial`, `prazoPagamentoDias` (só guardado), `semNotaFiscal`, `situacaoCadastro` (COMPLETO ou A_COMPLETAR), `chaveEnvio` + `hashEnvio` (idempotência do cadastro); `contato` (texto livre da 1.5) só leitura |
 | Compras | `NotaEntrada` / `NotaEntradaItem` | nota de compra e itens com snapshot; LANCADA vale para o custo; com o estoque da loja aberto, entra no razão (`MovimentoEstoque.notaId`, 1.6) |
 | Ficha | `FichaTecnica` | prato ou pré-preparo, rendimento; pré-preparo pode produzir um Insumo |
 | Ficha | `FichaItem` | insumo OU subficha, quantidade líquida, fator de correção |

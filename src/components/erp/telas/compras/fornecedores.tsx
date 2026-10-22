@@ -281,7 +281,7 @@ export function TelaDetalheFornecedor({
             titulo="Últimas notas"
             semRespiro
             acessorio={
-              <Link href={`${notasBase}?fornecedor=${f.id}&situacao=todas`} className={LINK_DE_TEXTO}>
+              <Link href={`${notasBase}?fornecedor=${f.id}&situacao=todas`} className={`${LINK_DE_TEXTO} inline-flex min-h-0 items-center [@media(pointer:coarse)]:min-h-11`}>
                 Ver todas
               </Link>
             }
@@ -350,7 +350,8 @@ function PartesSemQuebra({ partes }: { partes: (string | null | undefined)[] }) 
       {lista.map((p, n) => (
         <span key={n}>
           {n > 0 && ' · '}
-          <span className="whitespace-nowrap">{p}</span>
+          {/* Texto livre do cadastro antigo pode ser longo: só as partes curtas (CNPJ, WhatsApp) ficam inteiras numa linha. */}
+          <span className={p.length <= 40 ? 'whitespace-nowrap' : 'break-words'}>{p}</span>
         </span>
       ))}
     </>
