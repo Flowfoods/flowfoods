@@ -88,7 +88,7 @@ export function TelaDasMetasPorCategoria({
           )}
           <div className={!loja && s.lojas.length > 0 ? '' : 'pt-4'}>
             <FormMetasPorCategoria
-              key={`${s.versao}:${loja?.lojaId ?? 'rede'}`}
+              key={loja?.lojaId ?? 'rede'}
               acao={acao}
               alvo={loja ? 'loja' : 'rede'}
               categorias={s.categorias.map((c) => ({ id: c.id, chave: c.chave, nome: c.nome, ordem: c.ordem, ativa: c.ativa, sistema: c.sistema, usa: c.usa, campo: c.campo, campoDaRede: c.campoDaRede }))}
@@ -103,7 +103,7 @@ export function TelaDasMetasPorCategoria({
           </div>
           {s.historico.length > 0 && (
             <details className="border-t border-linha px-4 py-3 sm:px-5">
-              <summary className="cursor-pointer text-[13px] font-medium text-texto">Últimas mudanças nas metas por categoria</summary>
+              <summary className="cursor-pointer text-[13px] font-medium text-texto [@media(pointer:coarse)]:py-3">Últimas mudanças nas metas por categoria</summary>
               <div className="mt-3 -mx-4 sm:-mx-5">
                 <ListaHistorico linhas={s.historico} />
               </div>

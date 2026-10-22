@@ -30,6 +30,8 @@ export interface PermissoesDoPainelDeCategorias {
   veRede: boolean;
 }
 
+/** Link de texto com alvo de 44 px onde o dedo é o ponteiro. */
+const LINK_TOQUE = `${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`;
 const dinheiroComSinal = (c: number) => `${c < 0 ? '−' : '+'}${formatarDinheiro(Math.abs(c))}`;
 const idDaCategoria = (l: LinhaDoPainel) => `categoria-${l.chave.replace(/[^a-z0-9]/gi, '-')}`;
 
@@ -158,11 +160,11 @@ export function TelaDoCmvPorCategoria({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <nav aria-label="Trocar de período" className="flex items-center gap-1 rounded-[10px] border border-linha bg-painel p-1">
             {d.anterior ? (
-              <Link href={link(d.anterior)} aria-label={`Período anterior: ${d.anterior.nome}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto">
+              <Link href={link(d.anterior)} aria-label={`Período anterior: ${d.anterior.nome}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
                 <ChevronLeft size={18} aria-hidden />
               </Link>
             ) : (
-              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-[7px] text-suave/40">
+              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-[7px] text-suave/40 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
                 <ChevronLeft size={18} />
               </span>
             )}
@@ -170,26 +172,26 @@ export function TelaDoCmvPorCategoria({
               {d.periodo.nome}
             </span>
             {d.proximo ? (
-              <Link href={link(d.proximo)} aria-label={`Período seguinte: ${d.proximo.nome}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto">
+              <Link href={link(d.proximo)} aria-label={`Período seguinte: ${d.proximo.nome}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
                 <ChevronRight size={18} aria-hidden />
               </Link>
             ) : (
-              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-[7px] text-suave/40">
+              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-[7px] text-suave/40 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
                 <ChevronRight size={18} />
               </span>
             )}
           </nav>
           {!d.emCurso && (
-            <Link href={`${base}?${escopoQuery.slice(1)}`} className={LINK_DE_TEXTO}>
+            <Link href={`${base}?${escopoQuery.slice(1)}`} className={LINK_TOQUE}>
               Voltar para o período de agora
             </Link>
           )}
           {loja && pode.veRede && (
-            <Link href={`${base}?periodo=${d.periodo.inicio}&rede=1`} className={LINK_DE_TEXTO}>
+            <Link href={`${base}?periodo=${d.periodo.inicio}&rede=1`} className={LINK_TOQUE}>
               Ver a rede
             </Link>
           )}
-          <Link href={`${raiz}/dre?periodo=${d.periodo.inicio}${escopoQuery}`} className={LINK_DE_TEXTO}>
+          <Link href={`${raiz}/dre?periodo=${d.periodo.inicio}${escopoQuery}`} className={LINK_TOQUE}>
             Ver o DRE
           </Link>
           {d.emCurso ? <Selo tom="alerta">Parcial · até ontem</Selo> : d.status === 'FECHADO' ? <Selo tom="ok">Período fechado</Selo> : <Selo>Período encerrado</Selo>}
@@ -240,7 +242,7 @@ export function TelaDoCmvPorCategoria({
             <Aviso tom="alerta" titulo="As categorias estão sem cor.">
               {painel.semCor}.{' '}
               {painel.aClassificarCentavos > 0 && painel.insumosAClassificar !== null && painel.insumosAClassificar > 0 && pode.classificar && (
-                <Link href={`${raiz}/insumos/classificar`} className={LINK_DE_TEXTO}>
+                <Link href={`${raiz}/insumos/classificar`} className={LINK_TOQUE}>
                   Classificar {painel.insumosAClassificar} {painel.insumosAClassificar === 1 ? 'insumo' : 'insumos'}
                 </Link>
               )}
@@ -256,7 +258,7 @@ export function TelaDoCmvPorCategoria({
                 {painel.maioresDesvios.map((l, i) => (
                   <li key={l.chave} className="grid gap-x-4 gap-y-1 px-4 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center sm:px-5">
                     <div className="min-w-0">
-                      <a href={`#${idDaCategoria(l)}`} className={`${LINK_DE_TEXTO} font-medium`}>
+                      <a href={`#${idDaCategoria(l)}`} className={`${LINK_TOQUE} font-medium`}>
                         {i + 1}. {l.nome}
                       </a>
                       <p className="text-[12px] tabular-nums leading-snug text-suave">
@@ -272,7 +274,7 @@ export function TelaDoCmvPorCategoria({
 
           <Painel
             titulo="Categorias"
-            subtitulo={d.ate ? `Pelas compras de ${formatarData(d.periodo.inicio)} a ${formatarData(d.ate)}, na categoria que o insumo tem hoje. Percentuais sobre a receita bruta.` : 'Nenhum dia apurado ainda neste período.'}
+            subtitulo={d.ate ? `Pelas compras de ${formatarData(d.periodo.inicio)} a ${formatarData(d.ate)}, ${d.status === 'FECHADO' ? 'na categoria que o insumo tinha no dia do fechamento' : 'na categoria que o insumo tem hoje'}. Percentuais sobre a receita bruta.` : 'Nenhum dia apurado ainda neste período.'}
             semRespiro
           >
             {linha.valorCentavos === null && painel.linhas.every((l) => (l.realizadoCentavos ?? 0) === 0) ? (
