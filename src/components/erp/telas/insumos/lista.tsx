@@ -543,7 +543,7 @@ export function TelaListaInsumos({
               <Ordenar base={base} f={filtrosDaPagina} coluna="custo" alinhar="right">
                 Custo por unidade
               </Ordenar>
-              <th scope="col" className="hidden h-10 px-3 text-right font-semibold md:table-cell">
+              <th scope="col" className="hidden h-10 px-3 text-right font-semibold lg:table-cell">
                 Outras embalagens
               </th>
               <th scope="col" className="hidden h-10 px-3 font-semibold lg:table-cell">
@@ -590,7 +590,7 @@ export function TelaListaInsumos({
                 <td className="px-3 py-2 text-right">
                   <Custo i={i} />
                 </td>
-                <td className="hidden px-3 py-2 text-right text-suave md:table-cell">{i.variantes > 0 ? i.variantes : '—'}</td>
+                <td className="hidden px-3 py-2 text-right text-suave lg:table-cell">{i.variantes > 0 ? i.variantes : '—'}</td>
                 <td className="hidden px-3 py-2 lg:table-cell">
                   {i.ativo ? <Selo tom="ok">Ativo</Selo> : <Selo>Desativado</Selo>}
                 </td>
