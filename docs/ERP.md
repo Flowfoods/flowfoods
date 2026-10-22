@@ -2434,6 +2434,20 @@ tabela com CHECKs, índices, gatilho e RLS, e o conferidor acusando o gatilho, o
 trava por parceiro do cadastro derruba os testes de paralelo. Os outros testes com banco passaram a cadastrar insumo por
 `cadastrarInsumoDeTeste` (`tests/erp-db-apoio.ts`), que semeia as dez e manda a sugestão.
 
+**Resultado da prova (2026-10-22).** `npx vitest run` sem banco: 55 arquivos, 1349 testes passando (610 pulados por exigirem banco). Com banco
+(`ff_dev`, superusuário), duas rodadas seguidas: 97 arquivos, 1985 testes, todos passando. Como dono não-superusuário com FORCE RLS e como dono
+sem RLS: os 6 arquivos de banco tocados (categorias, insumos, isolamento, permissões, compras, ajuda) com 116 testes cada, passando. O teste de
+migração (`erp-insumo-categorias-migracao.db.test.ts`) cria os próprios perfis e por isso roda só com a URL de superusuário: com a URL de um
+dono comum ele não consegue criar banco, e isso não é defeito da migration. `prisma validate`, `typecheck`, `lint`, `gate` e `build` limpos;
+`erp:conferir-migracao` limpo; `migrate diff` vazio.
+Jornada no navegador (build de produção, banco recriado do zero): cadastro com sugestão e correção manual, recusa sem categoria com o formulário
+preservado, duplo clique, resposta perdida com reenvio, nome parecido, edição, prévia/aplicar/idempotência/fila/lote/reverter, CRUD das
+categorias, "Outros" protegido, Gerente e Operador sem a permissão, isolamento de outro parceiro e o nível 1 do /rodolfo: sem falha. Matriz de
+6 páginas x 4 tamanhos (1440, 1180, 820, 390) x 2 temas: sem rolagem lateral e sem violação do axe. Total da jornada: 132 conferências, todas ok. Com ponteiro de toque
+real (`isMobile`), as páginas novas não têm alvo abaixo de 44 px; sobraram só o cabeçalho ordenável da lista e o link "Voltar para a lista" no
+tablet, que já eram assim antes da I.1a. Prints em `scratchpad/shots-I1a` (80 arquivos). Scanner avoid-ai-design nos 23 arquivos de tela
+tocados: 0 P0, 0 P1 e 4 P2 (metadado com ponto médio, padrão já usado nas outras telas do ERP).
+
 ## Herança da I.1a (para a I.1b, a I.2 e as próximas)
 
 - **A I.1b recebe**: conservação sem valor padrão (hoje o formulário ainda abre em Seco) e o filtro "Conservação"; "Prazo de uso após
