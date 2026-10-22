@@ -16,6 +16,7 @@ import {
   executarFechar,
   executarReabrir,
   executarSalvarMetas,
+  executarSalvarMetasPorCategoria,
   executarEditarDespesa,
   executarLancarDespesa,
   executarMesPassado,
@@ -117,6 +118,13 @@ export async function acaoSalvarMetas(slug: string, anterior: EstadoLocal, form:
   const { ctx, negado, raiz } = await paraOPlano(slug, 'erp_dre_metas');
   if (negado) return recusadoLocal(anterior, negado);
   return executarSalvarMetas(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, anterior, form, raiz);
+}
+
+/** As metas por categoria (I.2a). `lojaId` vem preso à URL (bind), vazio = a rede; nunca do formulário. */
+export async function acaoSalvarMetasPorCategoria(slug: string, lojaId: string, anterior: EstadoLocal, form: FormData): Promise<EstadoLocal> {
+  const { ctx, negado, raiz } = await paraOPlano(slug, 'erp_dre_metas_por_categoria');
+  if (negado) return recusadoLocal(anterior, negado);
+  return executarSalvarMetasPorCategoria(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, lojaId || null, anterior, form, raiz);
 }
 
 export async function acaoFecharPeriodo(slug: string, inicio: string, anterior: EstadoLocal, form: FormData): Promise<EstadoLocal> {

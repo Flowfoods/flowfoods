@@ -17,6 +17,7 @@ import {
   executarCriarLinha,
   executarFechar,
   executarSalvarMetas,
+  executarSalvarMetasPorCategoria,
   executarEditarDespesa,
   executarLancarDespesa,
   executarMesPassado,
@@ -127,4 +128,11 @@ export async function acaoFecharPeriodo(inicio: string, anterior: EstadoLocal, f
   const { ctx, negado } = await paraOPlano();
   if (negado) return recusadoLocal(anterior, negado);
   return executarFechar(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(inicio), anterior, form, RAIZ);
+}
+
+/** As metas por categoria (I.2a). `lojaId` vem preso à URL (bind), vazio = a rede; nunca do formulário. */
+export async function acaoSalvarMetasPorCategoria(lojaId: string, anterior: EstadoLocal, form: FormData): Promise<EstadoLocal> {
+  const { ctx, negado } = await paraOPlano();
+  if (negado) return recusadoLocal(anterior, negado);
+  return executarSalvarMetasPorCategoria(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, lojaId || null, anterior, form, RAIZ);
 }

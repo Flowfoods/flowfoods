@@ -21,6 +21,7 @@ import type { TextosDaDespesa } from '@/lib/erp/despesa-campos';
 import { criarLinha, ocultarLinha, renomearLinha } from '@/lib/erp/plano';
 import { salvarRegra } from '@/lib/erp/periodos';
 import { salvarMetas } from '@/lib/erp/dre-metas';
+import { salvarMetasPorCategoria } from '@/lib/erp/metas-categorias';
 import { fecharPeriodo, reabrirPeriodo } from '@/lib/erp/dre-fechamento';
 import { formatarData } from '@/lib/erp/compra-campos';
 import type { Alcance } from '@/lib/erp/permissoes';
@@ -167,6 +168,26 @@ export async function executarSalvarMetas(cliente: ClienteDoParceiro, alcance: A
     mensagem: `${r.mudou === 1 ? '1 meta salva' : `${r.mudou} metas salvas`}. Valem a partir de ${formatarData(r.valeDesde)}; os períodos anteriores seguem com as metas que valiam neles.`,
     vez: vezDe(anterior),
   };
+}
+
+/**
+ * As metas por categoria (I.2a): os campos `cat_<id>` (a meta de cada categoria), `usa_<id>` com `viu_<id>` (a loja usa? o
+ * marcador diz que a categoria estava na tela, porque caixa desmarcada não é enviada), `segue` e, na rede, `total`.
+ * `lojaId` vem preso à URL (bind), nunca do formulário; nulo = a rede.
+ */
+export async function executarSalvarMetasPorCategoria(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, lojaId: string | null, anterior: EstadoLocal, form: FormData, raiz: string): Promise<EstadoLocal> {
+  const campos: Record<string, string> = {};
+  const usa: Record<string, boolean> = {};
+  for (const [campo, v] of form.entries()) {
+    if (campo.startsWith('cat_') && typeof v === 'string') campos[campo.slice(4)] = v;
+    if (campo.startsWith('viu_')) usa[campo.slice(4)] = form.get(`usa_${campo.slice(4)}`) === 'on';
+  }
+  const r = await salvarMetasPorCategoria(cliente, alcance, { lojaId, versao: textoDe(form.get('versao')), total: lojaId === null ? textoDe(form.get('total')) : undefined, campos, segue: textoDe(form.get('segue')), ...(lojaId === null ? {} : { usa }) }, autorNome);
+  if (!r.ok) return { ok: false, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
+  revalidatePath(raiz, 'layout');
+  const aviso = r.aviso ? ` Confira a divisão: ${r.aviso}.` : '';
+  if (r.mudou === 0) return { ok: true, mensagem: `Nada mudou: as metas já eram essas.${aviso}`, vez: vezDe(anterior) };
+  return { ok: true, mensagem: `Metas salvas. Valem a partir de ${formatarData(r.valeDesde)}; os períodos anteriores seguem com as metas que valiam neles.${aviso}`, vez: vezDe(anterior) };
 }
 
 /** `inicio` vem preso à URL (bind), nunca do formulário. Depois de fechar volta à tela do período. */
