@@ -60,8 +60,10 @@ export interface VistaCompleta {
   metaBp: number | null;
   /** A meta contra a qual o ritmo foi medido. */
   ritmoMetaBp: number | null;
-  /** Na rede: as lojas têm metas diferentes (I.2b). */
+  /** Na rede: as lojas têm metas diferentes (I.2b), com ou sem conta: o aviso vale em todos os ramos da tela. */
   metaMista: boolean;
+  /** A meta de cada loja, para escrever "Penha 30,0 % · Delivery 32,0 %" quando as metas diferem; vazio quando são iguais. */
+  metasPorLoja: { nome: string; bp: number }[];
   /** Nomes das lojas com meta própria diferente da rede (só a vista da rede). */
   comMetaPropria: string[];
   conta: ContaDoOrcamento | null;
@@ -122,6 +124,7 @@ function vistaDaLoja(o: OrcamentoDaLoja, veReceita: boolean): VistaDoOrcamento {
     metaBp: o.metaBp,
     ritmoMetaBp: o.metaBp,
     metaMista: false,
+    metasPorLoja: [],
     comMetaPropria: [],
     conta: o.conta,
     motivo: o.motivo,
@@ -214,7 +217,8 @@ export async function orcamentoDeCompra(cliente: ClienteDoParceiro, alcance: Alc
             veReceita: true,
             metaBp: e.conta?.metaBp ?? (porLoja.find((l) => l.metaBp !== null)?.metaBp ?? null),
             ritmoMetaBp: e.ritmoMetaBp,
-            metaMista: e.conta?.metaMista === true,
+            metaMista: e.metasDiferentes,
+            metasPorLoja: e.metasPorLoja,
             comMetaPropria: porLoja.filter((l) => l.metaBp !== null && l.metaBp !== metaBp).map((l) => l.nome),
             conta: e.conta,
             motivo: e.motivo,
