@@ -118,12 +118,21 @@ export function FormInsumo({
 
   // Erro do servidor: o foco vai para o primeiro campo com problema (teclado e leitor de tela não ficam procurando).
   const vez = estado?.vez;
-  const primeiroErro = Object.keys(erros).find((c) => c !== 'geral' && erros[c]);
+  // Na ordem em que os campos aparecem na tela (não na ordem em que o servidor os listou).
+  const ORDEM_NA_TELA = ['nome', 'tipo', 'categoriaId', 'conservacao', 'unidade', 'conteudo', 'preco', 'frete'];
+  const comErro = Object.keys(erros).filter((c) => c !== 'geral' && erros[c]);
+  const primeiroErro = [...comErro].sort((x, y) => (ORDEM_NA_TELA.indexOf(x) + 1 || 99) - (ORDEM_NA_TELA.indexOf(y) + 1 || 99))[0];
   const campoDoErro = useRef(primeiroErro);
   campoDoErro.current = primeiroErro;
   useEffect(() => {
     if (!vez || !campoDoErro.current) return;
-    const alvo = document.getElementById(`${idBase}-${campoDoErro.current}`) ?? document.querySelector<HTMLElement>(`[aria-describedby~="${idBase}-${campoDoErro.current}-erro"]`);
+    const c = campoDoErro.current;
+    // Unidade e tipo são grupos de rádio: o foco vai para a primeira opção (ou a marcada).
+    const alvo =
+      document.getElementById(`${idBase}-${c}`) ??
+      document.querySelector<HTMLElement>(`input[name="${c}"]:checked`) ??
+      document.querySelector<HTMLElement>(`input[name="${c}"]`) ??
+      document.querySelector<HTMLElement>(`[aria-describedby~="${idBase}-${c}-erro"]`);
     alvo?.focus({ preventScroll: false });
   }, [vez]);
 

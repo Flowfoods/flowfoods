@@ -10,7 +10,7 @@
  *    e Hortifruti vencem dele;
  *  - o substantivo que abre o nome manda ("molho de tomate" é molho, "pão de queijo" é pão): as palavras depois de "de",
  *    "com", "sem"... só valem quando o começo do nome não diz nada;
- *  - vários grupos diferentes ou nenhum → "Outros / a classificar", com o motivo, nunca um chute calado;
+ *  - vários grupos diferentes ou nenhum vão para "Outros / a classificar", com o motivo, nunca um chute calado;
  *  - o tipo "Embalagem" já é Descartáveis e embalagens.
  *
  * O dicionário abaixo é conhecimento de cozinha, e é só uma sugestão: a pessoa vê, confere e troca.

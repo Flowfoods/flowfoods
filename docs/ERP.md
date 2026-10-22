@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2), a cozinha pega a tarefa: histórico e indicadores por pessoa (3.3)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2), a cozinha pega a tarefa: histórico e indicadores por pessoa (3.3), categorias de insumo, categoria obrigatória, confirmação ao salvar e idempotência (I.1a)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -38,6 +38,7 @@ só diz como ver a fatia funcionando e quais regras o código já trava.
 | Produção de intermediários (3.1): planejar o lote pela ficha, requisição dos insumos criada junto, concluir com rendimento e validade, o lote entra no estoque, cancelar e estornar, quadro kanban | `src/lib/erp/{producao-campos,producao}.ts` (puro / com banco) + `criarRequisicaoNaTx` e `listaDaFichaNaTx` em `requisicao.ts`; telas em `src/components/erp/telas/producao/` e o esqueleto comum dos quadros em `telas/quadro/`; rotas `/erp/producao` e `/rodolfo/erp/<slug>/producao` (`<loja>`, `<loja>/nova`, `<loja>/<lote>`, `<loja>/<lote>/concluir`); migration `20261029000000_erp_producao` |
 | Lista do dia (3.2): o gerente define o que a loja produz no dia; a tela cruza com o estoque (vai usar / tem / comprar, com a cascata dos pré-preparos) e cada linha vira lote pela regra da 3.1 | `src/lib/erp/{producao-lista-campos,producao-lista}.ts` (conta pura / com banco) + `planejarProducaoNaTx` em `producao.ts`; telas `telas/producao/{lista,form-lista}.tsx`; rotas `/erp/producao/lista` e `/rodolfo/erp/<slug>/producao/lista` (`<loja>?dia=aaaa-mm-dd`); migration `20261030000000_erp_lista_do_dia` |
 | A cozinha pega a tarefa (3.3): pegar o lote (ou a linha da lista de hoje), soltar, passar para outra pessoa, concluir pela tela da cozinha; histórico da produção e indicadores por pessoa | regras de escrita em `producao.ts` (`pegarNaTx`, `pegarProducao`, `soltarProducao`, `passarProducao`) e `producao-lista.ts` (`pegarDaLista`); leituras em `producao-equipe.ts` (`tarefasDoDia`, `historicoDaProducao`, `indicadoresDaProducao`); conta pura em `producao-equipe-campos.ts`; quem pode receber em `credenciais.ts` (`pessoasQueProduzem`); telas `telas/producao/{tarefas,form-tarefas,historico-producao,indicadores,periodo}.tsx`; rotas `/erp/producao/{tarefas,historico,indicadores}` (`/<loja>`) e o espelho `/rodolfo/erp/<slug>/producao/...`; migration `20261031000000_erp_producao_equipe` |
+| Categorias de insumo (I.1a): tabela da rede, categoria obrigatória no cadastro, sugestão pelo nome, classificação assistida, retorno ao salvar e chave de envio | `src/lib/erp/{categoria-campos,categoria-sugestao}.ts` (puros) + `{categorias,classificar}.ts` (com banco) + `insumos.ts` (cadastrar e editar); telas `telas/insumos/{categorias,classificar,form-categorias,form-classificar,aviso-classificar,executar-categorias}.tsx` e `telas/cadastro/anuncio.tsx`; rotas `insumos/categorias` e `insumos/classificar` em `/erp` e `/rodolfo/erp/<slug>`; scripts `erp:semear-categorias` e `erp:classificar-insumos`; migrations `20261101000000_erp_insumo_categorias` e `20261101010000_erp_catalogo_v3` |
 | Foto sem metadados e envio por rota própria (1.3, herança da 1.2) | `src/lib/erp/{foto-metadados,foto-envio}.ts`; rotas `/erp/fichas/fotos` e `/rodolfo/erp/<slug>/fichas/fotos` |
 | Navegação por áreas (UX.9): hub de 4 áreas, abas por rota, trilha com a área, ações no ⌘K; rota nova `/estoque/contagens` | `src/lib/erp/modulos.ts` (`areasConstruidas`, `abasDaArea`, `acoesDaNavegacao`, `montarTrilha`) e `src/lib/rodolfo/modulos.ts`; `src/components/erp/ui/{abas,hub}.tsx`, `telas/hub-do-parceiro.tsx`, `shell/Shell.tsx`; sem migration |
 | Shell e design system (1.1) | `src/components/erp/{tokens.css,shell/*,ui/*}`; módulos em `src/lib/erp/modulos.ts` e `src/lib/rodolfo/modulos.ts`; visão em `src/lib/erp/visao.ts`; tema em `src/lib/erp/tema.ts`; contrato visual em `.interface-design/system.md` |
@@ -2368,6 +2369,90 @@ quadro, Concluir pelas Tarefas, Delivery) × gerente, cozinha (Duda) e dona × 3
 108 telas, zero rolagem lateral e zero violação do axe; alvos abaixo de 32 px só no shell. Console: só o 404 do `favicon.ico`
 e o prefetch do Next abortado. Prints em `pw/prova33p/jornada/` (8) e `pw/prova33p/matriz-{gerente,cozinha,dona}/`.
 
+## O que a I.1a entregou — categorias de insumo, obrigatoriedade, confirmação ao salvar e idempotência
+
+Prioridade do Rodolfo de 21/10/2026 (cadastro de insumos), primeira metade. Migrations ADITIVAS `20261101000000_erp_insumo_categorias` (uma
+tabela de tenant e colunas anuláveis em `Insumo`) e `20261101010000_erp_catalogo_v3` (só dado). Decisões 243 a 254. Permissão nova
+`insumos.categorias`. `VERSAO_DO_ERP` não mudou (a fase é "3.3" até a I.1b fechar a prioridade).
+
+1. **Categorias** (243, 244). `CategoriaInsumo` do parceiro, com as dez do plano (nomes exatos: Proteína; Hortifruti; Mercearias e secos;
+   Laticínios, frios e embutidos; Congelados e industrializados; Panificação; Bebidas; Descartáveis e embalagens; Limpeza e higienização;
+   Outros / a classificar), semeadas por `npm run erp:semear-categorias` (idempotente por `chave`) e sozinhas na primeira abertura de
+   casa nova, nunca pela migration (250). Aba **Categorias** (`insumos/categorias`): criar (entra antes de "Outros"), renomear (com a
+   versão lida), subir e descer, desativar (com uso: o insumo continua nela) e reativar, excluir (só sem insumo e sem passagem no
+   histórico). "Outros / a classificar" é do sistema: sem botões, e o gatilho do banco recusa até SQL cru. Tudo com antes/depois no
+   histórico. Gerir é `insumos.categorias` (rede inteira; só o Dono pelo perfil base); quem só vê lê a lista. Nome único sem diferenciar
+   caixa nem acento.
+2. **Sugestão pelo nome** (245): `categoria-sugestao.ts`, puro e determinístico, com 71 testes de nomes reais. Farinha → Mercearias e secos;
+   coxa de frango congelada → Proteína; pão → Panificação; molho → Mercearias e secos; ambíguo ou desconhecido → Outros com o motivo.
+3. **Cadastro** (246, 252, 253). Nome, categoria e unidade base obrigatórios: marcados "(obrigatório)" com `aria-required`, a unidade não
+   vem pré-marcada, a categoria sai sugerida (texto "Sugerida pelo nome ("farinha")", trocável, com "Voltar à sugestão") e o servidor
+   recusa cada falta no campo, com o resumo, o foco no primeiro problema e o formulário preservado. Depois de salvar: "Insumo salvo com
+   sucesso: <nome>" (criado) ou "Alterações salvas em <nome>" (atualizado), região viva preenchida depois da montagem, com "Cadastrar
+   outro insumo" e "Ver todos os insumos". Reenvio com a mesma chave devolve o mesmo insumo (um só, mesmo em 5 pedidos paralelos);
+   resposta perdida volta como "não deu para confirmar" e tocar de novo não duplica. Pré-preparo criado pela ficha recebe a sugestão
+   (ambíguo vai para Outros e a ficha não trava).
+4. **Classificação assistida dos antigos** (247): aba **Classificar insumos** e o script `erp:classificar-insumos` (`--previa` padrão,
+   `--aplicar`, `--reverter <lote>`, `--parceiro`). Prévia sem gravar; aplicar só onde `categoriaId` é nulo, um CLASSIFICOU por insumo;
+   2ª vez muda 0; reverter só o intocado; **fila de revisão** (sem categoria ou em Outros, com o motivo, a sugestão e o valor) com edição
+   em lote (até 200); contagem e valor sem categoria também no alto da lista de Insumos. A lista ganhou a coluna e o filtro de categoria
+   (inclui "Sem categoria" e "A revisar"). Aplicar e desfazer são `insumos.categorias`; classificar em lote é `insumos.editar`.
+5. **Nomes parecidos** (251): o que já existia ("Cebola"/"cebola") não é mexido; aparece em Classificar e na prévia do script.
+6. **Seed**: `npm run erp:seed-teste` semeia as dez e manda a categoria sugerida; confere o client gerado (`prisma generate`) antes de começar.
+
+### Referências Kairu consultadas (regra do plano)
+
+Lidas pelo MCP da Kairu em 21/10/2026 (análise da I.1), conteúdo integral: `prompt:b3592b7c…` "Da Ficha ao Fornecedor", "Estoque unificado"
+(Notion, snapshot de 14/10), `library:inventario-ciclico`, `pass:inventario-contagem-divergencias` e `pass:cmv-fichas-e-margem` (só o prompt).
+Buscas "cadastro de insumos categorias", "estoque insumos" e "compras fornecedor": nenhum prompt Kairu sobre categoria ou cadastro de insumo.
+
+| Material | Aplicado | Adaptado | Deixado para depois |
+|---|---|---|---|
+| Da Ficha ao Fornecedor | custo ausente é pendência, nunca 0; custo incompleto não é custo baixo (o valor sem categoria diz "sem saldo", não R$ 0) | "um clique, um pedido" virou chave de envio + impressão do conteúdo no servidor | cronograma e política de lote (fase 3.x) |
+| Inventário cíclico e divergências | "grupo" do inventário é diferente de setor físico: a categoria não é conservação nem onde fica | — | contagem por categoria (I.2) |
+| CMV, fichas e margem | categoria é o eixo do CMV gerencial; fotografia de período fechado não muda | a classificação nunca reescreve período fechado (o CMV 2.3 não lê categoria) | meta e desvio por categoria (I.2) |
+| Idempotência (pacotes de inventário) | mesma chave + mesmo conteúdo = mesmo resultado; mesma chave com conteúdo diferente = recusa | `409` virou frase no formulário | — |
+
+## Provar a I.1a
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate
+npx vitest run                                              # sem banco: 71 de sugestão, permissões v3, navegação, ajuda
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism   # com banco, 2x
+npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio
+```
+`tests/erp-categoria-sugestao.test.ts` (71, sem banco): as dez, o nome sem caixa nem acento (e a tabela de acentos igual à do banco), os
+exemplos do plano, 50 nomes reais, conservação que não decide, natureza que vence "congelados", ambíguo e desconhecido com motivo.
+`tests/erp-categorias.db.test.ts` (31): as dez, criar/renomear/mover/desativar/excluir, "Outros" por regra e por gatilho, isolamento (regra,
+FK composta, RLS), obrigatoriedade, SUGESTAO × MANUAL, reenvio (inclusive 5 em paralelo), nome parecido (inclusive em paralelo), insumo
+antigo, pré-preparo da ficha, a classificação assistida inteira (prévia sem gravar, aplicar, idempotência, fila, lote, reverter só o
+intocado, retrato de tudo que não é categoria idêntico) e as actions por perfil. `tests/erp-insumo-categorias-migracao.db.test.ts` (3): a
+migration com dado antigo (nomes parecidos incluídos) como superusuário, dono com FORCE RLS e dono sem RLS, sem WARNING, categoria nula,
+tabela com CHECKs, índices, gatilho e RLS, e o conferidor acusando o gatilho, o CHECK e a RLS que faltarem. Mutante conferido: tirar a
+trava por parceiro do cadastro derruba os testes de paralelo. Os outros testes com banco passaram a cadastrar insumo por
+`cadastrarInsumoDeTeste` (`tests/erp-db-apoio.ts`), que semeia as dez e manda a sugestão.
+
+## Herança da I.1a (para a I.1b, a I.2 e as próximas)
+
+- **A I.1b recebe**: conservação sem valor padrão (hoje o formulário ainda abre em Seco) e o filtro "Conservação"; "Prazo de uso após
+  abertura"; "Custo inicial de referência" (e a explicação do preço 0 como sentinela); marca de referência; tipo MATERIAL; "nome uma vez"
+  (`?nome=` e volta nos links "Insumo que falta" da nota, da ficha e das embalagens; rótulo da embalagem). A unidade base já é explícita.
+- **A I.2 recebe**: `CategoriaNaLoja` (meta e ativação por loja, herdando da rede), painéis de CMV por categoria e a vigência. `CategoriaInsumo`
+  já tem `criadaEm`/`desativadaEm`; a classificação passada do insumo está no histórico (`categoria`/`categoriaId`). Ao somar CMV por categoria,
+  use a categoria vigente do insumo e NÃO reescreva fotografia de período fechado; "excluir categoria" passa a conferir também as metas.
+- **Categoria única da rede** é desvio do "configuração por loja" do plano (decisão 243): fica para o Rodolfo confirmar.
+- **Insumo sem categoria existe** (nulo no banco): toda leitura nova trata nulo como "sem categoria", nunca como erro.
+- **Cadastro por outro caminho** (importação de insumos, integração) precisa mandar `categoriaId` (ou `entrada.categoriaId` ausente só edita
+  insumo que já tem) e, se quiser idempotência, `envio`. Quem cria insumo fora de `cadastrarInsumo` (como o pré-preparo da ficha) usa
+  `sugestaoParaInsumo`.
+- **Teste que precisa de um insumo** usa `cadastrarInsumoDeTeste`; o teste da regra de cadastro fala direto com `cadastrarInsumo`.
+- **Guarda do portão**: relação `insumos:` (e a chave de objeto com esse nome) é barrada pelo teste-guarda em qualquer arquivo; nomeie
+  `nInsumos`, `itens`.
+- **Ajuda**: `insumos` e `insumo-novo` e `insumo` subiram para a versão 2; as chaves novas são `insumo-categorias` e `insumo-classificar`.
+  Os testes não fixam o número da versão de `insumos`.
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -2379,6 +2464,7 @@ Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
 | Estrutura | `Marca` | marca do grupo; produto e faturamento podem apontar marca |
 | Estrutura | `Colaborador` | pessoa da operação; âncora do histórico por funcionário (login vem na 0.3) |
 | Insumos | `Insumo` | já existia; ganhou tipo (ingrediente/embalagem/pré-preparo), taxa de entrega, conservação e validade por conservação, mínimo, fornecedor padrão, origem |
+| Insumos | `CategoriaInsumo` | I.1a: a categoria da REDE (natureza do insumo para o CMV): `chave` estável das dez padrão, `sistema` ("Outros / a classificar"), `ativa`/`desativadaEm`, `ordem`. `Insumo` ganhou `categoriaId` (nula no banco, obrigatória na regra; FK composta), como foi classificada (`classificadoPor`), o motivo, o lote da classificação assistida e a `chaveEnvio` + `hashEnvio` do cadastro |
 | Insumos | `InsumoVariante` | outras embalagens de compra do mesmo insumo |
 | Compras | `Fornecedor` | quem vende |
 | Compras | `NotaEntrada` / `NotaEntradaItem` | nota de compra e itens com snapshot; LANCADA vale para o custo; com o estoque da loja aberto, entra no razão (`MovimentoEstoque.notaId`, 1.6) |

@@ -118,7 +118,7 @@ export function TelaClassificar({
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-suave">
-              <span className="font-semibold text-texto">Prévia, sem gravar nada:</span> {plural(previa.total, 'insumo está', 'insumos estão')} sem categoria. Se você aplicar agora,
+              <span className="font-semibold text-texto">Prévia, sem gravar nada:</span> {plural(previa.total, 'insumo está', 'insumos estão')} sem categoria (contando os desativados). Se você aplicar agora,
               {previa.paraRevisar > 0
                 ? ` ${plural(previa.total - previa.paraRevisar, 'vai', 'vão')} para a categoria certa e ${plural(previa.paraRevisar, 'fica', 'ficam')} em Outros / a classificar, com o motivo, para você revisar.`
                 : ' todos vão para a categoria que o nome indica.'}
@@ -134,8 +134,8 @@ export function TelaClassificar({
               <summary className="flex min-h-11 cursor-pointer items-center px-4 text-[13px] font-medium text-texto">
                 Ver os {previa.total} insumos e para onde cada um vai
               </summary>
-              <ul role="list" className="max-h-96 divide-y divide-linha overflow-auto border-t border-linha">
-                {previa.linhas.map((l) => (
+              <ul role="list" tabIndex={0} aria-label="Os insumos sem categoria e para onde cada um vai" className="max-h-96 divide-y divide-linha overflow-auto border-t border-linha">
+                {previa.linhas.slice(0, 300).map((l) => (
                   <li key={l.id} className="px-4 py-2 text-[13px]">
                     <p className="flex flex-wrap items-baseline justify-between gap-x-3">
                       <span className="font-medium text-texto">{l.nome}{!l.ativo && <span className="text-suave"> (desativado)</span>}</span>
@@ -145,6 +145,7 @@ export function TelaClassificar({
                   </li>
                 ))}
               </ul>
+              {previa.linhas.length > 300 && <p className="border-t border-linha px-4 py-2 text-[12px] text-suave">Mostrando os 300 primeiros; o script erp:classificar-insumos lista todos.</p>}
             </details>
             {ajustavel ? (
               <form action={acaoAplicar} className="flex flex-col gap-2 sm:flex-row sm:items-center">
