@@ -2681,7 +2681,27 @@ centavo, sem preço = valor nulo, só inclusão, 2ª aplicação não duplica) c
 a página e a action de verdade (dona, gerente, comprador, operador). `tests/erp-cmv-categorias-migracao.db.test.ts`: a migration com dado antigo
 como superusuário, dono com FORCE RLS e dono sem RLS.
 
-RESULTADO_DA_PROVA
+**Resultado da prova (2026-10-22).** `prisma validate`, `typecheck`, `lint`, `gate` e `build` limpos; `erp:conferir-migracao` limpo e `migrate diff`
+vazio no `ff_dev`. `npx vitest run` sem banco: 58 arquivos, 1412 testes passando (os de banco pulados). Com banco (`ff_dev`, superusuário), duas
+rodadas seguidas: 107 arquivos, 2120 testes, todos passando. Como dono NÃO-superusuário com FORCE RLS e como dono sem RLS (bancos novos, todas as
+migrations aplicadas pelo dono, `--no-file-parallelism`): os 17 arquivos de banco tocados ou vizinhos (metas e CMV por categoria, telas, retrato,
+CMV, fechamento do DRE, DRE, farol, categorias, contagem, estoque, insumos, isolamento, permissões, RLS, compras, orçamento e ajuda), 374 testes
+cada: sem RLS, 367 passando e 7 pulados; com FORCE RLS, 373 passando e 1 falha que já existia e é do banco criado por psql (o teste da 0.2 lê
+`_prisma_migrations`, que o psql não cria). O teste da migration cria os próprios bancos nos 3 perfis. Mutantes: tirar `travarParaEscrever` de
+`concluirContagem` e `travarMetas` de `salvarMetasPorCategoria` derruba os testes (restaurados). Jornada no navegador (build de produção, porta 3100,
+banco novo copiado do `ff_dev`, 87 conferências na jornada e 48 de axe e tamanho na matriz, todas ok): a dona aplica o modelo de 32% (nada gravado),
+edita Proteína e vê o aviso de soma, conserta e salva (conjunto da rede com 10 metas, vigência 01/10, meta do CMV do DRE em 32%); personaliza a
+Delivery (Proteína 14%) e a Vila da Penha segue a rede em 12%; o painel da rede (R$ 39.350,00, igual à DRE), da Vila da Penha (R$ 34.250,00, Panificação
+"um pouco pior", Sem categoria e Pré-preparos) e da Delivery (meta "da loja", "sem compra no período"); reclassifica Pão para Mercearias e o total não
+muda; manda o Molho para Outros e as categorias ficam sem cor com o motivo (6,86% a classificar); o estoque de setembro fecha pela tela e grava o
+retrato (8 insumos, soma igual ao total do fechamento; a abertura antiga segue sem retrato); setembro com "Variação do estoque, ainda não aberta por
+categoria"; fechar setembro no DRE grava a v4 e reclassificar depois não o muda; gerente (só a Vila da Penha, também por `?rede=1` e `?loja=<Delivery>`,
+nada da outra no HTML, sem as metas nem no ⌘K), operador e quem só vê o histórico (nada do painel nem das metas). Matriz de 6 páginas x 4 tamanhos
+(1440, 1180, 820, 390) x 2 temas: sem rolagem lateral, sem violação do axe, sem erro de console e, com ponteiro de toque real, nenhum alvo abaixo
+de 44 px (a jornada achou e fez corrigir: a mensagem de "salvo" sumia por o formulário remontar quando a versão muda; os links e as setas do período
+abaixo de 44 px; o texto do painel fechado dizia "categoria de hoje"). Prints em `scratchpad/shots-I2a`. Scanner avoid-ai-design nos arquivos de
+código tocados: 0 P0 e 0 P1 (só P2 de "meta strings com ponto médio", já existentes no padrão da casa). Também entrou a herança do pós-deploy da I.1b: o
+aviso de insumos sem categoria diz "sem saldo" em vez de R$ 0,00 (teste novo `erp-aviso-classificar.test.ts`).
 
 ## Herança da I.2a (para a I.2b e as próximas)
 
