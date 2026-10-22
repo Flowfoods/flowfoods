@@ -304,4 +304,4 @@ Editorial (separadores delicados, número de tabela sem serifa):
   excluir de vez (sem vínculo, com caixa de confirmação obrigatória e botão com o nome do item).
 - **Volta da edição**: a caneta volta à LISTA (mesma página, filtros e tamanho) com `AvisoDeSalvo` ("Insumo atualizado com sucesso: nome",
   "Continuar editando", "Ver o insumo"); o nome vem do banco, a URL só escolhe a frase. Colunas secundárias saem antes de a tabela passar da
-  largura (abaixo de 1024 px saem "Outras embalagens" e "Custo inicial"): sem rolagem lateral em 820 px.
+  largura (abaixo de 1280 px saem "Outras embalagens" e "Custo inicial"): sem rolagem lateral em 820 px.

@@ -162,11 +162,11 @@ export function FiltrosDaLista({
   return (
     // `key` = os filtros de agora: depois de um link que muda o filtro sem recarregar ("Ver quais são" no aviso), os campos nascem de novo
     // com o valor da URL (um <select defaultValue> não acompanha a mudança sozinho).
-    <form key={queryDosFiltros(f)} role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-5">
+    <form key={queryDosFiltros(f)} role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-3 xl:grid-cols-5">
       {f.ordem !== 'nome' && <input type="hidden" name="ordem" value={f.ordem} />}
       {f.direcao !== 'asc' && <input type="hidden" name="dir" value={f.direcao} />}
       {f.porPagina !== POR_PAGINA_PADRAO && <input type="hidden" name="por" value={f.porPagina} />}
-      <div className="col-span-2 flex gap-2 lg:col-span-5">
+      <div className="col-span-2 flex gap-2 lg:col-span-3 xl:col-span-5">
         <label htmlFor="insumos-q" className="sr-only">
           Buscar insumo pelo nome ou pela marca
         </label>
@@ -265,7 +265,7 @@ export function FiltrosDaLista({
         <input type="checkbox" name="incompleto" value="1" defaultChecked={f.incompleto} className={MARCAR} aria-describedby="insumos-incompleto-ajuda" />
         <span className="whitespace-nowrap">Cadastro incompleto</span>
       </label>
-      <p id="insumos-incompleto-ajuda" className="col-span-2 text-[12px] text-suave lg:col-span-3">
+      <p id="insumos-incompleto-ajuda" className="col-span-2 text-[12px] text-suave lg:col-span-2 xl:col-span-3">
         Cadastro incompleto: sem categoria, em “Outros / a classificar”, com a conservação a confirmar ou, no pré-preparo, sem validade na ficha. Custo não informado é outra coisa: use “Só sem custo”.
       </p>
     </form>
@@ -537,13 +537,13 @@ export function TelaListaInsumos({
               <th scope="col" className="h-10 px-3 text-right font-semibold">
                 Embalagem
               </th>
-              <th scope="col" className="hidden h-10 px-3 text-right font-semibold lg:table-cell">
+              <th scope="col" className="hidden h-10 px-3 text-right font-semibold xl:table-cell">
                 Custo inicial
               </th>
               <Ordenar base={base} f={filtrosDaPagina} coluna="custo" alinhar="right">
                 Custo por unidade
               </Ordenar>
-              <th scope="col" className="hidden h-10 px-3 text-right font-semibold lg:table-cell">
+              <th scope="col" className="hidden h-10 px-3 text-right font-semibold xl:table-cell">
                 Outras embalagens
               </th>
               <th scope="col" className="hidden h-10 px-3 font-semibold lg:table-cell">
@@ -581,7 +581,7 @@ export function TelaListaInsumos({
                   <CategoriaDaLinha i={i} />
                 </td>
                 <td className="px-3 py-2 text-right text-suave">{i.preparo ? '—' : formatarQuantidade(i.conteudoMilesimos, i.unidade)}</td>
-                <td className="hidden px-3 py-2 text-right lg:table-cell">
+                <td className="hidden px-3 py-2 text-right xl:table-cell">
                   <div className={i.preparo ? 'text-suave' : 'text-texto'}>{i.precoEmbalagemCentavos > 0 ? formatarDinheiro(i.precoEmbalagemCentavos) : i.preparo ? 'da ficha' : '—'}</div>
                   {i.taxaEntregaCentavos > 0 && (
                     <div className="text-[12px] text-suave">+ {formatarDinheiro(i.taxaEntregaCentavos)} frete</div>
@@ -590,7 +590,7 @@ export function TelaListaInsumos({
                 <td className="px-3 py-2 text-right">
                   <Custo i={i} />
                 </td>
-                <td className="hidden px-3 py-2 text-right text-suave lg:table-cell">{i.variantes > 0 ? i.variantes : '—'}</td>
+                <td className="hidden px-3 py-2 text-right text-suave xl:table-cell">{i.variantes > 0 ? i.variantes : '—'}</td>
                 <td className="hidden px-3 py-2 lg:table-cell">
                   {i.ativo ? <Selo tom="ok">Ativo</Selo> : <Selo>Desativado</Selo>}
                 </td>
