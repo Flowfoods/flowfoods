@@ -18,6 +18,7 @@ import { navegacaoDoParceiro, VERSAO_DO_ERP } from '@/lib/erp/modulos';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { COOKIE_MENU, COOKIE_TEMA, lerMenuRecolhido, lerTema } from '@/lib/erp/tema';
 import { AppShell } from '@/components/erp/shell/AppShell';
+import { EscopoDoRascunho } from '@/components/erp/telas/cadastro/rascunho';
 import { Aviso } from '@/components/erp/ui/superficies';
 import { acaoSair } from '../entrar/actions';
 import { acaoAjudaDicas, acaoAjudaFechar, acaoBuscarNoErp, acaoEscolherVisao } from './actions';
@@ -74,7 +75,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             {AVISO[parceiro.status]}
           </Aviso>
         )}
-        {children}
+        {/* O rascunho das telas é DESTA pessoa neste parceiro (ids do servidor): nada passa de uma pessoa ou parceiro para outro. */}
+        <EscopoDoRascunho escopo={`${parceiro.id}:${ctx.sessao.userId}`}>{children}</EscopoDoRascunho>
       </div>
     </AppShell>
   );

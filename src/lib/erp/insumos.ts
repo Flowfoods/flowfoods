@@ -29,6 +29,7 @@ import {
   FILTROS_PADRAO,
   lerChaveDeEnvio,
   lerFormInsumo,
+  marcado,
   POR_PAGINA,
   retratoDoInsumo,
   versaoDaVariante,
@@ -350,6 +351,8 @@ export async function editarInsumo(
   if (!lido.ok) return lido;
   const d = lido.dados;
   const trocouDeCategoria = d.categoriaId !== atual.categoriaId;
+  // I.1b: salvar NÃO confirma a conservação sozinho. Só confirma quem a trocou ou marcou "Confirmo que a conservação é esta".
+  const confirma = marcado(entrada.conservacaoConfirmada) || d.conservacao !== atual.conservacao;
 
   try {
     return await cliente.transacao(async (tx) => {
@@ -371,8 +374,8 @@ export async function editarInsumo(
       }
       const mudanca = diferenca(antesRetrato, depoisRetrato);
       if (!mudanca) {
-        // I.1b: salvar sem mudar nada, num insumo cuja conservação ninguém confirmou, é confirmá-la (a pessoa viu o campo e salvou).
-        if (!atual.conservacaoConfirmadaEm) return confirmarNaTransacao(tx, id, atual.nome, d.conservacao, versao, autorNome);
+        // I.1b: sem mudar nada, só marcar "Confirmo que a conservação é esta" confirma a de um insumo que ninguém confirmou.
+        if (!atual.conservacaoConfirmadaEm && confirma) return confirmarNaTransacao(tx, id, atual.nome, d.conservacao, versao, autorNome);
         return { ok: true as const, id, nome: atual.nome, mudou: [] };
       }
 
@@ -391,7 +394,7 @@ export async function editarInsumo(
           precoEmbalagemCentavos: d.precoEmbalagemCentavos,
           taxaEntregaCentavos: d.taxaEntregaCentavos,
           marcaReferencia: d.marcaReferencia,
-          ...(atual.conservacaoConfirmadaEm ? {} : { conservacaoConfirmadaEm: new Date() }),
+          ...(atual.conservacaoConfirmadaEm || !confirma ? {} : { conservacaoConfirmadaEm: new Date() }),
           // Mexeu na categoria: a classificação passa a ser desta pessoa e sai do lote da classificação assistida (a reversão
           // do lote não a desfaz mais). Salvou outra coisa, sem trocar a categoria: o insumo também sai do lote (uma pessoa o
           // revisou depois da máquina), mas a categoria e o "como foi classificada" ficam como estavam.

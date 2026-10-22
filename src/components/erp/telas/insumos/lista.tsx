@@ -138,20 +138,7 @@ export function FiltrosDaLista({ base, filtros: f, categorias }: { base: string;
           ))}
         </select>
       </div>
-      <div>
-        <label htmlFor="insumos-tipo" className="sr-only">
-          Tipo
-        </label>
-        <select id="insumos-tipo" name="tipo" defaultValue={f.tipo ?? ''} className={SELECT}>
-          <option value="">Todos os tipos</option>
-          {Object.entries(TIPOS).map(([k, r]) => (
-            <option key={k} value={k}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
+      <div className="col-span-2 lg:col-span-1">
         <label htmlFor="insumos-conservacao" className="sr-only">
           Conservação
         </label>
@@ -166,6 +153,19 @@ export function FiltrosDaLista({ base, filtros: f, categorias }: { base: string;
         </select>
       </div>
       <div>
+        <label htmlFor="insumos-tipo" className="sr-only">
+          Tipo
+        </label>
+        <select id="insumos-tipo" name="tipo" defaultValue={f.tipo ?? ''} className={SELECT}>
+          <option value="">Todos os tipos</option>
+          {Object.entries(TIPOS).map(([k, r]) => (
+            <option key={k} value={k}>
+              {r}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
         <label htmlFor="insumos-situacao" className="sr-only">
           Situação
         </label>
@@ -177,7 +177,7 @@ export function FiltrosDaLista({ base, filtros: f, categorias }: { base: string;
           ))}
         </select>
       </div>
-      <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[7px] border border-linha-forte bg-campo px-3 text-sm text-texto sm:min-h-[42px]">
+      <label className="col-span-2 flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[7px] border border-linha-forte bg-campo px-3 text-sm text-texto sm:min-h-[42px] lg:col-span-1">
         <input type="checkbox" name="preco" value="sem" defaultChecked={f.semPreco} className={MARCAR} />
         <span className="whitespace-nowrap">Só sem custo</span>
       </label>
@@ -362,7 +362,7 @@ export function TelaListaInsumos({
               </td>
               <td className="px-3 py-2 text-right text-suave">{i.preparo ? '—' : formatarQuantidade(i.conteudoMilesimos, i.unidade)}</td>
               <td className="px-3 py-2 text-right">
-                <div className={i.preparo ? 'text-suave' : 'text-texto'}>{i.precoEmbalagemCentavos > 0 ? formatarDinheiro(i.precoEmbalagemCentavos) : i.preparo ? 'da ficha' : 'não informado'}</div>
+                <div className={i.preparo ? 'text-suave' : 'text-texto'}>{i.precoEmbalagemCentavos > 0 ? formatarDinheiro(i.precoEmbalagemCentavos) : i.preparo ? 'da ficha' : '—'}</div>
                 {i.taxaEntregaCentavos > 0 && (
                   <div className="text-[12px] text-suave">+ {formatarDinheiro(i.taxaEntregaCentavos)} frete</div>
                 )}

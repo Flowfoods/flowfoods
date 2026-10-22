@@ -53,6 +53,8 @@ export function CamposDeConservacao({
     aoMudar?.();
   };
   const erroDaConservacao = erros.conservacao;
+  // Prazo em outra conservação sem o da principal: o banco não aceita, então a tela já diz (o servidor recusa do mesmo jeito).
+  const faltaDaPrincipal = principal !== '' && !linhas[principal].marcada && ORDEM_DAS_CONSERVACOES.some((c) => c !== principal && linhas[c].marcada);
   const idAjuda = `${idBase}-conservacao-ajuda`;
 
   return (
@@ -91,6 +93,12 @@ export function CamposDeConservacao({
           <p className="mt-1.5 text-[13px] text-atencao">
             Conservação a confirmar: este insumo está em Seco porque o sistema antigo assumia Seco quando ninguém escolhia. Confira e, se for outra, troque.
           </p>
+        )}
+        {aConfirmar && (
+          <label className="mt-1 flex min-h-11 cursor-pointer items-center gap-2.5 text-[13px] text-texto">
+            <input type="checkbox" name="conservacaoConfirmada" value="sim" onChange={() => aoMudar?.()} className={MARCAR} />
+            Confirmo que a conservação é esta
+          </label>
         )}
         <Erro id={`${idBase}-conservacao-erro`} texto={erroDaConservacao} />
       </div>
@@ -162,13 +170,17 @@ export function CamposDeConservacao({
                   </div>
                 </div>
                 <Erro id={`${idBase}-${chave}-erro`} texto={erro} />
+                {faltaDaPrincipal && principal === c && (
+                  <p role="status" className="mt-1.5 text-[13px] text-atencao">
+                    Informe também o prazo em {nome.toLowerCase()}, a conservação principal, ou desmarque as outras.
+                  </p>
+                )}
               </li>
             );
           })}
         </ul>
         <p className={AJUDA}>
-          Marque só onde o insumo pode ficar. Se informar o prazo de uma conservação, informe também o da conservação principal. A data de vencimento do
-          lote e a de abertura entram no recebimento e no controle de lote (ainda não existem no ERP).
+          Marque só onde o insumo pode ficar. A data de vencimento do lote e a de abertura entram no recebimento e no controle de lote (ainda não existem no ERP).
         </p>
       </fieldset>
       <input type="hidden" name="validadeNoFormulario" value="sim" />

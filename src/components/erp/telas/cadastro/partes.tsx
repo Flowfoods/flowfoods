@@ -37,7 +37,9 @@ export function BotaoOuMotivo({
   );
 }
 
-export function Voltar({ href, children }: { href: string; children: ReactNode }) {
+export function Voltar({ href, children, recarregar = false }: { href: string; children: ReactNode; /** Volta para a tela de origem com a página lida de novo (e não a guardada pelo roteador): a versão de lá pode ter mudado. */ recarregar?: boolean }) {
+  const classe = `${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`;
+  if (recarregar) return <a href={href} className={classe}>{children}</a>;
   return (
     // No toque (tablet deitado ou em pé), 44 px em qualquer largura; com mouse, a partir de 640 px, só o texto.
     <Link href={href} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`}>

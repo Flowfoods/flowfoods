@@ -8,7 +8,7 @@ import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/co
 import { contarConservacaoAConfirmar, listarInsumos } from '@/lib/erp/insumos';
 import { categoriasParaEscolher } from '@/lib/erp/categorias';
 import { resumoDoQueFalta } from '@/lib/erp/classificar';
-import { AvisoConservacaoAConfirmar, AvisoDaClassificacao } from '@/components/erp/telas/insumos/aviso-classificar';
+import { AvisosDaLista } from '@/components/erp/telas/insumos/aviso-classificar';
 import { lerFiltros, temFiltro } from '@/lib/erp/insumo-campos';
 import { FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
 import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
@@ -43,8 +43,7 @@ export default async function ParceiroInsumosPage({
       >
         <FiltrosDaLista base={base} filtros={filtros} categorias={categorias} />
       </CabecalhoDaLista>
-      <AvisoConservacaoAConfirmar quantos={aConfirmar} base={base} jaFiltrado={filtros.conservacao === 'confirmar'} />
-      <AvisoDaClassificacao resumo={faltam} href={`${base}/classificar`} />
+      <AvisosDaLista resumo={faltam} hrefClassificar={`${base}/classificar`} aConfirmar={aConfirmar} base={base} jaFiltrado={filtros.conservacao === 'confirmar'} />
       <TelaListaInsumos base={base} filtros={filtros} {...pagina} novoHref={ctx.bloqueio ? undefined : `${base}/novo`} />
     </div>
   );

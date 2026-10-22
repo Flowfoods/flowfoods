@@ -2489,13 +2489,13 @@ tocados: 0 P0, 0 P1 e 5 P2 (metadado com ponto médio, padrão já usado nas out
 Prioridade do Rodolfo de 21/10/2026 (cadastro de insumos), segunda metade. Duas migrations ADITIVAS: `20261102000000_erp_insumo_clareza`
 (valor `MATERIAL` em `InsumoTipo` e `Insumo.marcaReferencia`, com CHECK) e `20261102010000_erp_insumo_conservacao_confirmada`
 (`Insumo.conservacaoConfirmadaEm`). Nenhum valor antigo é reescrito: o Seco que ninguém escolheu, o custo 0 ("ainda não sei") e a validade
-gravada continuam exatamente como estavam. Decisões 259 a 268. Sem permissão nova (tudo é `insumos.editar`).
+gravada continuam exatamente como estavam. Decisões 259 a 269. Sem permissão nova (tudo é `insumos.editar`).
 
 1. **Nome uma vez só** (259, 260). "Insumo que falta: cadastrar" (nota de compra, ficha, embalagens por canal) abre um campo opcional de nome
    e leva `?nome=` (que o cadastro mostra preenchido, já com a categoria sugerida) e `?volta=` (só caminho interno da área de quem está logado,
    conferido na página e de novo na action: nada de open redirect). Salvou, volta para a tela de origem com `?insumoCriado=<id>`: aviso
    "Insumo salvo com sucesso: <nome>" (lido do banco), o insumo já na lista e escolhido na primeira linha vazia, e o que estava preenchido
-   recuperado (guardado só no navegador, 20 minutos; "Descartar e começar de novo"; a foto da ficha não é guardada). O rótulo da outra
+   recuperado (guardado só no navegador, 20 minutos, **por parceiro e pessoa**, apagado ao sair, ao trocar de pessoa e ao abrir a tela de entrar, e descartado se a ficha ou a nota mudou desde então; "Descartar e começar de novo"; a foto da ficha não é guardada). O rótulo da outra
    embalagem passou a "Nome desta embalagem de compra", com a ajuda dizendo que o insumo continua o mesmo. O nome do insumo, no formulário,
    já era pedido uma vez só: as causas reais do relato eram o atalho sem nome nem volta e esse rótulo.
 2. **Tipo de item** (261). Ingrediente, Embalagem e **Material de limpeza e uso** (`MATERIAL`), com o papel de cada um dito na tela e a
@@ -2511,8 +2511,9 @@ gravada continuam exatamente como estavam. Decisões 259 a 268. Sem permissão n
    recusa vazio, espaços, o placeholder e qualquer valor fora de Seco/ambiente, Pista fria, Refrigerado, Congelado, e não grava nada); o
    servidor deixou de assumir Seco; editar sem o campo mantém a gravada; "Cadastrar outro insumo" não lembra mais a conservação. O filtro da lista
    diz "Todas as conservações" e ganhou **Conservação a confirmar**: os Seco antigos, sem confirmação, em Proteína, Laticínios e Hortifruti
-   (aviso no alto da lista com a contagem, selo na linha, painel no detalhe com "Confirmar que é seco"). Nada é alterado pelo sistema; salvar o
-   formulário ou confirmar grava `conservacaoConfirmadaEm` e um `CONFIRMOU` no histórico.
+   (UM aviso no alto da lista, junto com o de categoria; selo na linha; painel no detalhe com "Confirmar que é seco"). Nada é alterado pelo sistema;
+   confirmar (botão, marcador "Confirmo que a conservação é esta" no editar, ou trocar a conservação) grava `conservacaoConfirmadaEm` e um `CONFIRMOU` no
+   histórico; salvar sem olhar o campo não confirma.
 5. **Prazo de uso após abertura** (264). O campo da validade do insumo comprado (que já era "depois de aberto") tem o nome e o texto do plano,
    em horas ou dias, por conservação; vazio = "não informado", sem padrão nem sugestão. Vencimento do lote e data/hora de abertura **não
    existem no ERP ainda** (o modelo `Etiqueta` tem os campos, mas nada grava, e `NotaEntradaItem` não tem lote): ficam para a 3.4, sem simular.
@@ -2564,7 +2565,7 @@ vazio no `ff_dev`. `npx vitest run` sem banco: 56 arquivos, 1372 testes passando
 rodadas seguidas: 101 arquivos, 2031 testes, todos passando. Como dono não-superusuário com FORCE RLS e como dono sem RLS (bancos novos, todas as
 migrations aplicadas pelo dono): os 9 arquivos de banco tocados ou vizinhos (clareza, insumos, validade, permissões, categorias, isolamento,
 compras, fichas e o apoio) com 160 testes cada, passando; o teste das duas migrations (`erp-insumo-clareza-migracao.db.test.ts`) cria os próprios bancos
-nos 3 perfis. Jornada no navegador (build de produção, porta 3100, banco novo copiado do `ff_dev` com os insumos antigos em Seco, 173
+nos 3 perfis. Jornada no navegador (build de produção, porta 3100, banco novo copiado do `ff_dev` com os insumos antigos em Seco, 189
 conferências, todas ok): conservação sem escolher (recusa no campo, foco nele, formulário preservado, "Conservação" forjado também recusado
 no servidor, nada gravado), cadastro completo com custo inicial (5 kg por R$ 25 = R$ 5,00/kg ao vivo e no detalhe, sem nota, item, movimento,
 saldo nem despesa), sem custo ("Custo não informado" no cadastro, no detalhe, na lista e na ficha incompleta; o banco guarda só o 0 interno),
@@ -2573,7 +2574,10 @@ material de limpeza e uso (categoria Limpeza sugerida pelo tipo, marca de refer�
 clique com um insumo só, "Insumo que falta: cadastrar" da nota e da ficha (nome levado, volta à tela de origem, insumo escolhido na linha vazia,
 nota e ficha recuperadas, barra de endereço limpa, aviso que não repete ao recarregar, Cancelar volta sem criar, volta externa ignorada e salvar
 vai ao detalhe), o mesmo no nível 1 (e a volta para outra casa ignorada), "conservação a confirmar" (aviso com a contagem, filtro, painel, confirmar
-sem alterar nada e com histórico, editar para Refrigerado, operador sem o botão), isolamento da outra casa. Matriz de 9 páginas x 4 tamanhos
+sem alterar nada e com histórico, editar para Refrigerado, operador sem o botão), isolamento da outra casa; **o rascunho é de quem o fez** (dona da Alfa deixa a nota, sai, a dona da Beta entra na mesma aba e não recebe nada; rascunho de
+outra pessoa do mesmo parceiro plantado no navegador não volta; o do próprio gerente volta; a tela de entrar e o Sair apagam tudo, no parceiro e no nível 1;
+ficha alterada por outra pessoa descarta o rascunho velho); um aviso só na lista; a fila diz quantos estão "sem certeza"; "Cadastrar outro insumo" abre sem
+conservação. Matriz de 9 páginas x 4 tamanhos
 (1440, 1180, 820, 390) x 2 temas: sem rolagem lateral, sem violação do axe (79 verificações) e sem erro de console. Com ponteiro de toque real, o
 que sobra abaixo de 44 px são só os cabeçalhos ordenáveis da lista, que já eram assim. Prints em `scratchpad/shots-I1b`. Scanner avoid-ai-design nos
 39 arquivos de código tocados: 0 P0, 0 P1 e 0 P2. A jornada achou e fez corrigir três defeitos que os testes não pegam: o rótulo da conservação
@@ -2592,10 +2596,11 @@ lista não acompanhava o link "Ver quais são".
 - **Quem cria insumo fora de `cadastrarInsumo`** (importação, integração) precisa mandar `conservacao` (o servidor não assume mais Seco) e,
   se quiser idempotência, `envio`; `marcaReferencia` é opcional. Teste que só precisa de um insumo usa `cadastrarInsumoDeTeste`, que diz
   Seco quando a chave não vem.
-- **Texto do custo ausente**: "Custo não informado" vale no cadastro, na lista, no detalhe, no histórico, na prévia e no detalhe da ficha e
-  no estoque da loja. As telas consumidoras que já diziam "sem preço" ou "custo incompleto" (estoque por período, produção, requisição,
-  CMV, canais, precificação) ficaram como estão: dizem a mesma coisa, nunca R$ 0,00 e margem que espera o custo. Unificar o texto é decisão
-  de redação, não de regra.
+- **Texto do custo ausente**: "Custo não informado" (ou "sem custo informado") vale nas telas: cadastro, lista, detalhe, histórico, ficha, canais,
+  estoque, produção e requisição. Ficam com "sem preço" só as frases MONTADAS na regra e cobertas por teste (custo da ficha, canais, CMV, contagem,
+  precificação): dizem a mesma coisa, nunca R$ 0,00 e margem que espera o custo. Trocá-las é redação, com teste junto.
+- **Rascunho**: a chave é parceiro + pessoa (ids do servidor) e some ao sair, entrar e trocar de pessoa (decisão 269); o de ficha, nota ou embalagens
+  guarda a versão lida e não volta sobre uma versão nova.
 - **Lições de código**: valor exportado de um arquivo `'use client'` NÃO chega a componente de servidor (o rótulo da opção de conservação
   quebrou o detalhe em produção até ir para `validade.ts`); `<select defaultValue>` não acompanha mudança de URL sem recarregar (o formulário de
   filtros ganhou `key` com os filtros); formulário que lê o rascunho depois do primeiro desenho precisa nascer de novo (`key`) quando ele chega,

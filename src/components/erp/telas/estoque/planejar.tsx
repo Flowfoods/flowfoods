@@ -80,7 +80,7 @@ export function TelaPlanejarCiclo({
     apoio: apoio(l),
     vencido: l.situacao !== 'em-dia',
     quantidade: l.saldoMilesimos < 0 ? `−${formatarQuantidade(-l.saldoMilesimos, l.unidade)}` : formatarQuantidade(l.saldoMilesimos, l.unidade),
-    valor: l.valorCentavos === null ? 'sem preço' : formatarDinheiro(l.valorCentavos),
+    valor: l.valorCentavos === null ? 'custo não informado' : formatarDinheiro(l.valorCentavos),
     emOutraContagem: l.emOutraContagem,
     sugerido: l.sugerido,
   }));

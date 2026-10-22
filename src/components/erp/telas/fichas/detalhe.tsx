@@ -266,7 +266,7 @@ export function TelaDetalheFicha({
                   <td className="hidden sm:table-cell" />
                   <td className="whitespace-nowrap py-2 pl-3 pr-4 text-right font-semibold tabular-nums sm:pr-5">
                     {formatarFracao(f.custo.total)}
-                    {incompleto && <span className="font-normal text-suave"> + sem preço</span>}
+                    {incompleto && <span className="font-normal text-suave"> + custo não informado</span>}
                   </td>
                 </tr>
               </tfoot>

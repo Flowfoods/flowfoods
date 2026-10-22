@@ -50,7 +50,7 @@ import { Segmentos } from '../../ui/segmentos';
 import { Painel } from '../../ui/superficies';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
-import { AvisoDeRascunho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
+import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
 import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
 import { CampoFoto } from './campo-foto';
 import { CamposDeValidade } from '../cadastro/campos-validade';
@@ -128,7 +128,7 @@ function contaDaLinha(l: LinhaDoItem, e: Escolhido | undefined) {
 
 export function FormFicha(props: PropsDoFormFicha) {
   // I.1b: voltou de "Insumo que falta: cadastrar"? O que estava preenchido volta junto, e o insumo novo já está na lista.
-  const r = useRascunhoDaTela<ValoresDaFicha>();
+  const r = useRascunhoDaTela<ValoresDaFicha>(props.modo === 'editar' ? props.versao : undefined);
   const [descartou, setDescartou] = useState(false);
   const recuperado = !descartou && r.valores ? r.valores : null;
   const criado = !descartou && r.insumoCriado ? props.opcoes.find((i) => i.id === r.insumoCriado) : undefined;
@@ -151,6 +151,7 @@ export function FormFicha(props: PropsDoFormFicha) {
       avisos={
         <>
           {criado && <AvisoInsumoCriado nome={criado.nome} escolhido={escolhido} />}
+          <AvisoDeRascunhoVelho quando={r.versaoMudou} oQue="A ficha" />
           <AvisoDeRascunho
             quando={!!recuperado}
             observacao="A foto que você tinha escolhido não é guardada: se for trocar a foto, escolha de novo."
@@ -284,7 +285,7 @@ function FormFichaBase({
       itens: linhas.map(({ chave: _c, ...l }) => l),
       validades: v.ok ? v.validades : null,
     };
-    guardarRascunho(chaveDoRascunho, valores);
+    guardarRascunho(chaveDoRascunho, valores, modo === 'editar' ? versao : undefined);
   }
 
   // O custo da prévia é por unidade BASE (kg, L, un), mesmo com o rendimento digitado em g ou ml (como no servidor).
@@ -583,8 +584,9 @@ function FormFichaBase({
             </div>
             <p className="text-right text-sm tabular-nums" aria-live="polite">
               <span className="text-suave">Prévia: </span>
-              <span className="font-semibold">{formatarFracao(previa.total)}</span>
-              {previa.porRende && (
+              {/* Nenhum item com custo: R$ 0,00 seria um custo que ninguém informou. */}
+              <span className="font-semibold">{previa.total.num === 0n && (previa.semPreco.length > 0 || previa.incompletos.length > 0) ? '—' : formatarFracao(previa.total)}</span>
+              {previa.porRende && !(previa.total.num === 0n && (previa.semPreco.length > 0 || previa.incompletos.length > 0)) && (
                 <span className="text-suave">
                   {' · '}
                   {formatarFracao(previa.porRende)} por {unidadeDoRende}

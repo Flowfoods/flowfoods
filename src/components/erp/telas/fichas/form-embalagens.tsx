@@ -22,7 +22,7 @@ import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
-import { AvisoDeRascunho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
+import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
 import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
 
 export interface LinhaDaEmbalagem {
@@ -39,7 +39,7 @@ const AJUDA_DO_CANAL: Record<CanalComEmbalagem, string> = {
 
 export function FormEmbalagens(props: PropsDoFormEmbalagens) {
   // I.1b: voltou de "Cadastrar em Insumos"? O que estava preenchido volta junto, e a embalagem nova já está na lista.
-  const r = useRascunhoDaTela<LinhaDaEmbalagem[]>();
+  const r = useRascunhoDaTela<LinhaDaEmbalagem[]>(props.impressao);
   const [descartou, setDescartou] = useState(false);
   const recuperado = !descartou && Array.isArray(r.valores) ? r.valores : null;
   const criado = !descartou && r.insumoCriado ? props.opcoes.find((o) => o.id === r.insumoCriado && o.embalagem) : undefined;
@@ -62,6 +62,7 @@ export function FormEmbalagens(props: PropsDoFormEmbalagens) {
       avisos={
         <>
           {criado && <AvisoInsumoCriado nome={criado.nome} escolhido={escolhido} />}
+          <AvisoDeRascunhoVelho quando={r.versaoMudou} oQue="A lista de embalagens da ficha" />
           <AvisoDeRascunho
             quando={!!recuperado}
             aoDescartar={() => {
@@ -155,7 +156,7 @@ function FormEmbalagensBase({
   }
   /** I.1b: antes de ir cadastrar a embalagem que falta, guarda as linhas da tela para recuperar na volta. */
   function guardarOQueFoiPreenchido() {
-    guardarRascunho(chaveDoRascunho, linhas.map(({ chave: _c, ...l }) => l));
+    guardarRascunho(chaveDoRascunho, linhas.map(({ chave: _c, ...l }) => l), impressao);
   }
   const idBase = 'embalagens';
   const rotuloDoErro = (campo: string) => {
@@ -189,7 +190,7 @@ function FormEmbalagensBase({
               acessorio={
                 <span className="shrink-0 text-right text-[12px] tabular-nums text-suave">
                   <span className="block text-[13px] font-semibold text-texto">{formatarFracao(total)}</span>
-                  {semPreco > 0 ? <span className="text-atencao">+ {semPreco} sem preço</span> : 'por porção'}
+                  {semPreco > 0 ? <span className="text-atencao">+ {semPreco} sem custo informado</span> : 'por porção'}
                 </span>
               }
             >
@@ -273,7 +274,7 @@ function FormEmbalagensBase({
                               conta.valor ? (
                                 <span className="text-texto">{formatarFracao(conta.valor)}</span>
                               ) : (
-                                <span className="text-atencao">sem preço</span>
+                                <span className="text-atencao">custo não informado</span>
                               )
                             ) : null}
                           </span>

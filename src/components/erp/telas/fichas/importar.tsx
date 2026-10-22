@@ -42,7 +42,7 @@ function LinhaDaPrevia({ f, novoInsumo }: { f: FichaNaPrevia; novoInsumo?: strin
         <p className="mt-0.5 text-[13px] tabular-nums text-suave">
           {plural(f.itens, 'insumo', 'insumos')} · rende {f.rende} · {f.custo}
           {f.validade && <span className="block">{f.validade}</span>}
-          {f.incompleto && <span className="text-atencao"> · custo incompleto (insumo sem preço)</span>}
+          {f.incompleto && <span className="text-atencao"> · custo incompleto (insumo sem custo informado)</span>}
           {f.mudancas.length > 0 && <span> · muda: {f.mudancas.join(', ')}</span>}
         </p>
       )}

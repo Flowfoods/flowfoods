@@ -97,7 +97,7 @@ export function CamposDaEmbalagem({
       <div className={`grid gap-3 ${temMenor ? 'grid-cols-[minmax(0,1fr)_minmax(0,9rem)]' : ''}`}>
         <div>
           <label htmlFor={id('conteudo')} className={ROTULO}>
-            {doInsumo ? 'Embalagem de compra: quanto vem' : 'Quanto vem na embalagem'}
+            Quanto vem na embalagem
           </label>
           <div className="relative">
             <input

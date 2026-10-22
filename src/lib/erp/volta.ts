@@ -25,6 +25,8 @@ export function caminhoDeVolta(valor: unknown, prefixo: string): string | null {
     return null;
   }
   if (u.origin !== ORIGEM_FALSA) return null;
+  // Barra dupla no caminho ("/erp//x") não é caminho da área: o navegador a trata de outro jeito conforme o contexto.
+  if (/\/\/|%2f|%5c/i.test(valor.split('?')[0])) return null;
   // Depois de normalizar ("/erp/../rodolfo"), continua dentro da área.
   if (!u.pathname.startsWith(prefixo)) return null;
   // Voltar para o cadastro de insumo faria um laço.

@@ -39,7 +39,7 @@ import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
 import { CampoData } from '../../ui/campo-data';
 import { ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
-import { AvisoDeRascunho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
+import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
 import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
 import type { AcaoDeNota, EstadoNota } from './estado';
 import { PreviaDoImpacto } from './previa';
@@ -88,7 +88,7 @@ function Enviar({ intencao, variante, children, disabled }: { intencao: 'conferi
 
 export function FormNota(props: PropsDoFormNota) {
   // I.1b: voltou de "Insumo que falta: cadastrar"? O que estava preenchido volta junto, e o insumo novo já está na lista.
-  const r = useRascunhoDaTela<ValoresDaNota>();
+  const r = useRascunhoDaTela<ValoresDaNota>(props.modo === 'editar' ? props.versao : undefined);
   const [descartou, setDescartou] = useState(false);
   const recuperado = !descartou && r.valores ? r.valores : null;
   const criado = !descartou && r.insumoCriado ? props.opcoes.insumos.find((i) => i.id === r.insumoCriado) : undefined;
@@ -112,6 +112,7 @@ export function FormNota(props: PropsDoFormNota) {
         avisos={
           <>
             {criado && <AvisoInsumoCriado nome={criado.nome} escolhido={escolhido} />}
+            <AvisoDeRascunhoVelho quando={r.versaoMudou} oQue="A nota" />
             <AvisoDeRascunho
               quando={!!recuperado}
               aoDescartar={() => {
@@ -234,7 +235,7 @@ function FormNotaBase({
       total,
       itens: linhas.map(({ chave: _c, ...l }) => l),
     };
-    guardarRascunho(chaveDoRascunho, valores);
+    guardarRascunho(chaveDoRascunho, valores, modo === 'editar' ? versao : undefined);
   }
 
   const diferenca = conta.total !== null && conta.frete !== null ? conta.total - (conta.soma + conta.frete) : null;

@@ -56,7 +56,7 @@ function Valor({ l }: { l: SituacaoDaLoja }) {
   return (
     <span>
       <span className="font-semibold text-texto">{formatarDinheiro(l.aberto.valorCentavos)}</span>
-      {l.aberto.pendentes > 0 && <span className="block text-[12px] text-suave">+ {l.aberto.pendentes} sem preço</span>}
+      {l.aberto.pendentes > 0 && <span className="block text-[12px] text-suave">+ {l.aberto.pendentes} sem custo informado</span>}
     </span>
   );
 }
@@ -126,7 +126,7 @@ export function TelaSituacaoDoEstoque({
           <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
             <div className="text-[12px] font-medium text-suave">Valor em estoque · lojas abertas</div>
             <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(total)}</div>
-            <div className="mt-1.5 text-[12px] text-suave">{pendentes > 0 ? `pelo custo de referência de hoje · ${pendentes} sem preço fora da soma` : 'pelo custo de referência de hoje'}</div>
+            <div className="mt-1.5 text-[12px] text-suave">{pendentes > 0 ? `pelo custo de referência de hoje · ${pendentes} sem custo informado fora da soma` : 'pelo custo de referência de hoje'}</div>
           </div>
         </div>
       )}

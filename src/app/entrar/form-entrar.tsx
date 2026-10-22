@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
+import { limparRascunhos } from '@/components/erp/telas/cadastro/rascunho';
 import { acaoEntrar, type EstadoEntrar } from './actions';
 import { EntrarComRosto } from './rosto';
 
@@ -23,6 +25,8 @@ function Botao() {
 
 export function FormEntrar({ aviso, rosto }: { aviso: string | null; rosto: boolean }) {
   const [estado, enviar] = useFormState<EstadoEntrar, FormData>(acaoEntrar, null);
+  // Quem chega à tela de entrar não herda o que a pessoa anterior deixou preenchido neste aparelho.
+  useEffect(() => limparRascunhos(), []);
   return (
     <div className="space-y-5">
       {aviso && !estado && (

@@ -240,7 +240,7 @@ export function FormInsumo({
                   </p>
                   {tipo === 'MATERIAL' && (
                     <p className="mt-1.5 text-[13px] text-atencao">
-                      Material de limpeza e uso não aparece na lista de ingredientes da ficha. Por enquanto, as compras dele ainda entram na soma de compras do CMV; a separação por categoria vem depois.
+                      Não entra em ficha técnica. As compras dele ainda contam no CMV por enquanto.
                     </p>
                   )}
                   <Erro id={`${idBase}-tipo-erro`} texto={erros.tipo} />
@@ -370,9 +370,16 @@ export function FormInsumo({
       </fieldset>
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-        <Link href={modo === 'criar' && volta ? volta : cancelar} className={classeDeBotao('fantasma')}>
-          Cancelar
-        </Link>
+        {modo === 'criar' && volta ? (
+          // Volta lendo a página de novo: o roteador guarda a anterior por uns segundos, e a versão da ficha ou da nota pode ter mudado.
+          <a href={volta} className={classeDeBotao('fantasma')}>
+            Cancelar
+          </a>
+        ) : (
+          <Link href={cancelar} className={classeDeBotao('fantasma')}>
+            Cancelar
+          </Link>
+        )}
         <BotaoEnviar disabled={!!bloqueio} className="sm:min-w-44">
           {modo === 'criar' ? (volta ? `Cadastrar e voltar para ${rotuloDaVolta(volta)}` : 'Cadastrar insumo') : 'Salvar alterações'}
         </BotaoEnviar>

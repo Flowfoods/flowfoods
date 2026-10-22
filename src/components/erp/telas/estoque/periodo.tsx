@@ -200,7 +200,7 @@ export function TelaPeriodo({
                       <span className="min-w-0 truncate font-medium text-texto">{i.nome}</span>
                       {i.paraOPiso && <Selo tom="alerta">para o piso</Selo>}
                     </span>
-                    <span className="shrink-0 tabular-nums text-suave">{i.valorCentavos === null ? 'sem preço' : formatarDinheiro(i.valorCentavos)}</span>
+                    <span className="shrink-0 tabular-nums text-suave">{i.valorCentavos === null ? 'custo não informado' : formatarDinheiro(i.valorCentavos)}</span>
                   </li>
                 ))}
                 {s.faltam.length > mostrados.length && <li className="px-4 py-2.5 text-[13px] text-suave sm:px-5">E mais {s.faltam.length - mostrados.length} insumos.</li>}

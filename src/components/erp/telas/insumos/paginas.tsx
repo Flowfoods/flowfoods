@@ -110,7 +110,7 @@ export function TelaFormInsumo({
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <TrilhaDaPagina itens={insumo ? [{ rotulo: insumo.nome, href: aqui }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo insumo' }]} />
-      <Voltar href={paraVoltar}>{insumo ? `Voltar para ${insumo.nome}` : volta ? `Voltar para ${rotuloDaVolta(volta)}` : 'Voltar para a lista'}</Voltar>
+      <Voltar href={paraVoltar} recarregar={!insumo && !!volta}>{insumo ? `Voltar para ${insumo.nome}` : volta ? `Voltar para ${rotuloDaVolta(volta)}` : 'Voltar para a lista'}</Voltar>
       <PageHeader
         icone="insumo"
         cor={COR.insumo}

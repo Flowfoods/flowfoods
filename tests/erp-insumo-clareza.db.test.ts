@@ -325,10 +325,14 @@ describe.skipIf(!URL_TESTE)('ERP I.1b · clareza do cadastro de insumos (Postgre
     expect(await confirmarConservacao(a, frango, 'Marina')).toMatchObject({ ok: true, mudou: [] });
     expect((await listarHistorico(a, { de: [{ entidade: 'Insumo', ids: [frango] }], limite: 10, verPrecos: false })).filter((x) => x.acao === 'CONFIRMOU')).toHaveLength(1);
 
-    // Salvar o formulário (mesmo sem mudar nada) também confirma; trocar para refrigerado muda e confirma.
+    // Salvar o formulário SEM mudar a conservação e sem marcar "Confirmo..." NÃO confirma (o campo não foi olhado); marcar confirma;
+    // trocar para refrigerado muda e confirma.
     const v = async (id: string) => (await a.insumo.findUniqueOrThrow({ where: { id }, select: { atualizadoEm: true } })).atualizadoEm.toISOString();
     const igual = { nome: 'Queijo (antigo)', tipo: 'INGREDIENTE', unidade: 'KG', conservacao: 'SECO', conteudo: '1', escala: 'base', preco: '10,00', categoriaId: cat.LATICINIOS };
-    expect(await editarInsumo(a, queijo, { ...igual, versao: await v(queijo) }, 'Marina')).toMatchObject({ ok: true, mudou: ['conservacao'] });
+    expect(await editarInsumo(a, queijo, { ...igual, versao: await v(queijo) }, 'Marina')).toMatchObject({ ok: true, mudou: [] });
+    expect(await contarConservacaoAConfirmar(a)).toBe(2);
+    expect((await a.insumo.findUniqueOrThrow({ where: { id: queijo }, select: { conservacaoConfirmadaEm: true } })).conservacaoConfirmadaEm).toBeNull();
+    expect(await editarInsumo(a, queijo, { ...igual, conservacaoConfirmada: 'sim', versao: await v(queijo) }, 'Marina')).toMatchObject({ ok: true, mudou: ['conservacao'] });
     expect(await editarInsumo(a, alface, { ...igual, nome: 'Alface (antigo)', conservacao: 'REFRIGERADO', categoriaId: cat.HORTIFRUTI, versao: await v(alface) }, 'Marina')).toMatchObject({ ok: true });
     expect(await contarConservacaoAConfirmar(a)).toBe(0);
     expect((await a.insumo.findUniqueOrThrow({ where: { id: alface }, select: { conservacao: true } })).conservacao).toBe('REFRIGERADO');

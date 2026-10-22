@@ -9,7 +9,7 @@ import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode, visaoDaRequisica
 import { contarConservacaoAConfirmar, listarInsumos } from '@/lib/erp/insumos';
 import { categoriasParaEscolher } from '@/lib/erp/categorias';
 import { resumoDoQueFalta } from '@/lib/erp/classificar';
-import { AvisoConservacaoAConfirmar, AvisoDaClassificacao } from '@/components/erp/telas/insumos/aviso-classificar';
+import { AvisosDaLista } from '@/components/erp/telas/insumos/aviso-classificar';
 import { lerFiltros, temFiltro } from '@/lib/erp/insumo-campos';
 import { FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
 import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
@@ -40,8 +40,7 @@ export default async function ErpInsumosPage({ searchParams }: { searchParams: R
       >
         <FiltrosDaLista base={BASE} filtros={filtros} categorias={categorias} />
       </CabecalhoDaLista>
-      <AvisoConservacaoAConfirmar quantos={aConfirmar} base={BASE} jaFiltrado={filtros.conservacao === 'confirmar'} />
-      <AvisoDaClassificacao resumo={faltam} href={cadastra ? `${BASE}/classificar` : undefined} />
+      <AvisosDaLista resumo={faltam} hrefClassificar={cadastra ? `${BASE}/classificar` : undefined} aConfirmar={aConfirmar} base={BASE} jaFiltrado={filtros.conservacao === 'confirmar'} />
       <TelaListaInsumos
         base={BASE}
         filtros={filtros}

@@ -178,7 +178,7 @@ export function TelaEstoqueDaLoja({
             <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
               <div className="text-[12px] font-medium text-suave">Valor em estoque</div>
               <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(e.total.centavos)}</div>
-              <div className="mt-1.5 text-[12px] text-suave">{e.total.pendentes > 0 ? `custo de referência de hoje · ${e.total.pendentes} sem preço fora da soma` : 'pelo custo de referência de hoje'}</div>
+              <div className="mt-1.5 text-[12px] text-suave">{e.total.pendentes > 0 ? `custo de referência de hoje · ${e.total.pendentes} sem custo informado fora da soma` : 'pelo custo de referência de hoje'}</div>
             </div>
             <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
               <div className="text-[12px] font-medium text-suave">Insumos com saldo</div>

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { CAMPO, ROTULO } from '@/components/erp/ui/campos';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
+import { limparRascunhos } from '@/components/erp/telas/cadastro/rascunho';
 import { AREA_DO_RODOLFO, destinoSeguro } from '@/lib/destino-seguro';
 
 function Formulario() {
@@ -14,6 +15,8 @@ function Formulario() {
   const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const [enviando, setEnviando] = useState(false);
+  // Quem chega à tela de entrar não herda o que a pessoa anterior deixou preenchido neste aparelho.
+  useEffect(() => limparRascunhos(), []);
 
   async function entrar(e: React.FormEvent) {
     e.preventDefault();

@@ -137,7 +137,7 @@ function Apoio({ i, custo }: { i: InsumoNaConta; custo: string | null | undefine
   return (
     <>
       {partes.length > 0 && <span className="block text-[12px] text-suave [overflow-wrap:anywhere]">{partes.join(' · ')}</span>}
-      {custo !== undefined && i.comprarMilesimos ? <span className="block text-[12px] tabular-nums text-suave">{custo === null ? 'sem preço' : `≈ ${custo} pelo último preço`}</span> : null}
+      {custo !== undefined && i.comprarMilesimos ? <span className="block text-[12px] tabular-nums text-suave">{custo === null ? 'custo não informado' : `≈ ${custo} pelo último preço`}</span> : null}
     </>
   );
 }
@@ -218,7 +218,7 @@ function MateriaPrima({ d, podeMontar }: { d: ListaDoDiaNaTela; podeMontar: bool
                     </td>
                     <td className="whitespace-nowrap px-5 py-3 text-right tabular-nums">
                       <Comprar i={i} />
-                      {d.custo && i.comprarMilesimos ? <span className="block text-[12px] text-suave">{custoDe(i.insumoId) === null ? 'sem preço' : `≈ ${custoDe(i.insumoId)}`}</span> : null}
+                      {d.custo && i.comprarMilesimos ? <span className="block text-[12px] text-suave">{custoDe(i.insumoId) === null ? 'custo não informado' : `≈ ${custoDe(i.insumoId)}`}</span> : null}
                     </td>
                   </tr>
                 ))}
@@ -335,7 +335,7 @@ function ParaQuemCompra({ d, raiz }: { d: ListaDoDiaNaTela; raiz: string }) {
             <p className="font-display text-[26px] font-bold leading-none tabular-nums">{formatarFracao(d.custo.total)}</p>
             <p className="mt-1.5 text-[12px] font-medium text-suave">
               compra estimada do que falta, pelo último preço pago
-              {d.custo.semPreco.length ? ` · sem contar ${d.custo.semPreco.join(', ')} (sem preço)` : ''}
+              {d.custo.semPreco.length ? ` · sem contar ${d.custo.semPreco.join(', ')} (sem custo informado)` : ''}
             </p>
           </div>
         )}

@@ -33,7 +33,7 @@ function Sumico({ d }: { d: DivergenciaDoInsumo }) {
     <span>
       <span className={`block text-[15px] font-bold ${falta ? 'text-erro' : 'text-texto'}`}>{falta ? `−${formatarQuantidade(d.sumicoMilesimos, d.unidade)}` : `+${formatarQuantidade(-d.sumicoMilesimos, d.unidade)}`}</span>
       <span className={`block text-[12px] ${d.sumicoCentavos === null ? 'text-atencao' : falta ? 'text-erro' : 'text-suave'}`}>
-        {d.sumicoCentavos === null ? 'sem preço' : falta ? `${formatarDinheiro(d.sumicoCentavos)} sem requisição` : `${formatarDinheiro(-d.sumicoCentavos)} requisitado a mais`}
+        {d.sumicoCentavos === null ? 'custo não informado' : falta ? `${formatarDinheiro(d.sumicoCentavos)} sem requisição` : `${formatarDinheiro(-d.sumicoCentavos)} requisitado a mais`}
       </span>
     </span>
   );
@@ -110,7 +110,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
           <div className={`mt-2 font-display text-[30px] font-bold leading-none tabular-nums ${r.sumicoCentavos > 0 ? 'text-erro' : ''}`}>{formatarDinheiro(r.sumicoCentavos)}</div>
           <div className="mt-1.5 text-[12px] text-suave">
             {r.comSumico === 0 ? 'nenhum insumo' : r.comSumico === 1 ? 'em 1 insumo' : `em ${r.comSumico} insumos`}
-            {r.semPreco ? ` · ${r.semPreco} sem preço fora da soma` : ''}
+            {r.semPreco ? ` · ${r.semPreco} sem custo informado fora da soma` : ''}
           </div>
         </div>
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
@@ -280,7 +280,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
                     <span className="min-w-0 truncate font-medium text-texto">{n.nome}</span>
                     <span className="shrink-0 text-right tabular-nums">
                       <span className="block font-semibold text-erro">{quantidadeNegativa(n.quantidadeMilesimos, n.unidade)}</span>
-                      <span className="block text-[12px] text-suave">{n.valorCentavos === null ? 'sem preço' : reais(n.valorCentavos)}</span>
+                      <span className="block text-[12px] text-suave">{n.valorCentavos === null ? 'custo não informado' : reais(n.valorCentavos)}</span>
                     </span>
                   </li>
                 ))}

@@ -282,13 +282,13 @@ export function TelaConferirContagem({
           <div className="mt-1.5 text-[12px] tabular-nums text-suave">
             <span className={c.soma.faltaCentavos ? 'font-semibold text-erro' : ''}>{formatarDinheiro(c.soma.faltaCentavos)} a menos</span> ·{' '}
             <span className={c.soma.sobraCentavos ? 'font-semibold text-ok' : ''}>{formatarDinheiro(c.soma.sobraCentavos)} a mais</span>
-            {c.soma.semPreco ? ` · ${c.soma.semPreco} sem preço` : ''}
+            {c.soma.semPreco ? ` · ${c.soma.semPreco} sem custo informado` : ''}
           </div>
         </div>
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
           <div className="text-[12px] font-medium text-suave">Para conferir</div>
           <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{c.soma.foraDaTolerancia}</div>
-          <div className="mt-1.5 text-[12px] text-suave">acima de {formatarDinheiro(c.regras.toleranciaCentavos)} por item, ou sem preço</div>
+          <div className="mt-1.5 text-[12px] text-suave">acima de {formatarDinheiro(c.regras.toleranciaCentavos)} por item, ou sem custo informado</div>
         </div>
         {fechamento && !aberta && c.contagem.valorTotalCentavos !== null && c.estado === 'APLICADA' && (
           <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">

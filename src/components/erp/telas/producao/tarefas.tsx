@@ -8,6 +8,7 @@
  * validade), que volta para cá. A mesma tela no nível 1 (que vê e gerencia, mas não pega).
  */
 
+import { FormQueLimpaRascunhos } from '../cadastro/form-que-limpa-rascunhos';
 import Link from 'next/link';
 import type { LinhaDaTarefa, LoteDaTarefa, TarefasDoDia } from '@/lib/erp/producao-equipe';
 import { formatarRendimento, rendimentoDoLote, situacaoDosInsumos } from '@/lib/erp/producao-campos';
@@ -117,11 +118,11 @@ export function TelaTarefas({
               Você está como <span className="font-semibold">{eu.nome}</span>.
             </p>
             {acoes.sair && (
-              <form action={acoes.sair} className="self-start sm:self-auto">
+              <FormQueLimpaRascunhos action={acoes.sair} className="self-start sm:self-auto">
                 <button type="submit" className={classeDeBotaoDaCozinha('fantasma', '!px-0 text-[15px] underline decoration-linha-forte underline-offset-4 sm:!px-3')}>
                   Não é você? Trocar de pessoa
                 </button>
-              </form>
+              </FormQueLimpaRascunhos>
             )}
           </div>
         ) : (
