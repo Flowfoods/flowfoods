@@ -21,6 +21,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { documentoValido, formatarDocumento } from '../src/lib/erp/compra-campos';
+import { doParceiro } from '../src/lib/erp/tenant';
 
 export const CHECKS_DA_2_1 = [
   ['FaturamentoLancamento', 'FaturamentoLancamento_valor_teto'],
@@ -180,29 +181,17 @@ export interface RelatorioDeFornecedores {
 }
 
 /**
- * Lê os fornecedores POR PARCEIRO, no contexto dele (a RLS forçada só deixa o papel do tenant ver a linha; o catálogo do Postgres
- * não basta para listar nomes). Só leitura. `db` sem `$transaction` (um objeto de teste só com `$queryRaw`) devolve nada.
+ * Lê os fornecedores POR PARCEIRO, pelo portão (`doParceiro`): a RLS forçada só deixa o papel do tenant ver a linha, e o portão é o
+ * único caminho para dado de tenant (o catálogo do Postgres não basta para listar nomes). Só leitura.
  */
-export async function relatorioDeFornecedores(db: Pick<PrismaClient, '$queryRaw' | '$transaction'>): Promise<RelatorioDeFornecedores> {
+export async function relatorioDeFornecedores(db: PrismaClient): Promise<RelatorioDeFornecedores> {
   const relatorio: RelatorioDeFornecedores = { repetidos: [], documentosAConferir: [], aCompletar: 0 };
-  if (typeof db.$transaction !== 'function') return relatorio;
   const parceiros = await db.$queryRaw<{ id: string; slug: string }[]>`SELECT "id", "slug" FROM "ParceiroFlow" ORDER BY "slug"`;
-  const papel = await db.$queryRaw<{ ok: boolean }[]>`
-    SELECT (EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_tenant')
-            AND CASE WHEN current_setting('server_version_num')::int >= 160000
-                     THEN pg_has_role(current_user, 'erp_tenant', 'SET') ELSE pg_has_role(current_user, 'erp_tenant', 'MEMBER') END
-            AND has_table_privilege('erp_tenant', '"Fornecedor"', 'SELECT')) AS "ok"`;
-  const comPapel = !!papel[0]?.ok;
   for (const p of parceiros) {
-    const linhas = await db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT set_config('app.parceiro_id', ${p.id}, true)`;
-      if (comPapel) await tx.$queryRaw`SELECT set_config('role', 'erp_tenant', true)`;
-      return tx.$queryRaw<{ nome: string; documento: string | null; situacao: string }[]>`
-        SELECT "nome", "documento", "situacaoCadastro"::text AS "situacao" FROM "Fornecedor" WHERE "parceiroId" = ${p.id} ORDER BY "nome"`;
-    });
+    const linhas = await doParceiro(p.id, db).fornecedor.findMany({ select: { nome: true, documento: true, situacaoCadastro: true }, orderBy: { nome: 'asc' } });
     const porDocumento = new Map<string, string[]>();
     for (const f of linhas) {
-      if (f.situacao === 'A_COMPLETAR') relatorio.aCompletar += 1;
+      if (f.situacaoCadastro === 'A_COMPLETAR') relatorio.aCompletar += 1;
       if (!f.documento) continue;
       porDocumento.set(f.documento, [...(porDocumento.get(f.documento) ?? []), f.nome]);
       if (!documentoValido(f.documento)) relatorio.documentosAConferir.push({ parceiro: p.slug, nome: f.nome, documento: f.documento });
@@ -213,7 +202,7 @@ export async function relatorioDeFornecedores(db: Pick<PrismaClient, '$queryRaw'
 }
 
 /** O que a migration deixou pendente (frases prontas para o terminal); lista vazia = tudo no lugar. */
-export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'> & Partial<Pick<PrismaClient, '$transaction'>>): Promise<string[]> {
+export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
   const pendencias: string[] = [];
   const checks = await db.$queryRaw<{ tabela: string; nome: string; validado: boolean }[]>`
     SELECT c.conrelid::regclass::text AS tabela, c.conname AS nome, c.convalidated AS validado
@@ -447,7 +436,8 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'> & Par
       pendencias.push(
         `Índice ${i} NÃO existe: há fornecedores do mesmo parceiro com o mesmo CNPJ/CPF. Corrija o cadastro de cada um (o documento certo, ou "Compras sem nota fiscal" e o documento em branco) e rode o CREATE UNIQUE INDEX "${i}" ON "Fornecedor"("parceiroId", "documento") WHERE "documento" IS NOT NULL; da migration 20261105000000_erp_fornecedor_cadastro. Enquanto isso o servidor já recusa documento repetido.`,
       );
-      const rel = db.$transaction ? await relatorioDeFornecedores(db as Pick<PrismaClient, '$queryRaw' | '$transaction'>) : null;
+      // O objeto de teste só com `$queryRaw` (sem cliente completo) não lista os pares; o cliente de verdade lista.
+      const rel = typeof (db as Partial<PrismaClient>).$transaction === 'function' ? await relatorioDeFornecedores(db as PrismaClient) : null;
       for (const r of rel?.repetidos ?? []) {
         pendencias.push(`  CNPJ/CPF repetido no parceiro ${r.parceiro}: ${formatarDocumento(r.documento)} em ${r.nomes.map((n) => `“${n}”`).join(' e ')}.`);
       }
