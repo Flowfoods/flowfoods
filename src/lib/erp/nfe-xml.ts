@@ -22,8 +22,9 @@ import { createHash } from 'node:crypto';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { documentoValido, normalizarCodigo, normalizarInscricao, UFS } from './compra-campos';
 import { limparTexto } from './insumo-campos';
+import { LIMITES_DO_XML } from './nfe-limites';
 
-export const LIMITES_DO_XML = { bytes: 1_000_000, itens: 200, tags: 60_000, profundidade: 40, duplicatas: 120 } as const;
+export { LIMITES_DO_XML };
 
 const NAMESPACE_DA_NFE = 'http://www.portalfiscal.inf.br/nfe';
 const TETO = 2_000_000_000;

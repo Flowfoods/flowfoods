@@ -18,7 +18,7 @@ import {
   type EntradaDaConferencia,
   type ResultadoDoc,
 } from '@/lib/erp/documentos-fiscais';
-import { LIMITES_DO_XML } from '@/lib/erp/nfe-xml';
+import { LIMITES_DO_XML } from '@/lib/erp/nfe-limites';
 import type { EstadoDocumento } from './documentos-estado';
 
 const textoDe = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : '');

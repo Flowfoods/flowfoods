@@ -9,7 +9,7 @@
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
-import { LIMITES_DO_XML } from '@/lib/erp/nfe-xml';
+import { LIMITES_DO_XML } from '@/lib/erp/nfe-limites';
 import { AJUDA, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
