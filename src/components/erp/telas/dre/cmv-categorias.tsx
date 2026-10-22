@@ -97,7 +97,7 @@ function LinhaDaTabela({ l, semCorGeral }: { l: LinhaDoPainel; semCorGeral: bool
         {mostraMeta && origem && <span className="block text-[12px] leading-snug text-suave">{origem}</span>}
       </td>
       <td className="hidden whitespace-nowrap px-3 py-2 text-right align-top font-normal xl:table-cell">
-        <span className="block min-h-6 leading-6">{mostraMeta && l.metaCentavos !== null ? formatarDinheiro(l.metaCentavos) : <span className="text-suave">—</span>}</span>
+        <span className="block min-h-6 leading-6">{mostraMeta && l.metaCentavos !== null && l.metaBp !== 0 ? formatarDinheiro(l.metaCentavos) : <span className="text-suave">—</span>}</span>
       </td>
       <td className="hidden whitespace-nowrap px-3 py-2 text-right align-top sm:table-cell">
         {l.desvioTexto ? (
