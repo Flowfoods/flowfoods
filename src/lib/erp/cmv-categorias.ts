@@ -192,7 +192,15 @@ export async function cmvPorCategoriaNaTx(tx: ClienteDoParceiro, alcance: Alcanc
   const montar = (categorias: CategoriaDoPainel[], lojas: LojaNoPainel[], nInsumos: number | null) => {
     const faixas = d.fechamento ? faixasDaVersao(d.farol.versaoDasFaixas) : FAIXAS_DO_FAROL;
     // Só entra na conta a loja que vendeu ou comprou: a parada não pesa nem conta como "sem meta".
-    const incluidas = lojas.filter((l) => l.receitaBrutaCentavos > 0 || l.compras.size > 0);
+    const doCmv = new Map(d.cmvDasLojas.lojas.map((c) => [c.lojaId, c]));
+    const enriquecidas = lojas.map((l) => {
+      const c = doCmv.get(l.lojaId);
+      const vale = c ? valeDaLoja(c) : null;
+      // Fotografia v4 (sem o real por categoria): a loja cujo DRE é o real fica pelas compras, e a variação explica a diferença.
+      const motivo = l.motivoSemRealPorCategoria ?? (!l.real && c?.real ? 'o fechamento é de antes do real por categoria' : null);
+      return { ...l, cmvCentavos: l.cmvCentavos !== undefined ? l.cmvCentavos : (vale?.centavos ?? null), motivoSemRealPorCategoria: motivo };
+    });
+    const incluidas = enriquecidas.filter((l) => l.receitaBrutaCentavos > 0 || l.compras.size > 0 || l.real || l.cmvCentavos != null);
     const painel = montarPainelDeCategorias({
       categorias,
       lojas: incluidas,
