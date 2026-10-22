@@ -1085,11 +1085,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/cmv-categorias'],
     titulo: 'CMV por categoria',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'É o CMV do DRE aberto em categorias: quanto da compra foi para Proteína, Hortifruti, Bebidas e as outras, e quanto isso pesa na receita bruta.' },
+      { texto: 'Esta tela mostra para onde foi o custo, categoria por categoria, para quem acompanha o resultado.' },
+      { texto: 'É o CMV do DRE aberto em categorias: quanto da compra foi para Proteína, Hortifruti, Bebidas e as outras, e quanto isso pesa na receita bruta.', para: ['dre.ver'] },
       { texto: 'A soma das categorias é a linha do CMV do DRE, ao centavo; no período que já terminou, a diferença para o real aparece numa linha à parte.', para: ['dre.ver'] },
-      { texto: 'Cada categoria com meta tem o desvio e o farol, as mesmas 5 faixas do DRE. Os maiores desvios mostram onde o custo mais passou da meta.', para: ['dre.ver'] },
+      { texto: 'Cada categoria com meta tem o desvio e o farol, as mesmas 5 faixas do DRE. Os maiores desvios mostram as categorias que saíram da meta, a que mais passou primeiro.', para: ['dre.ver'] },
     ],
     secoes: [
       {
@@ -1122,10 +1123,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/metas-categorias'],
     titulo: 'Metas por categoria',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'Aqui você diz quanto cada categoria deve pesar na receita bruta, em %. Vazio é sem meta e zero é uma meta de zero.' },
-      { texto: 'A meta total é a do CMV do DRE; a divisão pode não fechar nela, e a tela só avisa a diferença.', para: ['metas.editar'] },
+      { texto: 'Aqui quem define as metas diz quanto cada categoria pode pesar, em % da receita bruta.' },
+      { texto: 'Vazio é sem meta e zero é uma meta de zero. A meta total é a do CMV do DRE; a divisão pode não fechar nela, e a tela só avisa a diferença.', para: ['metas.editar'] },
       { texto: 'Usar o modelo de 32% só preenche o formulário, como referência ilustrativa: confira, mude e salve. Nada é gravado antes disso.', para: ['metas.editar'] },
     ],
     secoes: [

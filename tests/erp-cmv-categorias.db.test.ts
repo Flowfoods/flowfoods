@@ -403,6 +403,20 @@ describe.skipIf(!URL_TESTE)('ERP I.2a · metas e CMV por categoria (Postgres rea
     expect(linha((await painel(DONA(), VP))!, 'LIMPEZA').metaBp).toBe(50);
     const rede = (await painel(DONA(), REDE))!;
     expect(linha(rede, 'LIMPEZA').metaCentavos).toBe(R(500)); // só a Penha: 0,5 % de 100.000
+    // Veto do Guardião: a Delivery NÃO usa Bebidas mas comprou R$ 500,00. Na rede, a linha não compara o realizado de todas as lojas com a
+    // meta de quem usa: fica sem cor, com o motivo, sem desvio, e o valor segue no total (a soma é o DRE).
+    const bebidas = linha(rede, 'BEBIDAS');
+    expect(bebidas.realizadoCentavos).toBe(R(3_800));
+    expect(bebidas.desvioBp).toBeNull();
+    expect(bebidas.desvioCentavos).toBeNull();
+    expect(bebidas.farol).toMatchObject({ tipo: 'sem', motivo: 'Unidade Tijuca comprou Bebidas, marcada como não usa' });
+    expect(rede.painel!.maioresDesvios.map((l) => l.categoriaId)).not.toContain(cat.BEBIDAS);
+    expect(rede.painel!.variacaoCentavos).toBe(0);
+    // Limpeza (a Delivery não usa e não comprou): o realizado e a meta são só da Penha, mesma receita, pp e R$ do mesmo sinal.
+    const limpeza = linha(rede, 'LIMPEZA');
+    expect(limpeza.realizadoBp).toBe(70);
+    expect(limpeza.desvioBp).toBe(20);
+    expect(limpeza.desvioCentavos).toBe(R(200));
     // Voltar a usar: a linha existe com `usa` verdadeiro e o histórico guarda tudo.
     expect((await salvar(ids.dl, { segue: 'sim', campos: {}, usa: { [cat.LIMPEZA]: true, [cat.BEBIDAS]: true } })).ok).toBe(true);
     expect(await a.categoriaNaLoja.count({ where: { usa: false } })).toBe(0);

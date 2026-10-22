@@ -165,6 +165,17 @@ describe.skipIf(!URL_TESTE)('ERP I.2a · telas do CMV por categoria e das metas 
     expect(h.match(/.{60}R\$ 0,00.{40}/)?.[0] ?? null).toBeNull();
   });
 
+  it('período encerrado de antes das metas diz "não havia meta neste período"; "Maiores desvios" lista só quem saiu da meta e senão diz que ninguém saiu', async () => {
+    como(alcanceDe('DONO', 'rede'));
+    const antes = await painel({ rede: '1', periodo: '2026-07-10' });
+    expect(antes).toContain('não havia meta neste período');
+    expect(antes).not.toContain('defina em Metas por categoria');
+    const agora = await painel({ rede: '1', periodo: '2026-10-10' });
+    expect(agora).toContain('Maiores desvios');
+    expect(agora).toContain('As categorias que saíram da meta');
+    expect(agora).not.toContain('Nenhuma categoria passou da meta');
+  });
+
   it('o painel de uma loja traz só a loja; as caixas, o sumário e o link para o DRE ficam no escopo dela', async () => {
     como(alcanceDe('DONO', 'rede'), { tipo: 'loja', lojaId: ids.dl });
     const h = await painel({ loja: ids.dl, periodo: '2026-10-10' });

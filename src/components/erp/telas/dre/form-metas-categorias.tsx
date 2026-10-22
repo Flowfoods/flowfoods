@@ -146,7 +146,7 @@ export function FormMetasPorCategoria({
               placeholder="sem meta"
               aria-invalid={!!erros.total}
               aria-describedby={`meta-total-ajuda${erros.total ? ' meta-total-erro' : ''}`}
-              className={`${CAMPO} w-full max-w-[12rem] text-right tabular-nums`}
+              className={`${CAMPO} w-full max-w-[12rem] scroll-mb-28 text-right tabular-nums`}
             />
             <p id="meta-total-ajuda" className="mt-1.5 text-[12px] text-suave">
               É a meta da linha CMV do DRE: mudar aqui muda lá. As categorias dividem esse total.

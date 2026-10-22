@@ -182,16 +182,16 @@ export function TelaDoCmvPorCategoria({
             )}
           </nav>
           {!d.emCurso && (
-            <Link href={`${base}?${escopoQuery.slice(1)}`} className={LINK_TOQUE}>
+            <Link href={`${base}?${escopoQuery.slice(1)}`} className={classeDeBotao('secundario')}>
               Voltar para o período de agora
             </Link>
           )}
           {loja && pode.veRede && (
-            <Link href={`${base}?periodo=${d.periodo.inicio}&rede=1`} className={LINK_TOQUE}>
+            <Link href={`${base}?periodo=${d.periodo.inicio}&rede=1`} className={classeDeBotao('secundario')}>
               Ver a rede
             </Link>
           )}
-          <Link href={`${raiz}/dre?periodo=${d.periodo.inicio}${escopoQuery}`} className={LINK_TOQUE}>
+          <Link href={`${raiz}/dre?periodo=${d.periodo.inicio}${escopoQuery}`} className={classeDeBotao('secundario')}>
             Ver o DRE
           </Link>
           {d.emCurso ? <Selo tom="alerta">Parcial · até ontem</Selo> : d.status === 'FECHADO' ? <Selo tom="ok">Período fechado</Selo> : <Selo>Período encerrado</Selo>}
@@ -218,7 +218,7 @@ export function TelaDoCmvPorCategoria({
           </Metrica>
         </div>
         <div className="col-span-2 flex sm:col-span-1 [&>div]:w-full">
-          <Metrica rotulo="Meta total do CMV" valor={total.meta ? textoDaMeta(total.meta.metaBp) : 'Sem meta'} detalhe={total.meta ? (total.meta.metaCentavos !== null ? `${formatarDinheiro(total.meta.metaCentavos)} na receita do período` : total.meta.semComparacao ?? undefined) : pode.definirMetas ? 'defina em Metas por categoria' : undefined}>
+          <Metrica rotulo="Meta total do CMV" valor={total.meta ? textoDaMeta(total.meta.metaBp) : 'Sem meta'} detalhe={total.meta ? (total.meta.metaCentavos !== null ? `${formatarDinheiro(total.meta.metaCentavos)} na receita do período` : total.meta.semComparacao ?? undefined) : !d.emCurso ? 'não havia meta neste período' : pode.definirMetas ? 'defina em Metas por categoria' : undefined}>
             {total.meta && (
               <div className="mt-2 space-y-1">
                 {total.meta.desvioTexto && <p className="text-[12px] tabular-nums text-suave">Desvio {total.meta.desvioTexto}</p>}
@@ -250,9 +250,9 @@ export function TelaDoCmvPorCategoria({
             </Aviso>
           )}
 
-          <Painel titulo="Maiores desvios" subtitulo="As categorias com meta em que o custo mais passou da meta, em R$." acessorio={<Contagem>{painel.maioresDesvios.length}</Contagem>} semRespiro>
+          <Painel titulo="Maiores desvios" subtitulo="As categorias que saíram da meta, em ordem de quanto passaram, em R$." acessorio={<Contagem>{painel.maioresDesvios.length}</Contagem>} semRespiro>
             {painel.maioresDesvios.length === 0 ? (
-              <p className="px-4 py-4 text-sm text-suave sm:px-5">{painel.semCor ? 'Sem destaque enquanto as categorias estão sem cor.' : 'Nenhuma categoria passou da meta neste recorte.'}</p>
+              <p className="px-4 py-4 text-sm text-suave sm:px-5">{painel.semCor ? 'Sem destaque enquanto as categorias estão sem cor.' : 'Nenhuma categoria saiu da meta neste recorte.'}</p>
             ) : (
               <ol className="divide-y divide-linha">
                 {painel.maioresDesvios.map((l, i) => (

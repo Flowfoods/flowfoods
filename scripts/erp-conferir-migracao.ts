@@ -141,6 +141,7 @@ export const GATILHOS_DA_I_2A = [
   'CategoriaNaLoja_parceiro_imutavel',
   'MetaCmvConjunto_parceiro_imutavel',
   'MetaCmvConjunto_so_o_mais_novo',
+  'MetaCmvConjunto_sem_retroativo',
   'MetaCmvCategoria_parceiro_imutavel',
   'MetaCmvCategoria_do_conjunto_novo',
 ] as const;
@@ -342,7 +343,7 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
     }
     const gatilhos = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_I_2A]})`;
     for (const t of GATILHOS_DA_I_2A) {
-      if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261103000000_erp_cmv_categorias não foi aplicada por inteiro.`);
+      if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261103000000_erp_cmv_categorias (e a 20261103010000_erp_cmv_categorias_endurecimento) não foi aplicada por inteiro.`);
     }
   }
   return pendencias;

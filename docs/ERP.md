@@ -2619,7 +2619,7 @@ lista não acompanhava o link "Ver quais são".
 Prioridade do Rodolfo (decisões de 19 e 21/10/2026), primeira metade da I.2 (a análise foi dividida: a I.2b traz o real por categoria). Uma
 migration ADITIVA, `20261103000000_erp_cmv_categorias`: `Contagem.retratoGravadoEm` e quatro tabelas novas (`ContagemRetratoItem`,
 `CategoriaNaLoja`, `MetaCmvConjunto`, `MetaCmvCategoria`), todas com `parceiroId`, FK compostas, RLS condicional e `erp_tenant`. Nenhum dado
-antigo é reescrito. Decisões 270 a 283. Sem permissão nova: ver o painel é `dre.ver`, editar as metas é `metas.editar` com a rede inteira.
+antigo é reescrito. Decisões 270 a 285. Segunda migration `20261103010000_erp_cmv_categorias_endurecimento` (só gatilhos: conjunto de metas sem vigência retroativa e contagem que não fecha com retrato solto). Sem permissão nova: ver o painel é `dre.ver`, editar as metas é `metas.editar` com a rede inteira.
 
 1. **Metas por categoria** (271, 272, 273). Tela `dre/metas-categorias` (aba "Metas por categoria"): na rede, a meta total do CMV (a MESMA
    `DreMeta` da linha CMV do DRE: uma fonte só, gravada junto sob a trava `erp-metas:<parceiro>`) e a meta de cada categoria, em % da receita
@@ -2630,14 +2630,14 @@ antigo é reescrito. Decisões 270 a 283. Sem permissão nova: ver o painel é `
    a soma das categorias difere do total (aviso, não bloqueio). Categoria renomeada mantém; excluída ou desativada fica de fora e a frase diz.
 3. **Painel "CMV por categoria"** (275, 277, 279, 280). Tela `dre/cmv-categorias` (aba "CMV por categoria", link também no DRE): escopo rede ou
    loja e período; pelas COMPRAS (data da nota, até ontem no período em curso, "parcial"). Por categoria: realizado em R$ e %, meta em % e R$,
-   desvio em pp e R$ (realizado menos meta, o sinal da DRE) e o farol das cinco faixas de custo da 2.4. Maiores desvios (até 3, em R$). Linhas sem
+   desvio em pp e R$ (realizado menos meta, o sinal da DRE) e o farol das cinco faixas de custo da 2.4. Maiores desvios (até 3 categorias que SAÍRAM da meta, em R$; quem está "na meta" não entra). Linhas sem
    meta nem farol: Outros / a classificar, Sem categoria e **Pré-preparos (variação do estoque)**. **Sem cor** quando o dado não fecha (falta
    faturamento, "sem o CMV de X", sem contar) ou quando Outros mais Sem categoria passam de 2% do CMV (hipótese a validar), com o motivo escrito e o
    atalho "Classificar N insumos". Período encerrado: a diferença para o CMV real do DRE vai na linha "Variação do estoque, ainda não aberta por
    categoria"; a linha final soma tudo e **é a linha CMV do DRE, ao centavo** (a DRE não muda).
 4. **Categoria de hoje** (270). Toda conta ao vivo usa a categoria atual do insumo em todas as compras do período: reclassificar um insumo muda
    o período em curso inteiro e o total não muda. O fechado lê só a fotografia.
-5. **Retrato do estoque por insumo** (281). Todo fechamento, contagem aplicada e abertura de estoque NOVOS gravam, na MESMA transação que fecha a
+5. **Retrato do estoque por insumo** (281). Todo fechamento do período e toda abertura de estoque NOVOS (a cíclica não: é um pedaço do estoque) gravam, na MESMA transação que fecha a
    contagem, uma linha por insumo com saldo (quantidade e valor; nulo para insumo sem preço); a soma é o `valorTotalCentavos` ao centavo (código e
    gatilho do banco recusam diferente). Só inclusão e só em contagem aberta. `Contagem.retratoGravadoEm` nulo = "fechado antes da I.2", nunca
    reconstruído. É o que a I.2b usa para o real por categoria.
@@ -2676,7 +2676,7 @@ npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.p
 montagem do painel (desvio com o sinal da DRE, farol, maiores desvios, "sem cor" e o limiar de 2%, variação do estoque, soma = DRE) e o JSON da
 fotografia. `tests/erp-cmv-categorias.db.test.ts`: o cenário da análise (Vila da Penha e Delivery, outubro em curso e setembro encerrado), metas
 por vigência e herança, `CategoriaNaLoja`, reclassificar, excluir categoria com meta, fotografia v4, histórico, nº de consultas constante com 1 e
-50 lojas e o isolamento entre parceiros. `tests/erp-retrato-estoque.db.test.ts`: o retrato do fechamento, da cíclica e da abertura (soma = total ao
+50 lojas e o isolamento entre parceiros. `tests/erp-retrato-estoque.db.test.ts`: o retrato do fechamento e da abertura, e a cíclica sem retrato (soma = total ao
 centavo, sem preço = valor nulo, só inclusão, 2ª aplicação não duplica) com mutante (sem a trava, o teste cai). `tests/erp-cmv-categorias-telas.db.test.ts`:
 a página e a action de verdade (dona, gerente, comprador, operador). `tests/erp-cmv-categorias-migracao.db.test.ts`: a migration com dado antigo
 como superusuário, dono com FORCE RLS e dono sem RLS.
@@ -2723,6 +2723,11 @@ aviso de insumos sem categoria diz "sem saldo" em vez de R$ 0,00 (teste novo `er
 - **Lições de código**: formulário com `useFormState` que remonta quando a versão muda perde a mensagem de "salvo" (o `key` do formulário é só a
   loja; a versão chega por prop e o campo oculto acompanha); o teste-guarda barra a chave `insumos:` em objeto de tenant (use `nInsumos`) e a palavra
   "escopo" em texto de tela; texto de aviso do painel muda com o período fechado (a categoria é a do dia do fechamento).
+- **Realizado e meta no mesmo conjunto de lojas** (284): quem mexer na linha de categoria do painel mantém a regra: o desvio em R$ sai dos
+  centavos e o pp sobre a mesma receita; a loja que "não usa" e comprou deixa a linha sem cor com o motivo. Há teste de propriedade.
+- **Para a I.2b**: o uso da categoria por loja (`CategoriaNaLoja`) não tem vigência (285); desvio RELATIVO (% da própria meta) para categorias
+  pequenas, onde 0,2 pp é muito (Limpeza em 0,70% contra 0,50% é 40% acima da meta e aparece como "na meta"); as abas do DRE a 390 px rolam e a
+  última (Metas por categoria) fica fora da tela até rolar (é do shell, `Abas`, não da I.2a).
 - **Defeito que já existia, fora da I.2a**: a tela `/erp/estoque/<loja>/periodo` com o período anterior por fechar loga erro de hidratação do
   React (#418) porque o `Aviso` põe o formulário dentro de um `<p>`; virou tarefa à parte.
 - **Decisões para o Rodolfo**: (1) base BRUTA ou líquida (273); (2) a DRE fica inalterada (padrão) ou limpeza e descartáveis ganham linha própria,

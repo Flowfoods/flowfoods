@@ -231,7 +231,7 @@ export interface LinhaDoPainel {
 
 export interface PainelDeCategorias {
   linhas: LinhaDoPainel[];
-  /** Até 3 categorias com meta e cor, as que passaram mais em R$. */
+  /** Até 3 categorias que SAÍRAM da meta (faixa 3 ou pior), as que passaram mais em R$; quem está "na meta" não entra. */
   maioresDesvios: LinhaDoPainel[];
   /** O motivo que tira a cor de todas as categorias do escopo; nulo = as cores valem. */
   semCor: string | null;
@@ -322,6 +322,11 @@ export function montarPainelDeCategorias(e: EntradaDoPainel): PainelDeCategorias
   for (const c of ordenadas) {
     const realizado = somaDe(c.id);
     const quemUsa = e.lojas.filter((l) => !l.naoUsa.has(c.id));
+    // Quem NÃO usa a categoria mas comprou nela: o valor entra (custo nunca some, a soma é o DRE), só que fora do que se compara com a meta.
+    const foraQueComprou = e.lojas.filter((l) => l.naoUsa.has(c.id) && (l.compras.get(c.id) ?? 0) !== 0);
+    // Realizado e meta sobre o MESMO conjunto de lojas e a MESMA receita: o pp e o R$ do desvio sempre contam a mesma história.
+    const receitaDeQuemUsa = quemUsa.reduce((acc, l) => acc + l.receitaBrutaCentavos, 0);
+    const realizadoDeQuemUsa = quemUsa.reduce((acc, l) => acc + (l.compras.get(c.id) ?? 0), 0);
     const aClassificar = c.chave === CHAVE_DO_SISTEMA;
     // A categoria aparece quando alguma loja do escopo a usa e ela está ativa, ou quando tem valor (custo nunca some), ou tem meta.
     const metasDasQueUsam = quemUsa.map((l) => ({ l, bp: l.metas?.get(c.id) ?? null }));
@@ -329,7 +334,9 @@ export function montarPainelDeCategorias(e: EntradaDoPainel): PainelDeCategorias
     if (!(realizado !== 0 || (c.ativa && quemUsa.length > 0) || temMeta)) continue;
     const linha = vazia(c.id, 'categoria', `cat:${c.id}`, c.nome, { aClassificar, desativada: !c.ativa, naoUsada: quemUsa.length === 0 && realizado !== 0 });
     linha.realizadoCentavos = realizado;
-    linha.realizadoBp = bpDe(realizado);
+    // Com compra de quem não usa, o % mostrado é o do escopo todo (informativo; essa linha não tem desvio nem cor); senão, o de quem usa.
+    const receitaDoPercentual = foraQueComprou.length > 0 || quemUsa.length === 0 ? receita : receitaDeQuemUsa;
+    linha.realizadoBp = percentualDaReceita(realizado, receitaDoPercentual);
 
     // ---- a meta do escopo
     const comMeta = metasDasQueUsam.filter((x) => x.bp !== null);
@@ -337,10 +344,10 @@ export function montarPainelDeCategorias(e: EntradaDoPainel): PainelDeCategorias
       if (comMeta.length < quemUsa.length) {
         linha.metaParcial = `meta em ${comMeta.length} de ${quemUsa.length} lojas`;
       } else {
-        const metaCentavos = comMeta.reduce((s, x) => s + dividirExato(BigInt(x.bp!) * BigInt(x.l.receitaBrutaCentavos), 10_000n), 0);
+        const metaCentavos = comMeta.reduce((acc, x) => acc + dividirExato(BigInt(x.bp!) * BigInt(x.l.receitaBrutaCentavos), 10_000n), 0);
         const iguais = comMeta.every((x) => x.bp === comMeta[0].bp);
-        linha.metaBp = iguais ? comMeta[0].bp : bpDe(metaCentavos);
-        linha.metaCentavos = receita > 0 ? metaCentavos : null;
+        linha.metaBp = iguais ? comMeta[0].bp : percentualDaReceita(metaCentavos, receitaDeQuemUsa);
+        linha.metaCentavos = receitaDeQuemUsa > 0 ? metaCentavos : null;
         const origens = new Set(comMeta.map((x) => x.l.metaVemDe));
         linha.metaVemDe = origens.size === 1 ? (comMeta[0].l.metaVemDe ?? null) : 'mista';
       }
@@ -348,15 +355,21 @@ export function montarPainelDeCategorias(e: EntradaDoPainel): PainelDeCategorias
 
     // ---- o desvio e o farol (Outros e Sem categoria nunca; sem compra no período, sem comparação)
     if (!aClassificar && linha.metaBp !== null) {
-      if (receita <= 0) {
+      if (receitaDeQuemUsa <= 0) {
         linha.farol = { tipo: 'sem', motivo: 'sem faturamento', desvioTexto: null };
+      } else if (foraQueComprou.length > 0) {
+        const nomes = foraQueComprou.map((l) => l.nome);
+        const quem = nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`;
+        linha.farol = { tipo: 'sem', motivo: `${quem} ${nomes.length === 1 ? 'comprou' : 'compraram'} ${c.nome}, marcada como não usa`, desvioTexto: null };
       } else if (realizado === 0) {
         linha.farol = { tipo: 'sem', motivo: FRASE_DO_SEM_COMPRA, desvioTexto: null };
-      } else if (linha.realizadoBp !== null) {
-        linha.desvioBp = linha.realizadoBp - linha.metaBp;
-        linha.desvioTexto = pontosComDuasCasas(linha.desvioBp);
-        linha.desvioCentavos = linha.metaCentavos === null ? null : realizado - linha.metaCentavos;
-        linha.farol = farolDaCategoria(linha.desvioBp, linha.desvioTexto, semCor, faixas);
+      } else if (linha.realizadoBp !== null && linha.metaCentavos !== null) {
+        // O desvio sai dos centavos (sinal sempre igual nos dois) e o pp é esse valor sobre a mesma receita.
+        linha.desvioCentavos = realizadoDeQuemUsa - linha.metaCentavos;
+        const desvioBp = percentualDaReceita(linha.desvioCentavos, receitaDeQuemUsa) ?? 0;
+        linha.desvioBp = desvioBp;
+        linha.desvioTexto = pontosComDuasCasas(desvioBp);
+        linha.farol = farolDaCategoria(desvioBp, linha.desvioTexto, semCor, faixas);
       }
     }
     linhas.push(linha);
@@ -387,7 +400,7 @@ export function montarPainelDeCategorias(e: EntradaDoPainel): PainelDeCategorias
   const maioresDesvios = semCor
     ? []
     : linhas
-        .filter((l) => l.tipo === 'categoria' && !l.aClassificar && l.farol?.tipo === 'cor' && (l.desvioCentavos ?? 0) > 0)
+        .filter((l) => l.tipo === 'categoria' && !l.aClassificar && l.farol?.tipo === 'cor' && l.farol.posicao >= 3 && (l.desvioCentavos ?? 0) > 0)
         .sort((a, b) => (b.desvioCentavos ?? 0) - (a.desvioCentavos ?? 0) || a.nome.localeCompare(b.nome, 'pt-BR'))
         .slice(0, 3);
 

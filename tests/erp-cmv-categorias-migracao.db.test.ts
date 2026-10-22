@@ -24,6 +24,7 @@ import { conferirMigracao } from '../scripts/erp-conferir-migracao';
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const MIGRACOES = join(process.cwd(), 'prisma', 'migrations');
 const ESTA = '20261103000000_erp_cmv_categorias';
+const ENDURECIMENTO = '20261103010000_erp_cmv_categorias_endurecimento';
 const temPsql = spawnSync('psql', ['--version']).status === 0;
 
 function urlDe(banco: string, papel?: string): string {
@@ -116,6 +117,10 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP I.2a · migration das metas por cat
         const r = psql(dono, ['-f', join(MIGRACOES, ESTA, 'migration.sql')]);
         expect(r.ok, r.aviso).toBe(true);
         expect(r.aviso).not.toContain('WARNING');
+        // A migration seguinte (só funções e gatilhos, sem SELECT nem DDL de tabela) entra limpa por cima.
+        const r2 = psql(dono, ['-f', join(MIGRACOES, ENDURECIMENTO, 'migration.sql')]);
+        expect(r2.ok, r2.aviso).toBe(true);
+        expect(r2.aviso).not.toContain('WARNING');
 
         // Nada do que existia mudou, e a contagem de antes da I.2 fica SEM retrato (nula = "antes da I.2"): a migration não reconstrói.
         expect(contas()).toBe('3/2/1/1/0/0/0');
@@ -139,6 +144,8 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP I.2a · migration das metas por cat
         const retrato = comoP1(`INSERT INTO "ContagemRetratoItem"(id,"parceiroId","contagemId","insumoId","categoriaIdNaHora","tipoNaHora","quantidadeMilesimos","valorCentavos") VALUES ('r1','p1','c3','i1','cp','INGREDIENTE',2000,1000), ('r2','p1','c3','i2',NULL,'INGREDIENTE',1000,NULL);`);
         expect(retrato.ok, retrato.aviso).toBe(true);
         expect(comoP1(`UPDATE "Contagem" SET status = 'FECHADA', desfecho = 'APLICADA', "fechadaEm" = now(), "valorTotalCentavos" = 999, "retratoGravadoEm" = now() WHERE id = 'c3'`).aviso).toContain('Contagem_retrato_confere');
+        // Itens de retrato soltos: a contagem não fecha sem registrar `retratoGravadoEm`.
+        expect(comoP1(`UPDATE "Contagem" SET status = 'FECHADA', desfecho = 'APLICADA', "fechadaEm" = now(), "valorTotalCentavos" = 1000 WHERE id = 'c3'`).aviso).toContain('Contagem_retrato_confere');
         const fecha = comoP1(`UPDATE "Contagem" SET status = 'FECHADA', desfecho = 'APLICADA', "fechadaEm" = now(), "valorTotalCentavos" = 1000, "retratoGravadoEm" = now() WHERE id = 'c3'`);
         expect(fecha.ok, fecha.aviso).toBe(true);
         // O retrato só se inclui; a contagem antiga (c1) não aceita retrato depois de fechada.
@@ -149,6 +156,10 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP I.2a · migration das metas por cat
         expect(comoP1(`DELETE FROM "CategoriaInsumo" WHERE id = 'cp'`).aviso).toMatch(/MetaCmvCategoria_parceiroId_categoriaId_fkey|foreign key/);
         expect(comoP1(`INSERT INTO "MetaCmvConjunto"(id,"parceiroId","lojaId","vigenteDesde","criadoPorNome") VALUES ('k2','p1',NULL,'2026-10-01','Marina')`).ok).toBe(true);
         expect(comoP1(`UPDATE "MetaCmvCategoria" SET "percentualBp" = 1000 WHERE id = 'mk1'`).aviso).toContain('MetaCmvCategoria_do_conjunto_novo');
+        // Conjunto com vigência retroativa não nasce (nem na rede, nem na loja que já tem conjunto mais novo).
+        expect(comoP1(`INSERT INTO "MetaCmvConjunto"(id,"parceiroId","lojaId","vigenteDesde","criadoPorNome") VALUES ('k3','p1',NULL,'2026-08-01','Marina')`).aviso).toContain('MetaCmvConjunto_sem_retroativo');
+        expect(comoP1(`INSERT INTO "MetaCmvConjunto"(id,"parceiroId","lojaId","vigenteDesde","criadoPorNome") VALUES ('k4','p1','l1','2026-10-01','Marina'), ('k5','p1','l1','2026-09-01','Marina')`).aviso).toContain('MetaCmvConjunto_sem_retroativo');
+        expect(comoP1(`INSERT INTO "MetaCmvConjunto"(id,"parceiroId","lojaId","vigenteDesde","criadoPorNome") VALUES ('k6','p1','l2','2026-08-01','Marina')`).ok).toBe(true); // outro escopo: sem conjunto mais novo
         if (perfil.rls) {
           // O outro parceiro não enxerga nada disso e não consegue ligar a categoria de um à loja do outro.
           expect(psql(dono, ['-c', noContexto('p2', `SELECT (SELECT count(*) FROM "MetaCmvConjunto") || '/' || (SELECT count(*) FROM "ContagemRetratoItem") || '/' || (SELECT count(*) FROM "CategoriaNaLoja")`)]).saida.split('\n').pop()).toBe('0/0/0');

@@ -5,6 +5,7 @@
  * R$ 33.300,00 (Proteína 12.000, Hortifruti 2.500, Mercearias 5.200, Laticínios 4.000, Congelados 1.800, Panificação 2.100,
  * Bebidas 3.300, Descartáveis 1.400, Limpeza 700, Outros 300). O desvio tem o sinal do DRE (realizado menos meta).
  */
+import fc from 'fast-check';
 import { describe, expect, it } from 'vitest';
 import { CATEGORIAS_PADRAO } from '@/lib/erp/categoria-campos';
 import {
@@ -27,6 +28,8 @@ import {
   type EntradaDoPainel,
   type LojaNoPainel,
 } from '@/lib/erp/cmv-categorias-campos';
+import { ajudaParaATela } from '@/lib/erp/ajuda';
+import { resolverAlcance } from '@/lib/erp/permissoes';
 import { FAIXAS_DO_FAROL } from '@/lib/erp/farol-campos';
 import { farolDoDre } from '@/lib/erp/farol-dre-campos';
 import type { ComparacaoComMeta } from '@/lib/erp/dre-metas-campos';
@@ -195,7 +198,7 @@ describe('I.2a · o painel (critérios 1 a 3 da análise)', () => {
     expect(l.desvioCentavos).toBe(R(1_000));
     expect(l.farol).toMatchObject({ tipo: 'cor', cor: 'AMARELO' });
     expect(p.maioresDesvios[0].categoriaId).toBe(id('PROTEINA'));
-    expect(p.maioresDesvios).toHaveLength(3);
+    expect(p.maioresDesvios).toHaveLength(1); // só quem saiu da meta (Hortifruti e as outras seguem "na meta")
   });
 
   it('Hortifruti: 2,50 % contra 3,00 % é melhor que a meta (verde)', () => {
@@ -414,5 +417,97 @@ describe('I.2a · a fotografia v4 (critério 10)', () => {
     expect(l.lojas[0].compras.get('b')).toBe(100);
     expect(l.lojas[0].compras.has('a')).toBe(false);
     expect(l.lojas[0].metas).toBeNull();
+  });
+});
+
+describe('I.2a · realizado e meta sobre o MESMO conjunto de lojas (veto do Guardião)', () => {
+  const alfa = () => loja({ lojaId: 'a', nome: 'Alfa', receitaBrutaCentavos: R(100_000), compras: [[id('BEBIDAS'), 3_000]] });
+  const bairro = (compra: number) => loja({ lojaId: 'b', nome: 'Bairro', receitaBrutaCentavos: R(60_000), naoUsa: new Set([id('BEBIDAS')]), compras: [[id('BEBIDAS'), compra]] });
+
+  it('a loja que não usa Bebidas mas comprou: a linha fica sem cor com o motivo, o valor entra e a soma continua sendo o DRE', () => {
+    const e = entrada({ lojas: [alfa(), bairro(1_000)] });
+    const p = montarPainelDeCategorias(e);
+    const b = linhaDe(p, 'BEBIDAS');
+    expect(b.realizadoCentavos).toBe(R(4_000)); // o custo nunca some
+    expect(b.desvioBp).toBeNull();
+    expect(b.desvioCentavos).toBeNull();
+    expect(b.farol).toEqual({ tipo: 'sem', motivo: 'Bairro comprou Bebidas, marcada como não usa', desvioTexto: null });
+    expect(p.maioresDesvios.map((l) => l.categoriaId)).not.toContain(id('BEBIDAS'));
+    expect(p.somaDasComprasCentavos).toBe(e.totalCentavos);
+    expect(p.variacaoCentavos).toBe(0);
+  });
+
+  it('a loja que não usa e NÃO comprou: o desvio compara só quem usa (mesma receita), com pp e R$ do mesmo sinal', () => {
+    const p = montarPainelDeCategorias(entrada({ lojas: [alfa(), bairro(0)] }));
+    const b = linhaDe(p, 'BEBIDAS');
+    // Alfa: 3.000 sobre 100.000 = 3,00 % contra a meta de 3,00 %.
+    expect(b.realizadoBp).toBe(300);
+    expect(b.metaBp).toBe(300);
+    expect(b.desvioBp).toBe(0);
+    expect(b.desvioCentavos).toBe(0);
+  });
+
+  it('nomes de várias lojas na frase do motivo', () => {
+    const c2 = loja({ lojaId: 'c', nome: 'Centro', receitaBrutaCentavos: R(40_000), naoUsa: new Set([id('BEBIDAS')]), compras: [[id('BEBIDAS'), 200]] });
+    const b = linhaDe(montarPainelDeCategorias(entrada({ lojas: [alfa(), bairro(1_000), c2] })), 'BEBIDAS');
+    expect(b.farol).toMatchObject({ tipo: 'sem', motivo: 'Bairro e Centro compraram Bebidas, marcada como não usa' });
+  });
+
+  it('propriedade: para qualquer combinação de lojas, usos, receitas, compras e metas, o sinal do desvio em pp nunca contradiz o do desvio em R$', () => {
+    const cat = id('BEBIDAS');
+    fc.assert(
+      fc.property(
+        fc.array(
+          fc.record({
+            receita: fc.integer({ min: 0, max: 5_000_000 }),
+            compra: fc.integer({ min: 0, max: 800_000 }),
+            usa: fc.boolean(),
+            meta: fc.option(fc.integer({ min: 0, max: 10_000 }), { nil: null }),
+          }),
+          { minLength: 1, maxLength: 5 },
+        ),
+        (ls) => {
+          const lojas = ls.map((x, i) =>
+            loja({
+              lojaId: `l${i}`,
+              nome: `Loja ${i}`,
+              receitaBrutaCentavos: x.receita,
+              naoUsa: x.usa ? new Set() : new Set([cat]),
+              metas: new Map(x.meta === null ? [] : [[cat, x.meta]]),
+              compras: [] as [string, number][],
+            }),
+          );
+          lojas.forEach((l, i) => (l.compras as Map<string | null, number>).set(cat, ls[i].compra));
+          const total = ls.reduce((a, x) => a + x.compra, 0);
+          const p = montarPainelDeCategorias(entrada({ lojas, totalCentavos: total, receitaBrutaCentavos: ls.reduce((a, x) => a + x.receita, 0) }));
+          const l = p.linhas.find((x) => x.categoriaId === cat);
+          if (!l || l.desvioBp === null || l.desvioCentavos === null) return true;
+          // pp e R$ dizem a mesma coisa: nunca um positivo e o outro negativo.
+          return !(l.desvioBp > 0 && l.desvioCentavos < 0) && !(l.desvioBp < 0 && l.desvioCentavos > 0);
+        },
+      ),
+      { numRuns: 400 },
+    );
+  });
+});
+
+describe('I.2a · a ajuda do CMV por categoria e das metas só entrega o texto a quem pode ver a tela', () => {
+  const alcance = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR') => resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] });
+  const entrada = (a: ReturnType<typeof alcance>, chave: string) => ajudaParaATela(a).find((e) => e.chave === chave)!;
+
+  it('quem não tem `dre.ver` ou `metas.editar` recebe só o bloco livre, sem número, hipótese nem plano', () => {
+    const op = alcance('OPERADOR');
+    for (const chave of ['dre-cmv-categorias', 'dre-metas-categorias']) {
+      const e = entrada(op, chave);
+      expect(e.aula).toHaveLength(1);
+      expect(JSON.stringify(e)).not.toMatch(/2%|hipótese|32%|compra e real|modelo/);
+      expect(e.secoes ?? []).toHaveLength(0);
+    }
+  });
+
+  it('o gerente lê o painel (dre.ver) mas não o texto das metas (metas.editar); a dona lê os dois', () => {
+    expect(entrada(alcance('GERENTE'), 'dre-cmv-categorias').aula.length).toBeGreaterThan(1);
+    expect(entrada(alcance('GERENTE'), 'dre-metas-categorias').aula).toHaveLength(1);
+    expect(entrada(alcance('DONO'), 'dre-metas-categorias').aula.length).toBeGreaterThan(1);
   });
 });
