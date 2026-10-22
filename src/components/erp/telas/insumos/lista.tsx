@@ -366,7 +366,7 @@ function Ordenar({
     >
       <Link
         href={hrefCom(base, f, { ordem: coluna, direcao: proxima })}
-        className={`ff-transicao inline-flex min-h-8 items-center gap-1 rounded-[5px] hover:text-texto ${ativa ? 'text-texto' : ''}`}
+        className={`ff-transicao inline-flex min-h-8 items-center gap-1 rounded-[5px] hover:text-texto [@media(pointer:coarse)]:min-h-11 ${ativa ? 'text-texto' : ''}`}
       >
         {children}
         <span aria-hidden className="text-[11px]">
@@ -537,7 +537,7 @@ export function TelaListaInsumos({
               <th scope="col" className="h-10 px-3 text-right font-semibold">
                 Embalagem
               </th>
-              <th scope="col" className="h-10 px-3 text-right font-semibold">
+              <th scope="col" className="hidden h-10 px-3 text-right font-semibold lg:table-cell">
                 Custo inicial
               </th>
               <Ordenar base={base} f={filtrosDaPagina} coluna="custo" alinhar="right">
@@ -581,7 +581,7 @@ export function TelaListaInsumos({
                   <CategoriaDaLinha i={i} />
                 </td>
                 <td className="px-3 py-2 text-right text-suave">{i.preparo ? '—' : formatarQuantidade(i.conteudoMilesimos, i.unidade)}</td>
-                <td className="px-3 py-2 text-right">
+                <td className="hidden px-3 py-2 text-right lg:table-cell">
                   <div className={i.preparo ? 'text-suave' : 'text-texto'}>{i.precoEmbalagemCentavos > 0 ? formatarDinheiro(i.precoEmbalagemCentavos) : i.preparo ? 'da ficha' : '—'}</div>
                   {i.taxaEntregaCentavos > 0 && (
                     <div className="text-[12px] text-suave">+ {formatarDinheiro(i.taxaEntregaCentavos)} frete</div>

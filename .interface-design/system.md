@@ -283,3 +283,25 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   ("sem hora de pegar", "ninguém pegou"), nunca 0. Indicadores: um painel por pessoa em ordem alfabética, sem cor por pessoa,
   sem nota e sem R$, a amostra sempre escrita ("1 lote: amostra pequena"). **Voltar para…** (`Voltar`) com 44 px em toque em
   qualquer largura (`[@media(pointer:coarse)]:min-h-11`).
+
+## Lista paginada com ações na linha (L.1, lista de insumos)
+
+Padrão para as próximas listas de cadastro (fichas, fornecedores...), tirado do Kairu Corporativo (toolbar + tabela + rodapé com paginação,
+"preserve posição e filtros ao voltar do detalhe", "busca sem resultado preserva a busca e oferece limpar", alvos de 44 px) e do Kairu
+Editorial (separadores delicados, número de tabela sem serifa):
+
+- **Estado na URL**: busca, filtros, ordem, página e tamanho. Mudar filtro ou tamanho volta à página 1; ordem sempre com desempate por id.
+- **Dois totais, dois rótulos**: "No cadastro: N" (tudo o que a pessoa pode ver) e "Nesta lista: N" / "Com os filtros: N". Nunca a quantidade da página
+  como se fosse total. O subtítulo do cabeçalho é o do cadastro ("… no cadastro").
+- **Filtros ativos**: faixa "Filtros ativos:" com um chip por filtro (o X tira só aquele; 36 px com mouse, 44 px em toque) e "Limpar filtros", que
+  mantém o tamanho da página. Estado vazio útil: diz quantos há no cadastro e como sair.
+- **Rodapé** (`PaginacaoNumerada`): "Mostrando 1–25 de 137 insumos · Página 1 de 6", Anterior, números compactos (1 … 4 [5] 6 … 12, o atual com
+  `aria-current="page"`; no celular só "Página x de y"), Próxima (a ponta sem destino fica desabilitada sem sumir) e "Itens por página" como
+  links (10 · 25 · 50 · 100). Alvos de 44 px em qualquer largura. Zero resultado: "Mostrando 0 de 0", "Página 1 de 1", pontas desabilitadas.
+- **Ações na linha**: coluna "Ações" (tabela) ou linha própria no cartão (celular, nada de link dentro de link). Ícone com rótulo acessível que
+  diz o nome do item ("Editar Farinha de trigo"), 44 x 44, só para quem pode; o servidor decide de novo. Item que muda por outro lugar mostra o
+  motivo ("Pela ficha"). Remover nunca apaga direto: abre uma tela que mostra o que está ligado e só então oferece desativar (com vínculo) ou
+  excluir de vez (sem vínculo, com caixa de confirmação obrigatória e botão com o nome do item).
+- **Volta da edição**: a caneta volta à LISTA (mesma página, filtros e tamanho) com `AvisoDeSalvo` ("Insumo atualizado com sucesso: nome",
+  "Continuar editando", "Ver o insumo"); o nome vem do banco, a URL só escolhe a frase. Colunas secundárias saem antes de a tabela passar da
+  largura (abaixo de 1024 px saem "Outras embalagens" e "Custo inicial"): sem rolagem lateral em 820 px.

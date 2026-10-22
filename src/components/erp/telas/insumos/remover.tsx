@@ -64,9 +64,8 @@ export function TelaRemoverInsumo({
           <>
             <ul className="divide-y divide-linha text-sm" aria-label={`Registros ligados a ${i.nome}`}>
               {i.vinculos.map((v) => (
-                <li key={v.chave} className="flex items-baseline gap-3 py-2 first:pt-0 last:pb-0">
-                  <span className="min-w-8 shrink-0 text-right font-semibold tabular-nums text-texto">{v.n}</span>
-                  <span className="text-texto">{v.frase}</span>
+                <li key={v.chave} className="py-2 text-texto first:pt-0 last:pb-0">
+                  {v.frase}
                 </li>
               ))}
             </ul>
@@ -87,7 +86,7 @@ export function TelaRemoverInsumo({
           <>
             {!semVinculo && (
               <p className="mb-3 text-sm text-texto">
-                Como há registros ligados, “{i.nome}” <strong className="font-semibold">não pode ser excluído de vez</strong>. Desativar o tira da lista e da busca padrão; ficha, nota, estoque, produção e histórico ficam como estão, e dá para reativar quando quiser.
+                Como há registros ligados, “{i.nome}” <strong className="font-semibold">não pode ser excluído de vez</strong>. O caminho é desativar.
               </p>
             )}
             <fieldset disabled={!!bloqueio} className="min-w-0">
