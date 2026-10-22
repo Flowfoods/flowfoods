@@ -360,7 +360,7 @@ export const NOME_DOS_PREPARADOS = 'Pré-preparos (variação do estoque)';
 export const NOME_DA_VARIACAO = 'Variação do estoque, ainda não aberta por categoria';
 export const FRASE_DOS_PREPARADOS = 'Sem meta e sem farol. Aparece quando o CMV real é aberto por categoria.';
 export const FRASE_DOS_PREPARADOS_COM_REAL = 'Sem meta e sem farol. É o estoque de pré-preparo que desceu (positivo) ou subiu (negativo) no período; os ingredientes ficam na categoria deles.';
-export const FRASE_DA_VARIACAO = 'É a diferença entre o CMV real do DRE e as compras: o painel ainda não abre o estoque por categoria, mas o total nunca diverge do DRE.';
+export const FRASE_DA_VARIACAO = 'É a diferença entre o CMV real do DRE e as compras, nas lojas em que o estoque ainda não abre por categoria; o total nunca diverge do DRE.';
 export const FRASE_DO_SEM_COMPRA = 'sem compra no período';
 export const FRASE_DO_SEM_CONSUMO = 'sem consumo no período';
 
@@ -643,6 +643,8 @@ function montarMatriz(e: EntradaDoPainel, linhas: readonly LinhaDoPainel[]): Mat
       celulas: lojas.map((x) => celula(x, valor(x), meta(x), naoUsa(x))),
       rede: { centavos: l.realizadoCentavos ?? 0, bp: l.realizadoBp, metaBp: l.metaBp, desvioBp: l.desvioBp, naoUsa: false },
     });
+    // Categoria sem valor em nenhuma loja não ocupa linha da matriz (o painel de categorias mostra todas, com a meta).
+    if (l.tipo === 'categoria' && e.lojas.every((x) => valorDaCategoria(x, l.categoriaId) === 0)) continue;
     if (l.tipo === 'categoria') linhasDaMatriz.push(por((x) => valorDaCategoria(x, l.categoriaId), (x) => x.metas?.get(l.categoriaId!) ?? null, (x) => x.naoUsa.has(l.categoriaId!)));
     else if (l.tipo === 'sem-categoria') linhasDaMatriz.push(por((x) => valorDaCategoria(x, null), () => null, () => false));
     else if (l.tipo === 'preparos') linhasDaMatriz.push(por(valorDosPreparos, () => null, () => false));

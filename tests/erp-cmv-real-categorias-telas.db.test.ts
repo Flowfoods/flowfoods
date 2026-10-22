@@ -173,7 +173,7 @@ describe.skipIf(!URL_TESTE)('ERP I.2b · telas do CMV real por categoria (Postgr
     expect(h).toContain('o estoque subiu R$ 1.500,00 (de R$ 5.200,00 para R$ 6.700,00)');
     expect(h).toContain('−R$ 1.500,00');
     expect(h).toContain('Diferença = real menos compra');
-    expect(h).toContain('2 lojas');
+    expect(h).toContain('Lojas comparadas: ');
   });
 
   it('a matriz põe cada loja ao lado da outra e fecha no CMV do DRE; a evolução traz os períodos do mais antigo ao mais novo', async () => {

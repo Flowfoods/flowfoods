@@ -2395,3 +2395,63 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 ### 285. 2026-10-22 · ERP I.2a (veto do Guardião): endurecimentos do banco e da ajuda
 
 **Razão:** migration `20261103010000_erp_cmv_categorias_endurecimento` (só função e gatilho, sem SELECT nem DDL de tabela, entra limpa nos três perfis): (1) conjunto de metas por categoria NÃO nasce com vigência anterior à do mais novo do escopo (`MetaCmvConjunto_sem_retroativo`); (2) a contagem não fecha com itens de retrato soltos sem `retratoGravadoEm` (`Contagem_retrato_confere` ganhou a segunda regra). Migration ainda não vista em produção, mas a primeira já estava aplicada nos bancos locais: por isso um arquivo novo, nunca reescrever o aplicado. Ajuda: o único bloco livre de `dre-cmv-categorias` e de `dre-metas-categorias` não traz número, hipótese nem plano; o texto do painel e das metas só vai para quem tem `dre.ver` ou `metas.editar` (as duas entradas subiram para a versão 2). **Herança registrada:** o uso da categoria por loja (`CategoriaNaLoja`) NÃO tem vigência: valer hoje vale para o período em curso e para os períodos encerrados ainda abertos (o fechado lê a fotografia). Se o dono precisar do passado fiel, a I.2b dá vigência ao uso, como as metas têm.
+
+### 286. 2026-10-22 · ERP I.2b: o CMV real por categoria é inicial + entradas − final, aberto por insumo, e só abre quando fecha no real do DRE
+
+**Alternativas:** (a) reconstruir o estoque por categoria pelo livro; (b) usar o retrato por insumo que a I.2a passou a gravar, com o MESMO corte do real da 2.3.
+
+**Razão:** (b). O estoque final de uma categoria é o retrato do fechamento (`ContagemRetratoItem`) mais o que entrou depois do retrato e é do período, menos o que o retrato já trazia do período seguinte: o SQL do corte é um só (`cortesDosFechamentos`, em `cmv.ts`), aberto por categoria; o real do DRE soma as linhas, o real por categoria as usa abertas. O estoque inicial é o final do período anterior (mesma regra) ou, no primeiro período, o retrato da abertura. A categoria é a de HOJE do insumo em todas as parcelas (270). A loja só abre por categoria quando existem os dois retratos E a soma de tudo (categorias, sem categoria e pré-preparos) é o real do DRE ao centavo; qualquer divergência vira "não abriu" com o motivo, nunca um número que não fecha. A loja que não abre fica pelas compras e a diferença para o real do DRE vai na linha de variação do estoque, que agora diz QUAL loja e por quê. No painel da rede, as lojas se misturam (cada uma pelo que tem), a linha final é sempre o CMV do DRE. Propriedade testada com sorteios: Σ das linhas = CMV do DRE para qualquer combinação de lojas, usos, receitas, compras e montantes.
+
+### 287. 2026-10-22 · ERP I.2b: a abertura de antes do retrato é lida pelos movimentos ABERTURA; o fechamento de antes do retrato nunca é reconstruído
+
+**Razão:** a abertura (1.6) gravou um movimento ABERTURA por insumo com o valor da hora, então lê-lo não inventa nada, desde que a soma bata com o `valorTotalCentavos` da contagem ao centavo; se não bater, a loja fica pelas compras. O fechamento antigo guardou só o total: o preço da época não existe e reconstruir seria inventar (281). Consequência prática: o real por categoria de uma loja começa no primeiro período cujos DOIS estoques têm retrato; o período anterior segue com compras e variação.
+
+### 288. 2026-10-22 · ERP I.2b: pré-preparo vai à linha própria em TODAS as parcelas, e a compra × real por categoria compara real menos compra, com o sinal da 2.3
+
+**Razão:** a linha "Pré-preparos (variação do estoque)" ganhou valor: estoque inicial + entradas − estoque final dos insumos de tipo PRE_PREPARO (tipo de hoje). Se a casa comprou um insumo pré-preparo em nota, a compra também vai a essa linha (no painel pelas compras e no real), para o painel e a comparação nunca divergirem por classificação. Valor negativo quer dizer que o estoque dele subiu. Compra × real por categoria: diferença = real − compra, em R$ e em pontos da receita das lojas comparadas, o pp com o sinal do R$ (zero quando arredonda a 0,00; propriedade testada); negativa é compra maior que consumo, o estoque da categoria subiu ("dinheiro parado"); positiva é consumo do que já estava na prateleira. Só entram as lojas com o real aberto; as outras aparecem como "ficaram de fora", com o motivo. A soma das diferenças é a da página do DRE (2.3). Diferença não é perda: o texto não diz "perda" (aproveitado do material de inventário da Kairu).
+
+### 289. 2026-10-22 · ERP I.2b: a evolução lê os últimos 6 períodos pelo mesmo painel de cada um, sem inventar período sem dado
+
+**Alternativas:** (a) uma leitura própria e enxuta por período; (b) reaproveitar o painel (`cmvPorCategoriaNaTx`) em laço dentro de uma transação.
+
+**Razão:** (b): o número de um período aqui é, por construção, o do painel dele (teste compara). O fechado vem da fotografia como está (v4 só compras, v5 com o real; v1 a v3 "não apurado por categoria"); o aberto, ao vivo. Período sem faturamento nem compras fica com "—" e a frase; nunca zero. Para no primeiro dia do ERP. Sem cor (a cor é do painel do período). O número de consultas é o de cada período, NUNCA o de lojas (teste com 1 e 50 lojas). Linha de categoria sem valor em nenhum dos períodos não ocupa lugar.
+
+### 290. 2026-10-22 · ERP I.2b: meta total por loja (resolve a pendência 2.5-(2), salão × delivery) mora no conjunto de metas da loja
+
+**Alternativas:** (a) nova tabela de meta de CMV por loja; (b) coluna `MetaCmvConjunto.metaTotalBp`, só no conjunto da loja que personaliza.
+
+**Razão:** (b), migration aditiva `20261104000000_erp_cmv_real_categorias` (uma coluna nula e um CHECK: 0 a 100 %, só em conjunto de loja que não segue a rede). A meta total própria vale na linha CMV do DRE da loja (ao vivo e fotografada no fechamento), no painel de categorias e no orçamento de compra 2.5 dela; vazio = vale o total da rede (a `DreMeta` da linha CMV, uma fonte só). A REDE segue sempre a meta da rede, e a tela diz quais lojas têm a própria. No orçamento, o teto da rede é a soma dos tetos das lojas e, com metas diferentes, a "meta do CMV" mostrada é a média ponderada pela receita prevista, escrita como "média (cada loja usa a sua)"; o ritmo da rede usa a média ponderada pela receita até ontem. Vigência igual à das outras metas (começo do período em curso); período anterior não muda (provado: setembro segue 32 % na Delivery). Fotografias anteriores guardaram a meta da rede na linha da loja e são lidas como estão.
+
+### 291. 2026-10-22 · ERP I.2b: matriz categoria × loja só na rede, sem cor, e cada coluna fecha no CMV do DRE da loja
+
+**Razão:** com duas ou mais lojas no alcance e a visão da rede (que exige a rede inteira, como o DRE); quem tem uma loja só ou é gerente de uma loja não recebe a vista (nem o JSON: testado por `?rede=1`, `?loja=` e `?vista=matriz`). Cada célula é o valor da loja, o % da receita DELA e a meta da categoria naquela loja; sem cor, porque o farol depende de dado que muda por loja. A linha de variação do estoque entra por loja, para a coluna fechar. Linha sem valor em nenhuma loja não aparece.
+
+### 292. 2026-10-22 · ERP I.2b: desvio relativo (% da própria meta) é só leitura
+
+**Alternativas:** (a) mudar a régua do farol para relativa; (b) mostrar o relativo ao lado do desvio em pontos, sem cor e sem ordem.
+
+**Razão:** (b). As faixas do farol são v1 congeladas, em pontos da receita, iguais para todas as casas; mexer nelas é uma v2 e muda o fechado. Mas 0,20 pp é pouco em Hortifruti e muito em Limpeza (0,70 % contra 0,50 % é 40 % acima da meta e aparece "na meta"). O percentual da meta ("+40,0% da meta") aparece embaixo do desvio, nunca vira cor nem muda a ordem dos maiores desvios, e a ajuda explica. Pergunta ao Rodolfo: quer uma faixa relativa de verdade (v2 do farol)?
+
+### 293. 2026-10-22 · ERP I.2b: a fotografia do fechamento passa à versão 5, com o real por categoria; v4 e anteriores são lidas como estão
+
+**Razão:** `entrada.categorias` ganha a versão 2: por loja e categoria, o inicial, as entradas e o final (o real é a conta); mais o sem categoria, os pré-preparos, a compra de pré-preparo e o motivo de a loja não ter aberto. A leitura valida cada número inteiro; real malformado é descartado inteiro (a loja fica pelas compras). A v4 (categorias versão 1, só compras) lê como estava: sem real, com a variação do estoque; v1 a v3 dizem "não apurado por categoria". A linha da loja na fotografia leva a meta total própria da loja (290). Reclassificar depois não muda nada do fechado.
+
+### 294. 2026-10-22 · ERP I.2b (heranças do Guardião): frases no lugar de erro bruto e a explicação do % da rede
+
+**Razão:** (1) na rede, o % de cada categoria é sobre a receita das lojas que a USAM (284): a frase está no painel e nas metas. (2) salvar metas quando já existe conjunto do escopo com vigência depois do período de agora deixava o erro do gatilho `MetaCmvConjunto_sem_retroativo` chegar à tela; agora a conferência é feita ANTES de qualquer gravação (para não deixar gravação pela metade) e a frase diz o conjunto que existe e desde quando. O banco continua recusando por SQL.
+
+### 295. 2026-10-22 · ERP I.2b: transferência de estoque entre lojas NÃO existe, e o painel diz isso
+
+**Razão:** o termo "transferências recebidas − enviadas" da fórmula do plano vale 0 e não é mostrado (278). Sem transferência, o real por categoria de cada loja não desconta o que ela mandou para outra (quem manda parece consumir mais; quem recebe, menos); o da rede fica certo. A frase está na tela e na ajuda. Quando a transferência nascer, entra como movimento com par loja → loja e o corte a conta.
+
+### 296. 2026-10-22 · ERP I.2b: o uso da categoria por loja (`CategoriaNaLoja`) continua sem vigência
+
+**Razão:** a herança da I.2a dizia que a I.2b daria vigência ao uso "se o dono precisar do passado fiel". Não é preciso: o período fechado lê a fotografia (que guarda o uso da época) e o encerrado ainda aberto lê o uso de hoje, como todas as parcelas "de hoje" (270). Pergunta ao Rodolfo: se o aberto antigo precisar do uso da época, é uma tabela de vigência (aditiva).
+
+### 297. 2026-10-22 · ERP I.2b: as vistas novas moram na MESMA rota (`?vista=`), sem rota nova
+
+**Razão:** compra × real, evolução e por loja são `?vista=compra-real|evolucao|matriz` de `dre/cmv-categorias`: mesma permissão (`dre.ver`), mesma ajuda (`dre-cmv-categorias` v3), mesmo recorte de alcance, e nada novo no menu nem no ⌘K. A URL só ESCOLHE a vista (valor desconhecido cai nas categorias; a matriz pedida sem existir também). A evolução só lê os 6 períodos quando é pedida.
+
+### 298. 2026-10-22 · ERP I.2b: materiais Kairu consultados (regra do plano)
+
+**Razão:** `pass:cmv-fichas-e-margem` e `library:inventario-ciclico`, pelo MCP Kairu (22/10/2026). Aplicado: `null` é desconhecido, nunca zero ("—", "sem consumo no período", "sem faturamento nem compras"); CMV parcial/misto com selo e a origem de cada número; snapshot que não muda com compra mais cara amanhã (fotografia); item não contado não é zero e divergência não é perda comprovada (compra × real não diz "perda"); saldo final bate com o ledger (a soma do retrato é o total fotografado, e a das categorias é o real do DRE); concorrência e idempotência testadas (a fechar × nota da I.2a continua valendo). Deixado para depois: CMV teórico por prato, cobertura por venda, recontagem com duas versões.

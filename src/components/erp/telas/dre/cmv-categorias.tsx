@@ -267,7 +267,7 @@ export function TelaDoCmvPorCategoria({
       </div>
 
       {vista === 'evolucao' ? (
-        <VistaDaEvolucao e={evolucao} escopoNome={loja ? loja.nome : 'a rede'} />
+        <VistaDaEvolucao e={evolucao} escopoNome={loja ? `de ${loja.nome}` : 'da rede'} />
       ) : r.antigo || !painel ? (
         <Aviso tom="neutro" titulo="Não apurado por categoria (fechado antes da I.2).">
           Este período foi fechado antes de o CMV por categoria existir. O total do CMV, acima, é o do DRE e continua valendo; a fotografia dele não é recalculada. A FlowFoods pode reabrir o período e fechar de novo para guardar o CMV por categoria.
@@ -416,8 +416,7 @@ function VistaDaCompraReal({ c, lojasSemReal, periodoNome, encerrado, fechado }:
     <div className="space-y-4">
       <Painel
         titulo="Compra × real por categoria"
-        subtitulo="Diferença = real menos compra. Negativa (−): comprou mais do que consumiu, o estoque da categoria subiu. Positiva (+): consumiu mais do que comprou, o estoque desceu."
-        acessorio={<Contagem>{c.lojasComparadas.length === 1 ? c.lojasComparadas[0] : `${c.lojasComparadas.length} lojas`}</Contagem>}
+        subtitulo={`${c.lojasComparadas.length === 1 ? 'Loja comparada' : 'Lojas comparadas'}: ${c.lojasComparadas.join(', ')}. Diferença = real menos compra. Negativa (−): comprou mais do que consumiu, o estoque da categoria subiu. Positiva (+): consumiu mais do que comprou, o estoque desceu.`}
         semRespiro
       >
         <div className="overflow-x-auto">
@@ -473,7 +472,7 @@ function VistaDaCompraReal({ c, lojasSemReal, periodoNome, encerrado, fechado }:
       </Painel>
       {c.lojasDeFora.length > 0 && (
         <Aviso tom="neutro" titulo="Ficaram de fora da comparação.">
-          {c.lojasDeFora.map((l) => `${l.nome}: ${l.motivo}`).join('; ')}. Elas seguem pelas compras no painel de categorias.
+          {c.lojasDeFora.map((l) => `${l.nome}: ${l.motivo}`).join('; ')}. {c.lojasDeFora.length === 1 ? 'Essa loja segue' : 'Essas lojas seguem'} pelas compras no painel de categorias.
         </Aviso>
       )}
       <p className="text-[12px] leading-relaxed text-suave">
@@ -488,7 +487,7 @@ function VistaDaCompraReal({ c, lojasSemReal, periodoNome, encerrado, fechado }:
 function VistaDaMatriz({ m, periodoNome }: { m: MatrizDoPainel; periodoNome: string }) {
   const celula = (c: MatrizDoPainel['linhas'][number]['celulas'][number], apoio: boolean) => {
     if (!c) return <span className="text-suave">—</span>;
-    if (c.naoUsa && c.centavos === 0) return <span className="text-[12px] text-suave">não usa</span>;
+    if (c.centavos === 0) return <span className="text-suave">{c.naoUsa ? <span className="text-[12px]">não usa</span> : '—'}</span>;
     return (
       <>
         <span className="block min-h-6 leading-6">{apoio ? dinheiroComSinal(c.centavos) || moeda(0) : moeda(c.centavos)}</span>
@@ -616,7 +615,7 @@ function VistaDaEvolucao({ e, escopoNome }: { e: EvolucaoDeCategorias | null; es
   const comAviso = e.periodos.filter((p) => p.semDado);
   return (
     <div className="space-y-4">
-      <Painel titulo="Evolução por categoria" subtitulo={`Os últimos ${e.periodos.length} períodos de ${escopoNome}, do mais antigo ao mais novo: % da receita bruta, valor, meta que valia na época e desvio. Sem cor: a cor é do painel de cada período.`} semRespiro>
+      <Painel titulo="Evolução por categoria" subtitulo={`Os últimos ${e.periodos.length} períodos ${escopoNome}, do mais antigo ao mais novo: % da receita bruta, valor, meta que valia na época e desvio. Sem cor: a cor é do painel de cada período.`} semRespiro>
         <div className="hidden overflow-x-auto lg:block">
           <table className="w-full text-sm">
             <caption className="sr-only">Evolução do CMV por categoria nos últimos períodos</caption>

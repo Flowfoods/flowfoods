@@ -332,7 +332,7 @@ function Fechamento({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Pe
       subtitulo="Estes números são a fotografia do fechamento: a taxa do iFood, as metas e os nomes das linhas são os de quando fechou. Nada do que se faz depois muda esta tela."
       acessorio={
         pode.fecharPeriodo ? (
-          <Link href={`${raiz}/dre/periodos/${d.periodo.inicio}`} className={`${LINK_DE_TEXTO} text-[13px]`}>
+          <Link href={`${raiz}/dre/periodos/${d.periodo.inicio}`} className={`${LINK_DE_TEXTO} inline-flex items-center text-[13px] [@media(pointer:coarse)]:min-h-11`}>
             Ver o fechamento
           </Link>
         ) : undefined
@@ -468,11 +468,11 @@ export function TelaDoDre({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <nav aria-label="Trocar de período" className="flex items-center gap-1 rounded-[10px] border border-linha bg-painel p-1">
             {d.anterior ? (
-              <Link href={link(d.anterior)} aria-label={`Período anterior: ${d.anterior.nome}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto">
+              <Link href={link(d.anterior)} aria-label={`Período anterior: ${d.anterior.nome}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 text-suave hover:bg-texto/5 hover:text-texto">
                 <ChevronLeft size={18} aria-hidden />
               </Link>
             ) : (
-              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-[7px] text-suave/40">
+              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-[7px] [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 text-suave/40">
                 <ChevronLeft size={18} />
               </span>
             )}
@@ -480,11 +480,11 @@ export function TelaDoDre({
               {d.periodo.nome}
             </span>
             {d.proximo ? (
-              <Link href={link(d.proximo)} aria-label={`Período seguinte: ${d.proximo.nome}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto">
+              <Link href={link(d.proximo)} aria-label={`Período seguinte: ${d.proximo.nome}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 text-suave hover:bg-texto/5 hover:text-texto">
                 <ChevronRight size={18} aria-hidden />
               </Link>
             ) : (
-              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-[7px] text-suave/40">
+              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-[7px] [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 text-suave/40">
                 <ChevronRight size={18} />
               </span>
             )}
@@ -495,7 +495,7 @@ export function TelaDoDre({
             </Link>
           )}
           {loja && pode.veRede && (
-            <Link href={`${base}?periodo=${d.periodo.inicio}&rede=1`} className={LINK_DE_TEXTO}>
+            <Link href={`${base}?periodo=${d.periodo.inicio}&rede=1`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11`}>
               Ver a rede
             </Link>
           )}
@@ -579,11 +579,11 @@ export function TelaDoDre({
         acessorio={
           <span className="flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
             {r.faltaConfigurarTaxa && <Selo tom="alerta">Falta configurar a taxa do iFood</Selo>}
-            <Link href={`${raiz}/dre/cmv-categorias?periodo=${d.periodo.inicio}${escopoQuery}`} className={`${LINK_DE_TEXTO} text-[13px]`}>
+            <Link href={`${raiz}/dre/cmv-categorias?periodo=${d.periodo.inicio}${escopoQuery}`} className={`${LINK_DE_TEXTO} inline-flex items-center text-[13px] [@media(pointer:coarse)]:min-h-11`}>
               CMV por categoria
             </Link>
             {pode.definirMetas && (
-              <Link href={`${raiz}/dre/plano`} className={`${LINK_DE_TEXTO} text-[13px]`}>
+              <Link href={`${raiz}/dre/plano`} className={`${LINK_DE_TEXTO} inline-flex items-center text-[13px] [@media(pointer:coarse)]:min-h-11`}>
                 {Object.keys(d.metas).length > 0 ? 'Metas' : 'Definir metas'}
               </Link>
             )}
