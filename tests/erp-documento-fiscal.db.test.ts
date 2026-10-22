@@ -14,8 +14,6 @@
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-documento-fiscal.db.test.ts
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
@@ -23,36 +21,17 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
-import { cadastrarLoja, salvarCnpjDaLoja } from '@/lib/erp/estrutura';
-import { cadastrarVariante } from '@/lib/erp/variantes';
+import { salvarCnpjDaLoja } from '@/lib/erp/estrutura';
 import { cancelarNota, cadastrarFornecedor, editarNota, lancarNota, mudarSituacaoFornecedor, obterNota, obterFornecedor } from '@/lib/erp/compras';
 import { concluirAbertura, conferenciaDaAbertura, iniciarAbertura } from '@/lib/erp/estoque';
 import { cancelarDocumento, conciliarDocumento, ligarDocumento, listarDocumentos, obterDocumento, previaDoDocumento, receberXml, salvarConferencia, type EntradaDaConferencia } from '@/lib/erp/documentos-fiscais';
-import { digitoDaChave } from '@/lib/erp/nfe-xml';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { listarHistorico } from '@/lib/erp/historico';
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
-import { cadastrarInsumoDeTeste as cadastrarInsumo, cru, limparParceiros, perfilDoBanco, SEM_NOTA_FISCAL, type PerfilDoBanco } from './erp-db-apoio';
+import { cru, limparParceiros, perfilDoBanco, SEM_NOTA_FISCAL, type PerfilDoBanco } from './erp-db-apoio';
+import { bytes, CHAVE, montarCenario, xmlDe } from './erp-documento-fiscal-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
-const BASE = readFileSync(join(process.cwd(), 'tests', 'fixtures', 'nfe-sintetica.xml'), 'utf8');
-const CHAVE = '33261011222333000181550010000045211123456784';
-const bytes = (t: string) => new TextEncoder().encode(t);
-
-/** O XML do roteiro com trocas de texto; `nNF` refaz a chave inteira (e o dígito verificador), como um emitente de verdade faria. */
-function xmlDe(trocas: Array<[string | RegExp, string]> = [], nNF?: string, emit = '11222333000181'): string {
-  let t = BASE;
-  if (nNF || emit !== '11222333000181') {
-    nNF ??= '4521';
-    const corpo = `33261${emit}`.replace(/^33261/, '332610') + `55001${nNF.padStart(9, '0')}112345678`;
-    const nova = `${corpo}${digitoDaChave(corpo)}`;
-    t = t.split(CHAVE).join(nova).replace('<nNF>4521</nNF>', `<nNF>${nNF}</nNF>`).replace('<cDV>4</cDV>', `<cDV>${nova[43]}</cDV>`).replace('<nFat>4521</nFat>', `<nFat>${nNF}</nFat>`);
-    if (emit !== '11222333000181') t = t.replace('<emit>\n        <CNPJ>11222333000181</CNPJ>', `<emit>\n        <CNPJ>${emit}</CNPJ>`);
-  }
-  for (const [de, para] of trocas) t = t.replace(de, para);
-  return t;
-}
-
 describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)', { timeout: 180_000 }, () => {
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
@@ -96,30 +75,14 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)',
     if (!['localhost', '127.0.0.1'].includes(host)) throw new Error('ERP_DB_TESTE precisa ser local.');
     db = new PrismaClient({ datasources: { db: { url: URL_TESTE } } });
     perfil = await perfilDoBanco(db);
-    A = await db.parceiroFlow.create({ data: { nome: 'Notas fiscais A', slug: `nf-a-${sufixo}`, status: 'ATIVO' } });
-    B = await db.parceiroFlow.create({ data: { nome: 'Notas fiscais B', slug: `nf-b-${sufixo}`, status: 'ATIVO' } });
-    a = doParceiro(A.id, db);
-    b = doParceiro(B.id, db);
-    for (const [chave, nome] of [['vp', 'Vila da Penha'], ['centro', 'Centro']] as const) {
-      const r = await cadastrarLoja(a, { nome }, 'Marina');
-      if (!r.ok) throw new Error(JSON.stringify(r));
-      ids[chave] = r.id;
-    }
-    const lb = await cadastrarLoja(b, { nome: 'Loja B' }, 'Bia');
-    if (!lb.ok) throw new Error(JSON.stringify(lb));
-    ids.lojaB = lb.id;
-    // Insumos do roteiro, cada um com a embalagem que o fornecedor vende.
-    const novo = async (nome: string, unidade: 'KG' | 'UN', variante: { nome: string; conteudo: string }) => {
-      const i = await cadastrarInsumo(a, { nome, tipo: 'INGREDIENTE', unidade, escala: 'base', conteudo: '1', preco: '10,00' });
-      if (!i.ok) throw new Error(JSON.stringify(i));
-      const v = await cadastrarVariante(a, i.id, { nome: variante.nome, escala: 'base', conteudo: variante.conteudo, preco: '50,00' });
-      if (!v.ok) throw new Error(JSON.stringify(v));
-      return { insumo: i.id, variante: v.id };
-    };
-    const m = await novo('Muçarela', 'KG', { nome: 'Peça 2 kg', conteudo: '2' });
-    const ba = await novo('Bacon', 'KG', { nome: 'Pacote 1 kg', conteudo: '1' });
-    const g = await novo('Guardanapo', 'UN', { nome: 'Fardo 500 un', conteudo: '500' });
-    Object.assign(ids, { mucarela: m.insumo, peca: m.variante, bacon: ba.insumo, pacote: ba.variante, guardanapo: g.insumo, fardo: g.variante });
+    const c = await montarCenario(db, 'nf', sufixo);
+    A = c.A;
+    B = c.B;
+    a = c.a;
+    b = c.b;
+    Object.assign(ids, c.ids);
+    // A Penha e o Centro já têm CNPJ (o cenário); o critério 11 recomeça sem eles.
+    await a.loja.updateMany({ data: { cnpj: null } });
   });
 
   afterAll(async () => {
@@ -409,7 +372,6 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)',
   });
 
   it('isolamento entre parceiros: o parceiro B recebe a MESMA nota para a loja dele, sem conflito, e nada de A vaza', async () => {
-    expect(await salvarCnpjDaLoja(b, ids.lojaB, '11.444.777/0001-61', '', 'Bia')).toMatchObject({ ok: true });
     const r = await receberXml(b, alcanceDe('DONO', 'rede'), bytes(xmlDe()), 'Bia');
     expect(r).toMatchObject({ ok: true });
     const idB = (r as { id: string }).id;

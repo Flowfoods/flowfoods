@@ -176,6 +176,64 @@ export function documentoParaSaida(d: string): string {
 export const INDICE_DO_DOCUMENTO_DO_FORNECEDOR = 'Fornecedor_parceiroId_documento_key';
 export const INDICES_DA_F_1A = ['Fornecedor_parceiroId_chaveEnvio_key', INDICE_DO_DOCUMENTO_DO_FORNECEDOR] as const;
 
+/** As três tabelas da F.1b (de tenant: RLS forçada como as outras). */
+export const TABELAS_DA_F_1B = ['DocumentoFiscal', 'DocumentoFiscalItem', 'VinculoItemFornecedor'] as const;
+
+/** Os CHECKs da F.1b (as tabelas nascem com eles validados; o que se confere é que existem). */
+export const CHECKS_DA_F_1B = [
+  ['DocumentoFiscal', 'DocumentoFiscal_chave_44'],
+  ['DocumentoFiscal', 'DocumentoFiscal_modelo_55'],
+  ['DocumentoFiscal', 'DocumentoFiscal_emitente_formato'],
+  ['DocumentoFiscal', 'DocumentoFiscal_destinatario_formato'],
+  ['DocumentoFiscal', 'DocumentoFiscal_uf_valida'],
+  ['DocumentoFiscal', 'DocumentoFiscal_textos_curtos'],
+  ['DocumentoFiscal', 'DocumentoFiscal_valores_faixa'],
+  ['DocumentoFiscal', 'DocumentoFiscal_sha256_formato'],
+  ['DocumentoFiscal', 'DocumentoFiscal_xml_tamanho'],
+  ['DocumentoFiscal', 'DocumentoFiscal_conciliado_tem_nota'],
+  ['DocumentoFiscal', 'DocumentoFiscal_conciliado_tem_loja_e_fornecedor'],
+  ['DocumentoFiscal', 'DocumentoFiscal_cancelado_tem_motivo'],
+  ['DocumentoFiscalItem', 'DocumentoFiscalItem_nItem_faixa'],
+  ['DocumentoFiscalItem', 'DocumentoFiscalItem_textos_curtos'],
+  ['DocumentoFiscalItem', 'DocumentoFiscalItem_quantidade_faixa'],
+  ['DocumentoFiscalItem', 'DocumentoFiscalItem_valores_faixa'],
+  ['DocumentoFiscalItem', 'DocumentoFiscalItem_resolucao_inteira'],
+  ['DocumentoFiscalItem', 'DocumentoFiscalItem_fator_faixa'],
+  ['DocumentoFiscalItem', 'DocumentoFiscalItem_granel_sem_embalagem'],
+  ['DocumentoFiscalItem', 'DocumentoFiscalItem_embalagem_precisa_insumo'],
+  ['DocumentoFiscalItem', 'DocumentoFiscalItem_vinculo_precisa_insumo'],
+  ['VinculoItemFornecedor', 'VinculoItemFornecedor_textos_curtos'],
+  ['VinculoItemFornecedor', 'VinculoItemFornecedor_fator_faixa'],
+  ['VinculoItemFornecedor', 'VinculoItemFornecedor_granel_sem_embalagem'],
+] as const;
+
+/**
+ * Os índices da F.1b: a chave de acesso única por parceiro (um documento só), a nota de um documento só, a memória única por
+ * fornecedor + código + unidade e a chave de acesso única entre as NOTAS que valem (parcial, só no SQL). Sem eles, o mesmo XML
+ * entraria duas vezes ou duas notas ativas teriam a mesma chave.
+ */
+export const INDICE_DA_CHAVE_ATIVA_DA_NOTA = 'NotaEntrada_chave_ativa_key';
+export const INDICES_DA_F_1B = [
+  'DocumentoFiscal_parceiroId_chaveAcesso_key',
+  'DocumentoFiscal_parceiroId_notaEntradaId_key',
+  'DocumentoFiscalItem_parceiroId_documentoId_nItem_key',
+  'VinculoItemFornecedor_parceiroId_fornecedorId_codigoProduto_key',
+  INDICE_DA_CHAVE_ATIVA_DA_NOTA,
+] as const;
+
+/** O índice único TOTAL antigo da chave da nota: tem de ter saído (ele impediria conciliar de novo depois de cancelar a nota). */
+export const INDICE_ANTIGO_DA_CHAVE_DA_NOTA = 'NotaEntrada_parceiroId_chaveAcesso_key';
+
+/** Os gatilhos da F.1b: sem eles o conteúdo do documento mudaria, o cancelado voltaria e o item mudaria depois de conciliado. */
+export const GATILHOS_DA_F_1B = [
+  'DocumentoFiscal_parceiro_imutavel',
+  'DocumentoFiscalItem_parceiro_imutavel',
+  'VinculoItemFornecedor_parceiro_imutavel',
+  'DocumentoFiscal_conteudo_imutavel',
+  'DocumentoFiscalItem_so_na_conferencia',
+  'VinculoItemFornecedor_chave_imutavel',
+] as const;
+
 export interface RelatorioDeFornecedores {
   /** O mesmo CNPJ/CPF em mais de um fornecedor do mesmo parceiro (o índice único não nasce enquanto isso existir). */
   repetidos: { parceiro: string; documento: string; nomes: string[] }[];
@@ -448,6 +506,42 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       }
     }
   }
+  // F.1b: só se a migration dela já rodou (a tabela existe; o catálogo não passa pela RLS).
+  const documentos = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_class WHERE relname = 'DocumentoFiscal' AND relkind = 'r'`;
+  if (documentos[0]?.n) {
+    const tabelas = await db.$queryRaw<{ nome: string; rls: boolean; forcada: boolean }[]>`
+      SELECT relname AS nome, relrowsecurity AS rls, relforcerowsecurity AS forcada FROM pg_class WHERE relkind = 'r' AND relname = ANY(${[...TABELAS_DA_F_1B, 'Loja']})`;
+    const loja = tabelas.find((t) => t.nome === 'Loja');
+    for (const t of TABELAS_DA_F_1B) {
+      const achada = tabelas.find((x) => x.nome === t);
+      if (!achada) pendencias.push(`Tabela ${t} NÃO existe: a migration 20261106000000_erp_documento_fiscal não foi aplicada por inteiro.`);
+      // As antigas com RLS e a nova sem: o papel do tenant não alcançaria a tabela (o ERP quebraria) ou ela ficaria sem o cinto.
+      else if (loja?.rls && !(achada.rls && achada.forcada)) pendencias.push(`Tabela ${t} sem RLS forçada (as outras têm): rode o bloco da RLS da migration 20261106000000_erp_documento_fiscal como dono das tabelas.`);
+    }
+    const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_F_1B.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_F_1B) {
+      const achado = dela.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration 20261106000000_erp_documento_fiscal não foi aplicada por inteiro.`);
+      else if (!achado.validado) pendencias.push(`CHECK ${nome} ficou NOT VALID: corrija a linha que o viola e rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+    }
+    const indices = await db.$queryRaw<{ nome: string }[]>`SELECT indexname AS nome FROM pg_indexes WHERE indexname = ANY(${[...INDICES_DA_F_1B, INDICE_ANTIGO_DA_CHAVE_DA_NOTA]})`;
+    for (const i of INDICES_DA_F_1B) {
+      if (indices.some((x) => x.nome === i)) continue;
+      pendencias.push(
+        i === INDICE_DA_CHAVE_ATIVA_DA_NOTA
+          ? `Índice ${i} NÃO existe: há duas notas ativas com a mesma chave de acesso. Cancele a repetida e rode o CREATE UNIQUE INDEX "${i}" ON "NotaEntrada"("parceiroId", "chaveAcesso") WHERE "chaveAcesso" IS NOT NULL AND "status" <> 'CANCELADA'; da migration 20261106000000_erp_documento_fiscal.`
+          : `Índice ${i} NÃO existe: a migration 20261106000000_erp_documento_fiscal não foi aplicada por inteiro.`,
+      );
+    }
+    if (indices.some((x) => x.nome === INDICE_ANTIGO_DA_CHAVE_DA_NOTA)) {
+      pendencias.push(`O índice antigo ${INDICE_ANTIGO_DA_CHAVE_DA_NOTA} (chave única TOTAL) continua: com ele, cancelar a nota conciliada não libera a chave. Rode DROP INDEX "${INDICE_ANTIGO_DA_CHAVE_DA_NOTA}"; depois de criar o ${INDICE_DA_CHAVE_ATIVA_DA_NOTA}.`);
+    }
+    const gatilhos = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_F_1B]})`;
+    for (const t of GATILHOS_DA_F_1B) {
+      if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261106000000_erp_documento_fiscal não foi aplicada por inteiro.`);
+    }
+  }
   return pendencias;
 }
 
@@ -465,10 +559,10 @@ async function principal() {
       for (const d of rel.documentosAConferir) console.log(`  Documento a conferir no parceiro ${d.parceiro}: “${d.nome}” tem ${documentoParaSaida(d.documento)}, que não passa nos dígitos verificadores.`);
     }
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b e da F.1a conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias e das metas por categoria (com RLS), os índices e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a e da F.1b conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias, das metas por categoria e da nota fiscal por XML (com RLS), os índices e os gatilhos existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b e da F.1a: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a e da F.1b: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {
