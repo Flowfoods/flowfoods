@@ -124,6 +124,10 @@ describe('2.5 · a tela', () => {
   it('quem vê a receita: tabela de uma linha por loja, "passou" no lugar de "−R$", "sem nota de compra" no lugar de R$ 0,00, a explicação do ritmo e a previsão sem meta', () => {
     const vista = (p: Partial<VistaCompleta>): VistaCompleta => ({
       veReceita: true,
+      metaBp: 3000,
+      ritmoMetaBp: 3000,
+      metaMista: false,
+      comMetaPropria: [],
       conta: null,
       motivo: null,
       previsao: { realizadoCentavos: 2_600_000, projetadoCentavos: 1_500_000, previstaCentavos: 4_100_000, diasCompletos: 20, diasSemLancamento: 0, diasRestantes: 11, diasNaJanela: 28, diasAntesDeAbrir: 0, frasesDoZero: [] },
@@ -184,7 +188,7 @@ describe('2.5 · a tela', () => {
   });
 
   it('loja sem número na tabela: a célula diz "sem número" e o motivo vai uma vez, sob o nome, sem nowrap (B2: sem rolagem lateral)', () => {
-    const v = (p: Partial<VistaCompleta>): VistaCompleta => ({ veReceita: true, conta: null, motivo: null, previsao: null, previstaCentavos: null, ritmo: null, cmvAteOntemBp: null, compradoCentavos: 0, compradoAteOntemCentavos: 0, receitaAteOntemCentavos: null, diasSemLancamento: 0, semNota: [], quemPassou: [], ...p });
+    const v = (p: Partial<VistaCompleta>): VistaCompleta => ({ veReceita: true, metaBp: null, ritmoMetaBp: null, metaMista: false, comMetaPropria: [], conta: null, motivo: null, previsao: null, previstaCentavos: null, ritmo: null, cmvAteOntemBp: null, compradoCentavos: 0, compradoAteOntemCentavos: 0, receitaAteOntemCentavos: null, diasSemLancamento: 0, semNota: [], quemPassou: [], ...p });
     const motivo = 'sem faturamento lançado nas últimas 4 semanas';
     const dados: OrcamentoDeCompra = {
       periodo: PERIODO,

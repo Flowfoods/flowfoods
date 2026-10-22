@@ -14,7 +14,21 @@
  */
 
 import { CHAVE_DO_SISTEMA } from './categoria-campos';
-import { categoriasLidasDaFotografia, categoriasParaGravar, montarPainelDeCategorias, type CategoriaDoPainel, type CategoriasGravadas, type LojaNoPainel, type PainelDeCategorias } from './cmv-categorias-campos';
+import { valeDaLoja, type CmvDoDre } from './cmv-campos';
+import { realPorCategoria, type PedidoDoReal } from './cmv-categorias-real';
+import {
+  categoriasLidasDaFotografia,
+  categoriasParaGravar,
+  CHAVE_DOS_PREPARADOS,
+  montarEvolucao,
+  montarPainelDeCategorias,
+  type CategoriaDoPainel,
+  type CategoriasGravadas,
+  type EvolucaoDeCategorias,
+  type LojaNoPainel,
+  type PainelDeCategorias,
+} from './cmv-categorias-campos';
+import { somarDias } from './contagem-campos';
 import { hojeNoRio } from './compra-campos';
 import { dreDoPeriodoNaTx, recusaDoDre, type DreDoPeriodo, type PedidoDoEscopo } from './dre';
 import type { LinhaDoDre } from './dre-campos';
@@ -36,22 +50,24 @@ export async function categoriasDoPainel(tx: ClienteDoParceiro): Promise<Categor
 /**
  * As compras LANÇADAS de cada loja pela categoria de HOJE do insumo: o mesmo filtro e a mesma soma de `comprasPorLoja` (valor
  * mais frete rateado, pela data da nota), só que agrupada também por categoria. Item de nota sem insumo (linha importada ainda não
- * casada) ou de insumo sem categoria cai em "sem categoria" (chave nula): nada some, a soma continua sendo a do DRE.
+ * casada) ou de insumo sem categoria cai em "sem categoria" (chave nula): nada some, a soma continua sendo a do DRE. Insumo PRÉ-PREPARO
+ * (tipo de hoje) vai à chave `CHAVE_DOS_PREPARADOS`, a linha própria dos pré-preparos.
  */
 export async function comprasPorLojaECategoria(tx: ClienteDoParceiro, ids: readonly string[], de: string, ate: string): Promise<Map<string, Map<string | null, number>>> {
   const out = new Map<string, Map<string | null, number>>();
   if (ids.length === 0 || ate < de) return out;
-  const linhas = await tx.sql<{ lojaId: string; categoriaId: string | null; centavos: bigint }>`
-    SELECT n."lojaId", i."categoriaId", sum(it."valorTotalCentavos" + it."freteRateadoCentavos")::bigint AS "centavos"
+  const linhas = await tx.sql<{ lojaId: string; categoriaId: string | null; preparo: boolean; centavos: bigint }>`
+    SELECT n."lojaId", i."categoriaId", coalesce(i."tipo" = 'PRE_PREPARO', false) AS "preparo", sum(it."valorTotalCentavos" + it."freteRateadoCentavos")::bigint AS "centavos"
     FROM "NotaEntrada" n
     JOIN "NotaEntradaItem" it ON it."parceiroId" = n."parceiroId" AND it."notaId" = n."id"
     LEFT JOIN "Insumo" i ON i."parceiroId" = it."parceiroId" AND i."id" = it."insumoId"
     WHERE n."parceiroId" = ${tx.parceiroId} AND n."lojaId" = ANY(${[...ids]}::text[])
       AND n."status" = 'LANCADA' AND n."entradaEm" >= ${de}::date AND n."entradaEm" <= ${ate}::date
-    GROUP BY n."lojaId", i."categoriaId"`;
+    GROUP BY n."lojaId", i."categoriaId", coalesce(i."tipo" = 'PRE_PREPARO', false)`;
   for (const l of linhas) {
     if (!out.has(l.lojaId)) out.set(l.lojaId, new Map());
-    out.get(l.lojaId)!.set(l.categoriaId, Number(l.centavos));
+    // Insumo pré-preparo vai à linha própria (I.2b), qualquer que seja a categoria dele.
+    out.get(l.lojaId)!.set(l.preparo ? CHAVE_DOS_PREPARADOS : l.categoriaId, Number(l.centavos));
   }
   return out;
 }
@@ -70,27 +86,52 @@ export async function insumosAClassificar(tx: ClienteDoParceiro, ids: readonly s
   return r?.n ?? 0;
 }
 
-/** Tudo o que a conta de cada loja precisa, lido em consultas que não crescem com o número de lojas. */
-async function lerAsLojas(tx: ClienteDoParceiro, lojas: readonly { id: string; nome: string }[], periodo: Pick<Periodo, 'inicio'>, ate: string | null, receitaDe: (id: string) => number): Promise<LojaNoPainel[]> {
+/**
+ * Tudo o que a conta de cada loja precisa, lido em consultas que não crescem com o número de lojas. Com o `cmv` do DRE (I.2b), a loja
+ * cujo CMV é o real tenta abrir por categoria (retrato por insumo nos dois estoques); a que não consegue fica pelas compras e diz por quê.
+ */
+async function lerAsLojas(tx: ClienteDoParceiro, lojas: readonly { id: string; nome: string }[], periodo: Pick<Periodo, 'inicio' | 'fim'>, ate: string | null, receitaDe: (id: string) => number, cmv: CmvDoDre | null): Promise<LojaNoPainel[]> {
   const ids = lojas.map((l) => l.id);
   const [compras, vigentes, naoUsa] = await Promise.all([
     ate ? comprasPorLojaECategoria(tx, ids, periodo.inicio, ate) : Promise.resolve(new Map<string, Map<string | null, number>>()),
     conjuntosVigentes(tx, ids, periodo.inicio),
     categoriasQueNaoUsa(tx, ids),
   ]);
+  const doCmv = new Map((cmv?.lojas ?? []).map((l) => [l.lojaId, l]));
+  const pedidos: PedidoDoReal[] = [];
+  for (const l of lojas) {
+    const r = doCmv.get(l.id)?.real;
+    if (r) {
+      pedidos.push({ lojaId: l.id, inicio: periodo.inicio, fim: periodo.fim, realCentavos: r.centavos, fechamentoId: r.fechamentoId, fechamentoAnteriorId: r.fechamentoAnteriorId ?? null, aberturaId: r.aberturaId, inicialDe: r.inicialDe });
+    }
+  }
+  const abertos = await realPorCategoria(tx, pedidos);
   return lojas.map((l) => {
     const m = metasDaLoja(vigentes, l.id);
-    return { lojaId: l.id, nome: l.nome, receitaBrutaCentavos: receitaDe(l.id), compras: compras.get(l.id) ?? new Map(), naoUsa: naoUsa.get(l.id) ?? new Set(), metas: m.metas, metaVemDe: m.origem };
+    const aberto = abertos.get(`${l.id}|${periodo.inicio}`);
+    const vale = doCmv.get(l.id) ? valeDaLoja(doCmv.get(l.id)!) : null;
+    return {
+      lojaId: l.id,
+      nome: l.nome,
+      receitaBrutaCentavos: receitaDe(l.id),
+      compras: compras.get(l.id) ?? new Map(),
+      real: aberto?.aberto ? aberto.real : null,
+      cmvCentavos: vale?.centavos ?? null,
+      motivoSemRealPorCategoria: aberto && !aberto.aberto ? aberto.motivo : null,
+      naoUsa: naoUsa.get(l.id) ?? new Set(),
+      metas: m.metas,
+      metaVemDe: m.origem,
+    };
   });
 }
 
 /**
- * O que o fechamento grava em `entrada.categorias` (fotografia v4): por loja, as compras por categoria no período inteiro, a meta
- * efetiva da época e o uso. Lido na transação do fechamento, sob a trava exclusiva do período: é a mesma conta do painel ao vivo.
+ * O que o fechamento grava em `entrada.categorias` (fotografia v5): por loja, as compras por categoria no período inteiro, o real aberto
+ * por categoria (quando a loja tem o retrato nos dois estoques), a meta efetiva da época e o uso. Lido na transação do fechamento, sob a trava exclusiva do período: é a mesma conta do painel ao vivo.
  */
-export async function categoriasParaFotografia(tx: ClienteDoParceiro, lojas: readonly { id: string; nome: string }[], periodo: Periodo): Promise<CategoriasGravadas> {
+export async function categoriasParaFotografia(tx: ClienteDoParceiro, lojas: readonly { id: string; nome: string }[], periodo: Periodo, cmv: CmvDoDre): Promise<CategoriasGravadas> {
   const categorias = await categoriasDoPainel(tx);
-  const doPainel = await lerAsLojas(tx, lojas, periodo, periodo.fim, () => 0);
+  const doPainel = await lerAsLojas(tx, lojas, periodo, periodo.fim, () => 0, cmv);
   return categoriasParaGravar(categorias, doPainel);
 }
 
@@ -134,47 +175,93 @@ export interface CmvPorCategoria {
 export async function cmvPorCategoria(cliente: ClienteDoParceiro, alcance: Alcance, pedido: PedidoDoEscopo, data: string, hoje = hojeNoRio()): Promise<CmvPorCategoria | null> {
   if (recusaDoDre(alcance, pedido)) return null;
   if (pedido.tipo === 'loja' && !alcancaLoja(alcance, pedido.lojaId)) return null;
-  return cliente.transacao(async (tx) => {
-    const d = await dreDoPeriodoNaTx(tx, alcance, pedido, data, hoje);
-    if (!d) return null;
-    const linha = d.resultado.linhas.find((l) => l.tipo === 'cmv')!;
-    const total: TotalDoPainel = { linha, meta: d.metas[linha.chave] ?? null, farol: d.farol.porLinha[linha.chave] ?? null };
-    const receitaDe = (id: string) => (d.escopo.tipo === 'loja' ? d.resultado.receitaBrutaCentavos : (d.porLoja?.find((p) => p.loja.id === id)?.receitaBrutaCentavos ?? 0));
-    const cabecalho = { d, total };
-    const nomeDe = (id: string) => d.lojasDoEscopo.find((l) => l.id === id)?.nome ?? '';
-    const montar = (categorias: CategoriaDoPainel[], lojas: LojaNoPainel[], nInsumos: number | null) => {
-      const faixas = d.fechamento ? faixasDaVersao(d.farol.versaoDasFaixas) : FAIXAS_DO_FAROL;
-      // Só entra na conta a loja que vendeu ou comprou: a parada não pesa nem conta como "sem meta".
-      const incluidas = lojas.filter((l) => l.receitaBrutaCentavos > 0 || l.compras.size > 0);
-      const painel = montarPainelDeCategorias({
-        categorias,
-        lojas: incluidas,
-        totalCentavos: linha.valorCentavos,
-        receitaBrutaCentavos: d.resultado.receitaBrutaCentavos,
-        notaDoCmv: linha.nota,
-        semContarDoCmv: linha.semContar,
-        motivoGeral: d.farol.motivoGeral,
-        faixas,
-        encerrado: d.encerrado,
-        insumosAClassificar: nInsumos,
-      });
-      return { ...cabecalho, painel, antigo: false, lojasIncluidas: incluidas.length } satisfies CmvPorCategoria;
-    };
+  return cliente.transacao((tx) => cmvPorCategoriaNaTx(tx, alcance, pedido, data, hoje), { timeout: 20_000 });
+}
 
-    // ---- fechado: só a fotografia
-    if (d.fechamento) {
-      if (d.fechamento.versaoDaConta < 4) return { ...cabecalho, painel: null, antigo: true, lojasIncluidas: 0 };
-      const lidas = await lerCategoriasDaFotografia(tx, pedido.tipo === 'loja' ? { lojas: [pedido.lojaId] } : alcance, d.fechamento.fotografiaId);
-      const lida = categoriasLidasDaFotografia(lidas, receitaDe);
-      if (!lida || lida.lojas.length === 0) return { ...cabecalho, painel: null, antigo: true, lojasIncluidas: 0 };
-      return montar(lida.categorias, lida.lojas, null);
-    }
+/** O mesmo painel dentro de uma transação já aberta (a evolução lê vários períodos na mesma). */
+export async function cmvPorCategoriaNaTx(tx: ClienteDoParceiro, alcance: Alcance, pedido: PedidoDoEscopo, data: string, hoje: string): Promise<CmvPorCategoria | null> {
+  if (recusaDoDre(alcance, pedido)) return null;
+  if (pedido.tipo === 'loja' && !alcancaLoja(alcance, pedido.lojaId)) return null;
+  const d = await dreDoPeriodoNaTx(tx, alcance, pedido, data, hoje);
+  if (!d) return null;
+  const linha = d.resultado.linhas.find((l) => l.tipo === 'cmv')!;
+  const total: TotalDoPainel = { linha, meta: d.metas[linha.chave] ?? null, farol: d.farol.porLinha[linha.chave] ?? null };
+  const receitaDe = (id: string) => (d.escopo.tipo === 'loja' ? d.resultado.receitaBrutaCentavos : (d.porLoja?.find((p) => p.loja.id === id)?.receitaBrutaCentavos ?? 0));
+  const cabecalho = { d, total };
+  const nomeDe = (id: string) => d.lojasDoEscopo.find((l) => l.id === id)?.nome ?? '';
+  const montar = (categorias: CategoriaDoPainel[], lojas: LojaNoPainel[], nInsumos: number | null) => {
+    const faixas = d.fechamento ? faixasDaVersao(d.farol.versaoDasFaixas) : FAIXAS_DO_FAROL;
+    // Só entra na conta a loja que vendeu ou comprou: a parada não pesa nem conta como "sem meta".
+    const incluidas = lojas.filter((l) => l.receitaBrutaCentavos > 0 || l.compras.size > 0);
+    const painel = montarPainelDeCategorias({
+      categorias,
+      lojas: incluidas,
+      totalCentavos: linha.valorCentavos,
+      receitaBrutaCentavos: d.resultado.receitaBrutaCentavos,
+      notaDoCmv: linha.nota,
+      semContarDoCmv: linha.semContar,
+      motivoGeral: d.farol.motivoGeral,
+      faixas,
+      encerrado: d.encerrado,
+      insumosAClassificar: nInsumos,
+    });
+    return { ...cabecalho, painel, antigo: false, lojasIncluidas: incluidas.length } satisfies CmvPorCategoria;
+  };
 
-    // ---- ao vivo
-    const categorias = await categoriasDoPainel(tx);
-    const lojas = await lerAsLojas(tx, d.lojasDoEscopo.map((l) => ({ id: l.id, nome: nomeDe(l.id) })), d.periodo, d.ate, receitaDe);
-    const outros = categorias.find((c) => c.chave === CHAVE_DO_SISTEMA)?.id ?? null;
-    const aClassificar = d.ate ? await insumosAClassificar(tx, d.lojasDoEscopo.map((l) => l.id), d.periodo.inicio, d.ate, outros) : 0;
-    return montar(categorias, lojas, aClassificar);
-  });
+  // ---- fechado: só a fotografia
+  if (d.fechamento) {
+    if (d.fechamento.versaoDaConta < 4) return { ...cabecalho, painel: null, antigo: true, lojasIncluidas: 0 };
+    const lidas = await lerCategoriasDaFotografia(tx, pedido.tipo === 'loja' ? { lojas: [pedido.lojaId] } : alcance, d.fechamento.fotografiaId);
+    const lida = categoriasLidasDaFotografia(lidas, receitaDe);
+    if (!lida || lida.lojas.length === 0) return { ...cabecalho, painel: null, antigo: true, lojasIncluidas: 0 };
+    return montar(lida.categorias, lida.lojas, null);
+  }
+
+  // ---- ao vivo
+  const categorias = await categoriasDoPainel(tx);
+  const lojas = await lerAsLojas(tx, d.lojasDoEscopo.map((l) => ({ id: l.id, nome: nomeDe(l.id) })), d.periodo, d.ate, receitaDe, d.cmvDasLojas);
+  const outros = categorias.find((c) => c.chave === CHAVE_DO_SISTEMA)?.id ?? null;
+  const aClassificar = d.ate ? await insumosAClassificar(tx, d.lojasDoEscopo.map((l) => l.id), d.periodo.inicio, d.ate, outros) : 0;
+  return montar(categorias, lojas, aClassificar);
+}
+
+/**
+ * A evolução dos últimos períodos (até 6, o pedido e os 5 anteriores) por categoria: realizado, meta e desvio de cada um, na mesma
+ * transação. Cada período vem do mesmo painel de cima (o fechado, da fotografia como está; o aberto, ao vivo), então o número de um
+ * período aqui é o do painel dele. O número de consultas é o de cada período, nunca o de lojas. Para quando o ERP ainda não existia.
+ */
+export async function evolucaoDeCategorias(cliente: ClienteDoParceiro, alcance: Alcance, pedido: PedidoDoEscopo, data: string, hoje = hojeNoRio(), quantos = 6): Promise<EvolucaoDeCategorias | null> {
+  if (recusaDoDre(alcance, pedido)) return null;
+  if (pedido.tipo === 'loja' && !alcancaLoja(alcance, pedido.lojaId)) return null;
+  return cliente.transacao(
+    async (tx) => {
+      const lidos: CmvPorCategoria[] = [];
+      let dia = data;
+      for (let i = 0; i < quantos; i++) {
+        const r = await cmvPorCategoriaNaTx(tx, alcance, pedido, dia, hoje);
+        if (!r) return i === 0 ? null : montarEvolucao(lidos.map(paraAEvolucao));
+        lidos.push(r);
+        if (!r.d.anterior) break;
+        dia = somarDias(r.d.periodo.inicio, -1);
+      }
+      return montarEvolucao(lidos.map(paraAEvolucao));
+    },
+    { timeout: 30_000 },
+  );
+}
+
+function paraAEvolucao(r: CmvPorCategoria) {
+  const { d, total, painel } = r;
+  return {
+    inicio: d.periodo.inicio,
+    nome: d.periodo.nome,
+    situacao: d.status === 'FECHADO' ? ('fechado' as const) : d.emCurso ? ('em-curso' as const) : ('encerrado' as const),
+    antigo: r.antigo,
+    semFaturamento: d.resultado.semFaturamento,
+    totalCentavos: total.linha.valorCentavos,
+    totalBp: total.linha.percentualBp,
+    metaTotalBp: total.meta?.metaBp ?? null,
+    desvioTotalBp: total.meta?.desvioBp ?? null,
+    painel,
+  };
 }

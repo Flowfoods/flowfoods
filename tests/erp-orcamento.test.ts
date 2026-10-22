@@ -214,19 +214,19 @@ describe('cobertura por loja: a rede só tem número quando cada loja tem', () =
   const nova = orcamentoDaLoja(loja({ lojaId: 'ct', nome: 'Centro', primeiroLancamento: '2026-10-15', graos: graos('2026-10-15', '2026-10-20', { LOJA: 1000 }) }), OUTUBRO, HOJE, 3000);
 
   it('as duas com número: a rede soma (teto R$ 24.600,00 − R$ 12.000,00)', () => {
-    const r = orcamentoDoEscopo([penha, delivery], 3000);
+    const r = orcamentoDoEscopo([penha, delivery]);
     expect(r.conta).toEqual({ previstaCentavos: R(82_000), metaBp: 3000, tetoCentavos: R(24_600), compradoCentavos: R(12_000), saldoCentavos: R(12_600) });
   });
 
   it('uma sem número: a rede fica sem número, com o nome dela (somar esconderia o buraco)', () => {
-    const r = orcamentoDoEscopo([penha, delivery, nova], 3000);
+    const r = orcamentoDoEscopo([penha, delivery, nova]);
     expect(r.conta).toBeNull();
     expect(r.motivo).toBe('sem o orçamento de Centro');
   });
 
   it('o ritmo da rede fica sem cor se UMA loja tem dia sem lançamento, mesmo com a outra completa', () => {
     const furada = orcamentoDaLoja(loja({ lojaId: 'dl', nome: 'Delivery', canais: ['LOJA', 'IFOOD'], graos: graos('2026-09-01', '2026-10-20', { LOJA: 700, IFOOD: 300 }, [{ data: '2026-10-05', canal: 'IFOOD' }]) }), OUTUBRO, HOJE, 3000);
-    const r = orcamentoDoEscopo([penha, furada], 3000);
+    const r = orcamentoDoEscopo([penha, furada]);
     expect(r.conta).not.toBeNull();
     expect(r.diasSemLancamento).toBe(1);
     expect(r.ritmo).toMatchObject({ tipo: 'sem', motivo: MOTIVO_FALTA_FATURAMENTO });
@@ -234,7 +234,7 @@ describe('cobertura por loja: a rede só tem número quando cada loja tem', () =
 
   it('o ritmo da rede fica sem cor quando uma loja que vendeu não tem nota', () => {
     const semNota = orcamentoDaLoja(loja({ lojaId: 'dl', nome: 'Delivery', compradoCentavos: 0, compradoAteOntemCentavos: 0 }), OUTUBRO, HOJE, 3000);
-    const r = orcamentoDoEscopo([penha, semNota], 3000);
+    const r = orcamentoDoEscopo([penha, semNota]);
     expect(r.ritmo).toMatchObject({ tipo: 'sem', motivo: 'sem nota de compra de Delivery até ontem' });
   });
 });
@@ -315,6 +315,6 @@ describe('quem não vê a receita: o TETO arredondado para baixo, por faixa (dec
   it('a rede: o teto é a soma dos tetos das lojas', () => {
     const a = orcamentoDaLoja(loja(), OUTUBRO, HOJE, 3000);
     const b = orcamentoDaLoja(loja({ lojaId: 'dl', nome: 'Delivery' }), OUTUBRO, HOJE, 3000);
-    expect(orcamentoDoEscopo([a, b], 3000).conta?.tetoCentavos).toBe(a.conta!.tetoCentavos + b.conta!.tetoCentavos);
+    expect(orcamentoDoEscopo([a, b]).conta?.tetoCentavos).toBe(a.conta!.tetoCentavos + b.conta!.tetoCentavos);
   });
 });
