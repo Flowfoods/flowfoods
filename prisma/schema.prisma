@@ -1085,6 +1085,9 @@ model NotaEntrada {
   @@index([parceiroId, chaveAcesso])
   @@index([parceiroId, lojaId, entradaEm])
   @@index([parceiroId, fornecedorId, entradaEm])
+  // L.2: os relatórios de compras também filtram pela emissão da nota fiscal e pelo dia do lançamento (a entrada já tem o índice acima).
+  @@index([parceiroId, lojaId, emitidaEm])
+  @@index([parceiroId, lojaId, lancadaEm])
   // 1.5: a última compra de cada insumo (data da nota, depois a hora do lançamento).
   @@index([parceiroId, status, entradaEm(sort: Desc), lancadaEm(sort: Desc)], map: "NotaEntrada_parceiroId_status_entradaEm_idx")
 }

@@ -234,6 +234,9 @@ export const GATILHOS_DA_F_1B = [
   'VinculoItemFornecedor_chave_imutavel',
 ] as const;
 
+/** Os índices da L.2 (relatórios de compras): sem eles o relatório pela emissão ou pelo lançamento varre as notas da loja inteira. */
+export const INDICES_DA_L_2 = ['NotaEntrada_parceiroId_lojaId_emitidaEm_idx', 'NotaEntrada_parceiroId_lojaId_lancadaEm_idx'] as const;
+
 export interface RelatorioDeFornecedores {
   /** O mesmo CNPJ/CPF em mais de um fornecedor do mesmo parceiro (o índice único não nasce enquanto isso existir). */
   repetidos: { parceiro: string; documento: string; nomes: string[] }[];
@@ -540,6 +543,18 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
     const gatilhos = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_F_1B]})`;
     for (const t of GATILHOS_DA_F_1B) {
       if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration 20261106000000_erp_documento_fiscal não foi aplicada por inteiro.`);
+    }
+  }
+  // L.2: dois índices aditivos (o catálogo não passa pela RLS). Esperados quando a migration consta como aplicada OU quando um dos dois
+  // já existe (aplicada pela metade); antes dela, o banco da fase anterior fica limpo.
+  const indicesL2 = await db.$queryRaw<{ nome: string }[]>`SELECT indexname AS nome FROM pg_indexes WHERE indexname = ANY(${[...INDICES_DA_L_2]})`;
+  const registro = await db.$queryRaw<{ existe: boolean }[]>`SELECT to_regclass('public."_prisma_migrations"') IS NOT NULL AS existe`;
+  const constaAplicada = registro[0]?.existe
+    ? ((await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM "_prisma_migrations" WHERE migration_name = '20261107000000_erp_relatorio_compras' AND finished_at IS NOT NULL`)[0]?.n ?? 0) > 0
+    : false;
+  if (indicesL2.length > 0 || constaAplicada) {
+    for (const i of INDICES_DA_L_2) {
+      if (!indicesL2.some((x) => x.nome === i)) pendencias.push(`Índice ${i} NÃO existe: a migration 20261107000000_erp_relatorio_compras não foi aplicada por inteiro. Rode o CREATE INDEX dela.`);
     }
   }
   return pendencias;

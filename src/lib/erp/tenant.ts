@@ -284,7 +284,11 @@ type Operacao = (typeof OPERACOES)[number];
 
 type Amarrado = ReturnType<typeof estender>;
 type ModelosDoParceiro = { readonly [M in ModeloDeTenant]: Pick<Amarrado[M], Operacao & keyof Amarrado[M]> };
-type OpcoesDeTransacao = { maxWait?: number; timeout?: number };
+/**
+ * `repetivel` (L.2): a transação enxerga UMA fotografia do banco do começo ao fim (REPEATABLE READ), para um relatório que lê em várias
+ * consultas (resumo, grupos, linhas) nunca somar números de instantes diferentes quando alguém lança ou cancela uma nota no meio.
+ */
+type OpcoesDeTransacao = { maxWait?: number; timeout?: number; repetivel?: boolean };
 
 /**
  * Cliente de UM parceiro: os modelos de tenant (e só eles, só com operações de
@@ -412,7 +416,11 @@ function construir(base: PrismaClient, parceiroId: string, somenteLeitura: boole
             return consulta;
           };
           return fn(montar(tx as unknown as Record<string, unknown>, parceiroId, somenteLeitura, direto, null));
-        }, opcoes);
+        }, {
+          ...(opcoes?.maxWait !== undefined ? { maxWait: opcoes.maxWait } : {}),
+          ...(opcoes?.timeout !== undefined ? { timeout: opcoes.timeout } : {}),
+          ...(opcoes?.repetivel ? { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead } : {}),
+        });
       } catch (e) {
         throw traduzirErro(e);
       }
