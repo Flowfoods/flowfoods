@@ -84,6 +84,8 @@ export interface FiltrosDoRelatorio {
   porPagina: number;
   /** Frase quando o período digitado não faz sentido (o relatório sai vazio, com a frase). */
   periodoInvalido: string | null;
+  /** L.3: de onde a pessoa veio (a comparação). Dado de fora: a página só o aceita depois de `caminhoDeVolta`; aqui só o tamanho e a barra. */
+  volta: string;
 }
 
 type Params = Record<string, string | string[] | undefined>;
@@ -142,6 +144,7 @@ export function lerFiltrosDoRelatorio(sp: Params, hoje = hojeNoRio(), padrao: Pa
     pagina: lerPagina(um(sp.pagina)),
     porPagina: lerPorPagina(um(sp.por)),
     periodoInvalido,
+    volta: /^\/[^\s]{0,1999}$/.test(um(sp.volta)) ? um(sp.volta) : '',
   };
 }
 
@@ -165,6 +168,7 @@ export function queryDoRelatorio(f: FiltrosDoRelatorio, mudar: Partial<FiltrosDo
   if (x.so) q.set('so', x.so);
   if (x.porPagina !== POR_PAGINA_PADRAO) q.set('por', String(x.porPagina));
   if (!opcoes.semPagina && x.pagina > 1) q.set('pagina', String(x.pagina));
+  if (x.volta) q.set('volta', x.volta);
   return q.toString();
 }
 
