@@ -287,6 +287,9 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     expect((await listarInsumos(b)).total).toBe(0);
     expect(await buscarInsumos(b, 'ceb')).toEqual([]);
     expect((await buscarInsumos(a, 'ceb')).map((x) => x.nome)).toEqual(['Cebola']);
+    // ⌘K: sem caixa e sem acento.
+    expect((await buscarInsumos(a, 'CÉB')).map((x) => x.nome)).toEqual(['Cebola']);
+    expect(await buscarInsumos(a, '%%')).toEqual([]);
     // O mesmo nome no B é outro insumo.
     expect((await cadastrarInsumo(b, { ...cebola, categoriaId: catB })).ok).toBe(true);
     expect(await a.insumo.count({ where: { nome: 'Cebola' } })).toBe(1);

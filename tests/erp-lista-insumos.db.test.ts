@@ -321,6 +321,27 @@ describe.skipIf(!URL_TESTE)('ERP L.1 · lista de insumos (Postgres real)', { tim
       expect((await listarInsumos(a)).total).toBeGreaterThan(5);
     });
 
+    it('a busca ignora maiúscula E acento, no nome e na marca, e o texto segue literal', async () => {
+      await novo(a, 'Polpa de açaí', { categoriaId: cat.OUTROS, marcaReferencia: 'Ypê' });
+      await novo(a, 'Pão de queijo 50% mais', { categoriaId: cat.OUTROS });
+      // Sem acento acha com acento (e o contrário), em qualquer caixa.
+      expect(await nomesDe(a, { q: 'acai' })).toEqual(['Polpa de açaí']);
+      expect(await nomesDe(a, { q: 'AÇAÍ' })).toEqual(['Polpa de açaí']);
+      expect(await nomesDe(a, { q: 'de aca' })).toEqual(['Polpa de açaí']);
+      expect(await nomesDe(a, { q: 'pao de' })).toEqual(['Pão de queijo 50% mais']);
+      // Pela marca de referência.
+      expect(await nomesDe(a, { q: 'ype' })).toEqual(['Polpa de açaí']);
+      expect(await nomesDe(a, { q: 'YPÊ' })).toEqual(['Polpa de açaí']);
+      // Continua literal: % e _ são letras, não curingas.
+      expect(await nomesDe(a, { q: '50% m' })).toEqual(['Pão de queijo 50% mais']);
+      expect(await nomesDe(a, { q: 'aca%' })).toEqual([]);
+      expect(await nomesDe(a, { q: 'ac_i' })).toEqual([]);
+      // O contador e a página concordam com o filtro, e B não enxerga.
+      const r = await listarInsumos(a, { q: 'acai', situacao: 'todos' });
+      expect([r.total, r.linhas.length]).toEqual([1, 1]);
+      expect(await nomesDe(b, { q: 'acai' })).toEqual([]);
+    });
+
     it('o insumo de A nunca aparece em B, nem pela marca', async () => {
       expect(await nomesDe(b, { q: 'camil' })).toEqual([]);
       expect(await nomesDe(b, { marca: 'Camil' })).toEqual([]);

@@ -21,6 +21,7 @@ import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
 import { checkVioladoDe, ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
+import { idsDeInsumoPelaBusca } from './busca';
 import {
   CATEGORIAS_QUE_COSTUMAM_SER_FRIAS,
   conservacaoAConfirmar,
@@ -694,9 +695,8 @@ export interface LinhaDeInsumo {
   preparo: { fichaId: string; porUnidade: Fracao; incompleto: boolean } | null;
 }
 
-function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
-  // O texto da busca é literal: `%` e `_` não são curingas do LIKE (o Prisma não os escapa em `contains`).
-  const q = f.q.trim().slice(0, 80).replace(/[\\%_]/g, '\\$&');
+/** `idsDaBusca`: os insumos que a busca acha (ignora caixa e acento, texto literal; `busca.ts`); null = sem busca. */
+function filtroDoBanco(f: FiltrosDeInsumo, idsDaBusca: string[] | null): Prisma.InsumoWhereInput {
   // Os filtros que se combinam vão em AND (cada um com o seu OR/campo), para um nunca apagar o outro.
   const e: Prisma.InsumoWhereInput[] = [];
   // I.1a: 'sem' = sem categoria; 'revisar' = sem categoria ou em "Outros / a classificar"; senão, uma categoria.
@@ -708,7 +708,7 @@ function filtroDoBanco(f: FiltrosDeInsumo): Prisma.InsumoWhereInput {
   if (f.conservacao === FILTRO_A_CONFIRMAR) e.push(filtroDaConfirmacaoDaSituacao());
   else if (f.conservacao) e.push({ OR: [{ conservacao: f.conservacao }, { [COLUNA_DA_VALIDADE[f.conservacao]]: { not: null } }] });
   // L.1: a busca acha pelo nome OU pela marca de referência; "marca" é filtro à parte (sem diferenciar caixa).
-  if (q) e.push({ OR: [{ nome: { contains: q, mode: 'insensitive' } }, { marcaReferencia: { contains: q, mode: 'insensitive' } }] });
+  if (idsDaBusca) e.push({ id: { in: idsDaBusca } });
   if (f.marca === FILTRO_SEM_MARCA) e.push({ marcaReferencia: null });
   else if (f.marca) e.push({ marcaReferencia: { equals: f.marca, mode: 'insensitive' } });
   if (f.incompleto) e.push(filtroDoIncompleto());
@@ -812,8 +812,8 @@ export async function listarInsumos(
 ): Promise<{ linhas: LinhaDeInsumo[]; total: number; pagina: number; paginas: number; porPagina: number; totalDoCadastro: TotalDoCadastro }> {
   const f: FiltrosDeInsumo = { ...FILTROS_PADRAO, ...filtros };
   const porPagina = lerPorPagina(f.porPagina);
-  const where = filtroDoBanco(f);
   return cliente.transacao(async (tx) => {
+    const where = filtroDoBanco(f, await idsDeInsumoPelaBusca(tx, f.q));
     const total = await tx.insumo.count({ where });
     const todos = await tx.insumo.count();
     const ativos = await tx.insumo.count({ where: { ativo: true } });
@@ -982,10 +982,15 @@ export type InsumoDetalhado = NonNullable<Awaited<ReturnType<typeof obterInsumo>
 export async function buscarInsumos(cliente: ClienteDoParceiro, texto: string, limite = 8) {
   const q = texto.trim().slice(0, 80);
   if (q.length < 2) return [];
-  return cliente.insumo.findMany({
-    where: { nome: { contains: q, mode: 'insensitive' } },
-    orderBy: [{ ativo: 'desc' }, { nome: 'asc' }],
-    take: limite,
-    select: { id: true, nome: true, unidade: true, ativo: true },
+  // Sem caixa e sem acento ("acai" acha "açaí"): os ids vêm da busca por SQL e a lista, do cadastro.
+  return cliente.transacao(async (tx) => {
+    const ids = await idsDeInsumoPelaBusca(tx, q, { soNome: true });
+    if (!ids || ids.length === 0) return [];
+    return tx.insumo.findMany({
+      where: { id: { in: ids } },
+      orderBy: [{ ativo: 'desc' }, { nome: 'asc' }],
+      take: limite,
+      select: { id: true, nome: true, unidade: true, ativo: true },
+    });
   });
 }
