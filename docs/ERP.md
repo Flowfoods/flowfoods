@@ -2682,11 +2682,11 @@ a página e a action de verdade (dona, gerente, comprador, operador). `tests/erp
 como superusuário, dono com FORCE RLS e dono sem RLS.
 
 **Resultado da prova (2026-10-22).** `prisma validate`, `typecheck`, `lint`, `gate` e `build` limpos; `erp:conferir-migracao` limpo e `migrate diff`
-vazio no `ff_dev`. `npx vitest run` sem banco: 58 arquivos, 1412 testes passando (os de banco pulados). Com banco (`ff_dev`, superusuário), duas
-rodadas seguidas: 107 arquivos, 2120 testes, todos passando. Como dono NÃO-superusuário com FORCE RLS e como dono sem RLS (bancos novos, todas as
+vazio no `ff_dev`. `npx vitest run` sem banco: 58 arquivos, 1418 testes passando (os de banco pulados). Com banco (`ff_dev`, superusuário), duas
+rodadas seguidas: 107 arquivos, 2127 testes, todos passando. Como dono NÃO-superusuário com FORCE RLS e como dono sem RLS (bancos novos, todas as
 migrations aplicadas pelo dono, `--no-file-parallelism`): os 17 arquivos de banco tocados ou vizinhos (metas e CMV por categoria, telas, retrato,
-CMV, fechamento do DRE, DRE, farol, categorias, contagem, estoque, insumos, isolamento, permissões, RLS, compras, orçamento e ajuda), 374 testes
-cada: sem RLS, 367 passando e 7 pulados; com FORCE RLS, 373 passando e 1 falha que já existia e é do banco criado por psql (o teste da 0.2 lê
+CMV, fechamento do DRE, DRE, farol, categorias, contagem, estoque, insumos, isolamento, permissões, RLS, compras, orçamento e ajuda), 375 testes
+cada: sem RLS, 368 passando e 7 pulados; com FORCE RLS, 374 passando e 1 falha que já existia e é do banco criado por psql (o teste da 0.2 lê
 `_prisma_migrations`, que o psql não cria). O teste da migration cria os próprios bancos nos 3 perfis. Mutantes: tirar `travarParaEscrever` de
 `concluirContagem` e `travarMetas` de `salvarMetasPorCategoria` derruba os testes (restaurados). Jornada no navegador (build de produção, porta 3100,
 banco novo copiado do `ff_dev`, 87 conferências na jornada e 48 de axe e tamanho na matriz, todas ok): a dona aplica o modelo de 32% (nada gravado),
@@ -2698,7 +2698,7 @@ retrato (8 insumos, soma igual ao total do fechamento; a abertura antiga segue s
 categoria"; fechar setembro no DRE grava a v4 e reclassificar depois não o muda; gerente (só a Vila da Penha, também por `?rede=1` e `?loja=<Delivery>`,
 nada da outra no HTML, sem as metas nem no ⌘K), operador e quem só vê o histórico (nada do painel nem das metas). Matriz de 6 páginas x 4 tamanhos
 (1440, 1180, 820, 390) x 2 temas: sem rolagem lateral, sem violação do axe, sem erro de console e, com ponteiro de toque real, nenhum alvo abaixo
-de 44 px (a jornada achou e fez corrigir: a mensagem de "salvo" sumia por o formulário remontar quando a versão muda; os links e as setas do período
+de 44 px Depois do veto do Guardião (realizado e meta no mesmo conjunto de lojas, com teste de propriedade e a jornada com a Delivery marcando Bebidas como "não usa"; gatilhos de vigência e de retrato; maiores desvios só de quem saiu da meta) a bateria inteira rodou de novo: jornada com 90 conferências e matriz com 48, também com a barra de salvar nunca cobrindo o campo a 390 e 820 px. (A jornada achou e fez corrigir: a mensagem de "salvo" sumia por o formulário remontar quando a versão muda; os links e as setas do período
 abaixo de 44 px; o texto do painel fechado dizia "categoria de hoje"). Prints em `scratchpad/shots-I2a`. Scanner avoid-ai-design nos arquivos de
 código tocados: 0 P0 e 0 P1 (só P2 de "meta strings com ponto médio", já existentes no padrão da casa). Também entrou a herança do pós-deploy da I.1b: o
 aviso de insumos sem categoria diz "sem saldo" em vez de R$ 0,00 (teste novo `erp-aviso-classificar.test.ts`).
