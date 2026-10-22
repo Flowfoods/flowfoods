@@ -11,7 +11,10 @@
  *  - o farol é o da 2.4 (`faixaDoDesvio`, escala de custo), e a regra do "sem cor" também: quando o dado não fecha, o desvio
  *    fica em texto e o motivo por extenso. A isso se soma o limiar de "a classificar" (decisão 278);
  *  - "Outros / a classificar" e "Sem categoria" nunca têm farol: o que está lá é fila de classificação, não custo da natureza;
- *  - o desvio tem o MESMO sinal do DRE (realizado menos meta): positivo é custo acima da meta.
+ *  - o desvio tem o MESMO sinal do DRE (realizado menos meta): positivo é custo acima da meta;
+ *  - (I.2b) quando a loja tem o retrato por insumo nos dois estoques, o realizado da categoria é o CMV REAL dela: estoque inicial + entradas
+ *    do livro − estoque final (com o corte da 2.3), tudo na categoria de HOJE do insumo; o estoque de pré-preparo vai à linha própria;
+ *    sem o retrato, a loja segue pelas compras e a diferença para o real do DRE vai na linha de variação do estoque.
  */
 
 import { CATEGORIAS_PADRAO, CHAVE_DO_SISTEMA } from './categoria-campos';
@@ -170,17 +173,56 @@ export interface CategoriaDoPainel {
   sistema: boolean;
 }
 
+/** A chave, no mapa de compras, do que se comprou de insumo PRÉ-PREPARO: vai à linha própria dos pré-preparos, qualquer que seja a categoria dele. */
+export const CHAVE_DOS_PREPARADOS = '@preparos';
+
+/** Os três montantes do real de uma categoria (ou dos pré-preparos) numa loja: o real é inicial + entradas − final. */
+export interface MontantesDoEstoque {
+  inicial: number;
+  /** Entradas de compra que o livro registrou das notas do período (a data da nota decide o período). */
+  entradas: number;
+  final: number;
+}
+
+export const realDoMontante = (m: MontantesDoEstoque) => m.inicial + m.entradas - m.final;
+
+/** O real aberto por categoria de UMA loja: a chave nula é "sem categoria". Σ de tudo (com os pré-preparos) é o CMV real da loja. */
+export interface RealDaLoja {
+  categorias: ReadonlyMap<string | null, MontantesDoEstoque>;
+  preparos: MontantesDoEstoque;
+}
+
 export interface LojaNoPainel {
   lojaId: string;
   nome: string;
   receitaBrutaCentavos: number;
-  /** Compras LANÇADAS do recorte pela categoria de HOJE do insumo; a chave nula é "sem categoria". Loja sem nota: vazio. */
+  /** Compras LANÇADAS do recorte pela categoria de HOJE do insumo; a chave nula é "sem categoria"; os pré-preparos têm a chave `CHAVE_DOS_PREPARADOS`. Loja sem nota: vazio. */
   compras: ReadonlyMap<string | null, number>;
+  /** I.2b: o real aberto por categoria (retrato por insumo nos dois estoques); nulo/ausente = a loja fica pelas compras. */
+  real?: RealDaLoja | null;
+  /** I.2b: o CMV que vale da loja no DRE (real, senão compras); nulo = sem CMV. Só a matriz e a variação por loja leem. */
+  cmvCentavos?: number | null;
+  /** I.2b: o DRE da loja usa o REAL e o painel não conseguiu abri-lo por categoria; o motivo, em uma frase. */
+  motivoSemRealPorCategoria?: string | null;
   /** Categorias que esta loja não usa. */
   naoUsa: ReadonlySet<string>;
   /** A meta efetiva de cada categoria (pontos-base); nulo = nenhum conjunto vale para a loja. */
   metas: ReadonlyMap<string, number> | null;
   metaVemDe: 'rede' | 'loja' | null;
+}
+
+/** O que a loja vale numa categoria: o REAL quando aberto, senão as compras. A chave nula é "sem categoria". */
+export function valorDaCategoria(l: LojaNoPainel, id: string | null): number {
+  if (l.real) {
+    const m = l.real.categorias.get(id);
+    return m ? realDoMontante(m) : 0;
+  }
+  return l.compras.get(id) ?? 0;
+}
+
+/** O que a loja vale nos pré-preparos: o real do estoque dele (inicial + entradas − final), ou o que se comprou de insumo pré-preparo. */
+export function valorDosPreparos(l: LojaNoPainel): number {
+  return l.real ? realDoMontante(l.real.preparos) : (l.compras.get(CHAVE_DOS_PREPARADOS) ?? 0);
 }
 
 export interface EntradaDoPainel {

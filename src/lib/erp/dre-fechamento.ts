@@ -41,6 +41,7 @@ import { aceitaMeta, anoPassadoParaGravar, mesmaDataNoAnoPassado, metaApareceNaL
 import { VERSAO_DAS_FAIXAS } from './farol-campos';
 import { faturamentoDosGraos } from './faturamento';
 import { metasDoPeriodo } from './dre-metas';
+import { conjuntosVigentes, metaTotalDaLoja } from './metas-categorias';
 import { CODIGO, codigoDoSubtotal } from './dre-plano';
 import { garantirPlano } from './plano';
 import { rotuloDoMes } from './faturamento-campos';
@@ -312,6 +313,9 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
 
         // Uma leitura de plano, taxa e metas; a conta é a MESMA do DRE ao vivo.
         const metas = await metasDoPeriodo(tx, leitura.plano, periodo.inicio);
+        // I.2b: a loja que personalizou a meta TOTAL do CMV é fotografada com a dela; a rede, com a da rede.
+        const vigentes = await conjuntosVigentes(tx, leitura.lojas.map((l) => l.id), periodo.inicio);
+        const metaDoCmvDaRede = metas.get(CODIGO.cmv) ?? null;
         const base: Omit<EntradaDoDre, 'escopo'> = { plano: leitura.plano, receitas: leitura.receitas, taxaIfood: leitura.taxaIfood, despesas: leitura.despesas, cmv: leitura.cmv };
         const rede = montarDre({ ...base, escopo: { tipo: 'rede' } });
         const linhas: LinhaGravada[] = linhasParaGravar(rede, null, null, metaDa(metas, false));
@@ -320,7 +324,9 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
           // Loja desativada sem nada no período fica de fora, como no DRE ao vivo.
           const fim = r.linhas.find((l) => l.codigo === CODIGO.resultado)!;
           if (!loja.ativa && r.receitaBrutaCentavos === 0 && (fim.valorCentavos ?? 0) === 0) continue;
-          linhas.push(...linhasParaGravar(r, loja.id, loja.nome, metaDa(metas, true)));
+          const daLoja = metaDa(metas, true);
+          const cmvDaLoja = metaTotalDaLoja(vigentes, loja.id, metaDoCmvDaRede).bp;
+          linhas.push(...linhasParaGravar(r, loja.id, loja.nome, (l) => (l.chave === CODIGO.cmv ? cmvDaLoja : daLoja(l))));
         }
 
         const deAnoPassado = mesmaDataNoAnoPassado(periodo.inicio);
@@ -337,9 +343,9 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
             nomeDoPeriodo: periodo.nome,
             fechadoPorNome: autorNome,
             taxa: leitura.taxaIfood,
-            versaoDaConta: 4,
+            versaoDaConta: 5,
             entrada: {
-              versaoDaConta: 4,
+              versaoDaConta: 5,
               periodo: { inicio: periodo.inicio, fim: periodo.fim, nome: periodo.nome },
               ate: leitura.ate,
               lojas: leitura.lojas.map((l) => ({ id: l.id, nome: l.nome, ativa: l.ativa })),
@@ -352,8 +358,9 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
               // 2.4: o ano passado por loja e canal (o fechado lê a variação SÓ daqui) e a versão das faixas do farol com que foi lido.
               anoPassado,
               farol: { versao: VERSAO_DAS_FAIXAS },
-              // I.2a: o CMV por categoria (compras pela categoria de HOJE, meta efetiva e uso por loja) e a fotografia v4. O fechado lê SÓ daqui.
-              categorias: await categoriasParaFotografia(tx, leitura.lojas, periodo),
+              // I.2a: o CMV por categoria (compras pela categoria de HOJE, meta efetiva e uso por loja) e a fotografia v4; I.2b (v5): o real por categoria
+              // das lojas que têm o retrato por insumo nos dois estoques. O fechado lê SÓ daqui.
+              categorias: await categoriasParaFotografia(tx, leitura.lojas, periodo, leitura.cmv),
             } as unknown as Prisma.InputJsonValue,
             ressalvas: cond.ressalvas,
             justificativa,
