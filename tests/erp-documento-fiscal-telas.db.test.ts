@@ -25,6 +25,7 @@ vi.mock('next/navigation', () => ({
     throw new Error('NOT_FOUND');
   },
   usePathname: () => '/erp/compras/recebidas',
+  useSearchParams: () => new URLSearchParams(),
 }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
@@ -53,6 +54,8 @@ import ParceiroNotasRecebidasPage from '@/app/rodolfo/(painel)/erp/[slug]/compra
 import ParceiroNotaRecebidaPage from '@/app/rodolfo/(painel)/erp/[slug]/compras/recebidas/[id]/page';
 import * as daSessao from '@/app/erp/compras/actions';
 import * as doNivel1 from '@/app/rodolfo/(painel)/erp/[slug]/compras/actions';
+import { NaoEncontradaEmCompras } from '@/components/erp/telas/compras/nao-encontrada';
+import { dadosDoFormularioDeNota } from '@/lib/erp/compras';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 import { CHAVE, montarCenario, xmlDe, type Cenario } from './erp-documento-fiscal-apoio';
 
@@ -150,9 +153,9 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · actions e telas das notas recebidas por
     comoDona();
     const antes = await c.a.documentoFiscal.count();
     expect(await rodar(() => daSessao.acaoImportarXml(null, new FormData()))).toMatchObject({ ok: false, erros: { arquivo: 'Escolha o arquivo XML da nota.' } });
-    expect(await importar(new Uint8Array(1_500_000))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/1\.500 KB e o limite é 1 MB/) } });
-    expect(await importar(new Uint8Array(1_000_001))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/limite é 1 MB/) } });
-    expect(await importar(xmlDe().replace('<nfeProc', '<!DOCTYPE x [<!ENTITY e "x">]><nfeProc'))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/DOCTYPE, ENTITY/) } });
+    expect(await importar(new Uint8Array(1_500_000))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/1\.500 KB e o limite é 900 KB/) } });
+    expect(await importar(new Uint8Array(900_001))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/limite é 900 KB/) } });
+    expect(await importar(xmlDe().replace('<nfeProc', '<!DOCTYPE x [<!ENTITY e "x">]><nfeProc'))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/instruções extras/) } });
     expect(await importar(new Uint8Array([0x50, 0x4b, 3, 4, 0, 0, 0]))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/compactado/) } });
     expect(await c.a.documentoFiscal.count()).toBe(antes);
   });
@@ -175,6 +178,8 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · actions e telas das notas recebidas por
     expect(h).toContain('Aguardando conferência');
     expect(h).toContain('Importar XML');
     expect(h).toContain(sp('R$ 580,00'));
+    expect(h).toContain('arquivo XML');
+    expect(h).toContain('número de 44 dígitos');
     expect(h).not.toContain('nfeProc');
     expect(h).not.toContain('SignatureValue');
     const conciliadas = await html(ErpNotasRecebidasPage, { searchParams: { situacao: 'conciliadas' } });
@@ -196,7 +201,7 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · actions e telas das notas recebidas por
     expect(h).toContain('Importar XML da nota');
     expect(h).toContain('type="file"');
     expect(h).toContain('Ler a nota');
-    expect(h).toContain('não pede senha, certificado nem acesso à SEFAZ');
+    expect(h).toContain('não pede senha, certificado nem acesso ao site do governo que autoriza as notas (a SEFAZ)');
     expect(h).not.toMatch(/type="password"/);
     expect(h).not.toMatch(/<input[^>]+name="(senha|certificado|token|chaveApi)"/i);
     como(alcanceDe('OPERADOR', [c.ids.vp]), 'Caio');
@@ -218,6 +223,11 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · actions e telas das notas recebidas por
     expect(h).toContain('0 de 3');
     expect(h).toContain(sp('confere com a nota'));
     expect(h).toContain('Descartar esta nota fiscal');
+    // Item sem insumo: "Insumo que falta: cadastrar" em cada um dos 3 itens, e o que a nota fiscal é, dito em palavras simples.
+    expect(h.match(/Insumo que falta: cadastrar/g)).toHaveLength(3);
+    expect(h).toContain('arquivo XML da nota');
+    expect(h).toContain('A chave de acesso é o número de 44 dígitos');
+    expect(h).not.toMatch(/protNFe|DOCTYPE|procNFe/);
     expect(h).not.toContain('nfeProc');
     expect(h).not.toContain('<xml');
     como(alcanceDe('GERENTE', [c.ids.centro]), 'Gil Centro');
@@ -238,6 +248,22 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · actions e telas das notas recebidas por
     expect(h).not.toContain('Descartar esta nota fiscal');
     // E a action dela também recusa.
     expect(await rodar(async () => daSessao.acaoConferirDocumento(ids.doc, null, formDaConferencia(await versaoDe(ids.doc), 'conciliar')))).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/lançar nota de compra/) } });
+  });
+
+  it('a página de "não achamos" é em português, volta para a lista e não diz se a nota existe para outra pessoa', () => {
+    const h = sp(renderToStaticMarkup(NaoEncontradaEmCompras() as ReactElement));
+    expect(h).toContain('Não achamos esta nota fiscal.');
+    expect(h).toContain('Voltar para as notas recebidas');
+    expect(h).toContain('href="/erp/compras/recebidas"');
+    expect(h).not.toMatch(/This page could not be found|outra loja|outro parceiro/);
+  });
+
+  it('o formulário da nota manda ao navegador só a raiz do CNPJ dos fornecedores, nunca o documento inteiro', async () => {
+    comoDona();
+    const o = await dadosDoFormularioDeNota(c.a, alcanceDe('DONO', 'rede'));
+    const f = o.fornecedores.find((x) => x.nome === 'Laticínios Exemplo')!;
+    expect(f).toMatchObject({ raizCnpj: '11222333' });
+    expect(JSON.stringify(o.fornecedores)).not.toMatch(/11222333000181|11\.222\.333\/0001-81|"documento"/);
   });
 
   it('salvar, conferir o impacto e conciliar pelas actions: frases certas, prévia sem gravar, UMA nota depois', async () => {

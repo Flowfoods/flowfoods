@@ -164,13 +164,13 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)',
   it('critério 21: DOCTYPE com entidade, 1,5 MB, NFC-e, sem protocolo e cStat 110 são recusados e NADA é gravado', async () => {
     const antes = await contagens();
     const xxe = xmlDe().replace('<nfeProc', '<!DOCTYPE nfeProc [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>\n<nfeProc').replace('<natOp>Venda de mercadoria', '<natOp>&xxe;');
-    expect(await receber(xxe)).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/DOCTYPE, ENTITY/) } });
+    expect(await receber(xxe)).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/instruções extras/) } });
     expect(await receber(`<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY a "aaaa"><!ENTITY b "&a;&a;&a;&a;">]><nfeProc>&b;</nfeProc>`)).toMatchObject({ ok: false });
     const grande = xmlDe().replace('</nfeProc>', `<!-- ${'x'.repeat(1_500_000)} --></nfeProc>`);
-    expect(await receber(grande)).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/limite é 1 MB/) } });
+    expect(await receber(grande)).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/limite é 900 KB/) } });
     expect(await receber(xmlDe([['<mod>55</mod>', '<mod>65</mod>']], '4540'))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/NFC-e/) } });
-    expect(await receber(xmlDe([[/<protNFe[\s\S]*<\/protNFe>/, '']], '4541'))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/protocolo/) } });
-    expect(await receber(xmlDe([['<cStat>100</cStat>', '<cStat>110</cStat>']], '4542'))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/código 110/) } });
+    expect(await receber(xmlDe([[/<protNFe[\s\S]*<\/protNFe>/, '']], '4541'))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/autorização da Receita/) } });
+    expect(await receber(xmlDe([['<cStat>100</cStat>', '<cStat>110</cStat>']], '4542'))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/não está com o uso autorizado/) } });
     expect(await contagens()).toEqual(antes);
     expect(await a.fornecedor.count()).toBe(1);
   });
@@ -315,6 +315,27 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)',
     expect(await a.notaEntradaItem.count({ where: { nota: { chaveAcesso: CHAVE, status: 'LANCADA' } } })).toBe(3);
   });
 
+  it('cancelar a nota e descartar o documento ao mesmo tempo não se travam: uma ordem só de travas, e nenhuma das duas dá erro 500', async () => {
+    for (const nNF of ['4701', '4702', '4703', '4704', '4705', '4706']) {
+      const id = idDe(await receber(xmlDe([], nNF)));
+      const d = await detalhe(id);
+      const c = await conciliarDocumento(a, DONA(), id, conferencia(d), 'Marina Dona');
+      expect(c).toMatchObject({ ok: true });
+      const notaId = (c as { notaId: string }).notaId;
+      const v = (await detalhe(id)).versao;
+      // As duas ao mesmo tempo, em cada ordem de chegada: antes da ordem única (documento → nota) uma delas morria em deadlock.
+      const corrida = await Promise.allSettled([cancelarNota(a, DONA(), notaId, 'corrida: cancelar a nota', 'Marina'), cancelarDocumento(a, DONA(), id, v, 'corrida: descartar o documento', 'Marina')]);
+      expect(corrida.map((x) => x.status), nNF).toEqual(['fulfilled', 'fulfilled']);
+      const [rNota, rDoc] = corrida.map((x) => (x as PromiseFulfilledResult<{ ok: boolean }>).value);
+      expect(rNota.ok || rDoc.ok, nNF).toBe(true);
+      expect(await a.notaEntrada.count({ where: { id: notaId, status: 'CANCELADA' } })).toBe(1);
+      // Estornou UMA vez só (3 entradas e 3 estornos), qualquer que tenha sido a vencedora.
+      expect(await a.movimentoEstoque.count({ where: { notaId } })).toBe(6);
+      const depois = await detalhe(id);
+      expect(['AGUARDANDO_CONFERENCIA', 'CANCELADO']).toContain(depois.situacao);
+    }
+  });
+
   it('critério 22: a nota lançada à mão antes e o XML depois: "ligar" não cria nota nem estoque; conciliar sem ligar é recusado', async () => {
     // Fornecedor SEM CNPJ (como os antigos), nota digitada 4570 série 1, e só depois chega o XML da 4570.
     const f = await cadastrarFornecedor(a, { nome: 'Frios do Zé', ...SEM_NOTA_FISCAL }, 'Marina');
@@ -331,7 +352,12 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)',
     const recusado = await conciliarDocumento(a, DONA(), id, { versao: d.versao, data: dataBr(hoje), itens: escolhasDoRoteiro() }, 'Marina');
     expect(recusado).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/já existe a Nota 4570/i) } });
     expect(await a.notaEntrada.count()).toBe(notasAntes);
-    const ligou = await ligarDocumento(a, DONA(), id, manual.id, d.versao, {}, 'Marina Dona');
+    // Total diferente (R$ 60,00 × R$ 580,00): sem a confirmação explícita, não liga e não grava nada.
+    const semConfirmar = await ligarDocumento(a, DONA(), id, manual.id, d.versao, {}, 'Marina Dona');
+    expect(semConfirmar).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/R\$\s520,00 de diferença.*Confirme que é a mesma nota/) } });
+    expect((await obterNota(a, DONA(), manual.id))!.chaveAcesso).toBeNull();
+    expect(await detalhe(id)).toMatchObject({ situacao: 'AGUARDANDO_CONFERENCIA' });
+    const ligou = await ligarDocumento(a, DONA(), id, manual.id, d.versao, { confirmouDiferenca: true }, 'Marina Dona');
     expect(ligou).toMatchObject({ ok: true, notaId: manual.id });
     expect(await a.notaEntrada.count()).toBe(notasAntes);
     expect(await a.movimentoEstoque.count()).toBe(movsAntes);
@@ -429,7 +455,7 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)',
     await tentar(`UPDATE "NotaEntrada" SET "chaveAcesso" = '${original}' WHERE "id" = '${ativas[1].id}'`);
   });
 
-  it('o fornecedor desativado, o "sem nota fiscal" e dois cadastros com o mesmo CNPJ nunca são escolhidos sozinhos', async () => {
+  it('o fornecedor desativado e o "sem nota fiscal" nunca são escolhidos sozinhos', async () => {
     // Desativado: recusa com a frase de reativar; nada é gravado.
     const f = (await a.fornecedor.findFirst({ where: { documento: '11222333000181' } }))!;
     expect(await mudarSituacaoFornecedor(a, f.id, false, 'teste', 'Marina')).toMatchObject({ ok: true });
@@ -437,26 +463,7 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)',
     expect(await receber(xmlDe([], '4620'))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/está desativado.*Reative/) } });
     expect(await contagens()).toEqual(antes);
     expect(await mudarSituacaoFornecedor(a, f.id, true, '', 'Marina')).toMatchObject({ ok: true });
-    // Dois ativos com o mesmo CNPJ (só acontece onde o índice único não pôde ser criado): derruba o índice só durante este trecho e
-    // o recria no finally. Por mexer num índice do banco todo, os testes com banco rodam em sequência (--no-file-parallelism).
-    const indice = await db.$queryRawUnsafe<{ n: number }[]>(`SELECT count(*)::int AS n FROM pg_indexes WHERE indexname = 'Fornecedor_parceiroId_documento_key'`);
-    if (indice[0].n === 1) {
-      await db.$executeRawUnsafe(`DROP INDEX "Fornecedor_parceiroId_documento_key"`);
-      try {
-        await cru(db, perfil, A.id, `INSERT INTO "Fornecedor"(id,"parceiroId",nome,documento,"atualizadoEm") VALUES ('fdup${sufixo}','${A.id}','Laticínios Exemplo - Penha','11222333000181',now())`);
-        const id = idDe(await receber(xmlDe([], '4630')));
-        const d = await detalhe(id);
-        expect(d.fornecedor).toBeNull();
-        expect(d.fornecedoresCandidatos.map((x) => x.nome).sort()).toEqual(['Laticínios Exemplo', 'Laticínios Exemplo - Penha']);
-        // Sem escolher, não concilia; escolhendo um dos dois, concilia.
-        expect(await conciliarDocumento(a, DONA(), id, conferencia(d), 'Marina')).toMatchObject({ ok: false, erros: { fornecedorId: expect.stringMatching(/Escolha o fornecedor/) } });
-        const escolhido = await conciliarDocumento(a, DONA(), id, conferencia(d, { fornecedorId: 'fdup' + sufixo }), 'Marina');
-        expect(escolhido).toMatchObject({ ok: true });
-      } finally {
-        await cru(db, perfil, A.id, `UPDATE "Fornecedor" SET documento = NULL WHERE id = 'fdup${sufixo}'`);
-        await db.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Fornecedor_parceiroId_documento_key" ON "Fornecedor"("parceiroId", "documento") WHERE "documento" IS NOT NULL`);
-      }
-    }
+    // Dois cadastros ativos com o mesmo CNPJ (só onde o índice da F.1a não nasceu): num banco à parte, em `erp-documento-fiscal-cnpj-repetido.db.test.ts`.
     // "Compras sem nota fiscal" com o mesmo CNPJ: recusa explicando que ele nunca recebe nota fiscal.
     await cru(db, perfil, A.id, `UPDATE "Fornecedor" SET "ativo" = false WHERE id = '${f.id}'`);
     await cru(db, perfil, A.id, `UPDATE "Fornecedor" SET "documento" = '11222333000262', "semNotaFiscal" = true, "ativo" = true WHERE id = '${ids.fornManual}'`);

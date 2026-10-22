@@ -102,39 +102,39 @@ describe('F.1b · o XML sintético do roteiro', () => {
 describe('F.1b · ataques ao leitor (recusados antes de gravar qualquer coisa)', () => {
   it('XXE: DOCTYPE com ENTITY externa', () => {
     const xxe = FIXTURE.replace('<nfeProc', '<!DOCTYPE nfeProc [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>\n<nfeProc').replace('Venda de mercadoria', '&xxe;');
-    expect(erro(xxe)).toMatch(/DOCTYPE, ENTITY/);
+    expect(erro(xxe)).toMatch(/instruções extras/);
   });
 
   it('"billion laughs": entidades que se multiplicam são recusadas antes de qualquer expansão', () => {
     const lolz = `<?xml version="1.0"?><!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;&lol;"><!ENTITY lol3 "&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;&lol2;">]><nfeProc>&lol3;</nfeProc>`;
     const t0 = Date.now();
-    expect(erro(lolz)).toMatch(/DOCTYPE, ENTITY/);
+    expect(erro(lolz)).toMatch(/instruções extras/);
     expect(Date.now() - t0).toBeLessThan(500);
   });
 
   it('entidade solta no meio do texto (sem DOCTYPE) também é recusada', () => {
-    expect(erro(com('Venda de mercadoria', 'Venda &xxe; de mercadoria'))).toMatch(/DOCTYPE, ENTITY/);
-    expect(erro(com('Venda de mercadoria', 'Venda & mercadoria'))).toMatch(/DOCTYPE, ENTITY/);
+    expect(erro(com('Venda de mercadoria', 'Venda &xxe; de mercadoria'))).toMatch(/instruções extras/);
+    expect(erro(com('Venda de mercadoria', 'Venda & mercadoria'))).toMatch(/instruções extras/);
   });
 
   it('instrução de processamento (xml-stylesheet) e tags com nome de protótipo são recusadas', () => {
-    expect(erro(FIXTURE.replace('<nfeProc', '<?xml-stylesheet href="x.xsl"?><nfeProc'))).toMatch(/DOCTYPE, ENTITY/);
-    expect(erro(com('<natOp>Venda de mercadoria</natOp>', '<__proto__>x</__proto__>'))).toMatch(/DOCTYPE, ENTITY/);
+    expect(erro(FIXTURE.replace('<nfeProc', '<?xml-stylesheet href="x.xsl"?><nfeProc'))).toMatch(/instruções extras/);
+    expect(erro(com('<natOp>Venda de mercadoria</natOp>', '<__proto__>x</__proto__>'))).toMatch(/instruções extras/);
   });
 
-  it('arquivo de 1,5 MB, vazio, zip, PDF e binário', () => {
-    expect(erro(`${FIXTURE}<!-- ${'x'.repeat(1_500_000)} -->`)).toMatch(/limite é 1 MB/);
+  it('arquivo de 1,5 MB (acima dos 900 KB), vazio, zip, PDF e binário', () => {
+    expect(erro(`${FIXTURE}<!-- ${'x'.repeat(1_500_000)} -->`)).toMatch(/limite é 900 KB/);
     expect(erro(new Uint8Array())).toMatch(/vazio/);
     expect(erro(new Uint8Array([0x50, 0x4b, 0x03, 0x04, 0, 0, 0]))).toMatch(/compactado/);
     expect(erro(enc('%PDF-1.4 fake'))).toMatch(/PDF/);
     expect(erro(new Uint8Array([0x3c, 0x61, 0x3e, 0x00, 0x01]))).toMatch(/não é um XML de texto/);
   });
 
-  it('o limite de 1 MB é exato: 1.000.000 bytes passam do tamanho (e falham por ser lixo), 1.000.001 não', () => {
+  it('o limite de 900 KB é exato: 900.000 bytes passam do tamanho (e falham por ser lixo), 900.001 não', () => {
     const justo = enc(`<a>${'x'.repeat(LIMITES_DO_XML.bytes - 7)}</a>`);
     expect(justo.length).toBe(LIMITES_DO_XML.bytes);
-    expect(erro(justo)).not.toMatch(/limite é 1 MB/);
-    expect(erro(enc(`<a>${'x'.repeat(LIMITES_DO_XML.bytes - 6)}</a>`))).toMatch(/limite é 1 MB/);
+    expect(erro(justo)).not.toMatch(/limite é 900 KB/);
+    expect(erro(enc(`<a>${'x'.repeat(LIMITES_DO_XML.bytes - 6)}</a>`))).toMatch(/limite é 900 KB/);
   });
 
   it('itens demais: 201 itens (e 5.000) são recusados; 200 passam', () => {
@@ -160,7 +160,7 @@ describe('F.1b · ataques ao leitor (recusados antes de gravar qualquer coisa)',
   it('XML torto, texto qualquer e nota fora do esquema da NF-e', () => {
     expect(erro('<a><b></a>')).toMatch(/bem formado/);
     expect(erro('isso não é xml')).toMatch(/não parece um XML/);
-    expect(erro(FIXTURE.replace(/xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe"/g, 'xmlns="http://outro.exemplo/nfe"'))).toMatch(/esquema da NF-e/);
+    expect(erro(FIXTURE.replace(/xmlns="http:\/\/www\.portalfiscal\.inf\.br\/nfe"/g, 'xmlns="http://outro.exemplo/nfe"'))).toMatch(/padrão brasileiro/);
   });
 });
 
@@ -171,16 +171,16 @@ describe('F.1b · só entra nota fiscal autorizada, de venda, de verdade', () =>
   });
 
   it('NFe sem protocolo, resumo e evento têm a frase de cada um', () => {
-    expect(erro(FIXTURE.replace(/<nfeProc[^>]*>/, '').replace(/<protNFe[\s\S]*<\/protNFe>/, '').replace('</nfeProc>', ''))).toMatch(/SEM o protocolo/);
-    expect(erro(FIXTURE.replace(/<protNFe[\s\S]*<\/protNFe>/, ''))).toMatch(/protocolo de autorização/);
-    expect(erro('<resNFe xmlns="http://www.portalfiscal.inf.br/nfe"><chNFe>1</chNFe></resNFe>')).toMatch(/RESUMO/);
+    expect(erro(FIXTURE.replace(/<nfeProc[^>]*>/, '').replace(/<protNFe[\s\S]*<\/protNFe>/, '').replace('</nfeProc>', ''))).toMatch(/ainda não foi autorizada/);
+    expect(erro(FIXTURE.replace(/<protNFe[\s\S]*<\/protNFe>/, ''))).toMatch(/não traz a autorização da Receita/);
+    expect(erro('<resNFe xmlns="http://www.portalfiscal.inf.br/nfe"><chNFe>1</chNFe></resNFe>')).toMatch(/só o resumo/);
     expect(erro('<procEventoNFe xmlns="http://www.portalfiscal.inf.br/nfe"><evento/></procEventoNFe>')).toMatch(/evento/);
-    expect(erro('<outraCoisa/>')).toMatch(/não é uma NF-e autorizada/);
+    expect(erro('<outraCoisa/>')).toMatch(/não é de uma nota fiscal eletrônica \(NF-e\) autorizada/);
   });
 
   it('cStat que não é 100 nem 150 (denegada 110, cancelada 101)', () => {
-    expect(erro(com('<cStat>100</cStat>', '<cStat>110</cStat>'))).toMatch(/código 110/);
-    expect(erro(com('<cStat>100</cStat>', '<cStat>101</cStat>'))).toMatch(/código 101/);
+    expect(erro(com('<cStat>100</cStat>', '<cStat>110</cStat>'))).toMatch(/não está com o uso autorizado/);
+    expect(erro(com('<cStat>100</cStat>', '<cStat>101</cStat>'))).toMatch(/não está com o uso autorizado/);
     expect(ler(com('<cStat>100</cStat>', '<cStat>150</cStat>')).ok).toBe(true);
   });
 

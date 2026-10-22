@@ -50,14 +50,14 @@ export function FormImportarXml({ acao, base, bloqueio }: { acao: AcaoDeDocument
             onChange={(e) => {
               const f = e.target.files?.[0] ?? null;
               setNome(f?.name ?? null);
-              setGrande(f && f.size > LIMITES_DO_XML.bytes ? `O arquivo tem ${kb(f.size)} KB e o limite é 1 MB. Uma NF-e costuma ter poucas dezenas de KB: confira se é o XML da nota (e não um arquivo compactado ou outra coisa).` : null);
+              setGrande(f && f.size > LIMITES_DO_XML.bytes ? `O arquivo tem ${kb(f.size)} KB e o limite é 900 KB. Uma NF-e costuma ter poucas dezenas de KB: confira se é o XML da nota (e não um arquivo compactado ou outra coisa).` : null);
             }}
             aria-invalid={!!erro}
             aria-describedby={`importar-arquivo-ajuda${erro ? ' importar-arquivo-erro' : ''}`}
             className="block min-h-11 w-full rounded-[7px] border border-linha-forte bg-campo px-3 py-2 text-sm text-texto file:mr-3 file:min-h-9 file:rounded-[7px] file:border-0 file:bg-forte file:px-3 file:text-sm file:font-semibold file:text-texto"
           />
           <p id="importar-arquivo-ajuda" className={AJUDA}>
-            É o arquivo .xml que o fornecedor manda com a nota (não o PDF). Até 1 MB. {nome ? `Escolhido: ${nome}.` : ''}
+            É o arquivo .xml que o fornecedor manda com a nota (não o PDF). Até 900 KB. {nome ? `Escolhido: ${nome}.` : ''}
           </p>
           <div id="importar-arquivo-erro" role={erro ? 'alert' : undefined}>
             <Erro id="importar-arquivo-erro-texto" texto={erro} />

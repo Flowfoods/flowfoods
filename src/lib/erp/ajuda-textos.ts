@@ -581,11 +581,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/recebidas'],
     titulo: 'Notas recebidas',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'As notas fiscais que chegaram por XML e esperam a sua conferência.' },
+      { texto: 'As notas fiscais que chegaram por XML (o arquivo da nota que o fornecedor manda) e esperam a sua conferência.' },
       { texto: 'Receber a nota não lança nada: o custo e o estoque só mudam depois que você confere os itens e concilia.' },
-      { texto: 'A mesma nota fiscal não entra duas vezes.' },
+      { texto: 'A mesma nota fiscal não entra duas vezes: a chave de acesso, o número de 44 dígitos dela, é a prova.' },
     ],
   },
   {
@@ -593,10 +593,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/recebidas/importar'],
     titulo: 'Importar XML',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Envie o arquivo .xml que o fornecedor mandou com a nota, não o PDF.' },
-      { texto: 'O sistema só lê o arquivo: não pede senha, certificado nem acesso à SEFAZ.' },
+      { texto: 'O sistema só lê o arquivo: não pede senha, certificado nem acesso ao site do governo que autoriza as notas.' },
       { texto: 'Nota de outra empresa, cupom fiscal, nota sem autorização e arquivo grande demais são recusados, com o motivo.' },
     ],
   },

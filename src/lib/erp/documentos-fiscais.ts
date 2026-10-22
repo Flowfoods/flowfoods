@@ -16,7 +16,7 @@
 
 import { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
-import { ehErroDeUnicidade } from './tenant';
+import { ehDeadlock, ehErroDeUnicidade } from './tenant';
 import { filtroDeLojas, pode, recusa, type Alcance } from './permissoes';
 import { lojasComCompras } from './compras-custo';
 import {
@@ -39,7 +39,7 @@ import { listarHistorico } from './historico';
 import { chaveDoNome } from './categoria-campos';
 import { lerNfeXml, type NotaDoXml } from './nfe-xml';
 import { travarParaEscrever } from './periodo-trava';
-import { formatarQuantidade, type Unidade } from './unidades';
+import { formatarDinheiro, formatarQuantidade, type Unidade } from './unidades';
 import {
   chaveDaMemoria,
   colunasDaEmbalagem,
@@ -609,8 +609,8 @@ async function notasParaLigar(tx: ClienteDoParceiro, alcance: Alcance, doc: Docu
       diferencaCentavos: doc.vNfCentavos - n.totalCentavos,
       loja: n.loja.nome,
       fornecedor: n.fornecedorNomeSnapshot ?? '—',
-      /** Do fornecedor do documento: é a mesma nota, sem dúvida; senão, o fornecedor da nota lançada não tem CNPJ e pode ser o mesmo. */
-      mesmoFornecedor: !!doc.fornecedorId && n.fornecedorId === doc.fornecedorId,
+      /** Do fornecedor com o CNPJ do emitente (mesmo havendo dois cadastros com ele): é a mesma nota, sem dúvida; senão, o fornecedor da nota lançada não tem CNPJ e pode ser o mesmo. */
+      mesmoFornecedor: !!n.fornecedor?.documento && n.fornecedor.documento === doc.emitenteDocumento,
       fornecedorSemCnpj: !n.fornecedor?.documento,
     }))
     .filter((n) => n.mesmoFornecedor || n.fornecedorSemCnpj);
@@ -777,6 +777,8 @@ export interface EntradaDaConferencia {
   itens: EscolhaDoItem[];
   /** "Esta nota não é aquela já lançada": concilia mesmo com uma nota parecida lançada à mão. */
   outraNota?: boolean;
+  /** Ligar a uma nota lançada com total DIFERENTE do da nota fiscal: a pessoa viu a diferença e confirmou que é a mesma nota. */
+  confirmouDiferenca?: boolean;
 }
 
 const texto = (v: unknown) => (typeof v === 'string' ? v : '');
@@ -1101,6 +1103,7 @@ export async function salvarConferencia(cliente: ClienteDoParceiro, alcance: Alc
     });
   } catch (e) {
     if (e instanceof RecusaDoc) return e.resultado;
+    if (ehDeadlock(e)) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_DOCUMENTO }, conflito: true };
     throw e;
   }
 }
@@ -1170,6 +1173,7 @@ export async function previaDoDocumento(
     return { ok: true, previa: p.previa, contas: montado.contas };
   } catch (e) {
     if (e instanceof RecusaDoc) return e.resultado;
+    if (ehDeadlock(e)) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_DOCUMENTO }, conflito: true };
     throw e;
   }
 }
@@ -1234,6 +1238,7 @@ export async function conciliarDocumento(cliente: ClienteDoParceiro, alcance: Al
     });
   } catch (e) {
     if (e instanceof RecusaDoc) return e.resultado;
+    if (ehDeadlock(e)) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_DOCUMENTO }, conflito: true };
     if (e instanceof Recusa) return recusaDoLancamento(e, itensDaLinha).resultado;
     if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
     if (ehErroDeUnicidade(e)) return { ok: false, erros: { geral: MENSAGEM_CORRIDA }, conflito: true };
@@ -1246,7 +1251,7 @@ export async function conciliarDocumento(cliente: ClienteDoParceiro, alcance: Al
  * documento como conciliado com ela. NENHUM efeito novo: não cria nota, não mexe no estoque nem no custo. Mostra a diferença de total
  * na tela, mas a decisão é da pessoa. A nota ligada deixa de ser editável (ela é o que o documento diz).
  */
-export async function ligarDocumento(cliente: ClienteDoParceiro, alcance: Alcance, id: string, notaId: unknown, versao: unknown, entrada: Pick<EntradaDaConferencia, 'lojaId' | 'fornecedorId'> = {}, autorNome = 'Sistema'): Promise<ResultadoDoc> {
+export async function ligarDocumento(cliente: ClienteDoParceiro, alcance: Alcance, id: string, notaId: unknown, versao: unknown, entrada: Pick<EntradaDaConferencia, 'lojaId' | 'fornecedorId' | 'confirmouDiferenca'> = {}, autorNome = 'Sistema'): Promise<ResultadoDoc> {
   try {
     return await cliente.transacao(async (tx) => {
       await travarParaEscrever(tx);
@@ -1265,8 +1270,15 @@ export async function ligarDocumento(cliente: ClienteDoParceiro, alcance: Alcanc
       const negado = recusa(alcance, 'compras.lancar', { lojaId: nota.lojaId });
       if (negado) throw new RecusaDoc({ ok: false, erros: { geral: negado } });
       if (nota.chaveAcesso) throw new RecusaDoc({ ok: false, erros: { geral: 'Essa nota já está ligada a uma nota fiscal.' } });
-      const mesmoFornecedor = !!doc.fornecedorId && nota.fornecedorId === doc.fornecedorId;
-      if (!mesmoFornecedor && nota.fornecedor?.documento) {
+      // Total diferente: ligar não muda o valor da nota lançada, então a pessoa precisa ter visto a diferença e confirmado.
+      if (nota.totalCentavos !== doc.vNfCentavos && !entrada.confirmouDiferenca) {
+        const dif = Math.abs(doc.vNfCentavos - nota.totalCentavos);
+        throw new RecusaDoc({
+          ok: false,
+          erros: { geral: `A nota lançada tem ${formatarDinheiro(nota.totalCentavos)} e a nota fiscal diz ${formatarDinheiro(doc.vNfCentavos)}: ${formatarDinheiro(dif)} de diferença. Confirme que é a mesma nota para ligar; o valor da nota lançada não muda.` },
+        });
+      }
+      if (nota.fornecedor?.documento && nota.fornecedor.documento !== doc.emitenteDocumento) {
         throw new RecusaDoc({ ok: false, erros: { geral: 'O fornecedor dessa nota tem outro CNPJ: não é o emitente deste documento.' } });
       }
       // O fornecedor do documento: o que já tem; ou, havendo dúvida (dois cadastros com o mesmo CNPJ), o da nota lançada se for um deles.
@@ -1314,6 +1326,7 @@ export async function ligarDocumento(cliente: ClienteDoParceiro, alcance: Alcanc
     });
   } catch (e) {
     if (e instanceof RecusaDoc) return e.resultado;
+    if (ehDeadlock(e)) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_DOCUMENTO }, conflito: true };
     if (e instanceof Recusa) return e.resultado as Recusado;
     if (ehErroDeUnicidade(e)) return { ok: false, erros: { geral: MENSAGEM_CORRIDA }, conflito: true };
     throw e;
@@ -1371,6 +1384,7 @@ export async function cancelarDocumento(cliente: ClienteDoParceiro, alcance: Alc
     });
   } catch (e) {
     if (e instanceof RecusaDoc) return e.resultado;
+    if (ehDeadlock(e)) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_DOCUMENTO }, conflito: true };
     if (e instanceof Recusa) return e.resultado as Recusado;
     if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
     throw e;

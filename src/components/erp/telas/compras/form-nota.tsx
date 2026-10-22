@@ -29,7 +29,6 @@ import {
   mascararData,
   PREFIXO_DA_EMBALAGEM,
   quantidadeDoItem,
-  raizDoCnpj,
   ratearFrete,
 } from '@/lib/erp/compra-campos';
 import { formatarCusto, formatarDinheiro, formatarQuantidade, lerDinheiro, lerQuantidade, UNIDADES } from '@/lib/erp/unidades';
@@ -99,8 +98,8 @@ export function FormNota(props: PropsDoFormNota) {
   const fornecedorNovo = !descartou && r.fornecedorCriado ? props.opcoes.fornecedores.find((f) => f.id === r.fornecedorCriado) : undefined;
   let valores = recuperado ?? props.inicial;
   if (fornecedorNovo) valores = { ...valores, fornecedorId: fornecedorNovo.id };
-  const raizDoNovo = raizDoCnpj(fornecedorNovo?.documento ?? null);
-  const outrosDaMesmaEmpresa = fornecedorNovo && raizDoNovo ? props.opcoes.fornecedores.filter((f) => f.id !== fornecedorNovo.id && raizDoCnpj(f.documento) === raizDoNovo) : [];
+  const raizDoNovo = fornecedorNovo?.raizCnpj ?? null;
+  const outrosDaMesmaEmpresa = fornecedorNovo && raizDoNovo ? props.opcoes.fornecedores.filter((f) => f.id !== fornecedorNovo.id && f.raizCnpj === raizDoNovo) : [];
   let escolhido = false;
   if (criado) {
     const vaga = valores.itens.findIndex((l) => !l.insumoId);

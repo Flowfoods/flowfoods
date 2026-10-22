@@ -448,6 +448,16 @@ export function ehErroDeUnicidade(e: unknown): boolean {
 }
 
 /**
+ * Duas transações se esperando uma à outra (Postgres 40P01; o Prisma o traz como P2034 ou, em SQL cru, como P2010 com o código
+ * do Postgres). Quem grava devolve a frase de conflito em vez de deixar virar 500: nada foi gravado e a pessoa tenta de novo.
+ */
+export function ehDeadlock(e: unknown): boolean {
+  if (!(e instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (e.code === 'P2034') return true;
+  return /40P01|deadlock detected/i.test(`${e.message} ${JSON.stringify(e.meta ?? {})}`);
+}
+
+/**
  * CHECK do banco recusou a gravação (Postgres 23514): o nome do CHECK, ou null
  * se o erro é outro. O Prisma não traduz esse código (vem como erro
  * desconhecido, com o texto do Postgres); quem grava devolve uma frase em vez

@@ -9,7 +9,7 @@
  */
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import type { FormularioDeNota } from '@/lib/erp/compras';
 import { A_GRANEL, EMBALAGEM_PADRAO, embalagemDoItem, formatarData, formatarEmbalagens, PREFIXO_DA_EMBALAGEM } from '@/lib/erp/compra-campos';
@@ -20,7 +20,9 @@ import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { CampoData } from '../../ui/campo-data';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel, Selo } from '../../ui/superficies';
+import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
 import { ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
+import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
 import type { AcaoDeDocumento, EstadoDocumento } from './documentos-estado';
 import { PreviaDoImpacto } from './previa';
 
@@ -48,6 +50,42 @@ function BotaoLigar({ id, children }: { id: string; children: string }) {
   );
 }
 
+/**
+ * "Ligar a esta nota". Com o mesmo total, é um clique. Com total DIFERENTE, pede confirmação explícita, com a diferença à vista: ligar
+ * guarda só a chave da nota fiscal na nota lançada e não muda o valor dela, então quem liga tem de ter visto que os números não batem.
+ */
+function LigarComConfirmacao({ id, diferencaCentavos, lancadaCentavos, notaFiscalCentavos }: { id: string; diferencaCentavos: number; lancadaCentavos: number; notaFiscalCentavos: number }) {
+  const [pedindo, setPedindo] = useState(false);
+  const caixa = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (pedindo) caixa.current?.focus();
+  }, [pedindo]);
+  if (diferencaCentavos === 0) return <BotaoLigar id={id}>Ligar a esta nota</BotaoLigar>;
+  if (!pedindo) {
+    return (
+      <button type="button" aria-expanded={false} onClick={() => setPedindo(true)} className={classeDeBotao('secundario')}>
+        Ligar a esta nota
+      </button>
+    );
+  }
+  return (
+    <div ref={caixa} tabIndex={-1} role="group" aria-label="Confirmar a ligação" className="basis-full rounded-[10px] border border-atencao/50 px-4 py-3 text-sm outline-none">
+      <p className="font-semibold text-atencao">Os valores são diferentes.</p>
+      <p className="mt-1 tabular-nums text-texto">
+        A nota lançada tem {formatarDinheiro(lancadaCentavos)} e a nota fiscal diz {formatarDinheiro(notaFiscalCentavos)}: <span className="font-semibold">{formatarDinheiro(Math.abs(diferencaCentavos))} de diferença.</span>
+      </p>
+      <p className="mt-1 text-suave">Ligar guarda a chave da nota fiscal nesta nota e NÃO muda o valor dela, nem o custo, nem o estoque. Só ligue se você tem certeza de que é a mesma nota.</p>
+      <input type="hidden" name="confirmar_diferenca" value="1" />
+      <div className="mt-3 flex flex-wrap gap-2">
+        <BotaoLigar id={id}>Sim, é a mesma nota: ligar</BotaoLigar>
+        <button type="button" onClick={() => setPedindo(false)} className={classeDeBotao('fantasma')}>
+          Não ligar
+        </button>
+      </div>
+    </div>
+  );
+}
+
 interface Escolha {
   insumoId: string;
   embalagem: string;
@@ -56,16 +94,7 @@ interface Escolha {
 
 type Insumo = FormularioDeNota['insumos'][number];
 
-export function FormConferencia({
-  acao,
-  base,
-  doc,
-  opcoesDeInsumos,
-  hoje,
-  dataInicial,
-  bloqueio,
-  podeEditarVinculos,
-}: {
+type PropsDaConferencia = {
   acao: AcaoDeDocumento;
   /** A lista de notas recebidas de quem usa a tela (volta e "Recarregar"). */
   base: string;
@@ -77,13 +106,103 @@ export function FormConferencia({
   bloqueio: string | null;
   /** Quem tem `fornecedores.editar` muda o que o sistema lembra do item; as outras pessoas, não. */
   podeEditarVinculos: boolean;
-}) {
+  /** O cadastro de insumo de quem usa a tela (só para quem pode cadastrar insumos): "Insumo que falta: cadastrar", por item, com volta para esta conferência. */
+  novoInsumo?: string;
+};
+
+/** O que a pessoa tinha escolhido antes de sair para cadastrar o insumo que faltava (só no navegador desta aba; ver `rascunho.tsx`). */
+interface RascunhoDaConferencia {
+  escolhas: Record<number, Escolha>;
+  lojaId: string;
+  fornecedorId: string;
+  data: string;
+  /** O item que pediu o cadastro: é nele que o insumo novo entra na volta. */
+  item: number;
+}
+
+const escolhasDoDocumento = (itens: PropsDaConferencia['doc']['itens']): Record<number, Escolha> =>
+  Object.fromEntries(itens.map((i) => [i.nItem, { insumoId: i.insumoId ?? '', embalagem: i.insumoId ? i.embalagem : EMBALAGEM_PADRAO, fator: i.fator || '1' }]));
+
+/** Voltou de "Insumo que falta: cadastrar"? O que estava escolhido volta junto e o insumo novo já entra no item que o pediu. */
+export function FormConferencia(props: PropsDaConferencia) {
+  const r = useRascunhoDaTela<RascunhoDaConferencia>(props.doc.versao);
+  const [descartou, setDescartou] = useState(false);
+  const recuperado = !descartou && r.valores ? r.valores : null;
+  const criado = !descartou && r.insumoCriado ? props.opcoesDeInsumos.find((i) => i.id === r.insumoCriado) : undefined;
+  let escolhas = escolhasDoDocumento(props.doc.itens);
+  if (recuperado) {
+    // Só vale o que ainda é da nota: item que sumiu ou sem forma de escolha volta ao que a tela leu.
+    for (const it of props.doc.itens) {
+      const e = recuperado.escolhas?.[it.nItem];
+      if (e && typeof e.insumoId === 'string' && typeof e.embalagem === 'string' && typeof e.fator === 'string') escolhas[it.nItem] = e;
+    }
+  }
+  let escolhido = false;
+  if (criado) {
+    const pedido = props.doc.itens.find((i) => i.nItem === recuperado?.item && !escolhas[i.nItem]?.insumoId);
+    const vago = pedido ?? props.doc.itens.find((i) => !escolhas[i.nItem]?.insumoId);
+    if (vago) {
+      escolhas = { ...escolhas, [vago.nItem]: { ...escolhas[vago.nItem], insumoId: criado.id, embalagem: EMBALAGEM_PADRAO } };
+      escolhido = true;
+    }
+  }
+  return (
+    <FormConferenciaBase
+      // O rascunho só é lido depois do primeiro desenho: quando chega (ou se descarta), o formulário nasce de novo com os valores certos.
+      key={r.valores === undefined ? 'carregando' : descartou ? 'descartado' : 'pronto'}
+      {...props}
+      escolhasIniciais={escolhas}
+      lojaInicial={recuperado?.lojaId ?? ''}
+      fornecedorInicial={recuperado?.fornecedorId ?? ''}
+      dataInformada={recuperado?.data || props.dataInicial}
+      chaveDoRascunho={r.chave}
+      avisos={
+        <>
+          {criado && <AvisoInsumoCriado nome={criado.nome} escolhido={escolhido} />}
+          <AvisoDeRascunhoVelho quando={r.versaoMudou} oQue="A nota fiscal" />
+          <AvisoDeRascunho
+            quando={!!recuperado}
+            aoDescartar={() => {
+              r.descartar();
+              setDescartou(true);
+            }}
+          />
+        </>
+      }
+    />
+  );
+}
+
+function FormConferenciaBase({
+  acao,
+  base,
+  doc,
+  opcoesDeInsumos,
+  hoje,
+  bloqueio,
+  podeEditarVinculos,
+  novoInsumo,
+  escolhasIniciais,
+  lojaInicial,
+  fornecedorInicial,
+  dataInformada,
+  chaveDoRascunho,
+  avisos,
+}: PropsDaConferencia & { escolhasIniciais: Record<number, Escolha>; lojaInicial: string; fornecedorInicial: string; dataInformada: string; chaveDoRascunho: string; avisos: ReactNode }) {
+  const formRef = useRef<HTMLFormElement>(null);
   const [estado, enviar] = useFormState<EstadoDocumento, FormData>(acao, null);
   const saida = useAvisoDeSaida();
   const porId = useMemo(() => new Map(opcoesDeInsumos.map((i) => [i.id, i])), [opcoesDeInsumos]);
-  const [escolhas, setEscolhas] = useState<Record<number, Escolha>>(() =>
-    Object.fromEntries(doc.itens.map((i) => [i.nItem, { insumoId: i.insumoId ?? '', embalagem: i.insumoId ? i.embalagem : EMBALAGEM_PADRAO, fator: i.fator || '1' }])),
-  );
+  const [escolhas, setEscolhas] = useState<Record<number, Escolha>>(escolhasIniciais);
+
+  /** Antes de ir cadastrar o insumo que falta: guarda o que está escolhido (e em qual item a pessoa estava) para recuperar na volta. */
+  function guardarOQueFoiEscolhido(item: number) {
+    if (!formRef.current) return;
+    const f = new FormData(formRef.current);
+    const t = (k: string) => (typeof f.get(k) === 'string' ? (f.get(k) as string) : '');
+    const valores: RascunhoDaConferencia = { escolhas, lojaId: t('lojaId'), fornecedorId: t('fornecedorId'), data: t('data'), item };
+    guardarRascunho(chaveDoRascunho, valores, doc.versao);
+  }
   const erros = estado?.erros ?? {};
   const outrosErros = Object.entries(erros).filter(([k, v]) => v && !CAMPOS_COM_LUGAR.test(k));
   const idBase = 'documento';
@@ -128,8 +247,9 @@ export function FormConferencia({
   const temOutraNota = doc.notaParaLigar.some((n) => !n.mesmoFornecedor);
 
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <form ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="versao" value={doc.versao} />
+      {avisos}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={rotuloDoCampo} />
       {erros.geral && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
@@ -158,7 +278,7 @@ export function FormConferencia({
                   <label htmlFor={`${idBase}-lojaId`} className={ROTULO}>
                     Loja que recebeu
                   </label>
-                  <select id={`${idBase}-lojaId`} name="lojaId" defaultValue="" className={`${CAMPO} pr-8`} aria-invalid={!!erros.lojaId} aria-describedby={`${idBase}-lojaId-ajuda${erros.lojaId ? ` ${idBase}-lojaId-erro` : ''}`}>
+                  <select id={`${idBase}-lojaId`} name="lojaId" defaultValue={lojaInicial} className={`${CAMPO} pr-8`} aria-invalid={!!erros.lojaId} aria-describedby={`${idBase}-lojaId-ajuda${erros.lojaId ? ` ${idBase}-lojaId-erro` : ''}`}>
                     <option value="">Escolha a loja</option>
                     {doc.lojasCandidatas.map((l) => (
                       <option key={l.id} value={l.id}>
@@ -177,7 +297,7 @@ export function FormConferencia({
                   <label htmlFor={`${idBase}-fornecedorId`} className={ROTULO}>
                     Fornecedor
                   </label>
-                  <select id={`${idBase}-fornecedorId`} name="fornecedorId" defaultValue="" className={`${CAMPO} pr-8`} aria-invalid={!!erros.fornecedorId} aria-describedby={`${idBase}-fornecedorId-ajuda${erros.fornecedorId ? ` ${idBase}-fornecedorId-erro` : ''}`}>
+                  <select id={`${idBase}-fornecedorId`} name="fornecedorId" defaultValue={fornecedorInicial} className={`${CAMPO} pr-8`} aria-invalid={!!erros.fornecedorId} aria-describedby={`${idBase}-fornecedorId-ajuda${erros.fornecedorId ? ` ${idBase}-fornecedorId-erro` : ''}`}>
                     <option value="">Escolha o fornecedor</option>
                     {doc.fornecedoresCandidatos.map((f) => (
                       <option key={f.id} value={f.id}>
@@ -211,11 +331,11 @@ export function FormConferencia({
                     </p>
                     <p className="text-[13px] tabular-nums text-suave">
                       Lançada com {formatarDinheiro(n.totalCentavos)}; a nota fiscal diz {formatarDinheiro(doc.totais.vNfCentavos)}
-                      {n.diferencaCentavos === 0 ? ' (confere).' : ` (${n.diferencaCentavos > 0 ? 'a nota fiscal tem' : 'a lançada tem'} ${formatarDinheiro(Math.abs(n.diferencaCentavos))} a mais).`}
+                      {n.diferencaCentavos === 0 ? ' (confere).' : <span className="font-semibold text-atencao"> · {formatarDinheiro(Math.abs(n.diferencaCentavos))} de diferença ({n.diferencaCentavos > 0 ? 'a nota fiscal tem a mais' : 'a lançada tem a mais'}).</span>}
                     </p>
                     {!n.mesmoFornecedor && <p className="text-[12px] text-suave">O fornecedor dessa nota não tem CNPJ cadastrado: confira se é a mesma nota.</p>}
                   </div>
-                  <BotaoLigar id={n.id}>Ligar a esta nota</BotaoLigar>
+                  <LigarComConfirmacao id={n.id} diferencaCentavos={n.diferencaCentavos} lancadaCentavos={n.totalCentavos} notaFiscalCentavos={doc.totais.vNfCentavos} />
                 </li>
               ))}
             </ul>
@@ -250,6 +370,8 @@ export function FormConferencia({
                   erro={erros[`item-${it.nItem}`]}
                   erroDoFator={erros[`fator-${it.nItem}`]}
                   podeEditarVinculos={podeEditarVinculos}
+                  novoInsumo={novoInsumo}
+                  aoSairParaCadastrar={() => guardarOQueFoiEscolhido(it.nItem)}
                   aoMudar={(m) => mudar(it.nItem, m)}
                 />
               </li>
@@ -273,7 +395,7 @@ export function FormConferencia({
             <label htmlFor={`${idBase}-data`} className={ROTULO}>
               Data da entrada
             </label>
-            <CampoData id={`${idBase}-data`} name="data" defaultValue={dataInicial} aria-invalid={!!erros.data} aria-describedby={`${idBase}-data-ajuda${erros.data ? ` ${idBase}-data-erro` : ''}`} />
+            <CampoData id={`${idBase}-data`} name="data" defaultValue={dataInformada} aria-invalid={!!erros.data} aria-describedby={`${idBase}-data-ajuda${erros.data ? ` ${idBase}-data-erro` : ''}`} />
             <p id={`${idBase}-data-ajuda`} className={AJUDA}>
               O dia em que a mercadoria entrou na loja (dd/mm/aaaa, até {formatarData(hoje)}). A nota foi emitida em {formatarData(doc.emitidaEm)}. É esta data que diz qual compra é a mais nova e em que período ela entra.
             </p>
@@ -318,6 +440,8 @@ function ItemDaConferencia({
   erro,
   erroDoFator,
   podeEditarVinculos,
+  novoInsumo,
+  aoSairParaCadastrar,
   aoMudar,
 }: {
   it: ItemDoDocumento;
@@ -328,6 +452,8 @@ function ItemDaConferencia({
   erro?: string;
   erroDoFator?: string;
   podeEditarVinculos: boolean;
+  novoInsumo?: string;
+  aoSairParaCadastrar: () => void;
   aoMudar: (m: Partial<Escolha>) => void;
 }) {
   const n = it.nItem;
@@ -444,6 +570,12 @@ function ItemDaConferencia({
           `Escolha o insumo; depois diga quantas embalagens vêm em 1 ${it.unidadeComercial} da nota.`
         )}
       </p>
+      {!e.insumoId &&
+        (novoInsumo ? (
+          <AtalhoNovoInsumo href={novoInsumo} idDoCampo={`atalho-novo-insumo-${n}`} aoSair={aoSairParaCadastrar} />
+        ) : (
+          <p className="text-[12px] text-suave">Insumo que falta: peça a quem cuida dos insumos.</p>
+        ))}
       {mudouDaMemoria && (
         <p className="text-[12px] text-atencao">
           {podeEditarVinculos ? 'Você mudou o que o sistema lembrava: ele passa a lembrar assim (fica no histórico). Notas já conciliadas não mudam.' : 'Mudou do que o sistema lembra deste item. Só quem edita fornecedores muda o que ele lembra: se for o caso, peça a essa pessoa.'}

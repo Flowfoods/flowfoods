@@ -36,6 +36,7 @@ export function TelaDocumento({
   contexto,
   podeLancar,
   podeEditarVinculos,
+  novoInsumo,
   podeEditarFornecedor,
   bloqueio,
   opcoesDeInsumos,
@@ -55,6 +56,8 @@ export function TelaDocumento({
   /** Concilia, liga e descarta NESTA loja. */
   podeLancar: boolean;
   podeEditarVinculos: boolean;
+  /** O cadastro de insumo de quem usa a tela, quando a pessoa pode cadastrar insumos. */
+  novoInsumo?: string;
   podeEditarFornecedor: boolean;
   bloqueio: string | null;
   opcoesDeInsumos: FormularioDeNota['insumos'];
@@ -153,6 +156,9 @@ export function TelaDocumento({
             <p className="mt-3 break-all border-t border-linha pt-3 text-[12px] tabular-nums text-suave">
               <span className="font-medium text-texto">Chave de acesso:</span> {formatarChave(d.chaveAcesso)}
             </p>
+            <p className="mt-2 text-[12px] text-suave">
+              Estes dados vieram do arquivo XML da nota (o que o fornecedor manda por e-mail). A chave de acesso é o número de 44 dígitos que identifica a nota: por ela, a mesma nota não entra duas vezes.
+            </p>
           </Painel>
 
           {aguardando && podeLancar ? (
@@ -176,6 +182,7 @@ export function TelaDocumento({
               dataInicial={dataInicial}
               bloqueio={bloqueio}
               podeEditarVinculos={podeEditarVinculos}
+              novoInsumo={novoInsumo}
             />
           ) : (
             <ItensSomenteLeitura d={d} insumosBase={insumosBase} semPermissao={aguardando} />

@@ -3,7 +3,7 @@
  * já em centavos e milésimos, ou uma frase em português dizendo por que não entra. Nada daqui grava.
  *
  * A ordem importa (cada passo barra o que o seguinte não deveria ver):
- *  1. ANTES do leitor de XML: tamanho (1 MB), formato do arquivo (zip e PDF não são XML), UTF-8, declaração de codificação, nada de
+ *  1. ANTES do leitor de XML: tamanho (900 KB, abaixo do 1 MB que o Next aceita no corpo da requisição), formato do arquivo (zip e PDF não são XML), UTF-8, declaração de codificação, nada de
  *     `<!DOCTYPE`, `<!ENTITY`, instrução de processamento (`<?xml-stylesheet`), entidade que não seja uma das cinco do XML ou número,
  *     nome de tag perigoso, contagem de tags e profundidade (200 itens × ~60 tags cabem folgados). Sem DTD e sem entidade externa
  *     não há XXE nem "billion laughs": o arquivo com isso é recusado antes de qualquer leitura.
@@ -180,13 +180,13 @@ function medirEstrutura(t: string): { tags: number; profundidade: number } {
 }
 
 const FRASE_PERIGO =
-  'Este XML tem declarações de tipo ou de entidade (DOCTYPE, ENTITY) ou instruções de processamento, que uma NF-e de verdade não tem. Por segurança o arquivo foi recusado e nada foi gravado.';
+  'Este arquivo traz instruções extras que uma nota fiscal de verdade não tem. Por segurança ele foi recusado e nada foi gravado. Baixe o XML da nota de novo, direto do e-mail ou do portal do fornecedor.';
 
 function conferirAntes(bytes: Uint8Array): { ok: true; texto: string } | { ok: false; erro: string } {
   if (bytes.length === 0) return recusa('O arquivo está vazio. Escolha o XML da nota.');
   if (bytes.length > LIMITES_DO_XML.bytes) {
     const kb = Math.ceil(bytes.length / 1000).toLocaleString('pt-BR');
-    return recusa(`O arquivo tem ${kb} KB e o limite é 1 MB. Uma NF-e costuma ter poucas dezenas de KB: confira se é o XML da nota (e não um arquivo compactado ou outra coisa).`);
+    return recusa(`O arquivo tem ${kb} KB e o limite é 900 KB. Uma NF-e costuma ter poucas dezenas de KB: confira se é o XML da nota (e não um arquivo compactado ou outra coisa).`);
   }
   if (bytes[0] === 0x50 && bytes[1] === 0x4b) return recusa('Este arquivo parece compactado (zip). Descompacte e envie o arquivo .xml da nota.');
   if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) return recusa('Isto é um PDF. Envie o XML da nota; o PDF é só a impressão dela.');
@@ -307,38 +307,37 @@ function extrair(bruto: unknown, agora: Date, original: string): { ok: true; not
   const raizes = Object.keys(bruto).filter((k) => !k.startsWith('?'));
   if (raizes.length !== 1) return recusa('Este XML não é uma NF-e: esperava uma nota só no arquivo.');
   const nomeDaRaiz = raizes[0];
-  if (nomeDaRaiz === 'resNFe') return recusa('Isto é só o RESUMO da nota (resNFe), não a nota completa. Baixe o XML completo da nota.');
+  if (nomeDaRaiz === 'resNFe') return recusa('Este arquivo é só o resumo da nota, não a nota completa. Peça ao fornecedor o XML completo, com a autorização.');
   if (nomeDaRaiz === 'procEventoNFe' || nomeDaRaiz === 'evento' || nomeDaRaiz === 'retEvento' || nomeDaRaiz === 'envEvento') {
     return recusa('Isto é um evento da nota (cancelamento, ciência ou carta de correção), não a nota. Envie o XML da nota autorizada.');
   }
   if (nomeDaRaiz === 'NFe') {
-    return recusa('Este XML é de uma NF-e SEM o protocolo de autorização (o arquivo que o emitente assina e ainda não foi autorizado). Envie o XML autorizado, o “procNFe” (nfeProc).');
+    return recusa('Este XML é de uma nota que ainda não foi autorizada pela Receita. Peça ao fornecedor o XML da nota já autorizada.');
   }
-  if (nomeDaRaiz !== 'nfeProc') return recusa('Este XML não é uma NF-e autorizada (modelo 55). Envie o XML da nota que o fornecedor emitiu.');
+  if (nomeDaRaiz !== 'nfeProc') return recusa('Este XML não é de uma nota fiscal eletrônica (NF-e) autorizada. Envie o XML da nota que o fornecedor emitiu.');
 
   const proc = bruto.nfeProc;
   const nfe = unico(filho(proc, 'NFe'));
   const prot = unico(filho(proc, 'protNFe'));
   if (nfe === '__varios__' || prot === '__varios__') return recusa('Este arquivo tem mais de uma nota. Envie um XML por nota.');
-  if (!ehNó(nfe)) return recusa('Este XML não traz a nota (NFe) dentro do nfeProc.');
+  if (!ehNó(nfe)) return recusa('Este XML não traz a nota dentro dele. Baixe o arquivo de novo.');
   if (!ehNó(prot)) {
-    return recusa('Este XML não traz o protocolo de autorização (protNFe): é a nota ainda sem a autorização da SEFAZ. Envie o XML autorizado.');
+    return recusa('Este XML não traz a autorização da Receita: é a nota antes de ser autorizada. Peça ao fornecedor o XML da nota já autorizada.');
   }
   // O leitor descarta os atributos xmlns: o esquema se confere no texto, na abertura do nfeProc ou da NFe.
-  if (!declaraOEsquemaDaNfe(original)) return recusa('Este XML não é do esquema da NF-e (portalfiscal.inf.br/nfe).');
+  if (!declaraOEsquemaDaNfe(original)) return recusa('Este XML não é de uma nota fiscal eletrônica (NF-e) do padrão brasileiro.');
   if (texto(filho(proc, '@_versao')) !== '4.00') return recusa('Só leio NF-e na versão 4.00. Este arquivo é de outra versão.');
   const inf = filho(nfe, 'infNFe');
   if (!ehNó(inf) || texto(filho(inf, '@_versao')) !== '4.00') return recusa('Só leio NF-e na versão 4.00. Este arquivo é de outra versão.');
   const id = texto(filho(inf, '@_Id'));
   const chaveDoId = id && /^NFe(\d{44})$/.exec(id)?.[1];
-  if (!chaveDoId) return recusa('A chave de acesso da nota (Id) está torta: precisa ter 44 números.');
+  if (!chaveDoId) return recusa('A chave de acesso da nota está torta: precisa ter 44 números.');
 
   // O protocolo.
   const infProt = filho(prot, 'infProt');
   const cStat = texto(caminho(infProt, 'cStat'));
   if (cStat !== '100' && cStat !== '150') {
-    const motivo = texto(caminho(infProt, 'xMotivo'));
-    return recusa(`Só entra nota com uso autorizado (protocolo 100 ou 150). Esta tem o código ${cStat ?? 'ausente'}${motivo ? `: ${motivo.slice(0, 80)}` : ''}.`);
+    return recusa('Esta nota não está com o uso autorizado (pode ter sido denegada, cancelada ou rejeitada pela Receita). Só entra nota autorizada: confira com o fornecedor.');
   }
   if (texto(caminho(infProt, 'chNFe')) !== chaveDoId) return recusa('A chave do protocolo não é a chave da nota. O arquivo foi alterado ou está misturado com outra nota.');
   if (texto(caminho(infProt, 'tpAmb')) === '2') return recusa('Esta é uma nota de HOMOLOGAÇÃO (teste), sem valor fiscal. Ela não entra como compra.');
@@ -474,7 +473,7 @@ function lerItem(det: unknown, nItem: number): { ok: true; item: ItemDoXml } | {
   if (!codigo || codigo.length > 60) return recusa(`${onde}: o código do produto está ausente ou longo demais.`);
   if (!descricao) return recusa(`${onde}: falta a descrição do produto.`);
   if (!unidade || unidade.length > 10) return recusa(`${onde}: a unidade comercial está ausente ou fora do formato.`);
-  if (texto(filho(prod, 'indTot')) === '0') return recusa(`${onde}: este item não entra no total da nota (indTot 0). Lance à mão.`);
+  if (texto(filho(prod, 'indTot')) === '0') return recusa(`${onde}: este item não entra no total da nota. Lance à mão.`);
   const qTxt = texto(filho(prod, 'qCom'));
   const qCom = lerMilesimosDoXml(qTxt);
   if (qCom === null) return recusa(`${onde}: a quantidade (“${(qTxt ?? '').slice(0, 20)}”) não está no formato esperado (número com ponto, até 4 casas, maior que zero).`);

@@ -28,6 +28,7 @@ export default async function ParceiroNotaRecebidaPage({ params, searchParams }:
       podeLancar
       podeEditarVinculos
       podeEditarFornecedor
+      novoInsumo={`${base}/insumos/novo`}
       bloqueio={ctx.bloqueio}
       opcoesDeInsumos={insumos}
       hoje={hojeNoRio()}

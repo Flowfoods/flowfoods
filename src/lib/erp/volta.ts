@@ -54,6 +54,7 @@ export function voltaComFornecedor(caminho: string, fornecedorId: string): strin
 
 /** Para o botão e o texto: de onde a pessoa veio. */
 export function rotuloDaVolta(caminho: string): string {
+  if (/\/compras\/recebidas\//.test(caminho)) return 'a conferência da nota fiscal';
   if (/\/compras\//.test(caminho)) return 'a nota de compra';
   if (/\/fichas\/[^/]+\/canais/.test(caminho)) return 'as embalagens da ficha';
   if (/\/fichas\//.test(caminho)) return 'a ficha técnica';

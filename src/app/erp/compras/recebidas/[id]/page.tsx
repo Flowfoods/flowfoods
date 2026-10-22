@@ -33,6 +33,7 @@ export default async function ErpNotaRecebidaPage({ params, searchParams }: { pa
       podeLancar={podeLancar}
       podeEditarVinculos={pode(ctx.alcance, 'fornecedores.editar')}
       podeEditarFornecedor={pode(ctx.alcance, 'fornecedores.editar')}
+      novoInsumo={pode(ctx.alcance, 'insumos.editar') ? '/erp/insumos/novo' : undefined}
       bloqueio={ctx.bloqueio}
       opcoesDeInsumos={insumos}
       hoje={hojeNoRio()}

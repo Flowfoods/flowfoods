@@ -25,7 +25,7 @@ export function TelaImportarXml({ base, contexto, acao, bloqueio }: { base: stri
           <li>Quando tudo confere, você concilia: a nota de compra é lançada e o custo e o estoque seguem a regra de sempre.</li>
         </ol>
         <p className="mt-3 border-t border-linha pt-3 text-[12px] text-suave">
-          O sistema não pede senha, certificado nem acesso à SEFAZ: só o arquivo. A assinatura digital da nota não é conferida aqui, por isso a conferência dos itens e dos valores é sempre sua.
+          O sistema não pede senha, certificado nem acesso ao site do governo que autoriza as notas (a SEFAZ): só o arquivo. A assinatura digital da nota não é conferida aqui, por isso a conferência dos itens e dos valores é sempre sua.
         </p>
       </Painel>
       <FormImportarXml acao={acao} base={base} bloqueio={bloqueio} />

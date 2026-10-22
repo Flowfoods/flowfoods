@@ -6,7 +6,7 @@
 
 import Link from 'next/link';
 import { FileUp } from 'lucide-react';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import type { LinhaDeDocumento } from '@/lib/erp/documentos-fiscais';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { DOCUMENTOS_POR_PAGINA, queryDosFiltrosDeDocumento, ROTULO_DA_SITUACAO, temFiltroDeDocumento, type FiltrosDeDocumento } from '@/lib/erp/documento-fiscal-campos';
@@ -131,7 +131,7 @@ const hrefDaPagina = (base: string, f: FiltrosDeDocumento, pagina: number) => {
 
 const itensLigados = (l: LinhaDeDocumento) => `${l.vinculados} de ${l.itens} ${l.itens === 1 ? 'item ligado' : 'itens ligados'}`;
 
-export function TelaListaDocumentos({
+function CorpoDaLista({
   base,
   filtros: f,
   linhas,
@@ -273,5 +273,17 @@ export function TelaListaDocumentos({
         proxima={de + linhas.length - 1 < total ? hrefDaPagina(base, f, pagina + 1) : null}
       />
     </Painel>
+  );
+}
+
+/** Explica, uma vez, as duas palavras que a pessoa não precisa saber: o arquivo XML e a chave de acesso. */
+export function TelaListaDocumentos(props: ComponentProps<typeof CorpoDaLista>) {
+  return (
+    <div className="space-y-3">
+      <p className="text-[13px] text-suave">
+        Cada nota aqui veio de um arquivo XML: o arquivo da nota fiscal que o fornecedor manda por e-mail (não é o PDF). A chave de acesso é o número de 44 dígitos que identifica a nota; por ele, a mesma nota não entra duas vezes.
+      </p>
+      <CorpoDaLista {...props} />
+    </div>
   );
 }

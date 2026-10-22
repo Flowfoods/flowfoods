@@ -24,7 +24,7 @@
 import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
-import { checkVioladoDe, ehErroDeUnicidade } from './tenant';
+import { checkVioladoDe, ehDeadlock, ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
 import { filtroDeLojas, pode, recusa, type Alcance } from './permissoes';
 import {
@@ -516,11 +516,15 @@ export async function lojasParaLancar(tx: ClienteDoParceiro, alcance: Alcance) {
 export async function dadosDoFormularioDeNota(cliente: ClienteDoParceiro, alcance: Alcance, ja: { lojaId?: string; fornecedorId?: string; insumoIds?: string[] } = {}) {
   return cliente.transacao(async (tx) => {
     const lojas = (await lojasParaLancar(tx, alcance)).filter((l) => l.ativa || l.id === ja.lojaId);
-    const fornecedores = await tx.fornecedor.findMany({
-      where: { OR: [{ ativo: true }, ...(ja.fornecedorId ? [{ id: ja.fornecedorId }] : [])] },
-      orderBy: { nome: 'asc' },
-      select: { id: true, nome: true, ativo: true, documento: true },
-    });
+    // O navegador recebe só a raiz do CNPJ (a empresa, para o aviso "mesma empresa, outro estabelecimento"); nunca o documento
+    // inteiro, e nada de CPF (pessoa física).
+    const fornecedores = (
+      await tx.fornecedor.findMany({
+        where: { OR: [{ ativo: true }, ...(ja.fornecedorId ? [{ id: ja.fornecedorId }] : [])] },
+        orderBy: { nome: 'asc' },
+        select: { id: true, nome: true, ativo: true, documento: true },
+      })
+    ).map((f) => ({ id: f.id, nome: f.nome, ativo: f.ativo, raizCnpj: raizDoCnpj(f.documento) }));
     const lidos = await tx.insumo.findMany({
       where: { fichaQueProduz: { is: null }, OR: [{ ativo: true }, { id: { in: ja.insumoIds ?? [] } }] },
       orderBy: { nome: 'asc' },
@@ -607,6 +611,7 @@ async function conferirDuplicada(tx: ClienteDoParceiro, alcance: Alcance, d: Dad
   });
 }
 
+export const MENSAGEM_CONFLITO_DA_NOTA = 'Alguém mexeu nesta nota agora há pouco. Recarregue a página para ver a versão nova; nada foi gravado.';
 export const MENSAGEM_CORRIDA = 'Esta nota acabou de ser lançada (por outra pessoa ou por um clique duplo). Abra a lista de notas; nada foi gravado de novo.';
 
 export function dadosDosItens(tx: ClienteDoParceiro, notaId: string, d: DadosDaNota): Prisma.NotaEntradaItemCreateManyInput[] {
@@ -867,6 +872,8 @@ export async function editarNota(
  */
 export async function cancelarNotaNaTransacao(tx: ClienteDoParceiro, alcance: Alcance, id: string, motivo: string, autorNome: string): Promise<void> {
   await travarParaEscrever(tx);
+  // F.1b: a ordem das travas é SEMPRE documento fiscal → nota (descartar o documento e cancelar a nota ao mesmo tempo não se esperam).
+  await tx.sql`SELECT 1 FROM "DocumentoFiscal" WHERE "parceiroId" = ${tx.parceiroId} AND "notaEntradaId" = ${id} FOR UPDATE`;
   const atual = await notaVisivel(tx, alcance, id);
   if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true });
   const negado = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
@@ -931,6 +938,7 @@ export async function cancelarNota(
     });
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
+    if (ehDeadlock(e)) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_DA_NOTA }, conflito: true };
     if (e instanceof ErroDeTeto) return { ok: false, erros: { geral: e.message } };
     throw e;
   }

@@ -24,6 +24,7 @@ export function AtalhoNovoInsumo({
   aoSair,
   tipo,
   rotulo = 'Insumo que falta: cadastrar',
+  idDoCampo = 'atalho-novo-insumo-nome',
 }: {
   /** O cadastro de insumo de quem usa a tela (`/erp/insumos/novo` ou `/rodolfo/erp/<slug>/insumos/novo`). */
   href: string;
@@ -32,6 +33,8 @@ export function AtalhoNovoInsumo({
   /** Pré-escolhe o tipo no cadastro (as embalagens do prato pedem uma Embalagem). */
   tipo?: 'EMBALAGEM';
   rotulo?: string;
+  /** Mais de um atalho na mesma tela (um por item da nota fiscal): cada campo de nome tem o seu id. */
+  idDoCampo?: string;
 }) {
   const [aberto, setAberto] = useState(false);
   const [nome, setNome] = useState('');
@@ -70,11 +73,11 @@ export function AtalhoNovoInsumo({
   }
   return (
     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
-      <label htmlFor="atalho-novo-insumo-nome" className="sr-only">
+      <label htmlFor={idDoCampo} className="sr-only">
         Nome do insumo que falta (opcional)
       </label>
       <input
-        id="atalho-novo-insumo-nome"
+        id={idDoCampo}
         ref={campo}
         value={nome}
         maxLength={80}

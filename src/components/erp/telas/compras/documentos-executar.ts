@@ -41,7 +41,7 @@ export async function executarImportacao(cliente: ClienteDoParceiro, alcance: Al
   if (!(arquivo instanceof File) || arquivo.size === 0) return { ok: false, erros: { arquivo: 'Escolha o arquivo XML da nota.' }, vez: vezDe(anterior) };
   if (arquivo.size > LIMITES_DO_XML.bytes) {
     const kb = Math.ceil(arquivo.size / 1000).toLocaleString('pt-BR');
-    return { ok: false, erros: { arquivo: `O arquivo tem ${kb} KB e o limite é 1 MB. Uma NF-e costuma ter poucas dezenas de KB: confira se é o XML da nota (e não um arquivo compactado ou outra coisa).` }, vez: vezDe(anterior) };
+    return { ok: false, erros: { arquivo: `O arquivo tem ${kb} KB e o limite é 900 KB. Uma NF-e costuma ter poucas dezenas de KB: confira se é o XML da nota (e não um arquivo compactado ou outra coisa).` }, vez: vezDe(anterior) };
   }
   const bytes = new Uint8Array(await arquivo.arrayBuffer());
   const r = await receberXml(cliente, alcance, bytes, autorNome);
@@ -60,6 +60,7 @@ export function lerEntradaDaConferencia(form: FormData): EntradaDaConferencia {
     fornecedorId: textoDe(form.get('fornecedorId')),
     data: textoDe(form.get('data')),
     outraNota: form.get('outraNota') === 'on',
+    confirmouDiferenca: form.get('confirmar_diferenca') === '1',
     itens: nItens.map((n, i) => ({ nItem: Number(n), insumoId: insumos[i] ?? '', embalagem: embalagens[i] ?? '', fator: fatores[i] ?? '' })).filter((i) => Number.isInteger(i.nItem) && i.nItem > 0),
   };
 }
@@ -80,7 +81,7 @@ export async function executarConferencia(
   const entrada = lerEntradaDaConferencia(form);
   const ligar = textoDe(form.get('ligar'));
   if (ligar) {
-    const r = await ligarDocumento(cliente, alcance, documentoId, ligar, entrada.versao, { lojaId: entrada.lojaId, fornecedorId: entrada.fornecedorId }, autorNome);
+    const r = await ligarDocumento(cliente, alcance, documentoId, ligar, entrada.versao, { lojaId: entrada.lojaId, fornecedorId: entrada.fornecedorId, confirmouDiferenca: entrada.confirmouDiferenca }, autorNome);
     return concluir(r, anterior, base, () => 'ligada');
   }
   const intencao = textoDe(form.get('intencao'));

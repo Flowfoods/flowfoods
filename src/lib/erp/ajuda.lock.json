@@ -136,12 +136,12 @@
     "hash": "1b5e92fb87619c65"
   },
   "compras-documentos": {
-    "versao": 1,
-    "hash": "277f805c4e3d4229"
+    "versao": 2,
+    "hash": "784c1a462b4f0735"
   },
   "compras-documento-importar": {
-    "versao": 1,
-    "hash": "809767dd60ed3720"
+    "versao": 2,
+    "hash": "09c539aa945fc34a"
   },
   "compras-documento": {
     "versao": 1,
