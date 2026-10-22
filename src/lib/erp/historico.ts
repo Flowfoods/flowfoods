@@ -35,6 +35,9 @@ const ENTIDADE: Record<string, string> = {
   // 1.9: a taxa do iFood do parceiro.
   CanalConfig: 'Canal de venda',
   Fornecedor: 'Fornecedor',
+  // F.1b: a nota fiscal recebida por XML e o que o sistema lembra de cada item de cada fornecedor.
+  DocumentoFiscal: 'Nota fiscal recebida',
+  VinculoItemFornecedor: 'Item do fornecedor',
   // 2.1: o faturamento de um canal num dia. Só quem tem `faturamento.ver` recebe estas linhas.
   FaturamentoLancamento: 'Faturamento',
   // 2.2a: despesas, linhas do plano e a regra do período. Só quem tem `dre.ver` recebe estas linhas.
@@ -95,6 +98,8 @@ const ACAO: Record<string, string> = {
   // I.1a: categorias de insumo e a classificação dos insumos.
   RENOMEOU: 'Renomeou',
   REORDENOU: 'Reordenou',
+  CONCILIOU: 'Conciliou',
+  LIGOU: 'Ligou',
   CLASSIFICOU: 'Classificou',
   RECLASSIFICOU: 'Reclassificou',
 };
@@ -189,6 +194,14 @@ const CAMPO: Record<string, string> = {
   semNotaFiscal: 'compras sem nota fiscal',
   cadastro: 'cadastro',
   cnpj: 'CNPJ',
+  // F.1b: nota fiscal recebida por XML e a memória de cada item do fornecedor
+  emitente: 'emitente',
+  chaveDeAcesso: 'chave de acesso',
+  veioDoXml: 'veio do XML',
+  notaDeCompra: 'nota de compra',
+  itemDoFornecedor: 'item do fornecedor',
+  embalagemEscolhida: 'embalagem',
+  fatorPorUnidade: 'embalagens por unidade da nota',
   // 1.7: contagem do dia a dia e regras da loja
   prazo: 'prazo',
   ajustes: 'ajustes no estoque',
@@ -363,6 +376,13 @@ const ORDEM = [
   'cnpj',
   'loja',
   'fornecedor',
+  'emitente',
+  'itemDoFornecedor',
+  'embalagemEscolhida',
+  'fatorPorUnidade',
+  'chaveDeAcesso',
+  'veioDoXml',
+  'notaDeCompra',
   'data',
   'itensDaNota',
   'freteNotaCentavos',

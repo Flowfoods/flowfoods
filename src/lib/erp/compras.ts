@@ -84,19 +84,20 @@ export type ResultadoCompras =
       duplicadaId?: string;
     };
 
-type Recusada = Extract<ResultadoCompras, { ok: false }>;
+export type Recusada = Extract<ResultadoCompras, { ok: false }>;
 
-class Recusa extends Error {
+export class Recusa extends Error {
   constructor(readonly resultado: Recusada) {
     super('recusa');
   }
 }
 
-const motivoLimpo = (t: unknown) => (typeof t === 'string' ? t.trim().replace(/\s+/g, ' ').slice(0, 200) || null : null);
+export const motivoLimpo = (t: unknown) => (typeof t === 'string' ? t.trim().replace(/\s+/g, ' ').slice(0, 200) || null : null);
 
 export const MENSAGEM_CONFLITO_FORNECEDOR = 'Alguém alterou este fornecedor agora há pouco. Recarregue a página para ver a versão nova; nada foi gravado.';
 export const MENSAGEM_CONFLITO_NOTA = 'Alguém alterou esta nota agora há pouco. Recarregue a página para ver a versão nova; nada foi gravado.';
 export const MENSAGEM_NOTA_CANCELADA = 'Esta nota está cancelada: não se edita. Lance de novo, certa.';
+export const MENSAGEM_NOTA_DO_XML = 'Esta nota veio do XML da nota fiscal: não se edita. Cancele a nota (o estoque e o custo voltam) e concilie o documento de novo, certo.';
 
 // ================================================================ fornecedor
 
@@ -113,7 +114,7 @@ export function hashDoEnvioDoFornecedor(d: DadosFornecedor): string {
 }
 
 /** Cadastrar e editar fornecedor esperam um ao outro (nome parecido e documento repetido se conferem sem corrida). */
-async function travarFornecedores(tx: ClienteDoParceiro) {
+export async function travarFornecedores(tx: ClienteDoParceiro) {
   await tx.sql`SELECT 1 AS "ok" FROM (SELECT pg_advisory_xact_lock(hashtextextended(${`ff:fornecedor-cadastro:${tx.parceiroId}`}, 0))) AS "trava"`;
 }
 
@@ -121,7 +122,7 @@ async function travarFornecedores(tx: ClienteDoParceiro) {
  * O que impede gravar este cadastro (null = livre): o MESMO CNPJ/CPF em outro fornecedor, ou o mesmo nome (também escrito de outro
  * jeito: caixa, acento). Filial tem outro CNPJ e passa; nada se funde, nem por documento nem por nome. `exceto`: o próprio, ao editar.
  */
-async function conflitoDoFornecedor(tx: ClienteDoParceiro, d: DadosFornecedor, exceto: string | null): Promise<Recusada | null> {
+export async function conflitoDoFornecedor(tx: ClienteDoParceiro, d: DadosFornecedor, exceto: string | null): Promise<Recusada | null> {
   if (d.documento) {
     const outro = await tx.fornecedor.findFirst({
       where: { documento: d.documento, ...(exceto ? { id: { not: exceto } } : {}) },
@@ -494,7 +495,7 @@ const paraCompra = (i: InsumoLido): InsumoDaCompra => ({
   embalagens: i.variantes,
 });
 
-const ID = /^[a-z0-9]{1,64}$/i;
+export const ID = /^[a-z0-9]{1,64}$/i;
 
 /** Os insumos que a nota cita, deste parceiro; `travar`: FOR SHARE até o fim da transação (a unidade não muda no meio). */
 async function insumosCitados(tx: ClienteDoParceiro, ids: readonly string[], travar: boolean): Promise<Map<string, InsumoLido>> {
@@ -506,7 +507,7 @@ async function insumosCitados(tx: ClienteDoParceiro, ids: readonly string[], tra
 }
 
 /** Lojas onde a pessoa pode lançar nota (alcance + `compras.lancar`). */
-async function lojasParaLancar(tx: ClienteDoParceiro, alcance: Alcance) {
+export async function lojasParaLancar(tx: ClienteDoParceiro, alcance: Alcance) {
   const lojas = await tx.loja.findMany({ where: { id: filtroDeLojas(alcance) }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, ativa: true } });
   return lojas.filter((l) => pode(alcance, 'compras.lancar', { lojaId: l.id }));
 }
@@ -553,7 +554,7 @@ interface Contexto {
 }
 
 /** Lê o que a entrada cita (lojas do alcance, fornecedor, insumos) e passa pelo leitor puro. */
-async function lerNota(
+export async function lerNota(
   tx: ClienteDoParceiro,
   alcance: Alcance,
   entrada: EntradaDaNota,
@@ -606,9 +607,9 @@ async function conferirDuplicada(tx: ClienteDoParceiro, alcance: Alcance, d: Dad
   });
 }
 
-const MENSAGEM_CORRIDA = 'Esta nota acabou de ser lançada (por outra pessoa ou por um clique duplo). Abra a lista de notas; nada foi gravado de novo.';
+export const MENSAGEM_CORRIDA = 'Esta nota acabou de ser lançada (por outra pessoa ou por um clique duplo). Abra a lista de notas; nada foi gravado de novo.';
 
-function dadosDosItens(tx: ClienteDoParceiro, notaId: string, d: DadosDaNota): Prisma.NotaEntradaItemCreateManyInput[] {
+export function dadosDosItens(tx: ClienteDoParceiro, notaId: string, d: DadosDaNota): Prisma.NotaEntradaItemCreateManyInput[] {
   return d.itens.map((i, ordem) => ({
     parceiroId: tx.parceiroId,
     notaId,
@@ -627,7 +628,81 @@ function dadosDosItens(tx: ClienteDoParceiro, notaId: string, d: DadosDaNota): P
   }));
 }
 
-const dataDoBanco = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+export const dataDoBanco = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
+
+/** F.1b: o que a nota que vem de um documento fiscal (XML) leva a mais: de onde veio e a chave de acesso dela. */
+export interface ExtraDaNota {
+  origem: 'MANUAL' | 'IMPORTACAO';
+  /** Os 44 dígitos da NF-e (única entre as notas que valem, por parceiro). */
+  chaveAcesso?: string;
+  /** Data de emissão ("2026-10-21"). */
+  emitidaEm?: string;
+  /** O id do documento fiscal de onde a nota veio. */
+  origemRef?: string;
+}
+
+/**
+ * O núcleo de lançar a nota, DENTRO de uma transação que quem chama abriu. As travas e a ordem são as do lançamento de sempre
+ * (período, leitura, loja, período fechado, duplicada, abertura do estoque, nota, estoque, histórico): a conciliação do documento
+ * fiscal chama este mesmo núcleo, então a nota que vem do XML passa por TODAS as regras da digitada. Recusa vira `Recusa`.
+ */
+export async function lancarNotaNaTransacao(
+  tx: ClienteDoParceiro,
+  alcance: Alcance,
+  entrada: EntradaDaNota,
+  autorNome = 'Sistema',
+  extra?: ExtraDaNota,
+): Promise<{ id: string; dados: DadosDaNota; fornecedor: string; loja: string }> {
+  // 2.2b (decisão 155): a nota cai num período pela data de entrada. A trava compartilhada do período
+  // é a PRIMEIRA coisa da transação: ou a nota termina antes do fechamento (e entra nele), ou espera e é recusada.
+  await travarParaEscrever(tx);
+  const { lido, ctx } = await lerNota(tx, alcance, entrada, true);
+  if (!lido.ok) throw new Recusa(lido);
+  const d = lido.dados;
+  // Segunda trava (a action já conferiu sem a loja): lançar NESTA loja.
+  const negado = recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
+  if (negado) throw new Recusa({ ok: false, erros: { lojaId: negado } });
+  const fechado = (await datasEmPeriodoFechado(tx, [d.entradaEm])).get(d.entradaEm);
+  if (fechado) throw new Recusa({ ok: false, erros: { data: fraseDoPeriodoFechado(fechado) } });
+  await conferirDuplicada(tx, alcance, d);
+  // 1.6: trava a abertura da loja ANTES de marcar a hora do lançamento.
+  await travarAberturas(tx, [d.lojaId]);
+  const fornecedor = ctx.fornecedores.get(d.fornecedorId)!.nome;
+  const nota = await tx.notaEntrada.create({
+    data: {
+      parceiroId: tx.parceiroId,
+      lojaId: d.lojaId,
+      fornecedorId: d.fornecedorId,
+      fornecedorNomeSnapshot: fornecedor,
+      numero: d.numero,
+      serie: d.serie,
+      entradaEm: dataDoBanco(d.entradaEm),
+      freteCentavos: d.freteCentavos,
+      totalCentavos: d.totalCentavos,
+      status: 'LANCADA',
+      origem: extra?.origem ?? 'MANUAL',
+      ...(extra?.chaveAcesso ? { chaveAcesso: extra.chaveAcesso } : {}),
+      ...(extra?.emitidaEm ? { emitidaEm: dataDoBanco(extra.emitidaEm) } : {}),
+      ...(extra?.origemRef ? { origemRef: extra.origemRef } : {}),
+      lancadaEm: new Date(),
+    },
+    select: { id: true },
+  });
+  await tx.notaEntradaItem.createMany({ data: dadosDosItens(tx, nota.id, d) });
+  await aplicarNotaNoEstoque(tx, nota.id, '');
+  const loja = ctx.lojas.get(d.lojaId)!.nome;
+  await tx.historicoAlteracao.create({
+    data: {
+      parceiroId: tx.parceiroId,
+      entidade: 'NotaEntrada',
+      entidadeId: nota.id,
+      acao: 'CRIOU',
+      depois: { ...retratoDaNota(d, { loja, fornecedor }), ...(extra?.chaveAcesso ? { chaveDeAcesso: extra.chaveAcesso, veioDoXml: 'sim' } : {}) },
+      autorNome,
+    },
+  });
+  return { id: nota.id, dados: d, fornecedor, loja };
+}
 
 /**
  * Lança a nota (status LANCADA): vale para o custo na hora. No estoque: entra
@@ -637,51 +712,8 @@ const dataDoBanco = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 export async function lancarNota(cliente: ClienteDoParceiro, alcance: Alcance, entrada: EntradaDaNota, autorNome = 'Sistema'): Promise<ResultadoCompras> {
   try {
     return await cliente.transacao(async (tx) => {
-      // 2.2b (decisão 155): a nota cai num período pela data de entrada. A trava compartilhada do período
-      // é a PRIMEIRA coisa da transação: ou a nota termina antes do fechamento (e entra nele), ou espera e é recusada.
-      await travarParaEscrever(tx);
-      const { lido, ctx } = await lerNota(tx, alcance, entrada, true);
-      if (!lido.ok) throw new Recusa(lido);
-      const d = lido.dados;
-      // Segunda trava (a action já conferiu sem a loja): lançar NESTA loja.
-      const negado = recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
-      if (negado) throw new Recusa({ ok: false, erros: { lojaId: negado } });
-      const fechado = (await datasEmPeriodoFechado(tx, [d.entradaEm])).get(d.entradaEm);
-      if (fechado) throw new Recusa({ ok: false, erros: { data: fraseDoPeriodoFechado(fechado) } });
-      await conferirDuplicada(tx, alcance, d);
-      // 1.6: trava a abertura da loja ANTES de marcar a hora do lançamento.
-      await travarAberturas(tx, [d.lojaId]);
-      const fornecedor = ctx.fornecedores.get(d.fornecedorId)!.nome;
-      const nota = await tx.notaEntrada.create({
-        data: {
-          parceiroId: tx.parceiroId,
-          lojaId: d.lojaId,
-          fornecedorId: d.fornecedorId,
-          fornecedorNomeSnapshot: fornecedor,
-          numero: d.numero,
-          serie: d.serie,
-          entradaEm: dataDoBanco(d.entradaEm),
-          freteCentavos: d.freteCentavos,
-          totalCentavos: d.totalCentavos,
-          status: 'LANCADA',
-          origem: 'MANUAL',
-          lancadaEm: new Date(),
-        },
-        select: { id: true },
-      });
-      await tx.notaEntradaItem.createMany({ data: dadosDosItens(tx, nota.id, d) });
-      await aplicarNotaNoEstoque(tx, nota.id, '');
-      await tx.historicoAlteracao.create({
-        data: {
-          parceiroId: tx.parceiroId,
-          entidade: 'NotaEntrada',
-          entidadeId: nota.id,
-          acao: 'CRIOU',
-          depois: retratoDaNota(d, { loja: ctx.lojas.get(d.lojaId)!.nome, fornecedor }),
-          autorNome,
-        },
-      });
-      return { ok: true as const, id: nota.id, mudou: [] };
+      const r = await lancarNotaNaTransacao(tx, alcance, entrada, autorNome);
+      return { ok: true as const, id: r.id, mudou: [] };
     });
   } catch (e) {
     if (e instanceof Recusa) return e.resultado;
@@ -693,6 +725,7 @@ export async function lancarNota(cliente: ClienteDoParceiro, alcance: Alcance, e
 
 const SELECAO_DA_NOTA_GRAVADA = {
   id: true,
+  chaveAcesso: true,
   lojaId: true,
   fornecedorId: true,
   fornecedorNomeSnapshot: true,
@@ -776,6 +809,8 @@ export async function editarNota(
       const negadoAntes = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
       if (negadoAntes) throw new Recusa({ ok: false, erros: { geral: negadoAntes } });
       if (atual.status !== 'LANCADA') throw new Recusa({ ok: false, erros: { geral: MENSAGEM_NOTA_CANCELADA } });
+      // F.1b: a nota que veio do XML (ou foi ligada a ele) é o que o documento fiscal diz: não se edita, se cancela e se concilia de novo.
+      if (atual.chaveAcesso) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_NOTA_DO_XML } });
       if (atual.atualizadoEm.getTime() !== versao.getTime()) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_NOTA }, conflito: true });
       const { lido, ctx } = await lerNota(tx, alcance, entrada, true, atual);
       if (!lido.ok) throw new Recusa(lido);
@@ -825,6 +860,60 @@ export async function editarNota(
   }
 }
 
+/**
+ * O núcleo de cancelar a nota, dentro de uma transação que quem chama abriu (o cancelamento do documento fiscal conciliado usa o
+ * MESMO núcleo: o estorno é o oficial). Se a nota vinha de um documento fiscal (XML), ele volta a aguardar conferência na mesma
+ * transação: a chave fica livre para conciliar de novo e nunca há duas notas ativas com ela.
+ */
+export async function cancelarNotaNaTransacao(tx: ClienteDoParceiro, alcance: Alcance, id: string, motivo: string, autorNome: string): Promise<void> {
+  await travarParaEscrever(tx);
+  const atual = await notaVisivel(tx, alcance, id);
+  if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true });
+  const negado = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
+  if (negado) throw new Recusa({ ok: false, erros: { geral: negado } });
+  const dataDaNota = atual.entradaEm.toISOString().slice(0, 10);
+  const fechado = (await datasEmPeriodoFechado(tx, [dataDaNota])).get(dataDaNota);
+  if (fechado) throw new Recusa({ ok: false, erros: { geral: fraseDoPeriodoFechado(fechado) } });
+  await travarAberturas(tx, [atual.lojaId]);
+  const r = await tx.notaEntrada.updateMany({
+    where: { id, status: 'LANCADA' },
+    data: { status: 'CANCELADA', canceladaEm: new Date(), motivoCancelamento: motivo },
+  });
+  if (r.count === 0) throw new Recusa({ ok: false, erros: { geral: 'Esta nota já estava cancelada.' }, conflito: true });
+  const nome = rotuloDaNota({ numero: atual.numero, serie: atual.serie });
+  // 1.6: o que a nota tinha posto no estoque sai por estorno (nunca UPDATE no razão).
+  await aplicarNotaNoEstoque(tx, id, `${nome} cancelada: ${motivo}`);
+  await tx.historicoAlteracao.create({
+    data: {
+      parceiroId: tx.parceiroId,
+      entidade: 'NotaEntrada',
+      entidadeId: id,
+      acao: 'CANCELOU',
+      antes: { nome, situacao: 'LANCADA' },
+      depois: { nome, situacao: 'CANCELADA' },
+      motivo,
+      autorNome,
+    },
+  });
+  // F.1b: o documento fiscal que esta nota conciliava volta à fila.
+  const doc = await tx.documentoFiscal.findFirst({ where: { notaEntradaId: id, situacao: 'CONCILIADO' }, select: { id: true, numero: true, serie: true } });
+  if (doc) {
+    await tx.documentoFiscal.update({ where: { id: doc.id }, data: { situacao: 'AGUARDANDO_CONFERENCIA', notaEntradaId: null } });
+    await tx.historicoAlteracao.create({
+      data: {
+        parceiroId: tx.parceiroId,
+        entidade: 'DocumentoFiscal',
+        entidadeId: doc.id,
+        acao: 'ALTEROU',
+        antes: { nome: rotuloDaNota(doc), situacao: 'conciliada' },
+        depois: { nome: rotuloDaNota(doc), situacao: 'aguardando conferência' },
+        motivo: `A nota de compra foi cancelada: ${motivo}`,
+        autorNome,
+      },
+    });
+  }
+}
+
 /** Cancela (não apaga): sai do custo na hora; a última vira a anterior. Motivo obrigatório. */
 export async function cancelarNota(
   cliente: ClienteDoParceiro,
@@ -837,35 +926,7 @@ export async function cancelarNota(
   if (!motivo || motivo.length < 3) return { ok: false, erros: { motivo: 'Diga por que a nota sai (ex.: digitada em dobro, devolvida).' } };
   try {
     return await cliente.transacao(async (tx) => {
-      await travarParaEscrever(tx);
-      const atual = await notaVisivel(tx, alcance, id);
-      if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true });
-      const negado = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
-      if (negado) throw new Recusa({ ok: false, erros: { geral: negado } });
-      const dataDaNota = atual.entradaEm.toISOString().slice(0, 10);
-      const fechado = (await datasEmPeriodoFechado(tx, [dataDaNota])).get(dataDaNota);
-      if (fechado) throw new Recusa({ ok: false, erros: { geral: fraseDoPeriodoFechado(fechado) } });
-      await travarAberturas(tx, [atual.lojaId]);
-      const r = await tx.notaEntrada.updateMany({
-        where: { id, status: 'LANCADA' },
-        data: { status: 'CANCELADA', canceladaEm: new Date(), motivoCancelamento: motivo },
-      });
-      if (r.count === 0) throw new Recusa({ ok: false, erros: { geral: 'Esta nota já estava cancelada.' }, conflito: true });
-      const nome = rotuloDaNota({ numero: atual.numero, serie: atual.serie });
-      // 1.6: o que a nota tinha posto no estoque sai por estorno (nunca UPDATE no razão).
-      await aplicarNotaNoEstoque(tx, id, `${nome} cancelada: ${motivo}`);
-      await tx.historicoAlteracao.create({
-        data: {
-          parceiroId: tx.parceiroId,
-          entidade: 'NotaEntrada',
-          entidadeId: id,
-          acao: 'CANCELOU',
-          antes: { nome, situacao: 'LANCADA' },
-          depois: { nome, situacao: 'CANCELADA' },
-          motivo,
-          autorNome,
-        },
-      });
+      await cancelarNotaNaTransacao(tx, alcance, id, motivo, autorNome);
       return { ok: true as const, id, mudou: ['situacao'] };
     });
   } catch (e) {
@@ -1182,6 +1243,9 @@ export async function obterNota(cliente: ClienteDoParceiro, alcance: Pick<Alcanc
       motivoCancelamento: n.motivoCancelamento,
       lancadaEm: n.lancadaEm,
       versao: n.atualizadoEm.toISOString(),
+      /** F.1b: a chave de acesso da NF-e, quando a nota veio do XML ou foi ligada a ele; é o que trava a edição. */
+      chaveAcesso: n.chaveAcesso,
+      documentoId: n.chaveAcesso ? ((await tx.documentoFiscal.findFirst({ where: { notaEntradaId: n.id }, select: { id: true } }))?.id ?? null) : null,
       itens: n.itens.map((i) => {
         const vale = i.insumoId ? valem.get(i.insumoId) : undefined;
         return {

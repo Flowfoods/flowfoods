@@ -22,7 +22,7 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
     entidades: entidadesDoFiltro(entidade),
     limite: LIMITE_DO_HISTORICO,
     // 1.5: nota e fornecedor (valores, lojas) só para quem vê compras.
-    semEntidades: [...(pode(ctx.alcance, 'compras.ver') ? [] : ['NotaEntrada', 'Fornecedor']), ...(pode(ctx.alcance, 'producao.ver') ? [] : ['OrdemProducao', 'ListaProducao'])],
+    semEntidades: [...(pode(ctx.alcance, 'compras.ver') ? [] : ['NotaEntrada', 'Fornecedor', 'DocumentoFiscal', 'VinculoItemFornecedor']), ...(pode(ctx.alcance, 'producao.ver') ? [] : ['OrdemProducao', 'ListaProducao'])],
     // 1.10: taxa, margem-alvo, preço, margem e custo do canal só para quem vê preços.
     verPrecos: pode(ctx.alcance, 'precos.ver'),
     // 2.1: valores, pedidos e clientes do faturamento só para quem vê faturamento.
