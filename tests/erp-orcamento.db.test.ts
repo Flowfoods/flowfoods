@@ -51,7 +51,7 @@ vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { salvarCanaisDaLoja } from '@/lib/erp/faturamento';
-import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
+import { cadastrarInsumoDeTeste as cadastrarInsumo, SEM_NOTA_FISCAL } from './erp-db-apoio';
 import { cadastrarFornecedor, cancelarNota, lancarNota, obterNota, previaDaNota } from '@/lib/erp/compras';
 import type { EntradaDaNota } from '@/lib/erp/compra-campos';
 import { salvarMetas, situacaoDasMetas } from '@/lib/erp/dre-metas';
@@ -154,7 +154,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.5 · orçamento de compra (Postgres real)', {
     const insumo = await cadastrarInsumo(a, { tipo: 'INGREDIENTE', escala: 'base', nome: 'Carne moída', unidade: 'KG', conteudo: '1', preco: '40,00', conservacao: 'SECO' });
     if (!insumo.ok) throw new Error(JSON.stringify(insumo));
     ids.insumo = insumo.id;
-    const forn = await cadastrarFornecedor(a, { nome: 'Frigorífico Penha' }, 'Marina');
+    const forn = await cadastrarFornecedor(a, { nome: 'Frigorífico Penha', ...SEM_NOTA_FISCAL }, 'Marina');
     if (!forn.ok) throw new Error(JSON.stringify(forn));
     ids.fornecedor = forn.id;
     const insumoB = await cadastrarInsumo(b, { tipo: 'INGREDIENTE', escala: 'base', nome: 'Queijo', unidade: 'KG', conteudo: '1', preco: '40,00', conservacao: 'SECO' });

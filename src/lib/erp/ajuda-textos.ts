@@ -543,10 +543,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/fornecedores'],
     titulo: 'Fornecedores',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Quem vende para a casa e o último preço de cada insumo.' },
-      { texto: 'O CNPJ é opcional. Desativar não apaga a história.' },
+      { texto: 'Selo A completar é cadastro antigo sem e-mail ou WhatsApp: abra e complete. As notas dele continuam valendo.' },
+      { texto: 'Os contatos são só para consulta: o sistema não manda mensagem a eles sozinho.' },
     ],
   },
   {
@@ -554,9 +555,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/fornecedores/novo', 'compras/fornecedores/[id]/editar'],
     titulo: 'Cadastrar fornecedor',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'Nome, CNPJ ou CPF (se tiver) e contato. O nome não pode repetir.' },
+      { texto: 'Obrigatório: nome fantasia, razão social, CNPJ ou CPF, e-mail e WhatsApp com DDD. O CNPJ não repete; filial tem outro CNPJ e é outro cadastro.' },
+      { texto: 'Feira ou atacarejo sem nota: marque Compras sem nota fiscal e informe só o nome e o WhatsApp.' },
     ],
   },
   {
@@ -564,9 +566,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/fornecedores/[id]'],
     titulo: 'Detalhe do fornecedor',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'O que esse fornecedor já vendeu, com o último preço de cada insumo, e as últimas notas das lojas que você vê.' },
+      { texto: 'O cadastro, o que esse fornecedor já vendeu, com o último preço de cada insumo, e as últimas notas das lojas que você vê.' },
+      { texto: 'Cadastro a completar mostra o que falta. Outro cadastro com a mesma raiz de CNPJ aparece como outro estabelecimento da mesma empresa: nada é unido.' },
     ],
   },
   {
@@ -849,10 +852,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['lojas'],
     titulo: 'Lojas e marcas',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'As lojas e as marcas do grupo. Estoque, compras, contagem e faturamento são sempre de uma loja.' },
       { texto: 'Cadastrar loja ou marca é com quem tem a rede inteira.', para: ['lojas.gerir'] },
+      { texto: 'O CNPJ da loja é quem recebe as notas fiscais de compra. Informe em CNPJ da loja, na linha dela; duas lojas da mesma empresa podem ter o mesmo.', para: ['lojas.gerir'] },
       { texto: 'Cada loja mostra em quais canais vende. Para mudar, abra Canais de venda na linha dela.', para: ['lojas.gerir'] },
     ],
   },

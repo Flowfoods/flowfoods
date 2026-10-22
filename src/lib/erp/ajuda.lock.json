@@ -124,16 +124,16 @@
     "hash": "2594b3de930e4918"
   },
   "fornecedores": {
-    "versao": 1,
-    "hash": "b1907ed2116fdddb"
+    "versao": 2,
+    "hash": "bd859aada240a12b"
   },
   "fornecedor-novo": {
-    "versao": 1,
-    "hash": "73caca948a37816a"
+    "versao": 2,
+    "hash": "ff79249a2e37f208"
   },
   "fornecedor": {
-    "versao": 1,
-    "hash": "dae47225e02a2d1d"
+    "versao": 2,
+    "hash": "f1224ef4156f90cc"
   },
   "estoque": {
     "versao": 1,
@@ -208,8 +208,8 @@
     "hash": "5f273fd13764f653"
   },
   "lojas": {
-    "versao": 2,
-    "hash": "93da5f04aa8b2505"
+    "versao": 3,
+    "hash": "fd7c1b48f168f693"
   },
   "equipe": {
     "versao": 1,

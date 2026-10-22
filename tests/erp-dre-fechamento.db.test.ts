@@ -20,7 +20,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { lancarDia, salvarCanaisDaLoja, type EntradaDoCanal } from '@/lib/erp/faturamento';
-import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
+import { cadastrarInsumoDeTeste as cadastrarInsumo, SEM_NOTA_FISCAL } from './erp-db-apoio';
 import { cadastrarFornecedor, cancelarNota, editarNota, lancarNota } from '@/lib/erp/compras';
 import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
 import { concluirContagem, descartarContagem, iniciarFechamento } from '@/lib/erp/contagem';
@@ -390,7 +390,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
     const nota = (numero: string, data: string, valor = '100,00') => ({ lojaId: ids.vp, fornecedorId: ids.fornecedor, numero, serie: '', data, frete: '', total: valor, itens: [{ insumoId: ids.cheddar, embalagem: 'padrao', quantidade: '1', valor }] });
 
     it('prepara: fornecedor, insumo, uma nota de agosto e uma de outubro', async () => {
-      const f = await cadastrarFornecedor(a, { nome: 'Laticínios Rio' }, 'Marina');
+      const f = await cadastrarFornecedor(a, { nome: 'Laticínios Rio', ...SEM_NOTA_FISCAL }, 'Marina');
       if (!f.ok) throw new Error('fornecedor');
       ids.fornecedor = f.id;
       const i = await cadastrarInsumo(a, { tipo: 'INGREDIENTE', escala: 'base', nome: 'Cheddar fatiado', unidade: 'KG', conteudo: '5', preco: '89,90', frete: '5,00', conservacao: 'REFRIGERADO' });

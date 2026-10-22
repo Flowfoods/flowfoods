@@ -44,7 +44,7 @@ vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } 
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { mudarSituacaoInsumo } from '@/lib/erp/insumos';
-import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
+import { cadastrarInsumoDeTeste as cadastrarInsumo, SEM_NOTA_FISCAL } from './erp-db-apoio';
 import { cadastrarFicha } from '@/lib/erp/fichas';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { cadastrarFornecedor, cancelarNota, editarNota, lancarNota, obterNota } from '@/lib/erp/compras';
@@ -170,7 +170,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
     const molho = await cadastrarFicha(a, { nome: 'Molho cheddar', tipo: 'PRE_PREPARO', rendimento: '2', rendimentoUnidade: 'kg', itens: [{ insumoId: ids.cheddar, quantidade: '1', unidade: 'kg' }] }, { tipo: 'manter' }, 'Marina');
     if (!molho.ok) throw new Error(JSON.stringify(molho));
     ids.molho = (await a.insumo.findFirst({ where: { tipo: 'PRE_PREPARO' }, select: { id: true } }))!.id;
-    const f = await cadastrarFornecedor(a, { nome: 'Laticínios Rio' }, 'Marina');
+    const f = await cadastrarFornecedor(a, { nome: 'Laticínios Rio', ...SEM_NOTA_FISCAL }, 'Marina');
     if (!f.ok) throw new Error('fornecedor');
     ids.fornecedor = f.id;
     const lb = await cadastrarLoja(b, { nome: 'Loja B' }, 'Bia');

@@ -10,9 +10,10 @@ import { listarEstrutura } from '@/lib/erp/estrutura';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { FormCanais } from '@/components/erp/telas/estrutura/form-canais';
+import { FormCnpj } from '@/components/erp/telas/estrutura/form-cnpj';
 import { FormNome } from '@/components/erp/telas/estrutura/form-nome';
 import { resumoDaEstrutura, TelaEstrutura } from '@/components/erp/telas/estrutura/tela-estrutura';
-import { acaoCadastrarLojaDaSessao, acaoCadastrarMarcaDaSessao, acaoSalvarCanaisDaLojaDaSessao } from '../actions';
+import { acaoCadastrarLojaDaSessao, acaoCadastrarMarcaDaSessao, acaoSalvarCanaisDaLojaDaSessao, acaoSalvarCnpjDaLojaDaSessao } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,6 +36,7 @@ export default async function ErpLojasPage() {
         bloqueio={ctx.bloqueio}
         formLoja={cadastra ? <FormNome acao={acaoCadastrarLojaDaSessao} tipo="loja" /> : undefined}
         formMarca={cadastra ? <FormNome acao={acaoCadastrarMarcaDaSessao} tipo="marca" /> : undefined}
+        formCnpj={cadastra && !ctx.bloqueio ? (l) => <FormCnpj acao={acaoSalvarCnpjDaLojaDaSessao.bind(null, l.id)} lojaId={l.id} nome={l.nome} cnpj={l.cnpj} /> : undefined}
         formCanais={cadastra && !ctx.bloqueio ? (l) => <FormCanais acao={acaoSalvarCanaisDaLojaDaSessao.bind(null, l.id)} nome={l.nome} canais={l.canais} /> : undefined}
       />
     </div>

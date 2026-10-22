@@ -7,6 +7,7 @@
 
 import type { ReactNode } from 'react';
 import { CANAIS } from '@/lib/erp/canal-campos';
+import { formatarDocumento } from '@/lib/erp/compra-campos';
 import { CANAIS_EM_ORDEM, type CanalVenda } from '@/lib/erp/faturamento-campos';
 import { Contagem, Painel, Vazio } from '../../ui/superficies';
 
@@ -34,19 +35,25 @@ function InativaNoCelular({ ativa }: { ativa: boolean }) {
   return <span className="ml-2 text-[12px] font-normal text-suave sm:hidden">inativa</span>;
 }
 
-type LinhaDaEstrutura = { id: string; nome: string; slug?: string; ativa: boolean; criadoEm: Date; canaisDeVenda?: CanalVenda[] | null };
+type LinhaDaEstrutura = { id: string; nome: string; slug?: string; ativa: boolean; criadoEm: Date; canaisDeVenda?: CanalVenda[] | null; cnpj?: string | null };
 
 function Tabela({
   rotulo,
   linhas,
   mostrarLink,
   canais,
+  mostrarCnpj = false,
+  cnpj,
 }: {
   rotulo: string;
   linhas: LinhaDaEstrutura[];
   mostrarLink: boolean;
   /** 2.1: onde cada loja vende, com o controle para quem cadastra lojas (some nas marcas). */
   canais?: (l: LinhaDaEstrutura) => ReactNode;
+  /** F.1a: o CNPJ da loja (a marca não tem). */
+  mostrarCnpj?: boolean;
+  /** F.1a: o controle do CNPJ, só para quem cadastra lojas. */
+  cnpj?: (l: LinhaDaEstrutura) => ReactNode;
 }) {
   return (
     <table className="w-full table-fixed text-sm">
@@ -72,6 +79,10 @@ function Tabela({
                 <InativaNoCelular ativa={l.ativa} />
               </div>
               {mostrarLink && l.slug && <div className="truncate text-[12px] text-suave">{l.slug}</div>}
+              {mostrarCnpj && (
+                <div className="text-[12px] font-normal text-suave">{l.cnpj ? `CNPJ ${formatarDocumento(l.cnpj)}` : 'CNPJ não informado'}</div>
+              )}
+              {cnpj?.(l)}
               {canais && (
                 <>
                   <div className="text-[12px] font-normal text-suave">Vende em {CANAIS_EM_ORDEM.filter((c) => (l.canaisDeVenda ?? []).includes(c)).map((c) => CANAIS[c].curto).join(' · ') || '—'}</div>
@@ -98,8 +109,9 @@ export function TelaEstrutura({
   formMarca,
   mostrarLink = false,
   formCanais,
+  formCnpj,
 }: {
-  lojas: { id: string; nome: string; slug: string; ativa: boolean; criadoEm: Date; canaisDeVenda?: CanalVenda[] | null }[];
+  lojas: { id: string; nome: string; slug: string; ativa: boolean; criadoEm: Date; canaisDeVenda?: CanalVenda[] | null; cnpj?: string | null }[];
   marcas: { id: string; nome: string; ativa: boolean; criadoEm: Date }[];
   bloqueio: string | null;
   /** Sem formulário: a pessoa não cadastra lojas/marcas (a linha do campo some). */
@@ -109,6 +121,8 @@ export function TelaEstrutura({
   mostrarLink?: boolean;
   /** 2.1: o controle dos canais de venda de uma loja (só para quem cadastra lojas). */
   formCanais?: (l: { id: string; nome: string; canais: readonly CanalVenda[] }) => ReactNode;
+  /** F.1a: o controle do CNPJ de uma loja (só para quem cadastra lojas). */
+  formCnpj?: (l: { id: string; nome: string; cnpj: string }) => ReactNode;
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -128,6 +142,8 @@ export function TelaEstrutura({
             rotulo="Loja"
             linhas={lojas}
             mostrarLink={mostrarLink}
+            mostrarCnpj
+            cnpj={(l) => formCnpj?.({ id: l.id, nome: l.nome, cnpj: l.cnpj ?? '' })}
             canais={(l) => formCanais?.({ id: l.id, nome: l.nome, canais: CANAIS_EM_ORDEM.filter((c) => (l.canaisDeVenda ?? []).includes(c)) })}
           />
         )}

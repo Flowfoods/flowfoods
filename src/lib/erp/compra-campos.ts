@@ -64,6 +64,18 @@ export function cnpjValido(d: string): boolean {
   return d.length === 14 && documentoValido(d);
 }
 
+/**
+ * O CNPJ da loja (F.1a), como vem do formulário: com ou sem pontos, vazio = sem CNPJ (limpa). Só CNPJ de 14 dígitos com os dígitos
+ * verificadores certos: CPF e número torto não valem para o destinatário de uma nota.
+ */
+export function lerCnpjDaLoja(t: string): { ok: true; cnpj: string | null } | { ok: false; erro: string } {
+  const txt = t.trim();
+  if (!txt) return { ok: true, cnpj: null };
+  const d = digitos(txt);
+  if (/[^0-9.\-/\s]/.test(txt) || !cnpjValido(d)) return { ok: false, erro: 'CNPJ inválido. Confira os 14 números (ou deixe em branco).' };
+  return { ok: true, cnpj: d };
+}
+
 /** Os oito primeiros dígitos do CNPJ: a empresa. Filial e matriz têm a mesma raiz e CNPJs diferentes. CPF não tem raiz. */
 export function raizDoCnpj(d: string | null): string | null {
   return d && d.length === 14 ? d.slice(0, 8) : null;

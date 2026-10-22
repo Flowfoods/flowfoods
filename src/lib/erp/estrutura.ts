@@ -6,6 +6,7 @@
  */
 
 import { z } from 'zod';
+import { formatarDocumento, lerCnpjDaLoja } from './compra-campos';
 import { filtroDeLojas, type Alcance } from './permissoes';
 import { gerarSlug } from './slug';
 import { ehErroDeUnicidade, type ClienteDoParceiro } from './tenant';
@@ -110,7 +111,7 @@ export async function listarEstrutura(cliente: ClienteDoParceiro, alcance: Pick<
     cliente.loja.findMany({
       where: { id: filtroDeLojas(alcance) },
       orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
-      select: { id: true, nome: true, slug: true, ativa: true, criadoEm: true, canaisDeVenda: true },
+      select: { id: true, nome: true, slug: true, ativa: true, criadoEm: true, canaisDeVenda: true, cnpj: true },
     }),
     cliente.marca.findMany({
       orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
@@ -126,5 +127,49 @@ export async function listarLojasDoAlcance(cliente: ClienteDoParceiro, alcance: 
     where: { id: filtroDeLojas(alcance) },
     orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
     select: { id: true, nome: true, ativa: true },
+  });
+}
+
+export type ResultadoDoCnpjDaLoja =
+  | { ok: true; mudou: boolean; igualAoDeOutra: string | null }
+  | { ok: false; erros: { cnpj?: string; geral?: string } };
+
+const FRASE_CNPJ_CONFLITO = 'Alguém mudou o CNPJ desta loja agora há pouco. Recarregue a página; nada foi gravado.';
+
+/**
+ * F.1a — o CNPJ da loja (o destinatário das notas fiscais de compra). Com "cadastrar lojas" (rede inteira; quem chama já conferiu).
+ * Vazio limpa. Condicional ao que a tela leu (`liaAntes`: duas abas não se atropelam), com antes e depois no histórico, na mesma
+ * transação. NÃO é único: duas lojas podem operar no mesmo CNPJ (a conferência da nota pede a loja); quando acontece, o retorno diz qual.
+ */
+export async function salvarCnpjDaLoja(
+  cliente: ClienteDoParceiro,
+  lojaId: string,
+  cnpjDigitado: string,
+  liaAntes: string,
+  autorNome: string,
+): Promise<ResultadoDoCnpjDaLoja> {
+  const lido = lerCnpjDaLoja(cnpjDigitado);
+  if (!lido.ok) return { ok: false, erros: { cnpj: lido.erro } };
+  const antesLido = liaAntes.replace(/\D/g, '') || null;
+  return cliente.transacao(async (tx) => {
+    const l = await tx.loja.findUnique({ where: { id: lojaId }, select: { id: true, nome: true, cnpj: true } });
+    if (!l) return { ok: false as const, erros: { geral: 'Loja não encontrada.' } };
+    if ((l.cnpj ?? null) !== antesLido) return { ok: false as const, erros: { geral: FRASE_CNPJ_CONFLITO } };
+    if ((l.cnpj ?? null) === lido.cnpj) return { ok: true as const, mudou: false, igualAoDeOutra: null };
+    const r = await tx.loja.updateMany({ where: { id: lojaId, cnpj: l.cnpj }, data: { cnpj: lido.cnpj } });
+    if (r.count === 0) return { ok: false as const, erros: { geral: FRASE_CNPJ_CONFLITO } };
+    await tx.historicoAlteracao.create({
+      data: {
+        parceiroId: tx.parceiroId,
+        entidade: 'Loja',
+        entidadeId: l.id,
+        acao: 'ALTEROU',
+        antes: { nome: l.nome, cnpj: formatarDocumento(l.cnpj) },
+        depois: { nome: l.nome, cnpj: formatarDocumento(lido.cnpj) },
+        autorNome,
+      },
+    });
+    const outra = lido.cnpj ? await tx.loja.findFirst({ where: { cnpj: lido.cnpj, id: { not: lojaId } }, select: { nome: true } }) : null;
+    return { ok: true as const, mudou: true, igualAoDeOutra: outra?.nome ?? null };
   });
 }

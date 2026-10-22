@@ -53,7 +53,7 @@ import { modulosDoParceiro } from '@/lib/erp/modulos';
 import { formatarFracao } from '@/lib/erp/unidades';
 import * as comprasDaSessao from '@/app/erp/compras/actions';
 import * as fichasDaSessao from '@/app/erp/fichas/actions';
-import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { limparParceiros, perfilDoBanco, SEM_NOTA_FISCAL, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const sp = (t: string) => t.replace(/ /g, ' ');
@@ -185,14 +185,16 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
     expect(await rodar(() => comprasDaSessao.acaoCadastrarFornecedor(null, ruim))).toMatchObject({ erros: { documento: expect.stringMatching(/inválido/) } });
     const form = new FormData();
     form.set('nome', 'Laticínios Rio');
+    form.set('razaoSocial', 'Laticínios Rio Ltda');
     form.set('documento', '11.222.333/0001-81');
-    form.set('contato', 'Seu Jorge (21) 99999-0000');
+    form.set('email', 'vendas@laticiniosrio.com.br');
+    form.set('whatsapp', '(21) 99999-0000');
     const r = await rodar(() => comprasDaSessao.acaoCadastrarFornecedor(null, form));
     expect(r).toMatchObject({ redirect: expect.stringMatching(/^\/erp\/compras\/fornecedores\/.+\?feito=criado$/) });
     ids.laticinios = idDo(r);
     const [h] = await listarHistorico(a, { de: [{ entidade: 'Fornecedor', ids: [ids.laticinios] }], verPrecos: true });
     expect(h.mudancas.find((m) => m.campo === 'CNPJ/CPF')?.depois).toBe('11.222.333/0001-81');
-    const outro = await cadastrarFornecedor(a, { nome: 'Hortifruti Penha' }, 'Marina');
+    const outro = await cadastrarFornecedor(a, { nome: 'Hortifruti Penha', ...SEM_NOTA_FISCAL }, 'Marina');
     if (!outro.ok) throw new Error('fornecedor');
     ids.horti = outro.id;
   });
@@ -413,7 +415,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
     expect(await obterNota(b, donaB, ids.nota)).toBeNull();
     expect(await obterFornecedor(b, donaB, ids.laticinios)).toBeNull();
     expect((await listarNotas(b, donaB)).total).toBe(0);
-    const forn = await cadastrarFornecedor(b, { nome: 'Laticínios Rio' }, 'Bia'); // mesmo nome, outro parceiro: pode
+    const forn = await cadastrarFornecedor(b, { nome: 'Laticínios Rio', ...SEM_NOTA_FISCAL }, 'Bia'); // mesmo nome, outro parceiro: pode
     expect(forn.ok).toBe(true);
     const fB = (forn as { id: string }).id;
     const comInsumoDeA = await lancarNota(b, donaB, { lojaId: ids.lojaB, fornecedorId: fB, numero: '1', serie: '', data: '2026-10-14', frete: '', total: '10,00', itens: [{ insumoId: ids.cheddar, embalagem: 'padrao', quantidade: '1', valor: '10,00' }] }, 'Bia');

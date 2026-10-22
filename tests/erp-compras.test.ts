@@ -275,9 +275,9 @@ describe('ERP 1.5 · número, data, documento, filtros', () => {
     expect(documentoValido('11222333000182')).toBe(false);
     expect(documentoValido('52998224725')).toBe(true);
     expect(documentoValido('11111111111')).toBe(false);
-    expect(lerFormFornecedor({ nome: 'Laticínios Rio', documento: '11.222.333/0001-81', contato: ' (21) 99999-0000 ' })).toEqual({
+    expect(lerFormFornecedor({ nome: 'Laticínios Rio', razaoSocial: 'Laticínios Rio Ltda', documento: '11.222.333/0001-81', email: 'vendas@rio.com.br', whatsapp: ' (21) 99999-0000 ' })).toMatchObject({
       ok: true,
-      dados: { nome: 'Laticínios Rio', documento: '11222333000181', contato: '(21) 99999-0000' },
+      dados: { nome: 'Laticínios Rio', documento: '11222333000181', whatsapp: '21999990000' },
     });
     expect(lerFormFornecedor({ nome: 'X', documento: '123' }).ok).toBe(false);
   });

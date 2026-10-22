@@ -117,3 +117,10 @@ export async function cadastrarInsumoDeTeste(cliente: ClienteDoParceiro, entrada
   const sugestao = await sugestaoParaInsumo(cliente, String(comConservacao.nome ?? ''), typeof comConservacao.tipo === 'string' ? comConservacao.tipo : undefined);
   return cadastrarInsumo(cliente, { ...comConservacao, categoriaId: sugestao.categoriaId ?? '' }, autorNome);
 }
+
+/**
+ * F.1a: o fornecedor ganhou campos obrigatórios (razão social, CNPJ, e-mail, WhatsApp); os testes que só precisam de um fornecedor
+ * para o resto do cenário o cadastram "sem nota fiscal" (nome + WhatsApp), que é a exceção da regra. Quem exercita o cadastro
+ * completo fala com o servidor sem este atalho.
+ */
+export const SEM_NOTA_FISCAL = { semNotaFiscal: 'on', whatsapp: '(21) 99641-6060' } as const;

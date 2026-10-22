@@ -16,6 +16,7 @@ import { cadastrarLoja, cadastrarMarca } from '@/lib/erp/estrutura';
 import type { EstadoForm } from '@/components/erp/ui/campos';
 import type { EstadoDosCanais } from '@/components/erp/telas/faturamento/estado';
 import { executarCanaisDaLoja } from '@/components/erp/telas/faturamento/executar';
+import { executarCnpjDaLoja } from '@/components/erp/telas/estrutura/executar';
 
 async function cadastrarEstrutura(
   tipo: 'loja' | 'marca',
@@ -57,4 +58,13 @@ export async function acaoSalvarCanaisDaLoja(slug: string, lojaId: string, anter
   if (negado) return { ok: false, erros: { geral: negado }, vez: (anterior?.vez ?? 0) + 1 };
   await prisma.auditLog.create({ data: { userId: ctx.sessao.userId, evento: 'erp_loja_canais', dados: { parceiroId: ctx.parceiro.id, id: String(lojaId) } } });
   return executarCanaisDaLoja(ctx.cliente, ctx.sessao.autorNome, String(lojaId), anterior, form, `/rodolfo/erp/${slug}`);
+}
+
+/** F.1a: o CNPJ da loja (o nível 1 sempre pode; fica no auditLog). */
+export async function acaoSalvarCnpjDaLoja(slug: string, lojaId: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {
+  const ctx = await exigirParceiro(slug);
+  const negado = recusaDaAcao(ctx, 'lojas.gerir') ?? ctx.bloqueio;
+  if (negado) return { ok: false, erros: { geral: negado }, vez: (anterior?.vez ?? 0) + 1 };
+  await prisma.auditLog.create({ data: { userId: ctx.sessao.userId, evento: 'erp_loja_cnpj', dados: { parceiroId: ctx.parceiro.id, id: String(lojaId) } } });
+  return executarCnpjDaLoja(ctx.cliente, ctx.sessao.autorNome, String(lojaId), anterior, form, `/rodolfo/erp/${slug}`);
 }

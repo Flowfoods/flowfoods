@@ -15,6 +15,7 @@ import { cadastrarLoja, cadastrarMarca } from '@/lib/erp/estrutura';
 import type { EstadoForm } from '@/components/erp/ui/campos';
 import type { EstadoDosCanais } from '@/components/erp/telas/faturamento/estado';
 import { executarCanaisDaLoja } from '@/components/erp/telas/faturamento/executar';
+import { executarCnpjDaLoja } from '@/components/erp/telas/estrutura/executar';
 import {
   concluirRegistroDeRosto,
   ERRO_ATIVAR_ROSTO,
@@ -61,6 +62,14 @@ export async function acaoSalvarCanaisDaLojaDaSessao(lojaId: string, anterior: E
   const negado = recusaDaAcao(ctx, 'lojas.gerir') ?? ctx.bloqueio;
   if (negado) return { ok: false, erros: { geral: negado }, vez: (anterior?.vez ?? 0) + 1 };
   return executarCanaisDaLoja(ctx.cliente, ctx.sessao.autorNome, String(lojaId), anterior, form, '/erp');
+}
+
+/** F.1a: o CNPJ da loja (o destinatário das notas fiscais). Cadastro da rede: "cadastrar lojas e marcas", que exige a rede inteira. */
+export async function acaoSalvarCnpjDaLojaDaSessao(lojaId: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = recusaDaAcao(ctx, 'lojas.gerir') ?? ctx.bloqueio;
+  if (negado) return { ok: false, erros: { geral: negado }, vez: (anterior?.vez ?? 0) + 1 };
+  return executarCnpjDaLoja(ctx.cliente, ctx.sessao.autorNome, String(lojaId), anterior, form, '/erp');
 }
 
 export async function acaoOpcoesDeAtivarRosto() {

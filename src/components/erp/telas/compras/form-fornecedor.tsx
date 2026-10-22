@@ -3,7 +3,7 @@
 /**
  * Cadastro do fornecedor (F.1a): quem vende, onde fica, como falar e quanto tempo de prazo. Obrigatórios ditos em palavras
  * ("obrigatório"): nome fantasia, razão social, CNPJ ou CPF, e-mail e WhatsApp com DDD. A única exceção é "Compras sem nota
- * fiscal" (feira, atacarejo): pede só o nome e o WhatsApp. O servidor refaz toda a conferência (dígitos verificadores, documento
+ * fiscal" (feira, atacarejo): pede só o nome e o WhatsApp. A conferência é refeita ao salvar (dígitos verificadores, documento
  * repetido, nome parecido, formato); aqui o erro volta para o lado do campo, sem perder o que foi digitado. O mesmo envio feito duas
  * vezes (clique repetido, conexão que caiu) cadastra um fornecedor só.
  */

@@ -37,7 +37,7 @@ vi.mock('@/lib/erp/contexto', async () => {
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
-import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
+import { cadastrarInsumoDeTeste as cadastrarInsumo, SEM_NOTA_FISCAL } from './erp-db-apoio';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { cadastrarFornecedor, lancarNota } from '@/lib/erp/compras';
 import { cadastrarFicha } from '@/lib/erp/fichas';
@@ -143,7 +143,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
       if (!r.ok) throw new Error(`${chave}: ${JSON.stringify(r)}`);
       ids[chave] = r.id;
     }
-    const f = await cadastrarFornecedor(a, { nome: 'Frigorífico Rio' }, 'Marina');
+    const f = await cadastrarFornecedor(a, { nome: 'Frigorífico Rio', ...SEM_NOTA_FISCAL }, 'Marina');
     if (!f.ok) throw new Error('fornecedor');
     ids.fornecedor = f.id;
     const lb = await cadastrarLoja(b, { nome: 'Loja B' }, 'Bia');

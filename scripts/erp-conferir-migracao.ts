@@ -3,7 +3,8 @@
  * `20261026000000_erp_dre_despesas` (2.2a), `20261027000000_erp_dre_fechamento` (2.2b), `20261028000000_erp_cmv` (2.3),
  * `20261029000000_erp_producao` (3.1), `20261030000000_erp_lista_do_dia` (3.2), `20261031000000_erp_producao_equipe` (3.3) e
  * `20261101000000_erp_insumo_categorias` (I.1a), `20261102000000_erp_insumo_clareza` + `20261102010000_erp_insumo_conservacao_confirmada` (I.1b) e
- * `20261103000000_erp_cmv_categorias` (I.2a) + `20261103010000_erp_cmv_categorias_endurecimento` e `20261104000000_erp_cmv_real_categorias` (I.2b).
+ * `20261103000000_erp_cmv_categorias` (I.2a) + `20261103010000_erp_cmv_categorias_endurecimento` e `20261104000000_erp_cmv_real_categorias` (I.2b)
+ * e `20261105000000_erp_fornecedor_cadastro` (F.1a: cadastro do fornecedor e CNPJ da loja).
  *
  *   npm run erp:conferir-migracao
  *
@@ -19,6 +20,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+import { documentoValido, formatarDocumento } from '../src/lib/erp/compra-campos';
 
 export const CHECKS_DA_2_1 = [
   ['FaturamentoLancamento', 'FaturamentoLancamento_valor_teto'],
@@ -149,8 +151,68 @@ export const GATILHOS_DA_I_2A = [
   'MetaCmvCategoria_do_conjunto_novo',
 ] as const;
 
+/** Os CHECKs que a F.1a acrescentou em "Fornecedor" e "Loja" (nenhuma tabela nova: portão e RLS são os de sempre). */
+export const CHECKS_DA_F_1A = [
+  ['Fornecedor', 'Fornecedor_documento_formato'],
+  ['Fornecedor', 'Fornecedor_inscricao_formato'],
+  ['Fornecedor', 'Fornecedor_uf_valida'],
+  ['Fornecedor', 'Fornecedor_cep_formato'],
+  ['Fornecedor', 'Fornecedor_whatsapp_formato'],
+  ['Fornecedor', 'Fornecedor_email_formato'],
+  ['Fornecedor', 'Fornecedor_prazo_faixa'],
+  ['Fornecedor', 'Fornecedor_textos_curtos'],
+  ['Fornecedor', 'Fornecedor_chaveEnvio_completa'],
+  ['Fornecedor', 'Fornecedor_completo_tem_o_basico'],
+  ['Loja', 'Loja_cnpj_formato'],
+] as const;
+
+/** Os índices únicos da F.1a: a chave de envio (reenvio não duplica) e o documento fiscal (um fornecedor por CNPJ/CPF e parceiro). */
+export const INDICE_DO_DOCUMENTO_DO_FORNECEDOR = 'Fornecedor_parceiroId_documento_key';
+export const INDICES_DA_F_1A = ['Fornecedor_parceiroId_chaveEnvio_key', INDICE_DO_DOCUMENTO_DO_FORNECEDOR] as const;
+
+export interface RelatorioDeFornecedores {
+  /** O mesmo CNPJ/CPF em mais de um fornecedor do mesmo parceiro (o índice único não nasce enquanto isso existir). */
+  repetidos: { parceiro: string; documento: string; nomes: string[] }[];
+  /** Documento gravado que não passa nos dígitos verificadores (cadastro antigo): a tela mostra "Documento a conferir". */
+  documentosAConferir: { parceiro: string; nome: string; documento: string }[];
+  /** Quantos fornecedores ficaram "a completar" (todos os que existiam antes da F.1a). */
+  aCompletar: number;
+}
+
+/**
+ * Lê os fornecedores POR PARCEIRO, no contexto dele (a RLS forçada só deixa o papel do tenant ver a linha; o catálogo do Postgres
+ * não basta para listar nomes). Só leitura. `db` sem `$transaction` (um objeto de teste só com `$queryRaw`) devolve nada.
+ */
+export async function relatorioDeFornecedores(db: Pick<PrismaClient, '$queryRaw' | '$transaction'>): Promise<RelatorioDeFornecedores> {
+  const relatorio: RelatorioDeFornecedores = { repetidos: [], documentosAConferir: [], aCompletar: 0 };
+  if (typeof db.$transaction !== 'function') return relatorio;
+  const parceiros = await db.$queryRaw<{ id: string; slug: string }[]>`SELECT "id", "slug" FROM "ParceiroFlow" ORDER BY "slug"`;
+  const papel = await db.$queryRaw<{ ok: boolean }[]>`
+    SELECT (EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_tenant')
+            AND CASE WHEN current_setting('server_version_num')::int >= 160000
+                     THEN pg_has_role(current_user, 'erp_tenant', 'SET') ELSE pg_has_role(current_user, 'erp_tenant', 'MEMBER') END) AS "ok"`;
+  const comPapel = !!papel[0]?.ok;
+  for (const p of parceiros) {
+    const linhas = await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT set_config('app.parceiro_id', ${p.id}, true)`;
+      if (comPapel) await tx.$queryRaw`SELECT set_config('role', 'erp_tenant', true)`;
+      return tx.$queryRaw<{ nome: string; documento: string | null; situacao: string }[]>`
+        SELECT "nome", "documento", "situacaoCadastro"::text AS "situacao" FROM "Fornecedor" WHERE "parceiroId" = ${p.id} ORDER BY "nome"`;
+    });
+    const porDocumento = new Map<string, string[]>();
+    for (const f of linhas) {
+      if (f.situacao === 'A_COMPLETAR') relatorio.aCompletar += 1;
+      if (!f.documento) continue;
+      porDocumento.set(f.documento, [...(porDocumento.get(f.documento) ?? []), f.nome]);
+      if (!documentoValido(f.documento)) relatorio.documentosAConferir.push({ parceiro: p.slug, nome: f.nome, documento: f.documento });
+    }
+    for (const [documento, nomes] of Array.from(porDocumento)) if (nomes.length > 1) relatorio.repetidos.push({ parceiro: p.slug, documento, nomes });
+  }
+  return relatorio;
+}
+
 /** O que a migration deixou pendente (frases prontas para o terminal); lista vazia = tudo no lugar. */
-export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
+export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'> & Partial<Pick<PrismaClient, '$transaction'>>): Promise<string[]> {
   const pendencias: string[] = [];
   const checks = await db.$queryRaw<{ tabela: string; nome: string; validado: boolean }[]>`
     SELECT c.conrelid::regclass::text AS tabela, c.conname AS nome, c.convalidated AS validado
@@ -362,6 +424,34 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       }
     }
   }
+  // F.1a: só se a migration dela já rodou (a coluna existe; o catálogo não passa pela RLS).
+  const cadastro = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM information_schema.columns WHERE table_name = 'Fornecedor' AND column_name = 'situacaoCadastro'`;
+  if (cadastro[0]?.n) {
+    const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_F_1A.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_F_1A) {
+      const achado = dela.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration 20261105000000_erp_fornecedor_cadastro não foi aplicada por inteiro.`);
+      else if (!achado.validado) {
+        pendencias.push(`CHECK ${nome} ficou NOT VALID: corrija a linha antiga que o viola e rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+      }
+    }
+    const indices = await db.$queryRaw<{ nome: string }[]>`SELECT indexname AS nome FROM pg_indexes WHERE indexname = ANY(${[...INDICES_DA_F_1A]})`;
+    for (const i of INDICES_DA_F_1A) {
+      if (indices.some((x) => x.nome === i)) continue;
+      if (i !== INDICE_DO_DOCUMENTO_DO_FORNECEDOR) {
+        pendencias.push(`Índice ${i} NÃO existe: a migration 20261105000000_erp_fornecedor_cadastro não foi aplicada por inteiro.`);
+        continue;
+      }
+      pendencias.push(
+        `Índice ${i} NÃO existe: há fornecedores do mesmo parceiro com o mesmo CNPJ/CPF. Corrija o cadastro de cada um (o documento certo, ou "Compras sem nota fiscal" e o documento em branco) e rode o CREATE UNIQUE INDEX "${i}" ON "Fornecedor"("parceiroId", "documento") WHERE "documento" IS NOT NULL; da migration 20261105000000_erp_fornecedor_cadastro. Enquanto isso o servidor já recusa documento repetido.`,
+      );
+      const rel = db.$transaction ? await relatorioDeFornecedores(db as Pick<PrismaClient, '$queryRaw' | '$transaction'>) : null;
+      for (const r of rel?.repetidos ?? []) {
+        pendencias.push(`  CNPJ/CPF repetido no parceiro ${r.parceiro}: ${formatarDocumento(r.documento)} em ${r.nomes.map((n) => `“${n}”`).join(' e ')}.`);
+      }
+    }
+  }
   return pendencias;
 }
 
@@ -369,11 +459,17 @@ async function principal() {
   const db = new PrismaClient();
   try {
     const pendencias = await conferirMigracao(db);
+    // F.1a: o que NÃO é pendência da migration, mas é dado antigo que a equipe precisa resolver (não muda o código de saída).
+    const rel = await relatorioDeFornecedores(db).catch(() => null);
+    if (rel && (rel.aCompletar > 0 || rel.documentosAConferir.length > 0)) {
+      console.log(`Fornecedores: ${rel.aCompletar} a completar (cadastro anterior à F.1a: falta e-mail, WhatsApp e, se for o caso, razão social).`);
+      for (const d of rel.documentosAConferir) console.log(`  Documento a conferir no parceiro ${d.parceiro}: “${d.nome}” tem ${d.documento}, que não passa nos dígitos verificadores.`);
+    }
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a e da I.2b conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias e das metas por categoria (com RLS), os índices e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b e da F.1a conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias e das metas por categoria (com RLS), os índices e os gatilhos existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a e da I.2b: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b e da F.1a: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {

@@ -33,7 +33,7 @@ vi.mock('@/lib/erp/contexto', async () => {
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
-import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
+import { cadastrarInsumoDeTeste as cadastrarInsumo, SEM_NOTA_FISCAL } from './erp-db-apoio';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { cadastrarFornecedor, lancarNota } from '@/lib/erp/compras';
 import { cadastrarFicha, editarFicha, obterFicha } from '@/lib/erp/fichas';
@@ -219,7 +219,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.9 · custo por canal (Postgres real)', { time
 
   it('nota da caixa kraft mais cara (R$ 99,00 o cento) sobe o delivery e o iFood em 10 c; a loja não muda', async () => {
     const loja = await cadastrarLoja(a, { nome: 'Vila da Penha' }, 'Marina');
-    const forn = await cadastrarFornecedor(a, { nome: 'Embalagens Rio' }, 'Marina');
+    const forn = await cadastrarFornecedor(a, { nome: 'Embalagens Rio', ...SEM_NOTA_FISCAL }, 'Marina');
     if (!loja.ok || !forn.ok) throw new Error('loja/fornecedor');
     const dona = alcanceDe('DONO');
     const n = await lancarNota(
