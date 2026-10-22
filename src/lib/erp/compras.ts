@@ -21,6 +21,7 @@
  *   antes de marcar `lancadaEm`: lançar e concluir a abertura se esperam.
  */
 
+import { createHash } from 'node:crypto';
 import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
 import { ehErroDeUnicidade } from './tenant';
@@ -33,6 +34,8 @@ import {
   PREFIXO_DA_EMBALAGEM,
   custoDaCompra,
   FILTROS_DE_NOTA_PADRAO,
+  documentoAConferir,
+  faltaNoCadastro,
   formatarData,
   hojeNoRio,
   lerFormFornecedor,
@@ -40,8 +43,10 @@ import {
   NOTAS_POR_PAGINA,
   retratoDaNota,
   retratoDoFornecedor,
+  raizDoCnpj,
   rotuloDaNota,
   type DadosDaNota,
+  type DadosFornecedor,
   type EntradaDaNota,
   type FiltrosDeNota,
   type InsumoDaCompra,
@@ -54,17 +59,26 @@ import { formatarRendimento, porUnidadeDeRendimento, TIPOS_DE_FICHA, type CustoD
 import { lerCascata } from './ficha-custos';
 import { orcamentoNaNota, type OrcamentoNaNota } from './orcamento';
 import { cascataDeCusto, PROFUNDIDADE_MAXIMA, type FichaDaCascata } from './ficha-cascata';
-import { diferenca, type Erros } from './insumo-campos';
+import { diferenca, lerChaveDeEnvio, type Erros } from './insumo-campos';
+import { ACENTUADAS, chaveDoNome, SEM_ACENTO } from './categoria-campos';
 import { centavosDaFracao, compararCustos, compararFracoes, custoDaEmbalagem, formatarCusto, formatarFracao, formatarQuantidade as formatarQtd, type CustoExato, type Unidade } from './unidades';
 
 export type ResultadoCompras =
-  | { ok: true; id: string; mudou: string[] }
+  | {
+      ok: true;
+      id: string;
+      mudou: string[];
+      /** F.1a: o mesmo envio chegou de novo (clique repetido, resposta perdida): devolve o fornecedor que já existe, sem criar outro. */
+      repetido?: boolean;
+    }
   | {
       ok: false;
       erros: Erros;
       conflito?: boolean;
-      /** Fornecedor com o mesmo nome, desativado: dá para reativar. */
+      /** Fornecedor com o mesmo nome ou o mesmo CNPJ/CPF, desativado: dá para reativar. */
       desativadoId?: string;
+      /** F.1a: o fornecedor ATIVO que já tem este nome ou este CNPJ/CPF: abrir em vez de cadastrar de novo. */
+      existenteId?: string;
       naoEncontrado?: boolean;
       /** A mesma nota já lançada (e visível para quem tenta): link para ela. */
       duplicadaId?: string;

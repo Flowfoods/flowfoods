@@ -653,6 +653,10 @@ model Loja {
   ativa      Boolean      @default(true)
   criadoEm   DateTime     @default(now())
 
+  // F.1a: o CNPJ da loja (14 dígitos, dígitos verificadores conferidos pela regra), o destinatário das notas fiscais de compra.
+  // Opcional e NÃO único: duas lojas podem operar no mesmo CNPJ (a conferência da F.1b pede a loja). Muda com `lojas.gerir`.
+  cnpj       String?
+
   // 1.7: regras da contagem desta loja (mudam só com "cadastrar lojas", rede
   // inteira: o gerente não baixa o piso que o trava). Piso do fechamento do
   // período: cobertura mínima por valor e por itens, em pontos-base (CHECK
@@ -738,14 +742,40 @@ model Fornecedor {
   id         String       @id @default(cuid())
   parceiroId String
   parceiro   ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  // F.1a: o nome fantasia, como a casa chama (continua único no parceiro); a razão social é coluna própria.
   nome       String
-  // CNPJ/CPF só dígitos; opcional porque feira e atacarejo nem sempre têm.
+  // CNPJ/CPF só dígitos; opcional porque feira e atacarejo nem sempre têm. F.1a: único por parceiro (índice parcial só no SQL:
+  // `Fornecedor_parceiroId_documento_key`, onde o documento não é nulo); a filial tem outro CNPJ e é outro cadastro.
   documento  String?
+  // Texto livre do cadastro antigo (1.5). Só leitura a partir da F.1a: nada é convertido em WhatsApp ou e-mail por palpite.
   contato    String?
   ativo      Boolean      @default(true)
   criadoEm   DateTime     @default(now())
   // 1.5: edição condicional à versão lida (duas abas não se atropelam).
   atualizadoEm DateTime   @default(now()) @updatedAt
+
+  // F.1a — cadastro evoluído (preparado para o documento fiscal da F.1b). Tudo opcional no banco; o que é obrigatório quem exige é
+  // a regra (formulário e servidor), conforme `semNotaFiscal`.
+  razaoSocial        String?
+  inscricaoEstadual  String?
+  endereco           String?
+  municipio          String?
+  uf                 String?
+  cep                String?
+  email              String?
+  // Só dígitos com DDD (10 ou 11), sem o 55.
+  whatsapp           String?
+  contatoComercial   String?
+  // Prazo de pagamento combinado, em dias (0 a 180). Só GUARDADO: nenhuma conta, vencimento ou despesa nasce dele. Nulo = não informado.
+  prazoPagamentoDias Int?
+  // "Compras sem nota fiscal" (feira, atacarejo): dispensa CNPJ, razão social e e-mail; NUNCA casa com documento fiscal.
+  semNotaFiscal      Boolean @default(false)
+  // COMPLETO: passou pelo formulário com os obrigatórios. A_COMPLETAR: nasceu do sistema (migração dos antigos e, na F.1b, o
+  // emitente desconhecido de uma nota), recebe notas, mas só se edita completando.
+  situacaoCadastro   SituacaoCadastroFornecedor @default(A_COMPLETAR)
+  // Idempotência de criar (a mesma do insumo): a chave do formulário (por pessoa) e a impressão do conteúdo.
+  chaveEnvio         String?
+  hashEnvio          String?
 
   insumosPadrao Insumo[]
   variantes     InsumoVariante[]
@@ -753,7 +783,13 @@ model Fornecedor {
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, nome])
+  @@unique([parceiroId, chaveEnvio])
   @@index([parceiroId, documento])
+}
+
+enum SituacaoCadastroFornecedor {
+  COMPLETO
+  A_COMPLETAR
 }
 
 enum InsumoTipo {

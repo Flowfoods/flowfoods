@@ -17,11 +17,12 @@
  */
 
 import { z } from 'zod';
-import { nomeObrigatorio, primeiroErroPorCampo, type Erros, type Leitura } from './insumo-campos';
+import { limparTexto, marcado, nomeObrigatorio, primeiroErroPorCampo, type Erros, type Leitura } from './insumo-campos';
 import { custoDaEmbalagem, dividirArredondado, formatarDinheiro, formatarQuantidade, lerDinheiro, lerQuantidade, UNIDADES, type CustoExato, type Unidade } from './unidades';
 
 export const LIMITES_DA_NOTA = { itens: 80, numero: 20, serie: 10, motivo: 200 } as const;
-export const LIMITES_DO_FORNECEDOR = { nome: 80, contato: 120 } as const;
+/** F.1a: os tetos do cadastro do fornecedor (o banco repete em CHECK). */
+export const LIMITES_DO_FORNECEDOR = { nome: 80, razaoSocial: 120, endereco: 200, municipio: 60, email: 120, contatoComercial: 80, prazoMaximoDias: 180 } as const;
 
 /** O mesmo teto do INTEGER do banco que `unidades.ts` usa. */
 const TETO = 2_000_000_000;
@@ -58,28 +59,225 @@ export function formatarDocumento(d: string | null): string | null {
   return d;
 }
 
+/** CNPJ (14 dígitos) com os dígitos verificadores certos: o da loja e o do estabelecimento; CPF não vale aqui. */
+export function cnpjValido(d: string): boolean {
+  return d.length === 14 && documentoValido(d);
+}
+
+/** Os oito primeiros dígitos do CNPJ: a empresa. Filial e matriz têm a mesma raiz e CNPJs diferentes. CPF não tem raiz. */
+export function raizDoCnpj(d: string | null): string | null {
+  return d && d.length === 14 ? d.slice(0, 8) : null;
+}
+
+export const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'] as const;
+
+/** Os DDDs que existem no Brasil: "(00) 99999-9999" e "(10) ..." não são telefone de ninguém. */
+const DDDS = new Set(
+  '11 12 13 14 15 16 17 18 19 21 22 24 27 28 31 32 33 34 35 37 38 41 42 43 44 45 46 47 48 49 51 53 54 55 61 62 63 64 65 66 67 68 69 71 73 74 75 77 79 81 82 83 84 85 86 87 88 89 91 92 93 94 95 96 97 98 99'.split(' '),
+);
+
+/**
+ * WhatsApp com DDD: só os dígitos, sem o 55 do país ("+55 (21) 99641-6060" → "21996416060"). Celular tem 11 dígitos e o número
+ * começa por 9; fixo tem 10 (há quem use o WhatsApp Business no fixo). Sem DDD, DDD que não existe ou tamanho errado = null.
+ */
+export function normalizarWhatsapp(t: string): string | null {
+  let d = digitos(t);
+  if ((d.length === 12 || d.length === 13) && d.startsWith('55')) d = d.slice(2);
+  if (d.length !== 10 && d.length !== 11) return null;
+  if (!DDDS.has(d.slice(0, 2))) return null;
+  if (d.length === 11 && d[2] !== '9') return null;
+  if (d.length === 10 && d[2] === '0') return null;
+  return d;
+}
+
+/** "21996416060" → "(21) 99641-6060"; fixo → "(21) 2222-3333". */
+export function formatarWhatsapp(d: string | null): string | null {
+  if (!d) return null;
+  if (d.length === 11) return d.replace(/^(\d{2})(\d{5})(\d{4})$/, '($1) $2-$3');
+  if (d.length === 10) return d.replace(/^(\d{2})(\d{4})(\d{4})$/, '($1) $2-$3');
+  return d;
+}
+
+/** "20000000" → "20000-000". */
+export function formatarCep(d: string | null): string | null {
+  return d && d.length === 8 ? d.replace(/^(\d{5})(\d{3})$/, '$1-$2') : d;
+}
+
+/**
+ * Inscrição estadual: só números (2 a 14; cada UF tem o seu tamanho e o seu cálculo, que a F.1a NÃO confere: é formato, não
+ * dígito verificador) ou ISENTO. Pontos, traços e barras saem; "isento"/"isenta" viram ISENTO. Inválida = null.
+ */
+export function normalizarInscricao(t: string): string | null {
+  const s = t.trim().toUpperCase();
+  if (/^ISENT[OA]$/.test(s)) return 'ISENTO';
+  if (!/^[0-9./\-\s]+$/.test(s)) return null;
+  const d = digitos(s);
+  return d.length >= 2 && d.length <= 14 ? d : null;
+}
+
+/** E-mail sem espaço, com uma arroba e um ponto depois dela; o resto quem confere é quem manda a mensagem. */
+export function emailValido(e: string): boolean {
+  return e.length <= LIMITES_DO_FORNECEDOR.email && /^[^@\s]+@[^@\s.]+(\.[^@\s.]+)+$/.test(e);
+}
+
 export interface DadosFornecedor {
   nome: string;
+  razaoSocial: string | null;
   documento: string | null;
-  contato: string | null;
+  inscricaoEstadual: string | null;
+  endereco: string | null;
+  municipio: string | null;
+  uf: string | null;
+  cep: string | null;
+  email: string | null;
+  whatsapp: string | null;
+  contatoComercial: string | null;
+  prazoPagamentoDias: number | null;
+  semNotaFiscal: boolean;
 }
+
+/** O que o cadastro precisa ter para ser "completo" (a regra de obrigatoriedade, uma só para o formulário, o banco e a tela). */
+export function faltaNoCadastro(f: Pick<DadosFornecedor, 'razaoSocial' | 'documento' | 'email' | 'whatsapp' | 'semNotaFiscal'>): string[] {
+  const falta: string[] = [];
+  if (!f.semNotaFiscal) {
+    if (!f.razaoSocial) falta.push('razão social');
+    if (!f.documento) falta.push('CNPJ ou CPF');
+    if (!f.email) falta.push('e-mail');
+  }
+  if (!f.whatsapp) falta.push('WhatsApp');
+  return falta;
+}
+
+/** O documento gravado não passa nos dígitos verificadores (cadastro antigo, gravado quando o CNPJ era só digitado): a tela pede para conferir. */
+export function documentoAConferir(documento: string | null): boolean {
+  return !!documento && !documentoValido(documento);
+}
+
+const ROTULOS_DO_FORNECEDOR: Record<string, string> = {
+  nome: 'Nome fantasia',
+  razaoSocial: 'Razão social',
+  documento: 'CNPJ ou CPF',
+  inscricaoEstadual: 'Inscrição estadual',
+  endereco: 'Endereço',
+  municipio: 'Município',
+  uf: 'UF',
+  cep: 'CEP',
+  email: 'E-mail',
+  whatsapp: 'WhatsApp',
+  contatoComercial: 'Contato comercial',
+  prazoPagamentoDias: 'Prazo de pagamento',
+};
+export const rotuloDoCampoDoFornecedor = (c: string) => ROTULOS_DO_FORNECEDOR[c] ?? c;
 
 const formFornecedor = z.object({ nome: nomeObrigatorio(LIMITES_DO_FORNECEDOR.nome) });
 
+/** Texto livre do cadastro: NFC, sem invisíveis, espaços colapsados; vazio = null; acima do teto = erro. */
+function textoCurto(valor: unknown, max: number, campo: string, erros: Erros): string | null {
+  const t = limparTexto(texto(valor)).trim().replace(/\s+/g, ' ');
+  if (!t) return null;
+  if (t.length > max) {
+    erros[campo] = `${rotuloDoCampoDoFornecedor(campo)} longo demais (máx. ${max}).`;
+    return null;
+  }
+  return t;
+}
+
+/**
+ * O formulário do fornecedor (F.1a) → dados prontos. Obrigatórios: nome fantasia, razão social, CNPJ/CPF (com dígitos
+ * verificadores), e-mail e WhatsApp com DDD. Exceção, uma só: "Compras sem nota fiscal" (feira, atacarejo) pede apenas nome e
+ * WhatsApp; o resto vale se vier, mas nunca casa com documento fiscal. Cada falta volta no campo dela; o cadastro "a completar"
+ * NÃO sai daqui: só o sistema o cria.
+ */
 export function lerFormFornecedor(entrada: Record<string, unknown>): Leitura<DadosFornecedor> {
   const r = formFornecedor.safeParse({ nome: entrada.nome });
   const erros: Erros = r.success ? {} : primeiroErroPorCampo(r.error.issues);
+  const semNotaFiscal = marcado(entrada.semNotaFiscal);
+
+  const razaoSocial = textoCurto(entrada.razaoSocial, LIMITES_DO_FORNECEDOR.razaoSocial, 'razaoSocial', erros);
+  if (!razaoSocial && !erros.razaoSocial && !semNotaFiscal) erros.razaoSocial = 'Diga a razão social, como está escrita na nota.';
+
   const docTxt = texto(entrada.documento).trim();
   const documento = docTxt ? digitos(docTxt) : null;
-  if (docTxt && (!documento || !documentoValido(documento))) erros.documento = 'CNPJ ou CPF inválido. Confira os números (ou deixe em branco).';
-  const contato = texto(entrada.contato).trim().replace(/\s+/g, ' ') || null;
-  if (contato && contato.length > LIMITES_DO_FORNECEDOR.contato) erros.contato = `Contato longo demais (máx. ${LIMITES_DO_FORNECEDOR.contato}).`;
+  if (docTxt && (!documento || !documentoValido(documento))) erros.documento = 'CNPJ ou CPF inválido. Confira os números.';
+  else if (!docTxt && !semNotaFiscal) {
+    erros.documento = 'Informe o CNPJ ou CPF: é por ele que o sistema reconhece o fornecedor nas notas fiscais. Sem nota (feira, atacarejo)? Marque “Compras sem nota fiscal”.';
+  }
+
+  const ieTxt = texto(entrada.inscricaoEstadual).trim();
+  let inscricaoEstadual: string | null = null;
+  if (ieTxt) {
+    inscricaoEstadual = normalizarInscricao(ieTxt);
+    if (!inscricaoEstadual) erros.inscricaoEstadual = 'Inscrição estadual inválida: só números (2 a 14) ou ISENTO.';
+  }
+
+  const endereco = textoCurto(entrada.endereco, LIMITES_DO_FORNECEDOR.endereco, 'endereco', erros);
+  const municipio = textoCurto(entrada.municipio, LIMITES_DO_FORNECEDOR.municipio, 'municipio', erros);
+
+  const ufTxt = texto(entrada.uf).trim().toUpperCase();
+  let uf: string | null = null;
+  if (ufTxt) {
+    if ((UFS as readonly string[]).includes(ufTxt)) uf = ufTxt;
+    else erros.uf = 'UF inválida. Use a sigla, como RJ ou SP.';
+  }
+
+  const cepTxt = texto(entrada.cep).trim();
+  let cep: string | null = null;
+  if (cepTxt) {
+    const d = digitos(cepTxt);
+    if (/^\d{8}$/.test(d) && !/[^0-9.\-\s]/.test(cepTxt)) cep = d;
+    else erros.cep = 'CEP inválido: são 8 números. Ex.: 21020-000.';
+  }
+
+  const emailTxt = limparTexto(texto(entrada.email)).trim().toLowerCase();
+  let email: string | null = null;
+  if (emailTxt) {
+    if (emailValido(emailTxt)) email = emailTxt;
+    else erros.email = 'E-mail inválido. Ex.: vendas@fornecedor.com.br.';
+  } else if (!semNotaFiscal) erros.email = 'Informe o e-mail do fornecedor.';
+
+  const zapTxt = texto(entrada.whatsapp).trim();
+  let whatsapp: string | null = null;
+  if (zapTxt) {
+    whatsapp = normalizarWhatsapp(zapTxt);
+    if (!whatsapp) erros.whatsapp = 'WhatsApp inválido: use o DDD e o número. Ex.: (21) 99641-6060.';
+  } else erros.whatsapp = 'Informe o WhatsApp com DDD. Ex.: (21) 99641-6060.';
+
+  const contatoComercial = textoCurto(entrada.contatoComercial, LIMITES_DO_FORNECEDOR.contatoComercial, 'contatoComercial', erros);
+
+  const prazoTxt = texto(entrada.prazoPagamentoDias).trim();
+  let prazoPagamentoDias: number | null = null;
+  if (prazoTxt) {
+    if (/^\d{1,3}$/.test(prazoTxt) && Number(prazoTxt) <= LIMITES_DO_FORNECEDOR.prazoMaximoDias) prazoPagamentoDias = Number(prazoTxt);
+    else erros.prazoPagamentoDias = `Prazo em dias inteiros, de 0 a ${LIMITES_DO_FORNECEDOR.prazoMaximoDias}.`;
+  }
+
   if (!r.success || Object.keys(erros).length > 0) return { ok: false, erros };
-  return { ok: true, dados: { nome: r.data.nome, documento, contato } };
+  return {
+    ok: true,
+    dados: { nome: r.data.nome, razaoSocial, documento, inscricaoEstadual, endereco, municipio, uf, cep, email, whatsapp, contatoComercial, prazoPagamentoDias, semNotaFiscal },
+  };
 }
 
-export function retratoDoFornecedor(f: DadosFornecedor): Record<string, string | null> {
-  return { nome: f.nome, documento: formatarDocumento(f.documento), contato: f.contato };
+export type SituacaoDoCadastro = 'COMPLETO' | 'A_COMPLETAR';
+
+/** O retrato do cadastro para o histórico (antes e depois), com os números como a pessoa os lê. */
+export function retratoDoFornecedor(f: DadosFornecedor & { situacaoCadastro?: SituacaoDoCadastro }): Record<string, string | null> {
+  return {
+    nome: f.nome,
+    razaoSocial: f.razaoSocial,
+    documento: formatarDocumento(f.documento),
+    inscricaoEstadual: f.inscricaoEstadual,
+    endereco: f.endereco,
+    municipio: f.municipio,
+    uf: f.uf,
+    cep: formatarCep(f.cep),
+    email: f.email,
+    whatsapp: formatarWhatsapp(f.whatsapp),
+    contatoComercial: f.contatoComercial,
+    prazoPagamento: f.prazoPagamentoDias === null ? null : `${f.prazoPagamentoDias} ${f.prazoPagamentoDias === 1 ? 'dia' : 'dias'}`,
+    semNotaFiscal: f.semNotaFiscal ? 'sim' : 'não',
+    cadastro: f.situacaoCadastro === undefined ? null : f.situacaoCadastro === 'COMPLETO' ? 'completo' : 'a completar',
+  };
 }
 
 // ------------------------------------------------------------ número e data
