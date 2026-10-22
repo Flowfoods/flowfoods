@@ -69,8 +69,8 @@ export async function PaginaDoRelatorio({
   }
   let r = await relatorioDaTela(ctx.cliente, ctx.alcance, f, modo);
   // Procurou pelo nome e só um insumo com compra tem esse nome: é ele (a pessoa não precisa escolher de uma lista de um).
-  if (modo === 'insumo' && !f.insumoId && f.q && r.opcoes.insumos.length === 1) {
-    f = { ...f, insumoId: r.opcoes.insumos[0].id };
+  if (modo === 'insumo' && !f.insumoId && f.q && r.opcoes.listaDeInsumos.length === 1) {
+    f = { ...f, insumoId: r.opcoes.listaDeInsumos[0].id };
     r = await relatorioDaTela(ctx.cliente, ctx.alcance, f, modo);
   }
   return (

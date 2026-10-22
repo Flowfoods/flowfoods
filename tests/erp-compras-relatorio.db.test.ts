@@ -358,7 +358,7 @@ describe.skipIf(!URL_TESTE)('ERP L.2 · relatórios de compras (Postgres real)',
     const operador = await relatorioDaTela(a, alcanceDe('OPERADOR', [ids.vp]), filtros(), 'periodo');
     expect(operador).toMatchObject({ motivoVazio: 'sem-permissao', totais: null, linhas: null, grupos: null });
     expect(operador.opcoes.lojas).toEqual([]);
-    expect(operador.opcoes.insumos).toEqual([]);
+    expect(operador.opcoes.listaDeInsumos).toEqual([]);
     expect((await relatorioCompleto(a, alcanceDe('OPERADOR', [ids.vp]), filtros(), 1000)).motivoVazio).toBe('sem-permissao');
     // O parceiro B só tem a nota dele; o id de loja ou de insumo de A não abre nada em B.
     const deB = await relatorioDaTela(b, alcanceDe('DONO', 'rede'), filtros(), 'periodo');
@@ -367,7 +367,7 @@ describe.skipIf(!URL_TESTE)('ERP L.2 · relatórios de compras (Postgres real)',
     expect(cruzado.totais).toBeNull();
     const cruzado2 = await relatorioDaTela(b, alcanceDe('DONO', 'rede'), filtros({ insumo: ids.mucarela }), 'periodo');
     expect(cruzado2.totais!.linhas).toBe(0);
-    expect(deB.opcoes.insumos.map((i) => i.nome)).toEqual(['Muçarela']);
+    expect(deB.opcoes.listaDeInsumos.map((i) => i.nome)).toEqual(['Muçarela']);
     expect(deB.opcoes.fornecedores.map((f) => f.nome)).toEqual(['Fornecedor B']);
   });
 

@@ -4,7 +4,8 @@
  * `20261029000000_erp_producao` (3.1), `20261030000000_erp_lista_do_dia` (3.2), `20261031000000_erp_producao_equipe` (3.3) e
  * `20261101000000_erp_insumo_categorias` (I.1a), `20261102000000_erp_insumo_clareza` + `20261102010000_erp_insumo_conservacao_confirmada` (I.1b) e
  * `20261103000000_erp_cmv_categorias` (I.2a) + `20261103010000_erp_cmv_categorias_endurecimento` e `20261104000000_erp_cmv_real_categorias` (I.2b)
- * e `20261105000000_erp_fornecedor_cadastro` (F.1a: cadastro do fornecedor e CNPJ da loja).
+ * e `20261105000000_erp_fornecedor_cadastro` (F.1a: cadastro do fornecedor e CNPJ da loja), `20261106000000_erp_documento_fiscal` (F.1b)
+ * e `20261107000000_erp_relatorio_compras` (L.2: dois índices da nota de compra).
  *
  *   npm run erp:conferir-migracao
  *
@@ -574,7 +575,7 @@ async function principal() {
       for (const d of rel.documentosAConferir) console.log(`  Documento a conferir no parceiro ${d.parceiro}: “${d.nome}” tem ${documentoParaSaida(d.documento)}, que não passa nos dígitos verificadores.`);
     }
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a e da F.1b conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias, das metas por categoria e da nota fiscal por XML (com RLS), os índices e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a, da F.1b e da L.2 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias, das metas por categoria e da nota fiscal por XML (com RLS), os índices e os gatilhos existem.');
       return 0;
     }
     console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a e da F.1b: ${pendencias.length} pendência(s):`);

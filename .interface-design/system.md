@@ -305,3 +305,19 @@ Editorial (separadores delicados, número de tabela sem serifa):
 - **Volta da edição**: a caneta volta à LISTA (mesma página, filtros e tamanho) com `AvisoDeSalvo` ("Insumo atualizado com sucesso: nome",
   "Continuar editando", "Ver o insumo"); o nome vem do banco, a URL só escolhe a frase. Colunas secundárias saem antes de a tabela passar da
   largura (abaixo de 1280 px saem "Outras embalagens" e "Custo inicial"): sem rolagem lateral em 820 px.
+- **Relatório de compras (L.2)**: duas telas na área Compras (histórico de um insumo; compras do período), em `PageHeader` com o
+  recorte no subtítulo ("Casa Alfa · Data da entrada da nota, de 01/10/2026 a 22/10/2026"). **Filtros** em formulário GET com rótulo
+  persistente (13/500), grade 2 colunas no celular e 4 em ≥ 1024, recolhidos em "Filtros (n)" abaixo de 640 px (nascem abertos só
+  quando a tela ainda não tem o que mostrar); lojas em `<details>` de caixas de marcar (44 px por linha), sem marcar = todas as do
+  acesso; **atalhos de período** em chips de 36 px (44 em toque) com `aria-current`; **chips "Valendo:"** com × e "Limpar filtros".
+  **Indicadores**: `Cartao` borda `linha`, raio 14, título 12/500, número em Gelasio 26/700 tabular, conta por extenso em 12 px
+  ("R$ 118.600,00 ÷ 26 kg = R$ 45,62/kg") e SEMPRE um link "Ver as N linhas" de 44 px; uma linha por unidade (kg, L, un nunca
+  somam); "sem base" = selo atenção + o motivo, nunca R$ 0,00. **Para ler os números**: painel de notas em 13 px suave (data usada,
+  canceladas, documentos aguardando, sem base, histórico). **Tabela de grupos** (≥ 1024) e **de linhas** em 6 colunas com a
+  composição do total na célula ("itens R$ x + frete R$ y − desc. R$ 0,00", 12 px suave) e cartões abaixo de 1024 px (nome e total
+  na primeira linha, composição, data · embalagem = quantidade, preço, link da nota com área de 44 px). Cancelada: riscada +
+  selo "Cancelada" + banner de atenção no topo. Rodapé: `PaginacaoNumerada` com "Itens por página". **Saída**: "Planilha das
+  compras", "Planilha do resumo" e "Imprimir ou salvar em PDF" (secundários, uma linha acima dos indicadores, quebram no celular).
+  **Impressão**: mesma tela com `imprimir=1`, papel claro em qualquer tema, sem menu, barra do topo, abas e botões
+  (`@media print` em `tokens.css`), tabelas inteiras com cabeçalho repetido e linha que não parte; rolagem na própria região
+  (focável) abaixo de 640 px.

@@ -73,6 +73,7 @@ export function TabelasDaImpressao({
 
       <section aria-label="Totais" className="break-inside-avoid">
         <h2 className="mb-1 text-sm font-semibold">Totais</h2>
+        <div className="overflow-x-auto" role="region" aria-label="Totais" tabIndex={0}>
         <table className="w-full max-w-xl">
           <tbody>
             <tr><th scope="row" className={TH}>Compras (notas) · linhas</th><td className={`${TD} text-right tabular-nums`}>{t.notas} · {t.linhas}</td></tr>
@@ -99,6 +100,7 @@ export function TabelasDaImpressao({
                 ))}
           </tbody>
         </table>
+        </div>
         {Object.entries(t.semBase).filter(([, n]) => n).length > 0 && (
           <p className="mt-1 text-[12px]">
             Sem base para o preço médio (não calculado):{' '}
@@ -118,6 +120,7 @@ export function TabelasDaImpressao({
         {grupos.passouDoTeto ? (
           <p className="text-[12px]">Grupos demais para uma folha: reduza o período ou filtre.</p>
         ) : (
+          <div className="overflow-x-auto" role="region" aria-label="Tabela do resumo" tabIndex={0}>
           <table className="w-full">
             <thead>
               <tr>
@@ -144,6 +147,7 @@ export function TabelasDaImpressao({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </section>
 
@@ -154,6 +158,7 @@ export function TabelasDaImpressao({
             São mais de {teto.toLocaleString('pt-BR')} linhas: não cabem numa folha sem cortar. Os totais e o resumo acima estão completos; para as linhas, baixe a planilha das compras (ou reduza o período).
           </p>
         ) : (
+          <div className="overflow-x-auto" role="region" aria-label="Tabela das compras" tabIndex={0}>
           <table className="w-full">
             <thead>
               <tr>
@@ -189,6 +194,7 @@ export function TabelasDaImpressao({
               })}
             </tbody>
           </table>
+          </div>
         )}
       </section>
     </article>

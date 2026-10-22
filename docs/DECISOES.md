@@ -2681,3 +2681,68 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 ### 354. 2026-10-22 · ERP L.1 (ajustes dos fiscais): `npm run typecheck` com a mesma memória do build
 
 **Razão:** O `tsc` estoura a heap padrão nesta base, como o build. O script passou a `NODE_OPTIONS=--max-old-space-size=6144 tsc --noEmit`.
+
+### 355. 2026-10-22 · ERP L.2: sem permissão nova; ver e exportar são "ver compras e notas", por loja, e o servidor lê só as lojas do acesso
+
+**Alternativa:** criar "ver relatórios de compras" e "exportar". **Razão:** o relatório só reorganiza o que a nota de compra já mostra a quem tem `compras.ver` (quantidade, valor, frete, fornecedor, nota); uma permissão nova daria a perfil próprio antigo um buraco ou um vazio sem decisão do Rodolfo. Dono e Gerente têm (Gerente só nas lojas dele); Operador não tem `compras.ver`, então a página o leva a uma tela que ele pode, o menu nem mostra os relatórios e a planilha responde 403 sem dado. Loja pedida fora do acesso NUNCA amplia: sobra o que ele pode ver e, se nada sobra, o relatório sai vazio com a frase; o mesmo na planilha (403) e na impressão. O id de uma loja fora do acesso nem sai do servidor para a pessoa (teste no HTML). O nível 1 usa as mesmas telas pelo espelho `/rodolfo/erp/<slug>`.
+
+### 356. 2026-10-22 · ERP L.2: o dia é o do Rio (America/Sao_Paulo) para toda loja; o intervalo é [início, fim) convertido no SQL; fuso por loja fica como pergunta
+
+**Alternativa:** coluna `Loja.fusoHorario`. **Razão:** nenhuma loja do ERP tem fuso próprio e o resto do sistema já conta o dia no Rio (`hojeNoRio`); uma coluna sem tela para mudá-la seria um campo morto. `entradaEm` e `emitidaEm` são datas de calendário (sem fuso); só o instante do lançamento (`lancadaEm`, UTC) é lido no relógio do Rio: o filtro compara com `[meia-noite do Rio do primeiro dia, meia-noite do Rio do dia seguinte)` convertida para UTC (usa o índice) e o dia de agrupar sai de `AT TIME ZONE`. Provado no limite: 02:59:59 UTC de 11/10 é 23:59:59 de 10/10 e 03:00:00 UTC já é 11/10; 02:30 UTC de 01/10 é 23:30 de 30/09 (banco, teste puro e tela).
+
+### 357. 2026-10-22 · ERP L.2: três datas possíveis (entrada, emissão, lançamento), a escolha fica escrita e é a mesma em filtro, total, agrupar por dia, planilha e impressão
+
+**Razão:** "entrada" (padrão) é a data da nota que já põe a compra no período do CMV; "emissão" só existe nas notas que vieram do XML (as digitadas ficam de fora e a tela diz QUANTAS ficaram, no mesmo recorte); "lançamento" é o dia em que alguém lançou, no relógio do Rio. A frase "Data da entrada da nota, de 01/10/2026 a 31/10/2026" é a mesma na tela, no cabeçalho da planilha e na impressão (`fraseDoPeriodo`). Uma expressão SQL só (`DIA`) decide o dia; não há como filtro e total usarem datas diferentes.
+
+### 358. 2026-10-22 · ERP L.2: preço médio é valor ÷ quantidade (ponderado) só das linhas comparáveis; sem base, não calcula; só vale para UM insumo; custo entregue é o segundo número
+
+**Razão:** "comparável" = linha com insumo, unidade gravada, conta embalagens × conteúdo que fecha (até 1 milésimo de diferença) e valor maior que zero. O que não é comparável fica FORA da média, DENTRO do dinheiro e da contagem, e a tela lista os motivos ("a unidade não foi gravada na nota", "o valor da linha é zero (bonificação)", "a conta da embalagem não fecha", "a linha não está ligada a um insumo"); nunca vira R$ 0,00. Média de kg de insumos diferentes não é preço: o preço médio aparece no histórico de um insumo, no resumo agrupado por insumo e quando um insumo está escolhido. "Preço médio ponderado" soma só os itens; "custo médio entregue" soma também o frete atribuído (a distinção pedida entre preço do item e custo entregue). Amostra no teste: 5 kg a R$ 46, 10 kg a R$ 47, 6 kg a R$ 40 e 4 kg a R$ 50 dão R$ 45,62/kg (a média simples daria R$ 45,75). Preço abaixo de 1 centavo por unidade mostra as casas que precisa (R$ 0,0025/un), como no resto do ERP.
+
+### 359. 2026-10-22 · ERP L.2: quantidade nunca soma unidades; cada unidade tem a sua linha; unidade que a nota não gravou aparece como "sem unidade"
+
+**Razão:** kg, L e un ficam em linhas separadas no resumo, nos grupos (uma linha por grupo e unidade), na planilha ("Quantidade em kg", "Quantidade em L", "Quantidade em un") e na impressão. A linha sem unidade entra no dinheiro e fora de toda quantidade, e a planilha diz "não se soma (a nota não gravou a unidade)".
+
+### 360. 2026-10-22 · ERP L.2: valores do lançamento, não do cadastro de hoje
+
+**Razão:** a linha mostra o que a nota guardou: nome do insumo e do fornecedor (snapshot), embalagem original, quantidade de embalagens e conteúdo, quantidade convertida, unidade, valor e frete rateado. Renomear o insumo, trocar a embalagem ou o conteúdo no cadastro não muda uma compra antiga (teste: totais e linhas idênticos antes e depois de mexer no cadastro). Só o RÓTULO do grupo ("Muçarela") usa o nome de hoje, e o filtro por categoria usa a categoria de hoje do insumo (a nota não a guarda); a tela diz isso.
+
+### 361. 2026-10-22 · ERP L.2: nota cancelada fora de todo total e separada; documento fiscal que só aguarda conferência nem é lido como compra; a nota repetida conta uma vez
+
+**Razão:** o motor lê só itens de nota LANÇADA; as canceladas aparecem num aviso com o valor e num modo próprio ("Só notas canceladas", com banner, rotulado e sem somar com nada). A mesma nota cancelada e lançada de novo certa (o índice único deixa) entra uma vez só. `DocumentoFiscal` aguardando conferência não é consultado para compra: a tela só conta quantos aguardam e leva à tela de notas recebidas. O link do documento fiscal aparece na linha da nota que o concilia ou foi ligada a ele (`documentoId`).
+
+### 362. 2026-10-22 · ERP L.2: tudo se soma no banco, com um SQL de fonte só e uma fotografia só (REPEATABLE READ) por tela
+
+**Razão:** resumo, grupos, linhas, canceladas e contagens saem do mesmo trecho SQL (`fonte`, com `Prisma.sql` montado no código e conferido pelo mesmo guarda do portão); os parâmetros são sempre ligados (nenhum texto da URL vira SQL: ids com formato, listas fechadas, datas lidas). Paginação por `LIMIT/OFFSET` no banco com a contagem na mesma consulta; a ordem tem desempate (nenhuma linha repete nem some entre páginas). Como o relatório lê em várias consultas, `transacao(…, { repetivel: true })` (opção nova do portão, REPEATABLE READ) garante "soma das linhas = resumo" mesmo se alguém lança ou cancela uma nota no meio. A RLS continua valendo por baixo (`cliente.sql` roda no papel do tenant).
+
+### 363. 2026-10-22 · ERP L.2: migration aditiva com dois índices (emissão e lançamento por loja)
+
+**Razão:** a base "entrada" já tinha índice (`parceiroId, lojaId, entradaEm`); as outras duas ganharam `(parceiroId, lojaId, emitidaEm)` e `(parceiroId, lojaId, lancadaEm)`, ambos no `schema.prisma` (o `migrate diff` segue vazio). `CREATE INDEX IF NOT EXISTS`, sem tabela, coluna, CHECK, gatilho nem SELECT sob RLS; provada nos 3 perfis do banco com dado antigo e aplicada duas vezes. O conferidor cobra os dois índices quando a migration consta como aplicada (ou quando um deles já existe), e o banco da fase anterior continua limpo. Reverter = `DROP INDEX` dos dois nomes.
+
+### 364. 2026-10-22 · ERP L.2: as telas ficam em Compras, no grupo "Relatórios" do menu, com URL que guarda tudo; a loja do topo só decide quando nenhuma loja foi marcada
+
+**Razão:** `/compras/relatorios/insumo` (histórico de um insumo) e `/compras/relatorios/periodo` (compras do período), nas duas árvores, abas da área Compras. Lojas: caixa de marcar (sem marcar nenhuma = todas as do acesso; com uma só, vira texto). Atalhos de período (hoje, ontem, 7 dias, este mês, mês passado) mais "De/Até"; mês inteiro cabe aí. O histórico do insumo olha 90 dias quando a URL não traz datas; as compras do período, o mês até hoje; o período usado é sempre dito no subtítulo. Procurar pelo nome (sem acento) com um só insumo comprado já escolhe esse insumo. Cada indicador tem o seu "Ver as linhas"; cada grupo e cada fornecedor abre as linhas dele (com o chip "Aberto: …" e o × para voltar); cada linha abre a nota (com `?volta=` do relatório, validado como caminho interno) e, quando há, a nota fiscal (XML). O detalhe do insumo ganha "Ver o histórico de compras" (só com `compras.ver`). No celular e no tablet (< 1024 px) a linha vira cartão; filtros recolhem em "Filtros (n)".
+
+### 365. 2026-10-22 · ERP L.2: a planilha é CSV (ponto e vírgula, vírgula decimal, BOM), com proteção contra fórmula e sem dependência nova
+
+**Alternativa:** XLSX. **Razão:** não há biblioteca de planilha aprovada no projeto e o CSV abre no Excel e no Google Planilhas. Todo texto que começa com `=`, `+`, `-`, `@`, tabulação ou retorno de linha (com ou sem espaço antes) ganha apóstrofo na frente; aspas dobram; quebra de linha dentro de texto vira espaço. Número nunca é texto digitado: sai como o sistema formatou, sem milhar. Duas planilhas: "das compras" (uma linha por item, com data usada, entrada, emissão, lançamento no Rio, loja, fornecedor, nota, chave, insumo, embalagem original, quantidade de embalagens, quantidade convertida, unidade, preço unitário com 4 casas, valor dos itens, frete atribuído, descontos, total, situação, por que está sem base e se há nota fiscal) e "do resumo" (os grupos). O cabeçalho repete período, data usada, lojas e filtros; o rodapé repete os totais da tela (dinheiro somado, quantidade por unidade, canceladas fora). Teto de 50.000 linhas: acima disso a resposta é 413 em frase (nunca corta calada). Resposta com `Cache-Control: no-store` e `nosniff`; sem sessão 401, sem permissão 403, período torto 400. Não registra auditoria de download (pergunta abaixo).
+
+### 366. 2026-10-22 · ERP L.2: o PDF é a página de impressão do navegador, sem dependência: sem menu, tabelas inteiras, até 1.500 linhas
+
+**Razão:** "Imprimir ou salvar em PDF" abre a mesma tela com `imprimir=1`: cabeçalho com período, data usada, lojas e filtros, totais, o resumo inteiro e as linhas inteiras (sem página, com o cabeçalho da tabela se repetindo a cada folha e linha que não parte). Passou de 1.500 linhas, a página diz que não cabe em folha, mantém totais e resumo completos e manda para a planilha (nunca corta calada). O CSS de impressão (`tokens.css`) esconde menu, barra do topo, abas e botões e força papel claro, qualquer que seja o tema.
+
+### 367. 2026-10-22 · ERP L.2: desconto é R$ 0,00 por linha, dito na tela; frete é o rateio já gravado; o total da linha é itens + frete
+
+**Razão:** o sistema ainda não registra desconto por item (o valor de cada item é o que a nota cobra; no XML já vem líquido). A coluna "Total" mostra a composição "itens R$ x + frete R$ y − desc. R$ 0,00"; se alguma nota tiver desconto no cabeçalho, o relatório avisa quantas e que ele não é dividido pelos itens. O frete atribuído é o `freteRateadoCentavos` de cada item (rateio por maior resto, que fecha ao centavo): a soma das linhas é o frete da nota.
+
+### 368. 2026-10-22 · ERP L.2 (extra pedido pelo Maestro): a busca de insumo ignora acento além da caixa, sem extensão nova
+
+**Razão:** o pós-deploy da L.1 achou que "acai" não achava "Polpa de açaí" nem "ype" achava "Ypê". `busca.ts` usa `translate()` do Postgres com as mesmas letras do nome único (`chaveDoNome`), `LIKE` com o padrão escapado (`%`, `_` e `\` continuam letras), por consulta SQL parametrizada que devolve os ids. Vale para a lista de insumos (nome e marca), a busca rápida do topo e a busca dos relatórios. Extensão `unaccent` ficou de fora: exige permissão de criar extensão nos 3 perfis do banco. Fichas e fornecedores seguem só com `contains` insensível a caixa (herança).
+
+### 369. 2026-10-22 · ERP L.2: referências Kairu consultadas e o que foi aplicado
+
+**Razão:** pelo MCP Kairu em 22/10/2026: `library:design-precisao-corporativo` v1.2.0 (lido inteiro) e `pass:compras-cotacao-comparavel` v1.2.0 (lido inteiro); buscas "relatório de compras por insumo fornecedor período", "relatório tabela exportação" (design), "compras" e "relatório" (sem prompt de relatório de compras). Aplicado: "exportação deve refletir escopo e filtros", "toda informação derivada tem unidade, período e origem", "valor ausente não vira zero", "datas seguem o fuso da operação", "nunca carregar milhares de linhas: paginar", "nunca mostrar dado de outra unidade sem permissão", "comparar por unidade e não esconder que o preço unitário não é o custo total" (preço do item × custo entregue), "intervalo [início, fim) no dia operacional America/Sao_Paulo, virada de mês", "null é desconhecido, não zero", "export limitado às lojas autorizadas", "mesma importação duas vezes dá os mesmos totais" (a nota repetida conta uma vez). Fora de propósito: seleção múltipla e inspetor lateral (a linha abre a nota em tela cheia), comparação de fornecedores e períodos (L.3) e consumo (L.4).
+
+### 370. 2026-10-22 · ERP L.2: perguntas para o Rodolfo (não bloqueiam; o padrão adotado está em negrito)
+
+**Razão:** (1) Alguma loja fora do fuso do Rio? **Não: o dia de toda loja é o do Rio; fuso por loja só quando houver loja fora.** (2) O gerente deve poder baixar a planilha? **Sim: quem vê compras da loja baixa a planilha daquela loja.** (3) Registrar quem baixou cada planilha? **Não registra por enquanto; dá para registrar no histórico se a casa quiser.** (4) Precisa de XLSX de verdade? **Não: CSV abre no Excel; XLSX só com biblioteca aprovada.** (5) Desconto por item? **Não existe: o valor do item é o que a nota cobra.** (6) A categoria do relatório deve ser a do dia da compra? **Não: é a de hoje do insumo (a nota não guarda a categoria).** (7) O histórico do insumo deve abrir em 90 dias ou no mês? **90 dias; o período está sempre escrito na tela.**
+

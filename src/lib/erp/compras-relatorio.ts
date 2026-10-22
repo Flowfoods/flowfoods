@@ -58,7 +58,7 @@ export interface Opcoes {
   lojas: { id: string; nome: string; ativa: boolean }[];
   fornecedores: { id: string; nome: string }[];
   categorias: { id: string; nome: string }[];
-  insumos: { id: string; nome: string }[];
+  listaDeInsumos: { id: string; nome: string }[];
   /** Há mais insumos com compra do que a lista oferece: refine pela busca. */
   insumosTruncados: boolean;
 }
@@ -463,7 +463,7 @@ export async function opcoesDoRelatorio(tx: ClienteDoParceiro, lojasDoAcesso: Op
     lojas: lojasDoAcesso,
     fornecedores,
     categorias,
-    insumos: insumos.slice(0, LIMITE_DE_INSUMOS_NA_LISTA),
+    listaDeInsumos: insumos.slice(0, LIMITE_DE_INSUMOS_NA_LISTA),
     insumosTruncados: insumos.length > LIMITE_DE_INSUMOS_NA_LISTA,
   };
 }
@@ -491,7 +491,7 @@ export interface RelatorioDaTela {
   paginas: number;
 }
 
-const SEM_OPCOES: Opcoes = { lojas: [], fornecedores: [], categorias: [], insumos: [], insumosTruncados: false };
+const SEM_OPCOES: Opcoes = { lojas: [], fornecedores: [], categorias: [], listaDeInsumos: [], insumosTruncados: false };
 
 /**
  * Tudo o que uma tela de relatório precisa, numa fotografia só do banco. `modo`: o histórico de um insumo mostra sempre as

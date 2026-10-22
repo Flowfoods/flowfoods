@@ -146,14 +146,14 @@ export function FormularioDoRelatorio({
                 Insumo
               </label>
               <select id="rel-insumo" name="insumo" defaultValue={f.insumoId} className={SELECT}>
-                <option value="">{opcoes.insumos.length ? 'Escolha o insumo' : 'Nenhum insumo com compra'}</option>
-                {opcoes.insumos.map((i) => (
+                <option value="">{opcoes.listaDeInsumos.length ? 'Escolha o insumo' : 'Nenhum insumo com compra'}</option>
+                {opcoes.listaDeInsumos.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.nome}
                   </option>
                 ))}
               </select>
-              {opcoes.insumosTruncados && <p className="mt-1 text-[12px] text-suave">Muitos insumos: procure pelo nome para encurtar a lista.</p>}
+              {opcoes.insumosTruncados && <p className="mt-1 text-[12px] text-suave">São muitos insumos; procure pelo nome para encurtar a lista.</p>}
             </div>
           </>
         )}
@@ -209,7 +209,7 @@ export function FormularioDoRelatorio({
               </label>
               <select id="rel-insumo" name="insumo" defaultValue={f.insumoId} className={SELECT}>
                 <option value="">Todos os insumos</option>
-                {opcoes.insumos.map((i) => (
+                {opcoes.listaDeInsumos.map((i) => (
                   <option key={i.id} value={i.id}>
                     {i.nome}
                   </option>
@@ -291,7 +291,7 @@ export function ChipsDoRelatorio({
     itens.push({ chave: 'loja', rotulo: `Lojas: ${nomes.length ? nomes.join(', ') : 'fora do seu acesso'}`, sem: { lojaIds: [] } });
   }
   if (f.fornecedorId) itens.push({ chave: 'fornecedor', rotulo: `Fornecedor: ${opcoes.fornecedores.find((x) => x.id === f.fornecedorId)?.nome ?? 'outro'}`, sem: { fornecedorId: '' } });
-  if (modo === 'periodo' && f.insumoId) itens.push({ chave: 'insumo', rotulo: `Insumo: ${opcoes.insumos.find((x) => x.id === f.insumoId)?.nome ?? 'outro'}`, sem: { insumoId: '' } });
+  if (modo === 'periodo' && f.insumoId) itens.push({ chave: 'insumo', rotulo: `Insumo: ${opcoes.listaDeInsumos.find((x) => x.id === f.insumoId)?.nome ?? 'outro'}`, sem: { insumoId: '' } });
   if (f.q && !(modo === 'insumo' && f.insumoId)) itens.push({ chave: 'q', rotulo: `Nome: “${f.q}”`, sem: { q: '' } });
   if (f.categoriaId) itens.push({ chave: 'categoria', rotulo: `Categoria: ${opcoes.categorias.find((x) => x.id === f.categoriaId)?.nome ?? 'outra'}`, sem: { categoriaId: '' } });
   if (f.situacao === 'canceladas') itens.push({ chave: 'situacao', rotulo: 'Só notas canceladas', sem: { situacao: 'lancadas' } });

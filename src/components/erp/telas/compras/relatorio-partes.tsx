@@ -100,7 +100,10 @@ export function Indicadores({
         Resumo do recorte
       </h2>
       <div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-2 xl:grid-cols-4">
-        <Cartao rotulo="Total das compras (itens + frete)" ver={{ href: verTodas, texto: `Ver as ${pl(t.linhas, 'linha', 'linhas')}` }}>
+        <Cartao
+          rotulo={f.situacao === 'canceladas' ? 'Total das notas CANCELADAS (não é compra)' : 'Total das compras (itens + frete)'}
+          ver={{ href: verTodas, texto: t.linhas === 1 ? 'Ver a linha' : `Ver as ${sp(t.linhas)} linhas` }}
+        >
           <p className={GRANDE}>{formatarDinheiro(t.totalCentavos)}</p>
           <p className="mt-1.5 text-[12px] tabular-nums text-suave">
             {pl(t.notas, 'nota', 'notas')} · {pl(t.linhas, 'linha', 'linhas')}
@@ -165,7 +168,7 @@ export function Indicadores({
       {modo === 'insumo' && semBaseTotal > 0 && (
         <p className="text-[13px] text-suave">
           {pl(semBaseTotal, 'linha', 'linhas')} sem base ficou de fora do preço médio.{' '}
-          <Link href={verSemBase} className={LINK_DE_TEXTO}>
+          <Link href={verSemBase} className={`${LINK_DE_TEXTO} ff-toque`}>
             Ver quais são
           </Link>
         </p>
@@ -204,7 +207,7 @@ export function NotasDoRelatorio({
     itens.push(
       <li key="canceladas">
         {pl(r.canceladas.notas, 'nota cancelada', 'notas canceladas')} ({formatarDinheiro(r.canceladas.valorCentavos + r.canceladas.freteCentavos)}) neste recorte ficou de fora de todos os totais.{' '}
-        <Link href={hrefDoRelatorio(caminho, f, { situacao: 'canceladas', ver: 'linhas', ...RECORTE_NOVO })} className={LINK_DE_TEXTO}>
+        <Link href={hrefDoRelatorio(caminho, f, { situacao: 'canceladas', ver: 'linhas', ...RECORTE_NOVO })} className={`${LINK_DE_TEXTO} ff-toque`}>
           Ver as canceladas
         </Link>
       </li>,
@@ -214,7 +217,7 @@ export function NotasDoRelatorio({
     itens.push(
       <li key="aguardando">
         {pl(r.aguardando, 'nota fiscal recebida (XML) aguarda', 'notas fiscais recebidas (XML) aguardam')} conferência e não {r.aguardando === 1 ? 'conta' : 'contam'} como compra até serem conciliadas.{' '}
-        <Link href={`${comprasBase}/recebidas`} className={LINK_DE_TEXTO}>
+        <Link href={`${comprasBase}/recebidas`} className={`${LINK_DE_TEXTO} ff-toque`}>
           Ver as notas recebidas
         </Link>
       </li>,
@@ -396,13 +399,13 @@ function ComposicaoDoTotal({ l }: { l: LinhaDeCompra }) {
 function LinkDaNota({ l, comprasBase, volta }: { l: LinhaDeCompra; comprasBase: string; volta: string }) {
   return (
     <>
-      <Link href={`${comprasBase}/${l.notaId}?volta=${encodeURIComponent(volta)}`} className="ff-transicao rounded-[5px] font-medium text-texto underline decoration-linha-forte underline-offset-4 hover:decoration-texto">
+      <Link href={`${comprasBase}/${l.notaId}?volta=${encodeURIComponent(volta)}`} className="ff-toque ff-transicao rounded-[5px] font-medium text-texto underline decoration-linha-forte underline-offset-4 hover:decoration-texto">
         Nota {l.rotuloDaNota}
       </Link>
       {l.documentoId && (
         <>
           <span aria-hidden className="text-suave"> · </span>
-          <Link href={`${comprasBase}/recebidas/${l.documentoId}`} className="ff-transicao rounded-[5px] text-[12px] text-suave underline decoration-linha-forte underline-offset-4 hover:text-texto">
+          <Link href={`${comprasBase}/recebidas/${l.documentoId}`} className="ff-toque ff-transicao rounded-[5px] text-[12px] text-suave underline decoration-linha-forte underline-offset-4 hover:text-texto">
             nota fiscal (XML)
           </Link>
         </>

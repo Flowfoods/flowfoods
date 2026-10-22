@@ -72,7 +72,7 @@ function VazioDoRelatorio({ r, f, caminho, modo }: { r: RelatorioDaTela; f: Filt
     );
   }
   if (modo === 'insumo' && !f.insumoId) {
-    const n = r.opcoes.insumos.length;
+    const n = r.opcoes.listaDeInsumos.length;
     return (
       <Painel semRespiro>
         <Vazio titulo="Escolha um insumo para ver o histórico.">
@@ -108,14 +108,14 @@ export function TelaDoRelatorio({
   f: FiltrosDoRelatorio;
   r: RelatorioDaTela;
   hoje: string;
-  /** Só para quem vê insumos: o nome do insumo vira link para o detalhe. */
+  /** Só para quem vê o cadastro de insumos (o nome do insumo vira link para o detalhe). */
   insumosBase?: string;
   /** A loja escolhida no topo quando ela decidiu o recorte (a pessoa não marcou loja). */
   visaoDaLoja?: string | null;
 }) {
   const vazio = VazioDoRelatorio({ r, f, caminho, modo });
   const t = r.totais;
-  const insumoEscolhido = f.insumoId ? r.opcoes.insumos.find((i) => i.id === f.insumoId)?.nome : undefined;
+  const insumoEscolhido = f.insumoId ? r.opcoes.listaDeInsumos.find((i) => i.id === f.insumoId)?.nome : undefined;
   const subtitulo = [contexto, modo === 'insumo' && insumoEscolhido ? insumoEscolhido : null, fraseDoPeriodo(f)].filter(Boolean).join(' · ');
   const verLinhas = modo === 'insumo' || f.ver === 'linhas';
   const paginaDe = (p: number) => hrefDoRelatorio(caminho, f, { pagina: p }) + (modo === 'insumo' ? '#compras' : '');
@@ -167,11 +167,11 @@ export function TelaDoRelatorio({
             </Painel>
           ) : (
             <div className="space-y-3">
+            <Indicadores f={f} caminho={caminho} t={t} umInsumo={r.umInsumo} modo={modo} nFornecedores={modo === 'insumo' ? new Set(r.fornecedores?.grupos.map((g) => g.chave)).size : undefined} />
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <p className="text-[13px] text-suave">Levar o que está na tela, com o mesmo período, a mesma data usada e os mesmos totais:</p>
                 <BarraDeSaida f={f} exportar={`${comprasBase}/relatorios/periodo/exportar`} imprimir={caminho} modo={modo} />
               </div>
-            <Indicadores f={f} caminho={caminho} t={t} umInsumo={r.umInsumo} modo={modo} nFornecedores={modo === 'insumo' ? new Set(r.fornecedores?.grupos.map((g) => g.chave)).size : undefined} />
             </div>
           )}
 

@@ -337,6 +337,7 @@ html:has(.ff-app[data-tema='escuro']) {
   .ff-app header.sticky,
   .ff-app .fixed,
   .ff-app [role='dialog'],
+  .ff-app nav[aria-label^='Seções de'],
   .ff-app .ff-nao-imprime {
     display: none !important;
   }

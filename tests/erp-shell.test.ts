@@ -79,6 +79,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/compras/recebidas',
       '/erp/compras/orcamento',
       '/erp/compras/fornecedores',
+      '/erp/compras/relatorios/insumo',
+      '/erp/compras/relatorios/periodo',
       '/erp/estoque',
       '/erp/estoque/contagens',
       '/erp/estoque/requisicoes',
@@ -184,6 +186,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/compras/recebidas',
       '/rodolfo/erp/valentins/compras/orcamento',
       '/rodolfo/erp/valentins/compras/fornecedores',
+      '/rodolfo/erp/valentins/compras/relatorios/insumo',
+      '/rodolfo/erp/valentins/compras/relatorios/periodo',
       '/rodolfo/erp/valentins/estoque',
       '/rodolfo/erp/valentins/estoque/contagens',
       '/rodolfo/erp/valentins/estoque/requisicoes',
@@ -399,6 +403,10 @@ describe('ERP 1.1 · actions do shell no servidor', () => {
         },
       },
     };
+    // L.2: a busca de insumo acha pelos ids de uma consulta SQL (sem acento) e lê o cadastro por eles.
+    const cl = (estado.ctx as unknown as { cliente: Record<string, unknown> }).cliente;
+    cl.sql = async () => [{ id: 'i1' }];
+    cl.transacao = async (fn: (c: unknown) => unknown) => fn(cl);
     expect(await acaoBuscarNoErp('arroz')).toEqual([
       { tipo: 'insumo', rotulo: 'Arroz', detalhe: 'Insumo · Quilo', href: '/erp/insumos/i1', desativado: true },
       { tipo: 'ficha', rotulo: 'Arroz da casa', detalhe: 'Ficha técnica · Pré-preparo', href: '/erp/fichas/f1', desativado: false },
