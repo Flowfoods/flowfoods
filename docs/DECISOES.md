@@ -2526,7 +2526,7 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 ### 316. 2026-10-22 · ERP F.1b: parser de XML que recusa antes de ler, com frase em português
 
-**Razão:** `fast-xml-parser` 5.11.2 (a 4.x tinha aviso no `npm audit`) com `processEntities: false`, `parseTagValue: false` e sem prefixo de namespace. Antes do parser, no texto: tamanho (1 MB), arquivo que é zip, PDF ou tem byte nulo, UTF-8 inválido, `<!DOCTYPE`, `<!ENTITY`, instrução `<?` fora da declaração XML, entidade que não seja as cinco do XML ou numérica, nome de tag `__proto__`, número de tags e profundidade. Depois: `nfeProc` versão 4.00, protocolo com cStat 100 ou 150 (qualquer outro código, como o 110 da denegada, é recusado com o código na frase), modelo 55 (NFC-e é recusada), ambiente de produção (tpAmb 1), saída (tpNF 1), finalidade normal (finNFe 1), chave com dígito verificador módulo 11 e coerente com os campos do documento, destinatário com CNPJ de uma loja do parceiro, até 200 itens. Cada recusa é uma frase que diz o que fazer; nada é gravado. Sem DTD e sem entidade externa por construção: não há como o arquivo pedir nada à rede ou ao disco.
+**Razão:** `fast-xml-parser` 5.11.2 (a 4.x tinha aviso no `npm audit`) com `processEntities: false`, `parseTagValue: false` e sem prefixo de namespace. Antes do parser, no texto: tamanho (900 KB, ver 331), arquivo que é zip, PDF ou tem byte nulo, UTF-8 inválido, `<!DOCTYPE`, `<!ENTITY`, instrução `<?` fora da declaração XML, entidade que não seja as cinco do XML ou numérica, nome de tag `__proto__`, número de tags e profundidade. Depois: `nfeProc` versão 4.00, protocolo com cStat 100 ou 150 (qualquer outro código, como o 110 da denegada, é recusado com o código na frase), modelo 55 (NFC-e é recusada), ambiente de produção (tpAmb 1), saída (tpNF 1), finalidade normal (finNFe 1), chave com dígito verificador módulo 11 e coerente com os campos do documento, destinatário com CNPJ de uma loja do parceiro, até 200 itens. Cada recusa é uma frase que diz o que fazer; nada é gravado. Sem DTD e sem entidade externa por construção: não há como o arquivo pedir nada à rede ou ao disco.
 
 ### 317. 2026-10-22 · ERP F.1b: a assinatura digital do XML NÃO é verificada (risco aceito)
 
@@ -2552,7 +2552,7 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Razão:** Emitente desconhecido: cadastro provisório (`A_COMPLETAR`) com razão, fantasia, CNPJ, inscrição estadual, endereço e UF do XML (e-mail e WhatsApp vazios), com o sufixo do CNPJ no nome se o nome já existir. Recusas com frase: fornecedor desativado com esse CNPJ (reative), fornecedor marcado "Compras sem nota fiscal" com esse CNPJ (ele nunca recebe nota fiscal), emitente com o CNPJ de uma loja do próprio grupo (transferência entre lojas não é nota de compra). Dois fornecedores ativos com o mesmo CNPJ (só onde o índice da F.1a não pôde nascer) ou duas lojas com o mesmo CNPJ: o documento fica sem resolver até a pessoa escolher, e conciliar sem escolher é recusado.
 
-### 323. 2026-10-22 · ERP F.1b: upload pela server action, 1 MB, com a checagem de tamanho antes de ler os bytes
+### 323. 2026-10-22 · ERP F.1b: upload pela server action, com a checagem de tamanho antes de ler os bytes (o limite foi para 900 KB: 331)
 
 **Razão:** O arquivo vai por `FormData` para a action (sem rota de API nova e sem mexer no `next.config.js`, que limita a 1 MB por padrão). O cliente barra o arquivo maior antes de enviar (botão desabilitado e a frase na tela) e o servidor confere `file.size` ANTES de `arrayBuffer()`. Uma nota de 200 itens cabe com folga; arquivo maior é quase sempre outra coisa (zip, PDF).
 
@@ -2571,3 +2571,35 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 ### 327. 2026-10-22 · ERP F.1b: perguntas para o Rodolfo (não bloqueiam; o padrão está em negrito)
 
 **Razão:** (1) Fornecedor de feira que TEM CNPJ precisa de e-mail? **Sim, salvo "Compras sem nota fiscal"** (301, 313). (2) O "Cepai" é a SEFAZ? **Segue sem resposta; nada da F.1b depende, nenhum serviço ou credencial foi escolhido.** (3) Nota com mais de 200 itens? **Recusada com a frase de dividir**; subir o limite é uma linha (`LIMITES_DO_XML`), mas pede conferir o tempo da tela. (4) Quem troca a memória do fator? **Quem tem `fornecedores.editar`; o gerente que só lança cria a memória e não a troca** (319). (5) A assinatura do XML? **Não é verificada** (317): quando entrar a captação pela SEFAZ, a própria SEFAZ passa a ser a prova. (6) A data de entrada começa na emissão: nota emitida antes da abertura do estoque da loja entra no custo e NÃO no razão (320); **a pessoa pode mudar a data de entrada na conferência.** (7) Nota de transferência entre lojas do próprio grupo: **recusada** (322), até o Rodolfo dizer como quer tratar.
+
+### 328. 2026-10-22 · ERP F.1b (ajustes dos fiscais): a ordem das travas é sempre documento fiscal → nota; deadlock vira a frase de conflito
+
+**Razão:** Descartar um documento conciliado travava documento e depois nota; cancelar a nota travava nota e depois documento: duas pessoas ao mesmo tempo podiam se esperar (deadlock do Postgres, erro 500). `cancelarNotaNaTransacao` agora trava PRIMEIRO o documento ligado (`FOR UPDATE` por `notaEntradaId`, depois da trava compartilhada do período) e só então a nota, a mesma ordem do descarte e da conciliação. Por segurança, `ehDeadlock` (40P01 / P2034) em salvar, conciliar, ligar, descartar e cancelar a nota devolve "Alguém mexeu nesta nota agora há pouco…" com o botão de recarregar, nada gravado. Teste de corrida (seis rodadas de cancelar a nota × descartar o documento ao mesmo tempo): nenhuma recusa vira erro, a nota é estornada uma vez só; sem a trava nova o teste reprova.
+
+### 329. 2026-10-22 · ERP F.1b (ajustes dos fiscais): ligar compara o CNPJ, e com total diferente pede confirmação explícita (no servidor também)
+
+**Razão:** A nota lançada à mão liga ao documento quando o CNPJ do fornecedor dela é o do emitente, mesmo havendo dois cadastros com esse CNPJ (antes exigia o MESMO cadastro e recusava o outro). Quando o total da nota lançada difere do da nota fiscal, "Ligar a esta nota" não liga: abre uma confirmação com a diferença em destaque ("Os valores são diferentes… R$ 520,00 de diferença… NÃO muda o valor dela") e só o botão "Sim, é a mesma nota: ligar" envia. O servidor exige a confirmação (`confirmouDiferenca`) e recusa sem ela com a mesma frase: um envio sem a tela não liga por engano.
+
+### 330. 2026-10-22 · ERP F.1b (ajustes dos fiscais): o navegador recebe só a raiz do CNPJ dos fornecedores
+
+**Razão:** O formulário da nota recebia o documento inteiro de todos os fornecedores só para avisar "mesma empresa, outro estabelecimento". Agora `dadosDoFormularioDeNota` manda `raizCnpj` (os oito primeiros dígitos do CNPJ) e nada para CPF (pessoa física). Teste: o HTML e o dado do formulário não trazem o CNPJ completo.
+
+### 331. 2026-10-22 · ERP F.1b (ajustes dos fiscais): limite do XML em 900 KB (revisa o 1 MB das decisões 316 e 323)
+
+**Razão:** O Next recusa o corpo da requisição acima de 1 MB com uma página de erro, e o arquivo vai junto com o resto do formulário. Com o teto em 900 KB, a frase amigável ("o arquivo tem X KB e o limite é 900 KB") aparece sempre, no navegador e no servidor, antes do teto do Next. Uma NF-e de 200 itens fica na casa das centenas de KB no máximo.
+
+### 332. 2026-10-22 · ERP F.1b (ajustes dos fiscais): "Insumo que falta: cadastrar" por item da conferência, com volta mantendo as escolhas
+
+**Razão:** O mesmo padrão da nota digitada (311): cada item sem insumo tem o atalho; o nome é dito uma vez; o caminho de volta (`?volta=`) leva de volta à conferência; o que estava escolhido (insumo, embalagem e fator de cada item, loja, fornecedor e data de entrada) é guardado só no navegador desta aba e volta com "Recuperamos o que você tinha preenchido"; o insumo novo entra no item que pediu o cadastro e o aviso diz "Insumo salvo com sucesso". Quem não pode cadastrar insumos vê "peça a quem cuida dos insumos". O rascunho de uma versão velha do documento é descartado com aviso.
+
+### 333. 2026-10-22 · ERP F.1b (ajustes dos fiscais): mensagens sem jargão e sem eco do arquivo; XML e chave de acesso explicados
+
+**Razão:** As recusas não trazem mais `DOCTYPE, ENTITY`, `protNFe`, `procNFe`, `indTot` nem "SEFAZ" solta; a nota denegada não repete o código nem o texto de motivo do próprio arquivo ("110: Autorizado…" contradiria a recusa): diz que a nota não está com o uso autorizado e manda conferir com o fornecedor. A tela de importar e a ajuda dizem "o site do governo que autoriza as notas (a SEFAZ)". A lista e a conferência explicam, em uma frase, o que é o arquivo XML da nota (o que o fornecedor manda por e-mail, não o PDF) e a chave de acesso (o número de 44 dígitos que impede a mesma nota de entrar duas vezes). Ajuda: `compras-documentos` e `compras-documento-importar` na versão 2.
+
+### 334. 2026-10-22 · ERP F.1b (ajustes dos fiscais): página de "não achamos" em português nas rotas de Compras
+
+**Razão:** `not-found.tsx` nas duas árvores de Compras (`/erp/compras` e `/rodolfo/erp/[slug]/compras`): dentro do shell, "Não achamos esta nota fiscal." (ou "esta página"), com o botão de volta para a lista; o status continua 404 e a página não diz se a nota existe para outra pessoa, loja ou parceiro. A página de erro global do app não foi mexida.
+
+### 335. 2026-10-22 · ERP F.1b (ajustes dos fiscais): os testes de banco voltam a poder rodar em paralelo
+
+**Razão:** O cenário de dois cadastros com o mesmo CNPJ derrubava o índice `Fornecedor_parceiroId_documento_key` no banco compartilhado. Foi para `tests/erp-documento-fiscal-cnpj-repetido.db.test.ts`, que cria um banco DESCARTÁVEL (as migrations aplicadas como superusuário, sem o índice) e o apaga no fim, como fazem os arquivos `*-migracao`. Nenhum teste da F.1b mexe mais em índice do banco compartilhado: `ERP_DB_TESTE=... npx vitest run` (paralelo) e `--no-file-parallelism` passam no `ff_dev`. Nos bancos de dono (perfis), o paralelo ainda mostra instabilidade antiga de `erp-acesso` e `erp-permissoes` (limite de login por IP, sem relação com a F.1b): ali a convenção continua sendo em sequência.
