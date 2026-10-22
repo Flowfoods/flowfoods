@@ -1212,8 +1212,10 @@ export async function conciliarDocumento(cliente: ClienteDoParceiro, alcance: Al
         if (e instanceof Recusa) throw recusaDoLancamento(e, itensDaLinha);
         throw e;
       }
+      // A versão já foi conferida com o documento travado (`abrirParaMudar`); `aplicarEscolhas` pode ter tocado `atualizadoEm` ao gravar
+      // a loja ou o fornecedor escolhidos agora, então a trava final é só pela situação.
       const conciliou = await tx.documentoFiscal.updateMany({
-        where: { id, situacao: 'AGUARDANDO_CONFERENCIA', atualizadoEm: doc.atualizadoEm },
+        where: { id, situacao: 'AGUARDANDO_CONFERENCIA' },
         data: { situacao: 'CONCILIADO', notaEntradaId: nota.id },
       });
       if (conciliou.count === 0) throw new RecusaDoc({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DOCUMENTO }, conflito: true });

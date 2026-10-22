@@ -422,7 +422,7 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)',
     // Duas notas ATIVAS com a mesma chave não existem (índice parcial); a nota CANCELADA libera a chave.
     const ativas = await a.notaEntrada.findMany({ where: { status: 'LANCADA', chaveAcesso: { not: null } }, orderBy: { criadoEm: 'asc' }, take: 2 });
     expect(ativas).toHaveLength(2);
-    await expect(tentar(`UPDATE "NotaEntrada" SET "chaveAcesso" = '${ativas[0].chaveAcesso}' WHERE "id" = '${ativas[1].id}'`)).rejects.toThrow(/already exists/);
+    await expect(tentar(`UPDATE "NotaEntrada" SET "chaveAcesso" = '${ativas[0].chaveAcesso}' WHERE "id" = '${ativas[1].id}'`)).rejects.toThrow(/already exists|Unique constraint failed|23505/);
     const cancelada = (await a.notaEntrada.findFirst({ where: { status: 'CANCELADA', chaveAcesso: { not: null } } }))!;
     const original = ativas[1].chaveAcesso;
     await tentar(`UPDATE "NotaEntrada" SET "chaveAcesso" = '${cancelada.chaveAcesso}' WHERE "id" = '${ativas[1].id}'`);
@@ -437,21 +437,25 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · notas fiscais por XML (Postgres real)',
     expect(await receber(xmlDe([], '4620'))).toMatchObject({ ok: false, erros: { arquivo: expect.stringMatching(/está desativado.*Reative/) } });
     expect(await contagens()).toEqual(antes);
     expect(await mudarSituacaoFornecedor(a, f.id, true, '', 'Marina')).toMatchObject({ ok: true });
-    // Dois ativos com o mesmo CNPJ (índice único não existe nesta base de teste? existe: força por SQL só se der).
+    // Dois ativos com o mesmo CNPJ (só acontece onde o índice único não pôde ser criado): derruba o índice só durante este trecho e
+    // o recria no finally. Por mexer num índice do banco todo, os testes com banco rodam em sequência (--no-file-parallelism).
     const indice = await db.$queryRawUnsafe<{ n: number }[]>(`SELECT count(*)::int AS n FROM pg_indexes WHERE indexname = 'Fornecedor_parceiroId_documento_key'`);
     if (indice[0].n === 1) {
-      await cru(db, perfil, A.id, `DROP INDEX "Fornecedor_parceiroId_documento_key"`);
-      await cru(db, perfil, A.id, `INSERT INTO "Fornecedor"(id,"parceiroId",nome,documento,"atualizadoEm") VALUES ('fdup${sufixo}','${A.id}','Laticínios Exemplo - Penha','11222333000181',now())`);
-      const id = idDe(await receber(xmlDe([], '4630')));
-      const d = await detalhe(id);
-      expect(d.fornecedor).toBeNull();
-      expect(d.fornecedoresCandidatos.map((x) => x.nome).sort()).toEqual(['Laticínios Exemplo', 'Laticínios Exemplo - Penha']);
-      // Sem escolher, não concilia; escolhendo um dos dois, concilia.
-      expect(await conciliarDocumento(a, DONA(), id, conferencia(d), 'Marina')).toMatchObject({ ok: false, erros: { fornecedorId: expect.stringMatching(/Escolha o fornecedor/) } });
-      expect(await conciliarDocumento(a, DONA(), id, conferencia(d, { fornecedorId: 'fdup' + sufixo }), 'Marina')).toMatchObject({ ok: true });
-      await cru(db, perfil, A.id, `DELETE FROM "VinculoItemFornecedor" WHERE "fornecedorId" = 'fdup${sufixo}'`);
-      await cru(db, perfil, A.id, `UPDATE "Fornecedor" SET documento = NULL WHERE id = 'fdup${sufixo}'`);
-      await cru(db, perfil, A.id, `CREATE UNIQUE INDEX "Fornecedor_parceiroId_documento_key" ON "Fornecedor"("parceiroId", "documento") WHERE "documento" IS NOT NULL`);
+      await db.$executeRawUnsafe(`DROP INDEX "Fornecedor_parceiroId_documento_key"`);
+      try {
+        await cru(db, perfil, A.id, `INSERT INTO "Fornecedor"(id,"parceiroId",nome,documento,"atualizadoEm") VALUES ('fdup${sufixo}','${A.id}','Laticínios Exemplo - Penha','11222333000181',now())`);
+        const id = idDe(await receber(xmlDe([], '4630')));
+        const d = await detalhe(id);
+        expect(d.fornecedor).toBeNull();
+        expect(d.fornecedoresCandidatos.map((x) => x.nome).sort()).toEqual(['Laticínios Exemplo', 'Laticínios Exemplo - Penha']);
+        // Sem escolher, não concilia; escolhendo um dos dois, concilia.
+        expect(await conciliarDocumento(a, DONA(), id, conferencia(d), 'Marina')).toMatchObject({ ok: false, erros: { fornecedorId: expect.stringMatching(/Escolha o fornecedor/) } });
+        const escolhido = await conciliarDocumento(a, DONA(), id, conferencia(d, { fornecedorId: 'fdup' + sufixo }), 'Marina');
+        expect(escolhido).toMatchObject({ ok: true });
+      } finally {
+        await cru(db, perfil, A.id, `UPDATE "Fornecedor" SET documento = NULL WHERE id = 'fdup${sufixo}'`);
+        await db.$executeRawUnsafe(`CREATE UNIQUE INDEX IF NOT EXISTS "Fornecedor_parceiroId_documento_key" ON "Fornecedor"("parceiroId", "documento") WHERE "documento" IS NOT NULL`);
+      }
     }
     // "Compras sem nota fiscal" com o mesmo CNPJ: recusa explicando que ele nunca recebe nota fiscal.
     await cru(db, perfil, A.id, `UPDATE "Fornecedor" SET "ativo" = false WHERE id = '${f.id}'`);
