@@ -54,6 +54,7 @@ import {
   sugestaoParaInsumo,
 } from '@/lib/erp/categorias';
 import {
+  aceitarSugestoes,
   aplicarClassificacao,
   classificarEmLote,
   filaDeRevisao,
@@ -64,7 +65,7 @@ import {
   reverterLote,
 } from '@/lib/erp/classificar';
 import { cadastrarFicha } from '@/lib/erp/fichas';
-import { CATEGORIAS_PADRAO } from '@/lib/erp/categoria-campos';
+import { CATEGORIAS_PADRAO, chaveDoNome } from '@/lib/erp/categoria-campos';
 import { lerFormInsumo } from '@/lib/erp/insumo-campos';
 import { ALCANCE_FLOWFOODS, resolverAlcance } from '@/lib/erp/permissoes';
 import * as daSessao from '@/app/erp/insumos/actions';
@@ -165,7 +166,7 @@ describe.skipIf(!URL_TESTE)('ERP I.1a · categorias, cadastro e classificação 
 
   it('antes de semear a casa não tem categoria nenhuma (a migration não semeia); semear cria as dez com os nomes exatos, na ordem, e Outros é do sistema', async () => {
     expect(await a.categoriaInsumo.count()).toBe(0);
-    expect(await garantirCategoriasPadrao(a, 'Marina')).toBe(10);
+    expect(await garantirCategoriasPadrao(a)).toBe(10);
     const lista = await listarCategorias(a);
     expect(lista.map((c) => c.nome)).toEqual(CATEGORIAS_PADRAO.map((c) => c.nome));
     expect(lista.map((c) => c.chave)).toEqual(CATEGORIAS_PADRAO.map((c) => c.chave));
@@ -179,11 +180,11 @@ describe.skipIf(!URL_TESTE)('ERP I.1a · categorias, cadastro e classificação 
   });
 
   it('semear de novo cria 0 (idempotente); semear em paralelo também não duplica; o nome que a casa mudou continua sendo da padrão', async () => {
-    expect(await garantirCategoriasPadrao(a, 'Marina')).toBe(0);
-    await Promise.all([garantirCategoriasPadrao(a, 'x'), garantirCategoriasPadrao(a, 'y'), garantirCategoriasPadrao(a, 'z')]);
+    expect(await garantirCategoriasPadrao(a)).toBe(0);
+    await Promise.all([garantirCategoriasPadrao(a), garantirCategoriasPadrao(a), garantirCategoriasPadrao(a)]);
     expect(await a.categoriaInsumo.count()).toBe(10);
     // Outro parceiro semeia o seu em paralelo, sem tocar no de A.
-    const [c1, c2] = await Promise.all([garantirCategoriasPadrao(b, 'x'), garantirCategoriasPadrao(b, 'y')]);
+    const [c1, c2] = await Promise.all([garantirCategoriasPadrao(b), garantirCategoriasPadrao(b)]);
     expect(c1 + c2).toBe(10);
     for (const c of await listarCategorias(b)) catB[c.chave!] = c.id;
     expect(await a.categoriaInsumo.count()).toBe(10);
@@ -234,7 +235,7 @@ describe.skipIf(!URL_TESTE)('ERP I.1a · categorias, cadastro e classificação 
     const sug = await sugestaoParaInsumo(a, 'Coxa de frango congelada');
     expect(sug).toMatchObject({ categoriaId: cat.PROTEINA, chave: 'PROTEINA', nome: 'Carnes e peixes' });
     // Semear de novo não recria a "Proteína": a chave já existe, com o nome novo.
-    expect(await garantirCategoriasPadrao(a, 'Marina')).toBe(0);
+    expect(await garantirCategoriasPadrao(a)).toBe(0);
     expect(await a.categoriaInsumo.count({ where: { nome: 'Proteína' } })).toBe(0);
     await renomearCategoria(a, prot.id, { nome: 'Proteína', versao: (await listarCategorias(a)).find((c) => c.id === prot.id)!.versao }, 'Marina');
   });
@@ -551,9 +552,76 @@ describe.skipIf(!URL_TESTE)('ERP I.1a · categorias, cadastro e classificação 
   });
 
   it('categoriasDoFormulario semeia na primeira vez e devolve as ativas na ordem da casa, mais a que o insumo já tem', async () => {
-    const lista = await categoriasDoFormulario(a, 'Marina');
+    const lista = await categoriasDoFormulario(a);
     expect(lista.map((c) => c.nome).at(-1)).toBe('Outros / a classificar');
     expect(lista.every((c) => c.ativa)).toBe(true);
+  });
+
+  it('abrir tela nunca recria a padrão que a casa excluiu, nem grava histórico em nome de quem abriu; só o script (completar) devolve', async () => {
+    const N = await db.parceiroFlow.create({ data: { nome: 'Cat N', slug: `cat-n-${sufixo}`, status: 'ATIVO' } });
+    try {
+      const n = doParceiro(N.id, db);
+      // A primeira abertura (o Operador) semeia as dez, em nome do Sistema.
+      const primeira = await categoriasDoFormulario(n);
+      expect(primeira).toHaveLength(10);
+      const criou = async () => (await listarHistorico(n, { entidade: 'CategoriaInsumo', verPrecos: false, limite: 100 })).filter((h) => h.acao === 'CRIOU');
+      expect((await criou()).map((h) => h.autorNome)).toEqual(Array(10).fill('Sistema'));
+      // A Dona exclui "Bebidas" (sem uso).
+      const bebidas = (await listarCategorias(n)).find((c) => c.chave === 'BEBIDAS')!;
+      expect(await excluirCategoria(n, bebidas.id, 'Marina Dona')).toMatchObject({ ok: true });
+      // Outra pessoa abre o formulário, as categorias e a classificação: continua excluída e o histórico não ganha CRIOU.
+      await categoriasDoFormulario(n);
+      await garantirCategoriasPadrao(n);
+      await aplicarClassificacao(n, 'Paulo Operador');
+      await previaDaClassificacao(n, ALCANCE_FLOWFOODS);
+      expect(await n.categoriaInsumo.count({ where: { chave: 'BEBIDAS' } })).toBe(0);
+      expect(await n.categoriaInsumo.count()).toBe(9);
+      expect(await criou()).toHaveLength(10);
+      // O pré-preparo da ficha também não a traz de volta.
+      expect((await categoriasParaEscolher(n)).map((c) => c.nome)).not.toContain('Bebidas');
+      // O ato explícito (script) devolve, com o autor dado.
+      expect(await garantirCategoriasPadrao(n, { completar: true, autorNome: 'script' })).toBe(1);
+      expect(await n.categoriaInsumo.count({ where: { chave: 'BEBIDAS' } })).toBe(1);
+      expect((await criou()).filter((h) => h.autorNome === 'script')).toHaveLength(1);
+    } finally {
+      await limparParceiros(db, perfil, [N.id]);
+    }
+  });
+
+  it('o nome é comparado na forma composta e sem caracteres invisíveis: "Farínha" decomposto e "Proteína" com largura zero são os mesmos nomes', async () => {
+    const composto = 'Farínha de teste';
+    const decomposto = composto.normalize('NFD'); // i + acento combinante
+    expect(decomposto).not.toBe(composto);
+    expect(chaveDoNome(decomposto)).toBe(chaveDoNome(composto));
+    expect(chaveDoNome('Proteína\u200b')).toBe(chaveDoNome('proteina'));
+    const primeiro = await cadastrarInsumo(a, novo(composto), 'Marina');
+    expect(primeiro).toMatchObject({ ok: true, nome: composto });
+    const segundo = await cadastrarInsumo(a, novo(decomposto), 'Marina');
+    expect(segundo).toMatchObject({ ok: false, erros: { nome: expect.stringMatching(/Já existe/) } });
+    // Invisível no meio e nas pontas: o nome gravado sai limpo e o repetido é reconhecido.
+    const invisivel = await cadastrarInsumo(a, novo('\u200bFarínha\u200b de\ufeff teste'), 'Marina');
+    expect(invisivel).toMatchObject({ ok: false, erros: { nome: expect.stringMatching(/Já existe/) } });
+    const limpo = await cadastrarInsumo(a, novo('Sal\u200b grosso\u00ad'), 'Marina');
+    expect(limpo).toMatchObject({ ok: true, nome: 'Sal grosso' });
+    // Só invisível não é nome.
+    expect(await cadastrarInsumo(a, novo('\u200b\u200b\u200b'), 'Marina')).toMatchObject({ ok: false, erros: { nome: expect.any(String) } });
+    // Categoria: "Proteína" + largura zero é a mesma que já existe.
+    expect(await criarCategoria(a, { nome: 'Proteína\u200b' }, 'Marina')).toMatchObject({ ok: false, erros: { nome: expect.stringMatching(/Já existe/) } });
+    expect(await criarCategoria(a, { nome: 'Bebídas'.normalize('NFD') }, 'Marina')).toMatchObject({ ok: false, erros: { nome: expect.stringMatching(/Já existe/) } });
+  });
+
+  it('a chave de envio é por pessoa: a mesma chave de outra pessoa não reconhece nem revela o envio dela', async () => {
+    const entrada = novo('Pimenta do reino', { envio: 'envio-pessoa-0001' });
+    const dela = await cadastrarInsumo(a, entrada, 'Marina', 'user-marina');
+    expect(dela).toMatchObject({ ok: true });
+    // A mesma pessoa reenviando: o mesmo insumo.
+    expect(await cadastrarInsumo(a, entrada, 'Marina', 'user-marina')).toMatchObject({ ok: true, repetido: true });
+    // Outra pessoa com a MESMA chave e conteúdo diferente: não é recusa "dados diferentes de Pimenta do reino" (que revelaria o envio dela).
+    const outra = await cadastrarInsumo(a, novo('Cominho em pó', { envio: 'envio-pessoa-0001' }), 'Paulo', 'user-paulo');
+    expect(outra).toMatchObject({ ok: true, nome: 'Cominho em pó' });
+    expect(outra.ok && outra.repetido).toBeFalsy();
+    // Com o mesmo conteúdo, a outra pessoa também não é tratada como reenvio: vai pela regra do nome.
+    expect(await cadastrarInsumo(a, { ...entrada, envio: 'envio-pessoa-0002' }, 'Paulo', 'user-paulo')).toMatchObject({ ok: false, erros: { nome: expect.stringMatching(/Já existe/) } });
   });
 
   // ------------------------------------------------------ classificação assistida
@@ -712,6 +780,59 @@ describe.skipIf(!URL_TESTE)('ERP I.1a · categorias, cadastro e classificação 
       expect(outra.classificados).toBe(9);
       expect(outra.lote).not.toBe(ids.lote);
     });
+
+    it('o insumo que uma pessoa salvou depois (mesmo sem trocar a categoria) sai do lote: desfazer não tira a categoria dele', async () => {
+      const l = doParceiro(L.id, db);
+      const lote = (await lotesDeClassificacao(l))[0].lote;
+      const d = (await obterInsumo(l, ids['Cebola roxa'], ALCANCE_FLOWFOODS))!;
+      expect(await l.insumo.findUniqueOrThrow({ where: { id: ids['Cebola roxa'] }, select: { classificacaoLote: true } })).toEqual({ classificacaoLote: lote });
+      // Salva só o preço, a categoria é a mesma.
+      expect(await editarInsumo(l, ids['Cebola roxa'], { ...farinha, nome: 'Cebola roxa', categoriaId: d.categoria!.id, preco: '33,00', versao: d.versao }, 'Marina')).toMatchObject({ ok: true });
+      const depois = await l.insumo.findUniqueOrThrow({ where: { id: ids['Cebola roxa'] }, select: { categoriaId: true, classificacaoLote: true, classificadoPor: true } });
+      expect(depois).toEqual({ categoriaId: d.categoria!.id, classificacaoLote: null, classificadoPor: 'MIGRACAO' });
+      const r = await reverterLote(l, lote, 'Marina');
+      expect(r.ok && r.mantidos).toBeGreaterThanOrEqual(1);
+      expect((await l.insumo.findUniqueOrThrow({ where: { id: ids['Cebola roxa'] }, select: { categoriaId: true } })).categoriaId).toBe(d.categoria!.id);
+      expect(await l.insumo.count({ where: { categoriaId: null } })).toBe(8);
+    });
+
+    it('"Classificar os N" fica preso à prévia mostrada: se algo mudou desde então, nada é gravado e a prévia é refeita', async () => {
+      const l = doParceiro(L.id, db);
+      const vista = await previaDaClassificacao(l, ALCANCE_FLOWFOODS);
+      expect(vista.total).toBe(8);
+      expect(vista.assinatura).toMatch(/^[0-9a-f]{32}$/);
+      // Mesmo estado, mesma assinatura.
+      expect((await previaDaClassificacao(l, ALCANCE_FLOWFOODS)).assinatura).toBe(vista.assinatura);
+      // Entre a prévia e o clique, alguém cadastra um insumo antigo (sem categoria).
+      await legado(l, 'Tomate italiano');
+      const preso = await aplicarClassificacao(l, 'Marina', new Date(), vista.assinatura);
+      expect(preso).toMatchObject({ lote: null, classificados: 0, previaMudou: true });
+      expect(await l.insumo.count({ where: { categoriaId: null } })).toBe(9);
+      // A prévia nova tem outra assinatura e, com ela, aplica.
+      const nova = await previaDaClassificacao(l, ALCANCE_FLOWFOODS);
+      expect(nova.assinatura).not.toBe(vista.assinatura);
+      const feito = await aplicarClassificacao(l, 'Marina', new Date(Date.now() + 240_000), nova.assinatura);
+      expect(feito.previaMudou).toBeUndefined();
+      expect(feito.classificados).toBe(9);
+      expect(await l.insumo.count({ where: { categoriaId: null } })).toBe(0);
+    });
+
+    it('aceitar a sugestão dos marcados: classifica pelo nome o que o nome decide e deixa na fila o que não decide', async () => {
+      const l = doParceiro(L.id, db);
+      const alface = await legado(l, 'Alface crespa');
+      const zz = await legado(l, 'Zzz 99');
+      const r = await aceitarSugestoes(l, [alface, zz, alface], 'Marina');
+      expect(r).toEqual({ ok: true, classificados: 1, iguais: 0, semSugestao: 1, naoEncontrados: 0 });
+      const cs = Object.fromEntries((await listarCategorias(l)).map((c) => [c.chave!, c.id]));
+      expect(await l.insumo.findUniqueOrThrow({ where: { id: alface }, select: { categoriaId: true, classificadoPor: true, classificacaoLote: true } })).toEqual({ categoriaId: cs.HORTIFRUTI, classificadoPor: 'SUGESTAO', classificacaoLote: null });
+      expect((await l.insumo.findUniqueOrThrow({ where: { id: zz }, select: { categoriaId: true } })).categoriaId).toBeNull();
+      const [h] = await listarHistorico(l, { de: [{ entidade: 'Insumo', ids: [alface] }], verPrecos: true });
+      expect(h).toMatchObject({ acao: 'CLASSIFICOU', motivo: 'Sugestão pelo nome aceita em lote' });
+      // De novo: já está nela.
+      expect(await aceitarSugestoes(l, [alface], 'Marina')).toMatchObject({ ok: true, classificados: 0, iguais: 1 });
+      expect(await aceitarSugestoes(l, [], 'Marina')).toMatchObject({ ok: false });
+      expect(await aceitarSugestoes(b, [alface], 'Bia')).toMatchObject({ ok: true, classificados: 0, naoEncontrados: 1 });
+    });
   });
 
   // ---------------------------------------------------------------- as actions
@@ -725,7 +846,7 @@ describe.skipIf(!URL_TESTE)('ERP I.1a · categorias, cadastro e classificação 
         expect(r, quem).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/gerir categorias de insumos/) } });
         expect(await daSessao.acaoRenomearCategoria(cat.MERCEARIA, null, form({ nome: 'X', versao: new Date().toISOString() }))).toMatchObject({ ok: false });
         expect(await daSessao.acaoExcluirCategoria(cat.SOBREMESAS, null)).toMatchObject({ ok: false });
-        expect(await rodar(daSessao.acaoAplicarClassificacao())).toEqual({ destino: '/erp/insumos/classificar?feito=recusado' });
+        expect(await rodar(daSessao.acaoAplicarClassificacao(form({})))).toEqual({ destino: '/erp/insumos/classificar?feito=recusado' });
         expect(await rodar(daSessao.acaoReverterLote(form({ lote: 'lote-qualquer-1234' })))).toEqual({ destino: '/erp/insumos/classificar?feito=recusado' });
       }
       expect(await a.categoriaInsumo.count()).toBe(antes);

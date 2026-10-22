@@ -38,14 +38,31 @@ const MARCADO = new Set(['on', 'sim', 'true', '1']);
 export const marcado = (v: unknown) => typeof v === 'string' && MARCADO.has(v);
 const texto = (v: unknown) => (typeof v === 'string' ? v : '');
 
-/** Nome obrigatório (2..max letras, espaços colapsados): insumo, embalagem, ficha. */
+/**
+ * O texto como a pessoa o vê: forma composta (NFC, "í" é uma letra só e não "i" + acento) e sem caracteres invisíveis
+ * (largura zero, soft hyphen, marcas de direção, BOM) nem de controle. Sem isso "Farínha" decomposto e "Proteína" com um
+ * espaço de largura zero passavam por nomes diferentes dos que parecem iguais.
+ */
+export function limparTexto(s: string): string {
+  return s
+    .normalize('NFC')
+    .replace(/[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u3164\uFE00-\uFE0F\uFEFF\uFFA0]/g, '')
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g, '');
+}
+
+/** Nome obrigatório (2..max letras, espaços colapsados, sem invisíveis): insumo, embalagem, ficha. */
 export function nomeObrigatorio(max: number) {
   return z
     .string({ message: 'Dê um nome.' })
-    .trim()
-    .min(2, 'Dê um nome com pelo menos 2 letras.')
-    .max(max, `Nome longo demais (máx. ${max}).`)
-    .transform((s) => s.replace(/\s+/g, ' '));
+    .transform(limparTexto)
+    .pipe(
+      z
+        .string()
+        .trim()
+        .min(2, 'Dê um nome com pelo menos 2 letras.')
+        .max(max, `Nome longo demais (máx. ${max}).`)
+        .transform((s) => s.replace(/\s+/g, ' ')),
+    );
 }
 
 export function primeiroErroPorCampo(issues: readonly { path: PropertyKey[]; message: string }[]): Erros {

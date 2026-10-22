@@ -8,7 +8,7 @@
  */
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFormState } from 'react-dom';
 import type { LinhaDaFila } from '@/lib/erp/classificar';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
@@ -55,6 +55,9 @@ function BarraDeAcao({
       <BotaoEnviar disabled={!!bloqueio || marcados === 0 || !categoriaId} pendente="Classificando…" className="sm:min-w-52">
         {marcados === 0 ? 'Classificar os marcados' : `Classificar ${marcados} ${marcados === 1 ? 'marcado' : 'marcados'}`}
       </BotaoEnviar>
+      <BotaoEnviar nome="aceitar" valor="1" variante="secundario" disabled={!!bloqueio || marcados === 0} pendente="Classificando…" className="sm:min-w-64">
+        Aceitar a sugestão dos marcados
+      </BotaoEnviar>
     </div>
   );
 }
@@ -76,6 +79,9 @@ export function FormDaFila({
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(segura, null);
   const [marcados, setMarcados] = useState<ReadonlySet<string>>(new Set());
   const [categoriaId, setCategoriaId] = useState('');
+  // Depois de um envio que deu certo a página é refeita no servidor e a lista chega nova: a marcação recomeça vazia (não sobra
+  // marcado o que já saiu da fila, nem o que continua nela e a pessoa não escolheu de novo). Erro não refaz a lista: a marcação fica.
+  useEffect(() => setMarcados(new Set()), [linhas]);
   const todos = marcados.size === linhas.length && linhas.length > 0;
   const mostraValor = useMemo(() => linhas.some((l) => l.valorCentavos !== null), [linhas]);
   const alternar = (id: string) =>

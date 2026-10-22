@@ -17,7 +17,7 @@ export const FEITO: Readonly<Record<string, string>> = {
  * lê o insumo), nunca da URL: a URL só escolhe a chave.
  *  - criado: "Insumo salvo com sucesso: Farinha de trigo";
  *  - criado-repetido: o mesmo envio chegou duas vezes (clique repetido, resposta perdida) e o insumo existe uma vez só;
- *  - editado: "Alterações salvas em Farinha de trigo".
+ *  - editado: "Insumo atualizado com sucesso: Farinha de trigo".
  */
 export const SALVO: Readonly<Record<string, (nome: string) => { titulo: string; apoio?: string }>> = {
   criado: (nome) => ({ titulo: `Insumo salvo com sucesso: ${nome}` }),
@@ -25,7 +25,7 @@ export const SALVO: Readonly<Record<string, (nome: string) => { titulo: string; 
     titulo: `Insumo salvo com sucesso: ${nome}`,
     apoio: 'O envio chegou mais de uma vez; o insumo foi cadastrado uma vez só.',
   }),
-  editado: (nome) => ({ titulo: `Alterações salvas em ${nome}`, apoio: 'O antes e o depois estão em Últimas alterações.' }),
+  editado: (nome) => ({ titulo: `Insumo atualizado com sucesso: ${nome}`, apoio: 'O antes e o depois estão em Últimas alterações.' }),
 };
 
 /** A frase da URL que não leva o nome do insumo. As que levam estão em `fraseDoSalvo`. */

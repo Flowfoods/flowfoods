@@ -14,7 +14,7 @@ import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarInsumo, editarInsumo, mudarSituacaoInsumo } from '@/lib/erp/insumos';
 import { cadastrarVariante, editarVariante, mudarSituacaoVariante } from '@/lib/erp/variantes';
 import { criarCategoria, excluirCategoria, moverCategoria, mudarSituacaoCategoria, renomearCategoria } from '@/lib/erp/categorias';
-import { aplicarClassificacao, classificarEmLote, reverterLote } from '@/lib/erp/classificar';
+import { aceitarSugestoes, aplicarClassificacao, classificarEmLote, reverterLote } from '@/lib/erp/classificar';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import { concluirNaTela, voltarDaClassificacao, voltarDoMover } from '@/components/erp/telas/insumos/executar-categorias';
@@ -33,7 +33,7 @@ async function paraEditar() {
 export async function acaoCadastrarInsumo(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraEditar();
   if (negado) return recusado(anterior, negado);
-  const r = await cadastrarInsumo(ctx.cliente, entradaDe(form), ctx.sessao.autorNome);
+  const r = await cadastrarInsumo(ctx.cliente, entradaDe(form), ctx.sessao.autorNome, ctx.sessao.userId);
   return concluir(r, anterior, BASE, { mudou: 'criado', repetido: 'criado-repetido' });
 }
 
@@ -130,10 +130,12 @@ export async function acaoMoverCategoria(id: string, direcao: 'subir' | 'descer'
 // ------------------------------------------------------- classificação (I.1a)
 
 /** Aplicar e desfazer a classificação assistida mexem em todos os insumos da rede: são de quem gere as categorias. */
-export async function acaoAplicarClassificacao(): Promise<void> {
+export async function acaoAplicarClassificacao(form: FormData): Promise<void> {
   const { ctx, negado } = await paraGerirCategorias();
   if (negado) voltarDaClassificacao(CLASSIFICAR, BASE, 'recusado');
-  const r = await aplicarClassificacao(ctx.cliente, ctx.sessao.autorNome);
+  const vista = form.get('previa');
+  const r = await aplicarClassificacao(ctx.cliente, ctx.sessao.autorNome, new Date(), typeof vista === 'string' ? vista : '');
+  if (r.previaMudou) voltarDaClassificacao(CLASSIFICAR, BASE, 'previa-mudou');
   if (!r.lote) voltarDaClassificacao(CLASSIFICAR, BASE, 'nada');
   voltarDaClassificacao(CLASSIFICAR, BASE, 'aplicado', { n: r.classificados, outros: r.emOutros, lote: r.lote });
 }
@@ -150,7 +152,13 @@ export async function acaoReverterLote(form: FormData): Promise<void> {
 export async function acaoClassificarEmLote(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraEditar();
   if (negado) return recusado(anterior, negado);
-  const r = await classificarEmLote(ctx.cliente, form.getAll('ids').filter((x): x is string => typeof x === 'string'), form.get('categoriaId'), ctx.sessao.autorNome);
+  const ids = form.getAll('ids').filter((x): x is string => typeof x === 'string');
+  if (form.get('aceitar') === '1') {
+    const a = await aceitarSugestoes(ctx.cliente, ids, ctx.sessao.autorNome);
+    if (!a.ok) return recusado(anterior, a.erro);
+    voltarDaClassificacao(CLASSIFICAR, BASE, 'aceitas', { n: a.classificados, iguais: a.iguais, sem: a.semSugestao });
+  }
+  const r = await classificarEmLote(ctx.cliente, ids, form.get('categoriaId'), ctx.sessao.autorNome);
   if (!r.ok) return recusado(anterior, r.erro);
   voltarDaClassificacao(CLASSIFICAR, BASE, 'lote', { n: r.classificados, iguais: r.iguais });
 }

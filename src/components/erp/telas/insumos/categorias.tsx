@@ -52,8 +52,8 @@ export function TelaCategorias({
         cor={COR.insumo}
         titulo="Categorias de insumo"
         subtitulo={`${contexto ? `${contexto} · ` : ''}cadastro da rede, vale para todas as lojas · ${ativas} ${ativas === 1 ? 'ativa' : 'ativas'}`}
+        aviso={frase ? <Aviso tom="ok" titulo={frase} /> : undefined}
       />
-      {frase && <Aviso tom="ok" titulo={frase} />}
       <AvisoDaClassificacao resumo={faltam} href={podeClassificar ? `${base}/classificar` : undefined} />
 
       {podeGerir && (

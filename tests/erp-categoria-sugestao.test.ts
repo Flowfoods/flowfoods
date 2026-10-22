@@ -183,3 +183,21 @@ describe('o que manda na dúvida', () => {
     expect(palavrasDoNome('Pães, Limões & Flores 2x!')).toEqual(['pao', 'limao', 'flor', '2x']);
   });
 });
+
+describe('nome na forma composta e sem invisíveis', () => {
+  it('decomposto, com largura zero, soft hyphen e BOM dá o mesmo nome que o composto', () => {
+    const composto = 'Farínha de trigo';
+    expect(chaveDoNome(composto.normalize('NFD'))).toBe('farinha de trigo');
+    expect(chaveDoNome('Farí​nha­ de﻿ trigo')).toBe('farinha de trigo');
+    expect(chaveDoNome('Proteína​')).toBe(chaveDoNome('PROTEINA'));
+  });
+  it('a categoria sai limpa e só invisível não é nome', () => {
+    expect(lerNomeDaCategoria('Proteína​  nova')).toEqual({ ok: true, nome: 'Proteína nova' });
+    expect(lerNomeDaCategoria('Bebídas'.normalize('NFD'))).toEqual({ ok: true, nome: 'Bebídas' });
+    expect(lerNomeDaCategoria('​​​')).toMatchObject({ ok: false });
+  });
+  it('a sugestão não se perde com o nome decomposto', () => {
+    expect(sugerirCategoria('Coxa de frango congelada'.normalize('NFD'), 'INGREDIENTE').chave).toBe('PROTEINA');
+    expect(sugerirCategoria('Pão​ brioche', 'INGREDIENTE').chave).toBe(sugerirCategoria('Pão brioche', 'INGREDIENTE').chave);
+  });
+});

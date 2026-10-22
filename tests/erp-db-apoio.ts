@@ -110,7 +110,7 @@ export async function reabrirPeriodoDeTeste(cliente: ClienteDoParceiro, periodoI
  */
 export async function cadastrarInsumoDeTeste(cliente: ClienteDoParceiro, entrada: Record<string, unknown>, autorNome?: string) {
   if (entrada.categoriaId !== undefined) return cadastrarInsumo(cliente, entrada, autorNome);
-  await garantirCategoriasPadrao(cliente, 'Teste');
+  await garantirCategoriasPadrao(cliente);
   const sugestao = await sugestaoParaInsumo(cliente, String(entrada.nome ?? ''), typeof entrada.tipo === 'string' ? entrada.tipo : undefined);
   return cadastrarInsumo(cliente, { ...entrada, categoriaId: sugestao.categoriaId ?? '' }, autorNome);
 }

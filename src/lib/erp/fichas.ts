@@ -396,7 +396,7 @@ async function sincronizarInsumoProduzido(
     // motivo (a fila de revisão o pega): a ficha nunca trava por causa disso.
     let sugestao = await sugestaoParaInsumo(tx, f.nome, 'PRE_PREPARO');
     if (!sugestao.categoriaId) {
-      await garantirCategoriasPadrao(tx, autorNome);
+      await garantirCategoriasPadrao(tx);
       sugestao = await sugestaoParaInsumo(tx, f.nome, 'PRE_PREPARO');
     }
     const novo = await tx.insumo.create({

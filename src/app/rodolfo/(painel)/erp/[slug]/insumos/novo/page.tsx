@@ -8,10 +8,10 @@ import { acaoCadastrarInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroNovoInsumoPage({ params, searchParams }: { params: { slug: string }; searchParams: { nome?: string } }) {
+export default async function ParceiroNovoInsumoPage({ params, searchParams }: { params: { slug: string }; searchParams: { nome?: string; tipo?: string; unidade?: string; conservacao?: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.editar');
-  const categorias = await categoriasDoFormulario(ctx.cliente, ctx.sessao.autorNome);
+  const categorias = await categoriasDoFormulario(ctx.cliente);
   return (
     <TelaFormInsumo
       categorias={categorias}
@@ -21,6 +21,7 @@ export default async function ParceiroNovoInsumoPage({ params, searchParams }: {
       acao={acaoCadastrarInsumo.bind(null, ctx.parceiro.slug)}
       bloqueio={ctx.bloqueio}
       nomeSugerido={searchParams.nome}
+      lembrado={{ tipo: searchParams.tipo, unidade: searchParams.unidade, conservacao: searchParams.conservacao }}
     />
   );
 }

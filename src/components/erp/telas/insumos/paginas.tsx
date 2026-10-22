@@ -17,7 +17,7 @@ import { Painel } from '../../ui/superficies';
 import type { AcaoDeCadastro } from '../cadastro/estado';
 import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { FormEmbalagem } from './form-embalagem';
-import { FormInsumo, INSUMO_NOVO, type ValoresDoInsumo } from './form-insumo';
+import { FormInsumo, type ValoresDoInsumo } from './form-insumo';
 import { FormSituacao } from '../cadastro/form-situacao';
 import { TrilhaDaPagina } from '../../shell/trilha';
 
@@ -72,6 +72,7 @@ export function TelaFormInsumo({
   acao,
   bloqueio,
   nomeSugerido,
+  lembrado,
   categorias,
   envio,
 }: {
@@ -83,6 +84,8 @@ export function TelaFormInsumo({
   envio?: string;
   /** Novo vindo da importação de fichas ("Cadastrar “Picles”"): o nome já vem escrito. */
   nomeSugerido?: string;
+  /** "Cadastrar outro insumo": tipo, unidade e conservação do último, vindos da URL (só valores da lista valem). */
+  lembrado?: { tipo?: string; unidade?: string; conservacao?: string };
   base: string;
   contexto: string;
   acao: AcaoDeCadastro;
@@ -96,7 +99,7 @@ export function TelaFormInsumo({
     conservacao: insumo.conservacao,
     validades: insumo.validades,
     ...embalagemParaCampo(insumo, insumo.unidade),
-  } : nomeSugerido ? { ...INSUMO_NOVO, nome: nomeSugerido.slice(0, 80) } : undefined;
+  } : undefined;
   const volta = insumo ? `${base}/${insumo.id}` : base;
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -115,6 +118,8 @@ export function TelaFormInsumo({
         aqui={insumo ? `${base}/${insumo.id}/editar` : `${base}/novo`}
         cancelar={volta}
         inicial={inicial}
+        nomeSugerido={nomeSugerido}
+        lembrado={lembrado}
         versao={insumo?.versao}
         travaDaUnidade={insumo?.travaDaUnidade ?? null}
         bloqueio={bloqueio}

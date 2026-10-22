@@ -104,20 +104,7 @@ export function FiltrosDaLista({ base, filtros: f, categorias }: { base: string;
           </Link>
         )}
       </div>
-      <div>
-        <label htmlFor="insumos-tipo" className="sr-only">
-          Tipo
-        </label>
-        <select id="insumos-tipo" name="tipo" defaultValue={f.tipo ?? ''} className={SELECT}>
-          <option value="">Todos os tipos</option>
-          {Object.entries(TIPOS).map(([k, r]) => (
-            <option key={k} value={k}>
-              {r}
-            </option>
-          ))}
-        </select>
-      </div>
-      <div>
+      <div className="col-span-2 xl:col-span-1">
         <label htmlFor="insumos-categoria" className="sr-only">
           Categoria
         </label>
@@ -129,6 +116,19 @@ export function FiltrosDaLista({ base, filtros: f, categorias }: { base: string;
             <option key={c.id} value={c.id}>
               {c.nome}
               {c.ativa ? '' : ' (desativada)'}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label htmlFor="insumos-tipo" className="sr-only">
+          Tipo
+        </label>
+        <select id="insumos-tipo" name="tipo" defaultValue={f.tipo ?? ''} className={SELECT}>
+          <option value="">Todos os tipos</option>
+          {Object.entries(TIPOS).map(([k, r]) => (
+            <option key={k} value={k}>
+              {r}
             </option>
           ))}
         </select>

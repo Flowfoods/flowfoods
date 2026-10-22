@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 export default async function ParceiroCategoriasPage({ params, searchParams }: { params: { slug: string }; searchParams: { feito?: string; cat?: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.ver');
-  await garantirCategoriasPadrao(ctx.cliente, ctx.sessao.autorNome);
+  await garantirCategoriasPadrao(ctx.cliente);
   const slug = ctx.parceiro.slug;
   const [categorias, faltam] = await Promise.all([listarCategorias(ctx.cliente), resumoDoQueFalta(ctx.cliente, ctx.alcance)]);
   return (

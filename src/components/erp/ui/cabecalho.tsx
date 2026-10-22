@@ -40,6 +40,7 @@ export function PageHeader({
   titulo,
   subtitulo,
   acao,
+  aviso,
   children,
 }: {
   icone: ChaveIcone;
@@ -48,6 +49,8 @@ export function PageHeader({
   subtitulo?: ReactNode;
   /** Ação principal da tela (uma só). */
   acao?: ReactNode;
+  /** O que acabou de acontecer ("Insumo salvo..."): vem ANTES da caixa "Como funciona", para ser a primeira coisa que se lê. */
+  aviso?: ReactNode;
   /** Busca e filtros, logo abaixo. */
   children?: ReactNode;
 }) {
@@ -65,6 +68,7 @@ export function PageHeader({
         </div>
         {acao && <div className="flex shrink-0 flex-wrap items-center gap-2">{acao}</div>}
       </div>
+      {aviso}
       <CaixaDaTela />
       {children}
     </header>

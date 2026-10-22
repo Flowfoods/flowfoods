@@ -104,7 +104,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
   let catB = '';
   let catS = '';
   const catDe = async (c: ClienteDoParceiro) => {
-    await garantirCategoriasPadrao(c, 'Teste');
+    await garantirCategoriasPadrao(c);
     return (await c.categoriaInsumo.findFirstOrThrow({ where: { chave: 'HORTIFRUTI' } })).id;
   };
 

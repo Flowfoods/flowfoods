@@ -249,7 +249,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.4 · permissões (Postgres real)', { timeout:
 
     atual.ctx = () => ctxDe(dono.s);
     // I.1a: a categoria é obrigatória; a da casa vem das dez padrão.
-    await garantirCategoriasPadrao(doParceiro(A, db), 'Teste');
+    await garantirCategoriasPadrao(doParceiro(A, db));
     const categoria = (await doParceiro(A, db).categoriaInsumo.findFirstOrThrow({ where: { chave: 'MERCEARIA' } })).id;
     await expect(
       acaoCadastrarInsumoDaSessao(null, form({ nome: 'Pelo dono', unidade: 'KG', categoriaId: categoria, conteudo: '1', preco: '1,00' })),

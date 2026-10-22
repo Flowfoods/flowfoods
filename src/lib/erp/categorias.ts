@@ -3,8 +3,8 @@
  * função aqui que consiga tocar em categoria de outro parceiro.
  *
  * - a categoria é da REDE (do parceiro): o insumo tem UMA; a loja só vai personalizar a meta (I.2), nunca a natureza;
- * - as dez padrão nascem por `garantirCategoriasPadrao` (script `erp:semear-categorias`, e sozinha na primeira vez que alguém
- *   abre a tela), idempotente pela `chave`; a migration não semeia nada;
+ * - as dez padrão nascem por `garantirCategoriasPadrao` (script `erp:semear-categorias`, e sozinha só na primeira vez, quando a casa
+ *   não tem categoria nenhuma; depois, abrir tela nunca recria o que a casa excluiu), idempotente pela `chave`; a migration não semeia nada;
  * - criar, renomear, reordenar, desativar, reativar e excluir gravam o antes/depois no `HistoricoAlteracao` na MESMA
  *   transação; quem pode é `insumos.categorias` (checado na action, não aqui);
  * - "Outros / a classificar" é do sistema: não se renomeia, desativa nem exclui (regra aqui e gatilho no banco);
@@ -57,7 +57,7 @@ async function comNomeParecido(tx: ClienteDoParceiro, nome: string, exceto: stri
   const achadas = await tx.sql<{ id: string; nome: string }>`
     SELECT "id", "nome" FROM "CategoriaInsumo"
     WHERE "parceiroId" = ${tx.parceiroId}
-      AND lower(translate("nome", ${ACENTUADAS}, ${SEM_ACENTO})) = ${chaveDoNome(nome)}
+      AND lower(translate(normalize("nome", NFC), ${ACENTUADAS}, ${SEM_ACENTO})) = ${chaveDoNome(nome)}
       AND "id" <> ${exceto ?? ''}
     LIMIT 1`;
   return achadas[0] ?? null;
@@ -74,22 +74,42 @@ function erroDoBanco(e: unknown): Recusa | null {
 
 // -------------------------------------------------------------- semear
 
+/** Quem consta no histórico das categorias que o sistema cria sozinho: nunca a pessoa que só abriu uma tela. */
+export const AUTOR_DO_SISTEMA = 'Sistema';
+
 /**
- * As dez padrão deste parceiro, uma vez só: o que já existe (pela chave) fica como está, inclusive o nome que a casa mudou.
- * Uma categoria da casa sem chave com o mesmo nome de uma padrão é ADOTADA (ganha a chave) em vez de brigar com o nome único.
- * Cada criação vai para o histórico. Parceiro somente leitura (suspenso) não semeia. Devolve quantas criou.
+ * As dez padrão deste parceiro. Abrir tela NUNCA recria o que a casa tirou (decisão 249):
+ * - sem `completar` (telas, ficha, classificação): semeia as dez só quando a casa NÃO tem categoria nenhuma (a primeira vez) e,
+ *   de resto, garante apenas "Outros / a classificar", que é do sistema e não se exclui. Uma padrão excluída continua excluída.
+ *   O histórico sai em nome do Sistema, não de quem abriu a tela (que pode nem ter `insumos.categorias`).
+ * - `completar: true` (o script `erp:semear-categorias`, ato explícito de quem administra): devolve também as padrão que faltam.
+ * Pela chave, o que já existe fica como está, inclusive o nome que a casa mudou; uma categoria da casa sem chave com o mesmo
+ * nome de uma padrão é ADOTADA (ganha a chave) em vez de brigar com o nome único. Cada criação vai para o histórico.
+ * Parceiro somente leitura (suspenso) não semeia. Devolve quantas criou.
  */
-export async function garantirCategoriasPadrao(cliente: ClienteDoParceiro, autorNome = 'Sistema'): Promise<number> {
+export async function garantirCategoriasPadrao(cliente: ClienteDoParceiro, opcoes: { completar?: boolean; autorNome?: string } = {}): Promise<number> {
   if (cliente.somenteLeitura) return 0;
-  const prontas = await cliente.categoriaInsumo.count({ where: { chave: { in: CATEGORIAS_PADRAO.map((c) => c.chave) } } });
-  if (prontas >= CATEGORIAS_PADRAO.length) return 0;
+  const completar = opcoes.completar === true;
+  const autorNome = opcoes.autorNome ?? AUTOR_DO_SISTEMA;
+  const todas = await cliente.categoriaInsumo.count();
+  if (!completar && todas > 0) {
+    // A casa já foi semeada ou montada à mão. Só "Outros" é recriado, se por algum motivo não existir.
+    if ((await cliente.categoriaInsumo.count({ where: { chave: CHAVE_DO_SISTEMA } })) > 0) return 0;
+  } else if (completar) {
+    const prontas = await cliente.categoriaInsumo.count({ where: { chave: { in: CATEGORIAS_PADRAO.map((c) => c.chave) } } });
+    if (prontas >= CATEGORIAS_PADRAO.length) return 0;
+  }
   return cliente.transacao(async (tx) => {
     await travarCategorias(tx);
     const existentes = await tx.categoriaInsumo.findMany({ select: { id: true, chave: true, nome: true } });
+    // Relê sob a trava: quem chegou primeiro já pode ter semeado.
+    const soOutros = !completar && existentes.length > 0;
+    if (!completar && existentes.length > 0 && existentes.some((e) => e.chave === CHAVE_DO_SISTEMA)) return 0;
     const comChave = new Set(existentes.map((e) => e.chave).filter(Boolean));
     const porNome = new Map(existentes.filter((e) => !e.chave).map((e) => [chaveDoNome(e.nome), e] as const));
     let criadas = 0;
     for (const p of CATEGORIAS_PADRAO) {
+      if (soOutros && p.chave !== CHAVE_DO_SISTEMA) continue;
       if (comChave.has(p.chave)) continue;
       const adotada = porNome.get(chaveDoNome(p.nome));
       if (adotada) {
@@ -179,8 +199,8 @@ export async function categoriasParaEscolher(cliente: ClienteDoParceiro, atualId
  * O que o formulário de insumo precisa: garante as dez padrão (a primeira vez que alguém abre o formulário numa casa nova) e
  * devolve as que se oferecem. Parceiro somente leitura não semeia (e o formulário vem bloqueado).
  */
-export async function categoriasDoFormulario(cliente: ClienteDoParceiro, autorNome: string, atualId?: string | null): Promise<OpcaoDeCategoria[]> {
-  await garantirCategoriasPadrao(cliente, autorNome);
+export async function categoriasDoFormulario(cliente: ClienteDoParceiro, atualId?: string | null): Promise<OpcaoDeCategoria[]> {
+  await garantirCategoriasPadrao(cliente);
   return categoriasParaEscolher(cliente, atualId);
 }
 

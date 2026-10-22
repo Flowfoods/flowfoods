@@ -108,6 +108,24 @@ export function TelaDetalheInsumo({
         icone="insumo"
         cor={COR.insumo}
         titulo={i.nome}
+        aviso={
+          salvo ? (
+            <AvisoDeSalvo titulo={salvo.titulo} apoio={salvo.apoio}>
+              {salvo.criou && podeEditar && !bloqueio && (
+                // Quem cadastra em série quase sempre repete tipo, unidade e conservação: o próximo já abre com os do último.
+                <Link
+                  href={`${base}/novo?${new URLSearchParams({ tipo: i.tipo, unidade: i.unidade, conservacao: i.conservacao }).toString()}`}
+                  className={classeDeBotao('secundario')}
+                >
+                  Cadastrar outro insumo
+                </Link>
+              )}
+              <Link href={voltar} className={classeDeBotao('fantasma')}>
+                Ver todos os insumos
+              </Link>
+            </AvisoDeSalvo>
+          ) : undefined
+        }
         subtitulo={[contexto, TIPOS[i.tipo], i.categoria?.nome ?? 'sem categoria', p && !temValidade(i.validades) ? null : CONSERVACOES[i.conservacao], `medido em ${u.nome.toLowerCase()}`]
           .filter(Boolean)
           .join(' · ')}
@@ -124,18 +142,6 @@ export function TelaDetalheInsumo({
         }
       />
 
-      {salvo && (
-        <AvisoDeSalvo titulo={salvo.titulo} apoio={salvo.apoio}>
-          {salvo.criou && podeEditar && !bloqueio && (
-            <Link href={`${base}/novo`} className={classeDeBotao('secundario')}>
-              Cadastrar outro insumo
-            </Link>
-          )}
-          <Link href={voltar} className={classeDeBotao('fantasma')}>
-            Ver todos os insumos
-          </Link>
-        </AvisoDeSalvo>
-      )}
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
       {/* Recém-desativado: a frase do "feito" já diz isso; não repetir. */}
       {!i.ativo && feito !== 'desativado' && (

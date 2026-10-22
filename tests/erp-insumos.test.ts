@@ -367,9 +367,9 @@ describe('ERP 1.1 · ?feito= da URL só escolhe uma frase conhecida', () => {
     }
   });
 
-  it('I.1a · criar diz "Insumo salvo com sucesso: <nome>" e atualizar diz "Alterações salvas em <nome>"; o nome é o do banco', () => {
+  it('I.1a · criar diz "Insumo salvo com sucesso: <nome>" e atualizar diz "Insumo atualizado com sucesso: <nome>"; o nome é o do banco', () => {
     expect(fraseDoSalvo('criado', 'Farinha de trigo')).toEqual({ titulo: 'Insumo salvo com sucesso: Farinha de trigo', criou: true });
-    expect(fraseDoSalvo('editado', 'Farinha de trigo')).toMatchObject({ titulo: 'Alterações salvas em Farinha de trigo', criou: false });
+    expect(fraseDoSalvo('editado', 'Farinha de trigo')).toMatchObject({ titulo: 'Insumo atualizado com sucesso: Farinha de trigo', criou: false });
     expect(fraseDoSalvo('criado-repetido', 'Farinha de trigo')).toMatchObject({ titulo: 'Insumo salvo com sucesso: Farinha de trigo', criou: true, apoio: expect.stringMatching(/uma vez só/) });
   });
 });

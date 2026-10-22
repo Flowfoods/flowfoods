@@ -2372,13 +2372,13 @@ e o prefetch do Next abortado. Prints em `pw/prova33p/jornada/` (8) e `pw/prova3
 ## O que a I.1a entregou — categorias de insumo, obrigatoriedade, confirmação ao salvar e idempotência
 
 Prioridade do Rodolfo de 21/10/2026 (cadastro de insumos), primeira metade. Migrations ADITIVAS `20261101000000_erp_insumo_categorias` (uma
-tabela de tenant e colunas anuláveis em `Insumo`) e `20261101010000_erp_catalogo_v3` (só dado). Decisões 243 a 254. Permissão nova
+tabela de tenant e colunas anuláveis em `Insumo`) e `20261101010000_erp_catalogo_v3` (só dado). Decisões 243 a 258. Permissão nova
 `insumos.categorias`. `VERSAO_DO_ERP` não mudou (a fase é "3.3" até a I.1b fechar a prioridade).
 
 1. **Categorias** (243, 244). `CategoriaInsumo` do parceiro, com as dez do plano (nomes exatos: Proteína; Hortifruti; Mercearias e secos;
    Laticínios, frios e embutidos; Congelados e industrializados; Panificação; Bebidas; Descartáveis e embalagens; Limpeza e higienização;
-   Outros / a classificar), semeadas por `npm run erp:semear-categorias` (idempotente por `chave`) e sozinhas na primeira abertura de
-   casa nova, nunca pela migration (250). Aba **Categorias** (`insumos/categorias`): criar (entra antes de "Outros"), renomear (com a
+   Outros / a classificar), semeadas por `npm run erp:semear-categorias` (idempotente por `chave`; só ele devolve uma padrão que a casa tirou) e sozinhas UMA vez, na primeira abertura de
+   casa sem categoria nenhuma, em nome do "Sistema" e nunca pela migration; abrir tela depois não recria nada (250). Aba **Categorias** (`insumos/categorias`): criar (entra antes de "Outros"), renomear (com a
    versão lida), subir e descer, desativar (com uso: o insumo continua nela) e reativar, excluir (só sem insumo e sem passagem no
    histórico). "Outros / a classificar" é do sistema: sem botões, e o gatilho do banco recusa até SQL cru. Tudo com antes/depois no
    histórico. Gerir é `insumos.categorias` (rede inteira; só o Dono pelo perfil base); quem só vê lê a lista. Nome único sem diferenciar
@@ -2388,15 +2388,18 @@ tabela de tenant e colunas anuláveis em `Insumo`) e `20261101010000_erp_catalog
 3. **Cadastro** (246, 252, 253). Nome, categoria e unidade base obrigatórios: marcados "(obrigatório)" com `aria-required`, a unidade não
    vem pré-marcada, a categoria sai sugerida (texto "Sugerida pelo nome ("farinha")", trocável, com "Voltar à sugestão") e o servidor
    recusa cada falta no campo, com o resumo, o foco no primeiro problema e o formulário preservado. Depois de salvar: "Insumo salvo com
-   sucesso: <nome>" (criado) ou "Alterações salvas em <nome>" (atualizado), região viva preenchida depois da montagem, com "Cadastrar
+   sucesso: <nome>" (criado) ou "Insumo atualizado com sucesso: <nome>" (atualizado), região viva preenchida depois da montagem, com "Cadastrar
    outro insumo" e "Ver todos os insumos". Reenvio com a mesma chave devolve o mesmo insumo (um só, mesmo em 5 pedidos paralelos);
    resposta perdida volta como "não deu para confirmar" e tocar de novo não duplica. Pré-preparo criado pela ficha recebe a sugestão
-   (ambíguo vai para Outros e a ficha não trava).
+   (ambíguo vai para Outros e a ficha não trava). A chave de envio é por pessoa (252). "Cadastrar outro insumo" abre com tipo, unidade e
+   conservação do último (258). Nome em NFC e sem caracteres invisíveis (255).
 4. **Classificação assistida dos antigos** (247): aba **Classificar insumos** e o script `erp:classificar-insumos` (`--previa` padrão,
    `--aplicar`, `--reverter <lote>`, `--parceiro`). Prévia sem gravar; aplicar só onde `categoriaId` é nulo, um CLASSIFICOU por insumo;
    2ª vez muda 0; reverter só o intocado; **fila de revisão** (sem categoria ou em Outros, com o motivo, a sugestão e o valor) com edição
    em lote (até 200); contagem e valor sem categoria também no alto da lista de Insumos. A lista ganhou a coluna e o filtro de categoria
    (inclui "Sem categoria" e "A revisar"). Aplicar e desfazer são `insumos.categorias`; classificar em lote é `insumos.editar`.
+   "Classificar os N" fica preso à prévia mostrada (257); desfazer não tira a categoria do que uma pessoa salvou depois (256); a fila
+   tem "Aceitar a sugestão dos marcados" (258); a página exige `insumos.ver` além de `insumos.editar`.
 5. **Nomes parecidos** (251): o que já existia ("Cebola"/"cebola") não é mexido; aparece em Classificar e na prévia do script.
 6. **Seed**: `npm run erp:seed-teste` semeia as dez e manda a categoria sugerida; confere o client gerado (`prisma generate`) antes de começar.
 
@@ -2434,19 +2437,25 @@ tabela com CHECKs, índices, gatilho e RLS, e o conferidor acusando o gatilho, o
 trava por parceiro do cadastro derruba os testes de paralelo. Os outros testes com banco passaram a cadastrar insumo por
 `cadastrarInsumoDeTeste` (`tests/erp-db-apoio.ts`), que semeia as dez e manda a sugestão.
 
-**Resultado da prova (2026-10-22).** `npx vitest run` sem banco: 55 arquivos, 1349 testes passando (610 pulados por exigirem banco). Com banco
-(`ff_dev`, superusuário), duas rodadas seguidas: 97 arquivos, 1985 testes, todos passando. Como dono não-superusuário com FORCE RLS e como dono
-sem RLS: os 6 arquivos de banco tocados (categorias, insumos, isolamento, permissões, compras, ajuda) com 116 testes cada, passando. O teste de
-migração (`erp-insumo-categorias-migracao.db.test.ts`) cria os próprios perfis e por isso roda só com a URL de superusuário: com a URL de um
-dono comum ele não consegue criar banco, e isso não é defeito da migration. `prisma validate`, `typecheck`, `lint`, `gate` e `build` limpos;
-`erp:conferir-migracao` limpo; `migrate diff` vazio.
-Jornada no navegador (build de produção, banco recriado do zero): cadastro com sugestão e correção manual, recusa sem categoria com o formulário
-preservado, duplo clique, resposta perdida com reenvio, nome parecido, edição, prévia/aplicar/idempotência/fila/lote/reverter, CRUD das
-categorias, "Outros" protegido, Gerente e Operador sem a permissão, isolamento de outro parceiro e o nível 1 do /rodolfo: sem falha. Matriz de
-6 páginas x 4 tamanhos (1440, 1180, 820, 390) x 2 temas: sem rolagem lateral e sem violação do axe. Total da jornada: 132 conferências, todas ok. Com ponteiro de toque
-real (`isMobile`), as páginas novas não têm alvo abaixo de 44 px; sobraram só o cabeçalho ordenável da lista e o link "Voltar para a lista" no
-tablet, que já eram assim antes da I.1a. Prints em `scratchpad/shots-I1a` (80 arquivos). Scanner avoid-ai-design nos 23 arquivos de tela
-tocados: 0 P0, 0 P1 e 4 P2 (metadado com ponto médio, padrão já usado nas outras telas do ERP).
+**Resultado da prova (2026-10-22, depois do veto do Guardião).** `npx vitest run` sem banco: 55 arquivos, 1352 testes passando (os de banco
+pulados). Com banco (`ff_dev`, superusuário), duas rodadas seguidas: 97 arquivos, 1994 testes, todos passando. Como dono não-superusuário com
+FORCE RLS e como dono sem RLS: os 6 arquivos de banco tocados (categorias, insumos, isolamento, permissões, compras, ajuda) com 122 testes
+cada, passando. O teste de migração (`erp-insumo-categorias-migracao.db.test.ts`, 3 perfis) cria os próprios bancos e por isso roda só com a
+URL de superusuário. `prisma validate`, `typecheck`, `lint`, `gate` e `build` limpos; `erp:conferir-migracao` limpo; `migrate diff` vazio.
+Testes novos do veto: abrir formulário, categorias, classificação e ficha como outra pessoa não recria a padrão excluída nem grava `CRIOU`
+(só o script, com `completar`, a devolve); nome em NFC e sem invisíveis (insumo, categoria e chave do nome, inclusive no banco); chave de
+envio por pessoa; edição que não troca a categoria tira o insumo do lote; "Classificar os N" preso à prévia; "Aceitar a sugestão dos
+marcados".
+Jornada no navegador (build de produção, banco recriado do zero, 154 conferências, todas ok): cadastro com sugestão e correção manual,
+recusa sem categoria com "A sugestão era X" e "Voltar à sugestão", duplo clique, resposta perdida com reenvio, nome parecido, edição
+("Insumo atualizado com sucesso"), "Cadastrar outro insumo" com tipo, unidade e conservação do último, aviso de salvo antes da caixa
+"Como funciona", prévia/aplicar/idempotência/aceitar sugestão/fila/lote/reverter, CRUD das categorias, padrão excluída pela Dona que o
+Operador e o Gerente não trazem de volta (nem `CRIOU` no histórico), "Outros" protegido, Gerente e Operador sem a permissão, isolamento de
+outro parceiro e o nível 1 do /rodolfo. Matriz de 6 páginas x 4 tamanhos (1440, 1180, 820, 390) x 2 temas: sem rolagem lateral, sem
+violação do axe (52 verificações) e sem texto cortado nos filtros da lista. Com ponteiro de toque real (`isMobile`), as páginas novas não têm
+alvo abaixo de 44 px; sobraram só o cabeçalho ordenável da lista e o link "Voltar para a lista" no tablet, que já eram assim antes da I.1a.
+Prints em `scratchpad/shots-I1a` (inclui `a2-outro-lembrado`, `a5-erro`, `a7-editado`). Scanner avoid-ai-design nos 25 arquivos de tela
+tocados: 0 P0, 0 P1 e 5 P2 (metadado com ponto médio, padrão já usado nas outras telas do ERP).
 
 ## Herança da I.1a (para a I.1b, a I.2 e as próximas)
 

@@ -23,7 +23,7 @@ export default async function ErpCategoriasPage({ searchParams }: { searchParams
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.ver');
   // A primeira vez numa casa nova: as dez padrão nascem aqui (idempotente; parceiro somente leitura não semeia).
-  await garantirCategoriasPadrao(ctx.cliente, ctx.sessao.autorNome);
+  await garantirCategoriasPadrao(ctx.cliente);
   const [categorias, faltam] = await Promise.all([listarCategorias(ctx.cliente), resumoDoQueFalta(ctx.cliente, ctx.alcance)]);
   return (
     <TelaCategorias

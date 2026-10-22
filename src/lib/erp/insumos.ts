@@ -105,7 +105,7 @@ async function insumoComNomeParecido(tx: ClienteDoParceiro, nome: string, exceto
   const achados = await tx.sql<{ id: string; nome: string; ativo: boolean }>`
     SELECT "id", "nome", "ativo" FROM "Insumo"
     WHERE "parceiroId" = ${tx.parceiroId}
-      AND lower(translate("nome", ${ACENTUADAS}, ${SEM_ACENTO})) = ${chaveDoNome(nome)}
+      AND lower(translate(normalize("nome", NFC), ${ACENTUADAS}, ${SEM_ACENTO})) = ${chaveDoNome(nome)}
       AND "id" <> ${exceto ?? ''}
     ORDER BY ("nome" = ${nome}) DESC, "ativo" DESC
     LIMIT 1`;
@@ -165,13 +165,15 @@ export async function cadastrarInsumo(
   cliente: ClienteDoParceiro,
   entrada: Record<string, unknown>,
   autorNome = 'Sistema',
+  /** Quem envia (id do usuário): a chave de envio é POR PESSOA, então a chave de um não reconhece nem revela o envio de outro. */
+  pessoaId = '',
 ): Promise<ResultadoCadastro> {
   const lido = lerFormInsumo(entrada);
   const envio = lerChaveDeEnvio(entrada.envio);
   if (!lido.ok) return lido;
   if (!envio.ok) return { ok: false, erros: { geral: FRASE_ENVIO_TORTO }, conflito: true };
   const d = lido.dados;
-  const chave = envio.chave;
+  const chave = envio.chave ? createHash('sha256').update(`${pessoaId}|${envio.chave}`).digest('hex').slice(0, 40) : null;
   const hash = chave ? hashDoEnvio(d) : null;
   try {
     return await cliente.transacao(async (tx) => {
@@ -368,8 +370,13 @@ export async function editarInsumo(
           precoEmbalagemCentavos: d.precoEmbalagemCentavos,
           taxaEntregaCentavos: d.taxaEntregaCentavos,
           // Mexeu na categoria: a classificação passa a ser desta pessoa e sai do lote da classificação assistida (a reversão
-          // do lote não a desfaz mais). Não mexeu: tudo isso fica como estava.
-          ...(como ? { categoriaId: cat.categoria.id, ...como, classificacaoLote: null, classificadoEm: new Date() } : {}),
+          // do lote não a desfaz mais). Salvou outra coisa, sem trocar a categoria: o insumo também sai do lote (uma pessoa o
+          // revisou depois da máquina), mas a categoria e o "como foi classificada" ficam como estavam.
+          ...(como
+            ? { categoriaId: cat.categoria.id, ...como, classificacaoLote: null, classificadoEm: new Date() }
+            : atual.classificacaoLote
+              ? { classificacaoLote: null }
+              : {}),
         },
       });
       if (r.count === 0) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO }, conflito: true });

@@ -13,11 +13,12 @@ export default async function ParceiroClassificarPage({
   searchParams,
 }: {
   params: { slug: string };
-  searchParams: { feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string; pagina?: string };
+  searchParams: { feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string; sem?: string; pagina?: string };
 }) {
   const ctx = await exigirParceiro(params.slug);
+  exigirPermissao(ctx, 'insumos.ver');
   exigirPermissao(ctx, 'insumos.editar');
-  await garantirCategoriasPadrao(ctx.cliente, ctx.sessao.autorNome);
+  await garantirCategoriasPadrao(ctx.cliente);
   const slug = ctx.parceiro.slug;
   const base = `/rodolfo/erp/${slug}/insumos`;
   const [faltam, previa, lotes, fila, parecidos, categorias] = await Promise.all([

@@ -30,7 +30,7 @@ async function principal(): Promise<number> {
       console.log(`${p.nome} (${p.slug}): ${p.status.toLowerCase()}, pulado.`);
       continue;
     }
-    const criadas = await garantirCategoriasPadrao(doParceiro(p.id), AUTOR);
+    const criadas = await garantirCategoriasPadrao(doParceiro(p.id), { completar: true, autorNome: AUTOR });
     total += criadas;
     console.log(`${p.nome} (${p.slug}): ${criadas === 0 ? 'já tinha as dez, nada a criar' : `${criadas} categorias criadas`}`);
   }

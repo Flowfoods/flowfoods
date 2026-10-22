@@ -16,7 +16,7 @@ import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarInsumo, editarInsumo, mudarSituacaoInsumo, type ResultadoCadastro } from '@/lib/erp/insumos';
 import { cadastrarVariante, editarVariante, mudarSituacaoVariante, type ResultadoVariante } from '@/lib/erp/variantes';
 import { criarCategoria, excluirCategoria, moverCategoria, mudarSituacaoCategoria, renomearCategoria, type ResultadoCategoria } from '@/lib/erp/categorias';
-import { aplicarClassificacao, classificarEmLote, reverterLote } from '@/lib/erp/classificar';
+import { aceitarSugestoes, aplicarClassificacao, classificarEmLote, reverterLote } from '@/lib/erp/classificar';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import { concluirNaTela, voltarDaClassificacao, voltarDoMover } from '@/components/erp/telas/insumos/executar-categorias';
@@ -39,7 +39,7 @@ async function auditar(ctx: Ctx, evento: string, r: ResultadoCadastro | Resultad
 export async function acaoCadastrarInsumo(slug: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado, base } = await paraEditar(slug);
   if (negado) return recusado(anterior, negado);
-  const r = await cadastrarInsumo(ctx.cliente, entradaDe(form), ctx.sessao.autorNome);
+  const r = await cadastrarInsumo(ctx.cliente, entradaDe(form), ctx.sessao.autorNome, ctx.sessao.userId);
   await auditar(ctx, 'erp_insumo_criado', r);
   return concluir(r, anterior, base, { mudou: 'criado', repetido: 'criado-repetido' });
 }
@@ -150,10 +150,12 @@ export async function acaoMoverCategoria(slug: string, id: string, direcao: 'sub
 
 // ------------------------------------------------------- classificação (I.1a)
 
-export async function acaoAplicarClassificacao(slug: string): Promise<void> {
+export async function acaoAplicarClassificacao(slug: string, form: FormData): Promise<void> {
   const { ctx, negado, base, classificar } = await paraGerirCategorias(slug);
   if (negado) voltarDaClassificacao(classificar, base, 'recusado');
-  const r = await aplicarClassificacao(ctx.cliente, ctx.sessao.autorNome);
+  const vista = form.get('previa');
+  const r = await aplicarClassificacao(ctx.cliente, ctx.sessao.autorNome, new Date(), typeof vista === 'string' ? vista : '');
+  if (r.previaMudou) voltarDaClassificacao(classificar, base, 'previa-mudou');
   if (!r.lote) voltarDaClassificacao(classificar, base, 'nada');
   await prisma.auditLog.create({ data: { userId: ctx.sessao.userId, evento: 'erp_classificacao_aplicada', dados: { parceiroId: ctx.parceiro.id, lote: r.lote, n: r.classificados } } });
   voltarDaClassificacao(classificar, base, 'aplicado', { n: r.classificados, outros: r.emOutros, lote: r.lote });
@@ -171,7 +173,14 @@ export async function acaoReverterLote(slug: string, form: FormData): Promise<vo
 export async function acaoClassificarEmLote(slug: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado, base } = await paraEditar(slug);
   if (negado) return recusado(anterior, negado);
-  const r = await classificarEmLote(ctx.cliente, form.getAll('ids').filter((x): x is string => typeof x === 'string'), form.get('categoriaId'), ctx.sessao.autorNome);
+  const ids = form.getAll('ids').filter((x): x is string => typeof x === 'string');
+  if (form.get('aceitar') === '1') {
+    const a = await aceitarSugestoes(ctx.cliente, ids, ctx.sessao.autorNome);
+    if (!a.ok) return recusado(anterior, a.erro);
+    await prisma.auditLog.create({ data: { userId: ctx.sessao.userId, evento: 'erp_insumos_classificados_em_lote', dados: { parceiroId: ctx.parceiro.id, n: a.classificados } } });
+    voltarDaClassificacao(`${base}/classificar`, base, 'aceitas', { n: a.classificados, iguais: a.iguais, sem: a.semSugestao });
+  }
+  const r = await classificarEmLote(ctx.cliente, ids, form.get('categoriaId'), ctx.sessao.autorNome);
   if (!r.ok) return recusado(anterior, r.erro);
   await prisma.auditLog.create({ data: { userId: ctx.sessao.userId, evento: 'erp_insumos_classificados_em_lote', dados: { parceiroId: ctx.parceiro.id, n: r.classificados } } });
   voltarDaClassificacao(`${base}/classificar`, base, 'lote', { n: r.classificados, iguais: r.iguais });

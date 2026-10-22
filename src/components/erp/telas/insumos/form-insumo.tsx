@@ -11,7 +11,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useFormState } from 'react-dom';
-import { TIPOS, type TipoInsumo } from '@/lib/erp/insumo-campos';
+import { TIPOS, TIPOS_DO_FORM, type TipoInsumo } from '@/lib/erp/insumo-campos';
 import { CHAVE_DO_SISTEMA } from '@/lib/erp/categoria-campos';
 import { nomeDaChave, sugerirCategoria } from '@/lib/erp/categoria-sugestao';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
@@ -42,6 +42,15 @@ export interface ValoresDoInsumo extends ValoresDaEmbalagem {
 
 export const INSUMO_NOVO: ValoresDoInsumo = { nome: '', tipo: 'INGREDIENTE', unidade: '', categoriaId: '', conservacao: 'SECO', validades: null, ...EMBALAGEM_VAZIA };
 
+/** Só valor que existe na lista passa: a URL nunca escolhe mais que isso. */
+function valoresLembrados(l?: { tipo?: string; unidade?: string; conservacao?: string }): Partial<ValoresDoInsumo> {
+  const v: Partial<ValoresDoInsumo> = {};
+  if (l?.tipo && (TIPOS_DO_FORM as readonly string[]).includes(l.tipo)) v.tipo = l.tipo as TipoInsumo;
+  if (l?.unidade && Object.hasOwn(UNIDADES, l.unidade)) v.unidade = l.unidade as Unidade;
+  if (l?.conservacao && Object.hasOwn(CONSERVACOES, l.conservacao)) v.conservacao = l.conservacao as Conservacao;
+  return v;
+}
+
 const ROTULO_DO_CAMPO: Record<string, string> = {
   nome: 'Nome',
   tipo: 'Tipo',
@@ -67,7 +76,9 @@ export function FormInsumo({
   base,
   aqui,
   cancelar,
-  inicial = INSUMO_NOVO,
+  inicial: inicialDado,
+  nomeSugerido,
+  lembrado,
   versao,
   travaDaUnidade = null,
   bloqueio = null,
@@ -82,6 +93,10 @@ export function FormInsumo({
   aqui: string;
   cancelar: string;
   inicial?: ValoresDoInsumo;
+  /** Novo vindo da importação de fichas ("Cadastrar “Picles”"): o nome já vem escrito. */
+  nomeSugerido?: string;
+  /** "Cadastrar outro insumo": tipo, unidade e conservação do último (da URL; só valores da lista valem). */
+  lembrado?: { tipo?: string; unidade?: string; conservacao?: string };
   /** Editar: `atualizadoEm` lido (a gravação só passa se ainda for ele). */
   versao?: string;
   /** Editar: por que a unidade não pode mudar. */
@@ -92,6 +107,7 @@ export function FormInsumo({
   /** I.1a: a chave deste envio (um UUID por abertura do formulário): o servidor reconhece o reenvio e não cria outro. */
   envio?: string;
 }) {
+  const inicial: ValoresDoInsumo = inicialDado ?? { ...INSUMO_NOVO, ...valoresLembrados(lembrado), nome: (nomeSugerido ?? '').slice(0, 80) };
   const acaoSegura = useAcaoSegura(acao);
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acaoSegura, null);
   const [nome, setNome] = useState(inicial.nome);
@@ -243,8 +259,8 @@ export function FormInsumo({
               <p id={`${idBase}-categoriaId-ajuda`} aria-live="polite" className={AJUDA}>
                 {ajudaDaCategoria}
               </p>
-              <Erro id={`${idBase}-categoriaId-erro`} texto={erros.categoriaId} />
-              {escolheu && sugestao && sugeridaId !== '' && categoriaId !== sugeridaId && (
+              <Erro id={`${idBase}-categoriaId-erro`} texto={erros.categoriaId && nomeDaSugerida && categoriaId !== sugeridaId ? `${erros.categoriaId} A sugestão era ${nomeDaSugerida}.` : erros.categoriaId} />
+              {(escolheu || !!erros.categoriaId) && sugestao && sugeridaId !== '' && categoriaId !== sugeridaId && (
                 <button
                   type="button"
                   onClick={() => {

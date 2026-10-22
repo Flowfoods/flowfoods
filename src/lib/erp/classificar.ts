@@ -14,6 +14,7 @@
  * Categoria não entra em fotografia antiga: o DRE e o CMV de período fechado não leem nada daqui.
  */
 
+import { createHash } from 'node:crypto';
 import type { ClienteDoParceiro } from './tenant';
 import { CATEGORIAS_PADRAO, CHAVE_DO_SISTEMA, chaveDoNome } from './categoria-campos';
 import { sugerirCategoria, nomeDaChave } from './categoria-sugestao';
@@ -124,6 +125,8 @@ export interface PreviaDaClassificacao {
   paraRevisar: number;
   /** A casa ainda não tem categoria: a tela chama `garantirCategoriasPadrao` antes (a prévia não grava nada). */
   semCategoriasNaCasa: boolean;
+  /** `assinaturaDaPrevia` das linhas: a tela a manda de volta ao aplicar. */
+  assinatura: string;
 }
 
 /** O que `aplicarClassificacao` faria agora. NÃO grava nada. */
@@ -162,7 +165,17 @@ export async function previaDaClassificacao(cliente: ClienteDoParceiro, alcance:
     porCategoria: Array.from(contagem.values()).sort((a, b) => (ordem.get(a.chave) ?? 99) - (ordem.get(b.chave) ?? 99)),
     paraRevisar: linhas.filter((l) => l.chave === CHAVE_DO_SISTEMA).length,
     semCategoriasNaCasa: daCasa.length === 0,
+    assinatura: assinaturaDaPrevia(linhas),
   };
+}
+
+/**
+ * A impressão digital do que a prévia mostrou: quais insumos e para qual categoria cada um iria. "Classificar os N" leva isto
+ * junto e só aplica se, na hora de gravar, o resultado ainda for exatamente este; senão a tela refaz a prévia.
+ */
+export function assinaturaDaPrevia(itens: readonly { id: string; chave: string }[]): string {
+  const texto = [...itens].sort((a, b) => a.id.localeCompare(b.id)).map((i) => `${i.id}:${i.chave}`).join('|');
+  return createHash('sha256').update(texto).digest('hex').slice(0, 32);
 }
 
 /** A categoria da casa que recebe a sugestão: a da chave, se ativa; senão "Outros / a classificar". */
@@ -182,14 +195,22 @@ export interface ResultadoDaClassificacao {
   classificados: number;
   /** Desses, quantos foram para "Outros / a classificar" (ambíguos, com o motivo). */
   emOutros: number;
+  /** A prévia que a pessoa viu já não é a de agora (alguém mexeu): nada foi gravado, a tela refaz a prévia. */
+  previaMudou?: true;
 }
 
 /**
  * Classifica de verdade, só os que NÃO têm categoria: uma transação, um registro antes/depois por insumo, tudo no mesmo lote.
  * Idempotente: depois de rodar, não há mais insumo sem categoria, e a segunda vez muda 0.
  */
-export async function aplicarClassificacao(cliente: ClienteDoParceiro, autorNome = 'Sistema', agora = new Date()): Promise<ResultadoDaClassificacao> {
-  await garantirCategoriasPadrao(cliente, autorNome);
+export async function aplicarClassificacao(
+  cliente: ClienteDoParceiro,
+  autorNome = 'Sistema',
+  agora = new Date(),
+  /** A `assinatura` da prévia que a pessoa viu; ausente = sem conferir (o script). */
+  assinaturaVista?: string,
+): Promise<ResultadoDaClassificacao> {
+  await garantirCategoriasPadrao(cliente);
   return cliente.transacao(async (tx) => {
     await travarClassificacao(tx);
     const alvos = await tx.insumo.findMany({ where: { categoriaId: null }, select: { id: true, nome: true, tipo: true }, orderBy: { nome: 'asc' } });
@@ -209,6 +230,10 @@ export async function aplicarClassificacao(cliente: ClienteDoParceiro, autorNome
       g.ids.push(a.id);
       g.nomes.set(a.id, a.nome);
       grupos.set(k, g);
+    }
+    if (assinaturaVista !== undefined) {
+      const hoje = assinaturaDaPrevia(Array.from(grupos.values()).flatMap((g) => g.ids.map((id) => ({ id, chave: g.chave ?? '' }))));
+      if (hoje !== assinaturaVista) return { lote: null, classificados: 0, emOutros: 0, previaMudou: true as const };
     }
     let classificados = 0;
     let emOutros = 0;
@@ -392,6 +417,59 @@ export async function classificarEmLote(cliente: ClienteDoParceiro, ids: readonl
       });
     }
     return { ok: true as const, classificados, iguais: lidos.length - aMudar.length, naoEncontrados: unicos.length - lidos.length };
+  }, TETO_DA_TRANSACAO);
+}
+
+export type ResultadoDeAceitar = { ok: true; classificados: number; iguais: number; semSugestao: number; naoEncontrados: number } | { ok: false; erro: string };
+
+/**
+ * "Aceitar a sugestão dos marcados" (fila): cada insumo marcado recebe a categoria que o NOME dele sugere hoje. O que o nome
+ * não decide (ambíguo, desconhecido) ou cuja categoria sugerida não está ativa na casa NÃO é mexido: fica na fila, para a
+ * pessoa escolher. A classificação passa a ser "sugestão pelo nome, aceita" e o insumo sai do lote da classificação assistida.
+ */
+export async function aceitarSugestoes(cliente: ClienteDoParceiro, ids: readonly string[], autorNome = 'Sistema'): Promise<ResultadoDeAceitar> {
+  const unicos = Array.from(new Set(ids.filter((x) => typeof x === 'string' && x.length > 0 && x.length <= 60)));
+  if (unicos.length === 0) return { ok: false, erro: 'Marque pelo menos um insumo.' };
+  if (unicos.length > MAXIMO_EM_LOTE) return { ok: false, erro: `Dá para classificar até ${MAXIMO_EM_LOTE} insumos de uma vez. Marque menos e repita.` };
+  return cliente.transacao(async (tx) => {
+    await travarClassificacao(tx);
+    const casa = await tx.categoriaInsumo.findMany({ select: { id: true, chave: true, nome: true, ativa: true } });
+    const lidos = await tx.insumo.findMany({ where: { id: { in: unicos } }, select: { id: true, nome: true, tipo: true, categoriaId: true, categoria: { select: { nome: true } } } });
+    const agora = new Date();
+    let classificados = 0;
+    let iguais = 0;
+    let semSugestao = 0;
+    for (const i of lidos) {
+      const s = sugerirCategoria(i.nome, i.tipo);
+      const destino = s.chave === CHAVE_DO_SISTEMA ? undefined : casa.find((c) => c.chave === s.chave && c.ativa);
+      if (!destino) {
+        semSugestao++;
+        continue;
+      }
+      if (destino.id === i.categoriaId) {
+        iguais++;
+        continue;
+      }
+      const r = await tx.insumo.updateMany({
+        where: { id: i.id, categoriaId: i.categoriaId },
+        data: { categoriaId: destino.id, classificadoPor: 'SUGESTAO', classificacaoMotivo: null, classificacaoLote: null, classificadoEm: agora },
+      });
+      if (r.count === 0) continue;
+      classificados++;
+      await tx.historicoAlteracao.create({
+        data: {
+          parceiroId: tx.parceiroId,
+          entidade: 'Insumo',
+          entidadeId: i.id,
+          acao: i.categoriaId ? 'RECLASSIFICOU' : 'CLASSIFICOU',
+          antes: { nome: i.nome, categoria: i.categoria?.nome ?? null, categoriaId: i.categoriaId },
+          depois: { nome: i.nome, categoria: destino.nome, categoriaId: destino.id, classificadoPor: 'SUGESTAO' },
+          motivo: 'Sugestão pelo nome aceita em lote',
+          autorNome,
+        },
+      });
+    }
+    return { ok: true as const, classificados, iguais, semSugestao, naoEncontrados: unicos.length - lidos.length };
   }, TETO_DA_TRANSACAO);
 }
 

@@ -123,7 +123,7 @@ async function main() {
     const cliente = doParceiro(parceiro.id);
     for (const nome of p.lojas) linha(`loja ${nome}`, await cadastrarLoja(cliente, { nome }, AUTOR));
     for (const nome of p.marcas) linha(`marca ${nome}`, await cadastrarMarca(cliente, { nome }, AUTOR));
-    await garantirCategoriasPadrao(cliente, AUTOR);
+    await garantirCategoriasPadrao(cliente, { autorNome: AUTOR });
     for (const i of p.itens) {
       const sugestao = await sugestaoParaInsumo(cliente, i.nome, i.tipo);
       linha(i.nome, await cadastrarInsumo(cliente, { ...i, categoriaId: sugestao.categoriaId ?? '' }, AUTOR));

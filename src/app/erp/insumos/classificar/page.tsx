@@ -14,10 +14,11 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/insumos';
 
-export default async function ErpClassificarPage({ searchParams }: { searchParams: { feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string; pagina?: string } }) {
+export default async function ErpClassificarPage({ searchParams }: { searchParams: { feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string; sem?: string; pagina?: string } }) {
   const ctx = await exigirParceiroDaSessao();
+  exigirPermissaoNaPagina(ctx, 'insumos.ver');
   exigirPermissaoNaPagina(ctx, 'insumos.editar');
-  await garantirCategoriasPadrao(ctx.cliente, ctx.sessao.autorNome);
+  await garantirCategoriasPadrao(ctx.cliente);
   const [faltam, previa, lotes, fila, parecidos, categorias] = await Promise.all([
     resumoDoQueFalta(ctx.cliente, ctx.alcance),
     previaDaClassificacao(ctx.cliente, ctx.alcance),

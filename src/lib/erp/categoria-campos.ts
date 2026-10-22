@@ -8,7 +8,7 @@
  */
 
 import { z } from 'zod';
-import { primeiroErroPorCampo, type Erros } from './insumo-campos';
+import { limparTexto, primeiroErroPorCampo, type Erros } from './insumo-campos';
 
 /** A identidade estável de cada categoria padrão: sobrevive ao renomear. */
 export const CHAVES_PADRAO = [
@@ -71,7 +71,7 @@ const TROCA = new Map<string, string>([...ACENTUADAS].map((c, i) => [c, SEM_ACEN
  */
 export function chaveDoNome(nome: string): string {
   let t = '';
-  for (const c of nome) t += TROCA.get(c) ?? c;
+  for (const c of limparTexto(nome)) t += TROCA.get(c) ?? c;
   return t.toLowerCase().replace(/\s+/g, ' ').trim();
 }
 
@@ -79,10 +79,15 @@ export function chaveDoNome(nome: string): string {
 
 const nomeDaCategoria = z
   .string({ message: 'Dê um nome à categoria.' })
-  .trim()
-  .min(2, 'Dê um nome com pelo menos 2 letras.')
-  .max(NOME_MAXIMO_DA_CATEGORIA, `Nome longo demais (máx. ${NOME_MAXIMO_DA_CATEGORIA}).`)
-  .transform((s) => s.replace(/\s+/g, ' '));
+  .transform(limparTexto)
+  .pipe(
+    z
+      .string()
+      .trim()
+      .min(2, 'Dê um nome com pelo menos 2 letras.')
+      .max(NOME_MAXIMO_DA_CATEGORIA, `Nome longo demais (máx. ${NOME_MAXIMO_DA_CATEGORIA}).`)
+      .transform((s) => s.replace(/\s+/g, ' ')),
+  );
 
 /** O nome da categoria do formulário: 2 a 60 letras, espaços colapsados; ou os erros por campo. */
 export function lerNomeDaCategoria(entrada: unknown): { ok: true; nome: string } | { ok: false; erros: Erros } {

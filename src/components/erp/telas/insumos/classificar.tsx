@@ -26,7 +26,7 @@ import { FormDaFila } from './form-classificar';
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 /** A frase do `?feito=` da classificação. Só as chaves do mapa; os números são inteiros pequenos que a tela apenas mostra. */
-function fraseDoFeito(q: { feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string }): { titulo: string; tom: 'ok' | 'alerta' } | null {
+function fraseDoFeito(q: { feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string; sem?: string }): { titulo: string; tom: 'ok' | 'alerta' } | null {
   const n = inteiroDaUrl(q.n);
   switch (q.feito) {
     case 'aplicado':
@@ -46,6 +46,13 @@ function fraseDoFeito(q: { feito?: string; n?: string; outros?: string; mantidos
       };
     case 'sem-lote':
       return { tom: 'alerta', titulo: 'Esse lote não existe mais ou já foi desfeito. Nada foi mudado.' };
+    case 'aceitas':
+      return {
+        tom: 'ok',
+        titulo: `${plural(n ?? 0, 'insumo recebeu', 'insumos receberam')} a categoria que o nome sugere${inteiroDaUrl(q.iguais) ? `; ${plural(inteiroDaUrl(q.iguais)!, 'já estava', 'já estavam')} nela` : ''}${inteiroDaUrl(q.sem) ? `; ${plural(inteiroDaUrl(q.sem)!, 'ficou', 'ficaram')} na fila, porque o nome não decide a categoria` : ''}. Cada um tem o antes e o depois no histórico.`,
+      };
+    case 'previa-mudou':
+      return { tom: 'alerta', titulo: 'Alguém mexeu nos insumos enquanto você olhava a prévia. Nada foi gravado: confira a prévia de agora e aplique de novo.' };
     case 'recusado':
       return { tom: 'alerta', titulo: 'Só quem gere as categorias aplica ou desfaz a classificação assistida. Nada foi mudado.' };
     case 'lote':
@@ -83,20 +90,21 @@ export function TelaClassificar({
   /** `insumos.categorias`: aplica e desfaz a classificação assistida. */
   podeGerir: boolean;
   bloqueio: string | null;
-  query: { feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string };
+  query: { feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string; sem?: string };
   faltam: ResumoDoQueFalta;
   previa: PreviaDaClassificacao;
   lotes: LoteDeClassificacao[];
   fila: FilaDeRevisao;
   parecidos: GrupoDeNomesParecidos[];
   categorias: readonly OpcaoDeCategoria[];
-  acaoAplicar: () => Promise<void>;
+  acaoAplicar: (form: FormData) => Promise<void>;
   acaoReverter: (form: FormData) => Promise<void>;
   acaoEmLote: AcaoDeCadastro;
   hrefDaPagina: (pagina: number) => string;
 }) {
   const feito = fraseDoFeito(query);
   const ajustavel = podeGerir && !bloqueio;
+  const desativados = previa.linhas.filter((l) => !l.ativo).length;
   const de = (fila.pagina - 1) * 100 + 1;
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -105,8 +113,8 @@ export function TelaClassificar({
         cor={COR.insumo}
         titulo="Classificar insumos"
         subtitulo={`${contexto ? `${contexto} · ` : ''}${faltam.total === 0 ? 'todos os insumos ativos têm categoria' : `${plural(faltam.total, 'insumo ainda sem categoria definitiva', 'insumos ainda sem categoria definitiva')}`}`}
+        aviso={feito ? <Aviso tom={feito.tom} titulo={feito.titulo} /> : undefined}
       />
-      {feito && <Aviso tom={feito.tom} titulo={feito.titulo} />}
       <AvisoDaClassificacao resumo={faltam} />
 
       <Painel
@@ -118,7 +126,7 @@ export function TelaClassificar({
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-suave">
-              <span className="font-semibold text-texto">Prévia, sem gravar nada:</span> {plural(previa.total, 'insumo está', 'insumos estão')} sem categoria (contando os desativados). Se você aplicar agora,
+              <span className="font-semibold text-texto">Prévia, sem gravar nada:</span> {plural(previa.total, 'insumo está', 'insumos estão')} sem categoria{desativados > 0 ? `, sendo ${desativados} ${desativados === 1 ? 'desativado' : 'desativados'}` : ''}. Se você aplicar agora,
               {previa.paraRevisar > 0
                 ? ` ${plural(previa.total - previa.paraRevisar, 'vai', 'vão')} para a categoria certa e ${plural(previa.paraRevisar, 'fica', 'ficam')} em Outros / a classificar, com o motivo, para você revisar.`
                 : ' todos vão para a categoria que o nome indica.'}
@@ -149,6 +157,7 @@ export function TelaClassificar({
             </details>
             {ajustavel ? (
               <form action={acaoAplicar} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                <input type="hidden" name="previa" value={previa.assinatura} />
                 <BotaoEnviar pendente="Classificando…" className="sm:min-w-64">
                   Classificar os {previa.total} insumos
                 </BotaoEnviar>

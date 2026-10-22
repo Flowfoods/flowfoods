@@ -17,7 +17,7 @@ export default async function ErpEditarInsumoPage({ params }: { params: { id: st
   // Desativado não se edita: primeiro reativa (no detalhe).
   // Pré-preparo (1.3) só muda pela ficha técnica.
   if (!insumo.ativo || insumo.preparo) redirect(`/erp/insumos/${insumo.id}`);
-  const categorias = await categoriasDoFormulario(ctx.cliente, ctx.sessao.autorNome, insumo.categoria?.id);
+  const categorias = await categoriasDoFormulario(ctx.cliente, insumo.categoria?.id);
   return (
     <TelaFormInsumo
       insumo={insumo}
