@@ -7,6 +7,7 @@ import {
   custoMedioEntregue,
   fraseDoPeriodo,
   lerFiltrosDoRelatorio,
+  lerPagina,
   linhasSemBase,
   precoDaLinha,
   precoMedioPonderado,
@@ -78,6 +79,16 @@ describe('L.2 · filtros da URL', () => {
     expect(recorteDeUmInsumo({ insumoId: '', agrupar: 'insumo', grupo: 'i2' })).toBe(true);
     expect(recorteDeUmInsumo({ insumoId: '', agrupar: 'insumo', grupo: '-' })).toBe(false);
     expect(recorteDeUmInsumo({ insumoId: '', agrupar: 'fornecedor', grupo: 'f1' })).toBe(false);
+  });
+});
+
+describe('L.2 · página da URL', () => {
+  it('só inteiro de 1 a 1.000.000; o resto cai na primeira (nada de 22003 no banco)', () => {
+    for (const bom of ['1', '2', '15', '1000000']) expect(lerPagina(bom), bom).toBe(Number(bom));
+    for (const ruim of ['', '0', '-3', '1,5', '1.5', '1e12', '99999999', '1000001', '9007199254740993', 'abc', ' 2', '0x10', '٣']) expect(lerPagina(ruim), ruim).toBe(1);
+    expect(lerFiltrosDoRelatorio({ pagina: '99999999' }, HOJE).pagina).toBe(1);
+    expect(lerFiltrosDoRelatorio({ pagina: '1e12' }, HOJE).pagina).toBe(1);
+    expect(lerFiltrosDoRelatorio({ pagina: '1000000' }, HOJE).pagina).toBe(1_000_000);
   });
 });
 
@@ -178,5 +189,37 @@ describe('L.2 · planilha segura', () => {
     expect(sem[11]).toBe('');
     expect(sem[13]).toBe('');
     expect(sem[19]).toMatch(/unidade não foi gravada/);
+  });
+});
+
+describe('L.2 · a volta atravessa nota e documento fiscal (só caminho interno da área)', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { caminhoDeVolta, rotuloDaVolta } = await import('@/lib/erp/volta');
+  const ler = (f: string) => readFileSync(f, 'utf8');
+  const paginas = {
+    documento: ['src/app/erp/compras/recebidas/[id]/page.tsx', 'src/app/rodolfo/(painel)/erp/[slug]/compras/recebidas/[id]/page.tsx'],
+    nota: ['src/app/erp/compras/[id]/page.tsx', 'src/app/rodolfo/(painel)/erp/[slug]/compras/[id]/page.tsx'],
+  };
+  it('as duas páginas do documento honram `volta` pelo mesmo filtro da nota (nada de endereço de fora)', () => {
+    for (const f of paginas.documento) {
+      const t = ler(f);
+      expect(t, f).toMatch(/caminhoDeVolta\(searchParams\.volta, [^)]*, 2000\)/);
+      expect(t, f).toMatch(/voltar=\{deOnde \?\? undefined\}/);
+    }
+  });
+  it('as duas páginas da nota mandam a própria nota (com o relatório dela) como volta do documento fiscal', () => {
+    for (const f of paginas.nota) expect(ler(f), f).toMatch(/recebidas\/\$\{nota\.documentoId\}\?volta=\$\{encodeURIComponent\(/);
+  });
+  it('o filtro da volta recusa o que sai da área e rotula o relatório e a nota', () => {
+    const P = '/erp/';
+    expect(caminhoDeVolta('https://outro.site/erp/x', P, 2000)).toBeNull();
+    expect(caminhoDeVolta('//outro.site', P, 2000)).toBeNull();
+    expect(caminhoDeVolta('/rodolfo/erp/casa/compras', P, 2000)).toBeNull();
+    const relatorio = '/erp/compras/relatorios/periodo?de=2026-10-01&ate=2026-10-22&loja=a&loja=b';
+    expect(caminhoDeVolta(relatorio, P, 2000)).toBe(relatorio);
+    expect(rotuloDaVolta(relatorio)).toBe('o relatório de compras');
+    const nota = `/erp/compras/cabc123?volta=${encodeURIComponent(relatorio)}`;
+    expect(caminhoDeVolta(nota, P, 2000)).toBe(nota);
+    expect(rotuloDaVolta(nota)).toBe('a nota de compra');
   });
 });

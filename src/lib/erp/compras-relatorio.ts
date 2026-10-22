@@ -521,18 +521,17 @@ export async function relatorioDaTela(cliente: ClienteDoParceiro, alcance: Alcan
       if (!recorte) return vazio;
       // Histórico de um insumo sem insumo escolhido: nada a mostrar ainda (a tela convida a escolher).
       if (modo === 'insumo' && !f.insumoId) return { ...vazio, motivoVazio: null, lojasUsadas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)) };
-      const pag = { numero: f.pagina, porPagina: f.porPagina };
       const verLinhas = modo === 'insumo' || f.ver === 'linhas';
       const totais = await totaisDoRecorte(tx, recorte);
       const abertas = verLinhas ? await totalDasLinhasAbertas(tx, recorte) : null;
-      const total = verLinhas ? (abertas?.linhas ?? 0) : null;
-      const grupos = !verLinhas ? await gruposDoRecorte(tx, recorte, pag) : null;
-      const quantos = verLinhas ? (total ?? 0) : (grupos?.total ?? 0);
+      // O total vem ANTES de pedir a página: a pedida além da última cai na última (e o rodapé diz "Página 3 de 3", não "1 de 1").
+      const primeiraDosGrupos = verLinhas ? null : await gruposDoRecorte(tx, recorte, { numero: 1, porPagina: f.porPagina });
+      const quantos = verLinhas ? (abertas?.linhas ?? 0) : (primeiraDosGrupos?.total ?? 0);
       const paginas = Math.max(1, Math.ceil(quantos / f.porPagina));
       const pagina = Math.min(Math.max(1, f.pagina), paginas);
       const pagFinal = { numero: pagina, porPagina: f.porPagina };
-      // A página pedida além da última cai na última (a lista de grupos foi lida com a pedida: lê de novo se mudou).
-      const gruposFinal = !verLinhas && pagina !== f.pagina ? await gruposDoRecorte(tx, recorte, pagFinal) : grupos;
+      const grupos = primeiraDosGrupos && pagina > 1 ? await gruposDoRecorte(tx, recorte, pagFinal) : primeiraDosGrupos;
+      const gruposFinal = grupos;
       const linhas = verLinhas ? await linhasDoRecorte(tx, recorte, pagFinal) : null;
       const fornecedores = modo === 'insumo' ? await gruposDoRecorte(tx, { ...recorte, agrupar: 'fornecedor' }, null) : null;
       const canceladas = f.situacao === 'lancadas' ? await canceladasDoRecorte(tx, recorte) : null;

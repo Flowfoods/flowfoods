@@ -73,7 +73,7 @@ export function TabelasDaImpressao({
 
       <section aria-label="Totais" className="break-inside-avoid">
         <h2 className="mb-1 text-sm font-semibold">Totais</h2>
-        <div className="overflow-x-auto" role="region" aria-label="Totais" tabIndex={0}>
+        <div className="overflow-x-auto" role="region" aria-label="Tabela dos totais" tabIndex={0}>
         <table className="w-full max-w-xl">
           <tbody>
             <tr><th scope="row" className={TH}>Compras (notas) · linhas</th><td className={`${TD} text-right tabular-nums`}>{t.notas} · {t.linhas}</td></tr>

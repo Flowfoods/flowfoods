@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { obterDocumento, opcoesDeInsumosDoDocumento } from '@/lib/erp/documentos-fiscais';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
+import { caminhoDeVolta, rotuloDaVolta } from '@/lib/erp/volta';
 import { TelaDocumento } from '@/components/erp/telas/compras/tela-documento';
 import { acaoCancelarDocumento, acaoConferirDocumento } from '../../actions';
 
@@ -14,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/compras';
 
-export default async function ErpNotaRecebidaPage({ params, searchParams }: { params: { id: string }; searchParams: { feito?: string } }) {
+export default async function ErpNotaRecebidaPage({ params, searchParams }: { params: { id: string }; searchParams: { feito?: string; volta?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'compras.ver');
   const doc = await obterDocumento(ctx.cliente, ctx.alcance, params.id);
@@ -22,9 +23,13 @@ export default async function ErpNotaRecebidaPage({ params, searchParams }: { pa
   // Com a loja resolvida, a permissão é DELA; sem loja (duas lojas com o mesmo CNPJ), vale ter alguma das lojas do CNPJ para lançar.
   const podeLancar = doc.loja ? pode(ctx.alcance, 'compras.lancar', { lojaId: doc.loja.id }) : doc.lojasCandidatas.length > 0;
   const insumos = doc.situacao === 'AGUARDANDO_CONFERENCIA' && podeLancar ? await opcoesDeInsumosDoDocumento(ctx.cliente, ctx.alcance, doc) : [];
+  // L.2: veio do relatório ou da nota de compra? Volta para lá (só caminho interno da área, pelo mesmo filtro da volta da nota).
+  const deOnde = caminhoDeVolta(searchParams.volta, '/erp/', 2000);
   return (
     <TelaDocumento
       doc={doc}
+      voltar={deOnde ?? undefined}
+      voltarRotulo={deOnde ? rotuloDaVolta(deOnde) : undefined}
       base={`${BASE}/recebidas`}
       comprasBase={BASE}
       fornecedoresBase={`${BASE}/fornecedores`}

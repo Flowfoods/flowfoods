@@ -54,7 +54,9 @@ export type ChaveIcone =
   | 'canais'
   // I.1a: categorias de insumo e a classificação dos que já existiam.
   | 'categorias'
-  | 'classificar';
+  | 'classificar'
+  // L.2: os relatórios de compras (distinto do Orçamento, que é o medidor).
+  | 'relatorio';
 
 export interface ItemNav {
   href: string;
@@ -335,19 +337,19 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
         {
           // L.2: os relatórios de compras (a leitura do que já foi lançado; nada aqui lança nem muda nota).
           rotulo: 'Relatórios',
-          icone: 'metricas',
+          icone: 'relatorio',
           telas: [
             {
               href: `${base}/compras/relatorios/insumo`,
               rotulo: 'Histórico do insumo',
-              icone: 'insumo',
+              icone: 'historico',
               subtitulo: 'O que você comprou de um insumo, de quem e a que preço',
               permissao: 'compras.ver',
             },
             {
               href: `${base}/compras/relatorios/periodo`,
               rotulo: 'Compras do período',
-              icone: 'metricas',
+              icone: 'relatorio',
               subtitulo: 'Tudo o que foi comprado num dia ou período, com planilha',
               permissao: 'compras.ver',
             },

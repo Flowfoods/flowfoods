@@ -29,6 +29,8 @@ const DATA_HORA = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-d
 export function TelaDocumento({
   doc: d,
   base,
+  voltar,
+  voltarRotulo = 'as notas recebidas',
   comprasBase,
   fornecedoresBase,
   insumosBase,
@@ -47,6 +49,9 @@ export function TelaDocumento({
   doc: DocumentoDetalhado;
   /** A lista de notas recebidas de quem usa a tela. */
   base: string;
+  /** L.2: de onde a pessoa veio (o relatório ou a nota de compra), já validado; sem ele, a lista de notas recebidas. */
+  voltar?: string;
+  voltarRotulo?: string;
   /** A lista de notas de compra (link da nota lançada). */
   comprasBase: string;
   fornecedoresBase: string;
@@ -72,7 +77,7 @@ export function TelaDocumento({
   return (
     <div className="space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: d.rotulo }]} />
-      <Voltar href={base}>Voltar para as notas recebidas</Voltar>
+      <Voltar href={voltar ?? base}>Voltar para {voltarRotulo}</Voltar>
       <PageHeader
         icone="importar"
         cor={COR.compras}
@@ -107,7 +112,7 @@ export function TelaDocumento({
         <Aviso tom="alerta" titulo="Cadastro do fornecedor a completar.">
           Ele foi criado com os dados de uma nota fiscal. Falta completar o cadastro ({d.fornecedor.falta.join(', ')}).{' '}
           {podeEditarFornecedor ? (
-            <Link href={`${fornecedoresBase}/${d.fornecedor.id}/editar`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 min-w-11 items-center lg:min-h-0 lg:min-w-0`}>
+            <Link href={`${fornecedoresBase}/${d.fornecedor.id}/editar`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11`}>
               Completar o cadastro
             </Link>
           ) : (
@@ -118,7 +123,7 @@ export function TelaDocumento({
       {aguardando && d.parecidoSemNota && (
         <Aviso tom="neutro" titulo={`Já existe “${d.parecidoSemNota.nome}” em compras sem nota fiscal.`}>
           Se é o mesmo fornecedor, abra o cadastro dele e complete (CNPJ, razão social, e-mail). Nada é unido sozinho.{' '}
-          <Link href={`${fornecedoresBase}/${d.parecidoSemNota.id}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 min-w-11 items-center lg:min-h-0 lg:min-w-0`}>
+          <Link href={`${fornecedoresBase}/${d.parecidoSemNota.id}`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11`}>
             Abrir “{d.parecidoSemNota.nome}”
           </Link>
         </Aviso>
@@ -135,7 +140,7 @@ export function TelaDocumento({
             <dl className="space-y-2 text-sm">
               <Linha rotulo="Emitente">
                 {d.fornecedor ? (
-                  <Link href={`${fornecedoresBase}/${d.fornecedor.id}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 min-w-11 items-center lg:min-h-0 lg:min-w-0`}>
+                  <Link href={`${fornecedoresBase}/${d.fornecedor.id}`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11`}>
                     {d.fornecedor.nome}
                   </Link>
                 ) : (
@@ -244,7 +249,7 @@ function ItensSomenteLeitura({ d, insumosBase, semPermissao }: { d: DocumentoDet
             {i.insumoId ? (
               <p className="text-[13px] text-suave">
                 {insumosBase ? (
-                  <Link href={`${insumosBase}/${i.insumoId}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 min-w-11 items-center lg:min-h-0 lg:min-w-0`}>
+                  <Link href={`${insumosBase}/${i.insumoId}`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11`}>
                     {i.insumoNome}
                   </Link>
                 ) : (

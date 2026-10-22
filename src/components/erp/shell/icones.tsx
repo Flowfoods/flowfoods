@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Contact,
   CookingPot,
+  FileBarChart,
   Gauge,
   History,
   Inbox,
@@ -74,6 +75,7 @@ export const ICONES: Record<ChaveIcone, LucideIcon> = {
   canais: Bike,
   categorias: Tags,
   classificar: ListChecks,
+  relatorio: FileBarChart,
 };
 
 export function Icone({ nome, ...props }: { nome: ChaveIcone } & LucideProps) {

@@ -31,20 +31,21 @@ import { hrefDoRelatorio, RECORTE_NOVO } from './relatorio-filtros';
 const sp = (n: number) => n.toLocaleString('pt-BR');
 const pl = (n: number, um: string, varios: string) => `${sp(n)} ${n === 1 ? um : varios}`;
 const SIGLA = { KG: 'kg', L: 'L', UN: 'un' } as const;
+const verLinhas = (n: number) => (n === 1 ? 'Ver a linha' : `Ver as ${sp(n)} linhas`);
 const quantidade = (t: Pick<TotalPorUnidade, 'unidade' | 'quantidadeMilesimos'>) => (t.unidade ? formatarQuantidade(t.quantidadeMilesimos, t.unidade) : 'sem unidade');
 
 // ------------------------------------------------------------- indicadores
 
-function Cartao({ rotulo, children, ver, className = '' }: { rotulo: string; children: ReactNode; ver?: { href: string; texto: string }; className?: string }) {
+function Cartao({ rotulo, children, ver, className = '' }: { rotulo: string; children: ReactNode; ver?: { href: string; texto: string } | { href: string; texto: string }[]; className?: string }) {
   return (
     <div className={`flex min-w-0 flex-col rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5 ${className}`}>
       <h3 className="text-[12px] font-medium leading-snug text-suave">{rotulo}</h3>
       <div className="mt-2 min-w-0 flex-1">{children}</div>
-      {ver && (
-        <Link href={ver.href} className={`${LINK_DE_TEXTO} -mx-1 mt-2 inline-flex min-h-11 items-center self-start px-1 sm:min-h-9`}>
-          {ver.texto}
+      {(Array.isArray(ver) ? ver : ver ? [ver] : []).map((v) => (
+        <Link key={v.href} href={v.href} className={`${LINK_DE_TEXTO} -mx-1 mt-1 inline-flex min-h-11 items-center self-start px-1 sm:min-h-9`}>
+          {v.texto}
         </Link>
-      )}
+      ))}
     </div>
   );
 }
@@ -93,6 +94,7 @@ export function Indicadores({
   const verSemBase = hrefDoRelatorio(caminho, f, { ver: 'linhas', ...RECORTE_NOVO, so: 'sembase' });
   const comUnidade = t.unidades.filter((u) => u.unidade);
   const semUnidade = t.unidades.find((u) => !u.unidade);
+  const cancelada = f.situacao === 'canceladas';
   const semBaseTotal = Object.values(t.semBase).reduce((s, n) => s + (n ?? 0), 0);
   return (
     <section aria-labelledby="rel-resumo" className="space-y-3">
@@ -102,17 +104,17 @@ export function Indicadores({
       <div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-2 xl:grid-cols-4">
         <Cartao
           rotulo={f.situacao === 'canceladas' ? 'Total das notas CANCELADAS (não é compra)' : 'Total das compras (itens + frete)'}
-          ver={{ href: verTodas, texto: t.linhas === 1 ? 'Ver a linha' : `Ver as ${sp(t.linhas)} linhas` }}
+          ver={{ href: verTodas, texto: verLinhas(t.linhas) }}
         >
           <p className={GRANDE}>{formatarDinheiro(t.totalCentavos)}</p>
           <p className="mt-1.5 text-[12px] tabular-nums text-suave">
             {pl(t.notas, 'nota', 'notas')} · {pl(t.linhas, 'linha', 'linhas')}
           </p>
         </Cartao>
-        <Cartao rotulo="Valor dos itens e frete atribuído" ver={{ href: verTodas, texto: 'Ver o frete de cada linha' }}>
+        <Cartao rotulo="Valor dos itens (sem o frete)" ver={{ href: verTodas, texto: 'Ver o frete de cada linha' }}>
           <p className={GRANDE}>{formatarDinheiro(t.valorCentavos)}</p>
           <p className="mt-1.5 text-[12px] tabular-nums text-suave">
-            + {formatarDinheiro(t.freteCentavos)} de frete · desconto {formatarDinheiro(0)}
+            + {formatarDinheiro(t.freteCentavos)} de frete atribuído · desconto {formatarDinheiro(0)}
           </p>
         </Cartao>
         <Cartao rotulo="Quantidade comprada" ver={{ href: verTodas, texto: 'Ver as compras' }}>
@@ -137,19 +139,31 @@ export function Indicadores({
             <p className={GRANDE}>{nFornecedores ?? 0}</p>
             <p className="mt-1.5 text-[12px] text-suave">{(nFornecedores ?? 0) === 1 ? 'vendeu' : 'venderam'} este insumo no período</p>
           </Cartao>
-        ) : (
-          <Cartao rotulo="Preço médio" ver={semBaseTotal > 0 ? { href: verSemBase, texto: `Ver as ${pl(semBaseTotal, 'linha sem base', 'linhas sem base')}` } : undefined}>
-            <p className="text-sm text-suave">Só vale para um insumo por vez: kg de coisas diferentes não têm um preço só. Agrupe por insumo ou escolha um.</p>
+        ) : cancelada ? null : (
+          <Cartao
+            rotulo="Preço médio"
+            ver={[
+              ...(!umInsumo && f.agrupar !== 'insumo' ? [{ href: hrefDoRelatorio(caminho, f, { agrupar: 'insumo', ver: 'resumo', ...RECORTE_NOVO }), texto: 'Agrupar por insumo' }] : []),
+              ...(semBaseTotal > 0 ? [{ href: verSemBase, texto: semBaseTotal === 1 ? 'Ver a linha sem base' : `Ver as ${sp(semBaseTotal)} linhas sem base` }] : []),
+            ]}
+          >
+            <p className="text-sm text-suave">
+              {umInsumo
+                ? 'Veja os cartões do preço médio logo abaixo.'
+                : f.agrupar === 'insumo'
+                  ? 'Cada insumo tem o seu preço médio na tabela de baixo (kg de coisas diferentes não têm um preço só).'
+                  : 'Só vale para um insumo por vez: kg de coisas diferentes não têm um preço só. Agrupe por insumo ou escolha um.'}
+            </p>
           </Cartao>
         )}
       </div>
-      {umInsumo && comUnidade.length > 0 && (
+      {umInsumo && !cancelada && comUnidade.length > 0 && (
         <div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-2">
           {comUnidade.map((u) => (
             <Cartao
               key={u.unidade}
               rotulo={`Preço médio ponderado${comUnidade.length > 1 ? ` em ${SIGLA[u.unidade as Unidade]}` : ''} (só os itens)`}
-              ver={{ href: verTodas, texto: `Ver as ${pl(u.comparavel.linhas, 'linha que entra', 'linhas que entram')}` }}
+              ver={{ href: verTodas, texto: u.comparavel.linhas === 1 ? 'Ver a linha que entra' : `Ver as ${sp(u.comparavel.linhas)} linhas que entram` }}
             >
               <PrecoMedio t={u} comFrete={false} />
             </Cartao>
@@ -165,7 +179,7 @@ export function Indicadores({
           ))}
         </div>
       )}
-      {modo === 'insumo' && semBaseTotal > 0 && (
+      {modo === 'insumo' && !cancelada && semBaseTotal > 0 && (
         <p className="text-[13px] text-suave">
           {pl(semBaseTotal, 'linha', 'linhas')} sem base ficou de fora do preço médio.{' '}
           <Link href={verSemBase} className={`${LINK_DE_TEXTO} ff-toque`}>
@@ -367,6 +381,8 @@ export function TabelaDosGrupos({
 // ----------------------------------------------------------------- linhas
 
 function PrecoDaLinha({ l }: { l: LinhaDeCompra }) {
+  // Nota cancelada não é compra: não mostra preço nem custo entregue.
+  if (l.cancelada) return <span className="text-suave">—</span>;
   if (l.motivoSemBase) {
     return (
       <>
@@ -403,12 +419,12 @@ function LinkDaNota({ l, comprasBase, volta }: { l: LinhaDeCompra; comprasBase: 
         Nota {l.rotuloDaNota}
       </Link>
       {l.documentoId && (
-        <>
-          <span aria-hidden className="text-suave"> · </span>
-          <Link href={`${comprasBase}/recebidas/${l.documentoId}`} className="ff-toque ff-transicao rounded-[5px] text-[12px] text-suave underline decoration-linha-forte underline-offset-4 hover:text-texto">
+        // Em outra linha: dois links lado a lado com área de toque de 44 px se atropelariam.
+        <span className="mt-1 block">
+          <Link href={`${comprasBase}/recebidas/${l.documentoId}?volta=${encodeURIComponent(volta)}`} className="ff-toque ff-transicao rounded-[5px] text-[12px] text-suave underline decoration-linha-forte underline-offset-4 hover:text-texto">
             nota fiscal (XML)
           </Link>
-        </>
+        </span>
       )}
     </>
   );
@@ -459,7 +475,7 @@ export function TabelaDasCompras({
             <p className="text-sm tabular-nums">
               <PrecoDaLinha l={l} />
             </p>
-            <p className="flex min-h-11 flex-wrap items-center gap-x-1 text-[13px]">
+            <p className="flex min-h-11 flex-col items-start justify-center gap-0.5 text-[13px]">
               <LinkDaNota l={l} comprasBase={comprasBase} volta={volta} />
               {l.cancelada && <Selo>Cancelada</Selo>}
             </p>

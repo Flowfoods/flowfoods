@@ -8,9 +8,9 @@ import Link from 'next/link';
 import type { Opcoes } from '@/lib/erp/compras-relatorio';
 import {
   atalhosDePeriodo,
-  BASES_DE_DATA,
   LISTA_DE_AGRUPAMENTOS,
   LISTA_DE_BASES,
+  OPCAO_DA_BASE,
   queryDoRelatorio,
   ROTULO_DO_AGRUPAMENTO,
   type FiltrosDoRelatorio,
@@ -49,7 +49,7 @@ function SeletorDeLojas({ lojas, marcadas }: { lojas: Opcoes['lojas']; marcadas:
   }
   const resumo = marcadas.length === 0 ? `Todas as minhas lojas (${lojas.length})` : marcadas.length === 1 ? (lojas.find((l) => l.id === marcadas[0])?.nome ?? '1 loja') : `${marcadas.length} lojas`;
   return (
-    <div className="col-span-2 lg:col-span-1">
+    <div className="col-span-2 sm:col-span-1">
       <span id="rel-lojas-rotulo" className={ROTULO}>
         Lojas
       </span>
@@ -134,14 +134,14 @@ export function FormularioDoRelatorio({
       <FiltrosRecolhiveis ativos={ativos} id="relatorio-filtros" grade="grid-cols-2 lg:grid-cols-4" abertoNoInicio={semInsumo}>
         {modo === 'insumo' && (
           <>
-            <div className="col-span-2 lg:col-span-1">
+            <div className="col-span-2 sm:col-span-1">
               <label htmlFor="rel-q" className={ROTULO}>
                 Procurar o insumo
               </label>
               <input id="rel-q" name="q" type="search" defaultValue={f.q} placeholder="Nome ou marca" autoComplete="off" className={CAMPO} />
               <p className="mt-1 text-[12px] text-suave">Acha mesmo sem acento (açaí, acai).</p>
             </div>
-            <div className="col-span-2 lg:col-span-1">
+            <div className="col-span-2 sm:col-span-1">
               <label htmlFor="rel-insumo" className={ROTULO}>
                 Insumo
               </label>
@@ -169,20 +169,20 @@ export function FormularioDoRelatorio({
           </label>
           <CampoData id="rel-ate" name="ate" defaultValue={formatarData(f.ate)} aria-label="Data final (dd/mm/aaaa)" className="" />
         </div>
-        <div className="col-span-2 lg:col-span-1">
+        <div className="col-span-2 sm:col-span-1">
           <label htmlFor="rel-base" className={ROTULO}>
             Data usada
           </label>
           <select id="rel-base" name="base" defaultValue={f.base} className={SELECT}>
             {LISTA_DE_BASES.map((b) => (
               <option key={b} value={b}>
-                {BASES_DE_DATA[b].rotulo}
+                {OPCAO_DA_BASE[b]}
               </option>
             ))}
           </select>
         </div>
         <SeletorDeLojas lojas={opcoes.lojas} marcadas={f.lojaIds} />
-        <div className="col-span-2 lg:col-span-1">
+        <div className="col-span-2 sm:col-span-1">
           <label htmlFor="rel-fornecedor" className={ROTULO}>
             Fornecedor
           </label>
@@ -197,13 +197,13 @@ export function FormularioDoRelatorio({
         </div>
         {modo === 'periodo' && (
           <>
-            <div className="col-span-2 lg:col-span-1">
+            <div className="col-span-2 sm:col-span-1">
               <label htmlFor="rel-q" className={ROTULO}>
                 Nome do insumo
               </label>
               <input id="rel-q" name="q" type="search" defaultValue={f.q} placeholder="Ex.: queijo, açaí" autoComplete="off" className={CAMPO} />
             </div>
-            <div className="col-span-2 lg:col-span-1">
+            <div className="col-span-2 sm:col-span-1">
               <label htmlFor="rel-insumo" className={ROTULO}>
                 Um insumo só
               </label>
@@ -216,7 +216,7 @@ export function FormularioDoRelatorio({
                 ))}
               </select>
             </div>
-            <div className="col-span-2 lg:col-span-1">
+            <div className="col-span-2 sm:col-span-1">
               <label htmlFor="rel-categoria" className={ROTULO}>
                 Categoria do insumo
               </label>
@@ -229,7 +229,7 @@ export function FormularioDoRelatorio({
                 ))}
               </select>
             </div>
-            <div className="col-span-2 lg:col-span-1">
+            <div className="col-span-2 sm:col-span-1">
               <label htmlFor="rel-agrupar" className={ROTULO}>
                 Agrupar por
               </label>
@@ -241,7 +241,7 @@ export function FormularioDoRelatorio({
                 ))}
               </select>
             </div>
-            <div className="col-span-2 lg:col-span-1">
+            <div className="col-span-2 sm:col-span-1">
               <label htmlFor="rel-situacao" className={ROTULO}>
                 Notas
               </label>

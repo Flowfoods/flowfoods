@@ -2967,7 +2967,7 @@ Seis ajustes, decisões 349 a 354: um rótulo só ("Nesta lista", com "(com os f
 
 ## O que a L.2 entregou — relatórios de compras: histórico de um insumo e compras do dia ou período, com planilha e PDF
 
-Segunda entrega da "Evolução prioritária — lista de insumos e relatórios de compras, preços e consumo" (Rodolfo, 21/10/2026): a **Visão 1** (histórico de um insumo) e a **Visão 2** (compras do dia ou período), com a exportação. Comparação de fornecedores e períodos (L.3) e consumo e conciliação de estoque (L.4) ficam de fora. Uma migration ADITIVA (`20261107000000_erp_relatorio_compras`, dois índices). Decisões 355 a 370 (368 é o extra da busca sem acento, pedido pelo Maestro depois do pós-deploy da L.1). Sem permissão nova (`compras.ver`, por loja). Ajuda: `compras-relatorio-insumo` e `compras-relatorio-periodo` novas, `compras` na 3 e `insumo` na 4.
+Segunda entrega da "Evolução prioritária — lista de insumos e relatórios de compras, preços e consumo" (Rodolfo, 21/10/2026): a **Visão 1** (histórico de um insumo) e a **Visão 2** (compras do dia ou período), com a exportação. Comparação de fornecedores e períodos (L.3) e consumo e conciliação de estoque (L.4) ficam de fora. Uma migration ADITIVA (`20261107000000_erp_relatorio_compras`, dois índices). Decisões 355 a 371 (368 é o extra da busca sem acento, pedido pelo Maestro depois do pós-deploy da L.1; 371 é a rodada de ajustes dos fiscais). Sem permissão nova (`compras.ver`, por loja). Ajuda: `compras-relatorio-insumo` e `compras-relatorio-periodo` novas, `compras` na 3 e `insumo` na 4.
 
 **Telas** (nas duas árvores, `/erp/compras/relatorios/insumo`, `/erp/compras/relatorios/periodo` e `/rodolfo/erp/[slug]/compras/relatorios/...`), grupo "Relatórios" no menu de Compras; "Ver o histórico de compras" no detalhe do insumo; a nota aberta pelo relatório volta para ele (`?volta=`, só caminho interno).
 
@@ -3025,6 +3025,10 @@ npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.p
 - **Portão de tenant**: a opção `repetivel` de `transacao` é para leitura em várias consultas; escrita não a usa. O portão veta `insumos:` como propriedade de código (o relatório usa `listaDeInsumos`) e o teste das rotas de arquivo exige `pode(ctx.alcance, 'compras.ver')` na rota.
 - **Alvo de toque** de link solto em tela de tablet: `[@media(pointer:coarse)]:min-h-11` (o `lg:min-h-0` deixava 20 px num tablet deitado a 1180 px; corrigido no detalhe da nota, que o relatório abre).
 - **Decisões para o Rodolfo** (não bloqueiam): 370.
+
+### Rodada de ajustes dos fiscais (2026-10-22, depois da aprovação do Guardião e da primeira volta da UX)
+
+Decisão 371: a volta atravessa a nota fiscal (XML), `?pagina=` com teto e queda na última página depois de contar, landmark único na impressão, plural, cartões e canceladas mais claros, filtros em 2 colunas a 820 px, "Data usada" sem corte a 1180 px, "N compras" no subtítulo e ícone próprio. **Prova:** `typecheck`, `lint`, `gate` e `build` limpos; vitest sem e com banco (paralelo); navegador (build de produção, porta 3100): a volta pelo documento (do relatório e da nota, e as quatro voltas maliciosas ignoradas), `pagina` gigante nas duas visões, impressão com axe em 4 tamanhos × 2 temas (relatório do período e histórico do insumo), canceladas, cartões, 820 e 1180 px, e a matriz das telas tocadas em 4 tamanhos × 2 temas.
 
 ## Mapa do esquema (0.1)
 

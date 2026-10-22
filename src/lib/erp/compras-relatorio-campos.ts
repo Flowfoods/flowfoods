@@ -35,6 +35,8 @@ export const BASES_DE_DATA: Record<BaseDeData, { rotulo: string; curto: string; 
     explica: 'O dia em que alguém lançou a nota no ERP, pelo relógio do Rio de Janeiro (a virada do dia é à meia-noite do Rio).',
   },
 };
+/** O nome curto da opção no seletor (o rótulo inteiro cortava a 1180 px). */
+export const OPCAO_DA_BASE: Record<BaseDeData, string> = { entrada: 'Entrada da nota', emissao: 'Emissão da nota fiscal', lancamento: 'Lançamento no sistema' };
 export const LISTA_DE_BASES = Object.keys(BASES_DE_DATA) as BaseDeData[];
 
 export type AgruparPor = 'insumo' | 'fornecedor' | 'dia';
@@ -89,6 +91,12 @@ const um = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?
 const todos = (v: string | string[] | undefined) => (Array.isArray(v) ? v : v === undefined ? [] : [v]);
 const idOuNada = (v: string) => (/^[a-z0-9]{1,64}$/i.test(v) ? v : '');
 
+/** A página da URL: inteiro de 1 a 1.000.000 (como a lista de insumos); "1e12", "abc", negativo e decimal caem na primeira. */
+export function lerPagina(v: string): number {
+  const n = /^\d{1,7}$/.test(v) ? Number(v) : NaN;
+  return Number.isSafeInteger(n) && n >= 1 && n <= 1_000_000 ? n : 1;
+}
+
 export const primeiroDiaDoMes = (iso: string) => `${iso.slice(0, 7)}-01`;
 
 /** Soma `n` dias a "2026-10-14" no calendário (sem fuso: é data, não instante). */
@@ -131,7 +139,7 @@ export function lerFiltrosDoRelatorio(sp: Params, hoje = hojeNoRio(), padrao: Pa
     grupo: grupo === '-' || /^[a-z0-9]{1,64}$/i.test(grupo) || lerData(grupo) === grupo ? grupo : '',
     unidade: unidade === 'sem' || unidade === 'KG' || unidade === 'L' || unidade === 'UN' ? unidade : '',
     so: um(sp.so) === 'sembase' ? 'sembase' : '',
-    pagina: Math.max(1, Math.trunc(Number(um(sp.pagina))) || 1),
+    pagina: lerPagina(um(sp.pagina)),
     porPagina: lerPorPagina(um(sp.por)),
     periodoInvalido,
   };

@@ -116,10 +116,11 @@ export function TelaDoRelatorio({
   const vazio = VazioDoRelatorio({ r, f, caminho, modo });
   const t = r.totais;
   const insumoEscolhido = f.insumoId ? r.opcoes.listaDeInsumos.find((i) => i.id === f.insumoId)?.nome : undefined;
-  const subtitulo = [contexto, modo === 'insumo' && insumoEscolhido ? insumoEscolhido : null, fraseDoPeriodo(f)].filter(Boolean).join(' · ');
+  const nCompras = t ? `${t.notas.toLocaleString('pt-BR')} ${f.situacao === 'canceladas' ? (t.notas === 1 ? 'nota cancelada' : 'notas canceladas') : t.notas === 1 ? 'compra' : 'compras'}` : null;
+  const subtitulo = [contexto, modo === 'insumo' && insumoEscolhido ? insumoEscolhido : null, nCompras, fraseDoPeriodo(f)].filter(Boolean).join(' · ');
   const verLinhas = modo === 'insumo' || f.ver === 'linhas';
   const paginaDe = (p: number) => hrefDoRelatorio(caminho, f, { pagina: p }) + (modo === 'insumo' ? '#compras' : '');
-  const comPreco = r.umInsumo || (modo === 'periodo' && f.agrupar === 'insumo');
+  const comPreco = f.situacao !== 'canceladas' && (r.umInsumo || (modo === 'periodo' && f.agrupar === 'insumo'));
   const abertas = r.abertas;
   const rotuloDoGrupo = f.grupo
     ? (r.fornecedores?.grupos.find((g) => g.chave === f.grupo)?.rotulo ?? r.grupos?.grupos.find((g) => g.chave === f.grupo)?.rotulo ?? (f.agrupar === 'dia' ? formatarData(f.grupo) : r.linhas?.linhas[0] ? (f.agrupar === 'insumo' ? r.linhas.linhas[0].insumo : r.linhas.linhas[0].fornecedor) : undefined))
@@ -128,7 +129,7 @@ export function TelaDoRelatorio({
   return (
     <div className="space-y-6">
       <PageHeader
-        icone="metricas"
+        icone={modo === 'insumo' ? 'historico' : 'relatorio'}
         cor={COR.compras}
         titulo={TITULO[modo]}
         subtitulo={subtitulo}
@@ -178,7 +179,7 @@ export function TelaDoRelatorio({
           <NotasDoRelatorio f={f} caminho={caminho} r={r} comprasBase={comprasBase} />
 
           {t.linhas > 0 && modo === 'insumo' && r.fornecedores && r.fornecedores.grupos.length > 0 && (
-            <TabelaDosGrupos id="fornecedores" caminho={caminho} f={f} grupos={r.fornecedores.grupos} agrupar="fornecedor" comPreco titulo="De quem você comprou" ancora="#compras" />
+            <TabelaDosGrupos id="fornecedores" caminho={caminho} f={f} grupos={r.fornecedores.grupos} agrupar="fornecedor" comPreco={f.situacao !== 'canceladas'} titulo="De quem você comprou" ancora="#compras" />
           )}
 
           {t.linhas > 0 && modo === 'periodo' && (

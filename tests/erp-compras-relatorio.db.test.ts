@@ -405,6 +405,25 @@ describe.skipIf(!URL_TESTE)('ERP L.2 · relatórios de compras (Postgres real)',
     expect(grupos.total).toBeGreaterThan(2);
   });
 
+  it('página enorme ou torta não dá erro: cai na última (grupos e linhas), com o rodapé certo', async () => {
+    // Teto da URL: 99999999 e 1e12 viram a primeira página; 1.000.000 chega ao banco e cai na última.
+    for (const pagina of ['99999999', '1e12', '1000000', '-1', 'abc']) {
+      for (const ver of ['resumo', 'linhas']) {
+        const r = await relatorioDaTela(a, DONA(), filtros({ ver, pagina, por: '10' }), 'periodo');
+        expect(r.motivoVazio, `${ver} ${pagina}`).toBeNull();
+        expect(r.totais!.linhas, `${ver} ${pagina}`).toBe(7);
+        expect(r.pagina, `${ver} ${pagina}`).toBe(r.paginas);
+      }
+    }
+    // Com duas por página, a pedida além da última cai na última e o rodapé diz "2 de 2" (e não "1 de 1").
+    const f = { ...filtros({ agrupar: 'insumo' }), porPagina: 2, pagina: 1_000_000 };
+    const g = await relatorioDaTela(a, DONA(), f, 'periodo');
+    expect(g.grupos!.total).toBe(4);
+    expect([g.pagina, g.paginas, g.grupos!.grupos.length]).toEqual([2, 2, 2]);
+    const l = await relatorioDaTela(a, DONA(), { ...filtros({ ver: 'linhas' }), porPagina: 3, pagina: 1_000_000 }, 'periodo');
+    expect([l.pagina, l.paginas, l.linhas!.linhas.length]).toEqual([3, 3, 1]);
+  });
+
   it('o recorte de uma consulta só: a fotografia é a mesma para o resumo e as linhas (transação repetível)', async () => {
     const r = await relatorioDaTela(a, DONA(), filtros({ ver: 'linhas' }), 'periodo');
     expect(r.linhas!.total).toBe(r.totais!.linhas);
