@@ -18,6 +18,7 @@ import {
 import {
   compararEmbalagens,
   diferenca,
+  lerChaveDeEnvio,
   lerFormInsumo,
   lerFormVariante,
   retratoDaVariante,
@@ -26,7 +27,7 @@ import {
   type DadosInsumo,
 } from '@/lib/erp/insumo-campos';
 import { alvoDaLinha, descreverMudancas, rotuloEntidade } from '@/lib/erp/historico';
-import { fraseDoFeito } from '@/components/erp/telas/insumos/estado';
+import { fraseDoFeito, fraseDoSalvo } from '@/components/erp/telas/insumos/estado';
 
 /** O Intl põe espaço sem quebra depois do "R$"; o teste compara com espaço comum. */
 const n = <T,>(x: T): T => JSON.parse(JSON.stringify(x).replace(/\u00a0/g, ' '));
@@ -135,7 +136,7 @@ describe('ERP 1.1 · custo por unidade = (preço + frete) ÷ conteúdo, exato (f
 });
 
 describe('ERP 1.1 · formulário do insumo (o servidor converte)', () => {
-  const base = { nome: 'Cebola', tipo: 'INGREDIENTE', unidade: 'KG', conservacao: 'SECO', conteudo: '5', escala: 'base', preco: '89,90', frete: '5,00' };
+  const base = { nome: 'Cebola', tipo: 'INGREDIENTE', unidade: 'KG', categoriaId: 'cat1', conservacao: 'SECO', conteudo: '5', escala: 'base', preco: '89,90', frete: '5,00' };
 
   it('válido: tudo em inteiro', () => {
     const r = lerFormInsumo(base);
@@ -145,6 +146,7 @@ describe('ERP 1.1 · formulário do insumo (o servidor converte)', () => {
         nome: 'Cebola',
         tipo: 'INGREDIENTE',
         unidade: 'KG',
+        categoriaId: 'cat1',
         conservacao: 'SECO',
         validades: { principal: 'SECO', minutos: {} },
         conteudoMilesimos: 5000,
@@ -191,6 +193,37 @@ describe('ERP 1.1 · formulário do insumo (o servidor converte)', () => {
     expect(r.ok).toBe(false);
     if (r.ok) return;
     expect(Object.keys(r.erros).sort()).toEqual(['nome', 'tipo', 'unidade']);
+  });
+
+  it('I.1a · obrigatórios: nome, categoria e unidade base — cada falta volta no campo dela, com a frase do que fazer', () => {
+    const vazio = lerFormInsumo({ ...base, nome: '   ', categoriaId: '', unidade: '' });
+    expect(vazio.ok).toBe(false);
+    if (vazio.ok) return;
+    expect(Object.keys(vazio.erros).sort()).toEqual(['categoriaId', 'nome', 'unidade']);
+    expect(vazio.erros.nome).toMatch(/nome/i);
+    expect(vazio.erros.categoriaId).toMatch(/Escolha a categoria/);
+    expect(vazio.erros.unidade).toMatch(/Escolha a unidade base/);
+    // Só espaços na categoria não é categoria; sem o campo, também não; o placeholder da unidade não vira valor.
+    expect(lerFormInsumo({ ...base, categoriaId: '   ' }).ok).toBe(false);
+    const { categoriaId: _c, ...semCampo } = base;
+    const sem = lerFormInsumo(semCampo);
+    expect(!sem.ok && sem.erros.categoriaId).toMatch(/Escolha a categoria/);
+    const placeholder = lerFormInsumo({ ...base, unidade: 'Selecione' });
+    expect(!placeholder.ok && placeholder.erros.unidade).toMatch(/unidade base/);
+  });
+
+  it('I.1a · corrigir e reenviar: com o que faltava, passa', () => {
+    expect(lerFormInsumo({ ...base, categoriaId: '' }).ok).toBe(false);
+    expect(lerFormInsumo({ ...base, categoriaId: 'cat9' })).toMatchObject({ ok: true, dados: { categoriaId: 'cat9' } });
+  });
+
+  it('I.1a · a chave de envio: ausente vale (sem idempotência), UUID vale, torta é recusada', () => {
+    expect(lerChaveDeEnvio(undefined)).toEqual({ ok: true, chave: null });
+    expect(lerChaveDeEnvio('')).toEqual({ ok: true, chave: null });
+    expect(lerChaveDeEnvio('6f1c2b3a-9d4e-4f50-8a7b-1c2d3e4f5a6b')).toEqual({ ok: true, chave: '6f1c2b3a-9d4e-4f50-8a7b-1c2d3e4f5a6b' });
+    for (const torta of ['curta', 'com espaço no meio', 'x'.repeat(81), '<script>alert(1)</script>', 42, {}]) {
+      expect(lerChaveDeEnvio(torta), String(torta)).toEqual({ ok: false });
+    }
   });
 
   it('embalagem (variante): código de barras opcional, de 8 a 14 números', () => {
@@ -327,9 +360,16 @@ describe('ERP 1.1 · qual embalagem sai mais barata (em texto)', () => {
 
 describe('ERP 1.1 · ?feito= da URL só escolhe uma frase conhecida', () => {
   it('__proto__, constructor e desconhecido não viram frase (antes davam 500)', () => {
-    expect(fraseDoFeito('criado')).toBe('Insumo cadastrado.');
-    for (const f of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'xyz', '', undefined]) {
+    expect(fraseDoFeito('reativado')).toBe('Insumo reativado.');
+    for (const f of ['__proto__', 'constructor', 'toString', 'hasOwnProperty', 'xyz', '', undefined, 'criado', 'editado']) {
       expect(fraseDoFeito(f), String(f)).toBeUndefined();
+      if (f !== 'criado' && f !== 'editado') expect(fraseDoSalvo(f, 'Farinha'), String(f)).toBeUndefined();
     }
+  });
+
+  it('I.1a · criar diz "Insumo salvo com sucesso: <nome>" e atualizar diz "Alterações salvas em <nome>"; o nome é o do banco', () => {
+    expect(fraseDoSalvo('criado', 'Farinha de trigo')).toEqual({ titulo: 'Insumo salvo com sucesso: Farinha de trigo', criou: true });
+    expect(fraseDoSalvo('editado', 'Farinha de trigo')).toMatchObject({ titulo: 'Alterações salvas em Farinha de trigo', criou: false });
+    expect(fraseDoSalvo('criado-repetido', 'Farinha de trigo')).toMatchObject({ titulo: 'Insumo salvo com sucesso: Farinha de trigo', criou: true, apoio: expect.stringMatching(/uma vez só/) });
   });
 });

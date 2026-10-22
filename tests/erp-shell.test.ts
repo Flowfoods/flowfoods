@@ -70,6 +70,9 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     ]);
     expect(hrefs(a)).toEqual([
       '/erp/insumos',
+      // I.1a: as categorias e a classificação dos que já existiam moram ao lado dos insumos.
+      '/erp/insumos/categorias',
+      '/erp/insumos/classificar',
       '/erp/fichas',
       '/erp/fichas/canais',
       '/erp/compras',
@@ -123,7 +126,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     // Operador VÊ fichas (bate o olho na foto e no preparo), sem criar nem importar.
     // 1.8: ele pede requisição (o quadro aparece); divergências são de quem confere contagem. UX.9: vê as contagens (estoque.ver), sem Precificação e sem ação nenhuma.
     // 3.3: as tarefas da cozinha e o histórico da produção; os indicadores por pessoa são da gerência.
-    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/producao/lista', '/erp/producao/tarefas', '/erp/producao', '/erp/producao/historico', '/erp/lojas', '/erp/acesso']);
+    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/insumos/categorias', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/producao/lista', '/erp/producao/tarefas', '/erp/producao', '/erp/producao/historico', '/erp/lojas', '/erp/acesso']);
     // 3.1: o cozinheiro produz, então planejar a produção é a única ação dele.
     expect(hrefsDasAcoes(a)).toEqual(['/erp/producao/nova']);
     expect(futuros(a)).toEqual(['etiquetas']);
@@ -169,6 +172,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     const h = hrefs(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins');
     expect(h).toEqual([
       '/rodolfo/erp/valentins/insumos',
+      '/rodolfo/erp/valentins/insumos/categorias',
+      '/rodolfo/erp/valentins/insumos/classificar',
       '/rodolfo/erp/valentins/fichas',
       '/rodolfo/erp/valentins/fichas/canais',
       '/rodolfo/erp/valentins/compras',

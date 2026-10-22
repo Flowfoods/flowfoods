@@ -28,7 +28,7 @@ import { planoEfetivo } from '@/lib/erp/dre-plano';
 import { salvarTaxaDoIfood } from '@/lib/erp/canais';
 import { MOTIVO_DE_ANTES_DO_FAROL } from '@/lib/erp/farol-dre-campos';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
-import { cadastrarInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 import { BRT, nota, R } from './erp-cmv-apoio';
 

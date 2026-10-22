@@ -51,7 +51,10 @@ export type ChaveIcone =
   | 'sistema'
   | 'config'
   // 1.9: canais de venda (loja, delivery, iFood) e a taxa do iFood.
-  | 'canais';
+  | 'canais'
+  // I.1a: categorias de insumo e a classificação dos que já existiam.
+  | 'categorias'
+  | 'classificar';
 
 export interface ItemNav {
   href: string;
@@ -138,6 +141,8 @@ export type ChaveDeCor = keyof typeof COR;
 interface Tela extends ItemNav {
   /** null = livre; lista = qualquer uma delas (1.8: requisições = quem pede OU quem atende). */
   permissao: Permissao | readonly Permissao[] | null;
+  /** I.1a: além de `permissao`, a pessoa também precisa desta (sem "ver insumos" ninguém vê a área só por poder classificar). */
+  tambem?: Permissao;
   /**
    * 3.3: esta aba é a ENTRADA da área para quem tem `tem` e não tem `semTer` (a cozinha entra na Produção pelas Tarefas; a
    * gerência, pela Lista do dia, a primeira aba). Não muda a ordem das abas.
@@ -222,6 +227,21 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               icone: 'insumo',
               subtitulo: 'Lista, embalagem e custo por unidade',
               permissao: 'insumos.ver',
+            },
+            {
+              href: `${base}/insumos/categorias`,
+              rotulo: 'Categorias',
+              icone: 'categorias',
+              subtitulo: 'Proteína, hortifruti, mercearia...: onde o custo entra no CMV',
+              permissao: 'insumos.ver',
+            },
+            {
+              href: `${base}/insumos/classificar`,
+              rotulo: 'Classificar insumos',
+              icone: 'classificar',
+              subtitulo: 'Os insumos sem categoria: prévia, aplicar e revisar em lote',
+              permissao: 'insumos.editar',
+              tambem: 'insumos.ver',
             },
           ],
         },
@@ -568,6 +588,7 @@ export function telaSeuAcesso(base = '/erp'): ItemNav {
 }
 
 function liberada(alcance: Alcance, t: Tela) {
+  if (t.tambem && !pode(alcance, t.tambem)) return false;
   return t.permissao === null || (typeof t.permissao === 'string' ? pode(alcance, t.permissao) : t.permissao.some((p) => pode(alcance, p)));
 }
 
@@ -585,7 +606,7 @@ export function modulosDoParceiro(alcance: Alcance, base = '/erp'): ModuloNav[] 
       .map((g) => ({
         rotulo: g.rotulo,
         icone: g.icone,
-        itens: g.telas.filter((t) => liberada(alcance, t)).map(({ permissao: _p, entradaPara: _e, ...item }) => ({ ...item, area: m.nome })),
+        itens: g.telas.filter((t) => liberada(alcance, t)).map(({ permissao: _p, tambem: _t, entradaPara: _e, ...item }) => ({ ...item, area: m.nome })),
       }))
       .filter((g) => g.itens.length > 0);
     if (grupos.length === 0) continue;
@@ -600,7 +621,7 @@ export function modulosDoParceiro(alcance: Alcance, base = '/erp'): ModuloNav[] 
       cor: m.cor,
       href: entrada?.href ?? grupos[0].itens[0].href,
       grupos,
-      acoes: m.acoes.filter((t) => liberada(alcance, t)).map(({ permissao: _p, entradaPara: _e, ...item }) => ({ ...item, area: m.nome })),
+      acoes: m.acoes.filter((t) => liberada(alcance, t)).map(({ permissao: _p, tambem: _t, entradaPara: _e, ...item }) => ({ ...item, area: m.nome })),
     });
   }
   const futuros: ModuloNav[] = MODULOS_FUTUROS.filter((f) => f.ver.some((p) => pode(alcance, p))).map((f) => ({

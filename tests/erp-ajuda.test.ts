@@ -66,6 +66,9 @@ const relativas = (raiz: string) =>
 const ROTAS_DO_PARCEIRO = relativas(join('src', 'app', 'erp'));
 const ROTAS_DO_NIVEL1 = relativas(join('src', 'app', 'rodolfo', '(painel)', 'erp', '[slug]'));
 
+/** A versão de hoje do texto de Insumos (sobe quando o texto muda; os testes não fixam um número). */
+const VI = ENTRADAS.find((e) => e.chave === 'insumos')!.versao;
+
 describe('0.6 · o gate: ajuda sempre atualizada', () => {
   it('toda página do /erp e do nível 1 dentro do parceiro tem entrada; nenhuma entrada sobra', () => {
     expect(ROTAS_DO_PARCEIRO.length).toBeGreaterThan(30);
@@ -153,7 +156,7 @@ describe('0.6 · versão: texto mudou, a versão sobe (ajuda.lock.json)', () => 
     expect(() => lockNovo(mudou, lock)).toThrow(/versao nao subiu/);
     const subiu = clone((e) => ({ ...e, versao: e.versao + 1, aula: [{ texto: 'Outro texto.' }, ...e.aula.slice(1)] }));
     expect(divergenciasDoLock(subiu, lock).join()).toContain('lock esta desatualizado');
-    expect(lockNovo(subiu, lock).insumos.versao).toBe(2);
+    expect(lockNovo(subiu, lock).insumos.versao).toBe(VI + 1);
     expect(divergenciasDoLock(clone((e) => ({ ...e, versao: e.versao + 1 })), lock).join()).toContain('lock esta desatualizado');
   });
 
@@ -252,8 +255,8 @@ describe('0.6 · quando a caixa aparece', () => {
     expect(caixaDaTela(e, pref({ fechadas: ['fichas@1', 'insumos-novo@1'] }))).toEqual({ mudou: false, perguntar: false });
   });
   it('fechar só aceita chave@versão que existe no registro agora', () => {
-    expect(fechamentoValido('insumos@1')).toBe('insumos@1');
-    for (const ruim of ['insumos@2', 'nao-existe@1', 'insumos', '@1', 'insumos@1; drop table', 'a'.repeat(200) + '@1', 'INSUMOS@1', null, 7, ['insumos@1']]) {
+    expect(fechamentoValido(`insumos@${VI}`)).toBe(`insumos@${VI}`);
+    for (const ruim of [`insumos@${VI + 1}`, 'nao-existe@1', 'insumos', '@1', `insumos@${VI}; drop table`, 'a'.repeat(200) + '@1', 'INSUMOS@1', null, 7, [`insumos@${VI}`]]) {
       expect(fechamentoValido(ruim), String(ruim)).toBeNull();
     }
   });
@@ -317,7 +320,7 @@ describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fec
   });
 
   it('fechada nesta versão ou desligada: nenhuma caixa no HTML (sem flash); o "?" fica', async () => {
-    for (const p of [PREF({ fechadas: ['insumos@1'] }), PREF({ dicasLigadas: false })]) {
+    for (const p of [PREF({ fechadas: [`insumos@${VI}`] }), PREF({ dicasLigadas: false })]) {
       const h = await html('/erp/insumos', p);
       expect(h).not.toContain('data-ajuda-caixa');
       expect(h).not.toContain('Entendi, não mostrar');
@@ -341,12 +344,12 @@ describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fec
   });
 
   it('o texto mudou (versão subiu): a caixa volta com a etiqueta Mudou para quem tinha fechado; quem nunca viu não ganha etiqueta', async () => {
-    const h = await html('/erp/insumos', PREF({ fechadas: ['insumos@1'] }), DONO, { insumos: 2 });
+    const h = await html('/erp/insumos', PREF({ fechadas: [`insumos@${VI}`] }), DONO, { insumos: VI + 1 });
     expect(h).toContain('data-ajuda-caixa="insumos"');
     expect(h).toContain('Mudou');
-    expect(h).toContain('name="caixa" value="insumos@2"');
-    expect(await html('/erp/insumos', PREF(), DONO, { insumos: 2 })).not.toContain('Mudou');
-    expect(await html('/erp/insumos', PREF({ fechadas: ['insumos@2'] }), DONO, { insumos: 2 })).not.toContain('data-ajuda-caixa');
+    expect(h).toContain(`name="caixa" value="insumos@${VI + 1}"`);
+    expect(await html('/erp/insumos', PREF(), DONO, { insumos: VI + 1 })).not.toContain('Mudou');
+    expect(await html('/erp/insumos', PREF({ fechadas: [`insumos@${VI + 1}`] }), DONO, { insumos: VI + 1 })).not.toContain('data-ajuda-caixa');
   });
 
   it('telas de contar: a caixa nasce recolhida (<details> fechado, funciona sem JS); as outras nascem abertas', async () => {
@@ -381,7 +384,7 @@ describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fec
 
   it('o botão e os formulários funcionam sem JavaScript: são <form> e <button type="submit">', async () => {
     const h = await html('/erp/insumos', PREF());
-    expect(h).toMatch(/<form[^>]*>[\s\S]*name="caixa" value="insumos@1"[\s\S]*Entendi, não mostrar de novo<\/button><\/form>/);
+    expect(h).toMatch(new RegExp(`<form[^>]*>[\\s\\S]*name="caixa" value="insumos@${VI}"[\\s\\S]*Entendi, não mostrar de novo<\\/button><\\/form>`));
     // "Ver tudo" não faz nada sem JavaScript: nasce escondido
     expect(h).toMatch(/<button[^>]*hidden[^>]*>Ver tudo sobre esta tela/);
   });

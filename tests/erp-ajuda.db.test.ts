@@ -59,6 +59,11 @@ import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apo
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const SENHA = 'cozinha limpa 2026';
 
+import { ENTRADAS as ENTRADAS_DA_AJUDA } from '@/lib/erp/ajuda-textos';
+/** A versão de hoje do texto de Insumos: os testes não fixam um número (ele sobe quando o texto muda). */
+const VI = ENTRADAS_DA_AJUDA.find((e) => e.chave === 'insumos')!.versao;
+const CX = `insumos@${VI}`;
+
 describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', { timeout: 60_000 }, () => {
   let db: PrismaClient;
   let perfil: PerfilDoBanco;
@@ -173,13 +178,13 @@ describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', 
 
   it('"Entendi" fecha só aquela caixa, nas duas sessões da pessoa; a colega continua vendo; fechar de novo não duplica', async () => {
     como(ana.token);
-    await acaoAjudaFechar(form({ caixa: 'insumos@1' }));
-    await acaoAjudaFechar(form({ caixa: 'insumos@1' }));
-    expect((await ver(ana.token)).fechadas).toEqual(['insumos@1']);
-    expect((await ver(anaOutroAparelho.token)).fechadas).toEqual(['insumos@1']);
+    await acaoAjudaFechar(form({ caixa: CX }));
+    await acaoAjudaFechar(form({ caixa: CX }));
+    expect((await ver(ana.token)).fechadas).toEqual([CX]);
+    expect((await ver(anaOutroAparelho.token)).fechadas).toEqual([CX]);
     expect((await ver(bia.token)).fechadas).toEqual([]);
     await acaoAjudaFechar(form({ caixa: 'fichas@1' }));
-    expect((await ver(ana.token)).fechadas).toEqual(['insumos@1', 'fichas@1']);
+    expect((await ver(ana.token)).fechadas).toEqual([CX, 'fichas@1']);
   });
 
   it('usuarioId forjado no formulário é ignorado: só a pessoa da sessão muda', async () => {
@@ -199,7 +204,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', 
     const antes = await linhas(ana.s.usuario.id);
     const ruins = [
       'nao-existe@1',
-      'insumos@2',
+      `insumos@${VI + 1}`,
       'insumos@99',
       'insumos',
       '@1',
@@ -213,7 +218,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', 
       await acaoAjudaFechar(form({ caixa }));
       expect((await gravarPreferenciaDeAjuda(ana.token, { tipo: 'fechar', caixa }, o())).ok, caixa.slice(0, 30)).toBe(false);
     }
-    expect((await gravarPreferenciaDeAjuda(ana.token, { tipo: 'fechar', caixa: ['insumos@1'] as never }, o())).ok).toBe(false);
+    expect((await gravarPreferenciaDeAjuda(ana.token, { tipo: 'fechar', caixa: [CX] as never }, o())).ok).toBe(false);
     expect((await gravarPreferenciaDeAjuda(ana.token, { tipo: 'dicas', ligadas: 'sim' as never }, o())).ok).toBe(false);
     expect((await gravarPreferenciaDeAjuda(ana.token, { tipo: 'apagar' } as never, o())).ok).toBe(false);
     expect(await linhas(ana.s.usuario.id)).toEqual(antes);
@@ -261,18 +266,18 @@ describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', 
   it('sem cookie, com lixo, com sessão encerrada ou com token do nível 1: nada grava', async () => {
     const antes = await linhas(ana.s.usuario.id);
     como(undefined);
-    await acaoAjudaFechar(form({ caixa: 'insumos@1' }));
+    await acaoAjudaFechar(form({ caixa: CX }));
     await acaoAjudaDicas(form({ dicas: 'desligar' }));
     await acaoAjudaReabrir();
     como('nao-e-um-token');
-    await acaoAjudaFechar(form({ caixa: 'insumos@1' }));
+    await acaoAjudaFechar(form({ caixa: CX }));
     // O Rodolfo no /rodolfo tem JWT do next-auth, não o cookie ff_erp: a action não acha sessão.
     como('eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJyb2RvbGZvIn0.assinatura');
-    await acaoAjudaFechar(form({ caixa: 'insumos@1', usuarioId: ana.s.usuario.id }));
+    await acaoAjudaFechar(form({ caixa: CX, usuarioId: ana.s.usuario.id }));
     const morta = await entrar('ana');
     await encerrarSessao(morta.token, o());
     como(morta.token);
-    await acaoAjudaFechar(form({ caixa: 'insumos@1' }));
+    await acaoAjudaFechar(form({ caixa: CX }));
     expect((await gravarPreferenciaDeAjuda(morta.token, { tipo: 'reabrir' }, o())).ok).toBe(false);
     expect(await linhas(ana.s.usuario.id)).toEqual(antes);
   });

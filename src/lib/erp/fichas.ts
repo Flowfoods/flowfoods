@@ -50,6 +50,7 @@ import { cascataDeCusto, conferirGrafo, grafoDasArestas, type FichaDaCascata } f
 import { custosEmCascata, lerCascata, SELECAO_DO_INSUMO, SELECAO_DO_ITEM, type FichaLida } from './ficha-custos';
 import { anexarUltimasCompras, type ComUltimaCompra } from './compras-custo';
 import { motivoDaUnidadeTravada } from './insumos';
+import { garantirCategoriasPadrao, sugestaoParaInsumo } from './categorias';
 import { prepararFoto, type FotoPronta } from './foto';
 import { apagarFoto, assumirFotoPendente, devolverFotoPendente, faxinarPendentesDeVezEmQuando, salvarFoto } from './arquivos';
 import { cabeNaExibicao, UNIDADES, type CustoExato, type Fracao, type Unidade } from './unidades';
@@ -391,6 +392,13 @@ async function sincronizarInsumoProduzido(
     await historico(mesmoNome.id, 'ALTEROU', { nome: f.nome, fichaQueProduz: null }, { nome: f.nome, fichaQueProduz: f.nome });
     insumoId = mesmoNome.id;
   } else {
+    // I.1a: o pré-preparo nasce com a categoria que o nome sugere. Na dúvida ele vai para "Outros / a classificar" com o
+    // motivo (a fila de revisão o pega): a ficha nunca trava por causa disso.
+    let sugestao = await sugestaoParaInsumo(tx, f.nome, 'PRE_PREPARO');
+    if (!sugestao.categoriaId) {
+      await garantirCategoriasPadrao(tx, autorNome);
+      sugestao = await sugestaoParaInsumo(tx, f.nome, 'PRE_PREPARO');
+    }
     const novo = await tx.insumo.create({
       data: {
         parceiroId: tx.parceiroId,
@@ -401,12 +409,16 @@ async function sincronizarInsumoProduzido(
         precoEmbalagemCentavos: 0,
         ativo: f.ativa,
         ...conservacaoDe('SECO'),
+        ...(sugestao.categoriaId
+          ? { categoriaId: sugestao.categoriaId, classificadoPor: 'SUGESTAO', classificacaoMotivo: sugestao.chave === 'OUTROS' ? sugestao.motivo : null, classificadoEm: new Date() }
+          : {}),
       },
       select: { id: true },
     });
     await historico(novo.id, 'CRIOU', undefined, {
       nome: f.nome,
       tipo: 'PRE_PREPARO',
+      ...(sugestao.categoriaId ? { categoria: sugestao.nome, categoriaId: sugestao.categoriaId, classificadoPor: 'SUGESTAO' } : {}),
       unidade: f.unidadeRendimento,
       fichaQueProduz: f.nome,
       ...(f.validades ? { conservacao: f.validades.principal, validade: retratoDaValidade(f.validades) } : {}),

@@ -35,7 +35,8 @@ import {
   type SessaoValida,
 } from '@/lib/erp/credenciais';
 import { contextoDaSessao } from '@/lib/erp/contexto-base';
-import { cadastrarInsumo, listarInsumos } from '@/lib/erp/insumos';
+import { listarInsumos } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { criarParceiro, mudarStatusParceiro } from '@/lib/erp/parceiros';
 import { configDoRosto } from '@/lib/erp/rosto';
 import { doParceiro, ErroDeTenant } from '@/lib/erp/tenant';

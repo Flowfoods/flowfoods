@@ -10,10 +10,16 @@
  * com histórico. "Casa Gama" nasce e é suspensa, para ver o modo leitura.
  * A Casa Alfa (1.1) tem insumo com frete, embalagem em g, outras embalagens
  * de compra, um "Sem preço" e um desativado.
+ *
+ * I.1a: as dez categorias padrão nascem antes dos insumos e cada insumo entra com a categoria que o nome sugere (a categoria
+ * é obrigatória no cadastro). Se o client do Prisma estiver desatualizado (esquema novo sem `npx prisma generate`), o seed para
+ * antes de começar dizendo isso, em vez de quebrar no meio.
  */
 
+import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/db';
-import { doParceiro } from '@/lib/erp/tenant';
+import { doParceiro, MODELOS_DE_TENANT } from '@/lib/erp/tenant';
+import { garantirCategoriasPadrao, sugestaoParaInsumo } from '@/lib/erp/categorias';
 import { cadastrarInsumo, mudarSituacaoInsumo } from '@/lib/erp/insumos';
 import { cadastrarVariante } from '@/lib/erp/variantes';
 import { cadastrarLoja, cadastrarMarca } from '@/lib/erp/estrutura';
@@ -85,7 +91,17 @@ function linha(nome: string, r: { ok: true } | { ok: false; erros: Record<string
   console.log(`  ${nome}: ${r.ok ? 'criado' : Object.values(r.erros).join(', ')}`);
 }
 
+/** O client gerado conhece todos os modelos de tenant? Senão o portão estoura com um erro que não diz o motivo. */
+function conferirClientGerado() {
+  const conhecidos = new Set(Prisma.dmmf.datamodel.models.map((m) => m.name));
+  const faltam = MODELOS_DE_TENANT.filter((m) => !conhecidos.has(m[0].toUpperCase() + m.slice(1)));
+  if (faltam.length > 0) {
+    throw new Error(`O client do Prisma está desatualizado (falta: ${faltam.join(', ')}). Rode "npx prisma generate" (e "npx prisma migrate deploy" no banco local) e tente de novo.`);
+  }
+}
+
 async function main() {
+  conferirClientGerado();
   const host = new URL(process.env.DATABASE_URL ?? 'postgresql://x').hostname;
   if (!['localhost', '127.0.0.1'].includes(host) || process.env.NODE_ENV === 'production') {
     throw new Error(`Seed de teste só roda em banco local (host atual: ${host}).`);
@@ -107,7 +123,11 @@ async function main() {
     const cliente = doParceiro(parceiro.id);
     for (const nome of p.lojas) linha(`loja ${nome}`, await cadastrarLoja(cliente, { nome }, AUTOR));
     for (const nome of p.marcas) linha(`marca ${nome}`, await cadastrarMarca(cliente, { nome }, AUTOR));
-    for (const i of p.itens) linha(i.nome, await cadastrarInsumo(cliente, i, AUTOR));
+    await garantirCategoriasPadrao(cliente, AUTOR);
+    for (const i of p.itens) {
+      const sugestao = await sugestaoParaInsumo(cliente, i.nome, i.tipo);
+      linha(i.nome, await cadastrarInsumo(cliente, { ...i, categoriaId: sugestao.categoriaId ?? '' }, AUTOR));
+    }
     for (const [nomeDoInsumo, lista] of Object.entries(p.embalagens ?? {})) {
       const insumo = await cliente.insumo.findFirst({ where: { nome: nomeDoInsumo }, select: { id: true } });
       for (const e of insumo ? lista : []) {

@@ -27,7 +27,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
-import { cadastrarInsumo, editarInsumo, obterInsumo } from '@/lib/erp/insumos';
+import { editarInsumo, obterInsumo } from '@/lib/erp/insumos';
+import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { cadastrarFicha, editarFicha, obterFicha } from '@/lib/erp/fichas';
 import { hojeNoRio } from '@/lib/erp/compra-campos';

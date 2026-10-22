@@ -182,7 +182,7 @@ describe('ERP 1.4 · formulário da ficha e do insumo com validade', () => {
   });
 
   it('insumo: formulário antigo (só a conservação) continua valendo; com validade, grava os minutos', () => {
-    const antigo = { nome: 'Cebola', unidade: 'KG', conservacao: 'REFRIGERADO', conteudo: '5', preco: '10' };
+    const antigo = { nome: 'Cebola', unidade: 'KG', categoriaId: 'cat1', conservacao: 'REFRIGERADO', conteudo: '5', preco: '10' };
     const r = lerFormInsumo(antigo);
     expect(r.ok && r.dados.validades).toEqual({ principal: 'REFRIGERADO', minutos: {} });
     const comValidade = lerFormInsumo({ ...antigo, aceita_REFRIGERADO: 'on', validade_REFRIGERADO: '5', validadeEm_REFRIGERADO: 'dias' });

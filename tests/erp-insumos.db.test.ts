@@ -49,6 +49,7 @@ import {
   obterInsumo,
 } from '@/lib/erp/insumos';
 import { cadastrarVariante, editarVariante, mudarSituacaoVariante } from '@/lib/erp/variantes';
+import { garantirCategoriasPadrao } from '@/lib/erp/categorias';
 import { ALCANCE_FLOWFOODS, resolverAlcance } from '@/lib/erp/permissoes';
 import * as daSessao from '@/app/erp/insumos/actions';
 import * as doNivel1 from '@/app/rodolfo/(painel)/erp/[slug]/insumos/actions';
@@ -98,7 +99,14 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
       throw e;
     }
   }
-  const cebola = { nome: 'Cebola', tipo: 'INGREDIENTE', unidade: 'KG', conservacao: 'SECO', conteudo: '5', escala: 'base', preco: '89,90', frete: '5,00' };
+  // I.1a: a categoria é obrigatória; `categoriaId` (Hortifruti do parceiro A) entra no beforeAll, depois de as categorias existirem.
+  const cebola: Record<string, string> = { nome: 'Cebola', tipo: 'INGREDIENTE', unidade: 'KG', categoriaId: '', conservacao: 'SECO', conteudo: '5', escala: 'base', preco: '89,90', frete: '5,00' };
+  let catB = '';
+  let catS = '';
+  const catDe = async (c: ClienteDoParceiro) => {
+    await garantirCategoriasPadrao(c, 'Teste');
+    return (await c.categoriaInsumo.findFirstOrThrow({ where: { chave: 'HORTIFRUTI' } })).id;
+  };
 
   beforeAll(async () => {
     const host = new URL(URL_TESTE!).hostname;
@@ -110,6 +118,9 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     S = await db.parceiroFlow.create({ data: { nome: 'Ins S', slug: `ins-s-${sufixo}`, status: 'ATIVO' } });
     a = doParceiro(A.id, db);
     b = doParceiro(B.id, db);
+    cebola.categoriaId = await catDe(a);
+    catB = await catDe(b);
+    catS = await catDe(doParceiro(S.id, db));
   });
 
   afterAll(async () => {
@@ -277,7 +288,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
     expect(await buscarInsumos(b, 'ceb')).toEqual([]);
     expect((await buscarInsumos(a, 'ceb')).map((x) => x.nome)).toEqual(['Cebola']);
     // O mesmo nome no B é outro insumo.
-    expect((await cadastrarInsumo(b, cebola)).ok).toBe(true);
+    expect((await cadastrarInsumo(b, { ...cebola, categoriaId: catB })).ok).toBe(true);
     expect(await a.insumo.count({ where: { nome: 'Cebola' } })).toBe(1);
   });
 
@@ -327,7 +338,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.1 · cadastro de insumos (Postgres real)', { 
   });
 
   it('parceiro suspenso: só leitura (action recusa com o motivo; o portão recusa mesmo sem ela)', async () => {
-    const r = await cadastrarInsumo(doParceiro(S.id, db), { ...cebola, nome: 'Antes de suspender' });
+    const r = await cadastrarInsumo(doParceiro(S.id, db), { ...cebola, nome: 'Antes de suspender', categoriaId: catS });
     if (!r.ok) throw new Error('setup');
     await db.parceiroFlow.update({ where: { id: S.id }, data: { status: 'SUSPENSO' } });
     const motivo = 'Parceiro suspenso: insumos, fichas técnicas, lojas e marcas ficam bloqueados até reativar.';
