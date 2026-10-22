@@ -20,8 +20,8 @@
     "hash": "547d8cf5c44a5cf6"
   },
   "insumo-categorias": {
-    "versao": 1,
-    "hash": "1c56171b1a05a195"
+    "versao": 2,
+    "hash": "3fd4e67929b6dba1"
   },
   "insumo-classificar": {
     "versao": 1,
@@ -168,8 +168,8 @@
     "hash": "7660796e763878cb"
   },
   "periodo": {
-    "versao": 4,
-    "hash": "423f6a056b74a57f"
+    "versao": 5,
+    "hash": "4d08114d19bc6821"
   },
   "requisicoes": {
     "versao": 2,
@@ -224,8 +224,8 @@
     "hash": "9d803e531e0e9c5c"
   },
   "dre": {
-    "versao": 6,
-    "hash": "edb054da0acc2058"
+    "versao": 7,
+    "hash": "7e9340dce9b98841"
   },
   "dre-despesas": {
     "versao": 1,
@@ -244,11 +244,19 @@
     "hash": "dad1fd99acf3f852"
   },
   "dre-plano": {
-    "versao": 4,
-    "hash": "daa237a907ffe01a"
+    "versao": 5,
+    "hash": "953c405e5732d320"
+  },
+  "dre-cmv-categorias": {
+    "versao": 1,
+    "hash": "ce2b90237c858cb0"
+  },
+  "dre-metas-categorias": {
+    "versao": 1,
+    "hash": "ac45f4befa3c719d"
   },
   "dre-periodo": {
-    "versao": 3,
-    "hash": "335efa23341f21b8"
+    "versao": 4,
+    "hash": "5974c7e84ebe10d8"
   }
 }

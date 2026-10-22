@@ -447,6 +447,13 @@ export async function excluirCategoria(cliente: ClienteDoParceiro, id: string, a
       const atual = lidas[0];
       if (!atual) throw recusa({ geral: 'Categoria não encontrada.' }, { naoEncontrado: true });
       if (atual.sistema) throw recusa({ geral: FRASE_DO_SISTEMA });
+      // I.2a: a categoria com meta por categoria (de qualquer vigência) ou no estoque guardado de um fechamento não se exclui; a FK do banco é a última palavra.
+      const nMetas = await tx.metaCmvCategoria.count({ where: { categoriaId: id } });
+      if (nMetas > 0) {
+        throw recusa({ geral: `“${atual.nome}” tem meta nas metas por categoria: não dá para excluir. Tire a meta de Metas por categoria e, se ela já valeu em períodos passados, desative a categoria (o que já aconteceu não se apaga).` });
+      }
+      const nRetratos = await tx.contagemRetratoItem.count({ where: { categoriaIdNaHora: id } });
+      if (nRetratos > 0) throw recusa({ geral: `“${atual.nome}” está no estoque guardado de uma abertura ou de um fechamento: não dá para excluir. Desative a categoria.` });
       const uso = await usosDaCategoria(tx, id);
       if (uso.nInsumos > 0) {
         throw recusa({
@@ -456,6 +463,8 @@ export async function excluirCategoria(cliente: ClienteDoParceiro, id: string, a
       if (uso.nHistorico > 0) {
         throw recusa({ geral: `“${atual.nome}” já foi usada por insumos e isso está no histórico: não dá para excluir. Desative a categoria.` });
       }
+      // O uso por loja é só configuração ("esta loja não usa"): sai junto com a categoria.
+      await tx.categoriaNaLoja.deleteMany({ where: { categoriaId: id } });
       await tx.categoriaInsumo.deleteMany({ where: { id } });
       await tx.historicoAlteracao.create({
         data: { parceiroId: tx.parceiroId, entidade: 'CategoriaInsumo', entidadeId: id, acao: 'EXCLUIU', antes: { nome: atual.nome, ativo: true }, autorNome },
@@ -467,6 +476,9 @@ export async function excluirCategoria(cliente: ClienteDoParceiro, id: string, a
     const b = erroDoBanco(e);
     if (b) return b.resultado;
     // A FK (Restrict) é a última palavra: um insumo entrou nela no meio do caminho.
+    if (/MetaCmvCategoria_parceiroId_categoriaId_fkey/i.test(e instanceof Error ? e.message : '')) {
+      return { ok: false, erros: { geral: 'A categoria passou a ter meta agora há pouco: não dá para excluir. Desative-a.' } };
+    }
     if (/foreign key|Insumo_parceiroId_categoriaId_fkey/i.test(e instanceof Error ? e.message : '')) {
       return { ok: false, erros: { geral: 'A categoria passou a ter insumos agora há pouco: não dá para excluir. Desative-a.' } };
     }

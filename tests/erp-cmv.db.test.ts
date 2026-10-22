@@ -351,9 +351,9 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · os dois CMVs (Postgres real)', { timeout
     expect(r).toEqual({ ok: true, versao: 1, jaFechado: false, ressalvas: 0 });
 
     const foto = await a.dreFotografia.findFirst({ where: { periodoId: ids.out, substituidaEm: null }, select: { id: true, versaoDaConta: true, entrada: true } });
-    expect(foto!.versaoDaConta).toBe(3); // 2.4: o fechamento grava a versão 3 (a v2 trazia o CMV; a v3, o ano passado e as faixas)
+    expect(foto!.versaoDaConta).toBe(4); // I.2a: o fechamento grava a versão 4 (a v2 trazia o CMV; a v3, o ano passado e as faixas; a v4, o CMV por categoria)
     const entrada = foto!.entrada as { versaoDaConta: number; cmv: { lojas: Record<string, { compraCentavos: number | null; real: { finalCentavos: number; inicialCentavos: number; comprasReaisCentavos: number } | null; motivoSemReal: string | null }> } };
-    expect(entrada.versaoDaConta).toBe(3);
+    expect(entrada.versaoDaConta).toBe(4);
     expect(entrada.cmv.lojas[ids.vp].real!.finalCentavos).toBe(1_355_000);
     expect(entrada.cmv.lojas[ids.vp].real!.inicialCentavos).toBe(1_170_000);
     expect(entrada.cmv.lojas[ids.dl]).toMatchObject({ compraCentavos: R(4_000), real: null, motivoSemReal: 'estoque não aberto' });

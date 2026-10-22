@@ -29,6 +29,7 @@ import type { ClienteDoParceiro } from './tenant';
 import { ehErroDeUnicidade } from './tenant';
 import { alcancaLoja, recusa, type Alcance } from './permissoes';
 import { hojeNoRio } from './compra-campos';
+import { gravarRetrato, somaDoRetrato, type ItemDoRetrato } from './retrato-estoque';
 import { listarHistorico } from './historico';
 import {
   aberturasDe,
@@ -665,21 +666,25 @@ async function aplicar(
   let valorTotal = valoresContados.reduce((s, v) => s + Math.max(0, v.valor ?? 0), 0);
   // 2.3: quantos insumos com saldo ficaram sem preço no retrato do fechamento (o CMV real avisa); só o fechamento registra.
   let itensSemPreco: number | undefined;
+  // I.2a: o retrato do estoque por insumo, gravado na mesma transação que fecha o fechamento (soma = valorTotal, ao centavo).
+  let retrato: ItemDoRetrato[] | null = null;
   if (c.tipo === 'FECHAMENTO') {
     const saldos = await tx.saldoEstoque.findMany({ where: { lojaId: loja.id, quantidadeMilesimos: { gt: 0 } }, select: { insumoId: true, quantidadeMilesimos: true } });
     const todos = await custosDeReferencia(
       tx,
       saldos.map((s) => s.insumoId),
     );
-    valorTotal = saldos.reduce((s, x) => s + (valorDaQuantidade(todos.get(x.insumoId)?.porUnidade ?? null, x.quantidadeMilesimos) ?? 0), 0);
+    retrato = saldos.map((x) => ({ insumoId: x.insumoId, quantidadeMilesimos: x.quantidadeMilesimos, valorCentavos: valorDaQuantidade(todos.get(x.insumoId)?.porUnidade ?? null, x.quantidadeMilesimos) }));
+    valorTotal = somaDoRetrato(retrato);
     itensSemPreco = saldos.filter((x) => (todos.get(x.insumoId)?.porUnidade ?? null) === null).length;
   }
   const estouro = totalAcimaDoLimite(valorTotal);
   if (estouro) throw new Recusa({ ok: false, erros: { geral: estouro } });
   const naoContados = itens.length - contados.length;
+  const nRetrato = retrato ? await gravarRetrato(tx, c.id, retrato, valorTotal) : 0;
   await tx.contagem.updateMany({
     where: { id: c.id, status: 'ABERTA' },
-    data: { status: 'FECHADA', desfecho, fechadaEm: agora, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: naoContados, ...(itensSemPreco === undefined ? {} : { itensSemPreco }) },
+    data: { status: 'FECHADA', desfecho, fechadaEm: agora, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: naoContados, ...(itensSemPreco === undefined ? {} : { itensSemPreco }), ...(retrato ? { retratoGravadoEm: agora } : {}) },
   });
   const sobra = movimentos.filter((m) => m.valorCentavos > 0).reduce((s, m) => s + m.valorCentavos, 0);
   const falta = movimentos.filter((m) => m.valorCentavos < 0).reduce((s, m) => s - m.valorCentavos, 0);
@@ -699,7 +704,7 @@ async function aplicar(
         ...(falta ? { faltou: formatarDinheiro(falta) } : {}),
         ...(naoContados ? { naoAjustados: naoContados } : {}),
         ...(velhos.size ? { recontadosDepois: velhos.size } : {}),
-        ...(c.tipo === 'FECHAMENTO' ? { estoqueFinal: formatarDinheiro(valorTotal) } : {}),
+        ...(c.tipo === 'FECHAMENTO' ? { estoqueFinal: formatarDinheiro(valorTotal), retratoPorInsumo: `${nRetrato} ${nRetrato === 1 ? 'insumo' : 'insumos'}` } : {}),
       },
       motivo: naoContados ? `${naoContados} sem contar ficaram como estavam (sem ajuste).` : null,
       autorNome,

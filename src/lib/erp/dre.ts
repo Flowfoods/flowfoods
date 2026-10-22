@@ -71,6 +71,9 @@ export interface CmvDoPeriodo {
 /** O que a tela diz de um período fechado: a fotografia que ela lê (nada mais). */
 export interface FechamentoDoPeriodo {
   versao: number;
+  /** A fotografia que a tela lê e a versão da conta dela (I.2a: o CMV por categoria só existe a partir da 4). */
+  fotografiaId: string;
+  versaoDaConta: number;
   fechadoEm: Date;
   fechadoPorNome: string;
   /** As ressalvas que a pessoa pode ver (o gerente de uma loja, só as da loja dele). */
@@ -162,157 +165,166 @@ async function anoPassadoDe(tx: ClienteDoParceiro, alcance: Alcance, periodo: Pe
 export async function dreDoPeriodo(cliente: ClienteDoParceiro, alcance: Alcance, pedido: PedidoDoEscopo, data: string, hoje = hojeNoRio()): Promise<DreDoPeriodo | null> {
   if (recusaDoDre(alcance, pedido)) return null;
   if (pedido.tipo === 'loja' && !alcancaLoja(alcance, pedido.lojaId)) return null;
-  return cliente.transacao(async (tx) => {
-    const todas = await lojasDoFaturamento(tx, alcance);
-    const lojaPedida = pedido.tipo === 'loja' ? todas.find((l) => l.id === pedido.lojaId) : undefined;
-    if (pedido.tipo === 'loja' && !lojaPedida) return null;
+  return cliente.transacao((tx) => dreDoPeriodoNaTx(tx, alcance, pedido, data, hoje));
+}
 
-    const periodo = await periodoDe(tx, data > hoje ? hoje : data);
-    const ontem = somarDias(hoje, -1);
-    const emCurso = periodo.inicio <= hoje && hoje <= periodo.fim;
-    const encerrado = periodo.fim < hoje;
-    const ate = encerrado ? periodo.fim : ontem >= periodo.inicio ? (ontem < periodo.fim ? ontem : periodo.fim) : null;
-    const escopo: Escopo = pedido.tipo === 'rede' ? { tipo: 'rede' } : { tipo: 'loja', lojaId: pedido.lojaId, nome: lojaPedida!.nome };
-    const lojasDoEscopo = pedido.tipo === 'rede' ? todas : [lojaPedida!];
-    const lojaId = pedido.tipo === 'loja' ? pedido.lojaId : undefined;
-    const daLoja = pedido.tipo === 'loja';
-    const anterior = periodo.inicio > PRIMEIRO_DIA_DO_ERP ? await periodoDe(tx, somarDias(periodo.inicio, -1)) : null;
-    const proximo = encerrado ? await periodoDe(tx, somarDias(periodo.fim, 1)) : null;
-    const registro = await tx.periodoApuracao.findFirst({ where: { inicio: new Date(`${periodo.inicio}T00:00:00.000Z`), fim: new Date(`${periodo.fim}T00:00:00.000Z`) }, select: { id: true, status: true } });
-    const diasDoPeriodo = diasEntre(periodo.inicio, periodo.fim) + 1;
+/**
+ * O mesmo DRE dentro de uma transação que a pessoa que chama já abriu (I.2a): o painel de CMV por categoria lê o DRE e as compras
+ * por categoria no MESMO instante, para a soma das categorias bater com a linha do CMV ao centavo. Mesmas recusas.
+ */
+export async function dreDoPeriodoNaTx(tx: ClienteDoParceiro, alcance: Alcance, pedido: PedidoDoEscopo, data: string, hoje = hojeNoRio()): Promise<DreDoPeriodo | null> {
+  if (recusaDoDre(alcance, pedido)) return null;
+  if (pedido.tipo === 'loja' && !alcancaLoja(alcance, pedido.lojaId)) return null;
+  const todas = await lojasDoFaturamento(tx, alcance);
+  const lojaPedida = pedido.tipo === 'loja' ? todas.find((l) => l.id === pedido.lojaId) : undefined;
+  if (pedido.tipo === 'loja' && !lojaPedida) return null;
 
-    // ---- fechado: só a fotografia
-    if (registro?.status === 'FECHADO') {
-      const foto = await lerFotografiaVigente(tx, alcance, registro.id);
-      if (foto) {
-        const doEscopo = foto.linhas.filter((l) => l.lojaId === (pedido.tipo === 'loja' ? pedido.lojaId : null));
-        if (doEscopo.length === 0) return null;
-        const antigo = foto.versaoDaConta < 2;
-        const farolAntigo = foto.versaoDaConta < 3;
-        const lida = dreDaFotografia(doEscopo, escopo);
-        // Fotografia de antes do CMV guardou "Em breve": hoje a tela diz a verdade, sem inventar número.
-        const resultado = antigo ? { ...lida, linhas: lida.linhas.map((l) => (l.tipo === 'cmv' ? { ...l, nota: FRASE_DO_CMV_ANTIGO } : l)) } : lida;
-        // A visão de UMA loja recebe só aquela loja (o alcance pode ter outras): o painel do fechado é igual ao do ao vivo.
-        const cmvFoto = antigo ? null : await lerCmvDaFotografia(tx, pedido.tipo === 'loja' ? { lojas: [pedido.lojaId] } : alcance, foto.id);
-        const receitaFoto = (id: string) => Number(foto.linhas.find((l) => l.lojaId === id && l.chave === codigoDoSubtotal('RECEITA'))?.valorCentavos ?? 0);
-        let porLoja: ResumoDaLoja[] | null = null;
-        if (pedido.tipo === 'rede') {
-          const ids = Array.from(new Set(foto.linhas.filter((l) => l.lojaId !== null).map((l) => l.lojaId!)));
-          porLoja = ids.map((id) => {
-            const linhas = foto.linhas.filter((l) => l.lojaId === id);
-            const loja = todas.find((x) => x.id === id) ?? { id, nome: linhas[0].lojaNome ?? '', ativa: true, canais: [] };
-            // O nome é o da época da fotografia.
-            return resumoDaLoja({ ...loja, nome: linhas[0].lojaNome ?? loja.nome }, dreDaFotografia(linhas, { tipo: 'loja', lojaId: id, nome: linhas[0].lojaNome ?? '' }), 0);
-          });
-        }
-        // Fotografia v3 (2.4): o ano passado, a cobertura por loja, os pedidos e a versão das faixas saem SÓ dela (editar o faturamento de um
-        // período antigo depois não muda o fechado). As lojas que a pessoa alcança; na visão de UMA loja, só aquela.
-        const lojasLidas = pedido.tipo === 'loja' ? { lojas: [pedido.lojaId] } : alcance;
-        const canaisFoto = farolAntigo ? null : await lerCanaisDaFotografia(tx, lojasLidas, foto.id);
-        const guardado = canaisFoto ? lerAnoPassadoGuardado(canaisFoto.anoPassado, lojasLidas.lojas) : null;
-        const anoPassado = guardado
-          ? compararComOAnoPassadoPorLoja({ de: periodo.inicio, ate: periodo.fim, atual: resultado.porCanal, lojas: guardado, faltasNoPeriodoAtual: 0 })
-          : await anoPassadoDe(tx, alcance, periodo, periodo.fim, resultado, 0, lojasDoEscopo, lojaId); // v1 e v2: o painel de 2.2b segue lendo ao vivo (herança), mas SEM farol
-        // A versão das faixas é a que a fotografia gravou (v1 e v2: a 1, a única que existia); versão que não conhecemos não vira cor.
-        const versaoDasFaixas = farolAntigo ? 1 : canaisFoto?.versaoDasFaixas ?? VERSAO_DAS_FAIXAS;
-        const faixas = faixasDaVersao(versaoDasFaixas);
-        const metas = compararLinhas(resultado.linhas, metasDasLinhas(doEscopo), resultado.receitaBrutaCentavos, daLoja, farolAntigo ? null : anoPassado, faixas ?? FAIXAS_DO_FAROL);
-        const doEscopoDasRessalvas = foto.ressalvas.filter((r) => pedido.tipo === 'rede' || r.lojaId === pedido.lojaId);
-        const recorrentes: RecorrenteSemMes[] = doEscopoDasRessalvas.filter((r) => r.tipo === 'RECORRENTE').map((r) => ({ grupo: r.grupo ?? null, linhaId: r.linhaId ?? null }));
-        // Loja que fechou sem nenhum lançamento de faturamento (ressalva confirmada): a receita do escopo que a contém é incompleta, e não tem cor.
-        const lojasSemLancamento = doEscopoDasRessalvas.filter((r) => r.tipo === 'LOJA_SEM_LANCAMENTO').length;
-        const farol = farolDoDre({ linhas: resultado.linhas, metas, faltasDeFaturamento: lojasSemLancamento, recorrentes, receitaNaoApurada: farolAntigo, versaoDasFaixas, faixasDesconhecidas: faixas === null });
-        return {
-          periodo,
-          hoje,
-          ate: periodo.fim,
-          emCurso: false,
-          encerrado: true,
-          diasDoPeriodo,
-          diaDeHoje: null,
-          diasApurados: diasDoPeriodo,
-          status: 'FECHADO',
-          escopo,
-          resultado,
-          porLoja,
-          faltas: { total: 0 },
-          faltaLancar: [],
-          taxaConfigurada: foto.taxa !== null,
-          anterior,
-          proximo,
-          lojasDoEscopo,
-          metas,
-          anoPassado,
-          cmv: { antigo, painel: cmvFoto ? painelDoCmv(cmvFoto, receitaFoto) : null },
-          fechamento: { versao: foto.versao, fechadoEm: foto.criadoEm, fechadoPorNome: foto.fechadoPorNome, ressalvas: foto.ressalvas, totalDeRessalvas: foto.totalDeRessalvas, justificativa: foto.justificativa },
-          farol,
-          // No fechado só entra o canal com receita (ou ano passado): a configuração de hoje não reescreve o passado.
-          canais: canaisDoPeriodo({ porCanal: resultado.porCanal, receitaBrutaCentavos: resultado.receitaBrutaCentavos, pedidos: pedidosPorCanal(canaisFoto?.receitas ?? []), anoPassado: farolAntigo ? null : anoPassado, metas, farol, vendidos: [] }),
-          farolAntigo,
-        } satisfies DreDoPeriodo;
+  const periodo = await periodoDe(tx, data > hoje ? hoje : data);
+  const ontem = somarDias(hoje, -1);
+  const emCurso = periodo.inicio <= hoje && hoje <= periodo.fim;
+  const encerrado = periodo.fim < hoje;
+  const ate = encerrado ? periodo.fim : ontem >= periodo.inicio ? (ontem < periodo.fim ? ontem : periodo.fim) : null;
+  const escopo: Escopo = pedido.tipo === 'rede' ? { tipo: 'rede' } : { tipo: 'loja', lojaId: pedido.lojaId, nome: lojaPedida!.nome };
+  const lojasDoEscopo = pedido.tipo === 'rede' ? todas : [lojaPedida!];
+  const lojaId = pedido.tipo === 'loja' ? pedido.lojaId : undefined;
+  const daLoja = pedido.tipo === 'loja';
+  const anterior = periodo.inicio > PRIMEIRO_DIA_DO_ERP ? await periodoDe(tx, somarDias(periodo.inicio, -1)) : null;
+  const proximo = encerrado ? await periodoDe(tx, somarDias(periodo.fim, 1)) : null;
+  const registro = await tx.periodoApuracao.findFirst({ where: { inicio: new Date(`${periodo.inicio}T00:00:00.000Z`), fim: new Date(`${periodo.fim}T00:00:00.000Z`) }, select: { id: true, status: true } });
+  const diasDoPeriodo = diasEntre(periodo.inicio, periodo.fim) + 1;
+
+  // ---- fechado: só a fotografia
+  if (registro?.status === 'FECHADO') {
+    const foto = await lerFotografiaVigente(tx, alcance, registro.id);
+    if (foto) {
+      const doEscopo = foto.linhas.filter((l) => l.lojaId === (pedido.tipo === 'loja' ? pedido.lojaId : null));
+      if (doEscopo.length === 0) return null;
+      const antigo = foto.versaoDaConta < 2;
+      const farolAntigo = foto.versaoDaConta < 3;
+      const lida = dreDaFotografia(doEscopo, escopo);
+      // Fotografia de antes do CMV guardou "Em breve": hoje a tela diz a verdade, sem inventar número.
+      const resultado = antigo ? { ...lida, linhas: lida.linhas.map((l) => (l.tipo === 'cmv' ? { ...l, nota: FRASE_DO_CMV_ANTIGO } : l)) } : lida;
+      // A visão de UMA loja recebe só aquela loja (o alcance pode ter outras): o painel do fechado é igual ao do ao vivo.
+      const cmvFoto = antigo ? null : await lerCmvDaFotografia(tx, pedido.tipo === 'loja' ? { lojas: [pedido.lojaId] } : alcance, foto.id);
+      const receitaFoto = (id: string) => Number(foto.linhas.find((l) => l.lojaId === id && l.chave === codigoDoSubtotal('RECEITA'))?.valorCentavos ?? 0);
+      let porLoja: ResumoDaLoja[] | null = null;
+      if (pedido.tipo === 'rede') {
+        const ids = Array.from(new Set(foto.linhas.filter((l) => l.lojaId !== null).map((l) => l.lojaId!)));
+        porLoja = ids.map((id) => {
+          const linhas = foto.linhas.filter((l) => l.lojaId === id);
+          const loja = todas.find((x) => x.id === id) ?? { id, nome: linhas[0].lojaNome ?? '', ativa: true, canais: [] };
+          // O nome é o da época da fotografia.
+          return resumoDaLoja({ ...loja, nome: linhas[0].lojaNome ?? loja.nome }, dreDaFotografia(linhas, { tipo: 'loja', lojaId: id, nome: linhas[0].lojaNome ?? '' }), 0);
+        });
       }
-    }
-
-    // ---- ao vivo
-    const leitura = await entradaDoDre(tx, alcance, periodo, ate, { hoje, lojaId });
-    const metas = await metasDoPeriodo(tx, leitura.plano, periodo.inicio);
-    const entrada = (e: Escopo) => ({ escopo: e, plano: leitura.plano, receitas: leitura.receitas, taxaIfood: leitura.taxaIfood, despesas: leitura.despesas, cmv: leitura.cmv });
-    const resultado = montarDre(entrada(escopo));
-
-    let porLoja: ResumoDaLoja[] | null = null;
-    if (pedido.tipo === 'rede') {
-      const faltasDe = new Map(leitura.faltas.porLoja.map((f) => [f.loja.id, f.faltas]));
-      porLoja = lojasDoEscopo
-        .map((loja) => resumoDaLoja(loja, montarDre(entrada({ tipo: 'loja', lojaId: loja.id, nome: loja.nome })), faltasDe.get(loja.id) ?? 0))
-        // Loja desativada sem nada no período não é linha: só pesa quem vendeu ou lançou.
-        .filter((l) => l.loja.ativa || l.receitaBrutaCentavos !== 0 || l.resultadoCentavos !== 0);
-    }
-
-    const anoPassado = ate ? await anoPassadoDe(tx, alcance, periodo, ate, resultado, leitura.faltas.total, lojasDoEscopo, lojaId) : null;
-    const metasComparadas = compararLinhas(resultado.linhas, metas, resultado.receitaBrutaCentavos, daLoja, anoPassado);
-    // A loja só cobra o que é dela; a rede, tudo (inclusive a despesa sem loja).
-    const faltaLancarDoEscopo = pedido.tipo === 'rede' ? leitura.faltaLancar : leitura.faltaLancar.filter((f) => f.lojaId === pedido.lojaId);
-    const farol = farolDoDre({
-      linhas: resultado.linhas,
-      metas: metasComparadas,
-      faltasDeFaturamento: leitura.faltas.total,
-      recorrentes: faltaLancarDoEscopo.map((f) => ({ grupo: f.grupo, linhaId: f.linhaId })),
-      receitaNaoApurada: false,
-    });
-    return {
-      periodo,
-      hoje,
-      ate,
-      emCurso,
-      encerrado,
-      diasDoPeriodo,
-      diaDeHoje: emCurso ? diasEntre(periodo.inicio, hoje) + 1 : null,
-      diasApurados: ate ? diasEntre(periodo.inicio, ate) + 1 : 0,
-      status: registro?.status ?? null,
-      escopo,
-      resultado,
-      porLoja,
-      faltas: { total: leitura.faltas.total },
-      faltaLancar: faltaLancarDoEscopo,
-      taxaConfigurada: leitura.taxaIfood !== null,
-      anterior,
-      proximo,
-      lojasDoEscopo,
-      metas: metasComparadas,
-      anoPassado,
-      fechamento: null,
-      cmv: { antigo: false, painel: encerrado ? painelDoCmv(leitura.cmv, (id) => leitura.receitas.filter((r) => r.lojaId === id).reduce((t, r) => t + r.valorCentavos, 0)) : null },
-      farol,
-      canais: canaisDoPeriodo({
-        porCanal: resultado.porCanal,
-        receitaBrutaCentavos: resultado.receitaBrutaCentavos,
-        pedidos: pedidosPorCanal(leitura.receitas.filter((r) => pedido.tipo === 'rede' || r.lojaId === pedido.lojaId)),
+      // Fotografia v3 (2.4): o ano passado, a cobertura por loja, os pedidos e a versão das faixas saem SÓ dela (editar o faturamento de um
+      // período antigo depois não muda o fechado). As lojas que a pessoa alcança; na visão de UMA loja, só aquela.
+      const lojasLidas = pedido.tipo === 'loja' ? { lojas: [pedido.lojaId] } : alcance;
+      const canaisFoto = farolAntigo ? null : await lerCanaisDaFotografia(tx, lojasLidas, foto.id);
+      const guardado = canaisFoto ? lerAnoPassadoGuardado(canaisFoto.anoPassado, lojasLidas.lojas) : null;
+      const anoPassado = guardado
+        ? compararComOAnoPassadoPorLoja({ de: periodo.inicio, ate: periodo.fim, atual: resultado.porCanal, lojas: guardado, faltasNoPeriodoAtual: 0 })
+        : await anoPassadoDe(tx, alcance, periodo, periodo.fim, resultado, 0, lojasDoEscopo, lojaId); // v1 e v2: o painel de 2.2b segue lendo ao vivo (herança), mas SEM farol
+      // A versão das faixas é a que a fotografia gravou (v1 e v2: a 1, a única que existia); versão que não conhecemos não vira cor.
+      const versaoDasFaixas = farolAntigo ? 1 : canaisFoto?.versaoDasFaixas ?? VERSAO_DAS_FAIXAS;
+      const faixas = faixasDaVersao(versaoDasFaixas);
+      const metas = compararLinhas(resultado.linhas, metasDasLinhas(doEscopo), resultado.receitaBrutaCentavos, daLoja, farolAntigo ? null : anoPassado, faixas ?? FAIXAS_DO_FAROL);
+      const doEscopoDasRessalvas = foto.ressalvas.filter((r) => pedido.tipo === 'rede' || r.lojaId === pedido.lojaId);
+      const recorrentes: RecorrenteSemMes[] = doEscopoDasRessalvas.filter((r) => r.tipo === 'RECORRENTE').map((r) => ({ grupo: r.grupo ?? null, linhaId: r.linhaId ?? null }));
+      // Loja que fechou sem nenhum lançamento de faturamento (ressalva confirmada): a receita do escopo que a contém é incompleta, e não tem cor.
+      const lojasSemLancamento = doEscopoDasRessalvas.filter((r) => r.tipo === 'LOJA_SEM_LANCAMENTO').length;
+      const farol = farolDoDre({ linhas: resultado.linhas, metas, faltasDeFaturamento: lojasSemLancamento, recorrentes, receitaNaoApurada: farolAntigo, versaoDasFaixas, faixasDesconhecidas: faixas === null });
+      return {
+        periodo,
+        hoje,
+        ate: periodo.fim,
+        emCurso: false,
+        encerrado: true,
+        diasDoPeriodo,
+        diaDeHoje: null,
+        diasApurados: diasDoPeriodo,
+        status: 'FECHADO',
+        escopo,
+        resultado,
+        porLoja,
+        faltas: { total: 0 },
+        faltaLancar: [],
+        taxaConfigurada: foto.taxa !== null,
+        anterior,
+        proximo,
+        lojasDoEscopo,
+        metas,
         anoPassado,
-        metas: metasComparadas,
+        cmv: { antigo, painel: cmvFoto ? painelDoCmv(cmvFoto, receitaFoto) : null },
+        fechamento: { versao: foto.versao, fotografiaId: foto.id, versaoDaConta: foto.versaoDaConta, fechadoEm: foto.criadoEm, fechadoPorNome: foto.fechadoPorNome, ressalvas: foto.ressalvas, totalDeRessalvas: foto.totalDeRessalvas, justificativa: foto.justificativa },
         farol,
-        vendidos: Array.from(new Set(lojasDoEscopo.flatMap((l) => l.canais))),
-      }),
-      farolAntigo: false,
-    } satisfies DreDoPeriodo;
+        // No fechado só entra o canal com receita (ou ano passado): a configuração de hoje não reescreve o passado.
+        canais: canaisDoPeriodo({ porCanal: resultado.porCanal, receitaBrutaCentavos: resultado.receitaBrutaCentavos, pedidos: pedidosPorCanal(canaisFoto?.receitas ?? []), anoPassado: farolAntigo ? null : anoPassado, metas, farol, vendidos: [] }),
+        farolAntigo,
+      } satisfies DreDoPeriodo;
+    }
+  }
+
+  // ---- ao vivo
+  const leitura = await entradaDoDre(tx, alcance, periodo, ate, { hoje, lojaId });
+  const metas = await metasDoPeriodo(tx, leitura.plano, periodo.inicio);
+  const entrada = (e: Escopo) => ({ escopo: e, plano: leitura.plano, receitas: leitura.receitas, taxaIfood: leitura.taxaIfood, despesas: leitura.despesas, cmv: leitura.cmv });
+  const resultado = montarDre(entrada(escopo));
+
+  let porLoja: ResumoDaLoja[] | null = null;
+  if (pedido.tipo === 'rede') {
+    const faltasDe = new Map(leitura.faltas.porLoja.map((f) => [f.loja.id, f.faltas]));
+    porLoja = lojasDoEscopo
+      .map((loja) => resumoDaLoja(loja, montarDre(entrada({ tipo: 'loja', lojaId: loja.id, nome: loja.nome })), faltasDe.get(loja.id) ?? 0))
+      // Loja desativada sem nada no período não é linha: só pesa quem vendeu ou lançou.
+      .filter((l) => l.loja.ativa || l.receitaBrutaCentavos !== 0 || l.resultadoCentavos !== 0);
+  }
+
+  const anoPassado = ate ? await anoPassadoDe(tx, alcance, periodo, ate, resultado, leitura.faltas.total, lojasDoEscopo, lojaId) : null;
+  const metasComparadas = compararLinhas(resultado.linhas, metas, resultado.receitaBrutaCentavos, daLoja, anoPassado);
+  // A loja só cobra o que é dela; a rede, tudo (inclusive a despesa sem loja).
+  const faltaLancarDoEscopo = pedido.tipo === 'rede' ? leitura.faltaLancar : leitura.faltaLancar.filter((f) => f.lojaId === pedido.lojaId);
+  const farol = farolDoDre({
+    linhas: resultado.linhas,
+    metas: metasComparadas,
+    faltasDeFaturamento: leitura.faltas.total,
+    recorrentes: faltaLancarDoEscopo.map((f) => ({ grupo: f.grupo, linhaId: f.linhaId })),
+    receitaNaoApurada: false,
   });
+  return {
+    periodo,
+    hoje,
+    ate,
+    emCurso,
+    encerrado,
+    diasDoPeriodo,
+    diaDeHoje: emCurso ? diasEntre(periodo.inicio, hoje) + 1 : null,
+    diasApurados: ate ? diasEntre(periodo.inicio, ate) + 1 : 0,
+    status: registro?.status ?? null,
+    escopo,
+    resultado,
+    porLoja,
+    faltas: { total: leitura.faltas.total },
+    faltaLancar: faltaLancarDoEscopo,
+    taxaConfigurada: leitura.taxaIfood !== null,
+    anterior,
+    proximo,
+    lojasDoEscopo,
+    metas: metasComparadas,
+    anoPassado,
+    fechamento: null,
+    cmv: { antigo: false, painel: encerrado ? painelDoCmv(leitura.cmv, (id) => leitura.receitas.filter((r) => r.lojaId === id).reduce((t, r) => t + r.valorCentavos, 0)) : null },
+    farol,
+    canais: canaisDoPeriodo({
+      porCanal: resultado.porCanal,
+      receitaBrutaCentavos: resultado.receitaBrutaCentavos,
+      pedidos: pedidosPorCanal(leitura.receitas.filter((r) => pedido.tipo === 'rede' || r.lojaId === pedido.lojaId)),
+      anoPassado,
+      metas: metasComparadas,
+      farol,
+      vendidos: Array.from(new Set(lojasDoEscopo.flatMap((l) => l.canais))),
+    }),
+    farolAntigo: false,
+  } satisfies DreDoPeriodo;
+
 }

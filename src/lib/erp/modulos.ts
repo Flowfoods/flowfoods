@@ -502,6 +502,13 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               permissao: 'dre.ver',
             },
             {
+              href: `${base}/dre/cmv-categorias`,
+              rotulo: 'CMV por categoria',
+              icone: 'metricas',
+              subtitulo: 'O CMV do DRE aberto em categorias, com a meta e o farol de cada uma',
+              permissao: 'dre.ver',
+            },
+            {
               href: `${base}/dre/periodos`,
               rotulo: 'Períodos',
               icone: 'estoque',
@@ -513,6 +520,13 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               rotulo: 'Plano e metas',
               icone: 'cadastro',
               subtitulo: 'As linhas do DRE, os nomes que a casa usa e a meta de cada uma',
+              permissao: 'metas.editar',
+            },
+            {
+              href: `${base}/dre/metas-categorias`,
+              rotulo: 'Metas por categoria',
+              icone: 'cadastro',
+              subtitulo: 'Quanto cada categoria deve pesar na receita, na rede e em cada loja',
               permissao: 'metas.editar',
             },
           ],

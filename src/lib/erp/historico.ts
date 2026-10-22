@@ -43,6 +43,9 @@ const ENTIDADE: Record<string, string> = {
   RegraDoPeriodo: 'Período do DRE',
   // 2.2b: metas e fechamento do período (só quem tem `dre.ver` recebe estas linhas).
   DreMeta: 'Meta do DRE',
+  // I.2a: as metas por categoria (conjunto da rede ou da loja) e quais categorias a loja usa.
+  MetaCmvConjunto: 'Metas por categoria',
+  CategoriaNaLoja: 'Categoria na loja',
   PeriodoApuracao: 'Fechamento do período',
   DreFotografia: 'Fotografia do fechamento',
   AcessoParceiro: 'Acesso',
@@ -140,6 +143,8 @@ const CAMPO: Record<string, string> = {
   zerados: 'contados com zero',
   naoContados: 'não contados (entraram com zero)',
   semCusto: 'sem custo informado (valor pendente)',
+  // I.2a: o estoque guardado insumo por insumo (base do CMV real por categoria).
+  retratoPorInsumo: 'estoque guardado por insumo',
   valorCentavos: 'valor do estoque',
   email: 'e-mail',
   linkValeAte: 'link vale até',
@@ -578,7 +583,7 @@ export const ENTIDADES_DE_FATURAMENTO: readonly string[] = ['FaturamentoLancamen
  * período, período e (2.2b) metas e fotografia. Filtro no servidor, na consulta: o payload
  * não leva a linha. `verDre` ausente = fechado.
  */
-export const ENTIDADES_DE_DRE: readonly string[] = ['Despesa', 'DreLinha', 'DreMeta', 'RegraDoPeriodo', 'PeriodoApuracao', 'DreFotografia'];
+export const ENTIDADES_DE_DRE: readonly string[] = ['Despesa', 'DreLinha', 'DreMeta', 'MetaCmvConjunto', 'CategoriaNaLoja', 'RegraDoPeriodo', 'PeriodoApuracao', 'DreFotografia'];
 
 /**
  * Custo do lote (3.1, lição da decisão 90): o histórico do lote cita o custo e o que a diferença de rendimento custou. Só

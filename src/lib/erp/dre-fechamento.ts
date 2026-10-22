@@ -21,6 +21,7 @@
 import type { Prisma } from '@prisma/client';
 import { hojeNoRio, formatarData } from './compra-campos';
 import { cmvDoEscopo, cmvParaGravar } from './cmv-campos';
+import { categoriasParaFotografia } from './cmv-categorias';
 import { montarDre, type EntradaDoDre, type LinhaDoDre } from './dre-campos';
 import { entradaDoDre, type LeituraDoDre } from './dre-entrada';
 import {
@@ -336,9 +337,9 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
             nomeDoPeriodo: periodo.nome,
             fechadoPorNome: autorNome,
             taxa: leitura.taxaIfood,
-            versaoDaConta: 3,
+            versaoDaConta: 4,
             entrada: {
-              versaoDaConta: 3,
+              versaoDaConta: 4,
               periodo: { inicio: periodo.inicio, fim: periodo.fim, nome: periodo.nome },
               ate: leitura.ate,
               lojas: leitura.lojas.map((l) => ({ id: l.id, nome: l.nome, ativa: l.ativa })),
@@ -351,6 +352,8 @@ export async function fecharPeriodo(cliente: ClienteDoParceiro, alcance: Alcance
               // 2.4: o ano passado por loja e canal (o fechado lê a variação SÓ daqui) e a versão das faixas do farol com que foi lido.
               anoPassado,
               farol: { versao: VERSAO_DAS_FAIXAS },
+              // I.2a: o CMV por categoria (compras pela categoria de HOJE, meta efetiva e uso por loja) e a fotografia v4. O fechado lê SÓ daqui.
+              categorias: await categoriasParaFotografia(tx, leitura.lojas, periodo),
             } as unknown as Prisma.InputJsonValue,
             ressalvas: cond.ressalvas,
             justificativa,
