@@ -210,7 +210,7 @@ describe.skipIf(!URL_TESTE)('ERP F.1b · actions e telas das notas recebidas por
     expect(h).toContain('Nota 4521 · série 1');
     expect(h).toContain('QUEIJO MUSSARELA PECA 2KG');
     expect(h).toContain('código QJ-MUS-2K');
-    expect(h).toContain('Fornecedor novo, criado com os dados desta nota.');
+    expect(h).toContain('Cadastro do fornecedor a completar.');
     expect(h).toContain('3326 1011 2223 3300 0181 5500 1000 0045 2111 2345 6784');
     expect(h).toContain('Salvar o que escolhi');
     expect(h).toContain('Conferir o impacto');

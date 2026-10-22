@@ -101,10 +101,10 @@ export function TelaDocumento({
         </Aviso>
       )}
       {aguardando && d.fornecedor?.situacaoCadastro === 'A_COMPLETAR' && (
-        <Aviso tom="alerta" titulo="Fornecedor novo, criado com os dados desta nota.">
-          Falta completar o cadastro dele ({d.fornecedor.falta.join(', ')}).{' '}
+        <Aviso tom="alerta" titulo="Cadastro do fornecedor a completar.">
+          Ele foi criado com os dados de uma nota fiscal. Falta completar o cadastro ({d.fornecedor.falta.join(', ')}).{' '}
           {podeEditarFornecedor ? (
-            <Link href={`${fornecedoresBase}/${d.fornecedor.id}/editar`} className={LINK_DE_TEXTO}>
+            <Link href={`${fornecedoresBase}/${d.fornecedor.id}/editar`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 min-w-11 items-center lg:min-h-0 lg:min-w-0`}>
               Completar o cadastro
             </Link>
           ) : (
@@ -115,7 +115,7 @@ export function TelaDocumento({
       {aguardando && d.parecidoSemNota && (
         <Aviso tom="neutro" titulo={`Já existe “${d.parecidoSemNota.nome}” em compras sem nota fiscal.`}>
           Se é o mesmo fornecedor, abra o cadastro dele e complete (CNPJ, razão social, e-mail). Nada é unido sozinho.{' '}
-          <Link href={`${fornecedoresBase}/${d.parecidoSemNota.id}`} className={LINK_DE_TEXTO}>
+          <Link href={`${fornecedoresBase}/${d.parecidoSemNota.id}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 min-w-11 items-center lg:min-h-0 lg:min-w-0`}>
             Abrir “{d.parecidoSemNota.nome}”
           </Link>
         </Aviso>
@@ -132,7 +132,7 @@ export function TelaDocumento({
             <dl className="space-y-2 text-sm">
               <Linha rotulo="Emitente">
                 {d.fornecedor ? (
-                  <Link href={`${fornecedoresBase}/${d.fornecedor.id}`} className={LINK_DE_TEXTO}>
+                  <Link href={`${fornecedoresBase}/${d.fornecedor.id}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 min-w-11 items-center lg:min-h-0 lg:min-w-0`}>
                     {d.fornecedor.nome}
                   </Link>
                 ) : (
@@ -237,7 +237,7 @@ function ItensSomenteLeitura({ d, insumosBase, semPermissao }: { d: DocumentoDet
             {i.insumoId ? (
               <p className="text-[13px] text-suave">
                 {insumosBase ? (
-                  <Link href={`${insumosBase}/${i.insumoId}`} className={LINK_DE_TEXTO}>
+                  <Link href={`${insumosBase}/${i.insumoId}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 min-w-11 items-center lg:min-h-0 lg:min-w-0`}>
                     {i.insumoNome}
                   </Link>
                 ) : (

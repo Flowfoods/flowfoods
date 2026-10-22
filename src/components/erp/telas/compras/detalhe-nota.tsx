@@ -200,7 +200,7 @@ export function TelaDetalheNota({
             <dl className="space-y-2 text-sm">
               <Linha rotulo="Fornecedor">
                 {n.fornecedor ? (
-                  <Link href={`${fornecedoresBase}/${n.fornecedor.id}`} className={LINK_DE_TEXTO}>
+                  <Link href={`${fornecedoresBase}/${n.fornecedor.id}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 min-w-11 items-center lg:min-h-0 lg:min-w-0`}>
                     {n.fornecedor.nome}
                   </Link>
                 ) : (
@@ -267,7 +267,7 @@ function NomeDoItem({ i, insumosBase }: { i: Item; insumosBase?: string }) {
   return (
     <span className="min-w-0 font-medium text-texto">
       {insumosBase && i.insumoId ? (
-        <Link href={`${insumosBase}/${i.insumoId}`} className="ff-transicao rounded-[5px] underline-offset-4 hover:underline">
+        <Link href={`${insumosBase}/${i.insumoId}`} className="ff-transicao inline-flex min-h-11 min-w-11 items-center rounded-[5px] underline-offset-4 hover:underline lg:min-h-0 lg:min-w-0">
           {i.nome}
         </Link>
       ) : (
