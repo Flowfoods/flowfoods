@@ -8,6 +8,7 @@
 import { Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
+import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
 import { TIPOS } from '@/lib/erp/insumo-campos';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, dinheiroParaCampo, quantidadeParaCampo } from '@/lib/erp/unidades';
@@ -71,9 +72,15 @@ export function TelaFormInsumo({
   acao,
   bloqueio,
   nomeSugerido,
+  categorias,
+  envio,
 }: {
   /** Ausente = novo. */
   insumo?: InsumoDetalhado;
+  /** I.1a: as categorias que a casa oferece (as ativas, mais a que o insumo já tem). */
+  categorias: readonly OpcaoDeCategoria[];
+  /** I.1a: a chave deste envio, sorteada no servidor a cada abertura do formulário novo. */
+  envio?: string;
   /** Novo vindo da importação de fichas ("Cadastrar “Picles”"): o nome já vem escrito. */
   nomeSugerido?: string;
   base: string;
@@ -85,6 +92,7 @@ export function TelaFormInsumo({
     nome: insumo.nome,
     tipo: insumo.tipo,
     unidade: insumo.unidade,
+    categoriaId: insumo.categoria?.id ?? '',
     conservacao: insumo.conservacao,
     validades: insumo.validades,
     ...embalagemParaCampo(insumo, insumo.unidade),
@@ -110,6 +118,8 @@ export function TelaFormInsumo({
         versao={insumo?.versao}
         travaDaUnidade={insumo?.travaDaUnidade ?? null}
         bloqueio={bloqueio}
+        categorias={categorias}
+        envio={envio}
       />
     </div>
   );

@@ -3,6 +3,7 @@
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { obterInsumo } from '@/lib/erp/insumos';
+import { categoriasDoFormulario } from '@/lib/erp/categorias';
 import { TelaFormInsumo } from '@/components/erp/telas/insumos/paginas';
 import { acaoEditarInsumo } from '../../actions';
 
@@ -16,9 +17,11 @@ export default async function ParceiroEditarInsumoPage({ params }: { params: { s
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/insumos`;
   // Pré-preparo (1.3) só muda pela ficha técnica.
   if (!insumo.ativo || insumo.preparo) redirect(`${base}/${insumo.id}`);
+  const categorias = await categoriasDoFormulario(ctx.cliente, ctx.sessao.autorNome, insumo.categoria?.id);
   return (
     <TelaFormInsumo
       insumo={insumo}
+      categorias={categorias}
       base={base}
       contexto={ctx.parceiro.nome}
       acao={acaoEditarInsumo.bind(null, ctx.parceiro.slug, insumo.id)}

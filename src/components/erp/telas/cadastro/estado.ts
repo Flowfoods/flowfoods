@@ -10,6 +10,8 @@ export type EstadoCadastro = {
   conflito?: boolean;
   /** Nome repetido de um cadastro desativado: link para reativar. */
   desativadoId?: string;
+  /** I.1a: nome repetido de um cadastro ativo (ou escrito de outro jeito): link para abrir o que já existe. */
+  existenteId?: string;
   vez: number;
 } | null;
 

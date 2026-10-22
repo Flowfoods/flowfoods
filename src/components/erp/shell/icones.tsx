@@ -17,6 +17,8 @@ import {
   History,
   Inbox,
   Bike,
+  ListChecks,
+  Tags,
   KeyRound,
   LayoutGrid,
   MapPin,
@@ -70,6 +72,8 @@ export const ICONES: Record<ChaveIcone, LucideIcon> = {
   sistema: SlidersHorizontal,
   config: Settings2,
   canais: Bike,
+  categorias: Tags,
+  classificar: ListChecks,
 };
 
 export function Icone({ nome, ...props }: { nome: ChaveIcone } & LucideProps) {

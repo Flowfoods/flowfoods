@@ -21,7 +21,9 @@ import { ListaHistorico } from '../historico/lista-historico';
 import type { AcaoDeCadastro } from '../cadastro/estado';
 import { FormSituacao } from '../cadastro/form-situacao';
 import { BotaoOuMotivo } from '../cadastro/partes';
-import { fraseDoFeito } from './estado';
+import { fraseDoFeito, fraseDoSalvo } from './estado';
+import { AvisoDeSalvo } from '../cadastro/anuncio';
+import { COMO_CLASSIFICOU } from '@/lib/erp/categoria-campos';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { PrecosPagos } from './precos-pagos';
 import { PainelEstoqueDoInsumo } from '../estoque/saldo-do-insumo';
@@ -77,6 +79,8 @@ export function TelaDetalheInsumo({
     : null;
   // `feito` vem da URL: só chave própria do mapa (nada de __proto__/constructor).
   const mensagem = fraseDoFeito(feito);
+  // I.1a: criado e editado dizem O QUE foi salvo, com o nome lido do banco (nunca da URL).
+  const salvo = fraseDoSalvo(feito, i.nome);
 
   const embalagens = [
     {
@@ -104,7 +108,7 @@ export function TelaDetalheInsumo({
         icone="insumo"
         cor={COR.insumo}
         titulo={i.nome}
-        subtitulo={[contexto, TIPOS[i.tipo], p && !temValidade(i.validades) ? null : CONSERVACOES[i.conservacao], `medido em ${u.nome.toLowerCase()}`]
+        subtitulo={[contexto, TIPOS[i.tipo], i.categoria?.nome ?? 'sem categoria', p && !temValidade(i.validades) ? null : CONSERVACOES[i.conservacao], `medido em ${u.nome.toLowerCase()}`]
           .filter(Boolean)
           .join(' · ')}
         acao={
@@ -120,6 +124,18 @@ export function TelaDetalheInsumo({
         }
       />
 
+      {salvo && (
+        <AvisoDeSalvo titulo={salvo.titulo} apoio={salvo.apoio}>
+          {salvo.criou && podeEditar && !bloqueio && (
+            <Link href={`${base}/novo`} className={classeDeBotao('secundario')}>
+              Cadastrar outro insumo
+            </Link>
+          )}
+          <Link href={voltar} className={classeDeBotao('fantasma')}>
+            Ver todos os insumos
+          </Link>
+        </AvisoDeSalvo>
+      )}
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
       {/* Recém-desativado: a frase do "feito" já diz isso; não repetir. */}
       {!i.ativo && feito !== 'desativado' && (
@@ -264,6 +280,36 @@ export function TelaDetalheInsumo({
         </div>
 
         <aside className="min-w-0 space-y-4" aria-label="Validade, situação e alterações">
+          <Painel titulo="Categoria" subtitulo="A natureza do insumo para o CMV">
+            {i.categoria ? (
+              <div className="space-y-1">
+                <p className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-semibold text-texto">{i.categoria.nome}</span>
+                  {!i.categoria.ativa && <Selo>Categoria desativada</Selo>}
+                  {i.categoria.chave === 'OUTROS' && <Selo tom="alerta">A classificar</Selo>}
+                </p>
+                {i.classificadoPor && <p className="text-[12px] text-suave">Classificação: {COMO_CLASSIFICOU[i.classificadoPor] ?? i.classificadoPor}.</p>}
+                {i.classificacaoMotivo && <p className="text-[12px] text-suave">{i.classificacaoMotivo}</p>}
+              </div>
+            ) : (
+              <p className="flex flex-wrap items-center gap-2 text-sm">
+                <Selo tom="alerta">Sem categoria</Selo>
+                <span className="text-suave">Ainda não foi classificado.</span>
+              </p>
+            )}
+            <p className="mt-2 text-[12px] text-suave">
+              Não é onde o insumo fica guardado nem a conservação: coxa de frango é Proteína, mesmo congelada.
+              {editaAqui && i.ativo && !bloqueio && (
+                <>
+                  {' '}
+                  <Link href={`${aqui}/editar#insumo-categoriaId`} className={LINK_DE_TEXTO}>
+                    {i.categoria ? 'Mudar a categoria' : 'Escolher a categoria'}
+                  </Link>
+                  .
+                </>
+              )}
+            </p>
+          </Painel>
           <Painel
             titulo={p ? 'Onde fica e quanto dura' : 'Onde guarda e quanto dura'}
             subtitulo={p ? undefined : 'Validade depois de aberto ou manipulado'}

@@ -12,8 +12,8 @@ import type { EstadoCadastro } from './estado';
 
 /** O que toda regra de cadastro devolve (insumo, variante, ficha). */
 export type ResultadoDeCadastro =
-  | { ok: true; id: string; mudou: string[] }
-  | { ok: false; erros: Record<string, string>; conflito?: boolean; desativadoId?: string; naoEncontrado?: boolean };
+  | { ok: true; id: string; mudou: string[]; repetido?: boolean }
+  | { ok: false; erros: Record<string, string>; conflito?: boolean; desativadoId?: string; existenteId?: string; naoEncontrado?: boolean };
 
 const vezDe = (anterior: EstadoCadastro) => (anterior?.vez ?? 0) + 1;
 
@@ -38,7 +38,7 @@ export function concluir(
   r: ResultadoDeCadastro,
   anterior: EstadoCadastro,
   base: string,
-  feito: { mudou: string; igual?: string },
+  feito: { mudou: string; igual?: string; repetido?: string },
   alvoId?: string,
 ): EstadoCadastro {
   if (!r.ok) {
@@ -47,11 +47,13 @@ export function concluir(
       erros: r.erros,
       conflito: r.conflito,
       desativadoId: r.desativadoId,
+      existenteId: r.existenteId,
       vez: vezDe(anterior),
     };
   }
   revalidatePath(base, 'layout');
-  const frase = r.mudou.length === 0 && feito.igual ? feito.igual : feito.mudou;
+  // I.1a: o envio repetido (mesma chave) volta como o insumo que já existe; a frase diz isso (`feito.repetido`).
+  const frase = r.repetido && feito.repetido ? feito.repetido : r.mudou.length === 0 && feito.igual ? feito.igual : feito.mudou;
   redirect(`${base}/${alvoId ?? r.id}?feito=${frase}`);
 }
 

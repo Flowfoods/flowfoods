@@ -6,6 +6,9 @@
 
 import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { listarInsumos } from '@/lib/erp/insumos';
+import { categoriasParaEscolher } from '@/lib/erp/categorias';
+import { resumoDoQueFalta } from '@/lib/erp/classificar';
+import { AvisoDaClassificacao } from '@/components/erp/telas/insumos/aviso-classificar';
 import { lerFiltros, temFiltro } from '@/lib/erp/insumo-campos';
 import { FiltrosDaLista, TelaListaInsumos } from '@/components/erp/telas/insumos/lista';
 import { CabecalhoDaLista } from '@/components/erp/telas/insumos/paginas';
@@ -24,7 +27,12 @@ export default async function ParceiroInsumosPage({
   exigirPermissao(ctx, 'insumos.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/insumos`;
   const filtros = lerFiltros(searchParams);
-  const [pagina, { visao }] = await Promise.all([listarInsumos(ctx.cliente, filtros), visaoDaRequisicao(ctx)]);
+  const [pagina, { visao }, categorias, faltam] = await Promise.all([
+    listarInsumos(ctx.cliente, filtros),
+    visaoDaRequisicao(ctx),
+    categoriasParaEscolher(ctx.cliente, null, true),
+    resumoDoQueFalta(ctx.cliente, ctx.alcance),
+  ]);
   return (
     <div className="space-y-6">
       <CabecalhoDaLista
@@ -32,8 +40,9 @@ export default async function ParceiroInsumosPage({
         novoHref={`${base}/novo`}
         bloqueio={ctx.bloqueio}
       >
-        <FiltrosDaLista base={base} filtros={filtros} />
+        <FiltrosDaLista base={base} filtros={filtros} categorias={categorias} />
       </CabecalhoDaLista>
+      <AvisoDaClassificacao resumo={faltam} href={`${base}/classificar`} />
       <TelaListaInsumos base={base} filtros={filtros} {...pagina} novoHref={ctx.bloqueio ? undefined : `${base}/novo`} />
     </div>
   );
