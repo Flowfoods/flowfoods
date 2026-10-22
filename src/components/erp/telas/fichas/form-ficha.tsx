@@ -143,7 +143,8 @@ export function FormFicha(props: PropsDoFormFicha) {
   }
   return (
     <FormFichaBase
-      key={recuperado || criado ? 'voltou' : 'inicial'}
+      // O rascunho só é lido depois do primeiro desenho: quando chega (ou se descarta), o formulário nasce de novo com os valores certos.
+        key={r.valores === undefined ? 'carregando' : descartou ? 'descartado' : 'pronto'}
       {...props}
       inicial={valores}
       chaveDoRascunho={r.chave}

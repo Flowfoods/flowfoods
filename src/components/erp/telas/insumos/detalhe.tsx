@@ -10,7 +10,7 @@
 import Link from 'next/link';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
 import { AJUDA_DO_TIPO, compararEmbalagens, CONSERVACOES, TIPOS } from '@/lib/erp/insumo-campos';
-import { temValidade } from '@/lib/erp/validade';
+import { ROTULO_DA_OPCAO, temValidade } from '@/lib/erp/validade';
 import { IconeDaConservacao, ValidadesDoItem } from '../cadastro/validade';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, contaDoCusto, formatarCusto, formatarDinheiro, formatarFracao, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
@@ -23,7 +23,6 @@ import { FormSituacao } from '../cadastro/form-situacao';
 import { BotaoOuMotivo } from '../cadastro/partes';
 import { fraseDoFeito, fraseDoSalvo } from './estado';
 import { FormConfirmarConservacao } from './form-confirmar-conservacao';
-import { ROTULO_DA_OPCAO } from './campos-conservacao';
 import { AvisoDeSalvo } from '../cadastro/anuncio';
 import { COMO_CLASSIFICOU } from '@/lib/erp/categoria-campos';
 import { TrilhaDaPagina } from '../../shell/trilha';
@@ -106,7 +105,7 @@ export function TelaDetalheInsumo({
   return (
     <div className="space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: i.nome }]} />
-      <Link href={voltar} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+      <Link href={voltar} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`}>
         Voltar para a lista
       </Link>
       <PageHeader

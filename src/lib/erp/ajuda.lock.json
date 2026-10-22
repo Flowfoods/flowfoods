@@ -8,16 +8,16 @@
     "hash": "ed5dd1d05ab343e1"
   },
   "insumos": {
-    "versao": 2,
-    "hash": "d85253f11505cefc"
+    "versao": 3,
+    "hash": "415422f1a7d40857"
   },
   "insumo-novo": {
-    "versao": 2,
-    "hash": "4ed4a300f46d43f0"
+    "versao": 3,
+    "hash": "0325bf9012c88ba9"
   },
   "insumo": {
-    "versao": 2,
-    "hash": "e9c007604f5c7066"
+    "versao": 3,
+    "hash": "547d8cf5c44a5cf6"
   },
   "insumo-categorias": {
     "versao": 1,
@@ -28,8 +28,8 @@
     "hash": "5c6cb0c4eec6fd8c"
   },
   "insumo-embalagem": {
-    "versao": 1,
-    "hash": "159348e9284bea54"
+    "versao": 2,
+    "hash": "d6bbcf071f3e6faf"
   },
   "fichas": {
     "versao": 1,

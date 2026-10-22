@@ -16,19 +16,11 @@
  */
 
 import { useState } from 'react';
-import { CONSERVACOES, ORDEM_DAS_CONSERVACOES, validadesParaCampos, type Conservacao, type EmQue, type Validades } from '@/lib/erp/validade';
+import { CONSERVACOES, ORDEM_DAS_CONSERVACOES, ROTULO_DA_OPCAO, validadesParaCampos, type Conservacao, type EmQue, type Validades } from '@/lib/erp/validade';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
 import { IconeDaConservacao } from '../cadastro/validade';
 
 type Linha = { marcada: boolean; quantidade: string; em: EmQue };
-
-/** Seco é "ambiente" no dia a dia da cozinha: a opção diz as duas palavras. */
-export const ROTULO_DA_OPCAO: Record<Conservacao, string> = {
-  SECO: 'Seco (ambiente)',
-  PISTA_FRIA: 'Pista fria',
-  REFRIGERADO: 'Refrigerado',
-  CONGELADO: 'Congelado',
-};
 
 const OBRIGATORIO = <span className="font-normal text-suave"> (obrigatório)</span>;
 
@@ -65,7 +57,6 @@ export function CamposDeConservacao({
 
   return (
     <div className="space-y-5">
-      <input type="hidden" name="validadeNoFormulario" value="sim" />
       <div className="sm:max-w-md">
         <label htmlFor={`${idBase}-conservacao`} className={ROTULO}>
           Conservação{OBRIGATORIO}
@@ -180,6 +171,7 @@ export function CamposDeConservacao({
           lote e a de abertura entram no recebimento e no controle de lote (ainda não existem no ERP).
         </p>
       </fieldset>
+      <input type="hidden" name="validadeNoFormulario" value="sim" />
     </div>
   );
 }

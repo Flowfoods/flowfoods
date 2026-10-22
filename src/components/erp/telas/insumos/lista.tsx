@@ -10,7 +10,7 @@
 
 import Link from 'next/link';
 import { formatarData } from '@/lib/erp/compra-campos';
-import { formatarValidade } from '@/lib/erp/validade';
+import { formatarValidade, ROTULO_DA_OPCAO } from '@/lib/erp/validade';
 import type { LinhaDeInsumo } from '@/lib/erp/insumos';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
 import {
@@ -24,7 +24,6 @@ import {
 } from '@/lib/erp/insumo-campos';
 import { UNIDADES, formatarDinheiro, formatarFracao, formatarQuantidade, valorDoCusto } from '@/lib/erp/unidades';
 import { CAMPO, MARCAR } from '../../ui/campos';
-import { ROTULO_DA_OPCAO } from './campos-conservacao';
 import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
@@ -97,7 +96,9 @@ const ROTULO_DA_SITUACAO = { ativos: 'Ativos', desativados: 'Desativados', todos
 export function FiltrosDaLista({ base, filtros: f, categorias }: { base: string; filtros: FiltrosDeInsumo; categorias: readonly OpcaoDeCategoria[] }) {
   const SELECT = `${CAMPO} pr-8`;
   return (
-    <form role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-5 xl:grid-cols-[minmax(16rem,1fr)_repeat(4,minmax(9.5rem,auto))_auto]">
+    // `key` = os filtros de agora: depois de um link que muda o filtro sem recarregar ("Ver quais são" no aviso), os campos nascem de novo
+    // com o valor da URL (um <select defaultValue> não acompanha a mudança sozinho).
+    <form key={queryDosFiltros(f)} role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-5 xl:grid-cols-[minmax(16rem,1fr)_repeat(4,minmax(9.5rem,auto))_auto]">
       {f.ordem !== 'nome' && <input type="hidden" name="ordem" value={f.ordem} />}
       {f.direcao !== 'asc' && <input type="hidden" name="dir" value={f.direcao} />}
       <div className="col-span-2 flex gap-2 lg:col-span-5 xl:col-span-1">

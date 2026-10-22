@@ -32,6 +32,18 @@ export const CONSERVACOES = {
 } as const;
 export type Conservacao = keyof typeof CONSERVACOES;
 
+/**
+ * Como a conservação aparece na ESCOLHA e nas linhas do cadastro do insumo: Seco é "ambiente" no dia a dia da cozinha, então a
+ * opção diz as duas palavras. Mora aqui (e não no componente do formulário) porque a lista e o detalhe, que são de servidor, também a
+ * leem — valor exportado de arquivo "use client" não chega ao servidor.
+ */
+export const ROTULO_DA_OPCAO: Record<Conservacao, string> = {
+  SECO: 'Seco (ambiente)',
+  PISTA_FRIA: 'Pista fria',
+  REFRIGERADO: 'Refrigerado',
+  CONGELADO: 'Congelado',
+};
+
 type Erros = Record<string, string>;
 
 /** Ordem fixa da tela e do texto (a principal vem primeiro no texto). */

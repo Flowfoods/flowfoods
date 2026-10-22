@@ -95,7 +95,7 @@ export function AvisoDeRascunho({ quando, aoDescartar, observacao }: { quando: b
         Recuperamos o que você tinha preenchido antes de ir cadastrar o insumo.
         {observacao && <span className="block text-[13px] text-suave">{observacao}</span>}
       </p>
-      <button type="button" onClick={aoDescartar} className="ff-transicao min-h-11 rounded-[7px] px-3 text-[13px] font-medium text-suave underline underline-offset-4 hover:text-texto sm:min-h-9">
+      <button type="button" onClick={aoDescartar} className="ff-transicao min-h-11 rounded-[7px] px-3 text-[13px] font-medium text-suave underline underline-offset-4 hover:text-texto sm:min-h-9 [@media(pointer:coarse)]:min-h-11">
         Descartar e começar de novo
       </button>
     </div>

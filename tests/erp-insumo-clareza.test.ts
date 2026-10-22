@@ -13,7 +13,7 @@ import { conservacaoAConfirmar, lerFiltros, lerFormInsumo, MARCA_MAXIMA, TIPOS, 
 import { sugerirCategoria } from '@/lib/erp/categoria-sugestao';
 import { exemploDoCusto, TEXTO_DO_CUSTO_INICIAL } from '@/components/erp/telas/insumos/campos-embalagem';
 import { contaDoCusto, custoDaEmbalagem, formatarCusto, CUSTO_NAO_INFORMADO } from '@/lib/erp/unidades';
-import { lerValidades } from '@/lib/erp/validade';
+import { lerValidades, ROTULO_DA_OPCAO } from '@/lib/erp/validade';
 import { caminhoDeVolta, rotuloDaVolta, voltaComInsumo } from '@/lib/erp/volta';
 
 const n = (t: string) => t.replace(/\u00a0/g, ' ');
@@ -29,6 +29,10 @@ describe('I.1b · conservação escolhida, nunca assumida', () => {
     const { conservacao: _c, ...semCampo } = base;
     const sem = lerFormInsumo(semCampo);
     expect(!sem.ok && sem.erros.conservacao).toMatch(/Escolha a conservação/);
+  });
+
+  it('o rótulo da opção mora na lib (a lista e o detalhe, de servidor, o leem): Seco é "Seco (ambiente)"', () => {
+    expect(ROTULO_DA_OPCAO).toEqual({ SECO: 'Seco (ambiente)', PISTA_FRIA: 'Pista fria', REFRIGERADO: 'Refrigerado', CONGELADO: 'Congelado' });
   });
 
   it('as quatro conservações legítimas continuam valendo (Seco/ambiente, pista fria, refrigerado, congelado)', () => {

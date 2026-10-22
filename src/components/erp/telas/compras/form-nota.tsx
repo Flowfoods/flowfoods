@@ -104,7 +104,8 @@ export function FormNota(props: PropsDoFormNota) {
   return (
     <>
       <FormNotaBase
-        key={recuperado || criado ? 'voltou' : 'inicial'}
+        // O rascunho só é lido depois do primeiro desenho: quando chega (ou se descarta), o formulário nasce de novo com os valores certos.
+        key={r.valores === undefined ? 'carregando' : descartou ? 'descartado' : 'pronto'}
         {...props}
         inicial={valores}
         chaveDoRascunho={r.chave}
@@ -312,7 +313,7 @@ function FormNotaBase({
               </select>
               <Erro id={`${idBase}-fornecedorId-erro`} texto={erros.fornecedorId} />
               {novoFornecedor ? (
-                <Link href={novoFornecedor} className={`${LINK_DE_TEXTO} mt-1.5 inline-block`}>
+                <Link href={novoFornecedor} className={`${LINK_DE_TEXTO} mt-1.5 inline-flex min-h-0 items-center [@media(pointer:coarse)]:min-h-11`}>
                   Fornecedor novo: cadastrar
                 </Link>
               ) : (
