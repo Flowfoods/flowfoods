@@ -28,6 +28,7 @@
     "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.3",
     "bcryptjs": "^3.0.3",
+    "fast-xml-parser": "5.11.2",
     "lucide-react": "0.460.0",
     "luxon": "^3.7.2",
     "next": "^14",

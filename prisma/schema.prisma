@@ -574,6 +574,9 @@ model ParceiroFlow {
   erpCanaisConfig        CanalConfig[]
   erpNotasEntrada        NotaEntrada[]
   erpNotaEntradaItens    NotaEntradaItem[]
+  erpDocumentosFiscais   DocumentoFiscal[]
+  erpDocumentoFiscalItens DocumentoFiscalItem[]
+  erpVinculosItemFornecedor VinculoItemFornecedor[]
   erpSaldosEstoque       SaldoEstoque[]
   erpMovimentosEstoque   MovimentoEstoque[]
   erpContagens           Contagem[]
@@ -677,6 +680,7 @@ model Loja {
 
   colaboradores  Colaborador[]
   notasEntrada   NotaEntrada[]
+  documentosFiscais DocumentoFiscal[]
   saldos         SaldoEstoque[]
   movimentos     MovimentoEstoque[]
   contagens      Contagem[]
@@ -780,6 +784,9 @@ model Fornecedor {
   insumosPadrao Insumo[]
   variantes     InsumoVariante[]
   notas         NotaEntrada[]
+  // F.1b: as notas fiscais recebidas por XML e o que o sistema lembra dos itens dele.
+  documentosFiscais DocumentoFiscal[]
+  vinculosDeItem    VinculoItemFornecedor[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, nome])
@@ -862,6 +869,8 @@ model Insumo {
   usosEmFichas      FichaItem[]
   usosComoEmbalagem ProdutoEmbalagem[]
   notaItens         NotaEntradaItem[]
+  documentoItens    DocumentoFiscalItem[]
+  vinculosDeItem    VinculoItemFornecedor[]
   saldos            SaldoEstoque[]
   movimentos        MovimentoEstoque[]
   contagemItens     ContagemItem[]
@@ -1016,6 +1025,8 @@ model InsumoVariante {
   criadoEm               DateTime     @default(now())
 
   notaItens NotaEntradaItem[]
+  documentoItens DocumentoFiscalItem[]
+  vinculosDeItem VinculoItemFornecedor[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, insumoId, nome])
@@ -1065,9 +1076,13 @@ model NotaEntrada {
   itens      NotaEntradaItem[]
   // 1.6: entradas e estornos no estoque da loja (só com o estoque aberto).
   movimentos MovimentoEstoque[]
+  // F.1b: o documento fiscal (XML) que esta nota concilia, quando veio dele ou foi ligada a ele.
+  documento  DocumentoFiscal?
 
   @@unique([parceiroId, id])
-  @@unique([parceiroId, chaveAcesso])
+  // F.1b: a chave de acesso é única por parceiro SÓ entre as notas que valem (índice parcial `NotaEntrada_chave_ativa_key`, escrito no
+  // SQL da migration): a nota cancelada libera a chave para conciliar o mesmo documento de novo. Aqui fica o índice comum.
+  @@index([parceiroId, chaveAcesso])
   @@index([parceiroId, lojaId, entradaEm])
   @@index([parceiroId, fornecedorId, entradaEm])
   // 1.5: a última compra de cada insumo (data da nota, depois a hora do lançamento).
@@ -1109,6 +1124,166 @@ model NotaEntradaItem {
 
   @@unique([parceiroId, id])
   @@index([parceiroId, notaId])
+  @@index([parceiroId, insumoId])
+}
+
+// ------------------------------------------------- ERP · documento fiscal recebido por XML (F.1b)
+//
+// O documento fiscal (a NF-e que o fornecedor emitiu) NÃO é a nota de compra (`NotaEntrada`, o lançamento): receber o XML não
+// mexe em estoque, custo nem despesa. Só "Conciliar" cria a nota pelo serviço oficial de lançamento (`lancarNotaNaTransacao`),
+// ou "Ligar à nota já lançada" a uma nota digitada à mão (sem efeito novo). O conteúdo do documento é imutável (gatilho no SQL);
+// muda a situação, a loja/fornecedor quando ainda não resolvidos e a nota ligada. O XML fica guardado, mas NUNCA entra em listas.
+
+enum SituacaoDocumentoFiscal {
+  RECEBIDO // reservado: captação automática (fora da F.1b)
+  AGUARDANDO_CONFERENCIA // XML lido e gravado; falta a pessoa conferir e conciliar
+  CONCILIADO // virou (ou foi ligado a) uma nota de compra
+  CANCELADO // a casa descartou o documento (com motivo)
+  ERRO // reservado: captação automática (fora da F.1b)
+}
+
+enum OrigemDocumentoFiscal {
+  XML_MANUAL // a pessoa enviou o arquivo
+  SEFAZ // reservado: captação automática (fora da F.1b)
+}
+
+model DocumentoFiscal {
+  id          String       @id @default(cuid())
+  parceiroId  String
+  parceiro    ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  // A chave de acesso (44 dígitos, dígito verificador e coerência conferidos no parser). Única por parceiro, INCLUSIVE cancelado.
+  chaveAcesso String
+  modelo      Int          @default(55)
+  serie       String
+  numero      String
+  // Data de emissão no relógio do Rio.
+  emitidaEm   DateTime     @db.Date
+
+  emitenteDocumento     String
+  emitenteRazao         String
+  emitenteFantasia      String?
+  emitenteIe            String?
+  emitenteUf            String?
+  emitenteMunicipio     String?
+  emitenteEndereco      String?
+  emitenteCep           String?
+  destinatarioDocumento String
+
+  // A loja do CNPJ do destinatário. Nula só quando duas lojas da pessoa têm o mesmo CNPJ: ela escolhe na conferência.
+  lojaId       String?
+  loja         Loja?       @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  // O fornecedor do CNPJ do emitente. Nulo só quando dois cadastros ATIVOS têm o mesmo CNPJ (legado): nunca se escolhe sozinho.
+  fornecedorId String?
+  fornecedor   Fornecedor? @relation(fields: [parceiroId, fornecedorId], references: [parceiroId, id], onDelete: Restrict)
+
+  // Totais da nota, em centavos, como o emitente declarou.
+  vProdCentavos  Int
+  vDescCentavos  Int
+  vFreteCentavos Int
+  vSegCentavos   Int
+  vOutroCentavos Int
+  vIpiCentavos   Int
+  vStCentavos    Int
+  vNfCentavos    Int
+  // Duplicatas (cobrança): só GUARDADAS. Nenhuma despesa, vencimento ou conta a pagar nasce delas.
+  duplicatas     Json?
+
+  situacao  SituacaoDocumentoFiscal @default(AGUARDANDO_CONFERENCIA)
+  origem    OrigemDocumentoFiscal   @default(XML_MANUAL)
+  // Impressão do arquivo: o mesmo arquivo de novo é "já recebido"; a mesma chave com outro conteúdo é recusada.
+  xmlSha256 String
+  // O XML inteiro (≤ 1 MB). Nunca em lista: toda leitura escolhe as colunas.
+  xml       String
+  // A nota de compra que este documento concilia (única: uma nota só vem de um documento).
+  notaEntradaId String?
+  notaEntrada   NotaEntrada? @relation(fields: [parceiroId, notaEntradaId], references: [parceiroId, id], onDelete: Restrict)
+  motivo        String?
+  canceladoEm   DateTime?
+  criadoEm      DateTime     @default(now())
+  criadoPorNome String       @default("")
+  // Versão para conciliar/cancelar condicional (duas abas não se atropelam).
+  atualizadoEm  DateTime     @default(now()) @updatedAt
+
+  itens DocumentoFiscalItem[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, chaveAcesso])
+  @@unique([parceiroId, notaEntradaId])
+  @@index([parceiroId, situacao, emitidaEm(sort: Desc)])
+  @@index([parceiroId, lojaId])
+  @@index([parceiroId, fornecedorId])
+  @@index([parceiroId, destinatarioDocumento])
+}
+
+model DocumentoFiscalItem {
+  id               String          @id @default(cuid())
+  parceiroId       String
+  parceiro         ParceiroFlow    @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  documentoId      String
+  documento        DocumentoFiscal @relation(fields: [parceiroId, documentoId], references: [parceiroId, id], onDelete: Cascade)
+  nItem            Int
+  codigoProduto    String
+  gtin             String?
+  descricao        String
+  ncm              String?
+  cfop             String?
+  unidadeComercial String
+  // A quantidade comercial como veio (até 4 casas) e em milésimos (arredondada à terceira casa, metade para cima).
+  qComTexto        String
+  qComMilesimos    Int
+  vProdCentavos    Int
+  vDescCentavos    Int
+  vOutroCentavos   Int
+  vSegCentavos     Int
+  vIpiCentavos     Int
+  vStCentavos      Int
+  vFreteCentavos   Int
+  // O que o item custa de verdade: vProd − vDesc + vOutro + vSeg + vIPI + vST (custo é o que se paga). O frete vai à parte, rateado.
+  liquidoCentavos  Int
+
+  // Como a pessoa (ou a memória do fornecedor) resolveu o item: insumo, embalagem (variante ou a granel) e quantas embalagens
+  // vêm em 1 unidade comercial (milésimos). Tudo nulo = pendente. Fica no item: trocar a memória depois não muda o que foi usado.
+  insumoId       String?
+  insumo         Insumo?                @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  varianteId     String?
+  variante       InsumoVariante?        @relation(fields: [parceiroId, varianteId], references: [parceiroId, id], onDelete: Restrict)
+  aGranel        Boolean                @default(false)
+  fatorMilesimos Int?
+  vinculoId      String?
+  vinculo        VinculoItemFornecedor? @relation(fields: [parceiroId, vinculoId], references: [parceiroId, id], onDelete: Restrict)
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, documentoId, nItem])
+  @@index([parceiroId, insumoId])
+  @@index([parceiroId, vinculoId])
+}
+
+// A memória do fornecedor: "o QJ-MUS-2K em PC deste fornecedor é a Muçarela, embalagem Peça 2 kg, 1 por PC". Única por
+// fornecedor + código do produto + unidade comercial (o mesmo código em outra unidade é outro item). Mudar o fator ou o insumo
+// exige `fornecedores.editar`, deixa antes e depois no histórico e NUNCA muda nota já conciliada (o item guarda o que usou).
+model VinculoItemFornecedor {
+  id                String          @id @default(cuid())
+  parceiroId        String
+  parceiro          ParceiroFlow    @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  fornecedorId      String
+  fornecedor        Fornecedor      @relation(fields: [parceiroId, fornecedorId], references: [parceiroId, id], onDelete: Restrict)
+  codigoProduto     String
+  unidadeComercial  String
+  insumoId          String
+  insumo            Insumo          @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  varianteId        String?
+  variante          InsumoVariante? @relation(fields: [parceiroId, varianteId], references: [parceiroId, id], onDelete: Restrict)
+  aGranel           Boolean         @default(false)
+  // Quantas embalagens (ou kg/L/un, a granel) vêm em 1 unidade comercial, em milésimos (1000 = uma por unidade; 10 000 = dez).
+  fatorMilesimos    Int
+  criadoEm          DateTime        @default(now())
+  atualizadoEm      DateTime        @default(now()) @updatedAt
+  atualizadoPorNome String          @default("")
+
+  itensDeDocumento DocumentoFiscalItem[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, fornecedorId, codigoProduto, unidadeComercial])
   @@index([parceiroId, insumoId])
 }
 
