@@ -4155,3 +4155,115 @@ Observação: um banco recém-carregado (sem `VACUUM`) levou mais de 20 s na pri
 - **O R$ da baixa é o custo de referência do dia**; um preço mudado depois não reescreve o passado, mas a baixa sem preço entra com zero (dita).
 - **O livro de estoque da loja (1.6) mostra valor a quem tem `estoque.ver`**, inclusive o operador; este relatório não (pergunta 2 da decisão 397).
 - **Desempenho**: a leitura soma o livro inteiro da loja até o fim do período (`MovimentoEstoque` por loja e insumo). Medido em 320 mil movimentos (ver "Resultado da prova"), numa leitura só por tela, com teto de 20 s e 3 vagas por processo (decisão 398); com muitos anos de livro, levar o saldo inicial para uma tabela de fechamento é a saída.
+
+## O que a 3.4 entregou — etiquetas: o lote produzido, o lote do fornecedor e a embalagem aberta, na Zebra ou no papel
+
+Subfase 3.4 do plano ("Etiquetas"): etiqueta 60 × 40 e 60 × 60 mm com produto, conservação, manipulação ou abertura, validade,
+responsável, quantidade, lote e loja; o lote e o vencimento do item comprado registrados no recebimento; a abertura da
+embalagem com a validade efetiva; ZPL para a Zebra pelo Browser Print, com arquivo .zpl e papel A4 quando não der; retrato que
+a reimpressão não recalcula. Decisões 400 a 416. Migration aditiva `20261110000000_erp_etiquetas` (três tabelas de tenant com
+RLS; a "Etiqueta" da 0.1 virou a emissão). Sem permissão nova: `etiquetas.imprimir` por loja (o operador tem); o lote na nota é
+`compras.lancar`. `VERSAO_DO_ERP` = "Barney ERP · fase 3.4"; a lista de módulos "em breve" ficou vazia.
+
+| Peça | Onde |
+|---|---|
+| Regras puras: relógio do Rio, validade da abertura, leitura dos formulários, código da etiqueta, frases | `src/lib/erp/etiqueta-campos.ts` |
+| O desenho: texto limpo, quebra e medida, layout em pontos (203/300 dpi), ZPL, etiqueta de teste | `src/lib/erp/etiqueta-zpl.ts` |
+| Com banco: lojas, painel, lote, abertura, emissão, pedido e resultado, histórico, lote da nota, papel | `src/lib/erp/etiquetas.ts` |
+| `rastro` do XML guardado (nLote, qLote, dFab, dVal) | `rastrosDoXmlGuardado` em `src/lib/erp/nfe-xml.ts` |
+| Telas (as mesmas no /erp e no nível 1) | `src/components/erp/telas/etiquetas/` (`painel`, `lote`, `form-emitir`, `abrir`, `form-abrir`, `aberta`, `emissao`, `painel-impressao`, `browser-print.ts`, `papel`, `historico`, `impressora`, `config-impressora`, `lotes-da-nota`, `form-lote-nota`, `previa`) |
+| Rotas | `/erp/etiquetas` (`[loja]`, `[loja]/lote/[lote]`, `[loja]/abrir`, `[loja]/aberta/[abertura]`, `[loja]/[etiqueta]`, `[loja]/[etiqueta]/papel?pedido=`, `abrir`, `historico`, `historico/[loja]`, `impressora`), `/erp/compras/[id]/lotes` e o espelho em `/rodolfo/erp/[slug]/...` (ações com `auditLog`) |
+| Banco | `EtiquetaImpressao`, `LoteDeInsumo`, `AberturaDeLote` + colunas da "Etiqueta"; gatilhos `Etiqueta_origem_confere`, `EtiquetaImpressao_confere`, `LoteDeInsumo_confere`, `AberturaDeLote_confere` e os de parceiro imutável; conferidas por `npm run erp:conferir-migracao` |
+
+**O fluxo.** (1) O lote concluído na Produção ganha "Imprimir etiqueta" → a etiqueta do lote: tamanho, quantas (até 50, uma
+por pote), quanto em cada (opcional; juntas não passam do que saiu) e se a hora aparece, com a prévia proporcional redesenhada
+ao vivo → "Emitir" grava o retrato e leva à emissão. (2) A emissão: prévia do retrato, o painel de impressão (Zebra pelo
+Browser Print, "Baixar o arquivo .zpl", "Imprimir no papel (A4)", cópias) e os pedidos com o que aconteceu. (3) No
+recebimento, a nota tem "Lote e vencimento": por insumo, o lote como veio na embalagem (o rastro do XML como sugestão). (4) Na
+cozinha, "Abrir embalagem": o insumo, o lote (da nota, lido agora na embalagem ou "não informado"), onde vai ficar e quanto;
+a hora é a do registro; a tela mostra ao vivo até quando vale e recusa o lote vencido → a embalagem aberta emite a etiqueta
+dela. (5) Histórico de impressões por loja e período, com os totais que separam pedidos de etiquetas.
+
+### A regra da validade (decisões 401 a 403)
+
+| Caso | Na etiqueta |
+|---|---|
+| Lote produzido com validade (conclusão às 14:05, refrigerado 3 dias) | `MANIPULADO 23/10/26 14:05` e `VALIDADE 26/10/26 14:05` (a da conclusão, para sempre) |
+| Lote produzido sem validade na ficha | `VALIDADE NÃO INFORMADA` (e a tela pede para completar a ficha) |
+| Embalagem aberta 23/10 14:05, prazo 3 dias, lote vence 10/11 | `USAR ATÉ 26/10/26 14:05` (o prazo vem antes) e `VENC. LOTE 10/11/26` |
+| A mesma, lote vence 24/10 | `USAR ATÉ 24/10/26` (o vencimento vem antes: vale até o fim do dia no Rio; abrir não prolonga) |
+| Sem prazo depois de aberto na conservação escolhida | `PRAZO NÃO INFORMADO` (o vencimento do lote não vira validade depois de aberto) |
+| Lote vencido | não abre: "Este lote venceu em …: não abra. Separe para descarte e avise a gerência." |
+| Lote não informado | `VENC. LOTE NÃO INFORMADO` e `LOTE FORN. NÃO INFORMADO` (vale só o prazo) |
+
+### Referências Kairu consultadas (regra do plano)
+
+| Material | Lido | Aplicado | Adaptado | Fora, e por quê |
+|---|---|---|---|---|
+| `library:impressao-etiquetas` v1.0.0 (MCP, 23/10/2026) | inteiro | abas Imprimir/Histórico/Impressora; 60 × 40 e 60 × 60 a 203 dpi (480 × 320, 480 × 480); ZPL sanitizado com acentos (`^CI28`, `^FH`); prévia e ZPL do mesmo layout; nome grande quebra ou pede o formato maior, nunca trunca; snapshot e reimpressão sem recalcular; pedido gravado antes do envio, idempotência, reenvio consciente com aviso de duplicação; estados sem "impressa" automático, arquivo ≠ impressão; total de pedidos ≠ total de etiquetas; emissor da sessão separado de quem manipulou; emissão não mexe no estoque; validade no servidor no fuso da loja, dias como duração; isolamento por loja no servidor; instalar o aplicativo, aceitar o domínio e testar UMA etiqueta fictícia | sem prazo, o material bloqueia a emissão: aqui o lote sem validade sai "não informada" e a embalagem sem prazo "prazo não informado", com aviso (regra do coordenador de nunca inventar; perguntas 1 e 2 da decisão 415); cópias até 50, não 10 (412); Browser Print pela API local, sem empacotar o SDK (409) | logo e CNPJ na etiqueta (pergunta 8); hash do payload (o retrato regera o mesmo ZPL, testado); estado "confirmada pelo operador" (pergunta 9); limite de frequência; manipulação retroativa (manipulação = conclusão) |
+| `prompt:b3592b7c-e37b-4b1d-bffb-9053848afe28` "Da Ficha ao Fornecedor" (comunidade, MCP, 23/10/2026) | inteiro | busca pelo número do lote para conferir uma etiqueta impressa (painel da loja); validade = fabricação + prazo quando existe (herdado da 3.1) | — | rastreio de qual lote de insumo entrou no lote produzido (limitação também do material: pede outro desenho); botões de 56 px da tela de bancada (a etiqueta usa os de 44 px do formulário) |
+
+## Provar as etiquetas (3.4)
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate
+npx vitest run                                                         # sem banco
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism   # com banco (em blocos, se preferir)
+NODE_OPTIONS=--max-old-space-size=6144 npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code
+```
+
+`tests/erp-etiquetas.test.ts` (sem banco, 30): relógio do Rio, a regra da validade em cada caso, as situações, a leitura dos
+formulários, o ZPL (estrutura, limites, quebra, fonte mínima, campos que saem, acentos, sem validade), segurança (`^`, `~`,
+`_`, quebra, controle, largura zero, emoji, U+2028), nome do arquivo, etiqueta de teste, retrato determinístico e o rastro do
+XML. `tests/erp-etiquetas.db.test.ts` (Postgres, 15): emissão do lote e idempotência (5 emissões juntas, códigos sem repetir),
+recusas (não concluído, perdido, estornado; o estornado depois não imprime), reimpressão que não recalcula, pedidos e
+resultados, lotes da nota e a sugestão do XML, a regra da abertura, o item aberto, nota cancelada, escopo, isolamento e RLS,
+período fechado, totais do histórico e as barreiras do banco em SQL cru. `tests/erp-etiquetas-telas.db.test.ts` (8): as páginas
+e as actions de verdade por perfil (sem R$, 404 fora da loja e do parceiro, o nível 1 que não abre, o papel só com o pedido).
+`tests/erp-etiquetas-migracao.db.test.ts` (3 perfis): dado antigo (lote da 3.1 e uma "Etiqueta" da 0.1), nada some, sem aviso,
+regras pelo papel do tenant, conferidor limpo e acusando o que faltar. Jornada e matriz no navegador: scripts em
+`scratchpad/pw/prova34.mjs` e `matriz34.mjs` (Browser Print simulado por `page.route` em `localhost:9100`).
+
+**Resultado da prova (2026-10-23, depois do merge da L.4)**
+
+| Prova | Resultado |
+|---|---|
+| `prisma validate`, `typecheck`, `lint`, `gate` (710 arquivos), `build` | limpos |
+| `erp:conferir-migracao` e `migrate diff` | conferido (3.4 inclusa); vazio |
+| `vitest` sem banco | 136 arquivos (68 de banco pulam), 1.702 passando |
+| `vitest` com banco, superusuário, banco novo por `migrate deploy`, em 4 blocos | 81 arquivos, 1.291 testes, todos passando |
+| Dono NÃO-superusuário com FORCE RLS (migrations pelo dono), 15 arquivos de banco tocados ou vizinhos | 331 de 332 (a falha é a conhecida do teste da 0.2, que lê `_prisma_migrations`) |
+| Dono sem RLS, os mesmos 15 | 324 passando, 8 pulados |
+| Migration da 3.4 com dado antigo nos 3 perfis | 3 passando |
+| Jornada (build de produção, banco cópia do `ff_33` + migrations + categorias) | 34 de 34 conferências: concluir, emitir, Zebra (POST com o device e o ZPL `^CI28`, 480 × 320, `^PQ2`), .zpl (421 bytes), papel 60 × 40 mm (227 × 151 px a 96 dpi) e PDF A4, sem Browser Print, Zebra que recusa, 3 lotes na nota (a nota não muda), abrir pelo vencimento, sem prazo, abrir não mexe no estoque, histórico 5 pedidos · 9 etiquetas · 3 enviadas · 4 arquivo ou papel · 1 falhou |
+| Matriz: 10 telas × dona/gerente/operador × 1440/1180/820/390 × claro/escuro (232) | 0 rolagem lateral, 0 violação do axe, 0 erro de console, 0 alvo abaixo de 44 px com toque real, 0 R$, um h1 por tela |
+
+O que a prova achou e fez corrigir está na decisão 416 (a chave do formulário do lote na nota, os alvos de toque). O teste
+físico na Zebra do Valentin's (os dois rolos, 203 ou 300 dpi) depende do Rodolfo: o Browser Print instalado no computador da
+impressora, o domínio aceito e a etiqueta de teste da aba Impressora.
+
+## Herança da 3.4 (para as próximas)
+
+- **A emissão é imutável** (gatilho `Etiqueta_origem_confere`): corrigir é emitir de novo. Reimprimir é `EtiquetaImpressao` nova
+  do mesmo retrato (`pedirImpressao`). Mudou o desenho? Suba `VERSAO_DO_LAYOUT` e mantenha o retrato regerando o mesmo papel
+  (o teste do retrato determinístico denuncia).
+- **Uma função desenha tudo** (`montarEtiqueta`): prévia, papel e ZPL. Campo novo na etiqueta entra em `linhasDoConteudo`,
+  com `essencial` (recusa o formato se não couber) ou opcional (sai e é dito em `fora`), e um teste de nome longo nos dois tamanhos.
+- **Texto do usuário no ZPL só por `paraCampoZpl`** (normaliza e põe `^ ~ _` em hexadecimal dentro de `^FH`). Nunca concatene
+  texto cru num comando.
+- **A validade efetiva mora em dois lugares que precisam concordar**: `validadeDaAbertura` (JS) e os CHECKs da `AberturaDeLote`
+  (banco). Regra nova (horas, outra conservação) muda os dois e o teste das barreiras.
+- **O pedido de impressão muda uma vez** (de "preparada" para o resultado). "Enviada" não é "impressa": a confirmação física,
+  se vier, é um estado novo, não um uso diferente de "enviada".
+- **Browser Print**: os caminhos ficam em `browser-print.ts` (um adaptador). Se a versão instalada no Valentin's não aceitar o
+  POST de texto puro em `/write`, troque o adaptador (a biblioteca oficial da Zebra, servida como arquivo próprio), não o resto.
+  O que precisa sair do navegador já está: o pedido gravado antes e o resultado depois.
+- **O lote do fornecedor é por (nota, insumo)** e não muda; o lote lido na embalagem é de origem "abertura", sem nota. Nada de
+  vencimento no cadastro do insumo. Rastreio de qual lote de insumo entrou no lote produzido não existe (pede outro desenho).
+- **Formulário que volta para a mesma tela depois de gravar** leva a chave do envio da leitura como `key` (decisão 416).
+- **Matriz**: a pergunta da 1ª visita da caixa de ajuda (0.6) traz o link "Seu acesso" de 16 px; a matriz responde a pergunta
+  antes de medir. O link é da caixa (todo o ERP), não das telas.
+- **Para o Rodolfo** (decisão 415): imprimir ou bloquear sem validade/sem prazo; o fim do dia do vencimento; 50 etiquetas e
+  cópias; a FlowFoods não abre; lote na nota de quem lança nota; 203 ou 300 dpi e os rolos; CNPJ/logo; "saiu no papel".
