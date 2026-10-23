@@ -8,9 +8,10 @@
 
 import type { LotesDaNota } from '@/lib/erp/etiquetas';
 import { diaPorExtenso, quandoNaTela } from '@/lib/erp/etiqueta-campos';
+import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
-import { Aviso, Contagem, Painel } from '../../ui/superficies';
+import { Aviso, Contagem, Painel, Selo } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { Voltar } from '../cadastro/partes';
 import type { AcaoDeEstoque } from '../estoque/estado';
@@ -37,6 +38,7 @@ export function TelaLotesDaNota({
   envio: string;
 }) {
   const edita = podeRegistrar && n.lancada && !bloqueio;
+  const hoje = hojeNoRio();
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: n.rotulo, href: hrefNota }, { rotulo: 'Lote e vencimento' }]} />
@@ -60,7 +62,11 @@ export function TelaLotesDaNota({
                   {i.lotes.map((l) => (
                     <li key={l.id} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1 px-3.5 py-2.5 text-sm">
                       <span className="min-w-0">
-                        <span className="block font-semibold text-texto [overflow-wrap:anywhere]">{l.codigo ? `Lote ${l.codigo}` : 'Lote sem código'}</span>
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-texto [overflow-wrap:anywhere]">{l.codigo ? `Lote ${l.codigo}` : 'Lote sem código'}</span>
+                          {/* Chegou vencido (ou venceu depois): a abertura recusa; a tela já diz. */}
+                          {l.vencimento && l.vencimento < hoje && <Selo tom="erro">Venceu: não abra</Selo>}
+                        </span>
                         <span className="block text-[12px] tabular-nums text-suave [overflow-wrap:anywhere]">
                           {[l.vencimento ? `vence ${diaPorExtenso(l.vencimento)}` : 'vencimento não informado', l.fabricacao ? `fabricado ${diaPorExtenso(l.fabricacao)}` : null, l.marca ? `marca ${l.marca}` : null, l.doXml ? 'como no XML' : null]
                             .filter(Boolean)
