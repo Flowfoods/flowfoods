@@ -62,7 +62,9 @@ import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura 
 import { atenderRequisicao, obterRequisicao } from '@/lib/erp/requisicao';
 import { concluirProducao, listaDaProducao, obterOrdem, pegarProducao, planejarProducao } from '@/lib/erp/producao';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance, type Permissao } from '@/lib/erp/permissoes';
-import { loteParaEtiqueta, obterEmissao, painelDeEtiquetas, papelDoPedido } from '@/lib/erp/etiquetas';
+import { abrirEmbalagem, aberturaParaEtiqueta, loteParaEtiqueta, obterEmissao, painelDeEtiquetas, papelDoPedido, registrarLoteDaNota } from '@/lib/erp/etiquetas';
+import { fimDoVencimento } from '@/lib/erp/etiqueta-campos';
+import { TelaEmbalagemAberta } from '@/components/erp/telas/etiquetas/aberta';
 import { TelaEtiquetaDoLote } from '@/components/erp/telas/etiquetas/lote';
 import { TelaDaEmissao } from '@/components/erp/telas/etiquetas/emissao';
 import { TelaDoPapel } from '@/components/erp/telas/etiquetas/papel';
@@ -251,7 +253,9 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     como(OPERADOR());
     const h = await pagina(ErpEmissaoPage({ params: { lojaId: ids.vp, etiquetaId: ids.etiqueta }, searchParams: { feito: 'emitida' } }));
     const t = texto(h);
-    expect(t).toContain('Etiqueta emitida. Agora mande para a impressora');
+    // Rodada final (UX 5): o aviso não promete Zebra (a tela ainda não sabe se há uma neste aparelho).
+    expect(t).toContain('Etiqueta emitida: ela espera a impressora.');
+    expect(t).not.toContain('Agora mande para a impressora');
     expect(t).toContain('Imprimir na Zebra');
     expect(t).toContain('Baixar o arquivo .zpl');
     expect(t).toContain('Imprimir no papel (A4)');
@@ -432,6 +436,8 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     expect(texto(await pagina(ErpPapelPage({ params: { lojaId: ids.vp, etiquetaId: e2 }, searchParams: { pedido: papel.id } })))).not.toContain('Depois que a folha sair');
     const hh = texto(await pagina(ErpHistoricoDeImpressoesDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} })));
     expect(hh).toMatch(/Já imprimi 2 /);
+    // Rodada final (UX 6): o cartão do que ainda espera o "Já imprimi" (a etiqueta e2 foi confirmada: não conta).
+    expect(hh).toMatch(/Esperando o Já imprimi \d+ arquivo ou papel/);
     // O nível 1 também confirma (fica no auditLog).
     como(ALCANCE_FLOWFOODS, { userId: 'u-rodolfo', nome: 'Rodolfo' });
     expect(await doNivel1.acaoConfirmarImpressao(A.slug, ids.vp, e2)).toMatchObject({ ok: true, jaFeito: true });
@@ -481,5 +487,23 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     const h = await pagina(ErpLotesDaNotaPage({ params: { id: nota.id }, searchParams: {} }));
     expect(texto(h)).toContain('Pré-preparo não tem lote de fornecedor: a etiqueta dele vem do lote produzido.');
     expect(texto(h)).not.toContain('Registrar um lote');
+  });
+  it('rodada final · a embalagem SEM prazo cujo lote vence hoje: depois do fim do dia, vermelho, sem emitir, e "venceu: não use" no painel', async () => {
+    const lt = await registrarLoteDaNota(a, DONA(), ids.nota, { insumo: ids.creme, codigo: 'CR-HOJE', vencimento: hoje.split('-').reverse().join('/'), fabricacao: '', marca: '', envio: chave() }, { nome: 'Marina', userId: 'u-marina' });
+    if (!lt.ok) throw new Error(JSON.stringify(lt));
+    const ab = await abrirEmbalagem(a, OPERADOR(), ids.vp, { insumo: ids.creme, lote: lt.id, codigo: '', vencimento: '', fabricacao: '', marca: '', conservacao: 'CONGELADO', quanto: '', escala: 'base', envio: chave() }, { nome: 'Duda Lima', userId: 'u-duda' });
+    if (!ab.ok) throw new Error(JSON.stringify(ab));
+    const depois = new Date(fimDoVencimento(hoje).getTime() + 3_600_000);
+    const d = (await aberturaParaEtiqueta(a, OPERADOR(), ids.vp, ab.id, depois))!;
+    const h = sp(renderToStaticMarkup(createElement(TelaEmbalagemAberta, { d, base: '/erp/etiquetas', acao: async () => null, envio: 'x'.repeat(12), bloqueio: null })));
+    expect(h).toMatch(/role="alert"[^>]*><p class="font-semibold text-erro">Esta embalagem venceu em \d\d\/\d\d: não use\. Separe para descarte e avise a gerência\./);
+    expect(texto(h)).toContain('Venceu');
+    expect(texto(h)).not.toContain('Emitir a etiqueta');
+    const pp = (await painelDeEtiquetas(a, OPERADOR(), ids.vp, {}, depois))!;
+    const hp = texto(sp(renderToStaticMarkup(createElement(TelaPainelDeEtiquetas, { p: pp, base: '/erp/etiquetas', podeAbrir: true }))));
+    expect(hp).toMatch(/Creme de leite aberta .*lote CR-HOJE Venceu venceu: não use/);
+    // Antes do fim do dia, a mesma embalagem segue emitindo (o termo do sem prazo, em alerta).
+    const antes = (await aberturaParaEtiqueta(a, OPERADOR(), ids.vp, ab.id))!;
+    expect(antes).toMatchObject({ motivo: null, abertura: { situacao: { texto: 'Prazo após abertura não informado' } } });
   });
 });

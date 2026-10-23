@@ -480,11 +480,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'etiquetas',
     rotas: ['etiquetas/historico/[lojaId]'],
     titulo: 'Histórico de impressões da loja',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Cada pedido de impressão do período: Zebra, arquivo ou papel, as cópias e o que aconteceu.' },
       { texto: 'Pedidos e etiquetas são contas diferentes: um pedido de 10 cópias são 10 etiquetas.' },
-      { texto: 'Sem resultado é a Zebra que não respondeu ou a tela que fechou antes: pode ter saído. Já imprimi é quem disse que saiu.' },
+      { texto: 'Sem resultado é a Zebra que não respondeu: pode ter saído. Esperando o Já imprimi é arquivo ou papel que ninguém confirmou.' },
     ],
   },
   {

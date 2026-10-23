@@ -177,6 +177,10 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP 3.4 · migration das etiquetas, com
           expect(comoP1(`INSERT INTO "EtiquetaImpressao"(id,"parceiroId","lojaId","etiquetaId",sequencia,copias,transporte,situacao,"concluidaEm","solicitadaPorNome","chaveEnvio") VALUES ('ip3','p1','l1','e1',3,1,'ARQUIVO_ZPL','EXPORTADA',now(),'Duda','env-ip3-abcdef')`).ok).toBe(true);
           expect(comoP1(`UPDATE "EtiquetaImpressao" SET "confirmadaEm" = now(), "confirmadaPorNome" = 'Duda' WHERE id = 'ip3'`).ok).toBe(true);
           expect(comoP1(`UPDATE "EtiquetaImpressao" SET "confirmadaEm" = now(), "confirmadaPorNome" = 'Outra' WHERE id = 'ip3'`).aviso).toContain('EtiquetaImpressao_confere');
+          // Rodada final: não nasce confirmado; a confirmação não fica no futuro.
+          expect(comoP1(`INSERT INTO "EtiquetaImpressao"(id,"parceiroId","lojaId","etiquetaId",sequencia,copias,transporte,situacao,"concluidaEm","solicitadaPorNome","chaveEnvio","confirmadaEm","confirmadaPorNome") VALUES ('ip4','p1','l1','e1',4,1,'PAPEL','EXPORTADA',now(),'Duda','env-ip4-abcdef',now(),'Duda')`).aviso).toMatch(/nasce sem o "Já imprimi"/);
+          expect(comoP1(`INSERT INTO "EtiquetaImpressao"(id,"parceiroId","lojaId","etiquetaId",sequencia,copias,transporte,situacao,"concluidaEm","solicitadaPorNome","chaveEnvio") VALUES ('ip5','p1','l1','e1',5,1,'PAPEL','EXPORTADA',now(),'Duda','env-ip5-abcdef')`).ok).toBe(true);
+          expect(comoP1(`UPDATE "EtiquetaImpressao" SET "confirmadaEm" = now() + interval '1 day', "confirmadaPorNome" = 'Duda' WHERE id = 'ip5'`).aviso).toMatch(/não fica no futuro/);
           // Arquivo não é "enviada": o CHECK recusa a combinação.
           expect(comoP1(`INSERT INTO "EtiquetaImpressao"(id,"parceiroId","lojaId","etiquetaId",sequencia,copias,transporte,situacao,"concluidaEm","solicitadaPorNome") VALUES ('ip2','p1','l1','e1',2,1,'ARQUIVO_ZPL','ENVIADA',now(),'Duda')`).aviso).toContain('EtiquetaImpressao_resultado');
 

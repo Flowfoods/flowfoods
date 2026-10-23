@@ -589,6 +589,89 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · etiquetas, lote do fornecedor e abertura
     expect(r).toMatchObject({ ok: true });
     expect((await a.loteDeInsumo.findUnique({ where: { id: (r as { id: string }).id } }))!.codigo).toBe('L_23:#1');
   });
+  // ================================================================ rodada final (Guardião e UX)
+
+  it('rodada final · embalagem SEM prazo cujo lote do fornecedor vence hoje (cebola em seco): 1 ms antes do fim do dia emite; 1 h depois, tudo bloqueado', async () => {
+    const lt = await registrarLoteDaNota(a, GERENTE(), ids.nota, { insumo: ids.cebola, codigo: 'CB-HOJE', vencimento: br(hoje), fabricacao: '', marca: '', envio: chave() }, GIL);
+    expect(lt.ok).toBe(true);
+    const ab = await abrir(ids.cebola, { lote: (lt as { id: string }).id, conservacao: 'SECO' });
+    expect(ab.ok).toBe(true);
+    const AB = (ab as { id: string }).id;
+    expect((await a.aberturaDeLote.findUnique({ where: { id: AB } }))!).toMatchObject({ regraDaValidade: 'PRAZO_NAO_INFORMADO', validadeEm: null });
+    const fim = fimDoVencimento(hoje);
+    const antes = new Date(fim.getTime() - 1);
+    const depois = new Date(fim.getTime() + 3_600_000);
+    const emitirEm = (agora: Date) => emitirEtiquetaDaAbertura(a, OPERADOR(), ids.vp, AB, { formato: 'E60X40', quantas: '1', hora: 'sim', envio: chave() }, DUDA, agora);
+    const pedirEm = (e: string, transporte: string, agora: Date) => pedirImpressao(a, OPERADOR(), ids.vp, e, { copias: '1', transporte, resolucao: '203', envio: chave() }, DUDA, agora);
+    // 1 ms antes do fim do dia: ainda vale.
+    const r = await emitirEm(antes);
+    expect(r).toMatchObject({ ok: true });
+    const e = (r as { id: string }).id;
+    expect((await pedirEm(e, 'ARQUIVO_ZPL', antes)).ok).toBe(true);
+    const papel = await pedirEm(e, 'PAPEL', antes);
+    expect(papel.ok).toBe(true);
+    const pAntes = (await painelDeEtiquetas(a, OPERADOR(), ids.vp, {}, antes))!;
+    expect(pAntes.fila.map((f) => f.id)).toContain(e);
+    expect(pAntes.aberturas.find((x) => x.id === AB)).toMatchObject({ vencido: false, situacao: { texto: 'Prazo após abertura não informado' } });
+    // 1 h depois do fim do dia: emitir, Zebra, arquivo, papel (novo e antigo), "Já imprimi", tela, fila e selo.
+    const frase = /^Esta embalagem venceu em \d\d\/\d\d: não use\. Separe para descarte e avise a gerência\.$/;
+    expect(await emitirEm(depois)).toMatchObject({ ok: false, conflito: true, erros: { geral: expect.stringMatching(frase) } });
+    for (const t of ['BROWSER_PRINT', 'ARQUIVO_ZPL', 'PAPEL']) expect(await pedirEm(e, t, depois)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(frase) } });
+    expect((await papelDoPedido(a, OPERADOR(), ids.vp, e, (papel as { id: string }).id, depois))!).toMatchObject({ bloqueio: expect.stringMatching(frase), layout: null, conteudo: null });
+    expect(await confirmarImpressao(a, OPERADOR(), ids.vp, e, DUDA, depois)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(frase) } });
+    expect((await aberturaParaEtiqueta(a, OPERADOR(), ids.vp, AB, depois))!).toMatchObject({ motivo: expect.stringMatching(frase), abertura: { situacao: { texto: 'Venceu', tom: 'erro' } } });
+    expect((await obterEmissao(a, OPERADOR(), ids.vp, e, depois))!).toMatchObject({ bloqueio: expect.stringMatching(frase), etiqueta: { situacao: { texto: 'Venceu' } } });
+    const pDepois = (await painelDeEtiquetas(a, OPERADOR(), ids.vp, {}, depois))!;
+    expect(pDepois.fila.map((f) => f.id)).not.toContain(e);
+    expect(pDepois.aberturas.find((x) => x.id === AB)).toMatchObject({ vencido: true, situacao: { texto: 'Venceu', tom: 'erro' } });
+    // A dona e o nível 1 também não.
+    expect((await emitirEtiquetaDaAbertura(a, DONA(), ids.vp, AB, { formato: 'E60X40', quantas: '1', hora: 'sim', envio: chave() }, DUDA, depois)).ok).toBe(false);
+    expect((await pedirImpressao(a, ALCANCE_FLOWFOODS, ids.vp, e, { copias: '1', transporte: 'PAPEL', resolucao: '203', envio: chave() }, DUDA, depois)).ok).toBe(false);
+  });
+
+  it('rodada final · "Já imprimi" junto com a resposta da Zebra (12 rodadas): nunca erro cru; no fim, enviada OU confirmada, nunca as duas', async () => {
+    let confirmou = 0;
+    let enviou = 0;
+    for (let i = 0; i < 12; i++) {
+      const e = ((await emitir(L1)) as { id: string }).id;
+      const z = (await pedir(e)) as { id: string };
+      const cru1 = (x: unknown) => ({ CRUA: String(x).slice(0, 200) });
+      const [c, r] = await Promise.all([
+        confirmarImpressao(a, OPERADOR(), ids.vp, e, DUDA).catch(cru1),
+        resultadoDaImpressao(a, OPERADOR(), ids.vp, z.id, { resultado: 'ENVIADA', erro: '' }).catch(cru1),
+      ]);
+      expect(c).not.toHaveProperty('CRUA');
+      expect(r).not.toHaveProperty('CRUA');
+      const p = (await a.etiquetaImpressao.findUnique({ where: { id: z.id } }))!;
+      expect(p.situacao === 'ENVIADA' && p.confirmadaEm !== null).toBe(false);
+      expect(p.situacao === 'ENVIADA' || p.confirmadaEm !== null).toBe(true);
+      if (p.confirmadaEm) confirmou++;
+      else enviou++;
+    }
+    expect(confirmou + enviou).toBe(12);
+  });
+
+  it('rodada final · o banco: o pedido não nasce com "Já imprimi" nem confirma no futuro; o histórico conta o que espera o "Já imprimi"', async () => {
+    const e = ((await emitir(L1)) as { id: string }).id;
+    const h0 = (await historicoDeImpressoes(a, OPERADOR(), ids.vp, { periodo: 'hoje' }))!.totais.esperandoConfirmacao;
+    const arq = (await pedir(e, { transporte: 'ARQUIVO_ZPL' })) as { id: string };
+    expect((await pedir(e, { transporte: 'PAPEL' })).ok).toBe(true);
+    // Arquivo e papel da mesma etiqueta: UMA etiqueta esperando o "Já imprimi".
+    expect((await historicoDeImpressoes(a, OPERADOR(), ids.vp, { periodo: 'hoje' }))!.totais.esperandoConfirmacao).toBe(h0 + 1);
+    await expect(
+      cru(
+        db,
+        perfil,
+        A.id,
+        `INSERT INTO "EtiquetaImpressao"("id","parceiroId","lojaId","etiquetaId","sequencia","copias","transporte","situacao","concluidaEm","solicitadaPorNome","chaveEnvio","confirmadaEm","confirmadaPorNome") VALUES ($1,$2,$3,$4,99,1,'ARQUIVO_ZPL','EXPORTADA',now(),'X',$5,now(),'X')`,
+        `nasce${sufixo}`, A.id, ids.vp, e, `ch-nasce-${sufixo}`,
+      ),
+    ).rejects.toThrow(/nasce sem o "Já imprimi"/);
+    await expect(cru(db, perfil, A.id, `UPDATE "EtiquetaImpressao" SET "confirmadaEm" = now() + interval '10 years', "confirmadaPorNome" = 'X' WHERE "id" = $1`, arq.id)).rejects.toThrow(/não fica no futuro/);
+    expect(await confirmarImpressao(a, OPERADOR(), ids.vp, e, DUDA)).toMatchObject({ ok: true });
+    expect((await historicoDeImpressoes(a, OPERADOR(), ids.vp, { periodo: 'hoje' }))!.totais.esperandoConfirmacao).toBe(h0);
+  });
+
   it('período fechado não trava imprimir nem abrir (não mexem em dinheiro nem em estoque)', async () => {
     await a.transacao((tx) => criarPeriodoFechadoDeTeste(tx, { nome: 'Fechado de teste', inicio: somarDias(hoje, -2), fim: somarDias(hoje, 2) }));
     expect((await emitir(L1)).ok).toBe(true);
