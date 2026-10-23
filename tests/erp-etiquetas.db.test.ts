@@ -571,7 +571,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · etiquetas, lote do fornecedor e abertura
     expect((await papelDoPedido(a, OPERADOR(), ids.vp, e, (papel as { id: string }).id))!.bloqueio).toBeNull();
     const l = (await obterOrdem(a, DONA(), ids.vp, L))!;
     expect((await estornarProducao(a, GERENTE(), ids.vp, L, { versao: l.ordem.versao, motivo: 'erro de teste', confirmarNegativo: true }, GIL)).ok).toBe(true);
-    expect((await papelDoPedido(a, OPERADOR(), ids.vp, e, (papel as { id: string }).id))!.bloqueio).toMatch(/estornado/);
+    expect((await papelDoPedido(a, OPERADOR(), ids.vp, e, (papel as { id: string }).id))!).toMatchObject({ bloqueio: expect.stringMatching(/estornado/), layout: null, conteudo: null });
     expect(await confirmarImpressao(a, OPERADOR(), ids.vp, e, DUDA)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/estornado/) } });
   });
 
@@ -652,7 +652,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · etiquetas, lote do fornecedor e abertura
       expect(await pedirImpressao(a, OPERADOR(), ids.vp, E1, { copias: '1', transporte, resolucao: '203', envio: chave() }, DUDA, depois)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/venceu/) } });
     }
     const papel = (await a.etiquetaImpressao.findFirst({ where: { etiquetaId: E1, transporte: 'PAPEL' } }))!;
-    expect((await papelDoPedido(a, OPERADOR(), ids.vp, E1, papel.id, depois))!.bloqueio).toMatch(/venceu/);
+    expect((await papelDoPedido(a, OPERADOR(), ids.vp, E1, papel.id, depois))!).toMatchObject({ bloqueio: expect.stringMatching(/venceu/), layout: null });
     expect((await papelDoPedido(a, OPERADOR(), ids.vp, E1, papel.id))!.bloqueio).toBeNull();
     expect((await obterEmissao(a, OPERADOR(), ids.vp, E1, depois))!.bloqueio).toMatch(/venceu/);
     const p = (await painelDeEtiquetas(a, OPERADOR(), ids.vp, {}, depois))!;

@@ -40,7 +40,7 @@ export function TelaDoPapel({ d, base, contexto, confirmar }: { d: PapelDoPedido
           cor={COR.etiquetas}
           titulo={`Papel · ${d.etiqueta.codigo}`}
           subtitulo={[contexto, d.etiqueta.nome, `${d.pedido.copias} ${d.pedido.copias === 1 ? 'etiqueta' : 'etiquetas'} ${f.rotulo}`].filter(Boolean).join(' · ')}
-          acao={l.erro || d.bloqueio ? undefined : <BotaoImprimir />}
+          acao={!l || l.erro ? undefined : <BotaoImprimir />}
         />
         {d.bloqueio ? (
           <AvisoDeBloqueio frase={d.bloqueio} />
@@ -49,11 +49,11 @@ export function TelaDoPapel({ d, base, contexto, confirmar }: { d: PapelDoPedido
             <p className="text-sm text-suave">
               Imprima em tamanho real (100%, sem ajustar à página) e recorte nas linhas. Em papel adesivo A4, cada etiqueta sai com {f.larguraMm} × {f.alturaMm} mm.
             </p>
-            {d.naFila && !l.erro && <JaImprimiDoPapel confirmar={confirmar} voltar={daEmissao} />}
+            {d.naFila && l && !l.erro && <JaImprimiDoPapel confirmar={confirmar} voltar={daEmissao} />}
           </>
         )}
       </div>
-      {d.bloqueio ? null : l.erro ? (
+      {!l ? null : l.erro ? (
         <p role="alert" className="text-sm text-erro">
           {l.erro}
         </p>

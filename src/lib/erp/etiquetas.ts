@@ -1062,7 +1062,16 @@ export async function papelDoPedido(cliente: ClienteDoParceiro, alcance: Alcance
       const bloqueio = await bloqueioDaEmissao(tx, e, agora);
       // Rodada 1 (decisão 418): abrir o papel não tira da fila; o "Já imprimi" desta tela tira.
       const saiu = await tx.etiquetaImpressao.count({ where: { etiquetaId: e.id, OR: [{ situacao: 'ENVIADA' }, { confirmadaEm: { not: null } }] } });
-      return { loja, etiqueta: { id: e.id, codigo: e.codigo, formato: e.formato as Formato, nome: e.nomeSnapshot }, pedido: pedidoParaTela(p), conteudo, layout: montarEtiqueta(conteudo, e.formato as Formato, 203), bloqueio, naFila: saiu === 0 };
+      // Bloqueada: a tela recebe só o porquê; nada para desenhar (nem o conteúdo, nem o layout).
+      return {
+        loja,
+        etiqueta: { id: e.id, codigo: e.codigo, formato: e.formato as Formato, nome: e.nomeSnapshot },
+        pedido: pedidoParaTela(p),
+        conteudo: bloqueio ? null : conteudo,
+        layout: bloqueio ? null : montarEtiqueta(conteudo, e.formato as Formato, 203),
+        bloqueio,
+        naFila: saiu === 0,
+      };
     }),
   );
   return 'ok' in r ? null : r;
