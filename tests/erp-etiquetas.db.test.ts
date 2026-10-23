@@ -598,7 +598,8 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · etiquetas, lote do fornecedor e abertura
     await expect(inserir('2026-11-22 17:00:00', 30 * DIA, null, 'PRAZO_APOS_ABERTURA')).rejects.toThrow(/prazo da abertura|AberturaDeLote_confere/);
     // Sem lote informado, mas com vencimento: recusa.
     await expect(inserir('2026-10-25 03:00:00', 3 * DIA, '2026-10-24', 'VENCIMENTO_DO_LOTE')).rejects.toThrow(/sem lote|AberturaDeLote/);
-    await expect(cru(db, perfil, A.id, `UPDATE "AberturaDeLote" SET "abertoPorNome" = 'Outro' WHERE "id" = $1`, AB1)).rejects.toThrow(/não muda/);
+    // Mudar a abertura: o gatilho recusa; com a RLS forçada, o papel do tenant nem tem UPDATE nela (só lê e cria).
+    await expect(cru(db, perfil, A.id, `UPDATE "AberturaDeLote" SET "abertoPorNome" = 'Outro' WHERE "id" = $1`, AB1)).rejects.toThrow(/não muda|permission denied for table AberturaDeLote/);
     // Validade que passa do vencimento do lote: o CHECK do mínimo (direto, com o gatilho do prazo satisfeito).
     await expect(
       cru(db, perfil, A.id, `INSERT INTO "AberturaDeLote" (${cols}) VALUES ($1,$2,$3,$4,$5,'X','KG','REFRIGERADO',$6::timestamp,$7,$8::date,$9,$10,$11::timestamp,'PRAZO_APOS_ABERTURA','Teste')`, `y${sufixo}`, A.id, ids.vp, ids.creme, ab.loteId, '2026-10-23 17:00:00', 3 * DIA, isoDia(ab.vencimentoLoteEm!), ab.codigoLoteSnapshot, ab.marcaSnapshot, '2030-01-01 00:00:00'),
