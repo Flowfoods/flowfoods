@@ -4052,3 +4052,106 @@ código). Escolha e motivos na decisão 202. As prévias em imagem não abriram 
 **Herança (para as próximas).** Tela nova usa `PageHeader` (é ele que traz a caixa de ajuda). Alvo novo que encolhe acima de 600 px usa as classes
 já cobertas pela regra de toque (`sm:min-h-10`, `sm:min-h-[42px]`…) ou entra na lista em `tokens.css`. Fica para depois: Equipe longa no celular e
 "Ver tudo sobre esta tela" como link de texto em vez de botão fantasma.
+
+## O que a L.4 entregou — consumo e conciliação de estoque (relatório)
+
+Quarta entrega da "Evolução prioritária — lista de insumos e relatórios de compras, preços e consumo" (Rodolfo, 21/10/2026): **"Consumo e conciliação de estoque"** (L1231–1235), item 4 da "Ordem de entrega" (L1237–1242: "após validar cobertura dos movimentos") e os critérios L1244–1246. **Sem migration** (387): o livro do estoque já tem tudo. Decisões 386 a 397 (386 é a herança da L.3, em commit próprio). Sem permissão nova (`estoque.ver` por loja; R$ só com `compras.ver`, 390). Ajuda: `estoque-consumo` nova (versão 1; nenhuma entrada existente mudou).
+
+**Heranças da L.3 resolvidas (386, primeiro commit).** Fornecedor sem cadastro separado pelo nome da nota, também em "Comparar fornecedores" e nos agrupamentos de "Compras do período" (`n:<nome>`, mostrado "(sem cadastro)"); "Comparar períodos" sem "Tirar os filtros" à toa, sem "B: R$ 0,00" num lado sem compra, com um aviso só quando os dois lados não têm compra comparável e sem "cobre 0,0%", e "1 compra · nenhum fornecedor com preço comparável"; e a área de toque dos links de texto (nomes curtos, "nota 301", "Abrir o cadastro", fornecedores, "Ver as canceladas"): `position: relative; z-index: 1` + `min-width: 44px` no `ff-toque`/link de tabela e passo de 44 px nas linhas de tabela no toque (sistêmico, `tokens.css`).
+
+**Telas** (`/erp/estoque/relatorios/consumo`, `.../consumo/movimentos`, `.../consumo/exportar` e o espelho `/rodolfo/erp/[slug]/estoque/relatorios/consumo...`), grupo "Relatórios" do menu de Estoque e Movimentações (394).
+
+1. **A ponte de cada unidade** (kg, L e un nunca somados): Saldo inicial → Compras → Produzido → Uso → Perdas → Devoluções → Estornos → Ajustes → Saldo final, com a linha "Transferências entre lojas: ainda não existe no sistema", o selo "Confere" e a conta de bruto × líquido. Cada número abre os movimentos que o formam.
+2. **Tabela por insumo e loja** (≥ 1280 px; cartões abaixo): as mesmas colunas, número com sinal, R$ embaixo para quem vê, selos de lacuna. Abrir o nome do insumo leva ao **linha a linha** (17 caixas em 4 grupos, cada uma com "de onde vem", quantos movimentos e a quantidade; o que ainda não existe diz isso; as lacunas em frase).
+3. **Antes de ler** (392): o que ficou fora ou pede olhar: período em andamento, loja sem a abertura do estoque, notas fiscais (XML) que aguardam conferência (fora até virarem nota lançada), contagem em andamento, lacunas duras, sem contagem no período, sem valor.
+4. **Movimentos** (395): a coluna, o saldo inicial ou o final aberto, do mais novo ao mais velho, com quantidade com sinal, saldo antes › depois, selo "Estorno" e a origem com link (requisição #N e lote, nota, contagem ou abertura) conforme a permissão da loja; `volta` para o relatório.
+5. **Planilha e impressão** (395): CSV protegido (avisos no cabeçalho, 17 caixas, ponte conferida por linha, totais por unidade; `parte=movimentos` baixa os movimentos de um número) e "Imprimir ou salvar em PDF" com landmarks únicos.
+
+### O indicador e o que o relatório nunca faz (391)
+
+"Uso" é a **requisição registrada** (a baixa que o estoque deu ao entregar), não o consumo aferido por contagem (esse é o das Divergências, 1.8). O relatório só lê: não dá baixa pela venda, pela geração da tela, da planilha, da impressão nem dos movimentos (teste de contagem de linhas antes e depois). A diferença da contagem é Ajuste (sobra ou falta), nunca consumo nem perda presumidos.
+
+### A conta (387 a 389)
+
+Cada movimento cai numa coluna só (`BUCKET`, um `CASE` em SQL): compra (1º lançamento da nota), nota corrigida (o estorno do lançamento antigo e a nova entrada, juntos: só a diferença), nota cancelada (estorno do último lançamento de uma nota `CANCELADA`), produzido, lote desfeito, uso de lote, uso de setor, devolução (o estorno da baixa e o relançamento do líquido, juntos), perda, sobra e falta na contagem, ajuste manual, abertura, outros estornos e as duas caixas reservadas de transferência. Inicial = soma do livro até o dia anterior; final = soma até o fim do último dia (relógio do Rio); a ponte (inicial + soma das colunas) é conferida por uma segunda soma direta e o livro é conferido com `SaldoEstoque`.
+
+| Cebola, Casa, 01–31/10/2026 (conta à mão) | Quantidade |
+|---|---|
+| Saldo inicial (abertura de 28/09) | 20 kg |
+| Compras (3 notas lançadas: 50 + 20 + 10 kg) | +80 kg |
+| Estornos: nota cancelada −20 kg; nota corrigida de 10 para 12 kg +2 kg | −18 kg |
+| Uso: requisição de setor −30 kg; dois lotes −0,885 e −0,354 kg | −31,239 kg |
+| Devoluções (5 kg voltaram da requisição de setor: estorno +30, relança −25) | +5 kg |
+| Ajustes (a contagem de 12/10 achou 55 kg onde o livro tinha 55,761) | −0,761 kg |
+| **Saldo final** (20 + 80 − 18 − 31,239 + 5 − 0,761) | **55 kg** |
+
+### Evidência de cada caixa do Notion (para o Maestro marcar; L1231–1235, L1237–1242 e L1244–1246)
+
+| Caixa | Evidência |
+|---|---|
+| L1231 compras e consumo separados; entrada de nota não é uso; transferência interna não é compra nem consumo | Colunas Compras e Uso separadas (teste de banco: Cebola, e `compra` só de nota lançada); "Produzido" não é compra; transferência dita como inexistente e com linhas reservadas no detalhe e no CSV (393); jornada: ponte e linha a linha. |
+| L1232 saldo inicial, entradas, uso, perdas, devoluções, transferências, ajustes e saldo final, com sinais e origens | Ponte, tabela e linha a linha com sinal e "de onde vem"; 17 caixas; movimentos com a origem (nota, requisição e lote, contagem, abertura); testes de banco (cenário de outubro, SQL independente) e jornada dona. |
+| L1233 baixa na requisição; nunca de novo pela venda nem pela geração; dizer se é requisição registrada ou aferido | Decisão 391; teste "o relatório só lê" (linhas de movimento, saldo, requisição, item atendido, nota, histórico, contagem e ordem iguais antes e depois de tela, planilha, impressão e movimentos); frase na primeira dobra, nas notas, na ajuda e no CSV. |
+| L1234 saldo final concilia; diferença de inventário é ajuste; lacunas | Ponte conferida por segunda soma e por `SaldoEstoque` (389); a contagem entra como sobra/falta em Ajustes; lacunas: sem contagem (com a última data), negativo no fim e no meio, sem origem, saldo que não bate, sem valor, unidade que mudou (392). |
+| L1235 cancelamentos, estornos e devoluções separados; bruto × líquido; documento só capturado fora | Colunas Estornos e Devoluções à parte, bruto/líquido definidos e escritos (388); nota cancelada, corrigida e devolução em duas rodadas (devolução parcial); XML aguardando fora do livro, avisado com o número (teste de banco e jornada). |
+| L1237–1242 ordem de entrega, item 4 | Esta entrega, depois de validada a cobertura dos movimentos (quadro "Cobertura" abaixo). |
+| L1244 amostra: mudança de mês, devolução/cancelamento, nota repetida, transferência entre lojas | Fuso (23:30 de 31/10 em outubro, 00:30 de 01/11 em novembro), nota cancelada e corrigida, devolução, requisição de lote e lote estornado; nota repetida e relançada conta pela chave de idempotência do livro; transferência entre lojas não existe (dito). |
+| L1245 soma das linhas × resumo, exportação × tela, abertura da origem, isolamento entre empresas e lojas | Testes de banco (soma das caixas = final − inicial, CSV parseado = tela linha a linha e totais), "cada número abre as linhas" com `volta` (jornada), isolamento: gerente só da loja dele, parceiro B invisível, operador sem R$, 401/403/400/413. |
+| L1246 computador, tablet retrato e paisagem, celular, teclado e leitores de tela | Matriz de 14 telas × 4 tamanhos × 2 temas com ponteiro de toque, axe e hit-test; `caption`, `aria-label` com o que cada número abre, `aria-current`, landmarks únicos na impressão. Consumo real e publicação não foram declarados. |
+
+### Cobertura dos movimentos (o que falta, dito antes de entregar)
+
+Gravados hoje: abertura, compra, requisição, entrada de lote e contagem. **Sem quem grave**: perda (`PERDA`), ajuste manual (`AJUSTE`) e `PRODUCAO_CONSUMO`. **Inexistente**: transferência entre lojas. A contagem que bate não gera movimento (a cobertura de contagem vem de `ContagemItem`). O R$ da baixa é o custo de referência do dia da entrega; insumo sem preço entra com zero e é dito. Nada disso foi inventado: as colunas existem vazias e a tela diz por quê.
+
+### Referências Kairu consultadas (regra do plano)
+
+Pelo MCP Kairu em 23/10/2026: `pass:inventario-contagem-divergencias` v1.2.0, `library:inventario-ciclico` v1.0.0 e `pass:cmv-fichas-e-margem` v1.2.0 (lidos inteiros). O que foi aplicado está na decisão 396: item não contado não é zero, divergência não prova perda, saldo final que bate com o razão, custo ausente é indisponível (nunca zero), cobertura parcial dita antes dos números, "nunca compensar com baixa silenciosa" (o relatório não grava), dia operacional do Rio com [início, fim) e isolamento de outra loja testado em HTML, planilha e movimentos.
+
+## Provar a L.4
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate
+npx vitest run                                              # sem banco
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run   # com banco, 2x, em paralelo
+NODE_OPTIONS=--max-old-space-size=6144 npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio (não há migration nova)
+```
+`tests/erp-consumo-estoque.test.ts` (sem banco, 19): o mapa das caixas (uma coluna por caixa), a ponte, bruto × líquido, a propriedade com 300 sequências, as lacunas, os filtros da URL, o sinal, a planilha de negativo e os avisos. `tests/erp-consumo-estoque.db.test.ts` (Postgres de verdade, cenário conferido à mão no cabeçalho do arquivo, 26 testes, a planilha inclusa): a conta da Cebola, SQL independente, contado e não contado, lote e lote estornado, negativos, sem origem e perda, o dia do Rio, o resumo por unidade, os filtros, o XML aguardando, "só lê", os movimentos de cada número, perfis e isolamento, o dinheiro do livro e o teto, o R$ zerado na própria consulta de quem não vê custo e o relatório respondendo com a frase quando as vagas estão ocupadas. `tests/erp-vagas-de-relatorio.test.ts` (sem banco, 5) e `tests/erp-relatorio-teto.db.test.ts` (Postgres, 5): vagas e fila, teto cortado pelo banco, somente leitura no portão e no banco, o teto que não vaza no pool e seis relatórios juntos com no máximo três ao mesmo tempo. Sem migration: os 3 perfis de banco não têm o que aplicar; os arquivos de banco tocados rodam nos dois perfis.
+
+**Resultado da prova (L.4), rodada do Guardião e da UX (disponibilidade)**
+
+| Prova | Resultado |
+|---|---|
+| `prisma validate`, `typecheck`, `lint`, `gate` (661 arquivos), `build` | limpos |
+| `erp:conferir-migracao` e `migrate diff` contra o schema | conferido; "No difference detected" (a L.4 não tem migration) |
+| `vitest` sem banco | 1.647 passaram, 918 pulados (sem `ERP_DB_TESTE`) |
+| `vitest` com banco, 2 rodadas em paralelo (superusuário) | 2.609 de 2.609 nas duas |
+| Arquivos de banco tocados (consumo, teto de relatório, relatório e comparação de compras), dono não-superusuário **com** RLS (42 políticas) e **sem** RLS (0 políticas), em série | 77 de 77 nos dois |
+| Produção local (`next start`, porta 3100), matriz de 10 telas x 4 larguras (1440, 1180, 820, 390), claro e escuro | 0 problemas em 56 combinações por tema: sem rolagem lateral, sem texto miúdo, hit-test de toque ≥ 44 px sem sobreposição, axe sem violação, sem erro de console |
+| Jornada por perfil (dono, gerente só das lojas dele, operador e cozinha sem R$, isolamento entre dois parceiros) | 76 verificações, 0 falhas |
+| Pontos tocados na rodada, no navegador | 21 de 21: links de origem com volta (nota, requisição, lote, contagem) e volta forjada ignorada; grupo Relatórios no menu; "0 L" no lugar de "0 ml"; número e unidade sem quebra a 390 px; R$ negativo do Alho explicado; aviso da comparação uma vez só; Compras/Uso bruto e líquido na impressão e no CSV |
+
+**Desempenho e concorrência** (320 mil movimentos: 8 lojas x 400 insumos x 100 movimentos; banco local de 4 núcleos):
+
+| Medida | Antes da rodada | Depois |
+|---|---|---|
+| Tela de 1 mês, banco aquecido | 7 a 10 s (o livro lido 3 vezes) | **1,9 s** (uma leitura) |
+| Tela de 1 mês, cache frio (banco recém-reiniciado) | 8 a 31 s | **4,3 s** |
+| 3 meses, ano, planilha completa (3.200 linhas) | 8 s, 8 s, 6 s | 2,0 s, 2,2 s, 2,2 s |
+| Uma loja, um mês | 4,4 s | 0,4 s |
+| Movimentos de um número (um par) / da coluna "ajustes" inteira | 34 ms / 2,4 s | 33 ms / 0,4 s |
+| 20 pedidos pesados ao mesmo tempo (HTTP, produção local) | pool esgotado: erro "Unable to start a transaction" e o ERP travado | **20 respostas 200 em 9,8 s: 6 com os números, 14 com "Há outro relatório grande rodando", nenhum 5xx** |
+| Tela leve durante os 20 pesados | travava | mediana de 77 ms (repouso: 90 ms); maior espera de 809 ms, todas 200 |
+| Consulta que passa do teto | seguia rodando no banco depois do erro do Prisma | cortada pelo Postgres aos 20 s; frase "O relatório ficou grande demais" |
+
+Observação: um banco recém-carregado (sem `VACUUM`) levou mais de 20 s na primeira leitura de cada recorte, por causa dos bits de consulta ainda não marcados; isso não acontece em produção com o autovacuum, e o teto de 20 s corta o caso com a frase em vez de travar. O limite continua dito: acima disso o caminho é guardar o saldo por dia, não afrouxar o teto.
+
+### Herança da L.4 (para as próximas)
+
+- **Perda, ajuste manual e transferência entre lojas** não têm tela nem tipo: quando existirem, entram nas caixas já reservadas (`perda`, `ajuste`, `transf_entrada`, `transf_saida`) e o relatório não muda de forma. Transferência pede um tipo novo no livro (migration) e saída e entrada ligadas, sem contar como compra nem consumo da rede.
+- **A classificação mora num `CASE` só** (`BUCKET` em `consumo-estoque.ts`): quem criar um tipo de movimento ou uma nova forma de estorno precisa dizer em que caixa ele cai, ou ele vira "Outros estornos" (e o teste de banco denuncia).
+- **Consumo aferido** (inicial contado + entradas − final contado) continua nas Divergências; trazê-lo para este relatório exige contagem nas duas pontas do período.
+- **O R$ da baixa é o custo de referência do dia**; um preço mudado depois não reescreve o passado, mas a baixa sem preço entra com zero (dita).
+- **O livro de estoque da loja (1.6) mostra valor a quem tem `estoque.ver`**, inclusive o operador; este relatório não (pergunta 2 da decisão 397).
+- **Desempenho**: a leitura soma o livro inteiro da loja até o fim do período (`MovimentoEstoque` por loja e insumo). Medido em 320 mil movimentos (ver "Resultado da prova"), numa leitura só por tela, com teto de 20 s e 3 vagas por processo (decisão 398); com muitos anos de livro, levar o saldo inicial para uma tabela de fechamento é a saída.

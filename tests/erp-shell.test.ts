@@ -88,6 +88,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/estoque/contagens',
       '/erp/estoque/requisicoes',
       '/erp/estoque/divergencias',
+      '/erp/estoque/relatorios/consumo',
       '/erp/producao/lista',
       '/erp/producao/tarefas',
       '/erp/producao',
@@ -141,7 +142,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     // 3.3: as tarefas da cozinha e o histórico da produção; os indicadores por pessoa são da gerência.
     // 3.4: ele imprime a etiqueta do lote e registra a embalagem aberta (etiquetas.imprimir).
     expect(hrefs(a)).toEqual([
-      '/erp/insumos', '/erp/insumos/categorias', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes',
+      '/erp/insumos', '/erp/insumos/categorias', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/estoque/relatorios/consumo',
       '/erp/producao/lista', '/erp/producao/tarefas', '/erp/producao', '/erp/producao/historico',
       '/erp/etiquetas', '/erp/etiquetas/abrir', '/erp/etiquetas/historico', '/erp/etiquetas/impressora',
       '/erp/lojas', '/erp/acesso',
@@ -218,6 +219,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/estoque/contagens',
       '/rodolfo/erp/valentins/estoque/requisicoes',
       '/rodolfo/erp/valentins/estoque/divergencias',
+      '/rodolfo/erp/valentins/estoque/relatorios/consumo',
       '/rodolfo/erp/valentins/producao/lista',
       '/rodolfo/erp/valentins/producao/tarefas',
       '/rodolfo/erp/valentins/producao',

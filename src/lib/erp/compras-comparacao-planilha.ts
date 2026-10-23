@@ -32,7 +32,7 @@ import {
   reaisParaPlanilha,
   type FiltrosDoRelatorio,
 } from './compras-relatorio-campos';
-import { parametrosDaUrl, precoParaPlanilha, respostaHttpDaPlanilha, type RespostaDaPlanilha } from './compras-relatorio-planilha';
+import { comRecusaDeRelatorio, parametrosDaUrl, precoParaPlanilha, respostaHttpDaPlanilha, type RespostaDaPlanilha } from './compras-relatorio-planilha';
 import { formatarData, hojeNoRio } from './compra-campos';
 import { UNIDADES, type Fracao, type Unidade } from './unidades';
 
@@ -292,7 +292,7 @@ async function nomesDosFiltros(cliente: ClienteDoParceiro, f: FiltrosDoRelatorio
 
 const agora = (a?: Date) => (a ?? new Date()).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' });
 
-export async function planilhaDaComparacaoDePeriodos(cliente: ClienteDoParceiro | null, alcance: Alcance | null, f: FiltrosDePeriodos, opcoes: { agora?: Date } = {}): Promise<RespostaDaPlanilha> {
+async function montarPlanilhaDaComparacaoDePeriodos(cliente: ClienteDoParceiro | null, alcance: Alcance | null, f: FiltrosDePeriodos, opcoes: { agora?: Date } = {}): Promise<RespostaDaPlanilha> {
   if (!cliente || !alcance) return { ok: false, status: 401, frase: 'Entre no ERP para baixar a planilha.' };
   if (!pode(alcance, 'compras.ver')) return { ok: false, status: 403, frase: 'Seu acesso não inclui ver compras e notas.' };
   if (f.periodoInvalido) return { ok: false, status: 400, frase: f.periodoInvalido };
@@ -305,7 +305,7 @@ export async function planilhaDaComparacaoDePeriodos(cliente: ClienteDoParceiro 
   return { ok: true, nome: `comparacao-periodos-${f.rel.de}_a_${f.rel.ate}-contra-${f.deB}_a_${f.ateB}.csv`, corpo: planilhaDosPeriodos(r, f, nomes, agora(opcoes.agora), hojeNoRio(opcoes.agora)) };
 }
 
-export async function planilhaDaComparacaoDeFornecedores(cliente: ClienteDoParceiro | null, alcance: Alcance | null, f: FiltrosDoRelatorio, opcoes: { agora?: Date } = {}): Promise<RespostaDaPlanilha> {
+async function montarPlanilhaDaComparacaoDeFornecedores(cliente: ClienteDoParceiro | null, alcance: Alcance | null, f: FiltrosDoRelatorio, opcoes: { agora?: Date } = {}): Promise<RespostaDaPlanilha> {
   if (!cliente || !alcance) return { ok: false, status: 401, frase: 'Entre no ERP para baixar a planilha.' };
   if (!pode(alcance, 'compras.ver')) return { ok: false, status: 403, frase: 'Seu acesso não inclui ver compras e notas.' };
   if (f.periodoInvalido) return { ok: false, status: 400, frase: f.periodoInvalido };
@@ -314,6 +314,9 @@ export async function planilhaDaComparacaoDeFornecedores(cliente: ClienteDoParce
   if (r.motivoVazio || !r.insumo) return { ok: false, status: 403, frase: 'Nenhuma loja do seu acesso entra neste relatório, ou o insumo não existe.' };
   return { ok: true, nome: `comparacao-fornecedores-${f.de}_a_${f.ate}.csv`, corpo: planilhaDosFornecedores(r, f, await nomesDosFiltros(cliente, f), agora(opcoes.agora)) };
 }
+
+export const planilhaDaComparacaoDePeriodos = (...a: Parameters<typeof montarPlanilhaDaComparacaoDePeriodos>) => comRecusaDeRelatorio(() => montarPlanilhaDaComparacaoDePeriodos(...a));
+export const planilhaDaComparacaoDeFornecedores = (...a: Parameters<typeof montarPlanilhaDaComparacaoDeFornecedores>) => comRecusaDeRelatorio(() => montarPlanilhaDaComparacaoDeFornecedores(...a));
 
 /** A rota de download das duas árvores: lê os filtros da URL (`tela=fornecedores|periodos`) e responde. */
 export async function responderPlanilhaDaComparacao(cliente: ClienteDoParceiro | null, alcance: Alcance | null, req: Request): Promise<Response> {

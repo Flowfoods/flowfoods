@@ -28,6 +28,8 @@ import { cadastrarFornecedor, cancelarNota, lancarNota } from '@/lib/erp/compras
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import { comparacaoDeFornecedores, comparacaoDePeriodos } from '@/lib/erp/compras-comparacao';
 import { lerFiltrosDeFornecedores, lerFiltrosDePeriodos } from '@/lib/erp/compras-comparacao-campos';
+import { relatorioDaTela } from '@/lib/erp/compras-relatorio';
+import { lerFiltrosDoRelatorio } from '@/lib/erp/compras-relatorio-campos';
 import { planilhaDaComparacaoDeFornecedores, planilhaDaComparacaoDePeriodos, responderPlanilhaDaComparacao } from '@/lib/erp/compras-comparacao-planilha';
 import { cadastrarInsumoDeTeste as cadastrarInsumo, cru, limparParceiros, perfilDoBanco, SEM_NOTA_FISCAL, type PerfilDoBanco } from './erp-db-apoio';
 import { montarCenario } from './erp-documento-fiscal-apoio';
@@ -518,8 +520,17 @@ describe.skipIf(!URL_TESTE)('ERP L.3 · comparação de fornecedores e períodos
       await sql(`UPDATE "NotaEntrada" SET "fornecedorId" = NULL, "fornecedorNomeSnapshot" = 'Barraca da Maria' WHERE id = $1`, notas.H2);
       const r = await comparacaoDePeriodos(a, DONA(), periodos({ insumo: hort.id }));
       const forn = r.comparacao!.itens[0].fornecedores.map((x) => x.fornecedor).sort();
-      expect(forn).toEqual(['Barraca da Maria', 'Feira do João']);
+      expect(forn).toEqual(['Barraca da Maria (sem cadastro)', 'Feira do João (sem cadastro)']);
       expect(r.comparacao!.itens[0].fornecedores.map((x) => x.fornecedorId).sort()).toEqual(['n:Barraca da Maria', 'n:Feira do João']);
+      // (herança L.3 → L.4) Comparar fornecedores faz o mesmo: um fornecedor por nome guardado na nota, dito "sem cadastro".
+      const cf = await comparacaoDeFornecedores(a, DONA(), fornecedores({ de: '2026-10-01', ate: '2026-10-31', insumo: hort.id }));
+      expect(cf.tabelas).toHaveLength(1);
+      expect(cf.tabelas[0].fornecedores.map((x) => x.fornecedor).sort()).toEqual(['Barraca da Maria (sem cadastro)', 'Feira do João (sem cadastro)']);
+      expect(cf.tabelas[0].fornecedores.map((x) => x.fornecedorId).sort()).toEqual(['n:Barraca da Maria', 'n:Feira do João']);
+      // Cada um abre só as próprias linhas em "Compras do período" (a chave "n:<nome>" vale como grupo).
+      const aberto = await relatorioDaTela(a, DONA(), lerFiltrosDoRelatorio({ de: '2026-10-01', ate: '2026-10-31', insumo: hort.id, agrupar: 'fornecedor', grupo: 'n:Feira do João', ver: 'linhas' }, HOJE), 'periodo');
+      expect(aberto.linhas!.linhas.map((l) => l.rotuloDaNota)).toHaveLength(1);
+      expect(aberto.abertas).toMatchObject({ linhas: 1, valorCentavos: 2000 });
       await sql(`DELETE FROM "NotaEntradaItem" WHERE "notaId" = ANY($1)`, [notas.H1, notas.H2]);
     });
 

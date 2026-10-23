@@ -115,11 +115,25 @@ export function fonte(r: Recorte): Prisma.Sql {
       AND (${r.categoriaId}::text IS NULL OR ins."categoriaId" = ${r.categoriaId}::text)`);
 }
 
-/** A chave do grupo de uma linha de `f`: id do insumo, id do fornecedor ou o dia. "-" = sem insumo / sem fornecedor. */
+/**
+ * O fornecedor de uma linha de `f` nos agrupamentos e nas comparações: o id do cadastro; sem cadastro, o NOME que a nota guardou
+ * ("n:Feira do João"), para duas notas de fornecedores sem cadastro diferentes não virarem um só; sem nome nenhum, "-". É a MESMA
+ * chave em "Compras do período", na comparação de fornecedores e na de períodos (decisão 386).
+ */
+export const FORNECEDOR_DA_LINHA = guardado(Prisma.sql`COALESCE(f."fornecedorId", CASE WHEN COALESCE(f."fornecedorNomeSnapshot", '') = '' THEN '-' ELSE 'n:' || left(f."fornecedorNomeSnapshot", 500) END)`);
+
+/** O nome do fornecedor de uma linha de `f`: o do cadastro (ou o da nota); sem cadastro, o da nota com "(sem cadastro)". */
+export const NOME_DO_FORNECEDOR_DA_LINHA = guardado(Prisma.sql`(CASE
+      WHEN f."fornecedorId" IS NOT NULL THEN COALESCE(f."fornecedorNome", f."fornecedorNomeSnapshot", 'Sem fornecedor')
+      WHEN COALESCE(f."fornecedorNomeSnapshot", '') = '' THEN 'Sem fornecedor'
+      ELSE f."fornecedorNomeSnapshot" || ' (sem cadastro)'
+    END)`);
+
+/** A chave do grupo de uma linha de `f`: id do insumo, fornecedor (id ou "n:nome") ou o dia. "-" = sem insumo / sem fornecedor. */
 const CHAVE = (agrupar: AgruparPor) =>
   guardado(Prisma.sql`(CASE ${agrupar}::text
       WHEN 'insumo' THEN COALESCE(f."insumoId", '-')
-      WHEN 'fornecedor' THEN COALESCE(f."fornecedorId", '-')
+      WHEN 'fornecedor' THEN ${FORNECEDOR_DA_LINHA}
       ELSE to_char(f."dia", 'YYYY-MM-DD')
     END)`);
 
@@ -231,7 +245,7 @@ export async function gruposDoRecorte(tx: ClienteDoParceiro, r: Recorte, pagina:
       SELECT ${CHAVE(r.agrupar)} AS "chave",
              MIN(CASE ${r.agrupar}::text
                    WHEN 'insumo' THEN COALESCE(f."insumoNome", f."insumoNomeSnapshot", 'Sem insumo identificado')
-                   WHEN 'fornecedor' THEN COALESCE(f."fornecedorNome", f."fornecedorNomeSnapshot", 'Sem fornecedor')
+                   WHEN 'fornecedor' THEN ${NOME_DO_FORNECEDOR_DA_LINHA}
                    ELSE to_char(f."dia", 'DD/MM/YYYY')
                  END) AS "rotulo",
              f."unidade",
@@ -551,7 +565,7 @@ export async function relatorioDaTela(cliente: ClienteDoParceiro, alcance: Alcan
         paginas,
       };
     },
-    { repetivel: true, timeout: 30_000 },
+    { repetivel: true, relatorio: {} },
   );
 }
 
@@ -577,6 +591,6 @@ export async function relatorioCompleto(cliente: ClienteDoParceiro, alcance: Alc
         semEmissao: f.base === 'emissao' && f.situacao === 'lancadas' ? await semEmissaoNoRecorte(tx, recorte) : null,
       };
     },
-    { repetivel: true, timeout: 60_000 },
+    { repetivel: true, relatorio: {} },
   );
 }

@@ -855,6 +855,65 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    // L.4: o consumo e a conciliação do estoque (a leitura do livro; nada aqui dá baixa).
+    chave: 'estoque-consumo',
+    area: 'estoque',
+    rotas: ['estoque/relatorios/consumo', 'estoque/relatorios/consumo/movimentos'],
+    titulo: 'Consumo e conciliação',
+    versao: 1,
+    recolhida: true,
+    aula: [
+      { texto: 'Mostra, para cada insumo e loja, o saldo inicial, o que entrou e saiu e o saldo final, lidos do livro do estoque, sem dar baixa nem lançar nada.' },
+      { texto: '“Uso” é a requisição registrada, não o consumo medido na prateleira.' },
+      { texto: 'A diferença da contagem entra como ajuste, nunca como consumo nem perda presumidos.' },
+    ],
+    secoes: [
+      {
+        id: 'ponte',
+        titulo: 'Como a conta fecha',
+        blocos: [
+          { texto: 'Saldo final = saldo inicial + o que entrou − o que saiu, com cada movimento numa coluna só. A tela confere isso e avisa “A conta não fecha” se algo escapar.' },
+          { texto: 'Cada número abre os movimentos que o formam, com a origem de cada um: nota, requisição, lote ou contagem.' },
+          { texto: 'O consumo medido na prateleira é a conta da contagem: veja as Divergências, que cruzam a requisição com a contagem.' },
+        ],
+      },
+      {
+        id: 'bruto',
+        titulo: 'Bruto, líquido e o que se desfaz',
+        blocos: [{ texto: 'Compras e Uso são o bruto: o que foi lançado. Nota cancelada ou corrigida e lote desfeito ficam em Estornos; o que voltou de uma requisição fica em Devoluções. Líquido é o bruto mais o que foi desfeito.' }],
+      },
+      {
+        id: 'lacunas',
+        titulo: 'Quando falta conferir',
+        blocos: [
+          { texto: 'Sem contagem no período quer dizer que o saldo final é o do livro e ninguém o conferiu na prateleira. Saldo negativo, movimento sem origem e saldo que não bate com o livro pedem olhar.' },
+          { texto: 'Nota fiscal que só chegou por XML e ainda não foi conferida fica fora: só entra no estoque quando vira nota lançada.' },
+        ],
+      },
+      {
+        id: 'ainda-nao',
+        titulo: 'O que ainda não existe',
+        blocos: [{ texto: 'Transferência entre lojas e lançamento de perda ainda não existem no sistema. O lugar delas já está aqui e fica vazio até existirem; nada é inventado.' }],
+      },
+      {
+        id: 'datas',
+        titulo: 'A data e o dinheiro',
+        blocos: [
+          { texto: 'A data de cada movimento é o dia em que ele entrou no livro, pelo relógio do Rio. Uma nota de dia 10 lançada no dia 12 entra no estoque no dia 12.' },
+          { texto: 'Os valores em R$ são os que o livro gravou na hora de cada movimento: mudar o preço de um insumo depois não reescreve o passado. Insumo sem preço na época entra com valor zero e é avisado.', para: ['compras.ver'] },
+        ],
+      },
+      {
+        id: 'saida',
+        titulo: 'Planilha e PDF',
+        blocos: [
+          { texto: 'A planilha traz as mesmas colunas da tela, uma linha por insumo e loja, e os totais por unidade. Texto que começaria com = + - ou @ ganha um apóstrofo na frente.' },
+          { texto: 'Imprimir abre uma versão sem menu. Na janela de impressão, escolha “Salvar como PDF”.' },
+        ],
+      },
+    ],
+  },
+  {
     chave: 'compra-nova',
     area: 'compras',
     rotas: ['compras/nova', 'compras/[id]/editar'],

@@ -6,12 +6,13 @@
 
 import { visaoDaRequisicao } from '@/lib/erp/contexto';
 import type { Alcance } from '@/lib/erp/permissoes';
-import type { ClienteDoParceiro } from '@/lib/erp/tenant';
+import { ErroDeRelatorio, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { comparacaoDeFornecedores, comparacaoDePeriodos } from '@/lib/erp/compras-comparacao';
 import { lerFiltrosDeFornecedores, lerFiltrosDePeriodos } from '@/lib/erp/compras-comparacao-campos';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { caminhoDeVolta } from '@/lib/erp/volta';
 import { Painel, Vazio } from '../../ui/superficies';
+import { RelatorioGrande } from '../../ui/relatorio-grande';
 import { ImpressaoDosFornecedores, TelaDosFornecedores } from './comparacao-fornecedores';
 import { ImpressaoDosPeriodos, TelaDosPeriodos } from './comparacao-periodos';
 
@@ -28,7 +29,7 @@ function Nada({ titulo, texto }: { titulo: string; texto: string }) {
   );
 }
 
-export async function PaginaDosFornecedores({ ctx, caminho, comprasBase, insumosBase, searchParams }: { ctx: Ctx; caminho: string; comprasBase: string; insumosBase?: string; searchParams: Params }) {
+async function paginaDosFornecedores({ ctx, caminho, comprasBase, insumosBase, searchParams }: { ctx: Ctx; caminho: string; comprasBase: string; insumosBase?: string; searchParams: Params }) {
   const { visao } = await visaoDaRequisicao(ctx);
   const hoje = hojeNoRio();
   let f = { ...lerFiltrosDeFornecedores(searchParams, hoje), volta: '' };
@@ -50,7 +51,7 @@ export async function PaginaDosFornecedores({ ctx, caminho, comprasBase, insumos
   return <TelaDosFornecedores caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} insumosBase={insumosBase} visaoDaLoja={visaoDaLoja} />;
 }
 
-export async function PaginaDosPeriodos({ ctx, caminho, comprasBase, searchParams }: { ctx: Ctx; caminho: string; comprasBase: string; searchParams: Params }) {
+async function paginaDosPeriodos({ ctx, caminho, comprasBase, searchParams }: { ctx: Ctx; caminho: string; comprasBase: string; searchParams: Params }) {
   const { visao } = await visaoDaRequisicao(ctx);
   const hoje = hojeNoRio();
   let f = lerFiltrosDePeriodos(searchParams, hoje);
@@ -72,4 +73,23 @@ export async function PaginaDosPeriodos({ ctx, caminho, comprasBase, searchParam
   // Procurou pelo nome e só um insumo com compra tem esse nome: é ele (a leitura já saiu dele; aqui só o endereço e o formulário o assumem).
   if (r.insumoDaBusca) f = { ...f, rel: { ...f.rel, insumoId: r.insumoDaBusca } };
   return <TelaDosPeriodos caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} visaoDaLoja={visaoDaLoja} />;
+}
+
+/** Se o relatório não couber agora (passou do teto de tempo ou há outros grandes rodando), a frase no lugar dos números, sem 500. */
+export async function PaginaDosFornecedores(props: Parameters<typeof paginaDosFornecedores>[0]) {
+  try {
+    return await paginaDosFornecedores(props);
+  } catch (e) {
+    if (e instanceof ErroDeRelatorio) return <RelatorioGrande erro={e} caminho={props.caminho} />;
+    throw e;
+  }
+}
+
+export async function PaginaDosPeriodos(props: Parameters<typeof paginaDosPeriodos>[0]) {
+  try {
+    return await paginaDosPeriodos(props);
+  } catch (e) {
+    if (e instanceof ErroDeRelatorio) return <RelatorioGrande erro={e} caminho={props.caminho} />;
+    throw e;
+  }
 }

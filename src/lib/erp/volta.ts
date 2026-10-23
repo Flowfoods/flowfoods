@@ -38,6 +38,16 @@ export function caminhoDeVolta(valor: unknown, prefixo: string, maximo = 300): s
   return `${u.pathname}${u.search}`;
 }
 
+/**
+ * L.4: a tela de origem de um movimento (requisição, contagem, lote, nota) é aberta com `?volta=` apontando para os movimentos do
+ * consumo; aqui o endereço é validado (só caminho interno da MESMA área) e ganha o rótulo do "Voltar para ...". `raiz`: `/erp` ou
+ * `/rodolfo/erp/<slug>`. Sem volta válida, a tela de origem segue com o seu "Voltar" de sempre.
+ */
+export function voltaDoRelatorio(valor: unknown, raiz: string): { href: string; rotulo: string } | null {
+  const href = caminhoDeVolta(valor, `${raiz}/`, 2000);
+  return href ? { href, rotulo: rotuloDaVolta(href) } : null;
+}
+
 /** O caminho de volta com o insumo criado (a página de origem o lê para avisar e oferecer o insumo). */
 export function voltaComInsumo(caminho: string, insumoId: string): string {
   const u = new URL(caminho, ORIGEM_FALSA);
@@ -54,6 +64,8 @@ export function voltaComFornecedor(caminho: string, fornecedorId: string): strin
 
 /** Para o botão e o texto: de onde a pessoa veio. */
 export function rotuloDaVolta(caminho: string): string {
+  if (/\/estoque\/relatorios\/consumo\/movimentos/.test(caminho)) return 'os movimentos do consumo';
+  if (/\/estoque\/relatorios\/consumo/.test(caminho)) return 'o consumo e a conciliação';
   if (/\/compras\/relatorios\/comparar-/.test(caminho)) return 'a comparação de compras';
   if (/\/compras\/relatorios\//.test(caminho)) return 'o relatório de compras';
   if (/\/compras\/recebidas\//.test(caminho)) return 'a conferência da nota fiscal';

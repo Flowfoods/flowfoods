@@ -42,7 +42,7 @@ export function Cartao({ rotulo, children, ver, className = '' }: { rotulo: stri
       <h3 className="text-[12px] font-medium leading-snug text-suave">{rotulo}</h3>
       <div className="mt-2 min-w-0 flex-1">{children}</div>
       {(Array.isArray(ver) ? ver : ver ? [ver] : []).map((v) => (
-        <Link key={v.href} href={v.href} className={`${LINK_DE_TEXTO} -mx-1 mt-1 inline-flex min-h-11 items-center self-start px-1 sm:min-h-9`}>
+        <Link key={v.href} href={v.href} className={`${LINK_DE_TEXTO} -mx-1 mt-1 inline-flex min-h-11 items-center self-start px-1 sm:min-h-9 [@media(pointer:coarse)]:mt-4`}>
           {v.texto}
         </Link>
       ))}
@@ -420,7 +420,7 @@ function LinkDaNota({ l, comprasBase, volta }: { l: LinhaDeCompra; comprasBase: 
       </Link>
       {l.documentoId && (
         // Em outra linha: dois links lado a lado com área de toque de 44 px se atropelariam.
-        <span className="mt-1 block">
+        <span className="mt-1 block [@media(pointer:coarse)]:mt-6">
           <Link href={`${comprasBase}/recebidas/${l.documentoId}?volta=${encodeURIComponent(volta)}`} className="ff-toque ff-transicao rounded-[5px] text-[12px] text-suave underline decoration-linha-forte underline-offset-4 hover:text-texto">
             nota fiscal (XML)
           </Link>

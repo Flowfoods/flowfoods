@@ -17,8 +17,10 @@ import type { Alcance } from './permissoes';
 import {
   canceladasDoRecorte,
   documentosAguardando,
+  FORNECEDOR_DA_LINHA,
   fonte,
   gruposDoRecorte,
+  NOME_DO_FORNECEDOR_DA_LINHA,
   opcoesDoRelatorio,
   resolverRecorte,
   semEmissaoNoRecorte,
@@ -47,11 +49,7 @@ function guardado(f: Prisma.Sql): Prisma.Sql {
 /** O teto de células (insumo × unidade × fornecedor) que um lado carrega. Acima disso a tela manda reduzir o recorte. */
 export const TETO_DE_CELULAS = 20_000;
 
-/**
- * O fornecedor de uma linha na comparação: o id do cadastro; sem cadastro, o NOME que a nota guardou ("n:Feira do João"), para duas
- * notas de fornecedores sem cadastro diferentes não virarem um só; sem nome nenhum, "-".
- */
-const FORNECEDOR = guardado(Prisma.sql`COALESCE(f."fornecedorId", CASE WHEN COALESCE(f."fornecedorNomeSnapshot", '') = '' THEN '-' ELSE 'n:' || f."fornecedorNomeSnapshot" END)`);
+const FORNECEDOR = FORNECEDOR_DA_LINHA;
 
 const MOTIVOS = new Set<string>(['insumo', 'unidade', 'conversao', 'valor']);
 
@@ -89,7 +87,7 @@ export async function ladoDoRecorte(tx: ClienteDoParceiro, r: Recorte, teto = TE
     WITH f AS MATERIALIZED (${fonte(r)})
     (SELECT 'celula'::text AS "tipo", f."insumoId", MIN(COALESCE(f."insumoNome", f."insumoNomeSnapshot", 'Sem insumo identificado')) AS "insumo", f."unidade",
             ${FORNECEDOR} AS "fornecedorId",
-            MIN(COALESCE(f."fornecedorNome", f."fornecedorNomeSnapshot", 'Sem fornecedor')) AS "fornecedor", NULL::text AS "motivo",
+            MIN(${NOME_DO_FORNECEDOR_DA_LINHA}) AS "fornecedor", NULL::text AS "motivo",
             count(DISTINCT f."notaId")::float8 AS "notas", count(*)::float8 AS "linhas",
             sum(f."quantidadeMilesimos")::float8 AS "quantidade", sum(f."valor")::float8 AS "valor", sum(f."frete")::float8 AS "frete", 0::float8 AS "descontos"
      FROM f WHERE f."motivo" IS NULL
@@ -240,7 +238,7 @@ export async function comparacaoDePeriodos(cliente: ClienteDoParceiro, alcance: 
       const pagina = Math.min(Math.max(1, f.pagina), paginas);
       return { ...base, comparacao, totalDeItens: total, pagina, paginas, itensDaPagina: comparacao.itens.slice((pagina - 1) * f.porPagina, pagina * f.porPagina) };
     },
-    { repetivel: true, timeout: 60_000 },
+    { repetivel: true, relatorio: {} },
   );
 }
 
@@ -279,14 +277,14 @@ export async function comparacaoDeFornecedores(cliente: ClienteDoParceiro, alcan
       const grupos = await gruposDoRecorte(tx, { ...r, agrupar: 'fornecedor' }, null);
       const embalagens = await tx.sql<{ fornecedorId: string; unidade: string | null; embalagens: string[] | null }>`
         WITH f AS (${fonte(r)})
-        SELECT COALESCE(f."fornecedorId", '-') AS "fornecedorId", f."unidade",
+        SELECT ${FORNECEDOR} AS "fornecedorId", f."unidade",
                array_agg(DISTINCT f."embalagemSnapshot" ORDER BY f."embalagemSnapshot") FILTER (WHERE f."embalagemSnapshot" IS NOT NULL AND f."embalagemSnapshot" <> '') AS "embalagens"
         FROM f WHERE f."motivo" IS NULL
         GROUP BY 1, 2`;
       const ultimas = await tx.sql<{ fornecedorId: string; unidade: string; notaId: string; dia: Date; numero: string | null; serie: string; q: number; v: number; fr: number }>`
         WITH f AS (${fonte(r)}),
         n AS (
-          SELECT COALESCE(f."fornecedorId", '-') AS "fornecedorId", f."unidade", f."notaId", f."dia", f."numero", f."serie",
+          SELECT ${FORNECEDOR} AS "fornecedorId", f."unidade", f."notaId", f."dia", f."numero", f."serie",
                  sum(f."quantidadeMilesimos")::float8 AS "q", sum(f."valor")::float8 AS "v", sum(f."frete")::float8 AS "fr"
           FROM f WHERE f."motivo" IS NULL
           GROUP BY 1, 2, 3, 4, 5, 6
@@ -325,6 +323,6 @@ export async function comparacaoDeFornecedores(cliente: ClienteDoParceiro, alcan
         aguardando: await documentosAguardando(tx, r.lojas),
       };
     },
-    { repetivel: true, timeout: 60_000 },
+    { repetivel: true, relatorio: {} },
   );
 }

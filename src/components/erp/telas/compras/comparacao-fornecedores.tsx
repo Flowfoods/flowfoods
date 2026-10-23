@@ -142,7 +142,7 @@ function TabelaDaUnidade({
             <p className="text-[12px] tabular-nums text-suave">
               Última compra: <UltimaCompra x={x} comprasBase={comprasBase} volta={volta} />
             </p>
-            <Link href={linhas(x)} className={`${LINK_DE_TEXTO} -mx-1 inline-flex min-h-11 items-center px-1`}>
+            <Link href={linhas(x)} className={`${LINK_DE_TEXTO} -mx-1 inline-flex min-h-11 items-center px-1 [@media(pointer:coarse)]:!mt-4`}>
               {x.linhas === 1 ? 'Ver a linha' : `Ver as ${pl(x.linhas, 'linha', 'linhas')}`}
             </Link>
           </li>
@@ -322,6 +322,8 @@ export function TelaDosFornecedores({
   visaoDaLoja?: string | null;
 }) {
   const insumo = r.insumo;
+  // Só conta quem tem preço comparável; "0 fornecedores" soaria a erro quando a compra existe e ficou sem base.
+  const fraseDeFornecedores = (n: number) => (n === 0 ? 'nenhum fornecedor com preço comparável' : pl(n, 'fornecedor', 'fornecedores'));
   const nFornecedores = new Set(r.tabelas.flatMap((t) => t.fornecedores.map((x) => x.fornecedorId))).size;
   const subtitulo = [contexto, insumo?.nome, insumo && nFornecedores ? pl(nFornecedores, 'fornecedor', 'fornecedores') : null, fraseDoPeriodo(f)].filter(Boolean).join(' · ');
   const historico = insumo ? hrefDoRelatorio(`${comprasBase}/relatorios/insumo`, { ...f, insumoId: insumo.id, q: '', agrupar: 'insumo', grupo: '', unidade: '', so: '', ver: 'resumo' }, {}, { semPagina: true }) : null;
@@ -380,7 +382,7 @@ export function TelaDosFornecedores({
             </Cartao>
             <Cartao rotulo="No recorte">
               <p className="text-sm font-semibold tabular-nums text-texto">
-                {r.totais ? `${pl(r.totais.notas, 'compra', 'compras')} · ${pl(nFornecedores, 'fornecedor', 'fornecedores')}` : '—'}
+                {r.totais ? `${pl(r.totais.notas, 'compra', 'compras')} · ${fraseDeFornecedores(nFornecedores)}` : '—'}
               </p>
               <p className="mt-1.5 text-[12px] text-suave">{fraseDoPeriodo(f)}</p>
             </Cartao>

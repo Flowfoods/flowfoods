@@ -7,10 +7,11 @@ import { obterOrdem } from '@/lib/erp/producao';
 import { TelaDoLote } from '@/components/erp/telas/producao/lote';
 import { fraseDoEstoque } from '@/components/erp/telas/estoque/estado';
 import { acaoCancelarProducao, acaoEstornarProducao, acaoPassarLote, acaoPegarLote, acaoSoltarLote } from '../../actions';
+import { voltaDoRelatorio } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroLotePage({ params, searchParams }: { params: { slug: string; lojaId: string; ordemId: string }; searchParams: { feito?: string } }) {
+export default async function ParceiroLotePage({ params, searchParams }: { params: { slug: string; lojaId: string; ordemId: string }; searchParams: { feito?: string; volta?: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'producao.ver');
   const d = await obterOrdem(ctx.cliente, ctx.alcance, params.lojaId, params.ordemId);
@@ -21,6 +22,7 @@ export default async function ParceiroLotePage({ params, searchParams }: { param
     <TelaDoLote
       d={d}
       base={`${raiz}/producao`}
+      voltar={voltaDoRelatorio(searchParams.volta, `/rodolfo/erp/${ctx.parceiro.slug}`)}
       contexto={ctx.parceiro.nome}
       feito={fraseDoEstoque(searchParams.feito)}
       pode={{ registrar: true, estornar: true, gerenciar: true, pegar: false }}

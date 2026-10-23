@@ -10,12 +10,13 @@ import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp
 import { conferenciaDaContagem } from '@/lib/erp/contagem';
 import { TelaConferirContagem } from '@/components/erp/telas/estoque/conferir-contagem';
 import { acaoConcluirContagem, acaoDescartarContagem } from '../../../../actions';
+import { voltaDoRelatorio } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/estoque';
 
-export default async function ErpConferirContagemPage({ params, searchParams }: { params: { lojaId: string; contagemId: string }; searchParams: { feito?: string } }) {
+export default async function ErpConferirContagemPage({ params, searchParams }: { params: { lojaId: string; contagemId: string }; searchParams: { feito?: string; volta?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'estoque.ver');
   const c = await conferenciaDaContagem(ctx.cliente, ctx.alcance, params.lojaId, params.contagemId);
@@ -25,6 +26,7 @@ export default async function ErpConferirContagemPage({ params, searchParams }: 
     <TelaConferirContagem
       c={c}
       base={BASE}
+      voltar={voltaDoRelatorio(searchParams.volta, '/erp')}
       feito={searchParams.feito}
       notasBase={pode(ctx.alcance, 'compras.ver', { lojaId }) ? '/erp/compras' : undefined}
       acoes={{ concluir: acaoConcluirContagem.bind(null, lojaId, c.contagem.id), descartar: acaoDescartarContagem.bind(null, lojaId, c.contagem.id) }}

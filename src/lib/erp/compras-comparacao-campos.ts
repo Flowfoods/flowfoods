@@ -576,10 +576,12 @@ const faixaBr = (de: string, ate: string) => {
 /** TODOS os avisos de uma comparação (datas, cobertura, lado sem compra, notas sem emissão, documentos aguardando): a tela e o CSV dizem as mesmas frases. */
 export function avisosDaComparacao(f: { de: string; ate: string; deB: string; ateB: string }, a: LadoParaAviso, b: LadoParaAviso, aguardando: number, hoje: string): AvisoDeCobertura[] {
   const avisos: AvisoDeCobertura[] = avisosDeDatas(f, hoje);
-  if (a.celulas.length === 0) {
+  if (a.celulas.length === 0 && b.celulas.length === 0) {
+    avisos.push({ chave: 'sem-ambos', texto: `Nenhum dos dois períodos teve compra comparável neste recorte (A: ${faixaBr(a.de, a.ate)}; B: ${faixaBr(b.de, b.ate)}): não há o que comparar. Confira os períodos, os filtros e a data usada.` });
+  } else if (a.celulas.length === 0) {
     avisos.push({ chave: 'sem-a', texto: `No período A (${faixaBr(a.de, a.ate)}) não houve compra comparável neste recorte. Não há variação a calcular (sem base) e tudo o que B comprou aparece como “entrou”: não dá para dizer se o preço subiu ou desceu.` });
   }
-  if (b.celulas.length === 0) {
+  else if (b.celulas.length === 0) {
     avisos.push({ chave: 'sem-b', texto: `No período B (${faixaBr(b.de, b.ate)}) não houve compra comparável neste recorte. Não há variação a calcular (sem base) e tudo o que A comprou aparece como “saiu”: não dá para dizer se o preço subiu ou desceu.` });
   }
   for (const [nome, l] of [['A', a], ['B', b]] as const) {
@@ -590,7 +592,7 @@ export function avisosDaComparacao(f: { de: string; ate: string; deB: string; at
       avisos.push({
         chave: `base-${nome}`,
         semBaseDoLado: nome,
-        texto: `Cobertura incompleta no período ${nome}: ${plural(l.semBase.linhas, 'linha', 'linhas')} (${formatarDinheiro(l.semBase.valorCentavos + l.semBase.freteCentavos)}) ficou fora da conta por falta de base${pct !== null ? `, e a comparação cobre ${formatarPercentual(pct).replace('+', '')} do dinheiro comprado` : ''}. ${motivos}.`,
+        texto: `Cobertura incompleta no período ${nome}: ${plural(l.semBase.linhas, 'linha', 'linhas')} (${formatarDinheiro(l.semBase.valorCentavos + l.semBase.freteCentavos)}) ficou fora da conta por falta de base${pct === null ? '' : pct === 0 ? ', e nada do que foi comprado entra na conta' : `, e a comparação cobre ${formatarPercentual(pct).replace('+', '')} do dinheiro comprado`}. ${motivos}.`,
       });
     }
     if (l.semEmissao) {

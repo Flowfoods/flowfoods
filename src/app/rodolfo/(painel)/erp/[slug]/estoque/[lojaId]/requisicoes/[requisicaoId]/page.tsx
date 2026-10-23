@@ -6,10 +6,11 @@ import { obterRequisicao } from '@/lib/erp/requisicao';
 import { TelaDetalheDaRequisicao } from '@/components/erp/telas/requisicoes/detalhe';
 import { fraseDoEstoque } from '@/components/erp/telas/estoque/estado';
 import { acaoCancelarRequisicao, acaoDevolverNaRequisicao } from '../../../actions';
+import { voltaDoRelatorio } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroRequisicaoPage({ params, searchParams }: { params: { slug: string; lojaId: string; requisicaoId: string }; searchParams: { feito?: string } }) {
+export default async function ParceiroRequisicaoPage({ params, searchParams }: { params: { slug: string; lojaId: string; requisicaoId: string }; searchParams: { feito?: string; volta?: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'requisicao.pedir');
   const d = await obterRequisicao(ctx.cliente, ctx.alcance, params.lojaId, params.requisicaoId);
@@ -18,6 +19,7 @@ export default async function ParceiroRequisicaoPage({ params, searchParams }: {
     <TelaDetalheDaRequisicao
       d={d}
       base={`/rodolfo/erp/${ctx.parceiro.slug}/estoque`}
+      voltar={voltaDoRelatorio(searchParams.volta, `/rodolfo/erp/${ctx.parceiro.slug}`)}
       contexto={ctx.parceiro.nome}
       feito={fraseDoEstoque(searchParams.feito)}
       pode={{ atender: true, cancelar: true }}
