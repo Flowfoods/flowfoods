@@ -484,7 +484,7 @@ export async function movimentosDoConsumo(tx: ClienteDoParceiro, r: RecorteDoCon
     SELECT mv."id", mv."lojaId", l."nome" AS "loja", mv."insumoId", COALESCE(i."nome", mv."insumoNomeSnapshot") AS "insumo", mv."unidade", mv."tipo", mv."bucket", mv."estorno",
            mv."q", mv."v", mv."antesDoMov", mv."depois", mv."ocorridoEm", mv."motivo", mv."semOrigem", mv."notaId",
            ri."requisicaoId", rq."numero" AS "requisicaoNumero", ci."contagemId", ct."tipo"::text AS "contagemTipo", ct."titulo" AS "contagemTitulo",
-           mv."ordemProducaoId", op."codigoLote",
+           COALESCE(mv."ordemProducaoId", opr."id") AS "ordemProducaoId", COALESCE(op."codigoLote", opr."codigoLote") AS "codigoLote",
            count(*) OVER ()::float8 AS "quantos", (sum(mv."q") OVER ())::float8 AS "somaq", (sum(mv."v") OVER ())::float8 AS "somav"
     FROM mov mv
     JOIN "Loja" l ON l."parceiroId" = ${r.parceiroId}::text AND l."id" = mv."lojaId"
@@ -494,6 +494,7 @@ export async function movimentosDoConsumo(tx: ClienteDoParceiro, r: RecorteDoCon
     LEFT JOIN "ContagemItem" ci ON ci."parceiroId" = ${r.parceiroId}::text AND ci."id" = mv."contagemItemId"
     LEFT JOIN "Contagem" ct ON ct."parceiroId" = ${r.parceiroId}::text AND ct."id" = ci."contagemId"
     LEFT JOIN "OrdemProducao" op ON op."parceiroId" = ${r.parceiroId}::text AND op."id" = mv."ordemProducaoId"
+    LEFT JOIN "OrdemProducao" opr ON opr."parceiroId" = ${r.parceiroId}::text AND opr."requisicaoId" = ri."requisicaoId"
     WHERE (${r.categoriaId}::text IS NULL OR i."categoriaId" = ${r.categoriaId}::text)
       AND ${filtroDoLink(col)}
     ORDER BY mv."ocorridoEm" DESC, mv."criadoEm" DESC, mv."id" DESC
