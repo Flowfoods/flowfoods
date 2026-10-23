@@ -237,3 +237,73 @@ Sucos. Outras categorias no mesmo bairro passam normal.
 - Responder lead por automação
 - Reconectar instância em laço depois de bloqueio
 - Mandar mensagem fora de seg–sex 10h–18h
+
+---
+
+## 6. VPS caiu — como reerguer
+
+Ferramenta: GitHub → Actions → **barney-ops** → Run workflow → ação
+`reerguer-vps`, uma `etapa` por vez, lendo o log antes da próxima
+(`scripts/reerguer-vps.sh`). Roda no runner do GitHub porque a sessão do Claude
+não alcança a VPS. Não imprime segredo e não tem nenhum comando que apague
+volume.
+
+| Etapa | O que faz | Precisa de |
+|---|---|---|
+| `diagnosticar` | portas 22/80/443/3000, estado na Hostinger, saúde por SSH (memória, disco, OOM, log do boot anterior), containers, domínios, deploys das últimas 36 h, inspect do Traefik | Dokploy; SSH e Hostinger opcionais |
+| `reiniciar` | restart/start da VM pela API da Hostinger. **Recusa** se a VM estiver suspensa ou se SSH/painel ainda responderem | `HOSTINGER_API_TOKEN` |
+| `limpar-cache` | `docker builder prune -f` + `docker image prune -f`, só com disco ≥ 90% | `VPS_SSH_KEY` |
+| `subir` | Docker → Traefik → `alvos` na ordem, um por vez, esperando cada deploy terminar | Dokploy (+ SSH para o Traefik) |
+| `provar` | por domínio: DNS, HTTP, certificado (nome, emissor, validade) — tabela no resumo do job | nada |
+
+`alvos` aceita: `traefik` (settings.reloadTraefik), `container:<nome>`,
+`compose:<id>`, `application:<id>`, `postgres:<id>`, `redis:<id>`.
+
+Secrets (Settings → Secrets and variables → Actions): `DOKPLOY_URL`,
+`DOKPLOY_API_TOKEN` (já existem), `VPS_SSH_KEY` (chave privada com acesso root),
+`HOSTINGER_API_TOKEN` (hPanel → Conta → API). `VPS_SSH_USER` opcional.
+
+### Ordem
+
+1. A máquina responde? Painel `:3000` ou porta 22 respondendo = **não reinicie a
+   VM**, o problema está dentro dela.
+2. Docker → Traefik e Dokploy → bancos → Evolution/n8n → apps web → agentes.
+3. App com build: um por vez. App que não sobe em 2 tentativas: pendente com o
+   motivo, segue a fila.
+
+### Sintoma conhecido: todos os sites fora, painel no ar
+
+Containers dos apps `Up`, mas 80/443 sem resposta e `dokploy-traefik` em
+`Exited (255)` com o erro:
+
+    failed to set up container networking: attaching to network failed ... context deadline exceeded
+
+O Traefik é um container avulso ligado à rede overlay `dokploy-network`. No boot
+ele tenta entrar na rede antes do Swarm ficar pronto, falha, e daí nem
+`docker restart` nem o "Reload Traefik" do painel resolvem (os dois falharam em
+23/10). Destrava no host (terminal do hPanel ou SSH):
+
+    docker network disconnect -f dokploy-network dokploy-traefik
+    docker start dokploy-traefik
+    docker network connect dokploy-network dokploy-traefik
+    docker ps --filter name=dokploy-traefik
+
+Se o `connect` repetir o erro: `systemctl restart docker` (reinicia todos os
+containers, ~2 min fora, nenhum dado se perde) e `docker start dokploy-traefik`.
+
+Proibido em qualquer caso: `docker volume prune`, `docker system prune --volumes`,
+apagar volume, banco ou pasta de upload.
+
+### Incidente de 23/10/2026
+
+- ~19:00 UTC (16:00 RJ): a VPS parou de responder por completo (até a API do
+  Dokploy dava timeout). Todos os containers saíram com código 255 — desligamento
+  abrupto, não parada limpa. `dokploy-traefik` registrou fim às 19:00:54.
+- ~19:15 UTC: a máquina voltou (containers "Up 4 hours" às 23:15). Apps,
+  bancos, n8n, Evolution e Dokploy subiram sozinhos; o Traefik não (sintoma
+  acima), então todos os domínios ficaram fora.
+- Build triplo do `flowfoods-web` (migrar/web/worker com `build:`): **não foi a
+  causa**. O último deploy terminou às 13:39 UTC, 5h20 antes da queda, sem deploy
+  rodando às 19:00.
+- Causa raiz da queda: **em aberto** até ler o boot anterior por SSH
+  (`journalctl -b -1`, `dmesg`, `free`, `df`).

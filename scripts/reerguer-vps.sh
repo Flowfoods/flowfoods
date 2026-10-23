@@ -273,11 +273,21 @@ subir() {
     rssh 'bash -s' <<'REMOTO'
 systemctl is-active --quiet docker || { echo "docker parado — iniciando"; systemctl start docker; sleep 15; }
 echo "docker: $(systemctl is-active docker)"
-for c in dokploy-traefik; do
-  st=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo ausente)
-  echo "$c: $st"
-  [ "$st" = exited ] || [ "$st" = created ] && docker start "$c"
-done
+# Traefik é container avulso (não é serviço do Swarm). No boot ele pode tentar
+# entrar na rede overlay dokploy-network antes do Swarm ficar pronto e morrer com
+# "attaching to network failed ... context deadline exceeded" — e daí nem
+# restart resolve. Solta a rede à força, sobe, e reconecta.
+c=dokploy-traefik
+st=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo ausente)
+echo "$c: $st"
+if [ "$st" = exited ] || [ "$st" = created ]; then
+  docker start "$c" 2>/dev/null || {
+    echo "start direto falhou — destravando a rede"
+    docker network disconnect -f dokploy-network "$c" 2>&1
+    docker start "$c" && docker network connect dokploy-network "$c" 2>&1
+  }
+  sleep 5; docker ps -a --filter name="$c" --format "{{.Names}}\t{{.Status}}"
+fi
 sleep 10
 docker service ls --format "table {{.Name}}\t{{.Replicas}}" 2>&1 | grep -E "NAME|dokploy" || true
 REMOTO
