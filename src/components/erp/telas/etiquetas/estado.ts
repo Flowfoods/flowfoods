@@ -7,6 +7,7 @@ import { fraseDe } from '../cadastro/estado';
 
 const FEITO: Readonly<Record<string, string>> = {
   emitida: 'Etiqueta emitida. Agora mande para a impressora: a Zebra, o arquivo .zpl ou o papel.',
+  impressa: 'Registrado: a etiqueta saiu de “Esperando a impressora”, com o seu nome e a hora.',
   'ja-emitida': 'Esta etiqueta já tinha sido emitida (o mesmo toque, ou outra aba): nenhuma etiqueta nova.',
   aberta: 'Abertura registrada com a data e a hora de agora. Emita a etiqueta e cole na embalagem.',
   'ja-aberta': 'Esta abertura já estava registrada (o mesmo toque, ou outra aba): nada mudou.',

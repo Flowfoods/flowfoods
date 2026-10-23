@@ -8,7 +8,7 @@
 
 import Link from 'next/link';
 import { PEDIDOS_POR_PAGINA, type HistoricoDeImpressoes } from '@/lib/erp/etiquetas';
-import { FORMATOS, quandoNaTela, ROTULO_DA_SITUACAO, ROTULO_DO_TRANSPORTE } from '@/lib/erp/etiqueta-campos';
+import { FORMATOS, NOME_DO_PEDIDO, quandoNaTela, ROTULO_DO_TRANSPORTE, seloDoPedido } from '@/lib/erp/etiqueta-campos';
 import { ATALHOS_DO_PERIODO } from '@/lib/erp/producao-equipe-campos';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
@@ -17,7 +17,6 @@ import { FiltroEmLinks } from '../../ui/filtros';
 import { PaginacaoNumerada } from '../../ui/paginacao-numerada';
 import { Metrica, Painel, Selo, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
-import { TOM_DA_SITUACAO } from './emissao';
 
 type Linha = HistoricoDeImpressoes['linhas'][number];
 
@@ -30,14 +29,16 @@ function consulta(params: Record<string, string | null | undefined>): string {
   return s ? `?${s}` : '';
 }
 
-const pedido = (l: Linha) => `${l.sequencia === 1 ? 'Primeira' : `Reimpressão ${l.sequencia - 1}`} · ${l.copias === 1 ? '1 cópia' : `${l.copias} cópias`}`;
+const pedido = (l: Linha) => `${NOME_DO_PEDIDO[l.transporte]} · ${l.copias === 1 ? '1 cópia' : `${l.copias} cópias`}`;
 const como = (l: Linha) => `${ROTULO_DO_TRANSPORTE[l.transporte]}${l.transporte !== 'PAPEL' ? ` · ${l.resolucao} dpi` : ''}`;
 const origem = (l: Linha) => (l.etiqueta.origem === 'LOTE' ? `lote ${l.etiqueta.lote ?? '—'}` : `aberta · lote forn. ${l.etiqueta.lote ?? 'não informado'}`);
 
 function Resultado({ l }: { l: Linha }) {
+  const selo = seloDoPedido(l);
   return (
     <>
-      <Selo tom={TOM_DA_SITUACAO[l.situacao]}>{ROTULO_DA_SITUACAO[l.situacao]}</Selo>
+      <Selo tom={selo.tom}>{selo.texto}</Selo>
+      {l.confirmadaEm && <span className="mt-1 block text-[12px] tabular-nums text-suave">{l.confirmadaPorNome}, {quandoNaTela(l.confirmadaEm)}</span>}
       {l.erro && <span className="mt-1 block max-w-[18rem] text-[12px] text-erro [overflow-wrap:anywhere]">{l.erro}</span>}
     </>
   );
@@ -98,12 +99,12 @@ export function TelaHistoricoDeImpressoes({ h, base, contexto }: { h: HistoricoD
       </PageHeader>
 
       <section aria-label="Totais do período" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Metrica rotulo="Pedidos" valor={t.pedidos} detalhe="primeira e reimpressão" />
+        <Metrica rotulo="Pedidos" valor={t.pedidos} detalhe="Zebra, arquivo e papel" />
         <Metrica rotulo="Etiquetas" valor={t.etiquetas} detalhe="a soma das cópias" />
         <Metrica rotulo="Enviadas à Zebra" valor={t.enviadas} detalhe="etiquetas recebidas" />
-        <Metrica rotulo="Arquivo ou papel" valor={t.arquivos} detalhe="etiquetas geradas" />
+        <Metrica rotulo="Já imprimi" valor={t.confirmadas} detalhe="etiquetas que alguém disse que saíram" />
         <Metrica rotulo="Falharam" valor={t.falharam} detalhe={t.falharam === 1 ? 'pedido' : 'pedidos'} />
-        <Metrica rotulo="Sem resultado" valor={t.semResultado} detalhe="a tela fechou antes" />
+        <Metrica rotulo="Sem resultado" valor={t.semResultado} detalhe="a Zebra não respondeu ou a tela fechou" />
       </section>
 
       <Painel titulo="Pedidos de impressão" subtitulo={h.origem ? (h.origem === 'lote' ? 'Só de lotes produzidos' : 'Só de embalagens abertas') : 'Lotes produzidos e embalagens abertas'} semRespiro>

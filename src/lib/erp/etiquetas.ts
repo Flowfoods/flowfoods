@@ -443,6 +443,8 @@ export async function loteParaEtiqueta(cliente: ClienteDoParceiro, alcance: Alca
           quemFez: quemFez.nome,
         },
         motivo: motivoSemEtiqueta(o, agora),
+        /** Rodada 1 (decisão 417): o lote concluído venceu — a tela diz em vermelho o que fazer. */
+        vencido: o.status === 'CONCLUIDA' && venceu(o.validadeEm, agora),
         /** O conteúdo da prévia (o código e a quantidade entram na emissão). */
         previa: conteudoDoLote(o, loja.nome, quemFez.nome, { quantidadeMilesimos: o.produzidoMilesimos, mostrarHora: true, codigo: codigoDaEtiqueta(diaNoRio(agora), 0) }),
         emissoes: await emissoesDe(tx, { ordemProducaoId: o.id }),
@@ -755,7 +757,7 @@ export async function abrirEmbalagem(
               codigoDoLote: lote ? (lote.codigo ?? 'não informado') : 'lote não informado',
               vencimentoDoLote: lote?.vencimento ? diaPorExtenso(lote.vencimento) : 'não informado',
               prazoAposAbertura: prazo ? formatarValidade(prazo) : 'não informado',
-              validadeEfetiva: v.validadeEm ? (v.regra === 'VENCIMENTO_DO_LOTE' ? `${diaPorExtenso(lote!.vencimento!)} (vencimento do lote)` : quandoNaTela(v.validadeEm)) : 'sem data (prazo após abertura não informado)',
+              validadeEfetiva: v.validadeEm ? (v.regra === 'VENCIMENTO_DO_LOTE' ? `${diaPorExtenso(lote!.vencimento!)} (vencimento do lote)` : quandoNaTela(v.validadeEm)) : 'Prazo após abertura não informado',
               ...(ab.abertura.quantidadeMilesimos ? { quantoFoiAberto: formatarQuantidade(ab.abertura.quantidadeMilesimos, unidade) } : {}),
             },
             autorNome: autor.nome,
@@ -942,7 +944,7 @@ export async function emitirEtiquetaDaAbertura(
               origemDaEtiqueta: `Embalagem aberta em ${quandoNaTela(a.abertoEm)}`,
               formatoDaEtiqueta: FORMATOS[e.formato].rotulo,
               quantasEtiquetas: e.quantas,
-              validadeDaEtiqueta: a.validadeEm ? quandoNaTela(a.validadeEm) : 'sem data (prazo após abertura não informado)',
+              validadeDaEtiqueta: a.validadeEm ? quandoNaTela(a.validadeEm) : 'Prazo após abertura não informado',
             },
             autorNome: autor.nome,
           },
@@ -1058,7 +1060,9 @@ export async function papelDoPedido(cliente: ClienteDoParceiro, alcance: Alcance
       const conteudo = conteudoDaEmissao(e);
       // Rodada 1 (Guardião I1): o papel de um pedido antigo não reabre a etiqueta de lote estornado nem a vencida.
       const bloqueio = await bloqueioDaEmissao(tx, e, agora);
-      return { loja, etiqueta: { id: e.id, codigo: e.codigo, formato: e.formato as Formato, nome: e.nomeSnapshot }, pedido: pedidoParaTela(p), conteudo, layout: montarEtiqueta(conteudo, e.formato as Formato, 203), bloqueio };
+      // Rodada 1 (decisão 418): abrir o papel não tira da fila; o "Já imprimi" desta tela tira.
+      const saiu = await tx.etiquetaImpressao.count({ where: { etiquetaId: e.id, OR: [{ situacao: 'ENVIADA' }, { confirmadaEm: { not: null } }] } });
+      return { loja, etiqueta: { id: e.id, codigo: e.codigo, formato: e.formato as Formato, nome: e.nomeSnapshot }, pedido: pedidoParaTela(p), conteudo, layout: montarEtiqueta(conteudo, e.formato as Formato, 203), bloqueio, naFila: saiu === 0 };
     }),
   );
   return 'ok' in r ? null : r;

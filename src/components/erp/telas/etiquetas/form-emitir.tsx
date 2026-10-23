@@ -4,7 +4,8 @@
  * Emitir a etiqueta (3.4), do lote produzido ou da embalagem aberta: o tamanho (60 × 40 ou 60 × 60), quantas etiquetas (uma
  * por pote), quanto em cada (só no lote, opcional) e se a hora aparece. A prévia redesenha ao vivo com a MESMA função do papel;
  * o servidor lê tudo de novo e grava o retrato (a reimpressão usa o retrato: nada recalcula). A chave do envio faz o duplo
- * clique virar a mesma emissão.
+ * clique virar a mesma emissão. A barra de ação fica presa embaixo no celular e no tablet (até o menu lateral aparecer); nome
+ * que não cabe na 60 × 40 diz "Não cabe: use 60 × 60" com o botão para trocar (rodada 1, UX 7 e 9).
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -64,11 +65,17 @@ export function FormEmitir({
     const c = desserializar(previa);
     return montarEtiqueta({ ...c, quantidade: origem === 'LOTE' ? (q && q > 0 ? formatarQuantidade(q, unidade) : null) : c.quantidade, mostrarHora: hora }, formato);
   }, [previa, origem, q, unidade, hora, formato]);
+  // Não cabe na 60 × 40: a 60 × 60 cabe? (então a barra oferece a troca)
+  const cabeNa60 = useMemo(() => {
+    if (!layout.erro || formato !== 'E60X40') return false;
+    const c = desserializar(previa);
+    return !montarEtiqueta({ ...c, quantidade: origem === 'LOTE' ? (q && q > 0 ? formatarQuantidade(q, unidade) : null) : c.quantidade, mostrarHora: hora }, 'E60X60').erro;
+  }, [layout.erro, formato, previa, origem, q, unidade, hora]);
   const passo = (d: number) => setQuantas(String(Math.min(MAX_ETIQUETAS, Math.max(1, (n ?? 1) + d))));
   const travado = !!bloqueio;
   const podeEnviar = !travado && nValido && !layout.erro && !quantoInvalido && !passa;
   return (
-    <form action={enviar} className="space-y-5 pb-28 sm:pb-0">
+    <form action={enviar} className="space-y-5 pb-28 min-[900px]:pb-0">
       <input type="hidden" name="envio" value={envio} />
       <input type="hidden" name="escala" value={escala} />
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
@@ -170,9 +177,22 @@ export function FormEmitir({
         </p>
       )}
 
-      <div data-barra-fixa className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
+      <div data-barra-fixa className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 min-[900px]:static min-[900px]:border-0 min-[900px]:bg-transparent min-[900px]:p-0">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-3">
-          <span className="min-w-0 text-[13px] tabular-nums text-suave">{layout.erro ? 'Não cabe neste tamanho' : nValido ? `${n} × ${FORMATOS[formato].rotulo}` : 'Diga quantas etiquetas'}</span>
+          {layout.erro ? (
+            cabeNa60 ? (
+              <span className="flex min-w-0 flex-wrap items-center gap-x-2 text-[13px] text-erro">
+                <span className="font-semibold">Não cabe: use 60 × 60</span>
+                <button type="button" onClick={() => setFormato('E60X60')} className="inline-flex min-h-11 items-center font-semibold text-texto underline decoration-linha-forte underline-offset-4">
+                  Trocar para 60 × 60
+                </button>
+              </span>
+            ) : (
+              <span className="min-w-0 text-[13px] font-semibold text-erro">Não cabe nem na 60 × 60: veja a prévia</span>
+            )
+          ) : (
+            <span className="min-w-0 text-[13px] tabular-nums text-suave">{nValido ? `${n} ${n === 1 ? 'etiqueta' : 'etiquetas'} de ${FORMATOS[formato].rotulo}` : 'Diga quantas etiquetas'}</span>
+          )}
           <BotaoEnviar pendente="Emitindo…" disabled={!podeEnviar} className="min-w-[180px]">
             {nValido && n! > 1 ? `Emitir ${n} etiquetas` : 'Emitir a etiqueta'}
           </BotaoEnviar>

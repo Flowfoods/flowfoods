@@ -48,16 +48,31 @@ export type SituacaoDaImpressao = 'PREPARADA' | 'ENVIADA' | 'EXPORTADA' | 'FALHO
 export const ROTULO_DO_TRANSPORTE: Record<Transporte, string> = {
   BROWSER_PRINT: 'Zebra (Browser Print)',
   ARQUIVO_ZPL: 'Arquivo .zpl',
-  PAPEL: 'Papel (PDF)',
+  PAPEL: 'Papel A4',
 };
 
 /** O que aconteceu com o pedido, sem fingir: "enviada" é que o aplicativo da impressora recebeu, não que saiu no papel. */
 export const ROTULO_DA_SITUACAO: Record<SituacaoDaImpressao, string> = {
-  PREPARADA: 'Preparada, sem envio',
+  PREPARADA: 'Sem resultado',
   ENVIADA: 'Enviada à impressora',
   EXPORTADA: 'Arquivo gerado',
   FALHOU: 'Falhou',
 };
+
+/** O nome do pedido na tela (rodada 1, UX 11): pelo caminho, não pela ordem ("Reimpressão 2" de um papel confundia). */
+export const NOME_DO_PEDIDO: Record<Transporte, string> = { BROWSER_PRINT: 'Zebra', ARQUIVO_ZPL: 'Arquivo', PAPEL: 'Papel' };
+
+/**
+ * O selo do pedido (rodada 1, decisão 418): "Já imprimi" quando alguém disse que saiu; a Zebra sem resposta fica "Sem
+ * resultado" (pode ter saído); o arquivo foi "baixado" e o papel "aberto" — nenhum dos dois é "impresso".
+ */
+export function seloDoPedido(p: { transporte: Transporte; situacao: SituacaoDaImpressao; confirmadaEm: Date | null }): { texto: string; tom: 'ok' | 'alerta' | 'erro' | 'neutro' } {
+  if (p.confirmadaEm) return { texto: 'Já imprimi', tom: 'ok' };
+  if (p.situacao === 'ENVIADA') return { texto: 'Enviada à impressora', tom: 'ok' };
+  if (p.situacao === 'FALHOU') return { texto: 'Falhou', tom: 'erro' };
+  if (p.situacao === 'PREPARADA') return { texto: 'Sem resultado', tom: 'alerta' };
+  return { texto: p.transporte === 'PAPEL' ? 'Papel aberto' : 'Arquivo baixado', tom: 'neutro' };
+}
 
 export const ehTransporte = (v: unknown): v is Transporte => v === 'BROWSER_PRINT' || v === 'ARQUIVO_ZPL' || v === 'PAPEL';
 

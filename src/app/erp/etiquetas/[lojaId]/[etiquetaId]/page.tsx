@@ -8,7 +8,7 @@ import { exigirParceiroDaSessao, exigirPermissaoNaPagina } from '@/lib/erp/conte
 import { obterEmissao } from '@/lib/erp/etiquetas';
 import { TelaDaEmissao } from '@/components/erp/telas/etiquetas/emissao';
 import { fraseDasEtiquetas } from '@/components/erp/telas/etiquetas/estado';
-import { acaoPedirImpressao, acaoResultadoDaImpressao } from '../../actions';
+import { acaoConfirmarImpressao, acaoPedirImpressao, acaoResultadoDaImpressao } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +24,7 @@ export default async function ErpEmissaoPage({ params, searchParams }: { params:
       feito={fraseDasEtiquetas(searchParams.feito)}
       pedir={acaoPedirImpressao.bind(null, d.loja.id, d.etiqueta.id)}
       resultado={acaoResultadoDaImpressao.bind(null, d.loja.id)}
+      confirmar={acaoConfirmarImpressao.bind(null, d.loja.id, d.etiqueta.id)}
       hrefImpressora="/erp/etiquetas/impressora"
       bloqueio={ctx.bloqueio}
     />

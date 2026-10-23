@@ -8,7 +8,9 @@
  * - GET  {base}/available            → { printer: [...] };
  * - POST {base}/write                → { device, data } em texto (sem pré-consulta de CORS).
  *
- * "Enviada" quer dizer que o aplicativo aceitou o trabalho, não que saiu no papel: a tela pede para conferir.
+ * "Enviada" quer dizer que o aplicativo aceitou o trabalho, não que saiu no papel: a tela pede para conferir. Na primeira vez em
+ * https, o Chrome pede licença para o site falar com a rede local e o certificado de https://localhost:9101 precisa ser aceito
+ * (a aba Impressora explica).
  */
 
 export interface DispositivoZebra {
@@ -121,8 +123,28 @@ export async function detectar(base: string, uidEscolhido: string | null, ms = 3
   return padrao ? { estado: 'pronta', impressora: padrao, fonte: 'padrao' } : { estado: 'sem-impressora' };
 }
 
-/** Manda o ZPL para a impressora pelo aplicativo. Sem resposta em 15 s = falha (e pode ter saído: a tela diz). */
-export async function enviarZpl(base: string, impressora: DispositivoZebra, zpl: string, ms = 15000): Promise<{ ok: true } | { ok: false; erro: string }> {
+/**
+ * O erro que a Zebra devolve (em inglês, cru) em palavras de cozinha (rodada 1, UX 5): sem papel, tampa aberta, fita, pausada,
+ * desligada. O que não se reconhece aparece como veio, com "A impressora respondeu:".
+ */
+export function traduzirErroDaZebra(texto: string): string {
+  const t = texto.toLowerCase();
+  if (/paper out|media out|out of (paper|media)|no (paper|media)|media empty|paper empty/.test(t)) return 'Acabou o rolo de etiquetas: coloque um rolo novo e mande de novo.';
+  if (/head (is )?open|cover open|lid open|printhead open|door open/.test(t)) return 'A tampa da Zebra está aberta: feche até ouvir o clique e mande de novo.';
+  if (/ribbon/.test(t)) return 'Problema na fita (ribbon): confira se a fita está colocada e se não acabou.';
+  if (/paused|pause/.test(t)) return 'A Zebra está pausada: aperte o botão de pausa (ou desligue e ligue) e mande de novo.';
+  if (/head (too )?(hot|cold)|over ?temp|under ?temp|temperature/.test(t)) return 'A cabeça de impressão está quente demais: espere uns minutos e mande de novo.';
+  if (/offline|not connected|disconnected|unable to connect|could not connect|not found|no printer/.test(t)) return 'A Zebra não está ligada ou não está conectada a este computador: confira o cabo e a energia.';
+  return `A impressora respondeu: ${texto}`;
+}
+
+export type ResultadoDoEnvio = { ok: true } | { ok: false; erro: string; semResposta: boolean };
+
+/**
+ * Manda o ZPL para a impressora pelo aplicativo. Sem resposta em 15 s NÃO é falha: pode ter saído (rodada 1, UX 6). A tela diz
+ * "Sem resposta", o pedido fica "sem resultado" e a pessoa confere o papel ("Já imprimi" ou mandar de novo).
+ */
+export async function enviarZpl(base: string, impressora: DispositivoZebra, zpl: string, ms = 15000): Promise<ResultadoDoEnvio> {
   try {
     const r = await pedir(
       `${base}/write`,
@@ -131,10 +153,12 @@ export async function enviarZpl(base: string, impressora: DispositivoZebra, zpl:
     );
     if (r.ok) return { ok: true };
     const texto = (await r.text().catch(() => '')).trim().slice(0, 200);
-    return { ok: false, erro: texto ? `A impressora recusou: ${texto}` : `O aplicativo da Zebra recusou o envio (código ${r.status}).` };
+    return { ok: false, semResposta: false, erro: texto ? traduzirErroDaZebra(texto) : `O aplicativo da Zebra recusou o envio (código ${r.status}).` };
   } catch (e) {
     const abortou = e instanceof DOMException && e.name === 'AbortError';
-    return { ok: false, erro: abortou ? 'Sem resposta da impressora em 15 segundos. Pode ter saído: confira antes de mandar de novo.' : 'O aplicativo da Zebra parou de responder.' };
+    return abortou
+      ? { ok: false, semResposta: true, erro: 'A Zebra não respondeu em 15 segundos. Pode ter saído: confira o papel antes de mandar de novo.' }
+      : { ok: false, semResposta: false, erro: 'O aplicativo da Zebra parou de responder: nada foi enviado. Confira se o Browser Print está aberto.' };
   }
 }
 

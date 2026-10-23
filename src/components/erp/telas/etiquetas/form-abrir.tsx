@@ -83,7 +83,7 @@ export function FormAbrir({ acao, envioInicial, insumo, lotes, recarregar, bloqu
   const v = agoraMs !== null ? validadeDaAbertura({ abertoEm: new Date(agoraMs), prazoMin: prazo, vencimentoLote }) : null;
   const travado = !!bloqueio;
   return (
-    <form action={enviar} className="space-y-5 pb-28 sm:pb-0">
+    <form action={enviar} className="space-y-5 pb-28 min-[900px]:pb-0">
       <input type="hidden" name="envio" value={envio} />
       <input type="hidden" name="insumo" value={insumo.id} />
       <input type="hidden" name="escala" value={escala} />
@@ -174,7 +174,7 @@ export function FormAbrir({ acao, envioInicial, insumo, lotes, recarregar, bloqu
                       {CONSERVACOES[c]}
                       {c === insumo.conservacao && <span className="ml-2 text-[12px] font-normal text-suave">a do cadastro</span>}
                     </span>
-                    <span className={`block text-[12px] ${insumo.prazos[c] ? 'text-suave' : 'text-atencao'}`}>{insumo.prazos[c] ? `dura ${formatarValidade(insumo.prazos[c]!)} depois de aberto` : 'prazo depois de aberto não informado'}</span>
+                    <span className={`block text-[12px] ${insumo.prazos[c] ? 'text-suave' : 'text-atencao'}`}>{insumo.prazos[c] ? `dura ${formatarValidade(insumo.prazos[c]!)} depois de aberto` : 'Prazo após abertura não informado'}</span>
                   </span>
                 </span>
               </label>
@@ -227,7 +227,7 @@ export function FormAbrir({ acao, envioInicial, insumo, lotes, recarregar, bloqu
         </p>
       )}
 
-      <div data-barra-fixa className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 sm:static sm:border-0 sm:bg-transparent sm:p-0">
+      <div data-barra-fixa className="fixed inset-x-0 bottom-0 z-20 border-t border-linha bg-painel px-4 py-3 min-[900px]:static min-[900px]:border-0 min-[900px]:bg-transparent min-[900px]:p-0">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
           <span className="min-w-0 text-[13px] text-suave">A data e a hora entram sozinhas</span>
           <BotaoEnviar pendente="Registrando…" disabled={travado || (v !== null && !v.ok)} className="min-w-[200px]">

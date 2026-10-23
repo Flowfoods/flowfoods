@@ -17,6 +17,7 @@ import type { EstadoEstoque } from '@/components/erp/telas/estoque/estado';
 import { recusadoNoEstoque } from '@/components/erp/telas/estoque/executar';
 import {
   executarAbrir,
+  executarConfirmar,
   executarEmitirDaAbertura,
   executarEmitirDoLote,
   executarPedir,
@@ -63,6 +64,13 @@ export async function acaoResultadoDaImpressao(lojaId: string, pedidoId: string,
   const { ctx, negado } = await preparar('etiquetas.imprimir', lojaId);
   if (negado) return { ok: false, erros: { geral: negado } };
   return executarResultado(ctx.cliente, ctx.alcance, String(lojaId), String(pedidoId), resultado, erro);
+}
+
+/** "Já imprimi": a etiqueta saiu no papel (arquivo, papel A4 ou a Zebra que não respondeu); sai da fila com quem e quando. */
+export async function acaoConfirmarImpressao(lojaId: string, etiquetaId: string): Promise<ResultadoEstoque> {
+  const { ctx, negado, autor } = await preparar('etiquetas.imprimir', lojaId);
+  if (negado) return { ok: false, erros: { geral: negado } };
+  return executarConfirmar(ctx.cliente, ctx.alcance, autor, String(lojaId), String(etiquetaId), BASE);
 }
 
 /** A etiqueta de teste: dados fictícios, nada gravado. Basta imprimir etiquetas em alguma loja. */

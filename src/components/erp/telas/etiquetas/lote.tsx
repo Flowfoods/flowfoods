@@ -2,7 +2,8 @@
 /**
  * A etiqueta de um lote produzido (3.4): o retrato da conclusão (validade, conservação, manipulação, quem fez) e o formulário
  * de emissão com a prévia. Lote não concluído, cancelado, estornado ou perdido diz por que não leva etiqueta. Lote concluído
- * sem validade (a ficha não dizia) sai com "VALIDADE NÃO INFORMADA": a etiqueta nunca inventa prazo.
+ * sem validade (a ficha não dizia) sai com "VALIDADE NÃO INFORMADA": a etiqueta nunca inventa prazo. Lote vencido: não emite
+ * nem reimprime, e a tela diz em vermelho o que fazer (rodada 1, decisão 417).
  */
 
 import type { LoteParaEtiqueta } from '@/lib/erp/etiquetas';
@@ -17,7 +18,7 @@ import { Voltar } from '../cadastro/partes';
 import type { AcaoDeEstoque } from '../estoque/estado';
 import { serializar } from './conteudo';
 import { FormEmitir } from './form-emitir';
-import { ListaDeEmissoes, SeloDaValidade } from './partes';
+import { AvisoDeBloqueio, ListaDeEmissoes, SeloDaValidade } from './partes';
 
 export function TelaEtiquetaDoLote({ d, base, contexto, acao, envio, hrefLote, bloqueio }: { d: LoteParaEtiqueta; base: string; contexto?: string; acao: AcaoDeEstoque; envio: string; /** O lote na Produção (quem vê a produção). */ hrefLote: string | null; bloqueio: string | null }) {
   const l = d.lote;
@@ -37,7 +38,15 @@ export function TelaEtiquetaDoLote({ d, base, contexto, acao, envio, hrefLote, b
         </div>
       </PageHeader>
 
-      {d.motivo ? (
+      {d.motivo && d.vencido ? (
+        <AvisoDeBloqueio frase={d.motivo}>
+          {hrefLote && (
+            <a href={hrefLote} className="inline-flex min-h-11 items-center font-semibold text-texto underline underline-offset-4">
+              Abrir o lote na Produção
+            </a>
+          )}
+        </AvisoDeBloqueio>
+      ) : d.motivo ? (
         <Aviso tom="alerta" titulo={d.motivo}>
           {hrefLote && (
             <a href={hrefLote} className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4">

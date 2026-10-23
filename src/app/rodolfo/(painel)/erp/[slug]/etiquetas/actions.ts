@@ -17,6 +17,7 @@ import type { EstadoEstoque } from '@/components/erp/telas/estoque/estado';
 import { recusadoNoEstoque } from '@/components/erp/telas/estoque/executar';
 import {
   executarAbrir,
+  executarConfirmar,
   executarEmitirDaAbertura,
   executarEmitirDoLote,
   executarPedir,
@@ -69,6 +70,13 @@ export async function acaoResultadoDaImpressao(slug: string, lojaId: string, ped
   const { ctx, negado } = await preparar(slug, 'etiquetas.imprimir', lojaId);
   if (negado) return { ok: false, erros: { geral: negado } };
   return executarResultado(ctx.cliente, ctx.alcance, String(lojaId), String(pedidoId), resultado, erro);
+}
+
+export async function acaoConfirmarImpressao(slug: string, lojaId: string, etiquetaId: string): Promise<ResultadoEstoque> {
+  const { ctx, negado, base, autor } = await preparar(slug, 'etiquetas.imprimir', lojaId);
+  if (negado) return { ok: false, erros: { geral: negado } };
+  await auditar(ctx, 'erp_etiqueta_ja_imprimi', { lojaId: String(lojaId), etiquetaId: String(etiquetaId) });
+  return executarConfirmar(ctx.cliente, ctx.alcance, autor, String(lojaId), String(etiquetaId), base);
 }
 
 export async function acaoZplDeTeste(slug: string, formato: string, resolucao: string) {

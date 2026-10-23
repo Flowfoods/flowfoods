@@ -2,20 +2,21 @@
 /**
  * Uma etiqueta emitida (3.4): a prévia do retrato (o que vai no papel), o painel de impressão (Zebra, arquivo .zpl, papel) e
  * os pedidos já feitos, cada um com o que aconteceu sem fingir ("enviada" é que a Zebra recebeu). Reimprimir é outro pedido
- * do MESMO retrato: a validade não muda. Lote estornado depois: a etiqueta não se imprime mais.
+ * do MESMO retrato: a validade não muda. Lote estornado depois, ou a etiqueta vencida: não se imprime mais, e a tela diz em
+ * vermelho o que fazer (rodada 1, decisão 417). No celular e no tablet, o painel de impressão vem antes da prévia.
  */
 
 import Link from 'next/link';
 import type { EmissaoDaTela } from '@/lib/erp/etiquetas';
-import { FORMATOS, quandoNaTela, ROTULO_DA_SITUACAO, ROTULO_DO_TRANSPORTE, type SituacaoDaImpressao } from '@/lib/erp/etiqueta-campos';
+import { FORMATOS, NOME_DO_PEDIDO, quandoNaTela, seloDoPedido, type SituacaoDaImpressao } from '@/lib/erp/etiqueta-campos';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
 import { Aviso, Contagem, Painel, Selo, Vazio, type Tom } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { Voltar } from '../cadastro/partes';
-import type { AcaoDePedir, AcaoDeResultado } from './executar';
+import type { AcaoDeConfirmar, AcaoDePedir, AcaoDeResultado } from './executar';
 import { PainelDeImpressao } from './painel-impressao';
-import { SeloDaValidade } from './partes';
+import { AvisoDeBloqueio, SeloDaValidade } from './partes';
 import { PreviaDaEtiqueta } from './previa';
 
 export const TOM_DA_SITUACAO: Record<SituacaoDaImpressao, Tom> = { PREPARADA: 'alerta', ENVIADA: 'ok', EXPORTADA: 'neutro', FALHOU: 'erro' };
@@ -27,6 +28,7 @@ export function TelaDaEmissao({
   feito,
   pedir,
   resultado,
+  confirmar,
   hrefImpressora,
   bloqueio,
 }: {
@@ -36,6 +38,7 @@ export function TelaDaEmissao({
   feito?: string;
   pedir: AcaoDePedir;
   resultado: AcaoDeResultado;
+  confirmar: AcaoDeConfirmar;
   hrefImpressora: string;
   bloqueio: string | null;
 }) {
@@ -56,25 +59,36 @@ export function TelaDaEmissao({
         <div className="flex flex-wrap items-center gap-2">
           <SeloDaValidade situacao={e.situacao} />
           {e.regra === 'LOTE_SEM_VALIDADE' && <span className="text-[13px] text-suave">o lote foi concluído sem validade</span>}
-          {e.regra === 'PRAZO_NAO_INFORMADO' && <span className="text-[13px] text-suave">prazo depois de aberto não informado</span>}
         </div>
       </PageHeader>
-      {feito && <Aviso tom="ok" titulo={feito} />}
-      {d.origem.estornado && <Aviso tom="alerta" titulo="O lote desta etiqueta foi estornado depois: saiu do estoque.">A etiqueta não se imprime mais. Separe o que tiver dele.</Aviso>}
+      {d.bloqueio ? <AvisoDeBloqueio frase={d.bloqueio} /> : feito && <Aviso tom="ok" titulo={feito} />}
 
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
-        <Painel titulo="O que vai no papel" subtitulo="O retrato da emissão: reimprimir sai igual">
-          <PreviaDaEtiqueta layout={d.layout} />
-        </Painel>
-        <Painel titulo="Imprimir" subtitulo={d.pedidos.length ? 'Cada pedido fica no histórico; reimprimir é outro pedido' : 'A primeira impressão desta etiqueta'}>
-          {d.origem.estornado ? (
-            <p className="text-sm text-suave">Lote estornado: sem impressão.</p>
-          ) : bloqueio ? (
-            <p className="text-sm text-suave">{bloqueio}</p>
-          ) : (
-            <PainelDeImpressao copiasIniciais={e.quantas} pedir={pedir} resultado={resultado} hrefPapel={`${aqui}/papel`} hrefImpressora={hrefImpressora} />
-          )}
-        </Painel>
+        <div className="min-w-0 lg:col-start-2 lg:row-start-1">
+          <Painel titulo="Imprimir" subtitulo={d.pedidos.length ? 'Cada pedido fica no histórico; reimprimir é outro pedido' : 'A primeira impressão desta etiqueta'}>
+            {d.bloqueio ? (
+              <p className="text-sm text-suave">Sem impressão: nem na Zebra, nem no arquivo, nem no papel.</p>
+            ) : bloqueio ? (
+              <p className="text-sm text-suave">{bloqueio}</p>
+            ) : (
+              <PainelDeImpressao
+                copiasIniciais={e.quantas}
+                pedir={pedir}
+                resultado={resultado}
+                confirmar={confirmar}
+                naFila={d.naFila}
+                aConfirmar={!!d.aConfirmar}
+                hrefPapel={`${aqui}/papel`}
+                hrefImpressora={hrefImpressora}
+              />
+            )}
+          </Painel>
+        </div>
+        <div className="min-w-0 lg:col-start-1 lg:row-start-1">
+          <Painel titulo="O que vai no papel" subtitulo="O retrato da emissão: reimprimir sai igual">
+            <PreviaDaEtiqueta layout={d.layout} />
+          </Painel>
+        </div>
       </div>
 
       <Painel titulo="Pedidos de impressão" subtitulo="Quem pediu, quando, quantas cópias, como e o que aconteceu" acessorio={<Contagem>{d.pedidos.length}</Contagem>} semRespiro>
@@ -82,26 +96,33 @@ export function TelaDaEmissao({
           <Vazio>Esta etiqueta ainda não foi para a impressora.</Vazio>
         ) : (
           <ul className="divide-y divide-linha">
-            {d.pedidos.map((p) => (
-              <li key={p.id} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5 px-4 py-3 text-sm sm:px-5">
-                <span className="min-w-0">
-                  <span className="block font-semibold tabular-nums text-texto">
-                    {p.sequencia === 1 ? 'Primeira impressão' : `Reimpressão ${p.sequencia - 1}`} · {p.copias === 1 ? '1 cópia' : `${p.copias} cópias`}
+            {d.pedidos.map((p) => {
+              const selo = seloDoPedido(p);
+              return (
+                <li key={p.id} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5 px-4 py-3 text-sm sm:px-5">
+                  <span className="min-w-0">
+                    <span className="block font-semibold tabular-nums text-texto">
+                      {NOME_DO_PEDIDO[p.transporte]} · {p.copias === 1 ? '1 cópia' : `${p.copias} cópias`}
+                    </span>
+                    <span className="block text-[12px] tabular-nums text-suave">
+                      {p.transporte !== 'PAPEL' ? `${p.resolucao} dpi · ` : ''}pedido {quandoNaTela(p.solicitadaEm)} por {p.solicitadaPorNome}
+                    </span>
+                    {p.confirmadaEm && (
+                      <span className="block text-[12px] tabular-nums text-suave">
+                        “Já imprimi”: {p.confirmadaPorNome}, {quandoNaTela(p.confirmadaEm)}
+                      </span>
+                    )}
+                    {p.erro && <span className="block text-[12px] text-erro [overflow-wrap:anywhere]">{p.erro}</span>}
                   </span>
-                  <span className="block text-[12px] tabular-nums text-suave">
-                    {ROTULO_DO_TRANSPORTE[p.transporte]}
-                    {p.transporte !== 'PAPEL' ? ` · ${p.resolucao} dpi` : ''} · {quandoNaTela(p.solicitadaEm)} por {p.solicitadaPorNome}
-                  </span>
-                  {p.erro && <span className="block text-[12px] text-erro [overflow-wrap:anywhere]">{p.erro}</span>}
-                </span>
-                <Selo tom={TOM_DA_SITUACAO[p.situacao]}>{ROTULO_DA_SITUACAO[p.situacao]}</Selo>
-              </li>
-            ))}
+                  <Selo tom={selo.tom}>{selo.texto}</Selo>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Painel>
       <p className="text-[12px] text-suave">
-        “Enviada à impressora” quer dizer que o Browser Print da Zebra recebeu: confira o papel. “Arquivo gerado” é o .zpl ou o papel baixado, que ainda precisa ir para a impressora.{' '}
+        “Enviada à impressora” quer dizer que o Browser Print da Zebra recebeu: confira o papel. Baixar o arquivo ou abrir o papel não tira a etiqueta de “Esperando a impressora”: depois que sair, toque em “Já imprimi”.{' '}
         <Link href={hrefImpressora} className="inline-flex min-h-11 items-center underline decoration-linha-forte underline-offset-4">
           Impressora deste computador
         </Link>

@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { papelDoPedido } from '@/lib/erp/etiquetas';
 import { TelaDoPapel } from '@/components/erp/telas/etiquetas/papel';
+import { acaoConfirmarImpressao } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,5 +13,5 @@ export default async function ParceiroPapelDaEtiquetaPage({ params, searchParams
   exigirPermissao(ctx, 'etiquetas.imprimir');
   const d = await papelDoPedido(ctx.cliente, ctx.alcance, params.lojaId, params.etiquetaId, searchParams.pedido);
   if (!d) notFound();
-  return <TelaDoPapel d={d} base={`/rodolfo/erp/${ctx.parceiro.slug}/etiquetas`} contexto={ctx.parceiro.nome} />;
+  return <TelaDoPapel d={d} base={`/rodolfo/erp/${ctx.parceiro.slug}/etiquetas`} contexto={ctx.parceiro.nome} confirmar={acaoConfirmarImpressao.bind(null, ctx.parceiro.slug, d.loja.id, d.etiqueta.id)} />;
 }

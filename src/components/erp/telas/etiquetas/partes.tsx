@@ -13,6 +13,19 @@ export function SeloDaValidade({ situacao }: { situacao: { texto: string; tom: '
   return <Selo tom={situacao.tom}>{situacao.texto}</Selo>;
 }
 
+/**
+ * O aviso em vermelho de quando a etiqueta não sai (rodada 1, decisão 417): o lote ou a embalagem venceu (não use, separe para
+ * descarte, avise a gerência) ou o lote foi estornado. Card claro com borda fina; o vermelho fica só na frase.
+ */
+export function AvisoDeBloqueio({ frase, children }: { frase: string; children?: React.ReactNode }) {
+  return (
+    <div role="alert" className="rounded-[14px] border border-linha bg-painel px-4 py-3 text-sm sm:px-5">
+      <p className="font-semibold text-erro">{frase}</p>
+      {children && <div className="mt-1 text-suave">{children}</div>}
+    </div>
+  );
+}
+
 type Qual = 'imprimir' | 'abrir' | 'historico';
 
 const TITULO: Record<Qual, string> = {

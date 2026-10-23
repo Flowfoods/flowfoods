@@ -12,6 +12,7 @@ import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { ResultadoEstoque } from '@/lib/erp/estoque';
 import {
   abrirEmbalagem,
+  confirmarImpressao,
   emitirEtiquetaDaAbertura,
   emitirEtiquetaDoLote,
   pedirImpressao,
@@ -35,6 +36,8 @@ export interface PedidoDaTela {
 
 export type AcaoDePedir = (p: PedidoDaTela) => Promise<ResultadoDoPedido>;
 export type AcaoDeResultado = (pedidoId: string, resultado: 'ENVIADA' | 'FALHOU', erro: string) => Promise<ResultadoEstoque>;
+/** "Já imprimi" (rodada 1, decisão 418): a etiqueta saiu no papel; sai da fila com quem e quando. */
+export type AcaoDeConfirmar = () => Promise<ResultadoEstoque>;
 
 function concluir(r: ResultadoEstoque, anterior: EstadoEstoque, base: string, destino: (id: string) => string, feito: string, jaFeito: string): EstadoEstoque {
   if (!r.ok) return { ok: false, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
@@ -89,6 +92,13 @@ export function executarPedir(cliente: ClienteDoParceiro, alcance: Alcance, auto
 
 export function executarResultado(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, pedidoId: string, resultado: unknown, erro: unknown): Promise<ResultadoEstoque> {
   return resultadoDaImpressao(cliente, alcance, lojaId, String(pedidoId), { resultado, erro: typeof erro === 'string' ? erro : '' });
+}
+
+export function executarConfirmar(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, etiquetaId: string, base: string): Promise<ResultadoEstoque> {
+  return confirmarImpressao(cliente, alcance, lojaId, etiquetaId, autor).then((r) => {
+    if (r.ok) revalidatePath(base, 'layout');
+    return r;
+  });
 }
 
 // ================================================================ o lote do fornecedor na nota (Compras)
