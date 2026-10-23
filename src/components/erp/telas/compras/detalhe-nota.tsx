@@ -234,7 +234,7 @@ export function TelaDetalheNota({
               semRespiro
               acessorio={
                 estoqueBase ? (
-                  <Link href={`${estoqueBase}/${n.lojaId}`} className={`${LINK_DE_TEXTO} whitespace-nowrap`}>
+                  <Link href={`${estoqueBase}/${n.lojaId}`} className={`${LINK_DE_TEXTO} -my-3 inline-flex min-h-11 items-center whitespace-nowrap`}>
                     Ver o estoque
                   </Link>
                 ) : undefined
