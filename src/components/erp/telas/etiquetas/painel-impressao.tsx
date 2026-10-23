@@ -103,9 +103,9 @@ export function PainelDeImpressao({ copiasIniciais, pedir, resultado, hrefPapel,
         ) : deteccao.estado === 'pronta' ? (
           <p className="text-texto">
             <span className="font-semibold">Zebra pronta:</span> {deteccao.impressora.name}
-            <span className="block text-[12px] text-suave">
-              {deteccao.fonte === 'escolhida' ? 'escolhida neste computador' : 'a padrão do Browser Print'} · {pref.resolucao} dpi ·{' '}
-              <Link href={hrefImpressora} className={LINK_DE_TEXTO}>
+            <span className="flex flex-wrap items-center gap-x-1 text-[12px] text-suave">
+              {deteccao.fonte === 'escolhida' ? 'escolhida neste computador' : 'a padrão do Browser Print'} · {pref.resolucao} dpi ·
+              <Link href={hrefImpressora} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>
                 trocar
               </Link>
             </span>
@@ -119,10 +119,10 @@ export function PainelDeImpressao({ copiasIniciais, pedir, resultado, hrefPapel,
                 : 'Ligue a Zebra e escolha uma impressora padrão no Browser Print. Enquanto isso, baixe o arquivo .zpl ou imprima no papel.'}
             </p>
             <p className="flex flex-wrap gap-x-4 gap-y-1 text-[13px]">
-              <button type="button" onClick={() => void procurar(base, pref)} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+              <button type="button" onClick={() => void procurar(base, pref)} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>
                 Procurar de novo
               </button>
-              <Link href={hrefImpressora} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+              <Link href={hrefImpressora} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>
                 Como ligar a Zebra
               </Link>
             </p>

@@ -95,7 +95,7 @@ export function TelaAbrirEmbalagem({
       {!d.escolhido && d.insumos.length > 0 && (
         <p className="text-[13px] text-suave">
           Etiqueta de pré-preparo? Ela sai do lote produzido, em{' '}
-          <Link href={daLoja} className="underline decoration-linha-forte underline-offset-4">
+          <Link href={daLoja} className="inline-flex min-h-11 items-center underline decoration-linha-forte underline-offset-4">
             Imprimir
           </Link>
           .

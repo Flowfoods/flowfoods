@@ -102,7 +102,7 @@ export function TelaDaEmissao({
       </Painel>
       <p className="text-[12px] text-suave">
         “Enviada à impressora” quer dizer que o Browser Print da Zebra recebeu: confira o papel. “Arquivo gerado” é o .zpl ou o papel baixado, que ainda precisa ir para a impressora.{' '}
-        <Link href={hrefImpressora} className="underline decoration-linha-forte underline-offset-4">
+        <Link href={hrefImpressora} className="inline-flex min-h-11 items-center underline decoration-linha-forte underline-offset-4">
           Impressora deste computador
         </Link>
       </p>

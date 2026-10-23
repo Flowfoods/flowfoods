@@ -80,7 +80,7 @@ export function ConfigDaImpressora({ zplDeTeste }: { zplDeTeste: AcaoDeTeste }) 
 
   return (
     <div className="space-y-5">
-      <Painel titulo="Impressoras que o Browser Print vê" subtitulo="Neste computador" acessorio={<button type="button" onClick={() => void procurar(base)} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>Procurar de novo</button>}>
+      <Painel titulo="Impressoras que o Browser Print vê" subtitulo="Neste computador" acessorio={<button type="button" onClick={() => void procurar(base)} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Procurar de novo</button>}>
         <div aria-live="polite">
           {situacao.tipo === 'procurando' ? (
             <p className="text-sm text-suave">Procurando o Browser Print da Zebra neste computador…</p>

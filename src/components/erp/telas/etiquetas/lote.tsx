@@ -40,7 +40,7 @@ export function TelaEtiquetaDoLote({ d, base, contexto, acao, envio, hrefLote, b
       {d.motivo ? (
         <Aviso tom="alerta" titulo={d.motivo}>
           {hrefLote && (
-            <a href={hrefLote} className="font-semibold underline underline-offset-4">
+            <a href={hrefLote} className="inline-flex min-h-11 items-center font-semibold underline underline-offset-4">
               Abrir o lote na Produção
             </a>
           )}
@@ -60,7 +60,7 @@ export function TelaEtiquetaDoLote({ d, base, contexto, acao, envio, hrefLote, b
               <Linha rotulo="Quem fez">{l.quemFez ?? 'não registrado'}</Linha>
               {hrefLote && (
                 <Linha rotulo="Na Produção">
-                  <a href={hrefLote} className="underline decoration-linha-forte underline-offset-4">
+                  <a href={hrefLote} className="-my-3 inline-flex min-h-11 items-center underline decoration-linha-forte underline-offset-4">
                     lote {l.codigo}
                   </a>
                 </Linha>
