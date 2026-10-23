@@ -153,6 +153,9 @@ CREATE TABLE "EtiquetaImpressao" (
     "solicitadaPorUsuarioId" TEXT,
     "concluidaEm" TIMESTAMP(3),
     "chaveEnvio" TEXT,
+    "confirmadaEm" TIMESTAMP(3),
+    "confirmadaPorNome" TEXT,
+    "confirmadaPorUsuarioId" TEXT,
 
     CONSTRAINT "EtiquetaImpressao_pkey" PRIMARY KEY ("id"),
     CONSTRAINT "EtiquetaImpressao_faixas" CHECK ("sequencia" >= 1 AND "copias" BETWEEN 1 AND 50 AND "resolucao" IN (203, 300)),
@@ -162,11 +165,19 @@ CREATE TABLE "EtiquetaImpressao" (
       AND ("situacao" <> 'FALHOU' OR "erro" IS NOT NULL)
       AND ("situacao" <> 'EXPORTADA' OR "transporte" <> 'BROWSER_PRINT')
       AND ("situacao" <> 'ENVIADA' OR "transporte" = 'BROWSER_PRINT')
+      AND ("concluidaEm" IS NULL OR "concluidaEm" >= "solicitadaEm")
+    ),
+    -- "Já imprimi" (decisão 418): quem e quando, depois do pedido; só no que não teve a Zebra aceitando nem falhando.
+    CONSTRAINT "EtiquetaImpressao_confirmacao" CHECK (
+      ("confirmadaEm" IS NULL) = ("confirmadaPorNome" IS NULL)
+      AND ("confirmadaEm" IS NULL OR ("confirmadaEm" >= "solicitadaEm" AND "situacao" IN ('EXPORTADA', 'PREPARADA')))
+      AND ("confirmadaPorUsuarioId" IS NULL OR "confirmadaEm" IS NOT NULL)
     ),
     CONSTRAINT "EtiquetaImpressao_textos_curtos" CHECK (
       char_length("solicitadaPorNome") BETWEEN 1 AND 120
       AND ("erro" IS NULL OR char_length("erro") BETWEEN 1 AND 300)
       AND ("chaveEnvio" IS NULL OR char_length("chaveEnvio") BETWEEN 8 AND 64)
+      AND ("confirmadaPorNome" IS NULL OR char_length("confirmadaPorNome") BETWEEN 1 AND 120)
     )
 );
 
@@ -296,8 +307,8 @@ DECLARE
   i RECORD;
   prazo integer;
 BEGIN
-  IF TG_OP = 'UPDATE' THEN
-    RAISE EXCEPTION '[erp] a abertura registrada não muda (AberturaDeLote_imutavel).' USING ERRCODE = 'check_violation';
+  IF TG_OP IN ('UPDATE', 'DELETE') THEN
+    RAISE EXCEPTION '[erp] a abertura registrada não muda nem some (AberturaDeLote_imutavel).' USING ERRCODE = 'check_violation';
   END IF;
   SELECT x."tipo"::text AS "tipo", x."validadeSecoMin", x."validadePistaFriaMin", x."validadeRefrigeradoMin", x."validadeCongeladoMin"
     INTO i FROM "Insumo" x WHERE x."parceiroId" = NEW."parceiroId" AND x."id" = NEW."insumoId";
@@ -326,7 +337,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER "AberturaDeLote_confere" BEFORE INSERT OR UPDATE ON "AberturaDeLote"
+CREATE TRIGGER "AberturaDeLote_confere" BEFORE INSERT OR UPDATE OR DELETE ON "AberturaDeLote"
   FOR EACH ROW EXECUTE FUNCTION "erp_abertura_de_lote_confere"();
 
 -- A emissão (só as linhas da 3.4, com `regraDaValidade`): copia a validade da origem (o lote concluído ou a abertura), na
@@ -346,20 +357,33 @@ BEGIN
     RETURN NEW;
   END IF;
   IF NEW."ordemProducaoId" IS NOT NULL THEN
-    SELECT x."lojaId", x."status"::text AS "status", x."produzidoMilesimos", x."insumoProduzidoId", x."validadeEm", x."conservacaoSnapshot"::text AS "conservacao", x."codigoLote"
+    SELECT x."lojaId", x."status"::text AS "status", x."produzidoMilesimos", x."insumoProduzidoId", x."validadeEm", x."conservacaoSnapshot"::text AS "conservacao", x."codigoLote",
+           x."concluidaEm", x."responsavelNomeSnapshot", x."responsavelUsuarioId"
       INTO o FROM "OrdemProducao" x WHERE x."parceiroId" = NEW."parceiroId" AND x."id" = NEW."ordemProducaoId";
+    -- Quem fez: o da conclusão, ou ninguém (quem pegou e não é da equipe não assina; decisão 401). Manipulação = conclusão.
     IF NOT FOUND OR o."status" <> 'CONCLUIDA' OR coalesce(o."produzidoMilesimos", 0) <= 0 OR o."lojaId" <> NEW."lojaId"
        OR o."insumoProduzidoId" IS DISTINCT FROM NEW."insumoId" OR o."validadeEm" IS DISTINCT FROM NEW."validadeEm"
        OR o."conservacao" IS DISTINCT FROM NEW."conservacao"::text OR o."codigoLote" IS DISTINCT FROM NEW."loteProduzido"
-       OR (NEW."regraDaValidade" = 'LOTE_PRODUZIDO') <> (o."validadeEm" IS NOT NULL) THEN
+       OR (NEW."regraDaValidade" = 'LOTE_PRODUZIDO') <> (o."validadeEm" IS NOT NULL)
+       OR o."concluidaEm" IS DISTINCT FROM NEW."fabricadoEm" OR NEW."abertoEm" IS NOT NULL OR NEW."aberturaId" IS NOT NULL
+       OR (NEW."responsavelNomeSnapshot" IS NOT NULL AND NEW."responsavelNomeSnapshot" IS DISTINCT FROM o."responsavelNomeSnapshot")
+       OR (NEW."responsavelUsuarioId" IS NOT NULL AND NEW."responsavelUsuarioId" IS DISTINCT FROM o."responsavelUsuarioId")
+       OR (NEW."responsavelNomeSnapshot" IS NULL AND NEW."responsavelUsuarioId" IS NOT NULL)
+       OR NEW."loteFornecedor" IS NOT NULL OR NEW."marcaSnapshot" IS NOT NULL OR NEW."vencimentoLoteEm" IS NOT NULL THEN
       RAISE EXCEPTION '[erp] a etiqueta do lote copia o lote concluído desta loja: a validade e a conservação dele (Etiqueta_origem_confere).' USING ERRCODE = 'check_violation';
     END IF;
   ELSE
-    SELECT x."lojaId", x."insumoId", x."validadeEm", x."conservacao"::text AS "conservacao", x."regraDaValidade"::text AS "regra", x."vencimentoLoteEm", x."abertoEm"
+    SELECT x."lojaId", x."insumoId", x."validadeEm", x."conservacao"::text AS "conservacao", x."regraDaValidade"::text AS "regra", x."vencimentoLoteEm", x."abertoEm",
+           x."codigoLoteSnapshot", x."marcaSnapshot", x."abertoPorNome", x."abertoPorUsuarioId", x."quantidadeMilesimos"
       INTO a FROM "AberturaDeLote" x WHERE x."parceiroId" = NEW."parceiroId" AND x."id" = NEW."aberturaId";
+    -- O lote do fornecedor, a marca, quem abriu e quanto são os da abertura (nada forjado na etiqueta).
     IF NOT FOUND OR a."lojaId" <> NEW."lojaId" OR a."insumoId" <> NEW."insumoId" OR a."validadeEm" IS DISTINCT FROM NEW."validadeEm"
        OR a."conservacao" IS DISTINCT FROM NEW."conservacao"::text OR a."regra" <> NEW."regraDaValidade"::text
-       OR a."vencimentoLoteEm" IS DISTINCT FROM NEW."vencimentoLoteEm" OR a."abertoEm" IS DISTINCT FROM NEW."abertoEm" THEN
+       OR a."vencimentoLoteEm" IS DISTINCT FROM NEW."vencimentoLoteEm" OR a."abertoEm" IS DISTINCT FROM NEW."abertoEm"
+       OR a."codigoLoteSnapshot" IS DISTINCT FROM NEW."loteFornecedor" OR a."marcaSnapshot" IS DISTINCT FROM NEW."marcaSnapshot"
+       OR a."abertoPorNome" IS DISTINCT FROM NEW."responsavelNomeSnapshot" OR a."abertoPorUsuarioId" IS DISTINCT FROM NEW."responsavelUsuarioId"
+       OR a."quantidadeMilesimos" IS DISTINCT FROM NEW."quantidadeMilesimos"
+       OR NEW."fabricadoEm" IS NOT NULL OR NEW."loteProduzido" IS NOT NULL THEN
       RAISE EXCEPTION '[erp] a etiqueta do item aberto copia a abertura desta loja: a validade efetiva dela (Etiqueta_origem_confere).' USING ERRCODE = 'check_violation';
     END IF;
   END IF;
@@ -375,6 +399,9 @@ CREATE OR REPLACE FUNCTION "erp_etiqueta_impressao_confere"() RETURNS trigger AS
 DECLARE
   loja text;
 BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION '[erp] o pedido de impressão não some: é o histórico (EtiquetaImpressao_imutavel).' USING ERRCODE = 'check_violation';
+  END IF;
   IF TG_OP = 'INSERT' THEN
     SELECT e."lojaId" INTO loja FROM "Etiqueta" e WHERE e."parceiroId" = NEW."parceiroId" AND e."id" = NEW."etiquetaId";
     IF loja IS DISTINCT FROM NEW."lojaId" THEN
@@ -382,18 +409,30 @@ BEGIN
     END IF;
     RETURN NEW;
   END IF;
-  IF OLD."situacao" <> 'PREPARADA'
+  IF NEW."id" <> OLD."id"
      OR NEW."etiquetaId" <> OLD."etiquetaId" OR NEW."lojaId" <> OLD."lojaId" OR NEW."sequencia" <> OLD."sequencia" OR NEW."copias" <> OLD."copias"
      OR NEW."transporte" <> OLD."transporte" OR NEW."resolucao" <> OLD."resolucao" OR NEW."solicitadaEm" <> OLD."solicitadaEm"
      OR NEW."solicitadaPorNome" <> OLD."solicitadaPorNome" OR NEW."solicitadaPorUsuarioId" IS DISTINCT FROM OLD."solicitadaPorUsuarioId"
      OR NEW."chaveEnvio" IS DISTINCT FROM OLD."chaveEnvio" THEN
     RAISE EXCEPTION '[erp] o pedido de impressão só muda uma vez, de preparada para o resultado (EtiquetaImpressao_confere).' USING ERRCODE = 'check_violation';
   END IF;
+  -- "Já imprimi" (decisão 418): uma vez, sem mexer no resultado.
+  IF OLD."confirmadaEm" IS NULL AND NEW."confirmadaEm" IS NOT NULL THEN
+    IF NEW."situacao" <> OLD."situacao" OR NEW."erro" IS DISTINCT FROM OLD."erro" OR NEW."concluidaEm" IS DISTINCT FROM OLD."concluidaEm" THEN
+      RAISE EXCEPTION '[erp] confirmar a impressão não muda o resultado do pedido (EtiquetaImpressao_confere).' USING ERRCODE = 'check_violation';
+    END IF;
+    RETURN NEW;
+  END IF;
+  IF OLD."situacao" <> 'PREPARADA' OR OLD."confirmadaEm" IS NOT NULL
+     OR NEW."confirmadaEm" IS DISTINCT FROM OLD."confirmadaEm" OR NEW."confirmadaPorNome" IS DISTINCT FROM OLD."confirmadaPorNome"
+     OR NEW."confirmadaPorUsuarioId" IS DISTINCT FROM OLD."confirmadaPorUsuarioId" THEN
+    RAISE EXCEPTION '[erp] o pedido de impressão só muda uma vez, de preparada para o resultado (EtiquetaImpressao_confere).' USING ERRCODE = 'check_violation';
+  END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER "EtiquetaImpressao_confere" BEFORE INSERT OR UPDATE ON "EtiquetaImpressao"
+CREATE TRIGGER "EtiquetaImpressao_confere" BEFORE INSERT OR UPDATE OR DELETE ON "EtiquetaImpressao"
   FOR EACH ROW EXECUTE FUNCTION "erp_etiqueta_impressao_confere"();
 
 -- ------------------------------------------------------------ RLS

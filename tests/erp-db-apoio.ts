@@ -25,7 +25,7 @@ const ORDEM_DE_LIMPEZA = [
 ];
 
 /** Tabelas com gatilho que recusa o DELETE (a limpeza desliga só na transação dela). */
-const SEM_GATILHO_NA_LIMPEZA = ['DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem', 'CategoriaInsumo', 'ContagemRetratoItem', 'MetaCmvConjunto', 'MetaCmvCategoria', 'Etiqueta'];
+const SEM_GATILHO_NA_LIMPEZA = ['DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem', 'CategoriaInsumo', 'ContagemRetratoItem', 'MetaCmvConjunto', 'MetaCmvCategoria', 'Etiqueta', 'EtiquetaImpressao', 'AberturaDeLote'];
 
 export interface PerfilDoBanco {
   superusuario: boolean;

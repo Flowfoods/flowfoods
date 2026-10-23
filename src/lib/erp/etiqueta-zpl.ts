@@ -195,11 +195,11 @@ export function linhasDoConteudo(c: ConteudoDaEtiqueta): Linha[] {
     c.validade.tipo === 'instante' ? quando(c.validade.em) : c.validade.tipo === 'dia' ? diaDaEtiqueta(c.validade.dia) : null;
   if (c.origem === 'LOTE') {
     linhas.push({ campo: 'manipulacao', nome: 'a manipulação', texto: `MANIPULADO ${c.manipuladoEm ? quando(c.manipuladoEm) : 'SEM DATA'}`, essencial: true, maxLinhas: 1 });
-    linhas.push({ campo: 'validade', nome: 'a validade', texto: validade ? `VALIDADE ${validade}` : 'VALIDADE NÃO INFORMADA', essencial: true, destaque: true, maxLinhas: 2 });
+    linhas.push({ campo: 'validade', nome: 'a validade', texto: validade ? `VALIDADE ${validade}` : 'VALIDADE NÃO INFORMADA', essencial: true, destaque: !!validade, maxLinhas: 2 });
     linhas.push({ campo: 'lote', nome: 'o lote', texto: `LOTE ${c.lote ?? 'NÃO INFORMADO'}`, essencial: true, maxLinhas: 1 });
   } else {
     linhas.push({ campo: 'abertura', nome: 'a abertura', texto: `ABERTO ${c.abertoEm ? quando(c.abertoEm) : 'SEM DATA'}`, essencial: true, maxLinhas: 1 });
-    linhas.push({ campo: 'validade', nome: 'a validade', texto: validade ? `USAR ATÉ ${validade}` : 'PRAZO NÃO INFORMADO', essencial: true, destaque: true, maxLinhas: 2 });
+    linhas.push({ campo: 'validade', nome: 'a validade', texto: validade ? `USAR ATÉ ${validade}` : 'PRAZO APÓS ABERTURA NÃO INFORMADO', essencial: true, destaque: !!validade, maxLinhas: 2 });
     linhas.push({ campo: 'vencimento', nome: 'o vencimento do lote', texto: `VENC. LOTE ${c.vencimentoLote ? diaDaEtiqueta(c.vencimentoLote) : 'NÃO INFORMADO'}`, essencial: true, maxLinhas: 1 });
     linhas.push({ campo: 'lote', nome: 'o lote do fornecedor', texto: `LOTE FORN. ${c.lote ?? 'NÃO INFORMADO'}`, essencial: true, maxLinhas: 2 });
   }
@@ -215,7 +215,29 @@ export function linhasDoConteudo(c: ConteudoDaEtiqueta): Linha[] {
  * sobem). A marca, opcional, sai antes do que é essencial.
  */
 export function montarEtiqueta(c: ConteudoDaEtiqueta, formato: Formato, resolucao: Resolucao = 203): LayoutDaEtiqueta {
-  const escala = RESOLUCOES[resolucao] / 8;
+  // Rodada 1 (Guardião M3): o que entra e o que sai é decidido UMA vez, a 203 dpi (o que a prévia mostra); a 300 dpi o mesmo
+  // desenho é ampliado com arredondamento para baixo (cabe sempre, e a marca não some calada a 300).
+  if (resolucao !== 203) return ampliar(montarA203(c, formato), resolucao);
+  return montarA203(c, formato);
+}
+
+function ampliar(l: LayoutDaEtiqueta, resolucao: Resolucao): LayoutDaEtiqueta {
+  const k = RESOLUCOES[resolucao] / 8;
+  const f = (n: number) => Math.floor(n * k);
+  return {
+    ...l,
+    resolucao,
+    larguraPontos: f(l.larguraPontos),
+    alturaPontos: f(l.alturaPontos),
+    elementos: l.elementos.map((e) =>
+      e.tipo === 'filete' ? { ...e, x: f(e.x), y: f(e.y), largura: f(e.largura), espessura: Math.max(1, f(e.espessura)) } : { ...e, x: f(e.x), y: f(e.y), altura: f(e.altura) },
+    ),
+  };
+}
+
+function montarA203(c: ConteudoDaEtiqueta, formato: Formato): LayoutDaEtiqueta {
+  const resolucao: Resolucao = 203;
+  const escala = 1;
   const m = MEDIDAS[formato];
   const p = (n: number) => Math.round(n * escala);
   const larguraPontos = p(480);
@@ -286,7 +308,7 @@ const primeiraMaiuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 // ================================================================ o ZPL
 
 /** A versão do desenho (gravada na emissão): mudar posições ou fontes sobe o número. */
-export const VERSAO_DO_LAYOUT = 1;
+export const VERSAO_DO_LAYOUT = 2; // 2 (rodada 1 da 3.4): um termo só para a embalagem sem prazo; 300 dpi ampliado do desenho de 203
 
 /**
  * O documento ZPL de um layout, com `copias` (`^PQ`). Uma etiqueta por documento: as cópias saem iguais. `^CI28` antes de

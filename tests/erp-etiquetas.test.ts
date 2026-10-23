@@ -14,6 +14,9 @@ import {
   diaNoRio,
   fimDoVencimento,
   fraseDaValidadeDaAbertura,
+  fraseDoVencido,
+  lerCodigoDoLote,
+  venceu,
   inicioDoDiaNoRio,
   lerAbertura,
   lerCopias,
@@ -328,7 +331,7 @@ describe('3.4 · o ZPL: estrutura, tamanho e conteúdo', () => {
     expect(lote).toContain('RESP. NÃO REGISTRADO');
     expect(lote.join(' ')).not.toMatch(/VALIDADE \d/);
     const aberta = textos(zplDoLayout(montarEtiqueta({ ...ABERTA, validade: { tipo: 'nao-informada' }, vencimentoLote: null, lote: null, marca: null }, 'E60X40'), 1));
-    expect(aberta).toEqual(expect.arrayContaining(['PRAZO NÃO INFORMADO', 'VENC. LOTE NÃO INFORMADO', 'LOTE FORN. NÃO INFORMADO']));
+    expect(aberta).toEqual(expect.arrayContaining(['PRAZO APÓS ABERTURA NÃO INFORMADO', 'VENC. LOTE NÃO INFORMADO', 'LOTE FORN. NÃO INFORMADO']));
     expect(aberta.join(' ')).not.toMatch(/USAR ATÉ/);
   });
 
@@ -469,5 +472,81 @@ describe('3.4 · o rastro do XML vira sugestão (nada entra sozinho)', () => {
     expect(rastrosDoXmlGuardado(BASE).size).toBe(0);
     expect(rastrosDoXmlGuardado('<!DOCTYPE x [<!ENTITY a "b">]><x/>').size).toBe(0);
     expect(rastrosDoXmlGuardado('não é xml').size).toBe(0);
+  });
+});
+
+// ================================================================ rodada de correção 1 (Guardião e UX)
+
+describe('3.4 · rodada 1: vencido não emite, lote com pontuação, 300 dpi sem sumir nada, um termo para o sem prazo', () => {
+  it('venceu: a validade passou (no instante); sem data não se sabe; a frase diz quando, pelo dia quando é o vencimento do lote', () => {
+    const agora = new Date('2026-10-23T15:00:00Z'); // 12:00 no Rio
+    expect(venceu(new Date('2026-10-23T14:59:00Z'), agora)).toBe(true);
+    expect(venceu(new Date('2026-10-23T15:00:00Z'), agora)).toBe(true);
+    expect(venceu(new Date('2026-10-23T15:01:00Z'), agora)).toBe(false);
+    expect(venceu(null, agora)).toBe(false);
+    expect(fraseDoVencido({ origem: 'LOTE', validadeEm: new Date('2026-10-22T17:05:00Z'), porDia: null })).toBe('Este lote venceu em 22/10 às 14:05: não use. Separe para descarte e avise a gerência.');
+    expect(fraseDoVencido({ origem: 'ABERTA', validadeEm: fimDoVencimento('2026-10-22'), porDia: '2026-10-22' })).toBe('Esta embalagem venceu em 22/10: não use. Separe para descarte e avise a gerência.');
+  });
+
+  it('o lote do fornecedor aceita a pontuação comum (_ : # , ( ) +), como vem no nLote do XML; o resto continua recusado', () => {
+    for (const c of ['L_2310', 'LT:2026', 'N#4521', 'A-1/2.3', 'L 12, 3', 'L(1)+2']) expect(lerCodigoDoLote(c)).toEqual({ ok: true, codigo: c });
+    for (const c of ['L^XZ', 'L~1', 'L*1', 'L<1>', 'L"1']) expect(lerCodigoDoLote(c).ok, c).toBe(false);
+    // O ZPL protege o que passou: `_` vira hexadecimal dentro de ^FH.
+    expect(paraCampoZpl('LOTE FORN. L_2310')).toBe('LOTE FORN. L_5F2310');
+  });
+
+  it('300 dpi: o mesmo desenho de 203 ampliado — o que fica de fora é o mesmo e tudo cabe (o caso do Guardião e 3.000 sorteados)', () => {
+    const guardiao: ConteudoDaEtiqueta = {
+      origem: 'ABERTA',
+      produto: 'WWW casa cheddar caramelizada',
+      conservacao: 'REFRIGERADO',
+      quantidade: null,
+      manipuladoEm: null,
+      abertoEm: new Date('2026-10-23T15:00:00Z'),
+      validade: { tipo: 'instante', em: new Date('2026-10-26T15:00:00Z') },
+      vencimentoLote: '2026-11-10',
+      lote: 'cheddar com caramelizada',
+      marca: 'Molho especial Molho',
+      responsavel: 'cheddar cebola mmmm caramelizada',
+      loja: 'mmmm cheddar com',
+      codigo: 'E261023-0001',
+      mostrarHora: true,
+    };
+    const palavras = ['WWW', 'casa', 'cheddar', 'caramelizada', 'Molho', 'especial', 'mmmm', 'com', 'cebola', 'Ação', 'Ãçé', 'L-2310', 'leite', 'MMMMMM'];
+    let semente = 7;
+    const sorte = (n: number) => {
+      semente = (semente * 1103515245 + 12345) % 2147483648;
+      return semente % n;
+    };
+    const frase = (max: number) => Array.from({ length: 1 + sorte(max) }, () => palavras[sorte(palavras.length)]).join(' ');
+    const casos = [guardiao];
+    for (let i = 0; i < 3000; i++) {
+      casos.push({ ...guardiao, origem: sorte(2) ? 'ABERTA' : 'LOTE', produto: frase(5), lote: sorte(3) ? frase(3) : null, marca: sorte(2) ? frase(3) : null, responsavel: sorte(4) ? frase(3) : null, loja: frase(3) });
+    }
+    for (const c of casos) {
+      for (const f of ['E60X40', 'E60X60'] as const) {
+        const a = montarEtiqueta(c, f, 203);
+        const b = montarEtiqueta(c, f, 300);
+        expect(b.erro).toBe(a.erro);
+        expect(b.fora).toEqual(a.fora);
+        expect(b.elementos.map((e) => (e.tipo === 'texto' ? e.texto : '—'))).toEqual(a.elementos.map((e) => (e.tipo === 'texto' ? e.texto : '—')));
+        for (const e of b.elementos) {
+          const largura = e.tipo === 'texto' ? larguraDoTexto(e.texto, e.altura) : e.largura;
+          const altura = e.tipo === 'texto' ? e.altura : e.espessura;
+          expect(e.x + largura).toBeLessThanOrEqual(b.larguraPontos);
+          expect(e.y + altura).toBeLessThanOrEqual(b.alturaPontos);
+        }
+      }
+    }
+    expect(montarEtiqueta(guardiao, 'E60X60', 300).fora).toEqual(montarEtiqueta(guardiao, 'E60X60', 203).fora);
+  });
+
+  it('a embalagem sem prazo usa um termo só e cabe na 60 × 40 com nome de duas linhas (letra normal, não a de destaque)', () => {
+    const c: ConteudoDaEtiqueta = { ...conteudoDeTeste('E60X40', new Date('2026-10-23T15:00:00Z')), origem: 'ABERTA', produto: 'Creme de leite fresco integral', abertoEm: new Date('2026-10-23T15:00:00Z'), validade: { tipo: 'nao-informada' }, lote: null, vencimentoLote: null, responsavel: 'Otto Operador da Silva' };
+    const l = montarEtiqueta(c, 'E60X40');
+    expect(l.erro).toBeNull();
+    const t = l.elementos.filter((e) => e.tipo === 'texto') as { texto: string; altura: number }[];
+    expect(t.find((e) => e.texto === 'PRAZO APÓS ABERTURA NÃO INFORMADO')?.altura).toBe(22);
+    expect(t.some((e) => /PRAZO NÃO INFORMADO/.test(e.texto) && !/APÓS/.test(e.texto))).toBe(false);
   });
 });

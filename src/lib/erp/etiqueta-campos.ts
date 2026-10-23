@@ -136,6 +136,21 @@ export function validadeDaAbertura(a: { abertoEm: Date; prazoMin: number | null;
   return { ok: true, validadeEm: pelaAbertura, regra: 'PRAZO_APOS_ABERTURA' };
 }
 
+/**
+ * Rodada 1 (decisão 417): a validade da etiqueta já passou? Lote produzido ou embalagem aberta vencidos não emitem nem
+ * reimprimem (Zebra, arquivo e papel). Sem data (não informada), não há como dizer: segue.
+ */
+export function venceu(validadeEm: Date | null, agora: Date): boolean {
+  return !!validadeEm && validadeEm.getTime() <= agora.getTime();
+}
+
+/** "Este lote venceu em 22/10 às 14:05: não use. Separe para descarte e avise a gerência." (pelo dia, quando é o vencimento do lote). */
+export function fraseDoVencido(o: { origem: 'LOTE' | 'ABERTA'; validadeEm: Date; porDia: string | null }): string {
+  const p = partesNoRio(o.validadeEm);
+  const quando = o.porDia ? `${o.porDia.slice(8, 10)}/${o.porDia.slice(5, 7)}` : `${p.dia}/${p.mes} às ${p.hora}:${p.minuto}`;
+  return `${o.origem === 'LOTE' ? 'Este lote venceu' : 'Esta embalagem venceu'} em ${quando}: não use. Separe para descarte e avise a gerência.`;
+}
+
 /** "10/11/2026" a partir do dia (aaaa-mm-dd). */
 export function diaPorExtenso(iso: string): string {
   const [a, m, d] = iso.split('-');
@@ -246,7 +261,8 @@ export function lerCodigoDoLote(v: unknown): { ok: true; codigo: string | null }
   const t = limparTexto(v);
   if (!t) return { ok: true, codigo: null };
   if (t.length > LIMITES_DO_LOTE.codigo) return { ok: false, erro: `Lote: até ${LIMITES_DO_LOTE.codigo} letras.` };
-  if (!/^[\p{L}\p{N} ./\-]+$/u.test(t)) return { ok: false, erro: 'Lote: só letras, números, espaço, ponto, barra e hífen, como está na embalagem.' };
+  // Rodada 1 (Guardião M8): a pontuação comum do lote impresso (e do nLote do XML) também vale; o ZPL protege `^`, `~` e `_`.
+  if (!/^[\p{L}\p{N} ./\-_:#,()+]+$/u.test(t)) return { ok: false, erro: 'Lote: letras, números, espaço e . / - _ : # , ( ) +, como está na embalagem.' };
   return { ok: true, codigo: t };
 }
 

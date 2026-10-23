@@ -1993,6 +1993,10 @@ model EtiquetaImpressao {
   solicitadaPorUsuarioId String?
   concluidaEm            DateTime?
   chaveEnvio             String?
+  // Rodada 1 da 3.4 (decisão 418): "Já imprimi" — a pessoa diz que saiu no papel (arquivo, papel ou Zebra sem resposta).
+  confirmadaEm           DateTime?
+  confirmadaPorNome      String?
+  confirmadaPorUsuarioId String?
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, etiquetaId, sequencia])
