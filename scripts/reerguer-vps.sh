@@ -1,0 +1,283 @@
+#!/usr/bin/env bash
+# Reerguer a VPS — roda no runner do GitHub (ação "reerguer-vps" do barney-ops).
+#
+# Uma etapa por execução, para cada passo ser lido antes do próximo:
+#   diagnosticar  só leitura: rede, estado na Hostinger, saúde por SSH, apps no Dokploy
+#   reiniciar     restart/start pela API da Hostinger — recusa se a VM estiver
+#                 suspensa ou se o SSH/painel ainda responder
+#   limpar-cache  docker builder prune + image prune, SÓ se o disco passar de 90%
+#   subir         Docker → Dokploy/Traefik → lista de IDs, um por vez, esperando cada um
+#   provar        HTTP + certificado + DNS de cada domínio cadastrado no Dokploy
+#
+# Regras que o script garante:
+#   - nunca imprime token, senha ou chave; da API do Dokploy só saem nome, id,
+#     status e domínio (o JSON bruto tem variáveis de ambiente — não vai para o log);
+#   - nunca apaga volume: não existe "volume prune" nem "system prune" aqui.
+#
+# Variáveis (vêm dos secrets do repositório):
+#   DOKPLOY_URL, DOKPLOY_API_TOKEN, HOSTINGER_API_TOKEN, VPS_SSH_KEY,
+#   VPS_SSH_USER (padrão root), VPS_HOST (padrão 76.13.230.78)
+#   ALVOS (etapa subir): "compose:ID,application:ID,postgres:ID,redis:ID" — na ordem
+
+set -uo pipefail
+ETAPA="${1:-diagnosticar}"
+VPS_IP="${VPS_HOST:-76.13.230.78}"
+VPS_NOME="srv1608769"
+SSH_USER="${VPS_SSH_USER:-root}"
+HAPI="https://developers.hostinger.com/api/vps/v1"
+RESUMO="${GITHUB_STEP_SUMMARY:-/dev/null}"
+
+titulo() { echo; echo "================ $* ================"; }
+tem() { [ -n "${!1:-}" ]; }
+
+# ------------------------------------------------------------------ SSH
+SSH_OK=0
+preparar_ssh() {
+  tem VPS_SSH_KEY || return 1
+  mkdir -p ~/.ssh && chmod 700 ~/.ssh
+  printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps && chmod 600 ~/.ssh/vps
+  return 0
+}
+rssh() {
+  ssh -i ~/.ssh/vps -o BatchMode=yes -o ConnectTimeout=15 \
+      -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=20 \
+      "${SSH_USER}@${VPS_IP}" "$@"
+}
+testar_ssh() {
+  SSH_OK=0
+  preparar_ssh || { echo "SSH: secret VPS_SSH_KEY ausente — pulei"; return 1; }
+  if rssh 'echo ok' >/dev/null 2>&1; then SSH_OK=1; echo "SSH: responde"; else echo "SSH: NÃO responde"; fi
+}
+
+# ------------------------------------------------------------- Hostinger
+VM_ID=""; VM_ESTADO=""
+hostinger_estado() {
+  VM_ID=""; VM_ESTADO=""
+  if ! tem HOSTINGER_API_TOKEN; then echo "Hostinger: secret HOSTINGER_API_TOKEN ausente — pulei"; return 1; fi
+  code=$(curl -sS -o /tmp/vms.json -w '%{http_code}' --max-time 30 \
+           -H "Authorization: Bearer ${HOSTINGER_API_TOKEN}" "${HAPI}/virtual-machines" || echo 000)
+  if [ "$code" != 200 ]; then echo "Hostinger: GET virtual-machines -> HTTP $code"; return 1; fi
+  linha=$(jq -r --arg n "$VPS_NOME" --arg ip "$VPS_IP" '
+      [ (if type=="array" then . else (.data // []) end)[]
+        | select(((.hostname // "") | contains($n))
+                 or ([.ipv4[]?.address, .ipv4[]?.ip?] | index($ip))) ][0]
+      | if . == null then "" else "\(.id)\t\(.state)\t\(.hostname)\t\(.plan // "")" end' /tmp/vms.json)
+  if [ -z "$linha" ]; then echo "Hostinger: VM ${VPS_NOME} não encontrada na conta deste token"; return 1; fi
+  VM_ID=$(cut -f1 <<<"$linha"); VM_ESTADO=$(cut -f2 <<<"$linha")
+  echo "Hostinger: id=${VM_ID} estado=${VM_ESTADO} host=$(cut -f3 <<<"$linha") plano=$(cut -f4 <<<"$linha")"
+}
+
+# --------------------------------------------------------------- Dokploy
+DBASE=""
+dokploy() { # $1 método · $2 caminho · $3 corpo opcional → corpo em /tmp/dk.json, imprime o código
+  local corpo=()
+  [ -n "${3:-}" ] && corpo=(-H 'Content-Type: application/json' -d "$3")
+  curl -sk -o /tmp/dk.json -w '%{http_code}' --max-time 60 -X "$1" \
+       -H "x-api-key: ${DOKPLOY_API_TOKEN}" "${corpo[@]}" "${DBASE}$2" || echo 000
+}
+preparar_dokploy() {
+  if ! tem DOKPLOY_URL || ! tem DOKPLOY_API_TOKEN; then echo "Dokploy: faltam DOKPLOY_URL/DOKPLOY_API_TOKEN"; return 1; fi
+  DBASE=$(printf '%s' "$DOKPLOY_URL" | sed -E 's#^(https?://[^/]+).*#\1#')
+}
+# Inventário sem segredo: tipo, id, nome, status, domínios. Funciona com o
+# formato antigo (projeto → serviços) e o novo (projeto → ambiente → serviços).
+inventario() {
+  preparar_dokploy || return 1
+  code=$(dokploy GET /api/project.all)
+  if [ "$code" != 200 ]; then echo "Dokploy: project.all -> HTTP $code"; return 1; fi
+  jq -r '
+    [ .. | objects | select(has("domainId") | not) |
+      if   has("composeId")     and has("composeStatus")     then {t:"compose",     id:.composeId,     s:.composeStatus}
+      elif has("applicationId") and has("applicationStatus") then {t:"application", id:.applicationId, s:.applicationStatus}
+      elif has("postgresId")    and has("applicationStatus") then {t:"postgres",    id:.postgresId,    s:.applicationStatus}
+      elif has("redisId")       and has("applicationStatus") then {t:"redis",       id:.redisId,       s:.applicationStatus}
+      elif has("mysqlId")       and has("applicationStatus") then {t:"mysql",       id:.mysqlId,       s:.applicationStatus}
+      elif has("mariadbId")     and has("applicationStatus") then {t:"mariadb",     id:.mariadbId,     s:.applicationStatus}
+      elif has("mongoId")       and has("applicationStatus") then {t:"mongo",       id:.mongoId,       s:.applicationStatus}
+      else empty end
+      + {n:(.name // .appName // "?"), d:([.domains[]?.host] | join(" "))} ]
+    | unique_by(.id) | sort_by(.t, .n)[]
+    | "\(.t)\t\(.id)\t\(.n)\t\(.s)\t\(.d)"' /tmp/dk.json > /tmp/inventario.tsv
+  column -t -s $'\t' -N TIPO,ID,NOME,STATUS,DOMINIOS /tmp/inventario.tsv 2>/dev/null || cat /tmp/inventario.tsv
+}
+
+# ================================================================ etapas
+diagnosticar() {
+  titulo "1. Rede (do runner)"
+  ping -c 3 -W 3 "$VPS_IP" >/dev/null 2>&1 && echo "ping: responde" || echo "ping: sem resposta (pode ser ICMP bloqueado)"
+  timeout 8 bash -c "echo > /dev/tcp/${VPS_IP}/22" 2>/dev/null && echo "porta 22: aberta" || echo "porta 22: fechada/sem resposta"
+  echo "painel :3000 -> HTTP $(curl -s -o /dev/null -w '%{http_code}' --max-time 15 "http://${VPS_NOME}.hstgr.cloud:3000" || true)"
+  echo "consultoriaflowfoods.com.br -> HTTP $(curl -s -o /dev/null -w '%{http_code}' --max-time 15 https://consultoriaflowfoods.com.br || true)"
+
+  titulo "2. Hostinger"
+  hostinger_estado || true
+  case "$VM_ESTADO" in
+    suspended|suspending) echo "::error title=VPS SUSPENSA::Estado ${VM_ESTADO}. Não reinicie — ver pagamento/abuso no hPanel." ;;
+  esac
+
+  titulo "3. Saúde por SSH (só leitura)"
+  testar_ssh || true
+  if [ "$SSH_OK" = 1 ]; then
+    rssh 'bash -s' <<'REMOTO'
+sec() { echo; echo "--- $* ---"; }
+sec uptime; uptime
+sec "boots recentes"; last -x reboot shutdown 2>/dev/null | head -8
+sec "free -h"; free -h
+sec "swap"; swapon --show 2>/dev/null || echo "(sem swap)"
+sec "df -h"; df -h -x tmpfs -x overlay 2>/dev/null
+sec "df -i"; df -i / 2>/dev/null
+sec "docker system df"; docker system df 2>&1
+sec "OOM no boot atual (dmesg)"; dmesg -T 2>/dev/null | grep -i -E "out of memory|oom-kill|killed process" | tail -30
+sec "OOM no boot anterior (journal)"; journalctl -k -b -1 --no-pager 2>/dev/null | grep -i -E "out of memory|oom-kill|killed process" | tail -30
+sec "erros do boot anterior"; journalctl -b -1 -p err --no-pager 2>/dev/null | tail -100
+sec "fim do boot anterior"; journalctl -b -1 --no-pager 2>/dev/null | tail -40
+sec "docker"; systemctl is-active docker; systemctl status docker --no-pager 2>&1 | head -12
+sec "containers"; docker ps -a --format "table {{.Names}}\t{{.Status}}" 2>&1 | head -80
+sec "swarm services"; docker service ls 2>&1
+sec "builds do docker hoje (journal)"; journalctl -u docker --since today --no-pager 2>/dev/null | grep -i -c "build" || true
+sec "maiores consumidores de memória agora"; ps -eo pid,rss,comm --sort=-rss | head -12
+REMOTO
+  fi
+
+  titulo "4. Dokploy (inventário, sem segredos)"
+  inventario || true
+}
+
+reiniciar() {
+  hostinger_estado || { echo "::error::Sem acesso à API da Hostinger — reinicie pelo hPanel (VPS → Gerenciar → Reiniciar)."; exit 1; }
+  case "$VM_ESTADO" in
+    suspended|suspending) echo "::error title=VPS SUSPENSA::Não reiniciei. Ver pagamento/abuso no hPanel."; exit 1 ;;
+  esac
+  testar_ssh || true
+  if [ "$SSH_OK" = 1 ]; then echo "::warning::SSH responde — NÃO reiniciei a máquina. Siga para limpar-cache/subir."; exit 0; fi
+  if ! tem VPS_SSH_KEY && curl -s -o /dev/null --max-time 15 "http://${VPS_NOME}.hstgr.cloud:3000"; then
+    echo "::warning::Painel do Dokploy responde — a máquina está viva. NÃO reiniciei."; exit 0
+  fi
+  acao=restart; [ "$VM_ESTADO" = stopped ] && acao=start
+  echo "Disparando ${acao} (estado atual: ${VM_ESTADO})"
+  code=$(curl -sS -o /tmp/r.json -w '%{http_code}' --max-time 60 -X POST \
+           -H "Authorization: Bearer ${HOSTINGER_API_TOKEN}" "${HAPI}/virtual-machines/${VM_ID}/${acao}" || echo 000)
+  echo "POST ${acao} -> HTTP ${code}"
+  case "$code" in 2*) ;; *) echo "::error::Hostinger recusou o ${acao}."; exit 1 ;; esac
+  for i in $(seq 1 30); do
+    sleep 10
+    if timeout 5 bash -c "echo > /dev/tcp/${VPS_IP}/22" 2>/dev/null; then
+      echo "Porta 22 voltou após ~$((i*10)) s"; sleep 20; testar_ssh || true; hostinger_estado || true; exit 0
+    fi
+  done
+  hostinger_estado || true
+  echo "::error::Após 5 min a porta 22 não voltou."; exit 1
+}
+
+limpar_cache() {
+  testar_ssh || true
+  [ "$SSH_OK" = 1 ] || { echo "::error::Sem SSH, não limpo nada."; exit 1; }
+  rssh 'bash -s' <<'REMOTO'
+uso=$(df --output=pcent / | tail -1 | tr -dc 0-9)
+echo "Disco / em ${uso}%"
+if [ "$uso" -lt 90 ]; then echo "Abaixo de 90% — nada a limpar."; exit 0; fi
+echo "--- antes ---"; docker system df
+docker builder prune -f
+docker image prune -f
+echo "--- depois ---"; docker system df; df -h /
+REMOTO
+}
+
+esperar() { # $1 tipo · $2 id → espera sair de "running" (até 20 min)
+  local campo="applicationStatus" chave
+  [ "$1" = compose ] && campo="composeStatus"
+  chave="${1}Id"
+  for i in $(seq 1 80); do
+    sleep 15
+    code=$(dokploy GET "/api/${1}.one?${chave}=${2}")
+    st=$(jq -r ".${campo} // \"?\"" /tmp/dk.json 2>/dev/null)
+    echo "  [$((i*15))s] ${1} ${2}: ${st} (HTTP ${code})"
+    case "$st" in done) return 0 ;; error) return 1 ;; esac
+  done
+  return 2
+}
+
+subir() {
+  testar_ssh || true
+  if [ "$SSH_OK" = 1 ]; then
+    titulo "Docker e Dokploy/Traefik"
+    rssh 'bash -s' <<'REMOTO'
+systemctl is-active --quiet docker || { echo "docker parado — iniciando"; systemctl start docker; sleep 15; }
+echo "docker: $(systemctl is-active docker)"
+for c in dokploy-traefik; do
+  st=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo ausente)
+  echo "$c: $st"
+  [ "$st" = exited ] || [ "$st" = created ] && docker start "$c"
+done
+sleep 10
+docker service ls --format "table {{.Name}}\t{{.Replicas}}" 2>&1 | grep -E "NAME|dokploy" || true
+REMOTO
+  fi
+  preparar_dokploy || exit 1
+  for i in $(seq 1 12); do
+    curl -sk -o /dev/null --max-time 10 "${DBASE}" && break
+    echo "Painel ainda não responde (${i}/12)"; sleep 15
+  done
+  [ -n "${ALVOS:-}" ] || { echo "Sem ALVOS — só conferi Docker/Dokploy."; inventario; exit 0; }
+
+  falhas=0
+  IFS=',' read -ra lista <<<"$ALVOS"
+  for alvo in "${lista[@]}"; do
+    tipo="${alvo%%:*}"; id="${alvo#*:}"; tipo="${tipo// /}"; id="${id// /}"
+    titulo "${tipo} ${id}"
+    case "$tipo" in
+      compose|application) rota="${tipo}.deploy" ;;
+      postgres|redis|mysql|mariadb|mongo) rota="${tipo}.start" ;;
+      *) echo "::warning::tipo desconhecido: $tipo"; continue ;;
+    esac
+    code=$(dokploy POST "/api/${rota}" "{\"${tipo}Id\":\"${id}\"}")
+    echo "POST ${rota} -> HTTP ${code}"
+    case "$code" in 2*) ;; *) echo "::warning::${tipo} ${id} não disparou"; falhas=$((falhas+1)); continue ;; esac
+    if [ "$tipo" = compose ] || [ "$tipo" = application ]; then
+      if esperar "$tipo" "$id"; then echo "OK: ${tipo} ${id}"; else echo "::warning::${tipo} ${id} terminou com erro ou passou de 20 min"; falhas=$((falhas+1)); fi
+    else
+      sleep 20
+    fi
+  done
+  titulo "Inventário depois"
+  inventario || true
+  [ "$falhas" = 0 ] || exit 1
+}
+
+provar() {
+  inventario >/dev/null 2>&1 || true
+  {
+    [ -s /tmp/inventario.tsv ] && cut -f5 /tmp/inventario.tsv | tr ' ' '\n'
+    printf '%s\n' consultoriaflowfoods.com.br www.consultoriaflowfoods.com.br
+    [ -n "${EXTRAS:-}" ] && tr ',' '\n' <<<"$EXTRAS"
+  } | sed '/^$/d' | sort -u > /tmp/dominios
+  linha_tab="| Domínio | DNS → | HTTP | Certificado | Emissor | Vence em | Status |"
+  { echo "### Prova site por site"; echo; echo "$linha_tab"; echo "|---|---|---|---|---|---|---|"; } >> "$RESUMO"
+  echo "$linha_tab"
+  while read -r d; do
+    ip=$(dig +short A "$d" | tail -1)
+    http=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$d" || true)
+    cert=$(echo | timeout 15 openssl s_client -connect "$d:443" -servername "$d" 2>/dev/null \
+             | openssl x509 -noout -subject -issuer -enddate -ext subjectAltName 2>/dev/null)
+    emissor=$(sed -n 's/^issuer=.*O *= *\([^,]*\).*/\1/p' <<<"$cert" | head -1)
+    vence=$(sed -n 's/^notAfter=//p' <<<"$cert")
+    if grep -q "DNS:${d}\b" <<<"$cert" || grep -q "DNS:\*\.${d#*.}\b" <<<"$cert"; then nome=ok; else nome=ERRADO; fi
+    [ -z "$cert" ] && nome="sem cert"
+    prob=()
+    [ "$ip" != "$VPS_IP" ] && prob+=("DNS fora da VPS")
+    case "$http" in 2*|3*|401|403) ;; *) prob+=("fora do ar") ;; esac
+    [ "$nome" != ok ] && prob+=("certificado")
+    if [ ${#prob[@]} = 0 ]; then st=OK; else st=$(IFS=/; echo "${prob[*]}"); fi
+    l="| $d | ${ip:-?} | ${http:-000} | $nome | ${emissor:-?} | ${vence:-?} | $st |"
+    echo "$l"; echo "$l" >> "$RESUMO"
+  done < /tmp/dominios
+}
+
+case "$ETAPA" in
+  diagnosticar) diagnosticar ;;
+  reiniciar)    reiniciar ;;
+  limpar-cache) limpar_cache ;;
+  subir)        subir ;;
+  provar)       provar ;;
+  *) echo "etapa desconhecida: $ETAPA"; exit 2 ;;
+esac

@@ -34,6 +34,17 @@ on:
           - descobrir-api
           - deploy-compose
           - api
+          - reerguer-vps
+      etapa:
+        description: Etapa do reerguer-vps (uma por vez, na ordem)
+        type: choice
+        required: false
+        default: diagnosticar
+        options: [diagnosticar, reiniciar, limpar-cache, subir, provar]
+      alvos:
+        description: 'reerguer-vps/subir: tipo:ID na ordem, ex. postgres:abc,compose:xyz (um por vez)'
+        type: string
+        required: false
       alvo:
         description: URL do portal (para "verificar")
         type: string
@@ -194,3 +205,33 @@ jobs:
           echo '=== FIM ==='
           case "$code" in 2*) exit 0 ;; *) exit 1 ;; esac
 
+
+  # VPS caiu: scripts/reerguer-vps.sh, uma etapa por execução (docs/RUNBOOK.md,
+  # seção "VPS caiu — como reerguer"). Secrets extras, além dos do Dokploy:
+  #   VPS_SSH_KEY          chave privada com acesso à VPS (root ou VPS_SSH_USER)
+  #   VPS_SSH_USER         opcional, padrão root
+  #   HOSTINGER_API_TOKEN  hPanel → Conta → API (só para ver estado e reiniciar)
+  reerguer-vps:
+    if: inputs.acao == 'reerguer-vps'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    concurrency:
+      group: reerguer-vps
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: reerguer-vps — ${{ inputs.etapa }}
+        env:
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          HOSTINGER_API_TOKEN: ${{ secrets.HOSTINGER_API_TOKEN }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_USER: ${{ secrets.VPS_SSH_USER }}
+          ALVOS: ${{ inputs.alvos }}
+          EXTRAS: ${{ inputs.alvo }}
+        run: |
+          echo "Secrets presentes (só sim/não):"
+          for s in DOKPLOY_URL DOKPLOY_API_TOKEN HOSTINGER_API_TOKEN VPS_SSH_KEY; do
+            if [ -n "${!s:-}" ]; then echo "  $s: sim"; else echo "  $s: NÃO"; fi
+          done
+          bash scripts/reerguer-vps.sh "${{ inputs.etapa }}"
