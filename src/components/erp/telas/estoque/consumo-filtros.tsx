@@ -108,7 +108,7 @@ export function FormularioDoConsumo({ caminho, f, opcoes, hoje }: { caminho: str
             Mostrar
           </label>
           <select id="cons-so" name="so" defaultValue={f.so} className={SELECT}>
-            <option value="">Todos os insumos com movimento ou saldo</option>
+            <option value="">Todos com movimento ou saldo</option>
             <option value="atencao">Só o que pede atenção</option>
             <option value="semcontagem">Só o que ficou sem contagem no período</option>
           </select>

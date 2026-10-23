@@ -63,6 +63,9 @@ export interface EnderecosDoConsumo {
 
 type Liga = (col: ColunaDeLink, extra?: Partial<FiltrosDoConsumo>) => string;
 
+/** "a, b e c". */
+const listaEmFrase = (xs: string[]) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} e ${xs[xs.length - 1]}`);
+
 const TD_NUM = 'px-3 py-2.5 text-right align-top';
 
 // ------------------------------------------------------------------ um número que abre os movimentos
@@ -159,7 +162,7 @@ function PonteDaUnidade({ u, liga, verValores, linhasNoRecorte }: { u: ResumoDaU
               Quantidade
             </th>
             <th scope="col" className={`h-10 pl-3 pr-4 text-right font-semibold sm:pr-5 ${verValores ? '' : 'hidden'}`}>
-              R$ (como o livro gravou)
+              R$
             </th>
           </tr>
         </thead>
@@ -207,8 +210,9 @@ function PonteDaUnidade({ u, liga, verValores, linhasNoRecorte }: { u: ResumoDaU
           <tr className="border-t border-linha-forte bg-forte">
             <th scope="row" className="py-2.5 pl-4 pr-3 text-left font-semibold sm:pl-5">
               Saldo final
-              <span className="mt-1 flex flex-wrap gap-1.5 font-normal">
-                {confere ? <Selo tom="ok">Confere: inicial + movimentos = final</Selo> : <Selo tom="alerta">Não confere: diferença de {quantidadeComSinal(u.diferencaMilesimos, u.unidade)}</Selo>}
+              <span className="mt-1 block font-normal">
+                {confere ? <Selo tom="ok">Confere</Selo> : <Selo tom="alerta">Não confere</Selo>}
+                <span className="mt-1 block text-[12px] text-suave">{confere ? 'inicial + movimentos = final' : `diferença de ${quantidadeComSinal(u.diferencaMilesimos, u.unidade)} entre o final e a soma dos movimentos`}</span>
               </span>
             </th>
             <td className={TD_NUM}>
@@ -289,7 +293,6 @@ export function TabelaDoConsumo({
       <ul className="divide-y divide-linha xl:hidden">
         {linhas.map((l) => {
           const liga = ligaDaLinha(caminho, f, l, volta);
-          const un = SIGLA(l.unidade);
           const colunas = COLUNAS_DA_TELA.filter((c) => {
             const s = somaDaColuna(l.somas, c);
             return s.n > 0 || s.q !== 0;
@@ -297,14 +300,14 @@ export function TabelaDoConsumo({
           return (
             <li key={`${l.lojaId}|${l.insumoId}`} className="space-y-2 px-4 py-3">
               <p>{nomeDaLinha(caminho, f, l, umaLoja, aberta)}</p>
-              <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[13px] tabular-nums">
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-[13px] tabular-nums">
                 <div>
                   <dt className="text-[12px] text-suave">Saldo inicial</dt>
                   <dd>
                     <Link
                       href={liga('inicial')}
                       aria-label={`Saldo inicial de ${l.insumo}: ${quantidadeLimpa(l.inicial.q, l.unidade)}. Ver os movimentos`}
-                      className="inline-flex min-h-11 items-center rounded-[5px] text-texto underline decoration-linha-forte underline-offset-4"
+                      className="inline-flex min-h-11 min-w-11 items-center rounded-[5px] text-texto underline decoration-linha-forte underline-offset-4"
                     >
                       {quantidadeLimpa(l.inicial.q, l.unidade)}
                     </Link>
@@ -320,7 +323,7 @@ export function TabelaDoConsumo({
                         <Link
                           href={liga(c)}
                           aria-label={`${ROTULO_DA_COLUNA[c]} de ${l.insumo}: ${quantidadeComSinal(s.q, l.unidade)}, ${pl(s.n, 'movimento', 'movimentos')}. Ver os movimentos`}
-                          className="inline-flex min-h-11 items-center rounded-[5px] text-texto underline decoration-linha-forte underline-offset-4"
+                          className="inline-flex min-h-11 min-w-11 items-center rounded-[5px] text-texto underline decoration-linha-forte underline-offset-4"
                         >
                           {quantidadeComSinal(s.q, l.unidade)}
                         </Link>
@@ -335,7 +338,7 @@ export function TabelaDoConsumo({
                     <Link
                       href={liga('final')}
                       aria-label={`Saldo final de ${l.insumo}: ${quantidadeLimpa(l.final.q, l.unidade)}. Ver os movimentos`}
-                      className="inline-flex min-h-11 items-center rounded-[5px] font-semibold text-texto underline decoration-linha-forte underline-offset-4"
+                      className="inline-flex min-h-11 min-w-11 items-center rounded-[5px] font-semibold text-texto underline decoration-linha-forte underline-offset-4"
                     >
                       {quantidadeLimpa(l.final.q, l.unidade)}
                     </Link>
@@ -343,7 +346,7 @@ export function TabelaDoConsumo({
                   </dd>
                 </div>
               </dl>
-              {colunas.length < COLUNAS_DA_TELA.length && <p className="text-[12px] text-suave">Sem movimento em {COLUNAS_DA_TELA.filter((c) => !colunas.includes(c)).map((c) => ROTULO_DA_COLUNA[c].toLowerCase()).join(', ')} ({un}).</p>}
+              {colunas.length < COLUNAS_DA_TELA.length && <p className="text-[12px] text-suave">Sem movimento em {listaEmFrase(COLUNAS_DA_TELA.filter((c) => !colunas.includes(c)).map((c) => ROTULO_DA_COLUNA[c].toLowerCase()))}.</p>}
             </li>
           );
         })}
@@ -462,8 +465,9 @@ export function DetalheDaLinha({ l, f, caminho, volta, verValores }: { l: LinhaD
           <tr className="border-t border-linha-forte bg-forte">
             <th scope="row" className="py-2.5 pl-4 pr-3 text-left font-semibold sm:pl-5">
               Saldo final
-              <span className="mt-1 flex flex-wrap gap-1.5 font-normal">
-                {l.confere ? <Selo tom="ok">Confere: inicial + movimentos = final</Selo> : <Selo tom="alerta">Não confere: diferença de {quantidadeComSinal(l.diferencaMilesimos, l.unidade)}</Selo>}
+              <span className="mt-1 block font-normal">
+                {l.confere ? <Selo tom="ok">Confere</Selo> : <Selo tom="alerta">Não confere</Selo>}
+                <span className="mt-1 block text-[12px] text-suave">{l.confere ? 'inicial + movimentos = final' : `diferença de ${quantidadeComSinal(l.diferencaMilesimos, l.unidade)} entre o final e a soma dos movimentos`}</span>
               </span>
             </th>
             <td className="hidden sm:table-cell" />

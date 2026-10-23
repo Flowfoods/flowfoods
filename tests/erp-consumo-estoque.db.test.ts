@@ -486,6 +486,21 @@ describe.skipIf(!URL_TESTE)('ERP L.4 · consumo e conciliação de estoque (Post
     expect(p2.numeroDaPagina).toBe(p2.paginas);
   });
 
+  it('a restrição de atenção vale também para os movimentos; a caixa isola uma linha do detalhe; a soma só vale com uma unidade', async () => {
+    const atencao = (await movimentosDaTela(a, DONA(), filtros({ col: 'final', so: 'atencao' }))).lista!;
+    const [direto] = await sql<{ n: number }>(`SELECT count(*)::int AS n FROM "MovimentoEstoque" WHERE "parceiroId" = $1 AND "insumoId" = ANY($2)`, A.id, [ids.alho, ids.ovo, ids.pimenta]);
+    expect([atencao.total, direto.n]).toEqual([6, 6]);
+    expect(new Set(atencao.movimentos.map((m) => m.insumo))).toEqual(new Set(['Alho', 'Ovo', 'Pimenta']));
+    // Uma caixa só dentro da coluna (o linha a linha do detalhe) e uma caixa de outra coluna cai na coluna toda.
+    const falta = (await movimentosDaTela(a, DONA(), filtros({ col: 'ajustes', bucket: 'contagem_falta', insumo: ids.cebola }))).lista!;
+    expect([falta.total, falta.somaMilesimos]).toEqual([1, -761]);
+    const so = (await movimentosDaTela(a, DONA(), filtros({ col: 'compras', bucket: 'perda', insumo: ids.cebola }))).lista!;
+    expect(so.total).toBe(3);
+    // A soma: kg de um insumo só tem unidade; o recorte inteiro mistura kg, L e un.
+    expect((await movimentosDaTela(a, DONA(), filtros({ col: 'final', insumo: ids.cebola }))).lista!.unidadeUnica).toBe('KG');
+    expect((await movimentosDaTela(a, DONA(), filtros({ col: 'final' }))).lista!.unidadeUnica).toBeNull();
+  });
+
   it('o gerente vê só a loja dele (loja de fora = vazio), o outro parceiro não existe e o operador lê só quantidade (nenhum R$)', async () => {
     const g = await tela(GERENTE());
     expect(g.pagina!.linhas).toHaveLength(8);
@@ -642,5 +657,32 @@ describe.skipIf(!URL_TESTE)('ERP L.4 · consumo e conciliação de estoque (Post
       expect(linhas.join('\n')).toMatch(/Requisição #1/);
       expect(await planilhaDoConsumo(a, DONA(), filtros(), { parte: 'movimentos' })).toMatchObject({ ok: false, status: 400 });
     });
+  });
+
+  it('duas devoluções seguidas da mesma requisição (o estorno do relançamento também é devolução): requisitado −4, devolvido +2, líquido −2', async () => {
+    const far = await cadastrarInsumo(a, { nome: 'Farinha', tipo: 'INGREDIENTE', unidade: 'KG', escala: 'base', conteudo: '1', preco: '5,00', conservacao: 'SECO' });
+    if (!far.ok) throw new Error('farinha');
+    em('2026-10-21T09:00:00');
+    const n = await lancarNota(a, DONA(), { lojaId: ids.vp, fornecedorId: ids.ze, numero: '77', serie: '', data: '2026-10-21', frete: '', total: '50,00', itens: [{ insumoId: far.id, embalagem: 'granel', quantidade: '10', valor: '50,00' }] }, 'Marina');
+    if (!n.ok) throw new Error(JSON.stringify(n));
+    em('2026-10-21T10:00:00');
+    const p = await criarRequisicao(a, GERENTE(), ids.vp, { setor: 'COZINHA', paraDia: 'hoje', observacao: '', linhas: [{ insumoId: far.id, quantidade: '4', escala: 'base' }] }, 'Caio');
+    if (!p.ok) throw new Error(JSON.stringify(p));
+    let r = (await obterRequisicao(a, DONA(), ids.vp, p.id))!;
+    expect((await atenderRequisicao(a, GERENTE(), ids.vp, p.id, { versao: r.requisicao.versao, linhas: [{ itemId: r.itens[0].id, quantidade: '4', escala: 'base' }], encerrar: false, confirmarNegativo: false }, 'Edu Estoque')).ok).toBe(true);
+    for (const hora of ['11:00:00', '12:00:00']) {
+      em(`2026-10-21T${hora}`);
+      r = (await obterRequisicao(a, DONA(), ids.vp, p.id))!;
+      const dev = await devolverItem(a, GERENTE(), ids.vp, p.id, { versao: r.requisicao.versao, itemId: r.itens[0].id, quantidade: '1', escala: 'base', motivo: 'sobrou' }, 'Edu Estoque');
+      if (!dev.ok) throw new Error(JSON.stringify(dev));
+    }
+    em('2026-11-20T10:00:00');
+    ids.farinha = far.id;
+    const l = await linha('farinha');
+    expect([l.inicial.q, q(l, 'compra'), q(l, 'uso_setor'), q(l, 'devolucao_setor'), l.final.q]).toEqual([0, 10_000, -4_000, 2_000, 8_000]);
+    expect(l.somas.devolucao_setor?.n).toBe(4);
+    expect(l.somas.uso_setor?.n).toBe(1);
+    expect(l.confere).toBe(true);
+    expect(l.saldoGuardado).toBe(8_000);
   });
 });
