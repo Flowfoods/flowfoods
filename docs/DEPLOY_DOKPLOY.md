@@ -51,9 +51,12 @@ redeploy e nunca passam por chat, arquivo ou área de transferência.
 
 ### 2. Deploy
 
-Sobem quatro serviços, nesta ordem: `segredos` (gera e sai) → `postgres`
-(espera ficar saudável) → `web` (roda a migration e sobe o Next) → `worker`
-(fica dormindo; com `disparoAtivo=false`, o padrão, não envia nada).
+Sobem cinco serviços, nesta ordem: `segredos` (gera e sai) → `postgres`
+(espera ficar saudável) → `migrar` (aplica as migrations, roda a conferência e
+sai; se a migration falhar, nada mais sobe) → `web` (sobe o Next) e `worker`
+(fica dormindo; com `disparoAtivo=false`, o padrão, não envia nada). Desde
+23/10/2026 o portão do GitHub roda a suíte inteira com um Postgres de serviço:
+teste de integridade que falha segura o deploy (Ponto 4).
 
 ### 3. Abra o LOG do serviço `web`
 
@@ -187,18 +190,15 @@ número. A tela de Config mostra "Modo telefone pessoal" quando isso acontece.
 
 ---
 
-## 4. Migration (uma vez, antes do primeiro start)
+## 4. Migration
 
-No Dokploy, em **Advanced → Pre-deploy command** do app `web`:
-
-```
-npm run db:migrate
-```
-
-Ou rode uma vez no terminal do container:
+Roda sozinha a cada deploy, no serviço `migrar` do docker-compose (desde
+23/10/2026): não configure "Pre-deploy command" no `web`. Para rodar à mão, no
+terminal de um container com o banco:
 
 ```bash
 npm run db:migrate
+npm run erp:conferir-migracao
 ```
 
 São **442 linhas, só CREATE** — nenhum DROP. Roda em banco vazio sem risco.
@@ -341,6 +341,11 @@ Só depois: 10 envios manuais → ligar `disparoAtivo`.
 | Webhook responde 401 | `EVOLUTION_WEBHOOK_SECRET` diferente do header configurado |
 | Tudo aparece "SIMULADO" | `EVOLUTION_API_URL`/`_API_KEY` ausentes — é o dry-run |
 | Worker reinicia em laço | Olhe o log: quase sempre é `DATABASE_URL` |
+| Deploy falha com "service migrar didn't complete successfully" e o site fica fora | A migration falhou: log do `migrar`, depois docs/RUNBOOK.md 1.2 (corrigir, `prisma migrate resolve --rolled-back <nome>`, redeploy) |
+| Portão do GitHub vermelho em "Testes (com banco)" | Um teste de integridade falhou: o deploy não sai até corrigir (Ponto 4). O resumo do job mostra aprovados e pulados |
 
 Rollback: o Dokploy guarda o deploy anterior. Como as migrations são só
-aditivas, voltar a versão do app não quebra o banco.
+aditivas, voltar a versão do app não quebra o banco — EXCETO se o deploy que
+você quer desfazer parou numa migration com falha: aí o `migrar` da versão
+antiga também para (erro P3009) até alguém rodar `npx prisma migrate resolve
+--rolled-back <nome>` (docs/RUNBOOK.md 1.2).

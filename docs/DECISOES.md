@@ -2980,3 +2980,19 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Razão:** (UX 4) na 60 × 40, "PRAZO APÓS ABERTURA NÃO INFORMADO" numa linha encostava na borda com Arial (482 de 480 pontos): a etiqueta quebra o mesmo termo em duas linhas, "PRAZO APÓS ABERTURA" / "NÃO INFORMADO" (a tela segue com o termo inteiro); cada parte tem folga mesmo com a estimativa de largura 10 % maior (teste). (UX 5) a tela não sabe se há Zebra no aparelho quando mostra o aviso: ele passou a dizer "Etiqueta emitida: ela espera a impressora." (UX 6) a 1440 os cartões do histórico cortavam o detalhe: detalhes curtos, quatro por linha, e o cartão novo **"Esperando o Já imprimi"** (etiquetas com arquivo baixado ou papel aberto que ninguém confirmou e que a Zebra não recebeu).
 
+### 430. 2026-10-23 · Ponto 4: o portão do GitHub roda a suíte inteira com um Postgres de serviço; falha segura o deploy
+
+**Alternativas:** (a) manter `npm test` sem banco (os testes de isolamento, RLS, concorrência e migration eram PULADOS — 834 no run 39857676462 — e o portão ficava verde); (b) Postgres de serviço no job `portao`, migrations aplicadas do zero e a suíte inteira com `ERP_DB_TESTE`.
+
+**Razão:** (b). É o que o Ponto 4 aprovou: os testes críticos precisam rodar de verdade antes de publicar. O deploy já dependia do `portao` (`needs: portao`), então falha num teste com banco agora segura a publicação sem mexer em proteção de branch (Ponto 18, recusado — não foi tocado). O resumo do job (`GITHUB_STEP_SUMMARY`) mostra aprovados e pulados; os pulados são as variantes que pedem um dono NÃO superusuário com FORCE RLS (o usuário do serviço é superusuário) e continuam a rodar à mão (docs/ERP.md "Provar o isolamento"): não executado não é aprovado. Custo: o portão passa de ~3 para ~15 minutos (a suíte inteira levou 655 s na simulação local: 136 arquivos, 2.709 testes, 0 falhas). O CI usa Node 22, o mesmo da imagem de produção, e confere que o `psql` existe (sem ele, os testes de migration seriam pulados calados).
+
+### 431. 2026-10-23 · Ponto 20: serviço `migrar` de uma vez só; `web` e `worker` só sobem depois da migration concluída
+
+**Alternativas:** (a) a migration no comando do `web` (como era: o `worker` subia em paralelo, sem esperar, e podia rodar sobre estrutura antiga); (b) um serviço `migrar` (mesma imagem) com `restart: 'no'`, do qual `web` e `worker` dependem com `service_completed_successfully`.
+
+**Razão:** (b). Nenhum processo opera sobre estrutura incompatível. Migration que falha = web e worker não sobem e o site fica FORA até resolver: num deploy com código novo o Compose recria web e worker antes de esperar o `migrar` (conferido no código do Compose v2 pelo revisor). A disponibilidade é a mesma de antes (o `web` ficava reiniciando em laço), mas agora nada roda sobre estrutura pela metade e o motivo fica no log do `migrar`. Para destravar é preciso marcar a tentativa como desfeita (`prisma migrate resolve --rolled-back <nome>`), senão todo `migrate deploy` para com P3009, inclusive o rollback do Dokploy — passo a passo em docs/RUNBOOK.md 1.2. A migration saiu do comando do `web` (uma fonte só). Mesma imagem do `web`: o build é o mesmo (camadas em cache). O conferidor roda com tempo máximo de 120 s, para não pendurar o deploy com o site parado.
+
+### 432. 2026-10-23 · Ponto 15: o conferidor roda sozinho depois da migration, só registra e não bloqueia
+
+**Razão:** o `migrar` roda `npm run erp:conferir-migracao` depois da migration. Pendência em dado antigo (CHECK que ficou `NOT VALID`, índice que faltou) sai no log com a frase "ATENÇÃO: a conferência pós-migration listou pendências"; nada é apagado, convertido ou corrigido sozinho, e o site sobe (o Ponto 15 aprovou conferir e registrar, não reparar nem derrubar). Erro ao conferir (código 2) também não bloqueia: a migration já terminou bem. O que fazer com cada pendência está em docs/RUNBOOK.md.
+
