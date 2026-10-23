@@ -523,3 +523,54 @@ function lerItem(det: unknown, nItem: number): { ok: true; item: ItemDoXml } | {
     },
   };
 }
+
+// ------------------------------------------------------------ 3.4: o rastro (lote e validade do fornecedor)
+
+/** Um lote que o fornecedor declarou no item da NF-e (grupo `rastro`: nLote, qLote, dFab, dVal). */
+export interface RastroDoXml {
+  nLote: string;
+  /** Quantidade do lote em milésimos da unidade comercial (null = ausente ou fora do formato). */
+  qLoteMilesimos: number | null;
+  /** aaaa-mm-dd; null = ausente ou data impossível. */
+  dFab: string | null;
+  dVal: string | null;
+}
+
+const DATA_DO_XML = /^(\d{4})-(\d{2})-(\d{2})$/;
+function dataDoXml(t: string | undefined): string | null {
+  const m = t ? DATA_DO_XML.exec(t) : null;
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  return d.getUTCFullYear() === Number(m[1]) && d.getUTCMonth() === Number(m[2]) - 1 && d.getUTCDate() === Number(m[3]) ? t!.slice(0, 10) : null;
+}
+
+/**
+ * 3.4 (decisão 407): os lotes de cada item (por `nItem`) do XML que a F.1b JÁ guardou. É só SUGESTÃO para quem registra o lote
+ * no recebimento: nada é lançado sozinho. O arquivo passa de novo pela conferência de antes do leitor (o mesmo limite e as
+ * mesmas recusas); qualquer coisa estranha devolve vazio (sem sugestão), nunca erro. Lote sem número é ignorado.
+ */
+export function rastrosDoXmlGuardado(xml: string): Map<number, RastroDoXml[]> {
+  const fora = new Map<number, RastroDoXml[]>();
+  const antes = conferirAntes(new TextEncoder().encode(xml));
+  if (!antes.ok) return fora;
+  let bruto: unknown;
+  try {
+    bruto = PARSER.parse(antes.texto);
+  } catch {
+    return fora;
+  }
+  const nfe = unico(caminho(bruto, 'nfeProc', 'NFe'));
+  for (const det of lista(caminho(nfe, 'infNFe', 'det'))) {
+    const nItem = Number(texto(filho(det, '@_nItem')));
+    if (!Number.isInteger(nItem) || nItem < 1 || nItem > 990) continue;
+    const rastros: RastroDoXml[] = [];
+    for (const r of lista(caminho(det, 'prod', 'rastro')).slice(0, 50)) {
+      const nLote = texto(filho(r, 'nLote'))?.slice(0, 40);
+      if (!nLote) continue;
+      const q = texto(filho(r, 'qLote'));
+      rastros.push({ nLote, qLoteMilesimos: q ? lerMilesimosDoXml(q) : null, dFab: dataDoXml(texto(filho(r, 'dFab'))), dVal: dataDoXml(texto(filho(r, 'dVal'))) });
+    }
+    if (rastros.length) fora.set(nItem, rastros);
+  }
+  return fora;
+}

@@ -47,6 +47,8 @@ export function TelaDetalheNota({
   orcamento,
   orcamentoHref,
   documentoHref,
+  lotesHref,
+  lotesQuantos = 0,
 }: {
   nota: NotaDetalhada;
   base: string;
@@ -72,6 +74,10 @@ export function TelaDetalheNota({
   orcamentoHref?: string;
   /** F.1b: link da nota fiscal (XML) de onde a nota veio ou a que foi ligada; ausente = quem não vê notas recebidas. */
   documentoHref?: string;
+  /** 3.4: a tela "Lote e vencimento" (o lote do fornecedor de cada insumo, para a etiqueta da embalagem aberta). */
+  lotesHref?: string;
+  /** Rodada 1 da 3.4 (UX 4): quantos lotes já registrados nesta nota. */
+  lotesQuantos?: number;
 }) {
   const mensagem = fraseDaNota(feito);
   const fechado = fechadoNaData(periodos.fechados, n.entradaEm);
@@ -228,7 +234,7 @@ export function TelaDetalheNota({
               semRespiro
               acessorio={
                 estoqueBase ? (
-                  <Link href={`${estoqueBase}/${n.lojaId}`} className={`${LINK_DE_TEXTO} whitespace-nowrap`}>
+                  <Link href={`${estoqueBase}/${n.lojaId}`} className={`${LINK_DE_TEXTO} -my-3 inline-flex min-h-11 items-center whitespace-nowrap`}>
                     Ver o estoque
                   </Link>
                 ) : undefined
@@ -250,6 +256,14 @@ export function TelaDetalheNota({
                   </li>
                 ))}
               </ul>
+            </Painel>
+          )}
+          {lotesHref && (
+            <Painel titulo="Lote e vencimento" subtitulo="Como vieram na embalagem: a etiqueta da embalagem aberta usa">
+              <p className="text-sm text-suave">{lotesQuantos === 0 ? 'Nenhum lote registrado nesta nota.' : `${lotesQuantos} ${lotesQuantos === 1 ? 'lote registrado' : 'lotes registrados'} nesta nota.`}</p>
+              <Link href={lotesHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>
+                {n.cancelada ? 'Ver os lotes' : lotesQuantos === 0 ? 'Registrar os lotes' : 'Registrar ou ver os lotes'}
+              </Link>
             </Painel>
           )}
           {cancela && (

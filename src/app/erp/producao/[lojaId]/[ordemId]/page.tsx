@@ -31,7 +31,11 @@ export default async function ErpLotePage({ params, searchParams }: { params: { 
       voltar={voltaDoRelatorio(searchParams.volta, '/erp')}
       feito={fraseDoEstoque(searchParams.feito)}
       pode={{ registrar, estornar: registrar && pode(ctx.alcance, 'estoque.ajustar', { lojaId }), gerenciar, pegar: true }}
-      hrefs={{ requisicao: veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null, estoque: pode(ctx.alcance, 'estoque.ver', { lojaId }) ? `/erp/estoque/${lojaId}` : null }}
+      hrefs={{
+        requisicao: veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null,
+        estoque: pode(ctx.alcance, 'estoque.ver', { lojaId }) ? `/erp/estoque/${lojaId}` : null,
+        etiqueta: pode(ctx.alcance, 'etiquetas.imprimir', { lojaId }) ? `/erp/etiquetas/${lojaId}/lote/${d.ordem.id}` : null,
+      }}
       acoes={{
         pegar: acaoPegarLote.bind(null, lojaId),
         soltar: acaoSoltarLote.bind(null, lojaId),

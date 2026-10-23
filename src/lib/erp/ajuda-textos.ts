@@ -312,7 +312,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/[lojaId]/[ordemId]'],
     titulo: 'Lote',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'O que foi planejado, os insumos que saíram pela requisição, quem está fazendo e, depois de concluído, quanto saiu de verdade.' },
       { texto: 'O lote que outra pessoa pegou só ela ou a gerência conclui, solta ou cancela.', para: ['producao.registrar'] },
@@ -329,6 +329,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'O custo de referência do pré-preparo continua o da ficha. O lote mostra o que custou de verdade e não mexe nele.', para: ['insumos.ver'] },
         ],
       },
+      {
+        id: 'etiqueta',
+        titulo: 'A etiqueta do lote',
+        blocos: [{ texto: 'Depois de concluído, Imprimir etiqueta leva à etiqueta do lote. A validade é a da conclusão, e reimprimir não muda.', para: ['etiquetas.imprimir'] }],
+      },
     ],
   },
   {
@@ -343,6 +348,167 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Escolha onde o lote vai ficar: a validade nasce daí e não muda se a ficha mudar depois.' },
       { texto: 'O custo por quilo aparece ao vivo, enquanto você digita.', para: ['insumos.ver'] },
       { texto: 'Quem pegou o lote fica como quem fez, mesmo se a gerência concluir por ele.', para: ['producao.planejar'] },
+    ],
+  },
+  // ================================================================ 3.4: Etiquetas (e o lote do fornecedor na nota)
+  {
+    chave: 'etiquetas',
+    area: 'etiquetas',
+    rotas: ['etiquetas'],
+    titulo: 'Etiquetas',
+    versao: 1,
+    aula: [{ texto: 'Escolha a loja para imprimir a etiqueta dos lotes produzidos e das embalagens abertas.' }],
+  },
+  {
+    chave: 'etiquetas-loja',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]'],
+    titulo: 'Etiquetas da loja',
+    versao: 2,
+    aula: [
+      { texto: 'Os lotes concluídos e as embalagens abertas dos últimos 7 dias, cada um com a validade. Toque num deles para emitir a etiqueta.' },
+      { texto: 'Esperando a impressora são as etiquetas emitidas que a Zebra ainda não aceitou e que ninguém marcou com “Já imprimi”.' },
+      { texto: 'Lote ou embalagem vencida aparece como “venceu: não use” e sai da fila.' },
+    ],
+    secoes: [
+      {
+        id: 'validade',
+        titulo: 'De onde vem a validade',
+        blocos: [
+          { texto: 'Do lote produzido, é a da conclusão: a ficha dizia quanto dura na conservação escolhida. Da embalagem aberta, é o prazo depois de aberto ou o vencimento do lote, o que vier antes.' },
+          { texto: 'Sem prazo cadastrado, a etiqueta diz que não foi informado. Nenhum prazo é inventado.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'etiquetas-lote',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]/lote/[ordemId]'],
+    titulo: 'Etiqueta do lote',
+    versao: 2,
+    aula: [
+      { texto: 'Escolha o tamanho, quantas etiquetas e, se quiser, quanto vai em cada pote. A prévia mostra como vai sair.' },
+      { texto: 'A validade, a conservação e quem fez vêm da conclusão do lote: mudar a ficha depois não muda a etiqueta.' },
+      { texto: 'Lote sem validade sai com validade não informada; lote vencido não emite nem reimprime: separe para descarte e avise a gerência.' },
+    ],
+  },
+  {
+    chave: 'etiquetas-abrir',
+    area: 'etiquetas',
+    rotas: ['etiquetas/abrir'],
+    titulo: 'Abrir embalagem',
+    versao: 1,
+    aula: [{ texto: 'Escolha a loja onde a embalagem foi aberta.' }],
+  },
+  {
+    chave: 'etiquetas-abrir-loja',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]/abrir'],
+    titulo: 'Abrir uma embalagem',
+    versao: 1,
+    aula: [
+      { texto: 'Escolha o insumo, o lote dele e onde a embalagem aberta vai ficar. A data e a hora entram sozinhas.' },
+      { texto: 'A validade é o prazo depois de aberto ou o vencimento do lote, o que vier antes. Lote vencido não se abre.' },
+    ],
+    secoes: [
+      {
+        id: 'lote',
+        titulo: 'O lote da embalagem',
+        blocos: [
+          { texto: 'Os lotes vêm do recebimento da compra ou de uma abertura anterior. Se o lote não está na lista, leia na embalagem; se ela não diz, marque lote não informado.' },
+          { texto: 'Abrir não mexe no estoque: só registra quando e por quem a embalagem foi aberta, e quem abriu assina a etiqueta.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'etiquetas-aberta',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]/aberta/[aberturaId]'],
+    titulo: 'Embalagem aberta',
+    versao: 2,
+    aula: [
+      { texto: 'Quando foi aberta, por quem, o lote e até quando usar, com a regra que deu a data.' },
+      { texto: 'Emita a etiqueta e cole na embalagem. A abertura não se edita: se errou, registre outra.' },
+      { texto: 'Embalagem vencida não emite etiqueta: separe para descarte e avise a gerência.' },
+    ],
+  },
+  {
+    chave: 'etiquetas-emissao',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]/[etiquetaId]'],
+    titulo: 'Imprimir a etiqueta',
+    versao: 2,
+    aula: [
+      { texto: 'Imprima na Zebra. Sem a Zebra neste aparelho, baixe o arquivo .zpl ou imprima no papel e, depois que sair, toque em “Já imprimi”.' },
+      { texto: 'Reimprimir sai igual: a validade é a da emissão. Cada pedido fica no histórico.' },
+    ],
+    secoes: [
+      {
+        id: 'zebra',
+        titulo: 'Enviada não é impressa',
+        blocos: [
+          { texto: 'Enviada à impressora quer dizer que o Browser Print da Zebra recebeu. Confira o papel; se não saiu, veja a tampa, o rolo e a fita antes de mandar de novo, porque pode sair repetida.' },
+          { texto: 'Sem resposta em 15 segundos não é falha: confira o papel. Se saiu, toque em “Já imprimi”; se não, mande de novo.' },
+          { texto: 'Sem o Browser Print neste aparelho, a etiqueta fica esperando a impressora: imprima pelo computador da Zebra.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'etiquetas-papel',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]/[etiquetaId]/papel'],
+    titulo: 'Etiqueta no papel',
+    versao: 2,
+    aula: [
+      { texto: 'As etiquetas em tamanho real numa folha A4. Imprima em 100%, sem ajustar à página, e recorte nas linhas.' },
+      { texto: 'Depois que a folha sair, toque em “Já imprimi”: a etiqueta sai da fila.' },
+    ],
+  },
+  {
+    chave: 'etiquetas-historico',
+    area: 'etiquetas',
+    rotas: ['etiquetas/historico'],
+    titulo: 'Histórico de impressões',
+    versao: 1,
+    aula: [{ texto: 'Escolha a loja para ver o que foi impresso, quantas, como e por quem.' }],
+  },
+  {
+    chave: 'etiquetas-historico-loja',
+    area: 'etiquetas',
+    rotas: ['etiquetas/historico/[lojaId]'],
+    titulo: 'Histórico de impressões da loja',
+    versao: 3,
+    aula: [
+      { texto: 'Cada pedido de impressão do período: Zebra, arquivo ou papel, as cópias e o que aconteceu.' },
+      { texto: 'Pedidos e etiquetas são contas diferentes: um pedido de 10 cópias são 10 etiquetas.' },
+      { texto: 'Sem resultado é a Zebra que não respondeu: pode ter saído. Esperando o Já imprimi é arquivo ou papel que ninguém confirmou.' },
+    ],
+  },
+  {
+    chave: 'etiquetas-impressora',
+    area: 'etiquetas',
+    rotas: ['etiquetas/impressora'],
+    titulo: 'Impressora',
+    versao: 2,
+    aula: [
+      { texto: 'A Zebra deste computador: o Browser Print da Zebra precisa estar aberto nele. Escolha a impressora e imprima a etiqueta de teste.' },
+      { texto: 'A escolha fica neste navegador; outro computador escolhe de novo.' },
+      { texto: 'Na primeira vez, o Chrome pede licença para a rede local e o certificado de https://localhost:9101 precisa ser aceito: os passos estão na tela.' },
+    ],
+  },
+  {
+    chave: 'compra-lotes',
+    area: 'compras',
+    rotas: ['compras/[id]/lotes'],
+    titulo: 'Lote e vencimento',
+    versao: 1,
+    aula: [
+      { texto: 'O lote e o vencimento de cada insumo da nota, como vieram na embalagem. Nada é obrigatório nem inventado.' },
+      { texto: 'Quando a nota veio do XML, o lote que o fornecedor declarou aparece como sugestão: só entra se você confirmar.' },
+      { texto: 'Registrar não muda a nota, o estoque nem o custo.', para: ['compras.lancar'] },
     ],
   },
   {
@@ -773,13 +939,20 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/[id]'],
     titulo: 'Detalhe da nota',
-    versao: 4,
+    versao: 5,
     aula: [
       { texto: 'A nota, o frete de cada item e o que ela fez no estoque.' },
       { texto: 'Nota que veio do XML da nota fiscal não se edita: cancele e concilie a nota fiscal de novo.', para: ['compras.lancar'] },
       { texto: 'Nota do período em curso mostra como ficou o orçamento de compra da loja: quanto ainda cabe, ou quanto passou. É só aviso.' },
       { texto: 'Errou? Edite ou cancele com o motivo: o custo e o estoque voltam.', para: ['compras.lancar'] },
       { texto: 'Nota com data em período que o DRE já fechou não se edita nem se cancela.', para: ['compras.lancar'] },
+    ],
+    secoes: [
+      {
+        id: 'lotes',
+        titulo: 'Lote e vencimento',
+        blocos: [{ texto: 'O lote e o vencimento de cada insumo, como vieram na embalagem, ficam em Lote e vencimento. A cozinha escolhe o lote daqui ao abrir a embalagem, e a etiqueta usa o vencimento dele.' }],
+      },
     ],
   },
   {

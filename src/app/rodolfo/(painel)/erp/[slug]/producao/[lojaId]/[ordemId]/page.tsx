@@ -26,7 +26,7 @@ export default async function ParceiroLotePage({ params, searchParams }: { param
       contexto={ctx.parceiro.nome}
       feito={fraseDoEstoque(searchParams.feito)}
       pode={{ registrar: true, estornar: true, gerenciar: true, pegar: false }}
-      hrefs={{ requisicao: `${raiz}/estoque/${lojaId}/requisicoes`, estoque: `${raiz}/estoque/${lojaId}` }}
+      hrefs={{ requisicao: `${raiz}/estoque/${lojaId}/requisicoes`, estoque: `${raiz}/estoque/${lojaId}`, etiqueta: `${raiz}/etiquetas/${lojaId}/lote/${d.ordem.id}` }}
       acoes={{
         pegar: acaoPegarLote.bind(null, ctx.parceiro.slug, lojaId),
         soltar: acaoSoltarLote.bind(null, ctx.parceiro.slug, lojaId),

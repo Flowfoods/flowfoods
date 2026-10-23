@@ -22,6 +22,8 @@ export const FILTROS: { valor: string; rotulo: string; entidades?: string[] }[] 
   { valor: 'NotaEntrada', rotulo: 'Compras', entidades: ['NotaEntrada', 'Fornecedor', 'DocumentoFiscal', 'VinculoItemFornecedor'] },
   // 3.1: os lotes de produção (o custo deles só para quem tem "ver insumos e custos"). 3.2: e a lista do dia.
   { valor: 'OrdemProducao', rotulo: 'Produção', entidades: ['OrdemProducao', 'ListaProducao'] },
+  // 3.4: etiquetas emitidas, lotes do fornecedor e embalagens abertas (nenhum valor em R$).
+  { valor: 'Etiqueta', rotulo: 'Etiquetas', entidades: ['Etiqueta', 'LoteDeInsumo', 'AberturaDeLote'] },
   // 2.1: faturamento por canal e dia (só para quem tem "ver faturamento").
   { valor: 'FaturamentoLancamento', rotulo: 'Faturamento' },
   // 2.2a: despesas, linhas do plano e a regra do período (só para quem tem "ver DRE").
