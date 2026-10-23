@@ -202,6 +202,7 @@ REMOTO
   for c in dokploy-traefik; do
     code=$(dokploy GET "/api/docker.getConfig?containerId=${c}")
     echo "docker.getConfig ${c} -> HTTP ${code}"
+    jq -c 'if type=="object" and has("State") then "inspect ok" elif type=="object" then {sem_State: true, chaves: (keys|.[0:10]), message: (.message // null | tostring | .[0:300])} else {tipo: type, inicio: (tostring|.[0:200])} end' /tmp/dk.json 2>/dev/null || head -c 300 /tmp/dk.json
     [ "$code" = 200 ] && jq -c '{State: (.State | {Status, Running, Restarting, ExitCode, Error, StartedAt, FinishedAt, OOMKilled}),
         RestartCount, RestartPolicy: .HostConfig.RestartPolicy.Name, NetworkMode: .HostConfig.NetworkMode,
         PortBindings: .HostConfig.PortBindings, Ports: .NetworkSettings.Ports,
@@ -213,6 +214,9 @@ REMOTO
             Redes: (.NetworkSettings.Networks | to_entries | map({rede: .key, NetworkID: (.value.NetworkID // "" | .[0:12]),
                     EndpointID: (.value.EndpointID // "" | .[0:12]), IP: .value.IPAddress}))}' /tmp/dk.json
   fi
+  code=$(dokploy GET "/api/docker.getContainersByAppNameMatch?appName=traefik")
+  echo "containers '*traefik*' -> HTTP ${code}"
+  [ "$code" = 200 ] && jq -r '.[]? | "  \(.name)\t\(.state)\t\(.status)"' /tmp/dk.json
   code=$(dokploy GET "/api/docker.getContainersByAppNameMatch?appName=dokploy")
   echo "containers 'dokploy*' -> HTTP ${code}"
   [ "$code" = 200 ] && jq -r '.[]? | "  \(.name)\t\(.state)\t\(.status)"' /tmp/dk.json
