@@ -30,10 +30,23 @@ npm run db:migrate
 npm run erp:conferir-migracao   # 0 = ok · 1 = pendência em dado antigo · 2 = erro ao conferir
 ```
 
-**Se o deploy não subir o site:** abra o log do serviço `migrar`. Migration que
-falhou aparece ali; a versão anterior do `web` continua no ar (o Compose não
-chega a recriá-la). Corrija a causa e redeploye — nunca apague tabela nem rode
-`reset` para "destravar".
+**Se o deploy não subir o site** (Dokploy: "service migrar didn't complete
+successfully"): o site fica FORA até resolver — num deploy com código novo o
+Compose para o `web` e o `worker` antes de rodar o `migrar`. Abra o log do
+`migrar`: a migration que falhou e o motivo estão ali. Para destravar:
+
+1. Anote o nome da migration que falhou (ex.: `20261110000000_erp_etiquetas`).
+2. Corrija a causa (o dado que viola a regra, a permissão que faltou…) — nunca
+   apague tabela nem rode `reset`.
+3. Marque a tentativa que falhou como desfeita, no terminal de um container com
+   o banco: `npx prisma migrate resolve --rolled-back <nome>`. Sem esse passo,
+   QUALQUER `migrate deploy` para com o erro P3009 — inclusive o redeploy e o
+   rollback do Dokploy (o `migrar` da versão antiga encontra o mesmo registro).
+4. Redeploye.
+
+**Se o log do `migrar` disser "ATENÇÃO: não consegui conferir as
+migrations":** o site subiu; rode `npm run erp:conferir-migracao` à mão
+(código 124 = a conferência passou de 120 s).
 
 **Se o log do `migrar` disser "ATENÇÃO: a conferência pós-migration listou
 pendências":** o site subiu normalmente. As linhas acima da frase dizem o que

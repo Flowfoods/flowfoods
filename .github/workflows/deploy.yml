@@ -46,7 +46,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # A imagem de produção é node:22; o CI usa a mesma versão.
+          node-version: '22'
           cache: npm
       - run: npm ci
       - name: Lint
@@ -58,6 +59,10 @@ jobs:
         run: npm run gate
       - name: Tipos
         run: npx tsc --noEmit
+      # Os testes de migration usam o `psql` do runner; sem ele, seriam pulados
+      # e o portão ficaria verde. Se um dia sumir da imagem, falha aqui.
+      - name: psql disponível
+        run: psql --version
       - name: Banco de teste (migrations)
         run: npx prisma migrate deploy
         env:
@@ -75,7 +80,7 @@ jobs:
           {
             echo '### Testes do portão (com Postgres)'
             echo
-            grep -E 'Test Files|Tests ' /tmp/testes.txt | sed -E 's/\x1b\[[0-9;]*m//g' || echo 'Sem resultado: os testes não chegaram a rodar.'
+            sed -E 's/\x1b\[[0-9;]*m//g' /tmp/testes.txt 2>/dev/null | grep -E 'Test Files|Tests ' || echo 'Sem resultado: os testes não chegaram a rodar.'
             echo
             echo 'Pulados = variantes que pedem um dono não superusuário com FORCE RLS (rodar à mão, docs/ERP.md "Provar o isolamento"). Não executado não é aprovado.'
           } >> "$GITHUB_STEP_SUMMARY"
