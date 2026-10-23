@@ -74,7 +74,7 @@ export interface FiltrosDoRelatorio {
   situacao: SituacaoDoRelatorio;
   /** O que a tela mostra embaixo: o resumo por grupo ou as linhas das compras. */
   ver: 'resumo' | 'linhas';
-  /** Abre só as linhas deste grupo (id do insumo, id do fornecedor ou dia; "-" = sem insumo/fornecedor). */
+  /** Abre só as linhas deste grupo (id do insumo, id do fornecedor ou "n:<nome da nota>" se não tem cadastro, ou dia; "-" = sem insumo/fornecedor). */
   grupo: string;
   /** Abre só as linhas desta unidade ("sem" = sem unidade gravada). */
   unidade: '' | Unidade | 'sem';
@@ -138,7 +138,8 @@ export function lerFiltrosDoRelatorio(sp: Params, hoje = hojeNoRio(), padrao: Pa
     agrupar: (LISTA_DE_AGRUPAMENTOS as string[]).includes(agrupar) ? (agrupar as AgruparPor) : (padrao.agrupar ?? 'insumo'),
     situacao: um(sp.situacao) === 'canceladas' ? 'canceladas' : 'lancadas',
     ver: um(sp.ver) === 'linhas' ? 'linhas' : (padrao.ver ?? 'resumo'),
-    grupo: grupo === '-' || /^[a-z0-9]{1,64}$/i.test(grupo) || lerData(grupo) === grupo ? grupo : '',
+    // "n:<nome da nota>" = fornecedor sem cadastro, pelo nome que a nota guardou (decisão 386).
+    grupo: grupo === '-' || /^[a-z0-9]{1,64}$/i.test(grupo) || lerData(grupo) === grupo || /^n:[^\u0000-\u001f\u007f]{1,200}$/.test(grupo) ? grupo : '',
     unidade: unidade === 'sem' || unidade === 'KG' || unidade === 'L' || unidade === 'UN' ? unidade : '',
     so: um(sp.so) === 'sembase' ? 'sembase' : '',
     pagina: lerPagina(um(sp.pagina)),

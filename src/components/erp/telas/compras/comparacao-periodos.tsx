@@ -261,8 +261,8 @@ export function TabelaPorInsumo({
             <td />
             <td />
             <td className="px-3 py-2.5 text-right text-[13px]">
-              <span className="block"><span className="text-suave">A: </span>{formatarDinheiro(s.gastoACentavos)}</span>
-              <span className="block"><span className="text-suave">B: </span>{formatarDinheiro(s.gastoBCentavos)}</span>
+              <span className="block"><span className="text-suave">A: </span>{s.semCompraA ? <span className="text-suave">Sem compra</span> : formatarDinheiro(s.gastoACentavos)}</span>
+              <span className="block"><span className="text-suave">B: </span>{s.semCompraB ? <span className="text-suave">Sem compra</span> : formatarDinheiro(s.gastoBCentavos)}</span>
             </td>
             <td className="px-3 py-2.5 text-right">
               {semLado ? <span className="font-semibold">sem base</span> : <Sinal centavos={s.variacaoCentavos} className="font-semibold" />}
@@ -436,6 +436,7 @@ export function TelaDosPeriodos({
   const a = r.a;
   const b = r.b;
   const avisos = a && b && c ? avisosDaTela(r, f, hoje) : [];
+  const temFiltro = f.rel.lojaIds.length > 0 || !!f.rel.fornecedorId || !!f.rel.insumoId || !!f.rel.q || !!f.rel.categoriaId;
   const itensComBase = c?.itens ?? [];
   const semLado = !!s && (s.semCompraA || s.semCompraB);
   const semEfeitos = !!s && (semLado || s.nosDois === 0);
@@ -496,7 +497,7 @@ export function TelaDosPeriodos({
 
           {c.itens.length === 0 ? (
             <Painel semRespiro>
-              <Vazio titulo="Nenhuma compra comparável nos dois períodos." acao={<Link href={hrefDosPeriodos(caminho, f, { rel: { lojaIds: [], fornecedorId: '', insumoId: '', q: '', categoriaId: '' } })} className={classeDeBotao('secundario')}>Tirar os filtros</Link>}>
+              <Vazio titulo="Nenhuma compra comparável nos dois períodos." acao={temFiltro ? <Link href={hrefDosPeriodos(caminho, f, { rel: { lojaIds: [], fornecedorId: '', insumoId: '', q: '', categoriaId: '' } })} className={classeDeBotao('secundario')}>Tirar os filtros</Link> : undefined}>
                 Confira os períodos e a data usada ({BASES_DE_DATA[f.rel.base].curto}).
               </Vazio>
             </Painel>
