@@ -477,4 +477,78 @@ describe.skipIf(!URL_TESTE)('ERP L.3 · comparação de fornecedores e períodos
       expect(texto).not.toContain('Frios do Zé;');
     });
   });
+
+  // --------------------------------------------------- 1ª volta da UX e do Guardião
+
+  describe('um lado sem compra, fornecedor sem cadastro, busca de um insumo só', () => {
+    it('B vazio e A vazio: variação e % sem base, "saiu" e "entrou" mantidos, efeitos zerados e ditos', async () => {
+      // Dezembro não tem compra: A = setembro (com compra), B = dezembro.
+      const b0 = await comparacaoDePeriodos(a, DONA(), periodos({ de2: '2026-12-01', ate2: '2026-12-31', insumo: ids.queijo }));
+      expect(b0.comparacao!.resumo).toMatchObject({ semCompraB: true, semCompraA: false, variacaoDecimos: null, saiuCentavos: -10000, volumeCentavos: 0, precoCentavos: 0, nosDois: 0, fecha: true });
+      expect(b0.b!.celulas).toHaveLength(0);
+      const a0 = await comparacaoDePeriodos(a, DONA(), periodos({ de: '2026-12-01', ate: '2026-12-31', insumo: ids.queijo }));
+      expect(a0.comparacao!.resumo).toMatchObject({ semCompraA: true, variacaoDecimos: null, entrouCentavos: 15750 });
+      // A planilha diz "sem base" no lugar de "-100,0%" e traz os avisos da tela.
+      const csv = ((await planilhaDaComparacaoDePeriodos(a, DONA(), periodos({ de2: '2026-12-01', ate2: '2026-12-31', insumo: ids.queijo }), { agora: new Date('2026-10-22T15:00:00Z') })) as { corpo: string }).corpo;
+      const linhas = csv.split('\r\n');
+      expect(linhas.find((l) => l.startsWith('Variação B menos A (R$);'))).toMatch(/sem base \(um dos períodos não tem compra comparável\)/);
+      expect(linhas.find((l) => l.startsWith('Variação sobre A (%);'))).toBe('Variação sobre A (%);sem base');
+      expect(linhas.find((l) => l.startsWith('Efeito volume (R$);'))).toBe('Efeito volume (R$);');
+      expect(linhas.find((l) => l.startsWith('Gasto no período B (R$);'))).toBe('Gasto no período B (R$);sem compra comparável');
+      expect(csv).toContain('Aviso;');
+      expect(linhas.filter((l) => l.startsWith('Aviso;')).some((l) => /No período B .* não houve compra comparável/.test(l))).toBe(true);
+    });
+
+    it('o CSV traz os mesmos avisos da tela (cobertura incompleta, tamanhos, em andamento)', async () => {
+      const tela = await comparacaoDePeriodos(a, DONA(), periodos());
+      const csv = ((await planilhaDaComparacaoDePeriodos(a, DONA(), periodos(), { agora: new Date('2026-10-22T15:00:00Z') })) as { corpo: string }).corpo;
+      const avisos = csv.split('\r\n').filter((l) => l.startsWith('Aviso;'));
+      expect(avisos.some((l) => /Cobertura incompleta no período A: 1 linha/.test(sp(l)))).toBe(true);
+      expect(avisos.some((l) => /O período A tem 30 dias e o B tem 31 dias/.test(l))).toBe(true);
+      expect(avisos.some((l) => /O período B termina depois de hoje/.test(l))).toBe(true);
+      expect(tela.a!.semBase.linhas).toBe(1);
+    });
+
+    it('nota sem fornecedor cadastrado: agrupa pelo nome que a nota guardou, não tudo num "-"', async () => {
+      const hort = await cadastrarInsumo(a, { nome: 'Hortelã', tipo: 'INGREDIENTE', unidade: 'KG', escala: 'base', conteudo: '1', preco: '10,00' });
+      if (!hort.ok) throw new Error('hortelã');
+      await lanca('H1', ids.vp, ids.ze, '9001', '2026-10-12', '20,00', [[hort.id, 'granel', '2', '20,00']]);
+      await lanca('H2', ids.vp, ids.ze, '9002', '2026-10-13', '30,00', [[hort.id, 'granel', '3', '30,00']]);
+      await sql(`UPDATE "NotaEntrada" SET "fornecedorId" = NULL, "fornecedorNomeSnapshot" = 'Feira do João' WHERE id = $1`, notas.H1);
+      await sql(`UPDATE "NotaEntrada" SET "fornecedorId" = NULL, "fornecedorNomeSnapshot" = 'Barraca da Maria' WHERE id = $1`, notas.H2);
+      const r = await comparacaoDePeriodos(a, DONA(), periodos({ insumo: hort.id }));
+      const forn = r.comparacao!.itens[0].fornecedores.map((x) => x.fornecedor).sort();
+      expect(forn).toEqual(['Barraca da Maria', 'Feira do João']);
+      expect(r.comparacao!.itens[0].fornecedores.map((x) => x.fornecedorId).sort()).toEqual(['n:Barraca da Maria', 'n:Feira do João']);
+      await sql(`DELETE FROM "NotaEntradaItem" WHERE "notaId" = ANY($1)`, [notas.H1, notas.H2]);
+    });
+
+    it('procurou pelo nome e só um insumo com compra tem esse nome: a leitura já sai dele, uma vez só', async () => {
+      const p = await comparacaoDePeriodos(a, DONA(), periodos({ q: 'QUEIJO' }));
+      expect(p.insumoDaBusca).toBe(ids.queijo);
+      expect(p.umInsumo).toBe(true);
+      expect(p.comparacao!.itens.map((i) => i.insumo)).toEqual(['Queijo prato']);
+      const f = await comparacaoDeFornecedores(a, DONA(), fornecedores({ insumo: '', q: 'mucarela' }));
+      expect(f.insumoDaBusca).toBe(ids.mucarela);
+      expect(f.insumo?.nome).toBe('Muçarela');
+      expect(f.tabelas).toHaveLength(1);
+      // Insumo escolhido no formulário: a busca não manda.
+      expect((await comparacaoDeFornecedores(a, DONA(), fornecedores())).insumoDaBusca).toBeNull();
+      // Mais de um insumo com o nome: continua a escolher na lista.
+      const varios = await comparacaoDePeriodos(a, DONA(), periodos({ q: 'e' }));
+      expect(varios.insumoDaBusca).toBeNull();
+    });
+
+    it('insumo só com linha sem base: sem tabela de preço, nenhum fornecedor comparável', async () => {
+      const so = await cadastrarInsumo(a, { nome: 'Cravo', tipo: 'INGREDIENTE', unidade: 'KG', escala: 'base', conteudo: '1', preco: '10,00' });
+      if (!so.ok) throw new Error('cravo');
+      await lanca('CV', ids.vp, ids.ze, '9101', '2026-08-12', '5,00', [[so.id, 'granel', '1', '5,00']]);
+      await sql(`UPDATE "NotaEntradaItem" SET "valorTotalCentavos" = 0 WHERE "notaId" = $1`, notas.CV);
+      const r = await comparacaoDeFornecedores(a, DONA(), fornecedores({ insumo: so.id }));
+      expect(r.tabelas).toHaveLength(1);
+      expect(r.tabelas[0].comBase).toBe(0);
+      expect(r.tabelas[0].fornecedores[0]).toMatchObject({ precoDoItem: null, custoEntregue: null, linhasSemBase: 1 });
+      await sql(`DELETE FROM "NotaEntradaItem" WHERE "notaId" = $1`, notas.CV);
+    });
+  });
 });

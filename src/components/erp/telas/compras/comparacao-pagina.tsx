@@ -44,12 +44,9 @@ export async function PaginaDosFornecedores({ ctx, caminho, comprasBase, insumos
     if (r.motivoVazio || !r.insumo) return <Nada titulo="Nada para imprimir." texto={f.periodoInvalido ?? 'Nenhuma loja do seu acesso entra neste relatório.'} />;
     return <ImpressaoDosFornecedores caminho={caminho} contexto={ctx.parceiro.nome} f={f} r={r} geradoEm={geradoEm()} />;
   }
-  let r = await comparacaoDeFornecedores(ctx.cliente, ctx.alcance, f);
-  // Procurou pelo nome e só um insumo com compra tem esse nome: é ele (a pessoa não precisa escolher de uma lista de um).
-  if (!f.insumoId && f.q && r.opcoes.listaDeInsumos.length === 1) {
-    f = { ...f, insumoId: r.opcoes.listaDeInsumos[0].id };
-    r = await comparacaoDeFornecedores(ctx.cliente, ctx.alcance, f);
-  }
+  const r = await comparacaoDeFornecedores(ctx.cliente, ctx.alcance, f);
+  // Procurou pelo nome e só um insumo com compra tem esse nome: é ele (a leitura já saiu dele; aqui só o endereço e o formulário o assumem).
+  if (r.insumoDaBusca) f = { ...f, insumoId: r.insumoDaBusca };
   return <TelaDosFornecedores caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} insumosBase={insumosBase} visaoDaLoja={visaoDaLoja} />;
 }
 
@@ -71,11 +68,8 @@ export async function PaginaDosPeriodos({ ctx, caminho, comprasBase, searchParam
     }
     return <ImpressaoDosPeriodos caminho={caminho} contexto={ctx.parceiro.nome} f={f} r={r} geradoEm={geradoEm()} hoje={hoje} />;
   }
-  let r = await comparacaoDePeriodos(ctx.cliente, ctx.alcance, f);
-  // Procurou pelo nome e só um insumo com compra tem esse nome: é ele.
-  if (!f.rel.insumoId && f.rel.q && r.opcoes.listaDeInsumos.length === 1) {
-    f = { ...f, rel: { ...f.rel, insumoId: r.opcoes.listaDeInsumos[0].id } };
-    r = await comparacaoDePeriodos(ctx.cliente, ctx.alcance, f);
-  }
+  const r = await comparacaoDePeriodos(ctx.cliente, ctx.alcance, f);
+  // Procurou pelo nome e só um insumo com compra tem esse nome: é ele (a leitura já saiu dele; aqui só o endereço e o formulário o assumem).
+  if (r.insumoDaBusca) f = { ...f, rel: { ...f.rel, insumoId: r.insumoDaBusca } };
   return <TelaDosPeriodos caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} visaoDaLoja={visaoDaLoja} />;
 }

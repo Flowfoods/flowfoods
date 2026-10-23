@@ -106,7 +106,9 @@ function TabelaDaUnidade({
   const subtitulo =
     t.comBase >= 2
       ? `Custo entregue é o preço do item mais o frete que coube a ele, por ${SIGLA(u)}. Do custo entregue mais barato ao mais caro; o frete pode inverter a ordem do preço do item.`
-      : `Só um fornecedor tem preço neste insumo e período: não há com quem comparar. Custo entregue é o preço do item mais o frete que coube a ele, por ${SIGLA(u)}.`;
+      : t.comBase === 0
+        ? `Nenhum fornecedor tem preço comparável em ${SIGLA(u)} neste período: as linhas abaixo estão sem base.`
+        : `Só um fornecedor tem preço neste insumo e período: não há com quem comparar. Custo entregue é o preço do item mais o frete que coube a ele, por ${SIGLA(u)}.`;
   return (
     <Painel titulo={titulo} subtitulo={subtitulo} semRespiro>
       <ul className="divide-y divide-linha lg:hidden">
@@ -386,7 +388,7 @@ export function TelaDosFornecedores({
 
           {r.tabelas.length === 0 && r.semUnidade.length === 0 ? (
             <Painel semRespiro>
-              <Vazio titulo="Nenhuma compra deste insumo neste recorte." acao={<Link href={hrefDoRelatorio(caminho, { ...f, lojaIds: [] })} className={classeDeBotao('secundario')}>Tirar o filtro de lojas</Link>}>
+              <Vazio titulo="Nenhuma compra deste insumo neste recorte." acao={f.lojaIds.length > 0 ? <Link href={hrefDoRelatorio(caminho, { ...f, lojaIds: [] })} className={classeDeBotao('secundario')}>Tirar o filtro de lojas</Link> : undefined}>
                 Confira o período e a data usada ({BASES_DE_DATA[f.base].curto}).
               </Vazio>
             </Painel>
@@ -396,6 +398,13 @@ export function TelaDosFornecedores({
                 <p className="text-[13px] text-suave">Levar o que está na tela, com o mesmo período, a mesma data usada e os mesmos números:</p>
                 <BarraDeSaidaDaComparacao exportar={`${comprasBase}/relatorios/comparar/exportar`} imprimir={caminho} query={queryDoRelatorio(f, {}, { semPagina: true })} tela="fornecedores" />
               </div>
+              {r.tabelas.every((t) => t.comBase === 0) && (
+                <Painel semRespiro>
+                  <Vazio titulo="Nenhum fornecedor com preço comparável neste período.">
+                    As compras deste insumo estão sem base (sem unidade gravada ou com valor zero): abaixo, quais são e por quê. Sem base não entra preço, para não mostrar R$ 0,00 como se fosse preço.
+                  </Vazio>
+                </Painel>
+              )}
               {r.tabelas.map((t) => (
                 <TabelaDaUnidade key={t.unidade} t={t} f={f} caminho={caminho} comprasBase={comprasBase} insumoId={insumo.id} />
               ))}
@@ -457,7 +466,7 @@ export function ImpressaoDosFornecedores({ caminho, contexto, f, r, geradoEm }: 
         </header>
         {r.tabelas.map((t) => (
           <section key={t.unidade} aria-label={`Fornecedores em ${SIGLA(t.unidade)}`}>
-            <h2 className="mb-1 text-sm font-semibold">Fornecedores em {SIGLA(t.unidade)}</h2>
+            <h2 className="mb-1 break-after-avoid text-sm font-semibold">Fornecedores em {SIGLA(t.unidade)}</h2>
             <div className="overflow-x-auto" role="region" aria-label={`Tabela dos fornecedores em ${SIGLA(t.unidade)}`} tabIndex={0}>
               <table className="w-full">
                 <thead>

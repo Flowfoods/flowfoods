@@ -10,6 +10,7 @@ import { pode } from './permissoes';
 import type { ClienteDoParceiro } from './tenant';
 import { comparacaoDeFornecedores, comparacaoDePeriodos, type ComparacaoDeFornecedoresDaTela, type ComparacaoDePeriodosDaTela, TETO_DE_CELULAS } from './compras-comparacao';
 import {
+  avisosDaComparacao,
   FRASE_DA_FORMULA,
   FRASE_PRECO_VOLUME,
   MEDIDAS,
@@ -32,7 +33,7 @@ import {
   type FiltrosDoRelatorio,
 } from './compras-relatorio-campos';
 import { parametrosDaUrl, precoParaPlanilha, respostaHttpDaPlanilha, type RespostaDaPlanilha } from './compras-relatorio-planilha';
-import { formatarData } from './compra-campos';
+import { formatarData, hojeNoRio } from './compra-campos';
 import { UNIDADES, type Fracao, type Unidade } from './unidades';
 
 const SEP = ';';
@@ -136,20 +137,23 @@ export function totaisDosPeriodos(r: ComparacaoDePeriodosDaTela, f: FiltrosDePer
   const a = r.a!;
   const b = r.b!;
   const fora = (l: typeof a) => `${l.semBase.linhas} linha(s), R$ ${reaisParaPlanilha(l.semBase.valorCentavos + l.semBase.freteCentavos)}`;
+  const semLado = s.semCompraA || s.semCompraB;
+  const semEfeitos = semLado || s.nosDois === 0;
   const canc = (l: typeof a) => `${l.canceladas.notas} nota(s), R$ ${reaisParaPlanilha(l.canceladas.valorCentavos + l.canceladas.freteCentavos)}`;
   return [
     linha([texto('TOTAIS'), '']),
-    linha([texto('Gasto no período A (R$)'), reaisParaPlanilha(s.gastoACentavos)]),
-    linha([texto('Gasto no período B (R$)'), reaisParaPlanilha(s.gastoBCentavos)]),
-    linha([texto('Variação B menos A (R$)'), variacaoParaPlanilha(s.variacaoCentavos)]),
-    linha([texto('Variação sobre A (%)'), s.variacaoDecimos === null ? 'sem base (nada comprado em A)' : percentualParaPlanilha(s.variacaoDecimos)]),
-    linha([texto('Efeito volume (R$)'), variacaoParaPlanilha(s.volumeCentavos)]),
-    linha([texto('Efeito preço (R$)'), variacaoParaPlanilha(s.precoCentavos)]),
-    linha([texto('  do mesmo fornecedor (R$)'), variacaoParaPlanilha(s.mesmoFornecedorCentavos)]),
-    linha([texto('  troca de fornecedor (R$)'), variacaoParaPlanilha(s.trocaCentavos)]),
+    linha([texto('Gasto no período A (R$)'), s.semCompraA ? 'sem compra comparável' : reaisParaPlanilha(s.gastoACentavos)]),
+    linha([texto('Gasto no período B (R$)'), s.semCompraB ? 'sem compra comparável' : reaisParaPlanilha(s.gastoBCentavos)]),
+    linha([texto('Variação B menos A (R$)'), semLado ? 'sem base (um dos períodos não tem compra comparável)' : variacaoParaPlanilha(s.variacaoCentavos)]),
+    linha([texto('Variação sobre A (%)'), s.variacaoDecimos === null ? 'sem base' : percentualParaPlanilha(s.variacaoDecimos)]),
+    ...(s.entrouDomina ? [linha([texto('Nota sobre a variação'), texto(`A maior parte (R$ ${reaisParaPlanilha(s.entrouCentavos)}) é de insumo que só aparece em B: não é aumento de preço.`)])] : []),
+    linha([texto('Efeito volume (R$)'), semEfeitos ? '' : variacaoParaPlanilha(s.volumeCentavos)]),
+    linha([texto('Efeito preço (R$)'), semEfeitos ? '' : variacaoParaPlanilha(s.precoCentavos)]),
+    linha([texto('  do mesmo fornecedor (R$)'), semEfeitos ? '' : variacaoParaPlanilha(s.mesmoFornecedorCentavos)]),
+    linha([texto('  troca de fornecedor (R$)'), semEfeitos ? '' : variacaoParaPlanilha(s.trocaCentavos)]),
     linha([texto(`Insumos só em B: entraram (${s.soEmB}) (R$)`), variacaoParaPlanilha(s.entrouCentavos)]),
     linha([texto(`Insumos só em A: saíram (${s.soEmA}) (R$)`), variacaoParaPlanilha(s.saiuCentavos)]),
-    linha([texto('Conferência: volume + preço + entrou + saiu = variação'), texto(s.fecha ? 'fecha' : 'NÃO FECHA')]),
+    linha([texto('Conferência: volume + preço + entrou + saiu = variação'), texto(semLado ? 'não se aplica (sem base)' : s.fecha ? 'fecha' : 'NÃO FECHA')]),
     linha([texto('Fora da comparação (sem base) em A'), texto(fora(a))]),
     linha([texto('Fora da comparação (sem base) em B'), texto(fora(b))]),
     linha([texto('Canceladas em A (FORA dos totais)'), texto(canc(a))]),
@@ -158,7 +162,7 @@ export function totaisDosPeriodos(r: ComparacaoDePeriodosDaTela, f: FiltrosDePer
   ];
 }
 
-export function planilhaDosPeriodos(r: ComparacaoDePeriodosDaTela, f: FiltrosDePeriodos, nomes: { fornecedor?: string; insumo?: string; categoria?: string }, geradoEm: string): string {
+export function planilhaDosPeriodos(r: ComparacaoDePeriodosDaTela, f: FiltrosDePeriodos, nomes: { fornecedor?: string; insumo?: string; categoria?: string }, geradoEm: string, hoje: string): string {
   const periodos = [
     `Período A (base)|${fraseDoPeriodo({ de: f.rel.de, ate: f.rel.ate, base: f.rel.base })}`,
     `Período B (comparado)|${fraseDoPeriodo({ de: f.deB, ate: f.ateB, base: f.rel.base })}`,
@@ -166,6 +170,8 @@ export function planilhaDosPeriodos(r: ComparacaoDePeriodosDaTela, f: FiltrosDeP
   const partes = cabecalho('Comparação de períodos', periodos, f.rel, { lojas: r.lojasUsadas.map((l) => l.nome), ...nomes, medida: MEDIDAS[f.medida].explica }, geradoEm);
   partes.push(linha([texto('Como ler'), texto(FRASE_PRECO_VOLUME)]));
   partes.push(linha([texto('A conta'), texto(FRASE_DA_FORMULA)]));
+  // Os MESMOS avisos da tela ("Antes de ler"): quem lê só a planilha também sabe do que mudou a leitura.
+  for (const x of avisosDaComparacao({ de: f.rel.de, ate: f.rel.ate, deB: f.deB, ateB: f.ateB }, r.a!, r.b!, r.aguardando, hoje)) partes.push(linha([texto('Aviso'), texto(x.texto)]));
   partes.push('');
   partes.push(linha(COLUNAS_DOS_INSUMOS.map((c) => texto(c))));
   for (const i of r.comparacao!.itens) partes.push(linhaDoInsumo(i));
@@ -269,6 +275,8 @@ export function planilhaDosFornecedores(r: ComparacaoDeFornecedoresDaTela, f: Fi
     const sem = Object.values(r.totais.semBase).reduce((s, n) => s + (n ?? 0), 0);
     if (sem > 0) partes.push(linha([texto('Linhas sem base (fora do preço)'), sem]));
   }
+  if (r.aguardando > 0) partes.push(linha([texto('Notas fiscais (XML) aguardando conferência: NÃO são compra'), r.aguardando]));
+  if (r.semEmissao) partes.push(linha([texto('Notas digitadas sem data de emissão (fora da base emissão)'), r.semEmissao]));
   if (r.canceladas) partes.push(linha([texto('Canceladas no mesmo recorte (FORA dos totais)'), texto(`${r.canceladas.notas} nota(s), R$ ${reaisParaPlanilha(r.canceladas.valorCentavos + r.canceladas.freteCentavos)}`)]));
   return BOM_DO_CSV + partes.join('\r\n') + '\r\n';
 }
@@ -294,7 +302,7 @@ export async function planilhaDaComparacaoDePeriodos(cliente: ClienteDoParceiro 
     return { ok: false, status: 413, frase: `Este recorte tem mais de ${TETO_DE_CELULAS.toLocaleString('pt-BR')} combinações de insumo e fornecedor num dos períodos e a planilha não corta calada. Filtre por loja, fornecedor, categoria ou insumo.` };
   }
   const nomes = { ...(await nomesDosFiltros(cliente, f.rel)), insumo: r.insumo?.nome };
-  return { ok: true, nome: `comparacao-periodos-${f.rel.de}_a_${f.rel.ate}-contra-${f.deB}_a_${f.ateB}.csv`, corpo: planilhaDosPeriodos(r, f, nomes, agora(opcoes.agora)) };
+  return { ok: true, nome: `comparacao-periodos-${f.rel.de}_a_${f.rel.ate}-contra-${f.deB}_a_${f.ateB}.csv`, corpo: planilhaDosPeriodos(r, f, nomes, agora(opcoes.agora), hojeNoRio(opcoes.agora)) };
 }
 
 export async function planilhaDaComparacaoDeFornecedores(cliente: ClienteDoParceiro | null, alcance: Alcance | null, f: FiltrosDoRelatorio, opcoes: { agora?: Date } = {}): Promise<RespostaDaPlanilha> {

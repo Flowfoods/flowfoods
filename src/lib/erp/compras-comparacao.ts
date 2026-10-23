@@ -10,7 +10,9 @@
  * - Quem vê: `compras.ver`, só nas lojas do acesso (a mesma `resolverRecorte` da L.2).
  */
 
+import { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
+import { conferirSqlDoParceiro } from './tenant';
 import type { Alcance } from './permissoes';
 import {
   canceladasDoRecorte,
@@ -37,8 +39,19 @@ import { somarDias, type FiltrosDoRelatorio, type MotivoSemBase } from './compra
 import { numeroDaNota } from './compra-campos';
 import type { Unidade } from './unidades';
 
+function guardado(f: Prisma.Sql): Prisma.Sql {
+  conferirSqlDoParceiro(f.strings);
+  return f;
+}
+
 /** O teto de células (insumo × unidade × fornecedor) que um lado carrega. Acima disso a tela manda reduzir o recorte. */
 export const TETO_DE_CELULAS = 20_000;
+
+/**
+ * O fornecedor de uma linha na comparação: o id do cadastro; sem cadastro, o NOME que a nota guardou ("n:Feira do João"), para duas
+ * notas de fornecedores sem cadastro diferentes não virarem um só; sem nome nenhum, "-".
+ */
+const FORNECEDOR = guardado(Prisma.sql`COALESCE(f."fornecedorId", CASE WHEN COALESCE(f."fornecedorNomeSnapshot", '') = '' THEN '-' ELSE 'n:' || f."fornecedorNomeSnapshot" END)`);
 
 const MOTIVOS = new Set<string>(['insumo', 'unidade', 'conversao', 'valor']);
 
@@ -75,12 +88,12 @@ export async function ladoDoRecorte(tx: ClienteDoParceiro, r: Recorte, teto = TE
   }>`
     WITH f AS MATERIALIZED (${fonte(r)})
     (SELECT 'celula'::text AS "tipo", f."insumoId", MIN(COALESCE(f."insumoNome", f."insumoNomeSnapshot", 'Sem insumo identificado')) AS "insumo", f."unidade",
-            COALESCE(f."fornecedorId", '-') AS "fornecedorId",
+            ${FORNECEDOR} AS "fornecedorId",
             MIN(COALESCE(f."fornecedorNome", f."fornecedorNomeSnapshot", 'Sem fornecedor')) AS "fornecedor", NULL::text AS "motivo",
             count(DISTINCT f."notaId")::float8 AS "notas", count(*)::float8 AS "linhas",
             sum(f."quantidadeMilesimos")::float8 AS "quantidade", sum(f."valor")::float8 AS "valor", sum(f."frete")::float8 AS "frete", 0::float8 AS "descontos"
      FROM f WHERE f."motivo" IS NULL
-     GROUP BY f."insumoId", f."unidade", COALESCE(f."fornecedorId", '-')
+     GROUP BY f."insumoId", f."unidade", ${FORNECEDOR}
      ORDER BY 3, 2, 4, 5
      LIMIT ${teto + 1}::int)
     UNION ALL
@@ -169,6 +182,8 @@ export interface ComparacaoDePeriodosDaTela {
   insumo: { id: string; nome: string; marcaReferencia: string | null } | null;
   /** Um dos lados passou do teto de células: a comparação não é feita. */
   passouDoTeto: boolean;
+  /** Procurou pelo nome e só um insumo com compra tem esse nome: a comparação já saiu dele (a página põe no endereço, sem ler tudo de novo). */
+  insumoDaBusca: string | null;
 }
 
 const SEM_OPCOES: Opcoes = { lojas: [], fornecedores: [], categorias: [], listaDeInsumos: [], insumosTruncados: false };
@@ -207,14 +222,17 @@ export async function comparacaoDePeriodos(cliente: ClienteDoParceiro, alcance: 
         umInsumo: false,
         insumo: null,
         passouDoTeto: false,
+        insumoDaBusca: null,
       };
       if (!recorte) return vazio;
+      const unicoDaBusca = !f.rel.insumoId && f.rel.q && opcoes.listaDeInsumos.length === 1 ? opcoes.listaDeInsumos[0].id : null;
+      if (unicoDaBusca) recorte.insumoIds = [unicoDaBusca];
       const teto = limites.teto ?? TETO_DE_CELULAS;
       const a = await ladoDaTela(tx, recorte, teto);
       const b = await ladoDaTela(tx, recorteDoLadoB(recorte, f.deB, f.ateB), teto);
       const umInsumo = recorte.insumoIds?.length === 1;
       const insumo = umInsumo ? await tx.insumo.findUnique({ where: { id: recorte.insumoIds![0] }, select: { id: true, nome: true, marcaReferencia: true } }) : null;
-      const base = { ...vazio, motivoVazio: null, lojasUsadas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)), a, b, umInsumo, insumo, aguardando: await documentosAguardando(tx, recorte.lojas) };
+      const base = { ...vazio, insumoDaBusca: unicoDaBusca, motivoVazio: null, lojasUsadas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)), a, b, umInsumo, insumo, aguardando: await documentosAguardando(tx, recorte.lojas) };
       if (a.passouDoTeto || b.passouDoTeto) return { ...base, passouDoTeto: true };
       const comparacao = compararPeriodos(a.celulas, b.celulas, f.medida);
       const total = comparacao.itens.length;
@@ -240,6 +258,8 @@ export interface ComparacaoDeFornecedoresDaTela {
   canceladas: { notas: number; valorCentavos: number; freteCentavos: number } | null;
   semEmissao: number | null;
   aguardando: number;
+  /** Procurou pelo nome e só um insumo com compra tem esse nome: a comparação já saiu dele. */
+  insumoDaBusca: string | null;
 }
 
 /** Os fornecedores de UM insumo no período: preço do item e custo entregue por unidade, embalagens e a última compra de cada um. */
@@ -248,13 +268,14 @@ export async function comparacaoDeFornecedores(cliente: ClienteDoParceiro, alcan
     async (tx) => {
       const { recorte, lojasDoAcesso, motivo } = await resolverRecorte(tx, alcance, { ...f, agrupar: 'fornecedor', situacao: 'lancadas', grupo: '', unidade: '', so: '' });
       const opcoes = motivo === 'sem-permissao' ? SEM_OPCOES : await opcoesDoRelatorio(tx, lojasDoAcesso, f);
-      const vazio: ComparacaoDeFornecedoresDaTela = { motivoVazio: motivo, opcoes, lojasUsadas: [], insumo: null, tabelas: [], semUnidade: [], totais: null, canceladas: null, semEmissao: null, aguardando: 0 };
+      const vazio: ComparacaoDeFornecedoresDaTela = { motivoVazio: motivo, opcoes, lojasUsadas: [], insumo: null, tabelas: [], semUnidade: [], totais: null, canceladas: null, semEmissao: null, aguardando: 0, insumoDaBusca: null };
       if (!recorte) return vazio;
       const base = { ...vazio, lojasUsadas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)) };
-      if (!f.insumoId) return base;
-      const insumo = await tx.insumo.findUnique({ where: { id: f.insumoId }, select: { id: true, nome: true, marcaReferencia: true, unidade: true } });
+      const insumoId = f.insumoId || (f.q && opcoes.listaDeInsumos.length === 1 ? opcoes.listaDeInsumos[0].id : '');
+      if (!insumoId) return base;
+      const insumo = await tx.insumo.findUnique({ where: { id: insumoId }, select: { id: true, nome: true, marcaReferencia: true, unidade: true } });
       if (!insumo) return base;
-      const r: Recorte = { ...recorte, insumoIds: [f.insumoId] };
+      const r: Recorte = { ...recorte, insumoIds: [insumoId] };
       const grupos = await gruposDoRecorte(tx, { ...r, agrupar: 'fornecedor' }, null);
       const embalagens = await tx.sql<{ fornecedorId: string; unidade: string | null; embalagens: string[] | null }>`
         WITH f AS (${fonte(r)})
@@ -294,6 +315,7 @@ export async function comparacaoDeFornecedores(cliente: ClienteDoParceiro, alcan
       const c = await canceladasDoRecorte(tx, r);
       return {
         ...base,
+        insumoDaBusca: f.insumoId ? null : insumoId,
         insumo: { id: insumo.id, nome: insumo.nome, marcaReferencia: insumo.marcaReferencia, unidade: insumo.unidade as Unidade },
         tabelas,
         semUnidade,

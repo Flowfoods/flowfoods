@@ -11,7 +11,7 @@ import Link from 'next/link';
 import type { ReactNode } from 'react';
 import type { ComparacaoDePeriodosDaTela, LadoDaTela } from '@/lib/erp/compras-comparacao';
 import {
-  avisosDeDatas,
+  avisosDaComparacao,
   diasDoPeriodo,
   formatarPercentual,
   formatarVariacao,
@@ -22,7 +22,7 @@ import {
   type ItemComparado,
   type Lado,
 } from '@/lib/erp/compras-comparacao-campos';
-import { BASES_DE_DATA, FRASE_DO_MOTIVO, type FiltrosDoRelatorio } from '@/lib/erp/compras-relatorio-campos';
+import { BASES_DE_DATA, type FiltrosDoRelatorio } from '@/lib/erp/compras-relatorio-campos';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { faixaDaPagina } from '@/lib/erp/paginacao';
 import { COR } from '@/lib/erp/modulos';
@@ -59,33 +59,8 @@ function Sinal({ centavos, className = '' }: { centavos: number | null; classNam
 
 // ------------------------------------------------------------------ avisos
 
-function textoDoMotivo(l: LadoDaTela): string {
-  const m = l.semBase.porMotivo;
-  return (Object.keys(m) as (keyof typeof m)[]).filter((k) => m[k]).map((k) => `${pl(m[k] ?? 0, 'linha', 'linhas')}: ${FRASE_DO_MOTIVO[k]}`).join('; ');
-}
-
-export function avisosDaCobertura(r: ComparacaoDePeriodosDaTela, f: FiltrosDePeriodos, hoje: string): { chave: string; texto: ReactNode }[] {
-  const a = r.a!;
-  const b = r.b!;
-  const avisos: { chave: string; texto: ReactNode }[] = avisosDeDatas({ de: f.rel.de, ate: f.rel.ate, deB: f.deB, ateB: f.ateB }, hoje).map((x) => ({ chave: x.chave, texto: x.texto }));
-  if (a.celulas.length === 0) {
-    avisos.push({ chave: 'sem-a', texto: `No período A (${faixa(a.de, a.ate)}) não houve compra comparável neste recorte. A variação em % fica sem base e tudo o que B comprou aparece como “entrou”: não dá para dizer se o preço subiu ou desceu.` });
-  }
-  if (b.celulas.length === 0) {
-    avisos.push({ chave: 'sem-b', texto: `No período B (${faixa(b.de, b.ate)}) não houve compra comparável neste recorte. Tudo o que A comprou aparece como “saiu”: não dá para dizer se o preço subiu ou desceu.` });
-  }
-  for (const [nome, l] of [['A', a], ['B', b]] as const) {
-    if (l.semBase.linhas > 0) {
-      const pct = l.dinheiroTotalCentavos > 0 ? Math.floor((l.dinheiroComparavelCentavos * 1000) / l.dinheiroTotalCentavos) : null;
-      avisos.push({
-        chave: `base-${nome}`,
-        texto: `Cobertura incompleta no período ${nome}: ${pl(l.semBase.linhas, 'linha', 'linhas')} (${formatarDinheiro(l.semBase.valorCentavos + l.semBase.freteCentavos)}) ficou fora da conta por falta de base${pct !== null ? `, e a comparação cobre ${formatarPercentual(pct).replace('+', '')} do dinheiro comprado` : ''}. ${textoDoMotivo(l)}.`,
-      });
-    }
-    if (l.semEmissao) avisos.push({ chave: `emissao-${nome}`, texto: `${pl(l.semEmissao, 'nota lançada no período', 'notas lançadas no período')} ${nome} não ${l.semEmissao === 1 ? 'tem' : 'têm'} data de emissão (foram digitadas à mão) e ficou de fora. Para vê-las, use a data da entrada.` });
-  }
-  if (r.aguardando > 0) avisos.push({ chave: 'aguardando', texto: `${pl(r.aguardando, 'nota fiscal recebida (XML) aguarda', 'notas fiscais recebidas (XML) aguardam')} conferência e não ${r.aguardando === 1 ? 'conta' : 'contam'} como compra nos dois períodos até serem conciliadas.` });
-  return avisos;
+function avisosDaTela(r: ComparacaoDePeriodosDaTela, f: FiltrosDePeriodos, hoje: string) {
+  return avisosDaComparacao({ de: f.rel.de, ate: f.rel.ate, deB: f.deB, ateB: f.ateB }, r.a!, r.b!, r.aguardando, hoje);
 }
 
 // ----------------------------------------------------------------- tabela
@@ -159,13 +134,15 @@ export function TabelaPorInsumo({
   umInsumo: boolean;
 }) {
   const s = r.comparacao!.resumo;
+  const semLado = s.semCompraA || s.semCompraB;
+  const semEfeitos = semLado || s.nosDois === 0;
   const itens = r.itensDaPagina;
   const abrir = (i: ItemComparado) => hrefDosPeriodos(caminho, f, { rel: { insumoId: i.insumoId, q: '' }, pagina: 1 });
   const nome = (i: ItemComparado) =>
     umInsumo ? (
       <span className="font-medium text-texto">{i.insumo}</span>
     ) : (
-      <Link href={abrir(i)} className="ff-transicao rounded-[5px] font-medium text-texto underline-offset-4 hover:underline">
+      <Link href={abrir(i)} className="ff-toque ff-transicao rounded-[5px] font-medium text-texto underline-offset-4 hover:underline">
         {i.insumo}
       </Link>
     );
@@ -234,7 +211,7 @@ export function TabelaPorInsumo({
         <li className="px-4 py-3 text-sm tabular-nums">
           <p className="text-[12px] text-suave">Total de todos os {pl(r.totalDeItens, 'insumo', 'insumos')} (não só desta página)</p>
           <p>
-            Variação <Sinal centavos={s.variacaoCentavos} className="font-semibold" /> · volume <Sinal centavos={s.volumeCentavos} /> · preço <Sinal centavos={s.precoCentavos} />
+            Variação {semLado ? <span className="font-semibold">sem base</span> : <Sinal centavos={s.variacaoCentavos} className="font-semibold" />} · volume {semEfeitos ? '—' : <Sinal centavos={s.volumeCentavos} />} · preço {semEfeitos ? '—' : <Sinal centavos={s.precoCentavos} />}
           </p>
         </li>
         )}
@@ -288,13 +265,13 @@ export function TabelaPorInsumo({
               <span className="block"><span className="text-suave">B: </span>{formatarDinheiro(s.gastoBCentavos)}</span>
             </td>
             <td className="px-3 py-2.5 text-right">
-              <Sinal centavos={s.variacaoCentavos} className="font-semibold" />
+              {semLado ? <span className="font-semibold">sem base</span> : <Sinal centavos={s.variacaoCentavos} className="font-semibold" />}
               <span className="block text-[12px] text-suave">inclui entrou <Sinal centavos={s.entrouCentavos} /> e saiu <Sinal centavos={s.saiuCentavos} /></span>
             </td>
-            <td className="px-3 py-2.5 text-right"><Sinal centavos={s.volumeCentavos} className="font-semibold" /></td>
+            <td className="px-3 py-2.5 text-right">{semEfeitos ? '—' : <Sinal centavos={s.volumeCentavos} className="font-semibold" />}</td>
             <td className="py-2.5 pl-3 pr-5 text-right">
-              <Sinal centavos={s.precoCentavos} className="font-semibold" />
-              {s.trocaCentavos !== 0 && <span className="block lg:ml-auto lg:max-w-[11rem] text-[12px] text-suave">dos quais troca de fornecedor <Sinal centavos={s.trocaCentavos} /></span>}
+              {semEfeitos ? '—' : <Sinal centavos={s.precoCentavos} className="font-semibold" />}
+              {!semEfeitos && s.trocaCentavos !== 0 && <span className="block lg:ml-auto lg:max-w-[11rem] text-[12px] text-suave">dos quais troca de fornecedor <Sinal centavos={s.trocaCentavos} /></span>}
             </td>
           </tr>
         </tfoot>
@@ -458,14 +435,31 @@ export function TelaDosPeriodos({
   const s = c?.resumo;
   const a = r.a;
   const b = r.b;
-  const avisos = a && b && c ? avisosDaCobertura(r, f, hoje) : [];
+  const avisos = a && b && c ? avisosDaTela(r, f, hoje) : [];
   const itensComBase = c?.itens ?? [];
+  const semLado = !!s && (s.semCompraA || s.semCompraB);
+  const semEfeitos = !!s && (semLado || s.nosDois === 0);
+  const SEM_EFEITOS = semLado ? 'Sem compra comparável num dos períodos: não há como separar preço de volume.' : 'Nenhum insumo tem compra comparável nos dois períodos: não há como separar preço de volume.';
+  const verDoLado = (nome: 'A' | 'B', l: NonNullable<typeof a>) => [
+    ...(l.linhas > 0 ? [{ href: liga(nome), texto: l.linhas === 1 ? `Ver a linha de ${nome}` : `Ver as ${pl(l.linhas, 'linha', 'linhas')} de ${nome}` }] : []),
+    ...(l.semBase.linhas > 0 ? [{ href: liga(nome, { so: 'sembase' }), texto: l.semBase.linhas === 1 ? `Ver a linha sem base de ${nome}` : `Ver as ${pl(l.semBase.linhas, 'linha', 'linhas')} sem base de ${nome}` }] : []),
+  ];
   const avisosPainel =
     avisos.length > 0 ? (
       <Painel id="antes-de-ler" titulo="Antes de ler" subtitulo="O que muda o jeito de ler esta comparação." semRespiro className="scroll-mt-24">
         <ul className="space-y-2 px-4 py-3 text-[13px] leading-relaxed text-suave sm:px-5">
           {avisos.map((x) => (
-            <li key={x.chave}>{x.texto}</li>
+            <li key={x.chave}>
+              {x.texto}
+              {x.semBaseDoLado && (
+                <>
+                  {' '}
+                  <Link href={liga(x.semBaseDoLado, { so: 'sembase' })} className={`${LINK_DE_TEXTO} ff-toque`}>
+                    Ver as linhas sem base de {x.semBaseDoLado}
+                  </Link>
+                </>
+              )}
+            </li>
           ))}
         </ul>
       </Painel>
@@ -513,23 +507,56 @@ export function TelaDosPeriodos({
                   Os dois períodos e a variação
                 </h2>
                 <div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-2 xl:grid-cols-3">
-                  <Cartao rotulo={`Período A (a base) · ${faixa(a.de, a.ate)} · ${dias(a.de, a.ate)}`} ver={{ href: liga('A'), texto: a.linhas === 1 ? 'Ver a linha de A' : `Ver as ${pl(a.linhas, 'linha', 'linhas')} de A` }}>
-                    <p className={GRANDE}>{formatarDinheiro(s.gastoACentavos)}</p>
-                    <p className="mt-1.5 text-[12px] tabular-nums text-suave">
-                      {MEDIDAS[f.medida].curto} · {pl(a.notas, 'compra', 'compras')} · {quantidades(a)}
-                    </p>
+                  <Cartao rotulo={`Período A (a base) · ${faixa(a.de, a.ate)} · ${dias(a.de, a.ate)}`} ver={verDoLado('A', a)}>
+                    {s.semCompraA ? (
+                      <>
+                        <p className={GRANDE}>Sem compra</p>
+                        <p className="mt-1.5 text-[12px] text-suave">Nada comparável neste período{a.linhas > 0 ? `: só ${pl(a.linhas, 'linha', 'linhas')} sem base` : ''}.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className={GRANDE}>{formatarDinheiro(s.gastoACentavos)}</p>
+                        <p className="mt-1.5 text-[12px] tabular-nums text-suave">
+                          {MEDIDAS[f.medida].curto} · {pl(a.notas, 'compra', 'compras')} · {quantidades(a)}
+                        </p>
+                      </>
+                    )}
                   </Cartao>
-                  <Cartao rotulo={`Período B · ${faixa(b.de, b.ate)} · ${dias(b.de, b.ate)}`} ver={{ href: liga('B'), texto: b.linhas === 1 ? 'Ver a linha de B' : `Ver as ${pl(b.linhas, 'linha', 'linhas')} de B` }}>
-                    <p className={GRANDE}>{formatarDinheiro(s.gastoBCentavos)}</p>
-                    <p className="mt-1.5 text-[12px] tabular-nums text-suave">
-                      {MEDIDAS[f.medida].curto} · {pl(b.notas, 'compra', 'compras')} · {quantidades(b)}
-                    </p>
+                  <Cartao rotulo={`Período B · ${faixa(b.de, b.ate)} · ${dias(b.de, b.ate)}`} ver={verDoLado('B', b)}>
+                    {s.semCompraB ? (
+                      <>
+                        <p className={GRANDE}>Sem compra</p>
+                        <p className="mt-1.5 text-[12px] text-suave">Nada comparável neste período{b.linhas > 0 ? `: só ${pl(b.linhas, 'linha', 'linhas')} sem base` : ''}.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className={GRANDE}>{formatarDinheiro(s.gastoBCentavos)}</p>
+                        <p className="mt-1.5 text-[12px] tabular-nums text-suave">
+                          {MEDIDAS[f.medida].curto} · {pl(b.notas, 'compra', 'compras')} · {quantidades(b)}
+                        </p>
+                      </>
+                    )}
                   </Cartao>
                   <Cartao rotulo="Variação do gasto (B menos A)" ver={avisos.length > 0 ? { href: '#antes-de-ler', texto: avisos.length === 1 ? 'Ver o aviso sobre esta comparação' : `Ver os ${avisos.length} avisos sobre esta comparação` } : undefined}>
-                    <p className={GRANDE}>
-                      <Sinal centavos={s.variacaoCentavos} />
-                    </p>
-                    <p className="mt-1.5 text-[12px] text-suave">{s.variacaoDecimos === null ? 'Sem base para o percentual: nada foi comprado em A.' : `${formatarPercentual(s.variacaoDecimos)} sobre o período A`}</p>
+                    {semLado ? (
+                      <>
+                        <p className={GRANDE}>Sem base</p>
+                        <p className="mt-1.5 text-[12px] text-suave">
+                          Um dos períodos não tem compra comparável: não há variação nem % a calcular.{' '}
+                          {s.semCompraB ? `O que A comprou (${formatarDinheiro(-s.saiuCentavos)}) aparece como “saiu”.` : `O que B comprou (${formatarDinheiro(s.entrouCentavos)}) aparece como “entrou”.`}
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className={GRANDE}>
+                          <Sinal centavos={s.variacaoCentavos} />
+                        </p>
+                        <p className="mt-1.5 text-[12px] text-suave">
+                          {s.variacaoDecimos === null ? 'Sem base para o percentual.' : `${formatarPercentual(s.variacaoDecimos)} sobre o período A`}
+                          {s.entrouDomina ? ` A maior parte (${formatarDinheiro(s.entrouCentavos)}) é de insumo que só aparece em B: não é aumento de preço.` : ''}
+                        </p>
+                      </>
+                    )}
                   </Cartao>
                 </div>
                 <p className="text-[12px] text-suave">Gasto comparável: só as linhas com insumo, unidade e valor, nos dois períodos. {s.nosDois} {s.nosDois === 1 ? 'insumo está' : 'insumos estão'} nos dois.</p>
@@ -546,13 +573,13 @@ export function TelaDosPeriodos({
                 </div>
                 <div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-2 xl:grid-cols-4">
                   <Cartao rotulo="Efeito volume (comprou mais ou menos)" ver={{ href: '#insumos', texto: 'Ver por insumo' }}>
-                    <p className={GRANDE}><Sinal centavos={s.volumeCentavos} /></p>
-                    <p className="mt-1.5 text-[12px] text-suave">Quantidade que mudou, ao custo médio dos dois períodos.</p>
+                    <p className={GRANDE}>{semEfeitos ? '—' : <Sinal centavos={s.volumeCentavos} />}</p>
+                    <p className="mt-1.5 text-[12px] text-suave">{semEfeitos ? SEM_EFEITOS : 'Quantidade que mudou, ao custo médio dos dois períodos.'}</p>
                   </Cartao>
                   <Cartao rotulo="Efeito preço (cada unidade custou mais ou menos)" ver={{ href: '#insumos', texto: 'Ver por insumo' }}>
-                    <p className={GRANDE}><Sinal centavos={s.precoCentavos} /></p>
+                    <p className={GRANDE}>{semEfeitos ? '—' : <Sinal centavos={s.precoCentavos} />}</p>
                     <p className="mt-1.5 text-[12px] tabular-nums text-suave">
-                      do mesmo fornecedor <Sinal centavos={s.mesmoFornecedorCentavos} /> · troca de fornecedor <Sinal centavos={s.trocaCentavos} />
+                      {semEfeitos ? SEM_EFEITOS : <>do mesmo fornecedor <Sinal centavos={s.mesmoFornecedorCentavos} /> · troca de fornecedor <Sinal centavos={s.trocaCentavos} /></>}
                     </p>
                   </Cartao>
                   <Cartao rotulo="Só num dos períodos (sem como separar preço de volume)" ver={s.soEmA + s.soEmB > 0 ? { href: '#insumos', texto: 'Ver quais insumos' } : undefined}>
@@ -570,6 +597,7 @@ export function TelaDosPeriodos({
                       </>
                     )}
                   </Cartao>
+                  {!semLado && (
                   <Cartao rotulo="A soma">
                     <ul className="space-y-0.5 text-sm tabular-nums">
                       <li><Sinal centavos={s.volumeCentavos} /> <span className="text-suave">efeito volume</span></li>
@@ -581,6 +609,7 @@ export function TelaDosPeriodos({
                       = <Sinal centavos={s.volumeCentavos + s.precoCentavos + s.entrouCentavos + s.saiuCentavos} /> {s.fecha ? <span className="font-normal text-suave">(igual à variação)</span> : <Selo tom="erro">não fecha com a variação</Selo>}
                     </p>
                   </Cartao>
+                  )}
                 </div>
                 {r.umInsumo && (
                   <div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-3">
@@ -625,18 +654,20 @@ const lado = (l: Lado | null, u: Unidade, c: 'q' | 'c' | 'g') => (!l ? '—' : c
 
 /** A versão para imprimir ou salvar em PDF: o que a tela diz, sem menu e sem botão, com a tabela inteira. */
 export function ImpressaoDosPeriodos({ caminho, contexto, f, r, geradoEm, hoje }: { caminho: string; contexto: string; f: FiltrosDePeriodos; r: ComparacaoDePeriodosDaTela; geradoEm: string; hoje: string }) {
-  const avisos = avisosDaCobertura(r, f, hoje);
+  const avisos = avisosDaTela(r, f, hoje);
   const voltar = hrefDosPeriodos(caminho, f);
   const c = r.comparacao!;
   const s = c.resumo;
+  const semLado = s.semCompraA || s.semCompraB;
+  const semEfeitos = semLado || s.nosDois === 0;
   const linhas: [string, string][] = [
-    [`Gasto no período A`, formatarDinheiro(s.gastoACentavos)],
-    [`Gasto no período B`, formatarDinheiro(s.gastoBCentavos)],
-    ['Variação (B menos A)', `${txtSinal(s.variacaoCentavos)}${s.variacaoDecimos === null ? ' · sem base para o percentual (nada comprado em A)' : ` · ${formatarPercentual(s.variacaoDecimos)} sobre A`}`],
-    ['Efeito volume', txtSinal(s.volumeCentavos)],
-    ['Efeito preço', `${txtSinal(s.precoCentavos)} (do mesmo fornecedor ${txtSinal(s.mesmoFornecedorCentavos)}; troca de fornecedor ${txtSinal(s.trocaCentavos)})`],
+    [`Gasto no período A`, s.semCompraA ? 'sem compra comparável' : formatarDinheiro(s.gastoACentavos)],
+    [`Gasto no período B`, s.semCompraB ? 'sem compra comparável' : formatarDinheiro(s.gastoBCentavos)],
+    ['Variação (B menos A)', semLado ? 'sem base (um dos períodos não tem compra comparável)' : `${txtSinal(s.variacaoCentavos)}${s.variacaoDecimos === null ? ' · sem base para o percentual' : ` · ${formatarPercentual(s.variacaoDecimos)} sobre A`}${s.entrouDomina ? ` · a maior parte (${formatarDinheiro(s.entrouCentavos)}) é de insumo que só aparece em B` : ''}`],
+    ['Efeito volume', semEfeitos ? '—' : txtSinal(s.volumeCentavos)],
+    ['Efeito preço', semEfeitos ? '—' : `${txtSinal(s.precoCentavos)} (do mesmo fornecedor ${txtSinal(s.mesmoFornecedorCentavos)}; troca de fornecedor ${txtSinal(s.trocaCentavos)})`],
     ['Só num período', `entrou ${txtSinal(s.entrouCentavos)} (${pl(s.soEmB, 'insumo', 'insumos')}) · saiu ${txtSinal(s.saiuCentavos)} (${pl(s.soEmA, 'insumo', 'insumos')})`],
-    ['Conferência', `volume ${txtSinal(s.volumeCentavos)}, preço ${txtSinal(s.precoCentavos)}, entrou ${txtSinal(s.entrouCentavos)}, saiu ${txtSinal(s.saiuCentavos)} = ${txtSinal(s.volumeCentavos + s.precoCentavos + s.entrouCentavos + s.saiuCentavos)} ${s.fecha ? '(igual à variação)' : '(NÃO FECHA)'}`],
+    ...(semLado ? [] : ([['Conferência', `volume ${txtSinal(s.volumeCentavos)}, preço ${txtSinal(s.precoCentavos)}, entrou ${txtSinal(s.entrouCentavos)}, saiu ${txtSinal(s.saiuCentavos)} = ${txtSinal(s.volumeCentavos + s.precoCentavos + s.entrouCentavos + s.saiuCentavos)} ${s.fecha ? '(igual à variação)' : '(NÃO FECHA)'}`]] as [string, string][])),
   ];
   return (
     <div className="ff-relatorio-impressao mx-auto max-w-[1100px] space-y-5">
@@ -678,7 +709,7 @@ export function ImpressaoDosPeriodos({ caminho, contexto, f, r, geradoEm, hoje }
           </dl>
         </header>
         <section aria-label="Totais da comparação" className="break-inside-avoid">
-          <h2 className="mb-1 text-sm font-semibold">Totais</h2>
+          <h2 className="mb-1 break-after-avoid text-sm font-semibold">Totais</h2>
           <div className="overflow-x-auto" role="region" aria-label="Tabela dos totais da comparação" tabIndex={0}>
             <table className="w-full max-w-3xl">
               <tbody>
@@ -700,7 +731,7 @@ export function ImpressaoDosPeriodos({ caminho, contexto, f, r, geradoEm, hoje }
           )}
         </section>
         <section aria-label="Comparação por insumo">
-          <h2 className="mb-1 text-sm font-semibold">Por insumo ({c.itens.length})</h2>
+          <h2 className="mb-1 break-after-avoid text-sm font-semibold">Por insumo ({c.itens.length})</h2>
           <div className="overflow-x-auto" role="region" aria-label="Tabela da comparação por insumo" tabIndex={0}>
             <table className="w-full">
               <thead>
@@ -736,7 +767,7 @@ export function ImpressaoDosPeriodos({ caminho, contexto, f, r, geradoEm, hoje }
         </section>
         {r.umInsumo && c.itens.map((i) => (
           <section key={i.chave} aria-label={`Fornecedores de ${i.insumo} em ${SIGLA(i.unidade)}`}>
-            <h2 className="mb-1 text-sm font-semibold">Fornecedores de {i.insumo} em {SIGLA(i.unidade)}</h2>
+            <h2 className="mb-1 break-after-avoid text-sm font-semibold">Fornecedores de {i.insumo} em {SIGLA(i.unidade)}</h2>
             <div className="overflow-x-auto" role="region" aria-label={`Tabela dos fornecedores de ${i.insumo} em ${SIGLA(i.unidade)}`} tabIndex={0}>
               <table className="w-full">
                 <thead>

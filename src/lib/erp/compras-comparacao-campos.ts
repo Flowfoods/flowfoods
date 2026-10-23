@@ -16,12 +16,14 @@
 
 import { hojeNoRio, lerData } from './compra-campos';
 import {
+  FRASE_DO_MOTIVO,
   lerFiltrosDoRelatorio,
   primeiroDiaDoMes,
   somarDias,
   ultimoDiaDoMes,
   type BaseDeData,
   type FiltrosDoRelatorio,
+  type MotivoSemBase,
 } from './compras-relatorio-campos';
 import { custoDaEmbalagem, formatarDinheiro, somar, ZERO, type CustoExato, type Fracao, type Unidade } from './unidades';
 
@@ -253,6 +255,11 @@ export interface ResumoDaComparacao {
   soEmA: number;
   /** volume + preço + entrou + saiu = variação (conferido, e a tela escreve a soma). */
   fecha: boolean;
+  /** Um dos lados não tem NENHUMA compra comparável: não há variação, nem % (a manchete é "sem base"), nem efeito volume ou preço. */
+  semCompraA: boolean;
+  semCompraB: boolean;
+  /** "Entrou" (insumos novos) é a maior parte de uma variação positiva: a tela diz junto ao %. */
+  entrouDomina: boolean;
 }
 
 export function resumirItens(itens: ItemComparado[]): ResumoDaComparacao {
@@ -260,11 +267,13 @@ export function resumirItens(itens: ItemComparado[]): ResumoDaComparacao {
   const gastoA = itens.reduce((s, i) => s + (i.a?.gastoCentavos ?? 0), 0);
   const gastoB = itens.reduce((s, i) => s + (i.b?.gastoCentavos ?? 0), 0);
   const variacao = gastoB - gastoA;
+  const semA = itens.every((i) => !i.a);
+  const semB = itens.every((i) => !i.b);
   const r = {
     gastoACentavos: gastoA,
     gastoBCentavos: gastoB,
     variacaoCentavos: variacao,
-    variacaoDecimos: percentualEmDecimos(variacao, gastoA),
+    variacaoDecimos: semA || semB ? null : percentualEmDecimos(variacao, gastoA),
     volumeCentavos: soma((i) => i.volumeCentavos),
     precoCentavos: soma((i) => i.precoCentavos),
     mesmoFornecedorCentavos: soma((i) => i.mesmoFornecedorCentavos),
@@ -275,7 +284,13 @@ export function resumirItens(itens: ItemComparado[]): ResumoDaComparacao {
     soEmB: itens.filter((i) => i.situacao === 'so-b').length,
     soEmA: itens.filter((i) => i.situacao === 'so-a').length,
   };
-  return { ...r, fecha: r.volumeCentavos + r.precoCentavos + r.entrouCentavos + r.saiuCentavos === variacao };
+  return {
+    ...r,
+    fecha: r.volumeCentavos + r.precoCentavos + r.entrouCentavos + r.saiuCentavos === variacao,
+    semCompraA: semA,
+    semCompraB: semB,
+    entrouDomina: !semA && !semB && variacao > 0 && r.entrouCentavos * 2 > variacao,
+  };
 }
 
 export interface Comparacao {
@@ -530,7 +545,60 @@ export function avisosDeDatas(f: { de: string; ate: string; deB: string; ateB: s
   }
   const emAndamento = [f.ate > hoje ? 'A' : '', f.ateB > hoje ? 'B' : ''].filter(Boolean);
   if (emAndamento.length) {
-    avisos.push({ chave: 'andamento', texto: `O período ${emAndamento.join(' e ')} termina depois de hoje: só entram as compras já lançadas, e o resto do período ainda pode chegar.` });
+    const quem = emAndamento.length === 2 ? 'Os períodos A e B terminam' : `O período ${emAndamento[0]} termina`;
+    avisos.push({ chave: 'andamento', texto: `${quem} depois de hoje: só entram as compras já lançadas, e o resto ainda pode chegar.` });
+  }
+  return avisos;
+}
+
+/** O que o aviso de cobertura precisa de cada lado (a `LadoDaTela` do banco serve). */
+export interface LadoParaAviso {
+  de: string;
+  ate: string;
+  celulas: unknown[];
+  semBase: { linhas: number; valorCentavos: number; freteCentavos: number; porMotivo: Partial<Record<MotivoSemBase, number>> };
+  dinheiroTotalCentavos: number;
+  dinheiroComparavelCentavos: number;
+  semEmissao: number | null;
+}
+
+export interface AvisoDeCobertura extends AvisoDaComparacao {
+  /** O aviso fala das linhas sem base deste lado: a tela põe o link que as abre. */
+  semBaseDoLado?: 'A' | 'B';
+}
+
+const plural = (n: number, um: string, varios: string) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`;
+const faixaBr = (de: string, ate: string) => {
+  const br = (d: string) => d.split('-').reverse().join('/');
+  return de === ate ? br(de) : `${br(de)} a ${br(ate)}`;
+};
+
+/** TODOS os avisos de uma comparação (datas, cobertura, lado sem compra, notas sem emissão, documentos aguardando): a tela e o CSV dizem as mesmas frases. */
+export function avisosDaComparacao(f: { de: string; ate: string; deB: string; ateB: string }, a: LadoParaAviso, b: LadoParaAviso, aguardando: number, hoje: string): AvisoDeCobertura[] {
+  const avisos: AvisoDeCobertura[] = avisosDeDatas(f, hoje);
+  if (a.celulas.length === 0) {
+    avisos.push({ chave: 'sem-a', texto: `No período A (${faixaBr(a.de, a.ate)}) não houve compra comparável neste recorte. Não há variação a calcular (sem base) e tudo o que B comprou aparece como “entrou”: não dá para dizer se o preço subiu ou desceu.` });
+  }
+  if (b.celulas.length === 0) {
+    avisos.push({ chave: 'sem-b', texto: `No período B (${faixaBr(b.de, b.ate)}) não houve compra comparável neste recorte. Não há variação a calcular (sem base) e tudo o que A comprou aparece como “saiu”: não dá para dizer se o preço subiu ou desceu.` });
+  }
+  for (const [nome, l] of [['A', a], ['B', b]] as const) {
+    if (l.semBase.linhas > 0) {
+      const pct = l.dinheiroTotalCentavos > 0 ? Math.floor((l.dinheiroComparavelCentavos * 1000) / l.dinheiroTotalCentavos) : null;
+      const m = l.semBase.porMotivo;
+      const motivos = (Object.keys(m) as MotivoSemBase[]).filter((k) => m[k]).map((k) => `${plural(m[k] ?? 0, 'linha', 'linhas')}: ${FRASE_DO_MOTIVO[k]}`).join('; ');
+      avisos.push({
+        chave: `base-${nome}`,
+        semBaseDoLado: nome,
+        texto: `Cobertura incompleta no período ${nome}: ${plural(l.semBase.linhas, 'linha', 'linhas')} (${formatarDinheiro(l.semBase.valorCentavos + l.semBase.freteCentavos)}) ficou fora da conta por falta de base${pct !== null ? `, e a comparação cobre ${formatarPercentual(pct).replace('+', '')} do dinheiro comprado` : ''}. ${motivos}.`,
+      });
+    }
+    if (l.semEmissao) {
+      avisos.push({ chave: `emissao-${nome}`, texto: `${plural(l.semEmissao, 'nota lançada no período', 'notas lançadas no período')} ${nome} não ${l.semEmissao === 1 ? 'tem' : 'têm'} data de emissão (foram digitadas à mão) e ficou de fora. Para vê-las, use a data da entrada.` });
+    }
+  }
+  if (aguardando > 0) {
+    avisos.push({ chave: 'aguardando', texto: `${plural(aguardando, 'nota fiscal recebida (XML) aguarda', 'notas fiscais recebidas (XML) aguardam')} conferência e não ${aguardando === 1 ? 'conta' : 'contam'} como compra nos dois períodos até serem conciliadas.` });
   }
   return avisos;
 }

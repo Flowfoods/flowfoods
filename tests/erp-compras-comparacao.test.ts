@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   atalhosDeComparacao,
+  avisosDaComparacao,
   avisosDeDatas,
   centavosDe,
   compararItem,
@@ -393,5 +394,55 @@ describe('L.3 · o período anterior, a planilha e a volta', () => {
     expect(rotuloDaVolta('/erp/compras/relatorios/comparar-periodos?de=1')).toBe('a comparação de compras');
     expect(rotuloDaVolta('/rodolfo/erp/x/compras/relatorios/comparar-fornecedores?a=1')).toBe('a comparação de compras');
     expect(rotuloDaVolta('/erp/compras/relatorios/periodo?de=1')).toBe('o relatório de compras');
+  });
+});
+
+describe('L.3 (1ª volta da UX) · um lado sem compra, avisos e gramática', () => {
+  it('B vazio: nada de "−100,0%": variação sem base, só "saiu"; o mesmo com A vazio', () => {
+    const b0 = compararPeriodos([cel('queijo', 'x', 10, 133)], [], 'entregue');
+    expect(b0.resumo).toMatchObject({ semCompraA: false, semCompraB: true, variacaoDecimos: null, saiuCentavos: -13300, entrouCentavos: 0, volumeCentavos: 0, precoCentavos: 0, nosDois: 0, soEmA: 1, entrouDomina: false });
+    expect(formatarPercentual(b0.resumo.variacaoDecimos)).toBe('sem base');
+    const a0 = compararPeriodos([], [cel('queijo', 'x', 10, 133)], 'entregue');
+    expect(a0.resumo).toMatchObject({ semCompraA: true, semCompraB: false, variacaoDecimos: null, entrouCentavos: 13300, nosDois: 0, entrouDomina: false });
+    // Os dois vazios: os dois lados sem compra.
+    expect(compararPeriodos([], [], 'item').resumo).toMatchObject({ semCompraA: true, semCompraB: true, variacaoDecimos: null });
+    // Os dois com compra: percentual normal.
+    const dois = compararPeriodos([cel('q', 'x', 10, 100)], [cel('q', 'x', 10, 110)], 'item');
+    expect(dois.resumo).toMatchObject({ semCompraA: false, semCompraB: false, variacaoDecimos: 100 });
+  });
+
+  it('"entrou" domina quando é mais da metade de uma variação positiva', () => {
+    // A: queijo R$ 100,00. B: queijo R$ 100,00 + bacon novo R$ 300,00 -> variação +300,00, entrou 300,00 (100%).
+    const r = compararPeriodos([cel('queijo', 'x', 10, 100)], [cel('queijo', 'x', 10, 100), cel('bacon', 'x', 5, 300)], 'item').resumo;
+    expect([r.variacaoCentavos, r.entrouCentavos, r.entrouDomina]).toEqual([30000, 30000, true]);
+    // Preço sobe 10% e o insumo novo é pequeno: não domina.
+    const p = compararPeriodos([cel('queijo', 'x', 10, 100)], [cel('queijo', 'x', 10, 140), cel('sal', 'x', 1, 5)], 'item').resumo;
+    expect(p.entrouDomina).toBe(false);
+    // Variação negativa nunca "domina".
+    expect(compararPeriodos([cel('queijo', 'x', 10, 500)], [cel('queijo', 'x', 10, 100), cel('sal', 'x', 1, 5)], 'item').resumo.entrouDomina).toBe(false);
+  });
+
+  it('gramática: "Os períodos A e B terminam depois de hoje" e "O período B termina"', () => {
+    const d = (f: { de: string; ate: string; deB: string; ateB: string }) => avisosDeDatas(f, HOJE).find((a) => a.chave === 'andamento')?.texto;
+    expect(d({ de: '2026-10-01', ate: '2026-10-31', deB: '2026-11-01', ateB: '2026-11-30' })).toMatch(/^Os períodos A e B terminam depois de hoje/);
+    expect(d({ de: '2026-09-01', ate: '2026-09-30', deB: '2026-10-01', ateB: '2026-10-31' })).toMatch(/^O período B termina depois de hoje/);
+    expect(d({ de: '2026-10-20', ate: '2026-10-31', deB: '2026-09-01', ateB: '2026-09-12' })).toMatch(/^O período A termina depois de hoje/);
+  });
+
+  it('os avisos da comparação (a tela e o CSV dizem a mesma frase): cobertura com o link do lado, lado sem compra, emissão, aguardando', () => {
+    const lado = (de: string, ate: string, celulas: number, sem: number, extra: Record<string, unknown> = {}) => ({
+      de, ate, celulas: Array.from({ length: celulas }), semBase: { linhas: sem, valorCentavos: sem * 1500, freteCentavos: 0, porMotivo: sem ? ({ unidade: sem } as const) : {} },
+      dinheiroTotalCentavos: 33300, dinheiroComparavelCentavos: 31800, semEmissao: null as number | null, ...extra,
+    });
+    const av = avisosDaComparacao({ de: '2026-09-01', ate: '2026-09-30', deB: '2026-10-01', ateB: '2026-10-31' }, lado('2026-09-01', '2026-09-30', 4, 1), lado('2026-10-01', '2026-10-31', 0, 0, { semEmissao: 2 }), 3, HOJE);
+    const por = Object.fromEntries(av.map((x) => [x.chave, x]));
+    expect(por['base-A'].semBaseDoLado).toBe('A');
+    expect(sp(por['base-A'].texto)).toMatch(/Cobertura incompleta no período A: 1 linha \(R\$ 15,00\)/);
+    expect(por['base-A'].texto).toMatch(/cobre 95,4% do dinheiro/);
+    expect(por['sem-b'].texto).toMatch(/Não há variação a calcular \(sem base\).*“saiu”/);
+    expect(por['emissao-B'].texto).toMatch(/2 notas lançadas no período B não têm data de emissão/);
+    expect(por['aguardando'].texto).toMatch(/3 notas fiscais recebidas \(XML\) aguardam conferência e não contam/);
+    expect(por['tamanhos']).toBeDefined();
+    expect(por['sem-a']).toBeUndefined();
   });
 });
