@@ -152,12 +152,15 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP 3.4 · migration das etiquetas, com
           expect(comoP1(`UPDATE "LoteDeInsumo" SET codigo = 'L3' WHERE id = 'lt2'`).aviso).toContain('LoteDeInsumo_imutavel');
 
           // A emissão do lote copia a validade dele; outra validade é recusada; depois não muda.
-          const emitir = (id: string, validade: string) =>
-            comoP1(`INSERT INTO "Etiqueta"(id,"parceiroId","lojaId",codigo,"insumoId","ordemProducaoId","nomeSnapshot","unidadeSnapshot",conservacao,"validadeEm","regraDaValidade","loteProduzido","lojaNomeSnapshot",quantas,"chaveEnvio","emitidaPorNome",formato) VALUES
-              ('${id}','p1','l1','E261023-000${id.slice(-1)}','i1','o1','Molho','KG','REFRIGERADO','${validade}','LOTE_PRODUZIDO','261021-03','Loja 1',2,'env-${id}-abcdef','Duda','E60X40')`);
+          // Rodada 1 (decisão 420): a manipulação = a conclusão e quem fez = o lote, conferidos pelo banco.
+          const emitir = (id: string, validade: string, fabricado = '2026-10-21 15:00:00', quem = 'Caio') =>
+            comoP1(`INSERT INTO "Etiqueta"(id,"parceiroId","lojaId",codigo,"insumoId","ordemProducaoId","nomeSnapshot","unidadeSnapshot",conservacao,"validadeEm","regraDaValidade","loteProduzido","lojaNomeSnapshot",quantas,"chaveEnvio","emitidaPorNome",formato,"fabricadoEm","responsavelNomeSnapshot","responsavelUsuarioId") VALUES
+              ('${id}','p1','l1','E261023-000${id.slice(-1)}','i1','o1','Molho','KG','REFRIGERADO','${validade}','LOTE_PRODUZIDO','261021-03','Loja 1',2,'env-${id}-abcdef','Duda','E60X40','${fabricado}','${quem}','u-caio')`);
           const e1 = emitir('e1', VALIDADE_DO_LOTE);
           expect(e1.ok, e1.aviso).toBe(true);
           expect(emitir('e2', '2026-10-25 15:00:00').aviso).toContain('Etiqueta_origem_confere');
+          expect(emitir('e3', VALIDADE_DO_LOTE, '2020-01-01 00:00:00').aviso).toContain('Etiqueta_origem_confere');
+          expect(emitir('e4', VALIDADE_DO_LOTE, '2026-10-21 15:00:00', 'Forjado').aviso).toContain('Etiqueta_origem_confere');
           expect(comoP1(`UPDATE "Etiqueta" SET quantas = 3 WHERE id = 'e1'`).aviso).toContain('Etiqueta_imutavel');
           // A etiqueta antiga (sem regra) não é cobrada pelos gatilhos novos.
           expect(comoP1(`UPDATE "Etiqueta" SET "responsavelNomeSnapshot" = 'Equipe' WHERE id = 'e0'`).ok).toBe(true);
@@ -167,6 +170,13 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP 3.4 · migration das etiquetas, com
           expect(p1.ok, p1.aviso).toBe(true);
           expect(comoP1(`UPDATE "EtiquetaImpressao" SET situacao = 'ENVIADA', "concluidaEm" = now() WHERE id = 'ip1'`).ok).toBe(true);
           expect(comoP1(`UPDATE "EtiquetaImpressao" SET situacao = 'FALHOU', erro = 'x', "concluidaEm" = now() WHERE id = 'ip1'`).aviso).toContain('EtiquetaImpressao_confere');
+          // Rodada 1 (decisão 420): o pedido não some (com RLS, nem há DELETE; sem RLS, o gatilho recusa).
+          expect(comoP1(`DELETE FROM "EtiquetaImpressao" WHERE id = 'ip1'`).aviso).toMatch(comRls ? /permission denied for table EtiquetaImpressao/ : /EtiquetaImpressao_imutavel/);
+          expect(comoP1(`DELETE FROM "AberturaDeLote" WHERE id = 'a1'`).aviso).toMatch(comRls ? /permission denied for table AberturaDeLote/ : /AberturaDeLote_imutavel/);
+          // Rodada 1 (decisão 418): "Já imprimi" uma vez, num pedido de arquivo; não muda o resultado.
+          expect(comoP1(`INSERT INTO "EtiquetaImpressao"(id,"parceiroId","lojaId","etiquetaId",sequencia,copias,transporte,situacao,"concluidaEm","solicitadaPorNome","chaveEnvio") VALUES ('ip3','p1','l1','e1',3,1,'ARQUIVO_ZPL','EXPORTADA',now(),'Duda','env-ip3-abcdef')`).ok).toBe(true);
+          expect(comoP1(`UPDATE "EtiquetaImpressao" SET "confirmadaEm" = now(), "confirmadaPorNome" = 'Duda' WHERE id = 'ip3'`).ok).toBe(true);
+          expect(comoP1(`UPDATE "EtiquetaImpressao" SET "confirmadaEm" = now(), "confirmadaPorNome" = 'Outra' WHERE id = 'ip3'`).aviso).toContain('EtiquetaImpressao_confere');
           // Arquivo não é "enviada": o CHECK recusa a combinação.
           expect(comoP1(`INSERT INTO "EtiquetaImpressao"(id,"parceiroId","lojaId","etiquetaId",sequencia,copias,transporte,situacao,"concluidaEm","solicitadaPorNome") VALUES ('ip2','p1','l1','e1',2,1,'ARQUIVO_ZPL','ENVIADA',now(),'Duda')`).aviso).toContain('EtiquetaImpressao_resultado');
 
