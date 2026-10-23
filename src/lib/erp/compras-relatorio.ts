@@ -565,7 +565,7 @@ export async function relatorioDaTela(cliente: ClienteDoParceiro, alcance: Alcan
         paginas,
       };
     },
-    { repetivel: true, timeout: 30_000 },
+    { repetivel: true, relatorio: {} },
   );
 }
 
@@ -591,6 +591,6 @@ export async function relatorioCompleto(cliente: ClienteDoParceiro, alcance: Alc
         semEmissao: f.base === 'emissao' && f.situacao === 'lancadas' ? await semEmissaoNoRecorte(tx, recorte) : null,
       };
     },
-    { repetivel: true, timeout: 60_000 },
+    { repetivel: true, relatorio: {} },
   );
 }

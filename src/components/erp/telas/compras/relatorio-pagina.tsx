@@ -6,7 +6,8 @@
 
 import { visaoDaRequisicao } from '@/lib/erp/contexto';
 import type { Alcance } from '@/lib/erp/permissoes';
-import type { ClienteDoParceiro } from '@/lib/erp/tenant';
+import { ErroDeRelatorio, type ClienteDoParceiro } from '@/lib/erp/tenant';
+import { RelatorioGrande } from '../../ui/relatorio-grande';
 import { relatorioCompleto, relatorioDaTela } from '@/lib/erp/compras-relatorio';
 import { lerFiltrosDoRelatorio, somarDias, TETO_DA_IMPRESSAO } from '@/lib/erp/compras-relatorio-campos';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
@@ -16,7 +17,7 @@ import { TelaDeImpressao, TelaDoRelatorio, type Modo } from './relatorio-tela';
 
 type Params = Record<string, string | string[] | undefined>;
 
-export async function PaginaDoRelatorio({
+async function paginaDoRelatorio({
   ctx,
   modo,
   caminho,
@@ -79,4 +80,14 @@ export async function PaginaDoRelatorio({
   return (
     <TelaDoRelatorio modo={modo} caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} insumosBase={insumosBase} visaoDaLoja={visaoDaLoja} />
   );
+}
+
+/** Se o relatório não couber agora (passou do teto de tempo ou há outros grandes rodando), a frase no lugar dos números, sem 500. */
+export async function PaginaDoRelatorio(props: Parameters<typeof paginaDoRelatorio>[0]) {
+  try {
+    return await paginaDoRelatorio(props);
+  } catch (e) {
+    if (e instanceof ErroDeRelatorio) return <RelatorioGrande erro={e} caminho={props.caminho} />;
+    throw e;
+  }
 }

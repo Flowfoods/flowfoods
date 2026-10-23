@@ -238,7 +238,7 @@ export async function comparacaoDePeriodos(cliente: ClienteDoParceiro, alcance: 
       const pagina = Math.min(Math.max(1, f.pagina), paginas);
       return { ...base, comparacao, totalDeItens: total, pagina, paginas, itensDaPagina: comparacao.itens.slice((pagina - 1) * f.porPagina, pagina * f.porPagina) };
     },
-    { repetivel: true, timeout: 60_000 },
+    { repetivel: true, relatorio: {} },
   );
 }
 
@@ -323,6 +323,6 @@ export async function comparacaoDeFornecedores(cliente: ClienteDoParceiro, alcan
         aguardando: await documentosAguardando(tx, r.lojas),
       };
     },
-    { repetivel: true, timeout: 60_000 },
+    { repetivel: true, relatorio: {} },
   );
 }

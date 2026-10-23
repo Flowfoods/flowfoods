@@ -10,7 +10,7 @@
 
 import type { Alcance } from './permissoes';
 import { pode } from './permissoes';
-import type { ClienteDoParceiro } from './tenant';
+import { ErroDeRelatorio, type ClienteDoParceiro } from './tenant';
 import type { LinhaDeCompra, LinhaDeGrupo, TotaisDoRecorte } from './compras-relatorio';
 import { relatorioCompleto } from './compras-relatorio';
 import {
@@ -181,13 +181,25 @@ export type ParteDaPlanilha = 'linhas' | 'resumo';
 export type RespostaDaPlanilha = { ok: true; nome: string; corpo: string } | { ok: false; status: 400 | 401 | 403 | 413 | 503; frase: string };
 
 /** O relatório não coube agora: 413 se passou do teto de tempo, 503 se o servidor está ocupado com outros. A frase é a mesma da tela. */
+export async function comRecusaDeRelatorio(f: () => Promise<RespostaDaPlanilha>): Promise<RespostaDaPlanilha> {
+  try {
+    return await f();
+  } catch (e) {
+    if (e instanceof ErroDeRelatorio) return recusaDeRelatorio(e);
+    throw e;
+  }
+}
+
 export const recusaDeRelatorio = (e: { motivo: 'tempo' | 'ocupado'; message: string }): RespostaDaPlanilha => ({ ok: false, status: e.motivo === 'ocupado' ? 503 : 413, frase: e.message });
+
+/** A planilha inteira de um relatório; se ele não couber agora (teto de tempo ou servidor ocupado), a recusa em frase. */
+export const planilhaDoRelatorio = (...a: Parameters<typeof montarPlanilhaDoRelatorio>) => comRecusaDeRelatorio(() => montarPlanilhaDoRelatorio(...a));
 
 /**
  * A planilha inteira de um relatório. `titulo`: o nome da tela de onde saiu. Devolve a recusa em frase (sem sessão, sem permissão,
  * período torto, recorte grande demais), nunca um arquivo cortado.
  */
-export async function planilhaDoRelatorio(
+async function montarPlanilhaDoRelatorio(
   cliente: ClienteDoParceiro | null,
   alcance: Alcance | null,
   f: FiltrosDoRelatorio,
