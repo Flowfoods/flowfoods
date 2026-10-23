@@ -17,7 +17,7 @@
 # Variáveis (vêm dos secrets do repositório):
 #   DOKPLOY_URL, DOKPLOY_API_TOKEN, HOSTINGER_API_TOKEN, VPS_SSH_KEY,
 #   VPS_SSH_USER (padrão root), VPS_HOST (padrão 76.13.230.78)
-#   ALVOS (etapa subir): "compose:ID,application:ID,postgres:ID,redis:ID" — na ordem
+#   ALVOS (etapa subir): "traefik,compose:ID,application:ID,postgres:ID,redis:ID" — na ordem
 
 set -uo pipefail
 ETAPA="${1:-diagnosticar}"
@@ -101,6 +101,18 @@ inventario() {
   column -t -s $'\t' -N TIPO,ID,NOME,STATUS,DOMINIOS /tmp/inventario.tsv 2>/dev/null || cat /tmp/inventario.tsv
 }
 
+# Domínios cadastrados em cada compose/application → /tmp/dominios.tsv
+# (host, serviço, https, tipo de certificado). Precisa do inventário antes.
+coletar_dominios() {
+  : > /tmp/dominios.tsv
+  [ -s /tmp/inventario.tsv ] || return 0
+  while IFS=$'\t' read -r t id n _ _; do
+    case "$t" in compose) q="domain.byComposeId?composeId=$id" ;; application) q="domain.byApplicationId?applicationId=$id" ;; *) continue ;; esac
+    [ "$(dokploy GET "/api/$q")" = 200 ] || continue
+    jq -r --arg n "$n" '.[]? | "\(.host)\t\($n)\t\(.https)\t\(.certificateType // "")"' /tmp/dk.json >> /tmp/dominios.tsv
+  done < /tmp/inventario.tsv
+}
+
 # ================================================================ etapas
 diagnosticar() {
   titulo "1. Rede (do runner)"
@@ -141,6 +153,37 @@ REMOTO
 
   titulo "4. Dokploy (inventário, sem segredos)"
   inventario || true
+  [ -s /tmp/inventario.tsv ] || return 0
+
+  titulo "5. Portas 80/443 e DNS (resolvedor público)"
+  for p in 80 443; do
+    timeout 8 bash -c "echo > /dev/tcp/${VPS_IP}/${p}" 2>/dev/null && echo "porta ${p}: aberta" || echo "porta ${p}: fechada/sem resposta"
+  done
+
+  titulo "6. Containers (via API do Dokploy: nome, estado)"
+  code=$(dokploy GET /api/docker.getContainers)
+  if [ "$code" = 200 ]; then
+    jq -r '.[] | "\(.name // .Names // "?")\t\(.state // .State // "?")\t\(.status // .Status // "")"' /tmp/dk.json \
+      | sort | column -t -s $'\t' 2>/dev/null
+  else echo "docker.getContainers -> HTTP $code"; fi
+
+  titulo "7. Domínios cadastrados"
+  coletar_dominios
+  while IFS=$'\t' read -r h n https cert; do
+    ip=$(dig +short +time=3 +tries=1 A "$h" @1.1.1.1 | tail -1)
+    printf '%-40s %-20s https=%-5s cert=%-12s A=%s\n' "$h" "$n" "$https" "$cert" "${ip:-?}"
+  done < /tmp/dominios.tsv
+
+  titulo "8. Deploys das últimas 36 h (todas as apps) — builds simultâneos?"
+  : > /tmp/deploys.tsv
+  desde=$(date -u -d '36 hours ago' +%Y-%m-%dT%H:%M)
+  while IFS=$'\t' read -r t id n _ _; do
+    case "$t" in compose|application) ;; *) continue ;; esac
+    [ "$(dokploy GET "/api/deployment.all?${t}Id=$id")" = 200 ] || continue
+    jq -r --arg n "$n" --arg d "$desde" '.[]? | select(.createdAt >= $d)
+      | "\(.createdAt)\t\(.finishedAt // "-")\t\(.status)\t\($n)\t\(.title // "" | .[0:70])"' /tmp/dk.json >> /tmp/deploys.tsv
+  done < /tmp/inventario.tsv
+  sort /tmp/deploys.tsv | column -t -s $'\t' 2>/dev/null || sort /tmp/deploys.tsv
 }
 
 reiniciar() {
@@ -225,6 +268,16 @@ REMOTO
   for alvo in "${lista[@]}"; do
     tipo="${alvo%%:*}"; id="${alvo#*:}"; tipo="${tipo// /}"; id="${id// /}"
     titulo "${tipo} ${id}"
+    if [ "$tipo" = traefik ]; then
+      code=$(dokploy POST /api/settings.reloadTraefik '{}')
+      echo "POST settings.reloadTraefik -> HTTP ${code}"
+      sleep 20
+      for p in 80 443; do
+        timeout 8 bash -c "echo > /dev/tcp/${VPS_IP}/${p}" 2>/dev/null && echo "porta ${p}: aberta" || echo "porta ${p}: fechada"
+      done
+      case "$code" in 2*) ;; *) falhas=$((falhas+1)) ;; esac
+      continue
+    fi
     case "$tipo" in
       compose|application) rota="${tipo}.deploy" ;;
       postgres|redis|mysql|mariadb|mongo) rota="${tipo}.start" ;;
@@ -246,16 +299,17 @@ REMOTO
 
 provar() {
   inventario >/dev/null 2>&1 || true
+  coletar_dominios
   {
-    [ -s /tmp/inventario.tsv ] && cut -f5 /tmp/inventario.tsv | tr ' ' '\n'
+    cut -f1 /tmp/dominios.tsv
     printf '%s\n' consultoriaflowfoods.com.br www.consultoriaflowfoods.com.br
     [ -n "${EXTRAS:-}" ] && tr ',' '\n' <<<"$EXTRAS"
-  } | sed '/^$/d' | sort -u > /tmp/dominios
+  } | sed -E 's#^https?://##; s#/.*##; /^$/d' | sort -u > /tmp/dominios
   linha_tab="| Domínio | DNS → | HTTP | Certificado | Emissor | Vence em | Status |"
   { echo "### Prova site por site"; echo; echo "$linha_tab"; echo "|---|---|---|---|---|---|---|"; } >> "$RESUMO"
   echo "$linha_tab"
   while read -r d; do
-    ip=$(dig +short A "$d" | tail -1)
+    ip=$(dig +short +time=3 +tries=1 A "$d" @1.1.1.1 | tail -1)
     http=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$d" || true)
     cert=$(echo | timeout 15 openssl s_client -connect "$d:443" -servername "$d" 2>/dev/null \
              | openssl x509 -noout -subject -issuer -enddate -ext subjectAltName 2>/dev/null)
