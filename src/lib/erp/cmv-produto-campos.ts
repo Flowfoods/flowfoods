@@ -227,3 +227,42 @@ export function parcelasEmTexto(canal: CanalVenda, parcelas: readonly ParcelaDoR
 
 /** O rótulo do resultado: nunca "lucro líquido" (aluguel, equipe e impostos não entram). */
 export const ROTULO_DO_RESULTADO = 'Resultado após os custos informados';
+
+// ------------------------------------------------------------------ retrato
+
+const SUFIXO: Record<CanalVenda, string> = { LOJA: 'Loja', DELIVERY_PROPRIO: 'Delivery', IFOOD: 'Ifood' };
+
+/** Campos do histórico de cada canal pela meta de CMV (`precoLoja`, `cmvLoja`, `resultadoLoja`, `fisicoLoja`). */
+export const camposDoCmv = (c: CanalVenda) => ({ preco: `preco${SUFIXO[c]}`, cmv: `cmv${SUFIXO[c]}`, resultado: `resultado${SUFIXO[c]}`, custo: `fisico${SUFIXO[c]}` });
+
+/** "20,0%" a partir de pontos-base exatos (uma casa, metade para longe do zero). */
+export function porcentagemDoCmv(bp: Fracao): string {
+  const negativo = bp.num < 0n;
+  const n = negativo ? -bp.num : bp.num;
+  const decimos = (2n * n + 10n * bp.den) / (20n * bp.den);
+  const t = `${(decimos / 10n).toLocaleString('pt-BR')},${decimos % 10n}%`;
+  return negativo && decimos > 0n ? `−${t}` : t;
+}
+
+const reaisComSinal = (f: Fracao) => (f.num < 0n ? `−${formatarFracao({ num: -f.num, den: f.den })}` : formatarFracao(f));
+
+/**
+ * Retrato da precificação para o histórico (N.2): por canal, o preço DEFINIDO ("não definido" quando vazio — a
+ * sugestão não é preço praticado), o CMV com a meta e o farol, o resultado após os custos informados e o custo físico
+ * naquele instante. Nada é "lucro".
+ */
+export function retratoDoCmv(contas: readonly CmvDoCanal[]): Record<string, string> {
+  const r: Record<string, string> = {};
+  for (const c of contas) {
+    const k = camposDoCmv(c.canal);
+    r[k.preco] = c.precoCentavos === null ? 'não definido' : formatarFracao({ num: BigInt(c.precoCentavos), den: 1n });
+    r[k.cmv] = !c.cmvBp
+      ? `sem dados (${c.motivo ?? 'dados insuficientes'})`
+      : c.metaBp === null
+      ? `${porcentagemDoCmv(c.cmvBp)} (sem meta)`
+      : `${porcentagemDoCmv(c.cmvBp)} (meta ${formatarPontosBase(c.metaBp)}, ${STATUS_DO_CMV[c.status].rotulo})`;
+    r[k.resultado] = c.resultado.tipo === 'ok' ? `${reaisComSinal(c.resultado.valor)} (${porcentagemDoCmv(c.resultado.bp)})` : `pendente (${c.resultado.motivo})`;
+    r[k.custo] = c.fisico.completo ? formatarFracao(c.fisico.valor) : `incompleto (${formatarFracao(c.fisico.valor)} sem ${c.fisico.falta.map((n) => `“${n}”`).join(', ')})`;
+  }
+  return r;
+}

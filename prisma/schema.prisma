@@ -1447,6 +1447,9 @@ model CanalConfig {
   // CHECK 0..10000 e comissão + pagamento < 10000. Ver decisão 81.
   taxaPagamentoBp    Int          @default(0)
   margemAlvoPadraoBp Int?
+  // N.2: meta de CMV do canal, em pontos-base (30% = 3000). Comanda o preço sugerido (custo físico ÷ meta) e o
+  // farol da ficha. Null = sem meta. CHECK 1..9999. A margem-alvo acima fica como registro antigo, sem uso na sugestão.
+  metaCmvPadraoBp    Int?
   ativo              Boolean      @default(true)
   atualizadoEm       DateTime     @updatedAt
 

@@ -20,51 +20,38 @@ import {
   TIPOS_DE_FICHA,
   type FiltrosDeFicha,
 } from '@/lib/erp/ficha-campos';
-import { formatarFracao } from '@/lib/erp/unidades';
+import { formatarDinheiro, formatarFracao, formatarPontosBase } from '@/lib/erp/unidades';
 import { CAMPO, MARCAR } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { Miniatura } from './miniatura';
 import { CANAIS } from '@/lib/erp/canal-campos';
-import { FAROL, formatarPorcentagem, type PrecoDoCanal } from '@/lib/erp/preco-campos';
+import { porcentagemDoCmv, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
 
-/** 1.10: a margem líquida de um canal na lista — o número, e a palavra quando sai do alvo (nunca só a cor). */
-function MargemNaLista({ p }: { p: PrecoDoCanal }) {
-  if (!p.margens) return p.porQue && p.preco ? <span className="text-[12px] text-atencao">incompleta</span> : <span className="text-suave">—</span>;
-  const f = p.margens.farol;
-  // Sem preço próprio vale o sugerido, que fica no alvo por construção: número em cinza, sem farol.
-  if (p.preco?.origem === 'sugerido') {
-    return (
-      <span className="text-suave">
-        {formatarPorcentagem(p.margens.liquidaBp)}
-        <span className="sr-only"> pelo preço sugerido</span>
-      </span>
-    );
-  }
+/**
+ * N.2: o CMV de um canal na lista — o preço que a pessoa definiu, o CMV a esse preço e o farol EM PALAVRA (nunca só a
+ * cor), independente em cada canal. Sem dados diz por quê; canal sem preço definido não ganha farol.
+ */
+function CmvNaLista({ x }: { x: CmvDoCanal }) {
+  const st = STATUS_DO_CMV[x.status];
+  const cor = x.status === 'dentro' ? 'text-ok' : x.status === 'acima' ? 'text-atencao' : 'text-suave';
   return (
-    <>
-      <span className={f === 'prejuizo' ? 'text-erro font-semibold' : 'font-semibold text-texto'}>{formatarPorcentagem(p.margens.liquidaBp)}</span>
-      {f && f !== 'noAlvo' && <span className={`block text-[12px] ${f === 'prejuizo' ? 'text-erro' : 'text-atencao'}`}>{FAROL[f].rotulo}</span>}
-    </>
+    <span className="block" title={x.motivo ?? undefined}>
+      {x.cmvBp ? <span className="font-semibold text-texto">{porcentagemDoCmv(x.cmvBp)}</span> : <span className="text-suave">—</span>}
+      <span className={`block text-[12px] font-medium ${cor}`}>{st.rotulo}</span>
+      <span className="block whitespace-nowrap text-[12px] text-suave">{x.precoCentavos !== null ? formatarDinheiro(x.precoCentavos) : 'sem preço'}</span>
+      <span className="block whitespace-nowrap text-[12px] text-suave">{x.metaBp !== null ? `meta ${formatarPontosBase(x.metaBp)}` : 'sem meta'}</span>
+    </span>
   );
 }
 
-/**
- * Celular e tablet: só os canais FORA do alvo, com o número e a palavra; o
- * resto resumido ("iFood 30,6% abaixo do alvo; os outros no alvo").
- */
-function margemEmLinha(precos: readonly PrecoDoCanal[]): string | null {
-  if (precos.every((p) => !p.margens && !p.preco)) return null;
-  const fora = precos.filter((p) => (p.margens && p.preco?.origem === 'proprio' && p.margens.farol && p.margens.farol !== 'noAlvo') || (!p.margens && p.porQue && p.preco));
-  const noAlvo = precos.filter((p) => p.margens && !fora.includes(p));
-  const semPreco = precos.filter((p) => !p.margens && !fora.includes(p));
-  const partes = fora.map((p) =>
-    p.margens ? `${CANAIS[p.canal].curto} ${formatarPorcentagem(p.margens.liquidaBp)} ${FAROL[p.margens.farol!].rotulo}` : `${CANAIS[p.canal].curto} incompleta`,
+/** Celular e tablet: cada canal com o CMV e a palavra do farol ("CMV: Loja 20,0% dentro da meta; iFood sem dados"). */
+function cmvEmLinha(contas: readonly CmvDoCanal[]): string {
+  const partes = contas.map((x) =>
+    x.cmvBp ? `${CANAIS[x.canal].curto} ${porcentagemDoCmv(x.cmvBp)} ${STATUS_DO_CMV[x.status].rotulo}` : `${CANAIS[x.canal].curto} ${STATUS_DO_CMV[x.status].rotulo}`,
   );
-  if (noAlvo.length) partes.push(fora.length ? (noAlvo.length === 1 ? `${CANAIS[noAlvo[0].canal].curto} no alvo` : 'os outros no alvo') : 'no alvo nos canais com preço');
-  if (semPreco.length) partes.push(`${semPreco.map((p) => CANAIS[p.canal].curto).join(' e ')} sem preço`);
-  return `Margem líquida: ${partes.join('; ')}`;
+  return `CMV: ${partes.join('; ')}`;
 }
 
 function hrefCom(base: string, f: FiltrosDeFicha, mudar: Partial<FiltrosDeFicha>): string {
@@ -151,7 +138,7 @@ export function TelaListaFichas({
   paginas,
   novaHref,
   importarHref,
-  precos,
+  cmv: precos,
 }: {
   /** /erp/fichas ou /rodolfo/erp/<slug>/fichas */
   base: string;
@@ -163,8 +150,8 @@ export function TelaListaFichas({
   /** Quem cria (e não está bloqueado) vê os atalhos no vazio. */
   novaHref?: string;
   importarHref?: string;
-  /** 1.10: preço e margem por canal das fichas de prato (só para quem vê preços). */
-  precos?: ReadonlyMap<string, PrecoDoCanal[]>;
+  /** N.2: preço, CMV e farol por canal das fichas de prato (só para quem vê preços; nem sai do servidor para os outros). */
+  cmv?: ReadonlyMap<string, CmvDoCanal[]>;
 }) {
   if (total === 0) {
     return (
@@ -225,9 +212,7 @@ export function TelaListaFichas({
                 </span>
                 {/* 1.5 (herança d): validade em linha própria, quebrando em vez de cortar. */}
                 {validadesEmTexto(l.validades) && <span className="mt-0.5 block text-[12px] leading-snug text-suave">{validadesEmTexto(l.validades)}</span>}
-                {precos?.get(l.id) && margemEmLinha(precos.get(l.id)!) && (
-                  <span className="mt-0.5 block text-[12px] leading-snug tabular-nums text-suave">{margemEmLinha(precos.get(l.id)!)}</span>
-                )}
+                {precos?.get(l.id) && <span className="mt-0.5 block text-[12px] leading-snug tabular-nums text-suave">{cmvEmLinha(precos.get(l.id)!)}</span>}
               </span>
               <span className="shrink-0 text-right text-sm tabular-nums">
                 <CustoPorRende l={l} empilhado />
@@ -246,7 +231,7 @@ export function TelaListaFichas({
             <tr className="hidden bg-forte text-[12px] text-suave lg:table-row">
               <td colSpan={4} />
               <th scope="colgroup" colSpan={3} className="border-b border-linha px-3 pr-5 pt-2 text-center font-semibold">
-                Margem líquida
+                CMV ao seu preço
               </th>
             </tr>
           )}
@@ -269,7 +254,7 @@ export function TelaListaFichas({
             {precos &&
               (['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] as const).map((c) => (
                 <th key={c} scope="col" className="hidden h-10 px-3 text-right font-semibold lg:table-cell">
-                  <span className="sr-only">Margem líquida no </span>
+                  <span className="sr-only">CMV no </span>
                   {CANAIS[c].curto}
                 </th>
               ))}
@@ -298,9 +283,7 @@ export function TelaListaFichas({
                       <span className={precos ? '' : 'lg:hidden'}>{!l.ativa && ' · Desativada'}</span>
                     </div>
                     {validadesEmTexto(l.validades) && <div className="text-[12px] leading-snug text-suave">{validadesEmTexto(l.validades)}</div>}
-                    {precos?.get(l.id) && margemEmLinha(precos.get(l.id)!) && (
-                      <div className="text-[12px] leading-snug tabular-nums text-suave lg:hidden">{margemEmLinha(precos.get(l.id)!)}</div>
-                    )}
+                    {precos?.get(l.id) && <div className="text-[12px] leading-snug tabular-nums text-suave lg:hidden">{cmvEmLinha(precos.get(l.id)!)}</div>}
                   </div>
                 </div>
               </td>
@@ -322,9 +305,9 @@ export function TelaListaFichas({
               </td>
               {precos &&
                 (precos.get(l.id) ? (
-                  precos.get(l.id)!.map((p) => (
-                    <td key={p.canal} className="hidden whitespace-nowrap px-3 py-2 text-right last:pr-5 lg:table-cell">
-                      <MargemNaLista p={p} />
+                  precos.get(l.id)!.map((x) => (
+                    <td key={x.canal} className="hidden px-2.5 py-2 text-right align-top last:pr-5 lg:table-cell">
+                      <CmvNaLista x={x} />
                     </td>
                   ))
                 ) : (
@@ -342,8 +325,8 @@ export function TelaListaFichas({
 
       {precos && (
         <p className="hidden border-t border-linha px-5 py-2.5 text-[12px] text-suave lg:block">
-          Margem líquida = o que sobra do preço depois dos insumos, das embalagens e da taxa do canal. Em cinza: sem preço próprio (vale o sugerido, que
-          fica no alvo).
+          CMV = custo físico (insumos + embalagens do canal) ÷ o preço que você definiu; a taxa do iFood fica fora. Cada canal tem o seu farol. Sem
+          preço definido ou sem meta: sem dados (a sugestão não conta como preço).
         </p>
       )}
       <Paginacao

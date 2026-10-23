@@ -2,36 +2,31 @@
 
 // Scanner avoid-ai-design, SD4d (P2) aceito: "1 un · R$ 0,89" e "a cada R$ 10,00: R$ 2,62" são a linha de apoio da tabela densa (Kairu Corporativo), no padrão "A · B" das telas da 1.1–1.9. (O ignore do scanner não aceita id com minúscula.)
 /**
- * "Preço e margem por canal" no detalhe da ficha de PRATO (1.9 → 1.10), o
- * MESMO no nível 1 e na pessoa do parceiro. Tabela densa com os canais nas
- * colunas (Loja · Delivery · iFood): primeiro o que entra no custo (insumos,
- * embalagens, a taxa do iFood — em R$ quando há preço — e o custo do canal);
- * depois a margem-alvo, o preço sugerido com a conta, o preço de venda (campo,
- * só para quem muda preços), a margem bruta e a líquida em R$ e %, e o farol
- * com a palavra. No celular, um bloco por canal.
+ * "Preço e CMV por canal" no detalhe da ficha de PRATO (1.9 → 1.10 → N.2), o MESMO no nível 1 e na pessoa do parceiro.
+ * Tabela densa com os canais nas colunas (Loja · Delivery · iFood): primeiro o CUSTO FÍSICO (insumos + embalagens do
+ * canal: a base do CMV) e, separada, a taxa do iFood; depois a meta de CMV, o preço sugerido (custo físico ÷ meta), o
+ * preço de venda (campo, só para quem muda preços), o CMV com o farol (dentro · acima · sem dados) e o resultado após
+ * os custos informados (nunca "lucro líquido"). No celular, um bloco por canal.
  *
- * Ao vivo: cada tecla no preço refaz a conta com a MESMA função do servidor
- * (`precoDoCanal`). É prévia: o formulário manda só o texto do preço, e o
- * servidor recalcula tudo ao salvar. Incompleto nunca vira número.
+ * Ao vivo: cada tecla no preço refaz a conta com a MESMA função do servidor (`cmvDoCanal`). É prévia: o formulário
+ * manda só o texto do preço, e o servidor recalcula tudo ao salvar. Faltar custo, meta ou preço nunca vira número nem
+ * farol positivo: é "sem dados", com o motivo. A sugestão não é preço: vazio = preço não definido.
  */
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useFormState } from 'react-dom';
-import { CANAIS, contaDaTaxa, ORDEM_DOS_CANAIS, porQueIncompleto, taxaACadaDezReais, type CamadasDoCanal, type CanalVenda } from '@/lib/erp/canal-campos';
+import { camadasDoCanal, CANAIS, contaDaTaxa, ORDEM_DOS_CANAIS, taxaACadaDezReais, taxaSobrePreco, type CamadasDoCanal, type CanalVenda } from '@/lib/erp/canal-campos';
 import {
-  contaDoSugerido,
-  divisorDoSugerido,
-  entradaDaTela,
-  FAROL,
-  formatarPorcentagem,
-  formatarReaisComSinal,
-  LIMITES_DO_PRECO,
-  lerPrecos,
-  precoDoCanal,
-  type EntradaEmTexto,
-  type PrecoDoCanal,
-} from '@/lib/erp/preco-campos';
+  cmvDoCanal,
+  contaDoSugeridoPorCmv,
+  parcelasEmTexto,
+  porcentagemDoCmv,
+  ROTULO_DO_RESULTADO,
+  STATUS_DO_CMV,
+  type CmvDoCanal,
+} from '@/lib/erp/cmv-produto-campos';
+import { entradaDaTela, LIMITES_DO_PRECO, lerPrecos, type EntradaEmTexto } from '@/lib/erp/preco-campos';
 import { ACIMA_DO_LIMITE, dinheiroParaCampo, formatarDinheiro, formatarFracao, formatarPontosBase, formatarQuantidade, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO } from '../../ui/campos';
@@ -44,7 +39,8 @@ import { ErroGeral, useAvisoDeSaida } from '../cadastro/erros';
 /** O que o servidor manda (BigInt em texto). */
 export interface PrecosParaTela {
   entradas: EntradaEmTexto[];
-  margensAlvo: Record<CanalVenda, number | null>;
+  /** N.2: a meta de CMV de cada canal (null = sem meta). */
+  metasDeCmv: Record<CanalVenda, number | null>;
   precosProprios: Record<CanalVenda, number | null>;
   impressaoDosPrecos: string;
   impressaoDosCustos: string;
@@ -93,8 +89,8 @@ function ValorDaEmbalagem({ e }: { e: Embalagem | undefined }) {
   );
 }
 
-function Taxa({ p, linkDosCanais }: { p: PrecoDoCanal; linkDosCanais?: string }) {
-  const c = p.camadas;
+/** A taxa do canal: fora do CMV, em R$ quando há preço definido. */
+function Taxa({ c, preco, linkDosCanais }: { c: CamadasDoCanal; preco: number | null; linkDosCanais?: string }) {
   if (c.taxa.tipo === 'nenhuma') return TRACO;
   if (c.taxa.tipo === 'naoConfigurada') {
     return (
@@ -108,12 +104,12 @@ function Taxa({ p, linkDosCanais }: { p: PrecoDoCanal; linkDosCanais?: string })
       </>
     );
   }
-  if (c.taxa.valor && p.preco) {
+  if (preco !== null) {
     return (
       <>
-        <span className="text-texto">{formatarFracao(c.taxa.valor)}</span>
+        <span className="text-texto">{formatarFracao(taxaSobrePreco(preco, c.taxa.totalBp))}</span>
         <span className="block text-[12px] text-suave">
-          {formatarPontosBase(c.taxa.totalBp)} de {reais(p.preco.centavos)}
+          {formatarPontosBase(c.taxa.totalBp)} de {reais(preco)}
         </span>
       </>
     );
@@ -126,14 +122,12 @@ function Taxa({ p, linkDosCanais }: { p: PrecoDoCanal; linkDosCanais?: string })
   );
 }
 
-function CustoDoCanal({ c }: { c: CamadasDoCanal }) {
+/** Custo físico (insumos + embalagens): a base do CMV. Incompleto mostra a parte conhecida, identificada. */
+function CustoFisico({ x }: { x: CmvDoCanal }) {
   return (
     <>
-      <span className={`font-semibold ${c.incompleto ? 'text-atencao' : 'text-texto'}`}>{formatarFracao(c.total ?? c.semTaxa)}</span>
-      {c.taxa.tipo === 'sobrePreco' && !c.total && (
-        <span className="block text-[12px] font-normal text-suave">+ {formatarPontosBase(c.taxa.totalBp)} do preço</span>
-      )}
-      {c.incompleto && (
+      <span className={`font-semibold ${x.fisico.completo ? 'text-texto' : 'text-atencao'}`}>{formatarFracao(x.fisico.valor)}</span>
+      {!x.fisico.completo && (
         <span className="mt-1 block">
           <Selo tom="alerta">Incompleto</Selo>
         </span>
@@ -142,11 +136,11 @@ function CustoDoCanal({ c }: { c: CamadasDoCanal }) {
   );
 }
 
-function MargemAlvo({ p, linkDosCanais }: { p: PrecoDoCanal; linkDosCanais?: string }) {
-  if (p.margemAlvoBp !== null) return <span className="text-texto">{formatarPontosBase(p.margemAlvoBp)}</span>;
+function MetaDeCmv({ x, linkDosCanais }: { x: CmvDoCanal; linkDosCanais?: string }) {
+  if (x.metaBp !== null) return <span className="text-texto">{formatarPontosBase(x.metaBp)}</span>;
   return (
     <>
-      <span className="text-suave">sem alvo</span>
+      <span className="text-suave">sem meta</span>
       {linkDosCanais && (
         <Link href={linkDosCanais} className={`mt-0.5 block text-[12px] ${LINK_DE_TEXTO}`}>
           Definir
@@ -156,20 +150,23 @@ function MargemAlvo({ p, linkDosCanais }: { p: PrecoDoCanal; linkDosCanais?: str
   );
 }
 
-function Sugerido({ p, usar }: { p: PrecoDoCanal; usar?: (centavos: number) => void }) {
-  const s = p.sugerido;
-  if (s.tipo === 'incompleto') return <Selo tom="alerta">Incompleto</Selo>;
-  if (s.tipo === 'semAlvo') return TRACO;
-  if (s.tipo === 'inviavel') return <span className="text-[13px] text-atencao">não fecha: taxa + alvo = {formatarPontosBase(s.somaBp)}</span>;
+function Sugerido({ x, usar }: { x: CmvDoCanal; usar?: (centavos: number) => void }) {
+  const s = x.sugerido;
+  if (s.tipo === 'incompleto') return <Selo tom="alerta">Custo incompleto</Selo>;
+  if (s.tipo === 'semMeta') return TRACO;
+  if (s.tipo === 'semCusto') return <span className="text-[13px] text-suave">sem custo</span>;
   if (s.tipo === 'acimaDoLimite') return <span className="text-atencao">{ACIMA_DO_LIMITE}</span>;
   return (
     <>
       <span className="font-semibold text-texto">{reais(s.centavos)}</span>
-      <span className="block text-[12px] text-suave" title={contaDoSugerido(p.semTaxa, p.taxaBp, p.margemAlvoBp!, s)}>
-        {formatarFracao(p.semTaxa)} ÷ {divisorDoSugerido(p.taxaBp, p.margemAlvoBp!)}
-      </span>
-      {usar && s.cardapio !== s.centavos && s.cardapio <= LIMITES_DO_PRECO.centavos && (
-        <button type="button" onClick={() => usar(s.cardapio)} className={`mt-0.5 min-h-8 text-[12px] ${LINK_DE_TEXTO}`}>
+      <span className="block text-[12px] text-suave">{contaDoSugeridoPorCmv(x.fisico.valor, x.metaBp!, s).replace(/ = .*$/, '')}</span>
+      {usar && x.precoCentavos !== s.centavos && (
+        <button type="button" onClick={() => usar(s.centavos)} className={`mt-0.5 block min-h-8 w-full text-right text-[12px] ${LINK_DE_TEXTO}`}>
+          usar {reais(s.centavos)}
+        </button>
+      )}
+      {usar && s.cardapio !== s.centavos && s.cardapio <= LIMITES_DO_PRECO.centavos && x.precoCentavos !== s.cardapio && (
+        <button type="button" onClick={() => usar(s.cardapio)} className={`block min-h-8 w-full text-right text-[12px] ${LINK_DE_TEXTO}`}>
           usar {reais(s.cardapio)}
         </button>
       )}
@@ -177,28 +174,40 @@ function Sugerido({ p, usar }: { p: PrecoDoCanal; usar?: (centavos: number) => v
   );
 }
 
-/** Margem em R$ (forte) e % embaixo; o farol com a palavra (só na líquida). */
-function Margem({ p, qual }: { p: PrecoDoCanal; qual: 'bruta' | 'liquida' }) {
-  if (!p.margens) return p.porQue && p.preco ? <Selo tom="alerta">Incompleta</Selo> : TRACO;
-  const valor = qual === 'bruta' ? p.margens.bruta : p.margens.liquida;
-  const bp = qual === 'bruta' ? p.margens.brutaBp : p.margens.liquidaBp;
-  const farol = qual === 'liquida' ? p.margens.farol : null;
+/** O CMV ao preço definido, com o farol em palavra (nunca só a cor); sem dados diz o que falta. */
+function Cmv({ x }: { x: CmvDoCanal }) {
+  const st = STATUS_DO_CMV[x.status];
   return (
     <>
-      <span className={`${qual === 'liquida' ? 'text-[15px] font-semibold' : ''} ${valor.num < 0n ? 'text-erro' : 'text-texto'}`}>{formatarReaisComSinal(valor)}</span>
-      <span className="block text-[12px] text-suave">{formatarPorcentagem(bp)} do preço</span>
-      {farol && (
+      {x.cmvBp ? <span className="text-[15px] font-semibold text-texto">{porcentagemDoCmv(x.cmvBp)}</span> : TRACO}
+      <span className="mt-1 block">
+        <Selo tom={st.tom}>{st.rotulo}</Selo>
+      </span>
+      {x.motivo && <span className="mt-1 block max-w-[12rem] whitespace-normal text-[12px] text-suave sm:ml-auto">{x.motivo}</span>}
+    </>
+  );
+}
+
+/** Resultado após os custos informados: R$ e %, e quais parcelas entraram. Pendente diz por quê. */
+function Resultado({ x }: { x: CmvDoCanal }) {
+  const r = x.resultado;
+  if (r.tipo === 'pendente') return <span className="block max-w-[12rem] whitespace-normal text-[12px] text-suave sm:ml-auto">{r.motivo}</span>;
+  const valor = r.negativo ? `−${formatarFracao({ num: -r.valor.num, den: r.valor.den })}` : formatarFracao(r.valor);
+  return (
+    <>
+      <span className={`text-[15px] font-semibold ${r.negativo ? 'text-erro' : 'text-texto'}`}>{valor}</span>
+      <span className="block text-[12px] text-suave">{porcentagemDoCmv(r.bp)} do preço</span>
+      <span className="block max-w-[12rem] whitespace-normal text-[12px] text-suave sm:ml-auto">menos {parcelasEmTexto(x.canal, r.parcelas)}</span>
+      {r.negativo && (
         <span className="mt-1 block">
-          <Selo tom={FAROL[farol].tom} cheio={farol === 'prejuizo'}>
-            {FAROL[farol].rotulo}
+          <Selo tom="erro" cheio>
+            resultado negativo
           </Selo>
         </span>
       )}
     </>
   );
 }
-
-const origemDoPreco = (p: PrecoDoCanal) => (!p.preco ? 'sem preço' : p.preco.origem === 'proprio' ? 'seu preço' : 'o sugerido');
 
 export function PrecoEMargemPorCanal(props: Props) {
   if (props.acao) return <ComFormulario {...props} acao={props.acao} />;
@@ -237,24 +246,22 @@ function Conteudo({
     const t = textos[e.canal].trim();
     // A MESMA leitura do servidor (e a mesma frase de erro).
     const lido = lerPrecos({ [e.canal]: t });
-    const p = precoDoCanal(e, { margemAlvoBp: dados.margensAlvo[e.canal], precoProprioCentavos: lido.ok ? lido.dados[e.canal] : null });
-    return { p, erro: lido.ok ? undefined : lido.erros[`preco-${e.canal}`], digitado: !!t };
+    const x = cmvDoCanal(e, { metaBp: dados.metasDeCmv[e.canal], precoCentavos: lido.ok ? lido.dados[e.canal] : null });
+    return { x, c: camadasDoCanal(e), erro: lido.ok ? undefined : lido.erros[`preco-${e.canal}`], digitado: !!t };
   });
-  const precos = contas.map((x) => x.p);
-  const camadas = precos.map((p) => p.camadas);
+  const cmvs = contas.map((k) => k.x);
+  const camadas = contas.map((k) => k.c);
   const linhas = linhasDasEmbalagens(camadas);
-  const ifood = precos.find((p) => p.canal === 'IFOOD')!;
-  const motivos = precos.map((p) => ({ p, por: porQueIncompleto(p.camadas) })).filter((x) => x.por);
-  const semEmbalagem = precos.filter((p) => p.canal !== 'LOJA' && p.camadas.embalagens.length === 0).map((p) => CANAIS[p.canal].rotulo);
+  const ifood = camadas.find((c) => c.canal === 'IFOOD')!;
+  const semEmbalagem = camadas.filter((c) => c.canal !== 'LOJA' && c.embalagens.length === 0).map((c) => CANAIS[c.canal].rotulo);
   const configurar = podeConfigurar ? linkDosCanais : undefined;
   const mudar = (canal: CanalVenda, v: string) => setTextos((t) => ({ ...t, [canal]: v }));
   const usar = (canal: CanalVenda) => (centavos: number) => mudar(canal, dinheiroParaCampo(centavos));
 
   const campoDoPreco = (canal: CanalVenda, i: number, sufixo: string, largura: string) => {
-    const x = contas[i];
+    const k = contas[i];
     const id = `preco-${canal}${sufixo}`;
-    const erro = erros[`preco-${canal}`] ?? x.erro;
-    const sugerido = x.p.sugerido.tipo === 'ok' ? x.p.sugerido.centavos : null;
+    const erro = erros[`preco-${canal}`] ?? k.erro;
     return (
       <>
         <label htmlFor={id} className="sr-only">
@@ -267,7 +274,7 @@ function Conteudo({
             inputMode="decimal"
             autoComplete="off"
             value={textos[canal]}
-            placeholder={sugerido !== null ? dinheiroParaCampo(sugerido) : '0,00'}
+            placeholder="0,00"
             onChange={(e) => mudar(canal, e.target.value)}
             className={`${CAMPO} min-h-11 text-right text-base font-semibold tabular-nums sm:text-sm`}
             aria-invalid={!!erro}
@@ -275,7 +282,7 @@ function Conteudo({
           />
         </div>
         <span id={`${id}-ajuda`} className="mt-1 block text-[12px] text-suave">
-          {x.digitado ? 'seu preço' : sugerido !== null ? 'vazio = o sugerido' : 'sem preço'}
+          {k.digitado ? 'seu preço' : 'não definido'}
         </span>
         {erro && (
           <span id={`${id}-erro`} className="mt-0.5 block whitespace-normal text-[12px] text-erro">
@@ -286,15 +293,8 @@ function Conteudo({
     );
   };
 
-  const precoLido = (p: PrecoDoCanal) =>
-    p.preco ? (
-      <>
-        <span className="text-[15px] font-semibold text-texto">{reais(p.preco.centavos)}</span>
-        <span className="block text-[12px] text-suave">{origemDoPreco(p)}</span>
-      </>
-    ) : (
-      <span className="text-suave">sem preço</span>
-    );
+  const precoLido = (x: CmvDoCanal) =>
+    x.precoCentavos !== null ? <span className="text-[15px] font-semibold text-texto">{reais(x.precoCentavos)}</span> : <span className="text-suave">não definido</span>;
 
   const th = 'h-10 px-3 text-right font-semibold';
   const td = 'whitespace-nowrap px-3 py-2.5 text-right align-top';
@@ -302,8 +302,8 @@ function Conteudo({
   return (
     <Painel
       className={className}
-      titulo="Preço e margem por canal"
-      subtitulo="Uma porção: o que entra no custo de cada canal, o preço e o que sobra"
+      titulo="Preço e CMV por canal"
+      subtitulo="Uma porção: o custo físico de cada canal, a meta de CMV, o preço e o que sobra depois dos custos informados"
       semRespiro
       acessorio={
         linkDasEmbalagens ? (
@@ -321,15 +321,15 @@ function Conteudo({
 
       {/* Desktop e tablet: canais nas colunas (Kairu Corporativo). */}
       <table className="hidden w-full text-sm sm:table">
-        <caption className="sr-only">Custo, preço e margem de uma porção em cada canal de venda.</caption>
+        <caption className="sr-only">Custo físico, taxa, meta de CMV, preço, CMV e resultado de uma porção em cada canal de venda.</caption>
         <thead>
           <tr className="bg-forte text-[12px] text-suave">
             <th scope="col" className="h-10 pl-5 pr-3 text-left font-semibold">
-              O que entra
+              Uma porção
             </th>
-            {precos.map((p) => (
-              <th key={p.canal} scope="col" className={`${th} last:pr-5`}>
-                {CANAIS[p.canal].curto}
+            {cmvs.map((x) => (
+              <th key={x.canal} scope="col" className={`${th} last:pr-5`}>
+                {CANAIS[x.canal].curto}
               </th>
             ))}
           </tr>
@@ -371,26 +371,27 @@ function Conteudo({
               ))}
             </tr>
           ))}
-          <tr className="border-t border-linha">
-            <th scope="row" className={rotulo}>
-              Taxa do iFood
-              {ifood.camadas.taxa.tipo === 'sobrePreco' && (
-                <span className="block text-[12px] font-normal text-suave">{contaDaTaxa(ifood.camadas.taxa.taxa)}</span>
-              )}
+          <tr className="border-t border-linha-forte">
+            <th scope="row" className="h-11 py-2.5 pl-5 pr-3 text-left align-top font-semibold">
+              Custo físico
+              <span className="block text-[12px] font-normal text-suave">insumos + embalagens: a base do CMV</span>
             </th>
-            {precos.map((p) => (
-              <td key={p.canal} className={`${td} last:pr-5`}>
-                <Taxa p={p} linkDosCanais={configurar} />
+            {cmvs.map((x) => (
+              <td key={x.canal} className={`${td} last:pr-5`}>
+                <CustoFisico x={x} />
               </td>
             ))}
           </tr>
-          <tr className="border-t border-linha-forte">
-            <th scope="row" className="h-11 py-2.5 pl-5 pr-3 text-left align-top font-semibold">
-              Custo do canal
+          <tr className="border-t border-linha">
+            <th scope="row" className={rotulo}>
+              Taxa do iFood
+              <span className="block text-[12px] font-normal text-suave">
+                {ifood.taxa.tipo === 'sobrePreco' ? `${contaDaTaxa(ifood.taxa.taxa)} · fora do CMV` : 'fora do CMV'}
+              </span>
             </th>
-            {camadas.map((c) => (
+            {camadas.map((c, i) => (
               <td key={c.canal} className={`${td} last:pr-5`}>
-                <CustoDoCanal c={c} />
+                <Taxa c={c} preco={cmvs[i].precoCentavos} linkDosCanais={configurar} />
               </td>
             ))}
           </tr>
@@ -398,55 +399,56 @@ function Conteudo({
         <tbody className="tabular-nums">
           <tr className="border-t border-linha-forte bg-forte/50">
             <th scope="row" className={rotulo}>
-              Margem-alvo
-              <span className="block text-[12px] font-normal text-suave">o que deve sobrar, em % do preço</span>
+              Meta de CMV
+              <span className="block text-[12px] font-normal text-suave">custo físico, em % do preço</span>
             </th>
-            {precos.map((p) => (
-              <td key={p.canal} className={`${td} last:pr-5`}>
-                <MargemAlvo p={p} linkDosCanais={configurar} />
+            {cmvs.map((x) => (
+              <td key={x.canal} className={`${td} last:pr-5`}>
+                <MetaDeCmv x={x} linkDosCanais={configurar} />
               </td>
             ))}
           </tr>
           <tr className="border-t border-linha">
             <th scope="row" className={rotulo}>
               Preço sugerido
-              <span className="block text-[12px] font-normal text-suave">custo ÷ (1 − taxa − alvo), para cima</span>
+              <span className="block text-[12px] font-normal text-suave">custo físico ÷ meta, para cima</span>
             </th>
-            {precos.map((p) => (
-              <td key={p.canal} className={`${td} last:pr-5`}>
-                <Sugerido p={p} usar={editavel ? usar(p.canal) : undefined} />
+            {cmvs.map((x) => (
+              <td key={x.canal} className={`${td} last:pr-5`}>
+                <Sugerido x={x} usar={editavel ? usar(x.canal) : undefined} />
               </td>
             ))}
           </tr>
           <tr className="border-t border-linha">
             <th scope="row" className={rotulo}>
               Preço de venda
+              <span className="block text-[12px] font-normal text-suave">o que você cobra</span>
             </th>
-            {precos.map((p, i) => (
-              <td key={p.canal} className={`${td} last:pr-5`}>
-                {editavel ? campoDoPreco(p.canal, i, '', 'w-28') : precoLido(p)}
+            {cmvs.map((x, i) => (
+              <td key={x.canal} className={`${td} last:pr-5`}>
+                {editavel ? campoDoPreco(x.canal, i, '', 'w-28') : precoLido(x)}
               </td>
             ))}
           </tr>
           <tr className="border-t border-linha">
             <th scope="row" className={rotulo}>
-              Margem bruta
-              <span className="block text-[12px] font-normal text-suave">preço − insumos − embalagens</span>
+              CMV
+              <span className="block text-[12px] font-normal text-suave">custo físico ÷ preço de venda</span>
             </th>
-            {precos.map((p) => (
-              <td key={p.canal} className={`${td} last:pr-5`}>
-                <Margem p={p} qual="bruta" />
+            {cmvs.map((x) => (
+              <td key={x.canal} className={`${td} last:pr-5`} aria-live="polite">
+                <Cmv x={x} />
               </td>
             ))}
           </tr>
           <tr className="border-t border-linha">
             <th scope="row" className={rotulo}>
-              Margem líquida
-              <span className="block text-[12px] font-normal text-suave">bruta − taxa do canal</span>
+              {ROTULO_DO_RESULTADO}
+              <span className="block text-[12px] font-normal text-suave">não é lucro líquido</span>
             </th>
-            {precos.map((p) => (
-              <td key={p.canal} className={`${td} last:pr-5`} aria-live="polite">
-                <Margem p={p} qual="liquida" />
+            {cmvs.map((x) => (
+              <td key={x.canal} className={`${td} last:pr-5`} aria-live="polite">
+                <Resultado x={x} />
               </td>
             ))}
           </tr>
@@ -455,24 +457,21 @@ function Conteudo({
 
       {/* Celular: um bloco por canal, as mesmas linhas. */}
       <ol className="divide-y divide-linha sm:hidden">
-        {precos.map((p, i) => {
-          const c = p.camadas;
+        {cmvs.map((x, i) => {
+          const c = camadas[i];
+          const st = STATUS_DO_CMV[x.status];
           return (
-            <li key={p.canal} className="px-4 py-4">
+            <li key={x.canal} className="px-4 py-4">
               <div className="flex items-baseline justify-between gap-3">
-                <h3 className="text-[15px] font-semibold text-texto">{CANAIS[p.canal].rotulo}</h3>
-                {p.margens?.farol && (
-                  <Selo tom={FAROL[p.margens.farol].tom} cheio={p.margens.farol === 'prejuizo'}>
-                    {FAROL[p.margens.farol].rotulo}
-                  </Selo>
-                )}
+                <h3 className="text-[15px] font-semibold text-texto">{CANAIS[x.canal].rotulo}</h3>
+                <Selo tom={st.tom}>{st.rotulo}</Selo>
               </div>
               <dl className="mt-2 space-y-1.5 text-[13px] tabular-nums">
                 <div className="flex justify-between gap-3">
                   <dt className="text-suave">Insumos da receita</dt>
                   <dd>{formatarFracao(c.daFicha)}</dd>
                 </div>
-                {p.canal !== 'LOJA' && (
+                {x.canal !== 'LOJA' && (
                   <div className="flex justify-between gap-3">
                     <dt className="text-suave">
                       Embalagens
@@ -481,53 +480,46 @@ function Conteudo({
                     <dd className="shrink-0">{c.embalagens.length ? formatarFracao(c.embalagensTotal) : <span className="text-atencao">sem embalagem</span>}</dd>
                   </div>
                 )}
+                <div className="flex justify-between gap-3 border-t border-linha pt-1.5">
+                  <dt className="font-medium text-texto">Custo físico</dt>
+                  <dd className="text-right">
+                    <CustoFisico x={x} />
+                  </dd>
+                </div>
                 {c.taxa.tipo !== 'nenhuma' && (
                   <div className="flex justify-between gap-3">
-                    <dt className="text-suave">Taxa do iFood</dt>
+                    <dt className="text-suave">Taxa do iFood (fora do CMV)</dt>
                     <dd className="text-right">
-                      <Taxa p={p} linkDosCanais={configurar} />
+                      <Taxa c={c} preco={x.precoCentavos} linkDosCanais={configurar} />
                     </dd>
                   </div>
                 )}
-                <div className="flex justify-between gap-3 border-t border-linha pt-1.5">
-                  <dt className="font-medium text-texto">Custo do canal</dt>
-                  <dd className="text-right">
-                    <CustoDoCanal c={c} />
-                  </dd>
-                </div>
                 <div className="flex justify-between gap-3">
-                  <dt className="text-suave">Margem-alvo</dt>
+                  <dt className="text-suave">Meta de CMV</dt>
                   <dd className="text-right">
-                    <MargemAlvo p={p} linkDosCanais={configurar} />
+                    <MetaDeCmv x={x} linkDosCanais={configurar} />
                   </dd>
                 </div>
                 <div className="flex justify-between gap-3">
                   <dt className="text-suave">Preço sugerido</dt>
                   <dd className="text-right">
-                    <Sugerido p={p} usar={editavel ? usar(p.canal) : undefined} />
+                    <Sugerido x={x} usar={editavel ? usar(x.canal) : undefined} />
                   </dd>
                 </div>
                 <div className="flex items-start justify-between gap-3">
                   <dt className="pt-2.5 font-medium text-texto">Preço de venda</dt>
-                  <dd className="text-right">{editavel ? campoDoPreco(p.canal, i, '-m', 'w-32') : precoLido(p)}</dd>
+                  <dd className="text-right">{editavel ? campoDoPreco(x.canal, i, '-m', 'w-32') : precoLido(x)}</dd>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <dt className="text-suave">Margem bruta</dt>
+                  <dt className="font-medium text-texto">CMV</dt>
                   <dd className="text-right">
-                    <Margem p={p} qual="bruta" />
+                    <Cmv x={x} />
                   </dd>
                 </div>
                 <div className="flex justify-between gap-3">
-                  <dt className="font-medium text-texto">Margem líquida</dt>
+                  <dt className="text-suave">{ROTULO_DO_RESULTADO}</dt>
                   <dd className="text-right">
-                    {p.margens ? (
-                      <>
-                        <span className={`text-[15px] font-semibold ${p.margens.liquida.num < 0n ? 'text-erro' : 'text-texto'}`}>{formatarReaisComSinal(p.margens.liquida)}</span>
-                        <span className="block text-[12px] text-suave">{formatarPorcentagem(p.margens.liquidaBp)} do preço</span>
-                      </>
-                    ) : (
-                      <Margem p={p} qual="liquida" />
-                    )}
+                    <Resultado x={x} />
                   </dd>
                 </div>
               </dl>
@@ -537,14 +529,9 @@ function Conteudo({
       </ol>
 
       <div className="space-y-2 border-t border-linha px-4 py-3 text-[12px] text-suave sm:px-5">
-        {motivos.map(({ p, por }) => (
-          <p key={p.canal} className="text-atencao">
-            {CANAIS[p.canal].rotulo}: custo incompleto — {por}. Sugerido e margens esperam o custo.
-          </p>
-        ))}
         {semEmbalagem.length > 0 && (
           <p className="text-atencao">
-            {semEmbalagem.join(' e ')} sem embalagem cadastrada: se vai caixa ou sacola, o custo está baixo.
+            {semEmbalagem.join(' e ')} sem embalagem cadastrada: se vai caixa ou sacola, o custo físico está baixo.
             {linkDasEmbalagens && (
               <>
                 {' '}
@@ -555,6 +542,10 @@ function Conteudo({
             )}
           </p>
         )}
+        <p>
+          CMV aqui é o teórico do prato ao seu preço, não o CMV real do estoque nem o do DRE. A sugestão não vale como preço: sem preço definido, o canal fica
+          sem dados. O resultado desconta só o que está listado; aluguel, equipe, impostos e outras despesas não entram.
+        </p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <LinkDeAjuda secao="conta">Como a conta é feita</LinkDeAjuda>
           {editavel && (
@@ -569,7 +560,7 @@ function Conteudo({
         {linkDosCanais && (
           <p>
             <Link href={linkDosCanais} className={LINK_DE_TEXTO}>
-              Margens-alvo e taxa em Precificação
+              Metas de CMV e taxa em Precificação
             </Link>
           </p>
         )}

@@ -23,6 +23,7 @@ import { fraseDoFeitoDaFicha } from './estado';
 import { FormEmbalagens, type LinhaDaEmbalagem } from './form-embalagens';
 import { FormTaxaDoIfood } from './form-taxa';
 import { FormMargensAlvo } from './form-margens';
+import { FormMetasDeCmv } from './form-metas-cmv';
 
 export function TelaEmbalagensDaFicha({
   ficha,
@@ -71,7 +72,7 @@ export function TelaEmbalagensDaFicha({
 const O_QUE_ENTRA: Record<(typeof ORDEM_DOS_CANAIS)[number], string> = {
   LOJA: 'Insumos da receita',
   DELIVERY_PROPRIO: 'Insumos + embalagens do delivery (em cada ficha)',
-  IFOOD: 'Insumos + embalagens do iFood (em cada ficha) + taxa',
+  IFOOD: 'Insumos + embalagens do iFood (em cada ficha); a taxa fica fora do CMV',
 };
 
 export function TelaCanaisDeVenda({
@@ -88,6 +89,9 @@ export function TelaCanaisDeVenda({
   margens,
   versaoDasMargens,
   acaoMargens,
+  metas,
+  versaoDasMetas,
+  acaoMetas,
 }: {
   /** Base das fichas. */
   base: string;
@@ -106,7 +110,12 @@ export function TelaCanaisDeVenda({
   margens: Record<CanalVenda, number | null>;
   versaoDasMargens: string;
   acaoMargens: AcaoDeCadastro;
+  /** N.2: meta de CMV de cada canal e a versão lida. */
+  metas: Record<CanalVenda, number | null>;
+  versaoDasMetas: string;
+  acaoMetas: AcaoDeCadastro;
 }) {
+  const temMargemAntiga = ORDEM_DOS_CANAIS.some((c) => margens[c] !== null);
   const mensagem = fraseDoFeitoDaFicha(feito);
   return (
     <div className="space-y-6">
@@ -116,10 +125,10 @@ export function TelaCanaisDeVenda({
         titulo="Precificação"
         subtitulo={`${contexto} · canais de venda: o que entra no custo do prato em cada um`}
         acao={
-          // O preço e a margem de cada prato já estão na lista de fichas (só para quem vê preços): daqui é um clique.
+          // O preço e o CMV de cada prato já estão na lista de fichas (só para quem vê preços): daqui é um clique.
           podeVerFichas ? (
             <Link href={`${base}?tipo=PRATO`} className={classeDeBotao('secundario')}>
-              Margem de cada prato
+              CMV de cada prato
             </Link>
           ) : undefined
         }
@@ -142,7 +151,7 @@ export function TelaCanaisDeVenda({
                     Sobre o preço
                   </th>
                   <th scope="col" className="h-10 pl-3 pr-4 text-right font-semibold sm:pr-5">
-                    Margem-alvo
+                    Meta de CMV
                   </th>
                 </tr>
               </thead>
@@ -164,7 +173,7 @@ export function TelaCanaisDeVenda({
                       )}
                     </td>
                     <td className="whitespace-nowrap py-2.5 pl-3 pr-4 text-right tabular-nums sm:pr-5">
-                      {margens[c] === null ? <span className="text-suave">sem alvo</span> : <span className="font-semibold text-texto">{formatarPontosBase(margens[c]!)}</span>}
+                      {metas[c] === null ? <span className="text-suave">sem meta</span> : <span className="font-semibold text-texto">{formatarPontosBase(metas[c]!)}</span>}
                     </td>
                   </tr>
                 ))}
@@ -198,15 +207,31 @@ export function TelaCanaisDeVenda({
             </p>
           </Painel>
 
-          <Painel titulo="Margem-alvo por canal" subtitulo="O que deve sobrar do preço depois do custo e da taxa: o preço sugerido de cada ficha persegue isso">
+          <Painel titulo="Meta de CMV por canal" subtitulo="Quanto do preço o custo físico do prato pode ser: a sugestão de preço e o farol de cada ficha seguem isso">
             {podeEditar ? (
-              <FormMargensAlvo acao={acaoMargens} aqui={`${base}/canais`} versao={versaoDasMargens} inicial={margens} taxa={taxa} bloqueio={bloqueio} />
+              <FormMetasDeCmv acao={acaoMetas} aqui={`${base}/canais`} versao={versaoDasMetas} inicial={metas} taxaConfigurada={taxa !== null} bloqueio={bloqueio} />
             ) : (
               <p className="text-[15px] tabular-nums text-texto">
-                {ORDEM_DOS_CANAIS.map((c) => `${CANAIS[c].rotulo}: ${margens[c] === null ? 'sem alvo' : formatarPontosBase(margens[c]!)}`).join(' · ')}. Quem cuida dos preços muda aqui.
+                {ORDEM_DOS_CANAIS.map((c) => `${CANAIS[c].rotulo}: ${metas[c] === null ? 'sem meta' : formatarPontosBase(metas[c]!)}`).join(' · ')}. Quem cuida dos preços muda aqui.
               </p>
             )}
           </Painel>
+
+          {/* A margem-alvo (1.10) não comanda mais a sugestão. Fica guardada, à vista e editável para quem já tinha. */}
+          {temMargemAntiga && (
+            <Painel titulo="Margem-alvo (registro antigo)" subtitulo="Não comanda mais o preço sugerido: a meta de CMV acima substituiu. Nenhum valor foi apagado nem convertido">
+              <details>
+                <summary className="min-h-11 cursor-pointer py-2 text-[14px] text-texto">
+                  {ORDEM_DOS_CANAIS.map((c) => `${CANAIS[c].rotulo}: ${margens[c] === null ? 'sem alvo' : formatarPontosBase(margens[c]!)}`).join(' · ')}
+                </summary>
+                {podeEditar && (
+                  <div className="mt-3">
+                    <FormMargensAlvo acao={acaoMargens} aqui={`${base}/canais`} versao={versaoDasMargens} inicial={margens} taxa={taxa} bloqueio={bloqueio} />
+                  </div>
+                )}
+              </details>
+            </Painel>
+          )}
         </div>
         <aside className="min-w-0" aria-label="Alterações da taxa">
           <Painel titulo="Últimas alterações" semRespiro>

@@ -114,6 +114,14 @@ export function lerEnvioDosPrecos(form: FormData) {
   };
 }
 
+/** N.2: as metas de CMV dos canais e a versão lida. */
+export function lerEnvioDasMetas(form: FormData) {
+  return {
+    versao: textoDe(form.get('versao')),
+    metas: { LOJA: textoDe(form.get('metaCmv_LOJA')), DELIVERY_PROPRIO: textoDe(form.get('metaCmv_DELIVERY_PROPRIO')), IFOOD: textoDe(form.get('metaCmv_IFOOD')) },
+  };
+}
+
 /** 1.10: as margens-alvo dos canais e a versão lida. */
 export function lerEnvioDasMargens(form: FormData) {
   return {

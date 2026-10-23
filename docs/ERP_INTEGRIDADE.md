@@ -69,3 +69,49 @@ ficha para o farol de CMV (próxima entrega, N.2).
 | `tests/erp-retrato-estoque.db.test.ts` + `tests/erp-cmv.db.test.ts` (regressão) | 32 aprovados |
 | `npm run typecheck` | sem erro |
 | Validação em produção | não executada (fora do escopo) |
+
+## Entrega N.2 — meta de CMV por canal ligada à Precificação, à ficha e à lista
+
+### O que mudou
+
+| Onde | Antes | Agora |
+|---|---|---|
+| Precificação | margem-alvo por canal comandava a sugestão | **meta de CMV por canal** (form próprio, versão, histórico); margem-alvo antiga fica guardada num bloco recolhido "registro antigo", sem uso |
+| Ficha · "Preço e CMV por canal" | custo do canal com taxa, sugerido por margem, margem bruta e líquida | custo físico (insumos + embalagens) separado da taxa; meta; sugestão = custo físico ÷ meta (botões "usar"); preço de venda; CMV com farol em palavra; "Resultado após os custos informados" com as parcelas e "não é lucro líquido" |
+| Preço vazio | valia o sugerido | **não definido**: CMV e resultado ficam "sem dados" (a sugestão não é preço praticado). Nenhum preço gravado mudou |
+| Lista de fichas | margem líquida por canal | preço, CMV, farol e meta **por célula de canal** (desktop); linha "CMV: …" no tablet/celular |
+| Histórico do preço | margem líquida e custo com taxa | preço definido, CMV (meta e farol), resultado e custo físico na hora; campos novos escondidos de quem não vê preços |
+
+Arquivos: `prisma/migrations/20261108000000_erp_meta_cmv_canal` (coluna nula `CanalConfig.metaCmvPadraoBp`, CHECK 1–9.999, aditiva),
+`src/lib/erp/canais.ts` (`salvarMetasDeCmv`, `cmvDaLista`, `cmv` no detalhe), `src/lib/erp/cmv-produto-campos.ts` (retrato),
+`src/lib/erp/historico.ts`, telas em `src/components/erp/telas/fichas/` (`custo-por-canal.tsx`, `lista.tsx`, `canais.tsx`,
+`form-metas-cmv.tsx`) e as ações/páginas nas duas árvores (`/erp` e `/rodolfo/erp/[slug]`).
+
+Decisões tomadas na execução (reversíveis, sem efeito em dado):
+- meta guardada **por parceiro e canal** (mesmo lugar da taxa e da antiga margem-alvo); vigência = valor atual, com histórico;
+- a meta do iFood só grava com a taxa do iFood configurada: a linha do iFood nasce com a taxa, e criá-la antes faria a taxa
+  "não configurada" virar 0% em silêncio;
+- preço vazio = não definido (antes era "usar o sugerido"); assim a troca de base da sugestão não muda preço de ninguém.
+
+### Testes executados (23/10/2026, Postgres 16 local)
+
+| Suíte | Resultado |
+|---|---|
+| `tests/erp-cmv-produto.db.test.ts` (cenário de referência de ponta a ponta: nota → ficha → embalagens → taxa → metas → preços; conflito, faixa, permissão, lista = detalhe, operador sem dado financeiro) | 8 aprovados |
+| `tests/erp-precos.db.test.ts` (1.10, expectativas do histórico atualizadas para CMV; veto do Guardião ampliado para CMV/resultado/custo físico) | 11 aprovados |
+| Suíte inteira com banco (`ERP_DB_TESTE`) | 128 arquivos, 2.481 aprovados, **44 pulados**, 0 falhas |
+| `npm run typecheck`, `eslint` nos arquivos mexidos, `npm run gate` | limpos |
+| Telas no navegador (Chromium, app local com banco de teste) | ficha, lista e Precificação a 1440, 1180 (tablet deitado), 820 (tablet em pé) e 390 px: sem rolagem lateral, nada escondido |
+
+Os 44 pulados são variantes das provas de migração que exigem papéis de banco não-superusuário (`papelExiste`) e não
+existem neste Postgres local. Não foram executados; não contam como aprovados.
+
+### Limites e pendências
+
+- Filtro da lista por status de CMV por canal (dentro/acima/sem dados) **não feito**: precisa filtrar no servidor sobre o
+  conjunto todo, em `fichas.ts`, que a sessão da L.3 está mexendo. Próxima entrega.
+- Texto de ajuda "Como a conta é feita" (`ajuda-textos.ts`) ainda descreve a margem-alvo: arquivo em edição pela L.3;
+  atualizar depois da integração.
+- Canal "não ofertado" existe na conta, mas não há como marcar na ficha ainda (`ProdutoCanal.ativo` sem tela).
+- Ponto 1 continua bloqueado na escolha do método de valorização (ver N.1).
+- Nada publicado: sem merge, sem deploy.

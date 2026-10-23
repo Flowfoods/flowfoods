@@ -14,10 +14,13 @@ export const FEITO_FICHA: Readonly<Record<string, string>> = {
   'taxa-igual': 'Nada mudou: a taxa já era essa.',
   // 1.10
   precos: 'Preços salvos. O antes e o depois, com o custo do canal na hora, estão em Últimas alterações.',
-  'precos-custo': 'Preços salvos. O custo mudou enquanto você editava: as margens abaixo já são as de agora.',
+  'precos-custo': 'Preços salvos. O custo mudou enquanto você editava: o CMV e o resultado abaixo já são os de agora.',
   'precos-igual': 'Nada mudou: os preços já eram esses.',
-  margens: 'Margens-alvo salvas. O preço sugerido de todas as fichas já usa as novas.',
+  margens: 'Margens-alvo salvas. É registro antigo: o preço sugerido segue a meta de CMV.',
   'margens-igual': 'Nada mudou: as margens-alvo já eram essas.',
+  // N.2
+  metas: 'Metas de CMV salvas. A sugestão e o farol de todas as fichas já usam as novas; nenhum preço foi mudado.',
+  'metas-igual': 'Nada mudou: as metas de CMV já eram essas.',
 };
 
 export function fraseDoFeitoDaFicha(feito: string | undefined): string | undefined {

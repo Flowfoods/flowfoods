@@ -10,7 +10,7 @@
 
 import { exigirParceiroDaSessao, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarFicha, editarFicha, mudarSituacaoFicha } from '@/lib/erp/fichas';
-import { salvarEmbalagens, salvarMargensAlvo, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
+import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import type { EstadoImportacao } from '@/components/erp/telas/fichas/estado';
@@ -20,6 +20,7 @@ import {
   lerEnvioDaFicha,
   lerEnvioDasEmbalagens,
   lerEnvioDasMargens,
+  lerEnvioDasMetas,
   lerEnvioDosPrecos,
 } from '@/components/erp/telas/fichas/executar';
 
@@ -102,6 +103,15 @@ export async function acaoSalvarPrecos(id: string, anterior: EstadoCadastro, for
   if (negado) return recusado(anterior, negado);
   const r = await salvarPrecos(ctx.cliente, String(id), lerEnvioDosPrecos(form), ctx.sessao.autorNome);
   return concluir(r, anterior, BASE, { mudou: r.ok && r.custoMudou ? 'precos-custo' : 'precos', igual: 'precos-igual' });
+}
+
+/** N.2: meta de CMV de cada canal do parceiro (só quem muda preços). */
+export async function acaoSalvarMetasDeCmv(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
+  if (negado) return recusado(anterior, negado);
+  const r = await salvarMetasDeCmv(ctx.cliente, lerEnvioDasMetas(form), ctx.sessao.autorNome);
+  return concluir(r, anterior, BASE, { mudou: 'metas', igual: 'metas-igual' }, 'canais');
 }
 
 /** 1.10: margem-alvo de cada canal do parceiro (só a dona). */
