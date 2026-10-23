@@ -615,6 +615,87 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'compras-comparar-fornecedores',
+    area: 'compras',
+    rotas: ['compras/relatorios/comparar-fornecedores'],
+    titulo: 'Comparar fornecedores',
+    versao: 1,
+    recolhida: true,
+    aula: [
+      { texto: 'Escolha um insumo e o período para ver quem vende o mesmo insumo por menos, na mesma unidade (kg, litro ou unidade).' },
+      { texto: 'Custo entregue é o preço do item mais a parte do frete que coube a ele, dividido pela quantidade: o que cada kg custou até chegar.' },
+      { texto: 'O frete pode inverter a ordem. Por isso a tela diz quem é o mais barato no preço do item e quem é o mais barato entregue.' },
+    ],
+    secoes: [
+      {
+        id: 'embalagens',
+        titulo: 'Embalagens e marca',
+        blocos: [
+          { texto: 'Peça de 2 kg, caixa e quilo solto entram na mesma conta pela unidade base do insumo. A conta usa o valor e o frete gravados em cada nota.' },
+          { texto: 'A marca de referência é só uma informação do cadastro. A nota guarda a embalagem e o fornecedor, não a marca que veio, e nenhuma marca é barrada da comparação.' },
+        ],
+      },
+      {
+        id: 'sem-base',
+        titulo: 'Quando o sistema não compara',
+        blocos: [
+          { texto: 'Linha sem unidade gravada ou com valor zero fica “sem base”: sai do preço, mas aparece contada. Preço que não dá para calcular nunca vira R$ 0,00.' },
+          { texto: 'Com um fornecedor só não há com quem comparar. Fornecedor com uma compra só é avisado: pode não ser o preço de sempre dele.' },
+          { texto: 'Nota cancelada não conta como compra. Nota fiscal que só chegou por XML e ainda não foi conferida também não.' },
+        ],
+      },
+      {
+        id: 'diferenca',
+        titulo: 'A diferença não é economia',
+        blocos: [{ texto: 'A diferença para o mais barato é por unidade. Ela só vale para o que você de fato compra de cada um: quantidade e data de cada compra mudam o preço, e a última compra de cada fornecedor está na tabela.' }],
+      },
+    ],
+  },
+  {
+    chave: 'compras-comparar-periodos',
+    area: 'compras',
+    rotas: ['compras/relatorios/comparar-periodos'],
+    titulo: 'Comparar períodos',
+    versao: 1,
+    recolhida: true,
+    aula: [
+      { texto: 'Escolha dois períodos: o A é a base e o B é o que você compara com ele. As lojas, o fornecedor, o insumo e a data usada valem para os dois.' },
+      { texto: 'Efeito volume é quanto o gasto mudou por você ter comprado mais ou menos; efeito preço é quanto mudou porque cada unidade ficou mais cara ou mais barata. Os dois somados dão a variação.' },
+    ],
+    secoes: [
+      {
+        id: 'medida',
+        titulo: 'Custo entregue ou preço do item',
+        blocos: [{ texto: 'Custo entregue é o preço do item mais a parte do frete que coube a ele, dividido pela quantidade. Em “Medir o gasto por” você escolhe entre o custo entregue e o preço do item, e a tela usa a mesma escolha nos dois períodos.' }],
+      },
+      {
+        id: 'fornecedor',
+        titulo: 'Troca de fornecedor',
+        blocos: [
+          { texto: 'Dentro do efeito preço, a tela separa o que vem de um fornecedor mudar o próprio preço do que vem de trocar de fornecedor (ou comprar mais de um e menos de outro). Nada disso é chamado de inflação nem de economia.' },
+          { texto: 'Escolha um insumo para ver os fornecedores lado a lado nos dois períodos.' },
+        ],
+      },
+      {
+        id: 'so-um-lado',
+        titulo: 'Insumo que só aparece num período',
+        blocos: [
+          { texto: 'Sem compra do outro lado não há como separar preço de volume. O gasto do insumo aparece inteiro como “entrou” (só em B) ou “saiu” (só em A).' },
+          { texto: 'Se nada foi comprado em A, o percentual de variação fica “sem base”: dividir por zero não é crescimento.' },
+        ],
+      },
+      {
+        id: 'cobertura',
+        titulo: 'Quando falta dado',
+        blocos: [
+          { texto: 'Linha sem unidade, sem insumo ou com valor zero fica fora da conta e é contada à parte, com o dinheiro dela. A tela diz quanto do dinheiro de cada período a comparação cobre.' },
+          { texto: 'Períodos de tamanhos diferentes, que se sobrepõem ou que ainda não terminaram também são avisados antes dos números.' },
+          { texto: 'Cada gasto abre as compras que o formam, e cada compra abre a nota. Nota cancelada e nota fiscal ainda não conferida não entram.' },
+        ],
+      },
+    ],
+  },
+  {
     chave: 'compra-nova',
     area: 'compras',
     rotas: ['compras/nova', 'compras/[id]/editar'],

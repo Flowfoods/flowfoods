@@ -127,6 +127,14 @@
     "versao": 1,
     "hash": "baa6b602f574c7a1"
   },
+  "compras-comparar-fornecedores": {
+    "versao": 1,
+    "hash": "e5bf1733c6670b16"
+  },
+  "compras-comparar-periodos": {
+    "versao": 1,
+    "hash": "d86e9a196e050ccb"
+  },
   "compra-nova": {
     "versao": 4,
     "hash": "8a708c7d8d14f72f"

@@ -11,6 +11,8 @@ import {
   CalendarClock,
   ClipboardCheck,
   ClipboardList,
+  ArrowLeftRight,
+  Columns2,
   Contact,
   CookingPot,
   FileBarChart,
@@ -76,6 +78,8 @@ export const ICONES: Record<ChaveIcone, LucideIcon> = {
   categorias: Tags,
   classificar: ListChecks,
   relatorio: FileBarChart,
+  comparar: Columns2,
+  periodos: ArrowLeftRight,
 };
 
 export function Icone({ nome, ...props }: { nome: ChaveIcone } & LucideProps) {

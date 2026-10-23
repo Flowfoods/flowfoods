@@ -28,15 +28,15 @@ import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel, Selo } from '../../ui/superficies';
 import { hrefDoRelatorio, RECORTE_NOVO } from './relatorio-filtros';
 
-const sp = (n: number) => n.toLocaleString('pt-BR');
-const pl = (n: number, um: string, varios: string) => `${sp(n)} ${n === 1 ? um : varios}`;
+export const sp = (n: number) => n.toLocaleString('pt-BR');
+export const pl = (n: number, um: string, varios: string) => `${sp(n)} ${n === 1 ? um : varios}`;
 const SIGLA = { KG: 'kg', L: 'L', UN: 'un' } as const;
 const verLinhas = (n: number) => (n === 1 ? 'Ver a linha' : `Ver as ${sp(n)} linhas`);
 const quantidade = (t: Pick<TotalPorUnidade, 'unidade' | 'quantidadeMilesimos'>) => (t.unidade ? formatarQuantidade(t.quantidadeMilesimos, t.unidade) : 'sem unidade');
 
 // ------------------------------------------------------------- indicadores
 
-function Cartao({ rotulo, children, ver, className = '' }: { rotulo: string; children: ReactNode; ver?: { href: string; texto: string } | { href: string; texto: string }[]; className?: string }) {
+export function Cartao({ rotulo, children, ver, className = '' }: { rotulo: string; children: ReactNode; ver?: { href: string; texto: string } | { href: string; texto: string }[]; className?: string }) {
   return (
     <div className={`flex min-w-0 flex-col rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5 ${className}`}>
       <h3 className="text-[12px] font-medium leading-snug text-suave">{rotulo}</h3>
@@ -50,7 +50,7 @@ function Cartao({ rotulo, children, ver, className = '' }: { rotulo: string; chi
   );
 }
 
-const GRANDE = 'font-display text-[26px] font-bold leading-none tabular-nums';
+export const GRANDE = 'font-display text-[26px] font-bold leading-none tabular-nums';
 
 /** A conta por extenso, igual em toda parte: "R$ 1.186,00 ÷ 26 kg = R$ 45,62/kg". */
 function contaDoPreco(t: TotalPorUnidade, comFrete: boolean): string {
@@ -551,7 +551,7 @@ export function TabelaDasCompras({
 // -------------------------------------------------------- exportar e imprimir
 
 /** Planilha e impressão do que está na tela: o mesmo recorte (a URL leva tudo). Só a planilha das linhas e a do resumo. */
-export function BarraDeSaida({ f, exportar, imprimir, modo }: { f: FiltrosDoRelatorio; exportar: string; imprimir: string; modo: 'insumo' | 'periodo' }) {
+export function BarraDeSaida({ f, exportar, imprimir, modo, comparar }: { f: FiltrosDoRelatorio; exportar: string; imprimir: string; modo: 'insumo' | 'periodo'; /** L.3: os atalhos para as comparações (ficam na mesma linha). */ comparar?: { href: string; texto: string }[] }) {
   const q = (extra: Record<string, string>) => {
     const base = queryDoRelatorio(f, { pagina: 1 }, { semPagina: true });
     const p = new URLSearchParams(base);
@@ -571,6 +571,11 @@ export function BarraDeSaida({ f, exportar, imprimir, modo }: { f: FiltrosDoRela
       <Link href={`${imprimir}?${q({ imprimir: '1' })}`} className={classeDeBotao('secundario')}>
         Imprimir ou salvar em PDF
       </Link>
+      {(comparar ?? []).map((c) => (
+        <Link key={c.href} href={c.href} className={classeDeBotao('secundario')}>
+          {c.texto}
+        </Link>
+      ))}
     </div>
   );
 }

@@ -56,7 +56,10 @@ export type ChaveIcone =
   | 'categorias'
   | 'classificar'
   // L.2: os relatórios de compras (distinto do Orçamento, que é o medidor).
-  | 'relatorio';
+  | 'relatorio'
+  // L.3: comparar fornecedores (duas colunas) e comparar períodos (setas nos dois sentidos).
+  | 'comparar'
+  | 'periodos';
 
 export interface ItemNav {
   href: string;
@@ -351,6 +354,20 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               rotulo: 'Compras do período',
               icone: 'relatorio',
               subtitulo: 'Tudo o que foi comprado num dia ou período, com planilha',
+              permissao: 'compras.ver',
+            },
+            {
+              href: `${base}/compras/relatorios/comparar-fornecedores`,
+              rotulo: 'Comparar fornecedores',
+              icone: 'comparar',
+              subtitulo: 'Quem vende o mesmo insumo por menos, com e sem o frete',
+              permissao: 'compras.ver',
+            },
+            {
+              href: `${base}/compras/relatorios/comparar-periodos`,
+              rotulo: 'Comparar períodos',
+              icone: 'periodos',
+              subtitulo: 'O que mudou entre dois períodos: volume, preço e fornecedor',
               permissao: 'compras.ver',
             },
           ],

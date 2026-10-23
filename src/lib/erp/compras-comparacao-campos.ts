@@ -451,7 +451,10 @@ export function lerFiltrosDePeriodos(sp: Params, hoje = hojeNoRio()): FiltrosDeP
 }
 
 /** A URL da comparação de períodos com estes filtros (e as mudanças pedidas): sempre leva as quatro datas e a data usada. */
-export function queryDosPeriodos(f: FiltrosDePeriodos, mudar: Partial<FiltrosDePeriodos> & { rel?: Partial<FiltrosDoRelatorio> } = {}, opcoes: { semPagina?: boolean } = {}): string {
+/** O que se pode mudar numa URL de comparação: os campos da comparação e, dentro de `rel`, os filtros do relatório. */
+export type MudancaDosPeriodos = Omit<Partial<FiltrosDePeriodos>, 'rel'> & { rel?: Partial<FiltrosDoRelatorio> };
+
+export function queryDosPeriodos(f: FiltrosDePeriodos, mudar: MudancaDosPeriodos = {}, opcoes: { semPagina?: boolean } = {}): string {
   const x = { ...f, ...mudar, rel: { ...f.rel, ...(mudar.rel ?? {}) } };
   const q = new URLSearchParams();
   for (const l of x.rel.lojaIds) q.append('loja', l);
@@ -485,6 +488,23 @@ export function atalhosDeComparacao(hoje: string): { chave: string; rotulo: stri
     { chave: 'mes-ate-hoje', rotulo: 'Este mês até hoje × mesmo trecho do mês passado', de: inicioMesPassado, ate: ateMesmoDia, deB: primeiroDiaDoMes(hoje), ateB: hoje },
     { chave: 'mes-passado', rotulo: 'Mês passado × mês retrasado', de: primeiroDiaDoMes(retrasado), ate: ultimoDiaDoMes(retrasado), deB: inicioMesPassado, ateB: ultimoDiaDoMes(mesPassado) },
   ];
+}
+
+/** O período imediatamente anterior, do mesmo tamanho (7 dias viram os 7 anteriores; o mês inteiro, os mesmos dias antes). */
+export function periodoAnterior(de: string, ate: string): { de: string; ate: string } {
+  const n = diasDoPeriodo(de, ate);
+  const fim = somarDias(de, -1);
+  return { de: somarDias(fim, -(n - 1)), ate: fim };
+}
+
+/** O endereço (só a busca) de "Comparar com o período anterior" a partir de um relatório da L.2: B é o período dele, A o anterior. */
+export function queryParaCompararComOAnterior(f: FiltrosDoRelatorio): string {
+  const a = periodoAnterior(f.de, f.ate);
+  return queryDosPeriodos(
+    { rel: { ...f, de: a.de, ate: a.ate, volta: '' }, deB: f.de, ateB: f.ate, medida: 'entregue', pagina: 1, porPagina: 50, periodoInvalido: null },
+    {},
+    { semPagina: true },
+  );
 }
 
 // -------------------------------------------------------------- os avisos

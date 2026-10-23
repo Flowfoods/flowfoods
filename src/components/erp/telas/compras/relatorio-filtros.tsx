@@ -23,7 +23,7 @@ import { FiltrosRecolhiveis } from '../insumos/filtros-recolhiveis';
 
 type Modo = 'insumo' | 'periodo';
 
-const SELECT = `${CAMPO} pr-8`;
+export const SELECT = `${CAMPO} pr-8`;
 
 export const hrefDoRelatorio = (caminho: string, f: FiltrosDoRelatorio, mudar: Partial<FiltrosDoRelatorio> = {}, opcoes: { semPagina?: boolean } = {}) => {
   const q = queryDoRelatorio(f, mudar, opcoes);
@@ -38,7 +38,7 @@ export function filtrosAtivosDoRelatorio(f: FiltrosDoRelatorio, modo: Modo): num
   return [f.lojaIds.length > 0, !!f.fornecedorId, modo === 'periodo' && !!f.insumoId, modo === 'periodo' && !!f.q, !!f.categoriaId, f.situacao === 'canceladas'].filter(Boolean).length;
 }
 
-function SeletorDeLojas({ lojas, marcadas }: { lojas: Opcoes['lojas']; marcadas: string[] }) {
+export function SeletorDeLojas({ lojas, marcadas }: { lojas: Opcoes['lojas']; marcadas: string[] }) {
   if (lojas.length <= 1) {
     return (
       <div className="col-span-2">
