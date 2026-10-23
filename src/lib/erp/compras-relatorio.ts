@@ -79,7 +79,7 @@ const DIA = (base: BaseDeData) =>
     END`);
 
 /** Os itens do recorte, uma linha por item de nota, com tudo o que as consultas de baixo precisam. */
-function fonte(r: Recorte): Prisma.Sql {
+export function fonte(r: Recorte): Prisma.Sql {
   const ids = r.insumoIds;
   return guardado(Prisma.sql`
     SELECT

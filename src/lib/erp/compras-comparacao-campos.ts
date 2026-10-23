@@ -425,6 +425,11 @@ export function periodosPadrao(hoje: string): { de: string; ate: string; deB: st
   return { de: somarDias(hoje, -59), ate: somarDias(hoje, -30), deB: somarDias(hoje, -29), ateB: hoje };
 }
 
+/** A comparação de fornecedores usa os filtros do relatório da L.2; sem datas na URL, os últimos 90 dias (como o histórico do insumo). */
+export function lerFiltrosDeFornecedores(sp: Params, hoje = hojeNoRio()): FiltrosDoRelatorio {
+  return { ...lerFiltrosDoRelatorio(sp, hoje, { de: somarDias(hoje, -89) }), agrupar: 'fornecedor', situacao: 'lancadas', ver: 'resumo', grupo: '', unidade: '', so: '' };
+}
+
 export function lerFiltrosDePeriodos(sp: Params, hoje = hojeNoRio()): FiltrosDePeriodos {
   const p = periodosPadrao(hoje);
   const rel = lerFiltrosDoRelatorio({ ...sp, de: undefined, ate: undefined }, hoje, { de: p.de, ate: p.ate, ver: 'resumo' });
