@@ -301,6 +301,16 @@ REMOTO
       case "$code" in 2*) ;; *) falhas=$((falhas+1)) ;; esac
       continue
     fi
+    if [ "$tipo" = container ]; then
+      code=$(dokploy POST /api/docker.restartContainer "{\"containerId\":\"${id}\"}")
+      echo "POST docker.restartContainer ${id} -> HTTP ${code}"; head -c 300 /tmp/dk.json; echo
+      sleep 15
+      code=$(dokploy GET "/api/docker.getConfig?containerId=${id}")
+      jq -c '{Status: .State.Status, Error: .State.Error, StartedAt: .State.StartedAt, Ports: .NetworkSettings.Ports}' /tmp/dk.json 2>/dev/null
+      for p in 80 443; do porta "$p"; done
+      [ "$(jq -r .State.Running /tmp/dk.json 2>/dev/null)" = true ] || falhas=$((falhas+1))
+      continue
+    fi
     case "$tipo" in
       compose|application) rota="${tipo}.deploy" ;;
       postgres|redis|mysql|mariadb|mongo) rota="${tipo}.start" ;;
