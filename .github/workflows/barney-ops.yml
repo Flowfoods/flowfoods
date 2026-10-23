@@ -14,6 +14,11 @@
 #   api            — uma chamada qualquer à API do Dokploy (método, caminho,
 #                    corpo). É o "par de mãos" para criar app, domínio e
 #                    variáveis sem abrir o painel.
+#   diagnostico-tls — só leitura: DNS, certificado servido (subject, emissor,
+#                    SAN, validade), códigos HTTP/HTTPS da raiz e do www, e no
+#                    Dokploy o estado do compose, os domínios ligados e os
+#                    últimos deploys. Para quando o navegador diz
+#                    ERR_CERT_COMMON_NAME_INVALID (23/10/2026).
 #
 # Secrets (Settings → Secrets and variables → Actions):
 #   DOKPLOY_URL        ex.: https://dokploy.seu-dominio ou http://IP:3000
@@ -34,15 +39,17 @@ on:
           - descobrir-api
           - deploy-compose
           - api
+          - diagnostico-tls
       alvo:
         description: URL do portal (para "verificar")
         type: string
         required: false
         default: https://consultoriaflowfoods.com.br
       compose_id:
-        description: composeId do Dokploy (para "deploy-compose")
+        description: composeId do Dokploy (para "deploy-compose" e "diagnostico-tls")
         type: string
         required: false
+        default: JWsPI2ZLgUrh11MS_EwwB
       metodo:
         description: Método HTTP (para "api")
         type: choice
@@ -193,4 +200,119 @@ jobs:
           head -c "${LIMITE:-20000}" /tmp/corpo | tr -d '\000'; echo
           echo '=== FIM ==='
           case "$code" in 2*) exit 0 ;; *) exit 1 ;; esac
+
+  diagnostico-tls:
+    if: inputs.acao == 'diagnostico-tls'
+    runs-on: ubuntu-latest
+    steps:
+      # Parte 1 — o que a internet vê. Nada aqui usa segredo.
+      - name: DNS, certificado e HTTP da raiz e do www
+        env:
+          IP_VPS: 76.13.230.78
+        run: |
+          set -u
+          for host in consultoriaflowfoods.com.br www.consultoriaflowfoods.com.br; do
+            echo "=================== $host ==================="
+            echo "--- DNS (esperado A = ${IP_VPS}, sem AAAA) ---"
+            a=$(dig +short A "$host" | tr '\n' ' ')
+            aaaa=$(dig +short AAAA "$host" | tr '\n' ' ')
+            echo "A:    ${a:-<vazio>}"
+            echo "AAAA: ${aaaa:-<vazio>}"
+            case " $a " in
+              *" ${IP_VPS} "*) echo "DNS: aponta para a VPS" ;;
+              *) echo "::warning title=DNS::${host} não aponta para ${IP_VPS} (A = ${a:-vazio})" ;;
+            esac
+            [ -n "$aaaa" ] && echo "::warning title=DNS::${host} tem AAAA (${aaaa}) — a VPS não atende IPv6 pelo Traefik"
+            echo
+            echo "--- Certificado servido na 443 (SNI = $host) ---"
+            if openssl s_client -connect "${host}:443" -servername "$host" </dev/null >/tmp/tls.txt 2>&1; then :; fi
+            if grep -q 'BEGIN CERTIFICATE' /tmp/tls.txt; then
+              openssl x509 -in /tmp/tls.txt -noout -subject -issuer -dates -ext subjectAltName 2>/dev/null \
+                || openssl x509 -in /tmp/tls.txt -noout -subject -issuer -dates
+              echo "Resultado da verificação: $(grep -m1 'Verify return code' /tmp/tls.txt || echo '?')"
+            else
+              echo "Sem certificado: $(grep -m1 -iE 'error|refused|timed out' /tmp/tls.txt || head -3 /tmp/tls.txt)"
+            fi
+            echo
+            echo "--- HTTPS (sem seguir redirect) ---"
+            curl -sSI --max-time 20 "https://${host}/" 2>&1 | grep -iE '^(HTTP|location|server)' || true
+            echo "--- HTTPS ignorando o certificado (o app está atrás?) ---"
+            curl -skI --max-time 20 "https://${host}/" 2>&1 | grep -iE '^(HTTP|location|server|x-powered-by)' || true
+            echo "--- HTTP (porta 80) ---"
+            curl -sSI --max-time 20 "http://${host}/" 2>&1 | grep -iE '^(HTTP|location|server)' || true
+            echo "--- Desafio ACME na porta 80 (esperado 404 do Traefik, nunca redirect) ---"
+            curl -sSI --max-time 20 "http://${host}/.well-known/acme-challenge/teste" 2>&1 | grep -iE '^(HTTP|location)' || true
+            echo
+          done
+          echo "=================== o IP direto ==================="
+          echo "--- sem SNI (certificado padrão do Traefik) ---"
+          openssl s_client -connect "${IP_VPS}:443" </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer 2>/dev/null || echo "sem resposta"
+
+      # Parte 2 — o que o Dokploy pensa. Token só em header; nunca ecoado.
+      - name: Estado do compose no Dokploy (domínios, deploys)
+        env:
+          URL: ${{ secrets.DOKPLOY_URL }}
+          TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
+          COMPOSE_ID: ${{ inputs.compose_id }}
+        run: |
+          set -u
+          if [ -z "${URL:-}" ] || [ -z "${TOKEN:-}" ]; then
+            echo "::warning::Sem DOKPLOY_URL/DOKPLOY_API_TOKEN: pulei a parte do painel."
+            exit 0
+          fi
+          BASE=$(printf '%s' "$URL" | sed -E 's#^(https?://[^/]+).*#\1#')
+          get() {
+            # $1 = caminho (com query). Imprime o código e deixa o corpo em /tmp/corpo
+            curl -sk -o /tmp/corpo -w '%{http_code}' --max-time 60 \
+              -H "x-api-key: ${TOKEN}" "${BASE}$1" || echo 000
+          }
+
+          echo "=== compose.one ==="
+          code=$(get "/api/compose.one?composeId=${COMPOSE_ID}")
+          echo "HTTP $code"
+          if [ "$code" = 200 ]; then
+            jq '{name, appName, composeStatus, composeType, sourceType, branch, composePath,
+                 autoDeploy, createdAt,
+                 domains: [.domains[]? | {host, serviceName, port, https, certificateType, path, domainType, createdAt}],
+                 deploys_recentes: ([.deployments[]? | {status, title, createdAt, finishedAt, description}]
+                                    | sort_by(.createdAt) | reverse | .[0:5])}' /tmp/corpo \
+              || head -c 3000 /tmp/corpo
+          else
+            head -c 1500 /tmp/corpo; echo
+          fi
+
+          echo
+          echo "=== domain.byComposeId ==="
+          code=$(get "/api/domain.byComposeId?composeId=${COMPOSE_ID}")
+          echo "HTTP $code"
+          [ "$code" = 200 ] && (jq '[.[] | {host, serviceName, port, https, certificateType}]' /tmp/corpo || head -c 2000 /tmp/corpo)
+
+          echo
+          echo "=== deployment.all (últimos 5) ==="
+          code=$(get "/api/deployment.all?composeId=${COMPOSE_ID}")
+          echo "HTTP $code"
+          if [ "$code" = 200 ]; then
+            jq '[.[] | {deploymentId, status, title, description, createdAt, finishedAt, logPath}] | sort_by(.createdAt) | reverse | .[0:5]' /tmp/corpo || head -c 3000 /tmp/corpo
+          else
+            head -c 1000 /tmp/corpo; echo
+          fi
+
+          echo
+          echo "=== project.all: apps que carregam flowfoods no nome (para a rota manual antiga) ==="
+          code=$(get "/api/project.all")
+          echo "HTTP $code"
+          if [ "$code" = 200 ]; then
+            jq '[.[] | {projeto: .name,
+                        apps: [.applications[]? | select(.name | test("flow"; "i")) | {name, appName, applicationId, applicationStatus}],
+                        composes: [.compose[]? | select(.name | test("flow"; "i")) | {name, appName, composeId, composeStatus}]}
+                 | select((.apps | length) > 0 or (.composes | length) > 0)]' /tmp/corpo || head -c 2000 /tmp/corpo
+            # Rota Traefik manual de cada app "flowfoods" (a lição de 25/09)
+            for app in $(jq -r '.[] | .applications[]? | select(.name | test("flow"; "i")) | .applicationId' /tmp/corpo 2>/dev/null); do
+              echo
+              echo "--- application.readTraefikConfig ($app) ---"
+              c=$(get "/api/application.readTraefikConfig?applicationId=${app}")
+              echo "HTTP $c"
+              [ "$c" = 200 ] && head -c 2500 /tmp/corpo; echo
+            done
+          fi
 
