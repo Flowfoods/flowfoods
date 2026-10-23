@@ -407,6 +407,10 @@ BEGIN
     IF loja IS DISTINCT FROM NEW."lojaId" THEN
       RAISE EXCEPTION '[erp] o pedido de impressão é da loja da etiqueta (EtiquetaImpressao_confere).' USING ERRCODE = 'check_violation';
     END IF;
+    -- Rodada final: o pedido nasce sem o "Já imprimi" (a confirmação vem depois, de quem viu sair).
+    IF NEW."confirmadaEm" IS NOT NULL OR NEW."confirmadaPorNome" IS NOT NULL OR NEW."confirmadaPorUsuarioId" IS NOT NULL THEN
+      RAISE EXCEPTION '[erp] o pedido de impressão nasce sem o "Já imprimi" (EtiquetaImpressao_confere).' USING ERRCODE = 'check_violation';
+    END IF;
     RETURN NEW;
   END IF;
   IF NEW."id" <> OLD."id"
@@ -420,6 +424,10 @@ BEGIN
   IF OLD."confirmadaEm" IS NULL AND NEW."confirmadaEm" IS NOT NULL THEN
     IF NEW."situacao" <> OLD."situacao" OR NEW."erro" IS DISTINCT FROM OLD."erro" OR NEW."concluidaEm" IS DISTINCT FROM OLD."concluidaEm" THEN
       RAISE EXCEPTION '[erp] confirmar a impressão não muda o resultado do pedido (EtiquetaImpressao_confere).' USING ERRCODE = 'check_violation';
+    END IF;
+    -- Rodada final: a hora do "Já imprimi" não fica no futuro (5 min de folga para o relógio do servidor da aplicação).
+    IF NEW."confirmadaEm" > (now() AT TIME ZONE 'UTC') + interval '5 minutes' THEN
+      RAISE EXCEPTION '[erp] o "Já imprimi" não fica no futuro (EtiquetaImpressao_confere).' USING ERRCODE = 'check_violation';
     END IF;
     RETURN NEW;
   END IF;

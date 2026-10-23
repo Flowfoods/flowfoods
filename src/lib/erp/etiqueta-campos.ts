@@ -159,6 +159,15 @@ export function venceu(validadeEm: Date | null, agora: Date): boolean {
   return !!validadeEm && validadeEm.getTime() <= agora.getTime();
 }
 
+/**
+ * Até quando a etiqueta serve (rodada final, decisão 425): a validade gravada; sem ela (embalagem aberta SEM prazo após
+ * abertura), o fim do dia do vencimento do lote no Rio — abrir não prolonga o vencimento. Sem nenhum dos dois: null (não há
+ * como dizer). É o que `venceu` recebe em todo caminho de emitir e imprimir.
+ */
+export function limiteDeUso(validadeEm: Date | null, vencimentoLote: string | null): Date | null {
+  return validadeEm ?? (vencimentoLote ? fimDoVencimento(vencimentoLote) : null);
+}
+
 /** "Este lote venceu em 22/10 às 14:05: não use. Separe para descarte e avise a gerência." (pelo dia, quando é o vencimento do lote). */
 export function fraseDoVencido(o: { origem: 'LOTE' | 'ABERTA'; validadeEm: Date; porDia: string | null }): string {
   const p = partesNoRio(o.validadeEm);

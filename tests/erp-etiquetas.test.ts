@@ -16,6 +16,7 @@ import {
   fraseDaValidadeDaAbertura,
   fraseDoVencido,
   lerCodigoDoLote,
+  limiteDeUso,
   NOME_DO_PEDIDO,
   seloDoPedido,
   venceu,
@@ -30,8 +31,8 @@ import {
   situacaoDaValidade,
   validadeDaAbertura,
 } from '@/lib/erp/etiqueta-campos';
-import { conteudoDeTeste, larguraDoTexto, linhasDoConteudo, montarEtiqueta, nomeDoArquivo, paraCampoZpl, quebrarEmLinhas, textoDaEtiqueta, zplDoLayout, type ConteudoDaEtiqueta } from '@/lib/erp/etiqueta-zpl';
-import { conteudoDaEmissao, zplDaEmissao } from '@/lib/erp/etiquetas';
+import { conteudoDeTeste, larguraDoTexto, linhasDoConteudo, montarEtiqueta, nomeDoArquivo, paraCampoZpl, quebrarEmLinhas, textoDaEtiqueta, VERSAO_DO_LAYOUT, zplDoLayout, type ConteudoDaEtiqueta } from '@/lib/erp/etiqueta-zpl';
+import { conteudoDaEmissao, desenhoDaEmissao, zplDaEmissao } from '@/lib/erp/etiquetas';
 import { rastrosDoXmlGuardado } from '@/lib/erp/nfe-xml';
 import { traduzirErroDaZebra } from '@/components/erp/telas/etiquetas/browser-print';
 import { BASE } from './erp-documento-fiscal-apoio';
@@ -334,7 +335,7 @@ describe('3.4 · o ZPL: estrutura, tamanho e conteúdo', () => {
     expect(lote).toContain('RESP. NÃO REGISTRADO');
     expect(lote.join(' ')).not.toMatch(/VALIDADE \d/);
     const aberta = textos(zplDoLayout(montarEtiqueta({ ...ABERTA, validade: { tipo: 'nao-informada' }, vencimentoLote: null, lote: null, marca: null }, 'E60X40'), 1));
-    expect(aberta).toEqual(expect.arrayContaining(['PRAZO APÓS ABERTURA NÃO INFORMADO', 'VENC. LOTE NÃO INFORMADO', 'LOTE FORN. NÃO INFORMADO']));
+    expect(aberta).toEqual(expect.arrayContaining(['PRAZO APÓS ABERTURA', 'NÃO INFORMADO', 'VENC. LOTE NÃO INFORMADO', 'LOTE FORN. NÃO INFORMADO']));
     expect(aberta.join(' ')).not.toMatch(/USAR ATÉ/);
   });
 
@@ -549,8 +550,38 @@ describe('3.4 · rodada 1: vencido não emite, lote com pontuação, 300 dpi sem
     const l = montarEtiqueta(c, 'E60X40');
     expect(l.erro).toBeNull();
     const t = l.elementos.filter((e) => e.tipo === 'texto') as { texto: string; altura: number }[];
-    expect(t.find((e) => e.texto === 'PRAZO APÓS ABERTURA NÃO INFORMADO')?.altura).toBe(22);
+    // Rodada final (UX 4): o termo em duas linhas (inteiro numa linha encostava na borda com Arial), na letra normal.
+    const i = t.findIndex((e) => e.texto === 'PRAZO APÓS ABERTURA');
+    expect(i).toBeGreaterThan(-1);
+    expect(t[i + 1]).toMatchObject({ texto: 'NÃO INFORMADO', altura: 22 });
+    expect(t[i].altura).toBe(22);
     expect(t.some((e) => /PRAZO NÃO INFORMADO/.test(e.texto) && !/APÓS/.test(e.texto))).toBe(false);
+    // Folga real: cada parte termina bem antes da borda, mesmo com a estimativa de largura 10 % mais larga (Arial/Roboto).
+    for (const e of [t[i], t[i + 1]]) expect(16 + larguraDoTexto(e.texto, e.altura) * 1.1).toBeLessThan(480 - 16);
+  });
+});
+
+describe('3.4 · rodada final: a embalagem sem prazo vence com o lote; o desenho pela versão gravada', () => {
+  it('limiteDeUso: a validade gravada; sem ela, o fim do dia do vencimento do lote no Rio; sem os dois, nada', () => {
+    const v = new Date('2026-10-25T12:00:00Z');
+    expect(limiteDeUso(v, '2026-10-24')).toBe(v);
+    expect(limiteDeUso(null, '2026-10-23')!.toISOString()).toBe('2026-10-24T03:00:00.000Z');
+    expect(limiteDeUso(null, null)).toBeNull();
+    const fim = limiteDeUso(null, '2026-10-23')!;
+    expect(venceu(fim, new Date(fim.getTime() - 1))).toBe(false);
+    expect(venceu(fim, fim)).toBe(true);
+    expect(fraseDoVencido({ origem: 'ABERTA', validadeEm: fim, porDia: '2026-10-23' })).toBe('Esta embalagem venceu em 23/10: não use. Separe para descarte e avise a gerência.');
+  });
+
+  it('a versão do layout é a 1 (a primeira em produção); a emissão é desenhada pela versão gravada; versão desconhecida não imprime', () => {
+    expect(VERSAO_DO_LAYOUT).toBe(1);
+    const base = { codigo: 'E261023-0009', ordemProducaoId: 'o1', nomeSnapshot: 'Molho', unidadeSnapshot: 'KG', quantidadeMilesimos: null, conservacao: 'REFRIGERADO', loteFornecedor: null, loteProduzido: '261023-01', fabricadoEm: new Date('2026-10-23T15:00:00Z'), abertoEm: null, validadeEm: new Date('2026-10-26T15:00:00Z'), vencimentoLoteEm: null, regraDaValidade: 'LOTE_PRODUZIDO', marcaSnapshot: null, responsavelNomeSnapshot: 'Caio', lojaNomeSnapshot: 'Vila da Penha', mostrarHora: true, formato: 'E60X40' };
+    const sem = desenhoDaEmissao({ ...base, versaoDoLayout: null });
+    expect(desenhoDaEmissao({ ...base, versaoDoLayout: 1 })).toEqual(sem);
+    expect(sem.erro).toBeNull();
+    const futura = desenhoDaEmissao({ ...base, versaoDoLayout: 2 });
+    expect(futura.erro).toBe('Esta etiqueta foi emitida com o desenho versão 2, que este sistema não tem: emita de novo.');
+    expect(() => zplDaEmissao({ ...base, versaoDoLayout: 2 }, 1)).toThrow(/versão 2/);
   });
 });
 

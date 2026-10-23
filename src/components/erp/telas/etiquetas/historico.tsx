@@ -98,13 +98,14 @@ export function TelaHistoricoDeImpressoes({ h, base, contexto }: { h: HistoricoD
         </div>
       </PageHeader>
 
-      <section aria-label="Totais do período" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-        <Metrica rotulo="Pedidos" valor={t.pedidos} detalhe="Zebra, arquivo e papel" />
-        <Metrica rotulo="Etiquetas" valor={t.etiquetas} detalhe="a soma das cópias" />
-        <Metrica rotulo="Enviadas à Zebra" valor={t.enviadas} detalhe="etiquetas recebidas" />
-        <Metrica rotulo="Já imprimi" valor={t.confirmadas} detalhe="etiquetas que alguém disse que saíram" />
+      <section aria-label="Totais do período" className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <Metrica rotulo="Pedidos" valor={t.pedidos} detalhe="Zebra, arquivo, papel" />
+        <Metrica rotulo="Etiquetas" valor={t.etiquetas} detalhe="soma das cópias" />
+        <Metrica rotulo="Enviadas à Zebra" valor={t.enviadas} detalhe="a Zebra recebeu" />
+        <Metrica rotulo="Já imprimi" valor={t.confirmadas} detalhe="alguém disse que saiu" />
+        <Metrica rotulo="Esperando o Já imprimi" valor={t.esperandoConfirmacao} detalhe="arquivo ou papel" />
         <Metrica rotulo="Falharam" valor={t.falharam} detalhe={t.falharam === 1 ? 'pedido' : 'pedidos'} />
-        <Metrica rotulo="Sem resultado" valor={t.semResultado} detalhe="a Zebra não respondeu ou a tela fechou" />
+        <Metrica rotulo="Sem resultado" valor={t.semResultado} detalhe="Zebra sem resposta" />
       </section>
 
       <Painel titulo="Pedidos de impressão" subtitulo={h.origem ? (h.origem === 'lote' ? 'Só de lotes produzidos' : 'Só de embalagens abertas') : 'Lotes produzidos e embalagens abertas'} semRespiro>

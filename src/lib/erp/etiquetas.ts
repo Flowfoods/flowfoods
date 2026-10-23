@@ -45,6 +45,7 @@ import {
   diaPorExtenso,
   fraseDoVencido,
   venceu,
+  limiteDeUso,
   FORMATOS,
   ROTULO_DA_SITUACAO,
   ROTULO_DO_TRANSPORTE,
@@ -152,9 +153,26 @@ export function conteudoDaEmissao(e: EmissaoGravada): ConteudoDaEtiqueta {
   };
 }
 
+/**
+ * Os desenhos por versão (rodada final, decisão 427): a emissão é desenhada com a versão do layout GRAVADA nela, para a
+ * reimpressão sair igual mesmo depois de o desenho mudar. Hoje só existe a versão 1 (a primeira que vai para produção).
+ * Mudou o desenho? Crie a versão 2 AO LADO da 1 (a 1 continua desenhando as emissões antigas) e suba `VERSAO_DO_LAYOUT`.
+ */
+const DESENHOS: Readonly<Record<number, typeof montarEtiqueta>> = { 1: montarEtiqueta };
+
+/** O desenho de uma emissão gravada, pela versão dela; versão que este sistema não tem = layout com `erro` (não imprime). */
+export function desenhoDaEmissao(e: EmissaoGravada & { formato: string; versaoDoLayout?: number | null }, resolucao: Resolucao = 203): LayoutDaEtiqueta {
+  const versao = e.versaoDoLayout ?? 1;
+  const desenhar = DESENHOS[versao];
+  if (!desenhar) {
+    return { formato: e.formato as Formato, resolucao, larguraPontos: 0, alturaPontos: 0, elementos: [], fora: [], erro: `Esta etiqueta foi emitida com o desenho versão ${versao}, que este sistema não tem: emita de novo.` };
+  }
+  return desenhar(conteudoDaEmissao(e), e.formato as Formato, resolucao);
+}
+
 /** O ZPL de uma emissão gravada, com as cópias e a resolução do pedido. */
-export function zplDaEmissao(e: EmissaoGravada & { formato: string }, copias: number, resolucao: Resolucao = 203): string {
-  return zplDoLayout(montarEtiqueta(conteudoDaEmissao(e), e.formato as Formato, resolucao), copias);
+export function zplDaEmissao(e: EmissaoGravada & { formato: string; versaoDoLayout?: number | null }, copias: number, resolucao: Resolucao = 203): string {
+  return zplDoLayout(desenhoDaEmissao(e, resolucao), copias);
 }
 
 /** O próximo código do dia (sob a trava do dia: quem chega junto espera). */
@@ -213,7 +231,8 @@ async function filaDeImpressao(tx: ClienteDoParceiro, lojaIds: readonly string[]
       lojaId: { in: [...lojaIds] },
       regraDaValidade: { not: null },
       impressaEm: { gte: desde },
-      OR: [{ validadeEm: null }, { validadeEm: { gt: agora } }],
+      // Válida: a validade não passou; sem validade, o lote do fornecedor (se houver) ainda não venceu (decisão 425).
+      OR: [{ validadeEm: { gt: agora } }, { validadeEm: null, OR: [{ vencimentoLoteEm: null }, { vencimentoLoteEm: { gte: new Date(`${hojeNoRio(agora)}T00:00:00Z`) } }] }],
       NOT: { ordemProducao: { status: 'CANCELADA' } },
     },
     orderBy: { impressaEm: 'desc' },
@@ -286,7 +305,7 @@ export async function painelDeEtiquetas(cliente: ClienteDoParceiro, alcance: Alc
           abertoEm: a.abertoEm,
           validadeEm: a.validadeEm,
           situacao: situacaoDaAbertura(a, agora),
-          vencido: venceu(a.validadeEm, agora),
+          vencido: venceu(limiteDeUso(a.validadeEm, iso(a.vencimentoLoteEm)), agora),
           lote: a.codigoLoteSnapshot,
           abertoPor: a.abertoPorNome,
           emissoes: a._count.etiquetas,
@@ -348,8 +367,12 @@ function motivoSemEtiqueta(o: OrdemLida, agora: Date): string | null {
 }
 
 /** A situação da validade de uma abertura, com o termo único quando não há prazo (rodada 1, UX 8). */
-function situacaoDaAbertura(a: { validadeEm: Date | null; regraDaValidade: string; vencimentoLoteEm: Date | null }, agora: Date) {
-  if (a.regraDaValidade === 'PRAZO_NAO_INFORMADO') return { texto: 'Prazo após abertura não informado', tom: 'alerta' as const };
+function situacaoDaAbertura(a: { validadeEm: Date | null; regraDaValidade: string | null; vencimentoLoteEm: Date | null }, agora: Date) {
+  if (a.regraDaValidade === 'PRAZO_NAO_INFORMADO') {
+    // Rodada final (decisão 425): sem prazo, mas o lote do fornecedor venceu = venceu.
+    if (venceu(limiteDeUso(null, iso(a.vencimentoLoteEm)), agora)) return { texto: 'Venceu', tom: 'erro' as const };
+    return { texto: 'Prazo após abertura não informado', tom: 'alerta' as const };
+  }
   return situacaoDaValidade(a.validadeEm, agora, a.regraDaValidade === 'VENCIMENTO_DO_LOTE' ? iso(a.vencimentoLoteEm) : null);
 }
 
@@ -362,8 +385,10 @@ async function bloqueioDaEmissao(tx: ClienteDoParceiro, e: { ordemProducaoId: st
     const o = await tx.ordemProducao.findFirst({ where: { id: e.ordemProducaoId }, select: { status: true } });
     if (o?.status === 'CANCELADA') return 'O lote desta etiqueta foi estornado: saiu do estoque e a etiqueta não se imprime mais.';
   }
-  if (venceu(e.validadeEm, agora)) {
-    return fraseDoVencido({ origem: e.ordemProducaoId ? 'LOTE' : 'ABERTA', validadeEm: e.validadeEm!, porDia: e.regraDaValidade === 'VENCIMENTO_DO_LOTE' ? iso(e.vencimentoLoteEm) : null });
+  const limite = limiteDeUso(e.validadeEm, iso(e.vencimentoLoteEm));
+  if (venceu(limite, agora)) {
+    const porDia = e.regraDaValidade === 'VENCIMENTO_DO_LOTE' || !e.validadeEm ? iso(e.vencimentoLoteEm) : null;
+    return fraseDoVencido({ origem: e.ordemProducaoId ? 'LOTE' : 'ABERTA', validadeEm: limite!, porDia });
   }
   return null;
 }
@@ -863,7 +888,9 @@ export async function aberturaParaEtiqueta(cliente: ClienteDoParceiro, alcance: 
           situacao: situacaoDaAbertura(a, agora),
         },
         /** Rodada 1 (decisão 417): a embalagem vencida não emite etiqueta nova. */
-        motivo: venceu(a.validadeEm, agora) ? fraseDoVencido({ origem: 'ABERTA', validadeEm: a.validadeEm!, porDia: a.regraDaValidade === 'VENCIMENTO_DO_LOTE' ? vencimento : null }) : null,
+        motivo: venceu(limiteDeUso(a.validadeEm, vencimento), agora)
+          ? fraseDoVencido({ origem: 'ABERTA', validadeEm: limiteDeUso(a.validadeEm, vencimento)!, porDia: a.regraDaValidade === 'VENCIMENTO_DO_LOTE' || !a.validadeEm ? vencimento : null })
+          : null,
         previa: conteudoDaAbertura(a, loja.nome, { mostrarHora: true, codigo: codigoDaEtiqueta(diaNoRio(agora), 0) }),
         emissoes: await emissoesDe(tx, { aberturaId: a.id }),
       };
@@ -894,8 +921,10 @@ export async function emitirEtiquetaDaAbertura(
         const feita = await emissaoDaChave(tx, chave, lojaId, { aberturaId });
         if (feita) return { ok: true as const, id: feita, jaFeito: true };
         const a = await lerAberturaGravada(tx, lojaId, aberturaId);
-        if (venceu(a.validadeEm, agora)) {
-          throw new Recusa({ ok: false, erros: { geral: fraseDoVencido({ origem: 'ABERTA', validadeEm: a.validadeEm!, porDia: a.regraDaValidade === 'VENCIMENTO_DO_LOTE' ? iso(a.vencimentoLoteEm) : null }) }, conflito: true });
+        const limite = limiteDeUso(a.validadeEm, iso(a.vencimentoLoteEm));
+        if (venceu(limite, agora)) {
+          const porDia = a.regraDaValidade === 'VENCIMENTO_DO_LOTE' || !a.validadeEm ? iso(a.vencimentoLoteEm) : null;
+          throw new Recusa({ ok: false, erros: { geral: fraseDoVencido({ origem: 'ABERTA', validadeEm: limite!, porDia }) }, conflito: true });
         }
         const lido = lerEmissaoDaAbertura(entrada);
         if (!lido.ok) throw new Recusa({ ok: false, erros: lido.erros });
@@ -1004,7 +1033,7 @@ export async function obterEmissao(cliente: ClienteDoParceiro, alcance: Alcance,
           validadeEm: e.validadeEm,
           situacao:
             e.regraDaValidade === 'PRAZO_NAO_INFORMADO'
-              ? { texto: 'Prazo após abertura não informado', tom: 'alerta' as const }
+              ? situacaoDaAbertura(e, agora)
               : situacaoDaValidade(e.validadeEm, agora, e.regraDaValidade === 'VENCIMENTO_DO_LOTE' ? iso(e.vencimentoLoteEm) : null),
           emitidaEm: e.impressaEm,
           emitidaPorNome: e.emitidaPorNome,
@@ -1014,7 +1043,7 @@ export async function obterEmissao(cliente: ClienteDoParceiro, alcance: Alcance,
           ? { tipo: 'LOTE' as const, id: e.ordemProducaoId, codigo: e.loteProduzido, estornado: ordem?.status === 'CANCELADA' && !!ordem.concluidaEm }
           : { tipo: 'ABERTA' as const, id: e.aberturaId!, codigo: e.loteFornecedor, estornado: false },
         conteudo,
-        layout: montarEtiqueta(conteudo, e.formato as Formato, 203),
+        layout: desenhoDaEmissao(e, 203),
         pedidos: pedidos.map(pedidoParaTela),
         /** Rodada 1: estornada ou vencida = não se imprime mais (Zebra, arquivo e papel). */
         bloqueio: await bloqueioDaEmissao(tx, e, agora),
@@ -1029,20 +1058,6 @@ export async function obterEmissao(cliente: ClienteDoParceiro, alcance: Alcance,
 }
 
 export type EmissaoDaTela = NonNullable<Awaited<ReturnType<typeof obterEmissao>>>;
-
-/** O conteúdo de uma emissão para o arquivo/papel (lido de novo, por loja): null = não achou. */
-export async function emissaoParaArquivo(cliente: ClienteDoParceiro, alcance: Alcance, lojaId: string, etiquetaId: string) {
-  const r = await comRecusa(() =>
-    cliente.transacao(async (tx) => {
-      await lojaDoAlcance(tx, alcance, lojaId, 'etiquetas.imprimir');
-      if (!ID.test(etiquetaId)) throw naoEncontrado('Etiqueta');
-      const e = await tx.etiqueta.findFirst({ where: { id: etiquetaId, lojaId, regraDaValidade: { not: null } }, select: SELECAO_DA_EMISSAO });
-      if (!e) throw naoEncontrado('Etiqueta');
-      return { ...e, conteudo: conteudoDaEmissao(e) };
-    }),
-  );
-  return 'ok' in r ? null : r;
-}
 
 /**
  * O papel (A4) de um pedido de impressão em PAPEL: a emissão, quantas cópias e o retrato para o desenho. Só o pedido desta
@@ -1068,7 +1083,7 @@ export async function papelDoPedido(cliente: ClienteDoParceiro, alcance: Alcance
         etiqueta: { id: e.id, codigo: e.codigo, formato: e.formato as Formato, nome: e.nomeSnapshot },
         pedido: pedidoParaTela(p),
         conteudo: bloqueio ? null : conteudo,
-        layout: bloqueio ? null : montarEtiqueta(conteudo, e.formato as Formato, 203),
+        layout: bloqueio ? null : desenhoDaEmissao(e, 203),
         bloqueio,
         naFila: saiu === 0,
       };
@@ -1124,6 +1139,8 @@ export async function pedirImpressao(
         // O lote estornado depois da emissão saiu do estoque, e a etiqueta vencida não serve: não se imprime mais (decisão 417).
         const bloqueio = await bloqueioDaEmissao(tx, e, agora);
         if (bloqueio) throw new Recusa({ ok: false, erros: { geral: bloqueio }, conflito: true });
+        const desenho = desenhoDaEmissao(e, 203);
+        if (desenho.erro) throw new Recusa({ ok: false, erros: { geral: desenho.erro }, conflito: true });
         const zplDe = (n: number, res: Resolucao) => zplDaEmissao(e, n, res);
         const repetido = await tx.etiquetaImpressao.findFirst({ where: { chaveEnvio: chave }, select: { ...SELECAO_DO_PEDIDO, etiquetaId: true } });
         if (repetido) {
@@ -1207,14 +1224,23 @@ export async function confirmarImpressao(cliente: ClienteDoParceiro, alcance: Al
       const [travada] = await tx.sql<{ id: string }>`SELECT "id" FROM "Etiqueta" WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ${etiquetaId} AND "lojaId" = ${lojaId} AND "regraDaValidade" IS NOT NULL FOR UPDATE`;
       if (!travada) throw naoEncontrado('Etiqueta');
       const e = (await tx.etiqueta.findFirst({ where: { id: etiquetaId }, select: SELECAO_DA_EMISSAO }))!;
-      const pedidos = await tx.etiquetaImpressao.findMany({ where: { etiquetaId }, orderBy: { sequencia: 'desc' }, select: { id: true, situacao: true, confirmadaEm: true } });
-      const feito = pedidos.find((p) => p.situacao === 'ENVIADA' || p.confirmadaEm);
+      // Rodada final (Guardião): os pedidos são lidos TRAVADOS — a resposta da Zebra que chega junto termina antes, e aqui se
+      // vê o resultado dela (a Zebra aceitou = "já feito"), em vez de confirmar um pedido que acabou de virar "enviada".
+      const pedidos = await tx.sql<{ id: string; situacao: string; confirmada: boolean }>`
+        SELECT "id", "situacao"::text AS "situacao", "confirmadaEm" IS NOT NULL AS "confirmada" FROM "EtiquetaImpressao"
+        WHERE "parceiroId" = ${tx.parceiroId} AND "etiquetaId" = ${etiquetaId} ORDER BY "sequencia" DESC FOR UPDATE`;
+      const feito = pedidos.find((p) => p.situacao === 'ENVIADA' || p.confirmada);
       if (feito) return { ok: true as const, id: feito.id, jaFeito: true };
       const bloqueio = await bloqueioDaEmissao(tx, e, agora);
       if (bloqueio) throw new Recusa({ ok: false, erros: { geral: bloqueio }, conflito: true });
       const alvo = pedidos.find((p) => p.situacao === 'EXPORTADA' || p.situacao === 'PREPARADA');
       if (!alvo) throw new Recusa({ ok: false, erros: { geral: 'Peça a impressão primeiro (Zebra, arquivo ou papel); depois diga que saiu.' } });
-      await tx.etiquetaImpressao.update({ where: { id: alvo.id }, data: { confirmadaEm: agora, confirmadaPorNome: autor.nome, confirmadaPorUsuarioId: autor.userId ?? null } });
+      // Só confirma o pedido que ainda está sem resultado e sem confirmação (o banco relê a linha na hora de gravar).
+      const { count } = await tx.etiquetaImpressao.updateMany({
+        where: { id: alvo.id, confirmadaEm: null, situacao: { in: ['EXPORTADA', 'PREPARADA'] } },
+        data: { confirmadaEm: agora, confirmadaPorNome: autor.nome, confirmadaPorUsuarioId: autor.userId ?? null },
+      });
+      if (count !== 1) throw new Recusa({ ok: false, erros: { geral: 'A impressora respondeu agora mesmo: veja a etiqueta de novo.' }, conflito: true });
       return { ok: true as const, id: alvo.id };
     }),
   );
@@ -1244,15 +1270,27 @@ export async function historicoDeImpressoes(
       const inicio = inicioDoDiaNoRio(periodo.de);
       const fim = fimDoVencimento(periodo.ate);
       const origem = q.origem === 'lote' || q.origem === 'aberta' ? q.origem : null;
+      const daOrigem = origem ? (origem === 'lote' ? { ordemProducaoId: { not: null } } : { aberturaId: { not: null } }) : {};
       const where = {
         lojaId,
         solicitadaEm: { gte: inicio, lt: fim },
-        ...(origem ? { etiqueta: origem === 'lote' ? { ordemProducaoId: { not: null } } : { aberturaId: { not: null } } } : {}),
+        ...(origem ? { etiqueta: daOrigem } : {}),
       };
       const total = await tx.etiquetaImpressao.count({ where });
       const porSituacao = await tx.etiquetaImpressao.groupBy({ by: ['situacao'], where, _count: { _all: true }, _sum: { copias: true } });
       const confirmadas = await tx.etiquetaImpressao.aggregate({ where: { ...where, confirmadaEm: { not: null } }, _sum: { copias: true } });
       const semResultado = await tx.etiquetaImpressao.count({ where: { ...where, situacao: 'PREPARADA', confirmadaEm: null } });
+      // Rodada final (UX 6): etiquetas com arquivo baixado ou papel aberto que ninguém confirmou e que a Zebra não recebeu.
+      const esperandoConfirmacao = await tx.etiquetaImpressao.findMany({
+        where: {
+          ...where,
+          situacao: 'EXPORTADA',
+          confirmadaEm: null,
+          etiqueta: { ...daOrigem, impressoes: { none: { OR: [{ situacao: 'ENVIADA' }, { confirmadaEm: { not: null } }] } } },
+        },
+        distinct: ['etiquetaId'],
+        select: { etiquetaId: true },
+      });
       const paginas = Math.max(1, Math.ceil(total / PEDIDOS_POR_PAGINA));
       const pedida = typeof q.pagina === 'string' && /^\d{1,7}$/.test(q.pagina) ? Number(q.pagina) : 1;
       const pagina = Math.min(Math.max(1, pedida), paginas);
@@ -1285,6 +1323,8 @@ export async function historicoDeImpressoes(
           semResultado,
           /** "Já imprimi": cópias que a pessoa disse que saíram (arquivo, papel ou Zebra sem resposta). */
           confirmadas: confirmadas._sum.copias ?? 0,
+          /** Etiquetas com arquivo ou papel pedido e ainda sem o "Já imprimi" (nem a Zebra recebeu). */
+          esperandoConfirmacao: esperandoConfirmacao.length,
         },
         linhas: linhas.map((l) => ({
           ...pedidoParaTela(l),

@@ -181,6 +181,8 @@ interface Linha {
   /** Nome do campo para a tela ("a marca"). */
   nome: string;
   texto: string;
+  /** Onde a linha quebra, quando o texto inteiro encostaria na borda (cada parte ainda pode quebrar se não couber). */
+  quebra?: string[];
   essencial: boolean;
   destaque?: boolean;
   maxLinhas: number;
@@ -199,14 +201,19 @@ export function linhasDoConteudo(c: ConteudoDaEtiqueta): Linha[] {
     linhas.push({ campo: 'lote', nome: 'o lote', texto: `LOTE ${c.lote ?? 'NÃO INFORMADO'}`, essencial: true, maxLinhas: 1 });
   } else {
     linhas.push({ campo: 'abertura', nome: 'a abertura', texto: `ABERTO ${c.abertoEm ? quando(c.abertoEm) : 'SEM DATA'}`, essencial: true, maxLinhas: 1 });
-    linhas.push({ campo: 'validade', nome: 'a validade', texto: validade ? `USAR ATÉ ${validade}` : 'PRAZO APÓS ABERTURA NÃO INFORMADO', essencial: true, destaque: !!validade, maxLinhas: 2 });
+    // Sem prazo: o termo da tela, em duas linhas (inteiro numa só encostava na borda da 60 × 40 com Arial; rodada final, UX 4).
+    linhas.push(
+      validade
+        ? { campo: 'validade', nome: 'a validade', texto: `USAR ATÉ ${validade}`, essencial: true, destaque: true, maxLinhas: 2 }
+        : { campo: 'validade', nome: 'a validade', texto: 'PRAZO APÓS ABERTURA NÃO INFORMADO', quebra: ['PRAZO APÓS ABERTURA', 'NÃO INFORMADO'], essencial: true, maxLinhas: 2 },
+    );
     linhas.push({ campo: 'vencimento', nome: 'o vencimento do lote', texto: `VENC. LOTE ${c.vencimentoLote ? diaDaEtiqueta(c.vencimentoLote) : 'NÃO INFORMADO'}`, essencial: true, maxLinhas: 1 });
     linhas.push({ campo: 'lote', nome: 'o lote do fornecedor', texto: `LOTE FORN. ${c.lote ?? 'NÃO INFORMADO'}`, essencial: true, maxLinhas: 2 });
   }
   linhas.push({ campo: 'responsavel', nome: 'o responsável', texto: `RESP. ${c.responsavel ?? 'NÃO REGISTRADO'}`, essencial: true, maxLinhas: 2 });
   if (c.marca) linhas.push({ campo: 'marca', nome: 'a marca', texto: `MARCA ${c.marca}`, essencial: false, maxLinhas: 1 });
   linhas.push({ campo: 'loja', nome: 'a loja', texto: `${c.loja} · ${c.codigo}`, essencial: true, maxLinhas: 2 });
-  return linhas.map((l) => ({ ...l, texto: textoDaEtiqueta(l.texto) }));
+  return linhas.map((l) => ({ ...l, texto: textoDaEtiqueta(l.texto), quebra: l.quebra?.map(textoDaEtiqueta) }));
 }
 
 /**
@@ -273,7 +280,7 @@ function montarA203(c: ConteudoDaEtiqueta, formato: Formato): LayoutDaEtiqueta {
   // Quanto cada linha ocupa; a opcional sai se não couber (e as essenciais depois dela ainda precisam caber).
   const linhas = linhasDoConteudo(c).map((l) => {
     const med = l.destaque ? m.destaque : m.info;
-    return { ...l, altura: p(med.altura), passo: p(med.passo), partes: quebrarEmLinhas(l.texto, p(med.altura), util) };
+    return { ...l, altura: p(med.altura), passo: p(med.passo), partes: (l.quebra ?? [l.texto]).flatMap((t) => quebrarEmLinhas(t, p(med.altura), util)) };
   });
   for (const l of linhas) {
     if (l.partes.length > l.maxLinhas && l.essencial) return falha(`${primeiraMaiuscula(l.nome)} não cabe na ${nomeDoFormato}${formato === 'E60X40' ? ': use a 60 × 60' : ''}.`);
@@ -307,8 +314,12 @@ const primeiraMaiuscula = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 // ================================================================ o ZPL
 
-/** A versão do desenho (gravada na emissão): mudar posições ou fontes sobe o número. */
-export const VERSAO_DO_LAYOUT = 2; // 2 (rodada 1 da 3.4): um termo só para a embalagem sem prazo; 300 dpi ampliado do desenho de 203
+/**
+ * A versão do desenho (gravada na emissão): mudar posições, fontes ou textos fixos sobe o número, e o desenho antigo continua
+ * existindo para as emissões dele (`DESENHOS` em etiquetas.ts). A 1 é a primeira que vai para produção (decisão 427): as
+ * mudanças das rodadas da 3.4 aconteceram antes de qualquer emissão real.
+ */
+export const VERSAO_DO_LAYOUT = 1;
 
 /**
  * O documento ZPL de um layout, com `copias` (`^PQ`). Uma etiqueta por documento: as cópias saem iguais. `^CI28` antes de
