@@ -4294,3 +4294,19 @@ as 400, 401, 406, 408, 409, 410, 414, 415 e 416 corrigidas no lugar):
 **Herança que muda:** o pedido de impressão muda uma vez (o resultado) e ganha, uma vez, a confirmação "Já imprimi"; a fila e
 o histórico leem os dois (`situacao = 'ENVIADA'` ou `confirmadaEm` preenchida). Etiqueta nova que se imprime passa por
 `bloqueioDaEmissao` (estornado ou vencido) em TODOS os caminhos (emitir, pedir, papel, confirmar).
+
+**Resultado da prova da rodada 1 (2026-10-23)**
+
+| Prova | Resultado |
+|---|---|
+| `typecheck`, `lint`, `gate` (710 arquivos), `prisma validate`, `build` (0cffaa0) | limpos |
+| `erp:conferir-migracao` e `migrate diff` (banco novo por `migrate deploy`) | conferido; vazio |
+| `vitest` sem banco | 68 arquivos rodam (68 de banco pulam), 1.708 passando |
+| `vitest` com banco, superusuário, banco novo, em 4 blocos | 68 arquivos, 995 testes, todos passando (o da migration corrigido, decisão 424) |
+| Dono NÃO-superusuário com FORCE RLS (migrations pelo dono), 15 arquivos (etiquetas, telas, isolamento, RLS, acesso, permissões, produção, compras, estoque, requisição, validade, documento fiscal, insumos, onboarding) | 283 de 284 (a falha é a conhecida da 0.2, `_prisma_migrations`) |
+| Dono sem RLS, os mesmos 15 | 276 passando, 8 pulados |
+| Migration da 3.4 com dado antigo nos 3 perfis | 3 passando |
+| Ataques do Guardião (`rev34/t`, 5 arquivos) como superusuário, dono com RLS e dono sem RLS | 20/20 em cada; todo SQL cru recusado; 300 dpi: 0 diferença (antes 56) |
+| Jornada curta (build de produção) | 31 de 31: lote vencido bloqueado (painel, lote, emissão, papel antigo); sem Zebra no tablet, .zpl e papel não tiram da fila; papel A4 com 2 cópias = 1 folha (PDF); "Já imprimi" tira, com quem e quando; Zebra muda = "Sem resposta"/"Sem resultado"; "Paper out" em palavras; Zebra aceita = sai da fila; histórico com "Já imprimi" |
+| Matriz das telas mexidas × dona/operador × 390/820/1180/1440 × claro/escuro | 224 medições: 0 rolagem lateral, 0 violação do axe, 0 erro de console, nenhum alvo abaixo de 44 px com toque (depois do "Ver o estoque"), um h1, nenhum R$ nas telas de etiqueta |
+
