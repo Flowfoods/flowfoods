@@ -38,6 +38,7 @@ export function TelaDoLote({
   acoes,
   pessoas,
   bloqueio,
+  voltar,
 }: {
   d: LoteDaLoja;
   base: string;
@@ -51,6 +52,8 @@ export function TelaDoLote({
   /** Quem pode receber o lote (só para a gerência). */
   pessoas: readonly { usuarioId: string; nome: string }[];
   bloqueio: string | null;
+  /** L.4: de onde a pessoa veio (o consumo e a conciliação), já validado; sem isso, o "Voltar" de sempre. */
+  voltar?: { href: string; rotulo: string } | null;
 }) {
   const o = d.ordem;
   const u = UNIDADES[o.unidade];
@@ -73,7 +76,7 @@ export function TelaDoLote({
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: quadro }, { rotulo: `Lote ${o.codigoLote}` }]} />
-      <Voltar href={quadro}>Voltar para a produção</Voltar>
+      <Voltar href={voltar?.href ?? quadro}>{voltar ? `Voltar para ${voltar.rotulo}` : 'Voltar para a produção'}</Voltar>
       <PageHeader
         icone="producao"
         cor={COR.producao}

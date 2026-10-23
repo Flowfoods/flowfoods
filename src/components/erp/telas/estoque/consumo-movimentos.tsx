@@ -48,13 +48,14 @@ export interface EnderecosDosMovimentos {
 const DATA_HORA = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 const quando = (iso: string) => DATA_HORA.format(new Date(iso)).replace(',', ' às');
 
-function Origem({ m, e, links }: { m: MovimentoDoConsumo; e: EnderecosDosMovimentos; links: LinksDeOrigem | undefined }) {
+/** `volta`: o `?volta=` para a tela de origem trazer a pessoa de volta a estes movimentos (vazio se o endereço ficou comprido demais). */
+function Origem({ m, e, links, volta }: { m: MovimentoDoConsumo; e: EnderecosDosMovimentos; links: LinksDeOrigem | undefined; volta: string }) {
   const L = 'ff-toque ff-transicao rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:text-texto hover:decoration-texto';
   const texto = m.motivo;
   if (m.requisicaoId && links?.requisicao) {
     return (
       <>
-        <Link href={`${e.estoqueBase}/${m.lojaId}/requisicoes/${m.requisicaoId}`} className={L}>
+        <Link href={`${e.estoqueBase}/${m.lojaId}/requisicoes/${m.requisicaoId}${volta}`} className={L}>
           {m.requisicaoNumero !== null ? `Requisição #${m.requisicaoNumero}` : 'Ver a requisição'}
         </Link>
         {m.codigoLote && <span className="block text-[12px]">do lote {m.codigoLote}</span>}
@@ -64,7 +65,7 @@ function Origem({ m, e, links }: { m: MovimentoDoConsumo; e: EnderecosDosMovimen
   if (m.requisicaoId) return <span>{m.requisicaoNumero !== null ? `Requisição #${m.requisicaoNumero}` : 'Requisição'}{m.codigoLote ? ` do lote ${m.codigoLote}` : ''}</span>;
   if (m.ordemProducaoId && !m.requisicaoId) {
     return links?.lote ? (
-      <Link href={`${e.producaoBase}/${m.lojaId}/${m.ordemProducaoId}`} className={L}>
+      <Link href={`${e.producaoBase}/${m.lojaId}/${m.ordemProducaoId}${volta}`} className={L}>
         {m.codigoLote ? `Lote ${m.codigoLote}` : 'Ver o lote'}
       </Link>
     ) : (
@@ -73,7 +74,7 @@ function Origem({ m, e, links }: { m: MovimentoDoConsumo; e: EnderecosDosMovimen
   }
   if (m.contagemId) {
     const rotulo = m.contagemTipo === 'ABERTURA' ? 'Abertura do estoque' : `Contagem${m.contagemTitulo ? ` · ${m.contagemTitulo}` : ''}`;
-    const href = m.contagemTipo === 'ABERTURA' ? `${e.estoqueBase}/${m.lojaId}/abertura/conferir` : `${e.estoqueBase}/${m.lojaId}/contagens/${m.contagemId}/conferir`;
+    const href = m.contagemTipo === 'ABERTURA' ? `${e.estoqueBase}/${m.lojaId}/abertura/conferir` : `${e.estoqueBase}/${m.lojaId}/contagens/${m.contagemId}/conferir${volta}`;
     return (
       <Link href={href} className={L}>
         {rotulo}
@@ -82,7 +83,7 @@ function Origem({ m, e, links }: { m: MovimentoDoConsumo; e: EnderecosDosMovimen
   }
   if (m.notaId) {
     return links?.nota ? (
-      <Link href={`${e.comprasBase}/${m.notaId}`} className={L}>
+      <Link href={`${e.comprasBase}/${m.notaId}${volta}`} className={L}>
         {texto ?? 'Ver a nota'}
       </Link>
     ) : (
@@ -115,6 +116,9 @@ export function TelaDosMovimentos({
   links: Record<string, LinksDeOrigem>;
 }) {
   const movPath = `${enderecos.caminho}/movimentos`;
+  // As telas de origem voltam para ESTA página (com o recorte, a coluna e a página em que a pessoa estava).
+  const aqui = hrefDoConsumo(movPath, f);
+  const comVolta = aqui.length <= 1500 ? `?volta=${encodeURIComponent(aqui)}` : '';
   const voltar = f.volta || hrefDoConsumo(enderecos.caminho, f, { col: '', bucket: '', pagina: 1 }, { semPagina: true });
   const lista = r.lista;
   const col = f.col;
@@ -198,7 +202,7 @@ export function TelaDosMovimentos({
                         {quando(m.ocorridoEm)} · saldo {quantidadeLimpa(m.antesMilesimos, m.unidade)} para {quantidadeLimpa(m.depoisMilesimos, m.unidade)}
                       </p>
                       <p className="text-[12px] text-suave">
-                        <Origem m={m} e={enderecos} links={links[m.lojaId]} />
+                        <Origem m={m} e={enderecos} links={links[m.lojaId]} volta={comVolta} />
                       </p>
                     </li>
                   ))}
@@ -247,7 +251,7 @@ export function TelaDosMovimentos({
                           <span className="sr-only"> passa a </span> <span className="font-semibold text-texto">{quantidadeLimpa(m.depoisMilesimos, m.unidade)}</span>
                         </td>
                         <td className="py-2.5 pl-3 pr-5 text-[13px] text-suave">
-                          <Origem m={m} e={enderecos} links={links[m.lojaId]} />
+                          <Origem m={m} e={enderecos} links={links[m.lojaId]} volta={comVolta} />
                         </td>
                       </tr>
                     ))}

@@ -140,7 +140,7 @@ describe('L.4 · as lacunas', () => {
     expect(chaves({ finalMilesimos: -10_000, minSaldoMilesimos: -10_000 })).toEqual(['negativo-final']);
     expect(chaves({ minSaldoMilesimos: -3_000 })).toEqual(['negativo-no-meio']);
     const l = lacunasDaLinha({ ...base, unidade: 'UN', finalMilesimos: -10_000 })[0];
-    expect(l.texto).toMatch(/termina o período com −10 un/);
+    expect(l.texto).toMatch(/termina o período com −10\u00A0un/);
     expect(l.dura).toBe(true);
   });
 
@@ -152,6 +152,18 @@ describe('L.4 · as lacunas', () => {
     expect(ls.map((x) => [x.chave, x.dura])).toEqual([['sem-contagem', false], ['sem-valor', false]]);
     expect(ls[0].texto).toMatch(/Nenhuma contagem até aqui/);
     expect(lacunasDaLinha({ ...base, contadoNoPeriodo: false })[0].texto).toMatch(/A última contagem foi em 12\/10\/2026/);
+  });
+
+  it('R$ negativo com quantidade positiva ganha a explicação (só para quem vê R$, e só como aviso)', () => {
+    const l = lacunasDaLinha({ ...base, finalMilesimos: 7_000, finalCentavos: -1_000 }).find((x) => x.chave === 'valor-negativo');
+    expect(l?.dura).toBe(false);
+    expect(l?.rotulo).toBe('R$ negativo');
+    expect(l?.texto).toMatch(/saldo tem 7\u00A0kg, mas o R\$ dele está negativo \(−R\$\s10,00\)/);
+    expect(l?.texto).toMatch(/A quantidade está certa/);
+    // Sem ver R$, quantidade zero ou R$ positivo: nada a explicar.
+    expect(chaves({ finalMilesimos: 7_000, finalCentavos: -1_000, verValores: false })).toEqual([]);
+    expect(chaves({ finalMilesimos: 7_000, finalCentavos: 500 })).toEqual([]);
+    expect(chaves({ finalMilesimos: 0, finalCentavos: -500 })).toEqual([]);
   });
 
   it('sem movimento no período não pede contagem; sem valor só é dito a quem vê R$', () => {
@@ -185,12 +197,16 @@ describe('L.4 · filtros da URL, sinal e planilha', () => {
   });
 
   it('sinal sempre à vista (+ entra, − sai), negativo com o sinal tipográfico, zero sem sinal', () => {
-    expect(quantidadeComSinal(12_500, 'KG')).toBe('+12,5 kg');
-    expect(quantidadeComSinal(-2_000, 'KG')).toBe('−2 kg');
-    expect(quantidadeComSinal(-761, 'KG')).toBe('−761 g');
-    expect(quantidadeComSinal(0, 'UN')).toBe('0 un');
-    expect(quantidadeLimpa(-10_000, 'UN')).toBe('−10 un');
-    expect(quantidadeLimpa(6_500, 'L')).toBe('6,5 L');
+    expect(quantidadeComSinal(12_500, 'KG')).toBe('+12,5\u00A0kg');
+    expect(quantidadeComSinal(-2_000, 'KG')).toBe('−2\u00A0kg');
+    expect(quantidadeComSinal(-761, 'KG')).toBe('−761\u00A0g');
+    expect(quantidadeComSinal(0, 'UN')).toBe('0\u00A0un');
+    // Zero diz a unidade do insumo, não a menor ("0 ml", "0 g"), e número e unidade não se separam na quebra de linha.
+    expect(quantidadeComSinal(0, 'L')).toBe('0\u00A0L');
+    expect(quantidadeLimpa(0, 'KG')).toBe('0\u00A0kg');
+    expect(quantidadeComSinal(-37_739, 'KG')).toBe('−37,739\u00A0kg');
+    expect(quantidadeLimpa(-10_000, 'UN')).toBe('−10\u00A0un');
+    expect(quantidadeLimpa(6_500, 'L')).toBe('6,5\u00A0L');
     expect(dinheiroComSinal(-625).replace(/ /g, ' ')).toBe('−R$ 6,25');
     expect(dinheiroComSinal(4250).replace(/ /g, ' ')).toBe('+R$ 42,50');
   });

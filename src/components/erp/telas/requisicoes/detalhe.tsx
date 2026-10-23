@@ -31,6 +31,7 @@ export function TelaDetalheDaRequisicao({
   acoes,
   bloqueio,
   hrefProducao,
+  voltar,
 }: {
   d: RequisicaoDaLoja;
   base: string;
@@ -41,6 +42,8 @@ export function TelaDetalheDaRequisicao({
   pode: { atender: boolean; cancelar: boolean };
   acoes: { devolver: AcaoDeEstoque; cancelar: AcaoDeEstoque };
   bloqueio: string | null;
+  /** L.4: de onde a pessoa veio (o consumo e a conciliação), já validado; sem isso, o "Voltar" de sempre. */
+  voltar?: { href: string; rotulo: string } | null;
 }) {
   const r = d.requisicao;
   const daLoja = `${base}/${d.loja.id}`;
@@ -56,7 +59,7 @@ export function TelaDetalheDaRequisicao({
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: quadro }, { rotulo: numeroDaRequisicao(r.numero) }]} />
-      <Voltar href={quadro}>Voltar para as requisições</Voltar>
+      <Voltar href={voltar?.href ?? quadro}>{voltar ? `Voltar para ${voltar.rotulo}` : 'Voltar para as requisições'}</Voltar>
       <PageHeader
         icone="estoque"
         cor={COR.estoque}

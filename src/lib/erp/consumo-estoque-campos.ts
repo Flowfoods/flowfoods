@@ -20,7 +20,7 @@
 import { OPCOES_POR_PAGINA, POR_PAGINA_PADRAO, lerPorPagina } from './insumo-campos';
 import { hojeNoRio, lerData } from './compra-campos';
 import { atalhosDePeriodo, lerPagina, somarDias } from './compras-relatorio-campos';
-import { formatarDinheiro, formatarQuantidade, type Unidade } from './unidades';
+import { formatarDinheiro, formatarQuantidade, UNIDADES, type Unidade } from './unidades';
 
 export { OPCOES_POR_PAGINA, POR_PAGINA_PADRAO, atalhosDePeriodo, somarDias };
 
@@ -204,9 +204,23 @@ export function usoBrutoELiquido(s: SomasPorBucket): BrutoELiquido {
   return { bruto, desfeito, liquido: junta(bruto, desfeito) };
 }
 
+/**
+ * A linha "Compras: … lançadas, … em cancelamentos e correções de nota = … líquidas / Uso: … requisitados, … devolvidos = … líquidos" de
+ * uma unidade: a MESMA na tela, na impressão e na planilha (bruto e líquido definidos no mesmo lugar).
+ */
+export function frasesDoBrutoELiquido(s: SomasPorBucket, unidade: Unidade) {
+  const compras = comprasBrutaELiquida(s);
+  const uso = usoBrutoELiquido(s);
+  const qtd = (m: number) => quantidadeComSinal(m, unidade);
+  return {
+    compras: { lancadas: qtd(compras.bruto.q), cancelamentos: qtd(compras.desfeito.q), liquidas: qtd(compras.liquido.q) },
+    uso: { requisitados: qtd(uso.bruto.q), devolvidos: qtd(uso.desfeito.q), liquidos: qtd(uso.liquido.q) },
+  };
+}
+
 // ---------------------------------------------------------------- lacunas
 
-export type LacunaId = 'sem-contagem' | 'negativo-final' | 'negativo-no-meio' | 'sem-origem' | 'livro-diverge' | 'sem-valor' | 'unidade-mudou';
+export type LacunaId = 'sem-contagem' | 'negativo-final' | 'negativo-no-meio' | 'sem-origem' | 'livro-diverge' | 'sem-valor' | 'valor-negativo' | 'unidade-mudou';
 
 export interface Lacuna {
   chave: LacunaId;
@@ -232,6 +246,8 @@ export interface DadosParaLacunas {
   ultimaContagemEm: string | null;
   /** Mostra R$? (a lacuna "sem valor" só fala de dinheiro para quem o vê.) */
   verValores: boolean;
+  /** O R$ do saldo final (só olhado se `verValores`). */
+  finalCentavos?: number;
 }
 
 const br = (d: string) => d.split('-').reverse().join('/');
@@ -293,6 +309,14 @@ export function lacunasDaLinha(d: DadosParaLacunas): Lacuna[] {
       dura: false,
     });
   }
+  if (d.verValores && d.finalCentavos !== undefined && d.finalCentavos < 0 && d.finalMilesimos > 0) {
+    saida.push({
+      chave: 'valor-negativo',
+      rotulo: 'R$ negativo',
+      texto: `O saldo tem ${quantidadeLimpa(d.finalMilesimos, d.unidade)}, mas o R$ dele está negativo (${dinheiroLimpo(d.finalCentavos)}): o livro valora cada saída pelo custo do dia e cada entrada pelo valor da nota, e aqui as saídas custaram mais do que as entradas que sobraram (comum quando se dá baixa antes da nota entrar). A quantidade está certa; confira os preços.`,
+      dura: false,
+    });
+  }
   return saida;
 }
 
@@ -304,15 +328,26 @@ export const sp = (n: number) => n.toLocaleString('pt-BR');
 export const pl = (n: number, um: string, varios: string) => `${sp(n)} ${n === 1 ? um : varios}`;
 const MENOS = '−';
 
+const NBSP = '\u00A0';
+
+/**
+ * "12,5 kg" com o espaço que NÃO quebra (o número e a unidade ficam juntos na linha do celular). Zero diz a unidade do insumo
+ * ("0 L", "0 kg", "0 un"), não a menor ("0 ml", "0 g").
+ */
+function numeroComUnidade(milesimos: number, unidade: Unidade): string {
+  if (milesimos === 0) return `0${NBSP}${UNIDADES[unidade].sigla}`;
+  return formatarQuantidade(milesimos, unidade).replace(/ (?=[^ ]+$)/, NBSP);
+}
+
 /** "12,5 kg" ou "−2 kg" (negativo com o sinal tipográfico; a lib de quantidade não trata negativo). */
 export function quantidadeLimpa(milesimos: number, unidade: Unidade): string {
-  return milesimos < 0 ? `${MENOS}${formatarQuantidade(-milesimos, unidade)}` : formatarQuantidade(milesimos, unidade);
+  return milesimos < 0 ? `${MENOS}${numeroComUnidade(-milesimos, unidade)}` : numeroComUnidade(milesimos, unidade);
 }
 
 /** "+12,5 kg", "−2 kg" ou "0 kg": o sinal sempre, para quem lê não depender de cor. */
 export function quantidadeComSinal(milesimos: number, unidade: Unidade): string {
-  if (milesimos === 0) return formatarQuantidade(0, unidade);
-  return milesimos < 0 ? `${MENOS}${formatarQuantidade(-milesimos, unidade)}` : `+${formatarQuantidade(milesimos, unidade)}`;
+  if (milesimos === 0) return numeroComUnidade(0, unidade);
+  return milesimos < 0 ? `${MENOS}${numeroComUnidade(-milesimos, unidade)}` : `+${numeroComUnidade(milesimos, unidade)}`;
 }
 
 /** "+R$ 42,50", "−R$ 6,25" ou "R$ 0,00". */

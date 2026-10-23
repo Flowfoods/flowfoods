@@ -23,7 +23,6 @@ import {
   NOTA_DO_USO,
   ROTULO_DA_COLUNA,
   avisosDoConsumo,
-  comprasBrutaELiquida,
   dinheiroComSinal,
   dinheiroLimpo,
   fraseDoPeriodoDoConsumo,
@@ -32,7 +31,7 @@ import {
   quantidadeLimpa,
   queryDoConsumo,
   somaDaColuna,
-  usoBrutoELiquido,
+  frasesDoBrutoELiquido,
   type BucketId,
   type ColunaDeLink,
   type ColunaId,
@@ -139,10 +138,8 @@ const LINHAS_DA_PONTE: { coluna: ColunaId; rotulo: string; explica: string }[] =
 
 function PonteDaUnidade({ u, liga, verValores, linhasNoRecorte }: { u: ResumoDaUnidade; liga: Liga; verValores: boolean; linhasNoRecorte: number }) {
   const un = SIGLA(u.unidade);
-  const compras = comprasBrutaELiquida(u.somas);
-  const uso = usoBrutoELiquido(u.somas);
+  const frases = frasesDoBrutoELiquido(u.somas, u.unidade);
   const confere = u.diferencaMilesimos === 0;
-  const qtd = (m: number) => quantidadeComSinal(m, u.unidade);
   return (
     <Painel
       titulo={`Em ${un}: do saldo inicial ao final`}
@@ -223,8 +220,8 @@ function PonteDaUnidade({ u, liga, verValores, linhasNoRecorte }: { u: ResumoDaU
         </tbody>
       </table>
       <p className="border-t border-linha px-4 py-3 text-[13px] leading-relaxed text-suave sm:px-5">
-        <span className="font-semibold text-texto">Compras:</span> {qtd(compras.bruto.q)} lançadas, {qtd(compras.desfeito.q)} em cancelamentos e correções de nota = <span className="font-semibold text-texto">{qtd(compras.liquido.q)} líquidas</span>.{' '}
-        <span className="font-semibold text-texto">Uso:</span> {qtd(uso.bruto.q)} requisitados, {qtd(uso.desfeito.q)} devolvidos = <span className="font-semibold text-texto">{qtd(uso.liquido.q)} líquidos</span>.
+        <span className="font-semibold text-texto">Compras:</span> {frases.compras.lancadas} lançadas, {frases.compras.cancelamentos} em cancelamentos e correções de nota = <span className="font-semibold text-texto">{frases.compras.liquidas} líquidas</span>.{' '}
+        <span className="font-semibold text-texto">Uso:</span> {frases.uso.requisitados} requisitados, {frases.uso.devolvidos} devolvidos = <span className="font-semibold text-texto">{frases.uso.liquidos} líquidos</span>.
       </p>
     </Painel>
   );

@@ -27,6 +27,8 @@ import {
   ROTULO_DO_LINK,
   avisosDoConsumo,
   fraseDoPeriodoDoConsumo,
+  comprasBrutaELiquida,
+  usoBrutoELiquido,
   lerFiltrosDoConsumo,
   quantidadeParaPlanilha,
   reaisComSinalParaPlanilha,
@@ -227,6 +229,11 @@ async function montarPlanilhaDoConsumo(
     for (const b of LISTA_DE_BUCKETS) partes.push(linha([texto(`${BUCKETS[b].rotulo} (${un})`), quantidadeParaPlanilha(u.somas[b]?.q ?? 0), ...(vv ? [reaisComSinalParaPlanilha(u.somas[b]?.v ?? 0)] : [])]));
     partes.push(linha([texto(`Saldo final (${un})`), quantidadeParaPlanilha(u.final.q), ...(vv ? [reaisComSinalParaPlanilha(u.final.v)] : [])]));
     partes.push(linha([texto(`Confere (${un})`), SIM_NAO(u.diferencaMilesimos === 0)]));
+    // Bruto e líquido da unidade (as mesmas contas da frase "Compras: … lançadas … = … líquidas" da tela e da impressão).
+    const compras = comprasBrutaELiquida(u.somas);
+    const uso = usoBrutoELiquido(u.somas);
+    partes.push(linha([texto(`Compras (${un}): lançadas | cancelamentos e correções de nota | líquidas`), quantidadeParaPlanilha(compras.bruto.q), quantidadeParaPlanilha(compras.desfeito.q), quantidadeParaPlanilha(compras.liquido.q)]));
+    partes.push(linha([texto(`Uso (${un}): requisitados | devolvidos | líquidos`), quantidadeParaPlanilha(uso.bruto.q), quantidadeParaPlanilha(uso.desfeito.q), quantidadeParaPlanilha(uso.liquido.q)]));
   }
   partes.push(linha([texto('Insumos × lojas no relatório'), r.resumo.linhas]));
   partes.push(linha([texto('Com lacuna que pede atenção'), r.resumo.comLacunaDura]));

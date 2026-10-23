@@ -5,10 +5,11 @@ import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { conferenciaDaContagem } from '@/lib/erp/contagem';
 import { TelaConferirContagem } from '@/components/erp/telas/estoque/conferir-contagem';
 import { acaoConcluirContagem, acaoDescartarContagem } from '../../../../actions';
+import { voltaDoRelatorio } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroConferirContagemPage({ params, searchParams }: { params: { slug: string; lojaId: string; contagemId: string }; searchParams: { feito?: string } }) {
+export default async function ParceiroConferirContagemPage({ params, searchParams }: { params: { slug: string; lojaId: string; contagemId: string }; searchParams: { feito?: string; volta?: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'estoque.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;
@@ -19,6 +20,7 @@ export default async function ParceiroConferirContagemPage({ params, searchParam
     <TelaConferirContagem
       c={c}
       base={`${base}/estoque`}
+      voltar={voltaDoRelatorio(searchParams.volta, `/rodolfo/erp/${ctx.parceiro.slug}`)}
       contexto={ctx.parceiro.nome}
       feito={searchParams.feito}
       notasBase={`${base}/compras`}

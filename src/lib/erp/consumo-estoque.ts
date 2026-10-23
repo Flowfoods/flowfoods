@@ -285,6 +285,7 @@ function montarLinha(r: RecorteDoConsumo, p: ParLido, buckets: BucketLido[]): Li
       contadoNoPeriodo: p.contadoNoPeriodo,
       ultimaContagemEm: base.ultimaContagemEm,
       verValores: r.verValores,
+      finalCentavos: base.final.v,
     }),
   };
 }

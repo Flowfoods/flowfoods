@@ -17,6 +17,7 @@ import {
   dinheiroComSinal,
   dinheiroLimpo,
   fraseDoPeriodoDoConsumo,
+  frasesDoBrutoELiquido,
   quantidadeComSinal,
   quantidadeLimpa,
   somaDaColuna,
@@ -155,6 +156,17 @@ export function ImpressaoDoConsumo({
               </tbody>
             </table>
           </div>
+          <ul className="mt-2 space-y-1 text-[12px]">
+            {resumo.unidades.map((u) => {
+              const fr = frasesDoBrutoELiquido(u.somas, u.unidade);
+              return (
+                <li key={u.unidade}>
+                  <strong className="font-semibold">Em {UNIDADES[u.unidade].sigla}. Compras:</strong> {fr.compras.lancadas} lançadas, {fr.compras.cancelamentos} em cancelamentos e correções de nota = <strong className="font-semibold">{fr.compras.liquidas} líquidas</strong>.{' '}
+                  <strong className="font-semibold">Uso:</strong> {fr.uso.requisitados} requisitados, {fr.uso.devolvidos} devolvidos = <strong className="font-semibold">{fr.uso.liquidos} líquidos</strong>.
+                </li>
+              );
+            })}
+          </ul>
         </section>
 
         <section aria-label="Insumos e lojas">

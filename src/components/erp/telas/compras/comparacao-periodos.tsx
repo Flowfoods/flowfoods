@@ -435,7 +435,10 @@ export function TelaDosPeriodos({
   const s = c?.resumo;
   const a = r.a;
   const b = r.b;
-  const avisos = a && b && c ? avisosDaTela(r, f, hoje) : [];
+  const todosOsAvisos = a && b && c ? avisosDaTela(r, f, hoje) : [];
+  // "Nenhum dos dois períodos teve compra" é o próprio texto do quadro vazio: dito uma vez só (a planilha segue com a frase nos avisos).
+  const semAmbos = todosOsAvisos.find((x) => x.chave === 'sem-ambos');
+  const avisos = todosOsAvisos.filter((x) => x.chave !== 'sem-ambos');
   const temFiltro = f.rel.lojaIds.length > 0 || !!f.rel.fornecedorId || !!f.rel.insumoId || !!f.rel.q || !!f.rel.categoriaId;
   const itensComBase = c?.itens ?? [];
   const semLado = !!s && (s.semCompraA || s.semCompraB);
@@ -498,7 +501,7 @@ export function TelaDosPeriodos({
           {c.itens.length === 0 ? (
             <Painel semRespiro>
               <Vazio titulo="Nenhuma compra comparável nos dois períodos." acao={temFiltro ? <Link href={hrefDosPeriodos(caminho, f, { rel: { lojaIds: [], fornecedorId: '', insumoId: '', q: '', categoriaId: '' } })} className={classeDeBotao('secundario')}>Tirar os filtros</Link> : undefined}>
-                Confira os períodos e a data usada ({BASES_DE_DATA[f.rel.base].curto}).
+                {semAmbos ? semAmbos.texto : `Confira os períodos e a data usada (${BASES_DE_DATA[f.rel.base].curto}).`}
               </Vazio>
             </Painel>
           ) : (

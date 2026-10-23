@@ -139,7 +139,7 @@ export function lerFiltrosDoRelatorio(sp: Params, hoje = hojeNoRio(), padrao: Pa
     situacao: um(sp.situacao) === 'canceladas' ? 'canceladas' : 'lancadas',
     ver: um(sp.ver) === 'linhas' ? 'linhas' : (padrao.ver ?? 'resumo'),
     // "n:<nome da nota>" = fornecedor sem cadastro, pelo nome que a nota guardou (decisão 386).
-    grupo: grupo === '-' || /^[a-z0-9]{1,64}$/i.test(grupo) || lerData(grupo) === grupo || /^n:[^\u0000-\u001f\u007f]{1,200}$/.test(grupo) ? grupo : '',
+    grupo: grupo === '-' || /^[a-z0-9]{1,64}$/i.test(grupo) || lerData(grupo) === grupo || /^n:[^\u0000-\u001f\u007f]{1,500}$/.test(grupo) ? grupo : '',
     unidade: unidade === 'sem' || unidade === 'KG' || unidade === 'L' || unidade === 'UN' ? unidade : '',
     so: um(sp.so) === 'sembase' ? 'sembase' : '',
     pagina: lerPagina(um(sp.pagina)),

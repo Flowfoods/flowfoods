@@ -376,7 +376,7 @@ describe.skipIf(!URL_TESTE)('ERP L.4 · consumo e conciliação de estoque (Post
     const ovo = await linha('ovo');
     expect([ovo.unidade, ovo.inicial.q, q(ovo, 'uso_setor'), ovo.final.q]).toEqual(['UN', 0, -10_000, -10_000]);
     expect(ovo.lacunas.map((x) => x.chave)).toEqual(['negativo-final', 'sem-contagem']);
-    expect(ovo.lacunas[0].texto).toMatch(/termina o período com −10 un/);
+    expect(ovo.lacunas[0].texto).toMatch(/termina o período com −10\u00A0un/);
     const alho = await linha('alho');
     expect([q(alho, 'uso_setor'), q(alho, 'compra'), alho.final.q, alho.minSaldo]).toEqual([-3_000, 10_000, 7_000, -3_000]);
     expect(alho.lacunas.map((x) => x.chave)).toEqual(['negativo-no-meio', 'sem-contagem']);
@@ -608,6 +608,12 @@ describe.skipIf(!URL_TESTE)('ERP L.4 · consumo e conciliação de estoque (Post
       expect(cabecalho).toMatch(/Uso é a requisição registrada/);
       expect(cabecalho).toMatch(/Transferência entre lojas ainda não existe/);
       expect(cabecalho).toMatch(/Aviso;.*1 nota fiscal recebida \(XML\) aguarda conferência/);
+    });
+
+    it('bruto e líquido saem na planilha como na tela: compras lançadas, cancelamentos e correções, líquidas; requisitado, devolvido, líquido', async () => {
+      const cebola = (await csv({ insumo: ids.cebola, loja: ids.vp })).join('\n');
+      expect(cebola).toContain('Compras (kg): lançadas | cancelamentos e correções de nota | líquidas;80;-18;62');
+      expect(cebola).toContain('Uso (kg): requisitados | devolvidos | líquidos;-31,239;5;-26,239');
     });
 
     it('o dinheiro só sai para quem vê: dona tem as colunas em R$, operador não tem nenhuma', async () => {

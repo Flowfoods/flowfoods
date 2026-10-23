@@ -120,7 +120,7 @@ export function fonte(r: Recorte): Prisma.Sql {
  * ("n:Feira do João"), para duas notas de fornecedores sem cadastro diferentes não virarem um só; sem nome nenhum, "-". É a MESMA
  * chave em "Compras do período", na comparação de fornecedores e na de períodos (decisão 386).
  */
-export const FORNECEDOR_DA_LINHA = guardado(Prisma.sql`COALESCE(f."fornecedorId", CASE WHEN COALESCE(f."fornecedorNomeSnapshot", '') = '' THEN '-' ELSE 'n:' || f."fornecedorNomeSnapshot" END)`);
+export const FORNECEDOR_DA_LINHA = guardado(Prisma.sql`COALESCE(f."fornecedorId", CASE WHEN COALESCE(f."fornecedorNomeSnapshot", '') = '' THEN '-' ELSE 'n:' || left(f."fornecedorNomeSnapshot", 500) END)`);
 
 /** O nome do fornecedor de uma linha de `f`: o do cadastro (ou o da nota); sem cadastro, o da nota com "(sem cadastro)". */
 export const NOME_DO_FORNECEDOR_DA_LINHA = guardado(Prisma.sql`(CASE
