@@ -355,3 +355,9 @@ Editorial (separadores delicados, número de tabela sem serifa):
 - **Área de toque (L.4, sistêmico)**: o link de texto com folga invisível (`ff-toque`, link de tabela, de aviso e da trilha) ganha
   `position: relative; z-index: 1` (a folga ganha da linha seguinte, que antes a cobria e deixava o alvo em ~34 px), `min-width: 44px` (número
   curto) e a linha de tabela tem passo de 44 px no toque; número em cartão é um link `inline-flex min-h-11 min-w-11` (caixa real).
+- **Relatório pesado (L.4, rodada do Guardião)**: quando o banco corta a consulta (teto de 20 s) ou há outros relatórios grandes rodando, a tela
+  mostra o quadro vazio com a frase ("O relatório ficou grande demais" + "Diminua o período ou escolha menos lojas", ou "Há outro relatório grande
+  rodando" + "Tente em instantes"), os filtros continuam à vista e a saída é "Tentar de novo" / "Limpar e recomeçar" (`ui/relatorio-grande.tsx`
+  nos relatórios de compras). Nunca página de erro. **Quantidade**: o espaço entre número e unidade é o que não quebra ("−37,739 kg" fica numa
+  linha só a 390 px) e zero diz a unidade do insumo ("0 kg", "0 L"), nunca a menor ("0 g", "0 ml"). **Menu**: o grupo de um item só mostra o rótulo
+  do grupo quando ele diz outra coisa que o item ("RELATÓRIOS › Consumo e conciliação").

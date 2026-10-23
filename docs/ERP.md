@@ -4117,25 +4117,35 @@ NODE_OPTIONS=--max-old-space-size=6144 npm run build
 npm run erp:conferir-migracao
 npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio (não há migration nova)
 ```
-`tests/erp-consumo-estoque.test.ts` (sem banco, 18): o mapa das caixas (uma coluna por caixa), a ponte, bruto × líquido, a propriedade com 300 sequências, as lacunas, os filtros da URL, o sinal, a planilha de negativo e os avisos. `tests/erp-consumo-estoque.db.test.ts` (Postgres de verdade, cenário conferido à mão no cabeçalho do arquivo, 22 testes, a planilha inclusa): a conta da Cebola, SQL independente, contado e não contado, lote e lote estornado, negativos, sem origem e perda, o dia do Rio, o resumo por unidade, os filtros, o XML aguardando, "só lê", os movimentos de cada número, perfis e isolamento, o dinheiro do livro e o teto. Sem migration: os 3 perfis de banco não têm o que aplicar; os arquivos de banco tocados rodam nos dois perfis.
+`tests/erp-consumo-estoque.test.ts` (sem banco, 19): o mapa das caixas (uma coluna por caixa), a ponte, bruto × líquido, a propriedade com 300 sequências, as lacunas, os filtros da URL, o sinal, a planilha de negativo e os avisos. `tests/erp-consumo-estoque.db.test.ts` (Postgres de verdade, cenário conferido à mão no cabeçalho do arquivo, 26 testes, a planilha inclusa): a conta da Cebola, SQL independente, contado e não contado, lote e lote estornado, negativos, sem origem e perda, o dia do Rio, o resumo por unidade, os filtros, o XML aguardando, "só lê", os movimentos de cada número, perfis e isolamento, o dinheiro do livro e o teto, o R$ zerado na própria consulta de quem não vê custo e o relatório respondendo com a frase quando as vagas estão ocupadas. `tests/erp-vagas-de-relatorio.test.ts` (sem banco, 5) e `tests/erp-relatorio-teto.db.test.ts` (Postgres, 5): vagas e fila, teto cortado pelo banco, somente leitura no portão e no banco, o teto que não vaza no pool e seis relatórios juntos com no máximo três ao mesmo tempo. Sem migration: os 3 perfis de banco não têm o que aplicar; os arquivos de banco tocados rodam nos dois perfis.
 
-**Resultado da prova (L.4)**
+**Resultado da prova (L.4), rodada do Guardião e da UX (disponibilidade)**
 
 | Prova | Resultado |
 |---|---|
-| `prisma validate`, `typecheck`, `lint`, `gate` | limpos (659 arquivos varridos no portão) |
-| `npm run build` | passou |
+| `prisma validate`, `typecheck`, `lint`, `gate` (661 arquivos), `build` | limpos |
 | `erp:conferir-migracao` e `migrate diff` contra o schema | conferido; "No difference detected" (a L.4 não tem migration) |
-| `vitest` sem banco | 1.640 passaram, 908 pulados (sem `ERP_DB_TESTE`) |
-| `vitest` com banco, 2 rodadas em paralelo (`ff_l4a` e `ff_l4b`, superusuário) | 2.592 de 2.592 nas duas |
-| Arquivos de banco tocados (consumo, comparação e relatório de compras), dono não-superusuário **com** RLS (42 políticas) | 68 de 68 (a prova achou que o SQL de conferência do teste da L.4 lia fora do contexto do parceiro; passou a rodar dentro dele quando a RLS é forçada) |
-| Os mesmos, dono não-superusuário **sem** RLS (0 políticas) | 68 de 68 |
-| Produção local (`next start`, porta 3100), dono, matriz 4 larguras (1440, 1180, 820, 390) x claro e escuro | 0 problemas em 56 combinações por tema: sem rolagem lateral, sem texto miúdo, hit-test de toque sem sobreposição da linha seguinte, axe sem violação, sem erro de console |
-| Mesma matriz nas 5 páginas da L.3 mexidas pelos ajustes herdados | 0 problemas em 60 combinações por tema, claro e escuro |
+| `vitest` sem banco | 1.647 passaram, 918 pulados (sem `ERP_DB_TESTE`) |
+| `vitest` com banco, 2 rodadas em paralelo (superusuário) | 2.609 de 2.609 nas duas |
+| Arquivos de banco tocados (consumo, teto de relatório, relatório e comparação de compras), dono não-superusuário **com** RLS (42 políticas) e **sem** RLS (0 políticas), em série | 77 de 77 nos dois |
+| Produção local (`next start`, porta 3100), matriz de 10 telas x 4 larguras (1440, 1180, 820, 390), claro e escuro | 0 problemas em 56 combinações por tema: sem rolagem lateral, sem texto miúdo, hit-test de toque ≥ 44 px sem sobreposição, axe sem violação, sem erro de console |
 | Jornada por perfil (dono, gerente só das lojas dele, operador e cozinha sem R$, isolamento entre dois parceiros) | 76 verificações, 0 falhas |
+| Pontos tocados na rodada, no navegador | 21 de 21: links de origem com volta (nota, requisição, lote, contagem) e volta forjada ignorada; grupo Relatórios no menu; "0 L" no lugar de "0 ml"; número e unidade sem quebra a 390 px; R$ negativo do Alho explicado; aviso da comparação uma vez só; Compras/Uso bruto e líquido na impressão e no CSV |
 
-Desempenho medido com 320 mil movimentos (8 lojas x 400 insumos x 100 movimentos), banco local, a quente: ler a fonte do livro 1,8 s; resumo por unidade 3,6 s; página de 50 linhas 3,2 s; um insumo 47 ms; movimentos de um número 34 ms. Na primeira chamada fria do processo, "1 mês" levou 31 s (plano e cache frios); depois, 3 a 8 s para 3 meses, ano ou planilha completa de 3.200 linhas. É folga bem acima do volume de uma rede de 16 lojas num mês, mas o limite está dito: acima disso o caminho é materializar o saldo por dia, não afrouxar o teto.
+**Desempenho e concorrência** (320 mil movimentos: 8 lojas x 400 insumos x 100 movimentos; banco local de 4 núcleos):
 
+| Medida | Antes da rodada | Depois |
+|---|---|---|
+| Tela de 1 mês, banco aquecido | 7 a 10 s (o livro lido 3 vezes) | **1,9 s** (uma leitura) |
+| Tela de 1 mês, cache frio (banco recém-reiniciado) | 8 a 31 s | **4,3 s** |
+| 3 meses, ano, planilha completa (3.200 linhas) | 8 s, 8 s, 6 s | 2,0 s, 2,2 s, 2,2 s |
+| Uma loja, um mês | 4,4 s | 0,4 s |
+| Movimentos de um número (um par) / da coluna "ajustes" inteira | 34 ms / 2,4 s | 33 ms / 0,4 s |
+| 20 pedidos pesados ao mesmo tempo (HTTP, produção local) | pool esgotado: erro "Unable to start a transaction" e o ERP travado | **20 respostas 200 em 9,8 s: 6 com os números, 14 com "Há outro relatório grande rodando", nenhum 5xx** |
+| Tela leve durante os 20 pesados | travava | mediana de 77 ms (repouso: 90 ms); maior espera de 809 ms, todas 200 |
+| Consulta que passa do teto | seguia rodando no banco depois do erro do Prisma | cortada pelo Postgres aos 20 s; frase "O relatório ficou grande demais" |
+
+Observação: um banco recém-carregado (sem `VACUUM`) levou mais de 20 s na primeira leitura de cada recorte, por causa dos bits de consulta ainda não marcados; isso não acontece em produção com o autovacuum, e o teto de 20 s corta o caso com a frase em vez de travar. O limite continua dito: acima disso o caminho é guardar o saldo por dia, não afrouxar o teto.
 
 ### Herança da L.4 (para as próximas)
 
@@ -4144,4 +4154,4 @@ Desempenho medido com 320 mil movimentos (8 lojas x 400 insumos x 100 movimentos
 - **Consumo aferido** (inicial contado + entradas − final contado) continua nas Divergências; trazê-lo para este relatório exige contagem nas duas pontas do período.
 - **O R$ da baixa é o custo de referência do dia**; um preço mudado depois não reescreve o passado, mas a baixa sem preço entra com zero (dita).
 - **O livro de estoque da loja (1.6) mostra valor a quem tem `estoque.ver`**, inclusive o operador; este relatório não (pergunta 2 da decisão 397).
-- **Desempenho**: a leitura soma o livro inteiro da loja até o fim do período (`MovimentoEstoque` por loja e insumo). Medido em 320 mil movimentos (ver "Resultado da prova"); com muitos anos de livro, levar o saldo inicial para uma tabela de fechamento é a saída.
+- **Desempenho**: a leitura soma o livro inteiro da loja até o fim do período (`MovimentoEstoque` por loja e insumo). Medido em 320 mil movimentos (ver "Resultado da prova"), numa leitura só por tela, com teto de 20 s e 3 vagas por processo (decisão 398); com muitos anos de livro, levar o saldo inicial para uma tabela de fechamento é a saída.

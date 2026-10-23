@@ -379,7 +379,11 @@ describe.skipIf(!URL_TESTE)('ERP L.4 · consumo e conciliação de estoque (Post
     expect(ovo.lacunas[0].texto).toMatch(/termina o período com −10\u00A0un/);
     const alho = await linha('alho');
     expect([q(alho, 'uso_setor'), q(alho, 'compra'), alho.final.q, alho.minSaldo]).toEqual([-3_000, 10_000, 7_000, -3_000]);
-    expect(alho.lacunas.map((x) => x.chave)).toEqual(['negativo-no-meio', 'sem-contagem']);
+    // Baixa de 3 kg valorada pelo custo do dia (R$ 25,00/kg = −R$ 75,00) e nota de 10 kg a R$ 50,00: sobram 7 kg com R$ −25,00. A tela explica.
+    expect([alho.somas.uso_setor?.v, alho.somas.compra?.v, alho.final.v]).toEqual([-7_500, 5_000, -2_500]);
+    expect(alho.lacunas.map((x) => x.chave)).toEqual(['negativo-no-meio', 'sem-contagem', 'valor-negativo']);
+    expect(alho.lacunas[2]).toMatchObject({ rotulo: 'R$ negativo', dura: false });
+    expect(alho.lacunas[2].texto).toMatch(/saldo tem 7\u00A0kg, mas o R\$ dele está negativo/);
     const pimenta = await linha('pimenta');
     expect([q(pimenta, 'ajuste'), q(pimenta, 'perda'), pimenta.final.q, pimenta.semOrigem]).toEqual([3_000, -500, 2_500, 1]);
     expect(pimenta.lacunas.map((x) => x.chave)).toEqual(['sem-origem', 'sem-contagem']);
