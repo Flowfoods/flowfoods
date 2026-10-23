@@ -4325,3 +4325,18 @@ Os dois fiscais aprovaram a rodada 1, com um ponto de segurança do alimento e m
 - **Telas** (428): o sem prazo em duas linhas na etiqueta; "Etiqueta emitida: ela espera a impressora."; histórico com
   detalhes curtos e o cartão "Esperando o Já imprimi".
 
+
+**Resultado da prova da rodada final (2026-10-23)**
+
+| Prova | Resultado |
+|---|---|
+| `typecheck`, `lint`, `gate` (710 arquivos), `build` (e7d44fb) | limpos |
+| `erp:conferir-migracao` e `migrate diff` (banco novo por `migrate deploy`) | conferido; vazio |
+| `vitest` sem banco | 68 arquivos rodam, 1.710 passando |
+| `vitest` com banco, superusuário, banco novo, em 4 blocos | 68 arquivos, 999 testes, todos passando |
+| Dono NÃO-superusuário com FORCE RLS (migrations pelo dono), os 15 arquivos | 287 de 288 (a conhecida da 0.2, `_prisma_migrations`) |
+| Dono sem RLS, os mesmos 15 | 280 passando, 8 pulados |
+| Migration da 3.4 com dado antigo nos 3 perfis | 3 passando (nasce confirmado e confirmação no futuro recusados) |
+| Ataques do Guardião (`rev34/t`, 27 testes) nos 3 perfis | 27/27 em cada, nenhum achado; sem prazo + lote vencido: nada emite, imprime nem confirma; corrida "Já imprimi" × Zebra: 20 rodadas, 0 erro cru |
+| Jornada da rodada (build de produção) | 14 de 14: embalagem sem prazo de lote vencido bloqueada (painel, abertura, emissão, papel); o sem prazo em duas linhas na prévia (285 de 480 pontos); "Etiqueta emitida: ela espera a impressora."; histórico com "Esperando o Já imprimi", sem cartão cortado a 1440 e a 390 |
+| Matriz das telas mexidas × dona/operador × 390/1180/1440 × claro/escuro | 48 telas: 0 rolagem lateral, 0 axe, 0 alvo abaixo de 44 px, um h1, nenhum R$ |
