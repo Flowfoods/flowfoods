@@ -299,6 +299,9 @@ html:has(.ff-app[data-tema='escuro']) {
     display: inline-block;
     padding-block: 14px;
     margin-block: -14px;
+    /* L.3: o link de uma palavra só ("Ovo", "Alho") também chega a 44 px de largura sem mexer no desenho. */
+    padding-inline: 9px;
+    margin-inline: -9px;
   }
 }
 

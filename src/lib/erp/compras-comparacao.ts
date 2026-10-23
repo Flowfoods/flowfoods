@@ -67,40 +67,43 @@ export interface LadoDoBanco {
 
 /** As células comparáveis de um lado, o que ficou sem base e os totais de notas e linhas. */
 export async function ladoDoRecorte(tx: ClienteDoParceiro, r: Recorte, teto = TETO_DE_CELULAS): Promise<LadoDoBanco> {
-  const celulas = await tx.sql<{
-    insumoId: string; insumo: string; unidade: string; fornecedorId: string; fornecedor: string;
-    notas: number; linhas: number; quantidade: number; valor: number; frete: number;
+  // UMA leitura do recorte (CTE materializada) devolve as três coisas de que o lado precisa: as células comparáveis, o que ficou
+  // sem base (por motivo e por insumo) e os totais de notas e linhas. Ler três vezes custava três vezes o mesmo SQL.
+  const lidas = await tx.sql<{
+    tipo: string; insumoId: string | null; insumo: string | null; unidade: string | null; fornecedorId: string | null; fornecedor: string | null;
+    motivo: string | null; notas: number; linhas: number; quantidade: number; valor: number; frete: number; descontos: number;
   }>`
-    WITH f AS (${fonte(r)})
-    SELECT f."insumoId", MIN(COALESCE(f."insumoNome", f."insumoNomeSnapshot", 'Sem insumo identificado')) AS "insumo", f."unidade",
-           COALESCE(f."fornecedorId", '-') AS "fornecedorId",
-           MIN(COALESCE(f."fornecedorNome", f."fornecedorNomeSnapshot", 'Sem fornecedor')) AS "fornecedor",
-           count(DISTINCT f."notaId")::float8 AS "notas", count(*)::float8 AS "linhas",
-           sum(f."quantidadeMilesimos")::float8 AS "quantidade", sum(f."valor")::float8 AS "valor", sum(f."frete")::float8 AS "frete"
-    FROM f
-    WHERE f."motivo" IS NULL
-    GROUP BY f."insumoId", f."unidade", COALESCE(f."fornecedorId", '-')
-    ORDER BY 2, 1, 3, 4
-    LIMIT ${teto + 1}::int`;
-  const sem = await tx.sql<{ motivo: string; insumoId: string; linhas: number; valor: number; frete: number }>`
-    WITH f AS (${fonte(r)})
-    SELECT f."motivo", COALESCE(f."insumoId", '-') AS "insumoId", count(*)::float8 AS "linhas",
-           COALESCE(sum(f."valor"), 0)::float8 AS "valor", COALESCE(sum(f."frete"), 0)::float8 AS "frete"
-    FROM f WHERE f."motivo" IS NOT NULL
-    GROUP BY 1, 2
-    LIMIT ${teto + 1}::int`;
-  const [geral] = await tx.sql<{ notas: number; linhas: number; descontos: number }>`
-    WITH f AS (${fonte(r)})
-    SELECT count(DISTINCT f."notaId")::float8 AS "notas", count(*)::float8 AS "linhas",
-           count(DISTINCT f."notaId") FILTER (WHERE f."descontoDaNota" > 0)::float8 AS "descontos"
-    FROM f`;
+    WITH f AS MATERIALIZED (${fonte(r)})
+    (SELECT 'celula'::text AS "tipo", f."insumoId", MIN(COALESCE(f."insumoNome", f."insumoNomeSnapshot", 'Sem insumo identificado')) AS "insumo", f."unidade",
+            COALESCE(f."fornecedorId", '-') AS "fornecedorId",
+            MIN(COALESCE(f."fornecedorNome", f."fornecedorNomeSnapshot", 'Sem fornecedor')) AS "fornecedor", NULL::text AS "motivo",
+            count(DISTINCT f."notaId")::float8 AS "notas", count(*)::float8 AS "linhas",
+            sum(f."quantidadeMilesimos")::float8 AS "quantidade", sum(f."valor")::float8 AS "valor", sum(f."frete")::float8 AS "frete", 0::float8 AS "descontos"
+     FROM f WHERE f."motivo" IS NULL
+     GROUP BY f."insumoId", f."unidade", COALESCE(f."fornecedorId", '-')
+     ORDER BY 3, 2, 4, 5
+     LIMIT ${teto + 1}::int)
+    UNION ALL
+    (SELECT 'sem'::text, COALESCE(f."insumoId", '-'), NULL::text, NULL::text, NULL::text, NULL::text, f."motivo",
+            0::float8, count(*)::float8, 0::float8, COALESCE(sum(f."valor"), 0)::float8, COALESCE(sum(f."frete"), 0)::float8, 0::float8
+     FROM f WHERE f."motivo" IS NOT NULL
+     GROUP BY f."motivo", COALESCE(f."insumoId", '-')
+     LIMIT ${teto + 1}::int)
+    UNION ALL
+    (SELECT 'geral'::text, NULL::text, NULL::text, NULL::text, NULL::text, NULL::text, NULL::text,
+            count(DISTINCT f."notaId")::float8, count(*)::float8, 0::float8, 0::float8, 0::float8,
+            count(DISTINCT f."notaId") FILTER (WHERE f."descontoDaNota" > 0)::float8
+     FROM f)`;
+  const celulas = lidas.filter((l) => l.tipo === 'celula');
+  const sem = lidas.filter((l) => l.tipo === 'sem');
+  const geral = lidas.find((l) => l.tipo === 'geral');
   const semBase: SemBaseDoLado = { linhas: 0, valorCentavos: 0, freteCentavos: 0, porMotivo: {}, porInsumo: {} };
   for (const s of sem) {
     semBase.linhas += s.linhas;
     semBase.valorCentavos += s.valor;
     semBase.freteCentavos += s.frete;
-    if (MOTIVOS.has(s.motivo)) semBase.porMotivo[s.motivo as MotivoSemBase] = (semBase.porMotivo[s.motivo as MotivoSemBase] ?? 0) + s.linhas;
-    const i = (semBase.porInsumo[s.insumoId] ??= { linhas: 0, valorCentavos: 0, freteCentavos: 0 });
+    if (s.motivo && MOTIVOS.has(s.motivo)) semBase.porMotivo[s.motivo as MotivoSemBase] = (semBase.porMotivo[s.motivo as MotivoSemBase] ?? 0) + s.linhas;
+    const i = (semBase.porInsumo[s.insumoId ?? '-'] ??= { linhas: 0, valorCentavos: 0, freteCentavos: 0 });
     i.linhas += s.linhas;
     i.valorCentavos += s.valor;
     i.freteCentavos += s.frete;
@@ -108,11 +111,11 @@ export async function ladoDoRecorte(tx: ClienteDoParceiro, r: Recorte, teto = TE
   const passouDoTeto = celulas.length > teto || sem.length > teto;
   const doBanco = celulas.slice(0, teto).map(
     (c): Celula => ({
-      insumoId: c.insumoId,
-      insumo: c.insumo,
+      insumoId: c.insumoId as string,
+      insumo: c.insumo as string,
       unidade: c.unidade as Unidade,
-      fornecedorId: c.fornecedorId,
-      fornecedor: c.fornecedor,
+      fornecedorId: c.fornecedorId as string,
+      fornecedor: c.fornecedor as string,
       notas: c.notas,
       linhas: c.linhas,
       quantidadeMilesimos: c.quantidade,

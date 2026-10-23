@@ -98,10 +98,12 @@ function CelulaDeLado({ nome, lado, unidade, href, campo }: { nome: 'A' | 'B'; l
   if (campo === 'qtd') return <span className="block whitespace-nowrap">{rotulo}{formatarQuantidade(lado.quantidadeMilesimos, unidade)}</span>;
   if (campo === 'custo') return <span className="block whitespace-nowrap">{rotulo}{lado.custo ? formatarCusto(lado.custo, unidade) : 'sem base'}</span>;
   return (
-    <Link href={href} className="ff-transicao block whitespace-nowrap rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto">
-      {rotulo}
-      {formatarDinheiro(lado.gastoCentavos)}
-    </Link>
+    <span className="block whitespace-nowrap">
+      <Link href={href} className="ff-transicao rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto">
+        {rotulo}
+        {formatarDinheiro(lado.gastoCentavos)}
+      </Link>
+    </span>
   );
 }
 
@@ -135,7 +137,7 @@ function PrecoETroca({ i }: { i: ItemComparado }) {
     <>
       <Sinal centavos={i.precoCentavos} />
       {i.trocaCentavos !== null && i.trocaCentavos !== 0 && (
-        <span className="ml-auto block max-w-[11rem] text-[12px] text-suave">
+        <span className="block lg:ml-auto lg:max-w-[11rem] text-[12px] text-suave">
           dos quais troca de fornecedor <Sinal centavos={i.trocaCentavos} />
         </span>
       )}
@@ -292,7 +294,7 @@ export function TabelaPorInsumo({
             <td className="px-3 py-2.5 text-right"><Sinal centavos={s.volumeCentavos} className="font-semibold" /></td>
             <td className="py-2.5 pl-3 pr-5 text-right">
               <Sinal centavos={s.precoCentavos} className="font-semibold" />
-              {s.trocaCentavos !== 0 && <span className="ml-auto block max-w-[11rem] text-[12px] text-suave">dos quais troca de fornecedor <Sinal centavos={s.trocaCentavos} /></span>}
+              {s.trocaCentavos !== 0 && <span className="block lg:ml-auto lg:max-w-[11rem] text-[12px] text-suave">dos quais troca de fornecedor <Sinal centavos={s.trocaCentavos} /></span>}
             </td>
           </tr>
         </tfoot>
@@ -633,8 +635,8 @@ export function ImpressaoDosPeriodos({ caminho, contexto, f, r, geradoEm, hoje }
     ['Variação (B menos A)', `${txtSinal(s.variacaoCentavos)}${s.variacaoDecimos === null ? ' · sem base para o percentual (nada comprado em A)' : ` · ${formatarPercentual(s.variacaoDecimos)} sobre A`}`],
     ['Efeito volume', txtSinal(s.volumeCentavos)],
     ['Efeito preço', `${txtSinal(s.precoCentavos)} (do mesmo fornecedor ${txtSinal(s.mesmoFornecedorCentavos)}; troca de fornecedor ${txtSinal(s.trocaCentavos)})`],
-    ['Só num período', `entrou ${txtSinal(s.entrouCentavos)} (${s.soEmB} insumos) · saiu ${txtSinal(s.saiuCentavos)} (${s.soEmA} insumos)`],
-    ['Conferência', `${txtSinal(s.volumeCentavos)} + ${txtSinal(s.precoCentavos)} + ${txtSinal(s.entrouCentavos)} + ${txtSinal(s.saiuCentavos)} = ${txtSinal(s.volumeCentavos + s.precoCentavos + s.entrouCentavos + s.saiuCentavos)} ${s.fecha ? '(igual à variação)' : '(NÃO FECHA)'}`],
+    ['Só num período', `entrou ${txtSinal(s.entrouCentavos)} (${pl(s.soEmB, 'insumo', 'insumos')}) · saiu ${txtSinal(s.saiuCentavos)} (${pl(s.soEmA, 'insumo', 'insumos')})`],
+    ['Conferência', `volume ${txtSinal(s.volumeCentavos)}, preço ${txtSinal(s.precoCentavos)}, entrou ${txtSinal(s.entrouCentavos)}, saiu ${txtSinal(s.saiuCentavos)} = ${txtSinal(s.volumeCentavos + s.precoCentavos + s.entrouCentavos + s.saiuCentavos)} ${s.fecha ? '(igual à variação)' : '(NÃO FECHA)'}`],
   ];
   return (
     <div className="ff-relatorio-impressao mx-auto max-w-[1100px] space-y-5">

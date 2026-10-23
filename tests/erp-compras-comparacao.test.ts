@@ -16,6 +16,8 @@ import {
   formatarVariacao,
   lerFiltrosDePeriodos,
   percentualEmDecimos,
+  periodoAnterior,
+  queryParaCompararComOAnterior,
   percentualParaPlanilha,
   queryDosPeriodos,
   ranquearFornecedores,
@@ -24,6 +26,9 @@ import {
   type FornecedorDoInsumo,
 } from '@/lib/erp/compras-comparacao-campos';
 import { formatarReaisDaFracao } from '@/lib/erp/unidades';
+import { fracaoParaPlanilha } from '@/lib/erp/compras-comparacao-planilha';
+import { rotuloDaVolta } from '@/lib/erp/volta';
+import { lerFiltrosDoRelatorio } from '@/lib/erp/compras-relatorio-campos';
 
 const HOJE = '2026-10-22';
 const sp = (t: string) => t.replace(/ /g, ' ');
@@ -363,5 +368,30 @@ describe('L.3 · os filtros e os avisos de cobertura', () => {
     }
     // Os três primeiros têm o mesmo tamanho dos dois lados.
     for (const x of a.slice(0, 2)) expect(diasDoPeriodo(x.de, x.ate)).toBe(diasDoPeriodo(x.deB, x.ateB));
+  });
+});
+
+describe('L.3 · o período anterior, a planilha e a volta', () => {
+  it('o período anterior tem o mesmo tamanho e termina na véspera', () => {
+    expect(periodoAnterior('2026-10-01', '2026-10-22')).toEqual({ de: '2026-09-09', ate: '2026-09-30' });
+    expect(periodoAnterior('2026-10-10', '2026-10-10')).toEqual({ de: '2026-10-09', ate: '2026-10-09' });
+    expect(periodoAnterior('2026-03-01', '2026-03-31')).toEqual({ de: '2026-01-29', ate: '2026-02-28' });
+    expect(diasDoPeriodo('2026-01-29', '2026-02-28')).toBe(31);
+  });
+  it('"Comparar com o período anterior" parte do recorte da L.2: B é o período dele e os filtros seguem', () => {
+    const f = lerFiltrosDoRelatorio({ de: '2026-10-01', ate: '2026-10-22', loja: ['l1'], fornecedor: 'f1', insumo: 'i1', base: 'lancamento', volta: '/erp/x' }, HOJE);
+    const volta = lerFiltrosDePeriodos(Object.fromEntries(new URLSearchParams(queryParaCompararComOAnterior(f))) as Record<string, string>, HOJE);
+    expect([volta.rel.de, volta.rel.ate, volta.deB, volta.ateB]).toEqual(['2026-09-09', '2026-09-30', '2026-10-01', '2026-10-22']);
+    expect(volta.rel).toMatchObject({ lojaIds: ['l1'], fornecedorId: 'f1', insumoId: 'i1', base: 'lancamento', volta: '' });
+  });
+  it('preço por unidade da planilha: 4 casas, metade para cima, a partir de centavos por unidade', () => {
+    expect(fracaoParaPlanilha({ num: 150n, den: 1n })).toBe('1,5000');
+    expect(fracaoParaPlanilha({ num: 1n, den: 3n })).toBe('0,0033');
+    expect(fracaoParaPlanilha({ num: 100n * 1000n, den: 7n * 1000n })).toBe('0,1429');
+  });
+  it('o rótulo da volta diz "a comparação de compras" antes de "o relatório de compras"', () => {
+    expect(rotuloDaVolta('/erp/compras/relatorios/comparar-periodos?de=1')).toBe('a comparação de compras');
+    expect(rotuloDaVolta('/rodolfo/erp/x/compras/relatorios/comparar-fornecedores?a=1')).toBe('a comparação de compras');
+    expect(rotuloDaVolta('/erp/compras/relatorios/periodo?de=1')).toBe('o relatório de compras');
   });
 });

@@ -103,7 +103,10 @@ function TabelaDaUnidade({
   const linhas = (x: FornecedorRanqueado) =>
     hrefDoRelatorio(`${comprasBase}/relatorios/periodo`, { ...f, insumoId, q: '', agrupar: 'fornecedor', grupo: x.fornecedorId, unidade: u, ver: 'linhas', so: '', volta, pagina: 1 }, {}, { semPagina: true });
   const titulo = `Fornecedores em ${SIGLA(u)}`;
-  const subtitulo = t.comBase >= 2 ? 'Do custo entregue mais barato ao mais caro. O frete pode inverter a ordem do preço do item.' : 'Só um fornecedor tem preço neste insumo e período: não há com quem comparar.';
+  const subtitulo =
+    t.comBase >= 2
+      ? `Custo entregue é o preço do item mais o frete que coube a ele, por ${SIGLA(u)}. Do custo entregue mais barato ao mais caro; o frete pode inverter a ordem do preço do item.`
+      : `Só um fornecedor tem preço neste insumo e período: não há com quem comparar. Custo entregue é o preço do item mais o frete que coube a ele, por ${SIGLA(u)}.`;
   return (
     <Painel titulo={titulo} subtitulo={subtitulo} semRespiro>
       <ul className="divide-y divide-linha lg:hidden">
