@@ -4267,3 +4267,30 @@ impressora, o domínio aceito e a etiqueta de teste da aba Impressora.
   antes de medir. O link é da caixa (todo o ERP), não das telas.
 - **Para o Rodolfo** (decisão 415): imprimir ou bloquear sem validade/sem prazo; o fim do dia do vencimento; 50 etiquetas e
   cópias; a FlowFoods não abre; lote na nota de quem lança nota; 203 ou 300 dpi e os rolos; CNPJ/logo; "saiu no papel".
+
+## Rodada de correção 1 da 3.4
+
+O Guardião aprovou (1 importante + 7 menores) e a UX reprovou (2 médios + menores). O que mudou, com as decisões 417–423 (e
+as 400, 401, 406, 408, 409, 410, 414, 415 e 416 corrigidas no lugar):
+
+- **Vencido não sai** (417): lote produzido vencido, como a embalagem aberta vencida, não emite nem reimprime (Zebra, arquivo,
+  papel, nem o papel de um pedido antigo), para ninguém, e o servidor recusa. A tela diz em vermelho "Este lote venceu em
+  DD/MM às HH:MM: não use. Separe para descarte e avise a gerência."; no painel, "venceu: não use", fora da fila.
+- **A fila** (418): "Esperando a impressora" só se esvazia com a Zebra aceitando o envio ou com **"Já imprimi"** (quem e
+  quando, gravados no pedido: `confirmadaEm`, `confirmadaPorNome`, `confirmadaPorUsuarioId`). Baixar o .zpl ou abrir o papel
+  não tira. Sem Browser Print: "Sem Zebra neste aparelho" e a etiqueta fica na fila. Pedidos por nome: Zebra, Arquivo, Papel.
+- **Zebra** (419): sem resposta em 15 s = "Sem resposta" / "Sem resultado" (pode ter saído), não "Falhou"; os erros comuns da
+  Zebra em palavras (`traduzirErroDaZebra`).
+- **Banco** (420, 421): a etiqueta confere manipulação, quem fez, lote do fornecedor e marca com a origem; pedido e abertura não
+  somem (gatilho de DELETE); pedido não troca de id nem conclui antes de ser pedido; a chave do envio é da loja; 300 dpi é o
+  desenho de 203 ampliado (nada some calado); o lote aceita `_ : #`; pré-preparo numa nota = frase, não erro 500. A migration
+  `20261110000000_erp_etiquetas` foi ajustada no lugar (ainda não está na master).
+- **Telas** (422, 423): papel A4 sem a folha em branco (estilo de impressão só da página do papel); o link dos lotes na nota
+  com 44 px e a contagem; "Não cabe: use 60 × 60" com o botão de trocar; um termo para o sem prazo ("Prazo após abertura não
+  informado"); barras de ação presas até 900 px (tablet em pé) e a impressão antes da prévia no celular e no tablet; a aba
+  Impressora com a licença de rede local do Chrome e o certificado de https://localhost:9101; lote que chegou vencido na nota:
+  "separe e devolva ao fornecedor".
+
+**Herança que muda:** o pedido de impressão muda uma vez (o resultado) e ganha, uma vez, a confirmação "Já imprimi"; a fila e
+o histórico leem os dois (`situacao = 'ENVIADA'` ou `confirmadaEm` preenchida). Etiqueta nova que se imprime passa por
+`bloqueioDaEmissao` (estornado ou vencido) em TODOS os caminhos (emitir, pedir, papel, confirmar).
