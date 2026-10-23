@@ -27,7 +27,7 @@ SSH_USER="${VPS_SSH_USER:-root}"
 HAPI="https://developers.hostinger.com/api/vps/v1"
 RESUMO="${GITHUB_STEP_SUMMARY:-/dev/null}"
 
-titulo() { echo; echo "================ $* ================"; }
+titulo() { echo; echo "================ $* — $(date -u +%H:%M:%SZ) ================"; }
 tem() { [ -n "${!1:-}" ]; }
 
 # ------------------------------------------------------------------ SSH
@@ -207,9 +207,32 @@ REMOTO
         PortBindings: .HostConfig.PortBindings, Ports: .NetworkSettings.Ports,
         Redes: (.NetworkSettings.Networks | keys)}' /tmp/dk.json 2>/dev/null
   done
+  if [ "$(dokploy GET "/api/docker.getConfig?containerId=dokploy-traefik")" = 200 ]; then
+    echo "-- imagem, montagens (só origem→destino), redes com endpoint --"
+    jq -c '{Image: .Config.Image, Created, Mounts: [.Mounts[]? | "\(.Source)→\(.Destination)"],
+            Redes: (.NetworkSettings.Networks | to_entries | map({rede: .key, NetworkID: (.value.NetworkID // "" | .[0:12]),
+                    EndpointID: (.value.EndpointID // "" | .[0:12]), IP: .value.IPAddress}))}' /tmp/dk.json
+  fi
   code=$(dokploy GET "/api/docker.getContainersByAppNameMatch?appName=dokploy")
   echo "containers 'dokploy*' -> HTTP ${code}"
   [ "$code" = 200 ] && jq -r '.[]? | "  \(.name)\t\(.state)\t\(.status)"' /tmp/dk.json
+
+  titulo "10. Dokploy: versão e config do Traefik (só estrutura, sem e-mail/senha)"
+  code=$(dokploy GET /api/settings.getDokployVersion); echo "versão -> HTTP $code: $(head -c 80 /tmp/dk.json)"
+  code=$(dokploy GET /api/settings.readTraefikConfig); echo "readTraefikConfig -> HTTP $code"
+  if [ "$code" = 200 ]; then
+    jq -r 'if type=="string" then . else tostring end' /tmp/dk.json 2>/dev/null \
+      | grep -E '^[a-zA-Z]|^  [a-zA-Z]|address:|network:|exposedByDefault|swarmMode|endpoint:|watch:|directory:|entryPoint:|certResolver|storage:' \
+      | grep -viE 'email|password|token|secret|key|user' | head -60
+  fi
+
+  titulo "11. Compose ssh-setup (o que é — só nomes, imagens, montagens)"
+  id=$(awk -F'\t' '$3=="ssh-setup"{print $2}' /tmp/inventario.tsv)
+  if [ -n "$id" ] && [ "$(dokploy GET "/api/compose.one?composeId=$id")" = 200 ]; then
+    jq -r '"criado: \(.createdAt)  fonte: \(.sourceType)  descrição: \(.description // "-")"' /tmp/dk.json
+    jq -r '.composeFile // ""' /tmp/dk.json | grep -E '^\s*(services:|[a-z0-9_-]+:\s*$|image:|privileged:|pid:|network_mode:|- /)' \
+      | grep -viE 'password|token|secret|key=' | head -30
+  fi
 }
 
 reiniciar() {
