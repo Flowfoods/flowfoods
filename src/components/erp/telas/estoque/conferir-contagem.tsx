@@ -217,6 +217,7 @@ export function TelaConferirContagem({
   podeAplicar,
   podeContar,
   bloqueio,
+  voltar,
 }: {
   c: ConferenciaDaContagem;
   base: string;
@@ -227,6 +228,8 @@ export function TelaConferirContagem({
   podeAplicar: boolean;
   podeContar: boolean;
   bloqueio: string | null;
+  /** L.4: de onde a pessoa veio (o consumo e a conciliação), já validado; sem isso, o "Voltar" de sempre. */
+  voltar?: { href: string; rotulo: string } | null;
 }) {
   const loja = `${base}/${c.loja.id}`;
   const aqui = `${loja}/contagens/${c.contagem.id}`;
@@ -242,7 +245,7 @@ export function TelaConferirContagem({
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: c.loja.nome, href: loja }, { rotulo: titulo, href: aberta ? aqui : undefined }, { rotulo: aberta ? 'Conferir' : 'Resultado' }]} />
-      <Voltar href={aberta ? aqui : loja}>{aberta ? 'Voltar para a contagem' : `Voltar para o estoque da ${c.loja.nome}`}</Voltar>
+      <Voltar href={aberta ? aqui : (voltar?.href ?? loja)}>{aberta ? 'Voltar para a contagem' : voltar ? `Voltar para ${voltar.rotulo}` : `Voltar para o estoque da ${c.loja.nome}`}</Voltar>
       <PageHeader
         icone="estoque"
         cor={COR.estoque}

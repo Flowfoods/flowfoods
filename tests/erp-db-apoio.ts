@@ -17,7 +17,7 @@ export const TABELAS_DE_TENANT = MODELOS_DE_TENANT.map((m) => m[0].toUpperCase()
 
 /** Filhos antes dos pais. */
 const ORDEM_DE_LIMPEZA = [
-  'HistoricoAlteracao', 'Etiqueta', 'MovimentoEstoque', 'SaldoEstoque', 'ContagemRetratoItem', 'ContagemItem', 'Contagem',
+  'HistoricoAlteracao', 'EtiquetaImpressao', 'Etiqueta', 'AberturaDeLote', 'LoteDeInsumo', 'MovimentoEstoque', 'SaldoEstoque', 'ContagemRetratoItem', 'ContagemItem', 'Contagem',
   'ListaProducaoItem', 'ListaProducao', 'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'DocumentoFiscalItem', 'DocumentoFiscal', 'VinculoItemFornecedor', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
   'ProdutoCanal', 'ProdutoVenda', 'FichaItem', 'FichaTecnica', 'InsumoVariante', 'FaturamentoLancamento',
   'Despesa', 'DreMeta', 'FarolFaixa', 'MetaCmvCategoria', 'MetaCmvConjunto', 'CategoriaNaLoja', 'DreLinha', 'DreFotografiaLinha', 'DreFotografia', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'CategoriaInsumo', 'Fornecedor',
@@ -25,7 +25,7 @@ const ORDEM_DE_LIMPEZA = [
 ];
 
 /** Tabelas com gatilho que recusa o DELETE (a limpeza desliga só na transação dela). */
-const SEM_GATILHO_NA_LIMPEZA = ['DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem', 'CategoriaInsumo', 'ContagemRetratoItem', 'MetaCmvConjunto', 'MetaCmvCategoria'];
+const SEM_GATILHO_NA_LIMPEZA = ['DreFotografia', 'DreFotografiaLinha', 'ListaProducaoItem', 'CategoriaInsumo', 'ContagemRetratoItem', 'MetaCmvConjunto', 'MetaCmvCategoria', 'Etiqueta', 'EtiquetaImpressao', 'AberturaDeLote'];
 
 export interface PerfilDoBanco {
   superusuario: boolean;

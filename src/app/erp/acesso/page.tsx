@@ -5,7 +5,7 @@
 
 import { exigirParceiroDaSessao } from '@/lib/erp/contexto';
 import { listarLojasDoAlcance } from '@/lib/erp/estrutura';
-import { CATALOGO, rotuloDasLojas } from '@/lib/erp/permissoes';
+import { CATALOGO, rotuloDasLojas, type ModuloDoCatalogo } from '@/lib/erp/permissoes';
 import { listarRostos, podeAtivarRosto, rostosRemovidosEm } from '@/lib/erp/credenciais';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
@@ -43,7 +43,7 @@ export default async function SeuAcessoPage() {
   const onde = rotuloDasLojas(alcance.lojas, new Map(lojas.map((l) => [l.id, l.nome])));
   const modulos = CATALOGO.map((m) => ({
     rotulo: m.rotulo,
-    emBreve: 'emBreve' in m && m.emBreve,
+    emBreve: !!(m as ModuloDoCatalogo).emBreve,
     itens: Object.entries(m.permissoes)
       .filter(([p]) => alcance.permissoes.has(p as never))
       .map(([, d]) => d.rotulo),

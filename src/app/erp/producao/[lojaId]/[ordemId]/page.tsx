@@ -11,10 +11,11 @@ import { obterOrdem } from '@/lib/erp/producao';
 import { TelaDoLote } from '@/components/erp/telas/producao/lote';
 import { fraseDoEstoque } from '@/components/erp/telas/estoque/estado';
 import { acaoCancelarProducao, acaoEstornarProducao, acaoPassarLote, acaoPegarLote, acaoSoltarLote } from '../../actions';
+import { voltaDoRelatorio } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpLotePage({ params, searchParams }: { params: { lojaId: string; ordemId: string }; searchParams: { feito?: string } }) {
+export default async function ErpLotePage({ params, searchParams }: { params: { lojaId: string; ordemId: string }; searchParams: { feito?: string; volta?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'producao.ver');
   const d = await obterOrdem(ctx.cliente, ctx.alcance, params.lojaId, params.ordemId, new Date(), ctx.sessao.userId);
@@ -27,9 +28,14 @@ export default async function ErpLotePage({ params, searchParams }: { params: { 
     <TelaDoLote
       d={d}
       base="/erp/producao"
+      voltar={voltaDoRelatorio(searchParams.volta, '/erp')}
       feito={fraseDoEstoque(searchParams.feito)}
       pode={{ registrar, estornar: registrar && pode(ctx.alcance, 'estoque.ajustar', { lojaId }), gerenciar, pegar: true }}
-      hrefs={{ requisicao: veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null, estoque: pode(ctx.alcance, 'estoque.ver', { lojaId }) ? `/erp/estoque/${lojaId}` : null }}
+      hrefs={{
+        requisicao: veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null,
+        estoque: pode(ctx.alcance, 'estoque.ver', { lojaId }) ? `/erp/estoque/${lojaId}` : null,
+        etiqueta: pode(ctx.alcance, 'etiquetas.imprimir', { lojaId }) ? `/erp/etiquetas/${lojaId}/lote/${d.ordem.id}` : null,
+      }}
       acoes={{
         pegar: acaoPegarLote.bind(null, lojaId),
         soltar: acaoSoltarLote.bind(null, lojaId),

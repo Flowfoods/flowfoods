@@ -1,4 +1,4 @@
-# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2), a cozinha pega a tarefa: histórico e indicadores por pessoa (3.3), categorias de insumo, categoria obrigatória, confirmação ao salvar e idempotência (I.1a), cadastro de insumos claro (I.1b), metas por categoria e CMV por categoria pelas compras (I.2a), CMV real por categoria, compra × real, evolução, matriz e meta total por loja (I.2b), cadastro de fornecedor evoluído e CNPJ da loja (F.1a), notas fiscais por XML (F.1b), relatórios de compras (L.2)
+# ERP Barney — fatia vertical (Passo zero), fundação do banco (0.1), multi-tenant (0.2), login (0.3), permissões (0.4), shell único e cadastro de insumos (1.1), ficha técnica (1.2), pré-preparos e custo em cascata (1.3), validade por conservação (1.4), entrada de compra e custo pelo último preço (1.5), abertura do estoque (1.6), contagem do dia a dia com piso no fechamento do período (1.7), requisição com baixa e cruzamento requisição × contagem (1.8), precificação dentro da ficha: custo por canal em camadas (1.9), preço e margem por canal na ficha (1.10), onboarding: pedido de acesso, quadro e ativação (0.5), ajuda contextual (0.6), entrada de faturamento por canal (2.1), DRE ao vivo (2.2a), metas e fechamento do período (2.2b), dois CMVs: compra e real (2.3), farol por canal em 5 faixas (2.4), orçamento de compra (2.5), produção de intermediários (3.1), lista do dia (3.2), a cozinha pega a tarefa: histórico e indicadores por pessoa (3.3), categorias de insumo, categoria obrigatória, confirmação ao salvar e idempotência (I.1a), cadastro de insumos claro (I.1b), metas por categoria e CMV por categoria pelas compras (I.2a), CMV real por categoria, compra × real, evolução, matriz e meta total por loja (I.2b), cadastro de fornecedor evoluído e CNPJ da loja (F.1a), notas fiscais por XML (F.1b), relatórios de compras (L.2), comparação de fornecedores e de períodos (L.3)
 
 Plano, fases e ordem: página "FlowFoods Barney — ERP" no Notion. Este arquivo
 só diz como ver a fatia funcionando e quais regras o código já trava.
@@ -3030,6 +3030,80 @@ npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.p
 
 Decisão 371: a volta atravessa a nota fiscal (XML), `?pagina=` com teto e queda na última página depois de contar, landmark único na impressão, plural, cartões e canceladas mais claros, filtros em 2 colunas a 820 px, "Data usada" sem corte a 1180 px, "N compras" no subtítulo e ícone próprio. **Prova:** `typecheck`, `lint`, `gate` e `build` limpos; vitest sem e com banco (paralelo); navegador (build de produção, porta 3100): a volta pelo documento (do relatório e da nota, e as quatro voltas maliciosas ignoradas), `pagina` gigante nas duas visões, impressão com axe em 4 tamanhos × 2 temas (relatório do período e histórico do insumo), canceladas, cartões, 820 e 1180 px, e a matriz das telas tocadas em 4 tamanhos × 2 temas.
 
+## O que a L.3 entregou — comparação de fornecedores e de períodos (compras)
+
+Terceira entrega da "Evolução prioritária — lista de insumos e relatórios de compras, preços e consumo" (Rodolfo, 21/10/2026): **"Comparação de fornecedores e períodos"** (L1225–1227), item 3 da "Ordem de entrega" (L1237–1242) e os critérios L1244–1246. Consumo e conciliação de estoque (L.4) ficam de fora. **Sem migration** (374): os índices da L.2 bastam. Decisões 372 a 384 (372 e 373 são a herança da L.2, em commit próprio). Sem permissão nova (`compras.ver`, por loja). Ajuda: `compras-comparar-fornecedores` e `compras-comparar-periodos` novas (versão 1); nenhuma entrada existente mudou de texto.
+
+**Telas** (nas duas árvores: `/erp/compras/relatorios/comparar-fornecedores`, `.../comparar-periodos`, `.../comparar/exportar?tela=fornecedores|periodos` e o espelho em `/rodolfo/erp/[slug]/compras/relatorios/...`), grupo "Relatórios" do menu de Compras. Do histórico de um insumo parte "Comparar os fornecedores deste insumo" e de "Compras do período" parte "Comparar com o período anterior".
+
+1. **Comparar fornecedores** (378, 380). Um insumo e um período; uma tabela por unidade, uma linha por fornecedor: compras, quantidade, embalagens compradas, **preço do item** (R$/un, ponderado), **custo entregue** (com o frete atribuído), peso do frete, diferença para o mais barato em R$/un e em %, selos separados "Mais barato no preço do item" e "Mais barato entregue" (o frete pode inverter a ordem), última compra com link para a nota. Marca de referência visível como informação, sem bloquear marca. Sem base, um fornecedor só e uma compra só são ditos. Nunca "economia".
+2. **Comparar períodos** (375, 376, 377, 379). A (base) × B, mesmas lojas, filtros, data usada e medida (custo entregue ou preço do item). Gasto de A, de B e variação (R$ e %); "de onde veio": efeito volume, efeito preço (do mesmo fornecedor × troca de fornecedor), o que só aparece num período ("entrou" e "saiu") e a soma conferida; tabela por insumo (cartões no celular), com um insumo só os fornecedores lado a lado; "Antes de ler" com cobertura, tamanhos, sobreposição, período em andamento, lado sem compra, sem base e documentos aguardando.
+3. **Tudo abre** (382). Cada gasto abre as linhas em "Compras do período" com o mesmo recorte e "Voltar para a comparação de compras"; cada linha abre a nota e a nota fiscal (XML), com a volta encadeada.
+4. **Planilha e impressão** (381). CSV igual ao da L.2 (protegido contra fórmula) com os mesmos números da tela; "Imprimir ou salvar em PDF" sem menu, tabelas inteiras, landmarks únicos.
+5. **Por baixo** (374). `compras-comparacao-campos.ts` (conta pura em BigInt, filtros, avisos), `compras-comparacao.ts` (uma leitura por lado: células insumo × unidade × fornecedor, o que ficou sem base e os totais, numa CTE materializada; B é o recorte do A com as datas trocadas), `compras-comparacao-planilha.ts`. Teto de 20.000 células por lado (recusa em frase).
+
+### A conta (375 a 377)
+
+Por insumo e unidade com compra comparável nos dois lados, G = gasto em centavos pela medida, Q = quantidade em milésimos, P = G ÷ Q:
+
+| Efeito | Fórmula | Exemplo (10 kg a R$ 10,00 → 15 kg a R$ 9,50) |
+|---|---|---|
+| Preço | (P1 − P0) × (Q0 + Q1) ÷ 2 | (9,50 − 10,00) × 12,5 = −R$ 6,25 |
+| Volume | (Q1 − Q0) × (P0 + P1) ÷ 2 | 5 × 9,75 = +R$ 48,75 |
+| Variação | G1 − G0 = volume + preço | +R$ 42,50 |
+| Troca de fornecedor | efeito preço − Σ (efeito preço de cada fornecedor presente nos dois lados) | 0 (um fornecedor só) |
+
+Forma simétrica (ponto médio): não depende de qual período é a base e não deixa termo de interação. O efeito preço é arredondado UMA vez (metade para longe do zero) e o volume é o que sobra em inteiros: a soma de qualquer conjunto de itens fecha ao centavo. Insumo só num lado = "entrou" ou "saiu" (sem preço nem volume). % só com A > 0. Linha "sem base" (a regra da L.2) fica fora da conta e é contada, valorizada e aberta.
+
+### Evidência de cada caixa do Notion (para o Maestro marcar; L1225–1227, L1237–1242 e L1244–1246)
+
+| Caixa | Evidência |
+|---|---|
+| L1225 custo por mesma unidade base, frete/descontos pela regra de rateio, preço do item × custo entregue, só especificações compatíveis, sem bloquear marca | Teste de banco "o frete inverte a ordem" (Zé R$ 10,00 / R$ 12,00 × Laticínios R$ 10,50 / R$ 10,50, Peça 2 kg × quilo solto); jornada F1–F11, F18–F19 (marca Camil, dita como informação); testes puros do ranking. O desconto por item segue R$ 0,00 (decisão 367). |
+| L1226 comparar períodos: quantidade, gasto e custo médio; separar volume de preço; composição e troca de fornecedor; sem atribuir tudo a inflação ou economia | Testes puros com conta à mão (volume +48,75 e preço −6,25; troca +20,00; mistura 6/4 → 8/2: mesmo fornecedor +6,50, troca −4,50), propriedade com 300 cenários (soma fecha, inverter A e B troca o sinal), teste de banco do cenário inteiro nas duas medidas; jornada P8–P13. |
+| L1227 cobertura incompleta, ausência de base, denominador zero; sem crescimento ou economia enganosa; mesmos critérios, lojas e unidades | Testes de banco "A sem compra" (percentual sem base), "só num lado", "sem base dita por insumo", "o filtro de fornecedor vale nos dois lados", "loja"; jornada P14–P20 (nenhum ∞, NaN nem +0,0%). |
+| L1237–1242 ordem de entrega, item 3 | Esta entrega. |
+| L1244 amostra: dois fornecedores com embalagens diferentes, frete/desconto, mudança de mês, cancelamento, nota repetida, item sem conversão | Cenários dos testes de banco (agosto: Peça 2 kg × quilo solto, frete R$ 20,00, bonificação sem base, cancelada de R$ 500,00; setembro × outubro: mês inteiro de cada lado, troca de fornecedor, cebola sem unidade). Nota repetida e relançada contam uma vez pela mesma regra da L.2. |
+| L1245 soma das linhas × resumo, preço médio ponderado, exportação × tela, abertura da origem, isolamento entre empresas e lojas | Testes de banco (soma da coluna Variação da planilha = variação do resumo; planilha = tela nos dois relatórios), jornada X1–X13 contra SQL independente, P21–P23 (linhas, nota, volta), isolamento G1–G7, B1–B7, N1–N5. |
+| L1246 computador, tablet retrato e paisagem e celular, teclado e leitores de tela | Matriz de 20 telas × 4 tamanhos × 2 temas com ponteiro de toque (sem rolagem lateral, axe, alvos de 44 px, sem erro de console), gerente, teclado (T1–T4), `caption`, `aria-current`, landmarks únicos na impressão. Consumo real e publicação não foram declarados. |
+
+### Referências Kairu consultadas (regra do plano)
+
+Pelo MCP Kairu em 23/10/2026: `pass:compras-cotacao-comparavel` v1.2.0 (lido inteiro) e buscas "comparação de preços variação volume preço período" e "comparativo antes e depois delta tabela" (design): sem material de comparação de períodos nem de efeito preço × volume (a decomposição é própria, decisão 375). O que foi aplicado está na decisão 383: o menor preço unitário não é o menor custo total (preço do item × custo entregue), `null` é desconhecido (sem base, nunca R$ 0,00 nem % sobre zero), unidade incerta fora da comparação, "melhor preço não substitui decisão do comprador" (nunca "economia"), outra loja sem permissão nem no HTML, na planilha ou na impressão.
+
+## Provar a L.3
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate
+npx vitest run                                              # sem banco
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run   # com banco, 2x, em paralelo
+NODE_OPTIONS=--max-old-space-size=6144 npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio (não há migration nova)
+```
+`tests/erp-compras-comparacao.test.ts` (sem banco, 26): a conta com números à mão, a propriedade dos 300 cenários, os percentuais e as frases, o ranking por preço do item e por custo entregue, os filtros da URL, os avisos de datas, os atalhos, o período anterior, a planilha de 4 casas e o rótulo da volta. `tests/erp-compras-comparacao.db.test.ts` (21, Postgres de verdade, cenário conferido à mão no cabeçalho do arquivo): fornecedores (frete inverte a ordem, última compra ignora linha sem base, data usada pelo lançamento no relógio do Rio, planilha = tela), períodos (as duas medidas, sem base por insumo, cancelada, A sem compra, um insumo só, o filtro vale nos dois lados, loja, gerente, operador, outro parceiro, teto, paginação, data usada nos dois lados) e planilha (= tela, fórmula maliciosa, a rota 401/403/400/413/200). `tests/erp-busca-fichas-fornecedores.db.test.ts` (3): a herança da busca sem acento.
+
+**Resultado da prova (2026-10-23).** `prisma validate`, `typecheck`, `lint`, `gate` (645 arquivos varridos) e `build` limpos; `erp:conferir-migracao` limpo e `migrate diff` vazio no `ff_dev` (sem migration nova: nada a aplicar nos 3 perfis do banco). `npx vitest run` sem banco: 128 arquivos, 65 rodam e 63 (os de banco) pulam, 1616 testes passando. Com banco (`ff_dev`, superusuário), EM PARALELO, duas rodadas seguidas: 128 arquivos, 2541 testes, todos passando (155 s e 152 s). A primeira rodada achou um teste da 1.3 que contava as consultas da lista de fichas (9): a busca sem acento acrescentou uma consulta de ids quando há texto, a mesma com 3 ou com 30 fichas (não é N+1); a expectativa passou a 10, com o motivo escrito no teste. Nos perfis de banco, como a L.3 não tem migration, os 12 arquivos de banco tocados ou vizinhos (comparação, relatório, compras, busca, fornecedor, lista de insumos, insumos, subfichas, fichas, isolamento, permissões, RLS; 248 testes) rodaram como dono NÃO-superusuário com FORCE RLS (em sequência: 247 passando e 1 falha que já existia, o teste da 0.2 que lê `_prisma_migrations`, que o psql não cria) e como dono sem RLS (241 passando e 7 pulados).
+
+**Jornada no navegador** (build de produção, porta 3100, banco `ff_l3p` copiado do `ff_dev` com o cenário da L.2 mais o da L.3 conferido à mão e 24 insumos extras; roteiros em `scratchpad/prova-l3`, prints em `scratchpad/shots-L3`): dona (70 conferências: fornecedores contra SQL independente, o frete que inverte a ordem, a marca de referência, linhas, nota e volta; períodos com gasto de A e de B e a variação contra SQL, as duas medidas, volume, preço, troca, entrou e saiu, A sem compra, critérios iguais nos dois lados, lojas, paginação, atalhos, as saídas partindo dos relatórios da L.2; planilha igual à tela, impressão com as 38 linhas), perfis (36: gerente só da Penha, loja de fora = vazio e 403 na planilha, operador sem acesso e sem R$ no HTML, Casa Beta isolada, nível 1 nas duas casas, volta de fora ignorada, busca sem acento em fichas, fornecedores e no ⌘K), teclado (4) e a matriz de 20 telas × 4 tamanhos (1440, 1180, 820, 390) × 2 temas com ponteiro de toque, mais o gerente: sem rolagem lateral, 84 verificações do axe sem violação, sem erro de console e sem alvo abaixo de 44 px nos botões, chips e links de bloco (o medidor pulava o link de texto dentro de cartão: a 1ª volta da UX achou os nomes dos insumos nos cartões com 19 px, corrigidos e medidos com toque no centro do link na rodada de ajustes abaixo; os links de "nota 4570" e "Mudar a categoria" do detalhe do insumo medem 48 px nos 3 tamanhos). A jornada achou e fez corrigir: as colunas de custo médio e gasto quebravam a linha ("B:" sozinho), o gasto de cada lado era um link de 20 px em tablet, os links de uma palavra ("Ovo", "Alho") de 27 px de largura (herança da L.2, que só aparece com nome curto), os avisos empurravam os números para fora da primeira tela do celular (agora vêm depois dos três cartões, com um link no da variação), "A soma" apertada numa linha só (virou lista), "Ver as 1 linha" e "(1 insumos)", e o sinal duplo na conferência da impressão.
+
+**Desempenho** (banco com 300 mil itens de nota em 60 mil notas, com estatísticas): dois meses de 31 mil linhas cada em 0,6 s; quatro meses contra quatro (250 mil linhas) em 2,0 s; a planilha de mês × mês em 0,8 s; fornecedores de um insumo no ano em 0,24 s.
+
+### Rodada de ajustes da 1ª volta da UX e do Guardião (2026-10-23)
+
+Decisão 385. **UX, bloqueantes:** (B1) os nomes dos insumos nos cartões de "Por insumo" (< 1024 px) ganharam `ff-toque` (44 px, com o toque no centro acertando o link a 390, 820 e 1023 px); (B2) um lado sem compra comparável (B vazio, A vazio, ou "Este mês" no dia 1º) mostra o lado como "Sem compra", a variação como "Sem base" (sem % e sem sinal de queda), os efeitos volume e preço como "—" e mantém "saiu"/"entrou"; o cartão "A soma" some (não há variação a somar), e o rodapé, a impressão e o CSV dizem o mesmo; (B3) "Ver as linhas sem base" no aviso de cobertura e nos cartões de A e B, com `so=sembase`, o mesmo recorte e a volta para a comparação. **UX, não bloqueantes:** "Ver as 0 linhas" virou texto (sem link); "Os períodos A e B terminam depois de hoje"; os avisos (dias diferentes, em andamento, cobertura, lado sem compra, emissão, aguardando) saem no cabeçalho do CSV com as mesmas frases da tela (uma função só, `avisosDaComparacao`); "Tirar o filtro de lojas" só quando há filtro de lojas; insumo só com linha sem base: "Nenhum fornecedor com preço comparável neste período"; impressão com `break-after: avoid` nos títulos; quando "entrou" é mais da metade de uma variação positiva, a nota "a maior parte é de insumo que só aparece em B: não é aumento de preço" fica junto ao % (tela e CSV). **Guardião, baixos:** nota sem fornecedor cadastrado agrupa pelo nome que a nota guardou (`n:<nome>`), e não tudo em "-"; `busca.ts` não corta mais em 5.000 sem avisar (sem `limite`, vêm todos os que casam); a busca que acha um insumo só não lê a comparação duas vezes (a leitura já sai dele e a página só assume o endereço).
+
+**Prova da rodada.** `typecheck`, `lint`, `gate` (645 arquivos) e `build` limpos; `migrate diff` vazio e `erp:conferir-migracao` limpo. Sem banco: 1620 testes passando (65 arquivos rodam, 63 pulam). Com banco (`ff_dev`), EM PARALELO, duas rodadas: 128 arquivos, 2550 testes, todos passando. Novos: 4 testes puros (lado sem compra, "entrou" domina, gramática, avisos) e 5 de banco (B vazio e A vazio com o CSV, avisos no CSV, nota sem fornecedor cadastrado, busca de um insumo só, insumo só com linha sem base). Navegador (build de produção, porta 3100, banco novo): jornada dos pontos tocados (77 conferências em claro e 36 em escuro: hit-test de toque no centro dos links dos cartões a 390, 820 e 1023 px, B vazio e A vazio, as linhas sem base abrindo com a volta e a nota encadeada, o CSV com os avisos da tela, os botões e frases novos, `break-after` na impressão), axe sem violação em 9 telas × 4 tamanhos × 2 temas, e as jornadas e a matriz da entrega anterior de novo, todas ok (70 + 36 conferências e 48 por tema).
+
+## Herança da L.3 (para a L.4 e as próximas)
+
+- **A conta é pura** (`compras-comparacao-campos.ts`): quem precisar de efeito preço × volume em outra tela (consumo, DRE) chama `compararPeriodos(celulasA, celulasB, medida)`; células são `insumo × unidade × fornecedor` já somadas pelo banco.
+- **B é o recorte do A com as datas trocadas** (`recorteDoLadoB`): qualquer comparação nova herda lojas, filtros e data usada sem duplicar formulário.
+- **Marca comprada não existe na nota**: se a casa quiser comparar por marca, é preciso guardar a marca na linha da nota (fase própria; decisão 384).
+- **Fuso por loja** continua inexistente (`FUSO_OPERACIONAL`); desconto por item continua R$ 0,00; auditoria de download continua fora.
+- **Teto de 20.000 células** por lado: se algum cliente passar disso, a leitura vira por insumo (paginada no banco) em vez de em memória.
+- **`transacao(..., { repetivel: true })`** serve a toda tela que lê o mesmo recorte duas vezes (A e B).
+
 ## Mapa do esquema (0.1)
 
 Toda tabela abaixo tem `parceiroId` (tenant) e só se acessa por `doParceiro`.
@@ -3978,3 +4052,291 @@ código). Escolha e motivos na decisão 202. As prévias em imagem não abriram 
 **Herança (para as próximas).** Tela nova usa `PageHeader` (é ele que traz a caixa de ajuda). Alvo novo que encolhe acima de 600 px usa as classes
 já cobertas pela regra de toque (`sm:min-h-10`, `sm:min-h-[42px]`…) ou entra na lista em `tokens.css`. Fica para depois: Equipe longa no celular e
 "Ver tudo sobre esta tela" como link de texto em vez de botão fantasma.
+
+## O que a L.4 entregou — consumo e conciliação de estoque (relatório)
+
+Quarta entrega da "Evolução prioritária — lista de insumos e relatórios de compras, preços e consumo" (Rodolfo, 21/10/2026): **"Consumo e conciliação de estoque"** (L1231–1235), item 4 da "Ordem de entrega" (L1237–1242: "após validar cobertura dos movimentos") e os critérios L1244–1246. **Sem migration** (387): o livro do estoque já tem tudo. Decisões 386 a 397 (386 é a herança da L.3, em commit próprio). Sem permissão nova (`estoque.ver` por loja; R$ só com `compras.ver`, 390). Ajuda: `estoque-consumo` nova (versão 1; nenhuma entrada existente mudou).
+
+**Heranças da L.3 resolvidas (386, primeiro commit).** Fornecedor sem cadastro separado pelo nome da nota, também em "Comparar fornecedores" e nos agrupamentos de "Compras do período" (`n:<nome>`, mostrado "(sem cadastro)"); "Comparar períodos" sem "Tirar os filtros" à toa, sem "B: R$ 0,00" num lado sem compra, com um aviso só quando os dois lados não têm compra comparável e sem "cobre 0,0%", e "1 compra · nenhum fornecedor com preço comparável"; e a área de toque dos links de texto (nomes curtos, "nota 301", "Abrir o cadastro", fornecedores, "Ver as canceladas"): `position: relative; z-index: 1` + `min-width: 44px` no `ff-toque`/link de tabela e passo de 44 px nas linhas de tabela no toque (sistêmico, `tokens.css`).
+
+**Telas** (`/erp/estoque/relatorios/consumo`, `.../consumo/movimentos`, `.../consumo/exportar` e o espelho `/rodolfo/erp/[slug]/estoque/relatorios/consumo...`), grupo "Relatórios" do menu de Estoque e Movimentações (394).
+
+1. **A ponte de cada unidade** (kg, L e un nunca somados): Saldo inicial → Compras → Produzido → Uso → Perdas → Devoluções → Estornos → Ajustes → Saldo final, com a linha "Transferências entre lojas: ainda não existe no sistema", o selo "Confere" e a conta de bruto × líquido. Cada número abre os movimentos que o formam.
+2. **Tabela por insumo e loja** (≥ 1280 px; cartões abaixo): as mesmas colunas, número com sinal, R$ embaixo para quem vê, selos de lacuna. Abrir o nome do insumo leva ao **linha a linha** (17 caixas em 4 grupos, cada uma com "de onde vem", quantos movimentos e a quantidade; o que ainda não existe diz isso; as lacunas em frase).
+3. **Antes de ler** (392): o que ficou fora ou pede olhar: período em andamento, loja sem a abertura do estoque, notas fiscais (XML) que aguardam conferência (fora até virarem nota lançada), contagem em andamento, lacunas duras, sem contagem no período, sem valor.
+4. **Movimentos** (395): a coluna, o saldo inicial ou o final aberto, do mais novo ao mais velho, com quantidade com sinal, saldo antes › depois, selo "Estorno" e a origem com link (requisição #N e lote, nota, contagem ou abertura) conforme a permissão da loja; `volta` para o relatório.
+5. **Planilha e impressão** (395): CSV protegido (avisos no cabeçalho, 17 caixas, ponte conferida por linha, totais por unidade; `parte=movimentos` baixa os movimentos de um número) e "Imprimir ou salvar em PDF" com landmarks únicos.
+
+### O indicador e o que o relatório nunca faz (391)
+
+"Uso" é a **requisição registrada** (a baixa que o estoque deu ao entregar), não o consumo aferido por contagem (esse é o das Divergências, 1.8). O relatório só lê: não dá baixa pela venda, pela geração da tela, da planilha, da impressão nem dos movimentos (teste de contagem de linhas antes e depois). A diferença da contagem é Ajuste (sobra ou falta), nunca consumo nem perda presumidos.
+
+### A conta (387 a 389)
+
+Cada movimento cai numa coluna só (`BUCKET`, um `CASE` em SQL): compra (1º lançamento da nota), nota corrigida (o estorno do lançamento antigo e a nova entrada, juntos: só a diferença), nota cancelada (estorno do último lançamento de uma nota `CANCELADA`), produzido, lote desfeito, uso de lote, uso de setor, devolução (o estorno da baixa e o relançamento do líquido, juntos), perda, sobra e falta na contagem, ajuste manual, abertura, outros estornos e as duas caixas reservadas de transferência. Inicial = soma do livro até o dia anterior; final = soma até o fim do último dia (relógio do Rio); a ponte (inicial + soma das colunas) é conferida por uma segunda soma direta e o livro é conferido com `SaldoEstoque`.
+
+| Cebola, Casa, 01–31/10/2026 (conta à mão) | Quantidade |
+|---|---|
+| Saldo inicial (abertura de 28/09) | 20 kg |
+| Compras (3 notas lançadas: 50 + 20 + 10 kg) | +80 kg |
+| Estornos: nota cancelada −20 kg; nota corrigida de 10 para 12 kg +2 kg | −18 kg |
+| Uso: requisição de setor −30 kg; dois lotes −0,885 e −0,354 kg | −31,239 kg |
+| Devoluções (5 kg voltaram da requisição de setor: estorno +30, relança −25) | +5 kg |
+| Ajustes (a contagem de 12/10 achou 55 kg onde o livro tinha 55,761) | −0,761 kg |
+| **Saldo final** (20 + 80 − 18 − 31,239 + 5 − 0,761) | **55 kg** |
+
+### Evidência de cada caixa do Notion (para o Maestro marcar; L1231–1235, L1237–1242 e L1244–1246)
+
+| Caixa | Evidência |
+|---|---|
+| L1231 compras e consumo separados; entrada de nota não é uso; transferência interna não é compra nem consumo | Colunas Compras e Uso separadas (teste de banco: Cebola, e `compra` só de nota lançada); "Produzido" não é compra; transferência dita como inexistente e com linhas reservadas no detalhe e no CSV (393); jornada: ponte e linha a linha. |
+| L1232 saldo inicial, entradas, uso, perdas, devoluções, transferências, ajustes e saldo final, com sinais e origens | Ponte, tabela e linha a linha com sinal e "de onde vem"; 17 caixas; movimentos com a origem (nota, requisição e lote, contagem, abertura); testes de banco (cenário de outubro, SQL independente) e jornada dona. |
+| L1233 baixa na requisição; nunca de novo pela venda nem pela geração; dizer se é requisição registrada ou aferido | Decisão 391; teste "o relatório só lê" (linhas de movimento, saldo, requisição, item atendido, nota, histórico, contagem e ordem iguais antes e depois de tela, planilha, impressão e movimentos); frase na primeira dobra, nas notas, na ajuda e no CSV. |
+| L1234 saldo final concilia; diferença de inventário é ajuste; lacunas | Ponte conferida por segunda soma e por `SaldoEstoque` (389); a contagem entra como sobra/falta em Ajustes; lacunas: sem contagem (com a última data), negativo no fim e no meio, sem origem, saldo que não bate, sem valor, unidade que mudou (392). |
+| L1235 cancelamentos, estornos e devoluções separados; bruto × líquido; documento só capturado fora | Colunas Estornos e Devoluções à parte, bruto/líquido definidos e escritos (388); nota cancelada, corrigida e devolução em duas rodadas (devolução parcial); XML aguardando fora do livro, avisado com o número (teste de banco e jornada). |
+| L1237–1242 ordem de entrega, item 4 | Esta entrega, depois de validada a cobertura dos movimentos (quadro "Cobertura" abaixo). |
+| L1244 amostra: mudança de mês, devolução/cancelamento, nota repetida, transferência entre lojas | Fuso (23:30 de 31/10 em outubro, 00:30 de 01/11 em novembro), nota cancelada e corrigida, devolução, requisição de lote e lote estornado; nota repetida e relançada conta pela chave de idempotência do livro; transferência entre lojas não existe (dito). |
+| L1245 soma das linhas × resumo, exportação × tela, abertura da origem, isolamento entre empresas e lojas | Testes de banco (soma das caixas = final − inicial, CSV parseado = tela linha a linha e totais), "cada número abre as linhas" com `volta` (jornada), isolamento: gerente só da loja dele, parceiro B invisível, operador sem R$, 401/403/400/413. |
+| L1246 computador, tablet retrato e paisagem, celular, teclado e leitores de tela | Matriz de 14 telas × 4 tamanhos × 2 temas com ponteiro de toque, axe e hit-test; `caption`, `aria-label` com o que cada número abre, `aria-current`, landmarks únicos na impressão. Consumo real e publicação não foram declarados. |
+
+### Cobertura dos movimentos (o que falta, dito antes de entregar)
+
+Gravados hoje: abertura, compra, requisição, entrada de lote e contagem. **Sem quem grave**: perda (`PERDA`), ajuste manual (`AJUSTE`) e `PRODUCAO_CONSUMO`. **Inexistente**: transferência entre lojas. A contagem que bate não gera movimento (a cobertura de contagem vem de `ContagemItem`). O R$ da baixa é o custo de referência do dia da entrega; insumo sem preço entra com zero e é dito. Nada disso foi inventado: as colunas existem vazias e a tela diz por quê.
+
+### Referências Kairu consultadas (regra do plano)
+
+Pelo MCP Kairu em 23/10/2026: `pass:inventario-contagem-divergencias` v1.2.0, `library:inventario-ciclico` v1.0.0 e `pass:cmv-fichas-e-margem` v1.2.0 (lidos inteiros). O que foi aplicado está na decisão 396: item não contado não é zero, divergência não prova perda, saldo final que bate com o razão, custo ausente é indisponível (nunca zero), cobertura parcial dita antes dos números, "nunca compensar com baixa silenciosa" (o relatório não grava), dia operacional do Rio com [início, fim) e isolamento de outra loja testado em HTML, planilha e movimentos.
+
+## Provar a L.4
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate
+npx vitest run                                              # sem banco
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run   # com banco, 2x, em paralelo
+NODE_OPTIONS=--max-old-space-size=6144 npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio (não há migration nova)
+```
+`tests/erp-consumo-estoque.test.ts` (sem banco, 19): o mapa das caixas (uma coluna por caixa), a ponte, bruto × líquido, a propriedade com 300 sequências, as lacunas, os filtros da URL, o sinal, a planilha de negativo e os avisos. `tests/erp-consumo-estoque.db.test.ts` (Postgres de verdade, cenário conferido à mão no cabeçalho do arquivo, 26 testes, a planilha inclusa): a conta da Cebola, SQL independente, contado e não contado, lote e lote estornado, negativos, sem origem e perda, o dia do Rio, o resumo por unidade, os filtros, o XML aguardando, "só lê", os movimentos de cada número, perfis e isolamento, o dinheiro do livro e o teto, o R$ zerado na própria consulta de quem não vê custo e o relatório respondendo com a frase quando as vagas estão ocupadas. `tests/erp-vagas-de-relatorio.test.ts` (sem banco, 5) e `tests/erp-relatorio-teto.db.test.ts` (Postgres, 5): vagas e fila, teto cortado pelo banco, somente leitura no portão e no banco, o teto que não vaza no pool e seis relatórios juntos com no máximo três ao mesmo tempo. Sem migration: os 3 perfis de banco não têm o que aplicar; os arquivos de banco tocados rodam nos dois perfis.
+
+**Resultado da prova (L.4), rodada do Guardião e da UX (disponibilidade)**
+
+| Prova | Resultado |
+|---|---|
+| `prisma validate`, `typecheck`, `lint`, `gate` (661 arquivos), `build` | limpos |
+| `erp:conferir-migracao` e `migrate diff` contra o schema | conferido; "No difference detected" (a L.4 não tem migration) |
+| `vitest` sem banco | 1.647 passaram, 918 pulados (sem `ERP_DB_TESTE`) |
+| `vitest` com banco, 2 rodadas em paralelo (superusuário) | 2.609 de 2.609 nas duas |
+| Arquivos de banco tocados (consumo, teto de relatório, relatório e comparação de compras), dono não-superusuário **com** RLS (42 políticas) e **sem** RLS (0 políticas), em série | 77 de 77 nos dois |
+| Produção local (`next start`, porta 3100), matriz de 10 telas x 4 larguras (1440, 1180, 820, 390), claro e escuro | 0 problemas em 56 combinações por tema: sem rolagem lateral, sem texto miúdo, hit-test de toque ≥ 44 px sem sobreposição, axe sem violação, sem erro de console |
+| Jornada por perfil (dono, gerente só das lojas dele, operador e cozinha sem R$, isolamento entre dois parceiros) | 76 verificações, 0 falhas |
+| Pontos tocados na rodada, no navegador | 21 de 21: links de origem com volta (nota, requisição, lote, contagem) e volta forjada ignorada; grupo Relatórios no menu; "0 L" no lugar de "0 ml"; número e unidade sem quebra a 390 px; R$ negativo do Alho explicado; aviso da comparação uma vez só; Compras/Uso bruto e líquido na impressão e no CSV |
+
+**Desempenho e concorrência** (320 mil movimentos: 8 lojas x 400 insumos x 100 movimentos; banco local de 4 núcleos):
+
+| Medida | Antes da rodada | Depois |
+|---|---|---|
+| Tela de 1 mês, banco aquecido | 7 a 10 s (o livro lido 3 vezes) | **1,9 s** (uma leitura) |
+| Tela de 1 mês, cache frio (banco recém-reiniciado) | 8 a 31 s | **4,3 s** |
+| 3 meses, ano, planilha completa (3.200 linhas) | 8 s, 8 s, 6 s | 2,0 s, 2,2 s, 2,2 s |
+| Uma loja, um mês | 4,4 s | 0,4 s |
+| Movimentos de um número (um par) / da coluna "ajustes" inteira | 34 ms / 2,4 s | 33 ms / 0,4 s |
+| 20 pedidos pesados ao mesmo tempo (HTTP, produção local) | pool esgotado: erro "Unable to start a transaction" e o ERP travado | **20 respostas 200 em 9,8 s: 6 com os números, 14 com "Há outro relatório grande rodando", nenhum 5xx** |
+| Tela leve durante os 20 pesados | travava | mediana de 77 ms (repouso: 90 ms); maior espera de 809 ms, todas 200 |
+| Consulta que passa do teto | seguia rodando no banco depois do erro do Prisma | cortada pelo Postgres aos 20 s; frase "O relatório ficou grande demais" |
+
+Observação: um banco recém-carregado (sem `VACUUM`) levou mais de 20 s na primeira leitura de cada recorte, por causa dos bits de consulta ainda não marcados; isso não acontece em produção com o autovacuum, e o teto de 20 s corta o caso com a frase em vez de travar. O limite continua dito: acima disso o caminho é guardar o saldo por dia, não afrouxar o teto.
+
+### Herança da L.4 (para as próximas)
+
+- **Perda, ajuste manual e transferência entre lojas** não têm tela nem tipo: quando existirem, entram nas caixas já reservadas (`perda`, `ajuste`, `transf_entrada`, `transf_saida`) e o relatório não muda de forma. Transferência pede um tipo novo no livro (migration) e saída e entrada ligadas, sem contar como compra nem consumo da rede.
+- **A classificação mora num `CASE` só** (`BUCKET` em `consumo-estoque.ts`): quem criar um tipo de movimento ou uma nova forma de estorno precisa dizer em que caixa ele cai, ou ele vira "Outros estornos" (e o teste de banco denuncia).
+- **Consumo aferido** (inicial contado + entradas − final contado) continua nas Divergências; trazê-lo para este relatório exige contagem nas duas pontas do período.
+- **O R$ da baixa é o custo de referência do dia**; um preço mudado depois não reescreve o passado, mas a baixa sem preço entra com zero (dita).
+- **O livro de estoque da loja (1.6) mostra valor a quem tem `estoque.ver`**, inclusive o operador; este relatório não (pergunta 2 da decisão 397).
+- **Desempenho**: a leitura soma o livro inteiro da loja até o fim do período (`MovimentoEstoque` por loja e insumo). Medido em 320 mil movimentos (ver "Resultado da prova"), numa leitura só por tela, com teto de 20 s e 3 vagas por processo (decisão 398); com muitos anos de livro, levar o saldo inicial para uma tabela de fechamento é a saída.
+
+## O que a 3.4 entregou — etiquetas: o lote produzido, o lote do fornecedor e a embalagem aberta, na Zebra ou no papel
+
+Subfase 3.4 do plano ("Etiquetas"): etiqueta 60 × 40 e 60 × 60 mm com produto, conservação, manipulação ou abertura, validade,
+responsável, quantidade, lote e loja; o lote e o vencimento do item comprado registrados no recebimento; a abertura da
+embalagem com a validade efetiva; ZPL para a Zebra pelo Browser Print, com arquivo .zpl e papel A4 quando não der; retrato que
+a reimpressão não recalcula. Decisões 400 a 416. Migration aditiva `20261110000000_erp_etiquetas` (três tabelas de tenant com
+RLS; a "Etiqueta" da 0.1 virou a emissão). Sem permissão nova: `etiquetas.imprimir` por loja (o operador tem); o lote na nota é
+`compras.lancar`. `VERSAO_DO_ERP` = "Barney ERP · fase 3.4"; a lista de módulos "em breve" ficou vazia.
+
+| Peça | Onde |
+|---|---|
+| Regras puras: relógio do Rio, validade da abertura, leitura dos formulários, código da etiqueta, frases | `src/lib/erp/etiqueta-campos.ts` |
+| O desenho: texto limpo, quebra e medida, layout em pontos (203/300 dpi), ZPL, etiqueta de teste | `src/lib/erp/etiqueta-zpl.ts` |
+| Com banco: lojas, painel, lote, abertura, emissão, pedido e resultado, histórico, lote da nota, papel | `src/lib/erp/etiquetas.ts` |
+| `rastro` do XML guardado (nLote, qLote, dFab, dVal) | `rastrosDoXmlGuardado` em `src/lib/erp/nfe-xml.ts` |
+| Telas (as mesmas no /erp e no nível 1) | `src/components/erp/telas/etiquetas/` (`painel`, `lote`, `form-emitir`, `abrir`, `form-abrir`, `aberta`, `emissao`, `painel-impressao`, `browser-print.ts`, `papel`, `historico`, `impressora`, `config-impressora`, `lotes-da-nota`, `form-lote-nota`, `previa`) |
+| Rotas | `/erp/etiquetas` (`[loja]`, `[loja]/lote/[lote]`, `[loja]/abrir`, `[loja]/aberta/[abertura]`, `[loja]/[etiqueta]`, `[loja]/[etiqueta]/papel?pedido=`, `abrir`, `historico`, `historico/[loja]`, `impressora`), `/erp/compras/[id]/lotes` e o espelho em `/rodolfo/erp/[slug]/...` (ações com `auditLog`) |
+| Banco | `EtiquetaImpressao`, `LoteDeInsumo`, `AberturaDeLote` + colunas da "Etiqueta"; gatilhos `Etiqueta_origem_confere`, `EtiquetaImpressao_confere`, `LoteDeInsumo_confere`, `AberturaDeLote_confere` e os de parceiro imutável; conferidas por `npm run erp:conferir-migracao` |
+
+**O fluxo.** (1) O lote concluído na Produção ganha "Imprimir etiqueta" → a etiqueta do lote: tamanho, quantas (até 50, uma
+por pote), quanto em cada (opcional; juntas não passam do que saiu) e se a hora aparece, com a prévia proporcional redesenhada
+ao vivo → "Emitir" grava o retrato e leva à emissão. (2) A emissão: prévia do retrato, o painel de impressão (Zebra pelo
+Browser Print, "Baixar o arquivo .zpl", "Imprimir no papel (A4)", cópias) e os pedidos com o que aconteceu. (3) No
+recebimento, a nota tem "Lote e vencimento": por insumo, o lote como veio na embalagem (o rastro do XML como sugestão). (4) Na
+cozinha, "Abrir embalagem": o insumo, o lote (da nota, lido agora na embalagem ou "não informado"), onde vai ficar e quanto;
+a hora é a do registro; a tela mostra ao vivo até quando vale e recusa o lote vencido → a embalagem aberta emite a etiqueta
+dela. (5) Histórico de impressões por loja e período, com os totais que separam pedidos de etiquetas.
+
+### A regra da validade (decisões 401 a 403)
+
+| Caso | Na etiqueta |
+|---|---|
+| Lote produzido com validade (conclusão às 14:05, refrigerado 3 dias) | `MANIPULADO 23/10/26 14:05` e `VALIDADE 26/10/26 14:05` (a da conclusão, para sempre) |
+| Lote produzido sem validade na ficha | `VALIDADE NÃO INFORMADA` (e a tela pede para completar a ficha) |
+| Embalagem aberta 23/10 14:05, prazo 3 dias, lote vence 10/11 | `USAR ATÉ 26/10/26 14:05` (o prazo vem antes) e `VENC. LOTE 10/11/26` |
+| A mesma, lote vence 24/10 | `USAR ATÉ 24/10/26` (o vencimento vem antes: vale até o fim do dia no Rio; abrir não prolonga) |
+| Sem prazo depois de aberto na conservação escolhida | `PRAZO NÃO INFORMADO` (o vencimento do lote não vira validade depois de aberto) |
+| Lote vencido | não abre: "Este lote venceu em …: não abra. Separe para descarte e avise a gerência." |
+| Lote não informado | `VENC. LOTE NÃO INFORMADO` e `LOTE FORN. NÃO INFORMADO` (vale só o prazo) |
+
+### Referências Kairu consultadas (regra do plano)
+
+| Material | Lido | Aplicado | Adaptado | Fora, e por quê |
+|---|---|---|---|---|
+| `library:impressao-etiquetas` v1.0.0 (MCP, 23/10/2026) | inteiro | abas Imprimir/Histórico/Impressora; 60 × 40 e 60 × 60 a 203 dpi (480 × 320, 480 × 480); ZPL sanitizado com acentos (`^CI28`, `^FH`); prévia e ZPL do mesmo layout; nome grande quebra ou pede o formato maior, nunca trunca; snapshot e reimpressão sem recalcular; pedido gravado antes do envio, idempotência, reenvio consciente com aviso de duplicação; estados sem "impressa" automático, arquivo ≠ impressão; total de pedidos ≠ total de etiquetas; emissor da sessão separado de quem manipulou; emissão não mexe no estoque; validade no servidor no fuso da loja, dias como duração; isolamento por loja no servidor; instalar o aplicativo, aceitar o domínio e testar UMA etiqueta fictícia | sem prazo, o material bloqueia a emissão: aqui o lote sem validade sai "não informada" e a embalagem sem prazo "prazo não informado", com aviso (regra do coordenador de nunca inventar; perguntas 1 e 2 da decisão 415); cópias até 50, não 10 (412); Browser Print pela API local, sem empacotar o SDK (409) | logo e CNPJ na etiqueta (pergunta 8); hash do payload (o retrato regera o mesmo ZPL, testado); estado "confirmada pelo operador" (pergunta 9); limite de frequência; manipulação retroativa (manipulação = conclusão) |
+| `prompt:b3592b7c-e37b-4b1d-bffb-9053848afe28` "Da Ficha ao Fornecedor" (comunidade, MCP, 23/10/2026) | inteiro | busca pelo número do lote para conferir uma etiqueta impressa (painel da loja); validade = fabricação + prazo quando existe (herdado da 3.1) | — | rastreio de qual lote de insumo entrou no lote produzido (limitação também do material: pede outro desenho); botões de 56 px da tela de bancada (a etiqueta usa os de 44 px do formulário) |
+
+## Provar as etiquetas (3.4)
+
+```bash
+npx prisma validate && npm run typecheck && npm run lint && npm run gate
+npx vitest run                                                         # sem banco
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/<banco> npx vitest run --no-file-parallelism   # com banco (em blocos, se preferir)
+NODE_OPTIONS=--max-old-space-size=6144 npm run build
+npm run erp:conferir-migracao
+npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code
+```
+
+`tests/erp-etiquetas.test.ts` (sem banco, 30): relógio do Rio, a regra da validade em cada caso, as situações, a leitura dos
+formulários, o ZPL (estrutura, limites, quebra, fonte mínima, campos que saem, acentos, sem validade), segurança (`^`, `~`,
+`_`, quebra, controle, largura zero, emoji, U+2028), nome do arquivo, etiqueta de teste, retrato determinístico e o rastro do
+XML. `tests/erp-etiquetas.db.test.ts` (Postgres, 15): emissão do lote e idempotência (5 emissões juntas, códigos sem repetir),
+recusas (não concluído, perdido, estornado; o estornado depois não imprime), reimpressão que não recalcula, pedidos e
+resultados, lotes da nota e a sugestão do XML, a regra da abertura, o item aberto, nota cancelada, escopo, isolamento e RLS,
+período fechado, totais do histórico e as barreiras do banco em SQL cru. `tests/erp-etiquetas-telas.db.test.ts` (8): as páginas
+e as actions de verdade por perfil (sem R$, 404 fora da loja e do parceiro, o nível 1 que não abre, o papel só com o pedido).
+`tests/erp-etiquetas-migracao.db.test.ts` (3 perfis): dado antigo (lote da 3.1 e uma "Etiqueta" da 0.1), nada some, sem aviso,
+regras pelo papel do tenant, conferidor limpo e acusando o que faltar. Jornada e matriz no navegador: scripts em
+`scratchpad/pw/prova34.mjs` e `matriz34.mjs` (Browser Print simulado por `page.route` em `localhost:9100`).
+
+**Resultado da prova (2026-10-23, depois do merge da L.4)**
+
+| Prova | Resultado |
+|---|---|
+| `prisma validate`, `typecheck`, `lint`, `gate` (710 arquivos), `build` | limpos |
+| `erp:conferir-migracao` e `migrate diff` | conferido (3.4 inclusa); vazio |
+| `vitest` sem banco | 136 arquivos (68 de banco pulam), 1.702 passando |
+| `vitest` com banco, superusuário, banco novo por `migrate deploy`, em 4 blocos | 81 arquivos, 1.291 testes, todos passando |
+| Dono NÃO-superusuário com FORCE RLS (migrations pelo dono), 15 arquivos de banco tocados ou vizinhos | 331 de 332 (a falha é a conhecida do teste da 0.2, que lê `_prisma_migrations`) |
+| Dono sem RLS, os mesmos 15 | 324 passando, 8 pulados |
+| Migration da 3.4 com dado antigo nos 3 perfis | 3 passando |
+| Jornada (build de produção, banco cópia do `ff_33` + migrations + categorias) | 34 de 34 conferências: concluir, emitir, Zebra (POST com o device e o ZPL `^CI28`, 480 × 320, `^PQ2`), .zpl (421 bytes), papel 60 × 40 mm (227 × 151 px a 96 dpi) e PDF A4, sem Browser Print, Zebra que recusa, 3 lotes na nota (a nota não muda), abrir pelo vencimento, sem prazo, abrir não mexe no estoque, histórico 5 pedidos · 9 etiquetas · 3 enviadas · 4 arquivo ou papel · 1 falhou |
+| Matriz: 10 telas × dona/gerente/operador × 1440/1180/820/390 × claro/escuro (232) | 0 rolagem lateral, 0 violação do axe, 0 erro de console, 0 alvo abaixo de 44 px com toque real, 0 R$, um h1 por tela |
+
+O que a prova achou e fez corrigir está na decisão 416 (a chave do formulário do lote na nota, os alvos de toque). O teste
+físico na Zebra do Valentin's (os dois rolos, 203 ou 300 dpi) depende do Rodolfo: o Browser Print instalado no computador da
+impressora, o domínio aceito e a etiqueta de teste da aba Impressora.
+
+## Herança da 3.4 (para as próximas)
+
+- **A emissão é imutável** (gatilho `Etiqueta_origem_confere`): corrigir é emitir de novo. Reimprimir é `EtiquetaImpressao` nova
+  do mesmo retrato (`pedirImpressao`). Mudou o desenho? Suba `VERSAO_DO_LAYOUT` e mantenha o retrato regerando o mesmo papel
+  (o teste do retrato determinístico denuncia).
+- **Uma função desenha tudo** (`montarEtiqueta`): prévia, papel e ZPL. Campo novo na etiqueta entra em `linhasDoConteudo`,
+  com `essencial` (recusa o formato se não couber) ou opcional (sai e é dito em `fora`), e um teste de nome longo nos dois tamanhos.
+- **Texto do usuário no ZPL só por `paraCampoZpl`** (normaliza e põe `^ ~ _` em hexadecimal dentro de `^FH`). Nunca concatene
+  texto cru num comando.
+- **A validade efetiva mora em dois lugares que precisam concordar**: `validadeDaAbertura` (JS) e os CHECKs da `AberturaDeLote`
+  (banco). Regra nova (horas, outra conservação) muda os dois e o teste das barreiras.
+- **O pedido de impressão muda uma vez** (de "preparada" para o resultado). "Enviada" não é "impressa": a confirmação física,
+  se vier, é um estado novo, não um uso diferente de "enviada".
+- **Browser Print**: os caminhos ficam em `browser-print.ts` (um adaptador). Se a versão instalada no Valentin's não aceitar o
+  POST de texto puro em `/write`, troque o adaptador (a biblioteca oficial da Zebra, servida como arquivo próprio), não o resto.
+  O que precisa sair do navegador já está: o pedido gravado antes e o resultado depois.
+- **O lote do fornecedor é por (nota, insumo)** e não muda; o lote lido na embalagem é de origem "abertura", sem nota. Nada de
+  vencimento no cadastro do insumo. Rastreio de qual lote de insumo entrou no lote produzido não existe (pede outro desenho).
+- **Formulário que volta para a mesma tela depois de gravar** leva a chave do envio da leitura como `key` (decisão 416).
+- **Matriz**: a pergunta da 1ª visita da caixa de ajuda (0.6) traz o link "Seu acesso" de 16 px; a matriz responde a pergunta
+  antes de medir. O link é da caixa (todo o ERP), não das telas.
+- **Para o Rodolfo** (decisão 415): imprimir ou bloquear sem validade/sem prazo; o fim do dia do vencimento; 50 etiquetas e
+  cópias; a FlowFoods não abre; lote na nota de quem lança nota; 203 ou 300 dpi e os rolos; CNPJ/logo; "saiu no papel".
+
+## Rodada de correção 1 da 3.4
+
+O Guardião aprovou (1 importante + 7 menores) e a UX reprovou (2 médios + menores). O que mudou, com as decisões 417–423 (e
+as 400, 401, 406, 408, 409, 410, 414, 415 e 416 corrigidas no lugar):
+
+- **Vencido não sai** (417): lote produzido vencido, como a embalagem aberta vencida, não emite nem reimprime (Zebra, arquivo,
+  papel, nem o papel de um pedido antigo), para ninguém, e o servidor recusa. A tela diz em vermelho "Este lote venceu em
+  DD/MM às HH:MM: não use. Separe para descarte e avise a gerência."; no painel, "venceu: não use", fora da fila.
+- **A fila** (418): "Esperando a impressora" só se esvazia com a Zebra aceitando o envio ou com **"Já imprimi"** (quem e
+  quando, gravados no pedido: `confirmadaEm`, `confirmadaPorNome`, `confirmadaPorUsuarioId`). Baixar o .zpl ou abrir o papel
+  não tira. Sem Browser Print: "Sem Zebra neste aparelho" e a etiqueta fica na fila. Pedidos por nome: Zebra, Arquivo, Papel.
+- **Zebra** (419): sem resposta em 15 s = "Sem resposta" / "Sem resultado" (pode ter saído), não "Falhou"; os erros comuns da
+  Zebra em palavras (`traduzirErroDaZebra`).
+- **Banco** (420, 421): a etiqueta confere manipulação, quem fez, lote do fornecedor e marca com a origem; pedido e abertura não
+  somem (gatilho de DELETE); pedido não troca de id nem conclui antes de ser pedido; a chave do envio é da loja; 300 dpi é o
+  desenho de 203 ampliado (nada some calado); o lote aceita `_ : #`; pré-preparo numa nota = frase, não erro 500. A migration
+  `20261110000000_erp_etiquetas` foi ajustada no lugar (ainda não está na master).
+- **Telas** (422, 423): papel A4 sem a folha em branco (estilo de impressão só da página do papel); o link dos lotes na nota
+  com 44 px e a contagem; "Não cabe: use 60 × 60" com o botão de trocar; um termo para o sem prazo ("Prazo após abertura não
+  informado"); barras de ação presas até 900 px (tablet em pé) e a impressão antes da prévia no celular e no tablet; a aba
+  Impressora com a licença de rede local do Chrome e o certificado de https://localhost:9101; lote que chegou vencido na nota:
+  "separe e devolva ao fornecedor".
+
+**Herança que muda:** o pedido de impressão muda uma vez (o resultado) e ganha, uma vez, a confirmação "Já imprimi"; a fila e
+o histórico leem os dois (`situacao = 'ENVIADA'` ou `confirmadaEm` preenchida). Etiqueta nova que se imprime passa por
+`bloqueioDaEmissao` (estornado ou vencido) em TODOS os caminhos (emitir, pedir, papel, confirmar).
+
+**Resultado da prova da rodada 1 (2026-10-23)**
+
+| Prova | Resultado |
+|---|---|
+| `typecheck`, `lint`, `gate` (710 arquivos), `prisma validate`, `build` (0cffaa0) | limpos |
+| `erp:conferir-migracao` e `migrate diff` (banco novo por `migrate deploy`) | conferido; vazio |
+| `vitest` sem banco | 68 arquivos rodam (68 de banco pulam), 1.708 passando |
+| `vitest` com banco, superusuário, banco novo, em 4 blocos | 68 arquivos, 995 testes, todos passando (o da migration corrigido, decisão 424) |
+| Dono NÃO-superusuário com FORCE RLS (migrations pelo dono), 15 arquivos (etiquetas, telas, isolamento, RLS, acesso, permissões, produção, compras, estoque, requisição, validade, documento fiscal, insumos, onboarding) | 283 de 284 (a falha é a conhecida da 0.2, `_prisma_migrations`) |
+| Dono sem RLS, os mesmos 15 | 276 passando, 8 pulados |
+| Migration da 3.4 com dado antigo nos 3 perfis | 3 passando |
+| Ataques do Guardião (`rev34/t`, 5 arquivos) como superusuário, dono com RLS e dono sem RLS | 20/20 em cada; todo SQL cru recusado; 300 dpi: 0 diferença (antes 56) |
+| Jornada curta (build de produção) | 31 de 31: lote vencido bloqueado (painel, lote, emissão, papel antigo); sem Zebra no tablet, .zpl e papel não tiram da fila; papel A4 com 2 cópias = 1 folha (PDF); "Já imprimi" tira, com quem e quando; Zebra muda = "Sem resposta"/"Sem resultado"; "Paper out" em palavras; Zebra aceita = sai da fila; histórico com "Já imprimi" |
+| Matriz das telas mexidas × dona/operador × 390/820/1180/1440 × claro/escuro | 224 medições: 0 rolagem lateral, 0 violação do axe, 0 erro de console, nenhum alvo abaixo de 44 px com toque (depois do "Ver o estoque"), um h1, nenhum R$ nas telas de etiqueta |
+
+## Rodada final da 3.4
+
+Os dois fiscais aprovaram a rodada 1, com um ponto de segurança do alimento e menores (decisões 425–428; 402, 408, 418 e
+423 corrigidas no lugar):
+
+- **Embalagem sem prazo vence com o lote** (425): `limiteDeUso` = a validade gravada ou, sem ela, o fim do dia do vencimento
+  do lote no Rio. Depois disso não emite, não imprime (Zebra, arquivo, papel novo e antigo), não confirma, sai da fila e o
+  painel diz "venceu: não use". A etiqueta continua sem data de validade.
+- **"Já imprimi" × Zebra** (426): pedidos lidos com `FOR UPDATE`; sem erro cru; o gatilho recusa pedido que nasce confirmado
+  e confirmação no futuro.
+- **Versão do layout** (427): é a 1; `desenhoDaEmissao` desenha pela versão gravada (versão desconhecida não imprime).
+  Mudou o desenho? Versão 2 ao lado da 1. `emissaoParaArquivo` saiu.
+- **Telas** (428): o sem prazo em duas linhas na etiqueta; "Etiqueta emitida: ela espera a impressora."; histórico com
+  detalhes curtos e o cartão "Esperando o Já imprimi".
+
+
+**Resultado da prova da rodada final (2026-10-23)**
+
+| Prova | Resultado |
+|---|---|
+| `typecheck`, `lint`, `gate` (710 arquivos), `build` (e7d44fb) | limpos |
+| `erp:conferir-migracao` e `migrate diff` (banco novo por `migrate deploy`) | conferido; vazio |
+| `vitest` sem banco | 68 arquivos rodam, 1.710 passando |
+| `vitest` com banco, superusuário, banco novo, em 4 blocos | 68 arquivos, 999 testes, todos passando |
+| Dono NÃO-superusuário com FORCE RLS (migrations pelo dono), os 15 arquivos | 287 de 288 (a conhecida da 0.2, `_prisma_migrations`) |
+| Dono sem RLS, os mesmos 15 | 280 passando, 8 pulados |
+| Migration da 3.4 com dado antigo nos 3 perfis | 3 passando (nasce confirmado e confirmação no futuro recusados) |
+| Ataques do Guardião (`rev34/t`, 27 testes) nos 3 perfis | 27/27 em cada, nenhum achado; sem prazo + lote vencido: nada emite, imprime nem confirma; corrida "Já imprimi" × Zebra: 20 rodadas, 0 erro cru |
+| Jornada da rodada (build de produção) | 14 de 14: embalagem sem prazo de lote vencido bloqueada (painel, abertura, emissão, papel); o sem prazo em duas linhas na prévia (285 de 480 pontos); "Etiqueta emitida: ela espera a impressora."; histórico com "Esperando o Já imprimi", sem cartão cortado a 1440 e a 390 |
+| Matriz das telas mexidas × dona/operador × 390/1180/1440 × claro/escuro | 48 telas: 0 rolagem lateral, 0 axe, 0 alvo abaixo de 44 px, um h1, nenhum R$ |

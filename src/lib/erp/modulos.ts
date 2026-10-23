@@ -56,7 +56,10 @@ export type ChaveIcone =
   | 'categorias'
   | 'classificar'
   // L.2: os relatórios de compras (distinto do Orçamento, que é o medidor).
-  | 'relatorio';
+  | 'relatorio'
+  // L.3: comparar fornecedores (duas colunas) e comparar períodos (setas nos dois sentidos).
+  | 'comparar'
+  | 'periodos';
 
 export interface ItemNav {
   href: string;
@@ -119,7 +122,7 @@ export interface Navegacao {
 }
 
 /** Rodapé do menu lateral: a fase do plano que está no ar. */
-export const VERSAO_DO_ERP = 'Barney ERP · fase 3.3';
+export const VERSAO_DO_ERP = 'Barney ERP · fase 3.4';
 
 /** Paleta dos módulos (fora do vermelho, que é o único acento de marca). */
 export const COR = {
@@ -353,6 +356,20 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               subtitulo: 'Tudo o que foi comprado num dia ou período, com planilha',
               permissao: 'compras.ver',
             },
+            {
+              href: `${base}/compras/relatorios/comparar-fornecedores`,
+              rotulo: 'Comparar fornecedores',
+              icone: 'comparar',
+              subtitulo: 'Quem vende o mesmo insumo por menos, com e sem o frete',
+              permissao: 'compras.ver',
+            },
+            {
+              href: `${base}/compras/relatorios/comparar-periodos`,
+              rotulo: 'Comparar períodos',
+              icone: 'periodos',
+              subtitulo: 'O que mudou entre dois períodos: volume, preço e fornecedor',
+              permissao: 'compras.ver',
+            },
           ],
         },
       ],
@@ -432,6 +449,20 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
             },
           ],
         },
+        {
+          // L.4: a leitura do livro do estoque (nada aqui dá baixa, lança ou conta).
+          rotulo: 'Relatórios',
+          icone: 'relatorio',
+          telas: [
+            {
+              href: `${base}/estoque/relatorios/consumo`,
+              rotulo: 'Consumo e conciliação',
+              icone: 'relatorio',
+              subtitulo: 'Do saldo inicial ao final: compras, uso, devoluções e ajustes',
+              permissao: 'estoque.ver',
+            },
+          ],
+        },
       ],
       // Nova requisição, Planejar contagem e Abrir estoque são da loja (já estão nas telas dela).
       acoes: [],
@@ -498,6 +529,56 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
           permissao: 'producao.registrar',
         },
       ],
+    },
+    {
+      // 3.4: a área Etiquetas (decisão 413). Imprimir = os lotes concluídos e as embalagens abertas da loja, a fila e a emissão;
+      // Abrir embalagem = registrar a abertura (a data e a hora que dão a validade); Histórico = os pedidos de impressão;
+      // Impressora = a Zebra deste computador (Browser Print) e a etiqueta de teste. Tudo com "imprimir etiquetas", por loja.
+      chave: 'etiquetas',
+      nome: 'Etiquetas',
+      subtitulo: 'Validade impressa na hora: o lote produzido e a embalagem aberta, na Zebra ou no papel',
+      resumo: 'Validade e lote',
+      icone: 'etiquetas',
+      cor: COR.etiquetas,
+      grupos: [
+        {
+          rotulo: 'Etiquetas',
+          icone: 'etiquetas',
+          telas: [
+            {
+              href: `${base}/etiquetas`,
+              rotulo: 'Imprimir',
+              icone: 'etiquetas',
+              subtitulo: 'Lotes concluídos e embalagens abertas, prontos para a etiqueta',
+              permissao: 'etiquetas.imprimir',
+            },
+            {
+              href: `${base}/etiquetas/abrir`,
+              rotulo: 'Abrir embalagem',
+              icone: 'insumo',
+              subtitulo: 'A data e a hora em que se abriu, e a validade que isso dá',
+              permissao: 'etiquetas.imprimir',
+              // A abertura mora dentro da loja (`<loja>/abrir`, `<loja>/aberta/<id>`): acende esta aba, não Imprimir.
+              ativoEm: `^${base}/etiquetas/[^/]+/(abrir|aberta)(/|$)`,
+            },
+            {
+              href: `${base}/etiquetas/historico`,
+              rotulo: 'Histórico',
+              icone: 'historico',
+              subtitulo: 'O que foi pedido para imprimir, quantas, como e por quem',
+              permissao: 'etiquetas.imprimir',
+            },
+            {
+              href: `${base}/etiquetas/impressora`,
+              rotulo: 'Impressora',
+              icone: 'config',
+              subtitulo: 'A Zebra deste computador: conferir e imprimir um teste',
+              permissao: 'etiquetas.imprimir',
+            },
+          ],
+        },
+      ],
+      acoes: [],
     },
     {
       chave: 'dre',
@@ -621,17 +702,8 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
   ];
 }
 
-/** Do plano (Notion "FlowFoods Barney — ERP"), ainda sem tela. */
-export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [
-  {
-    chave: 'etiquetas',
-    nome: 'Etiquetas',
-    subtitulo: 'Validade impressa na hora',
-    icone: 'etiquetas',
-    fase: '3.4',
-    ver: ['etiquetas.imprimir'],
-  },
-];
+/** Do plano (Notion "FlowFoods Barney — ERP"), ainda sem tela. 3.4: Etiquetas virou área construída (a lista ficou vazia). */
+export const MODULOS_FUTUROS: readonly ModuloFuturo[] = [];
 
 /** "Seu acesso": da própria pessoa (senha, rosto, o que ela pode). Sem permissão. */
 export function telaSeuAcesso(base = '/erp'): ItemNav {

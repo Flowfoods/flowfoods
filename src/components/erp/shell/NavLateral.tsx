@@ -85,8 +85,9 @@ export function NavLateral({
           </ul>
         ) : (
           modulo.grupos.map((g) =>
-            // Grupo de um item só ("INSUMOS › Insumos"): o cabeçalho repete o item. Fica só o item, sem o rótulo que abre e fecha.
-            g.itens.length === 1 ? (
+            // Grupo de um item só que repete o nome ("INSUMOS › Insumos"): fica só o item, sem o rótulo que abre e fecha. Se o rótulo diz
+            // outra coisa ("RELATÓRIOS › Consumo e conciliação"), ele fica: é ele que mostra onde a tela mora.
+            g.itens.length === 1 && g.itens[0].rotulo.toLowerCase() === g.rotulo.toLowerCase() ? (
               <ul key={g.rotulo} className="mt-3 space-y-0.5">
                 <li>
                   <ItemDoMenu

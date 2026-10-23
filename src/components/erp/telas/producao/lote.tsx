@@ -38,6 +38,7 @@ export function TelaDoLote({
   acoes,
   pessoas,
   bloqueio,
+  voltar,
 }: {
   d: LoteDaLoja;
   base: string;
@@ -45,12 +46,14 @@ export function TelaDoLote({
   feito?: string;
   /** `gerenciar` (3.3) = "definir a lista do dia": solta e passa o lote de qualquer pessoa, conclui e cancela por ela. `pegar` = é uma pessoa da equipe (o nível 1 não pega). */
   pode: { registrar: boolean; estornar: boolean; gerenciar: boolean; pegar: boolean };
-  /** Para onde os links levam; null = a pessoa não vê aquela tela (o link nem aparece). */
-  hrefs: { requisicao: string | null; estoque: string | null };
+  /** Para onde os links levam; null = a pessoa não vê aquela tela (o link nem aparece). 3.4: `etiqueta` = a etiqueta do lote concluído (quem imprime etiquetas na loja). */
+  hrefs: { requisicao: string | null; estoque: string | null; etiqueta?: string | null };
   acoes: { pegar: AcaoDeEstoque; soltar: AcaoDeEstoque; passar: AcaoDeEstoque; cancelar: AcaoDeEstoque; estornar: AcaoDeEstoque };
   /** Quem pode receber o lote (só para a gerência). */
   pessoas: readonly { usuarioId: string; nome: string }[];
   bloqueio: string | null;
+  /** L.4: de onde a pessoa veio (o consumo e a conciliação), já validado; sem isso, o "Voltar" de sempre. */
+  voltar?: { href: string; rotulo: string } | null;
 }) {
   const o = d.ordem;
   const u = UNIDADES[o.unidade];
@@ -73,14 +76,19 @@ export function TelaDoLote({
   return (
     <div className="mx-auto max-w-4xl space-y-5">
       <TrilhaDaPagina itens={[{ rotulo: d.loja.nome, href: quadro }, { rotulo: `Lote ${o.codigoLote}` }]} />
-      <Voltar href={quadro}>Voltar para a produção</Voltar>
+      <Voltar href={voltar?.href ?? quadro}>{voltar ? `Voltar para ${voltar.rotulo}` : 'Voltar para a produção'}</Voltar>
       <PageHeader
         icone="producao"
         cor={COR.producao}
         titulo={`Lote ${o.codigoLote}`}
         subtitulo={[contexto, o.fichaNome, formatarQuantidade(o.planejadoMilesimos, o.unidade), textoDoParaDia(o.dataPlanejada, d.hoje), o.planejadaPorNome ? `planejado por ${o.planejadaPorNome}` : null].filter(Boolean).join(' · ')}
         acao={
-          podeConcluir ? (
+          // 3.4: o lote concluído (que saiu e não foi estornado) leva à etiqueta.
+          o.status === 'CONCLUIDA' && !o.estornado && (o.produzidoMilesimos ?? 0) > 0 && hrefs.etiqueta ? (
+            <Link href={hrefs.etiqueta} className={classeDeBotao('secundario')}>
+              Imprimir etiqueta
+            </Link>
+          ) : podeConcluir ? (
             !mexe ? (
               <div className="flex flex-col items-start gap-1 sm:items-end">
                 <button type="button" disabled aria-describedby="concluir-com-outro" className={classeDeBotao('secundario')}>

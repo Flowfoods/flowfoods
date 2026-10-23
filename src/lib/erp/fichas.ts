@@ -29,6 +29,7 @@ import type { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
 import { ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
+import { idsDeFichaPelaBusca } from './busca';
 import { diferenca, type Erros } from './insumo-campos';
 import {
   chaveDoItem,
@@ -763,10 +764,10 @@ async function preparosIncompletos(tx: ClienteDoParceiro): Promise<string[]> {
 /** Insumo sem preço: nem preço cadastrado nem nota lançada (1.5: a compra dá o preço). */
 const SEM_PRECO_NEM_COMPRA = { precoEmbalagemCentavos: 0, notaItens: { none: { nota: { status: 'LANCADA' as const } } } };
 
-function filtroDoBanco(f: FiltrosDeFicha, incompletos: string[]): Prisma.FichaTecnicaWhereInput {
-  const q = f.q.trim().slice(0, 80);
+/** `idsDaBusca`: as fichas cujo nome tem o texto, sem ligar para caixa nem acento (`busca.ts`); null = sem texto para buscar. */
+function filtroDoBanco(f: FiltrosDeFicha, incompletos: string[], idsDaBusca: string[] | null): Prisma.FichaTecnicaWhereInput {
   return {
-    ...(q ? { nome: { contains: q, mode: 'insensitive' as const } } : {}),
+    ...(idsDaBusca ? { id: { in: idsDaBusca } } : {}),
     ...(f.tipo ? { tipo: f.tipo } : {}),
     ...(f.situacao === 'ativas' ? { ativa: true } : f.situacao === 'desativadas' ? { ativa: false } : {}),
     ...(f.incompleto ? { itens: { some: { OR: [{ insumo: SEM_PRECO_NEM_COMPRA }, { subfichaId: { in: incompletos } }] } } } : {}),
@@ -795,7 +796,7 @@ export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<
   // Foto enviada e nunca salva (herança d da 1.3): sai também ao abrir a lista, de vez em quando.
   await faxinarPendentesDeVezEmQuando(cliente.parceiroId);
   return cliente.transacao(async (tx) => {
-    const where = filtroDoBanco(f, f.incompleto ? await preparosIncompletos(tx) : []);
+    const where = filtroDoBanco(f, f.incompleto ? await preparosIncompletos(tx) : [], await idsDeFichaPelaBusca(tx, f.q.trim().slice(0, 80)));
     const total = await tx.fichaTecnica.count({ where });
     const paginas = Math.max(1, Math.ceil(total / FICHAS_POR_PAGINA));
     const pagina = Math.min(Math.max(1, Math.trunc(f.pagina) || 1), paginas);
@@ -1016,10 +1017,14 @@ export type PreparoDoFormulario = Awaited<ReturnType<typeof preparosParaFicha>>[
 export async function buscarFichas(cliente: ClienteDoParceiro, texto: string, limite = 6) {
   const q = texto.trim().slice(0, 80);
   if (q.length < 2) return [];
-  return cliente.fichaTecnica.findMany({
-    where: { nome: { contains: q, mode: 'insensitive' } },
-    orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
-    take: limite,
-    select: { id: true, nome: true, tipo: true, ativa: true },
+  // Sem acento e sem caixa, como a busca de insumos (L.3): "feijao" acha "Feijão tropeiro".
+  return cliente.transacao(async (tx) => {
+    const ids = await idsDeFichaPelaBusca(tx, q);
+    return tx.fichaTecnica.findMany({
+      where: ids ? { id: { in: ids } } : { nome: { contains: q, mode: 'insensitive' } },
+      orderBy: [{ ativa: 'desc' }, { nome: 'asc' }],
+      take: limite,
+      select: { id: true, nome: true, tipo: true, ativa: true },
+    });
   });
 }

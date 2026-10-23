@@ -376,7 +376,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     expect(com3, JSON.stringify([viu3, vistas])).toBe(com30);
     // contexto, count, página (fichas, itens, insumos), 1 nível de pré-preparo (fichas, itens, insumos)
     // + 1.5: a última compra de todos os insumos lidos, numa consulta só
-    expect(com30).toBe(9);
+    // + L.3: com texto na busca, uma consulta de ids para a busca sem acento (a mesma com 3 ou com 30 fichas: não é N+1)
+    expect(com30).toBe(10);
     expect(vistas.filter((q) => q.includes('DISTINCT ON'))).toHaveLength(1);
     expect(vistas.filter((q) => q.includes('"FichaTecnica"."id", "public"."FichaTecnica"."nome"'))).toHaveLength(2);
     await contado.$disconnect();

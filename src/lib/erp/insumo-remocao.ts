@@ -22,6 +22,9 @@ export type ChaveDeVinculo =
   | 'requisicoes'
   | 'producao'
   | 'etiquetas'
+  // 3.4: lotes do fornecedor registrados (recebimento ou abertura) e embalagens abertas.
+  | 'lotesDoFornecedor'
+  | 'aberturas'
   | 'embalagens'
   | 'custoNoHistorico';
 
@@ -48,6 +51,8 @@ const FRASE_DO_VINCULO: Record<ChaveDeVinculo, (n: number) => string> = {
   requisicoes: (n) => `${plural(n, 'item', 'itens')} de requisição`,
   producao: (n) => `${plural(n, 'lote', 'lotes')} de produção deste item`,
   etiquetas: (n) => `${plural(n, 'etiqueta', 'etiquetas')}`,
+  lotesDoFornecedor: (n) => `${plural(n, 'lote', 'lotes')} do fornecedor registrado${n === 1 ? '' : 's'} (lote e vencimento)`,
+  aberturas: (n) => `${plural(n, 'embalagem aberta', 'embalagens abertas')} registrada${n === 1 ? '' : 's'}`,
   embalagens: (n) => `${plural(n, 'outra embalagem', 'outras embalagens')} de compra cadastrada${n === 1 ? '' : 's'}`,
   custoNoHistorico: (n) => `${plural(n, 'mudança', 'mudanças')} de custo no histórico do insumo`,
 };
@@ -88,6 +93,8 @@ export async function vinculosDoInsumo(tx: ClienteDoParceiro, id: string): Promi
           requisicaoItens: true,
           producoes: true,
           etiquetas: true,
+          lotesDoFornecedor: true,
+          aberturas: true,
         },
       },
     },
@@ -115,6 +122,8 @@ export async function vinculosDoInsumo(tx: ClienteDoParceiro, id: string): Promi
     requisicoes: c.requisicaoItens,
     producao: c.producoes,
     etiquetas: c.etiquetas,
+    lotesDoFornecedor: c.lotesDoFornecedor,
+    aberturas: c.aberturas,
     embalagens: c.variantes,
     custoNoHistorico: custo[0]?.n ?? 0,
   };

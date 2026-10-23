@@ -58,13 +58,14 @@ const futuros = (a: Alcance) =>
     .map((m) => m.chave);
 
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
-  it('Dono: as abas de cada área (UX.9), as ações fora do menu e o módulo futuro (Etiquetas)', () => {
+  it('Dono: as abas de cada área (UX.9), as ações fora do menu; 3.4: nenhum módulo futuro (Etiquetas virou área)', () => {
     const a = alcance({ perfilBase: 'DONO' });
     expect(modulosDoParceiro(a).filter((m) => m.href).map((m) => m.nome)).toEqual([
       'Cadastros e Cardápio',
       'Compras e Fornecedores',
       'Estoque e Movimentações',
       'Produção',
+      'Etiquetas',
       'Faturamento e DRE',
       'Rede e Equipe',
     ]);
@@ -81,15 +82,22 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/compras/fornecedores',
       '/erp/compras/relatorios/insumo',
       '/erp/compras/relatorios/periodo',
+      '/erp/compras/relatorios/comparar-fornecedores',
+      '/erp/compras/relatorios/comparar-periodos',
       '/erp/estoque',
       '/erp/estoque/contagens',
       '/erp/estoque/requisicoes',
       '/erp/estoque/divergencias',
+      '/erp/estoque/relatorios/consumo',
       '/erp/producao/lista',
       '/erp/producao/tarefas',
       '/erp/producao',
       '/erp/producao/historico',
       '/erp/producao/indicadores',
+      '/erp/etiquetas',
+      '/erp/etiquetas/abrir',
+      '/erp/etiquetas/historico',
+      '/erp/etiquetas/impressora',
       '/erp/faturamento',
       '/erp/dre/despesas',
       '/erp/dre',
@@ -114,8 +122,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/faturamento/importar',
       '/erp/dre/despesas/nova',
     ]);
-    // 2.1: Faturamento e DRE saiu dos futuros e virou área com tela. 3.1: a Produção também (Etiquetas chega na 3.4).
-    expect(futuros(a)).toEqual(['etiquetas']);
+    // 2.1: Faturamento e DRE saiu dos futuros e virou área com tela. 3.1: a Produção também. 3.4: e as Etiquetas.
+    expect(futuros(a)).toEqual([]);
   });
 
   it('Gerente: sem Equipe (não cuida da equipe); com Histórico (rede inteira)', () => {
@@ -127,15 +135,21 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     expect(h).toContain('/erp/fichas/canais');
   });
 
-  it('Operador: insumos, fichas, estoque (1.6: ele conta), lojas e Seu acesso; sem Equipe e Histórico; futuros só os que ele vai ver', () => {
+  it('Operador: insumos, fichas, estoque (1.6: ele conta), produção, etiquetas, lojas e Seu acesso; sem Equipe e Histórico', () => {
     const a = alcance({ perfilBase: 'OPERADOR' });
     // Operador VÊ fichas (bate o olho na foto e no preparo), sem criar nem importar.
     // 1.8: ele pede requisição (o quadro aparece); divergências são de quem confere contagem. UX.9: vê as contagens (estoque.ver), sem Precificação e sem ação nenhuma.
     // 3.3: as tarefas da cozinha e o histórico da produção; os indicadores por pessoa são da gerência.
-    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/insumos/categorias', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/producao/lista', '/erp/producao/tarefas', '/erp/producao', '/erp/producao/historico', '/erp/lojas', '/erp/acesso']);
+    // 3.4: ele imprime a etiqueta do lote e registra a embalagem aberta (etiquetas.imprimir).
+    expect(hrefs(a)).toEqual([
+      '/erp/insumos', '/erp/insumos/categorias', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/estoque/relatorios/consumo',
+      '/erp/producao/lista', '/erp/producao/tarefas', '/erp/producao', '/erp/producao/historico',
+      '/erp/etiquetas', '/erp/etiquetas/abrir', '/erp/etiquetas/historico', '/erp/etiquetas/impressora',
+      '/erp/lojas', '/erp/acesso',
+    ]);
     // 3.1: o cozinheiro produz, então planejar a produção é a única ação dele.
     expect(hrefsDasAcoes(a)).toEqual(['/erp/producao/nova']);
-    expect(futuros(a)).toEqual(['etiquetas']);
+    expect(futuros(a)).toEqual([]);
   });
 
   it('Gerente de uma loja só (N3): Histórico some (exige a rede inteira)', () => {
@@ -166,12 +180,23 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     expect(futuros(a)).toEqual([]);
   });
 
-  it('módulo futuro nunca tem link nem grupos, e traz a fase do plano', () => {
+  it('módulo futuro nunca tem link nem grupos, e traz a fase do plano (3.4: a lista ficou vazia)', () => {
     for (const m of modulosDoParceiro(ALCANCE_FLOWFOODS).filter((x) => !x.href)) {
       expect(m.grupos).toEqual([]);
       expect(m.fase).toMatch(/^\d\.\d$/);
     }
-    expect(MODULOS_FUTUROS.map((f) => f.fase)).toEqual(['3.4']);
+    expect(MODULOS_FUTUROS).toEqual([]);
+  });
+
+  it('3.4: a abertura de uma loja acende "Abrir embalagem"; a emissão e o papel acendem "Imprimir"', () => {
+    const nav = navegacaoDoParceiro(alcance({ perfilBase: 'OPERADOR' }));
+    expect(itemAtivo(nav, '/erp/etiquetas/l1/abrir')?.item.rotulo).toBe('Abrir embalagem');
+    expect(itemAtivo(nav, '/erp/etiquetas/l1/aberta/a9')?.item.rotulo).toBe('Abrir embalagem');
+    expect(itemAtivo(nav, '/erp/etiquetas/l1')?.item.rotulo).toBe('Imprimir');
+    expect(itemAtivo(nav, '/erp/etiquetas/l1/lote/o1')?.item.rotulo).toBe('Imprimir');
+    expect(itemAtivo(nav, '/erp/etiquetas/l1/e1/papel')?.item.rotulo).toBe('Imprimir');
+    expect(itemAtivo(nav, '/erp/etiquetas/historico/l1')?.item.rotulo).toBe('Histórico');
+    expect(itemAtivo(nav, '/erp/etiquetas/impressora')?.item.rotulo).toBe('Impressora');
   });
 
   it('nível 1 dentro do parceiro: mesmas telas sob a base dele, com Cadastro e sem "Seu acesso"', () => {
@@ -188,15 +213,22 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/compras/fornecedores',
       '/rodolfo/erp/valentins/compras/relatorios/insumo',
       '/rodolfo/erp/valentins/compras/relatorios/periodo',
+      '/rodolfo/erp/valentins/compras/relatorios/comparar-fornecedores',
+      '/rodolfo/erp/valentins/compras/relatorios/comparar-periodos',
       '/rodolfo/erp/valentins/estoque',
       '/rodolfo/erp/valentins/estoque/contagens',
       '/rodolfo/erp/valentins/estoque/requisicoes',
       '/rodolfo/erp/valentins/estoque/divergencias',
+      '/rodolfo/erp/valentins/estoque/relatorios/consumo',
       '/rodolfo/erp/valentins/producao/lista',
       '/rodolfo/erp/valentins/producao/tarefas',
       '/rodolfo/erp/valentins/producao',
       '/rodolfo/erp/valentins/producao/historico',
       '/rodolfo/erp/valentins/producao/indicadores',
+      '/rodolfo/erp/valentins/etiquetas',
+      '/rodolfo/erp/valentins/etiquetas/abrir',
+      '/rodolfo/erp/valentins/etiquetas/historico',
+      '/rodolfo/erp/valentins/etiquetas/impressora',
       '/rodolfo/erp/valentins/faturamento',
       '/rodolfo/erp/valentins/dre/despesas',
       '/rodolfo/erp/valentins/dre',
@@ -253,11 +285,12 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
       'Compras e Fornecedores',
       'Estoque e Movimentações',
       'Produção',
+      'Etiquetas',
       'Faturamento e DRE',
       'Rede e Equipe',
     ]);
     expect(grupos[1].itens.map((i) => i.rotulo)).toEqual(['Áreas do parceiro']);
-    expect(grupos[7].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
+    expect(grupos[8].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
     // As ações das áreas vão junto (o ⌘K do nível 1 as acha), sob a base do parceiro.
     expect(acoesDaNavegacao(dentro).map((a) => a.href)).toContain('/rodolfo/erp/valentins/compras/nova');
     expect(comParceiroAtual(nav, '/rodolfo/erp/outro/insumos', parceiros)).toBe(nav);

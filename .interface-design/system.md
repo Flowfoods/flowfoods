@@ -321,3 +321,43 @@ Editorial (separadores delicados, número de tabela sem serifa):
   **Impressão**: mesma tela com `imprimir=1`, papel claro em qualquer tema, sem menu, barra do topo, abas e botões
   (`@media print` em `tokens.css`), tabelas inteiras com cabeçalho repetido e linha que não parte; rolagem na própria região
   (focável) abaixo de 640 px.
+- **Comparação de fornecedores e de períodos (L.3)**: duas telas ao lado dos relatórios da L.2, no mesmo `PageHeader`, filtros em formulário GET (rótulo
+  persistente; Período A e Período B em dois `fieldset` de duas colunas, sempre à vista; o resto recolhido em "Filtros (n)" abaixo de 640 px),
+  atalhos de comparação em chips de 36 px (44 em toque) e chips "Valendo nos dois períodos:". **Períodos**: três `Cartao` (A, B, variação, com o
+  gasto em Gelasio 26/700 e a medida, o nº de compras e as quantidades POR UNIDADE em 12 px), o painel "Antes de ler" (cobertura, tamanhos,
+  sobreposição; um link no cartão da variação leva a ele), "De onde veio a variação" com a frase efeito preço × volume em 12 px e quatro cartões
+  (volume, preço com "do mesmo fornecedor · troca de fornecedor", "só num dos períodos" com entrou e saiu, e "A soma" em lista de quatro linhas
+  que termina em "= variação (igual à variação)"); tabela "Por insumo" (≥ 1024 px: Insumo, Quantidade, Custo médio, Gasto, Variação, Efeito
+  volume, Efeito preço; A e B empilhados e sem quebra, o gasto de cada lado é link para as compras dele; rodapé "Total de todos os insumos (não só
+  desta página)" só quando há mais de um) e cartões abaixo de 1024 px; com um insumo só, uma tabela dos fornecedores lado a lado. **Sinal**:
+  valor de variação sempre com + ou − (nunca só cor; o sinal menos é "−" tipográfico), zero sem sinal, "sem base" em palavra, nunca ∞ nem
+  0,0% no lugar de "sem base". Sem cor boa/ruim: gastar mais não é erro. **Fornecedores**: cartões do insumo, da marca de referência (só
+  informação) e do recorte, e uma tabela por unidade (≥ 1024 px: Fornecedor com selos e embalagens, Compras e quantidade com o frete,
+  Preço do item, Custo entregue com a diferença para o mais barato, Última compra) ou cartões (nome e selos, dois preços lado a lado, compras
+  · quantidade · frete, embalagens, última compra e "Ver as N linhas"); selos em palavra ("Mais barato no preço do item", "Mais barato
+  entregue"), "Sem base" em selo de atenção. Impressão e planilha como as da L.2 (landmarks com nomes únicos).
+- **Alvo de toque em link de uma palavra** (L.3): o link de tabela ou marcado com `ff-toque` ganha 9 px de folga invisível nos lados (compensada
+  pela margem) além dos 14 px de cima e de baixo: "Ovo" e "Alho" chegam a 44 x 44 sem mexer no desenho.
+- **Consumo e conciliação de estoque (L.4)**: uma tela na área Estoque (grupo "Relatórios"), duas rotas filhas ("Movimentos" de cada número e a
+  planilha), no mesmo `PageHeader` e filtros em formulário GET (De/Até sempre à vista com atalhos de período; lojas, nome do insumo, um insumo só,
+  categoria e "Mostrar" recolhidos em "Filtros (n)" abaixo de 640 px; chips "Valendo:"). Primeira dobra: a frase "Uso é a requisição registrada"
+  e três `Cartao` (insumos com movimento, "Conta do livro" Confere/Não confere, sem contagem no período). Depois, o painel "Antes de ler" e UMA
+  **ponte por unidade** (kg, L e un nunca somados): tabela de 3 colunas (Coluna com a explicação em 12 px, Quantidade, R$ só para quem vê) que
+  vai de Saldo inicial a Saldo final, com a linha "Transferências entre lojas: ainda não existe" e o selo "Confere" (palavra, nunca só cor) e a
+  frase de bruto × líquido embaixo. **Tabela por insumo e loja** a partir de 1280 px (Insumo com selos de lacuna e a unidade, 9 colunas numéricas à
+  direita, número com sinal, R$ embaixo em 12 px suave, "—" no que não mexeu); abaixo de 1280 px, cartões com só as colunas que mexeram (grade de
+  2 colunas: rótulo 12 px e o número como link de 44 px reais). **Sinal**: quantidade com + ou − (o menos é "−" tipográfico), saldo sem sinal, zero
+  sem sinal; sem cor boa/ruim. Com um insumo escolhido, o painel "linha a linha" por loja (grupos Entradas, Saídas, Desfazer e devolver, Ajustes
+  de inventário; cada caixa com "de onde vem"; o que ainda não existe diz isso) e as lacunas em frase. **Selos de lacuna**: atenção para as duras
+  (saldo negativo, sem origem, saldo que não bate), neutro para "Sem contagem no período"; sempre com palavra. Movimentos: tabela ≥ 768 px e lista
+  abaixo, quantidade com sinal, "saldo A › B", selo "Estorno" e a origem como link (requisição #N e lote, nota, contagem ou abertura). Impressão
+  (A4 paisagem) e planilha como as da L.2.
+- **Área de toque (L.4, sistêmico)**: o link de texto com folga invisível (`ff-toque`, link de tabela, de aviso e da trilha) ganha
+  `position: relative; z-index: 1` (a folga ganha da linha seguinte, que antes a cobria e deixava o alvo em ~34 px), `min-width: 44px` (número
+  curto) e a linha de tabela tem passo de 44 px no toque; número em cartão é um link `inline-flex min-h-11 min-w-11` (caixa real).
+- **Relatório pesado (L.4, rodada do Guardião)**: quando o banco corta a consulta (teto de 20 s) ou há outros relatórios grandes rodando, a tela
+  mostra o quadro vazio com a frase ("O relatório ficou grande demais" + "Diminua o período ou escolha menos lojas", ou "Há outro relatório grande
+  rodando" + "Tente em instantes"), os filtros continuam à vista e a saída é "Tentar de novo" / "Limpar e recomeçar" (`ui/relatorio-grande.tsx`
+  nos relatórios de compras). Nunca página de erro. **Quantidade**: o espaço entre número e unidade é o que não quebra ("−37,739 kg" fica numa
+  linha só a 390 px) e zero diz a unidade do insumo ("0 kg", "0 L"), nunca a menor ("0 g", "0 ml"). **Menu**: o grupo de um item só mostra o rótulo
+  do grupo quando ele diz outra coisa que o item ("RELATÓRIOS › Consumo e conciliação").

@@ -488,7 +488,7 @@ describe.skipIf(!URL_TESTE)('ERP L.1 · lista de insumos (Postgres real)', { tim
       const r = await db.$queryRaw<{ t: string }[]>`
         SELECT DISTINCT c.conrelid::regclass::text AS t FROM pg_constraint c
         WHERE c.contype = 'f' AND c.confrelid = '"Insumo"'::regclass AND c.conrelid <> '"Insumo"'::regclass`;
-      const cobertas = ['"ContagemRetratoItem"', '"InsumoVariante"', '"NotaEntradaItem"', '"DocumentoFiscalItem"', '"VinculoItemFornecedor"', '"FichaTecnica"', '"FichaItem"', '"ProdutoEmbalagem"', '"SaldoEstoque"', '"MovimentoEstoque"', '"ContagemItem"', '"RequisicaoItem"', '"OrdemProducao"', '"Etiqueta"'].map((t) => t.replaceAll('"', ''));
+      const cobertas = ['"ContagemRetratoItem"', '"InsumoVariante"', '"NotaEntradaItem"', '"DocumentoFiscalItem"', '"VinculoItemFornecedor"', '"FichaTecnica"', '"FichaItem"', '"ProdutoEmbalagem"', '"SaldoEstoque"', '"MovimentoEstoque"', '"ContagemItem"', '"RequisicaoItem"', '"OrdemProducao"', '"Etiqueta"', '"LoteDeInsumo"', '"AberturaDeLote"'].map((t) => t.replaceAll('"', ''));
       const noBanco = r.map((x) => x.t.replaceAll('"', '')).sort();
       expect(noBanco).toEqual([...cobertas].sort());
     });

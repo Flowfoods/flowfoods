@@ -223,3 +223,13 @@ describe('L.2 · a volta atravessa nota e documento fiscal (só caminho interno 
     expect(rotuloDaVolta(nota)).toBe('a nota de compra');
   });
 });
+
+describe('L.4 (Guardião) · o grupo "n:" aceita o nome da nota até o tamanho em que o banco o corta', () => {
+  it('nome longo de fornecedor sem cadastro abre a linha; passou do corte, o grupo é ignorado', () => {
+    const grupo = (g: string) => lerFiltrosDoRelatorio({ grupo: g }, '2026-11-20').grupo;
+    expect(grupo('n:Feira do João')).toBe('n:Feira do João');
+    expect(grupo(`n:${'x'.repeat(300)}`)).toBe(`n:${'x'.repeat(300)}`);
+    expect(grupo(`n:${'x'.repeat(500)}`)).toBe(`n:${'x'.repeat(500)}`);
+    expect(grupo(`n:${'x'.repeat(501)}`)).toBe('');
+  });
+});

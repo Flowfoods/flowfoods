@@ -322,7 +322,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/[lojaId]/[ordemId]'],
     titulo: 'Lote',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'O que foi planejado, os insumos que saíram pela requisição, quem está fazendo e, depois de concluído, quanto saiu de verdade.' },
       { texto: 'O lote que outra pessoa pegou só ela ou a gerência conclui, solta ou cancela.', para: ['producao.registrar'] },
@@ -339,6 +339,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'O custo de referência do pré-preparo continua o da ficha. O lote mostra o que custou de verdade e não mexe nele.', para: ['insumos.ver'] },
         ],
       },
+      {
+        id: 'etiqueta',
+        titulo: 'A etiqueta do lote',
+        blocos: [{ texto: 'Depois de concluído, Imprimir etiqueta leva à etiqueta do lote. A validade é a da conclusão, e reimprimir não muda.', para: ['etiquetas.imprimir'] }],
+      },
     ],
   },
   {
@@ -353,6 +358,167 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Escolha onde o lote vai ficar: a validade nasce daí e não muda se a ficha mudar depois.' },
       { texto: 'O custo por quilo aparece ao vivo, enquanto você digita.', para: ['insumos.ver'] },
       { texto: 'Quem pegou o lote fica como quem fez, mesmo se a gerência concluir por ele.', para: ['producao.planejar'] },
+    ],
+  },
+  // ================================================================ 3.4: Etiquetas (e o lote do fornecedor na nota)
+  {
+    chave: 'etiquetas',
+    area: 'etiquetas',
+    rotas: ['etiquetas'],
+    titulo: 'Etiquetas',
+    versao: 1,
+    aula: [{ texto: 'Escolha a loja para imprimir a etiqueta dos lotes produzidos e das embalagens abertas.' }],
+  },
+  {
+    chave: 'etiquetas-loja',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]'],
+    titulo: 'Etiquetas da loja',
+    versao: 2,
+    aula: [
+      { texto: 'Os lotes concluídos e as embalagens abertas dos últimos 7 dias, cada um com a validade. Toque num deles para emitir a etiqueta.' },
+      { texto: 'Esperando a impressora são as etiquetas emitidas que a Zebra ainda não aceitou e que ninguém marcou com “Já imprimi”.' },
+      { texto: 'Lote ou embalagem vencida aparece como “venceu: não use” e sai da fila.' },
+    ],
+    secoes: [
+      {
+        id: 'validade',
+        titulo: 'De onde vem a validade',
+        blocos: [
+          { texto: 'Do lote produzido, é a da conclusão: a ficha dizia quanto dura na conservação escolhida. Da embalagem aberta, é o prazo depois de aberto ou o vencimento do lote, o que vier antes.' },
+          { texto: 'Sem prazo cadastrado, a etiqueta diz que não foi informado. Nenhum prazo é inventado.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'etiquetas-lote',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]/lote/[ordemId]'],
+    titulo: 'Etiqueta do lote',
+    versao: 2,
+    aula: [
+      { texto: 'Escolha o tamanho, quantas etiquetas e, se quiser, quanto vai em cada pote. A prévia mostra como vai sair.' },
+      { texto: 'A validade, a conservação e quem fez vêm da conclusão do lote: mudar a ficha depois não muda a etiqueta.' },
+      { texto: 'Lote sem validade sai com validade não informada; lote vencido não emite nem reimprime: separe para descarte e avise a gerência.' },
+    ],
+  },
+  {
+    chave: 'etiquetas-abrir',
+    area: 'etiquetas',
+    rotas: ['etiquetas/abrir'],
+    titulo: 'Abrir embalagem',
+    versao: 1,
+    aula: [{ texto: 'Escolha a loja onde a embalagem foi aberta.' }],
+  },
+  {
+    chave: 'etiquetas-abrir-loja',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]/abrir'],
+    titulo: 'Abrir uma embalagem',
+    versao: 1,
+    aula: [
+      { texto: 'Escolha o insumo, o lote dele e onde a embalagem aberta vai ficar. A data e a hora entram sozinhas.' },
+      { texto: 'A validade é o prazo depois de aberto ou o vencimento do lote, o que vier antes. Lote vencido não se abre.' },
+    ],
+    secoes: [
+      {
+        id: 'lote',
+        titulo: 'O lote da embalagem',
+        blocos: [
+          { texto: 'Os lotes vêm do recebimento da compra ou de uma abertura anterior. Se o lote não está na lista, leia na embalagem; se ela não diz, marque lote não informado.' },
+          { texto: 'Abrir não mexe no estoque: só registra quando e por quem a embalagem foi aberta, e quem abriu assina a etiqueta.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'etiquetas-aberta',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]/aberta/[aberturaId]'],
+    titulo: 'Embalagem aberta',
+    versao: 2,
+    aula: [
+      { texto: 'Quando foi aberta, por quem, o lote e até quando usar, com a regra que deu a data.' },
+      { texto: 'Emita a etiqueta e cole na embalagem. A abertura não se edita: se errou, registre outra.' },
+      { texto: 'Embalagem vencida não emite etiqueta: separe para descarte e avise a gerência.' },
+    ],
+  },
+  {
+    chave: 'etiquetas-emissao',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]/[etiquetaId]'],
+    titulo: 'Imprimir a etiqueta',
+    versao: 2,
+    aula: [
+      { texto: 'Imprima na Zebra. Sem a Zebra neste aparelho, baixe o arquivo .zpl ou imprima no papel e, depois que sair, toque em “Já imprimi”.' },
+      { texto: 'Reimprimir sai igual: a validade é a da emissão. Cada pedido fica no histórico.' },
+    ],
+    secoes: [
+      {
+        id: 'zebra',
+        titulo: 'Enviada não é impressa',
+        blocos: [
+          { texto: 'Enviada à impressora quer dizer que o Browser Print da Zebra recebeu. Confira o papel; se não saiu, veja a tampa, o rolo e a fita antes de mandar de novo, porque pode sair repetida.' },
+          { texto: 'Sem resposta em 15 segundos não é falha: confira o papel. Se saiu, toque em “Já imprimi”; se não, mande de novo.' },
+          { texto: 'Sem o Browser Print neste aparelho, a etiqueta fica esperando a impressora: imprima pelo computador da Zebra.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'etiquetas-papel',
+    area: 'etiquetas',
+    rotas: ['etiquetas/[lojaId]/[etiquetaId]/papel'],
+    titulo: 'Etiqueta no papel',
+    versao: 2,
+    aula: [
+      { texto: 'As etiquetas em tamanho real numa folha A4. Imprima em 100%, sem ajustar à página, e recorte nas linhas.' },
+      { texto: 'Depois que a folha sair, toque em “Já imprimi”: a etiqueta sai da fila.' },
+    ],
+  },
+  {
+    chave: 'etiquetas-historico',
+    area: 'etiquetas',
+    rotas: ['etiquetas/historico'],
+    titulo: 'Histórico de impressões',
+    versao: 1,
+    aula: [{ texto: 'Escolha a loja para ver o que foi impresso, quantas, como e por quem.' }],
+  },
+  {
+    chave: 'etiquetas-historico-loja',
+    area: 'etiquetas',
+    rotas: ['etiquetas/historico/[lojaId]'],
+    titulo: 'Histórico de impressões da loja',
+    versao: 3,
+    aula: [
+      { texto: 'Cada pedido de impressão do período: Zebra, arquivo ou papel, as cópias e o que aconteceu.' },
+      { texto: 'Pedidos e etiquetas são contas diferentes: um pedido de 10 cópias são 10 etiquetas.' },
+      { texto: 'Sem resultado é a Zebra que não respondeu: pode ter saído. Esperando o Já imprimi é arquivo ou papel que ninguém confirmou.' },
+    ],
+  },
+  {
+    chave: 'etiquetas-impressora',
+    area: 'etiquetas',
+    rotas: ['etiquetas/impressora'],
+    titulo: 'Impressora',
+    versao: 2,
+    aula: [
+      { texto: 'A Zebra deste computador: o Browser Print da Zebra precisa estar aberto nele. Escolha a impressora e imprima a etiqueta de teste.' },
+      { texto: 'A escolha fica neste navegador; outro computador escolhe de novo.' },
+      { texto: 'Na primeira vez, o Chrome pede licença para a rede local e o certificado de https://localhost:9101 precisa ser aceito: os passos estão na tela.' },
+    ],
+  },
+  {
+    chave: 'compra-lotes',
+    area: 'compras',
+    rotas: ['compras/[id]/lotes'],
+    titulo: 'Lote e vencimento',
+    versao: 1,
+    aula: [
+      { texto: 'O lote e o vencimento de cada insumo da nota, como vieram na embalagem. Nada é obrigatório nem inventado.' },
+      { texto: 'Quando a nota veio do XML, o lote que o fornecedor declarou aparece como sugestão: só entra se você confirmar.' },
+      { texto: 'Registrar não muda a nota, o estoque nem o custo.', para: ['compras.lancar'] },
     ],
   },
   {
@@ -629,6 +795,146 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'compras-comparar-fornecedores',
+    area: 'compras',
+    rotas: ['compras/relatorios/comparar-fornecedores'],
+    titulo: 'Comparar fornecedores',
+    versao: 1,
+    recolhida: true,
+    aula: [
+      { texto: 'Escolha um insumo e o período para ver quem vende o mesmo insumo por menos, na mesma unidade (kg, litro ou unidade).' },
+      { texto: 'Custo entregue é o preço do item mais a parte do frete que coube a ele, dividido pela quantidade: o que cada kg custou até chegar.' },
+      { texto: 'O frete pode inverter a ordem. Por isso a tela diz quem é o mais barato no preço do item e quem é o mais barato entregue.' },
+    ],
+    secoes: [
+      {
+        id: 'embalagens',
+        titulo: 'Embalagens e marca',
+        blocos: [
+          { texto: 'Peça de 2 kg, caixa e quilo solto entram na mesma conta pela unidade base do insumo. A conta usa o valor e o frete gravados em cada nota.' },
+          { texto: 'A marca de referência é só uma informação do cadastro. A nota guarda a embalagem e o fornecedor, não a marca que veio, e nenhuma marca é barrada da comparação.' },
+        ],
+      },
+      {
+        id: 'sem-base',
+        titulo: 'Quando o sistema não compara',
+        blocos: [
+          { texto: 'Linha sem unidade gravada ou com valor zero fica “sem base”: sai do preço, mas aparece contada. Preço que não dá para calcular nunca vira R$ 0,00.' },
+          { texto: 'Com um fornecedor só não há com quem comparar. Fornecedor com uma compra só é avisado: pode não ser o preço de sempre dele.' },
+          { texto: 'Nota cancelada não conta como compra. Nota fiscal que só chegou por XML e ainda não foi conferida também não.' },
+        ],
+      },
+      {
+        id: 'diferenca',
+        titulo: 'A diferença não é economia',
+        blocos: [{ texto: 'A diferença para o mais barato é por unidade. Ela só vale para o que você de fato compra de cada um: quantidade e data de cada compra mudam o preço, e a última compra de cada fornecedor está na tabela.' }],
+      },
+    ],
+  },
+  {
+    chave: 'compras-comparar-periodos',
+    area: 'compras',
+    rotas: ['compras/relatorios/comparar-periodos'],
+    titulo: 'Comparar períodos',
+    versao: 1,
+    recolhida: true,
+    aula: [
+      { texto: 'Escolha dois períodos: o A é a base e o B é o que você compara com ele. As lojas, o fornecedor, o insumo e a data usada valem para os dois.' },
+      { texto: 'Efeito volume é quanto o gasto mudou por você ter comprado mais ou menos; efeito preço é quanto mudou porque cada unidade ficou mais cara ou mais barata. Os dois somados dão a variação.' },
+    ],
+    secoes: [
+      {
+        id: 'medida',
+        titulo: 'Custo entregue ou preço do item',
+        blocos: [{ texto: 'Custo entregue é o preço do item mais a parte do frete que coube a ele, dividido pela quantidade. Em “Medir o gasto por” você escolhe entre o custo entregue e o preço do item, e a tela usa a mesma escolha nos dois períodos.' }],
+      },
+      {
+        id: 'fornecedor',
+        titulo: 'Troca de fornecedor',
+        blocos: [
+          { texto: 'Dentro do efeito preço, a tela separa o que vem de um fornecedor mudar o próprio preço do que vem de trocar de fornecedor (ou comprar mais de um e menos de outro). Nada disso é chamado de inflação nem de economia.' },
+          { texto: 'Escolha um insumo para ver os fornecedores lado a lado nos dois períodos.' },
+        ],
+      },
+      {
+        id: 'so-um-lado',
+        titulo: 'Insumo que só aparece num período',
+        blocos: [
+          { texto: 'Sem compra do outro lado não há como separar preço de volume. O gasto do insumo aparece inteiro como “entrou” (só em B) ou “saiu” (só em A).' },
+          { texto: 'Se nada foi comprado em A, o percentual de variação fica “sem base”: dividir por zero não é crescimento.' },
+        ],
+      },
+      {
+        id: 'cobertura',
+        titulo: 'Quando falta dado',
+        blocos: [
+          { texto: 'Linha sem unidade, sem insumo ou com valor zero fica fora da conta e é contada à parte, com o dinheiro dela. A tela diz quanto do dinheiro de cada período a comparação cobre.' },
+          { texto: 'Períodos de tamanhos diferentes, que se sobrepõem ou que ainda não terminaram também são avisados antes dos números.' },
+          { texto: 'Cada gasto abre as compras que o formam, e cada compra abre a nota. Nota cancelada e nota fiscal ainda não conferida não entram.' },
+        ],
+      },
+    ],
+  },
+  {
+    // L.4: o consumo e a conciliação do estoque (a leitura do livro; nada aqui dá baixa).
+    chave: 'estoque-consumo',
+    area: 'estoque',
+    rotas: ['estoque/relatorios/consumo', 'estoque/relatorios/consumo/movimentos'],
+    titulo: 'Consumo e conciliação',
+    versao: 1,
+    recolhida: true,
+    aula: [
+      { texto: 'Mostra, para cada insumo e loja, o saldo inicial, o que entrou e saiu e o saldo final, lidos do livro do estoque, sem dar baixa nem lançar nada.' },
+      { texto: '“Uso” é a requisição registrada, não o consumo medido na prateleira.' },
+      { texto: 'A diferença da contagem entra como ajuste, nunca como consumo nem perda presumidos.' },
+    ],
+    secoes: [
+      {
+        id: 'ponte',
+        titulo: 'Como a conta fecha',
+        blocos: [
+          { texto: 'Saldo final = saldo inicial + o que entrou − o que saiu, com cada movimento numa coluna só. A tela confere isso e avisa “A conta não fecha” se algo escapar.' },
+          { texto: 'Cada número abre os movimentos que o formam, com a origem de cada um: nota, requisição, lote ou contagem.' },
+          { texto: 'O consumo medido na prateleira é a conta da contagem: veja as Divergências, que cruzam a requisição com a contagem.' },
+        ],
+      },
+      {
+        id: 'bruto',
+        titulo: 'Bruto, líquido e o que se desfaz',
+        blocos: [{ texto: 'Compras e Uso são o bruto: o que foi lançado. Nota cancelada ou corrigida e lote desfeito ficam em Estornos; o que voltou de uma requisição fica em Devoluções. Líquido é o bruto mais o que foi desfeito.' }],
+      },
+      {
+        id: 'lacunas',
+        titulo: 'Quando falta conferir',
+        blocos: [
+          { texto: 'Sem contagem no período quer dizer que o saldo final é o do livro e ninguém o conferiu na prateleira. Saldo negativo, movimento sem origem e saldo que não bate com o livro pedem olhar.' },
+          { texto: 'Nota fiscal que só chegou por XML e ainda não foi conferida fica fora: só entra no estoque quando vira nota lançada.' },
+        ],
+      },
+      {
+        id: 'ainda-nao',
+        titulo: 'O que ainda não existe',
+        blocos: [{ texto: 'Transferência entre lojas e lançamento de perda ainda não existem no sistema. O lugar delas já está aqui e fica vazio até existirem; nada é inventado.' }],
+      },
+      {
+        id: 'datas',
+        titulo: 'A data e o dinheiro',
+        blocos: [
+          { texto: 'A data de cada movimento é o dia em que ele entrou no livro, pelo relógio do Rio. Uma nota de dia 10 lançada no dia 12 entra no estoque no dia 12.' },
+          { texto: 'Os valores em R$ são os que o livro gravou na hora de cada movimento: mudar o preço de um insumo depois não reescreve o passado. Insumo sem preço na época entra com valor zero e é avisado.', para: ['compras.ver'] },
+        ],
+      },
+      {
+        id: 'saida',
+        titulo: 'Planilha e PDF',
+        blocos: [
+          { texto: 'A planilha traz as mesmas colunas da tela, uma linha por insumo e loja, e os totais por unidade. Texto que começaria com = + - ou @ ganha um apóstrofo na frente.' },
+          { texto: 'Imprimir abre uma versão sem menu. Na janela de impressão, escolha “Salvar como PDF”.' },
+        ],
+      },
+    ],
+  },
+  {
     chave: 'compra-nova',
     area: 'compras',
     rotas: ['compras/nova', 'compras/[id]/editar'],
@@ -647,13 +953,20 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/[id]'],
     titulo: 'Detalhe da nota',
-    versao: 4,
+    versao: 5,
     aula: [
       { texto: 'A nota, o frete de cada item e o que ela fez no estoque.' },
       { texto: 'Nota que veio do XML da nota fiscal não se edita: cancele e concilie a nota fiscal de novo.', para: ['compras.lancar'] },
       { texto: 'Nota do período em curso mostra como ficou o orçamento de compra da loja: quanto ainda cabe, ou quanto passou. É só aviso.' },
       { texto: 'Errou? Edite ou cancele com o motivo: o custo e o estoque voltam.', para: ['compras.lancar'] },
       { texto: 'Nota com data em período que o DRE já fechou não se edita nem se cancela.', para: ['compras.lancar'] },
+    ],
+    secoes: [
+      {
+        id: 'lotes',
+        titulo: 'Lote e vencimento',
+        blocos: [{ texto: 'O lote e o vencimento de cada insumo, como vieram na embalagem, ficam em Lote e vencimento. A cozinha escolhe o lote daqui ao abrir a embalagem, e a etiqueta usa o vencimento dele.' }],
+      },
     ],
   },
   {

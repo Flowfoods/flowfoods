@@ -74,7 +74,7 @@ export interface FiltrosDoRelatorio {
   situacao: SituacaoDoRelatorio;
   /** O que a tela mostra embaixo: o resumo por grupo ou as linhas das compras. */
   ver: 'resumo' | 'linhas';
-  /** Abre só as linhas deste grupo (id do insumo, id do fornecedor ou dia; "-" = sem insumo/fornecedor). */
+  /** Abre só as linhas deste grupo (id do insumo, id do fornecedor ou "n:<nome da nota>" se não tem cadastro, ou dia; "-" = sem insumo/fornecedor). */
   grupo: string;
   /** Abre só as linhas desta unidade ("sem" = sem unidade gravada). */
   unidade: '' | Unidade | 'sem';
@@ -84,6 +84,8 @@ export interface FiltrosDoRelatorio {
   porPagina: number;
   /** Frase quando o período digitado não faz sentido (o relatório sai vazio, com a frase). */
   periodoInvalido: string | null;
+  /** L.3: de onde a pessoa veio (a comparação). Dado de fora: a página só o aceita depois de `caminhoDeVolta`; aqui só o tamanho e a barra. */
+  volta: string;
 }
 
 type Params = Record<string, string | string[] | undefined>;
@@ -136,12 +138,14 @@ export function lerFiltrosDoRelatorio(sp: Params, hoje = hojeNoRio(), padrao: Pa
     agrupar: (LISTA_DE_AGRUPAMENTOS as string[]).includes(agrupar) ? (agrupar as AgruparPor) : (padrao.agrupar ?? 'insumo'),
     situacao: um(sp.situacao) === 'canceladas' ? 'canceladas' : 'lancadas',
     ver: um(sp.ver) === 'linhas' ? 'linhas' : (padrao.ver ?? 'resumo'),
-    grupo: grupo === '-' || /^[a-z0-9]{1,64}$/i.test(grupo) || lerData(grupo) === grupo ? grupo : '',
+    // "n:<nome da nota>" = fornecedor sem cadastro, pelo nome que a nota guardou (decisão 386).
+    grupo: grupo === '-' || /^[a-z0-9]{1,64}$/i.test(grupo) || lerData(grupo) === grupo || /^n:[^\u0000-\u001f\u007f]{1,500}$/.test(grupo) ? grupo : '',
     unidade: unidade === 'sem' || unidade === 'KG' || unidade === 'L' || unidade === 'UN' ? unidade : '',
     so: um(sp.so) === 'sembase' ? 'sembase' : '',
     pagina: lerPagina(um(sp.pagina)),
     porPagina: lerPorPagina(um(sp.por)),
     periodoInvalido,
+    volta: /^\/[^\s]{0,1999}$/.test(um(sp.volta)) ? um(sp.volta) : '',
   };
 }
 
@@ -165,6 +169,7 @@ export function queryDoRelatorio(f: FiltrosDoRelatorio, mudar: Partial<FiltrosDo
   if (x.so) q.set('so', x.so);
   if (x.porPagina !== POR_PAGINA_PADRAO) q.set('por', String(x.porPagina));
   if (!opcoes.semPagina && x.pagina > 1) q.set('pagina', String(x.pagina));
+  if (x.volta) q.set('volta', x.volta);
   return q.toString();
 }
 

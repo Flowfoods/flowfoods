@@ -176,7 +176,7 @@ export function TelaDetalheInsumo({
               </div>
               <p className="mt-3 border-t border-linha pt-3 text-[12px] text-suave">
                 Pré-preparo da casa: o custo é o da receita{' '}
-                <Link href={`${fichas}/${p.fichaId}`} className={LINK_DE_TEXTO}>
+                <Link href={`${fichas}/${p.fichaId}`} className={`${LINK_DE_TEXTO} ff-toque`}>
                   {p.nome}
                 </Link>{' '}
                 dividido pelo que ela rende. Mudou a receita ou o preço de um insumo dela, este custo muda junto. Não tem embalagem de compra.
@@ -202,7 +202,7 @@ export function TelaDetalheInsumo({
                 <>
                   Último preço: {formatarCusto(uc.custo, i.unidade)} em {formatarData(uc.entradaEm, true)} (
                   {notaDaUltima ? (
-                    <Link href={notaDaUltima} className={LINK_DE_TEXTO}>
+                    <Link href={notaDaUltima} className={`${LINK_DE_TEXTO} ff-toque`}>
                       nota {ud.numero}
                     </Link>
                   ) : (
@@ -326,7 +326,7 @@ export function TelaDetalheInsumo({
               {editaAqui && i.ativo && !bloqueio && (
                 <>
                   {' '}
-                  <Link href={`${aqui}/editar#insumo-categoriaId`} className={LINK_DE_TEXTO}>
+                  <Link href={`${aqui}/editar#insumo-categoriaId`} className={`${LINK_DE_TEXTO} ff-toque`}>
                     {i.categoria ? 'Mudar a categoria' : 'Escolher a categoria'}
                   </Link>
                   .
@@ -386,7 +386,7 @@ export function TelaDetalheInsumo({
               {p ? (
                 <>
                   Vem da ficha técnica{' '}
-                  <Link href={`${fichas}/${p.fichaId}`} className={LINK_DE_TEXTO}>
+                  <Link href={`${fichas}/${p.fichaId}`} className={`${LINK_DE_TEXTO} ff-toque`}>
                     {p.nome}
                   </Link>
                   .

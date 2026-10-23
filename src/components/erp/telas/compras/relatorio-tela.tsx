@@ -12,12 +12,15 @@ import type { RelatorioDaTela } from '@/lib/erp/compras-relatorio';
 import {
   BASES_DE_DATA,
   fraseDoPeriodo,
+  queryDoRelatorio,
   recorteDeUmInsumo,
   ROTULO_DO_AGRUPAMENTO,
   TETO_DA_IMPRESSAO,
   type FiltrosDoRelatorio,
 } from '@/lib/erp/compras-relatorio-campos';
 import { formatarData } from '@/lib/erp/compra-campos';
+import { queryParaCompararComOAnterior } from '@/lib/erp/compras-comparacao-campos';
+import { rotuloDaVolta } from '@/lib/erp/volta';
 import { faixaDaPagina } from '@/lib/erp/paginacao';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
@@ -27,6 +30,7 @@ import { PaginacaoNumerada } from '../../ui/paginacao-numerada';
 import { Aviso, Painel, Vazio } from '../../ui/superficies';
 import { OPCOES_POR_PAGINA } from '@/lib/erp/insumo-campos';
 import { BotaoImprimir } from './botao-imprimir';
+import { Voltar } from '../cadastro/partes';
 import { ChipsDoRelatorio, FormularioDoRelatorio, hrefDoRelatorio, RECORTE_NOVO } from './relatorio-filtros';
 import { BarraDeSaida, Indicadores, NotasDoRelatorio, TabelaDasCompras, TabelaDosGrupos } from './relatorio-partes';
 import { TabelasDaImpressao } from './relatorio-impressao';
@@ -122,12 +126,18 @@ export function TelaDoRelatorio({
   const paginaDe = (p: number) => hrefDoRelatorio(caminho, f, { pagina: p }) + (modo === 'insumo' ? '#compras' : '');
   const comPreco = f.situacao !== 'canceladas' && (r.umInsumo || (modo === 'periodo' && f.agrupar === 'insumo'));
   const abertas = r.abertas;
+  // L.3: as comparações partem do que a pessoa está olhando (o mesmo insumo, as mesmas lojas, a mesma data usada).
+  const comparar =
+    modo === 'insumo' && f.insumoId
+      ? [{ href: `${comprasBase}/relatorios/comparar-fornecedores?${queryDoRelatorio(f, {}, { semPagina: true })}`, texto: 'Comparar os fornecedores deste insumo' }]
+      : [{ href: `${comprasBase}/relatorios/comparar-periodos?${queryParaCompararComOAnterior(f)}`, texto: 'Comparar com o período anterior' }];
   const rotuloDoGrupo = f.grupo
     ? (r.fornecedores?.grupos.find((g) => g.chave === f.grupo)?.rotulo ?? r.grupos?.grupos.find((g) => g.chave === f.grupo)?.rotulo ?? (f.agrupar === 'dia' ? formatarData(f.grupo) : r.linhas?.linhas[0] ? (f.agrupar === 'insumo' ? r.linhas.linhas[0].insumo : r.linhas.linhas[0].fornecedor) : undefined))
     : undefined;
 
   return (
     <div className="space-y-6">
+      {f.volta && <Voltar href={f.volta}>Voltar para {rotuloDaVolta(f.volta)}</Voltar>}
       <PageHeader
         icone={modo === 'insumo' ? 'historico' : 'relatorio'}
         cor={COR.compras}
@@ -171,7 +181,7 @@ export function TelaDoRelatorio({
             <Indicadores f={f} caminho={caminho} t={t} umInsumo={r.umInsumo} modo={modo} nFornecedores={modo === 'insumo' ? new Set(r.fornecedores?.grupos.map((g) => g.chave)).size : undefined} />
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
                 <p className="text-[13px] text-suave">Levar o que está na tela, com o mesmo período, a mesma data usada e os mesmos totais:</p>
-                <BarraDeSaida f={f} exportar={`${comprasBase}/relatorios/periodo/exportar`} imprimir={caminho} modo={modo} />
+                <BarraDeSaida f={f} exportar={`${comprasBase}/relatorios/periodo/exportar`} imprimir={caminho} modo={modo} comparar={comparar} />
               </div>
             </div>
           )}

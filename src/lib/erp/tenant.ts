@@ -47,9 +47,11 @@
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { baseDoErp } from './base';
 import { ErroDeTenant, ehModeloDeTenant, MODELOS_DE_TENANT, type ModeloDeTenant } from './modelos';
+import { ErroDeRelatorio, TETO_DO_RELATORIO_MS, VAGAS_DO_PROCESSO } from './vagas-de-relatorio';
 
 export { ErroDeTenant, ehModeloDeTenant, MODELOS_DE_TENANT, RELACOES_DE_TENANT } from './modelos';
 export type { ModeloDeTenant } from './modelos';
+export { ErroDeRelatorio } from './vagas-de-relatorio';
 
 // Cliente base do portão: separado do `prisma` do portal (que é travado para
 // os modelos de tenant). Um por processo, lazy (`base.ts`).
@@ -84,12 +86,14 @@ export const PAPEL_DE_TENANT = 'erp_tenant';
  * `role` via set_config é o mesmo que `SET LOCAL ROLE`, numa ida só. Sem o
  * papel disponível (migration não conseguiu instalar a RLS), só o parceiro.
  * `leitura`: a transação abre read-only no Postgres.
+ * `tetoMs`: o banco corta a consulta que passar disso (`statement_timeout` local à transação; relatório).
  */
-function sqlDeContexto(parceiroId: string, leitura: boolean, papel: boolean): Prisma.Sql {
+function sqlDeContexto(parceiroId: string, leitura: boolean, papel: boolean, tetoMs?: number): Prisma.Sql {
   const ro = leitura ? Prisma.sql`, set_config('transaction_read_only', 'on', true)` : Prisma.empty;
+  const teto = tetoMs ? Prisma.sql`, set_config('statement_timeout', ${String(tetoMs)}, true)` : Prisma.empty;
   return papel
-    ? Prisma.sql`SELECT set_config('app.parceiro_id', ${parceiroId}, true), set_config('role', ${PAPEL_DE_TENANT}, true)${ro}`
-    : Prisma.sql`SELECT set_config('app.parceiro_id', ${parceiroId}, true)${ro}`;
+    ? Prisma.sql`SELECT set_config('app.parceiro_id', ${parceiroId}, true), set_config('role', ${PAPEL_DE_TENANT}, true)${ro}${teto}`
+    : Prisma.sql`SELECT set_config('app.parceiro_id', ${parceiroId}, true)${ro}${teto}`;
 }
 
 /**
@@ -102,10 +106,17 @@ function sqlDeStatus(parceiroId: string): Prisma.Sql {
 }
 
 /** Erro do banco que o portão traduz para ErroDeTenant. */
-function traduzirErro(e: unknown): unknown {
+function traduzirErro(e: unknown, relatorio = false): unknown {
+  if (e instanceof ErroDeRelatorio) return e;
   const msg = e instanceof Error ? e.message : String(e);
   if (msg.includes('erp_parceiro_inativo')) {
     return new ErroDeTenant('parceiro não está ATIVO (suspenso ou aguardando liberação): escrita recusada.');
+  }
+  if (relatorio) {
+    // O banco cortou a consulta (57014) ou a transação passou do prazo do Prisma: grande demais. Sem conexão no pool a tempo: ocupado.
+    if (msg.includes('statement timeout') || msg.includes('57014')) return new ErroDeRelatorio('tempo');
+    if (msg.includes('Unable to start a transaction in the given time')) return new ErroDeRelatorio('ocupado');
+    if (msg.includes('Transaction already closed') || msg.includes('expired transaction')) return new ErroDeRelatorio('tempo');
   }
   return e;
 }
@@ -288,7 +299,17 @@ type ModelosDoParceiro = { readonly [M in ModeloDeTenant]: Pick<Amarrado[M], Ope
  * `repetivel` (L.2): a transação enxerga UMA fotografia do banco do começo ao fim (REPEATABLE READ), para um relatório que lê em várias
  * consultas (resumo, grupos, linhas) nunca somar números de instantes diferentes quando alguém lança ou cancela uma nota no meio.
  */
-type OpcoesDeTransacao = { maxWait?: number; timeout?: number; repetivel?: boolean };
+type OpcoesDeTransacao = {
+  maxWait?: number;
+  timeout?: number;
+  repetivel?: boolean;
+  /**
+   * Relatório pesado (L.4): a transação é SOMENTE LEITURA no banco e no portão, cada consulta tem um teto de tempo (`tetoMs`, padrão
+   * 20 s; o Postgres corta e o portão devolve `ErroDeRelatorio('tempo')`, nunca um 500) e só algumas rodam juntas por processo
+   * (a vaga é pedida antes de abrir a transação; sem vaga a tempo, `ErroDeRelatorio('ocupado')`). Protege o pool de conexões.
+   */
+  relatorio?: { tetoMs?: number };
+};
 
 /**
  * Cliente de UM parceiro: os modelos de tenant (e só eles, só com operações de
@@ -369,6 +390,9 @@ function construir(base: PrismaClient, parceiroId: string, somenteLeitura: boole
       throw new ErroDeTenant('parceiro em somente leitura (suspenso ou aguardando liberação): escrita recusada.');
     }
   }
+  const barrarNoRelatorio = (escreve: boolean) => {
+    if (escreve) throw new ErroDeTenant('transação de relatório é somente leitura: escrita recusada.');
+  };
 
   // Fora de transação: cada operação vira um lote numa transação só —
   // [contexto, (status, se escreve), operação]. A consulta do Prisma é
@@ -399,15 +423,20 @@ function construir(base: PrismaClient, parceiroId: string, somenteLeitura: boole
     somenteLeitura,
     avulsoComTrava,
     async (fn, opcoes) => {
-      const papel = await papelDisponivel(base);
+      const relatorio = opcoes?.relatorio;
+      const tetoMs = relatorio ? (relatorio.tetoMs ?? TETO_DO_RELATORIO_MS) : undefined;
+      // Relatório pesado: a vaga vem ANTES de abrir a transação (quem espera não segura conexão do pool).
+      const soltar = relatorio ? await VAGAS_DO_PROCESSO.pegar() : null;
       try {
+        const papel = await papelDisponivel(base);
         // O `tx` de um cliente estendido carrega a mesma extensão de query.
         return await amarrado.$transaction(async (tx) => {
-          await tx.$queryRaw(sqlDeContexto(parceiroId, somenteLeitura, papel));
+          await tx.$queryRaw(sqlDeContexto(parceiroId, somenteLeitura || !!relatorio, papel, tetoMs));
           // Dentro de `transacao`: contexto já aberto; a 1ª escrita confere o
           // status (FOR SHARE segura a linha do parceiro até o fim da transação).
           let statusConferido = false;
           const direto: Executor = async (consulta, escreve) => {
+            if (relatorio) barrarNoRelatorio(escreve);
             barrarSeSoLeitura(escreve);
             if (escreve && !statusConferido) {
               await tx.$queryRaw(sqlDeStatus(parceiroId));
@@ -415,14 +444,18 @@ function construir(base: PrismaClient, parceiroId: string, somenteLeitura: boole
             }
             return consulta;
           };
-          return fn(montar(tx as unknown as Record<string, unknown>, parceiroId, somenteLeitura, direto, null));
+          return fn(montar(tx as unknown as Record<string, unknown>, parceiroId, somenteLeitura || !!relatorio, direto, null));
         }, {
-          ...(opcoes?.maxWait !== undefined ? { maxWait: opcoes.maxWait } : {}),
-          ...(opcoes?.timeout !== undefined ? { timeout: opcoes.timeout } : {}),
+          // Relatório: a transação inteira cabe no teto de uma consulta mais uma folga; o resto pede o que quiser.
+          ...(relatorio ? { maxWait: 5_000, timeout: (tetoMs ?? TETO_DO_RELATORIO_MS) + 10_000 } : {}),
+          ...(!relatorio && opcoes?.maxWait !== undefined ? { maxWait: opcoes.maxWait } : {}),
+          ...(!relatorio && opcoes?.timeout !== undefined ? { timeout: opcoes.timeout } : {}),
           ...(opcoes?.repetivel ? { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead } : {}),
         });
       } catch (e) {
-        throw traduzirErro(e);
+        throw traduzirErro(e, !!relatorio);
+      } finally {
+        soltar?.();
       }
     },
   );

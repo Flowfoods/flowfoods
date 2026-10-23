@@ -6,16 +6,18 @@
 
 import { visaoDaRequisicao } from '@/lib/erp/contexto';
 import type { Alcance } from '@/lib/erp/permissoes';
-import type { ClienteDoParceiro } from '@/lib/erp/tenant';
+import { ErroDeRelatorio, type ClienteDoParceiro } from '@/lib/erp/tenant';
+import { RelatorioGrande } from '../../ui/relatorio-grande';
 import { relatorioCompleto, relatorioDaTela } from '@/lib/erp/compras-relatorio';
 import { lerFiltrosDoRelatorio, somarDias, TETO_DA_IMPRESSAO } from '@/lib/erp/compras-relatorio-campos';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
+import { caminhoDeVolta } from '@/lib/erp/volta';
 import { Vazio, Painel } from '../../ui/superficies';
 import { TelaDeImpressao, TelaDoRelatorio, type Modo } from './relatorio-tela';
 
 type Params = Record<string, string | string[] | undefined>;
 
-export async function PaginaDoRelatorio({
+async function paginaDoRelatorio({
   ctx,
   modo,
   caminho,
@@ -34,6 +36,8 @@ export async function PaginaDoRelatorio({
   const hoje = hojeNoRio();
   // O histórico de um insumo olha mais longe que o mês: sem datas na URL, os últimos 90 dias. O período é sempre dito na tela.
   let f = lerFiltrosDoRelatorio(searchParams, hoje, modo === 'insumo' ? { de: somarDias(hoje, -89) } : {});
+  // L.3: a comparação abre estas linhas com `volta`; só vale caminho interno da área (`/erp/` ou `/rodolfo/erp/<slug>/`).
+  f = { ...f, volta: caminhoDeVolta(f.volta, comprasBase.slice(0, -'compras'.length), 2000) ?? '' };
   // A loja escolhida no topo decide o recorte só quando a pessoa não marcou nenhuma: a visão filtra, nunca concede.
   let visaoDaLoja: string | null = null;
   if (f.lojaIds.length === 0 && visao.tipo === 'loja') {
@@ -76,4 +80,14 @@ export async function PaginaDoRelatorio({
   return (
     <TelaDoRelatorio modo={modo} caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} insumosBase={insumosBase} visaoDaLoja={visaoDaLoja} />
   );
+}
+
+/** Se o relatório não couber agora (passou do teto de tempo ou há outros grandes rodando), a frase no lugar dos números, sem 500. */
+export async function PaginaDoRelatorio(props: Parameters<typeof paginaDoRelatorio>[0]) {
+  try {
+    return await paginaDoRelatorio(props);
+  } catch (e) {
+    if (e instanceof ErroDeRelatorio) return <RelatorioGrande erro={e} caminho={props.caminho} />;
+    throw e;
+  }
 }
