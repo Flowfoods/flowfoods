@@ -302,6 +302,14 @@ html:has(.ff-app[data-tema='escuro']) {
     /* L.3: o link de uma palavra só ("Ovo", "Alho") também chega a 44 px de largura sem mexer no desenho. */
     padding-inline: 9px;
     margin-inline: -9px;
+    /* L.4: a folga de toque tem de GANHAR da linha seguinte (que, vindo depois no HTML, pintava por cima e comia os 14 px de baixo:
+       o alvo de 44 px virava ~34). Acima da linha de baixo e do fundo da célula, o toque no centro e nas bordas cai no link. */
+    position: relative;
+    z-index: 1;
+  }
+  /* L.4: duas linhas de tabela seguidas, cada uma com um link de 44 px, não se pisam: a linha tem 44 px de passo no toque. */
+  .ff-app table tbody :is(td, th) {
+    height: 44px;
   }
 }
 

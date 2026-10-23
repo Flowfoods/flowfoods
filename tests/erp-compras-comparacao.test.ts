@@ -445,4 +445,24 @@ describe('L.3 (1ª volta da UX) · um lado sem compra, avisos e gramática', () 
     expect(por['tamanhos']).toBeDefined();
     expect(por['sem-a']).toBeUndefined();
   });
+
+  it('(herança L.3 → L.4) os dois lados sem compra comparável: um aviso só, e nada de "cobre 0,0%"', () => {
+    const lado = (de: string, ate: string, sem: number, extra: Record<string, unknown> = {}) => ({
+      de, ate, celulas: [] as unknown[], semBase: { linhas: sem, valorCentavos: sem * 1500, freteCentavos: 0, porMotivo: sem ? ({ unidade: sem } as const) : {} },
+      dinheiroTotalCentavos: sem * 1500, dinheiroComparavelCentavos: 0, semEmissao: null as number | null, ...extra,
+    });
+    const av = avisosDaComparacao({ de: '2026-09-01', ate: '2026-09-30', deB: '2026-10-01', ateB: '2026-10-31' }, lado('2026-09-01', '2026-09-30', 2), lado('2026-10-01', '2026-10-31', 0), 0, HOJE);
+    const chaves = av.map((x) => x.chave);
+    expect(chaves).toContain('sem-ambos');
+    expect(chaves).not.toContain('sem-a');
+    expect(chaves).not.toContain('sem-b');
+    expect(av.find((x) => x.chave === 'sem-ambos')!.texto).toMatch(/^Nenhum dos dois períodos teve compra comparável/);
+    const base = av.find((x) => x.chave === 'base-A')!.texto;
+    expect(base).not.toMatch(/0,0%/);
+    expect(base).toMatch(/nada do que foi comprado entra na conta/);
+    // Só um lado vazio: continua o aviso daquele lado.
+    const um = avisosDaComparacao({ de: '2026-09-01', ate: '2026-09-30', deB: '2026-10-01', ateB: '2026-10-31' }, { ...lado('2026-09-01', '2026-09-30', 0), celulas: [1] }, lado('2026-10-01', '2026-10-31', 0), 0, HOJE);
+    expect(um.map((x) => x.chave)).toContain('sem-b');
+    expect(um.map((x) => x.chave)).not.toContain('sem-ambos');
+  });
 });

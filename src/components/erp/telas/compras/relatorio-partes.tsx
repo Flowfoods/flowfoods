@@ -420,7 +420,7 @@ function LinkDaNota({ l, comprasBase, volta }: { l: LinhaDeCompra; comprasBase: 
       </Link>
       {l.documentoId && (
         // Em outra linha: dois links lado a lado com área de toque de 44 px se atropelariam.
-        <span className="mt-1 block">
+        <span className="mt-1 block [@media(pointer:coarse)]:mt-6">
           <Link href={`${comprasBase}/recebidas/${l.documentoId}?volta=${encodeURIComponent(volta)}`} className="ff-toque ff-transicao rounded-[5px] text-[12px] text-suave underline decoration-linha-forte underline-offset-4 hover:text-texto">
             nota fiscal (XML)
           </Link>
