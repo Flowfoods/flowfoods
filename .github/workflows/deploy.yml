@@ -19,8 +19,29 @@ on:
 
 jobs:
   portao:
-    name: Portão (lint · tipos · testes · build)
+    name: Portão (lint · tipos · testes com banco · build)
     runs-on: ubuntu-latest
+    # Ponto 4 do plano: os testes de integridade (isolamento entre parceiros e
+    # lojas, RLS, compra que não duplica, concorrência, migrations com dado
+    # antigo) precisam RODAR antes de publicar. Sem banco eles eram pulados e o
+    # portão ficava verde assim mesmo. Agora há um Postgres de serviço; falha
+    # aqui = o deploy (que depende deste job) não sai.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ff
+          POSTGRES_PASSWORD: ff
+          POSTGRES_DB: ff
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ff -d ff"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      ERP_DB_TESTE: postgresql://ff:ff@localhost:5432/ff
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -37,8 +58,27 @@ jobs:
         run: npm run gate
       - name: Tipos
         run: npx tsc --noEmit
-      - name: Testes do motor do Diagnóstico
-        run: npm test
+      - name: Banco de teste (migrations)
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: postgresql://ff:ff@localhost:5432/ff?schema=public
+      # A suíte inteira, com banco. Os testes de migration criam bancos próprios
+      # (o usuário do serviço é superusuário). As variantes que exigem um dono
+      # NÃO superusuário com FORCE RLS são puladas aqui — o resumo diz quantas.
+      - name: Testes (com banco)
+        run: |
+          set -o pipefail
+          npx vitest run --no-file-parallelism 2>&1 | tee /tmp/testes.txt
+      - name: Resumo dos testes
+        if: always()
+        run: |
+          {
+            echo '### Testes do portão (com Postgres)'
+            echo
+            grep -E 'Test Files|Tests ' /tmp/testes.txt | sed -E 's/\x1b\[[0-9;]*m//g' || echo 'Sem resultado: os testes não chegaram a rodar.'
+            echo
+            echo 'Pulados = variantes que pedem um dono não superusuário com FORCE RLS (rodar à mão, docs/ERP.md "Provar o isolamento"). Não executado não é aprovado.'
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Build de produção
         run: npm run build
 

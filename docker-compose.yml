@@ -13,9 +13,13 @@
 # está em scripts/exportar-segredos.sh). Ou seja: zero-config por padrão,
 # override por painel quando precisar — as EVOLUTION_* entram assim mais tarde.
 #
-# Ordem de subida: segredos → postgres (healthcheck) → web/worker. O `web` roda
-# a migration antes do Next; sem isso o primeiro deploy erraria em toda tela
-# que lê dados.
+# Ordem de subida: segredos → postgres (healthcheck) → migrar → web/worker.
+# `migrar` é um serviço de uma vez só: aplica as migrations e, só se elas
+# terminarem bem, web e worker sobem (Ponto 20 do plano: nenhum processo roda
+# sobre estrutura de banco incompatível — antes o worker não esperava). Em
+# seguida ele roda o conferidor (Ponto 15): pendência em dado antigo aparece
+# no log do `migrar`, sem apagar, converter nem corrigir nada, e sem derrubar
+# o site.
 
 services:
   # Gera os segredos que ainda não existem e termina. Idempotente: num volume
@@ -55,6 +59,33 @@ services:
       retries: 20
       start_period: 20s
 
+  # Aplica as migrations e termina. Falhou = web e worker NÃO sobem (melhor
+  # fora do ar com aviso no log do que rodando sobre estrutura pela metade; a
+  # versão anterior segue de pé porque o Compose não chega a recriá-la).
+  # Depois, o conferidor lê o catálogo do Postgres e lista o que ficou
+  # pendente em dado antigo (CHECK NOT VALID, índice que faltou): código 1 =
+  # pendência a resolver pela equipe, registrada aqui; não bloqueia.
+  migrar:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: 'no'
+    depends_on:
+      segredos:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c '. ./scripts/exportar-segredos.sh
+      && npx prisma migrate deploy
+      && echo "[migrar] migrations aplicadas"
+      && (npm run --silent erp:conferir-migracao
+      || echo "[migrar] ATENÇÃO: a conferência pós-migration listou pendências (acima). O site sobe; resolva conforme docs/RUNBOOK.md.")'
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-}
+    volumes:
+      - segredos:/segredos:ro
+
   web:
     build:
       context: .
@@ -65,12 +96,13 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
-    # 1. carrega os segredos (painel vence o volume) · 2. migration (só
-    # aditiva; em banco migrado é no-op) · 3. imprime o link de setup no log
-    # enquanto não houver admin · 4. sobe o Next.
+      migrar:
+        condition: service_completed_successfully
+    # 1. carrega os segredos (painel vence o volume) · 2. imprime o link de
+    # setup no log enquanto não houver admin · 3. sobe o Next. A migration já
+    # rodou no `migrar` (este serviço só sobe se ela terminou bem).
     command: >
       sh -c '. ./scripts/exportar-segredos.sh
-      && npx prisma migrate deploy
       && node scripts/imprimir-setup.mjs
       && npm start'
     environment:
@@ -120,6 +152,9 @@ services:
         condition: service_completed_successfully
       postgres:
         condition: service_healthy
+      # O worker lê e grava no banco: só sobe depois da migration (Ponto 20).
+      migrar:
+        condition: service_completed_successfully
     command: >
       sh -c '. ./scripts/exportar-segredos.sh && npm run worker'
     environment:

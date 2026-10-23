@@ -21,11 +21,26 @@ para treinar o fluxo inteiro antes de ter número.
 
 ### 1.2 Banco
 
-As migrations rodam no boot do container:
+As migrations rodam no serviço `migrar` do docker-compose, antes de qualquer
+outro processo: `web` e `worker` só sobem se ele terminar bem (Ponto 20 do
+plano). À mão, no mesmo banco:
 
 ```bash
 npm run db:migrate
+npm run erp:conferir-migracao   # 0 = ok · 1 = pendência em dado antigo · 2 = erro ao conferir
 ```
+
+**Se o deploy não subir o site:** abra o log do serviço `migrar`. Migration que
+falhou aparece ali; a versão anterior do `web` continua no ar (o Compose não
+chega a recriá-la). Corrija a causa e redeploye — nunca apague tabela nem rode
+`reset` para "destravar".
+
+**Se o log do `migrar` disser "ATENÇÃO: a conferência pós-migration listou
+pendências":** o site subiu normalmente. As linhas acima da frase dizem o que
+ficou pendente (CHECK `NOT VALID` por linha antiga que viola a regra, índice
+que faltou). Nada foi apagado nem corrigido sozinho (Ponto 15). Corrija as
+linhas apontadas com a equipe e rode o `ALTER TABLE … VALIDATE CONSTRAINT …`
+que a própria mensagem indica.
 
 Só aditivas. Nunca rode `prisma migrate reset` — apagaria os opt-outs, e opt-out
 apagado é obrigação de LGPD quebrada.

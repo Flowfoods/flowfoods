@@ -51,9 +51,12 @@ redeploy e nunca passam por chat, arquivo ou área de transferência.
 
 ### 2. Deploy
 
-Sobem quatro serviços, nesta ordem: `segredos` (gera e sai) → `postgres`
-(espera ficar saudável) → `web` (roda a migration e sobe o Next) → `worker`
-(fica dormindo; com `disparoAtivo=false`, o padrão, não envia nada).
+Sobem cinco serviços, nesta ordem: `segredos` (gera e sai) → `postgres`
+(espera ficar saudável) → `migrar` (aplica as migrations, roda a conferência e
+sai; se a migration falhar, nada mais sobe) → `web` (sobe o Next) e `worker`
+(fica dormindo; com `disparoAtivo=false`, o padrão, não envia nada). Desde
+23/10/2026 o portão do GitHub roda a suíte inteira com um Postgres de serviço:
+teste de integridade que falha segura o deploy (Ponto 4).
 
 ### 3. Abra o LOG do serviço `web`
 
