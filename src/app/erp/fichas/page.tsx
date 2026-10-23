@@ -10,7 +10,7 @@ import { listarFichas } from '@/lib/erp/fichas';
 import { cmvDaLista } from '@/lib/erp/canais';
 import { lerFiltrosDeFicha, temFiltroDeFicha } from '@/lib/erp/ficha-campos';
 import { FICHAS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtitulo';
-import { FiltrosDasFichas, TelaListaFichas } from '@/components/erp/telas/fichas/lista';
+import { FiltrosDasFichas, linhasSemCusto, TelaListaFichas } from '@/components/erp/telas/fichas/lista';
 import { CabecalhoDasFichas } from '@/components/erp/telas/fichas/paginas';
 
 export const dynamic = 'force-dynamic';
@@ -25,7 +25,8 @@ export default async function ErpFichasPage({ searchParams }: { searchParams: Re
   const edita = pode(ctx.alcance, 'fichas.editar');
   const livre = edita && !ctx.bloqueio;
   // N.2: preço e CMV por canal na lista só para quem vê preços (nem sai do servidor para os outros).
-  const precos = pode(ctx.alcance, 'precos.ver') ? await cmvDaLista(ctx.cliente, pagina.linhas) : undefined;
+  const verPrecos = pode(ctx.alcance, 'precos.ver');
+  const precos = verPrecos ? await cmvDaLista(ctx.cliente, pagina.linhas) : undefined;
   return (
     <div className="space-y-6">
       <CabecalhoDasFichas
@@ -34,12 +35,14 @@ export default async function ErpFichasPage({ searchParams }: { searchParams: Re
         podeEditar={edita}
         bloqueio={ctx.bloqueio}
       >
-        <FiltrosDasFichas base={BASE} filtros={filtros} />
+        <FiltrosDasFichas base={BASE} filtros={filtros} verCustos={verPrecos} />
       </CabecalhoDasFichas>
       <TelaListaFichas
         base={BASE}
         filtros={filtros}
         {...pagina}
+        // N.5: quem só opera recebe a lista sem nenhum valor de custo (visão operacional automática).
+        linhas={verPrecos ? pagina.linhas : linhasSemCusto(pagina.linhas)}
         novaHref={livre ? `${BASE}/nova` : undefined}
         importarHref={livre ? `${BASE}/importar` : undefined}
         cmv={precos}

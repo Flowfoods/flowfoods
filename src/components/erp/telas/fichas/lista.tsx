@@ -10,6 +10,13 @@
 import Link from 'next/link';
 import { validadesEmTexto } from '@/lib/erp/validade';
 import type { LinhaDeFicha } from '@/lib/erp/fichas';
+import type { CustoDaFicha } from '@/lib/erp/ficha-campos';
+
+/** N.5: a linha como a tela recebe; `custo` null = visão operacional (o servidor não mandou o número). */
+export type LinhaNaTela = Omit<LinhaDeFicha, 'custo'> & { custo: CustoDaFicha | null };
+
+/** N.5: tira os custos da página para quem só opera (o número não sai do servidor). */
+export const linhasSemCusto = (linhas: readonly LinhaDeFicha[]): LinhaNaTela[] => linhas.map((l) => ({ ...l, custo: null }));
 import {
   custoIncompleto,
   FICHAS_POR_PAGINA,
@@ -79,7 +86,8 @@ function CustoPorRende({ l, empilhado = false }: { l: LinhaDeFicha; empilhado?: 
 const ROTULO_DA_SITUACAO = { ativas: 'Ativas', desativadas: 'Desativadas', todas: 'Todas' } as const;
 
 /** Busca e filtros (GET: o estado vai para a URL). */
-export function FiltrosDasFichas({ base, filtros: f }: { base: string; filtros: FiltrosDeFicha }) {
+/** `verCustos` (N.5): quem só opera não vê o filtro de custo (é assunto da precificação). */
+export function FiltrosDasFichas({ base, filtros: f, verCustos = true }: { base: string; filtros: FiltrosDeFicha; verCustos?: boolean }) {
   const SELECT = `${CAMPO} pr-8`;
   return (
     <form role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(18rem,1fr)_repeat(2,minmax(10.5rem,auto))_auto]">
@@ -122,10 +130,12 @@ export function FiltrosDasFichas({ base, filtros: f }: { base: string; filtros: 
           ))}
         </select>
       </div>
-      <label className="col-span-2 flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[7px] border border-linha-forte bg-campo px-3 text-sm text-texto sm:min-h-[42px] lg:col-span-1">
-        <input type="checkbox" name="custo" value="incompleto" defaultChecked={f.incompleto} className={MARCAR} />
-        <span className="whitespace-nowrap">Só custo incompleto</span>
-      </label>
+      {verCustos && (
+        <label className="col-span-2 flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[7px] border border-linha-forte bg-campo px-3 text-sm text-texto sm:min-h-[42px] lg:col-span-1">
+          <input type="checkbox" name="custo" value="incompleto" defaultChecked={f.incompleto} className={MARCAR} />
+          <span className="whitespace-nowrap">Só custo incompleto</span>
+        </label>
+      )}
     </form>
   );
 }
@@ -144,7 +154,7 @@ export function TelaListaFichas({
   /** /erp/fichas ou /rodolfo/erp/<slug>/fichas */
   base: string;
   filtros: FiltrosDeFicha;
-  linhas: LinhaDeFicha[];
+  linhas: LinhaNaTela[];
   total: number;
   pagina: number;
   paginas: number;
@@ -195,6 +205,8 @@ export function TelaListaFichas({
     );
   }
 
+  // N.5: a página inteira vem com ou sem custos (o servidor decide pela permissão).
+  const verCustos = linhas.every((l) => l.custo !== null);
   const de = (pagina - 1) * FICHAS_POR_PAGINA + 1;
   const ate = de + linhas.length - 1;
 
@@ -215,9 +227,11 @@ export function TelaListaFichas({
                 {validadesEmTexto(l.validades) && <span className="mt-0.5 block text-[12px] leading-snug text-suave">{validadesEmTexto(l.validades)}</span>}
                 {precos?.get(l.id) && <span className="mt-0.5 block text-[12px] leading-snug tabular-nums text-suave">{cmvEmLinha(precos.get(l.id)!)}</span>}
               </span>
-              <span className="shrink-0 text-right text-sm tabular-nums">
-                <CustoPorRende l={l} empilhado />
-              </span>
+              {l.custo && (
+                <span className="shrink-0 text-right text-sm tabular-nums">
+                  <CustoPorRende l={{ ...l, custo: l.custo }} empilhado />
+                </span>
+              )}
             </Link>
           </li>
         ))}
@@ -225,7 +239,7 @@ export function TelaListaFichas({
 
       <table className="hidden w-full text-sm sm:table">
         <caption className="sr-only">
-          Fichas técnicas, {total} no total. Custo = soma dos insumos pelo custo de referência; por porção = custo dividido pelo rendimento.
+          Fichas técnicas, {total} no total.{verCustos ? ' Custo = soma dos insumos pelo custo de referência; por porção = custo dividido pelo rendimento.' : ''}
         </caption>
         <thead>
           {precos && (
@@ -243,15 +257,19 @@ export function TelaListaFichas({
             <th scope="col" className="hidden h-10 px-3 font-semibold md:table-cell">
               Rende
             </th>
-            <th scope="col" className={`hidden h-10 px-3 text-right font-semibold ${precos ? '' : 'md:table-cell'}`}>
-              Insumos
+            <th scope="col" className={`h-10 px-3 text-right font-semibold ${verCustos ? `hidden ${precos ? '' : 'md:table-cell'}` : ''}`}>
+              Itens
             </th>
-            <th scope="col" className="h-10 px-3 text-right font-semibold">
-              Custo da receita
-            </th>
-            <th scope="col" className="h-10 px-3 text-right font-semibold">
-              Por porção ou kg
-            </th>
+            {verCustos && (
+              <>
+                <th scope="col" className="h-10 px-3 text-right font-semibold">
+                  Custo da receita
+                </th>
+                <th scope="col" className="h-10 px-3 text-right font-semibold">
+                  Por porção ou kg
+                </th>
+              </>
+            )}
             {precos &&
               (['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] as const).map((c) => (
                 <th key={c} scope="col" className="hidden h-10 px-3 text-right font-semibold lg:table-cell">
@@ -291,19 +309,23 @@ export function TelaListaFichas({
               <td className="hidden whitespace-nowrap px-3 py-2 text-suave md:table-cell">
                 {formatarRendimento(l.rendimentoMilesimos, l.unidadeRendimento, l.tipo)}
               </td>
-              <td className={`hidden px-3 py-2 text-right text-suave ${precos ? '' : 'md:table-cell'}`}>{l.itens}</td>
-              <td className="whitespace-nowrap px-3 py-2 text-right">
-                {custoIncompleto(l.custo) ? (
-                  <span className="text-suave" title={`Falta preço em: ${l.custo.faltaPreco.join(', ')}`}>
-                    {formatarFracao(l.custo.total)} + ?
-                  </span>
-                ) : (
-                  formatarFracao(l.custo.total)
-                )}
-              </td>
-              <td className="px-3 py-2 text-right">
-                <CustoPorRende l={l} />
-              </td>
+              <td className={`px-3 py-2 text-right text-suave ${verCustos ? `hidden ${precos ? '' : 'md:table-cell'}` : ''}`}>{l.itens}</td>
+              {l.custo && (
+                <>
+                  <td className="whitespace-nowrap px-3 py-2 text-right">
+                    {custoIncompleto(l.custo) ? (
+                      <span className="text-suave" title={`Falta preço em: ${l.custo.faltaPreco.join(', ')}`}>
+                        {formatarFracao(l.custo.total)} + ?
+                      </span>
+                    ) : (
+                      formatarFracao(l.custo.total)
+                    )}
+                  </td>
+                  <td className="px-3 py-2 text-right">
+                    <CustoPorRende l={{ ...l, custo: l.custo }} />
+                  </td>
+                </>
+              )}
               {precos &&
                 (precos.get(l.id) ? (
                   precos.get(l.id)!.map((x) => (

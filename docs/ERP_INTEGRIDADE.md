@@ -156,3 +156,41 @@ existem neste Postgres local. Não foram executados; não contam como aprovados.
 - Filtro da lista por status de CMV e texto de ajuda da conta: esperam a L.3 entrar no master (mesmos trechos).
 - Impressão/PDF da ficha (visão operacional × gerencial) ainda não feita: as etapas já estão prontas para ela.
 - Ponto 1 (valorização do estoque) segue esperando a decisão do método.
+
+## Entrega N.5 — visão operacional e gerencial automáticas na ficha, e impressão/PDF
+
+**Achado:** quem só opera (perfil Operador, sem "ver preços") recebia o custo da ficha no detalhe e na lista (custo por
+porção, custo de cada item, custo da receita). A decisão aprovada pede a visão operacional sem custos, com proteção no
+servidor.
+
+**O que mudou**
+
+- `fichaNaTela(ficha, verCustos)` (`fichas.ts`): sem "ver preços", a ficha sai do servidor **sem nenhum valor de custo**
+  (ficha, itens e pré-preparos). A tela troca de composição sozinha: no lugar do custo, "Rende"; tabela de itens com a
+  quantidade limpa e bruta, sem coluna de custo vazia. Não há botão para trocar de visão; a permissão usada é a que já
+  existia ("ver preços"), sem papel novo.
+- Lista de fichas: sem "ver preços", as linhas chegam sem custo (`linhasSemCusto`), as colunas de custo saem e o filtro
+  "Só custo incompleto" some.
+- Impressão: nova página `/erp/fichas/[id]/imprimir` (e a do nível 1). A4 em pé, uma composição própria: identificação,
+  foto, descrição comercial, onde fica e quanto dura, ingredientes (limpo e bruto), modo de preparo em etapas. A versão
+  gerencial acrescenta o custo dos itens e a tabela de preço e CMV por canal ("resultado após os custos informados", com a
+  frase de que não é lucro líquido). A barra diz qual versão é e que só sai a ficha gravada (o que não foi salvo não entra).
+  Botão "Imprimir ou PDF" no detalhe.
+- Impressão de todo o ERP (`tokens.css`): o papel sai branco e com a altura do conteúdo. Antes, o fundo creme e a altura
+  mínima de tela cheia empurravam uma **folha em branco a mais** no fim (vale também para os relatórios da L.2).
+- Ajuda: textos de Fichas, Detalhe da ficha, Montar a ficha e Precificação atualizados para a meta de CMV, as etapas e a
+  impressão (versões sobem; o lock foi regravado). O operador não recebe nada sobre preço.
+
+**Testes**
+
+| Verificação | Resultado |
+|---|---|
+| `tests/erp-ficha-visoes.db.test.ts` (o que sai do servidor para operador e gerente no detalhe, na lista e na impressão; 404) | 4 aprovados |
+| Ajuda (`erp-ajuda*.test.ts`, expectativas atualizadas da margem-alvo para a meta de CMV) | 53 aprovados |
+| Suíte inteira com banco | 130 arquivos, 2.494 aprovados, 44 pulados, 0 falhas |
+| Navegador, entrando como Operador e como Gerente (acessos de teste locais) | operador: nenhum "R$" visível no detalhe, na lista e na impressão; PDF de 1 folha nas duas versões |
+
+Erro de lint conhecido e anterior a esta entrega: `tests/erp-ajuda.test.ts:278` (`react/no-children-prop`), já no master.
+
+**Limites:** Insumos, Produção e Estoque ainda mostram valores conforme as regras deles (fora desta entrega). A foto
+grande e as fotos de apoio na impressão dependem da galeria (ainda não feita): hoje sai a foto única.

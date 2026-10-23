@@ -926,6 +926,29 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes:
 export type FichaDetalhada = NonNullable<Awaited<ReturnType<typeof obterFicha>>>;
 
 /**
+ * N.5 — a ficha como a TELA e a IMPRESSÃO recebem, conforme a permissão efetiva (decisão de Rodolfo: visão operacional e
+ * gerencial automáticas). Quem vê a precificação (`precos.ver`) recebe com os custos; quem só opera recebe SEM nenhum
+ * valor de custo (nem da ficha, nem dos itens, nem dos pré-preparos): o número não sai do servidor, não é só escondido.
+ * `verCustos` diz à tela qual composição desenhar (sem coluna vazia).
+ */
+export function fichaNaTela(f: FichaDetalhada, verCustos: boolean) {
+  if (verCustos) return { ...f, verCustos: true as const };
+  return {
+    ...f,
+    verCustos: false as const,
+    custo: null,
+    itens: f.itens.map((i) => ({
+      ...i,
+      custo: null,
+      custoDoInsumo: null,
+      preparo: i.preparo ? { ...i.preparo, custo: null, itens: i.preparo.itens.map((x) => ({ ...x, custo: null })) } : null,
+    })),
+  };
+}
+
+export type FichaNaTela = ReturnType<typeof fichaNaTela>;
+
+/**
  * A foto de uma ficha DESTE parceiro (nome do arquivo e tipo), ou null. É o
  * que a rota da foto usa: id de ficha de outro parceiro não é achado.
  */

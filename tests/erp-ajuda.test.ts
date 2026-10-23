@@ -210,9 +210,9 @@ describe('0.6 · aula por permissão, não por perfil nem por setor', () => {
   it('o operador não recebe nada sobre preço e margem; a dona e o gerente recebem', () => {
     expect(texto(OPERADOR, 'ficha')).not.toMatch(/margem|iFood|preço|canal/i);
     expect(ajudaParaATela(OPERADOR).find((x) => x.chave === 'ficha')!.secoes).toEqual([]);
-    expect(texto(DONO, 'ficha')).toMatch(/margem-alvo/);
+    expect(texto(DONO, 'ficha')).toMatch(/meta de CMV/);
     expect(ajudaParaATela(DONO).find((x) => x.chave === 'ficha')!.secoes.map((s) => s.id)).toEqual(['conta']);
-    expect(texto(GERENTE, 'ficha')).toMatch(/margem-alvo/);
+    expect(texto(GERENTE, 'ficha')).toMatch(/meta de CMV/);
     // o mesmo vale para o que o operador não paga: bloco de compras no insumo
     expect(texto(OPERADOR, 'insumo')).not.toMatch(/nota/);
     expect(texto(DONO, 'insumo')).toMatch(/nota/);
@@ -222,7 +222,7 @@ describe('0.6 · aula por permissão, não por perfil nem por setor', () => {
 
   it('perfil próprio vale pelas permissões, não pelo nome; setor não concede', () => {
     const soVer = resolverAlcance(vinculo({ perfilBase: null, perfilProprio: ['fichas.ver', 'precos.ver'] }));
-    expect(texto(soVer, 'ficha')).toMatch(/margem-alvo/);
+    expect(texto(soVer, 'ficha')).toMatch(/meta de CMV/);
     const semPreco = resolverAlcance(vinculo({ perfilBase: 'GERENTE', permissoesRemovidas: ['precos.ver', 'precos.editar'] }));
     expect(texto(semPreco, 'ficha')).not.toMatch(/margem/i);
   });

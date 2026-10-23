@@ -11,7 +11,8 @@
  */
 
 import Link from 'next/link';
-import type { FichaDetalhada } from '@/lib/erp/fichas';
+import { Printer } from 'lucide-react';
+import type { FichaNaTela } from '@/lib/erp/fichas';
 import { contaDaFicha, custoIncompleto, formatarFator, formatarRendimento, porUnidadeDeRendimento, quantidadeBruta, TIPOS_DE_FICHA } from '@/lib/erp/ficha-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarFracao, formatarQuantidade, UNIDADES } from '@/lib/erp/unidades';
@@ -61,7 +62,8 @@ export function TelaDetalheFicha({
   acaoPrecos,
   linkDoProduzir,
 }: {
-  ficha: FichaDetalhada;
+  /** N.5: com ou sem os custos, conforme a permissão efetiva (o servidor decide e já manda sem os números). */
+  ficha: FichaNaTela;
   base: string;
   /** A lista como a pessoa deixou. */
   voltar: string;
@@ -87,7 +89,8 @@ export function TelaDetalheFicha({
     fator === 1000 ? null : `bruto ${formatarQuantidade(quantidadeBruta(q, fator), unidade)} · fator ${formatarFator(fator)}`;
   const rende = formatarRendimento(f.rendimentoMilesimos, f.unidadeRendimento, f.tipo);
   const por = porUnidadeDeRendimento(f.unidadeRendimento, f.tipo);
-  const incompleto = custoIncompleto(f.custo);
+  const incompleto = f.custo ? custoIncompleto(f.custo) : false;
+  const verCustos = f.verCustos;
   const mensagem = fraseDoFeitoDaFicha(feito);
 
   return (
@@ -102,11 +105,18 @@ export function TelaDetalheFicha({
           .filter(Boolean)
           .join(' · ')}
         acao={
-          podeEditar && f.ativa ? (
-            <BotaoOuMotivo href={`${base}/${f.id}/editar`} bloqueio={bloqueio} variante="primario">
-              Editar ficha
-            </BotaoOuMotivo>
-          ) : undefined
+          <div className="flex flex-wrap items-center gap-2">
+            {/* N.5: a versão para o papel sai da mesma permissão da tela (a cozinha imprime sem custos). */}
+            <Link href={`${base}/${f.id}/imprimir`} className={classeDeBotao('secundario')}>
+              <Printer size={16} aria-hidden />
+              Imprimir ou PDF
+            </Link>
+            {podeEditar && f.ativa && (
+              <BotaoOuMotivo href={`${base}/${f.id}/editar`} bloqueio={bloqueio} variante="primario">
+                Editar ficha
+              </BotaoOuMotivo>
+            )}
+          </div>
         }
       />
 
@@ -141,16 +151,24 @@ export function TelaDetalheFicha({
                   <h2 className="text-[13px] font-semibold text-suave">Descrição comercial</h2>
                   <p className="mt-1 text-[15px] leading-relaxed text-texto">{f.descricao ?? <span className="text-suave">Sem descrição comercial.</span>}</p>
                 </div>
-                <div className="border-t border-linha pt-4">
-                  <h2 className="text-[13px] font-semibold text-suave">Custo {por}</h2>
-                  <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                    <span className={`font-display text-[32px] font-bold leading-none tabular-nums ${incompleto ? 'text-atencao' : ''}`}>
-                      {formatarFracao(f.custo.porRendimento)}
-                    </span>
-                    {incompleto && <Selo tom="alerta">Custo incompleto</Selo>}
+                {f.custo ? (
+                  <div className="border-t border-linha pt-4">
+                    <h2 className="text-[13px] font-semibold text-suave">Custo {por}</h2>
+                    <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                      <span className={`font-display text-[32px] font-bold leading-none tabular-nums ${incompleto ? 'text-atencao' : ''}`}>
+                        {formatarFracao(f.custo.porRendimento)}
+                      </span>
+                      {incompleto && <Selo tom="alerta">Custo incompleto</Selo>}
+                    </div>
+                    <p className="mt-2 text-[13px] tabular-nums text-suave">{contaDaFicha(f.custo, f.rendimentoMilesimos, f.unidadeRendimento, f.tipo)}</p>
                   </div>
-                  <p className="mt-2 text-[13px] tabular-nums text-suave">{contaDaFicha(f.custo, f.rendimentoMilesimos, f.unidadeRendimento, f.tipo)}</p>
-                </div>
+                ) : (
+                  // Visão operacional: no lugar do custo, o que a cozinha usa (quanto a receita rende).
+                  <div className="border-t border-linha pt-4">
+                    <h2 className="text-[13px] font-semibold text-suave">Rende</h2>
+                    <p className="mt-1 font-display text-[28px] font-bold leading-none">{rende}</p>
+                  </div>
+                )}
                 <div className="border-t border-linha pt-4">
                   <h2 className="text-[13px] font-semibold text-suave">Onde fica e quanto dura</h2>
                   <div className="mt-1">
@@ -178,18 +196,22 @@ export function TelaDetalheFicha({
 
           <Painel className="order-3 sm:order-2" titulo="Insumos e pré-preparos" semRespiro acessorio={<span className="text-[12px] tabular-nums text-suave">{f.itens.length}</span>}>
             <table className="w-full text-sm">
-              <caption className="sr-only">Insumos e pré-preparos da receita: quantidade limpa, peso bruto e custo de cada um.</caption>
+              <caption className="sr-only">
+                {verCustos ? 'Insumos e pré-preparos da receita: quantidade limpa, peso bruto e custo de cada um.' : 'Insumos e pré-preparos da receita: quantidade limpa e peso bruto.'}
+              </caption>
               <thead>
                 <tr className="bg-forte text-left text-[12px] text-suave">
                   <th scope="col" className="h-10 pl-4 pr-3 font-semibold sm:pl-5">
                     Item
                   </th>
-                  <th scope="col" className="hidden h-10 px-3 text-right font-semibold sm:table-cell">
+                  <th scope="col" className={`h-10 px-3 text-right font-semibold ${verCustos ? 'hidden sm:table-cell' : 'pr-4 sm:pr-5'}`}>
                     Quantidade
                   </th>
-                  <th scope="col" className="h-10 pl-3 pr-4 text-right font-semibold sm:pr-5">
-                    Custo
-                  </th>
+                  {verCustos && (
+                    <th scope="col" className="h-10 pl-3 pr-4 text-right font-semibold sm:pr-5">
+                      Custo
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="tabular-nums">
@@ -214,16 +236,22 @@ export function TelaDetalheFicha({
                           {p && <Selo>Pré-preparo</Selo>}
                           {!i.ativo && <span className="text-[12px] text-suave">{p ? 'desativado' : 'insumo desativado'}</span>}
                         </div>
-                        {/* Celular: a quantidade vem embaixo do nome (a coluna some). */}
-                        <span className="block text-[12px] text-suave sm:hidden">
+                        {/* Celular: a quantidade vem embaixo do nome (a coluna some) — só quando a coluna do custo ocupa o lugar. */}
+                        <span className={`block text-[12px] text-suave sm:hidden ${verCustos ? '' : 'hidden'}`}>
                           {formatarQuantidade(i.quantidadeMilesimos, i.unidade)}
                           {bruto ? ` · ${bruto}` : ''}
                         </span>
                         {p && (
                           <details className="group mt-1.5">
                             <summary className="cursor-pointer list-none text-[12px] text-suave underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
-                              De onde vem: {formatarFracao(p.custo.porRendimento)} por {UNIDADES[p.unidadeRendimento].sigla} ({formatarFracao(p.custo.total)} ÷{' '}
-                              {formatarQuantidade(p.rendimentoMilesimos, p.unidadeRendimento)})
+                              {p.custo ? (
+                                <>
+                                  De onde vem: {formatarFracao(p.custo.porRendimento)} por {UNIDADES[p.unidadeRendimento].sigla} ({formatarFracao(p.custo.total)} ÷{' '}
+                                  {formatarQuantidade(p.rendimentoMilesimos, p.unidadeRendimento)})
+                                </>
+                              ) : (
+                                <>Receita do pré-preparo (rende {formatarQuantidade(p.rendimentoMilesimos, p.unidadeRendimento)})</>
+                              )}
                               <span className="ml-1 group-open:hidden">· ver a receita</span>
                             </summary>
                             <ul className="mt-2 space-y-1 border-l-2 border-linha-forte pl-3 text-[12px] text-suave">
@@ -234,29 +262,32 @@ export function TelaDetalheFicha({
                                     {x.fatorCorrecaoMilesimos !== 1000 ? ` (fator ${formatarFator(x.fatorCorrecaoMilesimos)})` : ''}
                                     {x.preparo ? ' · pré-preparo' : ''}
                                   </span>
-                                  <span className="tabular-nums">{x.custo ? formatarFracao(x.custo) : 'custo não informado'}</span>
+                                  {verCustos && <span className="tabular-nums">{x.custo ? formatarFracao(x.custo) : 'custo não informado'}</span>}
                                 </li>
                               ))}
                             </ul>
                           </details>
                         )}
                       </td>
-                      <td className="hidden whitespace-nowrap px-3 py-2.5 text-right text-suave sm:table-cell">
+                      <td className={`whitespace-nowrap px-3 py-2.5 text-right ${verCustos ? 'hidden text-suave sm:table-cell' : 'pr-4 text-texto sm:pr-5'}`}>
                         {formatarQuantidade(i.quantidadeMilesimos, i.unidade)}
-                        {bruto && <span className="block text-[12px]">{bruto}</span>}
+                        {bruto && <span className="block text-[12px] text-suave">{bruto}</span>}
                       </td>
-                      <td className="whitespace-nowrap py-2.5 pl-3 pr-4 text-right sm:pr-5">
-                        {i.custo ? <span className="text-texto">{formatarFracao(i.custo)}</span> : <Selo tom="alerta">Custo não informado</Selo>}
-                        {p && custoIncompleto(p.custo) && (
-                          <span className="mt-1 block">
-                            <Selo tom="alerta">Incompleto</Selo>
-                          </span>
-                        )}
-                      </td>
+                      {verCustos && (
+                        <td className="whitespace-nowrap py-2.5 pl-3 pr-4 text-right sm:pr-5">
+                          {i.custo ? <span className="text-texto">{formatarFracao(i.custo)}</span> : <Selo tom="alerta">Custo não informado</Selo>}
+                          {p?.custo && custoIncompleto(p.custo) && (
+                            <span className="mt-1 block">
+                              <Selo tom="alerta">Incompleto</Selo>
+                            </span>
+                          )}
+                        </td>
+                      )}
                     </tr>
                   );
                 })}
               </tbody>
+              {f.custo && (
               <tfoot>
                 <tr className="border-t border-linha-forte">
                   <th scope="row" className="h-11 pl-4 pr-3 text-left font-semibold sm:pl-5">
@@ -269,10 +300,12 @@ export function TelaDetalheFicha({
                   </td>
                 </tr>
               </tfoot>
+              )}
             </table>
             <p className="border-t border-linha px-4 py-3 text-[12px] text-suave sm:px-5">
-              Quantidade limpa; o custo conta o bruto (fator). Insumo pelo custo de referência; pré-preparo pelo custo da receita dele ÷ o que rende. Soma
-              sem arredondar; cada linha mostra o valor arredondado.
+              {verCustos
+                ? 'Quantidade limpa; o custo conta o bruto (fator). Insumo pelo custo de referência; pré-preparo pelo custo da receita dele ÷ o que rende. Soma sem arredondar; cada linha mostra o valor arredondado.'
+                : 'Quantidade limpa (já sem casca, osso ou aparas). Bruto é o que se pesa antes de limpar.'}
             </p>
           </Painel>
 
@@ -337,7 +370,7 @@ export function TelaDetalheFicha({
                       ) : (
                         <strong className="font-semibold">{f.insumoProduzido.nome}</strong>
                       )}
-                      , a {formatarFracao(f.custo.porRendimento)} por {UNIDADES[f.unidadeRendimento].sigla}.
+                      {f.custo ? `, a ${formatarFracao(f.custo.porRendimento)} por ${UNIDADES[f.unidadeRendimento].sigla}` : ''}.
                     </>
                   ) : (
                     'Vira insumo na próxima vez que a ficha for salva.'
@@ -364,7 +397,7 @@ export function TelaDetalheFicha({
                           </li>
                         ))}
                       </ul>
-                      <p className="mt-2 text-[12px] text-suave">Mudar esta receita muda o custo dessas fichas na hora.</p>
+                      {verCustos && <p className="mt-2 text-[12px] text-suave">Mudar esta receita muda o custo dessas fichas na hora.</p>}
                     </>
                   )}
                 </div>
