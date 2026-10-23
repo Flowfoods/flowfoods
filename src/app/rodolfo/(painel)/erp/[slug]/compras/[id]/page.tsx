@@ -7,6 +7,7 @@ import { lerFiltrosDeNota, queryDosFiltrosDeNota } from '@/lib/erp/compra-campos
 import { caminhoDeVolta, rotuloDaVolta } from '@/lib/erp/volta';
 import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { orcamentoDaNotaLancada } from '@/lib/erp/orcamento';
+import { contarLotesDaNota } from '@/lib/erp/etiquetas';
 import { TelaDetalheNota } from '@/components/erp/telas/compras/detalhe-nota';
 import { acaoCancelarNota } from '../actions';
 
@@ -39,6 +40,7 @@ export default async function ParceiroNotaPage({ params, searchParams }: { param
       orcamento={await orcamentoDaNotaLancada(ctx.cliente, ctx.alcance, nota)}
       orcamentoHref={`${base}/compras/orcamento`}
       lotesHref={`${base}/compras/${nota.id}/lotes`}
+      lotesQuantos={await contarLotesDaNota(ctx.cliente, nota.id)}
       documentoHref={nota.documentoId ? `${base}/compras/recebidas/${nota.documentoId}?volta=${encodeURIComponent(`${base}/compras/${nota.id}${dosRelatorios ? `?volta=${encodeURIComponent(dosRelatorios)}` : ''}`)}` : undefined}
     />
   );

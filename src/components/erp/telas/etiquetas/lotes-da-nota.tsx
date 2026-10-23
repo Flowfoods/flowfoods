@@ -3,7 +3,8 @@
  * Lote e vencimento de uma nota (3.4, decisão 406): por insumo da nota, os lotes do fornecedor registrados (como vieram na
  * embalagem), a sugestão do XML quando a nota veio dele (o `rastro`: só sugestão, a pessoa confirma) e o formulário para
  * registrar. Nada é obrigatório nem inventado. A nota não muda (nem o estoque, nem o custo). Ver = "ver compras" na loja da
- * nota; registrar e tirar = "lançar nota de compra" nela. Nenhum valor em R$.
+ * nota; registrar e tirar = "lançar nota de compra" nela. Nenhum valor em R$. Rodada 1: o lote que chegou vencido (vence antes
+ * da entrada) diz "separe e devolva ao fornecedor" (UX 13); o pré-preparo numa nota não oferece lote (Guardião M4).
  */
 
 import type { LotesDaNota } from '@/lib/erp/etiquetas';
@@ -57,6 +58,7 @@ export function TelaLotesDaNota({
         n.insumos.map((i) => (
           <Painel key={i.id} titulo={i.nome} subtitulo={`${i.quantidade} nesta nota${i.embalagens.length ? ` · ${i.embalagens.join(', ')}` : ''}`} acessorio={<Contagem>{i.lotes.length === 1 ? '1 lote' : `${i.lotes.length} lotes`}</Contagem>}>
             <div className="space-y-4">
+              {i.prePreparo && <p className="text-sm text-suave">Pré-preparo não tem lote de fornecedor: a etiqueta dele vem do lote produzido.</p>}
               {i.lotes.length > 0 && (
                 <ul className="divide-y divide-linha rounded-[10px] border border-linha">
                   {i.lotes.map((l) => (
@@ -64,9 +66,10 @@ export function TelaLotesDaNota({
                       <span className="min-w-0">
                         <span className="flex flex-wrap items-center gap-2">
                           <span className="font-semibold text-texto [overflow-wrap:anywhere]">{l.codigo ? `Lote ${l.codigo}` : 'Lote sem código'}</span>
-                          {/* Chegou vencido (ou venceu depois): a abertura recusa; a tela já diz. */}
-                          {l.vencimento && l.vencimento < hoje && <Selo tom="erro">Venceu: não abra</Selo>}
+                          {/* Chegou vencido (vence antes da entrada) ou venceu depois: a abertura recusa; a tela já diz. */}
+                          {l.vencimento && l.vencimento < n.entradaEm ? <Selo tom="erro">Chegou vencido</Selo> : l.vencimento && l.vencimento < hoje && <Selo tom="erro">Venceu: não abra</Selo>}
                         </span>
+                        {l.vencimento && l.vencimento < n.entradaEm && <span className="block text-[13px] font-semibold text-erro">Chegou vencido: separe e devolva ao fornecedor.</span>}
                         <span className="block text-[12px] tabular-nums text-suave [overflow-wrap:anywhere]">
                           {[l.vencimento ? `vence ${diaPorExtenso(l.vencimento)}` : 'vencimento não informado', l.fabricacao ? `fabricado ${diaPorExtenso(l.fabricacao)}` : null, l.marca ? `marca ${l.marca}` : null, l.doXml ? 'como no XML' : null]
                             .filter(Boolean)
@@ -94,14 +97,14 @@ export function TelaLotesDaNota({
                           {s.fabricacao ? ` · fabricado ${diaPorExtenso(s.fabricacao)}` : ''}
                           {s.quantidade ? ` · ${s.quantidade}` : ''}
                         </span>
-                        {edita && <FormUsarSugestao key={`${envio}-s${k}`} acao={acoes.registrar} insumoId={i.id} envioInicial={`${envio}-s${k}${i.id.slice(-6)}`.slice(0, 64)} sugestao={s} />}
+                        {edita && !i.prePreparo && <FormUsarSugestao key={`${envio}-s${k}`} acao={acoes.registrar} insumoId={i.id} envioInicial={`${envio}-s${k}${i.id.slice(-6)}`.slice(0, 64)} sugestao={s} />}
                       </li>
                     ))}
                   </ul>
                   <p className="text-[12px] text-suave">É o que o fornecedor declarou na nota fiscal. Confira na embalagem antes de registrar.</p>
                 </div>
               )}
-              {edita ? (
+              {i.prePreparo ? null : edita ? (
                 <details className="group rounded-[10px] border border-linha" open={i.lotes.length === 0 && i.sugestoes.length === 0}>
                   <summary className="ff-transicao flex min-h-11 cursor-pointer list-none items-center px-3.5 text-sm font-semibold text-texto hover:bg-texto/[0.03]">Registrar um lote</summary>
                   <div className="border-t border-linha px-3.5 py-3">

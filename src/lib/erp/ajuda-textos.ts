@@ -364,10 +364,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'etiquetas',
     rotas: ['etiquetas/[lojaId]'],
     titulo: 'Etiquetas da loja',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Os lotes concluídos e as embalagens abertas dos últimos 7 dias, cada um com a validade. Toque num deles para emitir a etiqueta.' },
-      { texto: 'Esperando a impressora são as etiquetas emitidas que ainda não foram para a Zebra nem viraram arquivo.' },
+      { texto: 'Esperando a impressora são as etiquetas emitidas que a Zebra ainda não aceitou e que ninguém marcou com “Já imprimi”.' },
+      { texto: 'Lote ou embalagem vencida aparece como “venceu: não use” e sai da fila.' },
     ],
     secoes: [
       {
@@ -385,11 +386,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'etiquetas',
     rotas: ['etiquetas/[lojaId]/lote/[ordemId]'],
     titulo: 'Etiqueta do lote',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Escolha o tamanho, quantas etiquetas e, se quiser, quanto vai em cada pote. A prévia mostra como vai sair.' },
       { texto: 'A validade, a conservação e quem fez vêm da conclusão do lote: mudar a ficha depois não muda a etiqueta.' },
-      { texto: 'Lote concluído sem validade sai com validade não informada: peça a quem cuida das fichas para completar.' },
+      { texto: 'Lote sem validade sai com validade não informada; lote vencido não emite nem reimprime: separe para descarte e avise a gerência.' },
     ],
   },
   {
@@ -426,10 +427,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'etiquetas',
     rotas: ['etiquetas/[lojaId]/aberta/[aberturaId]'],
     titulo: 'Embalagem aberta',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Quando foi aberta, por quem, o lote e até quando usar, com a regra que deu a data.' },
       { texto: 'Emita a etiqueta e cole na embalagem. A abertura não se edita: se errou, registre outra.' },
+      { texto: 'Embalagem vencida não emite etiqueta: separe para descarte e avise a gerência.' },
     ],
   },
   {
@@ -437,9 +439,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'etiquetas',
     rotas: ['etiquetas/[lojaId]/[etiquetaId]'],
     titulo: 'Imprimir a etiqueta',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'Imprima na Zebra, baixe o arquivo .zpl ou imprima no papel em tamanho real.' },
+      { texto: 'Imprima na Zebra. Sem a Zebra neste aparelho, baixe o arquivo .zpl ou imprima no papel e, depois que sair, toque em “Já imprimi”.' },
       { texto: 'Reimprimir sai igual: a validade é a da emissão. Cada pedido fica no histórico.' },
     ],
     secoes: [
@@ -448,7 +450,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Enviada não é impressa',
         blocos: [
           { texto: 'Enviada à impressora quer dizer que o Browser Print da Zebra recebeu. Confira o papel; se não saiu, veja a tampa, o rolo e a fita antes de mandar de novo, porque pode sair repetida.' },
-          { texto: 'Sem o Browser Print neste computador, o arquivo .zpl e o papel continuam funcionando.' },
+          { texto: 'Sem resposta em 15 segundos não é falha: confira o papel. Se saiu, toque em “Já imprimi”; se não, mande de novo.' },
+          { texto: 'Sem o Browser Print neste aparelho, a etiqueta fica esperando a impressora: imprima pelo computador da Zebra.' },
         ],
       },
     ],
@@ -458,8 +461,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'etiquetas',
     rotas: ['etiquetas/[lojaId]/[etiquetaId]/papel'],
     titulo: 'Etiqueta no papel',
-    versao: 1,
-    aula: [{ texto: 'As etiquetas em tamanho real numa folha A4. Imprima em 100%, sem ajustar à página, e recorte nas linhas.' }],
+    versao: 2,
+    aula: [
+      { texto: 'As etiquetas em tamanho real numa folha A4. Imprima em 100%, sem ajustar à página, e recorte nas linhas.' },
+      { texto: 'Depois que a folha sair, toque em “Já imprimi”: a etiqueta sai da fila.' },
+    ],
   },
   {
     chave: 'etiquetas-historico',
@@ -474,11 +480,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'etiquetas',
     rotas: ['etiquetas/historico/[lojaId]'],
     titulo: 'Histórico de impressões da loja',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'Cada pedido de impressão do período: a primeira ou a reimpressão, as cópias, o caminho e o que aconteceu.' },
+      { texto: 'Cada pedido de impressão do período: Zebra, arquivo ou papel, as cópias e o que aconteceu.' },
       { texto: 'Pedidos e etiquetas são contas diferentes: um pedido de 10 cópias são 10 etiquetas.' },
-      { texto: 'Sem resultado é o pedido que a tela não chegou a confirmar: pode ter saído ou não.' },
+      { texto: 'Sem resultado é a Zebra que não respondeu ou a tela que fechou antes: pode ter saído. Já imprimi é quem disse que saiu.' },
     ],
   },
   {
@@ -486,10 +492,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'etiquetas',
     rotas: ['etiquetas/impressora'],
     titulo: 'Impressora',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'A Zebra deste computador: o Browser Print da Zebra precisa estar aberto nele. Escolha a impressora e imprima a etiqueta de teste.' },
       { texto: 'A escolha fica neste navegador; outro computador escolhe de novo.' },
+      { texto: 'Na primeira vez, o Chrome pede licença para a rede local e o certificado de https://localhost:9101 precisa ser aceito: os passos estão na tela.' },
     ],
   },
   {

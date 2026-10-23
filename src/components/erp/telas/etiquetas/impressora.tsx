@@ -1,7 +1,7 @@
 /**
  * A aba Impressora (3.4): como ligar a Zebra ao computador da cozinha (Browser Print) e a configuração deste navegador. A
  * impressora física e o aplicativo dependem de quem está na loja: a tela diz o passo a passo e oferece o arquivo e o papel
- * enquanto isso.
+ * enquanto isso. Rodada 1 (UX 10): os passos citam a licença de rede local do Chrome e o certificado de https://localhost:9101.
  */
 
 import { COR } from '@/lib/erp/modulos';
@@ -13,6 +13,8 @@ const PASSOS = [
   'No computador ligado à Zebra (USB ou rede), instale o Zebra Browser Print, o aplicativo gratuito da Zebra para Windows e macOS.',
   'Abra o Browser Print e confira se ele mostra a impressora. Marque-a como padrão.',
   'Na primeira vez, o Browser Print pergunta se aceita este site: aceite.',
+  'No Chrome (e no Edge), na primeira vez aparece “Este site quer acessar dispositivos na sua rede local”: toque em Permitir. Se já recusou, libere no cadeado ao lado do endereço.',
+  'Ainda na primeira vez, abra https://localhost:9101 numa aba nova e aceite o certificado do Browser Print (Avançado → Continuar). Depois feche a aba.',
   'Volte aqui, procure de novo e imprima a etiqueta de teste no rolo que vai usar.',
 ];
 

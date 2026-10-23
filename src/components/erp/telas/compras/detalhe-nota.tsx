@@ -48,6 +48,7 @@ export function TelaDetalheNota({
   orcamentoHref,
   documentoHref,
   lotesHref,
+  lotesQuantos = 0,
 }: {
   nota: NotaDetalhada;
   base: string;
@@ -75,6 +76,8 @@ export function TelaDetalheNota({
   documentoHref?: string;
   /** 3.4: a tela "Lote e vencimento" (o lote do fornecedor de cada insumo, para a etiqueta da embalagem aberta). */
   lotesHref?: string;
+  /** Rodada 1 da 3.4 (UX 4): quantos lotes já registrados nesta nota. */
+  lotesQuantos?: number;
 }) {
   const mensagem = fraseDaNota(feito);
   const fechado = fechadoNaData(periodos.fechados, n.entradaEm);
@@ -257,8 +260,9 @@ export function TelaDetalheNota({
           )}
           {lotesHref && (
             <Painel titulo="Lote e vencimento" subtitulo="Como vieram na embalagem: a etiqueta da embalagem aberta usa">
-              <Link href={lotesHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
-                {n.cancelada ? 'Ver os lotes' : 'Registrar ou ver os lotes'}
+              <p className="text-sm text-suave">{lotesQuantos === 0 ? 'Nenhum lote registrado nesta nota.' : `${lotesQuantos} ${lotesQuantos === 1 ? 'lote registrado' : 'lotes registrados'} nesta nota.`}</p>
+              <Link href={lotesHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>
+                {n.cancelada ? 'Ver os lotes' : lotesQuantos === 0 ? 'Registrar os lotes' : 'Registrar ou ver os lotes'}
               </Link>
             </Painel>
           )}

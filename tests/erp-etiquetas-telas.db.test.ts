@@ -16,7 +16,7 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { ReactElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 
 const atual = vi.hoisted(() => ({ ctx: null as null | (() => unknown) }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
@@ -62,6 +62,11 @@ import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura 
 import { atenderRequisicao, obterRequisicao } from '@/lib/erp/requisicao';
 import { concluirProducao, listaDaProducao, obterOrdem, pegarProducao, planejarProducao } from '@/lib/erp/producao';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance, type Permissao } from '@/lib/erp/permissoes';
+import { loteParaEtiqueta, obterEmissao, painelDeEtiquetas, papelDoPedido } from '@/lib/erp/etiquetas';
+import { TelaEtiquetaDoLote } from '@/components/erp/telas/etiquetas/lote';
+import { TelaDaEmissao } from '@/components/erp/telas/etiquetas/emissao';
+import { TelaDoPapel } from '@/components/erp/telas/etiquetas/papel';
+import { TelaPainelDeEtiquetas } from '@/components/erp/telas/etiquetas/painel';
 import ErpEtiquetasPage from '@/app/erp/etiquetas/page';
 import ErpEtiquetasDaLojaPage from '@/app/erp/etiquetas/[lojaId]/page';
 import ErpEtiquetaDoLotePage from '@/app/erp/etiquetas/[lojaId]/lote/[ordemId]/page';
@@ -266,18 +271,25 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     expect((hp.match(/<svg role="img"/g) ?? []).length).toBe(2);
     expect(hp).toContain('width:60mm;height:40mm');
     expect(hp).toContain('@page { size: A4; margin: 8mm; }');
+    // Rodada 1 (UX 3): na impressão, sem a altura mínima da tela (2 cópias = 1 folha), com escopo só desta página.
+    expect(hp).toContain('@media print { .ff-app:has(.ff-papel-etiquetas) .min-h-dvh { min-height: 0 !important; }');
+    expect(hp).toContain('ff-papel-etiquetas');
     expect(hp).toContain('ff-nao-imprime');
+    // A Zebra já aceitou: nada a confirmar no papel.
+    expect(texto(hp)).not.toContain('Já imprimi');
     // Sem pedido, ou com o pedido da Zebra: 404 (abrir a página não grava nada).
     expect(await rodar(() => ErpPapelPage({ params: { lojaId: ids.vp, etiquetaId: ids.etiqueta }, searchParams: {} }))).toMatchObject({ erro: 'NOT_FOUND' });
     expect(await rodar(() => ErpPapelPage({ params: { lojaId: ids.vp, etiquetaId: ids.etiqueta }, searchParams: { pedido: zebra.id } }))).toMatchObject({ erro: 'NOT_FOUND' });
     const depois = texto(await pagina(ErpEmissaoPage({ params: { lojaId: ids.vp, etiquetaId: ids.etiqueta }, searchParams: {} })));
-    expect(depois).toContain('Primeira impressão · 3 cópias');
-    expect(depois).toContain('Reimpressão 1 · 2 cópias');
+    // Rodada 1 (UX 11): os pedidos pelo nome do caminho; o papel é "Papel aberto", não "Arquivo gerado" nem "Reimpressão 1".
+    expect(depois).toContain('Zebra · 3 cópias');
+    expect(depois).toContain('Papel · 2 cópias');
     expect(depois).toContain('Enviada à impressora');
-    expect(depois).toContain('Arquivo gerado');
+    expect(depois).toContain('Papel aberto');
+    expect(depois).not.toMatch(/Reimpressão|Primeira impressão|Arquivo gerado/);
     // O histórico da loja: 2 pedidos, 5 etiquetas, 3 enviadas, 2 em arquivo ou papel.
     const hh = texto(await pagina(ErpHistoricoDeImpressoesDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} })));
-    expect(hh).toMatch(/Pedidos 2 .*Etiquetas 5 .*Enviadas à Zebra 3 .*Arquivo ou papel 2/);
+    expect(hh).toMatch(/Pedidos 2 .*Etiquetas 5 .*Enviadas à Zebra 3 .*Já imprimi 0 /);
     expect(hh).not.toContain('R$');
     // A impressora: a tela de configuração e o teste (nada gravado).
     expect(texto(await pagina(ErpImpressoraPage()))).toContain('Como ligar a Zebra');
@@ -297,7 +309,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     expect(t).toContain('Abrir uma embalagem');
     expect(t).toContain('Lote L2310');
     expect(t).toContain('dura 3 dias depois de aberto');
-    expect(t).toContain('prazo depois de aberto não informado');
+    expect(t).toContain('Prazo após abertura não informado');
     // Nota e fornecedor do lote só para quem vê compras: o operador não vê.
     expect(t).not.toContain('Nota 4521');
     const lote = (await a.loteDeInsumo.findFirst({ where: { codigo: 'L2310' } }))!;
@@ -330,6 +342,9 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     expect(t).toContain('Registrar um lote');
     const hn = texto(await pagina(ErpNotaPage({ params: { id: ids.nota }, searchParams: {} })));
     expect(hn).toContain('Registrar ou ver os lotes');
+    // Rodada 1 (UX 4): o link tem 44 px (sem o sm:min-h-0) e o painel diz quantos lotes.
+    expect(hn).toContain('1 lote registrado nesta nota.');
+    expect(await pagina(ErpNotaPage({ params: { id: ids.nota }, searchParams: {} }))).not.toMatch(/sm:min-h-0[^"]*"[^>]*>Registrar ou ver os lotes/);
     como(OPERADOR());
     expect(await rodar(() => ErpLotesDaNotaPage({ params: { id: ids.nota }, searchParams: {} }))).toMatchObject({ erro: 'SEM_ACESSO' });
     como(GERENTE_DELIVERY());
@@ -378,5 +393,93 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     });
     const pedido = await doNivel1.acaoPedirImpressao(A.slug, ids.vp, ids.etiqueta, { copias: '1', transporte: 'ARQUIVO_ZPL', resolucao: '203', envio: chave() });
     expect(pedido).toMatchObject({ ok: true, situacao: 'EXPORTADA' });
+  });
+  it('rodada 1 · a fila na tela: arquivo e papel não tiram; "Já imprimi" (no papel e na emissão) tira e mostra quem e quando', async () => {
+    como(OPERADOR());
+    const em = (await rodar(() => daSessao.acaoEmitirDoLote(ids.vp, ids.lote, null, formDe({ formato: 'E60X40', quantas: '2', quanto: '', escala: 'base', hora: 'sim', envio: chave() })))) as { url: string };
+    const e2 = idDa(em.url, `/erp/etiquetas/${ids.vp}/`);
+    const codigo = (await a.etiqueta.findUnique({ where: { id: e2 } }))!.codigo;
+    const fila = async () => {
+      const t = texto(await pagina(ErpEtiquetasDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} })));
+      return t.includes('Esperando a impressora') && t.includes(codigo);
+    };
+    expect(await fila()).toBe(true);
+    // Antes de pedir: nada a confirmar.
+    expect(texto(await pagina(ErpEmissaoPage({ params: { lojaId: ids.vp, etiquetaId: e2 }, searchParams: {} })))).not.toContain('Saiu no papel (pelo arquivo');
+    expect(await daSessao.acaoConfirmarImpressao(ids.vp, e2)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/Peça a impressão primeiro/) } });
+    const arq = await daSessao.acaoPedirImpressao(ids.vp, e2, { copias: '2', transporte: 'ARQUIVO_ZPL', resolucao: '203', envio: chave() });
+    expect(arq).toMatchObject({ ok: true, situacao: 'EXPORTADA' });
+    expect(await fila()).toBe(true);
+    const papel = await daSessao.acaoPedirImpressao(ids.vp, e2, { copias: '2', transporte: 'PAPEL', resolucao: '203', envio: chave() });
+    if (!papel.ok) throw new Error(JSON.stringify(papel));
+    expect(await fila()).toBe(true);
+    const te = texto(await pagina(ErpEmissaoPage({ params: { lojaId: ids.vp, etiquetaId: e2 }, searchParams: {} })));
+    expect(te).toContain('Arquivo · 2 cópias');
+    expect(te).toContain('Arquivo baixado');
+    expect(te).toContain('Papel · 2 cópias');
+    expect(te).toContain('Saiu no papel (pelo arquivo, pelo papel A4 ou pela Zebra que não respondeu)?');
+    expect(te).toContain('Já imprimi');
+    const tp = texto(await pagina(ErpPapelPage({ params: { lojaId: ids.vp, etiquetaId: e2 }, searchParams: { pedido: papel.id } })));
+    expect(tp).toContain('Depois que a folha sair, toque em “Já imprimi”.');
+    // O "Já imprimi": sai da fila, com quem e quando; de novo = já feito.
+    expect(await daSessao.acaoConfirmarImpressao(ids.vp, e2)).toMatchObject({ ok: true });
+    expect(await daSessao.acaoConfirmarImpressao(ids.vp, e2)).toMatchObject({ ok: true, jaFeito: true });
+    expect(await fila()).toBe(false);
+    const depois = texto(await pagina(ErpEmissaoPage({ params: { lojaId: ids.vp, etiquetaId: e2 }, searchParams: { feito: 'impressa' } })));
+    expect(depois).toContain('Registrado: a etiqueta saiu de “Esperando a impressora”');
+    expect(depois).toMatch(/“Já imprimi”: Duda Lima, \d\d\/\d\d\/\d{4} às \d\d:\d\d/);
+    expect(depois).not.toContain('Saiu no papel (pelo arquivo');
+    expect(texto(await pagina(ErpPapelPage({ params: { lojaId: ids.vp, etiquetaId: e2 }, searchParams: { pedido: papel.id } })))).not.toContain('Depois que a folha sair');
+    const hh = texto(await pagina(ErpHistoricoDeImpressoesDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} })));
+    expect(hh).toMatch(/Já imprimi 2 /);
+    // O nível 1 também confirma (fica no auditLog).
+    como(ALCANCE_FLOWFOODS, { userId: 'u-rodolfo', nome: 'Rodolfo' });
+    expect(await doNivel1.acaoConfirmarImpressao(A.slug, ids.vp, e2)).toMatchObject({ ok: true, jaFeito: true });
+  });
+
+  it('rodada 1 · o lote vencido: em vermelho "não use", sem formulário de emissão, sem impressão (Zebra, arquivo, papel) e "venceu" no painel', async () => {
+    como(OPERADOR());
+    const futuro = new Date(Date.now() + 4 * DIA); // o molho dura 3 dias
+    const base = '/erp/etiquetas';
+    const nada = async () => null;
+    const dl = (await loteParaEtiqueta(a, OPERADOR(), ids.vp, ids.lote, null, futuro))!;
+    const hl = sp(renderToStaticMarkup(createElement(TelaEtiquetaDoLote, { d: dl, base, acao: nada, envio: 'x'.repeat(12), hrefLote: null, bloqueio: null })));
+    expect(texto(hl)).toMatch(/Este lote venceu em \d\d\/\d\d às \d\d:\d\d: não use\. Separe para descarte e avise a gerência\./);
+    expect(hl).toMatch(/role="alert"[^>]*><p class="font-semibold text-erro">Este lote venceu/);
+    expect(texto(hl)).not.toContain('Emitir a etiqueta');
+    const de = (await obterEmissao(a, OPERADOR(), ids.vp, ids.etiqueta, futuro))!;
+    const he = texto(sp(renderToStaticMarkup(createElement(TelaDaEmissao, { d: de, base, pedir: nada as never, resultado: nada as never, confirmar: nada as never, hrefImpressora: `${base}/impressora`, bloqueio: null }))));
+    expect(he).toContain('não use. Separe para descarte e avise a gerência.');
+    expect(he).toContain('Sem impressão: nem na Zebra, nem no arquivo, nem no papel.');
+    expect(he).not.toContain('Imprimir na Zebra');
+    const pedidoPapel = (await a.etiquetaImpressao.findFirst({ where: { etiquetaId: ids.etiqueta, transporte: 'PAPEL' } }))!;
+    const dp = (await papelDoPedido(a, OPERADOR(), ids.vp, ids.etiqueta, pedidoPapel.id, futuro))!;
+    const hp = sp(renderToStaticMarkup(createElement(TelaDoPapel, { d: dp, base, confirmar: nada as never })));
+    expect(texto(hp)).toContain('não use. Separe para descarte');
+    expect(hp).not.toContain('<svg role="img"');
+    const pp = (await painelDeEtiquetas(a, OPERADOR(), ids.vp, {}, futuro))!;
+    const hpn = texto(sp(renderToStaticMarkup(createElement(TelaPainelDeEtiquetas, { p: pp, base, podeAbrir: true }))));
+    expect(hpn).toContain('Venceu venceu: não use');
+    expect(hpn).not.toContain('Esperando a impressora');
+    // No servidor: a action recusa com a frase (a tela não é a única barreira) — hoje o lote ainda vale, então emite.
+    expect(texto(await pagina(ErpEtiquetaDoLotePage({ params: { lojaId: ids.vp, ordemId: ids.lote } })))).not.toContain('não use');
+  });
+  it('rodada 1 · na nota: o lote que chegou vencido diz "separe e devolva ao fornecedor"; o pré-preparo não oferece lote (frase, sem formulário)', async () => {
+    como(DONA(), { userId: 'u-marina', nome: 'Marina' });
+    const ontem = new Date(Date.parse(`${hoje}T12:00:00Z`) - DIA).toISOString().slice(0, 10);
+    const reg = await rodar(() => daSessao.acaoRegistrarLote(ids.nota, null, formDe({ insumo: ids.creme, codigo: 'LV-1', vencimento: ontem.split('-').reverse().join('/'), fabricacao: '', marca: '', envio: chave() })));
+    expect(reg).toMatchObject({ url: `/erp/compras/${ids.nota}/lotes?feito=lote-registrado` });
+    const t = texto(await pagina(ErpLotesDaNotaPage({ params: { id: ids.nota }, searchParams: {} })));
+    expect(t).toContain('Lote LV-1 Chegou vencido Chegou vencido: separe e devolva ao fornecedor.');
+    expect(t).not.toMatch(/Lote L2310 Chegou vencido/);
+    const solto = await cadastrarInsumo(a, { tipo: 'INGREDIENTE', escala: 'base', nome: 'Molho solto', unidade: 'KG', conteudo: '1', preco: '1,00', conservacao: 'REFRIGERADO' });
+    if (!solto.ok) throw new Error(JSON.stringify(solto));
+    await a.insumo.update({ where: { id: solto.id }, data: { tipo: 'PRE_PREPARO' } });
+    const forn = (await a.fornecedor.findFirst({ select: { id: true } }))!;
+    const nota = await lancarNota(a, DONA(), { lojaId: ids.vp, fornecedorId: forn.id, numero: '9102', serie: '', data: hoje, frete: '', total: '1,00', itens: [{ insumoId: solto.id, embalagem: 'padrao', quantidade: '1', valor: '1,00' }] }, 'Marina');
+    if (!nota.ok) throw new Error(JSON.stringify(nota));
+    const h = await pagina(ErpLotesDaNotaPage({ params: { id: nota.id }, searchParams: {} }));
+    expect(texto(h)).toContain('Pré-preparo não tem lote de fornecedor: a etiqueta dele vem do lote produzido.');
+    expect(texto(h)).not.toContain('Registrar um lote');
   });
 });

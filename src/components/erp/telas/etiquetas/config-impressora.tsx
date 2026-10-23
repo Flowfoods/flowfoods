@@ -74,7 +74,11 @@ export function ConfigDaImpressora({ zplDeTeste }: { zplDeTeste: AcaoDeTeste }) 
       return;
     }
     const e = await enviarZpl(base, escolhida, r.zpl);
-    setMsg(e.ok ? { tom: 'ok', texto: `Teste enviado para ${escolhida.name}. Confira: o texto deve caber inteiro em ${FORMATOS[formato].rotulo}, sem cortar. Saiu pequeno demais? Troque para 300 dpi.` } : { tom: 'erro', texto: e.erro });
+    setMsg(
+      e.ok
+        ? { tom: 'ok', texto: `Teste enviado para ${escolhida.name}. Confira: o texto deve caber inteiro em ${FORMATOS[formato].rotulo}, sem cortar. Saiu pequeno demais? Troque para 300 dpi.` }
+        : { tom: e.semResposta ? 'neutro' : 'erro', texto: e.semResposta ? `Sem resposta: ${e.erro}` : e.erro },
+    );
     setOcupado(false);
   }
 
@@ -86,7 +90,11 @@ export function ConfigDaImpressora({ zplDeTeste }: { zplDeTeste: AcaoDeTeste }) 
             <p className="text-sm text-suave">Procurando o Browser Print da Zebra neste computador…</p>
           ) : situacao.tipo === 'sem-aplicativo' ? (
             <p className="text-sm text-texto">
-              <span className="font-semibold">O Browser Print não respondeu.</span> <span className="text-suave">Siga os passos ao lado e procure de novo. Sem ele, as etiquetas saem pelo arquivo .zpl ou pelo papel.</span>
+              <span className="font-semibold">O Browser Print não respondeu.</span>{' '}
+              <span className="text-suave">
+                Siga os passos <span className="lg:hidden">abaixo</span>
+                <span className="hidden lg:inline">ao lado</span> e procure de novo. Sem ele, as etiquetas saem pelo arquivo .zpl ou pelo papel.
+              </span>
             </p>
           ) : situacao.impressoras.length === 0 ? (
             <p className="text-sm text-texto">

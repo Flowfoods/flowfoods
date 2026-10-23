@@ -16,6 +16,8 @@ import {
   fraseDaValidadeDaAbertura,
   fraseDoVencido,
   lerCodigoDoLote,
+  NOME_DO_PEDIDO,
+  seloDoPedido,
   venceu,
   inicioDoDiaNoRio,
   lerAbertura,
@@ -31,6 +33,7 @@ import {
 import { conteudoDeTeste, larguraDoTexto, linhasDoConteudo, montarEtiqueta, nomeDoArquivo, paraCampoZpl, quebrarEmLinhas, textoDaEtiqueta, zplDoLayout, type ConteudoDaEtiqueta } from '@/lib/erp/etiqueta-zpl';
 import { conteudoDaEmissao, zplDaEmissao } from '@/lib/erp/etiquetas';
 import { rastrosDoXmlGuardado } from '@/lib/erp/nfe-xml';
+import { traduzirErroDaZebra } from '@/components/erp/telas/etiquetas/browser-print';
 import { BASE } from './erp-documento-fiscal-apoio';
 
 const MIN = 60_000;
@@ -548,5 +551,31 @@ describe('3.4 · rodada 1: vencido não emite, lote com pontuação, 300 dpi sem
     const t = l.elementos.filter((e) => e.tipo === 'texto') as { texto: string; altura: number }[];
     expect(t.find((e) => e.texto === 'PRAZO APÓS ABERTURA NÃO INFORMADO')?.altura).toBe(22);
     expect(t.some((e) => /PRAZO NÃO INFORMADO/.test(e.texto) && !/APÓS/.test(e.texto))).toBe(false);
+  });
+});
+
+describe('3.4 · rodada 1: os pedidos por nome, "Já imprimi", sem resposta ≠ falhou, o erro da Zebra em palavras', () => {
+  it('nome do pedido pelo caminho (não "Reimpressão N"); selo: Já imprimi > enviada > falhou > sem resultado > arquivo baixado / papel aberto', () => {
+    expect(NOME_DO_PEDIDO).toEqual({ BROWSER_PRINT: 'Zebra', ARQUIVO_ZPL: 'Arquivo', PAPEL: 'Papel' });
+    const quando = new Date('2026-10-23T17:05:00Z');
+    expect(seloDoPedido({ transporte: 'PAPEL', situacao: 'EXPORTADA', confirmadaEm: null })).toEqual({ texto: 'Papel aberto', tom: 'neutro' });
+    expect(seloDoPedido({ transporte: 'ARQUIVO_ZPL', situacao: 'EXPORTADA', confirmadaEm: null })).toEqual({ texto: 'Arquivo baixado', tom: 'neutro' });
+    expect(seloDoPedido({ transporte: 'BROWSER_PRINT', situacao: 'PREPARADA', confirmadaEm: null })).toEqual({ texto: 'Sem resultado', tom: 'alerta' });
+    expect(seloDoPedido({ transporte: 'BROWSER_PRINT', situacao: 'FALHOU', confirmadaEm: null })).toEqual({ texto: 'Falhou', tom: 'erro' });
+    expect(seloDoPedido({ transporte: 'BROWSER_PRINT', situacao: 'ENVIADA', confirmadaEm: null })).toEqual({ texto: 'Enviada à impressora', tom: 'ok' });
+    for (const t of ['PAPEL', 'ARQUIVO_ZPL', 'BROWSER_PRINT'] as const) {
+      expect(seloDoPedido({ transporte: t, situacao: t === 'BROWSER_PRINT' ? 'PREPARADA' : 'EXPORTADA', confirmadaEm: quando })).toEqual({ texto: 'Já imprimi', tom: 'ok' });
+    }
+  });
+
+  it('os erros comuns da Zebra viram frase de cozinha; o desconhecido aparece como veio', () => {
+    expect(traduzirErroDaZebra('Error: Paper out')).toMatch(/^Acabou o rolo de etiquetas/);
+    expect(traduzirErroDaZebra('Error: Media Out')).toMatch(/^Acabou o rolo/);
+    expect(traduzirErroDaZebra('Error: Printer head open')).toMatch(/^A tampa da Zebra está aberta/);
+    expect(traduzirErroDaZebra('Ribbon Out')).toMatch(/fita \(ribbon\)/);
+    expect(traduzirErroDaZebra('Printer is paused')).toMatch(/pausada/);
+    expect(traduzirErroDaZebra('Head too hot')).toMatch(/quente demais/);
+    expect(traduzirErroDaZebra('Printer offline')).toMatch(/não está ligada/);
+    expect(traduzirErroDaZebra('Erro 42 qualquer')).toBe('A impressora respondeu: Erro 42 qualquer');
   });
 });
