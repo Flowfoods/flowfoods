@@ -225,7 +225,8 @@ jobs:
             [ -n "$aaaa" ] && echo "::warning title=DNS::${host} tem AAAA (${aaaa}) — a VPS não atende IPv6 pelo Traefik"
             echo
             echo "--- Certificado servido na 443 (SNI = $host) ---"
-            if openssl s_client -connect "${host}:443" -servername "$host" </dev/null >/tmp/tls.txt 2>&1; then :; fi
+            # timeout: um servidor que aceita a conexão e não fecha penduraria o job.
+            if timeout 20 openssl s_client -connect "${host}:443" -servername "$host" </dev/null >/tmp/tls.txt 2>&1; then :; fi
             if grep -q 'BEGIN CERTIFICATE' /tmp/tls.txt; then
               openssl x509 -in /tmp/tls.txt -noout -subject -issuer -dates -ext subjectAltName 2>/dev/null \
                 || openssl x509 -in /tmp/tls.txt -noout -subject -issuer -dates
@@ -246,7 +247,7 @@ jobs:
           done
           echo "=================== o IP direto ==================="
           echo "--- sem SNI (certificado padrão do Traefik) ---"
-          openssl s_client -connect "${IP_VPS}:443" </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer 2>/dev/null || echo "sem resposta"
+          timeout 20 openssl s_client -connect "${IP_VPS}:443" </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer 2>/dev/null || echo "sem resposta"
 
       # Parte 2 — o que o Dokploy pensa. Token só em header; nunca ecoado.
       - name: Estado do compose no Dokploy (domínios, deploys)
