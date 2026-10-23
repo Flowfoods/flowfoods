@@ -364,13 +364,8 @@ export async function resumoDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo
            sum(s."iq")::float8 AS "q", sum(s."iv")::float8 AS "v", 0::float8 AS "extra"
     FROM selecionados s GROUP BY s."unidade"
     UNION ALL
-    SELECT 'final'::text, s."unidade", NULL::text, count(*)::float8, sum(s."fq")::float8, sum(s."fv")::float8,
-           sum(s."fq" - (s."iq" + COALESCE(b."soma", 0)))::float8
+    SELECT 'final'::text, s."unidade", NULL::text, count(*)::float8, sum(s."fq")::float8, sum(s."fv")::float8, 0::float8
     FROM selecionados s
-    LEFT JOIN LATERAL (
-      SELECT sum(mv."q") AS "soma" FROM mov mv
-      WHERE mv."lojaId" = s."lojaId" AND mv."insumoId" = s."insumoId" AND NOT mv."antes" AND mv."ate"
-    ) b ON TRUE
     GROUP BY s."unidade"
     UNION ALL
     SELECT 'bucket'::text, s."unidade", mv."bucket", count(*)::float8, sum(mv."q")::float8, sum(mv."v")::float8, 0::float8
@@ -410,7 +405,6 @@ export async function resumoDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo
     } else if (l.tipo === 'final') {
       const u = da(l.unidade);
       u.final = { q: l.q, v: r.verValores ? l.v : 0 };
-      u.diferencaMilesimos = l.extra;
     } else if (l.tipo === 'bucket' && l.chave && BUCKETS_CONHECIDOS.has(l.chave)) {
       const s: Soma = (da(l.unidade).somas[l.chave as BucketId] ??= { n: 0, q: 0, v: 0 });
       s.n += l.n;
@@ -422,6 +416,8 @@ export async function resumoDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo
     else if (l.tipo === 'semvalor') semVal = l.n;
     else if (l.tipo === 'semorigem') semOrigem = l.n;
   }
+  // A ponte da unidade: o final lido por soma direta no livro contra o inicial mais a soma das caixas (nenhum movimento fica sem caixa).
+  for (const u of Array.from(porUnidade.values())) u.diferencaMilesimos = u.final.q - (u.inicial.q + LISTA_DE_BUCKETS.reduce((t, b) => t + (u.somas[b]?.q ?? 0), 0));
   return {
     linhas,
     comLacunaDura,
