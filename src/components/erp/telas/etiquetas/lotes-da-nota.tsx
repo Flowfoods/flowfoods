@@ -88,7 +88,7 @@ export function TelaLotesDaNota({
                           {s.fabricacao ? ` · fabricado ${diaPorExtenso(s.fabricacao)}` : ''}
                           {s.quantidade ? ` · ${s.quantidade}` : ''}
                         </span>
-                        {edita && <FormUsarSugestao acao={acoes.registrar} insumoId={i.id} envioInicial={`${envio}-s${k}${i.id.slice(-6)}`.slice(0, 64)} sugestao={s} />}
+                        {edita && <FormUsarSugestao key={`${envio}-s${k}`} acao={acoes.registrar} insumoId={i.id} envioInicial={`${envio}-s${k}${i.id.slice(-6)}`.slice(0, 64)} sugestao={s} />}
                       </li>
                     ))}
                   </ul>
@@ -99,7 +99,9 @@ export function TelaLotesDaNota({
                 <details className="group rounded-[10px] border border-linha" open={i.lotes.length === 0 && i.sugestoes.length === 0}>
                   <summary className="ff-transicao flex min-h-11 cursor-pointer list-none items-center px-3.5 text-sm font-semibold text-texto hover:bg-texto/[0.03]">Registrar um lote</summary>
                   <div className="border-t border-linha px-3.5 py-3">
-                    <FormLoteDaNota acao={acoes.registrar} insumoId={i.id} envioInicial={`${envio}-m${i.id.slice(-8)}`.slice(0, 64)} />
+                    {/* A chave do envio nasce a cada leitura da página: depois de registrar, a tela volta para ela mesma e o formulário
+                        recomeça (campos vazios e chave nova). Sem isso, o segundo lote ia com a chave do primeiro e virava "já registrado". */}
+                    <FormLoteDaNota key={envio} acao={acoes.registrar} insumoId={i.id} envioInicial={`${envio}-m${i.id.slice(-8)}`.slice(0, 64)} />
                   </div>
                 </details>
               ) : (
