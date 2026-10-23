@@ -35,6 +35,7 @@ import { porcentagemDoCmv, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-
  */
 function CmvNaLista({ x }: { x: CmvDoCanal }) {
   const st = STATUS_DO_CMV[x.status];
+  if (x.status === 'naoOfertado') return <span className="block text-[12px] text-suave">não ofertado</span>;
   const cor = x.status === 'dentro' ? 'text-ok' : x.status === 'acima' ? 'text-atencao' : 'text-suave';
   return (
     <span className="block" title={x.motivo ?? undefined}>

@@ -111,6 +111,10 @@ export function lerEnvioDosPrecos(form: FormData) {
     impressao: textoDe(form.get('impressao')),
     custos: textoDe(form.get('custos')),
     precos: { LOJA: textoDe(form.get('preco_LOJA')), DELIVERY_PROPRIO: textoDe(form.get('preco_DELIVERY_PROPRIO')), IFOOD: textoDe(form.get('preco_IFOOD')) },
+    // N.3: a tela que pergunta "vende neste canal?" manda `ofertas=1`; caixa desmarcada não vai no formulário.
+    ...(form.get('ofertas') === '1'
+      ? { ofertas: { LOJA: form.get('oferta_LOJA') === 'sim', DELIVERY_PROPRIO: form.get('oferta_DELIVERY_PROPRIO') === 'sim', IFOOD: form.get('oferta_IFOOD') === 'sim' } }
+      : {}),
   };
 }
 

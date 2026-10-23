@@ -130,7 +130,7 @@ async function configsDosCanais(tx: ClienteDoParceiro) {
 async function contaDosCanais(tx: ClienteDoParceiro, fichaId: string, custo: Pick<CustoDaFicha, 'porRendimento' | 'faltaPreco'>) {
   const [{ produtoId, lista }, cfg] = await Promise.all([embalagensGravadas(tx, fichaId), configsDosCanais(tx)]);
   const gravados = produtoId
-    ? await tx.produtoCanal.findMany({ where: { produtoId }, select: { id: true, canal: true, precoManualCentavos: true } })
+    ? await tx.produtoCanal.findMany({ where: { produtoId }, select: { id: true, canal: true, precoManualCentavos: true, ativo: true } })
     : [];
   // 1.5: a embalagem custa o último preço da nota (uma consulta para a leitura inteira).
   await anexarUltimasCompras(
@@ -149,9 +149,11 @@ async function contaDosCanais(tx: ClienteDoParceiro, fichaId: string, custo: Pic
     taxa: canal === 'IFOOD' ? (cfg.taxa ?? 'naoConfigurada') : null,
   }));
   const proprio = (c: CanalVenda) => gravados.find((g) => g.canal === c)?.precoManualCentavos ?? null;
+  // N.3: o canal é ofertado até alguém dizer que não (sem linha = ofertado, como sempre foi).
+  const ofertado = (c: CanalVenda) => gravados.find((g) => g.canal === c)?.ativo ?? true;
   const precos = entradas.map((e) => precoDoCanal(e, { margemAlvoBp: cfg.margens[e.canal], precoProprioCentavos: proprio(e.canal) }));
   // N.2: a conta pela meta de CMV, com o preço DEFINIDO pela pessoa (a sugestão não conta como preço praticado).
-  const cmv = entradas.map((e) => cmvDoCanal(e, { metaBp: cfg.metas[e.canal], precoCentavos: proprio(e.canal) }));
+  const cmv = entradas.map((e) => cmvDoCanal(e, { metaBp: cfg.metas[e.canal], precoCentavos: proprio(e.canal), ofertado: ofertado(e.canal) }));
   return { produtoId, lista, cfg, gravados, entradas, precos, cmv };
 }
 
@@ -186,6 +188,8 @@ export async function custoPorCanal(cliente: ClienteDoParceiro, ficha: { id: str
       // N.2
       cmv,
       metasDeCmv: cfg.metas,
+      // N.3
+      ofertados: Object.fromEntries(cmv.map((x) => [x.canal, x.ofertado])) as Record<CanalVenda, boolean>,
       impressaoDosPrecos: impressaoDosPrecos(gravados),
       impressaoDosCustos: impressaoDosCustos(entradas),
     };
@@ -568,7 +572,13 @@ export const MENSAGEM_CONFLITO_DOS_PRECOS =
 export async function salvarPrecos(
   cliente: ClienteDoParceiro,
   fichaId: string,
-  entrada: { impressao: unknown; custos: unknown; precos: Partial<Record<CanalVenda, unknown>> },
+  entrada: {
+    impressao: unknown;
+    custos: unknown;
+    precos: Partial<Record<CanalVenda, unknown>>;
+    /** N.3: em que canais o prato é vendido. Ausente = não mexe (quem chama sem a pergunta mantém o que está gravado). */
+    ofertas?: Partial<Record<CanalVenda, boolean>>;
+  },
   autorNome = 'Sistema',
 ): Promise<ResultadoDoCanal & { custoMudou?: boolean }> {
   if (!ID.test(fichaId)) return { ok: false, erros: { geral: 'Ficha não encontrada.' }, naoEncontrado: true };
@@ -583,8 +593,10 @@ export async function salvarPrecos(
         throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DOS_PRECOS }, conflito: true });
       }
       if (!lido.ok) throw new Recusa(lido);
+      // N.3: o que a pessoa marcou (ou o que já estava, quando a tela não perguntou).
+      const ofertaDe = (c: CanalVenda) => (typeof entrada.ofertas?.[c] === 'boolean' ? entrada.ofertas[c]! : conta.cmv.find((x) => x.canal === c)!.ofertado);
       // N.2: o retrato do histórico segue a meta de CMV (preço definido, CMV, resultado após os custos informados).
-      const novos = conta.entradas.map((e) => cmvDoCanal(e, { metaBp: conta.cfg.metas[e.canal], precoCentavos: lido.dados[e.canal] }));
+      const novos = conta.entradas.map((e) => cmvDoCanal(e, { metaBp: conta.cfg.metas[e.canal], precoCentavos: lido.dados[e.canal], ofertado: ofertaDe(e.canal) }));
       const sem = (r: Record<string, string>) => Object.fromEntries(Object.entries(r).filter(([k]) => !k.startsWith('fisico')));
       const antes = { nome: f.nome, ...sem(retratoDoCmv(conta.cmv)) };
       const depoisCompleto = retratoDoCmv(novos);
@@ -596,11 +608,13 @@ export async function salvarPrecos(
       const mudaram: CanalVenda[] = [];
       for (const canal of ORDEM_DOS_CANAIS) {
         const novo = lido.dados[canal];
+        const ativo = ofertaDe(canal);
         const linha = conta.gravados.find((g) => g.canal === canal);
-        if ((linha?.precoManualCentavos ?? null) === novo) continue;
+        if ((linha?.precoManualCentavos ?? null) === novo && (linha?.ativo ?? true) === ativo) continue;
         mudaram.push(canal);
-        if (linha) await tx.produtoCanal.update({ where: { id: linha.id }, data: { precoManualCentavos: novo } });
-        else await tx.produtoCanal.create({ data: { parceiroId: tx.parceiroId, produtoId, canal, precoManualCentavos: novo } });
+        // Tirar o canal não apaga o preço: ele fica guardado para quando o prato voltar ao canal.
+        if (linha) await tx.produtoCanal.update({ where: { id: linha.id }, data: { precoManualCentavos: novo, ativo } });
+        else await tx.produtoCanal.create({ data: { parceiroId: tx.parceiroId, produtoId, canal, precoManualCentavos: novo, ativo } });
       }
       // O snapshot: o custo do canal naquele instante, de cada canal cujo preço mudou (só no depois: é retrato, não mudança).
       const depois: Record<string, string> = { ...mudanca.depois } as Record<string, string>;
@@ -651,7 +665,7 @@ async function contasDaLista(cliente: ClienteDoParceiro, pratos: readonly { id: 
         where: { fichaId: { in: pratos.map((p) => p.id) }, marcaId: null },
         select: {
           fichaId: true,
-          canais: { select: { canal: true, precoManualCentavos: true } },
+          canais: { select: { canal: true, precoManualCentavos: true, ativo: true } },
           embalagens: { select: { canal: true, insumoId: true, quantidadeMilesimos: true, insumo: { select: SELECAO_DO_INSUMO } } },
         },
       }),
@@ -681,7 +695,7 @@ async function contasDaLista(cliente: ClienteDoParceiro, pratos: readonly { id: 
       );
       cmv.set(
         f.id,
-        entradas.map((e) => cmvDoCanal(e, { metaBp: cfg.metas[e.canal], precoCentavos: proprio(e.canal) })),
+        entradas.map((e) => cmvDoCanal(e, { metaBp: cfg.metas[e.canal], precoCentavos: proprio(e.canal), ofertado: p?.canais.find((x) => x.canal === e.canal)?.ativo ?? true })),
       );
     }
     return { precos: mapa, cmv };

@@ -32,14 +32,13 @@ import { PrecoEMargemPorCanal, type PrecosParaTela } from './custo-por-canal';
 
 /** A conta dos canais como o navegador recebe (BigInt em texto): a prévia refaz com a mesma função. */
 function precosParaTela(c: CustoPorCanal): PrecosParaTela {
-  const proprio = (canal: string) => {
-    const p = c.precos.find((x) => x.canal === canal)?.preco;
-    return p?.origem === 'proprio' ? p.centavos : null;
-  };
+  // O preço DEFINIDO pela pessoa (N.2: a mesma leitura da conta pela meta de CMV).
+  const proprio = (canal: string) => c.cmv.find((x) => x.canal === canal)?.precoCentavos ?? null;
   return {
     entradas: c.entradas.map(entradaParaTela),
     metasDeCmv: c.metasDeCmv,
     precosProprios: { LOJA: proprio('LOJA'), DELIVERY_PROPRIO: proprio('DELIVERY_PROPRIO'), IFOOD: proprio('IFOOD') },
+    ofertados: c.ofertados,
     impressaoDosPrecos: c.impressaoDosPrecos,
     impressaoDosCustos: c.impressaoDosCustos,
   };

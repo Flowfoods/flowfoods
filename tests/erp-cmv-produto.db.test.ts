@@ -251,6 +251,55 @@ describe.skipIf(!URL_TESTE)('ERP N.2 · preço pela meta de CMV, cenário de ref
     expect(t.cmv[1].precoCentavos).toBe(1250);
   });
 
+  it('N.3: tirar o iFood do prato pela ação guarda o preço, vira "não ofertado" na ficha, na lista e no histórico; voltar recupera tudo', async () => {
+    const t = await tela();
+    const form = (ofertas: Record<string, boolean>) => {
+      const f = new FormData();
+      f.set('impressao', t.impressaoDosPrecos);
+      f.set('custos', t.impressaoDosCustos);
+      f.set('ofertas', '1');
+      for (const [c, v] of Object.entries({ LOJA: '11,00', DELIVERY_PROPRIO: '12,50', IFOOD: '15,00' })) f.set(`preco_${c}`, v);
+      for (const [c, v] of Object.entries(ofertas)) if (v) f.set(`oferta_${c}`, 'sim');
+      return f;
+    };
+    atual.ctx = ctxDe('DONO', 'Marina');
+    await expect(fichasDaSessao.acaoSalvarPrecos(ids.ficha, null, form({ LOJA: true, DELIVERY_PROPRIO: true, IFOOD: false }))).rejects.toMatchObject({
+      url: `/erp/fichas/${ids.ficha}?feito=precos`,
+    });
+    // O preço do iFood fica guardado: só a oferta mudou.
+    const linha = (await a.produtoCanal.findFirst({ where: { canal: 'IFOOD' }, select: { precoManualCentavos: true, ativo: true } }))!;
+    expect(linha).toEqual({ precoManualCentavos: 1500, ativo: false });
+    const d = await tela();
+    expect(d.ofertados).toEqual({ LOJA: true, DELIVERY_PROPRIO: true, IFOOD: false });
+    expect(d.cmv[2]).toMatchObject({ status: 'naoOfertado', cmvBp: null, motivo: null });
+    expect(d.impressaoDosPrecos).toMatch(/IFOOD:1500:fora$/);
+    // A lista concorda.
+    const mapa = await cmvDaLista(a, (await listarFichas(a, {})).linhas);
+    expect(mapa.get(ids.ficha)![2].status).toBe('naoOfertado');
+    const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.ficha] }], limite: 1, verPrecos: true });
+    expect(h[0].mudancas.map((m) => `${m.campo}: ${sp(String(m.depois))}`)).toEqual(
+      expect.arrayContaining(['preço no iFood: não ofertado (guardado R$ 15,00)', 'CMV no iFood: não ofertado']),
+    );
+    // Tela velha (que ainda achava o iFood ofertado) dá conflito em vez de gravar por cima.
+    await expect(fichasDaSessao.acaoSalvarPrecos(ids.ficha, null, form({ LOJA: true, DELIVERY_PROPRIO: true, IFOOD: true }))).resolves.toMatchObject({ ok: false, conflito: true });
+    // Voltar ao canal com a tela nova: o preço guardado volta a valer.
+    const t2 = await tela();
+    const f2 = form({ LOJA: true, DELIVERY_PROPRIO: true, IFOOD: true });
+    f2.set('impressao', t2.impressaoDosPrecos);
+    f2.set('custos', t2.impressaoDosCustos);
+    await expect(fichasDaSessao.acaoSalvarPrecos(ids.ficha, null, f2)).rejects.toMatchObject({ url: `/erp/fichas/${ids.ficha}?feito=precos` });
+    const v = await tela();
+    expect(v.cmv[2]).toMatchObject({ status: 'dentro', precoCentavos: 1500 });
+  });
+
+  it('N.3: chamada sem a pergunta de oferta (ofertas ausente) não mexe no que está gravado', async () => {
+    await a.produtoCanal.updateMany({ where: { canal: 'LOJA' }, data: { ativo: false } });
+    const t = await tela();
+    expect(await salvarPrecos(a, ids.ficha, { impressao: t.impressaoDosPrecos, custos: t.impressaoDosCustos, precos: { LOJA: '11,50', DELIVERY_PROPRIO: '12,50', IFOOD: '15,00' } }, 'Marina')).toMatchObject({ ok: true });
+    expect(await a.produtoCanal.findFirst({ where: { canal: 'LOJA' }, select: { precoManualCentavos: true, ativo: true } })).toEqual({ precoManualCentavos: 1150, ativo: false });
+    await a.produtoCanal.updateMany({ where: { canal: 'LOJA' }, data: { ativo: true, precoManualCentavos: 1100 } });
+  });
+
   it('operador: nem CMV, nem preço, nem custo no payload da ficha e da lista (o servidor nem lê)', async () => {
     atual.ctx = ctxDe('OPERADOR', 'Caio');
     const json = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));

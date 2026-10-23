@@ -255,6 +255,14 @@ export function retratoDoCmv(contas: readonly CmvDoCanal[]): Record<string, stri
   const r: Record<string, string> = {};
   for (const c of contas) {
     const k = camposDoCmv(c.canal);
+    if (!c.ofertado) {
+      // N.3: o canal saiu do prato. O preço guardado não é praticado; nem CMV nem resultado valem aqui.
+      r[k.preco] = c.precoCentavos === null ? 'não ofertado' : `não ofertado (guardado ${formatarFracao({ num: BigInt(c.precoCentavos), den: 1n })})`;
+      r[k.cmv] = 'não ofertado';
+      r[k.resultado] = 'não ofertado';
+      r[k.custo] = c.fisico.completo ? formatarFracao(c.fisico.valor) : `incompleto (${formatarFracao(c.fisico.valor)})`;
+      continue;
+    }
     r[k.preco] = c.precoCentavos === null ? 'não definido' : formatarFracao({ num: BigInt(c.precoCentavos), den: 1n });
     r[k.cmv] = !c.cmvBp
       ? `sem dados (${c.motivo ?? 'dados insuficientes'})`

@@ -29,7 +29,7 @@ import {
 import { entradaDaTela, LIMITES_DO_PRECO, lerPrecos, type EntradaEmTexto } from '@/lib/erp/preco-campos';
 import { ACIMA_DO_LIMITE, dinheiroParaCampo, formatarDinheiro, formatarFracao, formatarPontosBase, formatarQuantidade, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
-import { CAMPO } from '../../ui/campos';
+import { CAMPO, MARCAR } from '../../ui/campos';
 import { LinkDeAjuda } from '../../ui/link-de-ajuda';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel, Selo } from '../../ui/superficies';
@@ -42,6 +42,8 @@ export interface PrecosParaTela {
   /** N.2: a meta de CMV de cada canal (null = sem meta). */
   metasDeCmv: Record<CanalVenda, number | null>;
   precosProprios: Record<CanalVenda, number | null>;
+  /** N.3: em que canais o prato é vendido (sem resposta gravada = vendido). */
+  ofertados: Record<CanalVenda, boolean>;
   impressaoDosPrecos: string;
   impressaoDosCustos: string;
 }
@@ -221,6 +223,7 @@ function ComFormulario(props: Props & { acao: AcaoDeCadastro }) {
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className={props.className}>
       <input type="hidden" name="impressao" value={props.dados.impressaoDosPrecos} />
       <input type="hidden" name="custos" value={props.dados.impressaoDosCustos} />
+      <input type="hidden" name="ofertas" value="1" />
       <Conteudo {...props} className="" estado={estado} editavel />
     </form>
   );
@@ -239,6 +242,7 @@ function Conteudo({
   const [textos, setTextos] = useState<Record<CanalVenda, string>>(
     () => Object.fromEntries(ORDEM_DOS_CANAIS.map((c) => [c, dados.precosProprios[c] === null ? '' : dinheiroParaCampo(dados.precosProprios[c]!)])) as Record<CanalVenda, string>,
   );
+  const [ofertas, setOfertas] = useState<Record<CanalVenda, boolean>>(() => ({ ...dados.ofertados }));
   const entradas = useMemo(() => dados.entradas.map(entradaDaTela), [dados.entradas]);
   const erros = estado?.erros ?? {};
   // A conta de cada canal com o que está digitado agora (texto ruim = prévia sem ele, e o aviso no campo).
@@ -246,7 +250,7 @@ function Conteudo({
     const t = textos[e.canal].trim();
     // A MESMA leitura do servidor (e a mesma frase de erro).
     const lido = lerPrecos({ [e.canal]: t });
-    const x = cmvDoCanal(e, { metaBp: dados.metasDeCmv[e.canal], precoCentavos: lido.ok ? lido.dados[e.canal] : null });
+    const x = cmvDoCanal(e, { metaBp: dados.metasDeCmv[e.canal], precoCentavos: lido.ok ? lido.dados[e.canal] : null, ofertado: ofertas[e.canal] });
     return { x, c: camadasDoCanal(e), erro: lido.ok ? undefined : lido.erros[`preco-${e.canal}`], digitado: !!t };
   });
   const cmvs = contas.map((k) => k.x);
@@ -262,8 +266,20 @@ function Conteudo({
     const k = contas[i];
     const id = `preco-${canal}${sufixo}`;
     const erro = erros[`preco-${canal}`] ?? k.erro;
+    const fora = !ofertas[canal];
     return (
       <>
+        <label className="mb-1.5 ml-auto flex min-h-11 w-fit cursor-pointer items-center justify-end gap-2 text-[13px] text-texto sm:min-h-8">
+          <input
+            type="checkbox"
+            name={`oferta_${canal}`}
+            value="sim"
+            checked={!fora}
+            onChange={(e) => setOfertas((o) => ({ ...o, [canal]: e.target.checked }))}
+            className={MARCAR}
+          />
+          vende {canal === 'LOJA' ? 'na loja' : canal === 'IFOOD' ? 'no iFood' : 'no delivery'}
+        </label>
         <label htmlFor={id} className="sr-only">
           Preço de venda no canal {CANAIS[canal].rotulo}
         </label>
@@ -275,14 +291,16 @@ function Conteudo({
             autoComplete="off"
             value={textos[canal]}
             placeholder="0,00"
+            // Fora do canal o preço fica guardado (readOnly ainda vai no formulário; disabled apagaria).
+            readOnly={fora}
             onChange={(e) => mudar(canal, e.target.value)}
-            className={`${CAMPO} min-h-11 text-right text-base font-semibold tabular-nums sm:text-sm`}
+            className={`${CAMPO} min-h-11 text-right text-base font-semibold tabular-nums sm:text-sm ${fora ? 'text-suave' : ''}`}
             aria-invalid={!!erro}
             aria-describedby={`${id}-ajuda${erro ? ` ${id}-erro` : ''}`}
           />
         </div>
         <span id={`${id}-ajuda`} className="mt-1 block text-[12px] text-suave">
-          {k.digitado ? 'seu preço' : 'não definido'}
+          {fora ? (k.digitado ? 'guardado, fora do canal' : 'não ofertado') : k.digitado ? 'seu preço' : 'não definido'}
         </span>
         {erro && (
           <span id={`${id}-erro`} className="mt-0.5 block whitespace-normal text-[12px] text-erro">
@@ -294,7 +312,9 @@ function Conteudo({
   };
 
   const precoLido = (x: CmvDoCanal) =>
-    x.precoCentavos !== null ? <span className="text-[15px] font-semibold text-texto">{reais(x.precoCentavos)}</span> : <span className="text-suave">não definido</span>;
+    !x.ofertado ? (
+      <span className="text-suave">não ofertado</span>
+    ) : x.precoCentavos !== null ? <span className="text-[15px] font-semibold text-texto">{reais(x.precoCentavos)}</span> : <span className="text-suave">não definido</span>;
 
   const th = 'h-10 px-3 text-right font-semibold';
   const td = 'whitespace-nowrap px-3 py-2.5 text-right align-top';
