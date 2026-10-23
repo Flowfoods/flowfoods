@@ -1164,12 +1164,13 @@ export async function resultadoDaImpressao(
       if (!ID.test(pedidoId)) throw naoEncontrado('Impressão');
       const resultado = entrada.resultado === 'ENVIADA' || entrada.resultado === 'FALHOU' ? entrada.resultado : null;
       if (!resultado) throw new Recusa({ ok: false, erros: { geral: 'Resultado desconhecido.' } });
-      const [p] = await tx.sql<{ id: string; lojaId: string; situacao: string; transporte: string }>`
-        SELECT "id", "lojaId", "situacao"::text AS "situacao", "transporte"::text AS "transporte" FROM "EtiquetaImpressao"
+      const [p] = await tx.sql<{ id: string; lojaId: string; situacao: string; transporte: string; confirmada: boolean }>`
+        SELECT "id", "lojaId", "situacao"::text AS "situacao", "transporte"::text AS "transporte", "confirmadaEm" IS NOT NULL AS "confirmada" FROM "EtiquetaImpressao"
         WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ${pedidoId} FOR UPDATE`;
       if (!p || p.lojaId !== lojaId) throw naoEncontrado('Impressão');
       if (p.transporte !== 'BROWSER_PRINT') throw new Recusa({ ok: false, erros: { geral: 'Só o envio pela Zebra tem resultado a registrar.' } });
       if (p.situacao === resultado) return { ok: true as const, id: p.id, jaFeito: true };
+      if (p.confirmada) throw new Recusa({ ok: false, erros: { geral: 'Alguém já disse que esta etiqueta saiu (“Já imprimi”). Para imprimir de novo, faça um pedido novo.' }, conflito: true });
       if (p.situacao !== 'PREPARADA') {
         throw new Recusa({ ok: false, erros: { geral: `Este pedido já ficou como “${ROTULO_DA_SITUACAO[p.situacao as SituacaoDaImpressao].toLowerCase()}”. Para tentar de novo, faça um pedido novo.` }, conflito: true });
       }

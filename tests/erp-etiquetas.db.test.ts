@@ -30,6 +30,8 @@ import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance, type Permissao } from
 import {
   abrirEmbalagem,
   aberturaParaEtiqueta,
+  confirmarImpressao,
+  papelDoPedido,
   emitirEtiquetaDaAbertura,
   emitirEtiquetaDoLote,
   historicoDeImpressoes,
@@ -562,6 +564,31 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · etiquetas, lote do fornecedor e abertura
     expect(busca.lotes.map((l) => l.id)).toEqual([L1]);
   });
 
+  it('rodada 1 · I1: o papel de um pedido feito ANTES do estorno não reabre a etiqueta (diz por quê)', async () => {
+    const L = await loteConcluido(ids.molho, '2', '2');
+    const e = ((await emitir(L)) as { id: string }).id;
+    const papel = await pedir(e, { transporte: 'PAPEL' });
+    expect((await papelDoPedido(a, OPERADOR(), ids.vp, e, (papel as { id: string }).id))!.bloqueio).toBeNull();
+    const l = (await obterOrdem(a, DONA(), ids.vp, L))!;
+    expect((await estornarProducao(a, GERENTE(), ids.vp, L, { versao: l.ordem.versao, motivo: 'erro de teste', confirmarNegativo: true }, GIL)).ok).toBe(true);
+    expect((await papelDoPedido(a, OPERADOR(), ids.vp, e, (papel as { id: string }).id))!.bloqueio).toMatch(/estornado/);
+    expect(await confirmarImpressao(a, OPERADOR(), ids.vp, e, DUDA)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/estornado/) } });
+  });
+
+  it('rodada 1 · M4 e M8: pré-preparo solto numa nota não oferece lote (frase, não erro cru); lote com _ : # registra', async () => {
+    const solto = await cadastrarInsumo(a, { tipo: 'INGREDIENTE', escala: 'base', nome: 'Molho solto', unidade: 'KG', conteudo: '1', preco: '1,00', conservacao: 'REFRIGERADO' });
+    if (!solto.ok) throw new Error(JSON.stringify(solto));
+    await a.insumo.update({ where: { id: solto.id }, data: { tipo: 'PRE_PREPARO' } });
+    const n = await lancarNota(a, DONA(), { lojaId: ids.vp, fornecedorId: ids.fornecedor, numero: '9101', serie: '', data: hoje, frete: '', total: '13,00', itens: [{ insumoId: solto.id, embalagem: 'padrao', quantidade: '1', valor: '1,00' }, { insumoId: ids.creme, embalagem: 'padrao', quantidade: '1', valor: '12,00' }] }, 'Marina');
+    if (!n.ok) throw new Error(JSON.stringify(n));
+    const tela = (await lotesDaNota(a, DONA(), n.id))!;
+    expect(tela.insumos.find((i) => i.id === solto.id)).toMatchObject({ prePreparo: true });
+    expect(tela.insumos.find((i) => i.id === ids.creme)).toMatchObject({ prePreparo: false });
+    expect(await registrarLoteDaNota(a, DONA(), n.id, { insumo: solto.id, codigo: 'X1', vencimento: '', fabricacao: '', marca: '', envio: chave() }, GIL)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/Pré-preparo não tem lote de fornecedor/) } });
+    const r = await registrarLoteDaNota(a, DONA(), n.id, { insumo: ids.creme, codigo: 'L_23:#1', vencimento: br(somarDias(hoje, 30)), fabricacao: '', marca: '', envio: chave() }, GIL);
+    expect(r).toMatchObject({ ok: true });
+    expect((await a.loteDeInsumo.findUnique({ where: { id: (r as { id: string }).id } }))!.codigo).toBe('L_23:#1');
+  });
   it('período fechado não trava imprimir nem abrir (não mexem em dinheiro nem em estoque)', async () => {
     await a.transacao((tx) => criarPeriodoFechadoDeTeste(tx, { nome: 'Fechado de teste', inicio: somarDias(hoje, -2), fim: somarDias(hoje, 2) }));
     expect((await emitir(L1)).ok).toBe(true);
@@ -614,4 +641,98 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · etiquetas, lote do fornecedor e abertura
     await expect(cru(db, perfil, A.id, `UPDATE "EtiquetaImpressao" SET "situacao" = 'FALHOU', "erro" = 'x' WHERE "id" = $1`, enviado.id)).rejects.toThrow(/só muda uma vez/);
     await expect(cru(db, perfil, A.id, `UPDATE "LoteDeInsumo" SET "codigo" = 'OUTRO' WHERE "id" = $1`, LOTE_LONGE)).rejects.toThrow(/não muda/);
   });
+  // ================================================================ rodada de correção 1 (Guardião e UX)
+
+  it('rodada 1 · lote vencido: não emite, não reimprime (Zebra, arquivo, papel), sai da fila e o painel diz "venceu"', async () => {
+    const depois = new Date(Date.now() + 4 * DIA_MS); // o molho dura 3 dias
+    const r = await emitirEtiquetaDoLote(a, OPERADOR(), ids.vp, L1, { formato: 'E60X40', quantas: '1', quanto: '', escala: 'base', hora: 'on', envio: chave() }, DUDA, null, depois);
+    expect(r).toMatchObject({ ok: false, conflito: true, erros: { geral: expect.stringMatching(/^Este lote venceu em \d\d\/\d\d às \d\d:\d\d: não use\. Separe para descarte e avise a gerência\.$/) } });
+    expect((await loteParaEtiqueta(a, OPERADOR(), ids.vp, L1, null, depois))!.motivo).toMatch(/venceu/);
+    for (const transporte of ['BROWSER_PRINT', 'ARQUIVO_ZPL', 'PAPEL']) {
+      expect(await pedirImpressao(a, OPERADOR(), ids.vp, E1, { copias: '1', transporte, resolucao: '203', envio: chave() }, DUDA, depois)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/venceu/) } });
+    }
+    const papel = (await a.etiquetaImpressao.findFirst({ where: { etiquetaId: E1, transporte: 'PAPEL' } }))!;
+    expect((await papelDoPedido(a, OPERADOR(), ids.vp, E1, papel.id, depois))!.bloqueio).toMatch(/venceu/);
+    expect((await papelDoPedido(a, OPERADOR(), ids.vp, E1, papel.id))!.bloqueio).toBeNull();
+    expect((await obterEmissao(a, OPERADOR(), ids.vp, E1, depois))!.bloqueio).toMatch(/venceu/);
+    const p = (await painelDeEtiquetas(a, OPERADOR(), ids.vp, {}, depois))!;
+    expect(p.lotes.find((l) => l.id === L1)).toMatchObject({ vencido: true, situacao: { texto: 'Venceu' } });
+    expect(p.fila.map((f) => f.id)).not.toContain(E1);
+  });
+
+  it('rodada 1 · a fila: arquivo e papel NÃO tiram; a Zebra aceitando ou "Já imprimi" tiram; "Já imprimi" uma vez, com quem e quando; Zebra sem resposta fica "sem resultado"', async () => {
+    const r = await emitir(L1);
+    const e = (r as { id: string }).id;
+    const naFila = async () => (await painelDeEtiquetas(a, OPERADOR(), ids.vp, {}))!.fila.some((f) => f.id === e);
+    expect(await naFila()).toBe(true);
+    expect(await confirmarImpressao(a, OPERADOR(), ids.vp, e, DUDA)).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/Peça a impressão primeiro/) } });
+    expect((await pedir(e, { transporte: 'ARQUIVO_ZPL' })).ok).toBe(true);
+    expect((await pedir(e, { transporte: 'PAPEL' })).ok).toBe(true);
+    expect(await naFila()).toBe(true);
+    const semResposta = await pedir(e); // Zebra que não respondeu: fica PREPARADA
+    expect(semResposta.ok).toBe(true);
+    expect((await obterEmissao(a, OPERADOR(), ids.vp, e))!).toMatchObject({ naFila: true, aConfirmar: (semResposta as { id: string }).id });
+    expect(await confirmarImpressao(a, OPERADOR(), ids.vp, e, DUDA)).toMatchObject({ ok: true });
+    expect(await naFila()).toBe(false);
+    const conf = (await a.etiquetaImpressao.findFirst({ where: { etiquetaId: e, confirmadaEm: { not: null } } }))!;
+    expect(conf).toMatchObject({ id: (semResposta as { id: string }).id, situacao: 'PREPARADA', confirmadaPorNome: 'Duda Lima', confirmadaPorUsuarioId: 'u-duda' });
+    expect(await confirmarImpressao(a, OPERADOR(), ids.vp, e, DUDA)).toMatchObject({ ok: true, jaFeito: true });
+    // Confirmado, o pedido não recebe mais resultado da Zebra.
+    expect(await resultadoDaImpressao(a, OPERADOR(), ids.vp, conf.id, { resultado: 'ENVIADA', erro: '' })).toMatchObject({ ok: false });
+    // Outra emissão: a Zebra aceitando tira da fila.
+    const e2 = ((await emitir(L1)) as { id: string }).id;
+    const z = await pedir(e2);
+    expect((await resultadoDaImpressao(a, OPERADOR(), ids.vp, (z as { id: string }).id, { resultado: 'ENVIADA', erro: '' })).ok).toBe(true);
+    expect((await painelDeEtiquetas(a, OPERADOR(), ids.vp, {}))!.fila.some((f) => f.id === e2)).toBe(false);
+    // O histórico conta as confirmadas e não chama de "sem resultado" o que foi confirmado.
+    const h = (await historicoDeImpressoes(a, OPERADOR(), ids.vp, { periodo: 'hoje' }))!;
+    expect(h.totais.confirmadas).toBeGreaterThanOrEqual(1);
+    expect(h.linhas.find((l) => l.id === conf.id)).toMatchObject({ confirmadaPorNome: 'Duda Lima' });
+  });
+
+  it('rodada 1 · Guardião: chave de outra loja, etiqueta forjada (manipulação, quem fez, lote e marca), pedido e abertura que somem, id e conclusão para trás', async () => {
+    // M6: a chave usada na Penha, reusada pela Delivery, não devolve o id da Penha.
+    const k = chave();
+    const r1 = await emitir(L1, { envio: k });
+    expect(r1.ok).toBe(true);
+    const outra = await emitirEtiquetaDoLote(a, alcanceDe('DONO', 'rede'), ids.delivery, L1, { formato: 'E60X40', quantas: '1', quanto: '', escala: 'base', hora: 'on', envio: k }, DUDA, null);
+    expect(outra).toMatchObject({ ok: false });
+    expect(JSON.stringify(outra)).not.toContain((r1 as { id: string }).id);
+    // M2: a etiqueta do lote com manipulação ou quem fez forjados; a do item aberto com lote ou marca forjados.
+    const o = (await a.ordemProducao.findUnique({ where: { id: L1 } }))!;
+    const ab = (await a.aberturaDeLote.findUnique({ where: { id: AB1 } }))!;
+    const ts = (d: Date) => d.toISOString().replace('T', ' ').replace('Z', '');
+    const doLote = (fabricado: string, resp: string | null) =>
+      cru(
+        db,
+        perfil,
+        A.id,
+        `INSERT INTO "Etiqueta" ("id","parceiroId","lojaId","codigo","insumoId","ordemProducaoId","nomeSnapshot","conservacao","validadeEm","regraDaValidade","formato","quantas","lojaNomeSnapshot","emitidaPorNome","chaveEnvio","fabricadoEm","loteProduzido","responsavelNomeSnapshot") VALUES ($1,$2,$3,$4,$5,$6,'X','REFRIGERADO',$7::timestamp,'LOTE_PRODUZIDO','E60X40',1,'VP','Teste',$8,$9::timestamp,$10,$11)`,
+        `f${sufixo}${resp ?? ''}${fabricado.length}`, A.id, ids.vp, `EF-${resp ?? 'n'}-${fabricado.slice(0, 4)}`, ids.insumoMolho, L1, ts(o.validadeEm!), `ch-${sufixo}-${resp ?? 'n'}-${fabricado.length}`, fabricado, o.codigoLote, resp,
+      );
+    await expect(doLote('2020-01-01 00:00:00', o.responsavelNomeSnapshot)).rejects.toThrow(/copia o lote concluído/);
+    await expect(doLote(ts(o.concluidaEm!), 'Fulano Forjado')).rejects.toThrow(/copia o lote concluído/);
+    const daAbertura = (lote: string | null, marca: string | null) =>
+      cru(
+        db,
+        perfil,
+        A.id,
+        `INSERT INTO "Etiqueta" ("id","parceiroId","lojaId","codigo","insumoId","aberturaId","nomeSnapshot","conservacao","validadeEm","regraDaValidade","formato","quantas","lojaNomeSnapshot","emitidaPorNome","chaveEnvio","abertoEm","vencimentoLoteEm","loteFornecedor","marcaSnapshot","responsavelNomeSnapshot","responsavelUsuarioId") VALUES ($1,$2,$3,$4,$5,$6,'X','REFRIGERADO',$7::timestamp,$8::"RegraDaValidade",'E60X40',1,'VP','Teste',$9,$10::timestamp,$11::date,$12,$13,$14,$15)`,
+        `g${sufixo}${lote}${marca}`.slice(0, 40), A.id, ids.vp, `EG-${lote}-${marca}`.slice(0, 40), ids.creme, AB1, ts(ab.validadeEm!), ab.regraDaValidade, `cg-${sufixo}-${lote}-${marca}`.slice(0, 60), ts(ab.abertoEm), ab.vencimentoLoteEm ? isoDia(ab.vencimentoLoteEm) : null, lote, marca, ab.abertoPorNome, ab.abertoPorUsuarioId,
+      );
+    await expect(daAbertura('FORJADO', ab.marcaSnapshot)).rejects.toThrow(/copia a abertura/);
+    await expect(daAbertura(ab.codigoLoteSnapshot, 'Marca Forjada')).rejects.toThrow(/copia a abertura/);
+    // M5: o pedido e a abertura não somem (com RLS, o papel do tenant nem tem DELETE nelas).
+    const algum = (await a.etiquetaImpressao.findFirst({ where: { etiquetaId: E1 } }))!;
+    await expect(cru(db, perfil, A.id, `DELETE FROM "EtiquetaImpressao" WHERE "id" = $1`, algum.id)).rejects.toThrow(/não some|permission denied/);
+    await expect(cru(db, perfil, A.id, `DELETE FROM "AberturaDeLote" WHERE "id" = $1`, AB1)).rejects.toThrow(/não muda nem some|permission denied/);
+    // M7: o pedido preparado não troca de id nem conclui antes de ser pedido.
+    const prep = await pedir(E1);
+    const pid = (prep as { id: string }).id;
+    await expect(cru(db, perfil, A.id, `UPDATE "EtiquetaImpressao" SET "id" = $2 WHERE "id" = $1`, pid, `novo${sufixo}`)).rejects.toThrow(/só muda uma vez/);
+    await expect(cru(db, perfil, A.id, `UPDATE "EtiquetaImpressao" SET "situacao" = 'ENVIADA', "concluidaEm" = "solicitadaEm" - interval '1 day' WHERE "id" = $1`, pid)).rejects.toThrow(/EtiquetaImpressao_resultado|check/i);
+    // Confirmar e mudar o resultado ao mesmo tempo: recusado.
+    await expect(cru(db, perfil, A.id, `UPDATE "EtiquetaImpressao" SET "confirmadaEm" = now(), "confirmadaPorNome" = 'X', "situacao" = 'ENVIADA', "concluidaEm" = now() WHERE "id" = $1`, pid)).rejects.toThrow(/não muda o resultado/);
+  });
+
 });
