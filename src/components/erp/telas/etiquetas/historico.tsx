@@ -100,7 +100,7 @@ export function TelaHistoricoDeImpressoes({ h, base, contexto }: { h: HistoricoD
       <section aria-label="Totais do período" className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <Metrica rotulo="Pedidos" valor={t.pedidos} detalhe="primeira e reimpressão" />
         <Metrica rotulo="Etiquetas" valor={t.etiquetas} detalhe="a soma das cópias" />
-        <Metrica rotulo="Enviadas à Zebra" valor={t.enviadas} detalhe="etiquetas que ela recebeu" />
+        <Metrica rotulo="Enviadas à Zebra" valor={t.enviadas} detalhe="etiquetas recebidas" />
         <Metrica rotulo="Arquivo ou papel" valor={t.arquivos} detalhe="etiquetas geradas" />
         <Metrica rotulo="Falharam" valor={t.falharam} detalhe={t.falharam === 1 ? 'pedido' : 'pedidos'} />
         <Metrica rotulo="Sem resultado" valor={t.semResultado} detalhe="a tela fechou antes" />
