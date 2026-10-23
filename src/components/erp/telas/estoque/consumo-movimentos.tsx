@@ -121,9 +121,11 @@ export function TelaDosMovimentos({
   const verValores = r.verValores;
   const titulo = col ? `Movimentos: ${ROTULO_DO_LINK[col]}${f.bucket ? ` · ${BUCKETS[f.bucket].rotulo}` : ''}` : 'Movimentos';
   const vazio = r.motivoVazio
-    ? r.motivoVazio === 'periodo'
-      ? { titulo: 'O período não faz sentido.', texto: f.periodoInvalido ?? '' }
-      : { titulo: 'Nenhuma dessas lojas está no seu acesso.', texto: 'O relatório só mostra as lojas que você pode ver.' }
+    ? r.motivoVazio === 'demorou'
+      ? { titulo: r.demorou?.titulo ?? 'O relatório não coube agora.', texto: r.demorou?.texto ?? 'Tente de novo em instantes.' }
+      : r.motivoVazio === 'periodo'
+        ? { titulo: 'O período não faz sentido.', texto: f.periodoInvalido ?? '' }
+        : { titulo: 'Nenhuma dessas lojas está no seu acesso.', texto: 'O relatório só mostra as lojas que você pode ver.' }
     : null;
   const movimentos = lista?.movimentos ?? [];
   const { de, ate } = faixaDaPagina(r.numeroDaPagina, f.porPagina, movimentos.length);

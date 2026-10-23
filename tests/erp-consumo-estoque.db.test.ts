@@ -46,8 +46,9 @@ import { atenderRequisicao, criarRequisicao, devolverItem, obterRequisicao } fro
 import { concluirProducao, estornarProducao, listaDaProducao, obterOrdem, planejarProducao } from '@/lib/erp/producao';
 import { receberXml } from '@/lib/erp/documentos-fiscais';
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
-import { consumoCompleto, consumoDaTela, movimentosDaTela } from '@/lib/erp/consumo-estoque';
+import { consumoCompleto, consumoDaTela, fonteDoConsumo, movimentosDaTela, resolverRecorteDoConsumo } from '@/lib/erp/consumo-estoque';
 import { planilhaDoConsumo, responderPlanilhaDoConsumo } from '@/lib/erp/consumo-estoque-planilha';
+import { RELATORIOS_SIMULTANEOS, VAGAS_DO_PROCESSO } from '@/lib/erp/vagas-de-relatorio';
 import { LISTA_DE_BUCKETS, BUCKETS } from '@/lib/erp/consumo-estoque-campos';
 import { lerFiltrosDoConsumo, type FiltrosDoConsumo } from '@/lib/erp/consumo-estoque-campos';
 import { cadastrarInsumoDeTeste as cadastrarInsumo, limparParceiros, perfilDoBanco, SEM_NOTA_FISCAL, type PerfilDoBanco } from './erp-db-apoio';
@@ -691,5 +692,61 @@ describe.skipIf(!URL_TESTE)('ERP L.4 · consumo e conciliação de estoque (Post
     expect(l.somas.uso_setor?.n).toBe(1);
     expect(l.confere).toBe(true);
     expect(l.saldoGuardado).toBe(8_000);
+  });
+
+  it('o R$ nem sai do banco para quem não vê custo: a própria consulta do livro zera o valor', async () => {
+    em('2026-11-20T10:00:00');
+    const maiorValor = (alcance: Alcance) =>
+      a.transacao(async (tx) => {
+        const { recorte } = await resolverRecorteDoConsumo(tx, alcance, filtros());
+        const [x] = await tx.sql<{ maior: number; movimentos: number }>`WITH mov AS (${fonteDoConsumo(recorte!)}) SELECT COALESCE(max(abs("v")), 0)::float8 AS "maior", count(*) FILTER (WHERE "q" <> 0)::int AS "movimentos" FROM mov`;
+        return { ...x, verValores: recorte!.verValores };
+      });
+    const dona = await maiorValor(DONA());
+    expect(dona.verValores).toBe(true);
+    expect(dona.maior).toBeGreaterThan(0);
+    const operador = await maiorValor(OPERADOR());
+    expect(operador.verValores).toBe(false);
+    expect(operador.movimentos).toBeGreaterThan(0);
+    expect(operador.maior).toBe(0);
+  });
+
+  it('a tela pelo servidor lê o livro numa transação de relatório (somente leitura e com teto), e não grava nada', async () => {
+    em('2026-11-20T10:00:00');
+    const antes = await sql<{ n: number }>(`SELECT count(*)::int AS n FROM "MovimentoEstoque" WHERE "parceiroId" = $1`, A.id);
+    const t = await tela(DONA());
+    expect(t.motivoVazio).toBeNull();
+    expect(t.demorou).toBeNull();
+    const depois = await sql<{ n: number }>(`SELECT count(*)::int AS n FROM "MovimentoEstoque" WHERE "parceiroId" = $1`, A.id);
+    expect(depois[0].n).toBe(antes[0].n);
+  });
+
+  it('com as vagas de relatório todas ocupadas, a tela, os movimentos, a impressão e a planilha respondem com a frase, sem erro 500', { timeout: 60_000 }, async () => {
+    em('2026-11-20T10:00:00');
+    const soltar = await Promise.all(Array.from({ length: RELATORIOS_SIMULTANEOS }, () => VAGAS_DO_PROCESSO.pegar()));
+    try {
+      const [t, m, c, p, resp] = await Promise.all([
+        tela(DONA()),
+        movimentosDaTela(a, DONA(), filtros({ col: 'compras' })),
+        consumoCompleto(a, DONA(), filtros(), 100),
+        planilhaDoConsumo(a, DONA(), filtros(), { parte: 'linhas' }),
+        responderPlanilhaDoConsumo(a, DONA(), new Request('http://x/exportar?de=2026-10-01&ate=2026-10-31')),
+      ]);
+      expect(t.motivoVazio).toBe('demorou');
+      expect(t.demorou).toMatchObject({ motivo: 'ocupado', titulo: 'Há outro relatório grande rodando.', texto: 'Tente em instantes.' });
+      // Os filtros continuam aparecendo (as lojas e os insumos do acesso), só os números ficam de fora.
+      expect(t.opcoes.lojas.length).toBeGreaterThan(0);
+      expect(t.resumo).toBeNull();
+      expect(m.motivoVazio).toBe('demorou');
+      expect(m.demorou?.titulo).toBe('Há outro relatório grande rodando.');
+      expect(c.motivoVazio).toBe('demorou');
+      expect(p).toEqual({ ok: false, status: 503, frase: 'Há outro relatório grande rodando. Tente em instantes.' });
+      expect(resp.status).toBe(503);
+      expect(await resp.text()).toBe('Há outro relatório grande rodando. Tente em instantes.');
+    } finally {
+      soltar.forEach((l) => l());
+    }
+    // Liberadas as vagas, tudo volta ao normal.
+    expect((await tela(DONA())).motivoVazio).toBeNull();
   });
 });

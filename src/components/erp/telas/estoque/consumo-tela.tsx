@@ -634,9 +634,11 @@ export function TelaDoConsumo({
   const resumo = r.resumo;
   const volta = hrefDoConsumo(caminho, f, {}, { semPagina: false });
   const vazio = r.motivoVazio
-    ? r.motivoVazio === 'periodo'
-      ? { titulo: 'O período não faz sentido.', texto: f.periodoInvalido ?? '' }
-      : { titulo: 'Nenhuma dessas lojas está no seu acesso.', texto: 'O relatório só mostra as lojas que você pode ver. Escolha entre as que aparecem em “Lojas”, ou deixe sem marcar para ver todas as suas.' }
+    ? r.motivoVazio === 'demorou'
+      ? { titulo: r.demorou?.titulo ?? 'O relatório não coube agora.', texto: r.demorou?.texto ?? 'Tente de novo em instantes.', tentar: true }
+      : r.motivoVazio === 'periodo'
+        ? { titulo: 'O período não faz sentido.', texto: f.periodoInvalido ?? '', tentar: false }
+        : { titulo: 'Nenhuma dessas lojas está no seu acesso.', texto: 'O relatório só mostra as lojas que você pode ver. Escolha entre as que aparecem em “Lojas”, ou deixe sem marcar para ver todas as suas.', tentar: false }
     : null;
   const linhas = r.pagina?.linhas ?? [];
   const insumoNome = f.insumoId ? linhas[0]?.insumo : undefined;
@@ -675,7 +677,18 @@ export function TelaDoConsumo({
 
       {vazio && (
         <Painel semRespiro>
-          <Vazio titulo={vazio.titulo} acao={<Link href={caminho} className={classeDeBotao('secundario')}>Limpar e recomeçar</Link>}>
+          <Vazio
+            titulo={vazio.titulo}
+            acao={
+              vazio.tentar ? (
+                <Link href={hrefDoConsumo(caminho, f)} className={classeDeBotao('secundario')}>
+                  Tentar de novo
+                </Link>
+              ) : (
+                <Link href={caminho} className={classeDeBotao('secundario')}>Limpar e recomeçar</Link>
+              )
+            }
+          >
             {vazio.texto}
           </Vazio>
         </Painel>

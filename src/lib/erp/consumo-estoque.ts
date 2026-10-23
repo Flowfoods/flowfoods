@@ -16,7 +16,7 @@
 
 import { Prisma } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
-import { conferirSqlDoParceiro } from './tenant';
+import { conferirSqlDoParceiro, ErroDeRelatorio } from './tenant';
 import { filtroDeLojas, pode, type Alcance } from './permissoes';
 import { idsDeInsumoPelaBusca } from './busca';
 import { FUSO_OPERACIONAL, somarDias } from './compras-relatorio-campos';
@@ -114,7 +114,8 @@ export function fonteDoConsumo(r: RecorteDoConsumo, o: OpcoesDaFonte = {}): Pris
   const pares = o.pares ?? null;
   return guardado(Prisma.sql`
     SELECT
-      m."id", m."lojaId", m."insumoId", m."tipo"::text AS "tipo", m."quantidadeMilesimos" AS "q", m."valorCentavos" AS "v",
+      m."id", m."lojaId", m."insumoId", m."tipo"::text AS "tipo", m."quantidadeMilesimos" AS "q",
+      (CASE WHEN ${r.verValores}::boolean THEN m."valorCentavos" ELSE 0 END) AS "v",
       m."saldoAntesMilesimos" AS "antesDoMov", m."saldoDepoisMilesimos" AS "depois", m."ocorridoEm", m."criadoEm", m."unidadeSnapshot"::text AS "unidade",
       m."insumoNomeSnapshot", m."motivo", m."notaId", m."requisicaoItemId", m."contagemItemId", m."ordemProducaoId",
       (m."estornoDeId" IS NOT NULL) AS "estorno",
@@ -229,7 +230,7 @@ const semValor = (r: RecorteDoConsumo, n: number) => (r.verValores ? n : 0);
 interface ParLido {
   lojaId: string; insumoId: string; loja: string; insumo: string; ativo: boolean; unidade: string | null;
   iq: number; iv: number; fq: number; fv: number; totalq: number; nDentro: number; minSaldo: number | null;
-  semOrigem: number; semValor: number; unidades: number; guardado: number; ultima: Date | null; contadoNoPeriodo: boolean; dura: boolean;
+  semOrigem: number; semValor: number; unidades: number; guardado: number; ultima: string | Date | null; contadoNoPeriodo: boolean; dura: boolean;
 }
 
 interface BucketLido {
@@ -288,51 +289,6 @@ function montarLinha(r: RecorteDoConsumo, p: ParLido, buckets: BucketLido[]): Li
   };
 }
 
-/** Os pares (loja × insumo) do recorte, ordenados por loja e insumo, uma página (ou todos até `teto`), com o total na mesma consulta. */
-async function paresDaPagina(tx: ClienteDoParceiro, r: RecorteDoConsumo, janela: { limite: number; deslocamento: number }) {
-  const lidos = await tx.sql<ParLido & { quantos: number }>`
-    WITH mov AS MATERIALIZED (${fonteDoConsumo(r)}),
-    ${paresDoConsumo(r)}
-    SELECT s."lojaId", s."insumoId", s."loja", s."insumo", s."ativo", s."unidade", s."iq", s."iv", s."fq", s."fv", s."totalq", s."nDentro", s."minSaldo",
-           s."semOrigem", s."semValor", s."unidades", s."guardado", s."ultima", s."contadoNoPeriodo", s."dura", count(*) OVER ()::float8 AS "quantos"
-    FROM selecionados s
-    ORDER BY s."loja", s."insumo", s."lojaId", s."insumoId"
-    LIMIT ${janela.limite}::int OFFSET ${janela.deslocamento}::int`;
-  return lidos;
-}
-
-async function bucketsDosPares(tx: ClienteDoParceiro, r: RecorteDoConsumo, pares: ParLido[] | null): Promise<BucketLido[]> {
-  if (pares && pares.length === 0) return [];
-  if (pares) {
-    return tx.sql<BucketLido>`
-      WITH mov AS (${fonteDoConsumo(r, { soPeriodo: true, pares: { lojaIds: pares.map((p) => p.lojaId), insumoIds: pares.map((p) => p.insumoId) } })})
-      SELECT mv."lojaId", mv."insumoId", mv."bucket", count(*)::float8 AS "n", sum(mv."q")::float8 AS "q", sum(mv."v")::float8 AS "v"
-      FROM mov mv GROUP BY mv."lojaId", mv."insumoId", mv."bucket"`;
-  }
-  // Todos os pares do recorte (planilha e impressão): a seleção vem da mesma conta dos saldos.
-  return tx.sql<BucketLido>`
-    WITH mov AS MATERIALIZED (${fonteDoConsumo(r)}),
-    ${paresDoConsumo(r)}
-    SELECT mv."lojaId", mv."insumoId", mv."bucket", count(*)::float8 AS "n", sum(mv."q")::float8 AS "q", sum(mv."v")::float8 AS "v"
-    FROM mov mv JOIN selecionados s ON s."lojaId" = mv."lojaId" AND s."insumoId" = mv."insumoId"
-    WHERE NOT mv."antes" AND mv."ate"
-    GROUP BY mv."lojaId", mv."insumoId", mv."bucket"`;
-}
-
-/** Uma página de linhas do relatório (ou todas, até o teto), já com as somas por caixa, a ponte e as lacunas. */
-export async function linhasDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo, pagina: { numero: number; porPagina: number } | null, teto: number) {
-  const limite = pagina ? pagina.porPagina : teto + 1;
-  const deslocamento = pagina ? (pagina.numero - 1) * pagina.porPagina : 0;
-  const lidos = await paresDaPagina(tx, r, { limite, deslocamento });
-  const doTeto = pagina ? lidos : lidos.slice(0, teto);
-  const buckets = await bucketsDosPares(tx, r, pagina ? doTeto : null);
-  return {
-    linhas: doTeto.map((p) => montarLinha(r, p, buckets)),
-    total: lidos[0]?.quantos ?? 0,
-    passouDoTeto: !pagina && lidos.length > teto,
-  };
-}
-
 export interface ResumoDaUnidade {
   unidade: Unidade;
   /** Quantos insumos × lojas tem nesta unidade. */
@@ -355,33 +311,75 @@ export interface ResumoDoConsumo {
 
 const ORDEM_DA_UNIDADE: Record<string, number> = { KG: 0, L: 1, UN: 2 };
 
-/** O resumo de TUDO o que está no recorte (não só da página): por unidade, a ponte inteira, e os contadores de lacuna. */
-export async function resumoDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo): Promise<ResumoDoConsumo> {
-  const lidos = await tx.sql<{ tipo: string; unidade: string | null; chave: string | null; n: number; q: number; v: number; extra: number }>`
+export interface LeituraDoConsumo {
+  /** O resumo de TUDO o que está no recorte (não só da página). */
+  resumo: ResumoDoConsumo;
+  linhas: LinhaDoConsumo[];
+  /** Quantos insumos × lojas o recorte tem (todas as páginas). */
+  total: number;
+  numeroDaPagina: number;
+  paginas: number;
+  /** Só na leitura sem página: havia mais linhas que o teto (a lista foi cortada nele). */
+  passouDoTeto: boolean;
+}
+
+/**
+ * A leitura do relatório, numa consulta só: o livro é lido e classificado UMA vez (`mov`, materializado) e dela saem o resumo de tudo
+ * o que está no recorte (por unidade, a ponte inteira, os contadores de lacuna), as linhas da página pedida (ou todas, até o teto) e
+ * as caixas dessas linhas. Antes eram três leituras do livro por tela; a conta de cada número é a mesma de antes.
+ * Pedida além da última página, cai na última. `janela.teto` lê sem página (planilha e impressão).
+ */
+export async function lerConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo, janela: { pagina: number; porPagina: number } | { teto: number }): Promise<LeituraDoConsumo> {
+  const semPagina = 'teto' in janela;
+  const limite = semPagina ? janela.teto + 1 : janela.porPagina;
+  const pedida = semPagina ? 1 : janela.pagina;
+  const lidos = await tx.sql<{ tipo: string; unidade: string | null; chave: string | null; n: number; q: number; v: number; extra: number; dados: Record<string, unknown> | null }>`
     WITH mov AS MATERIALIZED (${fonteDoConsumo(r)}),
-    ${paresDoConsumo(r)}
+    ${paresDoConsumo(r)},
+    pag AS (
+      SELECT s.*, row_number() OVER (ORDER BY s."loja", s."insumo", s."lojaId", s."insumoId")::float8 AS "ord",
+             LEAST(GREATEST(1, ${pedida}::int), GREATEST(1, CEIL((count(*) OVER ())::float8 / ${limite}::int)::int)) AS "numero"
+      FROM selecionados s
+    ),
+    pagina AS (
+      SELECT * FROM pag WHERE "ord" > ("numero" - 1) * ${limite}::int AND "ord" <= "numero" * ${limite}::int
+    )
     SELECT 'saldo'::text AS "tipo", s."unidade", NULL::text AS "chave", count(*)::float8 AS "n",
-           sum(s."iq")::float8 AS "q", sum(s."iv")::float8 AS "v", 0::float8 AS "extra"
+           sum(s."iq")::float8 AS "q", sum(s."iv")::float8 AS "v", 0::float8 AS "extra", NULL::jsonb AS "dados"
     FROM selecionados s GROUP BY s."unidade"
     UNION ALL
-    SELECT 'final'::text, s."unidade", NULL::text, count(*)::float8, sum(s."fq")::float8, sum(s."fv")::float8, 0::float8
+    SELECT 'final'::text, s."unidade", NULL::text, count(*)::float8, sum(s."fq")::float8, sum(s."fv")::float8, 0::float8, NULL::jsonb
     FROM selecionados s
     GROUP BY s."unidade"
     UNION ALL
-    SELECT 'bucket'::text, s."unidade", mv."bucket", count(*)::float8, sum(mv."q")::float8, sum(mv."v")::float8, 0::float8
+    SELECT 'bucket'::text, s."unidade", mv."bucket", count(*)::float8, sum(mv."q")::float8, sum(mv."v")::float8, 0::float8, NULL::jsonb
     FROM mov mv JOIN selecionados s ON s."lojaId" = mv."lojaId" AND s."insumoId" = mv."insumoId"
     WHERE NOT mv."antes" AND mv."ate"
     GROUP BY s."unidade", mv."bucket"
     UNION ALL
-    SELECT 'geral'::text, NULL::text, NULL::text, count(*)::float8, 0::float8, 0::float8, 0::float8 FROM selecionados
+    SELECT 'geral'::text, NULL::text, NULL::text, count(*)::float8, 0::float8, 0::float8, 0::float8, NULL::jsonb FROM selecionados
     UNION ALL
-    SELECT 'dura'::text, NULL::text, NULL::text, (count(*) FILTER (WHERE s."dura"))::float8, 0::float8, 0::float8, 0::float8 FROM selecionados s
+    SELECT 'dura'::text, NULL::text, NULL::text, (count(*) FILTER (WHERE s."dura"))::float8, 0::float8, 0::float8, 0::float8, NULL::jsonb FROM selecionados s
     UNION ALL
-    SELECT 'semcontagem'::text, NULL::text, NULL::text, (count(*) FILTER (WHERE s."nDentro" > 0 AND NOT s."contadoNoPeriodo"))::float8, 0::float8, 0::float8, 0::float8 FROM selecionados s
+    SELECT 'semcontagem'::text, NULL::text, NULL::text, (count(*) FILTER (WHERE s."nDentro" > 0 AND NOT s."contadoNoPeriodo"))::float8, 0::float8, 0::float8, 0::float8, NULL::jsonb FROM selecionados s
     UNION ALL
-    SELECT 'semvalor'::text, NULL::text, NULL::text, COALESCE(sum(s."semValor"), 0)::float8, 0::float8, 0::float8, 0::float8 FROM selecionados s
+    SELECT 'semvalor'::text, NULL::text, NULL::text, COALESCE(sum(s."semValor"), 0)::float8, 0::float8, 0::float8, 0::float8, NULL::jsonb FROM selecionados s
     UNION ALL
-    SELECT 'semorigem'::text, NULL::text, NULL::text, COALESCE(sum(s."semOrigem"), 0)::float8, 0::float8, 0::float8, 0::float8 FROM selecionados s`;
+    SELECT 'semorigem'::text, NULL::text, NULL::text, COALESCE(sum(s."semOrigem"), 0)::float8, 0::float8, 0::float8, 0::float8, NULL::jsonb FROM selecionados s
+    UNION ALL
+    SELECT 'par'::text, NULL::text, NULL::text, 0::float8, 0::float8, 0::float8, p."ord",
+           jsonb_build_object(
+             'lojaId', p."lojaId", 'insumoId', p."insumoId", 'loja', p."loja", 'insumo', p."insumo", 'ativo', p."ativo", 'unidade', p."unidade",
+             'iq', p."iq", 'iv', p."iv", 'fq', p."fq", 'fv', p."fv", 'totalq', p."totalq", 'nDentro', p."nDentro", 'minSaldo', p."minSaldo",
+             'semOrigem', p."semOrigem", 'semValor', p."semValor", 'unidades', p."unidades", 'guardado', p."guardado", 'ultima', p."ultima",
+             'contadoNoPeriodo', p."contadoNoPeriodo", 'dura', p."dura")
+    FROM pagina p
+    UNION ALL
+    SELECT 'caixa'::text, NULL::text, NULL::text, count(*)::float8, sum(mv."q")::float8, sum(mv."v")::float8, 0::float8,
+           jsonb_build_object('lojaId', mv."lojaId", 'insumoId', mv."insumoId", 'bucket', mv."bucket")
+    FROM mov mv JOIN pagina p ON p."lojaId" = mv."lojaId" AND p."insumoId" = mv."insumoId"
+    WHERE NOT mv."antes" AND mv."ate"
+    GROUP BY mv."lojaId", mv."insumoId", mv."bucket"`;
   const porUnidade = new Map<string, ResumoDaUnidade>();
   const da = (u: string | null) => {
     const k = u ?? 'UN';
@@ -397,6 +395,8 @@ export async function resumoDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo
   let semContagem = 0;
   let semVal = 0;
   let semOrigem = 0;
+  const pares: { ord: number; par: ParLido }[] = [];
+  const caixas: BucketLido[] = [];
   for (const l of lidos) {
     if (l.tipo === 'saldo') {
       const u = da(l.unidade);
@@ -415,16 +415,28 @@ export async function resumoDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo
     else if (l.tipo === 'semcontagem') semContagem = l.n;
     else if (l.tipo === 'semvalor') semVal = l.n;
     else if (l.tipo === 'semorigem') semOrigem = l.n;
+    else if (l.tipo === 'par' && l.dados) pares.push({ ord: l.extra, par: l.dados as unknown as ParLido });
+    else if (l.tipo === 'caixa' && l.dados) caixas.push({ ...(l.dados as { lojaId: string; insumoId: string; bucket: string }), n: l.n, q: l.q, v: l.v });
   }
   // A ponte da unidade: o final lido por soma direta no livro contra o inicial mais a soma das caixas (nenhum movimento fica sem caixa).
   for (const u of Array.from(porUnidade.values())) u.diferencaMilesimos = u.final.q - (u.inicial.q + LISTA_DE_BUCKETS.reduce((t, b) => t + (u.somas[b]?.q ?? 0), 0));
-  return {
+  const resumo: ResumoDoConsumo = {
     linhas,
     comLacunaDura,
     semContagem,
     semValor: semValor(r, semVal),
     movimentosSemOrigem: semOrigem,
     unidades: Array.from(porUnidade.values()).sort((a, b) => (ORDEM_DA_UNIDADE[a.unidade] ?? 9) - (ORDEM_DA_UNIDADE[b.unidade] ?? 9)),
+  };
+  const doBanco = pares.sort((a, b) => a.ord - b.ord).map((x) => montarLinha(r, x.par, caixas));
+  const paginas = semPagina ? 1 : Math.max(1, Math.ceil(linhas / limite));
+  return {
+    resumo,
+    linhas: semPagina ? doBanco.slice(0, janela.teto) : doBanco,
+    total: linhas,
+    numeroDaPagina: Math.min(Math.max(1, pedida), paginas),
+    paginas,
+    passouDoTeto: semPagina && doBanco.length > janela.teto,
   };
 }
 
@@ -623,8 +635,19 @@ export async function opcoesDoConsumo(tx: ClienteDoParceiro, lojasDoAcesso: Opco
 
 // ------------------------------------------------------- o relatório da tela
 
+/** O relatório não coube agora (grande demais ou servidor ocupado): a frase para a pessoa, no lugar dos números. */
+export interface RelatorioQueNaoCaiu {
+  motivo: 'tempo' | 'ocupado';
+  titulo: string;
+  texto: string;
+}
+
+const queNaoCaiu = (e: ErroDeRelatorio): RelatorioQueNaoCaiu => ({ motivo: e.motivo, titulo: e.titulo, texto: e.texto });
+
 export interface ConsumoDaTela {
-  motivoVazio: 'sem-permissao' | 'sem-loja' | 'periodo' | null;
+  motivoVazio: 'sem-permissao' | 'sem-loja' | 'periodo' | 'demorou' | null;
+  /** Só com `motivoVazio: 'demorou'`. */
+  demorou: RelatorioQueNaoCaiu | null;
   opcoes: OpcoesDoConsumo;
   lojasUsadas: { id: string; nome: string }[];
   verValores: boolean;
@@ -639,77 +662,97 @@ export interface ConsumoDaTela {
 
 const SEM_OPCOES: OpcoesDoConsumo = { lojas: [], categorias: [], listaDeInsumos: [], insumosTruncados: false };
 
-/** Tudo o que a tela principal precisa, numa fotografia só do banco. */
+const semNumeros = (motivo: ConsumoDaTela['motivoVazio'], opcoes: OpcoesDoConsumo): ConsumoDaTela => ({
+  motivoVazio: motivo,
+  demorou: null,
+  opcoes,
+  lojasUsadas: [],
+  verValores: false,
+  resumo: null,
+  pagina: null,
+  aguardando: 0,
+  contagensEmAndamento: 0,
+  lojasSemEstoque: [],
+  numeroDaPagina: 1,
+  paginas: 1,
+});
+
+/** Tudo o que a tela principal precisa, numa fotografia só do banco (transação de relatório: somente leitura, com teto de tempo). */
 export async function consumoDaTela(cliente: ClienteDoParceiro, alcance: Alcance, f: FiltrosDoConsumo): Promise<ConsumoDaTela> {
-  return cliente.transacao(
-    async (tx) => {
-      const { recorte, lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
-      const opcoes = motivo === 'sem-permissao' ? SEM_OPCOES : await opcoesDoConsumo(tx, lojasDoAcesso, f);
-      const vazio: ConsumoDaTela = {
-        motivoVazio: motivo,
-        opcoes,
-        lojasUsadas: [],
-        verValores: false,
-        resumo: null,
-        pagina: null,
-        aguardando: 0,
-        contagensEmAndamento: 0,
-        lojasSemEstoque: [],
-        numeroDaPagina: 1,
-        paginas: 1,
-      };
-      if (!recorte) return vazio;
-      const lojasUsadas = lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id));
-      const resumo = await resumoDoConsumo(tx, recorte);
-      // O total vem ANTES de pedir a página: a pedida além da última cai na última.
-      const paginas = Math.max(1, Math.ceil(resumo.linhas / f.porPagina));
-      const numero = Math.min(Math.max(1, f.pagina), paginas);
-      const doBanco = await linhasDoConsumo(tx, recorte, { numero, porPagina: f.porPagina }, 0);
-      return {
-        ...vazio,
-        motivoVazio: null,
-        lojasUsadas,
-        verValores: recorte.verValores,
-        resumo,
-        pagina: { linhas: doBanco.linhas, total: resumo.linhas },
-        aguardando: await documentosAguardandoDoConsumo(tx, recorte.lojas),
-        contagensEmAndamento: await contagensEmAndamento(tx, recorte.lojas),
-        lojasSemEstoque: await lojasSemEstoqueAberto(tx, lojasUsadas),
-        numeroDaPagina: numero,
-        paginas,
-      };
-    },
-    { repetivel: true, timeout: 60_000 },
-  );
+  try {
+    return await cliente.transacao(
+      async (tx) => {
+        const { recorte, lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
+        const opcoes = motivo === 'sem-permissao' ? SEM_OPCOES : await opcoesDoConsumo(tx, lojasDoAcesso, f);
+        if (!recorte) return semNumeros(motivo, opcoes);
+        const lojasUsadas = lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id));
+        // O livro é lido UMA vez: o resumo, a página e as caixas dela saem da mesma consulta (a página pedida além da última cai na última).
+        const lido = await lerConsumo(tx, recorte, { pagina: f.pagina, porPagina: f.porPagina });
+        return {
+          ...semNumeros(null, opcoes),
+          lojasUsadas,
+          verValores: recorte.verValores,
+          resumo: lido.resumo,
+          pagina: { linhas: lido.linhas, total: lido.total },
+          aguardando: await documentosAguardandoDoConsumo(tx, recorte.lojas),
+          contagensEmAndamento: await contagensEmAndamento(tx, recorte.lojas),
+          lojasSemEstoque: await lojasSemEstoqueAberto(tx, lojasUsadas),
+          numeroDaPagina: lido.numeroDaPagina,
+          paginas: lido.paginas,
+        };
+      },
+      { repetivel: true, relatorio: {} },
+    );
+  } catch (e) {
+    if (!(e instanceof ErroDeRelatorio)) throw e;
+    // Não coube: a tela sai com os filtros (uma leitura leve, fora da vaga do relatório) e a frase, sem 500.
+    const opcoes = await cliente.transacao(async (tx) => {
+      const { lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
+      return motivo === 'sem-permissao' ? SEM_OPCOES : opcoesDoConsumo(tx, lojasDoAcesso, f);
+    });
+    return { ...semNumeros('demorou', opcoes), demorou: queNaoCaiu(e) };
+  }
 }
 
+export type ConsumoCompleto =
+  | { motivoVazio: 'sem-permissao' | 'sem-loja' | 'periodo' | null; demorou: null; recorte: null; lojasUsadas: { id: string; nome: string }[]; resumo: null; linhas: null; aguardando: number; contagensEmAndamento: number; lojasSemEstoque: string[] }
+  | { motivoVazio: 'demorou'; demorou: RelatorioQueNaoCaiu; recorte: null; lojasUsadas: { id: string; nome: string }[]; resumo: null; linhas: null; aguardando: number; contagensEmAndamento: number; lojasSemEstoque: string[] }
+  | { motivoVazio: null; demorou: null; recorte: RecorteDoConsumo; lojasUsadas: { id: string; nome: string }[]; resumo: ResumoDoConsumo; linhas: Pick<LeituraDoConsumo, 'linhas' | 'total' | 'passouDoTeto'>; aguardando: number; contagensEmAndamento: number; lojasSemEstoque: string[] };
+
 /** Tudo para a planilha e a impressão: o resumo e as linhas inteiras (sem página), até o teto. */
-export async function consumoCompleto(cliente: ClienteDoParceiro, alcance: Alcance, f: FiltrosDoConsumo, teto: number) {
-  return cliente.transacao(
-    async (tx) => {
-      const { recorte, lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
-      if (!recorte) return { motivoVazio: motivo, recorte: null, lojasUsadas: [] as { id: string; nome: string }[], resumo: null, linhas: null, aguardando: 0, contagensEmAndamento: 0, lojasSemEstoque: [] as string[] };
-      const lojasUsadas = lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id));
-      // Em fila, na mesma fotografia (a transação tem uma conexão só).
-      const resumo = await resumoDoConsumo(tx, recorte);
-      const linhas = await linhasDoConsumo(tx, recorte, null, teto);
-      return {
-        motivoVazio: null,
-        recorte,
-        lojasUsadas,
-        resumo,
-        linhas,
-        aguardando: await documentosAguardandoDoConsumo(tx, recorte.lojas),
-        contagensEmAndamento: await contagensEmAndamento(tx, recorte.lojas),
-        lojasSemEstoque: await lojasSemEstoqueAberto(tx, lojasUsadas),
-      };
-    },
-    { repetivel: true, timeout: 120_000 },
-  );
+export async function consumoCompleto(cliente: ClienteDoParceiro, alcance: Alcance, f: FiltrosDoConsumo, teto: number): Promise<ConsumoCompleto> {
+  const nada = () => ({ recorte: null, lojasUsadas: [] as { id: string; nome: string }[], resumo: null, linhas: null, aguardando: 0, contagensEmAndamento: 0, lojasSemEstoque: [] as string[] });
+  try {
+    return await cliente.transacao(
+      async (tx): Promise<ConsumoCompleto> => {
+        const { recorte, lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
+        if (!recorte) return { ...nada(), motivoVazio: motivo, demorou: null };
+        const lojasUsadas = lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id));
+        const lido = await lerConsumo(tx, recorte, { teto });
+        return {
+          motivoVazio: null,
+          demorou: null,
+          recorte,
+          lojasUsadas,
+          resumo: lido.resumo,
+          linhas: { linhas: lido.linhas, total: lido.total, passouDoTeto: lido.passouDoTeto },
+          aguardando: await documentosAguardandoDoConsumo(tx, recorte.lojas),
+          contagensEmAndamento: await contagensEmAndamento(tx, recorte.lojas),
+          lojasSemEstoque: await lojasSemEstoqueAberto(tx, lojasUsadas),
+        };
+      },
+      { repetivel: true, relatorio: {} },
+    );
+  } catch (e) {
+    if (!(e instanceof ErroDeRelatorio)) throw e;
+    return { ...nada(), motivoVazio: 'demorou', demorou: queNaoCaiu(e) };
+  }
 }
 
 export interface MovimentosDaTela {
-  motivoVazio: 'sem-permissao' | 'sem-loja' | 'periodo' | null;
+  motivoVazio: 'sem-permissao' | 'sem-loja' | 'periodo' | 'demorou' | null;
+  /** Só com `motivoVazio: 'demorou'`. */
+  demorou: RelatorioQueNaoCaiu | null;
   opcoes: OpcoesDoConsumo;
   lojasUsadas: { id: string; nome: string }[];
   verValores: boolean;
@@ -720,18 +763,27 @@ export interface MovimentosDaTela {
 
 /** Os movimentos que formam um número do relatório (a coluna `f.col`), para a tela "Movimentos". */
 export async function movimentosDaTela(cliente: ClienteDoParceiro, alcance: Alcance, f: FiltrosDoConsumo): Promise<MovimentosDaTela> {
-  return cliente.transacao(
-    async (tx) => {
-      const { recorte, lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
-      const opcoes = motivo === 'sem-permissao' ? SEM_OPCOES : await opcoesDoConsumo(tx, lojasDoAcesso, f);
-      const vazio: MovimentosDaTela = { motivoVazio: motivo, opcoes, lojasUsadas: [], verValores: false, lista: null, numeroDaPagina: 1, paginas: 1 };
-      if (!recorte || !f.col) return vazio;
-      const primeira = await movimentosDoConsumo(tx, recorte, f.col, { numero: 1, porPagina: f.porPagina }, 0, f.bucket);
-      const paginas = Math.max(1, Math.ceil(primeira.total / f.porPagina));
-      const numero = Math.min(Math.max(1, f.pagina), paginas);
-      const lista = numero === 1 ? primeira : await movimentosDoConsumo(tx, recorte, f.col, { numero, porPagina: f.porPagina }, 0, f.bucket);
-      return { ...vazio, motivoVazio: null, lojasUsadas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)), verValores: recorte.verValores, lista, numeroDaPagina: numero, paginas };
-    },
-    { repetivel: true, timeout: 60_000 },
-  );
+  try {
+    return await cliente.transacao(
+      async (tx) => {
+        const { recorte, lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
+        const opcoes = motivo === 'sem-permissao' ? SEM_OPCOES : await opcoesDoConsumo(tx, lojasDoAcesso, f);
+        const vazio: MovimentosDaTela = { motivoVazio: motivo, demorou: null, opcoes, lojasUsadas: [], verValores: false, lista: null, numeroDaPagina: 1, paginas: 1 };
+        if (!recorte || !f.col) return vazio;
+        const primeira = await movimentosDoConsumo(tx, recorte, f.col, { numero: 1, porPagina: f.porPagina }, 0, f.bucket);
+        const paginas = Math.max(1, Math.ceil(primeira.total / f.porPagina));
+        const numero = Math.min(Math.max(1, f.pagina), paginas);
+        const lista = numero === 1 ? primeira : await movimentosDoConsumo(tx, recorte, f.col, { numero, porPagina: f.porPagina }, 0, f.bucket);
+        return { ...vazio, motivoVazio: null, lojasUsadas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)), verValores: recorte.verValores, lista, numeroDaPagina: numero, paginas };
+      },
+      { repetivel: true, relatorio: {} },
+    );
+  } catch (e) {
+    if (!(e instanceof ErroDeRelatorio)) throw e;
+    const opcoes = await cliente.transacao(async (tx) => {
+      const { lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
+      return motivo === 'sem-permissao' ? SEM_OPCOES : opcoesDoConsumo(tx, lojasDoAcesso, f);
+    });
+    return { motivoVazio: 'demorou', demorou: queNaoCaiu(e), opcoes, lojasUsadas: [], verValores: false, lista: null, numeroDaPagina: 1, paginas: 1 };
+  }
 }

@@ -11,10 +11,10 @@
 
 import type { Alcance } from './permissoes';
 import { pode } from './permissoes';
-import type { ClienteDoParceiro } from './tenant';
+import { ErroDeRelatorio, type ClienteDoParceiro } from './tenant';
 import { formatarData, hojeNoRio } from './compra-campos';
 import { BOM_DO_CSV, celulaDeTexto } from './compras-relatorio-campos';
-import { respostaHttpDaPlanilha, parametrosDaUrl, type RespostaDaPlanilha } from './compras-relatorio-planilha';
+import { respostaHttpDaPlanilha, parametrosDaUrl, recusaDeRelatorio, type RespostaDaPlanilha } from './compras-relatorio-planilha';
 import { consumoCompleto, movimentosDoConsumo, resolverRecorteDoConsumo, type LinhaDoConsumo, type MovimentoDoConsumo } from './consumo-estoque';
 import {
   BUCKETS,
@@ -140,6 +140,21 @@ export async function planilhaDoConsumo(
   f: FiltrosDoConsumo,
   opcoes: { parte: 'linhas' | 'movimentos'; agora?: Date; teto?: number },
 ): Promise<RespostaDaPlanilha> {
+  try {
+    return await montarPlanilhaDoConsumo(cliente, alcance, f, opcoes);
+  } catch (e) {
+    // Grande demais ou servidor ocupado: a frase no lugar do arquivo, nunca um 500.
+    if (e instanceof ErroDeRelatorio) return recusaDeRelatorio(e);
+    throw e;
+  }
+}
+
+async function montarPlanilhaDoConsumo(
+  cliente: ClienteDoParceiro | null,
+  alcance: Alcance | null,
+  f: FiltrosDoConsumo,
+  opcoes: { parte: 'linhas' | 'movimentos'; agora?: Date; teto?: number },
+): Promise<RespostaDaPlanilha> {
   if (!cliente || !alcance) return { ok: false, status: 401, frase: 'Entre no ERP para baixar a planilha.' };
   if (!pode(alcance, 'estoque.ver')) return { ok: false, status: 403, frase: 'Seu acesso não inclui ver o estoque.' };
   if (f.periodoInvalido) return { ok: false, status: 400, frase: f.periodoInvalido };
@@ -157,7 +172,7 @@ export async function planilhaDoConsumo(
         const m = await movimentosDoConsumo(tx, recorte, f.col as NonNullable<typeof f.col>, null, teto, f.bucket);
         return { recorte, m, lojas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)).map((l) => l.nome), insumo: f.insumoId ? (await tx.insumo.findUnique({ where: { id: f.insumoId }, select: { nome: true } }))?.nome : undefined };
       },
-      { repetivel: true, timeout: 120_000 },
+      { repetivel: true, relatorio: {} },
     );
     if (!lido) return { ok: false, status: 403, frase: 'Nenhuma loja do seu acesso entra neste relatório.' };
     if (lido.m.passouDoTeto) return { ok: false, status: 413, frase: `Este número tem mais de ${teto.toLocaleString('pt-BR')} movimentos e a planilha não corta calada. Reduza o período ou filtre por loja ou insumo.` };
@@ -175,6 +190,7 @@ export async function planilhaDoConsumo(
   }
 
   const r = await consumoCompleto(cliente, alcance, f, teto);
+  if (r.demorou) return recusaDeRelatorio({ motivo: r.demorou.motivo, message: `${r.demorou.titulo} ${r.demorou.texto}` });
   if (!r.recorte || !r.resumo || !r.linhas) return { ok: false, status: 403, frase: 'Nenhuma loja do seu acesso entra neste relatório.' };
   if (r.linhas.passouDoTeto) return { ok: false, status: 413, frase: `Este recorte tem mais de ${teto.toLocaleString('pt-BR')} linhas e a planilha não corta calada. Reduza o período ou filtre por loja ou insumo.` };
   const vv = r.recorte.verValores;

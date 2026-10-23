@@ -51,6 +51,7 @@ export async function PaginaDoConsumo({ ctx, bases, searchParams }: { ctx: Ctx; 
   }
   if (searchParams.imprimir === '1') {
     const r = await consumoDaTela(ctx.cliente, ctx.alcance, { ...f, pagina: 1, porPagina: TETO_DA_IMPRESSAO_DO_CONSUMO });
+    if (r.demorou) return <Nada titulo={r.demorou.titulo} texto={`${r.demorou.texto} A versão para imprimir lê o recorte inteiro.`} />;
     if (!r.resumo || !r.pagina) return <Nada titulo="Nada para imprimir." texto={f.periodoInvalido ?? 'Nenhuma loja do seu acesso entra neste relatório.'} />;
     return <ImpressaoDoConsumo caminho={caminho} contexto={ctx.parceiro.nome} f={f} r={r} geradoEm={geradoEm()} hoje={hoje} teto={TETO_DA_IMPRESSAO_DO_CONSUMO} />;
   }

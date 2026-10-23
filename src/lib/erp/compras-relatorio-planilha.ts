@@ -178,7 +178,10 @@ export function totaisDaPlanilha(t: TotaisDoRecorte, comPreco: boolean, cancelad
 
 export type ParteDaPlanilha = 'linhas' | 'resumo';
 
-export type RespostaDaPlanilha = { ok: true; nome: string; corpo: string } | { ok: false; status: 400 | 401 | 403 | 413; frase: string };
+export type RespostaDaPlanilha = { ok: true; nome: string; corpo: string } | { ok: false; status: 400 | 401 | 403 | 413 | 503; frase: string };
+
+/** O relatório não coube agora: 413 se passou do teto de tempo, 503 se o servidor está ocupado com outros. A frase é a mesma da tela. */
+export const recusaDeRelatorio = (e: { motivo: 'tempo' | 'ocupado'; message: string }): RespostaDaPlanilha => ({ ok: false, status: e.motivo === 'ocupado' ? 503 : 413, frase: e.message });
 
 /**
  * A planilha inteira de um relatório. `titulo`: o nome da tela de onde saiu. Devolve a recusa em frase (sem sessão, sem permissão,
