@@ -119,6 +119,7 @@ export function FormularioDosPeriodos({ caminho, f, opcoes, hoje }: { caminho: s
               </option>
             ))}
           </select>
+          {opcoes.insumosTruncados && <p className="mt-1 text-[12px] text-suave">São muitos insumos; procure pelo nome para encurtar a lista.</p>}
         </div>
         <div className="col-span-2 sm:col-span-1">
           <label htmlFor="cmp-categoria" className={ROTULO}>

@@ -321,3 +321,20 @@ Editorial (separadores delicados, número de tabela sem serifa):
   **Impressão**: mesma tela com `imprimir=1`, papel claro em qualquer tema, sem menu, barra do topo, abas e botões
   (`@media print` em `tokens.css`), tabelas inteiras com cabeçalho repetido e linha que não parte; rolagem na própria região
   (focável) abaixo de 640 px.
+- **Comparação de fornecedores e de períodos (L.3)**: duas telas ao lado dos relatórios da L.2, no mesmo `PageHeader`, filtros em formulário GET (rótulo
+  persistente; Período A e Período B em dois `fieldset` de duas colunas, sempre à vista; o resto recolhido em "Filtros (n)" abaixo de 640 px),
+  atalhos de comparação em chips de 36 px (44 em toque) e chips "Valendo nos dois períodos:". **Períodos**: três `Cartao` (A, B, variação, com o
+  gasto em Gelasio 26/700 e a medida, o nº de compras e as quantidades POR UNIDADE em 12 px), o painel "Antes de ler" (cobertura, tamanhos,
+  sobreposição; um link no cartão da variação leva a ele), "De onde veio a variação" com a frase efeito preço × volume em 12 px e quatro cartões
+  (volume, preço com "do mesmo fornecedor · troca de fornecedor", "só num dos períodos" com entrou e saiu, e "A soma" em lista de quatro linhas
+  que termina em "= variação (igual à variação)"); tabela "Por insumo" (≥ 1024 px: Insumo, Quantidade, Custo médio, Gasto, Variação, Efeito
+  volume, Efeito preço; A e B empilhados e sem quebra, o gasto de cada lado é link para as compras dele; rodapé "Total de todos os insumos (não só
+  desta página)" só quando há mais de um) e cartões abaixo de 1024 px; com um insumo só, uma tabela dos fornecedores lado a lado. **Sinal**:
+  valor de variação sempre com + ou − (nunca só cor; o sinal menos é "−" tipográfico), zero sem sinal, "sem base" em palavra, nunca ∞ nem
+  0,0% no lugar de "sem base". Sem cor boa/ruim: gastar mais não é erro. **Fornecedores**: cartões do insumo, da marca de referência (só
+  informação) e do recorte, e uma tabela por unidade (≥ 1024 px: Fornecedor com selos e embalagens, Compras e quantidade com o frete,
+  Preço do item, Custo entregue com a diferença para o mais barato, Última compra) ou cartões (nome e selos, dois preços lado a lado, compras
+  · quantidade · frete, embalagens, última compra e "Ver as N linhas"); selos em palavra ("Mais barato no preço do item", "Mais barato
+  entregue"), "Sem base" em selo de atenção. Impressão e planilha como as da L.2 (landmarks com nomes únicos).
+- **Alvo de toque em link de uma palavra** (L.3): o link de tabela ou marcado com `ff-toque` ganha 9 px de folga invisível nos lados (compensada
+  pela margem) além dos 14 px de cima e de baixo: "Ovo" e "Alho" chegam a 44 x 44 sem mexer no desenho.
