@@ -113,6 +113,19 @@ coletar_dominios() {
   done < /tmp/inventario.tsv
 }
 
+# "recusada" = nada escutando (serviço parado); "expirou" = pacote descartado
+# (firewall). A diferença decide onde procurar.
+porta() {
+  local out
+  out=$(nc -vz -w 8 "$VPS_IP" "$1" 2>&1)
+  case "$out" in
+    *succeeded*|*open*) echo "porta $1: ABERTA" ;;
+    *refused*)          echo "porta $1: RECUSADA (nada escutando)" ;;
+    *timed\ out*|*Operation\ now*|"") echo "porta $1: EXPIROU (pacote descartado — firewall?)" ;;
+    *) echo "porta $1: $out" ;;
+  esac
+}
+
 # ================================================================ etapas
 diagnosticar() {
   titulo "1. Rede (do runner)"
@@ -156,9 +169,7 @@ REMOTO
   [ -s /tmp/inventario.tsv ] || return 0
 
   titulo "5. Portas 80/443 e DNS (resolvedor público)"
-  for p in 80 443; do
-    timeout 8 bash -c "echo > /dev/tcp/${VPS_IP}/${p}" 2>/dev/null && echo "porta ${p}: aberta" || echo "porta ${p}: fechada/sem resposta"
-  done
+  for p in 22 80 443 3000; do porta "$p"; done
 
   titulo "6. Containers (via API do Dokploy: nome, estado)"
   code=$(dokploy GET /api/docker.getContainers)
@@ -184,6 +195,20 @@ REMOTO
       | "\(.createdAt)\t\(.finishedAt // "-")\t\(.status)\t\($n)\t\(.title // "" | .[0:70])"' /tmp/dk.json >> /tmp/deploys.tsv
   done < /tmp/inventario.tsv
   sort /tmp/deploys.tsv | column -t -s $'\t' 2>/dev/null || sort /tmp/deploys.tsv
+  [ -s /tmp/deploys.tsv ] || { echo "(nenhum — formato da resposta:)"; jq -c 'if type=="array" then (.[0] // {} | keys) else keys end' /tmp/dk.json 2>/dev/null | head -c 400; echo; }
+
+  titulo "9. Traefik (inspect: só estado, portas, rede, reinícios)"
+  for c in dokploy-traefik; do
+    code=$(dokploy GET "/api/docker.getConfig?containerId=${c}")
+    echo "docker.getConfig ${c} -> HTTP ${code}"
+    [ "$code" = 200 ] && jq -c '{State: (.State | {Status, Running, Restarting, ExitCode, Error, StartedAt, FinishedAt, OOMKilled}),
+        RestartCount, RestartPolicy: .HostConfig.RestartPolicy.Name, NetworkMode: .HostConfig.NetworkMode,
+        PortBindings: .HostConfig.PortBindings, Ports: .NetworkSettings.Ports,
+        Redes: (.NetworkSettings.Networks | keys)}' /tmp/dk.json 2>/dev/null
+  done
+  code=$(dokploy GET "/api/docker.getContainersByAppNameMatch?appName=dokploy")
+  echo "containers 'dokploy*' -> HTTP ${code}"
+  [ "$code" = 200 ] && jq -r '.[]? | "  \(.name)\t\(.state)\t\(.status)"' /tmp/dk.json
 }
 
 reiniciar() {
@@ -272,9 +297,7 @@ REMOTO
       code=$(dokploy POST /api/settings.reloadTraefik '{}')
       echo "POST settings.reloadTraefik -> HTTP ${code}"
       sleep 20
-      for p in 80 443; do
-        timeout 8 bash -c "echo > /dev/tcp/${VPS_IP}/${p}" 2>/dev/null && echo "porta ${p}: aberta" || echo "porta ${p}: fechada"
-      done
+      for p in 80 443; do porta "$p"; done
       case "$code" in 2*) ;; *) falhas=$((falhas+1)) ;; esac
       continue
     fi
