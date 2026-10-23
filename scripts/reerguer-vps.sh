@@ -190,7 +190,8 @@ REMOTO
   desde=$(date -u -d '36 hours ago' +%Y-%m-%dT%H:%M)
   while IFS=$'\t' read -r t id n _ _; do
     case "$t" in compose|application) ;; *) continue ;; esac
-    [ "$(dokploy GET "/api/deployment.all?${t}Id=$id")" = 200 ] || continue
+    if [ "$t" = compose ]; then q="deployment.allByCompose?composeId=$id"; else q="deployment.all?applicationId=$id"; fi
+    c=$(dokploy GET "/api/$q"); [ "$c" = 200 ] || { echo "  $n: $q -> HTTP $c"; continue; }
     jq -r --arg n "$n" --arg d "$desde" '.[]? | select(.createdAt >= $d)
       | "\(.createdAt)\t\(.finishedAt // "-")\t\(.status)\t\($n)\t\(.title // "" | .[0:70])"' /tmp/dk.json >> /tmp/deploys.tsv
   done < /tmp/inventario.tsv
