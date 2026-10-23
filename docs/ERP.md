@@ -4310,3 +4310,18 @@ o histórico leem os dois (`situacao = 'ENVIADA'` ou `confirmadaEm` preenchida).
 | Jornada curta (build de produção) | 31 de 31: lote vencido bloqueado (painel, lote, emissão, papel antigo); sem Zebra no tablet, .zpl e papel não tiram da fila; papel A4 com 2 cópias = 1 folha (PDF); "Já imprimi" tira, com quem e quando; Zebra muda = "Sem resposta"/"Sem resultado"; "Paper out" em palavras; Zebra aceita = sai da fila; histórico com "Já imprimi" |
 | Matriz das telas mexidas × dona/operador × 390/820/1180/1440 × claro/escuro | 224 medições: 0 rolagem lateral, 0 violação do axe, 0 erro de console, nenhum alvo abaixo de 44 px com toque (depois do "Ver o estoque"), um h1, nenhum R$ nas telas de etiqueta |
 
+## Rodada final da 3.4
+
+Os dois fiscais aprovaram a rodada 1, com um ponto de segurança do alimento e menores (decisões 425–428; 402, 408, 418 e
+423 corrigidas no lugar):
+
+- **Embalagem sem prazo vence com o lote** (425): `limiteDeUso` = a validade gravada ou, sem ela, o fim do dia do vencimento
+  do lote no Rio. Depois disso não emite, não imprime (Zebra, arquivo, papel novo e antigo), não confirma, sai da fila e o
+  painel diz "venceu: não use". A etiqueta continua sem data de validade.
+- **"Já imprimi" × Zebra** (426): pedidos lidos com `FOR UPDATE`; sem erro cru; o gatilho recusa pedido que nasce confirmado
+  e confirmação no futuro.
+- **Versão do layout** (427): é a 1; `desenhoDaEmissao` desenha pela versão gravada (versão desconhecida não imprime).
+  Mudou o desenho? Versão 2 ao lado da 1. `emissaoParaArquivo` saiu.
+- **Telas** (428): o sem prazo em duas linhas na etiqueta; "Etiqueta emitida: ela espera a impressora."; histórico com
+  detalhes curtos e o cartão "Esperando o Já imprimi".
+
