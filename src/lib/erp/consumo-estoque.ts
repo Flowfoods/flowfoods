@@ -1,0 +1,729 @@
+/**
+ * Consumo e conciliação de estoque (L.4) — a leitura com banco. UM motor serve à tela, aos movimentos de cada número, à planilha e à
+ * impressão: o mesmo recorte (lojas do acesso, período no relógio do Rio, insumo, categoria, atenção) vira o mesmo trecho de SQL,
+ * então tela, total, exportação e impressão nunca discordam.
+ *
+ * - SÓ LÊ. Nenhum INSERT/UPDATE/DELETE: a baixa de insumo é da requisição, nunca da geração do relatório (teste conta as linhas).
+ * - A fonte é o livro (`MovimentoEstoque`): quantidade em milésimos e dinheiro em centavos, com sinal, como o livro gravou. A
+ *   classificação de cada movimento numa coluna é UMA só, aqui no SQL (`BUCKET`): um movimento nunca cai em duas colunas.
+ * - Saldo inicial = soma do livro até o início do primeiro dia; final = até o fim do último. A ponte (inicial + movimentos = final)
+ *   é conferida por uma segunda soma direta, e o livro é conferido com `SaldoEstoque` (a cópia de consulta).
+ * - Quem vê: `estoque.ver`, por loja. R$ só para quem tem `compras.ver` em TODAS as lojas do recorte; sem isso o valor nem sai do
+ *   banco para a tela. Loja pedida fora do acesso NUNCA amplia: o relatório sai vazio.
+ * - Todas as leituras de uma tela acontecem numa transação de UMA fotografia (REPEATABLE READ).
+ * - O SQL é fixo (só parâmetros); os trechos compartilhados são `Prisma.sql` montados aqui e conferidos pelo mesmo guarda do portão.
+ */
+
+import { Prisma } from '@prisma/client';
+import type { ClienteDoParceiro } from './tenant';
+import { conferirSqlDoParceiro } from './tenant';
+import { filtroDeLojas, pode, type Alcance } from './permissoes';
+import { idsDeInsumoPelaBusca } from './busca';
+import { FUSO_OPERACIONAL, somarDias } from './compras-relatorio-campos';
+import type { Unidade } from './unidades';
+import {
+  BUCKETS_DA_COLUNA,
+  LISTA_DE_BUCKETS,
+  conferirPonte,
+  lacunasDaLinha,
+  type BucketId,
+  type ColunaDeLink,
+  type FiltrosDoConsumo,
+  type Lacuna,
+  type Soma,
+  type SomasPorBucket,
+} from './consumo-estoque-campos';
+
+const BUCKETS_CONHECIDOS = new Set<string>(LISTA_DE_BUCKETS);
+
+function guardado(f: Prisma.Sql): Prisma.Sql {
+  conferirSqlDoParceiro(f.strings);
+  return f;
+}
+
+/** O recorte já resolvido contra o acesso: o que o SQL recebe. */
+export interface RecorteDoConsumo {
+  parceiroId: string;
+  lojas: string[];
+  de: string;
+  ate: string;
+  /** O dia seguinte ao último: o fim aberto do intervalo [início, fim). */
+  fim: string;
+  /** null = qualquer insumo; lista (inclusive vazia) = só estes. */
+  insumoIds: string[] | null;
+  categoriaId: string | null;
+  so: FiltrosDoConsumo['so'];
+  /** Pode ver R$ em todas as lojas do recorte? Se não, o valor nem é lido para a tela. */
+  verValores: boolean;
+}
+
+export interface OpcoesDoConsumo {
+  lojas: { id: string; nome: string; ativa: boolean }[];
+  categorias: { id: string; nome: string }[];
+  listaDeInsumos: { id: string; nome: string }[];
+  insumosTruncados: boolean;
+}
+
+// ------------------------------------------------------------------- o SQL
+
+const INICIO = (r: RecorteDoConsumo) => guardado(Prisma.sql`((${r.de}::timestamp AT TIME ZONE ${FUSO_OPERACIONAL}::text) AT TIME ZONE 'UTC')`);
+const FIM = (r: RecorteDoConsumo) => guardado(Prisma.sql`((${r.fim}::timestamp AT TIME ZONE ${FUSO_OPERACIONAL}::text) AT TIME ZONE 'UTC')`);
+
+/** A versão de uma entrada de nota, lida da chave `compra:<nota>:<versão>:<ordem>` do movimento `a`; nula se a chave é de outro jeito. */
+const VERSAO = (a: string) => `(CASE WHEN ${a}."chaveIdempotencia" ~ '^compra:[^:]+:[0-9]+:[0-9]+$' THEN split_part(${a}."chaveIdempotencia", ':', 3)::bigint END)`;
+
+/**
+ * Em que caixa cai o movimento `m` (com o original `o` se ele é estorno, a nota `n`, as versões da nota `nv` e `rp."doLote"`, se a
+ * requisição é de um lote). A MESMA regra em toda consulta; a tela só rotula (`BUCKETS`). A ordem das regras importa: devolução e
+ * relançamento da requisição vêm ANTES do "uso". Texto fixo, sem dado de fora.
+ */
+const BUCKET = `(CASE
+      WHEN m."tipo" = 'ABERTURA' AND m."estornoDeId" IS NULL THEN 'abertura'
+      WHEN m."tipo" = 'ENTRADA_COMPRA' AND m."estornoDeId" IS NULL THEN
+        CASE WHEN ${VERSAO('m')} IS NULL OR nv."mn" IS NULL OR ${VERSAO('m')} <= nv."mn" THEN 'compra' ELSE 'nota_corrigida' END
+      WHEN m."tipo" = 'ENTRADA_COMPRA' THEN
+        CASE WHEN n."status"::text = 'CANCELADA' AND (${VERSAO('o')} IS NULL OR nv."mx" IS NULL OR ${VERSAO('o')} >= nv."mx") THEN 'nota_cancelada' ELSE 'nota_corrigida' END
+      WHEN m."tipo" = 'PRODUCAO_ENTRADA' THEN CASE WHEN m."estornoDeId" IS NULL THEN 'producao' ELSE 'lote_estornado' END
+      WHEN m."tipo" = 'REQUISICAO' THEN
+        CASE WHEN m."estornoDeId" IS NOT NULL OR m."chaveIdempotencia" LIKE 'devolucao:%'
+             THEN CASE WHEN rp."doLote" THEN 'devolucao_producao' ELSE 'devolucao_setor' END
+             ELSE CASE WHEN rp."doLote" THEN 'uso_producao' ELSE 'uso_setor' END END
+      WHEN m."tipo" = 'PRODUCAO_CONSUMO' AND m."estornoDeId" IS NULL THEN 'uso_producao'
+      WHEN m."tipo" = 'PERDA' AND m."estornoDeId" IS NULL THEN 'perda'
+      WHEN m."tipo" = 'CONTAGEM' AND m."estornoDeId" IS NULL THEN CASE WHEN m."quantidadeMilesimos" > 0 THEN 'contagem_sobra' ELSE 'contagem_falta' END
+      WHEN m."tipo" = 'AJUSTE' AND m."estornoDeId" IS NULL THEN 'ajuste'
+      ELSE 'estorno_outro'
+    END)`;
+
+/** Movimento sem nada que diga de onde veio: nenhum documento e (para perda e ajuste) nem motivo escrito. */
+const SEM_ORIGEM = `(m."notaId" IS NULL AND m."notaItemId" IS NULL AND m."requisicaoItemId" IS NULL AND m."contagemItemId" IS NULL AND m."ordemProducaoId" IS NULL
+      AND NOT (m."tipo"::text IN ('AJUSTE', 'PERDA') AND COALESCE(btrim(m."motivo"), '') <> ''))`;
+
+conferirSqlDoParceiro([BUCKET, SEM_ORIGEM]);
+
+interface OpcoesDaFonte {
+  /** Só os movimentos do período (as somas por caixa); sem isso vêm todos (os saldos precisam do histórico). */
+  soPeriodo?: boolean;
+  /** Só estes pares (loja, insumo): a página que está na tela. */
+  pares?: { lojaIds: string[]; insumoIds: string[] } | null;
+}
+
+/** Os movimentos do recorte, um por linha do livro, já com a caixa, o antes/depois do período e o que falta a cada consulta. */
+export function fonteDoConsumo(r: RecorteDoConsumo, o: OpcoesDaFonte = {}): Prisma.Sql {
+  const ids = r.insumoIds;
+  const pares = o.pares ?? null;
+  return guardado(Prisma.sql`
+    SELECT
+      m."id", m."lojaId", m."insumoId", m."tipo"::text AS "tipo", m."quantidadeMilesimos" AS "q", m."valorCentavos" AS "v",
+      m."saldoAntesMilesimos" AS "antesDoMov", m."saldoDepoisMilesimos" AS "depois", m."ocorridoEm", m."criadoEm", m."unidadeSnapshot"::text AS "unidade",
+      m."insumoNomeSnapshot", m."motivo", m."notaId", m."requisicaoItemId", m."contagemItemId", m."ordemProducaoId",
+      (m."estornoDeId" IS NOT NULL) AS "estorno",
+      (m."ocorridoEm" < ${INICIO(r)}) AS "antes",
+      (m."ocorridoEm" < ${FIM(r)}) AS "ate",
+      ${Prisma.raw(SEM_ORIGEM)} AS "semOrigem",
+      ${Prisma.raw(BUCKET)} AS "bucket"
+    FROM "MovimentoEstoque" m
+    LEFT JOIN "MovimentoEstoque" o ON o."parceiroId" = m."parceiroId" AND o."id" = m."estornoDeId"
+    LEFT JOIN "NotaEntrada" n ON n."parceiroId" = m."parceiroId" AND n."id" = m."notaId"
+    LEFT JOIN LATERAL (
+      SELECT MIN(x."ver") AS "mn", MAX(x."ver") AS "mx" FROM (
+        SELECT (CASE WHEN e."chaveIdempotencia" ~ '^compra:[^:]+:[0-9]+:[0-9]+$' THEN split_part(e."chaveIdempotencia", ':', 3)::bigint END) AS "ver"
+        FROM "MovimentoEstoque" e
+        WHERE m."tipo" = 'ENTRADA_COMPRA' AND e."parceiroId" = m."parceiroId" AND e."notaId" = m."notaId" AND e."tipo" = 'ENTRADA_COMPRA' AND e."estornoDeId" IS NULL
+      ) x
+    ) nv ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT EXISTS (
+        SELECT 1 FROM "RequisicaoItem" ri
+        JOIN "OrdemProducao" op ON op."parceiroId" = ri."parceiroId" AND op."requisicaoId" = ri."requisicaoId"
+        WHERE m."tipo" = 'REQUISICAO' AND ri."parceiroId" = m."parceiroId" AND ri."id" = m."requisicaoItemId"
+      ) AS "doLote"
+    ) rp ON TRUE
+    WHERE m."parceiroId" = ${r.parceiroId}::text
+      AND m."lojaId" = ANY(${r.lojas}::text[])
+      AND (${ids}::text[] IS NULL OR m."insumoId" = ANY(${ids}::text[]))
+      AND (NOT ${o.soPeriodo ?? false}::boolean OR (m."ocorridoEm" >= ${INICIO(r)} AND m."ocorridoEm" < ${FIM(r)}))
+      AND (${pares ? pares.lojaIds : null}::text[] IS NULL OR EXISTS (
+        SELECT 1 FROM unnest(${pares ? pares.lojaIds : null}::text[], ${pares ? pares.insumoIds : null}::text[]) AS p("l", "i")
+        WHERE p."l" = m."lojaId" AND p."i" = m."insumoId"))`);
+}
+
+/** Uma linha por par (loja, insumo) do recorte, com os saldos e os contadores de lacuna. Tem de vir depois de `mov` na mesma consulta. */
+function paresDoConsumo(r: RecorteDoConsumo): Prisma.Sql {
+  return guardado(Prisma.sql`
+    par AS (
+      SELECT mv."lojaId", mv."insumoId",
+        COALESCE(sum(mv."q") FILTER (WHERE mv."antes"), 0)::float8 AS "iq",
+        COALESCE(sum(mv."v") FILTER (WHERE mv."antes"), 0)::float8 AS "iv",
+        COALESCE(sum(mv."q") FILTER (WHERE mv."ate"), 0)::float8 AS "fq",
+        COALESCE(sum(mv."v") FILTER (WHERE mv."ate"), 0)::float8 AS "fv",
+        COALESCE(sum(mv."q"), 0)::float8 AS "totalq",
+        (count(*) FILTER (WHERE NOT mv."antes" AND mv."ate"))::float8 AS "nDentro",
+        (min(mv."depois") FILTER (WHERE NOT mv."antes" AND mv."ate"))::float8 AS "minSaldo",
+        (count(*) FILTER (WHERE NOT mv."antes" AND mv."ate" AND mv."semOrigem"))::float8 AS "semOrigem",
+        (count(*) FILTER (WHERE NOT mv."antes" AND mv."ate" AND mv."q" <> 0 AND mv."v" = 0))::float8 AS "semValor",
+        (count(DISTINCT mv."unidade"))::float8 AS "unidades",
+        min(mv."unidade") AS "unidade"
+      FROM mov mv GROUP BY mv."lojaId", mv."insumoId"
+    ),
+    cont AS (
+      SELECT c."lojaId", ci."insumoId",
+        ((max(c."fechadaEm") AT TIME ZONE 'UTC') AT TIME ZONE ${FUSO_OPERACIONAL}::text)::date AS "ultima",
+        bool_or(c."fechadaEm" >= ${INICIO(r)}) AS "noPeriodo"
+      FROM "ContagemItem" ci
+      JOIN "Contagem" c ON c."parceiroId" = ci."parceiroId" AND c."id" = ci."contagemId"
+      WHERE ci."parceiroId" = ${r.parceiroId}::text AND c."lojaId" = ANY(${r.lojas}::text[])
+        AND c."status"::text = 'FECHADA' AND c."desfecho"::text IN ('APLICADA', 'APLICADA_SOZINHA')
+        AND ci."contadoMilesimos" IS NOT NULL AND c."fechadaEm" < ${FIM(r)}
+      GROUP BY c."lojaId", ci."insumoId"
+    ),
+    sel AS (
+      SELECT p.*, l."nome" AS "loja", i."nome" AS "insumo", i."ativo", COALESCE(s."quantidadeMilesimos", 0)::float8 AS "guardado",
+             ct."ultima", COALESCE(ct."noPeriodo", false) AS "contadoNoPeriodo",
+             (p."fq" < 0 OR COALESCE(p."minSaldo", 0) < 0 OR p."semOrigem" > 0 OR COALESCE(s."quantidadeMilesimos", 0) <> p."totalq" OR p."unidades" > 1) AS "dura"
+      FROM par p
+      JOIN "Loja" l ON l."parceiroId" = ${r.parceiroId}::text AND l."id" = p."lojaId"
+      JOIN "Insumo" i ON i."parceiroId" = ${r.parceiroId}::text AND i."id" = p."insumoId"
+      LEFT JOIN "SaldoEstoque" s ON s."parceiroId" = ${r.parceiroId}::text AND s."lojaId" = p."lojaId" AND s."insumoId" = p."insumoId"
+      LEFT JOIN cont ct ON ct."lojaId" = p."lojaId" AND ct."insumoId" = p."insumoId"
+      WHERE (p."iq" <> 0 OR p."fq" <> 0 OR p."nDentro" > 0)
+        AND (${r.categoriaId}::text IS NULL OR i."categoriaId" = ${r.categoriaId}::text)
+    ),
+    selecionados AS (
+      SELECT * FROM sel x
+      WHERE (${r.so}::text <> 'atencao' OR x."dura")
+        AND (${r.so}::text <> 'semcontagem' OR (x."nDentro" > 0 AND NOT x."contadoNoPeriodo"))
+    )`);
+}
+
+// ------------------------------------------------------------ as consultas
+
+export interface LinhaDoConsumo {
+  lojaId: string;
+  loja: string;
+  insumoId: string;
+  insumo: string;
+  unidade: Unidade;
+  ativo: boolean;
+  inicial: { q: number; v: number };
+  final: { q: number; v: number };
+  somas: SomasPorBucket;
+  movimentosNoPeriodo: number;
+  minSaldo: number | null;
+  semOrigem: number;
+  semValor: number;
+  unidades: number;
+  saldoGuardado: number;
+  totalDoLivro: number;
+  ultimaContagemEm: string | null;
+  contadoNoPeriodo: boolean;
+  /** inicial + movimentos = final (segunda soma direta, no livro). */
+  confere: boolean;
+  diferencaMilesimos: number;
+  lacunas: Lacuna[];
+}
+
+const DIA = (d: Date | string | null) => (d === null ? null : typeof d === 'string' ? d.slice(0, 10) : d.toISOString().slice(0, 10));
+const semValor = (r: RecorteDoConsumo, n: number) => (r.verValores ? n : 0);
+
+interface ParLido {
+  lojaId: string; insumoId: string; loja: string; insumo: string; ativo: boolean; unidade: string | null;
+  iq: number; iv: number; fq: number; fv: number; totalq: number; nDentro: number; minSaldo: number | null;
+  semOrigem: number; semValor: number; unidades: number; guardado: number; ultima: Date | null; contadoNoPeriodo: boolean; dura: boolean;
+}
+
+interface BucketLido {
+  lojaId: string; insumoId: string; bucket: string; n: number; q: number; v: number;
+}
+
+function montarLinha(r: RecorteDoConsumo, p: ParLido, buckets: BucketLido[]): LinhaDoConsumo {
+  const somas: SomasPorBucket = {};
+  for (const b of buckets) {
+    if (b.lojaId !== p.lojaId || b.insumoId !== p.insumoId || !BUCKETS_CONHECIDOS.has(b.bucket)) continue;
+    const s = (somas[b.bucket as BucketId] ??= { n: 0, q: 0, v: 0 });
+    s.n += b.n;
+    s.q += b.q;
+    s.v += r.verValores ? b.v : 0;
+  }
+  const unidade = (p.unidade ?? 'UN') as Unidade;
+  const c = conferirPonte(p.iq, somas, p.fq);
+  const base = {
+    lojaId: p.lojaId,
+    loja: p.loja,
+    insumoId: p.insumoId,
+    insumo: p.insumo,
+    unidade,
+    ativo: p.ativo,
+    inicial: { q: p.iq, v: r.verValores ? p.iv : 0 },
+    final: { q: p.fq, v: r.verValores ? p.fv : 0 },
+    somas,
+    movimentosNoPeriodo: p.nDentro,
+    minSaldo: p.minSaldo,
+    semOrigem: p.semOrigem,
+    semValor: semValor(r, p.semValor),
+    unidades: p.unidades,
+    saldoGuardado: p.guardado,
+    totalDoLivro: p.totalq,
+    ultimaContagemEm: DIA(p.ultima),
+    contadoNoPeriodo: p.contadoNoPeriodo,
+    confere: c.fecha,
+    diferencaMilesimos: c.diferencaMilesimos,
+  };
+  return {
+    ...base,
+    lacunas: lacunasDaLinha({
+      unidade,
+      finalMilesimos: p.fq,
+      minSaldoMilesimos: p.minSaldo,
+      movimentosNoPeriodo: p.nDentro,
+      semOrigem: p.semOrigem,
+      semValor: base.semValor,
+      unidades: p.unidades,
+      saldoGuardadoMilesimos: p.guardado,
+      totalDoLivroMilesimos: p.totalq,
+      contadoNoPeriodo: p.contadoNoPeriodo,
+      ultimaContagemEm: base.ultimaContagemEm,
+      verValores: r.verValores,
+    }),
+  };
+}
+
+/** Os pares (loja × insumo) do recorte, ordenados por loja e insumo, uma página (ou todos até `teto`), com o total na mesma consulta. */
+async function paresDaPagina(tx: ClienteDoParceiro, r: RecorteDoConsumo, janela: { limite: number; deslocamento: number }) {
+  const lidos = await tx.sql<ParLido & { quantos: number }>`
+    WITH mov AS MATERIALIZED (${fonteDoConsumo(r)}),
+    ${paresDoConsumo(r)}
+    SELECT s."lojaId", s."insumoId", s."loja", s."insumo", s."ativo", s."unidade", s."iq", s."iv", s."fq", s."fv", s."totalq", s."nDentro", s."minSaldo",
+           s."semOrigem", s."semValor", s."unidades", s."guardado", s."ultima", s."contadoNoPeriodo", s."dura", count(*) OVER ()::float8 AS "quantos"
+    FROM selecionados s
+    ORDER BY s."loja", s."insumo", s."lojaId", s."insumoId"
+    LIMIT ${janela.limite}::int OFFSET ${janela.deslocamento}::int`;
+  return lidos;
+}
+
+async function bucketsDosPares(tx: ClienteDoParceiro, r: RecorteDoConsumo, pares: ParLido[] | null): Promise<BucketLido[]> {
+  if (pares && pares.length === 0) return [];
+  if (pares) {
+    return tx.sql<BucketLido>`
+      WITH mov AS (${fonteDoConsumo(r, { soPeriodo: true, pares: { lojaIds: pares.map((p) => p.lojaId), insumoIds: pares.map((p) => p.insumoId) } })})
+      SELECT mv."lojaId", mv."insumoId", mv."bucket", count(*)::float8 AS "n", sum(mv."q")::float8 AS "q", sum(mv."v")::float8 AS "v"
+      FROM mov mv GROUP BY mv."lojaId", mv."insumoId", mv."bucket"`;
+  }
+  // Todos os pares do recorte (planilha e impressão): a seleção vem da mesma conta dos saldos.
+  return tx.sql<BucketLido>`
+    WITH mov AS MATERIALIZED (${fonteDoConsumo(r)}),
+    ${paresDoConsumo(r)}
+    SELECT mv."lojaId", mv."insumoId", mv."bucket", count(*)::float8 AS "n", sum(mv."q")::float8 AS "q", sum(mv."v")::float8 AS "v"
+    FROM mov mv JOIN selecionados s ON s."lojaId" = mv."lojaId" AND s."insumoId" = mv."insumoId"
+    WHERE NOT mv."antes" AND mv."ate"
+    GROUP BY mv."lojaId", mv."insumoId", mv."bucket"`;
+}
+
+/** Uma página de linhas do relatório (ou todas, até o teto), já com as somas por caixa, a ponte e as lacunas. */
+export async function linhasDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo, pagina: { numero: number; porPagina: number } | null, teto: number) {
+  const limite = pagina ? pagina.porPagina : teto + 1;
+  const deslocamento = pagina ? (pagina.numero - 1) * pagina.porPagina : 0;
+  const lidos = await paresDaPagina(tx, r, { limite, deslocamento });
+  const doTeto = pagina ? lidos : lidos.slice(0, teto);
+  const buckets = await bucketsDosPares(tx, r, pagina ? doTeto : null);
+  return {
+    linhas: doTeto.map((p) => montarLinha(r, p, buckets)),
+    total: lidos[0]?.quantos ?? 0,
+    passouDoTeto: !pagina && lidos.length > teto,
+  };
+}
+
+export interface ResumoDaUnidade {
+  unidade: Unidade;
+  /** Quantos insumos × lojas tem nesta unidade. */
+  linhas: number;
+  inicial: { q: number; v: number };
+  final: { q: number; v: number };
+  somas: SomasPorBucket;
+  /** Soma das diferenças de ponte das linhas (zero quando tudo confere). */
+  diferencaMilesimos: number;
+}
+
+export interface ResumoDoConsumo {
+  linhas: number;
+  comLacunaDura: number;
+  semContagem: number;
+  semValor: number;
+  movimentosSemOrigem: number;
+  unidades: ResumoDaUnidade[];
+}
+
+const ORDEM_DA_UNIDADE: Record<string, number> = { KG: 0, L: 1, UN: 2 };
+
+/** O resumo de TUDO o que está no recorte (não só da página): por unidade, a ponte inteira, e os contadores de lacuna. */
+export async function resumoDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo): Promise<ResumoDoConsumo> {
+  const lidos = await tx.sql<{ tipo: string; unidade: string | null; chave: string | null; n: number; q: number; v: number; extra: number }>`
+    WITH mov AS MATERIALIZED (${fonteDoConsumo(r)}),
+    ${paresDoConsumo(r)}
+    SELECT 'saldo'::text AS "tipo", s."unidade", NULL::text AS "chave", count(*)::float8 AS "n",
+           sum(s."iq")::float8 AS "q", sum(s."iv")::float8 AS "v", 0::float8 AS "extra"
+    FROM selecionados s GROUP BY s."unidade"
+    UNION ALL
+    SELECT 'final'::text, s."unidade", NULL::text, count(*)::float8, sum(s."fq")::float8, sum(s."fv")::float8,
+           sum(s."fq" - (s."iq" + COALESCE(b."soma", 0)))::float8
+    FROM selecionados s
+    LEFT JOIN LATERAL (
+      SELECT sum(mv."q") AS "soma" FROM mov mv
+      WHERE mv."lojaId" = s."lojaId" AND mv."insumoId" = s."insumoId" AND NOT mv."antes" AND mv."ate"
+    ) b ON TRUE
+    GROUP BY s."unidade"
+    UNION ALL
+    SELECT 'bucket'::text, s."unidade", mv."bucket", count(*)::float8, sum(mv."q")::float8, sum(mv."v")::float8, 0::float8
+    FROM mov mv JOIN selecionados s ON s."lojaId" = mv."lojaId" AND s."insumoId" = mv."insumoId"
+    WHERE NOT mv."antes" AND mv."ate"
+    GROUP BY s."unidade", mv."bucket"
+    UNION ALL
+    SELECT 'geral'::text, NULL::text, NULL::text, count(*)::float8, 0::float8, 0::float8, 0::float8 FROM selecionados
+    UNION ALL
+    SELECT 'dura'::text, NULL::text, NULL::text, (count(*) FILTER (WHERE s."dura"))::float8, 0::float8, 0::float8, 0::float8 FROM selecionados s
+    UNION ALL
+    SELECT 'semcontagem'::text, NULL::text, NULL::text, (count(*) FILTER (WHERE s."nDentro" > 0 AND NOT s."contadoNoPeriodo"))::float8, 0::float8, 0::float8, 0::float8 FROM selecionados s
+    UNION ALL
+    SELECT 'semvalor'::text, NULL::text, NULL::text, COALESCE(sum(s."semValor"), 0)::float8, 0::float8, 0::float8, 0::float8 FROM selecionados s
+    UNION ALL
+    SELECT 'semorigem'::text, NULL::text, NULL::text, COALESCE(sum(s."semOrigem"), 0)::float8, 0::float8, 0::float8, 0::float8 FROM selecionados s`;
+  const porUnidade = new Map<string, ResumoDaUnidade>();
+  const da = (u: string | null) => {
+    const k = u ?? 'UN';
+    let x = porUnidade.get(k);
+    if (!x) {
+      x = { unidade: k as Unidade, linhas: 0, inicial: { q: 0, v: 0 }, final: { q: 0, v: 0 }, somas: {}, diferencaMilesimos: 0 };
+      porUnidade.set(k, x);
+    }
+    return x;
+  };
+  let linhas = 0;
+  let comLacunaDura = 0;
+  let semContagem = 0;
+  let semVal = 0;
+  let semOrigem = 0;
+  for (const l of lidos) {
+    if (l.tipo === 'saldo') {
+      const u = da(l.unidade);
+      u.linhas = l.n;
+      u.inicial = { q: l.q, v: r.verValores ? l.v : 0 };
+    } else if (l.tipo === 'final') {
+      const u = da(l.unidade);
+      u.final = { q: l.q, v: r.verValores ? l.v : 0 };
+      u.diferencaMilesimos = l.extra;
+    } else if (l.tipo === 'bucket' && l.chave && BUCKETS_CONHECIDOS.has(l.chave)) {
+      const s: Soma = (da(l.unidade).somas[l.chave as BucketId] ??= { n: 0, q: 0, v: 0 });
+      s.n += l.n;
+      s.q += l.q;
+      s.v += r.verValores ? l.v : 0;
+    } else if (l.tipo === 'geral') linhas = l.n;
+    else if (l.tipo === 'dura') comLacunaDura = l.n;
+    else if (l.tipo === 'semcontagem') semContagem = l.n;
+    else if (l.tipo === 'semvalor') semVal = l.n;
+    else if (l.tipo === 'semorigem') semOrigem = l.n;
+  }
+  return {
+    linhas,
+    comLacunaDura,
+    semContagem,
+    semValor: semValor(r, semVal),
+    movimentosSemOrigem: semOrigem,
+    unidades: Array.from(porUnidade.values()).sort((a, b) => (ORDEM_DA_UNIDADE[a.unidade] ?? 9) - (ORDEM_DA_UNIDADE[b.unidade] ?? 9)),
+  };
+}
+
+// ---------------------------------------------------------- os movimentos
+
+export interface MovimentoDoConsumo {
+  id: string;
+  lojaId: string;
+  loja: string;
+  insumoId: string;
+  insumo: string;
+  unidade: Unidade;
+  tipo: string;
+  bucket: BucketId;
+  estorno: boolean;
+  quantidadeMilesimos: number;
+  valorCentavos: number;
+  antesMilesimos: number;
+  depoisMilesimos: number;
+  /** O instante em que o movimento entrou no livro (ISO, UTC). */
+  ocorridoEm: string;
+  motivo: string | null;
+  semOrigem: boolean;
+  notaId: string | null;
+  requisicaoId: string | null;
+  requisicaoNumero: number | null;
+  /** Contagem que gerou o movimento e se foi a abertura. */
+  contagemId: string | null;
+  contagemTipo: string | null;
+  contagemTitulo: string | null;
+  ordemProducaoId: string | null;
+  codigoLote: string | null;
+}
+
+/** As baixas que um número abre: os baldes da coluna, ou todos os que formam o saldo inicial / final. */
+function filtroDoLink(col: ColunaDeLink): Prisma.Sql {
+  if (col === 'inicial') return Prisma.sql`mv."antes"`;
+  if (col === 'final') return Prisma.sql`mv."ate"`;
+  return Prisma.sql`(NOT mv."antes" AND mv."ate" AND mv."bucket" = ANY(${BUCKETS_DA_COLUNA[col] as string[]}::text[]))`;
+}
+
+/** Os movimentos que formam um número (a coluna aberta), do mais novo ao mais velho, paginados no banco; com o total e as somas. */
+export async function movimentosDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo, col: ColunaDeLink, pagina: { numero: number; porPagina: number } | null, teto: number) {
+  const limite = pagina ? pagina.porPagina : teto + 1;
+  const deslocamento = pagina ? (pagina.numero - 1) * pagina.porPagina : 0;
+  const lidos = await tx.sql<{
+    id: string; lojaId: string; loja: string; insumoId: string; insumo: string; unidade: string; tipo: string; bucket: string; estorno: boolean;
+    q: number; v: number; antesDoMov: number; depois: number; ocorridoEm: Date; motivo: string | null; semOrigem: boolean;
+    notaId: string | null; requisicaoId: string | null; requisicaoNumero: number | null; contagemId: string | null; contagemTipo: string | null; contagemTitulo: string | null;
+    ordemProducaoId: string | null; codigoLote: string | null; quantos: number; somaq: number; somav: number;
+  }>`
+    WITH mov AS (${fonteDoConsumo(r)})
+    SELECT mv."id", mv."lojaId", l."nome" AS "loja", mv."insumoId", COALESCE(i."nome", mv."insumoNomeSnapshot") AS "insumo", mv."unidade", mv."tipo", mv."bucket", mv."estorno",
+           mv."q", mv."v", mv."antesDoMov", mv."depois", mv."ocorridoEm", mv."motivo", mv."semOrigem", mv."notaId",
+           ri."requisicaoId", rq."numero" AS "requisicaoNumero", ci."contagemId", ct."tipo"::text AS "contagemTipo", ct."titulo" AS "contagemTitulo",
+           mv."ordemProducaoId", op."codigoLote",
+           count(*) OVER ()::float8 AS "quantos", (sum(mv."q") OVER ())::float8 AS "somaq", (sum(mv."v") OVER ())::float8 AS "somav"
+    FROM mov mv
+    JOIN "Loja" l ON l."parceiroId" = ${r.parceiroId}::text AND l."id" = mv."lojaId"
+    JOIN "Insumo" i ON i."parceiroId" = ${r.parceiroId}::text AND i."id" = mv."insumoId"
+    LEFT JOIN "RequisicaoItem" ri ON ri."parceiroId" = ${r.parceiroId}::text AND ri."id" = mv."requisicaoItemId"
+    LEFT JOIN "Requisicao" rq ON rq."parceiroId" = ${r.parceiroId}::text AND rq."id" = ri."requisicaoId"
+    LEFT JOIN "ContagemItem" ci ON ci."parceiroId" = ${r.parceiroId}::text AND ci."id" = mv."contagemItemId"
+    LEFT JOIN "Contagem" ct ON ct."parceiroId" = ${r.parceiroId}::text AND ct."id" = ci."contagemId"
+    LEFT JOIN "OrdemProducao" op ON op."parceiroId" = ${r.parceiroId}::text AND op."id" = mv."ordemProducaoId"
+    WHERE (${r.categoriaId}::text IS NULL OR i."categoriaId" = ${r.categoriaId}::text)
+      AND ${filtroDoLink(col)}
+    ORDER BY mv."ocorridoEm" DESC, mv."criadoEm" DESC, mv."id" DESC
+    LIMIT ${limite}::int OFFSET ${deslocamento}::int`;
+  const movimentos = (pagina ? lidos : lidos.slice(0, teto)).map(
+    (m): MovimentoDoConsumo => ({
+      id: m.id,
+      lojaId: m.lojaId,
+      loja: m.loja,
+      insumoId: m.insumoId,
+      insumo: m.insumo,
+      unidade: m.unidade as Unidade,
+      tipo: m.tipo,
+      bucket: (BUCKETS_CONHECIDOS.has(m.bucket) ? m.bucket : 'estorno_outro') as BucketId,
+      estorno: m.estorno,
+      quantidadeMilesimos: m.q,
+      valorCentavos: r.verValores ? m.v : 0,
+      antesMilesimos: m.antesDoMov,
+      depoisMilesimos: m.depois,
+      ocorridoEm: m.ocorridoEm.toISOString(),
+      motivo: m.motivo,
+      semOrigem: m.semOrigem,
+      notaId: m.notaId,
+      requisicaoId: m.requisicaoId,
+      requisicaoNumero: m.requisicaoNumero,
+      contagemId: m.contagemId,
+      contagemTipo: m.contagemTipo,
+      contagemTitulo: m.contagemTitulo,
+      ordemProducaoId: m.ordemProducaoId,
+      codigoLote: m.codigoLote,
+    }),
+  );
+  return {
+    movimentos,
+    total: lidos[0]?.quantos ?? 0,
+    somaMilesimos: lidos[0]?.somaq ?? 0,
+    somaCentavos: r.verValores ? (lidos[0]?.somav ?? 0) : 0,
+    passouDoTeto: !pagina && lidos.length > teto,
+  };
+}
+
+// -------------------------------------------------------------- avisos de fora do livro
+
+/** Notas fiscais (XML) que ainda aguardam conferência nas lojas escolhidas: NÃO são entrada de estoque e ficam fora. */
+export async function documentosAguardandoDoConsumo(tx: ClienteDoParceiro, lojas: string[]): Promise<number> {
+  const [t] = await tx.sql<{ n: number }>`
+    SELECT count(*)::float8 AS "n" FROM "DocumentoFiscal"
+    WHERE "parceiroId" = ${tx.parceiroId}::text AND "situacao" = 'AGUARDANDO_CONFERENCIA'::"SituacaoDocumentoFiscal" AND "lojaId" = ANY(${lojas}::text[])`;
+  return t?.n ?? 0;
+}
+
+/** Contagens abertas (começaram e não foram aplicadas) nas lojas escolhidas: o que se contou ainda não entrou no livro. */
+export async function contagensEmAndamento(tx: ClienteDoParceiro, lojas: string[]): Promise<number> {
+  const [t] = await tx.sql<{ n: number }>`
+    SELECT count(*)::float8 AS "n" FROM "Contagem"
+    WHERE "parceiroId" = ${tx.parceiroId}::text AND "lojaId" = ANY(${lojas}::text[]) AND "status"::text = 'ABERTA' AND "tipo"::text <> 'ABERTURA'`;
+  return t?.n ?? 0;
+}
+
+/** Lojas do recorte que ainda não concluíram a abertura do estoque (sem abertura não há saldo nem movimento). */
+export async function lojasSemEstoqueAberto(tx: ClienteDoParceiro, lojas: { id: string; nome: string }[]): Promise<string[]> {
+  if (lojas.length === 0) return [];
+  const abertas = await tx.sql<{ lojaId: string }>`
+    SELECT DISTINCT "lojaId" FROM "Contagem"
+    WHERE "parceiroId" = ${tx.parceiroId}::text AND "lojaId" = ANY(${lojas.map((l) => l.id)}::text[]) AND "tipo"::text = 'ABERTURA' AND "status"::text = 'FECHADA'`;
+  const ok = new Set(abertas.map((a) => a.lojaId));
+  return lojas.filter((l) => !ok.has(l.id)).map((l) => l.nome);
+}
+
+// -------------------------------------------------------------- o recorte
+
+const LIMITE_DE_INSUMOS_NA_LISTA = 1000;
+
+/** Resolve o que a pessoa pediu contra o que ela pode ver. Sem `estoque.ver` em nenhuma loja, ou sem nenhuma loja, não há recorte. */
+export async function resolverRecorteDoConsumo(tx: ClienteDoParceiro, alcance: Alcance, f: FiltrosDoConsumo) {
+  const doAcesso = await tx.loja.findMany({ where: { id: filtroDeLojas(alcance) }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, ativa: true } });
+  const lojasDoAcesso = doAcesso.filter((l) => pode(alcance, 'estoque.ver', { lojaId: l.id }));
+  if (lojasDoAcesso.length === 0) return { recorte: null as RecorteDoConsumo | null, lojasDoAcesso, motivo: 'sem-permissao' as const };
+  const permitidas = new Set(lojasDoAcesso.map((l) => l.id));
+  // Loja pedida fora do acesso nunca amplia o relatório: sobra só o que ela pode ver e, se não sobra nada, o relatório sai vazio.
+  const lojas = f.lojaIds.length ? f.lojaIds.filter((l) => permitidas.has(l)) : lojasDoAcesso.map((l) => l.id);
+  if (lojas.length === 0 || f.periodoInvalido) return { recorte: null, lojasDoAcesso, motivo: f.periodoInvalido ? ('periodo' as const) : ('sem-loja' as const) };
+  let insumoIds: string[] | null = null;
+  if (f.insumoId) insumoIds = [f.insumoId];
+  else if (f.q) insumoIds = (await idsDeInsumoPelaBusca(tx, f.q)) ?? null;
+  const recorte: RecorteDoConsumo = {
+    parceiroId: tx.parceiroId,
+    lojas,
+    de: f.de,
+    ate: f.ate,
+    fim: somarDias(f.ate, 1),
+    insumoIds,
+    categoriaId: f.categoriaId || null,
+    so: f.so,
+    verValores: lojas.every((id) => pode(alcance, 'compras.ver', { lojaId: id })),
+  };
+  return { recorte, lojasDoAcesso, motivo: null };
+}
+
+/** Os seletores dos filtros: só o que a pessoa pode ver (lojas do acesso; insumos que têm movimento nelas). */
+export async function opcoesDoConsumo(tx: ClienteDoParceiro, lojasDoAcesso: OpcoesDoConsumo['lojas'], f: Pick<FiltrosDoConsumo, 'q'>): Promise<OpcoesDoConsumo> {
+  const lojaIds = lojasDoAcesso.map((l) => l.id);
+  const ids = f.q ? await idsDeInsumoPelaBusca(tx, f.q) : null;
+  const categorias = await tx.categoriaInsumo.findMany({ orderBy: [{ ordem: 'asc' }, { nome: 'asc' }], select: { id: true, nome: true } });
+  const insumos = await tx.sql<{ id: string; nome: string }>`
+    SELECT i."id", i."nome" FROM "Insumo" i
+    WHERE i."parceiroId" = ${tx.parceiroId}::text
+      AND (${ids}::text[] IS NULL OR i."id" = ANY(${ids}::text[]))
+      AND EXISTS (SELECT 1 FROM "SaldoEstoque" s WHERE s."parceiroId" = i."parceiroId" AND s."insumoId" = i."id" AND s."lojaId" = ANY(${lojaIds}::text[]))
+    ORDER BY i."nome", i."id"
+    LIMIT ${LIMITE_DE_INSUMOS_NA_LISTA + 1}::int`;
+  return {
+    lojas: lojasDoAcesso,
+    categorias,
+    listaDeInsumos: insumos.slice(0, LIMITE_DE_INSUMOS_NA_LISTA),
+    insumosTruncados: insumos.length > LIMITE_DE_INSUMOS_NA_LISTA,
+  };
+}
+
+// ------------------------------------------------------- o relatório da tela
+
+export interface ConsumoDaTela {
+  motivoVazio: 'sem-permissao' | 'sem-loja' | 'periodo' | null;
+  opcoes: OpcoesDoConsumo;
+  lojasUsadas: { id: string; nome: string }[];
+  verValores: boolean;
+  resumo: ResumoDoConsumo | null;
+  pagina: { linhas: LinhaDoConsumo[]; total: number } | null;
+  aguardando: number;
+  contagensEmAndamento: number;
+  lojasSemEstoque: string[];
+  numeroDaPagina: number;
+  paginas: number;
+}
+
+const SEM_OPCOES: OpcoesDoConsumo = { lojas: [], categorias: [], listaDeInsumos: [], insumosTruncados: false };
+
+/** Tudo o que a tela principal precisa, numa fotografia só do banco. */
+export async function consumoDaTela(cliente: ClienteDoParceiro, alcance: Alcance, f: FiltrosDoConsumo): Promise<ConsumoDaTela> {
+  return cliente.transacao(
+    async (tx) => {
+      const { recorte, lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
+      const opcoes = motivo === 'sem-permissao' ? SEM_OPCOES : await opcoesDoConsumo(tx, lojasDoAcesso, f);
+      const vazio: ConsumoDaTela = {
+        motivoVazio: motivo,
+        opcoes,
+        lojasUsadas: [],
+        verValores: false,
+        resumo: null,
+        pagina: null,
+        aguardando: 0,
+        contagensEmAndamento: 0,
+        lojasSemEstoque: [],
+        numeroDaPagina: 1,
+        paginas: 1,
+      };
+      if (!recorte) return vazio;
+      const lojasUsadas = lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id));
+      const resumo = await resumoDoConsumo(tx, recorte);
+      // O total vem ANTES de pedir a página: a pedida além da última cai na última.
+      const paginas = Math.max(1, Math.ceil(resumo.linhas / f.porPagina));
+      const numero = Math.min(Math.max(1, f.pagina), paginas);
+      const doBanco = await linhasDoConsumo(tx, recorte, { numero, porPagina: f.porPagina }, 0);
+      return {
+        ...vazio,
+        motivoVazio: null,
+        lojasUsadas,
+        verValores: recorte.verValores,
+        resumo,
+        pagina: { linhas: doBanco.linhas, total: resumo.linhas },
+        aguardando: await documentosAguardandoDoConsumo(tx, recorte.lojas),
+        contagensEmAndamento: await contagensEmAndamento(tx, recorte.lojas),
+        lojasSemEstoque: await lojasSemEstoqueAberto(tx, lojasUsadas),
+        numeroDaPagina: numero,
+        paginas,
+      };
+    },
+    { repetivel: true, timeout: 60_000 },
+  );
+}
+
+/** Tudo para a planilha e a impressão: o resumo e as linhas inteiras (sem página), até o teto. */
+export async function consumoCompleto(cliente: ClienteDoParceiro, alcance: Alcance, f: FiltrosDoConsumo, teto: number) {
+  return cliente.transacao(
+    async (tx) => {
+      const { recorte, lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
+      if (!recorte) return { motivoVazio: motivo, recorte: null, lojasUsadas: [] as { id: string; nome: string }[], resumo: null, linhas: null, aguardando: 0, contagensEmAndamento: 0, lojasSemEstoque: [] as string[] };
+      const lojasUsadas = lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id));
+      // Em fila, na mesma fotografia (a transação tem uma conexão só).
+      const resumo = await resumoDoConsumo(tx, recorte);
+      const linhas = await linhasDoConsumo(tx, recorte, null, teto);
+      return {
+        motivoVazio: null,
+        recorte,
+        lojasUsadas,
+        resumo,
+        linhas,
+        aguardando: await documentosAguardandoDoConsumo(tx, recorte.lojas),
+        contagensEmAndamento: await contagensEmAndamento(tx, recorte.lojas),
+        lojasSemEstoque: await lojasSemEstoqueAberto(tx, lojasUsadas),
+      };
+    },
+    { repetivel: true, timeout: 120_000 },
+  );
+}
+
+export interface MovimentosDaTela {
+  motivoVazio: 'sem-permissao' | 'sem-loja' | 'periodo' | null;
+  opcoes: OpcoesDoConsumo;
+  lojasUsadas: { id: string; nome: string }[];
+  verValores: boolean;
+  lista: Awaited<ReturnType<typeof movimentosDoConsumo>> | null;
+  numeroDaPagina: number;
+  paginas: number;
+}
+
+/** Os movimentos que formam um número do relatório (a coluna `f.col`), para a tela "Movimentos". */
+export async function movimentosDaTela(cliente: ClienteDoParceiro, alcance: Alcance, f: FiltrosDoConsumo): Promise<MovimentosDaTela> {
+  return cliente.transacao(
+    async (tx) => {
+      const { recorte, lojasDoAcesso, motivo } = await resolverRecorteDoConsumo(tx, alcance, f);
+      const opcoes = motivo === 'sem-permissao' ? SEM_OPCOES : await opcoesDoConsumo(tx, lojasDoAcesso, f);
+      const vazio: MovimentosDaTela = { motivoVazio: motivo, opcoes, lojasUsadas: [], verValores: false, lista: null, numeroDaPagina: 1, paginas: 1 };
+      if (!recorte || !f.col) return vazio;
+      const primeira = await movimentosDoConsumo(tx, recorte, f.col, { numero: 1, porPagina: f.porPagina }, 0);
+      const paginas = Math.max(1, Math.ceil(primeira.total / f.porPagina));
+      const numero = Math.min(Math.max(1, f.pagina), paginas);
+      const lista = numero === 1 ? primeira : await movimentosDoConsumo(tx, recorte, f.col, { numero, porPagina: f.porPagina }, 0);
+      return { ...vazio, motivoVazio: null, lojasUsadas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)), verValores: recorte.verValores, lista, numeroDaPagina: numero, paginas };
+    },
+    { repetivel: true, timeout: 60_000 },
+  );
+}
