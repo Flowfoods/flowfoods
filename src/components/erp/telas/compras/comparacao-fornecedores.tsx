@@ -138,7 +138,7 @@ function TabelaDaUnidade({
               Última compra: <UltimaCompra x={x} comprasBase={comprasBase} volta={volta} />
             </p>
             <Link href={linhas(x)} className={`${LINK_DE_TEXTO} -mx-1 inline-flex min-h-11 items-center px-1`}>
-              Ver as {pl(x.linhas, 'linha', 'linhas')}
+              {x.linhas === 1 ? 'Ver a linha' : `Ver as ${pl(x.linhas, 'linha', 'linhas')}`}
             </Link>
           </li>
         ))}

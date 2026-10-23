@@ -94,11 +94,11 @@ type Lig = (lado: 'A' | 'B', extra?: Partial<FiltrosDoRelatorio>) => string;
 
 function CelulaDeLado({ nome, lado, unidade, href, campo }: { nome: 'A' | 'B'; lado: Lado | null; unidade: Unidade; href: string; campo: 'qtd' | 'custo' | 'gasto' }) {
   const rotulo = <span className="text-suave">{nome}: </span>;
-  if (!lado) return <span className="block">{rotulo}<span className="text-suave">—</span></span>;
-  if (campo === 'qtd') return <span className="block">{rotulo}{formatarQuantidade(lado.quantidadeMilesimos, unidade)}</span>;
-  if (campo === 'custo') return <span className="block">{rotulo}{lado.custo ? formatarCusto(lado.custo, unidade) : 'sem base'}</span>;
+  if (!lado) return <span className="block whitespace-nowrap">{rotulo}<span className="text-suave">—</span></span>;
+  if (campo === 'qtd') return <span className="block whitespace-nowrap">{rotulo}{formatarQuantidade(lado.quantidadeMilesimos, unidade)}</span>;
+  if (campo === 'custo') return <span className="block whitespace-nowrap">{rotulo}{lado.custo ? formatarCusto(lado.custo, unidade) : 'sem base'}</span>;
   return (
-    <Link href={href} className="ff-transicao block rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto">
+    <Link href={href} className="ff-transicao block whitespace-nowrap rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto">
       {rotulo}
       {formatarDinheiro(lado.gastoCentavos)}
     </Link>
@@ -135,7 +135,7 @@ function PrecoETroca({ i }: { i: ItemComparado }) {
     <>
       <Sinal centavos={i.precoCentavos} />
       {i.trocaCentavos !== null && i.trocaCentavos !== 0 && (
-        <span className="block text-[12px] text-suave">
+        <span className="ml-auto block max-w-[11rem] text-[12px] text-suave">
           dos quais troca de fornecedor <Sinal centavos={i.trocaCentavos} />
         </span>
       )}
@@ -228,12 +228,14 @@ export function TabelaPorInsumo({
             </p>
           </li>
         ))}
+        {r.totalDeItens > 1 && (
         <li className="px-4 py-3 text-sm tabular-nums">
           <p className="text-[12px] text-suave">Total de todos os {pl(r.totalDeItens, 'insumo', 'insumos')} (não só desta página)</p>
           <p>
             Variação <Sinal centavos={s.variacaoCentavos} className="font-semibold" /> · volume <Sinal centavos={s.volumeCentavos} /> · preço <Sinal centavos={s.precoCentavos} />
           </p>
         </li>
+        )}
       </ul>
       <table className="hidden w-full text-sm lg:table">
         <caption className="sr-only">
@@ -270,6 +272,7 @@ export function TabelaPorInsumo({
             </tr>
           ))}
         </tbody>
+        {r.totalDeItens > 1 && (
         <tfoot className="tabular-nums">
           <tr className="border-t border-linha-forte bg-forte">
             <th scope="row" className="py-2.5 pl-5 pr-3 text-left text-[12px] font-semibold text-suave">
@@ -289,10 +292,11 @@ export function TabelaPorInsumo({
             <td className="px-3 py-2.5 text-right"><Sinal centavos={s.volumeCentavos} className="font-semibold" /></td>
             <td className="py-2.5 pl-3 pr-5 text-right">
               <Sinal centavos={s.precoCentavos} className="font-semibold" />
-              {s.trocaCentavos !== 0 && <span className="block text-[12px] text-suave">dos quais troca de fornecedor <Sinal centavos={s.trocaCentavos} /></span>}
+              {s.trocaCentavos !== 0 && <span className="ml-auto block max-w-[11rem] text-[12px] text-suave">dos quais troca de fornecedor <Sinal centavos={s.trocaCentavos} /></span>}
             </td>
           </tr>
         </tfoot>
+        )}
       </table>
       {rodape}
     </Painel>
@@ -454,6 +458,16 @@ export function TelaDosPeriodos({
   const b = r.b;
   const avisos = a && b && c ? avisosDaCobertura(r, f, hoje) : [];
   const itensComBase = c?.itens ?? [];
+  const avisosPainel =
+    avisos.length > 0 ? (
+      <Painel id="antes-de-ler" titulo="Antes de ler" subtitulo="O que muda o jeito de ler esta comparação." semRespiro className="scroll-mt-24">
+        <ul className="space-y-2 px-4 py-3 text-[13px] leading-relaxed text-suave sm:px-5">
+          {avisos.map((x) => (
+            <li key={x.chave}>{x.texto}</li>
+          ))}
+        </ul>
+      </Painel>
+    ) : null;
   return (
     <div className="space-y-6">
       <PageHeader icone="periodos" cor={COR.compras} titulo="Comparar períodos" subtitulo={subtitulo}>
@@ -482,15 +496,7 @@ export function TelaDosPeriodos({
 
       {!vazio && a && b && c && s && !r.passouDoTeto && (
         <>
-          {avisos.length > 0 && (
-            <Painel titulo="Antes de ler" subtitulo="O que muda o jeito de ler esta comparação." semRespiro>
-              <ul className="space-y-2 px-4 py-3 text-[13px] leading-relaxed text-suave sm:px-5">
-                {avisos.map((x) => (
-                  <li key={x.chave}>{x.texto}</li>
-                ))}
-              </ul>
-            </Painel>
-          )}
+          {c.itens.length === 0 && avisosPainel}
 
           {c.itens.length === 0 ? (
             <Painel semRespiro>
@@ -505,19 +511,19 @@ export function TelaDosPeriodos({
                   Os dois períodos e a variação
                 </h2>
                 <div className="grid grid-cols-1 gap-3 min-[520px]:grid-cols-2 xl:grid-cols-3">
-                  <Cartao rotulo={`Período A (a base) · ${faixa(a.de, a.ate)} · ${dias(a.de, a.ate)}`} ver={{ href: liga('A'), texto: `Ver as ${pl(a.linhas, 'linha', 'linhas')} de A` }}>
+                  <Cartao rotulo={`Período A (a base) · ${faixa(a.de, a.ate)} · ${dias(a.de, a.ate)}`} ver={{ href: liga('A'), texto: a.linhas === 1 ? 'Ver a linha de A' : `Ver as ${pl(a.linhas, 'linha', 'linhas')} de A` }}>
                     <p className={GRANDE}>{formatarDinheiro(s.gastoACentavos)}</p>
                     <p className="mt-1.5 text-[12px] tabular-nums text-suave">
                       {MEDIDAS[f.medida].curto} · {pl(a.notas, 'compra', 'compras')} · {quantidades(a)}
                     </p>
                   </Cartao>
-                  <Cartao rotulo={`Período B · ${faixa(b.de, b.ate)} · ${dias(b.de, b.ate)}`} ver={{ href: liga('B'), texto: `Ver as ${pl(b.linhas, 'linha', 'linhas')} de B` }}>
+                  <Cartao rotulo={`Período B · ${faixa(b.de, b.ate)} · ${dias(b.de, b.ate)}`} ver={{ href: liga('B'), texto: b.linhas === 1 ? 'Ver a linha de B' : `Ver as ${pl(b.linhas, 'linha', 'linhas')} de B` }}>
                     <p className={GRANDE}>{formatarDinheiro(s.gastoBCentavos)}</p>
                     <p className="mt-1.5 text-[12px] tabular-nums text-suave">
                       {MEDIDAS[f.medida].curto} · {pl(b.notas, 'compra', 'compras')} · {quantidades(b)}
                     </p>
                   </Cartao>
-                  <Cartao rotulo="Variação do gasto (B menos A)">
+                  <Cartao rotulo="Variação do gasto (B menos A)" ver={avisos.length > 0 ? { href: '#antes-de-ler', texto: avisos.length === 1 ? 'Ver o aviso sobre esta comparação' : `Ver os ${avisos.length} avisos sobre esta comparação` } : undefined}>
                     <p className={GRANDE}>
                       <Sinal centavos={s.variacaoCentavos} />
                     </p>
@@ -526,6 +532,8 @@ export function TelaDosPeriodos({
                 </div>
                 <p className="text-[12px] text-suave">Gasto comparável: só as linhas com insumo, unidade e valor, nos dois períodos. {s.nosDois} {s.nosDois === 1 ? 'insumo está' : 'insumos estão'} nos dois.</p>
               </section>
+
+              {avisosPainel}
 
               <section aria-labelledby="cmp-origem" className="space-y-3">
                 <div>
@@ -546,16 +554,28 @@ export function TelaDosPeriodos({
                     </p>
                   </Cartao>
                   <Cartao rotulo="Só num dos períodos (sem como separar preço de volume)" ver={s.soEmA + s.soEmB > 0 ? { href: '#insumos', texto: 'Ver quais insumos' } : undefined}>
-                    <p className={GRANDE}><Sinal centavos={s.entrouCentavos + s.saiuCentavos} /></p>
-                    <p className="mt-1.5 text-[12px] tabular-nums text-suave">
-                      entrou <Sinal centavos={s.entrouCentavos} /> ({pl(s.soEmB, 'insumo', 'insumos')}) · saiu <Sinal centavos={s.saiuCentavos} /> ({pl(s.soEmA, 'insumo', 'insumos')})
-                    </p>
+                    {s.soEmA + s.soEmB === 0 ? (
+                      <>
+                        <p className={GRANDE}>Nenhum</p>
+                        <p className="mt-1.5 text-[12px] text-suave">Todos os insumos têm compra comparável nos dois períodos.</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className={GRANDE}><Sinal centavos={s.entrouCentavos + s.saiuCentavos} /></p>
+                        <p className="mt-1.5 text-[12px] tabular-nums text-suave">
+                          entrou <Sinal centavos={s.entrouCentavos} /> ({pl(s.soEmB, 'insumo', 'insumos')}) · saiu <Sinal centavos={s.saiuCentavos} /> ({pl(s.soEmA, 'insumo', 'insumos')})
+                        </p>
+                      </>
+                    )}
                   </Cartao>
                   <Cartao rotulo="A soma">
-                    <p className="text-sm tabular-nums">
-                      <Sinal centavos={s.volumeCentavos} /> <span className="text-suave">volume</span> <Sinal centavos={s.precoCentavos} /> <span className="text-suave">preço</span> <Sinal centavos={s.entrouCentavos} /> <span className="text-suave">entrou</span> <Sinal centavos={s.saiuCentavos} /> <span className="text-suave">saiu</span>
-                    </p>
-                    <p className="mt-1.5 text-sm font-semibold tabular-nums">
+                    <ul className="space-y-0.5 text-sm tabular-nums">
+                      <li><Sinal centavos={s.volumeCentavos} /> <span className="text-suave">efeito volume</span></li>
+                      <li><Sinal centavos={s.precoCentavos} /> <span className="text-suave">efeito preço</span></li>
+                      <li><Sinal centavos={s.entrouCentavos} /> <span className="text-suave">entrou</span></li>
+                      <li><Sinal centavos={s.saiuCentavos} /> <span className="text-suave">saiu</span></li>
+                    </ul>
+                    <p className="mt-1.5 border-t border-linha pt-1.5 text-sm font-semibold tabular-nums">
                       = <Sinal centavos={s.volumeCentavos + s.precoCentavos + s.entrouCentavos + s.saiuCentavos} /> {s.fecha ? <span className="font-normal text-suave">(igual à variação)</span> : <Selo tom="erro">não fecha com a variação</Selo>}
                     </p>
                   </Cartao>
