@@ -47,6 +47,7 @@ export function TelaDetalheNota({
   orcamento,
   orcamentoHref,
   documentoHref,
+  lotesHref,
 }: {
   nota: NotaDetalhada;
   base: string;
@@ -72,6 +73,8 @@ export function TelaDetalheNota({
   orcamentoHref?: string;
   /** F.1b: link da nota fiscal (XML) de onde a nota veio ou a que foi ligada; ausente = quem não vê notas recebidas. */
   documentoHref?: string;
+  /** 3.4: a tela "Lote e vencimento" (o lote do fornecedor de cada insumo, para a etiqueta da embalagem aberta). */
+  lotesHref?: string;
 }) {
   const mensagem = fraseDaNota(feito);
   const fechado = fechadoNaData(periodos.fechados, n.entradaEm);
@@ -250,6 +253,13 @@ export function TelaDetalheNota({
                   </li>
                 ))}
               </ul>
+            </Painel>
+          )}
+          {lotesHref && (
+            <Painel titulo="Lote e vencimento" subtitulo="Como vieram na embalagem: a etiqueta da embalagem aberta usa">
+              <Link href={lotesHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+                {n.cancelada ? 'Ver os lotes' : 'Registrar ou ver os lotes'}
+              </Link>
             </Painel>
           )}
           {cancela && (

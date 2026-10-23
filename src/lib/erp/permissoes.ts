@@ -120,10 +120,10 @@ export const CATALOGO = [
     },
   },
   {
-    // A impressão de etiquetas chega na 3.4.
+    // 3.4: a etiqueta do lote produzido e da embalagem aberta (abrir = registrar a abertura, que dá a validade). Já estava no
+    // catálogo desde a 0.4 (o operador tem): sem permissão nova, o catálogo segue na versão 3 (decisão 405).
     chave: 'etiquetas',
     rotulo: 'Etiquetas',
-    emBreve: true,
     permissoes: {
       'etiquetas.imprimir': { rotulo: 'Imprimir etiquetas', porLoja: true },
     },

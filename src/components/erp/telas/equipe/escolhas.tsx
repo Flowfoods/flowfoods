@@ -7,7 +7,7 @@
  */
 
 import type { ReactNode } from 'react';
-import { CATALOGO } from '@/lib/erp/permissoes';
+import { CATALOGO, type ModuloDoCatalogo } from '@/lib/erp/permissoes';
 import { classeDeBotao } from '../../ui/estilos';
 
 /** Etiqueta marcável (checkbox ou radio por baixo, acessível pelo teclado). */
@@ -121,7 +121,7 @@ export function GradeDePermissoes({
         <fieldset key={m.chave} className="min-w-0">
           <legend className="mb-1.5 flex items-baseline gap-2 text-[12px] font-semibold text-suave">
             {m.rotulo}
-            {'emBreve' in m && m.emBreve && (
+            {(m as ModuloDoCatalogo).emBreve && (
               <span className="font-normal normal-case tracking-normal text-suave">· tela em breve</span>
             )}
           </legend>

@@ -68,12 +68,60 @@
     "hash": "6f543f66c49319af"
   },
   "producao-lote": {
-    "versao": 2,
-    "hash": "7c7c09b7a4965440"
+    "versao": 3,
+    "hash": "25523d6b42840ff2"
   },
   "producao-concluir": {
     "versao": 2,
     "hash": "73d0e381bd09706e"
+  },
+  "etiquetas": {
+    "versao": 1,
+    "hash": "a8f518cb2e1f0dec"
+  },
+  "etiquetas-loja": {
+    "versao": 1,
+    "hash": "37468fdd5eb46dd8"
+  },
+  "etiquetas-lote": {
+    "versao": 1,
+    "hash": "6f0fa36b7258ae5b"
+  },
+  "etiquetas-abrir": {
+    "versao": 1,
+    "hash": "9e27f57178582394"
+  },
+  "etiquetas-abrir-loja": {
+    "versao": 1,
+    "hash": "c3abce1aec132fc4"
+  },
+  "etiquetas-aberta": {
+    "versao": 1,
+    "hash": "d7002fe2f5dc5f89"
+  },
+  "etiquetas-emissao": {
+    "versao": 1,
+    "hash": "c634bb4b3b4445e8"
+  },
+  "etiquetas-papel": {
+    "versao": 1,
+    "hash": "83b25e6b09f37112"
+  },
+  "etiquetas-historico": {
+    "versao": 1,
+    "hash": "abca2a4fc286e1c9"
+  },
+  "etiquetas-historico-loja": {
+    "versao": 1,
+    "hash": "20c285df63cfd6f2"
+  },
+  "etiquetas-impressora": {
+    "versao": 1,
+    "hash": "c87b84ed0e8b52cf"
+  },
+  "compra-lotes": {
+    "versao": 1,
+    "hash": "8c154d46f382d600"
   },
   "producao-tarefas": {
     "versao": 1,
@@ -140,8 +188,8 @@
     "hash": "8a708c7d8d14f72f"
   },
   "compra": {
-    "versao": 4,
-    "hash": "f881c9e8e64de6c1"
+    "versao": 5,
+    "hash": "e9820491c8ed4f07"
   },
   "fornecedores": {
     "versao": 3,

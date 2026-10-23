@@ -42,6 +42,7 @@ export default async function ErpNotaPage({ params, searchParams }: { params: { 
       periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')}
       orcamento={await orcamentoDaNotaLancada(ctx.cliente, ctx.alcance, nota)}
       orcamentoHref={`${BASE}/orcamento`}
+      lotesHref={`${BASE}/${nota.id}/lotes`}
       documentoHref={nota.documentoId ? `${BASE}/recebidas/${nota.documentoId}?volta=${encodeURIComponent(`${BASE}/${nota.id}${dosRelatorios ? `?volta=${encodeURIComponent(dosRelatorios)}` : ''}`)}` : undefined}
     />
   );

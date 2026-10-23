@@ -32,6 +32,10 @@ const ENTIDADE: Record<string, string> = {
   OrdemProducao: 'Lote',
   // 3.2: a lista do dia de uma loja (o que produzir; nenhum valor em R$).
   ListaProducao: 'Lista do dia',
+  // 3.4: a etiqueta emitida, o lote do fornecedor registrado e a embalagem aberta (nenhum valor em R$).
+  Etiqueta: 'Etiqueta',
+  LoteDeInsumo: 'Lote do fornecedor',
+  AberturaDeLote: 'Embalagem aberta',
   // 1.9: a taxa do iFood do parceiro.
   CanalConfig: 'Canal de venda',
   Fornecedor: 'Fornecedor',
@@ -102,6 +106,10 @@ const ACAO: Record<string, string> = {
   LIGOU: 'Ligou',
   CLASSIFICOU: 'Classificou',
   RECLASSIFICOU: 'Reclassificou',
+  // 3.4
+  EMITIU: 'Emitiu',
+  ABRIU: 'Abriu',
+  REGISTROU: 'Registrou',
 };
 
 /** I.1b: a palavra do custo que ninguém informou. Nunca "R$ 0,00": custo incompleto não é custo baixo. */
@@ -241,6 +249,18 @@ const CAMPO: Record<string, string> = {
   producaoDoDia: 'o que produzir',
   lotesGerados: 'lotes gerados',
   daLista: 'da lista',
+  // 3.4: etiquetas, lote do fornecedor e abertura
+  origemDaEtiqueta: 'origem',
+  formatoDaEtiqueta: 'formato',
+  quantasEtiquetas: 'quantas etiquetas',
+  quantidadePorEtiqueta: 'quanto em cada',
+  validadeDaEtiqueta: 'validade na etiqueta',
+  codigoDoLote: 'lote do fornecedor',
+  vencimentoDoLote: 'vencimento do lote',
+  fabricacaoDoLote: 'fabricação',
+  marcaQueVeio: 'marca que veio',
+  validadeEfetiva: 'validade depois de aberto',
+  quantoFoiAberto: 'quanto foi aberto',
   // 3.3: quem está com o lote
   responsavel: 'quem faz',
   feitoPor: 'quem fez',

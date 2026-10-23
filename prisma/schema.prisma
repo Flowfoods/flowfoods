@@ -592,6 +592,10 @@ model ParceiroFlow {
   erpMetasCmvCategorias  MetaCmvCategoria[]
   erpContagemRetratoItens ContagemRetratoItem[]
   erpEtiquetas           Etiqueta[]
+  // 3.4: os pedidos de impressão, o lote do fornecedor (recebimento) e a abertura de embalagem.
+  erpEtiquetaImpressoes  EtiquetaImpressao[]
+  erpLotesDeInsumo       LoteDeInsumo[]
+  erpAberturasDeLote     AberturaDeLote[]
   erpFaturamentos        FaturamentoLancamento[]
   erpDreLinhas           DreLinha[]
   erpDreMetas            DreMeta[]
@@ -688,6 +692,10 @@ model Loja {
   ordensProducao OrdemProducao[]
   listasProducao ListaProducao[]
   etiquetas      Etiqueta[]
+  // 3.4: pedidos de impressão, lotes do fornecedor e embalagens abertas da loja.
+  impressoesDeEtiqueta EtiquetaImpressao[]
+  lotesDeInsumo        LoteDeInsumo[]
+  aberturasDeLote      AberturaDeLote[]
   faturamentos   FaturamentoLancamento[]
   despesas       Despesa[]
   fotografiasDoDre DreFotografiaLinha[]
@@ -878,6 +886,9 @@ model Insumo {
   requisicaoItens   RequisicaoItem[]
   producoes         OrdemProducao[]
   etiquetas         Etiqueta[]
+  // 3.4: os lotes do fornecedor (recebimento ou lidos na embalagem) e as embalagens abertas.
+  lotesDoFornecedor LoteDeInsumo[]
+  aberturas         AberturaDeLote[]
 
   // O nome repete entre parceiros (todo mundo tem "Cebola"), nunca dentro de um.
   @@unique([parceiroId, nome])
@@ -1078,6 +1089,8 @@ model NotaEntrada {
   movimentos MovimentoEstoque[]
   // F.1b: o documento fiscal (XML) que esta nota concilia, quando veio dele ou foi ligada a ele.
   documento  DocumentoFiscal?
+  // 3.4: os lotes do fornecedor registrados no recebimento desta nota (por insumo; nunca reescrevem a nota).
+  lotesRecebidos LoteDeInsumo[]
 
   @@unique([parceiroId, id])
   // F.1b: a chave de acesso é única por parceiro SÓ entre as notas que valem (índice parcial `NotaEntrada_chave_ativa_key`, escrito no
@@ -1863,15 +1876,18 @@ enum EtiquetaFormato {
   E60X60
 }
 
-// Etiqueta impressa (3.4): rastreio de lote/validade com snapshot. Vem de um
-// lote produzido OU de um item de nota (lote do fornecedor) OU de um insumo aberto.
+// Etiqueta (3.4): a EMISSÃO — o retrato imutável do que vai no papel (decisão 400). Nasce de um lote produzido (`ordemProducaoId`)
+// ou de uma embalagem aberta (`aberturaId`): o nome, a conservação, a manipulação/abertura, a validade e a regra dela, o lote,
+// quem fez, a loja e o formato ficam aqui; reimprimir usa este retrato e NUNCA recalcula (decisão 401). Cada pedido de
+// impressão é uma `EtiquetaImpressao`. A validade nula é "não informada" (nunca inventada). Imutável depois de criada
+// (gatilho). `notaItemId`, `responsavelId` e o `codigo` livre são da 0.1: o item da nota não emite etiqueta na 3.4.
 model Etiqueta {
   id                      String           @id @default(cuid())
   parceiroId              String
   parceiro                ParceiroFlow     @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
   lojaId                  String
   loja                    Loja             @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
-  // Código lido no leitor (vai no ZPL); único no parceiro.
+  // O código impresso (E261023-0007): dia e sequência do dia no parceiro; único no parceiro.
   codigo                  String
   insumoId                String?
   insumo                  Insumo?          @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
@@ -1882,22 +1898,188 @@ model Etiqueta {
   // Snapshot.
   nomeSnapshot            String
   unidadeSnapshot         UnidadeBase?
+  // Quantidade em CADA etiqueta (milésimos); nula = sem quantidade no papel.
   quantidadeMilesimos     Int?
-  conservacao             Conservacao
+  // 3.4: nula = o lote foi concluído sem conservação (a ficha não dizia).
+  conservacao             Conservacao?
+  // Item aberto: o lote do fornecedor como estava (null = não informado).
   loteFornecedor          String?
+  // Lote produzido: a manipulação (a conclusão do lote).
   fabricadoEm             DateTime?
+  // Item aberto: a abertura.
   abertoEm                DateTime?
-  validadeEm              DateTime
+  // 3.4: nula = validade não informada (o lote sem validade, o item sem prazo após abertura).
+  validadeEm              DateTime?
   responsavelId           String?
   responsavel             Colaborador?     @relation(fields: [parceiroId, responsavelId], references: [parceiroId, id], onDelete: Restrict)
+  // Quem manipulou (lote) ou abriu (item); null = não registrado.
   responsavelNomeSnapshot String?
   formato                 EtiquetaFormato
+  // Quando a emissão foi feita (não quando saiu no papel: isso a `EtiquetaImpressao` diz, sem fingir).
   impressaEm              DateTime         @default(now())
+
+  // 3.4 (decisões 400 a 412).
+  aberturaId              String?
+  abertura                AberturaDeLote?  @relation(fields: [parceiroId, aberturaId], references: [parceiroId, id], onDelete: Restrict)
+  regraDaValidade         RegraDaValidade?
+  // O prazo que deu a validade: o do lote (ficha, na conservação escolhida) ou o após abertura; null = não informado.
+  validadeMinSnapshot     Int?
+  vencimentoLoteEm        DateTime?        @db.Date
+  // O código do lote produzido (261023-01).
+  loteProduzido           String?
+  marcaSnapshot           String?
+  lojaNomeSnapshot        String?
+  // Quantas etiquetas a emissão pediu (uma por pote): as cópias da primeira impressão.
+  quantas                 Int?
+  mostrarHora             Boolean          @default(true)
+  versaoDoLayout          Int?
+  // O login de quem manipulou/abriu (texto, sem FK: a credencial mora fora do tenant).
+  responsavelUsuarioId    String?
+  emitidaPorNome          String?
+  emitidaPorUsuarioId     String?
+  chaveEnvio              String?
+
+  impressoes EtiquetaImpressao[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, codigo])
+  @@unique([parceiroId, chaveEnvio])
   @@index([parceiroId, lojaId, validadeEm])
   @@index([parceiroId, ordemProducaoId])
+  @@index([parceiroId, aberturaId])
+  @@index([parceiroId, lojaId, impressaEm])
+}
+
+// 3.4: de onde veio a validade da etiqueta (e da abertura).
+enum RegraDaValidade {
+  LOTE_PRODUZIDO // o retrato da conclusão do lote (3.1): conclusão + validade da ficha na conservação escolhida
+  LOTE_SEM_VALIDADE // o lote foi concluído sem validade (a ficha não dizia): "não informada", nunca uma data
+  PRAZO_APOS_ABERTURA // abertura + prazo após abertura do insumo (antes do vencimento do lote, ou sem vencimento informado)
+  VENCIMENTO_DO_LOTE // o vencimento do lote chega antes: vale ele (abrir não prolonga)
+  PRAZO_NAO_INFORMADO // o insumo não tem prazo após abertura naquela conservação: sem data
+}
+
+enum TransporteDaImpressao {
+  BROWSER_PRINT // direto na Zebra pelo aplicativo local (Zebra Browser Print)
+  ARQUIVO_ZPL // o arquivo .zpl baixado
+  PAPEL // a página de impressão do navegador (PDF ou impressora comum)
+}
+
+enum SituacaoDaImpressao {
+  PREPARADA // gravada antes do envio
+  ENVIADA // o aplicativo da impressora aceitou (não prova que saiu no papel)
+  EXPORTADA // o arquivo ou a página de papel foi gerado (download não é impressão)
+  FALHOU // o envio falhou (ou ficou sem resposta: pode ter saído)
+}
+
+// 3.4: cada pedido de impressão de uma emissão (a primeira é a sequência 1; as outras são reimpressões, do MESMO retrato). Só a
+// situação muda, uma vez, de PREPARADA para o resultado (gatilho). Nunca "impressa" por conta de um envio aceito ou um download.
+model EtiquetaImpressao {
+  id                     String                @id @default(cuid())
+  parceiroId             String
+  parceiro               ParceiroFlow          @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId                 String
+  loja                   Loja                  @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  etiquetaId             String
+  etiqueta               Etiqueta              @relation(fields: [parceiroId, etiquetaId], references: [parceiroId, id], onDelete: Restrict)
+  sequencia              Int
+  copias                 Int
+  transporte             TransporteDaImpressao
+  situacao               SituacaoDaImpressao   @default(PREPARADA)
+  resolucao              Int                   @default(203)
+  erro                   String?
+  solicitadaEm           DateTime              @default(now())
+  solicitadaPorNome      String
+  solicitadaPorUsuarioId String?
+  concluidaEm            DateTime?
+  chaveEnvio             String?
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, etiquetaId, sequencia])
+  @@unique([parceiroId, chaveEnvio])
+  @@index([parceiroId, lojaId, solicitadaEm])
+}
+
+// 3.4: de onde veio o registro do lote do fornecedor.
+enum OrigemDoLote {
+  RECEBIMENTO // registrado na nota de compra (a nota não muda: o lote mora aqui)
+  ABERTURA // lido na embalagem na hora de abrir (sem nota)
+}
+
+// 3.4 (decisão 406): o lote do FORNECEDOR de um insumo comprado, numa loja: código e vencimento como estão na embalagem, opcionais
+// e nunca inventados; a data do lote nunca vai para o cadastro do insumo. Liga à nota (cabeçalho estável: editar a nota troca os
+// itens) e ao insumo. Não muda depois de registrado (gatilho); sai só se nunca foi aberto (FK das aberturas).
+model LoteDeInsumo {
+  id                 String       @id @default(cuid())
+  parceiroId         String
+  parceiro           ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId             String
+  loja               Loja         @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  insumoId           String
+  insumo             Insumo       @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  notaId             String?
+  nota               NotaEntrada? @relation(fields: [parceiroId, notaId], references: [parceiroId, id], onDelete: Restrict)
+  origem             OrigemDoLote
+  insumoNomeSnapshot String
+  unidadeSnapshot    UnidadeBase
+  codigo             String?
+  vencimentoEm       DateTime?    @db.Date
+  fabricadoEm        DateTime?    @db.Date
+  // A marca que veio (não é a marca de referência do cadastro).
+  marca              String?
+  // A pessoa aceitou a sugestão do `rastro` do XML da nota fiscal.
+  sugeridoPeloXml    Boolean      @default(false)
+  criadoEm           DateTime     @default(now())
+  criadoPorNome      String
+  criadoPorUsuarioId String?
+  chaveEnvio         String?
+
+  aberturas AberturaDeLote[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, chaveEnvio])
+  @@index([parceiroId, lojaId, insumoId])
+  @@index([parceiroId, notaId])
+}
+
+// 3.4 (decisão 402): a abertura de uma embalagem de insumo COMPRADO numa loja — o fato, imutável. A validade efetiva é o menor
+// entre o fim do dia do vencimento do lote (Rio) e abertura + prazo após abertura na conservação escolhida (CHECK no banco);
+// sem prazo, nula. Lote vencido não abre (CHECK). Não mexe no saldo nem no livro do estoque, nem na nota (decisão 404).
+model AberturaDeLote {
+  id                   String          @id @default(cuid())
+  parceiroId           String
+  parceiro             ParceiroFlow    @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId               String
+  loja                 Loja            @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  insumoId             String
+  insumo               Insumo          @relation(fields: [parceiroId, insumoId], references: [parceiroId, id], onDelete: Restrict)
+  // Nulo = lote não informado.
+  loteId               String?
+  lote                 LoteDeInsumo?   @relation(fields: [parceiroId, loteId], references: [parceiroId, id], onDelete: Restrict)
+  insumoNomeSnapshot   String
+  unidadeSnapshot      UnidadeBase
+  // Onde a embalagem aberta fica (dá o prazo).
+  conservacao          Conservacao
+  abertoEm             DateTime
+  prazoAposAberturaMin Int?
+  vencimentoLoteEm     DateTime?       @db.Date
+  codigoLoteSnapshot   String?
+  marcaSnapshot        String?
+  validadeEm           DateTime?
+  regraDaValidade      RegraDaValidade
+  // Quanto foi aberto (opcional, milésimos da unidade do insumo).
+  quantidadeMilesimos  Int?
+  abertoPorNome        String
+  abertoPorUsuarioId   String?
+  chaveEnvio           String?
+  criadoEm             DateTime        @default(now())
+
+  etiquetas Etiqueta[]
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, chaveEnvio])
+  @@index([parceiroId, lojaId, abertoEm])
+  @@index([parceiroId, loteId])
 }
 
 // ------------------------------------------------- ERP · faturamento e DRE

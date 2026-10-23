@@ -5,7 +5,8 @@
  * `20261101000000_erp_insumo_categorias` (I.1a), `20261102000000_erp_insumo_clareza` + `20261102010000_erp_insumo_conservacao_confirmada` (I.1b) e
  * `20261103000000_erp_cmv_categorias` (I.2a) + `20261103010000_erp_cmv_categorias_endurecimento` e `20261104000000_erp_cmv_real_categorias` (I.2b)
  * e `20261105000000_erp_fornecedor_cadastro` (F.1a: cadastro do fornecedor e CNPJ da loja), `20261106000000_erp_documento_fiscal` (F.1b)
- * e `20261107000000_erp_relatorio_compras` (L.2: dois índices da nota de compra).
+ * e `20261107000000_erp_relatorio_compras` (L.2: dois índices da nota de compra) e `20261110000000_erp_etiquetas` (3.4: a emissão da
+ * etiqueta, os pedidos de impressão, o lote do fornecedor e a abertura da embalagem).
  *
  *   npm run erp:conferir-migracao
  *
@@ -102,6 +103,37 @@ export const CHECKS_DA_3_3 = [
 
 /** Os índices da 3.3: o histórico e os indicadores leem os lotes encerrados da loja por período. */
 export const INDICES_DA_3_3 = ['OrdemProducao_parceiroId_lojaId_concluidaEm_idx', 'OrdemProducao_parceiroId_lojaId_canceladaEm_idx'] as const;
+
+/** As três tabelas da 3.4 (de tenant: RLS forçada como as outras; nascem com os CHECKs validados). */
+export const TABELAS_DA_3_4 = ['EtiquetaImpressao', 'LoteDeInsumo', 'AberturaDeLote'] as const;
+
+/** Os CHECKs que a 3.4 acrescentou em "Etiqueta" (NOT VALID + VALIDATE que só avisa: etiqueta antiga de banco de prova). */
+export const CHECKS_DA_3_4 = [
+  ['Etiqueta', 'Etiqueta_origem_da_emissao'],
+  ['Etiqueta', 'Etiqueta_validade_nunca_inventada'],
+  ['Etiqueta', 'Etiqueta_quantas_faixa'],
+  ['Etiqueta', 'Etiqueta_textos_curtos'],
+] as const;
+
+/** Os índices únicos da 3.4: a chave do envio (duplo clique = o mesmo registro) e a sequência do pedido (primeira, reimpressões). */
+export const INDICES_DA_3_4 = [
+  'Etiqueta_parceiroId_chaveEnvio_key',
+  'EtiquetaImpressao_parceiroId_chaveEnvio_key',
+  'EtiquetaImpressao_parceiroId_etiquetaId_sequencia_key',
+  'LoteDeInsumo_parceiroId_chaveEnvio_key',
+  'AberturaDeLote_parceiroId_chaveEnvio_key',
+] as const;
+
+/** Os gatilhos da 3.4: sem eles a emissão e a abertura mudariam depois de gravadas, ou apontariam lote de outra loja ou insumo. */
+export const GATILHOS_DA_3_4 = [
+  'Etiqueta_origem_confere',
+  'EtiquetaImpressao_confere',
+  'EtiquetaImpressao_parceiro_imutavel',
+  'LoteDeInsumo_confere',
+  'LoteDeInsumo_parceiro_imutavel',
+  'AberturaDeLote_confere',
+  'AberturaDeLote_parceiro_imutavel',
+] as const;
 
 /** Os CHECKs que a I.1a acrescentou em "Insumo" (a tabela nova nasce com os dela validados). */
 export const CHECKS_DA_I_1A = [
@@ -558,6 +590,35 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       if (!indicesL2.some((x) => x.nome === i)) pendencias.push(`Índice ${i} NÃO existe: a migration 20261107000000_erp_relatorio_compras não foi aplicada por inteiro. Rode o CREATE INDEX dela.`);
     }
   }
+  // 3.4: só se a migration dela já rodou (a tabela existe; o catálogo não passa pela RLS).
+  const etiquetas = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_class WHERE relname = 'EtiquetaImpressao' AND relkind = 'r'`;
+  if (etiquetas[0]?.n) {
+    const M = '20261110000000_erp_etiquetas';
+    const tabelas = await db.$queryRaw<{ nome: string; rls: boolean; forcada: boolean }[]>`
+      SELECT relname AS nome, relrowsecurity AS rls, relforcerowsecurity AS forcada FROM pg_class WHERE relkind = 'r' AND relname = ANY(${[...TABELAS_DA_3_4, 'Loja']})`;
+    const loja = tabelas.find((t) => t.nome === 'Loja');
+    for (const t of TABELAS_DA_3_4) {
+      const achada = tabelas.find((x) => x.nome === t);
+      if (!achada) pendencias.push(`Tabela ${t} NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
+      // As antigas com RLS e a nova sem: o papel do tenant não alcançaria a tabela (o ERP quebraria) ou ela ficaria sem o cinto.
+      else if (loja?.rls && !(achada.rls && achada.forcada)) pendencias.push(`Tabela ${t} sem RLS forçada (as outras têm): rode o bloco da RLS da migration ${M} como dono das tabelas.`);
+    }
+    const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_3_4.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_3_4) {
+      const achado = dela.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
+      else if (!achado.validado) pendencias.push(`CHECK ${nome} ficou NOT VALID: corrija a etiqueta antiga que o viola e rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+    }
+    const indices = await db.$queryRaw<{ nome: string }[]>`SELECT indexname AS nome FROM pg_indexes WHERE indexname = ANY(${[...INDICES_DA_3_4]})`;
+    for (const i of INDICES_DA_3_4) {
+      if (!indices.some((x) => x.nome === i)) pendencias.push(`Índice ${i} NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
+    }
+    const gatilhos = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_3_4]})`;
+    for (const t of GATILHOS_DA_3_4) {
+      if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
+    }
+  }
   return pendencias;
 }
 
@@ -575,10 +636,10 @@ async function principal() {
       for (const d of rel.documentosAConferir) console.log(`  Documento a conferir no parceiro ${d.parceiro}: “${d.nome}” tem ${documentoParaSaida(d.documento)}, que não passa nos dígitos verificadores.`);
     }
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a, da F.1b e da L.2 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias, das metas por categoria e da nota fiscal por XML (com RLS), os índices e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a, da F.1b, da L.2 e da 3.4 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias, das metas por categoria, da nota fiscal por XML e das etiquetas (com RLS), os índices e os gatilhos existem.');
       return 0;
     }
-    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a e da F.1b: ${pendencias.length} pendência(s):`);
+    console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a, da F.1b, da L.2 e da 3.4: ${pendencias.length} pendência(s):`);
     for (const p of pendencias) console.error(`  - ${p}`);
     return 1;
   } finally {
