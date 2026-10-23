@@ -187,6 +187,8 @@ function planejarUma(
     ...lido.dados,
     descricao: lido.dados.descricao ?? atual?.descricao ?? null,
     modoPreparo: lido.dados.modoPreparo ?? atual?.modoPreparo ?? null,
+    // N.4: a planilha não traz etapas: as que a ficha já tem ficam.
+    passosPreparo: atual?.passosPreparo ?? [],
     validades: entrada.validade === undefined ? (atual ? validadesDaLinha(atual) : null) : lido.dados.validades,
   };
   const custo = custoDaFicha(

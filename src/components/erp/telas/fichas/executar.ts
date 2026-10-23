@@ -43,6 +43,8 @@ export async function lerEnvioDaFicha(
     tipo: textoDe(form.get('tipo')),
     descricao: textoDe(form.get('descricao')),
     modoPreparo: textoDe(form.get('modoPreparo')),
+    // N.4: as etapas na ordem da tela.
+    passos: form.getAll('passo').map(textoDe),
     rendimento: textoDe(form.get('rendimento')),
     rendimentoUnidade: textoDe(form.get('rendimentoUnidade')),
     versao: textoDe(form.get('versao')),

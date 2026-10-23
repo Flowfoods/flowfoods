@@ -325,6 +325,7 @@ describe('ERP 1.2 · histórico da ficha: legível, só o que mudou', () => {
     tipo: 'PRATO' as const,
     descricao: 'Pão e blend',
     modoPreparo: null,
+    passosPreparo: [] as string[],
     rendimentoMilesimos: 1000,
     unidadeRendimento: 'UN' as const,
     itens: [

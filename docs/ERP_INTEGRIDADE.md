@@ -115,3 +115,44 @@ existem neste Postgres local. Não foram executados; não contam como aprovados.
 - Canal "não ofertado" existe na conta, mas não há como marcar na ficha ainda (`ProdutoCanal.ativo` sem tela).
 - Ponto 1 continua bloqueado na escolha do método de valorização (ver N.1).
 - Nada publicado: sem merge, sem deploy.
+
+## Entrega N.3 — canal ofertado ou não por prato
+
+- Na ficha, cada canal tem a caixa "vende na loja / no delivery / no iFood". Desmarcar não apaga o preço: ele fica
+  guardado (campo só leitura, "guardado, fora do canal") e volta a valer quando o canal for marcado de novo.
+- Canal fora: "não ofertado" na ficha, na lista e no histórico ("não ofertado (guardado R$ 15,00)"); sem CMV, farol nem
+  resultado. "Não ofertado" é diferente de "sem dados".
+- Usa a coluna que já existia (`ProdutoCanal.ativo`, nunca usada antes): sem migração. Tela velha que ainda achava o
+  canal ofertado recebe conflito em vez de gravar por cima. Chamada sem a pergunta (ex.: testes antigos) não mexe na oferta.
+- Testes: 2 novos no `tests/erp-cmv-produto.db.test.ts` (ação com o formulário, preço guardado, lista, histórico,
+  conflito, voltar ao canal; chamada sem a pergunta).
+
+## Entrega N.4 — modo de preparo em etapas numeradas e descrição comercial
+
+- Migração aditiva `20261109000000_erp_ficha_passos`: `FichaTecnica.passosPreparo TEXT[]` (vazia por padrão; CHECK de no
+  máximo 40 etapas). O texto antigo (`modoPreparo`) não muda.
+- Formulário: editor de etapas (campo próprio por etapa, numeração automática; adicionar, tirar, subir e descer por botão,
+  com foco acompanhando a etapa movida). Ficha antiga mostra o "Texto anterior do modo de preparo" guardado e editável, com
+  o botão "Copiar para as etapas (uma por linha)" — uma vez por edição, para não duplicar; nada é dividido sozinho.
+- Detalhe: etapas numeradas; o texto anterior aparece como "Texto anterior (guardado)" quando há etapas, ou sozinho com
+  a dica de organizar em etapas.
+- "Descrição" virou "Descrição comercial" (rótulo e ajuda: texto para cardápio e marketplace; não publica nada sozinho).
+  O campo é o mesmo; nenhum dado mudou.
+- Histórico: "modo de preparo em etapas" com antes e depois numerados (reordenar é mudança).
+- Importação por planilha não traz etapas e não apaga as existentes. Rascunho ao sair para cadastrar insumo guarda as
+  etapas.
+- Testes: `tests/erp-ficha-passos.db.test.ts` (7). No navegador (app local, banco de teste): copiar o texto anterior,
+  subir a etapa 3, salvar, conferir o detalhe e o texto anterior preservado; 4 tamanhos de tela sem rolagem lateral.
+
+### Bateria depois da N.4 (23/10/2026)
+
+| Verificação | Resultado |
+|---|---|
+| Suíte inteira com banco | 129 arquivos, 2.490 aprovados, 44 pulados (provas de migração com papéis de banco inexistentes no local), 0 falhas |
+| typecheck, eslint nos arquivos mexidos, portão de conteúdo | limpos |
+
+### Pendências que continuam
+
+- Filtro da lista por status de CMV e texto de ajuda da conta: esperam a L.3 entrar no master (mesmos trechos).
+- Impressão/PDF da ficha (visão operacional × gerencial) ainda não feita: as etapas já estão prontas para ela.
+- Ponto 1 (valorização do estoque) segue esperando a decisão do método.

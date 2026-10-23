@@ -199,6 +199,7 @@ export const SELECAO_PARA_EDITAR = {
   tipo: true,
   descricao: true,
   modoPreparo: true,
+  passosPreparo: true,
   rendimentoMilesimos: true,
   unidadeRendimento: true,
   ativa: true,
@@ -217,6 +218,8 @@ export function dadosGravados(f: {
   tipo: TipoFicha;
   descricao: string | null;
   modoPreparo: string | null;
+  /** N.4: ausente (leitura antiga) = sem etapas. */
+  passosPreparo?: string[];
   rendimentoMilesimos: number;
   unidadeRendimento: Unidade;
   itens: { insumoId: string | null; subfichaId?: string | null; quantidadeMilesimos: number; fatorCorrecaoMilesimos?: number }[];
@@ -228,6 +231,7 @@ export function dadosGravados(f: {
     tipo: f.tipo,
     descricao: f.descricao,
     modoPreparo: f.modoPreparo,
+    passosPreparo: f.passosPreparo ?? [],
     rendimentoMilesimos: f.rendimentoMilesimos,
     unidadeRendimento: f.unidadeRendimento,
     itens: f.itens
@@ -497,6 +501,7 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
         unidadeRendimento: d.unidadeRendimento,
         descricao: d.descricao,
         modoPreparo: d.modoPreparo,
+        passosPreparo: d.passosPreparo,
         conservacao: d.validades?.principal ?? null,
         ...colunasDaValidade(d.validades),
         origem: g.origem ?? 'MANUAL',
@@ -535,6 +540,7 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
       unidadeRendimento: d.unidadeRendimento,
       descricao: d.descricao,
       modoPreparo: d.modoPreparo,
+      passosPreparo: d.passosPreparo,
       conservacao: d.validades?.principal ?? null,
       ...colunasDaValidade(d.validades),
       ...dadosDaFoto,
@@ -857,6 +863,7 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes:
       select: {
         ...SELECAO_DA_LISTA,
         modoPreparo: true,
+        passosPreparo: true,
         origem: true,
         atualizadoEm: true,
         insumoProduzido: { select: { id: true, nome: true } },
@@ -874,6 +881,7 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes:
       tipo: f.tipo,
       descricao: f.descricao,
       modoPreparo: f.modoPreparo,
+      passosPreparo: f.passosPreparo,
       rendimentoMilesimos: f.rendimentoMilesimos,
       unidadeRendimento: f.unidadeRendimento,
       ativa: f.ativa,

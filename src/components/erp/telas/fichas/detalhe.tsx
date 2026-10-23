@@ -138,8 +138,8 @@ export function TelaDetalheFicha({
               </div>
               <div className="min-w-0 flex-1 space-y-4">
                 <div>
-                  <h2 className="text-[13px] font-semibold text-suave">O que é</h2>
-                  <p className="mt-1 text-[15px] leading-relaxed text-texto">{f.descricao ?? <span className="text-suave">Sem descrição.</span>}</p>
+                  <h2 className="text-[13px] font-semibold text-suave">Descrição comercial</h2>
+                  <p className="mt-1 text-[15px] leading-relaxed text-texto">{f.descricao ?? <span className="text-suave">Sem descrição comercial.</span>}</p>
                 </div>
                 <div className="border-t border-linha pt-4">
                   <h2 className="text-[13px] font-semibold text-suave">Custo {por}</h2>
@@ -289,11 +289,36 @@ export function TelaDetalheFicha({
           )}
 
           <Painel className="order-2 sm:order-4" titulo="Modo de preparo">
-            {f.modoPreparo ? (
-              <p className="whitespace-pre-line text-[15px] leading-relaxed text-texto">{f.modoPreparo}</p>
-            ) : (
-              <Vazio>Sem modo de preparo ainda.</Vazio>
+            {f.passosPreparo.length > 0 && (
+              <ol className="space-y-3">
+                {f.passosPreparo.map((p, i) => (
+                  <li key={i} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-2">
+                    <span aria-hidden className="font-display text-lg leading-snug text-suave">
+                      {i + 1}
+                    </span>
+                    <p className="whitespace-pre-line text-[15px] leading-relaxed text-texto">
+                      <span className="sr-only">Etapa {i + 1}: </span>
+                      {p}
+                    </p>
+                  </li>
+                ))}
+              </ol>
             )}
+            {f.modoPreparo && (
+              <div className={f.passosPreparo.length > 0 ? 'mt-4 border-t border-linha pt-4' : ''}>
+                {f.passosPreparo.length > 0 ? (
+                  <p className="mb-1.5 text-[12px] font-semibold text-suave">Texto anterior (guardado)</p>
+                ) : (
+                  podeEditar && (
+                    <p className="mb-2 text-[12px] text-suave">
+                      Texto corrido, de antes das etapas. Para organizar em etapas numeradas, use Editar ficha: o texto continua guardado.
+                    </p>
+                  )
+                )}
+                <p className="whitespace-pre-line text-[15px] leading-relaxed text-texto">{f.modoPreparo}</p>
+              </div>
+            )}
+            {!f.modoPreparo && f.passosPreparo.length === 0 && <Vazio>Sem modo de preparo ainda.</Vazio>}
           </Painel>
         </div>
 

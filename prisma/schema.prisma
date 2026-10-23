@@ -1310,6 +1310,8 @@ model FichaTecnica {
   insumoProduzidoId   String?
   insumoProduzido     Insumo?      @relation("FichaProduzInsumo", fields: [parceiroId, insumoProduzidoId], references: [parceiroId, id], onDelete: Restrict)
   modoPreparo         String?
+  // N.4: o preparo em etapas numeradas (a ordem é a da lista). O texto antigo acima fica guardado como "texto anterior".
+  passosPreparo       String[]     @default([])
   ativa               Boolean      @default(true)
   origem              OrigemDado   @default(MANUAL)
   criadoEm            DateTime     @default(now())

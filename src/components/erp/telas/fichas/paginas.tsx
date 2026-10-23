@@ -86,6 +86,7 @@ export function TelaFormFicha({
     tipo: ficha.tipo,
     descricao: ficha.descricao ?? '',
     modoPreparo: ficha.modoPreparo ?? '',
+    passos: ficha.passosPreparo,
     rendimento: rende!.texto,
     rendimentoUnidade: rende!.em,
     itens: ficha.itens.map((i) => ({
