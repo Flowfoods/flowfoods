@@ -463,30 +463,32 @@ export interface MovimentoDoConsumo {
   codigoLote: string | null;
 }
 
-/** As baixas que um número abre: os baldes da coluna, ou todos os que formam o saldo inicial / final. */
-function filtroDoLink(col: ColunaDeLink): Prisma.Sql {
+/** Os movimentos que um número abre: os baldes da coluna (ou só um balde), ou todos os que formam o saldo inicial / final. */
+function filtroDoLink(col: ColunaDeLink, bucket: BucketId | ''): Prisma.Sql {
   if (col === 'inicial') return Prisma.sql`mv."antes"`;
   if (col === 'final') return Prisma.sql`mv."ate"`;
-  return Prisma.sql`(NOT mv."antes" AND mv."ate" AND mv."bucket" = ANY(${BUCKETS_DA_COLUNA[col] as string[]}::text[]))`;
+  const baldes: string[] = bucket && BUCKETS_DA_COLUNA[col].includes(bucket) ? [bucket] : BUCKETS_DA_COLUNA[col];
+  return Prisma.sql`(NOT mv."antes" AND mv."ate" AND mv."bucket" = ANY(${baldes}::text[]))`;
 }
 
-/** Os movimentos que formam um número (a coluna aberta), do mais novo ao mais velho, paginados no banco; com o total e as somas. */
-export async function movimentosDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo, col: ColunaDeLink, pagina: { numero: number; porPagina: number } | null, teto: number) {
+/** Os movimentos que formam um número (a coluna aberta), do mais novo ao mais velho, paginados no banco; com o total e a soma. */
+export async function movimentosDoConsumo(tx: ClienteDoParceiro, r: RecorteDoConsumo, col: ColunaDeLink, pagina: { numero: number; porPagina: number } | null, teto: number, bucket: BucketId | '' = '') {
   const limite = pagina ? pagina.porPagina : teto + 1;
   const deslocamento = pagina ? (pagina.numero - 1) * pagina.porPagina : 0;
-  const lidos = await tx.sql<{
-    id: string; lojaId: string; loja: string; insumoId: string; insumo: string; unidade: string; tipo: string; bucket: string; estorno: boolean;
-    q: number; v: number; antesDoMov: number; depois: number; ocorridoEm: Date; motivo: string | null; semOrigem: boolean;
-    notaId: string | null; requisicaoId: string | null; requisicaoNumero: number | null; contagemId: string | null; contagemTipo: string | null; contagemTitulo: string | null;
-    ordemProducaoId: string | null; codigoLote: string | null; quantos: number; somaq: number; somav: number;
-  }>`
-    WITH mov AS (${fonteDoConsumo(r)})
+  // "Só o que pede atenção" e "só sem contagem" também valem para os movimentos: a lista é a dos insumos que o resumo contou.
+  const restrito = r.so !== '';
+  const cte = restrito ? Prisma.sql`WITH mov AS MATERIALIZED (${fonteDoConsumo(r)}), ${paresDoConsumo(r)}` : Prisma.sql`WITH mov AS (${fonteDoConsumo(r)})`;
+  const juntar = restrito ? Prisma.sql`JOIN selecionados s ON s."lojaId" = mv."lojaId" AND s."insumoId" = mv."insumoId"` : Prisma.empty;
+  const consulta = Prisma.sql`
+    ${cte}
     SELECT mv."id", mv."lojaId", l."nome" AS "loja", mv."insumoId", COALESCE(i."nome", mv."insumoNomeSnapshot") AS "insumo", mv."unidade", mv."tipo", mv."bucket", mv."estorno",
            mv."q", mv."v", mv."antesDoMov", mv."depois", mv."ocorridoEm", mv."motivo", mv."semOrigem", mv."notaId",
            ri."requisicaoId", rq."numero" AS "requisicaoNumero", ci."contagemId", ct."tipo"::text AS "contagemTipo", ct."titulo" AS "contagemTitulo",
            COALESCE(mv."ordemProducaoId", opr."id") AS "ordemProducaoId", COALESCE(op."codigoLote", opr."codigoLote") AS "codigoLote",
-           count(*) OVER ()::float8 AS "quantos", (sum(mv."q") OVER ())::float8 AS "somaq", (sum(mv."v") OVER ())::float8 AS "somav"
+           count(*) OVER ()::float8 AS "quantos", (sum(mv."q") OVER ())::float8 AS "somaq", (sum(mv."v") OVER ())::float8 AS "somav",
+           (min(mv."unidade") OVER ()) AS "uMin", (max(mv."unidade") OVER ()) AS "uMax"
     FROM mov mv
+    ${juntar}
     JOIN "Loja" l ON l."parceiroId" = ${r.parceiroId}::text AND l."id" = mv."lojaId"
     JOIN "Insumo" i ON i."parceiroId" = ${r.parceiroId}::text AND i."id" = mv."insumoId"
     LEFT JOIN "RequisicaoItem" ri ON ri."parceiroId" = ${r.parceiroId}::text AND ri."id" = mv."requisicaoItemId"
@@ -496,9 +498,15 @@ export async function movimentosDoConsumo(tx: ClienteDoParceiro, r: RecorteDoCon
     LEFT JOIN "OrdemProducao" op ON op."parceiroId" = ${r.parceiroId}::text AND op."id" = mv."ordemProducaoId"
     LEFT JOIN "OrdemProducao" opr ON opr."parceiroId" = ${r.parceiroId}::text AND opr."requisicaoId" = ri."requisicaoId"
     WHERE (${r.categoriaId}::text IS NULL OR i."categoriaId" = ${r.categoriaId}::text)
-      AND ${filtroDoLink(col)}
+      AND ${filtroDoLink(col, bucket)}
     ORDER BY mv."ocorridoEm" DESC, mv."criadoEm" DESC, mv."id" DESC
     LIMIT ${limite}::int OFFSET ${deslocamento}::int`;
+  const lidos = await tx.sql<{
+    id: string; lojaId: string; loja: string; insumoId: string; insumo: string; unidade: string; tipo: string; bucket: string; estorno: boolean;
+    q: number; v: number; antesDoMov: number; depois: number; ocorridoEm: Date; motivo: string | null; semOrigem: boolean;
+    notaId: string | null; requisicaoId: string | null; requisicaoNumero: number | null; contagemId: string | null; contagemTipo: string | null; contagemTitulo: string | null;
+    ordemProducaoId: string | null; codigoLote: string | null; quantos: number; somaq: number; somav: number; uMin: string; uMax: string;
+  }>`${consulta}`;
   const movimentos = (pagina ? lidos : lidos.slice(0, teto)).map(
     (m): MovimentoDoConsumo => ({
       id: m.id,
@@ -527,9 +535,12 @@ export async function movimentosDoConsumo(tx: ClienteDoParceiro, r: RecorteDoCon
       codigoLote: m.codigoLote,
     }),
   );
+  const um = lidos[0] && lidos[0].uMin === lidos[0].uMax ? (lidos[0].uMin as Unidade) : null;
   return {
     movimentos,
     total: lidos[0]?.quantos ?? 0,
+    /** A soma só quer dizer alguma coisa com UMA unidade (kg e L não se somam): nula se misturou. */
+    unidadeUnica: um,
     somaMilesimos: lidos[0]?.somaq ?? 0,
     somaCentavos: r.verValores ? (lidos[0]?.somav ?? 0) : 0,
     passouDoTeto: !pagina && lidos.length > teto,
@@ -719,10 +730,10 @@ export async function movimentosDaTela(cliente: ClienteDoParceiro, alcance: Alca
       const opcoes = motivo === 'sem-permissao' ? SEM_OPCOES : await opcoesDoConsumo(tx, lojasDoAcesso, f);
       const vazio: MovimentosDaTela = { motivoVazio: motivo, opcoes, lojasUsadas: [], verValores: false, lista: null, numeroDaPagina: 1, paginas: 1 };
       if (!recorte || !f.col) return vazio;
-      const primeira = await movimentosDoConsumo(tx, recorte, f.col, { numero: 1, porPagina: f.porPagina }, 0);
+      const primeira = await movimentosDoConsumo(tx, recorte, f.col, { numero: 1, porPagina: f.porPagina }, 0, f.bucket);
       const paginas = Math.max(1, Math.ceil(primeira.total / f.porPagina));
       const numero = Math.min(Math.max(1, f.pagina), paginas);
-      const lista = numero === 1 ? primeira : await movimentosDoConsumo(tx, recorte, f.col, { numero, porPagina: f.porPagina }, 0);
+      const lista = numero === 1 ? primeira : await movimentosDoConsumo(tx, recorte, f.col, { numero, porPagina: f.porPagina }, 0, f.bucket);
       return { ...vazio, motivoVazio: null, lojasUsadas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)), verValores: recorte.verValores, lista, numeroDaPagina: numero, paginas };
     },
     { repetivel: true, timeout: 60_000 },

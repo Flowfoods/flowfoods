@@ -51,7 +51,7 @@ function cabecalho(titulo: string, f: FiltrosDoConsumo, lojas: string[], geradoE
     nomes.categoria ? `Categoria (a de hoje no cadastro): ${nomes.categoria}` : '',
     f.so === 'atencao' ? 'Só o que pede atenção (saldo negativo, sem origem ou saldo que não bate)' : '',
     f.so === 'semcontagem' ? 'Só insumos sem contagem aplicada no período' : '',
-    f.col ? `Só o que forma: ${ROTULO_DO_LINK[f.col]}` : '',
+    f.col ? `Só o que forma: ${ROTULO_DO_LINK[f.col]}${f.bucket ? ` (${BUCKETS[f.bucket].rotulo})` : ''}` : '',
   ].filter(Boolean);
   return [
     linha([texto('Relatório'), texto(titulo)]),
@@ -154,7 +154,7 @@ export async function planilhaDoConsumo(
       async (tx) => {
         const { recorte, lojasDoAcesso } = await resolverRecorteDoConsumo(tx, alcance, f);
         if (!recorte) return null;
-        const m = await movimentosDoConsumo(tx, recorte, f.col as NonNullable<typeof f.col>, null, teto);
+        const m = await movimentosDoConsumo(tx, recorte, f.col as NonNullable<typeof f.col>, null, teto, f.bucket);
         return { recorte, m, lojas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)).map((l) => l.nome), insumo: f.insumoId ? (await tx.insumo.findUnique({ where: { id: f.insumoId }, select: { nome: true } }))?.nome : undefined };
       },
       { repetivel: true, timeout: 120_000 },
@@ -169,7 +169,7 @@ export async function planilhaDoConsumo(
     partes.push('');
     partes.push(linha([texto('TOTAIS'), '']));
     partes.push(linha([texto('Movimentos'), lido.m.total]));
-    partes.push(linha([texto('Soma da quantidade (só some com uma unidade só)'), quantidadeParaPlanilha(lido.m.somaMilesimos)]));
+    partes.push(linha([texto('Soma da quantidade'), lido.m.unidadeUnica ? `${quantidadeParaPlanilha(lido.m.somaMilesimos)} ${sigla(lido.m.unidadeUnica)}` : texto('não se soma: há unidades diferentes (kg, L e un)')]));
     if (vv) partes.push(linha([texto('Soma em R$'), reaisComSinalParaPlanilha(lido.m.somaCentavos)]));
     return { ok: true, nome: `consumo-estoque-movimentos-${f.col}-${periodo}.csv`, corpo: BOM_DO_CSV + partes.join('\r\n') + '\r\n' };
   }

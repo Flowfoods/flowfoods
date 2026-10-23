@@ -636,7 +636,7 @@ describe.skipIf(!URL_TESTE)('ERP L.4 · consumo e conciliação de estoque (Post
       const cab = linhas.findIndex((l) => l.startsWith('Quando entrou no livro'));
       const dados = linhas.slice(cab + 1).filter((l) => l && !l.startsWith('TOTAIS'));
       expect(dados.slice(0, 3)).toHaveLength(3);
-      expect(linhas.join('\n')).toContain('Soma da quantidade (só some com uma unidade só);-31,239');
+      expect(linhas.join('\n')).toContain('Soma da quantidade;-31,239 kg');
       const lista = (await movimentosDaTela(a, DONA(), filtros({ col: 'uso', insumo: ids.cebola }))).lista!;
       expect(lista.total).toBe(3);
       expect(linhas.join('\n')).toMatch(/Requisição #1/);

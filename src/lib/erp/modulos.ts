@@ -449,6 +449,20 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
             },
           ],
         },
+        {
+          // L.4: a leitura do livro do estoque (nada aqui dá baixa, lança ou conta).
+          rotulo: 'Relatórios',
+          icone: 'relatorio',
+          telas: [
+            {
+              href: `${base}/estoque/relatorios/consumo`,
+              rotulo: 'Consumo e conciliação',
+              icone: 'relatorio',
+              subtitulo: 'Do saldo inicial ao final: compras, uso, devoluções e ajustes',
+              permissao: 'estoque.ver',
+            },
+          ],
+        },
       ],
       // Nova requisição, Planejar contagem e Abrir estoque são da loja (já estão nas telas dela).
       acoes: [],

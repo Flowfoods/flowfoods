@@ -357,6 +357,8 @@ export interface FiltrosDoConsumo {
   so: FiltroDeAtencao;
   /** Na tela dos movimentos: o número que se abriu (coluna). Vazio na tela principal. */
   col: '' | ColunaDeLink;
+  /** Na tela dos movimentos: só esta caixa dentro da coluna (a linha a linha do detalhe). */
+  bucket: '' | BucketId;
   pagina: number;
   porPagina: number;
   periodoInvalido: string | null;
@@ -386,6 +388,7 @@ export function lerFiltrosDoConsumo(sp: Params, hoje = hojeNoRio()): FiltrosDoCo
   else if (diasDoIntervalo(de, ate) > DIAS_MAXIMOS) periodoInvalido = `O período passa de ${DIAS_MAXIMOS} dias. Escolha um período menor (um mês ou um trimestre dá a leitura mais clara).`;
   const so = um(sp.so);
   const col = um(sp.col);
+  const bucket = um(sp.bucket);
   return {
     lojaIds: Array.from(new Set(todos(sp.loja).map(idOuNada).filter(Boolean))).slice(0, 100),
     insumoId: idOuNada(um(sp.insumo)),
@@ -395,6 +398,7 @@ export function lerFiltrosDoConsumo(sp: Params, hoje = hojeNoRio()): FiltrosDoCo
     ate,
     so: so === 'atencao' || so === 'semcontagem' ? so : '',
     col: (LISTA_DE_LINKS as string[]).includes(col) ? (col as ColunaDeLink) : '',
+    bucket: (LISTA_DE_BUCKETS as string[]).includes(bucket) ? (bucket as BucketId) : '',
     pagina: lerPagina(um(sp.pagina)),
     porPagina: lerPorPagina(um(sp.por)),
     periodoInvalido,
@@ -414,6 +418,7 @@ export function queryDoConsumo(f: FiltrosDoConsumo, mudar: Partial<FiltrosDoCons
   q.set('ate', x.ate);
   if (x.so) q.set('so', x.so);
   if (x.col) q.set('col', x.col);
+  if (x.bucket) q.set('bucket', x.bucket);
   if (x.porPagina !== POR_PAGINA_PADRAO) q.set('por', String(x.porPagina));
   if (!opcoes.semPagina && x.pagina > 1) q.set('pagina', String(x.pagina));
   if (x.volta) q.set('volta', x.volta);

@@ -67,7 +67,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(abasPorArea(DONO)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Categorias', 'Classificar insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Notas recebidas', 'Orçamento', 'Fornecedores', 'Histórico do insumo', 'Compras do período', 'Comparar fornecedores', 'Comparar períodos'],
-      'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
+      'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências', 'Consumo e conciliação'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'CMV por categoria', 'Períodos', 'Plano e metas', 'Metas por categoria'],
       'Rede e Equipe': ['Lojas e marcas', 'Equipe', 'Histórico', 'Seu acesso'],
@@ -87,7 +87,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
     expect(abasPorArea(GERENTE)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Categorias', 'Classificar insumos', 'Fichas e produtos', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Notas recebidas', 'Orçamento', 'Fornecedores', 'Histórico do insumo', 'Compras do período', 'Comparar fornecedores', 'Comparar períodos'],
-      'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências'],
+      'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências', 'Consumo e conciliação'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
       // 2.2a: o gerente vê e lança despesa, vê o DRE e o período; plano de contas e período são do dono (rede inteira).
       'Faturamento e DRE': ['Faturamento', 'Despesas', 'DRE', 'CMV por categoria', 'Períodos'],
@@ -100,14 +100,14 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Gerente de loja (N3): igual ao gerente, sem Histórico (exige a rede inteira)', () => {
     const r = abasPorArea(GERENTE_N3);
     expect(r['Rede e Equipe']).toEqual(['Lojas e marcas', 'Seu acesso']);
-    expect(r['Estoque e Movimentações']).toEqual(['Visão geral', 'Contagens', 'Requisições', 'Divergências']);
+    expect(r['Estoque e Movimentações']).toEqual(['Visão geral', 'Contagens', 'Requisições', 'Divergências', 'Consumo e conciliação']);
   });
 
   it('Operador: sem a área Compras, sem Precificação, sem Divergências, e a única ação dele é planejar a produção', () => {
     expect(emUso(OPERADOR).map((m) => m.nome)).toEqual(['Cadastros e Cardápio', 'Estoque e Movimentações', 'Produção', 'Rede e Equipe']);
     expect(abasPorArea(OPERADOR)).toEqual({
       'Cadastros e Cardápio': ['Insumos', 'Categorias', 'Fichas e produtos'],
-      'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições'],
+      'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Consumo e conciliação'],
       // 3.3: a cozinha pega as tarefas e lê o histórico; os indicadores por pessoa são da gerência.
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico'],
       'Rede e Equipe': ['Lojas e marcas', 'Seu acesso'],
@@ -250,7 +250,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     expect(t[0]).toContain('Cadastros e Cardápio');
     expect(t[0]).toContain('Do insumo à ficha técnica e ao preço de venda');
     expect(abasDoCartao(uso[0]).map((a) => a.rotulo)).toEqual(['Insumos', 'Categorias', 'Fichas e produtos']);
-    expect(abasDoCartao(uso[1]).map((a) => a.rotulo)).toEqual(['Visão geral', 'Contagens', 'Requisições']);
+    expect(abasDoCartao(uso[1]).map((a) => a.rotulo)).toEqual(['Visão geral', 'Contagens', 'Requisições', 'Consumo e conciliação']);
     expect(t[0]).not.toContain('Precificação');
     expect(t[1]).not.toContain('Divergências');
     for (const x of cartoes(secao(html(DONO), 'Em uso')).map(texto)) expect(x).not.toMatch(/R\$|%|\d/);
@@ -264,6 +264,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
       { rotulo: 'Contagens', href: '/erp/estoque/contagens' },
       { rotulo: 'Requisições', href: '/erp/estoque/requisicoes' },
       { rotulo: 'Divergências', href: '/erp/estoque/divergencias' },
+      { rotulo: 'Consumo e conciliação', href: '/erp/estoque/relatorios/consumo' },
     ]);
     expect(/href="([^"]+)"/.exec(estoque)![1]).toBe('/erp/estoque');
     for (const c of uso) {
@@ -452,7 +453,7 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
   const parceiro = (r: string) => join('src', 'app', 'erp', ...r.split('/').filter(Boolean), 'page.tsx');
   const espelho = (r: string) => join('src', 'app', 'rodolfo', '(painel)', 'erp', '[slug]', ...r.split('/').filter(Boolean), 'page.tsx');
 
-  it.each([...ANTIGAS, ...profundas, '/estoque/contagens', '/compras/orcamento', '/compras/recebidas', '/compras/recebidas/importar', '/compras/relatorios/insumo', '/compras/relatorios/periodo', '/compras/relatorios/comparar-fornecedores', '/compras/relatorios/comparar-periodos', '/insumos/categorias', '/insumos/classificar'])('%s existe no /erp e no nível 1', (r) => {
+  it.each([...ANTIGAS, ...profundas, '/estoque/contagens', '/estoque/relatorios/consumo', '/compras/orcamento', '/compras/recebidas', '/compras/recebidas/importar', '/compras/relatorios/insumo', '/compras/relatorios/periodo', '/compras/relatorios/comparar-fornecedores', '/compras/relatorios/comparar-periodos', '/insumos/categorias', '/insumos/classificar'])('%s existe no /erp e no nível 1', (r) => {
     expect(existsSync(parceiro(r)), `/erp${r}`).toBe(true);
     expect(existsSync(espelho(r)), `/rodolfo/erp/<slug>${r}`).toBe(true);
   });
@@ -475,7 +476,7 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     const todas = [...emUso(DONO)].flatMap((m) => [...m.grupos.flatMap((g) => g.itens), ...m.acoes]).map((i) => i.href.replace('/erp', ''));
     const novas = todas.filter((r) => !ANTIGAS.includes(r) && r !== '/acesso');
     // 2.5: o orçamento de compra é aba da área Compras.
-    expect(novas).toEqual(['/insumos/categorias', '/insumos/classificar', '/compras/recebidas', '/compras/orcamento', '/compras/relatorios/insumo', '/compras/relatorios/periodo', '/compras/relatorios/comparar-fornecedores', '/compras/relatorios/comparar-periodos', '/compras/recebidas/importar', '/estoque/contagens', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/cmv-categorias', '/dre/periodos', '/dre/plano', '/dre/metas-categorias', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
+    expect(novas).toEqual(['/insumos/categorias', '/insumos/classificar', '/compras/recebidas', '/compras/orcamento', '/compras/relatorios/insumo', '/compras/relatorios/periodo', '/compras/relatorios/comparar-fornecedores', '/compras/relatorios/comparar-periodos', '/compras/recebidas/importar', '/estoque/contagens', '/estoque/relatorios/consumo', '/producao/lista', '/producao/tarefas', '/producao', '/producao/historico', '/producao/indicadores', '/producao/nova', '/faturamento', '/dre/despesas', '/dre', '/dre/cmv-categorias', '/dre/periodos', '/dre/plano', '/dre/metas-categorias', '/faturamento/lancar', '/faturamento/importar', '/dre/despesas/nova']);
   });
 });
 
@@ -496,7 +497,7 @@ describe('UX.9 · abas (nav com nome acessível, aria-current) e trilha', () => 
     expect((h.match(/aria-current="page"/g) ?? []).length).toBe(1);
     expect(h).toMatch(/<a [^>]*aria-current="page"[^>]*>Contagens<\/a>/);
     expect(h).not.toContain('role="tablist"');
-    expect((h.match(/<a /g) ?? []).length).toBe(4);
+    expect((h.match(/<a /g) ?? []).length).toBe(5);
   });
 
   it('as abas saem das mesmas abas do menu, na mesma ordem (nunca divergem)', () => {

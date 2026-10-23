@@ -87,6 +87,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/erp/estoque/contagens',
       '/erp/estoque/requisicoes',
       '/erp/estoque/divergencias',
+      '/erp/estoque/relatorios/consumo',
       '/erp/producao/lista',
       '/erp/producao/tarefas',
       '/erp/producao',
@@ -134,7 +135,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
     // Operador VÊ fichas (bate o olho na foto e no preparo), sem criar nem importar.
     // 1.8: ele pede requisição (o quadro aparece); divergências são de quem confere contagem. UX.9: vê as contagens (estoque.ver), sem Precificação e sem ação nenhuma.
     // 3.3: as tarefas da cozinha e o histórico da produção; os indicadores por pessoa são da gerência.
-    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/insumos/categorias', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/producao/lista', '/erp/producao/tarefas', '/erp/producao', '/erp/producao/historico', '/erp/lojas', '/erp/acesso']);
+    expect(hrefs(a)).toEqual(['/erp/insumos', '/erp/insumos/categorias', '/erp/fichas', '/erp/estoque', '/erp/estoque/contagens', '/erp/estoque/requisicoes', '/erp/estoque/relatorios/consumo', '/erp/producao/lista', '/erp/producao/tarefas', '/erp/producao', '/erp/producao/historico', '/erp/lojas', '/erp/acesso']);
     // 3.1: o cozinheiro produz, então planejar a produção é a única ação dele.
     expect(hrefsDasAcoes(a)).toEqual(['/erp/producao/nova']);
     expect(futuros(a)).toEqual(['etiquetas']);
@@ -196,6 +197,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/estoque/contagens',
       '/rodolfo/erp/valentins/estoque/requisicoes',
       '/rodolfo/erp/valentins/estoque/divergencias',
+      '/rodolfo/erp/valentins/estoque/relatorios/consumo',
       '/rodolfo/erp/valentins/producao/lista',
       '/rodolfo/erp/valentins/producao/tarefas',
       '/rodolfo/erp/valentins/producao',

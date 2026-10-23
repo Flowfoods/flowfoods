@@ -135,6 +135,10 @@
     "versao": 1,
     "hash": "d86e9a196e050ccb"
   },
+  "estoque-consumo": {
+    "versao": 1,
+    "hash": "af3d80b11746fe21"
+  },
   "compra-nova": {
     "versao": 4,
     "hash": "8a708c7d8d14f72f"
