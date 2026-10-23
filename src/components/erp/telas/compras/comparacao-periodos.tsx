@@ -74,7 +74,7 @@ function CelulaDeLado({ nome, lado, unidade, href, campo }: { nome: 'A' | 'B'; l
   if (campo === 'custo') return <span className="block whitespace-nowrap">{rotulo}{lado.custo ? formatarCusto(lado.custo, unidade) : 'sem base'}</span>;
   return (
     <span className="block whitespace-nowrap">
-      <Link href={href} className="ff-transicao rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto">
+      <Link href={href} className="ff-transicao inline-flex items-center rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto [@media(pointer:coarse)]:min-h-11">
         {rotulo}
         {formatarDinheiro(lado.gastoCentavos)}
       </Link>

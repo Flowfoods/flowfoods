@@ -42,7 +42,7 @@ export function Cartao({ rotulo, children, ver, className = '' }: { rotulo: stri
       <h3 className="text-[12px] font-medium leading-snug text-suave">{rotulo}</h3>
       <div className="mt-2 min-w-0 flex-1">{children}</div>
       {(Array.isArray(ver) ? ver : ver ? [ver] : []).map((v) => (
-        <Link key={v.href} href={v.href} className={`${LINK_DE_TEXTO} -mx-1 mt-1 inline-flex min-h-11 items-center self-start px-1 sm:min-h-9`}>
+        <Link key={v.href} href={v.href} className={`${LINK_DE_TEXTO} -mx-1 mt-1 inline-flex min-h-11 items-center self-start px-1 sm:min-h-9 [@media(pointer:coarse)]:mt-4`}>
           {v.texto}
         </Link>
       ))}
