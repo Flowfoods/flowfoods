@@ -4117,9 +4117,25 @@ NODE_OPTIONS=--max-old-space-size=6144 npm run build
 npm run erp:conferir-migracao
 npx prisma migrate diff --from-url <banco> --to-schema-datamodel prisma/schema.prisma --exit-code   # vazio (não há migration nova)
 ```
-`tests/erp-consumo-estoque.test.ts` (sem banco, 18): o mapa das caixas (uma coluna por caixa), a ponte, bruto × líquido, a propriedade com 300 sequências, as lacunas, os filtros da URL, o sinal, a planilha de negativo e os avisos. `tests/erp-consumo-estoque.db.test.ts` (Postgres de verdade, cenário conferido à mão no cabeçalho do arquivo, 21 + 5 da planilha): a conta da Cebola, SQL independente, contado e não contado, lote e lote estornado, negativos, sem origem e perda, o dia do Rio, o resumo por unidade, os filtros, o XML aguardando, "só lê", os movimentos de cada número, perfis e isolamento, o dinheiro do livro e o teto. Sem migration: os 3 perfis de banco não têm o que aplicar; os arquivos de banco tocados rodam nos dois perfis.
+`tests/erp-consumo-estoque.test.ts` (sem banco, 18): o mapa das caixas (uma coluna por caixa), a ponte, bruto × líquido, a propriedade com 300 sequências, as lacunas, os filtros da URL, o sinal, a planilha de negativo e os avisos. `tests/erp-consumo-estoque.db.test.ts` (Postgres de verdade, cenário conferido à mão no cabeçalho do arquivo, 22 testes, a planilha inclusa): a conta da Cebola, SQL independente, contado e não contado, lote e lote estornado, negativos, sem origem e perda, o dia do Rio, o resumo por unidade, os filtros, o XML aguardando, "só lê", os movimentos de cada número, perfis e isolamento, o dinheiro do livro e o teto. Sem migration: os 3 perfis de banco não têm o que aplicar; os arquivos de banco tocados rodam nos dois perfis.
 
-RESULTADO_DA_PROVA
+**Resultado da prova (L.4)**
+
+| Prova | Resultado |
+|---|---|
+| `prisma validate`, `typecheck`, `lint`, `gate` | limpos (659 arquivos varridos no portão) |
+| `npm run build` | passou |
+| `erp:conferir-migracao` e `migrate diff` contra o schema | conferido; "No difference detected" (a L.4 não tem migration) |
+| `vitest` sem banco | 1.640 passaram, 908 pulados (sem `ERP_DB_TESTE`) |
+| `vitest` com banco, 2 rodadas em paralelo (`ff_l4a` e `ff_l4b`, superusuário) | 2.592 de 2.592 nas duas |
+| Arquivos de banco tocados (consumo, comparação e relatório de compras), dono não-superusuário **com** RLS (42 políticas) | 68 de 68 (a prova achou que o SQL de conferência do teste da L.4 lia fora do contexto do parceiro; passou a rodar dentro dele quando a RLS é forçada) |
+| Os mesmos, dono não-superusuário **sem** RLS (0 políticas) | 68 de 68 |
+| Produção local (`next start`, porta 3100), dono, matriz 4 larguras (1440, 1180, 820, 390) x claro e escuro | 0 problemas em 56 combinações por tema: sem rolagem lateral, sem texto miúdo, hit-test de toque sem sobreposição da linha seguinte, axe sem violação, sem erro de console |
+| Mesma matriz nas 5 páginas da L.3 mexidas pelos ajustes herdados | 0 problemas em 60 combinações por tema, claro e escuro |
+| Jornada por perfil (dono, gerente só das lojas dele, operador e cozinha sem R$, isolamento entre dois parceiros) | 76 verificações, 0 falhas |
+
+Desempenho medido com 320 mil movimentos (8 lojas x 400 insumos x 100 movimentos), banco local, a quente: ler a fonte do livro 1,8 s; resumo por unidade 3,6 s; página de 50 linhas 3,2 s; um insumo 47 ms; movimentos de um número 34 ms. Na primeira chamada fria do processo, "1 mês" levou 31 s (plano e cache frios); depois, 3 a 8 s para 3 meses, ano ou planilha completa de 3.200 linhas. É folga bem acima do volume de uma rede de 16 lojas num mês, mas o limite está dito: acima disso o caminho é materializar o saldo por dia, não afrouxar o teto.
+
 
 ### Herança da L.4 (para as próximas)
 

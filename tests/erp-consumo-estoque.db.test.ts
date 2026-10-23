@@ -37,7 +37,7 @@ vi.mock('next/navigation', () => ({
   },
 }));
 
-import { type ClienteDoParceiro } from '@/lib/erp/tenant';
+import { PAPEL_DE_TENANT, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarFornecedor, cancelarNota, editarNota, lancarNota } from '@/lib/erp/compras';
 import { cadastrarFicha } from '@/lib/erp/fichas';
 import { concluirAbertura, contarItem, gravarMovimentos, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
@@ -84,7 +84,14 @@ describe.skipIf(!URL_TESTE)('ERP L.4 · consumo e conciliação de estoque (Post
     return l;
   };
   const q = (l: { somas: Record<string, { q: number } | undefined> }, b: string) => l.somas[b]?.q ?? 0;
-  const sql = async <T>(texto: string, ...v: unknown[]) => db.$queryRawUnsafe<T[]>(texto, ...v);
+  /** SQL cru de conferência, sempre do parceiro A; com dono não-superusuário e RLS forçada vai no contexto do parceiro. */
+  const sql = async <T>(texto: string, ...v: unknown[]) => {
+    if (perfil.superusuario || !perfil.rls) return db.$queryRawUnsafe<T[]>(texto, ...v);
+    return db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT set_config('app.parceiro_id', ${A.id}, true), set_config('role', ${PAPEL_DE_TENANT}, true)`;
+      return tx.$queryRawUnsafe<T[]>(texto, ...v);
+    });
+  };
 
   let envio = 0;
   const novoEnvio = () => `envio-${sufixo}-${++envio}`.padEnd(12, 'x');
