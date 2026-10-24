@@ -539,6 +539,74 @@ api_schema() {
   done
 }
 
+# Recria o Traefik por um compose de uso único no Dokploy (o Dokploy tem o
+# docker.sock do host). Usado quando não há SSH. Executa
+# scripts/infra/reerguer-traefik.sh, lê o relatório e remove o compose.
+traefik_via_compose() {
+  preparar_dokploy || exit 1
+  titulo "Guarda"
+  dokploy GET "/api/docker.getContainersByAppNameMatch?appName=traefik" >/dev/null
+  n=$(jq 'length' /tmp/dk.json 2>/dev/null || echo "?")
+  [ "$n" = 0 ] || { echo "::error::Já existe container *traefik* ($n) — não executo."; exit 1; }
+  inventario >/dev/null
+  ref=$(awk -F'\t' '$3=="ssh-setup"{print $2}' /tmp/inventario.tsv)
+  dokploy GET "/api/compose.one?composeId=$ref" >/dev/null
+  env_id=$(jq -r '.environmentId // empty' /tmp/dk.json)
+  [ -n "$env_id" ] || { echo "::error::Não achei environmentId"; exit 1; }
+  echo "ambiente: $env_id"
+
+  script=$(sed 's/\$/$$/g' scripts/infra/reerguer-traefik.sh)
+  compose=$(cat <<YML
+services:
+  reerguer:
+    image: docker:27-cli
+    restart: "no"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/dokploy/traefik:/tf:ro
+      - /etc/dokploy/traefik/reerguer:/out
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+$(sed 's/^/        /' <<<"$script")
+YML
+)
+  titulo "Criando compose temporário"
+  corpo=$(jq -n --arg n reerguer-traefik --arg e "$env_id" --arg f "$compose" \
+    '{name:$n, appName:"reerguer-traefik", environmentId:$e, composeType:"docker-compose", composeFile:$f, description:"temporário: recriar dokploy-traefik (24/10)"}')
+  code=$(dokploy POST /api/compose.create "$corpo"); echo "compose.create -> HTTP $code"
+  cid=$(jq -r '.composeId // empty' /tmp/dk.json)
+  if [ -z "$cid" ]; then
+    inventario >/dev/null; cid=$(awk -F'\t' '$1=="compose" && $3=="reerguer-traefik"{print $2}' /tmp/inventario.tsv | head -1)
+  fi
+  [ -n "$cid" ] || { echo "::error::compose não criado: $(head -c 300 /tmp/dk.json)"; exit 1; }
+  # Garante o arquivo e a fonte raw (o create pode ignorar composeFile)
+  code=$(dokploy POST /api/compose.update "$(jq -n --arg c "$cid" --arg f "$compose" '{composeId:$c, composeFile:$f, sourceType:"raw"}')")
+  echo "compose.update -> HTTP $code (id $cid)"
+
+  titulo "Deploy"
+  code=$(dokploy POST /api/compose.deploy "{\"composeId\":\"$cid\",\"title\":\"recriar dokploy-traefik\"}"); echo "compose.deploy -> HTTP $code"
+  esperar compose "$cid" || echo "::warning::deploy do compose não terminou em done"
+  sleep 60
+
+  titulo "Resultado"
+  dokploy GET "/api/docker.getConfig?containerId=dokploy-traefik" >/dev/null
+  jq -c '{Status: .State.Status, Running: .State.Running, Error: .State.Error, StartedAt: .State.StartedAt, RestartCount,
+          Ports: (.NetworkSettings.Ports | keys?), Redes: (.NetworkSettings.Networks // {} | keys)}' /tmp/dk.json 2>/dev/null || echo "(sem container)"
+  for p in 80 443; do porta "$p"; done
+  titulo "Relatório do host"
+  for path in /etc/dokploy/traefik/reerguer/reerguer.log reerguer/reerguer.log; do
+    code=$(dokploy GET "/api/settings.readTraefikFile?path=$(jq -rn --arg p "$path" '$p|@uri')")
+    echo "readTraefikFile $path -> HTTP $code"
+    if [ "$code" = 200 ]; then jq -r 'if type=="string" then . else tostring end' /tmp/dk.json | head -80; break; fi
+  done
+
+  titulo "Removendo compose temporário (sem volumes)"
+  code=$(dokploy POST /api/compose.delete "{\"composeId\":\"$cid\",\"deleteVolumes\":false}"); echo "compose.delete -> HTTP $code"
+  dokploy GET "/api/docker.getConfig?containerId=dokploy-traefik" >/dev/null
+  [ "$(jq -r '.State.Running // false' /tmp/dk.json 2>/dev/null)" = true ] || exit 1
+}
+
 case "$ETAPA" in
   diagnosticar) diagnosticar ;;
   reiniciar)    reiniciar ;;
@@ -548,5 +616,6 @@ case "$ETAPA" in
   recriar-traefik) recriar_traefik ;;
   aguardar-e-provar) aguardar_e_provar ;;
   api-schema)   api_schema ;;
+  traefik-via-compose) traefik_via_compose ;;
   *) echo "etapa desconhecida: $ETAPA"; exit 2 ;;
 esac
