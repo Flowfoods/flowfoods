@@ -60,7 +60,8 @@ export function CamposDeConservacao({
   const temPonto = { conservacao: useTemPonto('conservacao'), prazo: useTemPonto('prazo-abertura') };
 
   return (
-    <div className="space-y-5">
+    // No computador largo, a conservação à esquerda e os prazos à direita (mesma ordem de leitura e de Tab).
+    <div className="space-y-5 xl:grid xl:grid-cols-[minmax(0,18rem)_minmax(0,1fr)] xl:items-start xl:gap-8 xl:space-y-0">
       <div className="sm:max-w-md">
         <div className="mb-1.5 flex items-center gap-1">
           <label htmlFor={`${idBase}-conservacao`} className={ROTULO.replace('mb-1.5 ', '')}>

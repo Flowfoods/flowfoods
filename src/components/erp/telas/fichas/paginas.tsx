@@ -98,7 +98,7 @@ export function TelaFormFicha({
   };
   const volta = ficha ? `${base}/${ficha.id}` : base;
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
+    <div className="mx-auto max-w-4xl space-y-6 xl:max-w-6xl">
       <TrilhaDaPagina itens={ficha ? [{ rotulo: ficha.nome, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Nova ficha' }]} />
       <Voltar href={volta}>{ficha ? `Voltar para ${ficha.nome}` : 'Voltar para a lista'}</Voltar>
       <PageHeader

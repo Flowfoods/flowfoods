@@ -119,7 +119,7 @@ export function TelaFormInsumo({
   // "Recarregar" (depois de um conflito) não pode perder de onde a pessoa veio.
   const recarregarComEstado = (caminho: string) => comDe(caminho, de, insumo && origemLista ? { origem: 'lista' } : {});
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6 xl:max-w-5xl">
       <TrilhaDaPagina itens={insumo ? [{ rotulo: insumo.nome, href: aqui }, { rotulo: 'Editar' }] : [{ rotulo: 'Novo insumo' }]} />
       <Voltar href={paraVoltar} recarregar={!insumo && !!volta}>{insumo ? (origemLista ? 'Voltar para a lista' : `Voltar para ${insumo.nome}`) : volta ? `Voltar para ${rotuloDaVolta(volta)}` : 'Voltar para a lista'}</Voltar>
       <PageHeader

@@ -311,8 +311,9 @@ function FormFichaBase({
 
       <fieldset disabled={!!bloqueio} className="min-w-0 space-y-4">
         <Painel titulo="O que é">
-          <div className="space-y-4">
-            <div>
+          {/* No computador, a descrição comercial e a foto lado a lado (a ordem de leitura e de Tab não muda). */}
+          <div className="grid gap-4 lg:grid-cols-2 lg:gap-x-6">
+            <div className="lg:col-span-2">
               <label htmlFor={`${idBase}-nome`} className={ROTULO}>
                 Nome da ficha
               </label>
@@ -336,7 +337,7 @@ function FormFichaBase({
                 </Link>
               )}
             </div>
-            <div>
+            <div className="sm:max-w-xl lg:col-span-2">
               <Segmentos
                 nome="tipo"
                 legenda="É um prato ou um pré-preparo?"

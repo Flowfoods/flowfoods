@@ -196,8 +196,9 @@ export function FormInsumo({
 
       <fieldset disabled={!!bloqueio} className="min-w-0 space-y-4">
         <Painel titulo="O que é">
-          <div className="space-y-4">
-            <div>
+          {/* No computador, categoria e marca lado a lado (a ordem de leitura e de Tab é a mesma: nome, tipo, categoria, marca). */}
+          <div className="grid gap-4 lg:grid-cols-2 lg:gap-x-6">
+            <div className="lg:col-span-2">
               <label htmlFor={`${idBase}-nome`} className={ROTULO}>
                 Nome do insumo{OBRIGATORIO}
               </label>
@@ -228,7 +229,7 @@ export function FormInsumo({
               )}
             </div>
 
-            <div>
+            <div className="lg:col-span-2">
               {prePreparo ? (
                 <div>
                   <span className={ROTULO}>Tipo de item</span>
@@ -263,7 +264,7 @@ export function FormInsumo({
               )}
             </div>
 
-            <div className="sm:max-w-md">
+            <div className="sm:max-w-md lg:max-w-none">
               <label htmlFor={`${idBase}-categoriaId`} className={ROTULO}>
                 Categoria{OBRIGATORIO}
               </label>
@@ -312,7 +313,7 @@ export function FormInsumo({
               )}
             </div>
 
-            <div className="sm:max-w-md">
+            <div className="sm:max-w-md lg:max-w-none">
               <div className="mb-1.5 flex items-center gap-1">
                 <label htmlFor={`${idBase}-marcaReferencia`} className={ROTULO.replace('mb-1.5 ', '')}>
                   Marca de referência <span className="font-normal text-suave">(opcional)</span>
