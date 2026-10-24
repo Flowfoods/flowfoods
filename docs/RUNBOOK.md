@@ -353,3 +353,16 @@ lida do Dokploy em 23/10: entryPoints `:80`/`:443`, ACME por HTTP no `web`,
    Swarm/rede do Docker, não o Traefik. Próximo passo é `systemctl restart
    docker` — derruba por ~2 min todos os apps, bancos, n8n e Evolution; pedir
    autorização antes.
+
+### Prevenção (preparada em 24/10, ainda não aplicada)
+
+| Medida | Arquivo | Para valer |
+|---|---|---|
+| Sentinela: prova de hora em hora, job vermelho + e-mail quando um domínio real cai | `.github/workflows/sentinela-sites.yml` | merge na master |
+| Traefik sobe só depois do Swarm, no boot; destrava a rede se precisar; nunca remove nada | `scripts/infra/traefik-apos-swarm.sh` + `.service` | instalar no host (instruções no topo do `.service`) |
+| Prova com TLS validado e motivo da falha pelo curl (recusada × expirou × certificado inválido) | `scripts/reerguer-vps.sh provar` | já vale |
+| Espera a 443 abrir e prova duas vezes com 5 min de intervalo | etapa `aguardar-e-provar` | já vale |
+
+Ainda a decidir: quem/que rotina removeu os containers parados em 23/10 entre
+23:23 e 23:57 UTC (limpeza do Dokploy ou comando manual) — se for rotina,
+ela não pode rodar com o Traefik parado.

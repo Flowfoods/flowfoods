@@ -451,11 +451,17 @@ provar() {
   } | tee -a "$RESUMO"
   ok=$(grep -c '| OK' /tmp/p/*.linha 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
   echo; echo "OK: $ok de $(wc -l < /tmp/dominios)  (TLS validado; HTTP '-' = sem resposta, não é código do site)"
+  # Sentinela: falha se algum domínio real (não sslip/traefik.me) não estiver OK.
+  if [ -n "${FALHAR_SE_FORA:-}" ]; then
+    fora=$(grep -L '| OK' /tmp/p/*.linha 2>/dev/null | xargs -r -n1 basename | sed 's/\.linha$//' | grep -vE 'sslip\.io|traefik\.me' || true)
+    if [ -n "$fora" ]; then echo "::error title=Sites fora::$(echo $fora)"; SENTINELA_FALHOU=1; fi
+  fi
   if [ "$(dokploy GET "/api/docker.getConfig?containerId=dokploy-traefik" 2>/dev/null)" = 200 ] && [ -s /tmp/dk.json ]; then
     echo "Traefik: $(jq -c '{Status: .State.Status, StartedAt: .State.StartedAt, RestartCount, Error: .State.Error}' /tmp/dk.json 2>/dev/null)"
   else
     echo "Traefik: container não existe (ou sem leitura)"
   fi
+  [ -z "${SENTINELA_FALHOU:-}" ] || exit 1
 }
 
 # Espera a 443 abrir (até ALVOS minutos, padrão 20) e roda a prova duas vezes,

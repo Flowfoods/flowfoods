@@ -1,0 +1,19 @@
+# Instalar no host (uma vez):
+#   cp traefik-apos-swarm.sh /usr/local/bin/ && chmod +x /usr/local/bin/traefik-apos-swarm.sh
+#   cp traefik-apos-swarm.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable traefik-apos-swarm.service
+# Desfazer: systemctl disable traefik-apos-swarm.service && rm /etc/systemd/system/traefik-apos-swarm.service
+[Unit]
+Description=Sobe o dokploy-traefik depois que o Docker Swarm estiver pronto
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStartPre=/bin/sleep 20
+ExecStart=/usr/local/bin/traefik-apos-swarm.sh
+TimeoutStartSec=420
+
+[Install]
+WantedBy=multi-user.target
