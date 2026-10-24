@@ -13,6 +13,8 @@ import { FICHAS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtit
 import { FiltrosDasFichas, linhasSemCusto, TelaListaFichas } from '@/components/erp/telas/fichas/lista';
 import { CabecalhoDasFichas } from '@/components/erp/telas/fichas/paginas';
 import { AvisoDaListaDeFichas } from '@/components/erp/telas/fichas/aviso-da-lista';
+import { PainelDeSaude } from '@/components/erp/telas/fichas/saude';
+import { saudeDoCardapio } from '@/lib/erp/saude-do-cardapio';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +31,8 @@ export default async function ErpFichasPage({ searchParams }: { searchParams: Re
   const edita = pode(ctx.alcance, 'fichas.editar');
   const livre = edita && !ctx.bloqueio;
   const precos = verPrecos ? await cmvDaLista(ctx.cliente, pagina.linhas) : undefined;
+  // 24/10 (referência Nina): a saúde do cardápio, só para quem vê preços e na lista sem filtro (com filtro, a lista já é o recorte).
+  const saude = verPrecos && !temFiltroDeFicha(filtros) && pagina.pagina === 1 ? await saudeDoCardapio(ctx.cliente) : null;
   return (
     <div className="space-y-6">
       <CabecalhoDasFichas
@@ -40,6 +44,7 @@ export default async function ErpFichasPage({ searchParams }: { searchParams: Re
         <FiltrosDasFichas base={BASE} filtros={filtros} verCustos={verPrecos} />
       </CabecalhoDasFichas>
       <AvisoDaListaDeFichas cliente={ctx.cliente} base={BASE} filtros={filtros} feito={searchParams.feito} referencia={searchParams.ref} />
+      {saude && <PainelDeSaude saude={saude} base={BASE} configuracaoHref={`${BASE}/canais`} />}
       <TelaListaFichas
         base={BASE}
         filtros={filtros}

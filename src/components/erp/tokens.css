@@ -42,6 +42,10 @@
   --ff-ativo: rgb(196 21 34 / 0.08);
   /* Véu da ajuda (24/10): vermelho clarinho, translúcido; destaca o card sem apagar a tela. Não é sinal de erro. */
   --ff-veu-ajuda: rgb(234 29 44 / 0.1);
+  /* Séries dos gráficos (canais Loja, Delivery, iFood), ordem fixa; validadas (daltonismo e contraste) no claro e no escuro. */
+  --ff-serie-1: #2563a8;
+  --ff-serie-2: #0e9f6e;
+  --ff-serie-3: #c2410c;
   --ff-sombra: 0 10px 22px rgb(10 10 10 / 0.12);
   --ff-mistura-icone: 14%;
   --ff-icone-tinta: 100%;
@@ -72,6 +76,9 @@
   --ff-farol-vermelho: 245 66 77;
   --ff-ativo: rgb(234 29 44 / 0.12);
   --ff-veu-ajuda: rgb(234 29 44 / 0.14);
+  --ff-serie-1: #4a86d0;
+  --ff-serie-2: #129c6e;
+  --ff-serie-3: #d9602a;
   --ff-sombra: 0 10px 22px rgb(0 0 0 / 0.45);
   --ff-mistura-icone: 22%;
   --ff-icone-tinta: 55%;
@@ -103,6 +110,9 @@
     --ff-farol-vermelho: 245 66 77;
     --ff-ativo: rgb(234 29 44 / 0.12);
   --ff-veu-ajuda: rgb(234 29 44 / 0.14);
+  --ff-serie-1: #4a86d0;
+  --ff-serie-2: #129c6e;
+  --ff-serie-3: #d9602a;
     --ff-sombra: 0 10px 22px rgb(0 0 0 / 0.45);
     --ff-mistura-icone: 22%;
     --ff-icone-tinta: 55%;

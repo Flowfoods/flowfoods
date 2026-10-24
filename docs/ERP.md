@@ -4435,3 +4435,18 @@ Prioridade definida por Rodolfo em 24/10 (Notion, "Revisão aprofundada iFood").
 **No navegador (app local, banco de teste, Dona e Operador da Casa Alfa):** 1ª visita abre o card da tela sozinho com o véu; clicar fora, X e Escape fecham; a linha reabre; a 2ª visita no mesmo dia não reabre; outra tela abre a dela; botão de campo troca o conteúdo (um card só); "Não mostrar novamente" fecha e grava. Lista filtrada → detalhe (Onde é usado com 2 fichas) → "Voltar para a lista" mantém o filtro; editar mostra o alcance e "Ver quais" leva ao painel. 1440, 1180×820, 1024×768, 820×1180, 390×844 e 844×390: card dentro da tela e sem rolagem lateral. Tema escuro (1180×820, Operador): card legível e véu visível. **Não feito:** teste com pessoas do Valentin's, aparelho real, produção.
 
 **Próximo passo:** validar a proposta de `docs/NAVEGACAO.md` com operador e gestor; estender a ajuda ao painel do Barney (`/rodolfo`, hoje fora do registro de ajuda); revisar as outras telas com coluna lateral de 340 px a 1024 px.
+
+## Gráficos e análises — referência Nina (24/10/2026)
+
+Pedido de Rodolfo: criar gráficos e análises a partir dos módulos da Nina, evoluindo o ERP. Decisões 453 e 454. Sem merge e sem deploy. Análise completa no Notion: "Nina × FlowFoods — análise visual e funcional dos 8 módulos".
+
+| Entrega | Onde | Prova |
+|---|---|---|
+| Componente de gráfico de colunas (SVG próprio, dica, legenda, tabela) e cores dos canais validadas | `ui/grafico-colunas.tsx`, `lib/erp/grafico.ts`, `--ff-serie-*` em `tokens.css` | `erp-graficos.test.ts` |
+| Faturamento por dia e canal | `telas/faturamento/mes.tsx` (`GraficoDoMes`) | navegador |
+| Saúde do cardápio e célula de canal enxuta | `lib/erp/saude-do-cardapio.ts`, `telas/fichas/saude.tsx`, `telas/fichas/lista.tsx` | `erp-graficos.test.ts`, `erp-painel-do-dia.db.test.ts` |
+| Início de trabalho (indicadores e pendências por permissão) | `lib/erp/painel-do-dia.ts`, `telas/painel-do-dia.tsx`, `hub-do-parceiro.tsx` | `erp-painel-do-dia.db.test.ts` |
+
+**No navegador (app local, mês sintético de faturamento, Dona):** gráfico a 1440 (claro), 1180 (escuro) e 390 (celular), dica ao passar o mouse com as três séries e o total, dias com falta marcados, sem rolagem lateral. Saúde do cardápio e Início nos mesmos tamanhos. **Não feito:** teste com pessoas do Valentin's e produção. Os prints originais da Nina não foram abertos (o portal da Kairu é bloqueado na rede do ambiente).
+
+**Próximo passo:** gráficos de CMV por categoria (real × meta), compras do período por fornecedor e produção planejado × produzido, reaproveitando o mesmo componente.

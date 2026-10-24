@@ -12,6 +12,8 @@ import { FICHAS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtit
 import { FiltrosDasFichas, TelaListaFichas } from '@/components/erp/telas/fichas/lista';
 import { CabecalhoDasFichas } from '@/components/erp/telas/fichas/paginas';
 import { AvisoDaListaDeFichas } from '@/components/erp/telas/fichas/aviso-da-lista';
+import { PainelDeSaude } from '@/components/erp/telas/fichas/saude';
+import { saudeDoCardapio } from '@/lib/erp/saude-do-cardapio';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +30,7 @@ export default async function ParceiroFichasPage({
   const filtros = lerFiltrosDeFicha(searchParams);
   const [pagina, { visao }] = await Promise.all([listarFichas(ctx.cliente, filtros, { verPrecos: true }), visaoDaRequisicao(ctx)]);
   const precos = await cmvDaLista(ctx.cliente, pagina.linhas);
+  const saude = !temFiltroDeFicha(filtros) && pagina.pagina === 1 ? await saudeDoCardapio(ctx.cliente) : null;
   return (
     <div className="space-y-6">
       <CabecalhoDasFichas
@@ -39,6 +42,7 @@ export default async function ParceiroFichasPage({
         <FiltrosDasFichas base={base} filtros={filtros} />
       </CabecalhoDasFichas>
       <AvisoDaListaDeFichas cliente={ctx.cliente} base={base} filtros={filtros} feito={searchParams.feito} referencia={searchParams.ref} />
+      {saude && <PainelDeSaude saude={saude} base={base} configuracaoHref={`${base}/canais`} />}
       <TelaListaFichas
         base={base}
         filtros={filtros}

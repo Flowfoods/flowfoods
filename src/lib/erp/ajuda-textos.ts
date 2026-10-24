@@ -21,10 +21,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'inicio',
     rotas: [''],
     titulo: 'Áreas da Rede',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'Aqui ficam as áreas do restaurante: cadastros e cardápio, compras e fornecedores, estoque e movimentações, rede e equipe.' },
-      { texto: 'Cada card abre na primeira tela que você pode usar. As outras telas da área ficam nas abas, no alto.' },
+      { texto: 'No alto, os números do mês e o que precisa de você, na ordem em que vale resolver. Cada um abre a tela certa.' },
+      { texto: 'Abaixo ficam as áreas do restaurante, e cada card abre na primeira tela que você pode usar.' },
       { texto: 'Só aparece o que o seu acesso libera.' },
     ],
   },

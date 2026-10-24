@@ -13,13 +13,18 @@ import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../ui/cabecalho';
 import { HubDeModulos } from '../ui/hub';
 import { Aviso } from '../ui/superficies';
+import type { PainelDoDia } from '@/lib/erp/painel-do-dia';
+import { PainelDoDiaNaTela } from './painel-do-dia';
 
 export function HubDoParceiro({
   titulo,
   subtitulo,
   modulos,
   semAcesso,
+  painel,
 }: {
+  /** 24/10: indicadores e pendências do dia (só o que a permissão libera). */
+  painel?: PainelDoDia;
   titulo: string;
   subtitulo: string;
   modulos: ModuloNav[];
@@ -36,6 +41,7 @@ export function HubDoParceiro({
           Se precisar dela, fale com quem cuida da equipe.
         </Aviso>
       )}
+      {painel && <PainelDoDiaNaTela painel={painel} />}
       <HubDeModulos
         secoes={[
           {

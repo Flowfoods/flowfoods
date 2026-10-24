@@ -79,7 +79,8 @@ export function Metrica({
   return (
     <div className="flex min-w-0 flex-col rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
       <div className="text-[12px] font-medium leading-snug text-suave">{rotulo}</div>
-      <div className="mt-auto truncate pt-2 font-display text-[26px] font-bold leading-none tabular-nums">{valor}</div>
+      {/* 24/10: no tablet (4 cards a 1180 px) o valor grande cortava ("R$ 302.06…"); abaixo de 1280 px ele desce um tamanho. */}
+      <div className="mt-auto truncate pt-2 font-display text-[22px] font-bold leading-none tabular-nums xl:text-[26px]">{valor}</div>
       {detalhe && <div className="mt-1.5 truncate text-[12px] text-suave">{detalhe}</div>}
       {children}
     </div>

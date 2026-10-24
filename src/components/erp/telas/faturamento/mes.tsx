@@ -23,6 +23,8 @@ import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Contagem, Metrica, Painel, Selo, Vazio } from '../../ui/superficies';
 import { BotaoOuMotivo } from '../cadastro/partes';
 import { dataCurta } from './formato';
+import { FRASE_DO_ESTADO, serieDoMes } from '@/lib/erp/grafico';
+import { GraficoDeColunas, type PontoDoGrafico } from '../../ui/grafico-colunas';
 
 const SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const inteiro = (n: number) => n.toLocaleString('pt-BR');
@@ -380,6 +382,7 @@ export function TelaDoMes({
               );
             })()}
           </div>
+          <GraficoDoMes m={m} lojaAberta={lojaAberta} contexto={lojaAberta ? lojaAberta.loja.nome : contexto} />
           <Totais por={lojaAberta ? lojaAberta.porCanal : m.porCanal} total={lojaAberta ? lojaAberta.total : m.total} />
           {lojaAberta ? (
             <Painel
@@ -399,6 +402,38 @@ export function TelaDoMes({
         </>
       )}
     </div>
+  );
+}
+
+// ------------------------------------------------------------------ gráfico (24/10, referência Nina)
+
+const COR_DO_CANAL: Record<CanalVenda, number> = { LOJA: 1, DELIVERY_PROPRIO: 2, IFOOD: 3 };
+
+/** Faturamento por dia, empilhado por canal. Dia sem lançamento fica vazio (não é zero) e a falta aparece na base. */
+function GraficoDoMes({ m, lojaAberta, contexto }: { m: MesDoFaturamento; lojaAberta?: LojaNoMes; contexto: string }) {
+  const s = serieDoMes(m, lojaAberta);
+  if (s.diasLancados === 0) return null;
+  const pontos: PontoDoGrafico[] = s.dias.map((d) => ({
+    chave: d.data,
+    rotulo: dataCurta(d.data),
+    rotuloEixo: String(Number(d.data.slice(8, 10))),
+    valores: d.valores,
+    total: d.total,
+    nota: d.estado === 'falta' ? frasesDeFalta(d.faltam) : d.total === null ? FRASE_DO_ESTADO[d.estado] : undefined,
+    marca: d.estado === 'falta' ? 'falta' : undefined,
+  }));
+  const melhor = s.dias.reduce<(typeof s.dias)[number] | null>((b, d) => (d.total !== null && (!b || (b.total ?? 0) < d.total) ? d : b), null);
+  return (
+    <Painel
+      titulo="Faturamento por dia"
+      subtitulo={`${contexto} · ${s.diasLancados} ${s.diasLancados === 1 ? 'dia lançado' : 'dias lançados'}${melhor ? ` · maior dia: ${dataCurta(melhor.data)}, ${formatarDinheiro(melhor.total ?? 0)}` : ''}${s.diasComFalta ? ` · ${s.diasComFalta} com falta` : ''}`}
+    >
+      <GraficoDeColunas
+        titulo={`Faturamento por dia em ${rotuloDoMes(m.mes)}, por canal`}
+        series={CANAIS_EM_ORDEM.filter((c) => s.canais.includes(c)).map((c) => ({ chave: c, rotulo: CANAIS[c].rotulo, cor: COR_DO_CANAL[c] }))}
+        pontos={pontos}
+      />
+    </Painel>
   );
 }
 

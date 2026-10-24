@@ -48,9 +48,20 @@ function CmvNaLista({ x }: { x: CmvDoCanal }) {
   const st = STATUS_DO_CMV[x.status];
   if (x.status === 'naoOfertado') return <span className="block text-[12px] text-suave">não ofertado</span>;
   const cor = x.status === 'dentro' ? 'text-ok' : x.status === 'acima' ? 'text-atencao' : 'text-suave';
+  // 24/10 (referência Nina): sem CMV, a célula diz só o que falta primeiro (custo → meta → preço), em vez de repetir
+  // "— / sem dados / sem preço / sem meta" em toda linha. O motivo inteiro continua no title e na ficha.
+  if (!x.cmvBp) {
+    const falta = !x.fisico.completo ? 'falta custo' : x.metaBp === null && x.precoCentavos === null ? 'sem meta e preço' : x.metaBp === null ? 'sem meta' : 'sem preço';
+    return (
+      <span className="block" title={x.motivo ?? undefined}>
+        <span className="block text-[12px] font-medium text-suave">{st.rotulo}</span>
+        <span className="block whitespace-nowrap text-[12px] text-suave">{falta}</span>
+      </span>
+    );
+  }
   return (
     <span className="block" title={x.motivo ?? undefined}>
-      {x.cmvBp ? <span className="font-semibold text-texto">{porcentagemDoCmv(x.cmvBp)}</span> : <span className="text-suave">—</span>}
+      <span className="font-semibold text-texto">{porcentagemDoCmv(x.cmvBp)}</span>
       <span className={`block text-[12px] font-medium ${cor}`}>{st.rotulo}</span>
       <span className="block whitespace-nowrap text-[12px] text-suave">{x.precoCentavos !== null ? formatarDinheiro(x.precoCentavos) : 'sem preço'}</span>
       <span className="block whitespace-nowrap text-[12px] text-suave">{x.metaBp !== null ? `meta ${formatarPontosBase(x.metaBp)}` : 'sem meta'}</span>
