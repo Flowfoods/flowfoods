@@ -362,6 +362,7 @@ lida do Dokploy em 23/10: entryPoints `:80`/`:443`, ACME por HTTP no `web`,
 | Traefik sobe só depois do Swarm, no boot; destrava a rede se precisar; nunca remove nada | `scripts/infra/traefik-apos-swarm.sh` + `.service` | instalar no host (instruções no topo do `.service`) |
 | Prova com TLS validado e motivo da falha pelo curl (recusada × expirou × certificado inválido) | `scripts/reerguer-vps.sh provar` | já vale |
 | Espera a 443 abrir e prova duas vezes com 5 min de intervalo | etapa `aguardar-e-provar` | já vale |
+| Imagem do flowfoods-web construída uma vez por deploy (`web` builda; `migrar` e `worker` usam `flowfoods-web:local`) | `docker-compose.yml` | merge na master. Depois do 1º deploy, as 3 tags antigas (`<projeto>-migrar`, `-web`, `-worker`) ficam presas na última versão: `docker image rm` nelas libera o espaço (nenhum container usa mais) |
 
 Ainda a decidir: quem/que rotina removeu os containers parados em 23/10 entre
 23:23 e 23:57 UTC (limpeza do Dokploy ou comando manual) — se for rotina,

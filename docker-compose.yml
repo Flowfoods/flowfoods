@@ -70,9 +70,10 @@ services:
   # dois só ficam registrados aqui e não bloqueiam. Tempo máximo de 120 s: com
   # o site parado esperando, o conferidor não pode pendurar o deploy.
   migrar:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    # Mesma imagem do `web` (construída lá, uma vez por deploy). Sem build
+    # aqui de propósito: ver o comentário no `web`.
+    image: flowfoods-web:local
+    pull_policy: never
     restart: 'no'
     depends_on:
       segredos:
@@ -93,9 +94,16 @@ services:
       - segredos:/segredos:ro
 
   web:
+    # O ÚNICO serviço com build. migrar e worker usam a mesma imagem pelo
+    # nome. Antes os três tinham build do mesmo Dockerfile: o Compose gerava
+    # três imagens (o BuildKit reaproveita as camadas, mas isso depende da
+    # versão do Docker). Assim é um build por deploy, garantido, e os três
+    # sempre na mesma versão. pull_policy: never nos outros dois impede o
+    # Compose de procurar essa imagem no Docker Hub — ela só existe local.
     build:
       context: .
       dockerfile: Dockerfile
+    image: flowfoods-web:local
     restart: unless-stopped
     depends_on:
       segredos:
@@ -149,9 +157,8 @@ services:
     # host é como se perde um domínio.
 
   worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: flowfoods-web:local
+    pull_policy: never
     restart: unless-stopped
     depends_on:
       segredos:
