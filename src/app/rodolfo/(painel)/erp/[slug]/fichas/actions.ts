@@ -14,6 +14,7 @@ import { cadastrarFicha, editarFicha, mudarSituacaoFicha, type ResultadoFicha } 
 import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
+import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import type { EstadoImportacao } from '@/components/erp/telas/fichas/estado';
 import {
   executarImportacao,
@@ -67,7 +68,7 @@ export async function acaoSituacaoFicha(slug: string, id: string, anterior: Esta
   const ativa = querAtivo(form);
   const r = await mudarSituacaoFicha(ctx.cliente, String(id), ativa, form.get('motivo'), ctx.sessao.autorNome);
   await auditarFicha(ctx, ativa ? 'erp_ficha_reativada' : 'erp_ficha_desativada', r);
-  return concluir(r, anterior, base, { mudou: ativa ? 'reativada' : 'desativada' });
+  return concluir(r, anterior, base, { mudou: ativa ? 'reativada' : 'desativada' }, undefined, undefined, 'insumo', { de: deSeguroDaFicha(form.get('de')), aLista: form.get('origem') === 'lista' });
 }
 
 export async function acaoPreviaDaPlanilha(slug: string, anterior: EstadoImportacao, form: FormData): Promise<EstadoImportacao> {

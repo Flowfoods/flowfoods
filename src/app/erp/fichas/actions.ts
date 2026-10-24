@@ -13,6 +13,7 @@ import { cadastrarFicha, editarFicha, mudarSituacaoFicha } from '@/lib/erp/ficha
 import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
+import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import type { EstadoImportacao } from '@/components/erp/telas/fichas/estado';
 import {
   executarImportacao,
@@ -56,7 +57,8 @@ export async function acaoSituacaoFicha(id: string, anterior: EstadoCadastro, fo
   if (negado) return recusado(anterior, negado);
   const ativa = querAtivo(form);
   const r = await mudarSituacaoFicha(ctx.cliente, String(id), ativa, form.get('motivo'), ctx.sessao.autorNome);
-  return concluir(r, anterior, BASE, { mudou: ativa ? 'reativada' : 'desativada' });
+  // F4: veio da lixeira da lista → volta para a lista como estava (filtros e página), com a frase do feito.
+  return concluir(r, anterior, BASE, { mudou: ativa ? 'reativada' : 'desativada' }, undefined, undefined, 'insumo', { de: deSeguroDaFicha(form.get('de')), aLista: form.get('origem') === 'lista' });
 }
 
 /** Prévia da planilha: lê e mostra; nada é gravado. Também exige poder editar fichas. */

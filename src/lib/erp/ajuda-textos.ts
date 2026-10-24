@@ -180,6 +180,18 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'ficha-remover',
+    area: 'cadastros',
+    rotas: ['fichas/[id]/remover'],
+    titulo: 'Remover ficha',
+    versao: 1,
+    aula: [
+      { texto: 'Antes de remover, a tela mostra onde a ficha é usada: outras fichas, produção, lista do dia, requisições e produtos de venda.' },
+      { texto: 'Remover uma ficha é desativar: ela sai da lista e da escolha nas outras fichas. Receita, preços, produções e histórico ficam como estão.' },
+      { texto: 'Para voltar a usar ou editar, reative no detalhe da ficha.' },
+    ],
+  },
+  {
     chave: 'insumo-categorias',
     area: 'cadastros',
     rotas: ['insumos/categorias'],

@@ -952,6 +952,45 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes:
 export type FichaDetalhada = NonNullable<Awaited<ReturnType<typeof obterFicha>>>;
 
 /**
+ * F4 — o que a lixeira da lista mostra antes de desativar: onde a ficha é usada. Não existe excluir ficha de vez
+ * (o plano não especificou e há produção, estoque e histórico ligados): a lixeira DESATIVA, e esta leitura diz o que
+ * continua como está.
+ */
+export async function lerRemocaoDaFicha(cliente: ClienteDoParceiro, id: string) {
+  if (typeof id !== 'string' || !/^[a-z0-9]{1,64}$/i.test(id)) return null;
+  return cliente.transacao(async (tx) => {
+    const f = await tx.fichaTecnica.findUnique({
+      where: { id },
+      select: { id: true, nome: true, tipo: true, ativa: true, insumoProduzido: { select: { id: true, nome: true } }, usadaComoSub: { select: { ficha: { select: { id: true, nome: true, ativa: true } } } } },
+    });
+    if (!f) return null;
+    const [produtos, ordens, requisicoes, listas, saldos] = await Promise.all([
+      tx.produtoVenda.count({ where: { fichaId: id } }),
+      tx.ordemProducao.count({ where: { fichaId: id } }),
+      tx.requisicao.count({ where: { fichaId: id } }),
+      tx.listaProducaoItem.count({ where: { fichaId: id } }),
+      f.insumoProduzido ? tx.saldoEstoque.count({ where: { insumoId: f.insumoProduzido.id, quantidadeMilesimos: { not: 0 } } }) : Promise.resolve(0),
+    ]);
+    const usadaEm = Array.from(new Map(f.usadaComoSub.map((u) => [u.ficha.id, u.ficha])).values()).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    return {
+      id: f.id,
+      nome: f.nome,
+      tipo: f.tipo,
+      ativa: f.ativa,
+      usadaEm,
+      insumoProduzido: f.insumoProduzido,
+      produtos,
+      ordens,
+      requisicoes,
+      listas,
+      lojasComSaldo: saldos,
+    };
+  });
+}
+
+export type FichaParaRemover = NonNullable<Awaited<ReturnType<typeof lerRemocaoDaFicha>>>;
+
+/**
  * N.5 — a ficha como a TELA e a IMPRESSÃO recebem, conforme a permissão efetiva (decisão de Rodolfo: visão operacional e
  * gerencial automáticas). Quem vê a precificação (`precos.ver`) recebe com os custos; quem só opera recebe SEM nenhum
  * valor de custo (nem da ficha, nem dos itens, nem dos pré-preparos): o número não sai do servidor, não é só escondido.

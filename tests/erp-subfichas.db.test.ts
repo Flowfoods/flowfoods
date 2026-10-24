@@ -42,7 +42,8 @@ import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { editarInsumo, listarInsumos, mudarSituacaoInsumo, obterInsumo } from '@/lib/erp/insumos';
 import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { cadastrarVariante } from '@/lib/erp/variantes';
-import { cadastrarFicha, editarFicha, listarFichas, mudarSituacaoFicha, obterFicha, preparosParaFicha } from '@/lib/erp/fichas';
+import { cadastrarFicha, editarFicha, lerRemocaoDaFicha, listarFichas, mudarSituacaoFicha, obterFicha, preparosParaFicha } from '@/lib/erp/fichas';
+import { vinculosDaFicha } from '@/components/erp/telas/fichas/remover';
 import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { listarHistorico } from '@/lib/erp/historico';
 import { resolverAlcance } from '@/lib/erp/permissoes';
@@ -381,5 +382,42 @@ describe.skipIf(!URL_TESTE)('ERP 1.3 · subfichas e custo em cascata (Postgres r
     expect(vistas.filter((q) => q.includes('DISTINCT ON'))).toHaveLength(1);
     expect(vistas.filter((q) => q.includes('"FichaTecnica"."id", "public"."FichaTecnica"."nome"'))).toHaveLength(2);
     await contado.$disconnect();
+  });
+
+  it('F4 · lixeira da lista: mostra onde o molho é usado, desativa (nunca apaga) e volta para a lista como estava', async () => {
+    const r = (await lerRemocaoDaFicha(a, ids.molho))!;
+    expect(r.usadaEm.map((u) => u.id)).toContain(ids.burger);
+    expect(r.insumoProduzido).not.toBeNull();
+    const frases = vinculosDaFicha(r);
+    expect(frases.some((f) => f.startsWith('Entra em'))).toBe(true);
+    expect(frases.some((f) => f.startsWith('Produz o item de estoque'))).toBe(true);
+    // isolamento e id torto
+    expect(await lerRemocaoDaFicha(b, ids.molho)).toBeNull();
+    expect(await lerRemocaoDaFicha(a, "x'; drop")).toBeNull();
+    // operador não desativa pela action, nem vindo da lista
+    atual.ctx = () => ctxDe(A, 'OPERADOR');
+    const negado = await daSessao.acaoSituacaoFicha(ids.molho, null, Object.assign(new FormData(), {}));
+    expect(negado?.ok).toBe(false);
+    expect((await a.fichaTecnica.findUnique({ where: { id: ids.molho } }))!.ativa).toBe(true);
+    // a dona desativa pela lixeira: volta para a lista com os filtros (só os que a lista conhece) e a frase do feito
+    atual.ctx = () => ctxDe(A, 'DONO');
+    const form = new FormData();
+    form.set('ativo', 'nao');
+    form.set('origem', 'lista');
+    form.set('de', 'q=molho&tipo=PRE_PREPARO&lixo=1&pagina=2');
+    const url = await daSessao.acaoSituacaoFicha(ids.molho, null, form).then(
+      () => '',
+      (e: { url?: string }) => e.url ?? '',
+    );
+    expect(url).toBe(`/erp/fichas?q=molho&tipo=PRE_PREPARO&pagina=2&feito=desativada&ref=${ids.molho}`);
+    const depois = (await a.fichaTecnica.findUnique({ where: { id: ids.molho } }))!;
+    expect(depois.ativa).toBe(false);
+    // o burger continua com o molho na receita (nada em cascata)
+    expect((await obterFicha(a, ids.burger))!.itens.some((i) => i.subfichaId === ids.molho)).toBe(true);
+    // reativa (pelo detalhe), para os próximos testes
+    const volta = new FormData();
+    volta.set('ativo', 'sim');
+    await daSessao.acaoSituacaoFicha(ids.molho, null, volta).catch(() => null);
+    expect((await a.fichaTecnica.findUnique({ where: { id: ids.molho } }))!.ativa).toBe(true);
   });
 });

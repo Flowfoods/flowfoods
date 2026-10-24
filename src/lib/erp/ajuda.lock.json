@@ -23,6 +23,10 @@
     "versao": 1,
     "hash": "e44339b11139b115"
   },
+  "ficha-remover": {
+    "versao": 1,
+    "hash": "d183c4ac970258aa"
+  },
   "insumo-categorias": {
     "versao": 2,
     "hash": "3fd4e67929b6dba1"

@@ -587,6 +587,12 @@ export function queryDosFiltrosDeFicha(f: FiltrosDeFicha): string {
   return p.toString();
 }
 
+/** F4: o "de onde eu vim" da lista de fichas, dado de fora: só os filtros que a lista conhece sobrevivem. */
+export function deSeguroDaFicha(valor: unknown): string {
+  if (typeof valor !== 'string' || valor.length > 600) return '';
+  return queryDosFiltrosDeFicha(lerFiltrosDeFicha(Object.fromEntries(new URLSearchParams(valor))));
+}
+
 export function temFiltroDeFicha(f: FiltrosDeFicha): boolean {
   return !!(f.q || f.tipo || f.situacao !== 'ativas' || f.incompleto || f.cmv);
 }

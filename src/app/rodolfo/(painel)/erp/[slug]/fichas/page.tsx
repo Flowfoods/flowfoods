@@ -11,6 +11,7 @@ import { lerFiltrosDeFicha, temFiltroDeFicha } from '@/lib/erp/ficha-campos';
 import { FICHAS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtitulo';
 import { FiltrosDasFichas, TelaListaFichas } from '@/components/erp/telas/fichas/lista';
 import { CabecalhoDasFichas } from '@/components/erp/telas/fichas/paginas';
+import { AvisoDaListaDeFichas } from '@/components/erp/telas/fichas/aviso-da-lista';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,6 +38,7 @@ export default async function ParceiroFichasPage({
       >
         <FiltrosDasFichas base={base} filtros={filtros} />
       </CabecalhoDasFichas>
+      <AvisoDaListaDeFichas cliente={ctx.cliente} base={base} filtros={filtros} feito={searchParams.feito} referencia={searchParams.ref} />
       <TelaListaFichas
         base={base}
         filtros={filtros}
@@ -44,6 +46,7 @@ export default async function ParceiroFichasPage({
         novaHref={ctx.bloqueio ? undefined : `${base}/nova`}
         importarHref={ctx.bloqueio ? undefined : `${base}/importar`}
         cmv={precos}
+        acoes={!ctx.bloqueio}
       />
     </div>
   );

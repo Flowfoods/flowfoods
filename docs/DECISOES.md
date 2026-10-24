@@ -3044,3 +3044,9 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) manter a lista suspensa com todos os insumos em ordem alfabética; (b) um filtro de categoria separado antes da lista; (c) um campo de busca que acha pelo nome ou pela categoria e mostra a lista agrupada por categoria.
 
 **Razão:** (c). Com centenas de insumos a lista suspensa obriga a rolar; digitar "frango" ou "proteína" resolve em uma tecla. Pré-preparos primeiro, depois as categorias na ordem da casa, insumo sem categoria no fim ("Sem categoria"). Sem acento e sem caixa; cada palavra precisa aparecer no nome ou na categoria. Teclado: setas, Enter escolhe, Esc fecha; toque com linhas de 44 px. O valor segue no mesmo campo (`item_insumo`): o servidor, o rascunho e as regras de gravação não mudaram. Até 200 opções na lista, com aviso para digitar mais.
+
+### 443. 2026-10-24 · F4: caneta e lixeira na lista de fichas; a lixeira desativa, nunca apaga
+
+**Alternativas:** (a) só o detalhe (como era); (b) lixeira que exclui de vez quando não há vínculo, como nos insumos (L.1); (c) caneta para a edição que já existia e lixeira que leva a uma tela mostrando onde a ficha é usada e oferece desativar.
+
+**Razão:** (c). O plano proíbe inventar exclusão de ficha sem especificação própria (há produção, estoque e histórico ligados): a lixeira reaproveita a desativação que já existia (`mudarSituacaoFicha`), com o servidor conferindo permissão de novo. A tela de remover lista outras fichas que usam, produtos de venda, produções, listas do dia, requisições e o item de estoque produzido (com saldo). Ficha desativada não mostra caneta: reativa no detalhe. Concluir volta para a lista como estava (só os filtros que a lista conhece sobrevivem) com o aviso "Ficha desativada" e os atalhos "Ver a ficha" e "Ver as desativadas". No celular a caneta e a lixeira ficam fora do link do cartão, empilhadas, com 44 px.

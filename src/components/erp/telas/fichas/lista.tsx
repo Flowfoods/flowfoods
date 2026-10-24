@@ -8,6 +8,7 @@
  */
 
 import Link from 'next/link';
+import { Pencil, Trash2 } from 'lucide-react';
 import { validadesEmTexto } from '@/lib/erp/validade';
 import type { LinhaDeFicha } from '@/lib/erp/fichas';
 import type { CustoDaFicha } from '@/lib/erp/ficha-campos';
@@ -73,6 +74,30 @@ function hrefCom(base: string, f: FiltrosDeFicha, mudar: Partial<FiltrosDeFicha>
 function hrefDoDetalhe(base: string, id: string, f: FiltrosDeFicha): string {
   const q = queryDosFiltrosDeFicha(f);
   return q ? `${base}/${id}?de=${encodeURIComponent(q)}` : `${base}/${id}`;
+}
+
+/** F4: caneta e lixeira de 44 x 44, com o nome da ficha no rótulo (o leitor de tela diz qual linha é). */
+const ICONE_DE_ACAO =
+  'ff-transicao inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[7px] border border-linha-forte text-texto hover:border-texto/35 hover:bg-texto/5';
+
+function AcoesDaFicha({ l, base, f, empilhado = false }: { l: { id: string; nome: string; ativa: boolean }; base: string; f: FiltrosDeFicha; empilhado?: boolean }) {
+  const q = queryDosFiltrosDeFicha(f);
+  const de = q ? `?de=${encodeURIComponent(q)}` : '';
+  return (
+    <span className={`inline-flex gap-1.5 ${empilhado ? 'flex-col' : ''}`}>
+      {l.ativa ? (
+        <Link href={`${base}/${l.id}/editar`} className={ICONE_DE_ACAO} aria-label={`Editar ${l.nome}`} title="Editar">
+          <Pencil size={16} aria-hidden />
+        </Link>
+      ) : (
+        // Desativada não se edita: reative no detalhe. O espaço fica para as lixeiras alinharem.
+        !empilhado && <span aria-hidden className="inline-block h-11 w-11 shrink-0" />
+      )}
+      <Link href={`${base}/${l.id}/remover${de}`} className={ICONE_DE_ACAO} aria-label={`Remover ${l.nome}`} title="Remover">
+        <Trash2 size={16} aria-hidden />
+      </Link>
+    </span>
+  );
 }
 
 /** Custo por porção (ou kg); `empilhado` (celular): o "por porção" vai embaixo e o nome ganha espaço. */
@@ -172,6 +197,7 @@ export function TelaListaFichas({
   novaHref,
   importarHref,
   cmv: precos,
+  acoes = false,
 }: {
   /** /erp/fichas ou /rodolfo/erp/<slug>/fichas */
   base: string;
@@ -185,6 +211,8 @@ export function TelaListaFichas({
   importarHref?: string;
   /** N.2: preço, CMV e farol por canal das fichas de prato (só para quem vê preços; nem sai do servidor para os outros). */
   cmv?: ReadonlyMap<string, CmvDoCanal[]>;
+  /** F4: caneta e lixeira na linha (quem edita fichas e não está bloqueado; a página e a action conferem de novo). */
+  acoes?: boolean;
 }) {
   if (total === 0) {
     return (
@@ -236,8 +264,8 @@ export function TelaListaFichas({
     <Painel semRespiro>
       <ul className="divide-y divide-linha sm:hidden">
         {linhas.map((l) => (
-          <li key={l.id}>
-            <Link href={hrefDoDetalhe(base, l.id, f)} className="ff-transicao flex min-h-16 items-center gap-3 px-4 py-3 hover:bg-texto/[0.03]">
+          <li key={l.id} className="flex items-center">
+            <Link href={hrefDoDetalhe(base, l.id, f)} className="ff-transicao flex min-h-16 min-w-0 flex-1 items-center gap-3 py-3 pl-4 pr-3 hover:bg-texto/[0.03]">
               <Miniatura base={base} id={l.id} foto={l.foto} />
               <span className="min-w-0 flex-1">
                 <span className={`block truncate font-medium ${l.ativa ? 'text-texto' : 'text-suave'}`}>{l.nome}</span>
@@ -255,6 +283,11 @@ export function TelaListaFichas({
                 </span>
               )}
             </Link>
+            {acoes && (
+              <span className="shrink-0 py-2 pr-4">
+                <AcoesDaFicha l={l} base={base} f={f} empilhado />
+              </span>
+            )}
           </li>
         ))}
       </ul>
@@ -270,6 +303,7 @@ export function TelaListaFichas({
               <th scope="colgroup" colSpan={3} className="border-b border-linha px-3 pr-5 pt-2 text-center font-semibold">
                 CMV ao seu preço
               </th>
+              {acoes && <td />}
             </tr>
           )}
           <tr className="bg-forte text-left text-[12px] text-suave">
@@ -302,6 +336,11 @@ export function TelaListaFichas({
             <th scope="col" className={`hidden h-10 px-3 pr-5 font-semibold ${precos ? '' : 'lg:table-cell'}`}>
               Situação
             </th>
+            {acoes && (
+              <th scope="col" className="h-10 px-3 pr-5 text-right font-semibold">
+                <span className="sr-only">Ações</span>
+              </th>
+            )}
           </tr>
         </thead>
         <tbody className="tabular-nums">
@@ -363,6 +402,11 @@ export function TelaListaFichas({
               <td className={`hidden py-2 pl-3 pr-5 ${precos ? '' : 'lg:table-cell'}`}>
                 {l.ativa ? <Selo tom="ok">Ativa</Selo> : <Selo>Desativada</Selo>}
               </td>
+              {acoes && (
+                <td className="whitespace-nowrap py-2 pl-3 pr-5 text-right">
+                  <AcoesDaFicha l={l} base={base} f={f} />
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
