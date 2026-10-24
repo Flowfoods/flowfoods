@@ -53,6 +53,8 @@ import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
 import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
+import { SeletorDeItem } from './seletor-de-item';
+import type { OpcaoDoSeletor } from '@/lib/erp/seletor-campos';
 import { CampoFoto } from './campo-foto';
 import { CamposDeValidade } from '../cadastro/campos-validade';
 import { CONSERVACOES, entradaDoFormulario, lerValidades, type Conservacao, type Validades } from '@/lib/erp/validade';
@@ -222,6 +224,26 @@ function FormFichaBase({
   const idBase = 'ficha';
   // Prioridade nº 1 (23/10): a explicação vai para o botão de ajuda do campo; sem o ponto, o texto antigo fica.
   const temPonto = { tipo: useTemPonto('tipo'), descricao: useTemPonto('descricao'), rendimento: useTemPonto('rendimento') };
+  // F4: a busca do item acha pelo nome ou pela categoria; pré-preparos primeiro, depois as categorias na ordem da casa.
+  const opcoesDoSeletor = useMemo<OpcaoDoSeletor[]>(
+    () => [
+      ...preparos.map((p) => ({
+        valor: `${PREFIXO_DO_PREPARO}${p.id}`,
+        nome: p.nome,
+        grupo: 'Pré-preparos da casa',
+        ordemDoGrupo: -1,
+        detalhe: [p.ativo ? null : 'desativado', p.incompleto ? 'custo incompleto' : null].filter(Boolean).join(' · ') || null,
+      })),
+      ...opcoes.map((i) => ({
+        valor: i.id,
+        nome: i.nome,
+        grupo: i.categoria?.nome ?? 'Sem categoria',
+        ordemDoGrupo: i.categoria?.ordem ?? Number.MAX_SAFE_INTEGER,
+        detalhe: [i.ativo ? null : 'desativado', i.custo ? null : 'custo não informado'].filter(Boolean).join(' · ') || null,
+      })),
+    ],
+    [opcoes, preparos],
+  );
   const porEscolha = useMemo(() => {
     const m = new Map<string, Escolhido>();
     for (const i of opcoes) m.set(i.id, { nome: i.nome, unidade: i.unidade, porUnidade: i.custo ? custoPorUnidade(i.custo) : null, preparo: false, incompleto: false });
@@ -472,37 +494,16 @@ function FormFichaBase({
                       <label htmlFor={`${idBase}-item-${n}`} className="sr-only">
                         Insumo ou pré-preparo {n + 1}
                       </label>
-                      <select
+                      <SeletorDeItem
                         id={`${idBase}-item-${n}`}
                         name="item_insumo"
-                        value={l.escolha}
-                        onChange={(ev) => mudarLinha(l.chave, { escolha: ev.target.value })}
-                        className={CAMPO}
-                        aria-invalid={!!erro}
-                        aria-describedby={erro ? `${idBase}-item-${n}-erro` : undefined}
-                      >
-                        <option value="">Escolha o insumo ou o pré-preparo</option>
-                        {preparos.length > 0 && (
-                          <optgroup label="Pré-preparos (fichas da casa)">
-                            {preparos.map((p) => (
-                              <option key={p.id} value={`${PREFIXO_DO_PREPARO}${p.id}`}>
-                                {p.nome}
-                                {p.ativo ? '' : ' (desativado)'}
-                                {p.incompleto ? ' · custo incompleto' : ''}
-                              </option>
-                            ))}
-                          </optgroup>
-                        )}
-                        <optgroup label="Insumos">
-                          {opcoes.map((i) => (
-                            <option key={i.id} value={i.id}>
-                              {i.nome}
-                              {i.ativo ? '' : ' (desativado)'}
-                              {i.custo ? '' : ' · custo não informado'}
-                            </option>
-                          ))}
-                        </optgroup>
-                      </select>
+                        valor={l.escolha}
+                        opcoes={opcoesDoSeletor}
+                        aoEscolher={(v) => mudarLinha(l.chave, { escolha: v })}
+                        rotulo={`Insumo ou pré-preparo ${n + 1}`}
+                        invalido={!!erro}
+                        descritoPor={erro ? `${idBase}-item-${n}-erro` : undefined}
+                      />
                     </div>
                     <div>
                       <label htmlFor={`${idBase}-item-${n}-qtd`} className="sr-only">

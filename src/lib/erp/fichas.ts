@@ -993,7 +993,7 @@ export async function insumosParaFicha(cliente: ClienteDoParceiro, jaNaFicha: st
     // I.1b: material de limpeza e uso não é ingrediente: não é oferecido na ficha (o que já estivesse nela continua).
     where: { fichaQueProduz: { is: null }, OR: [{ ativo: true, NOT: { tipo: 'MATERIAL' } }, { id: { in: jaNaFicha } }] },
     orderBy: { nome: 'asc' },
-    select: SELECAO_DO_INSUMO,
+    select: { ...SELECAO_DO_INSUMO, categoria: { select: { nome: true, ordem: true } } },
   });
   await anexarUltimasCompras(cliente, lidos as (typeof lidos[number] & ComUltimaCompra)[]);
   return lidos.map((i) => ({
@@ -1002,6 +1002,8 @@ export async function insumosParaFicha(cliente: ClienteDoParceiro, jaNaFicha: st
     unidade: i.unidade as Unidade,
     ativo: i.ativo,
     custo: custoDoInsumo(i) as CustoExato | null,
+    /** F4: a busca da ficha agrupa e acha pela categoria; nulo = insumo antigo ainda sem categoria. */
+    categoria: i.categoria ? { nome: i.categoria.nome, ordem: i.categoria.ordem } : null,
   }));
 }
 

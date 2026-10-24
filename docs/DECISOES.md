@@ -3038,3 +3038,9 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Alternativas:** (a) filtrar só a página que já veio (50 linhas); (b) gravar o status do CMV numa coluna; (c) calcular o CMV de todos os pratos que passam nos outros filtros e paginar depois.
 
 **Razão:** (c). O CMV é calculado na hora e nunca gravado (decisões da N.2); uma coluna ficaria velha a cada compra. Filtrar só a página mentiria no total. Um valor só na URL (`cmv=IFOOD-acima`), canal e farol de listas fechadas. Só quem vê preços (`precos.ver`) filtra: para os outros o parâmetro é ignorado no servidor e o seletor nem aparece, para que o farol não vaze pela contagem do que volta. O filtro só traz pratos (pré-preparo não tem preço de venda).
+
+### 442. 2026-10-24 · F4: o item da ficha é escolhido digitando, pelo nome ou pela categoria
+
+**Alternativas:** (a) manter a lista suspensa com todos os insumos em ordem alfabética; (b) um filtro de categoria separado antes da lista; (c) um campo de busca que acha pelo nome ou pela categoria e mostra a lista agrupada por categoria.
+
+**Razão:** (c). Com centenas de insumos a lista suspensa obriga a rolar; digitar "frango" ou "proteína" resolve em uma tecla. Pré-preparos primeiro, depois as categorias na ordem da casa, insumo sem categoria no fim ("Sem categoria"). Sem acento e sem caixa; cada palavra precisa aparecer no nome ou na categoria. Teclado: setas, Enter escolhe, Esc fecha; toque com linhas de 44 px. O valor segue no mesmo campo (`item_insumo`): o servidor, o rascunho e as regras de gravação não mudaram. Até 200 opções na lista, com aviso para digitar mais.
