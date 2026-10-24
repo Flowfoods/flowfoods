@@ -230,6 +230,17 @@ REMOTO
       | grep -viE 'email|password|token|secret|key|user' | head -60
   fi
 
+  titulo "10b. Rotas da API do Dokploy ligadas ao Traefik (OpenAPI)"
+  for rota in /api/settings.getOpenApiDocument /swagger.json /api/openapi.json; do
+    code=$(dokploy GET "$rota"); echo "$rota -> HTTP $code"
+    if [ "$code" = 200 ] && jq -e .paths /tmp/dk.json >/dev/null 2>&1; then
+      jq -r '.paths | to_entries[] | select(.key | test("raefik|cleanup|Cleanup|prune|clean"; "")) |
+        .key as $k | .value | to_entries[] |
+        "\(.key | ascii_upcase) \($k)  corpo: \((.value.requestBody.content["application/json"].schema.properties // {}) | keys | join(","))"' /tmp/dk.json
+      break
+    fi
+  done
+
   titulo "11. Compose ssh-setup (o que é — só nomes, imagens, montagens)"
   id=$(awk -F'\t' '$3=="ssh-setup"{print $2}' /tmp/inventario.tsv)
   if [ -n "$id" ] && [ "$(dokploy GET "/api/compose.one?composeId=$id")" = 200 ]; then
