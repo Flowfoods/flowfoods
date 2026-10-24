@@ -427,8 +427,17 @@ recriar_traefik() {
   fi
   code=$(dokploy GET /api/settings.getTraefikPorts)
   echo "getTraefikPorts -> HTTP $code: $(head -c 300 /tmp/dk.json)"
-  [ "$code" = 200 ] || { echo "::error::Não li as portas atuais — não recrio."; exit 1; }
-  portas=$(jq -c 'if type=="array" then . else (.additionalPorts // .ports // []) end' /tmp/dk.json)
+  if [ "$code" = 200 ]; then
+    portas=$(jq -c 'if type=="array" then . else (.additionalPorts // .ports // []) end' /tmp/dk.json)
+  elif [ "${ALVOS:-}" != "${ALVOS#portas=}" ]; then
+    # O Dokploy lê as portas do container; sem container, a leitura falha.
+    # Só segue com valor passado à mão, tirado de um inspect anterior.
+    portas="${ALVOS#portas=}"
+    jq -e 'type=="array"' <<<"$portas" >/dev/null || { echo "::error::portas= precisa ser um array JSON"; exit 1; }
+    echo "Usando portas extras informadas: $portas"
+  else
+    echo "::error::Não li as portas atuais — não recrio. Informe alvos=portas=[...] a partir de um inspect anterior."; exit 1
+  fi
   code=$(dokploy GET /api/settings.haveTraefikDashboardPortEnabled); echo "dashboard habilitado? HTTP $code: $(head -c 50 /tmp/dk.json)"
 
   titulo "Recriando (mesmas portas extras: $portas)"
