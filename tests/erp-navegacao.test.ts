@@ -549,7 +549,7 @@ describe('UX.9 · abas (nav com nome acessível, aria-current) e trilha', () => 
     const n1 = comParceiroAtual(navegacaoDoNivel1(), '/rodolfo/erp/v/lojas', [{ slug: 'v', nome: 'V' }]);
     const r = abasDaArea(n1, itemAtivo(n1, '/rodolfo/erp/v/lojas'))!;
     expect(r.area).toBe('Rede e Equipe');
-    expect(r.abas.map((a) => a.rotulo)).toEqual(['Lojas e marcas', 'Equipe', 'Histórico', 'Cadastro do parceiro']);
+    expect(r.abas.map((a) => a.rotulo)).toEqual(['Lojas e marcas', 'Equipe', 'Histórico', 'Cadastro do parceiro', 'Custo médio por loja']);
   });
 
   it('trilha: /erp/insumos/novo = Início › Cadastros e Cardápio › Insumos › Novo insumo, com a área e a aba como links', () => {

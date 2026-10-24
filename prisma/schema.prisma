@@ -664,6 +664,12 @@ model Loja {
   // Opcional e NÃO único: duas lojas podem operar no mesmo CNPJ (a conferência da F.1b pede a loja). Muda com `lojas.gerir`.
   cnpj       String?
 
+  // N.1 (23/10/2026): marco de corte do custo médio ponderado DESTA loja. Nulo = método antigo (o último preço
+  // da rede valoriza saídas e retratos). Só a FlowFoods liga, depois do relatório de impacto; nada volta no tempo.
+  custoMedioDesde DateTime?
+  // N.1: diferença de base na troca (livro − regra antiga), para o período que atravessa o marco não misturar em silêncio.
+  custoMedioPonteCentavos Int?
+
   // 1.7: regras da contagem desta loja (mudam só com "cadastrar lojas", rede
   // inteira: o gerente não baixa o piso que o trava). Piso do fechamento do
   // período: cobertura mínima por valor e por itens, em pontos-base (CHECK
@@ -1487,6 +1493,8 @@ model SaldoEstoque {
   // Pode ficar negativo (baixa antes da nota): é sinal de divergência, não erro.
   quantidadeMilesimos Int          @default(0)
   valorCentavos       Int          @default(0)
+  // N.1: há quantidade com custo desconhecido neste saldo (desconhecido não é zero). Some quando o saldo zera.
+  valorIncompleto     Boolean      @default(false)
   // Trava otimista: update só com a versão lida.
   versao              Int          @default(0)
   atualizadoEm        DateTime     @updatedAt
@@ -1548,6 +1556,10 @@ model MovimentoEstoque {
   // 1.6: o movimento que este desfaz (espelho exato, conferido por trigger). Único.
   // NoAction (não Restrict): a limpeza administrativa apaga original e estorno no
   // mesmo DELETE (conferido no fim do comando); UPDATE no razão segue proibido.
+  // N.1: como o valor foi obtido — INFORMADO (nota, abertura, lote), MEDIA_LOJA (custo médio da loja),
+  // ESTORNO (o valor do original), REFERENCIA (saída além do saldo, sem base da loja), SEM_CUSTO.
+  // Nulo = movimento de antes do método. CHECK no banco.
+  valorMetodo          String?
   estornoDeId          String?
   estornoDe            MovimentoEstoque? @relation("EstornoDoMovimento", fields: [parceiroId, estornoDeId], references: [parceiroId, id], onDelete: NoAction)
   estorno              MovimentoEstoque? @relation("EstornoDoMovimento")

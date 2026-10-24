@@ -957,6 +957,8 @@ export async function concluirProducao(
                 tipo: 'PRODUCAO_ENTRADA',
                 quantidadeMilesimos: c.produzidoMilesimos,
                 valorCentavos: custo.totalCentavos,
+                // N.1: insumo que saiu sem custo deixa o lote com valor parcial (o saldo do pré-preparo fica incompleto).
+                valorParcial: custo.semPreco.length > 0,
                 insumoNome: insumo.nome,
                 unidade: insumo.unidade as Unidade,
                 motivo: `Lote ${ordem.codigoLote} · ${ordem.fichaNomeSnapshot}`,

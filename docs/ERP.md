@@ -4374,3 +4374,31 @@ Pedido de Rodolfo: trocar o texto didático fixo por ajuda sob demanda, junto do
 **Base:** o bloco N (N.1–N.5, branch `bruce/admiring-pascal-4qnypz`, sem merge na master) foi integrado nesta branch antes, porque a N.5 mexeu na ajuda: merge sem conflito.
 
 **Próximo passo:** estender os pontos às outras telas com texto fixo longo (embalagem de compra, compras, produção, DRE) e decidir se a caixa "Como funciona" da tela também vira card (hoje continua como na 0.6).
+
+## N.1 — custo médio ponderado por loja (24/10/2026)
+
+Decisões 437 a 440. Prospectivo: cada loja nasce no método antigo (último preço da rede) e só muda quando a FlowFoods liga em **Rede e Equipe › Custo médio por loja** (nível 1). Nada em produção muda sem esse clique.
+
+| Peça | Onde |
+|---|---|
+| Marco e diferença de base | `Loja.custoMedioDesde`, `Loja.custoMedioPonteCentavos` (migration `20261112000000_erp_custo_medio_loja`) |
+| Método de cada movimento | `MovimentoEstoque.valorMetodo` (`INFORMADO`, `MEDIA_LOJA`, `ESTORNO`, `REFERENCIA`, `SEM_CUSTO`) |
+| Custo desconhecido | `SaldoEstoque.valorIncompleto` |
+| Regra pura | `valorPelaMediaDaLoja`, `aplicarNosSaldos` em `src/lib/erp/estoque-campos.ts` |
+| Gravação | `gravarMovimentos` em `src/lib/erp/estoque.ts` (lê `lojasComCustoMedioEm`) |
+| Custo para as telas | `custosPorLoja` / `custosDaLoja` (média do livro; incompleto = sem custo) |
+| Impacto e troca | `src/lib/erp/custo-medio.ts`, página `/rodolfo/erp/[slug]/custo-medio` |
+| Aviso no DRE | `trocasDeCustoNoPeriodo` em `src/lib/erp/dre.ts` |
+
+### Provar a N.1
+
+```
+ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff npx vitest run tests/erp-custo-medio.test.ts tests/erp-custo-medio.db.test.ts tests/erp-custo-duas-lojas.db.test.ts
+```
+
+O aceite sintético do Notion (A e B com 10 kg a R$ 10; A compra 10 kg por R$ 200) fecha com CMV real de R$ 20 em B (antes: −R$ 100) e R$ 90 em A. A loja sem marco segue no método antigo (`erp-custo-duas-lojas.db.test.ts` continua passando).
+
+### Antes de ligar em produção
+
+- Ler o impacto de cada loja: linha com "valor negativo" ou "resíduo" vem de lançamento antigo e merece olhar antes.
+- Ligar logo depois de um fechamento deixa o período seguinte inteiro no método novo e evita o aviso de troca no DRE.

@@ -35,6 +35,7 @@ import { listarHistorico } from './historico';
 import {
   aberturasDe,
   comRecusa,
+  custosDaLoja,
   custosDeReferencia,
   gravarMovimentos,
   lojaDoAlcance,
@@ -526,7 +527,7 @@ export async function obterRequisicao(cliente: ClienteDoParceiro, alcance: Alcan
       const insumoIds = req.itens.map((i) => i.insumoId);
       const [saldos, custos, movs, aberturas] = await Promise.all([
         tx.saldoEstoque.findMany({ where: { lojaId, insumoId: { in: insumoIds } }, select: { insumoId: true, quantidadeMilesimos: true } }),
-        custosDeReferencia(tx, insumoIds),
+        custosDaLoja(tx, lojaId, insumoIds),
         tx.movimentoEstoque.findMany({ where: { requisicaoItemId: { in: req.itens.map((i) => i.id) } }, orderBy: [{ ocorridoEm: 'asc' }, { criadoEm: 'asc' }, { id: 'asc' }], select: SELECAO_DO_MOVIMENTO }),
         aberturasDe(tx, [lojaId]),
       ]);
@@ -619,7 +620,7 @@ export async function atenderRequisicao(
             },
           });
         }
-        const custos = await custosDeReferencia(tx, insumoIds);
+        const custos = await custosDaLoja(tx, lojaId, insumoIds);
         const baixas = baixasDaEntrega(
           { id: r.id, lojaId, numero: r.numero, setor: r.setor, versao: r.versao },
           itens,
@@ -850,7 +851,7 @@ export async function divergenciasDaLoja(cliente: ClienteDoParceiro, alcance: Al
           ORDER BY i."nome"`;
         const [insumos, custos, negativos] = await Promise.all([
           tx.insumo.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, unidade: true } }),
-          custosDeReferencia(tx, ids),
+          custosDaLoja(tx, lojaId, ids),
           tx.saldoEstoque.findMany({ where: { lojaId, quantidadeMilesimos: { lt: 0 } }, select: { insumoId: true, quantidadeMilesimos: true, insumo: { select: { nome: true, unidade: true } } } }),
         ]);
         const nomeDe = new Map(insumos.map((i) => [i.id, i]));

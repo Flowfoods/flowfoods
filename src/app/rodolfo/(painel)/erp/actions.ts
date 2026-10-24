@@ -11,6 +11,7 @@ import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/db';
 import { exigirNivel1, exigirParceiro } from '@/lib/erp/contexto';
 import { mudarStatusParceiro, renomearParceiro, type ResultadoParceiro } from '@/lib/erp/parceiros';
+import { ligarCustoMedio } from '@/lib/erp/custo-medio';
 import type { EstadoForm } from '@/components/erp/ui/campos';
 
 function paraEstado(r: ResultadoParceiro, vez: number): NonNullable<EstadoForm> {
@@ -45,4 +46,20 @@ export async function acaoMudarStatusParceiro(slug: string, anterior: EstadoForm
     revalidatePath('/rodolfo', 'layout');
   }
   return paraEstado(r, vez);
+}
+
+/**
+ * N.1: liga o custo médio ponderado numa loja do parceiro (só nível 1). Pede a confirmação de que o relatório de
+ * impacto foi lido. A troca vale daqui para a frente; nada é recalculado.
+ */
+export async function acaoLigarCustoMedio(slug: string, lojaId: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {
+  const { sessao, cliente, podeEscrever } = await exigirParceiro(slug);
+  const vez = (anterior?.vez ?? 0) + 1;
+  if (!podeEscrever) return { ok: false, erros: { geral: 'Parceiro suspenso ou em rascunho: nada muda até reativar.' }, vez };
+  if (form.get('li') !== 'sim') return { ok: false, erros: { li: 'Confirme que leu o impacto desta loja.' }, vez };
+  const r = await ligarCustoMedio(cliente, lojaId, sessao.autorNome);
+  if (!r.ok) return { ok: false, erros: { geral: r.erro }, vez };
+  await auditar(sessao.userId, 'erp_custo_medio_ligado', { slug, lojaId });
+  revalidatePath(`/rodolfo/erp/${slug}/custo-medio`);
+  return { ok: true, mensagem: r.jaFeito ? 'Esta loja já estava no custo médio.' : 'Custo médio ligado nesta loja a partir de agora.', vez };
 }

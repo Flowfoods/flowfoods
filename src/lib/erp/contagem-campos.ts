@@ -290,6 +290,8 @@ export function ajustesDaContagem(
         tipo: 'CONTAGEM' as const,
         quantidadeMilesimos: q,
         valorCentavos: valorDaQuantidade(custos.get(i.insumoId) ?? null, q) ?? 0,
+        // N.1: a referência é só para sobra sem base na loja; sem ela, o custo é desconhecido (não zero).
+        semCusto: !custos.get(i.insumoId),
         insumoNome: i.nome,
         unidade: i.unidade,
         motivo,

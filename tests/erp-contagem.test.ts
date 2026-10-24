@@ -164,8 +164,8 @@ describe('divergência, fecha sozinha e o ajuste (contado − esperado)', () => 
       'Contagem · Refrigerado',
     );
     expect(m).toEqual([
-      { lojaId: 'loja', insumoId: 'cheddar', tipo: 'CONTAGEM', quantidadeMilesimos: -2000, valorCentavos: -3796, insumoNome: 'Cheddar', unidade: 'KG', motivo: 'Contagem · Refrigerado', chave: 'contagem:i1', contagemItemId: 'i1' },
-      { lojaId: 'loja', insumoId: 'batata', tipo: 'CONTAGEM', quantidadeMilesimos: 2000, valorCentavos: 0, insumoNome: 'Batata', unidade: 'KG', motivo: 'Contagem · Refrigerado', chave: 'contagem:i2', contagemItemId: 'i2' },
+      { lojaId: 'loja', insumoId: 'cheddar', tipo: 'CONTAGEM', quantidadeMilesimos: -2000, valorCentavos: -3796, insumoNome: 'Cheddar', unidade: 'KG', motivo: 'Contagem · Refrigerado', chave: 'contagem:i1', contagemItemId: 'i1', semCusto: false },
+      { lojaId: 'loja', insumoId: 'batata', tipo: 'CONTAGEM', quantidadeMilesimos: 2000, valorCentavos: 0, insumoNome: 'Batata', unidade: 'KG', motivo: 'Contagem · Refrigerado', chave: 'contagem:i2', contagemItemId: 'i2', semCusto: true },
     ]);
   });
 });

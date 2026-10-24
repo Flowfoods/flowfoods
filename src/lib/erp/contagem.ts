@@ -35,10 +35,12 @@ import {
   aberturasDe,
   comRecusa,
   contarItem,
+  custosDaLoja,
   custosDeReferencia,
   gravarMovimentos,
   itemCongelado,
   lojaDoAlcance,
+  lojasComCustoMedioEm,
   MENSAGEM_LOJA_FORA,
   paraTela,
   Recusa,
@@ -48,7 +50,7 @@ import {
   type ResultadoDoItem,
   type ResultadoEstoque,
 } from './estoque';
-import { quantidadeComSinal, resumoDaContagem, totalAcimaDoLimite, valorAcimaDoTeto, valorDaQuantidade, type TipoDeMovimento } from './estoque-campos';
+import { proporcao, quantidadeComSinal, resumoDaContagem, totalAcimaDoLimite, valorAcimaDoTeto, valorDaQuantidade, type TipoDeMovimento } from './estoque-campos';
 import {
   ajustesDaContagem,
   coberturaDoPeriodo,
@@ -302,8 +304,9 @@ export async function planejamentoDoCiclo(cliente: ClienteDoParceiro, alcance: A
       ]);
       const saldoDe = new Map(saldos.map((s) => [s.insumoId, s.quantidadeMilesimos]));
       const universo = insumos.filter((i) => i.ativo || (saldoDe.get(i.id) ?? 0) !== 0);
-      const custos = await custosDeReferencia(
+      const custos = await custosDaLoja(
         tx,
+        lojaId,
         universo.map((i) => i.id),
       );
       const valores = universo.map((i) => ({ insumoId: i.id, valorCentavos: valorDaQuantidade(custos.get(i.id)?.porUnidade ?? null, saldoDe.get(i.id) ?? 0) }));
@@ -536,7 +539,7 @@ async function divergencias<T extends ItemParaAplicar>(tx: ClienteDoParceiro, lo
   const insumoIds = itens.map((i) => i.insumoId);
   const [saldos, custos] = await Promise.all([
     tx.saldoEstoque.findMany({ where: { lojaId, insumoId: { in: insumoIds } }, select: { insumoId: true, quantidadeMilesimos: true } }),
-    custosDeReferencia(tx, insumoIds),
+    custosDaLoja(tx, lojaId, insumoIds),
   ]);
   const atualDe = new Map(saldos.map((s) => [s.insumoId, s.quantidadeMilesimos]));
   const linhas = itens.map((i) => {
@@ -643,8 +646,9 @@ async function aplicar(
       })
     : [];
   const velhos = new Set(contados.filter((i) => posteriores.some((m) => m.insumoId === i.insumoId && m.ocorridoEm.getTime() > i.contadoEm!.getTime())).map((i) => i.id));
-  const custos = await custosDeReferencia(
+  const custos = await custosDaLoja(
     tx,
+    loja.id,
     contados.map((i) => i.insumoId),
   );
   const porUnidade = new Map(Array.from(custos).map(([k, v]) => [k, v.porUnidade]));
@@ -658,17 +662,41 @@ async function aplicar(
     `Contagem · ${titulo}`,
   );
   // Herança a da 1.6: valor de item contado acima do teto vira frase (o razão confere o INTEGER).
-  const valoresContados = contados.map((i) => ({ nome: i.insumoNomeSnapshot, valor: valorDaQuantidade(porUnidade.get(i.insumoId) ?? null, i.contadoMilesimos!) }));
+  const valoresContados: { nome: string; valor: number | null }[] = contados.map((i) => ({ nome: i.insumoNomeSnapshot, valor: valorDaQuantidade(porUnidade.get(i.insumoId) ?? null, i.contadoMilesimos!) }));
   const teto = valoresContados.map((v) => valorAcimaDoTeto(v.nome, v.valor)).find(Boolean);
   if (teto) throw new Recusa({ ok: false, erros: { geral: teto } });
-  await gravarMovimentos(tx, movimentos, { ocorridoEm: agora });
+  const gravados = await gravarMovimentos(tx, movimentos, { ocorridoEm: agora });
+  // N.1: com o custo médio ligado nesta loja, o valor fotografado é o do LIVRO DA LOJA (saldo valorado pela média),
+  // não quantidade × o último preço da rede. Saldo com custo desconhecido fica sem preço (nulo), nunca zero.
+  const mediaDaLoja = (await lojasComCustoMedioEm(tx, [loja.id], agora)).has(loja.id);
+  if (mediaDaLoja && contados.length) {
+    const doLivro = new Map(
+      (await tx.saldoEstoque.findMany({ where: { lojaId: loja.id, insumoId: { in: contados.map((i) => i.insumoId) } }, select: { insumoId: true, quantidadeMilesimos: true, valorCentavos: true, valorIncompleto: true } })).map((x) => [x.insumoId, x]),
+    );
+    valoresContados.splice(
+      0,
+      valoresContados.length,
+      ...contados.map((i) => {
+        const x = doLivro.get(i.insumoId);
+        const q = i.contadoMilesimos!;
+        const valor = q === 0 ? 0 : !x || x.valorIncompleto || x.quantidadeMilesimos <= 0 ? null : proporcao(x.valorCentavos, Math.min(q, x.quantidadeMilesimos), x.quantidadeMilesimos);
+        return { nome: i.insumoNomeSnapshot, valor };
+      }),
+    );
+  }
   // Valor fotografado: na cíclica, o que foi contado; no fechamento, o estoque final inteiro da loja (base do CMV real, 2.3).
   let valorTotal = valoresContados.reduce((s, v) => s + Math.max(0, v.valor ?? 0), 0);
   // 2.3: quantos insumos com saldo ficaram sem preço no retrato do fechamento (o CMV real avisa); só o fechamento registra.
   let itensSemPreco: number | undefined;
   // I.2a: o retrato do estoque por insumo, gravado na mesma transação que fecha o fechamento (soma = valorTotal, ao centavo).
   let retrato: ItemDoRetrato[] | null = null;
-  if (c.tipo === 'FECHAMENTO') {
+  if (c.tipo === 'FECHAMENTO' && mediaDaLoja) {
+    // N.1: o estoque final pelo livro da própria loja; o preço de outra loja não entra.
+    const saldos = await tx.saldoEstoque.findMany({ where: { lojaId: loja.id, quantidadeMilesimos: { gt: 0 } }, select: { insumoId: true, quantidadeMilesimos: true, valorCentavos: true, valorIncompleto: true } });
+    retrato = saldos.map((x) => ({ insumoId: x.insumoId, quantidadeMilesimos: x.quantidadeMilesimos, valorCentavos: x.valorIncompleto ? null : x.valorCentavos }));
+    valorTotal = somaDoRetrato(retrato);
+    itensSemPreco = saldos.filter((x) => x.valorIncompleto).length;
+  } else if (c.tipo === 'FECHAMENTO') {
     const saldos = await tx.saldoEstoque.findMany({ where: { lojaId: loja.id, quantidadeMilesimos: { gt: 0 } }, select: { insumoId: true, quantidadeMilesimos: true } });
     const todos = await custosDeReferencia(
       tx,
@@ -686,8 +714,9 @@ async function aplicar(
     where: { id: c.id, status: 'ABERTA' },
     data: { status: 'FECHADA', desfecho, fechadaEm: agora, fechadaPorNome: autorNome, valorTotalCentavos: valorTotal, naoContadosNoFechamento: naoContados, ...(itensSemPreco === undefined ? {} : { itensSemPreco }), ...(retrato ? { retratoGravadoEm: agora } : {}) },
   });
-  const sobra = movimentos.filter((m) => m.valorCentavos > 0).reduce((s, m) => s + m.valorCentavos, 0);
-  const falta = movimentos.filter((m) => m.valorCentavos < 0).reduce((s, m) => s - m.valorCentavos, 0);
+  // O que foi para o livro (com o custo médio, a sobra e a falta valem pela média da loja).
+  const sobra = gravados.filter((m) => m.valorCentavos > 0).reduce((s, m) => s + m.valorCentavos, 0);
+  const falta = gravados.filter((m) => m.valorCentavos < 0).reduce((s, m) => s - m.valorCentavos, 0);
   await tx.historicoAlteracao.create({
     data: {
       parceiroId: tx.parceiroId,
@@ -847,7 +876,7 @@ async function coberturaDaLoja(
     }
   }
   const ids = Array.from(new Set([...saldos.filter((s) => s.quantidadeMilesimos !== 0).map((s) => s.insumoId), ...Array.from(contadosNoPeriodo.keys())]));
-  const custos = await custosDeReferencia(tx, ids);
+  const custos = await custosDaLoja(tx, lojaId, ids);
   const valores = new Map(ids.map((id) => [id, valorDaQuantidade(custos.get(id)?.porUnidade ?? null, saldoDe.get(id) ?? 0)]));
   const cobertura = coberturaDoPeriodo(
     ids.map((id) => ({ insumoId: id, valorCentavos: valores.get(id) ?? null, contadoNoPeriodo: contadosNoPeriodo.has(id) })),

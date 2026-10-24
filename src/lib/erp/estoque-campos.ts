@@ -326,6 +326,103 @@ export interface MovimentoNovo {
   /** 3.1: a ordem de produção cujo lote entrou no estoque (`PRODUCAO_ENTRADA`; o estorno aponta a mesma). */
   ordemProducaoId?: string | null;
   estornoDeId?: string | null;
+  /**
+   * N.1: o custo desta ENTRADA é desconhecido (abertura de insumo sem custo, por exemplo). Desconhecido não é zero:
+   * com o custo médio da loja ligado, o movimento sai com valor 0, método `SEM_CUSTO`, e o saldo fica incompleto.
+   */
+  semCusto?: boolean;
+  /** N.1: o valor informado não cobre toda a quantidade (lote com insumo sem custo): entra o valor, o saldo fica incompleto. */
+  valorParcial?: boolean;
+}
+
+// ---------------------------------------------------- N.1 · custo médio da loja
+
+/** Como o valor do movimento foi obtido (`MovimentoEstoque.valorMetodo`). */
+export type MetodoDoValor = 'INFORMADO' | 'MEDIA_LOJA' | 'ESTORNO' | 'REFERENCIA' | 'SEM_CUSTO';
+
+export interface SaldoValorado {
+  quantidadeMilesimos: number;
+  valorCentavos: number;
+  /** Há quantidade com custo desconhecido neste saldo. */
+  valorIncompleto?: boolean;
+}
+
+/** a × b ÷ c arredondado à unidade (metade se afasta do zero), em inteiros: dinheiro nunca passa por ponto flutuante. */
+export function proporcao(a: number, b: number, c: number): number {
+  if (c === 0) throw new Error('proporção com divisor zero');
+  const n = BigInt(a) * BigInt(b);
+  const d = BigInt(c);
+  const neg = n < BigInt(0) !== d < BigInt(0);
+  const an = n < BigInt(0) ? -n : n;
+  const ad = d < BigInt(0) ? -d : d;
+  const q = (an * BigInt(2) + ad) / (ad * BigInt(2));
+  return Number(neg ? -q : q);
+}
+
+/**
+ * Média móvel ponderada da LOJA (decisão de 23/10/2026): o valor de UM movimento dado o saldo da loja antes dele.
+ *
+ * - Estorno: o valor do original (nunca recalculado pelo preço de hoje).
+ * - Entrada (nota, abertura, lote produzido): o valor informado; sem custo, 0 com `SEM_CUSTO` e o saldo fica incompleto.
+ *   Sobra na contagem ou ajuste para mais: pela média da loja, se houver base; senão, a referência informada.
+ * - Saída (requisição, produção, perda, ajuste e contagem para menos): pela média da loja (valor ÷ quantidade do saldo),
+ *   arredondada ao centavo. A saída que leva o saldo inteiro leva o valor inteiro (nada de resto de centavos com
+ *   quantidade zero); o que passa de zero vai pela mesma média. Saldo com custo desconhecido: a saída fica `SEM_CUSTO`.
+ *   Saldo zero ou negativo (a loja já está no vermelho): sem média da loja, vai pela referência informada (`REFERENCIA`).
+ *
+ * O saldo depois: quantidade e valor somados; "incompleto" acende com `SEM_CUSTO`/valor parcial e apaga quando a
+ * quantidade chega a zero ou abaixo (não sobra estoque com custo desconhecido).
+ */
+export function valorPelaMediaDaLoja(
+  saldo: SaldoValorado,
+  m: Pick<MovimentoNovo, 'tipo' | 'quantidadeMilesimos' | 'valorCentavos' | 'estornoDeId' | 'semCusto' | 'valorParcial'>,
+): { valorCentavos: number; metodo: MetodoDoValor; depois: Required<SaldoValorado> } {
+  const q = saldo.quantidadeMilesimos;
+  const v = saldo.valorCentavos;
+  const inc = saldo.valorIncompleto === true;
+  let valor: number;
+  let metodo: MetodoDoValor;
+  let acende = false;
+  if (m.estornoDeId) {
+    valor = m.valorCentavos;
+    metodo = 'ESTORNO';
+  } else if (m.quantidadeMilesimos > 0) {
+    const sobra = m.tipo === 'CONTAGEM' || m.tipo === 'AJUSTE';
+    if (sobra && q > 0 && !inc) {
+      valor = proporcao(v, m.quantidadeMilesimos, q);
+      metodo = 'MEDIA_LOJA';
+    } else if (m.semCusto) {
+      valor = 0;
+      metodo = 'SEM_CUSTO';
+      acende = true;
+    } else {
+      valor = m.valorCentavos;
+      metodo = sobra ? 'REFERENCIA' : 'INFORMADO';
+      acende = m.valorParcial === true;
+    }
+  } else if (m.quantidadeMilesimos < 0) {
+    const sai = -m.quantidadeMilesimos;
+    if (q > 0 && !inc) {
+      valor = sai >= q ? -(v + (sai > q ? proporcao(v, sai - q, q) : 0)) : -proporcao(v, sai, q);
+      metodo = 'MEDIA_LOJA';
+    } else if (q > 0) {
+      valor = 0;
+      metodo = 'SEM_CUSTO';
+    } else if (m.semCusto) {
+      valor = 0;
+      metodo = 'SEM_CUSTO';
+      acende = true;
+    } else {
+      valor = m.valorCentavos;
+      metodo = 'REFERENCIA';
+    }
+  } else {
+    valor = 0;
+    metodo = 'INFORMADO';
+  }
+  const qDepois = q + m.quantidadeMilesimos;
+  const incDepois = qDepois > 0 ? inc || acende : acende && qDepois < 0;
+  return { valorCentavos: valor, metodo, depois: { quantidadeMilesimos: qDepois, valorCentavos: v + valor, valorIncompleto: incDepois } };
 }
 
 /** Entrada de compra de cada item da nota (valor = valor do item + frete rateado). Item sem insumo ou sem quantidade fica de fora. */
@@ -390,19 +487,29 @@ export function mesmoEfeito(
  * É a mesma conta que o CHECK do banco confere (antes + quantidade = depois).
  */
 export function aplicarNosSaldos(
-  saldos: ReadonlyMap<string, { quantidadeMilesimos: number; valorCentavos: number }>,
+  saldos: ReadonlyMap<string, SaldoValorado>,
   movimentos: readonly MovimentoNovo[],
-): { linhas: (MovimentoNovo & { saldoAntesMilesimos: number; saldoDepoisMilesimos: number })[]; finais: Map<string, { quantidadeMilesimos: number; valorCentavos: number }> } {
-  const finais = new Map<string, { quantidadeMilesimos: number; valorCentavos: number }>();
-  for (const [k, v] of Array.from(saldos)) finais.set(k, { ...v });
+  /** N.1: lojas com o custo médio ligado neste instante. Fora delas, o valor do movimento é o que veio (método antigo). */
+  lojasComCustoMedio: ReadonlySet<string> = new Set(),
+): {
+  linhas: (MovimentoNovo & { saldoAntesMilesimos: number; saldoDepoisMilesimos: number; valorMetodo: MetodoDoValor | null })[];
+  finais: Map<string, Required<SaldoValorado>>;
+} {
+  const finais = new Map<string, Required<SaldoValorado>>();
+  for (const [k, v] of Array.from(saldos)) finais.set(k, { quantidadeMilesimos: v.quantidadeMilesimos, valorCentavos: v.valorCentavos, valorIncompleto: v.valorIncompleto === true });
   const ordenados = movimentos.map((m, i) => ({ m, i })).sort((p, q) => (p.m.lojaId < q.m.lojaId ? -1 : p.m.lojaId > q.m.lojaId ? 1 : p.m.insumoId < q.m.insumoId ? -1 : p.m.insumoId > q.m.insumoId ? 1 : p.i - q.i));
   const linhas = ordenados.map(({ m }) => {
     const k = chaveDoSaldo(m.lojaId, m.insumoId);
-    const s = finais.get(k) ?? { quantidadeMilesimos: 0, valorCentavos: 0 };
+    const s = finais.get(k) ?? { quantidadeMilesimos: 0, valorCentavos: 0, valorIncompleto: false };
     const antes = s.quantidadeMilesimos;
+    if (lojasComCustoMedio.has(m.lojaId)) {
+      const r = valorPelaMediaDaLoja(s, m);
+      finais.set(k, r.depois);
+      return { ...m, valorCentavos: r.valorCentavos, saldoAntesMilesimos: antes, saldoDepoisMilesimos: r.depois.quantidadeMilesimos, valorMetodo: r.metodo };
+    }
     const depois = antes + m.quantidadeMilesimos;
-    finais.set(k, { quantidadeMilesimos: depois, valorCentavos: s.valorCentavos + m.valorCentavos });
-    return { ...m, saldoAntesMilesimos: antes, saldoDepoisMilesimos: depois };
+    finais.set(k, { quantidadeMilesimos: depois, valorCentavos: s.valorCentavos + m.valorCentavos, valorIncompleto: s.valorIncompleto });
+    return { ...m, saldoAntesMilesimos: antes, saldoDepoisMilesimos: depois, valorMetodo: null };
   });
   return { linhas, finais };
 }

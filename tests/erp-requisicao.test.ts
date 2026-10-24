@@ -169,8 +169,8 @@ describe('atender: entrega parcial, estado, baixa com valor exato, saldo negativ
     ]);
     const m = baixasDaEntrega({ id: 'r1', lojaId: 'vp', numero: 12, setor: 'COZINHA', versao: 3 }, ITENS, [{ itemId: 'i1', quantidadeMilesimos: 2000 }, { itemId: 'i2', quantidadeMilesimos: 600 }], custos);
     expect(m).toEqual([
-      { lojaId: 'vp', insumoId: 'ched', tipo: 'REQUISICAO', quantidadeMilesimos: -2000, valorCentavos: -3796, insumoNome: 'Cheddar fatiado', unidade: 'KG', motivo: 'Requisição #12 · Cozinha', chave: 'requisicao:i1:3', requisicaoItemId: 'i1' },
-      { lojaId: 'vp', insumoId: 'bac', tipo: 'REQUISICAO', quantidadeMilesimos: -600, valorCentavos: -2520, insumoNome: 'Bacon', unidade: 'KG', motivo: 'Requisição #12 · Cozinha', chave: 'requisicao:i2:3', requisicaoItemId: 'i2' },
+      { lojaId: 'vp', insumoId: 'ched', tipo: 'REQUISICAO', quantidadeMilesimos: -2000, valorCentavos: -3796, insumoNome: 'Cheddar fatiado', unidade: 'KG', motivo: 'Requisição #12 · Cozinha', chave: 'requisicao:i1:3', requisicaoItemId: 'i1', semCusto: false },
+      { lojaId: 'vp', insumoId: 'bac', tipo: 'REQUISICAO', quantidadeMilesimos: -600, valorCentavos: -2520, insumoNome: 'Bacon', unidade: 'KG', motivo: 'Requisição #12 · Cozinha', chave: 'requisicao:i2:3', requisicaoItemId: 'i2', semCusto: false },
     ]);
     // Sem preço: 0 no livro (a tela diz pendente).
     expect(baixasDaEntrega({ id: 'r1', lojaId: 'vp', numero: 12, setor: 'SALAO', versao: 0 }, ITENS, [{ itemId: 'i2', quantidadeMilesimos: 600 }], new Map())[0].valorCentavos).toBe(0);

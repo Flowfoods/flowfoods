@@ -513,6 +513,20 @@ export function TelaDoDre({
 
       {d.avisoDaData && <Aviso tom="alerta" titulo={d.avisoDaData} />}
 
+      {d.trocasDeCusto.length > 0 && (
+        <Aviso tom="neutro" titulo={`Troca de método do custo neste período: ${d.trocasDeCusto.map((t) => `${t.nome} (${formatarData(t.desde, true)})`).join(', ')}.`}>
+          O estoque inicial foi valorizado pelo último preço da rede e o final pelo custo médio da loja. Diferença de base na troca:{' '}
+          {d.trocasDeCusto.map((t, i) => (
+            <span key={t.nome}>
+              {i > 0 && ', '}
+              {d.trocasDeCusto.length > 1 && `${t.nome} `}
+              {formatarDinheiro(t.ponteCentavos)}
+            </span>
+          ))}
+          . Ela não é perda nem ganho de mercadoria.
+        </Aviso>
+      )}
+
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         <div className="col-span-2 flex lg:col-span-1 [&>div]:w-full">
           <Metrica rotulo="Receita bruta" valor={r.semFaturamento ? '—' : formatarDinheiro(r.receitaBrutaCentavos)} detalhe={r.semFaturamento ? (d.ate ? 'sem faturamento lançado no período' : 'nenhum dia apurado ainda') : d.encerrado ? 'período inteiro' : `apurada até ontem, ${formatarData(d.ate!, true)}`} />

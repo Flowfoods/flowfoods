@@ -126,6 +126,12 @@ export interface DreDoPeriodo {
   metaDoCmvDaLoja: 'loja' | 'rede' | null;
   /** I.2b: na visão da rede, as lojas com meta própria do CMV diferente da meta da rede (a rede segue a da rede; elas, a delas). */
   lojasComMetaPropria: { nome: string; bp: number }[];
+  /**
+   * N.1: lojas do escopo que trocaram para o custo médio DENTRO deste período. O estoque inicial veio pela regra
+   * antiga e o final pela nova; `ponteCentavos` é a diferença de base no instante da troca (valor do livro − regra
+   * antiga), para ninguém ler a mudança de método como perda ou ganho de CMV.
+   */
+  trocasDeCusto: { nome: string; desde: string; ponteCentavos: number }[];
   /** O farol de cada linha com meta e a contagem por faixa (2.4). Sem `dre.ver` ninguém chega aqui. */
   farol: FarolDoDre;
   /** Um bloco por canal que o escopo vende (2.4). */
@@ -195,6 +201,7 @@ export async function dreDoPeriodoNaTx(tx: ClienteDoParceiro, alcance: Alcance, 
   const lojasDoEscopo = pedido.tipo === 'rede' ? todas : [lojaPedida!];
   const lojaId = pedido.tipo === 'loja' ? pedido.lojaId : undefined;
   const daLoja = pedido.tipo === 'loja';
+  const trocasDeCusto = await trocasDeCustoNoPeriodo(tx, lojasDoEscopo.map((l) => l.id), periodo);
   const anterior = periodo.inicio > PRIMEIRO_DIA_DO_ERP ? await periodoDe(tx, somarDias(periodo.inicio, -1)) : null;
   const proximo = encerrado ? await periodoDe(tx, somarDias(periodo.fim, 1)) : null;
   const registro = await tx.periodoApuracao.findFirst({ where: { inicio: new Date(`${periodo.inicio}T00:00:00.000Z`), fim: new Date(`${periodo.fim}T00:00:00.000Z`) }, select: { id: true, status: true } });
@@ -266,6 +273,7 @@ export async function dreDoPeriodoNaTx(tx: ClienteDoParceiro, alcance: Alcance, 
         cmvDasLojas: cmvFoto ?? SEM_CMV,
         metaDoCmvDaLoja: null,
         lojasComMetaPropria: pedido.tipo === 'rede' ? lojasComMetaPropriaDaFotografia(foto.linhas) : [],
+        trocasDeCusto,
         fechamento: { versao: foto.versao, fotografiaId: foto.id, versaoDaConta: foto.versaoDaConta, fechadoEm: foto.criadoEm, fechadoPorNome: foto.fechadoPorNome, ressalvas: foto.ressalvas, totalDeRessalvas: foto.totalDeRessalvas, justificativa: foto.justificativa },
         farol,
         // No fechado só entra o canal com receita (ou ano passado): a configuração de hoje não reescreve o passado.
@@ -338,6 +346,7 @@ export async function dreDoPeriodoNaTx(tx: ClienteDoParceiro, alcance: Alcance, 
     cmvDasLojas: leitura.cmv,
     metaDoCmvDaLoja: metaDoCmvDaLoja?.origem ?? null,
     lojasComMetaPropria,
+    trocasDeCusto,
     cmv: { antigo: false, painel: encerrado ? painelDoCmv(leitura.cmv, (id) => leitura.receitas.filter((r) => r.lojaId === id).reduce((t, r) => t + r.valorCentavos, 0)) : null },
     farol,
     canais: canaisDoPeriodo({
@@ -355,6 +364,24 @@ export async function dreDoPeriodoNaTx(tx: ClienteDoParceiro, alcance: Alcance, 
 }
 
 /** Fechado: as lojas cuja linha CMV foi fotografada com meta diferente da da rede (a rede segue a da rede; elas, a delas). */
+/** N.1: as lojas que ligaram o custo médio entre a meia-noite de Brasília do 1º dia e a do dia seguinte ao último. */
+export async function trocasDeCustoNoPeriodo(tx: ClienteDoParceiro, lojaIds: readonly string[], periodo: Periodo): Promise<{ nome: string; desde: string; ponteCentavos: number }[]> {
+  if (lojaIds.length === 0) return [];
+  const lojas = await tx.loja.findMany({
+    where: {
+      id: { in: [...lojaIds] },
+      custoMedioDesde: { gte: new Date(`${periodo.inicio}T03:00:00.000Z`), lt: new Date(`${somarDias(periodo.fim, 1)}T03:00:00.000Z`) },
+    },
+    orderBy: { nome: 'asc' },
+    select: { nome: true, custoMedioDesde: true, custoMedioPonteCentavos: true },
+  });
+  return lojas.map((l) => ({
+    nome: l.nome,
+    desde: new Date(l.custoMedioDesde!.getTime() - 3 * 3600_000).toISOString().slice(0, 10),
+    ponteCentavos: l.custoMedioPonteCentavos ?? 0,
+  }));
+}
+
 function lojasComMetaPropriaDaFotografia(linhas: readonly { lojaId: string | null; lojaNome: string | null; chave: string; metaBp: number | null }[]): { nome: string; bp: number }[] {
   const rede = linhas.find((l) => l.lojaId === null && l.chave === CODIGO.cmv)?.metaBp ?? null;
   return linhas

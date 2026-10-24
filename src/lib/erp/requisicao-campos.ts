@@ -337,6 +337,8 @@ export function baixasDaEntrega(
       tipo: 'REQUISICAO' as const,
       quantidadeMilesimos: -e.quantidadeMilesimos,
       valorCentavos: valorDaQuantidade(custos.get(i.insumoId) ?? null, -e.quantidadeMilesimos) ?? 0,
+      // N.1: com o custo médio ligado a saída vale pela média da loja; isto só pesa se a loja já estiver no vermelho.
+      semCusto: !custos.get(i.insumoId),
       insumoNome: i.nome,
       unidade: i.unidade,
       motivo: `Requisição ${numeroDaRequisicao(req.numero)} · ${rotuloDoSetor(req.setor)}`,

@@ -1565,6 +1565,19 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'custo-medio',
+    area: 'rede',
+    rotas: ['custo-medio'],
+    titulo: 'Custo médio por loja',
+    versao: 1,
+    soNivel1: true,
+    aula: [
+      { texto: 'Cada loja nasce valorizando o estoque pelo último preço da rede. Ligado aqui, o estoque e o CMV dela passam a valer pelo custo médio da própria loja.' },
+      { texto: 'Leia o impacto antes: o valor do livro, o valor pela regra antiga e a diferença de base, que fica guardada na troca.' },
+      { texto: 'Vale daqui para a frente, sem volta, e nada já gravado muda.' },
+    ],
+  },
+  {
     chave: 'dre',
     area: 'dre',
     rotas: ['dre'],

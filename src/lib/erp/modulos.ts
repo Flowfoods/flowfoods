@@ -210,6 +210,14 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
       subtitulo: 'Nome, situação e histórico do parceiro',
       permissao: null,
     });
+    // N.1: a troca para o custo médio por loja é decisão da FlowFoods, loja por loja.
+    pessoas.push({
+      href: `${base}/custo-medio`,
+      rotulo: 'Custo médio por loja',
+      icone: 'cadastro',
+      subtitulo: 'Impacto e troca da valorização do estoque',
+      permissao: null,
+    });
   } else {
     pessoas.push({ ...telaSeuAcesso(base), permissao: null });
   }

@@ -240,6 +240,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/equipe',
       '/rodolfo/erp/valentins/historico',
       '/rodolfo/erp/valentins/cadastro',
+      '/rodolfo/erp/valentins/custo-medio',
     ]);
   });
 

@@ -3014,3 +3014,21 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 ### 436. 2026-10-24 · Compose: a imagem do app é construída uma vez por deploy (`web` builda; `migrar` e `worker` reutilizam)
 
 **Razão:** os três serviços tinham `build:` do mesmo Dockerfile. No Docker 29/Compose 5.6 o BuildKit já reaproveitava as camadas (o passo pesado rodava uma vez — testado), então não houve três compilações do Next nem relação com a queda da VPS de 23/10. A mudança garante isso em qualquer versão e deixa uma imagem só por deploy (`flowfoods-web:local`, `pull_policy: never` nos outros dois). Depois do 1º deploy, as três tags antigas ficam presas na última versão: `docker image rm` nelas libera o espaço (docs/RUNBOOK.md).
+
+### 437. 2026-10-24 · N.1: custo médio ponderado por LOJA, prospectivo, ligado loja por loja pela FlowFoods
+
+**Alternativas:** (a) trocar o método de todas as lojas na migration; (b) recalcular o histórico pela média; (c) marco por loja (`Loja.custoMedioDesde`), gravado só quando a FlowFoods liga, valendo dali para a frente.
+
+**Razão:** (c), como a decisão de Rodolfo de 23/10 pede: método prospectivo, períodos fechados intactos. Nada muda em produção até alguém ligar. O marco mora na Loja (o papel `erp_tenant` não lê `ParceiroFlow`). A tela "Custo médio por loja" é só do nível 1 e mostra o impacto antes (valor do livro, valor pela regra antiga, diferença e alertas: valor negativo, resíduo, sem custo, sem referência). Ligar é idempotente, trava a loja (FOR UPDATE), grava a diferença de base (`custoMedioPonteCentavos`) e o antes/depois no histórico. Não existe desligar: o livro só anda para a frente.
+
+### 438. 2026-10-24 · N.1: as regras da média (o que vale cada movimento)
+
+**Razão:** com a loja ligada, `gravarMovimentos` decide o valor e grava o método (`MovimentoEstoque.valorMetodo`): entrada com valor informado = `INFORMADO` (frete elegível já dentro); saída e sobra de contagem = `MEDIA_LOJA`; a saída que leva o saldo inteiro leva o valor inteiro (nada de centavo com quantidade zero) e o excesso além de zero vai pela mesma média; estorno = valor do original (`ESTORNO`), nunca a média de hoje; saldo zerado ou negativo = `REFERENCIA` (o último preço da rede, só como referência). Conta em inteiros (BigInt), metade se afasta do zero, nunca divide por zero. Loja sem marco grava `valorMetodo` nulo e segue exatamente como antes.
+
+### 439. 2026-10-24 · N.1: custo desconhecido não é zero
+
+**Razão:** abertura de insumo sem preço entra com quantidade e SEM valor (`SEM_CUSTO`) e o saldo fica `valorIncompleto`; saídas desse saldo também ficam sem valor; lote de produção com insumo sem custo entra com o valor conhecido e o saldo do pré-preparo fica incompleto. Uma compra com custo não "conserta" sozinha a parte desconhecida; o incompleto só apaga quando a quantidade chega a zero. No fechamento, o retrato do item incompleto é nulo e entra em `itensSemPreco`: o CMV não fica artificialmente baixo.
+
+### 440. 2026-10-24 · N.1: a ficha técnica e a precificação continuam no último preço da rede; o período que atravessa a troca avisa
+
+**Razão:** a decisão de 23/10 manda o último preço da rede ficar como referência para precificar; só estoque, saídas, retratos e CMV real passam à média da loja. O DRE do período em que uma loja ligou mostra um aviso com a loja, o dia da troca e a diferença de base, dizendo que ela não é perda nem ganho de mercadoria (o estoque inicial veio pela regra antiga e o final pela nova). O dia da troca é o de Brasília.

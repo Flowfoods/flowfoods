@@ -207,7 +207,7 @@ describe('ERP 1.6 · saldo antes + quantidade = depois (a conta do CHECK do banc
       ['y', 0, 1000],
     ]);
     for (const l of linhas) expect(l.saldoAntesMilesimos + l.quantidadeMilesimos).toBe(l.saldoDepoisMilesimos);
-    expect(finais.get(chaveDoSaldo('vp', 'x'))).toEqual({ quantidadeMilesimos: 6500, valorCentavos: 650 });
+    expect(finais.get(chaveDoSaldo('vp', 'x'))).toEqual({ quantidadeMilesimos: 6500, valorCentavos: 650, valorIncompleto: false });
   });
 
   it('quantidade com sinal: "+15 kg" e "−2,5 kg"', () => {

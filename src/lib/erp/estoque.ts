@@ -57,6 +57,7 @@ import {
   valorDaQuantidade,
   type ContagemDigitada,
   type EstadoDoEstoque,
+  type MetodoDoValor,
   type MovimentoNovo,
   type TipoDeMovimento,
 } from './estoque-campos';
@@ -152,7 +153,8 @@ const aberturaFechada = (a: AberturaLida | undefined) => (a && a.status === 'FEC
 export interface CustoDeReferencia {
   /** Centavos por 1 unidade base (kg, L, un), exato; null = sem preço/custo incompleto (valor pendente). */
   porUnidade: Fracao | null;
-  origem: 'compra' | 'cadastro' | 'preparo';
+  /** N.1: `loja` = custo médio do livro da própria loja (método ligado). */
+  origem: 'compra' | 'cadastro' | 'preparo' | 'loja';
 }
 
 /**
@@ -188,6 +190,43 @@ export async function custosDeReferencia(tx: ClienteDoParceiro, insumoIds: reado
   return mapa;
 }
 
+/**
+ * N.1 — custo por unidade do LIVRO DE CADA LOJA (valor ÷ quantidade do saldo) para as lojas com o custo médio
+ * ligado; nas outras, a referência da rede de sempre. Saldo com custo desconhecido = sem preço (nulo), nunca zero;
+ * sem estoque na loja (zero ou negativo), fica a referência — é o mesmo que a saída faz nesse caso. A ficha técnica e
+ * a precificação NÃO usam isto: continuam com a referência da rede (decisão de 23/10/2026).
+ */
+export async function custosPorLoja(
+  tx: ClienteDoParceiro,
+  lojaIds: readonly string[],
+  insumoIds: readonly string[],
+  quando: Date = new Date(),
+): Promise<Map<string, Map<string, CustoDeReferencia>>> {
+  const ref = await custosDeReferencia(tx, insumoIds);
+  const lojas = Array.from(new Set(lojaIds));
+  const resultado = new Map(lojas.map((l) => [l, ref] as [string, Map<string, CustoDeReferencia>]));
+  const comMedia = await lojasComCustoMedioEm(tx, lojas, quando);
+  if (comMedia.size === 0 || insumoIds.length === 0) return resultado;
+  const saldos = await tx.saldoEstoque.findMany({
+    where: { lojaId: { in: Array.from(comMedia) }, insumoId: { in: Array.from(new Set(insumoIds)) } },
+    select: { lojaId: true, insumoId: true, quantidadeMilesimos: true, valorCentavos: true, valorIncompleto: true },
+  });
+  for (const lojaId of Array.from(comMedia)) {
+    const mapa = new Map(ref);
+    for (const x of saldos.filter((y) => y.lojaId === lojaId)) {
+      if (x.valorIncompleto) mapa.set(x.insumoId, { porUnidade: null, origem: 'loja' });
+      else if (x.quantidadeMilesimos > 0) mapa.set(x.insumoId, { porUnidade: { num: BigInt(x.valorCentavos) * BigInt(1000), den: BigInt(x.quantidadeMilesimos) }, origem: 'loja' });
+    }
+    resultado.set(lojaId, mapa);
+  }
+  return resultado;
+}
+
+/** N.1 — `custosPorLoja` de uma loja só. */
+export async function custosDaLoja(tx: ClienteDoParceiro, lojaId: string, insumoIds: readonly string[], quando?: Date): Promise<Map<string, CustoDeReferencia>> {
+  return (await custosPorLoja(tx, [lojaId], insumoIds, quando)).get(lojaId)!;
+}
+
 // ================================================================ livro-razão
 
 /**
@@ -221,19 +260,19 @@ export async function gravarMovimentos(
   tx: ClienteDoParceiro,
   movimentos: readonly MovimentoNovo[],
   opcoes: { ocorridoEm?: Date; garantir?: readonly { lojaId: string; insumoId: string }[] } = {},
-): Promise<void> {
+): Promise<{ chave: string; lojaId: string; insumoId: string; valorCentavos: number; valorMetodo: MetodoDoValor | null }[]> {
   const pares = new Map<string, { lojaId: string; insumoId: string }>();
   for (const p of [...(opcoes.garantir ?? []), ...movimentos]) pares.set(chaveDoSaldo(p.lojaId, p.insumoId), { lojaId: p.lojaId, insumoId: p.insumoId });
-  if (pares.size === 0) return;
+  if (pares.size === 0) return [];
   const lista = Array.from(pares.values()).sort((a, b) => (a.lojaId < b.lojaId ? -1 : a.lojaId > b.lojaId ? 1 : a.insumoId < b.insumoId ? -1 : a.insumoId > b.insumoId ? 1 : 0));
   await tx.saldoEstoque.createMany({
     data: lista.map((p) => ({ parceiroId: tx.parceiroId, lojaId: p.lojaId, insumoId: p.insumoId })),
     skipDuplicates: true,
   });
-  if (movimentos.length === 0) return;
+  if (movimentos.length === 0) return [];
   const comMovimento = lista.filter((p) => movimentos.some((m) => m.lojaId === p.lojaId && m.insumoId === p.insumoId));
-  const travados = await tx.sql<{ id: string; lojaId: string; insumoId: string; quantidadeMilesimos: number; valorCentavos: number; versao: number }>`
-    SELECT s."id", s."lojaId", s."insumoId", s."quantidadeMilesimos", s."valorCentavos", s."versao"
+  const travados = await tx.sql<{ id: string; lojaId: string; insumoId: string; quantidadeMilesimos: number; valorCentavos: number; valorIncompleto: boolean; versao: number }>`
+    SELECT s."id", s."lojaId", s."insumoId", s."quantidadeMilesimos", s."valorCentavos", s."valorIncompleto", s."versao"
     FROM "SaldoEstoque" s
     JOIN unnest(${comMovimento.map((p) => p.lojaId)}::text[], ${comMovimento.map((p) => p.insumoId)}::text[]) AS p("lojaId", "insumoId")
       ON p."lojaId" = s."lojaId" AND p."insumoId" = s."insumoId"
@@ -241,14 +280,17 @@ export async function gravarMovimentos(
     ORDER BY s."lojaId", s."insumoId"
     FOR UPDATE OF s`;
   const porChave = new Map(travados.map((s) => [chaveDoSaldo(s.lojaId, s.insumoId), s]));
+  const quando = opcoes.ocorridoEm ?? new Date();
+  // N.1: lojas com o custo médio ligado NESTE instante (marco de corte por loja; nulo = método antigo).
+  const lojasComCustoMedio = await lojasComCustoMedioEm(tx, Array.from(new Set(movimentos.map((m) => m.lojaId))), quando);
   const { linhas, finais } = aplicarNosSaldos(
-    new Map(travados.map((s) => [chaveDoSaldo(s.lojaId, s.insumoId), { quantidadeMilesimos: s.quantidadeMilesimos, valorCentavos: s.valorCentavos }])),
+    new Map(travados.map((s) => [chaveDoSaldo(s.lojaId, s.insumoId), { quantidadeMilesimos: s.quantidadeMilesimos, valorCentavos: s.valorCentavos, valorIncompleto: s.valorIncompleto }])),
     movimentos,
+    lojasComCustoMedio,
   );
   // Herança a da 1.6: estourar o INTEGER vira frase, nunca 500 (nada gravado: a transação volta).
   const estouro = estouroDoRazao(linhas, finais);
   if (estouro) throw new ErroDeTeto(estouro);
-  const quando = opcoes.ocorridoEm ?? new Date();
   await tx.movimentoEstoque.createMany({
     data: linhas.map((m) => ({
       parceiroId: tx.parceiroId,
@@ -269,12 +311,14 @@ export async function gravarMovimentos(
       requisicaoItemId: m.requisicaoItemId ?? null,
       ordemProducaoId: m.ordemProducaoId ?? null,
       estornoDeId: m.estornoDeId ?? null,
+      valorMetodo: m.valorMetodo,
     })),
   });
   const ids: string[] = [];
   const qs: number[] = [];
   const vals: number[] = [];
   const vers: number[] = [];
+  const incs: boolean[] = [];
   for (const [k, f] of Array.from(finais)) {
     const s = porChave.get(k);
     if (!s) continue;
@@ -282,15 +326,28 @@ export async function gravarMovimentos(
     qs.push(f.quantidadeMilesimos);
     vals.push(f.valorCentavos);
     vers.push(s.versao);
+    incs.push(f.valorIncompleto);
   }
   const atualizados = await tx.sql<{ id: string }>`
     UPDATE "SaldoEstoque" s
-    SET "quantidadeMilesimos" = v.q, "valorCentavos" = v.val, "versao" = s."versao" + 1, "atualizadoEm" = now()
-    FROM unnest(${ids}::text[], ${qs}::int[], ${vals}::int[], ${vers}::int[]) AS v(id, q, val, ver)
+    SET "quantidadeMilesimos" = v.q, "valorCentavos" = v.val, "valorIncompleto" = v.inc, "versao" = s."versao" + 1, "atualizadoEm" = now()
+    FROM unnest(${ids}::text[], ${qs}::int[], ${vals}::int[], ${vers}::int[], ${incs}::boolean[]) AS v(id, q, val, ver, inc)
     WHERE s."parceiroId" = ${tx.parceiroId} AND s."id" = v.id AND s."versao" = v.ver
     RETURNING s."id"`;
   // Impossível com a trava acima; se acontecer, a transação inteira volta.
   if (atualizados.length !== ids.length) throw new Error('[erp] saldo do estoque mudou no meio da gravação.');
+  // O valor que foi PARA O LIVRO (com o custo médio ligado, pode não ser o que veio): quem mostra sobra/falta usa este.
+  return linhas.map((m) => ({ chave: m.chave, lojaId: m.lojaId, insumoId: m.insumoId, valorCentavos: m.valorCentavos, valorMetodo: m.valorMetodo }));
+}
+
+/**
+ * N.1: as lojas (entre as pedidas) com o custo médio ligado no instante dado — marco de corte gravado e já
+ * alcançado. Movimento com data anterior ao marco segue o método antigo (nada volta no tempo).
+ */
+export async function lojasComCustoMedioEm(tx: ClienteDoParceiro, lojaIds: readonly string[], quando: Date): Promise<Set<string>> {
+  if (lojaIds.length === 0) return new Set();
+  const lojas = await tx.loja.findMany({ where: { id: { in: [...lojaIds] }, custoMedioDesde: { not: null, lte: quando } }, select: { id: true } });
+  return new Set(lojas.map((l) => l.id));
 }
 
 // ================================================================ nota × estoque (decisão 68)
@@ -416,11 +473,14 @@ export async function situacaoDoEstoque(cliente: ClienteDoParceiro, alcance: Alc
     const saldos = abertas.length
       ? await tx.saldoEstoque.findMany({ where: { lojaId: { in: abertas }, quantidadeMilesimos: { not: 0 } }, select: { lojaId: true, insumoId: true, quantidadeMilesimos: true } })
       : [];
-    const custos = await custosDeReferencia(
+    // N.1: cada loja pelo próprio livro quando o custo médio está ligado nela.
+    const custosDe = await custosPorLoja(
       tx,
+      abertas,
       saldos.map((s) => s.insumoId),
     );
     return lojas.map((l) => {
+      const custos = custosDe.get(l.id) ?? new Map<string, CustoDeReferencia>();
       const c = porLoja.get(l.id);
       const estado = estadoDoEstoque(c);
       const n = c ? contadosPor.get(c.id) : undefined;
@@ -927,6 +987,8 @@ export async function concluirAbertura(
             tipo: 'ABERTURA' as const,
             quantidadeMilesimos: i.contadoMilesimos!,
             valorCentavos: valorDaQuantidade(custos.get(i.insumoId)?.porUnidade ?? null, i.contadoMilesimos!) ?? 0,
+            // N.1: sem custo conhecido, a abertura não entra como zero confiável (com o custo médio ligado).
+            semCusto: !custos.get(i.insumoId)?.porUnidade,
             insumoNome: i.insumoNomeSnapshot,
             unidade: i.unidadeSnapshot as Unidade,
             motivo: 'Abertura do estoque (1ª contagem)',
@@ -1091,8 +1153,9 @@ export async function obterEstoqueDaLoja(cliente: ClienteDoParceiro, alcance: Al
         where: { lojaId },
         select: { insumoId: true, quantidadeMilesimos: true, insumo: { select: { nome: true, unidade: true, conservacao: true, ativo: true } } },
       });
-      const custos = await custosDeReferencia(
+      const custos = await custosDaLoja(
         tx,
+        lojaId,
         saldos.map((s) => s.insumoId),
       );
       const todas: LinhaDeSaldo[] = saldos
@@ -1149,11 +1212,12 @@ export async function saldosDoInsumo(cliente: ClienteDoParceiro, alcance: Alcanc
     const ids = lojas.map((l) => l.id);
     const aberturas = await aberturasDe(tx, ids);
     const saldos = await tx.saldoEstoque.findMany({ where: { insumoId, lojaId: { in: ids } }, select: { lojaId: true, quantidadeMilesimos: true } });
-    const custo = (await custosDeReferencia(tx, [insumoId])).get(insumoId)?.porUnidade ?? null;
+    const custosDe = await custosPorLoja(tx, ids, [insumoId]);
     const porLoja = new Map(saldos.map((s) => [s.lojaId, s.quantidadeMilesimos]));
     return lojas.map((l) => {
       const estado = estadoDoEstoque(aberturas.get(l.id));
       const q = estado === 'ABERTO' ? (porLoja.get(l.id) ?? 0) : null;
+      const custo = custosDe.get(l.id)?.get(insumoId)?.porUnidade ?? null;
       return { lojaId: l.id, loja: l.nome, estado, quantidadeMilesimos: q, valorCentavos: q === null ? null : valorDaQuantidade(custo, q) };
     });
   });
