@@ -305,5 +305,51 @@ apagar volume, banco ou pasta de upload.
 - Build triplo do `flowfoods-web` (migrar/web/worker com `build:`): **não foi a
   causa**. O último deploy terminou às 13:39 UTC, 5h20 antes da queda, sem deploy
   rodando às 19:00.
-- Causa raiz da queda: **em aberto** até ler o boot anterior por SSH
-  (`journalctl -b -1`, `dmesg`, `free`, `df`).
+- Causa raiz da queda: **hipótese** — coincide com o incidente da Hostinger
+  "Emergency Power Maintenance in BR-CAM Datacenter" (18:38–22:36 UTC; rede e
+  depois perda parcial de energia). Não comprovado: falta confirmar no hPanel
+  que a VPS fica no BR-CAM e ler `journalctl -b -1` no host.
+- 23:16 e 23:20 UTC: `settings.reloadTraefik` (200, sem efeito) e
+  `docker.restartContainer` (500, mesmo erro de rede). Fim dos 2 ciclos pela API.
+- Entre 23:23 e 23:57 UTC: **alguém ou alguma rotina removeu todos os containers
+  parados**, inclusive o `dokploy-traefik` e os `migrar-1`/`segredos-1` do
+  flowfoods-web. Não foi esta ferramenta. Volumes não são afetados por esse tipo
+  de limpeza; bancos seguiram `Up`.
+- 00:03 UTC (24/10): `settings.updateTraefikPorts` (recriação gerenciada pelo
+  Dokploy) recusou com 400 `The argument 'file' cannot be empty` — o Dokploy
+  copia imagem e montagens do container existente; sem ele, não recria. Nada foi
+  criado. `getTraefikPorts` e `readTraefikEnv` também dão 500 sem o container.
+
+### Traefik sumiu (container removido) — recriar no host
+
+Só quando `docker ps -a --filter name=dokploy-traefik` voltar vazio. Configuração
+lida do Dokploy em 23/10: entryPoints `:80`/`:443`, ACME por HTTP no `web`,
+`acme.json` em `/etc/dokploy/traefik/dynamic/`, provider docker na rede
+`dokploy-network`. Portas antes da queda: 80/tcp, 443/tcp, 443/udp, sem extras.
+
+1. Leitura (não muda nada):
+
+       docker images --format '{{.Repository}}:{{.Tag}}  {{.CreatedSince}}' | grep -i traefik
+       ls -la /etc/dokploy/traefik/traefik.yml /etc/dokploy/traefik/dynamic/acme.json
+       docker info --format 'swarm={{.Swarm.LocalNodeState}} manager={{.Swarm.ControlAvailable}}'
+       journalctl -u docker --since "2026-10-23 18:30" --no-pager | grep -iE "attach|deadline" | tail -20
+
+2. Recriar com a imagem que o passo 1 mostrou (troque `IMAGEM`):
+
+       docker run -d --name dokploy-traefik --restart always \
+         -v /etc/dokploy/traefik/traefik.yml:/etc/traefik/traefik.yml \
+         -v /etc/dokploy/traefik/dynamic:/etc/dokploy/traefik/dynamic \
+         -v /var/run/docker.sock:/var/run/docker.sock \
+         -p 80:80/tcp -p 443:443/tcp -p 443:443/udp \
+         IMAGEM
+       docker network connect dokploy-network dokploy-traefik
+       docker ps --filter name=dokploy-traefik
+
+   Sobe na bridge primeiro e só depois entra na overlay: se a entrada na rede
+   travar de novo, o Traefik fica de pé (responde 404/502) em vez de morrer.
+   Desfazer: `docker rm -f dokploy-traefik` volta ao estado de antes.
+
+3. Se o `network connect` repetir `context deadline exceeded`, o problema é o
+   Swarm/rede do Docker, não o Traefik. Próximo passo é `systemctl restart
+   docker` — derruba por ~2 min todos os apps, bancos, n8n e Evolution; pedir
+   autorização antes.
