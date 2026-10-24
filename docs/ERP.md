@@ -4449,4 +4449,15 @@ Pedido de Rodolfo: criar gráficos e análises a partir dos módulos da Nina, ev
 
 **No navegador (app local, mês sintético de faturamento, Dona):** gráfico a 1440 (claro), 1180 (escuro) e 390 (celular), dica ao passar o mouse com as três séries e o total, dias com falta marcados, sem rolagem lateral. Saúde do cardápio e Início nos mesmos tamanhos. **Não feito:** teste com pessoas do Valentin's e produção. Os prints originais da Nina não foram abertos (o portal da Kairu é bloqueado na rede do ambiente).
 
-**Próximo passo:** gráficos de CMV por categoria (real × meta), compras do período por fornecedor e produção planejado × produzido, reaproveitando o mesmo componente.
+**Rodada 2 (decisão 455):** barras horizontais em três telas.
+
+| Entrega | Onde | Prova |
+|---|---|---|
+| Componente de barras horizontais (valor escrito, traço da meta, resto em cinza) | `ui/barras-horizontais.tsx` | navegador |
+| CMV por categoria: realizado × meta | `telas/dre/cmv-categorias.tsx` (`RealizadoXMeta`) | navegador |
+| Compras do período: por fornecedor e por categoria | `lib/erp/compras-relatorio.ts` (`distribuicaoDoRecorte`), `telas/compras/relatorio-partes.tsx` (`ParaOndeFoiODinheiro`) | `erp-compras-relatorio.db.test.ts` |
+| Produção: rendimento por preparo | `lib/erp/producao-equipe-campos.ts` (`produzidoPorFicha`), `telas/producao/indicadores.tsx` | `erp-graficos.test.ts` |
+
+**No navegador:** os três painéis com dados sintéticos a 1440 (claro), 1180 (escuro) e 390, sem rolagem lateral. O banco local não tem compras nem lotes; as telas de verdade foram conferidas pelos testes com banco.
+
+**Próximo passo:** simulador de preço na ficha; evolução do CMV por categoria em linhas (6 períodos).

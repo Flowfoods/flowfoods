@@ -31,6 +31,7 @@ import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Contagem, Metrica, Painel, Selo } from '../../ui/superficies';
 import { Farol, Regua } from './farol';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
+import { BarrasHorizontais, type BarraDoGrafico } from '../../ui/barras-horizontais';
 
 export interface PermissoesDoPainelDeCategorias {
   /** `metas.editar` com a rede inteira: vê o convite para definir as metas por categoria. */
@@ -305,6 +306,8 @@ export function TelaDoCmvPorCategoria({
             </Aviso>
           )}
 
+          <RealizadoXMeta linhas={painel.linhas} />
+
           <Painel titulo="Maiores desvios" subtitulo="As categorias que saíram da meta, em ordem de quanto passaram, em R$." acessorio={<Contagem>{painel.maioresDesvios.length}</Contagem>} semRespiro>
             {painel.maioresDesvios.length === 0 ? (
               <p className="px-4 py-4 text-sm text-suave sm:px-5">{painel.semCor ? 'Sem destaque enquanto as categorias estão sem cor.' : 'Nenhuma categoria saiu da meta neste recorte.'}</p>
@@ -402,6 +405,37 @@ export function TelaDoCmvPorCategoria({
       </p>
       </details>
     </div>
+  );
+}
+
+/**
+ * Realizado × meta (24/10/2026, referência Nina): cada categoria com valor, em % da receita, da maior para a menor, com o traço da
+ * meta. Lê de relance o que a tabela diz linha a linha; a cor do farol continua só no farol (aqui a barra é uma série só, e "a
+ * classificar" fica em cinza). Cada barra leva à linha da tabela.
+ */
+export function RealizadoXMeta({ linhas }: { linhas: readonly LinhaDoPainel[] }) {
+  const barras: BarraDoGrafico[] = linhas
+    .filter((l) => (l.tipo === 'categoria' || l.tipo === 'sem-categoria') && l.realizadoBp !== null && (l.realizadoCentavos ?? 0) > 0)
+    .sort((a, b) => b.realizadoBp! - a.realizadoBp! || a.nome.localeCompare(b.nome, 'pt-BR'))
+    .map((l) => {
+      const fila = l.aClassificar || l.tipo === 'sem-categoria';
+      const meta = l.tipo === 'categoria' && !fila && l.metaBp !== null ? l.metaBp : null;
+      return {
+        chave: l.chave,
+        rotulo: l.nome,
+        valor: l.realizadoBp!,
+        valorTexto: percentualComDuasCasas(l.realizadoBp!),
+        detalhe: fila ? 'falta classificar os insumos' : meta === null ? 'sem meta' : `meta ${percentualComDuasCasas(meta)}${l.desvioTexto ? ` · ${l.desvioTexto}` : ''}`,
+        marca: meta,
+        neutra: fila,
+        href: `#${idDaCategoria(l)}`,
+      };
+    });
+  if (barras.length === 0) return null;
+  return (
+    <Painel titulo="Realizado × meta, por categoria" subtitulo="Em % da receita bruta, da maior para a menor. O traço é a meta; passar dele é custo acima da meta.">
+      <BarrasHorizontais titulo="CMV realizado por categoria, em percentual da receita, com a meta" barras={barras} marca={{ rotulo: 'meta' }} />
+    </Painel>
   );
 }
 

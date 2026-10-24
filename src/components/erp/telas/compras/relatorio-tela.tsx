@@ -32,7 +32,7 @@ import { OPCOES_POR_PAGINA } from '@/lib/erp/insumo-campos';
 import { BotaoImprimir } from './botao-imprimir';
 import { Voltar } from '../cadastro/partes';
 import { ChipsDoRelatorio, FormularioDoRelatorio, hrefDoRelatorio, RECORTE_NOVO } from './relatorio-filtros';
-import { BarraDeSaida, Indicadores, NotasDoRelatorio, TabelaDasCompras, TabelaDosGrupos } from './relatorio-partes';
+import { BarraDeSaida, Indicadores, NotasDoRelatorio, ParaOndeFoiODinheiro, TabelaDasCompras, TabelaDosGrupos } from './relatorio-partes';
 import { TabelasDaImpressao } from './relatorio-impressao';
 
 export type Modo = 'insumo' | 'periodo';
@@ -185,6 +185,8 @@ export function TelaDoRelatorio({
               </div>
             </div>
           )}
+
+          {t.linhas > 0 && r.distribuicao && <ParaOndeFoiODinheiro d={r.distribuicao} caminho={caminho} f={f} />}
 
           <NotasDoRelatorio f={f} caminho={caminho} r={r} comprasBase={comprasBase} />
 

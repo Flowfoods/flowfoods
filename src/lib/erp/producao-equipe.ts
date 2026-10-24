@@ -20,7 +20,7 @@ import { datasEmPeriodoFechado } from './periodo-trava';
 import { diasDeAtrasoDoLote, type StatusDaProducao } from './producao-campos';
 import { passadosPor } from './producao';
 import { estadoDaLinha, rotuloDoDia } from './producao-lista-campos';
-import { desfechoDoLote, diaDoEncerramento, indicadoresPorPessoa, lerFiltroId, lerPeriodoDoHistorico, resumoDoHistorico, tempoDoLote, type LoteEncerrado, type PeriodoDoHistorico } from './producao-equipe-campos';
+import { desfechoDoLote, diaDoEncerramento, indicadoresPorPessoa, lerFiltroId, produzidoPorFicha, lerPeriodoDoHistorico, resumoDoHistorico, tempoDoLote, type LoteEncerrado, type PeriodoDoHistorico } from './producao-equipe-campos';
 import type { StatusDaRequisicao } from './requisicao-campos';
 import type { Unidade } from './unidades';
 
@@ -421,6 +421,8 @@ export async function indicadoresDaProducao(
         semPessoa,
         daFlowFoods,
         resumo: resumoDoHistorico(encerrados),
+        /** Rendimento por ficha de TODOS os lotes concluídos da loja (a equipe e a FlowFoods): o gráfico do preparo, sem pessoa. */
+        porFicha: produzidoPorFicha(encerrados),
         /** Concluídos por uma pessoa da equipe sem hora de pegar (lote da 3.1, ou concluído direto): entram em tudo, menos no tempo. */
         semHoraDePegar: concluidos.filter((l) => !l.responsavelDesde && l.responsavel).length,
         cortado,

@@ -10,6 +10,7 @@ import { dinheiroCurto, marcasDoEixo, serieDoMes } from '@/lib/erp/grafico';
 import { resumirSaude } from '@/lib/erp/saude-do-cardapio';
 import type { LojaNoMes } from '@/lib/erp/faturamento';
 import type { CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
+import { produzidoPorFicha, type LoteEncerrado } from '@/lib/erp/producao-equipe-campos';
 
 describe('gráfico · eixo e formato', () => {
   it('marcas redondas de 0 até cobrir o máximo', () => {
@@ -104,5 +105,24 @@ describe('saúde do cardápio', () => {
     const s = resumirSaude([{ id: 'c', custoCompleto: true }], new Map([['c', [conta('LOJA', { ofertado: false, status: 'naoOfertado' })]]]));
     expect(s.prontos).toBe(0);
     expect(resumirSaude([], new Map())).toMatchObject({ pratos: 0, prontos: 0, custoIncompleto: 0 });
+  });
+});
+
+describe('rendimento por preparo', () => {
+  const lote = (o: Partial<LoteEncerrado>): LoteEncerrado =>
+    ({ id: 'x', codigo: 'x', fichaId: 'molho', fichaNome: 'Molho da casa', unidade: 'KG', status: 'CONCLUIDA', planejadoMilesimos: 10_000, produzidoMilesimos: 9_000, responsavel: null, responsavelDesde: null, insumosEntreguesEm: null, iniciadaEm: null, concluidaEm: new Date('2026-10-20T15:00:00Z'), concluidaPorNome: null, canceladaEm: null, canceladaPorNome: null, motivoCancelamento: null, motivoRendimento: null, ...o }) as LoteEncerrado;
+  it('soma produzido ÷ soma planejado por ficha (o lote grande pesa mais), de todo mundo; perdido, estornado e cancelado ficam fora', () => {
+    const r = produzidoPorFicha([
+      lote({ responsavel: { id: 'p1', nome: 'Ana' } }),
+      lote({ planejadoMilesimos: 30_000, produzidoMilesimos: 31_000 }),
+      lote({ produzidoMilesimos: 0 }),
+      lote({ status: 'CANCELADA' }),
+      lote({ fichaId: 'base', fichaNome: 'Base de pizza', unidade: 'UN', planejadoMilesimos: 20_000, produzidoMilesimos: 20_000 }),
+    ]);
+    expect(r).toEqual([
+      { fichaId: 'base', nome: 'Base de pizza', unidade: 'UN', lotes: 1, planejadoMilesimos: 20_000, produzidoMilesimos: 20_000, rendimentoBp: 10_000 },
+      { fichaId: 'molho', nome: 'Molho da casa', unidade: 'KG', lotes: 2, planejadoMilesimos: 40_000, produzidoMilesimos: 40_000, rendimentoBp: 10_000 },
+    ]);
+    expect(produzidoPorFicha([])).toEqual([]);
   });
 });

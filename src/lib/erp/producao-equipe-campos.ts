@@ -280,6 +280,26 @@ export interface IndicadoresDaPessoa {
 }
 
 /**
+ * Quanto saiu de cada ficha (por unidade) nos lotes CONCLUÍDOS com produção: soma produzida ÷ soma planejada (o lote grande pesa
+ * mais). Os perdidos e os estornados não entram (aparecem à parte). Ordem alfabética.
+ */
+export function produzidoPorFicha(lotes: readonly LoteEncerrado[]): ProduzidoPorFicha[] {
+  const porFichaMap = new Map<string, ProduzidoPorFicha>();
+  for (const l of lotes) {
+    if (desfechoDoLote(l) !== 'CONCLUIDO') continue;
+    const k = `${l.fichaId}:${l.unidade}`;
+    const f = porFichaMap.get(k) ?? { fichaId: l.fichaId, nome: l.fichaNome, unidade: l.unidade, lotes: 0, planejadoMilesimos: 0, produzidoMilesimos: 0, rendimentoBp: 0 };
+    f.lotes++;
+    f.planejadoMilesimos += l.planejadoMilesimos;
+    f.produzidoMilesimos += l.produzidoMilesimos!;
+    porFichaMap.set(k, f);
+  }
+  return Array.from(porFichaMap.values())
+    .map((f) => ({ ...f, rendimentoBp: rendimentoDoLote(f.planejadoMilesimos, f.produzidoMilesimos).rendimentoBp }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.unidade.localeCompare(b.unidade));
+}
+
+/**
  * Os indicadores de cada pessoa nos lotes encerrados do período: lotes, quanto produziu de cada ficha, rendimento médio
  * contra o planejado pela ficha, fora da faixa, tempo médio, perdidos, cancelados por ela (os da gerência à parte) e
  * estornados. Ordem alfabética (nada de ranking). Fora das pessoas: `semPessoa` = cancelados antes de alguém pegar;
@@ -305,18 +325,7 @@ export function indicadoresPorPessoa(lotes: readonly LoteEncerrado[]): { pessoas
     const nome = g.lotes.reduce((a, b) => (fimDe(b) > fimDe(a) ? b : a)).responsavel!.nome;
     const concluidos = g.lotes.filter((l) => desfechoDoLote(l) === 'CONCLUIDO');
     const perdidos = g.lotes.filter((l) => desfechoDoLote(l) === 'PERDIDO');
-    const porFichaMap = new Map<string, ProduzidoPorFicha>();
-    for (const l of concluidos) {
-      const k = `${l.fichaId}:${l.unidade}`;
-      const f = porFichaMap.get(k) ?? { fichaId: l.fichaId, nome: l.fichaNome, unidade: l.unidade, lotes: 0, planejadoMilesimos: 0, produzidoMilesimos: 0, rendimentoBp: 0 };
-      f.lotes++;
-      f.planejadoMilesimos += l.planejadoMilesimos;
-      f.produzidoMilesimos += l.produzidoMilesimos!;
-      porFichaMap.set(k, f);
-    }
-    const porFicha = Array.from(porFichaMap.values())
-      .map((f) => ({ ...f, rendimentoBp: rendimentoDoLote(f.planejadoMilesimos, f.produzidoMilesimos).rendimentoBp }))
-      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    const porFicha = produzidoPorFicha(concluidos);
     const rendimentos = concluidos.map((l) => rendimentoDoLote(l.planejadoMilesimos, l.produzidoMilesimos!));
     const tempos = [...concluidos, ...perdidos].map(tempoDoLote).filter((t): t is number => t !== null);
     const amostra = concluidos.length + perdidos.length;

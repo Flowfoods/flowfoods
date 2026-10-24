@@ -88,7 +88,7 @@ export function fonte(r: Recorte): Prisma.Sql {
       i."id" AS "itemId", i."ordem", i."insumoId", i."insumoNomeSnapshot", i."embalagemSnapshot", i."embalagensMilesimos",
       i."conteudoMilesimos", i."quantidadeMilesimos", i."valorTotalCentavos" AS "valor", i."freteRateadoCentavos" AS "frete",
       i."unidadeSnapshot"::text AS "unidade",
-      ins."nome" AS "insumoNome", forn."nome" AS "fornecedorNome",
+      ins."nome" AS "insumoNome", ins."categoriaId" AS "categoriaId", forn."nome" AS "fornecedorNome",
       ${DIA(r.base)} AS "dia",
       CASE
         WHEN i."insumoId" IS NULL THEN 'insumo'
@@ -265,6 +265,54 @@ export async function gruposDoRecorte(tx: ClienteDoParceiro, r: Recorte, pagina:
     grupos: pagina ? grupos : grupos.slice(0, TETO_DE_GRUPOS),
     total: linhas[0]?.quantosGrupos ?? 0,
     passouDoTeto: !pagina && linhas.length > TETO_DE_GRUPOS,
+  };
+}
+
+/** Para onde foi o dinheiro (24/10/2026, referência Nina): uma fatia do total em R$ (itens + frete), somando as unidades. */
+export interface FatiaDoRecorte {
+  /** Id do fornecedor ("n:nome" sem cadastro, "-" sem nenhum) ou id da categoria ("-" = sem categoria). */
+  chave: string;
+  rotulo: string;
+  centavos: number;
+}
+
+export interface DistribuicaoDoRecorte {
+  /** As maiores, em ordem de valor; o resto vira "outros" (nunca some do total). */
+  fatias: FatiaDoRecorte[];
+  outros: { quantos: number; centavos: number } | null;
+  totalCentavos: number;
+  /** Quantos fornecedores (ou categorias) o recorte tem, ao todo. */
+  quantos: number;
+}
+
+/**
+ * Dinheiro soma (kg, L e un não): por isso a distribuição é só em R$, itens + frete, a mesma soma dos indicadores. A categoria é a de
+ * hoje do insumo (a mesma do filtro de categoria); a linha sem insumo cai em "Sem categoria".
+ */
+export async function distribuicaoDoRecorte(tx: ClienteDoParceiro, r: Recorte, por: 'fornecedor' | 'categoria', quantas = 6): Promise<DistribuicaoDoRecorte> {
+  const sem = { ...r, grupo: null, unidade: null, soSemBase: false };
+  const linhas = await tx.sql<{ chave: string; rotulo: string; centavos: number; quantos: number; soma: number }>`
+    WITH f AS (${fonte(sem)}),
+    g AS (
+      SELECT CASE ${por}::text WHEN 'fornecedor' THEN ${FORNECEDOR_DA_LINHA} ELSE COALESCE(f."categoriaId", '-') END AS "chave",
+             MIN(CASE ${por}::text WHEN 'fornecedor' THEN ${NOME_DO_FORNECEDOR_DA_LINHA} ELSE COALESCE(c."nome", 'Sem categoria') END) AS "rotulo",
+             COALESCE(sum(f."valor" + f."frete"), 0)::float8 AS "centavos"
+      FROM f
+      LEFT JOIN "CategoriaInsumo" c ON c."parceiroId" = ${r.parceiroId}::text AND c."id" = f."categoriaId"
+      GROUP BY 1
+    )
+    SELECT g.*, count(*) OVER ()::float8 AS "quantos", sum(g."centavos") OVER ()::float8 AS "soma"
+    FROM g
+    ORDER BY g."centavos" DESC, g."rotulo" ASC, g."chave" ASC`;
+  const totalCentavos = linhas[0]?.soma ?? 0;
+  // "Outros" só quando junta duas ou mais: uma fatia sozinha aparece com o nome dela.
+  const corte = linhas.length > quantas + 1 ? quantas : linhas.length;
+  const resto = linhas.slice(corte);
+  return {
+    fatias: linhas.slice(0, corte).map((l) => ({ chave: l.chave, rotulo: l.rotulo, centavos: l.centavos })),
+    outros: resto.length ? { quantos: resto.length, centavos: resto.reduce((s, l) => s + l.centavos, 0) } : null,
+    totalCentavos,
+    quantos: linhas.length,
   };
 }
 
@@ -494,6 +542,8 @@ export interface RelatorioDaTela {
   /** Visão 2 resumo: os grupos. Visão 1: os fornecedores (sempre). */
   grupos: Awaited<ReturnType<typeof gruposDoRecorte>> | null;
   fornecedores: Awaited<ReturnType<typeof gruposDoRecorte>> | null;
+  /** Compras do período (lançadas, com compra): para onde foi o dinheiro, por fornecedor e por categoria. */
+  distribuicao: { fornecedor: DistribuicaoDoRecorte; categoria: DistribuicaoDoRecorte } | null;
   linhas: Awaited<ReturnType<typeof linhasDoRecorte>> | null;
   abertas: Awaited<ReturnType<typeof totalDasLinhasAbertas>> | null;
   canceladas: Awaited<ReturnType<typeof canceladasDoRecorte>> | null;
@@ -523,6 +573,7 @@ export async function relatorioDaTela(cliente: ClienteDoParceiro, alcance: Alcan
         totais: null,
         grupos: null,
         fornecedores: null,
+        distribuicao: null,
         linhas: null,
         abertas: null,
         canceladas: null,
@@ -549,12 +600,17 @@ export async function relatorioDaTela(cliente: ClienteDoParceiro, alcance: Alcan
       const linhas = verLinhas ? await linhasDoRecorte(tx, recorte, pagFinal) : null;
       const fornecedores = modo === 'insumo' ? await gruposDoRecorte(tx, { ...recorte, agrupar: 'fornecedor' }, null) : null;
       const canceladas = f.situacao === 'lancadas' ? await canceladasDoRecorte(tx, recorte) : null;
+      const distribuicao =
+        modo === 'periodo' && f.situacao === 'lancadas' && totais.linhas > 0
+          ? { fornecedor: await distribuicaoDoRecorte(tx, recorte, 'fornecedor'), categoria: await distribuicaoDoRecorte(tx, recorte, 'categoria') }
+          : null;
       return {
         ...vazio,
         lojasUsadas: lojasDoAcesso.filter((l) => recorte.lojas.includes(l.id)),
         totais,
         grupos: gruposFinal,
         fornecedores,
+        distribuicao,
         linhas,
         abertas,
         canceladas,

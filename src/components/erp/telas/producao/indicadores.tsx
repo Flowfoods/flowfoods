@@ -16,6 +16,10 @@ import { Aviso, Painel, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { FiltroDoPeriodo } from './periodo';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
+import { BarrasHorizontais } from '../../ui/barras-horizontais';
+import { FAIXA_DO_RENDIMENTO_BP, formatarRendimento } from '@/lib/erp/producao-campos';
+import { formatarQuantidade } from '@/lib/erp/unidades';
+import type { ProduzidoPorFicha } from '@/lib/erp/producao-equipe-campos';
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
@@ -72,6 +76,31 @@ function DaPessoa({ p, historico }: { p: IndicadoresDaPessoa; historico: string 
   );
 }
 
+/**
+ * Rendimento por preparo (24/10/2026, referência Nina): o que saiu de cada ficha contra o planejado, somando os lotes concluídos da
+ * loja no período, de todo mundo. É o retrato do preparo, não da pessoa: ordem alfabética, sem cor por resultado. O traço é 100%.
+ */
+export function RendimentoPorPreparo({ fichas }: { fichas: readonly ProduzidoPorFicha[] }) {
+  if (fichas.length === 0) return null;
+  const repetida = new Set(fichas.map((f) => f.fichaId).filter((id, i, a) => a.indexOf(id) !== i));
+  return (
+    <Painel titulo="Rendimento por preparo" subtitulo="O que saiu contra o planejado pela ficha, somando os lotes concluídos no período. O traço é 100%, o planejado.">
+      <BarrasHorizontais
+        titulo="Rendimento de cada preparo em percentual do planejado"
+        marca={{ rotulo: 'planejado (100%)' }}
+        barras={fichas.map((f) => ({
+          chave: `${f.fichaId}:${f.unidade}`,
+          rotulo: repetida.has(f.fichaId) ? `${f.nome} (${f.unidade.toLowerCase()})` : f.nome,
+          valor: f.rendimentoBp,
+          valorTexto: formatarRendimento(f.rendimentoBp),
+          detalhe: `${formatarQuantidade(f.produzidoMilesimos, f.unidade)} de ${formatarQuantidade(f.planejadoMilesimos, f.unidade)} · ${plural(f.lotes, 'lote', 'lotes')}${Math.abs(f.rendimentoBp - 10000) > FAIXA_DO_RENDIMENTO_BP ? ' · fora de ±10%' : ''}`,
+          marca: 10000,
+        }))}
+      />
+    </Painel>
+  );
+}
+
 export function TelaIndicadores({ d, base, contexto }: { d: IndicadoresDaProducao; base: string; contexto?: string }) {
   const aqui = `${base}/indicadores/${d.loja.id}`;
   const historicoDe = (id: string) => `${base}/historico/${d.loja.id}?de=${d.periodo.de}&ate=${d.periodo.ate}&pessoa=${encodeURIComponent(id)}`;
@@ -91,6 +120,7 @@ export function TelaIndicadores({ d, base, contexto }: { d: IndicadoresDaProduca
         Serve para conversar com a equipe: rendimento e tempo dependem da ficha, do equipamento e do dia. Com poucos lotes, ainda não dizem muito. {fraseDoResumo(d.resumo).replace(/\.?$/, '.')}
       </Aviso>
       {notas.length > 0 && <p className="text-[13px] text-suave">{notas.join(' ')}</p>}
+      <RendimentoPorPreparo fichas={d.porFicha} />
       {d.pessoas.length === 0 ? (
         <Painel>
           <Vazio titulo="Ninguém fez lote neste período.">Os indicadores aparecem quando a cozinha pega e conclui lotes pela tela de Tarefas.</Vazio>

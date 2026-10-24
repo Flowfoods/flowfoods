@@ -21,7 +21,7 @@ import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarFornecedor, cancelarNota, lancarNota } from '@/lib/erp/compras';
 import { ligarDocumento, obterDocumento, receberXml } from '@/lib/erp/documentos-fiscais';
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
-import { relatorioCompleto, relatorioDaTela, linhasDoRecorte, gruposDoRecorte, totaisDoRecorte, resolverRecorte } from '@/lib/erp/compras-relatorio';
+import { distribuicaoDoRecorte, relatorioCompleto, relatorioDaTela, linhasDoRecorte, gruposDoRecorte, totaisDoRecorte, resolverRecorte } from '@/lib/erp/compras-relatorio';
 import {
   abreComoFormula,
   custoMedioEntregue,
@@ -340,6 +340,28 @@ describe.skipIf(!URL_TESTE)('ERP L.2 · relatórios de compras (Postgres real)',
   });
 
   // --------------------------------------------------------- permissões
+
+  it('para onde foi o dinheiro (24/10/2026): por fornecedor e por categoria em R$ (itens + frete), somando o total; o resto vira "outros"', async () => {
+    const r = await relatorioDaTela(a, DONA(), filtros(), 'periodo');
+    const d = r.distribuicao!;
+    // Laticínios: L2 276,00 + L3 470,00 + 5,00 de frete + L4 240,00. Zé: Z2 80,00 + 100,00, Z3 zerada, Z4 200,00. A nota cancelada e o B ficam fora.
+    expect(d.fornecedor).toEqual({ fatias: [{ chave: ids.lat, rotulo: 'Laticínios Rio', centavos: 99100 }, { chave: ids.ze, rotulo: 'Frios do Zé', centavos: 38000 }], outros: null, totalCentavos: 137100, quantos: 2 });
+    expect(d.categoria.totalCentavos).toBe(137100);
+    expect(d.categoria.fatias.reduce((s, x) => s + x.centavos, 0) + (d.categoria.outros?.centavos ?? 0)).toBe(137100);
+    // Com uma fatia só à vista, o segundo vira "outros" apenas se juntar dois ou mais: aqui sobra um, e ele aparece com o nome.
+    const umaSo = await a.transacao(async (tx) => {
+      const { recorte } = await resolverRecorte(tx, DONA(), filtros());
+      return distribuicaoDoRecorte(tx, recorte!, 'fornecedor', 1);
+    });
+    expect(umaSo.fatias.map((x) => x.centavos)).toEqual([99100, 38000]);
+    expect(umaSo.outros).toBeNull();
+    // Canceladas e o histórico de um insumo não têm o gráfico.
+    expect((await relatorioDaTela(a, DONA(), filtros({ situacao: 'canceladas' }), 'periodo')).distribuicao).toBeNull();
+    expect((await relatorioDaTela(a, DONA(), filtros({ insumo: ids.mucarela }), 'insumo')).distribuicao).toBeNull();
+    // Gerente do Centro: só a nota L3.
+    const centro = await relatorioDaTela(a, alcanceDe('GERENTE', [ids.centro]), filtros(), 'periodo');
+    expect(centro.distribuicao!.fornecedor).toMatchObject({ quantos: 1, totalCentavos: 47500 });
+  });
 
   it('gerente de uma loja só enxerga a loja dele; pedir outra nunca amplia; operador e outro parceiro não veem nada', async () => {
     const gerenteVp = alcanceDe('GERENTE', [ids.vp]);

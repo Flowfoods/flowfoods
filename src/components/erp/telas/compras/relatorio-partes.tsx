@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import type { LinhaDeCompra, LinhaDeGrupo, RelatorioDaTela, TotaisDoRecorte } from '@/lib/erp/compras-relatorio';
+import type { DistribuicaoDoRecorte, LinhaDeCompra, LinhaDeGrupo, RelatorioDaTela, TotaisDoRecorte } from '@/lib/erp/compras-relatorio';
 import {
   BASES_DE_DATA,
   custoMedioEntregue,
@@ -26,6 +26,8 @@ import { formatarData } from '@/lib/erp/compra-campos';
 import { formatarCusto, formatarDinheiro, formatarQuantidade, type Unidade } from '@/lib/erp/unidades';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel, Selo } from '../../ui/superficies';
+import { BarrasHorizontais, type BarraDoGrafico } from '../../ui/barras-horizontais';
+import { dinheiroCurto } from '@/lib/erp/grafico';
 import { hrefDoRelatorio, RECORTE_NOVO } from './relatorio-filtros';
 
 export const sp = (n: number) => n.toLocaleString('pt-BR');
@@ -576,6 +578,69 @@ export function BarraDeSaida({ f, exportar, imprimir, modo, comparar }: { f: Fil
           {c.texto}
         </Link>
       ))}
+    </div>
+  );
+}
+
+// ------------------------------------------------- para onde foi o dinheiro
+
+/** "32%" do total; abaixo de 1%, "menos de 1%" (nunca "0%" para quem teve compra). */
+function parteDoTotal(c: number, total: number): string {
+  if (total <= 0) return '';
+  const p = (c / total) * 100;
+  return p < 1 ? 'menos de 1% do total' : `${Math.round(p).toLocaleString('pt-BR')}% do total`;
+}
+
+function barrasDa(d: DistribuicaoDoRecorte, href: (chave: string) => string | undefined, neutra: (chave: string) => boolean): BarraDoGrafico[] {
+  const barras: BarraDoGrafico[] = d.fatias.map((x) => ({
+    chave: x.chave,
+    rotulo: x.rotulo,
+    valor: x.centavos,
+    valorTexto: dinheiroCurto(x.centavos),
+    detalhe: parteDoTotal(x.centavos, d.totalCentavos),
+    href: href(x.chave),
+    neutra: neutra(x.chave),
+  }));
+  if (d.outros) {
+    barras.push({ chave: '@outros', rotulo: `Outros (${d.outros.quantos})`, valor: d.outros.centavos, valorTexto: dinheiroCurto(d.outros.centavos), detalhe: parteDoTotal(d.outros.centavos, d.totalCentavos), neutra: true });
+  }
+  return barras;
+}
+
+/**
+ * Compras do período, antes da tabela: para onde foi o dinheiro, por fornecedor e por categoria (24/10/2026, referência Nina). Só
+ * aparece o lado que tem dois ou mais (filtrar um fornecedor tira o gráfico de fornecedor). Cada barra abre as linhas dela.
+ */
+export function ParaOndeFoiODinheiro({ d, caminho, f }: { d: NonNullable<RelatorioDaTela['distribuicao']>; caminho: string; f: FiltrosDoRelatorio }) {
+  const fornecedor = !f.fornecedorId && d.fornecedor.quantos >= 2;
+  const categoria = !f.categoriaId && d.categoria.quantos >= 2;
+  if (!fornecedor && !categoria) return null;
+  return (
+    <div className={`grid gap-4 ${fornecedor && categoria ? 'xl:grid-cols-2' : ''}`}>
+      {fornecedor && (
+        <Painel titulo="Para onde foi o dinheiro, por fornecedor" subtitulo={`${pl(d.fornecedor.quantos, 'fornecedor', 'fornecedores')} · itens + frete, em R$`}>
+          <BarrasHorizontais
+            titulo="Compras por fornecedor, em reais"
+            barras={barrasDa(
+              d.fornecedor,
+              (chave) => hrefDoRelatorio(caminho, f, { ...RECORTE_NOVO, agrupar: 'fornecedor', grupo: chave, ver: 'linhas' }),
+              (chave) => chave === '-',
+            )}
+          />
+        </Painel>
+      )}
+      {categoria && (
+        <Painel titulo="Para onde foi o dinheiro, por categoria" subtitulo={`${pl(d.categoria.quantos, 'categoria', 'categorias')} · a categoria de hoje do insumo`}>
+          <BarrasHorizontais
+            titulo="Compras por categoria de insumo, em reais"
+            barras={barrasDa(
+              d.categoria,
+              (chave) => (chave === '-' ? undefined : hrefDoRelatorio(caminho, f, { ...RECORTE_NOVO, categoriaId: chave })),
+              (chave) => chave === '-',
+            )}
+          />
+        </Painel>
+      )}
     </div>
   );
 }
