@@ -48,15 +48,14 @@ import {
 } from './canal-campos';
 import { formatarPontosBase, type CustoExato, type Unidade } from './unidades';
 import {
-  camposDoCanal,
   impressaoDosCustos,
   impressaoDosPrecos,
   lerMargensAlvo,
   lerPrecos,
   precoDoCanal,
-  retratoDosPrecos,
   type EntradaDoCanal,
 } from './preco-campos';
+import { camposDoCmv, cmvDoCanal, lerMetasDeCmv, retratoDoCmv, type CmvDoCanal } from './cmv-produto-campos';
 
 export type ResultadoDoCanal = { ok: true; id: string; mudou: string[] } | { ok: false; erros: Erros; conflito?: boolean; naoEncontrado?: boolean };
 
@@ -111,14 +110,16 @@ async function taxaDoIfood(tx: ClienteDoParceiro) {
 /** As configurações dos canais do parceiro (até 3 linhas): a taxa do iFood e as margens-alvo (1.10). */
 async function configsDosCanais(tx: ClienteDoParceiro) {
   const lidas = await tx.canalConfig.findMany({
-    select: { id: true, canal: true, taxaBp: true, taxaPagamentoBp: true, margemAlvoPadraoBp: true, atualizadoEm: true },
+    select: { id: true, canal: true, taxaBp: true, taxaPagamentoBp: true, margemAlvoPadraoBp: true, metaCmvPadraoBp: true, atualizadoEm: true },
   });
   const de = (c: CanalVenda) => lidas.find((x) => x.canal === c) ?? null;
   const ifood = de('IFOOD');
   // A linha do iFood nasce na configuração da taxa (1.9): sem ela, a taxa não foi configurada.
   const taxa: TaxaDoCanal | null = ifood ? { comissaoBp: ifood.taxaBp, pagamentoBp: ifood.taxaPagamentoBp } : null;
   const margens = Object.fromEntries(ORDEM_DOS_CANAIS.map((c) => [c, de(c)?.margemAlvoPadraoBp ?? null])) as Record<CanalVenda, number | null>;
-  return { lidas, de, taxa, margens };
+  // N.2: a meta de CMV de cada canal (comanda a sugestão e o farol; a margem-alvo acima é registro antigo).
+  const metas = Object.fromEntries(ORDEM_DOS_CANAIS.map((c) => [c, de(c)?.metaCmvPadraoBp ?? null])) as Record<CanalVenda, number | null>;
+  return { lidas, de, taxa, margens, metas };
 }
 
 /**
@@ -129,7 +130,7 @@ async function configsDosCanais(tx: ClienteDoParceiro) {
 async function contaDosCanais(tx: ClienteDoParceiro, fichaId: string, custo: Pick<CustoDaFicha, 'porRendimento' | 'faltaPreco'>) {
   const [{ produtoId, lista }, cfg] = await Promise.all([embalagensGravadas(tx, fichaId), configsDosCanais(tx)]);
   const gravados = produtoId
-    ? await tx.produtoCanal.findMany({ where: { produtoId }, select: { id: true, canal: true, precoManualCentavos: true } })
+    ? await tx.produtoCanal.findMany({ where: { produtoId }, select: { id: true, canal: true, precoManualCentavos: true, ativo: true } })
     : [];
   // 1.5: a embalagem custa o último preço da nota (uma consulta para a leitura inteira).
   await anexarUltimasCompras(
@@ -148,8 +149,12 @@ async function contaDosCanais(tx: ClienteDoParceiro, fichaId: string, custo: Pic
     taxa: canal === 'IFOOD' ? (cfg.taxa ?? 'naoConfigurada') : null,
   }));
   const proprio = (c: CanalVenda) => gravados.find((g) => g.canal === c)?.precoManualCentavos ?? null;
+  // N.3: o canal é ofertado até alguém dizer que não (sem linha = ofertado, como sempre foi).
+  const ofertado = (c: CanalVenda) => gravados.find((g) => g.canal === c)?.ativo ?? true;
   const precos = entradas.map((e) => precoDoCanal(e, { margemAlvoBp: cfg.margens[e.canal], precoProprioCentavos: proprio(e.canal) }));
-  return { produtoId, lista, cfg, gravados, entradas, precos };
+  // N.2: a conta pela meta de CMV, com o preço DEFINIDO pela pessoa (a sugestão não conta como preço praticado).
+  const cmv = entradas.map((e) => cmvDoCanal(e, { metaBp: cfg.metas[e.canal], precoCentavos: proprio(e.canal), ofertado: ofertado(e.canal) }));
+  return { produtoId, lista, cfg, gravados, entradas, precos, cmv };
 }
 
 /**
@@ -160,7 +165,7 @@ async function contaDosCanais(tx: ClienteDoParceiro, fichaId: string, custo: Pic
 export async function custoPorCanal(cliente: ClienteDoParceiro, ficha: { id: string; tipo: string; custo: CustoDaFicha }) {
   if (ficha.tipo !== 'PRATO') return null;
   return cliente.transacao(async (tx) => {
-    const { produtoId, lista, cfg, gravados, entradas, precos } = await contaDosCanais(tx, ficha.id, ficha.custo);
+    const { produtoId, lista, cfg, gravados, entradas, precos, cmv } = await contaDosCanais(tx, ficha.id, ficha.custo);
     return {
       produtoId,
       impressao: impressaoDasEmbalagens(lista),
@@ -180,6 +185,11 @@ export async function custoPorCanal(cliente: ClienteDoParceiro, ficha: { id: str
       entradas,
       precos,
       margensAlvo: cfg.margens,
+      // N.2
+      cmv,
+      metasDeCmv: cfg.metas,
+      // N.3
+      ofertados: Object.fromEntries(cmv.map((x) => [x.canal, x.ofertado])) as Record<CanalVenda, boolean>,
       impressaoDosPrecos: impressaoDosPrecos(gravados),
       impressaoDosCustos: impressaoDosCustos(entradas),
     };
@@ -326,6 +336,8 @@ export async function obterTaxaDoIfood(cliente: ClienteDoParceiro) {
       versao: ifood ? ifood.atualizadoEm.toISOString() : '',
       margens: cfg.margens,
       versaoDasMargens: versaoDasMargens(cfg.lidas),
+      metas: cfg.metas,
+      versaoDasMetas: versaoDasMetas(cfg.lidas),
       historico,
     };
   });
@@ -473,6 +485,76 @@ export async function salvarMargensAlvo(
   }
 }
 
+// ------------------------------------------------------- meta de CMV (N.2)
+
+export const MENSAGEM_CONFLITO_DAS_METAS =
+  'Alguém mudou as metas de CMV ou a configuração dos canais agora há pouco. Recarregue a página para ver a versão nova; nada foi gravado.';
+
+/** O que a tela leu das metas (canal:meta:versão), na ordem dos canais. */
+function versaoDasMetas(lidas: readonly { canal: string; metaCmvPadraoBp: number | null; atualizadoEm: Date }[]): string {
+  return ORDEM_DOS_CANAIS.map((c) => {
+    const l = lidas.find((x) => x.canal === c);
+    return l ? `${c}:${l.metaCmvPadraoBp ?? '-'}:${l.atualizadoEm.toISOString()}` : `${c}:novo`;
+  }).join('|');
+}
+
+/**
+ * Meta de CMV de cada canal do parceiro (N.2). Comanda o preço sugerido (custo físico ÷ meta) e o farol de todas as
+ * fichas. `versao` = a impressão que a tela leu: se uma linha mudou (inclusive a taxa do iFood, que mora na mesma linha),
+ * conflito e nada muda. Diferente da margem-alvo, a meta do iFood não espera a taxa: a taxa não entra no CMV. Nenhuma
+ * margem-alvo antiga é convertida nem apagada aqui.
+ */
+export async function salvarMetasDeCmv(
+  cliente: ClienteDoParceiro,
+  entrada: { metas: Partial<Record<CanalVenda, unknown>>; versao: unknown },
+  autorNome = 'Sistema',
+): Promise<ResultadoDoCanal> {
+  try {
+    return await cliente.transacao(async (tx) => {
+      const cfg = await configsDosCanais(tx);
+      if (typeof entrada.versao !== 'string' || entrada.versao !== versaoDasMetas(cfg.lidas)) {
+        throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DAS_METAS }, conflito: true });
+      }
+      const lido = lerMetasDeCmv(entrada.metas);
+      if (!lido.ok) throw new Recusa(lido);
+      const mudou: string[] = [];
+      let id = '';
+      for (const canal of ORDEM_DOS_CANAIS) {
+        const novo = lido.dados[canal];
+        const linha = cfg.de(canal);
+        const retrato = (bp: number | null) => ({ nome: CANAIS[canal].rotulo, metaCmv: bp === null ? 'sem meta' : formatarPontosBase(bp) });
+        if (!linha) {
+          if (novo === null) continue;
+          // A linha do iFood nasce com a taxa (1.9): criá-la aqui faria a taxa "não configurada" virar 0% sem ninguém dizer.
+          if (canal === 'IFOOD') throw new Recusa({ ok: false, erros: { 'metaCmv-IFOOD': 'Configure a taxa do iFood antes (acima): a meta do iFood é guardada junto com ela.' } });
+          const criada = await tx.canalConfig.create({ data: { parceiroId: tx.parceiroId, canal, metaCmvPadraoBp: novo }, select: { id: true } });
+          await tx.historicoAlteracao.create({
+            data: { parceiroId: tx.parceiroId, entidade: 'CanalConfig', entidadeId: criada.id, acao: 'ALTEROU', antes: retrato(null), depois: retrato(novo), autorNome },
+          });
+          mudou.push(canal);
+          id = criada.id;
+          continue;
+        }
+        if (linha.metaCmvPadraoBp === novo) continue;
+        const r = await tx.canalConfig.updateMany({ where: { id: linha.id, atualizadoEm: linha.atualizadoEm }, data: { metaCmvPadraoBp: novo } });
+        if (r.count !== 1) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DAS_METAS }, conflito: true });
+        await tx.historicoAlteracao.create({
+          data: { parceiroId: tx.parceiroId, entidade: 'CanalConfig', entidadeId: linha.id, acao: 'ALTEROU', antes: retrato(linha.metaCmvPadraoBp), depois: retrato(novo), autorNome },
+        });
+        mudou.push(canal);
+        id = linha.id;
+      }
+      return { ok: true as const, id, mudou };
+    });
+  } catch (e) {
+    if (e instanceof Recusa) return e.resultado;
+    // Duas "primeiras" metas do mesmo canal juntas: o único (parceiro, canal) deixa uma; a outra relê.
+    if (ehErroDeUnicidade(e)) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_DAS_METAS }, conflito: true };
+    if (checkVioladoDe(e)) return { ok: false, erros: { geral: 'A meta de CMV fica entre 0,01% e 99,99%.' } };
+    throw e;
+  }
+}
+
 // ------------------------------------------------------- preços por canal (1.10)
 
 export const MENSAGEM_CONFLITO_DOS_PRECOS =
@@ -490,7 +572,13 @@ export const MENSAGEM_CONFLITO_DOS_PRECOS =
 export async function salvarPrecos(
   cliente: ClienteDoParceiro,
   fichaId: string,
-  entrada: { impressao: unknown; custos: unknown; precos: Partial<Record<CanalVenda, unknown>> },
+  entrada: {
+    impressao: unknown;
+    custos: unknown;
+    precos: Partial<Record<CanalVenda, unknown>>;
+    /** N.3: em que canais o prato é vendido. Ausente = não mexe (quem chama sem a pergunta mantém o que está gravado). */
+    ofertas?: Partial<Record<CanalVenda, boolean>>;
+  },
   autorNome = 'Sistema',
 ): Promise<ResultadoDoCanal & { custoMudou?: boolean }> {
   if (!ID.test(fichaId)) return { ok: false, erros: { geral: 'Ficha não encontrada.' }, naoEncontrado: true };
@@ -505,10 +593,13 @@ export async function salvarPrecos(
         throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DOS_PRECOS }, conflito: true });
       }
       if (!lido.ok) throw new Recusa(lido);
-      const novos = conta.entradas.map((e) => precoDoCanal(e, { margemAlvoBp: conta.cfg.margens[e.canal], precoProprioCentavos: lido.dados[e.canal] }));
-      const sem = (r: Record<string, string>) => Object.fromEntries(Object.entries(r).filter(([k]) => !k.startsWith('custo')));
-      const antes = { nome: f.nome, ...sem(retratoDosPrecos(conta.precos)) };
-      const depoisCompleto = retratoDosPrecos(novos);
+      // N.3: o que a pessoa marcou (ou o que já estava, quando a tela não perguntou).
+      const ofertaDe = (c: CanalVenda) => (typeof entrada.ofertas?.[c] === 'boolean' ? entrada.ofertas[c]! : conta.cmv.find((x) => x.canal === c)!.ofertado);
+      // N.2: o retrato do histórico segue a meta de CMV (preço definido, CMV, resultado após os custos informados).
+      const novos = conta.entradas.map((e) => cmvDoCanal(e, { metaBp: conta.cfg.metas[e.canal], precoCentavos: lido.dados[e.canal], ofertado: ofertaDe(e.canal) }));
+      const sem = (r: Record<string, string>) => Object.fromEntries(Object.entries(r).filter(([k]) => !k.startsWith('fisico')));
+      const antes = { nome: f.nome, ...sem(retratoDoCmv(conta.cmv)) };
+      const depoisCompleto = retratoDoCmv(novos);
       const mudanca = diferenca(antes, { nome: f.nome, ...sem(depoisCompleto) });
       const custoMudou = typeof entrada.custos === 'string' && entrada.custos !== impressaoDosCustos(conta.entradas);
       if (!mudanca) return { ok: true as const, id: f.id, mudou: [], custoMudou };
@@ -517,15 +608,17 @@ export async function salvarPrecos(
       const mudaram: CanalVenda[] = [];
       for (const canal of ORDEM_DOS_CANAIS) {
         const novo = lido.dados[canal];
+        const ativo = ofertaDe(canal);
         const linha = conta.gravados.find((g) => g.canal === canal);
-        if ((linha?.precoManualCentavos ?? null) === novo) continue;
+        if ((linha?.precoManualCentavos ?? null) === novo && (linha?.ativo ?? true) === ativo) continue;
         mudaram.push(canal);
-        if (linha) await tx.produtoCanal.update({ where: { id: linha.id }, data: { precoManualCentavos: novo } });
-        else await tx.produtoCanal.create({ data: { parceiroId: tx.parceiroId, produtoId, canal, precoManualCentavos: novo } });
+        // Tirar o canal não apaga o preço: ele fica guardado para quando o prato voltar ao canal.
+        if (linha) await tx.produtoCanal.update({ where: { id: linha.id }, data: { precoManualCentavos: novo, ativo } });
+        else await tx.produtoCanal.create({ data: { parceiroId: tx.parceiroId, produtoId, canal, precoManualCentavos: novo, ativo } });
       }
       // O snapshot: o custo do canal naquele instante, de cada canal cujo preço mudou (só no depois: é retrato, não mudança).
       const depois: Record<string, string> = { ...mudanca.depois } as Record<string, string>;
-      for (const canal of mudaram) depois[camposDoCanal(canal).custo] = depoisCompleto[camposDoCanal(canal).custo];
+      for (const canal of mudaram) depois[camposDoCmv(canal).custo] = depoisCompleto[camposDoCmv(canal).custo];
       await tx.historicoAlteracao.create({
         data: { parceiroId: tx.parceiroId, entidade: 'FichaTecnica', entidadeId: f.id, acao: 'ALTEROU', antes: mudanca.antes, depois, autorNome },
       });
@@ -550,13 +643,29 @@ export async function precosDaLista(cliente: ClienteDoParceiro, fichas: readonly
   const pratos = fichas.filter((f) => f.tipo === 'PRATO');
   const mapa = new Map<string, ReturnType<typeof precoDoCanal>[]>();
   if (pratos.length === 0) return mapa;
+  return (await contasDaLista(cliente, pratos)).precos;
+}
+
+/**
+ * N.2: preço, CMV e farol pela meta de CMV de cada canal das fichas de prato da página — a MESMA leitura em lote da
+ * `precosDaLista`, com a conta da meta de CMV ao lado. Só sai do servidor para quem vê preços (a página confere).
+ */
+export async function cmvDaLista(cliente: ClienteDoParceiro, fichas: readonly { id: string; tipo: string; custo: CustoDaFicha }[]) {
+  const pratos = fichas.filter((f) => f.tipo === 'PRATO');
+  if (pratos.length === 0) return new Map<string, CmvDoCanal[]>();
+  return (await contasDaLista(cliente, pratos)).cmv;
+}
+
+async function contasDaLista(cliente: ClienteDoParceiro, pratos: readonly { id: string; tipo: string; custo: CustoDaFicha }[]) {
+  const mapa = new Map<string, ReturnType<typeof precoDoCanal>[]>();
+  const cmv = new Map<string, CmvDoCanal[]>();
   return cliente.transacao(async (tx) => {
     const [produtos, cfg] = await Promise.all([
       tx.produtoVenda.findMany({
         where: { fichaId: { in: pratos.map((p) => p.id) }, marcaId: null },
         select: {
           fichaId: true,
-          canais: { select: { canal: true, precoManualCentavos: true } },
+          canais: { select: { canal: true, precoManualCentavos: true, ativo: true } },
           embalagens: { select: { canal: true, insumoId: true, quantidadeMilesimos: true, insumo: { select: SELECAO_DO_INSUMO } } },
         },
       }),
@@ -579,15 +688,20 @@ export async function precosDaLista(cliente: ClienteDoParceiro, fichas: readonly
                 .map((e) => ({ insumoId: e.insumoId, nome: e.insumo.nome, unidade: e.insumo.unidade as Unidade, quantidadeMilesimos: e.quantidadeMilesimos, insumo: e.insumo })),
         taxa: canal === 'IFOOD' ? (cfg.taxa ?? 'naoConfigurada') : null,
       }));
+      const proprio = (c: CanalVenda) => p?.canais.find((x) => x.canal === c)?.precoManualCentavos ?? null;
       mapa.set(
         f.id,
-        entradas.map((e) =>
-          precoDoCanal(e, { margemAlvoBp: cfg.margens[e.canal], precoProprioCentavos: p?.canais.find((c) => c.canal === e.canal)?.precoManualCentavos ?? null }),
-        ),
+        entradas.map((e) => precoDoCanal(e, { margemAlvoBp: cfg.margens[e.canal], precoProprioCentavos: proprio(e.canal) })),
+      );
+      cmv.set(
+        f.id,
+        entradas.map((e) => cmvDoCanal(e, { metaBp: cfg.metas[e.canal], precoCentavos: proprio(e.canal), ofertado: p?.canais.find((x) => x.canal === e.canal)?.ativo ?? true })),
       );
     }
-    return mapa;
+    return { precos: mapa, cmv };
   });
 }
+
+export type CmvDaLista = Awaited<ReturnType<typeof cmvDaLista>>;
 
 export type PrecosDaLista = Awaited<ReturnType<typeof precosDaLista>>;

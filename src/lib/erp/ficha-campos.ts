@@ -46,7 +46,7 @@ export const TIPOS_DE_FICHA = {
 } as const;
 export type TipoFicha = keyof typeof TIPOS_DE_FICHA;
 
-export const LIMITES_DA_FICHA = { nome: 80, descricao: 280, modoPreparo: 4000, itens: 60 } as const;
+export const LIMITES_DA_FICHA = { nome: 80, descricao: 280, modoPreparo: 4000, itens: 60, passos: 40, passo: 1000 } as const;
 
 /**
  * Em que a ficha rende, como a pessoa escolhe na tela: Prato em porções
@@ -117,6 +117,8 @@ export interface EntradaDaFicha {
   tipo?: unknown;
   descricao?: unknown;
   modoPreparo?: unknown;
+  /** N.4: as etapas do preparo, na ordem (cada uma um texto). Ausente = nenhuma. */
+  passos?: unknown;
   rendimento?: unknown;
   rendimentoUnidade?: unknown;
   itens: ItemDigitado[];
@@ -133,6 +135,8 @@ export interface DadosFicha {
   tipo: TipoFicha;
   descricao: string | null;
   modoPreparo: string | null;
+  /** N.4: as etapas do preparo, na ordem; vazia = sem etapas (vale o texto anterior, se houver). */
+  passosPreparo: string[];
   rendimentoMilesimos: number;
   unidadeRendimento: Unidade;
   itens: ItemDaFicha[];
@@ -200,6 +204,11 @@ const formFicha = z.object({
 
 /** Rótulo da linha do item no resumo de erros e na mensagem ("Item 2"). */
 export const chaveDoItem = (i: number) => `item-${i}`;
+/** N.4: a chave do erro de uma etapa do preparo ("Etapa 3"). */
+export const chaveDoPasso = (i: number) => `passo-${i}`;
+
+/** N.4: as etapas como o histórico e a impressão leem: "1. Selar o blend.\n2. Montar." (null = sem etapas). */
+export const passosEmTexto = (passos: readonly string[]): string | null => (passos.length ? passos.map((p, i) => `${i + 1}. ${p}`).join('\n') : null);
 
 /**
  * Formulário (ou planilha) → dados prontos para gravar. `insumos` = os do
@@ -225,12 +234,18 @@ export function lerFormFicha(
 
   const descricao = textoLivre(entrada.descricao)?.replace(/\s+/g, ' ') ?? null;
   if (descricao && descricao.length > LIMITES_DA_FICHA.descricao) {
-    erros.descricao = `Descrição curta: até ${LIMITES_DA_FICHA.descricao} letras (o passo a passo vai no modo de preparo).`;
+    erros.descricao = `Descrição comercial curta: até ${LIMITES_DA_FICHA.descricao} letras (o passo a passo vai no modo de preparo).`;
   }
   const modoPreparo = textoLivre(entrada.modoPreparo);
   if (modoPreparo && modoPreparo.length > LIMITES_DA_FICHA.modoPreparo) {
     erros.modoPreparo = `Modo de preparo longo demais (máx. ${LIMITES_DA_FICHA.modoPreparo} letras).`;
   }
+  // N.4: etapas na ordem em que vieram; etapa em branco não é etapa (nem erro).
+  const passosPreparo = (Array.isArray(entrada.passos) ? entrada.passos : []).map((p) => textoLivre(p)).filter((p): p is string => !!p);
+  if (passosPreparo.length > LIMITES_DA_FICHA.passos) erros.passos = `Até ${LIMITES_DA_FICHA.passos} etapas no modo de preparo.`;
+  passosPreparo.forEach((p, i) => {
+    if (p.length > LIMITES_DA_FICHA.passo) erros[chaveDoPasso(i)] = `Etapa ${i + 1} longa demais (máx. ${LIMITES_DA_FICHA.passo} letras): divida em duas.`;
+  });
 
   // Rendimento.
   const rendeEm = tipo === 'PRATO' ? 'porcao' : um(entrada.rendimentoUnidade, RENDE_DO_PREPARO);
@@ -320,6 +335,7 @@ export function lerFormFicha(
       tipo,
       descricao,
       modoPreparo,
+      passosPreparo,
       rendimentoMilesimos,
       unidadeRendimento: RENDE_EM[rendeEm!].unidade,
       itens,
@@ -489,6 +505,7 @@ export function retratoDaFicha(
     rendimento: formatarRendimento(d.rendimentoMilesimos, d.unidadeRendimento, d.tipo),
     descricao: d.descricao,
     modoPreparo: d.modoPreparo,
+    passos: passosEmTexto(d.passosPreparo),
     foto: fotoArquivo,
     conservacao: d.validades?.principal ?? null,
     validade: retratoDaValidade(d.validades),

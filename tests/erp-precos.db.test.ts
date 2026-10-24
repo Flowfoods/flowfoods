@@ -290,9 +290,12 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
     const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 1, verPrecos: true });
     expect(h[0].autorNome).toBe('Marina');
     expect(h[0].mudancas.map((m) => ({ ...m, depois: sp(m.depois), antes: m.antes && sp(m.antes) }))).toEqual([
-      { campo: 'preço no iFood', antes: null, depois: 'R$ 29,90 (o sugerido era R$ 51,20)' },
-      { campo: 'margem líquida no iFood', antes: 'R$ 30,72 (60,0%)', depois: 'R$ 15,00 (50,2%)' },
-      { campo: 'custo do iFood na hora', antes: null, depois: 'R$ 14,90' },
+      // N.2: o histórico segue a meta de CMV — preço DEFINIDO (vazio = "não definido", a sugestão não é preço), CMV,
+      // resultado após os custos informados e o custo físico na hora (sem a taxa). Sem meta de CMV ainda: o CMV sai sem farol.
+      { campo: 'preço no iFood', antes: 'não definido', depois: 'R$ 29,90' },
+      { campo: 'CMV no iFood', antes: 'sem dados (preço de venda não definido; sem meta de CMV para o canal)', depois: '23,6% (sem meta)' },
+      { campo: 'resultado após os custos informados no iFood', antes: 'pendente (preço de venda não definido)', depois: 'R$ 15,00 (50,2%)' },
+      { campo: 'custo físico do iFood na hora', antes: null, depois: 'R$ 7,06' },
     ]);
     // O mesmo preço de novo: nada muda, nada no histórico.
     const n = await a.historicoAlteracao.count();
@@ -363,8 +366,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
     ]);
     const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.burger] }], limite: 1, verPrecos: true });
     const de = (campo: string) => sp(h[0].mudancas.find((m) => m.campo === campo)!.depois);
-    // Antes da nota: 6,5164 → margem 21,3836 (76,6%); depois: 7,1164 → 20,7836 (74,5%).
-    const par = [de('custo da loja na hora'), de('margem líquida na loja')];
+    // Antes da nota: 6,5164 → resultado 21,3836 (76,6%); depois: 7,1164 → 20,7836 (74,5%).
+    const par = [de('custo físico da loja na hora'), de('resultado após os custos informados na loja')];
     expect([
       ['R$ 6,52', 'R$ 21,38 (76,6%)'],
       ['R$ 7,12', 'R$ 20,78 (74,5%)'],
@@ -378,8 +381,13 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
     const d = await tela(a, ids.baconBurger);
     expect(d.precos[0]).toMatchObject({ preco: { centavos: 3290, origem: 'proprio' }, margens: null });
     const h = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [ids.baconBurger] }], limite: 1, verPrecos: true });
-    // A margem era e continua "incompleta": não é mudança; o custo na hora sempre vai.
-    expect(h[0].mudancas.map((m) => sp(m.depois))).toEqual(['R$ 32,90', 'incompleto (R$ 1,50 sem “Bacon”)']);
+    // N.2: o CMV e o resultado ficam "sem dados"/"pendente" com o porquê (nunca número); o custo físico na hora sempre vai.
+    expect(h[0].mudancas.map((m) => sp(m.depois))).toEqual([
+      'R$ 32,90',
+      'sem dados (falta preço em “Bacon”; sem meta de CMV para o canal)',
+      'pendente (falta preço em “Bacon”)',
+      'incompleto (R$ 1,50 sem “Bacon”)',
+    ]);
     // Pré-preparo não se vende.
     const molho = await cadastrarFicha(
       a,
@@ -422,7 +430,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
 
   it('veto do Guardião: sem "ver preços", nada de preço, margem, custo do canal, taxa ou alvo no histórico — nem no payload da página', async () => {
     // O que nunca pode aparecer (sem diferenciar maiúscula).
-    const PROIBIDO = /preço no|margem líquida|margem-alvo|custo d[oa] .* na hora|custo do|sugerido|comiss|pagamento online|R\$|embalagens do/i;
+    const PROIBIDO = /preço no|margem líquida|margem-alvo|custo d[oa] .* na hora|custo do|custo físico|CMV n[oa] |resultado após|meta de CMV|sugerido|comiss|pagamento online|R\$|embalagens do/i;
     const json = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
     // A dona vê tudo (controle: o filtro não esconde de quem pode).
     atual.ctx = ctxDe(a, A, 'DONO', 'Marina');

@@ -176,6 +176,7 @@ const CAMPO: Record<string, string> = {
   rendimento: 'rende',
   descricao: 'descrição',
   modoPreparo: 'modo de preparo',
+  passos: 'modo de preparo em etapas',
   foto: 'foto',
   itens: 'insumos',
   fichaQueProduz: 'vem da ficha',
@@ -281,6 +282,17 @@ const CAMPO: Record<string, string> = {
   custoDelivery: 'custo do delivery na hora',
   custoIfood: 'custo do iFood na hora',
   margemAlvo: 'margem-alvo',
+  // N.2: preço pela meta de CMV (na ficha) e meta de CMV (no canal)
+  cmvLoja: 'CMV na loja',
+  cmvDelivery: 'CMV no delivery',
+  cmvIfood: 'CMV no iFood',
+  resultadoLoja: 'resultado após os custos informados na loja',
+  resultadoDelivery: 'resultado após os custos informados no delivery',
+  resultadoIfood: 'resultado após os custos informados no iFood',
+  metaCmv: 'meta de CMV',
+  fisicoLoja: 'custo físico da loja na hora',
+  fisicoDelivery: 'custo físico do delivery na hora',
+  fisicoIfood: 'custo físico do iFood na hora',
   // 2.1: faturamento por canal e dia, e os canais em que a loja vende
   faturamentoCentavos: 'faturamento',
   pedidos: 'pedidos',
@@ -308,7 +320,7 @@ const CAMPO: Record<string, string> = {
 };
 
 /** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. 3.3: quem fez o lote, na conclusão. */
-const NA_HORA = new Set(['custoLoja', 'custoDelivery', 'custoIfood', 'feitoPor']);
+const NA_HORA = new Set(['custoLoja', 'custoDelivery', 'custoIfood', 'fisicoLoja', 'fisicoDelivery', 'fisicoIfood', 'feitoPor']);
 
 /** Ordem de leitura dos campos conhecidos; os outros vêm depois, como vieram. */
 const ORDEM = [
@@ -342,15 +354,25 @@ const ORDEM = [
   'comissao',
   'pagamento',
   'margemAlvo',
+  'metaCmv',
   'precoLoja',
+  'cmvLoja',
+  'resultadoLoja',
   'margemLoja',
   'custoLoja',
+  'fisicoLoja',
   'precoDelivery',
+  'cmvDelivery',
+  'resultadoDelivery',
   'margemDelivery',
   'custoDelivery',
+  'fisicoDelivery',
   'precoIfood',
+  'cmvIfood',
+  'resultadoIfood',
   'margemIfood',
   'custoIfood',
+  'fisicoIfood',
   'faturamentoCentavos',
   'pedidos',
   'clientes',
@@ -368,6 +390,7 @@ const ORDEM = [
   'meta',
   'valeDesde',
   'modoPreparo',
+  'passos',
   'conservacao',
   'validade',
   'prazoAposAbertura',
@@ -684,6 +707,17 @@ export const CAMPOS_DE_PRECIFICACAO: ReadonlySet<string> = new Set([
   'margemAlvo',
   'comissao',
   'pagamento',
+  // N.2
+  'cmvLoja',
+  'cmvDelivery',
+  'cmvIfood',
+  'resultadoLoja',
+  'resultadoDelivery',
+  'resultadoIfood',
+  'metaCmv',
+  'fisicoLoja',
+  'fisicoDelivery',
+  'fisicoIfood',
 ]);
 
 /** O retrato sem os campos de precificação; null = só tinha isso (a linha some). */

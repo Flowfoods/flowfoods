@@ -370,4 +370,15 @@ html:has(.ff-app[data-tema='escuro']) {
   .ff-app tr {
     break-inside: avoid;
   }
+  /* N.5: o papel é branco e só tem a altura do conteúdo. Sem isto, o fundo creme da página, a margem de área segura e a
+     altura mínima de tela cheia do app empurravam uma folha em branco a mais no fim (ficha e relatórios). */
+  html:has(.ff-app),
+  body:has(.ff-app) {
+    background: #fff !important;
+    padding: 0 !important;
+  }
+  .ff-app,
+  .ff-app .min-h-dvh {
+    min-height: 0 !important;
+  }
 }

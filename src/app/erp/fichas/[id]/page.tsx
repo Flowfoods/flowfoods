@@ -6,7 +6,7 @@
 
 import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
-import { obterFicha } from '@/lib/erp/fichas';
+import { fichaNaTela, obterFicha } from '@/lib/erp/fichas';
 import { custoPorCanal } from '@/lib/erp/canais';
 import { lerFiltrosDeFicha, queryDosFiltrosDeFicha } from '@/lib/erp/ficha-campos';
 import { TelaDetalheFicha } from '@/components/erp/telas/fichas/detalhe';
@@ -27,7 +27,8 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
   const de = queryDosFiltrosDeFicha(lerFiltrosDeFicha(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));
   return (
     <TelaDetalheFicha
-      ficha={ficha}
+      // N.5: quem só opera recebe a ficha sem nenhum valor de custo (visão operacional automática).
+      ficha={fichaNaTela(ficha, verPrecos)}
       base={BASE}
       voltar={de ? `${BASE}?${de}` : BASE}
       feito={searchParams.feito}

@@ -234,8 +234,12 @@ export function lerMargensAlvo(entrada: Partial<Record<CanalVenda, unknown>>, ta
 // ------------------------------------------------------------- impressões
 
 /** Os preços próprios que a tela leu, na ordem dos canais ("LOJA:-|DELIVERY_PROPRIO:-|IFOOD:2990"). */
-export function impressaoDosPrecos(linhas: readonly { canal: string; precoManualCentavos: number | null }[]): string {
-  return ORDEM_DOS_CANAIS.map((c) => `${c}:${linhas.find((l) => l.canal === c)?.precoManualCentavos ?? '-'}`).join('|');
+export function impressaoDosPrecos(linhas: readonly { canal: string; precoManualCentavos: number | null; ativo?: boolean }[]): string {
+  // N.3: canal tirado do prato entra como ":fora" (só quando fora: a impressão de quem nunca tirou continua a mesma).
+  return ORDEM_DOS_CANAIS.map((c) => {
+    const l = linhas.find((x) => x.canal === c);
+    return `${c}:${l?.precoManualCentavos ?? '-'}${l && l.ativo === false ? ':fora' : ''}`;
+  }).join('|');
 }
 
 /** O custo que a tela leu (sem taxa, a taxa, incompleto): se o servidor ler outro, a frase avisa. */

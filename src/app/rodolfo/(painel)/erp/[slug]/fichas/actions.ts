@@ -11,7 +11,7 @@
 import { prisma } from '@/lib/db';
 import { exigirParceiro, recusaDaAcao } from '@/lib/erp/contexto';
 import { cadastrarFicha, editarFicha, mudarSituacaoFicha, type ResultadoFicha } from '@/lib/erp/fichas';
-import { salvarEmbalagens, salvarMargensAlvo, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
+import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import type { EstadoImportacao } from '@/components/erp/telas/fichas/estado';
@@ -21,6 +21,7 @@ import {
   lerEnvioDaFicha,
   lerEnvioDasEmbalagens,
   lerEnvioDasMargens,
+  lerEnvioDasMetas,
   lerEnvioDosPrecos,
 } from '@/components/erp/telas/fichas/executar';
 
@@ -114,6 +115,17 @@ export async function acaoSalvarPrecos(slug: string, id: string, anterior: Estad
   const r = await salvarPrecos(ctx.cliente, String(id), lerEnvioDosPrecos(form), ctx.sessao.autorNome);
   if (r.ok && r.mudou.length) await auditar(ctx, 'erp_ficha_precos', { id: r.id });
   return concluir(r, anterior, base, { mudou: r.ok && r.custoMudou ? 'precos-custo' : 'precos', igual: 'precos-igual' });
+}
+
+/** N.2: meta de CMV de cada canal do parceiro. */
+export async function acaoSalvarMetasDeCmv(slug: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+  const ctx = await exigirParceiro(String(slug));
+  const negado = recusaDaAcao(ctx, 'precos.ver') ?? recusaDaAcao(ctx, 'precos.editar') ?? ctx.bloqueio;
+  const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
+  if (negado) return recusado(anterior, negado);
+  const r = await salvarMetasDeCmv(ctx.cliente, lerEnvioDasMetas(form), ctx.sessao.autorNome);
+  if (r.ok && r.mudou.length) await auditar(ctx, 'erp_metas_cmv', { canais: r.mudou.join(',') });
+  return concluir(r, anterior, base, { mudou: 'metas', igual: 'metas-igual' }, 'canais');
 }
 
 /** 1.10: margem-alvo de cada canal do parceiro. */

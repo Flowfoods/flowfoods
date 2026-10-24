@@ -43,6 +43,8 @@ export async function lerEnvioDaFicha(
     tipo: textoDe(form.get('tipo')),
     descricao: textoDe(form.get('descricao')),
     modoPreparo: textoDe(form.get('modoPreparo')),
+    // N.4: as etapas na ordem da tela.
+    passos: form.getAll('passo').map(textoDe),
     rendimento: textoDe(form.get('rendimento')),
     rendimentoUnidade: textoDe(form.get('rendimentoUnidade')),
     versao: textoDe(form.get('versao')),
@@ -111,6 +113,18 @@ export function lerEnvioDosPrecos(form: FormData) {
     impressao: textoDe(form.get('impressao')),
     custos: textoDe(form.get('custos')),
     precos: { LOJA: textoDe(form.get('preco_LOJA')), DELIVERY_PROPRIO: textoDe(form.get('preco_DELIVERY_PROPRIO')), IFOOD: textoDe(form.get('preco_IFOOD')) },
+    // N.3: a tela que pergunta "vende neste canal?" manda `ofertas=1`; caixa desmarcada não vai no formulário.
+    ...(form.get('ofertas') === '1'
+      ? { ofertas: { LOJA: form.get('oferta_LOJA') === 'sim', DELIVERY_PROPRIO: form.get('oferta_DELIVERY_PROPRIO') === 'sim', IFOOD: form.get('oferta_IFOOD') === 'sim' } }
+      : {}),
+  };
+}
+
+/** N.2: as metas de CMV dos canais e a versão lida. */
+export function lerEnvioDasMetas(form: FormData) {
+  return {
+    versao: textoDe(form.get('versao')),
+    metas: { LOJA: textoDe(form.get('metaCmv_LOJA')), DELIVERY_PROPRIO: textoDe(form.get('metaCmv_DELIVERY_PROPRIO')), IFOOD: textoDe(form.get('metaCmv_IFOOD')) },
   };
 }
 

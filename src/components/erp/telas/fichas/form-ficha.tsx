@@ -56,6 +56,7 @@ import { CampoFoto } from './campo-foto';
 import { CamposDeValidade } from '../cadastro/campos-validade';
 import { CONSERVACOES, entradaDoFormulario, lerValidades, type Conservacao, type Validades } from '@/lib/erp/validade';
 import { PREFIXO_DO_PREPARO } from './prefixo';
+import { EditorDePassos } from './editor-passos';
 
 export interface LinhaDoItem {
   /** Id do insumo, ou "ficha:<id>" do pré-preparo (o valor do seletor). */
@@ -70,6 +71,8 @@ export interface ValoresDaFicha {
   tipo: TipoFicha;
   descricao: string;
   modoPreparo: string;
+  /** N.4: as etapas do preparo, na ordem (rascunho antigo, sem o campo: nenhuma). */
+  passos?: string[];
   rendimento: string;
   rendimentoUnidade: RendeEm;
   itens: LinhaDoItem[];
@@ -83,6 +86,7 @@ const NOVA: ValoresDaFicha = {
   tipo: 'PRATO',
   descricao: '',
   modoPreparo: '',
+  passos: [],
   rendimento: '1',
   rendimentoUnidade: 'porcao',
   itens: [VAZIA],
@@ -92,7 +96,8 @@ const NOVA: ValoresDaFicha = {
 const ROTULOS: Record<string, string> = {
   nome: 'Nome',
   tipo: 'Tipo',
-  descricao: 'Descrição',
+  descricao: 'Descrição comercial',
+  passos: 'Modo de preparo',
   foto: 'Foto',
   rendimento: 'Rendimento',
   itens: 'Insumos e pré-preparos',
@@ -103,7 +108,9 @@ const rotuloDoCampo = (c: string) =>
   ROTULOS[c] ??
   (c.startsWith('item-')
     ? `Item ${Number(c.slice(5)) + 1}`
-    : c.startsWith('validade-')
+    : c.startsWith('passo-')
+      ? `Etapa ${Number(c.slice(6)) + 1} do preparo`
+      : c.startsWith('validade-')
       ? `Validade em ${CONSERVACOES[c.slice(9) as Conservacao]?.toLowerCase() ?? c}`
       : c);
 
@@ -280,6 +287,7 @@ function FormFichaBase({
       tipo,
       descricao: t('descricao'),
       modoPreparo: t('modoPreparo'),
+      passos: f.getAll('passo').map((x) => (typeof x === 'string' ? x : '')),
       rendimento,
       rendimentoUnidade: rendeEm,
       itens: linhas.map(({ chave: _c, ...l }) => l),
@@ -344,7 +352,7 @@ function FormFichaBase({
             </div>
             <div>
               <label htmlFor={`${idBase}-descricao`} className={ROTULO}>
-                Descrição <span className="font-normal text-suave">(uma ou duas linhas)</span>
+                Descrição comercial <span className="font-normal text-suave">(uma ou duas linhas)</span>
               </label>
               <textarea
                 id={`${idBase}-descricao`}
@@ -355,8 +363,11 @@ function FormFichaBase({
                 placeholder="Ex.: Pão brioche, blend 180 g, cheddar e molho da casa"
                 className={`${CAMPO} resize-y`}
                 aria-invalid={!!erros.descricao}
-                aria-describedby={erros.descricao ? `${idBase}-descricao-erro` : undefined}
+                aria-describedby={`${idBase}-descricao-ajuda${erros.descricao ? ` ${idBase}-descricao-erro` : ''}`}
               />
+              <p id={`${idBase}-descricao-ajuda`} className={AJUDA}>
+                Texto de apresentação para cardápios e marketplaces. Não vai para lugar nenhum sozinho. O passo a passo da cozinha fica no modo de preparo.
+              </p>
               <Erro id={`${idBase}-descricao-erro`} texto={erros.descricao} />
             </div>
             <CampoFoto atual={fotoAtual} nome={nome} erro={erros.foto} idBase={idBase} envio={`${base}/fotos`} aoMudar={saida.aoMudar} aoOcupar={setEnviandoFoto} />
@@ -600,22 +611,8 @@ function FormFichaBase({
           </div>
         </Painel>
 
-        <Painel titulo="Modo de preparo">
-          <label htmlFor={`${idBase}-modoPreparo`} className="sr-only">
-            Modo de preparo
-          </label>
-          <textarea
-            id={`${idBase}-modoPreparo`}
-            name="modoPreparo"
-            rows={7}
-            maxLength={LIMITES_DA_FICHA.modoPreparo}
-            defaultValue={inicial.modoPreparo}
-            placeholder={'Passo a passo, um por linha. Ex.:\nSelar o blend 2 min de cada lado.\nDerreter o cheddar por cima.\nMontar: pão, molho, blend.'}
-            className={`${CAMPO} resize-y leading-relaxed`}
-            aria-invalid={!!erros.modoPreparo}
-            aria-describedby={erros.modoPreparo ? `${idBase}-modoPreparo-erro` : undefined}
-          />
-          <Erro id={`${idBase}-modoPreparo-erro`} texto={erros.modoPreparo} />
+        <Painel titulo="Modo de preparo" subtitulo="Em etapas numeradas: uma ação por etapa">
+          <EditorDePassos inicial={inicial.passos ?? []} textoAnterior={inicial.modoPreparo} erros={erros} idBase={idBase} aoMudar={saida.aoMudar} />
         </Painel>
       </fieldset>
 

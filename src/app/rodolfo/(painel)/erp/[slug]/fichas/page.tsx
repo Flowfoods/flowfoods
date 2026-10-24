@@ -6,7 +6,7 @@
 
 import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { listarFichas } from '@/lib/erp/fichas';
-import { precosDaLista } from '@/lib/erp/canais';
+import { cmvDaLista } from '@/lib/erp/canais';
 import { lerFiltrosDeFicha, temFiltroDeFicha } from '@/lib/erp/ficha-campos';
 import { FICHAS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtitulo';
 import { FiltrosDasFichas, TelaListaFichas } from '@/components/erp/telas/fichas/lista';
@@ -26,7 +26,7 @@ export default async function ParceiroFichasPage({
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
   const filtros = lerFiltrosDeFicha(searchParams);
   const [pagina, { visao }] = await Promise.all([listarFichas(ctx.cliente, filtros), visaoDaRequisicao(ctx)]);
-  const precos = await precosDaLista(ctx.cliente, pagina.linhas);
+  const precos = await cmvDaLista(ctx.cliente, pagina.linhas);
   return (
     <div className="space-y-6">
       <CabecalhoDasFichas
@@ -43,7 +43,7 @@ export default async function ParceiroFichasPage({
         {...pagina}
         novaHref={ctx.bloqueio ? undefined : `${base}/nova`}
         importarHref={ctx.bloqueio ? undefined : `${base}/importar`}
-        precos={precos}
+        cmv={precos}
       />
     </div>
   );
