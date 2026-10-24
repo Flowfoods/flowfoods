@@ -299,7 +299,7 @@ apagar volume, banco ou pasta de upload.
 - ~19:00 UTC (16:00 RJ): a VPS parou de responder por completo (até a API do
   Dokploy dava timeout). Todos os containers saíram com código 255 — desligamento
   abrupto, não parada limpa. `dokploy-traefik` registrou fim às 19:00:54.
-- ~19:15 UTC: a máquina voltou (containers "Up 4 hours" às 23:15). Apps,
+- 19:29 UTC: a máquina voltou (uptime lido no host às 00:59). Apps,
   bancos, n8n, Evolution e Dokploy subiram sozinhos; o Traefik não (sintoma
   acima), então todos os domínios ficaram fora.
 - Build triplo do `flowfoods-web` (migrar/web/worker com `build:`): **não foi a
@@ -319,6 +319,30 @@ apagar volume, banco ou pasta de upload.
   Dokploy) recusou com 400 `The argument 'file' cannot be empty` — o Dokploy
   copia imagem e montagens do container existente; sem ele, não recria. Nada foi
   criado. `getTraefikPorts` e `readTraefikEnv` também dão 500 sem o container.
+
+- 00:59 UTC: relatório do host (pelo compose de uso único): boot às **19:29 UTC**
+  (uptime), 11 GB de RAM livres de 16, Swarm ativo, `dokploy-network` overlay
+  attachable, `traefik.yml` e `acme.json` intactos — e **nenhuma imagem do
+  Traefik**: a limpeza das 23h apagou também imagens sem uso (padrão de
+  `docker system prune -a` / "limpar tudo" do Dokploy). Os eventos do Docker
+  daquele intervalo já não estavam no histórico do daemon.
+- **01:02 UTC: Traefik recriado** (`traefik:v3.6`, mesmas montagens e portas do
+  Dokploy) pela etapa `traefik-via-compose`; entrou na `dokploy-network` sem
+  erro. Compose temporário removido em seguida.
+- **01:04 e 01:09 UTC: prova com TLS validado — todos os domínios reais OK**,
+  Traefik `running`, 0 reinícios. Endereços auxiliares (`*.sslip.io`,
+  `*.traefik.me`) ficam com o certificado padrão do Traefik; `*.traefik.me`
+  bateu no limite do Let's Encrypt para esse domínio público (não é site de
+  cliente).
+
+### Sem SSH: recriar o Traefik pelo Dokploy
+
+`barney-ops` → `reerguer-vps` → etapa `traefik-via-compose`. Cria um compose de
+uso único (`docker:27-cli` com o docker.sock do host) que roda
+`scripts/infra/reerguer-traefik.sh`: recusa se o Traefik existir ou faltar
+config, baixa a imagem se ela sumiu, cria, conecta na overlay, grava relatório
+em `/etc/dokploy/traefik/reerguer/reerguer.log` (lido pela API) e o compose é
+removido no fim. Funcionou em 24/10.
 
 ### Traefik sumiu (container removido) — recriar no host
 
