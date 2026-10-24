@@ -12,8 +12,17 @@ echo "== imagens traefik"; docker images --format '{{.Repository}}:{{.Tag}} {{.C
 echo "== rede"; docker network inspect dokploy-network --format 'driver={{.Driver}} attachable={{.Attachable}} scope={{.Scope}}' 2>&1
 echo "== config"; ls -la /tf/traefik.yml /tf/dynamic/acme.json 2>&1
 echo "== antes"; docker ps -a --filter name=dokploy-traefik --format '{{.Names}} {{.Status}}'
+echo "== eventos do Docker 23/10 23:00 → 24/10 00:10 (remoções)"
+docker events --since 2026-10-23T23:00:00Z --until 2026-10-24T00:10:00Z \
+  --filter event=destroy --filter event=delete --filter event=untag --filter event=prune \
+  --format '{{.TimeNano}} {{.Type}} {{.Action}} {{index .Actor.Attributes "name"}}{{index .Actor.Attributes "reclaimed"}}' 2>&1 \
+  | awk '{ $1=strftime("%H:%M:%S", substr($1,1,10), 1); print }' | head -80
 IMG=$(docker images --format '{{.Repository}}:{{.Tag}}' | grep -m1 '^traefik:')
-if [ -z "$IMG" ]; then echo "PAREI: sem imagem traefik local"; exit 1; fi
+if [ -z "$IMG" ]; then
+  IMG="${TRAEFIK_IMAGEM:-traefik:v3.6}"
+  echo "== sem imagem local — baixando $IMG"
+  docker pull "$IMG" || { echo "PAREI: não baixou $IMG"; exit 1; }
+fi
 if [ ! -f /tf/traefik.yml ]; then echo "PAREI: sem /etc/dokploy/traefik/traefik.yml"; exit 1; fi
 if [ -n "$(docker ps -aq -f name=^dokploy-traefik$)" ]; then echo "PAREI: dokploy-traefik já existe"; exit 1; fi
 echo "== criando com $IMG"
