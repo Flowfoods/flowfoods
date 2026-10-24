@@ -11,6 +11,7 @@ import { resumirSaude } from '@/lib/erp/saude-do-cardapio';
 import type { LojaNoMes } from '@/lib/erp/faturamento';
 import type { CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
 import { produzidoPorFicha, type LoteEncerrado } from '@/lib/erp/producao-equipe-campos';
+import { colocarInsumoCriado } from '@/lib/erp/ficha-campos';
 
 describe('gráfico · eixo e formato', () => {
   it('marcas redondas de 0 até cobrir o máximo', () => {
@@ -124,5 +125,15 @@ describe('rendimento por preparo', () => {
       { fichaId: 'molho', nome: 'Molho da casa', unidade: 'KG', lotes: 2, planejadoMilesimos: 40_000, produzidoMilesimos: 40_000, rendimentoBp: 10_000 },
     ]);
     expect(produzidoPorFicha([])).toEqual([]);
+  });
+});
+
+describe('ficha · o insumo que acabou de ser cadastrado entra na receita', () => {
+  const V = { escolha: '', quantidade: '', unidade: '', fator: '' };
+  it('vai para a linha vazia; sem vazia, ganha linha nova; já presente ou no limite, nada muda', () => {
+    expect(colocarInsumoCriado([{ ...V, escolha: 'a', quantidade: '1' }, V], 'n', 'g', V)).toEqual({ itens: [{ ...V, escolha: 'a', quantidade: '1' }, { ...V, escolha: 'n', unidade: 'g' }], escolhido: true });
+    expect(colocarInsumoCriado([{ ...V, escolha: 'a', quantidade: '1' }], 'n', 'g', V)).toEqual({ itens: [{ ...V, escolha: 'a', quantidade: '1' }, { ...V, escolha: 'n', unidade: 'g' }], escolhido: true });
+    expect(colocarInsumoCriado([{ ...V, escolha: 'n', quantidade: '3' }], 'n', 'g', V)).toEqual({ itens: [{ ...V, escolha: 'n', quantidade: '3' }], escolhido: true });
+    expect(colocarInsumoCriado([{ ...V, escolha: 'a' }], 'n', 'g', V, 1)).toEqual({ itens: [{ ...V, escolha: 'a' }], escolhido: false });
   });
 });

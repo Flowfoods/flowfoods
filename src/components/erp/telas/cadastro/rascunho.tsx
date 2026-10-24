@@ -11,7 +11,7 @@
  * Uma foto escolhida na ficha não é guardada (arquivos não cabem aqui): a ficha avisa.
  */
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { PARAMETRO_FORNECEDOR_CRIADO, PARAMETRO_INSUMO_CRIADO } from '@/lib/erp/volta';
 
@@ -109,11 +109,17 @@ export function useRascunhoDaTela<T>(versaoAtual?: string): RascunhoDaTela<T> {
   const [fornecedorCriado] = useState(() => busca?.get(PARAMETRO_FORNECEDOR_CRIADO) ?? null);
   const [valores, setValores] = useState<T | null | undefined>(undefined);
   const [versaoMudou, setVersaoMudou] = useState(false);
+  // A leitura acontece UMA vez por visita: o React (modo estrito) pode rodar o efeito duas vezes no mesmo componente; a segunda
+  // rodada acharia o armazenamento já vazio e apagaria o que a primeira recuperou. O ref guarda o que foi lido.
+  const lido = useRef<{ valores: T | null; versaoMudou: boolean } | null>(null);
   useEffect(() => {
-    const r = lerRascunho<T>(chave, versaoAtual);
+    if (!lido.current) {
+      lido.current = lerRascunho<T>(chave, versaoAtual);
+      descartarRascunho(chave);
+    }
+    const r = lido.current;
     setValores(r.valores);
     setVersaoMudou(r.versaoMudou);
-    descartarRascunho(chave);
     // Limpa o parâmetro da barra de endereço: recarregar a página não repete o aviso nem a escolha.
     if (pathname && [PARAMETRO_INSUMO_CRIADO, PARAMETRO_FORNECEDOR_CRIADO].some((k) => new URLSearchParams(window.location.search).has(k))) {
       const p = new URLSearchParams(window.location.search);

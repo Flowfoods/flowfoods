@@ -19,6 +19,7 @@ import {
   formatarFator,
   lerFator,
   LIMITES_DA_FICHA,
+  colocarInsumoCriado,
   quantidadeBruta,
   RENDE_DO_PREPARO,
   RENDE_EM,
@@ -148,11 +149,9 @@ export function FormFicha(props: PropsDoFormFicha) {
   let valores = recuperado ?? props.inicial ?? NOVA;
   let escolhido = false;
   if (criado) {
-    const vaga = valores.itens.findIndex((l) => !l.escolha);
-    if (vaga >= 0) {
-      valores = { ...valores, itens: valores.itens.map((l, n) => (n === vaga ? { ...l, escolha: criado.id, unidade: SIGLAS_DIGITAVEIS[criado.unidade][0] } : l)) };
-      escolhido = true;
-    }
+    const colocado = colocarInsumoCriado(valores.itens, criado.id, SIGLAS_DIGITAVEIS[criado.unidade][0], VAZIA);
+    valores = { ...valores, itens: colocado.itens };
+    escolhido = colocado.escolhido;
   }
   return (
     <FormFichaBase

@@ -4461,3 +4461,16 @@ Pedido de Rodolfo: criar gráficos e análises a partir dos módulos da Nina, ev
 **No navegador:** os três painéis com dados sintéticos a 1440 (claro), 1180 (escuro) e 390, sem rolagem lateral. O banco local não tem compras nem lotes; as telas de verdade foram conferidas pelos testes com banco.
 
 **Próximo passo:** simulador de preço na ficha; evolução do CMV por categoria em linhas (6 períodos).
+
+## Roteiro E1–E3 — jornada piloto percorrida e rotas por destino (24/10/2026)
+
+Seguindo "COMEÇAR AQUI" (Notion). Decisão 456. Sem merge e sem deploy.
+
+| Entrega | Onde | Prova |
+|---|---|---|
+| Rascunho lido uma vez por visita (a ficha não volta vazia depois de cadastrar o insumo) | `telas/cadastro/rascunho.tsx` | navegador (roteiro da jornada) |
+| Insumo cadastrado entra numa linha da receita (vazia ou nova) | `lib/erp/ficha-campos.ts` (`colocarInsumoCriado`), `telas/fichas/form-ficha.tsx` | `erp-graficos.test.ts`, navegador |
+| Rotas afetadas por destino (98 páginas, permissão de entrada de cada uma) | `docs/NAVEGACAO.md` §6 | lido do código |
+
+**Jornada piloto (passos 1–9 do roteiro), app local, Dona e Operador, 1440 e 390:** lista com busca → detalhe com "Onde é usado" e volta com a busca → ficha nova com nome, rendimento e item → "Insumo que falta: cadastrar" com o nome levado → erros por campo sem perder o digitado → "Cadastrar e voltar" → ficha recuperada com aviso e o insumo novo na linha 2 → salvar → reabrir com 2 itens → "Onde é usado" do insumo novo lista a ficha → operador abre a ficha sem R$. **Não feito:** validação com operador e gestor do Valentin's; o mesmo percurso na nota de compra e nas embalagens foi coberto pela mesma correção, sem roteiro próprio.
+

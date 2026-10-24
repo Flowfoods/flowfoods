@@ -108,12 +108,12 @@ export function AtalhoNovoInsumo({
   );
 }
 
-/** Na tela de origem: o insumo que acabou de ser cadastrado já está na lista (e foi escolhido numa linha vazia, quando havia). */
+/** Na tela de origem: o insumo que acabou de ser cadastrado já está na lista (e escolhido numa linha, quando a tela pôde). */
 export function AvisoInsumoCriado({ nome, escolhido }: { nome: string; escolhido: boolean }) {
   return (
     <div role="status" className="rounded-[10px] border border-linha-forte px-4 py-3 text-sm">
       <p className="font-semibold text-texto">Insumo salvo com sucesso: {nome}</p>
-      <p className="mt-0.5 text-suave">{escolhido ? 'Ele já está na lista e foi escolhido numa linha vazia. Confira e siga.' : 'Ele já está na lista de insumos desta tela.'}</p>
+      <p className="mt-0.5 text-suave">{escolhido ? 'Ele já está na lista e foi escolhido numa linha. Confira a quantidade e siga.' : 'Ele já está na lista de insumos desta tela.'}</p>
     </div>
   );
 }
