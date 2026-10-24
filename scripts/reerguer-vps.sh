@@ -387,6 +387,51 @@ REMOTO
   [ "$falhas" = 0 ] || exit 1
 }
 
+# Marcador de conteúdo esperado por domínio (literal). Sem marcador: só título.
+marcador() {
+  case "$1" in
+    consultoriaflowfoods.com.br|www.consultoriaflowfoods.com.br) echo "Gastronomia que flui" ;;
+    *) echo "" ;;
+  esac
+}
+
+# Um domínio: DNS (resolvedor público), conexão, TLS VALIDADO (curl sem -k),
+# HTTP, título e marcador. O motivo da falha vem do código de saída do curl —
+# "000" sozinho não diz nada.
+provar_um() {
+  local d="$1" ip e http mk tit cert emissor vence st
+  ip=$(dig +short +time=3 +tries=1 A "$d" @1.1.1.1 | grep -E '^[0-9.]+$' | tail -1)
+  http=$(curl -sS -o "/tmp/p/$d.html" -w '%{http_code}' --max-time 15 "https://$d/" 2>"/tmp/p/$d.err"); e=$?
+  case "$e" in
+    0)  st="" ;;
+    6)  st="DNS não resolve" ;;
+    7)  st="conexão RECUSADA (nada na 443)" ;;
+    28) st="conexão EXPIROU" ;;
+    35) st="TLS: negociação falhou" ;;
+    60) st="TLS: certificado INVÁLIDO" ;;
+    *)  st="curl erro $e" ;;
+  esac
+  [ "$e" = 0 ] || http="-"
+  cert=""
+  case "$e" in 0|35|60)
+    cert=$(echo | timeout 10 openssl s_client -connect "$d:443" -servername "$d" 2>/dev/null \
+             | openssl x509 -noout -issuer -enddate 2>/dev/null) ;;
+  esac
+  emissor=$(sed -n 's/^issuer=.*O *= *\([^,]*\).*/\1/p' <<<"$cert" | head -1)
+  vence=$(sed -n 's/^notAfter=//p' <<<"$cert")
+  tit=$(grep -o -i '<title>[^<]*' "/tmp/p/$d.html" 2>/dev/null | head -1 | sed 's/<title>//I' | cut -c1-40)
+  mk=$(marcador "$d")
+  if [ "$e" = 0 ]; then
+    case "$http" in 2*|3*) ;; *) st="HTTP $http" ;; esac
+    if [ -z "$st" ] && [ -n "$mk" ] && ! grep -qF "$mk" "/tmp/p/$d.html"; then st="conteúdo inesperado"; fi
+    [ -z "$st" ] && st=OK
+  fi
+  [ "$ip" != "$VPS_IP" ] && st="$st; DNS → ${ip:-nada}"
+  printf '| %s | %s | %s | %s | %s | %s | %s |\n' "$d" "${ip:-?}" "${http:--}" \
+    "$( [ "$e" = 0 ] && echo válido || { [ -n "$cert" ] && echo inválido || echo 'não lido'; } )" \
+    "${emissor:--}" "${vence:--}" "$st${tit:+ · \"$tit\"}" > "/tmp/p/$d.linha"
+}
+
 provar() {
   inventario >/dev/null 2>&1 || true
   coletar_dominios
@@ -394,27 +439,41 @@ provar() {
     cut -f1 /tmp/dominios.tsv
     printf '%s\n' consultoriaflowfoods.com.br www.consultoriaflowfoods.com.br
     [ -n "${EXTRAS:-}" ] && tr ',' '\n' <<<"$EXTRAS"
-  } | sed -E 's#^https?://##; s#/.*##; /^$/d' | sort -u > /tmp/dominios
-  linha_tab="| Domínio | DNS → | HTTP | Certificado | Emissor | Vence em | Status |"
-  { echo "### Prova site por site"; echo; echo "$linha_tab"; echo "|---|---|---|---|---|---|---|"; } >> "$RESUMO"
-  echo "$linha_tab"
-  while read -r d; do
-    ip=$(dig +short +time=3 +tries=1 A "$d" @1.1.1.1 | tail -1)
-    http=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "https://$d" || true)
-    cert=$(echo | timeout 15 openssl s_client -connect "$d:443" -servername "$d" 2>/dev/null \
-             | openssl x509 -noout -subject -issuer -enddate -ext subjectAltName 2>/dev/null)
-    emissor=$(sed -n 's/^issuer=.*O *= *\([^,]*\).*/\1/p' <<<"$cert" | head -1)
-    vence=$(sed -n 's/^notAfter=//p' <<<"$cert")
-    if grep -q "DNS:${d}\b" <<<"$cert" || grep -q "DNS:\*\.${d#*.}\b" <<<"$cert"; then nome=ok; else nome=ERRADO; fi
-    [ -z "$cert" ] && nome="sem cert"
-    prob=()
-    [ "$ip" != "$VPS_IP" ] && prob+=("DNS fora da VPS")
-    case "$http" in 2*|3*|401|403) ;; *) prob+=("fora do ar") ;; esac
-    [ "$nome" != ok ] && prob+=("certificado")
-    if [ ${#prob[@]} = 0 ]; then st=OK; else st=$(IFS=/; echo "${prob[*]}"); fi
-    l="| $d | ${ip:-?} | ${http:-000} | $nome | ${emissor:-?} | ${vence:-?} | $st |"
-    echo "$l"; echo "$l" >> "$RESUMO"
-  done < /tmp/dominios
+  } | sed -E 's#^https?://##; s#/.*##; /^$/d' | grep -vE '^[0-9.]+$|^app\.seudominio' | sort -u > /tmp/dominios
+  rm -rf /tmp/p; mkdir -p /tmp/p
+  inicio=$(date -u +%H:%M:%SZ)
+  while read -r d; do provar_um "$d" & done < /tmp/dominios
+  wait
+  cab="| Domínio | DNS → | HTTP | TLS | Emissor | Vence em | Resultado |"
+  {
+    echo "### Prova site por site — $inicio a $(date -u +%H:%M:%SZ)"; echo; echo "$cab"; echo "|---|---|---|---|---|---|---|"
+    while read -r d; do cat "/tmp/p/$d.linha"; done < /tmp/dominios
+  } | tee -a "$RESUMO"
+  ok=$(grep -c '| OK' /tmp/p/*.linha 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
+  echo; echo "OK: $ok de $(wc -l < /tmp/dominios)  (TLS validado; HTTP '-' = sem resposta, não é código do site)"
+  if [ "$(dokploy GET "/api/docker.getConfig?containerId=dokploy-traefik" 2>/dev/null)" = 200 ] && [ -s /tmp/dk.json ]; then
+    echo "Traefik: $(jq -c '{Status: .State.Status, StartedAt: .State.StartedAt, RestartCount, Error: .State.Error}' /tmp/dk.json 2>/dev/null)"
+  else
+    echo "Traefik: container não existe (ou sem leitura)"
+  fi
+}
+
+# Espera a 443 abrir (até ALVOS minutos, padrão 20) e roda a prova duas vezes,
+# com 5 min entre elas, para ver se o Traefik fica de pé.
+aguardar_e_provar() {
+  preparar_dokploy || true
+  max="${ALVOS:-20}"; case "$max" in ''|*[!0-9]*) max=20 ;; esac
+  for i in $(seq 1 "$max"); do
+    if nc -z -w 5 "$VPS_IP" 443 2>/dev/null; then
+      echo "443 abriu às $(date -u +%H:%M:%SZ)"
+      titulo "Rodada 1"; provar
+      sleep 300
+      titulo "Rodada 2 (+5 min)"; provar
+      return 0
+    fi
+    echo "$(date -u +%H:%M:%SZ) 443 ainda fechada ($i/$max)"; sleep 55
+  done
+  echo "::warning::443 não abriu em $max min."; provar; exit 1
 }
 
 # Recria o dokploy-traefik pelo caminho gerenciado do Dokploy
@@ -467,5 +526,6 @@ case "$ETAPA" in
   subir)        subir ;;
   provar)       provar ;;
   recriar-traefik) recriar_traefik ;;
+  aguardar-e-provar) aguardar_e_provar ;;
   *) echo "etapa desconhecida: $ETAPA"; exit 2 ;;
 esac
