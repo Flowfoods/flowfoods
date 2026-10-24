@@ -32,6 +32,8 @@ import { UNIDADES, formatarDinheiro, formatarFracao, formatarQuantidade, valorDo
 import { CAMPO, MARCAR } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { FiltrosRecolhiveis } from './filtros-recolhiveis';
+import { MarcarTodosDaPagina } from './barra-categoria';
+import { FORM_DA_SELECAO } from './selecao';
 import { PaginacaoNumerada } from '../../ui/paginacao-numerada';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 
@@ -394,6 +396,7 @@ export function TelaListaInsumos({
   totalDoCadastro,
   novoHref,
   comAcoes = false,
+  selecionar = false,
 }: {
   /** /erp/insumos ou /rodolfo/erp/<slug>/insumos */
   base: string;
@@ -408,7 +411,22 @@ export function TelaListaInsumos({
   novoHref?: string;
   /** L.1: caneta e lixeira em cada linha — só para quem tem "cadastrar e editar insumos" e parceiro não bloqueado (o servidor confere de novo). */
   comAcoes?: boolean;
+  /** F4: caixa de marcar em cada linha, ligada à barra "Alterar categoria" (`BarraDeCategoria`, que a página põe junto). */
+  selecionar?: boolean;
 }) {
+  const caixa = (i: LinhaDeInsumo) => (
+    <label className="inline-flex h-11 w-11 cursor-pointer items-center justify-center">
+      <input
+        type="checkbox"
+        name="ids"
+        value={i.id}
+        form={FORM_DA_SELECAO}
+        data-categoria={i.categoria?.nome ?? 'Sem categoria'}
+        aria-label={`Marcar ${i.nome}`}
+        className={MARCAR}
+      />
+    </label>
+  );
   // A página que o servidor devolveu manda nos links (página pedida além da última já veio ajustada).
   const filtrosDaPagina: FiltrosDeInsumo = { ...f, pagina, porPagina };
   const { de, ate } = faixaDaPagina(pagina, porPagina, linhas.length);
@@ -482,13 +500,21 @@ export function TelaListaInsumos({
     <div className="space-y-3">
       {resumo}
       <Painel semRespiro>
+        {selecionar && (
+          <div className="flex items-center justify-between gap-2 border-b border-linha px-2 py-1 sm:px-3">
+            <MarcarTodosDaPagina />
+            <span className="pr-2 text-[12px] text-suave">Marque para mudar a categoria de vários de uma vez.</span>
+          </div>
+        )}
         {/* Celular: cartões que abrem o detalhe; as ações ficam numa linha própria (nada de link dentro de link). */}
         <ul className="divide-y divide-linha sm:hidden">
           {linhas.map((i) => (
             <li key={i.id}>
+              <div className="flex items-center">
+              {selecionar && <span className="shrink-0 pl-1">{caixa(i)}</span>}
               <Link
                 href={hrefDoDetalhe(base, i.id, filtrosDaPagina)}
-                className="ff-transicao flex min-h-14 items-center justify-between gap-3 px-4 py-3 hover:bg-texto/[0.03]"
+                className={`ff-transicao flex min-h-14 min-w-0 flex-1 items-center justify-between gap-3 py-3 pr-4 hover:bg-texto/[0.03] ${selecionar ? 'pl-1' : 'pl-4'}`}
               >
                 <span className="min-w-0">
                   <span className={`block truncate font-medium ${i.ativo ? 'text-texto' : 'text-suave'}`}>{i.nome}</span>
@@ -507,6 +533,7 @@ export function TelaListaInsumos({
                   <Custo i={i} />
                 </span>
               </Link>
+              </div>
               {comAcoes && !i.preparo && (
                 <div className="flex justify-end gap-2 px-4 pb-3">
                   {i.ativo && (
@@ -531,6 +558,11 @@ export function TelaListaInsumos({
           </caption>
           <thead>
             <tr className="bg-forte text-left text-[12px] text-suave">
+              {selecionar && (
+                <th scope="col" className="h-10 w-11 pl-2 sm:pl-3">
+                  <span className="sr-only">Marcar</span>
+                </th>
+              )}
               <Ordenar base={base} f={filtrosDaPagina} coluna="nome">
                 Insumo
               </Ordenar>
@@ -562,7 +594,8 @@ export function TelaListaInsumos({
           <tbody className="tabular-nums">
             {linhas.map((i) => (
               <tr key={i.id} id={`insumo-${i.id}`} className="ff-alvo ff-transicao border-t border-linha hover:bg-texto/[0.03]">
-                <td className="h-11 py-2 pl-4 pr-3 sm:pl-5">
+                {selecionar && <td className="w-11 py-1 pl-2 sm:pl-3">{caixa(i)}</td>}
+                <td className={`h-11 py-2 pr-3 ${selecionar ? 'pl-1' : 'pl-4 sm:pl-5'}`}>
                   <Link href={hrefDoDetalhe(base, i.id, filtrosDaPagina)} className={`ff-transicao rounded-[5px] font-medium underline-offset-4 hover:underline ${i.ativo ? 'text-texto' : 'text-suave'}`}>
                     {i.nome}
                   </Link>

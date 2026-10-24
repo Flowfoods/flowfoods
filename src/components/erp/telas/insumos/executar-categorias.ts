@@ -15,6 +15,15 @@ const vezDe = (anterior: EstadoCadastro) => (anterior?.vez ?? 0) + 1;
 /** O que a regra de categoria devolve. */
 export type ResultadoDeCategoria = { ok: true; id: string; mudou: string[] } | { ok: false; erros: Record<string, string>; conflito?: boolean };
 
+/**
+ * F4: para onde a action de categoria volta. `naLista` (já passada por `deSeguro`; null = não veio do painel) = a lista
+ * de insumos como estava, com o painel de categorias aberto; senão, a tela de Categorias.
+ */
+export function voltaDaCategoria(rota: string, base: string, naLista: string | null | undefined): string {
+  if (naLista === null || naLista === undefined) return `${rota}?`;
+  return `${base}?${naLista ? `${naLista}&` : ''}painel=categorias&`;
+}
+
 /** Depois de gravar: volta para a tela de `rota` com a frase. `cat` leva o id para a tela dizer o NOME (lido do banco). */
 export function concluirNaTela(
   r: ResultadoDeCategoria,
@@ -22,17 +31,24 @@ export function concluirNaTela(
   rota: string,
   feito: { mudou: string; igual?: string },
   base: string,
+  naLista: string | null = null,
 ): EstadoCadastro {
   if (!r.ok) return { ok: false, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
   revalidatePath(base, 'layout');
   const frase = r.mudou.length === 0 && feito.igual ? feito.igual : feito.mudou;
-  redirect(`${rota}?feito=${frase}&cat=${encodeURIComponent(r.id)}`);
+  redirect(`${voltaDaCategoria(rota, base, naLista)}feito=${frase}&cat=${encodeURIComponent(r.id)}`);
 }
 
 /** Sem estado de formulário (botão de subir e descer): se a regra recusou, volta com a frase da recusa. */
-export function voltarDoMover(r: ResultadoDeCategoria, rota: string, base: string): never {
+export function voltarDoMover(r: ResultadoDeCategoria, rota: string, base: string, naLista: string | null = null): never {
   revalidatePath(base, 'layout');
-  redirect(r.ok ? `${rota}?feito=${r.mudou.length ? 'moveu' : 'igual'}&cat=${encodeURIComponent(r.id)}` : `${rota}?feito=nao-moveu`);
+  const para = voltaDaCategoria(rota, base, naLista);
+  redirect(r.ok ? `${para}feito=${r.mudou.length ? 'moveu' : 'igual'}&cat=${encodeURIComponent(r.id)}` : `${para}feito=nao-moveu`);
+}
+
+/** F4: o `naLista` do formulário, saneado (só os filtros que a lista conhece); ausente = não veio do painel. */
+export function naListaDe(form: FormData | undefined, deSeguro: (v: unknown) => string): string | null {
+  return form && form.has('naLista') ? deSeguro(form.get('naLista')) : null;
 }
 
 /** As frases do `?feito=` da tela de categorias. O nome da categoria entra pelo banco (`%` é o lugar dele). */

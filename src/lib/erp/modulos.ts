@@ -241,21 +241,8 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               subtitulo: 'Lista, embalagem e custo por unidade',
               permissao: 'insumos.ver',
             },
-            {
-              href: `${base}/insumos/categorias`,
-              rotulo: 'Categorias',
-              icone: 'categorias',
-              subtitulo: 'Proteína, hortifruti, mercearia...: onde o custo entra no CMV',
-              permissao: 'insumos.ver',
-            },
-            {
-              href: `${base}/insumos/classificar`,
-              rotulo: 'Classificar insumos',
-              icone: 'classificar',
-              subtitulo: 'Os insumos sem categoria: prévia, aplicar e revisar em lote',
-              permissao: 'insumos.editar',
-              tambem: 'insumos.ver',
-            },
+            // F4: Categorias e Classificar saíram do menu (destinos redundantes): as categorias abrem num painel ao lado da
+            // lista e a classificação assistida pelo aviso e pelo painel. As páginas continuam no ar (links antigos valem).
           ],
         },
         {

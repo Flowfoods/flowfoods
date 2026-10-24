@@ -54,15 +54,16 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['insumos'],
     titulo: 'Insumos',
-    versao: 4,
+    versao: 5,
     // L.1: a caixa nasce recolhida (uma linha "Como funciona"): no celular a lista e os filtros ficam na primeira dobra.
     recolhida: true,
     aula: [
       { texto: 'Tudo o que a casa compra e usa: ingrediente, embalagem, material de limpeza e uso e pré-preparo.' },
       { texto: 'Antes da primeira compra vale o custo inicial de referência; depois, o último preço da nota lançada.' },
       { texto: '“Custo não informado” quer dizer que falta o custo e que as fichas que usam o insumo ficam incompletas.' },
-      { texto: 'Os filtros se combinam e os que estão valendo aparecem abaixo, cada um com o seu X; em “No cadastro” está tudo o que a casa tem e em “Nesta lista” só o que sobrou, com 10, 25, 50 ou 100 itens por página.' },
+      { texto: 'Os filtros se combinam e os que estão valendo aparecem abaixo, cada um com o seu X; em “No cadastro” está tudo o que a casa tem e em “Nesta lista” só o que sobrou, com 10, 25, 50 ou 100 itens por página; o botão Categorias abre um painel com quantos insumos há em cada uma, sem perder os filtros.' },
       { texto: 'A caneta edita e volta para esta mesma página; a lixeira mostra o que está ligado ao insumo antes de qualquer coisa.', para: ['insumos.editar'] },
+      { texto: 'Marque vários insumos desta página para mudar a categoria deles de uma vez; o resumo aparece antes de confirmar.', para: ['insumos.editar'] },
       { texto: 'Cadastre do jeito que você compra: a caixa de 5 kg, não o grama.', para: ['insumos.editar'] },
     ],
     secoes: [

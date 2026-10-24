@@ -868,6 +868,43 @@ describe.skipIf(!URL_TESTE)('ERP I.1a · categorias, cadastro e classificação 
       expect(await a.categoriaInsumo.count()).toBe(antes);
     });
 
+    it('F4 · pelo painel da lista: cada ação volta para a lista como estava, com o painel aberto; "Alterar categoria" dos marcados volta com o aviso', async () => {
+      atual.ctx = () => ctxDe(A, 'DONO');
+      const naLista = 'q=item&categoria=lixo&pagina=2&estranho=1';
+      const criada = await rodar(daSessao.acaoCriarCategoria(null, form({ nome: 'Do painel', naLista })));
+      // só os filtros que a lista conhece sobrevivem (o resto cai), e o painel volta aberto
+      expect(criada).toMatchObject({ destino: expect.stringMatching(/^\/erp\/insumos\?q=item.*pagina=2&painel=categorias&feito=criada&cat=/) });
+      expect((criada as { destino: string }).destino).not.toContain('estranho');
+      const doPainel = (await listarCategorias(a)).find((c) => c.nome === 'Do painel')!;
+      expect(await rodar(daSessao.acaoMoverCategoria(doPainel.id, 'subir', form({ naLista: '' })))).toMatchObject({ destino: expect.stringMatching(/^\/erp\/insumos\?painel=categorias&feito=moveu/) });
+      expect(await rodar(daSessao.acaoExcluirCategoria(doPainel.id, null, form({ naLista: 'q=item' })))).toEqual({ destino: '/erp/insumos?q=item&painel=categorias&feito=excluida' });
+      // sem o campo, continua indo para a tela de Categorias
+      const outra = await rodar(daSessao.acaoCriarCategoria(null, form({ nome: 'Fora do painel' })));
+      expect(outra).toMatchObject({ destino: expect.stringMatching(/^\/erp\/insumos\/categorias\?feito=criada/) });
+      const fora = (await listarCategorias(a)).find((c) => c.nome === 'Fora do painel')!;
+      await excluirCategoria(a, fora.id, 'Marina');
+
+      // marcados na lista → outra categoria: o operador não pode; o gerente pode; volta com quantos e qual
+      const x1 = await legado(a, 'Marcado um');
+      const x2 = await legado(a, 'Marcado dois');
+      atual.ctx = () => ctxDe(A, 'OPERADOR');
+      expect(await daSessao.acaoAlterarCategoriaNaLista(null, form({ ids: [x1, x2], categoriaId: cat.MERCEARIA, de: 'q=marcado' }))).toMatchObject({ ok: false });
+      atual.ctx = () => ctxDe(A, 'GERENTE');
+      expect(await daSessao.acaoAlterarCategoriaNaLista(null, form({ ids: [x1, x2], categoriaId: '', de: '' }))).toMatchObject({ ok: false, erros: { geral: expect.stringMatching(/Escolha a categoria/) } });
+      expect(await rodar(daSessao.acaoAlterarCategoriaNaLista(null, form({ ids: [x1, x2, x1], categoriaId: cat.MERCEARIA, de: 'q=marcado' })))).toEqual({
+        destino: `/erp/insumos?q=marcado&feito=categorias&n=2&cat=${cat.MERCEARIA}`,
+      });
+      const lidos = await a.insumo.findMany({ where: { id: { in: [x1, x2] } }, select: { categoriaId: true, classificadoPor: true } });
+      expect(lidos.every((i) => i.categoriaId === cat.MERCEARIA && i.classificadoPor === 'MANUAL')).toBe(true);
+      // de novo: nada muda, e o aviso diz isso (n=0)
+      expect(await rodar(daSessao.acaoAlterarCategoriaNaLista(null, form({ ids: [x1], categoriaId: cat.MERCEARIA, de: '' })))).toEqual({ destino: `/erp/insumos?feito=categorias&n=0&cat=${cat.MERCEARIA}` });
+      // B não muda os de A (o id não é achado no portão de B)
+      atual.ctx = () => ctxDe(B, 'DONO');
+      const catB = (await listarCategorias(b)).find((c) => c.ativa && !c.sistema)!.id;
+      expect(await rodar(doNivel1.acaoAlterarCategoriaNaLista(B.slug, null, form({ ids: [x1], categoriaId: catB, de: '' })))).toMatchObject({ destino: expect.stringContaining('n=0') });
+      expect((await a.insumo.findUnique({ where: { id: x1 }, select: { categoriaId: true } }))!.categoriaId).toBe(cat.MERCEARIA);
+    });
+
     it('o nível 1 faz o mesmo no parceiro do slug, com rastro no auditLog; categoria de outro parceiro não é alcançada', async () => {
       atual.ctx = () => ctxDe(A, 'DONO');
       atual.auditoria.length = 0;

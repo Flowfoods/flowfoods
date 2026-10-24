@@ -19,7 +19,8 @@ import { criarCategoria, excluirCategoria, moverCategoria, mudarSituacaoCategori
 import { aceitarSugestoes, aplicarClassificacao, classificarEmLote, reverterLote } from '@/lib/erp/classificar';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
-import { concluirNaTela, voltarDaClassificacao, voltarDoMover } from '@/components/erp/telas/insumos/executar-categorias';
+import { concluirNaTela, naListaDe, voltaDaCategoria, voltarDaClassificacao, voltarDoMover } from '@/components/erp/telas/insumos/executar-categorias';
+import { deSeguro as deSeguroDaLista } from '@/lib/erp/insumo-campos';
 import { retornoDaLista } from '@/components/erp/telas/insumos/retorno-da-lista';
 
 const BASE = '/erp/insumos';
@@ -119,14 +120,14 @@ export async function acaoCriarCategoria(anterior: EstadoCadastro, form: FormDat
   const { ctx, negado } = await paraGerirCategorias();
   if (negado) return recusado(anterior, negado);
   const r = await criarCategoria(ctx.cliente, entradaDe(form), ctx.sessao.autorNome);
-  return concluirNaTela(r, anterior, CATEGORIAS, { mudou: 'criada' }, BASE);
+  return concluirNaTela(r, anterior, CATEGORIAS, { mudou: 'criada' }, BASE, naListaDe(form, deSeguroDaLista));
 }
 
 export async function acaoRenomearCategoria(id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraGerirCategorias();
   if (negado) return recusado(anterior, negado);
   const r = await renomearCategoria(ctx.cliente, String(id), entradaDe(form), ctx.sessao.autorNome);
-  return concluirNaTela(r, anterior, CATEGORIAS, { mudou: 'renomeada', igual: 'igual' }, BASE);
+  return concluirNaTela(r, anterior, CATEGORIAS, { mudou: 'renomeada', igual: 'igual' }, BASE, naListaDe(form, deSeguroDaLista));
 }
 
 export async function acaoSituacaoCategoria(id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -134,22 +135,22 @@ export async function acaoSituacaoCategoria(id: string, anterior: EstadoCadastro
   if (negado) return recusado(anterior, negado);
   const ativo = querAtivo(form);
   const r = await mudarSituacaoCategoria(ctx.cliente, String(id), ativo, form.get('motivo'), ctx.sessao.autorNome);
-  return concluirNaTela(r, anterior, CATEGORIAS, { mudou: ativo ? 'reativada' : 'desativada' }, BASE);
+  return concluirNaTela(r, anterior, CATEGORIAS, { mudou: ativo ? 'reativada' : 'desativada' }, BASE, naListaDe(form, deSeguroDaLista));
 }
 
-export async function acaoExcluirCategoria(id: string, anterior: EstadoCadastro): Promise<EstadoCadastro> {
+export async function acaoExcluirCategoria(id: string, anterior: EstadoCadastro, form?: FormData): Promise<EstadoCadastro> {
   const { ctx, negado } = await paraGerirCategorias();
   if (negado) return recusado(anterior, negado);
   const r = await excluirCategoria(ctx.cliente, String(id), ctx.sessao.autorNome);
   if (r.ok) revalidatePath(BASE, 'layout');
-  if (r.ok) redirect(`${CATEGORIAS}?feito=excluida`);
+  if (r.ok) redirect(`${voltaDaCategoria(CATEGORIAS, BASE, naListaDe(form, deSeguroDaLista))}feito=excluida`);
   return { ok: false, erros: r.erros, vez: (anterior?.vez ?? 0) + 1 };
 }
 
-export async function acaoMoverCategoria(id: string, direcao: 'subir' | 'descer'): Promise<void> {
+export async function acaoMoverCategoria(id: string, direcao: 'subir' | 'descer', form?: FormData): Promise<void> {
   const { ctx, negado } = await paraGerirCategorias();
   if (negado) redirect(`${CATEGORIAS}?feito=nao-moveu`);
-  voltarDoMover(await moverCategoria(ctx.cliente, String(id), direcao === 'subir' ? 'subir' : 'descer', ctx.sessao.autorNome), CATEGORIAS, BASE);
+  voltarDoMover(await moverCategoria(ctx.cliente, String(id), direcao === 'subir' ? 'subir' : 'descer', ctx.sessao.autorNome), CATEGORIAS, BASE, naListaDe(form, deSeguroDaLista));
 }
 
 // ------------------------------------------------------- classificação (I.1a)
@@ -186,4 +187,20 @@ export async function acaoClassificarEmLote(anterior: EstadoCadastro, form: Form
   const r = await classificarEmLote(ctx.cliente, ids, form.get('categoriaId'), ctx.sessao.autorNome);
   if (!r.ok) return recusado(anterior, r.erro);
   voltarDaClassificacao(CLASSIFICAR, BASE, 'lote', { n: r.classificados, iguais: r.iguais });
+}
+
+/**
+ * F4: "Alterar categoria" na própria lista (os marcados desta página). A mesma regra da edição em lote da fila
+ * (`insumos.editar`, histórico por insumo); volta para a lista como estava, com o aviso do que mudou.
+ */
+export async function acaoAlterarCategoriaNaLista(anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+  const { ctx, negado } = await paraEditar();
+  if (negado) return recusado(anterior, negado);
+  const ids = form.getAll('ids').filter((x): x is string => typeof x === 'string');
+  const categoriaId = form.get('categoriaId');
+  const r = await classificarEmLote(ctx.cliente, ids, categoriaId, ctx.sessao.autorNome);
+  if (!r.ok) return recusado(anterior, r.erro);
+  revalidatePath(BASE, 'layout');
+  const de = deSeguroDaLista(form.get('de'));
+  redirect(`${BASE}?${de ? `${de}&` : ''}feito=categorias&n=${r.classificados}&cat=${encodeURIComponent(String(categoriaId))}`);
 }

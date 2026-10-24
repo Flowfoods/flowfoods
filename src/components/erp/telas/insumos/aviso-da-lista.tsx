@@ -37,6 +37,8 @@ export async function AvisoDaListaDeInsumos({
   feito,
   referencia,
   podeEditar,
+  quantos,
+  categoria,
 }: {
   cliente: ClienteDoParceiro;
   base: string;
@@ -44,9 +46,29 @@ export async function AvisoDaListaDeInsumos({
   feito: string | string[] | undefined;
   referencia: string | string[] | undefined;
   podeEditar: boolean;
+  /** F4: "Alterar categoria" na lista: quantos mudaram (`n`) e para qual categoria (`cat`, o nome vem do banco). */
+  quantos?: string | string[];
+  categoria?: string | string[];
 }) {
   const f = Array.isArray(feito) ? feito[0] : feito;
   const ref = Array.isArray(referencia) ? referencia[0] : referencia;
+  if (f === 'categorias') {
+    const n = Number(Array.isArray(quantos) ? quantos[0] : quantos);
+    const cat = Array.isArray(categoria) ? categoria[0] : categoria;
+    if (!Number.isInteger(n) || n < 0 || n > 200 || !cat || !ID.test(cat)) return null;
+    const nome = (await cliente.categoriaInsumo.findUnique({ where: { id: cat }, select: { nome: true } }))?.nome;
+    if (!nome) return null;
+    return (
+      <AvisoDeSalvo
+        titulo={n === 0 ? `Nada mudou: os marcados já estavam em ${nome}` : `${n} ${n === 1 ? 'insumo foi' : 'insumos foram'} para ${nome}`}
+        apoio={n > 0 ? 'O antes e o depois de cada um estão no histórico do insumo.' : undefined}
+      >
+        <Link href={`${base}?${queryDosFiltros({ ...filtros, categoria: cat, pagina: 1 })}`} className={classeDeBotao('secundario')}>
+          Ver os de {nome}
+        </Link>
+      </AvisoDeSalvo>
+    );
+  }
   if (!eFeito(f) || !ref || !ID.test(ref)) return null;
   const nome = await nomeDoAviso(cliente, f, ref);
   if (!nome) return null;

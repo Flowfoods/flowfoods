@@ -21,7 +21,8 @@ import { criarCategoria, excluirCategoria, moverCategoria, mudarSituacaoCategori
 import { aceitarSugestoes, aplicarClassificacao, classificarEmLote, reverterLote } from '@/lib/erp/classificar';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, entradaDe, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
-import { concluirNaTela, voltarDaClassificacao, voltarDoMover } from '@/components/erp/telas/insumos/executar-categorias';
+import { concluirNaTela, naListaDe, voltaDaCategoria, voltarDaClassificacao, voltarDoMover } from '@/components/erp/telas/insumos/executar-categorias';
+import { deSeguro as deSeguroDaLista } from '@/lib/erp/insumo-campos';
 import { retornoDaLista } from '@/components/erp/telas/insumos/retorno-da-lista';
 
 async function paraEditar(slug: string) {
@@ -130,7 +131,7 @@ export async function acaoCriarCategoria(slug: string, anterior: EstadoCadastro,
   if (negado) return recusado(anterior, negado);
   const r = await criarCategoria(ctx.cliente, entradaDe(form), ctx.sessao.autorNome);
   await auditar(ctx, 'erp_categoria_criada', r);
-  return concluirNaTela(r, anterior, categorias, { mudou: 'criada' }, base);
+  return concluirNaTela(r, anterior, categorias, { mudou: 'criada' }, base, naListaDe(form, deSeguroDaLista));
 }
 
 export async function acaoRenomearCategoria(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -138,7 +139,7 @@ export async function acaoRenomearCategoria(slug: string, id: string, anterior: 
   if (negado) return recusado(anterior, negado);
   const r = await renomearCategoria(ctx.cliente, String(id), entradaDe(form), ctx.sessao.autorNome);
   await auditar(ctx, 'erp_categoria_renomeada', r);
-  return concluirNaTela(r, anterior, categorias, { mudou: 'renomeada', igual: 'igual' }, base);
+  return concluirNaTela(r, anterior, categorias, { mudou: 'renomeada', igual: 'igual' }, base, naListaDe(form, deSeguroDaLista));
 }
 
 export async function acaoSituacaoCategoria(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -147,27 +148,27 @@ export async function acaoSituacaoCategoria(slug: string, id: string, anterior: 
   const ativo = querAtivo(form);
   const r = await mudarSituacaoCategoria(ctx.cliente, String(id), ativo, form.get('motivo'), ctx.sessao.autorNome);
   await auditar(ctx, ativo ? 'erp_categoria_reativada' : 'erp_categoria_desativada', r);
-  return concluirNaTela(r, anterior, categorias, { mudou: ativo ? 'reativada' : 'desativada' }, base);
+  return concluirNaTela(r, anterior, categorias, { mudou: ativo ? 'reativada' : 'desativada' }, base, naListaDe(form, deSeguroDaLista));
 }
 
-export async function acaoExcluirCategoria(slug: string, id: string, anterior: EstadoCadastro): Promise<EstadoCadastro> {
+export async function acaoExcluirCategoria(slug: string, id: string, anterior: EstadoCadastro, form?: FormData): Promise<EstadoCadastro> {
   const { ctx, negado, base, categorias } = await paraGerirCategorias(slug);
   if (negado) return recusado(anterior, negado);
   const r = await excluirCategoria(ctx.cliente, String(id), ctx.sessao.autorNome);
   await auditar(ctx, 'erp_categoria_excluida', r);
   if (r.ok) {
     revalidatePath(base, 'layout');
-    redirect(`${categorias}?feito=excluida`);
+    redirect(`${voltaDaCategoria(categorias, base, naListaDe(form, deSeguroDaLista))}feito=excluida`);
   }
   return { ok: false, erros: r.erros, vez: (anterior?.vez ?? 0) + 1 };
 }
 
-export async function acaoMoverCategoria(slug: string, id: string, direcao: 'subir' | 'descer'): Promise<void> {
+export async function acaoMoverCategoria(slug: string, id: string, direcao: 'subir' | 'descer', form?: FormData): Promise<void> {
   const { ctx, negado, base, categorias } = await paraGerirCategorias(slug);
   if (negado) redirect(`${categorias}?feito=nao-moveu`);
   const r = await moverCategoria(ctx.cliente, String(id), direcao === 'subir' ? 'subir' : 'descer', ctx.sessao.autorNome);
   await auditar(ctx, 'erp_categoria_reordenada', r);
-  voltarDoMover(r, categorias, base);
+  voltarDoMover(r, categorias, base, naListaDe(form, deSeguroDaLista));
 }
 
 // ------------------------------------------------------- classificação (I.1a)
@@ -206,4 +207,18 @@ export async function acaoClassificarEmLote(slug: string, anterior: EstadoCadast
   if (!r.ok) return recusado(anterior, r.erro);
   await prisma.auditLog.create({ data: { userId: ctx.sessao.userId, evento: 'erp_insumos_classificados_em_lote', dados: { parceiroId: ctx.parceiro.id, n: r.classificados } } });
   voltarDaClassificacao(`${base}/classificar`, base, 'lote', { n: r.classificados, iguais: r.iguais });
+}
+
+/** F4: "Alterar categoria" na própria lista, pelo nível 1. */
+export async function acaoAlterarCategoriaNaLista(slug: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
+  const { ctx, negado, base } = await paraEditar(slug);
+  if (negado) return recusado(anterior, negado);
+  const ids = form.getAll('ids').filter((x): x is string => typeof x === 'string');
+  const categoriaId = form.get('categoriaId');
+  const r = await classificarEmLote(ctx.cliente, ids, categoriaId, ctx.sessao.autorNome);
+  if (!r.ok) return recusado(anterior, r.erro);
+  await prisma.auditLog.create({ data: { userId: ctx.sessao.userId, evento: 'erp_insumos_categoria_em_lote', dados: { parceiroId: ctx.parceiro.id, classificados: r.classificados } } });
+  revalidatePath(base, 'layout');
+  const de = deSeguroDaLista(form.get('de'));
+  redirect(`${base}?${de ? `${de}&` : ''}feito=categorias&n=${r.classificados}&cat=${encodeURIComponent(String(categoriaId))}`);
 }

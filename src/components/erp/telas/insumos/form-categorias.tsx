@@ -7,7 +7,7 @@
  * por vez por linha, aberto por botão (`aria-expanded`), e os botões têm 44 px no toque.
  */
 
-import { useState } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import { useFormState } from 'react-dom';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { LinhaDeCategoria } from '@/lib/erp/categorias';
@@ -19,12 +19,35 @@ import { ErroGeral } from '../cadastro/erros';
 import { SalvandoAnunciado, useAcaoSegura } from '../cadastro/anuncio';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 
+/**
+ * F4: campos escondidos que vão em TODOS os formulários de categoria abaixo (o painel da lista de insumos manda
+ * `naLista` = a lista como estava, para a action voltar para ela com o painel aberto, em vez de ir para a tela de
+ * Categorias).
+ */
+const CamposOcultos = createContext<Readonly<Record<string, string>> | null>(null);
+
+export function ComCamposOcultos({ valores, children }: { valores: Readonly<Record<string, string>>; children: ReactNode }) {
+  return <CamposOcultos.Provider value={valores}>{children}</CamposOcultos.Provider>;
+}
+
+function Ocultos() {
+  const v = useContext(CamposOcultos);
+  return v ? (
+    <>
+      {Object.entries(v).map(([k, x]) => (
+        <input key={k} type="hidden" name={k} value={x} />
+      ))}
+    </>
+  ) : null;
+}
+
 export function FormNovaCategoria({ acao, bloqueio }: { acao: AcaoDeCadastro; bloqueio: string | null }) {
   const segura = useAcaoSegura(acao);
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(segura, null);
   const erros = estado?.erros ?? {};
   return (
     <form action={enviar} noValidate className="space-y-3">
+      <Ocultos />
       <SalvandoAnunciado />
       <ErroGeral estado={estado} recarregar="" />
       <fieldset disabled={!!bloqueio} className="min-w-0">
@@ -61,10 +84,11 @@ export function FormNovaCategoria({ acao, bloqueio }: { acao: AcaoDeCadastro; bl
 type Painel = 'renomear' | 'situacao' | 'excluir' | null;
 
 /** Subir ou descer uma posição: form de verdade (funciona sem JS), botão de 44 px no toque. */
-function BotaoDeOrdem({ acao, sentido, nome, desabilitado }: { acao: () => Promise<void>; sentido: 'subir' | 'descer'; nome: string; desabilitado: boolean }) {
+function BotaoDeOrdem({ acao, sentido, nome, desabilitado }: { acao: (form: FormData) => Promise<void>; sentido: 'subir' | 'descer'; nome: string; desabilitado: boolean }) {
   const Seta = sentido === 'subir' ? ArrowUp : ArrowDown;
   return (
     <form action={acao}>
+      <Ocultos />
       <button
         type="submit"
         disabled={desabilitado}
@@ -85,6 +109,7 @@ function FormRenomear({ acao, nome, versao }: { acao: AcaoDeCadastro; nome: stri
   return (
     <form action={enviar} noValidate className="space-y-3">
       <input type="hidden" name="versao" value={versao} />
+      <Ocultos />
       <SalvandoAnunciado />
       <ErroGeral estado={estado} recarregar="" />
       <div>
@@ -119,6 +144,7 @@ function FormExcluir({ acao, nome }: { acao: AcaoDeCadastro; nome: string }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(segura, null);
   return (
     <form action={enviar} className="space-y-3">
+      <Ocultos />
       <SalvandoAnunciado texto="Excluindo…" />
       <p className="text-sm text-suave">
         Excluir apaga “{nome}” de vez. Só dá para excluir uma categoria que nunca foi usada: se algum insumo já esteve nela, o histórico guarda isso e o caminho é
@@ -136,13 +162,14 @@ export interface AcoesDaLinha {
   renomear: AcaoDeCadastro;
   situacao: AcaoDeCadastro;
   excluir: AcaoDeCadastro;
-  subir: () => Promise<void>;
-  descer: () => Promise<void>;
+  subir: (form: FormData) => Promise<void>;
+  descer: (form: FormData) => Promise<void>;
 }
 
 /** Os botões de uma linha da lista, e o painel da ação aberta (um de cada vez). */
 export function AcoesDaCategoria({ categoria: c, acoes, primeira, ultima }: { categoria: LinhaDeCategoria; acoes: AcoesDaLinha; primeira: boolean; ultima: boolean }) {
   const [aberto, setAberto] = useState<Painel>(null);
+  const ocultos = useContext(CamposOcultos);
   const alternar = (p: Exclude<Painel, null>) => setAberto((a) => (a === p ? null : p));
   const idPainel = `acao-${c.id}`;
   if (c.sistema) {
@@ -178,6 +205,7 @@ export function AcoesDaCategoria({ categoria: c, acoes, primeira, ultima }: { ca
               ativo={c.ativa}
               oQue="categoria"
               idBase={`situacao-${c.id}`}
+              ocultos={ocultos ?? undefined}
               textos={{
                 desativar: `Desativar tira “${c.nome}” da lista que se oferece ao cadastrar. Nada é apagado: ${c.nInsumos === 0 ? 'nenhum insumo está nela agora' : c.nInsumos === 1 ? 'o insumo que está nela continua nela' : `os ${c.nInsumos} insumos que estão nela continuam nela`} e o histórico fica.`,
                 reativar: `“${c.nome}” está desativada. Reativar volta a oferecê-la nos cadastros novos.`,
