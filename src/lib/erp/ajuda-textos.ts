@@ -110,6 +110,41 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         ],
       },
     ],
+    pontos: [
+      {
+        id: 'tipo',
+        titulo: 'Tipo, categoria e conservação',
+        blocos: [{ texto: 'Tipo é o papel do item; categoria é a natureza dele para o CMV; conservação é onde ele fica guardado. Coxa de frango é Proteína, congelada ou não.' }],
+        secao: 'campos',
+      },
+      {
+        id: 'marca',
+        titulo: 'Marca de referência',
+        blocos: [{ texto: 'É a marca comercial que você costuma comprar. Só informa: não trava compra nem cotação e não é o fornecedor, porque a mesma marca pode vir de vários.' }],
+      },
+      {
+        id: 'conservacao',
+        titulo: 'Conservação principal',
+        blocos: [{ texto: 'Onde o insumo fica guardado normalmente. Não é a categoria: coxa de frango é Proteína, congelada ou não.' }],
+        secao: 'campos',
+      },
+      {
+        id: 'prazo-abertura',
+        titulo: 'Prazo de uso após abertura',
+        blocos: [
+          { texto: 'Prazo para consumir depois de abrir a embalagem, conforme o fabricante e o procedimento validado da operação. Marque só onde o insumo pode ficar; em branco, fica “não informado”. O vencimento do lote entra no recebimento da compra e nas etiquetas.' },
+        ],
+        secao: 'campos',
+      },
+      {
+        id: 'unidade',
+        titulo: 'Unidade, embalagem e custo',
+        blocos: [
+          { texto: 'Unidade base é como você controla o estoque e o que a ficha usa. Não é a embalagem: a caixa de 5 kg é medida em kg. Ex.: saco de 5 kg por R$ 25 dá R$ 5,00/kg.' },
+        ],
+        secao: 'campos',
+      },
+    ],
   },
   {
     chave: 'insumo',
@@ -207,6 +242,39 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'O modo de preparo vai em etapas numeradas, uma ação por etapa. Suba ou desça uma etapa pelos botões ao lado dela.' },
           { texto: 'A descrição comercial é o texto do cardápio e do marketplace. Não é publicada sozinha em lugar nenhum.' },
         ],
+      },
+    ],
+    pontos: [
+      {
+        id: 'tipo',
+        titulo: 'Prato ou pré-preparo',
+        blocos: [
+          { texto: 'Prato rende porções e o custo sai por porção. Pré-preparo (molho, massa, recheio) rende em kg, L ou un, entra em outras fichas e aparece em Insumos com o custo desta receita.' },
+        ],
+      },
+      {
+        id: 'descricao',
+        titulo: 'Descrição comercial',
+        blocos: [{ texto: 'Texto de apresentação para cardápios e marketplaces. Não vai para lugar nenhum sozinho; o passo a passo da cozinha fica nas etapas do preparo.' }],
+        secao: 'preparo',
+      },
+      {
+        id: 'foto',
+        titulo: 'Foto da ficha',
+        blocos: [{ texto: 'Do prato pronto ou da montagem: quem opera bate o olho e sabe o que é. A foto é reduzida e guardada sem a localização do celular.' }],
+      },
+      {
+        id: 'rendimento',
+        titulo: 'Rendimento',
+        blocos: [
+          { texto: 'Prato: quantas porções a receita dá. Pré-preparo: quanto sai pronto, já pesado depois do preparo; o que o cozimento tira ou acrescenta já está aqui.' },
+        ],
+      },
+      {
+        id: 'etapas',
+        titulo: 'Etapas do preparo',
+        blocos: [{ texto: 'Uma ação por etapa. A ordem aqui é a ordem na ficha e na impressão, e etapa em branco não é gravada.' }],
+        secao: 'preparo',
       },
     ],
   },

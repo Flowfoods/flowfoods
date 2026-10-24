@@ -149,7 +149,7 @@ export async function acaoEscolherVisao(valor: string): Promise<RespostaDaVisao>
 
 // ------------------------------------------------------- ajuda contextual (0.6)
 //
-// As três ações são da PRÓPRIA pessoa (preferência dela, não dado do parceiro):
+// As ações de ajuda são da PRÓPRIA pessoa (preferência dela, não dado do parceiro):
 // não pedem permissão e valem até em parceiro suspenso. Nenhuma recebe quem é a
 // pessoa: o `usuarioId` sai da sessão validada dentro de `credenciais.ts`; um
 // campo forjado no formulário não tem onde entrar. Recusa (sessão morta, caixa
@@ -168,6 +168,20 @@ export async function acaoAjudaDicas(form: FormData): Promise<void> {
     await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'dicas', ligadas: v !== 'desligar' });
   }
   revalidatePath('/erp', 'layout');
+}
+
+/**
+ * Ponto de ajuda: o card abriu sozinho agora (guarda o dia, para voltar só daqui
+ * a 7 dias). Sem revalidar: a tela segue como está, nada do formulário se perde;
+ * a próxima navegação já lê a preferência nova junto com a sessão.
+ */
+export async function acaoAjudaPontoVisto(ponto: string): Promise<void> {
+  await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'ponto-visto', ponto: String(ponto ?? '') });
+}
+
+/** Ponto de ajuda: "Não mostrar novamente" (só corta a abertura automática; o botão do campo continua). */
+export async function acaoAjudaPontoNunca(form: FormData): Promise<void> {
+  await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'ponto-nunca', ponto: String(form.get('ponto') ?? '') });
 }
 
 /** "Mostrar de novo as que fechei": zera a lista. */

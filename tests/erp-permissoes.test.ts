@@ -192,7 +192,7 @@ describe('ERP 0.4 · escopo de lojas e a checagem única', () => {
       parceiros: [],
       perfilRotulo: 'Operador',
       setores: [],
-      ajuda: { dicasLigadas: true, escolhida: false, fechadas: [] },
+      ajuda: { dicasLigadas: true, escolhida: false, fechadas: [], pontos: [] },
     };
     expect(contextoDaSessao({ ...base, alcance: daLojaX }).alcance).toBe(daLojaX);
     expect(() => contextoDaSessao({ ...base, alcance: null })).toThrow(/sem alcance/);
@@ -360,6 +360,9 @@ describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', 
     'acaoAjudaFechar',
     'acaoAjudaDicas',
     'acaoAjudaReabrir',
+    // Pontos de ajuda (23/10): mesma regra — só a preferência da própria pessoa, usuário da sessão.
+    'acaoAjudaPontoVisto',
+    'acaoAjudaPontoNunca',
   ]);
 
   it('páginas chamam exigirPermissaoNaPagina', () => {

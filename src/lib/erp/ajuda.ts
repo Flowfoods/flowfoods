@@ -14,7 +14,7 @@
  */
 
 import { pode, TODAS_AS_PERMISSOES, type Alcance, type Permissao } from './permissoes';
-import type { AreaDaAjuda, EntradaParaATela } from './ajuda-rota';
+import { FORMATO_ID_DO_PONTO, type AreaDaAjuda, type EntradaParaATela } from './ajuda-rota';
 import { ENTRADAS } from './ajuda-textos';
 
 export interface Bloco {
@@ -27,6 +27,22 @@ export interface Secao {
   id: string;
   titulo: string;
   blocos: Bloco[];
+}
+
+/**
+ * Ponto de ajuda (prioridade nº 1 de 23/10/2026): explicação curta que mora
+ * JUNTO do campo, seção ou ação, aberta num card flutuante pelo botão do
+ * próprio campo. Substitui o texto didático fixo embaixo do campo; o que é
+ * indispensável para agir (unidade, obrigatório, erro, alerta) continua na tela.
+ */
+export interface Ponto {
+  /** Kebab, único na entrada. O id completo é "chave.ponto": nunca renomear sem necessidade. */
+  id: string;
+  titulo: string;
+  /** 1 a 3 blocos curtos (até 3 frases para todos). */
+  blocos: Bloco[];
+  /** Seção desta entrada que o "Ver passo a passo" abre na gaveta. */
+  secao?: string;
 }
 
 export interface EntradaDeAjuda {
@@ -47,6 +63,8 @@ export interface EntradaDeAjuda {
    * ficar à vista no celular. Só muda o desenho; a lista de fechadas e a versão valem igual.
    */
   recolhida?: true;
+  /** Pontos de ajuda junto de campos e seções (card flutuante). */
+  pontos?: Ponto[];
 }
 
 export { ENTRADAS };
@@ -76,7 +94,18 @@ export function ajudaParaATela(alcance: Alcance): EntradaParaATela[] {
     secoes: (e.secoes ?? [])
       .map((s) => ({ id: s.id, titulo: s.titulo, blocos: s.blocos.filter((b) => lido(b, alcance)).map((b) => b.texto) }))
       .filter((s) => s.blocos.length > 0),
+    pontos: (e.pontos ?? [])
+      .map((p) => ({ id: `${e.chave}.${p.id}`, titulo: p.titulo, blocos: p.blocos.filter((b) => lido(b, alcance)).map((b) => b.texto), secao: p.secao ?? null }))
+      .filter((p) => p.blocos.length > 0),
   }));
+}
+
+/** "chave.ponto" de um ponto que existe no registro AGORA (lista branca do "visto" e do "não mostrar"). Outra coisa: null. */
+export function pontoValido(item: unknown): string | null {
+  if (typeof item !== 'string' || item.length > 101 || !FORMATO_ID_DO_PONTO.test(item)) return null;
+  const [chave, ponto] = item.split('.');
+  const e = entradaPorChave(chave);
+  return e?.pontos?.some((p) => p.id === ponto) ? item : null;
 }
 
 /** "chave@versão" de uma caixa que existe no registro AGORA (lista branca do "fechar"). Qualquer outra coisa: null. */
@@ -161,7 +190,20 @@ export function problemasDoRegistro(entradas: readonly EntradaDeAjuda[] = ENTRAD
       ids.add(s.id);
       if (s.blocos.length === 0 || s.blocos.length > 6) erros.push(`${onde} seção "${s.id}" precisa de 1 a 6 blocos`);
     }
-    for (const b of [...e.aula, ...(e.secoes ?? []).flatMap((s) => s.blocos)]) {
+    const idsDosPontos = new Set<string>();
+    for (const p of e.pontos ?? []) {
+      const ondeP = `${onde} ponto "${p.id}"`;
+      if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(p.id) || p.id.length > 40 || idsDosPontos.has(p.id)) erros.push(`${ondeP} com id inválido ou repetido`);
+      idsDosPontos.add(p.id);
+      if (p.blocos.length === 0 || p.blocos.length > 3) erros.push(`${ondeP} precisa de 1 a 3 blocos`);
+      const livresP = p.blocos.filter((b) => !b.para);
+      const frasesP = livresP.reduce((n, b) => n + contarFrases(b.texto), 0);
+      if (livresP.length === 0 || frasesP < 1 || frasesP > 3) erros.push(`${ondeP} tem ${frasesP} frases para todos (de 1 a 3)`);
+      if (p.secao && !ids.has(p.secao)) erros.push(`${ondeP} aponta para a seção "${p.secao}", que não existe nesta entrada`);
+      for (const t of [p.titulo, ...p.blocos.map((b) => b.texto)]) for (const m of problemasDoTexto(t)) erros.push(`${ondeP} "${t.slice(0, 40)}": ${m}`);
+      if (p.titulo.length > 60) erros.push(`${ondeP} título com mais de 60 caracteres`);
+    }
+    for (const b of [...e.aula, ...(e.secoes ?? []).flatMap((s) => s.blocos), ...(e.pontos ?? []).flatMap((p) => p.blocos)]) {
       for (const p of b.para ?? []) if (!TODAS_AS_PERMISSOES.includes(p)) erros.push(`${onde} permissão inexistente: ${p}`);
     }
   }

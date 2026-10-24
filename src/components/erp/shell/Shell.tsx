@@ -19,6 +19,7 @@ import { Dialogo } from '../ui/Dialogo';
 import { ContextoDaAjuda } from '../ui/link-de-ajuda';
 import { ContextoDaCaixa } from '../ui/caixa-da-tela';
 import { assinaturaDaPreferencia, CaixaDeAula, GavetaDeAjuda, preferenciaEfetiva, type Otimista } from './ajuda';
+import { ProvedorDosPontos } from './pontos';
 import { acaoGuardarMenu } from './acoes';
 import { BuscaGlobal } from './BuscaGlobal';
 import { MenuUsuario } from './MenuUsuario';
@@ -165,6 +166,15 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
 
   return (
     <ContextoDaAjuda.Provider value={contextoDaAjuda}>
+      <ProvedorDosPontos
+        chave={entradaDaTela?.chave ?? null}
+        pontos={entradaDaTela?.pontos ?? []}
+        caminho={caminho}
+        preferencia={ajuda?.preferencia ? preferencia : null}
+        ajuda={ajuda}
+        podeAbrirSozinho={!estadoDaCaixa && !ajudaAberta}
+        aoVerPassoAPasso={(secao, origem) => abrirAjuda(secao, origem)}
+      >
       <div
         className={`grid min-h-dvh grid-cols-[minmax(0,1fr)] ${
           recolhido ? 'min-[900px]:grid-cols-[68px_minmax(0,1fr)]' : 'min-[900px]:grid-cols-[232px_minmax(0,1fr)]'
@@ -291,6 +301,7 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
           </div>
         </Dialogo>
       </div>
+      </ProvedorDosPontos>
     </ContextoDaAjuda.Provider>
   );
 }

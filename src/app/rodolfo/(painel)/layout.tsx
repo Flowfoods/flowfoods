@@ -13,6 +13,7 @@ import { cookies } from 'next/headers';
 import { prisma } from '@/lib/db';
 import { AJUDA_DE_USO_ERP } from '@/lib/constants';
 import { ajudaParaATela } from '@/lib/erp/ajuda';
+import { diaDe } from '@/lib/erp/ajuda-rota';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 import { VERSAO_DO_ERP } from '@/lib/erp/modulos';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
@@ -80,7 +81,7 @@ export default async function PainelLayout({ children }: { children: React.React
       sair={null}
       buscarInsumosDoParceiro={acaoBuscarNoParceiro}
       // Nível 1: só o botão "?" dentro do parceiro (a ajuda lê o mesmo registro). Sem caixa, sem pergunta e sem preferência.
-      ajuda={{ entradas: ajudaParaATela(ALCANCE_FLOWFOODS), preferencia: null, acoes: null, contato: AJUDA_DE_USO_ERP }}
+      ajuda={{ entradas: ajudaParaATela(ALCANCE_FLOWFOODS), preferencia: null, acoes: null, hoje: diaDe(new Date()), contato: AJUDA_DE_USO_ERP }}
     >
       <EscopoDoRascunho escopo={`n1:${sessao.userId}`}>{children}</EscopoDoRascunho>
     </AppShell>

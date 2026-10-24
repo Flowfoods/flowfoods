@@ -147,15 +147,15 @@ describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', 
   });
 
   it('pessoa nova: dicas ligadas, sem resposta, nenhuma caixa fechada (e nenhuma linha no banco)', async () => {
-    expect(ana.s.ajuda).toEqual({ dicasLigadas: true, escolhida: false, fechadas: [] });
+    expect(ana.s.ajuda).toEqual({ dicasLigadas: true, escolhida: false, fechadas: [], pontos: [] });
     expect(await linhas(ana.s.usuario.id)).toEqual([]);
   });
 
   it('"Manter" grava a resposta; vale na outra sessão da pessoa e some a pergunta', async () => {
     como(ana.token);
     await acaoAjudaDicas(form({ dicas: 'manter' }));
-    expect(await ver(ana.token)).toEqual({ dicasLigadas: true, escolhida: true, fechadas: [] });
-    expect(await ver(anaOutroAparelho.token)).toEqual({ dicasLigadas: true, escolhida: true, fechadas: [] });
+    expect(await ver(ana.token)).toEqual({ dicasLigadas: true, escolhida: true, fechadas: [], pontos: [] });
+    expect(await ver(anaOutroAparelho.token)).toEqual({ dicasLigadas: true, escolhida: true, fechadas: [], pontos: [] });
     // quem não respondeu continua sendo perguntado
     expect((await ver(bia.token)).escolhida).toBe(false);
   });
@@ -163,7 +163,7 @@ describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', 
   it('"Desligar" grava e vale em outro aparelho, sem mexer na colega do mesmo parceiro', async () => {
     como(bia.token);
     await acaoAjudaDicas(form({ dicas: 'desligar' }));
-    expect(await ver(bia.token)).toEqual({ dicasLigadas: false, escolhida: true, fechadas: [] });
+    expect(await ver(bia.token)).toEqual({ dicasLigadas: false, escolhida: true, fechadas: [], pontos: [] });
     const outroAparelho = await entrar('bia');
     expect((await ver(outroAparelho.token)).dicasLigadas).toBe(false);
     expect((await ver(ana.token)).dicasLigadas).toBe(true);

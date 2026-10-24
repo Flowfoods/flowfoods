@@ -4340,3 +4340,37 @@ Os dois fiscais aprovaram a rodada 1, com um ponto de segurança do alimento e m
 | Ataques do Guardião (`rev34/t`, 27 testes) nos 3 perfis | 27/27 em cada, nenhum achado; sem prazo + lote vencido: nada emite, imprime nem confirma; corrida "Já imprimi" × Zebra: 20 rodadas, 0 erro cru |
 | Jornada da rodada (build de produção) | 14 de 14: embalagem sem prazo de lote vencido bloqueada (painel, abertura, emissão, papel); o sem prazo em duas linhas na prévia (285 de 480 pontos); "Etiqueta emitida: ela espera a impressora."; histórico com "Esperando o Já imprimi", sem cartão cortado a 1440 e a 390 |
 | Matriz das telas mexidas × dona/operador × 390/1180/1440 × claro/escuro | 48 telas: 0 rolagem lateral, 0 axe, 0 alvo abaixo de 44 px, um h1, nenhum R$ |
+
+## Prioridade nº 1 (23/10) — ajuda por ponto, em card flutuante (24/10/2026)
+
+Pedido de Rodolfo: trocar o texto didático fixo por ajuda sob demanda, junto do campo, seção ou ação que ela explica. Evolução da 0.6 (mesmo registro, mesma preferência por pessoa), não outro sistema. Decisões 433–436.
+
+**O que mudou na tela**
+
+- Botão `?` discreto ao lado dos campos e seções (`<PontoDeAjuda ponto="...">`, `src/components/erp/ui/ponto-de-ajuda.tsx`). Abre um card flutuante único (`src/components/erp/shell/pontos.tsx`): etiqueta "Como funciona", título, explicação curta, "Ver passo a passo" (abre a gaveta na seção certa, quando existe) e "Não mostrar novamente"; X para fechar. Sem botão de vídeo: não há vídeo.
+- Cadastrar insumo: tipo, marca, conservação, prazo após abertura, unidade/embalagem/custo. Montar a ficha: prato ou pré-preparo, descrição comercial, foto, rendimento, etapas.
+- Continua à vista o que é indispensável para agir: rótulos, obrigatório, unidades, erros, alertas, a linha curta do tipo, a categoria sugerida, os formatos da foto e "não é a data de vencimento impressa no lote".
+
+**Regras** (confirmadas em 23/10; ver decisão 433)
+
+- Abre sozinho na 1ª visita e de novo 7 dias depois da última abertura automática; uma abertura automática por visita, na ordem da tela; nunca junto com a caixa "Como funciona" ou a gaveta; nunca com as dicas desligadas ou no nível 1.
+- X/Escape dispensa agora sem perder nada; "Não mostrar novamente" corta a abertura automática; o botão abre sempre.
+- Abertura automática: não rouba foco, não rola a página, avisa o leitor de tela. Abertura manual: foco no card, a página sobe se o card cobrir o campo, Escape devolve o foco ao botão.
+
+**Onde mora**
+
+- Texto: `ajuda-textos.ts`, campo `pontos` da entrada da tela (1 a 3 frases, mesmo lint da 0.6; um teste reprova botão sem texto no registro). Fora do `ajuda.lock.json` (decisão 434).
+- "Já viu": `PreferenciaErp.pontos` (migration aditiva `20261111000000_erp_ajuda_pontos`), `chave.ponto=DIA` ou `=x`, dia de Brasília calculado no servidor, lista branca, gravação atômica, teto 300 com CHECK. "Mostrar as dicas de novo" zera também os pontos.
+
+**Provas desta rodada** (Postgres 16 local, dados isolados; produção não verificada)
+
+- Suíte completa com banco: **143 arquivos, 2.747 aprovados, 46 pulados, 0 falhas** (linha de base antes da mudança: 141 / 2.712 / 46 / 0). Os 46 pulados são as variantes que exigem papéis de banco não-superusuário, como nas rodadas anteriores. Novos: `tests/erp-ajuda-pontos.test.ts` (regras, dia de Brasília, lista branca, lint, cobertura dos botões) e `tests/erp-ajuda-pontos.db.test.ts` (gravação, "não mostrar" que não volta, duas abas, teto e CHECK, sem sessão nada grava, papel do tenant sem acesso). O teste com banco pegou um item duplicado no "visto" do mesmo dia, corrigido antes do commit.
+- Lint, typecheck e portão de conteúdo limpos.
+- No navegador (app local, dona de teste): 1ª visita só a caixa da tela; visita seguinte o card abre sozinho com o foco no campo de nome; Escape fecha; o mesmo ponto não volta e o próximo abre na visita seguinte; abertura manual leva o foco ao título e devolve ao botão; trocar de ponto mantém um card só; o formulário preservado; "Ver passo a passo" abre a gaveta; "Não mostrar novamente" fecha e grava. A 1440×900, 1180×820, 820×1180, 390×844 e 844×390: sem rolagem lateral e card dentro da tela; com toque, botão de 44 px e o campo fica visível acima do card.
+- Teste com pessoa operadora e gestora reais: **não feito**.
+
+**Referências Kairu (regra do plano):** busca na biblioteca por ajuda contextual, onboarding, tooltip e card flutuante sem resultado; a Formação recusa (matrícula da Turma 05 em diante). A referência visual seguida é a imagem aprovada por Rodolfo (card no canto inferior direito), adaptada aos componentes do ERP, sem marca de terceiros.
+
+**Base:** o bloco N (N.1–N.5, branch `bruce/admiring-pascal-4qnypz`, sem merge na master) foi integrado nesta branch antes, porque a N.5 mexeu na ajuda: merge sem conflito.
+
+**Próximo passo:** estender os pontos às outras telas com texto fixo longo (embalagem de compra, compras, produção, DRE) e decidir se a caixa "Como funciona" da tela também vira card (hoje continua como na 0.6).

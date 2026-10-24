@@ -20,6 +20,7 @@ import { CONSERVACOES, type Conservacao, type Validades } from '@/lib/erp/valida
 import { UNIDADES, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
+import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Segmentos } from '../../ui/segmentos';
 import { Painel } from '../../ui/superficies';
@@ -137,6 +138,8 @@ export function FormInsumo({
   const saida = useAvisoDeSaida();
   const erros = estado?.erros ?? {};
   const idBase = 'insumo';
+  // Prioridade nº 1 (23/10): a explicação vai para o botão de ajuda do campo; sem o ponto, o texto antigo fica.
+  const temPonto = { tipo: useTemPonto('tipo'), marca: useTemPonto('marca'), unidade: useTemPonto('unidade') };
   const prePreparo = inicial.tipo === 'PRE_PREPARO';
 
   // I.1a: a categoria sai sugerida pelo nome (sem a pessoa redigitar nada) e continua corrigível. Depois que a pessoa escolhe,
@@ -243,9 +246,13 @@ export function FormInsumo({
                     valor={tipo}
                     aoMudar={setTipo}
                   />
-                  <p id={`${idBase}-tipo-ajuda`} aria-live="polite" className={AJUDA}>
-                    {AJUDA_DO_TIPO[tipo as keyof typeof AJUDA_DO_TIPO] ?? ''} O tipo é o papel do item; a categoria é a natureza dele para o CMV; a conservação é onde fica guardado.
-                  </p>
+                  <div className="mt-1.5 flex items-center gap-1">
+                    <p id={`${idBase}-tipo-ajuda`} aria-live="polite" className={AJUDA.replace('mt-1.5', '')}>
+                      {AJUDA_DO_TIPO[tipo as keyof typeof AJUDA_DO_TIPO] ?? ''}
+                      {!temPonto.tipo && ' O tipo é o papel do item; a categoria é a natureza dele para o CMV; a conservação é onde fica guardado.'}
+                    </p>
+                    <PontoDeAjuda ponto="tipo" className="-my-3 sm:-my-1.5" />
+                  </div>
                   {tipo === 'MATERIAL' && (
                     <p className="mt-1.5 text-[13px] text-atencao">
                       Não entra em ficha técnica. As compras dele ainda contam no CMV por enquanto.
@@ -306,9 +313,12 @@ export function FormInsumo({
             </div>
 
             <div className="sm:max-w-md">
-              <label htmlFor={`${idBase}-marcaReferencia`} className={ROTULO}>
-                Marca de referência <span className="font-normal text-suave">(opcional)</span>
-              </label>
+              <div className="mb-1.5 flex items-center gap-1">
+                <label htmlFor={`${idBase}-marcaReferencia`} className={ROTULO.replace('mb-1.5 ', '')}>
+                  Marca de referência <span className="font-normal text-suave">(opcional)</span>
+                </label>
+                <PontoDeAjuda ponto="marca" className="-my-3 sm:-my-1.5" />
+              </div>
               <input
                 id={`${idBase}-marcaReferencia`}
                 name="marcaReferencia"
@@ -318,11 +328,13 @@ export function FormInsumo({
                 placeholder="Ex.: Camil"
                 className={CAMPO}
                 aria-invalid={!!erros.marcaReferencia}
-                aria-describedby={[`${idBase}-marcaReferencia-ajuda`, erros.marcaReferencia ? `${idBase}-marcaReferencia-erro` : ''].filter(Boolean).join(' ')}
+                aria-describedby={[temPonto.marca ? '' : `${idBase}-marcaReferencia-ajuda`, erros.marcaReferencia ? `${idBase}-marcaReferencia-erro` : ''].filter(Boolean).join(' ') || undefined}
               />
-              <p id={`${idBase}-marcaReferencia-ajuda`} className={AJUDA}>
-                A marca comercial que você costuma comprar. É só uma informação: não trava compra nem cotação e não é o fornecedor (a mesma marca pode vir de vários).
-              </p>
+              {!temPonto.marca && (
+                <p id={`${idBase}-marcaReferencia-ajuda`} className={AJUDA}>
+                  A marca comercial que você costuma comprar. É só uma informação: não trava compra nem cotação e não é o fornecedor (a mesma marca pode vir de vários).
+                </p>
+              )}
               <Erro id={`${idBase}-marcaReferencia-erro`} texto={erros.marcaReferencia} />
             </div>
           </div>
@@ -339,7 +351,11 @@ export function FormInsumo({
           />
         </Painel>
 
-        <Painel titulo="Unidade, embalagem de compra e custo" subtitulo="Três coisas diferentes: a unidade em que você controla, quanto vem em cada embalagem que compra e quanto paga por ela.">
+        <Painel
+          titulo="Unidade, embalagem de compra e custo"
+          subtitulo={temPonto.unidade ? undefined : 'Três coisas diferentes: a unidade em que você controla, quanto vem em cada embalagem que compra e quanto paga por ela.'}
+          acessorio={<PontoDeAjuda ponto="unidade" />}
+        >
           <div className="space-y-4">
             <div>
               {travaDaUnidade && unidade ? (
@@ -355,15 +371,17 @@ export function FormInsumo({
                   legenda="Unidade base"
                   obrigatorio
                   invalido={!!erros.unidade}
-                  descritoPor={[`${idBase}-unidade-ajuda`, erros.unidade ? `${idBase}-unidade-erro` : ''].filter(Boolean).join(' ')}
+                  descritoPor={[temPonto.unidade ? '' : `${idBase}-unidade-ajuda`, erros.unidade ? `${idBase}-unidade-erro` : ''].filter(Boolean).join(' ')}
                   opcoes={(Object.keys(UNIDADES) as Unidade[]).map((k) => [k, UNIDADES[k].nome] as const)}
                   valor={unidade}
                   aoMudar={setUnidade}
                 />
               )}
-              <p id={`${idBase}-unidade-ajuda`} className={AJUDA}>
-                A medida em que você controla o estoque e que a ficha usa (kg, L ou un). Não é a embalagem: a caixa de 5 kg é medida em kg.
-              </p>
+              {!temPonto.unidade && (
+                <p id={`${idBase}-unidade-ajuda`} className={AJUDA}>
+                  A medida em que você controla o estoque e que a ficha usa (kg, L ou un). Não é a embalagem: a caixa de 5 kg é medida em kg.
+                </p>
+              )}
               <Erro id={`${idBase}-unidade-erro`} texto={erros.unidade} />
             </div>
             {unidade ? (

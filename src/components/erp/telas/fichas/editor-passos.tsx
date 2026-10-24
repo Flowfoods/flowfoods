@@ -14,6 +14,7 @@ import { useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
 import { chaveDoPasso, LIMITES_DA_FICHA } from '@/lib/erp/ficha-campos';
 import { AJUDA, CAMPO, Erro } from '../../ui/campos';
+import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 import { classeDeBotao } from '../../ui/estilos';
 
 export function EditorDePassos({
@@ -30,6 +31,7 @@ export function EditorDePassos({
   idBase: string;
   aoMudar: () => void;
 }) {
+  const temPontoDasEtapas = useTemPonto('etapas');
   const proxima = useRef(0);
   const nova = (texto = '') => ({ chave: proxima.current++, texto });
   const [passos, setPassos] = useState(() => (inicial.length ? inicial.map((t) => nova(t)) : [nova()]));
@@ -149,7 +151,14 @@ export function EditorDePassos({
       >
         Adicionar etapa
       </button>
-      <p className={AJUDA}>Uma ação por etapa. A ordem aqui é a ordem na ficha e na impressão. Etapa em branco não é gravada.</p>
+      {temPontoDasEtapas ? (
+        <div className="mt-1.5 flex items-center gap-1">
+          <p className={AJUDA.replace('mt-1.5', '')}>Etapa em branco não é gravada.</p>
+          <PontoDeAjuda ponto="etapas" className="-my-3 sm:-my-1.5" />
+        </div>
+      ) : (
+        <p className={AJUDA}>Uma ação por etapa. A ordem aqui é a ordem na ficha e na impressão. Etapa em branco não é gravada.</p>
+      )}
 
       {textoAnterior && (
         <div className="mt-2 border-t border-linha pt-4">

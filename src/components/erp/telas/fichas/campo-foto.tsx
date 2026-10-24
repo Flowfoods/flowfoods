@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { LIMITE_DA_FOTO } from '@/lib/erp/foto';
 import { AJUDA, Erro, MARCAR, ROTULO } from '../../ui/campos';
+import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 import { classeDeBotao } from '../../ui/estilos';
 
 const LADO_MAXIMO = 1600;
@@ -70,6 +71,7 @@ export function CampoFoto({
   /** Enquanto envia, o formulário não salva. */
   aoOcupar: (ocupado: boolean) => void;
 }) {
+  const temPontoDaFoto = useTemPonto('foto');
   const entrada = useRef<HTMLInputElement>(null);
   const [previa, setPrevia] = useState<string | null>(null);
   const [enviada, setEnviada] = useState('');
@@ -132,9 +134,18 @@ export function CampoFoto({
             )}>
             {preparando ? 'Enviando a foto…' : mostrada ? 'Trocar foto' : 'Escolher foto'}
           </label>
-          <p id={`${idBase}-foto-ajuda`} className={AJUDA}>
-            Do prato pronto ou da montagem: quem opera bate o olho e sabe o que é. JPG, PNG ou WebP. A foto é reduzida e guardada sem a localização do celular.
-          </p>
+          {temPontoDaFoto ? (
+            <div className="mt-1.5 flex items-center gap-1">
+              <p id={`${idBase}-foto-ajuda`} className={AJUDA.replace('mt-1.5', '')}>
+                JPG, PNG ou WebP.
+              </p>
+              <PontoDeAjuda ponto="foto" className="-my-3 sm:-my-1.5" />
+            </div>
+          ) : (
+            <p id={`${idBase}-foto-ajuda`} className={AJUDA}>
+              Do prato pronto ou da montagem: quem opera bate o olho e sabe o que é. JPG, PNG ou WebP. A foto é reduzida e guardada sem a localização do celular.
+            </p>
+          )}
           {atual && (
             <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-texto sm:min-h-0">
               <input

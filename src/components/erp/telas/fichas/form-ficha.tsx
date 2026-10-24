@@ -45,6 +45,7 @@ import {
 } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
+import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Segmentos } from '../../ui/segmentos';
 import { Painel } from '../../ui/superficies';
@@ -219,6 +220,8 @@ function FormFichaBase({
   const [linhas, setLinhas] = useState(() => inicial.itens.map((l, i) => ({ ...l, chave: i })));
   const erros = estado?.erros ?? {};
   const idBase = 'ficha';
+  // Prioridade nº 1 (23/10): a explicação vai para o botão de ajuda do campo; sem o ponto, o texto antigo fica.
+  const temPonto = { tipo: useTemPonto('tipo'), descricao: useTemPonto('descricao'), rendimento: useTemPonto('rendimento') };
   const porEscolha = useMemo(() => {
     const m = new Map<string, Escolhido>();
     for (const i of opcoes) m.set(i.id, { nome: i.nome, unidade: i.unidade, porUnidade: i.custo ? custoPorUnidade(i.custo) : null, preparo: false, incompleto: false });
@@ -344,16 +347,24 @@ function FormFichaBase({
                 valor={tipo}
                 aoMudar={setTipo}
               />
-              <p className={AJUDA}>
-                {tipo === 'PRATO'
-                  ? 'Prato rende porções: o custo sai por porção.'
-                  : 'Pré-preparo (molho, massa, recheio) rende em kg, L ou un, entra em outras fichas e aparece em Insumos com o custo desta receita.'}
-              </p>
+              <div className="mt-1.5 flex items-center gap-1">
+                <p className={AJUDA.replace('mt-1.5', '')}>
+                  {tipo === 'PRATO'
+                    ? 'Prato rende porções: o custo sai por porção.'
+                    : temPonto.tipo
+                      ? 'Pré-preparo rende em kg, L ou un e entra em outras fichas.'
+                      : 'Pré-preparo (molho, massa, recheio) rende em kg, L ou un, entra em outras fichas e aparece em Insumos com o custo desta receita.'}
+                </p>
+                <PontoDeAjuda ponto="tipo" className="-my-3 sm:-my-1.5" />
+              </div>
             </div>
             <div>
-              <label htmlFor={`${idBase}-descricao`} className={ROTULO}>
-                Descrição comercial <span className="font-normal text-suave">(uma ou duas linhas)</span>
-              </label>
+              <div className="mb-1.5 flex items-center gap-1">
+                <label htmlFor={`${idBase}-descricao`} className={ROTULO.replace('mb-1.5 ', '')}>
+                  Descrição comercial <span className="font-normal text-suave">(uma ou duas linhas)</span>
+                </label>
+                <PontoDeAjuda ponto="descricao" className="-my-3 sm:-my-1.5" />
+              </div>
               <textarea
                 id={`${idBase}-descricao`}
                 name="descricao"
@@ -363,18 +374,20 @@ function FormFichaBase({
                 placeholder="Ex.: Pão brioche, blend 180 g, cheddar e molho da casa"
                 className={`${CAMPO} resize-y`}
                 aria-invalid={!!erros.descricao}
-                aria-describedby={`${idBase}-descricao-ajuda${erros.descricao ? ` ${idBase}-descricao-erro` : ''}`}
+                aria-describedby={[temPonto.descricao ? '' : `${idBase}-descricao-ajuda`, erros.descricao ? `${idBase}-descricao-erro` : ''].filter(Boolean).join(' ') || undefined}
               />
-              <p id={`${idBase}-descricao-ajuda`} className={AJUDA}>
-                Texto de apresentação para cardápios e marketplaces. Não vai para lugar nenhum sozinho. O passo a passo da cozinha fica no modo de preparo.
-              </p>
+              {!temPonto.descricao && (
+                <p id={`${idBase}-descricao-ajuda`} className={AJUDA}>
+                  Texto de apresentação para cardápios e marketplaces. Não vai para lugar nenhum sozinho. O passo a passo da cozinha fica no modo de preparo.
+                </p>
+              )}
               <Erro id={`${idBase}-descricao-erro`} texto={erros.descricao} />
             </div>
             <CampoFoto atual={fotoAtual} nome={nome} erro={erros.foto} idBase={idBase} envio={`${base}/fotos`} aoMudar={saida.aoMudar} aoOcupar={setEnviandoFoto} />
           </div>
         </Painel>
 
-        <Painel titulo="Rendimento">
+        <Painel titulo="Rendimento" acessorio={<PontoDeAjuda ponto="rendimento" />}>
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-32">
               <label htmlFor={`${idBase}-rendimento`} className={ROTULO}>
@@ -416,7 +429,7 @@ function FormFichaBase({
             )}
           </div>
           <Erro id={`${idBase}-rendimento-erro`} texto={erros.rendimento} />
-          {tipo === 'PRE_PREPARO' && (
+          {tipo === 'PRE_PREPARO' && !temPonto.rendimento && (
             <p className={AJUDA}>Quanto sai pronto, já pesado depois do preparo: o que o cozimento tira ou acrescenta já está aqui.</p>
           )}
         </Painel>

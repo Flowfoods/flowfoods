@@ -72,8 +72,8 @@ import {
   normalizarEmail,
   tokenTemFormato,
 } from './acesso';
-import { fechamentoValido, normalizarFechadas } from './ajuda';
-import type { PreferenciaDeAjuda } from './ajuda-rota';
+import { fechamentoValido, normalizarFechadas, pontoValido } from './ajuda';
+import { diaDe, itemDoPonto, normalizarPontos, type PreferenciaDeAjuda } from './ajuda-rota';
 import { ERRO_DONO_JA_TEM_ACESSO, fraseJaDecidido, FRASE_PEDIDO_MEXIDO, lerAtivacao, type EtapaDoPedido } from './pedido-campos';
 import {
   configDoRosto,
@@ -1728,15 +1728,21 @@ export async function validarSessao(token: unknown, o?: Opcoes): Promise<SessaoV
 // branca), com teto de 300 (o mais velho sai) e gravação atômica: duas abas
 // fechando caixas ao mesmo tempo não perdem nenhum fechamento.
 
-function preferenciaDe(p: { dicasLigadas: boolean; escolhidaEm: Date | null; fechadas: string[] | null } | null | undefined): PreferenciaDeAjuda {
-  if (!p) return { dicasLigadas: true, escolhida: false, fechadas: [] };
-  return { dicasLigadas: p.dicasLigadas, escolhida: p.escolhidaEm !== null, fechadas: normalizarFechadas(p.fechadas) };
+function preferenciaDe(
+  p: { dicasLigadas: boolean; escolhidaEm: Date | null; fechadas: string[] | null; pontos?: string[] | null } | null | undefined,
+): PreferenciaDeAjuda {
+  if (!p) return { dicasLigadas: true, escolhida: false, fechadas: [], pontos: [] };
+  return { dicasLigadas: p.dicasLigadas, escolhida: p.escolhidaEm !== null, fechadas: normalizarFechadas(p.fechadas), pontos: normalizarPontos(p.pontos) };
 }
 
 export type MudancaDeAjuda =
   | { tipo: 'dicas'; ligadas: boolean }
   | { tipo: 'fechar'; caixa: string }
-  | { tipo: 'reabrir' };
+  | { tipo: 'reabrir' }
+  /** O card do ponto abriu sozinho agora: guarda o dia (o servidor decide o dia, não o aparelho). */
+  | { tipo: 'ponto-visto'; ponto: string }
+  /** "Não mostrar novamente": o ponto não abre mais sozinho (a ajuda manual continua). */
+  | { tipo: 'ponto-nunca'; ponto: string };
 
 /** `ok: false` = sessão morta ou pedido recusado; nada foi gravado. */
 export async function gravarPreferenciaDeAjuda(token: unknown, mudanca: MudancaDeAjuda, o?: Opcoes): Promise<{ ok: boolean }> {
@@ -1754,11 +1760,20 @@ export async function gravarPreferenciaDeAjuda(token: unknown, mudanca: MudancaD
     return { ok: true };
   }
   if (mudanca.tipo === 'reabrir') {
+    // "Mostrar as dicas de novo" vale para as caixas e para os pontos (inclusive os "não mostrar novamente").
     await db.preferenciaErp.upsert({
       where: { usuarioId },
-      create: { usuarioId, fechadas: [] },
-      update: { fechadas: [] },
+      create: { usuarioId, fechadas: [], pontos: [] },
+      update: { fechadas: [], pontos: [] },
     });
+    return { ok: true };
+  }
+  if (mudanca.tipo === 'ponto-visto' || mudanca.tipo === 'ponto-nunca') {
+    const ponto = pontoValido(mudanca.ponto);
+    if (!ponto) return { ok: false };
+    // Quem pediu "não mostrar novamente" não volta a "visto" por causa de uma aba antiga.
+    if (mudanca.tipo === 'ponto-visto' && sessao.ajuda.pontos.includes(itemDoPonto(ponto, 'x'))) return { ok: true };
+    await gravarItemDoPonto(db, usuarioId, itemDoPonto(ponto, mudanca.tipo === 'ponto-nunca' ? 'x' : diaDe(agora)), agora);
     return { ok: true };
   }
   if (mudanca.tipo !== 'fechar') return { ok: false };
@@ -1786,6 +1801,31 @@ export async function acrescentarCaixaFechada(db: PrismaClient, usuarioId: strin
           SELECT u.x, u.n
           FROM unnest(array_append(array_remove(coalesce("PreferenciaErp"."fechadas", ARRAY[]::text[]), ${caixa}), ${caixa})) WITH ORDINALITY AS u(x, n)
           WHERE u.x = ${caixa} OR split_part(u.x, '@', 1) <> ${chave}
+          ORDER BY u.n DESC
+          LIMIT 300
+        ) t
+      ),
+      "atualizadoEm" = ${agora}`;
+}
+
+/**
+ * Grava "chave.ponto=..." numa instrução só (o ON CONFLICT trava a linha): tira
+ * o item anterior do MESMO ponto, mantém os 300 mais novos e não perde a
+ * gravação de outra aba. Exportada para o teste com banco; quem confere a lista
+ * branca é `gravarPreferenciaDeAjuda`.
+ */
+export async function gravarItemDoPonto(db: PrismaClient, usuarioId: string, item: string, agora: Date): Promise<void> {
+  const ponto = item.split('=')[0];
+  await db.$executeRaw`
+    INSERT INTO "PreferenciaErp" ("usuarioId", "pontos", "atualizadoEm")
+    VALUES (${usuarioId}, ARRAY[${item}]::text[], ${agora})
+    ON CONFLICT ("usuarioId") DO UPDATE SET
+      "pontos" = (
+        SELECT coalesce(array_agg(t.x ORDER BY t.n), ARRAY[]::text[])
+        FROM (
+          SELECT u.x, u.n
+          FROM unnest(array_append(array_remove(coalesce("PreferenciaErp"."pontos", ARRAY[]::text[]), ${item}), ${item})) WITH ORDINALITY AS u(x, n)
+          WHERE u.x = ${item} OR split_part(u.x, '=', 1) <> ${ponto}
           ORDER BY u.n DESC
           LIMIT 300
         ) t

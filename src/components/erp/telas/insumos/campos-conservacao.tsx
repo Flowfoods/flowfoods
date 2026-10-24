@@ -18,6 +18,7 @@
 import { useState } from 'react';
 import { CONSERVACOES, ORDEM_DAS_CONSERVACOES, ROTULO_DA_OPCAO, validadesParaCampos, type Conservacao, type EmQue, type Validades } from '@/lib/erp/validade';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
+import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 import { IconeDaConservacao } from '../cadastro/validade';
 
 type Linha = { marcada: boolean; quantidade: string; em: EmQue };
@@ -56,13 +57,17 @@ export function CamposDeConservacao({
   // Prazo em outra conservação sem o da principal: o banco não aceita, então a tela já diz (o servidor recusa do mesmo jeito).
   const faltaDaPrincipal = principal !== '' && !linhas[principal].marcada && ORDEM_DAS_CONSERVACOES.some((c) => c !== principal && linhas[c].marcada);
   const idAjuda = `${idBase}-conservacao-ajuda`;
+  const temPonto = { conservacao: useTemPonto('conservacao'), prazo: useTemPonto('prazo-abertura') };
 
   return (
     <div className="space-y-5">
       <div className="sm:max-w-md">
-        <label htmlFor={`${idBase}-conservacao`} className={ROTULO}>
-          Conservação{OBRIGATORIO}
-        </label>
+        <div className="mb-1.5 flex items-center gap-1">
+          <label htmlFor={`${idBase}-conservacao`} className={ROTULO.replace('mb-1.5 ', '')}>
+            Conservação{OBRIGATORIO}
+          </label>
+          <PontoDeAjuda ponto="conservacao" className="-my-3 sm:-my-1.5" />
+        </div>
         <select
           id={`${idBase}-conservacao`}
           name="conservacao"
@@ -75,7 +80,7 @@ export function CamposDeConservacao({
           }}
           className={`${CAMPO} pr-8`}
           aria-invalid={!!erroDaConservacao}
-          aria-describedby={[idAjuda, erroDaConservacao ? `${idBase}-conservacao-erro` : ''].filter(Boolean).join(' ')}
+          aria-describedby={[temPonto.conservacao ? '' : idAjuda, erroDaConservacao ? `${idBase}-conservacao-erro` : ''].filter(Boolean).join(' ') || undefined}
         >
           <option value="" disabled>
             Selecione a conservação
@@ -86,9 +91,11 @@ export function CamposDeConservacao({
             </option>
           ))}
         </select>
-        <p id={idAjuda} className={AJUDA}>
-          Onde o insumo fica guardado normalmente. Não é a categoria: coxa de frango é Proteína, congelada ou não.
-        </p>
+        {!temPonto.conservacao && (
+          <p id={idAjuda} className={AJUDA}>
+            Onde o insumo fica guardado normalmente. Não é a categoria: coxa de frango é Proteína, congelada ou não.
+          </p>
+        )}
         {aConfirmar && (
           <p className="mt-1.5 text-[13px] text-atencao">
             Conservação a confirmar: este insumo está em Seco porque o sistema antigo assumia Seco quando ninguém escolhia. Confira e, se for outra, troque.
@@ -105,11 +112,18 @@ export function CamposDeConservacao({
 
       <fieldset className="min-w-0">
         <legend className={ROTULO}>
-          Prazo de uso após abertura <span className="font-normal text-suave">(opcional)</span>
+          <span className="flex items-center gap-1">
+            <span>
+              Prazo de uso após abertura <span className="font-normal text-suave">(opcional)</span>
+            </span>
+            <PontoDeAjuda ponto="prazo-abertura" className="-my-3 sm:-my-1.5" />
+          </span>
         </legend>
+        {/* A diferença para o vencimento do lote é indispensável: fica sempre à vista (correção prioritária). */}
         <p id={`${idBase}-prazo-ajuda`} className="mb-2 text-[13px] leading-relaxed text-suave">
-          Prazo para consumir o produto depois de abrir a embalagem, conforme orientação do fabricante e procedimento validado da operação. Não é a
-          data de vencimento impressa no lote. Em branco, o prazo fica “não informado”.
+          {temPonto.prazo
+            ? 'Não é a data de vencimento impressa no lote. Em branco, fica “não informado”.'
+            : 'Prazo para consumir o produto depois de abrir a embalagem, conforme orientação do fabricante e procedimento validado da operação. Não é a data de vencimento impressa no lote. Em branco, o prazo fica “não informado”.'}
         </p>
         <div aria-hidden className="mb-1 hidden grid-cols-[minmax(0,1fr)_5.5rem_6.5rem] gap-2 text-[12px] font-semibold text-suave sm:grid">
           <span>Quando fica em</span>
@@ -179,9 +193,11 @@ export function CamposDeConservacao({
             );
           })}
         </ul>
-        <p className={AJUDA}>
-          Marque só onde o insumo pode ficar. A data de vencimento do lote e a de abertura entram no recebimento e no controle de lote (ainda não existem no ERP).
-        </p>
+        {!temPonto.prazo && (
+          <p className={AJUDA}>
+            Marque só onde o insumo pode ficar. A data de vencimento do lote e a de abertura entram no recebimento da compra e nas etiquetas.
+          </p>
+        )}
       </fieldset>
       <input type="hidden" name="validadeNoFormulario" value="sim" />
     </div>

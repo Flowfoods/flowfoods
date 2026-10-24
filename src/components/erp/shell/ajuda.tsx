@@ -42,6 +42,7 @@ export function preferenciaEfetiva(base: PreferenciaDeAjuda | null, o: Otimista 
     dicasLigadas: o.dicasLigadas ?? base.dicasLigadas,
     escolhida: o.escolhida ?? base.escolhida,
     fechadas: [...base.fechadas, ...o.fechadas],
+    pontos: base.pontos,
   };
 }
 

@@ -12,6 +12,7 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { ajudaParaATela } from '@/lib/erp/ajuda';
+import { diaDe } from '@/lib/erp/ajuda-rota';
 import { AJUDA_DE_USO_ERP } from '@/lib/constants';
 import { exigirParceiroDaSessao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { navegacaoDoParceiro, VERSAO_DO_ERP } from '@/lib/erp/modulos';
@@ -21,7 +22,7 @@ import { AppShell } from '@/components/erp/shell/AppShell';
 import { EscopoDoRascunho } from '@/components/erp/telas/cadastro/rascunho';
 import { Aviso } from '@/components/erp/ui/superficies';
 import { acaoSair } from '../entrar/actions';
-import { acaoAjudaDicas, acaoAjudaFechar, acaoBuscarNoErp, acaoEscolherVisao } from './actions';
+import { acaoAjudaDicas, acaoAjudaFechar, acaoAjudaPontoNunca, acaoAjudaPontoVisto, acaoBuscarNoErp, acaoEscolherVisao } from './actions';
 
 export const metadata: Metadata = {
   title: 'FlowFoods ERP',
@@ -65,7 +66,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       ajuda={{
         entradas: ajudaParaATela(alcance),
         preferencia: pessoa.ajuda,
-        acoes: { fechar: acaoAjudaFechar, dicas: acaoAjudaDicas },
+        acoes: { fechar: acaoAjudaFechar, dicas: acaoAjudaDicas, pontoVisto: acaoAjudaPontoVisto, pontoNunca: acaoAjudaPontoNunca },
+        hoje: diaDe(new Date()),
         contato: AJUDA_DE_USO_ERP,
       }}
     >

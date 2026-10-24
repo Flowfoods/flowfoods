@@ -239,7 +239,7 @@ describe('0.6 · aula por permissão, não por perfil nem por setor', () => {
 
 describe('0.6 · quando a caixa aparece', () => {
   const e = { chave: 'insumos', versao: 2 };
-  const pref = (p: Partial<PreferenciaDeAjuda>): PreferenciaDeAjuda => ({ dicasLigadas: true, escolhida: true, fechadas: [], ...p });
+  const pref = (p: Partial<PreferenciaDeAjuda>): PreferenciaDeAjuda => ({ dicasLigadas: true, escolhida: true, fechadas: [], pontos: [], ...p });
 
   it('ligada e aberta: aparece; pergunta só até a 1ª resposta', () => {
     expect(caixaDaTela(e, pref({}))).toEqual({ mudou: false, perguntar: false });
@@ -291,7 +291,8 @@ async function html(caminho: string, preferencia: PreferenciaDeAjuda | null, alc
         ajuda: {
           entradas: ajudaParaATela(alcance).map((e) => ({ ...e, versao: versoes[e.chave] ?? e.versao })),
           preferencia,
-          acoes: preferencia ? { fechar: acao, dicas: acao } : null,
+          acoes: preferencia ? { fechar: acao, dicas: acao, pontoVisto: acao, pontoNunca: acao } : null,
+          hoje: 20_000,
           contato: { url: 'https://wa.me/5521', display: '(21) 90000-0000' },
         },
         // A página de verdade: o PageHeader (onde a caixa mora, abaixo do h1) e o conteúdo.
@@ -305,7 +306,7 @@ async function html(caminho: string, preferencia: PreferenciaDeAjuda | null, alc
     ),
   );
 }
-const PREF = (p: Partial<PreferenciaDeAjuda> = {}): PreferenciaDeAjuda => ({ dicasLigadas: true, escolhida: true, fechadas: [], ...p });
+const PREF = (p: Partial<PreferenciaDeAjuda> = {}): PreferenciaDeAjuda => ({ dicasLigadas: true, escolhida: true, fechadas: [], pontos: [], ...p });
 
 describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fechou ou desligou', () => {
   it('ligada: caixa logo abaixo do título e acima do conteúdo, com o botão de fechar e o "?" no topo', async () => {
@@ -466,6 +467,6 @@ describe('0.6 · guardas estáticas', () => {
     const txt = readFileSync(join('src', 'app', 'erp', 'actions.ts'), 'utf8');
     const trecho = txt.slice(txt.indexOf('ajuda contextual (0.6)')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     expect(trecho).not.toMatch(/usuarioId|get\('usuario|get\("usuario/);
-    expect(trecho.match(/gravarPreferenciaDeAjuda\(tokenDoCookie\(\)/g)).toHaveLength(3);
+    expect(trecho.match(/gravarPreferenciaDeAjuda\(tokenDoCookie\(\)/g)).toHaveLength(5); // fechar, dicas, reabrir + os dois dos pontos de ajuda (23/10)
   });
 });

@@ -2512,6 +2512,9 @@ model PreferenciaErp {
   dicasLigadas Boolean   @default(true)
   escolhidaEm  DateTime?
   fechadas     String[]  @default([])
+  // Pontos de ajuda (23/10/2026): "chave.ponto=DIA" da última abertura automática
+  // ou "chave.ponto=x" (não mostrar novamente). No máximo 300 (CHECK no banco).
+  pontos       String[]  @default([])
   atualizadoEm DateTime  @updatedAt
 
   usuario UsuarioErp @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
