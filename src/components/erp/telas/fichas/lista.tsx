@@ -23,6 +23,8 @@ import {
   formatarRendimento,
   porUnidadeDeRendimento,
   queryDosFiltrosDeFicha,
+  STATUS_DO_FILTRO_DE_CMV,
+  valorDoFiltroDoCmv,
   temFiltroDeFicha,
   TIPOS_DE_FICHA,
   type FiltrosDeFicha,
@@ -33,7 +35,7 @@ import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { Miniatura } from './miniatura';
-import { CANAIS } from '@/lib/erp/canal-campos';
+import { CANAIS, ORDEM_DOS_CANAIS } from '@/lib/erp/canal-campos';
 import { porcentagemDoCmv, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
@@ -91,8 +93,8 @@ const ROTULO_DA_SITUACAO = { ativas: 'Ativas', desativadas: 'Desativadas', todas
 export function FiltrosDasFichas({ base, filtros: f, verCustos = true }: { base: string; filtros: FiltrosDeFicha; verCustos?: boolean }) {
   const SELECT = `${CAMPO} pr-8`;
   return (
-    <form role="search" action={base} className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(18rem,1fr)_repeat(2,minmax(10.5rem,auto))_auto]">
-      <div className="col-span-2 flex gap-2 lg:col-span-1">
+    <form role="search" action={base} className={`grid grid-cols-2 gap-2 ${verCustos ? 'lg:grid-cols-4 2xl:grid-cols-[minmax(18rem,1fr)_repeat(3,minmax(10.5rem,auto))_auto]' : 'lg:grid-cols-[minmax(18rem,1fr)_repeat(2,minmax(10.5rem,auto))]'}`}>
+      <div className={`col-span-2 flex gap-2 ${verCustos ? 'lg:col-span-4 2xl:col-span-1' : 'lg:col-span-1'}`}>
         <label htmlFor="fichas-q" className="sr-only">
           Buscar ficha pelo nome
         </label>
@@ -131,6 +133,25 @@ export function FiltrosDasFichas({ base, filtros: f, verCustos = true }: { base:
           ))}
         </select>
       </div>
+      {verCustos && (
+        <div className="col-span-2 sm:col-span-1">
+          <label htmlFor="fichas-cmv" className="sr-only">
+            CMV por canal
+          </label>
+          <select id="fichas-cmv" name="cmv" defaultValue={f.cmv ? valorDoFiltroDoCmv(f.cmv) : ''} className={SELECT}>
+            <option value="">CMV: todos</option>
+            {ORDEM_DOS_CANAIS.map((canal) => (
+              <optgroup key={canal} label={CANAIS[canal].rotulo}>
+                {STATUS_DO_FILTRO_DE_CMV.map((st) => (
+                  <option key={st} value={valorDoFiltroDoCmv({ canal, status: st })}>
+                    {CANAIS[canal].curto} · {STATUS_DO_CMV[st].rotulo}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+      )}
       {verCustos && (
         <label className="col-span-2 flex min-h-11 cursor-pointer items-center gap-2.5 rounded-[7px] border border-linha-forte bg-campo px-3 text-sm text-texto sm:min-h-[42px] lg:col-span-1">
           <input type="checkbox" name="custo" value="incompleto" defaultChecked={f.incompleto} className={MARCAR} />

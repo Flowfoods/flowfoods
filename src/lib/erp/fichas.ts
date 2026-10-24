@@ -30,6 +30,7 @@ import type { ClienteDoParceiro } from './tenant';
 import { ehErroDeUnicidade } from './tenant';
 import { listarHistorico } from './historico';
 import { idsDeFichaPelaBusca } from './busca';
+import { cmvDaLista } from './canais';
 import { diferenca, type Erros } from './insumo-campos';
 import {
   chaveDoItem,
@@ -765,9 +766,9 @@ async function preparosIncompletos(tx: ClienteDoParceiro): Promise<string[]> {
 const SEM_PRECO_NEM_COMPRA = { precoEmbalagemCentavos: 0, notaItens: { none: { nota: { status: 'LANCADA' as const } } } };
 
 /** `idsDaBusca`: as fichas cujo nome tem o texto, sem ligar para caixa nem acento (`busca.ts`); null = sem texto para buscar. */
-function filtroDoBanco(f: FiltrosDeFicha, incompletos: string[], idsDaBusca: string[] | null): Prisma.FichaTecnicaWhereInput {
+function filtroDoBanco(f: FiltrosDeFicha, incompletos: string[], idsDaBusca: string[] | null, idsDoCmv: string[] | null = null): Prisma.FichaTecnicaWhereInput {
   return {
-    ...(idsDaBusca ? { id: { in: idsDaBusca } } : {}),
+    ...(idsDaBusca || idsDoCmv ? { AND: [idsDaBusca, idsDoCmv].filter((x): x is string[] => x !== null).map((ids) => ({ id: { in: ids } })) } : {}),
     ...(f.tipo ? { tipo: f.tipo } : {}),
     ...(f.situacao === 'ativas' ? { ativa: true } : f.situacao === 'desativadas' ? { ativa: false } : {}),
     ...(f.incompleto ? { itens: { some: { OR: [{ insumo: SEM_PRECO_NEM_COMPRA }, { subfichaId: { in: incompletos } }] } } } : {}),
@@ -790,13 +791,37 @@ const SELECAO_DA_LISTA = {
   itens: { orderBy: { ordem: 'asc' as const }, select: SELECAO_DO_ITEM },
 } as const;
 
-/** Página da lista com o total, custo calculado na hora (nunca gravado), em cascata. */
-export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<FiltrosDeFicha> = {}) {
+/**
+ * F4: os pratos (dentro dos outros filtros) com aquele status do CMV naquele canal. Conta sobre o conjunto TODO, não só
+ * a página: o CMV é calculado na hora (nunca gravado), então não há coluna para o banco filtrar.
+ */
+async function idsPeloStatusDoCmv(cliente: ClienteDoParceiro, f: FiltrosDeFicha): Promise<string[]> {
+  if (!f.cmv || f.tipo === 'PRE_PREPARO') return [];
+  const base = await cliente.transacao(async (tx) => {
+    const where = filtroDoBanco(f, f.incompleto ? await preparosIncompletos(tx) : [], await idsDeFichaPelaBusca(tx, f.q.trim().slice(0, 80)));
+    const ids = (await tx.fichaTecnica.findMany({ where: { AND: [where, { tipo: 'PRATO' }] }, select: { id: true } })).map((x) => x.id);
+    if (ids.length === 0) return [];
+    const c = await custosEmCascata(tx, ids);
+    return ids.map((id) => ({ id, tipo: 'PRATO', custo: c.custo(id)! }));
+  });
+  if (base.length === 0) return [];
+  const cmv = await cmvDaLista(cliente, base);
+  const { canal, status } = f.cmv;
+  return base.filter((b) => cmv.get(b.id)?.find((x) => x.canal === canal)?.status === status).map((b) => b.id);
+}
+
+/**
+ * Página da lista com o total, custo calculado na hora (nunca gravado), em cascata. O filtro do CMV só vale com
+ * `verPrecos` (quem não vê preços não pode descobrir o status pela lista que volta).
+ */
+export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<FiltrosDeFicha> = {}, opcoes: { verPrecos?: boolean } = {}) {
   const f: FiltrosDeFicha = { ...FILTROS_DE_FICHA_PADRAO, ...filtros };
+  if (!opcoes.verPrecos) f.cmv = null;
   // Foto enviada e nunca salva (herança d da 1.3): sai também ao abrir a lista, de vez em quando.
   await faxinarPendentesDeVezEmQuando(cliente.parceiroId);
+  const idsDoCmv = f.cmv ? await idsPeloStatusDoCmv(cliente, f) : null;
   return cliente.transacao(async (tx) => {
-    const where = filtroDoBanco(f, f.incompleto ? await preparosIncompletos(tx) : [], await idsDeFichaPelaBusca(tx, f.q.trim().slice(0, 80)));
+    const where = filtroDoBanco(f, f.incompleto ? await preparosIncompletos(tx) : [], await idsDeFichaPelaBusca(tx, f.q.trim().slice(0, 80)), idsDoCmv);
     const total = await tx.fichaTecnica.count({ where });
     const paginas = Math.max(1, Math.ceil(total / FICHAS_POR_PAGINA));
     const pagina = Math.min(Math.max(1, Math.trunc(f.pagina) || 1), paginas);

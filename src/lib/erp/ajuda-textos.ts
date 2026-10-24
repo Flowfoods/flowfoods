@@ -223,12 +223,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas'],
     titulo: 'Fichas e produtos',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Cada receita da casa, com o que rende e o que leva.' },
       { texto: 'Pré-preparo (molho, base) entra dentro de outras fichas.' },
       { texto: 'O custo por porção aparece para quem vê os preços. “Incompleto” quer dizer que falta preço em algum insumo.', para: ['precos.ver'] },
-      { texto: 'Ao lado, cada canal tem o seu preço, o CMV e o farol: dentro da meta, acima da meta, sem dados ou não ofertado.', para: ['precos.ver'] },
+      { texto: 'Ao lado, cada canal tem o seu preço, o CMV e o farol: dentro da meta, acima da meta, sem dados ou não ofertado. O filtro “CMV” mostra só os pratos de um farol num canal, contando a lista inteira.', para: ['precos.ver'] },
     ],
     pontos: [
       {

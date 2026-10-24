@@ -3032,3 +3032,9 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 ### 440. 2026-10-24 · N.1: a ficha técnica e a precificação continuam no último preço da rede; o período que atravessa a troca avisa
 
 **Razão:** a decisão de 23/10 manda o último preço da rede ficar como referência para precificar; só estoque, saídas, retratos e CMV real passam à média da loja. O DRE do período em que uma loja ligou mostra um aviso com a loja, o dia da troca e a diferença de base, dizendo que ela não é perda nem ganho de mercadoria (o estoque inicial veio pela regra antiga e o final pela nova). O dia da troca é o de Brasília.
+
+### 441. 2026-10-24 · F4: filtro da lista de fichas pelo farol do CMV num canal, contado no servidor sobre a lista inteira
+
+**Alternativas:** (a) filtrar só a página que já veio (50 linhas); (b) gravar o status do CMV numa coluna; (c) calcular o CMV de todos os pratos que passam nos outros filtros e paginar depois.
+
+**Razão:** (c). O CMV é calculado na hora e nunca gravado (decisões da N.2); uma coluna ficaria velha a cada compra. Filtrar só a página mentiria no total. Um valor só na URL (`cmv=IFOOD-acima`), canal e farol de listas fechadas. Só quem vê preços (`precos.ver`) filtra: para os outros o parâmetro é ignorado no servidor e o seletor nem aparece, para que o farol não vaze pela contagem do que volta. O filtro só traz pratos (pré-preparo não tem preço de venda).

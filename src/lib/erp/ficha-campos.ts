@@ -38,6 +38,8 @@ import {
   type Fracao,
   type Unidade,
 } from './unidades';
+import { ORDEM_DOS_CANAIS, type CanalVenda } from './canal-campos';
+import type { StatusDoCmv } from './cmv-produto-campos';
 import { lerValidades, retratoDaValidade, type EntradaDeValidade, type Validades } from './validade';
 
 export const TIPOS_DE_FICHA = {
@@ -534,12 +536,33 @@ export interface FiltrosDeFicha {
   situacao: SituacaoDaFicha;
   /** Só fichas com custo incompleto (insumo "Sem preço", inclusive dentro de pré-preparo). */
   incompleto: boolean;
+  /** Só pratos com este status do CMV neste canal (lido no servidor sobre o conjunto todo; só para quem vê preços). */
+  cmv: FiltroDoCmv | null;
   pagina: number;
 }
 
+export interface FiltroDoCmv {
+  canal: CanalVenda;
+  status: StatusDoCmv;
+}
+
+export const STATUS_DO_FILTRO_DE_CMV: readonly StatusDoCmv[] = ['acima', 'dentro', 'semDados', 'naoOfertado'];
+
+/** `IFOOD-acima` → { canal, status }; qualquer outra coisa → null. */
+export function lerFiltroDoCmv(v: string | undefined): FiltroDoCmv | null {
+  const partes = (v ?? '').split('-');
+  if (partes.length !== 2) return null;
+  const [canal, status] = partes;
+  const c = ORDEM_DOS_CANAIS.find((x) => x === canal);
+  const st = STATUS_DO_FILTRO_DE_CMV.find((x) => x === status);
+  return c && st ? { canal: c, status: st } : null;
+}
+
+export const valorDoFiltroDoCmv = (f: FiltroDoCmv): string => `${f.canal}-${f.status}`;
+
 export const FICHAS_POR_PAGINA = 50;
 
-export const FILTROS_DE_FICHA_PADRAO: FiltrosDeFicha = { q: '', tipo: null, situacao: 'ativas', incompleto: false, pagina: 1 };
+export const FILTROS_DE_FICHA_PADRAO: FiltrosDeFicha = { q: '', tipo: null, situacao: 'ativas', incompleto: false, cmv: null, pagina: 1 };
 
 export function lerFiltrosDeFicha(sp: Record<string, string | string[] | undefined>): FiltrosDeFicha {
   const v = (k: string) => (Array.isArray(sp[k]) ? sp[k]![0] : sp[k]);
@@ -548,6 +571,7 @@ export function lerFiltrosDeFicha(sp: Record<string, string | string[] | undefin
     tipo: um(v('tipo'), Object.keys(TIPOS_DE_FICHA) as TipoFicha[]),
     situacao: um(v('situacao'), ['ativas', 'desativadas', 'todas'] as const) ?? 'ativas',
     incompleto: marcado(v('custo')) || v('custo') === 'incompleto',
+    cmv: lerFiltroDoCmv(v('cmv')),
     pagina: Math.max(1, Math.trunc(Number(v('pagina'))) || 1),
   };
 }
@@ -558,10 +582,11 @@ export function queryDosFiltrosDeFicha(f: FiltrosDeFicha): string {
   if (f.tipo) p.set('tipo', f.tipo);
   if (f.situacao !== 'ativas') p.set('situacao', f.situacao);
   if (f.incompleto) p.set('custo', 'incompleto');
+  if (f.cmv) p.set('cmv', valorDoFiltroDoCmv(f.cmv));
   if (f.pagina > 1) p.set('pagina', String(f.pagina));
   return p.toString();
 }
 
 export function temFiltroDeFicha(f: FiltrosDeFicha): boolean {
-  return !!(f.q || f.tipo || f.situacao !== 'ativas' || f.incompleto);
+  return !!(f.q || f.tipo || f.situacao !== 'ativas' || f.incompleto || f.cmv);
 }

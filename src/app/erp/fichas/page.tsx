@@ -20,12 +20,13 @@ const BASE = '/erp/fichas';
 export default async function ErpFichasPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.ver');
-  const filtros = lerFiltrosDeFicha(searchParams);
-  const [pagina, { visao }] = await Promise.all([listarFichas(ctx.cliente, filtros), visaoDaRequisicao(ctx)]);
+  // N.2: preço e CMV por canal na lista só para quem vê preços (nem sai do servidor para os outros); o filtro pelo CMV também.
+  const verPrecos = pode(ctx.alcance, 'precos.ver');
+  const lidos = lerFiltrosDeFicha(searchParams);
+  const filtros = verPrecos ? lidos : { ...lidos, cmv: null };
+  const [pagina, { visao }] = await Promise.all([listarFichas(ctx.cliente, filtros, { verPrecos }), visaoDaRequisicao(ctx)]);
   const edita = pode(ctx.alcance, 'fichas.editar');
   const livre = edita && !ctx.bloqueio;
-  // N.2: preço e CMV por canal na lista só para quem vê preços (nem sai do servidor para os outros).
-  const verPrecos = pode(ctx.alcance, 'precos.ver');
   const precos = verPrecos ? await cmvDaLista(ctx.cliente, pagina.linhas) : undefined;
   return (
     <div className="space-y-6">

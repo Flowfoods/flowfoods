@@ -25,7 +25,7 @@ export default async function ParceiroFichasPage({
   exigirPermissao(ctx, 'fichas.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
   const filtros = lerFiltrosDeFicha(searchParams);
-  const [pagina, { visao }] = await Promise.all([listarFichas(ctx.cliente, filtros), visaoDaRequisicao(ctx)]);
+  const [pagina, { visao }] = await Promise.all([listarFichas(ctx.cliente, filtros, { verPrecos: true }), visaoDaRequisicao(ctx)]);
   const precos = await cmvDaLista(ctx.cliente, pagina.linhas);
   return (
     <div className="space-y-6">
