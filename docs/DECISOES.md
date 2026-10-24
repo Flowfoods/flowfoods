@@ -3072,3 +3072,7 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 ### 447. 2026-10-24 · F5 (1ª parte): estado em voo em todo botão que grava; filete de carregamento na navegação; foto de apoio só depois de confirmar
 
 **Razão:** inventário dos botões de envio: os que gravavam sem estado (dicas, reabrir dicas, sair em três lugares, escolher parceiro) passam a usar `BotaoEnviar` ou o novo `EnvioComEstado` (mesmo comportamento para botões fora do design system: desabilita, `aria-busy`, troca o texto). Os demais envios crus são filtros GET (navegação) ou ações otimistas da ajuda, que respondem na hora. Navegação e filtros ganham um filete no topo que só aparece se a troca passar de 150 ms (sem espera artificial), some quando a tela chega e diz "Carregando…" ao leitor de tela; não diz "salvo". A foto de apoio agora mostra a prévia e só é enviada em "Pôr na ficha" (o plano pede envio após confirmação explícita).
+
+### 448. 2026-10-24 · F5 (2ª parte): inventário de responsividade por varredura automática, com os limites ditos
+
+**Razão:** o plano pede inventário com evidência, sem declarar cobertura global por um teste só. Varredura de 220 telas do ERP (nível 1 dentro do parceiro de teste) em 390, 820, 1180 e 1440 px: nenhuma com erro, nenhuma com rolagem lateral da página. Resultado e limites em `docs/UX-INVENTARIO.md` (teto de 220 telas; não mede legibilidade, teclado virtual, zoom nem toque real; teste com pessoas reais pendente).
