@@ -40,7 +40,7 @@ on:
         type: choice
         required: false
         default: diagnosticar
-        options: [diagnosticar, reiniciar, limpar-cache, subir, recriar-traefik, provar, aguardar-e-provar]
+        options: [diagnosticar, reiniciar, limpar-cache, subir, recriar-traefik, provar, aguardar-e-provar, api-schema, traefik-via-compose]
       alvos:
         description: 'reerguer-vps/subir: tipo:ID na ordem, ex. postgres:abc,compose:xyz (um por vez)'
         type: string

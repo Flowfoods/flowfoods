@@ -525,6 +525,20 @@ recriar_traefik() {
   done
 }
 
+# Mostra o esquema (campos e obrigatórios) de rotas da API. ALVOS = rotas
+# separadas por vírgula, ex. /compose.create,/compose.update
+api_schema() {
+  preparar_dokploy || exit 1
+  dokploy GET /api/settings.getOpenApiDocument >/dev/null
+  IFS=',' read -ra rotas <<<"${ALVOS:-}"
+  for r in "${rotas[@]}"; do
+    jq -c --arg r "$r" '.paths[$r] // {} | to_entries[] | {rota: $r, metodo: .key,
+      obrigatorios: (.value.requestBody.content["application/json"].schema.required // []),
+      campos: ((.value.requestBody.content["application/json"].schema.properties // {}) | map_values(.type // (.enum|tostring) // "?")),
+      query: [.value.parameters[]?.name]}' /tmp/dk.json
+  done
+}
+
 case "$ETAPA" in
   diagnosticar) diagnosticar ;;
   reiniciar)    reiniciar ;;
@@ -533,5 +547,6 @@ case "$ETAPA" in
   provar)       provar ;;
   recriar-traefik) recriar_traefik ;;
   aguardar-e-provar) aguardar_e_provar ;;
+  api-schema)   api_schema ;;
   *) echo "etapa desconhecida: $ETAPA"; exit 2 ;;
 esac
