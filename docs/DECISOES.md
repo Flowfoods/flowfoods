@@ -3121,3 +3121,11 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Achado:** percorrendo lançar nota → "Fornecedor novo: cadastrar" → "Insumo que falta: cadastrar" → lançar → Compras do período → Gerente de uma loja, a nota tinha a mesma lacuna da ficha: o insumo criado só entrava se houvesse linha vazia. **Razão:** `colocarInsumoCriado` passa a ser genérico (o campo da linha é parâmetro) e serve à ficha (`escolha`) e à nota (`insumoId`, embalagem padrão); quantidade e valor continuam com a pessoa. O resto da jornada já estava certo e foi comprovado: fornecedor e insumo voltam escolhidos, número, loja e itens recuperados, total errado barrado com a diferença escrita, nota lançada no relatório e no painel "Para onde foi o dinheiro" com a soma batendo; o Gerente só oferece a loja dele, não vê a nota de outra loja nas linhas nem pedindo a loja na URL, e o endereço direto da nota responde 404.
 
+### 458. 2026-10-24 · E4 estoque: jornada percorrida; campo "Solto" mais largo no celular; pergunta do R$ do operador segue aberta
+
+**Prova:** no app local, Dona, Gerente da Vila da Penha e Operador. Abrir o estoque → contagem de abertura (20 itens, números salvos sozinhos e mantidos ao recarregar) → conferir → concluir ("Estoque aberto") → nota lançada na loja entra no saldo (caixa kraft 300 → 400 un, custo atualizado pelo preço novo) → Operador pede a requisição → Gerente entrega e dá baixa (400 → 350 un, "a baixa entrou no livro") → Consumo e conciliação fecha (saldo inicial 0, ajustes +300 da abertura, compras +100, uso −50, saldo final 350), sem R$ para o Operador. A abertura da outra loja foi feita inteira pelo celular (390, toque), sem rolagem lateral.
+
+**Mudança:** no celular, nos itens em kg ou L com embalagem, a coluna "Solto" divide espaço com o seletor kg/g e ficava com uns 50 px; agora tem 1,6 vez a largura de "Fechadas" (88 px a 390). Só layout.
+
+**Não mudou (decisão de negócio):** a tela do estoque da loja mostra custo e valor do saldo a quem tem `estoque.ver`, inclusive o Operador, enquanto o Consumo esconde o R$ de quem não tem `compras.ver`. É a pergunta 2 da decisão 397, ainda sem resposta do Rodolfo; esconder é ajuste pequeno (mesma régua do Consumo) e fica pronto para quando ele decidir.
+

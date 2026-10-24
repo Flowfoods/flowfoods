@@ -419,7 +419,8 @@ function ItemContavel({
           <SituacaoDoItem l={l} repetir={repetir} />
         )}
       </div>
-      <div className={`mt-2.5 grid items-end gap-3 ${comEmbalagem ? 'grid-cols-2 sm:flex' : 'grid-cols-1 sm:flex'}`}>
+      {/* No celular, o solto em kg/L divide a coluna com o seletor kg/g: ganha mais largura que "Fechadas" para o número caber (24/10/2026). */}
+      <div className={`mt-2.5 grid items-end gap-3 ${!comEmbalagem ? 'grid-cols-1 sm:flex' : i.unidade === 'UN' ? 'grid-cols-2 sm:flex' : 'grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)] sm:flex'}`}>
         {comEmbalagem && (
           <div className="min-w-0">
             <label htmlFor={`${idBase}-emb`} className="mb-1 block truncate text-[12px] text-suave">
