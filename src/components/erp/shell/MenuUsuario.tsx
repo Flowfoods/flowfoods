@@ -7,6 +7,7 @@
  * vem no tema certo, sem flash.
  */
 
+import { EnvioComEstado } from '../ui/botoes';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
@@ -107,12 +108,16 @@ export function MenuUsuario({
           <div className="pt-1">
             {sair ? (
               <form action={sair} onSubmit={limparRascunhos}>
-                <button
-                  type="submit"
+                <EnvioComEstado
+                  pendente={
+                    <>
+                      <LogOut size={16} aria-hidden /> Saindo…
+                    </>
+                  }
                   className="ff-transicao flex min-h-11 w-full items-center gap-2 rounded-[8px] px-3 text-left text-[14px] hover:bg-texto/5"
                 >
                   <LogOut size={16} aria-hidden /> Sair
-                </button>
+                </EnvioComEstado>
               </form>
             ) : (
               <button

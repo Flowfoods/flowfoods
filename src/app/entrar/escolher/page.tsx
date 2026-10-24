@@ -3,6 +3,7 @@
  * qual vai trabalhar. O servidor confere o vínculo antes de gravar na sessão.
  */
 
+import { EnvioComEstado } from '@/components/erp/ui/botoes';
 import { redirect } from 'next/navigation';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { sessaoDaRequisicao } from '@/lib/erp/sessao';
@@ -30,10 +31,7 @@ export default async function EscolherPage() {
             <li key={p.id} className="border-t border-linha first:border-t-0">
               <form action={acaoEscolherParceiro}>
                 <input type="hidden" name="parceiroId" value={p.id} />
-                <button
-                  type="submit"
-                  className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-texto/5"
-                >
+                <EnvioComEstado className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left transition hover:bg-texto/5">
                   <span className="min-w-0">
                     <span className="block truncate font-medium text-texto">{p.nome}</span>
                     <span className="mt-0.5 flex items-center gap-2 text-[12px] text-suave">
@@ -45,16 +43,16 @@ export default async function EscolherPage() {
                   <span aria-hidden className="text-suave">
                     →
                   </span>
-                </button>
+                </EnvioComEstado>
               </form>
             </li>
           );
         })}
       </ul>
       <form action={acaoSair} className="mt-6">
-        <button type="submit" className="text-[13px] text-suave underline-offset-4 transition hover:text-texto hover:underline">
+        <EnvioComEstado pendente="Saindo…" className="text-[13px] text-suave underline-offset-4 transition hover:text-texto hover:underline">
           Sair
-        </button>
+        </EnvioComEstado>
       </form>
     </div>
   );

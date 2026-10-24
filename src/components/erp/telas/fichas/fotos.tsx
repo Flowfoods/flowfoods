@@ -6,7 +6,7 @@
  * entrar na ficha. Cada botão é um formulário com a versão lida: tela velha dá conflito no servidor.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useFormState } from 'react-dom';
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { FotosDaFicha } from '@/lib/erp/ficha-fotos';
@@ -32,21 +32,39 @@ export function TelaFotosDaFicha({ fotos: f, base, acao, bloqueio }: { fotos: Fo
   const cheio = f.apoios.length >= MAXIMO_DE_APOIOS;
   const V = <input type="hidden" name="versao" value={f.versao} />;
 
+  // Escolher só PREPARA (redesenha e mostra a prévia); nada sai do aparelho até "Pôr na ficha" (plano: enviar após
+  // confirmação explícita, com estado de envio e erro).
+  const [previa, setPrevia] = useState<{ arquivo: File; url: string } | null>(null);
+  const [legenda, setLegenda] = useState('');
+  useEffect(() => () => {
+    if (previa) URL.revokeObjectURL(previa.url);
+  }, [previa]);
+
   async function escolheu(e: React.ChangeEvent<HTMLInputElement>) {
     const original = e.target.files?.[0];
     e.target.value = '';
     setErroDoEnvio(null);
     if (!original) return;
+    const pronta = await reduzir(original);
+    if (pronta.size > LIMITE_DA_FOTO) return setErroDoEnvio('Foto acima de 8 MB: escolha outra.');
+    setLegenda('');
+    setPrevia({ arquivo: pronta, url: URL.createObjectURL(pronta) });
+  }
+
+  async function porNaFicha() {
+    if (!previa) return;
     setEnviando(true);
+    setErroDoEnvio(null);
     try {
-      const pronta = await reduzir(original);
-      const r = pronta.size > LIMITE_DA_FOTO ? { erro: 'Foto acima de 8 MB: escolha outra.' } : await enviarFoto(`${base}/fotos`, pronta);
+      const r = await enviarFoto(`${base}/fotos`, previa.arquivo);
       if ('erro' in r) return setErroDoEnvio(r.erro);
       const form = new FormData();
       form.set('tipo', 'adicionar');
       form.set('versao', f.versao);
       form.set('enviada', r.arquivo);
+      form.set('legenda', legenda);
       enviar(form);
+      setPrevia(null);
     } finally {
       setEnviando(false);
     }
@@ -164,7 +182,26 @@ export function TelaFotosDaFicha({ fotos: f, base, acao, bloqueio }: { fotos: Fo
           </ol>
         )}
         <div className="space-y-2 border-t border-linha px-4 py-4 sm:px-5">
-          {cheio ? (
+          {previa ? (
+            <div className="space-y-3">
+              {/* eslint-disable-next-line @next/next/no-img-element -- prévia local (ainda não enviada). */}
+              <img src={previa.url} alt="Prévia da foto escolhida" className="aspect-[4/3] w-full rounded-[8px] border border-linha object-cover sm:w-72" />
+              <div className="sm:max-w-md">
+                <label htmlFor="legenda-nova" className={ROTULO}>
+                  Legenda <span className="font-normal text-suave">(opcional)</span>
+                </label>
+                <input id="legenda-nova" value={legenda} onChange={(e) => setLegenda(e.target.value)} maxLength={LEGENDA_MAX} placeholder="Ex.: montagem final" className={CAMPO} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" onClick={porNaFicha} disabled={enviando || travado} aria-busy={enviando} className={classeDeBotao('primario')}>
+                  {enviando ? 'Enviando…' : 'Pôr na ficha'}
+                </button>
+                <button type="button" onClick={() => setPrevia(null)} disabled={enviando} className={classeDeBotao('secundario')}>
+                  Escolher outra
+                </button>
+              </div>
+            </div>
+          ) : cheio ? (
             <p className="text-sm text-suave">Chegou a {MAXIMO_DE_APOIOS} fotos de apoio: remova uma para pôr outra.</p>
           ) : (
             <div className="flex flex-wrap gap-2">
@@ -179,7 +216,7 @@ export function TelaFotosDaFicha({ fotos: f, base, acao, bloqueio }: { fotos: Fo
             </div>
           )}
           <p className="text-[12px] text-suave" aria-live="polite">
-            {enviando ? 'Enviando a foto…' : 'JPG, PNG ou WebP. A foto entra como apoio; para virar a capa, use “Tornar principal”.'}
+            {enviando ? 'Enviando a foto…' : previa ? 'Confira a foto: ela só vai para a ficha em “Pôr na ficha”.' : 'JPG, PNG ou WebP. A foto entra como apoio; para virar a capa, use “Tornar principal”.'}
           </p>
           {erroDoEnvio && <p className="text-[13px] text-erro">{erroDoEnvio}</p>}
         </div>

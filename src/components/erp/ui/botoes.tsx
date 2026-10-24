@@ -51,6 +51,19 @@ export function BotaoEnviar({
   );
 }
 
+/**
+ * F5: envio com estado para botões que não têm a cara do design system (cartão de escolha, link "Sair", linha de menu).
+ * Mesmo comportamento do `BotaoEnviar`: em voo fica desabilitado, `aria-busy` e, com `pendente`, troca o conteúdo.
+ */
+export function EnvioComEstado({ children, pendente, className = '', nome, valor }: { children: ReactNode; pendente?: ReactNode; className?: string; nome?: string; valor?: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" name={nome} value={valor} disabled={pending} aria-busy={pending} className={`${className} disabled:cursor-progress disabled:opacity-70`}>
+      {pending && pendente ? pendente : children}
+    </button>
+  );
+}
+
 export type RespostaDeAcao = { ok: boolean; mensagem: string };
 
 /**

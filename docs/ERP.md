@@ -4402,3 +4402,18 @@ O aceite sintético do Notion (A e B com 10 kg a R$ 10; A compra 10 kg por R$ 20
 
 - Ler o impacto de cada loja: linha com "valor negativo" ou "resíduo" vem de lançamento antigo e merece olhar antes.
 - Ligar logo depois de um fechamento deixa o período seguinte inteiro no método novo e evita o aviso de troca no DRE.
+
+## F4 — jornadas da ficha e dos insumos (24/10/2026)
+
+Decisões 441 a 446. Nada publicado; sem merge.
+
+| Entrega | Onde | Prova |
+|---|---|---|
+| Filtro da lista de fichas pelo farol do CMV num canal (servidor, lista inteira; só `precos.ver`) | `listarFichas`, `lerFiltroDoCmv` | `erp-cmv-produto.db.test.ts`, `erp-fichas.test.ts` |
+| Busca do item da ficha pelo nome ou categoria | `seletor-campos.ts`, `fichas/seletor-de-item.tsx` | `erp-seletor-item.test.ts` |
+| Caneta e lixeira na lista de fichas (a lixeira desativa) | `fichas/[id]/remover`, `lerRemocaoDaFicha` | `erp-subfichas.db.test.ts` |
+| Consumo imediato (ficha, lote, etiqueta) | migration `20261113000000_erp_consumo_imediato` | `erp-consumo-imediato.db.test.ts`, `erp-producao.db.test.ts` |
+| Fotos principal e de apoio | migration `20261114000000_erp_ficha_fotos_apoio`, `ficha-fotos.ts`, `fichas/[id]/fotos` | `erp-fichas.db.test.ts` |
+| Categorias em painel na lista de insumos e troca em lote | `insumos/painel-categorias.tsx`, `barra-categoria.tsx` | `erp-categorias.db.test.ts` |
+
+**Pendente da F4:** recorte opcional das fotos; fotos de apoio na impressão; seções do cardápio e farol principal de CMV (especificação própria no plano).

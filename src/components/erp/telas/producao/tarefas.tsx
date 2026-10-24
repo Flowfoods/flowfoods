@@ -18,6 +18,7 @@ import { COR } from '@/lib/erp/modulos';
 import { formatarQuantidade } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotaoDaCozinha, LINK_DE_TEXTO } from '../../ui/estilos';
+import { EnvioComEstado } from '../../ui/botoes';
 import { Aviso, Selo, Vazio } from '../../ui/superficies';
 import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { TrilhaDaPagina } from '../../shell/trilha';
@@ -119,9 +120,9 @@ export function TelaTarefas({
             </p>
             {acoes.sair && (
               <FormQueLimpaRascunhos action={acoes.sair} className="self-start sm:self-auto">
-                <button type="submit" className={classeDeBotaoDaCozinha('fantasma', '!px-0 text-[15px] underline decoration-linha-forte underline-offset-4 sm:!px-3')}>
+                <EnvioComEstado pendente="Trocando…" className={classeDeBotaoDaCozinha('fantasma', '!px-0 text-[15px] underline decoration-linha-forte underline-offset-4 sm:!px-3')}>
                   Não é você? Trocar de pessoa
-                </button>
+                </EnvioComEstado>
               </FormQueLimpaRascunhos>
             )}
           </div>

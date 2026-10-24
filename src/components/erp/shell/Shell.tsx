@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Menu } from 'lucide-react';
 import { entradaDoCaminho, caixaDaTela } from '@/lib/erp/ajuda-rota';
 import { abasDaArea, acoesDaNavegacao, itemAtivo, montarTrilha, telasDaNavegacao } from '@/lib/erp/modulos';
@@ -20,6 +20,7 @@ import { ContextoDaAjuda } from '../ui/link-de-ajuda';
 import { ContextoDaCaixa } from '../ui/caixa-da-tela';
 import { assinaturaDaPreferencia, CaixaDeAula, GavetaDeAjuda, preferenciaEfetiva, type Otimista } from './ajuda';
 import { ProvedorDosPontos } from './pontos';
+import { IndicadorDeNavegacao } from './indicador-navegacao';
 import { acaoGuardarMenu } from './acoes';
 import { BuscaGlobal } from './BuscaGlobal';
 import { MenuUsuario } from './MenuUsuario';
@@ -166,6 +167,9 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
 
   return (
     <ContextoDaAjuda.Provider value={contextoDaAjuda}>
+      <Suspense fallback={null}>
+        <IndicadorDeNavegacao />
+      </Suspense>
       <ProvedorDosPontos
         chave={entradaDaTela?.chave ?? null}
         pontos={entradaDaTela?.pontos ?? []}

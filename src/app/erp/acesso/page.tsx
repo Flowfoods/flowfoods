@@ -3,6 +3,7 @@
  * ver e remover aparelhos). Senha continua sendo o caminho principal.
  */
 
+import { BotaoEnviar } from '@/components/erp/ui/botoes';
 import { exigirParceiroDaSessao } from '@/lib/erp/contexto';
 import { listarLojasDoAlcance } from '@/lib/erp/estrutura';
 import { CATALOGO, rotuloDasLojas, type ModuloDoCatalogo } from '@/lib/erp/permissoes';
@@ -144,15 +145,15 @@ export default async function SeuAcessoPage() {
               <div className="flex flex-wrap gap-2">
                 <form action={acaoAjudaDicas}>
                   <input type="hidden" name="dicas" value={pessoa.ajuda.dicasLigadas ? 'desligar' : 'ligar'} />
-                  <button type="submit" className={classeDeBotao('secundario')}>
+                  <BotaoEnviar variante="secundario" pendente={pessoa.ajuda.dicasLigadas ? 'Desligando…' : 'Ligando…'}>
                     {pessoa.ajuda.dicasLigadas ? 'Desligar as dicas' : 'Ligar as dicas'}
-                  </button>
+                  </BotaoEnviar>
                 </form>
                 {pessoa.ajuda.dicasLigadas && pessoa.ajuda.fechadas.length > 0 && (
                   <form action={acaoAjudaReabrir}>
-                    <button type="submit" className={classeDeBotao('fantasma')}>
+                    <BotaoEnviar variante="fantasma" pendente="Reabrindo…">
                       Mostrar de novo as que fechei
-                    </button>
+                    </BotaoEnviar>
                   </form>
                 )}
               </div>

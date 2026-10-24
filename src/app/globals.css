@@ -28,3 +28,14 @@ body {
 img {
   -webkit-touch-callout: none;
 }
+
+/* F5: o filete de carregamento da navegação (o indicador só aparece depois de 150 ms). */
+@keyframes ff-carregando {
+  0% { transform: scaleX(0.05); }
+  60% { transform: scaleX(0.7); }
+  100% { transform: scaleX(0.92); }
+}
+.ff-carregando { animation: ff-carregando 6s cubic-bezier(0.1, 0.7, 0.2, 1) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .ff-carregando { animation: none; transform: scaleX(1); }
+}
