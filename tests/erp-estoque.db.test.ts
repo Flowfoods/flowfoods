@@ -369,11 +369,24 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
     expect(await obterEstoqueDaLoja(a, GERENTE_DELIVERY(), ids.vp)).toBeNull();
     expect((await saldosDoInsumo(a, GERENTE_DELIVERY(), ids.cheddar)).map((s) => s.loja)).toEqual(['Delivery']);
     expect(await saldosDoInsumo(a, DONA(), ids.cheddar)).toEqual([
-      { lojaId: ids.delivery, loja: 'Delivery', estado: 'EM_CONTAGEM', quantidadeMilesimos: null, valorCentavos: null },
-      { lojaId: ids.vp, loja: 'Vila da Penha', estado: 'ABERTO', quantidadeMilesimos: 17400, valorCentavos: 33060 },
+      { lojaId: ids.delivery, loja: 'Delivery', estado: 'EM_CONTAGEM', quantidadeMilesimos: null, verValores: true, valorCentavos: null },
+      { lojaId: ids.vp, loja: 'Vila da Penha', estado: 'ABERTO', quantidadeMilesimos: 17400, verValores: true, valorCentavos: 33060 },
     ]);
-    // Operador vê o estoque da loja dele.
-    expect((await obterEstoqueDaLoja(a, OPERADOR(), ids.vp))!.estado).toBe('ABERTO');
+    expect(e.verValores).toBe(true);
+    // Operador vê o estoque da loja dele, em QUANTIDADE: custo, valor, total, valor da abertura e valor do razão não saem do
+    // servidor (24/10/2026, a régua do Consumo: `compras.ver` na loja; o operador não tem).
+    const o = (await obterEstoqueDaLoja(a, OPERADOR(), ids.vp))!;
+    expect(o).toMatchObject({ estado: 'ABERTO', verValores: false, total: { centavos: 0, pendentes: 0 } });
+    expect(o.abertura?.valorTotalCentavos).toBeNull();
+    expect(o.linhas.find((l) => l.nome === 'Cheddar fatiado')).toMatchObject({ quantidadeMilesimos: 17400, porUnidade: null, valorCentavos: null });
+    expect(o.linhas.every((l) => l.porUnidade === null && l.valorCentavos === null)).toBe(true);
+    expect(o.movimentos.length).toBe(5);
+    expect(o.movimentos.every((m) => m.valorCentavos === 0)).toBe(true);
+    expect(JSON.stringify(o)).not.toContain('33060');
+    const geral = await situacaoDoEstoque(a, OPERADOR());
+    expect(geral.find((l) => l.id === ids.vp)).toMatchObject({ estado: 'ABERTO', verValores: false, aberto: { valorCentavos: 0, pendentes: 0 } });
+    expect((await situacaoDoEstoque(a, DONA())).find((l) => l.id === ids.vp)).toMatchObject({ verValores: true, aberto: { valorCentavos: 52870, pendentes: 1 } });
+    expect((await saldosDoInsumo(a, OPERADOR(), ids.cheddar))).toEqual([{ lojaId: ids.vp, loja: 'Vila da Penha', estado: 'ABERTO', quantidadeMilesimos: 17400, verValores: false, valorCentavos: null }]);
   });
 
   it('nota lançada na Penha aberta entra no estoque na MESMA transação (valor + frete); o saldo sobe', async () => {

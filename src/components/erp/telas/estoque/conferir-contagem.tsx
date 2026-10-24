@@ -71,7 +71,7 @@ function Depois({ l, notasBase }: { l: LinhaDaDivergencia; notasBase?: string })
   );
 }
 
-function Diferenca({ l }: { l: LinhaDaDivergencia }) {
+function Diferenca({ l, verValores }: { l: LinhaDaDivergencia; verValores: boolean }) {
   const d = l.div;
   if (!d.contado) return <span className="text-suave">sem contar</span>;
   if (d.diferencaMilesimos === 0) return <span className="text-suave">bateu</span>;
@@ -80,15 +80,19 @@ function Diferenca({ l }: { l: LinhaDaDivergencia }) {
   return (
     <span>
       <span className={`block text-[15px] font-bold ${cor}`}>{quantidadeComSinal(d.diferencaMilesimos, l.item.unidade)}</span>
-      <span className={`block text-[12px] ${d.valorCentavos === null ? 'text-atencao' : cor}`}>
-        {textoDoValorDaDiferenca(d.valorCentavos)}
-        {d.dentroDaTolerancia || d.valorCentavos === null ? '' : <span className="text-suave"> · confira</span>}
-      </span>
+      {verValores ? (
+        <span className={`block text-[12px] ${d.valorCentavos === null ? 'text-atencao' : cor}`}>
+          {textoDoValorDaDiferenca(d.valorCentavos)}
+          {d.dentroDaTolerancia || d.valorCentavos === null ? '' : <span className="text-suave"> · confira</span>}
+        </span>
+      ) : (
+        !d.dentroDaTolerancia && <span className="block text-[12px] text-suave">confira</span>
+      )}
     </span>
   );
 }
 
-function Tabela({ linhas, notasBase, legenda }: { linhas: LinhaDaDivergencia[]; notasBase?: string; legenda: string }) {
+function Tabela({ linhas, notasBase, legenda, verValores }: { linhas: LinhaDaDivergencia[]; notasBase?: string; legenda: string; verValores: boolean }) {
   return (
     <>
       <ul className="divide-y divide-linha md:hidden">
@@ -105,7 +109,7 @@ function Tabela({ linhas, notasBase, legenda }: { linhas: LinhaDaDivergencia[]; 
                 </span>
               </span>
               <span className="shrink-0 text-right tabular-nums">
-                <Diferenca l={l} />
+                <Diferenca l={l} verValores={verValores} />
               </span>
             </div>
             <dl className="grid grid-cols-3 gap-2 text-[12px] tabular-nums">
@@ -185,7 +189,7 @@ function Tabela({ linhas, notasBase, legenda }: { linhas: LinhaDaDivergencia[]; 
                   {l.item.conta && <span className="block whitespace-normal break-words text-[12px] font-normal leading-snug text-suave">{l.item.conta}</span>}
                 </td>
                 <td className="px-3 py-2.5 text-right">
-                  <Diferenca l={l} />
+                  <Diferenca l={l} verValores={verValores} />
                 </td>
                 <td className="px-3 py-2.5 pr-5 text-right font-semibold text-texto">{qtd(l.div.ficaEmMilesimos, l.item.unidade)}</td>
               </tr>
@@ -218,7 +222,10 @@ export function TelaConferirContagem({
   podeContar,
   bloqueio,
   voltar,
+  verValores = true,
 }: {
+  /** Sem `compras.ver` na loja (o operador): diferença em quantidade, sem R$ (24/10/2026). */
+  verValores?: boolean;
   c: ConferenciaDaContagem;
   base: string;
   contexto?: string;
@@ -257,7 +264,7 @@ export function TelaConferirContagem({
       {mensagem && (aberta || !['aplicada', 'ja-aplicada', 'periodo-fechado'].includes(feito ?? '')) && <Aviso tom="ok" titulo={mensagem} />}
 
       {!aberta && (
-        <Aviso tom={c.estado === 'VENCIDA' ? 'alerta' : c.estado === 'DESCARTADA' ? 'neutro' : 'ok'} titulo={resultado(c)}>
+        <Aviso tom={c.estado === 'VENCIDA' ? 'alerta' : c.estado === 'DESCARTADA' ? 'neutro' : 'ok'} titulo={resultado(c, verValores)}>
           {c.estado === 'VENCIDA' ? 'Nada mudou no estoque: contagem velha não se aplica como se fosse de agora.' : null}
           {feito === 'ja-aplicada' ? 'Já tinha sido aplicada (por outra pessoa ou outra aba): nada foi gravado de novo. ' : null}
           {c.estado === 'APLICADA' || c.estado === 'APLICADA_SOZINHA' ? (
@@ -268,7 +275,7 @@ export function TelaConferirContagem({
         </Aviso>
       )}
 
-      <div className={`grid gap-3 ${fechamento ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
+      <div className={`grid gap-3 ${fechamento ? 'sm:grid-cols-2 lg:grid-cols-4' : verValores ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
           <div className="text-[12px] font-medium text-suave">Contados</div>
           <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">
@@ -276,6 +283,7 @@ export function TelaConferirContagem({
           </div>
           <div className="mt-1.5 text-[12px] text-suave">{c.resumo.naoContados ? `${c.resumo.naoContados} sem contar (ficam como estão)` : 'todos contados'}</div>
         </div>
+        {verValores && (
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
           <div className="text-[12px] font-medium text-suave">Diferença em R$</div>
           {(() => {
@@ -288,12 +296,13 @@ export function TelaConferirContagem({
             {c.soma.semPreco ? ` · ${c.soma.semPreco} sem custo informado` : ''}
           </div>
         </div>
+        )}
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
           <div className="text-[12px] font-medium text-suave">Para conferir</div>
           <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{c.soma.foraDaTolerancia}</div>
-          <div className="mt-1.5 text-[12px] text-suave">acima de {formatarDinheiro(c.regras.toleranciaCentavos)} por item, ou sem custo informado</div>
+          <div className="mt-1.5 text-[12px] text-suave">{verValores ? `acima de ${formatarDinheiro(c.regras.toleranciaCentavos)} por item, ou sem custo informado` : 'fora da tolerância da loja'}</div>
         </div>
-        {fechamento && !aberta && c.contagem.valorTotalCentavos !== null && c.estado === 'APLICADA' && (
+        {verValores && fechamento && !aberta && c.contagem.valorTotalCentavos !== null && c.estado === 'APLICADA' && (
           <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
             <div className="text-[12px] font-medium text-suave">Estoque final fotografado</div>
             <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(c.contagem.valorTotalCentavos)}</div>
@@ -342,7 +351,7 @@ export function TelaConferirContagem({
             {comDiferenca.length === 0 ? (
               <p className="px-4 py-4 text-sm text-suave sm:px-5">Tudo o que foi contado bateu com o livro.</p>
             ) : (
-              <Tabela linhas={comDiferenca} notasBase={notasBase} legenda="Itens com diferença entre o contado e o livro." />
+              <Tabela linhas={comDiferenca} notasBase={notasBase} verValores={verValores} legenda="Itens com diferença entre o contado e o livro." />
             )}
           </Painel>
           {semContar.length > 0 && (
@@ -378,7 +387,7 @@ export function TelaConferirContagem({
                 </span>
               </summary>
               <div className="border-t border-linha">
-                <Tabela linhas={bateram} notasBase={notasBase} legenda="Itens que bateram com o livro." />
+                <Tabela linhas={bateram} notasBase={notasBase} verValores={verValores} legenda="Itens que bateram com o livro." />
               </div>
             </details>
           )}
@@ -387,7 +396,7 @@ export function TelaConferirContagem({
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-20" aria-label={fechamento ? 'Fechar o período' : 'Aplicar'}>
           {fechamento && cob && aberta && (
             <Painel titulo={coberturaDe(cob.periodo.nome)} subtitulo="Com o que já foi contado nesta contagem">
-              <CoberturaComPiso c={cob.cobertura} regras={cob.regras} />
+              <CoberturaComPiso c={cob.cobertura} regras={cob.regras} verValores={verValores} />
             </Painel>
           )}
           {aberta && (
@@ -439,12 +448,12 @@ export function TelaConferirContagem({
   );
 }
 
-function resultado(c: ConferenciaDaContagem): string {
+function resultado(c: ConferenciaDaContagem, verValores: boolean): string {
   const k = c.contagem;
   if (c.estado === 'VENCIDA') return `Fechou sem aplicar: o prazo acabou${k.fechaAutomaticoEm ? ` em ${quando(k.fechaAutomaticoEm)}` : ''}.`;
   if (c.estado === 'DESCARTADA') return 'Contagem descartada: nada foi para o estoque.';
   const em = k.fechadaEm ? ` em ${quando(k.fechadaEm)}` : '';
   if (c.estado === 'APLICADA_SOZINHA') return `Fechou sozinha${em}: tudo bateu dentro da tolerância e os ajustes entraram no livro.`;
-  if (k.tipo === 'FECHAMENTO') return `Período fechado${em}${k.fechadaPorNome ? ` por ${k.fechadaPorNome}` : ''}. Estoque final: ${formatarDinheiro(k.valorTotalCentavos ?? 0)}.`;
+  if (k.tipo === 'FECHAMENTO') return `Período fechado${em}${k.fechadaPorNome ? ` por ${k.fechadaPorNome}` : ''}.${verValores ? ` Estoque final: ${formatarDinheiro(k.valorTotalCentavos ?? 0)}.` : ''}`;
   return `Aplicada${em}${k.fechadaPorNome ? ` por ${k.fechadaPorNome}` : ''}: os ajustes entraram no livro do estoque.`;
 }

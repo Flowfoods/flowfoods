@@ -174,17 +174,20 @@ export function TelaEstoqueDaLoja({
 
       {e.estado === 'ABERTO' && (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className={`grid gap-3 ${e.verValores ? 'sm:grid-cols-3' : ''}`}>
+            {e.verValores && (
             <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
               <div className="text-[12px] font-medium text-suave">Valor em estoque</div>
               <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(e.total.centavos)}</div>
               <div className="mt-1.5 text-[12px] text-suave">{e.total.pendentes > 0 ? `custo de referência de hoje · ${e.total.pendentes} sem custo informado fora da soma` : 'pelo custo de referência de hoje'}</div>
             </div>
+            )}
             <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
               <div className="text-[12px] font-medium text-suave">Insumos com saldo</div>
               <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{e.itensComSaldo}</div>
               <div className="mt-1.5 text-[12px] text-suave">de {e.totalDeItens} acompanhados nesta loja</div>
             </div>
+            {e.verValores && (
             <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
               <div className="text-[12px] font-medium text-suave">Na abertura</div>
               <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(a?.valorTotalCentavos ?? 0)}</div>
@@ -193,9 +196,10 @@ export function TelaEstoqueDaLoja({
                 {a?.naoContadosNoFechamento ? ` · ${a.naoContadosNoFechamento} sem contar entraram com zero` : ''}
               </div>
             </div>
+            )}
           </div>
 
-          {periodo?.aberto && <PainelDaContagem s={periodo} aqui={aqui} pode={{ planejar: pode.ajustar && !bloqueio }} />}
+          {periodo?.aberto && <PainelDaContagem s={periodo} aqui={aqui} pode={{ planejar: pode.ajustar && !bloqueio }} verValores={e.verValores} />}
 
           {(pode.requisicoes || pode.ajustar) && (
             <Painel titulo="Requisições" subtitulo="O setor pede, o estoque entrega; a baixa sai no livro">
@@ -297,20 +301,22 @@ export function TelaEstoqueDaLoja({
                         <IconeDaConservacao conservacao={l.conservacao} />
                         <span className="min-w-0">
                           <NomeDoInsumo l={l} insumosBase={insumosBase} />
-                          <span className="block text-[12px] tabular-nums text-suave">
-                            {l.porUnidade ? `${formatarFracao(l.porUnidade)}/${UNIDADES[l.unidade].sigla}` : 'Custo não informado'}
-                          </span>
+                          {e.verValores && (
+                            <span className="block text-[12px] tabular-nums text-suave">
+                              {l.porUnidade ? `${formatarFracao(l.porUnidade)}/${UNIDADES[l.unidade].sigla}` : 'Custo não informado'}
+                            </span>
+                          )}
                         </span>
                       </span>
                       <span className="shrink-0 text-right tabular-nums">
                         <span className={`block font-semibold ${l.quantidadeMilesimos < 0 ? 'text-erro' : 'text-texto'}`}>{formatarQuantidadeComSinal(l.quantidadeMilesimos, l.unidade)}</span>
-                        <span className="block text-[12px] text-suave">{l.valorCentavos === null ? 'valor pendente' : formatarDinheiro(l.valorCentavos)}</span>
+                        {e.verValores && <span className="block text-[12px] text-suave">{l.valorCentavos === null ? 'valor pendente' : formatarDinheiro(l.valorCentavos)}</span>}
                       </span>
                     </li>
                   ))}
                 </ul>
                 <table className="hidden w-full text-sm md:table">
-                  <caption className="sr-only">Saldo de cada insumo nesta loja, com o valor pelo custo de referência de hoje.</caption>
+                  <caption className="sr-only">{e.verValores ? 'Saldo de cada insumo nesta loja, com o valor pelo custo de referência de hoje.' : 'Saldo de cada insumo nesta loja, em quantidade.'}</caption>
                   <thead>
                     <tr className="bg-forte text-left text-[12px] text-suave">
                       <th scope="col" className="h-10 pl-5 pr-3 font-semibold">
@@ -322,12 +328,16 @@ export function TelaEstoqueDaLoja({
                       <th scope="col" className="h-10 px-3 text-right font-semibold">
                         Quantidade
                       </th>
-                      <th scope="col" className="h-10 px-3 text-right font-semibold">
-                        Custo de referência
-                      </th>
-                      <th scope="col" className={`h-10 px-3 text-right font-semibold ${pode.ajustar && !bloqueio ? '' : 'pr-5'}`}>
-                        Valor
-                      </th>
+                      {e.verValores && (
+                        <th scope="col" className="h-10 px-3 text-right font-semibold">
+                          Custo de referência
+                        </th>
+                      )}
+                      {e.verValores && (
+                        <th scope="col" className={`h-10 px-3 text-right font-semibold ${pode.ajustar && !bloqueio ? '' : 'pr-5'}`}>
+                          Valor
+                        </th>
+                      )}
                       {pode.ajustar && !bloqueio && (
                         <th scope="col" className="h-10 px-3 pr-5 font-semibold">
                           <span className="sr-only">Recontar</span>
@@ -348,8 +358,8 @@ export function TelaEstoqueDaLoja({
                           </span>
                         </td>
                         <td className={`px-3 py-2 text-right font-semibold ${l.quantidadeMilesimos < 0 ? 'text-erro' : ''}`}>{formatarQuantidadeComSinal(l.quantidadeMilesimos, l.unidade)}</td>
-                        <td className="px-3 py-2 text-right text-suave">{l.porUnidade ? `${formatarFracao(l.porUnidade)}/${UNIDADES[l.unidade].sigla}` : <Selo tom="alerta">Custo não informado</Selo>}</td>
-                        <td className={`px-3 py-2 text-right ${pode.ajustar && !bloqueio ? '' : 'pr-5'}`}>{l.valorCentavos === null ? <span className="text-suave">pendente</span> : formatarDinheiro(l.valorCentavos)}</td>
+                        {e.verValores && <td className="px-3 py-2 text-right text-suave">{l.porUnidade ? `${formatarFracao(l.porUnidade)}/${UNIDADES[l.unidade].sigla}` : <Selo tom="alerta">Custo não informado</Selo>}</td>}
+                        {e.verValores && <td className={`px-3 py-2 text-right ${pode.ajustar && !bloqueio ? '' : 'pr-5'}`}>{l.valorCentavos === null ? <span className="text-suave">pendente</span> : formatarDinheiro(l.valorCentavos)}</td>}
                         {pode.ajustar && !bloqueio && (
                           <td className="px-3 py-2 pr-5 text-right">
                             <Link href={`${aqui}/contagens/nova?insumo=${l.insumoId}`} className={LINK_DE_TEXTO}>

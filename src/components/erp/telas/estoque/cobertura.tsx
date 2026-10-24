@@ -38,7 +38,8 @@ function BarraDoPiso({ rotulo, bp, pisoBp, detalhe, atinge }: { rotulo: string; 
   );
 }
 
-export function CoberturaComPiso({ c, regras }: { c: Cobertura; regras: Pick<RegrasDaContagem, 'pisoValorBp' | 'pisoItensBp'> }) {
+/** `verValores` falso (quem não vê as compras da loja, como o operador): a barra do valor fica, sem os R$ (24/10/2026). */
+export function CoberturaComPiso({ c, regras, verValores = true }: { c: Cobertura; regras: Pick<RegrasDaContagem, 'pisoValorBp' | 'pisoItensBp'>; verValores?: boolean }) {
   return (
     <div className="space-y-4">
       <BarraDoPiso
@@ -46,7 +47,7 @@ export function CoberturaComPiso({ c, regras }: { c: Cobertura; regras: Pick<Reg
         bp={c.valor.bp}
         pisoBp={regras.pisoValorBp}
         atinge={c.atingeValor}
-        detalhe={`${formatarDinheiro(c.valor.contadoCentavos)} de ${formatarDinheiro(c.valor.totalCentavos)} contados${c.semPreco ? ` (${c.semPreco} sem custo informado fora)` : ''}`}
+        detalhe={verValores ? `${formatarDinheiro(c.valor.contadoCentavos)} de ${formatarDinheiro(c.valor.totalCentavos)} contados${c.semPreco ? ` (${c.semPreco} sem custo informado fora)` : ''}` : 'medido pelo valor do estoque da loja'}
       />
       <BarraDoPiso rotulo="Dos insumos" bp={c.itens.bp} pisoBp={regras.pisoItensBp} atinge={c.atingeItens} detalhe={`${c.itens.contados} de ${c.itens.total} contados`} />
     </div>

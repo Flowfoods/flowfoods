@@ -61,7 +61,10 @@ export function TelaConferencia({
   acao,
   podeConcluir,
   bloqueio,
+  verValores = true,
 }: {
+  /** Sem `compras.ver` na loja (o operador): só quantidades, sem o valor do estoque inicial (24/10/2026). */
+  verValores?: boolean;
   c: ConferenciaDaAbertura;
   base: string;
   contexto?: string;
@@ -84,7 +87,7 @@ export function TelaConferencia({
         subtitulo={[contexto, `Abertura do estoque da ${c.loja.nome}`].filter(Boolean).join(' · ')}
       />
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className={`grid gap-3 ${verValores ? 'sm:grid-cols-3' : ''}`}>
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
           <div className="text-[12px] font-medium text-suave">Contados</div>
           <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">
@@ -95,6 +98,7 @@ export function TelaConferencia({
             {c.resumo.zerados > 0 ? ` · ${c.resumo.zerados} com zero` : ''}
           </div>
         </div>
+        {verValores && (
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:col-span-2 sm:px-5">
           <div className="text-[12px] font-medium text-suave">Valor do estoque inicial</div>
           <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(c.valorCentavos)}</div>
@@ -103,6 +107,7 @@ export function TelaConferencia({
             {c.semCusto.length > 0 && ` ${c.semCusto.length} ${c.semCusto.length === 1 ? 'insumo está' : 'insumos estão'} sem custo informado: entra a quantidade, o valor fica pendente.`}
           </div>
         </div>
+        )}
       </div>
 
       {c.acimaDoTeto.length > 0 && (
@@ -137,7 +142,7 @@ export function TelaConferencia({
             <ListaCurta linhas={zerados} vazio="Nenhum item com zero." />
           </Painel>
           <Painel titulo="Com quantidade" subtitulo="O que vira saldo, com o valor de cada um" semRespiro>
-            <ListaCurta linhas={comSaldo} vazio="Nenhum item com quantidade ainda." mostrarValor />
+            <ListaCurta linhas={comSaldo} vazio="Nenhum item com quantidade ainda." mostrarValor={verValores} />
           </Painel>
         </div>
         <aside className="min-w-0 space-y-4 lg:sticky lg:top-20" aria-label="Concluir">

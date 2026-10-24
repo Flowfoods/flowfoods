@@ -236,16 +236,16 @@
     "hash": "b494822b3c91cc7d"
   },
   "estoque-loja": {
-    "versao": 1,
-    "hash": "80274bf976cca9ee"
+    "versao": 2,
+    "hash": "30bcf69d0f32dd8b"
   },
   "estoque-abertura": {
     "versao": 1,
     "hash": "78aa64b9d7394faa"
   },
   "estoque-abertura-conferir": {
-    "versao": 1,
-    "hash": "0118ec3e7ff48143"
+    "versao": 2,
+    "hash": "5b8b21e22d9a0494"
   },
   "contagem-nova": {
     "versao": 1,

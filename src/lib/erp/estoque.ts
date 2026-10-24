@@ -450,6 +450,8 @@ export interface SituacaoDaLoja {
   contagem: { contados: number; total: number; iniciadaEm: Date; por: string | null } | null;
   /** Aberto: desde quando, itens com saldo e o valor pelo custo de referência de hoje. */
   aberto: { desde: Date; por: string | null; itensComSaldo: number; valorCentavos: number; pendentes: number } | null;
+  /** R$ só com `compras.ver` na loja (a régua do Consumo); sem ela, o valor vem zerado e a tela não o mostra. */
+  verValores: boolean;
 }
 
 /** Lojas do alcance com estoque à vista e a situação de cada uma. */
@@ -485,7 +487,8 @@ export async function situacaoDoEstoque(cliente: ClienteDoParceiro, alcance: Alc
       const estado = estadoDoEstoque(c);
       const n = c ? contadosPor.get(c.id) : undefined;
       const daLoja = saldos.filter((s) => s.lojaId === l.id);
-      const soma = somarValores(daLoja.map((s) => valorDaQuantidade(custos.get(s.insumoId)?.porUnidade ?? null, s.quantidadeMilesimos)));
+      const verValores = pode(alcance, 'compras.ver', { lojaId: l.id });
+      const soma = verValores ? somarValores(daLoja.map((s) => valorDaQuantidade(custos.get(s.insumoId)?.porUnidade ?? null, s.quantidadeMilesimos))) : { centavos: 0, pendentes: 0 };
       return {
         id: l.id,
         nome: l.nome,
@@ -493,6 +496,7 @@ export async function situacaoDoEstoque(cliente: ClienteDoParceiro, alcance: Alc
         estado,
         contagem: c && estado === 'EM_CONTAGEM' ? { contados: n?.contadoMilesimos ?? 0, total: n?._all ?? 0, iniciadaEm: c.criadoEm, por: c.iniciadaPorNome } : null,
         aberto: c && estado === 'ABERTO' ? { desde: c.fechadaEm!, por: c.fechadaPorNome, itensComSaldo: daLoja.filter((s) => s.quantidadeMilesimos > 0).length, valorCentavos: soma.centavos, pendentes: soma.pendentes } : null,
+        verValores,
       };
     });
   });
@@ -1141,7 +1145,10 @@ export async function obterEstoqueDaLoja(cliente: ClienteDoParceiro, alcance: Al
         select: { id: true, status: true, criadoEm: true, iniciadaPorNome: true, fechadaEm: true, fechadaPorNome: true, valorTotalCentavos: true, naoContadosNoFechamento: true },
       });
       const estado = estadoDoEstoque(c);
-      const base = { loja, estado, abertura: c };
+      // R$ do estoque só para quem vê as compras da loja (a mesma régua do Consumo, decisão 397): o operador lê quantidades.
+      // Sem ela, custo, valor e o valor fotografado na abertura não saem do servidor.
+      const verValores = pode(alcance, 'compras.ver', { lojaId });
+      const base = { loja, estado, verValores, abertura: c && !verValores ? { ...c, valorTotalCentavos: null } : c };
       if (estado === 'NAO_ABERTO') return { ...base, contagem: null, linhas: [] as LinhaDeSaldo[], total: { centavos: 0, pendentes: 0 }, movimentos: [] as MovimentoDaTela[], totalDeItens: 0, itensComSaldo: 0 };
       if (estado === 'EM_CONTAGEM') {
         const itens = await tx.contagemItem.findMany({ where: { contagemId: c!.id }, select: { contadoMilesimos: true } });
@@ -1153,11 +1160,7 @@ export async function obterEstoqueDaLoja(cliente: ClienteDoParceiro, alcance: Al
         where: { lojaId },
         select: { insumoId: true, quantidadeMilesimos: true, insumo: { select: { nome: true, unidade: true, conservacao: true, ativo: true } } },
       });
-      const custos = await custosDaLoja(
-        tx,
-        lojaId,
-        saldos.map((s) => s.insumoId),
-      );
+      const custos = verValores ? await custosDaLoja(tx, lojaId, saldos.map((s) => s.insumoId)) : new Map<string, CustoDeReferencia>();
       const todas: LinhaDeSaldo[] = saldos
         .map((s) => {
           const porUnidade = custos.get(s.insumoId)?.porUnidade ?? null;
@@ -1191,8 +1194,8 @@ export async function obterEstoqueDaLoja(cliente: ClienteDoParceiro, alcance: Al
         ...base,
         contagem: null,
         linhas,
-        total: somarValores(todas.filter((l) => l.quantidadeMilesimos !== 0).map((l) => l.valorCentavos)),
-        movimentos: movimentos.map(movimentoParaTela),
+        total: verValores ? somarValores(todas.filter((l) => l.quantidadeMilesimos !== 0).map((l) => l.valorCentavos)) : { centavos: 0, pendentes: 0 },
+        movimentos: movimentos.map(movimentoParaTela).map((m) => (verValores ? m : { ...m, valorCentavos: 0 })),
         totalDeItens,
         itensComSaldo,
       };
@@ -1218,7 +1221,8 @@ export async function saldosDoInsumo(cliente: ClienteDoParceiro, alcance: Alcanc
       const estado = estadoDoEstoque(aberturas.get(l.id));
       const q = estado === 'ABERTO' ? (porLoja.get(l.id) ?? 0) : null;
       const custo = custosDe.get(l.id)?.get(insumoId)?.porUnidade ?? null;
-      return { lojaId: l.id, loja: l.nome, estado, quantidadeMilesimos: q, valorCentavos: q === null ? null : valorDaQuantidade(custo, q) };
+      const verValores = pode(alcance, 'compras.ver', { lojaId: l.id });
+      return { lojaId: l.id, loja: l.nome, estado, quantidadeMilesimos: q, verValores, valorCentavos: q === null || !verValores ? null : valorDaQuantidade(custo, q) };
     });
   });
 }

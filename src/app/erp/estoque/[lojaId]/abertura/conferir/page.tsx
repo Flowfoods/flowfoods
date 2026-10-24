@@ -26,6 +26,7 @@ export default async function ErpConferirAberturaPage({ params }: { params: { lo
       acao={acaoConcluirAbertura.bind(null, c.loja.id)}
       podeConcluir={pode(ctx.alcance, 'estoque.ajustar', { lojaId: c.loja.id })}
       bloqueio={ctx.bloqueio}
+      verValores={pode(ctx.alcance, 'compras.ver', { lojaId: c.loja.id })}
     />
   );
 }

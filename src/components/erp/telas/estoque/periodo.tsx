@@ -71,7 +71,7 @@ function ListaDeContagens({ contagens, aqui, vazio }: { contagens: ResumoDaConta
 }
 
 /** Resumo no estoque da loja: cobertura do período, contagens abertas e os atalhos. */
-export function PainelDaContagem({ s, aqui, pode }: { s: Aberta; aqui: string; pode: { planejar: boolean } }) {
+export function PainelDaContagem({ s, aqui, pode, verValores = true }: { s: Aberta; aqui: string; pode: { planejar: boolean }; verValores?: boolean }) {
   const abertas = s.contagens.filter((c) => c.estado === 'EM_CONTAGEM' || c.estado === 'PRONTA');
   const falta = s.cobertura.paraOPiso.length;
   return (
@@ -85,7 +85,7 @@ export function PainelDaContagem({ s, aqui, pode }: { s: Aberta; aqui: string; p
       }
     >
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <CoberturaComPiso c={s.cobertura} regras={s.regras} />
+        <CoberturaComPiso c={s.cobertura} regras={s.regras} verValores={verValores} />
         <div className="min-w-0">
           <div className="text-[13px] font-medium text-texto">Em andamento</div>
           {abertas.length === 0 ? (
@@ -128,12 +128,15 @@ export function TelaPeriodo({
   pode,
   acoes,
   bloqueio,
+  verValores = true,
 }: {
   s: Aberta;
   base: string;
   contexto?: string;
   feito?: string;
   pode: { ajustar: boolean; contar: boolean; regras: boolean; periodos: boolean };
+  /** Sem `compras.ver` na loja (o operador): nenhum R$ na tela, só quantidades e percentuais. */
+  verValores?: boolean;
   acoes: { fechar: AcaoDeEstoque; regras: AcaoDeEstoque };
   bloqueio: string | null;
 }) {
@@ -171,7 +174,7 @@ export function TelaPeriodo({
             titulo="Cobertura do período"
             subtitulo={`Insumos com contagem aplicada de ${dataCurta(s.periodo.inicio)} a ${dataCurta(s.periodo.fim)}, sobre os que têm saldo`}
           >
-            <CoberturaComPiso c={s.cobertura} regras={s.regras} />
+            <CoberturaComPiso c={s.cobertura} regras={s.regras} verValores={verValores} />
             <p className="mt-4 border-t border-linha pt-3 text-sm text-suave">
               {f?.status === 'FECHADA' ? (
                 <span className="font-semibold text-texto">O estoque deste período já fechou. A cobertura acima é a de agora, com o saldo depois dos ajustes.</span>
@@ -200,7 +203,7 @@ export function TelaPeriodo({
                       <span className="min-w-0 truncate font-medium text-texto">{i.nome}</span>
                       {i.paraOPiso && <Selo tom="alerta">para o piso</Selo>}
                     </span>
-                    <span className="shrink-0 tabular-nums text-suave">{i.valorCentavos === null ? 'custo não informado' : formatarDinheiro(i.valorCentavos)}</span>
+                    {verValores && <span className="shrink-0 tabular-nums text-suave">{i.valorCentavos === null ? 'custo não informado' : formatarDinheiro(i.valorCentavos)}</span>}
                   </li>
                 ))}
                 {s.faltam.length > mostrados.length && <li className="px-4 py-2.5 text-[13px] text-suave sm:px-5">E mais {s.faltam.length - mostrados.length} insumos.</li>}
@@ -231,9 +234,11 @@ export function TelaPeriodo({
             ) : f?.status === 'FECHADA' ? (
               <div className="space-y-2 text-sm">
                 <p className="font-semibold text-texto">Fechado{f.fechadaEm ? ` em ${quando(f.fechadaEm)}` : ''}{f.fechadaPorNome ? ` por ${f.fechadaPorNome}` : ''}.</p>
-                <p className="text-suave">
-                  Estoque final: <span className="font-semibold tabular-nums text-texto">{formatarDinheiro(f.valorTotalCentavos ?? 0)}</span>
-                </p>
+                {verValores && (
+                  <p className="text-suave">
+                    Estoque final: <span className="font-semibold tabular-nums text-texto">{formatarDinheiro(f.valorTotalCentavos ?? 0)}</span>
+                  </p>
+                )}
                 {fraseDoSemPreco(f.itensSemPreco, 'final') && <p className="text-[12px] leading-snug text-suave">{fraseDoSemPreco(f.itensSemPreco, 'final')!.replace(/^./, (x) => x.toUpperCase())}.</p>}
                 <Link href={`${aqui}/contagens/${f.id}/conferir`} className={LINK_DE_TEXTO}>
                   Ver o fechamento
@@ -284,10 +289,12 @@ export function TelaPeriodo({
                     mais caros (A) {s.regras.freqADias} dias · médios (B) {s.regras.freqBDias} · menores (C) {s.regras.freqCDias}
                   </dd>
                 </div>
-                <div className="flex flex-col gap-0.5">
-                  <dt className="text-suave">Fecha sozinha até</dt>
-                  <dd className="tabular-nums text-texto">{formatarDinheiro(s.regras.toleranciaCentavos)} por item</dd>
-                </div>
+                {verValores && (
+                  <div className="flex flex-col gap-0.5">
+                    <dt className="text-suave">Fecha sozinha até</dt>
+                    <dd className="tabular-nums text-texto">{formatarDinheiro(s.regras.toleranciaCentavos)} por item</dd>
+                  </div>
+                )}
               </dl>
             )}
           </Painel>

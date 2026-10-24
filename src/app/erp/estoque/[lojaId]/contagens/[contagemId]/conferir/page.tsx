@@ -33,6 +33,7 @@ export default async function ErpConferirContagemPage({ params, searchParams }: 
       podeAplicar={pode(ctx.alcance, 'estoque.ajustar', { lojaId })}
       podeContar={pode(ctx.alcance, 'estoque.contar', { lojaId })}
       bloqueio={ctx.bloqueio}
+      verValores={pode(ctx.alcance, 'compras.ver', { lojaId })}
     />
   );
 }

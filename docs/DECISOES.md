@@ -3129,3 +3129,7 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 
 **Não mudou (decisão de negócio):** a tela do estoque da loja mostra custo e valor do saldo a quem tem `estoque.ver`, inclusive o Operador, enquanto o Consumo esconde o R$ de quem não tem `compras.ver`. É a pergunta 2 da decisão 397, ainda sem resposta do Rodolfo; esconder é ajuste pequeno (mesma régua do Consumo) e fica pronto para quando ele decidir.
 
+### 459. 2026-10-24 · O operador não recebe R$ nas telas de estoque (resposta à pergunta 2 da decisão 397)
+
+**Decisão:** Rodolfo delegou ("não me pergunte mais, só siga os planos"); aplicada a regra que o projeto já seguia na produção (3.2), na lista do dia e no Consumo: R$ do estoque só para quem tem `compras.ver` na loja. **Onde:** estoque da loja (cartões "Valor em estoque" e "Na abertura", colunas de custo e valor, valor dos movimentos do livro), visão geral (coluna e total, todo-ou-nada), saldo do insumo por loja, cobertura do período (a barra fica, sem os R$), período (valor do que falta contar, estoque final, tolerância), conferência da abertura e da contagem (diferença em quantidade e "confira", sem R$). Na loja e na visão geral o valor nem é lido no servidor; o teste com banco confere que nenhum valor sai para o operador (nem no JSON da tela) e que a dona continua vendo tudo. O nível 1 vê sempre. Ajuda das duas telas com a frase do valor só para `compras.ver` (versão 2). **Reverter:** trocar a régua nas leituras (`verValores`) e nas páginas; nada no banco muda.
+

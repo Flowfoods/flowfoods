@@ -4478,3 +4478,5 @@ Seguindo "COMEÇAR AQUI" (Notion). Decisão 456. Sem merge e sem deploy.
 
 **E4 · estoque (decisão 458):** jornada percorrida no app local com Dona, Gerente de uma loja e Operador: abertura com contagem (computador e celular), conferência e conclusão, compra que entra no saldo, requisição pedida pelo Operador e entregue pelo Gerente, Consumo e conciliação fechando a conta (0 + 300 + 100 − 50 = 350) sem R$ para o Operador. Ajustado: largura do campo "Solto" no celular. **Pendente de decisão:** o Operador vê o valor do saldo na tela do estoque da loja (pergunta 2 da decisão 397). **Não feito:** divergências de uma contagem com diferença e fechamento do período (1.7) pelo navegador.
 
+**R$ do estoque (decisão 459):** o operador lê só quantidades em todas as telas de estoque (loja, visão geral, período, cobertura, conferências, saldo no insumo). Prova: `erp-estoque.db.test.ts` (nada de valor no retorno para o operador) e navegador (nenhum R$ nas telas do operador a 390 e 1440; gerente e dona continuam vendo).
+

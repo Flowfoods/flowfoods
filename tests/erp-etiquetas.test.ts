@@ -499,7 +499,8 @@ describe('3.4 · rodada 1: vencido não emite, lote com pontuação, 300 dpi sem
     expect(paraCampoZpl('LOTE FORN. L_2310')).toBe('LOTE FORN. L_5F2310');
   });
 
-  it('300 dpi: o mesmo desenho de 203 ampliado — o que fica de fora é o mesmo e tudo cabe (o caso do Guardião e 3.000 sorteados)', () => {
+  // 3.000 casos × 2 formatos × 2 resoluções: uns 3 s sozinho; com a suíte inteira em paralelo passava do limite padrão de 5 s.
+  it('300 dpi: o mesmo desenho de 203 ampliado — o que fica de fora é o mesmo e tudo cabe (o caso do Guardião e 3.000 sorteados)', { timeout: 30_000 }, () => {
     const guardiao: ConteudoDaEtiqueta = {
       origem: 'ABERTA',
       produto: 'WWW casa cheddar caramelizada',

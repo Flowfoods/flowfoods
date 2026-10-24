@@ -26,7 +26,7 @@ export function PainelEstoqueDoInsumo({ saldos, unidade, estoqueBase }: { saldos
                   <span className={`block font-semibold ${s.quantidadeMilesimos < 0 ? 'text-erro' : 'text-texto'}`}>
                     {s.quantidadeMilesimos < 0 ? `−${formatarQuantidade(-s.quantidadeMilesimos, unidade)}` : formatarQuantidade(s.quantidadeMilesimos, unidade)}
                   </span>
-                  <span className="block text-[12px] text-suave">{s.valorCentavos === null ? 'valor pendente' : formatarDinheiro(s.valorCentavos)}</span>
+                  {s.verValores && <span className="block text-[12px] text-suave">{s.valorCentavos === null ? 'valor pendente' : formatarDinheiro(s.valorCentavos)}</span>}
                 </span>
               )}
             </Link>

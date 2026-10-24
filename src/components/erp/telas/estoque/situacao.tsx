@@ -52,7 +52,7 @@ function Detalhe({ l }: { l: SituacaoDaLoja }) {
 }
 
 function Valor({ l }: { l: SituacaoDaLoja }) {
-  if (!l.aberto) return <span className="text-suave">—</span>;
+  if (!l.aberto || !l.verValores) return <span className="text-suave">—</span>;
   return (
     <span>
       <span className="font-semibold text-texto">{formatarDinheiro(l.aberto.valorCentavos)}</span>
@@ -106,6 +106,9 @@ export function TelaSituacaoDoEstoque({
   bloqueio: string | null;
 }) {
   const abertas = lojas.filter((l) => l.aberto);
+  // Total em R$ só se a pessoa vê o valor de TODAS as lojas abertas (somar só algumas vazaria a diferença).
+  const verValores = abertas.length > 0 && abertas.every((l) => l.verValores);
+  const algumValor = lojas.some((l) => l.verValores);
   const total = abertas.reduce((s, l) => s + l.aberto!.valorCentavos, 0);
   const pendentes = abertas.reduce((s, l) => s + l.aberto!.pendentes, 0);
   const algumaFechada = lojas.some((l) => l.estado !== 'ABERTO' && l.ativa);
@@ -123,11 +126,13 @@ export function TelaSituacaoDoEstoque({
 
       {abertas.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {verValores && (
           <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
             <div className="text-[12px] font-medium text-suave">Valor em estoque · lojas abertas</div>
             <div className="mt-2 font-display text-[28px] font-bold leading-none tabular-nums">{formatarDinheiro(total)}</div>
             <div className="mt-1.5 text-[12px] text-suave">{pendentes > 0 ? `pelo custo de referência de hoje · ${pendentes} sem custo informado fora da soma` : 'pelo custo de referência de hoje'}</div>
           </div>
+          )}
         </div>
       )}
 
@@ -150,7 +155,7 @@ export function TelaSituacaoDoEstoque({
                     </div>
                     <div className="shrink-0 text-right text-sm tabular-nums">
                       <SeloDoEstado l={l} />
-                      {l.aberto && (
+                      {l.aberto && l.verValores && (
                         <div className="mt-1.5">
                           <Valor l={l} />
                         </div>
@@ -174,9 +179,11 @@ export function TelaSituacaoDoEstoque({
                   <th scope="col" className="h-10 px-3 font-semibold">
                     Andamento
                   </th>
-                  <th scope="col" className="h-10 px-3 text-right font-semibold">
-                    Valor
-                  </th>
+                  {algumValor && (
+                    <th scope="col" className="h-10 px-3 text-right font-semibold">
+                      Valor
+                    </th>
+                  )}
                   <th scope="col" className="h-10 px-3 pr-5 text-right font-semibold">
                     <span className="sr-only">Ação</span>
                   </th>
@@ -196,9 +203,11 @@ export function TelaSituacaoDoEstoque({
                     <td className="px-3 py-3 text-suave">
                       <Detalhe l={l} />
                     </td>
-                    <td className="px-3 py-3 text-right">
-                      <Valor l={l} />
-                    </td>
+                    {algumValor && (
+                      <td className="px-3 py-3 text-right">
+                        <Valor l={l} />
+                      </td>
+                    )}
                     <td className="px-3 py-3 pr-5 text-right">
                       <Acao l={l} {...acao} />
                     </td>
