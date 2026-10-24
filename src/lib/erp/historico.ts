@@ -178,6 +178,7 @@ const CAMPO: Record<string, string> = {
   modoPreparo: 'modo de preparo',
   passos: 'modo de preparo em etapas',
   consumoImediato: 'consumo imediato',
+  fotosApoio: 'fotos de apoio',
   foto: 'foto',
   itens: 'insumos',
   fichaQueProduz: 'vem da ficha',

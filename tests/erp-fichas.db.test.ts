@@ -44,6 +44,7 @@ import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 import { cadastrarFicha, editarFicha, MENSAGEM_CONFLITO_FICHA, MENSAGEM_FOTO_SUMIU, mudarSituacaoFicha, obterFicha } from '@/lib/erp/fichas';
 import { importarFichas, MENSAGEM_IMPORTACAO_DEMOROU, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { responderFoto } from '@/lib/erp/foto-resposta';
+import { mudarFotosDaFicha, obterFotosDaFicha } from '@/lib/erp/ficha-fotos';
 import { listarHistorico } from '@/lib/erp/historico';
 import { resolverAlcance } from '@/lib/erp/permissoes';
 import { centavosDaFracao } from '@/lib/erp/unidades';
@@ -438,5 +439,61 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
     ]);
     expect(await importarFichas(b, 'ficha;insumo;quantidade;unidade\nYakisoba;Pão de B;1;un')).toMatchObject({ ok: true, criadas: 1 });
     expect(await a.fichaTecnica.count({ where: { nome: 'Yakisoba' } })).toBe(0);
+  });
+
+  it('F4 · fotos de apoio: entram como apoio; legenda e ordem; "tornar principal" troca e a antiga vira apoio; tirar a principal pede substituta; tela velha dá conflito', async () => {
+    atual.ctx = () => ctxDe(A, 'DONO');
+    const enviar = async () => ((await (await envioDaSessao(pedidoDeFoto(JPG).req)).json()) as { arquivo: string }).arquivo;
+    const criada = await cadastrarFicha(a, xburger({ nome: 'Fotos F4' }), { tipo: 'manter' }, 'Marina');
+    if (!criada.ok) throw new Error(JSON.stringify(criada));
+    const id = criada.id;
+    const ler = async () => (await obterFotosDaFicha(a, id))!;
+    expect((await ler()).principal).toBeNull();
+
+    const n1 = await enviar();
+    expect(await mudarFotosDaFicha(a, id, (await ler()).versao, { tipo: 'adicionar', enviada: n1, legenda: '  ponto   da carne ' }, 'Marina')).toEqual({ ok: true, feito: 'foto de apoio adicionada' });
+    let f = await ler();
+    // nada vira capa pela ordem do envio
+    expect(f.principal).toBeNull();
+    expect(f.apoios).toEqual([{ arquivo: n1, mime: 'image/jpeg', bytes: expect.any(Number), legenda: 'ponto da carne' }]);
+    const velha = f.versao;
+    const n2 = await enviar();
+    expect((await mudarFotosDaFicha(a, id, velha, { tipo: 'adicionar', enviada: n2 }, 'Marina')).ok).toBe(true);
+    // a tela velha (versão de antes do 2º envio) não grava
+    expect(await mudarFotosDaFicha(a, id, velha, { tipo: 'legenda', arquivo: n1, legenda: 'x' }, 'Marina')).toMatchObject({ ok: false, conflito: true });
+    // ordem
+    f = await ler();
+    expect((await mudarFotosDaFicha(a, id, f.versao, { tipo: 'mover', arquivo: n2, para: 'cima' }, 'Marina')).ok).toBe(true);
+    expect((await ler()).apoios.map((x) => x.arquivo)).toEqual([n2, n1]);
+    // tornar principal (sem principal): sai dos apoios
+    expect((await mudarFotosDaFicha(a, id, (await ler()).versao, { tipo: 'principal', arquivo: n1 }, 'Marina')).ok).toBe(true);
+    f = await ler();
+    expect(f.principal).toEqual({ arquivo: n1 });
+    expect(f.apoios.map((x) => x.arquivo)).toEqual([n2]);
+    // trocar a principal: a antiga fica no lugar, como apoio
+    expect((await mudarFotosDaFicha(a, id, f.versao, { tipo: 'principal', arquivo: n2 }, 'Marina')).ok).toBe(true);
+    f = await ler();
+    expect(f.principal).toEqual({ arquivo: n2 });
+    expect(f.apoios.map((x) => x.arquivo)).toEqual([n1]);
+    // a rota serve a de apoio da própria ficha; nome que não é dela = 404; B não acha
+    expect((await responderFoto(a, id, true, n1)).status).toBe(200);
+    expect((await responderFoto(a, id, true, n2)).status).toBe(404);
+    expect((await responderFoto(b, id, true, n1)).status).toBe(404);
+    expect((await mudarFotosDaFicha(b, id, f.versao, { tipo: 'remover', arquivo: n1 }, 'Marina')).ok).toBe(false);
+    // tirar a principal sem dizer a substituta não passa; "nenhuma" tira a capa e mantém os apoios
+    expect(await mudarFotosDaFicha(a, id, f.versao, { tipo: 'removerPrincipal', substituta: '' }, 'Marina')).toMatchObject({ ok: false });
+    expect((await mudarFotosDaFicha(a, id, f.versao, { tipo: 'removerPrincipal', substituta: 'nenhuma' }, 'Marina')).ok).toBe(true);
+    f = await ler();
+    expect(f.principal).toBeNull();
+    expect(f.apoios.map((x) => x.arquivo)).toEqual([n1]);
+    expect(fotosDe(A.id)).not.toContain(n2); // o arquivo da capa tirada saiu do disco
+    expect(fotosDe(A.id)).toContain(n1);
+    // o histórico registra as fotos de apoio
+    const [h] = await listarHistorico(a, { de: [{ entidade: 'FichaTecnica', ids: [id] }], limite: 1, verPrecos: false });
+    expect(h.mudancas.some((m) => m.campo === 'foto')).toBe(true);
+    // remover o apoio apaga o arquivo
+    expect((await mudarFotosDaFicha(a, id, f.versao, { tipo: 'remover', arquivo: n1 }, 'Marina')).ok).toBe(true);
+    expect(fotosDe(A.id)).not.toContain(n1);
+    expect((await ler()).apoios).toEqual([]);
   });
 });

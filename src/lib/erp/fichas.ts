@@ -54,6 +54,7 @@ import { anexarUltimasCompras, type ComUltimaCompra } from './compras-custo';
 import { motivoDaUnidadeTravada } from './insumos';
 import { garantirCategoriasPadrao, sugestaoParaInsumo } from './categorias';
 import { prepararFoto, type FotoPronta } from './foto';
+import { lerFotosDeApoio } from './ficha-fotos-campos';
 import { apagarFoto, assumirFotoPendente, devolverFotoPendente, faxinarPendentesDeVezEmQuando, salvarFoto } from './arquivos';
 import { cabeNaExibicao, UNIDADES, type CustoExato, type Fracao, type Unidade } from './unidades';
 import { colunasDaValidade, retratoDaValidade, SELECAO_DA_VALIDADE, validadesDaLinha, type Validades } from './validade';
@@ -900,6 +901,7 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes:
         ...SELECAO_DA_LISTA,
         modoPreparo: true,
         passosPreparo: true,
+        fotosApoio: true,
         origem: true,
         atualizadoEm: true,
         insumoProduzido: { select: { id: true, nome: true } },
@@ -924,6 +926,8 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes:
       origem: f.origem,
       versao: f.atualizadoEm.toISOString(),
       foto: versaoDaFoto(f.fotoArquivo),
+      /** F4: as fotos de apoio, na ordem (o nome serve a rota `foto?apoio=`). */
+      fotosApoio: lerFotosDeApoio(f.fotosApoio).map((a) => ({ arquivo: a.arquivo, legenda: a.legenda })),
       insumoProduzido: f.insumoProduzido,
       validades: validadesDaLinha(f),
       consumoImediato: f.consumoImediato,

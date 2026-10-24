@@ -14,7 +14,9 @@ import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarPrecos, sa
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
-import type { EstadoImportacao } from '@/components/erp/telas/fichas/estado';
+import type { EstadoDasFotos, EstadoImportacao } from '@/components/erp/telas/fichas/estado';
+import { revalidatePath } from 'next/cache';
+import { mudarFotosDaFicha } from '@/lib/erp/ficha-fotos';
 import {
   executarImportacao,
   executarPrevia,
@@ -23,6 +25,7 @@ import {
   lerEnvioDasMargens,
   lerEnvioDasMetas,
   lerEnvioDosPrecos,
+  lerPedidoDeFoto,
 } from '@/components/erp/telas/fichas/executar';
 
 const BASE = '/erp/fichas';
@@ -123,4 +126,16 @@ export async function acaoSalvarMargensAlvo(anterior: EstadoCadastro, form: Form
   if (negado) return recusado(anterior, negado);
   const r = await salvarMargensAlvo(ctx.cliente, lerEnvioDasMargens(form), ctx.sessao.autorNome);
   return concluir(r, anterior, BASE, { mudou: 'margens', igual: 'margens-igual' }, 'canais');
+}
+
+/** F4: fotos da ficha (principal e de apoio). A regra confere versão e lista da ficha de novo dentro da transação. */
+export async function acaoFotosDaFicha(id: string, anterior: EstadoDasFotos, form: FormData): Promise<EstadoDasFotos> {
+  const vez = (anterior?.vez ?? 0) + 1;
+  const { ctx, negado } = await paraEditar();
+  if (negado) return { vez, ok: false, frase: negado };
+  const lido = lerPedidoDeFoto(form);
+  if (!lido) return { vez, ok: false, frase: 'Pedido inválido.' };
+  const r = await mudarFotosDaFicha(ctx.cliente, String(id), lido.versao, lido.pedido, ctx.sessao.autorNome);
+  if (r.ok) revalidatePath(`${BASE}/${id}`, 'layout');
+  return { vez, ok: r.ok, frase: r.ok ? `Pronto: ${r.feito}.` : r.erro };
 }

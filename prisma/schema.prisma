@@ -1343,6 +1343,9 @@ model FichaTecnica {
   fotoArquivo            String?
   fotoMime               String?
   fotoBytes              Int?
+  // F4: fotos de apoio, na ordem: [{ arquivo, mime, bytes, legenda }], até 8 (CHECK). A principal continua em
+  // fotoArquivo; trocar a principal passa a antiga para cá (nada é apagado por efeito colateral).
+  fotosApoio             Json         @default("[]")
   // 1.4: validade por conservação, o mesmo modelo do Insumo. `conservacao` é a
   // principal (null = validade não informada); cada coluna é a validade em
   // MINUTOS naquela conservação, null = o item não fica nela. CHECKs no banco:

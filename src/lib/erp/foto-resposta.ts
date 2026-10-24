@@ -10,11 +10,13 @@
 
 import type { ClienteDoParceiro } from './tenant';
 import { fotoDaFicha } from './fichas';
+import { fotoDeApoioDaFicha } from './ficha-fotos';
 import { abrirFoto } from './arquivos';
 
-export async function responderFoto(cliente: ClienteDoParceiro, fichaId: string, podeVer: boolean): Promise<Response> {
+/** `apoio` (F4): o nome de uma foto de apoio DESTA ficha; ausente = a principal. Nome fora da lista = 404. */
+export async function responderFoto(cliente: ClienteDoParceiro, fichaId: string, podeVer: boolean, apoio: string | null = null): Promise<Response> {
   if (!podeVer) return new Response('Sem acesso.', { status: 403 });
-  const foto = await fotoDaFicha(cliente, String(fichaId));
+  const foto = apoio ? await fotoDeApoioDaFicha(cliente, String(fichaId), apoio) : await fotoDaFicha(cliente, String(fichaId));
   if (!foto) return new Response('Foto não encontrada.', { status: 404 });
   const aberta = await abrirFoto(cliente.parceiroId, foto.arquivo);
   if (!aberta) return new Response('Foto não encontrada.', { status: 404 });

@@ -13,6 +13,7 @@ import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { decodificarPlanilha, LIMITE_DA_PLANILHA } from '@/lib/erp/ficha-planilha';
 import { NOME_DA_FOTO } from '@/lib/erp/foto';
 import { entradaDoFormulario } from '@/lib/erp/validade';
+import type { PedidoDeFoto } from '@/lib/erp/ficha-fotos';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { EstadoImportacao } from './estado';
 import { PREFIXO_DO_PREPARO } from './prefixo';
@@ -136,4 +137,26 @@ export function lerEnvioDasMargens(form: FormData) {
     versao: textoDe(form.get('versao')),
     margens: { LOJA: textoDe(form.get('margem_LOJA')), DELIVERY_PROPRIO: textoDe(form.get('margem_DELIVERY_PROPRIO')), IFOOD: textoDe(form.get('margem_IFOOD')) },
   };
+}
+
+/** F4: o pedido de foto, do formulário (cada botão manda `tipo` e o que precisa). */
+export function lerPedidoDeFoto(form: FormData): { versao: unknown; pedido: PedidoDeFoto } | null {
+  const t = (k: string) => (typeof form.get(k) === 'string' ? (form.get(k) as string) : '');
+  const tipo = t('tipo');
+  const versao = t('versao');
+  switch (tipo) {
+    case 'adicionar':
+      return { versao, pedido: { tipo, enviada: t('enviada'), legenda: t('legenda') } };
+    case 'legenda':
+      return { versao, pedido: { tipo, arquivo: t('arquivo'), legenda: t('legenda') } };
+    case 'mover':
+      return { versao, pedido: { tipo, arquivo: t('arquivo'), para: t('para') } };
+    case 'principal':
+    case 'remover':
+      return { versao, pedido: { tipo, arquivo: t('arquivo') } };
+    case 'removerPrincipal':
+      return { versao, pedido: { tipo, substituta: t('substituta') } };
+    default:
+      return null;
+  }
 }

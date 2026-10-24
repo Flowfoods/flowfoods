@@ -15,7 +15,9 @@ import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarPrecos, sa
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
 import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
-import type { EstadoImportacao } from '@/components/erp/telas/fichas/estado';
+import type { EstadoDasFotos, EstadoImportacao } from '@/components/erp/telas/fichas/estado';
+import { revalidatePath } from 'next/cache';
+import { mudarFotosDaFicha } from '@/lib/erp/ficha-fotos';
 import {
   executarImportacao,
   executarPrevia,
@@ -24,6 +26,7 @@ import {
   lerEnvioDasMargens,
   lerEnvioDasMetas,
   lerEnvioDosPrecos,
+  lerPedidoDeFoto,
 } from '@/components/erp/telas/fichas/executar';
 
 async function paraEditar(slug: string) {
@@ -138,4 +141,19 @@ export async function acaoSalvarMargensAlvo(slug: string, anterior: EstadoCadast
   const r = await salvarMargensAlvo(ctx.cliente, lerEnvioDasMargens(form), ctx.sessao.autorNome);
   if (r.ok && r.mudou.length) await auditar(ctx, 'erp_margens_alvo', { canais: r.mudou.join(',') });
   return concluir(r, anterior, base, { mudou: 'margens', igual: 'margens-igual' }, 'canais');
+}
+
+/** F4: fotos da ficha (principal e de apoio), pelo nível 1. */
+export async function acaoFotosDaFicha(slug: string, id: string, anterior: EstadoDasFotos, form: FormData): Promise<EstadoDasFotos> {
+  const vez = (anterior?.vez ?? 0) + 1;
+  const { ctx, negado, base } = await paraEditar(slug);
+  if (negado) return { vez, ok: false, frase: negado };
+  const lido = lerPedidoDeFoto(form);
+  if (!lido) return { vez, ok: false, frase: 'Pedido inválido.' };
+  const r = await mudarFotosDaFicha(ctx.cliente, String(id), lido.versao, lido.pedido, ctx.sessao.autorNome);
+  if (r.ok) {
+    await auditar(ctx, 'erp_ficha_fotos', { id: String(id), feito: r.feito });
+    revalidatePath(`${base}/${id}`, 'layout');
+  }
+  return { vez, ok: r.ok, frase: r.ok ? `Pronto: ${r.feito}.` : r.erro };
 }

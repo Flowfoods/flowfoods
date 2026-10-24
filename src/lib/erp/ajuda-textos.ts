@@ -180,6 +180,18 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'ficha-fotos',
+    area: 'cadastros',
+    rotas: ['fichas/[id]/fotos'],
+    titulo: 'Fotos da ficha',
+    versao: 1,
+    aula: [
+      { texto: 'A principal é a capa; as de apoio mostram detalhe, corte, montagem ou etapas, na ordem que você escolher.' },
+      { texto: 'Foto nova entra como apoio e vira capa só em “Tornar principal”; a capa antiga continua como apoio.' },
+      { texto: 'Para tirar a principal, diga qual fica no lugar dela ou escolha ficar sem principal: as de apoio nunca são apagadas junto.' },
+    ],
+  },
+  {
     chave: 'ficha-remover',
     area: 'cadastros',
     rotas: ['fichas/[id]/remover'],

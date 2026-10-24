@@ -39,3 +39,6 @@ export type EstadoImportacao = {
 } | null;
 
 export type AcaoDeImportacao = (anterior: EstadoImportacao, form: FormData) => Promise<EstadoImportacao>;
+
+/** F4: o retorno de uma mudança nas fotos da ficha (`vez` faz a tela anunciar mesmo quando a frase se repete). */
+export type EstadoDasFotos = { vez: number; ok: boolean; frase: string } | null;

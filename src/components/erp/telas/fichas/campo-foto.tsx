@@ -22,7 +22,7 @@ const LADO_MAXIMO = 1600;
  * EXIF para trás); se não der (navegador antigo, formato que ele não abre),
  * devolve o original — o servidor limpa do mesmo jeito.
  */
-async function reduzir(arquivo: File): Promise<File> {
+export async function reduzir(arquivo: File): Promise<File> {
   if (typeof createImageBitmap !== 'function') return arquivo;
   try {
     const img = await createImageBitmap(arquivo);
@@ -40,7 +40,7 @@ async function reduzir(arquivo: File): Promise<File> {
 }
 
 /** Manda a foto para a rota de envio; devolve o nome sorteado ou a frase do erro. */
-async function enviar(url: string, foto: File): Promise<{ arquivo: string } | { erro: string }> {
+export async function enviarFoto(url: string, foto: File): Promise<{ arquivo: string } | { erro: string }> {
   try {
     const r = await fetch(url, { method: 'POST', body: foto, headers: { 'Content-Type': foto.type || 'application/octet-stream' } });
     const corpo = (await r.json().catch(() => ({}))) as { arquivo?: string; erro?: string };
@@ -90,7 +90,7 @@ export function CampoFoto({
     setPreparando(true);
     aoOcupar(true);
     const final = await reduzir(original);
-    const r = final.size > LIMITE_DA_FOTO ? { erro: 'Foto acima de 8 MB: escolha outra.' } : await enviar(envio, final);
+    const r = final.size > LIMITE_DA_FOTO ? { erro: 'Foto acima de 8 MB: escolha outra.' } : await enviarFoto(envio, final);
     setPreparando(false);
     aoOcupar(false);
     if ('erro' in r) {

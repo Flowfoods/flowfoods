@@ -133,9 +133,10 @@ export function TelaDetalheFicha({
         <div className="flex min-w-0 flex-col gap-4">
           <Painel>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div className="w-full shrink-0 space-y-2 sm:w-64">
               {/* Sem foto, no celular, uma faixa baixa (não um quadro vazio do tamanho da foto). */}
               <div
-                className={`w-full shrink-0 overflow-hidden rounded-[10px] border border-linha bg-forte sm:aspect-[4/3] sm:w-64 ${f.foto ? 'aspect-[4/3]' : 'min-h-11'}`}
+                className={`w-full overflow-hidden rounded-[10px] border border-linha bg-forte sm:aspect-[4/3] ${f.foto ? 'aspect-[4/3]' : 'min-h-11'}`}
               >
                 {f.foto ? (
                   // eslint-disable-next-line @next/next/no-img-element -- foto privada servida pelo portão do parceiro; o otimizador do Next não a alcança.
@@ -145,6 +146,25 @@ export function TelaDetalheFicha({
                     Sem foto.{podeEditar && f.ativa && !bloqueio ? ' Em Editar ficha dá para pôr uma.' : ''}
                   </div>
                 )}
+              </div>
+              {/* F4: as fotos de apoio, na ordem, com a legenda; quem edita gerencia em "Fotos da ficha". */}
+              {f.fotosApoio.length > 0 && (
+                <ul className="grid grid-cols-4 gap-1.5" aria-label="Fotos de apoio">
+                  {f.fotosApoio.map((a, n) => (
+                    <li key={a.arquivo}>
+                      <a href={`${base}/${f.id}/foto?apoio=${a.arquivo}`} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-[6px] border border-linha" title={a.legenda ?? `Foto de apoio ${n + 1}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element -- foto privada servida pelo portão do parceiro. */}
+                        <img src={`${base}/${f.id}/foto?apoio=${a.arquivo}`} alt={a.legenda ? `Foto de apoio: ${a.legenda}` : `Foto de apoio ${n + 1}`} className="aspect-square w-full object-cover" loading="lazy" />
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {podeEditar && f.ativa && !bloqueio && (
+                <Link href={`${base}/${f.id}/fotos`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center text-[13px] sm:min-h-0`}>
+                  {f.fotosApoio.length > 0 || f.foto ? 'Gerenciar fotos (principal e de apoio)' : 'Pôr fotos de apoio'}
+                </Link>
+              )}
               </div>
               <div className="min-w-0 flex-1 space-y-4">
                 <div>
