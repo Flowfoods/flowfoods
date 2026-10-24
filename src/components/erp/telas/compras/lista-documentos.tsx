@@ -18,6 +18,7 @@ import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio, type Tom } from '../../ui/superficies';
 import { BotaoOuMotivo } from '../cadastro/partes';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 const TOM: Record<string, Tom> = { AGUARDANDO_CONFERENCIA: 'alerta', RECEBIDO: 'alerta', ERRO: 'erro', CONCILIADO: 'ok', CANCELADO: 'neutro' };
 
@@ -280,9 +281,11 @@ function CorpoDaLista({
 export function TelaListaDocumentos(props: ComponentProps<typeof CorpoDaLista>) {
   return (
     <div className="space-y-3">
-      <p className="text-[13px] text-suave">
-        Cada nota aqui veio de um arquivo XML: o arquivo da nota fiscal que o fornecedor manda por e-mail (não é o PDF). A chave de acesso é o número de 44 dígitos que identifica a nota; por ele, a mesma nota não entra duas vezes.
-      </p>
+      <ExplicacaoNoPonto ponto="xml">
+        <p className="text-[13px] text-suave">
+          Cada nota aqui veio de um arquivo XML: o arquivo da nota fiscal que o fornecedor manda por e-mail (não é o PDF). A chave de acesso é o número de 44 dígitos que identifica a nota; por ele, a mesma nota não entra duas vezes.
+        </p>
+      </ExplicacaoNoPonto>
       <CorpoDaLista {...props} />
     </div>
   );

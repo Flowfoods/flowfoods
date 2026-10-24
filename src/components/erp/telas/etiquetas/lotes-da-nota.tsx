@@ -17,6 +17,7 @@ import { TrilhaDaPagina } from '../../shell/trilha';
 import { Voltar } from '../cadastro/partes';
 import type { AcaoDeEstoque } from '../estoque/estado';
 import { FormLoteDaNota, FormTirarLote, FormUsarSugestao } from './form-lote-nota';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 export function TelaLotesDaNota({
   n,
@@ -48,9 +49,11 @@ export function TelaLotesDaNota({
       {feito && <Aviso tom="ok" titulo={feito} />}
       {n.cancelada && <Aviso tom="alerta" titulo="Nota cancelada.">Os lotes se registram na nota que vale; os já registrados ficam no histórico.</Aviso>}
       {bloqueio && podeRegistrar && <Aviso tom="neutro" titulo={bloqueio} />}
-      <p className="text-sm text-suave">
-        O lote e o vencimento de cada insumo, como vieram na embalagem. Nada é obrigatório nem inventado: o que a embalagem não diz fica em branco. Na hora de abrir a embalagem, a cozinha escolhe o lote daqui e a etiqueta usa o vencimento dele.
-      </p>
+      <ExplicacaoNoPonto ponto="lote">
+        <p className="text-sm text-suave">
+          O lote e o vencimento de cada insumo, como vieram na embalagem. Nada é obrigatório nem inventado: o que a embalagem não diz fica em branco. Na hora de abrir a embalagem, a cozinha escolhe o lote daqui e a etiqueta usa o vencimento dele.
+        </p>
+      </ExplicacaoNoPonto>
 
       {n.insumos.length === 0 ? (
         <Aviso tom="neutro" titulo="Esta nota não tem insumo ligado." />

@@ -30,6 +30,7 @@ import { PrecosPagos } from './precos-pagos';
 import { PainelEstoqueDoInsumo } from '../estoque/saldo-do-insumo';
 import type { SaldoDoInsumoNaLoja } from '@/lib/erp/estoque';
 import { formatarData } from '@/lib/erp/compra-campos';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 export function TelaDetalheInsumo({
   insumo: i,
@@ -322,7 +323,9 @@ export function TelaDetalheInsumo({
               </p>
             )}
             <p className="mt-2 text-[12px] text-suave">
-              Não é onde o insumo fica guardado nem a conservação: coxa de frango é Proteína, mesmo congelada.
+              <ExplicacaoNoPonto ponto="categoria" emLinha className="mr-2">
+                Não é onde o insumo fica guardado nem a conservação: coxa de frango é Proteína, mesmo congelada.
+              </ExplicacaoNoPonto>
               {editaAqui && i.ativo && !bloqueio && (
                 <>
                   {' '}

@@ -196,9 +196,9 @@ export function problemasDoRegistro(entradas: readonly EntradaDeAjuda[] = ENTRAD
       if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(p.id) || p.id.length > 40 || idsDosPontos.has(p.id)) erros.push(`${ondeP} com id inválido ou repetido`);
       idsDosPontos.add(p.id);
       if (p.blocos.length === 0 || p.blocos.length > 3) erros.push(`${ondeP} precisa de 1 a 3 blocos`);
-      const livresP = p.blocos.filter((b) => !b.para);
-      const frasesP = livresP.reduce((n, b) => n + contarFrases(b.texto), 0);
-      if (livresP.length === 0 || frasesP < 1 || frasesP > 3) erros.push(`${ondeP} tem ${frasesP} frases para todos (de 1 a 3)`);
+      // Um ponto pode ser inteiro de quem tem a permissão (ex.: preço): sem ela, a pessoa nem recebe o ponto e o botão some.
+      const frasesP = p.blocos.reduce((n, b) => n + contarFrases(b.texto), 0);
+      if (frasesP < 1 || frasesP > 3) erros.push(`${ondeP} tem ${frasesP} frases (de 1 a 3)`);
       if (p.secao && !ids.has(p.secao)) erros.push(`${ondeP} aponta para a seção "${p.secao}", que não existe nesta entrada`);
       for (const t of [p.titulo, ...p.blocos.map((b) => b.texto)]) for (const m of problemasDoTexto(t)) erros.push(`${ondeP} "${t.slice(0, 40)}": ${m}`);
       if (p.titulo.length > 60) erros.push(`${ondeP} título com mais de 60 caracteres`);

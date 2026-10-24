@@ -17,6 +17,7 @@ import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
 import { dataCurta } from '../faturamento/formato';
 import { FaixaComPalavra, Farol, idDaLinha, Regua } from './farol';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 function Faixas({ d }: { d: DreDoPeriodo }) {
   const { contagem, semCor, motivoGeral } = d.farol;
@@ -207,9 +208,11 @@ export function PainelDeFaroisDoDre({ d, raiz, definirMetas }: { d: DreDoPeriodo
             ))}
           </ul>
           {soma && <p className="text-[12px] leading-relaxed text-suave">{soma}</p>}
-          <p className="text-[12px] leading-relaxed text-suave">
-            O farol por canal é só o da receita, porque só ela nasce no canal. Compra e despesa são da loja, não do canal: dividi-las pela receita daria ao iFood o mesmo custo do salão por construção. O CMV e as despesas têm o farol no total, na tabela abaixo.
-          </p>
+          <ExplicacaoNoPonto ponto="farol-canal">
+            <p className="text-[12px] leading-relaxed text-suave">
+              O farol por canal é só o da receita, porque só ela nasce no canal. Compra e despesa são da loja, não do canal: dividi-las pela receita daria ao iFood o mesmo custo do salão por construção. O CMV e as despesas têm o farol no total, na tabela abaixo.
+            </p>
+          </ExplicacaoNoPonto>
         </>
       )}
     </section>

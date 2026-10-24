@@ -20,6 +20,7 @@ import { Aviso } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { Voltar } from '../cadastro/partes';
 import { quandoCurto, quantoDoItem, SeloDoAtraso } from './partes';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 /** Tom do título e da barra de cada coluna (estado), sempre com a palavra ao lado. */
 const TOM_DA_COLUNA: Record<StatusDaRequisicao, TomDaColuna> = {
@@ -124,19 +125,22 @@ export function TelaQuadroDeRequisicoes({
       {!q.aberto && <Aviso tom="alerta" titulo={`O estoque da ${q.loja.nome} ainda não foi aberto.`}>A requisição baixa do estoque: ela começa depois da contagem de abertura.</Aviso>}
       {bloqueio && <Aviso tom="alerta" titulo={bloqueio} />}
 
-      <p className="max-w-3xl text-sm text-suave">
-        O setor pede; o estoque entrega e dá baixa no livro, item a item. O que sai em parte fica em “atendidas em parte” até sair o resto ou alguém encerrar.
+      <div className="flex max-w-3xl flex-wrap items-center gap-x-4 gap-y-1">
+        <ExplicacaoNoPonto ponto="fluxo">
+          <p className="text-sm text-suave">
+            O setor pede; o estoque entrega e dá baixa no livro, item a item. O que sai em parte fica em “atendidas em parte” até sair o resto ou alguém encerrar.
+          </p>
+        </ExplicacaoNoPonto>
         {pode.divergencias && (
-          <>
-            {' '}
+          <p className="text-sm text-suave">
             O que a contagem acusa sem requisição aparece em{' '}
             <Link href={`${daLoja}/divergencias`} className={LINK_DE_TEXTO}>
               Divergências
             </Link>
             .
-          </>
+          </p>
         )}
-      </p>
+      </div>
 
       <GradeDoQuadro>
         {ORDEM_DO_QUADRO.map((s) => (

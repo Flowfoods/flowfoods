@@ -23,6 +23,7 @@ import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { Voltar } from '../cadastro/partes';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 const reais = (c: number) => (c < 0 ? `−${formatarDinheiro(-c)}` : formatarDinheiro(c));
 
@@ -100,9 +101,11 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
       </PageHeader>
       {d.aviso && <Aviso tom="alerta" titulo={d.aviso} />}
 
-      <p className="max-w-3xl text-sm text-suave">
-        Entre duas contagens de cada insumo: <span className="text-texto">o que havia + o que entrou − o que sobrou</span> é o que foi consumido. O que foi consumido sem requisição (nem perda lançada) sumiu. Não é culpa de ninguém até conferir: pode ser consumo sem pedido, entrega sem baixa, perda ou contagem errada. Nada é gravado aqui.
-      </p>
+      <ExplicacaoNoPonto ponto="conta">
+        <p className="max-w-3xl text-sm text-suave">
+          Entre duas contagens de cada insumo: <span className="text-texto">o que havia + o que entrou − o que sobrou</span> é o que foi consumido. O que foi consumido sem requisição (nem perda lançada) sumiu. Não é culpa de ninguém até conferir: pode ser consumo sem pedido, entrega sem baixa, perda ou contagem errada. Nada é gravado aqui.
+        </p>
+      </ExplicacaoNoPonto>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">

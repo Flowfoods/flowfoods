@@ -30,6 +30,7 @@ import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Contagem, Metrica, Painel, Selo } from '../../ui/superficies';
 import { Farol, Regua } from './farol';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 export interface PermissoesDoPainelDeCategorias {
   /** `metas.editar` com a rede inteira: vê o convite para definir as metas por categoria. */
@@ -492,9 +493,11 @@ function VistaDaCompraReal({ c, lojasSemReal, periodoNome, encerrado, fechado }:
           {c.lojasDeFora.map((l) => `${l.nome}: ${l.motivo}`).join('; ')}. {c.lojasDeFora.length === 1 ? 'Essa loja segue' : 'Essas lojas seguem'} pelas compras no painel de categorias.
         </Aviso>
       )}
-      <p className="text-[12px] leading-relaxed text-suave">
-        Os percentuais são pontos da receita bruta das lojas comparadas. A comparação é a mesma da página do DRE, aberta por categoria (a categoria de hoje do insumo). O estoque de pré-preparo fica à parte e não tem compra para comparar.
-      </p>
+      <ExplicacaoNoPonto ponto="percentuais">
+        <p className="text-[12px] leading-relaxed text-suave">
+          Os percentuais são pontos da receita bruta das lojas comparadas. A comparação é a mesma da página do DRE, aberta por categoria (a categoria de hoje do insumo). O estoque de pré-preparo fica à parte e não tem compra para comparar.
+        </p>
+      </ExplicacaoNoPonto>
     </div>
   );
 }
@@ -700,9 +703,11 @@ function VistaDaEvolucao({ e, escopoNome }: { e: EvolucaoDeCategorias | null; es
           {comAviso.map((p) => `${p.nome}: ${p.semDado}`).join('; ')}. O total do CMV, na última linha, é o do DRE do período.
         </Aviso>
       )}
-      <p className="text-[12px] leading-relaxed text-suave">
-        Período fechado vem da fotografia como ela está (categoria e meta da época); período aberto, do que o sistema sabe hoje. Onde o estoque foi contado por insumo nos dois fechamentos o número é o CMV real; nos outros, as compras.
-      </p>
+      <ExplicacaoNoPonto ponto="origem">
+        <p className="text-[12px] leading-relaxed text-suave">
+          Período fechado vem da fotografia como ela está (categoria e meta da época); período aberto, do que o sistema sabe hoje. Onde o estoque foi contado por insumo nos dois fechamentos o número é o CMV real; nos outros, as compras.
+        </p>
+      </ExplicacaoNoPonto>
     </div>
   );
 }

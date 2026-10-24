@@ -159,6 +159,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Mais embaixo, o que você pagou em cada nota e qual fornecedor saiu mais barato.', para: ['compras.ver'] },
       { texto: 'Para o histórico completo, com período, lojas e preço médio, use “Ver o histórico de compras”.', para: ['compras.ver'] },
     ],
+    pontos: [
+      {
+        id: 'categoria',
+        titulo: 'Categoria',
+        blocos: [{ texto: 'Categoria é a natureza do insumo para o CMV. Não é onde ele fica guardado nem a conservação: coxa de frango é Proteína, mesmo congelada.' }],
+      },
+    ],
   },
   {
     chave: 'insumo-remover',
@@ -222,6 +229,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Pré-preparo (molho, base) entra dentro de outras fichas.' },
       { texto: 'O custo por porção aparece para quem vê os preços. “Incompleto” quer dizer que falta preço em algum insumo.', para: ['precos.ver'] },
       { texto: 'Ao lado, cada canal tem o seu preço, o CMV e o farol: dentro da meta, acima da meta, sem dados ou não ofertado.', para: ['precos.ver'] },
+    ],
+    pontos: [
+      {
+        id: 'conta',
+        titulo: 'Como o CMV é calculado',
+        blocos: [{ texto: 'CMV é o custo físico (insumos e embalagens do canal) dividido pelo preço que você definiu; a taxa do iFood fica fora. Cada canal tem o seu farol. Sem preço definido ou sem meta, fica sem dados: a sugestão não conta como preço.', para: ['precos.ver'] }],
+      },
     ],
   },
   {
@@ -364,6 +378,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'Planejada: o lote existe e a requisição dos insumos já foi para o estoque. Em produção: alguém pegou, e o cartão diz quem. Concluída: o lote entrou no estoque.' },
           { texto: 'Concluídas e canceladas aparecem só no dia. Os lotes antigos ficam no Histórico.' },
         ],
+      },
+    ],
+    pontos: [
+      {
+        id: 'fluxo',
+        titulo: 'Como o lote anda',
+        blocos: [{ texto: 'Planeje o lote pela ficha: os insumos saem do estoque pela requisição, que o estoque entrega. Quem vai fazer pega o lote em Tarefas e, quando fica pronto, conclui dizendo quanto saiu de verdade; aí ele entra no estoque da loja.' }],
+        secao: 'andamento',
       },
     ],
   },
@@ -552,6 +574,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     titulo: 'Histórico de impressões',
     versao: 1,
     aula: [{ texto: 'Escolha a loja para ver o que foi impresso, quantas, como e por quem.' }],
+    pontos: [
+      {
+        id: 'situacao',
+        titulo: 'O que cada situação quer dizer',
+        blocos: [{ texto: '“Enviada à Zebra” é que o Browser Print recebeu, não que saiu no papel. “Sem resultado” é o pedido que a tela não chegou a confirmar, porque fechou ou caiu a conexão: pode ou não ter saído.' }],
+      },
+    ],
   },
   {
     chave: 'etiquetas-historico-loja',
@@ -563,6 +592,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Cada pedido de impressão do período: Zebra, arquivo ou papel, as cópias e o que aconteceu.' },
       { texto: 'Pedidos e etiquetas são contas diferentes: um pedido de 10 cópias são 10 etiquetas.' },
       { texto: 'Sem resultado é a Zebra que não respondeu: pode ter saído. Esperando o Já imprimi é arquivo ou papel que ninguém confirmou.' },
+    ],
+    pontos: [
+      {
+        id: 'situacao',
+        titulo: 'O que cada situação quer dizer',
+        blocos: [{ texto: '“Enviada à Zebra” é que o Browser Print recebeu, não que saiu no papel. “Sem resultado” é o pedido que a tela não chegou a confirmar, porque fechou ou caiu a conexão: pode ou não ter saído.' }],
+      },
     ],
   },
   {
@@ -587,6 +623,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'O lote e o vencimento de cada insumo da nota, como vieram na embalagem. Nada é obrigatório nem inventado.' },
       { texto: 'Quando a nota veio do XML, o lote que o fornecedor declarou aparece como sugestão: só entra se você confirmar.' },
       { texto: 'Registrar não muda a nota, o estoque nem o custo.', para: ['compras.lancar'] },
+    ],
+    pontos: [
+      {
+        id: 'lote',
+        titulo: 'Lote e vencimento',
+        blocos: [{ texto: 'O lote e o vencimento de cada insumo, como vieram na embalagem; o que a embalagem não diz fica em branco. Na hora de abrir a embalagem, a cozinha escolhe o lote daqui e a etiqueta usa o vencimento dele.' }],
+      },
     ],
   },
   {
@@ -632,6 +675,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     titulo: 'Histórico da produção',
     versao: 1,
     aula: [{ texto: 'Escolha a loja para ver o que a cozinha produziu, quanto, quem fez e quando.' }],
+    pontos: [
+      {
+        id: 'tempo',
+        titulo: 'Como o tempo é contado',
+        blocos: [{ texto: 'O tempo conta de quando a pessoa pegou o lote, ou de quando os insumos saíram do estoque se foi depois, até a conclusão. Lote concluído sem pegar pela tela da cozinha não tem tempo.' }],
+      },
+    ],
   },
   {
     chave: 'producao-historico-loja',
@@ -651,6 +701,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [{ texto: 'Conta de quando a pessoa pegou o lote, ou de quando os insumos saíram do estoque se foi depois, até a conclusão. Lote concluído sem pegar pela tela da cozinha fica sem tempo.' }],
       },
     ],
+    pontos: [
+      {
+        id: 'tempo',
+        titulo: 'Como o tempo é contado',
+        blocos: [{ texto: 'O tempo conta de quando a pessoa pegou o lote, ou de quando os insumos saíram do estoque se foi depois, até a conclusão. Lote concluído sem pegar pela tela da cozinha não tem tempo.' }],
+        secao: 'tempo',
+      },
+    ],
   },
   {
     chave: 'producao-indicadores',
@@ -659,6 +717,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     titulo: 'Indicadores da produção',
     versao: 1,
     aula: [{ texto: 'Escolha a loja para ver os indicadores da produção de cada pessoa.' }],
+    pontos: [
+      {
+        id: 'leitura',
+        titulo: 'Rendimento e tempo',
+        blocos: [{ texto: 'Rendimento é o que saiu contra o planejado pela ficha; a média dá o mesmo peso a cada lote e não conta os perdidos, que aparecem à parte. Tempo vai de quando a pessoa pegou o lote, ou de quando os insumos saíram se foi depois, até a conclusão.' }],
+      },
+    ],
   },
   {
     chave: 'producao-indicadores-loja',
@@ -680,6 +745,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'Cancelou: os que a própria pessoa cancelou. Os que a gerência cancelou enquanto estavam com ela ficam à parte e não contam para ela.' },
           { texto: 'Lote concluído pela FlowFoods, sem pessoa da equipe, fica fora das pessoas.' },
         ],
+      },
+    ],
+    pontos: [
+      {
+        id: 'leitura',
+        titulo: 'Rendimento e tempo',
+        blocos: [{ texto: 'Rendimento é o que saiu contra o planejado pela ficha; a média dá o mesmo peso a cada lote e não conta os perdidos, que aparecem à parte. Tempo vai de quando a pessoa pegou o lote, ou de quando os insumos saíram se foi depois, até a conclusão.' }],
+        secao: 'conta',
       },
     ],
   },
@@ -732,6 +805,18 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'A meta comanda a sugestão de preço das fichas (custo físico ÷ meta), sem mudar preço já definido.' },
       { texto: 'Sem a taxa do iFood, o resultado do iFood fica pendente; o CMV não depende dela.' },
       { texto: 'Confira os números no seu contrato com o iFood.', para: ['precos.editar'] },
+    ],
+    pontos: [
+      {
+        id: 'porcentagens',
+        titulo: 'O que entra na taxa',
+        blocos: [{ texto: 'As duas porcentagens são sobre o preço do prato. Mensalidade do plano e taxa de entrega não entram aqui: são do mês e do pedido, não do prato.', para: ['precos.ver'] }],
+      },
+      {
+        id: 'meta-cmv',
+        titulo: 'Meta de CMV e preço sugerido',
+        blocos: [{ texto: 'Meta de CMV é quanto do preço o custo físico pode ser, e o preço sugerido é o custo físico dividido pela meta. Pode ser igual ou diferente em cada canal. Mudar a meta não muda nenhum preço já definido.', para: ['precos.ver'] }],
+      },
     ],
   },
   {
@@ -1084,6 +1169,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Receber a nota não lança nada: o custo e o estoque só mudam depois que você confere os itens e concilia.' },
       { texto: 'A mesma nota fiscal não entra duas vezes: a chave de acesso, o número de 44 dígitos dela, é a prova.' },
     ],
+    pontos: [
+      {
+        id: 'xml',
+        titulo: 'De onde vêm estas notas',
+        blocos: [{ texto: 'Cada nota veio de um arquivo XML, o arquivo da nota fiscal que o fornecedor manda por e-mail (não é o PDF). A chave de acesso é o número de 44 dígitos da nota; por ele, a mesma nota não entra duas vezes.' }],
+      },
+    ],
   },
   {
     chave: 'compras-documento-importar',
@@ -1095,6 +1187,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Envie o arquivo .xml que o fornecedor mandou com a nota, não o PDF.' },
       { texto: 'O sistema só lê o arquivo: não pede senha, certificado nem acesso ao site do governo que autoriza as notas.' },
       { texto: 'Nota de outra empresa, cupom fiscal, nota sem autorização e arquivo grande demais são recusados, com o motivo.' },
+    ],
+    pontos: [
+      {
+        id: 'sefaz',
+        titulo: 'O que é conferido',
+        blocos: [{ texto: 'Só o arquivo é pedido: nada de senha, certificado ou acesso ao site do governo que autoriza as notas (a SEFAZ). A assinatura digital da nota não é conferida aqui.' }],
+      },
     ],
   },
   {
@@ -1258,6 +1357,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'O setor pede, o estoque entrega e o saldo baixa na entrega.' },
       { texto: 'Pedido atrasado ganha uma faixa vermelha.' },
     ],
+    pontos: [
+      {
+        id: 'fluxo',
+        titulo: 'Como a requisição anda',
+        blocos: [{ texto: 'O setor pede; o estoque entrega e dá baixa no livro, item a item. O que sai em parte fica em “atendidas em parte” até sair o resto ou alguém encerrar.' }],
+      },
+    ],
   },
   {
     chave: 'requisicao-nova',
@@ -1302,6 +1408,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     aula: [
       { texto: 'O que a contagem acusa sem requisição, em reais.' },
       { texto: '“Pequeno e repetido” é a diferença que passa despercebida. Por setor mostra onde olhar, não quem culpar.' },
+    ],
+    pontos: [
+      {
+        id: 'conta',
+        titulo: 'Como a divergência é calculada',
+        blocos: [{ texto: 'Entre duas contagens, o que havia mais o que entrou menos o que sobrou é o que foi consumido. O consumido sem requisição nem perda lançada aparece como sumiço. Pode ser consumo sem pedido, entrega sem baixa, perda ou contagem errada: confira antes de concluir.' }],
+      },
     ],
   },
   {
@@ -1393,6 +1506,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'Use ponto e vírgula entre as colunas. Linha com erro fica de fora e diz o motivo; as outras entram.' },
           { texto: 'Célula que começa com = + - ou @ é recusada: cole só o valor, sem fórmula.' },
         ],
+      },
+    ],
+    pontos: [
+      {
+        id: 'arquivo',
+        titulo: 'Como montar o arquivo',
+        blocos: [{ texto: 'Separe as colunas com ponto e vírgula, porque a vírgula é o decimal do Brasil. Abre no Excel ou no Google Planilhas; salve como CSV. Célula que começa com =, +, - ou @ é recusada.' }],
+        secao: 'colunas',
       },
     ],
   },
@@ -1551,6 +1672,20 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         ],
       },
     ],
+    pontos: [
+      {
+        id: 'leitura',
+        titulo: 'Como ler os números do DRE',
+        blocos: [{ texto: 'Despesa conta pela competência, o mês a que pertence, não pelo dia em que foi paga. O CMV é o real quando a contagem de fechamento foi aplicada; senão, o das compras pela data da nota. Loja sem nota e sem estoque fica sem CMV.', para: ['dre.ver'] }],
+        secao: 'competencia',
+      },
+      {
+        id: 'farol-canal',
+        titulo: 'Farol por canal',
+        blocos: [{ texto: 'O farol por canal é só o da receita, porque só ela nasce no canal. Compra e despesa são da loja, não do canal: o CMV e as despesas têm o farol no total, na tabela abaixo.', para: ['dre.ver'] }],
+        secao: 'farol',
+      },
+    ],
   },
   {
     chave: 'dre-despesas',
@@ -1700,6 +1835,20 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         ],
       },
     ],
+    pontos: [
+      {
+        id: 'percentuais',
+        titulo: 'Como ler compra × real',
+        blocos: [{ texto: 'Os percentuais são pontos da receita bruta das lojas comparadas. A comparação é a mesma da página do DRE, aberta pela categoria de hoje do insumo. O estoque de pré-preparo fica à parte e não tem compra para comparar.', para: ['dre.ver'] }],
+        secao: 'compra-x-real',
+      },
+      {
+        id: 'origem',
+        titulo: 'De onde vêm os números',
+        blocos: [{ texto: 'Período fechado vem da fotografia como ela está, com a categoria e a meta da época; período aberto, do que se sabe hoje. Onde o estoque foi contado por insumo nos dois fechamentos, o número é o CMV real; nos outros, as compras.', para: ['dre.ver'] }],
+        secao: 'categoria-de-hoje',
+      },
+    ],
   },
   {
     chave: 'dre-metas-categorias',
@@ -1731,6 +1880,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'A meta vale a partir do começo do período de agora. Os períodos anteriores seguem com as metas que valiam neles e o passado nunca é reescrito.', para: ['metas.editar'] },
           { texto: 'Duas pessoas salvando ao mesmo tempo: a segunda recebe o aviso e nada é gravado.', para: ['metas.editar'] },
         ],
+      },
+    ],
+    pontos: [
+      {
+        id: 'base',
+        titulo: 'Base da meta',
+        blocos: [{ texto: 'A meta é o percentual da receita bruta, a mesma base do DRE e do farol. Na rede, o percentual de cada categoria é sobre a receita das lojas que a usam.', para: ['dre.ver'] }],
+        secao: 'rede-e-loja',
       },
     ],
   },

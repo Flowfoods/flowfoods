@@ -15,6 +15,7 @@ import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { FiltroDoPeriodo } from './periodo';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
@@ -101,9 +102,11 @@ export function TelaIndicadores({ d, base, contexto }: { d: IndicadoresDaProduca
           ))}
         </div>
       )}
-      <p className="text-[12px] text-suave">
-        Rendimento: o que saiu contra o planejado pela ficha; a média dá o mesmo peso a cada lote e não conta os perdidos (que aparecem à parte). Tempo: de quando a pessoa pegou o lote (ou de quando os insumos saíram, se foi depois) até a conclusão.
-      </p>
+      <ExplicacaoNoPonto ponto="leitura">
+        <p className="text-[12px] text-suave">
+          Rendimento: o que saiu contra o planejado pela ficha; a média dá o mesmo peso a cada lote e não conta os perdidos (que aparecem à parte). Tempo: de quando a pessoa pegou o lote (ou de quando os insumos saíram, se foi depois) até a conclusão.
+        </p>
+      </ExplicacaoNoPonto>
     </div>
   );
 }

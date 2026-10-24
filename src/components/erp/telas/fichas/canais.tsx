@@ -24,6 +24,7 @@ import { FormEmbalagens, type LinhaDaEmbalagem } from './form-embalagens';
 import { FormTaxaDoIfood } from './form-taxa';
 import { FormMargensAlvo } from './form-margens';
 import { FormMetasDeCmv } from './form-metas-cmv';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 export function TelaEmbalagensDaFicha({
   ficha,
@@ -201,10 +202,12 @@ export function TelaCanaisDeVenda({
             ) : (
               <p className="text-[15px] text-texto">Ainda não configurada: o custo do iFood fica incompleto. Quem cuida dos preços configura aqui.</p>
             )}
-            <p className="mt-4 border-t border-linha pt-3 text-[12px] text-suave">
-              As duas porcentagens são sobre o preço do prato. Mensalidade do plano e taxa de entrega não entram aqui: são do mês e do pedido, não do prato.
-              {taxa ? ` Se vender a R$ 30,00 no iFood, ${formatarFracao(taxaSobrePreco(3000, taxaTotalBp(taxa)))} ficam com ele.` : ''}
-            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-x-3 border-t border-linha pt-3 text-[12px] text-suave">
+              <ExplicacaoNoPonto ponto="porcentagens">
+                <span>As duas porcentagens são sobre o preço do prato. Mensalidade do plano e taxa de entrega não entram aqui: são do mês e do pedido, não do prato.</span>
+              </ExplicacaoNoPonto>
+              {taxa ? <span>{`Se vender a R$ 30,00 no iFood, ${formatarFracao(taxaSobrePreco(3000, taxaTotalBp(taxa)))} ficam com ele.`}</span> : null}
+            </div>
           </Painel>
 
           <Painel titulo="Meta de CMV por canal" subtitulo="Quanto do preço o custo físico do prato pode ser: a sugestão de preço e o farol de cada ficha seguem isso">

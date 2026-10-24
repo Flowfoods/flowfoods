@@ -17,6 +17,7 @@ import { FiltroEmLinks } from '../../ui/filtros';
 import { PaginacaoNumerada } from '../../ui/paginacao-numerada';
 import { Metrica, Painel, Selo, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 type Linha = HistoricoDeImpressoes['linhas'][number];
 
@@ -205,7 +206,9 @@ export function TelaHistoricoDeImpressoes({ h, base, contexto }: { h: HistoricoD
           </>
         )}
       </Painel>
-      <p className="text-[12px] text-suave">“Enviada à Zebra” é que o Browser Print recebeu, não que saiu no papel. “Sem resultado” é o pedido que a tela não chegou a confirmar (fechou ou caiu a conexão): pode ou não ter saído.</p>
+      <ExplicacaoNoPonto ponto="situacao">
+        <p className="text-[12px] text-suave">“Enviada à Zebra” é que o Browser Print recebeu, não que saiu no papel. “Sem resultado” é o pedido que a tela não chegou a confirmar (fechou ou caiu a conexão): pode ou não ter saído.</p>
+      </ExplicacaoNoPonto>
     </div>
   );
 }

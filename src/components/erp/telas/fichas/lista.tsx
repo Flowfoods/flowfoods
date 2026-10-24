@@ -35,6 +35,7 @@ import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { Miniatura } from './miniatura';
 import { CANAIS } from '@/lib/erp/canal-campos';
 import { porcentagemDoCmv, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 /**
  * N.2: o CMV de um canal na lista — o preço que a pessoa definiu, o CMV a esse preço e o farol EM PALAVRA (nunca só a
@@ -347,10 +348,12 @@ export function TelaListaFichas({
       </table>
 
       {precos && (
-        <p className="hidden border-t border-linha px-5 py-2.5 text-[12px] text-suave lg:block">
-          CMV = custo físico (insumos + embalagens do canal) ÷ o preço que você definiu; a taxa do iFood fica fora. Cada canal tem o seu farol. Sem
-          preço definido ou sem meta: sem dados (a sugestão não conta como preço).
-        </p>
+        <ExplicacaoNoPonto ponto="conta" className="hidden border-t border-linha px-5 py-1.5 lg:block">
+          <p className="hidden border-t border-linha px-5 py-2.5 text-[12px] text-suave lg:block">
+            CMV = custo físico (insumos + embalagens do canal) ÷ o preço que você definiu; a taxa do iFood fica fora. Cada canal tem o seu farol. Sem
+            preço definido ou sem meta: sem dados (a sugestão não conta como preço).
+          </p>
+        </ExplicacaoNoPonto>
       )}
       <Paginacao
         de={de}

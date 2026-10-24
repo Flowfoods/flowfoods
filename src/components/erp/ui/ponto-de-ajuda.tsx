@@ -10,14 +10,41 @@
  * deixar o campo sem explicação.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePontos } from '../shell/pontos';
 
 export function useTemPonto(ponto: string): boolean {
   return usePontos().tem(ponto);
 }
 
-export function PontoDeAjuda({ ponto, className = '' }: { ponto: string; className?: string }) {
+/**
+ * Explicação de seção que virou ponto: com o ponto no registro desta tela,
+ * desenha só o botão com o título ("? Como a conta é feita"); sem ele, mostra
+ * o texto antigo (`children`) — nenhuma tela fica sem explicação.
+ */
+export function ExplicacaoNoPonto({
+  ponto,
+  children,
+  className = '',
+  emLinha = false,
+}: {
+  ponto: string;
+  children: ReactNode;
+  className?: string;
+  /** Dentro de um parágrafo (ao lado de um link, por exemplo): o botão entra em linha, sem bloco próprio. */
+  emLinha?: boolean;
+}) {
+  const tem = useTemPonto(ponto);
+  if (!tem) return <>{children}</>;
+  if (emLinha) return <PontoDeAjuda ponto={ponto} comRotulo className={className} />;
+  return (
+    <div className={className}>
+      <PontoDeAjuda ponto={ponto} comRotulo />
+    </div>
+  );
+}
+
+export function PontoDeAjuda({ ponto, className = '', comRotulo = false }: { ponto: string; className?: string; comRotulo?: boolean }) {
   const { tem, titulo, ativo, abrir, registrar, chave } = usePontos();
   const botao = useRef<HTMLButtonElement>(null);
   // Sem JavaScript o botão não abriria nada: nasce escondido e aparece depois de montar.
@@ -30,6 +57,29 @@ export function PontoDeAjuda({ ponto, className = '' }: { ponto: string; classNa
   }, [existe, ponto, registrar]);
   if (!existe) return null;
   const aberto = ativo === `${chave}.${ponto}`;
+  if (comRotulo) {
+    return (
+      <button
+        ref={botao}
+        type="button"
+        hidden={!montado}
+        style={montado ? undefined : { display: 'none' }}
+        aria-haspopup="dialog"
+        aria-expanded={aberto}
+        data-ponto={ponto}
+        onClick={(e) => abrir(ponto, e.currentTarget)}
+        className={`ff-transicao inline-flex min-h-11 items-center gap-2 rounded-[5px] text-left text-[13px] font-medium text-suave hover:text-texto sm:min-h-8 ${className}`}
+      >
+        <span
+          aria-hidden
+          className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-[11px] font-semibold leading-none ${aberto ? 'border-texto bg-texto text-fundo' : 'border-current'}`}
+        >
+          ?
+        </span>
+        <span className="underline decoration-linha-forte underline-offset-4">{titulo(ponto)}</span>
+      </button>
+    );
+  }
   return (
     <button
       ref={botao}

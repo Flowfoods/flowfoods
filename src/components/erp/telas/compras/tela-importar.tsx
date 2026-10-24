@@ -10,6 +10,7 @@ import { TrilhaDaPagina } from '../../shell/trilha';
 import { Voltar } from '../cadastro/partes';
 import type { AcaoDeDocumento } from './documentos-estado';
 import { FormImportarXml } from './form-importar';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 export function TelaImportarXml({ base, contexto, acao, bloqueio }: { base: string; contexto: string; acao: AcaoDeDocumento; bloqueio: string | null }) {
   return (
@@ -24,9 +25,13 @@ export function TelaImportarXml({ base, contexto, acao, bloqueio }: { base: stri
           <li>Para cada item você escolhe o insumo e a embalagem. Da próxima nota do mesmo fornecedor em diante, o sistema já lembra.</li>
           <li>Quando tudo confere, você concilia: a nota de compra é lançada e o custo e o estoque seguem a regra de sempre.</li>
         </ol>
-        <p className="mt-3 border-t border-linha pt-3 text-[12px] text-suave">
-          O sistema não pede senha, certificado nem acesso ao site do governo que autoriza as notas (a SEFAZ): só o arquivo. A assinatura digital da nota não é conferida aqui, por isso a conferência dos itens e dos valores é sempre sua.
-        </p>
+        <div className="mt-3 border-t border-linha pt-3 text-[12px] text-suave">
+          <ExplicacaoNoPonto ponto="sefaz">
+            <p>O sistema não pede senha, certificado nem acesso ao site do governo que autoriza as notas (a SEFAZ): só o arquivo. A assinatura digital da nota não é conferida aqui.</p>
+          </ExplicacaoNoPonto>
+          {/* A responsabilidade pela conferência é indispensável: fica sempre à vista. */}
+          <p className="mt-1">A conferência dos itens e dos valores é sempre sua.</p>
+        </div>
       </Painel>
       <FormImportarXml acao={acao} base={base} bloqueio={bloqueio} />
     </div>

@@ -16,6 +16,7 @@ import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro } from '../../ui/campos';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, useAvisoDeSaida } from '../cadastro/erros';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 const AJUDA_DO_CANAL: Record<CanalVenda, string> = {
   LOJA: 'Salão e balcão: só os insumos.',
@@ -110,10 +111,12 @@ export function FormMetasDeCmv({
           })}
         </ul>
       </fieldset>
-      <p className="text-[12px] text-suave">
-        Meta de CMV = quanto do preço o custo físico pode ser. Preço sugerido = custo físico ÷ meta. Pode ser igual ou diferente em cada canal. Vazio = sem
-        meta. Mudar a meta não muda nenhum preço já definido.
-      </p>
+      <ExplicacaoNoPonto ponto="meta-cmv">
+        <p className="text-[12px] text-suave">
+          Meta de CMV = quanto do preço o custo físico pode ser. Preço sugerido = custo físico ÷ meta. Pode ser igual ou diferente em cada canal. Vazio = sem
+          meta. Mudar a meta não muda nenhum preço já definido.
+        </p>
+      </ExplicacaoNoPonto>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
         <BotaoEnviar disabled={!!bloqueio} className="sm:min-w-44">
           Salvar metas de CMV

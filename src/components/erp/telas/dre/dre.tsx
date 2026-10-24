@@ -28,6 +28,7 @@ import { BotaoOuMotivo } from '../cadastro/partes';
 import { Farol, idDaLinha } from './farol';
 import { PainelDeFaroisDoDre } from './farol-painel';
 import { dataCurta } from '../faturamento/formato';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 export interface PermissoesDaTela {
   lancarDespesa: boolean;
@@ -612,10 +613,12 @@ export function TelaDoDre({
         </p>
       )}
 
-      <p className="text-[12px] leading-relaxed text-suave">
-        Despesa conta pela competência (o mês a que pertence), não pelo dia em que foi paga. {d.status === 'FECHADO' ? 'A taxa do iFood é a estimada pela taxa de quando o período fechou.' : 'A taxa do iFood é estimada pela taxa configurada hoje.'} O CMV é o real (estoque inicial mais compras menos estoque final) quando o período terminou e a contagem de fechamento foi aplicada; senão, o das compras pela data da nota. Loja sem nota e sem estoque fica sem CMV, e margem e resultados saem sem contar o CMV.{Object.keys(d.metas).length > 0 ? ' O desvio é o realizado menos a meta, em pontos percentuais (pp); na receita, a meta é de crescimento sobre o mesmo período do ano passado. O farol põe o desvio numa de 5 faixas fixas, as mesmas para todas as casas; a cor sempre vem com a régua, a palavra e o desvio, e some quando o dado ainda não fecha.' : ''}{' '}
-        {loja ? 'A loja não recebe rateio da rede.' : 'Receita por canal nas três primeiras linhas.'}
-      </p>
+      <ExplicacaoNoPonto ponto="leitura">
+        <p className="text-[12px] leading-relaxed text-suave">
+          Despesa conta pela competência (o mês a que pertence), não pelo dia em que foi paga. {d.status === 'FECHADO' ? 'A taxa do iFood é a estimada pela taxa de quando o período fechou.' : 'A taxa do iFood é estimada pela taxa configurada hoje.'} O CMV é o real (estoque inicial mais compras menos estoque final) quando o período terminou e a contagem de fechamento foi aplicada; senão, o das compras pela data da nota. Loja sem nota e sem estoque fica sem CMV, e margem e resultados saem sem contar o CMV.{Object.keys(d.metas).length > 0 ? ' O desvio é o realizado menos a meta, em pontos percentuais (pp); na receita, a meta é de crescimento sobre o mesmo período do ano passado. O farol põe o desvio numa de 5 faixas fixas, as mesmas para todas as casas; a cor sempre vem com a régua, a palavra e o desvio, e some quando o dado ainda não fecha.' : ''}{' '}
+          {loja ? 'A loja não recebe rateio da rede.' : 'Receita por canal nas três primeiras linhas.'}
+        </p>
+      </ExplicacaoNoPonto>
     </div>
   );
 }

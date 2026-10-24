@@ -14,6 +14,7 @@ import { Aviso, Contagem, Painel, Selo, Vazio } from '../../ui/superficies';
 import { ListaHistorico } from '../historico/lista-historico';
 import type { AcaoLocal } from './estado';
 import { FormMetasPorCategoria } from './form-metas-categorias';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 const lista = (nomes: readonly string[]) => (nomes.length <= 1 ? nomes.join('') : `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`);
 
@@ -118,8 +119,10 @@ export function TelaDasMetasPorCategoria({
         </Painel>
       )}
 
-      <p className="text-[12px] leading-relaxed text-suave">
-        A meta é o percentual da receita bruta, a mesma base do DRE e do farol. Na rede, o percentual de cada categoria é sobre a receita das lojas que a usam.{' '}
+      <p className="flex flex-wrap items-center gap-x-1 text-[12px] leading-relaxed text-suave">
+        <ExplicacaoNoPonto ponto="base" emLinha className="mr-2">
+          {'A meta é o percentual da receita bruta, a mesma base do DRE e do farol. Na rede, o percentual de cada categoria é sobre a receita das lojas que a usam. '}
+        </ExplicacaoNoPonto>
         <Link href={`${raiz}/dre/cmv-categorias`} className={LINK_DE_TEXTO}>
           Ver o CMV por categoria
         </Link>

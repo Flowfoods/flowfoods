@@ -19,6 +19,7 @@ import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { FiltroDoPeriodo } from './periodo';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 function SeloDoDesfecho({ l }: { l: LinhaDoHistoricoDaProducao }) {
   if (l.desfecho === 'CONCLUIDO') return null;
@@ -225,7 +226,9 @@ export function TelaHistoricoDaProducao({ h, base, contexto }: { h: HistoricoDaP
           </>
         )}
       </Painel>
-      <p className="text-[12px] text-suave">O tempo conta de quando a pessoa pegou o lote (ou de quando os insumos saíram do estoque, se foi depois) até a conclusão. Lote concluído sem pegar pela tela da cozinha não tem tempo.</p>
+      <ExplicacaoNoPonto ponto="tempo">
+        <p className="text-[12px] text-suave">O tempo conta de quando a pessoa pegou o lote (ou de quando os insumos saíram do estoque, se foi depois) até a conclusão. Lote concluído sem pegar pela tela da cozinha não tem tempo.</p>
+      </ExplicacaoNoPonto>
     </div>
   );
 }

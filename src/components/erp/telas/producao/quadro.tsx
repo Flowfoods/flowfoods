@@ -19,6 +19,7 @@ import { Aviso } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { CartaoDoQuadro, ColunaDoQuadro, GradeDoQuadro, type TomDaColuna } from '../quadro/quadro';
 import { quandoDoCartao, SeloDoAtraso } from '../requisicoes/partes';
+import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 const TOM_DA_COLUNA: Record<StatusDaProducao, TomDaColuna> = {
   PLANEJADA: 'atencao',
@@ -115,9 +116,11 @@ export function TelaQuadroDaProducao({
       {!q.aberto && <Aviso tom="alerta" titulo={`O estoque da ${q.loja.nome} ainda não foi aberto.`}>A produção baixa os insumos do estoque e põe o lote nele: ela começa depois da contagem de abertura.</Aviso>}
       {bloqueio && <Aviso tom="alerta" titulo={bloqueio} />}
 
-      <p className="max-w-3xl text-sm text-suave">
-        Planeje o lote pela ficha: os insumos saem do estoque pela requisição, que o estoque entrega. Quem vai fazer pega o lote em Tarefas; quando ficar pronto, conclui dizendo quanto saiu de verdade e ele entra no estoque da loja.
-      </p>
+      <ExplicacaoNoPonto ponto="fluxo">
+        <p className="max-w-3xl text-sm text-suave">
+          Planeje o lote pela ficha: os insumos saem do estoque pela requisição, que o estoque entrega. Quem vai fazer pega o lote em Tarefas; quando ficar pronto, conclui dizendo quanto saiu de verdade e ele entra no estoque da loja.
+        </p>
+      </ExplicacaoNoPonto>
 
       <GradeDoQuadro>
         {ORDEM_DO_QUADRO.map((s) => (

@@ -15,7 +15,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ajudaParaATela, ENTRADAS, pontoValido, problemasDoRegistro, type EntradaDeAjuda } from '@/lib/erp/ajuda';
 import { DIAS_PARA_VOLTAR, diaDe, estadoDoPonto, itemDoPonto, normalizarPontos, type PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
-import { ALCANCE_FLOWFOODS } from '@/lib/erp/permissoes';
+import { ALCANCE_FLOWFOODS, resolverAlcance } from '@/lib/erp/permissoes';
 
 const PREF = (p: Partial<PreferenciaDeAjuda> = {}): PreferenciaDeAjuda => ({ dicasLigadas: true, escolhida: true, fechadas: [], pontos: [], ...p });
 const ID = 'insumo-novo.marca';
@@ -108,7 +108,7 @@ describe('pontos · lista branca e registro', () => {
         { id: 'muitos', titulo: 'Ok', blocos: [{ texto: 'A.' }, { texto: 'B.' }, { texto: 'C.' }, { texto: 'D.' }] },
         { id: 'secao', titulo: 'Ok', blocos: [{ texto: 'Uma frase.' }], secao: 'nao-existe' },
         { id: 'jargao', titulo: 'Ok', blocos: [{ texto: 'O servidor calcula!' }] },
-        { id: 'so-gerente', titulo: 'Ok', blocos: [{ texto: 'Preço.', para: ['VER_PRECOS' as never] }] },
+        { id: 'longo', titulo: 'Ok', blocos: [{ texto: 'Uma. Duas. Três. Quatro.' }] },
       ],
     };
     const erros = problemasDoRegistro([ruim]).join('\n');
@@ -117,7 +117,15 @@ describe('pontos · lista branca e registro', () => {
     expect(erros).toContain('ponto "muitos" precisa de 1 a 3 blocos');
     expect(erros).toContain('seção "nao-existe", que não existe');
     expect(erros).toContain('ponto "jargao"');
-    expect(erros).toContain('ponto "so-gerente" tem 0 frases para todos');
+    expect(erros).toContain('ponto "longo" tem 4 frases (de 1 a 3)');
+  });
+
+  it('ponto só de quem vê preços: o operador nem recebe (o botão some); quem vê, recebe', () => {
+    const op = resolverAlcance({ perfilBase: 'OPERADOR', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] });
+    const fichasOp = ajudaParaATela(op).find((e) => e.chave === 'fichas')!;
+    const fichasN1 = ajudaParaATela(ALCANCE_FLOWFOODS).find((e) => e.chave === 'fichas')!;
+    expect(fichasOp.pontos.map((p) => p.id)).not.toContain('fichas.conta');
+    expect(fichasN1.pontos.map((p) => p.id)).toContain('fichas.conta');
   });
 
   it('a tela recebe o id completo "chave.ponto" e a seção do passo a passo', () => {
@@ -136,7 +144,7 @@ describe('pontos · todo botão do código tem texto no registro', () => {
     });
   }
   const usados = arquivos(join(process.cwd(), 'src')).flatMap((f) =>
-    Array.from(readFileSync(f, 'utf8').matchAll(/<PontoDeAjuda\s+ponto="([a-z0-9-]+)"/g)).map((m) => ({ f, id: m[1] })),
+    Array.from(readFileSync(f, 'utf8').matchAll(/<(?:PontoDeAjuda|ExplicacaoNoPonto)\s+ponto="([a-z0-9-]+)"/g)).map((m) => ({ f, id: m[1] })),
   );
   const ids = new Set(ENTRADAS.flatMap((e) => (e.pontos ?? []).map((p) => p.id)));
 

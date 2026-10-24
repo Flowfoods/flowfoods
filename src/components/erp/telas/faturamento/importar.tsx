@@ -24,6 +24,7 @@ import { AJUDA, ROTULO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import { Aviso, Painel, Selo, type Tom } from '../../ui/superficies';
 import type { AcaoDeImportacaoDeFaturamento, EstadoDaImportacao } from './estado';
+import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 
 const SITUACAO: Record<SituacaoNaPrevia, { rotulo: string; tom: Tom }> = {
   nova: { rotulo: 'Nova', tom: 'ok' },
@@ -77,6 +78,7 @@ export function TelaImportarFaturamento({
   base: string;
   bloqueio: string | null;
 }) {
+  const temPontoDoArquivo = useTemPonto('arquivo');
   // Um estado só: a prévia, e por cima dela o erro ou o resultado da importação
   // (um erro ao importar mantém a prévia na tela).
   const [estado, enviar] = useFormState<EstadoDaImportacao, FormData>(
@@ -124,10 +126,17 @@ export function TelaImportarFaturamento({
           <a href="/modelos/faturamento.csv" download className={classeDeBotao('secundario')}>
             Baixar o modelo (CSV)
           </a>
-          <p className={AJUDA}>
-            Separe as colunas com ponto e vírgula (a vírgula é o decimal do Brasil). Abre no Excel ou no Google Planilhas; salve como CSV. Célula que começa com =, +, - ou @ é
-            recusada.
-          </p>
+          {temPontoDoArquivo ? (
+            <div className="mt-1.5 flex items-center gap-1">
+              <p className={AJUDA.replace('mt-1.5', '')}>Colunas separadas por ponto e vírgula; salve como CSV.</p>
+              <PontoDeAjuda ponto="arquivo" className="-my-3 sm:-my-1.5" />
+            </div>
+          ) : (
+            <p className={AJUDA}>
+              Separe as colunas com ponto e vírgula (a vírgula é o decimal do Brasil). Abre no Excel ou no Google Planilhas; salve como CSV. Célula que começa com =, +, - ou @ é
+              recusada.
+            </p>
+          )}
         </div>
       </Painel>
 
