@@ -244,6 +244,11 @@ REMOTO
   code=$(dokploy GET /api/user.get); [ "$code" = 200 ] || code=$(dokploy GET /api/admin.one)
   echo "limpeza automática do Docker (enableDockerCleanup) -> HTTP $code: $(jq -r '[.. | objects | .enableDockerCleanup? // empty][0] // "não encontrado"' /tmp/dk.json 2>/dev/null)"
 
+  code=$(dokploy GET /api/settings.readTraefikEnv)
+  echo "readTraefikEnv -> HTTP $code; nomes das variáveis (sem valores): $(jq -r 'if type=="string" then . else tostring end' /tmp/dk.json 2>/dev/null | grep -oE '^[A-Za-z_][A-Za-z0-9_]*=' | tr -d '=' | tr '\n' ' ')"
+  code=$(dokploy GET /api/docker.getContainersByAppNameMatch?appName=dokploy)
+  echo "imagem do serviço dokploy (referência de versão): $(jq -r '.[0].image? // empty' /tmp/dk.json 2>/dev/null)"
+
   titulo "11. Compose ssh-setup (o que é — só nomes, imagens, montagens)"
   id=$(awk -F'\t' '$3=="ssh-setup"{print $2}' /tmp/inventario.tsv)
   if [ -n "$id" ] && [ "$(dokploy GET "/api/compose.one?composeId=$id")" = 200 ]; then
@@ -443,6 +448,7 @@ recriar_traefik() {
   titulo "Recriando (mesmas portas extras: $portas)"
   code=$(dokploy POST /api/settings.updateTraefikPorts "{\"additionalPorts\":${portas}}")
   echo "POST updateTraefikPorts -> HTTP $code: $(head -c 400 /tmp/dk.json)"
+  case "$code" in 2*) ;; *) echo "::error::Dokploy recusou recriar o Traefik (HTTP $code). Nada foi criado."; exit 1 ;; esac
 
   for t in 15 30 60; do
     sleep "$t"
