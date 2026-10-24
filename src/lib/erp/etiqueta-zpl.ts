@@ -19,7 +19,7 @@ import { dataHoraDaEtiqueta, diaDaEtiqueta, RESOLUCOES, type Formato, type Resol
 
 // ================================================================ o conteúdo
 
-export type ValidadeNaEtiqueta = { tipo: 'instante'; em: Date } | { tipo: 'dia'; dia: string } | { tipo: 'nao-informada' };
+export type ValidadeNaEtiqueta = { tipo: 'instante'; em: Date } | { tipo: 'dia'; dia: string } | { tipo: 'nao-informada' } | { tipo: 'consumo-imediato' };
 
 /** O que vai no papel, já decidido (vem da emissão gravada: nada aqui consulta ficha, insumo ou relógio). */
 export interface ConteudoDaEtiqueta {
@@ -191,13 +191,15 @@ interface Linha {
 /** As linhas da etiqueta, na ordem do papel. */
 export function linhasDoConteudo(c: ConteudoDaEtiqueta): Linha[] {
   const quando = (d: Date) => dataHoraDaEtiqueta(d, c.mostrarHora);
-  const conservacao = c.conservacao ? CONSERVACOES[c.conservacao].toUpperCase() : 'CONSERVAÇÃO NÃO INFORMADA';
+  // F4: o lote de consumo imediato não tem conservação nem prazo; o papel diz isso em vez de "não informada".
+  const imediato = c.validade.tipo === 'consumo-imediato';
+  const conservacao = c.conservacao ? CONSERVACOES[c.conservacao].toUpperCase() : imediato ? 'NÃO FICA GUARDADO' : 'CONSERVAÇÃO NÃO INFORMADA';
   const linhas: Linha[] = [{ campo: 'conservacao', nome: 'a conservação', texto: c.quantidade ? `${conservacao} · ${c.quantidade}` : conservacao, essencial: true, maxLinhas: 2 }];
   const validade =
     c.validade.tipo === 'instante' ? quando(c.validade.em) : c.validade.tipo === 'dia' ? diaDaEtiqueta(c.validade.dia) : null;
   if (c.origem === 'LOTE') {
     linhas.push({ campo: 'manipulacao', nome: 'a manipulação', texto: `MANIPULADO ${c.manipuladoEm ? quando(c.manipuladoEm) : 'SEM DATA'}`, essencial: true, maxLinhas: 1 });
-    linhas.push({ campo: 'validade', nome: 'a validade', texto: validade ? `VALIDADE ${validade}` : 'VALIDADE NÃO INFORMADA', essencial: true, destaque: !!validade, maxLinhas: 2 });
+    linhas.push({ campo: 'validade', nome: 'a validade', texto: validade ? `VALIDADE ${validade}` : imediato ? 'CONSUMO IMEDIATO' : 'VALIDADE NÃO INFORMADA', essencial: true, destaque: !!validade || imediato, maxLinhas: 2 });
     linhas.push({ campo: 'lote', nome: 'o lote', texto: `LOTE ${c.lote ?? 'NÃO INFORMADO'}`, essencial: true, maxLinhas: 1 });
   } else {
     linhas.push({ campo: 'abertura', nome: 'a abertura', texto: `ABERTO ${c.abertoEm ? quando(c.abertoEm) : 'SEM DATA'}`, essencial: true, maxLinhas: 1 });

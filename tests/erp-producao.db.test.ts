@@ -692,4 +692,19 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · produção do pré-preparo pela ficha (P
     expect(lista.ok).toBe(true);
     await expect(planejarProducao(lerSo, OPERADOR(), ids.vp, { fichaId: ids.molho, quantidade: '1', paraDia: 'hoje', observacao: '', linhas: lista.ok ? lista.linhas : [], envio: novoEnvio() }, AUTOR_COZINHA)).rejects.toThrow();
   });
+
+  it('F4: ficha de consumo imediato — o lote concluído guarda a marca, sem validade; a ficha volta como era', async () => {
+    const antes = (await a.fichaTecnica.findUnique({ where: { id: ids.molho }, select: { conservacao: true, validadeSecoMin: true, validadePistaFriaMin: true, validadeRefrigeradoMin: true, validadeCongeladoMin: true } }))!;
+    await a.fichaTecnica.update({ where: { id: ids.molho }, data: { consumoImediato: true, conservacao: null, validadeSecoMin: null, validadePistaFriaMin: null, validadeRefrigeradoMin: null, validadeCongeladoMin: null } });
+    try {
+      const p = (await planejar(OPERADOR(), '1')) as { ok: boolean; id: string };
+      expect(p.ok).toBe(true);
+      expect(await entregarTudo(p.id)).toMatchObject({ ok: true });
+      expect(await concluir(p.id, '1')).toMatchObject({ ok: true });
+      const o = (await a.ordemProducao.findUnique({ where: { id: p.id }, select: { consumoImediato: true, validadeEm: true, conservacaoSnapshot: true } }))!;
+      expect(o).toEqual({ consumoImediato: true, validadeEm: null, conservacaoSnapshot: null });
+    } finally {
+      await a.fichaTecnica.update({ where: { id: ids.molho }, data: { consumoImediato: false, ...antes } });
+    }
+  });
 });

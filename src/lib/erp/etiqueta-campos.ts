@@ -380,8 +380,14 @@ export function lerChaveDoEnvio(v: unknown): string | null {
 }
 
 /** A frase de uma situação de validade relativa a agora: "vence em 2 dias", "venceu", "vence hoje às 14:05". */
-export function situacaoDaValidade(validadeEm: Date | null, agora: Date, porDia: string | null = null): { texto: string; tom: 'ok' | 'alerta' | 'erro' | 'neutro' } {
-  if (!validadeEm) return { texto: 'Validade não informada', tom: 'alerta' };
+export function situacaoDaValidade(
+  validadeEm: Date | null,
+  agora: Date,
+  porDia: string | null = null,
+  /** F4: o lote de uma ficha de consumo imediato não tem prazo, e isso não é falta de informação. */
+  consumoImediato = false,
+): { texto: string; tom: 'ok' | 'alerta' | 'erro' | 'neutro' } {
+  if (!validadeEm) return consumoImediato ? { texto: 'Consumo imediato', tom: 'neutro' } : { texto: 'Validade não informada', tom: 'alerta' };
   if (porDia) {
     // Vale pelo vencimento do lote (uma data): até o fim daquele dia.
     const d = diasEntreDias(diaNoRio(agora), porDia);

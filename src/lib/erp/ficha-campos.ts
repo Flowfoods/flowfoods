@@ -130,6 +130,8 @@ export interface EntradaDaFicha {
    * ficha já tem. Presente sem nenhuma marcada (formulário) = não informada.
    */
   validade?: EntradaDeValidade;
+  /** F4: "sim" = consumo imediato. Ausente (planilha) = mantém o que a ficha tem, como a validade. */
+  consumoImediato?: unknown;
 }
 
 export interface DadosFicha {
@@ -144,7 +146,12 @@ export interface DadosFicha {
   itens: ItemDaFicha[];
   /** 1.4: principal + validade por conservação; null = não informada. */
   validades: Validades | null;
+  /** F4: sai da cozinha para o cliente sem ser guardado; só com `validades` nula. */
+  consumoImediato: boolean;
 }
+
+/** F4: a frase quando a ficha marca consumo imediato e também diz onde guarda. */
+export const MENSAGEM_CONSUMO_COM_VALIDADE = 'Consumo imediato não fica guardado: desmarque os lugares de guarda ou desmarque o consumo imediato.';
 
 export interface ItemDaFicha {
   insumoId: string | null;
@@ -329,6 +336,10 @@ export function lerFormFicha(
   const v = entrada.validade ? lerValidades(entrada.validade, 'ficha') : ({ ok: true, validades: null } as const);
   if (!v.ok) Object.assign(erros, v.erros);
 
+  // F4: consumo imediato é a ausência de guarda, não um lugar a mais.
+  const consumoImediato = marcado(entrada.consumoImediato) || entrada.consumoImediato === 'sim' || entrada.consumoImediato === true;
+  if (consumoImediato && v.ok && v.validades) erros.consumoImediato = MENSAGEM_CONSUMO_COM_VALIDADE;
+
   if (!r.success || rendimentoMilesimos === null || !v.ok || Object.keys(erros).length > 0) return { ok: false, erros };
   return {
     ok: true,
@@ -342,6 +353,7 @@ export function lerFormFicha(
       unidadeRendimento: RENDE_EM[rendeEm!].unidade,
       itens,
       validades: v.validades,
+      consumoImediato,
     },
   };
 }
@@ -511,6 +523,7 @@ export function retratoDaFicha(
     foto: fotoArquivo,
     conservacao: d.validades?.principal ?? null,
     validade: retratoDaValidade(d.validades),
+    consumoImediato: d.consumoImediato ? 'sim' : null,
     itens: itensEmTexto(
       d.itens.map((i) => {
         const p = i.subfichaId ? preparos.get(i.subfichaId) : undefined;

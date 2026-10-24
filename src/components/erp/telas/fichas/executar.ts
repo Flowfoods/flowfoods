@@ -51,6 +51,8 @@ export async function lerEnvioDaFicha(
     itens,
     // 1.4: o bloco de validade vem sempre do formulário (marcador); sem ele, a ficha mantém a que tem.
     validade: form.get('validadeNoFormulario') === 'sim' ? entradaDoFormulario((k) => textoDe(form.get(k))) : undefined,
+    // F4: o bloco de validade traz junto o consumo imediato (mesmo marcador: sem o bloco, a ficha mantém o que tem).
+    consumoImediato: form.get('validadeNoFormulario') === 'sim' ? (form.get('consumoImediato') === 'sim' ? 'sim' : 'nao') : undefined,
   };
   // A foto não vem no formulário (1.3): a tela já a enviou pela rota própria e manda só o nome sorteado.
   const enviada = textoDe(form.get('fotoNova'));

@@ -44,7 +44,7 @@ import {
   type Unidade,
 } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
-import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
+import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
 import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Segmentos } from '../../ui/segmentos';
@@ -81,6 +81,8 @@ export interface ValoresDaFicha {
   itens: LinhaDoItem[];
   /** 1.4: onde fica e quanto dura (null = não informada). */
   validades: Validades | null;
+  /** F4: sai da cozinha para o cliente sem guardar (rascunho antigo, sem o campo: não). */
+  consumoImediato?: boolean;
 }
 
 const VAZIA: LinhaDoItem = { escolha: '', quantidade: '', unidade: '', fator: '' };
@@ -106,6 +108,7 @@ const ROTULOS: Record<string, string> = {
   itens: 'Insumos e pré-preparos',
   modoPreparo: 'Modo de preparo',
   conservacao: 'Conservação principal',
+  consumoImediato: 'Consumo imediato',
 };
 const rotuloDoCampo = (c: string) =>
   ROTULOS[c] ??
@@ -214,6 +217,7 @@ function FormFichaBase({
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida();
   const [tipo, setTipo] = useState<TipoFicha>(inicial.tipo);
+  const [consumo, setConsumo] = useState(inicial.consumoImediato === true);
   const [nome, setNome] = useState(inicial.nome);
   const [enviandoFoto, setEnviandoFoto] = useState(false);
   const [rendimento, setRendimento] = useState(inicial.rendimento);
@@ -317,6 +321,7 @@ function FormFichaBase({
       rendimentoUnidade: rendeEm,
       itens: linhas.map(({ chave: _c, ...l }) => l),
       validades: v.ok ? v.validades : null,
+      consumoImediato: consumo,
     };
     guardarRascunho(chaveDoRascunho, valores, modo === 'editar' ? versao : undefined);
   }
@@ -458,7 +463,29 @@ function FormFichaBase({
         </Painel>
 
         <Painel titulo="Onde fica e quanto dura">
-          <CamposDeValidade para="ficha" inicial={inicial.validades} erros={erros} idBase={idBase} aoMudar={saida.aoMudar} />
+          {/* F4: consumo imediato não é um lugar a mais nem um prazo: marcado, os lugares de guarda saem da tela. */}
+          <label className="mb-3 flex min-h-11 cursor-pointer items-start gap-2.5 text-sm text-texto">
+            <input
+              type="checkbox"
+              name="consumoImediato"
+              value="sim"
+              checked={consumo}
+              onChange={(e) => {
+                setConsumo(e.target.checked);
+                saida.aoMudar();
+              }}
+              className={`${MARCAR} mt-0.5`}
+              aria-describedby={erros.consumoImediato ? `${idBase}-consumo-erro` : `${idBase}-consumo-ajuda`}
+            />
+            <span>
+              <span className="font-medium">Consumo imediato</span>
+              <span id={`${idBase}-consumo-ajuda`} className="block text-[12px] text-suave">
+                Sai da cozinha para o cliente, sem ser guardado. Não tem lugar de guarda nem prazo.
+              </span>
+            </span>
+          </label>
+          <Erro id={`${idBase}-consumo-erro`} texto={erros.consumoImediato} />
+          {consumo ? <input type="hidden" name="validadeNoFormulario" value="sim" /> : <CamposDeValidade para="ficha" inicial={inicial.validades} erros={erros} idBase={idBase} aoMudar={saida.aoMudar} />}
         </Painel>
 
         <Painel titulo="Insumos e pré-preparos" semRespiro>

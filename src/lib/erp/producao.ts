@@ -208,13 +208,14 @@ export async function opcoesDaProducao(cliente: ClienteDoParceiro, alcance: Alca
       const fichas = await tx.fichaTecnica.findMany({
         where: { tipo: 'PRE_PREPARO', ativa: true, insumoProduzidoId: { not: null } },
         orderBy: { nome: 'asc' },
-        select: { id: true, nome: true, unidadeRendimento: true, ...SELECAO_DA_VALIDADE },
+        select: { id: true, nome: true, unidadeRendimento: true, ...SELECAO_DA_VALIDADE, consumoImediato: true },
       });
       const lista: FichaParaProduzir[] = fichas.map((f) => ({
         id: f.id,
         nome: f.nome,
         unidade: f.unidadeRendimento as Unidade,
-        validade: retratoDaValidade(validadesDaLinha({ ...f, conservacao: f.conservacao as Conservacao | null })),
+        // F4: consumo imediato não é "a ficha não diz quanto dura".
+        validade: f.consumoImediato ? 'consumo imediato' : retratoDaValidade(validadesDaLinha({ ...f, conservacao: f.conservacao as Conservacao | null })),
       }));
       // A lista de insumos é editável na tela (como na requisição): todos os ativos entram na escolha.
       const ativos: OpcaoDeInsumo[] = (await tx.insumo.findMany({ where: { ativo: true }, orderBy: { nome: 'asc' }, select: { id: true, nome: true, unidade: true, conservacao: true } })).map((i) => ({ ...i, unidade: i.unidade as Unidade, conservacao: i.conservacao as Conservacao }));
@@ -935,7 +936,7 @@ export async function concluirProducao(
           });
         }
         const unidade = (ordem.unidadeSnapshot ?? 'KG') as Unidade;
-        const ficha = await tx.fichaTecnica.findFirst({ where: { id: ordem.fichaId }, select: SELECAO_DA_VALIDADE });
+        const ficha = await tx.fichaTecnica.findFirst({ where: { id: ordem.fichaId }, select: { ...SELECAO_DA_VALIDADE, consumoImediato: true } });
         const validades = ficha ? validadesDaLinha({ ...ficha, conservacao: ficha.conservacao as Conservacao | null }) : null;
         const lido = lerConclusao(entrada, { planejadoMilesimos: ordem.planejadoMilesimos, unidade, validades });
         if (!lido.ok) throw new Recusa({ ok: false, erros: lido.erros });
@@ -983,6 +984,8 @@ export async function concluirProducao(
             ...(comQuem(ordem) ? {} : ehPessoa(alcance, autor) ? { responsavelNomeSnapshot: autor.nome, responsavelUsuarioId: autor.userId } : { responsavelNomeSnapshot: null, responsavelUsuarioId: null }),
             motivoRendimento: c.motivo,
             ...(c.conservacao && c.validadeMin && validadeEm ? { conservacaoSnapshot: c.conservacao, validadeMinSnapshot: c.validadeMin, validadeEm } : {}),
+            // F4: a ficha de consumo imediato (sem validade, por regra do banco) fica fotografada no lote.
+            consumoImediato: ficha?.consumoImediato === true && !validadeEm,
             ...(ordem.iniciadaEm ? {} : { iniciadaEm: agora, iniciadaPorNome: autor.nome }),
             versao: { increment: 1 },
           },

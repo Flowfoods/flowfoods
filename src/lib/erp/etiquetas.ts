@@ -104,10 +104,13 @@ const SELECAO_DA_EMISSAO = {
   versaoDoLayout: true,
   impressaEm: true,
   emitidaPorNome: true,
+  // F4: fotografia do lote concluído (não muda): o papel do lote de consumo imediato diz isso, não "não informada".
+  ordemProducao: { select: { consumoImediato: true } },
 } as const;
 
 type EmissaoGravada = {
   codigo: string;
+  ordemProducao?: { consumoImediato: boolean } | null;
   ordemProducaoId: string | null;
   nomeSnapshot: string;
   unidadeSnapshot: string | null;
@@ -142,7 +145,9 @@ export function conteudoDaEmissao(e: EmissaoGravada): ConteudoDaEtiqueta {
         ? { tipo: 'dia', dia: vencimento }
         : e.validadeEm
           ? { tipo: 'instante', em: e.validadeEm }
-          : { tipo: 'nao-informada' },
+          : e.ordemProducao?.consumoImediato
+            ? { tipo: 'consumo-imediato' }
+            : { tipo: 'nao-informada' },
     vencimentoLote: vencimento,
     lote: e.ordemProducaoId ? e.loteProduzido : e.loteFornecedor,
     marca: e.marcaSnapshot,
@@ -272,7 +277,7 @@ export async function painelDeEtiquetas(cliente: ClienteDoParceiro, alcance: Alc
         },
         orderBy: [{ concluidaEm: 'desc' }, { id: 'asc' }],
         take: 40,
-        select: { id: true, codigoLote: true, fichaNomeSnapshot: true, unidadeSnapshot: true, produzidoMilesimos: true, conservacaoSnapshot: true, validadeEm: true, concluidaEm: true, responsavelNomeSnapshot: true, _count: { select: { etiquetas: true } } },
+        select: { id: true, codigoLote: true, fichaNomeSnapshot: true, unidadeSnapshot: true, produzidoMilesimos: true, conservacaoSnapshot: true, validadeEm: true, concluidaEm: true, responsavelNomeSnapshot: true, consumoImediato: true, _count: { select: { etiquetas: true } } },
       });
       const aberturas = await tx.aberturaDeLote.findMany({
         where: { lojaId, abertoEm: { gte: desde } },
@@ -292,7 +297,7 @@ export async function painelDeEtiquetas(cliente: ClienteDoParceiro, alcance: Alc
           quanto: formatarQuantidade(o.produzidoMilesimos ?? 0, (o.unidadeSnapshot ?? 'KG') as Unidade),
           conservacao: (o.conservacaoSnapshot ?? null) as Conservacao | null,
           validadeEm: o.validadeEm,
-          situacao: situacaoDaValidade(o.validadeEm, agora),
+          situacao: situacaoDaValidade(o.validadeEm, agora, null, o.consumoImediato),
           vencido: venceu(o.validadeEm, agora),
           concluidaEm: o.concluidaEm,
           quemFez: o.responsavelNomeSnapshot,
@@ -336,6 +341,7 @@ interface OrdemLida {
   concluidaEm: Date | null;
   responsavelUsuarioId: string | null;
   responsavelNomeSnapshot: string | null;
+  consumoImediato: boolean;
 }
 
 async function lerOrdem(tx: ClienteDoParceiro, lojaId: string, id: string, travar: boolean): Promise<OrdemLida> {
@@ -344,12 +350,12 @@ async function lerOrdem(tx: ClienteDoParceiro, lojaId: string, id: string, trava
     ? tx.sql<OrdemLida>`
       SELECT "id", "lojaId", "status"::text AS "status", "codigoLote", "fichaNomeSnapshot", "insumoProduzidoId", "unidadeSnapshot"::text AS "unidadeSnapshot",
              "produzidoMilesimos", "conservacaoSnapshot"::text AS "conservacaoSnapshot", "validadeMinSnapshot", "validadeEm", "concluidaEm",
-             "responsavelUsuarioId", "responsavelNomeSnapshot"
+             "responsavelUsuarioId", "responsavelNomeSnapshot", "consumoImediato"
       FROM "OrdemProducao" WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ${id} AND "lojaId" = ${lojaId} FOR SHARE`
     : tx.sql<OrdemLida>`
       SELECT "id", "lojaId", "status"::text AS "status", "codigoLote", "fichaNomeSnapshot", "insumoProduzidoId", "unidadeSnapshot"::text AS "unidadeSnapshot",
              "produzidoMilesimos", "conservacaoSnapshot"::text AS "conservacaoSnapshot", "validadeMinSnapshot", "validadeEm", "concluidaEm",
-             "responsavelUsuarioId", "responsavelNomeSnapshot"
+             "responsavelUsuarioId", "responsavelNomeSnapshot", "consumoImediato"
       FROM "OrdemProducao" WHERE "parceiroId" = ${tx.parceiroId} AND "id" = ${id} AND "lojaId" = ${lojaId}`;
   const [o] = await consulta;
   if (!o) throw new Recusa({ ok: false, erros: { geral: 'Lote não encontrado nesta loja.' }, naoEncontrado: true });
@@ -409,7 +415,7 @@ function conteudoDoLote(o: OrdemLida, loja: string, quemFez: string | null, e: {
     quantidade: e.quantidadeMilesimos ? formatarQuantidade(e.quantidadeMilesimos, unidade) : null,
     manipuladoEm: o.concluidaEm,
     abertoEm: null,
-    validade: o.validadeEm ? { tipo: 'instante', em: o.validadeEm } : { tipo: 'nao-informada' },
+    validade: o.validadeEm ? { tipo: 'instante', em: o.validadeEm } : o.consumoImediato ? { tipo: 'consumo-imediato' } : { tipo: 'nao-informada' },
     vencimentoLote: null,
     lote: o.codigoLote,
     marca: null,
@@ -463,7 +469,7 @@ export async function loteParaEtiqueta(cliente: ClienteDoParceiro, alcance: Alca
           conservacao: (o.conservacaoSnapshot ?? null) as Conservacao | null,
           validadeMin: o.validadeMinSnapshot,
           validadeEm: o.validadeEm,
-          situacao: situacaoDaValidade(o.validadeEm, agora),
+          situacao: situacaoDaValidade(o.validadeEm, agora, null, o.consumoImediato),
           concluidaEm: o.concluidaEm,
           quemFez: quemFez.nome,
         },

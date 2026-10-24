@@ -255,10 +255,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/nova', 'fichas/[id]/editar'],
     titulo: 'Montar a ficha',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'Monte a receita com a quantidade limpa, sem casca e sem osso. O fator de correção cobre a perda da limpeza: cebola 1,18 quer dizer que 354 g sujas dão 300 g limpas.' },
-      { texto: 'Pré-preparo diz quanto rende pronto. Diga também onde guarda e quanto dura.' },
+      { texto: 'Pré-preparo diz quanto rende pronto. Diga também onde guarda e quanto dura, ou marque consumo imediato quando nada fica guardado.' },
     ],
     secoes: [
       {

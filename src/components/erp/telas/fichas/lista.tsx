@@ -274,7 +274,7 @@ export function TelaListaFichas({
                   {!l.ativa && ' · Desativada'}
                 </span>
                 {/* 1.5 (herança d): validade em linha própria, quebrando em vez de cortar. */}
-                {validadesEmTexto(l.validades) && <span className="mt-0.5 block text-[12px] leading-snug text-suave">{validadesEmTexto(l.validades)}</span>}
+                {(l.consumoImediato || validadesEmTexto(l.validades)) && <span className="mt-0.5 block text-[12px] leading-snug text-suave">{l.consumoImediato ? 'Consumo imediato' : validadesEmTexto(l.validades)}</span>}
                 {precos?.get(l.id) && <span className="mt-0.5 block text-[12px] leading-snug tabular-nums text-suave">{cmvEmLinha(precos.get(l.id)!)}</span>}
               </span>
               {l.custo && (
@@ -362,7 +362,7 @@ export function TelaListaFichas({
                       {l.descricao ? ` · ${l.descricao}` : ''}
                       <span className={precos ? '' : 'lg:hidden'}>{!l.ativa && ' · Desativada'}</span>
                     </div>
-                    {validadesEmTexto(l.validades) && <div className="text-[12px] leading-snug text-suave">{validadesEmTexto(l.validades)}</div>}
+                    {(l.consumoImediato || validadesEmTexto(l.validades)) && <div className="text-[12px] leading-snug text-suave">{l.consumoImediato ? 'Consumo imediato' : validadesEmTexto(l.validades)}</div>}
                     {precos?.get(l.id) && <div className="text-[12px] leading-snug tabular-nums text-suave lg:hidden">{cmvEmLinha(precos.get(l.id)!)}</div>}
                   </div>
                 </div>

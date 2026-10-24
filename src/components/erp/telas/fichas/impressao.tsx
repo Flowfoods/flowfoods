@@ -81,7 +81,7 @@ export function TelaImpressaoFicha({
             )}
             <div className="space-y-1">
               <h2 className={TITULO}>Onde fica e quanto dura</h2>
-              <p className="text-[14px] leading-relaxed">{validade ?? 'Validade não informada.'}</p>
+              <p className="text-[14px] leading-relaxed">{f.consumoImediato ? 'Consumo imediato: sai da cozinha para o cliente, sem ser guardado.' : (validade ?? 'Validade não informada.')}</p>
             </div>
             {f.custo && (
               <div className="space-y-1">

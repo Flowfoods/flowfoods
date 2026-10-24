@@ -209,6 +209,7 @@ export const SELECAO_PARA_EDITAR = {
   fotoArquivo: true,
   insumoProduzidoId: true,
   ...SELECAO_DA_VALIDADE,
+  consumoImediato: true,
   itens: { orderBy: { ordem: 'asc' as const }, select: { insumoId: true, subfichaId: true, quantidadeMilesimos: true, fatorCorrecaoMilesimos: true } },
 } as const;
 
@@ -227,6 +228,8 @@ export function dadosGravados(f: {
   itens: { insumoId: string | null; subfichaId?: string | null; quantidadeMilesimos: number; fatorCorrecaoMilesimos?: number }[];
   /** 1.4: as colunas de validade (sem elas, a ficha conta como "não informada"). */
   validades?: Validades | null;
+  /** F4: ausente (leitura antiga) = não. */
+  consumoImediato?: boolean;
 }): DadosFicha {
   return {
     nome: f.nome,
@@ -245,6 +248,7 @@ export function dadosGravados(f: {
         fatorCorrecaoMilesimos: i.fatorCorrecaoMilesimos ?? 1000,
       })),
     validades: f.validades ?? null,
+    consumoImediato: f.consumoImediato ?? false,
   };
 }
 
@@ -506,6 +510,7 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
         passosPreparo: d.passosPreparo,
         conservacao: d.validades?.principal ?? null,
         ...colunasDaValidade(d.validades),
+        consumoImediato: d.consumoImediato,
         origem: g.origem ?? 'MANUAL',
         ...dadosDaFoto,
       },
@@ -545,6 +550,7 @@ export async function gravarFicha(tx: ClienteDoParceiro, g: Gravacao): Promise<{
       passosPreparo: d.passosPreparo,
       conservacao: d.validades?.principal ?? null,
       ...colunasDaValidade(d.validades),
+      consumoImediato: d.consumoImediato,
       ...dadosDaFoto,
     },
   });
@@ -675,6 +681,8 @@ export async function editarFicha(
         if (!lido.ok) throw new RecusaDaFicha({ ...lido, erros: await explicarInsumoExcluido(tx, entrada, lido.erros) });
         // Envio sem o bloco de validade (1.4) não apaga a que a ficha tem.
         if (entrada.validade === undefined) lido.dados.validades = validadesDaLinha(atual);
+        // F4: idem para o consumo imediato (a planilha não traz a coluna).
+        if (entrada.consumoImediato === undefined) lido.dados.consumoImediato = atual.consumoImediato && !lido.dados.validades;
         nome = lido.dados.nome;
         await conferirEstrutura(tx, lido.dados, atual, doCadastro);
         const r = await gravarFicha(tx, {
@@ -788,6 +796,7 @@ const SELECAO_DA_LISTA = {
   ativa: true,
   fotoArquivo: true,
   ...SELECAO_DA_VALIDADE,
+  consumoImediato: true,
   itens: { orderBy: { ordem: 'asc' as const }, select: SELECAO_DO_ITEM },
 } as const;
 
@@ -846,6 +855,7 @@ export async function listarFichas(cliente: ClienteDoParceiro, filtros: Partial<
       preparos: l.itens.filter((i) => i.subfichaId).length,
       custo: cascata.custo(l.id)!,
       validades: validadesDaLinha(l),
+      consumoImediato: l.consumoImediato,
     }));
     return { linhas, total, pagina, paginas };
   });
@@ -916,6 +926,7 @@ export async function obterFicha(cliente: ClienteDoParceiro, id: string, opcoes:
       foto: versaoDaFoto(f.fotoArquivo),
       insumoProduzido: f.insumoProduzido,
       validades: validadesDaLinha(f),
+      consumoImediato: f.consumoImediato,
       usadaEm,
       itens: f.itens.map((i, n) => {
         const sub = i.subfichaId ? cascata.fichas.get(i.subfichaId) : undefined;

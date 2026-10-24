@@ -8,7 +8,7 @@ import type { ConteudoDaEtiqueta } from '@/lib/erp/etiqueta-zpl';
 export type ConteudoSerial = Omit<ConteudoDaEtiqueta, 'manipuladoEm' | 'abertoEm' | 'validade'> & {
   manipuladoEm: string | null;
   abertoEm: string | null;
-  validade: { tipo: 'instante'; em: string } | { tipo: 'dia'; dia: string } | { tipo: 'nao-informada' };
+  validade: { tipo: 'instante'; em: string } | { tipo: 'dia'; dia: string } | { tipo: 'nao-informada' } | { tipo: 'consumo-imediato' };
 };
 
 export function serializar(c: ConteudoDaEtiqueta): ConteudoSerial {

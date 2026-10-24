@@ -95,6 +95,7 @@ export function TelaFormFicha({
       fator: i.fatorCorrecaoMilesimos === 1000 ? '' : formatarFator(i.fatorCorrecaoMilesimos),
     })),
     validades: ficha.validades,
+    consumoImediato: ficha.consumoImediato,
   };
   const volta = ficha ? `${base}/${ficha.id}` : base;
   return (

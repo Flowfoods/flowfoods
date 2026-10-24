@@ -172,22 +172,26 @@ export function TelaDetalheFicha({
                 <div className="border-t border-linha pt-4">
                   <h2 className="text-[13px] font-semibold text-suave">Onde fica e quanto dura</h2>
                   <div className="mt-1">
-                    <ValidadesDoItem
-                      validades={f.validades}
-                      vazio={
-                        <>
-                          {f.tipo === 'PRE_PREPARO' ? <span className="text-atencao">Validade não informada.</span> : 'Validade não informada.'}
-                          {podeEditar && f.ativa && !bloqueio ? (
-                            <>
-                              {' '}
-                              <Link href={`${base}/${f.id}/editar`} className={LINK_DE_TEXTO}>
-                                Dizer em Editar ficha
-                              </Link>
-                            </>
-                          ) : null}
-                        </>
-                      }
-                    />
+                    {f.consumoImediato ? (
+                      <p className="text-sm text-texto">Consumo imediato: sai da cozinha para o cliente, sem ser guardado.</p>
+                    ) : (
+                      <ValidadesDoItem
+                        validades={f.validades}
+                        vazio={
+                          <>
+                            {f.tipo === 'PRE_PREPARO' ? <span className="text-atencao">Validade não informada.</span> : 'Validade não informada.'}
+                            {podeEditar && f.ativa && !bloqueio ? (
+                              <>
+                                {' '}
+                                <Link href={`${base}/${f.id}/editar`} className={LINK_DE_TEXTO}>
+                                  Dizer em Editar ficha
+                                </Link>
+                              </>
+                            ) : null}
+                          </>
+                        }
+                      />
+                    )}
                   </div>
                 </div>
               </div>
