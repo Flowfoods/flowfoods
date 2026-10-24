@@ -43,6 +43,7 @@ import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTe
 import { usePathname, useSearchParams } from 'next/navigation';
 import { PARAMETRO_FORNECEDOR_CRIADO, PARAMETRO_INSUMO_CRIADO } from '@/lib/erp/volta';
 import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
+import { colocarInsumoCriado } from '@/lib/erp/ficha-campos';
 import type { AcaoDeNota, EstadoNota } from './estado';
 import { PreviaDoImpacto } from './previa';
 
@@ -102,11 +103,9 @@ export function FormNota(props: PropsDoFormNota) {
   const outrosDaMesmaEmpresa = fornecedorNovo && raizDoNovo ? props.opcoes.fornecedores.filter((f) => f.id !== fornecedorNovo.id && f.raizCnpj === raizDoNovo) : [];
   let escolhido = false;
   if (criado) {
-    const vaga = valores.itens.findIndex((l) => !l.insumoId);
-    if (vaga >= 0) {
-      valores = { ...valores, itens: valores.itens.map((l, n) => (n === vaga ? { ...l, insumoId: criado.id, embalagem: EMBALAGEM_PADRAO } : l)) };
-      escolhido = true;
-    }
+    const colocado = colocarInsumoCriado(valores.itens, 'insumoId', criado.id, { embalagem: EMBALAGEM_PADRAO }, VAZIA, LIMITES_DA_NOTA.itens);
+    valores = { ...valores, itens: colocado.itens };
+    escolhido = colocado.escolhido;
   }
   return (
     <>

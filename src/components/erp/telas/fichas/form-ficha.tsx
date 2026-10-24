@@ -149,7 +149,7 @@ export function FormFicha(props: PropsDoFormFicha) {
   let valores = recuperado ?? props.inicial ?? NOVA;
   let escolhido = false;
   if (criado) {
-    const colocado = colocarInsumoCriado(valores.itens, criado.id, SIGLAS_DIGITAVEIS[criado.unidade][0], VAZIA);
+    const colocado = colocarInsumoCriado(valores.itens, 'escolha', criado.id, { unidade: SIGLAS_DIGITAVEIS[criado.unidade][0] }, VAZIA, LIMITES_DA_FICHA.itens);
     valores = { ...valores, itens: colocado.itens };
     escolhido = colocado.escolhido;
   }

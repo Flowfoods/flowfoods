@@ -128,12 +128,20 @@ describe('rendimento por preparo', () => {
   });
 });
 
-describe('ficha · o insumo que acabou de ser cadastrado entra na receita', () => {
+describe('ficha e nota · o insumo que acabou de ser cadastrado entra numa linha', () => {
   const V = { escolha: '', quantidade: '', unidade: '', fator: '' };
+  const col = (itens: (typeof V)[], limite = 60) => colocarInsumoCriado(itens, 'escolha', 'n', { unidade: 'g' }, V, limite);
   it('vai para a linha vazia; sem vazia, ganha linha nova; já presente ou no limite, nada muda', () => {
-    expect(colocarInsumoCriado([{ ...V, escolha: 'a', quantidade: '1' }, V], 'n', 'g', V)).toEqual({ itens: [{ ...V, escolha: 'a', quantidade: '1' }, { ...V, escolha: 'n', unidade: 'g' }], escolhido: true });
-    expect(colocarInsumoCriado([{ ...V, escolha: 'a', quantidade: '1' }], 'n', 'g', V)).toEqual({ itens: [{ ...V, escolha: 'a', quantidade: '1' }, { ...V, escolha: 'n', unidade: 'g' }], escolhido: true });
-    expect(colocarInsumoCriado([{ ...V, escolha: 'n', quantidade: '3' }], 'n', 'g', V)).toEqual({ itens: [{ ...V, escolha: 'n', quantidade: '3' }], escolhido: true });
-    expect(colocarInsumoCriado([{ ...V, escolha: 'a' }], 'n', 'g', V, 1)).toEqual({ itens: [{ ...V, escolha: 'a' }], escolhido: false });
+    expect(col([{ ...V, escolha: 'a', quantidade: '1' }, V])).toEqual({ itens: [{ ...V, escolha: 'a', quantidade: '1' }, { ...V, escolha: 'n', unidade: 'g' }], escolhido: true });
+    expect(col([{ ...V, escolha: 'a', quantidade: '1' }])).toEqual({ itens: [{ ...V, escolha: 'a', quantidade: '1' }, { ...V, escolha: 'n', unidade: 'g' }], escolhido: true });
+    expect(col([{ ...V, escolha: 'n', quantidade: '3' }])).toEqual({ itens: [{ ...V, escolha: 'n', quantidade: '3' }], escolhido: true });
+    expect(col([{ ...V, escolha: 'a' }], 1)).toEqual({ itens: [{ ...V, escolha: 'a' }], escolhido: false });
+  });
+  it('na nota: o campo é o insumo e a embalagem vem a padrão; valor e quantidade ficam vazios', () => {
+    const N = { insumoId: '', embalagem: 'padrao', quantidade: '', valor: '' };
+    expect(colocarInsumoCriado([{ ...N, insumoId: 'a', quantidade: '2', valor: '10,00' }], 'insumoId', 'n', { embalagem: 'padrao' }, N, 200).itens).toEqual([
+      { ...N, insumoId: 'a', quantidade: '2', valor: '10,00' },
+      { ...N, insumoId: 'n' },
+    ]);
   });
 });

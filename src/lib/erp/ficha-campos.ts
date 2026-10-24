@@ -51,16 +51,17 @@ export type TipoFicha = keyof typeof TIPOS_DE_FICHA;
 export const LIMITES_DA_FICHA = { nome: 80, descricao: 280, modoPreparo: 4000, itens: 60, passos: 40, passo: 1000 } as const;
 
 /**
- * I.1b (24/10/2026): o insumo que a pessoa acabou de cadastrar a partir da ficha entra na receita. Vai para a primeira linha vazia;
- * sem linha vazia, ganha uma linha nova no fim (até o limite de itens). Se já está numa linha, nada muda. `escolhido` = está numa
- * linha. A quantidade fica para a pessoa: o cadastro nunca a inventa.
+ * I.1b (24/10/2026): o insumo que a pessoa acabou de cadastrar a partir da ficha ou da nota entra numa linha. Vai para a primeira
+ * linha vazia (`campo` sem valor); sem linha vazia, ganha uma linha nova no fim (até o limite de itens). Se já está numa linha, nada
+ * muda. `escolhido` = está numa linha. Quantidade e valor ficam para a pessoa: o cadastro nunca os inventa.
  */
-export function colocarInsumoCriado<L extends { escolha: string; unidade: string }>(itens: readonly L[], id: string, unidade: string, vazia: L, limite: number = LIMITES_DA_FICHA.itens): { itens: L[]; escolhido: boolean } {
-  if (itens.some((l) => l.escolha === id)) return { itens: [...itens], escolhido: true };
-  const vaga = itens.findIndex((l) => !l.escolha);
-  if (vaga >= 0) return { itens: itens.map((l, n) => (n === vaga ? { ...l, escolha: id, unidade } : l)), escolhido: true };
+export function colocarInsumoCriado<L extends object, K extends keyof L>(itens: readonly L[], campo: K, id: string, junto: Partial<L>, vazia: L, limite: number): { itens: L[]; escolhido: boolean } {
+  if (itens.some((l) => l[campo] === id)) return { itens: [...itens], escolhido: true };
+  const novo = { [campo]: id, ...junto } as Partial<L>;
+  const vaga = itens.findIndex((l) => !l[campo]);
+  if (vaga >= 0) return { itens: itens.map((l, n) => (n === vaga ? { ...l, ...novo } : l)), escolhido: true };
   if (itens.length >= limite) return { itens: [...itens], escolhido: false };
-  return { itens: [...itens, { ...vazia, escolha: id, unidade }], escolhido: true };
+  return { itens: [...itens, { ...vazia, ...novo }], escolhido: true };
 }
 
 /**
