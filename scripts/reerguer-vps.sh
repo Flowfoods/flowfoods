@@ -241,6 +241,9 @@ REMOTO
     fi
   done
 
+  code=$(dokploy GET /api/user.get); [ "$code" = 200 ] || code=$(dokploy GET /api/admin.one)
+  echo "limpeza automática do Docker (enableDockerCleanup) -> HTTP $code: $(jq -r '[.. | objects | .enableDockerCleanup? // empty][0] // "não encontrado"' /tmp/dk.json 2>/dev/null)"
+
   titulo "11. Compose ssh-setup (o que é — só nomes, imagens, montagens)"
   id=$(awk -F'\t' '$3=="ssh-setup"{print $2}' /tmp/inventario.tsv)
   if [ -n "$id" ] && [ "$(dokploy GET "/api/compose.one?composeId=$id")" = 200 ]; then
@@ -409,11 +412,45 @@ provar() {
   done < /tmp/dominios
 }
 
+# Recria o dokploy-traefik pelo caminho gerenciado do Dokploy
+# (settings.updateTraefikPorts reconstrói o container com traefik.yml, dynamic/
+# e acme.json do host). Reenvia as MESMAS portas extras que o Dokploy já tem:
+# nenhuma configuração muda. Recusa se o container existir.
+recriar_traefik() {
+  preparar_dokploy || exit 1
+  titulo "Estado antes"
+  code=$(dokploy GET "/api/docker.getContainersByAppNameMatch?appName=traefik")
+  n=$(jq 'length' /tmp/dk.json 2>/dev/null || echo "?")
+  echo "containers *traefik* -> HTTP $code, quantidade: $n"
+  if [ "$code" != 200 ] || [ "$n" != 0 ]; then
+    echo "::error::Container do Traefik existe (ou leitura falhou) — não recrio. Use o destravamento de rede."; exit 1
+  fi
+  code=$(dokploy GET /api/settings.getTraefikPorts)
+  echo "getTraefikPorts -> HTTP $code: $(head -c 300 /tmp/dk.json)"
+  [ "$code" = 200 ] || { echo "::error::Não li as portas atuais — não recrio."; exit 1; }
+  portas=$(jq -c 'if type=="array" then . else (.additionalPorts // .ports // []) end' /tmp/dk.json)
+  code=$(dokploy GET /api/settings.haveTraefikDashboardPortEnabled); echo "dashboard habilitado? HTTP $code: $(head -c 50 /tmp/dk.json)"
+
+  titulo "Recriando (mesmas portas extras: $portas)"
+  code=$(dokploy POST /api/settings.updateTraefikPorts "{\"additionalPorts\":${portas}}")
+  echo "POST updateTraefikPorts -> HTTP $code: $(head -c 400 /tmp/dk.json)"
+
+  for t in 15 30 60; do
+    sleep "$t"
+    titulo "Depois (+${t}s)"
+    dokploy GET "/api/docker.getConfig?containerId=dokploy-traefik" >/dev/null
+    jq -c '{Status: .State.Status, Running: .State.Running, Error: .State.Error, StartedAt: .State.StartedAt, RestartCount,
+            Ports: .NetworkSettings.Ports, Redes: (.NetworkSettings.Networks // {} | keys)}' /tmp/dk.json 2>/dev/null || echo "(sem container)"
+    for p in 80 443; do porta "$p"; done
+  done
+}
+
 case "$ETAPA" in
   diagnosticar) diagnosticar ;;
   reiniciar)    reiniciar ;;
   limpar-cache) limpar_cache ;;
   subir)        subir ;;
   provar)       provar ;;
+  recriar-traefik) recriar_traefik ;;
   *) echo "etapa desconhecida: $ETAPA"; exit 2 ;;
 esac
