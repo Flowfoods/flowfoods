@@ -129,12 +129,12 @@ export default async function SeuAcessoPage() {
             </div>
           </Painel>
 
-          <Painel titulo="Dicas" subtitulo="As caixinhas que explicam como cada tela funciona">
+          <Painel titulo="Dicas" subtitulo="Os cards que explicam como cada tela funciona">
             <div className="space-y-4">
               <p className="text-[14px] leading-relaxed text-suave">
                 {pessoa.ajuda.dicasLigadas ? (
                   <>
-                    As dicas estão <span className="font-semibold text-texto">ligadas</span>. Fechou uma caixinha, ela só volta se o texto mudar.
+                    As dicas estão <span className="font-semibold text-texto">ligadas</span>. O card de cada tela abre sozinho na primeira visita e uma vez por semana; o que você pediu para não mostrar só volta se o texto mudar.
                   </>
                 ) : (
                   <>
@@ -149,10 +149,10 @@ export default async function SeuAcessoPage() {
                     {pessoa.ajuda.dicasLigadas ? 'Desligar as dicas' : 'Ligar as dicas'}
                   </BotaoEnviar>
                 </form>
-                {pessoa.ajuda.dicasLigadas && pessoa.ajuda.fechadas.length > 0 && (
+                {pessoa.ajuda.dicasLigadas && (pessoa.ajuda.fechadas.length > 0 || pessoa.ajuda.pontos.length > 0) && (
                   <form action={acaoAjudaReabrir}>
                     <BotaoEnviar variante="fantasma" pendente="Reabrindo…">
-                      Mostrar de novo as que fechei
+                      Mostrar de novo as que dispensei
                     </BotaoEnviar>
                   </form>
                 )}

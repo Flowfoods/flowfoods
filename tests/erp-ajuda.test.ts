@@ -308,23 +308,24 @@ async function html(caminho: string, preferencia: PreferenciaDeAjuda | null, alc
 }
 const PREF = (p: Partial<PreferenciaDeAjuda> = {}): PreferenciaDeAjuda => ({ dicasLigadas: true, escolhida: true, fechadas: [], pontos: [], ...p });
 
-describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fechou ou desligou', () => {
-  it('ligada: caixa logo abaixo do título e acima do conteúdo, com o botão de fechar e o "?" no topo', async () => {
+describe('0.6 · HTML do servidor: a ajuda da tela vem pronta (linha que abre o card), e nunca abre para quem fechou ou desligou', () => {
+  it('ligada: a linha "Como funciona esta tela" logo abaixo do título e acima do conteúdo, com o "Não mostrar novamente" e o "?" no topo', async () => {
     const h = await html('/erp/insumos', PREF());
     expect(h).toContain('data-ajuda-caixa="insumos"');
-    expect(h).toContain('Como funciona');
-    expect(h).toContain('Entendi, não mostrar de novo');
+    expect(h).toContain('Como funciona esta tela');
+    expect(h).toContain('Não mostrar novamente');
     expect(h.indexOf('<h1')).toBeLessThan(h.indexOf('data-ajuda-caixa'));
     expect(h.indexOf('data-ajuda-caixa')).toBeLessThan(h.indexOf('conteúdo da página'));
     expect(h).toContain('aria-label="Ajuda desta tela"');
     expect(h).not.toContain('Quer as dicas de como usar cada tela?');
   });
 
-  it('fechada nesta versão ou desligada: nenhuma caixa no HTML (sem flash); o "?" fica', async () => {
+  it('fechada nesta versão ou desligada: a caixa não vale mais (não abre sozinha, sem "Não mostrar"); a linha manual e o "?" ficam', async () => {
     for (const p of [PREF({ fechadas: [`insumos@${VI}`] }), PREF({ dicasLigadas: false })]) {
       const h = await html('/erp/insumos', p);
       expect(h).not.toContain('data-ajuda-caixa');
-      expect(h).not.toContain('Entendi, não mostrar');
+      expect(h).toContain('data-ajuda-tela="insumos"');
+      expect(h).not.toContain('Não mostrar novamente');
       expect(h).toContain('aria-label="Ajuda desta tela"');
       expect(h).toContain('conteúdo da página');
     }
@@ -353,30 +354,27 @@ describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fec
     expect(await html('/erp/insumos', PREF({ fechadas: [`insumos@${VI + 1}`] }), DONO, { insumos: VI + 1 })).not.toContain('data-ajuda-caixa');
   });
 
-  it('telas de contar: a caixa nasce recolhida (<details> fechado, funciona sem JS); as outras nascem abertas', async () => {
-    const h = await html('/erp/estoque/loja1/abertura', PREF());
-    expect(h).toContain('data-ajuda-caixa="estoque-abertura"');
-    expect(h).toMatch(/<details class="group"><summary[\s\S]*Como funciona[\s\S]*Contagem de abertura/);
+  it('24/10: nenhuma tela traz texto fixo aberto — a explicação nasce recolhida em toda tela (<details> fechado, funciona sem JS)', async () => {
+    for (const c of ['/erp/estoque/loja1/abertura', '/erp/estoque/loja1/contagens/c1', '/erp/fichas', '/erp/insumos', '/erp/insumos/abc', '/erp']) {
+      const h = await html(c, PREF());
+      expect(h, c).toMatch(/<details class="group"><summary[\s\S]*Como funciona esta tela/);
+      expect(h, c).not.toMatch(/<details[^>]* open/);
+    }
+    // nem a pergunta da 1ª vez abre texto fixo: ela vai no card (e, sem JavaScript, dentro do <details>)
+    const h = await html('/erp/estoque/loja1/abertura', PREF({ escolhida: false }));
     expect(h).not.toMatch(/<details[^>]* open/);
-    expect(h).toContain('Entendi, não mostrar de novo');
-    expect(await html('/erp/estoque/loja1/contagens/c1', PREF())).toMatch(/<details class="group">/);
-    expect(await html('/erp/fichas', PREF())).not.toContain('<details');
-    // L.1: a lista de insumos também nasce recolhida (no celular a lista e os filtros ficam na primeira dobra); o detalhe do insumo não.
-    expect(await html('/erp/insumos', PREF())).toMatch(/<details class="group"><summary[\s\S]*Como funciona/);
-    expect(await html('/erp/insumos/abc', PREF())).not.toContain('<details');
-    // a pergunta da 1ª vez pendente abre a caixa recolhida
-    expect(await html('/erp/estoque/loja1/abertura', PREF({ escolhida: false }))).toMatch(/<details open="" class="group">/);
-    // fechada: nenhuma caixa, recolhida ou não
+    expect(h).toContain('Quer as dicas de como usar cada tela?');
+    // fechada: a linha fica (ajuda manual), sem caixa pendente
     expect(await html('/erp/estoque/loja1/abertura', PREF({ fechadas: ['estoque-abertura@1'] }))).not.toContain('data-ajuda-caixa');
   });
 
-  it('o seletor de visão mostra "Rede" no celular e "Rede Completa" a partir de sm', async () => {
+  it('o seletor de visão mostra "Rede" no celular e no tablet e "Rede Completa" a partir de xl (24/10: o topo do tablet é da trilha)', async () => {
     caminhoAtual = '/erp';
     const { SeletorVisao } = await import('@/components/erp/shell/SeletorVisao');
     const h = renderToStaticMarkup(
       createElement(SeletorVisao, { visao: { modo: 'parceiro', opcoes: [{ valor: 'rede', rotulo: 'Rede Completa', ativa: true }, { valor: 'l1', rotulo: 'Penha', ativa: true }] as never, valor: 'rede', escolher: async () => ({ ok: true as const }) } }),
     );
-    expect(h).toMatch(/<span class="sm:hidden">Rede<\/span><span class="hidden sm:inline">Rede Completa<\/span>/);
+    expect(h).toMatch(/<span class="xl:hidden">Rede<\/span><span class="hidden xl:inline">Rede Completa<\/span>/);
   });
 
   it('o LinkDeAjuda sem JavaScript nasce escondido (como o "Ver tudo")', async () => {
@@ -388,15 +386,17 @@ describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fec
 
   it('o botão e os formulários funcionam sem JavaScript: são <form> e <button type="submit">', async () => {
     const h = await html('/erp/insumos', PREF());
-    expect(h).toMatch(new RegExp(`<form[^>]*>[\\s\\S]*name="caixa" value="insumos@${VI}"[\\s\\S]*Entendi, não mostrar de novo<\\/button><\\/form>`));
-    // "Ver tudo" não faz nada sem JavaScript: nasce escondido
-    expect(h).toMatch(/<button[^>]*hidden[^>]*>Ver tudo sobre esta tela/);
+    expect(h).toMatch(new RegExp(`<form[^>]*>[\\s\\S]*name="caixa" value="insumos@${VI}"[\\s\\S]*Não mostrar novamente<\\/button><\\/form>`));
+    // "Ver tudo" mora no card (que só existe com JavaScript): o HTML sem JavaScript não promete botão que não funciona
+    expect(h).not.toContain('Ver tudo sobre esta tela');
   });
 
-  it('nível 1 dentro do parceiro: o "?" aparece, caixa e pergunta nunca', async () => {
+  it('nível 1 dentro do parceiro: o "?" e a linha manual aparecem; caixa pendente e pergunta nunca', async () => {
     const h = await html('/rodolfo/erp/casa/insumos', null, ALCANCE_FLOWFOODS);
     expect(h).toContain('aria-label="Ajuda desta tela"');
+    expect(h).toContain('data-ajuda-tela="insumos"');
     expect(h).not.toContain('data-ajuda-caixa');
+    expect(h).not.toContain('Não mostrar novamente');
     expect(h).not.toContain('Quer as dicas');
   });
 
@@ -415,7 +415,7 @@ describe('0.6 · HTML do servidor: a caixa vem pronta, e nunca vem para quem fec
 
   it('a caixa é uma seção nomeada (aria-labelledby) e não leva ícone, emoji nem gradiente', async () => {
     const h = await html('/erp/insumos', PREF());
-    const caixa = /<section aria-labelledby="([^"]+)" data-ajuda-caixa[\s\S]*?<\/section>/.exec(h)!;
+    const caixa = /<section aria-labelledby="([^"]+)" data-ajuda-tela[\s\S]*?<\/section>/.exec(h)!;
     expect(caixa[0]).toContain(`id="${caixa[1]}"`);
     expect(caixa[0]).not.toMatch(/<svg|gradient|\p{Extended_Pictographic}/u);
   });

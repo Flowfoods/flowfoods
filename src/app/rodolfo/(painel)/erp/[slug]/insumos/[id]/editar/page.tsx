@@ -5,6 +5,7 @@ import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { obterInsumo } from '@/lib/erp/insumos';
 import { categoriasDoFormulario } from '@/lib/erp/categorias';
 import { deSeguro } from '@/lib/erp/insumo-campos';
+import { ondeOInsumoEUsado } from '@/lib/erp/onde-e-usado';
 import { TelaFormInsumo } from '@/components/erp/telas/insumos/paginas';
 import { acaoEditarInsumo } from '../../actions';
 
@@ -19,6 +20,7 @@ export default async function ParceiroEditarInsumoPage({ params, searchParams }:
   // Pré-preparo (1.3) só muda pela ficha técnica.
   if (!insumo.ativo || insumo.preparo) redirect(`${base}/${insumo.id}`);
   const categorias = await categoriasDoFormulario(ctx.cliente, insumo.categoria?.id);
+  const usadoEm = (await ondeOInsumoEUsado(ctx.cliente, insumo.id, insumo.unidade)).total;
   // L.1: de onde a pessoa veio na lista (a caneta da linha manda `origem=lista`); só os filtros conhecidos passam.
   const de = deSeguro(searchParams.de);
   return (
@@ -31,6 +33,7 @@ export default async function ParceiroEditarInsumoPage({ params, searchParams }:
       bloqueio={ctx.bloqueio}
       de={de}
       origemLista={searchParams.origem === 'lista'}
+      usadoEm={usadoEm}
     />
   );
 }

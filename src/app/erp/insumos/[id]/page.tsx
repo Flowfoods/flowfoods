@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { obterInsumo } from '@/lib/erp/insumos';
 import { saldosDoInsumo } from '@/lib/erp/estoque';
+import { ondeOInsumoEUsado } from '@/lib/erp/onde-e-usado';
 import { lerFiltros, queryDosFiltros } from '@/lib/erp/insumo-campos';
 import { TelaDetalheInsumo } from '@/components/erp/telas/insumos/detalhe';
 import { acaoConfirmarConservacao, acaoSituacaoInsumo } from '../actions';
@@ -27,6 +28,7 @@ export default async function ErpInsumoPage({
   const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);
   if (!insumo) notFound();
   const saldos = await saldosDoInsumo(ctx.cliente, ctx.alcance, insumo.id);
+  const ondeEUsado = pode(ctx.alcance, 'fichas.ver') ? await ondeOInsumoEUsado(ctx.cliente, insumo.id, insumo.unidade) : undefined;
   // Volta para a lista como ela estava (só os filtros conhecidos passam).
   const de = queryDosFiltros(lerFiltros(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));
   return (
@@ -43,6 +45,7 @@ export default async function ErpInsumoPage({
       linkDaNota={(notaId, lojaId) => (pode(ctx.alcance, 'compras.ver', { lojaId }) ? `/erp/compras/${notaId}` : null)}
       historicoHref={pode(ctx.alcance, 'compras.ver') ? `/erp/compras/relatorios/insumo?insumo=${insumo.id}` : undefined}
       estoque={{ saldos, base: '/erp/estoque' }}
+      ondeEUsado={ondeEUsado}
     />
   );
 }

@@ -5,6 +5,7 @@ import { exigirParceiroDaSessao, exigirPermissaoNaPagina } from '@/lib/erp/conte
 import { obterInsumo } from '@/lib/erp/insumos';
 import { categoriasDoFormulario } from '@/lib/erp/categorias';
 import { deSeguro } from '@/lib/erp/insumo-campos';
+import { ondeOInsumoEUsado } from '@/lib/erp/onde-e-usado';
 import { TelaFormInsumo } from '@/components/erp/telas/insumos/paginas';
 import { acaoEditarInsumo } from '../../actions';
 
@@ -21,6 +22,7 @@ export default async function ErpEditarInsumoPage({ params, searchParams }: { pa
   // L.1: de onde a pessoa veio na lista (a caneta da linha manda `origem=lista`); só os filtros conhecidos passam.
   const de = deSeguro(searchParams.de);
   const categorias = await categoriasDoFormulario(ctx.cliente, insumo.categoria?.id);
+  const usadoEm = (await ondeOInsumoEUsado(ctx.cliente, insumo.id, insumo.unidade)).total;
   return (
     <TelaFormInsumo
       insumo={insumo}
@@ -31,6 +33,7 @@ export default async function ErpEditarInsumoPage({ params, searchParams }: { pa
       bloqueio={ctx.bloqueio}
       de={de}
       origemLista={searchParams.origem === 'lista'}
+      usadoEm={usadoEm}
     />
   );
 }

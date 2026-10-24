@@ -59,6 +59,13 @@ export const PREFERENCIA_INICIAL: PreferenciaDeAjuda = Object.freeze({ dicasLiga
  */
 export const DIAS_PARA_VOLTAR = 7;
 
+/**
+ * Ponto reservado da explicação da TELA (24/10/2026): a antiga caixa fixa
+ * "Como funciona" virou o mesmo card flutuante dos pontos. Id "chave.tela";
+ * nenhum ponto do registro pode usar esse nome.
+ */
+export const PONTO_DA_TELA = 'tela';
+
 export const FORMATO_ID_DO_PONTO = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const FORMATO_ITEM_DO_PONTO = /^([a-z0-9-]{1,60}\.[a-z0-9-]{1,40})=(x|[0-9]{1,6})$/;
 

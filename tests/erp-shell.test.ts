@@ -286,7 +286,7 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
       'Faturamento e DRE',
       'Rede e Equipe',
     ]);
-    expect(grupos[1].itens.map((i) => i.rotulo)).toEqual(['Áreas do parceiro']);
+    expect(grupos[1].itens.map((i) => i.rotulo)).toEqual(['Áreas da Rede']);
     expect(grupos[8].itens.map((i) => i.href)).toContain('/rodolfo/erp/valentins/cadastro');
     // As ações das áreas vão junto (o ⌘K do nível 1 as acha), sob a base do parceiro.
     expect(acoesDaNavegacao(dentro).map((a) => a.href)).toContain('/rodolfo/erp/valentins/compras/nova');
@@ -302,7 +302,7 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
     expect(itemAtivo(nav, '/rodolfo')).toBeNull();
     const dentro = comParceiroAtual(nav, '/rodolfo/erp/v/lojas', [{ slug: 'v', nome: 'V' }]);
     expect(itemAtivo(dentro, '/rodolfo/erp/v/lojas')?.item.href).toBe('/rodolfo/erp/v/lojas');
-    expect(itemAtivo(dentro, '/rodolfo/erp/v')?.item.rotulo).toBe('Áreas do parceiro');
+    expect(itemAtivo(dentro, '/rodolfo/erp/v')?.item.rotulo).toBe('Áreas da Rede');
   });
 
   it('busca ⌘K do parceiro só lista telas permitidas', () => {

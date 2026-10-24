@@ -155,7 +155,7 @@ export async function acaoEscolherVisao(valor: string): Promise<RespostaDaVisao>
 // campo forjado no formulário não tem onde entrar. Recusa (sessão morta, caixa
 // que não existe) não grava nada e não quebra a tela.
 
-/** "Entendi, não mostrar de novo": fecha ESTA caixa nesta versão do texto. */
+/** "Não mostrar novamente" do card da tela: fecha ESTA caixa nesta versão do texto. */
 export async function acaoAjudaFechar(form: FormData): Promise<void> {
   await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'fechar', caixa: String(form.get('caixa') ?? '') });
   revalidatePath('/erp', 'layout');

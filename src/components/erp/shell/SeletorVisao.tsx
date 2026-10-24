@@ -82,7 +82,7 @@ function DoParceiro({ visao }: { visao: VisaoDoParceiro }) {
   }
   return (
     <Popover
-      classeDoWrapper="min-w-0 max-w-[11rem] sm:max-w-[16rem]"
+      classeDoWrapper="min-w-0 shrink-0 max-w-[11rem] sm:max-w-[16rem]"
       rotulo={`Visão: ${atual?.rotulo ?? ''}. Trocar`}
       classeDoBotao={GATILHO}
       largura="w-64"
@@ -95,8 +95,9 @@ function DoParceiro({ visao }: { visao: VisaoDoParceiro }) {
             ) : (
               <>
                 {/* No celular, "Rede Completa" vira "Rede": o nome inteiro não cabe ao lado dos botões e cortava. */}
-                <span className="sm:hidden">{atual?.rotulo === 'Rede Completa' ? 'Rede' : atual?.rotulo}</span>
-                <span className="hidden sm:inline">{atual?.rotulo}</span>
+                {/* 24/10: até 1280 px (tablet) o topo é disputado pela trilha: "Rede" curto; o nome inteiro só no computador. */}
+                <span className="xl:hidden">{atual?.rotulo === 'Rede Completa' ? 'Rede' : atual?.rotulo}</span>
+                <span className="hidden xl:inline">{atual?.rotulo}</span>
               </>
             )}
           </span>

@@ -3076,3 +3076,21 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 ### 448. 2026-10-24 · F5 (2ª parte): inventário de responsividade por varredura automática, com os limites ditos
 
 **Razão:** o plano pede inventário com evidência, sem declarar cobertura global por um teste só. Varredura de 220 telas do ERP (nível 1 dentro do parceiro de teste) em 390, 820, 1180 e 1440 px: nenhuma com erro, nenhuma com rolagem lateral da página. Resultado e limites em `docs/UX-INVENTARIO.md` (teto de 220 telas; não mede legibilidade, teclado virtual, zoom nem toque real; teste com pessoas reais pendente).
+
+### 449. 2026-10-24 · Reorganização visual: a explicação da tela deixa de ser texto fixo e vira o card flutuante dos pontos
+
+**Alternativas:** (a) manter a caixa "Como funciona" aberta embaixo do título até a pessoa fechar (0.6); (b) a caixa vira uma linha discreta "Como funciona esta tela" que abre o mesmo card dos pontos, com a regra de 1ª visita e 7 dias.
+
+**Razão:** (b). Decisão de Rodolfo de 24/10: o padrão de pop-ups vale para todo o portal, especialmente o Parceiro Flow, e o texto didático fixo é o que polui. A linha cobre as 89 telas de uma vez. A explicação da tela é o ponto reservado `tela` (id "chave.tela"): abre sozinha na 1ª visita e de novo 7 dias depois enquanto a caixa valer; uma abertura automática por visita, e a da tela vem primeiro (é a primeira na tela). X/Escape/tocar fora dispensa agora; "Não mostrar novamente" é o mesmo "fechar" da caixa por versão do texto (se o texto mudar, volta com "Mudou"). A pergunta da 1ª vez ("manter ou desligar as dicas") vai dentro do card. Sem JavaScript, a linha é um `<details>` que abre ali mesmo, com os mesmos formulários. Nível 1: só a abertura manual. A lista branca do servidor aceita "chave.tela" para toda entrada; nenhum ponto do registro pode se chamar `tela` (lint).
+
+### 450. 2026-10-24 · Véu vermelho clarinho e translúcido com a ajuda aberta; tocar fora fecha
+
+**Razão:** decisão visual de Rodolfo de 24/10. Token `--ff-veu-ajuda` (claro: vermelho da marca a 10%; escuro: 14%), no card e no fundo da gaveta da ajuda (que antes era cinza 55%). O véu é só desenho: não segura clique nem foco, então a página continua usável e o contexto à vista; um clique fora do card (não rolagem) fecha a ajuda e segue para onde foi dado; clicar em outro botão de ajuda troca o conteúdo. Não é sinal de erro. Intensidade conferida em captura nos temas claro e escuro; aparelho real fica para a validação com Rodolfo.
+
+### 451. 2026-10-24 · "Onde é usado" no detalhe do insumo e o alcance no editar
+
+**Razão:** critério 4 da revisão iFood (objeto compartilhado deixa claro onde é usado antes da mudança) e jornada insumo → ficha. O detalhe ganha o painel com as fichas que levam o insumo (quantidade na receita) e os pratos que o usam como embalagem de um canal, cada uma com link; ativas primeiro; até 200 linhas por origem, com o total. Sem custo nem preço (aparece para quem vê fichas, inclusive a cozinha). O editar mostra "Usado em N fichas técnicas: mudar a embalagem ou o custo muda o custo delas ao salvar; o preço de venda escolhido não muda sozinho". Só leitura, no cliente do parceiro (teste de isolamento com banco).
+
+### 452. 2026-10-24 · Um nome por conceito e larguras do tablet
+
+**Razão:** QA-06 e QA-03 do Notion. "Fichas técnicas" em aba, título e ajuda (produto é a ficha que se vende); "Áreas da Rede" também no menu do nível 1. Precificação: a coluna "Últimas alterações" só vai ao lado a partir de 1280 px (a 1024 ela espremia a tabela e as metas). Seletor de visão: "Rede" curto até 1280 px, para não sumir atrás da trilha. Na lista de insumos do celular, Editar e Remover ficam discretos (sem borda, com texto e 44 px de toque). A reorganização do menu em entradas por tarefa fica como proposta em `docs/NAVEGACAO.md`, para validar com operador e gestor antes de mudar.

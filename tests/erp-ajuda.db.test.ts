@@ -63,6 +63,7 @@ import { ENTRADAS as ENTRADAS_DA_AJUDA } from '@/lib/erp/ajuda-textos';
 /** A versão de hoje do texto de Insumos: os testes não fixam um número (ele sobe quando o texto muda). */
 const VI = ENTRADAS_DA_AJUDA.find((e) => e.chave === 'insumos')!.versao;
 const CX = `insumos@${VI}`;
+const CX_FICHAS = `fichas@${ENTRADAS_DA_AJUDA.find((e) => e.chave === 'fichas')!.versao}`;
 
 describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', { timeout: 60_000 }, () => {
   let db: PrismaClient;
@@ -183,8 +184,8 @@ describe.skipIf(!URL_TESTE)('ERP 0.6 · preferência de ajuda (Postgres real)', 
     expect((await ver(ana.token)).fechadas).toEqual([CX]);
     expect((await ver(anaOutroAparelho.token)).fechadas).toEqual([CX]);
     expect((await ver(bia.token)).fechadas).toEqual([]);
-    await acaoAjudaFechar(form({ caixa: 'fichas@3' }));
-    expect((await ver(ana.token)).fechadas).toEqual([CX, 'fichas@3']);
+    await acaoAjudaFechar(form({ caixa: CX_FICHAS }));
+    expect((await ver(ana.token)).fechadas).toEqual([CX, CX_FICHAS]);
   });
 
   it('usuarioId forjado no formulário é ignorado: só a pessoa da sessão muda', async () => {

@@ -4417,3 +4417,21 @@ Decisões 441 a 446. Nada publicado; sem merge.
 | Categorias em painel na lista de insumos e troca em lote | `insumos/painel-categorias.tsx`, `barra-categoria.tsx` | `erp-categorias.db.test.ts` |
 
 **Pendente da F4:** recorte opcional das fotos; fotos de apoio na impressão; seções do cardápio e farol principal de CMV (especificação própria no plano).
+
+## Reorganização visual e estrutural — rodada 1 (24/10/2026)
+
+Prioridade definida por Rodolfo em 24/10 (Notion, "Revisão aprofundada iFood"). Decisões 449–452. Sem merge e sem deploy.
+
+| Entrega | Onde | Prova |
+|---|---|---|
+| Explicação da tela no card flutuante (linha "Como funciona esta tela"; 1ª visita e 7 dias; "Não mostrar novamente" por versão) — as 89 telas | `shell/ajuda.tsx` (`CaixaDeAula`), `shell/pontos.tsx` (ponto `tela`), `PONTO_DA_TELA` em `ajuda-rota.ts`, lista branca em `ajuda.ts` | `erp-ajuda.test.ts`, `erp-ajuda-pontos.test.ts` |
+| Véu vermelho clarinho no card e na gaveta da ajuda; tocar fora fecha | `--ff-veu-ajuda` em `tokens.css` | navegador (abaixo) |
+| Onde é usado (detalhe) e alcance (editar) | `lib/erp/onde-e-usado.ts`, `insumos/onde-e-usado.tsx` | `erp-onde-e-usado.db.test.ts` |
+| Vocabulário e larguras (Fichas técnicas, Áreas da Rede, Precificação no tablet, seletor de visão, ações no card do celular) | `modulos.ts`, `fichas/canais.tsx`, `SeletorVisao.tsx`, `insumos/lista.tsx` | `erp-navegacao.test.ts`, `erp-shell.test.ts` |
+| Mapa de navegação, proposta e os quatro modelos de tela | `docs/NAVEGACAO.md` | — |
+
+**Testes (Postgres 16 local, dados isolados):** suíte completa com banco 148 arquivos, 2.811 aprovados, 46 pulados (as variantes que exigem papéis não-superusuário, como antes), 1 falha — o teste com banco fixava a versão 3 do texto de Fichas, que subiu para 4 com o título novo; corrigido para ler a versão do registro e o arquivo reexecutado: 13/13. Lint, typecheck e portão de conteúdo limpos.
+
+**No navegador (app local, banco de teste, Dona e Operador da Casa Alfa):** 1ª visita abre o card da tela sozinho com o véu; clicar fora, X e Escape fecham; a linha reabre; a 2ª visita no mesmo dia não reabre; outra tela abre a dela; botão de campo troca o conteúdo (um card só); "Não mostrar novamente" fecha e grava. Lista filtrada → detalhe (Onde é usado com 2 fichas) → "Voltar para a lista" mantém o filtro; editar mostra o alcance e "Ver quais" leva ao painel. 1440, 1180×820, 1024×768, 820×1180, 390×844 e 844×390: card dentro da tela e sem rolagem lateral. Tema escuro (1180×820, Operador): card legível e véu visível. **Não feito:** teste com pessoas do Valentin's, aparelho real, produção.
+
+**Próximo passo:** validar a proposta de `docs/NAVEGACAO.md` com operador e gestor; estender a ajuda ao painel do Barney (`/rodolfo`, hoje fora do registro de ajuda); revisar as outras telas com coluna lateral de 340 px a 1024 px.

@@ -447,7 +447,7 @@ export function TelaListaDoDia({
                   naoGera={d.naoGera}
                   bloqueio={bloqueio}
                 />
-                {d.opcoes.length === 0 && <p className="mt-3 text-[13px] text-suave">Nenhum pré-preparo para produzir: cadastre a ficha técnica dele (molho, base, calda…) em Fichas e produtos.</p>}
+                {d.opcoes.length === 0 && <p className="mt-3 text-[13px] text-suave">Nenhum pré-preparo para produzir: cadastre a ficha técnica dele (molho, base, calda…) em Fichas técnicas.</p>}
                 <AtalhoDaConta d={d} />
               </div>
             ) : abertas.length > 0 ? (

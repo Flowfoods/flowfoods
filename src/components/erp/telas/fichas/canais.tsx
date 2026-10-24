@@ -135,7 +135,8 @@ export function TelaCanaisDeVenda({
         }
       />
       {mensagem && <Aviso tom="ok" titulo={mensagem} />}
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+      {/* QA-03 (24/10): a coluna de alterações só vai ao lado a partir de 1280 px; no tablet ela desce e a tabela e as metas ganham a largura toda. */}
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-4">
           <Painel titulo="Como cada canal entra no custo" subtitulo="Vale para todas as fichas de prato; as embalagens e o preço se escolhem em cada ficha" semRespiro>
             <table className="w-full text-sm">

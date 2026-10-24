@@ -65,7 +65,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Dono: 7 áreas, as abas de cada uma e as 10 ações; nenhum futuro', () => {
     expect(emUso(DONO).map((m) => m.nome)).toEqual(AREAS);
     expect(abasPorArea(DONO)).toEqual({
-      'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
+      'Cadastros e Cardápio': ['Insumos', 'Fichas técnicas', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Notas recebidas', 'Orçamento', 'Fornecedores', 'Histórico do insumo', 'Compras do período', 'Comparar fornecedores', 'Comparar períodos'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências', 'Consumo e conciliação'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
@@ -87,7 +87,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
 
   it('Gerente (rede): Precificação visível (ver preços), sem Equipe; ações de cadastro e de compra', () => {
     expect(abasPorArea(GERENTE)).toEqual({
-      'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos', 'Precificação'],
+      'Cadastros e Cardápio': ['Insumos', 'Fichas técnicas', 'Precificação'],
       'Compras e Fornecedores': ['Compras', 'Notas recebidas', 'Orçamento', 'Fornecedores', 'Histórico do insumo', 'Compras do período', 'Comparar fornecedores', 'Comparar períodos'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Divergências', 'Consumo e conciliação'],
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico', 'Indicadores'],
@@ -109,7 +109,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('Operador: sem a área Compras, sem Precificação, sem Divergências, e a única ação dele é planejar a produção', () => {
     expect(emUso(OPERADOR).map((m) => m.nome)).toEqual(['Cadastros e Cardápio', 'Estoque e Movimentações', 'Produção', 'Etiquetas', 'Rede e Equipe']);
     expect(abasPorArea(OPERADOR)).toEqual({
-      'Cadastros e Cardápio': ['Insumos', 'Fichas e produtos'],
+      'Cadastros e Cardápio': ['Insumos', 'Fichas técnicas'],
       'Estoque e Movimentações': ['Visão geral', 'Contagens', 'Requisições', 'Consumo e conciliação'],
       // 3.3: a cozinha pega as tarefas e lê o histórico; os indicadores por pessoa são da gerência.
       Produção: ['Lista do dia', 'Tarefas', 'Lotes', 'Histórico'],
@@ -255,7 +255,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
     const t = uso.map(texto);
     expect(t[0]).toContain('Cadastros e Cardápio');
     expect(t[0]).toContain('Do insumo à ficha técnica e ao preço de venda');
-    expect(abasDoCartao(uso[0]).map((a) => a.rotulo)).toEqual(['Insumos', 'Fichas e produtos']);
+    expect(abasDoCartao(uso[0]).map((a) => a.rotulo)).toEqual(['Insumos', 'Fichas técnicas']);
     expect(abasDoCartao(uso[1]).map((a) => a.rotulo)).toEqual(['Visão geral', 'Contagens', 'Requisições', 'Consumo e conciliação']);
     expect(t[0]).not.toContain('Precificação');
     expect(t[1]).not.toContain('Divergências');
@@ -326,12 +326,12 @@ const ROTAS_ATIVAS: [string, string][] = [
   ['/insumos/i1/editar', 'Insumos'],
   ['/insumos/i1/embalagens/nova', 'Insumos'],
   ['/insumos/i1/embalagens/v1', 'Insumos'],
-  ['/fichas', 'Fichas e produtos'],
-  ['/fichas/nova', 'Fichas e produtos'],
-  ['/fichas/importar', 'Fichas e produtos'],
-  ['/fichas/f1', 'Fichas e produtos'],
-  ['/fichas/f1/editar', 'Fichas e produtos'],
-  ['/fichas/f1/canais', 'Fichas e produtos'],
+  ['/fichas', 'Fichas técnicas'],
+  ['/fichas/nova', 'Fichas técnicas'],
+  ['/fichas/importar', 'Fichas técnicas'],
+  ['/fichas/f1', 'Fichas técnicas'],
+  ['/fichas/f1/editar', 'Fichas técnicas'],
+  ['/fichas/f1/canais', 'Fichas técnicas'],
   ['/fichas/canais', 'Precificação'],
   ['/compras', 'Compras'],
   ['/compras/nova', 'Compras'],
@@ -426,7 +426,7 @@ describe('UX.9 · itemAtivo acende a aba certa em cada rota profunda', () => {
       expect(a?.modulo.chave, rota).toBe('parceiros');
     }
     expect(itemAtivo(n1, '/rodolfo/erp/v/cadastro')?.item.rotulo).toBe('Cadastro do parceiro');
-    expect(itemAtivo(n1, '/rodolfo/erp/v')?.item.rotulo).toBe('Áreas do parceiro');
+    expect(itemAtivo(n1, '/rodolfo/erp/v')?.item.rotulo).toBe('Áreas da Rede');
   });
 
   it('o hub e a página de "Seu acesso": hub não acende aba; Seu acesso acende a dele', () => {

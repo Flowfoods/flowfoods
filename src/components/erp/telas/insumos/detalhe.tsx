@@ -31,6 +31,8 @@ import { PainelEstoqueDoInsumo } from '../estoque/saldo-do-insumo';
 import type { SaldoDoInsumoNaLoja } from '@/lib/erp/estoque';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
+import type { OndeEUsado } from '@/lib/erp/onde-e-usado';
+import { PainelOndeEUsado } from './onde-e-usado';
 
 export function TelaDetalheInsumo({
   insumo: i,
@@ -46,7 +48,10 @@ export function TelaDetalheInsumo({
   linkDaNota,
   historicoHref,
   estoque,
+  ondeEUsado,
 }: {
+  /** 24/10: as fichas que usam o insumo (ausente = quem não vê fichas). */
+  ondeEUsado?: OndeEUsado;
   /** 1.6: o saldo nas lojas em que a pessoa vê o estoque (vazio = painel não aparece). */
   estoque?: { saldos: SaldoDoInsumoNaLoja[]; base: string };
   /**
@@ -296,6 +301,7 @@ export function TelaDetalheInsumo({
           </Painel>
             </>
           )}
+          {ondeEUsado && <PainelOndeEUsado onde={ondeEUsado} fichasBase={fichas} />}
         </div>
 
         <aside className="min-w-0 space-y-4" aria-label="Tipo, categoria, conservação, situação e alterações">
@@ -395,7 +401,7 @@ export function TelaDetalheInsumo({
                   .
                 </>
               ) : (
-                'O vencimento impresso no lote e a data de abertura entram no recebimento e no controle de lote (ainda não existem no ERP).'
+                'O vencimento impresso no lote e a data de abertura são registrados na nota de compra (lote do fornecedor) e em Etiquetas, ao abrir a embalagem.'
               )}
             </p>
           </Painel>

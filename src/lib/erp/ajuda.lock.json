@@ -4,8 +4,8 @@
     "hash": "9e6243060b2c56a4"
   },
   "acesso": {
-    "versao": 1,
-    "hash": "ed5dd1d05ab343e1"
+    "versao": 2,
+    "hash": "03594e07f69d873c"
   },
   "insumos": {
     "versao": 5,
@@ -44,8 +44,8 @@
     "hash": "d6bbcf071f3e6faf"
   },
   "fichas": {
-    "versao": 3,
-    "hash": "d7b790e38c256353"
+    "versao": 4,
+    "hash": "fc363d302f725476"
   },
   "ficha-nova": {
     "versao": 4,

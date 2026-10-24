@@ -14,7 +14,9 @@ import { rotuloDaVolta } from '@/lib/erp/volta';
 import { COR } from '@/lib/erp/modulos';
 import { UNIDADES, dinheiroParaCampo, quantidadeParaCampo } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
-import { Painel } from '../../ui/superficies';
+import { Aviso, Painel } from '../../ui/superficies';
+import { LINK_DE_TEXTO } from '../../ui/estilos';
+import Link from 'next/link';
 import type { AcaoDeCadastro } from '../cadastro/estado';
 import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { FormEmbalagem } from './form-embalagem';
@@ -79,7 +81,10 @@ export function TelaFormInsumo({
   volta,
   de = '',
   origemLista = false,
+  usadoEm = 0,
 }: {
+  /** 24/10: quantas fichas usam o insumo (na receita ou como embalagem): a mudança vale para todas. */
+  usadoEm?: number;
   /** L.1: a lista como estava (filtros, página e tamanho, já filtrados) e se a pessoa veio da caneta da linha. */
   de?: string;
   origemLista?: boolean;
@@ -128,6 +133,14 @@ export function TelaFormInsumo({
         titulo={insumo ? 'Editar insumo' : 'Novo insumo'}
         subtitulo={insumo ? `${contexto} · ${insumo.nome}` : volta ? `${contexto} · depois de salvar, você volta para ${rotuloDaVolta(volta)}` : `${contexto} · cadastro da rede, vale para todas as lojas`}
       />
+      {insumo && usadoEm > 0 && (
+        <Aviso titulo={`Usado em ${usadoEm} ${usadoEm === 1 ? 'ficha técnica' : 'fichas técnicas'}.`}>
+          Mudar a embalagem ou o custo muda o custo delas ao salvar; o preço de venda escolhido não muda sozinho.{' '}
+          <Link href={`${comDe(aqui, de)}#onde-e-usado`} className={LINK_DE_TEXTO}>
+            Ver quais
+          </Link>
+        </Aviso>
+      )}
       <FormInsumo
         acao={acao}
         modo={insumo ? 'editar' : 'criar'}

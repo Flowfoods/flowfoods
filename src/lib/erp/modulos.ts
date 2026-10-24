@@ -251,7 +251,8 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
           telas: [
             {
               href: `${base}/fichas`,
-              rotulo: 'Fichas e produtos',
+              // QA-06 (24/10): um nome por conceito — aba, título da tela e ajuda dizem "Fichas técnicas" (produto é a ficha que se vende).
+              rotulo: 'Fichas técnicas',
               icone: 'fichas',
               subtitulo: 'Foto, insumos e custo por porção',
               permissao: 'fichas.ver',

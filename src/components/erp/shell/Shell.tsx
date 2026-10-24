@@ -11,15 +11,15 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { ChevronRight, Menu } from 'lucide-react';
-import { entradaDoCaminho, caixaDaTela } from '@/lib/erp/ajuda-rota';
+import { entradaDoCaminho, caixaDaTela, itemFechado } from '@/lib/erp/ajuda-rota';
 import { abasDaArea, acoesDaNavegacao, itemAtivo, montarTrilha, telasDaNavegacao } from '@/lib/erp/modulos';
 import { comParceiroAtual, slugNoCaminho } from '@/lib/rodolfo/modulos';
 import { Abas } from '../ui/abas';
 import { Dialogo } from '../ui/Dialogo';
 import { ContextoDaAjuda } from '../ui/link-de-ajuda';
 import { ContextoDaCaixa } from '../ui/caixa-da-tela';
-import { assinaturaDaPreferencia, CaixaDeAula, GavetaDeAjuda, preferenciaEfetiva, type Otimista } from './ajuda';
-import { ProvedorDosPontos } from './pontos';
+import { assinaturaDaPreferencia, CaixaDeAula, GavetaDeAjuda, PerguntaDasDicas, preferenciaEfetiva, type Otimista } from './ajuda';
+import { ProvedorDosPontos, type TelaNoCard } from './pontos';
 import { IndicadorDeNavegacao } from './indicador-navegacao';
 import { acaoGuardarMenu } from './acoes';
 import { BuscaGlobal } from './BuscaGlobal';
@@ -147,21 +147,36 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
   const abas = abasDaArea(nav, ativo);
   const outrasDaArea = abas ? { area: abas.area, telas: abas.abas.filter((a) => a.href !== ativo?.item.href).map((a) => ({ href: a.href, rotulo: a.rotulo })) } : null;
 
-  // Caixa "Como funciona" da tela: desenhada pelo PageHeader, abaixo do título (ContextoDaCaixa).
-  const caixa = entradaDaTela && estadoDaCaixa && ajuda?.acoes && (
-    <CaixaDeAula
-      entrada={entradaDaTela}
-      estado={estadoDaCaixa}
-      acoes={ajuda.acoes}
-      aoFechar={(fechada) =>
-        setOtimista((o) => ({ assinatura, fechadas: [...(o?.assinatura === assinatura ? o.fechadas : []), fechada], dicasLigadas: o?.assinatura === assinatura ? o.dicasLigadas : undefined, escolhida: o?.assinatura === assinatura ? o.escolhida : undefined }))
-      }
-      aoEscolher={(v) =>
-        setOtimista((o) => ({ assinatura, fechadas: o?.assinatura === assinatura ? o.fechadas : [], dicasLigadas: v === 'manter', escolhida: true }))
-      }
-      aoVerTudo={(origem) => abrirAjuda(undefined, origem)}
-    />
+  // Ajuda da tela (24/10): a linha "Como funciona esta tela" fica abaixo do título (PageHeader, via ContextoDaCaixa)
+  // e abre o card flutuante; o card abre sozinho na 1ª visita e de novo 7 dias depois, enquanto a caixa valer.
+  const acoesDaAjuda = ajuda?.acoes ?? null;
+  const aoFecharCaixa = useCallback(
+    (fechada: string) =>
+      setOtimista((o) => ({ assinatura, fechadas: [...(o?.assinatura === assinatura ? o.fechadas : []), fechada], dicasLigadas: o?.assinatura === assinatura ? o.dicasLigadas : undefined, escolhida: o?.assinatura === assinatura ? o.escolhida : undefined })),
+    [assinatura],
   );
+  const aoEscolherDicas = useCallback(
+    (v: 'manter' | 'desligar') => setOtimista((o) => ({ assinatura, fechadas: o?.assinatura === assinatura ? o.fechadas : [], dicasLigadas: v === 'manter', escolhida: true })),
+    [assinatura],
+  );
+  const caixa = entradaDaTela && ajuda && (
+    <CaixaDeAula entrada={entradaDaTela} estado={estadoDaCaixa} acoes={acoesDaAjuda} aoFechar={aoFecharCaixa} aoEscolher={aoEscolherDicas} />
+  );
+  const telaNoCard = useMemo<TelaNoCard | null>(() => {
+    if (!entradaDaTela) return null;
+    const caixaFechada = itemFechado(entradaDaTela);
+    return {
+      titulo: entradaDaTela.titulo,
+      blocos: entradaDaTela.aula,
+      pendente: !!estadoDaCaixa,
+      mudou: !!estadoDaCaixa?.mudou,
+      extra: estadoDaCaixa?.perguntar && acoesDaAjuda ? <PerguntaDasDicas acoes={acoesDaAjuda} aoEscolher={aoEscolherDicas} /> : null,
+      nunca:
+        estadoDaCaixa && acoesDaAjuda
+          ? { acao: acoesDaAjuda.fechar, campo: 'caixa', valor: caixaFechada, aoEnviar: () => aoFecharCaixa(caixaFechada) }
+          : null,
+    };
+  }, [entradaDaTela, estadoDaCaixa, acoesDaAjuda, aoEscolherDicas, aoFecharCaixa]);
 
   const contextoDaAjuda = useMemo(() => ({ abrir: abrirAjuda, disponivel: temAjuda }), [abrirAjuda, temAjuda]);
 
@@ -176,8 +191,9 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
         caminho={caminho}
         preferencia={ajuda?.preferencia ? preferencia : null}
         ajuda={ajuda}
-        podeAbrirSozinho={!estadoDaCaixa && !ajudaAberta}
-        aoVerPassoAPasso={(secao, origem) => abrirAjuda(secao, origem)}
+        tela={telaNoCard}
+        podeAbrirSozinho={!ajudaAberta}
+        aoVerPassoAPasso={(secao, origem) => abrirAjuda(secao ?? undefined, origem)}
       >
       <div
         className={`grid min-h-dvh grid-cols-[minmax(0,1fr)] ${

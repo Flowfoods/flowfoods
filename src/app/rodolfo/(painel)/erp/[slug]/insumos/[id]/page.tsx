@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { obterInsumo } from '@/lib/erp/insumos';
 import { saldosDoInsumo } from '@/lib/erp/estoque';
+import { ondeOInsumoEUsado } from '@/lib/erp/onde-e-usado';
 import { lerFiltros, queryDosFiltros } from '@/lib/erp/insumo-campos';
 import { TelaDetalheInsumo } from '@/components/erp/telas/insumos/detalhe';
 import { acaoConfirmarConservacao, acaoSituacaoInsumo } from '../actions';
@@ -22,6 +23,7 @@ export default async function ParceiroInsumoPage({
   const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);
   if (!insumo) notFound();
   const saldos = await saldosDoInsumo(ctx.cliente, ctx.alcance, insumo.id);
+  const ondeEUsado = await ondeOInsumoEUsado(ctx.cliente, insumo.id, insumo.unidade);
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/insumos`;
   const de = queryDosFiltros(lerFiltros(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));
   return (
@@ -39,6 +41,7 @@ export default async function ParceiroInsumoPage({
       linkDaNota={(notaId) => `/rodolfo/erp/${ctx.parceiro.slug}/compras/${notaId}`}
       historicoHref={`/rodolfo/erp/${ctx.parceiro.slug}/compras/relatorios/insumo?insumo=${insumo.id}`}
       estoque={{ saldos, base: `/rodolfo/erp/${ctx.parceiro.slug}/estoque` }}
+      ondeEUsado={ondeEUsado}
     />
   );
 }

@@ -89,6 +89,9 @@ describe('pontos · lista branca e registro', () => {
     expect(pontoValido("insumo-novo.marca'; DROP TABLE")).toBeNull();
     expect(pontoValido(`insumo-novo.${'a'.repeat(200)}`)).toBeNull();
     expect(pontoValido(42)).toBeNull();
+    // 24/10: o card da tela (a antiga caixa fixa) é o ponto reservado "tela", que toda entrada do registro tem.
+    for (const e of ENTRADAS) expect(pontoValido(`${e.chave}.tela`), e.chave).toBe(`${e.chave}.tela`);
+    expect(pontoValido('nao-existe.tela')).toBeNull();
   });
 
   it('o registro de verdade passa no lint (pontos inclusos)', () => {
@@ -133,6 +136,13 @@ describe('pontos · lista branca e registro', () => {
     expect(insumo.pontos.map((p) => p.id)).toContain('insumo-novo.marca');
     expect(insumo.pontos.find((p) => p.id === 'insumo-novo.tipo')!.secao).toBe('campos');
     expect(insumo.pontos.find((p) => p.id === 'insumo-novo.marca')!.secao).toBeNull();
+  });
+});
+
+describe('pontos · o nome "tela" é reservado ao card da tela', () => {
+  it('um ponto do registro chamado "tela" é recusado pelo lint', () => {
+    const e: EntradaDeAjuda = { chave: 'x-teste', area: 'inicio', rotas: ['x-teste'], titulo: 'Teste', versao: 1, aula: [{ texto: 'Uma frase.' }], pontos: [{ id: 'tela', titulo: 'Tela', blocos: [{ texto: 'Uma frase.' }] }] };
+    expect(problemasDoRegistro([e]).join('\n')).toContain('nome reservado');
   });
 });
 

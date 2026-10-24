@@ -33,7 +33,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['acesso'],
     titulo: 'Seu acesso',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Aqui estão os seus dados, o que você pode fazer no ERP e a entrada pelo rosto no celular.' },
       { texto: 'Trocou de aparelho? Ative o rosto de novo nele. Senha esquecida: fale com a FlowFoods.' },
@@ -41,10 +41,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     secoes: [
       {
         id: 'dicas',
-        titulo: 'As caixas de dica',
+        titulo: 'As dicas de cada tela',
         blocos: [
-          { texto: 'Cada tela pode abrir uma caixinha explicando como ela funciona. Fechou uma, ela não volta, a não ser que o texto mude.' },
-          { texto: 'No quadro Dicas, desta tela, você liga e desliga as caixinhas ou pede para ver de novo as que fechou. O botão ? no alto continua sempre à mão.' },
+          { texto: 'Logo abaixo do título de cada tela fica a linha Como funciona esta tela: ela abre um card com a explicação, sem tirar você do que estava fazendo.' },
+          { texto: 'Na primeira visita o card abre sozinho e volta uma vez por semana. O X fecha agora; Não mostrar novamente faz ele parar de abrir sozinho, a não ser que o texto mude.' },
+          { texto: 'No quadro Dicas, desta tela, você liga e desliga as dicas ou pede para ver de novo as que dispensou. O botão ? no alto continua sempre à mão.' },
         ],
       },
     ],
@@ -247,8 +248,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     chave: 'fichas',
     area: 'cadastros',
     rotas: ['fichas'],
-    titulo: 'Fichas e produtos',
-    versao: 3,
+    titulo: 'Fichas técnicas',
+    versao: 4,
     aula: [
       { texto: 'Cada receita da casa, com o que rende e o que leva.' },
       { texto: 'Pré-preparo (molho, base) entra dentro de outras fichas.' },

@@ -181,7 +181,7 @@ export function comParceiroAtual(
   const doParceiro: GrupoNav = {
     rotulo: parceiro.nome,
     icone: 'rede',
-    itens: [{ href: base, rotulo: 'Áreas do parceiro', icone: 'inicio', subtitulo: `Hub de ${parceiro.nome}` }],
+    itens: [{ href: base, rotulo: 'Áreas da Rede', icone: 'inicio', subtitulo: `Hub de ${parceiro.nome}` }],
   };
   const grupos: GrupoNav[] = areas.map((a) => ({ rotulo: a.nome, icone: a.icone, itens: a.grupos.flatMap((g) => g.itens) }));
   const acoes = areas.flatMap((a) => a.acoes);

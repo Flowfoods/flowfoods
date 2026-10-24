@@ -74,7 +74,7 @@ export function FormMetasDeCmv({
             const espera = canal === 'IFOOD' && !taxaConfigurada;
             const erro = erros[id];
             return (
-              <li key={canal} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_auto_15rem]">
+              <li key={canal} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(10rem,1fr)_auto_minmax(0,15rem)]">
                 <div className="min-w-0">
                   <label htmlFor={id} className="text-[14px] font-medium text-texto">
                     {CANAIS[canal].rotulo}

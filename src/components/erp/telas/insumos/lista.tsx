@@ -535,14 +535,15 @@ export function TelaListaInsumos({
               </Link>
               </div>
               {comAcoes && !i.preparo && (
-                <div className="flex justify-end gap-2 px-4 pb-3">
+                // Adendo de 24/10 (Planos 3/7): editar e remover ficam discretos (sem borda), com texto e toque de 44 px; a linha do insumo é o destaque.
+                <div className="-mt-1 flex justify-end gap-1 px-2 pb-1.5">
                   {i.ativo && (
-                    <Link href={hrefDeEditar(base, i.id, filtrosDaPagina)} className={classeDeBotao('secundario', 'px-3')} aria-label={`Editar ${i.nome}`}>
+                    <Link href={hrefDeEditar(base, i.id, filtrosDaPagina)} className={classeDeBotao('fantasma', 'px-3')} aria-label={`Editar ${i.nome}`}>
                       <Pencil size={16} aria-hidden />
                       Editar
                     </Link>
                   )}
-                  <Link href={hrefDeRemover(base, i.id, filtrosDaPagina)} className={classeDeBotao('secundario', 'px-3')} aria-label={`Remover ${i.nome}`}>
+                  <Link href={hrefDeRemover(base, i.id, filtrosDaPagina)} className={classeDeBotao('fantasma', 'px-3')} aria-label={`Remover ${i.nome}`}>
                     <Trash2 size={16} aria-hidden />
                     Remover
                   </Link>

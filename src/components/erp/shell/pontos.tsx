@@ -17,12 +17,22 @@
  * O card é não modal: a página continua usável atrás dele. A decisão "abre
  * sozinho?" é a mesma conta do servidor (`estadoDoPonto`), com o dia que o
  * servidor mandou (`hoje`), nunca o relógio do aparelho.
+ *
+ * Reorganização de 24/10/2026 (Rodolfo):
+ *  - a explicação da TELA (a antiga caixa fixa "Como funciona" embaixo do
+ *    título) é um ponto como os outros, o ponto `tela`: mesma regra de
+ *    1ª visita e 7 dias, e "Não mostrar novamente" é o "fechar" da caixa
+ *    (por versão do texto: se o texto mudar, ela volta com "Mudou");
+ *  - com o card aberto, um véu vermelho clarinho e translúcido cobre o resto
+ *    da tela (o contexto continua à vista). O véu não segura o clique: tocar
+ *    fora do card fecha a ajuda e o toque segue para onde foi dado.
  */
 
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { X } from 'lucide-react';
-import { estadoDoPonto, itemDoPonto, type PontoParaATela, type PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
+import { estadoDoPonto, itemDoPonto, PONTO_DA_TELA, type PontoParaATela, type PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
 import { classeDeBotao } from '../ui/estilos';
+import { Selo } from '../ui/superficies';
 import type { AjudaDoShell } from './tipos';
 
 /** Espera antes da abertura automática: a tela termina de montar e a pessoa se situa. */
@@ -53,6 +63,27 @@ export function usePontos() {
   return useContext(Contexto);
 }
 
+/** "Não mostrar novamente" como formulário de verdade (funciona sem JavaScript). */
+export interface FormularioNunca {
+  acao: (form: FormData) => Promise<void>;
+  campo: string;
+  valor: string;
+  /** Mudança otimista na tela (o card some, a preferência local já conta). */
+  aoEnviar: () => void;
+}
+
+/** A explicação da tela inteira, que o shell monta a partir da entrada da rota. */
+export interface TelaNoCard {
+  titulo: string;
+  blocos: string[];
+  /** A caixa ainda vale para esta pessoa (não fechou esta versão, dicas ligadas). */
+  pendente: boolean;
+  mudou: boolean;
+  /** O que mais vai no card da tela (a pergunta da 1ª vez). */
+  extra: ReactNode;
+  nunca: FormularioNunca | null;
+}
+
 export function ProvedorDosPontos({
   chave,
   pontos,
@@ -61,19 +92,29 @@ export function ProvedorDosPontos({
   ajuda,
   podeAbrirSozinho,
   aoVerPassoAPasso,
+  tela = null,
   children,
 }: {
   chave: string | null;
   pontos: PontoParaATela[];
+  /** A explicação da tela (ponto `tela`); null = a tela não tem ajuda. */
+  tela?: TelaNoCard | null;
   caminho: string;
   preferencia: PreferenciaDeAjuda | null;
   ajuda: AjudaDoShell | undefined;
   /** Falso quando outra ajuda já ocupa a tela (a caixa "Como funciona" ou a gaveta). */
   podeAbrirSozinho: boolean;
-  aoVerPassoAPasso: (secao: string, origem: HTMLElement | null) => void;
+  /** Seção da gaveta a abrir; null = a gaveta do começo ("Ver tudo sobre esta tela"). */
+  aoVerPassoAPasso: (secao: string | null, origem: HTMLElement | null) => void;
   children: ReactNode;
 }) {
-  const porId = useMemo(() => new Map(pontos.map((p) => [p.id, p])), [pontos]);
+  const idDaTela = chave ? `${chave}.${PONTO_DA_TELA}` : null;
+  const porId = useMemo(() => {
+    const m = new Map(pontos.map((p) => [p.id, p]));
+    if (tela && idDaTela && tela.blocos.length > 0) m.set(idDaTela, { id: idDaTela, titulo: tela.titulo, blocos: tela.blocos, secao: null });
+    return m;
+  }, [pontos, tela, idDaTela]);
+  const telaPendente = tela?.pendente ?? false;
   const [ativo, setAtivo] = useState<{ id: string; automatico: boolean } | null>(null);
   // O que esta aba já gravou e o servidor ainda não devolveu (vale até a próxima navegação).
   const [gravados, setGravados] = useState<string[]>([]);
@@ -137,7 +178,7 @@ export function ProvedorDosPontos({
     const t = window.setTimeout(() => {
       if (abriuSozinhoNestaVisita.current || document.querySelector('dialog[open]')) return;
       const candidatos = Array.from(registrados.current.entries())
-        .filter(([id]) => porId.has(id) && !dispensados.current.has(id) && estadoDoPonto(id, preferenciaComGravados, hoje) === 'elegivel')
+        .filter(([id]) => porId.has(id) && !dispensados.current.has(id) && (id !== idDaTela || telaPendente) && estadoDoPonto(id, preferenciaComGravados, hoje) === 'elegivel')
         .map(([id, els]) => ({ id, el: primeiroVisivel(els) }))
         .filter((c): c is { id: string; el: HTMLElement } => c.el !== null)
         .sort((a, b) => (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
@@ -150,7 +191,7 @@ export function ProvedorDosPontos({
       void acoes.pontoVisto(escolhido.id).catch(() => {});
     }, ESPERA_DA_ABERTURA_AUTOMATICA_MS);
     return () => window.clearTimeout(t);
-  }, [acoes, preferenciaComGravados, podeAbrirSozinho, ativo, porId, hoje, caminho]);
+  }, [acoes, preferenciaComGravados, podeAbrirSozinho, ativo, porId, hoje, caminho, idDaTela, telaPendente]);
 
   const valor = useMemo<ContextoDosPontos>(
     () => ({
@@ -165,29 +206,63 @@ export function ProvedorDosPontos({
   );
 
   const pontoAtivo = ativo ? porId.get(ativo.id) ?? null : null;
+  const ehTela = !!pontoAtivo && pontoAtivo.id === idDaTela;
+
+  // Tocar fora do card fecha a ajuda (o toque segue para onde foi dado). Outro botão de ajuda troca o conteúdo.
+  // `click`, não `pointerdown`: rolar a página no celular não fecha nada.
+  const abertoAgora = !!pontoAtivo;
+  useEffect(() => {
+    if (!abertoAgora) return;
+    const fora = (e: MouseEvent) => {
+      const alvo = e.target as Element | null;
+      if (!alvo || !alvo.isConnected) return;
+      if (alvo.closest('[data-ponto-de-ajuda], [data-ponto], dialog')) return;
+      fechar(false);
+    };
+    document.addEventListener('click', fora);
+    return () => document.removeEventListener('click', fora);
+  }, [abertoAgora, fechar]);
+
+  const nuncaDoPonto: FormularioNunca | null =
+    pontoAtivo && acoes
+      ? {
+          acao: acoes.pontoNunca,
+          campo: 'ponto',
+          valor: pontoAtivo.id,
+          aoEnviar: () => setGravados((g) => [...g, itemDoPonto(pontoAtivo.id, 'x')]),
+        }
+      : null;
+  const nunca = ehTela ? tela?.nunca ?? null : nuncaDoPonto;
 
   return (
     <Contexto.Provider value={valor}>
       {children}
       {pontoAtivo && ativo && (
-        <CardDeAjuda
-          key={pontoAtivo.id}
-          ponto={pontoAtivo}
-          automatico={ativo.automatico}
-          origem={origem}
-          podeDispensar={!!acoes}
-          acaoNunca={acoes?.pontoNunca ?? null}
-          aoFechar={fechar}
-          aoNunca={() => {
-            setGravados((g) => [...g, itemDoPonto(pontoAtivo.id, 'x')]);
-            fechar(true);
-          }}
-          aoVerPassoAPasso={(secao) => {
-            const de = origem.current;
-            setAtivo(null);
-            aoVerPassoAPasso(secao, de);
-          }}
-        />
+        <>
+          {/* Véu: vermelho clarinho e translúcido sobre o resto da tela. Só desenho: não segura clique nem foco. */}
+          <div aria-hidden data-veu-de-ajuda className="ff-veu-ajuda pointer-events-none fixed inset-0 z-[35]" />
+          <CardDeAjuda
+            key={pontoAtivo.id}
+            ponto={pontoAtivo}
+            etiqueta={ehTela ? 'Como funciona esta tela' : 'Como funciona'}
+            mudou={ehTela && !!tela?.mudou}
+            extra={ehTela ? tela?.extra : null}
+            verTudo={ehTela}
+            automatico={ativo.automatico}
+            origem={origem}
+            nunca={nunca}
+            aoFechar={fechar}
+            aoNunca={() => {
+              nunca?.aoEnviar();
+              fechar(true);
+            }}
+            aoVerPassoAPasso={(secao) => {
+              const de = origem.current;
+              setAtivo(null);
+              aoVerPassoAPasso(secao, de);
+            }}
+          />
+        </>
       )}
       {/* Aviso para leitor de tela quando o card abre sozinho (o foco fica onde a pessoa estava). */}
       <p className="sr-only" aria-live="polite">
@@ -204,22 +279,29 @@ function primeiroVisivel(els: Set<HTMLElement>): HTMLElement | null {
 
 function CardDeAjuda({
   ponto,
+  etiqueta,
+  mudou,
+  extra,
+  verTudo,
   automatico,
   origem,
-  podeDispensar,
-  acaoNunca,
+  nunca,
   aoFechar,
   aoNunca,
   aoVerPassoAPasso,
 }: {
   ponto: PontoParaATela;
+  etiqueta: string;
+  mudou: boolean;
+  extra: ReactNode;
+  /** Card da tela: "Ver tudo sobre esta tela" abre a gaveta do começo. */
+  verTudo: boolean;
   automatico: boolean;
   origem: RefObject<HTMLElement | null>;
-  podeDispensar: boolean;
-  acaoNunca: ((form: FormData) => Promise<void>) | null;
+  nunca: FormularioNunca | null;
   aoFechar: (devolverFoco: boolean) => void;
   aoNunca: () => void;
-  aoVerPassoAPasso: (secao: string) => void;
+  aoVerPassoAPasso: (secao: string | null) => void;
 }) {
   const id = useId();
   const titulo = useRef<HTMLHeadingElement>(null);
@@ -253,7 +335,7 @@ function CardDeAjuda({
   }, [aoFechar, automatico]);
 
   function aoEnviarNunca(e: FormEvent<HTMLFormElement>) {
-    if (!acaoNunca) {
+    if (!nunca) {
       e.preventDefault();
       return;
     }
@@ -272,7 +354,14 @@ function CardDeAjuda({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 pt-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-suave">Como funciona</p>
+          <p className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-suave">
+            <span>{etiqueta}</span>
+            {mudou && (
+              <Selo tom="alerta">
+                Mudou<span className="sr-only"> desde a última vez que você leu</span>
+              </Selo>
+            )}
+          </p>
           <h2 id={`${id}-t`} ref={titulo} tabIndex={-1} className="mt-1 text-[15px] font-semibold leading-snug text-texto outline-none">
             {ponto.titulo}
           </h2>
@@ -293,16 +382,23 @@ function CardDeAjuda({
         ))}
       </div>
 
-      {(ponto.secao || podeDispensar) && (
+      {extra}
+
+      {(ponto.secao || verTudo || nunca) && (
         <div className="mt-3 flex flex-wrap items-center gap-2">
           {ponto.secao && (
             <button type="button" aria-haspopup="dialog" onClick={() => aoVerPassoAPasso(ponto.secao as string)} className={classeDeBotao('secundario')}>
               Ver passo a passo
             </button>
           )}
-          {podeDispensar && acaoNunca && (
-            <form action={acaoNunca} onSubmit={aoEnviarNunca}>
-              <input type="hidden" name="ponto" value={ponto.id} />
+          {verTudo && (
+            <button type="button" aria-haspopup="dialog" onClick={() => aoVerPassoAPasso(null)} className={classeDeBotao('secundario')}>
+              Ver tudo sobre esta tela
+            </button>
+          )}
+          {nunca && (
+            <form action={nunca.acao} onSubmit={aoEnviarNunca}>
+              <input type="hidden" name={nunca.campo} value={nunca.valor} />
               <button type="submit" className={classeDeBotao('fantasma')}>
                 Não mostrar novamente
               </button>

@@ -40,6 +40,8 @@
   --ff-farol-laranja: 176 68 0;
   --ff-farol-vermelho: 196 21 34;
   --ff-ativo: rgb(196 21 34 / 0.08);
+  /* Véu da ajuda (24/10): vermelho clarinho, translúcido; destaca o card sem apagar a tela. Não é sinal de erro. */
+  --ff-veu-ajuda: rgb(234 29 44 / 0.1);
   --ff-sombra: 0 10px 22px rgb(10 10 10 / 0.12);
   --ff-mistura-icone: 14%;
   --ff-icone-tinta: 100%;
@@ -69,6 +71,7 @@
   --ff-farol-laranja: 240 145 58;
   --ff-farol-vermelho: 245 66 77;
   --ff-ativo: rgb(234 29 44 / 0.12);
+  --ff-veu-ajuda: rgb(234 29 44 / 0.14);
   --ff-sombra: 0 10px 22px rgb(0 0 0 / 0.45);
   --ff-mistura-icone: 22%;
   --ff-icone-tinta: 55%;
@@ -99,6 +102,7 @@
     --ff-farol-laranja: 240 145 58;
     --ff-farol-vermelho: 245 66 77;
     --ff-ativo: rgb(234 29 44 / 0.12);
+  --ff-veu-ajuda: rgb(234 29 44 / 0.14);
     --ff-sombra: 0 10px 22px rgb(0 0 0 / 0.45);
     --ff-mistura-icone: 22%;
     --ff-icone-tinta: 55%;
@@ -200,6 +204,23 @@ html:has(.ff-app[data-tema='escuro']) {
 }
 .ff-app dialog.ff-dialogo::backdrop {
   background: rgb(10 10 10 / 0.55);
+}
+/* A gaveta da ajuda usa o mesmo véu do card: a tela continua reconhecível atrás. */
+.ff-app dialog.ff-dialogo.ff-veu-de-ajuda::backdrop {
+  background: var(--ff-veu-ajuda);
+}
+.ff-veu-ajuda {
+  background: var(--ff-veu-ajuda);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ff-veu-ajuda {
+    animation: ff-veu 180ms ease-out;
+  }
+}
+@keyframes ff-veu {
+  from {
+    opacity: 0;
+  }
 }
 .ff-app dialog.ff-dialogo[open] {
   animation: ff-entrada 220ms cubic-bezier(0.23, 1, 0.32, 1);

@@ -54,7 +54,7 @@ export function TelaNovaProducao({
 
       {o.fichas.length === 0 ? (
         <Painel>
-          <Vazio titulo="Nenhum pré-preparo para produzir.">Só se produz pré-preparo (molho, base, calda…): cadastre a ficha técnica dele em Fichas e produtos.</Vazio>
+          <Vazio titulo="Nenhum pré-preparo para produzir.">Só se produz pré-preparo (molho, base, calda…): cadastre a ficha técnica dele em Fichas técnicas.</Vazio>
         </Painel>
       ) : (
         <Painel titulo="1. O que vai produzir" subtitulo="Escolha o pré-preparo e quanto: a lista de insumos sai da receita">
