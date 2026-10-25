@@ -7,7 +7,7 @@
  *  - a página: o número abre a composição com "Voltar para o DRE" na mesma visão, a despesa abre o detalhe que volta para a
  *    composição; endereço torto mostra a lista normal; volta de fora da área é ignorada;
  *  - o DRE em HTML: despesa abre a composição, "pelas compras" abre o relatório de compras com volta, o CMV abre o CMV por
- *    categoria, a receita diz "Lançamentos de <mês>" (um por mês quando o período cruza meses); sem a permissão, sem o link;
+ *    categoria, a receita diz "Faturamento do mês inteiro: <mês>" (um por mês quando o período cruza meses); sem a permissão, sem o link;
  *  - CMV por categoria: o valor pelas compras, ao vivo, abre o relatório de compras da categoria; sem `compras.ver` ou fechado, não.
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-dre-composicao.db.test.ts
@@ -246,18 +246,21 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     const el = await despesas({ linha: linha.aluguel, de: SET.de, ate: SET.ate });
     const p = el.props as Record<string, any>;
     expect(p.c.totalCentavos).toBe(R(4_500));
-    expect(p.voltarDre).toBe('/erp/dre?periodo=2026-09-01&rede=1');
+    expect(p.voltarDre).toBe('/erp/dre?periodo=2026-09-01&rede=1#linha-aluguel'); // volta na linha de onde veio
+    expect(p.periodo).toEqual({ nome: 'Setembro de 2026', situacao: 'encerrado' });
     const h = sp(renderToStaticMarkup(el));
     expect(h).toContain('Aluguel no DRE');
-    expect(h).toContain('Soma, o número do DRE');
+    expect(h).toContain('As 2 despesas que formam R$ 4.500,00');
+    expect(h).toContain('a soma de tudo acima');
+    expect(h).toContain('Período encerrado');
     expect(h).toContain('R$ 4.500,00');
-    expect(h).toContain('30 de 30 dias');
+    expect(h).toContain('30 de 30');
     expect(h).toContain(`/erp/dre/despesas/${ids.d_aluguelVp}?volta=${encodeURIComponent(`/erp/dre/despesas?linha=${linha.aluguel}&de=2026-09-01&ate=2026-09-30`)}`.replace(/&/g, '&amp;'));
     expect(h).not.toContain('Aluguel de outubro');
 
     comoGerente();
     const g = await despesas({ linha: linha.aluguel, de: SET.de, ate: SET.ate, loja: ids.dl });
-    expect((g.props as Record<string, any>).voltarDre).toBe('/erp/dre?periodo=2026-09-01');
+    expect((g.props as Record<string, any>).voltarDre).toBe('/erp/dre?periodo=2026-09-01#linha-aluguel');
     const hg = sp(renderToStaticMarkup(g));
     expect(hg).toContain('R$ 3.000,00');
     for (const proibido of ['Aluguel da Tijuca', '1.500,00', 'Unidade Tijuca', ids.dl]) expect(hg, proibido).not.toContain(proibido);
@@ -273,7 +276,7 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     como(alcanceDe('DONO', 'rede'));
     const volta = `/erp/dre/despesas?linha=${linha.aluguel}&de=2026-09-01&ate=2026-09-30`;
     const abre = async (v?: string) => tela(await resolver(await ErpDespesaPage({ params: { id: ids.d_aluguelVp }, searchParams: v ? { volta: v } : {} }))).props as Record<string, any>;
-    expect((await abre(volta)).voltar).toEqual({ href: volta, rotulo: 'o que forma o número do DRE' });
+    expect((await abre(volta)).voltar).toEqual({ href: volta, rotulo: 'Aluguel no DRE' });
     for (const fora of ['https://mal.example/erp/dre', '//mal.example/x', '/rodolfo/erp/outro/dre', '/erp/../rodolfo/x', '/erp/%2e%2e/rodolfo/erp/x', '/erp/dre\\x']) expect((await abre(fora)).voltar, fora).toBeUndefined();
     expect((await abre()).voltar).toBeUndefined();
   });
@@ -293,12 +296,12 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     atual.ctx = () => ({ parceiro: A, alcance: ALCANCE_FLOWFOODS, cliente: a, bloqueio: null, podeEscrever: true, sessao: { userId: 'rodolfo', autorNome: 'Rodolfo' } });
     const raiz = `/rodolfo/erp/${A.slug}`;
     const el = tela(await resolver(await NivelUmDespesasPage({ params: { slug: A.slug }, searchParams: { linha: linha.aluguel, de: SET.de, ate: SET.ate } })));
-    expect((el.props as Record<string, any>).voltarDre).toBe(`${raiz}/dre?periodo=2026-09-01&rede=1`);
+    expect((el.props as Record<string, any>).voltarDre).toBe(`${raiz}/dre?periodo=2026-09-01&rede=1#linha-aluguel`);
     const h = sp(renderToStaticMarkup(el));
     expect(h).toContain(`${raiz}/dre/despesas/${ids.d_aluguelVp}?volta=${encodeURIComponent(`${raiz}/dre/despesas?linha=${linha.aluguel}&de=2026-09-01&ate=2026-09-30`)}`.replace(/&/g, '&amp;'));
     const abre = async (v: string) => tela(await resolver(await NivelUmDespesaPage({ params: { slug: A.slug, id: ids.d_aluguelVp }, searchParams: { volta: v } }))).props as Record<string, any>;
     const volta = `${raiz}/dre/despesas?linha=${linha.aluguel}&de=2026-09-01&ate=2026-09-30`;
-    expect((await abre(volta)).voltar).toEqual({ href: volta, rotulo: 'o que forma o número do DRE' });
+    expect((await abre(volta)).voltar).toEqual({ href: volta, rotulo: 'Aluguel no DRE' });
     for (const fora of ['/erp/dre/despesas?linha=x&de=2026-09-01&ate=2026-09-30', '/rodolfo/erp/outro/dre', `${raiz}/../outro/dre`]) expect((await abre(fora)).voltar, fora).toBeUndefined();
   });
 
@@ -314,7 +317,7 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     expect(h).toContain(amp(`href="/erp/compras/relatorios/periodo?de=2026-09-01&ate=2026-09-30&loja=${ids.dl}&loja=${ids.vp}&volta=${voltaDoDre}"`));
     expect(h).toContain(amp('href="/erp/dre/cmv-categorias?periodo=2026-09-01&rede=1"'));
     expect(h).toContain(amp('href="/erp/faturamento?mes=2026-09&rede=1"'));
-    expect(h).toContain('Lançamentos de');
+    expect(h).toContain('Faturamento do mês inteiro:');
     expect(h).toContain('Ver as compras de 01/09 a 30/09');
     expect(h.match(/href="\/erp\/compras\/relatorios\/periodo\?de=2026-09-01&amp;ate=2026-09-30&amp;loja=/g)?.length).toBe(2); // a linha e o painel
     // Linha sem despesa e resultado não viram link.
@@ -336,7 +339,7 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     como(propria(['dre.ver', 'lojas.ver'], 'rede'));
     const s = await dre({ periodo: '2026-09-10', rede: '1' });
     expect(s).toContain(`linha=${linha.aluguel}`);
-    for (const proibido of ['Lançamentos de', '/erp/faturamento?mes=', '/erp/compras/relatorios/', 'Ver as compras de']) expect(s, proibido).not.toContain(proibido);
+    for (const proibido of ['Faturamento do mês inteiro', '/erp/faturamento?mes=', '/erp/compras/relatorios/', 'Ver as compras de']) expect(s, proibido).not.toContain(proibido);
   });
 
   it('período que cruza dois meses: um link de lançamentos para cada mês, e a receita não vira link', async () => {
@@ -344,7 +347,7 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     const cruzado: DreDoPeriodo = { ...d, periodo: { ...d.periodo, inicio: '2026-09-28', fim: '2026-10-04', nome: 'Semana de 28/09 a 04/10' }, ate: '2026-10-04' };
     const pode = { lancarDespesa: false, verFaturamento: true, verPrecos: false, verCompras: false, verEstoque: false, veRede: true };
     const h = sp(renderToStaticMarkup(createElement(TelaDoDre, { d: cruzado, base: '/erp/dre', raiz: '/erp', contexto: 'Rede Completa', pode, bloqueio: null })));
-    expect(h).toMatch(/Lançamentos de <a [^>]*href="\/erp\/faturamento\?mes=2026-09&amp;rede=1"[^>]*>setembro de 2026<\/a> e <a [^>]*href="\/erp\/faturamento\?mes=2026-10&amp;rede=1"[^>]*>outubro de 2026<\/a>/);
+    expect(h).toMatch(/Faturamento do mês inteiro: <a [^>]*href="\/erp\/faturamento\?mes=2026-09&amp;rede=1"[^>]*>setembro de 2026<\/a> e <a [^>]*href="\/erp\/faturamento\?mes=2026-10&amp;rede=1"[^>]*>outubro de 2026<\/a>/);
     expect(h).not.toMatch(/aria-label="Receita bruta,/);
   });
 
@@ -385,5 +388,11 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
       await conferirLinhaALinha(d, pedido.tipo === 'loja' ? pedido.lojaId : undefined);
     }
     expect(await dre({ periodo: '2026-09-10', rede: '1' })).toContain(`linha=${linha.aluguel}`);
+    // A composição diz a situação do período, como o DRE: fechado; outubro (em curso), parcial até ontem; recorte digitado, só as datas.
+    expect(((await despesas({ linha: linha.aluguel, ...SET })).props as Record<string, any>).periodo).toEqual({ nome: 'Setembro de 2026', situacao: 'fechado' });
+    const parcial = await despesas({ linha: linha.aluguel, de: '2026-10-01', ate: '2026-10-21' });
+    expect((parcial.props as Record<string, any>).periodo).toEqual({ nome: 'Outubro de 2026', situacao: 'parcial' });
+    expect(sp(renderToStaticMarkup(parcial))).toContain('Parcial · até ontem');
+    expect(((await despesas({ linha: linha.aluguel, de: '2026-09-05', ate: '2026-09-20' })).props as Record<string, any>).periodo).toBeNull();
   });
 });

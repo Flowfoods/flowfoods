@@ -22,7 +22,8 @@ import { chaveDaLinha } from '@/lib/erp/dre-plano';
 import { COR } from '@/lib/erp/modulos';
 import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { fechadoNoIntervalo } from '@/lib/erp/periodo-fechado-campos';
-import { situacaoDosPeriodos } from '@/lib/erp/periodos';
+import { periodoDe, situacaoDosPeriodos } from '@/lib/erp/periodos';
+import { somarDias } from '@/lib/erp/contagem-campos';
 import { voltaDoRelatorio } from '@/lib/erp/volta';
 import { planoDoParceiro } from '@/lib/erp/plano';
 import { pode, type Alcance } from '@/lib/erp/permissoes';
@@ -35,7 +36,8 @@ import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Vazio } from '../../ui/superficies';
 import { Voltar } from '../cadastro/partes';
-import { TelaDaComposicao } from './composicao-despesas';
+import { TelaDaComposicao, type PeriodoDaComposicao } from './composicao-despesas';
+import { idDaLinha } from './farol';
 import { TelaDaDespesa } from './detalhe-despesa';
 import { TelaDeDespesas } from './despesas';
 import { fraseDaDespesa, fraseDoMesPassado, fraseDoPeriodo, type AcaoDeCadastro, type AcaoLocal, type AcaoMesPassado } from './estado';
@@ -74,6 +76,9 @@ export async function PaginaDasDespesas({ c, lojasDoAlcance, query }: { c: Conte
     const base = `${c.raiz}/dre/despesas`;
     const aqui = `?linha=${recorte.linhaId}&de=${recorte.de}&ate=${recorte.ate}${lojaId ? `&loja=${lojaId}` : ''}`;
     const visaoDoDre = lojaId ? `&loja=${lojaId}` : c.alcance.lojas === 'todas' ? '&rede=1' : '';
+    const periodo = await periodoDaComposicao(c.cliente, recorte, hoje);
+    // Volta para o DRE na linha de onde veio (no celular ela fica a milhares de pixels do topo).
+    const ancora = idDaLinha(composicao.linha.codigo ?? `id:${composicao.linha.id}`);
     return (
       <>
         <TrilhaDaPagina itens={[{ rotulo: `${composicao.linha.nome} no DRE` }]} />
@@ -81,9 +86,10 @@ export async function PaginaDasDespesas({ c, lojasDoAlcance, query }: { c: Conte
           c={composicao}
           base={base}
           escopoNome={lojaId ? (lojasDoAlcance.find((l) => l.id === lojaId)?.nome ?? c.contexto) : c.alcance.lojas === 'todas' ? 'Rede Completa' : lojasDoAlcance.map((l) => l.nome).join(', ')}
-          daLoja={!!lojaId}
+          lojaId={lojaId}
           recorte={recorte}
-          voltarDre={pode(c.alcance, 'dre.ver') ? `${c.raiz}/dre?periodo=${recorte.de}${visaoDoDre}` : null}
+          periodo={periodo}
+          voltarDre={pode(c.alcance, 'dre.ver') ? `${c.raiz}/dre?periodo=${recorte.de}${visaoDoDre}#${ancora}` : null}
           aqui={aqui}
         />
       </>
@@ -113,6 +119,21 @@ export async function PaginaDasDespesas({ c, lojasDoAlcance, query }: { c: Conte
       bloqueio={c.bloqueio}
     />
   );
+}
+
+/**
+ * O período de onde veio o número da composição, quando o recorte é o que o DRE apura (do início do período até ontem, ou até o
+ * fim se já terminou): o nome e a situação, como o DRE diz. Recorte digitado que não é isso: nulo (a tela diz só as datas).
+ */
+async function periodoDaComposicao(cliente: ClienteDoParceiro, recorte: { de: string; ate: string }, hoje: string): Promise<PeriodoDaComposicao | null> {
+  return cliente.transacao(async (tx) => {
+    const p = await periodoDe(tx, recorte.de);
+    const ontem = somarDias(hoje, -1);
+    const ateDoDre = p.fim < hoje ? p.fim : ontem;
+    if (p.inicio !== recorte.de || recorte.ate !== ateDoDre) return null;
+    const reg = await tx.periodoApuracao.findFirst({ where: { inicio: new Date(`${p.inicio}T00:00:00.000Z`), fim: new Date(`${p.fim}T00:00:00.000Z`) }, select: { status: true } });
+    return { nome: p.nome, situacao: reg?.status === 'FECHADO' ? 'fechado' : p.fim < hoje ? 'encerrado' : 'parcial' };
+  });
 }
 
 /** Os formulários de lançar: o de uma despesa, ou o das que repetem todo mês. */
@@ -211,7 +232,9 @@ export async function PaginaDaDespesa({ c, id, query, acoes }: { c: ContextoDaTe
   const d = await obterDespesa(c.cliente, c.alcance, id, hoje);
   if (!d) notFound();
   // Veio da composição de uma linha do DRE (ou de outra tela da área): o "voltar" leva de volta para lá (caminho interno, conferido).
-  const voltar = voltaDoRelatorio(um(query.volta), c.raiz);
+  const lida = voltaDoRelatorio(um(query.volta), c.raiz);
+  // Da composição, o voltar diz o nome da linha ("Voltar para Aluguel no DRE"): a composição só lista despesas da linha dela.
+  const voltar = lida && /\/dre\/despesas\?(.*&)?linha=/.test(lida.href) ? { ...lida, rotulo: `${d.despesa.linhaNome} no DRE` } : lida;
   return (
     <>
       <TrilhaDaPagina itens={[{ rotulo: d.despesa.descricao }]} />

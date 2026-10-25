@@ -66,8 +66,8 @@ interface Abertura {
   oQue: string;
 }
 
-/** Número que abre os registros: sublinhado discreto (o mesmo das telas de compras), alvo de 44 px onde o dedo é o ponteiro. */
-const NUMERO_QUE_ABRE = 'ff-transicao inline-flex items-center rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto [@media(pointer:coarse)]:min-h-11';
+/** Número que abre os registros: sublinhado discreto; no toque, o alvo cresce para 44 px por fora (sem mexer na altura da linha). */
+const NUMERO_QUE_ABRE = "ff-transicao relative rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:-inset-y-2.5 [@media(pointer:coarse)]:after:inset-x-0 [@media(pointer:coarse)]:after:content-['']";
 
 function Celula({ l, semFaturamento, abre }: { l: LinhaDoDre; semFaturamento: boolean; abre?: Abertura | null }) {
   if (l.valorCentavos === null) return <span className="text-[13px] font-normal text-suave">{l.nota}</span>;
@@ -98,7 +98,7 @@ function Tabela({ d, raiz, pode, escopoQuery }: { d: DreDoPeriodo; raiz: string;
   const abre = (l: LinhaDoDre): Abertura | null => {
     if (!d.ate || l.valorCentavos === null || l.valorCentavos === 0) return null;
     if (l.tipo === 'linha' && l.linhaId) return { href: `${raiz}/dre/despesas?linha=${l.linhaId}&de=${d.periodo.inicio}&ate=${d.ate}${lojaQuery}`, oQue: 'ver as despesas que formam este número' };
-    // A receita não vira link: o faturamento é por mês, e o mês não é o recorte. "Lançamentos de <mês>" vai embaixo dela, dito.
+    // A receita não vira link: o faturamento é por mês, e o mês não é o recorte. "Faturamento do mês inteiro: <mês>" vai embaixo dela, dito.
     if (l.chave === CHAVE_CMV_COMPRA && pode.verCompras) return { href: `${raiz}/compras/relatorios/periodo?de=${d.periodo.inicio}&ate=${d.ate}${lojasDasCompras}&volta=${encodeURIComponent(aqui)}`, oQue: 'ver as compras que formam este número' };
     if (l.tipo === 'cmv') return { href: `${raiz}/dre/cmv-categorias?periodo=${d.periodo.inicio}${escopoQuery}`, oQue: 'ver o CMV por categoria' };
     return null;
@@ -179,7 +179,7 @@ function Tabela({ d, raiz, pode, escopoQuery }: { d: DreDoPeriodo; raiz: string;
                   </span>
                   {l.codigo === codigoDoSubtotal('RECEITA') && pode.verFaturamento && meses.length > 0 && (l.valorCentavos ?? 0) !== 0 && (
                     <span className="block text-[12px] font-normal leading-snug text-suave">
-                      Lançamentos de{' '}
+                      Faturamento do mês inteiro:{' '}
                       {meses.map((m, i) => (
                         <Fragment key={m}>
                           {i > 0 && (i === meses.length - 1 ? ' e ' : ', ')}
@@ -638,7 +638,7 @@ export function TelaDoDre({
         titulo={loja ? `Resultado da loja · ${loja.nome}` : 'Resultado da rede'}
         subtitulo={
           d.ate
-            ? `${dataCurta(d.periodo.inicio)} a ${dataCurta(d.ate)}${d.emCurso ? '. Despesa entra dia a dia (o aluguel do mês, um trinta avos por dia). Sem projeção: só o que já aconteceu.' : '.'} Percentuais sobre a receita bruta.`
+            ? `${dataCurta(d.periodo.inicio)} a ${dataCurta(d.ate)}${d.emCurso ? '. Despesa entra dia a dia (o aluguel do mês, um trinta avos por dia). Sem projeção: só o que já aconteceu.' : '.'} Percentuais sobre a receita bruta. O valor sublinhado abre o que forma o número.`
             : 'Nenhum dia apurado ainda neste período.'
         }
         semRespiro

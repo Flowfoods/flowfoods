@@ -1744,12 +1744,24 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/despesas'],
     titulo: 'Despesas',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Aluguel, salário, luz e as outras despesas da casa, pela competência: o mês a que a despesa pertence, não o dia em que foi paga.' },
       { texto: 'A pagar mostra as que têm vencimento e ainda não foram pagas: as vencidas e as que vencem em até 7 dias. Pagar não muda o DRE.' },
       { texto: 'Despesa da rede, que não é de uma loja, só aparece para quem tem a rede inteira.' },
       { texto: 'Lance cada despesa uma vez. As que repetem todo mês voltam em Lançar as do mês passado, com o valor para você conferir.', para: ['despesas.lancar'] },
+    ],
+    pontos: [
+      {
+        // Decisão 464: a mesma tela, vinda de um número do DRE, mostra o que forma esse número.
+        id: 'composicao',
+        titulo: 'De onde vem este número',
+        blocos: [
+          { texto: 'Vindo de um número do DRE, a tela mostra as despesas que formam esse número, no mesmo período e na mesma loja, e a soma no rodapé é o número.' },
+          { texto: 'Cada despesa conta só pelos dias dela que caem no período: um aluguel de R$ 3.100,00 de outubro, de 31 dias, entra numa semana de 7 dias com R$ 700,00.' },
+          { texto: 'Na visão de uma loja não entram as despesas da rede, como o contador do grupo.' },
+        ],
+      },
     ],
   },
   {

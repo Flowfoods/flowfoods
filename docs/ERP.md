@@ -4577,3 +4577,13 @@ sem loja; testes que comparam o total da tela de destino, o nível 1 e quem só 
 arquivos, 2.844 aprovados, 46 pulados, 0 falhas; lint, typecheck e gate limpos; teste novo `erp-dre-composicao` (9 casos, com
 banco) e 3 puros em `erp-dre.test`; navegador: jornada de composição com 23 conferências e o nível 1 (composição e voltas com a
 raiz do parceiro). **Não feito:** validação com o Valentin's; dados reais de faturamento.
+*Acabamento (decisão 465):* revisor de UX aprovou com ressalvas (6 "deve", 8 "deveria"); aplicados: a composição abre com o número,
+o período pelo nome e a situação ("Parcial · até ontem", "Período fechado"); tabela só a partir de 1280 px (a 1024 cortava "Entra
+no DRE"); número sublinhado com alvo de 44 px por fora, sem crescer a linha (a 390 com toque, a linha do aluguel fica com 44 px);
+ponto de ajuda "De onde vem este número"; "Voltar para Aluguel no DRE" no detalhe; "Voltar para o DRE" na linha de onde veio;
+textos sem "recorte", "competência" e "rateio"; "O valor sublinhado abre o que forma o número" no DRE e no CMV por categoria.
+Jornada de novo no navegador: 23 de 23; suíte com banco 151 arquivos, 2.845 aprovados, 46 pulados, 0 falhas; lint, typecheck e
+gate limpos.
+Matriz (antes e depois do acabamento): 9 telas (DRE de agora, fechado e de uma loja, composição de agora e do fechado, despesa com
+volta, CMV por categoria, compras da categoria, importação) × 6 tamanhos × claro e escuro × Dona, Gerente e Operador = 324 telas,
+0 falhas: sem rolagem lateral, sem tabela cortada na própria caixa, sem erro de página; o Operador redirecionado em todas, sem R$.

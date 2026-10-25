@@ -756,7 +756,8 @@ export interface ParteDaDespesa extends DespesaLida {
 }
 
 export interface ComposicaoDaLinha {
-  linha: { id: string; nome: string; grupo: GrupoDoDre };
+  /** `codigo` nulo = linha criada pela casa (no DRE a chave dela é `id:<id>`). */
+  linha: { id: string; nome: string; grupo: GrupoDoDre; codigo: string | null };
   itens: ParteDaDespesa[];
   /** A soma do que cai no recorte: é o número da linha no DRE ao vivo (mesma consulta, mesma apropriação). */
   totalCentavos: number;
@@ -770,7 +771,7 @@ export interface ComposicaoDaLinha {
  */
 export async function composicaoDaLinha(cliente: ClienteDoParceiro, alcance: Alcance, recorte: RecorteDaComposicao, lojaId?: string): Promise<ComposicaoDaLinha | null> {
   if (!podeVerDespesas(alcance) || recorte.ate < recorte.de) return null;
-  const linha = await cliente.dreLinha.findFirst({ where: { id: recorte.linhaId, calculada: false }, select: { id: true, nome: true, grupo: true } });
+  const linha = await cliente.dreLinha.findFirst({ where: { id: recorte.linhaId, calculada: false }, select: { id: true, nome: true, grupo: true, codigo: true } });
   if (!linha) return null;
   const linhas = await cliente.despesa.findMany({
     where: { AND: [escopoDoDre(alcance, lojaId), { linhaId: linha.id }, ...cruzaORecorte(recorte)] },

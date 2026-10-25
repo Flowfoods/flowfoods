@@ -15,7 +15,7 @@ import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Linha, Painel, Selo, Vazio } from '../../ui/superficies';
-import { BotaoOuMotivo } from '../cadastro/partes';
+import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { ListaHistorico } from '../historico/lista-historico';
 import { FormPagar, FormRemoverDespesa, FormSimples } from './acoes-despesa';
 import type { AcaoDeCadastro } from './estado';
@@ -62,9 +62,7 @@ export function TelaDaDespesa({
           ) : undefined
         }
       >
-        <Link href={voltar?.href ?? base} className={LINK_DE_TEXTO}>
-          {voltar ? `Voltar para ${voltar.rotulo}` : 'Voltar para as despesas'}
-        </Link>
+        <Voltar href={voltar?.href ?? base}>{voltar ? `Voltar para ${voltar.rotulo}` : 'Voltar para as despesas'}</Voltar>
       </PageHeader>
 
       {bloqueio && (

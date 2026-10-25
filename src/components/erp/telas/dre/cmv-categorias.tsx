@@ -79,8 +79,8 @@ function Nome({ l }: { l: LinhaDoPainel }) {
   );
 }
 
-/** Número que abre os registros: o mesmo sublinhado discreto do DRE e das telas de compras. */
-const NUMERO_QUE_ABRE = 'ff-transicao inline-flex items-center rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto [@media(pointer:coarse)]:min-h-11';
+/** Número que abre os registros: o mesmo sublinhado do DRE; no toque, o alvo cresce para 44 px por fora (sem mexer na altura da linha). */
+const NUMERO_QUE_ABRE = "ff-transicao relative rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto [@media(pointer:coarse)]:after:absolute [@media(pointer:coarse)]:after:-inset-y-2.5 [@media(pointer:coarse)]:after:inset-x-0 [@media(pointer:coarse)]:after:content-['']";
 
 function LinhaDaTabela({ l, semCorGeral, abre }: { l: LinhaDoPainel; semCorGeral: boolean; abre?: string | null }) {
   const apoio = l.tipo === 'variacao' || l.tipo === 'preparos';
@@ -191,6 +191,9 @@ export function TelaDoCmvPorCategoria({
     pode.verCompras && d.ate && d.status !== 'FECHADO' && soCompras && l.tipo === 'categoria' && l.categoriaId && !comPreparo.has(l.categoriaId) && l.fonte === 'compras' && (l.realizadoCentavos ?? 0) > 0
       ? `${raiz}/compras/relatorios/periodo?de=${d.periodo.inicio}&ate=${d.ate}&categoria=${l.categoriaId}${loja ? `&loja=${loja.lojaId}` : d.lojasDoEscopo.map((x) => `&loja=${x.id}`).join('')}&volta=${encodeURIComponent(aqui)}`
       : null;
+  const comValor = painel ? painel.linhas.filter((l) => l.tipo === 'categoria' && (l.realizadoCentavos ?? 0) > 0) : [];
+  const abrem = comValor.some((l) => abreCategoria(l) !== null);
+  const naoAbrem = pode.verCompras === true && comValor.some((l) => abreCategoria(l) === null);
   const selo = seloDoCmv(linha);
   const semFaturamento = d.resultado.semFaturamento;
   // Parte das categorias vem do real (estoque contado por insumo) e parte das compras: o selo diz "misto" e de quem é cada parte.
@@ -359,7 +362,7 @@ export function TelaDoCmvPorCategoria({
 
           <Painel
             titulo="Categorias"
-            subtitulo={d.ate ? `${fonteDoPainel(painel.linhas)} de ${formatarData(d.periodo.inicio)} a ${formatarData(d.ate)}, ${d.status === 'FECHADO' ? 'na categoria que o insumo tinha no dia do fechamento' : 'na categoria que o insumo tem hoje'}. Percentuais sobre a receita bruta.` : 'Nenhum dia apurado ainda neste período.'}
+            subtitulo={d.ate ? `${fonteDoPainel(painel.linhas)} de ${formatarData(d.periodo.inicio)} a ${formatarData(d.ate)}, ${d.status === 'FECHADO' ? 'na categoria que o insumo tinha no dia do fechamento' : 'na categoria que o insumo tem hoje'}. Percentuais sobre a receita bruta.${abrem ? ' O valor sublinhado abre as compras da categoria.' : ''}` : 'Nenhum dia apurado ainda neste período.'}
             semRespiro
           >
             {linha.valorCentavos === null && painel.linhas.every((l) => (l.realizadoCentavos ?? 0) === 0) ? (
@@ -417,6 +420,11 @@ export function TelaDoCmvPorCategoria({
                   </tfoot>
                 </table>
               </div>
+            )}
+            {naoAbrem && (
+              <p className="border-t border-linha px-4 py-2.5 text-[12px] leading-snug text-suave sm:px-5">
+                Valor sem sublinhado não abre as compras: vem da contagem de estoque, é de período fechado ou a categoria tem pré-preparo comprado em nota (no painel ele fica na linha dos pré-preparos).
+              </p>
             )}
           </Painel>
         </>
