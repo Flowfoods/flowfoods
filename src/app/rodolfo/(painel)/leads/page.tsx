@@ -15,6 +15,7 @@ import { Contagem, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/supe
 import { classeDeBotao, LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 import { ROTULO_DO_LEAD, rotulo } from '@/lib/rodolfo/rotulos';
+import { NA_LISTA_DE_VISITA } from '@/lib/rodolfo/visitas';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,7 +88,8 @@ export default async function LeadsPage({
     }),
     prisma.lead.count({ where }),
     prisma.lead.groupBy({ by: ['status'], _count: true }),
-    prisma.lead.count({ where: { canal: { in: ['VISITA', 'INSTAGRAM'] } } }),
+    // A régua da tela Visitas: o número do card é o que aparece ao abrir a lista.
+    prisma.lead.count({ where: NA_LISTA_DE_VISITA }),
   ]);
 
   const conta = (s: string) => porStatus.find((p) => p.status === s)?._count ?? 0;
@@ -131,12 +133,12 @@ export default async function LeadsPage({
         </div>
       </PageHeader>
 
+      {/* Todos com a linha de apoio: os números ficam na mesma altura. Cada card abre a lista que conta (decisão 472). */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {/* Todos com a linha de apoio: os números ficam na mesma altura. */}
-        <Metrica rotulo="Novos" valor={conta('NOVO')} detalhe="ainda não contatados" />
-        <Metrica rotulo="Em cadência" valor={conta('EM_CADENCIA')} detalhe="em andamento" />
-        <Metrica rotulo="Responderam" valor={conta('RESPONDEU')} detalhe="pelo WhatsApp" />
-        <Metrica rotulo="Visita e Instagram" valor={visita} detalhe="fixo ou sem celular" />
+        <Metrica rotulo="Novos" valor={conta('NOVO')} detalhe="ainda não contatados" href="/rodolfo/leads?status=NOVO" />
+        <Metrica rotulo="Em cadência" valor={conta('EM_CADENCIA')} detalhe="em andamento" href="/rodolfo/leads?status=EM_CADENCIA" />
+        <Metrica rotulo="Responderam" valor={conta('RESPONDEU')} detalhe="pelo WhatsApp" href="/rodolfo/leads?status=RESPONDEU" />
+        <Metrica rotulo="Visita e Instagram" valor={visita} detalhe="fixo ou sem celular" href="/rodolfo/visitas" />
       </div>
 
       <Painel

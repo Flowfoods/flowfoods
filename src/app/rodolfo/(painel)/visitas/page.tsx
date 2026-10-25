@@ -11,7 +11,6 @@
 
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
-import type { Prisma } from '@prisma/client';
 import { agoraSP } from '@/lib/rodolfo/estado';
 import { renderizar, TEMPLATE_INSTAGRAM } from '@/lib/barney/render';
 import { COR } from '@/lib/erp/modulos';
@@ -20,6 +19,7 @@ import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Aviso, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { CartaoVisita } from './cartao-visita';
 import { exigirNivel1 } from '@/lib/erp/contexto';
+import { NA_LISTA_DE_VISITA } from '@/lib/rodolfo/visitas';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,8 +28,9 @@ export default async function VisitasPage() {
   await exigirNivel1();
   const agora = agoraSP();
 
-  // A mesma regra da lista para os três números (antes "Na lista" parava em 60 e os outros contavam quem pediu para sair).
-  const daLista = { canal: { in: ['VISITA', 'INSTAGRAM'] }, status: { notIn: ['OPT_OUT', 'CONFLITO'] } } satisfies Prisma.LeadWhereInput;
+  // A mesma regra da lista para os três números (antes "Na lista" parava em 60 e os outros contavam quem pediu para sair),
+  // e para o card de Leads que traz até aqui.
+  const daLista = NA_LISTA_DE_VISITA;
   const [leads, naLista, totalFixos, semTelefone] = await Promise.all([
     prisma.lead.findMany({
       where: daLista,

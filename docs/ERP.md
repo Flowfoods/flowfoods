@@ -4669,3 +4669,11 @@ a verdade, confirmação de envio inteira com dia e hora, "Salvar áudio" e envi
 aviso ao sair e rascunho no aparelho sem conexão, selo "Não salvo", páginas de erro em português. Matriz 24 telas: 0 falhas;
 contraste claro e escuro: 0 textos abaixo do mínimo (eram 160); comportamento do Portal com API simulada: ok. Suíte com banco
 2.895 aprovados, 46 pulados, 0 falhas; lint, typecheck e portão limpos; testes novos `site-tema` e `portal-tela`.
+
+**E5.1 · sugestões G3 e G5 (decisão 472, 25/10/2026):** nas respostas do cliente no painel (`/rodolfo/portal/[id]`), cada bloco
+diz quantos itens chegaram ("1 de 7 recebidos, 2 pulados", a mesma régua do formulário e da Situação) e um filtro na URL mostra só
+os recebidos, os pulados com motivo ou os pendentes, descendo até a lista (`#itens`); o bloco sem item daquela situação some, e o
+filtro sem resultado diz qual e volta para todos. Em Leads, os quatro números abrem a lista que contam; "Visita e Instagram" passou a
+contar com a régua da tela Visitas (`NA_LISTA_DE_VISITA`; antes incluía quem pediu para sair). Matriz 96 telas: 0 falhas; jornada
+dos filtros e dos cards ok. Suíte com banco 2.902 aprovados, 46 pulados, 0 falhas; lint, typecheck e portão limpos; teste novo
+`portal-painel-filtro`.

@@ -9,6 +9,7 @@
  * no botão principal — nunca como fundo de bloco.
  */
 
+import Link from 'next/link';
 import type { ReactNode } from 'react';
 
 export function Painel({
@@ -64,26 +65,39 @@ export function Numero({ valor, rotulo, detalhe }: { valor: ReactNode; rotulo: s
   );
 }
 
-/** Métrica com caixa (faixa de indicadores no topo de uma tela). */
+/**
+ * Métrica com caixa (faixa de indicadores no topo de uma tela). Com `href` (decisão 472), o card inteiro é o link para a
+ * lista que o número conta, como no Início; sem `href`, é só leitura.
+ */
 export function Metrica({
   rotulo,
   valor,
   detalhe,
   children,
+  href,
 }: {
   rotulo: string;
   valor: ReactNode;
   detalhe?: ReactNode;
   children?: ReactNode;
+  href?: string;
 }) {
-  return (
-    <div className="flex min-w-0 flex-col rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
+  const corpo = (
+    <>
       <div className="text-[12px] font-medium leading-snug text-suave">{rotulo}</div>
       {/* 24/10: no tablet (4 cards a 1180 px) o valor grande cortava ("R$ 302.06…"); abaixo de 1280 px ele desce um tamanho. */}
-      <div className="mt-auto truncate pt-2 font-display text-[22px] font-bold leading-none tabular-nums xl:text-[26px]">{valor}</div>
+      <div className="mt-auto truncate pt-2 font-display text-[22px] font-bold leading-none tabular-nums text-texto xl:text-[26px]">{valor}</div>
       {detalhe && <div className="mt-1.5 truncate text-[12px] text-suave">{detalhe}</div>}
       {children}
-    </div>
+    </>
+  );
+  const caixa = 'flex min-w-0 flex-col rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5';
+  return href ? (
+    <Link href={href} className={`${caixa} ff-transicao hover:border-linha-forte`}>
+      {corpo}
+    </Link>
+  ) : (
+    <div className={caixa}>{corpo}</div>
   );
 }
 
