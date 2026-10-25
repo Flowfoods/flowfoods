@@ -6,7 +6,8 @@
  *
  * Recebe sempre o `ClienteDoParceiro` (parceiro da sessão) e o `Alcance`, com a LOJA: ver = `producao.ver`; planejar,
  * pegar (começar), concluir e cancelar = `producao.registrar`; estornar o lote concluído = `producao.registrar` E
- * `estoque.ajustar` (mexe no saldo). O custo do lote só sai do servidor para quem tem `insumos.ver` ("Ver insumos e custos").
+ * `estoque.ajustar` (mexe no saldo). O custo do lote só sai do servidor para quem tem `insumos.ver` ("Ver insumos e custos")
+ * e `compras.ver` na loja (`veCustosDaProducao`, decisão 460).
  *
  * 3.3 (decisões 231 a 240): PEGAR é começar — a mesma transição da 3.1 (Planejada → Em produção), agora com quem pegou e
  * desde quando (`responsavel*`). O lote que está com alguém só é concluído ou cancelado por essa pessoa ou pela gerência
@@ -49,6 +50,16 @@ import { faltaDe, lerParaDia, numeroDaRequisicao, textoDoParaDia, type LinhaDigi
 import { fraseDoLoteComOutro } from './producao-equipe-campos';
 import { formatarDinheiro, formatarFracao, formatarQuantidade, UNIDADES, type Fracao, type Unidade } from './unidades';
 import { CONSERVACOES, formatarValidade, retratoDaValidade, SELECAO_DA_VALIDADE, validadesDaLinha, type Conservacao, type Validades } from './validade';
+
+/**
+ * Quem recebe R$ da produção na loja (custo do lote e das baixas, custo por unidade, o que a diferença de rendimento custou,
+ * custo no histórico e na lista do dia): `insumos.ver` ("Ver insumos e custos") E `compras.ver` na loja — a régua do
+ * estoque e do Consumo (decisões 459 e 460). O Operador padrão produz, vê quantidade e rendimento, e o servidor não manda
+ * valor nenhum (nem no JSON da tela). O nível 1 vê sempre.
+ */
+export function veCustosDaProducao(alcance: Alcance, lojaId: string): boolean {
+  return pode(alcance, 'insumos.ver') && pode(alcance, 'compras.ver', { lojaId });
+}
 
 const ID = /^[a-z0-9]{1,64}$/i;
 const NAO_ENCONTRADO = 'Lote não encontrado nesta loja.';
@@ -768,7 +779,7 @@ export async function obterOrdem(cliente: ClienteDoParceiro, alcance: Alcance, l
         },
       });
       if (!o) throw naoEncontrado();
-      const verCustos = pode(alcance, 'insumos.ver');
+      const verCustos = veCustosDaProducao(alcance, lojaId);
       const status = o.status as StatusDaProducao;
       const unidade = (o.unidadeSnapshot ?? 'KG') as Unidade;
       const hoje = hojeNoRio(agora);

@@ -356,7 +356,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/lista/[lojaId]'],
     titulo: 'Lista do dia da loja',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'O que a loja vai produzir no dia, e o que isso pede do estoque: quanto vai usar de cada insumo, quanto tem e quanto falta.' },
       { texto: 'Falta escrito em vermelho quer dizer que o estoque não dá. Abaixo de zero quer dizer que o estoque está errado ou que falta lançar nota.' },
@@ -379,7 +379,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Para quem compra',
         blocos: [
           { texto: 'A lista não faz pedido. Quem compra vê o que falta e lança a nota em Compras.', para: ['compras.ver', 'compras.lancar'] },
-          { texto: 'A compra estimada usa o último preço pago. Insumo sem preço fica de fora, e a tela diz qual. A cozinha vê só as quantidades.', para: ['compras.ver', 'compras.lancar'] },
+          { texto: 'A compra estimada usa o último preço pago. Insumo sem preço fica de fora, e a tela diz qual. A cozinha vê só as quantidades.', para: ['compras.ver'] },
           { texto: 'O quanto ainda cabe é o mesmo do Orçamento de compra, com a compra estimada somada.', para: ['compras.ver', 'compras.lancar'] },
         ],
       },
@@ -438,21 +438,21 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/[lojaId]/[ordemId]'],
     titulo: 'Lote',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'O que foi planejado, os insumos que saíram pela requisição, quem está fazendo e, depois de concluído, quanto saiu de verdade.' },
       { texto: 'O lote que outra pessoa pegou só ela ou a gerência conclui, solta ou cancela.', para: ['producao.registrar'] },
       { texto: 'Para concluir, os insumos precisam estar entregues; se sobrou insumo, devolva pela requisição antes.', para: ['producao.registrar'] },
       { texto: 'Cancelar só vale se nada saiu do estoque, ou se tudo voltou. Estornar um lote concluído é de quem ajusta o saldo.', para: ['producao.registrar'] },
-      { texto: 'O custo do lote é o que saiu do estoque, dividido pelo que saiu de verdade, ao lado do que a ficha prevê.', para: ['insumos.ver'] },
+      { texto: 'O custo do lote é o que saiu do estoque, dividido pelo que saiu de verdade, ao lado do que a ficha prevê.', para: ['compras.ver'] },
     ],
     secoes: [
       {
         id: 'custo',
         titulo: 'A conta do custo',
         blocos: [
-          { texto: 'São 117,81 reais de insumos para 4,6 kg de molho: 25,61 reais por quilo. Se algum insumo saiu sem preço, o lote fica com custo incompleto e a tela diz qual, nunca com zero.', para: ['insumos.ver'] },
-          { texto: 'O custo de referência do pré-preparo continua o da ficha. O lote mostra o que custou de verdade e não mexe nele.', para: ['insumos.ver'] },
+          { texto: 'São 117,81 reais de insumos para 4,6 kg de molho: 25,61 reais por quilo. Se algum insumo saiu sem preço, o lote fica com custo incompleto e a tela diz qual, nunca com zero.', para: ['compras.ver'] },
+          { texto: 'O custo de referência do pré-preparo continua o da ficha. O lote mostra o que custou de verdade e não mexe nele.', para: ['compras.ver'] },
         ],
       },
       {
@@ -467,12 +467,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/[lojaId]/[ordemId]/concluir', 'producao/tarefas/[lojaId]/[ordemId]/concluir'],
     titulo: 'Concluir o lote',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Diga quanto saiu de verdade; zero se o lote se perdeu, e então nada entra no estoque.' },
       { texto: 'Passou de 10% para mais ou para menos, ou perdeu tudo: escreva o motivo.' },
       { texto: 'Escolha onde o lote vai ficar: a validade nasce daí e não muda se a ficha mudar depois.' },
-      { texto: 'O custo por quilo aparece ao vivo, enquanto você digita.', para: ['insumos.ver'] },
+      { texto: 'O custo por quilo aparece ao vivo, enquanto você digita.', para: ['compras.ver'] },
       { texto: 'Quem pegou o lote fica como quem fez, mesmo se a gerência concluir por ele.', para: ['producao.planejar'] },
     ],
   },
@@ -714,11 +714,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/historico/[lojaId]'],
     titulo: 'Histórico da produção da loja',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Os lotes encerrados no período: o que foi feito, quanto saiu contra o planejado, quem fez e quanto tempo levou.' },
       { texto: 'Filtre por pessoa, pré-preparo e dia. Quem fez é quem pegou o lote; sem pegar, quem concluiu.' },
-      { texto: 'O custo do lote é o que saiu do estoque pelos insumos. Insumo sem preço deixa o custo incompleto, nunca zero.', para: ['insumos.ver'] },
+      { texto: 'O custo do lote é o que saiu do estoque pelos insumos. Insumo sem preço deixa o custo incompleto, nunca zero.', para: ['compras.ver'] },
     ],
     secoes: [
       {

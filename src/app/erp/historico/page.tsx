@@ -29,8 +29,8 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
     verFaturamento,
     // 2.2a: despesas, plano de contas e período só para quem vê o DRE.
     verDre,
-    // 3.1: o custo do lote só para quem vê custos.
-    verCustos: pode(ctx.alcance, 'insumos.ver'),
+    // 3.1: o custo do lote só para quem vê custos E compras (a régua da produção, decisão 460).
+    verCustos: pode(ctx.alcance, 'insumos.ver') && pode(ctx.alcance, 'compras.ver'),
   });
   return (
     <div className="space-y-6">

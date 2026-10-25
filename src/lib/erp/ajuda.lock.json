@@ -64,8 +64,8 @@
     "hash": "849e5418c3ebfc54"
   },
   "producao-lista-loja": {
-    "versao": 3,
-    "hash": "774889db50eb97e8"
+    "versao": 4,
+    "hash": "e05c3d755d11be39"
   },
   "producao-quadro": {
     "versao": 2,
@@ -76,12 +76,12 @@
     "hash": "6f543f66c49319af"
   },
   "producao-lote": {
-    "versao": 3,
-    "hash": "25523d6b42840ff2"
+    "versao": 4,
+    "hash": "483a235ec69bae40"
   },
   "producao-concluir": {
-    "versao": 2,
-    "hash": "73d0e381bd09706e"
+    "versao": 3,
+    "hash": "f561f2a6a66da1b3"
   },
   "etiquetas": {
     "versao": 1,
@@ -144,8 +144,8 @@
     "hash": "15fa39db41cf1088"
   },
   "producao-historico-loja": {
-    "versao": 1,
-    "hash": "d0014d3cd6c8b4e0"
+    "versao": 2,
+    "hash": "19696a3eb0846f79"
   },
   "producao-indicadores": {
     "versao": 1,

@@ -292,6 +292,15 @@ describe.skipIf(!URL_TESTE)('ERP 3.2 · a lista do dia (Postgres real)', { timeo
     const dona = await ver(DONA());
     expect(dona.custo).not.toBeNull();
     expect(dona.orcamento).toMatchObject({ tipo: 'sem', arredondado: false });
+    // Decisão 460, a régua única da produção: "ver insumos e custos" E "ver compras" na loja. O chefe que define a lista e vê
+    // custos, mas não vê compras, lê só quantidades; o gerente da loja vê o estimado; o Operador, nada.
+    const chefeComCusto = await ver(alcanceDe(null, [ids.vp], ['producao.ver', 'producao.planejar', 'insumos.ver']));
+    expect(chefeComCusto.custo).toBeNull();
+    expect(chefeComCusto.pode).toMatchObject({ planejar: true, verCustos: false });
+    expect((await ver(GERENTE())).custo).toMatchObject({ total: dona.custo!.total });
+    const op = await ver(OPERADOR());
+    expect(op.custo).toBeNull();
+    expect(op.pode).toMatchObject({ verCustos: false });
   });
 
   let LOTE_MOLHO = '';

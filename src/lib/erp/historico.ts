@@ -680,7 +680,8 @@ export const ENTIDADES_DE_DRE: readonly string[] = ['Despesa', 'DreLinha', 'DreM
 
 /**
  * Custo do lote (3.1, lição da decisão 90): o histórico do lote cita o custo e o que a diferença de rendimento custou. Só
- * quem tem `insumos.ver` ("Ver insumos e custos") os recebe; sem ele, esses campos saem da linha no servidor, antes de
+ * quem tem `insumos.ver` ("Ver insumos e custos") e `compras.ver` (a régua da produção, decisão 460) os recebe; sem isso, esses
+ * campos saem da linha no servidor, antes de
  * montar a tela, e a alteração que só tinha isso some. `verCustos` ausente = fechado.
  */
 export const CAMPOS_DE_CUSTO_DA_PRODUCAO: ReadonlySet<string> = new Set(['custoDoLote', 'perdaEmReais']);
@@ -760,7 +761,7 @@ export async function listarHistorico(
      */
     verDre?: boolean;
     /**
-     * 3.1: quem lê pode ver custos (`insumos.ver`)? Sem isto, o custo do lote e o que a diferença de rendimento custou não saem
+     * 3.1: quem lê pode ver custos (`insumos.ver` e `compras.ver`; decisão 460)? Sem isto, o custo do lote e o que a diferença de rendimento custou não saem
      * do servidor. Fecha para quem esquece: ausente = não vê.
      */
     verCustos?: boolean;

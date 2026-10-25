@@ -8,7 +8,7 @@
  * Permissões (sempre com a LOJA; fora do alcance = não encontrado): a tela da cozinha = `producao.registrar` (é a tela de
  * quem produz); o histórico = `producao.ver` (a cozinha já vê no quadro quem concluiu cada lote); os indicadores por pessoa =
  * `producao.planejar` (a gerência; decisão 236). O custo do lote no histórico só sai do servidor para quem tem
- * `insumos.ver` (o contrato do lote da 3.1); os indicadores não têm R$.
+ * `insumos.ver` e `compras.ver` na loja (`veCustosDaProducao`, o mesmo contrato do lote; decisão 460); os indicadores não têm R$.
  */
 
 import type { ClienteDoParceiro } from './tenant';
@@ -18,7 +18,7 @@ import { somarDias } from './contagem-campos';
 import { aberturasDe, comRecusa, lojaDoAlcance } from './estoque';
 import { datasEmPeriodoFechado } from './periodo-trava';
 import { diasDeAtrasoDoLote, type StatusDaProducao } from './producao-campos';
-import { passadosPor } from './producao';
+import { passadosPor, veCustosDaProducao } from './producao';
 import { estadoDaLinha, rotuloDoDia } from './producao-lista-campos';
 import { desfechoDoLote, diaDoEncerramento, indicadoresPorPessoa, lerFiltroId, produzidoPorFicha, lerPeriodoDoHistorico, resumoDoHistorico, tempoDoLote, type LoteEncerrado, type PeriodoDoHistorico } from './producao-equipe-campos';
 import type { StatusDaRequisicao } from './requisicao-campos';
@@ -320,7 +320,8 @@ export const LINHAS_NA_TELA = 300;
 /**
  * O histórico da produção da loja no período: os lotes encerrados (o quê, quanto planejado × produzido, rendimento, quem
  * fez, quem concluiu, quando pegou e quando terminou), com os filtros de pessoa e ficha, as opções dos filtros (as pessoas
- * e as fichas que aparecem no período) e o resumo. `producao.ver` na loja. Custo só para `insumos.ver`.
+ * e as fichas que aparecem no período) e o resumo. `producao.ver` na loja. Custo só para `veCustosDaProducao` (`insumos.ver`
+ * e `compras.ver` na loja; decisão 460).
  */
 export async function historicoDaProducao(
   cliente: ClienteDoParceiro,
@@ -342,7 +343,7 @@ export async function historicoDaProducao(
       const pessoa = lerFiltroId(filtro.pessoa);
       const ficha = lerFiltroId(filtro.ficha);
       const filtrados = lotes.filter((l) => (!pessoa || l.lote.responsavel?.id === pessoa) && (!ficha || l.lote.fichaId === ficha));
-      const verCustos = pode(alcance, 'insumos.ver');
+      const verCustos = veCustosDaProducao(alcance, lojaId);
       const naTela = filtrados.slice(0, LINHAS_NA_TELA);
       const passados = await passadosPor(
         tx,

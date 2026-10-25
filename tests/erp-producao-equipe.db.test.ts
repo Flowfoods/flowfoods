@@ -392,6 +392,16 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)'
     expect(semCusto.verCustos).toBe(false);
     expect(semCusto.linhas.every((x) => !('custo' in x))).toBe(true);
     expect(JSON.stringify(semCusto)).not.toMatch(/totalCentavos|custoTotal/);
+    // O Operador padrão tem "ver insumos e custos" mas não vê compras na loja: também sem R$ (decisão 460, a régua do
+    // estoque). O gerente da loja vê.
+    const doOperador = (await historicoDaProducao(a, OPERADOR(), ids.vp, { periodo: 'hoje' }, EQUIPE))!;
+    expect(doOperador.verCustos).toBe(false);
+    expect(doOperador.linhas.length).toBe(h.linhas.length);
+    expect(doOperador.linhas.every((x) => !('custo' in x))).toBe(true);
+    expect(JSON.stringify(doOperador)).not.toMatch(/totalCentavos|custoTotal/);
+    const doGerente = (await historicoDaProducao(a, GERENTE(), ids.vp, { periodo: 'hoje' }, EQUIPE))!;
+    expect(doGerente.verCustos).toBe(true);
+    expect(doGerente.linhas.find((x) => x.id === ids.loteMolho)!.custo).toMatchObject({ incompleto: false });
     // A cozinha (producao.ver) lê o histórico; o dia sem lote é frase, não zero.
     expect(await historicoDaProducao(a, SO_VE(), ids.vp, { periodo: 'hoje' }, EQUIPE)).not.toBeNull();
     const ontem = (await historicoDaProducao(a, DONA(), ids.vp, { de: '2026-01-01', ate: '2026-01-01' }, EQUIPE))!;

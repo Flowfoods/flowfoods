@@ -6,7 +6,7 @@
  *
  * Permissões (sempre com a LOJA; fora do alcance = não encontrado): ver = `producao.ver` (a cozinha vê a lista); montar,
  * mudar e transformar em lotes = `producao.planejar` (o gerente; decisão 219). O custo estimado da compra só sai do servidor
- * para quem tem `insumos.ver` E define a lista ou compra (vê ou lança nota): a cozinha lê só quantidades (decisão 226). O
+ * para quem tem `insumos.ver` E `compras.ver` na loja (`veCustosDaProducao`, decisões 226 e 460): a cozinha lê só quantidades. O
  * orçamento de compra (2.5) só para quem vê ou lança nota na loja, pela vista dele (`orcamentoNaNota`: quem não vê o DRE
  * recebe o limite seguro, nunca a receita — decisões 210, 213 e 217). Quem não recebe o custo não leva o valor nem para a
  * conta do orçamento (ela parte de zero).
@@ -35,7 +35,7 @@ import { hojeNoRio } from './compra-campos';
 import { listarHistorico } from './historico';
 import { aberturasDe, comRecusa, custosDeReferencia, lojaDoAlcance, Recusa, type ResultadoEstoque } from './estoque';
 import { exigirAberto } from './requisicao';
-import { NIVEL1_NAO_PEGA, pegarNaTx, planejarProducaoNaTx, type Autor } from './producao';
+import { NIVEL1_NAO_PEGA, pegarNaTx, planejarProducaoNaTx, veCustosDaProducao, type Autor } from './producao';
 import { datasEmPeriodoFechado, fraseDoPeriodoFechado, travarParaEscrever } from './periodo-trava';
 import { PROFUNDIDADE_MAXIMA } from './ficha-cascata';
 import { faltaDe, textoDoCampo } from './requisicao-campos';
@@ -231,9 +231,9 @@ export async function obterListaDoDia(cliente: ClienteDoParceiro, alcance: Alcan
         const hoje = hojeNoRio(agora);
         const dia = diaDaLista(diaTexto, hoje);
         const podePlanejar = pode(alcance, 'producao.planejar', { lojaId });
-        // O custo estimado (R$) e o painel "Para quem compra": quem vê custos E define a lista ou compra (vê ou lança nota). A
-        // cozinha, mesmo com "ver insumos e custos", lê só as quantidades: o servidor monta sem o valor (decisão 226).
-        const verCustos = pode(alcance, 'insumos.ver') && (podePlanejar || pode(alcance, 'compras.ver', { lojaId }) || pode(alcance, 'compras.lancar', { lojaId }));
+        // O custo estimado (R$): a régua única da produção — vê custos E vê compras na loja (decisões 226 e 460). A cozinha,
+        // mesmo com "ver insumos e custos", lê só as quantidades: o servidor monta sem o valor.
+        const verCustos = veCustosDaProducao(alcance, lojaId);
         const abertura = (await aberturasDe(tx, [lojaId])).get(lojaId);
         const estoque: EstadoDoEstoqueDaLista = !abertura ? 'NAO_ABERTO' : abertura.status === 'FECHADA' && abertura.fechadaEm ? 'ABERTO' : 'EM_CONTAGEM';
         const periodoFechado = (await datasEmPeriodoFechado(tx, [dia])).get(dia) ?? null;

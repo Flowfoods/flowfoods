@@ -36,6 +36,7 @@ import {
   aberturasDe,
   comRecusa,
   custosDaLoja,
+  type CustoDeReferencia,
   custosDeReferencia,
   gravarMovimentos,
   lojaDoAlcance,
@@ -489,6 +490,7 @@ export interface ItemDoDetalhe {
   faltaMilesimos: number;
   /** Saldo do livro de agora na loja (pode ser negativo: alarme). */
   saldoMilesimos: number;
+  /** Custo de referência por unidade; `null` sem custo OU para quem não vê compras na loja (o valor não sai do servidor). */
   porUnidade: Fracao | null;
 }
 
@@ -525,9 +527,13 @@ export async function obterRequisicao(cliente: ClienteDoParceiro, alcance: Alcan
       // 3.1: requisição de produção diz de qual lote é (e o custo dele já fechou, ou não).
       const producao = await tx.ordemProducao.findFirst({ where: { requisicaoId: req.id }, select: { id: true, codigoLote: true, status: true, fichaNomeSnapshot: true, planejadoMilesimos: true, unidadeSnapshot: true } });
       const insumoIds = req.itens.map((i) => i.insumoId);
+      // R$ (custo por unidade e valor de cada saída do livro) só com `compras.ver` na loja: a régua do estoque (decisões 459 e
+      // 460). Quem pede ou entrega sem ver compras, como o Operador que abre a requisição do lote, lê só quantidades; o valor
+      // nem é lido aqui.
+      const verValores = pode(alcance, 'compras.ver', { lojaId });
       const [saldos, custos, movs, aberturas] = await Promise.all([
         tx.saldoEstoque.findMany({ where: { lojaId, insumoId: { in: insumoIds } }, select: { insumoId: true, quantidadeMilesimos: true } }),
-        custosDaLoja(tx, lojaId, insumoIds),
+        verValores ? custosDaLoja(tx, lojaId, insumoIds) : Promise.resolve(new Map<string, CustoDeReferencia>()),
         tx.movimentoEstoque.findMany({ where: { requisicaoItemId: { in: req.itens.map((i) => i.id) } }, orderBy: [{ ocorridoEm: 'asc' }, { criadoEm: 'asc' }, { id: 'asc' }], select: SELECAO_DO_MOVIMENTO }),
         aberturasDe(tx, [lojaId]),
       ]);
@@ -548,10 +554,11 @@ export async function obterRequisicao(cliente: ClienteDoParceiro, alcance: Alcan
       const hoje = hojeNoRio(agora);
       const paraDia = iso(req.paraDia);
       const historico = await listarHistorico(tx, { de: [{ entidade: 'Requisicao', ids: [req.id] }], limite: 20, verPrecos: false });
-      const movimentos: MovimentoDaTela[] = movs.map(movimentoParaTela);
+      const movimentos: MovimentoDaTela[] = movs.map(movimentoParaTela).map((m) => (verValores ? m : { ...m, valorCentavos: 0 }));
       return {
         loja,
         hoje,
+        verValores,
         aberto: aberturas.get(lojaId)?.status === 'FECHADA',
         requisicao: { ...req, status, paraDia, itens: undefined },
         itens,

@@ -1,7 +1,8 @@
 /**
  * ERP 3.1 · a produção nas telas (a página e a action de verdade, com banco): o que cada pessoa recebe no HTML e o que as
  * actions deixam passar.
- *  - o cozinheiro (Operador) planeja pela action (vai para o lote, "planejado"), vê o quadro, o lote e o R$ (ele vê custos);
+ *  - o cozinheiro (Operador) planeja pela action (vai para o lote, "planejado"), vê o quadro e o lote, SEM R$: tem "ver insumos e
+ *    custos" mas não vê compras na loja (decisão 460, a régua do estoque); o gerente da loja vê o R$;
  *  - o perfil de cozinha SEM custos produz, mas o HTML do lote e da conclusão não leva R$, custo por kg nem o histórico do custo;
  *  - o gerente da Delivery recebe 404 no quadro e no lote da Penha; outro parceiro, 404;
  *  - a conclusão antes da entrega mostra "Faltam sair…" e nenhum formulário; com tudo entregue, o formulário aparece;
@@ -61,6 +62,7 @@ import ErpLotePage from '@/app/erp/producao/[lojaId]/[ordemId]/page';
 import ErpConcluirLotePage from '@/app/erp/producao/[lojaId]/[ordemId]/concluir/page';
 import ErpRequisicaoPage from '@/app/erp/estoque/[lojaId]/requisicoes/[requisicaoId]/page';
 import ErpFichaPage from '@/app/erp/fichas/[id]/page';
+import ErpHistoricoPage from '@/app/erp/historico/page';
 import ParceiroProducaoDaLojaPage from '@/app/rodolfo/(painel)/erp/[slug]/producao/[lojaId]/page';
 import ParceiroLotePage from '@/app/rodolfo/(painel)/erp/[slug]/producao/[lojaId]/[ordemId]/page';
 import * as daSessao from '@/app/erp/producao/actions';
@@ -235,8 +237,19 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     expect(h).toContain('Quanto saiu de verdade');
     expect(h).toContain('Refrigerado');
     expect(h).toContain('Congelado');
-    expect(h).toContain('Custo do lote'); // o operador vê custos
-    expect(h).toContain('R$ 117,81');
+    // O operador conclui sem R$ (decisão 460): nada de custo no HTML nem no que vai para o formulário.
+    for (const proibido of ['R$', 'Custo do lote', '117,81', '23,56']) expect(h, proibido).not.toContain(proibido);
+    // E o dado que monta a tela já sai do servidor sem valor (o que vai para o formulário do navegador).
+    const doOperador = (await obterOrdem(a, OPERADOR(), ids.vp, LOTE))!;
+    expect(doOperador.custo).toBeNull();
+    expect(doOperador.itensDoLote.length).toBe(3);
+    expect(doOperador.itensDoLote.every((i) => i.valorCentavos === null)).toBe(true);
+    expect((await obterOrdem(a, GERENTE(), ids.vp, LOTE))!.custo).toMatchObject({ totalCentavos: 11781 });
+    // O gerente da loja (vê custos e compras) recebe o custo ao vivo.
+    como(GERENTE());
+    const ger = await pagina(ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: LOTE } }));
+    expect(ger).toContain('Custo do lote');
+    expect(ger).toContain('R$ 117,81');
     // O perfil de cozinha sem "ver insumos e custos" conclui, mas não recebe o R$.
     como(COZINHA_SEM_CUSTO());
     const sem = await pagina(ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: LOTE } }));
@@ -257,8 +270,8 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     expect(await rodar(() => ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: LOTE } }))).toMatchObject({ url: `/erp/producao/${ids.vp}/${LOTE}` });
   });
 
-  it('o lote concluído: R$ 25,61/kg, previsto R$ 23,56, 92%, diferença R$ 9,42 e a validade — para o operador; nada de R$ para a cozinha sem custos', async () => {
-    como(OPERADOR());
+  it('o lote concluído: R$ 25,61/kg, previsto R$ 23,56, 92%, diferença R$ 9,42 e a validade — para o gerente; o operador e a cozinha sem custos, sem R$', async () => {
+    como(GERENTE());
     const h = await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }));
     expect(h).toContain('R$ 25,61/kg');
     expect(h).toContain('R$ 117,81 ÷ 4,6 kg');
@@ -269,14 +282,25 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     expect(h).toMatch(/Refrigerado · 3 dias · vence \d\d\/\d\d às \d\d:\d\d/);
     expect(h).toContain('Molho cheddar na Vila da Penha agora: 4,6 kg');
     expect(h).toContain('Concluído');
-    // O perfil de cozinha sem custos: nada de R$ nem de custo por kg, nem no histórico do lote.
-    como(COZINHA_SEM_CUSTO());
-    const sem = await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }));
-    for (const proibido of ['R$', '117,81', '25,61', '23,56', '9,42', 'Custo do lote']) expect(sem, proibido).not.toContain(proibido);
-    expect(sem).toContain('4,6 kg');
-    expect(sem).toContain('92%');
+    // O operador (decisão 460) e o perfil de cozinha sem custos: nada de R$ nem de custo por kg, nem no histórico do lote; a
+    // quantidade, o rendimento e a validade continuam.
+    for (const quem of [OPERADOR, COZINHA_SEM_CUSTO]) {
+      como(quem());
+      const sem = await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }));
+      for (const proibido of ['R$', '117,81', '25,61', '23,56', '9,42', 'Custo do lote']) expect(sem, proibido).not.toContain(proibido);
+      expect(sem).toContain('4,6 kg');
+      expect(sem).toContain('92%');
+      expect(sem).toMatch(/Refrigerado · 3 dias · vence/);
+      const dado = (await obterOrdem(a, quem(), ids.vp, LOTE))!;
+      expect(dado.custo).toBeNull();
+      expect(dado.itensDoLote.every((i) => i.valorCentavos === null)).toBe(true);
+      expect(dado.movimentos.length).toBe(1);
+      expect(dado.movimentos.every((m) => m.valorCentavos === 0)).toBe(true);
+      expect(dado.historico.some((h) => JSON.stringify(h).includes('117,81'))).toBe(false);
+    }
     // E o operador não vê o botão de estornar (exige ajustar o saldo); a dona vê.
-    expect(h).not.toContain('Estornar este lote');
+    como(OPERADOR());
+    expect(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }))).not.toContain('Estornar este lote');
     como(alcanceDe('DONO', 'rede'));
     expect(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }))).toContain('Estornar este lote');
   });
@@ -287,6 +311,33 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     expect(rq).toContain('o custo dele está fechado e esta requisição não recebe mais entrega nem devolução');
     expect(rq).not.toContain('Receber de volta');
     expect(rq).not.toContain('Cancelar esta requisição');
+    // A dona vê o valor de cada saída no livro (−R$ 100,00 do cheddar: 2,5 kg × R$ 40,00).
+    expect(rq).toContain('−R$ 100,00');
+    // O operador abre a requisição pelo lote ("Abrir a requisição"): só quantidades. A soma das saídas é o custo do lote, então
+    // o valor delas também não sai do servidor (decisões 459 e 460, a régua do estoque: `compras.ver` na loja).
+    como(OPERADOR());
+    const doOperador = await pagina(ErpRequisicaoPage({ params: { lojaId: ids.vp, requisicaoId: REQ }, searchParams: {} }));
+    expect(doOperador).toContain('o custo dele está fechado');
+    for (const proibido of ['R$', '100,00', '117,81']) expect(doOperador, proibido).not.toContain(proibido);
+    const dado = (await obterRequisicao(a, OPERADOR(), ids.vp, REQ))!;
+    expect(dado.verValores).toBe(false);
+    expect(dado.movimentos.length).toBe(3);
+    expect(dado.movimentos.every((m) => m.valorCentavos === 0)).toBe(true);
+    expect(dado.itens.every((i) => i.porUnidade === null)).toBe(true);
+    const doGerente = (await obterRequisicao(a, GERENTE(), ids.vp, REQ))!;
+    expect(doGerente.verValores).toBe(true);
+    expect(doGerente.movimentos.reduce((s, m) => s + m.valorCentavos, 0)).toBe(-11781);
+  });
+
+  it('Histórico geral (filtro Produção): o custo do lote só para quem vê custos E compras (decisão 460)', async () => {
+    como(alcanceDe('DONO', 'rede'));
+    const dona = await pagina(ErpHistoricoPage({ searchParams: { entidade: 'OrdemProducao' } }));
+    expect(dona).toContain('117,81');
+    // Perfil próprio da rede com histórico, produção e custos, mas sem compras: vê o lote, não o R$.
+    como(alcanceDe(null, 'rede', ['historico.ver', 'producao.ver', 'insumos.ver']));
+    const semCompras = await pagina(ErpHistoricoPage({ searchParams: { entidade: 'OrdemProducao' } }));
+    expect(semCompras).toContain('Molho cheddar');
+    for (const proibido of ['117,81', '25,61', '9,42']) expect(semCompras, proibido).not.toContain(proibido);
   });
 
   it('alcance: o gerente da Delivery recebe 404 no quadro e no lote da Penha; o parceiro B não vê o lote de A', async () => {

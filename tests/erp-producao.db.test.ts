@@ -598,15 +598,19 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · produção do pré-preparo pela ficha (P
     expect(await a.movimentoEstoque.count({ where: { ordemProducaoId: id, estornoDeId: { not: null } } })).toBe(0);
   });
 
-  it('critério 15: o gerente da Delivery não abre lote da Penha (404); outro parceiro não existe; o operador vê o quadro, planeja, conclui e vê o R$', async () => {
+  it('critério 15: o gerente da Delivery não abre lote da Penha (404); outro parceiro não existe; o operador vê o quadro, planeja e conclui, sem R$ (decisão 460)', async () => {
     expect(await obterOrdem(a, GERENTE_DELIVERY(), ids.vp, L1)).toBeNull();
     expect(await quadroDaProducao(a, GERENTE_DELIVERY(), ids.vp)).toBeNull();
     expect(await obterOrdem(b, DONA(), ids.lojaB, L1)).toBeNull();
     expect(await obterOrdem(a, DONA(), ids.delivery, L1)).toBeNull();
     expect(await obterOrdem(a, DONA(), ids.vp, 'não-existe')).toBeNull();
-    // O operador vê o R$ do lote (tem "ver insumos e custos"); a cozinha sem custos não.
-    expect((await lote(L1, OPERADOR())).custo).not.toBeNull();
+    // Decisão 460: R$ do lote só com "ver insumos e custos" E "ver compras" na loja. O operador tem a primeira e não a
+    // segunda: sem R$ (como a cozinha sem custos); o gerente da Penha e a dona veem.
+    expect((await lote(L1, OPERADOR())).custo).toBeNull();
+    expect((await lote(L1, OPERADOR())).itensDoLote.every((i) => i.valorCentavos === null)).toBe(true);
     expect((await lote(L1, COZINHA_SEM_CUSTO())).custo).toBeNull();
+    expect((await lote(L1, GERENTE())).custo).not.toBeNull();
+    expect((await lote(L1, DONA())).custo).not.toBeNull();
     // A lista de lojas só traz a Penha para o gerente dela.
     expect((await lojasDaProducao(a, GERENTE())).map((l) => l.nome)).toEqual(['Vila da Penha']);
     expect((await lojasDaProducao(a, DONA())).map((l) => l.nome)).toEqual(['Delivery', 'Vila da Penha']);

@@ -2351,7 +2351,7 @@ ganhou a rota nova (lock regravado, 61 entradas).
 | Perdeu a corrida | O "Pegar" some do cartão; ficam a frase de quem pegou e "Ver de novo". |
 | Textos | Subtítulo da escolha de loja com maiúscula; aviso de estoque não aberto (e de período fechado) uma vez só, no alto; o Concluir das Tarefas em `/producao/tarefas/<loja>/<lote>/concluir`, com a aba Tarefas marcada (o endereço antigo continua). |
 | "Ver o estoque" (3.1) | Folga de toque: 48 px no tablet. |
-| Fica para o Rodolfo | O operador vê R$ no Histórico e no Concluir porque tem `insumos.ver`; na Lista do dia a 3.2 escondeu. Nada mudou: pendência na Herança da 3.3. |
+| Fica para o Rodolfo | O operador vê R$ no Histórico e no Concluir porque tem `insumos.ver`; na Lista do dia a 3.2 escondeu. Nada mudou: pendência na Herança da 3.3. **Resolvido em 25/10/2026 (decisão 460): R$ da produção só com `insumos.ver` e `compras.ver` na loja.** |
 
 **Provas** (código de `52ecd91`; build com o `BUILD_ID` gerado às 21:51:38, depois do commit das 21:50:30). Testes novos ou
 mexidos: `tests/erp-producao-equipe-polimento.test.ts` (5, sem banco: "recebeu", quem cancelou, "Manter" com erro, perder a
@@ -4024,7 +4024,10 @@ banco de teste: o operador é recusado pelo servidor.
   Histórico da produção e no Concluir porque o perfil padrão do Operador tem `insumos.ver` (custos); na Lista do dia a 3.2
   escondeu a estimativa de compra dele. A regra do sistema é a permissão (quem tem `insumos.ver` vê custo), e a incoerência fica
   para o Rodolfo decidir: tirar `insumos.ver` do Operador padrão (a cozinha deixa de ver custo em toda parte) ou aceitar que a
-  cozinha veja o custo do lote. Nada foi mudado.
+  cozinha veja o custo do lote. Nada foi mudado. **Resolvido em 25/10/2026 (decisão 460):** a regra do Rodolfo ("Operador
+  nunca recebe R$") virou a régua única `veCustosDaProducao` (`insumos.ver` E `compras.ver` na loja) no lote, no Concluir, no
+  Histórico e na lista do dia; a requisição do lote segue a régua do estoque (`compras.ver` na loja, decisão 459); o perfil do
+  Operador não mudou.
 
 ## Revisão visual de 21/10/2026 (antes das próximas funcionalidades)
 
