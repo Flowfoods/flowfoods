@@ -228,22 +228,26 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
               >
                 <Menu size={20} aria-hidden />
               </button>
-              <nav aria-label="Você está em" className="hidden min-w-0 sm:block">
+              {/* Recorta na própria caixa: sem espaço (nível 1 a 1024, com dois seletores), a trilha some por trás do corte e nunca
+                  passa por baixo dos botões da direita. */}
+              <nav aria-label="Você está em" className="hidden min-w-0 overflow-x-clip sm:block">
                 <ol className="flex min-w-0 items-center gap-1.5 text-[13px]">
                   <li className="shrink-0">
                     <Link href={nav.inicio.href} className="ff-transicao rounded-[5px] text-suave hover:text-texto">
                       Início
                     </Link>
                   </li>
-                  {/* Abaixo de 1024 px (tablet a 820), os níveis do meio dão lugar a "…": fica o pai e a tela atual, sem cortar o nome. */}
+                  {/* Abaixo de 1280 px (tablet em pé e deitado, notebook de 1024), os níveis do meio dão lugar a "…": fica o pai e a
+                      tela atual, sem cortar o nome (antes o corte era em 1024 e, a 1024, a trilha de 6 níveis virava "Et… › Im… › Vil…"). */}
                   {trilha.length > 2 && (
-                    <li className="flex shrink-0 items-center gap-1.5 text-suave lg:hidden">
+                    <li className="flex shrink-0 items-center gap-1.5 text-suave xl:hidden">
                       <ChevronRight size={14} aria-hidden className="shrink-0" />
                       <span title={trilha.slice(0, -2).map((t) => t.rotulo).join(' › ')}>…</span>
                     </li>
                   )}
                   {trilha.map((t, n) => (
-                    <li key={t.rotulo + n} className={`min-w-0 items-center gap-1.5 ${n < trilha.length - 2 ? 'hidden lg:flex' : 'flex'}`}>
+                    // Sem espaço, o nome da tela atual é o último a encolher: os níveis de cima cedem três vezes mais rápido.
+                    <li key={t.rotulo + n} className={`min-w-0 items-center gap-1.5 ${n < trilha.length - 2 ? 'hidden xl:flex' : 'flex'} ${n < trilha.length - 1 ? 'shrink-[3]' : ''}`}>
                       <ChevronRight size={14} aria-hidden className="shrink-0 text-suave" />
                       {t.href && n < trilha.length - 1 ? (
                         <Link href={t.href} className="ff-transicao truncate rounded-[5px] text-suave hover:text-texto">
@@ -263,7 +267,9 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
               </nav>
             </div>
 
-            <div className="flex min-w-0 items-center gap-1 sm:gap-2">
+            {/* A partir de 1024 px os botões não encolhem: quem cede é a trilha (já corta com "…"). Sem isso, a 1024 com uma
+                trilha de 6 níveis os dois lados encolhiam juntos e o menu da pessoa passava da tela (E4, jornada 3). */}
+            <div className="flex min-w-0 items-center gap-1 sm:gap-2 lg:shrink-0">
               <SeletorVisao visao={props.visao} />
               <BuscaGlobal locais={locais} buscarNoServidor={buscarNoServidor} />
               {entradaDaTela && (

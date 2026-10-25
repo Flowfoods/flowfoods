@@ -127,7 +127,7 @@ export function BuscaGlobal({
       >
         <Search size={18} aria-hidden />
         <span className="hidden lg:inline">Buscar</span>
-        <kbd className="ml-6 hidden rounded border border-linha px-1.5 font-sans text-[11px] text-suave lg:inline [@media(pointer:coarse)]:!hidden">
+        <kbd className="ml-6 hidden rounded border border-linha px-1.5 font-sans text-[11px] text-suave xl:inline [@media(pointer:coarse)]:!hidden">
           {atalho}
         </kbd>
       </button>

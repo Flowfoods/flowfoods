@@ -4483,3 +4483,30 @@ Seguindo "COMEÇAR AQUI" (Notion). Decisão 456. Sem merge e sem deploy.
 
 **R$ do estoque (decisão 459):** o operador lê só quantidades em todas as telas de estoque (loja, visão geral, período, cobertura, conferências, saldo no insumo). Prova: `erp-estoque.db.test.ts` (nada de valor no retorno para o operador) e navegador (nenhum R$ nas telas do operador a 390 e 1440; gerente e dona continuam vendo).
 
+
+**E4 · produção, lote e etiqueta (decisões 460 e 461, 25/10/2026):** jornada 3 percorrida no app local (build de produção,
+porta 3100, banco `ff_app` preparado pelas regras do sistema: Casa Alfa do seed, estoque da Vila da Penha aberto e duas
+fichas de pré-preparo; roteiros `scratchpad/jornada3/p1…p6`, fora do git). Pessoas: Dora (Dona), Gil (Gerente da Penha),
+Otto e Duda (Operador, cozinha da Penha).
+
+| Passo | O que se viu | Perfil e tamanho |
+|---|---|---|
+| Lista do dia | Molho cheddar 5 kg + Cebola caramelizada 3 kg; a conta fecha (cebola 5,835 kg × 5 kg = falta 835 g; óleo 1,05 L; cheddar 3 kg); compra estimada R$ 3,59 só para o Gerente | Gil 1440; Otto 390 lê sem R$ e sem formulário |
+| Gerar | 261025-01 e 261025-02 com as requisições #1 e #2; "Gerar" some; o estoque não muda (cheddar 6 kg, cebola 5 kg) | Gil 1440 |
+| Pegar | Otto pega o molho (botão de 56 px, "Você está como Otto", sem R$); Duda vê "com Otto" e pega a cebola; o estoque não muda; Concluir fechado com "Falta o estoque entregar os insumos" | Otto 390 toque; Duda 820 toque |
+| Entregar | #1 inteira; #2 com a cebola que restava (4,115 kg) e "Encerrar o resto"; cada baixa entra uma vez (cheddar 6 → 3 kg, óleo 4 → 2,95 L, cebola 5 → 0) | Gil 1440 |
+| Concluir | Otto: 4,6 kg (92%, faltaram 400 g), refrigerado, volta às Tarefas, "4,6 kg de 5 kg · rendeu 92%", sem R$; Duda: 2,5 kg (83,3%) sem motivo é recusado pelo servidor com a frase no campo e o digitado fica; com o motivo, conclui. Entradas no estoque: +4,6 kg (R$ 138,74) e +2,5 kg (R$ 20,63) | Otto 390; Duda 820 |
+| Etiqueta | 2 etiquetas de 2,3 kg (E261025-0001), prévia, arquivo .zpl com lote, validade (28/10 08:58) e responsável, "Já imprimi" registrado; saldo do molho e livro do estoque iguais antes e depois (sem nova baixa); nada de R$ | Otto 1180 toque |
+| Histórico | os 2 lotes, "fora de ±10%", o motivo da Duda, tempo; Otto sem R$, Gil com R$ 138,74 e R$ 20,63 | Otto 390; Gil 1440 |
+| Indicadores | Duda e Otto em ordem alfabética, "amostra pequena", sem R$; rendimento por preparo com dado real: Cebola caramelizada 83,3% (fora de ±10%), Molho 92%; o Operador volta ao início | Gil 1440 |
+
+**Matriz:** 11 telas da jornada × 6 tamanhos (1440, 1180, 1024, 820, 390, 844×390) × claro e escuro × Dona, Gerente e
+Operador = 396 telas: 0 rolagem lateral, 0 erro de página, e o Operador sem R$ no conteúdo (inclusive o escondido) e sem
+nenhum valor de custo da jornada no HTML. **Achados corrigidos:** (1) o Operador abria a requisição do lote e lia o valor de
+cada saída (decisão 460); (2) a 1024 o cabeçalho passava da tela (até 86 px com a Dona) — os botões da direita não encolhem a
+partir de 1024 e a trilha cede, com os níveis do meio em "…" abaixo de 1280, recorte na própria caixa, o nome da tela atual
+por último a encolher e o "Ctrl K" só a partir de 1280 (decisão 461). **Revisor de UX (independente):** aprovado com
+ressalvas; os achados de tela da produção seguem na rodada de acabamento (abaixo).
+**Observação:** o pacote da ajuda (texto fixo, igual para todos, desde a 0.6) vai inteiro ao navegador e tem exemplos com
+R$ ("saco de 5 kg por R$ 25"); não é dado da operação. **Não feito:** validação com a cozinha e a gerência do Valentin's;
+impressão física na Zebra (sem impressora aqui); aparelho real.
