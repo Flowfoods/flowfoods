@@ -51,19 +51,39 @@ export function textoDoEnviado(iso: string): string {
   return `Enviado ao Rodolfo em ${dia}, às ${hora}. O que você mudar continua salvo.`;
 }
 
-/** O que impede o envio agora (áudio gravado e não salvo, anexo subindo), ou null. */
-export function bloqueioDoEnvio(audiosPendentes: number, uploads: number): string | null {
+/** O que impede o envio agora (gravação em andamento, áudio gravado e não salvo, anexo subindo), ou null. Calculado na hora. */
+export function bloqueioDoEnvio(audiosPendentes: number, uploads: number, gravando = 0): string | null {
+  if (gravando > 0) return 'Há uma gravação em andamento. Toque em “Parar” e depois em “Salvar áudio”.';
   if (audiosPendentes > 0) return `Há ${audiosPendentes === 1 ? 'um áudio gravado' : `${audiosPendentes} áudios gravados`} que ainda não ${audiosPendentes === 1 ? 'foi salvo' : 'foram salvos'}. Toque em “Salvar áudio” no item.`;
   if (uploads > 0) return 'Espere o anexo terminar de subir.';
   return null;
 }
 
-/** Os rascunhos do aparelho que diferem do que o servidor tem (os iguais já estão salvos e não voltam). */
-export function rascunhosParaRecuperar(rascunhos: Record<string, unknown>, doServidor: Record<string, string>, itensValidos: Set<string>): Record<string, string> {
+/** Um rascunho guardado no aparelho: o texto e quando foi escrito. */
+export interface Rascunho {
+  t: string;
+  em: number;
+}
+
+/**
+ * Os rascunhos do aparelho que devem voltar: diferentes do que o servidor tem E escritos depois da resposta do servidor.
+ * Sem a hora, um rascunho antigo do celular apagaria a resposta que o cliente deu depois no computador. Rascunho sem hora
+ * (formato antigo) só volta se o servidor não tem resposta.
+ */
+export function rascunhosParaRecuperar(
+  rascunhos: Record<string, unknown>,
+  doServidor: Record<string, { texto: string; em: number | null }>,
+  itensValidos: Set<string>,
+): Record<string, string> {
   const saida: Record<string, string> = {};
-  for (const [id, texto] of Object.entries(rascunhos)) {
-    if (!itensValidos.has(id) || typeof texto !== 'string') continue;
-    if (texto !== (doServidor[id] ?? '')) saida[id] = texto;
+  for (const [id, valor] of Object.entries(rascunhos)) {
+    if (!itensValidos.has(id)) continue;
+    const servidor = doServidor[id];
+    const texto = typeof valor === 'string' ? valor : valor && typeof valor === 'object' && typeof (valor as Rascunho).t === 'string' ? (valor as Rascunho).t : null;
+    if (texto === null || texto === (servidor?.texto ?? '')) continue;
+    const em = typeof valor === 'object' && valor && typeof (valor as Rascunho).em === 'number' ? (valor as Rascunho).em : null;
+    const servidorTemResposta = !!servidor?.texto;
+    if (em === null ? !servidorTemResposta : !servidorTemResposta || servidor.em === null || em > servidor.em) saida[id] = texto;
   }
   return saida;
 }

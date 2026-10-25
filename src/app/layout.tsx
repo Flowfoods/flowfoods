@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     images: [
       {
         url: '/images/galeria/foto-7.jpg',
-        width: 860,
+        width: 851,
         height: 1280,
         alt: 'Rodolfo Cavalcante — FlowFoods Consultoria',
       },

@@ -52,7 +52,7 @@ export interface ArquivoTela {
 }
 
 export interface EstadoInicial {
-  respostas: Record<string, { texto: string; marcacao: Marcacao | null }>;
+  respostas: Record<string, { texto: string; marcacao: Marcacao | null; em?: string | null }>;
   arquivos: ArquivoTela[];
   finalizadoEm: string | null;
 }
@@ -81,7 +81,9 @@ export default function Portal({
   const [arquivos, setArquivos] = useState<ArquivoTela[]>(inicial.arquivos);
   // Anexos subindo e áudios gravados ainda não salvos: contam para a barra, para o "Enviar" e para o aviso ao sair.
   const [uploads, setUploads] = useState(0);
-  const [audiosPendentes, setAudiosPendentes] = useState<Set<string>>(() => new Set());
+  const [audios, setAudios] = useState<Map<string, 'gravando' | 'pronto'>>(() => new Map());
+  const audiosProntos = [...audios.values()].filter((a) => a === 'pronto').length;
+  const audiosGravando = [...audios.values()].filter((a) => a === 'gravando').length;
   const [recuperados, setRecuperados] = useState(0);
   // Estado de cada cartão, para o retorno visual ficar ao lado do que foi feito.
   const [statusItens, setStatusItens] = useState<Record<string, StatusSalvar>>({});
@@ -103,9 +105,9 @@ export default function Portal({
     (itemId: string, texto: string | null) => {
       try {
         const chave = chaveDoRascunho(token);
-        const atual = JSON.parse(localStorage.getItem(chave) ?? '{}') as Record<string, string>;
+        const atual = JSON.parse(localStorage.getItem(chave) ?? '{}') as Record<string, unknown>;
         if (texto === null) delete atual[itemId];
-        else atual[itemId] = texto;
+        else atual[itemId] = { t: texto, em: Date.now() };
         if (Object.keys(atual).length) localStorage.setItem(chave, JSON.stringify(atual));
         else localStorage.removeItem(chave);
       } catch {
@@ -195,7 +197,9 @@ export default function Portal({
     } catch {
       return;
     }
-    const doServidor = Object.fromEntries(Object.entries(inicial.respostas).map(([k, v]) => [k, v.texto]));
+    const doServidor = Object.fromEntries(
+      Object.entries(inicial.respostas).map(([k, v]) => [k, { texto: v.texto, em: v.em ? Date.parse(v.em) : null }]),
+    );
     const voltar = rascunhosParaRecuperar(rascunhos, doServidor, new Set(q.itens.map((i) => i.id)));
     const ids = Object.keys(voltar);
     if (ids.length === 0) {
@@ -220,7 +224,7 @@ export default function Portal({
   // Fechar ou recarregar com algo que ainda não salvou (sem conexão, áudio gravado, anexo subindo): o navegador pergunta.
   const precisaAvisar = useRef(false);
   precisaAvisar.current =
-    uploads > 0 || audiosPendentes.size > 0 || Object.values(statusItens).some((st) => st === 'erro' || st === 'recusado');
+    uploads > 0 || audios.size > 0 || Object.values(statusItens).some((st) => st === 'erro' || st === 'recusado');
   useEffect(() => {
     const aoSairDaPagina = (e: BeforeUnloadEvent) => {
       if (!precisaAvisar.current) return;
@@ -275,22 +279,24 @@ export default function Portal({
   // Estáveis (useCallback): os cartões avisam por efeito, e uma função nova a cada desenho faria o efeito rodar sem parar.
   const aoUpload = useCallback((delta: number) => setUploads((n) => Math.max(0, n + delta)), []);
   const aoMudarAudio = useCallback(
-    (itemId: string, pendente: boolean) =>
-      setAudiosPendentes((atual) => {
-        if (atual.has(itemId) === pendente) return atual;
-        const novo = new Set(atual);
-        if (pendente) novo.add(itemId);
-        else novo.delete(itemId);
+    (itemId: string, fase: 'nenhum' | 'gravando' | 'pronto') =>
+      setAudios((atual) => {
+        if ((atual.get(itemId) ?? 'nenhum') === fase) return atual;
+        const novo = new Map(atual);
+        if (fase === 'nenhum') novo.delete(itemId);
+        else novo.set(itemId, fase);
         return novo;
       }),
     [],
   );
   const emBranco = useMemo(() => progresso.situacoes.filter((s) => s.estado === 'PENDENTE').map((s) => s.item.id), [progresso]);
   const irParaEmBranco = () => {
-    const id = emBranco[0];
-    if (!id) return;
-    document.getElementById(`item-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    (document.getElementById(`campo-${id}`) as HTMLTextAreaElement | null)?.focus({ preventScroll: true });
+    if (emBranco.length === 0) return;
+    // O próximo em branco abaixo do que está na tela; no fim, volta ao primeiro. Sem pôr o cursor no campo: no celular o
+    // teclado abriria por cima das marcações ("Não tenho", "Não sei", "Agora não").
+    const limite = window.innerHeight * 0.4;
+    const id = emBranco.find((i) => (document.getElementById(`item-${i}`)?.getBoundingClientRect().top ?? 0) > limite) ?? emBranco[0];
+    document.getElementById(`item-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const blocosArquivo = q.blocos.filter((b) => b.tipo === 'ARQUIVO');
@@ -379,7 +385,7 @@ export default function Portal({
         respondidos={progresso.recebidos + progresso.marcados}
         total={progresso.total}
         finalizadoEm={finalizadoEm}
-        bloqueio={bloqueioDoEnvio(audiosPendentes.size, uploads)}
+        bloqueio={bloqueioDoEnvio(audiosProntos, uploads, audiosGravando)}
         irParaEmBranco={irParaEmBranco}
         antesDeEnviar={async () => {
           await Promise.all([...sujos.current.keys()].map((id) => salvarTexto(id)));
@@ -467,7 +473,7 @@ function CartaoItem({
   aoSubir: (a: ArquivoTela) => void;
   aoRemover: (id: string) => void;
   aoUpload: (delta: number) => void;
-  aoMudarAudio: (itemId: string, pendente: boolean) => void;
+  aoMudarAudio: (itemId: string, fase: 'nenhum' | 'gravando' | 'pronto') => void;
 }) {
   const estado: EstadoItem = estadoDe.get(item.id) ?? 'PENDENTE';
   const marcacao = marcacoes[item.id];
@@ -518,7 +524,7 @@ function CartaoItem({
               onClick={() => aoMarcar(item.id, m)}
               className={`min-h-[44px] border px-3 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60 ${
                 ativa
-                  ? 'border-footer bg-footer text-creme'
+                  ? 'border-footer bg-footer/10 text-footer ring-1 ring-inset ring-footer'
                   : 'border-footer/30 text-footer/70 hover:border-footer/60'
               }`}
             >
@@ -626,7 +632,7 @@ export function Gravador({
   item: Item;
   aoSubir: (a: ArquivoTela) => void;
   aoUpload?: (delta: number) => void;
-  aoMudarAudio?: (itemId: string, pendente: boolean) => void;
+  aoMudarAudio?: (itemId: string, fase: 'nenhum' | 'gravando' | 'pronto') => void;
 }) {
   const [fase, setFase] = useState<FaseGravacao>('ocioso');
   const [segundos, setSegundos] = useState(0);
@@ -646,13 +652,13 @@ export function Gravador({
   }, []);
 
   // Gravação pronta e ainda não salva: o "Enviar" da barra e o aviso ao sair sabem. Ao sair da tela, deixa de contar.
-  const pendente = fase === 'pronto' || fase === 'gravando';
+  const faseDoAudio = fase === 'gravando' ? 'gravando' : fase === 'pronto' ? 'pronto' : 'nenhum';
   useEffect(() => {
-    aoMudarAudio?.(item.id, pendente);
-  }, [pendente, item.id, aoMudarAudio]);
+    aoMudarAudio?.(item.id, faseDoAudio);
+  }, [faseDoAudio, item.id, aoMudarAudio]);
   const avisarAudio = useRef(aoMudarAudio);
   avisarAudio.current = aoMudarAudio;
-  useEffect(() => () => avisarAudio.current?.(item.id, false), [item.id]);
+  useEffect(() => () => avisarAudio.current?.(item.id, 'nenhum'), [item.id]);
 
   const pararRelogio = () => {
     if (relogio.current) clearInterval(relogio.current);
@@ -945,18 +951,32 @@ function BarraEnviar({
   aoEnviar: (quando: string) => void;
 }) {
   const [enviando, setEnviando] = useState(false);
-  const [erro, setErro] = useState<string | null>(null);
+  // 'salvar': faltou salvar uma resposta (some quando tudo salva); 'envio': o envio falhou (fica até um envio dar certo:
+  // "Tudo salvo" no lugar faria o cliente fechar achando que enviou).
+  const [falha, setFalha] = useState<null | 'salvar' | 'envio'>(null);
+  const [tentouComBloqueio, setTentouComBloqueio] = useState(false);
   const pct = total > 0 ? Math.round((respondidos / total) * 100) : 0;
 
-  // O erro de envio sai quando tudo salvou (antes ficava na tela depois que a rede voltava).
   useEffect(() => {
-    if (status === 'salvo') setErro(null);
-  }, [status]);
+    if (status === 'salvo' && falha === 'salvar') setFalha(null);
+  }, [status, falha]);
+  // O aviso do bloqueio é calculado na hora: some quando o áudio é salvo ou descartado e o anexo termina.
+  useEffect(() => {
+    if (!bloqueio) setTentouComBloqueio(false);
+  }, [bloqueio]);
+  const erro =
+    tentouComBloqueio && bloqueio
+      ? bloqueio
+      : falha === 'salvar'
+        ? 'Não enviou: falta salvar uma resposta. Tente de novo.'
+        : falha === 'envio'
+          ? 'Não enviou. O que você escreveu está salvo; tente enviar de novo em instantes.'
+          : null;
 
   const enviar = async () => {
-    // Áudio gravado e não salvo, ou anexo subindo: o "Enviar" não passa por cima (antes salvava só o texto).
+    // Gravação em andamento, áudio gravado e não salvo, ou anexo subindo: o "Enviar" não passa por cima.
     if (bloqueio) {
-      setErro(bloqueio);
+      setTentouComBloqueio(true);
       return;
     }
     const aviso =
@@ -966,17 +986,18 @@ function BarraEnviar({
     if (!window.confirm(aviso)) return;
 
     setEnviando(true);
-    setErro(null);
     const salvou = await antesDeEnviar();
     if (!salvou) {
       setEnviando(false);
-      setErro('Não enviou: falta salvar uma resposta. Tente de novo.');
+      setFalha('salvar');
       return;
     }
     const r = await fetch(`/api/portal/${token}/finalizar`, { method: 'POST' }).catch(() => null);
     setEnviando(false);
-    if (r?.ok) aoEnviar(new Date().toISOString());
-    else setErro('Não enviou. Tente de novo em instantes.');
+    if (r?.ok) {
+      setFalha(null);
+      aoEnviar(new Date().toISOString());
+    } else setFalha('envio');
   };
 
   return (
@@ -990,7 +1011,7 @@ function BarraEnviar({
             {respondidos} de {total}
             {pendentes > 0 && (
               // Leva ao próximo item em branco: com 50 itens, achar o que falta rolando é o que cansa.
-              <button type="button" onClick={irParaEmBranco} className="ml-1 inline-flex min-h-[44px] items-center font-normal text-footer/70 underline decoration-footer/40 underline-offset-4 hover:decoration-footer">
+              <button type="button" onClick={irParaEmBranco} className="-my-3 ml-1 inline-flex min-h-[44px] items-center font-normal text-footer/70 underline decoration-footer/40 underline-offset-4 hover:decoration-footer">
                 · {pendentes} em branco
               </button>
             )}

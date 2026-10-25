@@ -64,7 +64,7 @@ export default function Hero() {
             <img
               src="/images/galeria/foto-7.jpg"
               alt="Rodolfo Cavalcante, chef e consultor da FlowFoods"
-              width={860}
+              width={851}
               height={1280}
               className="aspect-[3/4] w-full object-cover object-top"
             />

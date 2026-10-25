@@ -40,12 +40,21 @@ describe('E5.1 · Portal do cliente: estado, selo, envio e rascunho', () => {
     expect(bloqueioDoEnvio(1, 0)).toBe('Há um áudio gravado que ainda não foi salvo. Toque em “Salvar áudio” no item.');
     expect(bloqueioDoEnvio(2, 1)).toMatch(/^Há 2 áudios gravados que ainda não foram salvos/);
     expect(bloqueioDoEnvio(0, 1)).toBe('Espere o anexo terminar de subir.');
+    expect(bloqueioDoEnvio(1, 0, 1)).toBe('Há uma gravação em andamento. Toque em “Parar” e depois em “Salvar áudio”.');
   });
 
-  it('o rascunho do aparelho só volta quando difere do servidor, e só para itens do formulário', () => {
-    const r = rascunhosParaRecuperar({ a: 'novo texto', b: 'igual', c: 'item que não existe', d: 42 }, { a: 'antigo', b: 'igual' }, new Set(['a', 'b', 'd']));
+  it('o rascunho do aparelho só volta quando difere do servidor e é mais novo que a resposta de lá', () => {
+    const servidor = { a: { texto: 'antigo', em: 1000 }, b: { texto: 'igual', em: 1000 }, f: { texto: 'respondido no computador', em: 5000 } };
+    const r = rascunhosParaRecuperar(
+      { a: { t: 'novo texto', em: 2000 }, b: { t: 'igual', em: 9000 }, c: { t: 'item que não existe', em: 9000 }, d: 42, f: { t: 'rascunho velho do celular', em: 3000 } },
+      servidor,
+      new Set(['a', 'b', 'd', 'f']),
+    );
+    // f: o cliente respondeu no computador depois; o rascunho velho do celular não apaga a resposta nova.
     expect(r).toEqual({ a: 'novo texto' });
-    expect(rascunhosParaRecuperar({ e: 'escrito sem conexão' }, {}, new Set(['e']))).toEqual({ e: 'escrito sem conexão' });
+    expect(rascunhosParaRecuperar({ e: { t: 'escrito sem conexão', em: 1 } }, {}, new Set(['e']))).toEqual({ e: 'escrito sem conexão' });
+    // Formato antigo (sem hora): só volta se o servidor não tem resposta.
+    expect(rascunhosParaRecuperar({ e: 'texto', a: 'texto' }, { a: { texto: 'resposta', em: 1 } }, new Set(['e', 'a']))).toEqual({ e: 'texto' });
     expect(chaveDoRascunho('tok')).toBe('ff-portal-rascunho:tok');
   });
 });

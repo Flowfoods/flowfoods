@@ -24,7 +24,7 @@ export default async function PortalPage({ params }: { params: { token: string }
   const [respostas, arquivos] = await Promise.all([
     prisma.portalResposta.findMany({
       where: { clienteId: c.cliente.id },
-      select: { itemId: true, texto: true, marcacao: true },
+      select: { itemId: true, texto: true, marcacao: true, atualizadoEm: true },
     }),
     prisma.portalArquivo.findMany({
       where: { clienteId: c.cliente.id },
@@ -35,7 +35,8 @@ export default async function PortalPage({ params }: { params: { token: string }
 
   const inicial: EstadoInicial = {
     respostas: Object.fromEntries(
-      respostas.map((r) => [r.itemId, { texto: r.texto ?? '', marcacao: r.marcacao }]),
+      // A hora da resposta: o rascunho do aparelho só volta se for mais novo (decisão 471).
+      respostas.map((r) => [r.itemId, { texto: r.texto ?? '', marcacao: r.marcacao, em: r.atualizadoEm.toISOString() }]),
     ),
     arquivos,
     finalizadoEm: c.cliente.finalizadoEm?.toISOString() ?? null,
