@@ -4524,3 +4524,29 @@ Otto; concluir mostra o botão da etiqueta (56 px) e ele leva à etiqueta do lot
 novo sem foco nem recarga; lista de amanhã com a falta de Cebola roxa (4,95 kg) junto do botão. **Fiscal independente:** aprovado com ressalvas; os 4
 "deveria" (confirmação que sumia e fazia a tela pular, frase do concluído que prometia validade, falta atribuída ao lote a
 gerar, "Não saiu" no lote cancelado) corrigidos antes do commit.
+
+**E4 · pendências das jornadas 1 e 2 (decisão 463, 25/10/2026):** percorridas no app local, sem mudança de código.
+
+*Jornada 2 — contagem com diferença, divergências e fechamento do período.* O Gerente planeja a contagem do refrigerado (o lugar
+todo, 6 insumos); o Otto conta no celular (390, toque) com diferença — molho 5 kg contra 5,55 no livro, bacon 2,9 contra 3 —, com
+"Não tem" nos zerados e os números mantidos ao recarregar, sem R$; não fecha sozinha (o molho passa da tolerância de R$ 5,00); a
+conferência mostra −550 g (R$ 15,26 a menos · confira) e −100 g (R$ 4,29) ao Gerente e só as quantidades ao Otto (nem no HTML); o
+Gerente aplica e o livro fica molho 5 kg, bacon 2,9 kg, cheddar 2,4 kg. Divergências do período: o bacon como "sumiu sem
+requisição" (−100 g, R$ 4,29; duas contagens, ninguém pediu); o molho fica de fora porque só tem uma contagem (o cruzamento pede
+contagem nas duas pontas); "requisitado sem contagem para cruzar" lista cebola e óleo; o Operador não abre a tela. Fechamento: no
+banco local, regra semanal desde 19/10 gravada direto (a tela só muda a regra a partir do próximo período, decisão 144), para a
+semana 19–25/10 terminar hoje; o Gerente começa o fechamento (lista vazia: tudo já contado no período, cobertura 100%), confere e
+fecha — "Período fechado", estoque final fotografado em R$ 1.078,43. Matriz: 6 telas (período, contagem, conferência, fechamento,
+divergências, estoque) × 6 tamanhos × 2 temas × Gerente e Operador = 144 telas, sem rolagem lateral, sem erro e o Operador sem R$.
+
+*Jornada 1 — conferência de nota por XML.* O Gerente da Penha sobe o XML sintético (nota 4521) com a loja sem CNPJ: recusa em frase
+("Nenhuma loja sua tem o CNPJ 11.444.777/0001-61… Cadastre o CNPJ da loja"), só a loja dele citada, nada gravado; a Dona cadastra o
+CNPJ em Lojas (dígito errado recusado no campo); de novo, a nota vira documento "Aguardando conferência" com o fornecedor "a
+completar"; o Gerente liga bacon (2 CX → 20 kg) e guardanapo (1 FD → 500 un), cadastra a mussarela pelo "Insumo que falta: cadastrar"
+(nome levado, categoria sugerida) e volta com as escolhas; "3 PC → 6 kg", 3 de 3 ligados, R$ 550,00 + frete R$ 30,00 = R$ 580,00
+"confere"; data de entrada trocada para hoje (a emissão, 21/10, é antes da abertura); a prévia mostra o custo novo de cada insumo e
+"Nada foi gravado"; conciliar lança UMA nota (IMPORTACAO, R$ 580,00), o estoque sobe uma vez (bacon 2,9 → 22,9 kg, guardanapo 500
+un, mussarela 6 kg), a nota diz que veio do XML e não tem "Editar"; o mesmo arquivo de novo é "já recebida"; o Operador não acessa.
+Matriz: 4 telas × 6 tamanhos × 2 temas × Gerente e Dona = 96 telas, sem falha. **Observação (não mudou):** a parte "Estoque" da
+prévia é uma frase ("Entra no estoque da Vila da Penha ao lançar"); as quantidades estão em cada item ("2 CX → 20 kg").
+**Não feito:** validação com o Valentin's; XML real de fornecedor (só o sintético).
