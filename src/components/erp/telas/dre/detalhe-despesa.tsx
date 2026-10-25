@@ -23,6 +23,7 @@ import type { AcaoDeCadastro } from './estado';
 export function TelaDaDespesa({
   d,
   base,
+  voltar,
   hoje,
   feito,
   podeLancar,
@@ -33,6 +34,8 @@ export function TelaDaDespesa({
   d: DespesaCompleta;
   /** `/erp/dre/despesas` ou `/rodolfo/erp/<slug>/dre/despesas`. */
   base: string;
+  /** Veio da composição de uma linha do DRE (decisão 464): o "voltar" leva para ela, não para a lista do mês. */
+  voltar?: { href: string; rotulo: string };
   hoje: string;
   feito?: string;
   podeLancar: boolean;
@@ -59,8 +62,8 @@ export function TelaDaDespesa({
           ) : undefined
         }
       >
-        <Link href={base} className={LINK_DE_TEXTO}>
-          Voltar para as despesas
+        <Link href={voltar?.href ?? base} className={LINK_DE_TEXTO}>
+          {voltar ? `Voltar para ${voltar.rotulo}` : 'Voltar para as despesas'}
         </Link>
       </PageHeader>
 

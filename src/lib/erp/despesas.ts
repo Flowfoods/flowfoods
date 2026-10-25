@@ -34,6 +34,8 @@ import {
   chaveDoEnvio,
   competenciaDoMes,
   diaNoMes,
+  diasDaCompetencia,
+  diasNoRecorte,
   ENVIO_VALIDO,
   ehFiltroDeSituacao,
   lerDataDoPagamento,
@@ -48,6 +50,7 @@ import {
   type Competencia,
   type ErrosDaDespesa,
   type FiltroDeSituacao,
+  type RecorteDaComposicao,
   type SituacaoDoPagamento,
   type TextosDaDespesa,
 } from './despesa-campos';
@@ -722,19 +725,65 @@ export interface DespesaApropriadaLida {
  */
 export async function despesasApropriadas(cliente: ClienteDoParceiro, alcance: Alcance, recorte: { de: string; ate: string }, lojaId?: string): Promise<DespesaApropriadaLida[]> {
   if (recorte.ate < recorte.de || !podeVerDespesas(alcance)) return [];
-  const escopo: Prisma.DespesaWhereInput = lojaId !== undefined ? (alcancaLoja(alcance, lojaId) ? { lojaId } : { id: '' }) : escopoDasDespesas(alcance);
   const linhas = await cliente.despesa.findMany({
-    where: {
-      AND: [
-        escopo,
-        { competencia: { lte: dataDoBanco(recorte.ate) } },
-        { OR: [{ competenciaFim: { gte: dataDoBanco(recorte.de) } }, { competenciaFim: null, competencia: { gte: dataDoBanco(recorte.de) } }] },
-      ],
-    },
+    where: { AND: [escopoDoDre(alcance, lojaId), ...cruzaORecorte(recorte)] },
     select: { linhaId: true, lojaId: true, valorCentavos: true, competencia: true, competenciaFim: true },
   });
   return linhas
     .map((d) => ({ linhaId: d.linhaId, lojaId: d.lojaId, centavos: apropriar(d.valorCentavos, { inicio: iso(d.competencia), fim: iso(d.competenciaFim ?? d.competencia) }, recorte) }))
     .filter((d) => d.centavos !== 0);
+}
+
+/** A visão do DRE: uma loja (sem a despesa da rede) ou o alcance inteiro (com a da rede, só para quem tem a rede inteira). */
+function escopoDoDre(alcance: Alcance, lojaId?: string): Prisma.DespesaWhereInput {
+  return lojaId !== undefined ? (alcancaLoja(alcance, lojaId) ? { lojaId } : { id: '' }) : escopoDasDespesas(alcance);
+}
+
+/** A competência tem algum dia em [de, ate]: a MESMA condição no DRE e na composição de uma linha. */
+function cruzaORecorte(recorte: { de: string; ate: string }): Prisma.DespesaWhereInput[] {
+  return [
+    { competencia: { lte: dataDoBanco(recorte.ate) } },
+    { OR: [{ competenciaFim: { gte: dataDoBanco(recorte.de) } }, { competenciaFim: null, competencia: { gte: dataDoBanco(recorte.de) } }] },
+  ];
+}
+
+/** Uma despesa na composição de uma linha: a despesa inteira e a parte dela que cai no recorte, como o DRE conta. */
+export interface ParteDaDespesa extends DespesaLida {
+  noRecorteCentavos: number;
+  diasNoRecorte: number;
+  /** Dias da competência inteira. */
+  dias: number;
+}
+
+export interface ComposicaoDaLinha {
+  linha: { id: string; nome: string; grupo: GrupoDoDre };
+  itens: ParteDaDespesa[];
+  /** A soma do que cai no recorte: é o número da linha no DRE ao vivo (mesma consulta, mesma apropriação). */
+  totalCentavos: number;
+}
+
+/**
+ * O que forma um número de despesa do DRE (jornada 4, decisão 464): as despesas da linha que cruzam o recorte, cada uma com a parte
+ * que cai nele. A consulta e a conta são as de `despesasApropriadas` (o DRE), filtradas pela linha: a soma é o número da tela, ao
+ * centavo. `lojaId` é a visão de uma loja (sem a despesa da rede); sem ele, o alcance inteiro. Nulo: sem permissão de ver despesas,
+ * ou a linha não existe neste parceiro (a página mostra a lista normal).
+ */
+export async function composicaoDaLinha(cliente: ClienteDoParceiro, alcance: Alcance, recorte: RecorteDaComposicao, lojaId?: string): Promise<ComposicaoDaLinha | null> {
+  if (!podeVerDespesas(alcance) || recorte.ate < recorte.de) return null;
+  const linha = await cliente.dreLinha.findFirst({ where: { id: recorte.linhaId, calculada: false }, select: { id: true, nome: true, grupo: true } });
+  if (!linha) return null;
+  const linhas = await cliente.despesa.findMany({
+    where: { AND: [escopoDoDre(alcance, lojaId), { linhaId: linha.id }, ...cruzaORecorte(recorte)] },
+    include: INCLUIR,
+    orderBy: [{ competencia: 'asc' }, { id: 'asc' }],
+  });
+  const itens = linhas
+    .map((d) => {
+      const l = lida(d);
+      return { ...l, noRecorteCentavos: apropriar(l.valorCentavos, l.competencia, recorte), diasNoRecorte: diasNoRecorte(l.competencia, recorte), dias: diasDaCompetencia(l.competencia) };
+    })
+    .filter((i) => i.noRecorteCentavos !== 0)
+    .sort((a, b) => b.noRecorteCentavos - a.noRecorteCentavos || a.descricao.localeCompare(b.descricao, 'pt-BR'));
+  return { linha, itens, totalCentavos: itens.reduce((s, i) => s + i.noRecorteCentavos, 0) };
 }
 

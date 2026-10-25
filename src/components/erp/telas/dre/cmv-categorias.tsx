@@ -40,6 +40,8 @@ export interface PermissoesDoPainelDeCategorias {
   classificar: boolean;
   /** A pessoa tem a rede inteira: pode alternar entre a rede e uma loja. */
   veRede: boolean;
+  /** `compras.ver`: o valor de cada categoria (pelas compras, ao vivo) abre o relatório de compras dela (decisão 464). */
+  verCompras?: boolean;
 }
 
 /** Link de texto com alvo de 44 px onde o dedo é o ponteiro. */
@@ -77,7 +79,10 @@ function Nome({ l }: { l: LinhaDoPainel }) {
   );
 }
 
-function LinhaDaTabela({ l, semCorGeral }: { l: LinhaDoPainel; semCorGeral: boolean }) {
+/** Número que abre os registros: o mesmo sublinhado discreto do DRE e das telas de compras. */
+const NUMERO_QUE_ABRE = 'ff-transicao inline-flex items-center rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto [@media(pointer:coarse)]:min-h-11';
+
+function LinhaDaTabela({ l, semCorGeral, abre }: { l: LinhaDoPainel; semCorGeral: boolean; abre?: string | null }) {
   const apoio = l.tipo === 'variacao' || l.tipo === 'preparos';
   const mostraMeta = l.tipo === 'categoria' && l.metaBp !== null;
   const origem = l.metaVemDe === 'loja' ? 'da loja' : l.metaVemDe === 'rede' ? 'da rede' : l.metaVemDe === 'mista' ? 'varia por loja' : null;
@@ -104,7 +109,17 @@ function LinhaDaTabela({ l, semCorGeral }: { l: LinhaDoPainel; semCorGeral: bool
       </th>
       <td className="px-3 py-2 text-right align-top">
         <span className="block min-h-6 leading-6">
-          {l.realizadoCentavos === null ? <span className="font-normal text-suave">—</span> : l.realizadoCentavos === 0 ? <span className="font-normal text-suave">—</span> : <span className={apoio ? 'font-normal' : ''}>{apoio ? dinheiroComSinal(l.realizadoCentavos) : moeda(l.realizadoCentavos)}</span>}
+          {l.realizadoCentavos === null ? (
+            <span className="font-normal text-suave">—</span>
+          ) : l.realizadoCentavos === 0 ? (
+            <span className="font-normal text-suave">—</span>
+          ) : abre && !apoio ? (
+            <Link href={abre} aria-label={`${l.nome}, ${moeda(l.realizadoCentavos)}: ver as compras que formam este número`} className={NUMERO_QUE_ABRE}>
+              {moeda(l.realizadoCentavos)}
+            </Link>
+          ) : (
+            <span className={apoio ? 'font-normal' : ''}>{apoio ? dinheiroComSinal(l.realizadoCentavos) : moeda(l.realizadoCentavos)}</span>
+          )}
         </span>
       </td>
       <td className="whitespace-nowrap px-3 py-2 text-right align-top font-normal sm:px-5">
@@ -164,6 +179,18 @@ export function TelaDoCmvPorCategoria({
   const link = (p: { inicio: string }) => `${base}?periodo=${p.inicio}${escopoQuery}${vistaQuery}`;
   const linkDaVista = (v: VistaDoPainel) => `${base}?periodo=${d.periodo.inicio}${escopoQuery}${v === 'categorias' ? '' : `&vista=${v}`}`;
   const linha = total.linha;
+  // Decisão 464: categoria pelas compras, ao vivo, abre as compras dela no MESMO recorte e visão (o relatório soma itens + frete,
+  // pela data da nota e pela categoria de hoje do insumo: a mesma conta). Fechado (categoria da época) e o real (estoque) não abrem.
+  // Na rede, as lojas vão por extenso: sem loja marcada o relatório usaria a loja escolhida no topo.
+  const aqui = `${base}?periodo=${d.periodo.inicio}${escopoQuery}`;
+  // Só abre quando o relatório soma o mesmo número: nenhuma loja do escopo no real por categoria (o relatório é só compras) e
+  // nenhum pré-preparo comprado na categoria (no painel ele está na linha dos pré-preparos; no relatório, na categoria dele).
+  const soCompras = (painel?.compraReal?.lojasComparadas.length ?? 0) === 0;
+  const comPreparo = new Set(r.categoriasComPreparoComprado ?? []);
+  const abreCategoria = (l: LinhaDoPainel): string | null =>
+    pode.verCompras && d.ate && d.status !== 'FECHADO' && soCompras && l.tipo === 'categoria' && l.categoriaId && !comPreparo.has(l.categoriaId) && l.fonte === 'compras' && (l.realizadoCentavos ?? 0) > 0
+      ? `${raiz}/compras/relatorios/periodo?de=${d.periodo.inicio}&ate=${d.ate}&categoria=${l.categoriaId}${loja ? `&loja=${loja.lojaId}` : d.lojasDoEscopo.map((x) => `&loja=${x.id}`).join('')}&volta=${encodeURIComponent(aqui)}`
+      : null;
   const selo = seloDoCmv(linha);
   const semFaturamento = d.resultado.semFaturamento;
   // Parte das categorias vem do real (estoque contado por insumo) e parte das compras: o selo diz "misto" e de quem é cada parte.
@@ -371,7 +398,7 @@ export function TelaDoCmvPorCategoria({
                   </thead>
                   <tbody className="tabular-nums">
                     {painel.linhas.map((l) => (
-                      <LinhaDaTabela key={l.chave} l={l} semCorGeral={painel.semCor !== null} />
+                      <LinhaDaTabela key={l.chave} l={l} semCorGeral={painel.semCor !== null} abre={abreCategoria(l)} />
                     ))}
                   </tbody>
                   <tfoot className="tabular-nums">

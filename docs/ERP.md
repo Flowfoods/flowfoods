@@ -4550,3 +4550,30 @@ un, mussarela 6 kg), a nota diz que veio do XML e não tem "Editar"; o mesmo arq
 Matriz: 4 telas × 6 tamanhos × 2 temas × Gerente e Dona = 96 telas, sem falha. **Observação (não mudou):** a parte "Estoque" da
 prévia é uma frase ("Entra no estoque da Vila da Penha ao lançar"); as quantidades estão em cada item ("2 CX → 20 kg").
 **Não feito:** validação com o Valentin's; XML real de fornecedor (só o sintético).
+
+**E4 · resultados, composição e fechamento — jornada 4 (decisão 464, 25/10/2026):** percorrida no app local (build de produção,
+banco `ff_app`, Casa Alfa de teste), com dados entrando pelas telas: a Dona tira o salão da loja só-delivery (canais Delivery ·
+iFood), importa a planilha de outubro (01/10 a 24/10, 120 lançamentos de loja × canal × dia, prévia "120 novas · 0 com erro"),
+configura a taxa do iFood (12 % + 3,2 %) e lança aluguel das duas lojas, contador da rede, folha e um conserto de um dia; o Gerente
+da Penha lança a luz (só a loja dele no formulário); a Dona lança duas notas no período de agora (R$ 861,50 e R$ 495,90).
+*Conferência dos números:* 01/10 a 18/10 receita R$ 180.301,75 (loja R$ 48.501,33 · delivery R$ 36.872,96 · iFood R$ 94.927,46,
+igual à planilha), aluguel R$ 8.100,00 (18/31 de R$ 9.300,00 + 18/31 de R$ 4.650,00), taxa do iFood por loja com um arredondamento,
+resultado R$ 143.672,78; período de agora até ontem (24/10) com 6/31 das despesas do mês e CMV pelas compras R$ 1.357,40 (as duas
+notas), aberto por categoria (Proteína R$ 540,00, Laticínios R$ 315,50, Embalagens R$ 310,00…). *Fechamento:* antes da taxa, "Houve
+venda no iFood e a taxa do iFood não está configurada" (com "Configurar a taxa"); depois, "Nenhuma condição pendente"; a Dona fecha
+01/10 a 18/10 — o DRE fechado bate linha a linha com o ao vivo na rede e em cada loja; o Gerente vê o fechado da loja dele, sem
+fechar. *Isolamento:* o Gerente só recebe a Vila da Penha (também com `?rede=1` e `?loja=<outra>`); o Operador não abre DRE, CMV por
+categoria, despesas, períodos nem faturamento.
+*Achado e mudança (decisão 464):* nenhum número do DRE abria o que o forma. Agora o valor de cada despesa abre a composição (cada
+despesa, os dias no recorte e a parte que entra; soma = número do DRE) → a despesa → volta para a composição → volta para o DRE;
+"Pelas compras" abre o relatório de compras do recorte (na rede, as lojas por extenso) → linha → nota; o CMV abre o CMV por
+categoria → a categoria abre as compras dela (só quando o destino soma o mesmo) → nota; a receita ganha "Lançamentos de <mês>"; o
+painel compra × real, "Ver as compras de dd/mm a dd/mm". Importação de faturamento diz "lançamentos", não "dias".
+*Roteiros:* `scratchpad/jornada3/j4a…j4g` e `j4-matriz.mjs` (fora do git).
+*Fiscais:* revisor de código/QA e guardião de isolamento, aprovados com ressalvas e sem vazamento; corrigido antes do commit: na
+rede, o relatório de compras herdava a loja escolhida no topo (as lojas agora vão por extenso no endereço); categoria com
+pré-preparo comprado em nota não abre (o relatório somaria diferente do painel); o painel abre as linhas; o título da composição
+sem loja; testes que comparam o total da tela de destino, o nível 1 e quem só lança despesas. *Checks:* suíte com banco 151
+arquivos, 2.844 aprovados, 46 pulados, 0 falhas; lint, typecheck e gate limpos; teste novo `erp-dre-composicao` (9 casos, com
+banco) e 3 puros em `erp-dre.test`; navegador: jornada de composição com 23 conferências e o nível 1 (composição e voltas com a
+raiz do parceiro). **Não feito:** validação com o Valentin's; dados reais de faturamento.

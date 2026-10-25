@@ -11,7 +11,9 @@ import Link from 'next/link';
 import { Fragment } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { formatarData } from '@/lib/erp/compra-campos';
-import { textoDoPercentual, type LinhaDoDre } from '@/lib/erp/dre-campos';
+import { CHAVE_CMV_COMPRA, textoDoPercentual, type LinhaDoDre } from '@/lib/erp/dre-campos';
+import { mesesDoIntervalo } from '@/lib/erp/despesa-campos';
+import { rotuloDoMes } from '@/lib/erp/faturamento-campos';
 import { textoDaMeta, textoDaMetaDeCrescimento, textoDaVariacao, type AnoPassado } from '@/lib/erp/dre-metas-campos';
 import { rotuloDaRessalva } from '@/lib/erp/dre-fechamento-campos';
 import { CODIGO, codigoDoSubtotal } from '@/lib/erp/dre-plano';
@@ -54,17 +56,53 @@ function prefixo(l: LinhaDoDre): string {
   return '';
 }
 
-function Celula({ l, semFaturamento }: { l: LinhaDoDre; semFaturamento: boolean }) {
+/** "01/09": o dia e o mês, sem o dia da semana (cabe numa frase de link). */
+const diaEMes = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+
+/** Para onde o número de uma linha leva (jornada 4, decisão 464): os registros que o formam, no recorte e na visão do DRE. */
+interface Abertura {
+  href: string;
+  /** Completa o nome acessível do link: "Aluguel, R$ 2.700,00: ver as despesas que formam este número". */
+  oQue: string;
+}
+
+/** Número que abre os registros: sublinhado discreto (o mesmo das telas de compras), alvo de 44 px onde o dedo é o ponteiro. */
+const NUMERO_QUE_ABRE = 'ff-transicao inline-flex items-center rounded-[5px] underline decoration-linha-forte underline-offset-4 hover:decoration-texto [@media(pointer:coarse)]:min-h-11';
+
+function Celula({ l, semFaturamento, abre }: { l: LinhaDoDre; semFaturamento: boolean; abre?: Abertura | null }) {
   if (l.valorCentavos === null) return <span className="text-[13px] font-normal text-suave">{l.nota}</span>;
   // Zero é "nada lançado" (nunca R$ 0,00 no lugar de dado ausente); só um resultado que fechou em zero com receita mostra o zero.
   if (l.valorCentavos === 0 && (l.tipo !== 'resultado' || semFaturamento)) return <span className="font-normal text-suave">—</span>;
   const negativo = l.valorCentavos < 0;
-  return <span className={negativo && l.tipo === 'resultado' ? 'text-erro' : undefined}>{formatarDinheiro(l.valorCentavos)}</span>;
+  const valor = formatarDinheiro(l.valorCentavos);
+  if (abre) {
+    return (
+      <Link href={abre.href} aria-label={`${l.nome}, ${valor}: ${abre.oQue}`} className={NUMERO_QUE_ABRE}>
+        {valor}
+      </Link>
+    );
+  }
+  return <span className={negativo && l.tipo === 'resultado' ? 'text-erro' : undefined}>{valor}</span>;
 }
 
-function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: PermissoesDaTela }) {
+function Tabela({ d, raiz, pode, escopoQuery }: { d: DreDoPeriodo; raiz: string; pode: PermissoesDaTela; escopoQuery: string }) {
   const r = d.resultado;
   const daLoja = d.escopo.tipo === 'loja';
+  const lojaQuery = d.escopo.tipo === 'loja' ? `&loja=${d.escopo.lojaId}` : '';
+  // O relatório de compras sem loja marcada usaria a loja escolhida no topo: na rede, as lojas do DRE vão por extenso.
+  const lojasDasCompras = d.escopo.tipo === 'loja' ? lojaQuery : d.lojasDoEscopo.map((l) => `&loja=${l.id}`).join('');
+  const meses = d.ate ? mesesDoIntervalo(d.periodo.inicio, d.ate) : [];
+  const faturamentoDoMes = (mes: string) => `${raiz}/faturamento?mes=${mes}${d.escopo.tipo === 'loja' ? `&loja=${d.escopo.lojaId}` : '&rede=1'}`;
+  const aqui = `${raiz}/dre?periodo=${d.periodo.inicio}${escopoQuery}`;
+  /** Cada número abre o que o forma, no MESMO recorte (início do período até o último dia apurado) e na mesma visão. */
+  const abre = (l: LinhaDoDre): Abertura | null => {
+    if (!d.ate || l.valorCentavos === null || l.valorCentavos === 0) return null;
+    if (l.tipo === 'linha' && l.linhaId) return { href: `${raiz}/dre/despesas?linha=${l.linhaId}&de=${d.periodo.inicio}&ate=${d.ate}${lojaQuery}`, oQue: 'ver as despesas que formam este número' };
+    // A receita não vira link: o faturamento é por mês, e o mês não é o recorte. "Lançamentos de <mês>" vai embaixo dela, dito.
+    if (l.chave === CHAVE_CMV_COMPRA && pode.verCompras) return { href: `${raiz}/compras/relatorios/periodo?de=${d.periodo.inicio}&ate=${d.ate}${lojasDasCompras}&volta=${encodeURIComponent(aqui)}`, oQue: 'ver as compras que formam este número' };
+    if (l.tipo === 'cmv') return { href: `${raiz}/dre/cmv-categorias?periodo=${d.periodo.inicio}${escopoQuery}`, oQue: 'ver o CMV por categoria' };
+    return null;
+  };
   const rotuloDoResultado = (l: LinhaDoDre) => (l.codigo === CODIGO.resultado && daLoja ? 'Resultado do período, antes das despesas da rede' : l.nome);
   /** Linha de despesa ou grupo sem valor: no celular fica escondida até a pessoa pedir (o DRE inteiro tem mais de 40 linhas). */
   const zerada = (l: LinhaDoDre) => (l.tipo === 'linha' || l.tipo === 'subtotal') && l.valorCentavos === 0 && l.codigo !== codigoDoSubtotal('RECEITA');
@@ -139,6 +177,19 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
                     {prefixo(l)}
                     {rotuloDoResultado(l)}
                   </span>
+                  {l.codigo === codigoDoSubtotal('RECEITA') && pode.verFaturamento && meses.length > 0 && (l.valorCentavos ?? 0) !== 0 && (
+                    <span className="block text-[12px] font-normal leading-snug text-suave">
+                      Lançamentos de{' '}
+                      {meses.map((m, i) => (
+                        <Fragment key={m}>
+                          {i > 0 && (i === meses.length - 1 ? ' e ' : ', ')}
+                          <Link href={faturamentoDoMes(m)} className={LINK_DE_TEXTO}>
+                            {rotuloDoMes(m)}
+                          </Link>
+                        </Fragment>
+                      ))}
+                    </span>
+                  )}
                   {apoio.length > 0 && (
                     <span className="block text-[12px] font-normal leading-snug text-suave">
                       {apoio.join(' · ')}
@@ -171,7 +222,7 @@ function Tabela({ d, raiz, pode }: { d: DreDoPeriodo; raiz: string; pode: Permis
                 </th>
                 <td className="px-3 py-2 text-right align-top">
                   <span className="block min-h-6 leading-6">
-                    <Celula l={l} semFaturamento={r.semFaturamento} />
+                    <Celula l={l} semFaturamento={r.semFaturamento} abre={abre(l)} />
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-3 py-2 text-right align-top sm:px-5">
@@ -605,12 +656,27 @@ export function TelaDoDre({
           </span>
         }
       >
-        {d.lojasDoEscopo.length === 0 ? <Vazio titulo="Nenhuma loja no seu acesso.">Peça a quem cuida da equipe para incluir as lojas em que você trabalha.</Vazio> : <Tabela d={d} raiz={raiz} pode={pode} />}
+        {d.lojasDoEscopo.length === 0 ? <Vazio titulo="Nenhuma loja no seu acesso.">Peça a quem cuida da equipe para incluir as lojas em que você trabalha.</Vazio> : <Tabela d={d} raiz={raiz} pode={pode} escopoQuery={escopoQuery} />}
       </Painel>
 
       {d.porLoja && <PorLoja d={d} base={base} />}
 
-      {d.cmv.painel && <PainelDoCmv painel={d.cmv.painel} raiz={raiz} verCompras={pode.verCompras === true} verEstoque={pode.verEstoque === true} />}
+      {d.cmv.painel && (
+        <PainelDoCmv
+          painel={d.cmv.painel}
+          raiz={raiz}
+          verCompras={pode.verCompras === true}
+          verEstoque={pode.verEstoque === true}
+          compras={
+            d.ate
+              ? {
+                  href: `${raiz}/compras/relatorios/periodo?de=${d.periodo.inicio}&ate=${d.ate}${loja ? `&loja=${loja.lojaId}` : d.lojasDoEscopo.map((l) => `&loja=${l.id}`).join('')}&ver=linhas&volta=${encodeURIComponent(`${base}?periodo=${d.periodo.inicio}${escopoQuery}`)}`,
+                  quando: `${diaEMes(d.periodo.inicio)} a ${diaEMes(d.ate)}`,
+                }
+              : null
+          }
+        />
+      )}
       {d.cmv.antigo && (
         <p className="text-[12px] leading-relaxed text-suave">
           Este período foi fechado antes de o CMV existir no DRE, então o CMV e o painel compra × real não foram apurados nele. A FlowFoods pode reabrir o período e fechar de novo para guardar o CMV.

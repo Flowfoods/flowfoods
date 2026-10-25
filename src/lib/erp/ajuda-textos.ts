@@ -1611,7 +1611,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre'],
     titulo: 'DRE',
-    versao: 8,
+    versao: 9,
     // A tela da reunião: a tabela fica à vista e a aula abre numa linha.
     recolhida: true,
     aula: [
@@ -1628,6 +1628,16 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'A rede soma as lojas e as despesas da rede; a loja mostra só o que é dela, antes das despesas da rede.' },
           { texto: 'No período em curso o número vai até ontem, sem projeção, e a despesa entra dia a dia.' },
+        ],
+      },
+      {
+        id: 'de-onde-vem',
+        titulo: 'De onde vem cada número',
+        blocos: [
+          { texto: 'O número sublinhado abre o que o forma, no mesmo período e na mesma loja: a despesa mostra cada lançamento e a parte dele que cai no período, e o CMV abre por categoria.', para: ['dre.ver'] },
+          // Nesta tela todos têm `dre.ver`: o `para` de cada frase abaixo é a permissão que dá o link.
+          { texto: 'O CMV pelas compras abre as compras do mesmo período, por insumo; de lá, cada compra abre a nota dela.', para: ['compras.ver'] },
+          { texto: 'A receita leva aos lançamentos do mês, porque o faturamento é por mês.', para: ['faturamento.ver'] },
         ],
       },
       {

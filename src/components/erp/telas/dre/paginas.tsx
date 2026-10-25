@@ -10,8 +10,8 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { dinheiroParaCampo } from '@/lib/erp/unidades';
-import { tipoDaCompetencia, ehFiltroDeSituacao, lerMesDaLista, type FiltroDeSituacao } from '@/lib/erp/despesa-campos';
-import { faltaLancar, lojasParaDespesa, listarDespesas, obterDespesa, podeVerDespesas, recorrentesEmFalta } from '@/lib/erp/despesas';
+import { tipoDaCompetencia, ehFiltroDeSituacao, lerMesDaLista, lerRecorteDaComposicao, type FiltroDeSituacao } from '@/lib/erp/despesa-campos';
+import { composicaoDaLinha, faltaLancar, lojasParaDespesa, listarDespesas, obterDespesa, podeVerDespesas, recorrentesEmFalta } from '@/lib/erp/despesas';
 import { recusaDoFechamento, situacaoDoFechamento } from '@/lib/erp/dre-fechamento';
 import { situacaoDasMetas } from '@/lib/erp/dre-metas';
 import { cmvPorCategoria, evolucaoDeCategorias } from '@/lib/erp/cmv-categorias';
@@ -23,6 +23,7 @@ import { COR } from '@/lib/erp/modulos';
 import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { fechadoNoIntervalo } from '@/lib/erp/periodo-fechado-campos';
 import { situacaoDosPeriodos } from '@/lib/erp/periodos';
+import { voltaDoRelatorio } from '@/lib/erp/volta';
 import { planoDoParceiro } from '@/lib/erp/plano';
 import { pode, type Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
@@ -34,6 +35,7 @@ import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Vazio } from '../../ui/superficies';
 import { Voltar } from '../cadastro/partes';
+import { TelaDaComposicao } from './composicao-despesas';
 import { TelaDaDespesa } from './detalhe-despesa';
 import { TelaDeDespesas } from './despesas';
 import { fraseDaDespesa, fraseDoMesPassado, fraseDoPeriodo, type AcaoDeCadastro, type AcaoLocal, type AcaoMesPassado } from './estado';
@@ -65,6 +67,28 @@ export async function PaginaDasDespesas({ c, lojasDoAlcance, query }: { c: Conte
   const situacao: FiltroDeSituacao = ehFiltroDeSituacao(um(query.situacao)) ? (um(query.situacao) as FiltroDeSituacao) : 'todas';
   const daUrl = um(query.loja);
   const lojaId = daUrl && lojasDoAlcance.some((l) => l.id === daUrl) ? daUrl : undefined;
+  // Jornada 4 (decisão 464): o número de uma despesa no DRE abre aqui as despesas que o formam, no recorte e na visão do DRE.
+  const recorte = lerRecorteDaComposicao({ linha: um(query.linha), de: um(query.de), ate: um(query.ate) });
+  const composicao = recorte ? await composicaoDaLinha(c.cliente, c.alcance, recorte, lojaId) : null;
+  if (recorte && composicao) {
+    const base = `${c.raiz}/dre/despesas`;
+    const aqui = `?linha=${recorte.linhaId}&de=${recorte.de}&ate=${recorte.ate}${lojaId ? `&loja=${lojaId}` : ''}`;
+    const visaoDoDre = lojaId ? `&loja=${lojaId}` : c.alcance.lojas === 'todas' ? '&rede=1' : '';
+    return (
+      <>
+        <TrilhaDaPagina itens={[{ rotulo: `${composicao.linha.nome} no DRE` }]} />
+        <TelaDaComposicao
+          c={composicao}
+          base={base}
+          escopoNome={lojaId ? (lojasDoAlcance.find((l) => l.id === lojaId)?.nome ?? c.contexto) : c.alcance.lojas === 'todas' ? 'Rede Completa' : lojasDoAlcance.map((l) => l.nome).join(', ')}
+          daLoja={!!lojaId}
+          recorte={recorte}
+          voltarDre={pode(c.alcance, 'dre.ver') ? `${c.raiz}/dre?periodo=${recorte.de}${visaoDoDre}` : null}
+          aqui={aqui}
+        />
+      </>
+    );
+  }
   const pagina = Number(um(query.pagina)) || 1;
   const lista = await listarDespesas(c.cliente, c.alcance, { mes, situacao, lojaId, pagina }, hoje);
   const faltam = podeVerDespesas(c.alcance)
@@ -186,10 +210,12 @@ export async function PaginaDaDespesa({ c, id, query, acoes }: { c: ContextoDaTe
   const hoje = hojeNoRio();
   const d = await obterDespesa(c.cliente, c.alcance, id, hoje);
   if (!d) notFound();
+  // Veio da composição de uma linha do DRE (ou de outra tela da área): o "voltar" leva de volta para lá (caminho interno, conferido).
+  const voltar = voltaDoRelatorio(um(query.volta), c.raiz);
   return (
     <>
       <TrilhaDaPagina itens={[{ rotulo: d.despesa.descricao }]} />
-      <TelaDaDespesa d={d} base={`${c.raiz}/dre/despesas`} hoje={hoje} feito={fraseDaDespesa(um(query.feito))} podeLancar={pode(c.alcance, 'despesas.lancar')} periodosHref={pode(c.alcance, 'dre.ver') ? `${c.raiz}/dre/periodos` : null} bloqueio={c.bloqueio} acoes={acoes} />
+      <TelaDaDespesa d={d} base={`${c.raiz}/dre/despesas`} voltar={voltar ?? undefined} hoje={hoje} feito={fraseDaDespesa(um(query.feito))} podeLancar={pode(c.alcance, 'despesas.lancar')} periodosHref={pode(c.alcance, 'dre.ver') ? `${c.raiz}/dre/periodos` : null} bloqueio={c.bloqueio} acoes={acoes} />
     </>
   );
 }

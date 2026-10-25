@@ -36,12 +36,15 @@ export function PainelDoCmv({
   raiz,
   verCompras,
   verEstoque,
+  compras,
 }: {
   painel: PainelDoCmv;
   /** `/erp` ou `/rodolfo/erp/<slug>`. */
   raiz: string;
   verCompras: boolean;
   verEstoque: boolean;
+  /** As compras do recorte do DRE no relatório de compras, nas mesmas lojas (decisão 464); nulo = nenhum dia apurado. */
+  compras?: { href: string; quando: string } | null;
 }) {
   const { comparacoes, total, semReal } = painel;
   if (comparacoes.length === 0 && semReal.length === 0) return null;
@@ -159,12 +162,12 @@ export function PainelDoCmv({
           </ul>
         </div>
       )}
-      {verCompras && (
+      {verCompras && compras && (
         <p className="border-t border-linha px-4 py-2.5 text-[12px] text-suave sm:px-5">
-          <Link href={`${raiz}/compras`} className={LINK_DE_TEXTO}>
-            Ver as notas
+          <Link href={compras.href} className={LINK_DE_TEXTO}>
+            Ver as compras de {compras.quando}
           </Link>
-          {' '}que entram na compra.
+          {' '}que formam a coluna Compra, linha a linha, com a nota de cada uma.
         </p>
       )}
     </Painel>

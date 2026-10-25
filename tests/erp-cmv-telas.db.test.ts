@@ -6,7 +6,7 @@
  *  - o gerente da Vila da Penha (390 px na prova visual) recebe SÓ a loja dele: nem pela URL (`?rede=1`, `?loja=<Unidade Entrega>`) vem a Delivery, o
  *    Centro, o R$ 4.321,00 delas ou a base da conta (`entrada`, ids do fechamento); isso vale ao vivo e depois de fechar (fotografia);
  *  - o operador não abre o DRE;
- *  - o link "Ver as notas" só aparece com `compras.ver`, e "Ver o estoque" só com `estoque.ver`;
+ *  - o link "Ver as compras de <recorte>" (decisão 464) só aparece com `compras.ver`, e "Ver o estoque" só com `estoque.ver`;
  *  - o Histórico: sem `dre.ver` nada do fechamento nem do CMV; com `dre.ver`, o CMV da rede e a fonte;
  *  - a fotografia nova mostra o painel; o fechado antes do CMV (v1) mostra "não apurado neste fechamento";
  *  - o "Em breve" do CMV sumiu, e nenhum R$ 0,00 no lugar de dado ausente.
@@ -145,7 +145,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · telas do CMV (Postgres real)', { timeout
     expect(h).toContain('R$ 24.621,00'); // o CMV da rede: o real da Penha + a compra da Unidade
     expect(h).toContain('R$ 26.321,00'); // a compra da rede, pela data da nota
     expect(h).toContain('O estoque subiu R$ 1.700,00 (de R$ 10.000,00 para R$ 11.700,00)');
-    expect(h).toContain('Ver as notas');
+    expect(h).toContain('Ver as compras de 01/09 a 30/09');
     expect(h).not.toContain('Em breve');
     expect(h).not.toContain('O CMV ainda não entra');
     expect(h.match(/.{60}R\$ 0,00.{40}/)?.[0] ?? null).toBeNull();
@@ -170,7 +170,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · telas do CMV (Postgres real)', { timeout
     como(propria(['dre.ver', 'lojas.ver'], 'rede'));
     const h = await html({ periodo: '2026-09-10', rede: '1' });
     expect(h).toContain('CMV: compra × real');
-    expect(h).not.toContain('Ver as notas');
+    expect(h).not.toContain('Ver as compras de');
     expect(h).not.toContain('Ver o estoque');
   });
 

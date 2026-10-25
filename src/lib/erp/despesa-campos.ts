@@ -354,3 +354,41 @@ export function lerMesDaLista(texto: string | undefined, hoje: string): string {
   const limite = janelaDaCompetencia(hoje).ate.slice(0, 7);
   return texto > limite || texto < LIMITES_DA_DESPESA.dataMinima.slice(0, 7) ? atual : texto;
 }
+
+// ------------------------------------------------------------------ composição de uma linha do DRE (jornada 4)
+
+/** O que um número de despesa do DRE abre: a linha do plano e o recorte [de, ate] que o DRE apurou. */
+export interface RecorteDaComposicao {
+  linhaId: string;
+  de: string;
+  ate: string;
+}
+
+/** O maior recorte que a composição aceita: um período mensal ou quinzenal com folga (a competência vai até 366 dias). */
+export const MAIOR_RECORTE_EM_DIAS = 400;
+
+const dataIso = (t: string | undefined): string | null => {
+  if (!t || !/^\d{4}-\d{2}-\d{2}$/.test(t)) return null;
+  const d = new Date(`${t}T00:00:00.000Z`);
+  return Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== t ? null : t;
+};
+
+/**
+ * `?linha=<id>&de=AAAA-MM-DD&ate=AAAA-MM-DD` na lista de despesas. Nulo = a lista normal do mês (endereço torto não vira erro: a
+ * pessoa vê a lista de sempre). O id só passa no formato; quem confere que a linha existe e é do parceiro é a leitura com banco.
+ */
+export function lerRecorteDaComposicao(q: { linha?: string; de?: string; ate?: string }): RecorteDaComposicao | null {
+  const linhaId = (q.linha ?? '').trim();
+  if (!/^[a-z0-9]{1,64}$/i.test(linhaId)) return null;
+  const de = dataIso(q.de);
+  const ate = dataIso(q.ate);
+  if (!de || !ate || ate < de || de < LIMITES_DA_DESPESA.dataMinima || diasEntre(de, ate) + 1 > MAIOR_RECORTE_EM_DIAS) return null;
+  return { linhaId, de, ate };
+}
+
+/** Quantos dias da competência caem no recorte (0 se não cruza). */
+export function diasNoRecorte(comp: Competencia, recorte: { de: string; ate: string }): number {
+  const inicio = comp.inicio > recorte.de ? comp.inicio : recorte.de;
+  const fim = comp.fim < recorte.ate ? comp.fim : recorte.ate;
+  return fim < inicio ? 0 : diasEntre(inicio, fim) + 1;
+}

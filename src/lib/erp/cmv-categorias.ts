@@ -75,6 +75,24 @@ export async function comprasPorLojaECategoria(tx: ClienteDoParceiro, ids: reado
   return out;
 }
 
+/**
+ * As categorias (de hoje) dos insumos PRÉ-PREPARO comprados em nota no recorte. No painel eles vão à linha dos pré-preparos; o
+ * relatório de compras filtrado por categoria os conta na categoria deles. A tela só abre o relatório de uma categoria que não
+ * está aqui: o número clicado é o total de destino (decisão 464).
+ */
+export async function categoriasComPreparoComprado(tx: ClienteDoParceiro, ids: readonly string[], de: string, ate: string): Promise<string[]> {
+  if (ids.length === 0 || ate < de) return [];
+  const linhas = await tx.sql<{ categoriaId: string }>`
+    SELECT DISTINCT i."categoriaId"
+    FROM "NotaEntrada" n
+    JOIN "NotaEntradaItem" it ON it."parceiroId" = n."parceiroId" AND it."notaId" = n."id"
+    JOIN "Insumo" i ON i."parceiroId" = it."parceiroId" AND i."id" = it."insumoId"
+    WHERE n."parceiroId" = ${tx.parceiroId} AND n."lojaId" = ANY(${[...ids]}::text[])
+      AND n."status" = 'LANCADA' AND n."entradaEm" >= ${de}::date AND n."entradaEm" <= ${ate}::date
+      AND i."tipo" = 'PRE_PREPARO' AND i."categoriaId" IS NOT NULL`;
+  return linhas.map((l) => l.categoriaId);
+}
+
 /** Quantos insumos diferentes compraram em "Outros / a classificar" ou sem categoria no recorte (o "Classificar N insumos"). */
 export async function insumosAClassificar(tx: ClienteDoParceiro, ids: readonly string[], de: string, ate: string, outrosId: string | null): Promise<number> {
   if (ids.length === 0 || ate < de) return 0;
@@ -169,6 +187,8 @@ export interface CmvPorCategoria {
   antigo: boolean;
   /** Quantas lojas entram na conta (com receita ou com compra). */
   lojasIncluidas: number;
+  /** Ao vivo: as categorias com pré-preparo comprado em nota no recorte (ver `categoriasComPreparoComprado`). */
+  categoriasComPreparoComprado?: string[];
 }
 
 /**
@@ -233,7 +253,8 @@ export async function cmvPorCategoriaNaTx(tx: ClienteDoParceiro, alcance: Alcanc
   const lojas = await lerAsLojas(tx, d.lojasDoEscopo.map((l) => ({ id: l.id, nome: nomeDe(l.id) })), d.periodo, d.ate, receitaDe, d.cmvDasLojas);
   const outros = categorias.find((c) => c.chave === CHAVE_DO_SISTEMA)?.id ?? null;
   const aClassificar = d.ate ? await insumosAClassificar(tx, d.lojasDoEscopo.map((l) => l.id), d.periodo.inicio, d.ate, outros) : null; // sem dia apurado nada foi lido (nulo, como no fechado)
-  return montar(categorias, lojas, aClassificar);
+  const comPreparo = d.ate ? await categoriasComPreparoComprado(tx, d.lojasDoEscopo.map((l) => l.id), d.periodo.inicio, d.ate) : [];
+  return { ...montar(categorias, lojas, aClassificar), categoriasComPreparoComprado: comPreparo };
 }
 
 /**

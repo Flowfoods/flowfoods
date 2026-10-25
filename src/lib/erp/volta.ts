@@ -64,6 +64,10 @@ export function voltaComFornecedor(caminho: string, fornecedorId: string): strin
 
 /** Para o botão e o texto: de onde a pessoa veio. */
 export function rotuloDaVolta(caminho: string): string {
+  // Jornada 4 (decisão 464): do DRE para os registros e de volta.
+  if (/\/dre\/despesas\?(.*&)?linha=/.test(caminho)) return 'o que forma o número do DRE';
+  if (/\/dre\/cmv-categorias/.test(caminho)) return 'o CMV por categoria';
+  if (/\/dre(\?|$)/.test(caminho)) return 'o DRE';
   if (/\/estoque\/relatorios\/consumo\/movimentos/.test(caminho)) return 'os movimentos do consumo';
   if (/\/estoque\/relatorios\/consumo/.test(caminho)) return 'o consumo e a conciliação';
   if (/\/compras\/relatorios\/comparar-/.test(caminho)) return 'a comparação de compras';

@@ -99,7 +99,7 @@ export function TelaImportarFaturamento({
     return (
       <div className="space-y-4">
         <Aviso tom="ok" titulo="Importação concluída.">
-          {plural(r.criadas, 'dia criado', 'dias criados')}, {plural(r.alteradas, 'corrigido', 'corrigidos')}, {plural(r.iguais, 'já estava igual', 'já estavam iguais')}
+          {plural(r.criadas, 'lançamento criado', 'lançamentos criados')}, {plural(r.alteradas, 'corrigido', 'corrigidos')}, {plural(r.iguais, 'já estava igual', 'já estavam iguais')}
           {r.comErro > 0 ? ` e ${plural(r.comErro, 'linha com erro ficou de fora', 'linhas com erro ficaram de fora')}` : ''}. O antes e o depois estão no histórico.
         </Aviso>
         <div className="flex flex-wrap gap-2">
@@ -210,11 +210,11 @@ export function TelaImportarFaturamento({
             <input type="hidden" name="arquivo" value={estado?.arquivo ?? ''} />
             <p className="text-[13px] text-suave">
               {entram > 0
-                ? `Entram ${plural(entram, 'dia', 'dias')}, numa vez só.${previa.contagem.erro > 0 ? ' As linhas com erro ficam de fora até você corrigir e enviar de novo.' : ''}`
+                ? `Entram ${plural(entram, 'lançamento', 'lançamentos')} (cada um é uma loja, um canal e um dia), numa vez só.${previa.contagem.erro > 0 ? ' As linhas com erro ficam de fora até você corrigir e enviar de novo.' : ''}`
                 : 'Nada para importar: corrija os erros, ou a planilha já está igual ao que foi lançado.'}
             </p>
             <BotaoEnviar disabled={entram === 0 || !!bloqueio} pendente="Importando…" className="sm:min-w-44">
-              {entram > 0 ? `Importar ${plural(entram, 'dia', 'dias')}` : 'Importar'}
+              {entram > 0 ? `Importar ${plural(entram, 'lançamento', 'lançamentos')}` : 'Importar'}
             </BotaoEnviar>
           </form>
         </Painel>

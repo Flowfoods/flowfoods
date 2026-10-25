@@ -11,12 +11,14 @@ import {
   chaveDoEnvio,
   competenciaDoMes,
   diaNoMes,
+  diasNoRecorte,
   ehMesInteiro,
   fatiar,
   frasePagamento,
   janelaDaCompetencia,
   lerCompetencia,
   lerDespesa,
+  lerRecorteDaComposicao,
   lerValorDaDespesa,
   mesesDoIntervalo,
   rotuloDaCompetencia,
@@ -41,6 +43,7 @@ import {
 } from '@/lib/erp/periodo-campos';
 import { ENTIDADES_DE_DRE } from '@/lib/erp/historico';
 import { PERFIS_BASE, resolverAlcance, recusa } from '@/lib/erp/permissoes';
+import { rotuloDaVolta, voltaDoRelatorio } from '@/lib/erp/volta';
 
 // --------------------------------------------------------------- apropriação ao centavo
 
@@ -549,5 +552,50 @@ describe('2.2a · permissões e vazamento', () => {
     }
     expect(lerPeriodoPedido('2026-10-18', hoje)).toEqual({ data: hoje, aviso: expect.stringMatching(/só existe até hoje/) });
     expect(lerPeriodoPedido('2019-12-31', hoje)).toEqual({ data: hoje, aviso: expect.stringMatching(/começa em 01\/01\/2020/) });
+  });
+});
+
+describe('Jornada 4 · o número do DRE abre o que o forma (decisão 464)', () => {
+  it('o endereço da composição: linha, de e até válidos; o resto é a lista normal', () => {
+    expect(lerRecorteDaComposicao({ linha: 'clinha123', de: '2026-09-01', ate: '2026-09-30' })).toEqual({ linhaId: 'clinha123', de: '2026-09-01', ate: '2026-09-30' });
+    expect(lerRecorteDaComposicao({ linha: 'clinha123', de: '2026-10-19', ate: '2026-10-19' })).toEqual({ linhaId: 'clinha123', de: '2026-10-19', ate: '2026-10-19' });
+    for (const torto of [
+      { linha: '', de: '2026-09-01', ate: '2026-09-30' },
+      { linha: 'x y', de: '2026-09-01', ate: '2026-09-30' },
+      { linha: "x'; drop", de: '2026-09-01', ate: '2026-09-30' },
+      { linha: 'a'.repeat(65), de: '2026-09-01', ate: '2026-09-30' },
+      { linha: 'clinha', de: '2026-09-31', ate: '2026-10-01' },
+      { linha: 'clinha', de: '01/09/2026', ate: '30/09/2026' },
+      { linha: 'clinha', de: '2026-09-30', ate: '2026-09-01' },
+      { linha: 'clinha', de: '2019-12-31', ate: '2020-01-31' },
+      { linha: 'clinha', de: '2025-01-01', ate: '2026-02-05' },
+      { linha: 'clinha', de: '2026-09-01' },
+      {},
+    ]) expect(lerRecorteDaComposicao(torto), JSON.stringify(torto)).toBeNull();
+    // 400 dias é o maior recorte; 401, não.
+    expect(lerRecorteDaComposicao({ linha: 'c', de: '2025-01-01', ate: somarDias('2025-01-01', 399) })).not.toBeNull();
+    expect(lerRecorteDaComposicao({ linha: 'c', de: '2025-01-01', ate: somarDias('2025-01-01', 400) })).toBeNull();
+  });
+
+  it('dias da competência dentro do recorte', () => {
+    const outubro = { inicio: '2026-10-01', fim: '2026-10-31' };
+    expect(diasNoRecorte(outubro, { de: '2026-10-19', ate: '2026-10-24' })).toBe(6);
+    expect(diasNoRecorte(outubro, { de: '2026-09-28', ate: '2026-10-04' })).toBe(4);
+    expect(diasNoRecorte(outubro, { de: '2026-11-01', ate: '2026-11-07' })).toBe(0);
+    expect(diasNoRecorte({ inicio: '2026-10-05', fim: '2026-10-05' }, { de: '2026-10-01', ate: '2026-10-18' })).toBe(1);
+    expect(diasNoRecorte({ inicio: '2026-01-01', fim: '2026-12-31' }, { de: '2026-09-01', ate: '2026-09-30' })).toBe(30);
+    // A soma das partes de um recorte bate com o apropriado (o que o DRE conta) ao centavo.
+    expect(apropriar(930_000, outubro, { de: '2026-10-19', ate: '2026-10-24' })).toBe(180_000);
+  });
+
+  it('o voltar: da composição, do DRE e do CMV por categoria, com o nome certo; de fora da área, nada', () => {
+    expect(rotuloDaVolta('/erp/dre/despesas?linha=abc&de=2026-09-01&ate=2026-09-30')).toBe('o que forma o número do DRE');
+    expect(rotuloDaVolta('/erp/dre/despesas?de=2026-09-01&linha=abc&ate=2026-09-30')).toBe('o que forma o número do DRE');
+    expect(rotuloDaVolta('/erp/dre?periodo=2026-09-01&rede=1')).toBe('o DRE');
+    expect(rotuloDaVolta('/rodolfo/erp/casa/dre?periodo=2026-09-01')).toBe('o DRE');
+    expect(rotuloDaVolta('/erp/dre/cmv-categorias?periodo=2026-09-01&rede=1')).toBe('o CMV por categoria');
+    expect(rotuloDaVolta('/erp/dre/despesas?mes=2026-09')).toBe('a tela anterior');
+    expect(voltaDoRelatorio('/erp/dre?periodo=2026-09-01&rede=1', '/erp')).toEqual({ href: '/erp/dre?periodo=2026-09-01&rede=1', rotulo: 'o DRE' });
+    for (const fora of ['https://x.example/erp/dre', '//x.example/erp/dre', '/rodolfo/erp/x/dre', '/erp/../rodolfo/erp/x', '/erp/dre\\x']) expect(voltaDoRelatorio(fora, '/erp'), fora).toBeNull();
   });
 });

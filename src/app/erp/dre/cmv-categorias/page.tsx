@@ -20,7 +20,7 @@ export default async function ErpCmvPorCategoriaPage({ searchParams }: { searchP
       visao={visao}
       lojasDoAlcance={lojas}
       query={searchParams}
-      pode={{ definirMetas: pode(ctx.alcance, 'metas.editar'), classificar: pode(ctx.alcance, 'insumos.ver') && pode(ctx.alcance, 'insumos.editar'), veRede: ctx.alcance.lojas === 'todas' }}
+      pode={{ definirMetas: pode(ctx.alcance, 'metas.editar'), classificar: pode(ctx.alcance, 'insumos.ver') && pode(ctx.alcance, 'insumos.editar'), veRede: ctx.alcance.lojas === 'todas', verCompras: pode(ctx.alcance, 'compras.ver') }}
     />
   );
 }

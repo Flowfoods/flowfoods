@@ -16,7 +16,7 @@ export default async function ParceiroCmvPorCategoriaPage({ params, searchParams
       visao={visao}
       lojasDoAlcance={lojas}
       query={searchParams}
-      pode={{ definirMetas: true, classificar: true, veRede: true }}
+      pode={{ definirMetas: true, classificar: true, veRede: true, verCompras: true }}
     />
   );
 }
