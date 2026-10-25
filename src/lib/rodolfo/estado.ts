@@ -57,11 +57,14 @@ export async function montarEstadoEnvio(ref: DateTime = agoraSP()): Promise<Esta
       prisma.dailyCounter.findUnique({
         where: { data_instancia: { data: diaSP(ref), instancia: INSTANCIA } },
       }),
-      prisma.message.count({
+      // As horas, não só a contagem: no teto da hora, a tela diz quando a vaga abre de verdade (decisão 473).
+      prisma.message.findMany({
         where: {
           direction: 'OUT',
           enviadaEm: { gte: ref.minus({ hours: 1 }).toJSDate() },
         },
+        select: { enviadaEm: true },
+        orderBy: { enviadaEm: 'asc' },
       }),
       prisma.message.count({
         where: { direction: 'OUT', status: { in: ['ENVIADA', 'ENTREGUE', 'LIDA'] } },
@@ -82,7 +85,8 @@ export async function montarEstadoEnvio(ref: DateTime = agoraSP()): Promise<Esta
     enviadosHoje: contador?.enviados ?? 0,
     entreguesHoje: contador?.entregues ?? 0,
     falhasConsecutivas,
-    enviadosUltimaHora: ultimaHora,
+    enviadosUltimaHora: ultimaHora.length,
+    enviosDaUltimaHoraEm: ultimaHora.map((m) => DateTime.fromJSDate(m.enviadaEm!).setZone(TIMEZONE)),
     ultimoEnvioEm: contador?.ultimoEnvioEm
       ? DateTime.fromJSDate(contador.ultimoEnvioEm).setZone(TIMEZONE)
       : null,

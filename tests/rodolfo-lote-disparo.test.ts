@@ -16,11 +16,12 @@ const banco = vi.hoisted(() => ({
   modelos: [] as Array<{ id: string; categoria: string | null; toque: string; canal: string; variante: string; corpo: string }>,
   upsertsDeModelo: 0,
   reaberturas: [] as string[][],
+  travas: 0,
 }));
 const enviar = vi.hoisted(() => vi.fn());
 
-vi.mock('@/lib/db', () => ({
-  prisma: {
+vi.mock('@/lib/db', () => {
+  const prisma: Record<string, unknown> = {
     optOut: {
       findUnique: async () => {
         throw new Error('não devia conferir o opt-out de lead fora do WhatsApp');
@@ -50,8 +51,15 @@ vi.mock('@/lib/db', () => ({
         return m;
       },
     },
-  },
-}));
+    // A trava dos modelos padrão (decisão 473): a transação do teste roda direto sobre o mesmo banco simulado.
+    $queryRaw: async () => {
+      banco.travas++;
+      return [{ trava: '' }];
+    },
+  };
+  prisma.$transaction = async (fn: (tx: unknown) => unknown) => fn(prisma);
+  return { prisma };
+});
 vi.mock('@/lib/rodolfo/config', () => ({ lerConfig: async () => ({ modoAprovacao: banco.modoAprovacao, janela: { diasSemana: [1, 2, 3, 4, 5], horaInicio: 10, horaFim: 18 } }) }));
 vi.mock('@/lib/rodolfo/outbox', () => ({ criarWhatsAppService: () => ({ sendText: enviar }) }));
 
@@ -111,8 +119,10 @@ describe('E5.1 · modelos de texto padrão', () => {
   it('cria os que faltam, uma vez só, sem upsert com nulo; o editado à mão fica', async () => {
     banco.modelos = [{ id: 'editado', categoria: null, toque: 'D0', canal: 'WHATSAPP', variante: 'A', corpo: 'texto revisado à mão' }];
     banco.upsertsDeModelo = 0;
+    banco.travas = 0;
     await garantirSeed();
     await garantirSeed();
+    expect(banco.travas).toBe(2);
     expect(banco.upsertsDeModelo).toBe(0);
     expect(banco.modelos).toHaveLength(SEED_TEMPLATES.length);
     expect(banco.modelos.find((m) => m.toque === 'D0' && m.canal === 'WHATSAPP')?.corpo).toBe('texto revisado à mão');

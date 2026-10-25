@@ -90,7 +90,7 @@ export function pendenciasDoNivel1(r: RetratoDoDia): PendenciaDoDia[] {
 
 export function indicadoresDoNivel1(r: RetratoDoDia): IndicadorDoDia[] {
   return [
-    { chave: 'enviados', rotulo: 'Enviados hoje', valor: { tipo: 'fracao', de: r.enviadosHoje, total: r.tetoDoDia }, contexto: 'teto de hoje, já com o aumento gradual', href: '/rodolfo/barney' },
+    { chave: 'enviados', rotulo: 'Enviados hoje', valor: { tipo: 'fracao', de: r.enviadosHoje, total: r.tetoDoDia, parcialEhNormal: true }, contexto: 'teto de hoje, já com o aumento gradual', href: '/rodolfo/barney' },
     // Sem WhatsApp conectado não chega resposta: "—", não um zero que parece medido.
     r.estadoInstancia === 'open'
       ? { chave: 'respostas', rotulo: 'Respostas em 24 horas', valor: { tipo: 'numero', numero: r.respostas24h }, contexto: r.semClassificar > 0 ? `${r.semClassificar} sem classificar` : r.respostas24h === 0 ? 'nenhuma resposta' : 'todas classificadas', href: '/rodolfo/inbox' }

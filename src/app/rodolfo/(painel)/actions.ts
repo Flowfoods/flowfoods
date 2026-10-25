@@ -16,7 +16,8 @@ import type { Prisma } from '@prisma/client';
 import { aprovarLote, cancelarLote, dispararProximo, FIM_DO_LOTE, salvarProposta } from '@/lib/rodolfo/lote';
 import { resumoDaImportacao, rotuloDoToque, textoDaRecusa } from '@/lib/rodolfo/rotulos';
 import { JANELA_PADRAO } from '@/lib/barney/regras';
-import { salvarConfig, type ConfigBarney } from '@/lib/rodolfo/config';
+import { lerConfig, salvarConfig, type ConfigBarney } from '@/lib/rodolfo/config';
+import { conferirRegrasDeEnvio } from '@/lib/rodolfo/regras-de-envio';
 import { importarLote } from '@/lib/rodolfo/importar-lote';
 import { criarWhatsAppService } from '@/lib/rodolfo/outbox';
 import { agoraSP } from '@/lib/rodolfo/estado';
@@ -151,23 +152,34 @@ export async function acaoSalvarConfig(_anterior: unknown, form: FormData): Prom
   // Nenhum dia marcado era salvo como segunda a sexta, sem aviso: o contrário do que a pessoa pediu (E5.1, decisão 466).
   if (dias.length === 0) return { ok: false, mensagem: 'Escolha ao menos um dia da semana. Para parar os envios, desligue o disparo.' };
 
-  // A chave geral não vem mais neste formulário (tem painel e ação próprios, decisão 469): sem a chave em `pedida`, o
-  // disparo fica como está. O intervalo vem em minutos e é gravado em segundos.
-  const emSegundos = (chave: string) => {
-    const m = num(chave);
-    return m === undefined ? undefined : Math.round(m * 60);
-  };
-  const pedida: Partial<ConfigBarney> = {
-    modoAprovacao: form.get('modoAprovacao') === 'on',
+  // Fora da faixa é recusado com o motivo, sem gravar nada (decisão 473); antes o servidor apertava em silêncio. Campo
+  // vazio mantém o valor atual (antes voltava ao padrão).
+  const campos = {
     maxPorDia: num('maxPorDia'),
     maxPorHora: num('maxPorHora'),
-    intervaloMinS: emSegundos('intervaloMinMinutos'),
-    intervaloMaxS: emSegundos('intervaloMaxMinutos'),
+    horaInicio: num('horaInicio'),
+    horaFim: num('horaFim'),
+    intervaloMinMinutos: num('intervaloMinMinutos'),
+    intervaloMaxMinutos: num('intervaloMaxMinutos'),
+  };
+  const atual = await lerConfig();
+  const recusa = conferirRegrasDeEnvio(campos, { ...atual.janela, intervaloMinS: atual.intervaloMinS, intervaloMaxS: atual.intervaloMaxS });
+  if (recusa) return { ok: false, mensagem: `${recusa} Nada foi salvo.` };
+
+  // A chave geral não vem mais neste formulário (tem painel e ação próprios, decisão 469): sem a chave em `pedida`, o
+  // disparo fica como está. O intervalo vem em minutos e é gravado em segundos.
+  const emSegundos = (m: number | undefined) => (m === undefined ? undefined : Math.round(m * 60));
+  const pedida: Partial<ConfigBarney> = {
+    modoAprovacao: form.get('modoAprovacao') === 'on',
+    maxPorDia: campos.maxPorDia,
+    maxPorHora: campos.maxPorHora,
+    intervaloMinS: emSegundos(campos.intervaloMinMinutos),
+    intervaloMaxS: emSegundos(campos.intervaloMaxMinutos),
     janela: {
       diasSemana: dias,
-      horaInicio: num('horaInicio') ?? 10,
-      horaFim: num('horaFim') ?? 18,
-    },
+      horaInicio: campos.horaInicio,
+      horaFim: campos.horaFim,
+    } as ConfigBarney['janela'],
   };
 
   // `salvarConfig` aperta contra os tetos rígidos. O que voltar é a verdade —

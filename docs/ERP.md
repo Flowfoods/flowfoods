@@ -4677,3 +4677,13 @@ filtro sem resultado diz qual e volta para todos. Em Leads, os quatro números a
 contar com a régua da tela Visitas (`NA_LISTA_DE_VISITA`; antes incluía quem pediu para sair). Matriz 96 telas: 0 falhas; jornada
 dos filtros e dos cards ok. Suíte com banco 2.902 aprovados, 46 pulados, 0 falhas; lint, typecheck e portão limpos; teste novo
 `portal-painel-filtro`.
+
+**E5.1 · ajustes conhecidos do painel do nível 1 (decisão 473, 25/10/2026):** a fila da Cadência mostra a situação de cada lead
+com a régua do disparo (na fila, enviada hoje, sem confirmação, não saiu, texto recusado, respondeu, pediu para sair, conflito,
+Visita e Instagram, sem celular) e "N na fila de M"; com ninguém na fila, "Enviar o próximo" some e a tela diz que a fila de hoje
+terminou (antes: botão habilitado e "Nada elegível"). Teto da hora com a hora real em que a vaga abre. Regras de envio: campo vazio
+mantém o gravado e valor fora da faixa é recusado com o campo e a faixa (antes apertava em silêncio); intervalo até 60 minutos.
+Barra de "Enviados hoje" cinza no parcial. Modelos padrão sob trava do banco (sem duplicar em dois "Montar lote"). Revisor: reprovou
+a primeira rodada (texto recusado aparecia "Na fila"), aprovou a reconferência. Matriz 60 telas: 0 falhas. Suíte com banco 2.925
+aprovados, 46 pulados, 0 falhas; lint, typecheck e portão limpos; testes novos `rodolfo-fila-c1`, `rodolfo-fila-disparo` e
+`rodolfo-modelos.db`.

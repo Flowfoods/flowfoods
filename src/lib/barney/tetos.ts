@@ -52,6 +52,11 @@ export interface EstadoEnvio {
   falhasConsecutivas: number;
   /** Envios nos últimos 60 minutos corridos. */
   enviadosUltimaHora: number;
+  /**
+   * A hora de cada um desses envios, do mais antigo ao mais novo (decisão 473): no teto da hora, a vaga abre quando o envio
+   * que estoura o teto completa 60 minutos. Ausente = estimativa fixa de 10 minutos, como antes.
+   */
+  enviosDaUltimaHoraEm?: DateTime[];
   ultimoEnvioEm: DateTime | null;
   janela?: Janela;
   /**
@@ -182,7 +187,7 @@ export function podeEnviar(estado: EstadoEnvio, agora: DateTime, opts: OpcoesEnv
     return negar(
       'TETO_HORARIO',
       `Teto da hora atingido: ${estado.enviadosUltimaHora}/${tetoHora}.`,
-      60 * 10,
+      segundosAteVagaNaHora(estado, tetoHora, agora),
     );
   }
 
@@ -200,6 +205,18 @@ export function podeEnviar(estado: EstadoEnvio, agora: DateTime, opts: OpcoesEnv
   }
 
   return { permitido: true, tetoDiaVigente };
+}
+
+/**
+ * Quanto falta para abrir vaga no teto da hora: com N envios na última hora e teto T, a vaga abre quando o (N − T + 1)º
+ * mais antigo completa 60 minutos. Sem as horas dos envios, a estimativa fixa de 10 minutos (o comportamento anterior).
+ */
+export function segundosAteVagaNaHora(estado: Pick<EstadoEnvio, 'enviadosUltimaHora' | 'enviosDaUltimaHoraEm'>, tetoHora: number, agora: DateTime): number {
+  const horas = estado.enviosDaUltimaHoraEm;
+  const indice = estado.enviadosUltimaHora - tetoHora;
+  if (!horas || indice < 0 || indice >= horas.length) return 60 * 10;
+  const abre = horas[indice].plus({ hours: 1 });
+  return Math.max(1, Math.ceil(abre.diff(agora, 'seconds').seconds));
 }
 
 /**

@@ -11,6 +11,8 @@ import { agoraSP, diaSP, montarEstadoEnvio } from '@/lib/rodolfo/estado';
 import { podeEnviar } from '@/lib/barney/tetos';
 import { lerConfig } from '@/lib/rodolfo/config';
 import { telaDaCadencia } from '@/lib/rodolfo/cadencia-tela';
+import { situacoesDoLote } from '@/lib/rodolfo/lote';
+import { ROTULO_DA_SITUACAO_NO_LOTE, TOM_DA_SITUACAO_NO_LOTE, type SituacaoNoLote } from '@/lib/rodolfo/fila';
 import { AtualizarSozinho } from '@/components/erp/telas/producao/atualizar-sozinho';
 import { acaoAprovarLote, acaoCancelarLote, acaoDryRun, acaoEnviarAgora, acaoProporLote } from '../actions';
 import { COR } from '@/lib/erp/modulos';
@@ -55,6 +57,9 @@ export default async function BarneyPage() {
                 nota: true,
                 avaliacoes: true,
                 status: true,
+                canal: true,
+                telefoneNormalizado: true,
+                donoNome: true,
               },
             },
           },
@@ -74,6 +79,9 @@ export default async function BarneyPage() {
     }),
   ]);
 
+  // Quem do lote ainda vai receber hoje, com a régua do disparo (decisão 473).
+  const situacoes = lote ? await situacoesDoLote(lote.itens, agora) : new Map<string, SituacaoNoLote>();
+  const naFila = lote ? lote.itens.filter((i) => situacoes.get(i.id) === 'NA_FILA').length : 0;
   const decisao = podeEnviar(estado, agora);
   // O que o "Enviar o próximo" passaria (manual: pula a exigência de manual e a janela, não o resto).
   const manual = podeEnviar(estado, agora, { manual: true });
@@ -84,6 +92,7 @@ export default async function BarneyPage() {
     automatico: decisao,
     totalEnviadoHistorico: estado.totalEnviadoHistorico,
     modoAprovacao: config.modoAprovacao,
+    naFila,
   });
   const { faltamManuais, principal } = tela;
   const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
@@ -107,7 +116,15 @@ export default async function BarneyPage() {
       )}
 
       {/* Decisões primeiro. Em 360px isto é o que aparece sem rolar. */}
-      <Painel titulo="Lote de hoje" acessorio={lote ? <Selo tom={TOM_STATUS[lote.status]}>{rotulo(ROTULO_DO_LOTE, lote.status)}</Selo> : null}>
+      <Painel
+        titulo="Lote de hoje"
+        acessorio={
+          lote ? (
+            // Fila terminada: o lote segue "Enviando" no banco, mas a tela não diz "Enviando" ao lado de "Fila de hoje terminada".
+            tela.filaTerminada ? <Selo tom="neutro">Fila terminada</Selo> : <Selo tom={TOM_STATUS[lote.status]}>{rotulo(ROTULO_DO_LOTE, lote.status)}</Selo>
+          ) : null
+        }
+      >
         <div className="grid gap-2 sm:grid-cols-2">
           {tela.montar && (
             <BotaoAcao acao={acaoProporLote} variante={principal === 'montar' ? 'primario' : 'secundario'}>
@@ -161,29 +178,45 @@ export default async function BarneyPage() {
         <Metrica rotulo="Manuais restantes" valor={faltamManuais > 0 ? faltamManuais : 'Feito'} detalhe={faltamManuais > 0 ? 'antes do automático' : 'número aquecido'} />
       </div>
 
-      <Painel titulo="Fila" acessorio={<Contagem>{lote?.itens.length ?? 0}</Contagem>} semRespiro>
+      <Painel
+        titulo="Fila"
+        subtitulo={lote && lote.itens.length > 0 ? 'Quem ainda vai receber hoje e, nos outros, por que não' : undefined}
+        acessorio={
+          <span className="shrink-0 whitespace-nowrap">
+            <Contagem>{lote && lote.itens.length > 0 ? `${naFila} na fila de ${lote.itens.length}` : 0}</Contagem>
+          </span>
+        }
+        semRespiro
+      >
         {!lote || lote.itens.length === 0 ? (
           <Vazio>{lote ? 'O lote de hoje ficou vazio: nenhum lead elegível. Importe leads ou monte de novo.' : 'Nenhum lote montado. Toque em “Montar lote de hoje”.'}</Vazio>
         ) : (
           <ul>
-            {lote.itens.map((item) => (
-              <li key={item.id} className="border-t border-linha px-4 py-3 first:border-t-0 sm:px-5">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{item.lead.restaurante ?? item.lead.nome}</p>
-                    <p className="mt-0.5 truncate text-[12px] text-suave">
-                      {[item.lead.bairro, item.lead.categoria].filter(Boolean).join(', ') || '—'}
-                      {item.lead.nota != null && `, nota ${item.lead.nota.toFixed(1).replace('.', ',')}`}
-                      {item.lead.avaliacoes != null && ` (${item.lead.avaliacoes})`}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="text-[12px] tabular-nums text-suave">{rotuloDoToque(item.toque)}</span>
-                    {item.lead.tier && <Selo>{item.lead.tier}</Selo>}
-                  </div>
-                </div>
-              </li>
-            ))}
+            {lote.itens.map((item) => {
+              const situacao = situacoes.get(item.id) ?? 'NA_FILA';
+              return (
+                <li key={item.id} className="border-t border-linha first:border-t-0">
+                  {/* O item abre o Lead 360: a conversa e o histórico estão lá. */}
+                  <Link
+                    href={`/rodolfo/leads/${item.lead.id}`}
+                    className="ff-transicao flex min-h-11 items-start justify-between gap-3 px-4 py-3 hover:bg-texto/[0.03] sm:px-5"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{item.lead.restaurante ?? item.lead.nome}</p>
+                      <p className="mt-0.5 truncate text-[12px] text-suave">
+                        {[item.lead.tier, item.lead.bairro, item.lead.categoria].filter(Boolean).join(', ') || '—'}
+                        {item.lead.nota != null && `, nota ${item.lead.nota.toFixed(1).replace('.', ',')}`}
+                        {item.lead.avaliacoes != null && ` (${item.lead.avaliacoes})`}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col items-end gap-1.5">
+                      <Selo tom={TOM_DA_SITUACAO_NO_LOTE[situacao]}>{ROTULO_DA_SITUACAO_NO_LOTE[situacao]}</Selo>
+                      <span className="text-[12px] tabular-nums text-suave">{rotuloDoToque(item.toque)}</span>
+                    </div>
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </Painel>

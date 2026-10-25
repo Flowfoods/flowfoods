@@ -78,7 +78,8 @@ describe('E5.1 · Início do nível 1', () => {
   it('os números do dia', () => {
     const i = indicadoresDoNivel1({ ...tranquilo, semClassificar: 1, pedidos: { abertos: 3, atrasados: 0 } });
     expect(i.map((x) => [x.rotulo, x.valor])).toEqual([
-      ['Enviados hoje', { tipo: 'fracao', de: 4, total: 10 }],
+      // Envio parcial é andamento do dia, não alerta (decisão 473).
+      ['Enviados hoje', { tipo: 'fracao', de: 4, total: 10, parcialEhNormal: true }],
       ['Respostas em 24 horas', { tipo: 'numero', numero: 2 }],
       ['Pedidos aguardando', { tipo: 'numero', numero: 3 }],
     ]);

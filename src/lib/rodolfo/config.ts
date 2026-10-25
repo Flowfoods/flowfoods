@@ -73,9 +73,16 @@ export async function lerConfig(): Promise<ConfigBarney> {
   return apertar((linha.valor ?? {}) as Partial<ConfigBarney>);
 }
 
+/** Só as chaves com valor: `undefined` (campo vazio no formulário) não apaga o que está gravado. */
+function definidos<T extends object>(o: T): Partial<T> {
+  return Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
 export async function salvarConfig(pedida: Partial<ConfigBarney>): Promise<ConfigBarney> {
   const atual = await lerConfig();
-  const nova = apertar({ ...atual, ...pedida });
+  // Campo vazio mantém o atual (decisão 473). Antes, `{ ...atual, ...pedida }` com `maxPorDia: undefined` apagava o valor
+  // gravado e a configuração voltava ao padrão sem aviso; a janela vazia voltava para 10h–18h.
+  const nova = apertar({ ...atual, ...definidos(pedida), janela: { ...atual.janela, ...definidos(pedida.janela ?? {}) } });
 
   await prisma.setting.upsert({
     where: { chave: CHAVE },

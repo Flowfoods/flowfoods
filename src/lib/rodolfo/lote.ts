@@ -22,6 +22,35 @@ import { agoraSP, diaSP, montarEstadoEnvio } from './estado';
 import { lerConfig } from './config';
 import { criarWhatsAppService } from './outbox';
 import { rotuloDoToque } from './rotulos';
+import { foraDaFilaPeloLead, situacaoNoLote, type LeadDaFila, type SituacaoNoLote } from './fila';
+import { validarTemplate } from '@/lib/barney/template-validator';
+
+/** O que a montagem do texto usa do lead. */
+interface LeadDoTexto {
+  nome: string;
+  restaurante: string | null;
+  bairro: string | null;
+  categoria: string | null;
+  nota: number | null;
+  avaliacoes: number | null;
+  donoNome: string | null;
+}
+
+/** O texto que sai para este lead: a mesma montagem para o disparo e para a fila da Cadência (decisão 473). */
+function textoDoLead(corpo: string, lead: LeadDoTexto, ref: DateTime): string {
+  return renderizar(
+    corpo,
+    {
+      nome: lead.restaurante ?? lead.nome,
+      bairro: lead.bairro ?? '',
+      categoria: lead.categoria ?? '',
+      nota: lead.nota ?? 0,
+      avaliacoes: lead.avaliacoes ?? 0,
+      donoNome: lead.donoNome,
+    },
+    ref,
+  );
+}
 
 export const SEQUENCIA_PADRAO = 'cadencia-padrao';
 
@@ -61,19 +90,24 @@ export async function garantirSeed(): Promise<void> {
 
   // O modelo padrão tem `categoria` nula, e chave única com nulo não serve para `upsert` (o Prisma recusa o nulo, e no
   // Postgres dois nulos nunca colidem). Antes era um `upsert` com nulo: "Montar lote" quebrava em todo banco sem modelos
-  // (E5.1, decisão 467). Agora: procura o padrão daquele toque e canal; só cria o que falta.
-  for (const t of SEED_TEMPLATES) {
-    const existe = await prisma.template.findFirst({
-      where: { categoria: null, toque: t.toque, canal: t.canal, variante: 'A' },
-      select: { id: true },
-    });
-    // Não sobrescreve: se o Rodolfo editou o texto no portal, a edição dele
-    // vence o seed. A fonte da verdade continua sendo `mensagens.md`, mas
-    // reimportar o seed não pode apagar uma revisão feita à mão.
-    if (!existe) {
-      await prisma.template.create({ data: { toque: t.toque, canal: t.canal, variante: 'A', corpo: t.corpo, ativo: true } });
+  // (E5.1, decisão 467). Agora: procura o padrão daquele toque e canal; só cria o que falta. A trava da transação (decisão
+  // 473, como as do ERP) faz dois "Montar lote" ao mesmo tempo esperarem um pelo outro: sem ela, os dois viam "falta" e
+  // criavam o mesmo modelo duas vezes.
+  await prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('barney:modelos-padrao', 0))::text AS "trava"`;
+    for (const t of SEED_TEMPLATES) {
+      const existe = await tx.template.findFirst({
+        where: { categoria: null, toque: t.toque, canal: t.canal, variante: 'A' },
+        select: { id: true },
+      });
+      // Não sobrescreve: se o Rodolfo editou o texto no portal, a edição dele
+      // vence o seed. A fonte da verdade continua sendo `mensagens.md`, mas
+      // reimportar o seed não pode apagar uma revisão feita à mão.
+      if (!existe) {
+        await tx.template.create({ data: { toque: t.toque, canal: t.canal, variante: 'A', corpo: t.corpo, ativo: true } });
+      }
     }
-  }
+  });
 }
 
 export interface ItemProposto {
@@ -295,15 +329,10 @@ export async function dispararProximo(
 
   for (const item of candidatos) {
     const lead = item.lead;
-    if (!lead.telefoneNormalizado) continue;
-
-    // Reconferência no instante do disparo: o mundo pode ter mudado desde a
-    // proposta.
-    if (lead.status === 'OPT_OUT' || lead.status === 'CONFLITO' || lead.status === 'RESPONDEU') {
-      continue;
-    }
-    // Movido para Visita e Instagram depois de montado o lote: "sai da cadência de WhatsApp" vale também para o lote de hoje.
-    if (lead.canal !== 'WHATSAPP') continue;
+    // Reconferência no instante do disparo: o mundo pode ter mudado desde a proposta. A mesma régua da fila na Cadência
+    // (`foraDaFilaPeloLead`, decisão 473): sem celular, pediu para sair, conflito, respondeu ou movido para Visita e
+    // Instagram depois de montado o lote ("sai da cadência de WhatsApp" vale também para o lote de hoje).
+    if (foraDaFilaPeloLead(lead) || !lead.telefoneNormalizado) continue;
     const saiu = await prisma.optOut.findUnique({
       where: { telefoneNormalizado: lead.telefoneNormalizado },
     });
@@ -325,24 +354,14 @@ export async function dispararProximo(
     });
     if (jaSaiu) continue;
 
+    // Desempate pelo id (decisão 473): a fila da Cadência escolhe o mesmo modelo mesmo com dois criados no mesmo instante.
     const template = await prisma.template.findFirst({
       where: { toque: item.toque, canal: 'WHATSAPP', ativo: true },
-      orderBy: { criadoEm: 'asc' },
+      orderBy: [{ criadoEm: 'asc' }, { id: 'asc' }],
     });
     if (!template) return { enviou: false, motivo: `Nenhum modelo de texto ativo para a ${rotuloDoToque(item.toque)}.` };
 
-    const corpo = renderizar(
-      template.corpo,
-      {
-        nome: lead.restaurante ?? lead.nome,
-        bairro: lead.bairro ?? '',
-        categoria: lead.categoria ?? '',
-        nota: lead.nota ?? 0,
-        avaliacoes: lead.avaliacoes ?? 0,
-        donoNome: lead.donoNome,
-      },
-      ref,
-    );
+    const corpo = textoDoLead(template.corpo, lead, ref);
 
     const service = criarWhatsAppService({ dryRun: opts.dryRun });
     const r = await service.sendText({
@@ -390,6 +409,48 @@ export async function dispararProximo(
   }
 
   return { enviou: false, motivo: FIM_DO_LOTE };
+}
+
+/**
+ * A situação de cada item do lote de hoje para a Cadência (decisão 473), com a régua do `dispararProximo`: o que ele pularia
+ * sai da fila com o motivo; o que ele mandaria fica "Na fila". Três consultas para o lote inteiro (quem pediu para sair, pelo
+ * telefone; as mensagens de hoje, pela chave do envio real; o modelo ativo de cada toque), em vez de uma por item. Para
+ * quem ainda iria, o texto é montado e conferido como o serviço de envio confere: texto recusado não está na fila.
+ */
+export async function situacoesDoLote(
+  itens: { id: string; toque: Toque; lead: LeadDaFila & LeadDoTexto & { id: string } }[],
+  ref: DateTime = agoraSP(),
+): Promise<Map<string, SituacaoNoLote>> {
+  const seguem = itens.filter((i) => !foraDaFilaPeloLead(i.lead));
+  const telefones = [...new Set(seguem.map((i) => i.lead.telefoneNormalizado!))];
+  const chaves = seguem.map((i) => dedupKeyEnvio(i.lead.id, i.toque, ref));
+  const toques = [...new Set(seguem.map((i) => i.toque))];
+  const [optOuts, mensagens, modelos] = await Promise.all([
+    telefones.length ? prisma.optOut.findMany({ where: { telefoneNormalizado: { in: telefones } }, select: { telefoneNormalizado: true } }) : [],
+    chaves.length ? prisma.message.findMany({ where: { dedupKey: { in: chaves } }, select: { dedupKey: true, status: true } }) : [],
+    // O mesmo modelo que o disparo usa: o ativo mais antigo do toque, no WhatsApp.
+    toques.length ? prisma.template.findMany({ where: { toque: { in: toques }, canal: 'WHATSAPP', ativo: true }, orderBy: [{ criadoEm: 'asc' }, { id: 'asc' }], select: { toque: true, corpo: true } }) : [],
+  ]);
+  const saiu = new Set(optOuts.map((o) => o.telefoneNormalizado));
+  const porChave = new Map(mensagens.map((m) => [m.dedupKey, m]));
+  const modeloDoToque = new Map<string, string>();
+  for (const m of modelos) if (!modeloDoToque.has(m.toque)) modeloDoToque.set(m.toque, m.corpo);
+  // Sem modelo do toque, o disparo para com "Nenhum modelo de texto ativo…": o item fica na fila e a recusa diz o motivo.
+  const recusado = (i: (typeof itens)[number]) => {
+    const corpo = modeloDoToque.get(i.toque);
+    return corpo !== undefined && !validarTemplate(textoDoLead(corpo, i.lead, ref), { toque: i.toque, canal: 'WHATSAPP', renderizado: true }).valido;
+  };
+  return new Map(
+    itens.map((i) => {
+      const banco = {
+        pediuParaSair: !!i.lead.telefoneNormalizado && saiu.has(i.lead.telefoneNormalizado),
+        mensagemDeHoje: porChave.get(dedupKeyEnvio(i.lead.id, i.toque, ref)) ?? null,
+      };
+      // Só monta o texto de quem ainda iria.
+      const iria = situacaoNoLote(i.lead, banco) === 'NA_FILA';
+      return [i.id, situacaoNoLote(i.lead, { ...banco, textoRecusado: iria && recusado(i) })];
+    }),
+  );
 }
 
 /**

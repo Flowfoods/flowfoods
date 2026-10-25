@@ -8,6 +8,8 @@
  * - Espera que passa sozinha (intervalo entre envios, teto da hora): o botão fica na tela, desabilitado, com quando libera,
  *   e a confirmação do envio anterior continua visível. Antes, o botão sumia depois de cada envio do aquecimento.
  * - Recusa que pede ação (disparo desligado, WhatsApp fora): sem botão, com o motivo e o link para Config.
+ * - Fila terminada (decisão 473): lote com itens, mas ninguém mais na fila (todos receberam, responderam ou saíram):
+ *   sem "Enviar o próximo", com o aviso de que a fila de hoje acabou. Antes o botão ficava e o servidor dizia "Nada elegível".
  */
 
 import type { Decisao } from '@/lib/barney/tetos';
@@ -24,6 +26,8 @@ export interface EntradaDaCadencia {
   automatico: Decisao;
   totalEnviadoHistorico: number;
   modoAprovacao: boolean;
+  /** Quantos itens do lote ainda estão na fila (`situacoesDoLote`); ausente = não conferido (só o tamanho do lote vale). */
+  naFila?: number;
 }
 
 export interface TelaDaCadencia {
@@ -35,6 +39,8 @@ export interface TelaDaCadencia {
   envio: null | { habilitado: boolean; texto: string; liberaEmSegundos?: number };
   parado: null | { titulo: string; texto: string; config: 'ligar' | 'conectar' | null };
   faltamManuais: number;
+  /** Lote com itens e ninguém mais na fila (decisão 473). */
+  filaTerminada: boolean;
 }
 
 /** "45 s", "cerca de 10 min". */
@@ -49,10 +55,13 @@ export function telaDaCadencia(e: EntradaDaCadencia): TelaDaCadencia {
   const aguardando = comItens && status === 'PROPOSTO';
   // Com aprovação manual, o lote só envia depois de aprovado; com aprovação automática, o lote proposto já envia.
   const podeEnviarOLote = comItens && (status === 'APROVADO' || status === 'EM_ENVIO' || (status === 'PROPOSTO' && !e.modoAprovacao));
+  // Lote com itens e ninguém mais na fila: nada a enviar hoje, qualquer que seja o motivo de cada um.
+  const filaTerminada = comItens && status !== 'CANCELADO' && e.naFila === 0;
   const texto = faltamManuais > 0 ? `Enviar o próximo (${ENVIOS_MANUAIS_INICIAIS - faltamManuais + 1} de ${ENVIOS_MANUAIS_INICIAIS})` : 'Enviar o próximo agora';
 
   let envio: TelaDaCadencia['envio'] = null;
-  if (podeEnviarOLote && e.manual.permitido) envio = { habilitado: true, texto };
+  if (filaTerminada) envio = null;
+  else if (podeEnviarOLote && e.manual.permitido) envio = { habilitado: true, texto };
   else if (podeEnviarOLote && e.manual.motivo && ESPERA.has(e.manual.motivo)) envio = { habilitado: false, texto, liberaEmSegundos: e.manual.tentarEmSegundos };
 
   // Aprovado ou enviando não se remonta (o servidor mantém o lote como está).
@@ -61,7 +70,7 @@ export function telaDaCadencia(e: EntradaDaCadencia): TelaDaCadencia {
     ? montar
       ? 'montar'
       : null
-    : aguardando && e.modoAprovacao
+    : aguardando && e.modoAprovacao && !filaTerminada
       ? 'aprovar'
       : envio?.habilitado && faltamManuais > 0
         ? 'enviar'
@@ -70,6 +79,9 @@ export function telaDaCadencia(e: EntradaDaCadencia): TelaDaCadencia {
   let parado: TelaDaCadencia['parado'] = null;
   if (status === 'CANCELADO') {
     parado = { titulo: 'Lote cancelado.', texto: 'Nada mais sai hoje. Para voltar a enviar, monte o lote de novo.', config: null };
+  } else if (filaTerminada) {
+    // Vale para todo motivo (enviada, sem confirmação, falhou, texto recusado, saiu da fila): o motivo de cada um está na lista.
+    parado = { titulo: 'Fila de hoje terminada.', texto: 'Ninguém mais na fila hoje; o motivo de cada um está na lista. Amanhã tem lote novo.', config: null };
   } else if (!e.manual.permitido) {
     const espera = envio && !envio.habilitado && envio.liberaEmSegundos ? ` Libera em ${quandoLibera(envio.liberaEmSegundos)}.` : '';
     const config = e.manual.motivo === 'DISPARO_DESLIGADO' ? 'ligar' : e.manual.motivo === 'INSTANCIA_FORA_DO_AR' ? 'conectar' : null;
@@ -87,6 +99,7 @@ export function telaDaCadencia(e: EntradaDaCadencia): TelaDaCadencia {
     envio,
     parado,
     faltamManuais,
+    filaTerminada,
   };
 }
 

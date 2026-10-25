@@ -5,6 +5,7 @@ import { acaoSalvarConfig, type Resposta } from '../actions';
 import { BotaoEnviar, MensagemDeResposta } from '@/components/erp/ui/botoes';
 import { AJUDA, CAMPO, MARCAR, ROTULO } from '@/components/erp/ui/campos';
 import type { ConfigBarney } from '@/lib/rodolfo/config';
+import { INTERVALO_MAXIMO_MIN } from '@/lib/rodolfo/regras-de-envio';
 
 const DIAS = [
   { n: 1, r: 'Seg' },
@@ -112,6 +113,7 @@ export function ConfigForm({ config }: { config: ConfigBarney }) {
           id="intervaloMinMinutos"
           rotulo="Intervalo mínimo (minutos)"
           min={2}
+          max={INTERVALO_MAXIMO_MIN}
           step={0.5}
           defaultValue={Math.round(config.intervaloMinS / 30) / 2}
           ajuda="Nunca menos de 2 minutos."
@@ -120,9 +122,10 @@ export function ConfigForm({ config }: { config: ConfigBarney }) {
           id="intervaloMaxMinutos"
           rotulo="Intervalo máximo (minutos)"
           min={2}
+          max={INTERVALO_MAXIMO_MIN}
           step={0.5}
           defaultValue={Math.round(config.intervaloMaxS / 30) / 2}
-          ajuda="Entre um envio e outro, o sistema sorteia um tempo entre o mínimo e o máximo."
+          ajuda={`Até ${INTERVALO_MAXIMO_MIN} minutos. Entre um envio e outro, o sistema sorteia um tempo entre o mínimo e o máximo.`}
         />
       </div>
 

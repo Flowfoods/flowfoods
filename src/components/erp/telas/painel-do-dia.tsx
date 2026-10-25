@@ -38,7 +38,7 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
               </span>
               {i.valor.tipo === 'fracao' && (
                 <span className="mt-2.5 block">
-                  <Barra valor={i.valor.de} total={i.valor.total} tom={i.valor.de === i.valor.total ? 'ok' : 'alerta'} rotulo={`${i.rotulo}: ${i.valor.de} de ${i.valor.total}`} />
+                  <Barra valor={i.valor.de} total={i.valor.total} tom={i.valor.de === i.valor.total ? 'ok' : i.valor.de < i.valor.total && i.valor.parcialEhNormal ? 'neutro' : 'alerta'} rotulo={`${i.rotulo}: ${i.valor.de} de ${i.valor.total}`} />
                 </span>
               )}
               <span className="mt-1.5 truncate text-[12px] text-suave">{i.contexto}</span>

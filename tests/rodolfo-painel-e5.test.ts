@@ -16,7 +16,11 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('next-auth', () => ({ getServerSession: async () => ({ user: { id: 'rodolfo' } }) }));
 vi.mock('@/lib/rodolfo/auth', () => ({ authOptions: {} }));
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
-vi.mock('@/lib/rodolfo/config', () => ({ salvarConfig: salvar }));
+// O formulário confere contra o que está gravado (decisão 473): a leitura devolve a configuração padrão.
+vi.mock('@/lib/rodolfo/config', () => ({
+  salvarConfig: salvar,
+  lerConfig: async () => ({ disparoAtivo: false, modoAprovacao: true, janela: { diasSemana: [1, 2, 3, 4, 5], horaInicio: 10, horaFim: 18 }, intervaloMinS: 300, intervaloMaxS: 1200, maxPorDia: 30, maxPorHora: 8 }),
+}));
 
 import { BatchStatus, Canal, EnrollmentStatus, Intencao, LeadStatus, MessageStatus, TipoTelefone, Toque } from '@prisma/client';
 import { DateTime } from 'luxon';
@@ -254,6 +258,43 @@ describe('E5.1 · Regras de envio: a chave geral fora do formulário (decisão 4
     expect('disparoAtivo' in pedida).toBe(false);
     expect(pedida.intervaloMinS).toBe(150);
     expect(pedida.intervaloMaxS).toBe(600);
+  });
+
+  it('fora da faixa é recusado com o nome do campo, sem gravar nada (decisão 473)', async () => {
+    const casos: [string[][], RegExp][] = [
+      [[['maxPorDia', '31']], /^Máximo por dia vai de 1 a 30\. Nada foi salvo\.$/],
+      [[['maxPorHora', '0']], /^Máximo por hora vai de 1 a 8\./],
+      [[['horaInicio', '9']], /^"Abre às" vai das 10h às 17h\./],
+      [[['horaInicio', '14'], ['horaFim', '12']], /^"Fecha às" precisa ser depois de "Abre às"/],
+      [[['intervaloMaxMinutos', '600']], /^O intervalo máximo vai de 2 a 60 minutos\./],
+      [[['intervaloMinMinutos', '1']], /^O intervalo mínimo vai de 2 a 60 minutos\./],
+      [[['intervaloMinMinutos', '30'], ['intervaloMaxMinutos', '10']], /^O intervalo máximo não pode ser menor que o mínimo\./],
+      // Só o mínimo, acima do máximo gravado (20 min): a conferência usa o gravado no lugar do campo vazio.
+      [[['intervaloMinMinutos', '25']], /^O intervalo máximo não pode ser menor que o mínimo\./],
+    ];
+    for (const [campos, motivo] of casos) {
+      salvar.mockClear();
+      const f = new FormData();
+      f.append('diaSemana', '1');
+      for (const [k, v] of campos) f.append(k, v);
+      const r = await acaoSalvarConfig(null as never, f);
+      expect(r.ok, JSON.stringify(campos)).toBe(false);
+      expect(r.mensagem).toMatch(motivo);
+      expect(salvar).not.toHaveBeenCalled();
+    }
+  });
+
+  it('campo vazio vai como "sem valor" (o servidor mantém o atual), não como o padrão', async () => {
+    salvar.mockClear();
+    const f = new FormData();
+    for (const [k, v] of [['diaSemana', '1'], ['maxPorDia', ''], ['horaInicio', ''], ['horaFim', '17'], ['intervaloMaxMinutos', '']]) f.append(k, v);
+    const r = await acaoSalvarConfig(null as never, f);
+    expect(r.ok).toBe(true);
+    const pedida = salvar.mock.calls[0][0] as { maxPorDia?: number; intervaloMaxS?: number; janela: { horaInicio?: number; horaFim?: number } };
+    expect(pedida.maxPorDia).toBeUndefined();
+    expect(pedida.intervaloMaxS).toBeUndefined();
+    expect(pedida.janela.horaInicio).toBeUndefined();
+    expect(pedida.janela.horaFim).toBe(17);
   });
 
   it('ligar e desligar mexem só na chave geral', async () => {

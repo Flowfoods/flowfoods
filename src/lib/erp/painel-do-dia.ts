@@ -17,7 +17,11 @@ export interface IndicadorDoDia {
   chave: string;
   rotulo: string;
   /** Centavos (dinheiro), contagem "x de y" ou um número simples (painel do nível 1: respostas, pedidos). */
-  valor: { tipo: 'dinheiro'; centavos: number } | { tipo: 'fracao'; de: number; total: number } | { tipo: 'numero'; numero: number | null };
+  /**
+   * `fracao` desenha uma barra: cheia é "ok"; parcial é alerta (falta algo), salvo quando `parcialEhNormal` — andamento do
+   * dia, como os envios da prospecção (decisão 473), em que metade do teto ao meio-dia não é problema.
+   */
+  valor: { tipo: 'dinheiro'; centavos: number } | { tipo: 'fracao'; de: number; total: number; parcialEhNormal?: boolean } | { tipo: 'numero'; numero: number | null };
   contexto: string;
   href: string;
 }
