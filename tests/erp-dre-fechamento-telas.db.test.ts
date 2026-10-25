@@ -312,7 +312,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     expect(pagina.d.fechamento.ressalvas.map((r: { titulo: string }) => r.titulo).join('|')).toContain('Internet da Penha');
     expect(pagina.d.fechamento).toMatchObject({ totalDeRessalvas: null, justificativa: null });
     expect(json(pagina).match(PROIBIDO)?.[0] ?? null).toBeNull();
-    const html = nbsp(renderToStaticMarkup(createElement(TelaDoDre, { d: pagina.d as never, base: '/erp/dre', raiz: '/erp', contexto: 'Vila da Penha', pode: pagina.pode as never, bloqueio: null })));
+    const html = nbsp(renderToStaticMarkup(createElement(TelaDoDre, { d: pagina.d as never, base: '/erp/dre', raiz: '/erp', pode: pagina.pode as never, bloqueio: null })));
     expect(html).toContain('Fechado com ressalvas');
     expect(html).toContain('Internet da Penha');
     expect(html).toContain('R$ 3.000,00'); // a receita da Penha: 30 × 100,00
@@ -331,7 +331,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }, { id: ids.mei, nome: 'Loja Meier', ativa: true }];
     const dona = await props(await ErpDrePage({ searchParams: { periodo: '2026-09-01' } }));
     expect(dona.d.fechamento).toMatchObject({ totalDeRessalvas: 3, justificativa: expect.stringContaining('planilha do contador') });
-    const htmlDona = nbsp(renderToStaticMarkup(createElement(TelaDoDre, { d: dona.d as never, base: '/erp/dre', raiz: '/erp', contexto: 'Rede Completa', pode: dona.pode as never, bloqueio: null })));
+    const htmlDona = nbsp(renderToStaticMarkup(createElement(TelaDoDre, { d: dona.d as never, base: '/erp/dre', raiz: '/erp', pode: dona.pode as never, bloqueio: null })));
     for (const t of ['Loja Meier', 'Gás do Meier', 'Anuidade do contador', 'Internet da Penha', 'planilha do contador', 'Fechado com ressalvas', 'Por loja']) expect(htmlDona, t).toContain(t);
     expect(htmlDona).toContain('R$ 10.777,80'); // 3.000,00 + 7.777,80
     // Operador: nada.
@@ -342,7 +342,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
   it('o DRE fechado mostra o período como fechado, com a versão e quem fechou, e o ao vivo de outubro não herda nada dele', async () => {
     const f = (await dreDoPeriodo(a, ALCANCE_FLOWFOODS, { tipo: 'rede' }, '2026-09-10', HOJE))!;
     expect(f).toMatchObject({ status: 'FECHADO', encerrado: true, emCurso: false, diasApurados: 30, faltas: { total: 0 }, fechamento: { versao: 1, fechadoPorNome: 'Ana Dona' } });
-    const html = nbsp(renderToStaticMarkup(createElement(TelaDoDre, { d: f, base: '/erp/dre', raiz: '/erp', contexto: 'Rede Completa', pode: { lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true, fecharPeriodo: true, definirMetas: true }, bloqueio: null })));
+    const html = nbsp(renderToStaticMarkup(createElement(TelaDoDre, { d: f, base: '/erp/dre', raiz: '/erp', pode: { lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true, fecharPeriodo: true, definirMetas: true }, bloqueio: null })));
     expect(html).toMatch(/Fechado em \d{2}\/\d{2}\/\d{4} às \d{2}:\d{2} por Ana Dona · versão 1/);
     expect(html).toContain('Período fechado');
     expect(html).toContain('Ver o fechamento');
@@ -355,7 +355,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     const aberto = (await dreDoPeriodo(a, ALCANCE_FLOWFOODS, { tipo: 'rede' }, '2026-08-10', HOJE))!;
     expect(aberto).toMatchObject({ encerrado: true, status: null });
     const htmlConvite = (pode: boolean) =>
-      nbsp(renderToStaticMarkup(createElement(TelaDoDre, { d: aberto, base: '/erp/dre', raiz: '/erp', contexto: 'Rede Completa', pode: { lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true, fecharPeriodo: pode }, bloqueio: null })));
+      nbsp(renderToStaticMarkup(createElement(TelaDoDre, { d: aberto, base: '/erp/dre', raiz: '/erp', pode: { lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true, fecharPeriodo: pode }, bloqueio: null })));
     expect(htmlConvite(true)).toContain('Conferir e fechar o período');
     expect(htmlConvite(true)).toContain('/erp/dre/periodos/2026-08-01');
     expect(htmlConvite(false)).not.toContain('Conferir e fechar o período');

@@ -158,7 +158,7 @@ function Canal({ c, d, raiz, definirMetas }: { c: CanalDoPeriodo; d: DreDoPeriod
                 {definirMetas && (
                   <>
                     {' · '}
-                    <Link href={`${raiz}/dre/plano`} className={LINK_DE_TEXTO}>
+                    <Link href={`${raiz}/dre/plano`} className={`${LINK_DE_TEXTO} ff-toque`}>
                       definir
                     </Link>
                   </>

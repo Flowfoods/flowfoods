@@ -45,7 +45,12 @@ export function TelaDaDespesa({
   acoes: { pagar: AcaoDeCadastro; desfazer: AcaoDeCadastro; parar: AcaoDeCadastro; remover: AcaoDeCadastro };
 }) {
   const x = d.despesa;
+  // Veio da composição (decisão 474): editar, pagar, desfazer e "não repete mais" voltam para esta tela com o mesmo
+  // "voltar" — antes, depois de pagar ou editar, o "voltar" levava para a lista do mês, e a composição se perdia.
+  const comVolta = voltar ? `?volta=${encodeURIComponent(voltar.href)}` : '';
+  const volta = voltar?.href;
   const aqui = `${base}/${x.id}`;
+  const recarregar = `${aqui}${comVolta}`;
   const dias = diasDaCompetencia(x.competencia);
   return (
     <div className="space-y-6">
@@ -56,7 +61,7 @@ export function TelaDaDespesa({
         subtitulo={`${x.linhaNome} · ${x.lojaNome ?? 'Rede'} · ${rotuloDaCompetencia(x.competencia)}`}
         acao={
           podeLancar ? (
-            <BotaoOuMotivo href={`${aqui}/editar`} bloqueio={bloqueio} variante="primario">
+            <BotaoOuMotivo href={`${aqui}/editar${comVolta}`} bloqueio={bloqueio} variante="primario">
               Editar
             </BotaoOuMotivo>
           ) : undefined
@@ -120,9 +125,9 @@ export function TelaDaDespesa({
           {podeLancar && (
             <div className="mt-4 space-y-3 border-t border-linha pt-4">
               {x.pagaEm ? (
-                <FormSimples acao={acoes.desfazer} versao={x.versao} aqui={aqui} bloqueio={bloqueio} rotulo="Desfazer o pagamento" pendente="Desfazendo…" />
+                <FormSimples acao={acoes.desfazer} versao={x.versao} aqui={recarregar} volta={volta} bloqueio={bloqueio} rotulo="Desfazer o pagamento" pendente="Desfazendo…" />
               ) : (
-                <FormPagar acao={acoes.pagar} versao={x.versao} hoje={hoje} aqui={aqui} bloqueio={bloqueio} />
+                <FormPagar acao={acoes.pagar} versao={x.versao} hoje={hoje} aqui={recarregar} volta={volta} bloqueio={bloqueio} />
               )}
             </div>
           )}
@@ -133,12 +138,12 @@ export function TelaDaDespesa({
         <Painel titulo="Mudar ou tirar">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
-              <Link href={`${aqui}/editar`} className={classeDeBotao('secundario')}>
+              <Link href={`${aqui}/editar${comVolta}`} className={classeDeBotao('secundario')}>
                 Editar valor, competência ou linha
               </Link>
-              {x.recorrente && <FormSimples acao={acoes.parar} versao={x.versao} aqui={aqui} bloqueio={bloqueio} rotulo="Não repete mais" pendente="Anotando…" />}
+              {x.recorrente && <FormSimples acao={acoes.parar} versao={x.versao} aqui={recarregar} volta={volta} bloqueio={bloqueio} rotulo="Não repete mais" pendente="Anotando…" />}
             </div>
-            <FormRemoverDespesa acao={acoes.remover} versao={x.versao} aqui={aqui} bloqueio={bloqueio} />
+            <FormRemoverDespesa acao={acoes.remover} versao={x.versao} aqui={recarregar} bloqueio={bloqueio} />
           </div>
         </Painel>
       )}

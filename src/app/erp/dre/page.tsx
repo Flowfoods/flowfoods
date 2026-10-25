@@ -7,7 +7,6 @@
  */
 
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode, visaoDaRequisicao } from '@/lib/erp/contexto';
-import { rotuloDaVisao } from '@/lib/erp/visao';
 import { recusaDoFechamento } from '@/lib/erp/dre-fechamento';
 import { carregarDre } from '@/components/erp/telas/dre/carregar';
 import { TelaDoDre } from '@/components/erp/telas/dre/dre';
@@ -32,7 +31,6 @@ export default async function ErpDrePage({ searchParams }: { searchParams: Recor
       d={d}
       base="/erp/dre"
       raiz="/erp"
-      contexto={rotuloDaVisao(visao)}
       pode={{ lancarDespesa: pode(ctx.alcance, 'despesas.lancar'), definirMetas: pode(ctx.alcance, 'metas.editar'), fecharPeriodo: recusaDoFechamento(ctx.alcance) === null, verFaturamento: pode(ctx.alcance, 'faturamento.ver'), verPrecos: pode(ctx.alcance, 'precos.ver'), verCompras: pode(ctx.alcance, 'compras.ver'), verEstoque: pode(ctx.alcance, 'estoque.ver'), veRede: ctx.alcance.lojas === 'todas' }}
       bloqueio={ctx.bloqueio}
     />

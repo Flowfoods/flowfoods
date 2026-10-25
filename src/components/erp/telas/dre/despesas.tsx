@@ -32,7 +32,7 @@ export function TelaDeDespesas({
   lista,
   base,
   raiz,
-  contexto,
+  abrangencia,
   hoje,
   mes,
   situacao,
@@ -48,7 +48,8 @@ export function TelaDeDespesas({
   /** `/erp/dre/despesas` ou `/rodolfo/erp/<slug>/dre/despesas`. */
   base: string;
   raiz: string;
-  contexto: string;
+  /** A loja do filtro, a rede inteira ou as lojas do acesso; no nível 1, com o parceiro na frente (decisão 474). */
+  abrangencia: string;
   hoje: string;
   mes: string;
   situacao: FiltroDeSituacao;
@@ -77,14 +78,13 @@ export function TelaDeDespesas({
   const aPagar = situacao === 'a-pagar';
   const de = lista.total === 0 ? 0 : (lista.pagina - 1) * lista.porPagina + 1;
   const ate = Math.min(lista.pagina * lista.porPagina, lista.total);
-  const nomeDaLoja = lojas.find((l) => l.id === lojaId)?.nome;
   return (
     <div className="space-y-6">
       <PageHeader
         icone="compras"
         cor={COR.dre}
         titulo="Despesas"
-        subtitulo={`${nomeDaLoja ?? contexto} · ${aPagar ? 'contas a pagar' : rotuloDoMes(mes)}`}
+        subtitulo={`${abrangencia} · ${aPagar ? 'contas a pagar' : rotuloDoMes(mes)}`}
         acao={
           podeLancar ? (
             <>
@@ -103,13 +103,13 @@ export function TelaDeDespesas({
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {!aPagar && (
             <nav aria-label="Trocar de mês" className="flex items-center gap-1 rounded-[10px] border border-linha bg-painel p-1">
-              <Link href={query({ mes: mesVizinho(mes, -1), pagina: 1 })} aria-label={`Mês anterior: ${rotuloDoMes(mesVizinho(mes, -1))}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto">
+              <Link href={query({ mes: mesVizinho(mes, -1), pagina: 1 })} aria-label={`Mês anterior: ${rotuloDoMes(mesVizinho(mes, -1))}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
                 <ChevronLeft size={18} aria-hidden />
               </Link>
               <span className="min-w-36 px-2 text-center text-sm font-semibold tabular-nums" aria-current="date">
                 {rotuloDoMes(mes)}
               </span>
-              <Link href={query({ mes: mesVizinho(mes, 1), pagina: 1 })} aria-label={`Mês seguinte: ${rotuloDoMes(mesVizinho(mes, 1))}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto">
+              <Link href={query({ mes: mesVizinho(mes, 1), pagina: 1 })} aria-label={`Mês seguinte: ${rotuloDoMes(mesVizinho(mes, 1))}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
                 <ChevronRight size={18} aria-hidden />
               </Link>
             </nav>
@@ -123,12 +123,12 @@ export function TelaDeDespesas({
             ]}
           />
           {!aPagar && !noMesAtual && (
-            <Link href={query({ mes: hoje.slice(0, 7), pagina: 1 })} className={LINK_DE_TEXTO}>
+            <Link href={query({ mes: hoje.slice(0, 7), pagina: 1 })} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11`}>
               Voltar para este mês
             </Link>
           )}
           {podeVerDre && (
-            <Link href={`${raiz}/dre`} className={LINK_DE_TEXTO}>
+            <Link href={`${raiz}/dre`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11`}>
               Ver o DRE
             </Link>
           )}
@@ -166,7 +166,7 @@ export function TelaDeDespesas({
         lista.aPagar.total > 0 && (
           <p className="text-[13px] text-suave">
             Contas a pagar: <strong className="font-semibold text-texto">{lista.aPagar.vencidas}</strong> {lista.aPagar.vencidas === 1 ? 'vencida' : 'vencidas'} e <strong className="font-semibold text-texto">{lista.aPagar.venceLogo}</strong> {lista.aPagar.venceLogo === 1 ? 'vence' : 'vencem'} em até 7 dias.{' '}
-            <Link href={query({ situacao: 'a-pagar', pagina: 1 })} className={LINK_DE_TEXTO}>
+            <Link href={query({ situacao: 'a-pagar', pagina: 1 })} className={`${LINK_DE_TEXTO} ff-toque`}>
               Ver as contas a pagar
             </Link>
           </p>
@@ -226,7 +226,7 @@ export function TelaDeDespesas({
                   {lista.itens.map((i) => (
                     <tr key={i.id} className="border-t border-linha align-top">
                       <th scope="row" className="max-w-[22rem] px-5 py-2.5 text-left font-medium">
-                        <Link href={`${base}/${i.id}`} className={`${LINK_DE_TEXTO} block truncate`}>
+                        <Link href={`${base}/${i.id}`} className={`${LINK_DE_TEXTO} relative z-[1] block truncate [@media(pointer:coarse)]:-my-3 [@media(pointer:coarse)]:py-3`}>
                           {i.descricao}
                         </Link>
                         <span className="block text-[12px] font-normal text-suave">

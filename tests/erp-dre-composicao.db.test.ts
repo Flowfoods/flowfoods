@@ -65,6 +65,7 @@ import ErpDespesaPage from '@/app/erp/dre/despesas/[id]/page';
 import ErpCmvPorCategoriaPage from '@/app/erp/dre/cmv-categorias/page';
 import NivelUmDespesasPage from '@/app/rodolfo/(painel)/erp/[slug]/dre/despesas/page';
 import NivelUmDespesaPage from '@/app/rodolfo/(painel)/erp/[slug]/dre/despesas/[id]/page';
+import ErpEditarDespesaPage from '@/app/erp/dre/despesas/[id]/editar/page';
 import { TelaDoDre } from '@/components/erp/telas/dre/dre';
 import { lerFiltrosDoRelatorio } from '@/lib/erp/compras-relatorio-campos';
 import { relatorioDaTela } from '@/lib/erp/compras-relatorio';
@@ -279,6 +280,57 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     expect((await abre(volta)).voltar).toEqual({ href: volta, rotulo: 'Aluguel no DRE' });
     for (const fora of ['https://mal.example/erp/dre', '//mal.example/x', '/rodolfo/erp/outro/dre', '/erp/../rodolfo/x', '/erp/%2e%2e/rodolfo/erp/x', '/erp/dre\\x']) expect((await abre(fora)).voltar, fora).toBeUndefined();
     expect((await abre()).voltar).toBeUndefined();
+
+    // Decisão 474: editar e pagar levam o mesmo "voltar" (antes, depois de pagar ou editar, o voltar ia para a lista do mês).
+    const el = tela(await resolver(await ErpDespesaPage({ params: { id: ids.d_aluguelVp }, searchParams: { volta } })));
+    const arvore: ReactElement[] = [];
+    const juntar = (n: unknown) => {
+      if (Array.isArray(n)) n.forEach(juntar);
+      else if (isValidElement(n)) {
+        arvore.push(n);
+        for (const v of Object.values(n.props as Record<string, unknown>)) if (v && typeof v === 'object') juntar(v);
+      }
+    };
+    juntar((el.type as (p: unknown) => unknown)(el.props));
+    const hrefs = arvore.map((e) => (e.props as { href?: string }).href).filter((h): h is string => typeof h === 'string');
+    const editar = `/erp/dre/despesas/${ids.d_aluguelVp}/editar?volta=${encodeURIComponent(volta)}`;
+    expect(hrefs.filter((h) => h === editar).length).toBe(2);
+    expect(hrefs.some((h) => h.endsWith('/editar'))).toBe(false);
+    const formularios = arvore.filter((e) => ['FormPagar', 'FormSimples'].includes((e.type as { name?: string }).name ?? ''));
+    expect(formularios.length).toBeGreaterThan(0);
+    for (const f of formularios) expect((f.props as { volta?: string }).volta).toBe(volta);
+    // Sem volta, nada muda: "Editar" sem parâmetro e formulários sem o campo.
+    const sem = tela(await resolver(await ErpDespesaPage({ params: { id: ids.d_aluguelVp }, searchParams: {} })));
+    const arvoreSem: ReactElement[] = [];
+    arvore.length = 0;
+    juntar((sem.type as (p: unknown) => unknown)(sem.props));
+    arvoreSem.push(...arvore);
+    expect(arvoreSem.some((e) => (e.props as { href?: string }).href === `/erp/dre/despesas/${ids.d_aluguelVp}/editar`)).toBe(true);
+    for (const f of arvoreSem.filter((e) => ['FormPagar', 'FormSimples'].includes((e.type as { name?: string }).name ?? ''))) expect((f.props as { volta?: string }).volta).toBeUndefined();
+  });
+
+  it('decisão 474: com uma loja escolhida no topo, "Ver a rede" diz a rede no DRE, no CMV e nas despesas; editar diz a loja da despesa', async () => {
+    como(alcanceDe('DONO', 'rede'), { tipo: 'loja', lojaId: ids.vp });
+    const subtitulos = (h: string) => h.match(/(Vila da Penha|Unidade Tijuca|Rede Completa) · Setembro de 2026/g) ?? [];
+    expect(subtitulos(await dre({ periodo: SET.de }))).toContain('Vila da Penha · Setembro de 2026');
+    expect(subtitulos(await dre({ periodo: SET.de, rede: '1' }))).toEqual(['Rede Completa · Setembro de 2026']);
+    expect(subtitulos(await categorias({ periodo: SET.de, rede: '1' }))).toEqual(['Rede Completa · Setembro de 2026']);
+    // A lista de despesas sem filtro mostra todas as lojas do acesso: diz a rede, não a loja do topo.
+    const lista = sp(renderToStaticMarkup(await resolver(await ErpDespesasPage({ searchParams: { mes: '2026-09' } }))));
+    const cabecalho = lista.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '';
+    expect(cabecalho).toContain('Rede Completa · setembro de 2026');
+    // O cabeçalho também tem o filtro de lojas; o subtítulo é o que vem logo depois do título.
+    expect(cabecalho.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).toMatch(/^ Despesas Rede Completa · setembro de 2026 /);
+    // Quem alcança só algumas lojas: a lista diz as lojas do acesso.
+    comoGerente();
+    const doGerente = sp(renderToStaticMarkup(await resolver(await ErpDespesasPage({ searchParams: { mes: '2026-09' } }))));
+    expect((doGerente.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).toMatch(/^ Despesas Vila da Penha · setembro de 2026 /);
+    // Editar: a loja da despesa (como no detalhe), não a do topo.
+    como(alcanceDe('DONO', 'rede'), { tipo: 'loja', lojaId: ids.dl });
+    const editar = sp(renderToStaticMarkup(await resolver(await ErpEditarDespesaPage({ params: { id: ids.d_aluguelVp }, searchParams: {} }))));
+    const cabecalhoEditar = editar.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '';
+    expect(cabecalhoEditar).toMatch(/Aluguel[^<]* · Vila da Penha/);
+    expect(cabecalhoEditar).not.toContain('Unidade Tijuca');
   });
 
   it('quem só lança despesas abre a composição sem o "Voltar para o DRE"', async () => {
@@ -346,7 +398,7 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     const d = (await dreDoPeriodo(a, ALCANCE_FLOWFOODS, { tipo: 'rede' }, '2026-09-15', HOJE))!;
     const cruzado: DreDoPeriodo = { ...d, periodo: { ...d.periodo, inicio: '2026-09-28', fim: '2026-10-04', nome: 'Semana de 28/09 a 04/10' }, ate: '2026-10-04' };
     const pode = { lancarDespesa: false, verFaturamento: true, verPrecos: false, verCompras: false, verEstoque: false, veRede: true };
-    const h = sp(renderToStaticMarkup(createElement(TelaDoDre, { d: cruzado, base: '/erp/dre', raiz: '/erp', contexto: 'Rede Completa', pode, bloqueio: null })));
+    const h = sp(renderToStaticMarkup(createElement(TelaDoDre, { d: cruzado, base: '/erp/dre', raiz: '/erp', pode, bloqueio: null })));
     expect(h).toMatch(/Faturamento do mês inteiro: <a [^>]*href="\/erp\/faturamento\?mes=2026-09&amp;rede=1"[^>]*>setembro de 2026<\/a> e <a [^>]*href="\/erp\/faturamento\?mes=2026-10&amp;rede=1"[^>]*>outubro de 2026<\/a>/);
     expect(h).not.toMatch(/aria-label="Receita bruta,/);
   });

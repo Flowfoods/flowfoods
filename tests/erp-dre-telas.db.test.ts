@@ -326,7 +326,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · telas e actions do DRE (Postgres real)'
 
   it('critérios 5 e 12 no HTML: parcial ao vivo, CMV sem nota de compra, "sem contar o CMV" e nenhum R$ 0,00 no lugar de dado ausente', async () => {
     const d = (await dreDoPeriodo(a, ALCANCE_FLOWFOODS, { tipo: 'loja', lojaId: ids.vp }, '2026-10-16', '2026-10-16'))!;
-    const el = createElement(TelaDoDre, { d, base: '/erp/dre', raiz: '/erp', contexto: 'Rede Completa', pode: { lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true }, bloqueio: null });
+    const el = createElement(TelaDoDre, { d, base: '/erp/dre', raiz: '/erp', pode: { lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true }, bloqueio: null });
     const html = renderToStaticMarkup(el).replace(/ /g, ' ');
     expect(html).toContain('16 de 31');
     expect(html).toContain('até ontem, 15/10');
@@ -340,8 +340,13 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · telas e actions do DRE (Postgres real)'
     expect(html.match(/.{60}R\$ 0,00.{40}/)?.[0] ?? null).toBeNull();
     // A rede mostra o que é da rede e o "Por loja".
     const rede = (await dreDoPeriodo(a, ALCANCE_FLOWFOODS, { tipo: 'rede' }, '2026-10-16', '2026-10-16'))!;
-    const htmlRede = renderToStaticMarkup(createElement(TelaDoDre, { d: rede, base: '/erp/dre', raiz: '/erp', contexto: 'Rede Completa', pode: { lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true }, bloqueio: null })).replace(/ /g, ' ');
+    const htmlRede = renderToStaticMarkup(createElement(TelaDoDre, { d: rede, base: '/erp/dre', raiz: '/erp', pode: { lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true }, bloqueio: null })).replace(/ /g, ' ');
     expect(htmlRede).toContain('Por loja');
+    // Decisão 474: sem loja aberta, o subtítulo diz a rede (antes, ao entrar por "Ver a rede", dizia a loja do topo); no nível 1, com o parceiro.
+    expect(htmlRede).toContain('Rede Completa · Outubro de 2026');
+    expect(html).toContain('Vila da Penha · Outubro de 2026');
+    const htmlN1 = renderToStaticMarkup(createElement(TelaDoDre, { d: rede, base: '/rodolfo/erp/x/dre', raiz: '/rodolfo/erp/x', parceiro: 'Casa Alfa', pode: { lancarDespesa: true, verFaturamento: true, verPrecos: true, veRede: true }, bloqueio: null }));
+    expect(htmlN1).toContain('Casa Alfa · Rede Completa · Outubro de 2026');
     expect(htmlRede).toContain('Contabilidade');
     expect(htmlRede.match(/.{80}R\$ 0,00.{40}/)?.[0] ?? null).toBeNull();
   });

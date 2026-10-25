@@ -12,7 +12,7 @@ export default async function ParceiroCmvPorCategoriaPage({ params, searchParams
   const { visao, lojas } = await visaoDaRequisicao(ctx);
   return (
     <PaginaDoCmvPorCategoria
-      c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: `${ctx.parceiro.nome} · ${rotuloDaVisao(visao)}`, raiz: `/rodolfo/erp/${ctx.parceiro.slug}` }}
+      c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: `${ctx.parceiro.nome} · ${rotuloDaVisao(visao)}`, parceiro: ctx.parceiro.nome, raiz: `/rodolfo/erp/${ctx.parceiro.slug}` }}
       visao={visao}
       lojasDoAlcance={lojas}
       query={searchParams}

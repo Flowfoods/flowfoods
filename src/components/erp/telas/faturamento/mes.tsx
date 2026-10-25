@@ -25,6 +25,7 @@ import { BotaoOuMotivo } from '../cadastro/partes';
 import { dataCurta } from './formato';
 import { FRASE_DO_ESTADO, serieDoMes } from '@/lib/erp/grafico';
 import { GraficoDeColunas, type PontoDoGrafico } from '../../ui/grafico-colunas';
+import { rotuloDoEscopo } from '@/lib/erp/visao';
 
 const SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const inteiro = (n: number) => n.toLocaleString('pt-BR');
@@ -198,7 +199,7 @@ function TabelaDaRede({ m, base }: { m: MesDoFaturamento; base: string }) {
         {m.lojas.map((l) => (
           <li key={l.loja.id} className="px-4 py-3">
             <div className="flex items-baseline justify-between gap-3">
-              <Link href={`${base}?mes=${m.mes}&loja=${l.loja.id}`} className={`${LINK_DE_TEXTO} min-w-0 truncate font-medium`}>
+              <Link href={`${base}?mes=${m.mes}&loja=${l.loja.id}`} className={`${LINK_DE_TEXTO} ff-toque min-w-0 truncate font-medium`}>
                 {l.loja.nome}
               </Link>
               <span className="shrink-0 text-[15px] font-semibold tabular-nums">{formatarDinheiro(l.total.valorCentavos)}</span>
@@ -240,7 +241,7 @@ function TabelaDaRede({ m, base }: { m: MesDoFaturamento; base: string }) {
             {m.lojas.map((l) => (
               <tr key={l.loja.id} className="border-t border-linha">
                 <th scope="row" className="h-11 max-w-[14rem] px-4 text-left font-medium text-texto sm:px-5">
-                  <Link href={`${base}?mes=${m.mes}&loja=${l.loja.id}`} className={`${LINK_DE_TEXTO} block truncate`}>
+                  <Link href={`${base}?mes=${m.mes}&loja=${l.loja.id}`} className={`${LINK_DE_TEXTO} block truncate py-3`}>
                     {l.loja.nome}
                   </Link>
                 </th>
@@ -279,7 +280,7 @@ function TabelaDaRede({ m, base }: { m: MesDoFaturamento; base: string }) {
 export function TelaDoMes({
   m,
   base,
-  contexto,
+  parceiro,
   lojaAberta,
   podeLancar,
   bloqueio,
@@ -287,8 +288,8 @@ export function TelaDoMes({
 }: {
   m: MesDoFaturamento;
   base: string;
-  /** "Rede Completa", o nome da loja ou o parceiro (N1). */
-  contexto: string;
+  /** Nível 1: o nome do parceiro, na frente da loja ou da rede no subtítulo. */
+  parceiro?: string;
   /** A loja do calendário (visão de uma loja ou `?loja=`); ausente = a rede. */
   lojaAberta?: LojaNoMes;
   podeLancar: boolean;
@@ -307,7 +308,7 @@ export function TelaDoMes({
         icone="dre"
         cor={COR.dre}
         titulo="Faturamento"
-        subtitulo={`${lojaAberta ? lojaAberta.loja.nome : contexto} · ${rotuloDoMes(m.mes)}`}
+        subtitulo={`${rotuloDoEscopo(lojaAberta?.loja.nome, parceiro)} · ${rotuloDoMes(m.mes)}`}
         acao={
           podeLancar ? (
             <>
@@ -323,29 +324,29 @@ export function TelaDoMes({
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <nav aria-label="Trocar de mês" className="flex items-center gap-1 rounded-[10px] border border-linha bg-painel p-1">
-            <Link href={`${base}?mes=${anterior}${lojaQuery}`} aria-label={`Mês anterior: ${rotuloDoMes(anterior)}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto">
+            <Link href={`${base}?mes=${anterior}${lojaQuery}`} aria-label={`Mês anterior: ${rotuloDoMes(anterior)}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
               <ChevronLeft size={18} aria-hidden />
             </Link>
             <span className="min-w-36 px-2 text-center text-sm font-semibold tabular-nums" aria-current="date">
               {rotuloDoMes(m.mes)}
             </span>
             {noMesAtual ? (
-              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-[7px] text-suave/40">
+              <span aria-hidden className="grid h-10 w-10 place-items-center rounded-[7px] text-suave/40 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
                 <ChevronRight size={18} />
               </span>
             ) : (
-              <Link href={`${base}?mes=${seguinte}${lojaQuery}`} aria-label={`Mês seguinte: ${rotuloDoMes(seguinte)}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto">
+              <Link href={`${base}?mes=${seguinte}${lojaQuery}`} aria-label={`Mês seguinte: ${rotuloDoMes(seguinte)}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
                 <ChevronRight size={18} aria-hidden />
               </Link>
             )}
           </nav>
           {!noMesAtual && (
-            <Link href={`${base}${lojaAberta ? `?loja=${lojaAberta.loja.id}` : ''}`} className={LINK_DE_TEXTO}>
+            <Link href={`${base}${lojaAberta ? `?loja=${lojaAberta.loja.id}` : ''}`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11`}>
               Voltar para este mês
             </Link>
           )}
           {lojaAberta && veRede && (
-            <Link href={`${base}?mes=${m.mes}&rede=1`} className={LINK_DE_TEXTO}>
+            <Link href={`${base}?mes=${m.mes}&rede=1`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11`}>
               Ver a rede
             </Link>
           )}
@@ -382,7 +383,7 @@ export function TelaDoMes({
               );
             })()}
           </div>
-          <GraficoDoMes m={m} lojaAberta={lojaAberta} contexto={lojaAberta ? lojaAberta.loja.nome : contexto} />
+          <GraficoDoMes m={m} lojaAberta={lojaAberta} contexto={rotuloDoEscopo(lojaAberta?.loja.nome)} />
           <Totais por={lojaAberta ? lojaAberta.porCanal : m.porCanal} total={lojaAberta ? lojaAberta.total : m.total} />
           {lojaAberta ? (
             <Painel

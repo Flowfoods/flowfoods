@@ -27,11 +27,17 @@ function ErroDaAcao({ estado, aqui }: { estado: EstadoCadastro; aqui: string }) 
   );
 }
 
-export function FormPagar({ acao, versao, hoje, aqui, bloqueio }: { acao: AcaoDeCadastro; versao: string; hoje: string; aqui: string; bloqueio: string | null }) {
+/** `volta`: de onde a pessoa veio (a composição de uma linha do DRE); a action devolve para a despesa com o mesmo "voltar". */
+function CampoDaVolta({ volta }: { volta?: string }) {
+  return volta ? <input type="hidden" name="volta" value={volta} /> : null;
+}
+
+export function FormPagar({ acao, versao, hoje, aqui, volta, bloqueio }: { acao: AcaoDeCadastro; versao: string; hoje: string; aqui: string; volta?: string; bloqueio: string | null }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   return (
     <form action={enviar} className="space-y-3">
       <input type="hidden" name="versao" value={versao} />
+      <CampoDaVolta volta={volta} />
       <ErroDaAcao estado={estado} aqui={aqui} />
       <div className="flex flex-wrap items-end gap-3">
         <div className="w-44">
@@ -49,11 +55,12 @@ export function FormPagar({ acao, versao, hoje, aqui, bloqueio }: { acao: AcaoDe
 }
 
 /** Um botão só (desfazer o pagamento, não repete mais). */
-export function FormSimples({ acao, versao, aqui, bloqueio, rotulo, pendente, variante = 'secundario' }: { acao: AcaoDeCadastro; versao: string; aqui: string; bloqueio: string | null; rotulo: string; pendente: string; variante?: 'secundario' | 'perigo' | 'fantasma' }) {
+export function FormSimples({ acao, versao, aqui, volta, bloqueio, rotulo, pendente, variante = 'secundario' }: { acao: AcaoDeCadastro; versao: string; aqui: string; volta?: string; bloqueio: string | null; rotulo: string; pendente: string; variante?: 'secundario' | 'perigo' | 'fantasma' }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   return (
     <form action={enviar} className="space-y-2">
       <input type="hidden" name="versao" value={versao} />
+      <CampoDaVolta volta={volta} />
       <ErroDaAcao estado={estado} aqui={aqui} />
       <BotaoEnviar variante={variante} pendente={pendente} disabled={!!bloqueio}>
         {rotulo}

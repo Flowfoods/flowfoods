@@ -14,5 +14,5 @@ export default async function ParceiroDespesasPage({ params, searchParams }: { p
   exigirPermissao(ctx, 'dre.ver');
   const { visao, lojas } = await visaoDaRequisicao(ctx);
   const raiz = `/rodolfo/erp/${ctx.parceiro.slug}`;
-  return <PaginaDasDespesas c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: `${ctx.parceiro.nome} · ${rotuloDaVisao(visao)}`, raiz }} lojasDoAlcance={lojas.map((l) => ({ id: l.id, nome: l.nome }))} query={searchParams} />;
+  return <PaginaDasDespesas c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: `${ctx.parceiro.nome} · ${rotuloDaVisao(visao)}`, parceiro: ctx.parceiro.nome, raiz }} lojasDoAlcance={lojas.map((l) => ({ id: l.id, nome: l.nome }))} query={searchParams} />;
 }

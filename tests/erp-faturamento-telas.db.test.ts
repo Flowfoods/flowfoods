@@ -250,6 +250,16 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · telas e actions de faturamento (Postgres
     // Duas lojas: o "Lançar o dia" pede a loja.
     const escolher = (await ErpLancarPage({ searchParams: {} })) as { props: { lojas: unknown[] } };
     expect(escolher.props.lojas).toHaveLength(2);
+    // Decisão 474: com a Vila da Penha escolhida no topo e "Ver a rede", o subtítulo (e o gráfico) dizem a rede, não a loja do topo.
+    atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
+    const html = (el: unknown) => renderToStaticMarkup(el as never).replace(/\u00a0/g, ' ');
+    const comLoja = html(await ErpFaturamentoPage({ searchParams: {} }));
+    expect(comLoja).toMatch(/Vila da Penha · [a-zç]+ de \d{4}/);
+    const daRede = html(await ErpFaturamentoPage({ searchParams: { rede: '1' } }));
+    expect(daRede).toMatch(/Rede Completa · [a-zç]+ de \d{4}/);
+    // O gráfico do mês também diz a rede.
+    expect(daRede).toMatch(/Rede Completa · \d+ dias? lançados?/);
+    expect(daRede).not.toMatch(/Vila da Penha · [a-zç]+ de \d{4}/);
   });
 
   it('critério 11: perfil com historico.ver e sem faturamento.ver abre o Histórico sem uma linha de faturamento (HTML e payload)', async () => {

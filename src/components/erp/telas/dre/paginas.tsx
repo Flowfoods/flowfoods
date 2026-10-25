@@ -28,7 +28,7 @@ import { voltaDoRelatorio } from '@/lib/erp/volta';
 import { planoDoParceiro } from '@/lib/erp/plano';
 import { pode, type Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
-import type { Visao } from '@/lib/erp/visao';
+import { ROTULO_REDE, type Visao } from '@/lib/erp/visao';
 import { PageHeader } from '../../ui/cabecalho';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { FiltroEmLinks } from '../../ui/filtros';
@@ -59,8 +59,20 @@ export interface ContextoDaTela {
   bloqueio: string | null;
   /** "Rede Completa", o nome da loja ou o parceiro (nível 1). */
   contexto: string;
+  /** Nível 1: o nome do parceiro (as telas com loja ou rede montam o subtítulo com ele, decisão 474). */
+  parceiro?: string;
   /** `/erp` ou `/rodolfo/erp/<slug>`. */
   raiz: string;
+}
+
+/**
+ * O que a lista de despesas (e a composição) mostra (decisão 474): a loja do filtro; sem filtro, a rede inteira para quem
+ * a alcança, ou as lojas do acesso. Antes a lista sem filtro dizia a loja escolhida no topo sobre as despesas de todas.
+ */
+function abrangenciaDasDespesas(c: ContextoDaTela, lojasDoAlcance: readonly { id: string; nome: string }[], lojaId: string | undefined): string {
+  // `lojaId` já foi conferido contra as lojas do acesso: o nome sempre existe.
+  const abrangencia = lojaId ? (lojasDoAlcance.find((l) => l.id === lojaId)?.nome ?? '') : c.alcance.lojas === 'todas' ? ROTULO_REDE : lojasDoAlcance.map((l) => l.nome).join(', ');
+  return [c.parceiro, abrangencia].filter(Boolean).join(' · ');
 }
 
 export async function PaginaDasDespesas({ c, lojasDoAlcance, query }: { c: ContextoDaTela; lojasDoAlcance: { id: string; nome: string }[]; query: Query }) {
@@ -85,7 +97,7 @@ export async function PaginaDasDespesas({ c, lojasDoAlcance, query }: { c: Conte
         <TelaDaComposicao
           c={composicao}
           base={base}
-          escopoNome={lojaId ? (lojasDoAlcance.find((l) => l.id === lojaId)?.nome ?? c.contexto) : c.alcance.lojas === 'todas' ? 'Rede Completa' : lojasDoAlcance.map((l) => l.nome).join(', ')}
+          escopoNome={abrangenciaDasDespesas(c, lojasDoAlcance, lojaId)}
           lojaId={lojaId}
           recorte={recorte}
           periodo={periodo}
@@ -106,7 +118,7 @@ export async function PaginaDasDespesas({ c, lojasDoAlcance, query }: { c: Conte
       lista={lista}
       base={`${c.raiz}/dre/despesas`}
       raiz={c.raiz}
-      contexto={c.contexto}
+      abrangencia={abrangenciaDasDespesas(c, lojasDoAlcance, lojaId)}
       hoje={hoje}
       mes={mes}
       situacao={situacao}
@@ -243,7 +255,7 @@ export async function PaginaDaDespesa({ c, id, query, acoes }: { c: ContextoDaTe
   );
 }
 
-export async function PaginaDeEditarDespesa({ c, id, acao }: { c: ContextoDaTela; id: string; acao: AcaoDeCadastro }) {
+export async function PaginaDeEditarDespesa({ c, id, acao, query = {} }: { c: ContextoDaTela; id: string; acao: AcaoDeCadastro; query?: Query }) {
   const hoje = hojeNoRio();
   const d = await obterDespesa(c.cliente, c.alcance, id, hoje);
   if (!d) notFound();
@@ -267,15 +279,18 @@ export async function PaginaDeEditarDespesa({ c, id, acao }: { c: ContextoDaTela
     recorrente: x.recorrente,
     vencimento: x.vencimento ? br(x.vencimento) : '',
   };
-  const voltar = `${c.raiz}/dre/despesas/${x.id}`;
+  // Veio da composição (decisão 474): o caminho segue para a despesa e, depois de salvar, ela abre com o mesmo "voltar".
+  const volta = voltaDoRelatorio(um(query.volta), c.raiz)?.href;
+  const voltar = `${c.raiz}/dre/despesas/${x.id}${volta ? `?volta=${encodeURIComponent(volta)}` : ''}`;
   const periodos = await avisoDePeriodos(c.cliente, c.alcance, c.raiz, hoje);
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: x.descricao, href: voltar }, { rotulo: 'Editar' }]} />
       <Voltar href={voltar}>Voltar para a despesa</Voltar>
-      <PageHeader icone="compras" cor={COR.dre} titulo="Editar despesa" subtitulo={`${x.descricao} · ${c.contexto}`} />
+      {/* A loja da despesa (como no detalhe), não a escolhida no topo (decisão 474). */}
+      <PageHeader icone="compras" cor={COR.dre} titulo="Editar despesa" subtitulo={[x.descricao, c.parceiro, x.lojaNome ?? 'Rede'].filter(Boolean).join(' · ')} />
       {d.fechado && <AvisoDoPeriodoFechado periodo={d.fechado} href={periodos.href} frase="Esta despesa cai nele: valor, competência, linha e loja não mudam mais; descrição, vencimento e “repete todo mês” sim." />}
-      <FormDespesa acao={acao} linhas={linhas} lojas={lojas} podeRede={lj.podeRede || x.lojaId === null} inicial={inicial} hoje={hoje} envio="" versao={x.versao} voltar={voltar} rotuloDoBotao="Salvar" bloqueio={c.bloqueio} periodoFechado={!!d.fechado} periodos={periodos} />
+      <FormDespesa acao={acao} linhas={linhas} lojas={lojas} podeRede={lj.podeRede || x.lojaId === null} inicial={inicial} hoje={hoje} envio="" versao={x.versao} voltar={voltar} volta={volta} rotuloDoBotao="Salvar" bloqueio={c.bloqueio} periodoFechado={!!d.fechado} periodos={periodos} />
     </div>
   );
 }
@@ -322,7 +337,7 @@ export async function PaginaDoCmvPorCategoria({ c, visao, lojasDoAlcance, query,
   const pedidaVista = um(query.vista);
   const vista: VistaDoPainel = pedidaVista === 'compra-real' || pedidaVista === 'evolucao' || (pedidaVista === 'matriz' && r.painel?.matriz) ? (pedidaVista as VistaDoPainel) : 'categorias';
   const evolucao = vista === 'evolucao' ? await evolucaoDeCategorias(c.cliente, c.alcance, pedido, pedida.data, hoje) : null;
-  return <TelaDoCmvPorCategoria vista={vista} evolucao={evolucao} r={{ ...r, d: { ...r.d, avisoDaData: pedida.aviso } }} base={`${c.raiz}/dre/cmv-categorias`} raiz={c.raiz} contexto={c.contexto} pode={p} bloqueio={c.bloqueio} />;
+  return <TelaDoCmvPorCategoria vista={vista} evolucao={evolucao} r={{ ...r, d: { ...r.d, avisoDaData: pedida.aviso } }} base={`${c.raiz}/dre/cmv-categorias`} raiz={c.raiz} parceiro={c.parceiro} pode={p} bloqueio={c.bloqueio} />;
 }
 
 /** As metas por categoria da rede (sem `?loja=`) ou de uma loja. Quem não define metas, ou loja que não existe: 404. */

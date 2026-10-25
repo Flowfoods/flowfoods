@@ -75,7 +75,7 @@ export function AvisoDoPeriodoFechado({
         </p>
         {href && (
           <p>
-            <Link href={href} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+            <Link href={href} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`}>
               Ver os períodos
             </Link>
           </p>

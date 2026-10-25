@@ -7,7 +7,6 @@
  */
 
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode, visaoDaRequisicao } from '@/lib/erp/contexto';
-import { rotuloDaVisao } from '@/lib/erp/visao';
 import { carregarDoMes } from '@/components/erp/telas/faturamento/carregar';
 import { TelaDoMes } from '@/components/erp/telas/faturamento/mes';
 
@@ -22,7 +21,6 @@ export default async function ErpFaturamentoPage({ searchParams }: { searchParam
     <TelaDoMes
       m={m}
       base="/erp/faturamento"
-      contexto={rotuloDaVisao(visao)}
       lojaAberta={lojaAberta}
       podeLancar={pode(ctx.alcance, 'faturamento.lancar')}
       bloqueio={ctx.bloqueio}

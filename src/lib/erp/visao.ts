@@ -81,6 +81,15 @@ export function resolverVisao(
   return { visao, opcoes, valor: escolhida.valor };
 }
 
+/**
+ * O que a tela mostra no subtítulo (decisão 474): a loja aberta, ou a rede quando nenhuma loja está aberta — inclusive ao
+ * entrar por "Ver a rede" com uma loja escolhida no topo (antes o subtítulo dizia a loja do topo sobre os números da rede).
+ * No nível 1, o parceiro vem na frente: "Casa Alfa · Rede Completa".
+ */
+export function rotuloDoEscopo(lojaNome: string | null | undefined, parceiro?: string | null): string {
+  return [parceiro, lojaNome || ROTULO_REDE].filter(Boolean).join(' · ');
+}
+
 /** "Rede Completa", "Loja Tijuca", "Sem loja no seu acesso". */
 export function rotuloDaVisao(visao: Visao): string {
   if (visao.tipo === 'rede') return ROTULO_REDE;

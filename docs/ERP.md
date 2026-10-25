@@ -4687,3 +4687,12 @@ Barra de "Enviados hoje" cinza no parcial. Modelos padrão sob trava do banco (s
 a primeira rodada (texto recusado aparecia "Na fila"), aprovou a reconferência. Matriz 60 telas: 0 falhas. Suíte com banco 2.925
 aprovados, 46 pulados, 0 falhas; lint, typecheck e portão limpos; testes novos `rodolfo-fila-c1`, `rodolfo-fila-disparo` e
 `rodolfo-modelos.db`.
+
+**DRE · a rede no subtítulo e o voltar para a composição (decisão 474, 25/10/2026):** DRE, CMV por categoria, Faturamento e a
+lista de Despesas dizem a loja aberta ou a rede (antes, ao entrar por "Ver a rede" com uma loja no topo, diziam a loja do topo);
+no nível 1, com o parceiro na frente; "Editar despesa" diz a loja da despesa. A despesa aberta pela composição mantém "Voltar para
+<linha> no DRE" depois de editar, pagar, desfazer e "não repete mais" (a volta segue no link e no formulário e é conferida de novo
+no servidor). Alvos de 44 px no toque nas mesmas telas (setas de mês, "Ver a rede", "Voltar para este mês/período de agora",
+"definir", nome da loja e da despesa nas tabelas, "Mostrar linhas zeradas", "Ver os períodos"). Revisor: reprovou a primeira
+rodada (três links pequenos), aprovou a reconferência. Matriz 108 telas: 0 falhas; jornada no navegador ok. Testes novos
+`erp-dre-volta` e casos de página nos testes com banco do DRE e do Faturamento.

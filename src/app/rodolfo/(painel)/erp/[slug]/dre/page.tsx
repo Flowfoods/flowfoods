@@ -5,7 +5,6 @@
  */
 
 import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/contexto';
-import { rotuloDaVisao } from '@/lib/erp/visao';
 import { carregarDre } from '@/components/erp/telas/dre/carregar';
 import { TelaDoDre } from '@/components/erp/telas/dre/dre';
 import { Painel, Vazio } from '@/components/erp/ui/superficies';
@@ -30,7 +29,7 @@ export default async function ParceiroDrePage({ params, searchParams }: { params
       d={d}
       base={`${raiz}/dre`}
       raiz={raiz}
-      contexto={`${ctx.parceiro.nome} · ${rotuloDaVisao(visao)}`}
+      parceiro={ctx.parceiro.nome}
       pode={{ lancarDespesa: true, definirMetas: true, fecharPeriodo: true, verFaturamento: true, verPrecos: true, verCompras: true, verEstoque: true, veRede: true }}
       bloqueio={ctx.bloqueio}
     />

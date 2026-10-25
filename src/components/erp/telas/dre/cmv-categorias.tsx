@@ -32,6 +32,7 @@ import { Aviso, Contagem, Metrica, Painel, Selo } from '../../ui/superficies';
 import { Farol, Regua } from './farol';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 import { BarrasHorizontais, type BarraDoGrafico } from '../../ui/barras-horizontais';
+import { rotuloDoEscopo } from '@/lib/erp/visao';
 
 export interface PermissoesDoPainelDeCategorias {
   /** `metas.editar` com a rede inteira: vê o convite para definir as metas por categoria. */
@@ -154,7 +155,7 @@ export function TelaDoCmvPorCategoria({
   r,
   base,
   raiz,
-  contexto,
+  parceiro,
   pode,
   bloqueio,
   vista = 'categorias',
@@ -168,7 +169,8 @@ export function TelaDoCmvPorCategoria({
   base: string;
   /** `/erp` ou `/rodolfo/erp/<slug>`. */
   raiz: string;
-  contexto: string;
+  /** Nível 1: o nome do parceiro, na frente da loja ou da rede no subtítulo. */
+  parceiro?: string;
   pode: PermissoesDoPainelDeCategorias;
   bloqueio: string | null;
 }) {
@@ -204,7 +206,7 @@ export function TelaDoCmvPorCategoria({
         icone="dre"
         cor={COR.dre}
         titulo="CMV por categoria"
-        subtitulo={`${loja ? loja.nome : contexto} · ${d.periodo.nome}`}
+        subtitulo={`${rotuloDoEscopo(loja?.nome, parceiro)} · ${d.periodo.nome}`}
         acao={
           pode.definirMetas ? (
             <Link href={`${raiz}/dre/metas-categorias${loja ? `?loja=${loja.lojaId}` : ''}`} className={classeDeBotao('secundario')}>

@@ -31,6 +31,7 @@ import { Farol, idDaLinha } from './farol';
 import { PainelDeFaroisDoDre } from './farol-painel';
 import { dataCurta } from '../faturamento/formato';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
+import { rotuloDoEscopo } from '@/lib/erp/visao';
 
 export interface PermissoesDaTela {
   lancarDespesa: boolean;
@@ -113,7 +114,7 @@ function Tabela({ d, raiz, pode, escopoQuery }: { d: DreDoPeriodo; raiz: string;
       {nZeradas > 0 && (
         <>
           <input type="checkbox" id="dre-zeradas" className="peer sr-only sm:hidden" />
-          <label htmlFor="dre-zeradas" className="block cursor-pointer border-b border-linha px-4 py-2.5 text-[13px] text-texto underline decoration-linha-forte underline-offset-4 peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-[-3px] peer-focus-visible:outline-acento peer-checked:[&>span:first-child]:hidden peer-checked:[&>span:last-child]:inline sm:hidden">
+          <label htmlFor="dre-zeradas" className="block min-h-11 cursor-pointer border-b border-linha px-4 py-3 text-[13px] text-texto underline decoration-linha-forte underline-offset-4 peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-[-3px] peer-focus-visible:outline-acento peer-checked:[&>span:first-child]:hidden peer-checked:[&>span:last-child]:inline sm:hidden">
             <span>Mostrar linhas zeradas ({nZeradas})</span>
             <span className="hidden">Esconder linhas zeradas</span>
           </label>
@@ -301,7 +302,7 @@ function PorLoja({ d, base }: { d: DreDoPeriodo; base: string }) {
             {lojas.map((l) => (
               <li key={l.loja.id} className="px-4 py-3">
                 <div className="flex items-baseline justify-between gap-3">
-                  <Link href={aqui(l.loja.id)} className={`${LINK_DE_TEXTO} min-w-0 truncate font-medium`}>
+                  <Link href={aqui(l.loja.id)} className={`${LINK_DE_TEXTO} ff-toque min-w-0 truncate font-medium`}>
                     {l.loja.nome}
                   </Link>
                   <span className="shrink-0 text-[15px] font-semibold tabular-nums">{l.receitaBrutaCentavos === 0 ? '—' : formatarDinheiro(l.resultadoCentavos)}</span>
@@ -339,7 +340,7 @@ function PorLoja({ d, base }: { d: DreDoPeriodo; base: string }) {
                 {lojas.map((l) => (
                   <tr key={l.loja.id} className="border-t border-linha">
                     <th scope="row" className="h-11 max-w-[16rem] px-5 text-left font-medium">
-                      <Link href={aqui(l.loja.id)} className={`${LINK_DE_TEXTO} block truncate`}>
+                      <Link href={aqui(l.loja.id)} className={`${LINK_DE_TEXTO} block truncate py-3`}>
                         {l.loja.nome}
                       </Link>
                     </th>
@@ -480,7 +481,7 @@ export function TelaDoDre({
   d,
   base,
   raiz,
-  contexto,
+  parceiro,
   pode,
   bloqueio,
 }: {
@@ -489,8 +490,8 @@ export function TelaDoDre({
   base: string;
   /** `/erp` ou `/rodolfo/erp/<slug>`. */
   raiz: string;
-  /** "Rede Completa", o nome da loja ou o parceiro (N1). */
-  contexto: string;
+  /** Nível 1: o nome do parceiro, na frente da loja ou da rede no subtítulo. */
+  parceiro?: string;
   pode: PermissoesDaTela;
   bloqueio: string | null;
 }) {
@@ -508,7 +509,7 @@ export function TelaDoDre({
         icone="dre"
         cor={COR.dre}
         titulo="DRE"
-        subtitulo={`${loja ? loja.nome : contexto} · ${d.periodo.nome}`}
+        subtitulo={`${rotuloDoEscopo(loja?.nome, parceiro)} · ${d.periodo.nome}`}
         acao={
           pode.lancarDespesa ? (
             <BotaoOuMotivo href={`${raiz}/dre/despesas/nova`} bloqueio={bloqueio} variante="primario">
@@ -542,7 +543,7 @@ export function TelaDoDre({
             )}
           </nav>
           {!d.emCurso && (
-            <Link href={`${base}?${escopoQuery.slice(1)}`} className={LINK_DE_TEXTO}>
+            <Link href={`${base}?${escopoQuery.slice(1)}`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11`}>
               Voltar para o período de agora
             </Link>
           )}

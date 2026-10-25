@@ -5,7 +5,6 @@
  */
 
 import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/contexto';
-import { rotuloDaVisao } from '@/lib/erp/visao';
 import { carregarDoMes } from '@/components/erp/telas/faturamento/carregar';
 import { TelaDoMes } from '@/components/erp/telas/faturamento/mes';
 
@@ -20,7 +19,7 @@ export default async function ParceiroFaturamentoPage({ params, searchParams }: 
     <TelaDoMes
       m={m}
       base={`/rodolfo/erp/${ctx.parceiro.slug}/faturamento`}
-      contexto={`${ctx.parceiro.nome} · ${rotuloDaVisao(visao)}`}
+      parceiro={ctx.parceiro.nome}
       lojaAberta={lojaAberta}
       podeLancar
       bloqueio={ctx.bloqueio}

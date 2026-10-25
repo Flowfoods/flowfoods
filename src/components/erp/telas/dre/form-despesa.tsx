@@ -74,6 +74,7 @@ export function FormDespesa({
   envio,
   versao,
   voltar,
+  volta,
   rotuloDoBotao,
   bloqueio,
   periodoFechado,
@@ -90,6 +91,8 @@ export function FormDespesa({
   /** `atualizadoEm` lido (editar). Vazio ao lançar. */
   versao: string;
   voltar: string;
+  /** Edição vinda da composição (decisão 474): depois de salvar, a despesa abre com o mesmo "voltar". */
+  volta?: string;
   rotuloDoBotao: string;
   bloqueio: string | null;
   /** Despesa que cai em período fechado: só o que não muda o DRE (vencimento, descrição, repetir) se edita. */
@@ -128,6 +131,7 @@ export function FormDespesa({
     <form action={enviar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="envio" value={envio} />
       <input type="hidden" name="versao" value={versao} />
+      {volta && <input type="hidden" name="volta" value={volta} />}
       {fechadoNoGeral ? <AvisoDoPeriodoFechado periodo={fechadoNoGeral} href={periodos.href} frase="Esta despesa é desse período: não dá para corrigir nem remover." /> : <ErroGeral estado={estado} recarregar={voltar} />}
       <ResumoDeErros erros={erros} idBase="desp" rotulos={(c) => ROTULOS[c] ?? c} />
       <fieldset disabled={travado} className="min-w-0 space-y-4">

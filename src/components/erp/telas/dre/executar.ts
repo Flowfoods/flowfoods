@@ -26,6 +26,7 @@ import { fecharPeriodo, reabrirPeriodo } from '@/lib/erp/dre-fechamento';
 import { formatarData } from '@/lib/erp/compra-campos';
 import type { Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
+import { voltaDoRelatorio } from '@/lib/erp/volta';
 import type { EstadoCadastro, EstadoLocal, EstadoMesPassado } from './estado';
 
 const textoDe = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : '');
@@ -60,6 +61,15 @@ function paraATela(r: Extract<ResultadoDaDespesa, { ok: false }>, anterior: Esta
 /** `raiz` = `/erp` ou `/rodolfo/erp/<slug>`. */
 const despesas = (raiz: string) => `${raiz}/dre/despesas`;
 
+/**
+ * O caminho de volta que veio no formulário (decisão 474), conferido como o da página: só caminho interno da área. Sai como
+ * `&volta=…` para a despesa abrir com o mesmo "voltar" (para a composição da linha, por exemplo).
+ */
+function comAVolta(form: FormData, raiz: string): string {
+  const v = voltaDoRelatorio(textoDe(form.get('volta')), raiz);
+  return v ? `&volta=${encodeURIComponent(v.href)}` : '';
+}
+
 export async function executarLancarDespesa(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, anterior: EstadoCadastro, form: FormData, raiz: string): Promise<EstadoCadastro> {
   const r = await lancarDespesa(cliente, alcance, lerTextosDaDespesa(form), autorNome);
   if (!r.ok) return paraATela(r, anterior);
@@ -72,7 +82,7 @@ export async function executarEditarDespesa(cliente: ClienteDoParceiro, alcance:
   const r = await editarDespesa(cliente, alcance, id, { ...resto, versao: textoDe(form.get('versao')) }, autorNome);
   if (!r.ok) return paraATela(r, anterior);
   revalidatePath(raiz, 'layout');
-  redirect(`${despesas(raiz)}/${id}?feito=${r.mudou ? 'salva' : 'igual'}`);
+  redirect(`${despesas(raiz)}/${id}?feito=${r.mudou ? 'salva' : 'igual'}${comAVolta(form, raiz)}`);
 }
 
 export async function executarRemoverDespesa(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, id: string, anterior: EstadoCadastro, form: FormData, raiz: string): Promise<EstadoCadastro> {
@@ -103,7 +113,7 @@ export async function executarMudancaSemDre(
   if (!r.ok) return paraATela(r, anterior);
   revalidatePath(raiz, 'layout');
   const feito = !r.mudou ? 'igual' : qual === 'pagar' ? 'paga' : qual === 'desfazer' ? 'nao-paga' : 'nao-repete';
-  redirect(`${despesas(raiz)}/${id}?feito=${feito}`);
+  redirect(`${despesas(raiz)}/${id}?feito=${feito}${comAVolta(form, raiz)}`);
 }
 
 export async function executarMesPassado(cliente: ClienteDoParceiro, alcance: Alcance, autorNome: string, anterior: EstadoMesPassado, form: FormData, raiz: string): Promise<EstadoMesPassado> {
