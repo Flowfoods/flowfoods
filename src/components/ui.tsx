@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 export function Etiqueta({ children, escura = false }: { children: ReactNode; escura?: boolean }) {
   return (
     <p
-      className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${escura ? 'text-primary' : 'text-primary'}`}
+      className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${escura ? 'text-bloco-realce' : 'text-realce'}`}
     >
       {children}
     </p>

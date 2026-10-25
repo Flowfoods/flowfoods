@@ -8,13 +8,13 @@ import { CAMPO_ARMADILHA, CONSENTIMENTO } from '@/lib/erp/pedido-textos';
 import { enviarPedido, type EstadoDoComecar } from '@/app/comecar/actions';
 
 const CAMPO =
-  'block min-h-12 w-full border border-ink/30 bg-white px-3.5 py-2.5 text-base text-ink placeholder:text-ink-5 hover:border-ink/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink aria-[invalid=true]:border-primary-dark';
+  'block min-h-12 w-full border border-ink/45 bg-papel px-3.5 py-2.5 text-base text-ink placeholder:text-ink-5 hover:border-ink/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink aria-[invalid=true]:border-realce';
 const ROTULO = 'mb-1.5 block text-[13px] font-semibold text-ink';
 
 function Erro({ id, texto }: { id: string; texto?: string }) {
   if (!texto) return null;
   return (
-    <p id={id} className="mt-1.5 text-[13px] font-medium text-primary-dark">
+    <p id={id} className="mt-1.5 text-[13px] font-medium text-realce">
       {texto}
     </p>
   );
@@ -27,7 +27,7 @@ function Enviar() {
       type="submit"
       disabled={pending}
       aria-busy={pending}
-      className="inline-flex min-h-[52px] w-full items-center justify-center bg-ink px-8 text-[13px] font-semibold uppercase tracking-[0.12em] text-surface transition-colors hover:bg-primary-dark focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-wait disabled:opacity-70"
+      className="inline-flex min-h-[52px] w-full items-center justify-center bg-ink px-8 text-[13px] font-semibold uppercase tracking-[0.12em] text-surface transition-colors hover:bg-primary-dark hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink disabled:cursor-wait disabled:opacity-70"
     >
       {pending ? 'Enviando…' : 'Enviar'}
     </button>
@@ -75,14 +75,14 @@ export default function FormComecar() {
       </p>
 
       {(estado?.tipo === 'bloqueado' || estado?.tipo === 'indisponivel') && (
-        <p role="alert" className="mt-4 border-l-2 border-primary-dark bg-white px-4 py-3 text-sm text-ink">
+        <p role="alert" className="mt-4 border border-ink/20 bg-papel px-4 py-3 text-sm text-ink">
           {estado.mensagem} {SAIDA_PELO_WHATSAPP}
         </p>
       )}
 
       <form action={enviar} className="mt-6 space-y-4" aria-describedby={estado?.tipo === 'erros' ? 'comecar-resumo' : undefined}>
         {estado?.tipo === 'erros' && (
-          <p id="comecar-resumo" role="alert" className="border-l-2 border-primary-dark bg-white px-4 py-3 text-sm font-medium text-ink">
+          <p id="comecar-resumo" role="alert" className="border border-ink/20 bg-papel px-4 py-3 text-sm font-semibold text-ink">
             {estado.mensagem}
           </p>
         )}
@@ -236,7 +236,7 @@ export default function FormComecar() {
         </div>
 
         <div>
-          <label className="flex cursor-pointer items-start gap-3 text-sm leading-snug text-ink [@media(pointer:coarse)]:min-h-11">
+          <label className="flex cursor-pointer items-start gap-3 text-sm leading-snug text-ink min-h-11">
             <input
               type="checkbox"
               name="consentimento"
@@ -249,7 +249,7 @@ export default function FormComecar() {
             <span>{CONSENTIMENTO.texto}</span>
           </label>
           <details className="mt-2 pl-8 text-[13px] leading-relaxed text-ink-3">
-            <summary className="inline cursor-pointer font-semibold text-ink underline decoration-ink/40 underline-offset-4 hover:decoration-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center">
+            <summary className="inline cursor-pointer font-semibold text-ink underline decoration-ink/40 underline-offset-4 hover:decoration-ink inline-flex min-h-11 items-center">
               (ver como usamos)
             </summary>
             <ul className="mt-2 list-disc space-y-1 pl-4">

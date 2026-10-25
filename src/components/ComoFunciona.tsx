@@ -13,7 +13,7 @@ export default function ComoFunciona() {
       <ol className="mt-12 grid gap-px border border-ink/10 bg-ink/10 md:grid-cols-2 lg:grid-cols-4">
         {PROCESSO.map((e) => (
           <li key={e.numero} className="bg-papel p-6 md:p-7">
-            <span className="font-display text-3xl font-bold text-primary tabular-nums">{e.numero}</span>
+            <span className="font-display text-3xl font-bold text-realce tabular-nums">{e.numero}</span>
             <h3 className="mt-4 font-display text-xl font-semibold leading-tight text-ink">{e.titulo}</h3>
             <p className="mt-3 text-[15px] leading-relaxed text-ink-3">{e.descricao}</p>
           </li>

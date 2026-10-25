@@ -4661,3 +4661,11 @@ escuro do sistema) com a régua corrigida: sem rolagem lateral; o Portal dava er
 toque, sem mudar o visual no computador. Sem tema escuro no site e no Portal, de propósito (material da marca para o cliente). Login,
 `/entrar`, primeiro acesso e os botões de acesso do site ficam de fora (adiados). Matriz depois: 24 telas, 0 falhas. Suíte com banco
 2.886 aprovados, 46 pulados, 0 falhas; lint, typecheck e portão limpos. Revisão de UX independente em andamento no commit.
+
+**E5.1 · visual do site e do Portal liberado (decisão 471, 25/10/2026):** o Rodolfo liberou mudar o visual. Site e Portal com claro e
+escuro pelo sistema (`.ff-site`, `--site-*`), vermelho por papel como no ERP (botão #C41522, letra pequena #C41522/#F5525A, #EA1D2C
+só no filete e na logo), cinzas legíveis, sem borda colorida, 44 px sempre. Portal com os 9 "deve" da revisão de UX: barra que diz
+a verdade, confirmação de envio inteira com dia e hora, "Salvar áudio" e envio que não passa por cima de áudio ou anexo pendente,
+aviso ao sair e rascunho no aparelho sem conexão, selo "Não salvo", páginas de erro em português. Matriz 24 telas: 0 falhas;
+contraste claro e escuro: 0 textos abaixo do mínimo (eram 160); comportamento do Portal com API simulada: ok. Suíte com banco
+2.895 aprovados, 46 pulados, 0 falhas; lint, typecheck e portão limpos; testes novos `site-tema` e `portal-tela`.

@@ -1,4 +1,4 @@
-// avoid-ai-design-ignore-file: SD4, SD5, K3, SD4d — site institucional, fora do shell do ERP: etiqueta em caixa alta e o filete/assinatura são o estilo editorial FlowFoods (CLAUDE.md) e o contrato da 1.1 proíbe mudar o visual do /.
+// avoid-ai-design-ignore-file: SD4, SD5, K3, SD4d — site institucional, fora do shell do ERP: etiqueta em caixa alta e o filete/assinatura são o estilo editorial FlowFoods (CLAUDE.md) (o visual do / foi liberado pelo Rodolfo em 25/10, decisão 471: o estilo editorial continua por ser a identidade).
 import { CONTACT_INFO } from '@/lib/constants';
 
 const NAV = [
@@ -17,7 +17,7 @@ export default function Footer() {
       <div className="mx-auto grid max-w-6xl gap-10 py-14 md:grid-cols-3">
         <div>
           <p className="font-display text-2xl font-bold leading-none text-ink">
-            Flow<span className="text-primary">Foods</span>
+            Flow<span className="text-marca">Foods</span>
           </p>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-ink-4">
             Consultoria para restaurantes. Estrutura, rentabilidade e crescimento, do diagnóstico à
@@ -27,9 +27,9 @@ export default function Footer() {
 
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-5">Navegação</p>
-          <nav className="mt-4 flex flex-col gap-2.5 [@media(pointer:coarse)]:gap-0">
+          <nav className="mt-4 flex flex-col">
             {NAV.map((l) => (
-              <a key={l.href} href={l.href} className="text-sm text-ink-3 transition-colors hover:text-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center">
+              <a key={l.href} href={l.href} className="text-sm text-ink-3 transition-colors hover:text-ink inline-flex min-h-11 items-center">
                 {l.label}
               </a>
             ))}
@@ -38,12 +38,12 @@ export default function Footer() {
 
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-5">Contato</p>
-          <div className="mt-4 flex flex-col gap-2.5 [@media(pointer:coarse)]:gap-0 [@media(pointer:coarse)]:items-start">
+          <div className="mt-4 flex flex-col items-start">
             <a
               href={CONTACT_INFO.whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-ink-3 transition-colors hover:text-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center"
+              className="text-sm text-ink-3 transition-colors hover:text-ink inline-flex min-h-11 items-center"
             >
               WhatsApp {CONTACT_INFO.whatsappDisplay}
             </a>
@@ -51,7 +51,7 @@ export default function Footer() {
               href={CONTACT_INFO.instagramUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-ink-3 transition-colors hover:text-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center"
+              className="text-sm text-ink-3 transition-colors hover:text-ink inline-flex min-h-11 items-center"
             >
               Instagram @{CONTACT_INFO.instagram}
             </a>
@@ -59,7 +59,7 @@ export default function Footer() {
               href={CONTACT_INFO.linkedinUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-ink-3 transition-colors hover:text-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center"
+              className="text-sm text-ink-3 transition-colors hover:text-ink inline-flex min-h-11 items-center"
             >
               LinkedIn
             </a>
@@ -70,7 +70,7 @@ export default function Footer() {
 
       <div className="mx-auto flex max-w-6xl flex-col gap-2 border-t border-ink/10 py-6 text-xs text-ink-5 sm:flex-row sm:items-center sm:justify-between">
         <p>© {ano} FlowFoods Consultoria.</p>
-        <a href="/rodolfo/login" className="font-semibold uppercase tracking-[0.16em] transition-colors hover:text-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center">
+        <a href="/rodolfo/login" className="font-semibold uppercase tracking-[0.16em] transition-colors hover:text-ink inline-flex min-h-11 items-center">
           Entrar
         </a>
       </div>

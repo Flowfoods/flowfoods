@@ -1,6 +1,6 @@
 'use client';
 
-// avoid-ai-design-ignore-file: SD4, SD5, K3 — Portal do cliente, fora do shell do ERP: o contrato da 1.1 exige o /portal visualmente igual (identidade editorial FlowFoods, CLAUDE.md).
+// avoid-ai-design-ignore-file: SD4, SD5, K3 — Portal do cliente, fora do shell do ERP: estilo editorial FlowFoods (CLAUDE.md); visual liberado pelo Rodolfo em 25/10 (decisão 471), com claro e escuro.
 
 /**
  * Formulário inicial — a tela que o dono do restaurante usa no celular.
@@ -30,7 +30,18 @@ import {
   type Questionario,
 } from '@/lib/portal/questionario';
 import { calcularProgresso, type EstadoItem } from '@/lib/portal/progresso';
-import { LIMITE_BYTES, formatarTamanho } from '@/lib/portal/limites';
+import { LIMITE_BYTES, LIMITE_TEXTO, formatarTamanho } from '@/lib/portal/limites';
+import {
+  ROTULO_DA_BARRA,
+  ROTULO_DO_CARTAO,
+  bloqueioDoEnvio,
+  chaveDoRascunho,
+  rascunhosParaRecuperar,
+  seloDoCartao,
+  statusGeral,
+  textoDoEnviado,
+  type StatusSalvar,
+} from '@/lib/portal/tela';
 import { LIMITE_GRAVACAO_S, MIMES_GRAVACAO, formatarDuracao, nomeDaGravacao } from '@/lib/portal/audio';
 
 export interface ArquivoTela {
@@ -46,7 +57,6 @@ export interface EstadoInicial {
   finalizadoEm: string | null;
 }
 
-type StatusSalvar = 'ocioso' | 'salvando' | 'salvo' | 'erro';
 
 const ESPERA_MS = 900;
 const NOVA_TENTATIVA_MS = 4000;
@@ -69,7 +79,10 @@ export default function Portal({
     Object.fromEntries(Object.entries(inicial.respostas).map(([k, v]) => [k, v.marcacao])),
   );
   const [arquivos, setArquivos] = useState<ArquivoTela[]>(inicial.arquivos);
-  const [status, setStatus] = useState<StatusSalvar>('ocioso');
+  // Anexos subindo e áudios gravados ainda não salvos: contam para a barra, para o "Enviar" e para o aviso ao sair.
+  const [uploads, setUploads] = useState(0);
+  const [audiosPendentes, setAudiosPendentes] = useState<Set<string>>(() => new Set());
+  const [recuperados, setRecuperados] = useState(0);
   // Estado de cada cartão, para o retorno visual ficar ao lado do que foi feito.
   const [statusItens, setStatusItens] = useState<Record<string, StatusSalvar>>({});
   const marcarItem = useCallback((itemId: string, s: StatusSalvar) => {
@@ -84,31 +97,44 @@ export default function Portal({
 
   const api = useCallback((rota: string) => `/api/portal/${token}/${rota}`, [token]);
 
+  // Rascunho no aparelho: o que ainda não foi confirmado pelo servidor fica guardado até salvar (sem internet, fechar a
+  // aba não perde o texto). O aparelho pode não deixar guardar (aba anônima, cheio): aí segue sem rascunho.
+  const guardarRascunho = useCallback(
+    (itemId: string, texto: string | null) => {
+      try {
+        const chave = chaveDoRascunho(token);
+        const atual = JSON.parse(localStorage.getItem(chave) ?? '{}') as Record<string, string>;
+        if (texto === null) delete atual[itemId];
+        else atual[itemId] = texto;
+        if (Object.keys(atual).length) localStorage.setItem(chave, JSON.stringify(atual));
+        else localStorage.removeItem(chave);
+      } catch {
+        /* sem armazenamento no aparelho */
+      }
+    },
+    [token],
+  );
+
+  /** 'ok', 'rede' (sem conexão ou erro do servidor: tenta de novo) ou 'recusado' (o servidor não aceita: não adianta repetir). */
   const enviarItem = useCallback(
-    async (itemId: string, dados: { texto?: string; marcacao?: Marcacao | null }): Promise<boolean> => {
+    async (itemId: string, dados: { texto?: string; marcacao?: Marcacao | null }): Promise<'ok' | 'rede' | 'recusado'> => {
       emVoo.current += 1;
-      setStatus('salvando');
       try {
         const r = await fetch(api('salvar'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId, ...dados }),
         });
-        if (!r.ok) throw new Error(String(r.status));
-        return true;
+        if (r.ok) return 'ok';
+        return r.status >= 400 && r.status < 500 ? 'recusado' : 'rede';
       } catch {
-        return false;
+        return 'rede';
       } finally {
         emVoo.current -= 1;
       }
     },
     [api],
   );
-
-  const atualizarStatus = useCallback((ok: boolean) => {
-    if (!ok) setStatus('erro');
-    else if (emVoo.current === 0 && sujos.current.size === 0) setStatus('salvo');
-  }, []);
 
   const salvarTexto = useCallback(
     async (itemId: string) => {
@@ -119,26 +145,30 @@ export default function Portal({
       const texto = sujos.current.get(itemId);
       if (texto === undefined) return;
       marcarItem(itemId, 'salvando');
-      const ok = await enviarItem(itemId, { texto });
+      const r = await enviarItem(itemId, { texto });
+      const ok = r === 'ok';
       // Digitou de novo enquanto salvava? Continua "salvando" até o próximo ciclo.
-      marcarItem(itemId, ok ? (sujos.current.get(itemId) === texto ? 'salvo' : 'salvando') : 'erro');
+      marcarItem(itemId, ok ? (sujos.current.get(itemId) === texto ? 'salvo' : 'salvando') : r === 'recusado' ? 'recusado' : 'erro');
       // Só limpa se ninguém digitou de novo enquanto o pedido voava.
-      if (ok && sujos.current.get(itemId) === texto) sujos.current.delete(itemId);
-      if (!ok) {
+      if (ok && sujos.current.get(itemId) === texto) {
+        sujos.current.delete(itemId);
+        guardarRascunho(itemId, null);
+      }
+      // Sem conexão: tenta de novo sozinho. Recusado (texto longo demais): repetir não adianta; o cartão diz o que fazer.
+      if (r === 'rede') {
         temporizadores.current.set(
           itemId,
           setTimeout(() => void salvarTexto(itemId), NOVA_TENTATIVA_MS),
         );
       }
-      atualizarStatus(ok);
     },
-    [enviarItem, atualizarStatus, marcarItem],
+    [enviarItem, marcarItem, guardarRascunho],
   );
 
   const aoDigitar = (itemId: string, valor: string) => {
     setTextos((s) => ({ ...s, [itemId]: valor }));
     sujos.current.set(itemId, valor);
-    setStatus('salvando');
+    guardarRascunho(itemId, valor);
     marcarItem(itemId, 'salvando');
     const t = temporizadores.current.get(itemId);
     if (t) clearTimeout(t);
@@ -150,11 +180,56 @@ export default function Portal({
     const anterior = marcacoes[itemId] ?? null;
     setMarcacoes((s) => ({ ...s, [itemId]: nova }));
     marcarItem(itemId, 'salvando');
-    const ok = await enviarItem(itemId, { marcacao: nova });
+    const ok = (await enviarItem(itemId, { marcacao: nova })) === 'ok';
     if (!ok) setMarcacoes((s) => ({ ...s, [itemId]: anterior }));
-    marcarItem(itemId, ok ? 'salvo' : 'erro');
-    atualizarStatus(ok);
+    // A marcação não tenta de novo sozinha: o cartão pede para tocar de novo.
+    marcarItem(itemId, ok ? 'salvo' : 'erro-marcar');
   };
+
+  // Ao abrir: o que ficou guardado no aparelho e não chegou ao servidor volta para o campo e é salvo (depois de montar,
+  // para o servidor e o aparelho desenharem igual).
+  useEffect(() => {
+    let rascunhos: Record<string, unknown> = {};
+    try {
+      rascunhos = JSON.parse(localStorage.getItem(chaveDoRascunho(token)) ?? '{}') as Record<string, unknown>;
+    } catch {
+      return;
+    }
+    const doServidor = Object.fromEntries(Object.entries(inicial.respostas).map(([k, v]) => [k, v.texto]));
+    const voltar = rascunhosParaRecuperar(rascunhos, doServidor, new Set(q.itens.map((i) => i.id)));
+    const ids = Object.keys(voltar);
+    if (ids.length === 0) {
+      try {
+        localStorage.removeItem(chaveDoRascunho(token));
+      } catch {
+        /* nada */
+      }
+      return;
+    }
+    setTextos((s) => ({ ...s, ...voltar }));
+    setRecuperados(ids.length);
+    for (const id of ids) {
+      sujos.current.set(id, voltar[id]);
+      marcarItem(id, 'salvando');
+      void salvarTexto(id);
+    }
+    // Só ao abrir a tela.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fechar ou recarregar com algo que ainda não salvou (sem conexão, áudio gravado, anexo subindo): o navegador pergunta.
+  const precisaAvisar = useRef(false);
+  precisaAvisar.current =
+    uploads > 0 || audiosPendentes.size > 0 || Object.values(statusItens).some((st) => st === 'erro' || st === 'recusado');
+  useEffect(() => {
+    const aoSairDaPagina = (e: BeforeUnloadEvent) => {
+      if (!precisaAvisar.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', aoSairDaPagina);
+    return () => window.removeEventListener('beforeunload', aoSairDaPagina);
+  }, []);
 
   // Fechou a aba com texto pendente: manda assim mesmo.
   useEffect(() => {
@@ -196,6 +271,27 @@ export default function Portal({
     () => new Map(progresso.situacoes.map((s) => [s.item.id, s.estado])),
     [progresso],
   );
+  const status = statusGeral(statusItens, uploads);
+  // Estáveis (useCallback): os cartões avisam por efeito, e uma função nova a cada desenho faria o efeito rodar sem parar.
+  const aoUpload = useCallback((delta: number) => setUploads((n) => Math.max(0, n + delta)), []);
+  const aoMudarAudio = useCallback(
+    (itemId: string, pendente: boolean) =>
+      setAudiosPendentes((atual) => {
+        if (atual.has(itemId) === pendente) return atual;
+        const novo = new Set(atual);
+        if (pendente) novo.add(itemId);
+        else novo.delete(itemId);
+        return novo;
+      }),
+    [],
+  );
+  const emBranco = useMemo(() => progresso.situacoes.filter((s) => s.estado === 'PENDENTE').map((s) => s.item.id), [progresso]);
+  const irParaEmBranco = () => {
+    const id = emBranco[0];
+    if (!id) return;
+    document.getElementById(`item-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    (document.getElementById(`campo-${id}`) as HTMLTextAreaElement | null)?.focus({ preventScroll: true });
+  };
 
   const blocosArquivo = q.blocos.filter((b) => b.tipo === 'ARQUIVO');
   const blocosPergunta = q.blocos.filter((b) => b.tipo === 'PERGUNTA');
@@ -214,20 +310,28 @@ export default function Portal({
     token,
     aoSubir: (a: ArquivoTela) => {
       setArquivos((s) => [...s, a]);
-      setStatus('salvo');
       marcarItem(a.itemId, 'salvo');
     },
     aoRemover: (id: string) => setArquivos((s) => s.filter((a) => a.id !== id)),
+    aoUpload,
+    aoMudarAudio,
   };
 
   return (
     <div className="pb-40">
       <header className="mx-auto max-w-2xl px-4 pb-6 pt-8 sm:pt-12">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-marca">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-realce">
           FlowFoods · Formulário inicial
         </p>
         <h1 className="mt-3 font-serifa text-3xl font-bold leading-tight sm:text-4xl">{cliente}</h1>
         <p className="mt-2 font-serifa text-lg italic text-footer/70">{q.abertura.tagline}</p>
+        {recuperados > 0 && (
+          <p role="status" className="mt-4 border border-footer/20 bg-papel px-4 py-3 text-sm">
+            {recuperados === 1
+              ? 'Recuperamos uma resposta que você escreveu sem conexão. Ela está sendo salva.'
+              : `Recuperamos ${recuperados} respostas que você escreveu sem conexão. Elas estão sendo salvas.`}
+          </p>
+        )}
       </header>
 
       <section className="mx-auto max-w-2xl space-y-4 px-4">
@@ -275,6 +379,8 @@ export default function Portal({
         respondidos={progresso.recebidos + progresso.marcados}
         total={progresso.total}
         finalizadoEm={finalizadoEm}
+        bloqueio={bloqueioDoEnvio(audiosPendentes.size, uploads)}
+        irParaEmBranco={irParaEmBranco}
         antesDeEnviar={async () => {
           await Promise.all([...sujos.current.keys()].map((id) => salvarTexto(id)));
           return sujos.current.size === 0;
@@ -289,12 +395,12 @@ export default function Portal({
 
 function Etiqueta({ children }: { children: React.ReactNode }) {
   return (
-    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-footer/55">{children}</p>
+    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-footer/70">{children}</p>
   );
 }
 
 function Cartao({ children }: { children: React.ReactNode }) {
-  return <div className="rounded-lg border border-footer/10 bg-white/70 p-4 sm:p-5">{children}</div>;
+  return <div className="border border-footer/10 bg-papel/70 p-4 sm:p-5">{children}</div>;
 }
 
 function Parte({
@@ -311,9 +417,9 @@ function Parte({
   return (
     <section className="mx-auto mt-12 max-w-2xl px-4">
       <div className="border-t border-footer/15 pt-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-marca">Parte {numero}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-realce">Parte {numero}</p>
         <h2 className="mt-1 font-serifa text-2xl font-bold">
-          {titulo} <span className="font-franklin text-base font-normal text-footer/50">· {total}</span>
+          {titulo} <span className="font-franklin text-base font-normal text-footer/70">· {total}</span>
         </h2>
       </div>
       <div className="mt-6 space-y-10">{children}</div>
@@ -330,11 +436,7 @@ function Bloco({ titulo, children }: { titulo: string; children: React.ReactNode
   );
 }
 
-const SELO: Record<EstadoItem, { rotulo: string; classe: string }> = {
-  RECEBIDO: { rotulo: 'Respondido', classe: 'border-footer bg-footer text-creme' },
-  MARCADO: { rotulo: 'Marcado', classe: 'border-footer/40 text-footer' },
-  PENDENTE: { rotulo: 'Pendente', classe: 'border-footer/15 text-footer/45' },
-};
+const TOM_DO_SELO = { erro: 'text-realce', forte: 'text-footer', suave: 'text-footer/70' } as const;
 
 function CartaoItem({
   item,
@@ -349,6 +451,8 @@ function CartaoItem({
   token,
   aoSubir,
   aoRemover,
+  aoUpload,
+  aoMudarAudio,
 }: {
   item: Item;
   textos: Record<string, string>;
@@ -362,27 +466,26 @@ function CartaoItem({
   token: string;
   aoSubir: (a: ArquivoTela) => void;
   aoRemover: (id: string) => void;
+  aoUpload: (delta: number) => void;
+  aoMudarAudio: (itemId: string, pendente: boolean) => void;
 }) {
-  const estado = estadoDe.get(item.id) ?? 'PENDENTE';
-  const selo = SELO[estado];
+  const estado: EstadoItem = estadoDe.get(item.id) ?? 'PENDENTE';
+  const marcacao = marcacoes[item.id];
   const meus = arquivos.filter((a) => a.itemId === item.id);
   const ehPergunta = item.tipo === 'PERGUNTA';
   const idCampo = `campo-${item.id}`;
   const statusItem = statusItens[item.id] ?? 'ocioso';
   const salvando = statusItem === 'salvando';
+  const selo = seloDoCartao(estado, statusItem, marcacao ? ROTULO_MARCACAO[marcacao] : null);
 
   return (
-    <article id={`item-${item.id}`} className="rounded-lg border border-footer/10 bg-white/70 p-4 sm:p-5">
+    <article id={`item-${item.id}`} className="scroll-mt-6 border border-footer/10 bg-papel/70 p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <label htmlFor={idCampo} className="block">
           <span className="font-medium leading-snug">{item.rotulo}</span>
-          {item.detalhe && <span className="mt-1 block text-sm text-footer/60">{item.detalhe}</span>}
+          {item.detalhe && <span className="mt-1 block text-sm text-footer/70">{item.detalhe}</span>}
         </label>
-        <span
-          className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider ${selo.classe}`}
-        >
-          {selo.rotulo}
-        </span>
+        <span className={`shrink-0 pt-0.5 text-[12px] font-semibold uppercase tracking-wider ${TOM_DO_SELO[selo.tom]}`}>{selo.rotulo}</span>
       </div>
 
       <textarea
@@ -391,18 +494,19 @@ function CartaoItem({
         onChange={(e) => aoDigitar(item.id, e.target.value)}
         onBlur={() => aoSairDoCampo(item.id)}
         rows={ehPergunta ? 4 : 2}
+        maxLength={LIMITE_TEXTO}
         placeholder={ehPergunta ? 'Sua resposta' : 'Escreva, cole um link ou anexe arquivos'}
-        className="mt-3 w-full resize-y rounded-md border border-footer/15 bg-white px-3 py-2.5 text-base leading-relaxed outline-none transition placeholder:text-footer/35 focus:border-footer/60"
+        className="mt-3 w-full resize-y border border-footer/45 bg-papel px-3 py-2.5 text-base leading-relaxed outline-none transition placeholder:text-footer/60 focus:border-footer"
       />
 
       <EstadoDoCartao status={statusItem} />
 
       <ListaArquivos token={token} arquivos={meus} aoRemover={aoRemover} />
 
-      {ehPergunta && <Gravador token={token} item={item} aoSubir={aoSubir} />}
+      {ehPergunta && <Gravador token={token} item={item} aoSubir={aoSubir} aoUpload={aoUpload} aoMudarAudio={aoMudarAudio} />}
 
       <div className="mt-3 flex flex-wrap gap-2">
-        <BotaoAnexar token={token} item={item} aoSubir={aoSubir} secundario={ehPergunta} />
+        <BotaoAnexar token={token} item={item} aoSubir={aoSubir} aoUpload={aoUpload} secundario={ehPergunta} />
         {MARCACOES.map((m) => {
           const ativa = marcacoes[item.id] === m;
           return (
@@ -412,10 +516,10 @@ function CartaoItem({
               aria-pressed={ativa}
               disabled={salvando}
               onClick={() => aoMarcar(item.id, m)}
-              className={`min-h-[44px] rounded-md border px-3 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60 ${
+              className={`min-h-[44px] border px-3 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60 ${
                 ativa
-                  ? 'border-marca bg-marca text-white'
-                  : 'border-footer/20 text-footer/70 hover:border-footer/50'
+                  ? 'border-footer bg-footer text-creme'
+                  : 'border-footer/30 text-footer/70 hover:border-footer/60'
               }`}
             >
               {ROTULO_MARCACAO[m]}
@@ -452,14 +556,14 @@ function EstadoDoCartao({ status }: { status: StatusSalvar }) {
     <p
       aria-live="polite"
       className={`mt-2 flex min-h-[1.25rem] items-center gap-2 text-xs ${
-        status === 'erro' ? 'text-marca' : status === 'salvo' ? 'text-footer' : 'text-footer/60'
+        status === 'salvando' ? 'text-footer/70' : status === 'salvo' ? 'text-footer' : 'text-realce'
       }`}
     >
       {status === 'salvando' && (
         <span className="h-2 w-2 animate-pulse rounded-full bg-footer/50" aria-hidden />
       )}
       {status === 'salvo' && <span aria-hidden>✓</span>}
-      {status === 'salvando' ? 'Salvando…' : status === 'salvo' ? 'Salvo' : 'Não salvou. Tentando de novo…'}
+      {ROTULO_DO_CARTAO[status]}
     </p>
   );
 }
@@ -515,10 +619,14 @@ export function Gravador({
   token,
   item,
   aoSubir,
+  aoUpload,
+  aoMudarAudio,
 }: {
   token: string;
   item: Item;
   aoSubir: (a: ArquivoTela) => void;
+  aoUpload?: (delta: number) => void;
+  aoMudarAudio?: (itemId: string, pendente: boolean) => void;
 }) {
   const [fase, setFase] = useState<FaseGravacao>('ocioso');
   const [segundos, setSegundos] = useState(0);
@@ -536,6 +644,15 @@ export function Gravador({
   useEffect(() => {
     setSuportado('MediaRecorder' in window && !!navigator.mediaDevices?.getUserMedia);
   }, []);
+
+  // Gravação pronta e ainda não salva: o "Enviar" da barra e o aviso ao sair sabem. Ao sair da tela, deixa de contar.
+  const pendente = fase === 'pronto' || fase === 'gravando';
+  useEffect(() => {
+    aoMudarAudio?.(item.id, pendente);
+  }, [pendente, item.id, aoMudarAudio]);
+  const avisarAudio = useRef(aoMudarAudio);
+  avisarAudio.current = aoMudarAudio;
+  useEffect(() => () => avisarAudio.current?.(item.id, false), [item.id]);
 
   const pararRelogio = () => {
     if (relogio.current) clearInterval(relogio.current);
@@ -618,7 +735,9 @@ export function Gravador({
     setErro(null);
     const nome = nomeDaGravacao(item.id, new Date(), gravacao.blob.type);
     const arquivo = new File([gravacao.blob], nome, { type: gravacao.blob.type });
+    aoUpload?.(1);
     const r = await subirArquivo(token, item.id, arquivo, setPct);
+    aoUpload?.(-1);
     setPct(null);
     if (r.ok) {
       aoSubir(r.arquivo);
@@ -630,12 +749,12 @@ export function Gravador({
   };
 
   const botao =
-    'inline-flex min-h-[44px] items-center gap-2 rounded-md px-4 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60';
+    'inline-flex min-h-[44px] items-center gap-2 px-4 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60';
 
   if (suportado === null) return null;
   if (!suportado) {
     return (
-      <p className="mt-3 text-sm text-footer/60">
+      <p className="mt-3 text-sm text-footer/70">
         Este navegador não grava áudio. Grave no celular e use “Anexar arquivo”.
       </p>
     );
@@ -651,22 +770,22 @@ export function Gravador({
       )}
 
       {fase === 'gravando' && (
-        <div className="flex flex-wrap items-center gap-3 rounded-md border border-marca/40 bg-white px-3 py-2">
+        <div className="flex flex-wrap items-center gap-3 border border-footer/20 bg-papel px-3 py-2">
           <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-marca" aria-hidden />
           <span className="text-sm font-medium tabular-nums" aria-live="polite">
             Gravando {formatarDuracao(segundos)}
           </span>
-          <span className="text-xs text-footer/50">máx. {formatarDuracao(LIMITE_GRAVACAO_S)}</span>
-          <button type="button" onClick={parar} className={`${botao} ml-auto bg-marca text-white hover:brightness-95`}>
+          <span className="text-xs text-footer/70">máx. {formatarDuracao(LIMITE_GRAVACAO_S)}</span>
+          <button type="button" onClick={parar} className={`${botao} ml-auto bg-primary text-white hover:bg-primary-dark`}>
             Parar
           </button>
         </div>
       )}
 
       {(fase === 'pronto' || fase === 'enviando') && gravacao && (
-        <div className="rounded-md border border-footer/15 bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-wider text-footer/55">
-            Ouça antes de enviar · {formatarDuracao(segundos)}
+        <div className="border border-footer/20 bg-papel p-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-footer/70">
+            Ouça antes de salvar · {formatarDuracao(segundos)}
           </p>
           <audio controls src={gravacao.url} className="mt-2 h-10 w-full" />
           <div className="mt-3 flex flex-wrap gap-2">
@@ -674,15 +793,15 @@ export function Gravador({
               type="button"
               onClick={enviar}
               disabled={fase === 'enviando'}
-              className={`${botao} bg-marca text-white hover:brightness-95`}
+              className={`${botao} bg-primary text-white hover:bg-primary-dark`}
             >
-              {fase === 'enviando' ? `Enviando ${pct ?? 0}%` : 'Enviar áudio'}
+              {fase === 'enviando' ? `Salvando ${pct ?? 0}%` : 'Salvar áudio'}
             </button>
             <button
               type="button"
               onClick={descartar}
               disabled={fase === 'enviando'}
-              className={`${botao} border border-footer/20 text-footer/70 hover:border-footer/50`}
+              className={`${botao} border border-footer/30 text-footer/70 hover:border-footer/60`}
             >
               Gravar de novo
             </button>
@@ -691,7 +810,7 @@ export function Gravador({
       )}
 
       {erro && (
-        <p role="alert" className="mt-2 text-sm text-marca">
+        <p role="alert" className="mt-2 text-sm text-realce">
           {erro}
         </p>
       )}
@@ -712,11 +831,11 @@ function ListaArquivos({
   if (arquivos.length === 0) return null;
 
   return (
-    <ul className="mt-3 divide-y divide-footer/10 rounded-md border border-footer/10">
+    <ul className="mt-3 divide-y divide-footer/10 border border-footer/15">
       {arquivos.map((a) => (
         <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2 text-sm">
           <span className="min-w-0 truncate">
-            {a.nomeOriginal} <span className="text-footer/50">· {formatarTamanho(a.tamanho)}</span>
+            {a.nomeOriginal} <span className="text-footer/70">· {formatarTamanho(a.tamanho)}</span>
           </span>
           <button
             type="button"
@@ -731,7 +850,7 @@ function ListaArquivos({
               if (r?.ok) aoRemover(a.id);
               else window.alert('Não removeu. Tente de novo.');
             }}
-            className="min-h-[44px] shrink-0 px-2 text-xs font-semibold uppercase tracking-wider text-footer/50 hover:text-marca"
+            className="min-h-[44px] shrink-0 px-2 text-xs font-semibold uppercase tracking-wider text-footer/70 hover:text-realce"
           >
             {removendo === a.id ? 'Removendo…' : 'Remover'}
           </button>
@@ -746,11 +865,13 @@ function BotaoAnexar({
   token,
   item,
   aoSubir,
+  aoUpload,
   secundario = false,
 }: {
   token: string;
   item: Item;
   aoSubir: (a: ArquivoTela) => void;
+  aoUpload: (delta: number) => void;
   secundario?: boolean;
 }) {
   const entrada = useRef<HTMLInputElement>(null);
@@ -768,12 +889,14 @@ function BotaoAnexar({
           const lista = Array.from(e.target.files ?? []);
           e.target.value = '';
           setErro(null);
+          aoUpload(1);
           for (const a of lista) {
             setPct(0);
             const r = await subirArquivo(token, item.id, a, setPct);
             if (r.ok) aoSubir(r.arquivo);
             else setErro(r.erro);
           }
+          aoUpload(-1);
           setPct(null);
         }}
       />
@@ -781,29 +904,22 @@ function BotaoAnexar({
         type="button"
         disabled={pct !== null}
         onClick={() => entrada.current?.click()}
-        className={`min-h-[44px] rounded-md border px-4 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60 ${
+        className={`min-h-[44px] border px-4 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60 ${
           secundario
-            ? 'border-footer/20 text-footer/70 hover:border-footer/50'
+            ? 'border-footer/30 text-footer/70 hover:border-footer/60'
             : 'border-footer bg-footer text-creme hover:bg-footer/85'
         }`}
       >
         {pct !== null ? `Enviando ${pct}%` : 'Anexar arquivo'}
       </button>
       {erro && (
-        <p role="alert" className="basis-full text-sm text-marca">
+        <p role="alert" className="basis-full text-sm text-realce">
           {erro}
         </p>
       )}
     </>
   );
 }
-
-const ROTULO_STATUS: Record<StatusSalvar, string> = {
-  ocioso: 'Salva sozinho enquanto você escreve',
-  salvando: 'Salvando…',
-  salvo: 'Tudo salvo',
-  erro: 'Sem conexão. Tentando de novo…',
-};
 
 function BarraEnviar({
   token,
@@ -812,6 +928,8 @@ function BarraEnviar({
   respondidos,
   total,
   finalizadoEm,
+  bloqueio,
+  irParaEmBranco,
   antesDeEnviar,
   aoEnviar,
 }: {
@@ -821,6 +939,8 @@ function BarraEnviar({
   respondidos: number;
   total: number;
   finalizadoEm: string | null;
+  bloqueio: string | null;
+  irParaEmBranco: () => void;
   antesDeEnviar: () => Promise<boolean>;
   aoEnviar: (quando: string) => void;
 }) {
@@ -828,7 +948,17 @@ function BarraEnviar({
   const [erro, setErro] = useState<string | null>(null);
   const pct = total > 0 ? Math.round((respondidos / total) * 100) : 0;
 
+  // O erro de envio sai quando tudo salvou (antes ficava na tela depois que a rede voltava).
+  useEffect(() => {
+    if (status === 'salvo') setErro(null);
+  }, [status]);
+
   const enviar = async () => {
+    // Áudio gravado e não salvo, ou anexo subindo: o "Enviar" não passa por cima (antes salvava só o texto).
+    if (bloqueio) {
+      setErro(bloqueio);
+      return;
+    }
     const aviso =
       pendentes > 0
         ? `Ainda há ${pendentes} ${pendentes === 1 ? 'item' : 'itens'} em branco. Enviar assim mesmo? Você pode continuar preenchendo depois.`
@@ -840,7 +970,7 @@ function BarraEnviar({
     const salvou = await antesDeEnviar();
     if (!salvou) {
       setEnviando(false);
-      setErro('Há texto que ainda não salvou. Confira a conexão e tente de novo.');
+      setErro('Não enviou: falta salvar uma resposta. Tente de novo.');
       return;
     }
     const r = await fetch(`/api/portal/${token}/finalizar`, { method: 'POST' }).catch(() => null);
@@ -850,7 +980,7 @@ function BarraEnviar({
   };
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-footer/15 bg-creme/95 backdrop-blur">
+    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-footer/15 bg-creme">
       <div className="h-0.5 bg-footer/10">
         <div className="h-full bg-marca transition-all" style={{ width: `${pct}%` }} />
       </div>
@@ -858,22 +988,26 @@ function BarraEnviar({
         <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold tabular-nums">
             {respondidos} de {total}
-            {pendentes > 0 && <span className="font-normal text-footer/60"> · {pendentes} em branco</span>}
+            {pendentes > 0 && (
+              // Leva ao próximo item em branco: com 50 itens, achar o que falta rolando é o que cansa.
+              <button type="button" onClick={irParaEmBranco} className="ml-1 inline-flex min-h-[44px] items-center font-normal text-footer/70 underline decoration-footer/40 underline-offset-4 hover:decoration-footer">
+                · {pendentes} em branco
+              </button>
+            )}
           </p>
-          <p aria-live="polite" className={`truncate text-xs ${status === 'erro' ? 'text-marca' : 'text-footer/55'}`}>
+          {/* Sem cortar: a confirmação do envio é a única que existe, e a 390 px saía pela metade. */}
+          <p aria-live="polite" className={`text-xs leading-snug ${erro || ['erro', 'recusado', 'erro-marcar'].includes(status) ? 'text-realce' : 'text-footer/70'}`}>
             {erro ??
-              (finalizadoEm && status !== 'erro'
-                ? `Enviado ao Rodolfo. Pode continuar completando.`
-                : ROTULO_STATUS[status])}
+              (finalizadoEm && ['salvo', 'ocioso'].includes(status) ? textoDoEnviado(finalizadoEm) : ROTULO_DA_BARRA[status])}
           </p>
         </div>
         <button
           type="button"
           onClick={enviar}
           disabled={enviando}
-          className="min-h-[48px] shrink-0 rounded-md bg-marca px-5 text-sm font-semibold uppercase tracking-wider text-white transition hover:brightness-95 disabled:opacity-60"
+          className="min-h-[48px] shrink-0 bg-primary px-5 text-sm font-semibold uppercase tracking-wider text-white transition hover:bg-primary-dark disabled:opacity-60"
         >
-          {enviando ? 'Enviando…' : finalizadoEm ? 'Enviar de novo' : 'Enviar'}
+          {enviando ? 'Enviando…' : finalizadoEm ? 'Avisar de novo' : 'Enviar'}
         </button>
       </div>
     </div>

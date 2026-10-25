@@ -18,9 +18,57 @@ html {
   html { scroll-behavior: auto; }
 }
 
+/*
+ * Site e Portal do cliente (E5.1, decisão 471): claro por padrão; escuro quando o sistema pede, só dentro de `.ff-site`.
+ * O ERP e o painel têm o tema deles (tokens.css) e não usam estas cores. Contraste conferido: texto sobre fundo ≥ 4,5:1.
+ */
+:root {
+  --site-surface: 245 240 235;
+  --site-surface-2: 237 230 223;
+  --site-surface-3: 221 211 200;
+  --site-papel: 252 250 248;
+  --site-ink: 10 10 10;
+  --site-ink-2: 26 26 26;
+  --site-ink-3: 61 58 55;
+  --site-ink-4: 107 102 97;
+  --site-ink-5: 114 108 102;
+  --site-primary: 196 21 34;
+  --site-primary-dark: 168 17 28;
+  --site-marca: 234 29 44;
+  --site-realce: 196 21 34;
+  --site-bloco-realce: 245 82 90;
+  --site-bloco: 10 10 10;
+  --site-bloco-texto: 245 240 235;
+}
+.ff-site {
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  .ff-site,
+  body:has(.ff-site) {
+    color-scheme: dark;
+    --site-surface: 14 13 12;
+    --site-surface-2: 22 21 19;
+    --site-surface-3: 52 49 46;
+    --site-papel: 22 21 19;
+    --site-ink: 245 240 235;
+    --site-ink-2: 232 226 220;
+    --site-ink-3: 210 203 196;
+    --site-ink-4: 176 169 162;
+    --site-ink-5: 150 143 136;
+    --site-primary: 196 21 34;
+    --site-primary-dark: 168 17 28;
+    --site-marca: 234 29 44;
+    --site-realce: 245 82 90;
+    --site-bloco-realce: 245 82 90;
+    --site-bloco: 31 29 27;
+    --site-bloco-texto: 245 240 235;
+  }
+}
+
 body {
-  background-color: #F5F0EB;
-  color: #0A0A0A;
+  background-color: rgb(var(--site-surface));
+  color: rgb(var(--site-ink));
   padding-top:    env(safe-area-inset-top);
   padding-bottom: env(safe-area-inset-bottom);
 }

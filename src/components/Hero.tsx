@@ -1,4 +1,4 @@
-// avoid-ai-design-ignore-file: SD4, SD5, K3, SD4d — site institucional, fora do shell do ERP: etiqueta em caixa alta e o filete/assinatura são o estilo editorial FlowFoods (CLAUDE.md) e o contrato da 1.1 proíbe mudar o visual do /.
+// avoid-ai-design-ignore-file: SD4, SD5, K3, SD4d — site institucional, fora do shell do ERP: etiqueta em caixa alta e o filete/assinatura são o estilo editorial FlowFoods (CLAUDE.md) (o visual do / foi liberado pelo Rodolfo em 25/10, decisão 471: o estilo editorial continua por ser a identidade).
 import { TAGLINE, whatsappUrl } from '@/lib/constants';
 
 const FATOS = [
@@ -18,7 +18,7 @@ export default function Hero() {
     <section className="px-5 pb-14 pt-28 md:px-8 md:pb-20 md:pt-40">
       <div className="mx-auto grid max-w-6xl items-end gap-12 lg:grid-cols-[1.15fr_0.85fr] lg:gap-16">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-primary">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-realce">
             Consultoria para restaurantes · Rio de Janeiro
           </p>
           <h1 className="mt-5 font-display text-[clamp(2.6rem,7vw,5.2rem)] font-bold leading-[1.02] tracking-tight text-ink [text-wrap:balance]">

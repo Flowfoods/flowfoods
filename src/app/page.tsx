@@ -8,6 +8,15 @@ import Sobre from '@/components/Sobre';
 import CTA from '@/components/CTA';
 import Footer from '@/components/Footer';
 import { getSEOSchema } from '@/lib/seo-schema';
+import type { Viewport } from 'next';
+
+/** A barra do navegador (Android) acompanha o tema do sistema (decisão 471). */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F5F0EB' },
+    { media: '(prefers-color-scheme: dark)', color: '#0E0D0C' },
+  ],
+};
 
 export default function Home() {
   return (
@@ -16,6 +25,8 @@ export default function Home() {
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(getSEOSchema()) }}
       />
+      {/* ff-site: claro ou escuro conforme o sistema (decisão 471). */}
+      <div className="ff-site">
       <Header />
       <main className="overflow-x-hidden">
         <Hero />
@@ -27,6 +38,7 @@ export default function Home() {
         <CTA />
       </main>
       <Footer />
+      </div>
     </>
   );
 }

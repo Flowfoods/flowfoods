@@ -17,7 +17,8 @@ import { LIMITE_BYTES, caminhoDoArquivo, pastaBase } from './arquivos';
 import { enviarAviso, montarAviso } from './aviso';
 
 /** Texto de uma resposta. Folgado para quem cola um relato longo. */
-export const LIMITE_TEXTO = 20_000;
+import { LIMITE_TEXTO } from './limites';
+export { LIMITE_TEXTO };
 
 const TOKEN_OK = /^[a-f0-9]{32}$/;
 

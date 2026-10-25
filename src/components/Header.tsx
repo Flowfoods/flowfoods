@@ -1,6 +1,6 @@
 'use client';
 
-// avoid-ai-design-ignore-file: SD4, SD5, K3, SD4d — site institucional, fora do shell do ERP: etiqueta em caixa alta e o filete/assinatura são o estilo editorial FlowFoods (CLAUDE.md) e o contrato da 1.1 proíbe mudar o visual do /.
+// avoid-ai-design-ignore-file: SD4, SD5, K3, SD4d — site institucional, fora do shell do ERP: etiqueta em caixa alta e o filete/assinatura são o estilo editorial FlowFoods (CLAUDE.md) (o visual do / foi liberado pelo Rodolfo em 25/10, decisão 471: o estilo editorial continua por ser a identidade).
 
 import { useState } from 'react';
 import { whatsappUrl } from '@/lib/constants';
@@ -23,11 +23,11 @@ export default function Header() {
   const [aberto, setAberto] = useState(false);
 
   return (
-    <header className="fixed inset-x-0 top-0 z-50 bg-surface/95 backdrop-blur-sm">
-      <div className="h-1 w-full bg-primary" aria-hidden />
+    <header className="fixed inset-x-0 top-0 z-50 border-b border-ink/10 bg-surface">
+      <div className="h-1 w-full bg-marca" aria-hidden />
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 md:h-[72px] md:px-8">
         <a href="#" className="inline-flex min-h-11 items-center font-display text-2xl font-bold leading-none tracking-tight text-ink">
-          Flow<span className="text-primary">Foods</span>
+          Flow<span className="text-marca">Foods</span>
         </a>
 
         <nav className="hidden items-center gap-7 md:flex">
@@ -53,7 +53,7 @@ export default function Header() {
             href={whatsappUrl('hero')}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-ink px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-surface transition-colors hover:bg-primary [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center"
+            className="bg-ink px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-surface transition-colors hover:bg-primary hover:text-white inline-flex min-h-11 items-center"
           >
             Falar com o Rodolfo
           </a>
