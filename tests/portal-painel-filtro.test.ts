@@ -11,6 +11,7 @@ import { isValidElement, type ReactElement, type ReactNode } from 'react';
 const banco = vi.hoisted(() => ({
   respostas: [] as { itemId: string; texto: string | null; marcacao: string | null }[],
   contagensDeLead: [] as unknown[],
+  listasDeLead: [] as unknown[],
 }));
 vi.mock('@/lib/erp/contexto', () => ({ exigirNivel1: async () => ({}) }));
 vi.mock('@/app/rodolfo/(painel)/portal/actions', () => ({ acaoZerarPortal: async () => ({}) }));
@@ -32,7 +33,10 @@ vi.mock('@/lib/db', () => ({
       }),
     },
     lead: {
-      findMany: async () => [],
+      findMany: async ({ where }: { where: unknown }) => {
+        banco.listasDeLead.push(where);
+        return [];
+      },
       count: async ({ where }: { where: unknown }) => {
         banco.contagensDeLead.push(where);
         return 0;
@@ -44,9 +48,12 @@ vi.mock('@/lib/db', () => ({
 
 import PortalClientePage from '@/app/rodolfo/(painel)/portal/[id]/page';
 import LeadsPage from '@/app/rodolfo/(painel)/leads/page';
+import VisitasPage from '@/app/rodolfo/(painel)/visitas/page';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createElement } from 'react';
 import { questionario } from '@/lib/portal/questionario';
 import { calcularProgresso } from '@/lib/portal/progresso';
-import { blocosNoPainel, contagemDoBloco, lerFiltroDeItem, vazioDoFiltro } from '@/lib/portal/painel';
+import { blocosNoPainel, contagemDoBloco, lerFiltroDeItem, mostradosNoBloco, resumoDoProgresso, vazioDoFiltro } from '@/lib/portal/painel';
 import { NA_LISTA_DE_VISITA } from '@/lib/rodolfo/visitas';
 import { Metrica } from '@/components/erp/ui/superficies';
 
@@ -102,8 +109,16 @@ describe('E5.1 · contagem e filtro por bloco (funções puras)', () => {
   it('só valor conhecido vira filtro', () => {
     expect(lerFiltroDeItem('PENDENTE')).toBe('PENDENTE');
     expect(lerFiltroDeItem('MARCADO')).toBe('MARCADO');
-    for (const v of [undefined, '', 'pendente', 'TODOS', "PENDENTE' OR 1=1"]) expect(lerFiltroDeItem(v)).toBeNull();
+    for (const v of [undefined, '', 'pendente', 'TODOS', "PENDENTE' OR 1=1", ['PENDENTE', 'RECEBIDO']]) expect(lerFiltroDeItem(v)).toBeNull();
     expect(vazioDoFiltro('MARCADO')).toBe('Nenhum item pulado com motivo.');
+  });
+
+  it('plural certo no resumo do topo, no bloco de um item e no que o filtro mostra', () => {
+    expect(resumoDoProgresso({ recebidos: 1, marcados: 1, pendentes: 1, total: 3 })).toBe('1 recebido, 1 pulado com motivo e 1 pendente de 3 itens');
+    expect(resumoDoProgresso({ recebidos: 2, marcados: 0, pendentes: 46, total: 48 })).toBe('2 recebidos, 0 pulados com motivo e 46 pendentes de 48 itens');
+    expect(contagemDoBloco({ total: 1, recebidos: 0, marcados: 0 })).toBe('0 de 1 recebido');
+    expect(mostradosNoBloco(4, 'PENDENTE')).toBe('4 pendentes neste bloco');
+    expect(mostradosNoBloco(1, 'MARCADO')).toBe('1 pulado com motivo neste bloco');
   });
 });
 
@@ -121,6 +136,19 @@ describe('E5.1 · a tela do cliente no painel', () => {
     expect(opcoes.map((o) => o.rotulo)).toEqual([`Todos (${q.itens.length})`, 'Recebidos (1)', 'Pulados com motivo (0)', `Pendentes (${q.itens.length - 1})`]);
     expect(opcoes.map((o) => o.href)).toEqual(['/rodolfo/portal/c1#itens', '/rodolfo/portal/c1?estado=RECEBIDO#itens', '/rodolfo/portal/c1?estado=MARCADO#itens', '/rodolfo/portal/c1?estado=PENDENTE#itens']);
     expect(opcoes.filter((o) => o.ativo).map((o) => o.rotulo)).toEqual([`Todos (${q.itens.length})`]);
+  });
+
+  it('com filtro na URL: a opção dele fica marcada, e cada bloco diz quantos itens aparecem', async () => {
+    banco.respostas = [{ itemId: a1.id, texto: 'ok', marcacao: null }];
+    const arvore = elementos(await pagina('PENDENTE'));
+    const filtro = arvore.find((e) => props(e).rotulo === 'Filtrar itens por situação')!;
+    const ativos = (props(filtro).opcoes as { rotulo: string; ativo: boolean }[]).filter((o) => o.ativo).map((o) => o.rotulo);
+    expect(ativos).toEqual([`Pendentes (${q.itens.length - 1})`]);
+    const blocoA = arvore.find((e) => props(e).titulo === q.blocos[0].titulo && props(e).acessorio)!;
+    expect(props(blocoA).subtitulo).toBe(`${q.blocos[0].itens.length - 1} pendentes neste bloco`);
+    // Sem filtro, o bloco não tem a linha de apoio.
+    const semFiltro = elementos(await pagina()).find((e) => props(e).titulo === q.blocos[0].titulo && props(e).acessorio)!;
+    expect(props(semFiltro).subtitulo).toBeUndefined();
   });
 
   it('com filtro: só os itens daquela situação; valor inventado mostra tudo', async () => {
@@ -152,5 +180,24 @@ describe('E5.1 · números de Leads como filtro', () => {
     ]);
     expect(banco.contagensDeLead).toContainEqual(NA_LISTA_DE_VISITA);
     expect(NA_LISTA_DE_VISITA.status.notIn).toEqual(['OPT_OUT', 'CONFLITO']);
+  });
+
+  it('a tela Visitas lista e conta com a mesma régua do card', async () => {
+    banco.listasDeLead = [];
+    banco.contagensDeLead = [];
+    await VisitasPage();
+    expect(banco.listasDeLead).toEqual([NA_LISTA_DE_VISITA]);
+    expect(banco.contagensDeLead[0]).toEqual(NA_LISTA_DE_VISITA);
+  });
+
+  it('o card com href vira link com a mesma caixa; sem href, continua só leitura', () => {
+    const comLink = renderToStaticMarkup(createElement(Metrica, { rotulo: 'Novos', valor: 3, detalhe: 'ainda não contatados', href: '/rodolfo/leads?status=NOVO' }));
+    const semLink = renderToStaticMarkup(createElement(Metrica, { rotulo: 'Novos', valor: 3, detalhe: 'ainda não contatados' }));
+    expect(comLink).toMatch(/^<a [^>]*href="\/rodolfo\/leads\?status=NOVO"/);
+    expect(semLink).toMatch(/^<div class="flex min-w-0 flex-col rounded-\[14px\] border border-linha bg-painel px-4 py-3\.5 sm:px-5">/);
+    expect(semLink).not.toContain('<a');
+    // O conteúdo é o mesmo nos dois: só a caixa muda.
+    const miolo = (h: string) => h.replace(/^<(a|div)[^>]*>/, '').replace(/<\/(a|div)>$/, '');
+    expect(miolo(comLink)).toBe(miolo(semLink));
   });
 });

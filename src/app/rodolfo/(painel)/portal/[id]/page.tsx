@@ -13,7 +13,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { questionario, ROTULO_MARCACAO } from '@/lib/portal/questionario';
 import { calcularProgresso, type EstadoItem } from '@/lib/portal/progresso';
-import { blocosNoPainel, contagemDoBloco, FILTROS_DE_ITEM, lerFiltroDeItem, vazioDoFiltro } from '@/lib/portal/painel';
+import { blocosNoPainel, contagemDoBloco, FILTROS_DE_ITEM, lerFiltroDeItem, mostradosNoBloco, resumoDoProgresso, vazioDoFiltro } from '@/lib/portal/painel';
 import { formatarTamanho } from '@/lib/portal/arquivos';
 import { ehAudio } from '@/lib/portal/audio';
 import { origemPublica } from '@/lib/portal/http';
@@ -43,7 +43,7 @@ export default async function PortalClientePage({
   searchParams = {},
 }: {
   params: { id: string };
-  searchParams?: { estado?: string };
+  searchParams?: { estado?: string | string[] };
 }) {
   // O middleware já exige a sessão; a página confere de novo (o layout não substitui a checagem).
   await exigirNivel1();
@@ -73,7 +73,7 @@ export default async function PortalClientePage({
         icone="portal"
         cor={COR.clientes}
         titulo={cliente.nome}
-        subtitulo={`${p.recebidos} recebidos, ${p.marcados} pulados com motivo e ${p.pendentes} pendentes de ${p.total} itens`}
+        subtitulo={resumoDoProgresso(p)}
         acao={
           <a href={`/rodolfo/portal/${cliente.id}/contexto`} className={classeDeBotao('secundario')}>
             Baixar contexto (.md)
@@ -156,6 +156,7 @@ export default async function PortalClientePage({
             <Painel
               key={b.bloco}
               titulo={b.titulo}
+              subtitulo={filtro ? mostradosNoBloco(b.situacoes.length, filtro) : undefined}
               acessorio={
                 <span className="shrink-0 whitespace-nowrap">
                   <Contagem>{contagemDoBloco(b)}</Contagem>

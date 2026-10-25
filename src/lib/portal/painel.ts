@@ -15,8 +15,8 @@ export const FILTROS_DE_ITEM: { chave: '' | EstadoItem; rotulo: string }[] = [
   { chave: 'PENDENTE', rotulo: 'Pendentes' },
 ];
 
-/** Só um valor conhecido vira filtro; qualquer outro (ou nenhum) mostra tudo. */
-export function lerFiltroDeItem(valor: string | undefined): EstadoItem | null {
+/** Só um valor conhecido vira filtro; qualquer outro, repetido na URL (`?estado=A&estado=B`) ou nenhum mostra tudo. */
+export function lerFiltroDeItem(valor: string | string[] | undefined): EstadoItem | null {
   return valor === 'RECEBIDO' || valor === 'MARCADO' || valor === 'PENDENTE' ? valor : null;
 }
 
@@ -58,9 +58,21 @@ export function blocosNoPainel(blocos: Bloco[], situacoes: SituacaoItem[], filtr
 
 /** "3 de 7 recebidos", e os pulados quando há: "3 de 7 recebidos, 1 pulado". */
 export function contagemDoBloco(b: Pick<BlocoNoPainel, 'total' | 'recebidos' | 'marcados'>): string {
-  // "1 de 7 recebidos": o plural é dos 7.
-  const base = `${b.recebidos} de ${b.total} recebidos`;
+  // "1 de 7 recebidos": o plural é dos 7 ("0 de 1 recebido" num bloco de um item só).
+  const base = `${b.recebidos} de ${b.total} ${b.total === 1 ? 'recebido' : 'recebidos'}`;
   return b.marcados > 0 ? `${base}, ${b.marcados} ${b.marcados === 1 ? 'pulado' : 'pulados'}` : base;
+}
+
+/** Com filtro, quantos itens do bloco aparecem: "4 pendentes neste bloco" (a contagem do cabeçalho segue sendo a do bloco). */
+export function mostradosNoBloco(n: number, filtro: EstadoItem): string {
+  const nome = { RECEBIDO: ['recebido', 'recebidos'], MARCADO: ['pulado com motivo', 'pulados com motivo'], PENDENTE: ['pendente', 'pendentes'] }[filtro];
+  return `${n} ${n === 1 ? nome[0] : nome[1]} neste bloco`;
+}
+
+/** "2 recebidos, 1 pulado com motivo e 46 pendentes de 51 itens", no plural certo. */
+export function resumoDoProgresso(p: { recebidos: number; marcados: number; pendentes: number; total: number }): string {
+  const n = (v: number, um: string, varios: string) => `${v} ${v === 1 ? um : varios}`;
+  return `${n(p.recebidos, 'recebido', 'recebidos')}, ${n(p.marcados, 'pulado com motivo', 'pulados com motivo')} e ${n(p.pendentes, 'pendente', 'pendentes')} de ${n(p.total, 'item', 'itens')}`;
 }
 
 /** O vazio do filtro, no singular do que se procurava. */
