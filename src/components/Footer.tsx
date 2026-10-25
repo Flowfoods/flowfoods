@@ -27,9 +27,9 @@ export default function Footer() {
 
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-5">Navegação</p>
-          <nav className="mt-4 flex flex-col gap-2.5">
+          <nav className="mt-4 flex flex-col gap-2.5 [@media(pointer:coarse)]:gap-0">
             {NAV.map((l) => (
-              <a key={l.href} href={l.href} className="text-sm text-ink-3 transition-colors hover:text-ink">
+              <a key={l.href} href={l.href} className="text-sm text-ink-3 transition-colors hover:text-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center">
                 {l.label}
               </a>
             ))}
@@ -38,12 +38,12 @@ export default function Footer() {
 
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink-5">Contato</p>
-          <div className="mt-4 flex flex-col gap-2.5">
+          <div className="mt-4 flex flex-col gap-2.5 [@media(pointer:coarse)]:gap-0 [@media(pointer:coarse)]:items-start">
             <a
               href={CONTACT_INFO.whatsappUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-ink-3 transition-colors hover:text-ink"
+              className="text-sm text-ink-3 transition-colors hover:text-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center"
             >
               WhatsApp {CONTACT_INFO.whatsappDisplay}
             </a>
@@ -51,7 +51,7 @@ export default function Footer() {
               href={CONTACT_INFO.instagramUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-ink-3 transition-colors hover:text-ink"
+              className="text-sm text-ink-3 transition-colors hover:text-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center"
             >
               Instagram @{CONTACT_INFO.instagram}
             </a>
@@ -59,7 +59,7 @@ export default function Footer() {
               href={CONTACT_INFO.linkedinUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-sm text-ink-3 transition-colors hover:text-ink"
+              className="text-sm text-ink-3 transition-colors hover:text-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center"
             >
               LinkedIn
             </a>
@@ -70,7 +70,7 @@ export default function Footer() {
 
       <div className="mx-auto flex max-w-6xl flex-col gap-2 border-t border-ink/10 py-6 text-xs text-ink-5 sm:flex-row sm:items-center sm:justify-between">
         <p>© {ano} FlowFoods Consultoria.</p>
-        <a href="/rodolfo/login" className="font-semibold uppercase tracking-[0.16em] transition-colors hover:text-ink">
+        <a href="/rodolfo/login" className="font-semibold uppercase tracking-[0.16em] transition-colors hover:text-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center">
           Entrar
         </a>
       </div>

@@ -26,7 +26,7 @@ export default function Header() {
     <header className="fixed inset-x-0 top-0 z-50 bg-surface/95 backdrop-blur-sm">
       <div className="h-1 w-full bg-primary" aria-hidden />
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5 md:h-[72px] md:px-8">
-        <a href="#" className="font-display text-2xl font-bold leading-none tracking-tight text-ink">
+        <a href="#" className="inline-flex min-h-11 items-center font-display text-2xl font-bold leading-none tracking-tight text-ink">
           Flow<span className="text-primary">Foods</span>
         </a>
 
@@ -35,7 +35,7 @@ export default function Header() {
             <a
               key={l.href}
               href={l.href}
-              className="text-[13px] font-medium text-ink-3 transition-colors hover:text-ink"
+              className="inline-flex min-h-11 items-center text-[13px] font-medium text-ink-3 transition-colors hover:text-ink"
             >
               {l.label}
             </a>
@@ -45,7 +45,7 @@ export default function Header() {
         <div className="hidden items-center gap-5 md:flex">
           <a
             href="/rodolfo/login"
-            className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-5 transition-colors hover:text-ink"
+            className="inline-flex min-h-11 items-center text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-5 transition-colors hover:text-ink"
           >
             Entrar
           </a>
@@ -53,7 +53,7 @@ export default function Header() {
             href={whatsappUrl('hero')}
             target="_blank"
             rel="noopener noreferrer"
-            className="bg-ink px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-surface transition-colors hover:bg-primary"
+            className="bg-ink px-5 py-2.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-surface transition-colors hover:bg-primary [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center"
           >
             Falar com o Rodolfo
           </a>

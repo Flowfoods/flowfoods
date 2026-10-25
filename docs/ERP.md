@@ -4653,3 +4653,11 @@ fora do formulário, minutos) e `erp-shell` (módulos e atalhos). Revisão indep
 precisa de você" com 22 px no toque de 640 px para cima; emergência do RUNBOOK citando a caixa que saiu) e 10 "deveria" (pausa
 automática fora do Início, dois vermelhos em Regras de envio, desligar com confirmação, onde conectar o WhatsApp, zero sem dado,
 intervalo antigo travando o formulário, entre outros); corrigidos no commit seguinte, com testes.
+
+**E5.1 · telas públicas: site e Portal do cliente (decisão 470, 25/10/2026):** E0 em 24 telas (2 telas × 6 tamanhos × claro e
+escuro do sistema) com a régua corrigida: sem rolagem lateral; o Portal dava erro de React #418 em todo carregamento (o gravador de
+áudio decidia na renderização se o navegador grava: falso no servidor, verdadeiro no navegador) — corrigido, com teste
+`portal-hidratacao`; o site tinha 13 a 21 alvos abaixo de 44 px no toque (menu, rodapé, consentimento) — corrigido só em tela de
+toque, sem mudar o visual no computador. Sem tema escuro no site e no Portal, de propósito (material da marca para o cliente). Login,
+`/entrar`, primeiro acesso e os botões de acesso do site ficam de fora (adiados). Matriz depois: 24 telas, 0 falhas. Suíte com banco
+2.886 aprovados, 46 pulados, 0 falhas; lint, typecheck e portão limpos. Revisão de UX independente em andamento no commit.

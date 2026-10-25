@@ -236,7 +236,7 @@ export default function FormComecar() {
         </div>
 
         <div>
-          <label className="flex cursor-pointer items-start gap-3 text-sm leading-snug text-ink">
+          <label className="flex cursor-pointer items-start gap-3 text-sm leading-snug text-ink [@media(pointer:coarse)]:min-h-11">
             <input
               type="checkbox"
               name="consentimento"
@@ -249,7 +249,7 @@ export default function FormComecar() {
             <span>{CONSENTIMENTO.texto}</span>
           </label>
           <details className="mt-2 pl-8 text-[13px] leading-relaxed text-ink-3">
-            <summary className="inline cursor-pointer font-semibold text-ink underline decoration-ink/40 underline-offset-4 hover:decoration-ink">
+            <summary className="inline cursor-pointer font-semibold text-ink underline decoration-ink/40 underline-offset-4 hover:decoration-ink [@media(pointer:coarse)]:inline-flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center">
               (ver como usamos)
             </summary>
             <ul className="mt-2 list-disc space-y-1 pl-4">

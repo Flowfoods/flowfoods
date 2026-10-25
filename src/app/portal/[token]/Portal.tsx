@@ -511,7 +511,7 @@ function escolherMime(): string | undefined {
  * Grava pelo microfone, mostra a prévia e envia. Sem MediaRecorder (navegador
  * muito antigo) ou sem permissão, avisa e deixa o "Anexar arquivo" como saída.
  */
-function Gravador({
+export function Gravador({
   token,
   item,
   aoSubir,
@@ -530,8 +530,12 @@ function Gravador({
   const pedacos = useRef<Blob[]>([]);
   const relogio = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const suportado =
-    typeof window !== 'undefined' && 'MediaRecorder' in window && !!navigator.mediaDevices?.getUserMedia;
+  // Só no navegador e depois de montar: calculado na renderização, dava falso no servidor e verdadeiro no navegador, e
+  // o React acusava a diferença (erro #418) em todo carregamento do Portal (E5.1, decisão 470). null = ainda não sabe.
+  const [suportado, setSuportado] = useState<boolean | null>(null);
+  useEffect(() => {
+    setSuportado('MediaRecorder' in window && !!navigator.mediaDevices?.getUserMedia);
+  }, []);
 
   const pararRelogio = () => {
     if (relogio.current) clearInterval(relogio.current);
@@ -628,6 +632,7 @@ function Gravador({
   const botao =
     'inline-flex min-h-[44px] items-center gap-2 rounded-md px-4 text-xs font-semibold uppercase tracking-wider transition disabled:opacity-60';
 
+  if (suportado === null) return null;
   if (!suportado) {
     return (
       <p className="mt-3 text-sm text-footer/60">
