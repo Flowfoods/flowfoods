@@ -113,7 +113,7 @@ export async function importarLote(
       data: {
         leadId: salvo.id,
         tipo: 'import',
-        descricao: item.motivo ?? `Importado no lote ${opts.lote} (${item.resultado}).`,
+        descricao: item.motivo ?? `Importado no lote ${opts.lote} (${item.resultado === 'ATUALIZADO' ? 'atualizado' : 'novo'}).`,
         dados: { resultado: item.resultado, scoreBase: lead.scoreBase, tier: lead.tier },
       },
     });

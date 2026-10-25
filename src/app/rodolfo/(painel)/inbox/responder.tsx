@@ -66,7 +66,7 @@ export function Responder({ leadId, rascunho }: { leadId: string; rascunho: stri
           {pendente ? 'Enviando…' : 'Enviar resposta'}
         </button>
         <button type="button" onClick={() => setAberto(false)} className={classeDeBotao('fantasma')}>
-          Fechar
+          Cancelar
         </button>
       </div>
 

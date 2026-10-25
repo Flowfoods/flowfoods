@@ -14,7 +14,7 @@ import { authOptions } from '@/lib/rodolfo/auth';
 import { prisma } from '@/lib/db';
 import type { Prisma } from '@prisma/client';
 import { aprovarLote, cancelarLote, dispararProximo, FIM_DO_LOTE, salvarProposta } from '@/lib/rodolfo/lote';
-import { rotuloDoToque, textoDaRecusa } from '@/lib/rodolfo/rotulos';
+import { resumoDaImportacao, rotuloDoToque, textoDaRecusa } from '@/lib/rodolfo/rotulos';
 import { JANELA_PADRAO } from '@/lib/barney/regras';
 import { salvarConfig, type ConfigBarney } from '@/lib/rodolfo/config';
 import { importarLote } from '@/lib/rodolfo/importar-lote';
@@ -66,7 +66,7 @@ export async function acaoAprovarLote(): Promise<Resposta> {
   await auditar(userId, 'lote_aprovado_ui', { loteId: lote.id });
   revalidatePath('/rodolfo/barney');
   revalidatePath('/rodolfo/hoje');
-  return { ok: true, mensagem: 'Lote aprovado. O worker começa a drenar na próxima janela.' };
+  return { ok: true, mensagem: 'Lote aprovado. Os envios saem um a um, nos dias e horários da janela de envio.' };
 }
 
 export async function acaoCancelarLote(): Promise<Resposta> {
@@ -175,9 +175,8 @@ export async function acaoSalvarConfig(_anterior: unknown, form: FormData): Prom
   return {
     ok: true,
     mensagem:
-      `Salvo. Em vigor: ${efetiva.maxPorDia}/dia · ${efetiva.maxPorHora}/hora · ` +
-      `${efetiva.janela.horaInicio}h–${efetiva.janela.horaFim}h · ` +
-      `disparo ${efetiva.disparoAtivo ? 'LIGADO' : 'desligado'}.`,
+      `Salvo. Valendo agora: até ${efetiva.maxPorDia} por dia e ${efetiva.maxPorHora} por hora, ` +
+      `das ${efetiva.janela.horaInicio}h às ${efetiva.janela.horaFim}h; disparo ${efetiva.disparoAtivo ? 'ligado' : 'desligado'}.`,
   };
 }
 
@@ -198,7 +197,7 @@ export async function acaoResponder(leadId: string, texto: string): Promise<Resp
   if (!corpo) return { ok: false, mensagem: 'Escreva a resposta antes de enviar.' };
 
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
-  if (!lead?.telefoneNormalizado) return { ok: false, mensagem: 'Lead sem telefone.' };
+  if (!lead?.telefoneNormalizado) return { ok: false, mensagem: 'Este lead não tem telefone válido.' };
 
   const saiu = await prisma.optOut.findUnique({
     where: { telefoneNormalizado: lead.telefoneNormalizado },
@@ -230,7 +229,7 @@ export async function acaoResponder(leadId: string, texto: string): Promise<Resp
   revalidatePath('/rodolfo/inbox');
   return {
     ok: true,
-    mensagem: r.simulado ? 'SIMULADO (Evolution não configurada).' : 'Resposta enviada.',
+    mensagem: r.simulado ? 'Resposta simulada: o WhatsApp da prospecção não está configurado, nada saiu.' : 'Resposta enviada.',
   };
 }
 
@@ -240,7 +239,7 @@ export async function acaoImportarJson(_anterior: unknown, form: FormData): Prom
   const lote = String(form.get('lote') ?? '').trim();
   const bruto = String(form.get('linhas') ?? '').trim();
   if (!lote) return { ok: false, mensagem: 'Dê um nome ao lote.' };
-  if (!bruto) return { ok: false, mensagem: 'Cole o JSON exportado pelo ledsflowfoods.' };
+  if (!bruto) return { ok: false, mensagem: 'Cole o conteúdo exportado pelo ledsflowfoods.' };
 
   let linhas: LinhaPlanilha[];
   try {
@@ -248,7 +247,7 @@ export async function acaoImportarJson(_anterior: unknown, form: FormData): Prom
     linhas = Array.isArray(j) ? j : (j.linhas ?? []);
     if (!Array.isArray(linhas) || linhas.length === 0) throw new Error('vazio');
   } catch {
-    return { ok: false, mensagem: 'JSON inválido. Esperado um array de linhas da planilha.' };
+    return { ok: false, mensagem: 'Não deu para ler o conteúdo colado. Cole exatamente o que o ledsflowfoods exportou (começa com “[”).' };
   }
 
   const rel = await importarLote(linhas, { lote, somenteCelular: true });
@@ -258,10 +257,7 @@ export async function acaoImportarJson(_anterior: unknown, form: FormData): Prom
 
   return {
     ok: true,
-    mensagem:
-      `${rel.total} linha(s): ${rel.novos} novo(s), ${rel.atualizados} atualizado(s), ` +
-      `${rel.bloqueadosConflito} conflito(s) Bibi, ${rel.bloqueadosOptOut} opt-out, ` +
-      `${rel.semTelefone} sem celular, ${rel.invalidos} inválida(s).`,
+    mensagem: resumoDaImportacao(rel),
   };
 }
 
@@ -278,7 +274,7 @@ export async function acaoMarcarOptOut(leadId: string): Promise<Resposta> {
   const userId = await exigirSessao();
 
   const lead = await prisma.lead.findUnique({ where: { id: leadId } });
-  if (!lead?.telefoneNormalizado) return { ok: false, mensagem: 'Lead sem telefone normalizado.' };
+  if (!lead?.telefoneNormalizado) return { ok: false, mensagem: 'Este lead não tem telefone válido.' };
 
   await prisma.$transaction([
     prisma.optOut.upsert({
@@ -292,13 +288,13 @@ export async function acaoMarcarOptOut(leadId: string): Promise<Resposta> {
       data: { status: 'OPT_OUT', proximoEnvioEm: null, motivoPausa: 'OPT_OUT manual' },
     }),
     prisma.leadEvent.create({
-      data: { leadId, tipo: 'status', descricao: 'Opt-out registrado à mão.' },
+      data: { leadId, tipo: 'status', descricao: 'Pediu para sair (registrado à mão).' },
     }),
   ]);
 
   await auditar(userId, 'opt_out_manual', { leadId });
   revalidatePath(`/rodolfo/leads/${leadId}`);
-  return { ok: true, mensagem: 'Opt-out registrado. Não entra mais em cadência.' };
+  return { ok: true, mensagem: 'Registrado: pediu para sair. Não entra mais em cadência.' };
 }
 
 /**
@@ -327,7 +323,7 @@ export async function acaoExcluirLead(leadId: string): Promise<Resposta> {
   revalidatePath('/rodolfo/leads');
   return {
     ok: true,
-    mensagem: 'Lead excluído. Um eventual opt-out do número continua valendo.',
+    mensagem: 'Lead excluído. Se ele pediu para sair, o bloqueio do número continua valendo.',
   };
 }
 
@@ -342,12 +338,12 @@ export async function acaoMarcarVisita(leadId: string): Promise<Resposta> {
       data: { status: 'PAUSADA_MANUAL', proximoEnvioEm: null, motivoPausa: 'Movido para visita' },
     }),
     prisma.leadEvent.create({
-      data: { leadId, tipo: 'status', descricao: 'Movido para Visita / Instagram.' },
+      data: { leadId, tipo: 'status', descricao: 'Movido para Visita e Instagram.' },
     }),
   ]);
 
   await auditar(userId, 'lead_para_visita', { leadId });
   revalidatePath(`/rodolfo/leads/${leadId}`);
   revalidatePath('/rodolfo/visitas');
-  return { ok: true, mensagem: 'Movido para Visita / Instagram. Sai da cadência de WhatsApp.' };
+  return { ok: true, mensagem: 'Movido para Visita e Instagram. Sai da cadência de WhatsApp.' };
 }

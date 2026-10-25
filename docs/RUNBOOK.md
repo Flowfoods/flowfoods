@@ -128,7 +128,7 @@ Confira em `/rodolfo/config`: a instância precisa aparecer como `open`.
 
 Rode o `ledsflowfoods`, pegue o pacote e:
 
-- **pelo portal:** `/rodolfo/leads` → "Importar lote" → cole o JSON;
+- **pelo portal:** `/rodolfo/leads` → "Importar leads" (tela própria) → cole o conteúdo exportado;
 - **pelo terminal:** `POST /api/leads/import` com `x-import-token`.
 
 A importação já bloqueia sozinha: conflito com o Bibi (suco/açaí/saladaria em

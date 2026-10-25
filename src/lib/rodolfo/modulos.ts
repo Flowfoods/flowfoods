@@ -49,7 +49,7 @@ export function modulosDoNivel1(): ModuloNav[] {
               icone: 'inbox',
               subtitulo: 'Respostas classificadas, com rascunho',
             },
-            { href: '/rodolfo/visitas', rotulo: 'Visitas', icone: 'visitas', subtitulo: 'Telefone fixo e Instagram' },
+            { href: '/rodolfo/visitas', rotulo: 'Visita e Instagram', icone: 'visitas', subtitulo: 'Telefone fixo e Instagram' },
           ],
         },
         {
@@ -113,7 +113,7 @@ export function modulosDoNivel1(): ModuloNav[] {
             {
               href: '/rodolfo/onboarding',
               rotulo: 'Aguardando liberação',
-              icone: 'inbox',
+              icone: 'acesso',
               subtitulo: 'Pedidos do site: ativar ou recusar',
             },
           ],

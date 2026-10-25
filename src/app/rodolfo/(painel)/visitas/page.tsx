@@ -1,5 +1,5 @@
 /**
- * Visita / Instagram — quem não entra na cadência de WhatsApp.
+ * Visita e Instagram — quem não entra na cadência de WhatsApp.
  *
  * Fixo não é lead ruim, é canal errado. Aqui ficam os que têm telefone fixo,
  * os sem telefone e os que foram movidos à mão.
@@ -16,6 +16,7 @@ import { agoraSP } from '@/lib/rodolfo/estado';
 import { renderizar, TEMPLATE_INSTAGRAM } from '@/lib/barney/render';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
+import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Aviso, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { CartaoVisita } from './cartao-visita';
 import { exigirNivel1 } from '@/lib/erp/contexto';
@@ -61,7 +62,7 @@ export default async function VisitasPage() {
         icone="visitas"
         cor={COR.comercial}
         titulo="Visita e Instagram"
-        subtitulo="Quem não tem celular. Fixo não é lead ruim — é canal errado."
+        subtitulo="Leads sem celular: abordagem por visita ou pelo Direct do Instagram."
       />
 
       <div className="grid grid-cols-3 gap-3">
@@ -71,14 +72,22 @@ export default async function VisitasPage() {
       </div>
 
       <Aviso tom="alerta" titulo="O Instagram bloqueia mensagem pré-preenchida.">
-        Nenhum link consegue abrir o Direct já com o texto. Por isso o fluxo é: copiar aqui, abrir o perfil, colar.
-        Direct converte menos que WhatsApp (cai em solicitações e muitas vezes nem notifica): trate como plano B, e como
-        o caminho natural para quem não respondeu depois do D+10.
+        Por isso: copie o texto aqui, abra o perfil e cole no Direct. O Direct responde menos que o WhatsApp (muitas vezes cai
+        em solicitações): use como plano B, também para quem não respondeu às 3 mensagens da cadência.
       </Aviso>
 
       {leads.length === 0 ? (
         <Painel>
-          <Vazio>Ninguém aqui. Fixos e sem-telefone caem nesta lista automaticamente na importação.</Vazio>
+          <Vazio
+            titulo="Ninguém aqui ainda."
+            acao={
+              <Link href="/rodolfo/leads" className={`${LINK_DE_TEXTO} ff-toque`}>
+                Abrir Leads
+              </Link>
+            }
+          >
+            Leads com telefone fixo ou sem telefone entram aqui na importação.
+          </Vazio>
         </Painel>
       ) : (
         <div className="space-y-3">

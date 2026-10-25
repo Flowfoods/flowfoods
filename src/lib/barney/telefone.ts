@@ -12,7 +12,7 @@
  *
  * Regra de canal (decisão do Rodolfo, `ledsflowfoods/SKILL.md`): a cadência de
  * WhatsApp usa APENAS celular — DDD + 9 dígitos começando em 9. Fixo não é lead
- * ruim, é canal errado: vai para a lista "Visita / Instagram".
+ * ruim, é canal errado: vai para a lista "Visita e Instagram".
  */
 
 export type TipoTelefone = 'CELULAR' | 'FIXO' | 'INVALIDO';
@@ -53,7 +53,7 @@ export function normalizarTelefone(entrada: string | null | undefined): Telefone
   if (/^sem\b/i.test(bruto)) return INVALIDO('sem telefone');
 
   let d = bruto.replace(/\D/g, '');
-  if (!d) return INVALIDO('sem digitos');
+  if (!d) return INVALIDO('sem dígitos');
 
   // Prefixo internacional: +55 vem como 55 na frente. Só descarta quando o que
   // sobra tem tamanho de número nacional — senão estaríamos comendo um DDD 55
@@ -66,11 +66,11 @@ export function normalizarTelefone(entrada: string | null | undefined): Telefone
   // Zero de operadora / trunk: 021 99999-8888.
   if (d.length > 11 && d.startsWith('0')) d = d.replace(/^0+/, '');
 
-  if (d.length < 10) return INVALIDO(`curto demais (${d.length} digitos)`);
-  if (d.length > 11) return INVALIDO(`longo demais (${d.length} digitos)`);
+  if (d.length < 10) return INVALIDO(`${d.length} dígitos, curto demais`);
+  if (d.length > 11) return INVALIDO(`${d.length} dígitos, longo demais`);
 
   const ddd = d.slice(0, 2);
-  if (!DDDS_VALIDOS.has(Number(ddd))) return INVALIDO(`DDD inexistente (${ddd})`);
+  if (!DDDS_VALIDOS.has(Number(ddd))) return INVALIDO(`DDD ${ddd} não existe`);
 
   const assinante = d.slice(2);
 

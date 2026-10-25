@@ -12,11 +12,11 @@ export const dynamic = 'force-dynamic';
 export default async function NovoPedidoPage() {
   await exigirNivel1();
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-3xl space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: 'Cadastrar pedido manual' }]} />
       <Voltar href="/rodolfo/onboarding">Voltar para Aguardando liberação</Voltar>
       <PageHeader
-        icone="inbox"
+        icone="novo"
         cor={COR.parceiros}
         titulo="Cadastrar pedido manual"
         subtitulo="Para quem chegou por outro caminho. Depois, ative no quadro."

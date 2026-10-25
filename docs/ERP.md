@@ -4620,3 +4620,20 @@ com o cenário montado: 15 telas × 6 tamanhos × 2 temas = 180, 0 falhas; Cadê
 `rodolfo-painel-e5` (rótulos, botões da Cadência em 12 casos e 61 combinações, dia forjado na Config) e `rodolfo-lote-disparo`
 (cancelado, aprovação, seed dos modelos, "Montar de novo" em lote aprovado). **Não feito:** a fila de "deveria" da revisão de UX
 (próxima fatia da E5.1); validação com pessoas reais; nenhum envio de verdade (piloto E5.2).
+
+**E5.1 · painel do nível 1, segunda fatia (a) (decisão 468, 25/10/2026):** os "deveria" S3, S4, S5, S9, S10, S11 e S12 da
+revisão de UX. Importação de leads em tela própria (`/rodolfo/leads/importar`, como as importações do ERP, com "Como funciona" e
+retorno em frase: "3 linhas lidas: 1 novo, 0 atualizados e 2 sem celular (em Visita e Instagram)."); lista de Leads com "Importar
+leads" como principal, vazios com o próximo passo e status/canal da URL validados (um valor inventado derrubava a página); Lead 360
+com "Enviar agora" no cabeçalho, trilha com o nome, Voltar de 44 px, "Histórico", telefone legível e "Outras ações" no fim; Portal do
+cliente com trilha, Voltar e "Pulados com motivo"; Inbox com o nome abrindo o Lead 360 e "Cancelar"; "Visita e Instagram" em todo
+lugar; textos sem jargão (Visitas, Onboarding, pedido manual, retornos das ações); pedido manual alinhado; ícone próprio em
+Aguardando liberação. *Navegador (build de produção, banco local; leads de teste importados pela tela e apagados no fim):* lista
+vazia, status inventado (200), importar a 390 e 1440, Lead 360 com os dois botões no cabeçalho e um só principal, Inbox com o link do
+nome, Portal com a trilha "Portal do cliente › Grupo Valentin's", pedido manual com título e cartão na mesma coluna; sem rolagem
+lateral nem erro de página. Matriz do painel com as telas novas: 16 telas × 6 tamanhos × 2 temas = 192, 0 falhas. *Checks:* suíte com
+banco 154 arquivos, 2.874 aprovados, 46 pulados, 0 falhas; lint, typecheck e portão limpos; teste novo `rodolfo-leads-e5` e casos
+novos em `rodolfo-painel-e5`. Revisão independente (código e UX): reprovou com 2 bloqueantes (busca de texto casando com todo lead com
+telefone; links novos com 20 px no toque) e 6 "deveria" (entre eles: "Enviar agora" aparecendo para fixo, Visita e quem não está no
+lote de hoje; lead movido para Visita ainda recebendo o WhatsApp do lote no servidor); todos corrigidos antes do commit, com testes
+(`envioNoLead360`, busca, canal no envio).

@@ -89,3 +89,32 @@ export function telaDaCadencia(e: EntradaDaCadencia): TelaDaCadencia {
     faltamManuais,
   };
 }
+
+export interface EntradaDoEnvioNoLead {
+  temCelular: boolean;
+  canal: string;
+  status: string;
+  pediuParaSair: boolean;
+  /** Situação do lote de hoje em que o lead está; null se não está no lote de hoje. */
+  loteDeHoje: string | null;
+  jaRecebeuHoje: boolean;
+  manual: Decisao;
+}
+
+/**
+ * "Enviar agora" no Lead 360 segue a regra da Cadência (decisão 468): só aparece quando o servidor deixaria sair
+ * (`dispararProximo` com o lead escolhido); senão, a tela diz por quê. A ordem é a do servidor.
+ */
+export function envioNoLead360(e: EntradaDoEnvioNoLead): { pode: boolean; motivo: string | null } {
+  const nao = (motivo: string) => ({ pode: false, motivo });
+  if (!e.temCelular) return nao('Sem celular válido: este lead não recebe WhatsApp.');
+  if (e.canal !== 'WHATSAPP') return nao('Lead de Visita e Instagram: não recebe WhatsApp do Barney.');
+  if (e.pediuParaSair || e.status === 'OPT_OUT') return nao('Pediu para sair: nunca recebe mensagem.');
+  if (e.status === 'CONFLITO') return nao('Conflito com o Grupo Bibi Sucos: nunca recebe mensagem.');
+  if (e.status === 'RESPONDEU') return nao('Já respondeu: continue a conversa pelo Inbox.');
+  if (e.loteDeHoje === null) return nao('Não está no lote de hoje. Os envios saem do lote, em Cadência.');
+  if (e.loteDeHoje === 'CANCELADO') return nao('O lote de hoje foi cancelado. Nada mais sai hoje.');
+  if (e.jaRecebeuHoje) return nao('Já recebeu a mensagem de hoje.');
+  if (!e.manual.permitido) return nao(e.manual.explicacao ?? 'O envio está parado agora.');
+  return { pode: true, motivo: null };
+}

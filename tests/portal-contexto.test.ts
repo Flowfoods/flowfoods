@@ -37,7 +37,7 @@ describe('md de contexto do cliente', () => {
 
     expect(md).toMatch(/^# Contexto — Grupo Valentin's/);
     expect(md).toContain('Enviado pelo cliente: 25/09/2026');
-    expect(md).toContain('Recebidos 2 · Marcados 2 · Pendentes 47 · Total 51');
+    expect(md).toContain('Recebidos 2 · Pulados com motivo 2 · Pendentes 47 · Total 51');
 
     // ausências antes das respostas
     expect(md.indexOf('## Ausências declaradas')).toBeLessThan(md.indexOf('## Parte 1'));

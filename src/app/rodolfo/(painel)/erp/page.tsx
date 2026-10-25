@@ -134,8 +134,8 @@ export default async function ErpPage() {
         <Painel titulo="Novo parceiro" className="self-start">
           <div className="space-y-4 text-sm">
             <p className="text-suave">
-              Um parceiro nasce de um pedido: o que chega pelo site ou o que você digita. Ao ativar, nascem o parceiro, o dono e o link de primeiro
-              acesso.
+              Um parceiro começa por um pedido: o que chega pelo site ou o que você digita. Ao ativar, o sistema cria o parceiro, o acesso do dono e o
+              link de primeiro acesso.
             </p>
             <div className="flex flex-col gap-2">
               <Link href="/rodolfo/onboarding/novo" className={classeDeBotao('primario', 'w-full')}>

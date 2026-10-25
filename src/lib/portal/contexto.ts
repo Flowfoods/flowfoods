@@ -91,7 +91,7 @@ export function gerarContextoMd(e: EntradaContexto): string {
   L.push('');
   L.push(`- Enviado pelo cliente: ${e.finalizadoEm ? dataHora(e.finalizadoEm) : 'ainda não'}`);
   L.push(`- Última atividade: ${e.ultimaAtividadeEm ? dataHora(e.ultimaAtividadeEm) : 'nenhuma'}`);
-  L.push(`- Recebidos ${p.recebidos} · Marcados ${p.marcados} · Pendentes ${p.pendentes} · Total ${p.total}`);
+  L.push(`- Recebidos ${p.recebidos} · Pulados com motivo ${p.marcados} · Pendentes ${p.pendentes} · Total ${p.total}`);
   L.push('');
 
   // Ausências primeiro: é o achado.
@@ -120,7 +120,7 @@ export function gerarContextoMd(e: EntradaContexto): string {
       for (const item of b.itens) {
         const s = situacao.get(item.id)!;
         const rotuloEstado =
-          s.estado === 'RECEBIDO' ? 'Recebido' : s.estado === 'MARCADO' ? `Marcado: ${ROTULO_MARCACAO[s.marcacao!]}` : 'Pendente';
+          s.estado === 'RECEBIDO' ? 'Recebido' : s.estado === 'MARCADO' ? `Pulado: ${ROTULO_MARCACAO[s.marcacao!]}` : 'Pendente';
         L.push(`**${item.id} · ${item.rotulo}** — ${rotuloEstado}`);
         if (item.detalhe) L.push(`_${item.detalhe}_`);
         L.push('');

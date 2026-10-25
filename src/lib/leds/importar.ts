@@ -208,7 +208,7 @@ export function importarLinha(
   if (tel.e164 && estado.optOuts.has(tel.e164)) {
     return {
       resultado: 'BLOQUEADO_OPT_OUT',
-      motivo: 'Telefone em opt-out permanente. Não entra em cadência.',
+      motivo: 'Este telefone já pediu para sair: entra na lista, mas nunca recebe mensagem.',
       lead: { ...comum, status: 'OPT_OUT' },
     };
   }
@@ -219,8 +219,8 @@ export function importarLinha(
       resultado: 'SEM_TELEFONE',
       motivo:
         tel.tipo === 'FIXO'
-          ? 'Fixo — vai para a lista Visita / Instagram.'
-          : `Sem celular válido (${tel.motivo ?? 'indefinido'}).`,
+          ? 'Telefone fixo: vai para Visita e Instagram.'
+          : `Sem celular válido (${tel.motivo ?? 'sem número'}): vai para Visita e Instagram.`,
       lead: { ...comum, status: 'NOVO' },
     };
   }

@@ -68,7 +68,7 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
       <TrilhaDaPagina itens={[{ rotulo: p.nomeGrupo }]} />
       <Voltar href="/rodolfo/onboarding">Voltar para Aguardando liberação</Voltar>
       <PageHeader
-        icone="inbox"
+        icone="acesso"
         cor={COR.parceiros}
         titulo={p.nomeGrupo}
         subtitulo={

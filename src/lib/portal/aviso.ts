@@ -28,7 +28,7 @@ export function montarAviso(params: {
     `Portal FlowFoods: ${cliente} enviou o formulário.`,
     '',
     `Recebidos: ${p.recebidos} de ${p.total}`,
-    `Marcados: ${p.marcados}${marcacoes ? ` (${marcacoes})` : ''}`,
+    `Pulados com motivo: ${p.marcados}${marcacoes ? ` (${marcacoes})` : ''}`,
     `Pendentes: ${p.pendentes}`,
     '',
     `Painel: ${linkPainel}`,

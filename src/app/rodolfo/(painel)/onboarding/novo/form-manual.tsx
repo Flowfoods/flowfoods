@@ -35,7 +35,7 @@ export function FormManual() {
     </Campo>
   );
   return (
-    <form action={enviar} className="mx-auto max-w-3xl space-y-4">
+    <form action={enviar} className="space-y-4">
       <Painel titulo="Quem é" subtitulo="O mesmo que o site pergunta. Fica em “Aguardando liberação” até você ativar ou recusar.">
         <div className="space-y-4">
           {campo('m-grupo', 'nomeGrupo', 'Nome do grupo ou do restaurante', { maxLength: 80 })}
@@ -60,7 +60,7 @@ export function FormManual() {
             aoMudar={setEtapa}
           />
           <p className="text-[12px] text-suave">
-            Sem a autorização do formulário do site: quem está digitando é você, depois de falar com a pessoa.
+            Este cadastro não tem o aceite de dados que o site pede. Use só depois de falar com a pessoa.
           </p>
         </div>
       </Painel>

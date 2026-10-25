@@ -302,6 +302,8 @@ export async function dispararProximo(
     if (lead.status === 'OPT_OUT' || lead.status === 'CONFLITO' || lead.status === 'RESPONDEU') {
       continue;
     }
+    // Movido para Visita e Instagram depois de montado o lote: "sai da cadência de WhatsApp" vale também para o lote de hoje.
+    if (lead.canal !== 'WHATSAPP') continue;
     const saiu = await prisma.optOut.findUnique({
       where: { telefoneNormalizado: lead.telefoneNormalizado },
     });

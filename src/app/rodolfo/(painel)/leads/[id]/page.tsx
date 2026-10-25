@@ -6,11 +6,12 @@
  * desde a importação; aqui ele finalmente aparece.
  */
 
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { gancho, angulo } from '@/lib/barney/render';
-import { agoraSP } from '@/lib/rodolfo/estado';
+import { agoraSP, diaSP, montarEstadoEnvio } from '@/lib/rodolfo/estado';
+import { podeEnviar } from '@/lib/barney/tetos';
+import { envioNoLead360 } from '@/lib/rodolfo/cadencia-tela';
 // avoid-ai-design-ignore: I3 — Check marca estado (opção escolhida, mensagem entregue), não é enfeite.
 import {
   CircleDashed,
@@ -28,10 +29,11 @@ import {
 } from 'lucide-react';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
-import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
-import { Aviso, Citacao, Linha, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
-import { ROTULO_DA_INSCRICAO, ROTULO_DA_INTENCAO, ROTULO_DA_MENSAGEM, ROTULO_DA_PAUSA, ROTULO_DO_CANAL, ROTULO_DO_LEAD, ROTULO_DO_TIPO_DE_TELEFONE, rotulo, rotuloDoToque, textoDoEvento } from '@/lib/rodolfo/rotulos';
-import { AcoesLead } from './acoes';
+import { Aviso, Citacao, Contagem, Linha, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
+import { ROTULO_DA_INSCRICAO, ROTULO_DA_INTENCAO, ROTULO_DA_MENSAGEM, ROTULO_DA_PAUSA, ROTULO_DO_CANAL, ROTULO_DO_LEAD, ROTULO_DO_TIPO_DE_TELEFONE, rotulo, rotuloDoToque, telefoneLegivel, textoDoEvento } from '@/lib/rodolfo/rotulos';
+import { AcoesLead, EnvioDoLead } from './acoes';
+import { TrilhaDaPagina } from '@/components/erp/shell/trilha';
+import { Voltar } from '@/components/erp/telas/cadastro/partes';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 
 export const dynamic = 'force-dynamic';
@@ -95,6 +97,23 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
     ? await prisma.optOut.findUnique({ where: { telefoneNormalizado: lead.telefoneNormalizado } })
     : null;
 
+  // "Enviar agora" só quando o servidor deixaria sair (a mesma ordem de `dispararProximo` com o lead escolhido).
+  const agora = agoraSP();
+  const [itemDeHoje, estadoEnvio, recebeuHoje] = await Promise.all([
+    prisma.batchItem.findFirst({ where: { leadId: lead.id, batch: { data: diaSP(agora) } }, select: { batch: { select: { status: true } } } }),
+    montarEstadoEnvio(agora),
+    prisma.message.findFirst({ where: { leadId: lead.id, direction: 'OUT', status: { in: ['PENDENTE', 'ENVIADA', 'ENTREGUE', 'LIDA'] }, criadoEm: { gte: diaSP(agora) } }, select: { id: true } }),
+  ]);
+  const envio = envioNoLead360({
+    temCelular: lead.tipoTelefone === 'CELULAR' && !!lead.telefoneNormalizado,
+    canal: lead.canal,
+    status: lead.status,
+    pediuParaSair: Boolean(optOut),
+    loteDeHoje: itemDeHoje?.batch.status ?? null,
+    jaRecebeuHoje: Boolean(recebeuHoje),
+    manual: podeEnviar(estadoEnvio, agora, { manual: true }),
+  });
+
   const enrollment = lead.enrollments[0];
   const nome = lead.restaurante ?? lead.nome;
 
@@ -105,13 +124,13 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
 
   return (
     <div className="space-y-6">
-      <Link href="/rodolfo/leads" className={LINK_DE_TEXTO}>
-        Voltar para Leads
-      </Link>
+      <TrilhaDaPagina itens={[{ rotulo: nome }]} />
+      <Voltar href="/rodolfo/leads">Voltar para Leads</Voltar>
       <PageHeader
         icone="leads"
         cor={COR.comercial}
         titulo={nome}
+        acao={<EnvioDoLead leadId={lead.id} whatsapp={lead.tipoTelefone === 'CELULAR' ? lead.telefoneNormalizado : null} podeEnviar={envio.pode} />}
         subtitulo={
           <span className="flex flex-wrap items-center gap-2">
             {[lead.bairro, lead.categoria, lead.bloco && `Bloco ${lead.bloco}`].filter(Boolean).join(', ') || '—'}
@@ -143,7 +162,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         <Metrica
           rotulo="Score base"
           valor={lead.scoreBase ?? '—'}
-          detalhe={`cap ${lead.capacidade ?? '—'}, acesso ${lead.acessoDecisor ?? '—'}, terr ${lead.territorio ?? '—'}`}
+          detalhe={`capacidade ${lead.capacidade ?? '—'}, acesso ao dono ${lead.acessoDecisor ?? '—'}, território ${lead.territorio ?? '—'}`}
         />
         <Metrica
           rotulo="Gap digital"
@@ -157,7 +176,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         <Painel titulo="Contato">
           <dl className="space-y-2 text-sm">
             <Linha rotulo="Telefone">
-              <span className="tabular-nums">{lead.telefoneNormalizado ?? '—'}</span>
+              <span className="tabular-nums">{telefoneLegivel(lead.telefoneNormalizado)}</span>
             </Linha>
             <Linha rotulo="Tipo">{rotulo(ROTULO_DO_TIPO_DE_TELEFONE, lead.tipoTelefone)}</Linha>
             <Linha rotulo="Canal">{rotulo(ROTULO_DO_CANAL, lead.canal)}</Linha>
@@ -176,6 +195,11 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         </Painel>
 
         <Painel titulo="Cadência">
+          {envio.motivo && (
+            <p className="mb-3 rounded-[7px] border border-linha bg-texto/[0.03] px-3 py-2 text-[13px] text-suave">
+              <strong className="text-texto">Envio pelo Barney:</strong> {envio.motivo}
+            </p>
+          )}
           {enrollment ? (
             <dl className="space-y-2 text-sm">
               <Linha rotulo="Situação">
@@ -237,9 +261,9 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         )}
       </Painel>
 
-      <Painel titulo={`Timeline (${lead.eventos.length})`}>
+      <Painel titulo="Histórico" acessorio={<Contagem>{lead.eventos.length}</Contagem>}>
         {lead.eventos.length === 0 ? (
-          <Vazio>Sem eventos.</Vazio>
+          <Vazio>Nada registrado ainda.</Vazio>
         ) : (
           <ol className="space-y-2.5">
             {lead.eventos.map((e) => {
@@ -260,11 +284,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         )}
       </Painel>
 
-      <AcoesLead
-        leadId={lead.id}
-        telefone={lead.telefoneNormalizado}
-        bloqueado={Boolean(optOut) || lead.status === 'CONFLITO'}
-      />
+      <AcoesLead leadId={lead.id} bloqueado={Boolean(optOut) || lead.status === 'CONFLITO'} jaEmVisita={lead.canal !== 'WHATSAPP'} />
     </div>
   );
 }

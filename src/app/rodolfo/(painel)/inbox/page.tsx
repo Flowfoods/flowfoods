@@ -105,7 +105,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             <Vazio
               titulo={`Nenhuma resposta em “${params.intencao === 'SEM' ? 'Sem classificar' : rotulo(ROTULO_DA_INTENCAO, params.intencao)}”.`}
               acao={
-                <Link href="/rodolfo/inbox" className={LINK_DE_TEXTO}>
+                <Link href="/rodolfo/inbox" className={`${LINK_DE_TEXTO} ff-toque`}>
                   Ver todas as respostas
                 </Link>
               }
@@ -122,7 +122,17 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
               <Painel key={m.id}>
                 <header className="mb-2 flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{m.lead?.restaurante ?? m.lead?.nome ?? m.to}</p>
+                    {/* O nome abre o Lead 360: a conversa inteira e o histórico estão lá. */}
+                    {m.lead ? (
+                      <Link
+                        href={`/rodolfo/leads/${m.lead.id}`}
+                        className="block truncate rounded-[5px] text-sm font-semibold underline decoration-linha-forte underline-offset-4 hover:decoration-texto [@media(pointer:coarse)]:flex [@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:items-center"
+                      >
+                        {m.lead.restaurante ?? m.lead.nome}
+                      </Link>
+                    ) : (
+                      <p className="truncate text-sm font-semibold">{m.to}</p>
+                    )}
                     <p className="truncate text-[12px] text-suave">
                       {[m.lead?.bairro, m.lead?.categoria].filter(Boolean).join(', ') || '—'},{' '}
                       {quando.format(m.criadoEm)}

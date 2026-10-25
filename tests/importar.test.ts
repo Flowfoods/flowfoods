@@ -124,7 +124,7 @@ describe('importação — travas', () => {
     const r = importarLinha(linha({ 'Telefone/WhatsApp': '(21) 2555-1234' }), estadoLimpo(), OPTS);
     expect(r.resultado).toBe('SEM_TELEFONE');
     expect(r.lead?.canal).toBe('VISITA');
-    expect(r.motivo).toContain('Visita / Instagram');
+    expect(r.motivo).toContain('Visita e Instagram');
   });
 
   it('"SEM TELEFONE" não vira número', () => {

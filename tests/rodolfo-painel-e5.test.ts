@@ -32,6 +32,8 @@ import {
   proximoToque,
   rotulo,
   rotuloDoToque,
+  resumoDaImportacao,
+  telefoneLegivel,
   textoDaRecusa,
   textoDoEvento,
 } from '@/lib/rodolfo/rotulos';
@@ -85,7 +87,17 @@ describe('E5.1 · rótulos do painel do nível 1', () => {
   it('a linha do tempo e as recusas sem código', () => {
     expect(textoDoEvento('D0 enviado.')).toBe('1ª mensagem (dia 0) enviada.');
     expect(textoDoEvento('D4 simulado — nada foi enviado.')).toBe('2ª mensagem (dia 4) simulada, nada foi enviado.');
-    expect(textoDoEvento('Opt-out registrado à mão.')).toBe('Opt-out registrado à mão.');
+    expect(textoDoEvento('Opt-out registrado à mão.')).toBe('Pediu para sair (registrado à mão).');
+    expect(textoDoEvento('Importado no lote X (novo).')).toBe('Importado no lote X (novo).');
+    expect(textoDoEvento('Importado no lote Zona Oeste (ATUALIZADO).')).toBe('Importado no lote Zona Oeste (atualizado).');
+    expect(telefoneLegivel('5521990001111')).toBe('(21) 99000-1111');
+    expect(telefoneLegivel('552133332222')).toBe('(21) 3333-2222');
+    expect(telefoneLegivel('123')).toBe('123');
+    expect(telefoneLegivel(null)).toBe('—');
+    expect(resumoDaImportacao({ total: 120, novos: 80, atualizados: 10, bloqueadosConflito: 3, bloqueadosOptOut: 1, semTelefone: 20, invalidos: 0 })).toBe(
+      '120 linhas lidas: 80 novos, 10 atualizados, 3 em conflito com o Bibi, 1 que já pediu para sair e 20 sem celular (em Visita e Instagram). Conflito com o Bibi e quem pediu para sair entram na lista, mas nunca recebem mensagem.',
+    );
+    expect(resumoDaImportacao({ total: 1, novos: 1, atualizados: 0, bloqueadosConflito: 0, bloqueadosOptOut: 0, semTelefone: 0, invalidos: 0 })).toBe('1 linha lida: 1 novo e 0 atualizados.');
     expect(rotulo(ROTULO_DA_PAUSA, 'OPT_OUT manual')).toBe('Pediu para sair (registrado à mão)');
     expect(rotulo(ROTULO_DA_PAUSA, 'RESPOSTA')).toBe('Respondeu');
     expect(textoDaRecusa('DISPARO_DESLIGADO: Disparo desligado.')).toBe('Disparo desligado. Ligue em Config.');

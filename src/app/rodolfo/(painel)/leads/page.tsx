@@ -7,13 +7,12 @@
 
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
-import type { Prisma } from '@prisma/client';
+import { Canal, LeadStatus, type Prisma } from '@prisma/client';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { BuscaEmFormulario, FiltroEmLinks } from '@/components/erp/ui/filtros';
 import { Contagem, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
-import { ImportarForm } from './importar-form';
-import { classeDeBotao } from '@/components/erp/ui/estilos';
+import { classeDeBotao, LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 import { ROTULO_DO_LEAD, rotulo } from '@/lib/rodolfo/rotulos';
 
@@ -50,15 +49,20 @@ export default async function LeadsPage({
   await exigirNivel1();
   const params = await searchParams;
 
+  // Só valores conhecidos chegam ao banco: um status inventado na URL derrubava a página (o Prisma recusa o enum).
+  const status = params.status && (Object.values(LeadStatus) as string[]).includes(params.status) ? (params.status as LeadStatus) : undefined;
+  const canal = params.canal && (Object.values(Canal) as string[]).includes(params.canal) ? (params.canal as Canal) : undefined;
   const where: Prisma.LeadWhereInput = {};
-  if (params.status) where.status = params.status as Prisma.LeadWhereInput['status'];
-  if (params.canal) where.canal = params.canal as Prisma.LeadWhereInput['canal'];
+  if (status) where.status = status;
+  if (canal) where.canal = canal;
   if (params.q) {
+    // O telefone só entra quando a busca tem dígitos: sem eles, o "contém vazio" casava com todo lead que tem telefone.
+    const digitos = params.q.replace(/\D/g, '');
     where.OR = [
       { nome: { contains: params.q, mode: 'insensitive' } },
       { restaurante: { contains: params.q, mode: 'insensitive' } },
       { bairro: { contains: params.q, mode: 'insensitive' } },
-      { telefoneNormalizado: { contains: params.q.replace(/\D/g, '') } },
+      ...(digitos ? [{ telefoneNormalizado: { contains: digitos } }] : []),
     ];
   }
 
@@ -104,9 +108,9 @@ export default async function LeadsPage({
         titulo="Leads"
         subtitulo={`${total} resultado${total === 1 ? '' : 's'}${params.q ? ` para “${params.q}”` : ''}`}
         acao={
-          <a href="#importar" className={classeDeBotao('secundario')}>
-            Importar lote
-          </a>
+          <Link href="/rodolfo/leads/importar" className={classeDeBotao('primario')}>
+            Importar leads
+          </Link>
         }
       >
         <div className="flex flex-col gap-3">
@@ -114,14 +118,14 @@ export default async function LeadsPage({
             valor={params.q}
             placeholder="Nome, bairro ou telefone"
             rotulo="Buscar leads"
-            ocultos={{ status: params.status }}
+            ocultos={{ status }}
           />
           <FiltroEmLinks
             rotulo="Filtrar por situação"
             opcoes={FILTROS.map((f) => ({
               href: hrefDo(f.chave),
               rotulo: f.rotulo,
-              ativo: (params.status ?? '') === f.chave,
+              ativo: (status ?? '') === f.chave,
             }))}
           />
         </div>
@@ -132,7 +136,7 @@ export default async function LeadsPage({
         <Metrica rotulo="Novos" valor={conta('NOVO')} detalhe="ainda não contatados" />
         <Metrica rotulo="Em cadência" valor={conta('EM_CADENCIA')} detalhe="em andamento" />
         <Metrica rotulo="Responderam" valor={conta('RESPONDEU')} detalhe="pelo WhatsApp" />
-        <Metrica rotulo="Visita / Instagram" valor={visita} detalhe="fixo ou sem celular" />
+        <Metrica rotulo="Visita e Instagram" valor={visita} detalhe="fixo ou sem celular" />
       </div>
 
       <Painel
@@ -141,7 +145,27 @@ export default async function LeadsPage({
         semRespiro
       >
         {leads.length === 0 ? (
-          <Vazio>Nada aqui. Importe um lote do ledsflowfoods abaixo.</Vazio>
+          params.q || status || canal ? (
+            <Vazio
+              titulo={params.q ? `Nada para “${params.q}”.` : 'Nenhum lead nesta situação.'}
+              acao={
+                <Link href="/rodolfo/leads" className={`${LINK_DE_TEXTO} ff-toque`}>
+                  {params.q ? 'Limpar a busca' : 'Ver todos os leads'}
+                </Link>
+              }
+            />
+          ) : (
+            <Vazio
+              titulo="Nenhum lead ainda."
+              acao={
+                <Link href="/rodolfo/leads/importar" className={classeDeBotao('secundario')}>
+                  Importar leads
+                </Link>
+              }
+            >
+              Importe a planilha do ledsflowfoods para começar.
+            </Vazio>
+          )
         ) : (
           <ul>
             {leads.map((l) => (
@@ -170,14 +194,11 @@ export default async function LeadsPage({
         )}
         {total > POR_PAGINA && (
           <p className="border-t border-linha px-4 py-3 text-center text-[12px] text-suave sm:px-5">
-            Mostrando os {POR_PAGINA} primeiros por tier e score. Refine a busca para ver o resto.
+            Mostrando os {POR_PAGINA} primeiros por faixa (T1 a T3) e score. Refine a busca para ver o resto.
           </p>
         )}
       </Painel>
 
-      <Painel id="importar" titulo="Importar lote" className="scroll-mt-24">
-        <ImportarForm />
-      </Painel>
     </div>
   );
 }

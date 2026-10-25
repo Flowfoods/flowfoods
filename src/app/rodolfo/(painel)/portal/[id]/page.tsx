@@ -5,7 +5,6 @@
  * diagnóstico segue o formulário, e o painel tem de bater com ele.
  */
 
-import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { questionario, ROTULO_MARCACAO } from '@/lib/portal/questionario';
@@ -16,18 +15,20 @@ import { origemPublica } from '@/lib/portal/http';
 import { COR } from '@/lib/erp/modulos';
 import { BotaoAcao } from '@/components/erp/ui/botoes';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
-import { classeDeBotao, LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
+import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { Numero, Painel, Selo } from '@/components/erp/ui/superficies';
 import { acaoZerarPortal } from '../actions';
 import { CopiarLink } from '../copiar';
 import { formatarQuando } from '../formatar';
 import { exigirNivel1 } from '@/lib/erp/contexto';
+import { TrilhaDaPagina } from '@/components/erp/shell/trilha';
+import { Voltar } from '@/components/erp/telas/cadastro/partes';
 
 export const dynamic = 'force-dynamic';
 
 const SELO: Record<EstadoItem, { tom: 'ok' | 'alerta' | 'neutro'; rotulo: string }> = {
   RECEBIDO: { tom: 'ok', rotulo: 'Recebido' },
-  MARCADO: { tom: 'alerta', rotulo: 'Marcado' },
+  MARCADO: { tom: 'alerta', rotulo: 'Pulado com motivo' },
   PENDENTE: { tom: 'neutro', rotulo: 'Pendente' },
 };
 
@@ -51,14 +52,13 @@ export default async function PortalClientePage({ params }: { params: { id: stri
 
   return (
     <div className="space-y-6">
-      <Link href="/rodolfo/portal" className={LINK_DE_TEXTO}>
-        Voltar para o Portal do cliente
-      </Link>
+      <TrilhaDaPagina itens={[{ rotulo: cliente.nome }]} />
+      <Voltar href="/rodolfo/portal">Voltar para o Portal do cliente</Voltar>
       <PageHeader
         icone="portal"
         cor={COR.clientes}
         titulo={cliente.nome}
-        subtitulo={`${p.recebidos} recebidos, ${p.marcados} marcados e ${p.pendentes} pendentes de ${p.total} itens`}
+        subtitulo={`${p.recebidos} recebidos, ${p.marcados} pulados com motivo e ${p.pendentes} pendentes de ${p.total} itens`}
         acao={
           <a href={`/rodolfo/portal/${cliente.id}/contexto`} className={classeDeBotao('secundario')}>
             Baixar contexto (.md)
@@ -79,7 +79,7 @@ export default async function PortalClientePage({ params }: { params: { id: stri
           <Numero valor={p.recebidos} rotulo="Recebidos" detalhe={`de ${p.total}`} />
           <Numero
             valor={p.marcados}
-            rotulo="Marcados"
+            rotulo="Pulados com motivo"
             detalhe={`${p.porMarcacao.NAO_TENHO} não tenho · ${p.porMarcacao.NAO_SEI} não sei · ${p.porMarcacao.AGORA_NAO} agora não`}
           />
           <Numero valor={p.pendentes} rotulo="Pendentes" />

@@ -24,11 +24,11 @@ export default async function OnboardingPage({ searchParams }: { searchParams: {
   return (
     <div className="space-y-6">
       <PageHeader
-        icone="inbox"
+        icone="acesso"
         cor={COR.parceiros}
         titulo="Aguardando liberação"
         subtitulo={[
-          abertos ? `${abertos} ${abertos === 1 ? 'pedido aberto' : 'pedidos abertos'}` : 'nenhum pedido aberto',
+          abertos ? `${abertos} ${abertos === 1 ? 'pedido aberto' : 'pedidos abertos'}` : 'Nenhum pedido aberto',
           atrasados ? `${atrasados} com atraso` : null,
         ]
           .filter(Boolean)
@@ -41,8 +41,8 @@ export default async function OnboardingPage({ searchParams }: { searchParams: {
       />
       {searchParams.feito === 'manual' && <Aviso tom="ok" titulo="Pedido cadastrado." />}
       <p className="max-w-3xl text-sm text-suave">
-        Quem pede para começar chega aqui, vindo do site ou digitado por você. Nada é criado antes da sua decisão: ao ativar, nascem o
-        parceiro, o dono e o link de primeiro acesso, de uma vez. Novo passa do prazo depois de 2 dias; Em conversa, depois de 7 dias sem
+        Quem pede para começar chega aqui, vindo do site ou digitado por você. Nada é criado antes da sua decisão: ao ativar, o sistema
+        cria de uma vez o parceiro, o acesso do dono e o link de primeiro acesso. Novo passa do prazo depois de 2 dias; Em conversa, depois de 7 dias sem
         movimento.
       </p>
       <QuadroDePedidos quadro={quadro} etapa={etapaDaAba(searchParams.etapa)} />

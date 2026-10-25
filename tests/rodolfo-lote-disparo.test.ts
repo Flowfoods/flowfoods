@@ -21,6 +21,11 @@ const enviar = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/db', () => ({
   prisma: {
+    optOut: {
+      findUnique: async () => {
+        throw new Error('não devia conferir o opt-out de lead fora do WhatsApp');
+      },
+    },
     batch: {
       findUnique: async () => banco.lote,
       upsert: async () => banco.lote,
@@ -124,5 +129,16 @@ describe('E5.1 · "Montar de novo" não mexe em lote aprovado nem em envio', () 
       expect(r.lote.status).toBe(status);
       expect(banco.reaberturas).toEqual([['PROPOSTO', 'CANCELADO']]);
     }
+  });
+});
+
+describe('E5.1 · lead movido para Visita depois de montado o lote', () => {
+  it('não recebe o WhatsApp do lote de hoje (pelo worker nem pelo Lead 360)', async () => {
+    banco.modoAprovacao = true;
+    const lead = { id: 'v1', status: 'NOVO', canal: 'VISITA', telefoneNormalizado: '5521990000004' };
+    banco.lote = { id: 'l1', status: 'APROVADO', itens: [{ leadId: 'v1', toque: 'D0', lead }] };
+    expect(await dispararProximo({})).toEqual({ enviou: false, motivo: FIM_DO_LOTE });
+    expect(await dispararProximo({ manual: true, leadId: 'v1' })).toEqual({ enviou: false, motivo: FIM_DO_LOTE });
+    expect(enviar).not.toHaveBeenCalled();
   });
 });

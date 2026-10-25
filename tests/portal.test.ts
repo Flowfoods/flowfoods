@@ -152,7 +152,7 @@ describe('aviso no WhatsApp', () => {
     });
     expect(texto).toContain("Grupo Valentin's enviou o formulário.");
     expect(texto).toContain('Recebidos: 1 de 51');
-    expect(texto).toContain('Marcados: 1 (NÃO TENHO: 1)');
+    expect(texto).toContain('Pulados com motivo: 1 (NÃO TENHO: 1)');
     expect(texto).toContain('Pendentes: 49');
     expect(texto).toContain('https://consultoriaflowfoods.com.br/rodolfo/portal/abc');
   });

@@ -67,7 +67,7 @@ export default async function PortalPage() {
               <>
                 <div className="mt-4 grid grid-cols-3 gap-4">
                   <Numero valor={p.recebidos} rotulo="Recebidos" />
-                  <Numero valor={p.marcados} rotulo="Marcados" />
+                  <Numero valor={p.marcados} rotulo="Pulados com motivo" />
                   <Numero valor={p.pendentes} rotulo="Pendentes" />
                 </div>
                 <div className="mt-3">
