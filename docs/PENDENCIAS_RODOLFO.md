@@ -109,14 +109,16 @@ o seu, e as notificações voltam sozinhas.
 
 ---
 
-## 🟡 5. Ligar o disparo — só depois dos 10 manuais
+## 🟡 5. Ligar o disparo — antes dos 10 manuais
 
 `disparoAtivo` nasce `false` e o código impede qualquer envio enquanto estiver
 assim (testado, e vale inclusive para o manual).
 
-Ordem: parear o QR → **10 primeiros envios um a um** em "Enviar o próximo" (Cadência) → só
-então ligar em `/rodolfo/config`. Os 10 manuais também são obrigatórios no
-código: o automático recusa até o 11º e diz quantos faltam.
+Ordem: parear o QR → ligar o disparo em `/rodolfo/config` (Regras de envio) →
+**10 primeiros envios um a um** em "Enviar o próximo" (Cadência). Com o disparo
+desligado nem o envio à mão sai, então ele vem antes. Os 10 manuais também são
+obrigatórios no código: mesmo com o disparo ligado, o automático recusa até o
+11º e diz quantos faltam.
 
 ---
 

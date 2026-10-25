@@ -20,11 +20,13 @@ import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { Aviso, Numero, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { exigirNivel1 } from '@/lib/erp/contexto';
+import { prisma } from '@/lib/db';
 
 export const dynamic = 'force-dynamic';
 
 const pct = (n: number | null) => (n === null ? '—' : `${(n * 100).toFixed(0)}%`);
 const brl = (n: number) => n.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const dataCurta = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
 
 function Funil({ etapas }: { etapas: EtapaFunil[] }) {
   const topo = etapas[0]?.valor ?? 0;
@@ -71,7 +73,7 @@ function TabelaCorte({ titulo, linhas }: { titulo: string; linhas: Corte[] }) {
   return (
     <Painel titulo={titulo}>
       {linhas.length === 0 ? (
-        <Vazio>Sem dado ainda.</Vazio>
+        <Vazio>Aparece depois da primeira importação de leads.</Vazio>
       ) : (
         <ul className="space-y-2.5">
           {linhas.map((l) => (
@@ -99,7 +101,8 @@ function TabelaCorte({ titulo, linhas }: { titulo: string; linhas: Corte[] }) {
 export default async function MetricasPage() {
   // O middleware já exige a sessão; a página confere de novo (o layout não substitui a checagem).
   await exigirNivel1();
-  const m = await carregarMetricas();
+  const [m, primeira] = await Promise.all([carregarMetricas(), prisma.lead.aggregate({ _min: { importadoEm: true } })]);
+  const desde = primeira._min.importadoEm;
   const piso = STOP_LOSS.taxaEntregaMinima;
 
   const tomEntrega = (t: number | null) => (t === null ? 'neutro' : t < piso ? 'erro' : 'ok');
@@ -110,7 +113,7 @@ export default async function MetricasPage() {
         icone="metricas"
         cor={COR.comercial}
         titulo="Métricas"
-        subtitulo="Tudo lido do banco. Nada estimado."
+        subtitulo={`${desde ? `Desde a primeira importação, ${dataCurta.format(desde)}` : 'Nenhum lead importado ainda'} · números reais, sem estimativa`}
         acao={
           <a href="/api/metricas/csv" className={classeDeBotao('secundario')}>
             Exportar CSV
@@ -121,8 +124,8 @@ export default async function MetricasPage() {
       <Painel titulo="Funil">
         <Funil etapas={m.funil} />
         <p className="mt-4 text-[13px] text-suave">
-          A porcentagem é a conversão sobre a etapa anterior. As últimas cinco etapas dependem do ambiente de
-          Diagnóstico, que ainda não existe — ficam em zero até ele alimentar os status.
+          A porcentagem é a conversão sobre a etapa anterior. As etapas “ainda não medido” entram quando o Diagnóstico
+          estiver no sistema.
         </p>
       </Painel>
 
@@ -149,7 +152,7 @@ export default async function MetricasPage() {
           <Numero
             valor={m.saude.tetoHoje}
             rotulo="Teto de hoje"
-            detalhe={m.saude.semanaRampa === null ? 'rampa não começou' : `semana ${m.saude.semanaRampa + 1} da rampa`}
+            detalhe={m.saude.semanaRampa === null ? 'aumento gradual ainda não começou' : `semana ${m.saude.semanaRampa + 1} do aumento gradual`}
           />
         </div>
 
@@ -170,13 +173,17 @@ export default async function MetricasPage() {
 
       <div className="grid gap-4 lg:grid-cols-2">
         <TabelaCorte titulo="Por bloco" linhas={m.porBloco} />
-        <TabelaCorte titulo="Por tier" linhas={m.porTier} />
+        <TabelaCorte titulo="Por faixa (T1 a T3)" linhas={m.porTier} />
         <TabelaCorte titulo="Por bairro" linhas={m.porBairro} />
         <TabelaCorte titulo="Por categoria" linhas={m.porCategoria} />
       </div>
 
       <Painel titulo="Custo de IA">
-        {/* 2 colunas no celular: valor em reais não cabe em um terço de 390 px. */}
+        {/* Sem classificação, nada de R$ 0,00 que parece medido (sem dado não é zero). */}
+        {m.custoIA.classificacoes === 0 && m.custoIA.mesBRL === 0 ? (
+          <Vazio titulo="Nenhuma classificação ainda.">O custo aparece quando o Inbox classificar a primeira resposta.</Vazio>
+        ) : (
+        // 2 colunas no celular: valor em reais não cabe em um terço de 390 px.
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <Numero
             valor={brl(m.custoIA.hojeBRL)}
@@ -186,6 +193,7 @@ export default async function MetricasPage() {
           <Numero valor={brl(m.custoIA.mesBRL)} rotulo="No mês" />
           <Numero valor={m.custoIA.classificacoes} rotulo="Classificações" />
         </div>
+        )}
         {m.custoIA.tetoDiarioBRL && m.custoIA.hojeBRL >= m.custoIA.tetoDiarioBRL && (
           <div className="mt-3">
             <Aviso tom="alerta" titulo="Teto do dia atingido.">

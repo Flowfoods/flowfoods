@@ -4637,3 +4637,16 @@ novos em `rodolfo-painel-e5`. Revisão independente (código e UX): reprovou com
 telefone; links novos com 20 px no toque) e 6 "deveria" (entre eles: "Enviar agora" aparecendo para fixo, Visita e quem não está no
 lote de hoje; lead movido para Visita ainda recebendo o WhatsApp do lote no servidor); todos corrigidos antes do commit, com testes
 (`envioNoLead360`, busca, canal no envio).
+
+**E5.1 · painel do nível 1, segunda fatia (b) (decisão 469, 25/10/2026):** os "deveria" S1, S2, S6, S7 e S8 e as sugestões G1, G2 e
+G4. Início com os números do dia e "O que precisa de você" (na ordem de resolver, cada um com a ação; dia tranquilo sem pendência);
+"Regras de envio" (era Config) em Comercial, com a chave geral em painel próprio ("Ligar o disparo"/"Desligar o disparo", com
+confirmação) e o formulário só com os limites (intervalo em minutos), sem jargão; módulo "Sistema" removido; Métricas com a base no
+subtítulo e sem R$ 0,00 sem classificação; vazios com o próximo passo em Hoje, Inbox (WhatsApp desconectado) e Aguardando liberação;
+"Manuais restantes" na Cadência; seletor "Abrir parceiro"; RUNBOOK e pendências com a ordem certa (ligar o disparo antes dos 10
+manuais, como o código exige). *Navegador (build de produção, banco local montado e apagado):* Início em três situações (banco vazio:
+4 pendências; com pendências: 5; tranquilo: só o formulário do cliente), Regras de envio desligando e ligando o disparo pela tela e
+salvando o intervalo em minutos sem mexer na chave, Métricas, Hoje, Inbox, Aguardando liberação e Cadência a 390; sem rolagem lateral
+nem erro de página. Matriz: 156 telas (com e sem dados), 0 falhas. *Checks:* suíte com banco 155 arquivos, 2.883 aprovados, 46
+pulados, 0 falhas; lint, typecheck e portão limpos; teste novo `rodolfo-inicio-e5`, casos novos em `rodolfo-painel-e5` (chave geral
+fora do formulário, minutos) e `erp-shell` (módulos e atalhos). Revisão independente em andamento no commit.

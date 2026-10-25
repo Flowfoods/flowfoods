@@ -14,7 +14,7 @@ import { ENVIOS_MANUAIS_INICIAIS, STOP_LOSS } from '@/lib/barney/regras';
 import { COR } from '@/lib/erp/modulos';
 import { contarRespostasSemClassificar } from '@/lib/rodolfo/notificacoes';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
-import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
+import { classeDeBotao, LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Barra, Metrica, Numero, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 import { ROTULO_DO_LOTE, proximoToque, rotulo, rotuloDoToque } from '@/lib/rodolfo/rotulos';
@@ -26,11 +26,11 @@ export const dynamic = 'force-dynamic';
 const ACAO: Record<string, { tom: 'alerta' | 'erro' | 'neutro'; oQueFazer: string }> = {
   DISPARO_DESLIGADO: {
     tom: 'neutro',
-    oQueFazer: 'Ligue o disparo em Config.',
+    oQueFazer: 'Ligue o disparo em Regras de envio.',
   },
   INSTANCIA_FORA_DO_AR: {
     tom: 'erro',
-    oQueFazer: 'Conecte o WhatsApp em Config (QR code) antes de retomar.',
+    oQueFazer: 'Conecte o WhatsApp em Regras de envio (QR code) antes de retomar.',
   },
   STOP_LOSS_FALHAS: {
     tom: 'erro',
@@ -146,7 +146,7 @@ export default async function PainelPage() {
           }
         />
         {/* O nome curto cabe a 390 px ("Desconectado" cortava); o detalhe diz onde resolver, não o nome técnico da instância. */}
-        <Metrica rotulo="WhatsApp" valor={whatsapp.curto} detalhe={estado.estadoInstancia === 'open' ? 'da prospecção' : 'conectar em Config'} />
+        <Metrica rotulo="WhatsApp" valor={whatsapp.curto} detalhe={estado.estadoInstancia === 'open' ? 'da prospecção' : 'conectar em Regras de envio'} />
         <Metrica
           rotulo="Manuais restantes"
           valor={faltamManuais > 0 ? faltamManuais : 'Feito'}
@@ -170,7 +170,14 @@ export default async function PainelPage() {
               {lote.status === 'APROVADO' && <Selo tom="ok">Aprovado</Selo>}
             </div>
           ) : (
-            <Vazio>Nenhum lote montado hoje. Monte em Cadência.</Vazio>
+            <Vazio
+              titulo="Nenhum lote hoje."
+              acao={
+                <Link href="/rodolfo/barney" className={classeDeBotao('secundario')}>
+                  Montar o lote em Cadência
+                </Link>
+              }
+            />
           )}
         </Painel>
 
@@ -191,7 +198,20 @@ export default async function PainelPage() {
 
       <Painel titulo="Próximos envios" semRespiro>
         {proximos.length === 0 ? (
-          <Vazio>Nada agendado. Importe leads e monte o lote do dia.</Vazio>
+          totalLeads === 0 ? (
+            <Vazio
+              titulo="Nenhum lead ainda."
+              acao={
+                <Link href="/rodolfo/leads/importar" className={classeDeBotao('secundario')}>
+                  Importar leads
+                </Link>
+              }
+            >
+              Os envios aparecem aqui depois da importação e do primeiro lote aprovado.
+            </Vazio>
+          ) : (
+            <Vazio>Nada agendado. A 2ª e a 3ª mensagem de cada lead aparecem aqui depois que a 1ª sair.</Vazio>
+          )
         ) : (
           <ul>
             {proximos.map((e) => (

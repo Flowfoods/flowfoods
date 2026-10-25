@@ -16,8 +16,8 @@ import type { ClienteDoParceiro } from './tenant';
 export interface IndicadorDoDia {
   chave: string;
   rotulo: string;
-  /** Centavos (dinheiro) ou contagem "x de y". */
-  valor: { tipo: 'dinheiro'; centavos: number } | { tipo: 'fracao'; de: number; total: number };
+  /** Centavos (dinheiro), contagem "x de y" ou um número simples (painel do nível 1: respostas, pedidos). */
+  valor: { tipo: 'dinheiro'; centavos: number } | { tipo: 'fracao'; de: number; total: number } | { tipo: 'numero'; numero: number };
   contexto: string;
   href: string;
 }

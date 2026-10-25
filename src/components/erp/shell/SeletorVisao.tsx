@@ -153,12 +153,13 @@ function DoNivel1({ visao }: { visao: VisaoDoNivel1 }) {
     <div className="flex min-w-0 items-center gap-1.5">
       <Popover
         classeDoWrapper="min-w-0 max-w-[11rem] sm:max-w-[16rem]"
-        rotulo={`Parceiro: ${parceiro?.nome ?? 'FlowFoods, todos'}. Trocar`}
+        rotulo={parceiro ? `Parceiro: ${parceiro.nome}. Trocar` : 'Nenhum parceiro aberto. Abrir um parceiro'}
         classeDoBotao={GATILHO}
         largura="w-72"
         conteudoDoBotao={
           <>
-            <span className="truncate">{parceiro?.nome ?? 'FlowFoods · todos'}</span>
+            {/* Fora de um parceiro, o seletor parecia filtro de leads ("FlowFoods · todos"): diz o que faz (decisão 469). */}
+            <span className="truncate">{parceiro?.nome ?? 'Abrir parceiro'}</span>
             <ChevronDown size={14} aria-hidden className="shrink-0 text-suave" />
           </>
         }

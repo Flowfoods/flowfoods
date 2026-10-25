@@ -23,7 +23,8 @@ export function modulosDoNivel1(): ModuloNav[] {
       icone: 'comercial',
       cor: COR.comercial,
       href: '/rodolfo/hoje',
-      acoes: [],
+      // Atalhos do Ctrl+K (decisão 469).
+      acoes: [{ href: '/rodolfo/leads/importar', rotulo: 'Importar leads', icone: 'importar', subtitulo: 'Colar a planilha do ledsflowfoods' }],
       grupos: [
         {
           rotulo: 'Prospecção',
@@ -37,6 +38,8 @@ export function modulosDoNivel1(): ModuloNav[] {
               icone: 'cadencia',
               subtitulo: 'Lote do dia, fila e aprovação',
             },
+            // Era o módulo "Sistema", com esta tela só (decisão 469): ela só regula a prospecção, então mora aqui.
+            { href: '/rodolfo/config', rotulo: 'Regras de envio', icone: 'config', subtitulo: 'Chave do disparo, janela e limites' },
           ],
         },
         {
@@ -98,7 +101,7 @@ export function modulosDoNivel1(): ModuloNav[] {
       icone: 'parceiros',
       cor: COR.parceiros,
       href: '/rodolfo/erp',
-      acoes: [],
+      acoes: [{ href: '/rodolfo/onboarding/novo', rotulo: 'Cadastrar pedido manual', icone: 'novo', subtitulo: 'Quem chegou por outro caminho' }],
       grupos: [
         {
           rotulo: 'Parceiros',
@@ -120,36 +123,12 @@ export function modulosDoNivel1(): ModuloNav[] {
         },
       ],
     },
-    {
-      chave: 'sistema',
-      nome: 'Sistema',
-      subtitulo: 'Ajustes do Barney',
-      resumo: 'Ajustes do Barney',
-      icone: 'sistema',
-      cor: COR.sistema,
-      href: '/rodolfo/config',
-      acoes: [],
-      grupos: [
-        {
-          rotulo: 'Ajustes',
-          icone: 'config',
-          itens: [
-            {
-              href: '/rodolfo/config',
-              rotulo: 'Config',
-              icone: 'config',
-              subtitulo: 'Janela, tetos e chave de disparo',
-            },
-          ],
-        },
-      ],
-    },
   ];
 }
 
 export function navegacaoDoNivel1(): Navegacao {
   return {
-    inicio: { href: '/rodolfo', titulo: 'Módulos da FlowFoods', subtitulo: 'Comercial, clientes e parceiros' },
+    inicio: { href: '/rodolfo', titulo: 'Início', subtitulo: 'O dia, o que precisa de você e os módulos' },
     rotuloDaArea: 'Barney',
     modulos: modulosDoNivel1(),
   };

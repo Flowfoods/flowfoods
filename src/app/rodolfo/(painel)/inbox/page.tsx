@@ -17,6 +17,7 @@ import { Aviso, Citacao, Metrica, Painel, Selo, Vazio } from '@/components/erp/u
 import { ROTULO_DA_INTENCAO, rotulo } from '@/lib/rodolfo/rotulos';
 import { Responder } from './responder';
 import { exigirNivel1 } from '@/lib/erp/contexto';
+import { INSTANCIA } from '@/lib/rodolfo/estado';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,7 +49,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     };
   }
 
-  const [mensagens, porIntencao, semClassificar] = await Promise.all([
+  const [mensagens, porIntencao, semClassificar, instancia] = await Promise.all([
     prisma.message.findMany({
       where,
       orderBy: { criadoEm: 'desc' },
@@ -62,7 +63,10 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     }),
     prisma.inboundClassification.groupBy({ by: ['intencao'], _count: true }),
     prisma.message.count({ where: { direction: 'IN', classificacao: { is: null } } }),
+    prisma.instanceState.findUnique({ where: { nome: INSTANCIA }, select: { estado: true } }),
   ]);
+  // Sem WhatsApp conectado nada chega: o vazio diz isso, em vez de parecer que ninguém respondeu (decisão 469).
+  const conectado = instancia?.estado === 'open';
 
   const conta = (i: string) => porIntencao.find((p) => p.intencao === i)?._count ?? 0;
 
@@ -111,7 +115,20 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
               }
             />
           ) : (
-            <Vazio titulo="Nenhuma resposta ainda.">Quando alguém responder uma mensagem da cadência, ela aparece aqui, já classificada.</Vazio>
+            <Vazio
+              titulo="Nenhuma resposta ainda."
+              acao={
+                conectado ? undefined : (
+                  <Link href="/rodolfo/config" className={`${LINK_DE_TEXTO} ff-toque`}>
+                    Conectar em Regras de envio
+                  </Link>
+                )
+              }
+            >
+              {conectado
+                ? 'Quando alguém responder uma mensagem da cadência, ela aparece aqui, já classificada.'
+                : 'Nada chega enquanto o WhatsApp da prospecção estiver desconectado.'}
+            </Vazio>
           )}
         </Painel>
       ) : (

@@ -135,7 +135,14 @@ A importação já bloqueia sozinha: conflito com o Bibi (suco/açaí/saladaria 
 Tijuca, Norte Shopping, Botafogo, Rio Sul), opt-out antigo e quem não tem
 celular. Fixo não some — vai para a lista de visita/Instagram.
 
-### 2.2 Os 10 primeiros envios: na mão
+### 2.2 Ligar o disparo
+
+`/rodolfo/config` (Regras de envio) → painel **Disparo** → "Ligar o disparo".
+A chave geral desligada recusa tudo, inclusive o envio à mão (decisão 7), por
+isso ela vem **antes** dos 10 manuais. Ligada, o automático continua recusando
+até o 10º envio manual — a trava do aquecimento é outra.
+
+### 2.3 Os 10 primeiros envios: na mão
 
 Enquanto o número não tiver 10 envios, o automático **recusa** e diz quantos
 faltam. Em `/rodolfo/barney` (Cadência), com o lote aprovado, use **"Enviar o
@@ -144,16 +151,11 @@ envio o botão fica desabilitado até o intervalo mínimo passar e a tela se
 atualiza sozinha (decisão 467). Lote cancelado não envia nada, nem à mão. É o
 aquecimento que decide se o número sobrevive.
 
-### 2.3 Ligar o disparo
-
-Só depois dos 10. `/rodolfo/config` → **Disparo ativo**. Antes disso a chave
-geral recusa tudo, inclusive envio manual.
-
 ### 2.4 A rotina
 
 1. `/rodolfo/barney` → **Montar lote de hoje**
-2. **Dry-run** → confira o texto de algumas mensagens em "Saíram hoje"
-   (aparecem como SIMULADA)
+2. **Simular o lote (não envia)** → confira o texto de algumas mensagens em
+   "Saíram hoje" (aparecem como Simulada)
 3. **Aprovar lote**
 4. O worker drena sozinho, respeitando janela, teto e intervalo
 5. `/rodolfo/inbox` → quem respondeu, com rascunho sugerido
@@ -176,7 +178,7 @@ lá em cima, em português, com o que fazer.
 
 | O que aparece | O que é | O que fazer |
 |---|---|---|
-| `Disparo desligado` | Chave geral off | Ligar em Config — depois dos 10 manuais |
+| `Disparo desligado` | Chave geral off | Ligar em Regras de envio — antes dos 10 manuais (sem ela, nem o manual sai) |
 | `Faltam N envios manuais` | Número ainda frio | "Enviar o próximo", em Cadência, um a um |
 | `Fora da janela` | Fora de seg–sex 10h–18h | Nada. Volta sozinho |
 | `Teto do dia atingido` | Cumpriu a cota | Nada. Volta amanhã |
@@ -195,7 +197,7 @@ caso:
 
 1. **pare o dia.** Cancelar o lote em `/rodolfo/barney`;
 2. não reconecte em laço — piora;
-3. no dia seguinte, volte com metade do volume (Config → Máximo por dia);
+3. no dia seguinte, volte com metade do volume (Regras de envio → Máximo por dia);
 4. se repetir, o número está queimado. Chip novo, rampa do zero.
 
 ### Pausar tudo em 1 clique

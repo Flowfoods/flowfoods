@@ -151,13 +151,18 @@ export async function acaoSalvarConfig(_anterior: unknown, form: FormData): Prom
   // Nenhum dia marcado era salvo como segunda a sexta, sem aviso: o contrário do que a pessoa pediu (E5.1, decisão 466).
   if (dias.length === 0) return { ok: false, mensagem: 'Escolha ao menos um dia da semana. Para parar os envios, desligue o disparo.' };
 
+  // A chave geral não vem mais neste formulário (tem painel e ação próprios, decisão 469): sem a chave em `pedida`, o
+  // disparo fica como está. O intervalo vem em minutos e é gravado em segundos.
+  const emSegundos = (chave: string) => {
+    const m = num(chave);
+    return m === undefined ? undefined : Math.round(m * 60);
+  };
   const pedida: Partial<ConfigBarney> = {
-    disparoAtivo: form.get('disparoAtivo') === 'on',
     modoAprovacao: form.get('modoAprovacao') === 'on',
     maxPorDia: num('maxPorDia'),
     maxPorHora: num('maxPorHora'),
-    intervaloMinS: num('intervaloMinS'),
-    intervaloMaxS: num('intervaloMaxS'),
+    intervaloMinS: emSegundos('intervaloMinMinutos'),
+    intervaloMaxS: emSegundos('intervaloMaxMinutos'),
     janela: {
       diasSemana: dias,
       horaInicio: num('horaInicio') ?? 10,
@@ -177,6 +182,34 @@ export async function acaoSalvarConfig(_anterior: unknown, form: FormData): Prom
     mensagem:
       `Salvo. Valendo agora: até ${efetiva.maxPorDia} por dia e ${efetiva.maxPorHora} por hora, ` +
       `das ${efetiva.janela.horaInicio}h às ${efetiva.janela.horaFim}h; disparo ${efetiva.disparoAtivo ? 'ligado' : 'desligado'}.`,
+  };
+}
+
+/**
+ * A chave geral do disparo, em painel próprio da Config (decisão 469): antes era uma caixa de marcar dentro do formulário
+ * que só valia depois de rolar até "Salvar ajustes". Liga ou desliga só a chave; os limites ficam como estão.
+ */
+export async function acaoLigarDisparo(): Promise<Resposta> {
+  return alternarDisparo(true);
+}
+
+export async function acaoDesligarDisparo(): Promise<Resposta> {
+  return alternarDisparo(false);
+}
+
+async function alternarDisparo(ligar: boolean): Promise<Resposta> {
+  const userId = await exigirSessao();
+  const efetiva = await salvarConfig({ disparoAtivo: ligar });
+  await auditar(userId, ligar ? 'disparo_ligado' : 'disparo_desligado', {});
+  revalidatePath('/rodolfo/config');
+  revalidatePath('/rodolfo/hoje');
+  revalidatePath('/rodolfo/barney');
+  revalidatePath('/rodolfo');
+  return {
+    ok: true,
+    mensagem: efetiva.disparoAtivo
+      ? 'Disparo ligado. Os envios saem do lote aprovado, um a um, dentro dos limites.'
+      : 'Disparo desligado. Nada sai, nem à mão, até você ligar de novo.',
   };
 }
 

@@ -250,20 +250,25 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
 });
 
 describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () => {
-  it('Hoje, Leads, Cadência, Inbox, Visitas, Métricas, Portal, Parceiros, Aguardando liberação (0.5) e Config, todas com tela', () => {
+  it('Hoje, Leads, Cadência, Regras de envio, Inbox, Visitas, Métricas, Portal, Parceiros e Aguardando liberação (0.5), todas com tela', () => {
     const h = modulosDoNivel1().flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.href)));
+    // E5.1 (decisão 469): "Regras de envio" (a antiga Config) mora em Comercial › Prospecção; o módulo Sistema saiu.
+    expect(modulosDoNivel1().map((m) => m.chave)).toEqual(['comercial', 'clientes', 'parceiros']);
     expect(h).toEqual([
       '/rodolfo/hoje',
       '/rodolfo/leads',
       '/rodolfo/barney',
+      '/rodolfo/config',
       '/rodolfo/inbox',
       '/rodolfo/visitas',
       '/rodolfo/metricas',
       '/rodolfo/portal',
       '/rodolfo/erp',
       '/rodolfo/onboarding',
-      '/rodolfo/config',
     ]);
+    // Os atalhos do Ctrl+K levam a telas que existem.
+    for (const a of modulosDoNivel1().flatMap((m) => m.acoes))
+      expect(existsSync(join('src', 'app', 'rodolfo', '(painel)', ...a.href.split('/').slice(2), 'page.tsx')), a.href).toBe(true);
     for (const x of h)
       expect(existsSync(join('src', 'app', 'rodolfo', '(painel)', ...x.split('/').slice(2), 'page.tsx')), x).toBe(true);
     expect(navegacaoDoNivel1().inicio.href).toBe('/rodolfo');

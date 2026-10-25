@@ -77,7 +77,7 @@ export default async function PainelLayout({ children }: { children: React.React
         escolher: acaoEscolherVisaoDoParceiro,
       }}
       notificacoes={notificacoes}
-      links={[{ rotulo: 'Config do Barney', href: '/rodolfo/config' }]}
+      links={[{ rotulo: 'Regras de envio', href: '/rodolfo/config' }]}
       sair={null}
       buscarInsumosDoParceiro={acaoBuscarNoParceiro}
       // Nível 1: só o botão "?" dentro do parceiro (a ajuda lê o mesmo registro). Sem caixa, sem pergunta e sem preferência.

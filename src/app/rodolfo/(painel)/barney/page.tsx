@@ -96,7 +96,7 @@ export default async function BarneyPage() {
         icone="cadencia"
         cor={COR.comercial}
         titulo="Cadência"
-        subtitulo={`Lote de ${agora.setLocale('pt-BR').toFormat("d 'de' LLLL")}, teto de ${decisao.tetoDiaVigente} por dia`}
+        subtitulo={`Lote de ${agora.setLocale('pt-BR').toFormat("d 'de' LLLL")}, teto de ${decisao.tetoDiaVigente} por dia, aprovação ${config.modoAprovacao ? 'manual' : 'automática'}`}
       />
 
       {faltamManuais > 0 && (
@@ -145,7 +145,7 @@ export default async function BarneyPage() {
               <>
                 {' '}
                 <Link href="/rodolfo/config" className={LINK_DE_TEXTO}>
-                  {tela.parado.config === 'ligar' ? 'Ligar em Config' : 'Conectar em Config'}
+                  {tela.parado.config === 'ligar' ? 'Ligar em Regras de envio' : 'Conectar em Regras de envio'}
                 </Link>
               </>
             )}
@@ -158,7 +158,7 @@ export default async function BarneyPage() {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
         <Metrica rotulo="No lote" valor={lote?.itens.length ?? 0} />
         <Metrica rotulo="Enviados" valor={estado.enviadosHoje} />
-        <Metrica rotulo="Aprovação" valor={config.modoAprovacao ? 'Manual' : 'Auto'} />
+        <Metrica rotulo="Manuais restantes" valor={faltamManuais > 0 ? faltamManuais : 'Feito'} detalhe={faltamManuais > 0 ? 'antes do automático' : 'número aquecido'} />
       </div>
 
       <Painel titulo="Fila" acessorio={<Contagem>{lote?.itens.length ?? 0}</Contagem>} semRespiro>

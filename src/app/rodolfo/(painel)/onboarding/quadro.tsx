@@ -12,7 +12,7 @@
 import Link from 'next/link';
 import type { CartaoDoPedido, QuadroDePedidos } from '@/lib/erp/pedidos';
 import { ORDEM_DAS_ETAPAS, ROTULO_DA_ETAPA, textoDaEtapa, type EtapaDoPedido } from '@/lib/erp/pedido-campos';
-import { Selo } from '@/components/erp/ui/superficies';
+import { Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { CartaoDoQuadro, ColunaDoQuadro, GradeDoQuadro, type TomDaColuna } from '@/components/erp/telas/quadro/quadro';
 
 const TOM_DA_COLUNA: Record<EtapaDoPedido, TomDaColuna> = {
@@ -92,6 +92,14 @@ function Coluna({ etapa, cartoes, ativa, agora }: { etapa: EtapaDoPedido; cartoe
 
 export function QuadroDePedidos({ quadro, etapa }: { quadro: QuadroDePedidos; etapa: EtapaDoPedido }) {
   const agora = new Date();
+  // Sem pedido nenhum: uma frase só, no lugar de quatro colunas vazias (decisão 469).
+  if (ORDEM_DAS_ETAPAS.every((e) => quadro[e].length === 0)) {
+    return (
+      <Painel>
+        <Vazio titulo="Nenhum pedido ainda.">Os pedidos que chegam pelo site e os que você cadastrar aparecem aqui.</Vazio>
+      </Painel>
+    );
+  }
   return (
     <>
       {/* Celular: 4 abas iguais, rótulo e contagem em duas linhas (nada corta, nada rola). */}

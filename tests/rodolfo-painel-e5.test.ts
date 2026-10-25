@@ -37,7 +37,7 @@ import {
   textoDaRecusa,
   textoDoEvento,
 } from '@/lib/rodolfo/rotulos';
-import { acaoSalvarConfig } from '@/app/rodolfo/(painel)/actions';
+import { acaoDesligarDisparo, acaoLigarDisparo, acaoSalvarConfig } from '@/app/rodolfo/(painel)/actions';
 import { telaDaCadencia, type EntradaDaCadencia } from '@/lib/rodolfo/cadencia-tela';
 import { podeEnviar, type EstadoEnvio } from '@/lib/barney/tetos';
 import { INTERVALO_MIN_S, TIMEZONE } from '@/lib/barney/regras';
@@ -100,7 +100,7 @@ describe('E5.1 · rótulos do painel do nível 1', () => {
     expect(resumoDaImportacao({ total: 1, novos: 1, atualizados: 0, bloqueadosConflito: 0, bloqueadosOptOut: 0, semTelefone: 0, invalidos: 0 })).toBe('1 linha lida: 1 novo e 0 atualizados.');
     expect(rotulo(ROTULO_DA_PAUSA, 'OPT_OUT manual')).toBe('Pediu para sair (registrado à mão)');
     expect(rotulo(ROTULO_DA_PAUSA, 'RESPOSTA')).toBe('Respondeu');
-    expect(textoDaRecusa('DISPARO_DESLIGADO: Disparo desligado.')).toBe('Disparo desligado. Ligue em Config.');
+    expect(textoDaRecusa('DISPARO_DESLIGADO: Disparo desligado.')).toBe('Disparo desligado. Ligue em Regras de envio.');
     expect(textoDaRecusa('TETO_DIARIO: Teto do dia atingido: 30/30.')).toBe('Teto do dia atingido: 30/30.');
     expect(textoDaRecusa('VALIDADOR: R1_NADA_GRATUITO: promete grátis')).toBe('A mensagem não passou na conferência do texto: promete grátis');
     expect(textoDaRecusa('FALHA após 3 tentativas: timeout')).toBe('Não saiu depois de 3 tentativas: timeout');
@@ -240,5 +240,29 @@ describe('E5.1 · Config sem nenhum dia', () => {
     expect(salvar).toHaveBeenCalledTimes(1);
     expect((salvar.mock.calls[0][0] as { janela: { diasSemana: number[] } }).janela.diasSemana).toEqual([1, 3]);
     expect(r.ok).toBe(true);
+  });
+});
+
+describe('E5.1 · Regras de envio: a chave geral fora do formulário (decisão 469)', () => {
+  it('salvar os limites não mexe na chave geral; o intervalo vem em minutos e é gravado em segundos', async () => {
+    salvar.mockClear();
+    const f = new FormData();
+    for (const [k, v] of [['maxPorDia', '10'], ['horaInicio', '10'], ['horaFim', '18'], ['diaSemana', '2'], ['intervaloMinMinutos', '2.5'], ['intervaloMaxMinutos', '10']]) f.append(k, v);
+    f.append('disparoAtivo', 'on'); // campo que não existe mais na tela: um POST forjado não liga o disparo
+    await acaoSalvarConfig(null as never, f);
+    const pedida = salvar.mock.calls[0][0] as Record<string, unknown>;
+    expect('disparoAtivo' in pedida).toBe(false);
+    expect(pedida.intervaloMinS).toBe(150);
+    expect(pedida.intervaloMaxS).toBe(600);
+  });
+
+  it('ligar e desligar mexem só na chave geral', async () => {
+    salvar.mockClear();
+    const ligou = await acaoLigarDisparo();
+    expect(salvar.mock.calls[0][0]).toEqual({ disparoAtivo: true });
+    expect(ligou).toMatchObject({ ok: true, mensagem: expect.stringMatching(/^Disparo ligado\./) });
+    const desligou = await acaoDesligarDisparo();
+    expect(salvar.mock.calls[1][0]).toEqual({ disparoAtivo: false });
+    expect(desligou.mensagem).toMatch(/^Disparo desligado\. Nada sai, nem à mão/);
   });
 });

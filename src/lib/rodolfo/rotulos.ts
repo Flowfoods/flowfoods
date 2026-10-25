@@ -118,8 +118,8 @@ export function textoDaRecusa(motivo: string | null | undefined): string {
   const m = /^([A-Z][A-Z0-9_]+): ([\s\S]*)$/.exec(motivo);
   if (!m) return motivo;
   const [, codigo, resto] = m;
-  if (codigo === 'DISPARO_DESLIGADO') return 'Disparo desligado. Ligue em Config.';
-  if (codigo === 'INSTANCIA_FORA_DO_AR') return `${resto} Conecte em Config.`;
+  if (codigo === 'DISPARO_DESLIGADO') return 'Disparo desligado. Ligue em Regras de envio.';
+  if (codigo === 'INSTANCIA_FORA_DO_AR') return `${resto} Conecte em Regras de envio.`;
   if (codigo === 'VALIDADOR') return `A mensagem não passou na conferência do texto: ${resto.replace(/\b[A-Z][A-Z0-9_]+: /g, '')}`;
   if (codigo === 'DEDUP') return 'Esta mensagem já saiu (ou já está na fila) para este lead hoje.';
   return resto;

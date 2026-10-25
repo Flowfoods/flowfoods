@@ -1,30 +1,28 @@
 /**
- * Hub do nível 1 — "Módulos da FlowFoods": a tela de entrada do /rodolfo.
- * Uma seção por módulo, um card por tela (as do Barney antigo e os Parceiros
- * Flow). "Hoje", que morava aqui, agora é /rodolfo/hoje.
+ * Início do nível 1 — a tela de entrada do /rodolfo (E5.1, decisão 469): os números do dia e "O que precisa de você"
+ * (o mesmo componente do Início do parceiro), e embaixo os módulos, um card por tela.
  */
 
 import { exigirNivel1 } from '@/lib/erp/contexto';
 import { COR } from '@/lib/erp/modulos';
 import { modulosDoNivel1 } from '@/lib/rodolfo/modulos';
+import { painelDoNivel1 } from '@/lib/rodolfo/painel-do-dia';
+import { agoraSP } from '@/lib/rodolfo/estado';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { HubDeModulos } from '@/components/erp/ui/hub';
+import { PainelDoDiaNaTela } from '@/components/erp/telas/painel-do-dia';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HubDoNivel1() {
   await exigirNivel1();
-  const modulos = modulosDoNivel1();
-  const telas = modulos.reduce((n, m) => n + m.grupos.reduce((k, g) => k + g.itens.length, 0), 0);
+  const agora = agoraSP();
+  const [painel, modulos] = await Promise.all([painelDoNivel1(agora), modulosDoNivel1()]);
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        icone="inicio"
-        cor={COR.inicio}
-        titulo="Módulos da FlowFoods"
-        subtitulo={`Nível 1 · ${modulos.length} módulos, ${telas} telas`}
-      />
+      <PageHeader icone="inicio" cor={COR.inicio} titulo="Início" subtitulo={agora.setLocale('pt-BR').toFormat("cccc, d 'de' LLLL")} />
+      <PainelDoDiaNaTela painel={painel} />
       <HubDeModulos
         secoes={modulos.map((m) => ({
           rotulo: m.nome,

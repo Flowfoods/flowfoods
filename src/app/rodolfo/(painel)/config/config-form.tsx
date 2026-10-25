@@ -41,21 +41,6 @@ export function ConfigForm({ config }: { config: ConfigBarney }) {
       <label className="flex items-start gap-3 rounded-[7px] border border-linha bg-texto/[0.03] p-3">
         <input
           type="checkbox"
-          name="disparoAtivo"
-          defaultChecked={config.disparoAtivo}
-          className={`${MARCAR} mt-0.5`}
-        />
-        <span>
-          <span className="block text-sm font-semibold">Disparo ativo</span>
-          <span className="mt-0.5 block text-[13px] text-suave">
-            Chave geral. Desligada, nada sai — nem automático, nem manual.
-          </span>
-        </span>
-      </label>
-
-      <label className="flex items-start gap-3 rounded-[7px] border border-linha bg-texto/[0.03] p-3">
-        <input
-          type="checkbox"
           name="modoAprovacao"
           defaultChecked={config.modoAprovacao}
           className={`${MARCAR} mt-0.5`}
@@ -63,7 +48,7 @@ export function ConfigForm({ config }: { config: ConfigBarney }) {
         <span>
           <span className="block text-sm font-semibold">Exigir aprovação do lote</span>
           <span className="mt-0.5 block text-[13px] text-suave">
-            O worker só drena lote aprovado no dia. Manter ligado é o recomendado.
+            Só sai mensagem de lote que você aprovou no dia. Manter ligado é o recomendado.
           </span>
         </span>
       </label>
@@ -87,7 +72,7 @@ export function ConfigForm({ config }: { config: ConfigBarney }) {
             </label>
           ))}
         </div>
-        <p className={AJUDA}>Sábado e domingo não são oferecidos — a janela só aperta para dentro.</p>
+        <p className={AJUDA}>Sábado e domingo não entram: a janela só pode ficar menor, nunca maior.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
@@ -113,7 +98,7 @@ export function ConfigForm({ config }: { config: ConfigBarney }) {
           min={1}
           max={30}
           defaultValue={config.maxPorDia}
-          ajuda="Teto absoluto 30. A rampa pode reduzir mais."
+          ajuda="No máximo 30. O aumento gradual do número novo pode deixar o teto do dia menor."
         />
         <Campo
           id="maxPorHora"
@@ -121,21 +106,23 @@ export function ConfigForm({ config }: { config: ConfigBarney }) {
           min={1}
           max={8}
           defaultValue={config.maxPorHora}
-          ajuda="Teto absoluto 8."
+          ajuda="No máximo 8."
         />
         <Campo
-          id="intervaloMinS"
-          rotulo="Intervalo mínimo (s)"
-          min={120}
-          defaultValue={config.intervaloMinS}
-          ajuda="Piso rígido de 120s."
+          id="intervaloMinMinutos"
+          rotulo="Intervalo mínimo (minutos)"
+          min={2}
+          step={0.5}
+          defaultValue={config.intervaloMinS / 60}
+          ajuda="Nunca menos de 2 minutos."
         />
         <Campo
-          id="intervaloMaxS"
-          rotulo="Intervalo máximo (s)"
-          min={120}
-          defaultValue={config.intervaloMaxS}
-          ajuda="O sorteio fica entre mínimo e máximo."
+          id="intervaloMaxMinutos"
+          rotulo="Intervalo máximo (minutos)"
+          min={2}
+          step={0.5}
+          defaultValue={config.intervaloMaxS / 60}
+          ajuda="Entre um envio e outro, o sistema sorteia um tempo entre o mínimo e o máximo."
         />
       </div>
 
