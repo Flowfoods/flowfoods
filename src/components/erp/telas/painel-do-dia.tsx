@@ -28,7 +28,7 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
                 {i.valor.tipo === 'dinheiro' ? (
                   formatarDinheiro(i.valor.centavos)
                 ) : i.valor.tipo === 'numero' ? (
-                  i.valor.numero.toLocaleString('pt-BR')
+                  i.valor.numero === null ? '—' : i.valor.numero.toLocaleString('pt-BR')
                 ) : (
                   <>
                     {i.valor.de}
@@ -58,7 +58,7 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
                   <p className="text-[14px] font-semibold text-texto">{p.titulo}</p>
                   <p className="text-[13px] leading-relaxed text-suave">{p.texto}</p>
                 </div>
-                <Link href={p.href} className={`${LINK_DE_TEXTO} inline-flex min-h-11 shrink-0 basis-full items-center pl-9 text-[13px] sm:min-h-0 sm:basis-auto sm:pl-0 sm:pt-0.5`}>
+                <Link href={p.href} className={`${LINK_DE_TEXTO} inline-flex min-h-11 shrink-0 basis-full items-center pl-9 text-[13px] sm:min-h-9 sm:basis-auto sm:pl-0 sm:pt-0.5`}>
                   {p.acao}
                 </Link>
               </li>

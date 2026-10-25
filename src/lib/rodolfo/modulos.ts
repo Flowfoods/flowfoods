@@ -39,7 +39,7 @@ export function modulosDoNivel1(): ModuloNav[] {
               subtitulo: 'Lote do dia, fila e aprovação',
             },
             // Era o módulo "Sistema", com esta tela só (decisão 469): ela só regula a prospecção, então mora aqui.
-            { href: '/rodolfo/config', rotulo: 'Regras de envio', icone: 'config', subtitulo: 'Chave do disparo, janela e limites' },
+            { href: '/rodolfo/config', rotulo: 'Regras de envio', icone: 'config', subtitulo: 'Configuração: chave do disparo, janela e limites' },
           ],
         },
         {

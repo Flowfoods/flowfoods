@@ -4649,4 +4649,7 @@ manuais, como o código exige). *Navegador (build de produção, banco local mon
 salvando o intervalo em minutos sem mexer na chave, Métricas, Hoje, Inbox, Aguardando liberação e Cadência a 390; sem rolagem lateral
 nem erro de página. Matriz: 156 telas (com e sem dados), 0 falhas. *Checks:* suíte com banco 155 arquivos, 2.883 aprovados, 46
 pulados, 0 falhas; lint, typecheck e portão limpos; teste novo `rodolfo-inicio-e5`, casos novos em `rodolfo-painel-e5` (chave geral
-fora do formulário, minutos) e `erp-shell` (módulos e atalhos). Revisão independente em andamento no commit.
+fora do formulário, minutos) e `erp-shell` (módulos e atalhos). Revisão independente: reprovou com 2 bloqueantes (links de "O que
+precisa de você" com 22 px no toque de 640 px para cima; emergência do RUNBOOK citando a caixa que saiu) e 10 "deveria" (pausa
+automática fora do Início, dois vermelhos em Regras de envio, desligar com confirmação, onde conectar o WhatsApp, zero sem dado,
+intervalo antigo travando o formulário, entre outros); corrigidos no commit seguinte, com testes.

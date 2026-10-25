@@ -320,11 +320,11 @@ O que ele **não** consegue ver, e você precisa conferir no navegador:
 - [ ] `/rodolfo/config` mostra a instância `open`
 - [ ] Log do worker: `worker iniciado`
 - [ ] Importar um lote pequeno em `/rodolfo/leads` e ver os leads na lista
-- [ ] `/rodolfo/barney` → Montar lote → **Dry-run** → **ler o texto de uma
+- [ ] `/rodolfo/barney` → Montar lote → **Simular o lote** → **ler o texto de uma
       mensagem inteira**, do gancho à assinatura
 - [ ] Site em `/` continua igual ao que estava
 
-Só depois: 10 envios manuais → ligar `disparoAtivo`.
+Depois: ligar o disparo em Regras de envio → 10 envios manuais, um a um, em Cadência (com o disparo desligado nem o manual sai).
 
 ---
 

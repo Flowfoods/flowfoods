@@ -202,8 +202,9 @@ caso:
 
 ### Pausar tudo em 1 clique
 
-`/rodolfo/config` → desmarque **Disparo ativo** → Salvar. Vale para automático
-e manual, na hora.
+`/rodolfo/config` (Regras de envio) → painel **Disparo** → **Desligar o disparo**
+(um toque, sem confirmação). Vale para automático e manual, na hora. "Salvar
+ajustes" não mexe na chave geral.
 
 ---
 

@@ -3,9 +3,6 @@ import { prisma } from '@/lib/db';
 import { lerConfig } from '@/lib/rodolfo/config';
 import { normalizarTelefone } from '@/lib/barney/telefone';
 import { montarEstadoEnvio, INSTANCIA } from '@/lib/rodolfo/estado';
-
-/** 120 → "2 min"; 150 → "2 min e 30 s". */
-const minutos = (s: number) => (s % 60 === 0 ? `${s / 60} min` : `${Math.floor(s / 60)} min e ${s % 60} s`);
 import { ENVIOS_MANUAIS_INICIAIS, INTERVALO_MIN_S, MAX_POR_DIA, MAX_POR_HORA, RAMPA_POR_SEMANA, RAMPA_TETO_FINAL, STOP_LOSS, TOQUES } from '@/lib/barney/regras';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
@@ -15,6 +12,9 @@ import { ChaveDoDisparo } from './chave-do-disparo';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 
 export const dynamic = 'force-dynamic';
+
+/** 120 → "2 min"; 150 → "2 min e 30 s". */
+const minutos = (s: number) => (s % 60 === 0 ? `${s / 60} min` : `${Math.floor(s / 60)} min e ${s % 60} s`);
 
 export default async function ConfigPage() {
   // O middleware já exige a sessão; a página confere de novo (o layout não substitui a checagem).
@@ -68,7 +68,8 @@ export default async function ConfigPage() {
         {estado.estadoInstancia !== 'open' && (
           <div className="mt-3">
             <Aviso tom="alerta" titulo="WhatsApp desconectado.">
-              Leia o QR code para conectar. Enquanto não estiver conectado, nada é enviado.
+              A conexão é feita no painel da Evolution: abra a instância {INSTANCIA} e leia o QR code com o celular do número da
+              prospecção (passo a passo no RUNBOOK, seção 1). Enquanto não estiver conectado, nada é enviado e nenhuma resposta chega.
             </Aviso>
           </div>
         )}

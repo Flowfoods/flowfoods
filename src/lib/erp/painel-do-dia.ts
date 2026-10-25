@@ -17,7 +17,7 @@ export interface IndicadorDoDia {
   chave: string;
   rotulo: string;
   /** Centavos (dinheiro), contagem "x de y" ou um número simples (painel do nível 1: respostas, pedidos). */
-  valor: { tipo: 'dinheiro'; centavos: number } | { tipo: 'fracao'; de: number; total: number } | { tipo: 'numero'; numero: number };
+  valor: { tipo: 'dinheiro'; centavos: number } | { tipo: 'fracao'; de: number; total: number } | { tipo: 'numero'; numero: number | null };
   contexto: string;
   href: string;
 }

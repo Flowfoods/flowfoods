@@ -144,7 +144,7 @@ export default async function BarneyPage() {
             {tela.parado.config && (
               <>
                 {' '}
-                <Link href="/rodolfo/config" className={LINK_DE_TEXTO}>
+                <Link href="/rodolfo/config" className={`${LINK_DE_TEXTO} ff-toque`}>
                   {tela.parado.config === 'ligar' ? 'Ligar em Regras de envio' : 'Conectar em Regras de envio'}
                 </Link>
               </>

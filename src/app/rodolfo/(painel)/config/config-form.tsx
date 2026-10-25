@@ -113,7 +113,7 @@ export function ConfigForm({ config }: { config: ConfigBarney }) {
           rotulo="Intervalo mínimo (minutos)"
           min={2}
           step={0.5}
-          defaultValue={config.intervaloMinS / 60}
+          defaultValue={Math.round(config.intervaloMinS / 30) / 2}
           ajuda="Nunca menos de 2 minutos."
         />
         <Campo
@@ -121,7 +121,7 @@ export function ConfigForm({ config }: { config: ConfigBarney }) {
           rotulo="Intervalo máximo (minutos)"
           min={2}
           step={0.5}
-          defaultValue={config.intervaloMaxS / 60}
+          defaultValue={Math.round(config.intervaloMaxS / 30) / 2}
           ajuda="Entre um envio e outro, o sistema sorteia um tempo entre o mínimo e o máximo."
         />
       </div>

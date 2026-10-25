@@ -139,4 +139,4 @@ por navegador), então o que resta é painel, na sua mão:
    clique Deploy uma vez; o site sobe atualizado com `/rodolfo` em modo
    "em configuração" até existir Postgres.
 2. Instância `flowfoods-prospeccao` na Evolution + webhook + QR
-3. 10 envios manuais → ligar `disparoAtivo`
+3. Ligar o disparo (Regras de envio) → 10 envios manuais, um a um, em Cadência

@@ -158,7 +158,7 @@ export default async function PainelPage() {
         <Painel
           titulo="Lote do dia"
           acessorio={
-            <Link href="/rodolfo/barney" className={LINK_DE_TEXTO}>
+            <Link href="/rodolfo/barney" className={`${LINK_DE_TEXTO} ff-toque`}>
               Abrir a cadência
             </Link>
           }
@@ -184,7 +184,7 @@ export default async function PainelPage() {
         <Painel
           titulo="Respostas"
           acessorio={
-            <Link href="/rodolfo/inbox" className={LINK_DE_TEXTO}>
+            <Link href="/rodolfo/inbox" className={`${LINK_DE_TEXTO} ff-toque`}>
               Abrir o Inbox
             </Link>
           }
