@@ -76,12 +76,15 @@ export function BotaoAcao({
   children,
   variante = 'secundario',
   confirmar,
+  desabilitado = false,
   className = '',
 }: {
   acao: () => Promise<RespostaDeAcao>;
   children: ReactNode;
   variante?: Variante;
   confirmar?: string;
+  /** Ação que volta a valer sozinha (uma espera): o botão fica na tela, sem clique, e a última resposta continua visível. */
+  desabilitado?: boolean;
   className?: string;
 }) {
   const [pendente, iniciar] = useTransition();
@@ -91,9 +94,10 @@ export function BotaoAcao({
     <div className={className}>
       <button
         type="button"
-        disabled={pendente}
+        disabled={pendente || desabilitado}
         aria-busy={pendente}
         onClick={() => {
+          if (desabilitado) return;
           if (confirmar && !window.confirm(confirmar)) return;
           iniciar(async () => {
             try {

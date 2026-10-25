@@ -192,7 +192,8 @@ describe('chave geral e envios manuais iniciais', () => {
     const d = podeEnviar(estado({ totalEnviadoHistorico: 9 }), TERCA_14H);
     expect(d.permitido).toBe(false);
     expect(d.motivo).toBe('EXIGE_ENVIO_MANUAL');
-    expect(d.explicacao).toContain('Faltam 1');
+    expect(d.explicacao).toBe('Falta 1 envio manual para o número aquecer. Use "Enviar o próximo", em Cadência, um a um.');
+    expect(podeEnviar(estado({ totalEnviadoHistorico: 7 }), TERCA_14H).explicacao).toMatch(/^Faltam 3 envios manuais/);
   });
 
   it('o manual passa durante os 10 iniciais', () => {
@@ -229,9 +230,10 @@ describe('janela', () => {
 
 describe('estado da instância em palavra de gente (fiscal UX: "close" cru na tela)', () => {
   it('open/connecting/close e desconhecido', () => {
-    expect(situacaoDaInstancia('open')).toEqual({ texto: 'Conectado', tom: 'ok' });
-    expect(situacaoDaInstancia('connecting')).toEqual({ texto: 'Conectando', tom: 'alerta' });
-    expect(situacaoDaInstancia('close')).toEqual({ texto: 'Desconectado', tom: 'erro' });
+    expect(situacaoDaInstancia('open')).toEqual({ texto: 'Conectado', curto: 'Conectado', tom: 'ok' });
+    expect(situacaoDaInstancia('connecting')).toEqual({ texto: 'Conectando', curto: 'Conectando', tom: 'alerta' });
+    // O curto cabe no card da Hoje a 390 px (E5.1).
+    expect(situacaoDaInstancia('close')).toEqual({ texto: 'Desconectado', curto: 'Fora do ar', tom: 'erro' });
     expect(situacaoDaInstancia(undefined).texto).toBe('Desconectado');
     expect(situacaoDaInstancia('refused').texto).toBe('Sem resposta da Evolution');
   });

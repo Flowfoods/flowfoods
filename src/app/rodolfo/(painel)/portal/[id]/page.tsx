@@ -10,7 +10,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { questionario, ROTULO_MARCACAO } from '@/lib/portal/questionario';
 import { calcularProgresso, type EstadoItem } from '@/lib/portal/progresso';
-import { formatarTamanho, pastaBase } from '@/lib/portal/arquivos';
+import { formatarTamanho } from '@/lib/portal/arquivos';
 import { ehAudio } from '@/lib/portal/audio';
 import { origemPublica } from '@/lib/portal/http';
 import { COR } from '@/lib/erp/modulos';
@@ -69,14 +69,8 @@ export default async function PortalClientePage({ params }: { params: { id: stri
       <Painel titulo="Link do cliente">
         <CopiarLink url={`${origemPublica()}/portal/${cliente.token}`} />
         <p className="mt-2 text-[13px] text-suave">
-          Arquivos no VPS:{' '}
-          <code>
-            {pastaBase()}/{cliente.token}/&lt;bloco&gt;/
-          </code>
-        </p>
-        <p className="mt-2 text-[13px] text-suave">
           O contexto (.md, no botão do topo) traz tudo que o cliente respondeu, marcou e enviou, item a item. Guarde em{' '}
-          <code>clientes/{cliente.slug}/</code> no repositório.
+          <code className="break-all">clientes/{cliente.slug}/</code> no repositório.
         </p>
       </Painel>
 
@@ -166,10 +160,12 @@ export default async function PortalClientePage({ params }: { params: { id: stri
         </Painel>
       ))}
 
-      <Painel titulo="Limpar dados de teste">
-        <p className="mb-3 text-sm text-suave">
-          Apaga todas as respostas e arquivos deste cliente, no banco e no disco. O cadastro e o link continuam os
-          mesmos.
+      {/* Ação que apaga respostas reais: fica fechada embaixo e diz o nome do cliente (antes: "Limpar dados de teste", em qualquer cliente). */}
+      <details className="rounded-[14px] border border-linha bg-painel px-4 py-1 sm:px-5">
+        <summary className="min-h-11 cursor-pointer py-3 text-[13px] font-medium text-texto">Apagar as respostas de {cliente.nome}</summary>
+        <p className="mb-3 mt-1 text-sm text-suave">
+          Apaga todas as respostas e arquivos deste cliente, no banco e no disco, para recomeçar o formulário. O cadastro e o
+          link continuam os mesmos. Não tem volta.
         </p>
         <BotaoAcao
           acao={zerar}
@@ -178,7 +174,8 @@ export default async function PortalClientePage({ params }: { params: { id: stri
         >
           Apagar respostas e arquivos
         </BotaoAcao>
-      </Painel>
+        <div className="h-3" />
+      </details>
     </div>
   );
 }

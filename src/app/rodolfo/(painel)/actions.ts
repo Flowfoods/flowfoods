@@ -13,7 +13,9 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/rodolfo/auth';
 import { prisma } from '@/lib/db';
 import type { Prisma } from '@prisma/client';
-import { aprovarLote, cancelarLote, dispararProximo, salvarProposta } from '@/lib/rodolfo/lote';
+import { aprovarLote, cancelarLote, dispararProximo, FIM_DO_LOTE, salvarProposta } from '@/lib/rodolfo/lote';
+import { rotuloDoToque, textoDaRecusa } from '@/lib/rodolfo/rotulos';
+import { JANELA_PADRAO } from '@/lib/barney/regras';
 import { salvarConfig, type ConfigBarney } from '@/lib/rodolfo/config';
 import { importarLote } from '@/lib/rodolfo/importar-lote';
 import { criarWhatsAppService } from '@/lib/rodolfo/outbox';
@@ -42,7 +44,8 @@ async function auditar(userId: string, evento: string, dados: Record<string, unk
 
 export async function acaoProporLote(): Promise<Resposta> {
   const userId = await exigirSessao();
-  const { itens } = await salvarProposta();
+  const { itens, mantido } = await salvarProposta();
+  if (mantido) return { ok: false, mensagem: 'O lote de hoje já foi aprovado e não muda. Para montar outro, cancele este antes.' };
   await auditar(userId, 'lote_proposto', { quantidade: itens.length });
   revalidatePath('/rodolfo/barney');
   revalidatePath('/rodolfo/hoje');
@@ -51,7 +54,9 @@ export async function acaoProporLote(): Promise<Resposta> {
     mensagem:
       itens.length === 0
         ? 'Nenhum lead elegível hoje. Importe uma planilha ou confira os filtros.'
-        : `${itens.length} lead(s) no lote de hoje.`,
+        : itens.length === 1
+          ? '1 lead no lote de hoje.'
+          : `${itens.length} leads no lote de hoje.`,
   };
 }
 
@@ -73,7 +78,7 @@ export async function acaoCancelarLote(): Promise<Resposta> {
   return { ok: true, mensagem: 'Lote cancelado. Nada mais sai hoje.' };
 }
 
-/** "Enviar agora" — os 10 primeiros do número, um a um. */
+/** "Enviar o próximo" (Cadência) e "Enviar" do Lead 360 — os 10 primeiros do número saem assim, um a um. */
 export async function acaoEnviarAgora(leadId?: string): Promise<Resposta> {
   const userId = await exigirSessao();
   const r = await dispararProximo({ manual: true, leadId });
@@ -81,12 +86,12 @@ export async function acaoEnviarAgora(leadId?: string): Promise<Resposta> {
   revalidatePath('/rodolfo/barney');
   revalidatePath('/rodolfo/hoje');
 
-  if (!r.enviou) return { ok: false, mensagem: r.motivo ?? 'Não enviou.' };
+  if (!r.enviou) return { ok: false, mensagem: textoDaRecusa(r.motivo) };
   return {
     ok: true,
     mensagem: r.simulado
-      ? `${r.toque} SIMULADO (dry-run: Evolution não configurada). Nada foi para a rede.`
-      : `${r.toque} enviado.`,
+      ? `${rotuloDoToque(r.toque)} simulada: o WhatsApp da prospecção não está configurado, nada saiu.`
+      : `${rotuloDoToque(r.toque)} enviada.`,
   };
 }
 
@@ -122,10 +127,11 @@ export async function acaoDryRun(): Promise<Resposta> {
   await auditar(userId, 'dry_run', { simulados: n, parou: ultimoMotivo });
   revalidatePath('/rodolfo/barney');
 
+  // "Nada elegível" é o fim normal da simulação; outro motivo diz onde ela parou antes do fim.
+  const parou = ultimoMotivo && ultimoMotivo !== FIM_DO_LOTE ? ` Parou: ${textoDaRecusa(ultimoMotivo)}` : '';
   return {
     ok: true,
-    mensagem:
-      `${n} mensagem(ns) simulada(s). Zero chamadas à Evolution.` + (ultimoMotivo ? ` Parou em: ${ultimoMotivo}` : ''),
+    mensagem: `${n === 0 ? 'Nenhuma mensagem simulada' : n === 1 ? '1 mensagem simulada' : `${n} mensagens simuladas`}. Nada foi enviado.${parou}`,
   };
 }
 
@@ -139,7 +145,11 @@ export async function acaoSalvarConfig(_anterior: unknown, form: FormData): Prom
     return Number.isFinite(n) ? n : undefined;
   };
 
-  const dias = form.getAll('diaSemana').map(Number).filter(Number.isFinite);
+  // Só os dias que a tela oferece (segunda a sexta). Um dia de fora não conta como "marcado": sem esta conferência, um POST com
+  // só o sábado passava daqui e a janela voltava para segunda a sexta sem aviso.
+  const dias = [...new Set(form.getAll('diaSemana').map(Number))].filter((d) => (JANELA_PADRAO.diasSemana as readonly number[]).includes(d));
+  // Nenhum dia marcado era salvo como segunda a sexta, sem aviso: o contrário do que a pessoa pediu (E5.1, decisão 466).
+  if (dias.length === 0) return { ok: false, mensagem: 'Escolha ao menos um dia da semana. Para parar os envios, desligue o disparo.' };
 
   const pedida: Partial<ConfigBarney> = {
     disparoAtivo: form.get('disparoAtivo') === 'on',
@@ -149,7 +159,7 @@ export async function acaoSalvarConfig(_anterior: unknown, form: FormData): Prom
     intervaloMinS: num('intervaloMinS'),
     intervaloMaxS: num('intervaloMaxS'),
     janela: {
-      diasSemana: dias.length ? dias : [1, 2, 3, 4, 5],
+      diasSemana: dias,
       horaInicio: num('horaInicio') ?? 10,
       horaFim: num('horaFim') ?? 18,
     },
@@ -211,7 +221,7 @@ export async function acaoResponder(leadId: string, texto: string): Promise<Resp
 
   await auditar(userId, 'resposta_manual', { leadId, enviou: r.ok });
 
-  if (!r.ok) return { ok: false, mensagem: r.motivo ?? 'Não enviou.' };
+  if (!r.ok) return { ok: false, mensagem: textoDaRecusa(r.motivo) };
 
   await prisma.leadEvent.create({
     data: { leadId, tipo: 'resposta_enviada', descricao: corpo.slice(0, 400) },

@@ -138,8 +138,11 @@ celular. Fixo não some — vai para a lista de visita/Instagram.
 ### 2.2 Os 10 primeiros envios: na mão
 
 Enquanto o número não tiver 10 envios, o automático **recusa** e diz quantos
-faltam. Em `/rodolfo/barney`, use **"Enviar agora (1)"**, um por vez, com uns
-minutos entre eles. É o aquecimento que decide se o número sobrevive.
+faltam. Em `/rodolfo/barney` (Cadência), com o lote aprovado, use **"Enviar o
+próximo (1 de 10)"**, um por vez, com uns minutos entre eles. Depois de cada
+envio o botão fica desabilitado até o intervalo mínimo passar e a tela se
+atualiza sozinha (decisão 467). Lote cancelado não envia nada, nem à mão. É o
+aquecimento que decide se o número sobrevive.
 
 ### 2.3 Ligar o disparo
 
@@ -174,7 +177,7 @@ lá em cima, em português, com o que fazer.
 | O que aparece | O que é | O que fazer |
 |---|---|---|
 | `Disparo desligado` | Chave geral off | Ligar em Config — depois dos 10 manuais |
-| `Faltam N envios manuais` | Número ainda frio | "Enviar agora", um a um |
+| `Faltam N envios manuais` | Número ainda frio | "Enviar o próximo", em Cadência, um a um |
 | `Fora da janela` | Fora de seg–sex 10h–18h | Nada. Volta sozinho |
 | `Teto do dia atingido` | Cumpriu a cota | Nada. Volta amanhã |
 | `Instância em "close"` | WhatsApp desconectou | Reparear o QR |

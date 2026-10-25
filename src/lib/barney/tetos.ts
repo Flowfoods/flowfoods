@@ -64,7 +64,7 @@ export interface EstadoEnvio {
 
 export interface OpcoesEnvio {
   /**
-   * Envio disparado à mão pelo Rodolfo em "Enviar agora". Pula a exigência de
+   * Envio disparado à mão pelo Rodolfo ("Enviar o próximo" na Cadência, "Enviar agora" no Lead 360). Pula a exigência de
    * envio manual (obviamente) e a janela — ele é humano, escolhe a hora dele.
    * NÃO pula teto, intervalo nem stop-loss: esses existem contra o WhatsApp,
    * não contra o operador.
@@ -123,7 +123,7 @@ export function podeEnviar(estado: EstadoEnvio, agora: DateTime, opts: OpcoesEnv
 
   // 1. Chave geral. Default false: o portal nasce mudo de propósito.
   if (!estado.disparoAtivo) {
-    return negar('DISPARO_DESLIGADO', 'Disparo desligado em /rodolfo/config.');
+    return negar('DISPARO_DESLIGADO', 'Disparo desligado.');
   }
 
   // 2–4. Stop-loss. Vem antes da janela porque estes exigem ação humana, não espera.
@@ -157,7 +157,7 @@ export function podeEnviar(estado: EstadoEnvio, agora: DateTime, opts: OpcoesEnv
     const faltam = ENVIOS_MANUAIS_INICIAIS - estado.totalEnviadoHistorico;
     return negar(
       'EXIGE_ENVIO_MANUAL',
-      `Faltam ${faltam} envios manuais para o número aquecer. Use "Enviar agora", um a um.`,
+      `${faltam === 1 ? 'Falta 1 envio manual' : `Faltam ${faltam} envios manuais`} para o número aquecer. Use "Enviar o próximo", em Cadência, um a um.`,
     );
   }
 
@@ -193,7 +193,7 @@ export function podeEnviar(estado: EstadoEnvio, agora: DateTime, opts: OpcoesEnv
       const falta = Math.ceil(INTERVALO_MIN_S - decorrido);
       return negar(
         'INTERVALO_MINIMO',
-        `Último envio há ${Math.floor(decorrido)}s; o piso é ${INTERVALO_MIN_S}s.`,
+        `Último envio há ${Math.floor(decorrido)} s; o intervalo mínimo é de ${INTERVALO_MIN_S} s.`,
         falta,
       );
     }

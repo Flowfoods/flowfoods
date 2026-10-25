@@ -30,6 +30,7 @@ import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Aviso, Citacao, Linha, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
+import { ROTULO_DA_INSCRICAO, ROTULO_DA_INTENCAO, ROTULO_DA_MENSAGEM, ROTULO_DA_PAUSA, ROTULO_DO_CANAL, ROTULO_DO_LEAD, ROTULO_DO_TIPO_DE_TELEFONE, rotulo, rotuloDoToque, textoDoEvento } from '@/lib/rodolfo/rotulos';
 import { AcoesLead } from './acoes';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 
@@ -114,7 +115,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         subtitulo={
           <span className="flex flex-wrap items-center gap-2">
             {[lead.bairro, lead.categoria, lead.bloco && `Bloco ${lead.bloco}`].filter(Boolean).join(', ') || '—'}
-            <Selo tom={STATUS_TOM[lead.status] ?? 'neutro'}>{lead.status}</Selo>
+            <Selo tom={STATUS_TOM[lead.status] ?? 'neutro'}>{rotulo(ROTULO_DO_LEAD, lead.status)}</Selo>
             {lead.tier && <Selo>{lead.tier}</Selo>}
           </span>
         }
@@ -158,17 +159,19 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             <Linha rotulo="Telefone">
               <span className="tabular-nums">{lead.telefoneNormalizado ?? '—'}</span>
             </Linha>
-            <Linha rotulo="Tipo">{lead.tipoTelefone}</Linha>
-            <Linha rotulo="Canal">{lead.canal}</Linha>
+            <Linha rotulo="Tipo">{rotulo(ROTULO_DO_TIPO_DE_TELEFONE, lead.tipoTelefone)}</Linha>
+            <Linha rotulo="Canal">{rotulo(ROTULO_DO_CANAL, lead.canal)}</Linha>
             {lead.endereco && <Linha rotulo="Endereço">{lead.endereco}</Linha>}
             {lead.donoNome && <Linha rotulo="Dono">{lead.donoNome}</Linha>}
             {lead.instagram && <Linha rotulo="Instagram">{lead.instagram}</Linha>}
             <Linha rotulo="Lote">{lead.lote ?? '—'}</Linha>
           </dl>
           {lead.obs && (
-            <p className="mt-3 rounded-[7px] border border-atencao/40 px-3 py-2 text-[13px] text-atencao">
-              Flag da importação: {lead.obs}
-            </p>
+            <div className="mt-3">
+              <Aviso tom="alerta" titulo="Aviso da importação:">
+                {lead.obs}
+              </Aviso>
+            </div>
           )}
         </Painel>
 
@@ -176,15 +179,15 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
           {enrollment ? (
             <dl className="space-y-2 text-sm">
               <Linha rotulo="Situação">
-                <Selo tom={enrollment.status === 'ATIVA' ? 'ok' : 'neutro'}>{enrollment.status}</Selo>
+                <Selo tom={enrollment.status === 'ATIVA' ? 'ok' : 'neutro'}>{rotulo(ROTULO_DA_INSCRICAO, enrollment.status)}</Selo>
               </Linha>
-              <Linha rotulo="Último toque">{enrollment.toqueAtual ?? '—'}</Linha>
+              <Linha rotulo="Último toque">{rotuloDoToque(enrollment.toqueAtual)}</Linha>
               <Linha rotulo="Próximo em">
                 <span className="tabular-nums">
                   {enrollment.proximoEnvioEm ? quando(enrollment.proximoEnvioEm) : '—'}
                 </span>
               </Linha>
-              {enrollment.motivoPausa && <Linha rotulo="Pausa">{enrollment.motivoPausa}</Linha>}
+              {enrollment.motivoPausa && <Linha rotulo="Pausa">{rotulo(ROTULO_DA_PAUSA, enrollment.motivoPausa)}</Linha>}
             </dl>
           ) : (
             <Vazio>Ainda não entrou em cadência.</Vazio>
@@ -215,17 +218,17 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
               >
                 <div className="mb-1 flex items-center justify-between gap-3 text-[12px] text-suave">
                   <span>
-                    {m.direction === 'IN' ? 'Recebida' : `Enviada${m.toque ? `, ${m.toque}` : ''}`},{' '}
+                    {m.direction === 'IN' ? 'Recebida' : `Enviada${m.toque ? `, ${rotuloDoToque(m.toque)}` : ''}`},{' '}
                     {quando(m.criadoEm)}
                   </span>
                   <Selo tom={m.status === 'FALHA' ? 'erro' : m.status === 'LIDA' ? 'ok' : 'neutro'}>
-                    {m.status === 'AGENDADA' ? 'SIMULADA' : m.status}
+                    {m.status === 'AGENDADA' ? 'Simulada' : rotulo(ROTULO_DA_MENSAGEM, m.status)}
                   </Selo>
                 </div>
                 <p className="whitespace-pre-wrap text-sm text-texto">{m.corpoRenderizado ?? '—'}</p>
                 {m.classificacao && (
                   <p className="mt-2 text-[12px] text-suave">
-                    Intenção: {m.classificacao.intencao} ({(m.classificacao.confianca * 100).toFixed(0)}%)
+                    Intenção: {rotulo(ROTULO_DA_INTENCAO, m.classificacao.intencao).toLowerCase()} ({(m.classificacao.confianca * 100).toFixed(0)}%)
                   </p>
                 )}
               </li>
@@ -245,7 +248,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                 <li key={e.id} className="flex gap-3 text-sm">
                   <I size={16} aria-hidden className="mt-0.5 shrink-0 text-suave" />
                   <span className="min-w-0 flex-1">
-                    <span className="text-texto">{e.descricao}</span>
+                    <span className="text-texto">{textoDoEvento(e.descricao)}</span>
                     <span className="ml-2 whitespace-nowrap text-[12px] tabular-nums text-suave">
                       {quando(e.criadoEm)}
                     </span>

@@ -21,8 +21,12 @@ import { podeEnviar } from '@/lib/barney/tetos';
 import { agoraSP, diaSP, montarEstadoEnvio } from './estado';
 import { lerConfig } from './config';
 import { criarWhatsAppService } from './outbox';
+import { rotuloDoToque } from './rotulos';
 
 export const SEQUENCIA_PADRAO = 'cadencia-padrao';
+
+/** O lote andou até o fim: não há mais item que possa sair hoje. */
+export const FIM_DO_LOTE = 'Nada elegível no lote de hoje.';
 
 /**
  * Qual toque vem depois, e em quantos dias a partir de HOJE.
@@ -55,25 +59,21 @@ export async function garantirSeed(): Promise<void> {
     ),
   );
 
-  await Promise.all(
-    SEED_TEMPLATES.map((t) =>
-      prisma.template.upsert({
-        where: {
-          categoria_toque_canal_variante: {
-            categoria: null as unknown as string,
-            toque: t.toque,
-            canal: t.canal,
-            variante: 'A',
-          },
-        },
-        create: { toque: t.toque, canal: t.canal, variante: 'A', corpo: t.corpo, ativo: true },
-        // Não sobrescreve: se o Rodolfo editou o texto no portal, a edição dele
-        // vence o seed. A fonte da verdade continua sendo `mensagens.md`, mas
-        // reimportar o seed não pode apagar uma revisão feita à mão.
-        update: {},
-      }),
-    ),
-  );
+  // O modelo padrão tem `categoria` nula, e chave única com nulo não serve para `upsert` (o Prisma recusa o nulo, e no
+  // Postgres dois nulos nunca colidem). Antes era um `upsert` com nulo: "Montar lote" quebrava em todo banco sem modelos
+  // (E5.1, decisão 467). Agora: procura o padrão daquele toque e canal; só cria o que falta.
+  for (const t of SEED_TEMPLATES) {
+    const existe = await prisma.template.findFirst({
+      where: { categoria: null, toque: t.toque, canal: t.canal, variante: 'A' },
+      select: { id: true },
+    });
+    // Não sobrescreve: se o Rodolfo editou o texto no portal, a edição dele
+    // vence o seed. A fonte da verdade continua sendo `mensagens.md`, mas
+    // reimportar o seed não pode apagar uma revisão feita à mão.
+    if (!existe) {
+      await prisma.template.create({ data: { toque: t.toque, canal: t.canal, variante: 'A', corpo: t.corpo, ativo: true } });
+    }
+  }
 }
 
 export interface ItemProposto {
@@ -181,33 +181,36 @@ export async function proporLote(ref: DateTime = agoraSP()): Promise<ItemPropost
   return itens.slice(0, teto);
 }
 
-/** Grava a proposta como o lote de hoje. Repropor substitui os itens. */
+/**
+ * Grava a proposta como o lote de hoje. Repropor substitui os itens, mas só de lote que aguarda aprovação ou foi cancelado
+ * (volta a aguardar aprovação). Lote aprovado ou em envio fica como está (`mantido`): repropor por cima embaralharia a fila
+ * no meio do caminho e tiraria a aprovação sem ninguém pedir. Antes, o `upsert` gravava "aguardando" em qualquer lote e o
+ * teste logo abaixo era sempre verdadeiro (E5.1, decisão 467).
+ */
 export async function salvarProposta(ref: DateTime = agoraSP()) {
-  const itens = await proporLote(ref);
   const data = diaSP(ref);
+  const existente = await prisma.batch.upsert({ where: { data }, create: { data, status: 'PROPOSTO' }, update: {} });
 
-  const lote = await prisma.batch.upsert({
-    where: { data },
-    create: { data, status: 'PROPOSTO' },
-    update: { status: 'PROPOSTO' },
+  // Condicional no próprio UPDATE: se outro aparelho aprovou no meio, nada muda.
+  const reaberto = await prisma.batch.updateMany({
+    where: { id: existente.id, status: { in: ['PROPOSTO', 'CANCELADO'] } },
+    data: { status: 'PROPOSTO' },
+  });
+  if (reaberto.count === 0) return { lote: existente, itens: [] as ItemProposto[], mantido: true };
+
+  const itens = await proporLote(ref);
+  await prisma.batchItem.deleteMany({ where: { batchId: existente.id } });
+  await prisma.batchItem.createMany({
+    data: itens.map((i, ordem) => ({
+      batchId: existente.id,
+      leadId: i.leadId,
+      toque: i.toque,
+      ordem,
+    })),
+    skipDuplicates: true,
   });
 
-  // Só reescreve enquanto ainda não foi aprovado: repropor por cima de um lote
-  // em envio embaralharia a fila no meio do caminho.
-  if (lote.status === 'PROPOSTO') {
-    await prisma.batchItem.deleteMany({ where: { batchId: lote.id } });
-    await prisma.batchItem.createMany({
-      data: itens.map((i, ordem) => ({
-        batchId: lote.id,
-        leadId: i.leadId,
-        toque: i.toque,
-        ordem,
-      })),
-      skipDuplicates: true,
-    });
-  }
-
-  return { lote, itens };
+  return { lote: { ...existente, status: 'PROPOSTO' as const }, itens, mantido: false };
 }
 
 export async function aprovarLote(ref: DateTime = agoraSP()) {
@@ -273,8 +276,17 @@ export async function dispararProximo(
 
   if (!lote) return { enviou: false, motivo: 'Nenhum lote montado hoje.' };
 
-  if (config.modoAprovacao && lote.status !== 'APROVADO' && lote.status !== 'EM_ENVIO' && !opts.manual) {
-    return { enviou: false, motivo: `Lote em "${lote.status}". Aprove antes de disparar.` };
+  // Cancelado é "nada mais sai hoje", para o worker, para o botão e para a simulação (E5.1, decisão 467). Antes, o envio
+  // manual e o worker com aprovação automática passavam por cima e mandavam o próximo item de um lote cancelado.
+  if (lote.status === 'CANCELADO') {
+    return { enviou: false, motivo: 'Lote de hoje cancelado. Nada mais sai hoje; para voltar a enviar, monte o lote de novo.' };
+  }
+
+  // Com aprovação manual, só sai de lote aprovado. Escapam a simulação (conferir antes de aprovar é o propósito dela) e o
+  // envio de um lead escolhido à mão no Lead 360 (quem escolhe o lead aprova aquele envio). O "Enviar o próximo" da
+  // Cadência, que pega o próximo da fila, espera a aprovação como o worker (decisão 467).
+  if (config.modoAprovacao && lote.status !== 'APROVADO' && lote.status !== 'EM_ENVIO' && !opts.dryRun && !(opts.manual && opts.leadId)) {
+    return { enviou: false, motivo: 'Lote de hoje aguardando aprovação. Aprove o lote antes de enviar.' };
   }
 
   const candidatos = opts.leadId
@@ -315,7 +327,7 @@ export async function dispararProximo(
       where: { toque: item.toque, canal: 'WHATSAPP', ativo: true },
       orderBy: { criadoEm: 'asc' },
     });
-    if (!template) return { enviou: false, motivo: `Sem template ativo para ${item.toque}.` };
+    if (!template) return { enviou: false, motivo: `Nenhum modelo de texto ativo para a ${rotuloDoToque(item.toque)}.` };
 
     const corpo = renderizar(
       template.corpo,
@@ -375,7 +387,7 @@ export async function dispararProximo(
     return { enviou: true, leadId: lead.id, toque: item.toque, simulado: r.simulado };
   }
 
-  return { enviou: false, motivo: 'Nada elegível no lote de hoje.' };
+  return { enviou: false, motivo: FIM_DO_LOTE };
 }
 
 /**

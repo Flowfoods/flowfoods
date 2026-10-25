@@ -6,10 +6,9 @@
  * página — fila parada sem causa visível é o que faz alguém desligar a trava.
  */
 
-import { situacaoDaInstancia } from '@/lib/whatsapp/situacao-da-instancia';
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
-import { montarEstadoEnvio, agoraSP, diaSP, INSTANCIA } from '@/lib/rodolfo/estado';
+import { montarEstadoEnvio, agoraSP, diaSP } from '@/lib/rodolfo/estado';
 import { podeEnviar } from '@/lib/barney/tetos';
 import { ENVIOS_MANUAIS_INICIAIS, STOP_LOSS } from '@/lib/barney/regras';
 import { COR } from '@/lib/erp/modulos';
@@ -18,6 +17,8 @@ import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Barra, Metrica, Numero, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { exigirNivel1 } from '@/lib/erp/contexto';
+import { ROTULO_DO_LOTE, proximoToque, rotulo, rotuloDoToque } from '@/lib/rodolfo/rotulos';
+import { situacaoDaInstancia } from '@/lib/whatsapp/situacao-da-instancia';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,11 +26,11 @@ export const dynamic = 'force-dynamic';
 const ACAO: Record<string, { tom: 'alerta' | 'erro' | 'neutro'; oQueFazer: string }> = {
   DISPARO_DESLIGADO: {
     tom: 'neutro',
-    oQueFazer: 'Ligue em Config, depois dos 10 envios manuais.',
+    oQueFazer: 'Ligue o disparo em Config.',
   },
   INSTANCIA_FORA_DO_AR: {
     tom: 'erro',
-    oQueFazer: 'Reconecte a instância (QR em Config) antes de retomar.',
+    oQueFazer: 'Conecte o WhatsApp em Config (QR code) antes de retomar.',
   },
   STOP_LOSS_FALHAS: {
     tom: 'erro',
@@ -39,11 +40,11 @@ const ACAO: Record<string, { tom: 'alerta' | 'erro' | 'neutro'; oQueFazer: strin
     tom: 'erro',
     oQueFazer: 'Entrega baixa é sinal de bloqueio silencioso. Pare o dia.',
   },
-  EXIGE_ENVIO_MANUAL: { tom: 'alerta', oQueFazer: 'Use "Enviar agora" em Cadência, um a um.' },
+  EXIGE_ENVIO_MANUAL: { tom: 'alerta', oQueFazer: 'Depois deles, o envio automático libera sozinho.' },
   FORA_DA_JANELA: { tom: 'neutro', oQueFazer: 'A fila volta sozinha na próxima janela útil.' },
   TETO_DIARIO: { tom: 'neutro', oQueFazer: 'Teto do dia cumprido. Volta amanhã.' },
   TETO_HORARIO: { tom: 'neutro', oQueFazer: 'Aguardando a próxima hora.' },
-  INTERVALO_MINIMO: { tom: 'neutro', oQueFazer: 'Respirando entre um envio e outro.' },
+  INTERVALO_MINIMO: { tom: 'neutro', oQueFazer: 'Esperando o intervalo entre envios.' },
 };
 
 /**
@@ -86,6 +87,17 @@ export default async function PainelPage() {
   const acao = decisao.motivo ? ACAO[decisao.motivo] : undefined;
   const taxaEntrega = estado.enviadosHoje > 0 ? Math.round((estado.entreguesHoje / estado.enviadosHoje) * 100) : null;
   const faltamManuais = Math.max(0, ENVIOS_MANUAIS_INICIAIS - estado.totalEnviadoHistorico);
+  // Disparo desligado: o que fazer depois de ligar depende de quanto o número já aqueceu.
+  const depoisDeLigar =
+    faltamManuais === 0
+      ? ''
+      : faltamManuais === ENVIOS_MANUAIS_INICIAIS
+        ? ` Depois, faça os ${ENVIOS_MANUAIS_INICIAIS} primeiros envios um a um, em Cadência.`
+        : faltamManuais === 1
+          ? ' Depois, faça o último envio manual, em Cadência.'
+          : ` Depois, faça os ${faltamManuais} envios manuais que faltam, um a um, em Cadência.`;
+  const oQueFazer = acao ? acao.oQueFazer + (decisao.motivo === 'DISPARO_DESLIGADO' ? depoisDeLigar : '') : null;
+  const whatsapp = situacaoDaInstancia(estado.estadoInstancia);
 
   return (
     <div className="space-y-6">
@@ -108,7 +120,7 @@ export default async function PainelPage() {
         ) : (
           <div className="space-y-1.5">
             <p className="font-display text-xl font-bold leading-snug">{decisao.explicacao}</p>
-            {acao && <p className="text-sm text-suave">{acao.oQueFazer}</p>}
+            {oQueFazer && <p className="text-sm text-suave">{oQueFazer}</p>}
           </div>
         )}
       </Painel>
@@ -133,7 +145,8 @@ export default async function PainelPage() {
               : `piso ${STOP_LOSS.taxaEntregaMinima * 100}%`
           }
         />
-        <Metrica rotulo="WhatsApp" valor={situacaoDaInstancia(estado.estadoInstancia).texto} detalhe={INSTANCIA} />
+        {/* O nome curto cabe a 390 px ("Desconectado" cortava); o detalhe diz onde resolver, não o nome técnico da instância. */}
+        <Metrica rotulo="WhatsApp" valor={whatsapp.curto} detalhe={estado.estadoInstancia === 'open' ? 'da prospecção' : 'conectar em Config'} />
         <Metrica
           rotulo="Manuais restantes"
           valor={faltamManuais > 0 ? faltamManuais : 'Feito'}
@@ -152,7 +165,7 @@ export default async function PainelPage() {
         >
           {lote ? (
             <div className="flex items-center justify-between gap-3">
-              <Numero valor={lote._count.itens} rotulo={`Leads no lote · ${lote.status}`} />
+              <Numero valor={lote._count.itens} rotulo={`Leads no lote · ${rotulo(ROTULO_DO_LOTE, lote.status).toLowerCase()}`} />
               {lote.status === 'PROPOSTO' && <Selo tom="alerta">Aguarda aprovação</Selo>}
               {lote.status === 'APROVADO' && <Selo tom="ok">Aprovado</Selo>}
             </div>
@@ -189,7 +202,7 @@ export default async function PainelPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{e.lead.restaurante ?? e.lead.nome}</p>
                   <p className="truncate text-[12px] text-suave">
-                    {e.lead.bairro ?? '—'}, toque {e.toqueAtual ?? 'D0'}
+                    {e.lead.bairro ?? '—'}, {rotuloDoToque(proximoToque(e.toqueAtual))}
                   </p>
                 </div>
                 <span className="shrink-0 text-[13px] tabular-nums text-suave">

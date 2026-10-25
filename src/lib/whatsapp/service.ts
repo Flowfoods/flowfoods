@@ -54,7 +54,7 @@ export interface PedidoEnvio {
   enrollmentId?: string;
   toque?: Toque;
   canal?: CanalTemplate;
-  /** Envio disparado à mão no "Enviar agora". */
+  /** Envio disparado à mão ("Enviar o próximo" na Cadência, "Enviar agora" no Lead 360). */
   manual?: boolean;
 }
 

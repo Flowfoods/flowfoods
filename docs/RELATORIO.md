@@ -47,7 +47,7 @@ Mobile-first, sobre chão preto para não se confundir com o site público.
 | `/rodolfo` | Painel: por que a fila está parada, e o que fazer |
 | `/rodolfo/leads` | Lista, filtros por URL, busca, importação |
 | `/rodolfo/leads/[id]` | Lead 360: score explicado, prévia do gancho, timeline, thread, ações |
-| `/rodolfo/barney` | Lote do dia, aprovar, dry-run, "Enviar agora", fila |
+| `/rodolfo/barney` | Lote do dia, aprovar, simular, "Enviar o próximo", fila |
 | `/rodolfo/inbox` | Respostas por intenção, rascunho editável |
 | `/rodolfo/visitas` | Fixos e sem-telefone, com copiar → abrir Direct |
 | `/rodolfo/metricas` | Funil, cortes, saúde do número, custo de IA, CSV |

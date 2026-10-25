@@ -18,7 +18,7 @@ import { STOP_LOSS } from '@/lib/barney/regras';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
-import { Numero, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
+import { Aviso, Numero, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 
 export const dynamic = 'force-dynamic';
@@ -33,13 +33,22 @@ function Funil({ etapas }: { etapas: EtapaFunil[] }) {
     <ol className="space-y-2.5">
       {etapas.map((e) => {
         const largura = topo > 0 ? Math.max((e.valor / topo) * 100, e.valor > 0 ? 1.5 : 0) : 0;
+        // Etapa que ainda não é medida (vem do Diagnóstico, fora do sistema): traço, sem barra e sem %, nunca um 0 que parece medido.
+        if (e.semOrigem) {
+          return (
+            <li key={e.chave} className="flex items-baseline justify-between gap-3">
+              <span className="text-sm text-suave">
+                {e.rotulo}
+                <span className="ml-2 text-[12px]">ainda não medido</span>
+              </span>
+              <span className="shrink-0 text-sm text-suave">—</span>
+            </li>
+          );
+        }
         return (
           <li key={e.chave}>
             <div className="mb-1 flex items-baseline justify-between gap-3">
-              <span className="text-sm text-texto">
-                {e.rotulo}
-                {e.semOrigem && <span className="ml-2 text-[12px] text-suave">aguarda diagnóstico</span>}
-              </span>
+              <span className="text-sm text-texto">{e.rotulo}</span>
               <span className="shrink-0 text-sm tabular-nums">
                 {e.valor}
                 {e.conversao !== null && <span className="ml-2 text-[12px] text-suave">{e.conversao.toFixed(0)}%</span>}
@@ -178,10 +187,11 @@ export default async function MetricasPage() {
           <Numero valor={m.custoIA.classificacoes} rotulo="Classificações" />
         </div>
         {m.custoIA.tetoDiarioBRL && m.custoIA.hojeBRL >= m.custoIA.tetoDiarioBRL && (
-          <p className="mt-3 rounded-[7px] border border-atencao/40 px-3 py-2 text-[13px] text-atencao">
-            Teto do dia atingido. O Inbox segue recebendo as respostas, sem classificar nem sugerir rascunho, até
-            amanhã.
-          </p>
+          <div className="mt-3">
+            <Aviso tom="alerta" titulo="Teto do dia atingido.">
+              O Inbox segue recebendo as respostas, sem classificar nem sugerir rascunho, até amanhã.
+            </Aviso>
+          </div>
         )}
       </Painel>
     </div>

@@ -4587,3 +4587,36 @@ gate limpos.
 Matriz (antes e depois do acabamento): 9 telas (DRE de agora, fechado e de uma loja, composição de agora e do fechado, despesa com
 volta, CMV por categoria, compras da categoria, importação) × 6 tamanhos × claro e escuro × Dona, Gerente e Operador = 324 telas,
 0 falhas: sem rolagem lateral, sem tabela cortada na própria caixa, sem erro de página; o Operador redirecionado em todas, sem R$.
+
+**E5.1 · painel do nível 1 com os padrões do ERP, primeira fatia (decisões 466 e 467, 25/10/2026):** E0 conferido antes de mexer
+(13 páginas do painel `/rodolfo` × 6 tamanhos × claro e escuro, 156 telas sem erro). Revisor de UX independente: 10 "deve", 12
+"deveria", 6 sugestões; esta fatia fez os 10 "deve" (466): nomes em português para todo status do banco e para o toque
+("1ª mensagem (dia 0)"), um botão principal por estado na Cadência, Hoje com frases de ação, Config recusando salvar sem dia,
+contagens certas em Visitas, etapa não medida como "—" em Métricas, avisos do ERP no lugar das caixas de borda colorida, filtro
+"Sem classificar" na Inbox, Portal sem o caminho do servidor e com o "apagar respostas" num bloco fechado.
+*Régua de rolagem lateral:* na emulação de celular o `innerWidth` cresce com a página e escondia a rolagem; os roteiros passaram a
+medir `scrollWidth − clientWidth`. Varredura de todas as telas alcançáveis pelos links a 390, 820 e 844×390 (Dona no ERP, 780; o
+Rodolfo no painel, 960): 1 no painel (Portal, o caminho do servidor, já retirado) e 18 no ERP (faturamento do dia a 820, menu da
+pessoa 1 a 6 px fora — os botões da direita do topo não encolhem mais desde 640 px; reconferido em 180 telas, Dona e Gerente, de
+640 a 1180: 0).
+*Revisor de código e segurança:* reprovou a primeira versão com 2 bloqueantes — o botão de envio sumia depois de cada envio do
+aquecimento (levando a confirmação junto) e o lote cancelado continuava enviando, pelo botão e pelo worker com aprovação
+automática — e 5 "deveria" (botão sem lote, plural e nome de botão antigo no texto do aquecimento, Hoje mandando fazer os 10 envios
+com o número aquecido, vazio errado da Inbox filtrada, código do banco ainda na tela). Corrigidos (467): decisão dos botões numa
+função pura (`telaDaCadencia`), espera com o botão desabilitado e a tela que se atualiza sozinha, cancelado recusado em
+`dispararProximo` por todos os caminhos, "Enviar o próximo" esperando a aprovação do lote como o worker, recusas sem código
+(`textoDaRecusa`). Reconferência: **aprovado**. O "deveria" que sobrou ("Montar de novo" tirava a aprovação de lote aprovado e
+reescrevia a fila em envio) também foi corrigido.
+*Achado do passeio:* "Montar lote" quebrava em banco sem modelos de texto (`upsert` com categoria nula na chave composta, recusado
+pelo Prisma); num banco novo, o primeiro lote nunca saía. Corrigido (procura e cria só o que falta).
+*Navegador (build de produção, banco local com 4 leads fictícios montados e apagados no fim; sem Evolution configurada, todo envio
+é simulação):* Cadência em 8 situações a 390 (sem lote com disparo desligado, aguardando aprovação, aprovado aquecendo, logo depois
+de um envio, cancelado, lote vazio, WhatsApp fora, aguardando com aprovação automática) — os botões e o motivo de cada uma batem com
+o servidor; a espera de 5 s libera o botão sozinha; cancelar e montar de novo volta para "Aguardando aprovação" com "2 leads no lote
+de hoje."; "Simular o lote" → "2 mensagens simuladas. Nada foi enviado.". Hoje, Inbox filtrada, Lead 360, Visitas, Config (dias
+desmarcados recusados) e Portal em claro e escuro: sem código do banco, sem rolagem lateral, sem erro de página. Matriz do painel
+com o cenário montado: 15 telas × 6 tamanhos × 2 temas = 180, 0 falhas; Cadência e Hoje de novo depois da última mudança: 24, 0.
+*Checks:* suíte com banco 153 arquivos, 2.871 aprovados, 46 pulados, 0 falhas; lint, typecheck e portão limpos; testes novos
+`rodolfo-painel-e5` (rótulos, botões da Cadência em 12 casos e 61 combinações, dia forjado na Config) e `rodolfo-lote-disparo`
+(cancelado, aprovação, seed dos modelos, "Montar de novo" em lote aprovado). **Não feito:** a fila de "deveria" da revisão de UX
+(próxima fatia da E5.1); validação com pessoas reais; nenhum envio de verdade (piloto E5.2).

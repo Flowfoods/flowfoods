@@ -11,6 +11,7 @@
 
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
+import type { Prisma } from '@prisma/client';
 import { agoraSP } from '@/lib/rodolfo/estado';
 import { renderizar, TEMPLATE_INSTAGRAM } from '@/lib/barney/render';
 import { COR } from '@/lib/erp/modulos';
@@ -26,12 +27,11 @@ export default async function VisitasPage() {
   await exigirNivel1();
   const agora = agoraSP();
 
-  const [leads, totalFixos, semTelefone] = await Promise.all([
+  // A mesma regra da lista para os três números (antes "Na lista" parava em 60 e os outros contavam quem pediu para sair).
+  const daLista = { canal: { in: ['VISITA', 'INSTAGRAM'] }, status: { notIn: ['OPT_OUT', 'CONFLITO'] } } satisfies Prisma.LeadWhereInput;
+  const [leads, naLista, totalFixos, semTelefone] = await Promise.all([
     prisma.lead.findMany({
-      where: {
-        canal: { in: ['VISITA', 'INSTAGRAM'] },
-        status: { notIn: ['OPT_OUT', 'CONFLITO'] },
-      },
+      where: daLista,
       orderBy: [{ tier: 'asc' }, { scoreBase: 'desc' }],
       take: 60,
       select: {
@@ -50,8 +50,9 @@ export default async function VisitasPage() {
         telefoneOriginal: true,
       },
     }),
-    prisma.lead.count({ where: { tipoTelefone: 'FIXO' } }),
-    prisma.lead.count({ where: { tipoTelefone: 'INVALIDO' } }),
+    prisma.lead.count({ where: daLista }),
+    prisma.lead.count({ where: { ...daLista, tipoTelefone: 'FIXO' } }),
+    prisma.lead.count({ where: { ...daLista, tipoTelefone: 'INVALIDO' } }),
   ]);
 
   return (
@@ -64,7 +65,7 @@ export default async function VisitasPage() {
       />
 
       <div className="grid grid-cols-3 gap-3">
-        <Metrica rotulo="Na lista" valor={leads.length} />
+        <Metrica rotulo="Na lista" valor={naLista} detalhe={naLista > leads.length ? `mostrando ${leads.length}` : undefined} />
         <Metrica rotulo="Telefone fixo" valor={totalFixos} />
         <Metrica rotulo="Sem telefone" valor={semTelefone} />
       </div>
@@ -121,7 +122,8 @@ export default async function VisitasPage() {
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
                     {l.tier && <Selo>{l.tier}</Selo>}
                     <span className="text-[12px] tabular-nums text-suave">
-                      {l.tipoTelefone === 'FIXO' ? l.telefoneOriginal : 'sem telefone'}
+                      {/* Celular movido à mão para visita também mostra o número; "sem telefone" só para quem não tem um válido. */}
+                      {l.tipoTelefone !== 'INVALIDO' && l.telefoneOriginal ? l.telefoneOriginal : 'sem telefone'}
                     </span>
                   </div>
                 </header>

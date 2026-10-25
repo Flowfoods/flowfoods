@@ -3,10 +3,10 @@ import { prisma } from '@/lib/db';
 import { lerConfig } from '@/lib/rodolfo/config';
 import { normalizarTelefone } from '@/lib/barney/telefone';
 import { montarEstadoEnvio, INSTANCIA } from '@/lib/rodolfo/estado';
-import { ENVIOS_MANUAIS_INICIAIS, INTERVALO_MIN_S, MAX_POR_DIA, MAX_POR_HORA, STOP_LOSS } from '@/lib/barney/regras';
+import { ENVIOS_MANUAIS_INICIAIS, INTERVALO_MIN_S, MAX_POR_DIA, MAX_POR_HORA, STOP_LOSS, TOQUES } from '@/lib/barney/regras';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
-import { Painel, Selo } from '@/components/erp/ui/superficies';
+import { Aviso, Painel, Selo } from '@/components/erp/ui/superficies';
 import { ConfigForm } from './config-form';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 
@@ -54,18 +54,20 @@ export default async function ConfigPage() {
             : 'Rampa ainda não começou — ela conta a partir do primeiro envio.'}
         </p>
         {estado.estadoInstancia !== 'open' && (
-          <p className="mt-3 rounded-[7px] border border-atencao/40 px-3 py-2 text-[13px] text-atencao">
-            Pareie o QR na Evolution. Enquanto o WhatsApp não estiver conectado, o Barney não envia.
-          </p>
+          <div className="mt-3">
+            <Aviso tom="alerta" titulo="WhatsApp desconectado.">
+              Leia o QR code para conectar. Enquanto não estiver conectado, nada é enviado.
+            </Aviso>
+          </div>
         )}
 
         {proprioNumero && (
-          <div className="mt-3 rounded-[7px] border border-atencao/40 px-3 py-2 text-[13px] text-atencao">
-            <strong>Modo telefone pessoal.</strong> O número que prospecta é o mesmo que recebe as notificações — então
-            elas ficam desligadas: a resposta do lead já chega neste aparelho.
-            <br />
-            Um número antigo resiste melhor a bloqueio que um chip novo, mas se cair leva junto o WhatsApp que está no
-            site. A rampa continua valendo.
+          <div className="mt-3">
+            <Aviso tom="alerta" titulo="Modo telefone pessoal.">
+              O número que prospecta é o mesmo que recebe as notificações, então elas ficam desligadas: a resposta do lead já
+              chega neste aparelho. Um número antigo resiste melhor a bloqueio que um chip novo, mas, se cair, leva junto o
+              WhatsApp que está no site. O aumento gradual continua valendo.
+            </Aviso>
           </div>
         )}
       </Painel>
@@ -105,8 +107,8 @@ export default async function ConfigPage() {
             <strong className="tabular-nums text-texto">{STOP_LOSS.taxaEntregaMinima * 100}%</strong>
           </li>
           <li className="flex justify-between gap-4">
-            <span>Toques por lead</span>
-            <strong className="text-texto">D0 · D+4 · D+10</strong>
+            <span>Mensagens por lead</span>
+            <strong className="text-texto">{`${TOQUES.length}, nos dias ${TOQUES.map((t) => t.offsetDias).join(', ').replace(/, (\d+)$/, ' e $1')}`}</strong>
           </li>
         </ul>
         <p className="mt-3 text-[13px] text-suave">

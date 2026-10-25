@@ -267,9 +267,10 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
               </nav>
             </div>
 
-            {/* A partir de 1024 px os botões não encolhem: quem cede é a trilha (já corta com "…"). Sem isso, a 1024 com uma
-                trilha de 6 níveis os dois lados encolhiam juntos e o menu da pessoa passava da tela (E4, jornada 3). */}
-            <div className="flex min-w-0 items-center gap-1 sm:gap-2 lg:shrink-0">
+            {/* Desde que a trilha aparece (640 px), os botões não encolhem: quem cede é a trilha (já corta com "…"). Sem isso,
+                com uma trilha longa os dois lados encolhiam juntos e o menu da pessoa passava da tela (E4, jornada 3, a 1024;
+                E5.1, faturamento do dia, a 820). */}
+            <div className="flex min-w-0 items-center gap-1 sm:shrink-0 sm:gap-2">
               <SeletorVisao visao={props.visao} />
               <BuscaGlobal locais={locais} buscarNoServidor={buscarNoServidor} />
               {entradaDaTela && (

@@ -15,6 +15,7 @@ import { Contagem, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/supe
 import { ImportarForm } from './importar-form';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { exigirNivel1 } from '@/lib/erp/contexto';
+import { ROTULO_DO_LEAD, rotulo } from '@/lib/rodolfo/rotulos';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,8 +37,8 @@ const FILTROS = [
   { chave: 'NOVO', rotulo: 'Novos' },
   { chave: 'EM_CADENCIA', rotulo: 'Em cadência' },
   { chave: 'RESPONDEU', rotulo: 'Responderam' },
-  { chave: 'CONFLITO', rotulo: 'Conflito Bibi' },
-  { chave: 'OPT_OUT', rotulo: 'Opt-out' },
+  { chave: 'CONFLITO', rotulo: 'Conflito (Bibi)' },
+  { chave: 'OPT_OUT', rotulo: 'Pediram para sair' },
 ];
 
 export default async function LeadsPage({
@@ -159,7 +160,7 @@ export default async function LeadsPage({
                     </p>
                   </div>
                   <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <Selo tom={STATUS_TOM[l.status] ?? 'neutro'}>{l.status}</Selo>
+                    <Selo tom={STATUS_TOM[l.status] ?? 'neutro'}>{rotulo(ROTULO_DO_LEAD, l.status)}</Selo>
                     {l.tier && <span className="text-[12px] tabular-nums text-suave">{l.tier}</span>}
                   </div>
                 </Link>

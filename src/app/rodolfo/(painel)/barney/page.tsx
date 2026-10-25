@@ -10,13 +10,17 @@ import { prisma } from '@/lib/db';
 import { agoraSP, diaSP, montarEstadoEnvio } from '@/lib/rodolfo/estado';
 import { podeEnviar } from '@/lib/barney/tetos';
 import { lerConfig } from '@/lib/rodolfo/config';
-import { ENVIOS_MANUAIS_INICIAIS } from '@/lib/barney/regras';
+import { telaDaCadencia } from '@/lib/rodolfo/cadencia-tela';
+import { AtualizarSozinho } from '@/components/erp/telas/producao/atualizar-sozinho';
 import { acaoAprovarLote, acaoCancelarLote, acaoDryRun, acaoEnviarAgora, acaoProporLote } from '../actions';
 import { COR } from '@/lib/erp/modulos';
 import { BotaoAcao } from '@/components/erp/ui/botoes';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { Aviso, Contagem, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { exigirNivel1 } from '@/lib/erp/contexto';
+import Link from 'next/link';
+import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
+import { ROTULO_DA_MENSAGEM, ROTULO_DO_LOTE, rotulo, rotuloDoToque } from '@/lib/rodolfo/rotulos';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,7 +75,18 @@ export default async function BarneyPage() {
   ]);
 
   const decisao = podeEnviar(estado, agora);
-  const faltamManuais = Math.max(0, ENVIOS_MANUAIS_INICIAIS - estado.totalEnviadoHistorico);
+  // O que o "Enviar o próximo" passaria (manual: pula a exigência de manual e a janela, não o resto).
+  const manual = podeEnviar(estado, agora, { manual: true });
+  // Os botões de cada situação saem de uma função pura e testada (E5.1, decisões 466 e 467).
+  const tela = telaDaCadencia({
+    lote: lote ? { status: lote.status, itens: lote.itens.length } : null,
+    manual,
+    automatico: decisao,
+    totalEnviadoHistorico: estado.totalEnviadoHistorico,
+    modoAprovacao: config.modoAprovacao,
+  });
+  const { faltamManuais, principal } = tela;
+  const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
   const hora = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
@@ -86,40 +101,58 @@ export default async function BarneyPage() {
 
       {faltamManuais > 0 && (
         <Aviso tom="alerta" titulo="Número ainda aquecendo.">
-          Faltam {faltamManuais} envio(s) manual(is) antes do automático liberar. Use “Enviar agora”, um a um, com
+          {faltamManuais === 1 ? 'Falta 1 envio manual' : `Faltam ${plural(faltamManuais, 'envio manual', 'envios manuais')}`} antes do automático liberar. Envie um a um, com
           intervalo entre eles.
         </Aviso>
       )}
 
       {/* Decisões primeiro. Em 360px isto é o que aparece sem rolar. */}
-      <Painel titulo="Decisão" acessorio={lote ? <Selo tom={TOM_STATUS[lote.status]}>{lote.status}</Selo> : null}>
+      <Painel titulo="Lote de hoje" acessorio={lote ? <Selo tom={TOM_STATUS[lote.status]}>{rotulo(ROTULO_DO_LOTE, lote.status)}</Selo> : null}>
         <div className="grid gap-2 sm:grid-cols-2">
-          <BotaoAcao acao={acaoProporLote}>{lote ? 'Repropor lote' : 'Montar lote de hoje'}</BotaoAcao>
+          {tela.montar && (
+            <BotaoAcao acao={acaoProporLote} variante={principal === 'montar' ? 'primario' : 'secundario'}>
+              {lote ? 'Montar de novo' : 'Montar lote de hoje'}
+            </BotaoAcao>
+          )}
 
-          <BotaoAcao acao={acaoDryRun}>Dry-run (não envia)</BotaoAcao>
+          <BotaoAcao acao={acaoDryRun}>Simular o lote (não envia)</BotaoAcao>
 
-          {lote?.status === 'PROPOSTO' && (
-            <BotaoAcao acao={acaoAprovarLote} variante="primario">
+          {tela.aprovar && (
+            <BotaoAcao acao={acaoAprovarLote} variante={principal === 'aprovar' ? 'primario' : 'secundario'}>
               Aprovar lote
             </BotaoAcao>
           )}
 
-          <BotaoAcao acao={acaoEnviarAgora} variante={lote?.status === 'PROPOSTO' ? 'secundario' : 'primario'}>
-            Enviar agora (1)
-          </BotaoAcao>
+          {/* Espera que passa sozinha (intervalo, teto da hora): o botão fica, desabilitado, e a confirmação do envio anterior
+              continua embaixo dele. Recusa que pede ação: sem botão, com o motivo embaixo. */}
+          {tela.envio && (
+            <BotaoAcao acao={acaoEnviarAgora} variante={faltamManuais > 0 ? 'primario' : 'secundario'} desabilitado={!tela.envio.habilitado}>
+              {tela.envio.texto}
+            </BotaoAcao>
+          )}
 
-          {lote && lote.status !== 'CANCELADO' && (
+          {tela.cancelar && (
             <BotaoAcao acao={acaoCancelarLote} variante="perigo" confirmar="Cancelar o lote de hoje? Nada mais sai.">
               Cancelar lote
             </BotaoAcao>
           )}
         </div>
 
-        {!decisao.permitido && (
+        {tela.parado && (
           <p className="mt-3 rounded-[7px] border border-linha bg-texto/[0.03] px-3 py-2 text-[13px] text-suave">
-            <strong className="text-texto">Fila parada:</strong> {decisao.explicacao}
+            <strong className="text-texto">{tela.parado.titulo}</strong> {tela.parado.texto}
+            {tela.parado.config && (
+              <>
+                {' '}
+                <Link href="/rodolfo/config" className={LINK_DE_TEXTO}>
+                  {tela.parado.config === 'ligar' ? 'Ligar em Config' : 'Conectar em Config'}
+                </Link>
+              </>
+            )}
           </p>
         )}
+        {/* Quando a espera acabar, a tela se atualiza sozinha e o botão volta a valer. */}
+        {tela.envio && !tela.envio.habilitado && <AtualizarSozinho intervaloMs={Math.max(5, (tela.envio.liberaEmSegundos ?? 60) + 2) * 1000} />}
       </Painel>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 [&>*:last-child]:col-span-2 sm:[&>*:last-child]:col-span-1">
@@ -130,7 +163,7 @@ export default async function BarneyPage() {
 
       <Painel titulo="Fila" acessorio={<Contagem>{lote?.itens.length ?? 0}</Contagem>} semRespiro>
         {!lote || lote.itens.length === 0 ? (
-          <Vazio>Nenhum lote montado. Toque em “Montar lote de hoje”.</Vazio>
+          <Vazio>{lote ? 'O lote de hoje ficou vazio: nenhum lead elegível. Importe leads ou monte de novo.' : 'Nenhum lote montado. Toque em “Montar lote de hoje”.'}</Vazio>
         ) : (
           <ul>
             {lote.itens.map((item) => (
@@ -145,7 +178,7 @@ export default async function BarneyPage() {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
-                    <span className="text-[12px] tabular-nums text-suave">{item.toque}</span>
+                    <span className="text-[12px] tabular-nums text-suave">{rotuloDoToque(item.toque)}</span>
                     {item.lead.tier && <Selo>{item.lead.tier}</Selo>}
                   </div>
                 </div>
@@ -168,13 +201,13 @@ export default async function BarneyPage() {
                 <div className="min-w-0">
                   <p className="truncate text-sm">{m.lead?.restaurante ?? m.lead?.nome ?? m.to}</p>
                   <p className="text-[12px] text-suave">
-                    {m.toque ?? '—'}, às {hora.format(m.criadoEm)}
+                    {rotuloDoToque(m.toque)}, às {hora.format(m.criadoEm)}
                   </p>
                 </div>
                 <Selo
                   tom={m.status === 'FALHA' ? 'erro' : m.status === 'ENTREGUE' || m.status === 'LIDA' ? 'ok' : 'neutro'}
                 >
-                  {m.status === 'AGENDADA' ? 'SIMULADA' : m.status}
+                  {m.status === 'AGENDADA' ? 'Simulada' : rotulo(ROTULO_DA_MENSAGEM, m.status)}
                 </Selo>
               </li>
             ))}

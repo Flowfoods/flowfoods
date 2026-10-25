@@ -6,12 +6,15 @@
  * adianta a digitação.
  */
 
+import Link from 'next/link';
 import { prisma } from '@/lib/db';
+import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import type { Prisma } from '@prisma/client';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { FiltroEmLinks } from '@/components/erp/ui/filtros';
-import { Citacao, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
+import { Aviso, Citacao, Metrica, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
+import { ROTULO_DA_INTENCAO, rotulo } from '@/lib/rodolfo/rotulos';
 import { Responder } from './responder';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 
@@ -26,15 +29,20 @@ const INTENCAO_TOM: Record<string, 'ok' | 'alerta' | 'erro' | 'neutro'> = {
   OUTRO: 'neutro',
 };
 
-const FILTROS = ['', 'INTERESSADO', 'PERGUNTA', 'DEPOIS', 'RECUSA', 'OPT_OUT'];
+/** '' = todas; SEM = as que a IA ainda não classificou (um dos três números do topo, agora com filtro). */
+const FILTROS = ['', 'SEM', 'INTERESSADO', 'PERGUNTA', 'DEPOIS', 'RECUSA', 'OPT_OUT'];
 
 export default async function InboxPage({ searchParams }: { searchParams: Promise<{ intencao?: string }> }) {
   // O middleware já exige a sessão; a página confere de novo (o layout não substitui a checagem).
   await exigirNivel1();
-  const params = await searchParams;
+  const lidos = await searchParams;
+  // Só um filtro conhecido vira consulta (um valor torto na URL não chega ao banco como enum inválido).
+  const params = { intencao: FILTROS.includes(lidos.intencao ?? '') ? lidos.intencao : undefined };
 
   const where: Prisma.MessageWhereInput = { direction: 'IN' };
-  if (params.intencao) {
+  if (params.intencao === 'SEM') {
+    where.classificacao = { is: null };
+  } else if (params.intencao) {
     where.classificacao = {
       is: { intencao: params.intencao as Prisma.InboundClassificationWhereInput['intencao'] },
     };
@@ -78,7 +86,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           rotulo="Filtrar por intenção"
           opcoes={FILTROS.map((f) => ({
             href: f ? `/rodolfo/inbox?intencao=${f}` : '/rodolfo/inbox',
-            rotulo: f || 'Todas',
+            rotulo: f === '' ? 'Todas' : f === 'SEM' ? 'Sem classificar' : rotulo(ROTULO_DA_INTENCAO, f),
             ativo: (params.intencao ?? '') === f,
           }))}
         />
@@ -92,7 +100,19 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
 
       {mensagens.length === 0 ? (
         <Painel>
-          <Vazio>Nenhuma resposta ainda. Elas chegam pelo webhook da Evolution.</Vazio>
+          {params.intencao ? (
+            // Com filtro, o vazio é do filtro, não da Inbox: diz qual e volta para todas.
+            <Vazio
+              titulo={`Nenhuma resposta em “${params.intencao === 'SEM' ? 'Sem classificar' : rotulo(ROTULO_DA_INTENCAO, params.intencao)}”.`}
+              acao={
+                <Link href="/rodolfo/inbox" className={LINK_DE_TEXTO}>
+                  Ver todas as respostas
+                </Link>
+              }
+            />
+          ) : (
+            <Vazio titulo="Nenhuma resposta ainda.">Quando alguém responder uma mensagem da cadência, ela aparece aqui, já classificada.</Vazio>
+          )}
         </Painel>
       ) : (
         <div className="space-y-3">
@@ -109,16 +129,18 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
                     </p>
                   </div>
                   <Selo tom={INTENCAO_TOM[m.classificacao?.intencao ?? 'OUTRO']}>
-                    {m.classificacao?.intencao ?? 'sem classificar'}
+                    {rotulo(ROTULO_DA_INTENCAO, m.classificacao?.intencao, 'Sem classificar')}
                   </Selo>
                 </header>
 
                 <Citacao>{m.corpoRenderizado || <em className="text-suave">(sem texto — áudio ou mídia)</em>}</Citacao>
 
                 {optOut ? (
-                  <p className="mt-3 rounded-[7px] border border-erro/40 px-3 py-2 text-[13px] text-erro">
-                    Pediu para sair. Removido da lista permanentemente — não responda.
-                  </p>
+                  <div className="mt-3">
+                    <Aviso tom="erro" titulo="Pediu para sair.">
+                      Saiu da lista para sempre. Não responda.
+                    </Aviso>
+                  </div>
                 ) : m.lead ? (
                   <Responder leadId={m.lead.id} rascunho={m.classificacao?.rascunhoSugerido ?? ''} />
                 ) : (
