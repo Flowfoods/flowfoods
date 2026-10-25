@@ -235,12 +235,19 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     expect(h).toMatch(/role="img" aria-label="Prévia da etiqueta 60 × 40 mm: Molho cheddar; REFRIGERADO; MANIPULADO \d\d\/\d\d\/\d\d \d\d:\d\d; VALIDADE \d\d\/\d\d\/\d\d \d\d:\d\d; LOTE \d{6}-\d{2}; RESP\. Caio Cozinha; Vila da Penha · E\d{6}-0000"/);
     expect(h).toContain('name="envio" value="env-');
     expect(h).not.toContain('R$');
+    // E4: antes da primeira emissão, nada de "já tem etiqueta".
+    expect(t).not.toContain('Este lote já tem');
     const k = chave();
     const form = () => formDe({ formato: 'E60X40', quantas: '3', quanto: '1', escala: 'base', hora: 'sim', envio: k });
     const r1 = (await rodar(() => daSessao.acaoEmitirDoLote(ids.vp, ids.lote, null, form()))) as { url: string };
     expect(r1.url).toMatch(new RegExp(`^/erp/etiquetas/${ids.vp}/[a-z0-9]+\\?feito=emitida$`));
     ids.etiqueta = idDa(r1.url, `/erp/etiquetas/${ids.vp}/`);
     expect(await rodar(() => daSessao.acaoEmitirDoLote(ids.vp, ids.lote, null, form()))).toMatchObject({ url: `/erp/etiquetas/${ids.vp}/${ids.etiqueta}?feito=ja-emitida` });
+    // E4 (revisão de UX): depois de emitir, a tela do lote diz no alto que ele já tem etiqueta e leva à reimpressão dela.
+    const depois = await pagina(ErpEtiquetaDoLotePage({ params: { lojaId: ids.vp, ordemId: ids.lote } }));
+    expect(texto(depois)).toMatch(/Este lote já tem etiqueta: E\d{6}-\d{4} \(3 cópias de 1 kg\)\./);
+    expect(texto(depois)).toMatch(/Reimprimir E\d{6}-\d{4}/);
+    expect(depois.split(`href="/erp/etiquetas/${ids.vp}/${ids.etiqueta}"`).length - 1).toBe(2); // o aviso e a lista de emitidas
     // 3 × 1 kg passa de 4,6 kg? Não; 5 × 1 kg passa: a frase volta no campo.
     expect(await rodar(() => daSessao.acaoEmitirDoLote(ids.vp, ids.lote, null, formDe({ formato: 'E60X40', quantas: '5', quanto: '1', escala: 'base', hora: 'sim', envio: chave() })))).toMatchObject({ ok: false, erros: { quanto: expect.stringMatching(/passa do que saiu do lote/) } });
     // Sem permissão de etiqueta: a action recusa (a tela nem aparece).

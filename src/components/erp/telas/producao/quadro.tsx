@@ -56,6 +56,7 @@ function Cartao({ c, aqui, hoje }: { c: CartaoDoLote; aqui: string; hoje: string
       </div>
       <div className="mt-1 text-[13px] tabular-nums text-suave">
         Lote <span className="text-texto">{c.codigoLote}</span> · {c.status === 'CONCLUIDA' && c.produzidoMilesimos !== null ? `${formatarQuantidade(c.produzidoMilesimos, c.unidade)} de ${formatarQuantidade(c.planejadoMilesimos, c.unidade)}${r ? ` · rendeu ${formatarRendimento(r.rendimentoBp)}` : ''}` : formatarQuantidade(c.planejadoMilesimos, c.unidade)}
+        {r?.foraDaFaixa && c.produzidoMilesimos !== 0 && <span className="text-atencao"> · fora de ±10%</span>}
       </div>
       {pendente && c.requisicao && <div className={`mt-2 text-[12px] ${falta ? 'text-atencao' : 'text-suave'}`}>{situacaoDosInsumos(c.requisicao.status, c.requisicao.numero)}</div>}
       <div className={`mt-1 text-[12px] ${c.responsavel && pendente ? 'font-semibold text-texto' : 'text-suave'}`}>{quem}</div>
@@ -85,12 +86,15 @@ export function TelaQuadroDaProducao({
   base: string;
   contexto?: string;
   feito?: string;
-  pode: { registrar: boolean };
+  /** `planejar` = a gerência (define a lista): para ela a ação principal é planejar; para a cozinha, as Tarefas (revisão de UX, E4). */
+  pode: { registrar: boolean; planejar?: boolean };
   bloqueio: string | null;
 }) {
   const aqui = `${base}/${q.loja.id}`;
   const pendentes = q.colunas.PLANEJADA.length + q.colunas.EM_EXECUCAO.length;
   const atrasadas = [...q.colunas.PLANEJADA, ...q.colunas.EM_EXECUCAO].filter((c) => c.atrasoDias > 0).length;
+  // Um primário por cabeçalho: para a gerência, planejar; para a cozinha, as Tarefas (revisão de UX, E4).
+  const [comoTarefas, comoNova] = pode.planejar ? (['secundario', 'primario'] as const) : (['primario', 'secundario'] as const);
   return (
     <div className="space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: q.loja.nome }]} />
@@ -102,10 +106,10 @@ export function TelaQuadroDaProducao({
         acao={
           pode.registrar && !bloqueio && q.aberto ? (
             <>
-              <Link href={`${base}/tarefas/${q.loja.id}`} className={classeDeBotao('secundario')}>
+              <Link href={`${base}/tarefas/${q.loja.id}`} className={classeDeBotao(comoTarefas)}>
                 Tarefas da cozinha
               </Link>
-              <Link href={`${aqui}/nova`} className={classeDeBotao('primario')}>
+              <Link href={`${aqui}/nova`} className={classeDeBotao(comoNova)}>
                 Nova produção
               </Link>
             </>

@@ -15,6 +15,7 @@ import { UNIDADES, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
+import { acabouDeAtualizarSozinha } from './atualizar-sozinho';
 import type { AcaoDeEstoque, EstadoEstoque } from '../estoque/estado';
 
 export interface OpcaoDaLista {
@@ -64,6 +65,7 @@ export function FormListaDoDia({
   opcoes,
   emLote,
   naoGera,
+  faltas = null,
   bloqueio,
 }: {
   salvar: AcaoDeEstoque;
@@ -78,6 +80,8 @@ export function FormListaDoDia({
   emLote: number;
   /** Por que as linhas não viram lote agora (estoque não aberto); null = viram. */
   naoGera: string | null;
+  /** O que falta no estoque para a lista salva (frase pronta, `faltasDaConta`); null = nada falta. */
+  faltas?: string | null;
   bloqueio: string | null;
 }) {
   const [estado, enviar] = useFormState<EstadoEstoque, FormData>(salvar, null);
@@ -220,6 +224,7 @@ export function FormListaDoDia({
               </BotaoEnviar>
             </div>
             {motivoDeNaoGerar && salvas > 0 && <p className="text-[13px] text-atencao">{motivoDeNaoGerar}</p>}
+            {!motivoDeNaoGerar && salvas > 0 && faltas && <p className="text-[13px] text-atencao">{faltas}</p>}
             {estadoGerar?.erros.geral && (
               <p role="alert" className="text-[13px] text-erro">
                 {estadoGerar.erros.geral}
@@ -269,9 +274,15 @@ export function FormPorNaLista({ acao, dia, versao, fichaId, quantidadeMilesimos
  */
 export function LevarParaVista({ vez, children }: { vez: string; children: ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
+  // O aviso já levado à vista (a parte de `vez` antes do último ":", sem o relógio do servidor).
+  const levado = useRef<string | null>(null);
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
+    const aviso = vez.slice(0, Math.max(0, vez.lastIndexOf(':')));
+    // A tela se atualizou sozinha (Tarefas, E4) e trouxe o mesmo aviso: não rola nem tira o foco de novo.
+    if (levado.current === aviso && acabouDeAtualizarSozinha()) return;
+    levado.current = aviso;
     const menosMovimento = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     el.scrollIntoView({ behavior: menosMovimento ? 'auto' : 'smooth', block: 'start' });
     el.focus({ preventScroll: true });

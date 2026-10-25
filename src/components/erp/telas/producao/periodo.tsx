@@ -62,7 +62,7 @@ export function FiltroDoPeriodo({
                 Quem fez
               </label>
               <select id="filtro-pessoa" name="pessoa" defaultValue={pessoa ?? ''} className={CAMPO_DO_FILTRO}>
-                <option value="">Todas as pessoas</option>
+                <option value="">Todas</option>
                 {pessoas!.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.nome}

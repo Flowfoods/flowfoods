@@ -517,3 +517,22 @@ export const TITULO_NO_HISTORICO_DA_LISTA: Readonly<Record<string, string>> = {
   EXCLUIU: 'Apagada',
   GEROU_LOTES: 'Lotes gerados',
 };
+
+/**
+ * O que falta para o dia, dito junto do "Gerar os lotes" (revisão de UX, E4): quem gera vê a falta antes de decidir. É a conta da
+ * lista inteira do dia (as linhas em aberto e o que os lotes já gerados ainda vão tirar do estoque), não só do lote a gerar; por
+ * isso a frase fala do dia e de "algum lote". Inclui o pré-preparo que falta produzir (a requisição vai pedi-lo). Gerar não compra
+ * nem baixa nada: a frase só avisa. null = nada falta, ou a loja sem saldo apurado (a conta já diz). Até 3 nomes, o resto "e mais N".
+ */
+export function faltasDaConta(conta: Pick<ContaDaLista, 'apurado' | 'materiaPrima' | 'preparos'>): string | null {
+  if (!conta.apurado) return null;
+  const lista = (itens: { nome: string; unidade: Unidade; q: number }[]) => {
+    const nomes = itens.slice(0, 3).map((i) => `${i.nome} (${formatarQuantidade(i.q, i.unidade)})`);
+    return `${nomes.join(', ')}${itens.length > 3 ? ` e mais ${itens.length - 3}` : ''}`;
+  };
+  const comprar = conta.materiaPrima.filter((i) => (i.comprarMilesimos ?? 0) > 0).map((i) => ({ nome: i.nome, unidade: i.unidade, q: i.comprarMilesimos! }));
+  const produzir = conta.preparos.filter((p) => (p.faltaProduzirMilesimos ?? 0) > 0).map((p) => ({ nome: p.nome, unidade: p.unidade, q: p.faltaProduzirMilesimos! }));
+  if (comprar.length === 0 && produzir.length === 0) return null;
+  const partes = [comprar.length ? `falta no estoque: ${lista(comprar)}` : null, produzir.length ? `falta produzir: ${lista(produzir)}` : null].filter(Boolean);
+  return `Para a lista do dia, ${partes.join('; ')}. Se não chegar a tempo, algum lote pode render menos.`;
+}

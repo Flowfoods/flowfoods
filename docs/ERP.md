@@ -4510,3 +4510,17 @@ ressalvas; os achados de tela da produção seguem na rodada de acabamento (abai
 **Observação:** o pacote da ajuda (texto fixo, igual para todos, desde a 0.6) vai inteiro ao navegador e tem exemplos com
 R$ ("saco de 5 kg por R$ 25"); não é dado da operação. **Não feito:** validação com a cozinha e a gerência do Valentin's;
 impressão física na Zebra (sem impressora aqui); aparelho real.
+
+**E4 · produção, rodada de acabamento (decisão 462, 25/10/2026):** os "deveria" do revisor de UX resolvidos sem regra nova:
+"fora de ±10%" no lote, nas Tarefas e no quadro; "Não saiu" no lote quando a requisição foi encerrada com corte; a falta do dia
+(no estoque e a produzir) dita junto do "Gerar os lotes" (`faltasDaConta`); "Imprimir a etiqueta do lote" (56 px) na confirmação de concluir
+pelas Tarefas, sem falar de custo; Tarefas que se atualizam sozinhas (`telas/producao/atualizar-sozinho.tsx`: a cada minuto e
+ao voltar à tela, não enquanto alguém digita; a confirmação fica e a tela não rola de novo até ela); a etiqueta do lote avisa
+no alto que já foi emitida, com "Reimprimir"; no quadro, "Tarefas da cozinha" como ação principal para quem não planeja.
+**Provas:** testes com banco nas telas (lote fora da faixa e "Não saiu", botão principal por perfil, etiqueta depois de
+concluir com e sem permissão e com lote de fora, aviso de etiqueta já emitida) e teste puro da frase de falta; navegador:
+Otto pega um lote no tablet, o Gerente entrega a requisição em outra tela e, sem recarregar, o Concluir aparece na tela do
+Otto; concluir mostra o botão da etiqueta (56 px) e ele leva à etiqueta do lote; o relógio de 1 minuto pede os dados de
+novo sem foco nem recarga; lista de amanhã com a falta de Cebola roxa (4,95 kg) junto do botão. **Fiscal independente:** aprovado com ressalvas; os 4
+"deveria" (confirmação que sumia e fazia a tela pular, frase do concluído que prometia validade, falta atribuída ao lote a
+gerar, "Não saiu" no lote cancelado) corrigidos antes do commit.

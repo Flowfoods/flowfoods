@@ -6,6 +6,7 @@
  * nem reimprime, e a tela diz em vermelho o que fazer (rodada 1, decisão 417).
  */
 
+import Link from 'next/link';
 import type { LoteParaEtiqueta } from '@/lib/erp/etiquetas';
 import { quandoNaTela } from '@/lib/erp/etiqueta-campos';
 import { COR } from '@/lib/erp/modulos';
@@ -56,6 +57,7 @@ export function TelaEtiquetaDoLote({ d, base, contexto, acao, envio, hrefLote, b
         </Aviso>
       ) : (
         <>
+          {d.emissoes.length > 0 && <JaEmitida emissoes={d.emissoes} base={daLoja} />}
           {!l.validadeEm && (
             <Aviso tom="alerta" titulo="Este lote foi concluído sem validade.">
               A etiqueta sai com VALIDADE NÃO INFORMADA: ninguém inventa prazo. Peça a quem cuida das fichas para informar quanto o pré-preparo dura; os próximos lotes já saem com a data.
@@ -82,5 +84,23 @@ export function TelaEtiquetaDoLote({ d, base, contexto, acao, envio, hrefLote, b
 
       <ListaDeEmissoes emissoes={d.emissoes} base={daLoja} />
     </div>
+  );
+}
+
+/**
+ * O lote já tem etiqueta (revisão de UX, E4): dito no alto, antes do formulário, para ninguém emitir em dobro sem querer. Mais
+ * cópias da mesma etiqueta saem pela reimpressão (a validade não muda); emitir de novo cria outra etiqueta, com outro código.
+ */
+function JaEmitida({ emissoes, base }: { emissoes: LoteParaEtiqueta['emissoes']; base: string }) {
+  const e = emissoes[0];
+  const copias = `${e.quantas} ${e.quantas === 1 ? 'cópia' : 'cópias'}${e.quantidade ? ` de ${e.quantidade}` : ''}`;
+  const titulo = emissoes.length === 1 ? `Este lote já tem etiqueta: ${e.codigo} (${copias}).` : `Este lote já tem ${emissoes.length} emissões de etiqueta; a última é ${e.codigo} (${copias}).`;
+  return (
+    <Aviso tom="neutro" titulo={titulo}>
+      Para mais cópias da mesma, reimprima por ela; emitir de novo cria outra etiqueta.{' '}
+      <Link href={`${base}/${e.id}`} className="inline-flex min-h-11 items-center font-semibold text-texto underline underline-offset-4">
+        Reimprimir {e.codigo}
+      </Link>
+    </Aviso>
   );
 }

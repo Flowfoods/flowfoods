@@ -12,6 +12,7 @@ import {
   DIAS_A_FRENTE_DA_LISTA,
   diaDaLista,
   estadoDaLinha,
+  faltasDaConta,
   fraseSemSaldo,
   lerLinhasDaLista,
   linhaEditavel,
@@ -373,5 +374,25 @@ describe('ERP 3.2 · o dia e as frases', () => {
     expect(textoDaProducao([{ nome: 'Molho cheddar', unidade: 'KG', quantidadeMilesimos: 5000 }, { nome: 'Base de cebola', unidade: 'KG', quantidadeMilesimos: 300 }])).toBe('Molho cheddar 5 kg · Base de cebola 300 g');
     expect(textoDaProducao([])).toBe('nada');
     expect(textoDosLotes([{ codigo: '261021-01', nome: 'Molho cheddar', unidade: 'KG', quantidadeMilesimos: 5000 }])).toBe('261021-01 Molho cheddar 5 kg');
+  });
+});
+
+describe('E4 · a falta do dia dita junto do "Gerar os lotes"', () => {
+  const item = (nome: string, unidade: 'KG' | 'L' | 'UN', comprarMilesimos: number | null) => ({ insumoId: nome, nome, unidade, vaiUsarMilesimos: 1000, temMilesimos: 0, comprarMilesimos, negativo: false, deOnde: [], embalagens: null });
+  const preparo = (nome: string, faltaProduzirMilesimos: number | null) => ({ insumoId: nome, fichaId: 'f', nome, unidade: 'KG' as const, vaiUsarMilesimos: 1000, temMilesimos: 0, naListaMilesimos: 0, faltaProduzirMilesimos, negativo: false, semFicha: false, deOnde: [] });
+  it('um insumo: nome e quantidade, falando do dia e de "algum lote" (não só do lote a gerar)', () => {
+    expect(faltasDaConta({ apurado: true, materiaPrima: [item('Cebola roxa', 'KG', 835), item('Óleo de soja', 'L', 0)], preparos: [] })).toBe('Para a lista do dia, falta no estoque: Cebola roxa (835 g). Se não chegar a tempo, algum lote pode render menos.');
+  });
+  it('vários: até 3 pelo nome e "e mais N"', () => {
+    const f = faltasDaConta({ apurado: true, materiaPrima: [item('A', 'KG', 1000), item('B', 'L', 500), item('C', 'UN', 3000), item('D', 'KG', 200)], preparos: [] });
+    expect(f).toBe('Para a lista do dia, falta no estoque: A (1 kg), B (500 ml), C (3 un) e mais 1. Se não chegar a tempo, algum lote pode render menos.');
+  });
+  it('o pré-preparo que falta produzir (a requisição vai pedir) também entra, mesmo sem matéria-prima faltando', () => {
+    expect(faltasDaConta({ apurado: true, materiaPrima: [item('A', 'KG', 0)], preparos: [preparo('Base de cebola', 1000)] })).toBe('Para a lista do dia, falta produzir: Base de cebola (1 kg). Se não chegar a tempo, algum lote pode render menos.');
+    expect(faltasDaConta({ apurado: true, materiaPrima: [item('Cebola roxa', 'KG', 300)], preparos: [preparo('Base de cebola', 500)] })).toBe('Para a lista do dia, falta no estoque: Cebola roxa (300 g); falta produzir: Base de cebola (500 g). Se não chegar a tempo, algum lote pode render menos.');
+  });
+  it('nada falta, ou a loja sem saldo apurado (sem "comprar"): sem frase, nunca "falta 0"', () => {
+    expect(faltasDaConta({ apurado: true, materiaPrima: [item('A', 'KG', 0)], preparos: [preparo('B', 0)] })).toBeNull();
+    expect(faltasDaConta({ apurado: false, materiaPrima: [item('A', 'KG', null)], preparos: [preparo('B', null)] })).toBeNull();
   });
 });

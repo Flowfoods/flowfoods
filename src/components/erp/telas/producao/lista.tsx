@@ -11,7 +11,7 @@
 
 import Link from 'next/link';
 import type { ListaDoDiaNaTela, LinhaDaLista } from '@/lib/erp/producao-lista';
-import { quantidadeComSinal, resumoDaConta, textoDasEmbalagens, TITULO_NO_HISTORICO_DA_LISTA, type InsumoNaConta, type PreparoNaConta } from '@/lib/erp/producao-lista-campos';
+import { faltasDaConta, quantidadeComSinal, resumoDaConta, textoDasEmbalagens, TITULO_NO_HISTORICO_DA_LISTA, type InsumoNaConta, type PreparoNaConta } from '@/lib/erp/producao-lista-campos';
 import { ROTULO_DA_PRODUCAO } from '@/lib/erp/producao-campos';
 import { fraseDoLimite, fraseDoSaldo, SUBTITULO_DO_LIMITE } from '@/lib/erp/orcamento-campos';
 import type { OrcamentoNaNota } from '@/lib/erp/orcamento';
@@ -445,6 +445,7 @@ export function TelaListaDoDia({
                   opcoes={d.opcoes}
                   emLote={fixas.length}
                   naoGera={d.naoGera}
+                  faltas={faltasDaConta(d.conta)}
                   bloqueio={bloqueio}
                 />
                 {d.opcoes.length === 0 && <p className="mt-3 text-[13px] text-suave">Nenhum pré-preparo para produzir: cadastre a ficha técnica dele (molho, base, calda…) em Fichas técnicas.</p>}

@@ -31,6 +31,8 @@ vi.mock('next/navigation', () => ({
     throw new Error('NOT_FOUND');
   },
   usePathname: () => '/erp/producao/tarefas',
+  // As Tarefas se atualizam sozinhas no navegador (E4); na renderização do servidor o efeito não roda.
+  useRouter: () => ({ refresh: () => {}, replace: () => {} }),
 }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
@@ -120,7 +122,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     for (const [k, v] of Object.entries(campos)) f.append(k, v);
     return f;
   };
-  const tarefas = (feito?: string, lojaId = ids.vp) => pagina(ErpTarefasDaLojaPage({ params: { lojaId }, searchParams: { feito } }));
+  const tarefas = (feito?: string, lojaId = ids.vp, lote?: string) => pagina(ErpTarefasDaLojaPage({ params: { lojaId }, searchParams: { feito, lote } }));
 
   beforeAll(async () => {
     const host = new URL(URL_TESTE!).hostname;
@@ -261,10 +263,22 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     expect(texto(await pagina(ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: ids.lote }, searchParams: { de: 'tarefas' } })))).toMatch(/Este lote está com Duda Lima \(pegou às \d\d:\d\d\)\. Só Duda Lima ou a gerência conclui\./);
     como(OPERADOR(), DUDA);
     const v = (await obterOrdem(a, DONA(), ids.vp, ids.lote))!.ordem.versao;
-    expect(await rodar(() => daSessao.acaoConcluirProducao(ids.vp, ids.lote, null, formDe({ versao: String(v), produzido: '4,6', escala: 'base', motivo: '', conservacao: '', voltar: 'tarefas' })))).toMatchObject({ url: `/erp/producao/tarefas/${ids.vp}?feito=concluido` });
-    const feitas = texto(await tarefas('concluido'));
+    expect(await rodar(() => daSessao.acaoConcluirProducao(ids.vp, ids.lote, null, formDe({ versao: String(v), produzido: '4,6', escala: 'base', motivo: '', conservacao: '', voltar: 'tarefas' })))).toMatchObject({ url: `/erp/producao/tarefas/${ids.vp}?lote=${ids.lote}&feito=concluido` });
+    const feitas = texto(await tarefas('concluido', ids.vp, ids.lote));
     expect(feitas).toMatch(/Feitas hoje 1/);
     expect(feitas).toMatch(/4,6 kg de 5 kg · rendeu 92% · Duda Lima · \d\d:\d\d/);
+    // E4: a confirmação não fala de custo para a cozinha e oferece a etiqueta do lote que acabou de sair (56 px).
+    expect(feitas).not.toMatch(/custo/i);
+    const comEtiqueta = await tarefas('concluido', ids.vp, ids.lote);
+    const link = comEtiqueta.match(new RegExp(`<a[^>]*href="/erp/etiquetas/${ids.vp}/lote/${ids.lote}"[^>]*>([^<]*)<`));
+    expect(link?.[0]).toContain('min-h-14');
+    expect(link?.[1]).toBe('Imprimir a etiqueta do lote');
+    // Sem o lote, com um lote que não é desta loja hoje, ou sem "imprimir etiquetas": nada de botão.
+    expect(await tarefas('concluido')).not.toContain('Imprimir a etiqueta do lote');
+    expect(await tarefas('concluido', ids.vp, 'c' + 'x'.repeat(24))).not.toContain('Imprimir a etiqueta do lote');
+    como(alcanceDe(null, [ids.vp], ['producao.ver', 'producao.registrar']), DUDA);
+    expect(await tarefas('concluido', ids.vp, ids.lote)).not.toContain('Imprimir a etiqueta do lote');
+    como(OPERADOR(), DUDA);
   });
 
   it('histórico: a cozinha lê o quê, quanto, quem fez e o tempo (sem R$ quando não vê custos); a dona vê o custo', async () => {

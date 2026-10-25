@@ -53,7 +53,7 @@ const FEITO: Readonly<Record<string, string>> = {
   planejado: 'Lote planejado. A requisição dos insumos já está com o estoque; quando os insumos chegarem, comece a produzir.',
   iniciado: 'Produção começada. Quando o lote ficar pronto, conclua dizendo quanto saiu de verdade.',
   'ja-iniciado': 'Este lote já estava em produção.',
-  concluido: 'Lote concluído: ele entrou no estoque da loja e o custo ficou fechado pelo que saiu do estoque.',
+  concluido: 'Lote concluído e registrado na produção. Quanto saiu, o rendimento e a validade estão no lote.',
   'ja-concluido': 'Este lote já tinha sido concluído (por outra pessoa ou outra aba): nada entrou no estoque de novo.',
   'lote-cancelado': 'Lote cancelado. A requisição dos insumos foi cancelada junto.',
   'lote-ja-cancelado': 'Este lote já estava cancelado.',

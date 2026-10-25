@@ -19,7 +19,8 @@ const vezDe = (anterior: EstadoEstoque) => (anterior?.vez ?? 0) + 1;
 function concluir(r: ResultadoEstoque, anterior: EstadoEstoque, base: string, destino: (id: string) => string, feito: string, jaFeito: string): EstadoEstoque {
   if (!r.ok) return { ok: false, erros: r.erros, conflito: r.conflito, vez: vezDe(anterior) };
   revalidatePath(base, 'layout');
-  redirect(`${destino(r.id)}?feito=${r.jaFeito ? jaFeito : feito}`);
+  const para = destino(r.id);
+  redirect(`${para}${para.includes('?') ? '&' : '?'}feito=${r.jaFeito ? jaFeito : feito}`);
 }
 
 export async function executarPlanejar(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, anterior: EstadoEstoque, form: FormData, base: string) {
@@ -71,7 +72,9 @@ export async function executarConcluir(cliente: ClienteDoParceiro, alcance: Alca
     { versao: form.get('versao'), produzido: form.get('produzido'), escala: form.get('escala'), motivo: form.get('motivo'), conservacao: form.get('conservacao') },
     autor,
   );
-  return concluir(r, anterior, base, destinoDaCozinha(base, lojaId, form), 'concluido', 'ja-concluido');
+  // Pelas Tarefas, a volta leva o lote: a confirmação oferece a etiqueta dele a um toque (revisão de UX, E4).
+  const volta = (x: string) => (form.get('voltar') === 'tarefas' ? `${base}/tarefas/${lojaId}?lote=${encodeURIComponent(x)}` : `${base}/${lojaId}/${x}`);
+  return concluir(r, anterior, base, volta, 'concluido', 'ja-concluido');
 }
 
 export async function executarCancelarLote(cliente: ClienteDoParceiro, alcance: Alcance, autor: Autor, lojaId: string, id: string, anterior: EstadoEstoque, form: FormData, base: string) {

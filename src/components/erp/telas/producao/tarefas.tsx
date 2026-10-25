@@ -10,6 +10,7 @@
 
 import { FormQueLimpaRascunhos } from '../cadastro/form-que-limpa-rascunhos';
 import Link from 'next/link';
+import { AtualizarSozinho } from './atualizar-sozinho';
 import type { LinhaDaTarefa, LoteDaTarefa, TarefasDoDia } from '@/lib/erp/producao-equipe';
 import { formatarRendimento, rendimentoDoLote, situacaoDosInsumos } from '@/lib/erp/producao-campos';
 import { horaDoDia, quandoPegou } from '@/lib/erp/producao-equipe-campos';
@@ -88,6 +89,7 @@ export function TelaTarefas({
   acoes,
   bloqueio,
   periodosHref,
+  etiquetaHref = null,
 }: {
   t: TarefasDoDia;
   /** `/erp/producao` ou o espelho do nível 1. */
@@ -101,6 +103,8 @@ export function TelaTarefas({
   acoes: AcoesDaCozinha;
   bloqueio: string | null;
   periodosHref: string | null;
+  /** Depois de concluir pelas Tarefas: a etiqueta do lote que acabou de sair (só para quem imprime etiquetas). */
+  etiquetaHref?: string | null;
 }) {
   const aqui = `${base}/tarefas/${t.loja.id}`;
   const doLote = `${base}/${t.loja.id}`;
@@ -111,6 +115,7 @@ export function TelaTarefas({
   const subtitulo = [contexto, t.loja.nome, primeiraMaiuscula(t.rotuloDeHoje)].filter(Boolean).join(' · ');
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      <AtualizarSozinho />
       <TrilhaDaPagina itens={[{ rotulo: t.loja.nome }]} />
       <PageHeader icone="producao" cor={COR.producao} titulo="Tarefas da cozinha" subtitulo={subtitulo}>
         {eu ? (
@@ -133,6 +138,11 @@ export function TelaTarefas({
       {feito && (
         <LevarParaVista vez={`${feito}:${vez}`}>
           <Aviso tom="ok" titulo={feito} />
+          {etiquetaHref && (
+            <Link href={etiquetaHref} className={classeDeBotaoDaCozinha('primario', 'mt-3 w-full sm:w-auto')}>
+              Imprimir a etiqueta do lote
+            </Link>
+          )}
         </LevarParaVista>
       )}
       {bloqueio && <Aviso tom="alerta" titulo={bloqueio} />}
@@ -285,6 +295,7 @@ export function TelaTarefas({
                     </span>
                     <span className="shrink-0 text-[13px] tabular-nums text-suave">
                       {perdido ? <span className="font-semibold text-erro">lote perdido</span> : `${formatarQuantidade(f.produzidoMilesimos, f.unidade)} de ${formatarQuantidade(f.planejadoMilesimos, f.unidade)} · rendeu ${formatarRendimento(r!.rendimentoBp)}`}
+                      {r?.foraDaFaixa && <span className="text-atencao"> · fora de ±10%</span>}
                       {' · '}
                       {f.feitoPor ?? 'sem quem fez'} · {horaDoDia(f.concluidaEm, t.hoje)}
                     </span>

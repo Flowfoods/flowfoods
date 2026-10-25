@@ -70,6 +70,11 @@ export function TelaDoLote({
   const c = d.custo;
   const semPreco = c?.semPreco ?? [];
   const entregues = d.requisicao?.status === 'ATENDIDA';
+  // Requisição atendida com o resto encerrado: o que ficou não "falta" mais (ninguém vai entregar); "não saiu", como na
+  // requisição ("Encerrada com corte"). Revisão de UX, E4.
+  const cancelada = d.requisicao?.status === 'CANCELADA';
+  const rotuloDoResto = entregues || cancelada ? 'Não saiu' : 'Falta';
+  const corDoResto = (falta: number) => (falta > 0 && !cancelada ? 'text-atencao' : 'text-suave');
   // Sem baixa não há custo: "—" (ou "a entregar" enquanto o lote ainda espera), nunca R$ 0,00.
   const custoDoItem = (i: (typeof d.itensDoLote)[number]) =>
     i.semPreco ? 'Custo não informado' : i.saiuMilesimos === 0 || i.valorCentavos === null ? (pend && i.faltaMilesimos > 0 ? 'a entregar' : '—') : formatarDinheiro(i.valorCentavos);
@@ -154,8 +159,8 @@ export function TelaDoLote({
                     <dd className="font-semibold text-texto">{formatarQuantidade(i.saiuMilesimos, i.unidade)}</dd>
                   </div>
                   <div>
-                    <dt className="text-suave">Falta</dt>
-                    <dd className={`font-semibold ${i.faltaMilesimos > 0 ? 'text-atencao' : 'text-texto'}`}>{i.faltaMilesimos ? formatarQuantidade(i.faltaMilesimos, i.unidade) : '—'}</dd>
+                    <dt className="text-suave">{rotuloDoResto}</dt>
+                    <dd className={`font-semibold ${i.faltaMilesimos > 0 && !cancelada ? 'text-atencao' : 'text-texto'}`}>{i.faltaMilesimos ? formatarQuantidade(i.faltaMilesimos, i.unidade) : '—'}</dd>
                   </div>
                   {c && (
                     <div>
@@ -168,7 +173,7 @@ export function TelaDoLote({
             ))}
           </ul>
           <table className="hidden w-full text-sm md:table">
-            <caption className="sr-only">Insumos do lote: pedido, o que saiu do estoque, o que falta e, para quem vê custos, o custo.</caption>
+            <caption className="sr-only">Insumos do lote: pedido, o que saiu do estoque, {entregues || cancelada ? 'o que não saiu (a requisição foi encerrada ou cancelada)' : 'o que falta'} e, para quem vê custos, o custo.</caption>
             <thead>
               <tr className="bg-forte text-left text-[12px] text-suave">
                 <th scope="col" className="h-10 pl-5 pr-3 font-semibold">
@@ -181,7 +186,7 @@ export function TelaDoLote({
                   Saiu
                 </th>
                 <th scope="col" className="h-10 px-3 text-right font-semibold">
-                  Falta
+                  {rotuloDoResto}
                 </th>
                 {c && (
                   <th scope="col" className="h-10 px-3 pr-5 text-right font-semibold">
@@ -196,7 +201,7 @@ export function TelaDoLote({
                   <td className="py-2.5 pl-5 pr-3 font-medium text-texto">{i.nome}</td>
                   <td className="px-3 py-2.5 text-right">{formatarQuantidade(i.pedidoMilesimos, i.unidade)}</td>
                   <td className="px-3 py-2.5 text-right font-semibold">{formatarQuantidade(i.saiuMilesimos, i.unidade)}</td>
-                  <td className={`px-3 py-2.5 text-right ${i.faltaMilesimos > 0 ? 'text-atencao' : 'text-suave'}`}>{i.faltaMilesimos ? formatarQuantidade(i.faltaMilesimos, i.unidade) : '—'}</td>
+                  <td className={`px-3 py-2.5 text-right ${corDoResto(i.faltaMilesimos)}`}>{i.faltaMilesimos ? formatarQuantidade(i.faltaMilesimos, i.unidade) : '—'}</td>
                   {c && <td className={`px-3 py-2.5 pr-5 text-right ${i.semPreco ? 'text-atencao' : ''}`}>{custoDoItem(i)}</td>}
                 </tr>
               ))}
@@ -231,6 +236,8 @@ export function TelaDoLote({
                     {formatarRendimento(d.rendimento.rendimentoBp)}
                     {d.rendimento.diferencaMilesimos > 0 ? ` · faltaram ${formatarQuantidade(d.rendimento.diferencaMilesimos, o.unidade)}` : d.rendimento.diferencaMilesimos < 0 ? ` · ${formatarQuantidade(-d.rendimento.diferencaMilesimos, o.unidade)} a mais` : ''}
                   </span>
+                  {/* A frase do Histórico: o estado fora da faixa é escrito, não só sugerido pelo número (revisão de UX, E4). */}
+                  {d.rendimento.foraDaFaixa && o.produzidoMilesimos !== 0 && <span className="block text-[12px] text-atencao">fora de ±10%</span>}
                 </Linha>
               )}
               {o.motivoRendimento && <Linha rotulo="Motivo da diferença">{o.motivoRendimento}</Linha>}

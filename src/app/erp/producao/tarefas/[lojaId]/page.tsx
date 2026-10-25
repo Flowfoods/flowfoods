@@ -15,12 +15,15 @@ import { acaoPassarLote, acaoPegarDaLista, acaoPegarLote, acaoSoltarLote } from 
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpTarefasDaLojaPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { feito?: string } }) {
+export default async function ErpTarefasDaLojaPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { feito?: string; lote?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'producao.registrar');
   const t = await tarefasDoDia(ctx.cliente, ctx.alcance, params.lojaId, ctx.sessao.userId);
   if (!t) notFound();
   const lojaId = t.loja.id;
+  // Depois de concluir pelas Tarefas: a etiqueta do lote que acabou de sair (um lote concluído hoje nesta loja).
+  const concluido = searchParams.feito === 'concluido' ? t.feitasHoje.find((f) => f.id === searchParams.lote && f.produzidoMilesimos > 0) : undefined;
+  const etiquetaHref = concluido && pode(ctx.alcance, 'etiquetas.imprimir', { lojaId }) ? `/erp/etiquetas/${lojaId}/lote/${concluido.id}` : null;
   return (
     <TelaTarefas
       t={t}
@@ -30,6 +33,7 @@ export default async function ErpTarefasDaLojaPage({ params, searchParams }: { p
       pessoas={t.pode.gerenciar ? await pessoasQueProduzem(ctx.parceiro.id, lojaId) : []}
       acoes={{ pegarLote: acaoPegarLote.bind(null, lojaId), pegarLinha: acaoPegarDaLista.bind(null, lojaId), soltar: acaoSoltarLote.bind(null, lojaId), passar: acaoPassarLote.bind(null, lojaId), sair: acaoSair }}
       bloqueio={ctx.bloqueio}
+      etiquetaHref={etiquetaHref}
       periodosHref={pode(ctx.alcance, 'dre.ver') ? '/erp/dre/periodos' : null}
     />
   );

@@ -16,5 +16,5 @@ export default async function ErpProducaoDaLojaPage({ params, searchParams }: { 
   exigirPermissaoNaPagina(ctx, 'producao.ver');
   const q = await quadroDaProducao(ctx.cliente, ctx.alcance, params.lojaId);
   if (!q) notFound();
-  return <TelaQuadroDaProducao q={q} base="/erp/producao" feito={fraseDoEstoque(searchParams.feito)} pode={{ registrar: pode(ctx.alcance, 'producao.registrar', { lojaId: q.loja.id }) }} bloqueio={ctx.bloqueio} />;
+  return <TelaQuadroDaProducao q={q} base="/erp/producao" feito={fraseDoEstoque(searchParams.feito)} pode={{ registrar: pode(ctx.alcance, 'producao.registrar', { lojaId: q.loja.id }), planejar: pode(ctx.alcance, 'producao.planejar', { lojaId: q.loja.id }) }} bloqueio={ctx.bloqueio} />;
 }

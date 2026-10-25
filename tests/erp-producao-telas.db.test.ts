@@ -52,7 +52,7 @@ import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { cadastrarFicha } from '@/lib/erp/fichas';
 import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
 import { atenderRequisicao, obterRequisicao } from '@/lib/erp/requisicao';
-import { concluirProducao, listaDaProducao, obterOrdem, planejarProducao } from '@/lib/erp/producao';
+import { cancelarProducao, concluirProducao, listaDaProducao, obterOrdem, planejarProducao } from '@/lib/erp/producao';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance, type Permissao } from '@/lib/erp/permissoes';
 import ErpProducaoPage from '@/app/erp/producao/page';
 import ErpNovaProducaoLojaPage from '@/app/erp/producao/nova/page';
@@ -412,4 +412,47 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     expect(await planejarProducao(b, alcanceDe('DONO', 'rede'), ids.lojaB, { fichaId: ids.molho, quantidade: '1', paraDia: 'hoje', observacao: '', linhas: [], envio: 'env-b-1234567' }, { nome: 'Bia' })).toMatchObject({ ok: false });
     expect(await concluirProducao(b, alcanceDe('DONO', 'rede'), ids.lojaB, LOTE, { versao: 0, produzido: '1', escala: 'base', motivo: '', conservacao: '' }, { nome: 'Bia' })).toMatchObject({ ok: false });
   });
+
+  it('E4 · lote fora de ±10%: o lote e o quadro escrevem "fora de ±10%"; a requisição encerrada com corte vira "Não saiu" no lote', async () => {
+    const dona = alcanceDe('DONO', 'rede');
+    como(dona);
+    const lista = await listaDaProducao(a, dona, ids.vp, ids.molho, '2');
+    if (!lista.ok) throw new Error('lista');
+    const p = await planejarProducao(a, dona, ids.vp, { fichaId: ids.molho, quantidade: '2', paraDia: 'hoje', observacao: '', linhas: lista.linhas.map((l) => ({ insumoId: l.insumoId, quantidade: l.quantidade, escala: 'base' })), envio: 'env-fora-da-faixa-1' }, { nome: 'Marina' });
+    if (!p.ok) throw new Error(JSON.stringify(p));
+    const lote = p.id;
+    const req = (await obterRequisicao(a, dona, ids.vp, (await obterOrdem(a, dona, ids.vp, lote))!.requisicao!.id))!;
+    // Entrega tudo menos parte da cebola, e encerra o resto (como a gerência fez na jornada).
+    const linhas = req.itens.map((i) => ({ itemId: i.id, quantidade: i.nome === 'Cebola' ? '0,2' : String(i.faltaMilesimos / 1000).replace('.', ','), escala: 'base' }));
+    expect(await atenderRequisicao(a, GERENTE(), ids.vp, req.requisicao.id, { versao: req.requisicao.versao, linhas, encerrar: true, confirmarNegativo: true }, 'Edu')).toMatchObject({ ok: true });
+    const o = (await obterOrdem(a, dona, ids.vp, lote))!;
+    expect(await concluirProducao(a, dona, ids.vp, lote, { versao: o.ordem.versao, produzido: '1,6', escala: 'base', motivo: 'faltou cebola', conservacao: 'REFRIGERADO' }, { nome: 'Marina' })).toMatchObject({ ok: true });
+    como(OPERADOR());
+    const h = sp(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: lote }, searchParams: {} })));
+    expect(h).toContain('80%');
+    expect(h).toContain('fora de ±10%');
+    expect(h).toContain('Não saiu');
+    expect(h).not.toContain('>Falta<');
+    const q = await pagina(ErpProducaoDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} }));
+    expect(q).toContain('fora de ±10%');
+    // Lote cancelado (nada saiu): a requisição cancelada também mostra "Não saiu", sem o tom de alerta.
+    const p2 = await planejarProducao(a, dona, ids.vp, { fichaId: ids.molho, quantidade: '2', paraDia: 'hoje', observacao: '', linhas: lista.linhas.map((l) => ({ insumoId: l.insumoId, quantidade: l.quantidade, escala: 'base' })), envio: 'env-cancelado-12345' }, { nome: 'Marina' });
+    if (!p2.ok) throw new Error(JSON.stringify(p2));
+    const o2 = (await obterOrdem(a, dona, ids.vp, p2.id))!;
+    expect(await cancelarProducao(a, dona, ids.vp, p2.id, { versao: o2.ordem.versao, motivo: 'mudou o cardápio' }, { nome: 'Marina' })).toMatchObject({ ok: true });
+    const hc = await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: p2.id }, searchParams: {} }));
+    expect(hc).toContain('Não saiu');
+    expect(hc).not.toMatch(/text-atencao[^>]*>[^<]*kg</);
+    // O lote de 92% (dentro da faixa) não ganha a frase.
+    expect(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }))).not.toContain('fora de ±10%');
+    // O quadro: para quem não planeja, a ação principal é Tarefas; para a dona, Nova produção.
+    const botao = (html: string, href: string) => html.match(new RegExp(`<a[^>]*href="${href}"[^>]*>`))?.[0] ?? '';
+    expect(botao(q, `/erp/producao/tarefas/${ids.vp}`)).toContain('bg-acao');
+    expect(botao(q, `/erp/producao/${ids.vp}/nova`)).not.toContain('bg-acao');
+    como(dona);
+    const daDona = await pagina(ErpProducaoDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} }));
+    expect(botao(daDona, `/erp/producao/${ids.vp}/nova`)).toContain('bg-acao');
+    expect(botao(daDona, `/erp/producao/tarefas/${ids.vp}`)).not.toContain('bg-acao');
+  });
 });
+

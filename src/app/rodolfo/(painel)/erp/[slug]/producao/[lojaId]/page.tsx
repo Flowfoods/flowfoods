@@ -13,5 +13,5 @@ export default async function ParceiroProducaoDaLojaPage({ params, searchParams 
   exigirPermissao(ctx, 'producao.ver');
   const q = await quadroDaProducao(ctx.cliente, ctx.alcance, params.lojaId);
   if (!q) notFound();
-  return <TelaQuadroDaProducao q={q} base={`/rodolfo/erp/${ctx.parceiro.slug}/producao`} contexto={ctx.parceiro.nome} feito={fraseDoEstoque(searchParams.feito)} pode={{ registrar: true }} bloqueio={ctx.bloqueio} />;
+  return <TelaQuadroDaProducao q={q} base={`/rodolfo/erp/${ctx.parceiro.slug}/producao`} contexto={ctx.parceiro.nome} feito={fraseDoEstoque(searchParams.feito)} pode={{ registrar: true, planejar: true }} bloqueio={ctx.bloqueio} />;
 }

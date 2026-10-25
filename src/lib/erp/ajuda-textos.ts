@@ -674,13 +674,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'producao',
     rotas: ['producao/tarefas/[lojaId]'],
     titulo: 'Tarefas da cozinha da loja',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'As tarefas de hoje da loja: pegue a que você vai fazer e o lote fica com você, com o seu nome e a hora.' },
       { texto: 'Com os insumos entregues e o lote pronto, toque em Concluir e diga quanto saiu de verdade.' },
       { texto: 'Se não for terminar, solte o lote com o motivo: ele volta para alguém pegar.' },
       { texto: 'No tablet da cozinha, cada um entra com o próprio acesso: confira o seu nome no alto antes de pegar.' },
       { texto: 'A gerência solta o lote de qualquer pessoa ou passa para outra, sempre com o motivo.', para: ['producao.planejar'] },
+      { texto: 'A tela se atualiza sozinha a cada minuto e quando você volta a ela: o que o estoque entregou aparece sem recarregar.', para: ['producao.registrar'] },
     ],
     secoes: [
       {
