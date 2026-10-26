@@ -87,7 +87,7 @@ export function FormularioDosPeriodos({ caminho, f, opcoes, hoje }: { caminho: s
             ))}
           </select>
         </div>
-        <SeletorDeLojas lojas={opcoes.lojas} marcadas={r.lojaIds} />
+        <SeletorDeLojas lojas={opcoes.lojas} marcadas={r.lojaIds} rede={r.rede} />
         <div className="col-span-2 sm:col-span-1">
           <label htmlFor="cmp-fornecedor" className={ROTULO}>
             Fornecedor
@@ -261,7 +261,7 @@ export function FormularioDosFornecedores({ caminho, f, opcoes, hoje, aberto }: 
             ))}
           </select>
         </div>
-        <SeletorDeLojas lojas={opcoes.lojas} marcadas={f.lojaIds} />
+        <SeletorDeLojas lojas={opcoes.lojas} marcadas={f.lojaIds} rede={f.rede} />
       </FiltrosRecolhiveis>
       <div className="flex flex-wrap items-center gap-2">
         <button type="submit" className={classeDeBotao('primario', 'w-full sm:w-auto')}>

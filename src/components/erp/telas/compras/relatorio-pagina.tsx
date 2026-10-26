@@ -9,7 +9,7 @@ import type { Alcance } from '@/lib/erp/permissoes';
 import { ErroDeRelatorio, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { RelatorioGrande } from '../../ui/relatorio-grande';
 import { relatorioCompleto, relatorioDaTela } from '@/lib/erp/compras-relatorio';
-import { lerFiltrosDoRelatorio, somarDias, TETO_DA_IMPRESSAO } from '@/lib/erp/compras-relatorio-campos';
+import { lerFiltrosDoRelatorio, recorteDaVisao, somarDias, TETO_DA_IMPRESSAO } from '@/lib/erp/compras-relatorio-campos';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
 import { caminhoDeVolta } from '@/lib/erp/volta';
 import { Vazio, Painel } from '../../ui/superficies';
@@ -38,12 +38,11 @@ async function paginaDoRelatorio({
   let f = lerFiltrosDoRelatorio(searchParams, hoje, modo === 'insumo' ? { de: somarDias(hoje, -89) } : {});
   // L.3: a comparação abre estas linhas com `volta`; só vale caminho interno da área (`/erp/` ou `/rodolfo/erp/<slug>/`).
   f = { ...f, volta: caminhoDeVolta(f.volta, comprasBase.slice(0, -'compras'.length), 2000) ?? '' };
-  // A loja escolhida no topo decide o recorte só quando a pessoa não marcou nenhuma: a visão filtra, nunca concede.
-  let visaoDaLoja: string | null = null;
-  if (f.lojaIds.length === 0 && visao.tipo === 'loja') {
-    f = { ...f, lojaIds: [visao.lojaId] };
-    visaoDaLoja = visao.nome;
-  }
+  // A loja escolhida no topo decide o recorte só quando a pessoa não marcou nenhuma e o endereço não pediu a rede (decisão 478):
+  // a visão filtra, nunca concede.
+  const daVisao = recorteDaVisao(f, visao);
+  f = daVisao.f;
+  const { soALoja: visaoDaLoja, alemDaLoja } = daVisao;
   if (searchParams.imprimir === '1') {
     if (modo === 'insumo' && !f.insumoId) {
       return (
@@ -78,7 +77,7 @@ async function paginaDoRelatorio({
     r = await relatorioDaTela(ctx.cliente, ctx.alcance, f, modo);
   }
   return (
-    <TelaDoRelatorio modo={modo} caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} insumosBase={insumosBase} visaoDaLoja={visaoDaLoja} />
+    <TelaDoRelatorio modo={modo} caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} insumosBase={insumosBase} visaoDaLoja={visaoDaLoja} alemDaLoja={alemDaLoja} />
   );
 }
 

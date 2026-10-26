@@ -10,6 +10,7 @@ import { ErroDeRelatorio, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { comparacaoDeFornecedores, comparacaoDePeriodos } from '@/lib/erp/compras-comparacao';
 import { lerFiltrosDeFornecedores, lerFiltrosDePeriodos } from '@/lib/erp/compras-comparacao-campos';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
+import { recorteDaVisao } from '@/lib/erp/compras-relatorio-campos';
 import { caminhoDeVolta } from '@/lib/erp/volta';
 import { Painel, Vazio } from '../../ui/superficies';
 import { RelatorioGrande } from '../../ui/relatorio-grande';
@@ -33,12 +34,11 @@ async function paginaDosFornecedores({ ctx, caminho, comprasBase, insumosBase, s
   const { visao } = await visaoDaRequisicao(ctx);
   const hoje = hojeNoRio();
   let f = { ...lerFiltrosDeFornecedores(searchParams, hoje), volta: '' };
-  // A loja escolhida no topo decide o recorte só quando a pessoa não marcou nenhuma: a visão filtra, nunca concede.
-  let visaoDaLoja: string | null = null;
-  if (f.lojaIds.length === 0 && visao.tipo === 'loja') {
-    f = { ...f, lojaIds: [visao.lojaId] };
-    visaoDaLoja = visao.nome;
-  }
+  // A loja escolhida no topo decide o recorte só quando a pessoa não marcou nenhuma e o endereço não pediu a rede (decisão 478):
+  // a visão filtra, nunca concede.
+  const daVisao = recorteDaVisao(f, visao);
+  f = daVisao.f;
+  const { soALoja: visaoDaLoja, alemDaLoja } = daVisao;
   if (searchParams.imprimir === '1') {
     if (!f.insumoId) return <Nada titulo="Escolha um insumo antes de imprimir." texto="Volte à comparação, escolha o insumo e depois use “Imprimir ou salvar em PDF”." />;
     const r = await comparacaoDeFornecedores(ctx.cliente, ctx.alcance, f);
@@ -48,7 +48,7 @@ async function paginaDosFornecedores({ ctx, caminho, comprasBase, insumosBase, s
   const r = await comparacaoDeFornecedores(ctx.cliente, ctx.alcance, f);
   // Procurou pelo nome e só um insumo com compra tem esse nome: é ele (a leitura já saiu dele; aqui só o endereço e o formulário o assumem).
   if (r.insumoDaBusca) f = { ...f, insumoId: r.insumoDaBusca };
-  return <TelaDosFornecedores caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} insumosBase={insumosBase} visaoDaLoja={visaoDaLoja} />;
+  return <TelaDosFornecedores caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} insumosBase={insumosBase} visaoDaLoja={visaoDaLoja} alemDaLoja={alemDaLoja} />;
 }
 
 async function paginaDosPeriodos({ ctx, caminho, comprasBase, searchParams }: { ctx: Ctx; caminho: string; comprasBase: string; searchParams: Params }) {
@@ -57,11 +57,9 @@ async function paginaDosPeriodos({ ctx, caminho, comprasBase, searchParams }: { 
   let f = lerFiltrosDePeriodos(searchParams, hoje);
   // A volta (de onde a pessoa veio) só vale como caminho interno da área.
   f = { ...f, rel: { ...f.rel, volta: caminhoDeVolta(f.rel.volta, comprasBase.slice(0, -'compras'.length), 2000) ?? '' } };
-  let visaoDaLoja: string | null = null;
-  if (f.rel.lojaIds.length === 0 && visao.tipo === 'loja') {
-    f = { ...f, rel: { ...f.rel, lojaIds: [visao.lojaId] } };
-    visaoDaLoja = visao.nome;
-  }
+  const daVisao = recorteDaVisao(f.rel, visao);
+  f = { ...f, rel: daVisao.f };
+  const { soALoja: visaoDaLoja, alemDaLoja } = daVisao;
   if (searchParams.imprimir === '1') {
     const r = await comparacaoDePeriodos(ctx.cliente, ctx.alcance, f);
     if (!r.comparacao || !r.a || !r.b) {
@@ -72,7 +70,7 @@ async function paginaDosPeriodos({ ctx, caminho, comprasBase, searchParams }: { 
   const r = await comparacaoDePeriodos(ctx.cliente, ctx.alcance, f);
   // Procurou pelo nome e só um insumo com compra tem esse nome: é ele (a leitura já saiu dele; aqui só o endereço e o formulário o assumem).
   if (r.insumoDaBusca) f = { ...f, rel: { ...f.rel, insumoId: r.insumoDaBusca } };
-  return <TelaDosPeriodos caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} visaoDaLoja={visaoDaLoja} />;
+  return <TelaDosPeriodos caminho={caminho} comprasBase={comprasBase} contexto={ctx.parceiro.nome} f={f} r={r} hoje={hoje} visaoDaLoja={visaoDaLoja} alemDaLoja={alemDaLoja} />;
 }
 
 /** Se o relatório não couber agora (passou do teto de tempo ou há outros grandes rodando), a frase no lugar dos números, sem 500. */

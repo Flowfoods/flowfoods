@@ -90,8 +90,9 @@ function Tabela({ d, raiz, pode, escopoQuery }: { d: DreDoPeriodo; raiz: string;
   const r = d.resultado;
   const daLoja = d.escopo.tipo === 'loja';
   const lojaQuery = d.escopo.tipo === 'loja' ? `&loja=${d.escopo.lojaId}` : '';
-  // O relatório de compras sem loja marcada usaria a loja escolhida no topo: na rede, as lojas do DRE vão por extenso.
-  const lojasDasCompras = d.escopo.tipo === 'loja' ? lojaQuery : d.lojasDoEscopo.map((l) => `&loja=${l.id}`).join('');
+  // O relatório de compras sem loja marcada usaria a loja escolhida no topo: na rede, ele vai pedido para a rede (`rede=1`, as
+  // mesmas lojas do acesso que o DRE soma), sem listar cada loja no endereço (decisão 478).
+  const lojasDasCompras = d.escopo.tipo === 'loja' ? lojaQuery : '&rede=1';
   const meses = d.ate ? mesesDoIntervalo(d.periodo.inicio, d.ate) : [];
   const faturamentoDoMes = (mes: string) => `${raiz}/faturamento?mes=${mes}${d.escopo.tipo === 'loja' ? `&loja=${d.escopo.lojaId}` : '&rede=1'}`;
   const aqui = `${raiz}/dre?periodo=${d.periodo.inicio}${escopoQuery}`;
@@ -671,7 +672,7 @@ export function TelaDoDre({
           compras={
             d.ate
               ? {
-                  href: `${raiz}/compras/relatorios/periodo?de=${d.periodo.inicio}&ate=${d.ate}${loja ? `&loja=${loja.lojaId}` : d.lojasDoEscopo.map((l) => `&loja=${l.id}`).join('')}&ver=linhas&volta=${encodeURIComponent(`${base}?periodo=${d.periodo.inicio}${escopoQuery}`)}`,
+                  href: `${raiz}/compras/relatorios/periodo?de=${d.periodo.inicio}&ate=${d.ate}${loja ? `&loja=${loja.lojaId}` : '&rede=1'}&ver=linhas&volta=${encodeURIComponent(`${base}?periodo=${d.periodo.inicio}${escopoQuery}`)}`,
                   quando: `${diaEMes(d.periodo.inicio)} a ${diaEMes(d.ate)}`,
                 }
               : null

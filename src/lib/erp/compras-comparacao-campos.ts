@@ -473,6 +473,7 @@ export function queryDosPeriodos(f: FiltrosDePeriodos, mudar: MudancaDosPeriodos
   const x = { ...f, ...mudar, rel: { ...f.rel, ...(mudar.rel ?? {}) } };
   const q = new URLSearchParams();
   for (const l of x.rel.lojaIds) q.append('loja', l);
+  if (x.rel.rede && x.rel.lojaIds.length === 0) q.set('rede', '1');
   if (x.rel.fornecedorId) q.set('fornecedor', x.rel.fornecedorId);
   if (x.rel.insumoId) q.set('insumo', x.rel.insumoId);
   if (x.rel.q) q.set('q', x.rel.q);

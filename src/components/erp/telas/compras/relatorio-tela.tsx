@@ -31,7 +31,7 @@ import { Aviso, Painel, Vazio } from '../../ui/superficies';
 import { OPCOES_POR_PAGINA } from '@/lib/erp/insumo-campos';
 import { BotaoImprimir } from './botao-imprimir';
 import { Voltar } from '../cadastro/partes';
-import { ChipsDoRelatorio, FormularioDoRelatorio, hrefDoRelatorio, RECORTE_NOVO } from './relatorio-filtros';
+import { ChipsDoRelatorio, FormularioDoRelatorio, hrefDoRelatorio, NotaDaVisao, RECORTE_NOVO } from './relatorio-filtros';
 import { BarraDeSaida, Indicadores, NotasDoRelatorio, ParaOndeFoiODinheiro, TabelaDasCompras, TabelaDosGrupos } from './relatorio-partes';
 import { TabelasDaImpressao } from './relatorio-impressao';
 
@@ -102,6 +102,7 @@ export function TelaDoRelatorio({
   hoje,
   insumosBase,
   visaoDaLoja,
+  alemDaLoja,
 }: {
   modo: Modo;
   /** O endereço desta tela (sem filtros). */
@@ -116,6 +117,8 @@ export function TelaDoRelatorio({
   insumosBase?: string;
   /** A loja escolhida no topo quando ela decidiu o recorte (a pessoa não marcou loja). */
   visaoDaLoja?: string | null;
+  /** A loja escolhida no topo quando o endereço pediu a rede e ela foi deixada de lado (decisão 478). */
+  alemDaLoja?: string | null;
 }) {
   const vazio = VazioDoRelatorio({ r, f, caminho, modo });
   const t = r.totais;
@@ -145,11 +148,7 @@ export function TelaDoRelatorio({
         subtitulo={subtitulo}
       >
         <FormularioDoRelatorio modo={modo} caminho={caminho} f={f} opcoes={r.opcoes} hoje={hoje} />
-        {visaoDaLoja && (
-          <p className="text-[13px] text-suave">
-            Mostrando só <strong className="font-semibold text-texto">{visaoDaLoja}</strong>, a loja escolhida no topo. Para ver outras, marque-as em “Lojas”.
-          </p>
-        )}
+        <NotaDaVisao soALoja={visaoDaLoja} alemDaLoja={alemDaLoja ? { nome: alemDaLoja, href: hrefDoRelatorio(caminho, f, { rede: false, pagina: 1 }) } : null} />
         <ChipsDoRelatorio caminho={caminho} f={f} opcoes={r.opcoes} modo={modo} rotuloDoGrupo={rotuloDoGrupo} />
       </PageHeader>
 

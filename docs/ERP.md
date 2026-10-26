@@ -4716,3 +4716,10 @@ banco sem quebrar a tela e registrado no log. Os títulos do formulário públic
 cabe. Revisor: reprovou a primeira rodada (questionário do Valentin's marcado por padrão para qualquer cliente), aprovou a
 segunda. Também: o nome da loja na lista do Estoque no celular ganhou 44 px no toque. Matriz 72 telas: 0 falhas. Suíte com
 banco 2.939 aprovados, 46 pulados, 0 falhas; testes novos `portal-cadastro` e `portal-cadastro.db`.
+
+**Relatório de compras · pedido para a rede (decisão 478, 26/10/2026):** o DRE e o CMV por categoria da rede abrem o relatório de
+compras com `rede=1` em vez de listar cada loja no endereço (com mais de ~55 lojas a volta da nota se perdia; com mais de 100, a
+lista era cortada calada). Com `rede=1` valem todas as lojas do acesso e a loja escolhida no topo é só dita ("Mostrando todas as
+suas lojas, não só <loja>… Ver só <loja>"); marcar loja vale mais. A regra mora em `recorteDaVisao` e vale para o relatório e as
+duas comparações; links, formulário, planilha e impressão levam a rede adiante. Revisor: aprovou na primeira rodada. Matriz 96
+telas: 0 falhas. Suíte com banco 2.945 aprovados, 46 pulados, 0 falhas; teste novo `erp-compras-rede`.

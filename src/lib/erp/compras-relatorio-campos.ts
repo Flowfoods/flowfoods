@@ -62,6 +62,11 @@ export const TETO_DA_IMPRESSAO = 1_500;
 export interface FiltrosDoRelatorio {
   /** Vazio = todas as lojas do acesso. Outras lojas pedidas fora do acesso nunca ampliam: o relatório sai vazio. */
   lojaIds: string[];
+  /**
+   * Decisão 478: sem loja marcada, a loja escolhida no topo decide o recorte, a menos que o endereço peça a rede (`?rede=1`, o
+   * que o DRE da rede manda): então valem todas as lojas do acesso, sem listar cada uma no endereço. Só vale sem loja marcada.
+   */
+  rede: boolean;
   fornecedorId: string;
   insumoId: string;
   /** Busca pelo nome (ou marca) do insumo; ignora caixa e acento. */
@@ -126,8 +131,10 @@ export function lerFiltrosDoRelatorio(sp: Params, hoje = hojeNoRio(), padrao: Pa
   if (ate < de) periodoInvalido = 'A data final vem antes da inicial. Corrija o período para ver as compras.';
   else if (de < ANO_MINIMO || ate > ANO_MAXIMO) periodoInvalido = 'Escolha datas entre 2000 e 2100.';
   const grupo = um(sp.grupo);
+  const lojaIds = Array.from(new Set(todos(sp.loja).map(idOuNada).filter(Boolean))).slice(0, 100);
   return {
-    lojaIds: Array.from(new Set(todos(sp.loja).map(idOuNada).filter(Boolean))).slice(0, 100),
+    lojaIds,
+    rede: lojaIds.length === 0 && um(sp.rede) === '1',
     fornecedorId: idOuNada(um(sp.fornecedor)),
     insumoId: idOuNada(um(sp.insumo)),
     q: um(sp.q).trim().slice(0, 80),
@@ -149,11 +156,26 @@ export function lerFiltrosDoRelatorio(sp: Params, hoje = hojeNoRio(), padrao: Pa
   };
 }
 
+/**
+ * Decisão 478 — o que a loja escolhida no topo faz no recorte, igual no relatório e nas duas comparações: sem loja marcada, ela
+ * decide (`soALoja`); se o endereço pediu a rede, valem todas as lojas do acesso e ela é só dita (`alemDaLoja`), com o caminho
+ * para ver só ela. A visão filtra, nunca concede.
+ */
+export function recorteDaVisao<T extends Pick<FiltrosDoRelatorio, 'lojaIds' | 'rede'>>(
+  f: T,
+  visao: { tipo: 'rede' } | { tipo: 'loja'; lojaId: string; nome: string } | { tipo: 'nenhuma' },
+): { f: T; soALoja: string | null; alemDaLoja: string | null } {
+  if (visao.tipo !== 'loja' || f.lojaIds.length > 0) return { f, soALoja: null, alemDaLoja: null };
+  if (f.rede) return { f, soALoja: null, alemDaLoja: visao.nome };
+  return { f: { ...f, lojaIds: [visao.lojaId] }, soALoja: visao.nome, alemDaLoja: null };
+}
+
 /** A URL do relatório com estes filtros (e as mudanças pedidas). Sempre leva as datas e a base: o endereço não muda com o dia. */
 export function queryDoRelatorio(f: FiltrosDoRelatorio, mudar: Partial<FiltrosDoRelatorio> = {}, opcoes: { semPagina?: boolean } = {}): string {
   const x = { ...f, ...mudar };
   const q = new URLSearchParams();
   for (const l of x.lojaIds) q.append('loja', l);
+  if (x.rede && x.lojaIds.length === 0) q.set('rede', '1');
   if (x.fornecedorId) q.set('fornecedor', x.fornecedorId);
   if (x.insumoId) q.set('insumo', x.insumoId);
   if (x.q) q.set('q', x.q);

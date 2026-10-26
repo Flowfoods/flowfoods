@@ -191,7 +191,7 @@ export function TelaDoCmvPorCategoria({
   const comPreparo = new Set(r.categoriasComPreparoComprado ?? []);
   const abreCategoria = (l: LinhaDoPainel): string | null =>
     pode.verCompras && d.ate && d.status !== 'FECHADO' && soCompras && l.tipo === 'categoria' && l.categoriaId && !comPreparo.has(l.categoriaId) && l.fonte === 'compras' && (l.realizadoCentavos ?? 0) > 0
-      ? `${raiz}/compras/relatorios/periodo?de=${d.periodo.inicio}&ate=${d.ate}&categoria=${l.categoriaId}${loja ? `&loja=${loja.lojaId}` : d.lojasDoEscopo.map((x) => `&loja=${x.id}`).join('')}&volta=${encodeURIComponent(aqui)}`
+      ? `${raiz}/compras/relatorios/periodo?de=${d.periodo.inicio}&ate=${d.ate}&categoria=${l.categoriaId}${loja ? `&loja=${loja.lojaId}` : '&rede=1'}&volta=${encodeURIComponent(aqui)}`
       : null;
   const comValor = painel ? painel.linhas.filter((l) => l.tipo === 'categoria' && (l.realizadoCentavos ?? 0) > 0) : [];
   const abrem = comValor.some((l) => abreCategoria(l) !== null);

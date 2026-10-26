@@ -35,7 +35,7 @@ import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
 import { BotaoImprimir } from './botao-imprimir';
 import { ChipsDosPeriodos, FormularioDosPeriodos, hrefDosPeriodos } from './comparacao-filtros';
 import { BarraDeSaidaDaComparacao } from './comparacao-fornecedores';
-import { hrefDoRelatorio } from './relatorio-filtros';
+import { hrefDoRelatorio, NotaDaVisao } from './relatorio-filtros';
 import { Cartao, GRANDE, pl } from './relatorio-partes';
 
 const SIGLA = (u: Unidade) => UNIDADES[u].sigla;
@@ -408,6 +408,7 @@ export function TelaDosPeriodos({
   r,
   hoje,
   visaoDaLoja,
+  alemDaLoja,
 }: {
   caminho: string;
   comprasBase: string;
@@ -416,6 +417,8 @@ export function TelaDosPeriodos({
   r: ComparacaoDePeriodosDaTela;
   hoje: string;
   visaoDaLoja?: string | null;
+  /** A loja escolhida no topo quando o endereço pediu a rede e ela foi deixada de lado (decisão 478). */
+  alemDaLoja?: string | null;
 }) {
   const subtitulo = [contexto, r.insumo?.nome, `A ${faixa(f.rel.de, f.rel.ate)} × B ${faixa(f.deB, f.ateB)}`, BASES_DE_DATA[f.rel.base].curto].filter(Boolean).join(' · ');
   const volta = hrefDosPeriodos(caminho, f);
@@ -472,11 +475,7 @@ export function TelaDosPeriodos({
     <div className="space-y-6">
       <PageHeader icone="periodos" cor={COR.compras} titulo="Comparar períodos" subtitulo={subtitulo}>
         <FormularioDosPeriodos caminho={caminho} f={f} opcoes={r.opcoes} hoje={hoje} />
-        {visaoDaLoja && (
-          <p className="text-[13px] text-suave">
-            Mostrando só <strong className="font-semibold text-texto">{visaoDaLoja}</strong>, a loja escolhida no topo. Para ver outras, marque-as em “Lojas”.
-          </p>
-        )}
+        <NotaDaVisao soALoja={visaoDaLoja} alemDaLoja={alemDaLoja ? { nome: alemDaLoja, href: hrefDosPeriodos(caminho, f, { rel: { rede: false }, pagina: 1 }) } : null} />
         <ChipsDosPeriodos caminho={caminho} f={f} opcoes={r.opcoes} insumoNome={r.insumo?.nome} />
       </PageHeader>
 

@@ -38,10 +38,16 @@ export function filtrosAtivosDoRelatorio(f: FiltrosDoRelatorio, modo: Modo): num
   return [f.lojaIds.length > 0, !!f.fornecedorId, modo === 'periodo' && !!f.insumoId, modo === 'periodo' && !!f.q, !!f.categoriaId, f.situacao === 'canceladas'].filter(Boolean).length;
 }
 
-export function SeletorDeLojas({ lojas, marcadas }: { lojas: Opcoes['lojas']; marcadas: string[] }) {
+/**
+ * `rede`: o endereço pediu a rede inteira (decisão 478). Sem loja marcada, o formulário a mantém ao aplicar outro filtro; marcar
+ * uma loja vale mais que ela.
+ */
+export function SeletorDeLojas({ lojas, marcadas, rede = false }: { lojas: Opcoes['lojas']; marcadas: string[]; rede?: boolean }) {
+  const daRede = rede && marcadas.length === 0 ? <input type="hidden" name="rede" value="1" /> : null;
   if (lojas.length <= 1) {
     return (
       <div className="col-span-2">
+        {daRede}
         <span className={ROTULO}>Loja</span>
         <p className="flex min-h-11 items-center text-sm text-texto sm:min-h-[42px]">{lojas[0]?.nome ?? 'Nenhuma loja no seu acesso'}</p>
       </div>
@@ -50,6 +56,7 @@ export function SeletorDeLojas({ lojas, marcadas }: { lojas: Opcoes['lojas']; ma
   const resumo = marcadas.length === 0 ? `Todas as minhas lojas (${lojas.length})` : marcadas.length === 1 ? (lojas.find((l) => l.id === marcadas[0])?.nome ?? '1 loja') : `${marcadas.length} lojas`;
   return (
     <div className="col-span-2 sm:col-span-1">
+      {daRede}
       <span id="rel-lojas-rotulo" className={ROTULO}>
         Lojas
       </span>
@@ -84,6 +91,29 @@ export function SeletorDeLojas({ lojas, marcadas }: { lojas: Opcoes['lojas']; ma
         </fieldset>
       </details>
     </div>
+  );
+}
+
+/**
+ * O que a loja escolhida no topo fez no recorte: decidiu (a pessoa não marcou loja) ou foi deixada de lado porque o endereço
+ * pediu a rede (decisão 478), com o caminho para ver só ela.
+ */
+export function NotaDaVisao({ soALoja, alemDaLoja }: { soALoja?: string | null; alemDaLoja?: { nome: string; href: string } | null }) {
+  if (soALoja) {
+    return (
+      <p className="text-[13px] text-suave">
+        Mostrando só <strong className="font-semibold text-texto">{soALoja}</strong>, a loja escolhida no topo. Para ver outras, marque-as em “Lojas”.
+      </p>
+    );
+  }
+  if (!alemDaLoja) return null;
+  return (
+    <p className="text-[13px] text-suave">
+      Mostrando todas as suas lojas, não só <strong className="font-semibold text-texto">{alemDaLoja.nome}</strong>, a loja escolhida no topo.{' '}
+      <Link href={alemDaLoja.href} className={`${LINK_DE_TEXTO} ff-toque`}>
+        Ver só {alemDaLoja.nome}
+      </Link>
+    </p>
   );
 }
 
@@ -181,7 +211,7 @@ export function FormularioDoRelatorio({
             ))}
           </select>
         </div>
-        <SeletorDeLojas lojas={opcoes.lojas} marcadas={f.lojaIds} />
+        <SeletorDeLojas lojas={opcoes.lojas} marcadas={f.lojaIds} rede={f.rede} />
         <div className="col-span-2 sm:col-span-1">
           <label htmlFor="rel-fornecedor" className={ROTULO}>
             Fornecedor

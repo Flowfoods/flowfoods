@@ -66,8 +66,10 @@ import ErpCmvPorCategoriaPage from '@/app/erp/dre/cmv-categorias/page';
 import NivelUmDespesasPage from '@/app/rodolfo/(painel)/erp/[slug]/dre/despesas/page';
 import NivelUmDespesaPage from '@/app/rodolfo/(painel)/erp/[slug]/dre/despesas/[id]/page';
 import ErpEditarDespesaPage from '@/app/erp/dre/despesas/[id]/editar/page';
+import ErpRelatorioPage from '@/app/erp/compras/relatorios/periodo/page';
+import ErpComparacaoDePeriodosPage from '@/app/erp/compras/relatorios/comparar-periodos/page';
 import { TelaDoDre } from '@/components/erp/telas/dre/dre';
-import { lerFiltrosDoRelatorio } from '@/lib/erp/compras-relatorio-campos';
+import { lerFiltrosDoRelatorio, recorteDaVisao } from '@/lib/erp/compras-relatorio-campos';
 import { relatorioDaTela } from '@/lib/erp/compras-relatorio';
 import { BRT, faturamento, nota, R, sp } from './erp-cmv-apoio';
 import { cadastrarInsumoDeTeste as cadastrarInsumo, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
@@ -138,8 +140,8 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
       const v = u.searchParams.getAll(k);
       params[k] = v.length > 1 ? v : v[0];
     }
-    let f = lerFiltrosDoRelatorio(params, HOJE);
-    if (f.lojaIds.length === 0 && lojaDoTopo) f = { ...f, lojaIds: [lojaDoTopo] };
+    // A mesma regra da página: a loja do topo decide só sem loja marcada e sem a rede pedida (decisão 478).
+    const { f } = recorteDaVisao(lerFiltrosDoRelatorio(params, HOJE), lojaDoTopo ? { tipo: 'loja', lojaId: lojaDoTopo, nome: 'topo' } : { tipo: 'rede' });
     return (await relatorioDaTela(a, alcance, f, 'periodo')).totais?.totalCentavos ?? null;
   };
   const textos = (p: Partial<TextosDaDespesa>): TextosDaDespesa => ({ envio: globalThis.crypto.randomUUID().replace(/-/g, ''), lojaId: '', linha: 'aluguel', descricao: 'Aluguel', valor: '1,00', tipo: 'mes', dia: '', mes: '2026-09', de: '', ate: '', recorrente: false, vencimento: '', ...p });
@@ -364,21 +366,41 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     expect(h).toContain(amp(`href="/erp/dre/despesas?linha=${linha.aluguel}&de=2026-09-01&ate=2026-09-30"`));
     expect(h).toContain('aria-label="Aluguel, R$ 4.500,00: ver as despesas que formam este número"');
     expect(h).toContain(amp(`href="/erp/dre/despesas?linha=${linha.iptu}&de=2026-09-01&ate=2026-09-30"`));
-    // Na rede, as lojas do DRE vão por extenso (sem loja marcada, o relatório usaria a loja escolhida no topo).
+    // Na rede, o relatório vai pedido para a rede (sem loja marcada ele usaria a loja escolhida no topo), sem listar as lojas
+    // no endereço (decisão 478).
     const voltaDoDre = encodeURIComponent('/erp/dre?periodo=2026-09-01&rede=1');
-    expect(h).toContain(amp(`href="/erp/compras/relatorios/periodo?de=2026-09-01&ate=2026-09-30&loja=${ids.dl}&loja=${ids.vp}&volta=${voltaDoDre}"`));
+    expect(h).toContain(amp(`href="/erp/compras/relatorios/periodo?de=2026-09-01&ate=2026-09-30&rede=1&volta=${voltaDoDre}"`));
     expect(h).toContain(amp('href="/erp/dre/cmv-categorias?periodo=2026-09-01&rede=1"'));
     expect(h).toContain(amp('href="/erp/faturamento?mes=2026-09&rede=1"'));
     expect(h).toContain('Faturamento do mês inteiro:');
     expect(h).toContain('Ver as compras de 01/09 a 30/09');
-    expect(h.match(/href="\/erp\/compras\/relatorios\/periodo\?de=2026-09-01&amp;ate=2026-09-30&amp;loja=/g)?.length).toBe(2); // a linha e o painel
+    expect(h.match(/href="\/erp\/compras\/relatorios\/periodo\?de=2026-09-01&amp;ate=2026-09-30&amp;rede=1&amp;/g)?.length).toBe(2); // a linha e o painel
+    expect(h).not.toMatch(/compras\/relatorios\/periodo\?[^"]*loja=/);
     // Linha sem despesa e resultado não viram link.
     expect(h).not.toContain(`linha=${linha.energia}`);
-    // O destino soma o número clicado, mesmo com uma loja escolhida no topo (o link da rede leva as lojas por extenso).
+    // O destino soma o número clicado, mesmo com uma loja escolhida no topo (o link da rede pede a rede, decisão 478).
     const compras = hrefDe(h, 'Pelas compras (data da nota), R$ 2.021,00')!;
     expect(compras).toBeTruthy();
     expect(await totalDoRelatorio(compras, alcanceDe('DONO', 'rede'), ids.vp)).toBe(R(2_021));
     expect(await totalDoRelatorio(compras, alcanceDe('DONO', 'rede'))).toBe(R(2_021));
+    // A página de verdade (decisão 478): com a Vila da Penha no topo, o link da rede soma a rede e diz que a loja do topo ficou
+    // de lado; sem a rede no endereço, a loja do topo decide, como antes. A comparação de períodos segue a mesma regra.
+    const params = Object.fromEntries(new URL(compras, 'http://x').searchParams);
+    expect(params.rede).toBe('1');
+    como(alcanceDe('DONO', 'rede'));
+    atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
+    const daRede = sp(renderToStaticMarkup(await resolver(await ErpRelatorioPage({ searchParams: params }))));
+    expect(daRede).toContain('R$ 2.021,00');
+    expect(daRede).toContain('Mostrando todas as suas lojas, não só <strong class="font-semibold text-texto">Vila da Penha</strong>, a loja escolhida no topo.');
+    expect(daRede).toContain('<input type="hidden" name="rede" value="1"/>');
+    const { rede: _rede, ...semRede } = params;
+    const soDoTopo = sp(renderToStaticMarkup(await resolver(await ErpRelatorioPage({ searchParams: semRede }))));
+    expect(soDoTopo).not.toContain('R$ 2.021,00');
+    expect(soDoTopo).toContain('Mostrando só <strong class="font-semibold text-texto">Vila da Penha</strong>, a loja escolhida no topo.');
+    const comparacao = sp(renderToStaticMarkup(await resolver(await ErpComparacaoDePeriodosPage({ searchParams: { rede: '1' } }))));
+    expect(comparacao).toContain('Mostrando todas as suas lojas, não só');
+    expect(sp(renderToStaticMarkup(await resolver(await ErpComparacaoDePeriodosPage({ searchParams: {} }))))).toContain('Mostrando só <strong');
+    como(alcanceDe('DONO', 'rede'));
 
     comoGerente();
     const g = await dre({ periodo: '2026-09-10', rede: '1' });
@@ -408,8 +430,8 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     const amp = (s: string) => s.replace(/&/g, '&amp;');
     const volta = encodeURIComponent('/erp/dre/cmv-categorias?periodo=2026-09-01&rede=1');
     const h = await categorias({ periodo: '2026-09-10', rede: '1' });
-    expect(h).toContain(amp(`href="/erp/compras/relatorios/periodo?de=2026-09-01&ate=2026-09-30&categoria=${cat.PROTEINA}&loja=${ids.dl}&loja=${ids.vp}&volta=${volta}"`));
-    expect(h).toContain(amp(`categoria=${cat.MERCEARIA}&loja=${ids.dl}&loja=${ids.vp}&volta=`));
+    expect(h).toContain(amp(`href="/erp/compras/relatorios/periodo?de=2026-09-01&ate=2026-09-30&categoria=${cat.PROTEINA}&rede=1&volta=${volta}"`));
+    expect(h).toContain(amp(`categoria=${cat.MERCEARIA}&rede=1&volta=`));
     expect(h).toContain(': ver as compras que formam este número');
     const proteina = hrefDe(h, 'Proteína, R$ 1.521,00')!;
     expect(await totalDoRelatorio(proteina, alcanceDe('DONO', 'rede'), ids.vp)).toBe(R(1_521));

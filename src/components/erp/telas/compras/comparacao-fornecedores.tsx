@@ -19,7 +19,7 @@ import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
 import { BotaoImprimir } from './botao-imprimir';
 import { ChipsDosFornecedores, FormularioDosFornecedores } from './comparacao-filtros';
-import { hrefDoRelatorio } from './relatorio-filtros';
+import { hrefDoRelatorio, NotaDaVisao } from './relatorio-filtros';
 import { Cartao, pl, GRANDE } from './relatorio-partes';
 
 const SIGLA = (u: Unidade) => UNIDADES[u].sigla;
@@ -311,6 +311,7 @@ export function TelaDosFornecedores({
   hoje,
   insumosBase,
   visaoDaLoja,
+  alemDaLoja,
 }: {
   caminho: string;
   comprasBase: string;
@@ -320,6 +321,8 @@ export function TelaDosFornecedores({
   hoje: string;
   insumosBase?: string;
   visaoDaLoja?: string | null;
+  /** A loja escolhida no topo quando o endereço pediu a rede e ela foi deixada de lado (decisão 478). */
+  alemDaLoja?: string | null;
 }) {
   const insumo = r.insumo;
   // Só conta quem tem preço comparável; "0 fornecedores" soaria a erro quando a compra existe e ficou sem base.
@@ -336,11 +339,7 @@ export function TelaDosFornecedores({
     <div className="space-y-6">
       <PageHeader icone="comparar" cor={COR.compras} titulo="Comparar fornecedores" subtitulo={subtitulo}>
         <FormularioDosFornecedores caminho={caminho} f={f} opcoes={r.opcoes} hoje={hoje} aberto={!insumo} />
-        {visaoDaLoja && (
-          <p className="text-[13px] text-suave">
-            Mostrando só <strong className="font-semibold text-texto">{visaoDaLoja}</strong>, a loja escolhida no topo. Para ver outras, marque-as em “Lojas”.
-          </p>
-        )}
+        <NotaDaVisao soALoja={visaoDaLoja} alemDaLoja={alemDaLoja ? { nome: alemDaLoja, href: hrefDoRelatorio(caminho, f, { rede: false }, { semPagina: true }) } : null} />
         <ChipsDosFornecedores caminho={caminho} f={f} opcoes={r.opcoes} insumoNome={insumo?.nome} />
       </PageHeader>
 
