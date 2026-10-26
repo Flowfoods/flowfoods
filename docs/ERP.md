@@ -4696,3 +4696,14 @@ no servidor). Alvos de 44 px no toque nas mesmas telas (setas de mês, "Ver a re
 "definir", nome da loja e da despesa nas tabelas, "Mostrar linhas zeradas", "Ver os períodos"). Revisor: reprovou a primeira
 rodada (três links pequenos), aprovou a reconferência. Matriz 108 telas: 0 falhas; jornada no navegador ok. Testes novos
 `erp-dre-volta` e casos de página nos testes com banco do DRE e do Faturamento.
+
+**Produção e navegação · etiqueta em "Feitas hoje" e o "…" da trilha (decisão 475, 25/10/2026):** para quem imprime etiquetas,
+cada lote concluído hoje diz "com etiqueta" ou "sem etiqueta" (só cobra o lote que pode recebê-la, pela mesma regra da tela de
+imprimir, agora em `etiqueta-campos.ts`). Abaixo de 1280 px a trilha fica "Início › … › tela atual" e o "…" é um botão de 44 px
+que abre os níveis acima; o que não cabe sai do Tab, sem sair do leitor de tela. Revisor: reprovou duas rodadas (foco invisível
+a 1024 no nível 1; pai encavalado no toque), aprovou a terceira. Matrizes de 108 e 72 telas: 0 falhas desta fatia. Também:
+`COR.sistema` removida (sem uso).
+
+**Engenharia · paleta escura (decisão 476, 25/10/2026):** teste `paleta-escura` impede que os três blocos de cores escuras (ERP
+escolhido, ERP do sistema e site/Portal) divirjam, em vez de reescrever o CSS. Suíte com banco 2.936 aprovados, 46 pulados,
+0 falhas; lint, typecheck e portão limpos.

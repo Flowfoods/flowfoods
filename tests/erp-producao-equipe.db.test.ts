@@ -327,6 +327,17 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · a cozinha pega a tarefa (Postgres real)'
     expect(await ordem(base)).toMatchObject({ responsavelUsuarioId: dono.userId, concluidaPorNome: dono.nome });
     // O lote que ninguém pegou, cancelado pela cozinha (sem dono, qualquer um que registra cancela).
     expect(await cancelarProducao(a, OPERADOR(), ids.vp, ids.loteParaCancelar, { versao: await versao(ids.loteParaCancelar), motivo: 'sobrou de ontem' }, CAIO)).toMatchObject({ ok: true });
+
+    // Decisão 475: "Feitas hoje" sabe se o lote já tem etiqueta (o perdido não leva etiqueta).
+    const feitas = async () => new Map((await tarefasDoDia(a, OPERADOR(), ids.vp, CAIO.userId))!.feitasHoje.map((f) => [f.id, f.etiquetas]));
+    expect((await feitas()).get(id)).toBe(0);
+    expect((await feitas()).get(base)).toBe(0);
+    // Só o lote que pode receber etiqueta é cobrado: o perdido (saiu zero) não.
+    const recebe = new Map((await tarefasDoDia(a, OPERADOR(), ids.vp, CAIO.userId))!.feitasHoje.map((f) => [f.id, f.recebeEtiqueta]));
+    expect(recebe.get(id)).toBe(true);
+    expect(recebe.get(base)).toBe(false);
+    await a.etiqueta.create({ data: { parceiroId: A.id, lojaId: ids.vp, codigo: 'E-TESTE-475', nomeSnapshot: 'Molho', formato: 'E60X40', ordemProducaoId: id } });
+    expect((await feitas()).get(id)).toBe(1);
   });
 
   it('o nível 1 não pega (nem da lista); começar um planejado fica sem dono, como na 3.1; concluir sem dono não deixa "quem fez"', async () => {

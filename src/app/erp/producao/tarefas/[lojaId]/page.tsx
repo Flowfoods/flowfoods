@@ -23,7 +23,8 @@ export default async function ErpTarefasDaLojaPage({ params, searchParams }: { p
   const lojaId = t.loja.id;
   // Depois de concluir pelas Tarefas: a etiqueta do lote que acabou de sair (um lote concluído hoje nesta loja).
   const concluido = searchParams.feito === 'concluido' ? t.feitasHoje.find((f) => f.id === searchParams.lote && f.produzidoMilesimos > 0) : undefined;
-  const etiquetaHref = concluido && pode(ctx.alcance, 'etiquetas.imprimir', { lojaId }) ? `/erp/etiquetas/${lojaId}/lote/${concluido.id}` : null;
+  const imprime = pode(ctx.alcance, 'etiquetas.imprimir', { lojaId });
+  const etiquetaHref = concluido && imprime ? `/erp/etiquetas/${lojaId}/lote/${concluido.id}` : null;
   return (
     <TelaTarefas
       t={t}
@@ -34,6 +35,7 @@ export default async function ErpTarefasDaLojaPage({ params, searchParams }: { p
       acoes={{ pegarLote: acaoPegarLote.bind(null, lojaId), pegarLinha: acaoPegarDaLista.bind(null, lojaId), soltar: acaoSoltarLote.bind(null, lojaId), passar: acaoPassarLote.bind(null, lojaId), sair: acaoSair }}
       bloqueio={ctx.bloqueio}
       etiquetaHref={etiquetaHref}
+      veEtiquetas={imprime}
       periodosHref={pode(ctx.alcance, 'dre.ver') ? '/erp/dre/periodos' : null}
     />
   );

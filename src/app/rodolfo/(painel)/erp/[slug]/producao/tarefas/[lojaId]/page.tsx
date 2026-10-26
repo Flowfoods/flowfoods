@@ -32,6 +32,7 @@ export default async function ParceiroTarefasDaLojaPage({ params, searchParams }
       acoes={{ pegarLote: acaoPegarLote.bind(null, s, lojaId), pegarLinha: acaoPegarDaLista.bind(null, s, lojaId), soltar: acaoSoltarLote.bind(null, s, lojaId), passar: acaoPassarLote.bind(null, s, lojaId), sair: null }}
       bloqueio={ctx.bloqueio}
       etiquetaHref={etiquetaHref}
+      veEtiquetas
       periodosHref={`${raiz}/dre/periodos`}
     />
   );

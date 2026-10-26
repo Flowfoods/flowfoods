@@ -137,7 +137,6 @@ export const COR = {
   comercial: '#2563A8',
   clientes: '#A16207',
   parceiros: '#57534E',
-  sistema: '#4C5A8A',
   inicio: '#57534E',
 } as const;
 

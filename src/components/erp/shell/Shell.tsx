@@ -26,7 +26,7 @@ import { BuscaGlobal } from './BuscaGlobal';
 import { MenuUsuario } from './MenuUsuario';
 import { NavLateral, type EstadoDaNav } from './NavLateral';
 import { Notificacoes } from './Notificacoes';
-import { BOTAO_ICONE } from './Popover';
+import { BOTAO_ICONE, Popover } from './Popover';
 import { SeletorVisao } from './SeletorVisao';
 import type { PropsDoShell, ResultadoDaBusca } from './tipos';
 import { ProvedorDaTrilha, useTrilhaExtra, type ItemDaTrilha } from './trilha';
@@ -144,6 +144,35 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
   // Área › aba (› o que a página acrescentar: o insumo aberto, "Novo insumo", "Editar"...). A área leva à entrada dela.
   const extra = useTrilhaExtra();
   const trilha: ItemDaTrilha[] = montarTrilha(ativo, extra);
+  // Decisão 475: o que não cabe inteiro na trilha (o "…" atrás do corte, quando o topo aperta) sai do Tab — senão ele parava
+  // num botão que ninguém vê. Só do Tab: o leitor de tela continua lendo a trilha inteira. A régua é a própria caixa da trilha.
+  const trilhaRef = useRef<HTMLOListElement>(null);
+  const chaveDaTrilha = trilha.map((t) => t.rotulo).join(' › ');
+  useEffect(() => {
+    const ol = trilhaRef.current;
+    const nav = ol?.closest('nav');
+    if (!ol || !nav || typeof ResizeObserver === 'undefined') return;
+    const itens = Array.from(ol.children) as HTMLElement[];
+    const recalcular = () => {
+      const caixa = nav.getBoundingClientRect();
+      for (const li of itens) {
+        const alvo = li.querySelector<HTMLElement>('a, button');
+        if (!alvo) continue;
+        const r = li.getBoundingClientRect();
+        const cabe = r.width > 0 && r.left >= caixa.left - 1 && r.right <= caixa.right + 1;
+        if (cabe) alvo.removeAttribute('tabindex');
+        else alvo.setAttribute('tabindex', '-1');
+      }
+    };
+    const observador = new ResizeObserver(recalcular);
+    observador.observe(nav);
+    itens.forEach((i) => observador.observe(i));
+    recalcular();
+    return () => {
+      observador.disconnect();
+      itens.forEach((i) => i.querySelector('a, button')?.removeAttribute('tabindex'));
+    };
+  }, [chaveDaTrilha]);
   const abas = abasDaArea(nav, ativo);
   const outrasDaArea = abas ? { area: abas.area, telas: abas.abas.filter((a) => a.href !== ativo?.item.href).map((a) => ({ href: a.href, rotulo: a.rotulo })) } : null;
 
@@ -231,23 +260,51 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
               {/* Recorta na própria caixa: sem espaço (nível 1 a 1024, com dois seletores), a trilha some por trás do corte e nunca
                   passa por baixo dos botões da direita. */}
               <nav aria-label="Você está em" className="hidden min-w-0 overflow-x-clip sm:block">
-                <ol className="flex min-w-0 items-center gap-1.5 text-[13px]">
+                <ol ref={trilhaRef} className="flex min-w-0 items-center gap-1.5 text-[13px]">
                   <li className="shrink-0">
                     <Link href={nav.inicio.href} className="ff-transicao rounded-[5px] text-suave hover:text-texto">
                       Início
                     </Link>
                   </li>
-                  {/* Abaixo de 1280 px (tablet em pé e deitado, notebook de 1024), os níveis do meio dão lugar a "…": fica o pai e a
-                      tela atual, sem cortar o nome (antes o corte era em 1024 e, a 1024, a trilha de 6 níveis virava "Et… › Im… › Vil…"). */}
-                  {trilha.length > 2 && (
+                  {/* Abaixo de 1280 px (tablet em pé e deitado, notebook de 1024), os níveis acima da tela dão lugar a "…": fica a tela
+                      atual, sem cortar o nome (antes o corte era em 1024 e, a 1024, a trilha de 6 níveis virava "Et… › Im… › Vil…"). */}
+                  {/* O "…" é botão (decisão 475): no toque, o título não aparece; tocar abre os níveis escondidos, cada um com o
+                      seu link. */}
+                  {trilha.length > 1 && (
                     <li className="flex shrink-0 items-center gap-1.5 text-suave xl:hidden">
                       <ChevronRight size={14} aria-hidden className="shrink-0" />
-                      <span title={trilha.slice(0, -2).map((t) => t.rotulo).join(' › ')}>…</span>
+                      <Popover
+                        fixo
+                        alinhar="esquerda"
+                        largura="w-64"
+                        rotulo={`Níveis acima: ${trilha.slice(0, -1).map((t) => t.rotulo).join(', ')}`}
+                        conteudoDoBotao={<span aria-hidden>…</span>}
+                        classeDoBotao="ff-transicao inline-grid h-8 min-w-8 place-items-center rounded-[5px] px-1 text-suave hover:bg-texto/5 hover:text-texto aria-expanded:bg-texto/5 aria-expanded:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:min-w-11"
+                      >
+                        {(fechar) => (
+                          <ul>
+                            {/* Todos os níveis acima da tela, inclusive o pai (abaixo de 1280 px ele também fica só aqui). */}
+                            {trilha.slice(0, -1).map((t, n) => (
+                              <li key={t.rotulo + n}>
+                                {t.href ? (
+                                  <Link href={t.href} onClick={fechar} className="ff-transicao flex min-h-11 items-center rounded-[7px] px-3 text-[13px] text-texto hover:bg-texto/5">
+                                    {t.rotulo}
+                                  </Link>
+                                ) : (
+                                  <span className="flex min-h-11 items-center px-3 text-[13px] text-suave">{t.rotulo}</span>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </Popover>
                     </li>
                   )}
                   {trilha.map((t, n) => (
                     // Sem espaço, o nome da tela atual é o último a encolher: os níveis de cima cedem três vezes mais rápido.
-                    <li key={t.rotulo + n} className={`min-w-0 items-center gap-1.5 ${n < trilha.length - 2 ? 'hidden xl:flex' : 'flex'} ${n < trilha.length - 1 ? 'shrink-[3]' : ''}`}>
+                    // Abaixo de 1280 px fica só a tela atual; os níveis acima (o pai inclusive) estão no "…" (decisão 475: o pai
+                    // espremido encavalava no título no toque, onde o link tem 44 px de largura mínima).
+                    <li key={t.rotulo + n} className={`min-w-0 items-center gap-1.5 ${n < trilha.length - 1 ? 'hidden xl:flex' : 'flex'} ${n < trilha.length - 1 ? 'shrink-[3]' : ''}`}>
                       <ChevronRight size={14} aria-hidden className="shrink-0 text-suave" />
                       {t.href && n < trilha.length - 1 ? (
                         <Link href={t.href} className="ff-transicao truncate rounded-[5px] text-suave hover:text-texto">

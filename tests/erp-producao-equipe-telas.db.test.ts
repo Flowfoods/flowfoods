@@ -266,7 +266,8 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     expect(await rodar(() => daSessao.acaoConcluirProducao(ids.vp, ids.lote, null, formDe({ versao: String(v), produzido: '4,6', escala: 'base', motivo: '', conservacao: '', voltar: 'tarefas' })))).toMatchObject({ url: `/erp/producao/tarefas/${ids.vp}?lote=${ids.lote}&feito=concluido` });
     const feitas = texto(await tarefas('concluido', ids.vp, ids.lote));
     expect(feitas).toMatch(/Feitas hoje 1/);
-    expect(feitas).toMatch(/4,6 kg de 5 kg · rendeu 92% · Duda Lima · \d\d:\d\d/);
+    // Decisão 475: quem imprime etiquetas vê que o lote ainda não tem etiqueta.
+    expect(feitas).toMatch(/4,6 kg de 5 kg · rendeu 92% · sem etiqueta · Duda Lima · \d\d:\d\d/);
     // E4: a confirmação não fala de custo para a cozinha e oferece a etiqueta do lote que acabou de sair (56 px).
     expect(feitas).not.toMatch(/custo/i);
     const comEtiqueta = await tarefas('concluido', ids.vp, ids.lote);
@@ -278,6 +279,8 @@ describe.skipIf(!URL_TESTE)('ERP 3.3 · telas da cozinha, do histórico e dos in
     expect(await tarefas('concluido', ids.vp, 'c' + 'x'.repeat(24))).not.toContain('Imprimir a etiqueta do lote');
     como(alcanceDe(null, [ids.vp], ['producao.ver', 'producao.registrar']), DUDA);
     expect(await tarefas('concluido', ids.vp, ids.lote)).not.toContain('Imprimir a etiqueta do lote');
+    // Quem não imprime etiquetas não vê a marcação (decisão 475).
+    expect(texto(await tarefas('concluido', ids.vp, ids.lote))).toMatch(/4,6 kg de 5 kg · rendeu 92% · Duda Lima/);
     como(OPERADOR(), DUDA);
   });
 

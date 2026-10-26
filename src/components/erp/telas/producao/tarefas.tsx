@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { AtualizarSozinho } from './atualizar-sozinho';
 import type { LinhaDaTarefa, LoteDaTarefa, TarefasDoDia } from '@/lib/erp/producao-equipe';
 import { formatarRendimento, rendimentoDoLote, situacaoDosInsumos } from '@/lib/erp/producao-campos';
-import { horaDoDia, quandoPegou } from '@/lib/erp/producao-equipe-campos';
+import { etiquetaDaFeita, horaDoDia, quandoPegou } from '@/lib/erp/producao-equipe-campos';
 import { textoDoAtraso } from '@/lib/erp/requisicao-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarQuantidade } from '@/lib/erp/unidades';
@@ -90,6 +90,7 @@ export function TelaTarefas({
   bloqueio,
   periodosHref,
   etiquetaHref = null,
+  veEtiquetas = false,
 }: {
   t: TarefasDoDia;
   /** `/erp/producao` ou o espelho do nível 1. */
@@ -105,6 +106,8 @@ export function TelaTarefas({
   periodosHref: string | null;
   /** Depois de concluir pelas Tarefas: a etiqueta do lote que acabou de sair (só para quem imprime etiquetas). */
   etiquetaHref?: string | null;
+  /** Quem imprime etiquetas na loja vê, em "Feitas hoje", se o lote já tem etiqueta (decisão 475). */
+  veEtiquetas?: boolean;
 }) {
   const aqui = `${base}/tarefas/${t.loja.id}`;
   const doLote = `${base}/${t.loja.id}`;
@@ -287,15 +290,19 @@ export function TelaTarefas({
             {t.feitasHoje.map((f) => {
               const perdido = f.produzidoMilesimos === 0;
               const r = perdido ? null : rendimentoDoLote(f.planejadoMilesimos, f.produzidoMilesimos);
+              const etiqueta = etiquetaDaFeita(f, veEtiquetas);
               return (
                 <li key={f.id}>
                   <Link href={`${doLote}/${f.id}`} className="ff-transicao flex min-h-14 flex-col gap-1 px-4 py-3 hover:bg-texto/[0.03] sm:flex-row sm:items-center sm:justify-between sm:gap-4">
                     <span className="min-w-0 text-[15px] font-semibold text-texto [overflow-wrap:anywhere]">
-                      {f.nome} <span className="font-normal tabular-nums text-suave">· lote {f.codigo}</span>
+                      {f.nome} <span className="whitespace-nowrap font-normal tabular-nums text-suave">· lote {f.codigo}</span>
                     </span>
                     <span className="shrink-0 text-[13px] tabular-nums text-suave">
                       {perdido ? <span className="font-semibold text-erro">lote perdido</span> : `${formatarQuantidade(f.produzidoMilesimos, f.unidade)} de ${formatarQuantidade(f.planejadoMilesimos, f.unidade)} · rendeu ${formatarRendimento(r!.rendimentoBp)}`}
                       {r?.foraDaFaixa && <span className="text-atencao"> · fora de ±10%</span>}
+                      {/* Lote que saiu e ainda não tem etiqueta: escrito, não só cor (o lote perdido não leva etiqueta). */}
+                      {etiqueta === 'com etiqueta' && ' · com etiqueta'}
+                      {etiqueta === 'sem etiqueta' && <span className="font-semibold text-atencao"> · sem etiqueta</span>}
                       {' · '}
                       {f.feitoPor ?? 'sem quem fez'} · {horaDoDia(f.concluidaEm, t.hoje)}
                     </span>

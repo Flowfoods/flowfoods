@@ -175,6 +175,22 @@ export function fraseDoVencido(o: { origem: 'LOTE' | 'ABERTA'; validadeEm: Date;
   return `${o.origem === 'LOTE' ? 'Este lote venceu' : 'Esta embalagem venceu'} em ${quando}: não use. Separe para descarte e avise a gerência.`;
 }
 
+/**
+ * Por que o lote não emite etiqueta (null = emite). Rodada 1 (decisão 417): lote vencido não emite. Uma regra só para a tela
+ * de imprimir a etiqueta e para "Feitas hoje" nas Tarefas (decisão 475): só aparece "sem etiqueta" o lote que pode recebê-la.
+ */
+export function motivoDoLoteSemEtiqueta(
+  o: { status: string; concluidaEm: Date | null; produzidoMilesimos: number | null; insumoProduzidoId: string | null; validadeEm: Date | null },
+  agora: Date,
+): string | null {
+  if (o.status === 'CANCELADA') return o.concluidaEm ? 'Este lote foi estornado: saiu do estoque e não leva etiqueta nova.' : 'Este lote foi cancelado: não tem o que etiquetar.';
+  if (o.status !== 'CONCLUIDA') return 'O lote ainda não foi concluído: a validade nasce na conclusão. Conclua e volte para imprimir.';
+  if (!o.produzidoMilesimos) return 'Este lote se perdeu (saiu zero): não tem o que etiquetar.';
+  if (!o.insumoProduzidoId) return 'O lote não tem o pré-preparo que entra no estoque: refaça a ficha.';
+  if (venceu(o.validadeEm, agora)) return fraseDoVencido({ origem: 'LOTE', validadeEm: o.validadeEm!, porDia: null });
+  return null;
+}
+
 /** "10/11/2026" a partir do dia (aaaa-mm-dd). */
 export function diaPorExtenso(iso: string): string {
   const [a, m, d] = iso.split('-');

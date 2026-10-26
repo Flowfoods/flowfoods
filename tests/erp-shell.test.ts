@@ -564,3 +564,16 @@ describe('ERP 1.1 · Regra Nº 2: um design system só, sem kit velho', () => {
     }
   });
 });
+
+describe('decisão 475 · o painel do "…" da trilha abre em posição fixa, dentro da tela', () => {
+  it('8 px abaixo do botão, alinhado à esquerda dele, sem passar das bordas', async () => {
+    const { posicaoDoPainelFixo } = await import('@/components/erp/shell/Popover');
+    expect(posicaoDoPainelFixo({ left: 126, bottom: 52 }, 256, 820)).toEqual({ top: 60, left: 126 });
+    // Perto da borda direita: encosta a 12 px dela.
+    expect(posicaoDoPainelFixo({ left: 700, bottom: 52 }, 256, 820)).toEqual({ top: 60, left: 552 });
+    // Perto da esquerda: 12 px de folga.
+    expect(posicaoDoPainelFixo({ left: 2, bottom: 52 }, 256, 820)).toEqual({ top: 60, left: 12 });
+    // Tela mais estreita que o painel: fica na folga da esquerda.
+    expect(posicaoDoPainelFixo({ left: 100, bottom: 52 }, 256, 200)).toEqual({ top: 60, left: 12 });
+  });
+});

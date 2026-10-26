@@ -44,6 +44,7 @@ import {
   validadeDaAbertura,
   diaPorExtenso,
   fraseDoVencido,
+  motivoDoLoteSemEtiqueta,
   venceu,
   limiteDeUso,
   FORMATOS,
@@ -362,16 +363,6 @@ async function lerOrdem(tx: ClienteDoParceiro, lojaId: string, id: string, trava
   return o;
 }
 
-/** Por que o lote não emite etiqueta (null = emite). Rodada 1 (decisão 417): lote vencido não emite. */
-function motivoSemEtiqueta(o: OrdemLida, agora: Date): string | null {
-  if (o.status === 'CANCELADA') return o.concluidaEm ? 'Este lote foi estornado: saiu do estoque e não leva etiqueta nova.' : 'Este lote foi cancelado: não tem o que etiquetar.';
-  if (o.status !== 'CONCLUIDA') return 'O lote ainda não foi concluído: a validade nasce na conclusão. Conclua e volte para imprimir.';
-  if (!o.produzidoMilesimos) return 'Este lote se perdeu (saiu zero): não tem o que etiquetar.';
-  if (!o.insumoProduzidoId) return 'O lote não tem o pré-preparo que entra no estoque: refaça a ficha.';
-  if (venceu(o.validadeEm, agora)) return fraseDoVencido({ origem: 'LOTE', validadeEm: o.validadeEm!, porDia: null });
-  return null;
-}
-
 /** A situação da validade de uma abertura, com o termo único quando não há prazo (rodada 1, UX 8). */
 function situacaoDaAbertura(a: { validadeEm: Date | null; regraDaValidade: string | null; vencimentoLoteEm: Date | null }, agora: Date) {
   if (a.regraDaValidade === 'PRAZO_NAO_INFORMADO') {
@@ -473,7 +464,7 @@ export async function loteParaEtiqueta(cliente: ClienteDoParceiro, alcance: Alca
           concluidaEm: o.concluidaEm,
           quemFez: quemFez.nome,
         },
-        motivo: motivoSemEtiqueta(o, agora),
+        motivo: motivoDoLoteSemEtiqueta(o, agora),
         /** Rodada 1 (decisão 417): o lote concluído venceu — a tela diz em vermelho o que fazer. */
         vencido: o.status === 'CONCLUIDA' && venceu(o.validadeEm, agora),
         /** O conteúdo da prévia (o código e a quantidade entram na emissão). */
@@ -511,7 +502,7 @@ export async function emitirEtiquetaDoLote(
         const feita = await emissaoDaChave(tx, chave, lojaId, { ordemProducaoId: ordemId });
         if (feita) return { ok: true as const, id: feita, jaFeito: true };
         const o = await lerOrdem(tx, lojaId, ordemId, true);
-        const motivo = motivoSemEtiqueta(o, agora);
+        const motivo = motivoDoLoteSemEtiqueta(o, agora);
         if (motivo) throw new Recusa({ ok: false, erros: { geral: motivo }, conflito: true });
         const unidade = (o.unidadeSnapshot ?? 'KG') as Unidade;
         const lido = lerEmissaoDoLote(entrada, { unidade, produzidoMilesimos: o.produzidoMilesimos ?? 0 });

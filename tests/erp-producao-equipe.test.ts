@@ -4,6 +4,7 @@
  * alfabética) e as frases ("sem dado = frase, nunca zero").
  */
 import { describe, expect, it } from 'vitest';
+import { motivoDoLoteSemEtiqueta } from '@/lib/erp/etiqueta-campos';
 import {
   AMOSTRA_PEQUENA,
   desfechoDoLote,
@@ -24,6 +25,7 @@ import {
   rotuloDoPeriodo,
   tempoDoLote,
   type LoteEncerrado,
+  etiquetaDaFeita,
 } from '@/lib/erp/producao-equipe-campos';
 
 const HOJE = '2026-10-21';
@@ -196,5 +198,27 @@ describe('os indicadores por pessoa', () => {
     const r = indicadoresPorPessoa([lote({ quem: ['u-caio', 'Caio'], concluidaEm: as('2026-10-19', '10:00') }), lote({ quem: ['u-caio', 'Caio Cozinha'], concluidaEm: as(HOJE, '10:00') })]);
     expect(r.pessoas).toHaveLength(1);
     expect(r.pessoas[0]).toMatchObject({ nome: 'Caio Cozinha', concluidos: 2 });
+  });
+});
+
+describe('decisão 475 · "Feitas hoje" diz se o lote já tem etiqueta', () => {
+  it('só para quem imprime; com etiqueta diz; sem, só cobra o lote que pode receber', () => {
+    expect(etiquetaDaFeita({ etiquetas: 0, recebeEtiqueta: true }, true)).toBe('sem etiqueta');
+    expect(etiquetaDaFeita({ etiquetas: 2, recebeEtiqueta: true }, true)).toBe('com etiqueta');
+    // Vencido depois da etiqueta: continua "com etiqueta".
+    expect(etiquetaDaFeita({ etiquetas: 1, recebeEtiqueta: false }, true)).toBe('com etiqueta');
+    expect(etiquetaDaFeita({ etiquetas: 0, recebeEtiqueta: false }, true)).toBeNull();
+    expect(etiquetaDaFeita({ etiquetas: 0, recebeEtiqueta: true }, false)).toBeNull();
+  });
+
+  it('a regra da tela de imprimir: perdido, sem pré-preparo de estoque e vencido não levam etiqueta', () => {
+    const agora = new Date('2026-10-25T15:00:00Z');
+    const lote = { status: 'CONCLUIDA', concluidaEm: agora, produzidoMilesimos: 4600, insumoProduzidoId: 'i1', validadeEm: new Date('2026-10-28T03:00:00Z') };
+    expect(motivoDoLoteSemEtiqueta(lote, agora)).toBeNull();
+    expect(motivoDoLoteSemEtiqueta({ ...lote, produzidoMilesimos: 0 }, agora)).toMatch(/se perdeu/);
+    expect(motivoDoLoteSemEtiqueta({ ...lote, insumoProduzidoId: null }, agora)).toMatch(/pré-preparo/);
+    expect(motivoDoLoteSemEtiqueta({ ...lote, validadeEm: new Date('2026-10-24T03:00:00Z') }, agora)).not.toBeNull();
+    // Sem validade não é vencido.
+    expect(motivoDoLoteSemEtiqueta({ ...lote, validadeEm: null }, agora)).toBeNull();
   });
 });

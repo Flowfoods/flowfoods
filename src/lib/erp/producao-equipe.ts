@@ -23,6 +23,7 @@ import { estadoDaLinha, rotuloDoDia } from './producao-lista-campos';
 import { desfechoDoLote, diaDoEncerramento, indicadoresPorPessoa, lerFiltroId, produzidoPorFicha, lerPeriodoDoHistorico, resumoDoHistorico, tempoDoLote, type LoteEncerrado, type PeriodoDoHistorico } from './producao-equipe-campos';
 import type { StatusDaRequisicao } from './requisicao-campos';
 import type { Unidade } from './unidades';
+import { motivoDoLoteSemEtiqueta } from './etiqueta-campos';
 
 /** Início de um dia do Rio (UTC−3) como instante. */
 const inicioDoDia = (dia: string) => new Date(`${dia}T03:00:00.000Z`);
@@ -92,6 +93,10 @@ export interface FeitaHoje {
   produzidoMilesimos: number;
   concluidaEm: Date;
   feitoPor: string | null;
+  /** Quantas etiquetas o lote já tem (decisão 475): "sem etiqueta" em "Feitas hoje" para quem imprime. */
+  etiquetas: number;
+  /** O lote ainda pode receber etiqueta (a regra da tela de imprimir: perdido, sem pré-preparo de estoque e vencido, não). */
+  recebeEtiqueta: boolean;
 }
 
 /**
@@ -136,7 +141,7 @@ export async function tarefasDoDia(cliente: ClienteDoParceiro, alcance: Alcance,
           where: { lojaId, status: 'CONCLUIDA', concluidaEm: { gte: inicioDoDia(hoje) } },
           orderBy: { concluidaEm: 'desc' },
           take: 30,
-          select: { id: true, codigoLote: true, fichaNomeSnapshot: true, unidadeSnapshot: true, planejadoMilesimos: true, produzidoMilesimos: true, concluidaEm: true, responsavelNomeSnapshot: true },
+          select: { id: true, codigoLote: true, fichaNomeSnapshot: true, unidadeSnapshot: true, planejadoMilesimos: true, produzidoMilesimos: true, concluidaEm: true, responsavelNomeSnapshot: true, insumoProduzidoId: true, validadeEm: true, _count: { select: { etiquetas: true } } },
         }),
         tx.ordemProducao.count({ where: { lojaId, status: { in: ['PLANEJADA', 'EM_EXECUCAO'] }, dataPlanejada: { gt: dataDe(hoje) } } }),
       ]);
@@ -207,6 +212,8 @@ export async function tarefasDoDia(cliente: ClienteDoParceiro, alcance: Alcance,
           produzidoMilesimos: o.produzidoMilesimos ?? 0,
           concluidaEm: o.concluidaEm!,
           feitoPor: o.responsavelNomeSnapshot,
+          etiquetas: o._count.etiquetas,
+          recebeEtiqueta: motivoDoLoteSemEtiqueta({ ...o, status: 'CONCLUIDA' }, agora) === null,
         })),
         /** Lotes planejados para depois de hoje (ficam em Lotes). */
         depois,

@@ -22,6 +22,17 @@ import { formatarQuantidade, type Unidade } from './unidades';
 const HORA = new Intl.DateTimeFormat('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 const DIA_HORA = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 
+/**
+ * A etiqueta do lote em "Feitas hoje" (decisão 475): só para quem imprime etiquetas na loja. Com etiqueta, diz; sem, só cobra
+ * a etiqueta do lote que ainda pode recebê-la (perdido, sem pré-preparo de estoque e vencido não levam: a regra da tela de
+ * imprimir, `motivoDoLoteSemEtiqueta`). null = não mostra nada.
+ */
+export function etiquetaDaFeita(f: { etiquetas: number; recebeEtiqueta: boolean }, veEtiquetas: boolean): 'com etiqueta' | 'sem etiqueta' | null {
+  if (!veEtiquetas) return null;
+  if (f.etiquetas > 0) return 'com etiqueta';
+  return f.recebeEtiqueta ? 'sem etiqueta' : null;
+}
+
 /** "09:12" (hoje) ou "20/10 às 09:12" (outro dia). */
 export function horaDoDia(d: Date, hoje: string): string {
   return hojeNoRio(d) === hoje ? HORA.format(d) : DIA_HORA.format(d).replace(',', ' às');
