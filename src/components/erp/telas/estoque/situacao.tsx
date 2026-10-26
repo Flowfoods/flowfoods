@@ -146,7 +146,7 @@ export function TelaSituacaoDoEstoque({
                 <li key={l.id} className="space-y-3 px-4 py-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <Link href={`${base}/${l.id}`} className="font-medium text-texto underline-offset-4 hover:underline">
+                      <Link href={`${base}/${l.id}`} className="ff-toque font-medium text-texto underline-offset-4 hover:underline">
                         {l.nome}
                       </Link>
                       <div className="mt-1 text-[13px] tabular-nums text-suave">

@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import { prisma } from '@/lib/db';
-import { questionario } from '@/lib/portal/questionario';
+import { QUESTIONARIOS_DISPONIVEIS, questionario } from '@/lib/portal/questionario';
 import { progressoDoCliente } from '@/lib/portal/dados';
 import { origemPublica } from '@/lib/portal/http';
 import { COR } from '@/lib/erp/modulos';
@@ -12,6 +12,7 @@ import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Barra, Numero, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { CopiarLink } from './copiar';
+import { NovoCliente } from './novo-cliente';
 import { formatarQuando } from './formatar';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 
@@ -30,6 +31,11 @@ export default async function PortalPage() {
   );
 
   const enviados = clientes.filter((c) => c.finalizadoEm).length;
+  // Os questionários que existem no código, com o nome da marca e o tamanho (decisão 477).
+  const questionarios = QUESTIONARIOS_DISPONIVEIS.flatMap((chave) => {
+    const q = questionario(chave);
+    return q ? [{ chave, rotulo: `${q.marca} (${q.itens.length} itens)`, marca: q.marca }] : [];
+  });
 
   return (
     <div className="space-y-6">
@@ -42,7 +48,7 @@ export default async function PortalPage() {
 
       {linhas.length === 0 && (
         <Painel>
-          <Vazio>Nenhum cliente cadastrado no portal.</Vazio>
+          <Vazio>Nenhum cliente cadastrado no portal. Cadastre o primeiro abaixo.</Vazio>
         </Painel>
       )}
 
@@ -82,12 +88,16 @@ export default async function PortalPage() {
               <p className="mt-3 text-sm text-atencao">Questionário {c.questionario} não existe no código.</p>
             )}
 
-            <Link href={`/rodolfo/portal/${c.id}`} className={`${LINK_DE_TEXTO} mt-4 inline-block`}>
+            <Link href={`/rodolfo/portal/${c.id}`} className={`${LINK_DE_TEXTO} mt-4 inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`}>
               Ver respostas de {c.nome}
             </Link>
           </Painel>
         ))}
       </div>
+
+      <Painel titulo="Cadastrar cliente" subtitulo="Gera o link do formulário inicial para mandar pelo WhatsApp do cliente.">
+        <NovoCliente questionarios={questionarios} />
+      </Painel>
     </div>
   );
 }

@@ -4707,3 +4707,12 @@ a 1024 no nível 1; pai encavalado no toque), aprovou a terceira. Matrizes de 10
 **Engenharia · paleta escura (decisão 476, 25/10/2026):** teste `paleta-escura` impede que os três blocos de cores escuras (ERP
 escolhido, ERP do sistema e site/Portal) divirjam, em vez de reescrever o CSS. Suíte com banco 2.936 aprovados, 46 pulados,
 0 falhas; lint, typecheck e portão limpos.
+
+**Portal do cliente · cadastrar cliente pela tela (decisão 477, 25/10/2026):** em `/rodolfo/portal`, "Cadastrar cliente" (nome,
+questionário e a confirmação da marca, porque o questionário cita a marca nas perguntas) cria o cliente com endereço único e
+link novo e abre a página dele com o link para copiar; antes era SQL. Conferência no servidor (nome, palavra longa, questionário
+da lista, marca confirmada, nome repetido sem contar acento, caixa e apóstrofo), cadastro e auditoria na mesma transação, erro do
+banco sem quebrar a tela e registrado no log. Os títulos do formulário público e do cabeçalho do painel quebram palavra que não
+cabe. Revisor: reprovou a primeira rodada (questionário do Valentin's marcado por padrão para qualquer cliente), aprovou a
+segunda. Também: o nome da loja na lista do Estoque no celular ganhou 44 px no toque. Matriz 72 telas: 0 falhas. Suíte com
+banco 2.939 aprovados, 46 pulados, 0 falhas; testes novos `portal-cadastro` e `portal-cadastro.db`.

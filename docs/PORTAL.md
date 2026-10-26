@@ -66,12 +66,9 @@ próprio número: nesse caso a mensagem aparece no chat "Você".
 
 ## Novo cliente
 
-Por enquanto, um JSON novo em `questionarios/` e uma linha no banco:
-
-```sql
-INSERT INTO "PortalCliente" (id, nome, slug, token, questionario)
-VALUES ('portal_<slug>', '<Nome>', '<slug>', replace(gen_random_uuid()::text, '-', ''), '<chave-do-json>');
-```
+Em `/rodolfo/portal`, "Cadastrar cliente": o nome e o questionário (decisão 477). O endereço e o link nascem no servidor,
+e a página do cliente abre com o link para copiar. Questionário de outra marca: um JSON novo em `questionarios/`, registrado
+em `src/lib/portal/questionario.ts` e com o hash fixado no teste; depois ele aparece na lista do cadastro.
 
 ## Dokploy
 

@@ -329,7 +329,7 @@ export default function Portal({
         <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-realce">
           FlowFoods · Formulário inicial
         </p>
-        <h1 className="mt-3 font-serifa text-3xl font-bold leading-tight sm:text-4xl">{cliente}</h1>
+        <h1 className="mt-3 break-words font-serifa text-3xl font-bold leading-tight sm:text-4xl">{cliente}</h1>
         <p className="mt-2 font-serifa text-lg italic text-footer/70">{q.abertura.tagline}</p>
         {recuperados > 0 && (
           <p role="status" className="mt-4 border border-footer/20 bg-papel px-4 py-3 text-sm">

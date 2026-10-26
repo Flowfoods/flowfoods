@@ -22,13 +22,14 @@ import { BotaoAcao } from '@/components/erp/ui/botoes';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { FiltroEmLinks } from '@/components/erp/ui/filtros';
-import { Contagem, Numero, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
+import { Aviso, Contagem, Numero, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { acaoZerarPortal } from '../actions';
 import { CopiarLink } from '../copiar';
 import { formatarQuando } from '../formatar';
 import { exigirNivel1 } from '@/lib/erp/contexto';
 import { TrilhaDaPagina } from '@/components/erp/shell/trilha';
 import { Voltar } from '@/components/erp/telas/cadastro/partes';
+import { LevarParaVista } from '@/components/erp/telas/producao/form-lista';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +44,7 @@ export default async function PortalClientePage({
   searchParams = {},
 }: {
   params: { id: string };
-  searchParams?: { estado?: string | string[] };
+  searchParams?: { estado?: string | string[]; feito?: string | string[] };
 }) {
   // O middleware já exige a sessão; a página confere de novo (o layout não substitui a checagem).
   await exigirNivel1();
@@ -80,6 +81,15 @@ export default async function PortalClientePage({
           </a>
         }
       />
+
+      {searchParams.feito === 'cadastrado' && (
+        // O formulário fica no fim da lista e a rolagem viria junto: o aviso e o link vêm para a vista (decisão 477).
+        <LevarParaVista vez={`cadastrado:${cliente.id}:0`}>
+          <Aviso tom="ok" titulo={`${cliente.nome} cadastrado.`}>
+            Copie o link abaixo e mande pelo WhatsApp do cliente. As respostas aparecem aqui conforme ele preenche.
+          </Aviso>
+        </LevarParaVista>
+      )}
 
       <Painel titulo="Link do cliente">
         <CopiarLink url={`${origemPublica()}/portal/${cliente.token}`} />

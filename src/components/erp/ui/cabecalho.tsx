@@ -60,10 +60,10 @@ export function PageHeader({
         <div className="flex min-w-0 items-center gap-3.5">
           <IconeDoModulo icone={icone} cor={cor} />
           <div className="min-w-0">
-            <h1 className="font-display text-[26px] font-bold leading-tight tracking-[-0.01em] [text-wrap:balance] sm:text-[30px]">
+            <h1 className="break-words font-display text-[26px] font-bold leading-tight tracking-[-0.01em] [text-wrap:balance] sm:text-[30px]">
               {titulo}
             </h1>
-            {subtitulo && <p className="mt-0.5 text-sm text-suave">{subtitulo}</p>}
+            {subtitulo && <p className="mt-0.5 break-words text-sm text-suave">{subtitulo}</p>}
           </div>
         </div>
         {acao && <div className="flex shrink-0 flex-wrap items-center gap-2">{acao}</div>}
