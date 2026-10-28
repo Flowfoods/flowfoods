@@ -91,7 +91,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['insumos/novo', 'insumos/[id]/editar'],
     titulo: 'Cadastrar insumo',
-    versao: 4,
+    versao: 5,
     aula: [
       { texto: 'O nome do insumo se digita uma vez só; quem veio de uma nota ou ficha volta para lá ao salvar, e quem veio da caneta da lista volta para a mesma página dela.' },
       { texto: 'Nome, categoria, conservação e unidade base são obrigatórios; o que faltar aparece junto do campo.' },
@@ -105,10 +105,24 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'A conservação não vem escolhida: “Selecione a conservação” é só a orientação e não se salva. Coxa de frango é Proteína, congelada ou não.' },
           { texto: 'Prazo de uso após abertura é opcional, em horas ou dias: quanto o produto dura depois de aberto. Não é o vencimento do lote; em branco, fica “não informado”.' },
-          { texto: 'Unidade base é como você controla (kg, L ou un); embalagem de compra é quanto vem em cada uma; o custo inicial é o que você paga por ela. Ex.: saco de 5 kg por R$ 25 → R$ 5,00/kg.' },
+          { texto: 'Unidade base é como você controla (kg, L ou un); embalagem de compra é quanto vem em cada uma; o custo inicial é o que você paga por ela.' },
           { texto: 'Sem custo ainda, marque “Ainda não sei o custo”: o insumo fica com “Custo não informado” e as fichas dele, incompletas, até haver custo ou compra.' },
           { texto: 'A marca de referência é opcional: não trava compra nem cotação e não é o fornecedor.' },
           { texto: 'Veio de uma nota ou ficha? O que você tinha preenchido lá é recuperado na volta. Salvou, a tela confirma com o nome, e um toque repetido não cria outro.' },
+        ],
+      },
+      {
+        // Decisão 480: os exemplos do "Complemento educacional — unidade, embalagem e custo" (Rodolfo, 25/10/2026), no lugar
+        // do texto fixo do formulário. Os valores em R$ são demonstração, só para quem vê custo.
+        id: 'exemplos',
+        titulo: 'Entenda com exemplos',
+        blocos: [
+          { texto: 'Aipim: comprou em saco e usa por peso na receita? O saco é a embalagem; kg e g são o peso que você usa. Confira quanto vem no saco.' },
+          { texto: 'Exemplo do aipim, só para treinar: se forem 6 sacos de 1 kg por R$ 68,34, são 6 kg e R$ 11,39 por kg.', para: ['compras.ver'] },
+          { texto: 'Margarina: comprou em pote e usa em gramas? Confira o peso líquido do pote no rótulo. O preço do pote não é o preço do quilo.' },
+          { texto: 'Exemplo da margarina: R$ 56,28 por 12 potes dá R$ 4,69 por pote. Sem o peso de cada pote, esse valor não diz o custo por kg.', para: ['compras.ver'] },
+          { texto: 'Refrigerante: se você vende ou usa a lata ou a garrafa inteira, conte por unidade. Se usa só uma parte do líquido na receita, a medida é de volume, em L ou ml.' },
+          { texto: 'Não sabe o peso ou o volume? Confira o rótulo ou consulte o fornecedor; não estime. 1 kg são 1.000 g e 1 L são 1.000 ml, e kg não é o mesmo que L. Se o peso de cada saco ou pote varia, confirme o conteúdo de cada um.' },
         ],
       },
     ],
@@ -142,7 +156,28 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'unidade',
         titulo: 'Unidade, embalagem e custo',
         blocos: [
-          { texto: 'Unidade base é como você controla o estoque e o que a ficha usa. Não é a embalagem: a caixa de 5 kg é medida em kg. Ex.: saco de 5 kg por R$ 25 dá R$ 5,00/kg.' },
+          { texto: 'Escolha a unidade pelo jeito que você usa o insumo, não pela embalagem em que ele vem.' },
+          { texto: 'Unidade base é como você controla o estoque e o que a ficha usa: a caixa de 5 kg é medida em kg, e o refrigerante vendido inteiro, em un.' },
+        ],
+        secao: 'exemplos',
+      },
+      {
+        id: 'conteudo',
+        titulo: 'Quanto vem na embalagem',
+        blocos: [
+          { texto: 'Informe o conteúdo de UMA embalagem que você compra, na medida da unidade base, e não quantas comprou.' },
+          { texto: 'Ex.: saco de farinha com 5 kg → 5; caixa de ovos com 30 un → 30; lata de 350 ml → 350, com ml marcado.' },
+          { texto: 'Na dúvida sobre o peso ou o volume, confira o rótulo ou consulte o fornecedor, sem estimar.' },
+        ],
+        secao: 'exemplos',
+      },
+      {
+        id: 'custo',
+        titulo: 'Custo inicial de referência',
+        blocos: [
+          { texto: 'Informe quanto você paga por uma embalagem de compra; o frete que cair em cada uma, se pagar, entra junto no custo.' },
+          { texto: 'Esse valor calcula o custo do insumo e das fichas antes da primeira compra registrada; depois, vale o último preço de compra.' },
+          { texto: 'Ex.: saco de farinha de 5 kg por R$ 25,00 → custo de referência R$ 5,00/kg.', para: ['compras.ver'] },
         ],
         secao: 'campos',
       },

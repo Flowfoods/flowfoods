@@ -12,10 +12,16 @@
  * (quanto vem) da unidade base (como se controla) e do custo (R$ por embalagem), com um exemplo na unidade escolhida e a conta
  * ao vivo ("5 kg por R$ 25,00 → R$ 5,00/kg"). Sem custo, a tela diz "Custo não informado", nunca R$ 0,00. `modo="variante"`
  * é a outra embalagem de compra, onde o valor é o preço dela.
+ *
+ * Decisão 480 (ajuda em sequência guiada, Rodolfo em 25/10/2026): no cadastro do insumo, a explicação de "quanto vem", do
+ * custo inicial (com o exemplo) e do frete sai do corpo e mora nos pontos `conteudo` e `custo` da sequência. Ficam na tela o
+ * rótulo, a medida (kg/g, L/ml, un), "(R$ por embalagem de compra)", "(se pagar)", os erros, a conta ao vivo e a origem do
+ * custo. Sem o ponto para a pessoa, o texto antigo continua (nenhum campo fica sem explicação).
  */
 
 import { useState } from 'react';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
+import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 import { Segmentos } from '../../ui/segmentos';
 import {
   UNIDADES,
@@ -73,6 +79,12 @@ export function CamposDaEmbalagem({
   modo?: 'insumo' | 'variante';
 }) {
   const doInsumo = modo === 'insumo';
+  // A explicação mora no card da sequência quando o ponto existe para esta pessoa nesta tela (só no cadastro do insumo).
+  const temPontoConteudo = useTemPonto('conteudo');
+  const temPontoCusto = useTemPonto('custo');
+  const textoDoConteudo = doInsumo && !temPontoConteudo;
+  const textoDoCusto = doInsumo && !temPontoCusto;
+  const textoDoFrete = !(doInsumo && temPontoCusto);
   const [v, setV] = useState(inicial);
   const mudar = (campo: Partial<ValoresDaEmbalagem>) => setV((x) => ({ ...x, ...campo }));
   const u = UNIDADES[unidade];
@@ -96,9 +108,12 @@ export function CamposDaEmbalagem({
     <div className="space-y-4">
       <div className={`grid gap-3 ${temMenor ? 'grid-cols-[minmax(0,1fr)_minmax(0,9rem)]' : ''}`}>
         <div>
-          <label htmlFor={id('conteudo')} className={ROTULO}>
-            Quanto vem na embalagem
-          </label>
+          <div className="mb-1.5 flex items-center gap-1">
+            <label htmlFor={id('conteudo')} className={ROTULO.replace('mb-1.5 ', '')}>
+              Quanto vem na embalagem
+            </label>
+            {doInsumo && <PontoDeAjuda ponto="conteudo" className="-my-3 sm:-my-1.5" />}
+          </div>
           <div className="relative">
             <input
               id={id('conteudo')}
@@ -110,13 +125,13 @@ export function CamposDaEmbalagem({
               onChange={(e) => mudar({ conteudo: e.target.value })}
               className={`${CAMPO} pr-11 text-right tabular-nums`}
               aria-invalid={!!erros.conteudo}
-              aria-describedby={descrito('conteudo', doInsumo)}
+              aria-describedby={descrito('conteudo', textoDoConteudo)}
             />
             <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[13px] text-suave">
               {sigla}
             </span>
           </div>
-          {doInsumo && (
+          {textoDoConteudo && (
             <p id={`${id('conteudo')}-ajuda`} className={AJUDA}>
               Quanto vem em UMA embalagem que você compra, na medida da unidade base. Ex.: {exemploDeQuanto}.
             </p>
@@ -141,10 +156,13 @@ export function CamposDaEmbalagem({
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label htmlFor={id('preco')} className={ROTULO}>
-            {doInsumo ? 'Custo inicial de referência' : 'Preço da embalagem'}
-            {doInsumo && <span className="font-normal text-suave"> (R$ por embalagem de compra)</span>}
-          </label>
+          <div className="mb-1.5 flex items-center gap-1">
+            <label htmlFor={id('preco')} className={ROTULO.replace('mb-1.5 ', '')}>
+              {doInsumo ? 'Custo inicial de referência' : 'Preço da embalagem'}
+              {doInsumo && <span className="font-normal text-suave"> (R$ por embalagem de compra)</span>}
+            </label>
+            {doInsumo && <PontoDeAjuda ponto="custo" className="-my-3 sm:-my-1.5" />}
+          </div>
           <div className="relative">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[13px] text-suave">R$</span>
             <input
@@ -158,10 +176,10 @@ export function CamposDaEmbalagem({
               onChange={(e) => mudar({ preco: e.target.value })}
               className={DINHEIRO}
               aria-invalid={!!erros.preco}
-              aria-describedby={descrito('preco', doInsumo)}
+              aria-describedby={descrito('preco', textoDoCusto)}
             />
           </div>
-          {doInsumo && (
+          {textoDoCusto && (
             <div id={`${id('preco')}-ajuda`} className="mt-1.5 space-y-1.5 text-[12px] text-suave">
               <p>{TEXTO_DO_CUSTO_INICIAL}</p>
               <p>
@@ -197,12 +215,14 @@ export function CamposDaEmbalagem({
               onChange={(e) => mudar({ frete: e.target.value })}
               className={DINHEIRO}
               aria-invalid={!!erros.frete}
-              aria-describedby={descrito('frete', true)}
+              aria-describedby={descrito('frete', textoDoFrete)}
             />
           </div>
-          <p id={`${id('frete')}-ajuda`} className={AJUDA}>
-            A parte da entrega que cai em cada embalagem. Entra no custo.
-          </p>
+          {textoDoFrete && (
+            <p id={`${id('frete')}-ajuda`} className={AJUDA}>
+              A parte da entrega que cai em cada embalagem. Entra no custo.
+            </p>
+          )}
           <Erro id={`${id('frete')}-erro`} texto={erros.frete} />
         </div>
       </div>
