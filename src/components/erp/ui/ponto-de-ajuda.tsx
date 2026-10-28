@@ -67,6 +67,7 @@ export function PontoDeAjuda({ ponto, className = '', comRotulo = false }: { pon
         aria-haspopup="dialog"
         aria-expanded={aberto}
         data-ponto={ponto}
+        data-ponto-ativo={aberto ? '' : undefined}
         onClick={(e) => abrir(ponto, e.currentTarget)}
         className={`ff-transicao inline-flex min-h-11 items-center gap-2 rounded-[5px] text-left text-[13px] font-medium text-suave hover:text-texto sm:min-h-8 ${className}`}
       >
@@ -90,6 +91,7 @@ export function PontoDeAjuda({ ponto, className = '', comRotulo = false }: { pon
       aria-haspopup="dialog"
       aria-expanded={aberto}
       data-ponto={ponto}
+      data-ponto-ativo={aberto ? '' : undefined}
       onClick={(e) => abrir(ponto, e.currentTarget)}
       className={`ff-transicao inline-grid h-11 w-11 shrink-0 place-items-center rounded-full align-middle text-suave hover:text-texto sm:h-7 sm:w-7 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 ${className}`}
     >

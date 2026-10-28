@@ -22,7 +22,7 @@ import { AppShell } from '@/components/erp/shell/AppShell';
 import { EscopoDoRascunho } from '@/components/erp/telas/cadastro/rascunho';
 import { Aviso } from '@/components/erp/ui/superficies';
 import { acaoSair } from '../entrar/actions';
-import { acaoAjudaDicas, acaoAjudaFechar, acaoAjudaPontoNunca, acaoAjudaPontoVisto, acaoBuscarNoErp, acaoEscolherVisao } from './actions';
+import { acaoAjudaDicas, acaoAjudaFechar, acaoAjudaPontoNunca, acaoAjudaPontosVistos, acaoBuscarNoErp, acaoEscolherVisao } from './actions';
 
 export const metadata: Metadata = {
   title: 'FlowFoods ERP',
@@ -66,7 +66,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       ajuda={{
         entradas: ajudaParaATela(alcance),
         preferencia: pessoa.ajuda,
-        acoes: { fechar: acaoAjudaFechar, dicas: acaoAjudaDicas, pontoVisto: acaoAjudaPontoVisto, pontoNunca: acaoAjudaPontoNunca },
+        acoes: { fechar: acaoAjudaFechar, dicas: acaoAjudaDicas, pontosVistos: acaoAjudaPontosVistos, pontoNunca: acaoAjudaPontoNunca },
         hoje: diaDe(new Date()),
         contato: AJUDA_DE_USO_ERP,
       }}

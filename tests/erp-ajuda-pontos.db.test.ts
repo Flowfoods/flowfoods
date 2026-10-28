@@ -62,7 +62,7 @@ import {
 } from '@/lib/erp/credenciais';
 import { ENTRADAS } from '@/lib/erp/ajuda';
 import { criarParceiro, mudarStatusParceiro } from '@/lib/erp/parceiros';
-import { acaoAjudaDicas, acaoAjudaPontoNunca, acaoAjudaPontoVisto, acaoAjudaReabrir } from '@/app/erp/actions';
+import { acaoAjudaDicas, acaoAjudaPontoNunca, acaoAjudaPontosVistos, acaoAjudaPontoVisto, acaoAjudaReabrir } from '@/app/erp/actions';
 import { diaDe } from '@/lib/erp/ajuda-rota';
 import { travarTenant } from '@/lib/db';
 import { ErroDeTenant } from '@/lib/erp/tenant';
@@ -206,6 +206,23 @@ describe.skipIf(!URL_TESTE)('ERP · pontos de ajuda (Postgres real)', { timeout:
     const gravados = await pontosNoBanco(ana.s.usuario.id);
     for (const p of pontos) expect(gravados).toContain(`${p}=${hoje()}`);
     expect(gravados).toContain('insumo-novo.marca=x');
+  });
+
+  it('sequência que começou sozinha (decisão 479): todos os passos numa ida ao servidor; "não mostrar" continua; forjado ou lista fora do tamanho recusa tudo', async () => {
+    como(ana.token);
+    await acaoAjudaPontosVistos(['ficha-nova.foto', 'insumo-novo.prazo-abertura', 'insumo-novo.marca', 'ficha-nova.foto']);
+    const gravados = (await pontosNoBanco(ana.s.usuario.id))!;
+    expect(gravados).toContain(`ficha-nova.foto=${hoje()}`);
+    expect(gravados).toContain(`insumo-novo.prazo-abertura=${hoje()}`);
+    // "Não mostrar novamente" de antes não volta a "visto"; repetido grava uma vez.
+    expect(gravados).toContain('insumo-novo.marca=x');
+    expect(gravados).not.toContain(`insumo-novo.marca=${hoje()}`);
+    expect(gravados.filter((i) => i.startsWith('ficha-nova.foto='))).toHaveLength(1);
+    const antes = await pontosNoBanco(bia.s.usuario.id);
+    for (const pontos of [['insumo-novo.tipo', 'insumo-novo.nao-existe'], [], Array(41).fill('insumo-novo.tipo'), 'insumo-novo.tipo' as never, ['insumo-novo.tipo=x']]) {
+      expect(await gravarPreferenciaDeAjuda(bia.token, { tipo: 'pontos-vistos', pontos }, o()), JSON.stringify(pontos).slice(0, 40)).toEqual({ ok: false });
+    }
+    expect(await pontosNoBanco(bia.s.usuario.id)).toEqual(antes);
   });
 
   it('"Mostrar as dicas de novo" zera os pontos (inclusive os "não mostrar"), só da pessoa da sessão', async () => {

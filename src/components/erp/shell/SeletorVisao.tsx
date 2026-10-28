@@ -82,7 +82,12 @@ function DoParceiro({ visao }: { visao: VisaoDoParceiro }) {
   }
   return (
     <Popover
-      classeDoWrapper="min-w-0 shrink-0 max-w-[11rem] sm:max-w-[16rem]"
+      // No celular o seletor cede espaço (o nome da loja trunca); com "shrink-0" o avatar passava da tela a 390 px com uma loja
+      // escolhida (decisão 479). Do tablet para cima, como antes.
+      classeDoWrapper="min-w-0 max-w-[11rem] sm:max-w-[16rem] sm:shrink-0"
+      // O painel abre em posição fixa, dentro da tela: no celular, alinhado ao seletor, ele saía pela esquerda.
+      fixo
+      larguraFixaPx={256}
       rotulo={`Visão: ${atual?.rotulo ?? ''}. Trocar`}
       classeDoBotao={GATILHO}
       largura="w-64"

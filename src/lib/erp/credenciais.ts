@@ -1741,8 +1741,16 @@ export type MudancaDeAjuda =
   | { tipo: 'reabrir' }
   /** O card do ponto abriu sozinho agora: guarda o dia (o servidor decide o dia, não o aparelho). */
   | { tipo: 'ponto-visto'; ponto: string }
+  /**
+   * A sequência guiada começou sozinha (decisão 479): os passos dela, numa ida ao servidor só — vários pedidos seguidos ficariam
+   * na fila do navegador e uma navegação no meio descartaria os últimos.
+   */
+  | { tipo: 'pontos-vistos'; pontos: string[] }
   /** "Não mostrar novamente": o ponto não abre mais sozinho (a ajuda manual continua). */
   | { tipo: 'ponto-nunca'; ponto: string };
+
+/** Teto de passos gravados de uma vez (uma tela tem bem menos pontos que isso). */
+export const MAXIMO_DE_PONTOS_POR_SEQUENCIA = 40;
 
 /** `ok: false` = sessão morta ou pedido recusado; nada foi gravado. */
 export async function gravarPreferenciaDeAjuda(token: unknown, mudanca: MudancaDeAjuda, o?: Opcoes): Promise<{ ok: boolean }> {
@@ -1765,6 +1773,23 @@ export async function gravarPreferenciaDeAjuda(token: unknown, mudanca: MudancaD
       where: { usuarioId },
       create: { usuarioId, fechadas: [], pontos: [] },
       update: { fechadas: [], pontos: [] },
+    });
+    return { ok: true };
+  }
+  if (mudanca.tipo === 'pontos-vistos') {
+    const lista = Array.isArray(mudanca.pontos) ? mudanca.pontos : [];
+    if (lista.length === 0 || lista.length > MAXIMO_DE_PONTOS_POR_SEQUENCIA) return { ok: false };
+    const validos = lista.map((p) => pontoValido(p));
+    // Um ponto forjado recusa o pedido inteiro: nada grava pela metade.
+    if (validos.some((p) => !p)) return { ok: false };
+    const dia = diaDe(agora);
+    // Tudo ou nada: uma falha do banco no meio não deixa a sequência marcada pela metade.
+    await db.$transaction(async (tx) => {
+      for (const ponto of Array.from(new Set(validos as string[]))) {
+        // Quem pediu "não mostrar novamente" não volta a "visto".
+        if (sessao.ajuda.pontos.includes(itemDoPonto(ponto, 'x'))) continue;
+        await gravarItemDoPonto(tx, usuarioId, itemDoPonto(ponto, dia), agora);
+      }
     });
     return { ok: true };
   }
@@ -1814,7 +1839,7 @@ export async function acrescentarCaixaFechada(db: PrismaClient, usuarioId: strin
  * gravação de outra aba. Exportada para o teste com banco; quem confere a lista
  * branca é `gravarPreferenciaDeAjuda`.
  */
-export async function gravarItemDoPonto(db: PrismaClient, usuarioId: string, item: string, agora: Date): Promise<void> {
+export async function gravarItemDoPonto(db: Pick<PrismaClient, '$executeRaw'>, usuarioId: string, item: string, agora: Date): Promise<void> {
   const ponto = item.split('=')[0];
   await db.$executeRaw`
     INSERT INTO "PreferenciaErp" ("usuarioId", "pontos", "atualizadoEm")

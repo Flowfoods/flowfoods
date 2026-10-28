@@ -128,6 +128,7 @@ export function CaixaDeAula({
         <summary
           ref={resumo}
           data-ponto={PONTO_DA_TELA}
+          data-ponto-ativo={aberto ? '' : undefined}
           aria-haspopup={comCard ? 'dialog' : undefined}
           aria-expanded={comCard ? aberto : undefined}
           onClick={(e) => {

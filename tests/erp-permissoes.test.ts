@@ -363,6 +363,8 @@ describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', 
     // Pontos de ajuda (23/10): mesma regra — só a preferência da própria pessoa, usuário da sessão.
     'acaoAjudaPontoVisto',
     'acaoAjudaPontoNunca',
+    // Sequência guiada (decisão 479): os passos de uma vez, com a mesma regra.
+    'acaoAjudaPontosVistos',
   ]);
 
   it('páginas chamam exigirPermissaoNaPagina', () => {

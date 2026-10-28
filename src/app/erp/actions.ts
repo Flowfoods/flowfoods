@@ -179,6 +179,11 @@ export async function acaoAjudaPontoVisto(ponto: string): Promise<void> {
   await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'ponto-visto', ponto: String(ponto ?? '') });
 }
 
+/** Sequência guiada que começou sozinha (decisão 479): todos os passos dela numa chamada só. */
+export async function acaoAjudaPontosVistos(pontos: string[]): Promise<void> {
+  await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'pontos-vistos', pontos: Array.isArray(pontos) ? pontos.map((p) => String(p ?? '')) : [] });
+}
+
 /** Ponto de ajuda: "Não mostrar novamente" (só corta a abertura automática; o botão do campo continua). */
 export async function acaoAjudaPontoNunca(form: FormData): Promise<void> {
   await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'ponto-nunca', ponto: String(form.get('ponto') ?? '') });

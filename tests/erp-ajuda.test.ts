@@ -291,7 +291,7 @@ async function html(caminho: string, preferencia: PreferenciaDeAjuda | null, alc
         ajuda: {
           entradas: ajudaParaATela(alcance).map((e) => ({ ...e, versao: versoes[e.chave] ?? e.versao })),
           preferencia,
-          acoes: preferencia ? { fechar: acao, dicas: acao, pontoVisto: acao, pontoNunca: acao } : null,
+          acoes: preferencia ? { fechar: acao, dicas: acao, pontosVistos: acao, pontoNunca: acao } : null,
           hoje: 20_000,
           contato: { url: 'https://wa.me/5521', display: '(21) 90000-0000' },
         },
@@ -467,6 +467,6 @@ describe('0.6 · guardas estáticas', () => {
     const txt = readFileSync(join('src', 'app', 'erp', 'actions.ts'), 'utf8');
     const trecho = txt.slice(txt.indexOf('ajuda contextual (0.6)')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     expect(trecho).not.toMatch(/usuarioId|get\('usuario|get\("usuario/);
-    expect(trecho.match(/gravarPreferenciaDeAjuda\(tokenDoCookie\(\)/g)).toHaveLength(5); // fechar, dicas, reabrir + os dois dos pontos de ajuda (23/10)
+    expect(trecho.match(/gravarPreferenciaDeAjuda\(tokenDoCookie\(\)/g)).toHaveLength(6); // fechar, dicas, reabrir + os dois dos pontos de ajuda (23/10) + o lote da sequência guiada (decisão 479)
   });
 });

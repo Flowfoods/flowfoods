@@ -54,8 +54,8 @@ export interface AjudaDoShell {
   acoes: {
     fechar: (form: FormData) => Promise<void>;
     dicas: (form: FormData) => Promise<void>;
-    /** Pontos de ajuda: o card abriu sozinho / "Não mostrar novamente". */
-    pontoVisto: (ponto: string) => Promise<void>;
+    /** Pontos de ajuda: a sequência começou sozinha (todos os passos de uma vez) / "Não mostrar novamente". */
+    pontosVistos: (pontos: string[]) => Promise<void>;
     pontoNunca: (form: FormData) => Promise<void>;
   } | null;
   /** Dia de hoje no horário de Brasília (o mesmo dia que o servidor grava), para a regra dos 7 dias. */

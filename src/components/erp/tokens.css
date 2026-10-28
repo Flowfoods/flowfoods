@@ -222,6 +222,19 @@ html:has(.ff-app[data-tema='escuro']) {
 .ff-veu-ajuda {
   background: var(--ff-veu-ajuda);
 }
+/* Sequência guiada (decisão 479): o botão do ponto da etapa aberta fica realçado para a pessoa achar o campo. Fica sob o véu
+   translúcido (o contorno aparece através dele) e sob a barra do topo, sem passar por cima do sino ao rolar. */
+.ff-app [data-ponto-ativo] {
+  outline: 2px solid rgb(var(--ff-acento));
+  outline-offset: 2px;
+  color: rgb(var(--ff-texto));
+}
+/* Folga no fim do conteúdo com a ajuda aberta, só quando uma tela curta não deixa o botão do ponto subir acima do card. */
+.ff-app #conteudo::after {
+  content: '';
+  display: block;
+  height: var(--ff-folga-da-ajuda, 0px);
+}
 @media (prefers-reduced-motion: no-preference) {
   .ff-veu-ajuda {
     animation: ff-veu 180ms ease-out;
