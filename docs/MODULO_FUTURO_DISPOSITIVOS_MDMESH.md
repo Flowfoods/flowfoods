@@ -1,6 +1,6 @@
-# Módulo futuro: Dispositivos (MDMesh)
+# Módulo em breve: Dispositivos (MDMesh)
 
-**Estado:** PROPOSTO / NÃO ATIVADO. **Produto:** ERP FlowFoods (Barney). **Data:** 28/10/2026.
+**Estado:** EM BREVE / NÃO ATIVADO. **Produto:** ERP FlowFoods (Barney). **Data:** 28/10/2026.
 
 ## Objetivo
 Administrar os dispositivos Android das lojas (tablets de pedidos, totens, terminais e painéis) de forma centralizada, aproveitando o [MDMesh](https://github.com/MDMesh-app/MDMesh) como motor de MDM e mantendo o FlowFoods como experiência principal de gestão.
@@ -23,7 +23,7 @@ O MDMesh é um MDM Android open source sob Apache-2.0, com servidor Java/Jersey 
 - **Adaptador backend:** `src/lib/erp/dispositivos/` (futuro) consome **API validada** do MDMesh; mapear endpoints e mecanismo de autenticação da versão adotada antes de implementar. Nenhuma chamada direta do browser ao MDM.
 - **Segurança:** segredos no ambiente, autenticação de serviço, escopo por tenant/loja, menor privilégio, rate limit, registro de ações, consentimento e retenção mínima de dados de localização. Verificar capacidade de isolamento multi-tenant do MDMesh; se não for garantida, separar instâncias por cliente ou introduzir gateway que impeça acesso cruzado.
 - **Banco FlowFoods (proposta, sem migration):** `DispositivoErp` (id, parceiroId, lojaId?, patrimonioId?, mdmInstanceId, externalDeviceId, apelido, finalidade, status, lastSeenAt, createdAt, updatedAt); `DispositivoEventoErp` (id, parceiroId, dispositivoId, tipo, atorId?, momento, detalhesRedigidos); `PoliticaDispositivoErp` (id, parceiroId, nome, configuracaoValidada, versao). Identidade externa única **por instância** e sempre sob parceiro.
-- **UX:** futura área `Dispositivos` no hub do ERP, com abas Visão geral, Equipamentos, Perfis, Aplicativos, Alertas e Histórico. Preservar o shell, tokens e padrões em `.interface-design/system.md`, `src/lib/erp/modulos.ts` e permissões atuais.
+- **UX:** área **Em breve** `Dispositivos` no hub do ERP, com abas Visão geral, Equipamentos, Perfis, Aplicativos, Alertas e Histórico. Preservar o shell, tokens e padrões em `.interface-design/system.md`, `src/lib/erp/modulos.ts` e permissões atuais.
 
 ## Integração com Patrimônio
 **Patrimônio** mantém tombamento, número de série, aquisição, custo, vida útil, garantia, manutenção e transferências. **Dispositivos** mantém telemetria e administração Android. A associação é opcional e auditável: um mesmo bem pode receber substituição de aparelho sem perder histórico patrimonial. Evitar criar cadastro duplicado e expor IMEI, serial ou localização a perfis sem autorização.
