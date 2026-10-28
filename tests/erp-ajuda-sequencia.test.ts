@@ -106,6 +106,13 @@ describe('decisão 479 · o card', () => {
     // Início automático: uma tentativa; com alguém digitando, só com o botão livre e sem rolar; sem escutar a rolagem.
     expect(pontos).toContain('if (digitando && !livreDoCard(escolhido.el)) return;');
     expect(pontos).toContain('rolar: !digitando');
+    // A tentativa da chegada fica usada antes de qualquer saída da conta (outra janela, ninguém elegível, alguém digitando):
+    // a sequência recusada não começa mais tarde, no meio do trabalho (ponto aberto na 3ª conferência).
+    const tentativa = pontos.slice(pontos.indexOf('const t = window.setTimeout(() => {'), pontos.indexOf('const passos = passosDaSequencia(visiveis, null);'));
+    expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeGreaterThan(0);
+    expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf("document.querySelector('dialog[open]')"));
+    expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (!escolhido) return;'));
+    expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (digitando && !livreDoCard(escolhido.el)) return;'));
     expect(pontos).not.toMatch(/addEventListener\('scroll'/);
     // A folga mora no fim do conteúdo (não depois da grade) e soma à que já existe.
     expect(readFileSync('src/components/erp/tokens.css', 'utf8')).toMatch(/#conteudo::after \{[^}]*var\(--ff-folga-da-ajuda, 0px\)/);

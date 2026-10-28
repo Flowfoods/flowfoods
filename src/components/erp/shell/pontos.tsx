@@ -145,15 +145,17 @@ export function ProvedorDosPontos({
   // Onde a pessoa estava quando a sequência começou: o foco volta para lá ao encerrar.
   const lugarDeTrabalho = useRef<HTMLElement | null>(null);
   const registrados = useRef<Map<string, Set<HTMLElement>>>(new Map());
-  // Uma sequência por visita: começou (sozinha ou pela pessoa) ou foi encerrada, não começa sozinha de novo.
-  const abriuSozinhoNestaVisita = useRef(false);
+  // Uma tentativa de começar sozinha por visita: usada quando a sequência começou (sozinha ou pela pessoa), foi encerrada ou a
+  // tentativa da chegada não começou (ninguém elegível, outra janela aberta, alguém digitando com o botão escondido). Usada,
+  // a sequência não começa sozinha mais tarde, no meio do trabalho; volta a valer ao trocar de tela.
+  const inicioUsadoNestaVisita = useRef(false);
 
   const idCompleto = useCallback((ponto: string) => (chave ? `${chave}.${ponto}` : ''), [chave]);
 
   // Trocar de tela: fecha o card e libera a abertura automática da próxima tela.
   useEffect(() => {
     setAtivo(null);
-    abriuSozinhoNestaVisita.current = false;
+    inicioUsadoNestaVisita.current = false;
   }, [caminho]);
 
   const preferenciaComGravados = useMemo<PreferenciaDeAjuda | null>(
@@ -176,7 +178,7 @@ export function ProvedorDosPontos({
    * (fechar o último passo) deixa o foco no botão do último ponto explicado, sem levar a pessoa de volta ao começo da tela.
    */
   const encerrar = useCallback((devolverFoco: boolean, para: 'trabalho' | 'ultimo' = 'trabalho') => {
-    abriuSozinhoNestaVisita.current = true;
+    inicioUsadoNestaVisita.current = true;
     setAtivo(null);
     if (!devolverFoco) return;
     const ordem = para === 'ultimo' ? [origem.current, lugarDeTrabalho.current] : [lugarDeTrabalho.current, origem.current];
@@ -189,7 +191,7 @@ export function ProvedorDosPontos({
       if (!porId.has(id)) return;
       origem.current = el;
       lugarDeTrabalho.current = el;
-      abriuSozinhoNestaVisita.current = true;
+      inicioUsadoNestaVisita.current = true;
       setAtivo({ id, automatico: false, rolar: true, passos: passosDaSequencia(visiveisNaOrdem(), id) });
     },
     [idCompleto, porId, visiveisNaOrdem],
@@ -229,19 +231,22 @@ export function ProvedorDosPontos({
   const hoje = ajuda?.hoje ?? 0;
   const acoes = ajuda?.acoes ?? null;
   useEffect(() => {
-    if (!acoes || !preferenciaComGravados || !podeAbrirSozinho || ativo || abriuSozinhoNestaVisita.current) return;
+    if (!acoes || !preferenciaComGravados || !podeAbrirSozinho || ativo || inicioUsadoNestaVisita.current) return;
     const t = window.setTimeout(() => {
-      if (abriuSozinhoNestaVisita.current || document.querySelector('dialog[open]')) return;
+      if (inicioUsadoNestaVisita.current) return;
+      // Uma tentativa, ao chegar na tela, e ela fica usada já aqui, comece ou não: uma nova renderização depois (resposta do
+      // servidor, outra preferência, um ponto que aparece) não reagenda o início no meio do trabalho.
+      inicioUsadoNestaVisita.current = true;
+      if (document.querySelector('dialog[open]')) return;
       const visiveis = visiveisNaOrdem();
       const escolhido = visiveis.find((c) => !c.optouFora && estadoDoPonto(c.id, preferenciaComGravados, hoje) === 'elegivel');
       if (!escolhido) return;
-      // Uma tentativa, ao chegar na tela. Ninguém digitando: começa, e a página sobe até o botão do ponto (como ao abrir à
-      // mão). Alguém já digitando num campo: só começa se o botão já estiver à vista e fora de onde o card abre — a página não
-      // se mexe debaixo de quem trabalha; senão, nesta visita não começa (nunca abre no meio do trabalho).
+      // Ninguém digitando: começa, e a página sobe até o botão do ponto (como ao abrir à mão). Alguém já digitando num campo:
+      // só começa se o botão já estiver à vista e fora de onde o card abre — a página não se mexe debaixo de quem trabalha;
+      // senão, nesta visita não começa (nunca abre no meio do trabalho).
       const digitando = estaDigitando();
       if (digitando && !livreDoCard(escolhido.el)) return;
       const passos = passosDaSequencia(visiveis, null);
-      abriuSozinhoNestaVisita.current = true;
       origem.current = escolhido.el;
       const foco = document.activeElement;
       lugarDeTrabalho.current = foco instanceof HTMLElement && foco !== document.body ? foco : null;
