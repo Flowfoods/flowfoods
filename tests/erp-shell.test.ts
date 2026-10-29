@@ -265,6 +265,7 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
       '/rodolfo/portal',
       '/rodolfo/erp',
       '/rodolfo/onboarding',
+      '/rodolfo/integracoes',
     ]);
     // Os atalhos do Ctrl+K levam a telas que existem.
     for (const a of modulosDoNivel1().flatMap((m) => m.acoes))

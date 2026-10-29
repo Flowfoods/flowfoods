@@ -164,4 +164,16 @@ describe('INT-1.1 · guardas', () => {
     expect(furos).toEqual([]);
   });
 
+  it('a Central do nível 1 não chama o iFood: nem o cliente, nem o token, nem o transporte (a única chamada é o comando da leitura TEST)', () => {
+    const raiz = join('src', 'app', 'rodolfo', '(painel)', 'integracoes');
+    const furos: string[] = [];
+    for (const f of [...arquivos(raiz), join('src', 'lib', 'integracoes', 'core', 'central.ts')]) {
+      const txt = readFileSync(f, 'utf8');
+      if (/from\s+['"](@\/lib\/integracoes\/ifood|\.\.\/ifood)\//.test(txt)) furos.push(`${f}: importa o cliente do iFood`);
+      if (/\bfetch\s*\(/.test(txt)) furos.push(`${f}: fetch`);
+      if (/testar conex/i.test(txt)) furos.push(`${f}: "testar conexão"`);
+    }
+    expect(arquivos(raiz).length).toBeGreaterThan(0);
+    expect(furos).toEqual([]);
+  });
 });

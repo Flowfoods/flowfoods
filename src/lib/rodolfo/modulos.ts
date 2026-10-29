@@ -119,6 +119,8 @@ export function modulosDoNivel1(): ModuloNav[] {
               icone: 'acesso',
               subtitulo: 'Pedidos do site: ativar ou recusar',
             },
+            // INT-1.8 (decisão 490): a Central de Integrações, só do nível 1.
+            { href: '/rodolfo/integracoes', rotulo: 'Integrações', icone: 'canais', subtitulo: 'Apps do iFood, lojas ligadas e liberação' },
           ],
         },
       ],

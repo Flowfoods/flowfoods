@@ -328,6 +328,15 @@ const CAMPO: Record<string, string> = {
   resultado: 'resultado',
   ressalvas: 'ressalvas',
   cmv: 'CMV',
+  // INT-1.8: Central de Integrações (o histórico do parceiro, na tela do nível 1)
+  provedor: 'provedor',
+  ambiente: 'ambiente',
+  modulo: 'módulo',
+  app: 'app',
+  nomeNoIfood: 'nome no iFood',
+  idNoIfood: 'id no iFood',
+  modulosPausados: 'módulos pausados',
+  erro: 'erro',
 };
 
 /** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. 3.3: quem fez o lote, na conclusão. */
