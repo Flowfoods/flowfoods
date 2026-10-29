@@ -14,7 +14,7 @@ import { FalhaDeRede, type PedidoHttp, type RespostaHttp } from '@/lib/integraco
 
 const SEGREDO = 'segredo-do-teste-c-nunca-em-log';
 const ENV = { INTEGRACAO_IFOOD_ATIVA: 'true', INTEGRACAO_CHAVE_CIFRAGEM: randomBytes(32).toString('hex'), IFOOD_TEST_CLIENT_SECRET: SEGREDO };
-const APP: AppDaLeitura = { id: 'app-teste', nome: 'Teste (C)', ambiente: 'TEST', categoria: 'TEST', clientId: 'cli-teste', modulos: ['ANALYTICS', 'MERCHANT'] };
+const APP: AppDaLeitura = { id: 'app-teste', nome: 'Teste (C)', ambiente: 'TEST', categoria: 'TEST', clientId: 'cli-teste', nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET', modulos: ['ANALYTICS', 'MERCHANT'] };
 const LOJA = '0b1f6d3e-8a51-4c2e-9d7a-3f2b6c1e5a90';
 const OUTRA = '7c2e9a14-5b3d-4f60-a8e1-2d9c4b7f1e63';
 const AGORA = Date.UTC(2026, 9, 29, 12, 0, 0);
@@ -69,6 +69,8 @@ describe('INT-1.4 · a leitura TEST', () => {
       { ...APP, ambiente: 'PRODUCAO' as const, categoria: 'BI' },
       { ...APP, categoria: 'BI' },
       { ...APP, modulos: ['MERCHANT'] },
+      // Decisão 489: app de teste cadastrado com o segredo de um app de produção.
+      { ...APP, nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET' },
     ]) {
       const m = montar({}, app);
       await expect(lerTest({ app, cliente: m.cliente, dia: '2026-10-28', agora: AGORA })).rejects.toBeInstanceOf(ErroDaLeitura);

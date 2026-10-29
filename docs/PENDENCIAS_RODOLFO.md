@@ -224,12 +224,12 @@ e deploy). Nenhuma chamada real ao iFood foi feita.
    só no painel (app `flowfoods-web` → Environment), nunca no Git, no Notion ou
    em chamado. **Só você tem esse segredo** (conta iFood Developer).
 3. **Ligar a chave geral** para a leitura TEST: `INTEGRACAO_IFOOD_ATIVA=true`,
-   no mesmo lugar. Sozinha ela não sincroniza nada.
-4. **Primeira leitura TEST** — eu rodo assim que 2 e 3 estiverem no painel, com o
-   Client ID do Teste (C):
-   `docker compose exec worker sh -c '. ./scripts/exportar-segredos.sh && npm run integracao:ler-test -- --client-id <Client ID>'`.
-   O HTTP 200 oficial (data, app, loja, requestId) fecha a INT-1.4 e libera a
-   INT-1.5 a 1.7, que dependem da resposta real.
+   no mesmo lugar. Sozinha ela não sincroniza nada. Salvou as duas: **me avise**.
+   Eu refaço o deploy (o worker só enxerga variável nova depois dele).
+4. **Primeira leitura TEST** — eu rodo, pelo GitHub (barney-ops → `reerguer-vps`
+   → etapa `leitura-ifood-test`), sem precisar de terminal no servidor. O HTTP
+   200 oficial (data, app, loja, requestId) fecha a INT-1.4 e libera a INT-1.5 a
+   1.7, que dependem da resposta real.
 5. **Validação acompanhada da 480 com o cliente fundador** (unidade, embalagem e
    custo, sem explicação pelo WhatsApp) — operação, fora do código.
 6. **Um celular de verdade** para conferir a ajuda com teclado virtual e barra de

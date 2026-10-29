@@ -75,10 +75,23 @@ describe('INT-1.1 · o app no provedor: só o nome da variável do cofre', () =>
     }
   });
 
+  it('o segredo combina com o ambiente: app de teste só com IFOOD_TEST_..., app de produção nunca com ele (decisão 489)', () => {
+    const r1 = lerApp({ ...base, nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET' });
+    expect(r1.ok).toBe(false);
+    if (!r1.ok) expect(r1.erros.nomeDoSegredo).toMatch(/começa com IFOOD_TEST_/);
+    const r2 = lerApp({ ...base, ambiente: 'PRODUCAO', categoria: 'BI', nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET' });
+    expect(r2.ok).toBe(false);
+    if (!r2.ok) expect(r2.erros.nomeDoSegredo).toMatch(/não usa o segredo de teste/);
+    expect(lerApp({ ...base, nomeDoSegredo: 'IFOOD_TEST_C_CLIENT_SECRET' }).ok).toBe(true);
+    expect(lerApp({ ...base, ambiente: 'PRODUCAO', categoria: 'BI', nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET' }).ok).toBe(true);
+    // "TESTE" não é "TEST_": o nome de produção que só começa parecido continua de produção.
+    expect(lerApp({ ...base, ambiente: 'PRODUCAO', categoria: 'BI', nomeDoSegredo: 'IFOOD_TESTE_BI_CLIENT_SECRET' }).ok).toBe(true);
+  });
+
   it('categoria × ambiente × módulos, como a política de homologação do iFood', () => {
     expect(lerApp({ ...base, ambiente: 'PRODUCAO' }).ok).toBe(false);
-    expect(lerApp({ ...base, ambiente: 'PRODUCAO', categoria: 'BI' }).ok).toBe(true);
-    const bi = lerApp({ ...base, ambiente: 'PRODUCAO', categoria: 'BI', modulos: ['ANALYTICS', 'REVIEW'] });
+    expect(lerApp({ ...base, ambiente: 'PRODUCAO', nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET', categoria: 'BI' }).ok).toBe(true);
+    const bi = lerApp({ ...base, ambiente: 'PRODUCAO', nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET', categoria: 'BI', modulos: ['ANALYTICS', 'REVIEW'] });
     expect(!bi.ok && bi.erros.modulos).toMatch(/não pertence à categoria/);
     expect(MODULOS_DA_CATEGORIA.BI).toEqual(['ANALYTICS']);
     expect(lerApp({ ...base, modulos: [] }).ok).toBe(false);
@@ -150,4 +163,5 @@ describe('INT-1.1 · guardas', () => {
     }
     expect(furos).toEqual([]);
   });
+
 });

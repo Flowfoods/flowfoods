@@ -3515,3 +3515,20 @@ Fora da integração, no mesmo bloco de trabalho (f0ce242): na suíte completa c
 **Revisão independente:** confirmação final: N1 a N4 fechados, nada novo de "deve" nem de "deveria"; ataque com tabela temporária contra o gatilho novo recusado; 4 mutações no banco e 9 no código, todas pegas.
 
 **Prova:** `integracao-fundacao.db` (11), `integracao-fundacao-migracao.db` (3 perfis, agora com as migrations 487 e 488: `search_path` na própria função, módulo existente que não ativa depois da troca da marca, conferidor acusando gatilho desligado, CREATE no schema e WITH CHECK aberto), `integracao-leitura-test` (11), `integracao-leitura-test.db` (4), `integracao-cliente-ifood` (20), `integracao-cofre`, `integracao-segredos-worker` (3). Mutação pega: voltar a função do módulo à versão da 487 (o módulo passa a ativar e o teste falha).
+
+### 489. 2026-10-29 · Publicação com autorização permanente; leitura TEST pelo GitHub; segredo que combina com o ambiente
+
+**Fonte:** Rodolfo, 29/10/2026: "Pode sempre sem pedir minha permissão" (merge e deploy). Plano: a leitura TEST oficial é um comando manual no servidor, com registro (seção 7), e a sessão do Claude não alcança a VPS.
+
+**Mudanças:**
+1. **Publicação:** a versão de trabalho foi para a `master` (avanço rápido `f478efa` → `2d4bdfe`: 81 commits, 9 migrations aditivas), portão verde (lint, tipos, testes com banco, build) e deploy no Dokploy às 09h34 UTC. A autorização ficou escrita no `CLAUDE.md` (seção "Publicação"): merge e deploy sem pedir; segredos, app de produção, homologação, ativação por loja e custo novo continuam com Rodolfo; nunca ler as variáveis do Dokploy pela API.
+2. **Leitura TEST sem terminal:** etapa `leitura-ifood-test` no `reerguer-vps` (barney-ops). Um compose de uso único com o docker.sock (o mesmo caminho que recriou o Traefik em 24/10) roda no worker o comando da INT-1.4 com limite de 15 min, mostra só sim/não das variáveis da integração, devolve o resultado no log e é removido no fim, mesmo com o job cancelado. Sem Client ID, usa o do Teste (C). Worker sem o comando (deploy antigo) e tempo esgotado têm mensagem própria.
+3. **Segredo × ambiente:** app de teste só com segredo `IFOOD_TEST_..._CLIENT_SECRET`; app de produção nunca com ele. Conferido no cadastro (`lerApp`), na leitura TEST e antes de qualquer pedido de token (`porQueNaoChamar`). Antes, um app de teste cadastrado por engano com `IFOOD_BI_CLIENT_SECRET` pediria token com a credencial de produção pelo caminho do TEST, sem o portão da homologação.
+
+**Revisão independente:** a etapa foi aprovada com ressalvas, sem nada que bloqueasse. Os três "deveria" foram corrigidos: o limite de tempo no worker com espera maior que ele; o erro do npm visível; e a trava segredo × ambiente, que estava fora do diff e virou o item 3. Dos opcionais, entraram: pular a espera se o compose falhar, não seguir sem conferir sobras, minúsculas, Client ID padrão, alvos numa linha só e a remoção garantida.
+
+**Prova:**
+- Simulador local da etapa, com Dokploy e docker falsos: recusas de entrada, worker sem o comando (saída 4), chave geral desligada (saída 2) e limite de tempo (124).
+- `integracao-fundacao` (cadastro recusa a troca nos dois sentidos; `IFOOD_TESTE_...` continua de produção), `integracao-cliente-ifood` (nada sai, nem o token, nos dois casos trocados) e `integracao-leitura-test` (app de teste com segredo de produção recusado antes de chamar).
+
+**Reverter:** `git revert` do commit; a etapa é só um arquivo de operação. Sem migration.

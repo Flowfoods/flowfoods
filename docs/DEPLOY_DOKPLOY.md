@@ -193,10 +193,15 @@ evidência (sem token nem segredo) em `/tmp/integracao-leituras/` dentro do
 worker. Ligar a chave sozinha não sincroniza nada.
 
 Sem terminal no servidor: GitHub → Actions → **barney-ops** → `reerguer-vps`,
-etapa `leitura-ifood-test`, `alvos` = Client ID (opcionais, separados por
-vírgula: `loja=<uuid>`, `dia=AAAA-MM-DD`, `token-novo`). Um compose de uso
-único com o docker.sock roda o mesmo comando no worker, mostra só sim/não das
-variáveis da integração, devolve o resultado no log e é removido no fim.
+etapa `leitura-ifood-test`. Em `alvos`, tudo opcional e separado por vírgula:
+o Client ID (sem ele, usa o do Teste (C)), `loja=<uuid>`, `dia=AAAA-MM-DD`,
+`token-novo`. Um compose de uso único com o docker.sock roda o mesmo comando no
+worker (com limite de 15 min), mostra só sim/não das variáveis da integração,
+devolve o resultado no log e é removido no fim, mesmo se o job for cancelado.
+
+Variável nova ou trocada no painel só chega ao worker depois de um deploy (o
+container guarda o ambiente de quando subiu): salve no painel e rode o deploy
+(Actions → "Portão e deploy" → Run workflow na `master`, ou o botão Deploy).
 
 **Sobre o ERP do parceiro (`/entrar` e `/erp`):** não pede variável nova. O
 rosto (passkey) só funciona em **https** (o navegador recusa em http, fora do

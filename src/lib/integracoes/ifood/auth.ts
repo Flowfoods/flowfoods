@@ -20,6 +20,7 @@
  *  - nada de segredo ou token em erro, log ou retorno além do token para quem chama.
  */
 
+import { segredoCombinaComAmbiente } from '../core/campos';
 import { baseDaApiIfood, chaveDeCifragem, cifrar, decifrar, ErroDeCofre, integracaoIfoodAtiva, lerSegredo } from '../core/cofre';
 import type { Limitador } from './limitador';
 import { classificar, esperaDoBackoff, lerRetryAfter } from './respostas';
@@ -37,8 +38,13 @@ export interface AppParaToken {
 }
 
 /** Por que nenhuma chamada pode sair para este app agora (null = pode). */
-export function porQueNaoChamar(app: Pick<AppParaToken, 'ambiente' | 'homologacao'>, env: Readonly<Record<string, string | undefined>> = process.env): string | null {
+export function porQueNaoChamar(app: Pick<AppParaToken, 'ambiente' | 'homologacao' | 'nomeDoSegredo'>, env: Readonly<Record<string, string | undefined>> = process.env): string | null {
   if (!integracaoIfoodAtiva(env)) return 'A integração do iFood está desligada (INTEGRACAO_IFOOD_ATIVA): nenhuma chamada sai.';
+  // Decisão 489: o segredo combina com o ambiente. Um app de teste cadastrado com o segredo de um app de produção (ou o
+  // contrário) não pede token: senão a credencial de produção sairia pelo caminho do TEST, sem o portão da homologação.
+  if (!segredoCombinaComAmbiente(app.ambiente, app.nomeDoSegredo)) {
+    return `O segredo ${app.nomeDoSegredo} não é de app ${app.ambiente === 'TEST' ? 'de teste' : 'de produção'}: nenhuma chamada sai. Corrija o cadastro do app.`;
+  }
   if (app.ambiente === 'PRODUCAO' && app.homologacao !== 'HOMOLOGADO') return 'App de produção ainda não homologado pelo iFood: nenhuma chamada sai.';
   return null;
 }

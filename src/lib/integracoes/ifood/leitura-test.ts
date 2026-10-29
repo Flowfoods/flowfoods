@@ -15,7 +15,7 @@
  *  - nada é gravado no banco do parceiro: a leitura é evidência (arquivo e registro de auditoria do comando), não dado publicado.
  */
 
-import { lerIdDaLojaIfood } from '../core/campos';
+import { lerIdDaLojaIfood, segredoCombinaComAmbiente } from '../core/campos';
 import type { ChamadaIfood, ResultadoIfood } from './http';
 
 export interface ClienteParaLeitura {
@@ -28,6 +28,7 @@ export interface AppDaLeitura {
   ambiente: 'TEST' | 'PRODUCAO';
   categoria: string;
   clientId: string;
+  nomeDoSegredo: string;
   modulos: readonly string[];
 }
 
@@ -91,6 +92,7 @@ export function consultaDoDia(dia: string) {
 export function porQueOAppNaoServe(app: AppDaLeitura): string | null {
   if (app.ambiente !== 'TEST' || app.categoria !== 'TEST') return `O app "${app.nome}" não é o app de teste (ambiente ${app.ambiente}, categoria ${app.categoria}). A leitura deste comando é só no TEST.`;
   if (!app.modulos.includes('ANALYTICS')) return `O app "${app.nome}" não tem o módulo Analytics no cadastro.`;
+  if (!segredoCombinaComAmbiente('TEST', app.nomeDoSegredo)) return `O app "${app.nome}" está cadastrado com o segredo ${app.nomeDoSegredo}, que não é de teste. A leitura deste comando é só com o segredo do app de teste.`;
   return null;
 }
 

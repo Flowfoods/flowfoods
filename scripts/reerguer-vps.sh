@@ -8,7 +8,7 @@
 #   limpar-cache  docker builder prune + image prune, SÓ se o disco passar de 90%
 #   subir         Docker → Dokploy/Traefik → lista de IDs, um por vez, esperando cada um
 #   provar        HTTP + certificado + DNS de cada domínio cadastrado no Dokploy
-#   leitura-ifood-test  roda no worker a leitura TEST do iFood (INT-1.4); ALVOS = Client ID[,loja=][,dia=][,token-novo]
+#   leitura-ifood-test  roda no worker a leitura TEST do iFood (INT-1.4); ALVOS = [Client ID][,loja=][,dia=][,token-novo]
 #
 # Regras que o script garante:
 #   - nunca imprime token, senha ou chave; da API do Dokploy só saem nome, id,
@@ -609,17 +609,21 @@ YML
 }
 
 # Leitura TEST do iFood (INT-1.4, decisão 486) no worker do servidor, por um compose de uso único com o docker.sock (o mesmo
-# caminho do traefik-via-compose: a sessão do Claude não alcança a VPS). ALVOS = "<Client ID>[,loja=<uuid>][,dia=AAAA-MM-DD]
-# [,token-novo]". Antes do comando, mostra só sim/não das variáveis da integração no worker. O comando recusa sozinho (saída 2,
-# sem chamar o iFood) com a chave geral desligada ou sem o segredo, e nunca imprime token nem segredo. Do Dokploy só se leem
-# appName e environmentId: o JSON do compose traz as variáveis do painel e não vai para o log.
+# caminho do traefik-via-compose: a sessão do Claude não alcança a VPS). ALVOS = "[Client ID][,loja=<uuid>][,dia=AAAA-MM-DD]
+# [,token-novo]"; sem Client ID, usa o do app Teste (C), que é público. Antes do comando, mostra só sim/não das variáveis da
+# integração no worker. O comando recusa sozinho (saída 2, sem chamar o iFood) com a chave geral desligada ou sem o segredo, e
+# nunca imprime token nem segredo. Do Dokploy só se leem appName e environmentId: o JSON do compose traz as variáveis do painel
+# e não vai para o log. Variável nova no painel só chega ao worker depois de um deploy (o exec herda o ambiente do container).
+CLIENT_ID_TESTE_C="a932c3e2-6117-4df2-8c72-1a7b9ccda4f4"
+LEITURA_LIMITE_S=900   # o comando no worker para sozinho aqui (429 com espera longa, rede lenta)
 leitura_ifood_test() {
   preparar_dokploy || exit 1
-  local uuid='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
-  local cid="" args="" item itens
-  IFS=',' read -ra itens <<<"${ALVOS:-}"
+  local uuid='^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+  local cid="" args="" item itens alvos="${ALVOS:-}"
+  case "$alvos" in *$'\n'*|*$'\r'*) echo "::error::alvos numa linha só, separados por vírgula"; exit 2 ;; esac
+  IFS=',' read -ra itens <<<"$alvos"
   for item in "${itens[@]}"; do
-    item=$(printf '%s' "$item" | tr -d '[:space:]')
+    item=$(printf '%s' "$item" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
     case "$item" in
       "") ;;
       loja=*) [[ "${item#loja=}" =~ $uuid ]] || { echo "::error::loja= precisa ser o UUID da loja"; exit 2; }; args="$args --loja ${item#loja=}" ;;
@@ -628,8 +632,7 @@ leitura_ifood_test() {
       *) { [[ "$item" =~ $uuid ]] && [ -z "$cid" ]; } || { echo "::error::alvos: Client ID (UUID) e, opcionais, loja=, dia=, token-novo"; exit 2; }; cid="$item" ;;
     esac
   done
-  [ -n "$cid" ] || { echo "::error::Informe em alvos o Client ID do app Teste (C)."; exit 2; }
-  args="--client-id ${cid}${args}"
+  args="--client-id ${cid:-$CLIENT_ID_TESTE_C}${args}"
 
   titulo "App do site no Dokploy"
   local web="${COMPOSE_WEB:-JWsPI2ZLgUrh11MS_EwwB}" projeto env_id
@@ -640,10 +643,13 @@ leitura_ifood_test() {
   echo "compose.one -> HTTP $code · projeto: ${projeto:-?}"
   [[ "$projeto" =~ ^[a-z0-9_-]+$ ]] && [ -n "$env_id" ] || { echo "::error::Não li appName/environmentId do app do site."; exit 1; }
 
-  # Sobra de uma execução anterior que não terminou: remove (só o compose de uso único, sem volumes).
-  inventario >/dev/null || true
-  awk -F'\t' '$1=="compose" && $3=="leitura-ifood-test"{print $2}' /tmp/inventario.tsv 2>/dev/null | while read -r velho; do
-    code=$(dokploy POST /api/compose.delete "{\"composeId\":\"$velho\",\"deleteVolumes\":false}"); echo "sobra $velho removida -> HTTP $code"
+  # Sobra de uma execução anterior que não terminou: remove (só o compose de uso único, sem volumes). Sem conseguir conferir,
+  # não segue: um compose antigo rodando junto poderia sobrescrever o relatório desta.
+  inventario >/dev/null || { echo "::error::Não li a lista de apps do Dokploy para conferir sobras; nada foi executado."; exit 1; }
+  local velho
+  for velho in $(awk -F'\t' '$1=="compose" && $3=="leitura-ifood-test"{print $2}' /tmp/inventario.tsv); do
+    code=$(dokploy POST /api/compose.delete "{\"composeId\":\"$velho\",\"deleteVolumes\":false}"); echo "remoção da sobra $velho -> HTTP $code"
+    case "$code" in 2*) ;; *) echo "::error::Não removi a sobra $velho; nada foi executado."; exit 1 ;; esac
   done
 
   local marca="${GITHUB_RUN_ID:-local}-$RANDOM"
@@ -658,6 +664,10 @@ OUT=/out/leitura-ifood-test.log
     echo "Worker não encontrado no projeto $PROJETO. Containers *worker* no host:"
     docker ps --format '{{.Names}}' | grep -i worker || echo "(nenhum)"
     echo "saida=3"
+  elif ! docker exec "$c" test -f scripts/integracao-ler-test.ts; then
+    echo "worker: $c ($(docker inspect -f '{{.State.Status}} desde {{.State.StartedAt}}' "$c"))"
+    echo "O worker está com uma versão sem o comando da leitura TEST: o deploy novo ainda não subiu."
+    echo "saida=4"
   else
     echo "worker: $c ($(docker inspect -f '{{.State.Status}} desde {{.State.StartedAt}}' "$c"))"
     echo "variáveis da integração no worker (só sim/não):"
@@ -665,8 +675,9 @@ OUT=/out/leitura-ifood-test.log
       [ "${INTEGRACAO_IFOOD_ATIVA:-}" = true ] && echo "  INTEGRACAO_IFOOD_ATIVA: true" || echo "  INTEGRACAO_IFOOD_ATIVA: não é true"
       [ -n "${IFOOD_TEST_CLIENT_SECRET:-}" ] && echo "  IFOOD_TEST_CLIENT_SECRET: presente" || echo "  IFOOD_TEST_CLIENT_SECRET: ausente"
       [ -n "${INTEGRACAO_CHAVE_CIFRAGEM:-}" ] && echo "  INTEGRACAO_CHAVE_CIFRAGEM: presente" || echo "  INTEGRACAO_CHAVE_CIFRAGEM: ausente"'
-    echo "comando: npm run integracao:ler-test -- $ARGS"
-    docker exec "$c" sh -c '. ./scripts/exportar-segredos.sh && npm run --silent integracao:ler-test -- "$@"' leitura $ARGS
+    echo "comando: integracao:ler-test $ARGS (limite de $LIMITE s)"
+    # O tsx direto sob o timeout (sem npm e sem sh no meio): o sinal chega a quem roda e nada fica órfão no worker.
+    docker exec "$c" sh -c '. ./scripts/exportar-segredos.sh && exec timeout -s TERM "$0" ./node_modules/.bin/tsx scripts/integracao-ler-test.ts "$@"' "$LIMITE" $ARGS
     echo "saida=$?"
   fi
 } > "$OUT.tmp" 2>&1
@@ -684,6 +695,7 @@ services:
       MARCA: "${marca}"
       PROJETO: "${projeto}"
       ARGS: "${args}"
+      LIMITE: "${LEITURA_LIMITE_S}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /etc/dokploy/traefik/reerguer:/out
@@ -697,20 +709,25 @@ YML
   corpo=$(jq -n --arg e "$env_id" --arg f "$compose" \
     '{name:"leitura-ifood-test", appName:"leitura-ifood-test", environmentId:$e, composeType:"docker-compose", composeFile:$f, description:"temporário: leitura TEST do iFood (INT-1.4)"}')
   code=$(dokploy POST /api/compose.create "$corpo"); echo "compose.create -> HTTP $code"
-  local cid_compose
-  cid_compose=$(jq -r '.composeId // empty' /tmp/dk.json 2>/dev/null)
-  if [ -z "$cid_compose" ]; then
-    inventario >/dev/null; cid_compose=$(awk -F'\t' '$1=="compose" && $3=="leitura-ifood-test"{print $2}' /tmp/inventario.tsv | head -1)
+  LEITURA_COMPOSE=$(jq -r '.composeId // empty' /tmp/dk.json 2>/dev/null)
+  if [ -z "$LEITURA_COMPOSE" ]; then
+    inventario >/dev/null; LEITURA_COMPOSE=$(awk -F'\t' '$1=="compose" && $3=="leitura-ifood-test"{print $2}' /tmp/inventario.tsv | head -1)
   fi
-  [ -n "$cid_compose" ] || { echo "::error::compose não criado (HTTP $code)"; exit 1; }
-  code=$(dokploy POST /api/compose.update "$(jq -n --arg c "$cid_compose" --arg f "$compose" '{composeId:$c, composeFile:$f, sourceType:"raw"}')")
-  echo "compose.update -> HTTP $code (id $cid_compose)"
-  code=$(dokploy POST /api/compose.deploy "{\"composeId\":\"$cid_compose\",\"title\":\"leitura TEST do iFood\"}"); echo "compose.deploy -> HTTP $code"
-  esperar compose "$cid_compose" || echo "::warning::deploy do compose não terminou em done"
+  [ -n "$LEITURA_COMPOSE" ] || { echo "::error::compose não criado (HTTP $code)"; exit 1; }
+  # Job cancelado ou erro no meio: o compose sai mesmo assim (senão um Deploy no painel rodaria a leitura de novo).
+  trap 'remover_compose_da_leitura' EXIT
+  code=$(dokploy POST /api/compose.update "$(jq -n --arg c "$LEITURA_COMPOSE" --arg f "$compose" '{composeId:$c, composeFile:$f, sourceType:"raw"}')")
+  echo "compose.update -> HTTP $code (id $LEITURA_COMPOSE)"
+  code=$(dokploy POST /api/compose.deploy "{\"composeId\":\"$LEITURA_COMPOSE\",\"title\":\"leitura TEST do iFood\"}"); echo "compose.deploy -> HTTP $code"
+  local subiu=0
+  esperar compose "$LEITURA_COMPOSE"; subiu=$?
+  [ "$subiu" = 1 ] && { echo "::error::O compose de uso único falhou ao subir (ver o deploy no painel); nada foi lido."; exit 1; }
+  [ "$subiu" = 0 ] || echo "::warning::deploy do compose não terminou em done; sigo esperando o relatório"
 
   titulo "Resultado"
-  local achou="" saida="" path tentativa
-  for tentativa in $(seq 1 24); do
+  # Espera o limite do comando e uma margem (o job tem 60 min).
+  local achou="" saida="" path tentativa voltas=$(( LEITURA_LIMITE_S / 15 + 10 ))
+  for tentativa in $(seq 1 "$voltas"); do
     for path in /etc/dokploy/traefik/reerguer/leitura-ifood-test.log reerguer/leitura-ifood-test.log; do
       code=$(dokploy GET "/api/settings.readTraefikFile?path=$(jq -rn --arg p "$path" '$p|@uri')")
       [ "$code" = 200 ] || continue
@@ -725,17 +742,26 @@ YML
     saida=$(sed -n 's/^saida=//p' /tmp/leitura.log | tail -1)
     { echo '### Leitura TEST do iFood'; echo '```'; sed -E 's/eyJ[A-Za-z0-9._-]{20,}/[mascarado]/g' /tmp/leitura.log | grep -v '^marca='; echo '```'; } >> "$RESUMO"
   else
-    echo "::error::O relatório da leitura não apareceu em 6 min."
+    echo "::error::O relatório da leitura não apareceu em $(( voltas * 15 / 60 )) min."
   fi
 
-  titulo "Removendo compose de uso único (sem volumes)"
-  code=$(dokploy POST /api/compose.delete "{\"composeId\":\"$cid_compose\",\"deleteVolumes\":false}"); echo "compose.delete -> HTTP $code"
   case "$saida" in
     0) echo "Leitura TEST com HTTP 200 oficial." ;;
     2) echo "::warning::Recusada antes de chamar o iFood (ver o motivo acima)."; exit 2 ;;
+    3) echo "::error::Worker do site não encontrado."; exit 1 ;;
+    4) echo "::error::O worker ainda está com a versão antiga (sem o comando)."; exit 1 ;;
+    124|143) echo "::error::A leitura passou de ${LEITURA_LIMITE_S} s e foi interrompida no worker."; exit 1 ;;
     "") exit 1 ;;
-    *) exit 1 ;;
+    *) echo "::error::A leitura terminou com o código ${saida} (1 = o iFood recusou ou falhou; outro = falha do npm ou do comando, ver acima)."; exit 1 ;;
   esac
+}
+
+LEITURA_COMPOSE=""
+remover_compose_da_leitura() {
+  [ -n "$LEITURA_COMPOSE" ] || return 0
+  titulo "Removendo compose de uso único (sem volumes)"
+  code=$(dokploy POST /api/compose.delete "{\"composeId\":\"$LEITURA_COMPOSE\",\"deleteVolumes\":false}"); echo "compose.delete -> HTTP $code"
+  LEITURA_COMPOSE=""
 }
 
 case "$ETAPA" in

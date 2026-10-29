@@ -29,6 +29,15 @@ const CLIENT_ID = /^[A-Za-z0-9._:-]{1,100}$/;
 /** Só o nome de segredo de app do provedor (decisão 487): `IFOOD_<NOME>_CLIENT_SECRET`, até 64 caracteres. */
 const NOME_DO_SEGREDO = /^IFOOD_[A-Z0-9]+(?:_[A-Z0-9]+)*_CLIENT_SECRET$/;
 
+/**
+ * Decisão 489: o segredo combina com o ambiente do app. App de teste só com segredo de teste (`IFOOD_TEST_..._CLIENT_SECRET`);
+ * app de produção nunca com ele. Conferido no cadastro e de novo antes de pedir token (`porQueNaoChamar`).
+ */
+export function segredoCombinaComAmbiente(ambiente: AmbienteDeIntegracao, nomeDoSegredo: string): boolean {
+  const deTeste = /^IFOOD_TEST(?:_[A-Z0-9]+)*_CLIENT_SECRET$/.test(nomeDoSegredo);
+  return ambiente === 'TEST' ? deTeste : !deTeste;
+}
+
 const texto = (x: unknown) => (typeof x === 'string' ? x.normalize('NFC').replace(/\s+/g, ' ').trim() : '');
 const temControle = (s: string) => /[\u0000-\u001f\u007f]/.test(s);
 
@@ -116,6 +125,11 @@ export function lerApp(e: Record<string, unknown>): LeituraDoApp {
   const nomeDoSegredo = texto(e.nomeDoSegredo);
   if (nomeDoSegredo.length > 64 || !NOME_DO_SEGREDO.test(nomeDoSegredo)) {
     erros.nomeDoSegredo = 'Escreva só o NOME da variável do cofre, no formato IFOOD_<NOME>_CLIENT_SECRET (ex.: IFOOD_TEST_CLIENT_SECRET). Nunca cole o segredo aqui.';
+  } else if (ehAmbiente(e.ambiente) && !segredoCombinaComAmbiente(e.ambiente, nomeDoSegredo)) {
+    erros.nomeDoSegredo =
+      e.ambiente === 'TEST'
+        ? 'App de teste usa o segredo de teste: o nome começa com IFOOD_TEST_ (ex.: IFOOD_TEST_CLIENT_SECRET).'
+        : 'App de produção não usa o segredo de teste: escolha outro nome (ex.: IFOOD_BI_CLIENT_SECRET).';
   }
   const lista = Array.isArray(e.modulos) ? e.modulos : typeof e.modulos === 'string' ? [e.modulos] : [];
   const modulos = Array.from(new Set(lista.filter(ehModulo)));

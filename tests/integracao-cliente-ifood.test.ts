@@ -252,6 +252,9 @@ describe('INT-1.3 · correções da revisão (decisão 487)', () => {
       [APP_TEST, { ...ENV, INTEGRACAO_IFOOD_ATIVA: 'false' }],
       [{ ...APP_PROD, homologacao: 'PENDENTE' as const }, ENV],
       [{ ...APP_PROD, homologacao: 'EM_ANDAMENTO' as const }, ENV],
+      // Decisão 489: o segredo não combina com o ambiente (teste com o de produção; produção homologada com o de teste).
+      [{ ...APP_TEST, nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET' }, { ...ENV, IFOOD_BI_CLIENT_SECRET: 'segredo-do-bi' }],
+      [{ ...APP_PROD, nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET' }, ENV],
     ] as const) {
       const t = tempo();
       const s = servidor();
@@ -260,7 +263,7 @@ describe('INT-1.3 · correções da revisão (decisão 487)', () => {
       const cliente = criarClienteIfood({ app, tokens, limitador, transporte: s.transporte, env, relogio: t.relogio, dormir: t.dormir });
       const r = await cliente.chamar(chamada);
       expect(!r.ok && r.classificacao.tipo).toBe('bloqueada');
-      expect(!r.ok && r.frase).toMatch(/desligada|não homologado/);
+      expect(!r.ok && r.frase).toMatch(/desligada|não homologado|não é de app/);
       await expect(tokens.token(app)).rejects.toThrow(ErroDeAutenticacao);
       expect(s.pedidos).toHaveLength(0);
     }
