@@ -247,6 +247,15 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     const dois = await Promise.all([marcarParceiroDeHomologacao(D.id, true, 'teste'), marcarParceiroDeHomologacao(D.id, true, 'teste')]);
     expect(dois.map((r) => r.ok && r.mudou).sort()).toEqual([false, true]);
     expect(await doParceiro(D.id, db).historicoAlteracao.count({ where: { entidade: 'MarcaDeTestes' } })).toBe(1);
+
+    // Dois cliques OPOSTOS: um depois do outro (linha travada); a resposta de cada um bate com o que ficou.
+    const E = await db.parceiroFlow.create({ data: { nome: `Central Opostos ${sufixo}`, slug: `central-e-${sufixo}`, status: 'ATIVO' } });
+    ids.push(E.id);
+    const [marcou, desmarcou] = await Promise.all([marcarParceiroDeHomologacao(E.id, true, 'teste'), marcarParceiroDeHomologacao(E.id, false, 'teste')]);
+    const ficou = (await db.parceiroFlow.findUniqueOrThrow({ where: { id: E.id } })).homologacaoDeIntegracao;
+    const historicos = await doParceiro(E.id, db).historicoAlteracao.count({ where: { entidade: 'MarcaDeTestes' } });
+    if (ficou) expect([marcou, desmarcou, historicos]).toEqual([{ ok: true, mudou: true }, { ok: true, mudou: false }, 1]);
+    else expect([marcou, desmarcou, historicos]).toEqual([{ ok: true, mudou: true }, { ok: true, mudou: true }, 2]);
   });
 
   it('módulo no teste: preparar, autorizar e ativar pela tela (a página volta com o aviso); "erro de permissão" não é ação de tela', async () => {

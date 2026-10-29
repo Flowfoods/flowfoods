@@ -78,8 +78,8 @@ export const MENSAGEM_TROCA_COM_LOJA_LIGADA =
 
 /**
  * Marca (ou desmarca) o parceiro de homologação: o único onde loja do ambiente de teste pode ser ligada (o banco confere na
- * hora de ligar). Numa transação só: grava a marca conferindo o valor lido (dois cliques opostos não se sobrescrevem; a trava
- * da linha faz esperar quem está ligando uma loja), conta as lojas ligadas já no contexto do parceiro e, havendo alguma,
+ * hora de ligar). Numa transação só: trava a linha do parceiro (dois cliques viram um depois do outro, e quem está ligando uma
+ * loja espera), grava a marca conferindo o valor lido, conta as lojas ligadas já no contexto do parceiro e, havendo alguma,
  * desfaz (decisão 481: o banco não trava a troca depois; a Central trava). Grava o histórico do parceiro junto. Repetir não
  * grava nada. Quem chama grava o registro de auditoria e confere se o parceiro pode ser alterado.
  */
@@ -92,10 +92,9 @@ export async function marcarParceiroDeHomologacao(parceiroId: string, valor: unk
     async (pf) => {
       const gravou = await pf.updateMany({ where: { id: parceiroId, homologacaoDeIntegracao: !valor }, data: { homologacaoDeIntegracao: valor } });
       if (gravou.count !== 1) {
-        const atual = await pf.findUnique({ where: { id: parceiroId }, select: { homologacaoDeIntegracao: true } });
-        // Não gravou: ou já estava assim, ou outro clique mudou entre a leitura e a gravação (não dizer "já estava assim").
-        const resultado = !atual ? ('sumiu' as const) : atual.homologacaoDeIntegracao === valor ? ('igual' as const) : ('conflito' as const);
-        return { parceiroId, resultado, historico: null };
+        // Com a linha travada antes, não gravar quer dizer: já estava assim (ou o parceiro não existe).
+        const atual = await pf.findUnique({ where: { id: parceiroId }, select: { id: true } });
+        return { parceiroId, resultado: atual ? ('igual' as const) : ('sumiu' as const), historico: null };
       }
       return {
         parceiroId,
@@ -114,9 +113,9 @@ export async function marcarParceiroDeHomologacao(parceiroId: string, valor: unk
       const [linha] = await sql<{ n: number }>`SELECT count(*)::int AS "n" FROM "IntegracaoConexao" WHERE "parceiroId" = ${id} AND "estado" = 'ATIVA'`;
       return Number(linha?.n ?? 0) > 0 ? MENSAGEM_TROCA_COM_LOJA_LIGADA : null;
     },
+    { travar: parceiroId },
   );
   if (!r.ok) return r;
   if (r.resultado === 'sumiu') return { ok: false, erro: 'Parceiro não encontrado.' };
-  if (r.resultado === 'conflito') return { ok: false, erro: 'Alguém mudou esta marca agora há pouco. Recarregue a página para ver como ficou; nada foi gravado.' };
   return { ok: true, mudou: r.resultado === 'mudou' };
 }

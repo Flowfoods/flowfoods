@@ -559,13 +559,16 @@ export async function gravarParceiroFlow<T>(
 export async function gravarParceiroFlowConferindo<T>(
   gravar: (parceiroFlow: DelegateParceiroFlow) => Promise<{ parceiroId: string; resultado: T; historico: RegistroDeHistorico | null }>,
   conferir: (sql: <R = unknown>(partes: TemplateStringsArray, ...valores: unknown[]) => Promise<R[]>, parceiroId: string) => Promise<string | null>,
-  base: PrismaClient = baseDoTenant(),
+  opcoes: { travar?: string; base?: PrismaClient } = {},
 ): Promise<{ ok: true; resultado: T } | { ok: false; erro: string }> {
+  const base = opcoes.base ?? baseDoTenant();
   const papel = await papelDisponivel(base);
   const desfeito = Symbol('desfeito');
   let erro = '';
   try {
     return await base.$transaction(async (tx) => {
+      // Trava a linha do parceiro antes de ler e decidir: dois pedidos ao mesmo tempo viram um depois do outro.
+      if (opcoes.travar) await tx.$queryRaw`SELECT 1 FROM "ParceiroFlow" WHERE "id" = ${opcoes.travar} FOR UPDATE`;
       const { parceiroId, resultado, historico } = await gravar(tx.parceiroFlow);
       if (!historico) return { ok: true as const, resultado };
       await tx.$queryRaw(sqlDeContexto(parceiroId, false, papel));
