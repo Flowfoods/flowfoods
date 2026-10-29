@@ -133,7 +133,10 @@ describe('decisão 479 · o card', () => {
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf("document.querySelector('dialog[open]')"));
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (!escolhido) return;'));
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (digitando && (!livreDoCard(escolhido.el)'));
-    expect(pontos).not.toMatch(/addEventListener\('scroll'/);
+    // Rolar a página nunca fecha nem avança: nada ouve a rolagem da janela ou do documento (a área visível do teclado, sim).
+    expect(pontos).not.toMatch(/(window|document)\.addEventListener\('scroll'/);
+    expect(pontos.match(/addEventListener\('scroll'/g) ?? []).toHaveLength(1);
+    expect(pontos).toContain("vv.addEventListener('scroll', medir);");
     // A folga mora no fim do conteúdo (não depois da grade) e soma à que já existe.
     expect(readFileSync('src/components/erp/tokens.css', 'utf8')).toMatch(/#conteudo::after \{[^}]*var\(--ff-folga-da-ajuda, 0px\)/);
     expect(pontos).toContain('parseFloat(raiz.style.getPropertyValue(VARIAVEL_DA_FOLGA))');

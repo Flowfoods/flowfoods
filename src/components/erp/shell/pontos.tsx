@@ -434,8 +434,13 @@ function estaDigitando(): boolean {
   return el instanceof HTMLInputElement && CAMPOS_DE_DIGITAR.has(el.type);
 }
 
-/** O card nunca encolhe abaixo disto: o topo com o X, uma linha do texto e o rodapé com Encerrar e Continuar. */
-const ALTURA_MINIMA_DO_CARD = 150;
+/**
+ * O card nunca encolhe abaixo disto: o topo com o X, umas três linhas do texto e o rodapé com Encerrar e Continuar (5ª
+ * conferência: com 150 px sobrava meia linha no celular deitado). Em tela muito baixa, o fim da região pode ficar sob o card.
+ */
+const ALTURA_MINIMA_DO_CARD = 210;
+/** Com o teclado aberto, o mínimo é o topo com o X e o rodapé (56 + 70 px): o campo em que a pessoa digita vem primeiro. */
+const ALTURA_DO_CARD_COM_TECLADO = 126;
 
 /** Com o card aberto, a região explicada (botão + região) cabe acima dele? Se não cabe, até onde o card pode crescer. */
 function alturaQueDeixaARegiao(botao: HTMLElement, card: DOMRect, teclado: number): number | null {
@@ -540,13 +545,26 @@ function CardDeAjuda({
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const medir = () => setTeclado(Math.abs(vv.scale - 1) < 0.01 ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0);
+    let quadro = 0;
+    const medir = () => {
+      cancelAnimationFrame(quadro);
+      quadro = requestAnimationFrame(() => setTeclado(Math.abs(vv.scale - 1) < 0.01 ? Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)) : 0));
+    };
     medir();
+    // No iPhone, a parte visível desliza (offsetTop) sem mudar de tamanho com o teclado aberto: ouve os dois. É a área visível,
+    // não a página: rolar a página não fecha nem avança nada (a regra dos pontos continua sem ouvir a rolagem da janela).
     vv.addEventListener('resize', medir);
-    return () => vv.removeEventListener('resize', medir);
+    vv.addEventListener('scroll', medir);
+    return () => {
+      cancelAnimationFrame(quadro);
+      vv.removeEventListener('resize', medir);
+      vv.removeEventListener('scroll', medir);
+    };
   }, []);
   const tecladoAgora = useRef(0);
   tecladoAgora.current = teclado;
+  // O teto que a região pediu (sem o do teclado): volta a valer quando o teclado fecha.
+  const tetoDaRegiao = useRef<number | null>(null);
 
   /** Rola a página `precisa` px para cima do conteúdo; tela curta ganha uma folga no fim para a rolagem render. */
   const rolarPor = useCallback((precisa: number, comportamento: ScrollBehavior) => {
@@ -571,6 +589,7 @@ function CardDeAjuda({
     // O teto entra como variável do CSS, sem vencer o limite por altura da tela (o teclado abrindo encolhe a tela depois).
     c.style.removeProperty('--ff-teto-do-card');
     const teto = alturaQueDeixaARegiao(alvo, c.getBoundingClientRect(), tecladoAgora.current);
+    tetoDaRegiao.current = teto;
     if (teto !== null) c.style.setProperty('--ff-teto-do-card', `${teto}px`);
     const rc = c.getBoundingClientRect();
     const r = retanguloAVista(alvo, rc);
@@ -624,13 +643,18 @@ function CardDeAjuda({
     };
   }, [posicionar, manterCampoAVista]);
   useEffect(() => {
-    if (teclado <= 0) return;
-    // Teclado aberto: o card cabe na metade da parte visível (a altura da tela no CSS não encolhe com o teclado).
     const c = card.current;
-    if (c) {
-      const atual = parseFloat(c.style.getPropertyValue('--ff-teto-do-card')) || Infinity;
-      c.style.setProperty('--ff-teto-do-card', `${Math.min(atual, Math.max(ALTURA_MINIMA_DO_CARD, Math.round((window.innerHeight - teclado) * 0.5)))}px`);
+    if (!c) return;
+    if (teclado <= 0) {
+      // Teclado fechou: vale de novo só o teto que a região pediu (5ª conferência: o card ficava baixo até o próximo passo).
+      if (tetoDaRegiao.current === null) c.style.removeProperty('--ff-teto-do-card');
+      else c.style.setProperty('--ff-teto-do-card', `${tetoDaRegiao.current}px`);
+      return;
     }
+    // Teclado aberto: o card cabe na metade da parte visível (a altura da tela no CSS não encolhe com o teclado). Aqui quem
+    // manda é o campo em que a pessoa digita: o card pode ficar só com o topo e o rodapé (o texto rola dentro dele).
+    const doTeclado = Math.max(ALTURA_DO_CARD_COM_TECLADO, Math.round((window.innerHeight - teclado) * 0.5));
+    c.style.setProperty('--ff-teto-do-card', `${Math.min(tetoDaRegiao.current ?? Infinity, doTeclado)}px`);
     if (estaDigitando()) manterCampoAVista();
   }, [teclado, manterCampoAVista]);
 
@@ -761,7 +785,7 @@ function CardDeAjuda({
         )}
       </div>
 
-      {temMais && (
+      {temMais && teclado === 0 && (
         <p aria-hidden className="shrink-0 px-4 pb-1 text-[12px] text-suave">
           Role o texto para ver o resto
         </p>
