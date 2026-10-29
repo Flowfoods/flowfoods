@@ -61,6 +61,8 @@ const ENTIDADE: Record<string, string> = {
   IntegracaoConexao: 'Integração',
   IntegracaoConexaoModulo: 'Módulo da integração',
   LiberacaoDeModulo: 'Módulo do ERP',
+  // INT-1.8 (decisão 490): a marca de parceiro de testes (só o nível 1 grava e vê).
+  MarcaDeTestes: 'Marca de parceiro de testes',
 };
 
 const ACAO: Record<string, string> = {
@@ -337,6 +339,7 @@ const CAMPO: Record<string, string> = {
   idNoIfood: 'id no iFood',
   modulosPausados: 'módulos pausados',
   erro: 'erro',
+  parceiroDeTestes: 'parceiro de testes',
 };
 
 /** Retrato do instante (1.10): o custo do canal quando o preço mudou. Vai só no depois e sempre aparece. 3.3: quem fez o lote, na conclusão. */
@@ -701,7 +704,7 @@ export const ENTIDADES_DE_DRE: readonly string[] = ['Despesa', 'DreLinha', 'DreM
  * Até a tela do parceiro existir com a permissão própria (INT-1.8), o histórico do parceiro não as mostra. Filtro no servidor,
  * na consulta. `verIntegracao` ausente = fechado.
  */
-export const ENTIDADES_DE_INTEGRACAO: readonly string[] = ['IntegracaoConexao', 'IntegracaoConexaoModulo', 'LiberacaoDeModulo'];
+export const ENTIDADES_DE_INTEGRACAO: readonly string[] = ['IntegracaoConexao', 'IntegracaoConexaoModulo', 'LiberacaoDeModulo', 'MarcaDeTestes'];
 
 /**
  * Custo do lote (3.1, lição da decisão 90): o histórico do lote cita o custo e o que a diferença de rendimento custou. Só

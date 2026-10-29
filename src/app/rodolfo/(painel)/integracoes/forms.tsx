@@ -2,10 +2,12 @@
 
 /**
  * Central de Integrações (INT-1.8, primeira parte) — formulários do nível 1. O servidor confere tudo de novo; aqui só se
- * escolhe e se confirma. O que tira acesso ou para a busca (bloquear, desligar, pausar) pede confirmação em dois passos.
+ * escolhe e se confirma. O que tira acesso ou para a busca (bloquear, desligar, ativar, pausar) pede confirmação em dois
+ * passos; cancelar devolve o foco ao botão que abriu. Depois de um envio com erro, o foco vai ao primeiro campo com erro (ou à
+ * resposta); depois de um cadastro certo, o formulário limpa.
  */
 
-import { useState } from 'react';
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { useFormState } from 'react-dom';
 import { BotaoEnviar } from '@/components/erp/ui/botoes';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO, Resultado, type EstadoForm } from '@/components/erp/ui/campos';
@@ -28,11 +30,49 @@ const MODULOS = [
   { valor: 'MERCHANT', rotulo: 'Loja (status e horários)' },
 ];
 
+/** A cada envio: com erro, foco no primeiro campo com erro (ou na resposta); com sucesso, limpa se for cadastro. */
+function useFocoDoEnvio(estado: EstadoForm, form: RefObject<HTMLFormElement>, limparNoSucesso = false) {
+  const vez = estado?.vez ?? 0;
+  const ok = estado?.ok ?? false;
+  useEffect(() => {
+    const f = form.current;
+    if (!vez || !f) return;
+    if (ok) {
+      if (limparNoSucesso) f.reset();
+      return;
+    }
+    const alvo = f.querySelector<HTMLElement>('[aria-invalid="true"]') ?? f.querySelector<HTMLElement>('[data-resposta]');
+    alvo?.focus();
+  }, [vez, ok, form, limparNoSucesso]);
+}
+
+/** A resposta do envio, focável (o foco vem para cá quando o erro não é de um campo). */
+function Resposta({ estado }: { estado: EstadoForm }) {
+  return (
+    <div data-resposta tabIndex={-1} className="outline-none">
+      <Resultado estado={estado} />
+    </div>
+  );
+}
+
+/** Botão que abre uma confirmação; cancelar fecha e devolve o foco a ele. */
+function useConfirmacao() {
+  const [aberta, setAberta] = useState(false);
+  const abridor = useRef<HTMLButtonElement>(null);
+  const cancelar = () => {
+    setAberta(false);
+    requestAnimationFrame(() => abridor.current?.focus());
+  };
+  return { aberta, abrir: () => setAberta(true), cancelar, abridor };
+}
+
 export function FormCadastrarApp() {
   const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoRegistrarApp, null);
+  const form = useRef<HTMLFormElement>(null);
+  useFocoDoEnvio(estado, form, true);
   const erro = (c: string) => estado?.erros?.[c];
   return (
-    <form action={enviar} noValidate className="space-y-4">
+    <form ref={form} action={enviar} noValidate className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="app-ambiente" className={ROTULO}>
@@ -61,14 +101,20 @@ export function FormCadastrarApp() {
         <label htmlFor="app-nome" className={ROTULO}>
           Nome do app
         </label>
-        <input id="app-nome" name="nome" maxLength={80} autoComplete="off" placeholder="Ex.: FlowFoods ERP · BI" className={CAMPO} aria-invalid={!!erro('nome')} aria-describedby="app-nome-erro" />
+        <input id="app-nome" name="nome" maxLength={80} autoComplete="off" className={CAMPO} aria-invalid={!!erro('nome')} aria-describedby="app-nome-ajuda app-nome-erro" />
+        <p id="app-nome-ajuda" className={AJUDA}>
+          Ex.: FlowFoods ERP · BI
+        </p>
         <Erro id="app-nome-erro" texto={erro('nome')} />
       </div>
       <div>
         <label htmlFor="app-client-id" className={ROTULO}>
           Client ID
         </label>
-        <input id="app-client-id" name="clientId" maxLength={100} autoComplete="off" spellCheck={false} className={`${CAMPO} font-mono`} aria-invalid={!!erro('clientId')} aria-describedby="app-client-id-erro" />
+        <input id="app-client-id" name="clientId" maxLength={100} autoComplete="off" spellCheck={false} className={`${CAMPO} font-mono`} aria-invalid={!!erro('clientId')} aria-describedby="app-client-id-ajuda app-client-id-erro" />
+        <p id="app-client-id-ajuda" className={AJUDA}>
+          Está no iFood Developer, em Meus aplicativos. O Client ID não é segredo.
+        </p>
         <Erro id="app-client-id-erro" texto={erro('clientId')} />
       </div>
       <div>
@@ -81,22 +127,31 @@ export function FormCadastrarApp() {
           maxLength={64}
           autoComplete="off"
           spellCheck={false}
-          placeholder="IFOOD_BI_CLIENT_SECRET"
           className={`${CAMPO} font-mono`}
           aria-invalid={!!erro('nomeDoSegredo')}
           aria-describedby="app-segredo-ajuda app-segredo-erro"
         />
         <p id="app-segredo-ajuda" className={AJUDA}>
-          Só o nome. O segredo em si vai no painel do Dokploy e nunca é colado aqui.
+          Só o nome, ex.: IFOOD_BI_CLIENT_SECRET. O segredo em si vai no painel do Dokploy e nunca é colado aqui.
         </p>
         <Erro id="app-segredo-erro" texto={erro('nomeDoSegredo')} />
       </div>
-      <fieldset aria-describedby="app-modulos-erro">
+      <fieldset aria-describedby="app-modulos-ajuda app-modulos-erro">
         <legend className={ROTULO}>Módulos que o app usa</legend>
+        <p id="app-modulos-ajuda" className={`${AJUDA} mb-2 mt-0`}>
+          BI usa só Analytics. Finanças: Financeiro e Loja. Avaliações: Avaliações e Loja. Teste: todos.
+        </p>
         <div className="grid gap-2 sm:grid-cols-2">
-          {MODULOS.map((m) => (
+          {MODULOS.map((m, i) => (
             <label key={m.valor} className="flex min-h-11 items-center gap-2.5 text-sm text-texto">
-              <input type="checkbox" name="modulos" value={m.valor} className={MARCAR} defaultChecked={m.valor === 'ANALYTICS'} />
+              <input
+                type="checkbox"
+                name="modulos"
+                value={m.valor}
+                className={MARCAR}
+                defaultChecked={m.valor === 'ANALYTICS'}
+                aria-invalid={i === 0 && !!erro('modulos') ? true : undefined}
+              />
               {m.rotulo}
             </label>
           ))}
@@ -106,28 +161,31 @@ export function FormCadastrarApp() {
       <BotaoEnviar variante="secundario" pendente="Cadastrando…">
         Cadastrar app
       </BotaoEnviar>
-      <Resultado estado={estado} />
+      <Resposta estado={estado} />
     </form>
   );
 }
 
+/** Liberar (um passo) ou bloquear (com confirmação). Quem usa passa `key={liberado}`: ao virar, a confirmação fecha. */
 export function FormLiberacao({ slug, liberado }: { slug: string; liberado: boolean }) {
   const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoMudarLiberacao.bind(null, slug), null);
-  const [confirmando, setConfirmando] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+  useFocoDoEnvio(estado, form);
+  const c = useConfirmacao();
   return (
-    <form action={enviar} className="space-y-3">
+    <form ref={form} action={enviar} className="space-y-3">
       <input type="hidden" name="liberado" value={liberado ? 'nao' : 'sim'} />
       {liberado ? (
-        confirmando ? (
+        c.aberta ? (
           <Confirmacao
             titulo="Bloquear o módulo Integração?"
             detalhe="O parceiro deixa de ver as integrações e nenhuma busca roda para ele. Nada é apagado; liberar de novo devolve o acesso."
             confirmar="Bloquear"
             tipoConfirmar="submit"
-            onCancelar={() => setConfirmando(false)}
+            onCancelar={c.cancelar}
           />
         ) : (
-          <button type="button" onClick={() => setConfirmando(true)} className={classeDeBotao('secundario', 'w-full')}>
+          <button ref={c.abridor} type="button" onClick={c.abrir} className={classeDeBotao('secundario', 'w-full')}>
             Bloquear módulo
           </button>
         )
@@ -136,20 +194,22 @@ export function FormLiberacao({ slug, liberado }: { slug: string; liberado: bool
           Liberar módulo
         </BotaoEnviar>
       )}
-      <Resultado estado={estado} />
+      <Resposta estado={estado} />
     </form>
   );
 }
 
 export function FormHomologacao({ slug, marcado }: { slug: string; marcado: boolean }) {
   const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoMarcarHomologacao.bind(null, slug), null);
+  const form = useRef<HTMLFormElement>(null);
+  useFocoDoEnvio(estado, form);
   return (
-    <form action={enviar} noValidate className="space-y-3">
+    <form ref={form} action={enviar} noValidate className="space-y-3">
       <input type="hidden" name="valor" value={marcado ? 'nao' : 'sim'} />
       {!marcado && (
         <div>
-          <label className="flex items-start gap-2.5 text-sm text-texto">
-            <input type="checkbox" name="soTestes" value="sim" className={`${MARCAR} mt-0.5`} aria-describedby="so-testes-erro" />
+          <label className="flex min-h-11 items-center gap-2.5 text-sm text-texto">
+            <input type="checkbox" name="soTestes" value="sim" className={MARCAR} aria-invalid={!!estado?.erros?.soTestes} aria-describedby="so-testes-erro" />
             Este parceiro existe só para testes. Nenhum restaurante de verdade usa este acesso.
           </label>
           <Erro id="so-testes-erro" texto={estado?.erros?.soTestes} />
@@ -158,7 +218,7 @@ export function FormHomologacao({ slug, marcado }: { slug: string; marcado: bool
       <BotaoEnviar variante="secundario" pendente="Gravando…" className="w-full">
         {marcado ? 'Tirar a marca de testes' : 'Marcar como parceiro de testes'}
       </BotaoEnviar>
-      <Resultado estado={estado} />
+      <Resposta estado={estado} />
     </form>
   );
 }
@@ -175,9 +235,11 @@ export function FormLigarLoja({
   ambienteRotulo: string;
 }) {
   const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoLigarConexao.bind(null, slug), null);
+  const form = useRef<HTMLFormElement>(null);
+  useFocoDoEnvio(estado, form, true);
   const erro = (c: string) => estado?.erros?.[c];
   return (
-    <form action={enviar} noValidate className="space-y-4">
+    <form ref={form} action={enviar} noValidate className="space-y-4">
       <p className="text-[13px] text-suave">
         Ambiente desta ligação: <span className="font-semibold text-texto">{ambienteRotulo}</span>. Ele vem da marca do parceiro, não se escolhe aqui.
       </p>
@@ -231,11 +293,13 @@ export function FormLigarLoja({
             maxLength={40}
             autoComplete="off"
             spellCheck={false}
-            placeholder="0b1f6d3e-8a51-4c2e-9d7a-3f2b6c1e5a90"
             className={`${CAMPO} font-mono`}
             aria-invalid={!!erro('idExterno')}
-            aria-describedby="ligar-id-erro"
+            aria-describedby="ligar-id-ajuda ligar-id-erro"
           />
+          <p id="ligar-id-ajuda" className={AJUDA}>
+            Como aparece no Portal do Parceiro: 8-4-4-4-12 letras e números.
+          </p>
           <Erro id="ligar-id-erro" texto={erro('idExterno')} />
         </div>
         <div>
@@ -250,42 +314,44 @@ export function FormLigarLoja({
       <BotaoEnviar variante="primario" pendente="Ligando…">
         Ligar loja
       </BotaoEnviar>
-      <Resultado estado={estado} />
+      <Resposta estado={estado} />
     </form>
   );
 }
 
 export function FormDesligar({ slug, conexaoId, nome }: { slug: string; conexaoId: string; nome: string }) {
   const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoDesligarConexao.bind(null, slug, conexaoId), null);
-  const [confirmando, setConfirmando] = useState(false);
+  const form = useRef<HTMLFormElement>(null);
+  useFocoDoEnvio(estado, form);
+  const c = useConfirmacao();
   return (
-    <form action={enviar} className="space-y-2">
-      {confirmando ? (
+    <form ref={form} action={enviar} className="space-y-2">
+      {c.aberta ? (
         <Confirmacao
           titulo={`Desligar ${nome}?`}
           detalhe="Os módulos ativos desta loja são pausados junto. A ligação fica no histórico; para voltar, ligue de novo."
           confirmar="Desligar"
           tipoConfirmar="submit"
-          onCancelar={() => setConfirmando(false)}
+          onCancelar={c.cancelar}
         />
       ) : (
-        <button type="button" onClick={() => setConfirmando(true)} className={classeDeBotao('secundario')}>
+        <button ref={c.abridor} type="button" onClick={c.abrir} className={classeDeBotao('secundario')}>
           Desligar loja
         </button>
       )}
-      <Resultado estado={estado} />
+      <Resposta estado={estado} />
     </form>
   );
 }
 
-export function FormPrepararModulo({ slug, conexaoId, opcoes }: { slug: string; conexaoId: string; opcoes: { valor: string; rotulo: string }[] }) {
+export function FormPrepararModulo({ slug, conexaoId, opcoes, semOpcao }: { slug: string; conexaoId: string; opcoes: { valor: string; rotulo: string }[]; semOpcao: string }) {
   const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoPrepararModulo.bind(null, slug, conexaoId), null);
+  const form = useRef<HTMLFormElement>(null);
+  useFocoDoEnvio(estado, form);
   const id = `preparar-${conexaoId}`;
-  if (opcoes.length === 0) {
-    return <p className="text-[13px] text-suave">Nenhum app cadastrado serve a esta loja (mesmo ambiente, com o módulo). Cadastre o app na Central primeiro.</p>;
-  }
+  if (opcoes.length === 0) return <p className="text-[13px] text-suave">{semOpcao}</p>;
   return (
-    <form action={enviar} noValidate className="space-y-2">
+    <form ref={form} action={enviar} noValidate className="space-y-2">
       <label htmlFor={id} className={ROTULO}>
         Preparar módulo
       </label>
@@ -305,7 +371,7 @@ export function FormPrepararModulo({ slug, conexaoId, opcoes }: { slug: string; 
         </BotaoEnviar>
       </div>
       <Erro id={`${id}-erro`} texto={estado?.erros?.appModulo} />
-      <Resultado estado={estado} />
+      <Resposta estado={estado} />
     </form>
   );
 }
@@ -315,25 +381,53 @@ const PEDE_CONFIRMACAO: Record<string, { titulo: string; detalhe: string; confir
   pausar: { titulo: 'Pausar este módulo?', detalhe: 'A busca desta loja para até você retomar. Nada é apagado.', confirmar: 'Pausar' },
 };
 
-export function FormAcaoDoModulo({ slug, moduloId, acao, rotulo }: { slug: string; moduloId: string; acao: string; rotulo: string }) {
+/**
+ * As ações que valem agora para um módulo, num formulário só (fica montado entre um estado e outro: a recusa do servidor
+ * aparece aqui). Dando certo, a página volta com o aviso no topo.
+ */
+export function FormAcoesDoModulo({ slug, moduloId, acoes }: { slug: string; moduloId: string; acoes: readonly { acao: string; rotulo: string }[] }) {
   const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoMudarModulo.bind(null, slug, moduloId), null);
-  const [confirmando, setConfirmando] = useState(false);
-  const pede = PEDE_CONFIRMACAO[acao];
+  const form = useRef<HTMLFormElement>(null);
+  useFocoDoEnvio(estado, form);
+  const [confirmando, setConfirmando] = useState<string | null>(null);
+  const abridores = useRef<Record<string, HTMLButtonElement | null>>({});
+  const cancelar = () => {
+    const quem = confirmando;
+    setConfirmando(null);
+    requestAnimationFrame(() => (quem ? abridores.current[quem]?.focus() : undefined));
+  };
+  const pede = confirmando ? PEDE_CONFIRMACAO[confirmando] : null;
   return (
-    <form action={enviar} className="space-y-2">
-      <input type="hidden" name="acao" value={acao} />
+    <form ref={form} action={enviar} className="space-y-2">
       {pede && confirmando ? (
-        <Confirmacao titulo={pede.titulo} detalhe={pede.detalhe} confirmar={pede.confirmar} tipoConfirmar="submit" onCancelar={() => setConfirmando(false)} />
-      ) : pede ? (
-        <button type="button" onClick={() => setConfirmando(true)} className={classeDeBotao('secundario')}>
-          {rotulo}
-        </button>
+        <>
+          <input type="hidden" name="acao" value={confirmando} />
+          <Confirmacao titulo={pede.titulo} detalhe={pede.detalhe} confirmar={pede.confirmar} tipoConfirmar="submit" onCancelar={cancelar} />
+        </>
       ) : (
-        <BotaoEnviar variante="secundario" pendente="Gravando…">
-          {rotulo}
-        </BotaoEnviar>
+        <div className="flex flex-wrap gap-2">
+          {acoes.map((a) =>
+            PEDE_CONFIRMACAO[a.acao] ? (
+              <button
+                key={a.acao}
+                ref={(el) => {
+                  abridores.current[a.acao] = el;
+                }}
+                type="button"
+                onClick={() => setConfirmando(a.acao)}
+                className={classeDeBotao('secundario')}
+              >
+                {a.rotulo}
+              </button>
+            ) : (
+              <BotaoEnviar key={a.acao} variante="secundario" pendente="Gravando…" nome="acao" valor={a.acao}>
+                {a.rotulo}
+              </BotaoEnviar>
+            ),
+          )}
+        </div>
       )}
-      <Resultado estado={estado} />
+      <Resposta estado={estado} />
     </form>
   );
 }

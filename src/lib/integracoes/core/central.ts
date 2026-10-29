@@ -8,7 +8,7 @@
  */
 
 import { prisma } from '@/lib/db';
-import { doParceiro } from '@/lib/erp/tenant';
+import { gravarParceiroFlowConferindo } from '@/lib/erp/tenant';
 
 export interface ValidadeDoToken {
   emitidoEm: Date;
@@ -78,19 +78,42 @@ export const MENSAGEM_TROCA_COM_LOJA_LIGADA =
 
 /**
  * Marca (ou desmarca) o parceiro de homologação: o único onde loja do ambiente de teste pode ser ligada (o banco confere na
- * hora de ligar). Recusa a troca com loja ligada (decisão 481: o banco não trava a troca depois; a tela trava). Repetir não
- * grava nada. Quem chama grava o registro de auditoria.
+ * hora de ligar). Numa transação só: grava a marca conferindo o valor lido (dois cliques opostos não se sobrescrevem; a trava
+ * da linha faz esperar quem está ligando uma loja), conta as lojas ligadas já no contexto do parceiro e, havendo alguma,
+ * desfaz (decisão 481: o banco não trava a troca depois; a Central trava). Grava o histórico do parceiro junto. Repetir não
+ * grava nada. Quem chama grava o registro de auditoria e confere se o parceiro pode ser alterado.
  */
-export async function marcarParceiroDeHomologacao(parceiroId: string, valor: unknown): Promise<ResultadoDaMarca> {
+export async function marcarParceiroDeHomologacao(parceiroId: string, valor: unknown, autorNome: string): Promise<ResultadoDaMarca> {
   if (typeof valor !== 'boolean') return { ok: false, erro: 'Diga se é para marcar ou desmarcar.' };
   if (typeof parceiroId !== 'string' || !parceiroId || parceiroId.length > 60) return { ok: false, erro: 'Parceiro não encontrado.' };
-  const parceiro = await prisma.parceiroFlow.findUnique({ where: { id: parceiroId }, select: { id: true, homologacaoDeIntegracao: true } });
-  if (!parceiro) return { ok: false, erro: 'Parceiro não encontrado.' };
-  if (parceiro.homologacaoDeIntegracao === valor) return { ok: true, mudou: false };
-  const ligadas = await doParceiro(parceiroId, undefined, { somenteLeitura: true }).integracaoConexao.count({ where: { estado: 'ATIVA' } });
-  if (ligadas > 0) return { ok: false, erro: MENSAGEM_TROCA_COM_LOJA_LIGADA };
-  // A gravação confere o valor que foi lido: dois cliques opostos ao mesmo tempo não se sobrescrevem.
-  const r = await prisma.parceiroFlow.updateMany({ where: { id: parceiroId, homologacaoDeIntegracao: !valor }, data: { homologacaoDeIntegracao: valor } });
-  if (r.count !== 1) return { ok: false, erro: 'Alguém mudou esta marca agora há pouco. Recarregue a página para ver como ficou; nada foi gravado.' };
-  return { ok: true, mudou: true };
+  const autor = String(autorNome ?? '').trim().slice(0, 120);
+  if (!autor) return { ok: false, erro: 'Falta quem fez a mudança.' };
+  const r = await gravarParceiroFlowConferindo(
+    async (pf) => {
+      const gravou = await pf.updateMany({ where: { id: parceiroId, homologacaoDeIntegracao: !valor }, data: { homologacaoDeIntegracao: valor } });
+      if (gravou.count !== 1) {
+        const atual = await pf.findUnique({ where: { id: parceiroId }, select: { homologacaoDeIntegracao: true } });
+        return { parceiroId, resultado: atual ? ('igual' as const) : ('sumiu' as const), historico: null };
+      }
+      return {
+        parceiroId,
+        resultado: 'mudou' as const,
+        historico: {
+          entidade: 'MarcaDeTestes',
+          entidadeId: parceiroId,
+          acao: 'ALTEROU',
+          antes: { parceiroDeTestes: valor ? 'Não' : 'Sim' },
+          depois: { parceiroDeTestes: valor ? 'Sim' : 'Não' },
+          autorNome: autor,
+        },
+      };
+    },
+    async (sql, id) => {
+      const [linha] = await sql<{ n: number }>`SELECT count(*)::int AS "n" FROM "IntegracaoConexao" WHERE "parceiroId" = ${id} AND "estado" = 'ATIVA'`;
+      return Number(linha?.n ?? 0) > 0 ? MENSAGEM_TROCA_COM_LOJA_LIGADA : null;
+    },
+  );
+  if (!r.ok) return r;
+  if (r.resultado === 'sumiu') return { ok: false, erro: 'Parceiro não encontrado.' };
+  return { ok: true, mudou: r.resultado === 'mudou' };
 }

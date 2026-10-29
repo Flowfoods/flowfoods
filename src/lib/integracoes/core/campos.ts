@@ -135,7 +135,8 @@ export function lerApp(e: Record<string, unknown>): LeituraDoApp {
   const modulos = Array.from(new Set(lista.filter(ehModulo)));
   if (modulos.length === 0 || modulos.length !== lista.length) erros.modulos = 'Marque os módulos que o app usa.';
   else if (ehCategoria(e.categoria) && modulos.some((m) => !MODULOS_DA_CATEGORIA[e.categoria as CategoriaDeApp].includes(m))) {
-    erros.modulos = 'Algum módulo marcado não pertence à categoria deste app no iFood.';
+    const permitidos = MODULOS_DA_CATEGORIA[e.categoria as CategoriaDeApp].map((m) => ROTULO_DO_MODULO[m]).join(', ');
+    erros.modulos = `Algum módulo marcado não pertence à categoria deste app no iFood. Nesta categoria: ${permitidos}.`;
   }
   if (Object.keys(erros).length > 0) return { ok: false, erros };
   return {

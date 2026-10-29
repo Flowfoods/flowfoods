@@ -19,7 +19,7 @@ import { conexoesDoParceiro } from '@/lib/integracoes/core/conexoes';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { Aviso, Contagem, Painel, Ponto, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { FormCadastrarApp } from './forms';
-import { QUANDO, ROTULO_DA_CATEGORIA, ROTULO_DA_HOMOLOGACAO, ROTULO_DO_PASSO, TOM_DA_HOMOLOGACAO } from './rotulos';
+import { diaBr, QUANDO, ROTULO_DA_CATEGORIA, ROTULO_DA_HOMOLOGACAO, ROTULO_DO_PASSO, TOM_DA_HOMOLOGACAO } from './rotulos';
 
 export const dynamic = 'force-dynamic';
 
@@ -160,11 +160,11 @@ export default async function CentralDeIntegracoesPage() {
                 {leituras.map((l, i) => (
                   <li key={`${l.quando.toISOString()}-${i}`} className="space-y-1.5 text-[13px]">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Selo tom={l.ok ? 'ok' : 'erro'}>{l.ok ? 'HTTP 200 nos passos' : 'Falhou'}</Selo>
+                      <Selo tom={l.ok ? 'ok' : 'erro'}>{l.ok ? 'Deu certo' : 'Falhou'}</Selo>
                       <span className="text-suave">{QUANDO.format(l.quando)}</span>
                     </div>
                     <p className="text-texto">
-                      Dia {l.dia}
+                      Dia {diaBr(l.dia)}
                       {l.loja ? (
                         <>
                           {' '}
@@ -175,8 +175,8 @@ export default async function CentralDeIntegracoesPage() {
                     <ul className="space-y-0.5 text-suave">
                       {l.passos.map((p) => (
                         <li key={p.nome} className="break-all">
-                          {ROTULO_DO_PASSO[p.nome] ?? p.nome}: HTTP {p.status ?? 'sem resposta'}
-                          {p.requestId ? ` · ${p.requestId}` : ''}
+                          {ROTULO_DO_PASSO[p.nome] ?? p.nome}: {p.status === null ? 'sem resposta' : `HTTP ${p.status}`}
+                          {p.requestId ? ` · código do pedido ${p.requestId}` : ''}
                         </li>
                       ))}
                     </ul>

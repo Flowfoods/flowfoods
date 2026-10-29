@@ -169,11 +169,20 @@ describe('INT-1.1 · guardas', () => {
     const furos: string[] = [];
     for (const f of [...arquivos(raiz), join('src', 'lib', 'integracoes', 'core', 'central.ts')]) {
       const txt = readFileSync(f, 'utf8');
-      if (/from\s+['"](@\/lib\/integracoes\/ifood|\.\.\/ifood)\//.test(txt)) furos.push(`${f}: importa o cliente do iFood`);
+      if (/(from\s+|import\s*\(\s*)['"](@\/lib\/integracoes\/ifood|\.\.\/ifood)\//.test(txt)) furos.push(`${f}: importa o cliente do iFood`);
+      // O armazém do token importa o serviço de token do iFood: a Central lê só as datas, por central.ts.
+      if (/['"](@\/lib\/integracoes\/core\/armazem-token|\.\/armazem-token)['"]/.test(txt)) furos.push(`${f}: importa o armazém do token`);
       if (/\bfetch\s*\(/.test(txt)) furos.push(`${f}: fetch`);
       if (/testar conex/i.test(txt)) furos.push(`${f}: "testar conexão"`);
     }
     expect(arquivos(raiz).length).toBeGreaterThan(0);
     expect(furos).toEqual([]);
+  });
+
+  it('toda ação da Central abre conferindo a sessão do nível 1 (uma action responde a POST em qualquer rota)', () => {
+    const txt = readFileSync(join('src', 'app', 'rodolfo', '(painel)', 'integracoes', 'actions.ts'), 'utf8');
+    const acoes = [...txt.matchAll(/export async function (\w+)\([^)]*\)[^{]*\{\n([^\n]*)/g)];
+    expect(acoes.length).toBeGreaterThanOrEqual(7);
+    for (const [, nome, primeira] of acoes) expect(primeira, nome).toMatch(/^\s+const (sessao|ctx) = await (exigirNivel1\(\)|exigirParceiro\(slug\));$/);
   });
 });

@@ -6,7 +6,6 @@
  * Nada aqui chama o iFood: a única chamada é o comando da leitura de teste.
  */
 
-import Link from 'next/link';
 import { exigirParceiro } from '@/lib/erp/contexto';
 import { ENTIDADES_DE_INTEGRACAO, listarHistorico } from '@/lib/erp/historico';
 import { liberacoesDoParceiro } from '@/lib/erp/liberacao';
@@ -16,15 +15,16 @@ import { ROTULO_DO_AMBIENTE, ROTULO_DO_MODULO } from '@/lib/integracoes/core/cam
 import { conexoesDoParceiro } from '@/lib/integracoes/core/conexoes';
 import { ROTULO_DO_ESTADO, transicao } from '@/lib/integracoes/core/estados';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
-import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Aviso, Contagem, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { ListaHistorico } from '@/components/erp/telas/historico/lista-historico';
-import { FormAcaoDoModulo, FormDesligar, FormHomologacao, FormLiberacao, FormLigarLoja, FormPrepararModulo } from '../forms';
-import { ACOES_NA_TELA, QUANDO, TOM_DO_ESTADO } from '../rotulos';
+import { Voltar } from '@/components/erp/telas/cadastro/partes';
+import { TrilhaDaPagina } from '@/components/erp/shell/trilha';
+import { FormAcoesDoModulo, FormDesligar, FormHomologacao, FormLiberacao, FormLigarLoja, FormPrepararModulo } from '../forms';
+import { ACOES_NA_TELA, ehCodigoFeito, FEITO, QUANDO, TOM_DO_ESTADO } from '../rotulos';
 
 export const dynamic = 'force-dynamic';
 
-export default async function IntegracoesDoParceiroNoNivel1({ params }: { params: { slug: string } }) {
+export default async function IntegracoesDoParceiroNoNivel1({ params, searchParams = {} }: { params: { slug: string }; searchParams?: { feito?: string } }) {
   const ctx = await exigirParceiro(params.slug);
   const { parceiro, cliente } = ctx;
   const [liberacoes, conexoes, apps, lojas, marcas, historico] = await Promise.all([
@@ -42,36 +42,43 @@ export default async function IntegracoesDoParceiroNoNivel1({ params }: { params
   const ligadas = conexoes.filter((c) => c.estado === 'ATIVA');
   const desligadas = conexoes.filter((c) => c.estado === 'DESLIGADA');
   const podeEscrever = ctx.podeEscrever;
+  const feito = ehCodigoFeito(searchParams.feito) ? FEITO[searchParams.feito] : null;
+  const appsDoAmbiente = (c: { provedor: string; ambiente: string }) => apps.filter((a) => a.provedor === c.provedor && a.ambiente === c.ambiente);
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        icone="canais"
-        cor={COR.parceiros}
-        titulo={`Integrações · ${parceiro.nome}`}
-        subtitulo={
-          <>
-            Nível 1 ·{' '}
-            <Link href="/rodolfo/integracoes" className={LINK_DE_TEXTO}>
-              todas as integrações
-            </Link>
-          </>
-        }
-      />
+      <TrilhaDaPagina itens={[{ rotulo: parceiro.nome }]} />
+      <Voltar href="/rodolfo/integracoes">Voltar para Integrações</Voltar>
+      <PageHeader icone="canais" cor={COR.parceiros} titulo={`Integrações · ${parceiro.nome}`} subtitulo="Nível 1 · lojas do iFood, módulos e liberação deste parceiro" />
 
-      {ctx.bloqueio && <Aviso tom="alerta" titulo="Só leitura">{ctx.bloqueio}</Aviso>}
+      {feito && (
+        <div role="status">
+          <Aviso tom="ok" titulo={feito} />
+        </div>
+      )}
+      {!podeEscrever && (
+        <Aviso tom="alerta" titulo="Só leitura">
+          Parceiro {parceiro.status === 'SUSPENSO' ? 'suspenso' : 'em rascunho'}: para ligar lojas, mudar módulos ou a liberação, reative o parceiro em Parceiros Flow.
+        </Aviso>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)]">
         <div className="min-w-0 space-y-4">
           <Painel titulo="Lojas do iFood ligadas" acessorio={<Contagem>{ligadas.length}</Contagem>} semRespiro>
             {ligadas.length === 0 ? (
-              <Vazio titulo="Nenhuma loja do iFood ligada.">Ligue abaixo a loja do iFood à Loja do parceiro. Ligar não busca nada: os módulos é que dizem o que será lido.</Vazio>
+              <Vazio titulo="Nenhuma loja do iFood ligada.">
+                {podeEscrever ? 'Ligue abaixo a loja do iFood à Loja do parceiro. Ligar não busca nada: os módulos é que dizem o que será lido.' : 'Com o parceiro reativado, a loja do iFood é ligada aqui.'}
+              </Vazio>
             ) : (
               <ul className="divide-y divide-linha">
                 {ligadas.map((c) => {
                   const usados = new Set(c.modulos.map((m) => m.modulo));
-                  const opcoes = apps
-                    .filter((a) => a.provedor === c.provedor && a.ambiente === c.ambiente)
+                  const doAmbiente = appsDoAmbiente(c);
+                  const semOpcao =
+                    doAmbiente.length === 0
+                      ? `Nenhum app de ${c.ambiente === 'TEST' ? 'teste' : 'produção'} cadastrado. Cadastre o app em Integrações, no painel Cadastrar app.`
+                      : 'Todos os módulos dos apps cadastrados já estão preparados nesta loja.';
+                  const opcoes = doAmbiente
                     .flatMap((a) => a.modulos.filter((m) => !usados.has(m)).map((m) => ({ valor: `${a.id}|${m}`, rotulo: `${ROTULO_DO_MODULO[m]} · ${a.nome}` })));
                   return (
                     <li key={c.id} className="space-y-4 px-4 py-4 sm:px-5">
@@ -102,6 +109,8 @@ export default async function IntegracoesDoParceiroNoNivel1({ params }: { params
                               // No teste a loja já vem autorizada: pedido de acesso não se aplica.
                               if (c.ambiente === 'TEST' && (a.acao === 'solicitar' || a.acao === 'cancelar-pedido')) return false;
                               if (semHomologacao && (a.acao === 'ativar' || a.acao === 'retomar')) return false;
+                              // Em produção, depois de um "sem permissão" do iFood, o caminho é um novo pedido de acesso (quem confirma a volta é a verificação).
+                              if (c.ambiente === 'PRODUCAO' && m.estado === 'ERRO_PERMISSAO' && a.acao === 'autorizar') return false;
                               return true;
                             });
                             return (
@@ -113,15 +122,11 @@ export default async function IntegracoesDoParceiroNoNivel1({ params }: { params
                                 </div>
                                 {m.ultimoErro && m.estado === 'ERRO_PERMISSAO' && <p className="text-[13px] text-erro">{m.ultimoErro}</p>}
                                 {semHomologacao && (m.estado === 'AUTORIZADO' || m.estado === 'PAUSADO') && (
-                                  <p className="text-[13px] text-suave">Em produção, só ativa depois que o app for homologado pelo iFood.</p>
+                                  <p className="text-[13px] text-suave">
+                                    Em produção, só ativa depois que o iFood homologar o app. A marca de homologação entra nesta Central junto com a homologação do app de produção.
+                                  </p>
                                 )}
-                                {podeEscrever && acoes.length > 0 && (
-                                  <div className="flex flex-wrap gap-2">
-                                    {acoes.map((a) => (
-                                      <FormAcaoDoModulo key={a.acao} slug={parceiro.slug} moduloId={m.id} acao={a.acao} rotulo={a.rotulo} />
-                                    ))}
-                                  </div>
-                                )}
+                                {podeEscrever && acoes.length > 0 && <FormAcoesDoModulo key={`${m.id}-${m.estado}`} slug={parceiro.slug} moduloId={m.id} acoes={acoes} />}
                               </li>
                             );
                           })}
@@ -130,7 +135,7 @@ export default async function IntegracoesDoParceiroNoNivel1({ params }: { params
 
                       {podeEscrever && (
                         <div className="space-y-4 border-t border-linha pt-4">
-                          <FormPrepararModulo slug={parceiro.slug} conexaoId={c.id} opcoes={opcoes} />
+                          <FormPrepararModulo slug={parceiro.slug} conexaoId={c.id} opcoes={opcoes} semOpcao={semOpcao} />
                           <FormDesligar slug={parceiro.slug} conexaoId={c.id} nome={c.nomeExterno} />
                         </div>
                       )}
@@ -156,7 +161,7 @@ export default async function IntegracoesDoParceiroNoNivel1({ params }: { params
               <ul className="space-y-2 text-[13px] text-suave">
                 {desligadas.map((c) => (
                   <li key={c.id}>
-                    {c.nomeExterno} · loja {c.loja.nome} · {ROTULO_DO_AMBIENTE[c.ambiente]}
+                    {c.nomeExterno} · loja {c.loja.nome} · {ROTULO_DO_AMBIENTE[c.ambiente]} · ligada em {QUANDO.format(c.criadoEm)}
                   </li>
                 ))}
               </ul>
@@ -180,7 +185,7 @@ export default async function IntegracoesDoParceiroNoNivel1({ params }: { params
                 Liberado, o parceiro vê as integrações dele (com a permissão de cada pessoa) e a busca pode rodar nas lojas com módulo ativo. Bloqueado, nada roda e
                 nada é apagado.
               </p>
-              {podeEscrever && <FormLiberacao slug={parceiro.slug} liberado={liberado} />}
+              {podeEscrever && <FormLiberacao key={String(liberado)} slug={parceiro.slug} liberado={liberado} />}
             </div>
           </Painel>
 
@@ -191,7 +196,7 @@ export default async function IntegracoesDoParceiroNoNivel1({ params }: { params
                 A loja de teste do iFood só pode ser ligada num parceiro marcado, criado só para isso. Dado de teste nunca entra num restaurante de verdade. Com loja
                 ligada, a marca não muda.
               </p>
-              <FormHomologacao slug={parceiro.slug} marcado={parceiro.homologacaoDeIntegracao} />
+              {podeEscrever && <FormHomologacao key={String(parceiro.homologacaoDeIntegracao)} slug={parceiro.slug} marcado={parceiro.homologacaoDeIntegracao} />}
             </div>
           </Painel>
 

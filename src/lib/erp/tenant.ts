@@ -551,6 +551,39 @@ export async function gravarParceiroFlow<T>(
 }
 
 /**
+ * Como `gravarParceiroFlow`, com uma conferência DENTRO do contexto do parceiro, na mesma transação, antes do histórico. A
+ * conferência devolve a frase para desfazer tudo (nada fica gravado), ou null para seguir. Decisão 490: a marca de parceiro
+ * de testes grava primeiro (a trava da linha do parceiro faz esperar quem está ligando uma loja) e só depois conta as lojas
+ * ligadas, que já enxerga a ligação que acabou de entrar.
+ */
+export async function gravarParceiroFlowConferindo<T>(
+  gravar: (parceiroFlow: DelegateParceiroFlow) => Promise<{ parceiroId: string; resultado: T; historico: RegistroDeHistorico | null }>,
+  conferir: (sql: <R = unknown>(partes: TemplateStringsArray, ...valores: unknown[]) => Promise<R[]>, parceiroId: string) => Promise<string | null>,
+  base: PrismaClient = baseDoTenant(),
+): Promise<{ ok: true; resultado: T } | { ok: false; erro: string }> {
+  const papel = await papelDisponivel(base);
+  const desfeito = Symbol('desfeito');
+  let erro = '';
+  try {
+    return await base.$transaction(async (tx) => {
+      const { parceiroId, resultado, historico } = await gravar(tx.parceiroFlow);
+      if (!historico) return { ok: true as const, resultado };
+      await tx.$queryRaw(sqlDeContexto(parceiroId, false, papel));
+      const recusa = await conferir((partes, ...valores) => tx.$queryRaw(Prisma.sql(partes, ...valores)), parceiroId);
+      if (recusa) {
+        erro = recusa;
+        throw desfeito;
+      }
+      await fecharComHistorico(tx, parceiroId, [historico], papel);
+      return { ok: true as const, resultado };
+    });
+  } catch (e) {
+    if (e === desfeito) return { ok: false, erro };
+    throw e;
+  }
+}
+
+/**
  * ÚLTIMO passo de uma transação fora do tenant (ParceiroFlow, acesso das
  * pessoas): entra no contexto do parceiro e grava o histórico sob a RLS, que
  * confere que ele é mesmo daquele parceiro. Ou fica tudo, ou nada.

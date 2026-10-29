@@ -23,8 +23,31 @@ export const TOM_DA_HOMOLOGACAO: Record<Homologacao, Tom> = { NAO_SE_APLICA: 'ne
 
 export const TOM_DO_ESTADO: Record<EstadoDoModulo, Tom> = { NAO_SOLICITADO: 'neutro', SOLICITADO: 'alerta', AUTORIZADO: 'neutro', ATIVO: 'ok', PAUSADO: 'alerta', ERRO_PERMISSAO: 'erro' };
 
+/** As ações de módulo que a tela oferece (a sétima, `erro-permissao`, é só do serviço). */
+export const ACOES_DA_TELA = ['solicitar', 'cancelar-pedido', 'autorizar', 'ativar', 'pausar', 'retomar'] as const satisfies readonly AcaoDoModulo[];
+export type AcaoDaTela = (typeof ACOES_DA_TELA)[number];
+
+/** O que a página diz no topo depois de uma ação cujo botão some (`?feito=`). */
+export const FEITO = {
+  solicitar: 'Pedido de acesso registrado. Falta a loja aprovar o app no Portal do Parceiro.',
+  'cancelar-pedido': 'Pedido de acesso cancelado.',
+  autorizar: 'Módulo marcado como autorizado.',
+  ativar: 'Módulo ativo. A busca dos números começa quando a sincronização diária existir.',
+  pausar: 'Módulo pausado. Nada é buscado nesta loja até retomar.',
+  retomar: 'Módulo ativo de novo.',
+  preparou: 'Módulo preparado. Ele começa como não solicitado.',
+  'ja-preparado': 'Este módulo já estava preparado nesta loja.',
+  desligou: 'Loja desligada. Os módulos ativos dela foram pausados; a ligação fica no histórico.',
+  'ja-desligada': 'Esta loja já estava desligada.',
+} as const satisfies Record<string, string>;
+export type CodigoFeito = keyof typeof FEITO;
+export const ehCodigoFeito = (x: unknown): x is CodigoFeito => typeof x === 'string' && Object.prototype.hasOwnProperty.call(FEITO, x);
+
+/** "2026-10-28" vira "28/10/2026". */
+export const diaBr = (dia: string) => (/^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia.split('-').reverse().join('/') : dia);
+
 /** As ações que a tela oferece, na ordem em que aparecem (a de erro de permissão é só do serviço). */
-export const ACOES_NA_TELA: readonly { acao: Exclude<AcaoDoModulo, 'erro-permissao'>; rotulo: string }[] = [
+export const ACOES_NA_TELA: readonly { acao: AcaoDaTela; rotulo: string }[] = [
   { acao: 'autorizar', rotulo: 'Marcar como autorizado' },
   { acao: 'solicitar', rotulo: 'Registrar pedido de acesso' },
   { acao: 'cancelar-pedido', rotulo: 'Cancelar pedido' },
