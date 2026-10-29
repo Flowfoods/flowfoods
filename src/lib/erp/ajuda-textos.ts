@@ -91,7 +91,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['insumos/novo', 'insumos/[id]/editar'],
     titulo: 'Cadastrar insumo',
-    versao: 6,
+    versao: 7,
     aula: [
       { texto: 'O nome do insumo se digita uma vez só; quem veio de uma nota ou ficha volta para lá ao salvar, e quem veio da caneta da lista volta para a mesma página dela.' },
       { texto: 'Nome, categoria, conservação e unidade base são obrigatórios; o que faltar aparece junto do campo.' },
@@ -158,7 +158,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Escolha a unidade pelo jeito que você usa o insumo, não pela embalagem em que ele vem.' },
           { texto: 'Unidade base é como você controla o estoque e o que a ficha usa: a caixa de 5 kg é medida em kg, e o refrigerante vendido inteiro, em un.' },
-          { texto: 'Com a unidade marcada, Continuar mostra quanto vem na embalagem e o custo.' },
+          { texto: 'Marque a unidade antes de concluir: aí esta ajuda segue para quanto vem na embalagem e o custo.' },
         ],
         secao: 'exemplos',
       },

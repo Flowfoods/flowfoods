@@ -113,7 +113,19 @@ describe('decisão 479 · o card', () => {
     expect(pontos).toMatch(/if \(podeAbrirSozinho\) return;\s*inicioUsadoNestaVisita\.current = true;\s*setAtivo\(null\);/);
     // 3ª conferência: girar o aparelho reposiciona (sem mexer na página de quem digita).
     expect(pontos).toMatch(/addEventListener\('resize', aoMudar\)[\s\S]{0,120}addEventListener\('orientationchange', aoMudar\)/);
-    expect(pontos).toMatch(/if \(!estaDigitando\(\)\) posicionar\(\);/);
+    // 4ª conferência: reposiciona só quando a largura muda ou o aparelho gira (a barra de endereço recolhendo não puxa a página);
+    // com alguém digitando, só mantém o campo à vista. Rádio, caixa e lista não contam como digitar.
+    expect(pontos).toContain("const girou = e.type === 'orientationchange' || window.innerWidth !== largura;");
+    expect(pontos).toMatch(/if \(estaDigitando\(\)\) manterCampoAVista\(\);\s*else if \(girou\) posicionar\(\);/);
+    const digitar = pontos.slice(pontos.indexOf('const CAMPOS_DE_DIGITAR'), pontos.indexOf('const CAMPOS_DE_DIGITAR') + 200);
+    for (const t of ['radio', 'checkbox', 'select', 'button']) expect(digitar).not.toContain(`'${t}'`);
+    expect(pontos).not.toMatch(/\/\^\(INPUT\|TEXTAREA\|SELECT\)\$\//);
+    // A região inteira acima do card: o card encolhe até o mínimo quando ela não cabe.
+    expect(pontos).toContain('const teto = alturaQueDeixaARegiao(alvo, c.getBoundingClientRect(), tecladoAgora.current);');
+    // A sequência que começou sozinha marca como vistos os passos que alcança (inclusive os que aparecem depois).
+    expect(pontos).toMatch(/if \(ativo\.sozinha && acoes && preferenciaComGravados && estadoDoPonto\(proximo, preferenciaComGravados, hoje\) === 'elegivel'\) \{[\s\S]{0,120}void acoes\.pontosVistos\(\[proximo\]\)/);
+    // "Encerrar" devolve o foco ao campo em que a pessoa trabalhava com o card aberto.
+    expect(pontos).toMatch(/addEventListener\('focusin', aoFocar\)/);
     // A tentativa da chegada fica usada antes de qualquer saída da conta (outra janela, ninguém elegível, alguém digitando):
     // a sequência recusada não começa mais tarde, no meio do trabalho (ponto aberto na 3ª conferência).
     const tentativa = pontos.slice(pontos.indexOf('const t = window.setTimeout(() => {'), pontos.indexOf('const passos = passosDaSequencia(visiveis, null);'));

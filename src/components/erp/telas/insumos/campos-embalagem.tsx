@@ -156,8 +156,9 @@ export function CamposDaEmbalagem({
 
       <div id={id('regiao-custo')} className="grid gap-3 sm:grid-cols-2">
         <div>
-          {/* Rótulos com a mesma altura nas duas colunas: com o "?", o do custo quebra em duas linhas no tablet. */}
-          <div className="mb-1.5 flex items-center gap-1 sm:min-h-10 sm:items-end">
+          {/* Rótulos com a mesma altura nas duas colunas: com o "?", o do custo quebra em duas linhas no tablet. Altura escrita em rem,
+              não `sm:min-h-10`: essa classe vira 44 px em tela de toque (tokens.css) e soltava o rótulo do campo no celular. */}
+          <div className="mb-1.5 flex items-center gap-1 sm:min-h-[2.5rem] sm:items-end">
             <label htmlFor={id('preco')} className={ROTULO.replace('mb-1.5 ', '')}>
               {doInsumo ? 'Custo inicial de referência' : 'Preço da embalagem'}
               {doInsumo && <span className="font-normal text-suave"> (R$ por embalagem de compra)</span>}
@@ -201,7 +202,7 @@ export function CamposDaEmbalagem({
           <Erro id={`${id('preco')}-erro`} texto={erros.preco} />
         </div>
         <div>
-          <div className="mb-1.5 flex items-center sm:min-h-10 sm:items-end">
+          <div className="mb-1.5 flex items-center sm:min-h-[2.5rem] sm:items-end">
             <label htmlFor={id('frete')} className={ROTULO.replace('mb-1.5 ', '')}>
               Frete por embalagem <span className="font-normal text-suave">(se pagar)</span>
             </label>
