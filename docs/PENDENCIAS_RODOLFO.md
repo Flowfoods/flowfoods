@@ -230,6 +230,11 @@ e deploy). Nenhuma chamada real ao iFood foi feita.
    → etapa `leitura-ifood-test`), sem precisar de terminal no servidor. O HTTP
    200 oficial (data, app, loja, requestId) fecha a INT-1.4 e libera a INT-1.5 a
    1.7, que dependem da resposta real.
+4b. **Só para você saber** (não precisa fazer nada): depois do HTTP 200, para o
+   Painel com a loja de teste, entra um parceiro só para testes ("Homologação
+   iFood"), marcado em **Integrações** (menu Parceiros Flow) e com a loja de teste
+   ligada. Eu faço; se preferir fazer pela tela, é ali. Dado de teste nunca entra
+   no Valentin's.
 5. **Validação acompanhada da 480 com o cliente fundador** (unidade, embalagem e
    custo, sem explicação pelo WhatsApp) — operação, fora do código.
 6. **Um celular de verdade** para conferir a ajuda com teclado virtual e barra de

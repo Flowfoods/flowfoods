@@ -3532,3 +3532,46 @@ Fora da integração, no mesmo bloco de trabalho (f0ce242): na suíte completa c
 - `integracao-fundacao` (cadastro recusa a troca nos dois sentidos; `IFOOD_TESTE_...` continua de produção), `integracao-cliente-ifood` (nada sai, nem o token, nos dois casos trocados) e `integracao-leitura-test` (app de teste com segredo de produção recusado antes de chamar).
 
 **Reverter:** `git revert` do commit; a etapa é só um arquivo de operação. Sem migration.
+
+### 490. 2026-10-29 · INT-1.8, primeira parte: a Central de Integrações do nível 1
+
+**Fonte:** PRIORIDADE 004 (INT-1.1 a INT-1.8 liberadas por Rodolfo em 28/10/2026) e o "Plano de execução — Integração iFood no FlowFoods ERP", seção 3.4. Enquanto a leitura TEST real espera o segredo no painel, a parte da INT-1.8 que não depende de dado: a Central no nível 1. As Integrações do parceiro (tela do nível 2 e 3) ficam para a segunda parte; o Painel iFood e o selo no Faturamento dependem da INT-1.5 a 1.7.
+
+**Mudanças:**
+1. **`/rodolfo/integracoes`** (menu Parceiros Flow › Integrações): mostra os apps no iFood, as leituras de teste, os parceiros e o cadastro de app.
+   - Por app: Client ID, categoria, homologação, nome da variável do cofre (nunca o segredo) e até quando vale o acesso guardado (só a data; o token não sai do banco).
+   - Últimas leituras de teste, lidas do registro do comando da INT-1.4: "Deu certo" ou "Falhou", dia, loja e o código de pedido de cada passo.
+   - Parceiros com liberação, marca de testes, lojas ligadas e módulos ativos.
+   - Cadastro de app.
+2. **`/rodolfo/integracoes/[slug]`**:
+   - Liberação do módulo Integração; bloquear pede confirmação.
+   - Marca de parceiro de testes; marcar pede a caixa "existe só para testes".
+   - Ligar loja do iFood: o ambiente vem da marca do parceiro, nunca do formulário.
+   - Preparar módulo e mudar o estado dele pela tabela de estados. "Erro de permissão" não é ação de tela (é do serviço, no 403). Em produção, sem homologação, não aparece "ativar". Depois de um "sem permissão", só o novo pedido de acesso.
+   - Desligar loja, com confirmação.
+   - Histórico.
+   - Parceiro suspenso ou em rascunho só lê: sem formulário, e toda ação recusa com a frase. Sucesso volta com um aviso no topo, que recebe o foco.
+3. **Marca de testes numa transação só** (`gravarParceiroFlowConferindo`, em `tenant.ts`), em quatro passos:
+   - grava conferindo o valor lido;
+   - entra no contexto do parceiro e conta as lojas ligadas;
+   - se houver alguma, desfaz tudo;
+   - grava no histórico do parceiro (entidade `MarcaDeTestes`, só do nível 1).
+   A trava da linha do parceiro faz a ligação de loja esperar, e vice-versa. O revisor provou a corrida das duas ordens; as duas são recusadas.
+4. **Nada na Central chama o iFood.** A guarda reprova importar o cliente, o token ou o transporte do iFood (por `from`, `import()` ou `require`) e o armazém do token. Não há "testar conexão": a única chamada continua sendo o comando da leitura TEST.
+
+**Não feito, de propósito:**
+- Marcar a homologação do app de produção (chega com a INT-1.9).
+- Saúde da sincronização: último D-1, atraso, 403 e 429 (chega com a INT-1.6).
+- A tela do parceiro (segunda parte).
+- O N+1 da tela global, irrelevante com poucos parceiros. Fica anotado.
+
+**Revisão independente:** duas revisões, uma de tela e uma de engenharia.
+- **1ª rodada:** as duas reprovaram pelo mesmo "deve" (a marca de testes gravava em parceiro suspenso). A de tela trouxe mais 1 "deve" (a confirmação de bloquear reaparecia sozinha) e 8 "deveria". A de engenharia trouxe 3 "deveria": histórico da marca, corrida e lacunas de teste.
+- **Recheques:** engenharia aprovou, com 25 de 26 mutações pegas. Tela aprovou com ressalvas, com 3 "deveria" de retorno das ações, corrigidos no canal único de aviso.
+
+**Prova:**
+- `integracao-central.db` (9): páginas e actions de verdade; suspenso com loja e módulo; rascunho; token guardado que não aparece; corrida marca × ligação; dois cliques; histórico da marca.
+- Guardas em `integracao-fundacao`, mais shell, ajuda, tenant, permissões e navegação.
+- Navegador, no build de produção local: 3 telas × 6 larguras × 2 temas, sem rolagem lateral, um botão principal por tela, alvos de 44 px e foco no erro e no aviso.
+
+**Reverter:** `git revert` dos commits da Central. Sem migration.
