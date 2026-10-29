@@ -29,6 +29,7 @@ vi.mock('next/navigation', () => ({
     throw new Error('NOT_FOUND');
   },
   usePathname: () => '/rodolfo/integracoes',
+  useRouter: () => ({ replace: () => {} }),
 }));
 // Os dois clientes (portal, com a trava; e o base do ERP, para o portão do tenant) apontam para o banco de teste.
 vi.mock('@/lib/db', async () => {
@@ -139,8 +140,8 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     // O suspenso já tem loja ligada e módulo preparado (para provar que a tela e as ações não mexem nisso).
     const s = doParceiro(S.id, db);
     const lojaS = await loja(s, 'Tijuca');
-    const ligS = await acoes.acaoLigarConexao(S.slug, null, form({ lojaId: lojaS, idExterno: uuid(), nomeExterno: 'Loja suspensa no iFood' }));
-    if (!ligS?.ok) throw new Error(JSON.stringify(ligS));
+    const ligS = await rodar(acoes.acaoLigarConexao(S.slug, null, form({ lojaId: lojaS, idExterno: uuid(), nomeExterno: 'Loja suspensa no iFood' })));
+    if (ligS.feito !== 'ligou') throw new Error(JSON.stringify(ligS));
     const cS = (await s.integracaoConexao.findFirstOrThrow()).id;
     await rodar(acoes.acaoPrepararModulo(S.slug, cS, null, form({ appModulo: `${appBi}|ANALYTICS` })));
     await db.parceiroFlow.update({ where: { id: S.id }, data: { status: 'SUSPENSO' } });
@@ -199,16 +200,16 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     expect((await acoes.acaoMarcarHomologacao(H.slug, null, form({})))?.erros?.geral).toMatch(/marcar ou desmarcar/);
     expect((await db.parceiroFlow.findUniqueOrThrow({ where: { id: H.id } })).homologacaoDeIntegracao).toBe(false);
 
-    expect((await acoes.acaoMarcarHomologacao(H.slug, null, form({ valor: 'sim', soTestes: 'sim' })))?.ok).toBe(true);
-    expect((await acoes.acaoMarcarHomologacao(H.slug, null, form({ valor: 'sim', soTestes: 'sim' })))?.mensagem).toBe('Já estava assim.');
+    expect((await rodar(acoes.acaoMarcarHomologacao(H.slug, null, form({ valor: 'sim', soTestes: 'sim' })))).feito).toBe('marcou');
+    expect((await rodar(acoes.acaoMarcarHomologacao(H.slug, null, form({ valor: 'sim', soTestes: 'sim' })))).feito).toBe('sem-mudanca');
     const marcas = await h.historicoAlteracao.findMany({ where: { entidade: 'MarcaDeTestes' } });
     expect(marcas.map((x) => [x.acao, x.antes, x.depois])).toEqual([['ALTEROU', { parceiroDeTestes: 'Não' }, { parceiroDeTestes: 'Sim' }]]);
 
     // O ambiente não vem do formulário: um "ambiente" forjado é ignorado.
-    const ligouH = await acoes.acaoLigarConexao(H.slug, null, form({ lojaId: lojaH, idExterno: uuid(), nomeExterno: 'Loja de teste do iFood', ambiente: 'PRODUCAO' }));
-    expect(ligouH?.ok, JSON.stringify(ligouH)).toBe(true);
-    const ligouA = await acoes.acaoLigarConexao(A.slug, null, form({ lojaId: lojaA, idExterno: uuid(), nomeExterno: 'Valentin’s Burger', ambiente: 'TEST' }));
-    expect(ligouA?.ok, JSON.stringify(ligouA)).toBe(true);
+    const ligouH = await rodar(acoes.acaoLigarConexao(H.slug, null, form({ lojaId: lojaH, idExterno: uuid(), nomeExterno: 'Loja de teste do iFood', ambiente: 'PRODUCAO' })));
+    expect(ligouH.feito, JSON.stringify(ligouH)).toBe('ligou');
+    const ligouA = await rodar(acoes.acaoLigarConexao(A.slug, null, form({ lojaId: lojaA, idExterno: uuid(), nomeExterno: 'Valentin’s Burger', ambiente: 'TEST' })));
+    expect(ligouA.feito, JSON.stringify(ligouA)).toBe('ligou');
     expect((await h.integracaoConexao.findMany({ select: { ambiente: true } })).map((c) => c.ambiente)).toEqual(['TEST']);
     expect((await a.integracaoConexao.findMany({ select: { ambiente: true } })).map((c) => c.ambiente)).toEqual(['PRODUCAO']);
 
@@ -227,12 +228,15 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     ids.push(C.id);
     const c = doParceiro(C.id, db);
     const lojaC = await loja(c, 'Loja da corrida');
-    // A ligação de teste entra numa transação que demora; a desmarcação chega no meio dela.
+    // A ligação de teste entra numa transação que demora; a desmarcação chega no meio dela (logo depois do create).
+    let entrou: () => void = () => {};
+    const criada = new Promise<void>((r) => (entrou = r));
     const ligando = c.transacao(async (tx) => {
       await tx.integracaoConexao.create({ data: { parceiroId: tx.parceiroId, lojaId: lojaC, provedor: 'IFOOD', ambiente: 'TEST', idExterno: uuid(), nomeExterno: 'Loja de teste', criadoPorNome: 'teste' } });
+      entrou();
       await new Promise((r) => setTimeout(r, 700));
     });
-    await new Promise((r) => setTimeout(r, 150));
+    await criada;
     const desmarcar = await marcarParceiroDeHomologacao(C.id, false, 'teste');
     await ligando;
     expect(desmarcar).toEqual({ ok: false, erro: MENSAGEM_TROCA_COM_LOJA_LIGADA });
@@ -296,9 +300,9 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
 
   it('liberação do módulo com histórico; repetir não grava; campo ausente é recusado; desligar a loja pausa o módulo ativo', async () => {
     expect((await acoes.acaoMudarLiberacao(A.slug, null, form({})))?.erros?.geral).toMatch(/liberar ou bloquear/);
-    expect((await acoes.acaoMudarLiberacao(A.slug, null, form({ liberado: 'sim' })))?.ok).toBe(true);
-    expect((await acoes.acaoMudarLiberacao(A.slug, null, form({ liberado: 'sim' })))?.mensagem).toBe('Já estava assim.');
-    expect((await acoes.acaoMudarLiberacao(A.slug, null, form({ liberado: 'nao' })))?.ok).toBe(true);
+    expect((await rodar(acoes.acaoMudarLiberacao(A.slug, null, form({ liberado: 'sim' })))).feito).toBe('liberou');
+    expect((await rodar(acoes.acaoMudarLiberacao(A.slug, null, form({ liberado: 'sim' })))).feito).toBe('sem-mudanca');
+    expect((await rodar(acoes.acaoMudarLiberacao(A.slug, null, form({ liberado: 'nao' })))).feito).toBe('bloqueou');
     const hist = await a.historicoAlteracao.findMany({ where: { entidade: 'LiberacaoDeModulo' }, orderBy: { ocorridoEm: 'asc' } });
     expect(hist.map((x) => x.acao)).toEqual(['LIBEROU', 'BLOQUEOU']);
 
@@ -307,7 +311,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     expect((await rodar(acoes.acaoDesligarConexao(H.slug, c, null))).feito).toBe('ja-desligada');
     expect((await h.integracaoConexaoModulo.findFirstOrThrow({ where: { conexaoId: c } })).estado).toBe('PAUSADO');
     // Sem loja ligada, a marca de testes pode sair.
-    expect((await acoes.acaoMarcarHomologacao(H.slug, null, form({ valor: 'nao' })))?.ok).toBe(true);
+    expect((await rodar(acoes.acaoMarcarHomologacao(H.slug, null, form({ valor: 'nao' })))).feito).toBe('desmarcou');
   });
 
   it('parceiro suspenso (ou em rascunho): a tela só lê, sem formulário de escrita, e toda ação é recusada sem gravar nada', async () => {

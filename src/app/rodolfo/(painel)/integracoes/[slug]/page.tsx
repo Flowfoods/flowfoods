@@ -19,6 +19,7 @@ import { Aviso, Contagem, Painel, Selo, Vazio } from '@/components/erp/ui/superf
 import { ListaHistorico } from '@/components/erp/telas/historico/lista-historico';
 import { Voltar } from '@/components/erp/telas/cadastro/partes';
 import { TrilhaDaPagina } from '@/components/erp/shell/trilha';
+import { AvisoDoFeito } from '../aviso-feito';
 import { FormAcoesDoModulo, FormDesligar, FormHomologacao, FormLiberacao, FormLigarLoja, FormPrepararModulo } from '../forms';
 import { ACOES_NA_TELA, ehCodigoFeito, FEITO, QUANDO, TOM_DO_ESTADO } from '../rotulos';
 
@@ -51,11 +52,7 @@ export default async function IntegracoesDoParceiroNoNivel1({ params, searchPara
       <Voltar href="/rodolfo/integracoes">Voltar para Integrações</Voltar>
       <PageHeader icone="canais" cor={COR.parceiros} titulo={`Integrações · ${parceiro.nome}`} subtitulo="Nível 1 · lojas do iFood, módulos e liberação deste parceiro" />
 
-      {feito && (
-        <div role="status">
-          <Aviso tom="ok" titulo={feito} />
-        </div>
-      )}
+      <AvisoDoFeito texto={feito} />
       {!podeEscrever && (
         <Aviso tom="alerta" titulo="Só leitura">
           Parceiro {parceiro.status === 'SUSPENSO' ? 'suspenso' : 'em rascunho'}: para ligar lojas, mudar módulos ou a liberação, reative o parceiro em Parceiros Flow.
@@ -151,7 +148,7 @@ export default async function IntegracoesDoParceiroNoNivel1({ params, searchPara
               {lojas.length === 0 ? (
                 <p className="text-sm text-suave">Este parceiro ainda não tem loja cadastrada. Cadastre a loja no ERP dele antes de ligar.</p>
               ) : (
-                <FormLigarLoja slug={parceiro.slug} lojas={lojas} marcas={marcas} ambienteRotulo={ROTULO_DO_AMBIENTE[ambiente]} />
+                <FormLigarLoja key={conexoes.length} slug={parceiro.slug} lojas={lojas} marcas={marcas} ambienteRotulo={ROTULO_DO_AMBIENTE[ambiente]} />
               )}
             </Painel>
           )}

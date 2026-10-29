@@ -93,7 +93,9 @@ export async function marcarParceiroDeHomologacao(parceiroId: string, valor: unk
       const gravou = await pf.updateMany({ where: { id: parceiroId, homologacaoDeIntegracao: !valor }, data: { homologacaoDeIntegracao: valor } });
       if (gravou.count !== 1) {
         const atual = await pf.findUnique({ where: { id: parceiroId }, select: { homologacaoDeIntegracao: true } });
-        return { parceiroId, resultado: atual ? ('igual' as const) : ('sumiu' as const), historico: null };
+        // Não gravou: ou já estava assim, ou outro clique mudou entre a leitura e a gravação (não dizer "já estava assim").
+        const resultado = !atual ? ('sumiu' as const) : atual.homologacaoDeIntegracao === valor ? ('igual' as const) : ('conflito' as const);
+        return { parceiroId, resultado, historico: null };
       }
       return {
         parceiroId,
@@ -115,5 +117,6 @@ export async function marcarParceiroDeHomologacao(parceiroId: string, valor: unk
   );
   if (!r.ok) return r;
   if (r.resultado === 'sumiu') return { ok: false, erro: 'Parceiro não encontrado.' };
+  if (r.resultado === 'conflito') return { ok: false, erro: 'Alguém mudou esta marca agora há pouco. Recarregue a página para ver como ficou; nada foi gravado.' };
   return { ok: true, mudou: r.resultado === 'mudou' };
 }

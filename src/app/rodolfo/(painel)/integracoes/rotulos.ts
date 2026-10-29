@@ -39,6 +39,12 @@ export const FEITO = {
   'ja-preparado': 'Este módulo já estava preparado nesta loja.',
   desligou: 'Loja desligada. Os módulos ativos dela foram pausados; a ligação fica no histórico.',
   'ja-desligada': 'Esta loja já estava desligada.',
+  ligou: 'Loja do iFood ligada. Agora prepare, nela, o módulo que vai usar.',
+  liberou: 'Módulo Integração liberado para este parceiro.',
+  bloqueou: 'Módulo Integração bloqueado. Nada foi apagado.',
+  marcou: 'Marcado como parceiro de testes: aqui só entra loja do ambiente de teste.',
+  desmarcou: 'Marca de testes retirada: aqui só entra loja de produção.',
+  'sem-mudanca': 'Já estava assim; nada mudou.',
 } as const satisfies Record<string, string>;
 export type CodigoFeito = keyof typeof FEITO;
 export const ehCodigoFeito = (x: unknown): x is CodigoFeito => typeof x === 'string' && Object.prototype.hasOwnProperty.call(FEITO, x);

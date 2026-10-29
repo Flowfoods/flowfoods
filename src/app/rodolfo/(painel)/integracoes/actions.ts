@@ -6,8 +6,8 @@
  * serviços (INT-1.1) conferem os dados e gravam o histórico do parceiro na mesma transação; aqui fica o registro de auditoria.
  * Parceiro suspenso ou em rascunho só lê: toda ação do parceiro recusa, inclusive a marca de testes.
  *
- * As ações cujo botão some depois de dar certo (mudar o módulo, preparar, desligar) voltam para a página com `?feito=`: o
- * aviso no topo diz o que aconteceu. As outras respondem no próprio formulário.
+ * Na página do parceiro, toda ação que dá certo volta com `?feito=`: o aviso no topo (um canal só) diz o que aconteceu.
+ * Recusa responde no próprio formulário. O cadastro de app, na página da Central, responde no formulário.
  *
  * Nenhuma ação chama o iFood. "Erro de permissão" não é ação de tela: quem registra é o serviço, quando o iFood responde 403.
  */
@@ -72,8 +72,7 @@ export async function acaoMudarLiberacao(slug: string, anterior: EstadoForm, for
   const r = await mudarLiberacao(ctx.cliente, 'integracao', liberado, ctx.sessao.autorNome);
   if (!r.ok) return recusa(vez, r.erro);
   if (r.mudou) await auditar(ctx.sessao.userId, liberado ? 'integracao.modulo-liberado' : 'integracao.modulo-bloqueado', { parceiroId: ctx.parceiro.id });
-  revalidar(slug);
-  return { ok: true, mensagem: !r.mudou ? 'Já estava assim.' : liberado ? 'Módulo Integração liberado para este parceiro.' : 'Módulo Integração bloqueado. Nada foi apagado.', vez };
+  voltarCom(ctx.parceiro.slug, !r.mudou ? 'sem-mudanca' : liberado ? 'liberou' : 'bloqueou');
 }
 
 export async function acaoMarcarHomologacao(slug: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {
@@ -87,8 +86,7 @@ export async function acaoMarcarHomologacao(slug: string, anterior: EstadoForm, 
   const r = await marcarParceiroDeHomologacao(ctx.parceiro.id, valor, ctx.sessao.autorNome);
   if (!r.ok) return recusa(vez, r.erro);
   if (r.mudou) await auditar(ctx.sessao.userId, valor ? 'integracao.parceiro-de-testes-marcado' : 'integracao.parceiro-de-testes-desmarcado', { parceiroId: ctx.parceiro.id });
-  revalidar(slug);
-  return { ok: true, mensagem: !r.mudou ? 'Já estava assim.' : valor ? 'Marcado como parceiro de testes: aqui só entra loja do ambiente de teste.' : 'Marca retirada: aqui só entra loja de produção.', vez };
+  voltarCom(ctx.parceiro.slug, !r.mudou ? 'sem-mudanca' : valor ? 'marcou' : 'desmarcou');
 }
 
 export async function acaoLigarConexao(slug: string, anterior: EstadoForm, form: FormData): Promise<EstadoForm> {
@@ -109,8 +107,7 @@ export async function acaoLigarConexao(slug: string, anterior: EstadoForm, form:
   const r = await ligarConexao(ctx.cliente, entrada, { nome: ctx.sessao.autorNome, usuarioId: null });
   if (!r.ok) return { ok: false, erros: r.erros, vez };
   await auditar(ctx.sessao.userId, 'integracao.loja-ligada', { parceiroId: ctx.parceiro.id, conexaoId: r.id, ambiente });
-  revalidar(slug);
-  return { ok: true, mensagem: 'Loja do iFood ligada. Agora prepare, nela, o módulo que vai usar.', vez };
+  voltarCom(ctx.parceiro.slug, 'ligou');
 }
 
 export async function acaoDesligarConexao(slug: string, conexaoId: string, anterior: EstadoForm): Promise<EstadoForm> {
