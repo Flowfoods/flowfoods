@@ -181,7 +181,9 @@ services:
       AI_DAILY_BUDGET_BRL: ${AI_DAILY_BUDGET_BRL:-5}
       USD_BRL: ${USD_BRL:-5.40}
       # Central de Integrações (INT-1.2). Desligada por padrão: só "true" liga. O segredo do app vem do painel (nunca do
-      # Git); a chave de cifragem do token sai do volume de segredos (o painel vence). Só o worker recebe.
+      # Git); a chave de cifragem do token sai do volume de segredos (o painel vence). Só o worker recebe estas variáveis no
+      # ambiente: SERVICO_DA_INTEGRACAO=1 faz o exportar-segredos.sh carregar a chave aqui e só aqui (decisão 487).
+      SERVICO_DA_INTEGRACAO: "1"
       INTEGRACAO_IFOOD_ATIVA: ${INTEGRACAO_IFOOD_ATIVA:-false}
       INTEGRACAO_CHAVE_CIFRAGEM: ${INTEGRACAO_CHAVE_CIFRAGEM:-}
       IFOOD_API_BASE: ${IFOOD_API_BASE:-https://merchant-api.ifood.com.br}

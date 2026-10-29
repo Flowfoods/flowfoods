@@ -18,9 +18,9 @@ import { classificar, esperaDoBackoff, lerRetryAfter } from '@/lib/integracoes/i
 import { FalhaDeRede, type PedidoHttp, type RespostaHttp } from '@/lib/integracoes/ifood/transporte';
 
 const SEGREDO = 'segredo-do-app-de-teste-nunca-em-log';
-const ENV = { INTEGRACAO_CHAVE_CIFRAGEM: randomBytes(32).toString('hex'), IFOOD_TEST_CLIENT_SECRET: SEGREDO, IFOOD_BI_CLIENT_SECRET: SEGREDO };
-const APP_TEST: AppParaToken = { id: 'app-teste', ambiente: 'TEST', clientId: 'a932c3e2-6117-4df2-8c72-1a7b9ccda4f4', nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET' };
-const APP_PROD: AppParaToken = { id: 'app-bi', ambiente: 'PRODUCAO', clientId: 'cliente-bi', nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET' };
+const ENV = { INTEGRACAO_IFOOD_ATIVA: 'true', INTEGRACAO_CHAVE_CIFRAGEM: randomBytes(32).toString('hex'), IFOOD_TEST_CLIENT_SECRET: SEGREDO, IFOOD_BI_CLIENT_SECRET: SEGREDO };
+const APP_TEST: AppParaToken = { id: 'app-teste', ambiente: 'TEST', clientId: 'a932c3e2-6117-4df2-8c72-1a7b9ccda4f4', nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET', homologacao: 'NAO_SE_APLICA' };
+const APP_PROD: AppParaToken = { id: 'app-bi', ambiente: 'PRODUCAO', clientId: 'cliente-bi', nomeDoSegredo: 'IFOOD_BI_CLIENT_SECRET', homologacao: 'HOMOLOGADO' };
 
 /** Relógio e sono simulados: dormir avança o relógio na hora. */
 function tempo(inicio = Date.UTC(2026, 9, 29, 12, 0, 0)) {
@@ -119,7 +119,7 @@ describe('INT-1.3 · o token do app', () => {
     }
     const t = tempo();
     const s = servidor();
-    const semSegredo = new ServicoDeToken({ armazem: armazemEmMemoria(), transporte: s.transporte, limitador: new Limitador(t.relogio, t.dormir), env: { INTEGRACAO_CHAVE_CIFRAGEM: ENV.INTEGRACAO_CHAVE_CIFRAGEM }, relogio: t.relogio, dormir: t.dormir });
+    const semSegredo = new ServicoDeToken({ armazem: armazemEmMemoria(), transporte: s.transporte, limitador: new Limitador(t.relogio, t.dormir), env: { INTEGRACAO_IFOOD_ATIVA: 'true', INTEGRACAO_CHAVE_CIFRAGEM: ENV.INTEGRACAO_CHAVE_CIFRAGEM }, relogio: t.relogio, dormir: t.dormir });
     await expect(semSegredo.token(APP_TEST)).rejects.toThrow(/Falta a variável IFOOD_TEST_CLIENT_SECRET/);
     expect(s.pedidos).toHaveLength(0);
   });
@@ -194,9 +194,22 @@ describe('INT-1.3 · as chamadas', () => {
     for (let i = 0; i < 450; i++) await lim.esperarVez('analytics');
     expect(t.sonos).toEqual([]);
     await lim.esperarVez('analytics');
-    expect(t.sonos.length).toBe(1);
-    expect(t.sonos[0]).toBeGreaterThan(0);
-    expect(t.sonos[0]).toBeLessThanOrEqual(200);
+    // Janela deslizante (decisão 487): a 451ª espera a primeira sair da janela de 60 s.
+    expect(t.sonos).toEqual([60_001]);
+  });
+
+  it('janela deslizante: em nenhum intervalo de 60 s passam mais de 90% do limite, nem depois de um tempo parado', async () => {
+    const t = tempo();
+    const lim = new Limitador(t.relogio, t.dormir);
+    t.avancar(120_000);
+    const quando: number[] = [];
+    for (let i = 0; i < 300; i++) {
+      await lim.esperarVez('autenticacao');
+      quando.push(t.relogio());
+    }
+    expect(lim.capacidade('autenticacao')).toBe(90);
+    for (let i = 0; i + 90 < quando.length; i++) expect(quando[i + 90] - quando[i]).toBeGreaterThanOrEqual(60_000);
+    expect(quando.filter((q) => q < quando[0] + 60_000)).toHaveLength(90);
   });
 
   it('nenhum registro leva token ou segredo; caminho estranho é recusado antes de sair', async () => {
@@ -209,6 +222,7 @@ describe('INT-1.3 · as chamadas', () => {
     await expect(m.cliente.chamar({ ...chamada, caminho: 'https://evil.com/x' })).rejects.toThrow('Caminho de chamada inválido.');
     await expect(m.cliente.chamar({ ...chamada, caminho: '/../../x' })).rejects.toThrow('Caminho de chamada inválido.');
     expect(semSegredo('falhou com Authorization: Bearer abc.def-123 e clientSecret=xyz&a=1 e {"accessToken":"q"}')).toBe('falhou com Authorization: Bearer [oculto] e clientSecret=[oculto]&a=1 e {"accessToken":"[oculto]"}');
+    expect(semSegredo('{"token":"abc"} e token=xyz')).toBe('{"token":"[oculto]"} e token=[oculto]');
   });
 });
 
@@ -219,9 +233,99 @@ describe('INT-1.3 · leitura das respostas', () => {
     expect(lerRetryAfter(new Date(agora + 5000).toUTCString(), agora)).toBe(5000);
     expect(lerRetryAfter('99999', agora)).toBe(300_000);
     expect(lerRetryAfter('lixo', agora)).toBeNull();
+    // Só segundos inteiros ou data HTTP: "1.5" não vira data (antes virava espera zero).
+    expect(lerRetryAfter('1.5', agora)).toBeNull();
+    expect(lerRetryAfter('2026-10-29', agora)).toBeNull();
+    expect(lerRetryAfter('Thursday, 29-Oct-26 12:00:09 GMT', agora)).toBe(9000);
     expect([2, 3, 4, 5, 6, 7, 8].map((n) => esperaDoBackoff(n, () => 1))).toEqual([1000, 2000, 4000, 8000, 16000, 30000, 30000]);
     expect(esperaDoBackoff(2, () => 0)).toBe(500);
     expect(classificar(204, {}, '', agora)).toEqual({ tipo: 'ok' });
     expect(classificar(418, {}, '', agora)).toEqual({ tipo: 'inesperado' });
+  });
+});
+
+describe('INT-1.3 · correções da revisão (decisão 487)', () => {
+  const chamada = { metodo: 'GET' as const, caminho: '/merchant/v1.0/merchants', familia: 'merchant' as const };
+
+  it('chave geral desligada ou app de produção sem homologação: nada sai, nem o pedido de token', async () => {
+    for (const [app, env] of [
+      [APP_TEST, { ...ENV, INTEGRACAO_IFOOD_ATIVA: 'false' }],
+      [{ ...APP_PROD, homologacao: 'PENDENTE' as const }, ENV],
+      [{ ...APP_PROD, homologacao: 'EM_ANDAMENTO' as const }, ENV],
+    ] as const) {
+      const t = tempo();
+      const s = servidor();
+      const limitador = new Limitador(t.relogio, t.dormir);
+      const tokens = new ServicoDeToken({ armazem: armazemEmMemoria(), transporte: s.transporte, limitador, env, relogio: t.relogio, dormir: t.dormir });
+      const cliente = criarClienteIfood({ app, tokens, limitador, transporte: s.transporte, env, relogio: t.relogio, dormir: t.dormir });
+      const r = await cliente.chamar(chamada);
+      expect(!r.ok && r.classificacao.tipo).toBe('bloqueada');
+      expect(!r.ok && r.frase).toMatch(/desligada|não homologado/);
+      await expect(tokens.token(app)).rejects.toThrow(ErroDeAutenticacao);
+      expect(s.pedidos).toHaveLength(0);
+    }
+  });
+
+  it('8 chamadas juntas com 401 no token velho: UMA renovação (cada 401 descarta só o token que usou)', async () => {
+    const t = tempo();
+    const pedidos: PedidoHttp[] = [];
+    let emitidos = 0;
+    let naApi = 0;
+    // Atrasos reais e escalonados: o 401 da 1ª chega antes da renovação; os das outras, depois dela (o caso da tempestade).
+    const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const transporte = async (p: PedidoHttp): Promise<RespostaHttp> => {
+      pedidos.push(p);
+      if (p.url.endsWith('/oauth/token')) {
+        await esperar(3);
+        return json(200, { accessToken: `tok-${++emitidos}`, type: 'bearer', expiresIn: 21600 });
+      }
+      const n = naApi++;
+      if (n < 8) await esperar(n * 15);
+      return p.cabecalhos.Authorization === 'Bearer tok-1' ? json(401, {}) : json(200, { ok: 1 });
+    };
+    const limitador = new Limitador(t.relogio, t.dormir);
+    const tokens = new ServicoDeToken({ armazem: armazemEmMemoria(), transporte, limitador, env: ENV, relogio: t.relogio, dormir: t.dormir });
+    const cliente = criarClienteIfood({ app: APP_TEST, tokens, limitador, transporte, env: ENV, relogio: t.relogio, dormir: t.dormir, aleatorio: () => 1 });
+    const r = await Promise.all(Array.from({ length: 8 }, () => cliente.chamar(chamada)));
+    expect(r.every((x) => x.ok)).toBe(true);
+    expect(pedidos.filter((p) => p.url.endsWith('/oauth/token'))).toHaveLength(2);
+  });
+
+  it('validade curta não vira um pedido por chamada (margem = metade da validade); validade enorme fica em 24 h', async () => {
+    const m = montar({ token: () => json(200, { accessToken: 'tok-curto', expiresIn: 600 }) });
+    for (let i = 0; i < 5; i++) expect((await m.cliente.chamar(chamada)).ok).toBe(true);
+    expect(m.s.dosTokens()).toHaveLength(1);
+    m.t.avancar(301_000);
+    await m.cliente.chamar(chamada);
+    expect(m.s.dosTokens()).toHaveLength(2);
+    const longo = montar({ token: () => json(200, { accessToken: 'tok-longo', expiresIn: 10 * 86_400 }) });
+    await longo.tokens.token(APP_TEST);
+    const g = longo.armazem.dados.get(APP_TEST.id)!;
+    expect(g.expiraEm.getTime() - g.emitidoEm.getTime()).toBe(86_400_000);
+  });
+
+  it('token: Retry-After maior que o prazo para na hora, sem esperar com a trava presa e sem repetir', async () => {
+    const m = montar({ token: () => json(429, {}, { 'retry-after': '46' }) });
+    await expect(m.tokens.token(APP_TEST)).rejects.toThrow(/pediu para esperar 46 s/);
+    expect(m.s.dosTokens()).toHaveLength(1);
+    expect(m.t.sonos.filter((ms) => ms >= 1000)).toEqual([]);
+  });
+
+  it('escrita não se repete às cegas: falha de rede ou 5xx num POST comum para; POST de leitura marcado repete', async () => {
+    const post = { metodo: 'POST' as const, caminho: '/review/v2.0/merchants/x/reviews/y/answers', familia: 'review' as const, corpo: { text: 'Obrigado' } };
+    const rede = montar({ roteiro: ['rede', json(200, { ok: 1 })] });
+    const r1 = await rede.cliente.chamar(post);
+    expect(r1.ok).toBe(false);
+    expect(!r1.ok && r1.frase).toMatch(/pode ter chegado ao iFood/);
+    expect(rede.s.dasApis()).toHaveLength(1);
+    const cincoxx = montar({ roteiro: [json(503, {}), json(200, { ok: 1 })] });
+    expect((await cincoxx.cliente.chamar(post)).ok).toBe(false);
+    expect(cincoxx.s.dasApis()).toHaveLength(1);
+    const leitura = montar({ roteiro: ['rede', json(503, {}), json(200, { ok: 1 })] });
+    expect((await leitura.cliente.chamar({ ...post, caminho: '/analytics/v1.0/merchants/x/orders/kpis', familia: 'analytics', idempotente: true })).ok).toBe(true);
+    expect(leitura.s.dasApis()).toHaveLength(3);
+    // 429 se repete mesmo em escrita: o iFood não processou.
+    const limite = montar({ roteiro: [json(429, {}, { 'retry-after': '1' }), json(200, { ok: 1 })] });
+    expect((await limite.cliente.chamar(post)).ok).toBe(true);
   });
 });

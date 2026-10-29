@@ -1,8 +1,12 @@
 /**
- * Cliente iFood (INT-1.3, decisão 485) — toda chamada às APIs do iFood passa por aqui:
+ * Cliente iFood (INT-1.3, decisões 485 e 487) — toda chamada às APIs do iFood passa por aqui:
+ *  - nada sai com a chave geral desligada nem para app de produção sem homologação (`porQueNaoChamar`);
  *  - token do app pelo serviço coordenado (`auth.ts`), nunca um por chamada;
  *  - limitador por família de rota; espera crescente com sorteio; Retry-After respeitado;
- *  - 401 → um token novo e uma nova tentativa; 403 e 400 → não repete (quem chamou pausa o módulo ou corrige o pedido);
+ *  - 401 → descarta só o token que levou o 401, pega outro e tenta UMA vez; 403 e 400 → não repete (quem chamou pausa o módulo
+ *    ou corrige o pedido);
+ *  - falha de rede ou 5xx só se repete em leitura (GET, ou POST de leitura marcado `idempotente`): escrita que pode ter
+ *    chegado ao iFood não é reenviada às cegas; 429 se repete sempre (o iFood não processou);
  *  - cabeçalho de homologação só no TEST, decidido pelo ambiente do app (`core/ambiente.ts`) e conferido antes de enviar;
  *  - o registro de cada chamada leva método, caminho, status, tentativa, duração e requestId — nunca token, segredo ou corpo.
  * Nenhum teste chama o iFood: o transporte é trocado por um servidor simulado. A primeira chamada real é a leitura TEST da
@@ -11,7 +15,7 @@
 
 import { cabecalhosDoAmbiente, conferirCabecalhos } from '../core/ambiente';
 import { baseDaApiIfood } from '../core/cofre';
-import { ErroDeAutenticacao, type AppParaToken, type ServicoDeToken } from './auth';
+import { ErroDeAutenticacao, porQueNaoChamar, type AppParaToken, type ServicoDeToken } from './auth';
 import type { Familia, Limitador } from './limitador';
 import { classificar, esperaDoBackoff, FRASE_DA_CLASSIFICACAO, repetivel, type Classificacao } from './respostas';
 import { FalhaDeRede, type Transporte } from './transporte';
@@ -23,6 +27,8 @@ export interface ChamadaIfood {
   familia: Familia;
   consulta?: Record<string, string>;
   corpo?: unknown;
+  /** POST de leitura que o contrato diz ser repetível (ex.: a consulta do Analytics): pode repetir em falha de rede ou 5xx. */
+  idempotente?: boolean;
 }
 
 export type ResultadoIfood<T> =
@@ -60,7 +66,8 @@ export function semSegredo(texto: string): string {
   return texto
     .replace(/Bearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [oculto]')
     .replace(/(clientSecret|client_secret|accessToken|access_token)=([^&\s"]+)/gi, '$1=[oculto]')
-    .replace(/("(?:clientSecret|accessToken|access_token|client_secret)"\s*:\s*")[^"]*"/gi, '$1[oculto]"');
+    .replace(/("(?:clientSecret|accessToken|access_token|client_secret|token)"\s*:\s*")[^"]*"/gi, '$1[oculto]"')
+    .replace(/\b(token)=([^&\s"]+)/gi, '$1=[oculto]');
 }
 
 const CAMINHO = /^\/[A-Za-z0-9._~\-/:]*$/;
@@ -72,6 +79,9 @@ export function criarClienteIfood(o: OpcoesDoCliente) {
 
   async function chamar<T = unknown>(c: ChamadaIfood): Promise<ResultadoIfood<T>> {
     if (!CAMINHO.test(c.caminho) || c.caminho.includes('//') || c.caminho.includes('..')) throw new Error('Caminho de chamada inválido.');
+    const recusa = porQueNaoChamar(o.app, o.env ?? process.env);
+    if (recusa) return { ok: false, status: null, classificacao: { tipo: 'bloqueada' }, frase: recusa, requestId: null, tentativas: 0 };
+    const repeteSeFalhar = c.metodo === 'GET' || c.idempotente === true;
     const base = baseDaApiIfood(o.env);
     const qs = c.consulta && Object.keys(c.consulta).length ? `?${new URLSearchParams(c.consulta).toString()}` : '';
     const url = `${base}${c.caminho}${qs}`;
@@ -106,6 +116,10 @@ export function criarClienteIfood(o: OpcoesDoCliente) {
       } catch (e) {
         if (!(e instanceof FalhaDeRede)) throw e;
         o.registrar?.({ appId: o.app.id, ambiente: o.app.ambiente, metodo: c.metodo, caminho: c.caminho, status: null, tipo: 'falha-de-rede', tentativa, duracaoMs: relogio() - inicio, requestId: null });
+        if (e.motivo === 'grande-demais') return { ok: false, status: null, classificacao: { tipo: 'inesperado' }, frase: e.message, requestId: null, tentativas: tentativa };
+        if (!repeteSeFalhar) {
+          return { ok: false, status: null, classificacao: { tipo: 'indisponivel' }, frase: 'Falha de rede num pedido que não se repete sozinho: ele pode ter chegado ao iFood. Confira antes de enviar de novo.', requestId: null, tentativas: tentativa };
+        }
         ultimo = { status: null, classificacao: { tipo: 'indisponivel' }, requestId: null };
         if (tentativa < max) await dormir(esperaDoBackoff(tentativa + 1, o.aleatorio));
         continue;
@@ -126,11 +140,12 @@ export function criarClienteIfood(o: OpcoesDoCliente) {
       if (cl.tipo === 'nao-autenticado' && !renovouToken) {
         // Um token novo, uma vez só (a marca `renovouToken` limita): essa volta não conta como tentativa.
         renovouToken = true;
-        await o.tokens.invalidar(o.app);
+        await o.tokens.invalidar(o.app, token);
         tentativa--;
         continue;
       }
       if (!repetivel(cl) || tentativa === max) break;
+      if (cl.tipo === 'indisponivel' && !repeteSeFalhar) break;
       const espera = cl.tipo === 'limite' && cl.esperarMs !== null ? cl.esperarMs : esperaDoBackoff(tentativa + 1, o.aleatorio);
       await dormir(espera);
     }

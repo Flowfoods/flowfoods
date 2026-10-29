@@ -10,7 +10,10 @@
  *    ativa em dois parceiros; identidade da conexão não muda; desligada não volta (ligar de novo é linha nova); o módulo usa um
  *    app do mesmo ambiente com o módulo; sem DELETE; o outro parceiro não enxerga;
  *  - o app não se apaga; o conferidor pós-deploy não lista pendência — e lista quando falta o índice, um gatilho, a RLS ou o
- *    REVOKE das globais.
+ *    REVOKE das globais;
+ *  - depois, a migration da decisão 487 (endurecimento) no mesmo banco: search_path com pg_temp nas funções SECURITY DEFINER
+ *    (tabela temporária não engana mais os gatilhos), desligar passa mesmo com a marca trocada, app imutável, nome do segredo
+ *    restrito; o conferidor acusa o pg_temp faltando.
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff npx vitest run tests/integracao-fundacao-migracao.db.test.ts
  * Os perfis de dono precisam dos papéis `ff_dono` (com GRANT erp_tenant) e `ff_semrls` (sem ele); sem eles, só o perfil do
@@ -26,6 +29,7 @@ import { conferirMigracao } from '../scripts/erp-conferir-migracao';
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const MIGRACOES = join(process.cwd(), 'prisma', 'migrations');
 const DA_INT_1_1 = '20261115000000_erp_integracao_fundacao';
+const DA_487 = '20261116000000_erp_integracao_endurecimento';
 const temPsql = spawnSync('psql', ['--version']).status === 0;
 
 function urlDe(banco: string, papel?: string): string {
@@ -203,6 +207,39 @@ describe.skipIf(!URL_TESTE || !temPsql)('INT-1.1 · migration da Central de Inte
           expect(psql(superuser, ['-c', `SELECT count(*) FROM "IntegracaoApp"`]).saida).toBe('2');
 
           expect(await conferirMigracao(db)).toEqual([]);
+
+          // ---------------------------------------------- decisão 487: a migration de endurecimento, no mesmo banco
+          const r487 = psql(dono, ['-f', join(MIGRACOES, DA_487, 'migration.sql')]);
+          expect(r487.ok, r487.aviso).toBe(true);
+          expect(r487.aviso).not.toContain('WARNING');
+          expect(psql(superuser, ['-c', `SELECT string_agg(proname || '=' || array_to_string(proconfig, ';'), ',' ORDER BY proname) FROM pg_proc WHERE proname IN ('erp_integracao_conexao_confere','erp_integracao_modulo_confere','erp_exigir_parceiro_ativo')`]).saida).toBe(
+            'erp_exigir_parceiro_ativo=search_path=public, pg_temp,erp_integracao_conexao_confere=search_path=public, pg_temp,erp_integracao_modulo_confere=search_path=public, pg_temp',
+          );
+          expect(await conferirMigracao(db)).toEqual([]);
+          // Tabela temporária com o nome de "ParceiroFlow" não engana o gatilho: TEST no parceiro real continua recusado.
+          const ataque = psql(dono, [
+            '-c',
+            noContexto(
+              'p2',
+              `CREATE TEMP TABLE "ParceiroFlow" (id text, "homologacaoDeIntegracao" boolean); INSERT INTO "ParceiroFlow" VALUES ('p2', true);
+               INSERT INTO "IntegracaoConexao"(id,"parceiroId","lojaId",provedor,ambiente,"idExterno","nomeExterno","criadoPorNome","atualizadoEm") VALUES ('cx','p2','l2','IFOOD','TEST','${OUTRA_LOJA}','x','x',now());`,
+            ),
+          ]);
+          expect(ataque.aviso).toMatch(/TEST só no parceiro de homologação/);
+          // Trocar a marca com conexão ligada não prende a conexão: desligar passa.
+          expect(psql(superuser, ['-c', `UPDATE "ParceiroFlow" SET "homologacaoDeIntegracao" = false WHERE id = 'p1'`]).ok).toBe(true);
+          const desliga = como('p1', `UPDATE "IntegracaoConexao" SET estado = 'DESLIGADA', "desligadaEm" = now(), "desligadaPorNome" = 'Rodolfo' WHERE id = 'c6'`);
+          expect(desliga.ok, desliga.aviso).toBe(true);
+          // O app não muda de identidade; o nome do segredo é só IFOOD_<NOME>_CLIENT_SECRET.
+          expect(psql(dono, ['-c', `UPDATE "IntegracaoApp" SET ambiente = 'PRODUCAO', categoria = 'BI' WHERE id = 'a1'`]).aviso).toMatch(/não troca de provedor, ambiente, categoria nem Client ID/);
+          expect(app('a5', 'PRODUCAO', 'BI', 'INTEGRACAO_CHAVE_CIFRAGEM').aviso).toContain('IntegracaoApp_nome_do_segredo');
+          expect(app('a6', 'PRODUCAO', 'BI', 'IFOOD_FINANCAS_CLIENT_SECRET').ok).toBe(true);
+          // O conferidor acusa o pg_temp faltando.
+          expect(psql(superuser, ['-c', `ALTER FUNCTION "erp_integracao_modulo_confere"() SET search_path = public`]).ok).toBe(true);
+          expect((await conferirMigracao(db)).join('\n')).toMatch(/erp_integracao_modulo_confere sem pg_temp no fim do search_path/);
+          expect(psql(superuser, ['-c', `ALTER FUNCTION "erp_integracao_modulo_confere"() SET search_path = public, pg_temp`]).ok).toBe(true);
+          expect(await conferirMigracao(db)).toEqual([]);
+
           // O conferidor acusa o que faltar (e diz qual migration rodar).
           expect(psql(superuser, ['-c', `DROP INDEX "IntegracaoConexao_externa_ativa_key"`]).ok).toBe(true);
           expect(psql(superuser, ['-c', `DROP TRIGGER "IntegracaoConexao_confere" ON "IntegracaoConexao"`]).ok).toBe(true);
@@ -215,7 +252,7 @@ describe.skipIf(!URL_TESTE || !temPsql)('INT-1.1 · migration da Central de Inte
             expect(psql(superuser, ['-c', `GRANT SELECT ON "IntegracaoToken" TO erp_tenant`]).ok).toBe(true);
             const pend = (await conferirMigracao(db)).join('\n');
             expect(pend).toMatch(/Tabela IntegracaoConexaoModulo sem RLS forçada/);
-            expect(pend).toMatch(/O papel erp_tenant alcança a tabela global IntegracaoToken/);
+            expect(pend).toMatch(/O papel erp_tenant tem SELECT na tabela global IntegracaoToken/);
           }
         } finally {
           await db.$disconnect();

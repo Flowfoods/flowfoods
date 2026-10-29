@@ -204,9 +204,9 @@ export async function lerTest(o: { app: AppDaLeitura; cliente: ClienteParaLeitur
   }
 
   // 2. O Analytics, primeiro o mínimo (diagnostica o acesso); só com ele certo, a consulta do dia.
-  const minimo = await passo('analytics-minimo', { metodo: 'POST', caminho: caminhoDosKpis(leitura.loja), familia: 'analytics', corpo: consultaMinima(o.dia) });
+  const minimo = await passo('analytics-minimo', { metodo: 'POST', caminho: caminhoDosKpis(leitura.loja), familia: 'analytics', idempotente: true, corpo: consultaMinima(o.dia) });
   if (!minimo.ok) return fim(minimo.status === 403 ? DICA_DO_403 : `O Analytics falhou (HTTP ${minimo.status ?? 'sem resposta'}): ${minimo.frase}`);
-  const doDia = await passo('analytics-do-dia', { metodo: 'POST', caminho: caminhoDosKpis(leitura.loja), familia: 'analytics', corpo: consultaDoDia(o.dia) });
+  const doDia = await passo('analytics-do-dia', { metodo: 'POST', caminho: caminhoDosKpis(leitura.loja), familia: 'analytics', idempotente: true, corpo: consultaDoDia(o.dia) });
   if (!doDia.ok) return fim(`A consulta do dia falhou (HTTP ${doDia.status ?? 'sem resposta'}): ${doDia.frase}`);
   return fim(
     `Leitura TEST oficial com HTTP ${doDia.status}: ${leitura.lojasVistas.length} loja(s) na lista; Analytics na loja ${leitura.loja} em ${o.dia} (requestId ${minimo.requestId ?? 'não informado'} e ${doDia.requestId ?? 'não informado'}).`,

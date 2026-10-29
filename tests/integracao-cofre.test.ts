@@ -21,7 +21,15 @@ describe('INT-1.2 · o segredo pelo nome', () => {
     expect(lerSegredo('IFOOD_TEST_CLIENT_SECRET', { IFOOD_TEST_CLIENT_SECRET: ` ${SEGREDO} ` })).toBe(SEGREDO);
     expect(() => lerSegredo('IFOOD_TEST_CLIENT_SECRET', {})).toThrow(/Falta a variável IFOOD_TEST_CLIENT_SECRET no cofre/);
     expect(() => lerSegredo('IFOOD_TEST_CLIENT_SECRET', { IFOOD_TEST_CLIENT_SECRET: '   ' })).toThrow(ErroDeCofre);
-    expect(() => lerSegredo('ifood minúsculo', { 'ifood minúsculo': SEGREDO })).toThrow('Nome de variável do cofre inválido.');
+    expect(() => lerSegredo('ifood minúsculo', { 'ifood minúsculo': SEGREDO })).toThrow(/Nome de variável do cofre inválido/);
+    // Decisão 487: só nome de segredo de app (IFOOD_<NOME>_CLIENT_SECRET). Outras variáveis do servidor nunca saem como segredo.
+    const servidor = { INTEGRACAO_CHAVE_CIFRAGEM: 'chave', DATABASE_URL: 'postgresql://x', NEXTAUTH_SECRET: 'n', ANTHROPIC_API_KEY: 'a', IFOOD_TEST: 't' };
+    for (const nome of Object.keys(servidor)) {
+      expect(() => lerSegredo(nome, servidor), nome).toThrow(/só IFOOD_<NOME>_CLIENT_SECRET/);
+      expect(temSegredo(nome, servidor), nome).toBe(false);
+    }
+    expect(lerSegredo('IFOOD_BI_PRODUCAO_CLIENT_SECRET', { IFOOD_BI_PRODUCAO_CLIENT_SECRET: 's' })).toBe('s');
+    expect(() => lerSegredo(`IFOOD_${'A'.repeat(60)}_CLIENT_SECRET`, {})).toThrow(/inválido/);
     expect(temSegredo('IFOOD_TEST_CLIENT_SECRET', { IFOOD_TEST_CLIENT_SECRET: SEGREDO })).toBe(true);
     expect(temSegredo('IFOOD_TEST_CLIENT_SECRET', {})).toBe(false);
   });
@@ -67,10 +75,10 @@ describe('INT-1.2 · chave geral e endereço da API', () => {
     for (const v of [undefined, '', 'TRUE', '1', 'sim', 'yes', 'false', ' true1']) expect(integracaoIfoodAtiva({ INTEGRACAO_IFOOD_ATIVA: v }), String(v)).toBe(false);
   });
 
-  it('HTTPS num domínio do iFood, sem caminho, usuário ou parâmetro; vazio = o oficial', () => {
+  it('só o host oficial da API, em HTTPS, sem caminho, usuário ou parâmetro; vazio = o oficial', () => {
     expect(baseDaApiIfood({})).toBe(API_IFOOD_PADRAO);
     expect(baseDaApiIfood({ IFOOD_API_BASE: 'https://merchant-api.ifood.com.br/' })).toBe(API_IFOOD_PADRAO);
-    for (const ruim of ['http://merchant-api.ifood.com.br', 'https://merchant-api.ifood.com.br.ataque.com', 'https://ifood.com.br@ataque.com', 'https://evil.com', 'https://merchant-api.ifood.com.br/v1', 'https://merchant-api.ifood.com.br?x=1', 'nada']) {
+    for (const ruim of ['http://merchant-api.ifood.com.br', 'https://merchant-api.ifood.com.br.ataque.com', 'https://ifood.com.br@ataque.com', 'https://evil.com', 'https://merchant-api.ifood.com.br/v1', 'https://merchant-api.ifood.com.br?x=1', 'nada', 'https://ifood.com.br', 'https://outro.ifood.com.br']) {
       expect(() => baseDaApiIfood({ IFOOD_API_BASE: ruim }), ruim).toThrow(ErroDeCofre);
     }
   });

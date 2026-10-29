@@ -96,8 +96,18 @@ export async function desligarConexao(cliente: ClienteDoParceiro, conexaoId: str
     const agora = new Date();
     const r = await tx.integracaoConexao.updateMany({ where: { id: c.id, estado: 'ATIVA' }, data: { estado: 'DESLIGADA', desligadaEm: agora, desligadaPorNome: nome } });
     if (r.count !== 1) return { ok: false, erro: MENSAGEM_CONFLITO, conflito: true };
+    // Decisão 487: nenhum módulo fica ativo numa conexão desligada (a ativação ao mesmo tempo espera a trava da linha no banco).
+    const pausados = await tx.integracaoConexaoModulo.updateMany({ where: { conexaoId: c.id, estado: 'ATIVO' }, data: { estado: 'PAUSADO', pausadoEm: agora } });
     await tx.historicoAlteracao.create({
-      data: { parceiroId: tx.parceiroId, entidade: 'IntegracaoConexao', entidadeId: c.id, acao: 'DESLIGOU', antes: { nomeNoIfood: c.nomeExterno, situacao: 'Ligada' }, depois: { nomeNoIfood: c.nomeExterno, situacao: 'Desligada' }, autorNome: nome },
+      data: {
+        parceiroId: tx.parceiroId,
+        entidade: 'IntegracaoConexao',
+        entidadeId: c.id,
+        acao: 'DESLIGOU',
+        antes: { nomeNoIfood: c.nomeExterno, situacao: 'Ligada' },
+        depois: { nomeNoIfood: c.nomeExterno, situacao: 'Desligada', ...(pausados.count > 0 ? { modulosPausados: pausados.count } : {}) },
+        autorNome: nome,
+      },
     });
     return { ok: true, mudou: true };
   });
@@ -171,12 +181,17 @@ export async function mudarModulo(
   return cliente.transacao(async (tx): Promise<ResultadoDoModulo> => {
     const m = await tx.integracaoConexaoModulo.findUnique({
       where: { id: moduloId },
-      select: { id: true, estado: true, modulo: true, conexao: { select: { estado: true, ambiente: true } } },
+      select: { id: true, estado: true, modulo: true, appId: true, conexao: { select: { estado: true, ambiente: true } } },
     });
     if (!m) return { ok: false, erro: 'Módulo não encontrado.' };
     if (m.conexao.estado !== 'ATIVA' && acao !== 'erro-permissao' && acao !== 'pausar') return { ok: false, erro: 'Esta integração está desligada.' };
     const para = transicao(m.estado, acao, m.conexao.ambiente);
     if (!para) return { ok: false, erro: porQueNao(m.estado, acao, m.conexao.ambiente) };
+    // Decisão 487: em produção, ativar (ou retomar) só com o app homologado pelo provedor; o banco confere de novo.
+    if (para === 'ATIVO' && m.conexao.ambiente === 'PRODUCAO') {
+      const app = await appPorId(m.appId);
+      if (app?.estadoHomologacao !== 'HOMOLOGADO') return { ok: false, erro: 'Em produção, o módulo só ativa depois que o app for homologado pelo iFood.' };
+    }
     const data: Prisma.IntegracaoConexaoModuloUpdateManyMutationInput = { estado: para };
     if (acao === 'solicitar') data.solicitadoEm = agora;
     if (acao === 'autorizar') Object.assign(data, { autorizadoEm: agora, verificadoEm: agora });

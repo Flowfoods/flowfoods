@@ -223,4 +223,110 @@ describe.skipIf(!URL_TESTE)('INT-1.1 · fundação da Central de Integrações (
     // Bloquear não apagou conexão nenhuma.
     expect((await conexoesDoParceiro(a)).length).toBeGreaterThan(0);
   });
+
+  // ------------------------------------------------------------ decisão 487 (rodada de correção da revisão independente)
+
+  /** Roda SQL como o papel do tenant no contexto do parceiro (ou como o dono, num banco sem RLS), numa transação só. */
+  const comoTenant = (parceiroId: string, f: (tx: { exec: (sql: string, ...v: unknown[]) => Promise<number> }) => Promise<void>) =>
+    db.$transaction(async (tx) => {
+      if (perfil.rls) await tx.$queryRaw`SELECT set_config('app.parceiro_id', ${parceiroId}, true), set_config('role', 'erp_tenant', true)`;
+      await f({ exec: (sql, ...v) => tx.$executeRawUnsafe(sql, ...v) });
+    });
+
+  it('487: tabela temporária com o nome de "ParceiroFlow" ou "IntegracaoApp" não engana os gatilhos', async () => {
+    // TEST num parceiro real, com um "ParceiroFlow" falso dizendo que ele é de homologação.
+    await expect(
+      comoTenant(ids[0], async (tx) => {
+        await tx.exec(`CREATE TEMP TABLE "ParceiroFlow" (id text, "homologacaoDeIntegracao" boolean) ON COMMIT DROP`);
+        await tx.exec(`INSERT INTO "ParceiroFlow" VALUES ($1, true)`, ids[0]);
+        await tx.exec(
+          `INSERT INTO "IntegracaoConexao"(id,"parceiroId","lojaId",provedor,ambiente,"idExterno","nomeExterno","criadoPorNome","atualizadoEm") VALUES ($1,$2,$3,'IFOOD','TEST',$4,'x','x',now())`,
+          `tmp-${sufixo}`,
+          ids[0],
+          lojaA,
+          uuid(),
+        );
+      }),
+    ).rejects.toThrow(/TEST só no parceiro de homologação/);
+    // O app BI de produção numa conexão TEST, com um "IntegracaoApp" falso dizendo que ele é de TEST.
+    const lig = await ligarConexao(h, ligacao(lojaH, uuid(), 'TEST'), AUTOR);
+    if (!lig.ok) throw new Error('sem conexão TEST');
+    await expect(
+      comoTenant(ids[2], async (tx) => {
+        await tx.exec(`CREATE TEMP TABLE "IntegracaoApp" (id text, provedor text, ambiente text, modulos text[], "estadoHomologacao" text) ON COMMIT DROP`);
+        await tx.exec(`INSERT INTO "IntegracaoApp" VALUES ($1, 'IFOOD', 'TEST', '{REVIEW}', 'NAO_SE_APLICA')`, appBi);
+        await tx.exec(`INSERT INTO "IntegracaoConexaoModulo"(id,"parceiroId","conexaoId","appId",modulo,"criadoPorNome","atualizadoEm") VALUES ($1,$2,$3,$4,'REVIEW','x',now())`, `tmpm-${sufixo}`, ids[2], lig.id, appBi);
+      }),
+    ).rejects.toThrow(/o app não serve a esta conexão/);
+  });
+
+  it('487: SQL cru do outro parceiro não enxerga nenhuma das três tabelas; o tenant não apaga; nas globais, nenhum privilégio', async () => {
+    await mudarLiberacao(a, 'integracao', true, AUTOR.nome);
+    if (perfil.rls) {
+      const n = await b.transacao(async (tx) =>
+        tx.sql<{ c: number; m: number; l: number }>`SELECT (SELECT count(*) FROM "IntegracaoConexao" WHERE "parceiroId" <> ${ids[1]})::int AS c, (SELECT count(*) FROM "IntegracaoConexaoModulo" WHERE "parceiroId" <> ${ids[1]})::int AS m, (SELECT count(*) FROM "LiberacaoDeModulo" WHERE "parceiroId" <> ${ids[1]})::int AS l`,
+      );
+      expect(n[0]).toEqual({ c: 0, m: 0, l: 0 });
+      // De outros parceiros, nada; e o A enxerga os dele (o zero acima não é tabela vazia).
+      const doA = await a.transacao(async (tx) => tx.sql<{ l: number }>`SELECT count(*)::int AS l FROM "LiberacaoDeModulo"`);
+      expect(doA[0].l).toBe(1);
+    }
+    const papel = await db.$queryRaw<{ existe: boolean }[]>`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_tenant') AS existe`;
+    if (papel[0].existe) {
+      for (const t of ['IntegracaoConexao', 'IntegracaoConexaoModulo', 'LiberacaoDeModulo']) {
+        const r = await db.$queryRaw<{ pode: boolean }[]>`SELECT has_table_privilege('erp_tenant', ${`"${t}"`}, 'DELETE') AS pode`;
+        expect(r[0].pode, t).toBe(false);
+      }
+      for (const t of ['IntegracaoApp', 'IntegracaoToken']) {
+        for (const p of ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) {
+          const r = await db.$queryRaw<{ pode: boolean }[]>`SELECT has_table_privilege('erp_tenant', ${`"${t}"`}, ${p}) AS pode`;
+          expect(r[0].pode, `${t} ${p}`).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('487: trocar a marca de homologação com conexão ligada não prende a conexão (desligar passa); módulo novo nela é recusado', async () => {
+    const H2 = await db.parceiroFlow.create({ data: { nome: `Int H2 ${sufixo}`, slug: `int-h2-${sufixo}`, status: 'ATIVO', homologacaoDeIntegracao: true } });
+    ids.push(H2.id);
+    const h2 = doParceiro(H2.id, db);
+    const l = await cadastrarLoja(h2, { nome: 'Loja H2' }, 'teste');
+    if (!l.ok) throw new Error('sem loja');
+    const lig = await ligarConexao(h2, ligacao(l.id, uuid(), 'TEST'), AUTOR);
+    if (!lig.ok) throw new Error('sem conexão');
+    await db.parceiroFlow.update({ where: { id: H2.id }, data: { homologacaoDeIntegracao: false } });
+    const p = await prepararModulo(h2, lig.id, appTeste, 'ANALYTICS', AUTOR.nome);
+    expect(!p.ok && p.erro).toMatch(/não combina mais com o parceiro/);
+    expect(await desligarConexao(h2, lig.id, AUTOR.nome)).toEqual({ ok: true, mudou: true });
+  });
+
+  it('487: desligar pausa os módulos ativos; em produção, ativar exige o app homologado (regra e banco); o app não muda de identidade', async () => {
+    const lig = await ligarConexao(a, ligacao(lojaA, uuid()), AUTOR);
+    if (!lig.ok) throw new Error('sem conexão');
+    const m = await prepararModulo(a, lig.id, appBi, 'ANALYTICS', AUTOR.nome);
+    if (!m.ok) throw new Error(JSON.stringify(m));
+    expect(await mudarModulo(a, m.id, 'solicitar', AUTOR.nome)).toMatchObject({ ok: true, estado: 'SOLICITADO' });
+    expect(await mudarModulo(a, m.id, 'autorizar', AUTOR.nome)).toMatchObject({ ok: true, estado: 'AUTORIZADO' });
+    // App de produção ainda PENDENTE: a regra recusa; furando a regra, o banco recusa.
+    expect(await mudarModulo(a, m.id, 'ativar', AUTOR.nome)).toEqual({ ok: false, erro: 'Em produção, o módulo só ativa depois que o app for homologado pelo iFood.' });
+    await expect(a.integracaoConexaoModulo.update({ where: { id: m.id }, data: { estado: 'ATIVO', ativadoEm: new Date(), ativadoPorNome: 'x' } })).rejects.toThrow(/só ativa com o app homologado/);
+    await prisma.integracaoApp.update({ where: { id: appBi }, data: { estadoHomologacao: 'HOMOLOGADO' } });
+    expect(await mudarModulo(a, m.id, 'ativar', AUTOR.nome)).toMatchObject({ ok: true, estado: 'ATIVO' });
+    // Desligar a conexão pausa o módulo ativo, na mesma transação, e conta no histórico.
+    expect(await desligarConexao(a, lig.id, AUTOR.nome)).toEqual({ ok: true, mudou: true });
+    expect((await a.integracaoConexaoModulo.findUnique({ where: { id: m.id } }))?.estado).toBe('PAUSADO');
+    const hist = await a.historicoAlteracao.findFirst({ where: { entidade: 'IntegracaoConexao', entidadeId: lig.id, acao: 'DESLIGOU' } });
+    expect(hist?.depois).toMatchObject({ modulosPausados: 1 });
+    // Nem furando a regra o módulo volta a ATIVO numa conexão desligada.
+    await expect(a.integracaoConexaoModulo.update({ where: { id: m.id }, data: { estado: 'ATIVO' } })).rejects.toThrow(/conexão está desligada/);
+    // O app não troca de ambiente, categoria nem Client ID.
+    await expect(prisma.integracaoApp.update({ where: { id: appBi }, data: { ambiente: 'TEST', categoria: 'TEST' } })).rejects.toThrow(/não troca de provedor, ambiente, categoria nem Client ID/);
+    await expect(prisma.integracaoApp.update({ where: { id: appBi }, data: { clientId: `outro-${sufixo}` } })).rejects.toThrow(/não troca/);
+    // O nome do segredo: só IFOOD_<NOME>_CLIENT_SECRET (regra e banco).
+    const ruim = await registrarApp({ provedor: 'IFOOD', ambiente: 'PRODUCAO', nome: 'Errado', categoria: 'BI', clientId: `ruim-${sufixo}`, nomeDoSegredo: 'INTEGRACAO_CHAVE_CIFRAGEM', modulos: ['ANALYTICS'] }, AUTOR.nome);
+    expect(!ruim.ok && ruim.erros.nomeDoSegredo).toMatch(/IFOOD_<NOME>_CLIENT_SECRET/);
+    await expect(
+      db.$executeRawUnsafe(`INSERT INTO "IntegracaoApp"(id,provedor,ambiente,nome,categoria,"clientId","nomeDoSegredo",modulos,"criadoPorNome","atualizadoEm") VALUES ($1,'IFOOD','PRODUCAO','x','BI',$2,'DATABASE_URL','{ANALYTICS}','x',now())`, `db-${sufixo}`, `db-${sufixo}`),
+    ).rejects.toThrow(/IntegracaoApp_nome_do_segredo/);
+  });
 });

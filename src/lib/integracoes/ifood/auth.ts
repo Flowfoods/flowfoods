@@ -1,5 +1,5 @@
 /**
- * Cliente iFood (INT-1.3, decisão 485) — o token do app (OAuth2 client_credentials, app centralizado).
+ * Cliente iFood (INT-1.3, decisões 485 e 487) — o token do app (OAuth2 client_credentials, app centralizado).
  *
  * Contrato (skill iFood v3, referência Authentication, e plano de execução): POST /authentication/v1.0/oauth/token com
  * `Content-Type: application/x-www-form-urlencoded` e campos camelCase `grantType=client_credentials`, `clientId`,
@@ -7,23 +7,40 @@
  * até 8.000 caracteres; a rota aceita 100 pedidos por minuto.
  *
  * Regras:
- *  - um token por app, guardado cifrado (cofre da INT-1.2) e em memória; renova 10 minutos antes de vencer;
+ *  - nada sai com a chave geral desligada, nem para app de produção sem homologação (`porQueNaoChamar`, conferido aqui e em
+ *    cada chamada do cliente);
+ *  - um token por app, guardado cifrado (cofre da INT-1.2) e em memória; renova antes de vencer, com margem de 10 minutos ou
+ *    metade da validade, o que for menor (validade curta não vira um pedido por chamada); validade aceita até 24 h;
  *  - renovação coordenada: uma por vez no processo (mesma promessa para quem pedir junto) e entre processos (trava do banco no
- *    armazém), relendo o guardado depois de pegar a trava — nunca um token por chamada;
- *  - credencial recusada (400/401 na rota do token) para com erro claro, sem tentar de novo nem trocar de app;
+ *    armazém, com a leitura e a gravação DENTRO da trava), relendo o guardado depois de pegar a trava — nunca um token por
+ *    chamada. O pedido inteiro (tentativas e esperas) cabe num prazo menor que o da trava: o iFood pedir para esperar mais do
+ *    que isso para com erro claro, sem segurar a trava;
+ *  - um 401 descarta só o token que levou o 401 (se outro processo já renovou, o novo fica): nunca uma tempestade de tokens;
+ *  - credencial recusada (400/401/403 na rota do token) para com erro claro, sem tentar de novo nem trocar de app;
  *  - nada de segredo ou token em erro, log ou retorno além do token para quem chama.
  */
 
-import { baseDaApiIfood, chaveDeCifragem, cifrar, decifrar, ErroDeCofre, lerSegredo } from '../core/cofre';
+import { baseDaApiIfood, chaveDeCifragem, cifrar, decifrar, ErroDeCofre, integracaoIfoodAtiva, lerSegredo } from '../core/cofre';
 import type { Limitador } from './limitador';
 import { classificar, esperaDoBackoff, lerRetryAfter } from './respostas';
 import { FalhaDeRede, type Transporte } from './transporte';
+
+export type EstadoDeHomologacao = 'NAO_SE_APLICA' | 'PENDENTE' | 'EM_ANDAMENTO' | 'HOMOLOGADO' | 'RECUSADO';
 
 export interface AppParaToken {
   id: string;
   ambiente: 'TEST' | 'PRODUCAO';
   clientId: string;
   nomeDoSegredo: string;
+  /** Em PRODUCAO, só o app HOMOLOGADO chama o iFood. */
+  homologacao: EstadoDeHomologacao;
+}
+
+/** Por que nenhuma chamada pode sair para este app agora (null = pode). */
+export function porQueNaoChamar(app: Pick<AppParaToken, 'ambiente' | 'homologacao'>, env: Readonly<Record<string, string | undefined>> = process.env): string | null {
+  if (!integracaoIfoodAtiva(env)) return 'A integração do iFood está desligada (INTEGRACAO_IFOOD_ATIVA): nenhuma chamada sai.';
+  if (app.ambiente === 'PRODUCAO' && app.homologacao !== 'HOMOLOGADO') return 'App de produção ainda não homologado pelo iFood: nenhuma chamada sai.';
+  return null;
 }
 
 export interface TokenGuardado {
@@ -32,12 +49,16 @@ export interface TokenGuardado {
   expiraEm: Date;
 }
 
-/** Onde o token cifrado mora (o banco, em produção) e a trava entre processos. */
-export interface ArmazemDeToken {
+export interface OperacoesDoArmazem {
   ler(appId: string): Promise<TokenGuardado | null>;
   gravar(appId: string, t: TokenGuardado): Promise<void>;
   apagar(appId: string): Promise<void>;
-  comTrava<T>(appId: string, f: () => Promise<T>): Promise<T>;
+}
+
+/** Onde o token cifrado mora (o banco, em produção) e a trava entre processos. */
+export interface ArmazemDeToken extends OperacoesDoArmazem {
+  /** Roda `f` com a trava do app; as operações que `f` recebe ficam dentro dela (no banco, na mesma transação). */
+  comTrava<T>(appId: string, f: (a: OperacoesDoArmazem) => Promise<T>): Promise<T>;
 }
 
 export class ErroDeAutenticacao extends Error {
@@ -48,10 +69,19 @@ export class ErroDeAutenticacao extends Error {
 }
 
 export const MARGEM_DE_RENOVACAO_MS = 10 * 60 * 1000;
+export const VALIDADE_MAXIMA_S = 24 * 60 * 60;
+/** O pedido do token inteiro (tentativas e esperas) cabe aqui; a trava no banco dura mais (`armazem-token.ts`). */
+export const PRAZO_DO_PEDIDO_DE_TOKEN_MS = 40_000;
+const TEMPO_POR_TENTATIVA_MS = 15_000;
 const TOKEN_MAXIMO = 8000;
 const TENTATIVAS_DO_TOKEN = 3;
 
 const contextoDoToken = (appId: string) => `integracao-token:${appId}`;
+
+/** A margem de renovação: 10 minutos ou metade da validade, o que for menor. */
+export function margemDeRenovacao(emitidoEm: number, expiraEm: number): number {
+  return Math.min(MARGEM_DE_RENOVACAO_MS, Math.max(0, (expiraEm - emitidoEm) / 2));
+}
 
 export interface OpcoesDoServicoDeToken {
   armazem: ArmazemDeToken;
@@ -64,8 +94,14 @@ export interface OpcoesDoServicoDeToken {
   tempoMaximoMs?: number;
 }
 
+interface TokenNaMemoria {
+  token: string;
+  emitidoEm: number;
+  expiraEm: number;
+}
+
 export class ServicoDeToken {
-  private memoria = new Map<string, { token: string; expiraEm: number }>();
+  private memoria = new Map<string, TokenNaMemoria>();
   private emAndamento = new Map<string, Promise<string>>();
   private readonly relogio: () => number;
   private readonly dormir: (ms: number) => Promise<void>;
@@ -75,14 +111,16 @@ export class ServicoDeToken {
     this.dormir = o.dormir ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
   }
 
-  private valido(expiraEm: number): boolean {
-    return expiraEm - MARGEM_DE_RENOVACAO_MS > this.relogio();
+  private valido(emitidoEm: number, expiraEm: number): boolean {
+    return expiraEm - margemDeRenovacao(emitidoEm, expiraEm) > this.relogio();
   }
 
   /** O token válido do app: da memória, do armazém ou um novo (coordenado). */
   token(app: AppParaToken): Promise<string> {
+    const recusa = porQueNaoChamar(app, this.o.env ?? process.env);
+    if (recusa) return Promise.reject(new ErroDeAutenticacao(recusa));
     const m = this.memoria.get(app.id);
-    if (m && this.valido(m.expiraEm)) return Promise.resolve(m.token);
+    if (m && this.valido(m.emitidoEm, m.expiraEm)) return Promise.resolve(m.token);
     const ja = this.emAndamento.get(app.id);
     if (ja) return ja;
     const p = this.obter(app).finally(() => this.emAndamento.delete(app.id));
@@ -90,18 +128,35 @@ export class ServicoDeToken {
     return p;
   }
 
-  /** Esquece o token (ex.: o iFood respondeu 401): o próximo pedido busca outro, uma vez. */
-  async invalidar(app: AppParaToken): Promise<void> {
-    this.memoria.delete(app.id);
-    await this.o.armazem.apagar(app.id);
+  /**
+   * Esquece o token. Com `tokenUsado` (o iFood respondeu 401 a ele), só descarta se o guardado ainda for esse: se outro processo
+   * ou outra chamada já renovou, o token novo fica. Sem `tokenUsado`, descarta o que houver.
+   */
+  async invalidar(app: AppParaToken, tokenUsado?: string): Promise<void> {
+    if (tokenUsado === undefined) {
+      this.memoria.delete(app.id);
+      await this.o.armazem.apagar(app.id);
+      return;
+    }
+    if (this.memoria.get(app.id)?.token === tokenUsado) this.memoria.delete(app.id);
+    await this.o.armazem.comTrava(app.id, async (a) => {
+      const g = await a.ler(app.id);
+      if (!g) return;
+      let guardado: string | null;
+      try {
+        guardado = decifrar(g.tokenCifrado, contextoDoToken(app.id), chaveDeCifragem(this.o.env));
+      } catch {
+        guardado = null;
+      }
+      if (guardado === null || guardado === tokenUsado) await a.apagar(app.id);
+    });
   }
 
-  private lerGuardado(app: AppParaToken, g: TokenGuardado | null): string | null {
-    if (!g || !this.valido(g.expiraEm.getTime())) return null;
+  private lerGuardado(app: AppParaToken, g: TokenGuardado | null): TokenNaMemoria | null {
+    if (!g || !this.valido(g.emitidoEm.getTime(), g.expiraEm.getTime())) return null;
     try {
       const token = decifrar(g.tokenCifrado, contextoDoToken(app.id), chaveDeCifragem(this.o.env));
-      this.memoria.set(app.id, { token, expiraEm: g.expiraEm.getTime() });
-      return token;
+      return { token, emitidoEm: g.emitidoEm.getTime(), expiraEm: g.expiraEm.getTime() };
     } catch (e) {
       if (e instanceof ErroDeCofre && /INTEGRACAO_CHAVE_CIFRAGEM/.test(e.message)) throw e;
       // Chave trocada ou texto mexido: o guardado não serve; busca outro.
@@ -111,26 +166,35 @@ export class ServicoDeToken {
 
   private async obter(app: AppParaToken): Promise<string> {
     const doArmazem = this.lerGuardado(app, await this.o.armazem.ler(app.id));
-    if (doArmazem) return doArmazem;
-    return this.o.armazem.comTrava(app.id, async () => {
+    if (doArmazem) {
+      this.memoria.set(app.id, doArmazem);
+      return doArmazem.token;
+    }
+    const novo = await this.o.armazem.comTrava(app.id, async (a) => {
       // Outro processo pode ter renovado enquanto esperávamos a trava.
-      const relido = this.lerGuardado(app, await this.o.armazem.ler(app.id));
+      const relido = this.lerGuardado(app, await a.ler(app.id));
       if (relido) return relido;
-      const novo = await this.pedirAoIfood(app);
-      const emitidoEm = new Date(this.relogio());
-      const expiraEm = new Date(emitidoEm.getTime() + novo.expiresIn * 1000);
-      await this.o.armazem.gravar(app.id, { tokenCifrado: cifrar(novo.accessToken, contextoDoToken(app.id), chaveDeCifragem(this.o.env)), emitidoEm, expiraEm });
-      this.memoria.set(app.id, { token: novo.accessToken, expiraEm: expiraEm.getTime() });
-      return novo.accessToken;
+      const r = await this.pedirAoIfood(app);
+      const emitidoEm = this.relogio();
+      const expiraEm = emitidoEm + Math.min(r.expiresIn, VALIDADE_MAXIMA_S) * 1000;
+      await a.gravar(app.id, { tokenCifrado: cifrar(r.accessToken, contextoDoToken(app.id), chaveDeCifragem(this.o.env)), emitidoEm: new Date(emitidoEm), expiraEm: new Date(expiraEm) });
+      return { token: r.accessToken, emitidoEm, expiraEm };
     });
+    this.memoria.set(app.id, novo);
+    return novo.token;
   }
 
   private async pedirAoIfood(app: AppParaToken): Promise<{ accessToken: string; expiresIn: number }> {
+    const recusa = porQueNaoChamar(app, this.o.env ?? process.env);
+    if (recusa) throw new ErroDeAutenticacao(recusa);
     const segredo = lerSegredo(app.nomeDoSegredo, this.o.env);
     const corpo = new URLSearchParams({ grantType: 'client_credentials', clientId: app.clientId, clientSecret: segredo }).toString();
     const url = `${baseDaApiIfood(this.o.env)}/authentication/v1.0/oauth/token`;
+    const prazo = this.relogio() + PRAZO_DO_PEDIDO_DE_TOKEN_MS;
     for (let tentativa = 1; tentativa <= TENTATIVAS_DO_TOKEN; tentativa++) {
       await this.o.limitador.esperarVez('autenticacao');
+      const restante = prazo - this.relogio();
+      if (restante < 1000) throw new ErroDeAutenticacao('O iFood não entregou o token dentro do prazo. Tente de novo.');
       let r;
       try {
         r = await this.o.transporte({
@@ -138,11 +202,11 @@ export class ServicoDeToken {
           metodo: 'POST',
           cabecalhos: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
           corpo,
-          tempoMaximoMs: this.o.tempoMaximoMs ?? 20_000,
+          tempoMaximoMs: Math.min(this.o.tempoMaximoMs ?? TEMPO_POR_TENTATIVA_MS, restante),
         });
       } catch (e) {
-        if (!(e instanceof FalhaDeRede) || tentativa === TENTATIVAS_DO_TOKEN) throw new ErroDeAutenticacao('Não consegui falar com o iFood para pedir o token.');
-        await this.dormir(esperaDoBackoff(tentativa + 1, this.o.aleatorio));
+        if (!(e instanceof FalhaDeRede) || e.motivo === 'grande-demais' || tentativa === TENTATIVAS_DO_TOKEN) throw new ErroDeAutenticacao('Não consegui falar com o iFood para pedir o token.');
+        await this.esperarDentroDoPrazo(esperaDoBackoff(tentativa + 1, this.o.aleatorio), prazo, 'O iFood não respondeu ao pedido de token dentro do prazo. Tente de novo.');
         continue;
       }
       const c = classificar(r.status, r.cabecalhos, r.corpo, this.relogio());
@@ -162,13 +226,24 @@ export class ServicoDeToken {
         throw new ErroDeAutenticacao(`O iFood recusou a credencial do app (HTTP ${r.status}). Confira o Client ID do app e o segredo em ${app.nomeDoSegredo}; nada foi repetido.`);
       }
       if ((c.tipo === 'limite' || c.tipo === 'indisponivel') && tentativa < TENTATIVAS_DO_TOKEN) {
-        const espera = c.tipo === 'limite' ? (lerRetryAfter(r.cabecalhos['retry-after'], this.relogio()) ?? esperaDoBackoff(tentativa + 1, this.o.aleatorio)) : esperaDoBackoff(tentativa + 1, this.o.aleatorio);
-        await this.dormir(espera);
+        const pedida = c.tipo === 'limite' ? lerRetryAfter(r.cabecalhos['retry-after'], this.relogio()) : null;
+        const espera = pedida ?? esperaDoBackoff(tentativa + 1, this.o.aleatorio);
+        await this.esperarDentroDoPrazo(
+          espera,
+          prazo,
+          c.tipo === 'limite' ? `O iFood pediu para esperar ${Math.ceil(espera / 1000)} s antes de outro token. Nada foi repetido agora; tente de novo depois.` : 'O iFood não respondeu ao pedido de token dentro do prazo. Tente de novo.',
+        );
         continue;
       }
       throw new ErroDeAutenticacao(`O iFood não entregou o token (HTTP ${r.status}).`);
     }
     throw new ErroDeAutenticacao('O iFood não entregou o token.');
+  }
+
+  /** Espera só se couber no prazo (com a trava presa, não se espera além dele). */
+  private async esperarDentroDoPrazo(ms: number, prazo: number, frase: string): Promise<void> {
+    if (this.relogio() + ms + 1000 > prazo) throw new ErroDeAutenticacao(frase);
+    await this.dormir(ms);
   }
 }
 
@@ -176,8 +251,7 @@ export class ServicoDeToken {
 export function armazemEmMemoria(): ArmazemDeToken & { dados: Map<string, TokenGuardado> } {
   const dados = new Map<string, TokenGuardado>();
   const travas = new Map<string, Promise<unknown>>();
-  return {
-    dados,
+  const operacoes: OperacoesDoArmazem = {
     async ler(appId) {
       return dados.get(appId) ?? null;
     },
@@ -187,9 +261,16 @@ export function armazemEmMemoria(): ArmazemDeToken & { dados: Map<string, TokenG
     async apagar(appId) {
       dados.delete(appId);
     },
+  };
+  return {
+    dados,
+    ...operacoes,
     comTrava(appId, f) {
       const anterior = travas.get(appId) ?? Promise.resolve();
-      const minha = anterior.then(f, f);
+      const minha = anterior.then(
+        () => f(operacoes),
+        () => f(operacoes),
+      );
       travas.set(appId, minha.catch(() => {}));
       return minha;
     },

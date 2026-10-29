@@ -13,7 +13,7 @@ import { Limitador } from '@/lib/integracoes/ifood/limitador';
 import type { PedidoHttp, RespostaHttp } from '@/lib/integracoes/ifood/transporte';
 
 const SEGREDO = 'segredo-do-teste-c-nunca-em-log';
-const ENV = { INTEGRACAO_CHAVE_CIFRAGEM: randomBytes(32).toString('hex'), IFOOD_TEST_CLIENT_SECRET: SEGREDO };
+const ENV = { INTEGRACAO_IFOOD_ATIVA: 'true', INTEGRACAO_CHAVE_CIFRAGEM: randomBytes(32).toString('hex'), IFOOD_TEST_CLIENT_SECRET: SEGREDO };
 const APP: AppDaLeitura = { id: 'app-teste', nome: 'Teste (C)', ambiente: 'TEST', categoria: 'TEST', clientId: 'cli-teste', modulos: ['ANALYTICS', 'MERCHANT'] };
 const LOJA = '0b1f6d3e-8a51-4c2e-9d7a-3f2b6c1e5a90';
 const OUTRA = '7c2e9a14-5b3d-4f60-a8e1-2d9c4b7f1e63';
@@ -34,7 +34,7 @@ function montar(rotas: { lojas?: () => RespostaHttp; kpis?: (corpo: unknown, n: 
   };
   const limitador = new Limitador(() => AGORA, async () => {});
   const tokens = new ServicoDeToken({ armazem: armazemEmMemoria(), transporte, limitador, env: ENV, relogio: () => AGORA, dormir: async () => {} });
-  const cliente = criarClienteIfood({ app: { id: app.id, ambiente: app.ambiente, clientId: app.clientId, nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET' }, tokens, limitador, transporte, env: ENV, relogio: () => AGORA, dormir: async () => {}, aleatorio: () => 1 });
+  const cliente = criarClienteIfood({ app: { id: app.id, ambiente: app.ambiente, clientId: app.clientId, nomeDoSegredo: 'IFOOD_TEST_CLIENT_SECRET', homologacao: app.ambiente === 'TEST' ? 'NAO_SE_APLICA' : 'PENDENTE' }, tokens, limitador, transporte, env: ENV, relogio: () => AGORA, dormir: async () => {}, aleatorio: () => 1 });
   const apis = () => pedidos.filter((p) => !p.url.endsWith('/oauth/token'));
   return { pedidos, apis, cliente, app };
 }

@@ -109,7 +109,7 @@ export async function executarLeituraTest(o: OpcoesDoComando, d: DependenciasDoC
   }
 
   const limitador = new Limitador();
-  const paraToken = { id: app.id, ambiente: app.ambiente, clientId: app.clientId, nomeDoSegredo: app.nomeDoSegredo };
+  const paraToken = { id: app.id, ambiente: app.ambiente, clientId: app.clientId, nomeDoSegredo: app.nomeDoSegredo, homologacao: app.estadoHomologacao };
   const tokens = new ServicoDeToken({ armazem: d.armazem ?? armazemDoBanco, transporte: d.transporte, limitador, env });
   if (o.tokenNovo) {
     await tokens.invalidar(paraToken);

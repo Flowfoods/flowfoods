@@ -1,7 +1,8 @@
 /**
- * Cliente iFood (INT-1.3) — limitador por família de rota, no processo (o worker é um processo só; decisão 11). Balde de fichas
- * que se repõe continuamente, com folga de 10% abaixo do limite oficial, e fila por família: duas chamadas ao mesmo tempo não
- * gastam a mesma ficha.
+ * Cliente iFood (INT-1.3, decisões 485 e 487) — limitador por família de rota, no processo (o worker é um processo só; decisão
+ * 11). Janela deslizante de 60 s: em QUALQUER intervalo de 60 s passam no máximo 90% do limite oficial da família. (O balde de
+ * fichas anterior começava cheio e repunha no mesmo ritmo: depois de um minuto parado, o primeiro minuto deixava passar quase o
+ * dobro.) Fila por família: duas chamadas ao mesmo tempo não ocupam a mesma vaga.
  *
  * Limites oficiais (por minuto): autenticação 100, Analytics 500, Merchant 100 (GET /merchants), Review 2.000, Financial
  * 1.000 (plano de execução, seções 1 e 13). Seguimos o menor número quando a documentação diverge.
@@ -18,10 +19,11 @@ export const LIMITES_POR_MINUTO: Record<Familia, number> = {
 };
 
 const FOLGA = 0.9;
+const JANELA_MS = 60_000;
 
 export class Limitador {
-  private fichas = new Map<Familia, number>();
-  private ultimo = new Map<Familia, number>();
+  /** Quando cada vaga da janela foi usada, em ordem. */
+  private usos = new Map<Familia, number[]>();
   private filas = new Map<Familia, Promise<void>>();
 
   constructor(
@@ -30,33 +32,28 @@ export class Limitador {
     private readonly limites: Record<Familia, number> = LIMITES_POR_MINUTO,
   ) {}
 
-  private capacidade(f: Familia) {
+  /** Quantas chamadas cabem em qualquer janela de 60 s. */
+  capacidade(f: Familia) {
     return Math.max(1, Math.floor(this.limites[f] * FOLGA));
   }
 
-  private repor(f: Familia) {
-    const agora = this.relogio();
-    const cap = this.capacidade(f);
-    const antes = this.ultimo.get(f);
-    const atual = this.fichas.get(f) ?? cap;
-    const ganho = antes === undefined ? 0 : ((agora - antes) * cap) / 60_000;
-    this.fichas.set(f, Math.min(cap, atual + ganho));
-    this.ultimo.set(f, agora);
-  }
-
-  /** Espera a vez da família (sem estourar o limite) e gasta uma ficha. */
+  /** Espera a vez da família (sem passar do teto em nenhuma janela de 60 s) e ocupa a vaga. */
   esperarVez(f: Familia): Promise<void> {
     const anterior = this.filas.get(f) ?? Promise.resolve();
     const minha = anterior.then(async () => {
-      this.repor(f);
-      let fichas = this.fichas.get(f)!;
-      if (fichas < 1) {
-        const ms = Math.ceil(((1 - fichas) * 60_000) / this.capacidade(f));
-        await this.dormir(ms);
-        this.repor(f);
-        fichas = this.fichas.get(f)!;
+      const usos = this.usos.get(f) ?? [];
+      this.usos.set(f, usos);
+      const cap = this.capacidade(f);
+      for (;;) {
+        const agora = this.relogio();
+        while (usos.length > 0 && usos[0] <= agora - JANELA_MS) usos.shift();
+        if (usos.length < cap) {
+          usos.push(agora);
+          return;
+        }
+        // A vaga mais antiga sai da janela 60 s depois de usada.
+        await this.dormir(Math.max(1, usos[0] + JANELA_MS - agora + 1));
       }
-      this.fichas.set(f, Math.max(0, fichas - 1));
     });
     // A fila segue mesmo se alguém lá atrás falhar.
     this.filas.set(f, minha.catch(() => {}));

@@ -170,8 +170,8 @@ ERP_WEBAUTHN_RP_ID=consultoriaflowfoods.com.br            # domínio (igual ou "
 
 # Central de Integrações — iFood (INT-1.2; só no `worker`). Desligada por padrão.
 INTEGRACAO_IFOOD_ATIVA=false                         # só "true" liga; qualquer outro valor deixa desligada
-INTEGRACAO_CHAVE_CIFRAGEM=                           # vazia = a do volume de segredos (gerada sozinha); fixar: openssl rand -hex 32
-IFOOD_API_BASE=https://merchant-api.ifood.com.br     # só https e domínio do iFood
+INTEGRACAO_CHAVE_CIFRAGEM=                           # vazia = a do volume de segredos (gerada sozinha; só o worker carrega); fixar: openssl rand -hex 32
+IFOOD_API_BASE=https://merchant-api.ifood.com.br     # só o endereço oficial (outro valor é recusado)
 IFOOD_TEST_CLIENT_SECRET=...                         # segredo do app Teste (C), INT-0.3 — nunca no Git, no Notion ou em chamado
 # IFOOD_BI_CLIENT_SECRET=...                         # só depois de criar o app BI de produção (Rodolfo)
 ```

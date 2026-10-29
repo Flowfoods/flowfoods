@@ -19,13 +19,19 @@ export type Classificacao =
   | { tipo: 'limite'; esperarMs: number | null }
   | { tipo: 'indisponivel' }
   | { tipo: 'erro-no-corpo'; codigo: string | null }
-  | { tipo: 'inesperado' };
+  | { tipo: 'inesperado' }
+  /** Recusada aqui, antes de sair: integração desligada ou app de produção sem homologação (decisão 487). */
+  | { tipo: 'bloqueada' };
 
-/** Quantos ms o Retry-After pede (segundos ou data HTTP), ou null se ausente/ilegível. Nunca negativo; teto de 5 minutos. */
+/**
+ * Quantos ms o Retry-After pede, ou null se ausente/ilegível. Só os dois formatos do HTTP: segundos inteiros ou data HTTP (em
+ * GMT). "1.5" ou texto solto não viram data (antes, viravam espera zero). Nunca negativo; teto de 5 minutos.
+ */
 export function lerRetryAfter(valor: string | null | undefined, agoraMs: number): number | null {
   if (!valor) return null;
   const s = valor.trim();
   if (/^\d+$/.test(s)) return Math.min(Number(s) * 1000, 300_000);
+  if (!/^[A-Za-z]{3,9},? .* GMT$|^[A-Za-z]{3} [A-Za-z]{3} +\d{1,2} \d{2}:\d{2}:\d{2} \d{4}$/.test(s)) return null;
   const data = Date.parse(s);
   if (Number.isNaN(data)) return null;
   return Math.min(Math.max(data - agoraMs, 0), 300_000);
@@ -82,4 +88,5 @@ export const FRASE_DA_CLASSIFICACAO: Record<Classificacao['tipo'], string> = {
   indisponivel: 'O iFood não respondeu como devia (fora do ar ou lento); a leitura tenta de novo mais tarde.',
   'erro-no-corpo': 'O iFood respondeu com erro no conteúdo. A leitura não foi aceita.',
   inesperado: 'Resposta inesperada do iFood. A leitura não foi aceita.',
+  bloqueada: 'Chamada não enviada: a integração está desligada ou o app de produção ainda não foi homologado.',
 };

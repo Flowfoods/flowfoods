@@ -8,7 +8,8 @@
  *    autenticado): o token de um app não decifra como token de outro. Trocar a chave invalida o cache: o serviço pede um token
  *    novo (não há o que migrar).
  *  - Chave geral INTEGRACAO_IFOOD_ATIVA: só "true" liga. Qualquer outro valor, ausência incluída, deixa tudo desligado.
- *  - O endereço da API só pode ser HTTPS num domínio do iFood: credencial nunca vai para outro destino por erro de configuração.
+ *  - O endereço da API só pode ser o oficial (https://merchant-api.ifood.com.br): credencial nunca vai para outro destino por erro
+ *    de configuração.
  */
 
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
@@ -22,11 +23,16 @@ export class ErroDeCofre extends Error {
 
 type Ambiente = Readonly<Record<string, string | undefined>>;
 
-const NOME_DE_VARIAVEL = /^[A-Z][A-Z0-9_]{2,63}$/;
+/**
+ * Só nome de segredo de app de provedor (decisão 487): `<PROVEDOR>_..._CLIENT_SECRET`, até 64 caracteres. Antes, qualquer nome de
+ * variável servia, e um cadastro errado mandaria a chave de cifragem ou a URL do banco ao iFood como segredo do app.
+ */
+const NOME_DE_VARIAVEL = /^IFOOD_[A-Z0-9]+(?:_[A-Z0-9]+)*_CLIENT_SECRET$/;
+const nomeValido = (nome: string) => typeof nome === 'string' && nome.length <= 64 && NOME_DE_VARIAVEL.test(nome);
 
 /** O valor do segredo pelo nome da variável. Sem a variável: erro com o nome (nunca com valor). */
 export function lerSegredo(nome: string, env: Ambiente = process.env): string {
-  if (!NOME_DE_VARIAVEL.test(nome)) throw new ErroDeCofre('Nome de variável do cofre inválido.');
+  if (!nomeValido(nome)) throw new ErroDeCofre('Nome de variável do cofre inválido: só IFOOD_<NOME>_CLIENT_SECRET.');
   const valor = env[nome];
   if (typeof valor !== 'string' || valor.trim() === '') {
     throw new ErroDeCofre(`Falta a variável ${nome} no cofre (Dokploy → Environment). Sem ela, a integração não autentica.`);
@@ -36,7 +42,7 @@ export function lerSegredo(nome: string, env: Ambiente = process.env): string {
 
 /** Tem o segredo? (para a tela dizer "configurado" sem ler nem mostrar o valor). */
 export function temSegredo(nome: string, env: Ambiente = process.env): boolean {
-  return NOME_DE_VARIAVEL.test(nome) && typeof env[nome] === 'string' && env[nome]!.trim() !== '';
+  return nomeValido(nome) && typeof env[nome] === 'string' && env[nome]!.trim() !== '';
 }
 
 /** A chave de cifragem: 64 caracteres hexadecimais (o que o serviço `segredos` gera) ou base64 de 32 bytes. */
@@ -67,7 +73,7 @@ export function decifrar(cifrado: string, contexto: string, chave: Buffer): stri
   if (partes.length !== 4 || partes[0] !== VERSAO) throw new ErroDeCofre('Token cifrado em formato desconhecido.');
   try {
     const [, iv, tag, corpo] = partes;
-    const d = createDecipheriv('aes-256-gcm', chave, Buffer.from(iv, 'base64url'));
+    const d = createDecipheriv('aes-256-gcm', chave, Buffer.from(iv, 'base64url'), { authTagLength: 16 });
     d.setAAD(Buffer.from(contexto, 'utf8'));
     d.setAuthTag(Buffer.from(tag, 'base64url'));
     return Buffer.concat([d.update(Buffer.from(corpo, 'base64url')), d.final()]).toString('utf8');
@@ -82,8 +88,9 @@ export function integracaoIfoodAtiva(env: Ambiente = process.env): boolean {
 }
 
 export const API_IFOOD_PADRAO = 'https://merchant-api.ifood.com.br';
+const HOST_DA_API_IFOOD = 'merchant-api.ifood.com.br';
 
-/** O endereço da API do iFood: HTTPS, domínio do iFood, sem usuário/senha, sem caminho extra. Padrão: o oficial. */
+/** O endereço da API do iFood: só o host oficial, em HTTPS, sem usuário/senha nem caminho extra. Padrão: o oficial. */
 export function baseDaApiIfood(env: Ambiente = process.env): string {
   const bruto = (env.IFOOD_API_BASE ?? '').trim() || API_IFOOD_PADRAO;
   let u: URL;
@@ -94,9 +101,9 @@ export function baseDaApiIfood(env: Ambiente = process.env): string {
   }
   const host = u.hostname.toLowerCase();
   if (u.protocol !== 'https:' || u.username || u.password || u.search || u.hash || (u.pathname !== '/' && u.pathname !== '')) {
-    throw new ErroDeCofre('IFOOD_API_BASE precisa ser só https://<domínio do iFood>, sem caminho, usuário ou parâmetros.');
+    throw new ErroDeCofre('IFOOD_API_BASE precisa ser só https://merchant-api.ifood.com.br, sem caminho, usuário ou parâmetros.');
   }
-  if (host !== 'ifood.com.br' && !host.endsWith('.ifood.com.br')) throw new ErroDeCofre('IFOOD_API_BASE precisa ser um domínio do iFood (*.ifood.com.br).');
+  if (host !== HOST_DA_API_IFOOD) throw new ErroDeCofre(`IFOOD_API_BASE precisa ser https://${HOST_DA_API_IFOOD} (o endereço oficial da API do iFood).`);
   return `https://${host}`;
 }
 

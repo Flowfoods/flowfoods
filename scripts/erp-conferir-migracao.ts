@@ -163,6 +163,12 @@ export const GATILHOS_DA_INT_1_1 = [
   'IntegracaoApp_nao_apaga',
 ] as const;
 
+/** Decisão 487: as funções SECURITY DEFINER com `pg_temp` no fim do search_path (sem isso, tabela temporária engana o gatilho). */
+export const FUNCOES_SEGURAS_DA_487 = ['erp_integracao_conexao_confere', 'erp_integracao_modulo_confere', 'erp_exigir_parceiro_ativo'] as const;
+export const GATILHOS_DA_487 = ['IntegracaoApp_imutavel'] as const;
+/** Todos os privilégios de tabela: o papel do tenant não pode ter nenhum nas globais da Central. */
+const PRIVILEGIOS_DE_TABELA = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER'] as const;
+
 /** Os CHECKs que a I.1a acrescentou em "Insumo" (a tabela nova nasce com os dela validados). */
 export const CHECKS_DA_I_1A = [
   ['Insumo', 'Insumo_classificadoPor_valido'],
@@ -661,13 +667,30 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
         pendencias.push(`Tabela ${t} sem RLS forçada (as outras têm): rode o bloco da RLS da migration ${M} como dono das tabelas.`);
       }
     }
-    // As globais não podem ficar ao alcance do papel do tenant.
+    // As globais não podem ficar ao alcance do papel do tenant (nenhum privilégio); nas de tenant, sem DELETE e com a política.
     const papel = await db.$queryRaw<{ existe: boolean }[]>`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_tenant') AS existe`;
     if (papel[0]?.existe) {
       for (const t of GLOBAIS_DA_INT_1_1) {
-        const alcance = await db.$queryRaw<{ pode: boolean }[]>`SELECT has_table_privilege('erp_tenant', ${`"${t}"`}, 'SELECT') OR has_table_privilege('erp_tenant', ${`"${t}"`}, 'INSERT') AS pode`;
-        if (alcance[0]?.pode) pendencias.push(`O papel erp_tenant alcança a tabela global ${t}: rode o REVOKE da migration ${M}.`);
+        for (const p of PRIVILEGIOS_DE_TABELA) {
+          const alcance = await db.$queryRaw<{ pode: boolean }[]>`SELECT has_table_privilege('erp_tenant', ${`"${t}"`}, ${p}) AS pode`;
+          if (alcance[0]?.pode) pendencias.push(`O papel erp_tenant tem ${p} na tabela global ${t}: rode o REVOKE da migration ${M}.`);
+        }
       }
+      for (const t of TABELAS_DA_INT_1_1) {
+        const apaga = await db.$queryRaw<{ pode: boolean }[]>`SELECT has_table_privilege('erp_tenant', ${`"${t}"`}, 'DELETE') AS pode`;
+        if (apaga[0]?.pode) pendencias.push(`O papel erp_tenant pode apagar em ${t} (desligar e bloquear são estados): rode REVOKE DELETE ON "${t}" FROM erp_tenant;`);
+      }
+    }
+    if (loja?.rls) {
+      const politicas = await db.$queryRaw<{ tabela: string; permissiva: string; usando: string | null }[]>`
+        SELECT tablename AS tabela, permissive AS permissiva, qual AS usando FROM pg_policies WHERE policyname = ANY(${TABELAS_DA_INT_1_1.map((t) => `${t}_do_parceiro`)})`;
+      for (const t of TABELAS_DA_INT_1_1) {
+        const pol = politicas.find((x) => x.tabela === t);
+        if (!pol || !/app\.parceiro_id/.test(pol.usando ?? '')) pendencias.push(`Política ${t}_do_parceiro ausente ou sem o filtro do parceiro: rode o bloco da RLS da migration ${M}.`);
+      }
+      const outras = await db.$queryRaw<{ tabela: string; nome: string }[]>`
+        SELECT tablename AS tabela, policyname AS nome FROM pg_policies WHERE tablename = ANY(${[...TABELAS_DA_INT_1_1]}) AND policyname <> ALL(${TABELAS_DA_INT_1_1.map((t) => `${t}_do_parceiro`)})`;
+      for (const o of outras) pendencias.push(`Política a mais em ${o.tabela} (${o.nome}): políticas somam acesso; confira e apague.`);
     }
     const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
       SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_INT_1_1.map(([, nome]) => nome)})`;
@@ -683,6 +706,23 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
     const gatilhos = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_INT_1_1]})`;
     for (const t of GATILHOS_DA_INT_1_1) {
       if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
+    }
+    // Decisão 487 (só depois que a migration dela rodou: o gatilho do app é dela).
+    const M2 = '20261116000000_erp_integracao_endurecimento';
+    const dela487 = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_487]})`;
+    // O CHECK novo do nome do segredo também é dela: com ele ou com o gatilho, a 487 rodou (vale para banco montado sem o Prisma).
+    const aplicada487 = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_constraint WHERE conname = 'IntegracaoApp_nome_do_segredo' AND pg_get_constraintdef(oid) LIKE '%CLIENT_SECRET%'`;
+    if (dela487.length > 0 || (aplicada487[0]?.n ?? 0) > 0) {
+      for (const t of GATILHOS_DA_487) {
+        if (!dela487.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration ${M2} não foi aplicada por inteiro.`);
+      }
+      const funcoes = await db.$queryRaw<{ nome: string; config: string[] | null }[]>`SELECT proname AS nome, proconfig AS config FROM pg_proc WHERE proname = ANY(${[...FUNCOES_SEGURAS_DA_487]})`;
+      for (const f of FUNCOES_SEGURAS_DA_487) {
+        const achada = funcoes.find((x) => x.nome === f);
+        const caminho = achada?.config?.find((c) => c.startsWith('search_path='));
+        if (!achada) pendencias.push(`Função ${f} NÃO existe: a migration ${M2} não foi aplicada por inteiro.`);
+        else if (!caminho || !/,\s*pg_temp$/.test(caminho)) pendencias.push(`Função ${f} sem pg_temp no fim do search_path (tabela temporária engana o gatilho): rode o último bloco da migration ${M2}.`);
+      }
     }
   }
   return pendencias;
@@ -702,7 +742,7 @@ async function principal() {
       for (const d of rel.documentosAConferir) console.log(`  Documento a conferir no parceiro ${d.parceiro}: “${d.nome}” tem ${documentoParaSaida(d.documento)}, que não passa nos dígitos verificadores.`);
     }
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a, da F.1b, da L.2, da 3.4 e da INT-1.1 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias, das metas por categoria, da nota fiscal por XML, das etiquetas e da Central de Integrações (com RLS), os índices e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a, da F.1b, da L.2, da 3.4, da INT-1.1 e do endurecimento da Central (decisão 487) conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias, das metas por categoria, da nota fiscal por XML, das etiquetas e da Central de Integrações (com RLS, sem DELETE para o tenant e as globais fora do alcance dele), os índices e os gatilhos existem, e as funções que rodam como dono têm o search_path fechado.');
       return 0;
     }
     console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a, da F.1b, da L.2 e da 3.4: ${pendencias.length} pendência(s):`);

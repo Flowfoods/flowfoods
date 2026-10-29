@@ -26,7 +26,8 @@ export const ROTULO_DO_MODULO: Record<Modulo, string> = { ANALYTICS: 'Analytics'
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ID_CURTO = /^[A-Za-z0-9-]{1,40}$/;
 const CLIENT_ID = /^[A-Za-z0-9._:-]{1,100}$/;
-const NOME_DO_SEGREDO = /^[A-Z][A-Z0-9_]{2,63}$/;
+/** Só o nome de segredo de app do provedor (decisão 487): `IFOOD_<NOME>_CLIENT_SECRET`, até 64 caracteres. */
+const NOME_DO_SEGREDO = /^IFOOD_[A-Z0-9]+(?:_[A-Z0-9]+)*_CLIENT_SECRET$/;
 
 const texto = (x: unknown) => (typeof x === 'string' ? x.normalize('NFC').replace(/\s+/g, ' ').trim() : '');
 const temControle = (s: string) => /[\u0000-\u001f\u007f]/.test(s);
@@ -113,8 +114,8 @@ export function lerApp(e: Record<string, unknown>): LeituraDoApp {
   const clientId = texto(e.clientId);
   if (!CLIENT_ID.test(clientId)) erros.clientId = 'Cole o Client ID do app (sem espaços).';
   const nomeDoSegredo = texto(e.nomeDoSegredo);
-  if (!NOME_DO_SEGREDO.test(nomeDoSegredo)) {
-    erros.nomeDoSegredo = 'Escreva só o NOME da variável do cofre, em maiúsculas (ex.: IFOOD_TEST_CLIENT_SECRET). Nunca cole o segredo aqui.';
+  if (nomeDoSegredo.length > 64 || !NOME_DO_SEGREDO.test(nomeDoSegredo)) {
+    erros.nomeDoSegredo = 'Escreva só o NOME da variável do cofre, no formato IFOOD_<NOME>_CLIENT_SECRET (ex.: IFOOD_TEST_CLIENT_SECRET). Nunca cole o segredo aqui.';
   }
   const lista = Array.isArray(e.modulos) ? e.modulos : typeof e.modulos === 'string' ? [e.modulos] : [];
   const modulos = Array.from(new Set(lista.filter(ehModulo)));
