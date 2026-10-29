@@ -14,6 +14,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { ajudaParaATela, entradaPorChave, problemasDoRegistro } from '@/lib/erp/ajuda';
 import { navegacaoDoParceiro } from '@/lib/erp/modulos';
+import { NENHUM_MODULO_LIBERADO } from '@/lib/erp/liberacao';
 import { resolverAlcance, type Alcance, type VinculoDePermissao } from '@/lib/erp/permissoes';
 import { CamposDaEmbalagem, EMBALAGEM_VAZIA, TEXTO_DO_CUSTO_INICIAL } from '@/components/erp/telas/insumos/campos-embalagem';
 
@@ -52,7 +53,7 @@ async function noShell(filho: ReturnType<typeof campos>, alcance: Alcance = DONO
   return n(
     renderToStaticMarkup(
       createElement(AppShell, {
-        navegacao: navegacaoDoParceiro(alcance),
+        navegacao: navegacaoDoParceiro(alcance, NENHUM_MODULO_LIBERADO),
         contexto: 'Casa · Ativo',
         usuario: { nome: 'Maria', papel: 'Dona' },
         tema: 'claro',

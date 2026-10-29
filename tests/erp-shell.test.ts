@@ -26,6 +26,7 @@ import {
   navegacaoDoParceiro,
   telasDaNavegacao,
 } from '@/lib/erp/modulos';
+import { NENHUM_MODULO_LIBERADO, TODOS_OS_MODULOS_COM_LIBERACAO, type ModuloComLiberacao } from '@/lib/erp/liberacao';
 import { comParceiroAtual, modulosDoNivel1, navegacaoDoNivel1, slugNoCaminho } from '@/lib/rodolfo/modulos';
 import {
   escolhaDoCookie,
@@ -49,18 +50,18 @@ const vinculo = (v: Partial<VinculoDePermissao>): VinculoDePermissao => ({
 const alcance = (v: Partial<VinculoDePermissao>) => resolverAlcance(vinculo(v));
 
 // As abas (os itens do menu); as ações das áreas ficam em `acoes`, fora do menu e do hub (UX.9).
-const hrefs = (a: Alcance, base?: string) =>
-  modulosDoParceiro(a, base).flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.href)));
-const hrefsDasAcoes = (a: Alcance, base?: string) => modulosDoParceiro(a, base).flatMap((m) => m.acoes.map((i) => i.href));
+const hrefs = (a: Alcance, base?: string, liberados: ReadonlySet<ModuloComLiberacao> = NENHUM_MODULO_LIBERADO) =>
+  modulosDoParceiro(a, base ?? '/erp', liberados).flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.href)));
+const hrefsDasAcoes = (a: Alcance, base?: string) => modulosDoParceiro(a, base ?? '/erp', NENHUM_MODULO_LIBERADO).flatMap((m) => m.acoes.map((i) => i.href));
 const futuros = (a: Alcance) =>
-  modulosDoParceiro(a)
+  modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO)
     .filter((m) => !m.href)
     .map((m) => m.chave);
 
 describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () => {
   it('Dono: as abas de cada área (UX.9), as ações fora do menu; 3.4: nenhum módulo futuro (Etiquetas virou área)', () => {
     const a = alcance({ perfilBase: 'DONO' });
-    expect(modulosDoParceiro(a).filter((m) => m.href).map((m) => m.nome)).toEqual([
+    expect(modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => m.href).map((m) => m.nome)).toEqual([
       'Cadastros e Cardápio',
       'Compras e Fornecedores',
       'Estoque e Movimentações',
@@ -163,7 +164,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
   });
 
   it('1.8: o quadro e as divergências de uma loja acendem a aba deles, não a "Visão geral"', () => {
-    const nav = navegacaoDoParceiro(alcance({ perfilBase: 'DONO' }));
+    const nav = navegacaoDoParceiro(alcance({ perfilBase: 'DONO' }), NENHUM_MODULO_LIBERADO);
     expect(itemAtivo(nav, '/erp/estoque/l1/requisicoes')?.item.rotulo).toBe('Requisições');
     expect(itemAtivo(nav, '/erp/estoque/l1/requisicoes/r9/atender')?.item.rotulo).toBe('Requisições');
     expect(itemAtivo(nav, '/erp/estoque/l1/divergencias')?.item.rotulo).toBe('Divergências');
@@ -172,14 +173,14 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
 
   it('perfil sem "ver insumos" nem "ver fichas": a área Cadastros e Cardápio nem aparece; Seu acesso sempre aparece', () => {
     const a = alcance({ perfilBase: null, perfilProprio: ['lojas.ver'] });
-    const mods = modulosDoParceiro(a);
+    const mods = modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO);
     expect(mods.map((m) => m.chave)).not.toContain('cadastros');
     expect(hrefs(a)).toEqual(['/erp/lojas', '/erp/acesso']);
     expect(futuros(a)).toEqual([]);
   });
 
   it('módulo futuro nunca tem link nem grupos, e traz a fase do plano (3.4: a lista ficou vazia)', () => {
-    for (const m of modulosDoParceiro(ALCANCE_FLOWFOODS).filter((x) => !x.href)) {
+    for (const m of modulosDoParceiro(ALCANCE_FLOWFOODS, '/erp', NENHUM_MODULO_LIBERADO).filter((x) => !x.href)) {
       expect(m.grupos).toEqual([]);
       expect(m.fase).toMatch(/^\d\.\d$/);
     }
@@ -187,7 +188,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
   });
 
   it('3.4: a abertura de uma loja acende "Abrir embalagem"; a emissão e o papel acendem "Imprimir"', () => {
-    const nav = navegacaoDoParceiro(alcance({ perfilBase: 'OPERADOR' }));
+    const nav = navegacaoDoParceiro(alcance({ perfilBase: 'OPERADOR' }), NENHUM_MODULO_LIBERADO);
     expect(itemAtivo(nav, '/erp/etiquetas/l1/abrir')?.item.rotulo).toBe('Abrir embalagem');
     expect(itemAtivo(nav, '/erp/etiquetas/l1/aberta/a9')?.item.rotulo).toBe('Abrir embalagem');
     expect(itemAtivo(nav, '/erp/etiquetas/l1')?.item.rotulo).toBe('Imprimir');
@@ -198,7 +199,8 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
   });
 
   it('nível 1 dentro do parceiro: mesmas telas sob a base dele, com Cadastro e sem "Seu acesso"', () => {
-    const h = hrefs(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins');
+    // O nível 1 vê as abas de módulo com liberação em todo parceiro (INT-1.8: Integrações leva à Central dele).
+    const h = hrefs(ALCANCE_FLOWFOODS, '/rodolfo/erp/valentins', TODOS_OS_MODULOS_COM_LIBERACAO);
     expect(h).toEqual([
       '/rodolfo/erp/valentins/insumos',
       '/rodolfo/erp/valentins/fichas',
@@ -233,6 +235,7 @@ describe('ERP 1.1 · menu e hub do parceiro só com o que o alcance libera', () 
       '/rodolfo/erp/valentins/dre/plano',
       '/rodolfo/erp/valentins/dre/metas-categorias',
       '/rodolfo/erp/valentins/lojas',
+      '/rodolfo/erp/valentins/integracoes',
       '/rodolfo/erp/valentins/equipe',
       '/rodolfo/erp/valentins/historico',
       '/rodolfo/erp/valentins/cadastro',
@@ -312,7 +315,7 @@ describe('ERP 1.1 · nível 1: o Barney antigo vira módulo do mesmo shell', () 
   });
 
   it('busca ⌘K do parceiro só lista telas permitidas', () => {
-    const operador = telasDaNavegacao(navegacaoDoParceiro(alcance({ perfilBase: 'OPERADOR' }))).map((t) => t.href);
+    const operador = telasDaNavegacao(navegacaoDoParceiro(alcance({ perfilBase: 'OPERADOR' }), NENHUM_MODULO_LIBERADO)).map((t) => t.href);
     expect(operador).not.toContain('/erp/equipe');
     expect(operador).not.toContain('/erp/historico');
   });

@@ -30,7 +30,7 @@ import {
   type Navegacao,
 } from '@/lib/erp/modulos';
 import { comParceiroAtual, navegacaoDoNivel1 } from '@/lib/rodolfo/modulos';
-import { MODULOS_COM_LIBERACAO } from '@/lib/erp/liberacao';
+import { MODULOS_COM_LIBERACAO, NENHUM_MODULO_LIBERADO } from '@/lib/erp/liberacao';
 import { HubDoParceiro } from '@/components/erp/telas/hub-do-parceiro';
 import { Abas } from '@/components/erp/ui/abas';
 
@@ -57,7 +57,7 @@ const ACOES = ['Novo insumo', 'Nova ficha', 'Importar planilha', 'Lançar nota',
 // O operador produz (planeja o lote), então "Nova produção" é a única ação que ele tem.
 const ACOES_SEM_O_OPERADOR = ACOES.filter((a) => a !== 'Nova produção');
 
-const emUso = (a: Alcance) => modulosDoParceiro(a).filter((m) => m.href);
+const emUso = (a: Alcance) => modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => m.href);
 const abasPorArea = (a: Alcance) => Object.fromEntries(emUso(a).map((m) => [m.nome, m.grupos.flatMap((g) => g.itens.map((i) => i.rotulo))]));
 const acoesPorArea = (a: Alcance) => Object.fromEntries(emUso(a).map((m) => [m.nome, m.acoes.map((x) => x.rotulo)]));
 
@@ -83,7 +83,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Faturamento e DRE': ['Lançar o dia', 'Importar faturamento', 'Lançar despesa'],
       'Rede e Equipe': [],
     });
-    expect(modulosDoParceiro(DONO).filter((m) => !m.href).map((m) => m.nome)).toEqual(FUTUROS);
+    expect(modulosDoParceiro(DONO, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href).map((m) => m.nome)).toEqual(FUTUROS);
   });
 
   it('Gerente (rede): Precificação visível (ver preços), sem Equipe; ações de cadastro e de compra', () => {
@@ -98,7 +98,7 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       'Rede e Equipe': ['Lojas e marcas', 'Histórico', 'Seu acesso'],
     });
     expect(emUso(GERENTE).flatMap((m) => m.acoes.map((a) => a.rotulo))).toEqual(ACOES);
-    expect(modulosDoParceiro(GERENTE).filter((m) => !m.href)).toHaveLength(0);
+    expect(modulosDoParceiro(GERENTE, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href)).toHaveLength(0);
   });
 
   it('Gerente de loja (N3): igual ao gerente, sem Histórico (exige a rede inteira)', () => {
@@ -118,13 +118,13 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
       Etiquetas: ['Imprimir', 'Abrir embalagem', 'Histórico', 'Impressora'],
       'Rede e Equipe': ['Lojas e marcas', 'Seu acesso'],
     });
-    expect(acoesDaNavegacao(navegacaoDoParceiro(OPERADOR)).map((a) => a.rotulo)).toEqual(['Nova produção']);
+    expect(acoesDaNavegacao(navegacaoDoParceiro(OPERADOR, NENHUM_MODULO_LIBERADO)).map((a) => a.rotulo)).toEqual(['Nova produção']);
     // 3.3: a cozinha entra na Produção pelas Tarefas; a gerência continua entrando pela Lista do dia (decisão 225).
-    expect(modulosDoParceiro(OPERADOR).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/tarefas');
-    expect(modulosDoParceiro(GERENTE).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/lista');
+    expect(modulosDoParceiro(OPERADOR, '/erp', NENHUM_MODULO_LIBERADO).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/tarefas');
+    expect(modulosDoParceiro(GERENTE, '/erp', NENHUM_MODULO_LIBERADO).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/lista');
     // Um chefe (operador + "definir a lista do dia") entra pela lista, como a gerência.
-    expect(modulosDoParceiro(proprio(['producao.ver', 'producao.registrar', 'producao.planejar'])).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/lista');
-    expect(modulosDoParceiro(OPERADOR).filter((m) => !m.href).map((m) => m.nome)).toEqual([]);
+    expect(modulosDoParceiro(proprio(['producao.ver', 'producao.registrar', 'producao.planejar']), '/erp', NENHUM_MODULO_LIBERADO).find((m) => m.chave === 'producao')!.href).toBe('/erp/producao/lista');
+    expect(modulosDoParceiro(OPERADOR, '/erp', NENHUM_MODULO_LIBERADO).filter((m) => !m.href).map((m) => m.nome)).toEqual([]);
   });
 
   it('Rede e Equipe sempre aparece (Seu acesso é livre), mesmo num perfil sem nada', () => {
@@ -136,51 +136,51 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
   it('perfil sem nenhuma aba de uma área: a área some do hub, do seletor, do menu e do ⌘K, e a ação some com ela', () => {
     // "Lançar nota" e "cadastrar fornecedor" sem "ver compras": nenhuma aba de Compras e Fornecedores é permitida.
     const a = proprio(['compras.lancar', 'fornecedores.editar', 'lojas.ver']);
-    const nav = navegacaoDoParceiro(a);
+    const nav = navegacaoDoParceiro(a, NENHUM_MODULO_LIBERADO);
     expect(nav.modulos.map((m) => m.nome)).not.toContain('Compras e Fornecedores');
     expect(telasDaNavegacao(nav).map((t) => t.href)).not.toContain('/erp/compras');
     expect(acoesDaNavegacao(nav).map((x) => x.rotulo)).toEqual([]);
     expect(nav.modulos.flatMap((m) => m.grupos.map((g) => g.rotulo))).not.toContain('Compras');
     // Idem para "Novo insumo" sem "ver insumos" nem "ver fichas".
-    const b = navegacaoDoParceiro(proprio(['insumos.editar', 'lojas.ver']));
+    const b = navegacaoDoParceiro(proprio(['insumos.editar', 'lojas.ver']), NENHUM_MODULO_LIBERADO);
     expect(b.modulos.map((m) => m.nome)).toEqual(['Rede e Equipe']);
     expect(acoesDaNavegacao(b)).toEqual([]);
   });
 
   it('"Lançar o dia" e "Importar faturamento" só com ver E lançar: lançar sozinho não abre a área nem a ação', () => {
-    const lancaSo = navegacaoDoParceiro(proprio(['faturamento.lancar', 'lojas.ver']));
+    const lancaSo = navegacaoDoParceiro(proprio(['faturamento.lancar', 'lojas.ver']), NENHUM_MODULO_LIBERADO);
     expect(lancaSo.modulos.map((m) => m.nome)).not.toContain('Faturamento e DRE');
     expect(acoesDaNavegacao(lancaSo).map((x) => x.rotulo)).toEqual([]);
-    const ve = navegacaoDoParceiro(proprio(['faturamento.ver']));
+    const ve = navegacaoDoParceiro(proprio(['faturamento.ver']), NENHUM_MODULO_LIBERADO);
     expect(telasDaNavegacao(ve).map((t) => t.href)).toContain('/erp/faturamento');
     expect(acoesDaNavegacao(ve).map((x) => x.rotulo)).toEqual([]);
-    const ambos = navegacaoDoParceiro(proprio(['faturamento.ver', 'faturamento.lancar']));
+    const ambos = navegacaoDoParceiro(proprio(['faturamento.ver', 'faturamento.lancar']), NENHUM_MODULO_LIBERADO);
     expect(acoesDaNavegacao(ambos).map((x) => x.rotulo)).toEqual(['Lançar o dia', 'Importar faturamento']);
   });
 
   it('ação só com a área visível E a permissão dela: ver sem editar não traz ação', () => {
-    const verSo = navegacaoDoParceiro(proprio(['insumos.ver', 'fichas.ver']));
+    const verSo = navegacaoDoParceiro(proprio(['insumos.ver', 'fichas.ver']), NENHUM_MODULO_LIBERADO);
     expect(acoesDaNavegacao(verSo)).toEqual([]);
-    const lanca = navegacaoDoParceiro(proprio(['compras.ver', 'compras.lancar']));
+    const lanca = navegacaoDoParceiro(proprio(['compras.ver', 'compras.lancar']), NENHUM_MODULO_LIBERADO);
     expect(acoesDaNavegacao(lanca).map((x) => x.rotulo)).toEqual(['Lançar nota', 'Importar XML']);
   });
 
   it('⌘K: o Dono acha "Novo fornecedor", "Lançar nota" e "Lançar o dia"; o Operador só acha "Nova produção"; cada ação diz a área', () => {
-    const dono = acoesDaNavegacao(navegacaoDoParceiro(DONO));
+    const dono = acoesDaNavegacao(navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO));
     expect(dono.map((x) => x.rotulo)).toEqual(ACOES);
     expect(dono.find((x) => x.rotulo === 'Lançar nota')).toMatchObject({ href: '/erp/compras/nova', modulo: 'Compras e Fornecedores' });
     expect(dono.find((x) => x.rotulo === 'Novo fornecedor')?.href).toBe('/erp/compras/fornecedores/novo');
     expect(dono.find((x) => x.rotulo === 'Lançar o dia')).toMatchObject({ href: '/erp/faturamento/lancar', modulo: 'Faturamento e DRE' });
-    const operador = acoesDaNavegacao(navegacaoDoParceiro(OPERADOR)).map((x) => x.rotulo);
+    const operador = acoesDaNavegacao(navegacaoDoParceiro(OPERADOR, NENHUM_MODULO_LIBERADO)).map((x) => x.rotulo);
     for (const r of ACOES_SEM_O_OPERADOR) expect(operador).not.toContain(r);
     expect(dono.find((x) => x.rotulo === 'Nova produção')).toMatchObject({ href: '/erp/producao/nova', modulo: 'Produção' });
     // O detalhe de uma aba é "Área · subtítulo".
-    const t = telasDaNavegacao(navegacaoDoParceiro(DONO)).find((x) => x.href === '/erp/estoque/contagens')!;
+    const t = telasDaNavegacao(navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO)).find((x) => x.href === '/erp/estoque/contagens')!;
     expect(t.modulo).toBe('Estoque e Movimentações');
   });
 
   it('nenhum texto do menu, do hub e do ⌘K carrega dinheiro, custo ou margem', () => {
-    const nav = navegacaoDoParceiro(DONO);
+    const nav = navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO);
     const textos = [
       ...nav.modulos.flatMap((m) => [m.nome, m.subtitulo, ...m.grupos.flatMap((g) => g.itens.flatMap((i) => [i.rotulo, i.subtitulo])), ...m.acoes.flatMap((a) => [a.rotulo, a.subtitulo])]),
     ];
@@ -189,15 +189,15 @@ describe('UX.9 · papéis × áreas, abas e ações', () => {
 
   it('Rede ↔ loja nunca muda quais áreas e abas aparecem (só o que as telas leem)', () => {
     // A navegação nasce SÓ do alcance e da base: `modulosDoParceiro(alcance, base)` não recebe a visão.
-    expect(modulosDoParceiro.length).toBe(1); // (alcance, base = '/erp')
-    expect(modulosDoParceiro(GERENTE_N3).map((m) => m.nome)).toEqual([...AREAS, ...FUTUROS]);
+    expect(modulosDoParceiro.length).toBe(3); // (alcance, base, liberados): a visão não entra
+    expect(modulosDoParceiro(GERENTE_N3, '/erp', NENHUM_MODULO_LIBERADO).map((m) => m.nome)).toEqual([...AREAS, ...FUTUROS]);
   });
 });
 
 // ---------------------------------------------------------------- hub
 const html = (a: Alcance, base?: string) =>
   renderToStaticMarkup(
-    createElement(HubDoParceiro, { titulo: 'Áreas da Rede', subtitulo: 'Casa', modulos: modulosDoParceiro(a, base), semAcesso: false }),
+    createElement(HubDoParceiro, { titulo: 'Áreas da Rede', subtitulo: 'Casa', modulos: modulosDoParceiro(a, base ?? '/erp', NENHUM_MODULO_LIBERADO), semAcesso: false }),
   );
 const secao = (h: string, rotulo: string) => {
   const m = new RegExp(`<section aria-label="${rotulo}">([\\s\\S]*?)</section>`).exec(h);
@@ -287,7 +287,7 @@ describe('UX.9 · hub: um card por área, nunca uma ação', () => {
   });
 
   it('o resumo do seletor de área é curto (não corta no menu de 232 px) e existe em toda área', () => {
-    for (const m of modulosDoParceiro(DONO).filter((x) => x.href)) {
+    for (const m of modulosDoParceiro(DONO, '/erp', NENHUM_MODULO_LIBERADO).filter((x) => x.href)) {
       expect(m.resumo, m.nome).toBeTruthy();
       expect(m.resumo!.length, m.resumo).toBeLessThanOrEqual(20);
     }
@@ -414,7 +414,7 @@ const ROTAS_ATIVAS: [string, string][] = [
 ];
 
 describe('UX.9 · itemAtivo acende a aba certa em cada rota profunda', () => {
-  const nav = navegacaoDoParceiro(DONO);
+  const nav = navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO);
   it.each(ROTAS_ATIVAS)('/erp%s → %s', (rota, aba) => {
     expect(itemAtivo(nav, `/erp${rota}`)?.item.rotulo).toBe(aba);
   });
@@ -511,7 +511,7 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
 
 // ---------------------------------------------------------------- abas e trilha
 describe('UX.9 · abas (nav com nome acessível, aria-current) e trilha', () => {
-  const nav = navegacaoDoParceiro(DONO);
+  const nav = navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO);
   const marcado = (rota: string) => {
     const ativo = itemAtivo(nav, rota);
     const r = abasDaArea(nav, ativo)!;
@@ -540,9 +540,9 @@ describe('UX.9 · abas (nav com nome acessível, aria-current) e trilha', () => 
   });
 
   it('uma aba sozinha não vira barra de abas; fora de área (Comercial, lista de parceiros) não há abas', () => {
-    const so = navegacaoDoParceiro(proprio(['lojas.ver']));
+    const so = navegacaoDoParceiro(proprio(['lojas.ver']), NENHUM_MODULO_LIBERADO);
     expect(abasDaArea(so, itemAtivo(so, '/erp/acesso'))).not.toBeNull(); // Lojas + Seu acesso
-    const um = navegacaoDoParceiro(proprio([]));
+    const um = navegacaoDoParceiro(proprio([]), NENHUM_MODULO_LIBERADO);
     expect(abasDaArea(um, itemAtivo(um, '/erp/acesso'))).toBeNull();
     const n1 = navegacaoDoNivel1();
     expect(abasDaArea(n1, itemAtivo(n1, '/rodolfo/leads'))).toBeNull();
@@ -553,7 +553,8 @@ describe('UX.9 · abas (nav com nome acessível, aria-current) e trilha', () => 
     const n1 = comParceiroAtual(navegacaoDoNivel1(), '/rodolfo/erp/v/lojas', [{ slug: 'v', nome: 'V' }]);
     const r = abasDaArea(n1, itemAtivo(n1, '/rodolfo/erp/v/lojas'))!;
     expect(r.area).toBe('Rede e Equipe');
-    expect(r.abas.map((a) => a.rotulo)).toEqual(['Lojas e marcas', 'Equipe', 'Histórico', 'Cadastro do parceiro', 'Custo médio por loja']);
+    // INT-1.8: o nível 1 vê Integrações em todo parceiro (leva à Central dele).
+    expect(r.abas.map((a) => a.rotulo)).toEqual(['Lojas e marcas', 'Integrações', 'Equipe', 'Histórico', 'Cadastro do parceiro', 'Custo médio por loja']);
   });
 
   it('trilha: /erp/insumos/novo = Início › Cadastros e Cardápio › Insumos › Novo insumo, com a área e a aba como links', () => {
@@ -634,7 +635,7 @@ describe('UX.9 · guardas estáticas', () => {
 
   it('a navegação por áreas não usa rótulo de ação como card nem como aba (Novo…, Lançar…, Importar…)', () => {
     for (const a of [DONO, GERENTE, OPERADOR]) {
-      const abas = modulosDoParceiro(a).flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.rotulo)));
+      const abas = modulosDoParceiro(a, '/erp', NENHUM_MODULO_LIBERADO).flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.rotulo)));
       for (const r of ACOES) expect(abas).not.toContain(r);
     }
   });
@@ -692,18 +693,24 @@ describe('INT-1.8 · Integrações aparece em Rede e Equipe só com o módulo li
   const abasDaRede = (nav: ReturnType<typeof navegacaoDoParceiro>) => nav.modulos.find((m) => m.chave === 'rede')?.grupos.flatMap((g) => g.itens.map((i) => i.href)) ?? [];
   const liberado = new Set(MODULOS_COM_LIBERACAO);
 
-  it('sem liberação, ninguém vê a aba (nem o Dono); liberado, o Dono e o Gerente veem; o Operador não', () => {
-    expect(abasDaRede(navegacaoDoParceiro(DONO))).not.toContain('/erp/integracoes');
+  it('sem liberação, ninguém vê a aba (nem o Dono); liberado, o Dono vê; o Gerente só com a permissão extra; o Operador não', () => {
+    expect(abasDaRede(navegacaoDoParceiro(DONO, NENHUM_MODULO_LIBERADO))).not.toContain('/erp/integracoes');
     expect(abasDaRede(navegacaoDoParceiro(DONO, liberado))).toContain('/erp/integracoes');
-    const gerente = resolverAlcance({ perfilBase: 'GERENTE', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: false, lojaIds: ['l1'] });
-    expect(abasDaRede(navegacaoDoParceiro(gerente, liberado))).toContain('/erp/integracoes');
+    const gerente = (extras: string[]) => resolverAlcance({ perfilBase: 'GERENTE', perfilProprio: null, permissoesExtras: extras, permissoesRemovidas: [], redeInteira: false, lojaIds: ['l1'] });
+    expect(abasDaRede(navegacaoDoParceiro(gerente([]), liberado))).not.toContain('/erp/integracoes');
+    expect(abasDaRede(navegacaoDoParceiro(gerente(['integracao.ver']), liberado))).toContain('/erp/integracoes');
     const operador = resolverAlcance({ perfilBase: 'OPERADOR', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: false, lojaIds: ['l1'] });
     expect(abasDaRede(navegacaoDoParceiro(operador, liberado))).not.toContain('/erp/integracoes');
   });
 
-  it('o layout do /erp passa os módulos liberados do parceiro para o menu', () => {
-    const txt = readFileSync(join('src', 'app', 'erp', 'layout.tsx'), 'utf8');
-    expect(txt).toMatch(/liberacoesDoParceiro\(ctx\.cliente\)/);
-    expect(txt).toMatch(/navegacaoDoParceiro\(alcance, liberados\)/);
+  it('o layout (menu, busca, trilha) e o hub do /erp passam os módulos liberados do parceiro; o nível 1 vê a aba em todo parceiro', () => {
+    const layout = readFileSync(join('src', 'app', 'erp', 'layout.tsx'), 'utf8');
+    expect(layout).toMatch(/modulosLiberados\(ctx\.cliente\)/);
+    expect(layout).toMatch(/navegacaoDoParceiro\(alcance, liberados\)/);
+    const hub = readFileSync(join('src', 'app', 'erp', 'page.tsx'), 'utf8');
+    expect(hub).toMatch(/modulosLiberados\(ctx\.cliente\)/);
+    expect(hub).toMatch(/modulosDoParceiro\(ctx\.alcance, '\/erp', liberados\)/);
+    const nivel1 = comParceiroAtual(navegacaoDoNivel1(), '/rodolfo/erp/v/insumos', [{ slug: 'v', nome: 'V' }]);
+    expect(nivel1.modulos.flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.href)))).toContain('/rodolfo/erp/v/integracoes');
   });
 });

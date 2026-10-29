@@ -21,6 +21,7 @@ export function HubDoParceiro({
   subtitulo,
   modulos,
   semAcesso,
+  semModulo = false,
   painel,
 }: {
   /** 24/10: indicadores e pendências do dia (só o que a permissão libera). */
@@ -30,6 +31,8 @@ export function HubDoParceiro({
   modulos: ModuloNav[];
   /** Chegou aqui vindo de uma tela fora do acesso (`?sem-acesso=1`). */
   semAcesso: boolean;
+  /** INT-1.8: veio da tela de um módulo que não está liberado para o parceiro (`?sem-modulo=integracao`). */
+  semModulo?: boolean;
 }) {
   const emUso = modulos.filter((m) => m.href);
   const futuros = modulos.filter((m) => !m.href);
@@ -39,6 +42,11 @@ export function HubDoParceiro({
       {semAcesso && (
         <Aviso tom="alerta" titulo="Essa tela não está no seu acesso.">
           Se precisar dela, fale com quem cuida da equipe.
+        </Aviso>
+      )}
+      {semModulo && (
+        <Aviso tom="alerta" titulo="O módulo Integração não está liberado para a sua rede.">
+          Para usar, fale com a FlowFoods.
         </Aviso>
       )}
       {painel && <PainelDoDiaNaTela painel={painel} />}

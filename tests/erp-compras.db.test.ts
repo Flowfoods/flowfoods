@@ -50,6 +50,7 @@ import { cancelarNota, editarNota, lancarNota, listarNotas, obterFornecedor, obt
 import { listarHistorico } from '@/lib/erp/historico';
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import { modulosDoParceiro } from '@/lib/erp/modulos';
+import { NENHUM_MODULO_LIBERADO } from '@/lib/erp/liberacao';
 import { formatarFracao } from '@/lib/erp/unidades';
 import * as comprasDaSessao from '@/app/erp/compras/actions';
 import * as fichasDaSessao from '@/app/erp/fichas/actions';
@@ -364,8 +365,8 @@ describe.skipIf(!URL_TESTE)('ERP 1.5 · compras (Postgres real)', { timeout: 120
 
   it('operador: compras nem aparece; a action recusa e nada é gravado', async () => {
     const operador = alcanceDe('OPERADOR', 'rede');
-    expect(modulosDoParceiro(operador).map((m) => m.chave)).not.toContain('compras');
-    expect(modulosDoParceiro(DONA()).find((m) => m.chave === 'compras')?.href).toBe('/erp/compras');
+    expect(modulosDoParceiro(operador, '/erp', NENHUM_MODULO_LIBERADO).map((m) => m.chave)).not.toContain('compras');
+    expect(modulosDoParceiro(DONA(), '/erp', NENHUM_MODULO_LIBERADO).find((m) => m.chave === 'compras')?.href).toBe('/erp/compras');
     atual.ctx = () => ctxDe(A, operador, 'Paulo Operador');
     const antes = await a.notaEntrada.count();
     const r = (await rodar(() => comprasDaSessao.acaoSalvarNota('', null, formDaNota({ numero: '950' })))) as { erros: Record<string, string> };

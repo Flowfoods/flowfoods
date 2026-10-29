@@ -1,7 +1,8 @@
 /**
  * Integrações do parceiro (INT-1.8, segunda parte; decisão 491) — o que a pessoa do parceiro lê na tela dela: as lojas do iFood
  * ligadas às lojas do alcance dela e o estado de cada módulo, em linguagem simples. Só lê, pelo portão do tenant (RLS); nunca
- * toca a tabela global de apps nem o token, e não importa quem grava (`conexoes.ts`, `apps.ts`): a guarda reprova.
+ * toca a tabela global de apps nem o token, e não importa quem grava (`conexoes.ts`, `apps.ts`): a guarda de
+ * `integracao-fundacao` reprova (e o papel do tenant nem lê as tabelas globais).
  *
  * A tela só existe com o módulo Integração liberado para o parceiro e com a permissão `integracao.ver` da pessoa.
  */
@@ -25,7 +26,7 @@ export const SITUACAO_PARA_O_PARCEIRO: Record<EstadoDoModulo, { rotulo: string; 
   SOLICITADO: {
     rotulo: 'Esperando a loja aprovar',
     tom: 'alerta',
-    explicacao: 'Quem administra esta loja no Portal do Parceiro do iFood precisa aprovar o app da FlowFoods, em Serviços e soluções, Integrações.',
+    explicacao: 'Quem administra esta loja no Portal do Parceiro do iFood precisa aprovar o app da FlowFoods, na parte de integrações e aplicativos do portal.',
   },
   AUTORIZADO: { rotulo: 'Aprovado pela loja', tom: 'neutro', explicacao: 'A loja aprovou. A FlowFoods ativa em seguida.' },
   ATIVO: { rotulo: 'Ativo', tom: 'ok', explicacao: 'Ligado. Os números entram sozinhos quando a busca diária começar.' },

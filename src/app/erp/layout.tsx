@@ -16,7 +16,7 @@ import { diaDe } from '@/lib/erp/ajuda-rota';
 import { AJUDA_DE_USO_ERP } from '@/lib/constants';
 import { exigirParceiroDaSessao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { navegacaoDoParceiro, VERSAO_DO_ERP } from '@/lib/erp/modulos';
-import { liberacoesDoParceiro } from '@/lib/erp/liberacao';
+import { modulosLiberados } from '@/lib/erp/liberacao';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { COOKIE_MENU, COOKIE_TEMA, lerMenuRecolhido, lerTema } from '@/lib/erp/tema';
 import { AppShell } from '@/components/erp/shell/AppShell';
@@ -41,9 +41,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const ctx = await exigirParceiroDaSessao();
   const { parceiro, pessoa, bloqueio, alcance } = ctx;
   const status = STATUS_DO_PARCEIRO[parceiro.status];
-  const [{ opcoes, valor }, liberacoes] = await Promise.all([visaoDaRequisicao(ctx), liberacoesDoParceiro(ctx.cliente)]);
   // INT-1.8 (decisão 491): aba de módulo com liberação só aparece com o módulo liberado para o parceiro.
-  const liberados = new Set(liberacoes.filter((l) => l.liberado).map((l) => l.modulo));
+  const [{ opcoes, valor }, liberados] = await Promise.all([visaoDaRequisicao(ctx), modulosLiberados(ctx.cliente)]);
   const c = cookies();
 
   const links = [{ rotulo: 'Seu acesso', href: '/erp/acesso' }];

@@ -63,6 +63,7 @@ import {
 import { listarHistorico } from '@/lib/erp/historico';
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import { modulosDoParceiro } from '@/lib/erp/modulos';
+import { NENHUM_MODULO_LIBERADO } from '@/lib/erp/liberacao';
 import * as estoqueDaSessao from '@/app/erp/estoque/actions';
 import { cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
@@ -184,7 +185,7 @@ describe.skipIf(!URL_TESTE)('ERP 1.6 · abertura do estoque (Postgres real)', { 
   });
 
   it('o módulo Estoque sai de "em breve": dona, gerente e operador veem (cada um as telas que pode)', () => {
-    const doOperador = modulosDoParceiro(alcanceDe('OPERADOR', ['x']));
+    const doOperador = modulosDoParceiro(alcanceDe('OPERADOR', ['x']), '/erp', NENHUM_MODULO_LIBERADO);
     const estoque = doOperador.find((m) => m.chave === 'estoque')!;
     expect(estoque.href).toBe('/erp/estoque');
     expect(estoque.fase).toBeUndefined();

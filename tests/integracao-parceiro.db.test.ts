@@ -56,12 +56,16 @@ import { resolverAlcance, TODAS_AS_PERMISSOES, type Alcance } from '@/lib/erp/pe
 import { registrarApp } from '@/lib/integracoes/core/apps';
 import { desligarConexao, ligarConexao, mudarModulo, prepararModulo } from '@/lib/integracoes/core/conexoes';
 import ErpIntegracoesPage from '@/app/erp/integracoes/page';
+import { createElement } from 'react';
+import { TelaIntegracoes } from '@/components/erp/telas/integracoes/tela-integracoes';
+import { Selo } from '@/components/erp/ui/superficies';
+import { SITUACAO_PARA_O_PARCEIRO } from '@/lib/integracoes/core/do-parceiro';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const uuid = () => globalThis.crypto.randomUUID();
 const html = async (el: Promise<ReactElement>) => renderToStaticMarkup(await el);
-const alcanceDe = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR', lojaIds: string[] | 'rede'): Alcance =>
-  resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojaIds === 'rede', lojaIds: lojaIds === 'rede' ? [] : lojaIds });
+const alcanceDe = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR', lojaIds: string[] | 'rede', extras: string[] = []): Alcance =>
+  resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: extras, permissoesRemovidas: [], redeInteira: lojaIds === 'rede', lojaIds: lojaIds === 'rede' ? [] : lojaIds });
 
 describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real)', { timeout: 120_000 }, () => {
   let db: PrismaClient;
@@ -128,9 +132,12 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
 
   it('sem o módulo liberado, nem o Dono entra (volta com aviso); sem a permissão (Operador), também não', async () => {
     como(alcanceDe('DONO', 'rede'));
-    await expect(ErpIntegracoesPage()).rejects.toThrow(/REDIRECT .*sem-acesso=1/);
+    await expect(ErpIntegracoesPage()).rejects.toThrow(/REDIRECT \/erp\?sem-modulo=integracao/);
     await mudarLiberacao(a, 'integracao', true, 'teste');
     como(alcanceDe('OPERADOR', [lojaA1]));
+    await expect(ErpIntegracoesPage()).rejects.toThrow('SEM_ACESSO');
+    // O Gerente base não tem: só com a permissão extra (decisão 491).
+    como(alcanceDe('GERENTE', [lojaA1]));
     await expect(ErpIntegracoesPage()).rejects.toThrow('SEM_ACESSO');
   });
 
@@ -147,8 +154,8 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
       expect(pagina, proibido).not.toContain(proibido);
   });
 
-  it('o Gerente de uma loja só vê a ligação da loja dele', async () => {
-    como(alcanceDe('GERENTE', [lojaA1]));
+  it('o Gerente de uma loja (com a permissão extra) só vê a ligação da loja dele', async () => {
+    como(alcanceDe('GERENTE', [lojaA1], ['integracao.ver']));
     const pagina = await html(ErpIntegracoesPage());
     expect(pagina).toContain(`Valentin Burger Penha ${sufixo}`);
     expect(pagina).not.toContain(`Valentin Gourmet Meier ${sufixo}`);
@@ -181,5 +188,26 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
       .catch((e) => {
         if (e !== desfazer) throw e;
       });
+  });
+
+  it('a tela: o selo "Loja de teste do iFood" só na loja de teste; cada situação no seu tom; o pedido de ligação abre o WhatsApp', () => {
+    const base = { id: 'c', loja: 'Vila da Penha', marca: null, ligadaEm: new Date('2026-10-29T12:00:00Z') };
+    const html2 = renderToStaticMarkup(
+      createElement(TelaIntegracoes, {
+        integracoes: [
+          { ...base, id: 'c1', nomeNoIfood: 'Loja real', teste: false, modulos: [{ id: 'm1', rotulo: 'Números de venda', situacao: SITUACAO_PARA_O_PARCEIRO.ERRO_PERMISSAO }] },
+          { ...base, id: 'c2', nomeNoIfood: 'Loja teste', teste: true, modulos: [{ id: 'm2', rotulo: 'Números de venda', situacao: SITUACAO_PARA_O_PARCEIRO.ATIVO }] },
+        ],
+      }),
+    );
+    const blocoReal = html2.slice(html2.indexOf('Loja real'), html2.indexOf('Loja teste'));
+    expect(blocoReal).not.toContain('Loja de teste do iFood');
+    expect(html2.slice(html2.indexOf('Loja teste'))).toContain('Loja de teste do iFood');
+    expect(SITUACAO_PARA_O_PARCEIRO.ERRO_PERMISSAO.tom).toBe('erro');
+    expect(SITUACAO_PARA_O_PARCEIRO.ATIVO.tom).toBe('ok');
+    expect(SITUACAO_PARA_O_PARCEIRO.SOLICITADO.tom).toBe('alerta');
+    const seloDoErro = renderToStaticMarkup(createElement(Selo, { tom: 'erro', children: 'x' }));
+    expect(blocoReal).toContain(seloDoErro.slice(0, seloDoErro.indexOf('>') + 1));
+    expect(html2).toContain('https://wa.me/5521996416060');
   });
 });

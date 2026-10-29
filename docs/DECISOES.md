@@ -3575,3 +3575,34 @@ Fora da integração, no mesmo bloco de trabalho (f0ce242): na suíte completa c
 - Navegador, no build de produção local: 3 telas × 6 larguras × 2 temas, sem rolagem lateral, um botão principal por tela, alvos de 44 px e foco no erro e no aviso.
 
 **Reverter:** `git revert` dos commits da Central. Sem migration.
+
+### 491. 2026-10-29 · INT-1.8, segunda parte: as Integrações do parceiro (tela só leitura)
+
+**Fonte:** "Plano de execução — Integração iFood no FlowFoods ERP", seção 3.4: "Integrações do parceiro — Nível 2 e 3 com permissão, só com o módulo liberado: lojas do iFood ligadas às Lojas e marcas, estado por módulo, última sincronização, erros em linguagem simples, pedido de conexão".
+
+**Mudanças:**
+1. **`/erp/integracoes`**, aba Integrações em Rede e Equipe. Só leitura: mostra as lojas do iFood ligadas às lojas do alcance da pessoa (o filtro vai na consulta) e o estado de cada módulo em linguagem simples, com o que fazer quando depende da loja.
+   - Exemplos de estado: "Esperando a loja aprovar: quem administra a loja no Portal do Parceiro aprova o app da FlowFoods"; "O iFood recusou o acesso".
+   - Sem sincronização ainda (INT-1.6), a "última sincronização" vira o aviso de que a busca automática não começou.
+   - O pedido de conexão é falar com a FlowFoods pelo WhatsApp, com o assunto já escrito.
+   - Não mostra Client ID, app, segredo, estado cru nem ligação desligada.
+2. **Permissão `integracao.ver`** (por loja, catálogo 4): só o **Dono** recebe pelo perfil base; os outros perfis recebem como extra ou no perfil próprio.
+   - Por que não no Gerente base: quem cuida da equipe com um perfil próprio parcial deixaria de cobrir os Gerentes e não poderia mais editá-los. Ponto levantado pela revisão.
+   - Migration `20261118000000_erp_catalogo_v4`, só dado e idempotente: promove só o perfil próprio "copiado do Dono" da v3, como as v2 e v3 faziam. Ninguém ganha o que não tinha.
+3. **Aba que depende de módulo liberado:** o campo `modulo` na aba e o parâmetro `liberados` agora **obrigatório** em `modulosDoParceiro` e `navegacaoDoParceiro`. Cada chamada decide; a revisão pegou o hub sem os liberados.
+   - O layout (menu, busca, trilha) e o hub "Áreas da Rede" leem `modulosLiberados` do parceiro.
+   - O nível 1 vê a aba em todo parceiro. No espelho, `/rodolfo/erp/<parceiro>/integracoes` leva à Central daquele parceiro.
+4. **Sem o módulo liberado:** a tela volta ao hub com "O módulo Integração não está liberado para a sua rede. Para usar, fale com a FlowFoods." **Sem a permissão:** volta com o aviso de acesso de sempre.
+5. **Leitura em `do-parceiro.ts`:** pelo portão do tenant, sem importar quem grava. A guarda de `integracao-fundacao` agora inclui este arquivo.
+
+**Revisão independente** (engenharia e tela juntas): aprovada com ressalvas, sem falha de segurança.
+- 2 "deve" corrigidos: o hub sem a aba e a guarda que não cobria o arquivo de leitura.
+- "Deveria" corrigidos: aviso próprio de módulo não liberado; permissão fora do Gerente base; caminho do Portal sem menu exato não confirmado; pedido de conexão com link; asserções do selo de teste e do tom.
+- 13 de 19 mutações pegas na rodada.
+
+**Prova:**
+- `integracao-parceiro.db` (5). Cobre: sem módulo e sem permissão; Gerente base sem e com extra; Dono vendo só o que é do alcance, sem nada técnico, sem desligada e sem o parceiro B; migration v4 nos três casos e repetida.
+- Testes atualizados: `erp-permissoes` (v4 e as versões antigas), `erp-permissoes.db`, `erp-navegacao` (aba com e sem liberação, Gerente com extra, layout, hub e nível 1), `erp-shell`, `erp-ajuda`.
+- Navegador, no build local: Dono e Gerente; bloquear na Central faz a aba sumir e a tela cair no aviso; espelho do nível 1; 360 a 1280, claro e escuro, sem rolagem lateral.
+
+**Reverter:** `git revert` dos commits. A migration é só dado: os perfis promovidos ficam com a permissão a mais, que sem o módulo liberado não abre nada.

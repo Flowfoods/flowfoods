@@ -9,6 +9,7 @@
  */
 
 import { ALCANCE_FLOWFOODS } from '@/lib/erp/permissoes';
+import { TODOS_OS_MODULOS_COM_LIBERACAO } from '@/lib/erp/liberacao';
 import { COR, modulosDoParceiro, type GrupoNav, type ModuloNav, type Navegacao } from '@/lib/erp/modulos';
 
 export const ROTULO_PARCEIROS = 'Parceiros Flow';
@@ -158,7 +159,8 @@ export function comParceiroAtual(
   const parceiro = slug ? parceiros.find((p) => p.slug === slug) : undefined;
   if (!parceiro) return nav;
   const base = `/rodolfo/erp/${parceiro.slug}`;
-  const areas = modulosDoParceiro(ALCANCE_FLOWFOODS, base).filter((m) => m.href);
+  // O nível 1 vê as abas de módulo com liberação em qualquer parceiro (é quem libera; Integrações leva à Central dele).
+  const areas = modulosDoParceiro(ALCANCE_FLOWFOODS, base, TODOS_OS_MODULOS_COM_LIBERACAO).filter((m) => m.href);
   const doParceiro: GrupoNav = {
     rotulo: parceiro.nome,
     icone: 'rede',

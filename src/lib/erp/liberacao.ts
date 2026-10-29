@@ -35,6 +35,18 @@ export async function moduloLiberado(cliente: ClienteDoParceiro, modulo: ModuloC
   return r?.liberado ?? false;
 }
 
+/** Os módulos liberados para o parceiro (para o menu e o hub decidirem as abas que dependem de liberação). */
+export async function modulosLiberados(cliente: ClienteDoParceiro): Promise<Set<ModuloComLiberacao>> {
+  const linhas = await cliente.liberacaoDeModulo.findMany({ where: { liberado: true }, select: { modulo: true } });
+  return new Set(linhas.map((l) => l.modulo).filter(ehModuloComLiberacao));
+}
+
+/** Nenhum módulo liberado: parceiro que não tem nenhum (o padrão de quem nasce). */
+export const NENHUM_MODULO_LIBERADO: ReadonlySet<ModuloComLiberacao> = new Set();
+
+/** Todos os módulos com liberação: o nível 1 vê as abas deles em qualquer parceiro (é quem libera). */
+export const TODOS_OS_MODULOS_COM_LIBERACAO: ReadonlySet<ModuloComLiberacao> = new Set(MODULOS_COM_LIBERACAO);
+
 export interface EstadoDaLiberacao {
   modulo: ModuloComLiberacao;
   rotulo: string;

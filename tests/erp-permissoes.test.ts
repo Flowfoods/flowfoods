@@ -488,9 +488,12 @@ describe('catálogo v4 (INT-1.8): ver as integrações das lojas (decisão 491)'
   const base = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR', lojas: 'rede' | string[]) =>
     resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojas === 'rede', lojaIds: lojas === 'rede' ? [] : lojas });
 
-  it('Dono e Gerente têm pelo perfil base (por loja); o Operador não', () => {
+  it('só o Dono tem pelo perfil base (Gerente e Operador, só como extra): quem cuida da equipe com perfil parcial continua cobrindo o Gerente', () => {
     expect(base('DONO', 'rede').permissoes.has('integracao.ver')).toBe(true);
-    expect(base('GERENTE', ['l1']).permissoes.has('integracao.ver')).toBe(true);
+    expect(base('GERENTE', ['l1']).permissoes.has('integracao.ver')).toBe(false);
+    // Um perfil próprio parcial da v3 que cuidava da equipe (cobria o Gerente base) continua cobrindo.
+    const cuida = V3.filter((p) => p !== 'precos.editar');
+    expect(cobre(proprio(cuida, 3), base('GERENTE', ['l1']))).toBe(true);
     expect(base('OPERADOR', ['l1']).permissoes.has('integracao.ver')).toBe(false);
     expect(rotuloDaPermissao('integracao.ver')).toBe('Ver as integrações das lojas (iFood)');
   });

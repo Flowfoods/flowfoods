@@ -143,8 +143,6 @@ export const COR = {
 
 export type ChaveDeCor = keyof typeof COR;
 
-/** Sem módulo liberado: o padrão (as abas que dependem de liberação ficam fora). */
-const SEM_MODULO_LIBERADO: ReadonlySet<ModuloComLiberacao> = new Set();
 
 interface Tela extends ItemNav {
   /** null = livre; lista = qualquer uma delas (1.8: requisições = quem pede OU quem atende). */
@@ -731,7 +729,7 @@ function liberada(alcance: Alcance, t: Tela) {
  * que ela vai poder ver, desabilitados. A entrada da área é a primeira aba
  * permitida.
  */
-export function modulosDoParceiro(alcance: Alcance, base = '/erp', liberados: ReadonlySet<ModuloComLiberacao> = SEM_MODULO_LIBERADO): ModuloNav[] {
+export function modulosDoParceiro(alcance: Alcance, base: string, liberados: ReadonlySet<ModuloComLiberacao>): ModuloNav[] {
   const construidos: ModuloNav[] = [];
   for (const m of areasConstruidas(base, alcance.nivel === 'FLOWFOODS')) {
     const grupos = m.grupos
@@ -773,7 +771,7 @@ export function modulosDoParceiro(alcance: Alcance, base = '/erp', liberados: Re
 }
 
 /** Navegação do /erp (pessoa do parceiro). "Seu acesso" fica no menu do usuário e no hub. */
-export function navegacaoDoParceiro(alcance: Alcance, liberados: ReadonlySet<ModuloComLiberacao> = SEM_MODULO_LIBERADO): Navegacao {
+export function navegacaoDoParceiro(alcance: Alcance, liberados: ReadonlySet<ModuloComLiberacao>): Navegacao {
   return {
     inicio: { href: '/erp', titulo: 'Áreas da Rede', subtitulo: 'Tudo o que você usa no ERP' },
     rotuloDaArea: 'ERP',

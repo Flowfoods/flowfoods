@@ -152,7 +152,7 @@ export const CATALOGO = [
   },
   {
     // INT-1.8 (decisão 491): a tela das integrações do parceiro, só leitura. Só vale com o módulo Integração liberado para o
-    // parceiro (decisão 482). Dono e gerente recebem pelo perfil base; perfil próprio só se alguém der (catálogo 4).
+    // parceiro (decisão 482). O Dono recebe pelo perfil base; os demais, como extra ou no perfil próprio (catálogo 4).
     chave: 'integracao',
     rotulo: 'Integração',
     permissoes: {
@@ -191,7 +191,9 @@ export function normalizarPermissoes(lista: readonly unknown[]): Permissao[] {
 
 export type PerfilBase = 'DONO' | 'GERENTE' | 'OPERADOR';
 
-const SEM_GERENTE = new Set<Permissao>(['acessos.gerir', 'lojas.gerir', 'metas.editar', 'precos.editar', 'insumos.categorias']);
+// INT-1.8 (decisão 491): `integracao.ver` fica só no Dono pelo perfil base. No Gerente base, quem cuida da equipe com um perfil
+// próprio parcial deixaria de cobrir os Gerentes; quem precisar ganha como extra.
+const SEM_GERENTE = new Set<Permissao>(['acessos.gerir', 'lojas.gerir', 'metas.editar', 'precos.editar', 'insumos.categorias', 'integracao.ver']);
 
 const DO_OPERADOR: Permissao[] = [
   'insumos.ver',

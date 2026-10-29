@@ -154,10 +154,11 @@ describe('INT-1.1 · guardas', () => {
 
   it('rota e tela do parceiro não importam quem grava a Central ou a liberação (só o nível 1 e o serviço da integração)', () => {
     const furos: string[] = [];
-    for (const raiz of [join('src', 'app', 'erp'), join('src', 'app', 'entrar'), join('src', 'components', 'erp')]) {
-      for (const f of arquivos(raiz)) {
+    for (const raiz of [join('src', 'app', 'erp'), join('src', 'app', 'entrar'), join('src', 'components', 'erp'), join('src', 'lib', 'integracoes', 'core', 'do-parceiro.ts')]) {
+      for (const f of raiz.endsWith('.ts') ? [raiz] : arquivos(raiz)) {
         const txt = readFileSync(f, 'utf8');
-        if (/from\s+['"]@\/lib\/integracoes\/core\/(conexoes|apps)['"]/.test(txt)) furos.push(`${f}: importa a Central`);
+        if (/from\s+['"](@\/lib\/integracoes\/core|\.)\/(conexoes|apps)['"]/.test(txt)) furos.push(`${f}: importa a Central`);
+        if (/\.\s*integracao(App|Token)\b/.test(txt)) furos.push(`${f}: tabela global`);
         if (/\b(mudarLiberacao|ligarConexao|desligarConexao|prepararModulo|mudarModulo|registrarApp)\b/.test(txt)) furos.push(`${f}: chama quem grava`);
       }
     }
