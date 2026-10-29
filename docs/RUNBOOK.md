@@ -261,6 +261,7 @@ volume.
 | `limpar-cache` | `docker builder prune -f` + `docker image prune -f`, só com disco ≥ 90% | `VPS_SSH_KEY` |
 | `subir` | Docker → Traefik → `alvos` na ordem, um por vez, esperando cada deploy terminar | Dokploy (+ SSH para o Traefik) |
 | `provar` | por domínio: DNS, HTTP, certificado (nome, emissor, validade) — tabela no resumo do job | nada |
+| `leitura-ifood-test` | roda no worker a leitura TEST do iFood (INT-1.4) por um compose de uso único com o docker.sock; `alvos` = Client ID[,loja=uuid][,dia=AAAA-MM-DD][,token-novo]. Mostra só sim/não das variáveis; nunca token nem segredo | Dokploy |
 
 `alvos` aceita: `traefik` (settings.reloadTraefik), `container:<nome>`,
 `compose:<id>`, `application:<id>`, `postgres:<id>`, `redis:<id>`.

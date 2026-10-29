@@ -192,6 +192,12 @@ consulta o Analytics na loja de teste com o cabeçalho de homologação e grava 
 evidência (sem token nem segredo) em `/tmp/integracao-leituras/` dentro do
 worker. Ligar a chave sozinha não sincroniza nada.
 
+Sem terminal no servidor: GitHub → Actions → **barney-ops** → `reerguer-vps`,
+etapa `leitura-ifood-test`, `alvos` = Client ID (opcionais, separados por
+vírgula: `loja=<uuid>`, `dia=AAAA-MM-DD`, `token-novo`). Um compose de uso
+único com o docker.sock roda o mesmo comando no worker, mostra só sim/não das
+variáveis da integração, devolve o resultado no log e é removido no fim.
+
 **Sobre o ERP do parceiro (`/entrar` e `/erp`):** não pede variável nova. O
 rosto (passkey) só funciona em **https** (o navegador recusa em http, fora do
 localhost) e fica preso ao domínio: trocar de domínio depois obriga cada pessoa

@@ -40,9 +40,9 @@ on:
         type: choice
         required: false
         default: diagnosticar
-        options: [diagnosticar, reiniciar, limpar-cache, subir, recriar-traefik, provar, aguardar-e-provar, api-schema, traefik-via-compose]
+        options: [diagnosticar, reiniciar, limpar-cache, subir, recriar-traefik, provar, aguardar-e-provar, api-schema, traefik-via-compose, leitura-ifood-test]
       alvos:
-        description: 'reerguer-vps/subir: tipo:ID na ordem, ex. postgres:abc,compose:xyz (um por vez)'
+        description: 'reerguer-vps/subir: tipo:ID na ordem, ex. postgres:abc,compose:xyz · leitura-ifood-test: Client ID[,loja=uuid][,dia=AAAA-MM-DD][,token-novo]'
         type: string
         required: false
       alvo:

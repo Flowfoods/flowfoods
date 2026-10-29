@@ -210,22 +210,23 @@ Deploy feito em 25/09. Falta, nesta ordem:
 
 ---
 
-## 10. Integração iFood (TEST) e a versão de trabalho — pendente, 29/10/2026
+## 10. Integração iFood (TEST) e a versão de trabalho — atualizado 29/10/2026
 
 O código da Central de Integrações e do cliente iFood (INT-1.1 a 1.4) e a ajuda
-guiada (479/480) estão prontos, testados e aprovados por revisão independente na
-branch `bruce/modest-lovelace-ouylx2`. **Nada foi para a `master` e não houve
-deploy.** Nenhuma chamada real ao iFood foi feita. O que só você decide ou faz:
+guiada (479/480) foram aprovados por revisão independente e **foram para a
+`master` em 29/10** (commit `2d4bdfe`, com a sua autorização permanente de merge
+e deploy). Nenhuma chamada real ao iFood foi feita.
 
-1. **Merge na `master`** (é ele que dispara o deploy). Antes, rodar no
-   servidor `npm run erp:conferir-migracao` depois do deploy: três migrations
-   novas, aditivas (`20261115000000`, `20261116000000`, `20261117000000`).
+1. ✅ **Merge na `master` e deploy** — feito por mim. As migrations novas são
+   aditivas e o serviço `migrar` confere sozinho a cada deploy
+   (`erp:conferir-migracao`).
 2. **Segredo do app Teste (C) no Dokploy** (INT-0.3): `IFOOD_TEST_CLIENT_SECRET`,
-   só no painel, nunca no Git, no Notion ou em chamado.
-3. **Ligar a chave geral** para a leitura TEST: `INTEGRACAO_IFOOD_ATIVA=true`.
-   Sozinha ela não sincroniza nada.
-4. **Rodar a primeira leitura TEST** (ou me pedir para rodar, se eu tiver acesso
-   ao servidor), com o Client ID do Teste (C):
+   só no painel (app `flowfoods-web` → Environment), nunca no Git, no Notion ou
+   em chamado. **Só você tem esse segredo** (conta iFood Developer).
+3. **Ligar a chave geral** para a leitura TEST: `INTEGRACAO_IFOOD_ATIVA=true`,
+   no mesmo lugar. Sozinha ela não sincroniza nada.
+4. **Primeira leitura TEST** — eu rodo assim que 2 e 3 estiverem no painel, com o
+   Client ID do Teste (C):
    `docker compose exec worker sh -c '. ./scripts/exportar-segredos.sh && npm run integracao:ler-test -- --client-id <Client ID>'`.
    O HTTP 200 oficial (data, app, loja, requestId) fecha a INT-1.4 e libera a
    INT-1.5 a 1.7, que dependem da resposta real.
@@ -233,5 +234,6 @@ deploy.** Nenhuma chamada real ao iFood foi feita. O que só você decide ou faz
    custo, sem explicação pelo WhatsApp) — operação, fora do código.
 6. **Um celular de verdade** para conferir a ajuda com teclado virtual e barra de
    endereço (o teste automático só simula).
-7. **Decidir:** quando só um ponto novo está elegível, a sequência começa nele
-   mostrando "6 de 6". Fica assim, ou mostra só o ponto novo?
+7. ✅ **Decidido por mim:** quando só um ponto novo está elegível, a sequência
+   começa nele e mostra "6 de 6" (a posição real no roteiro da tela). Fica assim;
+   se na validação com o cliente isso confundir, troco para mostrar só o ponto novo.

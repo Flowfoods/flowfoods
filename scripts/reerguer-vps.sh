@@ -8,6 +8,7 @@
 #   limpar-cache  docker builder prune + image prune, SÓ se o disco passar de 90%
 #   subir         Docker → Dokploy/Traefik → lista de IDs, um por vez, esperando cada um
 #   provar        HTTP + certificado + DNS de cada domínio cadastrado no Dokploy
+#   leitura-ifood-test  roda no worker a leitura TEST do iFood (INT-1.4); ALVOS = Client ID[,loja=][,dia=][,token-novo]
 #
 # Regras que o script garante:
 #   - nunca imprime token, senha ou chave; da API do Dokploy só saem nome, id,
@@ -607,6 +608,136 @@ YML
   [ "$(jq -r '.State.Running // false' /tmp/dk.json 2>/dev/null)" = true ] || exit 1
 }
 
+# Leitura TEST do iFood (INT-1.4, decisão 486) no worker do servidor, por um compose de uso único com o docker.sock (o mesmo
+# caminho do traefik-via-compose: a sessão do Claude não alcança a VPS). ALVOS = "<Client ID>[,loja=<uuid>][,dia=AAAA-MM-DD]
+# [,token-novo]". Antes do comando, mostra só sim/não das variáveis da integração no worker. O comando recusa sozinho (saída 2,
+# sem chamar o iFood) com a chave geral desligada ou sem o segredo, e nunca imprime token nem segredo. Do Dokploy só se leem
+# appName e environmentId: o JSON do compose traz as variáveis do painel e não vai para o log.
+leitura_ifood_test() {
+  preparar_dokploy || exit 1
+  local uuid='^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+  local cid="" args="" item itens
+  IFS=',' read -ra itens <<<"${ALVOS:-}"
+  for item in "${itens[@]}"; do
+    item=$(printf '%s' "$item" | tr -d '[:space:]')
+    case "$item" in
+      "") ;;
+      loja=*) [[ "${item#loja=}" =~ $uuid ]] || { echo "::error::loja= precisa ser o UUID da loja"; exit 2; }; args="$args --loja ${item#loja=}" ;;
+      dia=*) [[ "${item#dia=}" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "::error::dia= precisa ser AAAA-MM-DD"; exit 2; }; args="$args --dia ${item#dia=}" ;;
+      token-novo) args="$args --token-novo" ;;
+      *) { [[ "$item" =~ $uuid ]] && [ -z "$cid" ]; } || { echo "::error::alvos: Client ID (UUID) e, opcionais, loja=, dia=, token-novo"; exit 2; }; cid="$item" ;;
+    esac
+  done
+  [ -n "$cid" ] || { echo "::error::Informe em alvos o Client ID do app Teste (C)."; exit 2; }
+  args="--client-id ${cid}${args}"
+
+  titulo "App do site no Dokploy"
+  local web="${COMPOSE_WEB:-JWsPI2ZLgUrh11MS_EwwB}" projeto env_id
+  code=$(dokploy GET "/api/compose.one?composeId=${web}")
+  projeto=$(jq -r '.appName // empty' /tmp/dk.json 2>/dev/null | tr '[:upper:]' '[:lower:]')
+  env_id=$(jq -r '.environmentId // empty' /tmp/dk.json 2>/dev/null)
+  : > /tmp/dk.json
+  echo "compose.one -> HTTP $code · projeto: ${projeto:-?}"
+  [[ "$projeto" =~ ^[a-z0-9_-]+$ ]] && [ -n "$env_id" ] || { echo "::error::Não li appName/environmentId do app do site."; exit 1; }
+
+  # Sobra de uma execução anterior que não terminou: remove (só o compose de uso único, sem volumes).
+  inventario >/dev/null || true
+  awk -F'\t' '$1=="compose" && $3=="leitura-ifood-test"{print $2}' /tmp/inventario.tsv 2>/dev/null | while read -r velho; do
+    code=$(dokploy POST /api/compose.delete "{\"composeId\":\"$velho\",\"deleteVolumes\":false}"); echo "sobra $velho removida -> HTTP $code"
+  done
+
+  local marca="${GITHUB_RUN_ID:-local}-$RANDOM"
+  local script
+  script=$(cat <<'SH'
+OUT=/out/leitura-ifood-test.log
+{
+  echo "marca=$MARCA"
+  echo "início: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  c=$(docker ps --filter "label=com.docker.compose.project=$PROJETO" --filter label=com.docker.compose.service=worker --format '{{.Names}}' | head -1)
+  if [ -z "$c" ]; then
+    echo "Worker não encontrado no projeto $PROJETO. Containers *worker* no host:"
+    docker ps --format '{{.Names}}' | grep -i worker || echo "(nenhum)"
+    echo "saida=3"
+  else
+    echo "worker: $c ($(docker inspect -f '{{.State.Status}} desde {{.State.StartedAt}}' "$c"))"
+    echo "variáveis da integração no worker (só sim/não):"
+    docker exec "$c" sh -c '. ./scripts/exportar-segredos.sh >/dev/null 2>&1
+      [ "${INTEGRACAO_IFOOD_ATIVA:-}" = true ] && echo "  INTEGRACAO_IFOOD_ATIVA: true" || echo "  INTEGRACAO_IFOOD_ATIVA: não é true"
+      [ -n "${IFOOD_TEST_CLIENT_SECRET:-}" ] && echo "  IFOOD_TEST_CLIENT_SECRET: presente" || echo "  IFOOD_TEST_CLIENT_SECRET: ausente"
+      [ -n "${INTEGRACAO_CHAVE_CIFRAGEM:-}" ] && echo "  INTEGRACAO_CHAVE_CIFRAGEM: presente" || echo "  INTEGRACAO_CHAVE_CIFRAGEM: ausente"'
+    echo "comando: npm run integracao:ler-test -- $ARGS"
+    docker exec "$c" sh -c '. ./scripts/exportar-segredos.sh && npm run --silent integracao:ler-test -- "$@"' leitura $ARGS
+    echo "saida=$?"
+  fi
+} > "$OUT.tmp" 2>&1
+mv -f "$OUT.tmp" "$OUT"
+SH
+)
+  script=$(sed 's/\$/$$/g' <<<"$script")
+  local compose
+  compose=$(cat <<YML
+services:
+  leitura:
+    image: docker:27-cli
+    restart: "no"
+    environment:
+      MARCA: "${marca}"
+      PROJETO: "${projeto}"
+      ARGS: "${args}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/dokploy/traefik/reerguer:/out
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+$(sed 's/^/        /' <<<"$script")
+YML
+)
+  titulo "Compose de uso único"
+  corpo=$(jq -n --arg e "$env_id" --arg f "$compose" \
+    '{name:"leitura-ifood-test", appName:"leitura-ifood-test", environmentId:$e, composeType:"docker-compose", composeFile:$f, description:"temporário: leitura TEST do iFood (INT-1.4)"}')
+  code=$(dokploy POST /api/compose.create "$corpo"); echo "compose.create -> HTTP $code"
+  local cid_compose
+  cid_compose=$(jq -r '.composeId // empty' /tmp/dk.json 2>/dev/null)
+  if [ -z "$cid_compose" ]; then
+    inventario >/dev/null; cid_compose=$(awk -F'\t' '$1=="compose" && $3=="leitura-ifood-test"{print $2}' /tmp/inventario.tsv | head -1)
+  fi
+  [ -n "$cid_compose" ] || { echo "::error::compose não criado (HTTP $code)"; exit 1; }
+  code=$(dokploy POST /api/compose.update "$(jq -n --arg c "$cid_compose" --arg f "$compose" '{composeId:$c, composeFile:$f, sourceType:"raw"}')")
+  echo "compose.update -> HTTP $code (id $cid_compose)"
+  code=$(dokploy POST /api/compose.deploy "{\"composeId\":\"$cid_compose\",\"title\":\"leitura TEST do iFood\"}"); echo "compose.deploy -> HTTP $code"
+  esperar compose "$cid_compose" || echo "::warning::deploy do compose não terminou em done"
+
+  titulo "Resultado"
+  local achou="" saida="" path tentativa
+  for tentativa in $(seq 1 24); do
+    for path in /etc/dokploy/traefik/reerguer/leitura-ifood-test.log reerguer/leitura-ifood-test.log; do
+      code=$(dokploy GET "/api/settings.readTraefikFile?path=$(jq -rn --arg p "$path" '$p|@uri')")
+      [ "$code" = 200 ] || continue
+      jq -r 'if type=="string" then . else tostring end' /tmp/dk.json > /tmp/leitura.log 2>/dev/null || continue
+      if grep -qx "marca=${marca}" /tmp/leitura.log && grep -q '^saida=' /tmp/leitura.log; then achou=1; break 2; fi
+    done
+    sleep 15
+  done
+  if [ -n "$achou" ]; then
+    # Defesa extra: mascara qualquer coisa com cara de JWT (o comando já não imprime token nem segredo).
+    sed -E 's/eyJ[A-Za-z0-9._-]{20,}/[mascarado]/g' /tmp/leitura.log | grep -v '^marca='
+    saida=$(sed -n 's/^saida=//p' /tmp/leitura.log | tail -1)
+    { echo '### Leitura TEST do iFood'; echo '```'; sed -E 's/eyJ[A-Za-z0-9._-]{20,}/[mascarado]/g' /tmp/leitura.log | grep -v '^marca='; echo '```'; } >> "$RESUMO"
+  else
+    echo "::error::O relatório da leitura não apareceu em 6 min."
+  fi
+
+  titulo "Removendo compose de uso único (sem volumes)"
+  code=$(dokploy POST /api/compose.delete "{\"composeId\":\"$cid_compose\",\"deleteVolumes\":false}"); echo "compose.delete -> HTTP $code"
+  case "$saida" in
+    0) echo "Leitura TEST com HTTP 200 oficial." ;;
+    2) echo "::warning::Recusada antes de chamar o iFood (ver o motivo acima)."; exit 2 ;;
+    "") exit 1 ;;
+    *) exit 1 ;;
+  esac
+}
+
 case "$ETAPA" in
   diagnosticar) diagnosticar ;;
   reiniciar)    reiniciar ;;
@@ -617,5 +748,6 @@ case "$ETAPA" in
   aguardar-e-provar) aguardar_e_provar ;;
   api-schema)   api_schema ;;
   traefik-via-compose) traefik_via_compose ;;
+  leitura-ifood-test) leitura_ifood_test ;;
   *) echo "etapa desconhecida: $ETAPA"; exit 2 ;;
 esac

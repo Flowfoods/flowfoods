@@ -84,6 +84,16 @@ VPS Hostinger com Dokploy, n8n, PostgreSQL e Evolution API. Portal de formulári
 em portal.consultoriaflowfoods.com.br. Este repo é o site/portal
 (Next.js 14 + Prisma); ver `docs/` para decisões, deploy e pendências.
 
+## Publicação (autorização permanente, 29/10/2026)
+
+- Rodolfo autorizou: **merge na `master` e deploy sem pedir permissão**, sempre.
+  O push na `master` roda o portão (lint, tipos, testes com banco, build) e só
+  então o deploy no Dokploy. Portão vermelho = corrigir e publicar de novo.
+- Continua só com ele: segredos no cofre/painel, app de produção do iFood,
+  homologação, autorização e ativação por loja, e qualquer custo novo.
+- Nunca ler as variáveis do Dokploy pela API ou por workflow: os segredos
+  apareceriam nos logs do GitHub.
+
 ## Contexto dos clientes
 
 `clientes/<slug>/contexto-<data>.md`: o que cada cliente respondeu no Portal,
