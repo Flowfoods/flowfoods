@@ -30,6 +30,7 @@ import {
   type Navegacao,
 } from '@/lib/erp/modulos';
 import { comParceiroAtual, navegacaoDoNivel1 } from '@/lib/rodolfo/modulos';
+import { MODULOS_COM_LIBERACAO } from '@/lib/erp/liberacao';
 import { HubDoParceiro } from '@/components/erp/telas/hub-do-parceiro';
 import { Abas } from '@/components/erp/ui/abas';
 
@@ -444,10 +445,12 @@ describe('UX.9 · itemAtivo acende a aba certa em cada rota profunda', () => {
       '/' + arquivo.slice(raiz.length + 1).split('/').slice(0, -1).map((s) => (s.startsWith('[') ? 'x' : s)).join('/');
     const nivel1 = comParceiroAtual(navegacaoDoNivel1(), '/rodolfo/erp/v/insumos', [{ slug: 'v', nome: 'V' }]);
     const parceiro = join('src', 'app', 'erp');
+    // Com os módulos de liberação liberados (INT-1.8: Integrações só aparece com o módulo liberado para o parceiro).
+    const navComTudo = navegacaoDoParceiro(DONO, new Set(MODULOS_COM_LIBERACAO));
     for (const f of paginas(parceiro)) {
       const r = `/erp${rota(f, parceiro) === '/' ? '' : rota(f, parceiro)}`;
       if (r === '/erp') continue; // o hub
-      expect(itemAtivo(nav, r), r).not.toBeNull();
+      expect(itemAtivo(navComTudo, r), r).not.toBeNull();
     }
     const espelho = join('src', 'app', 'rodolfo', '(painel)', 'erp', '[slug]');
     for (const f of paginas(espelho)) {
@@ -681,5 +684,26 @@ describe('UX.9 · guardas estáticas', () => {
       [join('src', 'components', 'erp', 'telas', 'compras', 'paginas.tsx'), /rotulo: 'Novo fornecedor'/],
     ];
     for (const [f, re] of exige) expect(readFileSync(f, 'utf8'), `${f} ${re}`).toMatch(re);
+  });
+});
+
+// ---------------------------------------------------------------- INT-1.8: aba que depende de módulo liberado
+describe('INT-1.8 · Integrações aparece em Rede e Equipe só com o módulo liberado (decisão 491)', () => {
+  const abasDaRede = (nav: ReturnType<typeof navegacaoDoParceiro>) => nav.modulos.find((m) => m.chave === 'rede')?.grupos.flatMap((g) => g.itens.map((i) => i.href)) ?? [];
+  const liberado = new Set(MODULOS_COM_LIBERACAO);
+
+  it('sem liberação, ninguém vê a aba (nem o Dono); liberado, o Dono e o Gerente veem; o Operador não', () => {
+    expect(abasDaRede(navegacaoDoParceiro(DONO))).not.toContain('/erp/integracoes');
+    expect(abasDaRede(navegacaoDoParceiro(DONO, liberado))).toContain('/erp/integracoes');
+    const gerente = resolverAlcance({ perfilBase: 'GERENTE', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: false, lojaIds: ['l1'] });
+    expect(abasDaRede(navegacaoDoParceiro(gerente, liberado))).toContain('/erp/integracoes');
+    const operador = resolverAlcance({ perfilBase: 'OPERADOR', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: false, lojaIds: ['l1'] });
+    expect(abasDaRede(navegacaoDoParceiro(operador, liberado))).not.toContain('/erp/integracoes');
+  });
+
+  it('o layout do /erp passa os módulos liberados do parceiro para o menu', () => {
+    const txt = readFileSync(join('src', 'app', 'erp', 'layout.tsx'), 'utf8');
+    expect(txt).toMatch(/liberacoesDoParceiro\(ctx\.cliente\)/);
+    expect(txt).toMatch(/navegacaoDoParceiro\(alcance, liberados\)/);
   });
 });

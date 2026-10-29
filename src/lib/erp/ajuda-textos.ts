@@ -1596,6 +1596,18 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     ],
   },
   {
+    chave: 'integracoes',
+    area: 'rede',
+    rotas: ['integracoes'],
+    titulo: 'Integrações',
+    versao: 1,
+    aula: [
+      { texto: 'As lojas do iFood ligadas às suas lojas e o que está ativo em cada uma. Aqui só se consulta: ligar e ativar é com a FlowFoods.' },
+      { texto: 'Esperando a loja aprovar quer dizer que quem administra a loja no Portal do Parceiro do iFood precisa aprovar o app da FlowFoods, em Serviços e soluções, Integrações.' },
+      { texto: 'Quando a busca automática começar, as vendas do iFood entram sozinhas no faturamento, com os dados até ontem.' },
+    ],
+  },
+  {
     chave: 'equipe',
     area: 'rede',
     rotas: ['equipe'],

@@ -303,6 +303,10 @@
     "versao": 3,
     "hash": "fd7c1b48f168f693"
   },
+  "integracoes": {
+    "versao": 1,
+    "hash": "f6a4fd178f0745e9"
+  },
   "equipe": {
     "versao": 1,
     "hash": "15d3af5a44b272be"

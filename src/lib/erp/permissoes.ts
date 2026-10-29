@@ -28,9 +28,9 @@
 
 /**
  * Sobe quando o catálogo ganha permissão nova (perfil próprio guarda em que versão nasceu). 2 = 3.2, `producao.planejar`.
- * 3 = I.1a, `insumos.categorias`.
+ * 3 = I.1a, `insumos.categorias`. 4 = INT-1.8, `integracao.ver`.
  */
-export const VERSAO_DO_CATALOGO = 3;
+export const VERSAO_DO_CATALOGO = 4;
 
 export interface DefinicaoDePermissao {
   rotulo: string;
@@ -148,6 +148,15 @@ export const CATALOGO = [
     permissoes: {
       'precos.ver': { rotulo: 'Ver preços e margens' },
       'precos.editar': { rotulo: 'Mudar preços e margens' },
+    },
+  },
+  {
+    // INT-1.8 (decisão 491): a tela das integrações do parceiro, só leitura. Só vale com o módulo Integração liberado para o
+    // parceiro (decisão 482). Dono e gerente recebem pelo perfil base; perfil próprio só se alguém der (catálogo 4).
+    chave: 'integracao',
+    rotulo: 'Integração',
+    permissoes: {
+      'integracao.ver': { rotulo: 'Ver as integrações das lojas (iFood)', porLoja: true },
     },
   },
 ] as const satisfies readonly ModuloDoCatalogo[];
@@ -289,7 +298,7 @@ export interface VinculoDePermissao {
 }
 
 /** O que entrou no catálogo em cada versão (a 1 é a de nascença). */
-const NOVAS_NA_VERSAO: Readonly<Record<number, readonly Permissao[]>> = { 2: ['producao.planejar'], 3: ['insumos.categorias'] };
+const NOVAS_NA_VERSAO: Readonly<Record<number, readonly Permissao[]>> = { 2: ['producao.planejar'], 3: ['insumos.categorias'], 4: ['integracao.ver'] };
 
 /** O catálogo como era na versão `versao`: o de hoje menos o que entrou depois. */
 function catalogoNaVersao(versao: number): Permissao[] {

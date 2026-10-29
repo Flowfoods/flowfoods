@@ -28,6 +28,7 @@ import {
 import { caixaDaTela, entradaDoCaminho, rotaRelativa, type PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
 import { divergenciasDoLock, hashDaEntrada, lockNovo, type Lock } from '@/lib/erp/ajuda-integridade';
 import { itemAtivo, modulosDoParceiro, navegacaoDoParceiro } from '@/lib/erp/modulos';
+import { MODULOS_COM_LIBERACAO } from '@/lib/erp/liberacao';
 import { ALCANCE_FLOWFOODS, resolverAlcance, TODAS_AS_PERMISSOES, type Alcance, type VinculoDePermissao } from '@/lib/erp/permissoes';
 import lockSalvo from '@/lib/erp/ajuda.lock.json';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
@@ -133,7 +134,8 @@ describe('0.6 · o gate: ajuda sempre atualizada', () => {
 
   it('a área de cada entrada é a área onde a tela acende no menu', () => {
     const nomeDaArea = (base: string, a: Alcance) => (rota: string) => {
-      const nav = { ...navegacaoDoParceiro(a), modulos: modulosDoParceiro(a, base) };
+      // Com os módulos de liberação liberados: a entrada de uma tela que depende deles também tem área.
+      const nav = { ...navegacaoDoParceiro(a), modulos: modulosDoParceiro(a, base, new Set(MODULOS_COM_LIBERACAO)) };
       const ativo = itemAtivo(nav, `${base}/${rota.replace(/\[[^\]]+\]/g, 'x1')}`.replace(/\/$/, ''));
       return ativo?.modulo.chave ?? 'inicio';
     };

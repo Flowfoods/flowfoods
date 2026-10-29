@@ -18,6 +18,7 @@
  */
 
 import { pode, type Alcance, type Permissao } from './permissoes';
+import type { ModuloComLiberacao } from './liberacao';
 
 /** Chave do ícone: o desenho mora em `src/components/erp/shell/icones.tsx`. */
 export type ChaveIcone =
@@ -142,11 +143,16 @@ export const COR = {
 
 export type ChaveDeCor = keyof typeof COR;
 
+/** Sem módulo liberado: o padrão (as abas que dependem de liberação ficam fora). */
+const SEM_MODULO_LIBERADO: ReadonlySet<ModuloComLiberacao> = new Set();
+
 interface Tela extends ItemNav {
   /** null = livre; lista = qualquer uma delas (1.8: requisições = quem pede OU quem atende). */
   permissao: Permissao | readonly Permissao[] | null;
   /** I.1a: além de `permissao`, a pessoa também precisa desta (sem "ver insumos" ninguém vê a área só por poder classificar). */
   tambem?: Permissao;
+  /** INT-1.8 (decisão 491): a aba só aparece com este módulo liberado para o parceiro (decisão 482). */
+  modulo?: ModuloComLiberacao;
   /**
    * 3.3: esta aba é a ENTRADA da área para quem tem `tem` e não tem `semTer` (a cozinha entra na Produção pelas Tarefas; a
    * gerência, pela Lista do dia, a primeira aba). Não muda a ordem das abas.
@@ -688,6 +694,14 @@ function areasConstruidas(base: string, nivel1: boolean): DefinicaoDeArea[] {
               subtitulo: 'Onde a operação acontece',
               permissao: 'lojas.ver',
             },
+            {
+              href: `${base}/integracoes`,
+              rotulo: 'Integrações',
+              icone: 'canais',
+              subtitulo: 'Lojas do iFood ligadas e o que está ativo',
+              permissao: 'integracao.ver',
+              modulo: 'integracao',
+            },
           ],
         },
         { rotulo: 'Pessoas', icone: 'equipe', telas: pessoas },
@@ -717,14 +731,16 @@ function liberada(alcance: Alcance, t: Tela) {
  * que ela vai poder ver, desabilitados. A entrada da área é a primeira aba
  * permitida.
  */
-export function modulosDoParceiro(alcance: Alcance, base = '/erp'): ModuloNav[] {
+export function modulosDoParceiro(alcance: Alcance, base = '/erp', liberados: ReadonlySet<ModuloComLiberacao> = SEM_MODULO_LIBERADO): ModuloNav[] {
   const construidos: ModuloNav[] = [];
   for (const m of areasConstruidas(base, alcance.nivel === 'FLOWFOODS')) {
     const grupos = m.grupos
       .map((g) => ({
         rotulo: g.rotulo,
         icone: g.icone,
-        itens: g.telas.filter((t) => liberada(alcance, t)).map(({ permissao: _p, tambem: _t, entradaPara: _e, ...item }) => ({ ...item, area: m.nome })),
+        itens: g.telas
+          .filter((t) => liberada(alcance, t) && (!t.modulo || liberados.has(t.modulo)))
+          .map(({ permissao: _p, tambem: _t, entradaPara: _e, modulo: _m, ...item }) => ({ ...item, area: m.nome })),
       }))
       .filter((g) => g.itens.length > 0);
     if (grupos.length === 0) continue;
@@ -739,7 +755,7 @@ export function modulosDoParceiro(alcance: Alcance, base = '/erp'): ModuloNav[] 
       cor: m.cor,
       href: entrada?.href ?? grupos[0].itens[0].href,
       grupos,
-      acoes: m.acoes.filter((t) => liberada(alcance, t)).map(({ permissao: _p, tambem: _t, entradaPara: _e, ...item }) => ({ ...item, area: m.nome })),
+      acoes: m.acoes.filter((t) => liberada(alcance, t) && (!t.modulo || liberados.has(t.modulo))).map(({ permissao: _p, tambem: _t, entradaPara: _e, modulo: _m, ...item }) => ({ ...item, area: m.nome })),
     });
   }
   const futuros: ModuloNav[] = MODULOS_FUTUROS.filter((f) => f.ver.some((p) => pode(alcance, p))).map((f) => ({
@@ -757,11 +773,11 @@ export function modulosDoParceiro(alcance: Alcance, base = '/erp'): ModuloNav[] 
 }
 
 /** Navegação do /erp (pessoa do parceiro). "Seu acesso" fica no menu do usuário e no hub. */
-export function navegacaoDoParceiro(alcance: Alcance): Navegacao {
+export function navegacaoDoParceiro(alcance: Alcance, liberados: ReadonlySet<ModuloComLiberacao> = SEM_MODULO_LIBERADO): Navegacao {
   return {
     inicio: { href: '/erp', titulo: 'Áreas da Rede', subtitulo: 'Tudo o que você usa no ERP' },
     rotuloDaArea: 'ERP',
-    modulos: modulosDoParceiro(alcance, '/erp'),
+    modulos: modulosDoParceiro(alcance, '/erp', liberados),
   };
 }
 

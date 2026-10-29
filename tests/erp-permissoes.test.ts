@@ -405,8 +405,8 @@ describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', 
 });
 
 describe('catálogo v2 (3.2): perfil próprio salvo na v1 (decisão 219)', () => {
-  // A v1 é o catálogo de hoje menos o que entrou depois (a v2 trouxe `producao.planejar`; a v3, `insumos.categorias`).
-  const V1 = TODAS_AS_PERMISSOES.filter((p) => p !== 'producao.planejar' && p !== 'insumos.categorias');
+  // A v1 é o catálogo de hoje menos o que entrou depois (a v2 trouxe `producao.planejar`; a v3, `insumos.categorias`; a v4, `integracao.ver`).
+  const V1 = TODAS_AS_PERMISSOES.filter((p) => p !== 'producao.planejar' && p !== 'insumos.categorias' && p !== 'integracao.ver');
   const proprio = (permissoes: readonly string[], catalogoVersao: number | null, lojas: 'rede' | string[] = 'rede') =>
     resolverAlcance({ perfilBase: null, perfilProprio: permissoes, perfilCatalogoVersao: catalogoVersao, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojas === 'rede', lojaIds: lojas === 'rede' ? [] : lojas });
   const base = (perfilBase: 'DONO' | 'GERENTE', lojas: 'rede' | string[]) => resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojas === 'rede', lojaIds: lojas === 'rede' ? [] : lojas });
@@ -426,14 +426,14 @@ describe('catálogo v2 (3.2): perfil próprio salvo na v1 (decisão 219)', () =>
     const semPrecos = V1.filter((p) => p !== 'precos.editar');
     expect(permissoesNoCatalogoAtual(semPrecos, 1)).toEqual(semPrecos);
     expect(proprio(semPrecos, 1).permissoes.has('producao.planejar')).toBe(false);
-    expect(novasDesdeOPerfil(semPrecos, 1)).toEqual(['insumos.categorias', 'producao.planejar']);
+    expect(novasDesdeOPerfil(semPrecos, 1)).toEqual(['insumos.categorias', 'producao.planejar', 'integracao.ver']);
     const cozinha = ['producao.ver', 'producao.registrar', 'insumos.ver'];
     expect(proprio(cozinha, 1).permissoes.has('producao.planejar')).toBe(false);
-    expect(novasDesdeOPerfil(normalizarPermissoes(cozinha), 1)).toEqual(['insumos.categorias', 'producao.planejar']);
-    // Salvo na v2 com tudo menos "definir a lista": foi escolha de quem salvou, nada entra; só a da v3 fica a revisar.
+    expect(novasDesdeOPerfil(normalizarPermissoes(cozinha), 1)).toEqual(['insumos.categorias', 'producao.planejar', 'integracao.ver']);
+    // Salvo na v2 com tudo menos "definir a lista": foi escolha de quem salvou, nada entra; só as da v3 e da v4 ficam a revisar.
     expect(permissoesNoCatalogoAtual(V1, 2)).toEqual(V1);
     expect(proprio(V1, 2).permissoes.has('producao.planejar')).toBe(false);
-    expect(novasDesdeOPerfil(V1, 2)).toEqual(['insumos.categorias']);
+    expect(novasDesdeOPerfil(V1, 2)).toEqual(['insumos.categorias', 'integracao.ver']);
     // Lojas e "exige rede" continuam valendo: o sócio de UMA loja não passa a cobrir quem tem a rede.
     expect(cobre(proprio(V1, 1, ['l1']), base('DONO', 'rede'))).toBe(false);
   });
@@ -447,7 +447,7 @@ describe('catálogo v2 (3.2): perfil próprio salvo na v1 (decisão 219)', () =>
 });
 
 describe('catálogo v3 (I.1a): gerir categorias de insumos (decisão 248)', () => {
-  const V2 = TODAS_AS_PERMISSOES.filter((p) => p !== 'insumos.categorias');
+  const V2 = TODAS_AS_PERMISSOES.filter((p) => p !== 'insumos.categorias' && p !== 'integracao.ver');
   const proprio = (permissoes: readonly string[], catalogoVersao: number | null, lojas: 'rede' | string[] = 'rede') =>
     resolverAlcance({ perfilBase: null, perfilProprio: permissoes, perfilCatalogoVersao: catalogoVersao, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojas === 'rede', lojaIds: lojas === 'rede' ? [] : lojas });
   const base = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR', lojas: 'rede' | string[]) =>
@@ -468,9 +468,9 @@ describe('catálogo v3 (I.1a): gerir categorias de insumos (decisão 248)', () =
     expect(cobre(proprio(V2, 2), base('DONO', 'rede'))).toBe(true);
     const semPrecos = V2.filter((p) => p !== 'precos.editar');
     expect(permissoesNoCatalogoAtual(semPrecos, 2)).toEqual(semPrecos);
-    expect(novasDesdeOPerfil(semPrecos, 2)).toEqual(['insumos.categorias']);
-    // Salvo na v3 sem a nova: escolha de quem salvou.
-    expect(novasDesdeOPerfil(V2, 3)).toEqual([]);
+    expect(novasDesdeOPerfil(semPrecos, 2)).toEqual(['insumos.categorias', 'integracao.ver']);
+    // Salvo na v3 sem a nova da v3: escolha de quem salvou (só a da v4 fica a revisar).
+    expect(novasDesdeOPerfil(V2, 3)).toEqual(['integracao.ver']);
   });
 
   it('a migration 20261101010000_erp_catalogo_v3 confere exatamente o catálogo da v2 (todas menos insumos.categorias)', () => {
@@ -478,6 +478,37 @@ describe('catálogo v3 (I.1a): gerir categorias de insumos (decisão 248)', () =
     const lista = sql.slice(sql.indexOf('ARRAY['), sql.indexOf(']::text[]'));
     const nomes = Array.from(lista.matchAll(/'([a-z]+\.[a-z]+)'/g)).map((m) => m[1]);
     expect(nomes).toEqual(V2);
+  });
+});
+
+describe('catálogo v4 (INT-1.8): ver as integrações das lojas (decisão 491)', () => {
+  const V3 = TODAS_AS_PERMISSOES.filter((p) => p !== 'integracao.ver');
+  const proprio = (permissoes: readonly string[], catalogoVersao: number | null, lojas: 'rede' | string[] = 'rede') =>
+    resolverAlcance({ perfilBase: null, perfilProprio: permissoes, perfilCatalogoVersao: catalogoVersao, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojas === 'rede', lojaIds: lojas === 'rede' ? [] : lojas });
+  const base = (perfilBase: 'DONO' | 'GERENTE' | 'OPERADOR', lojas: 'rede' | string[]) =>
+    resolverAlcance({ perfilBase, perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: lojas === 'rede', lojaIds: lojas === 'rede' ? [] : lojas });
+
+  it('Dono e Gerente têm pelo perfil base (por loja); o Operador não', () => {
+    expect(base('DONO', 'rede').permissoes.has('integracao.ver')).toBe(true);
+    expect(base('GERENTE', ['l1']).permissoes.has('integracao.ver')).toBe(true);
+    expect(base('OPERADOR', ['l1']).permissoes.has('integracao.ver')).toBe(false);
+    expect(rotuloDaPermissao('integracao.ver')).toBe('Ver as integrações das lojas (iFood)');
+  });
+
+  it('o "copiado do Dono" da v3 ganha a nova e continua cobrindo o Dono base; o parcial fica como está (e a Equipe pede para revisar)', () => {
+    expect(permissoesNoCatalogoAtual(V3, 3)).toEqual(TODAS_AS_PERMISSOES);
+    expect(cobre(proprio(V3, 3), base('DONO', 'rede'))).toBe(true);
+    const semPrecos = V3.filter((p) => p !== 'precos.editar');
+    expect(permissoesNoCatalogoAtual(semPrecos, 3)).toEqual(semPrecos);
+    expect(novasDesdeOPerfil(semPrecos, 3)).toEqual(['integracao.ver']);
+    expect(novasDesdeOPerfil(V3, 4)).toEqual([]);
+  });
+
+  it('a migration 20261118000000_erp_catalogo_v4 confere exatamente o catálogo da v3 (todas menos integracao.ver)', () => {
+    const sql = readFileSync(join(process.cwd(), 'prisma', 'migrations', '20261118000000_erp_catalogo_v4', 'migration.sql'), 'utf8');
+    const lista = sql.slice(sql.indexOf('ARRAY['), sql.indexOf(']::text[]'));
+    const nomes = Array.from(lista.matchAll(/'([a-z]+\.[a-z]+)'/g)).map((m) => m[1]);
+    expect(nomes).toEqual(V3);
   });
 });
 
