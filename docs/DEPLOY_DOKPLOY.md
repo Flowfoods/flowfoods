@@ -183,6 +183,15 @@ do app aponta. Para conferir sem mostrar valor nenhum:
 chama o iFood). Trocar `INTEGRACAO_CHAVE_CIFRAGEM` só invalida o token guardado:
 o serviço pede um novo.
 
+**Primeira leitura TEST (INT-1.4):** com `INTEGRACAO_IFOOD_ATIVA=true` e o
+segredo do app Teste (C) no painel, rode no servidor
+`docker compose exec worker npm run integracao:ler-test -- --client-id <Client ID do Teste (C)>`
+(opcional: `--loja <uuid>`, `--dia AAAA-MM-DD`, `--token-novo`). O comando
+cadastra o app de teste na Central se faltar, lista as lojas que o app enxerga,
+consulta o Analytics na loja de teste com o cabeçalho de homologação e grava a
+evidência (sem token nem segredo) em `/tmp/integracao-leituras/` dentro do
+worker. Ligar a chave sozinha não sincroniza nada.
+
 **Sobre o ERP do parceiro (`/entrar` e `/erp`):** não pede variável nova. O
 rosto (passkey) só funciona em **https** (o navegador recusa em http, fora do
 localhost) e fica preso ao domínio: trocar de domínio depois obriga cada pessoa
