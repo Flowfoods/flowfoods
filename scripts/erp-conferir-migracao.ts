@@ -682,11 +682,14 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       }
     }
     if (loja?.rls) {
-      const politicas = await db.$queryRaw<{ tabela: string; permissiva: string; usando: string | null }[]>`
-        SELECT tablename AS tabela, permissive AS permissiva, qual AS usando FROM pg_policies WHERE policyname = ANY(${TABELAS_DA_INT_1_1.map((t) => `${t}_do_parceiro`)})`;
+      const politicas = await db.$queryRaw<{ tabela: string; permissiva: string; usando: string | null; gravando: string | null }[]>`
+        SELECT tablename AS tabela, permissive AS permissiva, qual AS usando, with_check AS gravando FROM pg_policies WHERE policyname = ANY(${TABELAS_DA_INT_1_1.map((t) => `${t}_do_parceiro`)})`;
       for (const t of TABELAS_DA_INT_1_1) {
         const pol = politicas.find((x) => x.tabela === t);
-        if (!pol || !/app\.parceiro_id/.test(pol.usando ?? '')) pendencias.push(`Política ${t}_do_parceiro ausente ou sem o filtro do parceiro: rode o bloco da RLS da migration ${M}.`);
+        // Decisão 488: a leitura (USING) E a gravação (WITH CHECK) filtram pelo parceiro.
+        if (!pol || !/app\.parceiro_id/.test(pol.usando ?? '') || !/app\.parceiro_id/.test(pol.gravando ?? '')) {
+          pendencias.push(`Política ${t}_do_parceiro ausente ou sem o filtro do parceiro na leitura ou na gravação: rode o bloco da RLS da migration ${M}.`);
+        }
       }
       const outras = await db.$queryRaw<{ tabela: string; nome: string }[]>`
         SELECT tablename AS tabela, policyname AS nome FROM pg_policies WHERE tablename = ANY(${[...TABELAS_DA_INT_1_1]}) AND policyname <> ALL(${TABELAS_DA_INT_1_1.map((t) => `${t}_do_parceiro`)})`;
@@ -706,6 +709,16 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
     const gatilhos = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_INT_1_1]})`;
     for (const t of GATILHOS_DA_INT_1_1) {
       if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
+    }
+    // Decisão 488: gatilho existente mas desligado não protege nada.
+    const desligados = await db.$queryRaw<{ nome: string; tabela: string }[]>`
+      SELECT t.tgname AS nome, c.relname AS tabela FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid
+      WHERE NOT t.tgisinternal AND t.tgenabled = 'D' AND t.tgname = ANY(${[...GATILHOS_DA_INT_1_1, ...GATILHOS_DA_487]})`;
+    for (const d of desligados) pendencias.push(`Gatilho ${d.nome} está DESLIGADO: rode ALTER TABLE "${d.tabela}" ENABLE TRIGGER "${d.nome}";`);
+    // A correção do pg_temp supõe que o tenant não cria objeto no schema (senão, troca uma tabela de verdade pela dele).
+    if (papel[0]?.existe) {
+      const cria = await db.$queryRaw<{ pode: boolean }[]>`SELECT has_schema_privilege('erp_tenant', current_schema(), 'CREATE') AS pode`;
+      if (cria[0]?.pode) pendencias.push('O papel erp_tenant pode criar objetos no schema do banco: rode REVOKE CREATE ON SCHEMA <schema> FROM erp_tenant, PUBLIC;');
     }
     // Decisão 487 (só depois que a migration dela rodou: o gatilho do app é dela).
     const M2 = '20261116000000_erp_integracao_endurecimento';

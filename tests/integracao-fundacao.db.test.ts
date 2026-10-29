@@ -253,7 +253,8 @@ describe.skipIf(!URL_TESTE)('INT-1.1 · fundação da Central de Integrações (
     if (!lig.ok) throw new Error('sem conexão TEST');
     await expect(
       comoTenant(ids[2], async (tx) => {
-        await tx.exec(`CREATE TEMP TABLE "IntegracaoApp" (id text, provedor text, ambiente text, modulos text[], "estadoHomologacao" text) ON COMMIT DROP`);
+        // Com os tipos de verdade (enum): o ataque não falha por erro de tipo, só pelo search_path fechado.
+        await tx.exec(`CREATE TEMP TABLE "IntegracaoApp" (id text, provedor "ProvedorDeIntegracao", ambiente "AmbienteDeIntegracao", modulos "ModuloDeIntegracao"[], "estadoHomologacao" "HomologacaoDeApp") ON COMMIT DROP`);
         await tx.exec(`INSERT INTO "IntegracaoApp" VALUES ($1, 'IFOOD', 'TEST', '{REVIEW}', 'NAO_SE_APLICA')`, appBi);
         await tx.exec(`INSERT INTO "IntegracaoConexaoModulo"(id,"parceiroId","conexaoId","appId",modulo,"criadoPorNome","atualizadoEm") VALUES ($1,$2,$3,$4,'REVIEW','x',now())`, `tmpm-${sufixo}`, ids[2], lig.id, appBi);
       }),
@@ -270,6 +271,17 @@ describe.skipIf(!URL_TESTE)('INT-1.1 · fundação da Central de Integrações (
       // De outros parceiros, nada; e o A enxerga os dele (o zero acima não é tabela vazia).
       const doA = await a.transacao(async (tx) => tx.sql<{ l: number }>`SELECT count(*)::int AS l FROM "LiberacaoDeModulo"`);
       expect(doA[0].l).toBe(1);
+      // Nem grava em nome do outro (WITH CHECK da política), nas três tabelas (decisão 488). O módulo usa uma conexão de verdade
+      // do A (o gatilho passa; quem recusa é a política).
+      const doA2 = await ligarConexao(a, ligacao(lojaA, uuid()), AUTOR);
+      if (!doA2.ok) throw new Error('sem conexão do A');
+      for (const [sql, valores] of [
+        [`INSERT INTO "IntegracaoConexao"(id,"parceiroId","lojaId",provedor,ambiente,"idExterno","nomeExterno","criadoPorNome","atualizadoEm") VALUES ($1,$2,$3,'IFOOD','PRODUCAO',$4,'x','x',now())`, [`x1-${sufixo}`, ids[0], lojaA, uuid()]],
+        [`INSERT INTO "IntegracaoConexaoModulo"(id,"parceiroId","conexaoId","appId",modulo,"criadoPorNome","atualizadoEm") VALUES ($1,$2,$3,$4,'ANALYTICS','x',now())`, [`x2-${sufixo}`, ids[0], doA2.id, appBi]],
+        [`INSERT INTO "LiberacaoDeModulo"(id,"parceiroId",modulo,liberado,"mudadoPorNome") VALUES ($1,$2,'outro-modulo',true,'x')`, [`x3-${sufixo}`, ids[0]]],
+      ] as const) {
+        await expect(comoTenant(ids[1], async (tx) => void (await tx.exec(sql, ...valores))), sql.slice(12, 40)).rejects.toThrow(/row-level security/);
+      }
     }
     const papel = await db.$queryRaw<{ existe: boolean }[]>`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_tenant') AS existe`;
     if (papel[0].existe) {
@@ -294,9 +306,15 @@ describe.skipIf(!URL_TESTE)('INT-1.1 · fundação da Central de Integrações (
     if (!l.ok) throw new Error('sem loja');
     const lig = await ligarConexao(h2, ligacao(l.id, uuid(), 'TEST'), AUTOR);
     if (!lig.ok) throw new Error('sem conexão');
+    // Um módulo já preparado e autorizado antes da troca da marca (decisão 488: ele também não ativa depois).
+    const antes = await prepararModulo(h2, lig.id, appTeste, 'ANALYTICS', AUTOR.nome);
+    if (!antes.ok) throw new Error(JSON.stringify(antes));
+    expect(await mudarModulo(h2, antes.id, 'autorizar', AUTOR.nome)).toMatchObject({ ok: true, estado: 'AUTORIZADO' });
     await db.parceiroFlow.update({ where: { id: H2.id }, data: { homologacaoDeIntegracao: false } });
-    const p = await prepararModulo(h2, lig.id, appTeste, 'ANALYTICS', AUTOR.nome);
-    expect(!p.ok && p.erro).toMatch(/não combina mais com o parceiro/);
+    const ativar = await mudarModulo(h2, antes.id, 'ativar', AUTOR.nome);
+    expect(ativar).toEqual({ ok: false, erro: 'o ambiente da conexão não combina mais com o parceiro (marca de homologação): desligue a conexão.' });
+    const p = await prepararModulo(h2, lig.id, appTeste, 'REVIEW', AUTOR.nome);
+    expect(!p.ok && p.erro).toMatch(/não combina mais com o parceiro|não serve a esta loja/);
     expect(await desligarConexao(h2, lig.id, AUTOR.nome)).toEqual({ ok: true, mudou: true });
   });
 

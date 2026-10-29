@@ -1,7 +1,7 @@
 /**
  * INT-1.4 (decisão 486) — o comando da leitura TEST, no servidor (nunca no CI):
  *
- *   docker compose exec worker npm run integracao:ler-test -- --client-id <Client ID do app Teste (C)> [--loja <uuid>] [--dia AAAA-MM-DD] [--token-novo]
+ *   docker compose exec worker sh -c '. ./scripts/exportar-segredos.sh && npm run integracao:ler-test -- --client-id <Client ID do app Teste (C)> [--loja <uuid>] [--dia AAAA-MM-DD] [--token-novo]'
  *
  * Passos: confere a chave geral (INTEGRACAO_IFOOD_ATIVA) e a configuração (segredo pelo nome, chave de cifragem, endereço);
  * acha o app de TEST na Central (ou cadastra com o Client ID, que é público; o segredo continua só no cofre); faz a leitura

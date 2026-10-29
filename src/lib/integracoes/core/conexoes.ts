@@ -178,6 +178,17 @@ export async function mudarModulo(
   const erro = typeof o.erro === 'string' ? o.erro.replace(/\s+/g, ' ').trim().slice(0, 500) : '';
   if (acao === 'erro-permissao' && !erro) return { ok: false, erro: 'Diga qual foi o erro de permissão.' };
   const agora = o.agora ?? new Date();
+  try {
+    return await mudarModuloNaTransacao(cliente, moduloId, acao, nome, erro, agora);
+  } catch (e) {
+    // O banco recusou (corrida com o desligar, app que perdeu a homologação): a frase dele, sem estourar (decisão 488).
+    const frase = fraseDoBanco(e);
+    if (frase) return { ok: false, erro: frase };
+    throw e;
+  }
+}
+
+function mudarModuloNaTransacao(cliente: ClienteDoParceiro, moduloId: string, acao: AcaoDoModulo, nome: string, erro: string, agora: Date): Promise<ResultadoDoModulo> {
   return cliente.transacao(async (tx): Promise<ResultadoDoModulo> => {
     const m = await tx.integracaoConexaoModulo.findUnique({
       where: { id: moduloId },

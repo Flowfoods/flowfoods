@@ -73,8 +73,16 @@ const ROTULO_DA_ACAO: Record<AcaoDoModulo, string> = {
 
 /**
  * A sincronização de um módulo só roda com TUDO junto: o módulo Integração liberado para o parceiro, a conexão ativa, o módulo
- * ativo e a chave geral ligada. Faltou um, não chama o provedor (e não grava nada).
+ * ativo, a chave geral ligada, o ambiente da conexão combinando com a marca de homologação do parceiro e o app pronto (de TEST,
+ * ou de produção HOMOLOGADO). Faltou um, não chama o provedor (e não grava nada). Os dois últimos: decisão 488.
  */
-export function podeSincronizar(o: { liberado: boolean; conexaoAtiva: boolean; estado: EstadoDoModulo; chaveGeral: boolean }): boolean {
-  return o.liberado && o.conexaoAtiva && o.estado === 'ATIVO' && o.chaveGeral;
+export function podeSincronizar(o: {
+  liberado: boolean;
+  conexaoAtiva: boolean;
+  estado: EstadoDoModulo;
+  chaveGeral: boolean;
+  ambienteCombina: boolean;
+  appPronto: boolean;
+}): boolean {
+  return o.liberado && o.conexaoAtiva && o.estado === 'ATIVO' && o.chaveGeral && o.ambienteCombina && o.appPronto;
 }

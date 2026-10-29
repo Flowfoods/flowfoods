@@ -142,6 +142,9 @@ export async function lerTest(o: { app: AppDaLeitura; cliente: ClienteParaLeitur
   const recusa = porQueOAppNaoServe(o.app);
   if (recusa) throw new ErroDaLeitura(recusa);
   if (!diaSeguinte(o.dia)) throw new ErroDaLeitura('Dia inválido: use AAAA-MM-DD.');
+  // O Analytics é D-1: hoje ou depois não existe ainda, e intervalo inválido com 400 conta como infração no iFood (decisão 488).
+  const ontem = ontemEmBrasilia(o.agora);
+  if (o.dia > ontem) throw new ErroDaLeitura(`O Analytics só tem até ontem (${ontem}, no horário de Brasília). Use --dia ${ontem} ou antes.`);
   let pedida: string | null = null;
   if (o.loja !== undefined && o.loja !== null && o.loja !== '') {
     pedida = lerIdDaLojaIfood(o.loja);

@@ -48,11 +48,13 @@ describe('INT-1.1 · o ciclo de um módulo', () => {
   });
 
   it('sincroniza só com tudo junto: liberado, conexão ativa, módulo ativo e chave geral', () => {
-    const tudo = { liberado: true, conexaoAtiva: true, estado: 'ATIVO' as const, chaveGeral: true };
+    const tudo = { liberado: true, conexaoAtiva: true, estado: 'ATIVO' as const, chaveGeral: true, ambienteCombina: true, appPronto: true };
     expect(podeSincronizar(tudo)).toBe(true);
     expect(podeSincronizar({ ...tudo, liberado: false })).toBe(false);
     expect(podeSincronizar({ ...tudo, conexaoAtiva: false })).toBe(false);
     expect(podeSincronizar({ ...tudo, chaveGeral: false })).toBe(false);
+    expect(podeSincronizar({ ...tudo, ambienteCombina: false })).toBe(false);
+    expect(podeSincronizar({ ...tudo, appPronto: false })).toBe(false);
     for (const e of ESTADOS_DO_MODULO.filter((x) => x !== 'ATIVO')) expect(podeSincronizar({ ...tudo, estado: e }), e).toBe(false);
   });
 });

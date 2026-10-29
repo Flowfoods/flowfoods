@@ -140,7 +140,13 @@ export function criarClienteIfood(o: OpcoesDoCliente) {
       if (cl.tipo === 'nao-autenticado' && !renovouToken) {
         // Um token novo, uma vez só (a marca `renovouToken` limita): essa volta não conta como tentativa.
         renovouToken = true;
-        await o.tokens.invalidar(o.app, token);
+        try {
+          await o.tokens.invalidar(o.app, token);
+        } catch (e) {
+          // A trava do token não respondeu (outro processo renovando): devolve "não autenticado", sem estourar (decisão 488).
+          if (!(e instanceof ErroDeAutenticacao)) throw e;
+          return { ok: false, status: r.status, classificacao: cl, frase: e.message, requestId, tentativas: tentativa };
+        }
         tentativa--;
         continue;
       }

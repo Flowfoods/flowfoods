@@ -291,6 +291,20 @@ describe('INT-1.3 · correções da revisão (decisão 487)', () => {
     expect(pedidos.filter((p) => p.url.endsWith('/oauth/token'))).toHaveLength(2);
   });
 
+  it('401 com a trava do token sem responder: "não autenticado" com a frase, sem estourar (decisão 488)', async () => {
+    const t = tempo();
+    const s = servidor([json(401, {})]);
+    const base = armazemEmMemoria();
+    let travas = 0;
+    // A 1ª trava (pedir o token) funciona; a 2ª (descartar depois do 401) não responde.
+    const armazem = { ...base, comTrava: <T,>(appId: string, f: Parameters<typeof base.comTrava<T>>[1]) => (++travas === 1 ? base.comTrava(appId, f) : Promise.reject(new ErroDeAutenticacao('A trava do token no banco não respondeu a tempo.'))) };
+    const limitador = new Limitador(t.relogio, t.dormir);
+    const tokens = new ServicoDeToken({ armazem, transporte: s.transporte, limitador, env: ENV, relogio: t.relogio, dormir: t.dormir });
+    const cliente = criarClienteIfood({ app: APP_TEST, tokens, limitador, transporte: s.transporte, env: ENV, relogio: t.relogio, dormir: t.dormir });
+    const r = await cliente.chamar(chamada);
+    expect(r).toMatchObject({ ok: false, status: 401, classificacao: { tipo: 'nao-autenticado' }, frase: expect.stringMatching(/trava do token/) });
+  });
+
   it('validade curta não vira um pedido por chamada (margem = metade da validade); validade enorme fica em 24 h', async () => {
     const m = montar({ token: () => json(200, { accessToken: 'tok-curto', expiresIn: 600 }) });
     for (let i = 0; i < 5; i++) expect((await m.cliente.chamar(chamada)).ok).toBe(true);

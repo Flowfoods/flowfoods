@@ -117,6 +117,22 @@ describe.skipIf(!URL_TESTE)('INT-1.4 · o comando da leitura TEST (Postgres real
     expect(s2.pedidos.filter((p) => p.url.endsWith('/oauth/token'))).toHaveLength(0);
   });
 
+  it('evidência que conteria o segredo do app não é gravada (saída 1)', async () => {
+    const pedidos: PedidoHttp[] = [];
+    const transporte = async (p: PedidoHttp): Promise<RespostaHttp> => {
+      pedidos.push(p);
+      if (p.url.endsWith('/authentication/v1.0/oauth/token')) return json(200, { accessToken: TOKEN, type: 'bearer', expiresIn: 21600 });
+      // Um nome de loja que (por absurdo) traz o segredo: a conferência antes de gravar recusa.
+      if (p.url.endsWith('/merchant/v1.0/merchants')) return json(200, [{ id: LOJA, name: `Loja ${SEGREDO}` }]);
+      return json(200, { data: [], currentPage: 1, size: 0, totalItems: 0, totalPages: 0 });
+    };
+    const r = deps(transporte);
+    expect(await executarLeituraTest({ clientId, dia: '2026-10-28', tokenNovo: true }, r.d)).toBe(1);
+    expect(r.gravados).toHaveLength(0);
+    expect(r.linhas.join('\n')).toMatch(/conteria o segredo do app: não foi gravada/);
+    expect(r.linhas.join('\n')).not.toContain(SEGREDO);
+  });
+
   it('403 no Analytics: saída 1, a dica do que conferir e o token guardado descartado', async () => {
     const s = ifoodSimulado(() => json(403, { message: 'Forbidden' }));
     const r = deps(s.transporte);

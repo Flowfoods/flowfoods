@@ -2,7 +2,7 @@
  * Central de Integrações (INT-1.2) — confere, no servidor, se a integração do iFood está pronta para ligar. Nunca imprime valor
  * de segredo: só nomes de variável, presença e frases.
  *
- *   docker compose exec worker npm run integracao:conferir
+ *   docker compose exec worker sh -c '. ./scripts/exportar-segredos.sh && npm run integracao:conferir'
  *
  * Código de saída: 0 = pronto (ou desligada e pronta); 1 = falta algo. Não chama o iFood.
  */

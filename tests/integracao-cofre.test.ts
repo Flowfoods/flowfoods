@@ -58,6 +58,9 @@ describe('INT-1.2 · o token cifrado', () => {
     corpo[0] ^= 1;
     expect(() => decifrar([partes[0], partes[1], partes[2], corpo.toString('base64url')].join('.'), 'integracao-token:app-1', chave)).toThrow(ErroDeCofre);
     expect(() => decifrar('texto-solto', 'integracao-token:app-1', chave)).toThrow('Token cifrado em formato desconhecido.');
+    // Tag encurtada (12 bytes em vez de 16): recusada (decisão 488: decifrar exige a tag inteira).
+    const tagCurta = Buffer.from(partes[2], 'base64url').subarray(0, 12).toString('base64url');
+    expect(() => decifrar([partes[0], partes[1], tagCurta, partes[3]].join('.'), 'integracao-token:app-1', chave)).toThrow(ErroDeCofre);
   });
 
   it('a chave: 64 hex (o que o compose gera) ou base64 de 32 bytes; o resto com frase clara', () => {

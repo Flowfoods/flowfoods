@@ -179,13 +179,13 @@ IFOOD_TEST_CLIENT_SECRET=...                         # segredo do app Teste (C),
 **Sobre a Central de Integrações:** o Client ID de cada app fica no cadastro do
 app (tela do nível 1), e o segredo só aqui, no painel, com o nome que o cadastro
 do app aponta. Para conferir sem mostrar valor nenhum:
-`docker compose exec worker npm run integracao:conferir` (diz o que falta; não
+`docker compose exec worker sh -c '. ./scripts/exportar-segredos.sh && npm run integracao:conferir'` (diz o que falta; não
 chama o iFood). Trocar `INTEGRACAO_CHAVE_CIFRAGEM` só invalida o token guardado:
 o serviço pede um novo.
 
 **Primeira leitura TEST (INT-1.4):** com `INTEGRACAO_IFOOD_ATIVA=true` e o
 segredo do app Teste (C) no painel, rode no servidor
-`docker compose exec worker npm run integracao:ler-test -- --client-id <Client ID do Teste (C)>`
+`docker compose exec worker sh -c '. ./scripts/exportar-segredos.sh && npm run integracao:ler-test -- --client-id <Client ID do Teste (C)>'`
 (opcional: `--loja <uuid>`, `--dia AAAA-MM-DD`, `--token-novo`). O comando
 cadastra o app de teste na Central se faltar, lista as lojas que o app enxerga,
 consulta o Analytics na loja de teste com o cabeçalho de homologação e grava a

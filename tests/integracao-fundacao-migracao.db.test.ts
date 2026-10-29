@@ -30,6 +30,7 @@ const URL_TESTE = process.env.ERP_DB_TESTE;
 const MIGRACOES = join(process.cwd(), 'prisma', 'migrations');
 const DA_INT_1_1 = '20261115000000_erp_integracao_fundacao';
 const DA_487 = '20261116000000_erp_integracao_endurecimento';
+const DA_488 = '20261117000000_erp_integracao_ajustes';
 const temPsql = spawnSync('psql', ['--version']).status === 0;
 
 function urlDe(banco: string, papel?: string): string {
@@ -238,6 +239,39 @@ describe.skipIf(!URL_TESTE || !temPsql)('INT-1.1 · migration da Central de Inte
           expect(psql(superuser, ['-c', `ALTER FUNCTION "erp_integracao_modulo_confere"() SET search_path = public`]).ok).toBe(true);
           expect((await conferirMigracao(db)).join('\n')).toMatch(/erp_integracao_modulo_confere sem pg_temp no fim do search_path/);
           expect(psql(superuser, ['-c', `ALTER FUNCTION "erp_integracao_modulo_confere"() SET search_path = public, pg_temp`]).ok).toBe(true);
+          expect(await conferirMigracao(db)).toEqual([]);
+
+          // ---------------------------------------------- decisão 488: a migration de ajustes, no mesmo banco
+          const r488 = psql(dono, ['-f', join(MIGRACOES, DA_488, 'migration.sql')]);
+          expect(r488.ok, r488.aviso).toBe(true);
+          expect(r488.aviso).not.toContain('WARNING');
+          // O search_path seguro vai na própria função (sem depender de um ALTER depois).
+          expect(psql(superuser, ['-c', `SELECT array_to_string(proconfig, ';') FROM pg_proc WHERE proname = 'erp_integracao_modulo_confere'`]).saida).toBe('search_path=public, pg_temp');
+          expect(await conferirMigracao(db)).toEqual([]);
+          // Trocada a marca de homologação, um módulo que já existia não ativa. (p2 volta a ser de homologação e liga uma conexão
+          // TEST com módulo autorizado; depois a marca sai.)
+          expect(psql(superuser, ['-c', `UPDATE "ParceiroFlow" SET "homologacaoDeIntegracao" = true WHERE id = 'p2'`]).ok).toBe(true);
+          const prep = como(
+            'p2',
+            `INSERT INTO "IntegracaoConexao"(id,"parceiroId","lojaId",provedor,ambiente,"idExterno","nomeExterno","criadoPorNome","atualizadoEm") VALUES ('c9','p2','l2','IFOOD','TEST','${OUTRA_LOJA}','x','x',now());
+             INSERT INTO "IntegracaoConexaoModulo"(id,"parceiroId","conexaoId","appId",modulo,estado,"criadoPorNome","atualizadoEm") VALUES ('cm9','p2','c9','a1','ANALYTICS','AUTORIZADO','x',now());`,
+          );
+          expect(prep.ok, prep.aviso).toBe(true);
+          expect(psql(superuser, ['-c', `UPDATE "ParceiroFlow" SET "homologacaoDeIntegracao" = false WHERE id = 'p2'`]).ok).toBe(true);
+          expect(como('p2', `UPDATE "IntegracaoConexaoModulo" SET estado = 'ATIVO', "ativadoEm" = now(), "ativadoPorNome" = 'x' WHERE id = 'cm9'`).aviso).toMatch(/não combina mais com o parceiro/);
+          // O conferidor acusa: gatilho desligado; o tenant podendo criar no schema; política que deixa gravar em nome de outro.
+          expect(psql(superuser, ['-c', `ALTER TABLE "IntegracaoConexao" DISABLE TRIGGER "IntegracaoConexao_confere"`]).ok).toBe(true);
+          expect(psql(superuser, ['-c', `GRANT CREATE ON SCHEMA public TO erp_tenant`]).ok).toBe(true);
+          const pend488 = (await conferirMigracao(db)).join('\n');
+          expect(pend488).toMatch(/Gatilho IntegracaoConexao_confere está DESLIGADO/);
+          expect(pend488).toMatch(/erp_tenant pode criar objetos no schema/);
+          expect(psql(superuser, ['-c', `ALTER TABLE "IntegracaoConexao" ENABLE TRIGGER "IntegracaoConexao_confere"`]).ok).toBe(true);
+          expect(psql(superuser, ['-c', `REVOKE CREATE ON SCHEMA public FROM erp_tenant`]).ok).toBe(true);
+          if (comRls) {
+            expect(psql(superuser, ['-c', `ALTER POLICY "LiberacaoDeModulo_do_parceiro" ON "LiberacaoDeModulo" WITH CHECK (true)`]).ok).toBe(true);
+            expect((await conferirMigracao(db)).join('\n')).toMatch(/Política LiberacaoDeModulo_do_parceiro ausente ou sem o filtro do parceiro na leitura ou na gravação/);
+            expect(psql(superuser, ['-c', `ALTER POLICY "LiberacaoDeModulo_do_parceiro" ON "LiberacaoDeModulo" WITH CHECK ("parceiroId" = NULLIF(current_setting('app.parceiro_id', true), ''))`]).ok).toBe(true);
+          }
           expect(await conferirMigracao(db)).toEqual([]);
 
           // O conferidor acusa o que faltar (e diz qual migration rodar).

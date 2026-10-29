@@ -10,7 +10,7 @@ import { lerArgumentos } from '@/lib/integracoes/ifood/comando-leitura-test';
 import { criarClienteIfood } from '@/lib/integracoes/ifood/http';
 import { CAMINHO_DAS_LOJAS, caminhoDosKpis, consultaDoDia, consultaMinima, diaSeguinte, ErroDaLeitura, lerTest, ontemEmBrasilia, type AppDaLeitura } from '@/lib/integracoes/ifood/leitura-test';
 import { Limitador } from '@/lib/integracoes/ifood/limitador';
-import type { PedidoHttp, RespostaHttp } from '@/lib/integracoes/ifood/transporte';
+import { FalhaDeRede, type PedidoHttp, type RespostaHttp } from '@/lib/integracoes/ifood/transporte';
 
 const SEGREDO = 'segredo-do-teste-c-nunca-em-log';
 const ENV = { INTEGRACAO_IFOOD_ATIVA: 'true', INTEGRACAO_CHAVE_CIFRAGEM: randomBytes(32).toString('hex'), IFOOD_TEST_CLIENT_SECRET: SEGREDO };
@@ -80,6 +80,9 @@ describe('INT-1.4 · a leitura TEST', () => {
     const m = montar();
     await expect(lerTest({ app: APP, cliente: m.cliente, dia: '2026-02-30', agora: AGORA })).rejects.toThrow(/Dia inválido/);
     await expect(lerTest({ app: APP, cliente: m.cliente, dia: '2026-10-28', loja: 'loja-1', agora: AGORA })).rejects.toThrow(/UUID/);
+    // D-1 (decisão 488): hoje e o futuro não existem no Analytics (e intervalo inválido conta como infração).
+    await expect(lerTest({ app: APP, cliente: m.cliente, dia: '2026-10-29', agora: AGORA })).rejects.toThrow(/só tem até ontem \(2026-10-28/);
+    await expect(lerTest({ app: APP, cliente: m.cliente, dia: '2030-01-01', agora: AGORA })).rejects.toThrow(/só tem até ontem/);
     expect(m.pedidos).toHaveLength(0);
   });
 
@@ -112,6 +115,18 @@ describe('INT-1.4 · a leitura TEST', () => {
     expect(l.passos.map((p) => [p.nome, p.status])).toEqual([['lojas', 200], ['analytics-minimo', 403]]);
     expect(l.conclusao).toMatch(/403 no Analytics: o token do app de teste não tem o módulo/);
     expect(m.apis()).toHaveLength(2);
+  });
+
+  it('a consulta do Analytics é leitura repetível: falha de rede na 1ª tentativa repete e segue (POST marcado idempotente)', async () => {
+    const m = montar({
+      kpis: (_c, n) => {
+        if (n === 0) throw new FalhaDeRede('rede');
+        return json(200, ENVELOPE);
+      },
+    });
+    const l = await lerTest({ app: APP, cliente: m.cliente, dia: '2026-10-28', agora: AGORA });
+    expect(l.ok).toBe(true);
+    expect(m.apis().filter((p) => p.url.includes('/analytics/'))).toHaveLength(3);
   });
 
   it('lista em formato inesperado não vira "nenhuma loja"', async () => {
