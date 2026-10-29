@@ -213,15 +213,20 @@ export function ProvedorDosPontos({
     setAtivo({ id: proximo, automatico: false, rolar: true, passos });
   }, [ativo, visiveisNaOrdem, encerrar]);
 
+  // Muda quando um botão de ponto entra ou sai da tela (decisão 480): o card aberto refaz o "2 de 5" e o Continuar/Concluir
+  // com os pontos de agora (escolher a unidade faz aparecer "Quanto vem" e o custo).
+  const [mudancaDosPontos, setMudancaDosPontos] = useState(0);
   const registrar = useCallback(
     (ponto: string, el: HTMLElement) => {
       const id = idCompleto(ponto);
       const lista = registrados.current.get(id) ?? new Set<HTMLElement>();
       lista.add(el);
       registrados.current.set(id, lista);
+      setMudancaDosPontos((n) => n + 1);
       return () => {
         lista.delete(el);
         if (lista.size === 0) registrados.current.delete(id);
+        setMudancaDosPontos((n) => n + 1);
       };
     },
     [idCompleto],
@@ -242,10 +247,10 @@ export function ProvedorDosPontos({
       const escolhido = visiveis.find((c) => !c.optouFora && estadoDoPonto(c.id, preferenciaComGravados, hoje) === 'elegivel');
       if (!escolhido) return;
       // Ninguém digitando: começa, e a página sobe até o botão do ponto (como ao abrir à mão). Alguém já digitando num campo:
-      // só começa se o botão já estiver à vista e fora de onde o card abre — a página não se mexe debaixo de quem trabalha;
-      // senão, nesta visita não começa (nunca abre no meio do trabalho).
+      // só começa se o botão E o campo em foco já estiverem à vista e fora de onde o card abre — a página não se mexe debaixo
+      // de quem trabalha; senão, nesta visita não começa (nunca abre no meio do trabalho).
       const digitando = estaDigitando();
-      if (digitando && !livreDoCard(escolhido.el)) return;
+      if (digitando && (!livreDoCard(escolhido.el) || !livreDoCard(document.activeElement as HTMLElement))) return;
       const passos = passosDaSequencia(visiveis, null);
       origem.current = escolhido.el;
       const foco = document.activeElement;
@@ -259,6 +264,15 @@ export function ProvedorDosPontos({
     }, ESPERA_DA_ABERTURA_AUTOMATICA_MS);
     return () => window.clearTimeout(t);
   }, [acoes, preferenciaComGravados, podeAbrirSozinho, ativo, hoje, caminho, visiveisNaOrdem]);
+
+  // A ajuda completa (gaveta) abriu, por qualquer caminho (botão do topo, atalho "?", "Ver passo a passo"): o card fecha — as
+  // duas nunca ficam abertas juntas — e a tentativa de começar sozinha desta visita fica usada: ao fechar a gaveta, a
+  // sequência não começa por cima do trabalho (3ª conferência da 479).
+  useEffect(() => {
+    if (podeAbrirSozinho) return;
+    inicioUsadoNestaVisita.current = true;
+    setAtivo(null);
+  }, [podeAbrirSozinho]);
 
   // "Desligar" as dicas no card da tela encerra a sequência: quem acabou de dizer que não quer dicas não recebe as próximas.
   const dicasLigadas = preferencia?.dicasLigadas ?? null;
@@ -290,7 +304,15 @@ export function ProvedorDosPontos({
 
   const pontoAtivo = ativo ? porId.get(ativo.id) ?? null : null;
   const ehTela = !!pontoAtivo && pontoAtivo.id === idDaTela;
-  const progresso = ativo ? progressoDoPasso(ativo.passos, ativo.id) : null;
+  // A sequência de agora (com os pontos que apareceram depois de a etapa abrir); se o alvo da etapa saiu da tela, vale a de
+  // quando ela abriu.
+  const passosAgora = useMemo(() => {
+    if (!ativo) return [] as string[];
+    void mudancaDosPontos;
+    const agora = passosDaSequencia(visiveisNaOrdem(), ativo.passos);
+    return agora.includes(ativo.id) ? agora : ativo.passos;
+  }, [ativo, visiveisNaOrdem, mudancaDosPontos]);
+  const progresso = ativo ? progressoDoPasso(passosAgora, ativo.id) : null;
   const temProximo = !!progresso && progresso.n < progresso.de;
 
   // Tocar fora do card fecha a ajuda (o toque segue para onde foi dado). Outro botão de ajuda troca o conteúdo.
@@ -302,6 +324,11 @@ export function ProvedorDosPontos({
       const alvo = e.target as Element | null;
       if (!alvo || !alvo.isConnected) return;
       if (alvo.closest('[data-ponto-de-ajuda], [data-ponto], dialog')) return;
+      // Tocar na região que a etapa explica (decisão 480: os botões da unidade, o campo) é fazer o que o card pede: a
+      // sequência continua aberta, sem avançar. Depois, "Continuar" segue para o próximo ponto (inclusive o que acabou de
+      // aparecer, como "Quanto vem" depois de escolher a unidade).
+      const regiao = regiaoDoPonto(origem.current);
+      if (regiao?.contains(alvo)) return;
       // Tocar fora sai da sequência: nunca avança uma etapa sem querer.
       encerrar(false);
     };
@@ -366,7 +393,8 @@ export function ProvedorDosPontos({
 function retanguloDoCard(): { top: number; left: number; right: number; bottom: number } {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const altura = Math.min(vh * 0.6, 448);
+  // Tela baixa (até 600 px): o card ocupa no máximo metade dela, para o campo explicado caber acima (o mesmo do CSS do card).
+  const altura = Math.min(vh * (vh <= 600 ? 0.5 : 0.6), 448);
   const bottom = vh - 12;
   if (vw < 640) return { top: bottom - altura, left: 12, right: vw - 12, bottom };
   const right = vw - 20;
@@ -386,6 +414,32 @@ function livreDoCard(el: HTMLElement): boolean {
   if (r.top < TOPO_LIVRE_PX || r.bottom > window.innerHeight - 12) return false;
   const c = retanguloDoCard();
   return r.right <= c.left || r.left >= c.right || r.bottom <= c.top - 8;
+}
+
+/** A região que o ponto explica (`data-alvo` do botão, decisão 480), se está na página e à vista. */
+function regiaoDoPonto(botao: HTMLElement | null): HTMLElement | null {
+  const id = botao?.dataset.alvo;
+  if (!id) return null;
+  const el = document.getElementById(id);
+  return el && el.isConnected && el.getClientRects().length > 0 ? el : null;
+}
+
+/**
+ * O que precisa ficar à vista ao abrir a etapa: o botão do ponto e, quando cabe acima do card (ou na tela, com o card ao lado),
+ * a região inteira que ele explica (decisão 480: o card não cobre o campo nem os botões de escolha). Não cabendo, mostra a
+ * região a partir do topo, sem tirar o botão de vista; sem região, só o botão (como antes).
+ */
+function retanguloAVista(botao: HTMLElement, card: DOMRect): { top: number; bottom: number; left: number; right: number } {
+  const b = botao.getBoundingClientRect();
+  const regiao = regiaoDoPonto(botao);
+  if (!regiao) return b;
+  const rr = regiao.getBoundingClientRect();
+  const u = { top: Math.min(b.top, rr.top), bottom: Math.max(b.bottom, rr.bottom), left: Math.min(b.left, rr.left), right: Math.max(b.right, rr.right) };
+  const naMesmaColuna = u.right > card.left && u.left < card.right;
+  const espaco = (naMesmaColuna ? card.top - 12 : window.innerHeight - 12) - (TOPO_LIVRE_PX + 12);
+  if (u.bottom - u.top <= espaco) return u;
+  const corte = u.top + Math.max(espaco, 0);
+  return b.bottom <= corte ? { ...u, bottom: corte } : b;
 }
 
 function primeiroVisivel(els: Set<HTMLElement>): HTMLElement | null {
@@ -440,33 +494,55 @@ function CardDeAjuda({
   // página só sobe se ninguém estiver digitando (quem está num campo não perde o lugar).
   // Na sequência, o mesmo vale ao avançar: o botão do próximo ponto fica à vista, acima do card e abaixo da barra do topo, e a
   // página rola só o necessário (sem animação para quem pediu menos movimento).
-  useEffect(() => {
+  const posicionar = useCallback(() => {
     const alvo = origem.current;
     const c = card.current;
-    if (rolar && alvo?.isConnected && c) {
-      const topoDoCard = c.getBoundingClientRect().top;
-      const r = alvo.getBoundingClientRect();
-      const comportamento: ScrollBehavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
-      const rc = c.getBoundingClientRect();
-      // O botão tem de ficar acima do card quando o card está na mesma coluna (celular em pé); com o card ao lado (computador,
-      // celular deitado), basta ficar dentro da tela.
-      const naMesmaColuna = r.right > rc.left && r.left < rc.right;
-      const limiteDeBaixo = naMesmaColuna ? topoDoCard - 12 : window.innerHeight - 12;
-      if (r.bottom > limiteDeBaixo) {
-        const precisa = r.bottom - limiteDeBaixo + 12;
-        // Tela curta: a página não rola o bastante para o botão subir acima do card; uma folga no fim do conteúdo resolve.
-        // Soma à folga que já houver e mede de novo (com o conteúdo mais curto que a tela, o começo da folga não rende rolagem).
-        const raiz = document.documentElement;
-        const sobra = () => raiz.scrollHeight - window.innerHeight - window.scrollY;
-        for (let i = 0; i < 4 && precisa > sobra(); i++) {
-          const atual = parseFloat(raiz.style.getPropertyValue(VARIAVEL_DA_FOLGA)) || 0;
-          raiz.style.setProperty(VARIAVEL_DA_FOLGA, `${Math.ceil(atual + precisa - sobra() + 16)}px`);
-        }
-        window.scrollBy({ top: precisa, behavior: comportamento });
-      } else if (r.top < TOPO_LIVRE_PX) window.scrollBy({ top: r.top - TOPO_LIVRE_PX - 12, behavior: comportamento });
-    }
+    if (!alvo?.isConnected || !c) return;
+    const topoDoCard = c.getBoundingClientRect().top;
+    const rc = c.getBoundingClientRect();
+    const r = retanguloAVista(alvo, rc);
+    const comportamento: ScrollBehavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
+    // O botão tem de ficar acima do card quando o card está na mesma coluna (celular em pé); com o card ao lado (computador,
+    // celular deitado), basta ficar dentro da tela.
+    const naMesmaColuna = r.right > rc.left && r.left < rc.right;
+    const limiteDeBaixo = naMesmaColuna ? topoDoCard - 12 : window.innerHeight - 12;
+    if (r.bottom > limiteDeBaixo) {
+      const precisa = r.bottom - limiteDeBaixo + 12;
+      // Tela curta: a página não rola o bastante para o botão subir acima do card; uma folga no fim do conteúdo resolve.
+      // Soma à folga que já houver e mede de novo (com o conteúdo mais curto que a tela, o começo da folga não rende rolagem).
+      const raiz = document.documentElement;
+      const sobra = () => raiz.scrollHeight - window.innerHeight - window.scrollY;
+      for (let i = 0; i < 4 && precisa > sobra(); i++) {
+        const atual = parseFloat(raiz.style.getPropertyValue(VARIAVEL_DA_FOLGA)) || 0;
+        raiz.style.setProperty(VARIAVEL_DA_FOLGA, `${Math.ceil(atual + precisa - sobra() + 16)}px`);
+      }
+      window.scrollBy({ top: precisa, behavior: comportamento });
+    } else if (r.top < TOPO_LIVRE_PX) window.scrollBy({ top: r.top - TOPO_LIVRE_PX - 12, behavior: comportamento });
+  }, [origem]);
+
+  useEffect(() => {
+    if (rolar) posicionar();
     if (!automatico) titulo.current?.focus({ preventScroll: true });
-  }, [automatico, rolar, origem]);
+  }, [automatico, rolar, posicionar]);
+
+  // Girar o aparelho ou mudar o tamanho da janela com o card aberto (3ª conferência da 479): o alvo volta para cima do card.
+  // Com alguém digitando, a página não se mexe (o teclado virtual abrindo também muda o tamanho da tela).
+  useEffect(() => {
+    let quadro = 0;
+    const aoMudar = () => {
+      cancelAnimationFrame(quadro);
+      quadro = requestAnimationFrame(() => {
+        if (!estaDigitando()) posicionar();
+      });
+    };
+    window.addEventListener('resize', aoMudar);
+    window.addEventListener('orientationchange', aoMudar);
+    return () => {
+      cancelAnimationFrame(quadro);
+      window.removeEventListener('resize', aoMudar);
+      window.removeEventListener('orientationchange', aoMudar);
+    };
+  }, [posicionar]);
 
   // Escape encerra a sequência (se não houver outra janela por cima). Devolve o foco só se ele estava no card.
   useEffect(() => {
@@ -498,7 +574,7 @@ function CardDeAjuda({
       aria-labelledby={`${id}-t`}
       aria-describedby={progresso ? `${id}-p` : undefined}
       data-ponto-de-ajuda={ponto.id}
-      className="fixed inset-x-3 z-40 flex max-h-[min(60dvh,28rem)] flex-col rounded-[14px] border border-linha-forte bg-painel shadow-[0_12px_32px_-12px_rgba(10,10,10,0.35)] sm:inset-x-auto sm:right-5 sm:w-[min(380px,calc(100vw-2.5rem))]"
+      className="fixed inset-x-3 z-40 flex max-h-[min(60dvh,28rem)] flex-col [@media(max-height:600px)]:max-h-[50dvh] rounded-[14px] border border-linha-forte bg-painel shadow-[0_12px_32px_-12px_rgba(10,10,10,0.35)] sm:inset-x-auto sm:right-5 sm:w-[min(380px,calc(100vw-2.5rem))]"
       style={{ bottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
       {/* O topo (com o X) e o rodapé (Encerrar ajuda, Continuar) ficam sempre à vista; só o texto rola num card alto. */}

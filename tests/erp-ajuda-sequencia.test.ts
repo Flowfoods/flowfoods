@@ -82,7 +82,9 @@ describe('decisão 479 · o card', () => {
     expect(pontos).toContain('Encerrar ajuda');
     expect(pontos).toContain("{temProximo ? 'Continuar' : 'Concluir'}");
     // Tocar fora e Escape saem da sequência (nunca avançam).
-    expect(pontos).toMatch(/const fora = \(e: MouseEvent\) => \{[\s\S]{0,400}?encerrar\(false\);/);
+    expect(pontos).toMatch(/const fora = \(e: MouseEvent\) => \{[\s\S]{0,900}?encerrar\(false\);/);
+    // Decisão 480: tocar dentro da região que a etapa explica não encerra (nem avança): é fazer o que o card pede.
+    expect(pontos).toMatch(/const fora = \(e: MouseEvent\) => \{[\s\S]{0,700}?if \(regiao\?\.contains\(alvo\)\) return;[\s\S]{0,200}?encerrar\(false\);/);
     expect(pontos).toMatch(/e\.key !== 'Escape'[\s\S]{0,500}?aoEncerrar\(/);
     // Nenhum temporizador avança etapa (os que há: a abertura automática, a espera da rolagem e o foco depois de "Manter as dicas").
     const temporizadores = pontos.split('setTimeout(').slice(1);
@@ -104,15 +106,21 @@ describe('decisão 479 · o card', () => {
     // "Desligar" encerra a sequência.
     expect(pontos).toMatch(/dicasAntes\.current === true && dicasLigadas === false && ativo\) encerrar\(true\)/);
     // Início automático: uma tentativa; com alguém digitando, só com o botão livre e sem rolar; sem escutar a rolagem.
-    expect(pontos).toContain('if (digitando && !livreDoCard(escolhido.el)) return;');
+    // 3ª conferência: com alguém digitando, o botão E o campo em foco precisam estar livres do card.
+    expect(pontos).toContain('if (digitando && (!livreDoCard(escolhido.el) || !livreDoCard(document.activeElement as HTMLElement))) return;');
     expect(pontos).toContain('rolar: !digitando');
+    // 3ª conferência: a gaveta abriu (qualquer caminho, inclusive o atalho "?"): o card fecha e a tentativa da visita fica usada.
+    expect(pontos).toMatch(/if \(podeAbrirSozinho\) return;\s*inicioUsadoNestaVisita\.current = true;\s*setAtivo\(null\);/);
+    // 3ª conferência: girar o aparelho reposiciona (sem mexer na página de quem digita).
+    expect(pontos).toMatch(/addEventListener\('resize', aoMudar\)[\s\S]{0,120}addEventListener\('orientationchange', aoMudar\)/);
+    expect(pontos).toMatch(/if \(!estaDigitando\(\)\) posicionar\(\);/);
     // A tentativa da chegada fica usada antes de qualquer saída da conta (outra janela, ninguém elegível, alguém digitando):
     // a sequência recusada não começa mais tarde, no meio do trabalho (ponto aberto na 3ª conferência).
     const tentativa = pontos.slice(pontos.indexOf('const t = window.setTimeout(() => {'), pontos.indexOf('const passos = passosDaSequencia(visiveis, null);'));
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeGreaterThan(0);
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf("document.querySelector('dialog[open]')"));
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (!escolhido) return;'));
-    expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (digitando && !livreDoCard(escolhido.el)) return;'));
+    expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (digitando && (!livreDoCard(escolhido.el)'));
     expect(pontos).not.toMatch(/addEventListener\('scroll'/);
     // A folga mora no fim do conteúdo (não depois da grade) e soma à que já existe.
     expect(readFileSync('src/components/erp/tokens.css', 'utf8')).toMatch(/#conteudo::after \{[^}]*var\(--ff-folga-da-ajuda, 0px\)/);

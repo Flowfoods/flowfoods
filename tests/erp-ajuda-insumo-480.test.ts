@@ -118,7 +118,7 @@ describe('decisão 480 · os cards', () => {
 
   it('o registro continua válido e a entrada subiu de versão', () => {
     expect(problemasDoRegistro()).toEqual([]);
-    expect(entrada?.versao).toBeGreaterThanOrEqual(5);
+    expect(entrada?.versao).toBeGreaterThanOrEqual(6);
   });
 
   it('pontos na ordem dos campos; o card da unidade abre com a frase do plano e leva aos exemplos', () => {

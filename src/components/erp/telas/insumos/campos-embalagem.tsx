@@ -106,13 +106,13 @@ export function CamposDaEmbalagem({
 
   return (
     <div className="space-y-4">
-      <div className={`grid gap-3 ${temMenor ? 'grid-cols-[minmax(0,1fr)_minmax(0,9rem)]' : ''}`}>
+      <div id={id('regiao-conteudo')} className={`grid gap-3 ${temMenor ? 'grid-cols-[minmax(0,1fr)_minmax(0,9rem)]' : ''}`}>
         <div>
           <div className="mb-1.5 flex items-center gap-1">
             <label htmlFor={id('conteudo')} className={ROTULO.replace('mb-1.5 ', '')}>
               Quanto vem na embalagem
             </label>
-            {doInsumo && <PontoDeAjuda ponto="conteudo" className="-my-3 sm:-my-1.5" />}
+            {doInsumo && <PontoDeAjuda ponto="conteudo" alvo={id('regiao-conteudo')} className="-my-3 sm:-my-1.5" />}
           </div>
           <div className="relative">
             <input
@@ -154,14 +154,15 @@ export function CamposDaEmbalagem({
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div id={id('regiao-custo')} className="grid gap-3 sm:grid-cols-2">
         <div>
-          <div className="mb-1.5 flex items-center gap-1">
+          {/* Rótulos com a mesma altura nas duas colunas: com o "?", o do custo quebra em duas linhas no tablet. */}
+          <div className="mb-1.5 flex items-center gap-1 sm:min-h-10 sm:items-end">
             <label htmlFor={id('preco')} className={ROTULO.replace('mb-1.5 ', '')}>
               {doInsumo ? 'Custo inicial de referência' : 'Preço da embalagem'}
               {doInsumo && <span className="font-normal text-suave"> (R$ por embalagem de compra)</span>}
             </label>
-            {doInsumo && <PontoDeAjuda ponto="custo" className="-my-3 sm:-my-1.5" />}
+            {doInsumo && <PontoDeAjuda ponto="custo" alvo={id('regiao-custo')} className="-my-3 sm:-my-1.5" />}
           </div>
           <div className="relative">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[13px] text-suave">R$</span>
@@ -200,9 +201,11 @@ export function CamposDaEmbalagem({
           <Erro id={`${id('preco')}-erro`} texto={erros.preco} />
         </div>
         <div>
-          <label htmlFor={id('frete')} className={ROTULO}>
-            Frete por embalagem <span className="font-normal text-suave">(se pagar)</span>
-          </label>
+          <div className="mb-1.5 flex items-center sm:min-h-10 sm:items-end">
+            <label htmlFor={id('frete')} className={ROTULO.replace('mb-1.5 ', '')}>
+              Frete por embalagem <span className="font-normal text-suave">(se pagar)</span>
+            </label>
+          </div>
           <div className="relative">
             <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-[13px] text-suave">R$</span>
             <input

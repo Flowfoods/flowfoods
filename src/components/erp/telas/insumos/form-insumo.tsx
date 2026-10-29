@@ -355,10 +355,10 @@ export function FormInsumo({
         <Painel
           titulo="Unidade, embalagem de compra e custo"
           subtitulo={temPonto.unidade ? undefined : 'Três coisas diferentes: a unidade em que você controla, quanto vem em cada embalagem que compra e quanto paga por ela.'}
-          acessorio={<PontoDeAjuda ponto="unidade" />}
+          acessorio={<PontoDeAjuda ponto="unidade" alvo={`${idBase}-regiao-unidade`} />}
         >
           <div className="space-y-4">
-            <div>
+            <div id={`${idBase}-regiao-unidade`}>
               {travaDaUnidade && unidade ? (
                 <div>
                   <span className={ROTULO}>Unidade base</span>

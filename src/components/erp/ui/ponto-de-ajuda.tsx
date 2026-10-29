@@ -44,17 +44,23 @@ export function ExplicacaoNoPonto({
   );
 }
 
-export function PontoDeAjuda({ ponto, className = '', comRotulo = false }: { ponto: string; className?: string; comRotulo?: boolean }) {
+/**
+ * `alvo` (decisão 480): o id da região que o ponto explica (o campo, os botões de escolha). Com ela, o card abre deixando a
+ * região à vista acima dele, e tocar dentro dela não encerra a sequência (é fazer o que o card pede).
+ */
+export function PontoDeAjuda({ ponto, className = '', comRotulo = false, alvo }: { ponto: string; className?: string; comRotulo?: boolean; alvo?: string }) {
   const { tem, titulo, ativo, abrir, registrar, chave } = usePontos();
   const botao = useRef<HTMLButtonElement>(null);
   // Sem JavaScript o botão não abriria nada: nasce escondido e aparece depois de montar.
   const [montado, setMontado] = useState(false);
   useEffect(() => setMontado(true), []);
   const existe = tem(ponto);
+  // Registra depois de montado (o botão nasce escondido): assim a sequência conta o ponto quando ele já está à vista, e o card
+  // aberto refaz o "2 de 5" quando um ponto aparece (decisão 480: escolher a unidade faz surgir "Quanto vem" e o custo).
   useEffect(() => {
-    if (!existe || !botao.current) return;
+    if (!existe || !montado || !botao.current) return;
     return registrar(ponto, botao.current);
-  }, [existe, ponto, registrar]);
+  }, [existe, montado, ponto, registrar]);
   if (!existe) return null;
   const aberto = ativo === `${chave}.${ponto}`;
   if (comRotulo) {
@@ -68,6 +74,7 @@ export function PontoDeAjuda({ ponto, className = '', comRotulo = false }: { pon
         aria-expanded={aberto}
         data-ponto={ponto}
         data-ponto-ativo={aberto ? '' : undefined}
+        data-alvo={alvo}
         onClick={(e) => abrir(ponto, e.currentTarget)}
         className={`ff-transicao inline-flex min-h-11 items-center gap-2 rounded-[5px] text-left text-[13px] font-medium text-suave hover:text-texto sm:min-h-8 ${className}`}
       >
@@ -92,6 +99,7 @@ export function PontoDeAjuda({ ponto, className = '', comRotulo = false }: { pon
       aria-expanded={aberto}
       data-ponto={ponto}
       data-ponto-ativo={aberto ? '' : undefined}
+      data-alvo={alvo}
       onClick={(e) => abrir(ponto, e.currentTarget)}
       className={`ff-transicao inline-grid h-11 w-11 shrink-0 place-items-center rounded-full align-middle text-suave hover:text-texto sm:h-7 sm:w-7 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 ${className}`}
     >

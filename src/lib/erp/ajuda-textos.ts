@@ -91,7 +91,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['insumos/novo', 'insumos/[id]/editar'],
     titulo: 'Cadastrar insumo',
-    versao: 5,
+    versao: 6,
     aula: [
       { texto: 'O nome do insumo se digita uma vez só; quem veio de uma nota ou ficha volta para lá ao salvar, e quem veio da caneta da lista volta para a mesma página dela.' },
       { texto: 'Nome, categoria, conservação e unidade base são obrigatórios; o que faltar aparece junto do campo.' },
@@ -118,7 +118,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Entenda com exemplos',
         blocos: [
           { texto: 'Aipim: comprou em saco e usa por peso na receita? O saco é a embalagem; kg e g são o peso que você usa. Confira quanto vem no saco.' },
-          { texto: 'Exemplo do aipim, só para treinar: se forem 6 sacos de 1 kg por R$ 68,34, são 6 kg e R$ 11,39 por kg.', para: ['compras.ver'] },
+          { texto: 'Exemplo do aipim, só para treinar: se forem 6 sacos de 1 kg por R$ 68,34, são 6 kg e R$ 11,39 por kg. No cadastro vai UMA embalagem: 1 kg por R$ 11,39.', para: ['compras.ver'] },
           { texto: 'Margarina: comprou em pote e usa em gramas? Confira o peso líquido do pote no rótulo. O preço do pote não é o preço do quilo.' },
           { texto: 'Exemplo da margarina: R$ 56,28 por 12 potes dá R$ 4,69 por pote. Sem o peso de cada pote, esse valor não diz o custo por kg.', para: ['compras.ver'] },
           { texto: 'Refrigerante: se você vende ou usa a lata ou a garrafa inteira, conte por unidade. Se usa só uma parte do líquido na receita, a medida é de volume, em L ou ml.' },
@@ -158,6 +158,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Escolha a unidade pelo jeito que você usa o insumo, não pela embalagem em que ele vem.' },
           { texto: 'Unidade base é como você controla o estoque e o que a ficha usa: a caixa de 5 kg é medida em kg, e o refrigerante vendido inteiro, em un.' },
+          { texto: 'Com a unidade marcada, Continuar mostra quanto vem na embalagem e o custo.' },
         ],
         secao: 'exemplos',
       },
@@ -166,14 +167,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Quanto vem na embalagem',
         blocos: [
           { texto: 'Informe o conteúdo de UMA embalagem que você compra, na medida da unidade base, e não quantas comprou.' },
-          { texto: 'Ex.: saco de farinha com 5 kg → 5; caixa de ovos com 30 un → 30; lata de 350 ml → 350, com ml marcado.' },
+          { texto: 'Ex.: saco de farinha com 5 kg → 5; caixa de ovos com 30 un → 30; óleo que você mede em litro, lata de 900 ml → 900, com ml em Medida.' },
           { texto: 'Na dúvida sobre o peso ou o volume, confira o rótulo ou consulte o fornecedor, sem estimar.' },
         ],
         secao: 'exemplos',
       },
       {
         id: 'custo',
-        titulo: 'Custo inicial de referência',
+        titulo: 'Custo inicial e frete',
         blocos: [
           { texto: 'Informe quanto você paga por uma embalagem de compra; o frete que cair em cada uma, se pagar, entra junto no custo.' },
           { texto: 'Esse valor calcula o custo do insumo e das fichas antes da primeira compra registrada; depois, vale o último preço de compra.' },
