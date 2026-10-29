@@ -28,10 +28,10 @@ services:
     image: alpine:3.20
     command: >
       sh -c 'set -e; cd /segredos;
-      for f in postgres_password nextauth_secret admin_setup_token leads_import_token webhook_secret; do
+      for f in postgres_password nextauth_secret admin_setup_token leads_import_token webhook_secret integracao_chave_cifragem; do
       if [ ! -s "$$f" ]; then head -c 32 /dev/urandom | od -An -tx1 | tr -d " \n" > "$$f"; echo "[segredos] gerado: $$f"; fi;
       done;
-      chmod 644 postgres_password nextauth_secret admin_setup_token leads_import_token webhook_secret;
+      chmod 644 postgres_password nextauth_secret admin_setup_token leads_import_token webhook_secret integracao_chave_cifragem;
       echo "[segredos] prontos"'
     volumes:
       - segredos:/segredos
@@ -180,6 +180,13 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       AI_DAILY_BUDGET_BRL: ${AI_DAILY_BUDGET_BRL:-5}
       USD_BRL: ${USD_BRL:-5.40}
+      # Central de Integrações (INT-1.2). Desligada por padrão: só "true" liga. O segredo do app vem do painel (nunca do
+      # Git); a chave de cifragem do token sai do volume de segredos (o painel vence). Só o worker recebe.
+      INTEGRACAO_IFOOD_ATIVA: ${INTEGRACAO_IFOOD_ATIVA:-false}
+      INTEGRACAO_CHAVE_CIFRAGEM: ${INTEGRACAO_CHAVE_CIFRAGEM:-}
+      IFOOD_API_BASE: ${IFOOD_API_BASE:-https://merchant-api.ifood.com.br}
+      IFOOD_TEST_CLIENT_SECRET: ${IFOOD_TEST_CLIENT_SECRET:-}
+      IFOOD_BI_CLIENT_SECRET: ${IFOOD_BI_CLIENT_SECRET:-}
     volumes:
       - segredos:/segredos:ro
     # Sem porta e sem domínio: o worker não atende requisição nenhuma.

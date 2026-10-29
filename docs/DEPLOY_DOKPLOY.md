@@ -167,7 +167,21 @@ USD_BRL=5.40
 # endereço diferente do site (ex.: portal.consultoriaflowfoods.com.br).
 ERP_WEBAUTHN_ORIGIN=https://consultoriaflowfoods.com.br   # endereço exato da página
 ERP_WEBAUTHN_RP_ID=consultoriaflowfoods.com.br            # domínio (igual ou "pai" do endereço)
+
+# Central de Integrações — iFood (INT-1.2; só no `worker`). Desligada por padrão.
+INTEGRACAO_IFOOD_ATIVA=false                         # só "true" liga; qualquer outro valor deixa desligada
+INTEGRACAO_CHAVE_CIFRAGEM=                           # vazia = a do volume de segredos (gerada sozinha); fixar: openssl rand -hex 32
+IFOOD_API_BASE=https://merchant-api.ifood.com.br     # só https e domínio do iFood
+IFOOD_TEST_CLIENT_SECRET=...                         # segredo do app Teste (C), INT-0.3 — nunca no Git, no Notion ou em chamado
+# IFOOD_BI_CLIENT_SECRET=...                         # só depois de criar o app BI de produção (Rodolfo)
 ```
+
+**Sobre a Central de Integrações:** o Client ID de cada app fica no cadastro do
+app (tela do nível 1), e o segredo só aqui, no painel, com o nome que o cadastro
+do app aponta. Para conferir sem mostrar valor nenhum:
+`docker compose exec worker npm run integracao:conferir` (diz o que falta; não
+chama o iFood). Trocar `INTEGRACAO_CHAVE_CIFRAGEM` só invalida o token guardado:
+o serviço pede um novo.
 
 **Sobre o ERP do parceiro (`/entrar` e `/erp`):** não pede variável nova. O
 rosto (passkey) só funciona em **https** (o navegador recusa em http, fora do
