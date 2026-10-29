@@ -4,6 +4,7 @@
  */
 
 import { BotaoEnviar } from '@/components/erp/ui/botoes';
+import { modulosLiberados } from '@/lib/erp/liberacao';
 import { exigirParceiroDaSessao } from '@/lib/erp/contexto';
 import { listarLojasDoAlcance } from '@/lib/erp/estrutura';
 import { CATALOGO, rotuloDasLojas, type ModuloDoCatalogo } from '@/lib/erp/permissoes';
@@ -36,15 +37,18 @@ function rostoNoSite(): boolean {
 
 export default async function SeuAcessoPage() {
   const { pessoa, alcance, cliente, parceiro } = await exigirParceiroDaSessao();
-  const [rostos, removidosEm, lojas] = await Promise.all([
+  const [rostos, removidosEm, lojas, liberados] = await Promise.all([
     listarRostos(pessoa.usuario.id),
     rostosRemovidosEm(pessoa.usuario.id),
     listarLojasDoAlcance(cliente, alcance),
+    modulosLiberados(cliente),
   ]);
   const onde = rotuloDasLojas(alcance.lojas, new Map(lojas.map((l) => [l.id, l.nome])));
   const modulos = CATALOGO.map((m) => ({
     rotulo: m.rotulo,
     emBreve: !!(m as ModuloDoCatalogo).emBreve,
+    // INT-1.8: a permissão existe, mas o módulo ainda não foi liberado para a rede (não abre tela nenhuma).
+    semLiberar: !!(m as ModuloDoCatalogo).liberacao && !liberados.has((m as ModuloDoCatalogo).liberacao!),
     itens: Object.entries(m.permissoes)
       .filter(([p]) => alcance.permissoes.has(p as never))
       .map(([, d]) => d.rotulo),
@@ -99,6 +103,9 @@ export default async function SeuAcessoPage() {
                         {m.rotulo}
                         {m.emBreve && (
                           <span className="ml-1.5 font-normal normal-case tracking-normal text-suave">· em breve</span>
+                        )}
+                        {m.semLiberar && (
+                          <span className="ml-1.5 font-normal normal-case tracking-normal text-suave">· depende de a FlowFoods liberar o módulo</span>
                         )}
                       </dt>
                       <dd className="mt-1 text-[13px] leading-relaxed text-texto">{m.itens.join(' · ')}</dd>

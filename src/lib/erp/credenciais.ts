@@ -45,6 +45,7 @@ import {
   type Permissao,
   type Setor,
   type VinculoDePermissao,
+  permissoesSemModuloLiberado,
 } from './permissoes';
 import {
   ajusteMinimo,
@@ -503,8 +504,13 @@ export interface LinhaDePerfil {
   atualizadoEm: Date;
 }
 
-export async function listarPerfis(parceiroId: string, o?: Opcoes): Promise<LinhaDePerfil[]> {
+/**
+ * `liberados` (INT-1.8): com ele, o "revise" não cita permissão de módulo que o parceiro ainda não tem liberado (seria
+ * promessa de uma tela que não existe para ele).
+ */
+export async function listarPerfis(parceiroId: string, o?: Opcoes, liberados?: ReadonlySet<string>): Promise<LinhaDePerfil[]> {
   const { db } = abrir(o);
+  const semModulo = liberados ? permissoesSemModuloLiberado(liberados) : new Set<string>();
   const perfis = await db.perfilAcesso.findMany({
     where: { parceiroId },
     include: { _count: { select: { acessos: true } } },
@@ -520,7 +526,7 @@ export async function listarPerfis(parceiroId: string, o?: Opcoes): Promise<Linh
       permissoes,
       setores: normalizarSetores(p.setores ?? []),
       catalogoVersao: p.catalogoVersao,
-      revisar: novasDesdeOPerfil(permissoes, p.catalogoVersao),
+      revisar: novasDesdeOPerfil(permissoes, p.catalogoVersao).filter((x) => !semModulo.has(x)),
       pessoas: p._count.acessos,
       atualizadoEm: p.atualizadoEm,
     };

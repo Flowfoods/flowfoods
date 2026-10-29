@@ -45,6 +45,8 @@ export interface ModuloDoCatalogo {
   rotulo: string;
   /** Ainda sem tela: a permissão já existe para montar o perfil. */
   emBreve?: boolean;
+  /** INT-1.8 (decisão 491): só vale com este módulo liberado para o parceiro pela FlowFoods (decisão 482). */
+  liberacao?: 'integracao';
   permissoes: Record<string, DefinicaoDePermissao>;
 }
 
@@ -155,6 +157,7 @@ export const CATALOGO = [
     // parceiro (decisão 482). O Dono recebe pelo perfil base; os demais, como extra ou no perfil próprio (catálogo 4).
     chave: 'integracao',
     rotulo: 'Integração',
+    liberacao: 'integracao',
     permissoes: {
       'integracao.ver': { rotulo: 'Ver as integrações das lojas (iFood)', porLoja: true },
     },
@@ -172,6 +175,16 @@ const DEFINICOES = new Map<string, DefinicaoDePermissao & { modulo: string }>(
 );
 
 export const TODAS_AS_PERMISSOES = Array.from(DEFINICOES.keys()) as Permissao[];
+
+/** As permissões de módulos que dependem de liberação e que este parceiro ainda não tem liberados (não abrem tela nenhuma). */
+export function permissoesSemModuloLiberado(liberados: ReadonlySet<string>): Set<Permissao> {
+  return new Set(
+    CATALOGO.flatMap((m) => {
+      const precisa = (m as ModuloDoCatalogo).liberacao;
+      return precisa && !liberados.has(precisa) ? (Object.keys(m.permissoes) as Permissao[]) : [];
+    }),
+  );
+}
 
 export function ehPermissao(p: unknown): p is Permissao {
   return typeof p === 'string' && DEFINICOES.has(p);

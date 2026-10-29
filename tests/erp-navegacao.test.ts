@@ -481,7 +481,9 @@ describe('UX.9 · URLs antigas continuam, e a única rota nova existe no /erp e 
     // 3.4: Etiquetas e o lote do fornecedor na nota.
     '/etiquetas', '/etiquetas/abrir', '/etiquetas/historico', '/etiquetas/impressora', '/etiquetas/[lojaId]', '/etiquetas/[lojaId]/lote/[ordemId]',
     '/etiquetas/[lojaId]/abrir', '/etiquetas/[lojaId]/aberta/[aberturaId]', '/etiquetas/[lojaId]/[etiquetaId]', '/etiquetas/[lojaId]/[etiquetaId]/papel',
-    '/etiquetas/historico/[lojaId]', '/compras/[id]/lotes'])('%s existe no /erp e no nível 1', (r) => {
+    '/etiquetas/historico/[lojaId]', '/compras/[id]/lotes',
+    // INT-1.8: Integrações (no nível 1, leva à Central do parceiro).
+    '/integracoes'])('%s existe no /erp e no nível 1', (r) => {
     expect(existsSync(parceiro(r)), `/erp${r}`).toBe(true);
     expect(existsSync(espelho(r)), `/rodolfo/erp/<slug>${r}`).toBe(true);
   });
@@ -712,5 +714,18 @@ describe('INT-1.8 · Integrações aparece em Rede e Equipe só com o módulo li
     expect(hub).toMatch(/modulosDoParceiro\(ctx\.alcance, '\/erp', liberados\)/);
     const nivel1 = comParceiroAtual(navegacaoDoNivel1(), '/rodolfo/erp/v/insumos', [{ slug: 'v', nome: 'V' }]);
     expect(nivel1.modulos.flatMap((m) => m.grupos.flatMap((g) => g.itens.map((i) => i.href)))).toContain('/rodolfo/erp/v/integracoes');
+  });
+});
+
+describe('INT-1.8 · o hub diz quem libera o módulo (decisão 491)', () => {
+  const hub = (semModulo: boolean) =>
+    renderToStaticMarkup(createElement(HubDoParceiro, { titulo: 'Áreas da Rede', subtitulo: 'Casa', modulos: [], semAcesso: false, semModulo }));
+  it('com sem-modulo, o aviso diz que é a FlowFoods quem libera (não "quem cuida da equipe") e traz o WhatsApp; sem ele, nada', () => {
+    const com = hub(true);
+    expect(com).toContain('O módulo Integração não está liberado para a sua rede.');
+    expect(com).toContain('fale com a FlowFoods');
+    expect(com).toContain('https://wa.me/');
+    expect(com).not.toContain('quem cuida da equipe');
+    expect(hub(false)).not.toContain('não está liberado');
   });
 });

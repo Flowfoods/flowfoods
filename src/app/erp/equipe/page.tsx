@@ -5,6 +5,7 @@
  * dar aparece travado, e o servidor recusa do mesmo jeito.
  */
 
+import { modulosLiberados } from '@/lib/erp/liberacao';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { listarAcessos, listarPerfis } from '@/lib/erp/credenciais';
 import { listarLojasDoAlcance } from '@/lib/erp/estrutura';
@@ -30,7 +31,7 @@ export default async function ErpEquipePage({ searchParams }: { searchParams: { 
   const rede = ctx.alcance.lojas === 'todas';
   const [pessoas, perfis, lojas, historico] = await Promise.all([
     listarAcessos(ctx.parceiro.id),
-    listarPerfis(ctx.parceiro.id),
+    modulosLiberados(ctx.cliente).then((liberados) => listarPerfis(ctx.parceiro.id, undefined, liberados)),
     listarLojasDoAlcance(ctx.cliente, ctx.alcance),
     rede ? listarHistorico(ctx.cliente, { entidades: ['AcessoParceiro', 'PerfilAcesso'], limite: 6, verPrecos: false }) : undefined,
   ]);

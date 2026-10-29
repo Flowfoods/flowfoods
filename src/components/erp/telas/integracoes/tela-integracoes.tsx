@@ -29,7 +29,7 @@ export function TelaIntegracoes({ integracoes }: { integracoes: IntegracaoParaOP
               <li key={c.id} className="space-y-3 px-4 py-4 sm:px-5">
                 <div className="space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-[15px] font-medium text-texto">{c.nomeNoIfood}</h3>
+                    <h3 className="text-sm font-medium text-texto">{c.nomeNoIfood}</h3>
                     {c.teste && <Selo tom="alerta">Loja de teste do iFood</Selo>}
                   </div>
                   <p className="text-[13px] text-suave">

@@ -5,6 +5,7 @@
  * tela que o dono usa em /erp/equipe (`TelaEquipe`), com o alcance do nível 1.
  */
 
+import { modulosLiberados } from '@/lib/erp/liberacao';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
 import { listarAcessos, listarPerfis } from '@/lib/erp/credenciais';
 import { listarLojasDoAlcance } from '@/lib/erp/estrutura';
@@ -37,7 +38,7 @@ export default async function AcessosPage({
   const { parceiro, cliente, alcance } = ctx;
   const [pessoas, perfis, lojas, historico] = await Promise.all([
     listarAcessos(parceiro.id),
-    listarPerfis(parceiro.id),
+    modulosLiberados(cliente).then((liberados) => listarPerfis(parceiro.id, undefined, liberados)),
     listarLojasDoAlcance(cliente, alcance),
     listarHistorico(cliente, { entidades: ['AcessoParceiro', 'PerfilAcesso'], limite: 6, verPrecos: false }),
   ]);

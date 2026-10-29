@@ -13,6 +13,8 @@ import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../ui/cabecalho';
 import { HubDeModulos } from '../ui/hub';
 import { Aviso } from '../ui/superficies';
+import { LINK_DE_TEXTO } from '../ui/estilos';
+import { AJUDA_DE_USO_ERP } from '@/lib/constants';
 import type { PainelDoDia } from '@/lib/erp/painel-do-dia';
 import { PainelDoDiaNaTela } from './painel-do-dia';
 
@@ -46,7 +48,11 @@ export function HubDoParceiro({
       )}
       {semModulo && (
         <Aviso tom="alerta" titulo="O módulo Integração não está liberado para a sua rede.">
-          Para usar, fale com a FlowFoods.
+          Para usar,{' '}
+          <a href={AJUDA_DE_USO_ERP.url} target="_blank" rel="noopener noreferrer" className={LINK_DE_TEXTO}>
+            fale com a FlowFoods no WhatsApp
+          </a>
+          .
         </Aviso>
       )}
       {painel && <PainelDoDiaNaTela painel={painel} />}

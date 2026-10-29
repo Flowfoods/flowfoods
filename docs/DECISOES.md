@@ -3605,4 +3605,11 @@ Fora da integração, no mesmo bloco de trabalho (f0ce242): na suíte completa c
 - Testes atualizados: `erp-permissoes` (v4 e as versões antigas), `erp-permissoes.db`, `erp-navegacao` (aba com e sem liberação, Gerente com extra, layout, hub e nível 1), `erp-shell`, `erp-ajuda`.
 - Navegador, no build local: Dono e Gerente; bloquear na Central faz a aba sumir e a tela cair no aviso; espelho do nível 1; 360 a 1280, claro e escuro, sem rolagem lateral.
 
+**Recheque (outro revisor):** aprovada com ressalvas, sem "deve". Os 5 "deveria" foram fechados depois:
+- "Seu acesso" diz "depende de a FlowFoods liberar o módulo" quando o módulo não está liberado.
+- A grade da Equipe marca o módulo como "só com o módulo liberado pela FlowFoods".
+- O "revise" de perfil antigo não cita permissão de módulo não liberado (`listarPerfis` recebe os liberados).
+- Testes novos: selo da loja de teste vindo do banco; liberar e bloquear mudando o que o menu recebe; a rota do espelho; o aviso do hub, que agora traz o WhatsApp.
+- As mutações que sobreviveram ao recheque (selo invertido, bloqueio ignorado, espelho apagado, aviso do hub sumido) agora são pegas.
+
 **Reverter:** `git revert` dos commits. A migration é só dado: os perfis promovidos ficam com a permissão a mais, que sem o módulo liberado não abre nada.

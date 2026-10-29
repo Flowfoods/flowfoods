@@ -51,7 +51,8 @@ vi.mock('@/lib/erp/contexto', async () => {
 import { prisma } from '@/lib/db';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
-import { mudarLiberacao } from '@/lib/erp/liberacao';
+import { modulosLiberados, mudarLiberacao, NENHUM_MODULO_LIBERADO } from '@/lib/erp/liberacao';
+import { listarPerfis } from '@/lib/erp/credenciais';
 import { resolverAlcance, TODAS_AS_PERMISSOES, type Alcance } from '@/lib/erp/permissoes';
 import { registrarApp } from '@/lib/integracoes/core/apps';
 import { desligarConexao, ligarConexao, mudarModulo, prepararModulo } from '@/lib/integracoes/core/conexoes';
@@ -120,6 +121,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
 
   afterAll(async () => {
     if (!db) return;
+    await db.perfilAcesso.deleteMany({ where: { parceiroId: { in: ids } } });
     await limparParceiros(db, perfil, ids);
     await db.$transaction(async (tx) => {
       await tx.$executeRawUnsafe(`ALTER TABLE "IntegracaoApp" DISABLE TRIGGER "IntegracaoApp_nao_apaga"`);
@@ -150,6 +152,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     expect(pagina).toContain('Esperando a loja aprovar');
     expect(pagina).toContain('Portal do Parceiro');
     expect(pagina).toContain('2 lojas do iFood ligadas');
+    expect(pagina).not.toContain('Loja de teste do iFood');
     for (const proibido of ['SOLICITADO', 'ANALYTICS', 'PRODUCAO', `bi-par-${sufixo}`, 'IFOOD_BI_CLIENT_SECRET', 'FlowFoods ERP · BI', `Loja antiga desligada ${sufixo}`, `Loja do parceiro B ${sufixo}`])
       expect(pagina, proibido).not.toContain(proibido);
   });
@@ -209,5 +212,34 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     const seloDoErro = renderToStaticMarkup(createElement(Selo, { tom: 'erro', children: 'x' }));
     expect(blocoReal).toContain(seloDoErro.slice(0, seloDoErro.indexOf('>') + 1));
     expect(html2).toContain('https://wa.me/5521996416060');
+  });
+
+  it('liberar e bloquear mudam o que o menu recebe; a loja de teste (no parceiro de testes) leva o selo; o "revise" só cita módulo liberado', async () => {
+    expect([...(await modulosLiberados(a))]).toEqual(['integracao']);
+    await mudarLiberacao(a, 'integracao', false, 'teste');
+    expect([...(await modulosLiberados(a))]).toEqual([]);
+    // Perfil próprio parcial da v3 (sem a permissão nova): sem o módulo liberado, nada a revisar sobre integrações.
+    const V3 = TODAS_AS_PERMISSOES.filter((p) => p !== 'integracao.ver' && p !== 'precos.editar');
+    const parcial = await db.perfilAcesso.create({ data: { parceiroId: A.id, nome: `Parcial v3 ${sufixo}`, base: 'DONO', permissoes: V3, catalogoVersao: 3 } });
+    const revisarSem = (await listarPerfis(A.id, undefined, await modulosLiberados(a))).find((p) => p.id === parcial.id)?.revisar;
+    expect(revisarSem).toEqual([]);
+    await mudarLiberacao(a, 'integracao', true, 'teste');
+    const revisarCom = (await listarPerfis(A.id, undefined, await modulosLiberados(a))).find((p) => p.id === parcial.id)?.revisar;
+    expect(revisarCom).toEqual(['integracao.ver']);
+    expect((await listarPerfis(A.id, undefined, NENHUM_MODULO_LIBERADO)).find((p) => p.id === parcial.id)?.revisar).toEqual([]);
+
+    // Parceiro de testes com a loja de teste ligada: o selo aparece nela.
+    const H = await db.parceiroFlow.create({ data: { nome: `Parceiro Int H ${sufixo}`, slug: `pint-h-${sufixo}`, status: 'ATIVO', homologacaoDeIntegracao: true } });
+    ids.push(H.id);
+    const h = doParceiro(H.id, db);
+    const lojaH = await cadastrarLoja(h, { nome: 'Loja de teste' }, 'teste');
+    if (!lojaH.ok) throw new Error(JSON.stringify(lojaH));
+    const r = await ligarConexao(h, { lojaId: lojaH.id, provedor: 'IFOOD', ambiente: 'TEST', idExterno: uuid(), nomeExterno: `Teste iFood ${sufixo}` }, { nome: 'teste' });
+    if (!r.ok) throw new Error(JSON.stringify(r));
+    await mudarLiberacao(h, 'integracao', true, 'teste');
+    como(alcanceDe('DONO', 'rede'), h);
+    const pagina = await html(ErpIntegracoesPage());
+    expect(pagina).toContain(`Teste iFood ${sufixo}`);
+    expect(pagina).toContain('Loja de teste do iFood');
   });
 });

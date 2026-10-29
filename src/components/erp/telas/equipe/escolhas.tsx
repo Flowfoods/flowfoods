@@ -124,6 +124,9 @@ export function GradeDePermissoes({
             {(m as ModuloDoCatalogo).emBreve && (
               <span className="font-normal normal-case tracking-normal text-suave">· tela em breve</span>
             )}
+            {(m as ModuloDoCatalogo).liberacao && (
+              <span className="font-normal normal-case tracking-normal text-suave">· só com o módulo liberado pela FlowFoods</span>
+            )}
           </legend>
           <div className="grid gap-x-4 sm:grid-cols-2">
             {Object.entries(m.permissoes).map(([p, d]) => {
