@@ -207,3 +207,31 @@ Deploy feito em 25/09. Falta, nesta ordem:
    portal funciona; só o aviso no WhatsApp não sai.
 3. Em `/rodolfo/portal`, copiar o link e mandar para o Valentin's.
 
+
+---
+
+## 10. Integração iFood (TEST) e a versão de trabalho — pendente, 29/10/2026
+
+O código da Central de Integrações e do cliente iFood (INT-1.1 a 1.4) e a ajuda
+guiada (479/480) estão prontos, testados e aprovados por revisão independente na
+branch `bruce/modest-lovelace-ouylx2`. **Nada foi para a `master` e não houve
+deploy.** Nenhuma chamada real ao iFood foi feita. O que só você decide ou faz:
+
+1. **Merge na `master`** (é ele que dispara o deploy). Antes, rodar no
+   servidor `npm run erp:conferir-migracao` depois do deploy: três migrations
+   novas, aditivas (`20261115000000`, `20261116000000`, `20261117000000`).
+2. **Segredo do app Teste (C) no Dokploy** (INT-0.3): `IFOOD_TEST_CLIENT_SECRET`,
+   só no painel, nunca no Git, no Notion ou em chamado.
+3. **Ligar a chave geral** para a leitura TEST: `INTEGRACAO_IFOOD_ATIVA=true`.
+   Sozinha ela não sincroniza nada.
+4. **Rodar a primeira leitura TEST** (ou me pedir para rodar, se eu tiver acesso
+   ao servidor), com o Client ID do Teste (C):
+   `docker compose exec worker sh -c '. ./scripts/exportar-segredos.sh && npm run integracao:ler-test -- --client-id <Client ID>'`.
+   O HTTP 200 oficial (data, app, loja, requestId) fecha a INT-1.4 e libera a
+   INT-1.5 a 1.7, que dependem da resposta real.
+5. **Validação acompanhada da 480 com o cliente fundador** (unidade, embalagem e
+   custo, sem explicação pelo WhatsApp) — operação, fora do código.
+6. **Um celular de verdade** para conferir a ajuda com teclado virtual e barra de
+   endereço (o teste automático só simula).
+7. **Decidir:** quando só um ponto novo está elegível, a sequência começa nele
+   mostrando "6 de 6". Fica assim, ou mostra só o ponto novo?

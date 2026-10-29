@@ -4723,3 +4723,29 @@ lista era cortada calada). Com `rede=1` valem todas as lojas do acesso e a loja 
 suas lojas, não só <loja>… Ver só <loja>"); marcar loja vale mais. A regra mora em `recorteDaVisao` e vale para o relatório e as
 duas comparações; links, formulário, planilha e impressão levam a rede adiante. Revisor: aprovou na primeira rodada. Matriz 96
 telas: 0 falhas. Suíte com banco 2.945 aprovados, 46 pulados, 0 falhas; teste novo `erp-compras-rede`.
+
+**Ajuda em sequência guiada (decisão 479, 26–29/10/2026):** os cards flutuantes da tela formam um passo a passo na ordem da
+página: o X ("Fechar etapa e continuar") e "Continuar" avançam, o último conclui, "Encerrar ajuda", Escape e tocar fora saem.
+Começa sozinha na 1ª visita e a cada 7 dias, uma tentativa por visita, nunca por cima de quem digita nem com o menu ou a gaveta
+de ajuda abertos; a gaveta e o card nunca ficam abertos juntos. No celular, o card cabe sem esconder o alvo, reposiciona ao
+girar (não ao rolar), mantém à vista o campo de quem digita e sobe com o teclado virtual. Revisor: cinco conferências
+(as três primeiras e a quarta reprovaram; a quinta aprovou, com a confirmação dos últimos ajustes). Commits e45c969, af6b68b, b190793 e b3ffda7. Hipótese sem prova: teclado e barra de endereço de um celular real.
+
+**Cadastro de insumo · unidade, embalagem e custo nos cards (decisão 480, 28–29/10/2026):** a frase de abertura, "Quanto vem na
+embalagem", "Custo inicial e frete" e a seção "Entenda com exemplos" saíram do corpo e entraram na sequência (7 e 8 de 8 depois de
+marcar a unidade); a região explicada fica inteira acima do card; R$ só para quem vê custo. Commits 342c42f, b190793 e b3ffda7.
+Validação acompanhada com o cliente fundador: pendente (operação).
+
+**PRIORIDADE 004 · Central de Integrações e cliente iFood (decisões 481–488, 28–29/10/2026):** INT-1.1 (dados da Central com RLS,
+liberação do módulo Integração, estados), INT-1.2 (cofre), INT-1.3 (cliente iFood) e INT-1.4 (comando da leitura TEST) prontos
+na versão de trabalho, com duas rodadas de correção da revisão independente (487 e 488; o "deve" era gatilho enganável por
+tabela temporária). Migrations aditivas `20261115000000_erp_integracao_fundacao`, `20261116000000_erp_integracao_endurecimento`
+e `20261117000000_erp_integracao_ajustes`; o conferidor pós-deploy cobre as três. **Nenhuma chamada real ao iFood foi feita.** A
+primeira (INT-1.4) depende de Rodolfo pôr `IFOOD_TEST_CLIENT_SECRET` no Dokploy, do merge e deploy (decisão dele) e de
+`INTEGRACAO_IFOOD_ATIVA=true`; como rodar está em `docs/DEPLOY_DOKPLOY.md`. INT-1.5 a 1.7 esperam a resposta real do TEST.
+
+**Provas desta rodada** (Postgres 16 local, dados sintéticos; produção não verificada): suíte completa com banco no commit 19debd7: **179 arquivos, 3.090 aprovados, 0 pulados, 0 falhas**; os
+perfis de dono não-superusuário (com e sem RLS) passaram a rodar depois de criar os papéis locais `ff_dono` e `ff_semrls` (antes,
+46 testes ficavam pulados); 16 testes de migração em 3 perfis. No navegador (build de produção local): 70 + 90 conferências da
+480, 9 da quinta rodada e os roteiros dos revisores da 479 (sequência, fluxos, 7 dias, alvo que some, giro em 11 combinações,
+gaveta e atalho, menu, campo sob o card, teclado e barra de endereço simulados, editar e "Outra embalagem").

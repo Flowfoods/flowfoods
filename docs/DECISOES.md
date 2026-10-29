@@ -3359,3 +3359,159 @@ pré-preparo com custo incompleto = valor pendente, nunca "R$ 0,00" como fato
 **Revisão independente:** aprovada na primeira rodada, sem "deve". O "deveria" (a ligação da página com a rede não tinha teste: desfazer a regra na página deixava tudo verde) entrou antes do commit, com o teste das páginas; as sugestões (marcar e desmarcar loja, os dois "limpar", parceiro de loja única) estão registradas acima. O revisor conferiu também a planilha e a impressão com `rede=1` (mesmas lojas e total da tela), a navegação interna inteira levando a rede e o estoque/consumo intacto.
 
 **Reverter:** `git revert` do commit; nada no banco muda. Links antigos com as lojas por extenso continuam funcionando.
+
+### 479. 2026-10-29 · Ajuda em sequência guiada: os cards flutuantes da tela formam um passo a passo que a pessoa avança ou encerra
+
+**Fonte:** decisão vigente de Rodolfo de 25/10/2026 no Notion ("Refinamento prioritário de UX — ajuda dispensável", "Referência aprovada — treinamento contextual em card flutuante"): "todos os pop-ups educativos do portal flutuantes, passando de um ponto ao próximo à medida que a pessoa fecha cada explicação". Substitui, só no que conflita, o X que apenas dispensava o card (decisões de 23 e 24/10) e a proibição genérica de sequência de pop-ups. Vale para o padrão compartilhado (`pontos.tsx`), então chega a todas as telas que já têm pontos.
+
+**Mudanças:**
+1. **A sequência:** os pontos visíveis e permitidos da tela, na ordem da página (`ajuda-sequencia.ts`, regras puras), formam os passos. Um card por vez, perto do botão do ponto, com o botão realçado e o véu vermelho clarinho. O X ("Fechar etapa e continuar") e "Continuar" abrem o próximo; no último, viram "Fechar ajuda"/"Concluir" e concluem, sem voltar ao início. "Encerrar ajuda", Escape e tocar fora saem da sequência inteira, sem avançar. Progresso "2 de 5" lido pelo leitor de tela. Sem temporizador, sem tempo mínimo.
+2. **Início automático:** a regra da 1ª visita e dos 7 dias decide quando a sequência pode começar sozinha, uma tentativa por visita, comece ou não. Ao começar, todos os passos contam como vistos, num lote só (uma transação). Não começa por cima de quem digita: o botão do 1º ponto e o campo em foco precisam ficar livres do card; senão, a tentativa se gasta. Não começa com o menu ou a gaveta de ajuda abertos. Depois de encerrar, não recomeça na mesma visita. "Não mostrar novamente" tira o ponto da sequência automática; o botão dele continua abrindo.
+3. **Ajuda completa e card nunca juntos:** a gaveta "?" (botão do topo, atalho de teclado ou "Ver passo a passo") fecha o card e gasta a tentativa da visita.
+4. **Tela e foco:** o card cabe na tela (topo com o X e rodapé com Encerrar/Continuar sempre à vista; só o texto rola); avançar leva o foco ao card e rola só o necessário para o botão ficar acima dele (sem movimento se a pessoa pediu menos movimento); girar o aparelho ou mudar o tamanho da janela reposiciona o card aberto; encerrar devolve o foco a onde a pessoa estava. Se um ponto some ou aparece no meio, o "2 de 5" e o Continuar/Concluir se refazem, sem apontar para o que não está na tela.
+5. **Nada muda nos dados:** abrir, avançar e encerrar não gravam, não enviam e não mexem no formulário; a preferência é por pessoa.
+6. **Celular de verdade (4ª conferência):** só campo de digitar conta como "alguém digitando" (rádio, caixa de seleção e lista não), então girar o aparelho com o foco num botão de escolha reposiciona o card; o card só se reposiciona quando a largura muda ou o aparelho gira (a barra de endereço recolhendo enquanto a pessoa rola não puxa a página); com alguém digitando, a página sobe só o necessário para o campo continuar à vista, e com teclado virtual o card sobe junto com a parte visível da tela; um aviso discreto ("Role o texto para ver o resto") aparece quando o texto do card rola.
+7. **Vistos e foco:** a sequência que começou sozinha marca como vistos os passos que alcança, inclusive os que aparecem no meio (antes, só os da partida); "Encerrar" devolve o foco ao campo em que a pessoa trabalhava com o card aberto.
+
+**Não feito, de propósito:** "Pular etapa" separado do X (o X já avança uma etapa); áudio "Ouvir explicação" (seção própria do plano, ainda não liberada); começar só pelo ponto novo quando só ele está elegível (hoje a sequência começa nele, mostrando "6 de 6"; fica para Rodolfo decidir se é assim). **Hipótese sem prova:** o comportamento com teclado virtual e barra de endereço de um celular real (Android e iPhone) — o navegador de teste só simula mudando a altura da tela; conferir num aparelho.
+
+**Revisão independente:** cinco conferências. A 1ª e a 2ª (de outro revisor) reprovaram, com 9 e 3 achados corrigidos: "visto" gravado passo a passo perdia passos (agora um lote, numa transação); 7 dias reiniciando na volta pela navegação; início antes do alvo à vista; "Desligar" dicas que não encerrava; Escape tirando o foco de quem digita; realce sob a barra do topo; folga que deslocava o menu; leitor de tela sem o "passo 2 de 6"; lista de lojas cortada no celular; alturas reais de celular; conta da folga. A 3ª reprovou: a gaveta aberta na chegada adiava o início, que vinha depois por cima de quem digitava; girar o aparelho escondia o alvo; o atalho "?" não fechava o card; o campo em foco ficava sob o card. A 4ª reprovou: girar com o foco num rádio ou numa caixa não reposicionava, e apontou a barra de endereço puxando a página, os passos novos sem visto e o foco ao encerrar. A 5ª **aprovou**, com duas sugestões atendidas (teto do card ao fechar o teclado; o deslizar da parte visível no iPhone). Confirmação final (19debd7): os ajustes da 5ª fechados, nada novo de "deve" ou "deveria"; 479 aprovada e 480 aprovada sem ressalva.
+
+**Prova:** testes `erp-ajuda-sequencia` (regras puras da sequência e guardas do provedor), `erp-ajuda-pontos.db` (o lote de vistos numa transação) e o restante da ajuda. No navegador (build de produção local), os roteiros das conferências: sequência completa em 1280×800, 390×664 (tema escuro) e 375×553; fluxos de encerrar, Escape, tocar fora, gaveta × card, "Desligar" dicas, rascunho preservado e nenhum insumo criado (16 antes e depois); 7 dias e "nunca" simulados no banco; Dora e Gil no mesmo navegador; Otto sem R$; alvo que some e volta; rotação 820×1180 ↔ 1180×820, 390×664 ↔ 664×390 e 768×1024 ↔ 1024×768 com todos os passos à vista; gaveta na chegada e atalho "?" sem card junto; menu aberto na chegada; campo em foco nunca sob o card (0 de 3 pontos cobertos em 4 telas); "Encerrar" devolvendo o foco ao campo onde ele fica livre (1600 e 1920 px).
+
+**Reverter:** `git revert` dos commits e45c969, af6b68b, b190793, b3ffda7 e 19debd7 (só a parte da 479); preferências gravadas continuam válidas.
+
+### 480. 2026-10-29 · Cadastro de insumo: a explicação de unidade, embalagem e custo sai do corpo e vai para os cards da sequência
+
+**Fonte:** "Complemento educacional — unidade, embalagem e custo" (Rodolfo, 25/10/2026, no Notion) com a interação da 479: a frase de abertura e os exemplos ficam nos cards flutuantes; na página, só rótulos, unidades, obrigatoriedade, erros e avisos essenciais.
+
+**Mudanças:**
+1. **Cards novos no cadastro:** o ponto da unidade abre com "Escolha a unidade pelo jeito que você usa o insumo, não pela embalagem em que ele vem." e avisa: "Com a unidade marcada, esta ajuda segue para quanto vem na embalagem e o custo." (frase que vale também no editar com a unidade travada). Pontos novos "Quanto vem na embalagem" e "Custo inicial e frete" junto dos campos. A seção "Entenda com exemplos" (aipim, margarina, refrigerante, dúvida sobre o conteúdo, 1 kg = 1.000 g e 1 L = 1.000 ml) abre pelo "Ver passo a passo".
+2. **A sequência chega aos pontos novos:** o ponto declara a região que explica (`alvo`): tocar ou digitar na unidade, no campo "Quanto vem" ou no custo não encerra a sequência, e o Continuar segue para os pontos que apareceram depois da unidade (7 de 8, 8 de 8), que contam como vistos. O card mira o botão e a região juntos e, quando a região não cabe acima dele, encolhe (até o mínimo, com topo e rodapé à vista; o texto rola dentro): no celular em pé e deitado, não cobre os botões da unidade, o campo, a Medida, o custo, "Ainda não sei o custo" nem o frete. Os rótulos do custo e do frete têm altura em rem (a classe de 40 px virava 44 px no toque e mudava a "Outra embalagem").
+3. **Ficam na tela:** rótulos, Medida, "(R$ por embalagem de compra)", "(se pagar)", erros, a conta ao vivo e a origem do custo. Sem o ponto para a pessoa, o texto antigo continua. "Outra embalagem" não muda.
+4. **R$ por permissão:** os exemplos em dinheiro (aipim, margarina, custo) só para quem vê custo (`compras.ver`), conferido no HTML e nas respostas, não só escondido.
+
+**Não feito, de propósito:** o exemplo do custo segue fixo em kg (o registro de textos é estático; o texto da tela que acompanhava a unidade saiu do corpo por decisão); validação acompanhada com o cliente fundador (operação, com Rodolfo); áudio (seção própria).
+
+**Revisão independente:** a revisão da 480 aprovou com ressalvas: "Quanto vem" e o custo nunca entravam na sequência (escolher a unidade encerrava) e o card cobria os controles que explica; seis sugestões de texto e alinhamento, cinco atendidas. A 4ª conferência reprovou as correções (o frete coberto no celular, a classe de 40 px que virava 44 px no toque e mudava a "Outra embalagem"). A 5ª **aprovou** com um "deveria": no celular deitado o card encolhia até meia linha; atendido com o mínimo de umas três linhas, aceitando o fim da região sob o card nessa posição (troca proposta pelo revisor). Confirmação final (19debd7): os ajustes da 5ª fechados, nada novo de "deve" ou "deveria"; 479 aprovada e 480 aprovada sem ressalva.
+
+**Prova:** teste `erp-ajuda-insumo-480` (shell real; textos fora do corpo com os pontos; texto antigo sem os pontos; "Outra embalagem" igual; ordem dos cards; a conta dos exemplos; sem R$ para perfil sem `compras.ver`; três mutações pegas). No navegador, 70 de 70 conferências das correções (390×664, 375×553, 820×1180, 1280×900, 1024×768: tocar em Quilo não encerra; "Quanto vem" 7 de 8 e "Custo inicial e frete" 8 de 8; o card não cobre unidade, campo, Medida nem custo; tocar fora encerra; o digitado fica; sem rolagem lateral) e 90 de 90 da rodada anterior (perfis com e sem R$, formulário preservado).
+
+**Reverter:** `git revert` de 342c42f e da parte da 480 em b190793, b3ffda7 e 19debd7; versão da entrada `insumo-novo` volta a 4 com o `ajuda.lock.json`.
+
+### 481. 2026-10-29 · INT-1.1: a fundação de dados da Central de Integrações
+
+**Fonte:** PRIORIDADE 004 (H0 e Onda 1 liberadas por Rodolfo em 28/10/2026) e o "Plano de execução — Integração iFood no FlowFoods ERP", seções 3.2 e 3.5. Aceite da fatia: "teste prova que o parceiro A não vê conexões do parceiro B".
+
+**Mudanças (migration aditiva `20261115000000_erp_integracao_fundacao`):**
+1. **Globais, só do nível 1 e do serviço:** `IntegracaoApp` (app do provedor por ambiente; guarda o Client ID e só o NOME da variável do cofre, nunca o segredo) e `IntegracaoToken` (cifrado). O papel do tenant não alcança (REVOKE).
+2. **De tenant, com RLS forçada e sem DELETE:** `IntegracaoConexao` (a loja do iFood ligada à `Loja` e, se houver, à marca), `IntegracaoConexaoModulo` (o estado de cada módulo numa conexão) e `LiberacaoDeModulo` (decisão 482). Desligar, pausar e bloquear são estados; o histórico fica.
+3. **O banco como cinto:** uma loja do iFood ativa num parceiro só, em toda a base (índice único parcial, fora da RLS); TEST só no parceiro de homologação (`ParceiroFlow.homologacaoDeIntegracao`) e PRODUCAO nunca nele; o módulo usa um app do mesmo provedor e ambiente que tem o módulo; a identidade da conexão não muda e a desligada não volta (ligar de novo é linha nova); o app não se apaga. Sem relação Prisma do app (global) para os módulos (tenant): o teste-portão pegou que ela abriria leitura de dado do parceiro pelo cliente do portal.
+4. **Serviços** em `src/lib/integracoes/core` (`campos`, `estados`, `apps`, `conexoes`), com histórico do parceiro na mesma transação e mudança de estado otimista (quem chega segundo não sobrescreve). O histórico do parceiro não mostra as entidades da Central até as telas da INT-1.8.
+5. **Conferidor pós-deploy** cobra as tabelas, a RLS forçada, o REVOKE das globais, os CHECKs, o índice parcial e os gatilhos.
+
+**Não feito, de propósito:** telas (INT-1.8); a troca de `homologacaoDeIntegracao` com conexão já ligada não é travada pelo banco (só o nível 1 grava; a tela da INT-1.8 vai recusar).
+
+**Revisão independente:** revisão independente de INT-1.1 a 1.3 em duas rodadas e um recheque. Primeira rodada: INT-1.1 **reprovada** por um "deve" (os gatilhos que rodam como dono podiam ser enganados por tabela temporária criada pelo papel do tenant) e INT-1.2 e INT-1.3 aprovadas com onze "deveria" — todos corrigidos na decisão 487. Recheque: as quatro fatias (INT-1.1 a 1.4) **aprovadas**, com quatro "deveria" novos corrigidos na decisão 488. O revisor refez os ataques sem sucesso e rodou 28 + 5 mutações; as que sobreviveram viraram teste.
+
+**Prova:** `integracao-fundacao` (12, sem banco), `integracao-fundacao.db` (7, Postgres: o parceiro B não vê nem muda a conexão do A; a mesma loja do iFood em dois parceiros recusada; TEST fora da homologação recusado; módulo com app errado recusado; mutações do índice e do gatilho pegas) e `integracao-fundacao-migracao.db` (a migration com dado antigo como superusuário, como dono não-superusuário com RLS forçada e como dono sem RLS: nada some, sem aviso, as regras pelo papel do tenant, o conferidor limpo e acusando índice, gatilho, RLS e REVOKE faltando; duas mutações da migration pegas).
+
+**Reverter:** a migration é aditiva; `git revert` de fa1898b tira o código. As tabelas podem ficar (vazias) ou sair com `DROP TABLE` das cinco e `ALTER TABLE "ParceiroFlow" DROP COLUMN "homologacaoDeIntegracao"`.
+
+Fora da integração, no mesmo bloco de trabalho (f0ce242): na suíte completa com banco, três "Montar lote" juntos num banco novo fizeram colidir o upsert da sequência padrão (o upsert do Prisma não é atômico); a sequência e os passos passaram para a mesma transação travada dos modelos de texto da decisão 473.
+
+### 482. 2026-10-29 · A base da liberação de módulos por parceiro, começando pelo módulo Integração
+
+**Fonte:** decisão de Rodolfo de 25/10/2026 ("cada módulo liberado individualmente por Rodolfo para cada Parceiro Flow") e INT-1.1 ("cadeado do módulo Integração").
+
+**Mudanças:** `src/lib/erp/liberacao.ts` com `MODULOS_COM_LIBERACAO = ['integracao']`. Sem registro, o módulo nasce bloqueado. Acesso efetivo = módulo liberado para o parceiro E a permissão da pessoa e da loja. Mudar a liberação trava por parceiro e módulo, é idempotente (repetir não cria registro nem histórico) e grava LIBEROU/BLOQUEOU no histórico do parceiro. Bloquear não apaga dado.
+
+**Não feito, de propósito:** os módulos que já existem não dependem da liberação (o estado inicial deles não foi decidido e esta base não tira nem dá acesso); catálogo com cadeado, pedido do parceiro e central de solicitações ficam para a rodada da liberação.
+
+**Prova:** casos de liberação em `integracao-fundacao` e `integracao-fundacao.db`.
+
+### 483. 2026-10-29 · Os estados de um módulo numa conexão
+
+**Mudanças:** `src/lib/integracoes/core/estados.ts` (puro): NAO_SOLICITADO → SOLICITADO → AUTORIZADO → ATIVO ⇄ PAUSADO; 403 do provedor leva a ERRO_PERMISSAO, que para sem nova tentativa automática (consultar loja não autorizada é infração no iFood). No TEST, a loja de teste já vem autorizada para o app de teste (NAO_SOLICITADO → AUTORIZADO); em PRODUCAO, nunca: toda loja passa pelo pedido e pela aprovação do responsável dela. Só ATIVO sincroniza.
+
+**Prova:** `integracao-fundacao` (transições válidas e inválidas, o atalho só no TEST).
+
+### 484. 2026-10-29 · INT-1.2: cofre e configuração
+
+**Fonte:** plano da integração, seções 3.5 e 3.6; aceite "o boot falha com mensagem clara se faltar variável".
+
+**Mudanças:**
+1. **`core/cofre.ts`:** o segredo do app é lido pelo NOME guardado no cadastro; o valor nunca entra no banco, no log nem no erro. Chave de cifragem de 32 bytes (hex ou base64). Token cifrado em AES-256-GCM, com o app como contexto (AAD) e formato versionado `v1`: token copiado de outro app não decifra. Chave geral `INTEGRACAO_IFOOD_ATIVA` (só "true" liga). Base da API só https em `*.ifood.com.br`. `conferirConfiguracao` lista tudo o que falta, sem valor; `exigirConfiguracao` para com mensagem clara.
+2. **`core/ambiente.ts`:** o cabeçalho de homologação vai só no TEST e é conferido antes de enviar; PRODUCAO nunca leva.
+3. **Compose e Dokploy:** o serviço de segredos gera `integracao_chave_cifragem`; só o worker recebe as variáveis da integração, desligada por padrão. `exportar-segredos.sh`, `.env.example` e `DEPLOY_DOKPLOY.md` atualizados. `npm run integracao:conferir` mostra só nomes e presença.
+
+**Não feito, de propósito:** chamar `exigirConfiguracao` no início do serviço da integração no worker: vem com os jobs (INT-1.6). Até lá, o aceite "o boot falha com mensagem clara" fica **parcial**: o comando da INT-1.4, única chamada ao iFood hoje, começa por ela.
+
+**Revisão independente:** ver 481 e 487 (o cofre lia qualquer variável pelo nome e a chave de cifragem ia também para o web: corrigido na 487).
+
+**Prova:** `integracao-cofre` (10).
+
+### 485. 2026-10-29 · INT-1.3: o cliente iFood
+
+**Fonte:** plano da integração, seções 3 e 4, com o contrato da referência Authentication da skill iFood v3. Aceite: "testes contra servidor simulado; teste 'produção nunca envia o header'".
+
+**Mudanças:**
+1. **Token do app (`ifood/auth.ts`):** client_credentials com campos camelCase em form; um token por app, guardado cifrado e em memória, renovado 10 minutos antes de vencer. Uma renovação por vez no processo (mesma promessa para quem pedir junto) e entre processos (trava do banco por app, relendo o guardado depois de pegar a trava). Credencial recusada (400, 401 ou 403 na rota do token) para com erro claro, sem repetir nem trocar de app.
+2. **Chamadas (`ifood/http.ts`):** limitador por família de rota a 90% do limite do iFood; 401 renova o token uma vez; 403 e 400 não repetem; 429 respeita Retry-After; 5xx e falha de rede com espera crescente (1 s, 2 s, 4 s… até 30 s) e sorteio; caminho validado; o registro de cada chamada leva método, caminho, status, tentativa, duração e requestId, nunca token, segredo ou corpo.
+3. **Armazém no banco (`core/armazem-token.ts`):** `IntegracaoToken` com `pg_advisory_xact_lock` por app.
+
+**Não feito, de propósito:** nenhuma chamada ao iFood. A primeira é a leitura TEST da INT-1.4, por comando no servidor, que depende do segredo do app Teste (C) no Dokploy (INT-0.3, Rodolfo).
+
+**Revisão independente:** ver 481 e 487 (trava sem a transação, tempestade de tokens no 401, validade curta, limitador que estourava no primeiro minuto e cliente que ignorava a chave geral: corrigidos na 487).
+
+**Prova:** `integracao-cliente-ifood` (13: token em cache e single-flight; renovação perto de vencer; credencial recusada sem repetir; 401 renova uma vez; 403 e 400 sem repetir; 429 com Retry-After; 5xx e rede com espera; produção nunca envia o cabeçalho; registro sem segredo) e `integracao-token.db` (dois processos ao mesmo tempo fazem um pedido só; guardado cifrado; invalidar apaga; tirar a trava faz o teste falhar).
+
+### 486. 2026-10-29 · INT-1.4: o comando da primeira leitura oficial no TEST (construído e testado; a execução real depende do segredo e do deploy)
+
+**Fonte:** plano da integração, seção 5 (INT-1.4: "comando de servidor, fora do CI, que autentica com o app Teste (C), lista as lojas e consulta o Analytics na loja de teste") e seção 6 (passo 4); contrato da skill iFood v3 (referências Merchant e Analytics v1 e o percurso do Analytics).
+
+**Mudanças:**
+1. **`ifood/leitura-test.ts`:** só o app de TEST (categoria TEST, com Analytics) e só com a chave geral ligada; lista as lojas que o app enxerga (`GET /merchant/v1.0/merchants`) e consulta apenas uma loja dessa lista (consultar loja não autorizada é infração no iFood). Analytics em dois passos: o payload mínimo da skill (diagnostica o acesso) e, só com ele certo, a consulta diária do plano (seção 4), que é a base do contrato da INT-1.5. `POST /analytics/v1.0/merchants/{id}/orders/kpis`, sem `sort`, marcado como leitura repetível. 403 explica o que conferir no Developer.
+2. **`ifood/comando-leitura-test.ts` e `npm run integracao:ler-test`:** confere a chave geral e a configuração (`exigirConfiguracao`), acha o app de TEST na Central ou cadastra com o Client ID (público; o segredo fica no cofre), usa o cliente da INT-1.3, grava a evidência num arquivo dentro do worker (sem token nem segredo, conferido antes de gravar) e um registro de auditoria (`integracao.leitura-test`). Um 403 descarta o token guardado. Saída 0, 1 ou 2.
+3. **`DEPLOY_DOKPLOY.md`:** como rodar no servidor.
+
+**Não feito, de propósito:** rodar de verdade. Depende de Rodolfo pôr `IFOOD_TEST_CLIENT_SECRET` no Dokploy (INT-0.3), de o código chegar ao servidor (merge e deploy, decisão de Rodolfo) e de `INTEGRACAO_IFOOD_ATIVA=true`. Sem o HTTP 200 oficial registrado, a INT-1.4 continua aberta e a INT-1.5 a 1.7 esperam a resposta real.
+
+**Prova:** `integracao-leitura-test` (9: os pedidos do contrato e o cabeçalho de homologação em toda chamada às APIs e nunca na do token; app que não é de teste recusado antes de chamar; loja fora da lista nunca consultada; duas lojas pedem `--loja`; nenhuma loja; 403 sem seguir adiante; lista em formato inesperado; datas e argumentos) e `integracao-leitura-test.db` (3: recusa antes de chamar; com o Client ID, cadastra, lê, guarda cifrado, grava evidência sem token nem segredo e audita; rodar de novo reaproveita app e token; 403 descarta o token). Duas mutações pegas.
+
+### 487. 2026-10-29 · Central de Integrações: rodada de correção da revisão independente (INT-1.1 a 1.3)
+
+**Fonte:** revisão independente de INT-1.1 a 1.3: INT-1.1 reprovada por um "deve"; INT-1.2 e INT-1.3 aprovadas com "deveria".
+
+**Mudanças (migration aditiva `20261116000000_erp_integracao_endurecimento` e código):**
+1. **"deve" — gatilhos enganáveis por tabela temporária:** as três funções que rodam como dono (`erp_integracao_conexao_confere`, `erp_integracao_modulo_confere` e a `erp_exigir_parceiro_ativo` da 0.2) ficam com `search_path = <schema>, pg_temp`. Antes, uma tabela temporária `"ParceiroFlow"` ou `"IntegracaoApp"` criada pelo papel do tenant era lida no lugar da verdadeira e furava as regras de TEST e PRODUCAO. O conferidor pós-deploy cobra o `pg_temp` no fim.
+2. **Marca de homologação trocada com conexão ligada:** desligar sempre passa; módulo novo numa conexão que não combina mais com o parceiro é recusado.
+3. **Isolamento conferido de verdade:** SQL cru do outro parceiro não enxerga nenhuma das três tabelas de tenant; o tenant não tem DELETE nelas; nas globais, nenhum privilégio. O conferidor passa a cobrar política, ausência de DELETE, política a mais e qualquer privilégio nas globais.
+4. **Produção só homologada:** ativar ou retomar módulo em PRODUCAO exige o app HOMOLOGADO (regra e banco); o cliente não chama o iFood com a chave geral desligada nem para app de produção sem homologação (nem o pedido de token).
+5. **Módulo e conexão:** módulo só nasce e só ativa em conexão ativa (trava de leitura na linha, contra a corrida com o desligar); desligar pausa os módulos ativos na mesma transação e conta no histórico.
+6. **App e cofre:** provedor, ambiente, categoria e Client ID do app não mudam; o nome do segredo é só `IFOOD_<NOME>_CLIENT_SECRET` (cofre, formulário e CHECK): a chave de cifragem ou a URL do banco não podem mais ir ao iFood como segredo; decifrar exige tag de 16 bytes; a base da API só aceita `https://merchant-api.ifood.com.br`; a chave de cifragem só vai para o ambiente do worker.
+7. **Token:** ler e gravar dentro da transação da trava (funciona com pool de uma conexão), espera pela trava limitada, pedido inteiro num prazo menor que o da trava (o iFood pedir para esperar mais para com erro claro, sem segurar a trava nem emitir dois tokens), falha do banco vira frase sem detalhe interno; um 401 descarta só o token que levou o 401 (oito chamadas juntas fazem uma renovação, não oito); margem de renovação de 10 minutos ou metade da validade; validade aceita até 24 h.
+8. **Chamadas:** limitador por janela deslizante (em nenhum intervalo de 60 s passa mais de 90% do limite); falha de rede ou 5xx só se repete em leitura (GET ou POST de leitura marcado); 429 sempre; redirecionamento recusado e corpo de resposta limitado a 10 MB, com teste contra servidor local; Retry-After só em segundos inteiros ou data HTTP.
+
+**Não feito, de propósito:** a chamada de `exigirConfiguracao` no início do serviço da integração no worker vem com os jobs (INT-1.6): hoje só o comando da INT-1.4 chama o iFood, e ele começa por ela. O aceite "o boot falha com mensagem clara" da INT-1.2 fica registrado como parcial até lá. A troca da marca de homologação com conexão ligada não é travada no banco (só o nível 1 grava; a tela da INT-1.8 vai recusar).
+
+**Revisão independente:** recheque aprovou as quatro fatias; refez o ataque da tabela temporária nas três funções (recusado) e confirmou cada correção com mutação. Quatro "deveria" novos: decisão 488.
+
+**Prova:** `integracao-fundacao.db` (11, com os casos da 487: tabela temporária recusada nos dois gatilhos; outro parceiro sem ver nada por SQL cru; sem DELETE; nenhum privilégio nas globais; marca trocada e desligar; produção só homologada; desligar pausa; app imutável; nome do segredo), `integracao-fundacao-migracao.db` (3 perfis, agora com a migration da 487: `pg_temp` nas três funções, o ataque recusado, desligar com a marca trocada, app imutável, segredo restrito, conferidor acusando o `pg_temp` faltando), `integracao-cliente-ifood` (19), `integracao-token.db` (2, com pool de uma conexão), `integracao-transporte` (4, servidor local), `integracao-cofre`. Mutações pegas: tirar o `pg_temp` (o ataque passa a gravar e o teste falha), voltar ao 401 que apaga qualquer token (9 pedidos de token em vez de 2), ler e gravar fora da transação (o pool de uma conexão trava), seguir redirecionamento.
+
+### 488. 2026-10-29 · Central de Integrações: ajustes do recheque (marca de homologação ao ativar, comando no servidor, D-1, política inteira)
+
+**Fonte:** recheque da revisão independente (INT-1.1 a 1.4 aprovadas, quatro "deveria").
+
+**Mudanças (migration aditiva `20261117000000_erp_integracao_ajustes` e código):**
+1. **Marca de homologação ao ativar:** trocada a marca do parceiro, um módulo que já existia também não ativa nem retoma (antes, só o módulo novo era recusado). O `search_path` seguro vai na própria função (`SET search_path FROM CURRENT` com o caminho `<schema>, pg_temp` fechado na sessão da migration). A guarda de sincronização (`podeSincronizar`) passa a exigir o ambiente combinando com a marca e o app pronto (de TEST, ou de produção homologado).
+2. **Comando no servidor:** os comandos documentados (`integracao:conferir`, `integracao:ler-test`) carregam os segredos como o worker (`docker compose exec worker sh -c '. ./scripts/exportar-segredos.sh && npm run ...'`); como estavam, falhavam no deploy padrão sem chamar o iFood.
+3. **D-1:** a leitura TEST recusa o dia de hoje e datas futuras antes de chamar (intervalo inválido com 400 conta como infração no iFood).
+4. **Política inteira:** o conferidor confere também a cláusula de gravação (WITH CHECK) da política, gatilho desligado e o papel do tenant sem CREATE no schema; o teste tenta gravar em nome de outro parceiro nas três tabelas.
+5. **Também:** 401 com a trava do token sem responder devolve "não autenticado" com a frase, sem estourar; `mudarModulo` traduz a recusa do banco; o teste do ataque usa os tipos enum (não falha por erro de tipo); testes novos de tag curta, evidência com segredo recusada, consulta do Analytics repetível e chave só no worker.
+
+**Não feito, de propósito:** os módulos do app (`modulos`) continuam editáveis (acrescentar módulo é uso legítimo); app que volta de HOMOLOGADO deixa o módulo ATIVO no banco, mas o cliente bloqueia a chamada e a guarda de sincronização também; limitador por processo (o comando e o worker terão limitadores separados): tratar na INT-1.6.
+
+**Revisão independente:** confirmação final: N1 a N4 fechados, nada novo de "deve" nem de "deveria"; ataque com tabela temporária contra o gatilho novo recusado; 4 mutações no banco e 9 no código, todas pegas.
+
+**Prova:** `integracao-fundacao.db` (11), `integracao-fundacao-migracao.db` (3 perfis, agora com as migrations 487 e 488: `search_path` na própria função, módulo existente que não ativa depois da troca da marca, conferidor acusando gatilho desligado, CREATE no schema e WITH CHECK aberto), `integracao-leitura-test` (11), `integracao-leitura-test.db` (4), `integracao-cliente-ifood` (20), `integracao-cofre`, `integracao-segredos-worker` (3). Mutação pega: voltar a função do módulo à versão da 487 (o módulo passa a ativar e o teste falha).
