@@ -57,6 +57,10 @@ const ENTIDADE: Record<string, string> = {
   DreFotografia: 'Fotografia do fechamento',
   AcessoParceiro: 'Acesso',
   PerfilAcesso: 'Perfil',
+  // INT-1.1: a Central de Integrações (só o nível 1 grava) e a liberação de módulos do parceiro.
+  IntegracaoConexao: 'Integração',
+  IntegracaoConexaoModulo: 'Módulo da integração',
+  LiberacaoDeModulo: 'Módulo do ERP',
 };
 
 const ACAO: Record<string, string> = {
@@ -110,6 +114,11 @@ const ACAO: Record<string, string> = {
   EMITIU: 'Emitiu',
   ABRIU: 'Abriu',
   REGISTROU: 'Registrou',
+  // INT-1.1
+  DESLIGOU: 'Desligou',
+  PREPAROU: 'Preparou',
+  LIBEROU: 'Liberou',
+  BLOQUEOU: 'Bloqueou',
 };
 
 /** I.1b: a palavra do custo que ninguém informou. Nunca "R$ 0,00": custo incompleto não é custo baixo. */
@@ -679,6 +688,13 @@ export const ENTIDADES_DE_FATURAMENTO: readonly string[] = ['FaturamentoLancamen
 export const ENTIDADES_DE_DRE: readonly string[] = ['Despesa', 'DreLinha', 'DreMeta', 'MetaCmvConjunto', 'CategoriaNaLoja', 'RegraDoPeriodo', 'PeriodoApuracao', 'DreFotografia'];
 
 /**
+ * Central de Integrações (INT-1.1): as conexões com o provedor, o estado dos módulos e a liberação de módulos são do nível 1.
+ * Até a tela do parceiro existir com a permissão própria (INT-1.8), o histórico do parceiro não as mostra. Filtro no servidor,
+ * na consulta. `verIntegracao` ausente = fechado.
+ */
+export const ENTIDADES_DE_INTEGRACAO: readonly string[] = ['IntegracaoConexao', 'IntegracaoConexaoModulo', 'LiberacaoDeModulo'];
+
+/**
  * Custo do lote (3.1, lição da decisão 90): o histórico do lote cita o custo e o que a diferença de rendimento custou. Só
  * quem tem `insumos.ver` ("Ver insumos e custos") e `compras.ver` (a régua da produção, decisão 460) os recebe; sem isso, esses
  * campos saem da linha no servidor, antes de
@@ -765,6 +781,8 @@ export async function listarHistorico(
      * do servidor. Fecha para quem esquece: ausente = não vê.
      */
     verCustos?: boolean;
+    /** INT-1.1: quem lê vê a Central de Integrações (hoje, só o nível 1)? Ausente = não vê. */
+    verIntegracao?: boolean;
     /** 2.1: só as alterações de faturamento desta loja neste dia (inclusive de lançamento já removido). */
     faturamentoDoDia?: { lojaId: string; dia: string };
   },
@@ -775,6 +793,7 @@ export async function listarHistorico(
     ...(filtro.verPrecos ? [] : ENTIDADES_DE_PRECIFICACAO),
     ...(filtro.verFaturamento === true ? [] : ENTIDADES_DE_FATURAMENTO),
     ...(filtro.verDre === true ? [] : ENTIDADES_DE_DRE),
+    ...(filtro.verIntegracao === true ? [] : ENTIDADES_DE_INTEGRACAO),
   ];
   const limite = filtro.limite ?? 100;
   const where = {

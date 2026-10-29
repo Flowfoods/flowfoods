@@ -60,6 +60,10 @@ export const MODELOS_DE_TENANT = [
   'dreFotografiaLinha',
   'farolFaixa',
   'historicoAlteracao',
+  // INT-1.1: a Central de Integrações (a loja do provedor ligada à Loja e o estado de cada módulo) e a liberação de módulos.
+  'integracaoConexao',
+  'integracaoConexaoModulo',
+  'liberacaoDeModulo',
 ] as const;
 
 export type ModeloDeTenant = (typeof MODELOS_DE_TENANT)[number];
@@ -117,6 +121,9 @@ export const RELACOES_DE_TENANT = [
   'erpDreFotografiaLinhas',
   'erpFarolFaixas',
   'erpHistoricoAlteracoes',
+  'erpIntegracaoConexoes',
+  'erpIntegracaoConexaoModulos',
+  'erpLiberacoesDeModulo',
 ] as const;
 
 const NOMES_DE_MODELO = new Set<string>(MODELOS_DE_TENANT.map((m) => m[0].toUpperCase() + m.slice(1)));

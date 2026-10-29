@@ -546,66 +546,73 @@ enum PeriodoTipo {
 }
 
 model ParceiroFlow {
-  id               String         @id @default(cuid())
-  nome             String
-  slug             String         @unique
-  status           ParceiroStatus @default(RASCUNHO)
-  criadoEm         DateTime       @default(now())
+  id                      String         @id @default(cuid())
+  nome                    String
+  slug                    String         @unique
+  status                  ParceiroStatus @default(RASCUNHO)
+  criadoEm                DateTime       @default(now())
   // 2.2a: SEM USO. A regra do período mora em `RegraDoPeriodo` (a migration copiou
   // estes dois valores para a primeira linha). As colunas ficam só porque migration
   // aditiva não apaga coluna; nada as lê nem as grava.
-  periodoTipo      PeriodoTipo    @default(MENSAL)
-  periodoDiaInicio Int            @default(1)
+  periodoTipo             PeriodoTipo    @default(MENSAL)
+  periodoDiaInicio        Int            @default(1)
+  // INT-1.1 (decisão 481): parceiro de homologação da Central de Integrações. Conexão do ambiente TEST só existe aqui e a de
+  // PRODUCAO nunca (gatilho no banco): dado de teste nunca cai em parceiro real.
+  homologacaoDeIntegracao Boolean        @default(false)
 
   // Relações de tenant: nunca acessadas pelo prisma cru (RELACOES_DE_TENANT).
   // Prefixo `erp` nas novas: nome único, o teste-guarda não confunde com
   // campos homônimos do Diagnóstico (`lojas`, `fichasTecnicas`).
-  insumos                   Insumo[]
-  erpLojas                  Loja[]
-  erpMarcas                 Marca[]
-  erpColaboradores          Colaborador[]
-  erpFornecedores           Fornecedor[]
-  erpInsumoVariantes        InsumoVariante[]
-  erpFichasTecnicas         FichaTecnica[]
-  erpFichaItens             FichaItem[]
-  erpProdutosVenda          ProdutoVenda[]
-  erpProdutoCanais          ProdutoCanal[]
-  erpProdutoEmbalagens      ProdutoEmbalagem[]
-  erpCanaisConfig           CanalConfig[]
-  erpNotasEntrada           NotaEntrada[]
-  erpNotaEntradaItens       NotaEntradaItem[]
-  erpDocumentosFiscais      DocumentoFiscal[]
-  erpDocumentoFiscalItens   DocumentoFiscalItem[]
-  erpVinculosItemFornecedor VinculoItemFornecedor[]
-  erpSaldosEstoque          SaldoEstoque[]
-  erpMovimentosEstoque      MovimentoEstoque[]
-  erpContagens              Contagem[]
-  erpContagemItens          ContagemItem[]
-  erpRequisicoes            Requisicao[]
-  erpRequisicaoItens        RequisicaoItem[]
-  erpOrdensProducao         OrdemProducao[]
-  erpListasProducao         ListaProducao[]
-  erpListaProducaoItens     ListaProducaoItem[]
-  erpCategoriasInsumo       CategoriaInsumo[]
-  erpCategoriasNaLoja       CategoriaNaLoja[]
-  erpMetasCmvConjuntos      MetaCmvConjunto[]
-  erpMetasCmvCategorias     MetaCmvCategoria[]
-  erpContagemRetratoItens   ContagemRetratoItem[]
-  erpEtiquetas              Etiqueta[]
+  insumos                     Insumo[]
+  erpLojas                    Loja[]
+  erpMarcas                   Marca[]
+  erpColaboradores            Colaborador[]
+  erpFornecedores             Fornecedor[]
+  erpInsumoVariantes          InsumoVariante[]
+  erpFichasTecnicas           FichaTecnica[]
+  erpFichaItens               FichaItem[]
+  erpProdutosVenda            ProdutoVenda[]
+  erpProdutoCanais            ProdutoCanal[]
+  erpProdutoEmbalagens        ProdutoEmbalagem[]
+  erpCanaisConfig             CanalConfig[]
+  erpNotasEntrada             NotaEntrada[]
+  erpNotaEntradaItens         NotaEntradaItem[]
+  erpDocumentosFiscais        DocumentoFiscal[]
+  erpDocumentoFiscalItens     DocumentoFiscalItem[]
+  erpVinculosItemFornecedor   VinculoItemFornecedor[]
+  erpSaldosEstoque            SaldoEstoque[]
+  erpMovimentosEstoque        MovimentoEstoque[]
+  erpContagens                Contagem[]
+  erpContagemItens            ContagemItem[]
+  erpRequisicoes              Requisicao[]
+  erpRequisicaoItens          RequisicaoItem[]
+  erpOrdensProducao           OrdemProducao[]
+  erpListasProducao           ListaProducao[]
+  erpListaProducaoItens       ListaProducaoItem[]
+  erpCategoriasInsumo         CategoriaInsumo[]
+  erpCategoriasNaLoja         CategoriaNaLoja[]
+  erpMetasCmvConjuntos        MetaCmvConjunto[]
+  erpMetasCmvCategorias       MetaCmvCategoria[]
+  erpContagemRetratoItens     ContagemRetratoItem[]
+  erpEtiquetas                Etiqueta[]
   // 3.4: os pedidos de impressão, o lote do fornecedor (recebimento) e a abertura de embalagem.
-  erpEtiquetaImpressoes     EtiquetaImpressao[]
-  erpLotesDeInsumo          LoteDeInsumo[]
-  erpAberturasDeLote        AberturaDeLote[]
-  erpFaturamentos           FaturamentoLancamento[]
-  erpDreLinhas              DreLinha[]
-  erpDreMetas               DreMeta[]
-  erpDespesas               Despesa[]
-  erpPeriodosApuracao       PeriodoApuracao[]
-  erpRegrasDoPeriodo        RegraDoPeriodo[]
-  erpDreFotografias         DreFotografia[]
-  erpDreFotografiaLinhas    DreFotografiaLinha[]
-  erpFarolFaixas            FarolFaixa[]
-  erpHistoricoAlteracoes    HistoricoAlteracao[]
+  erpEtiquetaImpressoes       EtiquetaImpressao[]
+  erpLotesDeInsumo            LoteDeInsumo[]
+  erpAberturasDeLote          AberturaDeLote[]
+  erpFaturamentos             FaturamentoLancamento[]
+  erpDreLinhas                DreLinha[]
+  erpDreMetas                 DreMeta[]
+  erpDespesas                 Despesa[]
+  erpPeriodosApuracao         PeriodoApuracao[]
+  erpRegrasDoPeriodo          RegraDoPeriodo[]
+  erpDreFotografias           DreFotografia[]
+  erpDreFotografiaLinhas      DreFotografiaLinha[]
+  erpFarolFaixas              FarolFaixa[]
+  erpHistoricoAlteracoes      HistoricoAlteracao[]
+  // INT-1.1: a Central de Integrações (conexões e módulos por conexão) e a liberação de módulos por parceiro.
+  erpIntegracaoConexoes       IntegracaoConexao[]
+  erpIntegracaoConexaoModulos IntegracaoConexaoModulo[]
+  erpLiberacoesDeModulo       LiberacaoDeModulo[]
 
   // Acesso das pessoas (0.3): FORA do tenant, só por `src/lib/erp/credenciais.ts`
   // (RELACOES_DE_CREDENCIAL; o prisma do portal recusa).
@@ -707,6 +714,8 @@ model Loja {
   fotografiasDoDre     DreFotografiaLinha[]
   categoriasNaLoja     CategoriaNaLoja[]
   conjuntosDeMetaCmv   MetaCmvConjunto[]
+  // INT-1.1: as lojas de um provedor (iFood) ligadas a esta loja.
+  conexoesDeIntegracao IntegracaoConexao[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, slug])
@@ -723,8 +732,10 @@ model Marca {
   ativa      Boolean      @default(true)
   criadoEm   DateTime     @default(now())
 
-  produtos     ProdutoVenda[]
-  faturamentos FaturamentoLancamento[]
+  produtos             ProdutoVenda[]
+  faturamentos         FaturamentoLancamento[]
+  // INT-1.1: a loja do iFood é de uma marca (decisão 5 do plano da integração).
+  conexoesDeIntegracao IntegracaoConexao[]
 
   @@unique([parceiroId, id])
   @@unique([parceiroId, nome])
@@ -2822,4 +2833,169 @@ model TentativaPedidoParceiro {
 
   @@index([ip, criadoEm])
   @@index([criadoEm])
+}
+
+// ------------------------------------------------- Central de Integrações (INT-1.1)
+//
+// Fundação de dados da Central de Integrações (PRIORIDADE 004, H0; decisões 481 a 483). O iFood é o primeiro provedor; a base
+// serve aos próximos (Anota AI, PDVs) sem tabela por provedor. Regras que o Prisma não descreve moram no SQL da migration
+// `20261115000000_erp_integracao_fundacao`: CHECKs, o índice único parcial da loja do provedor (uma loja do iFood ativa num
+// parceiro só, em toda a base) e os gatilhos (ambiente × parceiro de homologação, app do mesmo ambiente com o módulo, campos
+// imutáveis). Segredo nunca entra no banco: o app guarda só o NOME da variável do cofre.
+
+enum ProvedorDeIntegracao {
+  IFOOD
+}
+
+enum AmbienteDeIntegracao {
+  TEST
+  PRODUCAO
+}
+
+// A categoria do app no provedor define os módulos que ele pode usar (política de homologação do iFood).
+enum CategoriaDeAppIntegracao {
+  TEST
+  BI
+  FINANCAS
+  AVALIACOES
+}
+
+enum ModuloDeIntegracao {
+  ANALYTICS
+  FINANCIAL
+  REVIEW
+  MERCHANT
+}
+
+enum HomologacaoDeApp {
+  NAO_SE_APLICA
+  PENDENTE
+  EM_ANDAMENTO
+  HOMOLOGADO
+  RECUSADO
+}
+
+enum EstadoDaConexao {
+  ATIVA
+  DESLIGADA
+}
+
+// Ciclo de um módulo numa conexão (transições em `src/lib/integracoes/core/estados.ts`). ERRO_PERMISSAO = o provedor
+// respondeu 403: o módulo para, sem nova tentativa, até alguém resolver.
+enum EstadoDoModuloDeIntegracao {
+  NAO_SOLICITADO
+  SOLICITADO
+  AUTORIZADO
+  ATIVO
+  PAUSADO
+  ERRO_PERMISSAO
+}
+
+// Global (sem parceiro): os apps da FlowFoods no provedor. Só o nível 1 e o serviço da integração leem e gravam
+// (`src/lib/integracoes/`); o papel `erp_tenant` não tem acesso.
+model IntegracaoApp {
+  id                String                   @id @default(cuid())
+  provedor          ProvedorDeIntegracao
+  ambiente          AmbienteDeIntegracao
+  nome              String
+  categoria         CategoriaDeAppIntegracao
+  // Público (aparece no Developer e no Notion). O segredo, nunca: só o nome da variável do cofre (Dokploy).
+  clientId          String
+  nomeDoSegredo     String
+  modulos           ModuloDeIntegracao[]
+  estadoHomologacao HomologacaoDeApp         @default(NAO_SE_APLICA)
+  criadoEm          DateTime                 @default(now())
+  criadoPorNome     String
+  atualizadoEm      DateTime                 @updatedAt
+
+  token IntegracaoToken?
+
+  @@unique([provedor, ambiente, clientId])
+}
+
+// Global: o token de acesso do app, cifrado (AES-256-GCM, chave fora do banco). Um por app; só o serviço de token lê.
+model IntegracaoToken {
+  id           String        @id @default(cuid())
+  appId        String        @unique
+  app          IntegracaoApp @relation(fields: [appId], references: [id], onDelete: Cascade)
+  tokenCifrado String
+  emitidoEm    DateTime
+  expiraEm     DateTime
+  atualizadoEm DateTime      @updatedAt
+}
+
+// Uma loja do provedor (o merchant do iFood) ligada a uma Loja do parceiro e, quando há, a uma marca. Ligar de novo é linha
+// nova: a desligada fica como histórico (provedor, ambiente e id externo não mudam depois de gravados).
+model IntegracaoConexao {
+  id                 String               @id @default(cuid())
+  parceiroId         String
+  parceiro           ParceiroFlow         @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  lojaId             String
+  loja               Loja                 @relation(fields: [parceiroId, lojaId], references: [parceiroId, id], onDelete: Restrict)
+  marcaId            String?
+  marca              Marca?               @relation(fields: [parceiroId, marcaId], references: [parceiroId, id], onDelete: Restrict)
+  provedor           ProvedorDeIntegracao
+  ambiente           AmbienteDeIntegracao
+  // O id da loja no provedor (merchantId, UUID no iFood) e o id curto que o Portal do Parceiro mostra.
+  idExterno          String
+  idCurto            String?
+  nomeExterno        String
+  estado             EstadoDaConexao      @default(ATIVA)
+  criadoEm           DateTime             @default(now())
+  criadoPorNome      String
+  criadoPorUsuarioId String?
+  atualizadoEm       DateTime             @updatedAt
+  desligadaEm        DateTime?
+  desligadaPorNome   String?
+
+  modulos IntegracaoConexaoModulo[]
+
+  @@unique([parceiroId, id])
+  @@index([parceiroId, lojaId])
+}
+
+// O estado de cada módulo (Analytics, Financial...) numa conexão, pelo app que o usa.
+model IntegracaoConexaoModulo {
+  id             String                     @id @default(cuid())
+  parceiroId     String
+  parceiro       ParceiroFlow               @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  conexaoId      String
+  conexao        IntegracaoConexao          @relation(fields: [parceiroId, conexaoId], references: [parceiroId, id], onDelete: Restrict)
+  // O app global, sem relação no Prisma de propósito: relação de modelo global para modelo de tenant abriria leitura de dado do
+  // parceiro pelo cliente do portal. O gatilho do banco confere o app na criação; app não se apaga (gatilho).
+  appId          String
+  modulo         ModuloDeIntegracao
+  estado         EstadoDoModuloDeIntegracao @default(NAO_SOLICITADO)
+  solicitadoEm   DateTime?
+  autorizadoEm   DateTime?
+  verificadoEm   DateTime?
+  ativadoEm      DateTime?
+  ativadoPorNome String?
+  pausadoEm      DateTime?
+  ultimoErro     String?
+  ultimoErroEm   DateTime?
+  criadoEm       DateTime                   @default(now())
+  criadoPorNome  String
+  atualizadoEm   DateTime                   @updatedAt
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, conexaoId, modulo])
+  @@index([parceiroId, appId])
+}
+
+// Liberação de um módulo do ERP para um parceiro (decisão de Rodolfo de 25/10/2026: "cada módulo liberado individualmente").
+// Hoje só o módulo Integração depende dela (decisão 482); os demais seguem como estão até a rodada da liberação decidir o estado
+// inicial. Bloquear não apaga dado nem histórico. Quem grava é o nível 1.
+model LiberacaoDeModulo {
+  id            String       @id @default(cuid())
+  parceiroId    String
+  parceiro      ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
+  modulo        String
+  liberado      Boolean
+  mudadoEm      DateTime     @default(now())
+  mudadoPorNome String
+  criadoEm      DateTime     @default(now())
+
+  @@unique([parceiroId, id])
+  @@unique([parceiroId, modulo])
 }

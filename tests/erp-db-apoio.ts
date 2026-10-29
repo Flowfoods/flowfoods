@@ -21,7 +21,7 @@ const ORDEM_DE_LIMPEZA = [
   'ListaProducaoItem', 'ListaProducao', 'OrdemProducao', 'RequisicaoItem', 'Requisicao', 'DocumentoFiscalItem', 'DocumentoFiscal', 'VinculoItemFornecedor', 'NotaEntradaItem', 'NotaEntrada', 'ProdutoEmbalagem',
   'ProdutoCanal', 'ProdutoVenda', 'FichaItem', 'FichaTecnica', 'InsumoVariante', 'FaturamentoLancamento',
   'Despesa', 'DreMeta', 'FarolFaixa', 'MetaCmvCategoria', 'MetaCmvConjunto', 'CategoriaNaLoja', 'DreLinha', 'DreFotografiaLinha', 'DreFotografia', 'PeriodoApuracao', 'RegraDoPeriodo', 'CanalConfig', 'Insumo', 'CategoriaInsumo', 'Fornecedor',
-  'Colaborador', 'Marca', 'Loja',
+  'Colaborador', 'IntegracaoConexaoModulo', 'IntegracaoConexao', 'LiberacaoDeModulo', 'Marca', 'Loja',
 ];
 
 /** Tabelas com gatilho que recusa o DELETE (a limpeza desliga só na transação dela). */

@@ -135,6 +135,34 @@ export const GATILHOS_DA_3_4 = [
   'AberturaDeLote_parceiro_imutavel',
 ] as const;
 
+/** INT-1.1: as três tabelas de tenant da Central de Integrações (RLS forçada como as outras) e as duas globais (sem o tenant). */
+export const TABELAS_DA_INT_1_1 = ['IntegracaoConexao', 'IntegracaoConexaoModulo', 'LiberacaoDeModulo'] as const;
+export const GLOBAIS_DA_INT_1_1 = ['IntegracaoApp', 'IntegracaoToken'] as const;
+
+/** Os CHECKs da INT-1.1 (nascem validados: tabelas novas). */
+export const CHECKS_DA_INT_1_1 = [
+  ['IntegracaoApp', 'IntegracaoApp_nome_do_segredo'],
+  ['IntegracaoApp', 'IntegracaoApp_categoria_do_ambiente'],
+  ['IntegracaoConexao', 'IntegracaoConexao_id_externo'],
+  ['IntegracaoConexao', 'IntegracaoConexao_desligada'],
+  ['IntegracaoConexaoModulo', 'IntegracaoConexaoModulo_ativo_tem_autor'],
+  ['IntegracaoConexaoModulo', 'IntegracaoConexaoModulo_erro_dito'],
+  ['LiberacaoDeModulo', 'LiberacaoDeModulo_modulo'],
+] as const;
+
+/** O índice único parcial (uma loja do provedor ativa num parceiro só, em toda a base) e os únicos da liberação e do módulo. */
+export const INDICES_DA_INT_1_1 = ['IntegracaoConexao_externa_ativa_key', 'IntegracaoConexaoModulo_parceiroId_conexaoId_modulo_key', 'LiberacaoDeModulo_parceiroId_modulo_key'] as const;
+
+/** Os gatilhos da INT-1.1: sem eles, loja de teste cairia em parceiro real, ou um app sem o módulo serviria a uma conexão. */
+export const GATILHOS_DA_INT_1_1 = [
+  'IntegracaoConexao_confere',
+  'IntegracaoConexao_parceiro_imutavel',
+  'IntegracaoConexaoModulo_confere',
+  'IntegracaoConexaoModulo_parceiro_imutavel',
+  'LiberacaoDeModulo_parceiro_imutavel',
+  'IntegracaoApp_nao_apaga',
+] as const;
+
 /** Os CHECKs que a I.1a acrescentou em "Insumo" (a tabela nova nasce com os dela validados). */
 export const CHECKS_DA_I_1A = [
   ['Insumo', 'Insumo_classificadoPor_valido'],
@@ -619,6 +647,44 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
     }
   }
+  // INT-1.1: só se a migration dela já rodou (a tabela existe; o catálogo não passa pela RLS).
+  const integracao = await db.$queryRaw<{ n: number }[]>`SELECT count(*)::int AS n FROM pg_class WHERE relname = 'IntegracaoConexao' AND relkind = 'r'`;
+  if (integracao[0]?.n) {
+    const M = '20261115000000_erp_integracao_fundacao';
+    const tabelas = await db.$queryRaw<{ nome: string; rls: boolean; forcada: boolean }[]>`
+      SELECT relname AS nome, relrowsecurity AS rls, relforcerowsecurity AS forcada FROM pg_class WHERE relkind = 'r' AND relname = ANY(${[...TABELAS_DA_INT_1_1, ...GLOBAIS_DA_INT_1_1, 'Loja']})`;
+    const loja = tabelas.find((t) => t.nome === 'Loja');
+    for (const t of [...TABELAS_DA_INT_1_1, ...GLOBAIS_DA_INT_1_1]) {
+      const achada = tabelas.find((x) => x.nome === t);
+      if (!achada) pendencias.push(`Tabela ${t} NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
+      else if (loja?.rls && (TABELAS_DA_INT_1_1 as readonly string[]).includes(t) && !(achada.rls && achada.forcada)) {
+        pendencias.push(`Tabela ${t} sem RLS forçada (as outras têm): rode o bloco da RLS da migration ${M} como dono das tabelas.`);
+      }
+    }
+    // As globais não podem ficar ao alcance do papel do tenant.
+    const papel = await db.$queryRaw<{ existe: boolean }[]>`SELECT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'erp_tenant') AS existe`;
+    if (papel[0]?.existe) {
+      for (const t of GLOBAIS_DA_INT_1_1) {
+        const alcance = await db.$queryRaw<{ pode: boolean }[]>`SELECT has_table_privilege('erp_tenant', ${`"${t}"`}, 'SELECT') OR has_table_privilege('erp_tenant', ${`"${t}"`}, 'INSERT') AS pode`;
+        if (alcance[0]?.pode) pendencias.push(`O papel erp_tenant alcança a tabela global ${t}: rode o REVOKE da migration ${M}.`);
+      }
+    }
+    const dela = await db.$queryRaw<{ nome: string; validado: boolean }[]>`
+      SELECT c.conname AS nome, c.convalidated AS validado FROM pg_constraint c WHERE c.conname = ANY(${CHECKS_DA_INT_1_1.map(([, nome]) => nome)})`;
+    for (const [tabela, nome] of CHECKS_DA_INT_1_1) {
+      const achado = dela.find((c) => c.nome === nome);
+      if (!achado) pendencias.push(`CHECK ${nome} (${tabela}) NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
+      else if (!achado.validado) pendencias.push(`CHECK ${nome} ficou NOT VALID: rode ALTER TABLE "${tabela}" VALIDATE CONSTRAINT "${nome}";`);
+    }
+    const indices = await db.$queryRaw<{ nome: string }[]>`SELECT indexname AS nome FROM pg_indexes WHERE indexname = ANY(${[...INDICES_DA_INT_1_1]})`;
+    for (const i of INDICES_DA_INT_1_1) {
+      if (!indices.some((x) => x.nome === i)) pendencias.push(`Índice ${i} NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
+    }
+    const gatilhos = await db.$queryRaw<{ nome: string }[]>`SELECT tgname AS nome FROM pg_trigger WHERE NOT tgisinternal AND tgname = ANY(${[...GATILHOS_DA_INT_1_1]})`;
+    for (const t of GATILHOS_DA_INT_1_1) {
+      if (!gatilhos.some((g) => g.nome === t)) pendencias.push(`Gatilho ${t} NÃO existe: a migration ${M} não foi aplicada por inteiro.`);
+    }
+  }
   return pendencias;
 }
 
@@ -636,7 +702,7 @@ async function principal() {
       for (const d of rel.documentosAConferir) console.log(`  Documento a conferir no parceiro ${d.parceiro}: “${d.nome}” tem ${documentoParaSaida(d.documento)}, que não passa nos dígitos verificadores.`);
     }
     if (pendencias.length === 0) {
-      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a, da F.1b, da L.2 e da 3.4 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias, das metas por categoria, da nota fiscal por XML e das etiquetas (com RLS), os índices e os gatilhos existem.');
+      console.log('Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a, da F.1b, da L.2, da 3.4 e da INT-1.1 conferidas: os CHECKs estão validados, o índice do grão humano, o da requisição do lote, as tabelas da lista do dia, das categorias, das metas por categoria, da nota fiscal por XML, das etiquetas e da Central de Integrações (com RLS), os índices e os gatilhos existem.');
       return 0;
     }
     console.error(`Migrations da 2.1, da 2.2a, da 2.2b, da 2.3, da 3.1, da 3.2, da 3.3, da I.1a, da I.1b, da I.2a, da I.2b, da F.1a, da F.1b, da L.2 e da 3.4: ${pendencias.length} pendência(s):`);
