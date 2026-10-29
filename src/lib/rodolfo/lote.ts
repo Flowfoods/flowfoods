@@ -72,29 +72,26 @@ const PROXIMO_TOQUE: Partial<Record<Toque, { toque: Toque; emDias: number }>> = 
 
 /** Cria a sequência D0/D+4/D+10 e os templates do seed. Idempotente. */
 export async function garantirSeed(): Promise<void> {
-  const seq = await prisma.sequence.upsert({
-    where: { nome: SEQUENCIA_PADRAO },
-    create: { nome: SEQUENCIA_PADRAO },
-    update: {},
-  });
-
-  await Promise.all(
-    TOQUES.map((t, i) =>
-      prisma.sequenceStep.upsert({
-        where: { sequenceId_toque: { sequenceId: seq.id, toque: t.toque } },
-        create: { sequenceId: seq.id, toque: t.toque, offsetDias: t.offsetDias, ordem: i },
-        update: { offsetDias: t.offsetDias, ordem: i },
-      }),
-    ),
-  );
-
   // O modelo padrão tem `categoria` nula, e chave única com nulo não serve para `upsert` (o Prisma recusa o nulo, e no
   // Postgres dois nulos nunca colidem). Antes era um `upsert` com nulo: "Montar lote" quebrava em todo banco sem modelos
   // (E5.1, decisão 467). Agora: procura o padrão daquele toque e canal; só cria o que falta. A trava da transação (decisão
   // 473, como as do ERP) faz dois "Montar lote" ao mesmo tempo esperarem um pelo outro: sem ela, os dois viam "falta" e
-  // criavam o mesmo modelo duas vezes.
+  // criavam o mesmo modelo duas vezes. A sequência e os passos também entram sob a trava: num banco novo, três "Montar
+  // lote" juntos faziam o `upsert` da sequência colidir (o upsert do Prisma não é atômico: os três tentavam criar).
   await prisma.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended('barney:modelos-padrao', 0))::text AS "trava"`;
+    const seq = await tx.sequence.upsert({
+      where: { nome: SEQUENCIA_PADRAO },
+      create: { nome: SEQUENCIA_PADRAO },
+      update: {},
+    });
+    for (const [i, t] of TOQUES.entries()) {
+      await tx.sequenceStep.upsert({
+        where: { sequenceId_toque: { sequenceId: seq.id, toque: t.toque } },
+        create: { sequenceId: seq.id, toque: t.toque, offsetDias: t.offsetDias, ordem: i },
+        update: { offsetDias: t.offsetDias, ordem: i },
+      });
+    }
     for (const t of SEED_TEMPLATES) {
       const existe = await tx.template.findFirst({
         where: { categoria: null, toque: t.toque, canal: t.canal, variante: 'A' },
