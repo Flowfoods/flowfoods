@@ -6,6 +6,7 @@ import { resolverAlcance, type Alcance, type Permissao } from '@/lib/erp/permiss
 import { obterMes } from '@/lib/erp/faturamento';
 import { situacaoDoEstoque } from '@/lib/erp/estoque';
 import { saudeDoCardapio } from '@/lib/erp/saude-do-cardapio';
+import { dreDoPeriodo } from '@/lib/erp/dre';
 import { painelDoDia, type PainelDoDia } from '@/lib/erp/painel-do-dia';
 import { PainelDoDiaNaTela } from '@/components/erp/telas/painel-do-dia';
 
@@ -13,6 +14,7 @@ vi.mock('@/lib/erp/faturamento', () => ({ obterMes: vi.fn() }));
 vi.mock('@/lib/erp/estoque', () => ({ situacaoDoEstoque: vi.fn() }));
 vi.mock('@/lib/erp/producao-lista', () => ({ lojasDaListaDoDia: vi.fn() }));
 vi.mock('@/lib/erp/saude-do-cardapio', () => ({ saudeDoCardapio: vi.fn() }));
+vi.mock('@/lib/erp/dre', () => ({ dreDoPeriodo: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 const HOJE = '2026-10-29';
@@ -35,6 +37,7 @@ const ler = (alcance = dono) => painelDoDia(cliente, alcance, '/erp', HOJE, visa
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(dreDoPeriodo).mockResolvedValue(null);
   vi.mocked(obterMes).mockResolvedValue(faturamento());
   vi.mocked(saudeDoCardapio).mockResolvedValue({ pratos: 2, prontos: 1, custoIncompleto: 0 } as Awaited<ReturnType<typeof saudeDoCardapio>>);
   vi.mocked(situacaoDoEstoque).mockResolvedValue(estoque());

@@ -44,7 +44,7 @@ export function cmvDaHome(leitura: LeituraDoDreParaHome, contexto: ContextoDoCmv
     familia: 'cmv', titulo: 'CMV', estado, escopo: { tipo: 'loja', lojaId: loja.id, nome: loja.nome },
     valor: { unidade: 'centavos', valor: null }, percentual: null, referencia: null, origem: null, cobertura: null,
     consultadoEm: consulta, fonteDoCmv: null, notaDaConta: null, semContar: [],
-    avisos: [{ codigo: estado, texto }], detalhe: { href: raiz + '/dre?' + query.toString(), rotulo: 'Ver o DRE da loja' },
+    avisos: [{ codigo: estado, texto }], detalhe: { href: raiz + '/dre?' + query.toString(), rotulo: 'Ver o DRE atual da loja' },
   });
   if (leitura.estado === 'erro') return vazio('erro', 'Não foi possível carregar o CMV.');
   if (leitura.estado === 'indisponivel' || !leitura.dre) return vazio('indisponivel', 'O CMV não está disponível neste resumo. Confira o DRE da loja.');

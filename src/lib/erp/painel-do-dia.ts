@@ -11,6 +11,8 @@ import { alcancaLoja, pode, type Alcance } from './permissoes';
 import { saudeDoCardapio } from './saude-do-cardapio';
 import { situacaoDoEstoque } from './estoque';
 import { lojasDaListaDoDia } from './producao-lista';
+import { dreDoPeriodo } from './dre';
+import { cmvDaHome, type WidgetCmvHome } from './home-cmv';
 import { hojeNoRio } from './compra-campos';
 import type { ClienteDoParceiro } from './tenant';
 import type { Visao } from './visao';
@@ -46,6 +48,8 @@ export interface PainelDoDia {
   estados?: EstadoDoResumo[];
   /** Momento da consulta do resumo, não data de alteração dos registros. */
   consultadoEm?: string;
+  /** CMV canônico de uma loja autorizada; omitido na rede e sem dre.ver. */
+  cmv?: WidgetCmvHome;
 }
 
 export interface EstadoDoResumo {
@@ -97,12 +101,18 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     estoque: pode(alcanceDaVisao, 'estoque.ver'),
     // Primeira fatia: somente a loja escolhida. Rede não vira um total fictício.
     producao: !!lojaId && pode(alcanceDaVisao, 'producao.ver', { lojaId }),
+    cmv: !!lojaId && pode(alcanceDaVisao, 'dre.ver', { lojaId }),
   };
-  const [leituraFat, leituraSaude, leituraEstoque, leituraProducao] = await Promise.allSettled([
+  const [leituraFat, leituraSaude, leituraEstoque, leituraProducao, leituraCmv] = await Promise.allSettled([
     leituraAutorizada(autorizado.faturamento, () => obterMes(cliente, alcanceDaVisao, { mes, ...(lojaId ? { lojaId } : {}) }, hoje)),
     leituraAutorizada(autorizado.cardapio, () => saudeDoCardapio(cliente)),
     leituraAutorizada(autorizado.estoque, () => situacaoDoEstoque(cliente, alcanceDaVisao)),
     leituraAutorizada(autorizado.producao, () => lojasDaListaDoDia(cliente, alcanceDaVisao, agora)),
+    // Uma única leitura do DRE, do mesmo cliente/loja e dia de negócio. Não
+    // usa fallback de query/rede nem troca o período corrente por outro com dado.
+    leituraAutorizada(autorizado.cmv, () => lojaId
+      ? dreDoPeriodo(cliente, alcanceDaVisao, { tipo: 'loja', lojaId }, hoje, hoje)
+      : Promise.resolve(null)),
   ]);
   // Rejeições são tratadas por fonte e não entram no DTO, no HTML ou em logs.
   const fat = leituraFat.status === 'fulfilled' ? leituraFat.value : null;
@@ -257,5 +267,22 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     }
   }
 
-  return { indicadores, pendencias, ...(estados.length ? { estados, consultadoEm: new Date().toISOString() } : {}) };
+  // Compartilhado também na Home que só pode ver CMV. É hora da consulta,
+  // não a data de alteração dos registros nem garantia de fotografia global.
+  const consultadoEm = new Date().toISOString();
+  let cmv: WidgetCmvHome | null = null;
+  if (autorizado.cmv && visao?.tipo === 'loja') {
+    const contextoCmv = { alcance: alcanceDaVisao, loja: { id: visao.lojaId, nome: visao.nome }, raiz: base, consultadoEm };
+    try {
+      cmv = cmvDaHome(leituraCmv.status === 'rejected' ? { estado: 'erro' } : { estado: 'lido', dre: leituraCmv.value }, contextoCmv);
+    } catch {
+      // Incompatibilidade de projeção tampouco derruba os outros módulos.
+      cmv = cmvDaHome({ estado: 'erro' }, contextoCmv);
+    }
+  }
+  return {
+    indicadores, pendencias,
+    ...(estados.length ? { estados } : {}), ...(cmv ? { cmv } : {}),
+    ...(estados.length || cmv ? { consultadoEm } : {}),
+  };
 }
