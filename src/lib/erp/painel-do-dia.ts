@@ -14,6 +14,7 @@ import { lojasDaListaDoDia } from './producao-lista';
 import { dreDoPeriodo } from './dre';
 import { cmvDaHome, type WidgetCmvHome } from './home-cmv';
 import { comprasAnaliticas, lerComprasDaHome } from './home-compras';
+import { lerXmlAguardandoDaHome, xmlAguardandoDaHome, type XmlAguardandoHome } from './home-xml-aguardando';
 import { despesasIndisponiveis, estoqueAnalitico, faturamentoAnalitico, producaoAnalitica, type AnaliticoDaHome, type LeituraHome, type WidgetAnaliticoHome } from './home-analitico';
 import { hojeNoRio } from './compra-campos';
 import type { ClienteDoParceiro } from './tenant';
@@ -54,6 +55,8 @@ export interface PainelDoDia {
   cmv?: WidgetCmvHome;
   /** H2 de uma loja; rede conserva resumo atual e orienta seleção explícita. */
   analitico?: AnaliticoDaHome;
+  /** Contagem da fila atual atribuída à loja; consulta independente do dinheiro de Compras. */
+  xmlAguardando?: XmlAguardandoHome;
 }
 
 export interface EstadoDoResumo {
@@ -107,8 +110,9 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     producao: !!lojaId && pode(alcanceDaVisao, 'producao.ver', { lojaId }),
     cmv: !!lojaId && pode(alcanceDaVisao, 'dre.ver', { lojaId }),
     compras: !!lojaId && pode(alcanceDaVisao, 'compras.ver', { lojaId }),
+    xml: !!lojaId && pode(alcanceDaVisao, 'compras.ver', { lojaId }),
   };
-  const [leituraFat, leituraSaude, leituraEstoque, leituraProducao, leituraCmv, leituraCompras] = await Promise.allSettled([
+  const [leituraFat, leituraSaude, leituraEstoque, leituraProducao, leituraCmv, leituraCompras, leituraXml] = await Promise.allSettled([
     leituraAutorizada(autorizado.faturamento, () => obterMes(cliente, alcanceDaVisao, { mes, ...(lojaId ? { lojaId } : {}) }, hoje)),
     leituraAutorizada(autorizado.cardapio, () => saudeDoCardapio(cliente)),
     leituraAutorizada(autorizado.estoque, () => situacaoDoEstoque(cliente, alcanceDaVisao)),
@@ -119,6 +123,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
       ? dreDoPeriodo(cliente, alcanceDaVisao, { tipo: 'loja', lojaId }, hoje, hoje)
       : Promise.resolve(null)),
     leituraAutorizada(autorizado.compras, () => lojaId ? lerComprasDaHome(cliente, alcanceDaVisao, lojaId, hoje) : Promise.resolve(null)),
+    leituraAutorizada(autorizado.xml, () => lojaId ? lerXmlAguardandoDaHome(cliente, alcanceDaVisao, lojaId) : Promise.resolve(null)),
   ]);
   // Rejeições são tratadas por fonte e não entram no DTO, no HTML ou em logs.
   const fat = leituraFat.status === 'fulfilled' ? leituraFat.value : null;
@@ -276,6 +281,15 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
   // Compartilhado também na Home que só pode ver CMV. É hora da consulta,
   // não a data de alteração dos registros nem garantia de fotografia global.
   const consultadoEm = new Date().toISOString();
+  let xmlAguardando: XmlAguardandoHome | null = null;
+  if (autorizado.xml && visao?.tipo === 'loja') {
+    const contextoXml = { alcance: alcanceDaVisao, loja: { id: visao.lojaId, nome: visao.nome }, raiz: base, hoje, consultadoEm };
+    try {
+      xmlAguardando = xmlAguardandoDaHome(leituraXml.status === 'rejected' ? { estado: 'erro' } : { estado: 'lido', dados: leituraXml.value }, contextoXml);
+    } catch {
+      xmlAguardando = xmlAguardandoDaHome({ estado: 'erro' }, contextoXml);
+    }
+  }
   let cmv: WidgetCmvHome | null = null;
   if (autorizado.cmv && visao?.tipo === 'loja') {
     const contextoCmv = { alcance: alcanceDaVisao, loja: { id: visao.lojaId, nome: visao.nome }, raiz: base, consultadoEm };
@@ -305,6 +319,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     indicadores, pendencias,
     ...(estados.length ? { estados } : {}), ...(cmv ? { cmv } : {}),
     ...(analitico ? { analitico } : {}),
-    ...(estados.length || cmv || (analitico?.tipo === 'loja' && analitico.widgets.length) ? { consultadoEm } : {}),
+    ...(xmlAguardando ? { xmlAguardando } : {}),
+    ...(estados.length || cmv || xmlAguardando || (analitico?.tipo === 'loja' && analitico.widgets.length) ? { consultadoEm } : {}),
   };
 }
