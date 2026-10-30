@@ -21,7 +21,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'inicio',
     rotas: [''],
     titulo: 'Visão geral da operação',
-    versao: 5,
+    versao: 6,
     aula: [
       { texto: 'Escolha uma loja no alto para ver seus indicadores, a evolução do faturamento e os pontos de atenção. Cada número informa a loja e o período a que se refere.' },
       { texto: 'Sem dados não é zero: o painel avisa sobre ausências e falhas, e Atualizar resumo tenta carregar de novo.' },
@@ -29,6 +29,15 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'No CMV, a comparação usa a meta e a régua do DRE do mesmo período; se faltar base, o motivo aparece no lugar da cor.', para: ['dre.ver'] },
     ],
     secoes: [
+      {
+        id: 'faturamento-totais',
+        titulo: 'Pedidos, atendimentos e ticket',
+        blocos: [
+          { texto: 'Pedidos, atendimentos e ticket vêm dos mesmos lançamentos do faturamento do mês.', para: ['faturamento.ver'] },
+          { texto: 'Atendimentos não são pessoas únicas; se faltarem lançamentos, a leitura fica parcial.', para: ['faturamento.ver'] },
+          { texto: 'Em um lançamento marcado Não vendeu, pedidos e atendimentos são zero e não há base para o ticket; isso é diferente de não lançar.', para: ['faturamento.ver'] },
+        ],
+      },
       {
         id: 'compras-categorias',
         titulo: 'Compras por categoria atual',
