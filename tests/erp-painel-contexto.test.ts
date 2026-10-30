@@ -12,6 +12,7 @@ import { PainelDoDiaNaTela } from '@/components/erp/telas/painel-do-dia';
 vi.mock('@/lib/erp/faturamento', () => ({ obterMes: vi.fn() }));
 vi.mock('@/lib/erp/estoque', () => ({ situacaoDoEstoque: vi.fn() }));
 vi.mock('@/lib/erp/saude-do-cardapio', () => ({ saudeDoCardapio: vi.fn() }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 const HOJE = '2026-10-29';
 const cliente = {} as ClienteDoParceiro;

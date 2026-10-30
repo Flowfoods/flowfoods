@@ -41,6 +41,26 @@ export interface PendenciaDoDia {
 export interface PainelDoDia {
   indicadores: IndicadorDoDia[];
   pendencias: PendenciaDoDia[];
+  /** Metadados independentes das fontes autorizadas; o painel institucional N1 continua sem eles. */
+  estados?: EstadoDoResumo[];
+  /** Momento da consulta do resumo, não data de alteração dos registros. */
+  consultadoEm?: string;
+}
+
+export interface EstadoDoResumo {
+  chave: 'faturamento' | 'cardapio' | 'estoque';
+  estado: 'ok' | 'parcial' | 'sem_dados' | 'erro';
+  rotulo: string;
+  escopo: string;
+  referencia: string;
+  /** Texto de produto controlado: nunca a razão de uma rejeição/erro interno. */
+  mensagem?: string;
+  href: string;
+  acao: string;
+}
+
+function leituraAutorizada<T>(autorizada: boolean, ler: () => Promise<T>): Promise<T | null> {
+  return autorizada ? Promise.resolve().then(ler) : Promise.resolve(null);
 }
 
 const plural = (n: number, um: string, varios: string) => `${n.toLocaleString('pt-BR')} ${n === 1 ? um : varios}`;
@@ -65,14 +85,53 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
   const faturamentoHref = base + '/faturamento?' + queryFaturamento.toString();
   const estoqueHref = lojaId ? base + '/estoque/' + encodeURIComponent(lojaId) : base + '/estoque';
 
-  const [fat, saude, estoque] = await Promise.all([
-    pode(alcanceDaVisao, 'faturamento.ver') ? obterMes(cliente, alcanceDaVisao, { mes, ...(lojaId ? { lojaId } : {}) }, hoje) : null,
-    pode(alcance, 'fichas.ver') && pode(alcance, 'precos.ver') ? saudeDoCardapio(cliente) : null,
-    pode(alcanceDaVisao, 'estoque.ver') ? situacaoDoEstoque(cliente, alcanceDaVisao) : null,
+  const autorizado = {
+    faturamento: pode(alcanceDaVisao, 'faturamento.ver'),
+    cardapio: pode(alcance, 'fichas.ver') && pode(alcance, 'precos.ver'),
+    estoque: pode(alcanceDaVisao, 'estoque.ver'),
+  };
+  const [leituraFat, leituraSaude, leituraEstoque] = await Promise.allSettled([
+    leituraAutorizada(autorizado.faturamento, () => obterMes(cliente, alcanceDaVisao, { mes, ...(lojaId ? { lojaId } : {}) }, hoje)),
+    leituraAutorizada(autorizado.cardapio, () => saudeDoCardapio(cliente)),
+    leituraAutorizada(autorizado.estoque, () => situacaoDoEstoque(cliente, alcanceDaVisao)),
   ]);
+  // Rejeições são tratadas por fonte e não entram no DTO, no HTML ou em logs.
+  const fat = leituraFat.status === 'fulfilled' ? leituraFat.value : null;
+  const saude = leituraSaude.status === 'fulfilled' ? leituraSaude.value : null;
+  const estoque = leituraEstoque.status === 'fulfilled' ? leituraEstoque.value : null;
+  const estados: EstadoDoResumo[] = [];
+  const lancados = new Set(fat?.lojas.flatMap((l) => l.dias.filter((d) => d.total !== null).map((d) => d.data)) ?? []);
+  if (autorizado.faturamento) {
+    const estado = leituraFat.status === 'rejected' ? 'erro' : !lancados.size ? 'sem_dados' : fat!.faltas > 0 ? 'parcial' : 'ok';
+    estados.push({
+      chave: 'faturamento', estado, escopo,
+      rotulo: `Faturamento de ${MESES[Number(mes.slice(5, 7)) - 1]}`,
+      referencia: `Mês civil · ${MESES[Number(mes.slice(5, 7)) - 1]} de ${mes.slice(0, 4)}`,
+      mensagem: estado === 'erro' ? 'Não foi possível carregar o faturamento.'
+        : estado === 'sem_dados' ? (fat?.lojas.length ? 'Ainda não há lançamentos neste mês.' : 'Nenhuma loja disponível para faturamento neste contexto.')
+        : estado === 'parcial' ? `${plural(fat!.faltas, 'canal sem lançamento', 'canais sem lançamento')} neste mês. O valor não está completo.` : undefined,
+      href: faturamentoHref, acao: 'Ver o faturamento',
+    });
+  }
+  if (autorizado.cardapio) {
+    const estado = leituraSaude.status === 'rejected' ? 'erro' : !saude?.pratos ? 'sem_dados' : 'ok';
+    estados.push({
+      chave: 'cardapio', estado, escopo: 'Da rede', rotulo: 'Pratos prontos para o preço', referencia: 'Situação atual do cadastro',
+      mensagem: estado === 'erro' ? 'Não foi possível carregar a situação do cardápio.' : estado === 'sem_dados' ? 'Ainda não há pratos neste resumo da rede.' : undefined,
+      href: `${base}/fichas`, acao: 'Ver as fichas técnicas',
+    });
+  }
+  if (autorizado.estoque) {
+    const estado = leituraEstoque.status === 'rejected' ? 'erro' : !estoque?.some((l) => l.ativa) ? 'sem_dados' : 'ok';
+    estados.push({
+      chave: 'estoque', estado, escopo, rotulo: 'Lojas com estoque aberto', referencia: 'Posição atual',
+      mensagem: estado === 'erro' ? 'Não foi possível carregar a situação do estoque.'
+        : estado === 'sem_dados' ? (estoque?.length ? 'Nenhuma loja ativa neste contexto.' : 'Nenhuma loja disponível para estoque neste contexto.') : undefined,
+      href: estoqueHref, acao: 'Ver o estoque',
+    });
+  }
 
   if (fat && fat.lojas.length > 0) {
-    const lancados = new Set(fat.lojas.flatMap((l) => l.dias.filter((d) => d.total !== null).map((d) => d.data)));
     indicadores.push({
       chave: 'faturamento',
       escopo,
@@ -161,5 +220,5 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     }
   }
 
-  return { indicadores, pendencias };
+  return { indicadores, pendencias, ...(estados.length ? { estados, consultadoEm: new Date().toISOString() } : {}) };
 }

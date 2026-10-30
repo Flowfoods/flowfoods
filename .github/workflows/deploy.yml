@@ -63,13 +63,29 @@ jobs:
       # e o portão ficaria verde. Se um dia sumir da imagem, falha aqui.
       - name: psql disponível
         run: psql --version
+      # Papéis públicos de fixtures, só no serviço descartável acima. As
+      # migrations dos cenários criam seus próprios bancos, com donos sem
+      # SUPERUSER/BYPASSRLS: um pode SET erp_tenant e o outro não pode.
+      - name: Banco de teste (três perfis obrigatórios)
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTIONS" = 'true'
+          psql 'postgresql://ff:ff@localhost:5432/ff' -X -v ON_ERROR_STOP=1 \
+            -v ci_postgres_efemero=github-actions-service-postgres16 \
+            -f scripts/preparar-banco-teste.sql
+          # Existir no catálogo não basta: confirmar autenticação com as
+          # mesmas fixtures que os testes de migration usam. Erro aborta o job.
+          for papel in ff_dono ff_semrls; do
+            PGPASSWORD="$papel" psql -h localhost -p 5432 -U "$papel" -d ff \
+              -X --no-password -v ON_ERROR_STOP=1 -c 'SELECT current_user' > /dev/null
+          done
       - name: Banco de teste (migrations)
         run: npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://ff:ff@localhost:5432/ff?schema=public
       # A suíte inteira, com banco. Os testes de migration criam bancos próprios
-      # (o usuário do serviço é superusuário). As variantes que exigem um dono
-      # NÃO superusuário com FORCE RLS são puladas aqui — o resumo diz quantas.
+      # pelo administrador do serviço e aplicam/validam as migrations nos três
+      # perfis. A preparação acima falha se os donos sem superusuário faltarem.
       - name: Testes (com banco)
         run: |
           set -o pipefail
@@ -82,7 +98,7 @@ jobs:
             echo
             sed -E 's/\x1b\[[0-9;]*m//g' /tmp/testes.txt 2>/dev/null | grep -E 'Test Files|Tests ' || echo 'Sem resultado: os testes não chegaram a rodar.'
             echo
-            echo 'Pulados = variantes que pedem um dono não superusuário com FORCE RLS (rodar à mão, docs/ERP.md "Provar o isolamento"). Não executado não é aprovado.'
+            echo 'O serviço efêmero prepara os três perfis: superusuário, dono com SET erp_tenant/FORCE RLS e dono sem RLS. Falha de preparação ou de teste bloqueia o deploy. Não executado não é aprovado.'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Build de produção
         run: npm run build
