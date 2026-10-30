@@ -6,6 +6,7 @@
  * desde a importação; aqui ele finalmente aparece.
  */
 
+import { HistoricoRecolhivel } from '@/components/erp/telas/historico/historico-recolhivel';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/db';
 import { gancho, angulo } from '@/lib/barney/render';
@@ -261,7 +262,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         )}
       </Painel>
 
-      <Painel titulo="Histórico" acessorio={<Contagem>{lead.eventos.length}</Contagem>}>
+      <HistoricoRecolhivel chave={lead.id} titulo="Histórico" acessorio={<Contagem>{lead.eventos.length}</Contagem>}>
         {lead.eventos.length === 0 ? (
           <Vazio>Nada registrado ainda.</Vazio>
         ) : (
@@ -282,7 +283,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             })}
           </ol>
         )}
-      </Painel>
+      </HistoricoRecolhivel>
 
       <AcoesLead leadId={lead.id} bloqueado={Boolean(optOut) || lead.status === 'CONFLITO'} jaEmVisita={lead.canal !== 'WHATSAPP'} />
     </div>

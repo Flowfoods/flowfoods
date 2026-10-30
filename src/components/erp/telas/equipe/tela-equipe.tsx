@@ -6,6 +6,7 @@
  * o servidor (`credenciais.ts`: sem escalada, último administrador).
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { LinhaDeAcesso, LinhaDePerfil } from '@/lib/erp/credenciais';
 import type { LinhaDeHistorico } from '@/lib/erp/historico';
@@ -340,7 +341,7 @@ export function TelaEquipe({
             </Painel>
 
             {historico && (
-              <Painel
+              <HistoricoRecolhivel chave={`${hrefBase}/${ator.acessoId ?? 'nivel1'}`} quantidade={historico.length}
                 titulo="Últimas mudanças na equipe"
                 acessorio={
                   historicoHref && (
@@ -356,7 +357,7 @@ export function TelaEquipe({
                 ) : (
                   <ListaHistorico linhas={historico} compacta />
                 )}
-              </Painel>
+              </HistoricoRecolhivel>
             )}
           </div>
 

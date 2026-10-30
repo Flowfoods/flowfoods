@@ -21,6 +21,7 @@ import { Aviso, Contagem, Painel, Selo } from '../../ui/superficies';
 import type { AcaoLocal } from './estado';
 import { FormFechar } from './form-fechar';
 import { FormReabrir } from './form-reabrir';
+import { Voltar } from '../cadastro/partes';
 
 const QUANDO = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
 const quando = (d: Date) => QUANDO.format(d).replace(',', ' às');
@@ -164,6 +165,7 @@ export function TelaDoFechamento({
   const verDre = `${raiz}/dre?periodo=${periodo.inicio}&rede=1`;
   return (
     <div className="space-y-6">
+      <Voltar href={raiz + '/dre/periodos'}>Voltar para os períodos</Voltar>
       <PageHeader icone="estoque" cor={COR.dre} titulo={fechado ? `${periodo.nome} · fechado` : `Fechar ${periodo.nome}`} subtitulo={`${contexto} · ${formatarData(periodo.inicio)} a ${formatarData(periodo.fim)}`}>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           {fechado ? <Selo tom="ok">Período fechado</Selo> : s.hoje <= periodo.fim ? <Selo tom="alerta">Em curso</Selo> : <Selo>Encerrado, ainda aberto</Selo>}

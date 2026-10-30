@@ -7,6 +7,7 @@
  * está com o lote e desde quando; o lote com outra pessoa só ela ou a gerência conclui, solta ou cancela.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { LoteDaLoja } from '@/lib/erp/producao';
 import { formatarRendimento, fraseSemPreco, pendente as pendenteDoLote, quandoVence, TITULO_NO_HISTORICO_DO_LOTE } from '@/lib/erp/producao-campos';
@@ -332,9 +333,9 @@ export function TelaDoLote({
         </div>
       )}
 
-      <Painel titulo="Histórico" semRespiro>
+      <HistoricoRecolhivel chave={aqui} quantidade={d.historico.length} titulo="Histórico" semRespiro>
         {d.historico.length === 0 ? <Vazio>Sem alterações.</Vazio> : <ListaHistorico linhas={d.historico} compacta doCadastro={`Lote ${o.codigoLote} · ${o.fichaNome}`} titulos={TITULO_NO_HISTORICO_DO_LOTE} />}
-      </Painel>
+      </HistoricoRecolhivel>
     </div>
   );
 }

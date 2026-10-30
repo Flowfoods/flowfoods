@@ -13,6 +13,7 @@ export default async function ParceiroNovaFichaPage({ params }: { params: { slug
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;
   return (
     <TelaFormFicha
+      verCustos
       base={`${base}/fichas`}
       contexto={ctx.parceiro.nome}
       acao={acaoCadastrarFicha.bind(null, ctx.parceiro.slug)}

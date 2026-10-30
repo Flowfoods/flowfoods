@@ -7,6 +7,7 @@
  * linha nunca se apaga e o grupo dela não muda depois de criada (oculte e crie outra).
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import type { LinhaDoPlano } from '@/lib/erp/dre-plano';
 import { chaveDaLinha, GRUPOS_DE_DESPESA, linhasLancaveisDoGrupo, PLANO_PADRAO, ROTULO_DO_GRUPO } from '@/lib/erp/dre-plano';
 import { COR } from '@/lib/erp/modulos';
@@ -51,12 +52,9 @@ export function TelaDoPlano({
         >
           <FormMetas acao={acoes.metas} linhas={metas.linhas} versao={metas.versao} valeDesde={metas.periodoAtual.inicio} periodoAtual={metas.periodoAtual.nome} bloqueio={bloqueio} />
           {metas.historico.length > 0 && (
-            <details className="border-t border-linha px-4 py-3 sm:px-5">
-              <summary className="cursor-pointer text-[13px] font-medium text-texto">Últimas mudanças nas metas</summary>
-              <div className="mt-3 -mx-4 sm:-mx-5">
-                <ListaHistorico linhas={metas.historico} />
-              </div>
-            </details>
+            <HistoricoRecolhivel chave={contexto} titulo="Últimas mudanças nas metas" quantidade={metas.historico.length} embutido semRespiro>
+              <ListaHistorico linhas={metas.historico} />
+            </HistoricoRecolhivel>
           )}
         </Painel>
       )}

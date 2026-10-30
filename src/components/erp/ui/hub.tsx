@@ -15,6 +15,7 @@
  */
 
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import type { ChaveIcone } from '@/lib/erp/modulos';
 import { IconeDoModulo } from './cabecalho';
 
@@ -30,10 +31,11 @@ export interface CartaoDoHub {
   abas?: { rotulo: string; href: string }[];
 }
 
-const CAIXA = 'flex h-full min-w-0 flex-col items-start rounded-[14px] border border-linha bg-painel p-3.5 sm:p-5';
-const HOVER = 'ff-transicao hover:border-linha-forte hover:bg-forte';
+const CAIXA = 'ff-identidade-modulo ff-cartao-modulo flex h-full min-w-0 flex-col items-start rounded-[14px] border p-3.5 sm:p-5';
+const HOVER = 'ff-transicao';
 
 export function CartaoModulo({ c }: { c: CartaoDoHub }) {
+  const identidade = { '--cor-modulo': c.cor } as CSSProperties;
   const cabeca = (
     <>
       <IconeDoModulo icone={c.icone} cor={c.cor} tamanho={40} />
@@ -45,7 +47,7 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
   );
   if (!c.href) {
     return (
-      <div aria-disabled="true" className={`${CAIXA} bg-transparent`}>
+      <div aria-disabled="true" className={CAIXA} style={identidade}>
         {cabeca}
         {c.fase && (
           <span className="mt-3 inline-flex w-max items-center rounded-[7px] border border-linha-forte px-2 py-0.5 text-[12px] font-medium text-suave">
@@ -57,7 +59,7 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
   }
   if (!c.abas || c.abas.length === 0) {
     return (
-      <Link href={c.href} className={`${CAIXA} ${HOVER}`}>
+      <Link href={c.href} className={`${CAIXA} ${HOVER}`} style={identidade}>
         {cabeca}
       </Link>
     );
@@ -65,7 +67,7 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
   // Card de área: o título é o link principal e estica sobre o card todo (o card inteiro leva à primeira aba); os nomes das
   // abas são links IRMÃOS, acima da camada esticada (nunca link dentro de link) e chegam por Tab depois do título.
   return (
-    <div className={`${CAIXA} relative ${HOVER}`}>
+    <div className={`${CAIXA} relative ${HOVER}`} style={identidade}>
       <IconeDoModulo icone={c.icone} cor={c.cor} tamanho={40} />
       <span className="mt-3 block min-w-0">
         <Link href={c.href} className="ff-cartao-titulo block text-[14px] font-semibold leading-snug text-texto [overflow-wrap:anywhere] sm:text-[15px]">

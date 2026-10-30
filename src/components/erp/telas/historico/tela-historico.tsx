@@ -4,9 +4,10 @@
  * linha nova.
  */
 
+import { HistoricoRecolhivel } from './historico-recolhivel';
 import type { LinhaDeHistorico } from '@/lib/erp/historico';
 import { FiltroEmLinks } from '../../ui/filtros';
-import { Painel, Vazio } from '../../ui/superficies';
+import { Vazio } from '../../ui/superficies';
 import { ListaHistorico } from './lista-historico';
 
 export const FILTROS: { valor: string; rotulo: string; entidades?: string[] }[] = [
@@ -70,7 +71,7 @@ export function TelaHistorico({
           ativo: (entidade ?? '') === f.valor,
         }))}
       />
-      <Painel
+      <HistoricoRecolhivel chave={hrefBase} quantidade={linhas.length}
         titulo={linhas.length === LIMITE ? `Últimas ${LIMITE} alterações` : `${linhas.length} alterações`}
         semRespiro
       >
@@ -89,7 +90,7 @@ export function TelaHistorico({
             <ListaHistorico linhas={linhas} />
           </>
         )}
-      </Painel>
+      </HistoricoRecolhivel>
     </div>
   );
 }

@@ -21,7 +21,7 @@ export interface IndicadorDoDia {
    * `fracao` desenha uma barra: cheia é "ok"; parcial é alerta (falta algo), salvo quando `parcialEhNormal` — andamento do
    * dia, como os envios da prospecção (decisão 473), em que metade do teto ao meio-dia não é problema.
    */
-  valor: { tipo: 'dinheiro'; centavos: number } | { tipo: 'fracao'; de: number; total: number; parcialEhNormal?: boolean } | { tipo: 'numero'; numero: number | null };
+  valor: { tipo: 'dinheiro'; centavos: number | null } | { tipo: 'fracao'; de: number; total: number; parcialEhNormal?: boolean } | { tipo: 'numero'; numero: number | null };
   contexto: string;
   href: string;
 }
@@ -59,7 +59,9 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     indicadores.push({
       chave: 'faturamento',
       rotulo: `Faturamento de ${MESES[Number(mes.slice(5, 7)) - 1]}`,
-      valor: { tipo: 'dinheiro', centavos: fat.total.valorCentavos },
+      // Nenhum lançamento não comprova faturamento zero. Um dia informado
+      // como "Não vendeu" continua sendo um zero real, distinto de ausência.
+      valor: { tipo: 'dinheiro', centavos: lancados.size ? fat.total.valorCentavos : null },
       contexto: lancados.size ? `${plural(lancados.size, 'dia lançado', 'dias lançados')} · ${plural(fat.total.pedidos, 'pedido', 'pedidos')}` : 'nenhum dia lançado ainda',
       href: `${base}/faturamento`,
     });

@@ -4755,3 +4755,16 @@ gaveta e atalho, menu, campo sob o card, teclado e barra de endereço simulados,
 **Central de Integrações do nível 1 (INT-1.8, primeira parte; decisão 490):** `/rodolfo/integracoes` reúne apps, leituras de teste e parceiros. `/rodolfo/integracoes/<parceiro>` cobre liberação, marca de testes, lojas do iFood, módulos e histórico. Nada nela chama o iFood. Duas revisões independentes: as duas reprovaram na 1ª rodada; nos recheques, engenharia aprovou e tela aprovou com ressalvas, corrigidas. A tela do parceiro (nível 2 e 3) é a segunda parte; o Painel iFood e o selo no Faturamento esperam a INT-1.5 a 1.7.
 
 **Integrações do parceiro (INT-1.8, segunda parte; decisão 491):** a tela só leitura `/erp/integracoes` (aba em Rede e Equipe) aparece só com o módulo Integração liberado e a permissão `integracao.ver` (Dono pelo perfil base; os demais como extra). Mostra as lojas do iFood ligadas às lojas do alcance e o estado de cada módulo em linguagem simples. O pedido de conexão vai para o WhatsApp da FlowFoods. Catálogo de permissões 4, com a migration que só promove o perfil "copiado do Dono". O Painel iFood e o selo no Faturamento esperam a INT-1.5 a 1.7.
+
+## Continuidade Codex — 29/10/2026 (decisão 492)
+
+Base reconciliada com o Notion: master `5243e00677bb28f7473982a326f56836831f3f08`; branch `codex/erp-ux-continuidade-20261029`.
+
+- Formulários de ficha retiram custos no servidor para quem edita receita sem precos.ver; composição operacional e cálculo no servidor preservados.
+- Históricos recolhidos em 28 blocos, com wrapper acessível e reset por consulta/contexto. Alertas e pendências continuam visíveis.
+- Cards, seletor e menu usam a mesma identidade cromática central dos ícones, em claro/escuro.
+- Retorno seguro nas listas/hubs e controles locais nas lacunas autenticadas; queries e contexto preservados, sem retorno externo ou ciclos. Inventário estático de 217 rotas, distinguindo controles, impressão e redirecionamento; não significa 217 jornadas operacionais testadas.
+- Links de saída de formulários alterados pedem confirmação, inclusive com vários formulários na mesma tela.
+- Home diferencia ausência de lançamentos de zero informado. Custo médio por loja não foi ativado.
+
+QA real local com dados sintéticos: 18 cenários aprovados; 3 telas × 3 larguras × 2 temas sem transbordamento; editor sem preços; teclado/retorno/filtros/troca de visão; insumo → ficha → custo atualizado de R$ 2 para R$ 4. Revisões independentes executadas. Tipos, lint e baterias focadas aprovados. A suíte completa/build no Windows teve limitações de fixtures CRLF, caminhos e argumentos psql; publicação depende do portão Linux existente. Acompanhar commit, resultado CI e comprovação do ambiente no registro de execução da página principal do Notion. Sem migration nova ou ação real de integração/anúncios.

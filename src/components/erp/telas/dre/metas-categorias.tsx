@@ -3,6 +3,7 @@
  * loja segue a rede ou personaliza o conjunto inteiro. Só quem define metas (`metas.editar`, com a rede inteira) chega aqui.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import { percentualComDuasCasas } from '@/lib/erp/cmv-categorias-campos';
 import type { SituacaoDasMetasPorCategoria } from '@/lib/erp/metas-categorias';
@@ -109,12 +110,9 @@ export function TelaDasMetasPorCategoria({
             />
           </div>
           {s.historico.length > 0 && (
-            <details className="border-t border-linha px-4 py-3 sm:px-5">
-              <summary className="cursor-pointer text-[13px] font-medium text-texto [@media(pointer:coarse)]:py-3">Últimas mudanças nas metas por categoria</summary>
-              <div className="mt-3 -mx-4 sm:-mx-5">
-                <ListaHistorico linhas={s.historico} />
-              </div>
-            </details>
+            <HistoricoRecolhivel chave={`${base}/${loja?.lojaId ?? 'rede'}`} titulo="Últimas mudanças nas metas por categoria" quantidade={s.historico.length} embutido semRespiro>
+              <ListaHistorico linhas={s.historico} />
+            </HistoricoRecolhivel>
           )}
         </Painel>
       )}

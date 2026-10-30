@@ -6,6 +6,7 @@
  * Nenhum valor em R$.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import { PEDIDOS_POR_PAGINA, type HistoricoDeImpressoes } from '@/lib/erp/etiquetas';
 import { FORMATOS, NOME_DO_PEDIDO, quandoNaTela, ROTULO_DO_TRANSPORTE, seloDoPedido } from '@/lib/erp/etiqueta-campos';
@@ -15,7 +16,7 @@ import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { FiltroEmLinks } from '../../ui/filtros';
 import { PaginacaoNumerada } from '../../ui/paginacao-numerada';
-import { Metrica, Painel, Selo, Vazio } from '../../ui/superficies';
+import { Metrica, Selo, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
@@ -109,7 +110,7 @@ export function TelaHistoricoDeImpressoes({ h, base, contexto }: { h: HistoricoD
         <Metrica rotulo="Sem resultado" valor={t.semResultado} detalhe="Zebra sem resposta" />
       </section>
 
-      <Painel titulo="Pedidos de impressão" subtitulo={h.origem ? (h.origem === 'lote' ? 'Só de lotes produzidos' : 'Só de embalagens abertas') : 'Lotes produzidos e embalagens abertas'} semRespiro>
+      <HistoricoRecolhivel chave={aqui} quantidade={h.linhas.length} titulo="Pedidos de impressão" subtitulo={h.origem ? (h.origem === 'lote' ? 'Só de lotes produzidos' : 'Só de embalagens abertas') : 'Lotes produzidos e embalagens abertas'} semRespiro>
         {h.linhas.length === 0 ? (
           <Vazio titulo="Nenhuma impressão neste período.">{filtrado ? 'Tire o filtro ou escolha outro período.' : 'As impressões aparecem aqui a partir do primeiro pedido.'}</Vazio>
         ) : (
@@ -205,7 +206,7 @@ export function TelaHistoricoDeImpressoes({ h, base, contexto }: { h: HistoricoD
             <PaginacaoNumerada de={de} ate={ate} total={h.total} pagina={h.pagina} paginas={h.paginas} singular="pedido" plural="pedidos" href={href} />
           </>
         )}
-      </Painel>
+      </HistoricoRecolhivel>
       <ExplicacaoNoPonto ponto="situacao">
         <p className="text-[12px] text-suave">“Enviada à Zebra” é que o Browser Print recebeu, não que saiu no papel. “Sem resultado” é o pedido que a tela não chegou a confirmar (fechou ou caiu a conexão): pode ou não ter saído.</p>
       </ExplicacaoNoPonto>

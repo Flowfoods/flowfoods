@@ -6,6 +6,7 @@
  * do histórico. Custo por unidade = valor + frete rateado ÷ quantidade.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
 import { formatarData } from '@/lib/erp/compra-campos';
@@ -35,7 +36,7 @@ export function PrecosPagos({
   }
   const varios = i.precoPorFornecedor.length > 1;
   return (
-    <Painel
+    <HistoricoRecolhivel chave={i.id} quantidade={i.compras.length}
       titulo="Preço pago"
       subtitulo="Últimas compras, com o frete rateado"
       semRespiro
@@ -99,6 +100,6 @@ export function PrecosPagos({
           );
         })}
       </ul>
-    </Painel>
+    </HistoricoRecolhivel>
   );
 }

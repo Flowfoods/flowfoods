@@ -11,6 +11,7 @@ import { CATALOGO, rotuloDasLojas, type ModuloDoCatalogo } from '@/lib/erp/permi
 import { listarRostos, podeAtivarRosto, rostosRemovidosEm } from '@/lib/erp/credenciais';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
+import { Voltar } from '@/components/erp/telas/cadastro/partes';
 import { Contagem, Painel, Vazio } from '@/components/erp/ui/superficies';
 import { AjudaDeAcesso } from '@/app/entrar/ajuda';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
@@ -56,6 +57,7 @@ export default async function SeuAcessoPage() {
 
   return (
     <div className="space-y-6">
+      <Voltar href="/erp">Voltar para as áreas da rede</Voltar>
       <PageHeader
         icone="acesso"
         cor={COR.rede}

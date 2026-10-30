@@ -50,6 +50,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
 
   return (
     <AppShell
+      chaveDoContexto={parceiro.id + ':' + ctx.sessao.userId}
       navegacao={navegacaoDoParceiro(alcance, liberados)}
       contexto={`${parceiro.nome} · ${status.rotulo}`}
       usuario={{

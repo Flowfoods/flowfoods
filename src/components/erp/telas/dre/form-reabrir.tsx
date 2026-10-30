@@ -7,15 +7,17 @@
  */
 
 import { useFormState } from 'react-dom';
+import { useAvisoDeSaida } from '../cadastro/erros';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro } from '../../ui/campos';
 import type { AcaoLocal, EstadoLocal } from './estado';
 
 export function FormReabrir({ acao, fotografia, bloqueio }: { acao: AcaoLocal; fotografia: string; bloqueio: string | null }) {
   const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
+  const saida = useAvisoDeSaida();
   const erros = estado?.erros ?? {};
   return (
-    <form action={enviar} noValidate className="space-y-3">
+    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-3">
       <input type="hidden" name="fotografia" value={fotografia} />
       {erros.geral && !erros.motivo && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">

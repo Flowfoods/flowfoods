@@ -7,7 +7,7 @@
 
 import { FileUp, Plus } from 'lucide-react';
 import type { ReactNode } from 'react';
-import type { FichaDetalhada, InsumoDoFormulario, PreparoDoFormulario } from '@/lib/erp/fichas';
+import type { FichaNaTela, InsumoDoFormulario, PreparoDoFormularioNaTela } from '@/lib/erp/fichas';
 import { formatarFator, itemParaCampo, rendimentoParaCampo } from '@/lib/erp/ficha-campos';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
@@ -69,14 +69,17 @@ export function TelaFormFicha({
   preparos,
   bloqueio,
   novoInsumo,
+  verCustos,
 }: {
   /** Ausente = nova. */
-  ficha?: FichaDetalhada;
+  ficha?: FichaNaTela;
   base: string;
   contexto: string;
   acao: AcaoDeCadastro;
   opcoes: InsumoDoFormulario[];
-  preparos: PreparoDoFormulario[];
+  preparos: PreparoDoFormularioNaTela[];
+  /** O servidor já retirou os valores das opções quando esta permissão não existe. */
+  verCustos: boolean;
   bloqueio: string | null;
   novoInsumo?: string;
 }) {
@@ -109,6 +112,7 @@ export function TelaFormFicha({
         subtitulo={ficha ? `${contexto} · ${ficha.nome}` : `${contexto} · receita da rede, vale para todas as lojas`}
       />
       <FormFicha
+        verCustos={verCustos}
         acao={acao}
         modo={ficha ? 'editar' : 'criar'}
         base={base}

@@ -5,6 +5,7 @@
  * (WhatsApp, e-mail) são montados aqui, só de dado conferido.
  */
 
+import { HistoricoRecolhivel } from '@/components/erp/telas/historico/historico-recolhivel';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { exigirNivel1 } from '@/lib/erp/contexto';
@@ -192,7 +193,7 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
           )}
         </div>
 
-        <Painel titulo="Histórico" subtitulo="Só a etapa, o motivo e quem fez." className="self-start lg:col-start-1">
+        <HistoricoRecolhivel chave={p.id} quantidade={p.eventos.length} titulo="Histórico" subtitulo="Só a etapa, o motivo e quem fez." className="self-start lg:col-start-1">
           <ol className="space-y-3 text-sm">
             {p.eventos.map((e) => (
               <li key={e.id} className="flex flex-wrap justify-between gap-x-4 gap-y-0.5">
@@ -203,7 +204,7 @@ export default async function PedidoPage({ params, searchParams }: { params: { i
               </li>
             ))}
           </ol>
-        </Painel>
+        </HistoricoRecolhivel>
       </div>
     </div>
   );

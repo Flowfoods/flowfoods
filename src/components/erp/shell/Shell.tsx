@@ -14,6 +14,7 @@ import { ChevronRight, Menu } from 'lucide-react';
 import { entradaDoCaminho, caixaDaTela, itemFechado } from '@/lib/erp/ajuda-rota';
 import { abasDaArea, acoesDaNavegacao, itemAtivo, montarTrilha, telasDaNavegacao } from '@/lib/erp/modulos';
 import { comParceiroAtual, slugNoCaminho } from '@/lib/rodolfo/modulos';
+import { raizDoRetorno } from '@/lib/erp/voltar-navegacao';
 import { Abas } from '../ui/abas';
 import { Dialogo } from '../ui/Dialogo';
 import { ContextoDaAjuda } from '../ui/link-de-ajuda';
@@ -28,14 +29,24 @@ import { NavLateral, type EstadoDaNav } from './NavLateral';
 import { Notificacoes } from './Notificacoes';
 import { BOTAO_ICONE, Popover } from './Popover';
 import { SeletorVisao } from './SeletorVisao';
+import { VoltarDaNavegacao } from './VoltarDaNavegacao';
 import type { PropsDoShell, ResultadoDaBusca } from './tipos';
 import { ProvedorDaTrilha, useTrilhaExtra, type ItemDaTrilha } from './trilha';
+import { ProvedorDaConsulta } from './contexto-da-consulta';
 
 export function Shell(p: { props: PropsDoShell; children: ReactNode }) {
+  const caminho = usePathname() ?? '';
+  const contexto = [
+    p.props.chaveDoContexto ?? '',
+    raizDoRetorno(caminho) ?? '',
+    p.props.visao.modo === 'parceiro' ? p.props.visao.valor ?? '' : '',
+  ].join(':');
   return (
+    <ProvedorDaConsulta contexto={contexto}>
     <ProvedorDaTrilha>
       <Casca {...p} />
     </ProvedorDaTrilha>
+    </ProvedorDaConsulta>
   );
 }
 
@@ -353,6 +364,9 @@ function Casca({ props, children }: { props: PropsDoShell; children: ReactNode }
           </header>
 
           <main id="conteudo" className="mx-auto w-full max-w-[1400px] px-4 pb-12 pt-6 sm:px-6 lg:px-8">
+            <Suspense fallback={null}>
+              <VoltarDaNavegacao nav={nav} chaveDoContexto={props.chaveDoContexto} visao={props.visao.modo === 'parceiro' ? props.visao.valor : undefined} />
+            </Suspense>
             {abas && (
               <Abas
                 rotulo={`Seções de ${abas.area}`}

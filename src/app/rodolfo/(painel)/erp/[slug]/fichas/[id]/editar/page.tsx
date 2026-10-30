@@ -2,7 +2,7 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
-import { insumosParaFicha, obterFicha, preparosParaFicha } from '@/lib/erp/fichas';
+import { fichaNaTela, insumosParaFicha, obterFicha, preparosParaFicha } from '@/lib/erp/fichas';
 import { TelaFormFicha } from '@/components/erp/telas/fichas/paginas';
 import { acaoEditarFicha } from '../../actions';
 
@@ -17,7 +17,8 @@ export default async function ParceiroEditarFichaPage({ params }: { params: { sl
   if (!ficha.ativa) redirect(`${base}/fichas/${ficha.id}`);
   return (
     <TelaFormFicha
-      ficha={ficha}
+      verCustos
+      ficha={fichaNaTela(ficha, true)}
       base={`${base}/fichas`}
       contexto={ctx.parceiro.nome}
       acao={acaoEditarFicha.bind(null, ctx.parceiro.slug, ficha.id)}

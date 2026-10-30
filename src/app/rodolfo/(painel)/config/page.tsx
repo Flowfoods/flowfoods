@@ -6,6 +6,7 @@ import { montarEstadoEnvio, INSTANCIA } from '@/lib/rodolfo/estado';
 import { ENVIOS_MANUAIS_INICIAIS, INTERVALO_MIN_S, MAX_POR_DIA, MAX_POR_HORA, RAMPA_POR_SEMANA, RAMPA_TETO_FINAL, STOP_LOSS, TOQUES } from '@/lib/barney/regras';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
+import { Voltar } from '@/components/erp/telas/cadastro/partes';
 import { Aviso, Painel, Selo } from '@/components/erp/ui/superficies';
 import { ConfigForm } from './config-form';
 import { ChaveDoDisparo } from './chave-do-disparo';
@@ -38,6 +39,7 @@ export default async function ConfigPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
+      <Voltar href="/rodolfo">Voltar para o início</Voltar>
       <PageHeader
         icone="config"
         cor={COR.comercial}

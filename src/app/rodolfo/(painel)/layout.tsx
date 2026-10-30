@@ -60,6 +60,7 @@ export default async function PainelLayout({ children }: { children: React.React
 
   return (
     <AppShell
+      chaveDoContexto={'n1:' + sessao.userId}
       navegacao={navegacaoDoNivel1()}
       contexto="Nível 1 · FlowFoods"
       usuario={{ nome: sessao.autorNome, papel: 'Nível 1 · FlowFoods' }}

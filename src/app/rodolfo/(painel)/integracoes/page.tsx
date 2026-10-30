@@ -7,6 +7,7 @@
  */
 
 import Link from 'next/link';
+import { HistoricoRecolhivel } from '@/components/erp/telas/historico/historico-recolhivel';
 import { prisma } from '@/lib/db';
 import { exigirNivel1, leituraDoParceiro } from '@/lib/erp/contexto';
 import { moduloLiberado } from '@/lib/erp/liberacao';
@@ -156,6 +157,9 @@ export default async function CentralDeIntegracoesPage() {
                 Nenhuma leitura de teste ainda. Ela roda por comando quando o segredo do app de teste e a chave geral estiverem no painel do servidor.
               </p>
             ) : (
+              <>
+              <p className="mb-3 text-[13px] text-suave">Última leitura: <strong className={leituras[0].ok ? 'font-semibold text-ok' : 'font-semibold text-erro'}>{leituras[0].ok ? 'deu certo' : 'falhou'}</strong>, {QUANDO.format(leituras[0].quando)}.</p>
+              <HistoricoRecolhivel chave="nivel1/leituras-test" titulo="Leituras registradas" quantidade={leituras.length} embutido>
               <ol className="space-y-4">
                 {leituras.map((l, i) => (
                   <li key={`${l.quando.toISOString()}-${i}`} className="space-y-1.5 text-[13px]">
@@ -183,6 +187,8 @@ export default async function CentralDeIntegracoesPage() {
                   </li>
                 ))}
               </ol>
+              </HistoricoRecolhivel>
+              </>
             )}
           </Painel>
 

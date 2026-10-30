@@ -9,6 +9,7 @@
  * abaixo (a cozinha usa pelo celular). A mesma tela no nível 1 e na pessoa do parceiro.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { ListaDoDiaNaTela, LinhaDaLista } from '@/lib/erp/producao-lista';
 import { faltasDaConta, quantidadeComSinal, resumoDaConta, textoDasEmbalagens, TITULO_NO_HISTORICO_DA_LISTA, type InsumoNaConta, type PreparoNaConta } from '@/lib/erp/producao-lista-campos';
@@ -487,9 +488,9 @@ export function TelaListaDoDia({
       </div>
 
       {historico.length > 0 && (
-        <Painel titulo="Histórico da lista" semRespiro>
+        <HistoricoRecolhivel chave={`${aqui}/${d.dia}`} quantidade={historico.length} titulo="Histórico da lista" semRespiro>
           <ListaHistorico linhas={historico} compacta titulos={TITULO_NO_HISTORICO_DA_LISTA} />
-        </Painel>
+        </HistoricoRecolhivel>
       )}
     </div>
   );

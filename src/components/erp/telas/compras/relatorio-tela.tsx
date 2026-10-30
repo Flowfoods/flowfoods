@@ -7,6 +7,7 @@
  */
 
 import Link from 'next/link';
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import type { ReactNode } from 'react';
 import type { RelatorioDaTela } from '@/lib/erp/compras-relatorio';
 import {
@@ -38,6 +39,11 @@ import { TabelasDaImpressao } from './relatorio-impressao';
 export type Modo = 'insumo' | 'periodo';
 
 const TITULO: Record<Modo, string> = { insumo: 'Histórico de um insumo', periodo: 'Compras do período' };
+
+/** O relatório geral continua operacional; no histórico do insumo só os resultados recolhem. */
+function ResultadosDoHistorico({ modo, chave, titulo, quantidade, children }: { modo: Modo; chave: string; titulo: string; quantidade: number; children: ReactNode }) {
+  return modo === 'insumo' ? <HistoricoRecolhivel chave={chave} titulo={titulo} quantidade={quantidade} semRespiro>{children}</HistoricoRecolhivel> : <>{children}</>;
+}
 
 function Aba({ href, ativa, children }: { href: string; ativa: boolean; children: ReactNode }) {
   return (
@@ -190,7 +196,9 @@ export function TelaDoRelatorio({
           <NotasDoRelatorio f={f} caminho={caminho} r={r} comprasBase={comprasBase} />
 
           {t.linhas > 0 && modo === 'insumo' && r.fornecedores && r.fornecedores.grupos.length > 0 && (
-            <TabelaDosGrupos id="fornecedores" caminho={caminho} f={f} grupos={r.fornecedores.grupos} agrupar="fornecedor" comPreco={f.situacao !== 'canceladas'} titulo="De quem você comprou" ancora="#compras" />
+            <ResultadosDoHistorico modo={modo} chave={`${caminho}/${f.insumoId}/${f.lojaIds.join(',')}/${f.rede}`} titulo="De quem você comprou" quantidade={r.fornecedores.grupos.length}>
+              <TabelaDosGrupos id="fornecedores" caminho={caminho} f={f} grupos={r.fornecedores.grupos} agrupar="fornecedor" comPreco={f.situacao !== 'canceladas'} titulo="De quem você comprou" ancora="#compras" />
+            </ResultadosDoHistorico>
           )}
 
           {t.linhas > 0 && modo === 'periodo' && (
@@ -205,6 +213,7 @@ export function TelaDoRelatorio({
           )}
 
           {t.linhas > 0 && verLinhas && abertas && r.linhas && (
+            <ResultadosDoHistorico modo={modo} chave={`${caminho}/${f.insumoId}/${f.lojaIds.join(',')}/${f.rede}`} titulo="Compras deste insumo" quantidade={r.linhas.linhas.length}>
             <div className="space-y-3">
               {(f.grupo || f.unidade || f.so) && (
                 <p className="text-sm text-suave" aria-live="polite">
@@ -227,6 +236,7 @@ export function TelaDoRelatorio({
                 />
               )}
             </div>
+            </ResultadosDoHistorico>
           )}
 
           {t.linhas > 0 && !verLinhas && r.grupos && (

@@ -7,6 +7,7 @@
  * os botões aparecem desabilitados, com o motivo.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { InsumoDetalhado } from '@/lib/erp/insumos';
 import { AJUDA_DO_TIPO, compararEmbalagens, comDe, CONSERVACOES, TIPOS } from '@/lib/erp/insumo-campos';
@@ -422,13 +423,13 @@ export function TelaDetalheInsumo({
               )}
             </Painel>
           )}
-          <Painel titulo="Últimas alterações" semRespiro>
+          <HistoricoRecolhivel chave={`${base}/${i.id}`} quantidade={i.historico.length} titulo="Últimas alterações" semRespiro>
             {i.historico.length === 0 ? (
               <Vazio>Nada registrado ainda.</Vazio>
             ) : (
               <ListaHistorico linhas={i.historico} compacta doCadastro={i.nome} />
             )}
-          </Painel>
+          </HistoricoRecolhivel>
         </aside>
       </div>
     </div>

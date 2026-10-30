@@ -4,6 +4,7 @@
  * define o plano e o período (a rede inteira) e nunca reescreve o passado.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { SituacaoDosPeriodos } from '@/lib/erp/periodos';
 import { formatarData } from '@/lib/erp/compra-campos';
@@ -85,7 +86,7 @@ export function TelaDosPeriodos({ s, raiz, contexto, podeMudar, podeVerDre, pode
         </ul>
       </Painel>
 
-      <Painel titulo="Regras anteriores" semRespiro>
+      <HistoricoRecolhivel chave={`${raiz}/regras`} titulo="Regras anteriores" quantidade={s.regras.length} semRespiro>
         {s.regras.length === 0 ? (
           <Vazio titulo="Nenhuma regra." />
         ) : (
@@ -100,8 +101,10 @@ export function TelaDosPeriodos({ s, raiz, contexto, podeMudar, podeVerDre, pode
             ))}
           </ul>
         )}
-        {s.historico.length > 0 && <ListaHistorico linhas={s.historico} />}
-      </Painel>
+      </HistoricoRecolhivel>
+      <HistoricoRecolhivel chave={raiz} titulo="Alterações nas regras do período" quantidade={s.historico.length} semRespiro>
+        {s.historico.length > 0 ? <ListaHistorico linhas={s.historico} /> : <Vazio titulo="Nada registrado ainda." />}
+      </HistoricoRecolhivel>
     </div>
   );
 }

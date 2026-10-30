@@ -91,4 +91,22 @@ describe.skipIf(!URL_TESTE)('Início de trabalho · Postgres real', { timeout: 9
     const p = await painelDoDia(b, alcance('DONO'), '/erp', HOJE);
     expect(p).toEqual({ indicadores: [], pendencias: [] });
   });
+
+  it('sem lançamentos não informa zero; um dia marcado Não vendeu comprova zero', async () => {
+    const loja = await cadastrarLoja(b, { nome: 'Loja sem lançamentos' }, 'Marina');
+    if (!loja.ok) throw new Error(JSON.stringify(loja));
+    const sem = await painelDoDia(b, alcance('DONO'), '/erp', HOJE);
+    expect(sem.indicadores.find((i) => i.chave === 'faturamento')).toMatchObject({
+      valor: { tipo: 'dinheiro', centavos: null }, contexto: 'nenhum dia lançado ainda',
+    });
+    const zero = await lancarDia(b, alcance('DONO'), {
+      lojaId: loja.id, data: '2026-10-23',
+      canais: [{ canal: 'LOJA', valor: '', pedidos: '', clientes: '', naoVendeu: true, versao: '' }],
+    }, 'Marina', HOJE);
+    expect(zero.ok).toBe(true);
+    const informado = await painelDoDia(b, alcance('DONO'), '/erp', HOJE);
+    expect(informado.indicadores.find((i) => i.chave === 'faturamento')).toMatchObject({
+      valor: { tipo: 'dinheiro', centavos: 0 },
+    });
+  });
 });

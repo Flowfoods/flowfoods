@@ -7,6 +7,7 @@
  * alterações. Quem só vê não tem botão nenhum.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { NotaDetalhada } from '@/lib/erp/compras';
 import { formatarData } from '@/lib/erp/compra-campos';
@@ -269,9 +270,9 @@ export function TelaDetalheNota({
           {cancela && (
             <Painel titulo="Situação">{bloqueio ? <p className="text-sm text-suave">{bloqueio}</p> : <FormCancelarNota acao={acaoCancelar} />}</Painel>
           )}
-          <Painel titulo="Alterações" semRespiro>
+          <HistoricoRecolhivel chave={`${base}/${n.id}`} quantidade={n.historico.length} titulo="Alterações" semRespiro>
             {n.historico.length === 0 ? <Vazio>Nada registrado ainda.</Vazio> : <ListaHistorico linhas={n.historico} compacta doCadastro={n.rotulo} />}
-          </Painel>
+          </HistoricoRecolhivel>
         </aside>
       </div>
     </div>

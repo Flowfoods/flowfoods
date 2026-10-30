@@ -9,6 +9,7 @@ import { impactoDoCustoMedio, type AlertaDoImpacto } from '@/lib/erp/custo-medio
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
+import { Voltar } from '@/components/erp/telas/cadastro/partes';
 import { Aviso, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
 import { FormLigarCustoMedio } from './form';
 
@@ -30,6 +31,7 @@ export default async function CustoMedioPage({ params }: { params: { slug: strin
 
   return (
     <div className="space-y-6">
+      <Voltar href={'/rodolfo/erp/' + encodeURIComponent(parceiro.slug)}>Voltar para as áreas da rede</Voltar>
       <PageHeader
         icone="cadastro"
         cor={COR.rede}
