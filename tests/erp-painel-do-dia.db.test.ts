@@ -14,13 +14,14 @@ vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
-import { resolverAlcance } from '@/lib/erp/permissoes';
+import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { lancarDia } from '@/lib/erp/faturamento';
 import { cadastrarFicha } from '@/lib/erp/fichas';
 import { painelDoDia } from '@/lib/erp/painel-do-dia';
 import { saudeDoCardapio } from '@/lib/erp/saude-do-cardapio';
 import { iniciarAbertura } from '@/lib/erp/estoque';
+import { salvarListaDoDia } from '@/lib/erp/producao-lista';
 import { cadastrarInsumoDeTeste as cadastrarInsumo, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
@@ -155,5 +156,51 @@ describe.skipIf(!URL_TESTE)('Início de trabalho · Postgres real', { timeout: 9
     const permitido = await painelDoDia(a, restrito, '/erp', HOJE, { tipo: 'loja', lojaId: lojaBId, nome: 'Loja B da visão' });
     expect(permitido.indicadores.find((i) => i.chave === 'faturamento')?.valor).toEqual({ tipo: 'dinheiro', centavos: 700_000 });
     expect(pb.indicadores.find((i) => i.chave === 'cardapio')?.escopo).toBe('Da rede');
+  });
+
+  it('produção usa a lista real da loja selecionada, sem custos ou efeitos ao consultar; outro parceiro não a recebe', async () => {
+    const nova = await cadastrarLoja(a, { nome: 'Produção B sintética' }, 'Marina');
+    if (!nova.ok) throw new Error(JSON.stringify(nova));
+    const lojaB = nova.id;
+    const ingrediente = await a.insumo.findFirst({ where: { nome: 'Carne' }, select: { id: true } });
+    if (!ingrediente) throw new Error('Ingrediente sintético ausente.');
+    const fichas: string[] = [];
+    for (const nome of ['Pré-preparo QA um', 'Pré-preparo QA dois']) {
+      const ficha = await cadastrarFicha(a, {
+        nome, tipo: 'PRE_PREPARO', rendimento: '1', rendimentoUnidade: 'kg',
+        itens: [{ insumoId: ingrediente.id, quantidade: '1', unidade: 'kg' }],
+        validade: { principal: 'REFRIGERADO', linhas: { REFRIGERADO: { marcada: true, quantidade: '3', em: 'dias' } } },
+      } as never, { tipo: 'manter' }, 'Marina');
+      if (!ficha.ok) throw new Error(JSON.stringify(ficha));
+      fichas.push(ficha.id);
+    }
+    const agora = new Date(`${HOJE}T16:00:00.000Z`);
+    for (const [lojaId, escolhidas] of [[lojaAId, fichas.slice(0, 1)], [lojaB, fichas]] as const) {
+      const r = await salvarListaDoDia(a, alcance('DONO'), lojaId, {
+        dia: HOJE, versao: '', linhaIds: escolhidas.map(() => ''), fichaIds: escolhidas, quantidades: escolhidas.map(() => '1'),
+      }, { nome: 'Marina' }, agora);
+      expect(r.ok).toBe(true);
+    }
+    const operacao: Alcance = { nivel: 'LOJA', lojas: [lojaB], permissoes: new Set(['producao.ver']) };
+    const visao = { tipo: 'loja', lojaId: lojaB, nome: 'Produção B sintética' } as const;
+    const antes = await Promise.all([a.listaProducao.count(), a.listaProducaoItem.count(), a.ordemProducao.count(), a.movimentoEstoque.count()]);
+    for (let tentativa = 0; tentativa < 2; tentativa++) {
+      const p = await painelDoDia(a, operacao, '/erp', agora, visao);
+      expect(p.indicadores).toEqual([expect.objectContaining({
+        chave: 'producao', valor: { tipo: 'numero', numero: 2 },
+        contexto: '2 pré-preparos ainda sem lote ativo. A lista inclui os que já viraram lote.',
+        href: `/erp/producao/lista/${lojaB}?dia=${HOJE}`,
+      })]);
+      expect(p.estados?.[0]).toMatchObject({ chave: 'producao', estado: 'ok' });
+      expect(JSON.stringify(p)).not.toMatch(/centavos|custo|Carne|Centro/);
+    }
+    expect(await Promise.all([a.listaProducao.count(), a.listaProducaoItem.count(), a.ordemProducao.count(), a.movimentoEstoque.count()])).toEqual(antes);
+    const outroParceiro = await painelDoDia(b, operacao, '/erp', agora, visao);
+    expect(outroParceiro.indicadores).toEqual([]);
+    expect(outroParceiro.pendencias).toEqual([]);
+    expect(outroParceiro.estados?.[0]).toMatchObject({ chave: 'producao', estado: 'sem_dados' });
+    expect(await painelDoDia(a, operacao, '/erp', agora, { tipo: 'loja', lojaId: lojaAId, nome: 'Centro' })).toEqual({ indicadores: [], pendencias: [] });
+    const rede = await painelDoDia(a, alcance('DONO'), '/erp', agora, { tipo: 'rede' });
+    expect(rede.estados?.some((e) => e.chave === 'producao')).toBe(false);
   });
 });
