@@ -10,10 +10,10 @@
  * é a permissão de ver fichas, conferida na página).
  */
 
-import type { CanalVenda, FichaTipo, UnidadeBase } from '@prisma/client';
+import type { CanalVenda, FichaTipo, Prisma, UnidadeBase } from '@prisma/client';
 import type { ClienteDoParceiro } from './tenant';
 
-/** Teto de linhas lidas por consulta: insumo muito usado mostra as primeiras e diz quantas são no total. */
+/** Teto de fichas distintas exibidas; os usos de cada ficha apresentada vêm completos. */
 export const TETO_DE_USOS = 200;
 
 export interface UsoDoInsumo {
@@ -52,7 +52,7 @@ export function juntarUsos(
     }
     return u;
   };
-  // A mesma ficha pode ter o insumo em mais de uma linha (raro, mas a ficha aceita): soma.
+  // Linhas repetidas do legado também entram inteiras, sem alterar a receita.
   for (const r of receita) {
     const u = pegar(r);
     u.naReceitaMilesimos = (u.naReceitaMilesimos ?? 0) + r.quantidadeMilesimos;
@@ -66,33 +66,52 @@ export function juntarUsos(
   return Array.from(porFicha.values()).sort((a, b) => Number(b.ativa) - Number(a.ativa) || a.nome.localeCompare(b.nome, 'pt-BR', { sensitivity: 'base' }));
 }
 
-export async function ondeOInsumoEUsado(tx: ClienteDoParceiro, insumoId: string, unidade: UnidadeBase): Promise<OndeEUsado> {
-  const [linhas, embalagens, total] = await Promise.all([
-    tx.fichaItem.findMany({
-      where: { insumoId },
-      select: { quantidadeMilesimos: true, ficha: { select: { id: true, nome: true, tipo: true, ativa: true } } },
-      orderBy: { fichaId: 'asc' },
-      take: TETO_DE_USOS,
-    }),
-    tx.produtoEmbalagem.findMany({
-      where: { insumoId },
-      select: { canal: true, produto: { select: { ficha: { select: { id: true, nome: true, tipo: true, ativa: true } } } } },
-      orderBy: { produtoId: 'asc' },
-      take: TETO_DE_USOS,
-    }),
-    tx.sql<{ n: number }>`
-      SELECT count(*)::int AS "n" FROM (
-        SELECT "fichaId" FROM "FichaItem" WHERE "parceiroId" = ${tx.parceiroId} AND "insumoId" = ${insumoId}
-        UNION
-        SELECT p."fichaId" FROM "ProdutoEmbalagem" e
-          JOIN "ProdutoVenda" p ON p."parceiroId" = e."parceiroId" AND p."id" = e."produtoId"
-          WHERE e."parceiroId" = ${tx.parceiroId} AND e."insumoId" = ${insumoId}
-      ) f`,
-  ]);
-  const usos = juntarUsos(
-    linhas.map((l) => ({ fichaId: l.ficha.id, nome: l.ficha.nome, tipo: l.ficha.tipo, ativa: l.ficha.ativa, quantidadeMilesimos: l.quantidadeMilesimos })),
-    embalagens.map((e) => ({ fichaId: e.produto.ficha.id, nome: e.produto.ficha.nome, tipo: e.produto.ficha.tipo, ativa: e.produto.ficha.ativa, canal: e.canal })),
-  );
-  const n = total[0]?.n ?? usos.length;
-  return { usos, total: Math.max(n, usos.length), cortada: linhas.length >= TETO_DE_USOS || embalagens.length >= TETO_DE_USOS, unidade };
+export async function ondeOInsumoEUsado(cliente: ClienteDoParceiro, insumoId: string, unidade: UnidadeBase): Promise<OndeEUsado> {
+  // O teto é de fichas, não das linhas que compõem uma ficha. A mesma leitura
+  // mantém seleção, total e usos coerentes se um vínculo mudar durante a consulta.
+  return cliente.transacao(async (tx) => {
+    const where: Prisma.FichaTecnicaWhereInput = {
+      OR: [{ itens: { some: { insumoId } } }, { produtos: { some: { embalagens: { some: { insumoId } } } } }],
+    };
+    const [fichas, total] = await Promise.all([
+      tx.fichaTecnica.findMany({
+        where,
+        select: { id: true, nome: true, tipo: true, ativa: true },
+        orderBy: [{ ativa: 'desc' }, { nome: 'asc' }, { id: 'asc' }],
+        take: TETO_DE_USOS,
+      }),
+      tx.fichaTecnica.count({ where }),
+    ]);
+    if (fichas.length === 0) return { usos: [], total, cortada: false, unidade };
+
+    const ids = fichas.map((f) => f.id);
+    const [receita, embalagem] = await Promise.all([
+      tx.fichaItem.groupBy({
+        by: ['fichaId'],
+        where: { insumoId, fichaId: { in: ids } },
+        _sum: { quantidadeMilesimos: true },
+      }),
+      // Um registro por ficha/canal, mesmo se vários produtos da ficha
+      // usam a embalagem. O portão/RLS e a chave composta preservam o parceiro.
+      tx.sql<{ fichaId: string; canal: CanalVenda }>`
+        SELECT DISTINCT p."fichaId", e."canal"
+        FROM "ProdutoEmbalagem" e
+        JOIN "ProdutoVenda" p ON p."parceiroId" = e."parceiroId" AND p."id" = e."produtoId"
+        WHERE e."parceiroId" = ${tx.parceiroId} AND e."insumoId" = ${insumoId}
+          AND p."fichaId" = ANY(${ids}::text[])`,
+    ]);
+    const quantidades = new Map(receita.map((r) => [r.fichaId, r._sum.quantidadeMilesimos]));
+    const porFicha = new Map(fichas.map((f) => [f.id, f]));
+    const usos = juntarUsos(
+      fichas.flatMap((f) => {
+        const quantidadeMilesimos = quantidades.get(f.id);
+        return quantidadeMilesimos === null || quantidadeMilesimos === undefined ? [] : [{ fichaId: f.id, nome: f.nome, tipo: f.tipo, ativa: f.ativa, quantidadeMilesimos }];
+      }),
+      embalagem.flatMap((e) => {
+        const f = porFicha.get(e.fichaId);
+        return f ? [{ fichaId: f.id, nome: f.nome, tipo: f.tipo, ativa: f.ativa, canal: e.canal }] : [];
+      }),
+    );
+    return { usos, total, cortada: total > fichas.length, unidade };
+  }, { repetivel: true });
 }

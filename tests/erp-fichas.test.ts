@@ -5,6 +5,7 @@
  * os insumos; foto conferida pelos bytes; histórico legível.
  */
 import { describe, expect, it } from 'vitest';
+import { sep } from 'node:path';
 import {
   contaDaFicha,
   custoDaFicha,
@@ -262,7 +263,7 @@ describe('ERP 1.2 · foto conferida pelos bytes, nome sorteado e caminho isolado
 
   it('caminho = <base>/<parceiro>/fichas/<nome sorteado>; nada de ../', () => {
     const nome = `${'a'.repeat(32)}.jpg`;
-    expect(caminhoDaFoto('ckparceiroA', nome, '/data/erp')).toBe(`/data/erp/ckparceiroA/fichas/${nome}`);
+    expect(caminhoDaFoto('ckparceiroA', nome, '/data/erp').split(sep).join('/')).toBe(`/data/erp/ckparceiroA/fichas/${nome}`);
     expect(() => caminhoDaFoto('../outro', nome, '/data/erp')).toThrow();
     expect(() => caminhoDaFoto('ckparceiroA', '../../etc/passwd', '/data/erp')).toThrow();
     expect(() => caminhoDaFoto('ckparceiroA', 'foto.svg', '/data/erp')).toThrow();

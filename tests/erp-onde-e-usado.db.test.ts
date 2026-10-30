@@ -118,4 +118,79 @@ describe.skipIf(!URL_TESTE)('onde é usado · Postgres real', { timeout: 90_000 
   it('isolamento: o cliente de outro parceiro não vê nem conta as fichas de A', async () => {
     expect(await ondeOInsumoEUsado(b, ids.queijo, 'KG')).toMatchObject({ usos: [], total: 0 });
   });
+
+  it('67 fichas × 3 vínculos de produtos: os 201 registros não cortam canais nem quantidade', async () => {
+    const insumo = await cadastrarInsumo(a, { tipo: 'EMBALAGEM', nome: 'Embalagem do limite', unidade: 'UN', conteudo: '1', preco: '0,30', conservacao: 'SECO', escala: 'base' });
+    if (!insumo.ok) throw new Error(JSON.stringify(insumo));
+    const fichas = Array.from({ length: 67 }, (_,i) => ({
+      id: `${sufixo}embf${String(i).padStart(3,'0')}`, parceiroId: A.id, nome: `Limite embalagem ${String(i).padStart(3,'0')}`,
+      tipo: 'PRATO' as const, rendimentoMilesimos: 1000, unidadeRendimento: 'UN' as const,
+    }));
+    const produtos = fichas.flatMap((f) => [0, 1, 2].map((j) => ({
+      id: `${f.id}p${j}`, parceiroId: A.id, fichaId: f.id, nome: `${f.nome} produto ${j}`,
+    })));
+    await a.transacao(async (tx) => {
+      await tx.fichaTecnica.createMany({ data: fichas });
+      await tx.produtoVenda.createMany({ data: produtos });
+      await tx.produtoEmbalagem.createMany({ data: produtos.map((p,i) => ({
+        parceiroId: A.id, produtoId: p.id, insumoId: insumo.id, quantidadeMilesimos: 1000,
+        canal: i % 3 === 2 ? 'IFOOD' as const : 'DELIVERY_PROPRIO' as const,
+      })) });
+      // Duplicata legada, ainda válida no esquema: a consulta deve somar sem regravar.
+      await tx.fichaItem.createMany({ data: [1000, 2500].map((quantidadeMilesimos) => ({ parceiroId: A.id, fichaId: fichas[0].id, insumoId: insumo.id, quantidadeMilesimos })) });
+    });
+    const o = await ondeOInsumoEUsado(a, insumo.id, 'UN');
+    expect(o).toMatchObject({ total: 67, cortada: false }); expect(o.usos).toHaveLength(67);
+    for (const u of o.usos) expect(u.embalagemEm).toEqual(['DELIVERY_PROPRIO', 'IFOOD']);
+    expect(o.usos[0].naReceitaMilesimos).toBe(3500);
+    expect(o.usos[66].naReceitaMilesimos).toBeNull();
+    expect(await ondeOInsumoEUsado(b, insumo.id, 'UN')).toMatchObject({ total: 0, usos: [], cortada: false });
+    // O filtro de insumo não incorpora os 201 registros de outro cadastro.
+    expect((await ondeOInsumoEUsado(a, ids.caixa, 'UN')).total).toBe(1);
+  });
+
+  it('exatamente 200 fichas completas não são corte; a 201ª é contada sem excluir ativa por desativada', async () => {
+    const insumo = await cadastrarInsumo(a, { tipo: 'INGREDIENTE', nome: 'Ingrediente do limite', unidade: 'KG', conteudo: '1', preco: '1,00', conservacao: 'SECO', escala: 'base' });
+    if (!insumo.ok) throw new Error(JSON.stringify(insumo));
+    const fichas = Array.from({ length: 201 }, (_,i) => ({
+      id: `${sufixo}recf${String(i).padStart(3,'0')}`, parceiroId: A.id,
+      nome: i === 200 ? 'A desativada do limite' : `Limite receita ${String(i).padStart(3,'0')}`,
+      tipo: i === 0 ? 'PRE_PREPARO' as const : 'PRATO' as const,
+      rendimentoMilesimos: 1000, unidadeRendimento: i === 0 ? 'KG' as const : 'UN' as const, ativa: i !== 200,
+    }));
+    await a.transacao(async (tx) => {
+      await tx.fichaTecnica.createMany({ data: fichas.slice(0,200) });
+      await tx.fichaItem.createMany({ data: fichas.slice(0,200).map((f,i) => ({ parceiroId: A.id, fichaId: f.id, insumoId: insumo.id, quantidadeMilesimos: i + 1 })) });
+    });
+    const cheio = await ondeOInsumoEUsado(a, insumo.id, 'KG');
+    expect(cheio).toMatchObject({ total: 200, cortada: false }); expect(cheio.usos).toHaveLength(200);
+    await a.transacao(async (tx) => {
+      await tx.fichaTecnica.create({ data: fichas[200] });
+      await tx.fichaItem.create({ data: { parceiroId: A.id, fichaId: fichas[200].id, insumoId: insumo.id, quantidadeMilesimos: 999 } });
+    });
+    const cortado = await ondeOInsumoEUsado(a, insumo.id, 'KG');
+    expect(cortado).toMatchObject({ total: 201, cortada: true }); expect(cortado.usos).toHaveLength(200);
+    expect(cortado.usos.every((u) => u.ativa)).toBe(true);
+    expect(cortado.usos[0]).toMatchObject({ nome: 'Limite receita 000', tipo: 'PRE_PREPARO', naReceitaMilesimos: 1 });
+    expect(cortado.usos[199]).toMatchObject({ nome: 'Limite receita 199', naReceitaMilesimos: 200 });
+  });
+
+  it('uso só no pré-preparo não inventa uso direto no prato que leva a subficha', async () => {
+    const insumo = await cadastrarInsumo(a, { tipo: 'INGREDIENTE', nome: 'Ingrediente da composição', unidade: 'KG', conteudo: '1', preco: '1,00', conservacao: 'SECO', escala: 'base' });
+    if (!insumo.ok) throw new Error(JSON.stringify(insumo));
+    const preparo = `${sufixo}preparo`, prato = `${sufixo}composto`;
+    await a.transacao(async (tx) => {
+      await tx.fichaTecnica.createMany({ data: [
+        { id: preparo, parceiroId: A.id, nome: 'Pré-preparo da composição', tipo: 'PRE_PREPARO', rendimentoMilesimos: 1000, unidadeRendimento: 'KG' },
+        { id: prato, parceiroId: A.id, nome: 'Prato com subficha', tipo: 'PRATO', rendimentoMilesimos: 1000, unidadeRendimento: 'UN' },
+      ] });
+      await tx.fichaItem.createMany({ data: [
+        { parceiroId: A.id, fichaId: preparo, insumoId: insumo.id, quantidadeMilesimos: 1000 },
+        { parceiroId: A.id, fichaId: prato, subfichaId: preparo, quantidadeMilesimos: 500 },
+      ] });
+    });
+    expect(await ondeOInsumoEUsado(a, insumo.id, 'KG')).toEqual({ total: 1, cortada: false, unidade: 'KG', usos: [
+      { fichaId: preparo, nome: 'Pré-preparo da composição', tipo: 'PRE_PREPARO', ativa: true, naReceitaMilesimos: 1000, embalagemEm: [] },
+    ] });
+  });
 });
