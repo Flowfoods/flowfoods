@@ -21,11 +21,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'inicio',
     rotas: [''],
     titulo: 'Visão geral da operação',
-    versao: 3,
+    versao: 4,
     aula: [
       { texto: 'Escolha uma loja no alto para ver seus indicadores, a evolução do faturamento e os pontos de atenção. Cada número informa a loja e o período a que se refere.' },
       { texto: 'Sem dados não é zero: o painel avisa sobre ausências e falhas, e Atualizar resumo tenta carregar de novo.' },
       { texto: 'Só aparece o que o seu acesso libera: em Rede Completa, veja o resumo da rede e as áreas disponíveis; na visão de uma loja, use o menu para abrir as áreas.' },
+      { texto: 'No CMV, a comparação usa a meta e a régua do DRE do mesmo período; se faltar base, o motivo aparece no lugar da cor.', para: ['dre.ver'] },
     ],
   },
   {

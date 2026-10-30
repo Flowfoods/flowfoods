@@ -1,4 +1,4 @@
-/** CMV de uma loja: apresenta o DTO autorizado, sem consulta, fórmula ou meta. */
+/** CMV de uma loja: apresenta a conta e a comparação canônicas, sem consulta ou recálculo. */
 import Link from 'next/link';
 import type { WidgetCmvHome } from '@/lib/erp/home-cmv';
 import type { EstadoDoWidgetHome } from '@/lib/erp/home-contratos';
@@ -9,6 +9,7 @@ import { formatarDinheiro } from '@/lib/erp/unidades';
 import { IconeDoModulo } from '../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../ui/estilos';
 import { Selo, type Tom } from '../ui/superficies';
+import { Farol } from './dre/farol';
 
 const ESTADOS: Record<EstadoDoWidgetHome, { rotulo: string; tom: Tom }> = {
   ok: { rotulo: 'Disponível', tom: 'neutro' },
@@ -27,6 +28,72 @@ const percentualComSinal = (bp: number) => `${bp < 0 ? '−' : ''}${percentualCo
 
 function SemValor({ texto }: { texto: string }) {
   return <><span aria-hidden>—</span><span className="sr-only">{texto}</span></>;
+}
+
+type ComparacaoDaHome = NonNullable<WidgetCmvHome['comparacaoComMeta']>;
+const registro = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+const numeroOuNull = (v: unknown) => v === null || Number.isSafeInteger(v);
+const textoOuNull = (v: unknown) => v === null || (typeof v === 'string' && v.trim().length > 0);
+
+/** Guarda estrutural de apresentação: nunca refaz a conta ou classifica o farol. */
+function comparacaoValida(v: unknown): v is ComparacaoDaHome {
+  if (!registro(v) || typeof v.estado !== 'string' || !['com_meta', 'sem_meta', 'indisponivel'].includes(v.estado) || v.tipo !== 'percentual') return false;
+  if (![v.metaBp, v.metaCentavos, v.desvioBp, v.versaoDasFaixas].every(numeroOuNull)
+    || ![v.desvioTexto, v.semComparacao].every(textoOuNull)
+    || ![null, 'loja', 'rede', 'fotografia'].includes(v.origemDaMeta as string | null)
+    || ![null, true, false].includes(v.farolAntigo as boolean | null)) return false;
+  if (v.estado === 'com_meta' && v.metaBp === null) return false;
+  if (v.estado === 'sem_meta' && (v.metaBp !== null || v.metaCentavos !== null || v.desvioBp !== null)) return false;
+  if ((v.desvioBp === null) !== (v.desvioTexto === null)) return false;
+  if (v.farol === null) return true;
+  if (!registro(v.farol)) return false;
+  const f = v.farol;
+  if (f.tipo === 'sem') return typeof f.motivo === 'string' && f.motivo.trim().length > 0 && textoOuNull(f.desvioTexto);
+  return f.tipo === 'cor' && typeof f.escala === 'string' && ['custo', 'receita'].includes(f.escala)
+    && typeof f.cor === 'string' && ['AZUL', 'VERDE', 'AMARELO', 'LARANJA', 'VERMELHO'].includes(f.cor)
+    && [1, 2, 3, 4, 5].includes(f.posicao as number)
+    && ['palavra', 'rotulo', 'desvioTexto'].every((chave) => typeof f[chave] === 'string' && (f[chave] as string).trim().length > 0)
+    && textoOuNull(f.confira);
+}
+
+function ComparacaoComMetaNaTela({ comparacao, realizado, compacto }: { comparacao: unknown; realizado: number | null; compacto: boolean }) {
+  if (comparacao === undefined) return null;
+  if (!comparacaoValida(comparacao) || comparacao.estado === 'indisponivel') {
+    return (
+      <section aria-label="CMV versus meta" className="space-y-2 border-t border-linha pt-3">
+        <h3 className="text-[13px] font-semibold text-texto">Comparação com a meta</h3>
+        <p className="text-[12px] leading-relaxed text-suave">Comparação indisponível nesta leitura. Confira os avisos e o detalhamento do CMV no DRE.</p>
+      </section>
+    );
+  }
+  const origem = comparacao.origemDaMeta === 'loja' ? 'Meta da loja' : comparacao.origemDaMeta === 'rede' ? 'Meta da rede'
+    : comparacao.origemDaMeta === 'fotografia' ? 'Meta da fotografia do fechamento' : 'Origem da meta não informada nesta leitura';
+  return (
+    <section aria-label="CMV versus meta" className="space-y-3 border-t border-linha pt-3">
+      <h3 className="text-[13px] font-semibold text-texto">Comparação com a meta</h3>
+      {comparacao.estado === 'sem_meta' ? <p className="text-[13px] text-suave">Sem meta registrada nesta leitura.</p> : (
+        <dl className={'grid min-w-0 gap-3 ' + (compacto ? 'grid-cols-2' : 'sm:grid-cols-2')}>
+          <div className="min-w-0">
+            <dt className="text-[12px] text-suave">Realizado</dt>
+            <dd className="mt-1 break-words text-[19px] font-semibold tabular-nums text-texto">{realizado === null ? <SemValor texto="Realizado não disponível" /> : percentualComSinal(realizado)}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[12px] text-suave">Meta</dt>
+            <dd className="mt-1 break-words text-[19px] font-semibold tabular-nums text-texto">{comparacao.metaBp === null ? <SemValor texto="Meta não disponível" /> : percentualComSinal(comparacao.metaBp)}</dd>
+            <dd className="mt-1 break-words text-[12px] tabular-nums text-suave">{comparacao.metaCentavos === null ? <SemValor texto="Valor da meta não disponível" /> : formatarDinheiro(comparacao.metaCentavos)}</dd>
+          </div>
+          <div className="min-w-0 col-span-full">
+            <dt className="text-[12px] text-suave">Desvio em pontos percentuais</dt>
+            <dd className="mt-1 break-words text-[14px] font-semibold tabular-nums text-texto">{comparacao.desvioTexto === null ? <SemValor texto="Desvio não disponível" /> : comparacao.desvioTexto}</dd>
+          </div>
+        </dl>
+      )}
+      {comparacao.semComparacao && <p className="break-words text-[12px] leading-relaxed text-suave">{comparacao.semComparacao}</p>}
+      {(comparacao.estado === 'com_meta' || comparacao.origemDaMeta !== null) && <p className="break-words text-[12px] text-suave">{origem}</p>}
+      {comparacao.farol ? <div role="group" aria-label="Farol do CMV"><Farol f={comparacao.farol} forma="linha" /></div>
+        : comparacao.estado === 'com_meta' ? <p className="text-[12px] text-suave">Farol não disponível nesta leitura.</p> : null}
+    </section>
+  );
 }
 
 export function CmvDaHomeNaTela({ cmv, compacto = false }: { cmv: WidgetCmvHome; compacto?: boolean }) {
@@ -82,6 +149,8 @@ export function CmvDaHomeNaTela({ cmv, compacto = false }: { cmv: WidgetCmvHome;
             </dd>
           </div>
         </dl>
+
+        <ComparacaoComMetaNaTela comparacao={cmv.comparacaoComMeta} realizado={percentual?.pontosBase ?? null} compacto={compacto} />
 
         <div className="space-y-1 break-words text-[12px] leading-relaxed text-suave">
           <p><span className="font-medium text-texto">Base do CMV:</span> {fonte}</p>

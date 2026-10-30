@@ -4,7 +4,7 @@
  * que diz "não apurado neste fechamento" onde a fotografia não tem o CMV (herança do fiscal pós-deploy da 2.3).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative, sep } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
@@ -58,7 +58,7 @@ describe('2.4 · cor só no indicador (critério 11): nenhuma borda, fundo ou gr
   it('o único lugar que usa a cor do farol é o texto (text-farol-*) e o token', () => {
     const usos = arquivos(join(process.cwd(), 'src'))
       .filter((p) => /farol-(azul|verde|amarelo|laranja|vermelho)/.test(readFileSync(p, 'utf8')))
-      .map((p) => p.replace(process.cwd() + '/', ''))
+      .map((p) => relative(process.cwd(), p).split(sep).join('/'))
       .sort();
     expect(usos).toEqual(['src/components/erp/telas/dre/farol.tsx', 'src/components/erp/tokens.css']);
   });

@@ -7,6 +7,8 @@ import type { DreDoPeriodo } from '@/lib/erp/dre';
 import { fraseDoSemPreco } from '@/lib/erp/cmv-campos';
 import { pode, type Alcance } from '@/lib/erp/permissoes';
 import type { AvisoDoWidgetHome, EstadoDoWidgetHome, WidgetHome } from './home-contratos';
+import type { FarolDaLinha } from './farol-dre-campos';
+import { faixasDaVersao } from './farol-campos';
 
 export type LeituraDoDreParaHome =
   | { estado: 'lido'; dre: DreDoPeriodo | null }
@@ -28,6 +30,72 @@ export interface WidgetCmvHome extends WidgetHome<'cmv'> {
   fonteDoCmv: 'real' | 'compras' | null;
   notaDaConta: string | null;
   semContar: readonly string[];
+  /** Opcional para leitores anteriores; falha de metadados não invalida o CMV. */
+  comparacaoComMeta?: ComparacaoCmvHome;
+}
+
+export interface ComparacaoCmvHome {
+  estado: 'com_meta' | 'sem_meta' | 'indisponivel';
+  tipo: 'percentual';
+  metaBp: number | null;
+  metaCentavos: number | null;
+  desvioBp: number | null;
+  desvioTexto: string | null;
+  semComparacao: string | null;
+  origemDaMeta: 'loja' | 'rede' | 'fotografia' | null;
+  farol: FarolDaLinha | null;
+  versaoDasFaixas: number | null;
+  farolAntigo: boolean | null;
+}
+
+const comparacaoVazia = (estado: 'sem_meta' | 'indisponivel'): ComparacaoCmvHome => ({
+  estado, tipo: 'percentual', metaBp: null, metaCentavos: null, desvioBp: null, desvioTexto: null,
+  semComparacao: null, origemDaMeta: null, farol: null, versaoDasFaixas: null, farolAntigo: null,
+});
+const inteiroOuNulo = (valor: unknown): valor is number | null => valor === null || Number.isSafeInteger(valor);
+const textoOuNulo = (valor: unknown): valor is string | null => valor === null || typeof valor === 'string';
+function exigirComparacao(condicao: unknown): asserts condicao {
+  if (!condicao) throw new Error('Comparação CMV incompatível.');
+}
+
+/** Copia exclusivamente a linha já autorizada. Não recalcula meta, desvio ou farol. */
+function compararCmvJaLido(d: DreDoPeriodo, chave: string): ComparacaoCmvHome {
+  const metas = d.metas;
+  exigirComparacao(metas && typeof metas === 'object' && !Array.isArray(metas));
+  // Não percorre o mapa: getters/dados de outras linhas sequer são lidos.
+  const antigo = d.farolAntigo;
+  exigirComparacao(typeof antigo === 'boolean');
+  if (!Object.hasOwn(metas, chave)) return { ...comparacaoVazia('sem_meta'), farolAntigo: antigo };
+  const meta = metas[chave];
+  exigirComparacao(meta && typeof meta === 'object');
+  const { metaBp, tipo, metaCentavos, desvioBp, desvioTexto, semComparacao } = meta;
+  exigirComparacao(tipo === 'percentual' && Number.isSafeInteger(metaBp) && metaBp >= 0 && metaBp <= 10_000
+    && inteiroOuNulo(metaCentavos) && inteiroOuNulo(desvioBp) && textoOuNulo(desvioTexto) && textoOuNulo(semComparacao));
+  const origem = d.fechamento ? 'fotografia' : d.metaDoCmvDaLoja;
+  exigirComparacao(origem === null || origem === 'loja' || origem === 'rede' || origem === 'fotografia');
+  const fonte = d.farol;
+  const versao = fonte.versaoDasFaixas;
+  const porLinha = fonte.porLinha;
+  exigirComparacao(Number.isSafeInteger(versao) && versao > 0 && porLinha && typeof porLinha === 'object'
+    && Object.hasOwn(porLinha, chave));
+  const linha = porLinha[chave];
+  exigirComparacao(linha && typeof linha === 'object');
+  let farol: FarolDaLinha;
+  if (linha.tipo === 'sem') {
+    const { motivo, desvioTexto: texto } = linha;
+    exigirComparacao(typeof motivo === 'string' && textoOuNulo(texto));
+    farol = { tipo: 'sem', motivo, desvioTexto: texto };
+  } else {
+    exigirComparacao(linha.tipo === 'cor');
+    const { escala, cor, posicao, palavra, confira, desvioTexto: texto, rotulo } = linha;
+    exigirComparacao(escala === 'custo' && ['AZUL', 'VERDE', 'AMARELO', 'LARANJA', 'VERMELHO'].includes(cor)
+      && Number.isInteger(posicao) && posicao >= 1 && posicao <= 5 && typeof palavra === 'string'
+      && textoOuNulo(confira) && typeof texto === 'string' && typeof rotulo === 'string'
+      && faixasDaVersao(versao) !== null);
+    farol = { tipo: 'cor', escala, cor, posicao, palavra, confira, desvioTexto: texto, rotulo };
+  }
+  return { estado: 'com_meta', tipo, metaBp, metaCentavos, desvioBp, desvioTexto, semComparacao,
+    origemDaMeta: origem, farol, versaoDasFaixas: versao, farolAntigo: antigo };
 }
 
 const raizValida = (raiz: string) => raiz === '/erp' || /^\/rodolfo\/erp\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(raiz);
@@ -98,6 +166,16 @@ export function cmvDaHome(leitura: LeituraDoDreParaHome, contexto: ContextoDoCmv
   }
   if (d.emCurso && d.ate !== null) avisar('periodo-em-curso', 'Período em curso: os valores do DRE vão somente até a data apurada.');
 
+  // Este bloco tem sua própria fronteira de falha. Metas/faróis incompatíveis
+  // não apagam valor, percentual, fonte, cobertura nem estado do CMV validado.
+  let comparacaoComMeta: ComparacaoCmvHome;
+  try {
+    comparacaoComMeta = compararCmvJaLido(d, linha.chave);
+  } catch {
+    comparacaoComMeta = comparacaoVazia('indisponivel');
+    avisar('cmv-comparacao-indisponivel', 'A comparação com a meta não está disponível neste resumo. Confira o DRE da loja.');
+  }
+
   query.set('periodo', d.periodo.inicio);
   return {
     familia: 'cmv', titulo: 'CMV', estado,
@@ -115,7 +193,7 @@ export function cmvDaHome(leitura: LeituraDoDreParaHome, contexto: ContextoDoCmv
       custosDoEstoque: real ? { semPrecoInicial: real.semPrecoInicial, semPrecoFinal: real.semPrecoFinal } : null,
     },
     consultadoEm: consulta, fonteDoCmv: estado === 'sem_dados' || d.cmv.antigo ? null : fonte,
-    notaDaConta: linha.nota, semContar: [...linha.semContar], avisos,
+    notaDaConta: linha.nota, semContar: [...linha.semContar], avisos, comparacaoComMeta,
     detalhe: { href: raiz + '/dre?' + query.toString(), rotulo: 'Ver o CMV no DRE da loja' },
   };
 }
