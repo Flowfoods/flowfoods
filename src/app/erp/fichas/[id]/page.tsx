@@ -8,7 +8,8 @@ import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { fichaNaTela, obterFicha } from '@/lib/erp/fichas';
 import { custoPorCanal } from '@/lib/erp/canais';
-import { lerFiltrosDeFicha, queryDosFiltrosDeFicha } from '@/lib/erp/ficha-campos';
+import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
+import { voltaDaFichaAoInsumo } from '@/lib/erp/ficha-volta-insumo';
 import { TelaDetalheFicha } from '@/components/erp/telas/fichas/detalhe';
 import { acaoSalvarPrecos, acaoSituacaoFicha } from '../actions';
 
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/fichas';
 
-export default async function ErpFichaPage({ params, searchParams }: { params: { id: string }; searchParams: { de?: string; feito?: string } }) {
+export default async function ErpFichaPage({ params, searchParams }: { params: { id: string }; searchParams: { de?: string | string[]; feito?: string; volta?: string | string[] } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.ver');
   // 1.9/1.10: o custo, o preço e a margem por canal — inclusive no histórico da ficha — só saem do servidor para quem vê a precificação.
@@ -24,13 +25,15 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
   const ficha = await obterFicha(ctx.cliente, params.id, { verPrecos });
   if (!ficha) notFound();
   const canais = verPrecos ? await custoPorCanal(ctx.cliente, ficha) : null;
-  const de = queryDosFiltrosDeFicha(lerFiltrosDeFicha(Object.fromEntries(new URLSearchParams(searchParams.de ?? ''))));
+  const de = deSeguroDaFicha(searchParams.de);
+  const origem = await voltaDaFichaAoInsumo(searchParams.volta, '/erp', ctx.cliente, ctx.alcance);
   return (
     <TelaDetalheFicha
       // N.5: quem só opera recebe a ficha sem nenhum valor de custo (visão operacional automática).
       ficha={fichaNaTela(ficha, verPrecos)}
       base={BASE}
-      voltar={de ? `${BASE}?${de}` : BASE}
+      voltar={origem ?? (de ? `${BASE}?${de}` : BASE)}
+      rotuloVoltar={origem ? 'Voltar para o insumo' : undefined}
       feito={searchParams.feito}
       podeEditar={pode(ctx.alcance, 'fichas.editar')}
       bloqueio={ctx.bloqueio}

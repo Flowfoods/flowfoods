@@ -11,56 +11,57 @@ import { CANAIS } from '@/lib/erp/canal-campos';
 import { formatarQuantidade } from '@/lib/erp/unidades';
 import { Contagem, Painel, Selo } from '../../ui/superficies';
 
-export function PainelOndeEUsado({ onde, fichasBase }: { onde: OndeEUsado; fichasBase: string }) {
+export function PainelOndeEUsado({ onde, fichasBase, volta }: { onde: OndeEUsado; fichasBase: string; volta?: string }) {
   const { usos, total, cortada, unidade } = onde;
   return (
-    <Painel
-      id="onde-e-usado"
-      titulo="Onde é usado"
-      subtitulo={total === 0 ? 'Nenhuma ficha técnica leva este insumo' : total === 1 ? 'Mudar este insumo muda esta ficha' : 'Mudar este insumo muda estas fichas'}
-      acessorio={total > 0 ? <Contagem>{total}</Contagem> : undefined}
-      semRespiro={usos.length > 0}
-    >
-      {usos.length === 0 ? (
-        <p className="text-[13px] text-suave">Quando uma ficha usar este insumo na receita ou como embalagem de um canal, ela aparece aqui.</p>
-      ) : (
-        <>
-          <ul className="divide-y divide-linha">
-            {usos.map((u) => (
-              <li key={u.fichaId}>
-                <Link
-                  href={`${fichasBase}/${u.fichaId}`}
-                  className="ff-transicao flex min-h-14 items-center justify-between gap-3 px-4 py-3 hover:bg-texto/[0.03] sm:px-5"
-                >
-                  <span className="min-w-0">
-                    <span className={`flex flex-wrap items-center gap-2 font-medium ${u.ativa ? 'text-texto' : 'text-suave'}`}>
-                      <span className="[overflow-wrap:anywhere]">{u.nome}</span>
-                      {!u.ativa && <Selo>Desativada</Selo>}
+    <div id="onde-e-usado" tabIndex={-1} className="scroll-mt-24" role="group" aria-label="Onde é usado">
+      <Painel
+        titulo="Onde é usado"
+        subtitulo={total === 0 ? 'Nenhuma ficha técnica leva este insumo' : total === 1 ? 'Mudar este insumo muda esta ficha' : 'Mudar este insumo muda estas fichas'}
+        acessorio={total > 0 ? <Contagem>{total}</Contagem> : undefined}
+        semRespiro={usos.length > 0}
+      >
+        {usos.length === 0 ? (
+          <p className="text-[13px] text-suave">Quando uma ficha usar este insumo na receita ou como embalagem de um canal, ela aparece aqui.</p>
+        ) : (
+          <>
+            <ul className="divide-y divide-linha">
+              {usos.map((u) => (
+                <li key={u.fichaId}>
+                  <Link
+                    href={`${fichasBase}/${u.fichaId}${volta ? `?${new URLSearchParams({ volta })}` : ''}`}
+                    className="ff-transicao flex min-h-14 items-center justify-between gap-3 px-4 py-3 hover:bg-texto/[0.03] sm:px-5"
+                  >
+                    <span className="min-w-0">
+                      <span className={`flex flex-wrap items-center gap-2 font-medium ${u.ativa ? 'text-texto' : 'text-suave'}`}>
+                        <span className="[overflow-wrap:anywhere]">{u.nome}</span>
+                        {!u.ativa && <Selo>Desativada</Selo>}
+                      </span>
+                      <span className="block text-[12px] text-suave">
+                        {[
+                          u.tipo === 'PRE_PREPARO' ? 'Pré-preparo' : 'Prato',
+                          u.naReceitaMilesimos !== null ? `${formatarQuantidade(u.naReceitaMilesimos, unidade)} na receita` : null,
+                          u.embalagemEm.length > 0 ? `embalagem: ${u.embalagemEm.map((c) => CANAIS[c].curto).join(', ')}` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </span>
                     </span>
-                    <span className="block text-[12px] text-suave">
-                      {[
-                        u.tipo === 'PRE_PREPARO' ? 'Pré-preparo' : 'Prato',
-                        u.naReceitaMilesimos !== null ? `${formatarQuantidade(u.naReceitaMilesimos, unidade)} na receita` : null,
-                        u.embalagemEm.length > 0 ? `embalagem: ${u.embalagemEm.map((c) => CANAIS[c].curto).join(', ')}` : null,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
+                    <span aria-hidden className="shrink-0 text-suave">
+                      ›
                     </span>
-                  </span>
-                  <span aria-hidden className="shrink-0 text-suave">
-                    ›
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-          {cortada && (
-            <p className="border-t border-linha px-4 py-3 text-[13px] text-suave sm:px-5">
-              Mostrando {usos.length} de {total} fichas. Os usos diretos das fichas exibidas estão completos.
-            </p>
-          )}
-        </>
-      )}
-    </Painel>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            {cortada && (
+              <p className="border-t border-linha px-4 py-3 text-[13px] text-suave sm:px-5">
+                Mostrando {usos.length} de {total} fichas. Os usos diretos das fichas exibidas estão completos.
+              </p>
+            )}
+          </>
+        )}
+      </Painel>
+    </div>
   );
 }

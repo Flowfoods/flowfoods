@@ -51,6 +51,7 @@ export function TelaDetalheFicha({
   ficha: f,
   base,
   voltar,
+  rotuloVoltar = 'Voltar para a lista',
   feito,
   contexto,
   podeEditar,
@@ -67,8 +68,9 @@ export function TelaDetalheFicha({
   /** N.5: com ou sem os custos, conforme a permissão efetiva (o servidor decide e já manda sem os números). */
   ficha: FichaNaTela;
   base: string;
-  /** A lista como a pessoa deixou. */
+  /** A origem autorizada ou a lista como a pessoa deixou. */
   voltar: string;
+  rotuloVoltar?: string;
   feito?: string;
   /** Antes do tipo no subtítulo (o N1 põe o nome do parceiro). */
   contexto?: string;
@@ -98,7 +100,7 @@ export function TelaDetalheFicha({
   return (
     <div className="space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: f.nome }]} />
-      <Voltar href={voltar}>Voltar para a lista</Voltar>
+      <Voltar href={voltar}>{rotuloVoltar}</Voltar>
       <PageHeader
         icone="fichas"
         cor={COR.fichas}

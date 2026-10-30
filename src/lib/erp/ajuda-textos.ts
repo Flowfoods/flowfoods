@@ -219,13 +219,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['insumos/[id]'],
     titulo: 'Detalhe do insumo',
-    versao: 4,
+    versao: 5,
     aula: [
       { texto: 'O custo de hoje e a origem dele (o último preço de compra ou o custo inicial de referência), e quanto tem em cada loja do seu acesso.' },
       { texto: 'Conservação e prazo de uso após abertura ficam lado a lado, sem confundir com o vencimento do lote.' },
       { texto: 'A categoria fica ao lado, com a forma como foi escolhida; em “Outros / a classificar” o insumo espera revisão.' },
       { texto: 'Mais embaixo, o que você pagou em cada nota e qual fornecedor saiu mais barato.', para: ['compras.ver'] },
       { texto: 'Para o histórico completo, com período, lojas e preço médio, use “Ver o histórico de compras”.', para: ['compras.ver'] },
+      { texto: 'Abra uma ficha em “Onde é usado” para consultá-la. Na ficha, “Voltar para o insumo” retorna a este trecho e mantém os filtros da lista de insumos.', para: ['fichas.ver'] },
     ],
     pontos: [
       {
