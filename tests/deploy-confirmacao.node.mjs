@@ -122,9 +122,9 @@ test('saída usa apenas IDs/status/datas; título, token, description, erro e co
   assert.doesNotMatch(JSON.stringify(h.emitted) + h.reports.join(), /DADO_PRIVADO|TOKEN_SINTETICO|flowfoods-ci|example\.test/);
 });
 
-test('IDs coincidentes de outra tentativa não substituem o deployment fixado', async () => {
+test('outro ID com mesmo marcador não substitui o deployment fixado', async () => {
   const h = harness([{}, [row()], [row('done', { deploymentId: 'outro-id' })]]);
-  assert.deepEqual(await h.run(), { exitCode: 1, status: 'confirmation_ambiguous' });
+  assert.deepEqual(await h.run(), { exitCode: 1, status: 'confirmation_missing' });
   assert.equal(h.emitted.at(-1).deploymentId, 'deployment-fixture');
   assert.ok(h.emitted.every((r) => r.status !== 'done'));
 });
@@ -135,8 +135,50 @@ test('mais de um registro com mesmo marcador é inconclusivo, mesmo se um está 
 });
 
 test('registro já observado desaparecido não troca para latest', async () => {
-  const h = harness([{}, [row()], [row('done', { title: 'outro marcador' })]]);
+  const h = harness([{}, [row()], [row('done', { deploymentId: 'manual', title: 'outro marcador' })]]);
   assert.deepEqual(await h.run(), { exitCode: 1, status: 'confirmation_missing' });
+});
+
+test('mesmo ID+compose permanece vinculado depois que o título vira mensagem do commit', async () => {
+  const h = harness([{}, [row()], [row('running', { title: 'Mensagem privada do commit' })], [row('done', { title: 'Mensagem privada do commit', description: 'Commit hash privado' })]]);
+  assert.deepEqual(await h.run(), { exitCode: 0, status: 'done' });
+  assert.equal(h.emitted.at(-1).deploymentId, 'deployment-fixture');
+  assert.equal(h.calls.filter((c) => c.options.method === 'POST').length, 1);
+  assert.doesNotMatch(JSON.stringify(h.emitted) + h.reports.join(), /Mensagem privada|Commit hash privado/);
+});
+
+test('ID fixado pode terminar em erro/cancelamento com título alterado; não inventa sucesso', async () => {
+  for (const status of ['error', 'cancelled']) {
+    const h = harness([{}, [row()], [row(status, { title: 'Mensagem do commit', errorMessage: 'RAZAO_PRIVADA', ...(status === 'cancelled' ? { finishedAt: null } : {}) })]]);
+    assert.deepEqual(await h.run(), { exitCode: 1, status });
+    assert.equal(h.emitted.at(-1).deploymentId, 'deployment-fixture');
+    assert.doesNotMatch(JSON.stringify(h.emitted) + h.reports.join(), /Mensagem do commit|RAZAO_PRIVADA/);
+  }
+});
+
+test('após vínculo, título ausente ou reutilizado em outro ID não muda o alvo', async () => {
+  const h = harness([{}, [row()], [row('done', { title: undefined }), row('done', { deploymentId: 'outro-id' })]]);
+  assert.deepEqual(await h.run(), { exitCode: 0, status: 'done' });
+  assert.equal(h.emitted.at(-1).deploymentId, 'deployment-fixture');
+  assert.ok(h.emitted.every((r) => r.deploymentId !== 'outro-id'));
+});
+
+test('ID fixado de outro compose é recusado mesmo com status done', async () => {
+  const h = harness([{}, [row()], [row('done', { title: 'Commit', composeId: 'outro-compose' })]]);
+  assert.deepEqual(await h.run(), { exitCode: 1, status: 'confirmation_response' });
+  assert.ok(h.emitted.every((r) => r.status !== 'done'));
+});
+
+test('ID fixado duplicado na listagem é ambíguo, mesmo com títulos diferentes', async () => {
+  const h = harness([{}, [row()], [row('done', { title: 'Commit um' }), row('done', { title: 'Commit dois' })]]);
+  assert.deepEqual(await h.run(), { exitCode: 1, status: 'confirmation_ambiguous' });
+});
+
+test('antes do primeiro vínculo, título já alterado não permite inferir o ID por horário ou latest', async () => {
+  const h = harness([{}, [row('done', { title: 'Mensagem do commit' })]]);
+  assert.deepEqual(await h.run(), { exitCode: 1, status: 'confirmation_timeout' });
+  assert.ok(h.emitted.every((r) => !r.deploymentId && r.status !== 'done'));
+  assert.equal(h.calls.filter((c) => c.options.method === 'POST').length, 1);
 });
 
 for (const status of ['error', 'cancelled']) test(`terminal ${status} reprova sem expor a razão`, async () => {

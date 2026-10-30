@@ -67,7 +67,10 @@ function timestamp(value, optional = false) {
 /** Recebe metadados, usa só o marcador criado pelo runner e devolve uma allowlist. */
 export function correlate(rows, title, composeId, pinnedId) {
   if (!Array.isArray(rows)) throw new Error('confirmation_response');
-  const matches = rows.filter((row) => row && typeof row === 'object' && row.title === title);
+  // O Dokploy pode trocar title pela mensagem do commit ao terminar o build.
+  // Só a primeira associação depende do marcador; depois o ID nunca muda.
+  const matches = rows.filter((row) => row && typeof row === 'object'
+    && (pinnedId ? row.deploymentId === pinnedId : row.title === title));
   if (matches.length > 1) throw new Error('confirmation_ambiguous');
   if (!matches.length) {
     if (pinnedId) throw new Error('confirmation_missing');

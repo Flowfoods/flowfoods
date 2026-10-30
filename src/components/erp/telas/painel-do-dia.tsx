@@ -8,6 +8,7 @@ import { formatarDinheiro } from '@/lib/erp/unidades';
 import { LINK_DE_TEXTO } from '../ui/estilos';
 import { Barra, Painel, Selo } from '../ui/superficies';
 import { AtualizarResumo } from './atualizar-resumo';
+import { CmvDaHomeNaTela } from './cmv-da-home';
 
 const QUANDO = new Intl.DateTimeFormat('pt-BR', {
   dateStyle: 'short', timeStyle: 'short', timeZone: 'America/Sao_Paulo',
@@ -15,16 +16,18 @@ const QUANDO = new Intl.DateTimeFormat('pt-BR', {
 
 export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
   const estados = painel.estados ?? [];
+  const temResumo = estados.length > 0 || Boolean(painel.cmv);
   const blocos = estados.length
     ? [
       ...estados.map((estado) => ({ chave: estado.chave, estado, indicador: painel.indicadores.find((i) => i.chave === estado.chave) })),
       ...painel.indicadores.filter((i) => !estados.some((e) => e.chave === i.chave)).map((indicador) => ({ chave: indicador.chave, estado: undefined, indicador })),
     ]
     : painel.indicadores.map((indicador) => ({ chave: indicador.chave, estado: undefined, indicador }));
-  if (blocos.length === 0 && painel.pendencias.length === 0) return null;
-  const consultado = painel.consultadoEm ? new Date(painel.consultadoEm) : null;
+  if (blocos.length === 0 && painel.pendencias.length === 0 && !painel.cmv) return null;
+  const quando = painel.consultadoEm ?? painel.cmv?.consultadoEm;
+  const consultado = quando ? new Date(quando) : null;
   return (
-    <section aria-label={estados.length ? 'Resumo da operação' : 'Resumo de hoje'} className="space-y-4">
+    <section aria-label={temResumo ? 'Resumo da operação' : 'Resumo de hoje'} className="space-y-4">
       {blocos.length > 0 && (
         <div className={'grid gap-3 ' + (blocos.length >= 3 ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2')}>
           {blocos.map(({ chave, indicador: i, estado }) => i ? (
@@ -73,6 +76,7 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
           ) : null)}
         </div>
       )}
+      {painel.cmv && <CmvDaHomeNaTela cmv={painel.cmv} />}
       {painel.pendencias.length > 0 && (
         <Painel titulo="O que precisa de você" subtitulo="Na ordem em que vale resolver" semRespiro>
           <ol className="divide-y divide-linha">
@@ -94,7 +98,7 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
           </ol>
         </Painel>
       )}
-      {estados.length > 0 && (
+      {temResumo && (
         <div className="space-y-2 border-t border-linha pt-3">
           <AtualizarResumo />
           {consultado && Number.isFinite(consultado.getTime()) && (
