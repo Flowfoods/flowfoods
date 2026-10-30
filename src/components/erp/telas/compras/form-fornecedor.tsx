@@ -96,7 +96,7 @@ export function FormFornecedor({
   const [semNota, setSemNota] = useState(inicial.semNotaFiscal);
   // A chave do envio nasce na montagem e não muda enquanto o formulário estiver aberto.
   const [chaveDeEnvio] = useState(envio ?? '');
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const erros = estado?.erros ?? {};
   const idBase = 'fornecedor';
 

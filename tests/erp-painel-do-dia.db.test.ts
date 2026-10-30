@@ -20,6 +20,7 @@ import { lancarDia } from '@/lib/erp/faturamento';
 import { cadastrarFicha } from '@/lib/erp/fichas';
 import { painelDoDia } from '@/lib/erp/painel-do-dia';
 import { saudeDoCardapio } from '@/lib/erp/saude-do-cardapio';
+import { iniciarAbertura } from '@/lib/erp/estoque';
 import { cadastrarInsumoDeTeste as cadastrarInsumo, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
@@ -34,6 +35,7 @@ describe.skipIf(!URL_TESTE)('Início de trabalho · Postgres real', { timeout: 9
   let B: { id: string };
   let a: ClienteDoParceiro;
   let b: ClienteDoParceiro;
+  let lojaAId: string;
 
   beforeAll(async () => {
     const host = new URL(URL_TESTE!).hostname;
@@ -47,6 +49,7 @@ describe.skipIf(!URL_TESTE)('Início de trabalho · Postgres real', { timeout: 9
     const loja = await cadastrarLoja(a, { nome: 'Centro' }, 'Marina');
     if (!loja.ok) throw new Error(JSON.stringify(loja));
     const lojaId = (loja as unknown as { id: string }).id;
+    lojaAId = lojaId;
     // 3 dias lançados só na Loja; os outros canais que a loja vende ficam em falta.
     for (const d of ['2026-10-21', '2026-10-22', '2026-10-23']) {
       const r = await lancarDia(a, alcance('DONO'), { lojaId, data: d, canais: [{ canal: 'LOJA', valor: '1.000,00', pedidos: '20', clientes: '20', naoVendeu: false, versao: '' }] }, 'Marina', HOJE);
@@ -72,7 +75,7 @@ describe.skipIf(!URL_TESTE)('Início de trabalho · Postgres real', { timeout: 9
   it('a dona vê faturamento, cardápio e estoque, e as pendências', async () => {
     const p = await painelDoDia(a, alcance('DONO'), '/erp', HOJE);
     expect(p.indicadores.map((i) => i.chave)).toEqual(['faturamento', 'cardapio', 'estoque']);
-    expect(p.indicadores[0]).toMatchObject({ valor: { tipo: 'dinheiro', centavos: 300_000 }, href: '/erp/faturamento' });
+    expect(p.indicadores[0]).toMatchObject({ valor: { tipo: 'dinheiro', centavos: 300_000 }, href: '/erp/faturamento?mes=2026-10' });
     expect(p.indicadores[0].contexto).toContain('3 dias lançados');
     expect(p.indicadores[1]).toMatchObject({ valor: { tipo: 'fracao', de: 0, total: 1 } });
     expect(p.indicadores[2]).toMatchObject({ valor: { tipo: 'fracao', de: 0, total: 1 } });
@@ -108,5 +111,42 @@ describe.skipIf(!URL_TESTE)('Início de trabalho · Postgres real', { timeout: 9
     expect(informado.indicadores.find((i) => i.chave === 'faturamento')).toMatchObject({
       valor: { tipo: 'dinheiro', centavos: 0 },
     });
+  });
+
+  it('visão da loja B separa seus valores/pendências de A; rede e alcance restrito continuam corretos', async () => {
+    const nova = await cadastrarLoja(a, { nome: 'Loja B da visão' }, 'Marina');
+    if (!nova.ok) throw new Error(JSON.stringify(nova));
+    const lojaBId = nova.id;
+    const lancamento = await lancarDia(a, alcance('DONO'), {
+      lojaId: lojaBId, data: '2026-10-23',
+      canais: [{ canal: 'LOJA', valor: '7.000,00', pedidos: '70', clientes: '70', naoVendeu: false, versao: '' }],
+    }, 'Marina', HOJE);
+    expect(lancamento.ok).toBe(true);
+    expect((await iniciarAbertura(a, alcance('DONO'), lojaBId, 'Marina')).ok).toBe(true);
+    const pa = await painelDoDia(a, alcance('DONO'), '/erp', HOJE, { tipo: 'loja', lojaId: lojaAId, nome: 'Centro' });
+    const pb = await painelDoDia(a, alcance('DONO'), '/erp', HOJE, { tipo: 'loja', lojaId: lojaBId, nome: 'Loja B da visão' });
+    const rede = await painelDoDia(a, alcance('DONO'), '/erp', HOJE, { tipo: 'rede' });
+    expect(pa.indicadores.find((i) => i.chave === 'faturamento')?.valor).toEqual({ tipo: 'dinheiro', centavos: 300_000 });
+    expect(pb.indicadores.find((i) => i.chave === 'faturamento')).toMatchObject({
+      valor: { tipo: 'dinheiro', centavos: 700_000 }, escopo: 'Loja B da visão',
+      href: '/erp/faturamento?mes=2026-10&loja=' + lojaBId,
+    });
+    expect(rede.indicadores.find((i) => i.chave === 'faturamento')?.valor).toEqual({ tipo: 'dinheiro', centavos: 1_000_000 });
+    expect(pb.indicadores.find((i) => i.chave === 'estoque')?.valor).toEqual({ tipo: 'fracao', de: 0, total: 1 });
+    expect(rede.indicadores.find((i) => i.chave === 'estoque')?.valor).toEqual({ tipo: 'fracao', de: 0, total: 2 });
+    expect(pa.pendencias.map((p) => p.chave)).toContain('estoque-abrir');
+    expect(pb.pendencias.map((p) => p.chave)).toContain('estoque-contagem');
+    expect(pb.pendencias.map((p) => p.chave)).not.toContain('estoque-abrir');
+    expect(JSON.stringify(pb)).not.toContain('Centro');
+    const restrito = resolverAlcance({
+      perfilBase: 'GERENTE', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [],
+      redeInteira: false, lojaIds: [lojaBId],
+    });
+    expect(await painelDoDia(a, restrito, '/erp', HOJE, { tipo: 'loja', lojaId: lojaAId, nome: 'Centro' }))
+      .toEqual({ indicadores: [], pendencias: [] });
+    expect(await painelDoDia(a, restrito, '/erp', HOJE, { tipo: 'rede' })).toEqual({ indicadores: [], pendencias: [] });
+    const permitido = await painelDoDia(a, restrito, '/erp', HOJE, { tipo: 'loja', lojaId: lojaBId, nome: 'Loja B da visão' });
+    expect(permitido.indicadores.find((i) => i.chave === 'faturamento')?.valor).toEqual({ tipo: 'dinheiro', centavos: 700_000 });
+    expect(pb.indicadores.find((i) => i.chave === 'cardapio')?.escopo).toBe('Da rede');
   });
 });

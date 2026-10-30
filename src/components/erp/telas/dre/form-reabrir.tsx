@@ -14,7 +14,7 @@ import type { AcaoLocal, EstadoLocal } from './estado';
 
 export function FormReabrir({ acao, fotografia, bloqueio }: { acao: AcaoLocal; fotografia: string; bloqueio: string | null }) {
   const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const erros = estado?.erros ?? {};
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-3">

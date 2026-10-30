@@ -30,7 +30,7 @@ export function FormFechar({
   bloqueio: string | null;
 }) {
   const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const erros = estado?.erros ?? {};
   const comRessalva = ressalvas.length > 0;
   return (

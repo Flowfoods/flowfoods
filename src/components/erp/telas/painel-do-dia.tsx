@@ -24,6 +24,7 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
               className="ff-transicao group flex min-w-0 flex-col rounded-[14px] border border-linha bg-painel px-4 py-3.5 hover:border-linha-forte sm:px-5"
             >
               <span className="text-[12px] font-medium text-suave">{i.rotulo}</span>
+              {i.escopo && <span className="mt-0.5 break-words text-[12px] font-medium text-texto">{i.escopo}</span>}
               <span className="mt-2 truncate font-display text-[26px] font-bold leading-none tabular-nums text-texto">
                 {i.valor.tipo === 'dinheiro' ? (
                   i.valor.centavos === null ? <><span aria-hidden>—</span><span className="sr-only">Sem lançamentos</span></> : formatarDinheiro(i.valor.centavos)
@@ -41,7 +42,7 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
                   <Barra valor={i.valor.de} total={i.valor.total} tom={i.valor.de === i.valor.total ? 'ok' : i.valor.de < i.valor.total && i.valor.parcialEhNormal ? 'neutro' : 'alerta'} rotulo={`${i.rotulo}: ${i.valor.de} de ${i.valor.total}`} />
                 </span>
               )}
-              <span className="mt-1.5 truncate text-[12px] text-suave">{i.contexto}</span>
+              <span className="mt-1.5 break-words text-[12px] leading-snug text-suave">{i.contexto}</span>
             </Link>
           ))}
         </div>
@@ -56,6 +57,7 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
                 </span>
                 <div className="min-w-0 flex-1">
                   <p className="text-[14px] font-semibold text-texto">{p.titulo}</p>
+                  {p.escopo && <p className="text-[12px] font-medium text-suave">{p.escopo}</p>}
                   <p className="text-[13px] leading-relaxed text-suave">{p.texto}</p>
                 </div>
                 <Link href={p.href} className={`${LINK_DE_TEXTO} inline-flex min-h-11 shrink-0 basis-full items-center pl-9 text-[13px] sm:min-h-9 sm:basis-auto sm:pl-0 sm:pt-0.5`}>

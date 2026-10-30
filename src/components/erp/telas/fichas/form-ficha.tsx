@@ -217,7 +217,7 @@ function FormFichaBase({
 }: PropsDoFormFicha & { chaveDoRascunho: string; avisos: ReactNode }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const [tipo, setTipo] = useState<TipoFicha>(inicial.tipo);
   const [consumo, setConsumo] = useState(inicial.consumoImediato === true);
   const [nome, setNome] = useState(inicial.nome);

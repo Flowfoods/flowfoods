@@ -44,7 +44,7 @@ export function FormMargensAlvo({
   bloqueio: string | null;
 }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const [textos, setTextos] = useState<Record<CanalVenda, string>>(
     () => Object.fromEntries(ORDEM_DOS_CANAIS.map((c) => [c, inicial[c] === null ? '' : pontosBaseParaCampo(inicial[c]!)])) as Record<CanalVenda, string>,
   );

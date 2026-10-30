@@ -101,7 +101,7 @@ export function FormDespesa({
   periodos: AvisoDePeriodos;
 }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const [v, setV] = useState(inicial);
   const mudar = (p: Partial<InicialDaDespesa>) => {
     setV((x) => ({ ...x, ...p }));

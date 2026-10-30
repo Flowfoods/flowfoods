@@ -37,7 +37,7 @@ export function FormTaxaDoIfood({
   variante?: 'primario' | 'secundario';
 }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const [comissao, setComissao] = useState(inicial.comissao);
   const [pagamento, setPagamento] = useState(inicial.pagamento);
   const erros = estado?.erros ?? {};

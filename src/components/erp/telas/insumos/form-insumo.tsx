@@ -135,7 +135,7 @@ export function FormInsumo({
   const [tipo, setTipo] = useState<TipoInsumo>(inicial.tipo);
   // A chave do envio nasce na montagem e não muda enquanto o formulário estiver aberto (nem se a página for reenviada pelo servidor).
   const [chaveDeEnvio] = useState(envio ?? '');
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const erros = estado?.erros ?? {};
   const idBase = 'insumo';
   // Prioridade nº 1 (23/10): a explicação vai para o botão de ajuda do campo; sem o ponto, o texto antigo fica.

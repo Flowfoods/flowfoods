@@ -52,7 +52,7 @@ export function FormEmbalagem({
   bloqueio?: string | null;
 }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const erros = estado?.erros ?? {};
   const idBase = 'embalagem';
 

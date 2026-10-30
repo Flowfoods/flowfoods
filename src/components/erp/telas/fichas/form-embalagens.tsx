@@ -106,7 +106,7 @@ function FormEmbalagensBase({
 }: PropsDoFormEmbalagens & { chaveDoRascunho: string; avisos: ReactNode }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const proxima = useRef(inicial.length);
   const [linhas, setLinhas] = useState(() => inicial.map((l, i) => ({ ...l, chave: i })));
   const erros = estado?.erros ?? {};

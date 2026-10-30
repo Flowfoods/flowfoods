@@ -5,22 +5,24 @@
  * URL só escolhe, o portão isola.
  */
 
-import { exigirParceiro } from '@/lib/erp/contexto';
+import { exigirParceiro, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { modulosDoParceiro } from '@/lib/erp/modulos';
 import { TODOS_OS_MODULOS_COM_LIBERACAO } from '@/lib/erp/liberacao';
 import { STATUS_DO_PARCEIRO } from '@/lib/erp/parceiros';
 import { HubDoParceiro } from '@/components/erp/telas/hub-do-parceiro';
 import { painelDoDia } from '@/lib/erp/painel-do-dia';
+import { rotuloDaVisao } from '@/lib/erp/visao';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HubDoParceiroNoNivel1({ params }: { params: { slug: string } }) {
   const { parceiro, alcance, cliente } = await exigirParceiro(params.slug);
-  const painel = await painelDoDia(cliente, alcance, `/rodolfo/erp/${parceiro.slug}`);
+  const { visao } = await visaoDaRequisicao({ parceiro, alcance });
+  const painel = await painelDoDia(cliente, alcance, `/rodolfo/erp/${parceiro.slug}`, undefined, visao);
   return (
     <HubDoParceiro
       titulo={parceiro.nome}
-      subtitulo={`Parceiro Flow · ${STATUS_DO_PARCEIRO[parceiro.status].rotulo} · visto pelo nível 1`}
+      subtitulo={`Parceiro Flow · ${STATUS_DO_PARCEIRO[parceiro.status].rotulo} · ${rotuloDaVisao(visao)} · visto pelo nível 1`}
       modulos={modulosDoParceiro(alcance, `/rodolfo/erp/${parceiro.slug}`, TODOS_OS_MODULOS_COM_LIBERACAO)}
       semAcesso={false}
       painel={painel}
