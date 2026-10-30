@@ -6,7 +6,7 @@ import { ValorMonetarioHome } from './valor-monetario-home';
 const indisponivel = (): ComplementosFaturamentoHome => ({ estado: 'indisponivel', pedidos: null, atendimentos: null, ticketMedioCentavos: null, aviso: 'Pedidos, atendimentos e ticket médio não estão disponíveis nesta leitura.' });
 const contador = (n: unknown) => Number.isSafeInteger(n) && typeof n === 'number' && n >= 0;
 
-function mesmoRecorte(widget: WidgetFaturamentoHome, leitura: FaturamentoDiarioHome): boolean {
+export function mesmoRecorteDoFaturamento(widget: WidgetFaturamentoHome, leitura: FaturamentoDiarioHome): boolean {
   const ref = widget.referencia;
   const destino = new URL(widget.detalhe.href, 'https://flowfoods.invalid'); // Só análise, sem requisição.
   return widget.detalhe.href === leitura.detalhe.href
@@ -23,7 +23,7 @@ function paraExibir(widget: WidgetFaturamentoHome, leitura: FaturamentoDiarioHom
     const { estado, pedidos, atendimentos, ticketMedioCentavos, aviso } = c;
     if (!['ok', 'parcial', 'sem_dados', 'indisponivel', 'erro'].includes(estado) || (aviso !== null && typeof aviso !== 'string')) return indisponivel();
     if (estado !== 'ok' && estado !== 'parcial') return { estado, pedidos: null, atendimentos: null, ticketMedioCentavos: null, aviso };
-    if ((widget.estado !== 'ok' && widget.estado !== 'parcial') || !mesmoRecorte(widget, leitura)
+    if ((widget.estado !== 'ok' && widget.estado !== 'parcial') || !mesmoRecorteDoFaturamento(widget, leitura)
       || widget.origem?.fonte !== 'faturamento' || widget.escopo.tipo !== 'loja'
       || !contador(pedidos) || !contador(atendimentos) || (ticketMedioCentavos !== null && !Number.isSafeInteger(ticketMedioCentavos))
       || (pedidos === 0 && ticketMedioCentavos !== null)) return indisponivel();
