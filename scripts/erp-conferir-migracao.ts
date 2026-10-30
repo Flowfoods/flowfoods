@@ -749,7 +749,10 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
       pendencias.push('Coluna CanalConfig.taxaConfigurada deve ser BOOLEAN NOT NULL DEFAULT true: confira a migration 20261119000000_erp_taxa_ifood_independente.');
     }
     const check = await db.$queryRaw<{ validado: boolean }[]>`
-      SELECT convalidated AS validado FROM pg_constraint WHERE conname = ${CHECK_DA_META_SEM_TAXA} AND conrelid = '"CanalConfig"'::regclass`;
+      SELECT c.convalidated AS validado FROM pg_catalog.pg_constraint c
+      JOIN pg_catalog.pg_class t ON t.oid = c.conrelid
+      JOIN pg_catalog.pg_namespace n ON n.oid = t.relnamespace
+      WHERE c.conname = ${CHECK_DA_META_SEM_TAXA} AND t.relname = ${'CanalConfig'} AND n.nspname = current_schema()`;
     if (!check.length) pendencias.push(`CHECK ${CHECK_DA_META_SEM_TAXA} (CanalConfig) NÃO existe: a migration 20261119000000_erp_taxa_ifood_independente não foi aplicada por inteiro.`);
     else if (!check[0].validado) pendencias.push(`CHECK ${CHECK_DA_META_SEM_TAXA} ficou NOT VALID: rode ALTER TABLE "CanalConfig" VALIDATE CONSTRAINT "${CHECK_DA_META_SEM_TAXA}";`);
   }
