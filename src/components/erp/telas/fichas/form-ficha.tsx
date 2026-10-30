@@ -495,6 +495,11 @@ function FormFichaBase({
         <Painel titulo="Insumos e pré-preparos" semRespiro>
           <p className="border-b border-linha px-4 py-3 text-[12px] leading-relaxed text-suave sm:px-5">
             Quantidade <strong className="font-semibold text-texto">limpa</strong>. Fator = bruto ÷ limpo (cebola: 1,18). Vazio = sem perda.
+            {' '}{tipo === 'PRE_PREPARO'
+              ? 'Inclua os materiais consumidos na produção deste lote. Embalagens de expedição são configuradas no prato, por canal.'
+              : verCustos
+                ? 'Os itens compõem o rendimento total informado. As embalagens de expedição ficam na próxima etapa, por porção e canal.'
+                : 'Os itens compõem o rendimento total informado.'}
           </p>
           {erros.itens && (
             <p id={`${idBase}-itens`} className="border-b border-linha px-4 py-3 text-[13px] text-erro sm:px-5">
@@ -668,10 +673,16 @@ function FormFichaBase({
         <Link href={cancelar} className={classeDeBotao('fantasma')}>
           Cancelar
         </Link>
-        <BotaoEnviar disabled={!!bloqueio || enviandoFoto} className="sm:min-w-44">
+        <BotaoEnviar disabled={!!bloqueio || enviandoFoto} variante={tipo === 'PRATO' && verCustos ? 'secundario' : 'primario'} className="sm:min-w-44">
           {modo === 'criar' ? 'Cadastrar ficha' : 'Salvar alterações'}
         </BotaoEnviar>
+        {tipo === 'PRATO' && verCustos && (
+          <BotaoEnviar nome="continuar" valor="embalagens" disabled={!!bloqueio || enviandoFoto}>
+            Salvar e continuar para embalagens
+          </BotaoEnviar>
+        )}
       </div>
+      {tipo === 'PRATO' && verCustos && <p className="text-right text-[13px] text-suave">Primeiro salve a receita e o rendimento. Depois, confira as embalagens e o preço de cada canal. O preço manual fica preservado.</p>}
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
     </form>
   );

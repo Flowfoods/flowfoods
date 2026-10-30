@@ -33,7 +33,7 @@ export interface LinhaDaEmbalagem {
 }
 
 const AJUDA_DO_CANAL: Record<CanalComEmbalagem, string> = {
-  DELIVERY_PROPRIO: 'O que vai junto quando a casa entrega: caixa, guardanapo, talher, sachê.',
+  DELIVERY_PROPRIO: 'Embalagens para cada porção: caixa, sacola, guardanapo e talher. Sem taxa de marketplace.',
   IFOOD: 'O que vai junto no pedido do iFood (pode ser diferente do delivery: sacola lacrada, por exemplo).',
 };
 
@@ -86,6 +86,9 @@ type PropsDoFormEmbalagens = {
   impressao: string;
   /** Custo de uma porção da ficha (fração em texto: BigInt não atravessa). */
   porcao: { num: string; den: string };
+  /** A parte conhecida da receita não pode parecer um custo completo. */
+  faltaPreco: string[];
+  podeConferirPrecos: boolean;
   bloqueio: string | null;
   /** Link para cadastrar insumo (só para quem pode). */
   novoInsumo?: string;
@@ -99,6 +102,8 @@ function FormEmbalagensBase({
   inicial,
   impressao,
   porcao,
+  faltaPreco,
+  podeConferirPrecos,
   bloqueio,
   novoInsumo,
   chaveDoRascunho,
@@ -176,11 +181,15 @@ function FormEmbalagensBase({
           const doCanal = linhas.filter((l) => l.canal === canal);
           let total = ZERO;
           let semPreco = 0;
+          let linhasPendentes = 0;
           for (const l of doCanal) {
             const c = contaDaLinha(l);
             if (c?.valor) total = somar(total, c.valor);
             if (c?.semPreco) semPreco++;
+            if (!c && (l.insumoId || l.quantidade.trim())) linhasPendentes++;
           }
+          const incompleto = faltaPreco.length > 0 || semPreco > 0 || linhasPendentes > 0;
+          const fisico = somar(custoDaPorcao, total);
           const delivery = linhas.filter((l) => l.canal === 'DELIVERY_PROPRIO' && l.insumoId);
           return (
             <Painel
@@ -189,8 +198,8 @@ function FormEmbalagensBase({
               subtitulo={AJUDA_DO_CANAL[canal]}
               acessorio={
                 <span className="shrink-0 text-right text-[12px] tabular-nums text-suave">
-                  <span className="block text-[13px] font-semibold text-texto">{formatarFracao(total)}</span>
-                  {semPreco > 0 ? <span className="text-atencao">+ {semPreco} sem custo informado</span> : 'por porção'}
+                  <span className="block text-[13px] font-semibold text-texto">{total.num === 0n && (semPreco > 0 || linhasPendentes > 0) ? '—' : formatarFracao(total)}</span>
+                  {semPreco > 0 || linhasPendentes > 0 ? <span className="text-atencao">Embalagens incompletas</span> : 'por porção'}
                 </span>
               }
             >
@@ -322,9 +331,12 @@ function FormEmbalagensBase({
                 )}
               </div>
               <p className="mt-3 text-[12px] tabular-nums text-suave">
-                Com os insumos da receita ({formatarFracao(custoDaPorcao)}): {formatarFracao(somar(custoDaPorcao, total))} por porção
+                {incompleto ? 'Custo físico parcial conhecido' : 'Custo físico da receita e embalagens'}: {incompleto && fisico.num === 0n ? '—' : `${formatarFracao(fisico)} por porção`}
                 {canal === 'IFOOD' ? ', antes da taxa do iFood' : ''}.
               </p>
+              {faltaPreco.length > 0 && <p className="mt-1 text-[12px] text-atencao">Custo da receita incompleto: falta o custo de {faltaPreco.join(', ')}.</p>}
+              {semPreco > 0 && <p className="mt-1 text-[12px] text-atencao">Falta informar o custo de {semPreco} {semPreco === 1 ? 'embalagem' : 'embalagens'}.</p>}
+              {linhasPendentes > 0 && <p className="mt-1 text-[12px] text-atencao">Complete as embalagens e quantidades para conferir o custo.</p>}
             </Painel>
           );
         })}
@@ -344,9 +356,10 @@ function FormEmbalagensBase({
         <Link href={cancelar} className={classeDeBotao('fantasma')}>
           Cancelar
         </Link>
-        <BotaoEnviar disabled={!!bloqueio} className="sm:min-w-44">
+        <BotaoEnviar disabled={!!bloqueio} variante={podeConferirPrecos ? 'secundario' : 'primario'} className="sm:min-w-44">
           Salvar embalagens
         </BotaoEnviar>
+        {podeConferirPrecos && <BotaoEnviar nome="continuar" valor="precos" disabled={!!bloqueio}>Salvar e conferir preços</BotaoEnviar>}
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
     </form>

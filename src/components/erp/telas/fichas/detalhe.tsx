@@ -31,6 +31,7 @@ import { ValidadesDoItem } from '../cadastro/validade';
 import type { CustoPorCanal } from '@/lib/erp/canais';
 import { entradaParaTela } from '@/lib/erp/preco-campos';
 import { PrecoEMargemPorCanal, type PrecosParaTela } from './custo-por-canal';
+import { EtapaPrecos } from './etapa-precos';
 
 /** A conta dos canais como o navegador recebe (BigInt em texto): a prévia refaz com a mesma função. */
 function precosParaTela(c: CustoPorCanal): PrecosParaTela {
@@ -335,8 +336,8 @@ export function TelaDetalheFicha({
           </Painel>
 
           {canais && (
+            <EtapaPrecos referencia={`${f.id}:${feito ?? ''}`}>
             <PrecoEMargemPorCanal
-              className="order-4 sm:order-3"
               dados={precosParaTela(canais)}
               linkDasEmbalagens={f.ativa ? linkDasEmbalagens : undefined}
               linkDosCanais={linkDaTaxa}
@@ -344,6 +345,7 @@ export function TelaDetalheFicha({
               acao={f.ativa ? acaoPrecos : undefined}
               aqui={`${base}/${f.id}`}
             />
+            </EtapaPrecos>
           )}
 
           <Painel className="order-2 sm:order-4" titulo="Modo de preparo">
