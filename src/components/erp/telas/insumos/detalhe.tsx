@@ -302,7 +302,7 @@ export function TelaDetalheInsumo({
           </Painel>
             </>
           )}
-          {ondeEUsado && <PainelOndeEUsado onde={ondeEUsado} fichasBase={fichas} />}
+      {ondeEUsado && <PainelOndeEUsado onde={ondeEUsado} fichasBase={fichas} volta={comDe(aqui, de)} />}
         </div>
 
         <aside className="min-w-0 space-y-4" aria-label="Tipo, categoria, conservação, situação e alterações">
