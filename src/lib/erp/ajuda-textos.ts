@@ -21,7 +21,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'inicio',
     rotas: [''],
     titulo: 'Visão geral da operação',
-    versao: 6,
+    versao: 7,
     aula: [
       { texto: 'Escolha uma loja no alto para ver seus indicadores, a evolução do faturamento e os pontos de atenção. Cada número informa a loja e o período a que se refere.' },
       { texto: 'Sem dados não é zero: o painel avisa sobre ausências e falhas, e Atualizar resumo tenta carregar de novo.' },
@@ -45,6 +45,15 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'A composição de Compras reúne itens e frete das notas lançadas, pela data de entrada, no mesmo recorte do indicador.', para: ['compras.ver'] },
           { texto: 'Ela usa a categoria atual do insumo; mudar o cadastro pode redistribuir compras antigas.', para: ['compras.ver'] },
           { texto: 'Abra o relatório para conferir os valores de cada grupo e o que está reunido em Outros.', para: ['compras.ver'] },
+        ],
+      },
+      {
+        id: 'xml-conferencia',
+        titulo: 'XML aguardando conferência',
+        blocos: [
+          { texto: 'Na visão de uma loja, os pontos de atenção contam os XML atribuídos a ela aguardando conferência, sem recorte mensal. Documentos sem loja atribuída ficam fora dessa contagem.', para: ['compras.ver'] },
+          { texto: 'XML recebido ainda não é compra lançada: não entra em Compras, estoque nem CMV. O atalho abre a fila de notas da loja, que também pode incluir recebidas ou com erro.', para: ['compras.ver'] },
+          { texto: 'Zero vale só para XML aguardando conferência; não significa fila vazia. Se a consulta falhar, a contagem fica indisponível. Atualizar resumo consulta de novo, sem afirmar quando os documentos mudaram.', para: ['compras.ver'] },
         ],
       },
     ],

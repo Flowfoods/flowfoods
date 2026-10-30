@@ -4,6 +4,7 @@
  */
 import Link from 'next/link';
 import type { PainelDoDia, PendenciaDoDia } from '@/lib/erp/painel-do-dia';
+import type { XmlAguardandoHome } from '@/lib/erp/home-xml-aguardando';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { LINK_DE_TEXTO } from '../ui/estilos';
 import { Barra, Painel, Selo } from '../ui/superficies';
@@ -82,12 +83,25 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
 }
 
 /** A mesma lista acionável também compõe a Home de uma loja. */
-export function PendenciasDoResumo({ pendencias }: { pendencias: readonly PendenciaDoDia[] }) {
-  if (!pendencias.length) return null;
+export function PendenciasDoResumo({ pendencias, xmlAguardando: xml }: { pendencias: readonly PendenciaDoDia[]; xmlAguardando?: XmlAguardandoHome }) {
+  const contagem = xml?.estado === 'ok' && Number.isSafeInteger(xml.aguardando) && xml.aguardando !== null && xml.aguardando >= 0 ? xml.aguardando : null;
+  const escopoXml = xml ? `${xml.loja.nome} · fila atual, sem recorte mensal${xml.loja.ativa === false ? ' · loja desativada' : ''}` : '';
+  const filaMaisAmpla = 'A fila também pode incluir notas recebidas ou com erro.';
+  const lista = xml && contagem !== null && contagem > 0 ? [...pendencias, {
+    chave: 'xml-aguardando-conferencia',
+    titulo: `${contagem.toLocaleString('pt-BR')} XML aguardando conferência`,
+    escopo: escopoXml,
+    texto: `Só documentos atribuídos a esta loja. XML recebido ainda não é compra lançada e não entra em Compras, estoque ou CMV. ${filaMaisAmpla}`,
+    href: xml.detalhe.href,
+    acao: xml.detalhe.rotulo,
+  }] : pendencias;
+  if (!lista.length && !xml) return null;
   return (
+    <div className="space-y-3">
+      {lista.length > 0 && (
         <Painel titulo="O que precisa de você" subtitulo="Na ordem em que vale resolver" semRespiro>
           <ol className="divide-y divide-linha">
-            {pendencias.map((p, n) => (
+            {lista.map((p, n) => (
               <li key={p.chave} className="flex flex-wrap items-start gap-3 px-4 py-3.5 sm:flex-nowrap sm:px-5">
                 <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-linha-forte text-[12px] font-semibold text-texto">
                   {n + 1}
@@ -104,6 +118,17 @@ export function PendenciasDoResumo({ pendencias }: { pendencias: readonly Penden
             ))}
           </ol>
         </Painel>
+      )}
+      {xml && (contagem === null || contagem === 0) && (
+        <div role="group" aria-label="Conferência de XML" className="min-w-0 space-y-1 break-words text-[12px] leading-relaxed text-suave">
+          <p className="font-medium">{escopoXml}</p>
+          <p>{contagem === 0 ? 'Nenhum XML atribuído a esta loja aguardando conferência nesta consulta.' : 'Contagem de XML aguardando conferência indisponível nesta consulta.'}</p>
+          {contagem === null && xml.aviso && <p>{xml.aviso}</p>}
+          <p>{filaMaisAmpla}</p>
+          <Link href={xml.detalhe.href} className={LINK_DE_TEXTO + ' inline-flex min-h-11 items-center'}>{xml.detalhe.rotulo}</Link>
+        </div>
+      )}
+    </div>
   );
 }
 

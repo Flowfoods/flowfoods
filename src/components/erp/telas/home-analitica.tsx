@@ -140,6 +140,9 @@ export function HomeAnalitica({ analitico, painel }: { analitico: Extract<Analit
   const faturamento = widgets.find((w): w is WidgetFaturamentoHome => w.familia === 'faturamento');
   const temCardapio = painel.indicadores.some((i) => i.chave === 'cardapio') || painel.estados?.some((e) => e.chave === 'cardapio');
   const temOperacao = Boolean(estoque || producao || temCardapio);
+  // A fila é atual, sem recorte mensal. Só compõe o contexto desta mesma leitura/loja.
+  const xml = painel.xmlAguardando;
+  const xmlDaLoja = xml?.loja.id === analitico.loja.id && xml.referencia === 'fila_atual' && xml.consultadoEm === painel.consultadoEm ? xml : undefined;
   return (
     <section aria-label="Resumo da operação" className="space-y-5">
       <p className="text-[13px] leading-relaxed text-suave">{analitico.loja.nome} · cada indicador informa seu período e sua base.</p>
@@ -164,8 +167,8 @@ export function HomeAnalitica({ analitico, painel }: { analitico: Extract<Analit
         )}
       </div>
       {compras?.composicaoPorCategoria && <ComprasCategoriasHome widget={compras} />}
-      {painel.pendencias.length > 0 && <section aria-label="Pontos de atenção"><PendenciasDoResumo pendencias={painel.pendencias} /></section>}
-      {(widgets.length > 0 || temCardapio || painel.pendencias.length > 0) && <AtualizacaoDoResumo consultadoEm={painel.consultadoEm} />}
+      {(painel.pendencias.length > 0 || xmlDaLoja) && <section aria-label="Pontos de atenção"><PendenciasDoResumo pendencias={painel.pendencias} xmlAguardando={xmlDaLoja} /></section>}
+      {(widgets.length > 0 || temCardapio || painel.pendencias.length > 0 || xmlDaLoja) && <AtualizacaoDoResumo consultadoEm={painel.consultadoEm} />}
     </section>
   );
 }
