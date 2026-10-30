@@ -28,7 +28,7 @@ export function FormTaxaDoIfood({
 }: {
   acao: AcaoDeCadastro;
   aqui: string;
-  /** `atualizadoEm` lido ('' = ainda não configurada). */
+  /** `atualizadoEm` da linha lida ('' = sem linha; a linha pode ter só a meta, sem taxa). */
   versao: string;
   inicial: { comissao: string; pagamento: string };
   bloqueio: string | null;

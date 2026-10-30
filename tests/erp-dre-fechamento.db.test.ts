@@ -33,7 +33,7 @@ import { metasDoPeriodo, salvarMetas, situacaoDasMetas } from '@/lib/erp/dre-met
 import { travarParaEscrever, travarParaFechar } from '@/lib/erp/periodo-trava';
 import { planoDoParceiro, garantirPlano, renomearLinha, ocultarLinha } from '@/lib/erp/plano';
 import { listarHistorico } from '@/lib/erp/historico';
-import { salvarTaxaDoIfood } from '@/lib/erp/canais';
+import { obterTaxaDoIfood, salvarMetasDeCmv, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import { criarPeriodoFechadoDeTeste, cru, limparParceiros, perfilDoBanco, reabrirPeriodoDeTeste, type PerfilDoBanco } from './erp-db-apoio';
 
@@ -347,7 +347,15 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { 
       expect((await lancarDiaDe(a, ids.vp, '2026-08-03', [canal('IFOOD', '500,00', '12', false, iv.atualizadoEm.toISOString())])).ok).toBe(true);
       const r = await fechar('2026-08-01');
       expect(r).toMatchObject({ ok: false, duras: [{ codigo: 'SEM_TAXA_IFOOD' }] });
-      expect(await salvarTaxaDoIfood(a, { comissao: '12', pagamento: '3,2', versao: '' }, 'Marina')).toMatchObject({ ok: true });
+      const sem = await obterTaxaDoIfood(a);
+      expect(await salvarMetasDeCmv(a, { versao: sem.versaoDasMetas, metas: { IFOOD: '30' } }, 'Marina')).toMatchObject({ ok: true });
+      const soMeta = await obterTaxaDoIfood(a);
+      expect(soMeta.taxa).toBeNull();
+      expect(soMeta.versao).not.toBe('');
+      expect(await fechar('2026-08-01')).toMatchObject({ ok: false, duras: [{ codigo: 'SEM_TAXA_IFOOD' }] });
+      const aberto = (await dre(DONA(), { tipo: 'rede' }, '2026-08-01'))!;
+      expect(linha(aberto, 'taxas-ifood').valorCentavos).toBeNull();
+      expect(await salvarTaxaDoIfood(a, { comissao: '12', pagamento: '3,2', versao: soMeta.versao }, 'Marina')).toMatchObject({ ok: true });
       const s = (await situacao('2026-08-01'))!;
       expect(s.condicoes!.duras).toEqual([]);
     });

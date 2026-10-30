@@ -72,6 +72,11 @@ export interface TaxaDoCanal {
   pagamentoBp: number;
 }
 
+/** A meta pode existir antes da taxa. A existência da linha e seus zeros internos não comprovam taxa informada. */
+export function taxaConfiguradaDaLinha(linha: { taxaConfigurada: boolean; taxaBp: number; taxaPagamentoBp: number } | null | undefined): TaxaDoCanal | null {
+  return linha?.taxaConfigurada ? { comissaoBp: linha.taxaBp, pagamentoBp: linha.taxaPagamentoBp } : null;
+}
+
 export const taxaTotalBp = (t: TaxaDoCanal) => t.comissaoBp + t.pagamentoBp;
 
 /** Exatamente `bp` pontos-base de `precoCentavos`, em fração de centavos (nada arredonda aqui). */

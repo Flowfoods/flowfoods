@@ -143,16 +143,16 @@ describe.skipIf(!URL_TESTE)('ERP N.2 · preço pela meta de CMV, cenário de ref
     }
   });
 
-  it('a meta do iFood espera a taxa (a linha do iFood nasce com ela); loja e delivery gravam com histórico', async () => {
+  it('a meta do iFood grava antes da taxa; todos os canais têm histórico e a taxa continua desconhecida', async () => {
     const o = await obterTaxaDoIfood(a);
     expect(o.metas).toEqual({ LOJA: null, DELIVERY_PROPRIO: null, IFOOD: null });
-    expect(await salvarMetasDeCmv(a, { versao: o.versaoDasMetas, metas: { LOJA: '25', DELIVERY_PROPRIO: '25', IFOOD: '30' } }, 'Marina')).toMatchObject({
-      ok: false,
-      erros: { 'metaCmv-IFOOD': expect.stringMatching(/taxa do iFood antes/) },
-    });
-    // Nada gravou (tudo ou nada).
-    expect(await a.canalConfig.count()).toBe(0);
-    expect(await salvarMetasDeCmv(a, { versao: o.versaoDasMetas, metas: { LOJA: '25', DELIVERY_PROPRIO: '25' } }, 'Marina')).toMatchObject({ ok: true, mudou: ['LOJA', 'DELIVERY_PROPRIO'] });
+    expect(await salvarMetasDeCmv(a, { versao: o.versaoDasMetas, metas: { LOJA: '25', DELIVERY_PROPRIO: '25', IFOOD: '28' } }, 'Marina')).toMatchObject({ ok: true, mudou: ['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] });
+    const d = await obterTaxaDoIfood(a);
+    expect(d.taxa).toBeNull();
+    expect(d.versao).not.toBe('');
+    expect(d.metas.IFOOD).toBe(2800);
+    expect((await tela()).cmv[2].sugerido.tipo).toBe('ok');
+    expect((await tela()).cmv[2].resultado).toMatchObject({ tipo: 'pendente', motivo: expect.stringContaining('taxa do iFood não configurada') });
     const h = await listarHistorico(a, { de: [{ entidade: 'CanalConfig', ids: (await a.canalConfig.findMany()).map((c) => c.id) }], limite: 10, verPrecos: true });
     expect(h.flatMap((x) => x.mudancas.map((m) => `${m.campo}: ${sp(String(m.depois))}`))).toEqual(expect.arrayContaining(['meta de CMV: 25%']));
   });

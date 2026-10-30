@@ -216,7 +216,7 @@ export function TelaCanaisDeVenda({
                 {contaDaTaxa(taxa)}. A cada R$ 10,00 de venda, {taxaACadaDezReais(taxaTotalBp(taxa))} ficam com o iFood.
               </p>
             ) : (
-              <p className="text-[15px] text-texto">Ainda não configurada: o custo do iFood fica incompleto. Quem cuida dos preços configura aqui.</p>
+              <p className="text-[15px] text-texto">Ainda não configurada: o resultado após os custos informados fica pendente. O custo físico, o CMV e a sugestão pela meta continuam disponíveis. Quem cuida dos preços configura a taxa aqui.</p>
             )}
             <div className="mt-4 flex flex-wrap items-center gap-x-3 border-t border-linha pt-3 text-[12px] text-suave">
               <ExplicacaoNoPonto ponto="porcentagens">
@@ -228,7 +228,7 @@ export function TelaCanaisDeVenda({
 
           <Painel titulo="Meta de CMV por canal" subtitulo="Quanto do preço o custo físico do prato pode ser: a sugestão de preço e o farol de cada ficha seguem isso">
             {podeEditar ? (
-              <FormMetasDeCmv acao={acaoMetas} aqui={`${base}/canais`} versao={versaoDasMetas} inicial={metas} taxaConfigurada={taxa !== null} bloqueio={bloqueio} />
+              <FormMetasDeCmv acao={acaoMetas} aqui={`${base}/canais`} versao={versaoDasMetas} inicial={metas} bloqueio={bloqueio} />
             ) : (
               <p className="text-[15px] tabular-nums text-texto">
                 {ORDEM_DOS_CANAIS.map((c) => `${CANAIS[c].rotulo}: ${metas[c] === null ? 'sem meta' : formatarPontosBase(metas[c]!)}`).join(' · ')}. Quem cuida dos preços muda aqui.

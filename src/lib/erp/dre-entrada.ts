@@ -15,6 +15,7 @@
  */
 
 import type { CmvDoDre } from './cmv-campos';
+import { taxaConfiguradaDaLinha } from './canal-campos';
 import { cmvDasLojas } from './cmv';
 import { despesasApropriadas, faltaLancar, type RecorrenteEmFalta } from './despesas';
 import type { DespesaApropriada, ReceitaLida, TaxaDoIfood } from './dre-campos';
@@ -85,7 +86,7 @@ export async function entradaDoDre(
   const lojas = await lojasDoFaturamento(tx, alcance);
   const plano = await planoDoParceiro(tx);
   const graos = ate ? await faturamentoDosGraos(tx, alcance, { de: periodo.inicio, ate, lojaId }) : [];
-  const taxaLinha = await tx.canalConfig.findFirst({ where: { canal: 'IFOOD' }, select: { taxaBp: true, taxaPagamentoBp: true } });
+  const taxaLinha = await tx.canalConfig.findFirst({ where: { canal: 'IFOOD' }, select: { taxaConfigurada: true, taxaBp: true, taxaPagamentoBp: true } });
   const despesas = ate ? await despesasApropriadas(tx, alcance, { de: periodo.inicio, ate }, lojaId) : [];
   const faltas = ate ? await faltasDoIntervalo(tx, alcance, { de: periodo.inicio, ate, lojaId }, opcoes.hoje) : { total: 0, porLoja: [] as { loja: LojaDoFaturamento; faltas: number }[] };
   const aFalta = await faltaLancar(tx, alcance, periodo.inicio, ate ?? periodo.inicio, opcoes.hoje);
@@ -98,7 +99,7 @@ export async function entradaDoDre(
     plano,
     receitas: somarReceitas(graos),
     despesas: somarDespesas(despesas),
-    taxaIfood: taxaLinha ? { comissaoBp: taxaLinha.taxaBp, pagamentoBp: taxaLinha.taxaPagamentoBp } : null,
+    taxaIfood: taxaConfiguradaDaLinha(taxaLinha),
     faltas,
     faltaLancar: aFalta,
     cmv,

@@ -38,6 +38,7 @@ export const CHECKS_DA_2_1 = [
 ] as const;
 
 export const INDICE_DO_GRAO = 'FaturamentoLancamento_grao_humano';
+export const CHECK_DA_META_SEM_TAXA = 'CanalConfig_taxa_pendente_coerente';
 
 /** Os CHECKs que a 2.2a acrescentou em tabelas que já existiam (a tabela nova tem os dela de nascença). */
 export const CHECKS_DA_2_2A = [
@@ -737,6 +738,20 @@ export async function conferirMigracao(db: Pick<PrismaClient, '$queryRaw'>): Pro
         else if (!caminho || !/,\s*pg_temp$/.test(caminho)) pendencias.push(`Função ${f} sem pg_temp no fim do search_path (tabela temporária engana o gatilho): rode o último bloco da migration ${M2}.`);
       }
     }
+  }
+  // A coluna marca a aplicação desta migration, como as demais fases opcionais deste conferidor.
+  const taxaIndependente = await db.$queryRaw<{ tipo: string; nula: string; padrao: string | null }[]>`
+    SELECT data_type AS tipo, is_nullable AS nula, column_default AS padrao FROM information_schema.columns
+    WHERE table_schema = current_schema() AND table_name = 'CanalConfig' AND column_name = 'taxaConfigurada'`;
+  if (taxaIndependente.length) {
+    const c = taxaIndependente[0];
+    if (c.tipo !== 'boolean' || c.nula !== 'NO' || c.padrao !== 'true') {
+      pendencias.push('Coluna CanalConfig.taxaConfigurada deve ser BOOLEAN NOT NULL DEFAULT true: confira a migration 20261119000000_erp_taxa_ifood_independente.');
+    }
+    const check = await db.$queryRaw<{ validado: boolean }[]>`
+      SELECT convalidated AS validado FROM pg_constraint WHERE conname = ${CHECK_DA_META_SEM_TAXA} AND conrelid = '"CanalConfig"'::regclass`;
+    if (!check.length) pendencias.push(`CHECK ${CHECK_DA_META_SEM_TAXA} (CanalConfig) NÃO existe: a migration 20261119000000_erp_taxa_ifood_independente não foi aplicada por inteiro.`);
+    else if (!check[0].validado) pendencias.push(`CHECK ${CHECK_DA_META_SEM_TAXA} ficou NOT VALID: rode ALTER TABLE "CanalConfig" VALIDATE CONSTRAINT "${CHECK_DA_META_SEM_TAXA}";`);
   }
   return pendencias;
 }
