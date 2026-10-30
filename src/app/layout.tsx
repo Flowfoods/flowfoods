@@ -1,22 +1,36 @@
 import type { Metadata } from 'next';
-import { Gelasio, Libre_Franklin } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 
 // Identidade FlowFoods: títulos em Gelasio, texto em Libre Franklin. As duas
 // variáveis servem o site, o Portal do cliente e o Espaço do Rodolfo.
-const gelasio = Gelasio({
-  subsets: ['latin'],
-  weight: ['400', '600', '700'],
-  style: ['normal', 'italic'],
+// Arquivos oficiais versionados; os mesmos pesos/estilos, sem consulta no build.
+const gelasio = localFont({
+  src: [
+    { path: './fonts/gelasio/Gelasio-Variable.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/gelasio/Gelasio-Variable.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/gelasio/Gelasio-Variable.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/gelasio/Gelasio-Italic-Variable.woff2', weight: '400', style: 'italic' },
+    { path: './fonts/gelasio/Gelasio-Italic-Variable.woff2', weight: '600', style: 'italic' },
+    { path: './fonts/gelasio/Gelasio-Italic-Variable.woff2', weight: '700', style: 'italic' },
+  ],
   variable: '--font-gelasio',
   display: 'swap',
+  adjustFontFallback: 'Times New Roman',
+  preload: true,
 });
 
-const franklin = Libre_Franklin({
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
+const franklin = localFont({
+  src: [
+    { path: './fonts/libre-franklin/LibreFranklin-Variable.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/libre-franklin/LibreFranklin-Variable.woff2', weight: '500', style: 'normal' },
+    { path: './fonts/libre-franklin/LibreFranklin-Variable.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/libre-franklin/LibreFranklin-Variable.woff2', weight: '700', style: 'normal' },
+  ],
   variable: '--font-franklin',
   display: 'swap',
+  adjustFontFallback: 'Arial',
+  preload: true,
 });
 
 const SITE_URL = 'https://consultoriaflowfoods.com.br';
