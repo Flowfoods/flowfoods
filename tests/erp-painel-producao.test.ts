@@ -96,7 +96,7 @@ describe('Home · produção de hoje de uma loja, sem consolidado ou custo', () 
   it('omite Rede e visão não resolvida, mesmo com permissão, sem consultar ou inventar total', async () => {
     const rede = await painelDoDia(cliente, acesso(['producao.ver'], 'todas'), '/erp', HOJE, { tipo: 'rede' });
     const semVisao = await painelDoDia(cliente, acesso(), '/erp', HOJE);
-    expect(rede).toEqual({ indicadores: [], pendencias: [] });
+    expect(rede).toEqual({ indicadores: [], pendencias: [], analitico: { tipo: 'rede' } });
     expect(semVisao).toEqual({ indicadores: [], pendencias: [] });
     expect(lojasDaListaDoDia).not.toHaveBeenCalled();
   });

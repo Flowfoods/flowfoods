@@ -10,8 +10,11 @@ import { situacaoDoEstoque } from '@/lib/erp/estoque';
 import { saudeDoCardapio } from '@/lib/erp/saude-do-cardapio';
 import { lojasDaListaDoDia } from '@/lib/erp/producao-lista';
 import { painelDoDia } from '@/lib/erp/painel-do-dia';
+import { lerComprasDaHome } from '@/lib/erp/home-compras';
 
 vi.mock('@/lib/erp/dre', () => ({ dreDoPeriodo: vi.fn() }));
+vi.mock('@/lib/erp/compras-relatorio', () => ({ resolverRecorte: vi.fn(), totaisDoRecorte: vi.fn() }));
+vi.mock('@/lib/erp/home-compras', async (original) => ({ ...await original<typeof import('@/lib/erp/home-compras')>(), lerComprasDaHome: vi.fn() }));
 vi.mock('@/lib/erp/faturamento', () => ({ obterMes: vi.fn() }));
 vi.mock('@/lib/erp/estoque', () => ({ situacaoDoEstoque: vi.fn() }));
 vi.mock('@/lib/erp/saude-do-cardapio', () => ({ saudeDoCardapio: vi.fn() }));
@@ -40,6 +43,7 @@ function dto(alteracoes: Partial<DreDoPeriodo> = {}, compraCentavos: number | nu
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.mocked(lerComprasDaHome).mockResolvedValue(null);
   vi.mocked(dreDoPeriodo).mockResolvedValue(dto());
   vi.mocked(obterMes).mockResolvedValue({
     lojas: [{ loja: { id: 'lojab', nome: 'Loja B' }, dias: [{ data: '2026-10-28', total: { valorCentavos: 700_000 } }] }],
@@ -207,7 +211,10 @@ describe('Home · falha do DRE é isolada e nunca reconstitui fórmula ou perío
       vi.mocked(dreDoPeriodo).mockResolvedValueOnce(dto({ escopo }));
       const p = await painelDoDia(cliente, acesso(['dre.ver']), '/erp', HOJE, visao);
       expect(p).not.toHaveProperty('cmv');
-      expect(p).toEqual({ indicadores: [], pendencias: [] });
+      expect(p.indicadores).toEqual([]);
+      expect(p.pendencias).toEqual([]);
+      expect(p.analitico?.tipo).toBe('loja');
+      expect(JSON.stringify(p)).not.toMatch(/Loja A privada|"familia":"cmv"/);
     }
     expect(dreDoPeriodo).toHaveBeenCalledTimes(2);
   });

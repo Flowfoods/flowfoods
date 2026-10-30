@@ -7,6 +7,7 @@ import { obterMes } from '@/lib/erp/faturamento';
 import { situacaoDoEstoque } from '@/lib/erp/estoque';
 import { saudeDoCardapio } from '@/lib/erp/saude-do-cardapio';
 import { dreDoPeriodo } from '@/lib/erp/dre';
+import { lerComprasDaHome } from '@/lib/erp/home-compras';
 import { painelDoDia, type PainelDoDia } from '@/lib/erp/painel-do-dia';
 import { PainelDoDiaNaTela } from '@/components/erp/telas/painel-do-dia';
 
@@ -15,6 +16,8 @@ vi.mock('@/lib/erp/estoque', () => ({ situacaoDoEstoque: vi.fn() }));
 vi.mock('@/lib/erp/producao-lista', () => ({ lojasDaListaDoDia: vi.fn() }));
 vi.mock('@/lib/erp/saude-do-cardapio', () => ({ saudeDoCardapio: vi.fn() }));
 vi.mock('@/lib/erp/dre', () => ({ dreDoPeriodo: vi.fn() }));
+vi.mock('@/lib/erp/compras-relatorio', () => ({ resolverRecorte: vi.fn(), totaisDoRecorte: vi.fn() }));
+vi.mock('@/lib/erp/home-compras', async (original) => ({ ...await original<typeof import('@/lib/erp/home-compras')>(), lerComprasDaHome: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 const HOJE = '2026-10-29';
@@ -38,6 +41,7 @@ const ler = (alcance = dono) => painelDoDia(cliente, alcance, '/erp', HOJE, visa
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(dreDoPeriodo).mockResolvedValue(null);
+  vi.mocked(lerComprasDaHome).mockResolvedValue(null);
   vi.mocked(obterMes).mockResolvedValue(faturamento());
   vi.mocked(saudeDoCardapio).mockResolvedValue({ pratos: 2, prontos: 1, custoIncompleto: 0 } as Awaited<ReturnType<typeof saudeDoCardapio>>);
   vi.mocked(situacaoDoEstoque).mockResolvedValue(estoque());
@@ -96,9 +100,9 @@ describe('H1 · cada fonte tem estado independente e conserva o contexto autoriz
     expect(JSON.stringify(p) + htmlDe(p)).not.toMatch(/faturamento|cardapio|centavos|preço/i);
   });
 
-  it('sem fonte autorizada, conserva o contrato vazio anterior e não cria metadados', async () => {
+  it('sem fonte autorizada, conserva dados vazios e só o modo de loja sem metadados de fonte', async () => {
     const p = await ler(alcanceCom());
-    expect(p).toEqual({ indicadores: [], pendencias: [] });
+    expect(p).toEqual({ indicadores: [], pendencias: [], analitico: { tipo: 'loja', loja: { id: 'lojab', nome: 'Loja B' }, widgets: [] } });
     expect(htmlDe(p)).toBe('');
     expect(obterMes).not.toHaveBeenCalled();
     expect(saudeDoCardapio).not.toHaveBeenCalled();
