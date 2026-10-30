@@ -105,6 +105,8 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Build de produção
         run: npm run build
+      - name: Fontes locais do build
+        run: node scripts/verificar-fontes-build.mjs
 
   deploy:
     name: Deploy no Dokploy
