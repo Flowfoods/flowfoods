@@ -11,6 +11,7 @@ import { PainelDoDiaNaTela } from '@/components/erp/telas/painel-do-dia';
 
 vi.mock('@/lib/erp/faturamento', () => ({ obterMes: vi.fn() }));
 vi.mock('@/lib/erp/estoque', () => ({ situacaoDoEstoque: vi.fn() }));
+vi.mock('@/lib/erp/producao-lista', () => ({ lojasDaListaDoDia: vi.fn() }));
 vi.mock('@/lib/erp/saude-do-cardapio', () => ({ saudeDoCardapio: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
@@ -18,7 +19,8 @@ const HOJE = '2026-10-29';
 const cliente = {} as ClienteDoParceiro;
 const visao = { tipo: 'loja', lojaId: 'lojab', nome: 'Loja B' } as const;
 const dono = resolverAlcance({
-  perfilBase: 'DONO', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [],
+  // Esta matriz cobre as três fontes de H1; Produção tem matriz própria.
+  perfilBase: 'DONO', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: ['producao.ver'], redeInteira: true, lojaIds: [],
 });
 const alcanceCom = (...permissoes: Permissao[]): Alcance => ({ nivel: 'LOJA', lojas: ['lojab'], permissoes: new Set(permissoes) });
 const faturamento = (centavos: number | null = 700_000, faltas = 0) => ({

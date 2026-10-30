@@ -50,6 +50,9 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
+      # Contrato de correlação/timeout com HTTP inteiramente simulado.
+      - name: Contrato da confirmação de deploy
+        run: node --test tests/deploy-confirmacao.node.mjs
       - name: Lint
         run: npm run lint
       # O portão de conteúdo veio com a F1 do Caminho 1 e rodava só à mão.
@@ -106,39 +109,21 @@ jobs:
   deploy:
     name: Deploy no Dokploy
     needs: portao
-    # workflow_dispatch entra na condição para o deploy poder ser re-disparado
-    # da aba Actions no instante em que o segredo existir — sem commit vazio só
-    # para acordar o webhook. Continua travado na master: dispatch em outra ref
-    # roda só o portão.
     if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    concurrency:
+      group: flowfoods-compose-JWsPI2ZLgUrh11MS_EwwB
+      cancel-in-progress: false
     steps:
-      - name: Disparar o deploy
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Disparar e acompanhar o deploy
         env:
-          WEBHOOK: ${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}
-          URL: ${{ secrets.DOKPLOY_URL }}
-          TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
-          # composeId do app flowfoods-web no painel (projeto FlowFoods).
+          DOKPLOY_DEPLOY_WEBHOOK: ${{ secrets.DOKPLOY_DEPLOY_WEBHOOK }}
+          DOKPLOY_URL: ${{ secrets.DOKPLOY_URL }}
+          DOKPLOY_API_TOKEN: ${{ secrets.DOKPLOY_API_TOKEN }}
           COMPOSE_ID: JWsPI2ZLgUrh11MS_EwwB
-        run: |
-          set -euo pipefail
-          if [ -n "${WEBHOOK:-}" ]; then
-            codigo=$(curl -sS -X POST -o /tmp/resposta.txt -w '%{http_code}' --max-time 60 "$WEBHOOK")
-          elif [ -n "${URL:-}" ] && [ -n "${TOKEN:-}" ]; then
-            BASE=$(printf '%s' "$URL" | sed -E 's#^(https?://[^/]+).*#\1#')
-            codigo=$(curl -sk -X POST -o /tmp/resposta.txt -w '%{http_code}' --max-time 60 \
-                       -H "x-api-key: ${TOKEN}" -H 'Content-Type: application/json' \
-                       -d "{\"composeId\":\"${COMPOSE_ID}\"}" "${BASE}/api/compose.deploy")
-          else
-            echo "::notice title=Deploy não disparado::Faltam DOKPLOY_URL e DOKPLOY_API_TOKEN (ou DOKPLOY_DEPLOY_WEBHOOK). O portão passou; a subida segue manual."
-            exit 0
-          fi
-          echo "Dokploy respondeu HTTP $codigo"
-          # A resposta pode trazer id de build; nunca traz segredo — o webhook
-          # inteiro vive no secret e não é ecoado.
-          head -c 500 /tmp/resposta.txt || true
-          echo
-          if [ "$codigo" -lt 200 ] || [ "$codigo" -ge 300 ]; then
-            echo "::error title=Deploy recusado::O Dokploy respondeu $codigo."
-            exit 1
-          fi
+        run: node scripts/disparar-deploy.mjs

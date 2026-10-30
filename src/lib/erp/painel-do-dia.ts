@@ -2,7 +2,7 @@
  * Início de trabalho (24/10/2026, referência: painéis da Nina e Início do
  * iFood): o que a pessoa precisa ver ao abrir o ERP — poucos números e "o que
  * precisa de você", com o atalho para resolver. Cada bloco só existe com a
- * permissão dele (faturamento, preços, estoque); quem não tem nada disso vê só
+ * permissão dele (faturamento, preços, estoque, produção por loja); quem não tem nada disso vê só
  * as áreas, como antes. Reaproveita as leituras das telas (nenhuma conta nova).
  */
 
@@ -10,6 +10,7 @@ import { obterMes } from './faturamento';
 import { alcancaLoja, pode, type Alcance } from './permissoes';
 import { saudeDoCardapio } from './saude-do-cardapio';
 import { situacaoDoEstoque } from './estoque';
+import { lojasDaListaDoDia } from './producao-lista';
 import { hojeNoRio } from './compra-campos';
 import type { ClienteDoParceiro } from './tenant';
 import type { Visao } from './visao';
@@ -48,7 +49,7 @@ export interface PainelDoDia {
 }
 
 export interface EstadoDoResumo {
-  chave: 'faturamento' | 'cardapio' | 'estoque';
+  chave: 'faturamento' | 'cardapio' | 'estoque' | 'producao';
   estado: 'ok' | 'parcial' | 'sem_dados' | 'erro';
   rotulo: string;
   escopo: string;
@@ -67,9 +68,13 @@ const plural = (n: number, um: string, varios: string) => `${n.toLocaleString('p
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
-export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, base: string, hoje = hojeNoRio(), visao?: Visao): Promise<PainelDoDia> {
+export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, base: string, hojeOuAgora: string | Date = new Date(), visao?: Visao): Promise<PainelDoDia> {
   const indicadores: IndicadorDoDia[] = [];
   const pendencias: PendenciaDoDia[] = [];
+  // Um único relógio define mês, dia da lista e aprofundamento. A data textual
+  // dos chamadores antigos fixa meio-dia UTC, que permanece no mesmo dia no Rio.
+  const agora = typeof hojeOuAgora === 'string' ? new Date(`${hojeOuAgora}T12:00:00.000Z`) : hojeOuAgora;
+  const hoje = hojeNoRio(agora);
   const mes = hoje.slice(0, 7);
 
   // A visão já vem resolvida no servidor, mas nunca amplia o alcance se um
@@ -84,21 +89,26 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
   else if (visao?.tipo === 'rede') queryFaturamento.set('rede', '1');
   const faturamentoHref = base + '/faturamento?' + queryFaturamento.toString();
   const estoqueHref = lojaId ? base + '/estoque/' + encodeURIComponent(lojaId) : base + '/estoque';
+  const producaoHref = lojaId ? `${base}/producao/lista/${encodeURIComponent(lojaId)}?dia=${hoje}` : '';
 
   const autorizado = {
     faturamento: pode(alcanceDaVisao, 'faturamento.ver'),
     cardapio: pode(alcance, 'fichas.ver') && pode(alcance, 'precos.ver'),
     estoque: pode(alcanceDaVisao, 'estoque.ver'),
+    // Primeira fatia: somente a loja escolhida. Rede não vira um total fictício.
+    producao: !!lojaId && pode(alcanceDaVisao, 'producao.ver', { lojaId }),
   };
-  const [leituraFat, leituraSaude, leituraEstoque] = await Promise.allSettled([
+  const [leituraFat, leituraSaude, leituraEstoque, leituraProducao] = await Promise.allSettled([
     leituraAutorizada(autorizado.faturamento, () => obterMes(cliente, alcanceDaVisao, { mes, ...(lojaId ? { lojaId } : {}) }, hoje)),
     leituraAutorizada(autorizado.cardapio, () => saudeDoCardapio(cliente)),
     leituraAutorizada(autorizado.estoque, () => situacaoDoEstoque(cliente, alcanceDaVisao)),
+    leituraAutorizada(autorizado.producao, () => lojasDaListaDoDia(cliente, alcanceDaVisao, agora)),
   ]);
   // Rejeições são tratadas por fonte e não entram no DTO, no HTML ou em logs.
   const fat = leituraFat.status === 'fulfilled' ? leituraFat.value : null;
   const saude = leituraSaude.status === 'fulfilled' ? leituraSaude.value : null;
   const estoque = leituraEstoque.status === 'fulfilled' ? leituraEstoque.value : null;
+  const producao = leituraProducao.status === 'fulfilled' ? leituraProducao.value?.find((l) => l.id === lojaId) : null;
   const estados: EstadoDoResumo[] = [];
   const lancados = new Set(fat?.lojas.flatMap((l) => l.dias.filter((d) => d.total !== null).map((d) => d.data)) ?? []);
   if (autorizado.faturamento) {
@@ -128,6 +138,16 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
       mensagem: estado === 'erro' ? 'Não foi possível carregar a situação do estoque.'
         : estado === 'sem_dados' ? (estoque?.length ? 'Nenhuma loja ativa neste contexto.' : 'Nenhuma loja disponível para estoque neste contexto.') : undefined,
       href: estoqueHref, acao: 'Ver o estoque',
+    });
+  }
+  if (autorizado.producao) {
+    const estado = leituraProducao.status === 'rejected' ? 'erro' : !producao?.naLista ? 'sem_dados' : 'ok';
+    estados.push({
+      chave: 'producao', estado, escopo,
+      rotulo: 'Pré-preparos na lista de hoje', referencia: `Hoje · ${hoje.split('-').reverse().join('/')}`,
+      mensagem: estado === 'erro' ? 'Não foi possível carregar a lista de produção de hoje.'
+        : estado === 'sem_dados' ? (producao ? 'Nenhum pré-preparo listado hoje.' : 'Nenhuma loja ativa disponível para produção neste contexto.') : undefined,
+      href: producaoHref, acao: 'Ver a lista',
     });
   }
 
@@ -216,6 +236,23 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
         texto: 'Sem saldo inicial, a compra não entra no estoque e o CMV real do mês fica sem base.',
         href: estoqueHref,
         acao: 'Abrir o estoque',
+      });
+    }
+  }
+
+  if (producao) {
+    indicadores.push({
+      chave: 'producao', escopo, rotulo: 'Pré-preparos na lista de hoje',
+      valor: { tipo: 'numero', numero: producao.naLista },
+      contexto: `${plural(producao.semLote, 'pré-preparo ainda sem lote ativo', 'pré-preparos ainda sem lote ativo')}. A lista inclui os que já viraram lote.`,
+      href: producaoHref,
+    });
+    if (producao.semLote > 0) {
+      pendencias.push({
+        chave: 'producao-sem-lote', escopo,
+        titulo: plural(producao.semLote, 'pré-preparo ainda sem lote ativo', 'pré-preparos ainda sem lote ativo'),
+        texto: 'Confira na lista de hoje os pré-preparos que estão sem lote ativo.',
+        href: producaoHref, acao: 'Ver a lista',
       });
     }
   }

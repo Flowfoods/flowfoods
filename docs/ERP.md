@@ -4783,3 +4783,10 @@ QA real local com dados sintéticos: 18 cenários aprovados; 3 telas × 3 largur
 - CI prepara e verifica os três perfis do Postgres efêmero, com e sem RLS; ausência de perfil ou falha de login interrompe o job. Nenhuma configuração de produção é alterada.
 - 44 testes dirigidos com banco aprovados, além da bateria isolada sobreposta de 22 testes; tipos/lint/conteúdo aprovados. SQL de preparação validado em cluster novo. Revisões independentes sem bloqueantes. Três cenários de Chrome com dados sintéticos aprovados, incluindo falha real/restauração/foco e layout 360/1440. CI, merge e ambiente servido são acompanhados no mesmo plano Notion.
 - Recorte parcial de H1; H1 completo e H3 continuam pendentes. Próximo: contrato e CMV de uma loja a partir de um DreDoPeriodo canônico, sem recalcular regras ou ativar custeio/integracao.
+
+## Home operacional e confirmação da publicação — quarta rodada Codex (decisão 495)
+
+- Produção na Home de uma loja: pré-preparos na lista de hoje e ainda sem lote ativo, com data Rio, link do mesmo dia/loja e estados honestos. Somente com producao.ver, sem valores financeiros, geração de lotes ou consolidado de rede.
+- Contrato puro CMV preserva a leitura autorizada de um único DRE: valor, percentual, denominador, período, fonte, ressalvas e fotografia. Ainda não ligado à composição visual; o fallback sem DTO precisa receber período validado antes dessa integração. Nenhuma fórmula ou consulta nova.
+- Deploy deixa de confundir fila aceita com término: helper acompanha a tentativa correlacionada, com timeout e saídas mínimas. Webhook sozinho continua aceito sem confirmação; título não comprova o SHA compilado. Testes HTTP simulados fazem parte do portão.
+- 98 testes dirigidos com banco e quatro jornadas reais de Chrome com dados sintéticos aprovados; tipos/lint/conteúdo passaram. Inclui operador sem custos, retorno da lista, nenhuma escrita e 360/1440 sem transbordamento. Revisões e CI/publicação são registrados no mesmo plano Notion. H1/H3 e validação operacional de produção permanecem parciais.
