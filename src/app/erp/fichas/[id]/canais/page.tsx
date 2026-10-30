@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/fichas';
 
-export default async function ErpEmbalagensDaFichaPage({ params }: { params: { id: string } }) {
+export default async function ErpEmbalagensDaFichaPage({ params, searchParams }: { params: { id: string }; searchParams?: { feito?: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.editar');
   exigirPermissaoNaPagina(ctx, 'precos.ver');
@@ -32,6 +32,8 @@ export default async function ErpEmbalagensDaFichaPage({ params }: { params: { i
       acao={acaoSalvarEmbalagens.bind(null, ficha.id)}
       opcoes={await embalagensParaEscolher(ctx.cliente, canais.embalagens.map((e) => e.insumoId))}
       bloqueio={ctx.bloqueio}
+      feito={searchParams?.feito}
+      podeConferirPrecos={pode(ctx.alcance, 'fichas.ver')}
       novoInsumo={pode(ctx.alcance, 'insumos.editar') ? '/erp/insumos/novo' : undefined}
     />
   );

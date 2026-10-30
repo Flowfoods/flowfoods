@@ -14,6 +14,7 @@ import { cadastrarFicha, editarFicha, mudarSituacaoFicha, type ResultadoFicha } 
 import { salvarEmbalagens, salvarMargensAlvo, salvarMetasDeCmv, salvarPrecos, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 import { concluir, querAtivo, recusado } from '@/components/erp/telas/cadastro/executar';
+import { concluirEtapaDaFicha } from '@/components/erp/telas/fichas/continuar';
 import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import type { EstadoDasFotos, EstadoImportacao } from '@/components/erp/telas/fichas/estado';
 import { revalidatePath } from 'next/cache';
@@ -52,7 +53,8 @@ export async function acaoCadastrarFicha(slug: string, anterior: EstadoCadastro,
   if ('erroDaFoto' in envio) return concluir({ ok: false, erros: { foto: envio.erroDaFoto } }, anterior, base, { mudou: 'criada' });
   const r = await cadastrarFicha(ctx.cliente, envio.entrada, envio.foto, ctx.sessao.autorNome);
   await auditarFicha(ctx, 'erp_ficha_criada', r);
-  return concluir(r, anterior, base, { mudou: 'criada' });
+  const proxima = form.get('continuar') === 'embalagens' && envio.entrada.tipo === 'PRATO' && !recusaDaAcao(ctx, 'precos.ver');
+  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'criada' }, proxima ? 'embalagens' : null);
 }
 
 export async function acaoEditarFicha(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -62,7 +64,8 @@ export async function acaoEditarFicha(slug: string, id: string, anterior: Estado
   if ('erroDaFoto' in envio) return concluir({ ok: false, erros: { foto: envio.erroDaFoto } }, anterior, base, { mudou: 'editada' });
   const r = await editarFicha(ctx.cliente, String(id), envio.entrada, envio.foto, ctx.sessao.autorNome);
   await auditarFicha(ctx, 'erp_ficha_alterada', r);
-  return concluir(r, anterior, base, { mudou: 'editada', igual: 'igual' });
+  const proxima = form.get('continuar') === 'embalagens' && envio.entrada.tipo === 'PRATO' && !recusaDaAcao(ctx, 'precos.ver');
+  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'editada', igual: 'igual' }, proxima ? 'embalagens' : null);
 }
 
 export async function acaoSituacaoFicha(slug: string, id: string, anterior: EstadoCadastro, form: FormData): Promise<EstadoCadastro> {
@@ -96,7 +99,8 @@ export async function acaoSalvarEmbalagens(slug: string, id: string, anterior: E
   if (negado) return recusado(anterior, negado);
   const r = await salvarEmbalagens(ctx.cliente, String(id), lerEnvioDasEmbalagens(form), ctx.sessao.autorNome);
   if (r.ok) await auditar(ctx, 'erp_ficha_embalagens', { id: r.id });
-  return concluir(r, anterior, base, { mudou: 'embalagens', igual: 'igual' });
+  const proxima = form.get('continuar') === 'precos' && !recusaDaAcao(ctx, 'fichas.ver');
+  return concluirEtapaDaFicha(r, anterior, base, { mudou: 'embalagens', igual: 'igual' }, proxima ? 'precos' : null);
 }
 
 /** 1.9: a taxa do iFood do parceiro. */

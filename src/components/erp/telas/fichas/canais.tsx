@@ -36,6 +36,8 @@ export function TelaEmbalagensDaFicha({
   opcoes,
   bloqueio,
   novoInsumo,
+  feito,
+  podeConferirPrecos,
 }: {
   ficha: FichaDetalhada;
   canais: CustoPorCanal;
@@ -45,8 +47,11 @@ export function TelaEmbalagensDaFicha({
   opcoes: EmbalagemDoFormulario[];
   bloqueio: string | null;
   novoInsumo?: string;
+  feito?: string;
+  podeConferirPrecos: boolean;
 }) {
   const volta = `${base}/${ficha.id}`;
+  const mensagem = fraseDoFeitoDaFicha(feito);
   const inicial: LinhaDaEmbalagem[] = canais.embalagens.map((e) => {
     const q = quantidadeParaCampo(e.quantidadeMilesimos, e.unidade);
     return { canal: e.canal, insumoId: e.insumoId, quantidade: q.texto, unidade: q.escala === 'menor' ? UNIDADES[e.unidade].menor : UNIDADES[e.unidade].sigla };
@@ -56,6 +61,13 @@ export function TelaEmbalagensDaFicha({
       <TrilhaDaPagina itens={[{ rotulo: ficha.nome, href: volta }, { rotulo: 'Embalagens por canal' }]} />
       <Voltar href={volta}>Voltar para {ficha.nome}</Voltar>
       <PageHeader icone="canais" cor={COR.fichas} titulo="Embalagens por canal" subtitulo={`${contexto} · ${ficha.nome} · o que vai junto em cada porção`} />
+      {mensagem && <Aviso tom="ok" titulo={mensagem} />}
+      <p className="text-sm leading-relaxed text-suave">
+        Receita salva: a Loja usa os insumos da receita. Delivery próprio e iFood acrescentam as embalagens configuradas aqui.
+        {' '}A quantidade é por porção de cada produto, inclusive a sacola. Configure apenas o uso que ainda não está na receita; usos diferentes do mesmo insumo podem coexistir.
+        {' '}Salvar esta previsão de custo não movimenta estoque. Condimentos comestíveis continuam como ingredientes.
+      </p>
+      <Link href={`${volta}/editar`} className={classeDeBotao('secundario')}>Revisar receita e rendimento</Link>
       <FormEmbalagens
         acao={acao}
         aqui={`${base}/${ficha.id}/canais`}
@@ -64,6 +76,8 @@ export function TelaEmbalagensDaFicha({
         inicial={inicial}
         impressao={canais.impressao}
         porcao={{ num: ficha.custo.porRendimento.num.toString(), den: ficha.custo.porRendimento.den.toString() }}
+        faltaPreco={ficha.custo.faltaPreco}
+        podeConferirPrecos={podeConferirPrecos}
         bloqueio={bloqueio}
         novoInsumo={novoInsumo}
       />

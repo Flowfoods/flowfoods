@@ -40,9 +40,9 @@ export async function reduzir(arquivo: File): Promise<File> {
 }
 
 /** Manda a foto para a rota de envio; devolve o nome sorteado ou a frase do erro. */
-export async function enviarFoto(url: string, foto: File): Promise<{ arquivo: string } | { erro: string }> {
+export async function enviarFoto(url: string, foto: File, signal?: AbortSignal): Promise<{ arquivo: string } | { erro: string }> {
   try {
-    const r = await fetch(url, { method: 'POST', body: foto, headers: { 'Content-Type': foto.type || 'application/octet-stream' } });
+    const r = await fetch(url, { method: 'POST', body: foto, signal, headers: { 'Content-Type': foto.type || 'application/octet-stream' } });
     const corpo = (await r.json().catch(() => ({}))) as { arquivo?: string; erro?: string };
     if (r.ok && corpo.arquivo) return { arquivo: corpo.arquivo };
     return { erro: corpo.erro ?? 'Não deu para enviar a foto. Tente de novo.' };
@@ -73,6 +73,8 @@ export function CampoFoto({
 }) {
   const temPontoDaFoto = useTemPonto('foto');
   const entrada = useRef<HTMLInputElement>(null);
+  const escolha = useRef(0);
+  const envioAtual = useRef<AbortController | null>(null);
   const [previa, setPrevia] = useState<string | null>(null);
   const [enviada, setEnviada] = useState('');
   const [remover, setRemover] = useState(false);
@@ -80,22 +82,37 @@ export function CampoFoto({
   const [preparando, setPreparando] = useState(false);
 
   useEffect(() => () => {
+    // Redução de imagem não é cancelável; a identidade também protege essa etapa.
+    escolha.current++;
+    envioAtual.current?.abort();
+  }, []);
+
+  useEffect(() => () => {
     if (previa) URL.revokeObjectURL(previa);
   }, [previa]);
 
   async function escolheu(e: React.ChangeEvent<HTMLInputElement>) {
-    const original = e.target.files?.[0];
-    setAviso(null);
+    const campo = e.target;
+    const original = campo.files?.[0];
     if (!original) return;
+    const estaEscolha = ++escolha.current;
+    envioAtual.current?.abort();
+    const controlador = new AbortController();
+    envioAtual.current = controlador;
+    setAviso(null);
     setPreparando(true);
     aoOcupar(true);
     const final = await reduzir(original);
-    const r = final.size > LIMITE_DA_FOTO ? { erro: 'Foto acima de 8 MB: escolha outra.' } : await enviarFoto(envio, final);
+    if (estaEscolha !== escolha.current) return;
+    const r = final.size > LIMITE_DA_FOTO ? { erro: 'Foto acima de 8 MB: escolha outra.' } : await enviarFoto(envio, final, controlador.signal);
+    // Um servidor pode terminar o envio apesar do abort. Só a última escolha altera o formulário.
+    if (estaEscolha !== escolha.current) return;
+    envioAtual.current = null;
     setPreparando(false);
     aoOcupar(false);
     if ('erro' in r) {
       setAviso(r.erro);
-      e.target.value = '';
+      campo.value = '';
       return;
     }
     setEnviada(r.arquivo);
@@ -154,6 +171,12 @@ export function CampoFoto({
                 value="sim"
                 checked={remover}
                 onChange={(e) => {
+                  escolha.current++;
+                  envioAtual.current?.abort();
+                  envioAtual.current = null;
+                  setPreparando(false);
+                  aoOcupar(false);
+                  setAviso(null);
                   setRemover(e.target.checked);
                   if (e.target.checked && entrada.current) entrada.current.value = '';
                   setPrevia(null);
