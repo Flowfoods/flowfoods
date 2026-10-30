@@ -1476,6 +1476,9 @@ model CanalConfig {
   parceiroId         String
   parceiro           ParceiroFlow @relation(fields: [parceiroId], references: [id], onDelete: Restrict)
   canal              CanalVenda
+  // A linha pode nascer só com a meta de CMV. False = taxa desconhecida, mesmo com os números internos em zero.
+  // True por compatibilidade: antes deste campo, a existência da linha iFood significava taxa configurada.
+  taxaConfigurada    Boolean      @default(true)
   // Comissão sobre o preço, em pontos-base (12% = 1200).
   taxaBp             Int          @default(0)
   // Taxa fixa por pedido (ex.: taxa de transação), em centavos. 1.9: não entra

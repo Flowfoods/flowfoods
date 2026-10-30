@@ -32,15 +32,12 @@ export function FormMetasDeCmv({
   aqui,
   versao,
   inicial,
-  taxaConfigurada,
   bloqueio,
 }: {
   acao: AcaoDeCadastro;
   aqui: string;
   versao: string;
   inicial: Record<CanalVenda, number | null>;
-  /** A meta do iFood é guardada junto com a taxa dele: sem a taxa, o campo espera. */
-  taxaConfigurada: boolean;
   bloqueio: string | null;
 }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
@@ -71,7 +68,6 @@ export function FormMetasDeCmv({
         <ul className="divide-y divide-linha">
           {ORDEM_DOS_CANAIS.map((canal) => {
             const id = `metaCmv-${canal}`;
-            const espera = canal === 'IFOOD' && !taxaConfigurada;
             const erro = erros[id];
             return (
               <li key={canal} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(10rem,1fr)_auto_minmax(0,15rem)]">
@@ -80,7 +76,7 @@ export function FormMetasDeCmv({
                     {CANAIS[canal].rotulo}
                   </label>
                   <p id={`${id}-ajuda`} className={AJUDA.replace('mt-1.5', 'mt-0.5')}>
-                    {espera ? 'Configure a taxa do iFood acima antes: a meta do iFood é guardada junto com ela.' : AJUDA_DO_CANAL[canal]}
+                    {AJUDA_DO_CANAL[canal]}
                   </p>
                 </div>
                 <div className="flex items-stretch gap-2">
@@ -91,7 +87,6 @@ export function FormMetasDeCmv({
                       inputMode="decimal"
                       autoComplete="off"
                       value={textos[canal]}
-                      disabled={espera && !textos[canal]}
                       onChange={(e) => setTextos((t) => ({ ...t, [canal]: e.target.value }))}
                       className={`${CAMPO} min-h-11 text-right text-base font-semibold tabular-nums sm:text-sm`}
                       aria-invalid={!!erro}

@@ -29,6 +29,7 @@ import { listarHistorico } from './historico';
 import {
   CAMPO_DO_CANAL,
   CANAIS,
+  taxaConfiguradaDaLinha,
   taxaTotalBp,
   CANAIS_COM_EMBALAGEM,
   ehCanalComEmbalagem,
@@ -99,23 +100,22 @@ async function embalagensGravadas(tx: ClienteDoParceiro, fichaId: string) {
   return { produtoId: produto?.id ?? null, lista };
 }
 
-/** A taxa do iFood do parceiro (null = não configurada). */
+/** A linha do iFood do parceiro, inclusive quando só a meta foi configurada. */
 async function taxaDoIfood(tx: ClienteDoParceiro) {
   return tx.canalConfig.findFirst({
     where: { canal: 'IFOOD' },
-    select: { id: true, taxaBp: true, taxaPagamentoBp: true, margemAlvoPadraoBp: true, atualizadoEm: true },
+    select: { id: true, taxaConfigurada: true, taxaBp: true, taxaPagamentoBp: true, margemAlvoPadraoBp: true, atualizadoEm: true },
   });
 }
 
 /** As configurações dos canais do parceiro (até 3 linhas): a taxa do iFood e as margens-alvo (1.10). */
 async function configsDosCanais(tx: ClienteDoParceiro) {
   const lidas = await tx.canalConfig.findMany({
-    select: { id: true, canal: true, taxaBp: true, taxaPagamentoBp: true, margemAlvoPadraoBp: true, metaCmvPadraoBp: true, atualizadoEm: true },
+    select: { id: true, canal: true, taxaConfigurada: true, taxaBp: true, taxaPagamentoBp: true, margemAlvoPadraoBp: true, metaCmvPadraoBp: true, atualizadoEm: true },
   });
   const de = (c: CanalVenda) => lidas.find((x) => x.canal === c) ?? null;
   const ifood = de('IFOOD');
-  // A linha do iFood nasce na configuração da taxa (1.9): sem ela, a taxa não foi configurada.
-  const taxa: TaxaDoCanal | null = ifood ? { comissaoBp: ifood.taxaBp, pagamentoBp: ifood.taxaPagamentoBp } : null;
+  const taxa = taxaConfiguradaDaLinha(ifood);
   const margens = Object.fromEntries(ORDEM_DOS_CANAIS.map((c) => [c, de(c)?.margemAlvoPadraoBp ?? null])) as Record<CanalVenda, number | null>;
   // N.2: a meta de CMV de cada canal (comanda a sugestão e o farol; a margem-alvo acima é registro antigo).
   const metas = Object.fromEntries(ORDEM_DOS_CANAIS.map((c) => [c, de(c)?.metaCmvPadraoBp ?? null])) as Record<CanalVenda, number | null>;
@@ -323,7 +323,7 @@ export const CAMPOS_DAS_EMBALAGENS = Object.values(CAMPO_DO_CANAL);
 // ------------------------------------------------------------ taxa do iFood
 
 /** Retrato da taxa para o histórico ("23%"). */
-const retratoDaTaxa = (t: TaxaDoCanal) => ({ nome: 'iFood', comissao: formatarPontosBase(t.comissaoBp), pagamento: formatarPontosBase(t.pagamentoBp) });
+const retratoDaTaxa = (t: TaxaDoCanal | null) => ({ nome: 'iFood', comissao: t ? formatarPontosBase(t.comissaoBp) : 'não configurada', pagamento: t ? formatarPontosBase(t.pagamentoBp) : 'não configurado' });
 
 /** A taxa do iFood do parceiro, as margens-alvo dos canais (1.10) e as últimas alterações deles. */
 export async function obterTaxaDoIfood(cliente: ClienteDoParceiro) {
@@ -345,7 +345,7 @@ export async function obterTaxaDoIfood(cliente: ClienteDoParceiro) {
 
 /**
  * Configura a taxa do iFood do parceiro (comissão + pagamento online, %).
- * `versao` = o `atualizadoEm` lido ('' = a tela leu "não configurada").
+ * `versao` = o `atualizadoEm` da linha lida ('' = sem linha; a linha pode ter só meta e ainda não ter taxa).
  */
 export async function salvarTaxaDoIfood(
   cliente: ClienteDoParceiro,
@@ -363,7 +363,7 @@ export async function salvarTaxaDoIfood(
         throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DA_TAXA }, conflito: true });
       if (!atual) {
         const novo = await tx.canalConfig.create({
-          data: { parceiroId: tx.parceiroId, canal: 'IFOOD', taxaBp: t.comissaoBp, taxaPagamentoBp: t.pagamentoBp },
+          data: { parceiroId: tx.parceiroId, canal: 'IFOOD', taxaConfigurada: true, taxaBp: t.comissaoBp, taxaPagamentoBp: t.pagamentoBp },
           select: { id: true },
         });
         await tx.historicoAlteracao.create({
@@ -380,12 +380,12 @@ export async function salvarTaxaDoIfood(
           },
         });
       }
-      const antes = retratoDaTaxa({ comissaoBp: atual.taxaBp, pagamentoBp: atual.taxaPagamentoBp });
+      const antes = retratoDaTaxa(taxaConfiguradaDaLinha(atual));
       const mudanca = diferenca(antes, retratoDaTaxa(t));
       if (!mudanca) return { ok: true as const, id: atual.id, mudou: [] };
       const r = await tx.canalConfig.updateMany({
         where: { id: atual.id, atualizadoEm: atual.atualizadoEm },
-        data: { taxaBp: t.comissaoBp, taxaPagamentoBp: t.pagamentoBp },
+        data: { taxaConfigurada: true, taxaBp: t.comissaoBp, taxaPagamentoBp: t.pagamentoBp },
       });
       if (r.count !== 1) throw new Recusa({ ok: false, erros: { geral: MENSAGEM_CONFLITO_DA_TAXA }, conflito: true });
       await tx.historicoAlteracao.create({
@@ -425,8 +425,7 @@ function versaoDasMargens(lidas: readonly { canal: string; margemAlvoPadraoBp: n
 /**
  * Margem-alvo (líquida) de cada canal do parceiro. `versao` = a impressão que a
  * tela leu: se uma linha mudou (inclusive a taxa do iFood, que mora na mesma
- * linha), conflito e nada muda. Loja e delivery nascem aqui; a linha do iFood
- * nasce com a taxa (sem taxa, o alvo do iFood espera).
+ * linha), conflito e nada muda. Sem taxa, o alvo legado do iFood espera; a meta de CMV é independente.
  */
 export async function salvarMargensAlvo(
   cliente: ClienteDoParceiro,
@@ -525,9 +524,8 @@ export async function salvarMetasDeCmv(
         const retrato = (bp: number | null) => ({ nome: CANAIS[canal].rotulo, metaCmv: bp === null ? 'sem meta' : formatarPontosBase(bp) });
         if (!linha) {
           if (novo === null) continue;
-          // A linha do iFood nasce com a taxa (1.9): criá-la aqui faria a taxa "não configurada" virar 0% sem ninguém dizer.
-          if (canal === 'IFOOD') throw new Recusa({ ok: false, erros: { 'metaCmv-IFOOD': 'Configure a taxa do iFood antes (acima): a meta do iFood é guardada junto com ela.' } });
-          const criada = await tx.canalConfig.create({ data: { parceiroId: tx.parceiroId, canal, metaCmvPadraoBp: novo }, select: { id: true } });
+          // Só a meta nasceu: no iFood, a taxa permanece desconhecida até ser explicitamente informada.
+          const criada = await tx.canalConfig.create({ data: { parceiroId: tx.parceiroId, canal, metaCmvPadraoBp: novo, taxaConfigurada: canal !== 'IFOOD' }, select: { id: true } });
           await tx.historicoAlteracao.create({
             data: { parceiroId: tx.parceiroId, entidade: 'CanalConfig', entidadeId: criada.id, acao: 'ALTEROU', antes: retrato(null), depois: retrato(novo), autorNome },
           });
