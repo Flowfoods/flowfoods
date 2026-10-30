@@ -8,8 +8,8 @@ import { acaoLigarCustoMedio } from '../../actions';
 
 /** Ligar o custo médio numa loja: pede a confirmação de que o impacto foi lido. Não tem volta (o livro segue para a frente). */
 export function FormLigarCustoMedio({ slug, lojaId, loja }: { slug: string; lojaId: string; loja: string }) {
-  const saida = useAvisoDeSaida();
   const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoLigarCustoMedio.bind(null, slug, lojaId), null);
+  const saida = useAvisoDeSaida(estado);
   const id = `li-${lojaId}`;
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-3 border-t border-linha pt-4">

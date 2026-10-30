@@ -218,7 +218,7 @@ export function PrecoEMargemPorCanal(props: Props) {
 
 function ComFormulario(props: Props & { acao: AcaoDeCadastro }) {
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(props.acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className={props.className}>
       <input type="hidden" name="impressao" value={props.dados.impressaoDosPrecos} />

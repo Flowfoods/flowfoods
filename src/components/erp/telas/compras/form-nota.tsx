@@ -192,7 +192,7 @@ function FormNotaBase({
     daqui.delete(PARAMETRO_FORNECEDOR_CRIADO);
     return daqui.toString() ? `${pathname}?${daqui}` : pathname;
   })();
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   // A primeira chave livre: a nota nova já nasce com uma linha vazia (chave 0).
   const proxima = useRef(Math.max(1, inicial.itens.length));
   const [linhas, setLinhas] = useState(() => (inicial.itens.length ? inicial.itens : [VAZIA]).map((l, i) => ({ ...l, chave: i })));

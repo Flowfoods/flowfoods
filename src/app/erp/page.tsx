@@ -15,7 +15,8 @@ export const dynamic = 'force-dynamic';
 
 export default async function HubDaRede({ searchParams }: { searchParams: { 'sem-acesso'?: string; 'sem-modulo'?: string } }) {
   const ctx = await exigirParceiroDaSessao();
-  const [{ visao }, painel, liberados] = await Promise.all([visaoDaRequisicao(ctx), painelDoDia(ctx.cliente, ctx.alcance, '/erp'), modulosLiberados(ctx.cliente)]);
+  const [{ visao }, liberados] = await Promise.all([visaoDaRequisicao(ctx), modulosLiberados(ctx.cliente)]);
+  const painel = await painelDoDia(ctx.cliente, ctx.alcance, '/erp', undefined, visao);
   return (
     <HubDoParceiro
       titulo="Áreas da Rede"

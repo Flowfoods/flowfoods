@@ -59,9 +59,20 @@ export function ErroGeral({ estado, recarregar }: { estado: EstadoCadastro; reca
   );
 }
 
-/** Avisa antes de sair, inclusive por Voltar/menu do roteador, com alterações ainda não salvas. */
-export function useAvisoDeSaida() {
+/** A resposta explícita da action; enviar não é comprovação de que o servidor salvou. */
+type ResultadoDoEnvio = { ok: boolean } | null | undefined;
+
+/** Avisa antes de sair; uma resposta de erro rearma a proteção sem interferir no sucesso da action. */
+export function useAvisoDeSaida(resultado?: ResultadoDoEnvio) {
   const sujo = useRef(false);
+  const resultadoVisto = useRef<ResultadoDoEnvio>(undefined);
+  useEffect(() => {
+    if (resultadoVisto.current === resultado) return;
+    resultadoVisto.current = resultado;
+    // O mesmo erro antigo pode continuar renderizado durante o envio seguinte.
+    // Só uma resposta nova comprova que o que foi enviado ainda precisa de atenção.
+    if (resultado?.ok === false) sujo.current = true;
+  }, [resultado]);
   useEffect(() => {
     const aviso = (e: BeforeUnloadEvent) => {
       if (!sujo.current || dispensaDoUnload) return;

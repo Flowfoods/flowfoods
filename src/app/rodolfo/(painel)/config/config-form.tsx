@@ -36,8 +36,8 @@ function Campo({
 }
 
 export function ConfigForm({ config }: { config: ConfigBarney }) {
-  const saida = useAvisoDeSaida();
   const [estado, acao] = useFormState(acaoSalvarConfig, inicial);
+  const saida = useAvisoDeSaida(estado);
 
   return (
     <form action={acao} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} className="space-y-5">

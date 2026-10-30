@@ -191,7 +191,7 @@ function FormConferenciaBase({
 }: PropsDaConferencia & { escolhasIniciais: Record<number, Escolha>; lojaInicial: string; fornecedorInicial: string; dataInformada: string; chaveDoRascunho: string; avisos: ReactNode }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [estado, enviar] = useFormState<EstadoDocumento, FormData>(acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const porId = useMemo(() => new Map(opcoesDeInsumos.map((i) => [i.id, i])), [opcoesDeInsumos]);
   const [escolhas, setEscolhas] = useState<Record<number, Escolha>>(escolhasIniciais);
 

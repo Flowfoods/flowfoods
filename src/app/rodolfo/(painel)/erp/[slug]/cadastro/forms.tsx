@@ -7,8 +7,8 @@ import { CAMPO, Erro, ROTULO, Resultado, type EstadoForm } from '@/components/er
 import { acaoMudarStatusParceiro, acaoRenomearParceiro } from '../../actions';
 
 export function FormRenomear({ slug, nome }: { slug: string; nome: string }) {
-  const saida = useAvisoDeSaida();
   const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoRenomearParceiro.bind(null, slug), null);
+  const saida = useAvisoDeSaida(estado);
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-1.5">
       <label htmlFor="nome-parceiro" className={ROTULO}>
@@ -36,8 +36,8 @@ export function FormRenomear({ slug, nome }: { slug: string; nome: string }) {
 
 /** Uma ação por vez, a que o status atual permite. Suspender pede motivo. */
 export function FormStatus({ slug, novo }: { slug: string; novo: 'ATIVO' | 'SUSPENSO' }) {
-  const saida = useAvisoDeSaida();
   const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoMudarStatusParceiro.bind(null, slug), null);
+  const saida = useAvisoDeSaida(estado);
   const suspender = novo === 'SUSPENSO';
   return (
     <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-3">

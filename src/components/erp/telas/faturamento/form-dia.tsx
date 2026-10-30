@@ -171,7 +171,7 @@ export function FormDoDia({
   fechado: string | null;
 }) {
   const [estado, enviar] = useFormState<EstadoDoDia, FormData>(acao, null);
-  const saida = useAvisoDeSaida();
+  const saida = useAvisoDeSaida(estado);
   const travado = somenteLeitura || !!bloqueio || !!fechado;
   return (
     <form action={enviar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">

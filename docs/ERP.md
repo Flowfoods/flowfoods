@@ -4768,3 +4768,10 @@ Base reconciliada com o Notion: master `5243e00677bb28f7473982a326f56836831f3f08
 - Home diferencia ausência de lançamentos de zero informado. Custo médio por loja não foi ativado.
 
 QA real local com dados sintéticos: 18 cenários aprovados; 3 telas × 3 larguras × 2 temas sem transbordamento; editor sem preços; teclado/retorno/filtros/troca de visão; insumo → ficha → custo atualizado de R$ 2 para R$ 4. Revisões independentes executadas. Tipos, lint e baterias focadas aprovados. A suíte completa/build no Windows teve limitações de fixtures CRLF, caminhos e argumentos psql; publicação depende do portão Linux existente. Acompanhar commit, resultado CI e comprovação do ambiente no registro de execução da página principal do Notion. Sem migration nova ou ação real de integração/anúncios.
+
+## Home e formulários — segunda rodada Codex (decisão 493)
+
+- Home do parceiro e espelho do nível 1 consultam faturamento/estoque na loja selecionada e dentro do alcance. O cadastro compartilhado do cardápio informa “Da rede”; links preservam mês, loja e parceiro. Visão inválida não vira Rede silenciosamente. Ausência de lançamento continua diferente de zero.
+- Após resposta de erro ao salvar, 18 formulários recuperam o aviso de saída com alterações. Sucesso não gera aviso falso nem apaga edições feitas durante o envio.
+- 30 testes dirigidos com banco, tipos, lint e portão de conteúdo aprovados. Dois cenários reais de Chrome com dados sintéticos: erro/cancelar/corrigir/persistir e Rede R$ 8.000 → loja B R$ 7.000, em 360/1440 sem transbordamento. Revisão independente sem bloqueantes. CI, merge e publicação desta rodada são acompanhados no mesmo plano Notion.
+- H-A14 do resumo existente evoluiu; H1/estados independentes e a Home analítica de seis famílias continuam na fila. Sem migration, regra financeira nova ou ativação de integração/custeio.
