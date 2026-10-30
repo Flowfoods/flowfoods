@@ -5,6 +5,7 @@
  * de compra. Cancelada: o motivo. Ao lado (a partir de 1024 px): situação (descartar), cobrança e alterações. Quem só vê não tem botão.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { FormularioDeNota } from '@/lib/erp/compras';
 import { formatarCep, formatarData, formatarDocumento, formatarEmbalagens } from '@/lib/erp/compra-campos';
@@ -219,9 +220,9 @@ export function TelaDocumento({
               {d.canceladoEm && <Linha rotulo="Descartada em">{DATA_HORA.format(d.canceladoEm).replace(',', ' às')}</Linha>}
             </dl>
           </Painel>
-          <Painel titulo="Alterações" semRespiro>
+          <HistoricoRecolhivel chave={`${base}/${d.id}`} quantidade={d.historico.length} titulo="Alterações" semRespiro>
             {d.historico.length === 0 ? <Vazio>Nada registrado ainda.</Vazio> : <ListaHistorico linhas={d.historico} compacta doCadastro={d.rotulo} />}
-          </Painel>
+          </HistoricoRecolhivel>
         </aside>
       </div>
     </div>

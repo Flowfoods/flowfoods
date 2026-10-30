@@ -18,7 +18,7 @@ import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { FiltroEmLinks } from '../../ui/filtros';
 import { Paginacao } from '../../ui/paginacao';
 import { Aviso, Metrica, Painel, Selo, Vazio } from '../../ui/superficies';
-import { BotaoOuMotivo } from '../cadastro/partes';
+import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 
 type Lista = Awaited<ReturnType<typeof listarDespesas>>;
 
@@ -80,6 +80,9 @@ export function TelaDeDespesas({
   const ate = Math.min(lista.pagina * lista.porPagina, lista.total);
   return (
     <div className="space-y-6">
+      <Voltar href={podeVerDre ? raiz + '/dre' : raiz}>
+        {podeVerDre ? 'Voltar para o DRE' : 'Voltar para as áreas da rede'}
+      </Voltar>
       <PageHeader
         icone="compras"
         cor={COR.dre}

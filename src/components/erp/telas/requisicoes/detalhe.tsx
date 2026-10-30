@@ -6,6 +6,7 @@
  * volta, cancelar a pedida; e o histórico. A mesma tela no nível 1 e na pessoa.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { RequisicaoDaLoja } from '@/lib/erp/requisicao';
 import { numeroDaRequisicao, pendente, TITULO_NO_HISTORICO_DA_REQUISICAO, quantidadeNegativa, rotuloDoSetor, textoDoParaDia } from '@/lib/erp/requisicao-campos';
@@ -193,9 +194,9 @@ export function TelaDetalheDaRequisicao({
             )}
           </div>
         )}
-        <Painel titulo="Histórico" semRespiro className={podeDevolver || podeCancelar ? '' : 'lg:col-span-2'}>
+        <HistoricoRecolhivel chave={aqui} quantidade={d.historico.length} titulo="Histórico" semRespiro className={podeDevolver || podeCancelar ? '' : 'lg:col-span-2'}>
           {d.historico.length === 0 ? <Vazio>Sem alterações.</Vazio> : <ListaHistorico linhas={d.historico} compacta doCadastro={`Requisição ${numeroDaRequisicao(r.numero)} · ${d.loja.nome}`} titulos={TITULO_NO_HISTORICO_DA_REQUISICAO} />}
-        </Painel>
+        </HistoricoRecolhivel>
       </div>
     </div>
   );

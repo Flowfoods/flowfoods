@@ -99,7 +99,7 @@ export interface ModuloNav {
    */
   resumo?: string;
   icone: ChaveIcone;
-  /** Cor do módulo: só no quadrado do ícone (hub, seletor de módulo, cabeçalho). */
+  /** Identidade central da área: ícone, card e menu (decisão visual de 29/10). */
   cor: string;
   /** Primeira tela do módulo; null = ainda não construído. */
   href: string | null;

@@ -167,16 +167,54 @@ html:has(.ff-app[data-tema='escuro']) {
   transition-timing-function: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
-/* Quadrado do ícone do módulo: a cor do módulo só mora aqui (hub, seletor e cabeçalho). */
+/* Identidade das áreas (29/10): a paleta de modulos.ts também orienta cards e menu.
+   O texto permanece neutro; as misturas usam os mesmos tokens de tema do ícone.
+   A exceção de borda/sombra tonal é só destas superfícies, não de painéis operacionais. */
+.ff-app .ff-identidade-modulo {
+  --ff-modulo-cor: var(--cor-modulo, rgb(var(--ff-suave)));
+  --ff-modulo-tinta: color-mix(in srgb, var(--ff-modulo-cor) var(--ff-icone-tinta), rgb(var(--ff-texto)));
+  --ff-modulo-fundo: color-mix(in srgb, var(--ff-modulo-cor) 7%, rgb(var(--ff-painel)));
+  --ff-modulo-realce: color-mix(in srgb, var(--ff-modulo-cor) 12%, rgb(var(--ff-painel)));
+  --ff-modulo-borda: color-mix(in srgb, var(--ff-modulo-tinta) 48%, rgb(var(--ff-painel)));
+  --ff-modulo-sombra: color-mix(in srgb, var(--ff-modulo-cor) 24%, transparent);
+}
+
+.ff-app :is(.ff-cartao-modulo, .ff-seletor-modulo) {
+  background-color: var(--ff-modulo-fundo);
+  border-color: var(--ff-modulo-borda);
+  box-shadow: 0 2px 0 var(--ff-modulo-sombra);
+}
+.ff-app :is(.ff-cartao-modulo, .ff-seletor-modulo):not([aria-disabled='true']):is(:hover, :focus-within, [aria-expanded='true']) {
+  background-color: var(--ff-modulo-realce);
+  border-color: var(--ff-modulo-tinta);
+  box-shadow: 0 3px 0 var(--ff-modulo-sombra);
+}
+.ff-app .ff-cartao-modulo[aria-disabled='true'] {
+  border-style: dashed;
+  box-shadow: none;
+}
+.ff-app .ff-nav-icone {
+  color: var(--ff-modulo-tinta);
+}
+.ff-app :is(.ff-nav-item, a.ff-opcao-modulo):hover {
+  background-color: var(--ff-modulo-fundo);
+}
+.ff-app .ff-opcao-modulo[aria-current='true'] {
+  background-color: var(--ff-modulo-realce);
+  box-shadow: inset 2px 0 0 var(--ff-modulo-tinta);
+  font-weight: 600;
+}
+
+/* Quadrado do ícone: conserva a identidade do módulo no cabeçalho, card e seletor. */
 .ff-app .ff-icone-modulo {
   background-color: color-mix(in srgb, var(--cor-modulo) var(--ff-mistura-icone), transparent);
   color: color-mix(in srgb, var(--cor-modulo) var(--ff-icone-tinta), rgb(var(--ff-texto)));
 }
 
-/* Item ativo do menu: fundo tinto + indicador de 2 px na borda esquerda (kit pulso). */
+/* Ativo reconhecível por forma/peso e aria-current, além da cor da própria área. */
 .ff-app .ff-nav-item[aria-current='page'] {
-  background-color: var(--ff-ativo);
-  box-shadow: inset 2px 0 0 rgb(var(--ff-acento));
+  background-color: var(--ff-modulo-realce);
+  box-shadow: inset 2px 0 0 var(--ff-modulo-tinta);
   color: rgb(var(--ff-texto));
   font-weight: 600;
 }

@@ -6,6 +6,7 @@
  * Nada aqui chama o iFood: a única chamada é o comando da leitura de teste.
  */
 
+import { HistoricoRecolhivel } from '@/components/erp/telas/historico/historico-recolhivel';
 import { exigirParceiro } from '@/lib/erp/contexto';
 import { ENTIDADES_DE_INTEGRACAO, listarHistorico } from '@/lib/erp/historico';
 import { liberacoesDoParceiro } from '@/lib/erp/liberacao';
@@ -197,9 +198,9 @@ export default async function IntegracoesDoParceiroNoNivel1({ params, searchPara
             </div>
           </Painel>
 
-          <Painel titulo="Histórico das integrações">
+          <HistoricoRecolhivel chave={parceiro.id} quantidade={historico.length} titulo="Histórico das integrações">
             {historico.length === 0 ? <p className="text-sm text-suave">Nada mudou ainda nas integrações deste parceiro.</p> : <ListaHistorico linhas={historico} compacta />}
-          </Painel>
+          </HistoricoRecolhivel>
         </div>
       </div>
     </div>

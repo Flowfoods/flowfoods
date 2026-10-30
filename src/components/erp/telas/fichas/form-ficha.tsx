@@ -27,7 +27,7 @@ import {
   type RendeEm,
   type TipoFicha,
 } from '@/lib/erp/ficha-campos';
-import type { InsumoDoFormulario, PreparoDoFormulario } from '@/lib/erp/fichas';
+import type { InsumoDoFormulario, PreparoDoFormularioNaTela } from '@/lib/erp/fichas';
 import {
   custoDoUso,
   custoPorUnidade,
@@ -187,7 +187,9 @@ type PropsDoFormFicha = {
   cancelar: string;
   opcoes: InsumoDoFormulario[];
   /** Pré-preparos que podem entrar (sem a própria ficha), com o custo por unidade. */
-  preparos?: PreparoDoFormulario[];
+  preparos?: PreparoDoFormularioNaTela[];
+  /** Permissão efetiva; as opções já chegam do servidor sem valores quando falsa. */
+  verCustos: boolean;
   inicial?: ValoresDaFicha;
   fotoAtual?: string | null;
   versao?: string;
@@ -204,6 +206,7 @@ function FormFichaBase({
   cancelar,
   opcoes,
   preparos = [],
+  verCustos,
   inicial = NOVA,
   fotoAtual = null,
   versao,
@@ -235,32 +238,32 @@ function FormFichaBase({
         nome: p.nome,
         grupo: 'Pré-preparos da casa',
         ordemDoGrupo: -1,
-        detalhe: [p.ativo ? null : 'desativado', p.incompleto ? 'custo incompleto' : null].filter(Boolean).join(' · ') || null,
+        detalhe: [p.ativo ? null : 'desativado', verCustos && p.incompleto ? 'custo incompleto' : null].filter(Boolean).join(' · ') || null,
       })),
       ...opcoes.map((i) => ({
         valor: i.id,
         nome: i.nome,
         grupo: i.categoria?.nome ?? 'Sem categoria',
         ordemDoGrupo: i.categoria?.ordem ?? Number.MAX_SAFE_INTEGER,
-        detalhe: [i.ativo ? null : 'desativado', i.custo ? null : 'custo não informado'].filter(Boolean).join(' · ') || null,
+        detalhe: [i.ativo ? null : 'desativado', verCustos && !i.custo ? 'custo não informado' : null].filter(Boolean).join(' · ') || null,
       })),
     ],
-    [opcoes, preparos],
+    [opcoes, preparos, verCustos],
   );
   const porEscolha = useMemo(() => {
     const m = new Map<string, Escolhido>();
-    for (const i of opcoes) m.set(i.id, { nome: i.nome, unidade: i.unidade, porUnidade: i.custo ? custoPorUnidade(i.custo) : null, preparo: false, incompleto: false });
+    for (const i of opcoes) m.set(i.id, { nome: i.nome, unidade: i.unidade, porUnidade: verCustos && i.custo ? custoPorUnidade(i.custo) : null, preparo: false, incompleto: false });
     for (const p of preparos) {
       m.set(`${PREFIXO_DO_PREPARO}${p.id}`, {
         nome: p.nome,
         unidade: p.unidade,
-        porUnidade: { num: BigInt(p.custo.num), den: BigInt(p.custo.den) },
+        porUnidade: verCustos && p.custo ? { num: BigInt(p.custo.num), den: BigInt(p.custo.den) } : null,
         preparo: true,
-        incompleto: p.incompleto,
+        incompleto: verCustos && p.incompleto === true,
       });
     }
     return m;
-  }, [opcoes, preparos]);
+  }, [opcoes, preparos, verCustos]);
 
   function mudarLinha(chave: number, mudanca: Partial<LinhaDoItem>) {
     setLinhas((ls) =>
@@ -377,10 +380,12 @@ function FormFichaBase({
               <div className="mt-1.5 flex items-center gap-1">
                 <p className={AJUDA.replace('mt-1.5', '')}>
                   {tipo === 'PRATO'
-                    ? 'Prato rende porções: o custo sai por porção.'
+                    ? (verCustos ? 'Prato rende porções: o custo sai por porção.' : 'Prato rende porções.')
                     : temPonto.tipo
                       ? 'Pré-preparo rende em kg, L ou un e entra em outras fichas.'
-                      : 'Pré-preparo (molho, massa, recheio) rende em kg, L ou un, entra em outras fichas e aparece em Insumos com o custo desta receita.'}
+                      : verCustos
+                        ? 'Pré-preparo (molho, massa, recheio) rende em kg, L ou un, entra em outras fichas e aparece em Insumos com o custo desta receita.'
+                        : 'Pré-preparo (molho, massa, recheio) rende em kg, L ou un, entra em outras fichas e aparece em Insumos.'}
                 </p>
                 <PontoDeAjuda ponto="tipo" className="-my-3 sm:-my-1.5" />
               </div>
@@ -498,13 +503,13 @@ function FormFichaBase({
           )}
           <div
             aria-hidden
-            className="hidden grid-cols-[minmax(0,1fr)_6.5rem_5rem_5.5rem_7rem_auto] gap-2 border-b border-linha bg-forte px-5 py-2 text-[12px] font-semibold text-suave sm:grid"
+            className={`hidden ${verCustos ? 'grid-cols-[minmax(0,1fr)_6.5rem_5rem_5.5rem_7rem_auto]' : 'grid-cols-[minmax(0,1fr)_6.5rem_5rem_5.5rem_auto]'} gap-2 border-b border-linha bg-forte px-5 py-2 text-[12px] font-semibold text-suave sm:grid`}
           >
             <span>Insumo ou pré-preparo</span>
             <span className="text-right">Quantidade</span>
             <span>Medida</span>
             <span className="text-right">Fator</span>
-            <span className="text-right">Custo</span>
+            {verCustos && <span className="text-right">Custo</span>}
             <span className="w-11" />
           </div>
           <ul className="divide-y divide-linha">
@@ -515,7 +520,7 @@ function FormFichaBase({
               const erro = erros[`item-${n}`];
               return (
                 <li key={l.chave} className="px-4 py-3 sm:px-5">
-                  <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_5rem_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_6.5rem_5rem_5.5rem_7rem_auto] sm:items-center">
+                  <div className={`grid grid-cols-[minmax(0,1fr)_4.5rem_5rem_auto] gap-2 ${verCustos ? 'sm:grid-cols-[minmax(0,1fr)_6.5rem_5rem_5.5rem_7rem_auto]' : 'sm:grid-cols-[minmax(0,1fr)_6.5rem_5rem_5.5rem_auto]'} sm:items-center`}>
                     <div className="col-span-4 sm:col-span-1">
                       <label htmlFor={`${idBase}-item-${n}`} className="sr-only">
                         Insumo ou pré-preparo {n + 1}
@@ -579,13 +584,15 @@ function FormFichaBase({
                         className={`${CAMPO} text-right tabular-nums placeholder:text-[13px]`}
                       />
                     </div>
-                    <p
-                      className="col-span-4 row-start-3 flex items-center justify-end text-right text-[13px] tabular-nums text-suave sm:col-span-1 sm:row-start-auto sm:min-h-[42px]"
-                      aria-live="polite"
-                    >
-                      <span className="mr-1 sm:hidden">Custo</span>
-                      {!c ? '—' : c.custo ? formatarFracao(c.custo) : <span className="text-atencao">não informado</span>}
-                    </p>
+                    {verCustos && (
+                      <p
+                        className="col-span-4 row-start-3 flex items-center justify-end text-right text-[13px] tabular-nums text-suave sm:col-span-1 sm:row-start-auto sm:min-h-[42px]"
+                        aria-live="polite"
+                      >
+                        <span className="mr-1 sm:hidden">Custo</span>
+                        {!c ? '—' : c.custo ? formatarFracao(c.custo) : <span className="text-atencao">não informado</span>}
+                      </p>
+                    )}
                     <button
                       type="button"
                       onClick={() => {
@@ -598,15 +605,15 @@ function FormFichaBase({
                       <Trash2 size={16} aria-hidden />
                     </button>
                   </div>
-                  {e && c && (c.fator !== 1000 || e.preparo) && (
+                  {e && c && (c.fator !== 1000 || (e.preparo && verCustos)) && (
                     <p className="mt-1.5 text-[12px] tabular-nums text-suave">
                       {c.fator !== 1000 && (
                         <>
                           Bruto {formatarQuantidade(c.bruta, e.unidade)} (fator {formatarFator(c.fator)})
                         </>
                       )}
-                      {c.fator !== 1000 && e.preparo && ' · '}
-                      {e.preparo && (
+                      {c.fator !== 1000 && e.preparo && verCustos && ' · '}
+                      {e.preparo && verCustos && (
                         <>
                           Pré-preparo a {e.porUnidade ? formatarFracao(e.porUnidade) : '—'} por {UNIDADES[e.unidade].sigla}
                           {e.incompleto && <span className="text-atencao"> (custo incompleto)</span>}
@@ -634,7 +641,7 @@ function FormFichaBase({
               </button>
               {novoInsumo && <AtalhoNovoInsumo href={novoInsumo} aoSair={guardarOQueFoiPreenchido} />}
             </div>
-            <p className="text-right text-sm tabular-nums" aria-live="polite">
+            {verCustos && <p className="text-right text-sm tabular-nums" aria-live="polite">
               <span className="text-suave">Prévia: </span>
               {/* Nenhum item com custo: R$ 0,00 seria um custo que ninguém informou. */}
               <span className="font-semibold">{previa.total.num === 0n && (previa.semPreco.length > 0 || previa.incompletos.length > 0) ? '—' : formatarFracao(previa.total)}</span>
@@ -648,7 +655,7 @@ function FormFichaBase({
               {previa.incompletos.length > 0 && (
                 <span className="block text-[12px] text-atencao">Custo incompleto dentro de {previa.incompletos.join(', ')}.</span>
               )}
-            </p>
+            </p>}
           </div>
         </Painel>
 

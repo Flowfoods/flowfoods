@@ -5,9 +5,10 @@
 **Personalidade:** precisão e densidade (central de operação de restaurante),
 com a identidade editorial FlowFoods.
 
-**Base:** quente (creme e preto, nunca cinza azulado). **Profundidade:** só
-bordas finas + UMA camada de superfície (`painel` sobre `fundo`); sombra só no
-que flutua (diálogo, gaveta, popover).
+**Base:** quente (creme e preto, nunca cinza azulado). **Profundidade:**
+bordas finas + UMA camada de superfície (`painel` sobre `fundo`); sombra no
+que flutua (diálogo, gaveta, popover). Exceção específica aprovada em 29/10:
+cards e seletor de módulos recebem borda e sombra tonal discreta da área.
 
 Fontes: geometria e comportamento do kit Kairu Dark "pulso"
 (`library:design-central-escura`, `src/design-kit.css` + `src/DesignKit.tsx`);
@@ -40,8 +41,13 @@ entra. Acento continua o vermelho FlowFoods (o kit manda preservar a marca).
 | `erro` / `ok` / `atencao` | #F5525A / #4ADE80 / #F59E0B | #C41522 / #166534 / #92400E | só em selo e texto, sempre com palavra |
 
 Tema: cookie `ff_tema` (claro | escuro | sistema) lido no servidor → `data-tema`.
-Cor de módulo (paleta em `src/lib/erp/modulos.ts`) SÓ no quadrado do ícone:
-fundo a 14 % (claro) / 22 % (escuro), ícone na cor (escuro: misturado ao creme).
+Cor de módulo: uma paleta central em `src/lib/erp/modulos.ts` para ícone,
+card e menu, conforme a decisão do Notion de 29/10. O quadrado mantém fundo
+a 14 % (claro) / 22 % (escuro), ícone na cor (escuro: misturado ao creme).
+Cards e seletor usam fundo tonal de 7 % (12 % no realce), borda derivada da
+tinta e sombra de 2–3 px. O menu ativo usa a tinta da área com filete e peso,
+além de `aria-current`; o vermelho continua no foco e no botão de marca.
+Liberação, erro e "Em breve" conservam palavras e controles próprios.
 
 ## Tipo
 
@@ -58,7 +64,7 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
 ## Padrões
 
 - **Menu lateral** 232 px (68 recolhido), altura total, borda direita; item
-  40 px, ativo = `--ff-ativo` + `inset 2px 0 0 acento`; seletor de módulo no
+  40 px, ativo = realce tonal + `inset 2px 0 0 tinta da área`; seletor de módulo no
   topo; grupos com botão `aria-expanded`; fase no rodapé. < 900 px: gaveta.
 - **Barra superior** 64 px, borda inferior, sem blur.
 - **Botão** 40 px (44 no celular), padding 16, raio 7, 14 px/600. Um
@@ -69,6 +75,15 @@ campo, selo), 10 (quadrado do ícone 40, segmentado), 14 (card, diálogo).
   `aria-describedby`.
 - **Card** borda `linha`, raio 14, cabeçalho 48 px com título 13 px/600,
   corpo 16/20.
+- **Histórico** wrapper `HistoricoRecolhivel` sobre os registros já autorizados:
+  fechado ao entrar, voltar, restaurar cache ou trocar pessoa/parceiro/visão/objeto;
+  preserva expansão ao filtrar/atualizar a mesma consulta. `summary` nativo,
+  Ver/Ocultar histórico, `aria-expanded`, foco e toque; links acessórios ficam
+  fora do acionador. Alertas e pendências operacionais permanecem visíveis.
+- **Voltar** reutiliza o controle de cadastro. Nas listas/hubs inventariados,
+  origem comprovada na navegação atual e no mesmo contexto, depois pai
+  autorizado e raiz; sem destino seguro, botão inativo explicado. Não usa
+  `history.back`. Links de saída dos formulários alterados pedem confirmação.
 - **Tabela** linha 44 px, cabeçalho em `forte` 12 px/600, números tabulares à
   direita, sem card em volta de número; no celular, colunas viram linha de
   apoio.

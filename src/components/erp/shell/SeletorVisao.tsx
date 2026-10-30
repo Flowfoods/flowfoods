@@ -17,6 +17,7 @@ import { Check, ChevronDown, Store } from 'lucide-react';
 import { slugNoCaminho } from '@/lib/rodolfo/modulos';
 import type { OpcaoDeVisao } from '@/lib/erp/visao';
 import { Popover } from './Popover';
+import { useContextoDaConsulta } from './contexto-da-consulta';
 import type { VisaoDoNivel1, VisaoDoParceiro } from './tipos';
 
 const GATILHO =
@@ -68,6 +69,7 @@ function ListaDeOpcoes({
 
 function DoParceiro({ visao }: { visao: VisaoDoParceiro }) {
   const router = useRouter();
+  const { avisarTrocaDeVisao } = useContextoDaConsulta();
   const [pendente, iniciar] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const atual = visao.opcoes.find((o) => o.valor === visao.valor);
@@ -119,6 +121,7 @@ function DoParceiro({ visao }: { visao: VisaoDoParceiro }) {
             iniciar(async () => {
               const r = await visao.escolher(v);
               if (!r.ok) return setErro(r.mensagem);
+              if (v !== visao.valor) avisarTrocaDeVisao();
               setErro(null);
               fechar();
               router.refresh();
@@ -132,6 +135,7 @@ function DoParceiro({ visao }: { visao: VisaoDoParceiro }) {
 
 function DoNivel1({ visao }: { visao: VisaoDoNivel1 }) {
   const router = useRouter();
+  const { avisarTrocaDeVisao } = useContextoDaConsulta();
   const caminho = usePathname();
   const slug = slugNoCaminho(caminho);
   const parceiro = slug ? visao.parceiros.find((p) => p.slug === slug) : undefined;
@@ -219,6 +223,7 @@ function DoNivel1({ visao }: { visao: VisaoDoNivel1 }) {
                 iniciar(async () => {
                   const r = await visao.escolher(parceiro.slug, v);
                   if (!r.ok) return setErro(r.mensagem);
+                  if (v !== lojas.valor) avisarTrocaDeVisao();
                   setErro(null);
                   setLojas({ ...lojas, valor: v });
                   fechar();

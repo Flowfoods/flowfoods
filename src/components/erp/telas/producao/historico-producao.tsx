@@ -7,6 +7,7 @@
  * Tabela Corporativo a partir de 1280 px; cartões abaixo (a cozinha consulta pelo celular). A mesma tela no nível 1.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { HistoricoDaProducao, LinhaDoHistoricoDaProducao } from '@/lib/erp/producao-equipe';
 import { canceladoPelaPessoa, formatarTempo, fraseDoResumo, fraseDoRendimentoDoLote, horaDoDia, rotuloDoPeriodo, ROTULO_DO_DESFECHO } from '@/lib/erp/producao-equipe-campos';
@@ -16,7 +17,7 @@ import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
-import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
+import { Aviso, Selo, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { FiltroDoPeriodo } from './periodo';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
@@ -103,7 +104,7 @@ export function TelaHistoricoDaProducao({ h, base, contexto }: { h: HistoricoDaP
       </PageHeader>
       {h.cortado && <Aviso tom="alerta" titulo="Período com lotes demais para uma tela só: escolha um período menor." />}
 
-      <Painel titulo="Lotes encerrados" subtitulo={h.resumo.total ? `${fraseDoResumo(h.resumo)}${filtrado ? ' (com o filtro)' : ''}` : undefined} semRespiro>
+      <HistoricoRecolhivel chave={aqui} quantidade={h.linhas.length} titulo="Lotes encerrados" subtitulo={h.resumo.total ? `${fraseDoResumo(h.resumo)}${filtrado ? ' (com o filtro)' : ''}` : undefined} semRespiro>
         {h.linhas.length === 0 ? (
           <Vazio titulo="Nenhum lote encerrado neste período.">{filtrado ? 'Tire o filtro ou escolha outro período.' : 'Os lotes aparecem aqui quando são concluídos ou cancelados.'}</Vazio>
         ) : (
@@ -222,10 +223,10 @@ export function TelaHistoricoDaProducao({ h, base, contexto }: { h: HistoricoDaP
                 ))}
               </tbody>
             </table>
-            {h.foraDaTela > 0 && <p className="border-t border-linha px-4 py-3 text-[13px] text-suave sm:px-5">Mais {h.foraDaTela} lotes no período: escolha um período menor ou filtre para ver.</p>}
           </>
         )}
-      </Painel>
+      </HistoricoRecolhivel>
+      {h.foraDaTela > 0 && <p className="border-t border-linha px-4 py-3 text-[13px] text-suave sm:px-5">Mais {h.foraDaTela} lotes no período: escolha um período menor ou filtre para ver.</p>}
       <ExplicacaoNoPonto ponto="tempo">
         <p className="text-[12px] text-suave">O tempo conta de quando a pessoa pegou o lote (ou de quando os insumos saíram do estoque, se foi depois) até a conclusão. Lote concluído sem pegar pela tela da cozinha não tem tempo.</p>
       </ExplicacaoNoPonto>

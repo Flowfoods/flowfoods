@@ -11,6 +11,11 @@ import { useEffect, useRef } from 'react';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import type { EstadoCadastro } from './estado';
 
+// Uma tela pode ter vários formulários independentes. A decisão vale para o
+// clique inteiro, sem apagar o estado de nenhum deles antes de realmente sair.
+const saidasConfirmadas = new WeakSet<MouseEvent>();
+let dispensaDoUnload = false;
+
 /** Resumo quando há mais de um erro. `rotulos` dá o nome de cada campo (o resto aparece pela chave). */
 export function ResumoDeErros({
   erros,
@@ -54,17 +59,42 @@ export function ErroGeral({ estado, recarregar }: { estado: EstadoCadastro; reca
   );
 }
 
-/** Avisa antes de sair (fechar, recarregar) com o formulário alterado e não salvo. */
+/** Avisa antes de sair, inclusive por Voltar/menu do roteador, com alterações ainda não salvas. */
 export function useAvisoDeSaida() {
   const sujo = useRef(false);
   useEffect(() => {
     const aviso = (e: BeforeUnloadEvent) => {
-      if (!sujo.current) return;
+      if (!sujo.current || dispensaDoUnload) return;
       e.preventDefault();
       e.returnValue = '';
     };
+    // Uma navegação do Next não descarrega o documento: beforeunload sozinho
+    // deixava Voltar, a trilha e o menu abandonarem o formulário sem aviso.
+    const aoNavegar = (e: MouseEvent) => {
+      if (!sujo.current || e.defaultPrevented || saidasConfirmadas.has(e) || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+      const link = e.target instanceof Element ? e.target.closest('a[href]') : null;
+      if (!(link instanceof HTMLAnchorElement) || link.hasAttribute('download') || (link.target && link.target !== '_self')) return;
+      const destino = new URL(link.href, window.location.href);
+      if (!['http:', 'https:'].includes(destino.protocol)) return;
+      // Âncoras de ajuda/erros e o endereço atual mantêm o formulário aberto.
+      if (destino.origin === window.location.origin && destino.pathname === window.location.pathname && destino.search === window.location.search) return;
+      if (!window.confirm('Você tem alterações ainda não salvas. Deseja sair desta tela?')) {
+        e.preventDefault();
+        e.stopPropagation();
+      } else {
+        saidasConfirmadas.add(e);
+        // O descarregamento decorrente deste clique não repete a pergunta. Se
+        // a navegação falhar, o próximo evento continua protegido.
+        dispensaDoUnload = true;
+        window.setTimeout(() => { dispensaDoUnload = false; }, 0);
+      }
+    };
     window.addEventListener('beforeunload', aviso);
-    return () => window.removeEventListener('beforeunload', aviso);
+    document.addEventListener('click', aoNavegar, true);
+    return () => {
+      window.removeEventListener('beforeunload', aviso);
+      document.removeEventListener('click', aoNavegar, true);
+    };
   }, []);
   return {
     aoMudar: () => {

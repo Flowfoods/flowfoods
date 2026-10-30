@@ -10,6 +10,7 @@
  * bloqueado: botões desabilitados, com o motivo.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import { Printer } from 'lucide-react';
 import type { FichaNaTela } from '@/lib/erp/fichas';
@@ -437,9 +438,9 @@ export function TelaDetalheFicha({
               )}
             </Painel>
           )}
-          <Painel titulo="Últimas alterações" semRespiro>
+          <HistoricoRecolhivel chave={`${base}/${f.id}`} quantidade={f.historico.length} titulo="Últimas alterações" semRespiro>
             {f.historico.length === 0 ? <Vazio>Nada registrado ainda.</Vazio> : <ListaHistorico linhas={f.historico} compacta doCadastro={f.nome} />}
-          </Painel>
+          </HistoricoRecolhivel>
         </aside>
       </div>
     </div>

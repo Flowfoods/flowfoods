@@ -1094,6 +1094,24 @@ export async function preparosParaFicha(cliente: ClienteDoParceiro, jaNaFicha: s
 
 export type PreparoDoFormulario = Awaited<ReturnType<typeof preparosParaFicha>>[number];
 
+/** N.5: editar a receita não concede acesso aos custos dos insumos nem dos pré-preparos. */
+export type PreparoDoFormularioNaTela = Omit<PreparoDoFormulario, 'custo' | 'incompleto'> & {
+  custo: PreparoDoFormulario['custo'] | null;
+  incompleto: boolean | null;
+};
+
+/** Projeção feita NO SERVIDOR, antes de as opções atravessarem o limite do formulário cliente. */
+export function opcoesDaFichaNaTela(opcoes: InsumoDoFormulario[], preparos: PreparoDoFormulario[], verCustos: boolean): {
+  opcoes: InsumoDoFormulario[];
+  preparos: PreparoDoFormularioNaTela[];
+} {
+  if (verCustos) return { opcoes, preparos };
+  return {
+    opcoes: opcoes.map(({ id, nome, unidade, ativo, categoria }) => ({ id, nome, unidade, ativo, categoria, custo: null })),
+    preparos: preparos.map(({ id, nome, unidade, ativo }) => ({ id, nome, unidade, ativo, custo: null, incompleto: null })),
+  };
+}
+
 /** Busca do ⌘K: fichas DESTE parceiro pelo nome. */
 export async function buscarFichas(cliente: ClienteDoParceiro, texto: string, limite = 6) {
   const q = texto.trim().slice(0, 80);

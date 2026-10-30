@@ -4,12 +4,14 @@
  * antes/depois em `HistoricoAlteracao`.
  */
 
+import { HistoricoRecolhivel } from '@/components/erp/telas/historico/historico-recolhivel';
 import Link from 'next/link';
 import { exigirParceiro } from '@/lib/erp/contexto';
 import { listarHistorico } from '@/lib/erp/historico';
 import { STATUS_DO_PARCEIRO, transicoesDe } from '@/lib/erp/parceiros';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
+import { Voltar } from '@/components/erp/telas/cadastro/partes';
 import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Painel, Ponto, Vazio } from '@/components/erp/ui/superficies';
 import { ListaHistorico } from '@/components/erp/telas/historico/lista-historico';
@@ -39,6 +41,7 @@ export default async function CadastroParceiroPage({ params }: { params: { slug:
 
   return (
     <div className="space-y-6">
+      <Voltar href={'/rodolfo/erp/' + encodeURIComponent(parceiro.slug)}>Voltar para as áreas da rede</Voltar>
       <PageHeader
         icone="cadastro"
         cor={COR.rede}
@@ -80,7 +83,7 @@ export default async function CadastroParceiroPage({ params }: { params: { slug:
           </Painel>
         </div>
 
-        <Painel
+        <HistoricoRecolhivel chave={parceiro.id} quantidade={historico.length}
           titulo="Histórico do parceiro"
           acessorio={
             <Link href={`/rodolfo/erp/${parceiro.slug}/historico?entidade=ParceiroFlow`} className={LINK_DE_TEXTO}>
@@ -95,7 +98,7 @@ export default async function CadastroParceiroPage({ params }: { params: { slug:
           ) : (
             <ListaHistorico linhas={historico} compacta />
           )}
-        </Painel>
+        </HistoricoRecolhivel>
       </div>
     </div>
   );

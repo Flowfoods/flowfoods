@@ -2,7 +2,7 @@
 
 import { notFound, redirect } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
-import { insumosParaFicha, preparosParaFicha, obterFicha } from '@/lib/erp/fichas';
+import { fichaNaTela, insumosParaFicha, opcoesDaFichaNaTela, preparosParaFicha, obterFicha } from '@/lib/erp/fichas';
 import { TelaFormFicha } from '@/components/erp/telas/fichas/paginas';
 import { acaoEditarFicha } from '../../actions';
 
@@ -11,6 +11,7 @@ export const dynamic = 'force-dynamic';
 export default async function ErpEditarFichaPage({ params }: { params: { id: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.editar');
+  const verCustos = pode(ctx.alcance, 'precos.ver');
   const ficha = await obterFicha(ctx.cliente, params.id);
   if (!ficha) notFound();
   if (!ficha.ativa) redirect(`/erp/fichas/${ficha.id}`);
@@ -20,12 +21,12 @@ export default async function ErpEditarFichaPage({ params }: { params: { id: str
   ]);
   return (
     <TelaFormFicha
-      ficha={ficha}
+      ficha={fichaNaTela(ficha, verCustos)}
       base="/erp/fichas"
       contexto={ctx.parceiro.nome}
       acao={acaoEditarFicha.bind(null, ficha.id)}
-      opcoes={opcoes}
-      preparos={preparos}
+      {...opcoesDaFichaNaTela(opcoes, preparos, verCustos)}
+      verCustos={verCustos}
       bloqueio={ctx.bloqueio}
       novoInsumo={pode(ctx.alcance, 'insumos.editar') ? '/erp/insumos/novo' : undefined}
     />

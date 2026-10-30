@@ -5,6 +5,7 @@
  * as últimas notas nas lojas de quem vê.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import { Plus } from 'lucide-react';
 import type { CadastroDoFornecedor, FornecedorDetalhado, LinhaDeFornecedor, SituacaoDoFornecedor } from '@/lib/erp/compras';
@@ -278,7 +279,7 @@ export function TelaDetalheFornecedor({
               </ul>
             )}
           </Painel>
-          <Painel
+          <HistoricoRecolhivel chave={`${base}/${f.id}/notas`} quantidade={f.notas.length}
             titulo="Últimas notas"
             semRespiro
             acessorio={
@@ -308,7 +309,7 @@ export function TelaDetalheFornecedor({
                 ))}
               </ul>
             )}
-          </Painel>
+          </HistoricoRecolhivel>
         </div>
         <aside className="min-w-0 space-y-4" aria-label="Cadastro, situação e alterações">
           <Painel titulo="Cadastro">
@@ -334,9 +335,9 @@ export function TelaDetalheFornecedor({
               {bloqueio ? <p className="text-sm text-suave">{bloqueio}</p> : <FormSituacao acao={acaoSituacao} ativo={f.ativo} oQue="fornecedor" idBase="situacao-fornecedor" />}
             </Painel>
           )}
-          <Painel titulo="Alterações" semRespiro>
+          <HistoricoRecolhivel chave={`${base}/${f.id}`} quantidade={f.historico.length} titulo="Alterações" semRespiro>
             {f.historico.length === 0 ? <Vazio>Nada registrado ainda.</Vazio> : <ListaHistorico linhas={f.historico} compacta doCadastro={f.nome} />}
-          </Painel>
+          </HistoricoRecolhivel>
         </aside>
       </div>
     </div>

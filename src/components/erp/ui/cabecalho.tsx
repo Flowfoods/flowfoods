@@ -4,7 +4,8 @@
  * Quadrado de 40 px com o ícone na cor do módulo · h1 grande em Gelasio ·
  * subtítulo com contexto e contagem ("Rede Completa · 43 insumos") · a ação
  * principal à direita (uma por tela) · a caixa "Como funciona" (quando a
- * pessoa ainda não fechou) · busca e filtros logo abaixo. Um h1 por tela. A cor do módulo só existe no quadrado; o resto é neutro.
+ * pessoa ainda não fechou) · busca e filtros logo abaixo. Um h1 por tela. A
+ * identidade da área também orienta menu/cards; o conteúdo operacional é neutro.
  */
 
 import type { CSSProperties, ReactNode } from 'react';

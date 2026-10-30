@@ -8,6 +8,7 @@
 
 import Link from 'next/link';
 import { useFormState } from 'react-dom';
+import { useAvisoDeSaida } from '../cadastro/erros';
 import { LIMITES_DO_FECHAMENTO, rotuloDaRessalva, type Ressalva } from '@/lib/erp/dre-fechamento-campos';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
@@ -29,10 +30,11 @@ export function FormFechar({
   bloqueio: string | null;
 }) {
   const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
+  const saida = useAvisoDeSaida();
   const erros = estado?.erros ?? {};
   const comRessalva = ressalvas.length > 0;
   return (
-    <form action={enviar} noValidate className="space-y-4">
+    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="impressao" value={impressao} />
       {erros.geral && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">

@@ -4,6 +4,7 @@
  * o "Remover" com motivo e as últimas alterações do dia (antes e depois).
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { DiaDaLojaLido } from '@/lib/erp/faturamento';
 import { hojeNoRio } from '@/lib/erp/compra-campos';
@@ -119,13 +120,13 @@ export function TelaDoDia({
         </Painel>
       )}
 
-      <Painel titulo="Alterações deste dia" subtitulo="O antes e o depois de cada lançamento, com quem e quando." semRespiro>
+      <HistoricoRecolhivel chave={`${base}/${dia.loja.id}/${dia.data}`} quantidade={dia.historico.length} titulo="Alterações deste dia" subtitulo="O antes e o depois de cada lançamento, com quem e quando." semRespiro>
         {dia.historico.length === 0 ? (
           <p className="px-4 py-6 text-sm text-suave sm:px-5">Nada lançado neste dia ainda.</p>
         ) : (
           <ListaHistorico linhas={dia.historico} compacta />
         )}
-      </Painel>
+      </HistoricoRecolhivel>
     </div>
   );
 }

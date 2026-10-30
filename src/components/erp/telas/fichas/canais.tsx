@@ -5,6 +5,7 @@
  * rotas só resolvem contexto e permissão e passam dados e actions prontos.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { CustoPorCanal, EmbalagemDoFormulario } from '@/lib/erp/canais';
 import type { FichaDetalhada } from '@/lib/erp/fichas';
@@ -238,9 +239,9 @@ export function TelaCanaisDeVenda({
           )}
         </div>
         <aside className="min-w-0" aria-label="Alterações da taxa">
-          <Painel titulo="Últimas alterações" semRespiro>
+          <HistoricoRecolhivel chave={base} quantidade={historico.length} titulo="Últimas alterações" semRespiro>
             {historico.length === 0 ? <Vazio>Nada registrado ainda.</Vazio> : <ListaHistorico linhas={historico} compacta doCadastro="Canais de venda" />}
-          </Painel>
+          </HistoricoRecolhivel>
         </aside>
       </div>
     </div>

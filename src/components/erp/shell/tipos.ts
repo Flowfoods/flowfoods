@@ -64,6 +64,8 @@ export interface AjudaDoShell {
 }
 
 export interface PropsDoShell {
+  /** Identidade canônica pessoa/parceiro, para zerar a memória de navegação ao trocar de contexto. */
+  chaveDoContexto?: string;
   navegacao: Navegacao;
   /** Linha de contexto embaixo da marca (o parceiro na sessão, ou "Nível 1 · FlowFoods"). */
   contexto: string;

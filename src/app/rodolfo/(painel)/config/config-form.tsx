@@ -1,6 +1,7 @@
 'use client';
 
 import { useFormState } from 'react-dom';
+import { useAvisoDeSaida } from '@/components/erp/telas/cadastro/erros';
 import { acaoSalvarConfig, type Resposta } from '../actions';
 import { BotaoEnviar, MensagemDeResposta } from '@/components/erp/ui/botoes';
 import { AJUDA, CAMPO, MARCAR, ROTULO } from '@/components/erp/ui/campos';
@@ -35,10 +36,11 @@ function Campo({
 }
 
 export function ConfigForm({ config }: { config: ConfigBarney }) {
+  const saida = useAvisoDeSaida();
   const [estado, acao] = useFormState(acaoSalvarConfig, inicial);
 
   return (
-    <form action={acao} className="space-y-5">
+    <form action={acao} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} className="space-y-5">
       <label className="flex items-start gap-3 rounded-[7px] border border-linha bg-texto/[0.03] p-3">
         <input
           type="checkbox"

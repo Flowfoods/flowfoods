@@ -5,6 +5,7 @@
  * não. A MESMA tela no nível 1 e na pessoa do parceiro.
  */
 
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import Link from 'next/link';
 import type { DespesaCompleta } from '@/lib/erp/despesas';
 import { formatarData } from '@/lib/erp/compra-campos';
@@ -148,9 +149,9 @@ export function TelaDaDespesa({
         </Painel>
       )}
 
-      <Painel titulo="Alterações desta despesa" subtitulo="Quem mudou o quê, com antes e depois." semRespiro>
+      <HistoricoRecolhivel chave={aqui} quantidade={d.historico.length} titulo="Alterações desta despesa" subtitulo="Quem mudou o quê, com antes e depois." semRespiro>
         {d.historico.length === 0 ? <Vazio titulo="Nada registrado ainda." /> : <ListaHistorico linhas={d.historico} />}
-      </Painel>
+      </HistoricoRecolhivel>
     </div>
   );
 }

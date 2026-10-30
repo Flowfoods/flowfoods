@@ -1,9 +1,14 @@
 import { PrismaClient } from '@prisma/client';
+import { createElement, type ComponentProps, type ReactElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
 const atual = vi.hoisted(() => ({ ctx: null as null | (() => unknown) }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('next/navigation', () => ({
+  usePathname: () => '/erp/fichas/nova',
+  useSearchParams: () => null,
+  useRouter: () => ({ push: () => {}, refresh: () => {} }),
   redirect: (url: string) => {
     throw Object.assign(new Error(`REDIRECT ${url}`), { url });
   },
@@ -11,6 +16,7 @@ vi.mock('next/navigation', () => ({
     throw new Error('NOT_FOUND');
   },
 }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
   return {
@@ -29,11 +35,18 @@ vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } 
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarInsumoDeTeste as cadastrarInsumo, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
-import { cadastrarFicha } from '@/lib/erp/fichas';
+import { cadastrarFicha, obterFicha } from '@/lib/erp/fichas';
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import ErpFichaPage from '@/app/erp/fichas/[id]/page';
 import ErpFichasPage from '@/app/erp/fichas/page';
 import ErpImprimirFichaPage from '@/app/erp/fichas/[id]/imprimir/page';
+import ErpNovaFichaPage from '@/app/erp/fichas/nova/page';
+import ErpEditarFichaPage from '@/app/erp/fichas/[id]/editar/page';
+import ParceiroNovaFichaPage from '@/app/rodolfo/(painel)/erp/[slug]/fichas/nova/page';
+import ParceiroEditarFichaPage from '@/app/rodolfo/(painel)/erp/[slug]/fichas/[id]/editar/page';
+import { TelaFormFicha } from '@/components/erp/telas/fichas/paginas';
+import { FormFicha } from '@/components/erp/telas/fichas/form-ficha';
+import { acaoEditarFicha } from '@/app/erp/fichas/actions';
 
 /**
  * ERP N.5 · visão operacional × gerencial automática na ficha (Postgres real): quem só opera (sem "ver preços") recebe do
@@ -79,6 +92,14 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     );
     if (!f.ok) throw new Error(JSON.stringify(f));
     ids.ficha = f.id;
+    const preparo = await cadastrarFicha(
+      a,
+      { nome: 'Pão tostado', tipo: 'PRE_PREPARO', rendimento: '1', rendimentoUnidade: 'un', itens: [{ insumoId: pao.id, quantidade: '1', unidade: 'un' }] },
+      { tipo: 'manter' },
+      'Marina',
+    );
+    if (!preparo.ok) throw new Error(JSON.stringify(preparo));
+    ids.preparo = preparo.id;
   });
 
   afterAll(async () => {
@@ -138,5 +159,78 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
   it('ficha de outro parceiro na URL da impressão: 404', async () => {
     atual.ctx = ctxDe('DONO');
     await expect(ErpImprimirFichaPage({ params: { id: 'naoexiste123' } })).rejects.toThrow(/NOT_FOUND/);
+  });
+
+  type Formulario = ReactElement<ComponentProps<typeof TelaFormFicha>>;
+  const propsDoCliente = (pagina: Formulario) => {
+    const tela = TelaFormFicha(pagina.props) as ReactElement<{ children: ReactElement[] }>;
+    return tela.props.children.find((c) => c?.type === FormFicha)!.props as ComponentProps<typeof FormFicha>;
+  };
+  const editorSemCustos = () => ({
+    ...ctxDe('OPERADOR')(),
+    alcance: resolverAlcance({ perfilBase: null, perfilProprio: ['fichas.ver', 'fichas.editar'], permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] }),
+  });
+
+  it('editor sem ver preços: criar e editar recebem do servidor opções e pré-preparos sem nenhum custo', async () => {
+    atual.ctx = editorSemCustos;
+    const paginas = [await ErpNovaFichaPage(), await ErpEditarFichaPage({ params: { id: ids.ficha } })] as Formulario[];
+    for (const pagina of paginas) {
+      expect(pagina.props.verCustos).toBe(false);
+      expect(pagina.props.opcoes.length).toBeGreaterThan(0);
+      expect(pagina.props.preparos.some((p) => p.id === ids.preparo)).toBe(true);
+      expect(pagina.props.opcoes.every((i) => i.custo === null)).toBe(true);
+      expect(pagina.props.preparos.every((p) => p.custo === null && p.incompleto === null)).toBe(true);
+      // Confere também o limite real de serialização: o FormFicha é use client.
+      const cliente = propsDoCliente(pagina);
+      expect(cliente.verCustos).toBe(false);
+      expect(json(cliente)).not.toMatch(/737|porRendimento|"centavos"|"num"|"den"/);
+      expect(json(pagina.props.ficha ?? null)).not.toMatch(/737|porRendimento|"centavos"/);
+      const html = renderToStaticMarkup(createElement(TelaFormFicha, pagina.props));
+      expect(html).not.toMatch(/R\$|Custo|custo incompleto|custo não informado|Prévia:/);
+      for (const campo of ['item_insumo', 'item_quantidade', 'item_unidade', 'item_fator', 'rendimento']) expect(html).toContain(`name="${campo}"`);
+    }
+  });
+
+  it('editor sem custos continua editando a receita; o servidor preserva a conta de insumo e pré-preparo', async () => {
+    atual.ctx = editorSemCustos;
+    const atualFicha = (await obterFicha(a, ids.ficha))!;
+    const envio = new FormData();
+    for (const [chave, valor] of Object.entries({
+      nome: atualFicha.nome,
+      tipo: 'PRATO',
+      rendimento: '2',
+      versao: atualFicha.versao,
+      item_insumo: `ficha:${ids.preparo}`,
+      item_quantidade: '2',
+      item_unidade: 'un',
+      item_fator: '',
+      passo: 'Tostar o pão e servir.',
+    })) envio.set(chave, valor);
+    await expect(acaoEditarFicha(ids.ficha, null, envio)).rejects.toThrow(/REDIRECT/);
+    const salvo = (await obterFicha(a, ids.ficha))!;
+    expect(salvo.rendimentoMilesimos).toBe(2000);
+    expect(salvo.itens[0].subfichaId).toBe(ids.preparo);
+    expect(salvo.custo.total).toEqual({ num: 1474n, den: 1n });
+    expect(salvo.custo.porRendimento).toEqual({ num: 737n, den: 1n });
+    expect(salvo.passosPreparo).toEqual(['Tostar o pão e servir.']);
+  });
+
+  it('gerente e nível 1 preservam os custos na criação e edição', async () => {
+    atual.ctx = ctxDe('GERENTE');
+    const paginas = [
+      await ErpNovaFichaPage(),
+      await ErpEditarFichaPage({ params: { id: ids.ficha } }),
+      await ParceiroNovaFichaPage({ params: { slug: 'visoes' } }),
+      await ParceiroEditarFichaPage({ params: { slug: 'visoes', id: ids.ficha } }),
+    ] as Formulario[];
+    for (const pagina of paginas) {
+      expect(pagina.props.verCustos).toBe(true);
+      expect(pagina.props.opcoes.some((i) => i.custo?.centavos === 737)).toBe(true);
+      expect(pagina.props.preparos.some((p) => p.custo?.num === '737')).toBe(true);
+      const cliente = propsDoCliente(pagina);
+      expect(cliente.verCustos).toBe(true);
+      expect(json(cliente)).toContain('737');
+      expect(renderToStaticMarkup(createElement(TelaFormFicha, pagina.props))).toMatch(/Prévia:/);
+    }
   });
 });

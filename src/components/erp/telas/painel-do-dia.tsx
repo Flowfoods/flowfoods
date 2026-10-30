@@ -26,7 +26,7 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
               <span className="text-[12px] font-medium text-suave">{i.rotulo}</span>
               <span className="mt-2 truncate font-display text-[26px] font-bold leading-none tabular-nums text-texto">
                 {i.valor.tipo === 'dinheiro' ? (
-                  formatarDinheiro(i.valor.centavos)
+                  i.valor.centavos === null ? <><span aria-hidden>—</span><span className="sr-only">Sem lançamentos</span></> : formatarDinheiro(i.valor.centavos)
                 ) : i.valor.tipo === 'numero' ? (
                   i.valor.numero === null ? '—' : i.valor.numero.toLocaleString('pt-BR')
                 ) : (
