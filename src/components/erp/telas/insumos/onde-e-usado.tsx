@@ -17,7 +17,7 @@ export function PainelOndeEUsado({ onde, fichasBase }: { onde: OndeEUsado; ficha
     <Painel
       id="onde-e-usado"
       titulo="Onde é usado"
-      subtitulo={total === 0 ? 'Nenhuma ficha técnica leva este insumo' : 'Mudar este insumo muda estas fichas'}
+      subtitulo={total === 0 ? 'Nenhuma ficha técnica leva este insumo' : total === 1 ? 'Mudar este insumo muda esta ficha' : 'Mudar este insumo muda estas fichas'}
       acessorio={total > 0 ? <Contagem>{total}</Contagem> : undefined}
       semRespiro={usos.length > 0}
     >
@@ -56,7 +56,7 @@ export function PainelOndeEUsado({ onde, fichasBase }: { onde: OndeEUsado; ficha
           </ul>
           {cortada && (
             <p className="border-t border-linha px-4 py-3 text-[13px] text-suave sm:px-5">
-              Mostrando {usos.length} de {total} fichas.
+              Mostrando {usos.length} de {total} fichas. Os usos diretos das fichas exibidas estão completos.
             </p>
           )}
         </>
