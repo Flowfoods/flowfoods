@@ -10,6 +10,7 @@ import { GraficoDeColunas, type PontoDoGrafico } from '../ui/grafico-colunas';
 import { LINK_DE_TEXTO } from '../ui/estilos';
 import { Painel, Selo } from '../ui/superficies';
 import { FaturamentoComplementosHome } from './faturamento-complementos-home';
+import { FaturamentoCanaisHome } from './faturamento-canais-home';
 
 const COR_DO_CANAL: Record<CanalVenda, number> = { LOJA: 1, DELIVERY_PROPRIO: 2, IFOOD: 3 };
 
@@ -49,6 +50,7 @@ export function EvolucaoFaturamentoHome({ leitura, loja, widgetFaturamento }: { 
               <p className="mt-1 text-[13px] leading-relaxed text-suave">{semLeitura ? 'Atualize o resumo ou abra o faturamento para conferir este recorte.' : 'Os dias ganham valor conforme os lançamentos do mês são informados.'}</p>
             </div>
           )}
+          {widgetFaturamento && <FaturamentoCanaisHome widget={widgetFaturamento} leitura={leitura} />}
           <Link href={leitura.detalhe.href} className={LINK_DE_TEXTO + ' inline-flex min-h-11 items-center'}>{leitura.detalhe.rotulo}</Link>
         </div>
       </Painel>
