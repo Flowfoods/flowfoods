@@ -92,7 +92,14 @@ describe.skipIf(!URL_TESTE)('Início de trabalho · Postgres real', { timeout: 9
 
   it('isolamento: outro parceiro não vê o faturamento, as fichas nem as lojas de A', async () => {
     const p = await painelDoDia(b, alcance('DONO'), '/erp', HOJE);
-    expect(p).toEqual({ indicadores: [], pendencias: [] });
+    expect(p.indicadores).toEqual([]);
+    expect(p.pendencias).toEqual([]);
+    expect(p.estados?.map(({ chave, estado }) => ({ chave, estado }))).toEqual([
+      { chave: 'faturamento', estado: 'sem_dados' },
+      { chave: 'cardapio', estado: 'sem_dados' },
+      { chave: 'estoque', estado: 'sem_dados' },
+    ]);
+    expect(JSON.stringify(p)).not.toMatch(/Centro|Burger|Carne|300000/);
   });
 
   it('sem lançamentos não informa zero; um dia marcado Não vendeu comprova zero', async () => {

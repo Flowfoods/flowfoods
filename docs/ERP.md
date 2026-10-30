@@ -4775,3 +4775,11 @@ QA real local com dados sintéticos: 18 cenários aprovados; 3 telas × 3 largur
 - Após resposta de erro ao salvar, 18 formulários recuperam o aviso de saída com alterações. Sucesso não gera aviso falso nem apaga edições feitas durante o envio.
 - 30 testes dirigidos com banco, tipos, lint e portão de conteúdo aprovados. Dois cenários reais de Chrome com dados sintéticos: erro/cancelar/corrigir/persistir e Rede R$ 8.000 → loja B R$ 7.000, em 360/1440 sem transbordamento. Revisão independente sem bloqueantes. CI, merge e publicação desta rodada são acompanhados no mesmo plano Notion.
 - H-A14 do resumo existente evoluiu; H1/estados independentes e a Home analítica de seis famílias continuam na fila. Sem migration, regra financeira nova ou ativação de integração/custeio.
+
+## Resumo com estados independentes e CI — terceira rodada Codex (decisão 494)
+
+- As três fontes existentes da Home têm estados independentes de erro, ausência, parcial e dados disponíveis. Falha em uma fonte conserva as outras; autorização antecede cada consulta/estado. Mês/escopo/momento da consulta e ausência versus zero ficam explícitos.
+- Atualizar resumo reconsulta manualmente a rota com anúncio local; Enter recupera dados após falha mantendo foco. O painel institucional permanece compatível com o contrato anterior.
+- CI prepara e verifica os três perfis do Postgres efêmero, com e sem RLS; ausência de perfil ou falha de login interrompe o job. Nenhuma configuração de produção é alterada.
+- 44 testes dirigidos com banco aprovados, além da bateria isolada sobreposta de 22 testes; tipos/lint/conteúdo aprovados. SQL de preparação validado em cluster novo. Revisões independentes sem bloqueantes. Três cenários de Chrome com dados sintéticos aprovados, incluindo falha real/restauração/foco e layout 360/1440. CI, merge e ambiente servido são acompanhados no mesmo plano Notion.
+- Recorte parcial de H1; H1 completo e H3 continuam pendentes. Próximo: contrato e CMV de uma loja a partir de um DreDoPeriodo canônico, sem recalcular regras ou ativar custeio/integracao.
