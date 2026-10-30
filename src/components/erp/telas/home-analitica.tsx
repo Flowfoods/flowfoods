@@ -1,7 +1,7 @@
 /** H2 de uma loja: composição autorizada, sem contas de domínio ou consultas. */
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import type { AnaliticoDaHome, WidgetAnaliticoHome, WidgetEstoqueHome, WidgetProducaoHome } from '@/lib/erp/home-analitico';
+import type { AnaliticoDaHome, WidgetAnaliticoHome, WidgetComprasHome, WidgetEstoqueHome, WidgetProducaoHome } from '@/lib/erp/home-analitico';
 import type { EstadoDoWidgetHome, FamiliaDaHome } from '@/lib/erp/home-contratos';
 import type { PainelDoDia } from '@/lib/erp/painel-do-dia';
 import { percentualComDuasCasas } from '@/lib/erp/cmv-categorias-campos';
@@ -13,6 +13,7 @@ import { LINK_DE_TEXTO } from '../ui/estilos';
 import { Painel, Selo, type Tom } from '../ui/superficies';
 import { CmvDaHomeNaTela } from './cmv-da-home';
 import { EvolucaoFaturamentoHome } from './evolucao-faturamento-home';
+import { ComprasCategoriasHome } from './compras-categorias-home';
 import { AtualizacaoDoResumo, PendenciasDoResumo } from './painel-do-dia';
 
 const FAMILIAS: FamiliaDaHome[] = ['faturamento', 'cmv', 'compras', 'despesas', 'estoque', 'producao'];
@@ -134,6 +135,7 @@ export function HomeAnalitica({ analitico, painel }: { analitico: Extract<Analit
   const widgets = [...analitico.widgets].sort((a, b) => FAMILIAS.indexOf(a.familia) - FAMILIAS.indexOf(b.familia));
   const estoque = widgets.find((w): w is WidgetEstoqueHome => w.familia === 'estoque');
   const producao = widgets.find((w): w is WidgetProducaoHome => w.familia === 'producao');
+  const compras = widgets.find((w): w is WidgetComprasHome => w.familia === 'compras');
   const temCardapio = painel.indicadores.some((i) => i.chave === 'cardapio') || painel.estados?.some((e) => e.chave === 'cardapio');
   const temOperacao = Boolean(estoque || producao || temCardapio);
   return (
@@ -159,6 +161,7 @@ export function HomeAnalitica({ analitico, painel }: { analitico: Extract<Analit
           </section>
         )}
       </div>
+      {compras?.composicaoPorCategoria && <ComprasCategoriasHome widget={compras} />}
       {painel.pendencias.length > 0 && <section aria-label="Pontos de atenção"><PendenciasDoResumo pendencias={painel.pendencias} /></section>}
       {(widgets.length > 0 || temCardapio || painel.pendencias.length > 0) && <AtualizacaoDoResumo consultadoEm={painel.consultadoEm} />}
     </section>

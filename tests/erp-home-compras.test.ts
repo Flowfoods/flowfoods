@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { lerComprasDaHome, comprasAnaliticas, filtrosDeComprasHome } from '@/lib/erp/home-compras';
 import type { ContextoHomeLoja } from '@/lib/erp/home-analitico';
-import { resolverRecorte, totaisDoRecorte, relatorioDaTela, opcoesDoRelatorio, documentosAguardando, type Recorte, type TotaisDoRecorte } from '@/lib/erp/compras-relatorio';
+import { resolverRecorte, totaisDoRecorte, distribuicaoDoRecorte, relatorioDaTela, opcoesDoRelatorio, documentosAguardando, type Recorte, type TotaisDoRecorte } from '@/lib/erp/compras-relatorio';
 import { lerFiltrosDoRelatorio, somarDias } from '@/lib/erp/compras-relatorio-campos';
 import { ErroDeRelatorio } from '@/lib/erp/vagas-de-relatorio';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import type { Alcance } from '@/lib/erp/permissoes';
 
-vi.mock('@/lib/erp/compras-relatorio', () => ({ resolverRecorte: vi.fn(), totaisDoRecorte: vi.fn(), relatorioDaTela: vi.fn(), opcoesDoRelatorio: vi.fn(), documentosAguardando: vi.fn() }));
+vi.mock('@/lib/erp/compras-relatorio', () => ({ resolverRecorte: vi.fn(), totaisDoRecorte: vi.fn(), distribuicaoDoRecorte: vi.fn(), relatorioDaTela: vi.fn(), opcoesDoRelatorio: vi.fn(), documentosAguardando: vi.fn() }));
 vi.mock('@/lib/db', () => { throw new Error('Somente fontes mockadas nesta matriz.'); });
 
 const HOJE = '2026-10-30';
@@ -27,16 +27,18 @@ beforeEach(() => {
   transacao.mockImplementation(<T>(fn: (tx: ClienteDoParceiro) => Promise<T>) => fn(cliente));
   vi.mocked(resolverRecorte).mockResolvedValue({ recorte: recorte(), lojasDoAcesso: [{ id: 'lojab', nome: 'Loja B', ativa: true }], motivo: null });
   vi.mocked(totaisDoRecorte).mockResolvedValue(total());
+  vi.mocked(distribuicaoDoRecorte).mockResolvedValue({ fatias: [{ chave: 'categoria', rotulo: 'Categoria atual', centavos: 3000 }], outros: null, totalCentavos: 3000, quantos: 1 });
 });
 
 describe('H2 · compras estreitas com a mesma regra do relatório', () => {
-  it('autoriza antes da transação e pede somente resolver+totais da loja, entrada01→hoje, lançadas', async () => {
+  it('autoriza antes da transação e pede resolver+totais+composição da loja, entrada01→hoje, lançadas', async () => {
     const dados = await ler();
     expect(transacao).toHaveBeenCalledTimes(1);
     expect(transacao).toHaveBeenCalledWith(expect.any(Function), { repetivel: true, relatorio: {} });
     expect(resolverRecorte).toHaveBeenCalledWith(cliente, expect.objectContaining({ lojas: ['lojab'], permissoes: alcance.permissoes }), expect.objectContaining({ lojaIds: ['lojab'], de: '2026-10-01', ate: HOJE, base: 'entrada', situacao: 'lancadas', fornecedorId: '', insumoId: '', q: '' }));
     expect(totaisDoRecorte).toHaveBeenCalledTimes(1);
     expect(totaisDoRecorte).toHaveBeenCalledWith(cliente, recorte());
+    expect(distribuicaoDoRecorte).toHaveBeenCalledWith(cliente, recorte(), 'categoria', 6);
     expect(relatorioDaTela).not.toHaveBeenCalled(); expect(opcoesDoRelatorio).not.toHaveBeenCalled(); expect(documentosAguardando).not.toHaveBeenCalled();
     const w = comprasAnaliticas({ estado: 'lido', dados }, contexto)!;
     expect(w.valor.valor).toBe(3000); // O total já contém frete; não 3300.

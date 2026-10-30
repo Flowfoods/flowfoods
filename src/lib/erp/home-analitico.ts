@@ -8,6 +8,7 @@ import type { SituacaoDaLoja } from './estoque';
 import type { lojasDaListaDoDia } from './producao-lista';
 import { pode, type Alcance, type Permissao } from './permissoes';
 import type { FamiliaDaHome, MedidaDoWidgetHome } from './home-contratos';
+import type { ComposicaoComprasHome } from './home-compras-categorias';
 
 export type WidgetFaturamentoHome = WidgetHome<'faturamento'>;
 export interface WidgetComprasHome extends WidgetHome<'compras'> {
@@ -18,6 +19,8 @@ export interface WidgetComprasHome extends WidgetHome<'compras'> {
   /** Motivos fora da base do preço médio; não tornam o total entregue incompleto. */
   semBase: Partial<Record<'insumo' | 'unidade' | 'conversao' | 'valor', number>> | null;
   notasComDesconto: number | null;
+  /** Recorte do mesmo KPI; classificação atual, sem fotografia ou percentual novo. */
+  composicaoPorCategoria?: ComposicaoComprasHome;
 }
 export interface WidgetEstoqueHome extends WidgetHome<'estoque'> {
   situacao: 'NAO_ABERTO' | 'EM_CONTAGEM' | 'ABERTO' | null;

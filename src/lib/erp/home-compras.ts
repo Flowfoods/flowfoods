@@ -2,13 +2,14 @@
 import type { Alcance } from './permissoes';
 import { pode } from './permissoes';
 import type { ClienteDoParceiro } from './tenant';
-import { resolverRecorte, totaisDoRecorte, type TotaisDoRecorte } from './compras-relatorio';
+import { resolverRecorte, totaisDoRecorte, distribuicaoDoRecorte, type TotaisDoRecorte } from './compras-relatorio';
 import { lerFiltrosDoRelatorio, queryDoRelatorio, somarDias, type FiltrosDoRelatorio } from './compras-relatorio-campos';
 import { lerData } from './compra-campos';
 import { ErroDeRelatorio } from './vagas-de-relatorio';
 import { baseDoWidgetHome, contextoHomePermitido, type ContextoHomeLoja, type LeituraHome, type WidgetComprasHome } from './home-analitico';
+import { projetarCategoriasDasCompras, type LeituraDaComposicaoCompras } from './home-compras-categorias';
 
-export type DadosComprasHome = { tipo: 'totais'; filtros: FiltrosDoRelatorio; totais: TotaisDoRecorte }
+export type DadosComprasHome = { tipo: 'totais'; filtros: FiltrosDoRelatorio; totais: TotaisDoRecorte; composicaoPorCategoria?: LeituraDaComposicaoCompras }
   | { tipo: 'sem-loja' } | { tipo: 'incompativel' } | { tipo: 'limite'; motivo: 'tempo' | 'ocupado' };
 
 export function filtrosDeComprasHome(lojaId: string, hoje: string): FiltrosDoRelatorio {
@@ -20,6 +21,9 @@ export async function lerComprasDaHome(cliente: ClienteDoParceiro, alcance: Alca
   if (!/^[a-z0-9]{1,64}$/i.test(lojaId) || lerData(hoje) !== hoje || !pode(alcance, 'compras.ver', { lojaId })) return null;
   const filtros = filtrosDeComprasHome(lojaId, hoje);
   const restrito: Alcance = { ...alcance, lojas: [lojaId] };
+  // Somente uma leitura de totais concluída, após os gates, pode sobreviver a
+  // erro da composição/encerramento. A variável é local desta requisição.
+  let baseLida: Extract<DadosComprasHome, { tipo: 'totais' }> | undefined;
   try {
     return await cliente.transacao<DadosComprasHome>(async (tx) => {
       const { recorte, motivo } = await resolverRecorte(tx, restrito, filtros);
@@ -29,9 +33,18 @@ export async function lerComprasDaHome(cliente: ClienteDoParceiro, alcance: Alca
         || recorte.fim !== somarDias(hoje, 1) || recorte.agrupar !== 'insumo'
         || recorte.fornecedorId !== null || recorte.insumoIds !== null || recorte.categoriaId !== null
         || recorte.grupo !== null || recorte.unidade !== null || recorte.soSemBase) return { tipo: 'incompativel' };
-      return { tipo: 'totais', filtros, totais: await totaisDoRecorte(tx, recorte) };
+      const totais = await totaisDoRecorte(tx, recorte);
+      baseLida = { tipo: 'totais', filtros, totais };
+      const composicaoPorCategoria: LeituraDaComposicaoCompras = totais.notas === 0
+        ? { estado: 'sem_dados' }
+        : { estado: 'lido', distribuicao: await distribuicaoDoRecorte(tx, recorte, 'categoria', 6) };
+      return { ...baseLida, composicaoPorCategoria };
     }, { repetivel: true, relatorio: {} });
   } catch (erro) {
+    // Um erro SQL pode abortar a transação: o fallback fica fora, depois de o
+    // portão encerrá-la. Não usa SAVEPOINT, retry ou outra leitura de totais.
+    if (baseLida) return { ...baseLida, composicaoPorCategoria: erro instanceof ErroDeRelatorio
+      ? { estado: 'limite', motivo: erro.motivo } : { estado: 'erro' } };
     if (erro instanceof ErroDeRelatorio) return { tipo: 'limite', motivo: erro.motivo };
     throw erro;
   }
@@ -64,5 +77,15 @@ export function comprasAnaliticas(leitura: LeituraHome<DadosComprasHome>, c: Con
   if (!t.notas) widget.avisos = [{ codigo: 'compras-sem-notas', texto: 'Nenhuma compra lançada neste recorte, pela entrada da nota.' }];
   else if (Object.values(widget.semBase).some((n) => (n ?? 0) > 0)) widget.avisos = [{ codigo: 'compras-preco-medio', texto: 'Há itens fora da base do preço médio. O valor entregue segue o total do relatório.' }];
   if (t.notasComDesconto > 0) widget.avisos = [...widget.avisos, { codigo: 'compras-desconto', texto: 'Há notas com desconto. Confira a composição no relatório.' }];
+  // A projeção da composição também tem fronteira própria: getters/campos
+  // incompatíveis não apagam o KPI canônico que já foi preenchido acima.
+  if (Object.hasOwn(d, 'composicaoPorCategoria')) {
+    const detalhe = { href: widget.detalhe.href, rotulo: 'Ver a composição no relatório de compras' };
+    try {
+      widget.composicaoPorCategoria = projetarCategoriasDasCompras(d.composicaoPorCategoria, { totalCentavos: t.totalCentavos, notas: t.notas }, detalhe);
+    } catch {
+      widget.composicaoPorCategoria = projetarCategoriasDasCompras({ estado: 'erro' }, { totalCentavos: t.totalCentavos, notas: t.notas }, detalhe);
+    }
+  }
   return widget;
 }
