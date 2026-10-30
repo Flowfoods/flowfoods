@@ -3,7 +3,7 @@
  * independentes não convertem erro/ausência em zero nem criam autorização.
  */
 import Link from 'next/link';
-import type { PainelDoDia } from '@/lib/erp/painel-do-dia';
+import type { PainelDoDia, PendenciaDoDia } from '@/lib/erp/painel-do-dia';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { LINK_DE_TEXTO } from '../ui/estilos';
 import { Barra, Painel, Selo } from '../ui/superficies';
@@ -24,8 +24,6 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
     ]
     : painel.indicadores.map((indicador) => ({ chave: indicador.chave, estado: undefined, indicador }));
   if (blocos.length === 0 && painel.pendencias.length === 0 && !painel.cmv) return null;
-  const quando = painel.consultadoEm ?? painel.cmv?.consultadoEm;
-  const consultado = quando ? new Date(quando) : null;
   return (
     <section aria-label={temResumo ? 'Resumo da operação' : 'Resumo de hoje'} className="space-y-4">
       {blocos.length > 0 && (
@@ -77,10 +75,19 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
         </div>
       )}
       {painel.cmv && <CmvDaHomeNaTela cmv={painel.cmv} />}
-      {painel.pendencias.length > 0 && (
+      <PendenciasDoResumo pendencias={painel.pendencias} />
+      {temResumo && <AtualizacaoDoResumo consultadoEm={painel.consultadoEm ?? painel.cmv?.consultadoEm} />}
+    </section>
+  );
+}
+
+/** A mesma lista acionável também compõe a Home de uma loja. */
+export function PendenciasDoResumo({ pendencias }: { pendencias: readonly PendenciaDoDia[] }) {
+  if (!pendencias.length) return null;
+  return (
         <Painel titulo="O que precisa de você" subtitulo="Na ordem em que vale resolver" semRespiro>
           <ol className="divide-y divide-linha">
-            {painel.pendencias.map((p, n) => (
+            {pendencias.map((p, n) => (
               <li key={p.chave} className="flex flex-wrap items-start gap-3 px-4 py-3.5 sm:flex-nowrap sm:px-5">
                 <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-linha-forte text-[12px] font-semibold text-texto">
                   {n + 1}
@@ -97,15 +104,18 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
             ))}
           </ol>
         </Painel>
-      )}
-      {temResumo && (
+  );
+}
+
+/** Único acionador persistente; o horário representa consulta, não mudança dos dados. */
+export function AtualizacaoDoResumo({ consultadoEm }: { consultadoEm?: string | null }) {
+  const consultado = consultadoEm ? new Date(consultadoEm) : null;
+  return (
         <div className="space-y-2 border-t border-linha pt-3">
           <AtualizarResumo />
           {consultado && Number.isFinite(consultado.getTime()) && (
             <p className="text-[12px] text-suave">Resumo consultado em {QUANDO.format(consultado)}. Atualizar consulta todos os indicadores e as pendências deste resumo.</p>
           )}
         </div>
-      )}
-    </section>
   );
 }

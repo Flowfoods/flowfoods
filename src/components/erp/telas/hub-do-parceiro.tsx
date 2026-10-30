@@ -17,6 +17,7 @@ import { LINK_DE_TEXTO } from '../ui/estilos';
 import { AJUDA_DE_USO_ERP } from '@/lib/constants';
 import type { PainelDoDia } from '@/lib/erp/painel-do-dia';
 import { PainelDoDiaNaTela } from './painel-do-dia';
+import { HomeAnalitica } from './home-analitica';
 
 export function HubDoParceiro({
   titulo,
@@ -38,9 +39,15 @@ export function HubDoParceiro({
 }) {
   const emUso = modulos.filter((m) => m.href);
   const futuros = modulos.filter((m) => !m.href);
+  const analitico = painel?.analitico;
+  const lojaAnalitica = analitico?.tipo === 'loja' ? analitico : null;
   return (
     <div className="space-y-8">
-      <PageHeader icone="inicio" cor={COR.inicio} titulo={titulo} subtitulo={subtitulo} />
+      <PageHeader
+        icone="inicio" cor={COR.inicio}
+        titulo={lojaAnalitica ? 'Visão geral da operação' : titulo}
+        subtitulo={lojaAnalitica && titulo !== 'Áreas da Rede' ? `${titulo} · ${subtitulo}` : subtitulo}
+      />
       {semAcesso && (
         <Aviso tom="alerta" titulo="Essa tela não está no seu acesso.">
           Se precisar dela, fale com quem cuida da equipe.
@@ -55,6 +62,9 @@ export function HubDoParceiro({
           .
         </Aviso>
       )}
+      {analitico?.tipo === 'rede' && <Aviso titulo="Detalhe analítico por loja">Selecione uma loja no topo para ver seus indicadores e sua evolução. Este resumo mantém a visão da rede.</Aviso>}
+      {lojaAnalitica && painel ? <HomeAnalitica analitico={lojaAnalitica} painel={painel} /> : (
+      <>
       {painel && <PainelDoDiaNaTela painel={painel} />}
       <HubDeModulos
         secoes={[
@@ -84,6 +94,8 @@ export function HubDoParceiro({
           },
         ]}
       />
+      </>
+      )}
     </div>
   );
 }

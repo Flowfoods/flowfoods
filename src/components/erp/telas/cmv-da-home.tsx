@@ -29,7 +29,7 @@ function SemValor({ texto }: { texto: string }) {
   return <><span aria-hidden>—</span><span className="sr-only">{texto}</span></>;
 }
 
-export function CmvDaHomeNaTela({ cmv }: { cmv: WidgetCmvHome }) {
+export function CmvDaHomeNaTela({ cmv, compacto = false }: { cmv: WidgetCmvHome; compacto?: boolean }) {
   const estado = ESTADOS[cmv.estado];
   const referencia = cmv.referencia;
   const cobertura = cmv.cobertura;
@@ -62,7 +62,7 @@ export function CmvDaHomeNaTela({ cmv }: { cmv: WidgetCmvHome }) {
           ) : <p>Período do CMV não disponível nesta consulta.</p>}
         </div>
 
-        <dl className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <dl className={'grid min-w-0 gap-4 ' + (compacto ? '' : 'sm:grid-cols-2 lg:grid-cols-3')}>
           <div className="min-w-0">
             <dt className="text-[12px] text-suave">Valor do CMV</dt>
             <dd className="mt-1 break-words font-display text-[26px] font-bold leading-tight tabular-nums text-texto">

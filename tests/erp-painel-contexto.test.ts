@@ -8,6 +8,7 @@ import { situacaoDoEstoque } from '@/lib/erp/estoque';
 import { lojasDaListaDoDia } from '@/lib/erp/producao-lista';
 import { saudeDoCardapio } from '@/lib/erp/saude-do-cardapio';
 import { dreDoPeriodo } from '@/lib/erp/dre';
+import { lerComprasDaHome } from '@/lib/erp/home-compras';
 import { painelDoDia } from '@/lib/erp/painel-do-dia';
 import { PainelDoDiaNaTela } from '@/components/erp/telas/painel-do-dia';
 
@@ -16,6 +17,8 @@ vi.mock('@/lib/erp/estoque', () => ({ situacaoDoEstoque: vi.fn() }));
 vi.mock('@/lib/erp/producao-lista', () => ({ lojasDaListaDoDia: vi.fn() }));
 vi.mock('@/lib/erp/saude-do-cardapio', () => ({ saudeDoCardapio: vi.fn() }));
 vi.mock('@/lib/erp/dre', () => ({ dreDoPeriodo: vi.fn() }));
+vi.mock('@/lib/erp/compras-relatorio', () => ({ resolverRecorte: vi.fn(), totaisDoRecorte: vi.fn() }));
+vi.mock('@/lib/erp/home-compras', async (original) => ({ ...await original<typeof import('@/lib/erp/home-compras')>(), lerComprasDaHome: vi.fn() }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: () => {} }) }));
 
 const HOJE = '2026-10-29';
@@ -33,6 +36,7 @@ const idsDoAlcance = (a: Alcance) => Object.keys(dados).filter((id) => a.lojas =
 beforeEach(() => {
   vi.resetAllMocks();
   vi.mocked(dreDoPeriodo).mockResolvedValue(null);
+  vi.mocked(lerComprasDaHome).mockResolvedValue(null);
   vi.mocked(lojasDaListaDoDia).mockResolvedValue([]);
   vi.mocked(obterMes).mockImplementation(async (_c, alcance, filtro) => {
     const ids = idsDoAlcance(alcance).filter((id) => !filtro.lojaId || filtro.lojaId === id);

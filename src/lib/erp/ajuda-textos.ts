@@ -20,12 +20,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     chave: 'inicio',
     area: 'inicio',
     rotas: [''],
-    titulo: 'Áreas da Rede',
-    versao: 2,
+    titulo: 'Visão geral da operação',
+    versao: 3,
     aula: [
-      { texto: 'No alto, os números do mês e o que precisa de você, na ordem em que vale resolver. Cada um abre a tela certa.' },
-      { texto: 'Abaixo ficam as áreas do restaurante, e cada card abre na primeira tela que você pode usar.' },
-      { texto: 'Só aparece o que o seu acesso libera.' },
+      { texto: 'Escolha uma loja no alto para ver seus indicadores, a evolução do faturamento e os pontos de atenção. Cada número informa a loja e o período a que se refere.' },
+      { texto: 'Sem dados não é zero: o painel avisa sobre ausências e falhas, e Atualizar resumo tenta carregar de novo.' },
+      { texto: 'Só aparece o que o seu acesso libera: em Rede Completa, veja o resumo da rede e as áreas disponíveis; na visão de uma loja, use o menu para abrir as áreas.' },
     ],
   },
   {

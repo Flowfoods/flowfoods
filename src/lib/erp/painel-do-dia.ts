@@ -13,6 +13,8 @@ import { situacaoDoEstoque } from './estoque';
 import { lojasDaListaDoDia } from './producao-lista';
 import { dreDoPeriodo } from './dre';
 import { cmvDaHome, type WidgetCmvHome } from './home-cmv';
+import { comprasAnaliticas, lerComprasDaHome } from './home-compras';
+import { despesasIndisponiveis, estoqueAnalitico, faturamentoAnalitico, producaoAnalitica, type AnaliticoDaHome, type LeituraHome, type WidgetAnaliticoHome } from './home-analitico';
 import { hojeNoRio } from './compra-campos';
 import type { ClienteDoParceiro } from './tenant';
 import type { Visao } from './visao';
@@ -50,6 +52,8 @@ export interface PainelDoDia {
   consultadoEm?: string;
   /** CMV canônico de uma loja autorizada; omitido na rede e sem dre.ver. */
   cmv?: WidgetCmvHome;
+  /** H2 de uma loja; rede conserva resumo atual e orienta seleção explícita. */
+  analitico?: AnaliticoDaHome;
 }
 
 export interface EstadoDoResumo {
@@ -102,8 +106,9 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     // Primeira fatia: somente a loja escolhida. Rede não vira um total fictício.
     producao: !!lojaId && pode(alcanceDaVisao, 'producao.ver', { lojaId }),
     cmv: !!lojaId && pode(alcanceDaVisao, 'dre.ver', { lojaId }),
+    compras: !!lojaId && pode(alcanceDaVisao, 'compras.ver', { lojaId }),
   };
-  const [leituraFat, leituraSaude, leituraEstoque, leituraProducao, leituraCmv] = await Promise.allSettled([
+  const [leituraFat, leituraSaude, leituraEstoque, leituraProducao, leituraCmv, leituraCompras] = await Promise.allSettled([
     leituraAutorizada(autorizado.faturamento, () => obterMes(cliente, alcanceDaVisao, { mes, ...(lojaId ? { lojaId } : {}) }, hoje)),
     leituraAutorizada(autorizado.cardapio, () => saudeDoCardapio(cliente)),
     leituraAutorizada(autorizado.estoque, () => situacaoDoEstoque(cliente, alcanceDaVisao)),
@@ -113,6 +118,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     leituraAutorizada(autorizado.cmv, () => lojaId
       ? dreDoPeriodo(cliente, alcanceDaVisao, { tipo: 'loja', lojaId }, hoje, hoje)
       : Promise.resolve(null)),
+    leituraAutorizada(autorizado.compras, () => lojaId ? lerComprasDaHome(cliente, alcanceDaVisao, lojaId, hoje) : Promise.resolve(null)),
   ]);
   // Rejeições são tratadas por fonte e não entram no DTO, no HTML ou em logs.
   const fat = leituraFat.status === 'fulfilled' ? leituraFat.value : null;
@@ -280,9 +286,25 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
       cmv = cmvDaHome({ estado: 'erro' }, contextoCmv);
     }
   }
+  let analitico: AnaliticoDaHome | undefined;
+  if (visao?.tipo === 'rede') analitico = { tipo: 'rede' };
+  if (visao?.tipo === 'loja') {
+    const contexto = { alcance: alcanceDaVisao, loja: { id: visao.lojaId, nome: visao.nome }, raiz: base, hoje, consultadoEm };
+    const leitura = <T,>(r: PromiseSettledResult<T | null>): LeituraHome<T> => r.status === 'fulfilled' ? { estado: 'lido', dados: r.value } : { estado: 'erro' };
+    const projetar = <T,>(ler: () => T, falha: () => T): T => { try { return ler(); } catch { return falha(); } };
+    // Cada projeção é independente e usa somente a leitura já autorizada.
+    const faturamento = projetar(() => faturamentoAnalitico(leitura(leituraFat), contexto), () => faturamentoAnalitico({ estado: 'erro' }, contexto));
+    const compras = projetar(() => comprasAnaliticas(leitura(leituraCompras), contexto), () => comprasAnaliticas({ estado: 'erro' }, contexto));
+    const posicao = projetar(() => estoqueAnalitico(leitura(leituraEstoque), contexto), () => estoqueAnalitico({ estado: 'erro' }, contexto));
+    const lista = projetar(() => producaoAnalitica(leitura(leituraProducao), contexto), () => producaoAnalitica({ estado: 'erro' }, contexto));
+    const despesas = despesasIndisponiveis(contexto); // Sem contrato financeiro: nenhuma consulta nova.
+    const widgets = [faturamento?.widget, cmv, compras, despesas, posicao, lista].filter((w): w is WidgetAnaliticoHome => !!w);
+    analitico = { tipo: 'loja', loja: contexto.loja, widgets, ...(faturamento ? { faturamentoDiario: faturamento.diario } : {}) };
+  }
   return {
     indicadores, pendencias,
     ...(estados.length ? { estados } : {}), ...(cmv ? { cmv } : {}),
-    ...(estados.length || cmv ? { consultadoEm } : {}),
+    ...(analitico ? { analitico } : {}),
+    ...(estados.length || cmv || (analitico?.tipo === 'loja' && analitico.widgets.length) ? { consultadoEm } : {}),
   };
 }
