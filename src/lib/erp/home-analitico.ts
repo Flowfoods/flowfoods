@@ -9,8 +9,12 @@ import type { lojasDaListaDoDia } from './producao-lista';
 import { pode, type Alcance, type Permissao } from './permissoes';
 import type { FamiliaDaHome, MedidaDoWidgetHome } from './home-contratos';
 import type { ComposicaoComprasHome } from './home-compras-categorias';
+import { complementosDoFaturamento, type ComplementosFaturamentoHome } from './home-faturamento-complementos';
 
-export type WidgetFaturamentoHome = WidgetHome<'faturamento'>;
+export interface WidgetFaturamentoHome extends WidgetHome<'faturamento'> {
+  /** Mesmo total da loja/mês; ausência do campo preserva compatibilidade com DTO antigo. */
+  complementos?: ComplementosFaturamentoHome;
+}
 export interface WidgetComprasHome extends WidgetHome<'compras'> {
   baseDeData: 'entrada';
   notas: number | null;
@@ -84,12 +88,16 @@ export function faturamentoAnalitico(leitura: LeituraHome<MesDoFaturamento>, c: 
   if (!contextoHomePermitido(c, 'faturamento.ver')) return null;
   const mes = c.hoje.slice(0, 7);
   const detalhe = { href: c.raiz + '/faturamento?' + new URLSearchParams({ mes, loja: c.loja.id }).toString(), rotulo: 'Ver o faturamento da loja' };
-  const widget = baseDoWidgetHome('faturamento', 'Faturamento', c, 'centavos', detalhe);
+  const widget: WidgetFaturamentoHome = {
+    ...baseDoWidgetHome('faturamento', 'Faturamento', c, 'centavos', detalhe),
+    complementos: complementosDoFaturamento('indisponivel'),
+  };
   const diario: FaturamentoDiarioHome = { mes, hoje: c.hoje, totalCentavos: null, serie: null, estado: widget.estado, detalhe, consultadoEm: c.consultadoEm };
   const terminar = (estado: EstadoDoWidgetHome, codigo: string, texto: string) => {
     widget.estado = estado; diario.estado = estado; widget.avisos = [{ codigo, texto }];
     widget.valor.valor = null; diario.totalCentavos = null; diario.serie = null;
     widget.referencia = null; widget.origem = null; widget.cobertura = null;
+    widget.complementos = complementosDoFaturamento(estado);
     return { widget, diario };
   };
   if (leitura.estado === 'erro') return terminar('erro', 'faturamento-erro', 'Não foi possível carregar o faturamento desta loja.');
@@ -112,6 +120,9 @@ export function faturamentoAnalitico(leitura: LeituraHome<MesDoFaturamento>, c: 
     widget.cobertura = { lojasIncluidas: [c.loja.id], lojasElegiveis: 1, diasApurados: null, diasDoPeriodo: m.dias.length, faltasDeFaturamento: loja.faltas, custosDoEstoque: null };
     if (!diario.serie.diasLancados) widget.avisos = [{ codigo: 'faturamento-sem-lancamento', texto: 'Ainda não há lançamentos neste mês.' }];
     else if (loja.faltas > 0) widget.avisos = [{ codigo: 'faturamento-parcial', texto: 'Há canais sem lançamento neste mês. O valor ainda está incompleto.' }];
+    // Fronteira própria: falha dos campos adicionais não desfaz receita/série.
+    // Somente o total desta mesma loja, já revalidada, é lido pela projeção pura.
+    widget.complementos = complementosDoFaturamento(widget.estado, () => loja.total);
     return { widget, diario };
   } catch {
     return terminar('erro', 'faturamento-erro', 'Não foi possível carregar o faturamento desta loja.');

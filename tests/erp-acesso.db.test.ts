@@ -140,8 +140,10 @@ describe.skipIf(!URL_TESTE)('ERP 0.3 · login das pessoas dos parceiros (Postgre
     expect(achou.n).toBe(0);
 
     const hist = await doParceiro(A, db).historicoAlteracao.findMany({ where: { entidade: 'AcessoParceiro' }, orderBy: { ocorridoEm: 'asc' } });
-    expect(hist.map((h) => h.acao)).toEqual(['CRIOU', 'GEROU_LINK']);
-    expect(hist[0].depois).toMatchObject({ nome: 'Maria Souza', email: email('maria'), status: 'ATIVO' });
+    // Os dois eventos nascem na mesma transação: now() pode ser idêntico.
+    // O contrato exige os dois registros, sem uma ordem artificial no empate.
+    expect(hist.map((h) => h.acao).sort()).toEqual(['CRIOU', 'GEROU_LINK']);
+    expect(hist.find((h) => h.acao === 'CRIOU')?.depois).toMatchObject({ nome: 'Maria Souza', email: email('maria'), status: 'ATIVO' });
     expect(JSON.stringify(hist)).not.toContain(token);
 
     const repetido = await criarAcesso(A, { nome: 'Maria', email: email('maria') }, 'Rodolfo', o());

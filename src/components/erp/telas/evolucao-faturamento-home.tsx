@@ -1,6 +1,6 @@
 /** Evolução da mesma leitura mensal: reaproveita gráfico, estados e tabela do kit. */
 import Link from 'next/link';
-import type { FaturamentoDiarioHome } from '@/lib/erp/home-analitico';
+import type { FaturamentoDiarioHome, WidgetFaturamentoHome } from '@/lib/erp/home-analitico';
 import { CANAIS } from '@/lib/erp/canal-campos';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { rotuloDoMes, type CanalVenda } from '@/lib/erp/faturamento-campos';
@@ -9,10 +9,11 @@ import { formatarDinheiro } from '@/lib/erp/unidades';
 import { GraficoDeColunas, type PontoDoGrafico } from '../ui/grafico-colunas';
 import { LINK_DE_TEXTO } from '../ui/estilos';
 import { Painel, Selo } from '../ui/superficies';
+import { FaturamentoComplementosHome } from './faturamento-complementos-home';
 
 const COR_DO_CANAL: Record<CanalVenda, number> = { LOJA: 1, DELIVERY_PROPRIO: 2, IFOOD: 3 };
 
-export function EvolucaoFaturamentoHome({ leitura, loja }: { leitura: FaturamentoDiarioHome; loja: string }) {
+export function EvolucaoFaturamentoHome({ leitura, loja, widgetFaturamento }: { leitura: FaturamentoDiarioHome; loja: string; widgetFaturamento?: WidgetFaturamentoHome }) {
   const serie = leitura.serie;
   const titulo = `Faturamento por dia em ${rotuloDoMes(leitura.mes)} · ${loja}`;
   const pontos: PontoDoGrafico[] = serie?.dias.map((dia) => ({
@@ -32,6 +33,7 @@ export function EvolucaoFaturamentoHome({ leitura, loja }: { leitura: Faturament
     <section aria-label="Evolução do faturamento" className="min-w-0">
       <Painel titulo="Faturamento por dia" subtitulo={`${loja} · ${rotuloDoMes(leitura.mes)} · mês civil`}>
         <div className="space-y-4">
+          {widgetFaturamento && <FaturamentoComplementosHome widget={widgetFaturamento} leitura={leitura} />}
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-[13px] text-suave">Total informado no mês: <strong className="font-semibold tabular-nums text-texto">{semLeitura ? 'valor não disponível' : leitura.totalCentavos === null ? valorAusente : formatarDinheiro(leitura.totalCentavos)}</strong></p>
             {leitura.estado === 'parcial' && <Selo tom="alerta">Parcial</Selo>}

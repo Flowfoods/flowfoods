@@ -1,7 +1,7 @@
 /** H2 de uma loja: composição autorizada, sem contas de domínio ou consultas. */
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import type { AnaliticoDaHome, WidgetAnaliticoHome, WidgetComprasHome, WidgetEstoqueHome, WidgetProducaoHome } from '@/lib/erp/home-analitico';
+import type { AnaliticoDaHome, WidgetAnaliticoHome, WidgetComprasHome, WidgetEstoqueHome, WidgetFaturamentoHome, WidgetProducaoHome } from '@/lib/erp/home-analitico';
 import type { EstadoDoWidgetHome, FamiliaDaHome } from '@/lib/erp/home-contratos';
 import type { PainelDoDia } from '@/lib/erp/painel-do-dia';
 import { percentualComDuasCasas } from '@/lib/erp/cmv-categorias-campos';
@@ -14,6 +14,7 @@ import { Painel, Selo, type Tom } from '../ui/superficies';
 import { CmvDaHomeNaTela } from './cmv-da-home';
 import { EvolucaoFaturamentoHome } from './evolucao-faturamento-home';
 import { ComprasCategoriasHome } from './compras-categorias-home';
+import { ValorMonetarioHome } from './valor-monetario-home';
 import { AtualizacaoDoResumo, PendenciasDoResumo } from './painel-do-dia';
 
 const FAMILIAS: FamiliaDaHome[] = ['faturamento', 'cmv', 'compras', 'despesas', 'estoque', 'producao'];
@@ -40,7 +41,7 @@ function ValorDoIndicador({ widget }: { widget: WidgetAnaliticoHome }) {
     const bp = widget.percentual.pontosBase;
     return <>{bp < 0 ? '−' : ''}{percentualComDuasCasas(bp)}</>;
   }
-  return widget.valor.unidade === 'centavos' ? formatarDinheiro(valor)
+  return widget.valor.unidade === 'centavos' ? <ValorMonetarioHome centavos={valor} />
     : widget.valor.unidade === 'pontos_base' ? formatarPontosBase(valor) : inteiro(valor);
 }
 
@@ -66,7 +67,7 @@ function IndicadorAnalitico({ widget }: { widget: WidgetAnaliticoHome }) {
           <h2 className="min-w-0 break-words text-[13px] font-semibold text-texto">{identidade.nome}</h2>
         </div>
         <div className="space-y-1">
-          <p className="break-words font-display text-[23px] font-bold leading-tight tabular-nums text-texto [overflow-wrap:anywhere]"><ValorDoIndicador widget={widget} /></p>
+          <p className="break-words font-display text-[23px] font-bold leading-tight tabular-nums text-texto"><ValorDoIndicador widget={widget} /></p>
           {widget.familia === 'cmv' && widget.percentual?.pontosBase != null && widget.valor.valor !== null && <p className="text-[12px] font-medium tabular-nums text-suave">{formatarDinheiro(widget.valor.valor)} de custo no DRE</p>}
           {widget.familia === 'estoque' && <p className="text-[12px] text-suave">{widget.rotuloDoValor}</p>}
           {widget.familia === 'producao' && <p className="text-[12px] text-suave">Pré-preparos na lista de hoje</p>}
@@ -136,6 +137,7 @@ export function HomeAnalitica({ analitico, painel }: { analitico: Extract<Analit
   const estoque = widgets.find((w): w is WidgetEstoqueHome => w.familia === 'estoque');
   const producao = widgets.find((w): w is WidgetProducaoHome => w.familia === 'producao');
   const compras = widgets.find((w): w is WidgetComprasHome => w.familia === 'compras');
+  const faturamento = widgets.find((w): w is WidgetFaturamentoHome => w.familia === 'faturamento');
   const temCardapio = painel.indicadores.some((i) => i.chave === 'cardapio') || painel.estados?.some((e) => e.chave === 'cardapio');
   const temOperacao = Boolean(estoque || producao || temCardapio);
   return (
@@ -148,7 +150,7 @@ export function HomeAnalitica({ analitico, painel }: { analitico: Extract<Analit
       ) : <p className="rounded-[14px] border border-linha bg-painel p-5 text-sm text-suave">Não há indicadores disponíveis no seu acesso a esta loja. As áreas permitidas continuam na navegação.</p>}
 
       <div className="grid min-w-0 items-start gap-4 xl:grid-cols-3">
-        {analitico.faturamentoDiario && <div className={'min-w-0 ' + (painel.cmv ? 'xl:col-span-2' : 'xl:col-span-3')}><EvolucaoFaturamentoHome leitura={analitico.faturamentoDiario} loja={analitico.loja.nome} /></div>}
+        {analitico.faturamentoDiario && <div className={'min-w-0 ' + (painel.cmv ? 'xl:col-span-2' : 'xl:col-span-3')}><EvolucaoFaturamentoHome leitura={analitico.faturamentoDiario} loja={analitico.loja.nome} widgetFaturamento={faturamento} /></div>}
         {painel.cmv && <div className={'min-w-0 ' + (analitico.faturamentoDiario ? 'xl:row-span-2' : 'xl:col-span-3')}><CmvDaHomeNaTela cmv={painel.cmv} compacto={Boolean(analitico.faturamentoDiario)} /></div>}
         {temOperacao && (
           <section aria-label="Operação de hoje" className={'min-w-0 space-y-3 ' + (painel.cmv && analitico.faturamentoDiario ? 'xl:col-span-2' : 'xl:col-span-3')}>
