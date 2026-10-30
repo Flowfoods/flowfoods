@@ -32,11 +32,12 @@ function harness(replies, overrides = {}) {
   return { calls, emitted, reports, sleeps, run: (patch = {}) => runDeploy({ ...config, ...patch }, deps) };
 }
 
-test('HTTPS somente na origem existente; normaliza URL do painel sem transmitir path/query/hash', () => {
+test('preserva HTTP/HTTPS da origem existente; normaliza painel sem transmitir path/query/hash', () => {
   assert.equal(dokployOrigin(config.url), config.url);
   assert.equal(dokployOrigin(config.url + '/dashboard/project?token=DADO_PRIVADO#ambiente'), config.url);
-  for (const value of ['http://deploy.example.test', 'https://u:p@deploy.example.test', 'arquivo']) {
-    assert.throws(() => dokployOrigin(value));
+  assert.equal(dokployOrigin('http://192.0.2.24:3000/dashboard?private=DADO_PRIVADO#ambiente'), 'http://192.0.2.24:3000');
+  for (const value of ['https://u:p@deploy.example.test', 'http://u:p@192.0.2.24:3000', 'ftp://deploy.example.test', 'file:///fixture', 'data:text/plain,fixture', 'wss://deploy.example.test', 'arquivo']) {
+    assert.throws(() => dokployOrigin(value), { message: 'invalid_config_url' });
   }
 });
 
@@ -70,6 +71,39 @@ test('URL legada com caminho/query/hash usa só a origem; metadados descartados 
   assert.equal(h.calls[0].url, config.url + '/api/compose.deploy');
   assert.equal(h.calls[1].url, config.url + '/api/deployment.allByCompose?composeId=' + config.composeId);
   assert.doesNotMatch(JSON.stringify(h.calls) + JSON.stringify(h.emitted) + h.reports.join(), /DADO_PRIVADO|dashboard|secreto/);
+});
+
+test('API HTTP legada usa o mesmo protocolo, host e porta para POST único e todos os GETs', async () => {
+  const legacy = 'http://192.0.2.24:3000';
+  const h = harness([{}, [row()], [row('done')]]);
+  assert.deepEqual(await h.run({ url: legacy + '/dashboard?private=DADO_PRIVADO#ambiente' }), { exitCode: 0, status: 'done' });
+  assert.equal(h.calls.filter((c) => c.options.method === 'POST').length, 1);
+  assert.equal(h.calls[0].url, legacy + '/api/compose.deploy');
+  assert.ok(h.calls.slice(1).every((c) => c.url === legacy + '/api/deployment.allByCompose?composeId=' + config.composeId));
+  assert.ok(h.calls.every((c) => c.options.redirect === 'error' && c.options.dispatcher === undefined));
+  assert.doesNotMatch(JSON.stringify(h.calls) + JSON.stringify(h.emitted), /DADO_PRIVADO|dashboard|ambiente/);
+});
+
+test('falha HTTP ou de certificado HTTPS não muda protocolo/canal nem repete POST', async () => {
+  for (const url of ['http://192.0.2.24:3000', config.url]) {
+    const h = harness([() => { throw new Error('CERT_OR_NETWORK_PRIVADO'); }]);
+    assert.deepEqual(await h.run({ url }), { exitCode: 1, status: 'post_failed' });
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.calls[0].url, url + '/api/compose.deploy');
+    assert.equal(h.calls[0].options.redirect, 'error');
+    assert.equal(h.calls[0].options.dispatcher, undefined);
+    assert.doesNotMatch(JSON.stringify(h.emitted) + h.reports.join(), /CERT_OR_NETWORK_PRIVADO|example\.test|192\.0\.2/);
+  }
+});
+
+test('redirect em API HTTP/HTTPS não é seguido e não cria POST adicional ou fallback', async () => {
+  for (const url of ['http://192.0.2.24:3000', config.url]) {
+    const h = harness([{}, () => new Response(null, { status: 302, headers: { Location: 'https://outro.example.test' } })]);
+    assert.deepEqual(await h.run({ url }), { exitCode: 1, status: 'confirmation_http' });
+    assert.equal(h.calls.length, 2);
+    assert.equal(h.calls.filter((c) => c.options.method === 'POST').length, 1);
+    assert.ok(h.calls.every((c) => c.url.startsWith(url + '/api/') && c.options.redirect === 'error'));
+  }
 });
 
 test('done alheio nunca confirma; registro esperado pode surgir depois da fila', async () => {
@@ -226,6 +260,39 @@ test('webhook-only registra aceitação sem conclusão e não envia header do to
   assert.deepEqual(h.emitted, [{ composeId: config.composeId, status: 'accepted_unconfirmed', createdAt: stamp }]);
 });
 
+test('webhook HTTP explícito preserva sua URL, sem token, upgrade automático ou confirmação fictícia', async () => {
+  const webhook = 'http://192.0.2.24:3000/deploy/fixture?fixture=1';
+  const h = harness([{}]);
+  assert.deepEqual(await h.run({ url: undefined, webhook }), { exitCode: 0, status: 'accepted_unconfirmed' });
+  assert.equal(h.calls.length, 1);
+  assert.equal(h.calls[0].url, webhook);
+  assert.equal(h.calls[0].options.headers, undefined);
+  assert.equal(h.calls[0].options.redirect, 'error');
+  assert.doesNotMatch(JSON.stringify(h.emitted) + h.reports.join(), /192\.0\.2|fixture=1|TOKEN_SINTETICO/);
+});
+
+test('webhook HTTP/HTTPS ignora fragmento sem transmiti-lo no pedido ou na saída', async () => {
+  for (const webhook of ['http://192.0.2.24:3000/deploy/fixture?fixture=1', config.webhook]) {
+    const h = harness([{}]);
+    assert.deepEqual(await h.run({ url: undefined, webhook: webhook + '#SEGREDO_FRAGMENTO_TESTE' }), { exitCode: 0, status: 'accepted_unconfirmed' });
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.calls[0].url, webhook);
+    assert.equal(h.calls[0].options.headers, undefined);
+    assert.doesNotMatch(JSON.stringify(h.calls) + JSON.stringify(h.emitted) + h.reports.join(), /SEGREDO_FRAGMENTO_TESTE|#/);
+  }
+});
+
+test('redirect ou falha de webhook HTTP/HTTPS não muda origem e não repete o disparo', async () => {
+  for (const webhook of ['http://192.0.2.24:3000/deploy/fixture', config.webhook]) {
+    const h = harness([() => new Response(null, { status: 302, headers: { Location: 'https://outro.example.test' } })]);
+    assert.deepEqual(await h.run({ url: undefined, webhook }), { exitCode: 1, status: 'post_failed' });
+    assert.equal(h.calls.length, 1);
+    assert.equal(h.calls[0].url, webhook);
+    assert.equal(h.calls[0].options.redirect, 'error');
+    assert.equal(h.calls[0].options.headers, undefined);
+  }
+});
+
 test('nenhum canal configurado não dispara e é explícito, sem inventar publicação', async () => {
   const h = harness([]);
   assert.deepEqual(await h.run({ url: undefined, token: undefined, webhook: undefined }), { exitCode: 0, status: 'not_configured' });
@@ -233,11 +300,21 @@ test('nenhum canal configurado não dispara e é explícito, sem inventar public
 });
 
 test('configuração insegura/faltante falha antes de qualquer POST; não cai em webhook silenciosamente', async () => {
-  for (const patch of [{ url: 'http://deploy.example.test' }, { composeId: 'TOKEN PRIVADO' }, { runId: '' }, { sha: 'master' }, { token: 'bad\nheader' }, { maxWaitMs: 1_200_001 }, { pollMs: 0 }, { requestTimeoutMs: 60_001 }, { url: undefined, webhook: 'http://hooks.example.test/a' }]) {
+  for (const [patch, status] of [
+    [{ url: 'ftp://deploy.example.test' }, 'invalid_config_url'],
+    [{ composeId: 'TOKEN PRIVADO' }, 'invalid_config_identifier'],
+    [{ runId: '' }, 'invalid_config_marker'], [{ sha: 'master' }, 'invalid_config_marker'],
+    [{ token: 'bad\nheader' }, 'invalid_config_token'],
+    [{ maxWaitMs: 1_200_001 }, 'invalid_config_limits'], [{ pollMs: 0 }, 'invalid_config_limits'], [{ requestTimeoutMs: 60_001 }, 'invalid_config_limits'],
+    [{ url: undefined, webhook: 'ftp://hooks.example.test/a' }, 'invalid_config_url'],
+    [{ url: undefined, webhook: 'http://u:p@hooks.example.test/a' }, 'invalid_config_url'],
+    [{ url: undefined, webhook: 'https://u:p@hooks.example.test/a' }, 'invalid_config_url'],
+  ]) {
     const h = harness([]);
-    assert.deepEqual(await h.run(patch), { exitCode: 1, status: 'invalid_config' });
+    assert.deepEqual(await h.run(patch), { exitCode: 1, status });
     assert.equal(h.calls.length, 0);
     assert.doesNotMatch(JSON.stringify(h.emitted), /TOKEN PRIVADO|bad/);
+    assert.deepEqual(h.reports, [status]);
   }
 });
 

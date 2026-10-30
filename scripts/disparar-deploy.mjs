@@ -4,6 +4,11 @@ const MAX_WAIT_MS = 20 * 60_000;
 const MAX_BODY_BYTES = 1_048_576;
 const MESSAGES = {
   invalid_config: 'Configuração de deploy inválida; nenhuma tentativa foi iniciada.',
+  invalid_config_url: 'URL de deploy inválida: use a origem HTTP ou HTTPS configurada, sem credenciais na URL.',
+  invalid_config_identifier: 'Identificador do compose inválido; nenhuma tentativa foi iniciada.',
+  invalid_config_marker: 'Identificação da execução do CI inválida; nenhuma tentativa foi iniciada.',
+  invalid_config_limits: 'Limites de acompanhamento inválidos; nenhuma tentativa foi iniciada.',
+  invalid_config_token: 'Formato da credencial do canal inválido; nenhuma tentativa foi iniciada.',
   post_failed: 'Não foi possível confirmar a aceitação do disparo. O POST não foi repetido.',
   accepted_unconfirmed: 'Publicação aceita pelo webhook; confirmação indisponível neste canal.',
   not_configured: 'Deploy não disparado: nenhum canal configurado.',
@@ -16,23 +21,30 @@ const MESSAGES = {
   cancelled: 'O deployment correlacionado foi cancelado.',
 };
 
-/** Apenas HTTPS da origem configurada; nenhuma descoberta de host ou leitura de env remoto. */
+function configuredUrl(value) {
+  let url;
+  try { url = new URL(value); } catch { throw new Error('invalid_config_url'); }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('invalid_config_url');
+  return url;
+}
+
+/** Preserva HTTP/HTTPS da origem configurada; não descobre host nem troca protocolo. */
 export function dokployOrigin(value) {
-  const url = new URL(value);
-  if (url.protocol !== 'https:' || url.username || url.password) throw new Error('invalid_config');
+  const url = configuredUrl(value);
   // A configuração anterior já aceitava URLs coladas do painel. Descartar o
   // restante preserva essa compatibilidade sem enviar caminho/query/fragmento.
   return url.origin;
 }
 
 function webhookUrl(value) {
-  const url = new URL(value);
-  if (url.protocol !== 'https:' || url.username || url.password || url.hash) throw new Error('invalid_config');
+  const url = configuredUrl(value);
+  // Fragmento não faz parte da requisição HTTP; o fluxo anterior o ignorava.
+  url.hash = '';
   return url.href;
 }
 
 export function deploymentTitle({ runId, runAttempt, sha }) {
-  if (!/^\d{1,30}$/.test(runId ?? '') || !/^\d{1,10}$/.test(runAttempt ?? '') || !/^[a-f\d]{40}$/i.test(sha ?? '')) throw new Error('invalid_config');
+  if (!/^\d{1,30}$/.test(runId ?? '') || !/^\d{1,10}$/.test(runAttempt ?? '') || !/^[a-f\d]{40}$/i.test(sha ?? '')) throw new Error('invalid_config_marker');
   return `flowfoods-ci:${runId}:${runAttempt}:${sha.toLowerCase()}`;
 }
 
@@ -136,20 +148,23 @@ export async function runDeploy(config, deps = {}) {
   };
   let origin, webhook, title, maxWaitMs, pollMs, requestTimeoutMs;
   try {
-    if (typeof config.composeId !== 'string' || !/^[a-z\d_-]{1,128}$/i.test(config.composeId)) throw new Error();
+    if (typeof config.composeId !== 'string' || !/^[a-z\d_-]{1,128}$/i.test(config.composeId)) throw new Error('invalid_config_identifier');
     composeId = config.composeId;
     maxWaitMs = config.maxWaitMs ?? MAX_WAIT_MS;
     pollMs = config.pollMs ?? 15_000;
     requestTimeoutMs = config.requestTimeoutMs ?? 15_000;
     if (![maxWaitMs, pollMs, requestTimeoutMs].every((n) => Number.isInteger(n) && n > 0)
-      || maxWaitMs > MAX_WAIT_MS || pollMs > 60_000 || requestTimeoutMs > 60_000) throw new Error();
+      || maxWaitMs > MAX_WAIT_MS || pollMs > 60_000 || requestTimeoutMs > 60_000) throw new Error('invalid_config_limits');
     if (config.url && config.token) {
       origin = dokployOrigin(config.url);
-      if (typeof config.token !== 'string' || !config.token.trim() || /[\r\n]/.test(config.token)) throw new Error();
+      if (typeof config.token !== 'string' || !config.token.trim() || /[\r\n]/.test(config.token)) throw new Error('invalid_config_token');
       title = deploymentTitle(config);
     } else if (config.webhook) webhook = webhookUrl(config.webhook);
     else return finish('not_configured', 0);
-  } catch { return finish('invalid_config', 1); }
+  } catch (error) {
+    const codes = ['invalid_config_url', 'invalid_config_identifier', 'invalid_config_marker', 'invalid_config_limits', 'invalid_config_token'];
+    return finish(codes.includes(error.message) ? error.message : 'invalid_config', 1);
+  }
 
   try {
     await request(fetcher, origin ? `${origin}/api/compose.deploy` : webhook, {
