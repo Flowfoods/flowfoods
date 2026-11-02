@@ -28,6 +28,7 @@ import { custoPorCanal, obterTaxaDoIfood, salvarMetasDeCmv, salvarTaxaDoIfood } 
 import { resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { formatarFracao } from '@/lib/erp/unidades';
+import { porcentagemDoCmv } from '@/lib/erp/cmv-produto-campos';
 import * as acoes from '@/app/erp/fichas/actions';
 import * as acoesN1 from '@/app/rodolfo/(painel)/erp/[slug]/fichas/actions';
 import PaginaEmbalagens from '@/app/erp/fichas/[id]/canais/page';
@@ -195,6 +196,7 @@ describe.skipIf(!URL_TESTE)('Ficha: receita salva → embalagens → preço (Pos
     const depois = await canais(id);
     expect(depois.cmv.map((x) => x.precoCentavos)).toEqual([3000, 4000, 5000]);
     expect(depois.cmv[2].sugerido).toMatchObject({ tipo: 'ok', centavos: 6400 });
+    expect(porcentagemDoCmv(depois.cmv[2].cmvBp!)).toBe('32,0%');
     const telaDepois = sp(renderToStaticMarkup(await PaginaEmbalagens({ params: { id }, searchParams: {} })));
     for (const trecho of ['R$ 16,00 ÷ 25%', 'R$ 64,00', 'R$ 50,00', '32,0%']) expect(telaDepois).toContain(trecho);
     expect(await cliente.movimentoEstoque.count()).toBe(0);

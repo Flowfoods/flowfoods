@@ -214,7 +214,8 @@ function FormEmbalagensBase({
             if (c) naTela.push(c.naTela);
             if (!c && (l.insumoId || l.quantidade.trim())) linhasPendentes++;
           }
-          const incompleto = faltaPreco.length > 0 || semPreco > 0 || linhasPendentes > 0;
+          // Linha que o servidor recusaria (repetida, acima do limite…) também deixa o custo físico como parcial.
+          const incompleto = faltaPreco.length > 0 || semPreco > 0 || linhasPendentes > 0 || recusaDoCanal(canal) !== null;
           const fisico = somar(custoDaPorcao, total);
           const repetidas = naReceita
             ? embalagensTambemNaReceita(naReceita, doCanal.flatMap((l) => (porId.get(l.insumoId) ? [{ insumoId: l.insumoId, nome: porId.get(l.insumoId)!.nome }] : [])))
@@ -433,7 +434,8 @@ function SugestaoPelaMeta({ x }: { x: ContaDasEmbalagens }) {
 function PrecoComEstasEmbalagens({ canal, conta: x, recusa }: { canal: CanalComEmbalagem; conta: ContaDasEmbalagens | null; recusa: string | null }) {
   const st = x ? STATUS_DO_CMV[x.status] : null;
   return (
-    <div role="group" aria-label={`Preço e CMV do ${CANAIS[canal].rotulo} com estas embalagens`} className="mt-3 border-t border-linha pt-3">
+    // aria-live no grupo (não no dl, que entra e sai): a passagem de "Corrija"/"Complete" para os valores também é anunciada.
+    <div role="group" aria-live="polite" aria-label={`Preço e CMV do ${CANAIS[canal].rotulo} com estas embalagens`} className="mt-3 border-t border-linha pt-3">
       <p className="text-[12px] font-semibold uppercase tracking-wide text-suave">Com estas embalagens</p>
       {recusa ? (
         <p className="mt-1 text-[13px] text-suave">Corrija antes de ver o preço sugerido e o CMV: {recusa}</p>
@@ -444,8 +446,7 @@ function PrecoComEstasEmbalagens({ canal, conta: x, recusa }: { canal: CanalComE
           Não ofertado: este prato não está marcado como vendido neste canal. As embalagens continuam configuradas; sem sugestão nem farol.
         </p>
       ) : (
-        // Muda enquanto a pessoa digita: o leitor de tela anuncia, como no detalhe.
-        <dl aria-live="polite" className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px] tabular-nums sm:grid-cols-4">
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px] tabular-nums sm:grid-cols-4">
           <div className="min-w-0">
             <dt className="text-[12px] text-suave">Meta de CMV</dt>
             <dd className="text-texto">{x.metaBp === null ? <span className="text-suave">sem meta</span> : formatarPontosBase(x.metaBp)}</dd>

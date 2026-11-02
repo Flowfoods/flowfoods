@@ -228,7 +228,9 @@ describe('Kairu (31/10): aviso de embalagem que também está na receita', () =>
     const h = html({ naReceita: ['caixa', 'carne'] });
     expect(h).toContain('“Caixa” também está na receita: se for o mesmo uso, o custo entra duas vezes no Delivery próprio.');
     expect(h).not.toContain('no iFood. Usos diferentes');
+    // O aviso não bloqueia: nenhum botão de envio fica desativado.
     expect(h).toContain('Salvar embalagens');
+    expect(h).not.toContain('disabled=""');
   });
   it('sem repetição, ou sem a lista da receita, nenhum aviso', () => {
     expect(html({ naReceita: ['carne'] })).not.toContain('também está na receita');
