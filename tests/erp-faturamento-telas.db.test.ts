@@ -56,8 +56,12 @@ import ErpLancarPage from '@/app/erp/faturamento/lancar/page';
 import ErpImportarPage from '@/app/erp/faturamento/importar/page';
 import ErpHistoricoPage from '@/app/erp/historico/page';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { relogioDoCenario } from './relogio-do-cenario';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
+
+// "D = hoje − 2" cai no mês anterior nos dias 1 e 2: o arquivo roda no meio de um mês fixo.
+relogioDoCenario('2026-10-17T12:00:00-03:00');
 
 describe.skipIf(!URL_TESTE)('ERP 2.1 · telas e actions de faturamento (Postgres real)', { timeout: 120_000 }, () => {
   let db: PrismaClient;
