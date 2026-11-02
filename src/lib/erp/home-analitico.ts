@@ -10,10 +10,13 @@ import { pode, type Alcance, type Permissao } from './permissoes';
 import type { FamiliaDaHome, MedidaDoWidgetHome } from './home-contratos';
 import type { ComposicaoComprasHome } from './home-compras-categorias';
 import { complementosDoFaturamento, type ComplementosFaturamentoHome } from './home-faturamento-complementos';
+import { projetarCanaisDoFaturamento, type ComposicaoFaturamentoHome } from './home-faturamento-canais';
 
 export interface WidgetFaturamentoHome extends WidgetHome<'faturamento'> {
   /** Mesmo total da loja/mês; ausência do campo preserva compatibilidade com DTO antigo. */
   complementos?: ComplementosFaturamentoHome;
+  /** Mesma loja/mês; opcional para consumidores anteriores. */
+  composicaoPorCanal?: ComposicaoFaturamentoHome;
 }
 export interface WidgetComprasHome extends WidgetHome<'compras'> {
   baseDeData: 'entrada';
@@ -98,6 +101,7 @@ export function faturamentoAnalitico(leitura: LeituraHome<MesDoFaturamento>, c: 
     widget.valor.valor = null; diario.totalCentavos = null; diario.serie = null;
     widget.referencia = null; widget.origem = null; widget.cobertura = null;
     widget.complementos = complementosDoFaturamento(estado);
+    widget.composicaoPorCanal = projetarCanaisDoFaturamento(estado);
     return { widget, diario };
   };
   if (leitura.estado === 'erro') return terminar('erro', 'faturamento-erro', 'Não foi possível carregar o faturamento desta loja.');
@@ -123,6 +127,11 @@ export function faturamentoAnalitico(leitura: LeituraHome<MesDoFaturamento>, c: 
     // Fronteira própria: falha dos campos adicionais não desfaz receita/série.
     // Somente o total desta mesma loja, já revalidada, é lido pela projeção pura.
     widget.complementos = complementosDoFaturamento(widget.estado, () => loja.total);
+    widget.composicaoPorCanal = projetarCanaisDoFaturamento(widget.estado, () => ({
+      totalCentavos: loja.total.valorCentavos, faltas: loja.faltas, diasDoPeriodo: m.dias.length,
+      porCanal: loja.porCanal, faltasPorCanal: loja.faltasPorCanal,
+      configurados: loja.loja.canais, comLancamento: diario.serie!.canais,
+    }));
     return { widget, diario };
   } catch {
     return terminar('erro', 'faturamento-erro', 'Não foi possível carregar o faturamento desta loja.');
