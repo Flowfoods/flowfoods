@@ -195,6 +195,10 @@ describe('tela de embalagens: a prévia segue a regra do servidor e a unidade da
     const h = html({ inicial: [linha('DELIVERY_PROPRIO', 'caixa'), linha('DELIVERY_PROPRIO', 'caixa'), linha('IFOOD', 'sacola')] });
     expect(h).toContain('Corrija antes de ver o preço sugerido e o CMV: “Caixa” já está neste canal (linha 1).');
     expect(h).not.toContain('R$ 56,00');
+    // Nenhum total conta a linha recusada: nem o do painel (R$ 4,00), nem o custo físico (R$ 14,00).
+    expect(h).toContain('Corrija as embalagens');
+    expect(h).toContain('Custo físico parcial conhecido: —');
+    expect(h).not.toMatch(/R\$ 4,00|R\$ 14,00/);
     expect(h).toContain('R$ 52,00'); // o iFood segue independente
   });
   it('quantidade acima do limite por porção: recusa, sem sugestão de milhares de reais', () => {

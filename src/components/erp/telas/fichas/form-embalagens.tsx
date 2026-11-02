@@ -214,8 +214,9 @@ function FormEmbalagensBase({
             if (c) naTela.push(c.naTela);
             if (!c && (l.insumoId || l.quantidade.trim())) linhasPendentes++;
           }
-          // Linha que o servidor recusaria (repetida, acima do limite…) também deixa o custo físico como parcial.
-          const incompleto = faltaPreco.length > 0 || semPreco > 0 || linhasPendentes > 0 || recusaDoCanal(canal) !== null;
+          // Linha que o servidor recusaria (repetida, acima do limite…): nenhum total, nem parcial, conta com ela.
+          const recusa = linhasPendentes > 0 ? null : recusaDoCanal(canal);
+          const incompleto = faltaPreco.length > 0 || semPreco > 0 || linhasPendentes > 0 || recusa !== null;
           const fisico = somar(custoDaPorcao, total);
           const repetidas = naReceita
             ? embalagensTambemNaReceita(naReceita, doCanal.flatMap((l) => (porId.get(l.insumoId) ? [{ insumoId: l.insumoId, nome: porId.get(l.insumoId)!.nome }] : [])))
@@ -228,8 +229,8 @@ function FormEmbalagensBase({
               subtitulo={AJUDA_DO_CANAL[canal]}
               acessorio={
                 <span className="shrink-0 text-right text-[12px] tabular-nums text-suave">
-                  <span className="block text-[13px] font-semibold text-texto">{total.num === 0n && (semPreco > 0 || linhasPendentes > 0) ? '—' : formatarFracao(total)}</span>
-                  {semPreco > 0 || linhasPendentes > 0 ? <span className="text-atencao">Embalagens incompletas</span> : 'por porção'}
+                  <span className="block text-[13px] font-semibold text-texto">{recusa || (total.num === 0n && (semPreco > 0 || linhasPendentes > 0)) ? '—' : formatarFracao(total)}</span>
+                  {recusa ? <span className="text-atencao">Corrija as embalagens</span> : semPreco > 0 || linhasPendentes > 0 ? <span className="text-atencao">Embalagens incompletas</span> : 'por porção'}
                 </span>
               }
             >
@@ -361,7 +362,7 @@ function FormEmbalagensBase({
                 )}
               </div>
               <p className="mt-3 text-[12px] tabular-nums text-suave">
-                {incompleto ? 'Custo físico parcial conhecido' : 'Custo físico da receita e embalagens'}: {incompleto && fisico.num === 0n ? '—' : `${formatarFracao(fisico)} por porção`}
+                {incompleto ? 'Custo físico parcial conhecido' : 'Custo físico da receita e embalagens'}: {recusa || (incompleto && fisico.num === 0n) ? '—' : `${formatarFracao(fisico)} por porção`}
                 {canal === 'IFOOD' ? ', antes da taxa do iFood' : ''}.
               </p>
               {faltaPreco.length > 0 && <p className="mt-1 text-[12px] text-atencao">Custo da receita incompleto: falta o custo de {faltaPreco.join(', ')}.</p>}
@@ -376,8 +377,8 @@ function FormEmbalagensBase({
                 <PrecoComEstasEmbalagens
                   canal={canal}
                   // Linha pela metade ou que o servidor recusaria não entra na conta: em vez de um canal "completo" falso, nada.
-                  recusa={linhasPendentes > 0 ? null : recusaDoCanal(canal)}
-                  conta={linhasPendentes > 0 || recusaDoCanal(canal) ? null : contaDasEmbalagensNaTela({ canal, porcao: custoDaPorcao, faltaPreco, embalagens: naTela, preco: precos[canal] })}
+                  recusa={recusa}
+                  conta={linhasPendentes > 0 || recusa ? null : contaDasEmbalagensNaTela({ canal, porcao: custoDaPorcao, faltaPreco, embalagens: naTela, preco: precos[canal] })}
                 />
               )}
             </Painel>
