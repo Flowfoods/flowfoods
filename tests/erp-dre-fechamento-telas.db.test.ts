@@ -70,9 +70,12 @@ import NivelUmPeriodoPage from '@/app/rodolfo/(painel)/erp/[slug]/dre/periodos/[
 import { TelaDoDre } from '@/components/erp/telas/dre/dre';
 import { TelaDoFechamento } from '@/components/erp/telas/dre/periodo-fechamento';
 import { cru, limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
+import { relogioDoCenario } from './relogio-do-cenario';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const HOJE = '2026-10-17';
+// Páginas e ações leem o relógio real: o arquivo inteiro roda no dia do cenário.
+relogioDoCenario(`${HOJE}T12:00:00-03:00`);
 const nbsp = (t: string) => t.replace(/\u00a0/g, ' ');
 
 describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (Postgres real)', { timeout: 180_000 }, () => {

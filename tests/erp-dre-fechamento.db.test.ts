@@ -36,10 +36,13 @@ import { listarHistorico } from '@/lib/erp/historico';
 import { obterTaxaDoIfood, salvarMetasDeCmv, salvarTaxaDoIfood } from '@/lib/erp/canais';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import { criarPeriodoFechadoDeTeste, cru, limparParceiros, perfilDoBanco, reabrirPeriodoDeTeste, type PerfilDoBanco } from './erp-db-apoio';
+import { relogioDoCenario } from './relogio-do-cenario';
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 /** "Hoje" do teste: o relógio do ambiente dos testes de DRE. Outubro está em curso; setembro e agosto terminaram. */
 const HOJE = '2026-10-17';
+// O fechamento do estoque lê o relógio real: o arquivo inteiro roda no dia do cenário.
+relogioDoCenario(`${HOJE}T12:00:00-03:00`);
 const dia = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 describe.skipIf(!URL_TESTE)('ERP 2.2b · metas e fechamento (Postgres real)', { timeout: 300_000 }, () => {
