@@ -214,6 +214,16 @@ export const CAMPO_DO_CANAL: Record<CanalComEmbalagem, 'embalagensDelivery' | 'e
 
 export const SEM_EMBALAGEM = 'Nenhuma';
 
+/**
+ * Revisão Kairu de 31/10/2026 (Ficha/custos): a mesma embalagem na receita e no canal pode ser o MESMO uso cobrado duas
+ * vezes. Só aviso — usos diferentes do mesmo insumo são legítimos e nada é bloqueado. Devolve, sem repetir, os nomes das
+ * embalagens do canal que também são itens diretos da receita. O que vai dentro de um pré-preparo fica fora deste aviso.
+ */
+export function embalagensTambemNaReceita(idsDaReceita: readonly string[], doCanal: readonly { insumoId: string; nome: string }[]): string[] {
+  const naReceita = new Set(idsDaReceita.filter(Boolean));
+  return Array.from(new Set(doCanal.filter((e) => e.insumoId && naReceita.has(e.insumoId)).map((e) => e.nome)));
+}
+
 /** Retrato das embalagens para o histórico da ficha: "Caixa kraft 1 un · Guardanapo 2 un" por canal. */
 export function retratoDasEmbalagens(
   lista: readonly EmbalagemDoCanal[],

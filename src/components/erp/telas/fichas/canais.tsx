@@ -83,6 +83,8 @@ export function TelaEmbalagensDaFicha({
         novoInsumo={novoInsumo}
         // Meta, preço escolhido e oferta já lidos com as embalagens (a página exige precos.ver): a sugestão e o CMV aparecem ao vivo.
         precos={precosDasEmbalagens(canais.cmv)}
+        // Itens diretos da receita salva: embalagem repetida no canal ganha aviso (Kairu, 31/10), sem bloquear.
+        naReceita={ficha.itens.flatMap((i) => (i.insumoId ? [i.insumoId] : []))}
       />
     </div>
   );

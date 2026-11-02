@@ -14,7 +14,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFormState } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import type { EmbalagemDoFormulario } from '@/lib/erp/canais';
-import { CANAIS, CANAIS_COM_EMBALAGEM, chaveDaEmbalagem, lerEmbalagens, LIMITES_DO_CANAL, type CanalComEmbalagem, type EmbalagemDoCadastro } from '@/lib/erp/canal-campos';
+import { CANAIS, CANAIS_COM_EMBALAGEM, chaveDaEmbalagem, embalagensTambemNaReceita, lerEmbalagens, LIMITES_DO_CANAL, type CanalComEmbalagem, type EmbalagemDoCadastro } from '@/lib/erp/canal-campos';
 import { contaDoSugeridoPorCmv, porcentagemDoCmv, STATUS_DO_CMV } from '@/lib/erp/cmv-produto-campos';
 import { custoDoUso, custoPorUnidade, escalaDaSigla, formatarDinheiro, formatarFracao, formatarPontosBase, lerQuantidadeNa, SIGLAS_DIGITAVEIS, somar, ZERO, type Fracao } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -97,6 +97,8 @@ type PropsDoFormEmbalagens = {
   novoInsumo?: string;
   /** Meta, preço escolhido e oferta de cada canal: sem isso, a tela não mostra sugestão nem CMV (compatível). */
   precos?: PrecosDasEmbalagens | null;
+  /** Insumos que são itens diretos da receita salva: embalagem repetida no canal ganha um aviso (sem bloquear). */
+  naReceita?: readonly string[];
 };
 
 function FormEmbalagensBase({
@@ -113,6 +115,7 @@ function FormEmbalagensBase({
   novoInsumo,
   precos,
   gravadas,
+  naReceita,
   chaveDoRascunho,
   avisos,
 }: PropsDoFormEmbalagens & { chaveDoRascunho: string; avisos: ReactNode; gravadas: readonly LinhaDaEmbalagem[] }) {
@@ -213,6 +216,9 @@ function FormEmbalagensBase({
           }
           const incompleto = faltaPreco.length > 0 || semPreco > 0 || linhasPendentes > 0;
           const fisico = somar(custoDaPorcao, total);
+          const repetidas = naReceita
+            ? embalagensTambemNaReceita(naReceita, doCanal.flatMap((l) => (porId.get(l.insumoId) ? [{ insumoId: l.insumoId, nome: porId.get(l.insumoId)!.nome }] : [])))
+            : [];
           const delivery = linhas.filter((l) => l.canal === 'DELIVERY_PROPRIO' && l.insumoId);
           return (
             <Painel
@@ -360,6 +366,11 @@ function FormEmbalagensBase({
               {faltaPreco.length > 0 && <p className="mt-1 text-[12px] text-atencao">Custo da receita incompleto: falta o custo de {faltaPreco.join(', ')}.</p>}
               {semPreco > 0 && <p className="mt-1 text-[12px] text-atencao">Falta informar o custo de {semPreco} {semPreco === 1 ? 'embalagem' : 'embalagens'}.</p>}
               {linhasPendentes > 0 && <p className="mt-1 text-[12px] text-atencao">Complete as embalagens e quantidades para conferir o custo.</p>}
+              {repetidas.length > 0 && (
+                <p className="mt-1 text-[12px] text-atencao">
+                  {repetidas.map((n) => `“${n}”`).join(', ')} também {repetidas.length === 1 ? 'está' : 'estão'} na receita: se for o mesmo uso, o custo entra duas vezes no {CANAIS[canal].rotulo}. Usos diferentes do mesmo insumo podem ficar.
+                </p>
+              )}
               {precos && (
                 <PrecoComEstasEmbalagens
                   canal={canal}

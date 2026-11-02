@@ -222,3 +222,16 @@ describe('tela de embalagens: a prévia segue a regra do servidor e a unidade da
     expect(h).not.toContain('R$ 52,00');
   });
 });
+
+describe('Kairu (31/10): aviso de embalagem que também está na receita', () => {
+  it('avisa no canal onde se repete, sem bloquear o salvar; o outro canal fica quieto', () => {
+    const h = html({ naReceita: ['caixa', 'carne'] });
+    expect(h).toContain('“Caixa” também está na receita: se for o mesmo uso, o custo entra duas vezes no Delivery próprio.');
+    expect(h).not.toContain('no iFood. Usos diferentes');
+    expect(h).toContain('Salvar embalagens');
+  });
+  it('sem repetição, ou sem a lista da receita, nenhum aviso', () => {
+    expect(html({ naReceita: ['carne'] })).not.toContain('também está na receita');
+    expect(html({})).not.toContain('também está na receita');
+  });
+});

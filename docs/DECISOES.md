@@ -3893,3 +3893,15 @@ Testes mockados, revisão independente, CI e nova tentativa de publicação fica
 **Validação local:** 19 testes puros e de renderização novos (entrada igual à do servidor, matriz 10/12/13 da especificação, sacola 1 e 2 por porção, taxa fora do numerador, custo ausente × nenhuma embalagem, sem meta/sem preço, não ofertado, linha pela metade, embalagem repetida, quantidade acima do limite, desativada já gravada, kg digitado em g, “Custo incompleto” no bloco, campos do envio inalterados, compatibilidade sem o campo) e 1 teste PostgreSQL 16 novo na jornada da ficha: tela com R$ 48,00/R$ 52,00, preços R$ 40,00/R$ 50,00 e CMV 30,0%/26,0% iguais ao detalhe; depois de salvar a sacola 2 por porção, tela e detalhe mostram R$ 64,00 e 32,0% sem mudar os preços escolhidos e sem movimento de estoque; perfil sem `precos.ver` recusado. A tela do nível 1 usa o mesmo componente e não foi renderizada em teste próprio. Revisão independente sem P1/P2; os P3 (regra de recusa, taxa do iFood, anúncio, rótulo e testes) entraram neste registro. Ajuda `ficha-embalagens` na versão 2 com lock regenerado.
 
 **Limites e reversão:** não implementa habilitação de canal por quem não muda preços, materiais opcionais de pré-preparo, comestível ligado a canal, gravação coordenada receita + preços nem rateio por pedido (dependem de contrato). A reversão é local ao formulário, à tela e ao módulo da conta; não há dado gravado novo.
+
+### 512. 2026-11-02 · Aviso de embalagem do canal que também está na receita
+
+**Fonte e recorte:** revisão da biblioteca Kairu de 31/10/2026, linha “Ficha e precificação” (“evitar dupla incidência de embalagem”), confrontada com o código: sugestão C/meta, preço manual, regras por canal, sacola configurável, custo ausente pendente, soma em vez de média de percentuais e passado preservado já eram atendidos com testes; vigência/versão, custo por loja, origem do custo por item, aviso de fator em pré-preparo e cenários comparáveis dependem de contrato. O único delta elegível é o aviso abaixo, que a decisão 504 tinha deixado de fora.
+
+1. **Só aviso:** na tela de embalagens por canal, quando uma embalagem do canal também é item direto da receita salva, o painel diz “se for o mesmo uso, o custo entra duas vezes” e que usos diferentes podem ficar. Nada é bloqueado, gravado ou recalculado; o envio do formulário é o mesmo.
+2. **Uma função pura:** `embalagensTambemNaReceita` compara os insumos dos itens diretos da receita com as embalagens escolhidas na tela, sem repetir nomes. O que vai dentro de um pré-preparo não entra neste aviso (limite).
+3. **Sem dado novo:** os ids vêm de `ficha.itens`, que a tela já recebe (página exige `fichas.editar` + `precos.ver`); o aviso não mostra valores.
+
+**Validação local:** 2 testes puros em `erp-canais` e 2 de renderização: aviso só no canal repetido, sem bloquear o botão; sem repetição ou sem a lista, nada.
+
+**Limites e reversão:** não detecta embalagem dentro de pré-preparo nem decide se o uso é o mesmo. Reversão local à tela, ao formulário e à função.

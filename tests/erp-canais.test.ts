@@ -21,6 +21,7 @@ import {
   type EmbalagemDoCadastro,
   type EmbalagemParaCusto,
 } from '@/lib/erp/canal-campos';
+import { embalagensTambemNaReceita } from '@/lib/erp/canal-campos';
 import { custoDaFicha, type ItemParaCusto } from '@/lib/erp/ficha-campos';
 import { centavosDaFracao, compararFracoes, custoDaEmbalagem, formatarPontosBase, lerPontosBase, pontosBaseParaCampo, type Fracao } from '@/lib/erp/unidades';
 
@@ -214,6 +215,18 @@ describe('embalagens por canal: leitura do formulário', () => {
     expect(retratoDasEmbalagens(lista, nomes)).toEqual({ embalagensDelivery: 'Caixa kraft 1 un · Guardanapo 2 un', embalagensIfood: 'Nenhuma' });
     expect(impressaoDasEmbalagens(lista)).toBe('DELIVERY_PROPRIO:cx:1000|DELIVERY_PROPRIO:gu:2000');
     expect(impressaoDasEmbalagens([])).toBe('');
+  });
+});
+
+describe('Kairu (31/10): embalagem do canal que também está na receita', () => {
+  it('aponta só o canal onde se repete, sem repetir nomes; sem repetição, nada', () => {
+    const receita = ['pote', 'carne'];
+    expect(embalagensTambemNaReceita(receita, [{ insumoId: 'pote', nome: 'Pote 250 ml' }, { insumoId: 'sacola', nome: 'Sacola' }, { insumoId: 'pote', nome: 'Pote 250 ml' }])).toEqual(['Pote 250 ml']);
+    expect(embalagensTambemNaReceita(receita, [{ insumoId: 'sacola', nome: 'Sacola' }])).toEqual([]);
+    expect(embalagensTambemNaReceita([], [{ insumoId: 'pote', nome: 'Pote 250 ml' }])).toEqual([]);
+  });
+  it('item sem insumo (pré-preparo) e linha sem embalagem escolhida não contam', () => {
+    expect(embalagensTambemNaReceita(['', 'pote'], [{ insumoId: '', nome: '' }])).toEqual([]);
   });
 });
 
