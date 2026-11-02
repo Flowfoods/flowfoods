@@ -1,14 +1,15 @@
 /**
- * ERP do parceiro — ficha técnica para imprimir ou salvar em PDF (N.5). A visão sai da permissão EFETIVA da sessão: sem
- * "ver preços", a ficha chega sem nenhum valor de custo e sem a área de preços (o número nem sai do servidor). O id da URL
- * só escolhe: a leitura passa pelo portão do parceiro, então ficha de outro parceiro é 404.
+ * ERP do parceiro — ficha técnica para imprimir ou salvar em PDF (N.5). Decisão de 31/10/2026: a página sai SEMPRE sem
+ * preços e custos (o número nem sai do servidor), inclusive por URL direta, recarga ou Ctrl+P. "Com preços e custos" é
+ * uma escolha explícita a cada impressão; a ação confere `precos.ver` no servidor e só então devolve os valores. O id da
+ * URL só escolhe: a leitura passa pelo portão do parceiro, então ficha de outro parceiro é 404.
  */
 
 import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { fichaNaTela, obterFicha } from '@/lib/erp/fichas';
-import { custoPorCanal } from '@/lib/erp/canais';
 import { TelaImpressaoFicha } from '@/components/erp/telas/fichas/impressao';
+import { acaoImpressaoFinanceira } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,14 +18,13 @@ const BASE = '/erp/fichas';
 export default async function ErpImprimirFichaPage({ params }: { params: { id: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.ver');
-  const verPrecos = pode(ctx.alcance, 'precos.ver');
-  const ficha = await obterFicha(ctx.cliente, params.id, { verPrecos });
+  const ficha = await obterFicha(ctx.cliente, params.id, { verPrecos: false });
   if (!ficha) notFound();
-  const canais = verPrecos ? ((await custoPorCanal(ctx.cliente, ficha))?.cmv ?? null) : null;
   return (
     <TelaImpressaoFicha
-      ficha={fichaNaTela(ficha, verPrecos)}
-      canais={canais}
+      ficha={fichaNaTela(ficha, false)}
+      podeFinanceiro={pode(ctx.alcance, 'precos.ver')}
+      carregarFinanceiro={acaoImpressaoFinanceira}
       contexto={ctx.parceiro.nome}
       base={BASE}
       voltar={`${BASE}/${ficha.id}`}

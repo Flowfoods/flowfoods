@@ -19,6 +19,7 @@ import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import type { EstadoDasFotos, EstadoImportacao } from '@/components/erp/telas/fichas/estado';
 import { revalidatePath } from 'next/cache';
 import { mudarFotosDaFicha } from '@/lib/erp/ficha-fotos';
+import { lerImpressaoFinanceira, type ImpressaoFinanceira } from '@/lib/erp/ficha-impressao';
 import {
   executarImportacao,
   executarPrevia,
@@ -160,4 +161,12 @@ export async function acaoFotosDaFicha(slug: string, id: string, anterior: Estad
     revalidatePath(`${base}/${id}`, 'layout');
   }
   return { vez, ok: r.ok, frase: r.ok ? `Pronto: ${r.feito}.` : r.erro };
+}
+
+/** Impressão com preços e custos pelo nível 1, só depois da escolha explícita na tela de impressão (decisão de 31/10/2026). */
+export async function acaoImpressaoFinanceira(slug: string, id: string, versao: string): Promise<ImpressaoFinanceira> {
+  const ctx = await exigirParceiro(String(slug));
+  const negado = recusaDaAcao(ctx, 'fichas.ver') ?? recusaDaAcao(ctx, 'precos.ver');
+  if (negado) return { ok: false, erro: negado };
+  return lerImpressaoFinanceira(ctx.cliente, id, versao);
 }

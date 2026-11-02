@@ -46,7 +46,11 @@ import ParceiroNovaFichaPage from '@/app/rodolfo/(painel)/erp/[slug]/fichas/nova
 import ParceiroEditarFichaPage from '@/app/rodolfo/(painel)/erp/[slug]/fichas/[id]/editar/page';
 import { TelaFormFicha } from '@/components/erp/telas/fichas/paginas';
 import { FormFicha } from '@/components/erp/telas/fichas/form-ficha';
-import { acaoEditarFicha } from '@/app/erp/fichas/actions';
+import { acaoEditarFicha, acaoImpressaoFinanceira } from '@/app/erp/fichas/actions';
+import { acaoImpressaoFinanceira as acaoImpressaoFinanceiraN1 } from '@/app/rodolfo/(painel)/erp/[slug]/fichas/actions';
+import ParceiroImprimirFichaPage from '@/app/rodolfo/(painel)/erp/[slug]/fichas/[id]/imprimir/page';
+import { DocumentoDaFicha, TelaImpressaoFicha } from '@/components/erp/telas/fichas/impressao';
+import { FICHA_MUDOU_NA_IMPRESSAO } from '@/lib/erp/ficha-impressao';
 
 /**
  * ERP N.5 · visão operacional × gerencial automática na ficha (Postgres real): quem só opera (sem "ver preços") recebe do
@@ -110,6 +114,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
   });
 
   type Props = { props: { ficha: { verCustos: boolean; custo: unknown; itens: { custo: unknown; custoDoInsumo: unknown }[]; passosPreparo: string[] }; canais: unknown } };
+  type Impressao = ReactElement<ComponentProps<typeof TelaImpressaoFicha>>;
 
   it('operador: detalhe e impressão sem nenhum valor de custo; as etapas, quantidades e o resto da operação continuam', async () => {
     atual.ctx = ctxDe('OPERADOR');
@@ -121,10 +126,15 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect(det.props.ficha.passosPreparo).toEqual(['Aquecer a chapa.', 'Tostar o pão.']);
     // Nem o número cru (737 centavos) nem fração de custo saem do servidor.
     expect(json(det.props.ficha)).not.toMatch(/737|porRendimento|"centavos"/);
-    const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Props;
+    const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
     expect(imp.props.ficha.verCustos).toBe(false);
-    expect(imp.props.canais).toBeNull();
+    expect(imp.props.podeFinanceiro).toBe(false);
+    expect('canais' in imp.props).toBe(false);
     expect(json(imp.props.ficha)).not.toMatch(/737|porRendimento|"centavos"/);
+    // Decisão de 31/10: mesmo chamando a ação direto, quem não vê preços recebe a recusa, nunca os valores.
+    const forcado = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versao);
+    expect(forcado.ok).toBe(false);
+    expect(json(forcado)).not.toMatch(/737|porRendimento|"centavos"/);
   });
 
   it('operador: a lista vem sem custo em nenhuma linha e sem o filtro de custo', async () => {
@@ -147,9 +157,16 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect(det.props.ficha.verCustos).toBe(true);
     expect(det.props.ficha.custo).not.toBeNull();
     expect(det.props.canais).not.toBeNull();
-    const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Props & { props: { canais: unknown[] } };
-    expect(imp.props.ficha.verCustos).toBe(true);
-    expect(imp.props.canais).toHaveLength(3);
+    // Impressão (decisão de 31/10): a página sai SEM valores mesmo para quem vê preços; eles só vêm pela ação, sob escolha.
+    const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
+    expect(imp.props.ficha.verCustos).toBe(false);
+    expect(imp.props.podeFinanceiro).toBe(true);
+    expect(json(imp.props.ficha)).not.toMatch(/737|porRendimento|"centavos"/);
+    const comValores = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versao);
+    if (!comValores.ok) throw new Error(comValores.erro);
+    expect(comValores.ficha.verCustos).toBe(true);
+    expect(comValores.ficha.id).toBe(ids.ficha);
+    expect(comValores.canais).toHaveLength(3);
     type El = { props: { children: El[] | El; linhas?: { custo: unknown }[] } };
     const pagina = (await ErpFichasPage({ searchParams: {} })) as El;
     const tela = ([] as El[]).concat(pagina.props.children).find((c) => c && 'linhas' in c.props)!;
@@ -159,6 +176,42 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
   it('ficha de outro parceiro na URL da impressão: 404', async () => {
     atual.ctx = ctxDe('DONO');
     await expect(ErpImprimirFichaPage({ params: { id: 'naoexiste123' } })).rejects.toThrow(/NOT_FOUND/);
+  });
+
+  it('impressão: o papel sem valores não tem título nem número financeiro; com valores, tem a área por canal', async () => {
+    atual.ctx = ctxDe('GERENTE');
+    const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
+    const html = renderToStaticMarkup(createElement(TelaImpressaoFicha, imp.props));
+    expect(html).toContain('Tostar o pão.');
+    expect(html).toContain('Imprimir ou salvar em PDF');
+    expect(html).not.toMatch(/7,37|Preço e CMV|Custo da receita|R\$/);
+    const r = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versao);
+    if (!r.ok) throw new Error(r.erro);
+    const papel = renderToStaticMarkup(createElement(DocumentoDaFicha, { ficha: r.ficha, canais: r.canais, contexto: 'Visões', base: '/erp/fichas', geradoEm: new Date() }));
+    expect(papel).toContain('Preço e CMV por canal');
+    expect(papel).toContain('7,37');
+    expect(papel).not.toMatch(/lucro/i);
+  });
+
+  it('impressão com valores: versão diferente da que a tela mostra é recusada; id inválido ou de outro parceiro também', async () => {
+    atual.ctx = ctxDe('DONO');
+    const antiga = new Date(0).toISOString();
+    expect(await acaoImpressaoFinanceira(ids.ficha, antiga)).toEqual({ ok: false, erro: FICHA_MUDOU_NA_IMPRESSAO });
+    expect((await acaoImpressaoFinanceira('naoexiste123', antiga)).ok).toBe(false);
+    expect((await acaoImpressaoFinanceira({} as unknown as string, antiga)).ok).toBe(false);
+    expect(json(await acaoImpressaoFinanceira('naoexiste123', antiga))).not.toMatch(/737/);
+  });
+
+  it('nível 1: a página também sai sem valores e a ação do nível 1 devolve os valores da mesma versão', async () => {
+    atual.ctx = ctxDe('DONO');
+    const imp = (await ParceiroImprimirFichaPage({ params: { slug: P.id, id: ids.ficha } })) as Impressao;
+    expect(imp.props.ficha.verCustos).toBe(false);
+    expect(imp.props.podeFinanceiro).toBe(true);
+    expect(json(imp.props.ficha)).not.toMatch(/737|porRendimento|"centavos"/);
+    const r = await imp.props.carregarFinanceiro(ids.ficha, imp.props.ficha.versao);
+    expect(r.ok && r.ficha.verCustos).toBe(true);
+    const direto = await acaoImpressaoFinanceiraN1('qualquer', ids.ficha, imp.props.ficha.versao);
+    expect(direto.ok).toBe(true);
   });
 
   type Formulario = ReactElement<ComponentProps<typeof TelaFormFicha>>;
