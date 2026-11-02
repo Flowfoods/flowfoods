@@ -8,10 +8,11 @@
 
 import { custoPorCanal } from './canais';
 import type { CmvDoCanal } from './cmv-produto-campos';
-import { fichaNaTela, obterFicha, type FichaNaTela } from './fichas';
+import { fichaNaTela, obterFicha } from './fichas';
+import { fichaNoPapel, type FichaNoPapel } from './ficha-papel';
 import type { ClienteDoParceiro } from './tenant';
 
-export type ImpressaoFinanceira = { ok: true; ficha: FichaNaTela; canais: CmvDoCanal[] | null } | { ok: false; erro: string };
+export type ImpressaoFinanceira = { ok: true; ficha: FichaNoPapel; canais: CmvDoCanal[] | null } | { ok: false; erro: string };
 
 export const FICHA_MUDOU_NA_IMPRESSAO = 'A ficha foi alterada depois que esta página abriu. Recarregue a página para imprimir a versão atual.';
 
@@ -24,5 +25,5 @@ export async function lerImpressaoFinanceira(cliente: ClienteDoParceiro, id: unk
   if (!ficha) return { ok: false, erro: 'Ficha não encontrada.' };
   if (ficha.versao !== versao) return { ok: false, erro: FICHA_MUDOU_NA_IMPRESSAO };
   const canais = (await custoPorCanal(cliente, ficha))?.cmv ?? null;
-  return { ok: true, ficha: fichaNaTela(ficha, true), canais };
+  return { ok: true, ficha: fichaNoPapel(fichaNaTela(ficha, true)), canais };
 }

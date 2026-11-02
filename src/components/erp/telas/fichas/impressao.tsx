@@ -19,7 +19,7 @@ import Link from 'next/link';
 import { useEffect, useReducer, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { Printer } from 'lucide-react';
-import type { FichaNaTela } from '@/lib/erp/fichas';
+import type { FichaNoPapel } from '@/lib/erp/ficha-papel';
 import type { ImpressaoFinanceira } from '@/lib/erp/ficha-impressao';
 import { CANAIS } from '@/lib/erp/canal-campos';
 import { parcelasEmTexto, porcentagemDoCmv, ROTULO_DO_RESULTADO, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
@@ -30,14 +30,21 @@ import { validadesEmTexto } from '@/lib/erp/validade';
 import { classeDeBotao } from '../../ui/estilos';
 import { Dialogo } from '../../ui/Dialogo';
 import { urlDaFoto } from './miniatura';
-import { estadoInicialDaImpressao, transicaoDaImpressao, type ConteudoDaImpressao } from './impressao-escolha';
+import {
+  chamarImpressaoDaTela,
+  estadoInicialDaImpressao,
+  quemAbriuAImpressao,
+  transicaoDaImpressao,
+  type ConteudoDaImpressao,
+  type MarcadorDeImpressao,
+} from './impressao-escolha';
 
 const TH = 'border-b border-linha-forte px-2 py-1.5 text-left text-[11px] font-semibold text-suave print:text-black';
 const TD = 'border-b border-linha px-2 py-1.5 align-top text-[12.5px] print:text-black';
 const SECAO = 'break-inside-avoid-page space-y-2';
 const TITULO = 'text-[11px] font-semibold uppercase tracking-wide text-suave print:text-black';
 
-type DadosFinanceiros = { ficha: FichaNaTela; canais: CmvDoCanal[] | null };
+type DadosFinanceiros = { ficha: FichaNoPapel; canais: CmvDoCanal[] | null };
 
 const FALHA_DE_REDE = 'Não foi possível carregar os preços e custos. Confira a conexão e tente de novo.';
 
@@ -55,8 +62,8 @@ export function TelaImpressaoFicha({
   voltar,
   geradoEm,
 }: {
-  /** Sempre a versão sem valores (`fichaNaTela(…, false)`). */
-  ficha: FichaNaTela;
+  /** Sempre a versão sem valores: `fichaNoPapel(fichaNaTela(…, false))`. */
+  ficha: FichaNoPapel;
   /** Permissão efetiva de ver preços. Só decide se a opção aparece disponível; quem decide é a ação do servidor. */
   podeFinanceiro: boolean;
   /** Ação do servidor: confere `precos.ver` e devolve os valores da mesma versão da ficha. */
@@ -68,20 +75,20 @@ export function TelaImpressaoFicha({
 }) {
   const [estado, enviar] = useReducer(transicaoDaImpressao<DadosFinanceiros>, undefined, estadoInicialDaImpressao<DadosFinanceiros>);
   const botao = useRef<HTMLButtonElement>(null);
-  /** true entre o `window.print()` desta tela e o `afterprint`. */
-  const nossaImpressao = useRef(false);
+  const formulario = useRef<HTMLFormElement>(null);
+  const alerta = useRef<HTMLParagraphElement>(null);
+  /** Ligado só durante o `window.print()` desta tela; o primeiro `beforeprint` o consome. */
+  const marcador = useRef<MarcadorDeImpressao>({ nossa: false });
   /** Número do pedido em andamento: resposta de pedido cancelado é ignorada. */
   const pedido = useRef(0);
 
   useEffect(() => {
-    // Impressão que não foi aberta por esta tela (Ctrl+P, menu): descarta qualquer valor ANTES do navegador montar o papel.
+    // Impressão que não foi aberta por esta tela (Ctrl+P, menu) — inclusive depois de uma nossa que não terminou —
+    // descarta qualquer valor ANTES de o navegador montar o papel.
     const antes = () => {
-      if (!nossaImpressao.current) flushSync(() => enviar({ tipo: 'impressaoNativa' }));
+      if (quemAbriuAImpressao(marcador.current) === 'navegador') flushSync(() => enviar({ tipo: 'impressaoNativa' }));
     };
-    const depois = () => {
-      nossaImpressao.current = false;
-      enviar({ tipo: 'terminouImpressao' });
-    };
+    const depois = () => enviar({ tipo: 'terminouImpressao' });
     window.addEventListener('beforeprint', antes);
     window.addEventListener('afterprint', depois);
     return () => {
@@ -92,14 +99,27 @@ export function TelaImpressaoFicha({
 
   useEffect(() => {
     if (estado.fase !== 'imprimir') return;
-    nossaImpressao.current = true;
     enviar({ tipo: 'chamouImpressao' });
-    window.print();
+    // Se o navegador não abriu a impressão durante a chamada (bloqueada, desativada ou adiada), os valores são
+    // descartados agora: uma impressão que começar depois sai sem eles.
+    if (!chamarImpressaoDaTela(marcador.current, () => window.print())) enviar({ tipo: 'terminouImpressao' });
   }, [estado.fase]);
 
   const escolhendo = estado.fase === 'escolhendo' ? estado : null;
   const carregando = estado.fase === 'carregando';
+  const aberto = escolhendo !== null || carregando;
   const dados = estado.dados;
+  const erro = escolhendo?.erro ?? null;
+
+  // Ao abrir, o foco vai à opção marcada (setas trocam a escolha); o diálogo já focou antes, este efeito vem depois.
+  useEffect(() => {
+    if (aberto) formulario.current?.querySelector<HTMLInputElement>('input[name="conteudo"]:checked')?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só na abertura.
+  }, [aberto]);
+  // Recusa ou falha: o foco vai à mensagem, que o leitor de tela lê.
+  useEffect(() => {
+    if (erro) alerta.current?.focus();
+  }, [erro]);
 
   async function confirmar() {
     if (!escolhendo) return;
@@ -145,8 +165,10 @@ export function TelaImpressaoFicha({
         </p>
       </div>
 
-      <Dialogo aberto={escolhendo !== null || carregando} aoFechar={cancelar} titulo="Imprimir a ficha" voltarPara={botao} className="ff-nao-imprime w-[min(32rem,calc(100vw-2rem))]">
+      <Dialogo aberto={aberto} aoFechar={cancelar} titulo="Imprimir a ficha" voltarPara={botao} className="ff-nao-imprime w-[min(32rem,calc(100vw-2rem))]">
         <form
+          ref={formulario}
+          aria-busy={carregando}
           className="space-y-4 p-4"
           onSubmit={(e) => {
             e.preventDefault();
@@ -171,7 +193,7 @@ export function TelaImpressaoFicha({
                     checked={marcado && !indisponivel}
                     disabled={indisponivel}
                     onChange={() => enviar({ tipo: 'escolher', escolha: o.valor, podeFinanceiro })}
-                    className="mt-1 h-4 w-4 shrink-0"
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--ff-acao))]"
                   />
                   <span className="space-y-0.5">
                     <span className="block text-[14px] font-semibold text-texto">{o.rotulo}</span>
@@ -181,14 +203,18 @@ export function TelaImpressaoFicha({
               );
             })}
           </fieldset>
-          {escolhendo?.erro && (
-            <p role="alert" className="text-[13px] font-medium text-texto">
-              {escolhendo.erro}
+          {erro && (
+            <p ref={alerta} tabIndex={-1} role="alert" className="text-[13px] font-medium text-texto outline-none">
+              {erro}
             </p>
           )}
+          <p role="status" className="text-[13px] text-suave">
+            {carregando ? 'Preparando os preços e custos desta impressão…' : ''}
+          </p>
           <div className="flex flex-wrap gap-2">
-            <button type="submit" disabled={carregando} className={classeDeBotao('primario')}>
-              {carregando ? 'Preparando os valores…' : 'Imprimir'}
+            {/* aria-disabled em vez de disabled: o foco não se perde enquanto carrega; o envio repetido é ignorado. */}
+            <button type="submit" aria-disabled={carregando} className={classeDeBotao('primario', carregando ? 'opacity-60' : '')}>
+              {carregando ? 'Preparando…' : 'Imprimir'}
             </button>
             <button type="button" onClick={cancelar} className={classeDeBotao('secundario')}>
               Cancelar
@@ -210,7 +236,7 @@ export function DocumentoDaFicha({
   base,
   geradoEm,
 }: {
-  ficha: FichaNaTela;
+  ficha: FichaNoPapel;
   /** Só na versão com valores e só para prato. */
   canais: CmvDoCanal[] | null;
   contexto: string;
@@ -328,7 +354,9 @@ export function DocumentoDaFicha({
         {gerencial && canais && (
           <section className={SECAO}>
             <h2 className={TITULO}>Preço e CMV por canal (uma porção)</h2>
-            <table className="w-full border-collapse">
+            {/* No celular a tabela rola dentro do bloco, sem rolar a página; no papel A4 ela cabe inteira. */}
+            <div className="overflow-x-auto print:overflow-visible">
+            <table className="w-full min-w-[34rem] border-collapse print:min-w-0">
               <thead>
                 <tr>
                   <th className={TH}>Canal</th>
@@ -376,6 +404,7 @@ export function DocumentoDaFicha({
                 ))}
               </tbody>
             </table>
+            </div>
             <p className="text-[11px] text-suave print:text-black">
               CMV teórico do prato ao preço definido, não o CMV real do estoque. O resultado desconta só o que está listado: aluguel, equipe, impostos e
               outras despesas não entram. A taxa do iFood fica fora do CMV.

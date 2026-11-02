@@ -199,7 +199,34 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect(await acaoImpressaoFinanceira(ids.ficha, antiga)).toEqual({ ok: false, erro: FICHA_MUDOU_NA_IMPRESSAO });
     expect((await acaoImpressaoFinanceira('naoexiste123', antiga)).ok).toBe(false);
     expect((await acaoImpressaoFinanceira({} as unknown as string, antiga)).ok).toBe(false);
-    expect(json(await acaoImpressaoFinanceira('naoexiste123', antiga))).not.toMatch(/737/);
+    // Outro parceiro de verdade, com ficha e preço próprios: pelo portão de A, a ficha de B não existe.
+    const Q = await db.parceiroFlow.create({ data: { nome: 'Visões B (N.5)', slug: `visoes-b-${sufixo}`, status: 'ATIVO' } });
+    try {
+      const b = doParceiro(Q.id, db);
+      const queijo = await cadastrarInsumo(b, { escala: 'base', tipo: 'INGREDIENTE', nome: 'Queijo', unidade: 'UN', conteudo: '1', preco: '9,13' });
+      if (!queijo.ok) throw new Error(JSON.stringify(queijo));
+      const fb = await cadastrarFicha(b, { nome: 'Lanche B', tipo: 'PRATO', rendimento: '1', itens: [{ insumoId: queijo.id, quantidade: '1', unidade: 'un' }] }, { tipo: 'manter' }, 'Bia');
+      if (!fb.ok) throw new Error(JSON.stringify(fb));
+      const versaoDeB = (await obterFicha(b, fb.id))!.versao;
+      const r = await acaoImpressaoFinanceira(fb.id, versaoDeB);
+      expect(r).toEqual({ ok: false, erro: 'Ficha não encontrada.' });
+      expect(json(r)).not.toMatch(/913|737/);
+      await expect(ErpImprimirFichaPage({ params: { id: fb.id } })).rejects.toThrow(/NOT_FOUND/);
+    } finally {
+      await limparParceiros(db, perfil, [Q.id]);
+    }
+  });
+
+  it('impressão: o navegador recebe só o que o papel usa (sem histórico, autores, usos ou composição do pré-preparo)', async () => {
+    atual.ctx = ctxDe('GERENTE');
+    const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
+    const campos = ['ativa', 'consumoImediato', 'custo', 'descricao', 'foto', 'id', 'itens', 'modoPreparo', 'nome', 'passosPreparo', 'rendimentoMilesimos', 'tipo', 'unidadeRendimento', 'validades', 'verCustos', 'versao'];
+    expect(Object.keys(imp.props.ficha).sort()).toEqual(campos);
+    const r = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versao);
+    if (!r.ok) throw new Error(r.erro);
+    expect(Object.keys(r.ficha).sort()).toEqual(campos);
+    expect(Object.keys(r.ficha.itens[0]).sort()).toEqual(['custo', 'fatorCorrecaoMilesimos', 'id', 'nome', 'preparo', 'quantidadeMilesimos', 'unidade']);
+    expect(json(r.ficha)).not.toMatch(/historico|autorNome|usadaEm|fotosApoio|custoDoInsumo/);
   });
 
   it('nível 1: a página também sai sem valores e a ação do nível 1 devolve os valores da mesma versão', async () => {
@@ -210,7 +237,8 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect(json(imp.props.ficha)).not.toMatch(/737|porRendimento|"centavos"/);
     const r = await imp.props.carregarFinanceiro(ids.ficha, imp.props.ficha.versao);
     expect(r.ok && r.ficha.verCustos).toBe(true);
-    const direto = await acaoImpressaoFinanceiraN1('qualquer', ids.ficha, imp.props.ficha.versao);
+    // O slug escolhe o parceiro em exigirParceiro (sessão do nível 1); aqui o contexto é simulado, então só se confere a ligação.
+    const direto = await acaoImpressaoFinanceiraN1(P.id, ids.ficha, imp.props.ficha.versao);
     expect(direto.ok).toBe(true);
   });
 

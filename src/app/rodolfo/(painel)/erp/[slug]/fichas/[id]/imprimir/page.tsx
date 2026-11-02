@@ -6,6 +6,7 @@
 import { notFound } from 'next/navigation';
 import { exigirParceiro, exigirPermissao, pode } from '@/lib/erp/contexto';
 import { fichaNaTela, obterFicha } from '@/lib/erp/fichas';
+import { fichaNoPapel } from '@/lib/erp/ficha-papel';
 import { TelaImpressaoFicha } from '@/components/erp/telas/fichas/impressao';
 import { acaoImpressaoFinanceira } from '../../actions';
 
@@ -19,7 +20,7 @@ export default async function ParceiroImprimirFichaPage({ params }: { params: { 
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
   return (
     <TelaImpressaoFicha
-      ficha={fichaNaTela(ficha, false)}
+      ficha={fichaNoPapel(fichaNaTela(ficha, false))}
       podeFinanceiro={pode(ctx.alcance, 'precos.ver')}
       carregarFinanceiro={acaoImpressaoFinanceira.bind(null, ctx.parceiro.slug)}
       contexto={ctx.parceiro.nome}

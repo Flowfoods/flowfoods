@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  chamarImpressaoDaTela,
   estadoInicialDaImpressao,
+  quemAbriuAImpressao,
   SEM_PERMISSAO_FINANCEIRA,
   transicaoDaImpressao,
   type EstadoDaImpressao,
   type EventoDaImpressao,
+  type MarcadorDeImpressao,
 } from '@/components/erp/telas/fichas/impressao-escolha';
 
 /**
@@ -112,12 +115,79 @@ describe('Impressão da Ficha · escolha de preços e custos', () => {
     expect(transicaoDaImpressao(parado, { tipo: 'impressaoNativa' })).toBe(parado);
   });
 
-  it('"Voltar à versão sem valores" descarta; abrir durante o carregamento ou a impressão não reinicia', () => {
+  it('"Voltar à versão sem valores" descarta; abrir durante o carregamento não reinicia; impressão presa não trava o botão', () => {
     const carregando = ultimo({ tipo: 'abrir' }, { tipo: 'escolher', escolha: 'com', podeFinanceiro: true }, { tipo: 'confirmar', podeFinanceiro: true });
     expect(transicaoDaImpressao(carregando, { tipo: 'abrir' })).toBe(carregando);
     const pronto = transicaoDaImpressao(carregando, { tipo: 'carregou', dados: DADOS });
     expect(transicaoDaImpressao(pronto, { tipo: 'descartar' })).toEqual({ fase: 'parado', dados: null });
     const imprimindo = transicaoDaImpressao(pronto, { tipo: 'chamouImpressao' });
-    expect(transicaoDaImpressao(imprimindo, { tipo: 'abrir' })).toBe(imprimindo);
+    // Sem aviso do navegador, a impressão ficaria presa: abrir de novo pergunta outra vez e descarta os valores.
+    expect(transicaoDaImpressao(imprimindo, { tipo: 'abrir' })).toEqual({ fase: 'escolhendo', escolha: 'sem', erro: null, dados: null });
+  });
+});
+
+describe('Impressão da Ficha · quem abriu a janela de impressão', () => {
+  /** Navegador que dispara o beforeprint durante o print() (Chrome, Edge, Firefox de mesa). */
+  const navegadorQueAvisa = (m: MarcadorDeImpressao, vistos: string[]) => () => vistos.push(quemAbriuAImpressao(m));
+
+  it('a impressão da tela consome o marcador: o Ctrl+P seguinte é do navegador, mesmo sem afterprint', () => {
+    const m: MarcadorDeImpressao = { nossa: false };
+    const vistos: string[] = [];
+    expect(chamarImpressaoDaTela(m, navegadorQueAvisa(m, vistos))).toBe(true);
+    expect(vistos).toEqual(['tela']);
+    expect(m.nossa).toBe(false);
+    expect(quemAbriuAImpressao(m)).toBe('navegador');
+  });
+
+  it('janela que não abre durante a chamada (bloqueada, adiada ou com erro): conta como não começou e desliga o marcador', () => {
+    const m: MarcadorDeImpressao = { nossa: false };
+    expect(chamarImpressaoDaTela(m, () => {})).toBe(false);
+    expect(m.nossa).toBe(false);
+    expect(quemAbriuAImpressao(m)).toBe('navegador'); // a impressão adiada, se vier, é tratada como Ctrl+P: sem valores
+    expect(
+      chamarImpressaoDaTela(m, () => {
+        throw new Error('bloqueada');
+      }),
+    ).toBe(false);
+    expect(m.nossa).toBe(false);
+  });
+
+  it('revisão P2-1: "Com" cuja janela não abre → valores descartados; o Ctrl+P depois sai sem eles e o botão volta a perguntar', () => {
+    const m: MarcadorDeImpressao = { nossa: false };
+    let e = ultimo(
+      { tipo: 'abrir' },
+      { tipo: 'escolher', escolha: 'com', podeFinanceiro: true },
+      { tipo: 'confirmar', podeFinanceiro: true },
+      { tipo: 'carregou', dados: DADOS },
+    );
+    expect(e).toEqual({ fase: 'imprimir', dados: DADOS });
+    // O que o componente faz na fase "imprimir":
+    e = transicaoDaImpressao(e, { tipo: 'chamouImpressao' });
+    if (!chamarImpressaoDaTela(m, () => {})) e = transicaoDaImpressao(e, { tipo: 'terminouImpressao' });
+    expect(e).toEqual({ fase: 'parado', dados: null });
+    // Ctrl+P depois: do navegador, e não há valores a descartar.
+    expect(quemAbriuAImpressao(m)).toBe('navegador');
+    expect(transicaoDaImpressao(e, { tipo: 'impressaoNativa' })).toEqual({ fase: 'parado', dados: null });
+    expect(transicaoDaImpressao(e, { tipo: 'abrir' })).toMatchObject({ fase: 'escolhendo', escolha: 'sem' });
+  });
+
+  it('janela que abre: os valores ficam até o afterprint e então somem', () => {
+    const m: MarcadorDeImpressao = { nossa: false };
+    let e = ultimo(
+      { tipo: 'abrir' },
+      { tipo: 'escolher', escolha: 'com', podeFinanceiro: true },
+      { tipo: 'confirmar', podeFinanceiro: true },
+      { tipo: 'carregou', dados: DADOS },
+      { tipo: 'chamouImpressao' },
+    );
+    const vistos: string[] = [];
+    const comecou = chamarImpressaoDaTela(m, () => {
+      vistos.push(quemAbriuAImpressao(m));
+      expect(e.dados).toEqual(DADOS); // o papel é montado com os valores
+      e = transicaoDaImpressao(e, { tipo: 'terminouImpressao' }); // afterprint
+    });
+    expect(comecou).toBe(true);
+    expect(vistos).toEqual(['tela']);
+    expect(e).toEqual({ fase: 'parado', dados: null });
   });
 });

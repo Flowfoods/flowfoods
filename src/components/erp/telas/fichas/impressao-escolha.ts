@@ -45,8 +45,9 @@ const parado = <D>(): EstadoDaImpressao<D> => ({ fase: 'parado', dados: null });
 export function transicaoDaImpressao<D>(estado: EstadoDaImpressao<D>, evento: EventoDaImpressao<D>): EstadoDaImpressao<D> {
   switch (evento.tipo) {
     case 'abrir':
-      // Cada pedido recomeça em "Sem preços e custos" e sem valores na tela. Com a janela aberta ou carregando, ignora.
-      if (estado.fase === 'carregando' || estado.fase === 'imprimindo') return estado;
+      // Cada pedido recomeça em "Sem preços e custos" e sem valores na tela — inclusive se uma impressão anterior ficou
+      // presa sem aviso do navegador (os valores dela são descartados). Só o carregamento em curso não é interrompido.
+      if (estado.fase === 'carregando') return estado;
       return { fase: 'escolhendo', escolha: 'sem', erro: null, dados: null };
     case 'escolher':
       if (estado.fase !== 'escolhendo') return estado;
@@ -75,4 +76,36 @@ export function transicaoDaImpressao<D>(estado: EstadoDaImpressao<D>, evento: Ev
     case 'descartar':
       return estado.fase === 'carregando' ? estado : parado();
   }
+}
+
+/**
+ * Quem abriu a janela de impressão. `nossa` liga imediatamente antes do `window.print()` desta tela e é CONSUMIDA no
+ * primeiro `beforeprint`: um Ctrl+P depois disso é sempre do navegador, mesmo que o `afterprint` nunca chegue.
+ */
+export interface MarcadorDeImpressao {
+  nossa: boolean;
+}
+
+/** No `beforeprint`: 'tela' = a impressão que esta tela pediu (consome o marcador); 'navegador' = Ctrl+P ou menu. */
+export function quemAbriuAImpressao(m: MarcadorDeImpressao): 'tela' | 'navegador' {
+  if (!m.nossa) return 'navegador';
+  m.nossa = false;
+  return 'tela';
+}
+
+/**
+ * Chama a impressão do navegador uma vez. true = ela começou durante a chamada (o `beforeprint` chegou). false = não
+ * começou (bloqueada, desativada ou adiada pelo navegador): o marcador é desligado e quem chamou descarta os valores —
+ * por segurança, uma impressão que começar depois sai sem eles.
+ */
+export function chamarImpressaoDaTela(m: MarcadorDeImpressao, imprimir: () => void): boolean {
+  m.nossa = true;
+  try {
+    imprimir();
+  } catch {
+    // Impressão indisponível (ex.: bloqueada pelo navegador): conta como não começou.
+  }
+  const comecou = !m.nossa;
+  m.nossa = false;
+  return comecou;
 }

@@ -862,7 +862,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Pré-preparo: “Produzir” planeja um lote dele, com os insumos tirados da receita.', para: ['producao.registrar'] },
       { texto: 'Em “Preço e CMV por canal”: o custo físico de cada canal, a meta de CMV, o preço sugerido pela meta, o seu preço, o CMV e o resultado após os custos informados.', para: ['precos.ver'] },
       { texto: 'Preço em branco é preço não definido: o canal fica sem dados até você pôr o seu. A sugestão nunca muda o seu preço.', para: ['precos.ver'] },
-      { texto: '“Imprimir ou salvar em PDF” pergunta antes o que sai no papel; cancelar não imprime, e o Ctrl+P sai sem valores.' },
+      { texto: 'Na página de impressão, o botão pergunta antes o que sai no papel; cancelar não imprime, e o Ctrl+P de lá sai sem valores.' },
     ],
     secoes: [
       {

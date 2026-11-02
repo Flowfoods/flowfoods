@@ -8,6 +8,7 @@
 import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { fichaNaTela, obterFicha } from '@/lib/erp/fichas';
+import { fichaNoPapel } from '@/lib/erp/ficha-papel';
 import { TelaImpressaoFicha } from '@/components/erp/telas/fichas/impressao';
 import { acaoImpressaoFinanceira } from '../../actions';
 
@@ -22,7 +23,7 @@ export default async function ErpImprimirFichaPage({ params }: { params: { id: s
   if (!ficha) notFound();
   return (
     <TelaImpressaoFicha
-      ficha={fichaNaTela(ficha, false)}
+      ficha={fichaNoPapel(fichaNaTela(ficha, false))}
       podeFinanceiro={pode(ctx.alcance, 'precos.ver')}
       carregarFinanceiro={acaoImpressaoFinanceira}
       contexto={ctx.parceiro.nome}
