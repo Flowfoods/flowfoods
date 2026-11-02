@@ -175,7 +175,8 @@ export function TelaImpressaoFicha({
             void confirmar();
           }}
         >
-          <fieldset className="space-y-2" disabled={carregando}>
+          {/* Sem disabled no carregamento: o foco pode estar no rádio (Enter confirma) e não deve se perder; a troca é ignorada. */}
+          <fieldset className="space-y-2" aria-disabled={carregando}>
             <legend className="mb-2 text-[14px] font-semibold text-texto">O que deve sair no papel?</legend>
             {OPCOES.map((o) => {
               const indisponivel = o.valor === 'com' && !podeFinanceiro;
