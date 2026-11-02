@@ -187,7 +187,7 @@ describe.skipIf(!URL_TESTE)('Ficha: receita salva → embalagens → preço (Pos
     const tela = sp(renderToStaticMarkup(await PaginaEmbalagens({ params: { id }, searchParams: {} })));
     // Delivery: 12 ÷ 25% = 48; ao seu preço de 40, CMV 30% acima. iFood: 13 ÷ 25% = 52; a 50, 26% acima. Mesmos números do detalhe.
     expect(c.cmv.map((x) => x.sugerido.tipo === 'ok' && x.sugerido.centavos)).toEqual([4000, 4800, 5200]);
-    for (const trecho of ['R$ 12,00 ÷ 25% = R$ 48,00', 'R$ 13,00 ÷ 25% = R$ 52,00', 'R$ 40,00', 'R$ 50,00', '30,0%', '26,0%', 'acima da meta']) expect(tela).toContain(trecho);
+    for (const trecho of ['R$ 12,00 ÷ 25%', 'R$ 48,00', 'R$ 13,00 ÷ 25%', 'R$ 52,00', 'R$ 40,00', 'R$ 50,00', '30,0%', '26,0%', 'acima da meta']) expect(tela).toContain(trecho);
     expect(tela.match(/Com estas embalagens/g)).toHaveLength(2);
     expect(tela).not.toMatch(/name="preco_|lucro/i);
     // Sacola 2 por porção no iFood: a previsão sobe, o preço escolhido continua o mesmo e o estoque não se move.
@@ -195,6 +195,8 @@ describe.skipIf(!URL_TESTE)('Ficha: receita salva → embalagens → preço (Pos
     const depois = await canais(id);
     expect(depois.cmv.map((x) => x.precoCentavos)).toEqual([3000, 4000, 5000]);
     expect(depois.cmv[2].sugerido).toMatchObject({ tipo: 'ok', centavos: 6400 });
+    const telaDepois = sp(renderToStaticMarkup(await PaginaEmbalagens({ params: { id }, searchParams: {} })));
+    for (const trecho of ['R$ 16,00 ÷ 25%', 'R$ 64,00', 'R$ 50,00', '32,0%']) expect(telaDepois).toContain(trecho);
     expect(await cliente.movimentoEstoque.count()).toBe(0);
     // Quem não vê preços não chega à tela (e não recebe nenhum desses valores).
     contexto(true);

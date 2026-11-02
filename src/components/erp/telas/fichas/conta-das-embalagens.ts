@@ -70,7 +70,9 @@ export function contaDasEmbalagensNaTela(p: {
         // `custoDoInsumo` devolve o último preço pago quando há; sem ele, embalagem zerada = sem custo (nunca R$ 0,00).
         insumo: { ultimaCompra: e.custo, precoEmbalagemCentavos: 0, taxaEntregaCentavos: 0, conteudoMilesimos: 0 },
       })),
-      taxa: null,
+      // iFood: a taxa não entra no custo físico, na sugestão nem no CMV. Montado como "não configurada" para que, se o
+      // resultado um dia escapar daqui, chegue pendente — nunca P − C sem a taxa.
+      taxa: p.canal === 'IFOOD' ? 'naoConfigurada' : null,
     },
     { metaBp: p.preco.metaBp, precoCentavos: p.preco.precoCentavos, ofertado: p.preco.ofertado },
   );

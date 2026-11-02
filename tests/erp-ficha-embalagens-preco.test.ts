@@ -153,10 +153,10 @@ describe('tela de embalagens: meta, sugestão, preço escolhido e CMV em cada ca
   it('mostra os quatro, por canal, só para leitura, sem campo de preço e sem "lucro"', () => {
     const h = html();
     expect(h.match(/Com estas embalagens/g)).toHaveLength(2);
-    expect(h).toContain('Sugestão pela meta');
+    expect(h).toContain('Preço sugerido');
     expect(h).toContain('R$ 48,00'); // Delivery: 12 ÷ 25%
     expect(h).toContain('R$ 52,00'); // iFood: 13 ÷ 25%
-    expect(h).toContain('R$ 12,00 ÷ 25% = R$ 48,00');
+    expect(h).toContain('R$ 12,00 ÷ 25%');
     expect(h).toContain('Seu preço');
     expect(h).toContain('R$ 50,00');
     expect(h).toContain('dentro da meta');
@@ -169,7 +169,7 @@ describe('tela de embalagens: meta, sugestão, preço escolhido e CMV em cada ca
 
   it('linha pela metade não vira canal completo: nada de sugestão ou CMV até completar', () => {
     const h = html({ inicial: [...base.inicial, { canal: 'DELIVERY_PROPRIO', insumoId: '', quantidade: '2', unidade: 'un' }] });
-    expect(h).toContain('Complete as embalagens para ver a sugestão pela meta e o CMV.');
+    expect(h).toContain('Complete as embalagens para ver o preço sugerido e o CMV.');
     expect(h).not.toContain('R$ 48,00');
     expect(h).toContain('R$ 52,00'); // o iFood segue independente
   });
@@ -186,5 +186,39 @@ describe('tela de embalagens: meta, sugestão, preço escolhido e CMV em cada ca
     const h = html({ precos: undefined });
     expect(h).not.toContain('Com estas embalagens');
     expect(h).toContain('Custo físico da receita e embalagens: R$ 12,00 por porção');
+  });
+});
+
+describe('tela de embalagens: a prévia segue a regra do servidor e a unidade da embalagem', () => {
+  const linha = (canal: 'DELIVERY_PROPRIO' | 'IFOOD', insumoId: string, quantidade = '1', unidade = 'un') => ({ canal, insumoId, quantidade, unidade });
+  it('embalagem repetida no canal: o servidor recusaria, então nada de preço sugerido nem farol', () => {
+    const h = html({ inicial: [linha('DELIVERY_PROPRIO', 'caixa'), linha('DELIVERY_PROPRIO', 'caixa'), linha('IFOOD', 'sacola')] });
+    expect(h).toContain('Corrija antes de ver o preço sugerido e o CMV: “Caixa” já está neste canal (linha 1).');
+    expect(h).not.toContain('R$ 56,00');
+    expect(h).toContain('R$ 52,00'); // o iFood segue independente
+  });
+  it('quantidade acima do limite por porção: recusa, sem sugestão de milhares de reais', () => {
+    const h = html({ inicial: [linha('DELIVERY_PROPRIO', 'caixa', '2000'), linha('IFOOD', 'sacola')] });
+    expect(h).toContain('Mais de 1.000 un por porção? Confira o número.');
+    expect(h).not.toContain('R$ 16.040,00');
+  });
+  it('embalagem desativada que já estava gravada no canal continua valendo, como no servidor (jaNoCanal)', () => {
+    const desativada = [...opcoes, { id: 'velha', nome: 'Caixa antiga', unidade: 'UN' as const, ativo: false, embalagem: true, custo: CAIXA }];
+    const gravada = html({ opcoes: desativada, inicial: [linha('DELIVERY_PROPRIO', 'velha'), linha('IFOOD', 'sacola')] });
+    expect(gravada).not.toContain('está desativada');
+    expect(gravada).toContain('R$ 48,00');
+  });
+  it('embalagem medida em kg, digitada em g: 20 g de R$ 50,00/kg = R$ 1,00; receita 10 + 1 = 11 ÷ 25% = R$ 44,00', () => {
+    const filme = { id: 'filme', nome: 'Filme', unidade: 'KG' as const, ativo: true, embalagem: true, custo: custoDaEmbalagem(5000, 0, 1000)! };
+    const h = html({ opcoes: [...opcoes, filme], inicial: [linha('DELIVERY_PROPRIO', 'filme', '20', 'g'), linha('IFOOD', 'sacola')] });
+    expect(h).toContain('R$ 11,00 ÷ 25%');
+    expect(h).toContain('R$ 44,00');
+  });
+  it('embalagem sem custo: o bloco diz "Custo incompleto" e "sem dados" com o motivo, sem número', () => {
+    const semCusto = [...opcoes, { id: 'semcusto', nome: 'Sacola sem custo', unidade: 'UN' as const, ativo: true, embalagem: true, custo: null }];
+    const h = html({ opcoes: semCusto, inicial: [linha('DELIVERY_PROPRIO', 'caixa'), linha('IFOOD', 'semcusto')] });
+    expect(h).toContain('Custo incompleto');
+    expect(h).toContain('falta preço em “Sacola sem custo”');
+    expect(h).not.toContain('R$ 52,00');
   });
 });

@@ -14,7 +14,7 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFormState } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import type { EmbalagemDoFormulario } from '@/lib/erp/canais';
-import { CANAIS, CANAIS_COM_EMBALAGEM, chaveDaEmbalagem, LIMITES_DO_CANAL, type CanalComEmbalagem } from '@/lib/erp/canal-campos';
+import { CANAIS, CANAIS_COM_EMBALAGEM, chaveDaEmbalagem, lerEmbalagens, LIMITES_DO_CANAL, type CanalComEmbalagem, type EmbalagemDoCadastro } from '@/lib/erp/canal-campos';
 import { contaDoSugeridoPorCmv, porcentagemDoCmv, STATUS_DO_CMV } from '@/lib/erp/cmv-produto-campos';
 import { custoDoUso, custoPorUnidade, escalaDaSigla, formatarDinheiro, formatarFracao, formatarPontosBase, lerQuantidadeNa, SIGLAS_DIGITAVEIS, somar, ZERO, type Fracao } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -60,6 +60,7 @@ export function FormEmbalagens(props: PropsDoFormEmbalagens) {
         key={r.valores === undefined ? 'carregando' : descartou ? 'descartado' : 'pronto'}
       {...props}
       inicial={linhas}
+      gravadas={props.inicial}
       chaveDoRascunho={r.chave}
       avisos={
         <>
@@ -111,9 +112,10 @@ function FormEmbalagensBase({
   bloqueio,
   novoInsumo,
   precos,
+  gravadas,
   chaveDoRascunho,
   avisos,
-}: PropsDoFormEmbalagens & { chaveDoRascunho: string; avisos: ReactNode }) {
+}: PropsDoFormEmbalagens & { chaveDoRascunho: string; avisos: ReactNode; gravadas: readonly LinhaDaEmbalagem[] }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida(estado);
@@ -123,6 +125,12 @@ function FormEmbalagensBase({
   const porId = useMemo(() => new Map(opcoes.map((o) => [o.id, o])), [opcoes]);
   const custoDaPorcao: Fracao = useMemo(() => ({ num: BigInt(porcao.num), den: BigInt(porcao.den) }), [porcao]);
   const ativas = opcoes.filter((o) => o.embalagem && o.ativo);
+  // A mesma regra que o servidor aplica ao salvar (tipo, ativa, repetida, limites): linha que ele recusaria não acende farol.
+  const cadastro = useMemo(
+    () => new Map<string, EmbalagemDoCadastro>(opcoes.map((o) => [o.id, { id: o.id, nome: o.nome, unidade: o.unidade, tipo: o.embalagem ? 'EMBALAGEM' : 'OUTRO', ativo: o.ativo }])),
+    [opcoes],
+  );
+  const jaNoCanal = useMemo(() => new Set(gravadas.filter((l) => l.insumoId).map((l) => `${l.canal}:${l.insumoId}`)), [gravadas]);
 
   function mudar(chave: number, m: Partial<LinhaDaEmbalagem>) {
     setLinhas((ls) =>
@@ -170,6 +178,13 @@ function FormEmbalagensBase({
     guardarRascunho(chaveDoRascunho, linhas.map(({ chave: _c, ...l }) => l), impressao);
   }
   const idBase = 'embalagens';
+  const regraDoServidor = lerEmbalagens(
+    linhas.filter((l) => l.insumoId || l.quantidade.trim()),
+    cadastro,
+    jaNoCanal,
+  );
+  const recusaDoCanal = (canal: CanalComEmbalagem): string | null =>
+    regraDoServidor.ok ? null : (Object.entries(regraDoServidor.erros).find(([k]) => k === `emb-${canal}` || k.startsWith(`emb-${canal}-`))?.[1] ?? null);
   const rotuloDoErro = (campo: string) => {
     const m = /^emb-(DELIVERY_PROPRIO|IFOOD)-(\d+)$/.exec(campo);
     return m ? `${CANAIS[m[1] as CanalComEmbalagem].rotulo}, linha ${Number(m[2]) + 1}` : campo;
@@ -348,8 +363,9 @@ function FormEmbalagensBase({
               {precos && (
                 <PrecoComEstasEmbalagens
                   canal={canal}
-                  // Linha pela metade não entra na conta: em vez de um canal "completo" falso, nenhuma sugestão nem CMV.
-                  conta={linhasPendentes > 0 ? null : contaDasEmbalagensNaTela({ canal, porcao: custoDaPorcao, faltaPreco, embalagens: naTela, preco: precos[canal] })}
+                  // Linha pela metade ou que o servidor recusaria não entra na conta: em vez de um canal "completo" falso, nada.
+                  recusa={linhasPendentes > 0 ? null : recusaDoCanal(canal)}
+                  conta={linhasPendentes > 0 || recusaDoCanal(canal) ? null : contaDasEmbalagensNaTela({ canal, porcao: custoDaPorcao, faltaPreco, embalagens: naTela, preco: precos[canal] })}
                 />
               )}
             </Painel>
@@ -393,7 +409,8 @@ function SugestaoPelaMeta({ x }: { x: ContaDasEmbalagens }) {
   return (
     <>
       <span className="font-semibold text-texto">{formatarDinheiro(s.centavos)}</span>
-      <span className="block text-[12px] text-suave">{contaDoSugeridoPorCmv(x.fisico.valor, x.metaBp!, s)}</span>
+      {/* Como no detalhe: o valor acima e a conta até o "÷". */}
+      <span className="block text-[12px] text-suave">{contaDoSugeridoPorCmv(x.fisico.valor, x.metaBp!, s).replace(/ = .*$/, '')}</span>
     </>
   );
 }
@@ -402,25 +419,28 @@ function SugestaoPelaMeta({ x }: { x: ContaDasEmbalagens }) {
  * Embalagens → preço sem sair da tela: meta, sugestão pela meta, preço escolhido e CMV a esse preço, pela mesma conta do
  * detalhe e com as embalagens que estão na tela. Só leitura: o preço muda no passo de preços.
  */
-function PrecoComEstasEmbalagens({ canal, conta: x }: { canal: CanalComEmbalagem; conta: ContaDasEmbalagens | null }) {
+function PrecoComEstasEmbalagens({ canal, conta: x, recusa }: { canal: CanalComEmbalagem; conta: ContaDasEmbalagens | null; recusa: string | null }) {
   const st = x ? STATUS_DO_CMV[x.status] : null;
   return (
     <div role="group" aria-label={`Preço e CMV do ${CANAIS[canal].rotulo} com estas embalagens`} className="mt-3 border-t border-linha pt-3">
       <p className="text-[12px] font-semibold uppercase tracking-wide text-suave">Com estas embalagens</p>
-      {!x ? (
-        <p className="mt-1 text-[13px] text-suave">Complete as embalagens para ver a sugestão pela meta e o CMV.</p>
+      {recusa ? (
+        <p className="mt-1 text-[13px] text-suave">Corrija antes de ver o preço sugerido e o CMV: {recusa}</p>
+      ) : !x ? (
+        <p className="mt-1 text-[13px] text-suave">Complete as embalagens para ver o preço sugerido e o CMV.</p>
       ) : !x.ofertado ? (
         <p className="mt-1 text-[13px] text-suave">
           Não ofertado: este prato não está marcado como vendido neste canal. As embalagens continuam configuradas; sem sugestão nem farol.
         </p>
       ) : (
-        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px] tabular-nums sm:grid-cols-4">
+        // Muda enquanto a pessoa digita: o leitor de tela anuncia, como no detalhe.
+        <dl aria-live="polite" className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px] tabular-nums sm:grid-cols-4">
           <div className="min-w-0">
             <dt className="text-[12px] text-suave">Meta de CMV</dt>
             <dd className="text-texto">{x.metaBp === null ? <span className="text-suave">sem meta</span> : formatarPontosBase(x.metaBp)}</dd>
           </div>
           <div className="min-w-0">
-            <dt className="text-[12px] text-suave">Sugestão pela meta</dt>
+            <dt className="text-[12px] text-suave">Preço sugerido</dt>
             <dd>
               <SugestaoPelaMeta x={x} />
             </dd>
@@ -436,7 +456,7 @@ function PrecoComEstasEmbalagens({ canal, conta: x }: { canal: CanalComEmbalagem
               <span className="mt-1 block">
                 <Selo tom={st!.tom}>{st!.rotulo}</Selo>
               </span>
-              {x.motivo && <span className="mt-1 block whitespace-normal text-[12px] text-suave">{x.motivo}</span>}
+              {x.motivo && <span className="mt-1 block whitespace-normal break-words text-[12px] text-suave">{x.motivo}</span>}
             </dd>
           </div>
         </dl>
