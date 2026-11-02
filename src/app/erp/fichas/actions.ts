@@ -18,6 +18,7 @@ import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import type { EstadoDasFotos, EstadoImportacao } from '@/components/erp/telas/fichas/estado';
 import { revalidatePath } from 'next/cache';
 import { mudarFotosDaFicha } from '@/lib/erp/ficha-fotos';
+import { lerImpressaoFinanceira, type ImpressaoFinanceira } from '@/lib/erp/ficha-impressao';
 import {
   executarImportacao,
   executarPrevia,
@@ -142,4 +143,15 @@ export async function acaoFotosDaFicha(id: string, anterior: EstadoDasFotos, for
   const r = await mudarFotosDaFicha(ctx.cliente, String(id), lido.versao, lido.pedido, ctx.sessao.autorNome);
   if (r.ok) revalidatePath(`${BASE}/${id}`, 'layout');
   return { vez, ok: r.ok, frase: r.ok ? `Pronto: ${r.feito}.` : r.erro };
+}
+
+/**
+ * Impressão com preços e custos (decisão de 31/10/2026): só depois da escolha explícita na tela de impressão. Quem não
+ * vê preços recebe a recusa, nunca os valores. Só leitura: vale também com o parceiro bloqueado para gravação.
+ */
+export async function acaoImpressaoFinanceira(id: string, versao: string): Promise<ImpressaoFinanceira> {
+  const ctx = await exigirParceiroDaSessao();
+  const negado = recusaDaAcao(ctx, 'fichas.ver') ?? recusaDaAcao(ctx, 'precos.ver');
+  if (negado) return { ok: false, erro: negado };
+  return lerImpressaoFinanceira(ctx.cliente, id, versao);
 }

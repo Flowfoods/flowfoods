@@ -175,7 +175,9 @@ servidor.
   foto, descrição comercial, onde fica e quanto dura, ingredientes (limpo e bruto), modo de preparo em etapas. A versão
   gerencial acrescenta o custo dos itens e a tabela de preço e CMV por canal ("resultado após os custos informados", com a
   frase de que não é lucro líquido). A barra diz qual versão é e que só sai a ficha gravada (o que não foi salvo não entra).
-  Botão "Imprimir ou PDF" no detalhe.
+  Botão "Imprimir ou PDF" no detalhe. **Atualizado pela decisão 510 (02/11/2026):** a página de impressão sai sempre sem
+  valores, para todos; "Com preços e custos" é escolhido a cada impressão e lido por ação do servidor que confere
+  `precos.ver`. O texto acima sobre a "versão gerencial" automática vale para a consulta, não mais para o papel.
 - Impressão de todo o ERP (`tokens.css`): o papel sai branco e com a altura do conteúdo. Antes, o fundo creme e a altura
   mínima de tela cheia empurravam uma **folha em branco a mais** no fim (vale também para os relatórios da L.2).
 - Ajuda: textos de Fichas, Detalhe da ficha, Montar a ficha e Precificação atualizados para a meta de CMV, as etapas e a

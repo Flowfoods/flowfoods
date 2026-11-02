@@ -855,14 +855,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/[id]', 'fichas/[id]/imprimir'],
     titulo: 'Detalhe da ficha',
-    versao: 4,
+    versao: 5,
     aula: [
       { texto: 'Foto, descrição comercial, o que a receita leva e o modo de preparo em etapas.' },
       { texto: 'O custo por porção e de cada item, com a conta à mostra.', para: ['precos.ver'] },
       { texto: 'Pré-preparo: “Produzir” planeja um lote dele, com os insumos tirados da receita.', para: ['producao.registrar'] },
       { texto: 'Em “Preço e CMV por canal”: o custo físico de cada canal, a meta de CMV, o preço sugerido pela meta, o seu preço, o CMV e o resultado após os custos informados.', para: ['precos.ver'] },
       { texto: 'Preço em branco é preço não definido: o canal fica sem dados até você pôr o seu. A sugestão nunca muda o seu preço.', para: ['precos.ver'] },
-      { texto: '“Imprimir ou PDF” sai com o que você pode ver: a versão da cozinha não leva valores.' },
+      { texto: 'Na página de impressão, o botão pergunta antes o que sai no papel; cancelar não imprime, e o Ctrl+P de lá sai sem valores.' },
     ],
     secoes: [
       {
