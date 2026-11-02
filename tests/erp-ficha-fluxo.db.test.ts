@@ -174,4 +174,31 @@ describe.skipIf(!URL_TESTE)('Ficha: receita salva → embalagens → preço (Pos
     await expect(acoes.acaoCadastrarFicha(null, receita('Salvar padrão', { continuar: 'https://exemplo.invalid/' }))).rejects.toMatchObject({ url: expect.stringMatching(/\/[^/]+\?feito=criada$/) });
     await expect(acoesN1.acaoCadastrarFicha(parceiro.slug, null, receita('Fluxo nível 1'))).rejects.toMatchObject({ url: expect.stringMatching(new RegExp(`^/rodolfo/erp/${parceiro.slug}/fichas/[^/]+/canais\\?feito=criada$`)) });
   });
+
+  it('embalagens → preço na mesma tela: meta, sugestão, preço escolhido e CMV iguais ao detalhe; salvar não mexe em preço nem estoque', async () => {
+    contexto();
+    const id = await cadastrar('Prato da prévia');
+    await expect(acoes.acaoSalvarEmbalagens(id, null, embalagens(''))).rejects.toThrow(/REDIRECT/);
+    const cfg = await obterTaxaDoIfood(cliente);
+    expect(await salvarMetasDeCmv(cliente, { versao: cfg.versaoDasMetas, metas: { LOJA: '25', DELIVERY_PROPRIO: '25', IFOOD: '25' } })).toMatchObject({ ok: true });
+    let c = await canais(id);
+    await expect(acoes.acaoSalvarPrecos(id, null, form({ impressao: c.impressaoDosPrecos, custos: c.impressaoDosCustos, preco_LOJA: '30', preco_DELIVERY_PROPRIO: '40', preco_IFOOD: '50' }))).rejects.toThrow(/REDIRECT/);
+    c = await canais(id);
+    const tela = sp(renderToStaticMarkup(await PaginaEmbalagens({ params: { id }, searchParams: {} })));
+    // Delivery: 12 ÷ 25% = 48; ao seu preço de 40, CMV 30% acima. iFood: 13 ÷ 25% = 52; a 50, 26% acima. Mesmos números do detalhe.
+    expect(c.cmv.map((x) => x.sugerido.tipo === 'ok' && x.sugerido.centavos)).toEqual([4000, 4800, 5200]);
+    for (const trecho of ['R$ 12,00 ÷ 25% = R$ 48,00', 'R$ 13,00 ÷ 25% = R$ 52,00', 'R$ 40,00', 'R$ 50,00', '30,0%', '26,0%', 'acima da meta']) expect(tela).toContain(trecho);
+    expect(tela.match(/Com estas embalagens/g)).toHaveLength(2);
+    expect(tela).not.toMatch(/name="preco_|lucro/i);
+    // Sacola 2 por porção no iFood: a previsão sobe, o preço escolhido continua o mesmo e o estoque não se move.
+    await expect(acoes.acaoSalvarEmbalagens(id, null, embalagens(c.impressao, '2'))).rejects.toThrow(/REDIRECT/);
+    const depois = await canais(id);
+    expect(depois.cmv.map((x) => x.precoCentavos)).toEqual([3000, 4000, 5000]);
+    expect(depois.cmv[2].sugerido).toMatchObject({ tipo: 'ok', centavos: 6400 });
+    expect(await cliente.movimentoEstoque.count()).toBe(0);
+    // Quem não vê preços não chega à tela (e não recebe nenhum desses valores).
+    contexto(true);
+    await expect(PaginaEmbalagens({ params: { id }, searchParams: {} })).rejects.toThrow('SEM_ACESSO');
+    contexto();
+  });
 });
