@@ -185,7 +185,7 @@ export function TelaImpressaoFicha({
               return (
                 <label
                   key={o.valor}
-                  className={`flex min-h-11 gap-3 rounded-[10px] border p-3 ${marcado && !indisponivel ? 'border-texto' : 'border-linha'} ${indisponivel ? 'opacity-60' : 'cursor-pointer'}`}
+                  className={`flex min-h-11 gap-3 rounded-[10px] border p-3 ${marcado && !indisponivel ? 'border-texto' : 'border-linha'} ${indisponivel ? 'cursor-not-allowed bg-forte' : 'cursor-pointer'}`}
                 >
                   <input
                     type="radio"
@@ -197,7 +197,8 @@ export function TelaImpressaoFicha({
                     className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--ff-acao))]"
                   />
                   <span className="space-y-0.5">
-                    <span className="block text-[14px] font-semibold text-texto">{o.rotulo}</span>
+                    {/* Indisponível sem opacidade: o motivo continua legível (contraste do texto suave). */}
+                    <span className={`block text-[14px] font-semibold ${indisponivel ? 'text-suave' : 'text-texto'}`}>{o.rotulo}</span>
                     <span className="block text-[13px] leading-relaxed text-suave">{indisponivel ? 'Seu acesso não inclui preços e custos.' : o.ajuda}</span>
                   </span>
                 </label>
