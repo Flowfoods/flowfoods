@@ -237,9 +237,20 @@ describe('decisão 520 · os pontos de Lançar despesa e de Despesa no registro'
     for (const t of ['a competência decide o período', 'só até ontem', 'no DRE da loja e no da rede', 'a da rede entra só no DRE da rede, sem dividir entre as lojas', 'sem as deduções da venda']) expect(comoConta, t).toContain(t);
   });
 
-  it('a que repete todo mês: volta em Lançar as do mês passado, o DRE avisa Falta lançar, Não repete mais encerra', () => {
+  it('a que repete todo mês: volta em Lançar as do mês passado, a lista e o DRE avisam Falta lançar, Não repete mais na última encerra', () => {
     const r = card(DONO, 'dre-despesa-nova', 'repete');
-    for (const t of ['Lançar as do mês passado', 'nada entra sozinho', 'o DRE avisa Falta lançar', 'Não repete mais']) expect(r, t).toContain(t);
+    for (const t of ['Lançar as do mês passado', 'nada entra sozinho', 'a lista de despesas e o DRE avisam Falta lançar', 'por até 12 meses', 'Não repete mais na despesa do último mês lançado']) expect(r, t).toContain(t);
+    // Chega a quem só lança (que não abre o DRE, mas vê o aviso na lista) inteiro.
+    expect(card(SO_LANCA, 'dre-despesa-nova', 'repete')).toBe(r);
+  });
+
+  it('a aula da lista (revisão da 520, v3) diz o filtro A pagar como ele é: tudo com vencimento e sem pagamento, de qualquer mês', () => {
+    const e = entradaPorChave('dre-despesas')!;
+    expect(e.versao).toBe(3);
+    const aula = e.aula.map((b) => b.texto).join(' ');
+    expect(aula).toContain('A pagar mostra todas as que têm vencimento e ainda não foram pagas, de qualquer mês, pela ordem de vencimento');
+    expect(aula).toContain('no alto, quantas já venceram e quantas vencem em até 7 dias');
+    expect(aula).not.toContain('ainda não foram pagas: as vencidas e as que vencem em até 7 dias');
   });
 
   it('vencimento e pagamento não mudam o DRE; A pagar é o filtro da lista', () => {
@@ -431,6 +442,9 @@ describe('decisão 520 · cada bloco chega só a quem ele serve', () => {
     expect([quantas(h, 'como-conta'), quantas(h, 'pagamento')]).toEqual([1, 1]);
     expect(h).not.toContain('Marcar como paga');
     expect(h).not.toContain('Mudar ou tirar');
-    expect(h).not.toContain('Marque como paga');
+    // O corpo do card não é escrito no HTML: o que vale é o que o shell recebe para quem só vê.
+    const doShell = ajudaParaATela(SO_VE).find((e) => e.chave === 'dre-despesa')!;
+    expect(doShell.pontos.map((p) => p.id)).toEqual(['dre-despesa.como-conta', 'dre-despesa.pagamento']);
+    expect(JSON.stringify(doShell)).not.toContain('Marque como paga');
   });
 });

@@ -1939,10 +1939,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/despesas'],
     titulo: 'Despesas',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Aluguel, salário, luz e as outras despesas da casa, pela competência: o mês a que a despesa pertence, não o dia em que foi paga.' },
-      { texto: 'A pagar mostra as que têm vencimento e ainda não foram pagas: as vencidas e as que vencem em até 7 dias. Pagar não muda o DRE.' },
+      // Decisão 520 (revisão): o filtro é toda despesa com vencimento e sem pagamento, de qualquer mês; vencidas e 7 dias são as métricas do alto.
+      { texto: 'A pagar mostra todas as que têm vencimento e ainda não foram pagas, de qualquer mês, pela ordem de vencimento; no alto, quantas já venceram e quantas vencem em até 7 dias. Pagar não muda o DRE.' },
       { texto: 'Despesa da rede, que não é de uma loja, só aparece para quem tem a rede inteira.' },
       { texto: 'Lance cada despesa uma vez. As que repetem todo mês voltam em Lançar as do mês passado, com o valor para você conferir.', para: ['despesas.lancar'] },
     ],
@@ -2033,7 +2034,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Repete todo mês',
         blocos: [
           { texto: 'No mês seguinte, ela aparece em Lançar as do mês passado com o mesmo valor, para você conferir e lançar: nada entra sozinho.' },
-          { texto: 'Enquanto o mês seguinte não for lançado, o DRE avisa Falta lançar. Para parar, use Não repete mais na despesa do último mês lançado.' },
+          // A lista também avisa (quem só lança não abre o DRE); a cobrança olha os 12 meses anteriores (`recorrentesEmFalta`).
+          { texto: 'Enquanto o mês seguinte não for lançado, a lista de despesas e o DRE avisam Falta lançar, por até 12 meses. Para parar antes, use Não repete mais na despesa do último mês lançado.' },
         ],
       },
       {
