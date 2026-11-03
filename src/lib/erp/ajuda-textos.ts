@@ -1215,6 +1215,50 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'A data da nota decide o período dela: se o DRE já fechou esse período, a nota não entra nem se edita. É também essa data que põe a nota no CMV de compra do período.', para: ['compras.lancar'] },
       { texto: 'Só lance como nota o que é comida e embalagem para vender. Limpeza e descartável da operação vão como despesa, e o pagamento ao fornecedor de uma nota já lançada não é despesa: a nota já é o custo.', para: ['compras.lancar'] },
     ],
+    // Decisão 522: o que cada campo muda no custo, no estoque e no DRE, junto do campo. Saíram do corpo e moram aqui: o "o custo
+    // dos insumos passa a ser o desta compra" do cabeçalho e o "É ela que diz qual compra é a mais nova." da data (no `data`), o
+    // "O preço por kg, L ou un sai da conta, com o frete rateado." dos itens (no `itens`) e o apoio do frete (no `frete`). Na ordem
+    // da página. O exemplo em R$ é só de quem vê custo; o resto não diz valor nenhum.
+    pontos: [
+      {
+        id: 'loja',
+        titulo: 'Loja que recebeu',
+        blocos: [
+          { texto: 'Aparecem as lojas em que você pode lançar nota; loja desativada não recebe nota nova.' },
+          // `efeitoDaNota`: a hora do lançamento conta, e editar não a muda (a nota antiga editada para esta loja não entra).
+          { texto: 'A compra conta no CMV de compra e no orçamento de compra desta loja, e entra no estoque dela se ele já estava aberto quando a nota foi lançada e a data não é anterior à abertura.' },
+          // `ultimasCompras` não filtra loja: a última nota de qualquer loja dá o custo de referência (fichas e preços).
+          { texto: 'O custo do insumo que as fichas usam é um só na rede: vale a compra mais recente dele, de qualquer loja.' },
+        ],
+      },
+      {
+        id: 'data',
+        titulo: 'O que a data da nota decide',
+        blocos: [
+          { texto: 'A data impressa na nota diz qual compra é a mais nova: o custo do insumo segue a de data mais recente e, na mesma data, a lançada por último.' },
+          // `editarNota` confere a data de antes e a de depois: nem sair nem entrar num período fechado.
+          { texto: 'Ela põe a nota num período do DRE e no CMV de compra dele; período já fechado não recebe nota nova nem nota com a data mudada para dentro dele, e as que caem nele não mudam.' },
+          { texto: 'No estoque, a nota só entra se o estoque da loja já estava aberto quando ela foi lançada e a data não é anterior à abertura; editar não muda a hora do lançamento.' },
+        ],
+      },
+      {
+        id: 'itens',
+        titulo: 'Embalagem, quantidade e valor',
+        blocos: [
+          { texto: 'Escolha a embalagem em que o insumo veio e diga quantas: 3 caixas de 5 kg viram 15 kg no estoque e na conta do custo; a granel, digite direto em kg, L ou un.' },
+          { texto: 'O valor é o total da linha na nota; o preço por kg, L ou un sai da conta: o valor mais a parte do frete, dividido pela quantidade.' },
+          { texto: 'Ex.: 3 caixas de 5 kg por R$ 269,70, sem frete, dão R$ 17,98 por kg.', para: ['compras.ver'] },
+        ],
+      },
+      {
+        id: 'frete',
+        titulo: 'Frete e total',
+        blocos: [
+          { texto: 'O frete é dividido entre os itens pelo valor de cada um e entra no custo deles e no CMV de compra.' },
+          { texto: 'O total da nota tem que ser igual aos itens mais o frete, ao centavo: se não bater, a nota não entra.' },
+        ],
+      },
+    ],
   },
   {
     chave: 'compra',
@@ -1234,6 +1278,42 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'lotes',
         titulo: 'Lote e vencimento',
         blocos: [{ texto: 'O lote e o vencimento de cada insumo, como vieram na embalagem, ficam em Lote e vencimento. A cozinha escolhe o lote daqui ao abrir a embalagem, e a etiqueta usa o vencimento dele.' }],
+      },
+    ],
+    // Decisão 522: o que a nota fez no custo, no DRE e no estoque. Saíram do corpo e moram aqui: "O frete foi dividido entre os
+    // itens pelo valor de cada um e entra no custo." do Total (no `total`) e o subtítulo "Entrada e estorno, nunca apagados" de No
+    // estoque (no `estoque`, que só aparece com movimento). Na ordem da página. Quem só vê recebe tudo, menos o que editar e
+    // cancelar fazem no custo, que é de quem lança.
+    pontos: [
+      {
+        id: 'total',
+        titulo: 'Frete, período e CMV de compra',
+        blocos: [
+          { texto: 'Quando há frete, ele é dividido entre os itens pelo valor de cada um e entra no custo deles.' },
+          { texto: 'Pela data da nota, a compra conta no CMV de compra e no orçamento de compra da loja, no período em que ela cai.' },
+          { texto: 'Nota cancelada sai do custo, do CMV de compra e do orçamento.' },
+        ],
+      },
+      {
+        id: 'custo',
+        titulo: 'Custo por unidade e o que vale',
+        blocos: [
+          { texto: 'Custo por unidade é o valor do item mais a parte do frete, dividido pela quantidade na unidade do insumo.' },
+          // `valeNoCusto`/`valeOutra` em `obterNota`: a última compra da rede (`ultimasCompras`), de qualquer loja.
+          { texto: 'Vale no custo a compra mais recente do insumo pela data da nota, de qualquer loja da rede, e é esse custo que as fichas usam; se há uma mais nova, a linha diz a data dela.' },
+          { texto: 'Editar ou cancelar a nota que vale refaz o custo: cancelada, volta a valer a compra anterior ou, sem ela, o preço do cadastro.', para: ['compras.lancar'] },
+        ],
+      },
+      {
+        // Só com movimento no estoque (o painel "No estoque" só aparece com ele).
+        id: 'estoque',
+        titulo: 'Entrada e estorno no estoque',
+        blocos: [
+          { texto: 'A nota entra no estoque da loja se o estoque dela já estava aberto quando a nota foi lançada e a data não é anterior à abertura.' },
+          // `aplicarNotaNoEstoque`: estorna o que valia e só lança o novo se `efeitoDaNota` ainda deixa (data antes da abertura = só o estorno).
+          { texto: 'Nada é apagado: quando a edição muda o que entrou, a entrada antiga é estornada e a nova só entra se a nota ainda cumprir essa regra; cancelar estorna o que a nota tinha posto.' },
+          { texto: 'Cada linha mostra o saldo do insumo na loja antes e depois do movimento.' },
+        ],
       },
     ],
   },

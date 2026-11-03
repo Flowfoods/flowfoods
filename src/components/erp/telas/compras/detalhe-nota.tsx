@@ -20,6 +20,7 @@ import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { Aviso, Linha, Painel, Selo, Vazio } from '../../ui/superficies';
+import { PainelComPonto, PontoDeAjuda, TextoComPonto } from '../../ui/ponto-de-ajuda';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { ListaHistorico } from '../historico/lista-historico';
 import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
@@ -124,7 +125,8 @@ export function TelaDetalheNota({
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-4">
-          <Painel titulo="Total da nota">
+          {/* Decisão 522: o frete no custo e a data no CMV de compra moram no ponto "total"; o que a nota fez no estoque fica. */}
+          <Painel titulo="Total da nota" acessorio={<PontoDeAjuda ponto="total" />}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
               <span className={`font-display text-[32px] font-bold leading-none tabular-nums ${n.cancelada ? 'text-suave line-through' : ''}`}>
                 {formatarDinheiro(n.totalCentavos)}
@@ -134,12 +136,12 @@ export function TelaDetalheNota({
               </p>
             </div>
             <p className="mt-3 border-t border-linha pt-3 text-[12px] text-suave">
-              {n.freteCentavos > 0 ? 'O frete foi dividido entre os itens pelo valor de cada um e entra no custo. ' : ''}
+              {n.freteCentavos > 0 ? <TextoComPonto ponto="total" semPonto="O frete foi dividido entre os itens pelo valor de cada um e entra no custo. " /> : ''}
               {n.estoque.frase}
             </p>
           </Painel>
 
-          <Painel titulo="Itens" semRespiro>
+          <Painel titulo="Itens" semRespiro acessorio={<PontoDeAjuda ponto="custo" />}>
             {/* Celular: um bloco por item. */}
             <ul className="divide-y divide-linha md:hidden">
               {n.itens.map((i) => (
@@ -228,10 +230,12 @@ export function TelaDetalheNota({
               {n.canceladaEm && <Linha rotulo="Cancelada em">{DATA_HORA.format(n.canceladaEm).replace(',', ' às')}</Linha>}
             </dl>
           </Painel>
+          {/* Decisão 522: "Entrada e estorno, nunca apagados" mora no ponto "estoque"; sem ele, o subtítulo de antes. */}
           {n.estoque.movimentos.length > 0 && (
-            <Painel
+            <PainelComPonto
+              ponto="estoque"
               titulo="No estoque"
-              subtitulo="Entrada e estorno, nunca apagados"
+              subtituloSemPonto="Entrada e estorno, nunca apagados"
               semRespiro
               acessorio={
                 estoqueBase ? (
@@ -257,7 +261,7 @@ export function TelaDetalheNota({
                   </li>
                 ))}
               </ul>
-            </Painel>
+            </PainelComPonto>
           )}
           {lotesHref && (
             <Painel titulo="Lote e vencimento" subtitulo="Como vieram na embalagem: a etiqueta da embalagem aberta usa">
