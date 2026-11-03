@@ -135,10 +135,15 @@ describe('decisão 479 · o card', () => {
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf("document.querySelector('dialog[open]')"));
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (!escolhido) return;'));
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (digitando && (!livreDoCard(escolhido.el)'));
-    // Rolar a página nunca fecha nem avança: nada ouve a rolagem da janela ou do documento (a área visível do teclado, sim).
-    expect(pontos).not.toMatch(/(window|document)\.addEventListener\('scroll'/);
-    expect(pontos.match(/addEventListener\('scroll'/g) ?? []).toHaveLength(1);
+    // Rolar a página nunca fecha nem avança: a área visível do teclado é ouvida, e a rolagem da janela só depois de fechar a
+    // ajuda, para aparar a folga do fim (revisão da 521) — essa escuta não fecha, não avança e não abre nada.
+    expect(pontos).not.toMatch(/document\.addEventListener\('scroll'/);
+    expect(pontos.match(/addEventListener\('scroll'/g) ?? []).toHaveLength(2);
     expect(pontos).toContain("vv.addEventListener('scroll', medir);");
+    expect(pontos.match(/window\.addEventListener\('scroll', aoRolar, \{ passive: true \}\);/g) ?? []).toHaveLength(1);
+    const aoRolar = pontos.slice(pontos.indexOf('const aoRolar = () => {'), pontos.indexOf("window.addEventListener('scroll', aoRolar, { passive: true });"));
+    expect(aoRolar).toContain('apararFolga()');
+    expect(aoRolar).not.toMatch(/encerrar|avancar|setAtivo|aoContinuar|aoEncerrar|abrir\(/);
     // A folga mora no fim do conteúdo (não depois da grade) e soma à que já existe.
     expect(readFileSync('src/components/erp/tokens.css', 'utf8')).toMatch(/#conteudo::after \{[^}]*var\(--ff-folga-da-ajuda, 0px\)/);
     expect(pontos).toContain('parseFloat(raiz.style.getPropertyValue(VARIAVEL_DA_FOLGA))');
