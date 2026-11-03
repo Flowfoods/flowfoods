@@ -6,7 +6,7 @@
 import { redirect } from 'next/navigation';
 import { configDoRosto, rostoPossivel } from '@/lib/erp/rosto';
 import { sessaoDaRequisicao } from '@/lib/erp/sessao';
-import { AjudaDeAcesso } from './ajuda';
+import { EsqueciASenha } from './ajuda';
 import { FormEntrar } from './form-entrar';
 
 export const dynamic = 'force-dynamic';
@@ -51,7 +51,7 @@ export default async function EntrarPage({ searchParams }: { searchParams: { sen
       >
         <h2 className="mb-5 font-display text-xl font-bold">Entrar</h2>
         <FormEntrar aviso={aviso} rosto={rosto} />
-        <AjudaDeAcesso className="mt-6 border-t border-linha pt-4" />
+        <EsqueciASenha className="mt-6 border-t border-linha pt-4" />
       </section>
     </div>
   );

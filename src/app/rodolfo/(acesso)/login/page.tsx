@@ -5,6 +5,7 @@ import { signIn } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { CAMPO, ROTULO } from '@/components/erp/ui/campos';
+import { CampoDeSenha } from '@/components/erp/ui/campo-senha';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
 import { limparRascunhos } from '@/components/erp/telas/cadastro/rascunho';
 import { AREA_DO_RODOLFO, destinoSeguro } from '@/lib/destino-seguro';
@@ -62,9 +63,8 @@ function Formulario() {
         <label htmlFor="senha" className={ROTULO}>
           Senha
         </label>
-        <input
+        <CampoDeSenha
           id="senha"
-          type="password"
           required
           autoComplete="current-password"
           value={senha}

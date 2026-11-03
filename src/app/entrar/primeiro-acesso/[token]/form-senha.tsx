@@ -1,6 +1,7 @@
 'use client';
 
 import { useFormState, useFormStatus } from 'react-dom';
+import { CampoDeSenha } from '@/components/erp/ui/campo-senha';
 import { acaoDefinirSenha, type EstadoSenha } from '../../actions';
 
 const ROTULO = 'mb-1.5 block text-[10px] font-semibold uppercase tracking-[0.14em] text-suave';
@@ -30,10 +31,9 @@ export function FormSenha({ token, email, primeiraVez }: { token: string; email:
         <label htmlFor="senha" className={ROTULO}>
           {primeiraVez ? 'Crie sua senha' : 'Nova senha'}
         </label>
-        <input
+        <CampoDeSenha
           id="senha"
           name="senha"
-          type="password"
           required
           minLength={10}
           autoComplete="new-password"
@@ -49,10 +49,10 @@ export function FormSenha({ token, email, primeiraVez }: { token: string; email:
         <label htmlFor="confirmacao" className={ROTULO}>
           Repita a senha
         </label>
-        <input
+        <CampoDeSenha
           id="confirmacao"
           name="confirmacao"
-          type="password"
+          rotuloDoBotao="Mostrar senha repetida"
           required
           autoComplete="new-password"
           className={CAMPO}
