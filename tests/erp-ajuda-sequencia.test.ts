@@ -120,8 +120,10 @@ describe('decisão 479 · o card', () => {
     const digitar = pontos.slice(pontos.indexOf('const CAMPOS_DE_DIGITAR'), pontos.indexOf('const CAMPOS_DE_DIGITAR') + 200);
     for (const t of ['radio', 'checkbox', 'select', 'button']) expect(digitar).not.toContain(`'${t}'`);
     expect(pontos).not.toMatch(/\/\^\(INPUT\|TEXTAREA\|SELECT\)\$\//);
-    // A região inteira acima do card: o card encolhe até o mínimo quando ela não cabe.
-    expect(pontos).toContain('const teto = alturaQueDeixaARegiao(alvo, c.getBoundingClientRect(), tecladoAgora.current);');
+    // A região inteira acima do card: o card encolhe até o mínimo quando ela não cabe (decisão 521: regra pura `posicaoDoCard`,
+    // com a altura útil sem o teclado).
+    expect(pontos).toMatch(/const p = posicaoDoCard\(\{\s*janela: window\.innerHeight - tecladoAgora\.current,/);
+    expect(pontos).toContain('...medirAlvo(botao, rc),');
     // A sequência que começou sozinha marca como vistos os passos que alcança (inclusive os que aparecem depois).
     expect(pontos).toMatch(/if \(ativo\.sozinha && acoes && preferenciaComGravados && estadoDoPonto\(proximo, preferenciaComGravados, hoje\) === 'elegivel'\) \{[\s\S]{0,120}void acoes\.pontosVistos\(\[proximo\]\)/);
     // "Encerrar" devolve o foco ao campo em que a pessoa trabalhava com o card aberto.
