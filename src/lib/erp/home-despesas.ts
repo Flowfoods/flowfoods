@@ -27,7 +27,7 @@ export const GRUPOS_DAS_DESPESAS_DA_HOME = [
 ] as const satisfies readonly GrupoDoDre[];
 export type GrupoDasDespesasHome = (typeof GRUPOS_DAS_DESPESAS_DA_HOME)[number];
 /** A linha que acompanha o total no card e no painel: a base e o que fica de fora. */
-export const RECORTE_DAS_DESPESAS_DA_HOME = 'Pelo mês da despesa · sem CMV e deduções';
+export const RECORTE_DAS_DESPESAS_DA_HOME = 'No período do DRE · sem CMV e deduções';
 
 export interface GrupoDaComposicaoDespesasHome {
   grupo: GrupoDasDespesasHome;
@@ -53,6 +53,7 @@ export interface WidgetDespesasHome extends WidgetHome<'despesas'> {
 }
 
 const INDISPONIVEL = 'As despesas não estão disponíveis neste resumo. Confira o DRE da loja.';
+const doRecorte = (g: unknown) => (GRUPOS_DAS_DESPESAS_DA_HOME as readonly unknown[]).includes(g);
 const DIVERGENTE = 'As despesas não conferem com os subtotais do DRE desta leitura. Confira o DRE da loja.';
 
 /** Valor de uma linha do DRE como BigInt; recusa o que não é inteiro seguro. */
@@ -118,9 +119,11 @@ export function despesasDaHome(leitura: LeituraDoDreParaHome, c: ContextoHomeLoj
 
   const avisos: AvisoDoWidgetHome[] = [];
   const avisar = (codigo: string, texto: string) => avisos.push({ codigo, texto });
-  // A loja só cobra o que é dela: recorrentes da rede (sem loja) ficam fora deste card.
-  const recorrentes = d.fechamento ? null : d.faltaLancar.filter((f) => f.lojaId === loja.id).length;
-  const ressalvaRecorrente = d.fechamento?.ressalvas.some((r) => r.tipo === 'RECORRENTE' && r.lojaId === loja.id) ?? false;
+  // A loja só cobra o que é dela e do recorte: recorrentes da rede (sem loja) e de dedução (ex.: DAS) ficam fora deste card.
+  const recorrentes = d.fechamento ? null : d.faltaLancar.filter((f) => f.lojaId === loja.id && doRecorte(f.grupo)).length;
+  // Ressalva antiga, gravada sem o grupo, conta (lado conservador); com grupo, só os oito do recorte.
+  const ressalvaRecorrente = d.fechamento?.ressalvas.some((r) => r.tipo === 'RECORRENTE' && r.lojaId === loja.id
+    && (r.grupo === undefined || r.grupo === null || doRecorte(r.grupo))) ?? false;
   if (recorrentes) {
     avisar('recorrentes-sem-lancamento', recorrentes === 1
       ? 'Uma despesa que repete todo mês ainda está sem o mês lançado nesta loja. O total está incompleto.'

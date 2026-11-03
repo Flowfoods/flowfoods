@@ -57,7 +57,7 @@ describe('Despesas na Home · apresentação', () => {
     expect(h).toContain('aria-label="Indicador de Despesas"');
     expect(h).toContain('aria-label="Despesas da loja"');
     expect(h).toContain('data-valor-monetario="' + formatarDinheiro(TOTAL) + '"');
-    expect(h.match(/Pelo mês da despesa · sem CMV e deduções/g)).toHaveLength(2);
+    expect(h.match(/No período do DRE · sem CMV e deduções/g)).toHaveLength(2);
     expect(h).toContain('Parcial');
     expect(h).toContain('<caption class="mb-2 text-left font-semibold text-texto">Despesas por grupo do DRE</caption>');
     const corpo = h.slice(h.indexOf('<tbody>'), h.indexOf('</tbody>'));
@@ -117,7 +117,7 @@ describe('Despesas na Home · apresentação', () => {
     expect(h).not.toContain('aria-label="Despesas da loja"');
     expect(h).toContain('O total de despesas por competência ainda não está disponível neste resumo.');
     expect(h).toContain('href="/erp/dre/despesas?loja=lojab"');
-    expect(h).not.toMatch(/R\$|<table|Pelo mês da despesa · sem CMV|Ocupação|Pessoal/);
+    expect(h).not.toMatch(/R\$|<table|No período do DRE · sem CMV|Ocupação|Pessoal/);
   });
 
   it('DTO incompatível (total diferente da soma ou grupos faltando) vira indisponível, sem números', () => {
@@ -131,6 +131,27 @@ describe('Despesas na Home · apresentação', () => {
       expect(h).toContain('As despesas estão indisponíveis nesta leitura.');
       expect(h).toContain('Indisponível');
       expect(h).not.toContain('<table');
+      expect(texto(h)).not.toMatch(/R\$/);
+    }
+  });
+
+  it('o card da faixa usa a mesma guarda: DTO incompatível mostra indisponível, sem número nem Parcial', () => {
+    const w = widget();
+    expect(w.estado).toBe('parcial');
+    const card = (h: string) => h.slice(h.indexOf('aria-label="Indicador de Despesas"'), h.indexOf('</a>', h.indexOf('aria-label="Indicador de Despesas"')));
+    const valido = card(html(w));
+    expect(valido).toContain('data-valor-monetario="' + formatarDinheiro(TOTAL) + '"');
+    expect(valido).toContain('>Parcial<');
+    for (const ruim of [
+      { ...w, valor: { unidade: 'centavos' as const, valor: TOTAL + 1 } },
+      { ...w, composicaoPorGrupo: { ...w.composicaoPorGrupo!, grupos: w.composicaoPorGrupo!.grupos.slice(1) } },
+    ]) {
+      const h = html(ruim);
+      const c = card(h);
+      expect(c).toContain('>Indisponível<');
+      expect(c).toContain('Valor não disponível');
+      expect(c).not.toMatch(/data-valor-monetario|R\$|>Parcial</);
+      expect(h).not.toContain(formatarDinheiro(TOTAL + 1));
       expect(texto(h)).not.toMatch(/R\$/);
     }
   });

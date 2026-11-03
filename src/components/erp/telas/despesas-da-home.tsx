@@ -28,7 +28,7 @@ function SemValor({ texto }: { texto: string }) {
  * seguros e o total igual à soma deles. Não refaz a conta: a conferência com os
  * subtotais do DRE pertence ao adaptador; aqui só se recusa DTO incompatível.
  */
-function gruposLegiveis(w: WidgetDespesasHome, c: ComposicaoDespesasHome): boolean {
+export function gruposLegiveis(w: WidgetDespesasHome, c: ComposicaoDespesasHome): boolean {
   if (c.estado !== 'ok' || c.base !== 'competencia_sem_cmv_e_deducoes' || !(w.estado === 'ok' || w.estado === 'parcial')) return false;
   const total = w.valor.valor;
   if (w.valor.unidade !== 'centavos' || !Number.isSafeInteger(total) || !Array.isArray(c.grupos) || c.grupos.length !== GRUPOS_DAS_DESPESAS_DA_HOME.length) return false;
@@ -41,12 +41,15 @@ function gruposLegiveis(w: WidgetDespesasHome, c: ComposicaoDespesasHome): boole
   return soma === BigInt(total as number) && c.grupos.some((g) => g.comLancamento);
 }
 
+/** Estado mostrado quando a composição não é legível: erro e sem dados ficam; o resto vira indisponível. */
+export const estadoSemComposicaoLegivel = (e: EstadoDoWidgetHome): EstadoDoWidgetHome => (e === 'erro' || e === 'sem_dados' ? e : 'indisponivel');
+
 export function DespesasDaHomeNaTela({ widget }: { widget: WidgetDespesasHome }) {
   const c = widget.composicaoPorGrupo;
   if (!c) return null;
   const legivel = gruposLegiveis(widget, c);
   // Um DTO incompatível nunca vira número: apresenta-se como indisponível.
-  const estado = legivel ? ESTADOS[widget.estado] : ESTADOS[widget.estado === 'erro' || widget.estado === 'sem_dados' ? widget.estado : 'indisponivel'];
+  const estado = ESTADOS[legivel ? widget.estado : estadoSemComposicaoLegivel(widget.estado)];
   const referencia = widget.referencia;
   const cobertura = widget.cobertura;
   const foto = widget.origem?.fotografia;

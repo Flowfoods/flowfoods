@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { montarDre, type DespesaApropriada, type LinhaDoDre } from '@/lib/erp/dre-campos';
-import { CODIGO, PLANO_PADRAO, planoEfetivo, type LinhaDoBanco } from '@/lib/erp/dre-plano';
+import { CODIGO, GRUPOS_DE_DESPESA, PLANO_PADRAO, planoEfetivo, type LinhaDoBanco } from '@/lib/erp/dre-plano';
 import { dreDaFotografia, linhasParaGravar } from '@/lib/erp/dre-fechamento-campos';
 import { resolverAlcance, type Alcance, type Permissao } from '@/lib/erp/permissoes';
 import type { CmvDoDre } from '@/lib/erp/cmv-campos';
@@ -85,6 +85,10 @@ const recorrente = (alteracoes: Partial<RecorrenteEmFalta> = {}): RecorrenteEmFa
 });
 
 describe('Despesas da Home · soma das linhas do DRE, conferida com os subtotais', () => {
+  it('os oito grupos do card são os grupos de despesa do DRE sem a dedução, na mesma ordem: grupo novo não some em silêncio', () => {
+    expect([...GRUPOS_DAS_DESPESAS_DA_HOME]).toEqual(GRUPOS_DE_DESPESA.filter((g) => g !== 'DEDUCAO'));
+  });
+
   it('soma os oito grupos, com linha da casa e linha oculta com valor, e cada grupo é o subtotal do DRE', () => {
     const d = dre();
     const w = adaptar(d);
@@ -217,6 +221,33 @@ describe('Despesas da Home · estados honestos', () => {
     expect(w.estado).toBe('parcial');
     expect(w.avisos.map((a) => a.codigo)).toEqual(['fechado-com-ressalva-recorrente']);
     expect(JSON.stringify(w)).not.toMatch(/Privado|Segredo|Aluguel privado|Não copiar|123456|Loja A/);
+  });
+
+  it('recorrente de dedução (DAS) fora do recorte não deixa parcial nem avisa; a de Ocupação continua avisando', () => {
+    const das = recorrente({ origemId: 'das', descricao: 'DAS', linhaNome: 'Impostos sobre a venda (DAS)', linhaId: 'l-impostos', grupo: 'DEDUCAO' });
+    const d = dre({ faltaLancar: [das] });
+    const w = adaptar(d);
+    expect(w.estado).toBe('ok');
+    expect(w.recorrentesSemLancamento).toBe(0);
+    expect(w.avisos).toEqual([]);
+    d.faltaLancar.push(recorrente({ origemId: 'aluguel', descricao: 'Aluguel', linhaNome: 'Aluguel', linhaId: 'l-aluguel', grupo: 'OCUPACAO' }));
+    const com = adaptar(d);
+    expect(com.estado).toBe('parcial');
+    expect(com.recorrentesSemLancamento).toBe(1);
+    expect(com.avisos.map((a) => a.codigo)).toEqual(['recorrentes-sem-lancamento']);
+  });
+
+  it('fechado: ressalva de recorrente de dedução não deixa parcial; de Ocupação ou sem grupo (antiga) deixa', () => {
+    const d = fechado(dre());
+    const ressalva = (id: string, grupo?: 'DEDUCAO' | 'OCUPACAO') => ({ id, tipo: 'RECORRENTE' as const, lojaId: 'lojab', lojaNome: 'Loja B', titulo: 'Privado', detalhe: 'Privado', ...(grupo ? { grupo } : {}) });
+    d.fechamento!.ressalvas = [ressalva('das', 'DEDUCAO')];
+    expect(adaptar(d)).toMatchObject({ estado: 'ok', avisos: [] });
+    d.fechamento!.ressalvas = [ressalva('das', 'DEDUCAO'), ressalva('aluguel', 'OCUPACAO')];
+    expect(adaptar(d).estado).toBe('parcial');
+    d.fechamento!.ressalvas = [ressalva('das', 'DEDUCAO'), ressalva('antiga')];
+    const antiga = adaptar(d);
+    expect(antiga.estado).toBe('parcial');
+    expect(antiga.avisos.map((a) => a.codigo)).toEqual(['fechado-com-ressalva-recorrente']);
   });
 
   it('FECHADO sem fotografia não usa a leitura viva', () => {

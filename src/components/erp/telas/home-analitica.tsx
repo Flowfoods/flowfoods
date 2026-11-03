@@ -13,7 +13,7 @@ import { IconeDoModulo } from '../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../ui/estilos';
 import { Painel, Selo, type Tom } from '../ui/superficies';
 import { CmvDaHomeNaTela } from './cmv-da-home';
-import { DespesasDaHomeNaTela } from './despesas-da-home';
+import { DespesasDaHomeNaTela, estadoSemComposicaoLegivel, gruposLegiveis } from './despesas-da-home';
 import { EvolucaoFaturamentoHome } from './evolucao-faturamento-home';
 import { ComprasCategoriasHome } from './compras-categorias-home';
 import { ValorMonetarioHome } from './valor-monetario-home';
@@ -52,7 +52,14 @@ function AvisosDoIndicador({ widget }: { widget: WidgetAnaliticoHome }) {
   return <ul className="space-y-1 break-words text-[12px] leading-relaxed text-suave">{widget.avisos.map((aviso, i) => <li key={`${aviso.codigo}-${i}`}>{aviso.texto}</li>)}</ul>;
 }
 
-function IndicadorAnalitico({ widget }: { widget: WidgetAnaliticoHome }) {
+// O card da faixa usa a mesma guarda do painel: DTO de despesas incompatível não mostra número nem selo de leitura válida.
+function paraAFaixa(w: WidgetAnaliticoHome): WidgetAnaliticoHome {
+  if (w.familia !== 'despesas' || !w.composicaoPorGrupo || gruposLegiveis(w, w.composicaoPorGrupo)) return w;
+  return { ...w, estado: estadoSemComposicaoLegivel(w.estado), valor: { ...w.valor, valor: null } };
+}
+
+function IndicadorAnalitico({ widget: recebido }: { widget: WidgetAnaliticoHome }) {
+  const widget = paraAFaixa(recebido);
   const identidade = IDENTIDADE[widget.familia];
   const estado = ESTADO[widget.estado];
   const referencia = widget.referencia;

@@ -94,6 +94,8 @@ describe.skipIf(!URL_TESTE)('Home · Despesas por competência iguais ao DRE da 
     const oculta = await ocultarLinha(a, dono, { linha: 'iptu', ocultar: true, versao: iptu.versao }, 'Teste Home despesas');
     if (!oculta.ok) throw new Error(JSON.stringify(oculta));
     await lancado({ lojaId: salao, linha: 'sistemas', descricao: 'Sistema de PDV', valor: '200,00', mes: '2026-09', recorrente: true });
+    // DAS que repete todo mês: dedução, fora do card; a falta de outubro não pode deixar o card parcial por ela.
+    await lancado({ lojaId: salao, linha: 'impostos', descricao: 'DAS mensal', valor: '450,00', mes: '2026-09', recorrente: true });
     // Fora da loja com salão: dedução (impostos), despesa da rede sem loja e despesa da outra loja.
     await lancado({ lojaId: salao, linha: 'impostos', descricao: 'DAS', valor: '500,00', mes: '2026-10' });
     await lancado({ lojaId: '', linha: 'energia', descricao: 'Energia do escritório', valor: '999,00', mes: '2026-10' });
@@ -121,7 +123,8 @@ describe.skipIf(!URL_TESTE)('Home · Despesas por competência iguais ao DRE da 
     expect(centavosDe(w!, 'OCUPACAO')).toBe(308_000);
     expect(centavosDe(w!, 'UTILIDADES')).toBe(14_000);
     expect(centavosDe(w!, 'ADMINISTRATIVA')).toBe(12_000);
-    // Em curso e com a recorrente de setembro ainda sem outubro: parcial, só com a contagem.
+    // Em curso e com a recorrente de setembro ainda sem outubro: parcial, só com a contagem. O DAS que também falta é dedução e não conta.
+    expect(d.faltaLancar.map((f) => f.grupo).sort()).toEqual(['ADMINISTRATIVA', 'DEDUCAO']);
     expect(w!.estado).toBe('parcial');
     expect(w!.recorrentesSemLancamento).toBe(1);
     expect(w!.avisos.map((x) => x.codigo)).toEqual(['recorrentes-sem-lancamento', 'periodo-em-curso']);
@@ -130,7 +133,7 @@ describe.skipIf(!URL_TESTE)('Home · Despesas por competência iguais ao DRE da 
     expect(w!.detalhe.href).toBe(`/erp/dre?loja=${salao}&periodo=2026-10-01`);
     // CMV e deduções fora: impostos (500 × 28/31 = 451,61) estão na dedução do DRE, não no card.
     expect(subtotal(d, 'DEDUCAO')).toBe(45_161);
-    expect(JSON.stringify(w)).not.toMatch(/45161|Sistema de PDV/);
+    expect(JSON.stringify(w)).not.toMatch(/45161|Sistema de PDV|DAS mensal/);
     expect(painel.cmv?.escopo.lojaId).toBe(salao);
   });
 
