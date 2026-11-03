@@ -267,7 +267,8 @@ html:has(.ff-app[data-tema='escuro']) {
   outline-offset: 2px;
   color: rgb(var(--ff-texto));
 }
-/* Folga no fim do conteúdo com a ajuda aberta, só quando uma tela curta não deixa o botão do ponto subir acima do card. */
+/* Folga no fim do conteúdo com a ajuda aberta (decisão 521): o alvo do ponto e o fim da página sobem acima do card mesmo numa
+   tela curta; ao fechar, sai a parte que não está à vista. */
 .ff-app #conteudo::after {
   content: '';
   display: block;

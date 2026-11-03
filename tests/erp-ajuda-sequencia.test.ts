@@ -84,7 +84,8 @@ describe('decisão 479 · o card', () => {
     // Tocar fora e Escape saem da sequência (nunca avançam).
     expect(pontos).toMatch(/const fora = \(e: MouseEvent\) => \{[\s\S]{0,900}?encerrar\(false\);/);
     // Decisão 480: tocar dentro da região que a etapa explica não encerra (nem avança): é fazer o que o card pede.
-    expect(pontos).toMatch(/const fora = \(e: MouseEvent\) => \{[\s\S]{0,700}?if \(regiao\?\.contains\(alvo\)\) return;[\s\S]{0,200}?encerrar\(false\);/);
+    // (Decisão 521: a região é a do data-alvo ou a da posição do botão; num painel inteiro, só campo, botão, link ou rótulo.)
+    expect(pontos).toMatch(/const fora = \(e: MouseEvent\) => \{[\s\S]{0,900}?if \(achada\?\.regiao\.contains\(alvo\) && toqueMantemAberto\([\s\S]{0,120}?\) return;[\s\S]{0,200}?encerrar\(false\);/);
     expect(pontos).toMatch(/e\.key !== 'Escape'[\s\S]{0,500}?aoEncerrar\(/);
     // Nenhum temporizador avança etapa (os que há: a abertura automática, a espera da rolagem e o foco depois de "Manter as dicas").
     const temporizadores = pontos.split('setTimeout(').slice(1);
@@ -120,8 +121,10 @@ describe('decisão 479 · o card', () => {
     const digitar = pontos.slice(pontos.indexOf('const CAMPOS_DE_DIGITAR'), pontos.indexOf('const CAMPOS_DE_DIGITAR') + 200);
     for (const t of ['radio', 'checkbox', 'select', 'button']) expect(digitar).not.toContain(`'${t}'`);
     expect(pontos).not.toMatch(/\/\^\(INPUT\|TEXTAREA\|SELECT\)\$\//);
-    // A região inteira acima do card: o card encolhe até o mínimo quando ela não cabe.
-    expect(pontos).toContain('const teto = alturaQueDeixaARegiao(alvo, c.getBoundingClientRect(), tecladoAgora.current);');
+    // A região inteira acima do card: o card encolhe até o mínimo quando ela não cabe (decisão 521: regra pura `posicaoDoCard`,
+    // com a altura útil sem o teclado).
+    expect(pontos).toMatch(/const p = posicaoDoCard\(\{\s*janela: window\.innerHeight - tecladoAgora\.current,/);
+    expect(pontos).toContain('...medirAlvo(botao, rc),');
     // A sequência que começou sozinha marca como vistos os passos que alcança (inclusive os que aparecem depois).
     expect(pontos).toMatch(/if \(ativo\.sozinha && acoes && preferenciaComGravados && estadoDoPonto\(proximo, preferenciaComGravados, hoje\) === 'elegivel'\) \{[\s\S]{0,120}void acoes\.pontosVistos\(\[proximo\]\)/);
     // "Encerrar" devolve o foco ao campo em que a pessoa trabalhava com o card aberto.
@@ -133,10 +136,15 @@ describe('decisão 479 · o card', () => {
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf("document.querySelector('dialog[open]')"));
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (!escolhido) return;'));
     expect(tentativa.indexOf('inicioUsadoNestaVisita.current = true;')).toBeLessThan(tentativa.indexOf('if (digitando && (!livreDoCard(escolhido.el)'));
-    // Rolar a página nunca fecha nem avança: nada ouve a rolagem da janela ou do documento (a área visível do teclado, sim).
-    expect(pontos).not.toMatch(/(window|document)\.addEventListener\('scroll'/);
-    expect(pontos.match(/addEventListener\('scroll'/g) ?? []).toHaveLength(1);
+    // Rolar a página nunca fecha nem avança: a área visível do teclado é ouvida, e a rolagem da janela só depois de fechar a
+    // ajuda, para aparar a folga do fim (revisão da 521) — essa escuta não fecha, não avança e não abre nada.
+    expect(pontos).not.toMatch(/document\.addEventListener\('scroll'/);
+    expect(pontos.match(/addEventListener\('scroll'/g) ?? []).toHaveLength(2);
     expect(pontos).toContain("vv.addEventListener('scroll', medir);");
+    expect(pontos.match(/window\.addEventListener\('scroll', aoRolar, \{ passive: true \}\);/g) ?? []).toHaveLength(1);
+    const aoRolar = pontos.slice(pontos.indexOf('const aoRolar = () => {'), pontos.indexOf("window.addEventListener('scroll', aoRolar, { passive: true });"));
+    expect(aoRolar).toContain('apararFolga()');
+    expect(aoRolar).not.toMatch(/encerrar|avancar|setAtivo|aoContinuar|aoEncerrar|abrir\(/);
     // A folga mora no fim do conteúdo (não depois da grade) e soma à que já existe.
     expect(readFileSync('src/components/erp/tokens.css', 'utf8')).toMatch(/#conteudo::after \{[^}]*var\(--ff-folga-da-ajuda, 0px\)/);
     expect(pontos).toContain('parseFloat(raiz.style.getPropertyValue(VARIAVEL_DA_FOLGA))');

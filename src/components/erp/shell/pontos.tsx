@@ -41,9 +41,17 @@
  *  - avançar leva o foco ao próximo card e rola só o necessário para o botão
  *    do ponto ficar à vista acima do card; encerrar devolve o foco a onde a
  *    pessoa estava.
+ *
+ * O card não cobre o que explica (decisão 521): o alvo é o botão e a região
+ * dele (`data-alvo`, ou, sem ele, o painel do cabeçalho ou o campo do rótulo
+ * onde o botão está); a página rola para o alvo ficar acima do card (o começo
+ * dele, quando é maior que a tela, sem nunca tirar o botão de vista) e continua
+ * rolando com o card aberto; tocar no alvo não encerra. O foco não fica preso:
+ * Tab depois do último botão do card (ou Shift+Tab antes do primeiro) volta ao
+ * botão do ponto, junto do campo.
  */
 
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as TeclaNoReact, type ReactNode, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import { estadoDoPonto, itemDoPonto, PONTO_DA_TELA, type PontoParaATela, type PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
 import {
@@ -56,6 +64,7 @@ import {
   proximoPasso,
   type PontoNaTela,
 } from '@/lib/erp/ajuda-sequencia';
+import { folgaQueFica, posicaoDoCard, regiaoPelaPosicao, tabNoCard, tocouEmControle, toqueMantemAberto, uniao, vemAntes, type Faixa, type MedidasDoCard, type OrigemDaRegiao } from '@/lib/erp/ajuda-posicao';
 import { classeDeBotao } from '../ui/estilos';
 import { Selo } from '../ui/superficies';
 import type { AjudaDoShell } from './tipos';
@@ -200,6 +209,12 @@ export function ProvedorDosPontos({
     ordem.find((el) => el?.isConnected)?.focus();
   }, []);
 
+  // O card aberto agora (para `abrir` saber se o botão é o do mesmo card, sem refazer a função a cada etapa).
+  const ativoAgora = useRef(ativo);
+  ativoAgora.current = ativo;
+  // Pedido de foco no card aberto: o botão do mesmo ponto acionado de novo (Enter ou toque) leva o foco ao título do card.
+  const [pedidoDeFoco, setPedidoDeFoco] = useState(0);
+
   const abrir = useCallback(
     (ponto: string, el: HTMLElement) => {
       const id = idCompleto(ponto);
@@ -207,6 +222,12 @@ export function ProvedorDosPontos({
       origem.current = el;
       lugarDeTrabalho.current = el;
       inicioUsadoNestaVisita.current = true;
+      // O mesmo card já aberto (a pessoa voltou ao botão pelo Tab, revisão da 521): só o foco vai para o card; a sequência e
+      // o passo continuam onde estavam.
+      if (ativoAgora.current?.id === id) {
+        setPedidoDeFoco((n) => n + 1);
+        return;
+      }
       setAtivo({ id, automatico: false, rolar: true, passos: passosDaSequencia(visiveisNaOrdem(), id), sozinha: false });
     },
     [idCompleto, porId, visiveisNaOrdem],
@@ -303,13 +324,33 @@ export function ProvedorDosPontos({
     dicasAntes.current = dicasLigadas;
   }, [dicasLigadas, ativo, encerrar]);
 
-  // A folga pedida por um card (tela curta) fica até trocar de tela: tirá-la ao fechar faria a página saltar para cima.
+  // A folga pedida por um card (tela curta, ou para rolar com o card aberto) sai ao trocar de tela; ao fechar a ajuda, sai só a
+  // parte abaixo da tela (a que está à vista fica: tirá-la faria a página saltar para cima).
   useEffect(
     () => () => {
       document.documentElement.style.removeProperty(VARIAVEL_DA_FOLGA);
     },
     [caminho],
   );
+  // Fechada a ajuda, a parte da folga que fica à vista sai aos poucos na rolagem seguinte (revisão da 521): a cada quadro de
+  // rolagem, sai o que ficou abaixo da tela, sem salto. A rolagem só apara a folga: não fecha nem avança nada.
+  const comCardAberto = !!ativo;
+  useEffect(() => {
+    if (comCardAberto) return;
+    if (!apararFolga()) return;
+    let quadro = 0;
+    const aoRolar = () => {
+      cancelAnimationFrame(quadro);
+      quadro = requestAnimationFrame(() => {
+        if (!apararFolga()) window.removeEventListener('scroll', aoRolar);
+      });
+    };
+    window.addEventListener('scroll', aoRolar, { passive: true });
+    return () => {
+      cancelAnimationFrame(quadro);
+      window.removeEventListener('scroll', aoRolar);
+    };
+  }, [comCardAberto, caminho]);
 
   const valor = useMemo<ContextoDosPontos>(
     () => ({
@@ -359,11 +400,10 @@ export function ProvedorDosPontos({
       const alvo = e.target as Element | null;
       if (!alvo || !alvo.isConnected) return;
       if (alvo.closest('[data-ponto-de-ajuda], [data-ponto], dialog')) return;
-      // Tocar na região que a etapa explica (decisão 480: os botões da unidade, o campo) é fazer o que o card pede: a
-      // sequência continua aberta, sem avançar. Depois, "Continuar" segue para o próximo ponto (inclusive o que acabou de
-      // aparecer, como "Quanto vem" depois de escolher a unidade).
-      const regiao = regiaoDoPonto(origem.current);
-      if (regiao?.contains(alvo)) return;
+      // Tocar na região que a etapa explica (480: o data-alvo; 521: a da posição do botão, mas num painel ou grupo inteiro só
+      // campo, botão, link ou rótulo) é fazer o que o card pede: segue aberta, sem avançar; "Continuar" leva ao próximo ponto.
+      const achada = origem.current?.isConnected ? regiaoParaVer(origem.current) : null;
+      if (achada?.regiao.contains(alvo) && toqueMantemAberto(achada.por, tocouEmControle(cadeiaAte(alvo, achada.regiao)))) return;
       // Tocar fora sai da sequência: nunca avança uma etapa sem querer.
       encerrar(false);
     };
@@ -398,6 +438,7 @@ export function ProvedorDosPontos({
             verTudo={ehTela}
             automatico={ativo.automatico}
             rolar={ativo.rolar}
+            pedidoDeFoco={pedidoDeFoco}
             origem={origem}
             nunca={nunca}
             progresso={progresso}
@@ -455,15 +496,28 @@ const ALTURA_MINIMA_DO_CARD = 210;
 /** Com o teclado aberto, o mínimo é o topo com o X e o rodapé (56 + 70 px): o campo em que a pessoa digita vem primeiro. */
 const ALTURA_DO_CARD_COM_TECLADO = 126;
 
-/** Com o card aberto, a região explicada (botão + região) cabe acima dele? Se não cabe, até onde o card pode crescer. */
-function alturaQueDeixaARegiao(botao: HTMLElement, card: DOMRect, teclado: number): number | null {
-  const b = botao.getBoundingClientRect();
-  const regiao = regiaoDoPonto(botao);
-  const rr = regiao ? regiao.getBoundingClientRect() : b;
-  const u = { top: Math.min(b.top, rr.top), bottom: Math.max(b.bottom, rr.bottom), left: Math.min(b.left, rr.left), right: Math.max(b.right, rr.right) };
-  if (!(u.right > card.left && u.left < card.right)) return null;
-  const livre = window.innerHeight - teclado - 12 - 12 - (TOPO_LIVRE_PX + 12) - (u.bottom - u.top);
-  return livre >= card.height ? null : Math.max(livre, ALTURA_MINIMA_DO_CARD);
+/** O que recebe o foco pelo Tab dentro do card (botões, links e campos ligados). */
+const FOCAVEIS_DO_CARD = 'a[href], button:not([disabled]), input:not([type=hidden]):not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Respiro do card: até a borda de baixo, até o alvo e abaixo da barra do topo. */
+const MARGEM_DO_CARD = 12;
+
+/** A folga no fim do conteúdo chega pelo menos a `minimo` (soma à que já houver, nunca diminui com o card aberto). */
+function garantirFolga(minimo: number) {
+  const raiz = document.documentElement;
+  const atual = parseFloat(raiz.style.getPropertyValue(VARIAVEL_DA_FOLGA)) || 0;
+  if (atual < minimo) raiz.style.setProperty(VARIAVEL_DA_FOLGA, `${Math.ceil(minimo)}px`);
+}
+
+/** Ajuda fechada: a folga do fim fica só no tanto à vista (`folgaQueFica`). Devolve se ainda sobrou folga. */
+function apararFolga(): boolean {
+  const raiz = document.documentElement;
+  const atual = parseFloat(raiz.style.getPropertyValue(VARIAVEL_DA_FOLGA)) || 0;
+  if (atual <= 0) return false;
+  const fica = folgaQueFica(atual, raiz.scrollHeight, window.scrollY, window.innerHeight);
+  if (fica <= 0) raiz.style.removeProperty(VARIAVEL_DA_FOLGA);
+  else if (fica < atual) raiz.style.setProperty(VARIAVEL_DA_FOLGA, `${fica}px`);
+  return fica > 0;
 }
 
 /** O botão está à vista, abaixo da barra do topo, e o card não vai cobri-lo. */
@@ -482,22 +536,98 @@ function regiaoDoPonto(botao: HTMLElement | null): HTMLElement | null {
   return el && el.isConnected && el.getClientRects().length > 0 ? el : null;
 }
 
+/** Campos de verdade (o que se preenche ou escolhe), para medir as peças da região (a regra do rótulo usa `ehCampo`). */
+const CONTROLES = 'input:not([type=hidden]), select, textarea';
+
 /**
- * O que precisa ficar à vista ao abrir a etapa: o botão do ponto e, quando cabe acima do card (ou na tela, com o card ao lado),
- * a região inteira que ele explica (decisão 480: o card não cobre o campo nem os botões de escolha). Não cabendo, mostra a
- * região a partir do topo, sem tirar o botão de vista; sem região, só o botão (como antes).
+ * A região que o ponto explica quando o botão não diz (`data-alvo`), pela posição dele na página (decisão 521, regra pura
+ * `regiaoPelaPosicao`; antes, sem `data-alvo`, só o botão contava e o card cobria o campo ao lado dele): o painel do
+ * cabeçalho ("Conta a pagar", o primeiro canal do dia, o "Despesa" do detalhe), o grupo da legenda, ou o campo do rótulo.
  */
-function retanguloAVista(botao: HTMLElement, card: DOMRect): { top: number; bottom: number; left: number; right: number } {
+function regiaoImplicita(botao: HTMLElement): { regiao: HTMLElement; por: OrigemDaRegiao } | null {
+  const subindo: HTMLElement[] = [];
+  for (let el = botao.parentElement; el && subindo.length < 4; el = el.parentElement) subindo.push(el);
+  const achada = regiaoPelaPosicao(
+    subindo.map((el) => ({
+      tag: el.tagName,
+      dentro: () =>
+        Array.from(el.querySelectorAll('*'), (d) => ({
+          tag: d.tagName,
+          tipo: d.getAttribute('type'),
+          antesDoBotao: vemAntes<Node>(d, botao),
+          outroPonto: d !== botao && d.hasAttribute('data-ponto'),
+        })),
+    })),
+  );
+  return achada ? { regiao: subindo[achada.indice], por: achada.por } : null;
+}
+
+/** Do elemento tocado até a região (sem ela), para saber se o toque caiu num campo, botão, link ou rótulo. */
+function cadeiaAte(tocado: Element, regiao: Element) {
+  const cadeia: { tag: string; temHref: boolean; papel: string | null }[] = [];
+  for (let el: Element | null = tocado; el && el !== regiao; el = el.parentElement) cadeia.push({ tag: el.tagName, temHref: el.hasAttribute('href'), papel: el.getAttribute('role') });
+  return cadeia;
+}
+
+/** O que o card deixa à vista ao abrir, e por onde veio: a região do `data-alvo` (480) ou, sem ele, a da posição do botão. */
+function regiaoParaVer(botao: HTMLElement): { regiao: HTMLElement; por: OrigemDaRegiao } | null {
+  const doAlvo = regiaoDoPonto(botao);
+  const achada = doAlvo ? { regiao: doAlvo, por: 'alvo' as const } : regiaoImplicita(botao);
+  return achada && achada.regiao.isConnected && achada.regiao.getClientRects().length > 0 ? achada : null;
+}
+
+/**
+ * As partes do alvo que de fato aparecem (linhas de texto e campos), para saber o que cai na coluna do card: no computador,
+ * o painel ocupa a largura toda, mas o campo à esquerda não fica sob o card da direita. Região grande demais para medir peça
+ * por peça: conta a caixa dela inteira.
+ */
+function pecasDaRegiao(regiao: HTMLElement): Faixa2D[] {
+  const caixa = regiao.getBoundingClientRect();
+  const pecas: Faixa2D[] = [];
+  const andar = document.createTreeWalker(regiao, NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT);
+  const trecho = document.createRange();
+  let vistos = 0;
+  for (let no = andar.nextNode(); no; no = andar.nextNode()) {
+    if (++vistos > 800) return [caixa];
+    const el = no.nodeType === Node.TEXT_NODE ? no.parentElement : (no as Element);
+    // O que não aparece (dentro de um "abrir" fechado, escondido) não conta.
+    if (!el || el.checkVisibility?.() === false) continue;
+    let rects: ArrayLike<DOMRect> = [];
+    if (no.nodeType === Node.TEXT_NODE) {
+      if (!no.textContent?.trim()) continue;
+      trecho.selectNodeContents(no);
+      rects = trecho.getClientRects();
+    } else if (el.matches(`${CONTROLES}, button, img, svg`)) rects = [el.getBoundingClientRect()];
+    // Texto só para leitor de tela tem 1 px: não conta. O que transborda da região fica no limite dela.
+    for (const r of Array.from(rects)) {
+      const p = { top: Math.max(r.top, caixa.top), bottom: Math.min(r.bottom, caixa.bottom), left: Math.max(r.left, caixa.left), right: Math.min(r.right, caixa.right) };
+      if (r.width > 1 && r.height > 1 && p.bottom > p.top && p.right > p.left) pecas.push(p);
+    }
+  }
+  return pecas;
+}
+
+interface Faixa2D extends Faixa {
+  left: number;
+  right: number;
+}
+
+/**
+ * Mede o alvo do ponto em relação ao card (posições na janela): o alvo inteiro (botão + região), a parte dele na coluna do
+ * card e onde termina o começo (o cabeçalho do painel, a legenda, ou o botão).
+ */
+function medirAlvo(botao: HTMLElement, card: DOMRect): Pick<MedidasDoCard, 'alvo' | 'botao' | 'naColuna' | 'comeco'> {
   const b = botao.getBoundingClientRect();
-  const regiao = regiaoDoPonto(botao);
-  if (!regiao) return b;
-  const rr = regiao.getBoundingClientRect();
-  const u = { top: Math.min(b.top, rr.top), bottom: Math.max(b.bottom, rr.bottom), left: Math.min(b.left, rr.left), right: Math.max(b.right, rr.right) };
-  const naMesmaColuna = u.right > card.left && u.left < card.right;
-  const espaco = (naMesmaColuna ? card.top - 12 : window.innerHeight - 12) - (TOPO_LIVRE_PX + 12);
-  if (u.bottom - u.top <= espaco) return u;
-  const corte = u.top + Math.max(espaco, 0);
-  return b.bottom <= corte ? { ...u, bottom: corte } : b;
+  const regiao = regiaoParaVer(botao)?.regiao ?? null;
+  const caixa = regiao?.getBoundingClientRect() ?? null;
+  const alvo = uniao(caixa ? [b, caixa] : [b]) as Faixa;
+  const pecas = [b, ...(regiao ? pecasDaRegiao(regiao) : [])];
+  const naColunaDoCard = pecas.filter((r) => r.right > card.left && r.left < card.right);
+  let naColuna = uniao(naColunaDoCard);
+  // A última peça está na coluna: o respiro e a borda do painel embaixo dela também (o painel não fica cortado pelo card).
+  if (naColuna && naColuna.bottom >= Math.max(...pecas.map((r) => r.bottom)) - 1) naColuna = { top: naColuna.top, bottom: alvo.bottom };
+  const cabecalho = regiao?.querySelector(':scope > header, :scope > legend')?.getBoundingClientRect();
+  return { alvo, botao: { top: b.top, bottom: b.bottom }, naColuna, comeco: Math.max(b.bottom, cabecalho?.bottom ?? -Infinity) };
 }
 
 function primeiroVisivel(els: Set<HTMLElement>): HTMLElement | null {
@@ -513,6 +643,7 @@ function CardDeAjuda({
   verTudo,
   automatico,
   rolar,
+  pedidoDeFoco,
   origem,
   nunca,
   progresso,
@@ -531,6 +662,8 @@ function CardDeAjuda({
   automatico: boolean;
   /** A página pode subir para o botão do ponto ficar à vista. */
   rolar: boolean;
+  /** Muda quando o botão deste mesmo ponto é acionado com o card aberto: o foco vai para o título. */
+  pedidoDeFoco: number;
   origem: RefObject<HTMLElement | null>;
   nunca: FormularioNunca | null;
   /** "2 de 5" (só quando a tela tem mais de um ponto à vista). */
@@ -594,25 +727,31 @@ function CardDeAjuda({
   }, []);
 
   const posicionar = useCallback(() => {
-    const alvo = origem.current;
+    const botao = origem.current;
     const c = card.current;
-    if (!alvo?.isConnected || !c) return;
-    // A região explicada inteira acima do card (4ª conferência: no celular o card cobria o frete e os botões da unidade): se não
-    // cabe com a altura de sempre, o card encolhe até o mínimo (o texto rola dentro dele; topo e rodapé ficam à vista).
-    // O teto entra como variável do CSS, sem vencer o limite por altura da tela (o teclado abrindo encolhe a tela depois).
+    if (!botao?.isConnected || !c) return;
+    // O alvo do ponto (o botão e a região que ele explica: a do `data-alvo` ou, sem ela, o painel ou o campo do botão) à vista
+    // junto do card (decisão 521, regra pura em `ajuda-posicao.ts`): inteiro acima do card quando cabe, com o card encolhendo
+    // até o mínimo se preciso (o texto rola dentro dele; topo e rodapé ficam à vista); maior que a tela, pelo menos o começo
+    // (o cabeçalho). O teto entra como variável do CSS, sem vencer o limite por altura da tela (o teclado abrindo encolhe a
+    // tela depois).
     c.style.removeProperty('--ff-teto-do-card');
-    const teto = alturaQueDeixaARegiao(alvo, c.getBoundingClientRect(), tecladoAgora.current);
-    tetoDaRegiao.current = teto;
-    if (teto !== null) c.style.setProperty('--ff-teto-do-card', `${teto}px`);
     const rc = c.getBoundingClientRect();
-    const r = retanguloAVista(alvo, rc);
+    const p = posicaoDoCard({
+      janela: window.innerHeight - tecladoAgora.current,
+      topoLivre: TOPO_LIVRE_PX,
+      margem: MARGEM_DO_CARD,
+      card: rc.height,
+      cardMinimo: ALTURA_MINIMA_DO_CARD,
+      ...medirAlvo(botao, rc),
+    });
+    tetoDaRegiao.current = p.teto;
+    if (p.teto !== null) c.style.setProperty('--ff-teto-do-card', `${p.teto}px`);
+    // Com o card aberto, a página continua rolando até o fim do conteúdo passar acima dele (a folga sai ao fechar).
+    garantirFolga(c.getBoundingClientRect().height + 2 * MARGEM_DO_CARD);
     const comportamento: ScrollBehavior = window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
-    // O botão tem de ficar acima do card quando o card está na mesma coluna (celular em pé); com o card ao lado (computador,
-    // celular deitado), basta ficar dentro da tela.
-    const naMesmaColuna = r.right > rc.left && r.left < rc.right;
-    const limiteDeBaixo = naMesmaColuna ? rc.top - 12 : window.innerHeight - tecladoAgora.current - 12;
-    if (r.bottom > limiteDeBaixo) rolarPor(r.bottom - limiteDeBaixo + 12, comportamento);
-    else if (r.top < TOPO_LIVRE_PX) window.scrollBy({ top: r.top - TOPO_LIVRE_PX - 12, behavior: comportamento });
+    if (p.rolar > 0) rolarPor(p.rolar, comportamento);
+    else if (p.rolar < 0) window.scrollBy({ top: p.rolar, behavior: comportamento });
   }, [origem, rolarPor]);
 
   /** Quem digita não perde o campo: se o card (ou o teclado) passou a cobri-lo, a página sobe só o necessário, sem animação. */
@@ -631,6 +770,13 @@ function CardDeAjuda({
     if (rolar) posicionar();
     if (!automatico) titulo.current?.focus({ preventScroll: true });
   }, [automatico, rolar, posicionar]);
+
+  // O botão do mesmo ponto de novo (Enter nele depois de sair do card pelo Tab): o foco volta ao título, sem refazer nada.
+  // Só a mudança conta: o card que abre (inclusive sozinho, sem roubar o foco) não reage ao pedido de um card anterior.
+  const pedidoAoAbrir = useRef(pedidoDeFoco);
+  useEffect(() => {
+    if (pedidoDeFoco !== pedidoAoAbrir.current) titulo.current?.focus({ preventScroll: true });
+  }, [pedidoDeFoco]);
 
   // Girar o aparelho ou mudar a LARGURA da janela com o card aberto (3ª conferência da 479): o alvo volta para cima do card.
   // Só a altura mudando (a barra de endereço do celular recolhendo enquanto a pessoa rola, o teclado abrindo) não reposiciona:
@@ -671,12 +817,15 @@ function CardDeAjuda({
     if (estaDigitando()) manterCampoAVista();
   }, [teclado, manterCampoAVista]);
 
-  // Há mais texto abaixo da dobra do card (tela baixa): uma linha discreta avisa que dá para rolar.
+  // Há mais texto abaixo da dobra do card (tela baixa): uma linha discreta avisa que dá para rolar. Texto que rola (card
+  // encolhido) também entra no Tab, com nome, para quem usa teclado conseguir rolá-lo (revisão da 521).
   const corpo = useRef<HTMLDivElement>(null);
   const [temMais, setTemMais] = useState(false);
+  const [rolavel, setRolavel] = useState(false);
   const medirCorpo = useCallback(() => {
     const el = corpo.current;
     setTemMais(!!el && el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+    setRolavel(!!el && el.scrollHeight - el.clientHeight > 4);
   }, []);
   useEffect(() => {
     medirCorpo();
@@ -701,6 +850,23 @@ function CardDeAjuda({
     return () => window.removeEventListener('keydown', tecla);
   }, [aoEncerrar, automatico]);
 
+  // Tab no card (decisão 521, revisão): o card é não modal e o foco não fica preso nele. Depois do último botão do card, e
+  // antes do primeiro (inclusive do título), o foco vai ao botão do ponto, junto do campo explicado: dali a pessoa segue a
+  // página e faz o que o card pede (480), sem saltar para o "Pular para o conteúdo" do topo. Só sem esse botão (desligado ou
+  // fora da página) o Tab circula no card. Com o foco num campo da página (abertura automática), o Tab é o da página.
+  function aoTeclar(e: TeclaNoReact<HTMLDivElement>) {
+    if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey || !card.current) return;
+    const foco = document.activeElement;
+    if (!foco) return;
+    const botoes = Array.from(card.current.querySelectorAll<HTMLElement>(FOCAVEIS_DO_CARD)).filter((el) => el.getClientRects().length > 0);
+    const botaoDoPonto = origem.current;
+    // `:disabled` pega também o botão dentro de um grupo desligado (parceiro bloqueado), que não tem o atributo; e, se o foco
+    // não pegar nele mesmo assim, `tabNoCard` circula no card (a tecla nunca fica parada).
+    const podeReceber = !!botaoDoPonto?.isConnected && botaoDoPonto.getClientRects().length > 0 && !botaoDoPonto.matches(':disabled');
+    const focado = tabNoCard<HTMLElement>(botoes, foco as HTMLElement, podeReceber ? botaoDoPonto : null, e.shiftKey, () => document.activeElement);
+    if (focado) e.preventDefault();
+  }
+
   function aoEnviarNunca(e: FormEvent<HTMLFormElement>) {
     if (!nunca) {
       e.preventDefault();
@@ -717,6 +883,7 @@ function CardDeAjuda({
       aria-labelledby={`${id}-t`}
       aria-describedby={progresso ? `${id}-p` : undefined}
       data-ponto-de-ajuda={ponto.id}
+      onKeyDown={aoTeclar}
       className="fixed inset-x-3 z-40 flex max-h-[min(60dvh,28rem,var(--ff-teto-do-card,100dvh))] flex-col [@media(max-height:600px)]:max-h-[min(50dvh,var(--ff-teto-do-card,100dvh))] rounded-[14px] border border-linha-forte bg-painel shadow-[0_12px_32px_-12px_rgba(10,10,10,0.35)] sm:inset-x-auto sm:right-5 sm:w-[min(380px,calc(100vw-2.5rem))]"
       style={{ bottom: teclado > 0 ? `calc(max(0.75rem, env(safe-area-inset-bottom)) + ${teclado}px)` : 'max(0.75rem, env(safe-area-inset-bottom))' }}
     >
@@ -754,7 +921,14 @@ function CardDeAjuda({
         </button>
       </div>
 
-      <div ref={corpo} onScroll={medirCorpo} className="min-h-0 overflow-y-auto px-4 pb-4">
+      <div
+        ref={corpo}
+        onScroll={medirCorpo}
+        tabIndex={rolavel ? 0 : undefined}
+        role={rolavel ? 'region' : undefined}
+        aria-label={rolavel ? `Texto da ajuda: ${ponto.titulo}` : undefined}
+        className="min-h-0 overflow-y-auto px-4 pb-4"
+      >
         <div className="mt-2 space-y-1.5 text-[14px] leading-relaxed text-suave">
           {ponto.blocos.map((t, n) => (
             <p key={n}>{t}</p>
