@@ -130,6 +130,11 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     return f;
   };
   const idDa = (url: string, depoisDe: string) => url.split(depoisDe)[1].split('?')[0];
+  /** Decisão 516: onde começa e termina o <details> do histórico "Pedidos de impressão" no HTML da emissão. */
+  const blocoDosPedidos = (h: string) => {
+    const ini = h.lastIndexOf('<details', h.indexOf('>Pedidos de impressão<'));
+    return { ini, fim: h.indexOf('</details>', ini), aberto: /^<details[^>]*\sopen/.test(h.slice(ini)) };
+  };
 
   beforeAll(async () => {
     const host = new URL(URL_TESTE!).hostname;
@@ -275,6 +280,13 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     expect(zebra.zpl).toMatch(/^\^XA\n\^CI28\n\^PW480\n\^LL320/);
     expect(zebra.zpl).toContain('^PQ3,0,1,Y');
     expect(zebra.situacao).toBe('PREPARADA');
+    // Decisão 516: o histórico de pedidos chega recolhido; a Zebra sem resposta fica à vista, FORA do <details>.
+    const semResposta = await pagina(ErpEmissaoPage({ params: { lojaId: ids.vp, etiquetaId: ids.etiqueta }, searchParams: {} }));
+    const b1 = blocoDosPedidos(semResposta);
+    expect(b1).toMatchObject({ ini: expect.any(Number), aberto: false });
+    expect(b1.ini).toBeGreaterThan(-1);
+    expect(semResposta.indexOf('1 pedido de impressão ficou sem resultado.')).toBeGreaterThan(-1);
+    expect(semResposta.indexOf('1 pedido de impressão ficou sem resultado.')).toBeLessThan(b1.ini);
     expect(await daSessao.acaoResultadoDaImpressao(ids.vp, zebra.id, 'ENVIADA', '')).toMatchObject({ ok: true });
     const papel = await daSessao.acaoPedirImpressao(ids.vp, ids.etiqueta, { copias: '2', transporte: 'PAPEL', resolucao: '203', envio: chave() });
     if (!papel.ok) throw new Error(JSON.stringify(papel));
@@ -298,10 +310,25 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     expect(depois).toContain('Enviada à impressora');
     expect(depois).toContain('Papel aberto');
     expect(depois).not.toMatch(/Reimpressão|Primeira impressão|Arquivo gerado/);
+    // Enviada e papel aberto: nenhum aviso falso de falha ou de falta de resposta.
+    expect(depois).not.toMatch(/pedidos? de impressão (falh|ficou sem|ficaram sem)/);
     // O histórico da loja: 2 pedidos, 5 etiquetas, 3 enviadas, 2 em arquivo ou papel.
     const hh = texto(await pagina(ErpHistoricoDeImpressoesDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} })));
     expect(hh).toMatch(/Pedidos 2 .*Etiquetas 5 .*Enviadas à Zebra 3 .*Já imprimi 0 /);
     expect(hh).not.toContain('R$');
+    // Decisão 516: a Zebra recusou um pedido; a contagem fica fora do histórico recolhido e o motivo continua dentro dele.
+    const recusado = await daSessao.acaoPedirImpressao(ids.vp, ids.etiqueta, { copias: '1', transporte: 'BROWSER_PRINT', resolucao: '203', envio: chave() });
+    if (!recusado.ok) throw new Error(JSON.stringify(recusado));
+    expect(await daSessao.acaoResultadoDaImpressao(ids.vp, recusado.id, 'FALHOU', 'Zebra sem papel')).toMatchObject({ ok: true });
+    const comFalha = await pagina(ErpEmissaoPage({ params: { lojaId: ids.vp, etiquetaId: ids.etiqueta }, searchParams: {} }));
+    const b2 = blocoDosPedidos(comFalha);
+    expect(b2.ini).toBeGreaterThan(-1);
+    expect(b2.aberto).toBe(false);
+    expect(comFalha.indexOf('1 pedido de impressão falhou.')).toBeGreaterThan(-1);
+    expect(comFalha.indexOf('1 pedido de impressão falhou.')).toBeLessThan(b2.ini);
+    expect(comFalha.indexOf('Zebra sem papel')).toBeGreaterThan(b2.ini);
+    expect(comFalha.indexOf('Zebra sem papel')).toBeLessThan(b2.fim);
+    expect(comFalha).toContain('3 registros exibidos');
     // A impressora: a tela de configuração e o teste (nada gravado).
     expect(texto(await pagina(ErpImpressoraPage()))).toContain('Como ligar a Zebra');
     const teste = await daSessao.acaoZplDeTeste('E60X60', '300');

@@ -7,13 +7,14 @@
  */
 
 import Link from 'next/link';
-import type { EmissaoDaTela } from '@/lib/erp/etiquetas';
+import type { EmissaoDaTela, PedidoDeImpressao } from '@/lib/erp/etiquetas';
 import { FORMATOS, NOME_DO_PEDIDO, quandoNaTela, seloDoPedido, type SituacaoDaImpressao } from '@/lib/erp/etiqueta-campos';
 import { COR } from '@/lib/erp/modulos';
 import { PageHeader } from '../../ui/cabecalho';
-import { Aviso, Contagem, Painel, Selo, Vazio, type Tom } from '../../ui/superficies';
+import { Aviso, Painel, Selo, Vazio, type Tom } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { Voltar } from '../cadastro/partes';
+import { HistoricoRecolhivel } from '../historico/historico-recolhivel';
 import type { AcaoDeConfirmar, AcaoDePedir, AcaoDeResultado } from './executar';
 import { PainelDeImpressao } from './painel-impressao';
 import { AvisoDeBloqueio, SeloDaValidade } from './partes';
@@ -91,12 +92,53 @@ export function TelaDaEmissao({
         </div>
       </div>
 
-      <Painel titulo="Pedidos de impressão" subtitulo="Quem pediu, quando, quantas cópias, como e o que aconteceu" acessorio={<Contagem>{d.pedidos.length}</Contagem>} semRespiro>
-        {d.pedidos.length === 0 ? (
+      <PedidosDaEmissao chave={aqui} pedidos={d.pedidos} />
+      <p className="text-[12px] text-suave">
+        “Enviada à impressora” quer dizer que o Browser Print da Zebra recebeu: confira o papel. Baixar o arquivo ou abrir o papel não tira a etiqueta de “Esperando a impressora”: depois que sair, toque em “Já imprimi”.{' '}
+        <Link href={hrefImpressora} className="inline-flex min-h-11 items-center underline decoration-linha-forte underline-offset-4">
+          Impressora deste computador
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Visão C (decisão 516): o que deu errado não fica escondido no histórico recolhido. Conta pelo mesmo selo da linha:
+ * "Falhou" e "Sem resultado" (a Zebra não respondeu); o que alguém confirmou com "Já imprimi" não conta.
+ */
+export function pendenciasDosPedidos(pedidos: readonly Pick<PedidoDeImpressao, 'transporte' | 'situacao' | 'confirmadaEm'>[]) {
+  const textos = pedidos.map((p) => seloDoPedido(p).texto);
+  return { falharam: textos.filter((t) => t === 'Falhou').length, semResultado: textos.filter((t) => t === 'Sem resultado').length };
+}
+
+function avisoDosPedidos({ falharam, semResultado }: ReturnType<typeof pendenciasDosPedidos>): { tom: Tom; titulo: string; apoio: string } | null {
+  if (falharam === 0 && semResultado === 0) return null;
+  const partes: string[] = [];
+  if (falharam > 0) partes.push(falharam === 1 ? '1 pedido de impressão falhou' : `${falharam} pedidos de impressão falharam`);
+  if (semResultado > 0) {
+    const quem = falharam > 0 ? '' : semResultado === 1 ? ' pedido de impressão' : ' pedidos de impressão';
+    partes.push(`${semResultado}${quem} ${semResultado === 1 ? 'ficou' : 'ficaram'} sem resultado`);
+  }
+  const apoio = [
+    falharam > 0 ? 'O motivo de cada um está em “Pedidos de impressão”, logo abaixo.' : null,
+    semResultado > 0 ? 'Sem resultado é a Zebra que não respondeu: pode ter saído, confira o papel.' : null,
+  ].filter(Boolean).join(' ');
+  return { tom: falharam > 0 ? 'erro' : 'alerta', titulo: `${partes.join(' e ')}.`, apoio };
+}
+
+/** Os pedidos desta etiqueta: histórico recolhido ao entrar; falha e falta de resposta ficam à vista, fora dele. */
+export function PedidosDaEmissao({ chave, pedidos }: { chave: string; pedidos: PedidoDeImpressao[] }) {
+  const aviso = avisoDosPedidos(pendenciasDosPedidos(pedidos));
+  return (
+    <>
+      {aviso && <Aviso tom={aviso.tom} titulo={aviso.titulo}>{aviso.apoio}</Aviso>}
+      <HistoricoRecolhivel chave={chave} titulo="Pedidos de impressão" subtitulo="Quem pediu, quando, quantas cópias, como e o que aconteceu" quantidade={pedidos.length} semRespiro>
+        {pedidos.length === 0 ? (
           <Vazio>Esta etiqueta ainda não foi para a impressora.</Vazio>
         ) : (
           <ul className="divide-y divide-linha">
-            {d.pedidos.map((p) => {
+            {pedidos.map((p) => {
               const selo = seloDoPedido(p);
               return (
                 <li key={p.id} className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1.5 px-4 py-3 text-sm sm:px-5">
@@ -120,13 +162,7 @@ export function TelaDaEmissao({
             })}
           </ul>
         )}
-      </Painel>
-      <p className="text-[12px] text-suave">
-        “Enviada à impressora” quer dizer que o Browser Print da Zebra recebeu: confira o papel. Baixar o arquivo ou abrir o papel não tira a etiqueta de “Esperando a impressora”: depois que sair, toque em “Já imprimi”.{' '}
-        <Link href={hrefImpressora} className="inline-flex min-h-11 items-center underline decoration-linha-forte underline-offset-4">
-          Impressora deste computador
-        </Link>
-      </p>
-    </div>
+      </HistoricoRecolhivel>
+    </>
   );
 }
