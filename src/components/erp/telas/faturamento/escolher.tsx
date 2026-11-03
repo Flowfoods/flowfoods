@@ -92,7 +92,7 @@ export function TelaEscolherODia({
               </button>
             </form>
           </Painel>
-          <Painel titulo="Atalhos" subtitulo="Hoje e ontem, direto na loja." semRespiro acessorio={<PontoDeAjuda ponto="atalhos" />}>
+          <Painel titulo="Atalhos" subtitulo="Ontem e hoje, direto na loja." semRespiro acessorio={<PontoDeAjuda ponto="atalhos" />}>
             <ul className="divide-y divide-linha">
               {lojas.map((l) => (
                 <li key={l.id} className="flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2 sm:px-5">

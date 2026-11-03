@@ -477,6 +477,13 @@ describe.each(AREAS.map((a) => [a.nome, a]))('decisão 519 · âncoras na tela r
     expect(ancora(h, 'data')).toBeGreaterThan(data);
     expect(ancora(h, 'data')).toBeLessThan(h.indexOf('id="data"', data + 20));
     noCabecalho(h, 'Atalhos', 'atalhos');
+    // P3 do QA da 519 (corrigido na 520): o subtítulo segue a ordem dos links e do card, "Ontem e hoje".
+    expect(h).toContain('Ontem e hoje, direto na loja.');
+    expect(h).not.toContain('Hoje e ontem');
+    expect(h.indexOf('>Ontem</a>')).toBeGreaterThan(-1);
+    expect(h.indexOf('>Ontem</a>')).toBeLessThan(h.indexOf('>Hoje</a>'));
+    expect(card(alcance, 'faturamento-lancar', 'atalhos').startsWith('Cada atalho')).toBe(true);
+    expect(entradaPorChave('faturamento-lancar')?.pontos?.find((p) => p.id === 'atalhos')?.titulo).toBe('Ontem e hoje');
   });
 });
 
