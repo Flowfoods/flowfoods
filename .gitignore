@@ -22,3 +22,10 @@ tsconfig.tsbuildinfo
 
 # Estado local do oh-my-claudecode (orquestração dos agentes)
 .omc/
+
+# LGPD (02/11/2026): em clientes/ só entra .md — planilha, compactado, dump,
+# imagem ou PDF podem carregar dado pessoal de terceiros. Quem força com
+# `git add -f` cai no teste tests/clientes-custodia.test.ts.
+/clientes/**
+!/clientes/**/
+!/clientes/**/*.md

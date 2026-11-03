@@ -3,9 +3,11 @@
  *
  * É o entregável "md de contexto da marca" do CLAUDE.md, na versão crua: o
  * que o cliente disse, marcou e mandou, item a item, sem interpretação do
- * consultor. Vai para `clientes/<slug>/` no repositório e vira a base de
- * qualquer sessão futura sobre a casa: diagnóstico, plano de 90 dias,
- * relatório mensal.
+ * consultor. Fica no Notion privado da consultoria (o repositório é público:
+ * conferido em 03/11/2026) e vira a base de qualquer sessão futura sobre a
+ * casa: diagnóstico, plano de 90 dias, relatório mensal. Não leva o caminho do
+ * anexo no VPS: ele contém o código do link do cliente, que lê e apaga as
+ * respostas.
  *
  * Função pura, sem banco e sem relógio: recebe tudo pronto e devolve texto.
  * Ausência de dado é achado, então as marcações abrem o arquivo, antes das
@@ -138,7 +140,7 @@ export function gerarContextoMd(e: EntradaContexto): string {
           for (const a of arqs) {
             const tipoArq = ehAudio(a.nomeOriginal) ? 'áudio — transcrever e colar aqui' : 'arquivo';
             L.push(
-              `- \`${a.nomeOriginal}\` (${tipoArq}, ${formatarTamanho(a.tamanho)}, enviado ${dataHora(a.criadoEm)}, no VPS em \`${a.caminho}\`)`,
+              `- \`${a.nomeOriginal}\` (${tipoArq}, ${formatarTamanho(a.tamanho)}, enviado ${dataHora(a.criadoEm)}, guardado no Portal)`,
             );
           }
           L.push('');
@@ -161,7 +163,8 @@ export function gerarContextoMd(e: EntradaContexto): string {
 
   L.push('## Como usar');
   L.push('');
-  L.push('- Guardar em `clientes/<slug>/` no repositório; cada nova exportação é um arquivo novo, datado.');
+  L.push('- Guardar no Notion privado da consultoria, nunca no repositório (público); cada nova exportação é um arquivo novo, datado.');
+  L.push('- Dado pessoal de cliente final ou de funcionário que aparecer numa resposta não vai para sessão de IA nem para o Notion: só o agregado.');
   L.push('- Áudios: transcrever e colar como citação abaixo do item, com a data.');
   L.push('- Diagnóstico, plano de 90 dias e relatório mensal partem daqui e dos relatórios (iFood, PDV, financeiro).');
   L.push('');

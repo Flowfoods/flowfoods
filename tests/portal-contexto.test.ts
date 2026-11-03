@@ -48,10 +48,11 @@ describe('md de contexto do cliente', () => {
     // texto vira citação, linha a linha
     expect(md).toContain('> Voltar ao faturamento de 2025.\n> Cozinha sem os sócios no pico.');
 
-    // arquivos com tipo e caminho; áudio pede transcrição
+    // arquivos com tipo, sem o caminho do VPS (leva o código do link); áudio pede transcrição
     expect(md).toContain('`Vendas por canal.xlsx` (arquivo, 300 KB');
     expect(md).toContain('`Audio p1.1 25-09 18h20.webm` (áudio — transcrever e colar aqui');
-    expect(md).toContain('no VPS em `/data/portal/x/C/v.xlsx`');
+    expect(md).toContain('guardado no Portal');
+    expect(md).not.toContain('/data/portal/');
 
     // pendentes listados
     expect(md).toContain('## Pendentes');

@@ -96,9 +96,11 @@ em portal.consultoriaflowfoods.com.br. Este repo é o site/portal
 
 ## Contexto dos clientes
 
-`clientes/<slug>/contexto-<data>.md`: o que cada cliente respondeu no Portal,
-exportado do painel. Antes de trabalhar num cliente, leia o mais recente.
-Regras em `clientes/README.md`.
+`contexto-<data>.md`: o que cada cliente respondeu no Portal, exportado do
+painel. Antes de trabalhar num cliente, leia o mais recente. **O repositório
+está público (conferido em 03/11/2026): enquanto for, o contexto fica no Notion
+privado, não em `clientes/`.** Dado pessoal de cliente final ou de funcionário
+do cliente nunca entra em sessão de IA. Regras em `clientes/README.md`.
 
 ## Cliente ativo
 
