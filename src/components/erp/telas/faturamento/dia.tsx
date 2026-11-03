@@ -13,7 +13,7 @@ import { CANAIS } from '@/lib/erp/canal-campos';
 import { fraseDoNumero } from '@/lib/erp/faturamento-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
-import { comVoltaParaAHome } from '@/lib/erp/volta';
+import { comVoltaParaAHome, type VoltaParaAHome } from '@/lib/erp/volta';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { PageHeader } from '../../ui/cabecalho';
@@ -50,7 +50,7 @@ export function TelaDoDia({
    * Decisão 518: a volta para a Home, já conferida (`voltaParaAHome`). Viaja no Voltar para o mês, nos dias vizinhos e no
    * formulário, para o mês continuar oferecendo "Voltar para o início" depois de salvar. Nula = a tela de sempre.
    */
-  volta?: { href: string; rotulo: string } | null;
+  volta?: VoltaParaAHome | null;
 }) {
   const hoje = hojeNoRio();
   const mes = dia.data.slice(0, 7);

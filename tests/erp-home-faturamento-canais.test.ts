@@ -94,7 +94,7 @@ describe('Home · composição canônica do faturamento por canal', () => {
     expect(faturamentoAnalitico(leitura, { ...contexto, loja: { id: 'outra', nome: 'Outra' } })).toBeNull();
     const m = mes(); m.mes = '2026-09'; expect(composicao(m).estado).toBe('indisponivel');
     const n1 = faturamentoAnalitico({ estado: 'lido', dados: mes() }, { ...contexto, raiz: '/rodolfo/erp/casa-b' })!;
-    expect(n1.widget.detalhe.href).toBe('/rodolfo/erp/casa-b/faturamento?mes=2026-10&loja=lojab'); expect(n1.widget.composicaoPorCanal!.estado).toBe('ok');
+    expect(n1.widget.detalhe.href).toBe('/rodolfo/erp/casa-b/faturamento?mes=2026-10&loja=lojab&volta=%2Frodolfo%2Ferp%2Fcasa-b'); expect(n1.widget.composicaoPorCanal!.estado).toBe('ok');
   });
 });
 
@@ -105,7 +105,8 @@ describe('Home · composição sem consultas adicionais', () => {
   it('uma única obterMes alimenta KPI, série, complementos e composição', async () => {
     vi.mocked(obterMes).mockResolvedValueOnce(mes());
     const p = await painelDoDia(cliente, contexto.alcance, '/erp', contexto.hoje, visao);
-    expect(obterMes).toHaveBeenCalledTimes(1); expect(cliente.transacao).not.toHaveBeenCalled();
+    // Decisão 518 (revisão): uma leitura por mês. A do mês corrente alimenta tudo; a do mês anterior só conta as faltas dele.
+    expect(vi.mocked(obterMes).mock.calls.map((c) => c[2].mes)).toEqual(['2026-10', '2026-09']); expect(cliente.transacao).not.toHaveBeenCalled();
     if (p.analitico?.tipo !== 'loja') throw new Error('Loja esperada');
     expect(p.analitico.widgets.find(w => w.familia === 'faturamento')).toMatchObject({ composicaoPorCanal: { estado: 'ok', totalCentavos: 40000 } });
   });

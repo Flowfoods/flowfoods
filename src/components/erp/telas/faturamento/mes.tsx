@@ -26,10 +26,10 @@ import { dataCurta } from './formato';
 import { FRASE_DO_ESTADO, serieDoMes } from '@/lib/erp/grafico';
 import { GraficoDeColunas, type PontoDoGrafico } from '../../ui/grafico-colunas';
 import { rotuloDoEscopo } from '@/lib/erp/visao';
-import { comVoltaParaAHome } from '@/lib/erp/volta';
+import { comVoltaParaAHome, type VoltaParaAHome } from '@/lib/erp/volta';
 
 /** Decisão 518: a volta para a Home, já conferida pela página (`voltaParaAHome`); nula = a tela de sempre. */
-type VoltaDaHome = { href: string; rotulo: string } | null | undefined;
+type VoltaDaHome = VoltaParaAHome | null | undefined;
 
 const SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const inteiro = (n: number) => n.toLocaleString('pt-BR');
@@ -324,7 +324,7 @@ export function TelaDoMes({
               <BotaoOuMotivo href={`${base}/importar`} bloqueio={bloqueio} variante="secundario">
                 Importar planilha
               </BotaoOuMotivo>
-              <BotaoOuMotivo href={`${base}/lancar`} bloqueio={bloqueio} variante="primario">
+              <BotaoOuMotivo href={comVoltaParaAHome(`${base}/lancar`, volta)} bloqueio={bloqueio} variante="primario">
                 Lançar o dia
               </BotaoOuMotivo>
             </>
@@ -373,8 +373,8 @@ export function TelaDoMes({
       ) : (
         <>
           {faltas > 0 && (
-            <Aviso tom="alerta" titulo={`${faltas} ${faltas === 1 ? 'canal sem lançamento' : 'canais sem lançamento'} neste mês.`}>
-              {lojaAberta ? 'Os dias marcados em vermelho têm canal que a loja vende e ninguém lançou.' : 'Abra a loja para ver os dias marcados em vermelho.'}
+            <Aviso tom="alerta" titulo={`${faltas.toLocaleString('pt-BR')} ${faltas === 1 ? 'lançamento faltando' : 'lançamentos faltando'} neste mês.`}>
+              {lojaAberta ? 'Os dias marcados em vermelho têm canal que a loja vende e ninguém lançou. Cada canal conta um por dia.' : 'Cada canal conta um por dia. Abra a loja para ver os dias marcados em vermelho.'}
             </Aviso>
           )}
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">

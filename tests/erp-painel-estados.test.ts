@@ -116,7 +116,7 @@ describe('H1 · cada fonte tem estado independente e conserva o contexto autoriz
     vi.mocked(obterMes).mockResolvedValueOnce(faturamento(700_000, 3));
     const p = await ler();
     expect(p.estados?.map((e) => e.estado)).toEqual(['parcial', 'ok', 'ok']);
-    expect(p.estados?.[0].mensagem).toContain('3 canais sem lançamento');
+    expect(p.estados?.[0].mensagem).toContain('3 lançamentos faltando neste mês');
     expect(p.indicadores.find((i) => i.chave === 'cardapio')?.valor).toEqual({ tipo: 'fracao', de: 1, total: 2 });
     expect(p.indicadores.find((i) => i.chave === 'estoque')?.valor).toEqual({ tipo: 'fracao', de: 0, total: 1 });
     expect(htmlDe(p).match(/>Parcial</g)).toHaveLength(1);
@@ -149,7 +149,7 @@ describe('H1 · cada fonte tem estado independente e conserva o contexto autoriz
     expect(html).toContain('Nenhuma loja disponível para faturamento neste contexto.');
     expect(html).toContain('Ainda não há pratos neste resumo da rede.');
     expect(html).toContain('Nenhuma loja disponível para estoque neste contexto.');
-    expect(html).toContain('href="/erp/faturamento?mes=2026-10&amp;loja=lojab"');
+    expect(html).toContain('href="/erp/faturamento?mes=2026-10&amp;loja=lojab&amp;volta=%2Ferp"');
     expect(html).toContain('href="/erp/fichas"');
     expect(html).toContain('href="/erp/estoque/lojab"');
     expect(html).not.toContain('R$');
@@ -168,7 +168,7 @@ describe('H1 · cada fonte tem estado independente e conserva o contexto autoriz
     const p = await ler();
     expect(Date.parse(p.consultadoEm!)).toBeGreaterThanOrEqual(antes);
     expect(Date.parse(p.consultadoEm!)).toBeLessThanOrEqual(Date.now());
-    expect(p.estados?.[0]).toMatchObject({ escopo: 'Loja B', referencia: 'Mês civil · outubro de 2026', href: '/erp/faturamento?mes=2026-10&loja=lojab' });
+    expect(p.estados?.[0]).toMatchObject({ escopo: 'Loja B', referencia: 'Mês civil · outubro de 2026', href: '/erp/faturamento?mes=2026-10&loja=lojab&volta=%2Ferp' });
     expect(p.estados?.[1]).toMatchObject({ escopo: 'Da rede', referencia: 'Situação atual do cadastro' });
     expect(p.estados?.[2]).toMatchObject({ escopo: 'Loja B', referencia: 'Posição atual', href: '/erp/estoque/lojab' });
     expect(htmlDe(p)).toContain('Resumo consultado em');

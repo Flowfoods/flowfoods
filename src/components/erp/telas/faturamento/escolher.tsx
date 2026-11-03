@@ -14,6 +14,7 @@ import { Painel, Vazio } from '../../ui/superficies';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { COR } from '@/lib/erp/modulos';
 import { formatarData } from '@/lib/erp/compra-campos';
+import { comVoltaParaAHome, type VoltaParaAHome } from '@/lib/erp/volta';
 import { Voltar } from '../cadastro/partes';
 
 export function TelaEscolherODia({
@@ -25,6 +26,7 @@ export function TelaEscolherODia({
   dataDigitada,
   erro,
   contexto,
+  volta,
 }: {
   base: string;
   lojas: { id: string; nome: string }[];
@@ -34,11 +36,13 @@ export function TelaEscolherODia({
   dataDigitada?: string;
   erro?: string;
   contexto: string;
+  /** Decisão 518: a volta da Home, já conferida pela página; segue no formulário, nos atalhos e no Voltar. */
+  volta?: VoltaParaAHome | null;
 }) {
   return (
     <div className="mx-auto max-w-2xl space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: 'Lançar o dia' }]} />
-      <Voltar href={base}>Voltar para o faturamento</Voltar>
+      <Voltar href={comVoltaParaAHome(base, volta)}>Voltar para o faturamento</Voltar>
       <PageHeader icone="dre" cor={COR.dre} titulo="Lançar o dia" subtitulo={`${contexto} · escolha a loja e a data`} />
       {lojas.length === 0 ? (
         <Painel>
@@ -48,6 +52,7 @@ export function TelaEscolherODia({
         <>
           <Painel titulo="Qual loja e qual dia">
             <form method="get" action={`${base}/lancar`} className="space-y-4">
+              {volta && <input type="hidden" name="volta" value={volta.href} />}
               <div>
                 <label htmlFor="loja" className={ROTULO}>
                   Loja
@@ -85,10 +90,10 @@ export function TelaEscolherODia({
                 <li key={l.id} className="flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2 sm:px-5">
                   <span className="min-w-0 truncate text-sm font-medium text-texto">{l.nome}</span>
                   <span className="flex gap-5">
-                    <Link href={`${base}/${l.id}/${ontem}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+                    <Link href={comVoltaParaAHome(`${base}/${l.id}/${ontem}`, volta)} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
                       Ontem
                     </Link>
-                    <Link href={`${base}/${l.id}/${hoje}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+                    <Link href={comVoltaParaAHome(`${base}/${l.id}/${hoje}`, volta)} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
                       Hoje
                     </Link>
                   </span>

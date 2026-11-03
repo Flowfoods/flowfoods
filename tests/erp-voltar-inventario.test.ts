@@ -171,6 +171,10 @@ describe('Inventário do Voltar: toda página do ERP tem retorno (Visão C)', ()
       for (const v of ['/erp/insumos', '/rodolfo/erp/outro', raiz === '/erp' ? '/rodolfo/erp/alfa' : '/erp', '%2Ferp', 'https://fora.test/erp', '//erp', raiz + '?sem-acesso=1']) {
         expect(temVoltarNoShell(rota, 'volta=' + encodeURIComponent(v)), `${rota} ${v}`).toBe(true);
       }
+      // Volta repetida: a página a recusa (chega como lista), então o shell também desenha o seu (nunca ficam os dois sem Voltar).
+      const uma = 'volta=' + encodeURIComponent(raiz);
+      expect(temVoltarNoShell(rota, `${uma}&${uma}`)).toBe(true);
+      expect(temVoltarNoShell(rota, `mes=2026-10&${uma}&volta=`)).toBe(true);
     }
     // Só o faturamento do mês cede: o dia tem o próprio "Voltar para o mês" e nunca esteve no shell.
     expect(inventario.filter((p) => CEDEM_A_VOLTA_DA_HOME.some((r) => r.test(p.rota))).map((p) => p.rota).sort()).toEqual(['/erp/faturamento', '/rodolfo/erp/alfa/faturamento']);

@@ -45,7 +45,7 @@ describe('H2 · faturamento é a projeção mensal existente com null/zero e cob
     expect(p.diario.serie?.dias.find((d) => d.data === HOJE)).toMatchObject({ total: null, estado: 'em-aberto' });
     expect(p.diario.serie?.dias.at(-1)).toMatchObject({ total: null, estado: 'futuro' });
     expect(JSON.stringify(p)).not.toMatch(/999999|989999|conferencia|Autor privado/);
-    expect(p.widget.detalhe.href).toBe('/erp/faturamento?mes=2026-10&loja=lojab');
+    expect(p.widget.detalhe.href).toBe('/erp/faturamento?mes=2026-10&loja=lojab&volta=%2Ferp');
   });
 
   it('nenhum lançamento preserva null e série com lacunas, enquanto zero registrado continua zero', () => {

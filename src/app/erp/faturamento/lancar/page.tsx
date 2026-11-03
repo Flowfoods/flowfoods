@@ -12,6 +12,7 @@ import { lerDataDoLancamento } from '@/lib/erp/faturamento-campos';
 import { lojasDoFaturamento } from '@/lib/erp/faturamento';
 import { rotuloDaVisao } from '@/lib/erp/visao';
 import { TelaEscolherODia } from '@/components/erp/telas/faturamento/escolher';
+import { comVoltaParaAHome, voltaParaAHome } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,14 +28,16 @@ export default async function ErpLancarODiaPage({ searchParams }: { searchParams
   const hoje = hojeNoRio();
   const loja = typeof searchParams.loja === 'string' ? searchParams.loja : undefined;
   const dataTxt = typeof searchParams.data === 'string' ? searchParams.data : undefined;
+  // Decisão 518: a volta da Home (só a Home exata desta área) segue do botão "Lançar o dia" até o dia escolhido.
+  const volta = voltaParaAHome(searchParams.volta, '/erp');
   let erro: string | undefined;
   if (loja && dataTxt !== undefined) {
     const d = lerDataDoLancamento(dataTxt, hoje);
     if (!lojas.some((l) => l.id === loja)) erro = 'Escolha uma das lojas da lista.';
     else if (!d.ok) erro = d.erro;
-    else redirect(`${BASE}/${loja}/${d.data}`);
+    else redirect(comVoltaParaAHome(`${BASE}/${loja}/${d.data}`, volta));
   }
-  if (lojas.length === 1 && dataTxt === undefined) redirect(`${BASE}/${lojas[0].id}/${hoje}`);
+  if (lojas.length === 1 && dataTxt === undefined) redirect(comVoltaParaAHome(`${BASE}/${lojas[0].id}/${hoje}`, volta));
   return (
     <TelaEscolherODia
       base={BASE}
@@ -44,6 +47,7 @@ export default async function ErpLancarODiaPage({ searchParams }: { searchParams
       ontem={somarDias(hoje, -1)}
       dataDigitada={dataTxt}
       erro={erro}
+      volta={volta}
       contexto={rotuloDaVisao(visao)}
     />
   );

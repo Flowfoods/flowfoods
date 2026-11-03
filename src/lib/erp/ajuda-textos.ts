@@ -21,7 +21,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'inicio',
     rotas: [''],
     titulo: 'Visão geral da operação',
-    versao: 10,
+    versao: 11,
     aula: [
       { texto: 'Escolha uma loja no alto para ver seus indicadores, a evolução do faturamento e os pontos de atenção. Cada número informa a loja e o período a que se refere.' },
       { texto: 'Sem dados não é zero: o painel avisa sobre ausências e falhas, e Atualizar resumo tenta carregar de novo.' },
@@ -62,7 +62,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Pontos de atenção',
         blocos: [
           { texto: 'Os pontos de atenção ficam em dois grupos: Completar dados, quando algo já aconteceu e falta registrar, e Resolver operação, quando falta fazer algo na casa. O grupo não diz o que é mais urgente.' },
-          { texto: 'Canais sem lançamento abrem o faturamento da mesma loja e do mesmo mês, e Voltar para o início traz você de volta. Abrir, voltar ou só olhar não tira o ponto da lista: ele sai quando a nova consulta ao faturamento não encontrar mais falta.', para: ['faturamento.ver'] },
+          { texto: 'Lançamentos faltando contam um para cada canal que a loja vende, em cada dia sem lançamento. O atalho abre o faturamento do mês da falta, na loja escolhida no alto ou na rede, e Voltar para o início traz você de volta.', para: ['faturamento.ver'] },
+          { texto: 'Abrir, voltar ou só olhar não tira o ponto da lista: ele sai quando a nova consulta ao faturamento não encontrar mais falta. O mês anterior aparece à parte enquanto tiver falta e ainda aceitar lançamento.', para: ['faturamento.ver'] },
           { texto: 'Se a consulta ao faturamento falhar, o ponto aparece como não conferido, sem número. Isso não quer dizer que o mês esteja completo.', para: ['faturamento.ver'] },
         ],
       },

@@ -122,7 +122,7 @@ describe.skipIf(!URL_TESTE)('Home · pedidos, atendimentos e ticket da fonte men
     expect(faturamentoAnalitico({ estado: 'lido', dados: ma }, contexto(ids.principal, sem))).toBeNull();
     expect(faturamentoAnalitico({ estado: 'lido', dados: mb }, contexto(ids.principal))!.widget).toMatchObject({ estado: 'indisponivel', valor: { valor: null }, complementos: { pedidos: null, atendimentos: null, ticketMedioCentavos: null } });
     const n1 = faturamentoAnalitico({ estado: 'lido', dados: ma }, contexto(ids.principal, dono([ids.principal]), '/rodolfo/erp/casa-a'))!;
-    expect(n1.widget.detalhe.href).toBe('/rodolfo/erp/casa-a/faturamento?mes=2026-10&loja=' + ids.principal);
+    expect(n1.widget.detalhe.href).toBe('/rodolfo/erp/casa-a/faturamento?mes=2026-10&loja=' + ids.principal + '&volta=%2Frodolfo%2Ferp%2Fcasa-a');
     expect(n1.widget.complementos).toMatchObject({ pedidos: 4, atendimentos: 8, ticketMedioCentavos: 25000 });
   });
 });

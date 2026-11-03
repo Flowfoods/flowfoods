@@ -18,7 +18,9 @@ import { comprasAnaliticas, lerComprasDaHome } from './home-compras';
 import { lerXmlAguardandoDaHome, xmlAguardandoDaHome, type XmlAguardandoHome } from './home-xml-aguardando';
 import { estoqueAnalitico, faturamentoAnalitico, producaoAnalitica, type AnaliticoDaHome, type LeituraHome, type WidgetAnaliticoHome } from './home-analitico';
 import { hojeNoRio } from './compra-campos';
-import { comVoltaParaAHome, voltaParaAHome } from './volta';
+import { mesVizinho } from './faturamento-campos';
+import { datasEmPeriodoFechado } from './periodo-trava';
+import { comVoltaParaAHome, voltaParaAHome, type VoltaParaAHome } from './volta';
 import type { ClienteDoParceiro } from './tenant';
 import type { Visao } from './visao';
 
@@ -61,6 +63,9 @@ export interface PendenciaDoDia {
   leitura?: 'confirmada' | 'nao_conferida';
 }
 
+/** Decisão 518 (revisão): toda pendência do ERP é classificada; só o painel do nível 1 (`PendenciaDoDia`) fica sem. */
+export type PendenciaDoErp = PendenciaDoDia & { natureza: NaturezaDaPendencia };
+
 export interface PainelDoDia {
   indicadores: IndicadorDoDia[];
   pendencias: PendenciaDoDia[];
@@ -96,9 +101,25 @@ const plural = (n: number, um: string, varios: string) => `${n.toLocaleString('p
 
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 
+/**
+ * Decisão 518 (revisão): as faltas de um mês que ainda aceitam lançamento. A conta é a do calendário (`obterMes`, a mesma
+ * do mês corrente), sem os dias de período FECHADO, que `lancarDia` recusa com a mesma leitura (`datasEmPeriodoFechado`).
+ * Sem falta no mês, nem consulta o período.
+ */
+async function faltasQueAindaAceitamLancamento(cliente: ClienteDoParceiro, alcance: Alcance, filtro: { mes: string; lojaId?: string }, hoje: string): Promise<number> {
+  const m = await obterMes(cliente, alcance, filtro, hoje);
+  if (!m.faltas) return 0;
+  const porDia = new Map<string, number>();
+  for (const l of m.lojas) for (const d of l.dias) if (d.faltam.length) porDia.set(d.data, (porDia.get(d.data) ?? 0) + d.faltam.length);
+  const fechadas = await datasEmPeriodoFechado(cliente, [...porDia.keys()]);
+  let faltas = 0;
+  for (const [data, n] of porDia) if (!fechadas.has(data)) faltas += n;
+  return faltas;
+}
+
 export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, base: string, hojeOuAgora: string | Date = new Date(), visao?: Visao): Promise<PainelDoDia> {
   const indicadores: IndicadorDoDia[] = [];
-  const pendencias: PendenciaDoDia[] = [];
+  const pendencias: PendenciaDoErp[] = [];
   // Um único relógio define mês, dia da lista e aprofundamento. A data textual
   // dos chamadores antigos fixa meio-dia UTC, que permanece no mesmo dia no Rio.
   const agora = typeof hojeOuAgora === 'string' ? new Date(`${hojeOuAgora}T12:00:00.000Z`) : hojeOuAgora;
@@ -112,12 +133,19 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
   const lojaId = visao?.tipo === 'loja' ? visao.lojaId : undefined;
   const alcanceDaVisao: Alcance = lojaId ? { ...alcance, lojas: [lojaId] } : alcance;
   const escopo = visao?.tipo === 'loja' ? visao.nome : alcance.lojas === 'todas' ? 'Rede Completa' : 'Lojas do seu acesso';
-  const queryFaturamento = new URLSearchParams({ mes });
-  if (lojaId) queryFaturamento.set('loja', lojaId);
-  else if (visao?.tipo === 'rede') queryFaturamento.set('rede', '1');
-  const faturamentoHref = base + '/faturamento?' + queryFaturamento.toString();
-  // Decisão 518: a pendência do faturamento leva a volta para esta Home (só a Home exata da área, conferida do outro lado).
-  const faturamentoDaPendencia = comVoltaParaAHome(faturamentoHref, voltaParaAHome(base, base));
+  // Decisão 518: todo caminho da Home para o faturamento (pendência, indicador e estado) leva a volta para esta Home (só a
+  // Home exata da área, conferida de novo do outro lado), para a mesma tela não ter dois Voltar diferentes.
+  const voltaDaHome: VoltaParaAHome | null = voltaParaAHome(base, base);
+  const faturamentoDoMes = (m: string) => {
+    const query = new URLSearchParams({ mes: m });
+    if (lojaId) query.set('loja', lojaId);
+    else if (visao?.tipo === 'rede') query.set('rede', '1');
+    return comVoltaParaAHome(base + '/faturamento?' + query.toString(), voltaDaHome);
+  };
+  const faturamentoHref = faturamentoDoMes(mes);
+  // Decisão 518 (revisão): falta conta até ontem e a Home lê o mês corrente, então na virada do mês as faltas do anterior
+  // sumiriam sem ninguém lançar. O mês civil anterior tem leitura própria, com o mesmo alcance e a mesma loja.
+  const mesAnterior = mesVizinho(mes, -1);
   const estoqueHref = lojaId ? base + '/estoque/' + encodeURIComponent(lojaId) : base + '/estoque';
   const producaoHref = lojaId ? `${base}/producao/lista/${encodeURIComponent(lojaId)}?dia=${hoje}` : '';
 
@@ -135,7 +163,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
   // ou na rede), com o parceiro aceitando escrita. Os outros recebem "Ver o faturamento", sem prometer o lançamento.
   const lancaFaturamento = autorizado.faturamento && !cliente.somenteLeitura
     && pode(alcanceDaVisao, 'faturamento.lancar', lojaId ? { lojaId } : {});
-  const [leituraFat, leituraSaude, leituraEstoque, leituraProducao, leituraCmv, leituraCompras, leituraXml] = await Promise.allSettled([
+  const [leituraFat, leituraSaude, leituraEstoque, leituraProducao, leituraCmv, leituraCompras, leituraXml, leituraFatAnterior] = await Promise.allSettled([
     leituraAutorizada(autorizado.faturamento, () => obterMes(cliente, alcanceDaVisao, { mes, ...(lojaId ? { lojaId } : {}) }, hoje)),
     leituraAutorizada(autorizado.cardapio, () => saudeDoCardapio(cliente)),
     leituraAutorizada(autorizado.estoque, () => situacaoDoEstoque(cliente, alcanceDaVisao)),
@@ -147,6 +175,8 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
       : Promise.resolve(null)),
     leituraAutorizada(autorizado.compras, () => lojaId ? lerComprasDaHome(cliente, alcanceDaVisao, lojaId, hoje) : Promise.resolve(null)),
     leituraAutorizada(autorizado.xml, () => lojaId ? lerXmlAguardandoDaHome(cliente, alcanceDaVisao, lojaId) : Promise.resolve(null)),
+    // Por último: a leitura do mês corrente continua sendo a primeira a consultar o faturamento.
+    leituraAutorizada(autorizado.faturamento, () => faltasQueAindaAceitamLancamento(cliente, alcanceDaVisao, { mes: mesAnterior, ...(lojaId ? { lojaId } : {}) }, hoje)),
   ]);
   // Rejeições são tratadas por fonte e não entram no DTO, no HTML ou em logs.
   const fat = leituraFat.status === 'fulfilled' ? leituraFat.value : null;
@@ -163,7 +193,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
       referencia: `Mês civil · ${MESES[Number(mes.slice(5, 7)) - 1]} de ${mes.slice(0, 4)}`,
       mensagem: estado === 'erro' ? 'Não foi possível carregar o faturamento.'
         : estado === 'sem_dados' ? (fat?.lojas.length ? 'Ainda não há lançamentos neste mês.' : 'Nenhuma loja disponível para faturamento neste contexto.')
-        : estado === 'parcial' ? `${plural(fat!.faltas, 'canal sem lançamento', 'canais sem lançamento')} neste mês. O valor não está completo.` : undefined,
+        : estado === 'parcial' ? `${plural(fat!.faltas, 'lançamento faltando', 'lançamentos faltando')} neste mês. O valor não está completo.` : undefined,
       href: faturamentoHref, acao: 'Ver o faturamento',
     });
   }
@@ -195,50 +225,49 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     });
   }
 
-  const rotuloDoFaturamento = `Faturamento de ${MESES[Number(mes.slice(5, 7)) - 1]}`;
+  const nomeDoMes = (m: string) => `${MESES[Number(m.slice(5, 7)) - 1]}${m.slice(0, 4) === mes.slice(0, 4) ? '' : ` de ${m.slice(0, 4)}`}`;
+  const semLancar = lancaFaturamento ? '' : cliente.somenteLeitura ? ' Os lançamentos estão bloqueados agora; o motivo aparece no faturamento.'
+    : ` Lançar é com quem tem “lançar faturamento” ${lojaId ? 'nesta loja' : 'nas lojas'}.`;
+  /**
+   * Decisão 518: a pendência existe enquanto a leitura DESTA consulta contar faltas. Clicar, visitar ou voltar não a tira; ela
+   * muda ou sai só quando uma consulta válida (a próxima abertura da Home, ou Atualizar resumo) contar menos. Leitura que
+   * falhou não confirma nada: a pendência continua "não conferida", sem número e sem "Lançar", em vez de sumir. Sem estado
+   * guardado: a próxima consulta válida decide. A conta é um por canal que a loja vende, em cada dia sem lançamento.
+   */
+  const pendenciaDoFaturamento = (m: string, leitura: number | 'erro'): PendenciaDoErp | null => {
+    const corrente = m === mes;
+    const nome = nomeDoMes(m);
+    const doMes = { chave: corrente ? 'faturamento-faltas' : 'faturamento-faltas-mes-anterior', escopo, natureza: 'completar_dados' as const, indicador: `Faturamento de ${nome}`, href: faturamentoDoMes(m) };
+    if (leitura === 'erro') {
+      return {
+        ...doMes, leitura: 'nao_conferida', acao: 'Ver o faturamento',
+        titulo: `Lançamentos faltando ${corrente ? 'neste mês' : `em ${nome}`}: não deu para conferir agora`,
+        texto: `A consulta ao faturamento ${corrente ? 'deste mês' : `de ${nome}`} falhou. Isso não quer dizer que o mês esteja completo. Use Atualizar resumo para consultar de novo.`,
+      };
+    }
+    if (leitura <= 0) return null;
+    return {
+      ...doMes, leitura: 'confirmada', acao: lancaFaturamento ? 'Lançar o que falta' : 'Ver o faturamento',
+      titulo: `${plural(leitura, 'lançamento faltando', 'lançamentos faltando')} ${corrente ? 'neste mês' : `em ${nome}`}`,
+      texto: `Conta um para cada canal que a loja vende, em cada dia que ficou sem lançamento. Enquanto faltar, o faturamento e o DRE ${corrente ? 'deste mês' : `de ${nome}`} ficam incompletos.${semLancar}`,
+    };
+  };
   if (fat && fat.lojas.length > 0) {
     indicadores.push({
       chave: 'faturamento',
       escopo,
-      rotulo: rotuloDoFaturamento,
+      rotulo: `Faturamento de ${MESES[Number(mes.slice(5, 7)) - 1]}`,
       // Nenhum lançamento não comprova faturamento zero. Um dia informado
       // como "Não vendeu" continua sendo um zero real, distinto de ausência.
       valor: { tipo: 'dinheiro', centavos: lancados.size ? fat.total.valorCentavos : null },
       contexto: lancados.size ? `${plural(lancados.size, 'dia lançado', 'dias lançados')} · ${plural(fat.total.pedidos, 'pedido', 'pedidos')}` : 'nenhum dia lançado ainda',
       href: faturamentoHref,
     });
-    // Decisão 518: a pendência existe enquanto ESTA leitura da fonte contar faltas. Clicar, visitar ou voltar não a tira;
-    // ela muda ou sai só quando uma consulta válida (a próxima abertura da Home, ou Atualizar resumo) contar menos.
-    if (fat.faltas > 0) {
-      pendencias.push({
-        chave: 'faturamento-faltas',
-        escopo,
-        natureza: 'completar_dados',
-        indicador: rotuloDoFaturamento,
-        leitura: 'confirmada',
-        titulo: `${plural(fat.faltas, 'canal sem lançamento', 'canais sem lançamento')} neste mês`,
-        texto: 'Dia que a loja vendeu e ninguém lançou deixa o faturamento e o DRE incompletos.'
-          + (lancaFaturamento ? '' : cliente.somenteLeitura ? ' Os lançamentos estão bloqueados agora; o motivo aparece no faturamento.'
-            : ` Lançar é com quem tem “lançar faturamento” ${lojaId ? 'nesta loja' : 'nas lojas'}.`),
-        href: faturamentoDaPendencia,
-        acao: lancaFaturamento ? 'Lançar o que falta' : 'Ver o faturamento',
-      });
-    }
-  } else if (autorizado.faturamento && leituraFat.status === 'rejected') {
-    // Decisão 518: leitura que falhou não confirma nada. A pendência continua, sem número e sem "Lançar", em vez de sumir
-    // como se o mês estivesse completo. Sem estado guardado: a próxima consulta válida decide.
-    pendencias.push({
-      chave: 'faturamento-faltas',
-      escopo,
-      natureza: 'completar_dados',
-      indicador: rotuloDoFaturamento,
-      leitura: 'nao_conferida',
-      titulo: 'Canais sem lançamento: não deu para conferir agora',
-      texto: 'A consulta ao faturamento falhou. Isso não quer dizer que o mês esteja completo; Atualizar resumo consulta de novo.',
-      href: faturamentoDaPendencia,
-      acao: 'Ver o faturamento',
-    });
   }
+  for (const p of autorizado.faturamento ? [
+    pendenciaDoFaturamento(mes, leituraFat.status === 'rejected' ? 'erro' : fat && fat.lojas.length > 0 ? fat.faltas : 0),
+    pendenciaDoFaturamento(mesAnterior, leituraFatAnterior.status === 'rejected' ? 'erro' : leituraFatAnterior.value ?? 0),
+  ] : []) if (p) pendencias.push(p);
 
   if (saude && saude.pratos > 0) {
     indicadores.push({

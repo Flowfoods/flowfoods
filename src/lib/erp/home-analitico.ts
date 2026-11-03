@@ -12,6 +12,7 @@ import type { ComposicaoComprasHome } from './home-compras-categorias';
 import { complementosDoFaturamento, type ComplementosFaturamentoHome } from './home-faturamento-complementos';
 import { projetarCanaisDoFaturamento, type ComposicaoFaturamentoHome } from './home-faturamento-canais';
 import type { WidgetDespesasHome } from './home-despesas';
+import { comVoltaParaAHome, voltaParaAHome } from './volta';
 
 export interface WidgetFaturamentoHome extends WidgetHome<'faturamento'> {
   /** Mesmo total da loja/mês; ausência do campo preserva compatibilidade com DTO antigo. */
@@ -92,7 +93,9 @@ export function baseDoWidgetHome<F extends FamiliaDaHome>(familia: F, titulo: st
 export function faturamentoAnalitico(leitura: LeituraHome<MesDoFaturamento>, c: ContextoHomeLoja): { widget: WidgetFaturamentoHome; diario: FaturamentoDiarioHome } | null {
   if (!contextoHomePermitido(c, 'faturamento.ver')) return null;
   const mes = c.hoje.slice(0, 7);
-  const detalhe = { href: c.raiz + '/faturamento?' + new URLSearchParams({ mes, loja: c.loja.id }).toString(), rotulo: 'Ver o faturamento da loja' };
+  // Decisão 518: o card e a evolução abrem o mesmo faturamento da pendência, com a mesma volta para a Home (nunca dois Voltar).
+  const href = comVoltaParaAHome(c.raiz + '/faturamento?' + new URLSearchParams({ mes, loja: c.loja.id }).toString(), voltaParaAHome(c.raiz, c.raiz));
+  const detalhe = { href, rotulo: 'Ver o faturamento da loja' };
   const widget: WidgetFaturamentoHome = {
     ...baseDoWidgetHome('faturamento', 'Faturamento', c, 'centavos', detalhe),
     complementos: complementosDoFaturamento('indisponivel'),

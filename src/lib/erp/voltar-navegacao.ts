@@ -49,8 +49,9 @@ export function temVoltarNoShell(caminho: string, consulta = ''): boolean {
   // O relatório normal já desenha um Voltar quando recebe origem validada.
   if (/^\/compras\/relatorios\/(insumo|periodo)$/.test(parte)
     && caminhoDeVolta(query.get('volta'), raiz + '/', 2000)) return false;
-  // Decisão 518: aberto pela pendência da Home com a volta válida, o faturamento do mês desenha "Voltar para o início".
-  if (parte === '/faturamento' && voltaParaAHome(query.get('volta'), raiz)) return false;
+  // Decisão 518: aberto pela pendência da Home com a volta válida, o faturamento do mês desenha "Voltar para o início". A página
+  // recusa volta repetida (`?volta=/erp&volta=/erp` chega como lista); o shell também, para nunca sumirem os dois Voltar.
+  if (parte === '/faturamento' && query.getAll('volta').length === 1 && voltaParaAHome(query.get('volta'), raiz)) return false;
   // O espelho de Integrações só redireciona à Central do parceiro.
   if (raiz !== '/erp' && parte === '/integracoes') return false;
   return padroes.some((r) => r.test(parte));

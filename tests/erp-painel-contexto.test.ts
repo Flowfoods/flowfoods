@@ -59,7 +59,7 @@ describe('Resumo da Home respeita visão autorizada antes de ler os módulos', (
   it('visão B não soma A, não mostra pendência A e usa links da mesma loja/mês', async () => {
     const p = await painelDoDia(cliente, perfil('DONO'), '/erp', HOJE, { tipo: 'loja', lojaId: 'lojab', nome: 'Loja B' });
     expect(p.indicadores.find((i) => i.chave === 'faturamento')).toMatchObject({
-      valor: { tipo: 'dinheiro', centavos: 700_000 }, escopo: 'Loja B', href: '/erp/faturamento?mes=2026-10&loja=lojab',
+      valor: { tipo: 'dinheiro', centavos: 700_000 }, escopo: 'Loja B', href: '/erp/faturamento?mes=2026-10&loja=lojab&volta=%2Ferp',
     });
     expect(p.indicadores.find((i) => i.chave === 'estoque')).toMatchObject({
       valor: { tipo: 'fracao', de: 1, total: 1 }, escopo: 'Loja B', href: '/erp/estoque/lojab',
@@ -74,7 +74,7 @@ describe('Resumo da Home respeita visão autorizada antes de ler os módulos', (
   it('rede soma A+B e mantém base de rede no aprofundamento', async () => {
     const p = await painelDoDia(cliente, perfil('DONO'), '/erp', HOJE, { tipo: 'rede' });
     expect(p.indicadores.find((i) => i.chave === 'faturamento')).toMatchObject({
-      valor: { tipo: 'dinheiro', centavos: 800_000 }, escopo: 'Rede Completa', href: '/erp/faturamento?mes=2026-10&rede=1',
+      valor: { tipo: 'dinheiro', centavos: 800_000 }, escopo: 'Rede Completa', href: '/erp/faturamento?mes=2026-10&rede=1&volta=%2Ferp',
     });
     expect(p.indicadores.find((i) => i.chave === 'estoque')).toMatchObject({ valor: { tipo: 'fracao', de: 1, total: 2 } });
     expect(p.pendencias.find((p) => p.chave === 'estoque-abrir')).toMatchObject({ escopo: 'Rede Completa' });
