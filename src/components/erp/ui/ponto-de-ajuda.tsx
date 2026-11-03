@@ -10,8 +10,9 @@
  * deixar o campo sem explicação.
  */
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import { usePontos } from '../shell/pontos';
+import { Painel } from './superficies';
 
 export function useTemPonto(ponto: string): boolean {
   return usePontos().tem(ponto);
@@ -41,6 +42,37 @@ export function ExplicacaoNoPonto({
     <div className={className}>
       <PontoDeAjuda ponto={ponto} comRotulo />
     </div>
+  );
+}
+
+/**
+ * Painel cujo subtítulo trazia uma explicação que virou ponto (decisão 519): com o ponto para a pessoa, o botão vai no
+ * cabeçalho e o subtítulo fica só com o essencial (`subtitulo`, que pode faltar); sem ele, o texto de antes
+ * (`subtituloSemPonto`) — nenhum painel fica sem explicação. Serve a telas do servidor, que não usam `useTemPonto`.
+ */
+export function PainelComPonto({
+  ponto,
+  subtitulo,
+  subtituloSemPonto,
+  acessorio,
+  ...resto
+}: Omit<ComponentProps<typeof Painel>, 'subtitulo'> & { ponto: string; subtitulo?: string; subtituloSemPonto: string }) {
+  const tem = useTemPonto(ponto);
+  return (
+    <Painel
+      {...resto}
+      subtitulo={tem ? subtitulo : subtituloSemPonto}
+      acessorio={
+        tem ? (
+          <span className="flex shrink-0 items-center gap-2">
+            <PontoDeAjuda ponto={ponto} />
+            {acessorio}
+          </span>
+        ) : (
+          acessorio
+        )
+      }
+    />
   );
 }
 

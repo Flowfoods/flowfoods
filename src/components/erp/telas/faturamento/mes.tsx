@@ -27,6 +27,7 @@ import { FRASE_DO_ESTADO, serieDoMes } from '@/lib/erp/grafico';
 import { GraficoDeColunas, type PontoDoGrafico } from '../../ui/grafico-colunas';
 import { rotuloDoEscopo } from '@/lib/erp/visao';
 import { comVoltaParaAHome, type VoltaParaAHome } from '@/lib/erp/volta';
+import { ExplicacaoNoPonto, PainelComPonto, PontoDeAjuda } from '../../ui/ponto-de-ajuda';
 
 /** Decisão 518: a volta para a Home, já conferida pela página (`voltaParaAHome`); nula = a tela de sempre. */
 type VoltaDaHome = VoltaParaAHome | null | undefined;
@@ -49,7 +50,14 @@ function Totais({ por, total }: { por: Record<CanalVenda, TotaisDoRecorte>; tota
     { chave: 'total', rotulo: 'Total', t: total, destaque: true },
   ];
   return (
-    <Painel titulo="Por canal" subtitulo="Faturamento, pedidos e clientes atendidos no mês. O ticket médio é a conta, não um número lançado." semRespiro>
+    // Decisão 519: "o ticket médio é a conta" mora no ponto "numeros" (com o que entra e o que não entra no número).
+    <PainelComPonto
+      ponto="numeros"
+      titulo="Por canal"
+      subtitulo="Faturamento, pedidos e clientes atendidos no mês."
+      subtituloSemPonto="Faturamento, pedidos e clientes atendidos no mês. O ticket médio é a conta, não um número lançado."
+      semRespiro
+    >
       <div className="overflow-x-auto">
         <table className="w-full text-sm sm:min-w-[360px]">
           <thead>
@@ -87,7 +95,7 @@ function Totais({ por, total }: { por: Record<CanalVenda, TotaisDoRecorte>; tota
           </tbody>
         </table>
       </div>
-    </Painel>
+    </PainelComPonto>
   );
 }
 
@@ -197,7 +205,15 @@ function Calendario({ l, base, mes, volta }: { l: LojaNoMes; base: string; mes: 
 function TabelaDaRede({ m, base, volta }: { m: MesDoFaturamento; base: string; volta: VoltaDaHome }) {
   const faltas = (n: number) => (n > 0 ? <span className="font-semibold text-erro">{n} {n === 1 ? 'falta' : 'faltas'}</span> : <span className="text-suave">0 faltas</span>);
   return (
-    <Painel titulo="Por loja" subtitulo="Soma do que cada loja do seu acesso lançou no mês. Falta é canal que a loja vende, sem lançamento, até ontem (cada canal em cada dia conta uma)." semRespiro acessorio={<Contagem>{m.lojas.length}</Contagem>}>
+    // Decisão 519: o que é falta (e a conta de um por canal em cada dia) mora no ponto "falta".
+    <PainelComPonto
+      ponto="falta"
+      titulo="Por loja"
+      subtitulo="Soma do que cada loja do seu acesso lançou no mês."
+      subtituloSemPonto="Soma do que cada loja do seu acesso lançou no mês. Falta é canal que a loja vende, sem lançamento, até ontem (cada canal em cada dia conta uma)."
+      semRespiro
+      acessorio={<Contagem>{m.lojas.length}</Contagem>}
+    >
       {/* No celular: um cartão por loja (nome, total, faltas e o que cada canal fez). */}
       <ul className="divide-y divide-linha sm:hidden">
         {m.lojas.map((l) => (
@@ -275,7 +291,7 @@ function TabelaDaRede({ m, base, volta }: { m: MesDoFaturamento; base: string; v
           </tfoot>
         </table>
       </div>
-    </Painel>
+    </PainelComPonto>
   );
 }
 
@@ -312,7 +328,13 @@ export function TelaDoMes({
   return (
     <div className="space-y-6">
       {/* Leitura nova da Home (e não a guardada pelo roteador): a pendência só muda com a consulta seguinte à fonte. */}
-      {volta && <Voltar href={volta.href} recarregar>{`Voltar para ${volta.rotulo}`}</Voltar>}
+      {volta && (
+        <div className="flex items-center gap-1">
+          <Voltar href={volta.href} recarregar>{`Voltar para ${volta.rotulo}`}</Voltar>
+          {/* Decisão 519: o que a volta faz com o aviso do início (abrir ou voltar não resolve). */}
+          <PontoDeAjuda ponto="volta" className="-my-3 sm:-my-1.5" />
+        </div>
+      )}
       <PageHeader
         icone="dre"
         cor={COR.dre}
@@ -395,19 +417,24 @@ export function TelaDoMes({
           <GraficoDoMes m={m} lojaAberta={lojaAberta} contexto={rotuloDoEscopo(lojaAberta?.loja.nome)} />
           <Totais por={lojaAberta ? lojaAberta.porCanal : m.porCanal} total={lojaAberta ? lojaAberta.total : m.total} />
           {lojaAberta ? (
-            <Painel
+            // Decisão 519: "falta é canal sem lançamento até ontem; hoje está em aberto" mora no ponto "falta"; fica a data de início.
+            <PainelComPonto
+              ponto="falta"
               titulo={`Dia a dia · ${lojaAberta.loja.nome}`}
-              subtitulo={lojaAberta.primeiraData ? `Lançando desde ${formatarData(lojaAberta.primeiraData)}. Falta é canal sem lançamento até ontem; hoje ainda está em aberto.` : 'Nenhum dia lançado ainda: a primeira entrada abre o calendário de faltas.'}
+              subtitulo={lojaAberta.primeiraData ? `Lançando desde ${formatarData(lojaAberta.primeiraData)}.` : 'Nenhum dia lançado ainda: a primeira entrada abre o calendário de faltas.'}
+              subtituloSemPonto={lojaAberta.primeiraData ? `Lançando desde ${formatarData(lojaAberta.primeiraData)}. Falta é canal sem lançamento até ontem; hoje ainda está em aberto.` : 'Nenhum dia lançado ainda: a primeira entrada abre o calendário de faltas.'}
               acessorio={!lojaAberta.loja.ativa ? <Selo>Loja desativada</Selo> : undefined}
               semRespiro
             >
               <Calendario l={lojaAberta} base={base} mes={m.mes} volta={volta} />
-            </Painel>
+            </PainelComPonto>
           ) : (
             <TabelaDaRede m={m} base={base} volta={volta} />
           )}
           {m.temIntegracao && (
-            <p className="text-[12px] text-suave">Dias com integração valem o número dela; o que a casa digitou fica como conferência na tela do dia.</p>
+            <ExplicacaoNoPonto ponto="integracao">
+              <p className="text-[12px] text-suave">Dias com integração valem o número dela; o que a casa digitou fica como conferência na tela do dia.</p>
+            </ExplicacaoNoPonto>
           )}
         </>
       )}

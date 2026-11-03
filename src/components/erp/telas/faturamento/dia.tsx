@@ -18,7 +18,8 @@ import { TrilhaDaPagina } from '../../shell/trilha';
 import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
-import { Aviso, Painel } from '../../ui/superficies';
+import { Aviso } from '../../ui/superficies';
+import { PainelComPonto, PontoDeAjuda } from '../../ui/ponto-de-ajuda';
 import { ListaHistorico } from '../historico/lista-historico';
 import { Voltar } from '../cadastro/partes';
 import type { AcaoDoDia } from './estado';
@@ -105,7 +106,11 @@ export function TelaDoDia({
         </Aviso>
       )}
       {dia.fechado && (
-        <AvisoDoPeriodoFechado periodo={dia.fechado} href={verPeriodos ? `${base.replace(/\/faturamento$/, '')}/dre/periodos` : null} frase="Este dia só pode ser consultado: não aceita lançar, corrigir nem remover." />
+        <div className="space-y-1">
+          <AvisoDoPeriodoFechado periodo={dia.fechado} href={verPeriodos ? `${base.replace(/\/faturamento$/, '')}/dre/periodos` : null} frase="Este dia só pode ser consultado: não aceita lançar, corrigir nem remover." />
+          {/* Decisão 519: o aviso diz o que não dá e a saída; o porquê fica no card. */}
+          <PontoDeAjuda ponto="periodo-fechado" comRotulo />
+        </div>
       )}
       {!podeLancar && !dia.fechado && !bloqueio && (
         <Aviso titulo="Você pode ver este dia.">Lançar é com quem tem “lançar faturamento” nesta loja.</Aviso>
@@ -118,13 +123,18 @@ export function TelaDoDia({
       )}
 
       {podeLancar && remover && !dia.fechado && !bloqueio && removiveis.length > 0 && (
-        <Painel titulo="Lançou no dia ou na loja errada?" subtitulo="Para corrigir um número, é só salvar o dia de novo. Remover serve para o que não deveria existir.">
+        // Decisão 519: corrigir × remover mora no ponto "remover"; sem ele, o subtítulo de antes.
+        <PainelComPonto
+          ponto="remover"
+          titulo="Lançou no dia ou na loja errada?"
+          subtituloSemPonto="Para corrigir um número, é só salvar o dia de novo. Remover serve para o que não deveria existir."
+        >
           <div className="space-y-3">
             {removiveis.map((c) => (
               <FormRemover key={c.canal} acao={remover(c.canal)} rotulo={CANAIS[c.canal].rotulo} versao={c.humano!.versao} voltar={voltar} volta={volta?.href} />
             ))}
           </div>
-        </Painel>
+        </PainelComPonto>
       )}
 
       <HistoricoRecolhivel chave={`${base}/${dia.loja.id}/${dia.data}`} quantidade={dia.historico.length} titulo="Alterações deste dia" subtitulo="O antes e o depois de cada lançamento, com quem e quando." semRespiro>

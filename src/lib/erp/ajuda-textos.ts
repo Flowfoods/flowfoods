@@ -1567,6 +1567,44 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         ],
       },
     ],
+    // Decisão 519: o texto educativo dos subtítulos e do rodapé do mês saiu do corpo e mora nestes cards (na ordem da página).
+    pontos: [
+      {
+        // Só com a volta da Home conferida (decisão 518): sem ela, o botão nem aparece.
+        id: 'volta',
+        titulo: 'Voltar para o início',
+        blocos: [
+          { texto: 'Voltar para o início lê o resumo de novo, na loja ou na rede escolhida no alto.' },
+          { texto: 'O aviso de lançamentos faltando só sai de lá quando essa nova leitura não achar mais falta: abrir, voltar ou só olhar não resolve.' },
+        ],
+      },
+      {
+        id: 'numeros',
+        titulo: 'Faturamento, pedidos e clientes',
+        blocos: [
+          { texto: 'Não entram taxa de entrega, gorjeta, 10 % de serviço nem pedido cancelado.' },
+          { texto: 'Clientes são atendimentos, não pessoas diferentes.' },
+          { texto: 'O ticket médio é o faturamento dividido pelos pedidos, refeito na hora: é a conta, não um número lançado.' },
+        ],
+        secao: 'o-numero',
+      },
+      {
+        id: 'falta',
+        titulo: 'O que conta como falta',
+        blocos: [
+          { texto: 'Falta é cada canal que a loja vende e ficou sem lançamento num dia, de quando ela começou a lançar até ontem: dois canais no mesmo dia são duas faltas.' },
+          { texto: 'Hoje ainda está em aberto, e Não vendeu é lançamento com zero, não falta.' },
+          { texto: 'Para tirar a falta, abra o dia com falta e lance o canal; se ele não vendeu, marque Não vendeu.', para: ['faturamento.lancar'] },
+        ],
+        secao: 'falta',
+      },
+      {
+        // Só no mês que tem número de integração.
+        id: 'integracao',
+        titulo: 'Integração e o que a casa digitou',
+        blocos: [{ texto: 'Dia com integração vale o número dela. O que a casa digitou fica como conferência na tela do dia, com a diferença entre os dois.' }],
+      },
+    ],
   },
   {
     chave: 'faturamento-lancar',
@@ -1577,6 +1615,27 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     aula: [
       { texto: 'Escolha a loja e a data, que começa em hoje. Com uma loja só no seu acesso, você já cai no dia dela.' },
       { texto: 'Só dá para lançar até hoje e até três anos para trás.' },
+    ],
+    // Decisão 519: o que a aula não diz, junto de cada campo.
+    pontos: [
+      {
+        id: 'loja',
+        titulo: 'Quais lojas aparecem',
+        blocos: [{ texto: 'Aparecem as lojas ativas em que você pode lançar faturamento. Loja desativada não recebe lançamento novo, mas os dias antigos dela continuam no mês.' }],
+      },
+      {
+        id: 'data',
+        titulo: 'Qual dia lançar',
+        blocos: [
+          { texto: 'A data começa em hoje, que ainda está em aberto: o dia só conta como falta depois que passa.' },
+          { texto: 'Dia de período fechado do DRE abre só para consulta, sem lançar nem corrigir.' },
+        ],
+      },
+      {
+        id: 'atalhos',
+        titulo: 'Ontem e hoje',
+        blocos: [{ texto: 'Cada atalho abre o dia da loja direto, com um bloco para cada canal que ela vende. Ontem já conta como falta se algum canal ficou sem lançamento; hoje ainda está em aberto.' }],
+      },
     ],
   },
   {
@@ -1599,6 +1658,42 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Dia de período fechado',
         blocos: [
           { texto: 'Quando o período do resultado é fechado, os dias dele não aceitam mais lançar, corrigir nem remover. Onde o período começa e termina fica em Períodos, na área Faturamento e DRE. Para mexer num dia fechado, peça à FlowFoods para reabrir o período: a tela já diz isso.' },
+        ],
+      },
+    ],
+    // Decisão 519: os cards ficam fora do bloco que trava no dia só de consulta, para abrirem também para quem só vê.
+    pontos: [
+      {
+        // Só no dia de período fechado, logo abaixo do aviso.
+        id: 'periodo-fechado',
+        titulo: 'Por que este dia não aceita lançamento',
+        blocos: [{ texto: 'Fechar o período guarda uma fotografia do DRE daqueles dias. Depois disso nada muda dentro das datas dele, nem o faturamento: lançar, corrigir ou remover aqui mudaria um resultado já fechado.' }],
+        secao: 'periodo-fechado',
+      },
+      {
+        id: 'numeros',
+        titulo: 'Faturamento, pedidos e clientes do canal',
+        blocos: [
+          { texto: 'Faturamento é a venda dos produtos dos pedidos concluídos no dia, sem a taxa de entrega e já sem o desconto que a casa pagou.' },
+          { texto: 'No iFood, entra o total dos itens menos o incentivo que a loja bancou; a comissão do iFood entra depois, no resultado.' },
+          { texto: 'Clientes são atendimentos do dia, não pessoas diferentes.' },
+        ],
+      },
+      {
+        id: 'nao-vendeu',
+        titulo: 'Não vendeu ou em branco',
+        blocos: [
+          { texto: 'Não vendeu conta como lançado: o canal fecha o dia com zero e sai da falta.' },
+          { texto: 'Em branco, o canal continua sem lançamento e aparece como falta no mês, menos hoje, que ainda está em aberto.' },
+        ],
+      },
+      {
+        // O subtítulo do painel "Lançou no dia ou na loja errada?" (só aparece para quem lança).
+        id: 'remover',
+        titulo: 'Corrigir ou remover',
+        blocos: [
+          { texto: 'Para corrigir um número, é só salvar o dia de novo: o antes e o depois ficam em Alterações deste dia.', para: ['faturamento.lancar'] },
+          { texto: 'Remover serve para o que não deveria existir, como o lançamento no dia ou na loja errada, e pede o motivo.', para: ['faturamento.lancar'] },
         ],
       },
     ],
