@@ -11,6 +11,7 @@ import type { FamiliaDaHome, MedidaDoWidgetHome } from './home-contratos';
 import type { ComposicaoComprasHome } from './home-compras-categorias';
 import { complementosDoFaturamento, type ComplementosFaturamentoHome } from './home-faturamento-complementos';
 import { projetarCanaisDoFaturamento, type ComposicaoFaturamentoHome } from './home-faturamento-canais';
+import type { WidgetDespesasHome } from './home-despesas';
 
 export interface WidgetFaturamentoHome extends WidgetHome<'faturamento'> {
   /** Mesmo total da loja/mês; ausência do campo preserva compatibilidade com DTO antigo. */
@@ -42,7 +43,8 @@ export interface WidgetProducaoHome extends WidgetHome<'producao'> {
   naLista: number | null;
   semLote: number | null;
 }
-export type WidgetDespesasHome = WidgetHome<'despesas'>;
+/** O card de Despesas: lido do DRE com `dre.ver` (home-despesas.ts) ou o marcador sem valor abaixo. */
+export type { WidgetDespesasHome };
 export type WidgetAnaliticoHome = WidgetFaturamentoHome | WidgetCmvHome | WidgetComprasHome | WidgetDespesasHome | WidgetEstoqueHome | WidgetProducaoHome;
 
 export interface FaturamentoDiarioHome {
@@ -193,6 +195,7 @@ export function producaoAnalitica(leitura: LeituraHome<LojasDaProducaoHome>, c: 
   return widget;
 }
 
+/** Marcador sem valor para quem lança despesas sem `dre.ver`: aponta aos lançamentos, nunca a um total. */
 export function despesasIndisponiveis(c: ContextoHomeLoja): WidgetDespesasHome | null {
   if (!contextoHomePermitido(c, 'dre.ver') && !contextoHomePermitido(c, 'despesas.lancar')) return null;
   const widget = baseDoWidgetHome('despesas', 'Despesas', c, 'centavos', { href: c.raiz + '/dre/despesas?' + new URLSearchParams({ loja: c.loja.id }).toString(), rotulo: 'Ver as despesas da loja' });

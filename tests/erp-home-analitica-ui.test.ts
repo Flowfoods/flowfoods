@@ -96,7 +96,7 @@ describe('H2 · composição de uma loja', () => {
     expect(h).toContain('ff-identidade-modulo ff-cartao-modulo');
   });
 
-  it('mantém Despesas indisponível sem transformar ausência em zero ou a pagar', () => {
+  it('marcador de Despesas (quem só lança, sem dre.ver) fica indisponível sem transformar ausência em zero ou a pagar', () => {
     const p = completo();
     p.analitico = { tipo: 'loja', loja: { id: 'lojab', nome: 'Loja B sintética' }, widgets: [despesas()] };
     p.cmv = undefined; p.indicadores = []; p.estados = []; p.pendencias = [];
@@ -104,7 +104,7 @@ describe('H2 · composição de uma loja', () => {
     expect(h).toContain('Indisponível');
     expect(h).toContain('O resumo por competência ainda não está disponível.');
     expect(h).toContain('Valor não disponível');
-    expect(h).not.toMatch(/R\$|a pagar|CMV da loja|Evolução do faturamento/);
+    expect(h).not.toMatch(/R\$|a pagar|CMV da loja|Evolução do faturamento|Despesas da loja|Competência · sem CMV/);
   });
 
   it('Cardápio fica secundário Da rede e não ocupa a família CMV', () => {

@@ -1,7 +1,8 @@
 /** H2 de uma loja: composição autorizada, sem contas de domínio ou consultas. */
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
-import type { AnaliticoDaHome, WidgetAnaliticoHome, WidgetComprasHome, WidgetEstoqueHome, WidgetFaturamentoHome, WidgetProducaoHome } from '@/lib/erp/home-analitico';
+import type { AnaliticoDaHome, WidgetAnaliticoHome, WidgetComprasHome, WidgetDespesasHome, WidgetEstoqueHome, WidgetFaturamentoHome, WidgetProducaoHome } from '@/lib/erp/home-analitico';
+import { RECORTE_DAS_DESPESAS_DA_HOME } from '@/lib/erp/home-despesas';
 import type { EstadoDoWidgetHome, FamiliaDaHome } from '@/lib/erp/home-contratos';
 import type { PainelDoDia } from '@/lib/erp/painel-do-dia';
 import { percentualComDuasCasas } from '@/lib/erp/cmv-categorias-campos';
@@ -12,6 +13,7 @@ import { IconeDoModulo } from '../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../ui/estilos';
 import { Painel, Selo, type Tom } from '../ui/superficies';
 import { CmvDaHomeNaTela } from './cmv-da-home';
+import { DespesasDaHomeNaTela } from './despesas-da-home';
 import { EvolucaoFaturamentoHome } from './evolucao-faturamento-home';
 import { ComprasCategoriasHome } from './compras-categorias-home';
 import { ValorMonetarioHome } from './valor-monetario-home';
@@ -54,6 +56,8 @@ function IndicadorAnalitico({ widget }: { widget: WidgetAnaliticoHome }) {
   const identidade = IDENTIDADE[widget.familia];
   const estado = ESTADO[widget.estado];
   const referencia = widget.referencia;
+  // Despesas lidas do DRE trazem os avisos no próprio painel; o marcador de quem só lança continua no card.
+  const despesasDoDre = widget.familia === 'despesas' && widget.composicaoPorGrupo !== undefined;
   const intervalo = referencia?.inicio && referencia.fim ? `${formatarData(referencia.inicio, true)} a ${formatarData(referencia.fim)}` : null;
   const quando = referencia?.base === 'posicao_atual' ? 'Posição atual'
     : referencia?.base === 'dia_operacional' ? `Hoje${referencia.inicio ? ` · ${formatarData(referencia.inicio)}` : ''}`
@@ -72,10 +76,11 @@ function IndicadorAnalitico({ widget }: { widget: WidgetAnaliticoHome }) {
           {widget.familia === 'estoque' && <p className="text-[12px] text-suave">{widget.rotuloDoValor}</p>}
           {widget.familia === 'producao' && <p className="text-[12px] text-suave">Pré-preparos na lista de hoje</p>}
           {widget.familia === 'compras' && <p className="text-[12px] text-suave">Total entregue · itens e frete</p>}
+          {despesasDoDre && <p className="text-[12px] text-suave">{RECORTE_DAS_DESPESAS_DA_HOME}</p>}
         </div>
         <p className="break-words text-[12px] leading-relaxed text-suave">{quando}</p>
         <div><Selo tom={estado.tom}>{estado.texto}</Selo></div>
-        {!['cmv', 'estoque', 'producao'].includes(widget.familia) && <AvisosDoIndicador widget={widget} />}
+        {!['cmv', 'estoque', 'producao'].includes(widget.familia) && !despesasDoDre && <AvisosDoIndicador widget={widget} />}
         <span className="mt-auto pt-1 text-[12px] font-medium text-texto underline decoration-linha-forte underline-offset-4">{widget.detalhe.rotulo}</span>
       </Link>
     </div>
@@ -138,6 +143,7 @@ export function HomeAnalitica({ analitico, painel }: { analitico: Extract<Analit
   const producao = widgets.find((w): w is WidgetProducaoHome => w.familia === 'producao');
   const compras = widgets.find((w): w is WidgetComprasHome => w.familia === 'compras');
   const faturamento = widgets.find((w): w is WidgetFaturamentoHome => w.familia === 'faturamento');
+  const despesas = widgets.find((w): w is WidgetDespesasHome => w.familia === 'despesas');
   const temCardapio = painel.indicadores.some((i) => i.chave === 'cardapio') || painel.estados?.some((e) => e.chave === 'cardapio');
   const temOperacao = Boolean(estoque || producao || temCardapio);
   // A fila é atual, sem recorte mensal. Só compõe o contexto desta mesma leitura/loja.
@@ -166,6 +172,7 @@ export function HomeAnalitica({ analitico, painel }: { analitico: Extract<Analit
           </section>
         )}
       </div>
+      {despesas?.composicaoPorGrupo && <DespesasDaHomeNaTela widget={despesas} />}
       {compras?.composicaoPorCategoria && <ComprasCategoriasHome widget={compras} />}
       {(painel.pendencias.length > 0 || xmlDaLoja) && <section aria-label="Pontos de atenção"><PendenciasDoResumo pendencias={painel.pendencias} xmlAguardando={xmlDaLoja} /></section>}
       {(widgets.length > 0 || temCardapio || painel.pendencias.length > 0 || xmlDaLoja) && <AtualizacaoDoResumo consultadoEm={painel.consultadoEm} />}

@@ -12,10 +12,11 @@ import { saudeDoCardapio } from './saude-do-cardapio';
 import { situacaoDoEstoque } from './estoque';
 import { lojasDaListaDoDia } from './producao-lista';
 import { dreDoPeriodo } from './dre';
-import { cmvDaHome, type WidgetCmvHome } from './home-cmv';
+import { cmvDaHome, type LeituraDoDreParaHome, type WidgetCmvHome } from './home-cmv';
+import { despesasDaHome } from './home-despesas';
 import { comprasAnaliticas, lerComprasDaHome } from './home-compras';
 import { lerXmlAguardandoDaHome, xmlAguardandoDaHome, type XmlAguardandoHome } from './home-xml-aguardando';
-import { despesasIndisponiveis, estoqueAnalitico, faturamentoAnalitico, producaoAnalitica, type AnaliticoDaHome, type LeituraHome, type WidgetAnaliticoHome } from './home-analitico';
+import { estoqueAnalitico, faturamentoAnalitico, producaoAnalitica, type AnaliticoDaHome, type LeituraHome, type WidgetAnaliticoHome } from './home-analitico';
 import { hojeNoRio } from './compra-campos';
 import type { ClienteDoParceiro } from './tenant';
 import type { Visao } from './visao';
@@ -117,8 +118,8 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     leituraAutorizada(autorizado.cardapio, () => saudeDoCardapio(cliente)),
     leituraAutorizada(autorizado.estoque, () => situacaoDoEstoque(cliente, alcanceDaVisao)),
     leituraAutorizada(autorizado.producao, () => lojasDaListaDoDia(cliente, alcanceDaVisao, agora)),
-    // Uma única leitura do DRE, do mesmo cliente/loja e dia de negócio. Não
-    // usa fallback de query/rede nem troca o período corrente por outro com dado.
+    // Uma única leitura do DRE, do mesmo cliente/loja e dia de negócio, para o CMV
+    // e as Despesas. Não usa fallback de query/rede nem troca o período corrente por outro com dado.
     leituraAutorizada(autorizado.cmv, () => lojaId
       ? dreDoPeriodo(cliente, alcanceDaVisao, { tipo: 'loja', lojaId }, hoje, hoje)
       : Promise.resolve(null)),
@@ -290,11 +291,13 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
       xmlAguardando = xmlAguardandoDaHome({ estado: 'erro' }, contextoXml);
     }
   }
+  // A mesma leitura do DRE serve ao CMV e às Despesas; cada projeção tem sua própria fronteira de falha.
+  const leituraDoDre: LeituraDoDreParaHome = leituraCmv.status === 'rejected' ? { estado: 'erro' } : { estado: 'lido', dre: leituraCmv.value };
   let cmv: WidgetCmvHome | null = null;
   if (autorizado.cmv && visao?.tipo === 'loja') {
     const contextoCmv = { alcance: alcanceDaVisao, loja: { id: visao.lojaId, nome: visao.nome }, raiz: base, consultadoEm };
     try {
-      cmv = cmvDaHome(leituraCmv.status === 'rejected' ? { estado: 'erro' } : { estado: 'lido', dre: leituraCmv.value }, contextoCmv);
+      cmv = cmvDaHome(leituraDoDre, contextoCmv);
     } catch {
       // Incompatibilidade de projeção tampouco derruba os outros módulos.
       cmv = cmvDaHome({ estado: 'erro' }, contextoCmv);
@@ -311,7 +314,9 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     const compras = projetar(() => comprasAnaliticas(leitura(leituraCompras), contexto), () => comprasAnaliticas({ estado: 'erro' }, contexto));
     const posicao = projetar(() => estoqueAnalitico(leitura(leituraEstoque), contexto), () => estoqueAnalitico({ estado: 'erro' }, contexto));
     const lista = projetar(() => producaoAnalitica(leitura(leituraProducao), contexto), () => producaoAnalitica({ estado: 'erro' }, contexto));
-    const despesas = despesasIndisponiveis(contexto); // Sem contrato financeiro: nenhuma consulta nova.
+    // Despesas reaproveitam a leitura do DRE do CMV (nenhuma consulta nova). Sem `dre.ver` a leitura
+    // nem existe: quem só lança despesas recebe o marcador sem valor, e quem não tem nenhuma, nada.
+    const despesas = projetar(() => despesasDaHome(leituraDoDre, contexto), () => despesasDaHome({ estado: 'erro' }, contexto));
     const widgets = [faturamento?.widget, cmv, compras, despesas, posicao, lista].filter((w): w is WidgetAnaliticoHome => !!w);
     analitico = { tipo: 'loja', loja: contexto.loja, widgets, ...(faturamento ? { faturamentoDiario: faturamento.diario } : {}) };
   }
