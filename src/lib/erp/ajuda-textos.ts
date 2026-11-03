@@ -21,7 +21,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'inicio',
     rotas: [''],
     titulo: 'Visão geral da operação',
-    versao: 9,
+    versao: 11,
     aula: [
       { texto: 'Escolha uma loja no alto para ver seus indicadores, a evolução do faturamento e os pontos de atenção. Cada número informa a loja e o período a que se refere.' },
       { texto: 'Sem dados não é zero: o painel avisa sobre ausências e falhas, e Atualizar resumo tenta carregar de novo.' },
@@ -55,6 +55,16 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'Uma despesa de vários dias entra só com os dias deste período e, no período em curso, até ontem. Por isso o valor fica parcial até o fim do período.', para: ['dre.ver'] },
           { texto: 'Grupo sem lançamento aparece com traço, não como zero. A despesa da rede, sem loja, fica fora do card da loja. Período fechado vem da fotografia do fechamento.', para: ['dre.ver'] },
           { texto: 'Cada grupo mostra as linhas do DRE que têm valor. Conferir este valor abre as despesas que formam a linha, na mesma loja e no mesmo período, e Voltar para o início traz você de volta. No período fechado esse atalho não aparece, porque a fotografia não muda e as despesas podem mudar.', para: ['dre.ver'] },
+        ],
+      },
+      {
+        id: 'pontos-de-atencao',
+        titulo: 'Pontos de atenção',
+        blocos: [
+          { texto: 'Os pontos de atenção ficam em dois grupos: Completar dados, quando algo já aconteceu e falta registrar, e Resolver operação, quando falta fazer algo na casa. O grupo não diz o que é mais urgente.' },
+          { texto: 'Lançamentos faltando contam um para cada canal que a loja vende, em cada dia sem lançamento. O atalho abre o faturamento do mês da falta, na loja escolhida no alto ou na rede, e Voltar para o início traz você de volta.', para: ['faturamento.ver'] },
+          { texto: 'Abrir, voltar ou só olhar não tira o ponto da lista: ele sai quando a nova consulta ao faturamento não encontrar mais falta. O mês anterior aparece à parte enquanto tiver falta e ainda aceitar lançamento.', para: ['faturamento.ver'] },
+          { texto: 'Se a consulta ao faturamento falhar, o ponto aparece como não conferido, sem número. Isso não quer dizer que o mês esteja completo.', para: ['faturamento.ver'] },
         ],
       },
       {

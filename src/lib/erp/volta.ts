@@ -55,12 +55,33 @@ const HOME_DA_AREA = /^(?:\/erp|\/rodolfo\/erp\/[a-z0-9]+(?:-[a-z0-9]+)*)$/;
  * Decisão 517 (revisão): a composição de uma linha do DRE aberta pela Home ("Conferir este valor") recebe `?volta=` com a Home
  * da área, e SÓ ela: o valor tem de ser exatamente a `raiz` de quem lê (a da sessão), sem query (as únicas que a Home lê hoje
  * são os avisos "sem acesso"/"sem módulo", que uma volta não pode trazer) e sem `%` (nada de caminho codificado, como
- * `/erp/dre/d%65spesas`, que passaria por outra tela). Qualquer outro caminho: nulo, e a composição segue com o "Voltar para o
- * DRE" de sempre. A loja da Home vem da visão escolhida (cookie), que a composição não toca.
+ * `/erp/dre/d%65spesas`, que passaria por outra tela). Qualquer outro caminho: nulo, e a tela segue com o seu Voltar de sempre.
+ * A loja da Home vem da visão escolhida (cookie), que a tela de origem não toca.
+ *
+ * Decisão 518: a mesma regra, sem afrouxar, serve à pendência de lançamentos faltando da Home, que abre o Faturamento.
  */
-export function voltaDaComposicao(valor: unknown, raiz: string): { href: string; rotulo: string } | null {
+export function voltaParaAHome(valor: unknown, raiz: string): VoltaParaAHome | null {
   if (typeof valor !== 'string' || !HOME_DA_AREA.test(raiz) || valor.includes('%') || valor !== raiz) return null;
-  return { href: raiz, rotulo: 'o início' };
+  return { href: raiz, rotulo: 'o início' } as VoltaParaAHome;
+}
+
+declare const CONFERIDA: unique symbol;
+/**
+ * Decisão 518 (revisão): a volta conferida tem tipo próprio, marcado, que só `voltaParaAHome` produz. Um `{ href }` montado à
+ * mão (vindo da URL ou do formulário) não passa no tipo de `comVoltaParaAHome`.
+ */
+export type VoltaParaAHome = { readonly href: string; readonly rotulo: string; readonly [CONFERIDA]: true };
+
+/** Decisão 517: o nome de origem continua valendo para a composição do DRE. */
+export const voltaDaComposicao = voltaParaAHome;
+
+/**
+ * Decisão 518: leva a volta da Home adiante, de tela em tela do mesmo circuito (mês → dia → mês). Só aceita a volta já
+ * conferida por `voltaParaAHome` (o tipo marcado); sem ela, o endereço sai como entrou.
+ */
+export function comVoltaParaAHome(href: string, volta: VoltaParaAHome | null | undefined): string {
+  if (!volta) return href;
+  return `${href}${href.includes('?') ? '&' : '?'}volta=${encodeURIComponent(volta.href)}`;
 }
 
 /** O caminho de volta com o insumo criado (a página de origem o lê para avisar e oferecer o insumo). */

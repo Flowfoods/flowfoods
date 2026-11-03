@@ -3,7 +3,7 @@
  * independentes não convertem erro/ausência em zero nem criam autorização.
  */
 import Link from 'next/link';
-import type { PainelDoDia, PendenciaDoDia } from '@/lib/erp/painel-do-dia';
+import type { NaturezaDaPendencia, PainelDoDia, PendenciaDoDia } from '@/lib/erp/painel-do-dia';
 import type { XmlAguardandoHome } from '@/lib/erp/home-xml-aguardando';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { LINK_DE_TEXTO } from '../ui/estilos';
@@ -82,41 +82,67 @@ export function PainelDoDiaNaTela({ painel }: { painel: PainelDoDia }) {
   );
 }
 
+/** Decisão 518: os dois grupos, na ordem em que as fontes já vinham (o grupo não é urgência nem nota). */
+const GRUPOS: readonly { natureza: NaturezaDaPendencia; rotulo: string }[] = [
+  { natureza: 'completar_dados', rotulo: 'Completar dados' },
+  { natureza: 'resolver_operacao', rotulo: 'Resolver operação' },
+];
+
+function ItemDaPendencia({ p, n }: { p: PendenciaDoDia; n: number }) {
+  return (
+    <li className="flex flex-wrap items-start gap-3 px-4 py-3.5 sm:flex-nowrap sm:px-5">
+      <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-linha-forte text-[12px] font-semibold text-texto">
+        {n}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-semibold text-texto">{p.titulo}</p>
+        {p.escopo && <p className="text-[12px] font-medium text-suave">{p.escopo}</p>}
+        {p.leitura === 'nao_conferida' && <span className="mt-1 inline-flex"><Selo tom="alerta">Não conferido</Selo></span>}
+        <p className="text-[13px] leading-relaxed text-suave">{p.texto}</p>
+        {p.indicador && <p className="text-[12px] text-suave">Indicador afetado: {p.indicador}</p>}
+      </div>
+      <Link href={p.href} className={LINK_DE_TEXTO + ' inline-flex min-h-11 shrink-0 basis-full items-center pl-9 text-[13px] sm:min-h-9 sm:basis-auto sm:pl-0 sm:pt-0.5'}>
+        {p.acao}
+      </Link>
+    </li>
+  );
+}
+
 /** A mesma lista acionável também compõe a Home de uma loja. */
 export function PendenciasDoResumo({ pendencias, xmlAguardando: xml }: { pendencias: readonly PendenciaDoDia[]; xmlAguardando?: XmlAguardandoHome }) {
   const contagem = xml?.estado === 'ok' && Number.isSafeInteger(xml.aguardando) && xml.aguardando !== null && xml.aguardando >= 0 ? xml.aguardando : null;
   const escopoXml = xml ? `${xml.loja.nome} · fila atual, sem recorte mensal${xml.loja.ativa === false ? ' · loja desativada' : ''}` : '';
   const filaMaisAmpla = 'A fila também pode incluir notas recebidas ou com erro.';
-  const lista = xml && contagem !== null && contagem > 0 ? [...pendencias, {
+  const lista: readonly PendenciaDoDia[] = xml && contagem !== null && contagem > 0 ? [...pendencias, {
     chave: 'xml-aguardando-conferencia',
     titulo: `${contagem.toLocaleString('pt-BR')} XML aguardando conferência`,
     escopo: escopoXml,
     texto: `Só documentos atribuídos a esta loja. XML recebido ainda não é compra lançada e não entra em Compras, estoque ou CMV. ${filaMaisAmpla}`,
     href: xml.detalhe.href,
     acao: xml.detalhe.rotulo,
+    natureza: 'resolver_operacao',
   }] : pendencias;
   if (!lista.length && !xml) return null;
+  // Decisão 518: com todas classificadas (ERP), dois grupos no MESMO painel; sem classificação (nível 1), a lista de antes.
+  const agrupada = lista.length > 0 && lista.every((p) => p.natureza);
+  const grupos = agrupada ? GRUPOS.map((g) => ({ ...g, itens: lista.filter((p) => p.natureza === g.natureza) })).filter((g) => g.itens.length) : [];
+  const inicioDe = (i: number) => 1 + grupos.slice(0, i).reduce((n, g) => n + g.itens.length, 0);
   return (
     <div className="space-y-3">
       {lista.length > 0 && (
-        <Painel titulo="O que precisa de você" subtitulo="Na ordem em que vale resolver" semRespiro>
-          <ol className="divide-y divide-linha">
-            {lista.map((p, n) => (
-              <li key={p.chave} className="flex flex-wrap items-start gap-3 px-4 py-3.5 sm:flex-nowrap sm:px-5">
-                <span aria-hidden className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full border border-linha-forte text-[12px] font-semibold text-texto">
-                  {n + 1}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[14px] font-semibold text-texto">{p.titulo}</p>
-                  {p.escopo && <p className="text-[12px] font-medium text-suave">{p.escopo}</p>}
-                  <p className="text-[13px] leading-relaxed text-suave">{p.texto}</p>
-                </div>
-                <Link href={p.href} className={LINK_DE_TEXTO + ' inline-flex min-h-11 shrink-0 basis-full items-center pl-9 text-[13px] sm:min-h-9 sm:basis-auto sm:pl-0 sm:pt-0.5'}>
-                  {p.acao}
-                </Link>
-              </li>
-            ))}
-          </ol>
+        <Painel titulo="O que precisa de você" subtitulo={agrupada ? 'O que falta registrar e o que falta fazer na casa' : 'Na ordem em que vale resolver'} semRespiro>
+          {agrupada ? grupos.map((g, i) => (
+            <div key={g.natureza} role="group" aria-labelledby={`pendencias-${g.natureza}`} className={i > 0 ? 'border-t border-linha' : ''}>
+              <h3 id={`pendencias-${g.natureza}`} className="px-4 pt-3.5 text-[12px] font-semibold uppercase tracking-[0.12em] text-suave sm:px-5">{g.rotulo}</h3>
+              <ol start={inicioDe(i)} className="divide-y divide-linha">
+                {g.itens.map((p, n) => <ItemDaPendencia key={p.chave} p={p} n={inicioDe(i) + n} />)}
+              </ol>
+            </div>
+          )) : (
+            <ol className="divide-y divide-linha">
+              {lista.map((p, n) => <ItemDaPendencia key={p.chave} p={p} n={n + 1} />)}
+            </ol>
+          )}
         </Painel>
       )}
       {xml && (contagem === null || contagem === 0) && (

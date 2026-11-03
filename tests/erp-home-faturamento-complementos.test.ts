@@ -138,7 +138,7 @@ describe('Faturamento · complementos puros do mesmo total', () => {
     expect(faturamentoAnalitico(leitura, { ...c, alcance: { ...alcance, permissoes: new Set() } })).toBeNull();
     expect(faturamentoAnalitico(leitura, { ...c, loja: { id: 'lojaa', nome: 'Proibida' } })).toBeNull();
     const n1 = projetar(mes(), { ...c, raiz: '/rodolfo/erp/casa-b' });
-    expect(n1.widget.detalhe.href).toBe('/rodolfo/erp/casa-b/faturamento?mes=2026-10&loja=lojab');
+    expect(n1.widget.detalhe.href).toBe('/rodolfo/erp/casa-b/faturamento?mes=2026-10&loja=lojab&volta=%2Frodolfo%2Ferp%2Fcasa-b');
     expect(n1.widget.complementos?.pedidos).toBe(4);
   });
 
@@ -162,7 +162,9 @@ describe('Faturamento · nenhum custo adicional de leitura na Home', () => {
   it('uma única obterMes alimenta receita, evolução e os três complementos; outras fontes continuam sem acesso', async () => {
     vi.mocked(obterMes).mockResolvedValueOnce(mes());
     const p = await painelDoDia(cliente, alcance, '/erp', HOJE, visao);
-    expect(obterMes).toHaveBeenCalledTimes(1); expect(obterMes).toHaveBeenCalledWith(cliente, expect.objectContaining({ lojas: ['lojab'] }), { mes: '2026-10', lojaId: 'lojab' }, HOJE);
+    // Decisão 518 (revisão): uma leitura por mês. A do mês corrente alimenta tudo; a do mês anterior só conta as faltas dele.
+    expect(vi.mocked(obterMes).mock.calls.map((c) => c[2])).toEqual([{ mes: '2026-10', lojaId: 'lojab' }, { mes: '2026-09', lojaId: 'lojab' }]);
+    expect(obterMes).toHaveBeenNthCalledWith(1, cliente, expect.objectContaining({ lojas: ['lojab'] }), { mes: '2026-10', lojaId: 'lojab' }, HOJE);
     expect(p.analitico?.tipo).toBe('loja'); if (p.analitico?.tipo !== 'loja') throw new Error('Loja esperada.');
     const fat = p.analitico.widgets.find(w => w.familia === 'faturamento');
     expect(fat).toMatchObject({ valor: { valor: 100000 }, complementos: { pedidos: 4, atendimentos: 8, ticketMedioCentavos: 25000 } });
@@ -184,6 +186,6 @@ describe('Faturamento · nenhum custo adicional de leitura na Home', () => {
     const p = await painelDoDia(cliente, alcance, '/erp', HOJE, visao);
     if (p.analitico?.tipo !== 'loja') throw new Error('Loja esperada.');
     expect(p.analitico.widgets.find(w => w.familia === 'faturamento')).toMatchObject({ estado: 'erro', valor: { valor: null }, complementos: { estado: 'erro', pedidos: null, atendimentos: null, ticketMedioCentavos: null } });
-    expect(obterMes).toHaveBeenCalledTimes(1); expect(JSON.stringify(p)).not.toMatch(/SQL|999999/);
+    expect(vi.mocked(obterMes).mock.calls.map((c) => c[2].mes)).toEqual(['2026-10', '2026-09']); expect(JSON.stringify(p)).not.toMatch(/SQL|999999/);
   });
 });

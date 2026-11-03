@@ -76,7 +76,7 @@ describe.skipIf(!URL_TESTE)('Início de trabalho · Postgres real', { timeout: 9
   it('a dona vê faturamento, cardápio e estoque, e as pendências', async () => {
     const p = await painelDoDia(a, alcance('DONO'), '/erp', HOJE);
     expect(p.indicadores.map((i) => i.chave)).toEqual(['faturamento', 'cardapio', 'estoque']);
-    expect(p.indicadores[0]).toMatchObject({ valor: { tipo: 'dinheiro', centavos: 300_000 }, href: '/erp/faturamento?mes=2026-10' });
+    expect(p.indicadores[0]).toMatchObject({ valor: { tipo: 'dinheiro', centavos: 300_000 }, href: '/erp/faturamento?mes=2026-10&volta=%2Ferp' });
     expect(p.indicadores[0].contexto).toContain('3 dias lançados');
     expect(p.indicadores[1]).toMatchObject({ valor: { tipo: 'fracao', de: 0, total: 1 } });
     expect(p.indicadores[2]).toMatchObject({ valor: { tipo: 'fracao', de: 0, total: 1 } });
@@ -137,7 +137,7 @@ describe.skipIf(!URL_TESTE)('Início de trabalho · Postgres real', { timeout: 9
     expect(pa.indicadores.find((i) => i.chave === 'faturamento')?.valor).toEqual({ tipo: 'dinheiro', centavos: 300_000 });
     expect(pb.indicadores.find((i) => i.chave === 'faturamento')).toMatchObject({
       valor: { tipo: 'dinheiro', centavos: 700_000 }, escopo: 'Loja B da visão',
-      href: '/erp/faturamento?mes=2026-10&loja=' + lojaBId,
+      href: '/erp/faturamento?mes=2026-10&loja=' + lojaBId + '&volta=%2Ferp',
     });
     expect(rede.indicadores.find((i) => i.chave === 'faturamento')?.valor).toEqual({ tipo: 'dinheiro', centavos: 1_000_000 });
     expect(pb.indicadores.find((i) => i.chave === 'estoque')?.valor).toEqual({ tipo: 'fracao', de: 0, total: 1 });
