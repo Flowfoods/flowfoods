@@ -104,7 +104,7 @@ describe('H2 · composição de uma loja', () => {
     expect(h).toContain('Indisponível');
     expect(h).toContain('O resumo por competência ainda não está disponível.');
     expect(h).toContain('Valor não disponível');
-    expect(h).not.toMatch(/R\$|a pagar|CMV da loja|Evolução do faturamento|Despesas da loja|Competência · sem CMV/);
+    expect(h).not.toMatch(/R\$|a pagar|CMV da loja|Evolução do faturamento|Despesas da loja|Pelo mês da despesa · sem CMV/);
   });
 
   it('Cardápio fica secundário Da rede e não ocupa a família CMV', () => {

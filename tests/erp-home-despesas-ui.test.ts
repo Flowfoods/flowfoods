@@ -57,7 +57,7 @@ describe('Despesas na Home · apresentação', () => {
     expect(h).toContain('aria-label="Indicador de Despesas"');
     expect(h).toContain('aria-label="Despesas da loja"');
     expect(h).toContain('data-valor-monetario="' + formatarDinheiro(TOTAL) + '"');
-    expect(h.match(/Competência · sem CMV e deduções/g)).toHaveLength(2);
+    expect(h.match(/Pelo mês da despesa · sem CMV e deduções/g)).toHaveLength(2);
     expect(h).toContain('Parcial');
     expect(h).toContain('<caption class="mb-2 text-left font-semibold text-texto">Despesas por grupo do DRE</caption>');
     const corpo = h.slice(h.indexOf('<tbody>'), h.indexOf('</tbody>'));
@@ -117,7 +117,7 @@ describe('Despesas na Home · apresentação', () => {
     expect(h).not.toContain('aria-label="Despesas da loja"');
     expect(h).toContain('O total de despesas por competência ainda não está disponível neste resumo.');
     expect(h).toContain('href="/erp/dre/despesas?loja=lojab"');
-    expect(h).not.toMatch(/R\$|<table|Competência · sem CMV|Ocupação|Pessoal/);
+    expect(h).not.toMatch(/R\$|<table|Pelo mês da despesa · sem CMV|Ocupação|Pessoal/);
   });
 
   it('DTO incompatível (total diferente da soma ou grupos faltando) vira indisponível, sem números', () => {

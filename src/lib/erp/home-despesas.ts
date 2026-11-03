@@ -27,7 +27,7 @@ export const GRUPOS_DAS_DESPESAS_DA_HOME = [
 ] as const satisfies readonly GrupoDoDre[];
 export type GrupoDasDespesasHome = (typeof GRUPOS_DAS_DESPESAS_DA_HOME)[number];
 /** A linha que acompanha o total no card e no painel: a base e o que fica de fora. */
-export const RECORTE_DAS_DESPESAS_DA_HOME = 'Competência · sem CMV e deduções';
+export const RECORTE_DAS_DESPESAS_DA_HOME = 'Pelo mês da despesa · sem CMV e deduções';
 
 export interface GrupoDaComposicaoDespesasHome {
   grupo: GrupoDasDespesasHome;
