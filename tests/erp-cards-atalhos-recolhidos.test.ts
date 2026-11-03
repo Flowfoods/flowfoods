@@ -32,7 +32,7 @@ describe('cards de módulos: atalhos recolhidos por padrão', () => {
     expect(conteudo).toContain('Ver atalhos');
     expect(conteudo).toContain('<span class="sr-only"> de Compras e Fornecedores</span>');
     // A região controlada existe, está oculta e contém a lista com os mesmos links.
-    const regiao = new RegExp(`<div id="${controla.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" hidden="">([\\s\\S]*?)</div>`).exec(h);
+    const regiao = new RegExp(`<div id="${controla.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}" hidden=""[^>]*>([\\s\\S]*?)</div>`).exec(h);
     expect(regiao).not.toBeNull();
     expect(regiao![1]).toContain('aria-label="Abas de Compras e Fornecedores"');
     expect([...regiao![1].matchAll(/href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/erp/compras', '/erp/fornecedores', '/erp/compras/historico']);
@@ -62,7 +62,10 @@ describe('cards de módulos: atalhos recolhidos por padrão', () => {
   it('a grade alinha os cards ao topo (abrir um não estica os vizinhos) e cada card tem o próprio botão', () => {
     const outro: CartaoDoHub = { ...compras, chave: 'estoque', nome: 'Estoque', href: '/erp/estoque', abas: [{ rotulo: 'Contagens', href: '/erp/estoque/contagens' }] };
     const h = renderToStaticMarkup(createElement(HubDeModulos, { secoes: [{ rotulo: 'Operação', cartoes: [compras, outro] }] }));
-    expect(h).toMatch(/<ul class="grid [^"]*items-start/);
+    expect(h).toMatch(/<ul class="grid [^"]*min-\[600px\]:items-start/);
+    // Seção sem atalhos mantém a altura igual por linha.
+    const semAtalhos = renderToStaticMarkup(createElement(HubDeModulos, { secoes: [{ rotulo: 'Fases', cartoes: [{ ...compras, abas: undefined }] }] }));
+    expect(/<ul class="(grid [^"]*)"/.exec(semAtalhos)![1]).not.toContain('items-start');
     expect(h.match(/aria-expanded="false"/g)).toHaveLength(2);
     const ids = [...h.matchAll(/aria-controls="([^"]+)"/g)].map((m) => m[1]);
     expect(new Set(ids).size).toBe(2);

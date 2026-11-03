@@ -25,13 +25,19 @@ export function AtalhosDoCartao({ nome, abas }: { nome: string; abas: { rotulo: 
   const [aberto, definirAberto] = useState(false);
   const botao = useRef<HTMLButtonElement>(null);
   const regiao = useRef<HTMLDivElement>(null);
+  /** O foco estava num atalho? (Quando o atalho focado some, o navegador joga o foco no body antes deste efeito.) */
+  const focoNosAtalhos = useRef(false);
   const id = useId();
   const assinatura = abas.map((a) => a.href).join('\n');
 
   useAntesDaPintura(() => {
     const recolher = () => {
-      // Se o foco estava num atalho que vai sumir, ele volta ao botão (contexto válido), nunca se perde no body.
-      if (regiao.current?.contains(document.activeElement)) botao.current?.focus();
+      // Se o foco estava num atalho (que pode já ter sumido por troca de permissão), ele volta ao botão, nunca fica no body.
+      const ativo = document.activeElement;
+      if (focoNosAtalhos.current && (!ativo || ativo === document.body || !ativo.isConnected || regiao.current?.contains(ativo))) botao.current?.focus();
+      focoNosAtalhos.current = false;
+      // Fecha também direto no DOM: a página entra no cache do navegador já recolhida.
+      if (regiao.current) regiao.current.hidden = true;
       definirAberto(false);
     };
     const aoRestaurar = (evento: PageTransitionEvent) => {
@@ -55,14 +61,24 @@ export function AtalhosDoCartao({ nome, abas }: { nome: string; abas: { rotulo: 
         aria-expanded={aberto}
         aria-controls={id}
         onClick={() => definirAberto((a) => !a)}
-        className="ff-transicao inline-flex min-h-11 items-center gap-1.5 rounded-[7px] text-[13px] font-medium text-texto hover:underline hover:underline-offset-4"
+        className="ff-transicao pointer-events-auto inline-flex min-h-11 items-center gap-1.5 rounded-[7px] text-[13px] font-medium text-texto hover:underline hover:underline-offset-4"
       >
         {aberto ? 'Ocultar atalhos' : 'Ver atalhos'}
         <span className="sr-only"> de {nome}</span>
         <ChevronDown size={16} aria-hidden className={`ff-transicao ${aberto ? 'rotate-180' : ''}`} />
       </button>
       {/* `hidden` fora da árvore de acessibilidade e da tabulação; nenhuma classe de display neste elemento. */}
-      <div ref={regiao} id={id} hidden={!aberto}>
+      <div
+        ref={regiao}
+        id={id}
+        hidden={!aberto}
+        className="pointer-events-auto"
+        onFocus={() => (focoNosAtalhos.current = true)}
+        onBlur={(e) => {
+          // Só sai quando o foco foi para outro elemento fora dos atalhos; sem destino (item removido), continua marcado.
+          if (e.relatedTarget && !regiao.current?.contains(e.relatedTarget as Node)) focoNosAtalhos.current = false;
+        }}
+      >
         <ul aria-label={`Abas de ${nome}`} className="flex flex-wrap items-center gap-x-4 pb-1 text-[13px] text-suave">
           {abas.map((a) => (
             <li key={a.href} className="flex items-center">

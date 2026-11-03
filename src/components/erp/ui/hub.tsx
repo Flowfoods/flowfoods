@@ -79,7 +79,8 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
         </Link>
         <span className="mt-0.5 line-clamp-3 block text-[13px] leading-snug text-suave [text-wrap:pretty] sm:line-clamp-none">{c.subtitulo}</span>
       </span>
-      <div className="relative z-10 mt-4 hidden w-full border-t border-linha pt-1 min-[600px]:block">
+      {/* pointer-events-none: o espaço vazio ao lado do botão continua levando à área (camada do título); botão e lista recebem o clique. */}
+      <div className="pointer-events-none relative z-10 mt-4 hidden w-full border-t border-linha pt-1 min-[600px]:block">
         <AtalhosDoCartao nome={c.nome} abas={c.abas} />
       </div>
     </div>
@@ -95,8 +96,9 @@ export function HubDeModulos({ secoes }: { secoes: { rotulo: string; cartoes: Ca
           <section key={s.rotulo} aria-label={s.rotulo}>
             {/* avoid-ai-design-ignore: SD4 — rótulo de seção em caixa alta só no hub e nos grupos do menu (contrato do shell). */}
             <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-suave">{s.rotulo}</h2>
-            {/* items-start: altura natural; abrir os atalhos de um card não estica os vizinhos (pedido de 30/10). */}
-            <ul className="grid grid-cols-2 items-start gap-2.5 sm:gap-3 xl:grid-cols-4">
+            {/* Seção com atalhos: altura natural a partir de 600 px, para abrir um card não esticar os vizinhos (pedido de 30/10).
+                Sem atalhos (ou no celular, onde a lista não aparece), os cards da linha seguem com a mesma altura. */}
+            <ul className={`grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4 ${s.cartoes.some((c) => c.href && c.abas?.length) ? 'min-[600px]:items-start' : ''}`}>
               {s.cartoes.map((c) => (
                 <li key={c.chave} className="min-w-0">
                   <CartaoModulo c={c} />
