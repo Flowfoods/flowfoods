@@ -10,6 +10,8 @@ import { dreDoPeriodo, type DreDoPeriodo } from '@/lib/erp/dre';
 import type { ContextoHomeLoja } from '@/lib/erp/home-analitico';
 import type { LeituraDoDreParaHome } from '@/lib/erp/home-cmv';
 import { despesasDaHome, GRUPOS_DAS_DESPESAS_DA_HOME, type WidgetDespesasHome } from '@/lib/erp/home-despesas';
+import { lerRecorteDaComposicao } from '@/lib/erp/despesa-campos';
+import { voltaDaComposicao } from '@/lib/erp/volta';
 import { painelDoDia } from '@/lib/erp/painel-do-dia';
 import { obterMes } from '@/lib/erp/faturamento';
 import { situacaoDoEstoque } from '@/lib/erp/estoque';
@@ -39,19 +41,19 @@ const contexto = (alteracoes: Partial<ContextoHomeLoja> = {}): ContextoHomeLoja 
 
 // Plano gravado (com ids), uma linha criada pela casa e o IPTU oculto.
 const plano = planoEfetivo([
-  ...PLANO_PADRAO.map((p, i): LinhaDoBanco => ({ id: 'l-' + p.codigo, codigo: p.codigo, nome: p.nome, grupo: p.grupo, calculada: p.calculada, sentido: p.sentido, ordem: (i + 1) * 10, ativa: p.codigo !== 'iptu', atualizadoEm: new Date('2026-10-01T12:00:00.000Z') })),
+  ...PLANO_PADRAO.map((p, i): LinhaDoBanco => ({ id: 'l' + p.codigo.replace(/-/g, ''), codigo: p.codigo, nome: p.nome, grupo: p.grupo, calculada: p.calculada, sentido: p.sentido, ordem: (i + 1) * 10, ativa: p.codigo !== 'iptu', atualizadoEm: new Date('2026-10-01T12:00:00.000Z') })),
   { id: 'seguro', codigo: null, nome: 'Seguro do ponto', grupo: 'ADMINISTRATIVA', calculada: false, sentido: 'MENOR_MELHOR', ordem: 999, ativa: true, atualizadoEm: new Date('2026-10-01T12:00:00.000Z') },
 ]);
 const DESPESAS: DespesaApropriada[] = [
-  { linhaId: 'l-aluguel', lojaId: 'lojab', centavos: 300_000 },
-  { linhaId: 'l-salarios', lojaId: 'lojab', centavos: 500_000 },
+  { linhaId: 'laluguel', lojaId: 'lojab', centavos: 300_000 },
+  { linhaId: 'lsalarios', lojaId: 'lojab', centavos: 500_000 },
   { linhaId: 'seguro', lojaId: 'lojab', centavos: 12_000 }, // linha da casa
-  { linhaId: 'l-iptu', lojaId: 'lojab', centavos: 31_000 }, // linha oculta com valor
-  { linhaId: 'l-tarifas', lojaId: 'lojab', centavos: 4_500 },
-  { linhaId: 'l-impostos', lojaId: 'lojab', centavos: 40_000 }, // dedução: fora
-  { linhaId: 'l-taxas-cartao', lojaId: 'lojab', centavos: 7_700 }, // dedução: fora
-  { linhaId: 'l-energia', lojaId: null, centavos: 99_999 }, // rede sem loja: fora da loja
-  { linhaId: 'l-aluguel', lojaId: 'lojaa', centavos: 777_777 }, // outra loja: fora
+  { linhaId: 'liptu', lojaId: 'lojab', centavos: 31_000 }, // linha oculta com valor
+  { linhaId: 'ltarifas', lojaId: 'lojab', centavos: 4_500 },
+  { linhaId: 'limpostos', lojaId: 'lojab', centavos: 40_000 }, // dedução: fora
+  { linhaId: 'ltaxascartao', lojaId: 'lojab', centavos: 7_700 }, // dedução: fora
+  { linhaId: 'lenergia', lojaId: null, centavos: 99_999 }, // rede sem loja: fora da loja
+  { linhaId: 'laluguel', lojaId: 'lojaa', centavos: 777_777 }, // outra loja: fora
 ];
 const ESPERADO = 300_000 + 500_000 + 12_000 + 31_000 + 4_500;
 const cmvDaFixture: CmvDoDre = { lojas: [{ lojaId: 'lojab', lojaNome: 'Loja B', compraCentavos: 55_555, real: null, motivoSemReal: 'estoque não aberto' }], parcial: false };
@@ -80,7 +82,7 @@ const fechado = (d: DreDoPeriodo): DreDoPeriodo => ({
   },
 });
 const recorrente = (alteracoes: Partial<RecorrenteEmFalta> = {}): RecorrenteEmFalta => ({
-  origemId: 'origem-privada', mesAlvo: '2026-10', descricao: 'Contador privado', linhaNome: 'Contabilidade', linhaId: 'l-contabilidade',
+  origemId: 'origem-privada', mesAlvo: '2026-10', descricao: 'Contador privado', linhaNome: 'Contabilidade', linhaId: 'lcontabilidade',
   grupo: 'ADMINISTRATIVA', lojaId: 'lojab', lojaNome: 'Loja B', linhaOculta: false, valorCentavos: 654_321, vencimento: null, ...alteracoes,
 });
 
@@ -96,10 +98,14 @@ describe('Despesas da Home · soma das linhas do DRE, conferida com os subtotais
     expect(w.composicaoPorGrupo).toMatchObject({ estado: 'ok', base: 'competencia_sem_cmv_e_deducoes' });
     expect(w.composicaoPorGrupo!.grupos.map((g) => g.grupo)).toEqual([...GRUPOS_DAS_DESPESAS_DA_HOME]);
     for (const g of GRUPOS_DAS_DESPESAS_DA_HOME) expect(grupo(w, g).centavos, g).toBe(linhaDe(d, `grupo:${g}`).valorCentavos);
-    expect(grupo(w, 'OCUPACAO')).toEqual({ grupo: 'OCUPACAO', rotulo: 'Ocupação', centavos: 331_000, comLancamento: true });
+    const conferir = (linha: string) => `/erp/dre/despesas?linha=${linha}&de=2026-10-01&ate=2026-10-31&loja=lojab&volta=%2Ferp`;
+    expect(grupo(w, 'OCUPACAO')).toEqual({ grupo: 'OCUPACAO', rotulo: 'Ocupação', centavos: 331_000, comLancamento: true, linhas: [
+      { chave: 'aluguel', nome: 'Aluguel', centavos: 300_000, conferir: conferir('laluguel') },
+      { chave: 'iptu', nome: 'IPTU', centavos: 31_000, conferir: conferir('liptu') },
+    ] });
     expect(grupo(w, 'ADMINISTRATIVA')).toMatchObject({ centavos: 12_000, comLancamento: true });
     expect(grupo(w, 'FINANCEIRA')).toMatchObject({ rotulo: 'Financeiras', centavos: 4_500 });
-    expect(grupo(w, 'MARKETING')).toEqual({ grupo: 'MARKETING', rotulo: 'Marketing', centavos: 0, comLancamento: false });
+    expect(grupo(w, 'MARKETING')).toEqual({ grupo: 'MARKETING', rotulo: 'Marketing', centavos: 0, comLancamento: false, linhas: [] });
     expect(linhaDe(d, 'id:seguro')).toMatchObject({ tipo: 'linha', grupo: 'ADMINISTRATIVA', valorCentavos: 12_000 });
     expect(linhaDe(d, 'iptu')).toMatchObject({ tipo: 'linha', oculta: true, valorCentavos: 31_000 });
   });
@@ -124,7 +130,7 @@ describe('Despesas da Home · soma das linhas do DRE, conferida com os subtotais
   });
 
   it('preserva valores negativos com o sinal, sem limitar ou trocar por zero', () => {
-    const d = dre({}, [{ linhaId: 'l-diversas', lojaId: 'lojab', centavos: -5_000 }, { linhaId: 'l-marketing', lojaId: 'lojab', centavos: 2_000 }]);
+    const d = dre({}, [{ linhaId: 'ldiversas', lojaId: 'lojab', centavos: -5_000 }, { linhaId: 'lmarketing', lojaId: 'lojab', centavos: 2_000 }]);
     const w = adaptar(d);
     expect(w.estado).toBe('ok');
     expect(w.valor.valor).toBe(-3_000);
@@ -162,7 +168,7 @@ describe('Despesas da Home · estados honestos', () => {
   });
 
   it('todas as linhas sem valor é sem dados, não um total zero inventado', () => {
-    const w = adaptar(dre({}, [{ linhaId: 'l-impostos', lojaId: 'lojab', centavos: 40_000 }, { linhaId: 'l-energia', lojaId: null, centavos: 10_000 }]));
+    const w = adaptar(dre({}, [{ linhaId: 'limpostos', lojaId: 'lojab', centavos: 40_000 }, { linhaId: 'lenergia', lojaId: null, centavos: 10_000 }]));
     expect(w.estado).toBe('sem_dados');
     expect(w.valor.valor).toBeNull();
     expect(w.composicaoPorGrupo!.grupos).toEqual([]);
@@ -224,13 +230,13 @@ describe('Despesas da Home · estados honestos', () => {
   });
 
   it('recorrente de dedução (DAS) fora do recorte não deixa parcial nem avisa; a de Ocupação continua avisando', () => {
-    const das = recorrente({ origemId: 'das', descricao: 'DAS', linhaNome: 'Impostos sobre a venda (DAS)', linhaId: 'l-impostos', grupo: 'DEDUCAO' });
+    const das = recorrente({ origemId: 'das', descricao: 'DAS', linhaNome: 'Impostos sobre a venda (DAS)', linhaId: 'limpostos', grupo: 'DEDUCAO' });
     const d = dre({ faltaLancar: [das] });
     const w = adaptar(d);
     expect(w.estado).toBe('ok');
     expect(w.recorrentesSemLancamento).toBe(0);
     expect(w.avisos).toEqual([]);
-    d.faltaLancar.push(recorrente({ origemId: 'aluguel', descricao: 'Aluguel', linhaNome: 'Aluguel', linhaId: 'l-aluguel', grupo: 'OCUPACAO' }));
+    d.faltaLancar.push(recorrente({ origemId: 'aluguel', descricao: 'Aluguel', linhaNome: 'Aluguel', linhaId: 'laluguel', grupo: 'OCUPACAO' }));
     const com = adaptar(d);
     expect(com.estado).toBe('parcial');
     expect(com.recorrentesSemLancamento).toBe(1);
@@ -319,6 +325,119 @@ describe('Despesas da Home · permissão, escopo e falhas', () => {
     const w = adaptar(dre());
     expect(w.consultadoEm).toBe(consulta);
     expect(JSON.parse(JSON.stringify(w))).toEqual(w);
+  });
+});
+
+// ------------------------------------------------------------------ "Conferir este valor" (decisão 517)
+
+describe('Despesas da Home · Conferir este valor (linha do DRE → composição da linha)', () => {
+  const linhasDe = (w: WidgetDespesasHome) => w.composicaoPorGrupo!.grupos.flatMap((g) => g.linhas);
+  const emCurso = () => dre({ hoje: HOJE, emCurso: true, encerrado: false, ate: '2026-10-28', diasApurados: 28, diaDeHoje: 29 });
+
+  it('cada grupo leva as linhas com valor do DRE, na ordem do DRE, somando o subtotal; linha sem valor não entra', () => {
+    const d = dre();
+    const w = adaptar(d);
+    for (const g of w.composicaoPorGrupo!.grupos) {
+      const doDre = d.resultado.linhas.filter((l) => l.tipo === 'linha' && l.grupo === g.grupo && l.valorCentavos !== 0);
+      expect(g.linhas.map((l) => l.chave), g.grupo).toEqual(doDre.map((l) => l.chave));
+      expect(g.linhas.reduce((s, l) => s + l.centavos, 0), g.grupo).toBe(g.centavos);
+      expect(g.linhas.length > 0, g.grupo).toBe(g.comLancamento);
+    }
+    expect(linhasDe(w).map((l) => l.nome)).toEqual(['Salários', 'Aluguel', 'IPTU', 'Seguro do ponto', 'Tarifas e antecipação']);
+    expect(linhasDe(w).every((l) => l.centavos !== 0)).toBe(true);
+  });
+
+  it('o link abre a composição da linha no MESMO recorte e loja, com volta para a Home; o leitor da rota aceita o endereço', () => {
+    const d = emCurso();
+    for (const raiz of ['/erp', '/rodolfo/erp/casa-alfa']) {
+      const w = adaptar(d, contexto({ raiz }));
+      expect(w.estado).toBe('parcial');
+      for (const l of linhasDe(w)) {
+        const u = new URL(l.conferir!, 'https://local.test');
+        expect(u.pathname, l.nome).toBe(`${raiz}/dre/despesas`);
+        expect([...u.searchParams.keys()]).toEqual(['linha', 'de', 'ate', 'loja', 'volta']);
+        const doDre = d.resultado.linhas.find((x) => x.chave === l.chave)!;
+        expect(lerRecorteDaComposicao({ linha: u.searchParams.get('linha')!, de: u.searchParams.get('de')!, ate: u.searchParams.get('ate')! }))
+          .toEqual({ linhaId: doDre.linhaId, de: '2026-10-01', ate: '2026-10-28' });
+        expect(u.searchParams.get('loja')).toBe('lojab');
+        expect(voltaDaComposicao(u.searchParams.get('volta'), raiz)).toEqual({ href: raiz, rotulo: 'o início' });
+      }
+    }
+    // A linha criada pela casa e a linha oculta com valor também abrem a composição.
+    const w = adaptar(d);
+    expect(linhasDe(w).find((l) => l.chave === 'id:seguro')!.conferir).toBe('/erp/dre/despesas?linha=seguro&de=2026-10-01&ate=2026-10-28&loja=lojab&volta=%2Ferp');
+    expect(linhasDe(w).find((l) => l.chave === 'iptu')!.conferir).toContain('linha=liptu&');
+  });
+
+  it('fotografia (período fechado): linhas e valores ficam, nenhum link; FECHADO sem fotografia não tem linha nenhuma', () => {
+    const vivo = dre();
+    const escopo = { tipo: 'loja', lojaId: loja.id, nome: loja.nome } as const;
+    const resultado = dreDaFotografia(linhasParaGravar(vivo.resultado, loja.id, loja.nome, () => null), escopo);
+    const w = adaptar(fechado({ ...vivo, escopo, resultado }));
+    expect(w.origem?.modo).toBe('fotografia');
+    expect(linhasDe(w).length).toBe(5);
+    expect(linhasDe(w).every((l) => l.conferir === null)).toBe(true);
+    expect(JSON.stringify(w)).not.toContain('/dre/despesas?');
+    expect(adaptar(dre({ status: 'FECHADO' })).composicaoPorGrupo!.grupos).toEqual([]);
+  });
+
+  it('sem leitura válida não há link: sem dados, nenhum dia apurado, divergente, erro, indisponível', () => {
+    const casos = [
+      adaptar(dre({}, [{ linhaId: 'limpostos', lojaId: 'lojab', centavos: 40_000 }])),
+      adaptar(dre({ hoje: periodo.inicio, emCurso: true, encerrado: false, ate: null, diasApurados: 0, diaDeHoje: 1 }, [])),
+      (() => { const d = dre(); linhaDe(d, 'grupo:PESSOAL').valorCentavos = 500_001; return adaptar(d); })(),
+      despesasDaHome({ estado: 'erro' }, contexto())!,
+      despesasDaHome({ estado: 'indisponivel' }, contexto())!,
+    ];
+    for (const w of casos) {
+      expect(w.composicaoPorGrupo!.grupos).toEqual([]);
+      expect(JSON.stringify(w)).not.toContain('/dre/despesas?');
+    }
+  });
+
+  it('quem só lança despesas (sem dre.ver) e quem não tem nenhuma das duas não recebem linha nem link', () => {
+    const lancador = despesasDaHome({ estado: 'lido', dre: emCurso() }, contexto({ alcance: acesso(['despesas.lancar']) }))!;
+    expect(lancador.composicaoPorGrupo).toBeUndefined();
+    expect(JSON.stringify(lancador)).not.toMatch(/dre\/despesas\?linha|laluguel|Aluguel/);
+    expect(despesasDaHome({ estado: 'lido', dre: emCurso() }, contexto({ alcance: acesso([]) }))).toBeNull();
+  });
+
+  it('linha com id que a rota não aceita fica na lista, sem link (nunca um link que cai na lista do mês)', () => {
+    const d = emCurso();
+    linhaDe(d, 'aluguel').linhaId = 'id-com-hifen';
+    const w = adaptar(d);
+    expect(grupo(w, 'OCUPACAO').linhas.map((l) => [l.chave, l.conferir === null])).toEqual([['aluguel', true], ['iptu', false]]);
+  });
+});
+
+describe('Composição · volta da Home (voltaDaComposicao)', () => {
+  it('aceita só a Home exata da área de quem lê, nas duas áreas', () => {
+    expect(voltaDaComposicao('/erp', '/erp')).toEqual({ href: '/erp', rotulo: 'o início' });
+    expect(voltaDaComposicao('/rodolfo/erp/casa-alfa', '/rodolfo/erp/casa-alfa')).toEqual({ href: '/rodolfo/erp/casa-alfa', rotulo: 'o início' });
+  });
+
+  it.each([
+    // Outro caminho da área, mesmo interno e legítimo (revisão da 517): só a Home vale.
+    '/erp/insumos', '/erp/dre?periodo=2026-10-01&loja=lojab', '/erp/', '/erp?sem-acesso=1', '/erp?sem-modulo=integracao', '/erp#topo',
+    // Caminho codificado: o laço `/erp/dre/d%65spesas` e o controle `%09`.
+    '/erp/dre/d%65spesas?linha=laluguel&de=2026-10-01&ate=2026-10-28', '/erp/%09/x', '/%65rp', '/erp%2f', '/erp%3Fx=1',
+    // A própria tela de despesas seria um laço.
+    '/erp/dre/despesas', '/erp/dre/despesas?linha=laluguel&de=2026-10-01&ate=2026-10-28', '/erp/dre/despesas/abc',
+    // Fora da área ou torto.
+    'https://fora.test/erp', '//fora.test/erp', 'http:/erp', '/erp/../rodolfo/erp/x', '/erp\\dre', '/erp//dre',
+    '/rodolfo/erp/outro', '/rodolfo/erp/outro/dre', '/erpx', ' /erp', '/erp ', '/erp\u0000', '/ERP', 'javascript:alert(1)', '',
+  ])('recusa %j (cai no "Voltar para o DRE")', (volta) => {
+    expect(voltaDaComposicao(volta, '/erp')).toBeNull();
+  });
+
+  it('recusa valor que não é texto, Home de outra área e raiz fora da forma da Home', () => {
+    for (const v of [undefined, null, 1, ['/erp'], { href: '/erp' }]) expect(voltaDaComposicao(v, '/erp')).toBeNull();
+    expect(voltaDaComposicao('/erp', '/rodolfo/erp/casa-alfa')).toBeNull();
+    expect(voltaDaComposicao('/rodolfo/erp/casa-alfa', '/erp')).toBeNull();
+    expect(voltaDaComposicao('/rodolfo/erp/outro', '/rodolfo/erp/casa-alfa')).toBeNull();
+    expect(voltaDaComposicao('/rodolfo/erp/casa-alfa/insumos', '/rodolfo/erp/casa-alfa')).toBeNull();
+    expect(voltaDaComposicao('/rodolfo/erp/casa%2dalfa', '/rodolfo/erp/casa-alfa')).toBeNull();
+    for (const raiz of ['/erp/', '//erp', '/rodolfo/erp/', '/rodolfo/erp/Casa_Alfa', '/rodolfo/erp/casa-alfa/dre', 'https://fora.test/erp']) expect(voltaDaComposicao(raiz, raiz), raiz).toBeNull();
   });
 });
 

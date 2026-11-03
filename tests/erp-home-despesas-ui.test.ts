@@ -22,13 +22,13 @@ const consulta = '2026-10-29T18:00:00.000Z';
 const loja = { id: 'lojab', nome: 'Loja B sintética', ativa: true, canais: ['LOJA' as const] };
 const dono = resolverAlcance({ perfilBase: 'DONO', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] });
 const contexto = (alcance: Alcance = dono): ContextoHomeLoja => ({ alcance, loja: { id: loja.id, nome: loja.nome }, raiz: '/erp', hoje: '2026-10-29', consultadoEm: consulta });
-const plano = planoEfetivo(PLANO_PADRAO.map((p, i): LinhaDoBanco => ({ id: 'l-' + p.codigo, codigo: p.codigo, nome: p.nome, grupo: p.grupo, calculada: p.calculada, sentido: p.sentido, ordem: (i + 1) * 10, ativa: true, atualizadoEm: new Date('2026-10-01T12:00:00.000Z') })));
+const plano = planoEfetivo(PLANO_PADRAO.map((p, i): LinhaDoBanco => ({ id: 'l' + p.codigo.replace(/-/g, ''), codigo: p.codigo, nome: p.nome, grupo: p.grupo, calculada: p.calculada, sentido: p.sentido, ordem: (i + 1) * 10, ativa: true, atualizadoEm: new Date('2026-10-01T12:00:00.000Z') })));
 const DESPESAS: DespesaApropriada[] = [
-  { linhaId: 'l-aluguel', lojaId: 'lojab', centavos: 280_000 },
-  { linhaId: 'l-salarios', lojaId: 'lojab', centavos: 451_613 },
-  { linhaId: 'l-internet', lojaId: 'lojab', centavos: 14_000 },
-  { linhaId: 'l-impostos', lojaId: 'lojab', centavos: 45_161 },
-  { linhaId: 'l-energia', lojaId: null, centavos: 99_900 },
+  { linhaId: 'laluguel', lojaId: 'lojab', centavos: 280_000 },
+  { linhaId: 'lsalarios', lojaId: 'lojab', centavos: 451_613 },
+  { linhaId: 'linternet', lojaId: 'lojab', centavos: 14_000 },
+  { linhaId: 'limpostos', lojaId: 'lojab', centavos: 45_161 },
+  { linhaId: 'lenergia', lojaId: null, centavos: 99_900 },
 ];
 function dre(alteracoes: Partial<DreDoPeriodo> = {}, despesas = DESPESAS): DreDoPeriodo {
   const escopo = { tipo: 'loja', lojaId: loja.id, nome: loja.nome } as const;
@@ -49,6 +49,7 @@ const html = (w: WidgetDespesasHome) => renderToStaticMarkup(createElement(HubDo
 const doPainel = (w: WidgetDespesasHome) => renderToStaticMarkup(createElement(DespesasDaHomeNaTela, { widget: w }));
 const texto = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
 const ZERO = formatarDinheiro(0);
+const escapar = (t: string) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 describe('Despesas na Home · apresentação', () => {
   it('card e painel com total, recorte, grupos em tabela, selo Parcial, origem, período e link do mesmo período', () => {
@@ -61,7 +62,7 @@ describe('Despesas na Home · apresentação', () => {
     expect(h).toContain('Parcial');
     expect(h).toContain('<caption class="mb-2 text-left font-semibold text-texto">Despesas por grupo do DRE</caption>');
     const corpo = h.slice(h.indexOf('<tbody>'), h.indexOf('</tbody>'));
-    expect(corpo.match(/<tr /g)).toHaveLength(8);
+    expect(corpo.match(/<tr[ >]/g)).toHaveLength(8 + 3); // os oito grupos e as três linhas com valor
     for (const rotulo of ['Despesas variáveis', 'Pessoal', 'Ocupação', 'Utilidades', 'Administrativas', 'Marketing', 'Outras despesas', 'Financeiras']) expect(corpo).toContain(`>${rotulo}</th>`);
     expect(corpo).toContain(formatarDinheiro(280_000));
     expect(corpo).toContain(formatarDinheiro(451_613));
@@ -77,7 +78,64 @@ describe('Despesas na Home · apresentação', () => {
     expect(h).toContain('Resumo consultado em');
     // O aviso aparece uma vez (no painel), sem bloco de Atenção ou pendência nova.
     expect(h.match(/Período em curso: as despesas entram dia a dia/g)).toHaveLength(1);
-    expect(h).not.toMatch(/Atenção|Conferir este valor|Pontos de atenção/);
+    expect(h).not.toMatch(/Atenção|Pontos de atenção/);
+    // "Conferir este valor" só nas linhas do painel (decisão 517): nunca no card da faixa, que já é um link.
+    const card = h.slice(h.indexOf('aria-label="Indicador de Despesas"'), h.indexOf('</a>', h.indexOf('aria-label="Indicador de Despesas"')));
+    expect(card).not.toContain('Conferir');
+    expect(h.match(/>Conferir este valor<\/a>/g)).toHaveLength(3);
+  });
+
+  it('decisão 517: cada grupo lista as linhas com valor e cada linha abre a composição dela no mesmo recorte e loja, com volta para a Home', () => {
+    const h = doPainel(widget());
+    const corpo = h.slice(h.indexOf('<tbody>'), h.indexOf('</tbody>'));
+    const linhas = corpo.match(/<tr data-linha-do-grupo="[A-Z_]+"/g)!.map((x) => x.slice(25, -1));
+    expect(linhas).toEqual(['PESSOAL', 'OCUPACAO', 'UTILIDADES']);
+    for (const [grupo, nome, id, centavos] of [['Pessoal', 'Salários', 'lsalarios', 451_613], ['Ocupação', 'Aluguel', 'laluguel', 280_000], ['Utilidades', 'Internet e telefone', 'linternet', 14_000]] as const) {
+      expect(corpo).toContain(`<span class="sr-only">${grupo}: </span>${nome}`);
+      const link = new RegExp(`<a aria-label="${escapar(`Conferir este valor: ${nome}, ${formatarDinheiro(centavos)}`)}"[^>]*href="${escapar(`/erp/dre/despesas?linha=${id}&amp;de=2026-10-01&amp;ate=2026-10-28&amp;loja=lojab&amp;volta=%2Ferp`)}">Conferir este valor</a>`);
+      expect(corpo).toMatch(link);
+    }
+    // O total e os grupos não têm composição própria: nenhum link no rodapé nem na linha do grupo.
+    const rodape = h.slice(h.indexOf('<tfoot>'), h.indexOf('</tfoot>'));
+    expect(rodape).not.toContain('<a');
+    expect(corpo.match(/<a /g)).toHaveLength(3);
+    expect(h).toContain('Conferir este valor abre as despesas que formam a linha, nesta loja e neste período. Os grupos e o total são a soma dessas linhas.');
+    expect(h).not.toContain('Período fechado: os valores vêm da fotografia');
+    // Espelho do nível 1: a mesma tela, com a raiz do parceiro e a volta para a Home dele.
+    const n1 = renderToStaticMarkup(createElement(DespesasDaHomeNaTela, { widget: despesasDaHome({ estado: 'lido', dre: dre() }, { ...contexto(), raiz: '/rodolfo/erp/casa-alfa' })! }));
+    expect(n1).toContain('href="/rodolfo/erp/casa-alfa/dre/despesas?linha=laluguel&amp;de=2026-10-01&amp;ate=2026-10-28&amp;loja=lojab&amp;volta=%2Frodolfo%2Ferp%2Fcasa-alfa"');
+    expect(n1).not.toContain('href="/erp/');
+  });
+
+  it('decisão 517: DTO com linhas que não somam o grupo, linha repetida ou link de fora vira indisponível, sem link', () => {
+    const w = widget();
+    const trocar = (f: (g: WidgetDespesasHome['composicaoPorGrupo'] & object) => WidgetDespesasHome['composicaoPorGrupo']) => ({ ...w, composicaoPorGrupo: f(w.composicaoPorGrupo!) });
+    const naOcupacao = (mudar: (l: { chave: string; nome: string; centavos: number; conferir: string | null }[]) => unknown[]) =>
+      trocar((c) => ({ ...c, grupos: c.grupos.map((g) => (g.grupo === 'OCUPACAO' ? { ...g, linhas: mudar(g.linhas) as typeof g.linhas } : g)) }));
+    for (const ruim of [
+      naOcupacao((ls) => ls.map((l) => ({ ...l, centavos: l.centavos + 1 }))), // linhas não somam o grupo
+      naOcupacao(() => []), // grupo com lançamento sem linha
+      naOcupacao((ls) => [...ls, { ...ls[0], centavos: 0 }]), // linha zerada
+      naOcupacao((ls) => ls.map((l) => ({ ...l, conferir: 'https://fora.test/erp/dre/despesas?linha=x&de=1' }))),
+      naOcupacao((ls) => ls.map((l) => ({ ...l, conferir: '//fora.test/erp/dre/despesas?linha=x&de=1' }))),
+      naOcupacao((ls) => ls.map((l) => ({ ...l, chave: 'salarios' }))), // a mesma linha em dois grupos
+      trocar((c) => ({ ...c, grupos: c.grupos.map((g) => (g.grupo === 'MARKETING' ? { ...g, linhas: [{ chave: 'marketing', nome: 'Marketing', centavos: 1, conferir: null }] } : g)) })),
+    ]) {
+      const h = doPainel(ruim);
+      expect(h).toContain('As despesas estão indisponíveis nesta leitura.');
+      expect(h).not.toMatch(/<table|Conferir este valor|dre\/despesas\?linha/);
+      expect(texto(html(ruim))).not.toMatch(/R\$/);
+    }
+  });
+
+  it('decisão 517: sem link quando não há leitura ao vivo, mesmo que o DTO traga o endereço', () => {
+    const w = widget();
+    const foto = { ...w, origem: { fonte: 'dre' as const, modo: 'fotografia' as const, fotografia: { id: 'f', versao: 1, versaoDaConta: 1, fechadaEm: '2026-11-02T12:00:00.000Z' } } };
+    const h = doPainel(foto);
+    expect(h).toContain(formatarDinheiro(280_000));
+    expect(h).toContain('<span class="sr-only">Ocupação: </span>Aluguel');
+    expect(h).not.toMatch(/Conferir este valor<\/a>|dre\/despesas\?linha/);
+    expect(h).toContain('Período fechado: os valores vêm da fotografia do fechamento. Conferir este valor não aparece');
   });
 
   it('não mostra CMV, deduções nem a despesa da rede; grupo sem lançamento é "—", nunca R$ 0,00', () => {
@@ -89,7 +147,7 @@ describe('Despesas na Home · apresentação', () => {
   });
 
   it('sem dados (nenhum lançamento ou nenhum dia apurado) não desenha tabela nem R$ 0,00', () => {
-    for (const d of [dre({}, [{ linhaId: 'l-impostos', lojaId: 'lojab', centavos: 45_161 }]), dre({ ate: null, diasApurados: 0, diaDeHoje: 1 }, [])]) {
+    for (const d of [dre({}, [{ linhaId: 'limpostos', lojaId: 'lojab', centavos: 45_161 }]), dre({ ate: null, diasApurados: 0, diaDeHoje: 1 }, [])]) {
       const w = widget(d);
       expect(w.estado).toBe('sem_dados');
       const h = html(w);
@@ -97,6 +155,7 @@ describe('Despesas na Home · apresentação', () => {
       expect(h).toContain('Sem dados');
       expect(h).not.toContain('<table');
       expect(texto(h)).not.toMatch(/R\$/);
+      expect(h).not.toMatch(/Conferir este valor|dre\/despesas\?linha/);
     }
   });
 
@@ -107,6 +166,7 @@ describe('Despesas na Home · apresentação', () => {
     expect(h).not.toContain('<table');
     expect(texto(h)).not.toMatch(/R\$/);
     expect(h).toContain('href="/erp/dre?loja=lojab"');
+    expect(h).not.toMatch(/Conferir este valor|dre\/despesas\?linha/);
   });
 
   it('quem só lança despesas (sem dre.ver) vê o marcador: sem painel, sem grupos e sem valores', () => {
@@ -117,7 +177,7 @@ describe('Despesas na Home · apresentação', () => {
     expect(h).not.toContain('aria-label="Despesas da loja"');
     expect(h).toContain('O total de despesas por competência ainda não está disponível neste resumo.');
     expect(h).toContain('href="/erp/dre/despesas?loja=lojab"');
-    expect(h).not.toMatch(/R\$|<table|No período do DRE · sem CMV|Ocupação|Pessoal/);
+    expect(h).not.toMatch(/R\$|<table|No período do DRE · sem CMV|Ocupação|Pessoal|Conferir este valor|dre\/despesas\?linha/);
   });
 
   it('DTO incompatível (total diferente da soma ou grupos faltando) vira indisponível, sem números', () => {
@@ -160,7 +220,7 @@ describe('Despesas na Home · apresentação', () => {
     const d = dre({ emCurso: false, encerrado: true, ate: '2026-10-31', diasApurados: 31, diaDeHoje: null, status: 'FECHADO', fechamento: {
       versao: 2, fotografiaId: 'foto-b', versaoDaConta: 5, fechadoEm: new Date('2026-11-02T12:00:00.000Z'), fechadoPorNome: 'Autor privado',
       ressalvas: [], totalDeRessalvas: 0, justificativa: 'Justificativa privada',
-    } }, [{ linhaId: 'l-diversas', lojaId: 'lojab', centavos: -5_000 }, { linhaId: 'l-aluguel', lojaId: 'lojab', centavos: 2_000 }]);
+    } }, [{ linhaId: 'ldiversas', lojaId: 'lojab', centavos: -5_000 }, { linhaId: 'laluguel', lojaId: 'lojab', centavos: 2_000 }]);
     const w = widget(d);
     expect(w.estado).toBe('ok');
     const h = doPainel(w);
@@ -171,11 +231,15 @@ describe('Despesas na Home · apresentação', () => {
     expect(h).toContain(formatarDinheiro(-3_000));
     expect(h).toContain('Há valores negativos nesta composição');
     expect(h).not.toMatch(/Autor privado|Justificativa privada/);
+    // Decisão 517: a fotografia mostra as linhas, sem "Conferir este valor" (a composição lê ao vivo), e diz por quê.
+    expect(h).toContain('<span class="sr-only">Outras despesas: </span>Despesas diversas');
+    expect(h).not.toMatch(/Conferir este valor<\/a>|dre\/despesas\?linha/);
+    expect(h).toContain('Período fechado: os valores vêm da fotografia do fechamento.');
   });
 
   it('a ajuda das Despesas acompanha dre.ver; quem só lança não recebe o bloco', () => {
     const inicio = (permissoes: Set<'dre.ver' | 'despesas.lancar'>) => ajudaParaATela({ nivel: 'LOJA', lojas: ['lojab'], permissoes }).find((e) => e.chave === 'inicio')!;
-    expect(inicio(new Set(['dre.ver'])).secoes?.find((s) => s.id === 'despesas-da-loja')?.blocos).toHaveLength(3);
+    expect(inicio(new Set(['dre.ver'])).secoes?.find((s) => s.id === 'despesas-da-loja')?.blocos).toHaveLength(4);
     expect(inicio(new Set(['despesas.lancar'])).secoes?.some((s) => s.id === 'despesas-da-loja')).toBe(false);
     expect(inicio(new Set()).secoes?.some((s) => s.id === 'despesas-da-loja')).toBe(false);
   });

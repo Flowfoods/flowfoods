@@ -60,6 +60,10 @@ import { FICHA_MUDOU_NA_IMPRESSAO } from '@/lib/erp/ficha-impressao';
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-ficha-visoes.db.test.ts
  */
 const URL_TESTE = process.env.ERP_DB_TESTE;
+/**
+ * O custo cru (737 centavos) só conta como VALOR no JSON (depois de `:`, `,` ou `[`, sem outro dígito depois) ou como
+ * bigint serializado ("737n"). Carimbo de hora como "09:22:09.737Z" ou id aleatório com 737 não é custo.
+ */
 const json = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? `${v}n` : v instanceof Map ? Object.fromEntries(v) : v));
 
 describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha (Postgres real)', { timeout: 120_000 }, () => {
@@ -125,16 +129,16 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect(det.props.canais).toBeNull();
     expect(det.props.ficha.passosPreparo).toEqual(['Aquecer a chapa.', 'Tostar o pão.']);
     // Nem o número cru (737 centavos) nem fração de custo saem do servidor.
-    expect(json(det.props.ficha)).not.toMatch(/737|porRendimento|"centavos"/);
+    expect(json(det.props.ficha)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
     const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
     expect(imp.props.ficha.verCustos).toBe(false);
     expect(imp.props.podeFinanceiro).toBe(false);
     expect('canais' in imp.props).toBe(false);
-    expect(json(imp.props.ficha)).not.toMatch(/737|porRendimento|"centavos"/);
+    expect(json(imp.props.ficha)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
     // Decisão de 31/10: mesmo chamando a ação direto, quem não vê preços recebe a recusa, nunca os valores.
     const forcado = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versao);
     expect(forcado.ok).toBe(false);
-    expect(json(forcado)).not.toMatch(/737|porRendimento|"centavos"/);
+    expect(json(forcado)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
   });
 
   it('operador: a lista vem sem custo em nenhuma linha e sem o filtro de custo', async () => {
@@ -145,7 +149,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     const tela = filhos.find((c) => c && 'linhas' in c.props)!;
     expect(tela.props.linhas!.length).toBeGreaterThan(0);
     expect(tela.props.linhas!.every((l) => l.custo === null)).toBe(true);
-    expect(json(tela.props.linhas)).not.toMatch(/737|porRendimento/);
+    expect(json(tela.props.linhas)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento/);
     const cabecalho = filhos.find((c) => c && !('linhas' in c.props))!;
     const filtros = ([] as El[]).concat(cabecalho.props.children).find((c) => c && 'filtros' in c.props)!;
     expect(filtros.props.verCustos).toBe(false);
@@ -161,7 +165,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
     expect(imp.props.ficha.verCustos).toBe(false);
     expect(imp.props.podeFinanceiro).toBe(true);
-    expect(json(imp.props.ficha)).not.toMatch(/737|porRendimento|"centavos"/);
+    expect(json(imp.props.ficha)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
     const comValores = await acaoImpressaoFinanceira(ids.ficha, imp.props.ficha.versao);
     if (!comValores.ok) throw new Error(comValores.erro);
     expect(comValores.ficha.verCustos).toBe(true);
@@ -234,7 +238,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     const imp = (await ParceiroImprimirFichaPage({ params: { slug: P.id, id: ids.ficha } })) as Impressao;
     expect(imp.props.ficha.verCustos).toBe(false);
     expect(imp.props.podeFinanceiro).toBe(true);
-    expect(json(imp.props.ficha)).not.toMatch(/737|porRendimento|"centavos"/);
+    expect(json(imp.props.ficha)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
     const r = await imp.props.carregarFinanceiro(ids.ficha, imp.props.ficha.versao);
     expect(r.ok && r.ficha.verCustos).toBe(true);
     // O slug escolhe o parceiro em exigirParceiro (sessão do nível 1); aqui o contexto é simulado, então só se confere a ligação.
@@ -264,8 +268,8 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
       // Confere também o limite real de serialização: o FormFicha é use client.
       const cliente = propsDoCliente(pagina);
       expect(cliente.verCustos).toBe(false);
-      expect(json(cliente)).not.toMatch(/737|porRendimento|"centavos"|"num"|"den"/);
-      expect(json(pagina.props.ficha ?? null)).not.toMatch(/737|porRendimento|"centavos"/);
+      expect(json(cliente)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"|"num"|"den"/);
+      expect(json(pagina.props.ficha ?? null)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
       const html = renderToStaticMarkup(createElement(TelaFormFicha, pagina.props));
       expect(html).not.toMatch(/R\$|Custo|custo incompleto|custo não informado|Prévia:/);
       for (const campo of ['item_insumo', 'item_quantidade', 'item_unidade', 'item_fator', 'rendimento']) expect(html).toContain(`name="${campo}"`);

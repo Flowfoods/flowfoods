@@ -8,7 +8,9 @@
  *    composição; endereço torto mostra a lista normal; volta de fora da área é ignorada;
  *  - o DRE em HTML: despesa abre a composição, "pelas compras" abre o relatório de compras com volta, o CMV abre o CMV por
  *    categoria, a receita diz "Faturamento do mês inteiro: <mês>" (um por mês quando o período cruza meses); sem a permissão, sem o link;
- *  - CMV por categoria: o valor pelas compras, ao vivo, abre o relatório de compras da categoria; sem `compras.ver` ou fechado, não.
+ *  - CMV por categoria: o valor pelas compras, ao vivo, abre o relatório de compras da categoria; sem `compras.ver` ou fechado, não;
+ *  - decisão 517: o "Conferir este valor" da Home abre esta composição com a mesma soma da linha do card e volta SÓ para a Home
+ *    (a volta passa pelo detalhe e volta); volta de fora, de outra área ou para a própria composição cai no "Voltar para o DRE".
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-dre-composicao.db.test.ts
  */
@@ -59,6 +61,9 @@ import type { TextosDaDespesa } from '@/lib/erp/despesa-campos';
 import { dreDoPeriodo, type DreDoPeriodo } from '@/lib/erp/dre';
 import { fecharPeriodo } from '@/lib/erp/dre-fechamento';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
+import { painelDoDia } from '@/lib/erp/painel-do-dia';
+import type { WidgetDespesasHome } from '@/lib/erp/home-despesas';
+import { formatarDinheiro } from '@/lib/erp/unidades';
 import ErpDrePage from '@/app/erp/dre/page';
 import ErpDespesasPage from '@/app/erp/dre/despesas/page';
 import ErpDespesaPage from '@/app/erp/dre/despesas/[id]/page';
@@ -357,6 +362,66 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     const volta = `${raiz}/dre/despesas?linha=${linha.aluguel}&de=2026-09-01&ate=2026-09-30`;
     expect((await abre(volta)).voltar).toEqual({ href: volta, rotulo: 'Aluguel no DRE' });
     for (const fora of ['/erp/dre/despesas?linha=x&de=2026-09-01&ate=2026-09-30', '/rodolfo/erp/outro/dre', `${raiz}/../outro/dre`]) expect((await abre(fora)).voltar, fora).toBeUndefined();
+  });
+
+  it('decisão 517: o "Conferir este valor" da Home abre a composição com a soma da linha do card e volta para a Home; volta inválida cai no DRE', async () => {
+    const vp = { tipo: 'loja' as const, lojaId: ids.vp, nome: 'Vila da Penha' };
+    const dono = alcanceDe('DONO', 'rede');
+    como(dono, vp);
+    const p = await painelDoDia(a, dono, '/erp', HOJE, vp);
+    const w = (p.analitico?.tipo === 'loja' ? p.analitico.widgets.find((x) => x.familia === 'despesas') : undefined) as WidgetDespesasHome;
+    const linhas = w.composicaoPorGrupo!.grupos.flatMap((g) => g.linhas);
+    // Outubro em curso (até 21/10): Ocupação = Aluguel de outubro (3.000 × 21/31) + IPTU do ano (10/dia × 21).
+    expect(linhas.map((l) => l.nome)).toEqual(['Aluguel', 'IPTU']);
+    const consulta = (href: string) => Object.fromEntries(new URL(href, 'http://x').searchParams);
+    for (const l of linhas) {
+      const el = await despesas(consulta(l.conferir!));
+      const props = el.props as Record<string, any>;
+      expect(props.c.totalCentavos, l.nome).toBe(l.centavos);
+      expect(props.lojaId).toBe(ids.vp);
+      expect(props.periodo).toEqual({ nome: 'Outubro de 2026', situacao: 'parcial' });
+      expect(props.volta).toEqual({ href: '/erp', rotulo: 'o início' });
+      const h = sp(renderToStaticMarkup(el));
+      expect(h).toContain('href="/erp">Voltar para o início</a>');
+      expect(h).not.toContain('Voltar para o DRE');
+      expect(h).toContain(sp(formatarDinheiro(l.centavos)));
+    }
+    expect(linhas.reduce((s, l) => s + l.centavos, 0)).toBe(w.composicaoPorGrupo!.grupos.find((g) => g.grupo === 'OCUPACAO')!.centavos);
+
+    // A volta viaja: composição → despesa → composição, e a composição reaberta ainda volta para a Home.
+    const aluguel = linhas[0];
+    const el = await despesas(consulta(aluguel.conferir!));
+    const daComposicao = `/erp/dre/despesas?linha=${linha.aluguel}&de=2026-10-01&ate=2026-10-21&loja=${ids.vp}&volta=%2Ferp`;
+    expect((el.props as Record<string, any>).aqui).toBe(daComposicao.slice('/erp/dre/despesas'.length));
+    expect(sp(renderToStaticMarkup(el))).toContain(`/erp/dre/despesas/${ids.d_outubro}?volta=${encodeURIComponent(daComposicao)}`.replace(/&/g, '&amp;'));
+    const detalhe = tela(await resolver(await ErpDespesaPage({ params: { id: ids.d_outubro }, searchParams: { volta: daComposicao } }))).props as Record<string, any>;
+    expect(detalhe.voltar).toEqual({ href: daComposicao, rotulo: 'Aluguel no DRE' });
+    expect(((await despesas(consulta(detalhe.voltar.href))).props as Record<string, any>).volta).toEqual({ href: '/erp', rotulo: 'o início' });
+
+    // Volta de fora, de outra área, torta, codificada, outro caminho da área ou a própria composição: ignorada, segue o "Voltar para o DRE" (e nada viaja).
+    const base = consulta(aluguel.conferir!);
+    for (const fora of ['https://mal.example/erp', '//mal.example/erp', '/rodolfo/erp/outro', '/erp/../rodolfo/erp/x', '/erp\\x', '/erpx', daComposicao, '/erp/dre/despesas',
+      `/erp/dre/d%65spesas?linha=${linha.aluguel}&de=2026-10-01&ate=2026-10-21`, '/erp/%09/x', '/erp/insumos', '/erp?sem-acesso=1']) {
+      const e = await despesas({ ...base, volta: fora });
+      const props = e.props as Record<string, any>;
+      expect(props.volta, fora).toBeNull();
+      expect(props.aqui, fora).not.toContain('volta');
+      expect(props.voltarDre, fora).toBe(`/erp/dre?periodo=2026-10-01&loja=${ids.vp}#linha-aluguel`);
+      expect(sp(renderToStaticMarkup(e)), fora).not.toContain('Voltar para o início');
+    }
+
+    // Nível 1: a mesma composição com a raiz do parceiro; a Home da pessoa do parceiro (/erp) não vale lá.
+    atual.ctx = () => ({ parceiro: A, alcance: ALCANCE_FLOWFOODS, cliente: a, bloqueio: null, podeEscrever: true, sessao: { userId: 'rodolfo', autorNome: 'Rodolfo' } });
+    const raiz = `/rodolfo/erp/${A.slug}`;
+    const pN1 = await painelDoDia(a, ALCANCE_FLOWFOODS, raiz, HOJE, vp);
+    const wN1 = (pN1.analitico?.tipo === 'loja' ? pN1.analitico.widgets.find((x) => x.familia === 'despesas') : undefined) as WidgetDespesasHome;
+    const n1 = wN1.composicaoPorGrupo!.grupos.flatMap((g) => g.linhas)[0];
+    expect(n1.conferir).toBe(`${raiz}/dre/despesas?linha=${linha.aluguel}&de=2026-10-01&ate=2026-10-21&loja=${ids.vp}&volta=${encodeURIComponent(raiz)}`);
+    const abreN1 = async (q: Record<string, string>) => tela(await resolver(await NivelUmDespesasPage({ params: { slug: A.slug }, searchParams: q }))).props as Record<string, any>;
+    const doN1 = await abreN1(consulta(n1.conferir!));
+    expect(doN1.c.totalCentavos).toBe(n1.centavos);
+    expect(doN1.volta).toEqual({ href: raiz, rotulo: 'o início' });
+    for (const fora of ['/erp', `${raiz}/insumos`, `${raiz}/dre`, `/rodolfo/erp/outro`]) expect((await abreN1({ ...consulta(n1.conferir!), volta: fora })).volta, fora).toBeNull();
   });
 
   it('o DRE: despesa abre a composição, "pelas compras" o relatório com volta, o CMV a tela por categoria, a receita os lançamentos do mês', async () => {

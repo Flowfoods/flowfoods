@@ -21,7 +21,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'inicio',
     rotas: [''],
     titulo: 'Visão geral da operação',
-    versao: 8,
+    versao: 9,
     aula: [
       { texto: 'Escolha uma loja no alto para ver seus indicadores, a evolução do faturamento e os pontos de atenção. Cada número informa a loja e o período a que se refere.' },
       { texto: 'Sem dados não é zero: o painel avisa sobre ausências e falhas, e Atualizar resumo tenta carregar de novo.' },
@@ -54,6 +54,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'O card de Despesas soma as despesas da loja pelo período a que elas se referem, com os mesmos valores do DRE da loja no mesmo período. CMV e deduções da venda ficam fora.', para: ['dre.ver'] },
           { texto: 'Uma despesa de vários dias entra só com os dias deste período e, no período em curso, até ontem. Por isso o valor fica parcial até o fim do período.', para: ['dre.ver'] },
           { texto: 'Grupo sem lançamento aparece com traço, não como zero. A despesa da rede, sem loja, fica fora do card da loja. Período fechado vem da fotografia do fechamento.', para: ['dre.ver'] },
+          { texto: 'Cada grupo mostra as linhas do DRE que têm valor. Conferir este valor abre as despesas que formam a linha, na mesma loja e no mesmo período, e Voltar para o início traz você de volta. No período fechado esse atalho não aparece, porque a fotografia não muda e as despesas podem mudar.', para: ['dre.ver'] },
         ],
       },
       {

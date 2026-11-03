@@ -3,7 +3,8 @@
  * número da linha no DRE com a linha, o recorte apurado e a visão (rede ou uma loja). Síntese primeiro (o número, o período com
  * a situação dele e a visão), depois cada despesa da linha que cruza o recorte com a parte que cai nele (apropriação dia a dia, a
  * conta do DRE); o rodapé soma essas partes. Cada despesa abre o detalhe, que volta para cá; "Voltar para o DRE" (na linha de
- * onde veio) e "Todas as despesas de <mês>" desfazem o filtro.
+ * onde veio) e "Todas as despesas de <mês>" desfazem o filtro. Aberta pelo "Conferir este valor" da Home (decisão 517), o voltar
+ * leva de volta à Home.
  */
 
 import Link from 'next/link';
@@ -38,6 +39,7 @@ export function TelaDaComposicao({
   recorte,
   periodo,
   voltarDre,
+  volta,
   aqui,
 }: {
   c: ComposicaoDaLinha;
@@ -51,6 +53,8 @@ export function TelaDaComposicao({
   periodo: PeriodoDaComposicao | null;
   /** O DRE do período, na mesma visão e na linha de onde veio. Nulo = quem lê não abre o DRE (só lança despesas). */
   voltarDre: string | null;
+  /** De onde a pessoa veio, já conferido (`voltaDaComposicao`): a Home. Nulo = o "Voltar para o DRE" de sempre. */
+  volta?: { href: string; rotulo: string } | null;
   /** A query desta tela (`?linha=…`), para o detalhe da despesa voltar para cá. */
   aqui: string;
 }) {
@@ -67,7 +71,7 @@ export function TelaDaComposicao({
   const exemplo = c.itens.find((i) => i.diasNoRecorte < i.dias);
   return (
     <div className="space-y-6">
-      {voltarDre && <Voltar href={voltarDre}>Voltar para o DRE</Voltar>}
+      {volta ? <Voltar href={volta.href}>{`Voltar para ${volta.rotulo}`}</Voltar> : voltarDre && <Voltar href={voltarDre}>Voltar para o DRE</Voltar>}
       <PageHeader icone="dre" cor={COR.dre} titulo={nome} subtitulo={`${escopoNome} · ${quando}`}>
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {periodo && (periodo.situacao === 'parcial' ? <Selo tom="alerta">Parcial · até ontem</Selo> : periodo.situacao === 'fechado' ? <Selo tom="ok">Período fechado</Selo> : <Selo>Período encerrado</Selo>)}
