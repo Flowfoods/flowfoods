@@ -77,6 +77,16 @@ export function PainelComPonto({
 }
 
 /**
+ * Texto do corpo que virou ponto e não é subtítulo de painel (decisão 522): o subtítulo do cabeçalho da página, uma frase no
+ * rodapé de um painel. Com o ponto para a pessoa, `comPonto` (o essencial, que pode faltar); sem ele, `semPonto`, o texto de antes.
+ * Serve a telas do servidor, que não usam `useTemPonto`; o botão do ponto mora em outro lugar (junto do campo ou no cabeçalho).
+ */
+export function TextoComPonto({ ponto, comPonto = null, semPonto }: { ponto: string; comPonto?: ReactNode; semPonto: ReactNode }) {
+  const tem = useTemPonto(ponto);
+  return <>{tem ? comPonto : semPonto}</>;
+}
+
+/**
  * `alvo` (decisão 480): o id da região que o ponto explica (o campo, os botões de escolha). Com ela, o card abre deixando a
  * região à vista acima dele, e tocar dentro dela não encerra a sequência (é fazer o que o card pede).
  *

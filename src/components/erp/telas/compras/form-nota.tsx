@@ -34,9 +34,10 @@ import {
 import { formatarCusto, formatarDinheiro, formatarQuantidade, lerDinheiro, lerQuantidade, UNIDADES } from '@/lib/erp/unidades';
 import { fechadoNaData, periodoDaFraseDeRecusa, type AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
 import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
-import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
+import { AJUDA, CAMPO, Erro, ROTULO, ROTULO_EM_LINHA } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel } from '../../ui/superficies';
+import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 import { CampoData } from '../../ui/campo-data';
 import { ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
@@ -207,6 +208,10 @@ function FormNotaBase({
   // Editar uma nota que já é de período fechado: o aviso vai no TOPO (já está assim ao abrir a tela, não depende de digitar nada).
   const avisoNoTopo = modo === 'editar' && !!fechadoDaData && dataDigitada === inicial.data && !erros.data;
   const porId = useMemo(() => new Map(opcoes.insumos.map((i) => [i.id, i])), [opcoes.insumos]);
+  // Decisão 522: o que a data, os itens e o frete mudam no custo mora nos pontos; sem o ponto para a pessoa, o texto de antes.
+  const temData = useTemPonto('data');
+  const temItens = useTemPonto('itens');
+  const temFrete = useTemPonto('frete');
 
   function mudar(chave: number, m: Partial<LinhaDaNota>) {
     setLinhas((ls) =>
@@ -298,9 +303,16 @@ function FormNotaBase({
         <Painel titulo="A nota">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor={`${idBase}-lojaId`} className={ROTULO}>
-                Loja que recebeu
-              </label>
+              {/*
+                Decisão 522: o botão fica fora do rótulo (dentro dele, o toque passaria ao campo). `-my-3` em todo tamanho: ao lado de
+                "Fornecedor" (duas colunas a partir de 640 px), o botão de 44 px do toque não pode deixar esta linha mais alta.
+              */}
+              <div className="mb-1.5 flex items-center gap-1">
+                <label htmlFor={`${idBase}-lojaId`} className={ROTULO_EM_LINHA}>
+                  Loja que recebeu
+                </label>
+                <PontoDeAjuda ponto="loja" className="-my-3" />
+              </div>
               <select
                 id={`${idBase}-lojaId`}
                 name="lojaId"
@@ -389,9 +401,13 @@ function FormNotaBase({
               </div>
             </div>
             <div>
-              <label htmlFor={`${idBase}-data`} className={ROTULO}>
-                Data da nota
-              </label>
+              {/* Decisão 522: ao lado de "Número da nota" (duas colunas a partir de 640 px), o mesmo `-my-3` da loja. */}
+              <div className="mb-1.5 flex items-center gap-1">
+                <label htmlFor={`${idBase}-data`} className={ROTULO_EM_LINHA}>
+                  Data da nota
+                </label>
+                <PontoDeAjuda ponto="data" className="-my-3" />
+              </div>
               <CampoData
                 id={`${idBase}-data`}
                 name="data"
@@ -401,7 +417,7 @@ function FormNotaBase({
                 aria-describedby={`${idBase}-data-ajuda${erros.data && !fechadoDaData ? ` ${idBase}-data-erro` : ''}${fechadoDaData ? ` ${idBase}-periodo-fechado` : ''}`}
               />
               <p id={`${idBase}-data-ajuda`} className={AJUDA}>
-                A data impressa na nota (dd/mm/aaaa, até {formatarData(hoje)}). É ela que diz qual compra é a mais nova.
+                A data impressa na nota (dd/mm/aaaa, até {formatarData(hoje)}).{temData ? '' : ' É ela que diz qual compra é a mais nova.'}
               </p>
               <Erro id={`${idBase}-data-erro`} texto={fechadoDaData ? undefined : erros.data} />
             </div>
@@ -420,9 +436,10 @@ function FormNotaBase({
           </div>
         </Painel>
 
-        <Painel titulo="Itens" semRespiro>
+        {/* Decisão 522: o que fica é o que se digita (o total da linha); a conta do preço por unidade mora no ponto "itens". */}
+        <Painel titulo="Itens" semRespiro acessorio={<PontoDeAjuda ponto="itens" />}>
           <p className="border-b border-linha px-4 py-3 text-[12px] leading-relaxed text-suave sm:px-5">
-            Valor do item = o <strong className="font-semibold text-texto">total da linha</strong> na nota. O preço por kg, L ou un sai da conta, com o frete rateado.
+            Valor do item = o <strong className="font-semibold text-texto">total da linha</strong> na nota.{temItens ? '' : ' O preço por kg, L ou un sai da conta, com o frete rateado.'}
           </p>
           {erros.itens && (
             <p id={`${idBase}-itens`} className="border-b border-linha px-4 py-3 text-[13px] text-erro sm:px-5">
@@ -585,7 +602,8 @@ function FormNotaBase({
           </div>
         </Painel>
 
-        <Painel titulo="Frete e total">
+        {/* Decisão 522: o card fala do frete e do total juntos, então mora no cabeçalho do painel (a região são os dois campos e a conta). */}
+        <Painel titulo="Frete e total" acessorio={<PontoDeAjuda ponto="frete" />}>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor={`${idBase}-frete`} className={ROTULO}>
@@ -601,11 +619,13 @@ function FormNotaBase({
                 onChange={(e) => setFrete(e.target.value)}
                 className={`${CAMPO} text-right tabular-nums`}
                 aria-invalid={!!erros.frete}
-                aria-describedby={`${idBase}-frete-ajuda${erros.frete ? ` ${idBase}-frete-erro` : ''}`}
+                aria-describedby={[temFrete ? '' : `${idBase}-frete-ajuda`, erros.frete ? `${idBase}-frete-erro` : ''].filter(Boolean).join(' ') || undefined}
               />
-              <p id={`${idBase}-frete-ajuda`} className={AJUDA}>
-                Dividido entre os itens pelo valor de cada um; entra no custo.
-              </p>
+              {!temFrete && (
+                <p id={`${idBase}-frete-ajuda`} className={AJUDA}>
+                  Dividido entre os itens pelo valor de cada um; entra no custo.
+                </p>
+              )}
               <Erro id={`${idBase}-frete-erro`} texto={erros.frete} />
             </div>
             <div>

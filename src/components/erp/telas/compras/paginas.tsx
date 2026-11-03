@@ -13,6 +13,7 @@ import type { AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
 import { PageHeader } from '../../ui/cabecalho';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { Aviso } from '../../ui/superficies';
+import { TextoComPonto } from '../../ui/ponto-de-ajuda';
 import { Voltar } from '../cadastro/partes';
 import type { AcaoDeNota } from './estado';
 import type { AcaoDeCadastro } from '../cadastro/estado';
@@ -66,7 +67,14 @@ export function TelaFormNota({
         icone="compras"
         cor={COR.compras}
         titulo={nota ? 'Editar nota' : 'Lançar nota'}
-        subtitulo={nota ? `${contexto} · ${nota.rotulo} · ${nota.fornecedorNome}` : `${contexto} · o custo dos insumos passa a ser o desta compra`}
+        subtitulo={
+          nota ? (
+            `${contexto} · ${nota.rotulo} · ${nota.fornecedorNome}`
+          ) : (
+            // Decisão 522: o que a data decide no custo (a mais nova vale) mora no ponto "data"; sem ele, a frase de antes.
+            <TextoComPonto ponto="data" comPonto={contexto} semPonto={`${contexto} · o custo dos insumos passa a ser o desta compra`} />
+          )
+        }
       />
       {opcoes.fornecedores.length === 0 && (
         <Aviso tom="alerta" titulo="Nenhum fornecedor cadastrado.">
