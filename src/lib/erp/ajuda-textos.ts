@@ -1225,7 +1225,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Loja que recebeu',
         blocos: [
           { texto: 'Aparecem as lojas em que você pode lançar nota; loja desativada não recebe nota nova.' },
-          { texto: 'A compra entra no estoque desta loja, se ele já foi aberto, e conta no CMV de compra e no orçamento de compra dela.' },
+          // `efeitoDaNota`: a hora do lançamento conta, e editar não a muda (a nota antiga editada para esta loja não entra).
+          { texto: 'A compra conta no CMV de compra e no orçamento de compra desta loja, e entra no estoque dela se ele já estava aberto quando a nota foi lançada e a data não é anterior à abertura.' },
           // `ultimasCompras` não filtra loja: a última nota de qualquer loja dá o custo de referência (fichas e preços).
           { texto: 'O custo do insumo que as fichas usam é um só na rede: vale a compra mais recente dele, de qualquer loja.' },
         ],
@@ -1235,8 +1236,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'O que a data da nota decide',
         blocos: [
           { texto: 'A data impressa na nota diz qual compra é a mais nova: o custo do insumo segue a de data mais recente e, na mesma data, a lançada por último.' },
-          { texto: 'Ela põe a nota num período do DRE e no CMV de compra dele; período já fechado não recebe nota nova nem deixa mudar as que caem nele.' },
-          { texto: 'No estoque, a nota só entra se a loja já abriu o estoque e a data não é anterior à abertura.' },
+          // `editarNota` confere a data de antes e a de depois: nem sair nem entrar num período fechado.
+          { texto: 'Ela põe a nota num período do DRE e no CMV de compra dele; período já fechado não recebe nota nova nem nota com a data mudada para dentro dele, e as que caem nele não mudam.' },
+          { texto: 'No estoque, a nota só entra se o estoque da loja já estava aberto quando ela foi lançada e a data não é anterior à abertura; editar não muda a hora do lançamento.' },
         ],
       },
       {
@@ -1307,8 +1309,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'estoque',
         titulo: 'Entrada e estorno no estoque',
         blocos: [
-          { texto: 'A nota entra no estoque da loja quando foi lançada depois da abertura do estoque e a data dela não é anterior à abertura.' },
-          { texto: 'Nada é apagado: quando a edição muda o que entrou, a entrada antiga é estornada e entra a nova; cancelar estorna o que a nota tinha posto.' },
+          { texto: 'A nota entra no estoque da loja se o estoque dela já estava aberto quando a nota foi lançada e a data não é anterior à abertura.' },
+          // `aplicarNotaNoEstoque`: estorna o que valia e só lança o novo se `efeitoDaNota` ainda deixa (data antes da abertura = só o estorno).
+          { texto: 'Nada é apagado: quando a edição muda o que entrou, a entrada antiga é estornada e a nova só entra se a nota ainda cumprir essa regra; cancelar estorna o que a nota tinha posto.' },
           { texto: 'Cada linha mostra o saldo do insumo na loja antes e depois do movimento.' },
         ],
       },

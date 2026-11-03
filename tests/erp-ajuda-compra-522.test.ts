@@ -34,6 +34,9 @@ import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance, type VinculoDePermiss
 import { TelaFormNota } from '@/components/erp/telas/compras/paginas';
 import { FormNota } from '@/components/erp/telas/compras/form-nota';
 import { TelaDetalheNota } from '@/components/erp/telas/compras/detalhe-nota';
+import { custoDaCompra, quantidadeDoItem, ratearFrete, ultimaCompraDaLista } from '@/lib/erp/compra-campos';
+import { efeitoDaNota, entradasDaNota, mesmoEfeito } from '@/lib/erp/estoque-campos';
+import { formatarCusto, formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
 import { relogioDoCenario } from './relogio-do-cenario';
 
 relogioDoCenario('2026-10-17T12:00:00-03:00');
@@ -281,42 +284,78 @@ describe('decisão 522 · os pontos de Lançar nota e de Detalhe da nota no regi
     expect(entradaPorChave('compra-nova')?.rotas).toEqual(['compras/nova', 'compras/[id]/editar']);
   });
 
-  it('a data decide a compra mais nova (e o desempate), o período do DRE e do CMV de compra, o período fechado e o estoque', () => {
+  it('a data decide a compra mais nova (e o desempate): a regra do último preço, e o card dizendo a mesma coisa', () => {
     const data = card(DONO, 'compra-nova', 'data');
-    for (const t of [
-      'diz qual compra é a mais nova',
-      'o custo do insumo segue a de data mais recente',
-      'na mesma data, a lançada por último',
-      'período do DRE',
-      'CMV de compra',
-      'período já fechado não recebe nota nova nem deixa mudar as que caem nele',
-      'a data não é anterior à abertura',
-    ])
-      expect(data, t).toContain(t);
+    // A regra: data da nota mais recente vence; na mesma data, a lançada por último; cancelada não conta.
+    const item = (notaId: string, entradaEm: string, lancadaEm: number, status = 'LANCADA') => ({ notaId, entradaEm, lancadaEm, status, valorCentavos: 100, freteRateadoCentavos: 0, quantidadeMilesimos: 1000 });
+    expect(ultimaCompraDaLista([item('nova-data', '2026-10-14', 1), item('lancada-depois', '2026-10-10', 9)])!.compra.notaId).toBe('nova-data');
+    expect(ultimaCompraDaLista([item('primeira', '2026-10-14', 1), item('segunda', '2026-10-14', 2)])!.compra.notaId).toBe('segunda');
+    expect(ultimaCompraDaLista([item('anterior', '2026-10-10', 1), item('cancelada', '2026-10-14', 2, 'CANCELADA')])!.compra.notaId).toBe('anterior');
+    for (const t of ['diz qual compra é a mais nova', 'o custo do insumo segue a de data mais recente', 'na mesma data, a lançada por último']) expect(data, t).toContain(t);
+    // Período do DRE, CMV de compra e o fechado: nem nota nova, nem data mudada para dentro, nem mexer nas de dentro (`editarNota`).
+    for (const t of ['período do DRE', 'CMV de compra', 'período já fechado não recebe nota nova nem nota com a data mudada para dentro dele', 'as que caem nele não mudam']) expect(data, t).toContain(t);
+  });
+
+  it('o estoque nos cards de lançar e da nota é a regra de `efeitoDaNota`: aberto quando a nota foi lançada e data a partir da abertura', () => {
+    const abertura = { abertoEm: new Date('2026-10-01T13:00:00Z') };
+    const depois = new Date('2026-10-14T12:00:00Z');
+    const antes = new Date('2026-09-30T12:00:00Z');
+    expect(efeitoDaNota({ status: 'LANCADA', lancadaEm: depois, entradaEm: '2026-10-14' }, abertura)).toEqual({ movimenta: true });
+    // Editar não muda a hora do lançamento: a nota lançada antes da abertura, com data trocada para depois dela, continua fora.
+    expect(efeitoDaNota({ status: 'LANCADA', lancadaEm: antes, entradaEm: '2026-10-14' }, abertura)).toEqual({ movimenta: false, motivo: 'lancada-antes' });
+    expect(efeitoDaNota({ status: 'LANCADA', lancadaEm: depois, entradaEm: '2026-09-20' }, abertura)).toEqual({ movimenta: false, motivo: 'data-anterior' });
+    expect(efeitoDaNota({ status: 'LANCADA', lancadaEm: depois, entradaEm: '2026-10-14' }, null)).toEqual({ movimenta: false, motivo: 'nao-aberto' });
+    const regra = 'já estava aberto quando';
+    expect(card(DONO, 'compra-nova', 'loja')).toContain(`entra no estoque dela se ele ${regra} a nota foi lançada e a data não é anterior à abertura`);
+    expect(card(DONO, 'compra-nova', 'data')).toContain(`só entra se o estoque da loja ${regra} ela foi lançada e a data não é anterior à abertura; editar não muda a hora do lançamento`);
+    expect(card(DONO, 'compra', 'estoque')).toContain(`se o estoque dela ${regra} a nota foi lançada e a data não é anterior à abertura`);
+    for (const [chave, p] of [['compra-nova', 'loja'], ['compra-nova', 'data'], ['compra', 'estoque']]) expect(card(DONO, chave, p), `${chave}.${p}`).not.toMatch(/se ele já foi aberto|se a loja já abriu o estoque|lançada depois da abertura/);
+  });
+
+  it('editar: o que entrou é estornado e a entrada nova só vem se a nota ainda cumprir a regra; mesma entrada, nada muda', () => {
+    const nota = { id: 'n1', lojaId: 'loja-vp', rotulo: 'Nota 1', versao: 1 };
+    const linha = { insumoId: 'i-ched', insumoNome: 'Cheddar', unidade: 'KG' as const, quantidadeMilesimos: 15_000, valorCentavos: 26_970, freteRateadoCentavos: 600, embalagem: 'Caixa · 5 kg' };
+    const entrou = entradasDaNota(nota, [linha]);
+    expect(entrou.map((m) => [m.quantidadeMilesimos, m.valorCentavos])).toEqual([[15_000, 27_570]]);
+    // Mesmo efeito (só mudou o número da nota, por exemplo): nada se mexe; quantidade diferente: estorna e lança de novo.
+    expect(mesmoEfeito(entrou, entradasDaNota({ ...nota, versao: 2 }, [linha]))).toBe(true);
+    expect(mesmoEfeito(entrou, entradasDaNota({ ...nota, versao: 2 }, [{ ...linha, quantidadeMilesimos: 10_000 }]))).toBe(false);
+    // Data trocada para antes da abertura: o que a nota deve ter no estoque é nada, então só o estorno.
+    const efeito = efeitoDaNota({ status: 'LANCADA', lancadaEm: new Date('2026-10-14T12:00:00Z'), entradaEm: '2026-09-20' }, { abertoEm: new Date('2026-10-01T13:00:00Z') });
+    expect(efeito.movimenta ? entradasDaNota(nota, [linha]) : []).toEqual([]);
+    const estoque = card(DONO, 'compra', 'estoque');
+    for (const t of ['Nada é apagado', 'a entrada antiga é estornada e a nova só entra se a nota ainda cumprir essa regra', 'cancelar estorna', 'antes e depois']) expect(estoque, t).toContain(t);
+    expect(estoque).not.toContain('estornada e entra a nova');
   });
 
   it('a loja: estoque, CMV de compra e orçamento são da loja; o custo do insumo é um só na rede, de qualquer loja', () => {
     const loja = card(DONO, 'compra-nova', 'loja');
-    for (const t of ['loja desativada não recebe nota nova', 'entra no estoque desta loja, se ele já foi aberto', 'CMV de compra e no orçamento de compra dela', 'um só na rede', 'de qualquer loja']) expect(loja, t).toContain(t);
+    for (const t of ['loja desativada não recebe nota nova', 'conta no CMV de compra e no orçamento de compra desta loja', 'um só na rede', 'de qualquer loja']) expect(loja, t).toContain(t);
   });
 
-  it('itens e frete: embalagem × quantidade vira a quantidade do insumo, o valor é o total da linha, o frete entra no custo pelo valor', () => {
+  it('itens e frete: a conta do exemplo é a do sistema (quantidade, custo por unidade, frete pelo valor)', () => {
     const itens = card(DONO, 'compra-nova', 'itens');
-    for (const t of ['3 caixas de 5 kg viram 15 kg', 'a granel, digite direto em kg, L ou un', 'O valor é o total da linha na nota', 'o preço por kg, L ou un sai da conta', 'dividido pela quantidade']) expect(itens, t).toContain(t);
-    // A conta do exemplo: R$ 269,70 ÷ 15 kg = R$ 17,98 por kg.
-    expect(itens).toContain('R$ 269,70, sem frete, dão R$ 17,98 por kg');
-    expect(Math.round(26_970 / 15)).toBe(1798);
+    // 3 caixas de 5 kg: a quantidade e o custo saem das mesmas funções da tela e da gravação.
+    const quantidade = quantidadeDoItem(3000, 5000);
+    expect(formatarQuantidade(quantidade, 'KG')).toBe('15 kg');
+    expect(itens).toContain(`3 caixas de 5 kg viram ${formatarQuantidade(quantidade, 'KG')} no estoque`);
+    const porKg = formatarCusto(custoDaCompra([{ valorCentavos: 26_970, freteRateadoCentavos: 0, quantidadeMilesimos: quantidade }]), 'KG');
+    expect(porKg).toMatch(/\/kg$/);
+    expect(itens.replace(/ /g, ' ')).toContain(`por ${formatarDinheiro(26_970).replace(/ /g, ' ')}, sem frete, dão ${porKg.replace(/\/kg$/, '').replace(/ /g, ' ')} por kg`);
+    for (const t of ['a granel, digite direto em kg, L ou un', 'O valor é o total da linha na nota', 'o preço por kg, L ou un sai da conta', 'o valor mais a parte do frete, dividido pela quantidade']) expect(itens, t).toContain(t);
+    // O frete vai pelo valor de cada item (o maior leva mais) e fecha ao centavo.
+    const partes = ratearFrete([26_970, 5_490], 600);
+    expect(partes.reduce((x, y) => x + y, 0)).toBe(600);
+    expect(partes[0]).toBeGreaterThan(partes[1]);
     const frete = card(DONO, 'compra-nova', 'frete');
     for (const t of ['dividido entre os itens pelo valor de cada um', 'entra no custo deles e no CMV de compra', 'itens mais o frete, ao centavo', 'a nota não entra']) expect(frete, t).toContain(t);
   });
 
-  it('o detalhe: o frete e o período no Total, o que vale no custo (rede, data, fichas) e a entrada e o estorno no estoque', () => {
+  it('o detalhe: o frete e o período no Total, o que vale no custo (rede, data, fichas)', () => {
     const total = card(DONO, 'compra', 'total');
     for (const t of ['dividido entre os itens pelo valor de cada um', 'Pela data da nota', 'CMV de compra e no orçamento de compra da loja', 'Nota cancelada sai do custo']) expect(total, t).toContain(t);
     const custo = card(DONO, 'compra', 'custo');
     for (const t of ['o valor do item mais a parte do frete, dividido pela quantidade', 'compra mais recente do insumo pela data da nota', 'de qualquer loja da rede', 'as fichas usam', 'a linha diz a data dela', 'volta a valer a compra anterior']) expect(custo, t).toContain(t);
-    const estoque = card(DONO, 'compra', 'estoque');
-    for (const t of ['lançada depois da abertura do estoque', 'não é anterior à abertura', 'Nada é apagado', 'a entrada antiga é estornada e entra a nova', 'cancelar estorna', 'antes e depois']) expect(estoque, t).toContain(t);
   });
 });
 

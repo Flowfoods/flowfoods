@@ -44,7 +44,7 @@ vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } 
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
-import { cadastrarFornecedor, lancarNota } from '@/lib/erp/compras';
+import { cadastrarFornecedor, editarNota, lancarNota, obterNota } from '@/lib/erp/compras';
 import { cadastrarVariante } from '@/lib/erp/variantes';
 import { concluirAbertura, contarItem, iniciarAbertura, obterContagemDeAbertura } from '@/lib/erp/estoque';
 import { ajudaParaATela } from '@/lib/erp/ajuda';
@@ -198,20 +198,23 @@ describe.skipIf(!URL_TESTE)('Decisão 522 · pontos de ajuda de Lançar nota e d
     const v = (await a.contagem.findFirst({ where: { lojaId: ids.vp, tipo: 'ABERTURA' }, select: { versao: true } }))!.versao;
     expect((await concluirAbertura(a, DONA, ids.vp, { versao: v, confirmarNaoContados: true }, 'Marina', t0)).ok).toBe(true);
 
-    // A nota de outubro (3 caixas de 5 kg + R$ 6,00 de frete) entra no estoque; a de setembro é de antes da abertura e não entra.
-    for (const [chave, data, numero] of [
-      ['outubro', '2026-10-14', '000123'],
-      ['setembro', '2026-09-20', '000077'],
+    // Penha: a nota de outubro (3 caixas de 5 kg + R$ 6,00 de frete) entra no estoque; a de setembro é de antes da abertura e não
+    // entra; a de 15/10 entra e depois é editada para 25/09 (antes da abertura). Méier: a mais nova de todas (16/10), num estoque
+    // que não foi aberto, prova que o custo vale pela compra mais recente de QUALQUER loja.
+    const nota = (loja: string, data: string, numero: string) => ({ lojaId: loja, fornecedorId: ids.fornecedor, numero, serie: '1', data, frete: '6,00', total: '275,70', itens: [{ insumoId: ids.cheddar, embalagem: `v:${ids.caixa}`, quantidade: '3', valor: '269,70' }] });
+    for (const [chave, loja, data, numero] of [
+      ['outubro', ids.vp, '2026-10-14', '000123'],
+      ['setembro', ids.vp, '2026-09-20', '000077'],
+      ['editada', ids.vp, '2026-10-15', '000130'],
+      ['meier', ids.meier, '2026-10-16', '000140'],
     ] as const) {
-      const r = await lancarNota(
-        a,
-        DONA,
-        { lojaId: ids.vp, fornecedorId: ids.fornecedor, numero, serie: '1', data, frete: '6,00', total: '275,70', itens: [{ insumoId: ids.cheddar, embalagem: `v:${ids.caixa}`, quantidade: '3', valor: '269,70' }] },
-        'Marina',
-      );
+      const r = await lancarNota(a, DONA, nota(loja, data, numero), 'Marina');
       if (!r.ok) throw new Error(JSON.stringify(r));
       ids[chave] = r.id;
     }
+    const versao = (await obterNota(a, DONA, ids.editada))!.versao;
+    const ed = await editarNota(a, DONA, ids.editada, { ...nota(ids.vp, '2026-09-25', '000130'), versao }, 'Marina');
+    if (!ed.ok) throw new Error(JSON.stringify(ed));
     await a.transacao((tx) => criarPeriodoFechadoDeTeste(tx, { nome: 'Setembro de teste', inicio: '2026-09-01', fim: '2026-09-30' }));
   });
 
@@ -270,11 +273,13 @@ describe.skipIf(!URL_TESTE)('Decisão 522 · pontos de ajuda de Lançar nota e d
       expect(noCabecalho(h, 'Itens', 'custo'), area.nome).toBe(true);
       expect(noCabecalho(h, 'No estoque', 'estoque'), area.nome).toBe(true);
       expect(naOrdem(h), area.nome).toEqual(['tela', 'total', 'custo', 'estoque']);
-      // O essencial fica: o que a nota fez no estoque, o saldo, a soma e "vale no custo".
+      // O essencial fica: o que a nota fez no estoque, o saldo e a soma.
       expect(h, area.nome).toContain('Entrou no estoque da Vila da Penha.');
       expect(h, area.nome).toContain('saldo 2 kg para 17 kg');
       expect(h, area.nome).toContain('Itens R$ 269,70 + frete R$ 6,00');
-      expect(h, area.nome).toContain('vale no custo');
+      // "De qualquer loja da rede": a nota mais nova é a do Méier, e a da Penha diz a data dela (a regra que o card `custo` conta).
+      expect(h, area.nome).toContain('vale a de 16/10/2026');
+      expect(h, area.nome).not.toContain('vale no custo');
       expect(h, area.nome).toContain('Editar nota');
       for (const t of SAIU) expect(h, `${area.nome}: ${t}`).not.toContain(t);
 
@@ -283,11 +288,32 @@ describe.skipIf(!URL_TESTE)('Decisão 522 · pontos de ajuda de Lançar nota e d
       expect(f, area.nome).toContain('Não mexe no estoque: a data da nota é anterior à abertura do estoque da Vila da Penha (01/10/2026).');
       expect(f, area.nome).not.toContain('Editar nota');
       expect(f, area.nome).not.toContain('>No estoque</h2>');
-      // Outubro é mais nova: setembro diz a data da que vale.
-      expect(f, area.nome).toContain('vale a de 14/10/2026');
+      expect(f, area.nome).toContain('vale a de 16/10/2026');
       expect(ancora(f, 'total'), area.nome).toBeGreaterThan(f.indexOf('data-aviso-periodo-fechado'));
       expect(naOrdem(f), area.nome).toEqual(['tela', 'total', 'custo']);
       for (const t of SAIU) expect(f, `${area.nome}: ${t}`).not.toContain(t);
+
+      // A nota do Méier (outra loja, estoque não aberto): é a que vale no custo, e não mexe no estoque.
+      const m = await naTela(await area.nota(ids.meier), `${area.raiz}/compras/${ids.meier}`, area.alcance, area.preferencia);
+      expect(m, area.nome).toContain('vale no custo');
+      expect(m, area.nome).toContain('Não mexe no estoque: o estoque da Méier ainda não foi aberto.');
+      expect(naOrdem(m), area.nome).toEqual(['tela', 'total', 'custo']);
+    }
+  });
+
+  it('Editar para uma data antes da abertura: a entrada é estornada e nenhuma nova entra (a regra do card `estoque`), e o ponto do estoque continua', async () => {
+    const { movimentos, frase } = (await obterNota(a, alcanceDe('DONO'), ids.editada))!.estoque;
+    expect(movimentos.map((x) => [x.estorno, x.quantidadeMilesimos])).toEqual([
+      [false, 15_000],
+      [true, -15_000],
+    ]);
+    expect(frase).toContain('Não mexe no estoque: a data da nota é anterior à abertura do estoque da Vila da Penha (01/10/2026).');
+    for (const area of AREAS()) {
+      como(area.alcance);
+      const h = await naTela(await area.nota(ids.editada), `${area.raiz}/compras/${ids.editada}`, area.alcance, area.preferencia);
+      expect(noCabecalho(h, 'No estoque', 'estoque'), area.nome).toBe(true);
+      expect(h.split('Estorno · ').length - 1, area.nome).toBe(1);
+      expect(naOrdem(h), area.nome).toEqual(['tela', 'total', 'custo', 'estoque']);
     }
   });
 
