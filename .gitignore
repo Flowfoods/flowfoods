@@ -23,22 +23,9 @@ tsconfig.tsbuildinfo
 # Estado local do oh-my-claudecode (orquestração dos agentes)
 .omc/
 
-# LGPD (02/11/2026): planilha e compactado de cliente nunca entram no repo —
-# podem carregar dado pessoal de terceiros. Só o .md agregado fica. Colchete
-# porque o git no Linux diferencia maiúscula (base.CSV). Quem força com
+# LGPD (02/11/2026): em clientes/ só entra .md — planilha, compactado, dump,
+# imagem ou PDF podem carregar dado pessoal de terceiros. Quem força com
 # `git add -f` cai no teste tests/clientes-custodia.test.ts.
-/clientes/**/*.[cC][sS][vV]
-/clientes/**/*.[tT][sS][vV]
-/clientes/**/*.[xX][lL][sS]
-/clientes/**/*.[xX][lL][sS][xX]
-/clientes/**/*.[xX][lL][sS][mM]
-/clientes/**/*.[xX][lL][sS][bB]
-/clientes/**/*.[oO][dD][sS]
-/clientes/**/*.[nN][uU][mM][bB][eE][rR][sS]
-/clientes/**/*.[zZ][iI][pP]
-/clientes/**/*.7[zZ]
-/clientes/**/*.[rR][aA][rR]
-/clientes/**/*.[gG][zZ]
-/clientes/**/*.[tT][gG][zZ]
-/clientes/**/*.[tT][aA][rR]
-/clientes/**/*.[sS][qQ][lL]
+/clientes/**
+!/clientes/**/
+!/clientes/**/*.md
