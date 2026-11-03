@@ -17,7 +17,7 @@
  *   (ou o trecho selecionado) volta depois da troca de tipo.
  */
 
-import { useRef, useState, type InputHTMLAttributes } from 'react';
+import { useEffect, useRef, useState, type InputHTMLAttributes } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 
 type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'id'> & {
@@ -29,6 +29,15 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'type' | 'id'> & {
 export function CampoDeSenha({ id, rotuloDoBotao = 'Mostrar senha', className = '', ...campo }: Props) {
   const [visivel, setVisivel] = useState(false);
   const ref = useRef<HTMLInputElement>(null);
+  // Ao enviar, a senha volta a ficar oculta: tablet compartilhado da loja não fica com a senha à mostra depois de um erro,
+  // e o gerenciador de senhas do navegador volta a reconhecer o campo. O valor enviado não muda.
+  useEffect(() => {
+    const form = ref.current?.form;
+    if (!form) return;
+    const ocultar = () => setVisivel(false);
+    form.addEventListener('submit', ocultar);
+    return () => form.removeEventListener('submit', ocultar);
+  }, []);
 
   function alternar() {
     const c = ref.current;

@@ -81,7 +81,7 @@ describe('515 · mostrar e ocultar a senha', () => {
     expect(attr(campo(h, 'email'), 'autocomplete')).toBe('username webauthn');
   });
 
-  it('/entrar depois de um erro: o campo volta oculto no HTML do servidor, com o erro ligado a ele', () => {
+  it('/entrar depois de um erro: o HTML do servidor começa com o campo oculto, com o erro ligado a ele', () => {
     estadoDoForm = { erro: 'E-mail ou senha incorretos.', email: 'a@b.com', vez: 1 };
     try {
       const h = html(createElement(FormEntrar, { aviso: null, rosto: false }));
@@ -98,6 +98,9 @@ describe('515 · mostrar e ocultar a senha', () => {
     const h = html(createElement(FormSenha, { token: 't', email: 'maria@casa.com', primeiraVez: false }));
     conferir(h, 'senha', 'new-password', 'Mostrar senha');
     conferir(h, 'confirmacao', 'new-password', 'Mostrar senha repetida');
+    // Os nomes que a action lê (actions.ts): sem eles o envio quebraria em silêncio.
+    expect(campo(h, 'senha')).toContain('name="senha"');
+    expect(campo(h, 'confirmacao')).toContain('name="confirmacao"');
     expect(attr(campo(h, 'senha'), 'minlength')).toBe('10');
     expect(campo(h, 'senha')).toContain('aria-describedby="senha-dica"');
     expect(h).toMatch(/<input[^>]*type="email"[^>]*autocomplete="username"/i); // o e-mail escondido para o gerenciador de senhas
