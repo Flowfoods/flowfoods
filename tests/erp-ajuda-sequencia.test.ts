@@ -84,7 +84,8 @@ describe('decisão 479 · o card', () => {
     // Tocar fora e Escape saem da sequência (nunca avançam).
     expect(pontos).toMatch(/const fora = \(e: MouseEvent\) => \{[\s\S]{0,900}?encerrar\(false\);/);
     // Decisão 480: tocar dentro da região que a etapa explica não encerra (nem avança): é fazer o que o card pede.
-    expect(pontos).toMatch(/const fora = \(e: MouseEvent\) => \{[\s\S]{0,700}?if \(regiao\?\.contains\(alvo\)\) return;[\s\S]{0,200}?encerrar\(false\);/);
+    // (Decisão 521: a região é a do data-alvo ou a da posição do botão; num painel inteiro, só campo, botão, link ou rótulo.)
+    expect(pontos).toMatch(/const fora = \(e: MouseEvent\) => \{[\s\S]{0,900}?if \(achada\?\.regiao\.contains\(alvo\) && toqueMantemAberto\([\s\S]{0,120}?\) return;[\s\S]{0,200}?encerrar\(false\);/);
     expect(pontos).toMatch(/e\.key !== 'Escape'[\s\S]{0,500}?aoEncerrar\(/);
     // Nenhum temporizador avança etapa (os que há: a abertura automática, a espera da rolagem e o foco depois de "Manter as dicas").
     const temporizadores = pontos.split('setTimeout(').slice(1);

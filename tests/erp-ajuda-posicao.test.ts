@@ -12,6 +12,9 @@ import {
   posicaoDoCard,
   proximoFocoNoCard,
   regiaoPelaPosicao,
+  tabNoCard,
+  tocouEmControle,
+  toqueMantemAberto,
   uniao,
   vemAntes,
   type Descendente,
@@ -133,25 +136,61 @@ describe('decisão 521 · alvo maior que a tela', () => {
     expect(posicaoDoCard({ ...longo(900), naColuna: null })).toEqual({ teto: null, rolar: 816, mostra: 'comeco' });
   });
 
-  it('em qualquer posição e tamanho, o botão termina entre a barra do topo e o card', () => {
+  it('em qualquer posição e tamanho, o botão termina entre a barra do topo e o card (ou na tela, com o card ao lado)', () => {
     let casos = 0;
-    for (const janela of [390, 500, 844]) {
+    let comCardAoLado = 0;
+    for (const janela of [390, 500, 844, 900]) {
       for (const altura of [44, 200, 500, 900, 1400, 2400]) {
         for (const top of [-1500, -600, -100, 0, 90, 300, 700, 1200]) {
           for (const desvio of [0, 0.25, 0.5, 0.9]) {
             for (const card of [195, 351, 448]) {
-              const b = top + Math.round((altura - 44) * desvio);
-              const m: MedidasDoCard = { janela, topoLivre: 72, margem: 12, card, cardMinimo: 210, alvo: { top, bottom: top + altura }, botao: { top: b, bottom: b + 44 }, naColuna: { top, bottom: top + altura }, comeco: b + 44 };
-              const v = botaoAVista(m);
-              // Só não dá quando nem o botão cabe entre a barra e o card no mínimo (janela de 390 com card de 210).
-              if (v.limite - (m.topoLivre + m.margem) >= 44) expect(v.ok, JSON.stringify({ m, v })).toBe(true);
-              casos++;
+              // Cabeçalho do tamanho do botão, ou mais alto que ele (o começo termina abaixo do botão).
+              for (const cabecalho of [0, 60, 300]) {
+                const b = top + Math.round((altura - 44) * desvio);
+                const alvo = { top, bottom: top + altura };
+                const botao = { top: b, bottom: b + 44 };
+                const comeco = Math.min(alvo.bottom, b + 44 + cabecalho);
+                // Coluna do card: o alvo todo (celular), nenhuma parte (card ao lado), só o botão, ou só o fim do alvo.
+                const colunas: (Faixa | null)[] = [alvo, null, botao, { top: Math.max(top, alvo.bottom - 100), bottom: alvo.bottom }];
+                for (const naColuna of colunas) {
+                  const m: MedidasDoCard = { janela, topoLivre: 72, margem: 12, card, cardMinimo: 210, alvo, botao, naColuna, comeco };
+                  const v = botaoAVista(m);
+                  // O botão sob o card só importa se ele está na coluna do card; fora dela, basta estar na tela.
+                  const botaoNaColuna = !!naColuna && naColuna.top <= botao.top && botao.bottom <= naColuna.bottom;
+                  const limite = botaoNaColuna ? v.limite : janela - 12;
+                  const cabe = limite - (m.topoLivre + m.margem) >= 44;
+                  if (cabe) {
+                    expect(v.top, JSON.stringify(m)).toBeGreaterThanOrEqual(m.topoLivre + m.margem - 0.5);
+                    expect(v.bottom, JSON.stringify(m)).toBeLessThanOrEqual(limite + 0.5);
+                  }
+                  if (!naColuna) comCardAoLado++;
+                  casos++;
+                }
+              }
             }
           }
         }
       }
     }
-    expect(casos).toBeGreaterThan(1000);
+    expect(casos).toBeGreaterThan(20000);
+    expect(comCardAoLado).toBeGreaterThan(5000);
+  });
+
+  it('cabeçalho mais alto que o botão: o começo inclui o cabeçalho inteiro quando cabe', () => {
+    // Painel longo a partir de 600; botão em 610–654; cabeçalho até 760. O começo (600–760) vai para o topo livre.
+    const v = botaoAVista(celular({ top: 600, bottom: 1800 }, { botao: { top: 610, bottom: 654 }, comeco: 760 }));
+    expect(v.p).toEqual({ teto: null, rolar: 516, mostra: 'comeco' });
+    expect(760 - v.p.rolar).toBeLessThanOrEqual(844 - 12 - 351 - 12);
+    expect(v.ok).toBe(true);
+  });
+
+  it('card ao lado com só uma parte do alvo na coluna dele: essa parte fica acima do card, o resto só na tela', () => {
+    // Computador: painel de 500 px; só o fim dele (o 3º campo) na coluna do card de 417 px.
+    const m: MedidasDoCard = { janela: 900, topoLivre: 72, margem: 12, card: 417, cardMinimo: 210, alvo: { top: 300, bottom: 800 }, botao: { top: 314, bottom: 342 }, naColuna: { top: 700, bottom: 800 }, comeco: 350 };
+    const p = posicaoDoCard(m);
+    // Cabe inteiro com o card de 300 (800 − 300 = 500 de alvo; 888 − 12 − 84 − 500 = 292 < 417): o card encolhe a 292.
+    expect(p).toEqual({ teto: 292, rolar: 216, mostra: 'inteiro' });
+    expect(800 - p.rolar).toBe(900 - 12 - 292 - 12);
   });
 });
 
@@ -203,20 +242,20 @@ describe('decisão 521 · a região de um ponto sem data-alvo', () => {
   const outroPonto: Descendente = { tag: 'BUTTON', tipo: 'button', antesDoBotao: false, outroPonto: true };
 
   it('no cabeçalho de um painel: o painel', () => {
-    expect(regiaoPelaPosicao([nivel('SPAN'), nivel('HEADER'), nivel('SECTION', [campo('INPUT')]), nivel('FIELDSET')])).toBe(2);
-    expect(regiaoPelaPosicao([nivel('HEADER'), nivel('SECTION'), nivel('DIV')])).toBe(1);
+    expect(regiaoPelaPosicao([nivel('SPAN'), nivel('HEADER'), nivel('SECTION', [campo('INPUT')]), nivel('FIELDSET')])).toEqual({ indice: 2, por: 'cabecalho' });
+    expect(regiaoPelaPosicao([nivel('HEADER'), nivel('SECTION'), nivel('DIV')])).toEqual({ indice: 1, por: 'cabecalho' });
     // Um header que não é de painel (o topo da página): nenhuma.
     expect(regiaoPelaPosicao([nivel('HEADER'), nivel('DIV', [campo('INPUT')])])).toBeNull();
   });
 
   it('na legenda de um grupo: o grupo', () => {
-    expect(regiaoPelaPosicao([nivel('SPAN'), nivel('LEGEND'), nivel('FIELDSET', [campo('INPUT', false, 'radio')]), nivel('DIV')])).toBe(2);
+    expect(regiaoPelaPosicao([nivel('SPAN'), nivel('LEGEND'), nivel('FIELDSET', [campo('INPUT', false, 'radio')]), nivel('DIV')])).toEqual({ indice: 2, por: 'legenda' });
   });
 
   it('junto do rótulo, com o campo embaixo do botão: o campo com o rótulo', () => {
     // "Data" em Lançar o dia: a linha do rótulo (sem campo) e, acima, o rótulo com o campo depois do botão.
-    expect(regiaoPelaPosicao([nivel('DIV', [el('LABEL', true)]), nivel('DIV', [el('DIV', true), el('LABEL', true), campo('INPUT', false, 'text')]), nivel('FORM')])).toBe(1);
-    expect(regiaoPelaPosicao([nivel('DIV'), nivel('DIV', [campo('SELECT')])])).toBe(1);
+    expect(regiaoPelaPosicao([nivel('DIV', [el('LABEL', true)]), nivel('DIV', [el('DIV', true), el('LABEL', true), campo('INPUT', false, 'text')]), nivel('FORM')])).toEqual({ indice: 1, por: 'rotulo' });
+    expect(regiaoPelaPosicao([nivel('DIV'), nivel('DIV', [campo('SELECT')])])).toEqual({ indice: 1, por: 'rotulo' });
   });
 
   it('botão depois do campo (a frase embaixo das etapas, a caixa de marcar): só o botão, como antes', () => {
@@ -248,8 +287,8 @@ describe('decisão 521 · a região de um ponto sem data-alvo', () => {
         throw new Error('não precisava ler');
       },
     };
-    expect(regiaoPelaPosicao([nivel('DIV', [campo('SELECT')]), naoLer])).toBe(0);
-    expect(regiaoPelaPosicao([nivel('HEADER'), nivel('SECTION'), naoLer])).toBe(1);
+    expect(regiaoPelaPosicao([nivel('DIV', [campo('SELECT')]), naoLer])).toEqual({ indice: 0, por: 'rotulo' });
+    expect(regiaoPelaPosicao([nivel('HEADER'), nivel('SECTION'), naoLer])).toEqual({ indice: 1, por: 'cabecalho' });
   });
 
   it('o que é campo', () => {
@@ -357,6 +396,79 @@ describe('decisão 521 · o Tab no card (não modal)', () => {
   });
 });
 
+describe('decisão 521 · o foco que não pega no botão do ponto (parceiro bloqueado)', () => {
+  /** Um botão de mentira na mesma árvore: `pega` diz se o foco fica nele (num grupo desligado, não fica). */
+  class Botao extends No {
+    constructor(
+      nome: string,
+      pai: No,
+      readonly pega = true,
+    ) {
+      super(nome, pai);
+    }
+    focus() {
+      if (this.pega) focoAgora = this;
+    }
+  }
+  let focoAgora: unknown = null;
+  const pagina = new No('página');
+  const grupo = new No('fieldset desligado', pagina);
+  const pontoLigado = new Botao('? do campo', pagina);
+  const pontoDesligado = new Botao('? no grupo desligado', grupo, false);
+  const card = new No('card', pagina);
+  const x = new Botao('X', card);
+  const nunca = new Botao('Não mostrar novamente', card);
+  const concluir = new Botao('Concluir', card);
+  const botoes = [x, nunca, concluir];
+  const agora = () => focoAgora;
+
+  it('Tab no último botão: vai ao botão do ponto quando ele pega o foco', () => {
+    focoAgora = concluir;
+    expect(tabNoCard(botoes, concluir, pontoLigado, false, agora)).toBe(pontoLigado);
+    expect(focoAgora).toBe(pontoLigado);
+  });
+
+  it('botão do ponto que não pega o foco (dentro do grupo desligado): o Tab circula no card, nunca fica parado', () => {
+    focoAgora = concluir;
+    expect(tabNoCard(botoes, concluir, pontoDesligado, false, agora)).toBe(x);
+    expect(focoAgora).toBe(x);
+    focoAgora = x;
+    expect(tabNoCard(botoes, x, pontoDesligado, true, agora)).toBe(concluir);
+    expect(focoAgora).toBe(concluir);
+  });
+
+  it('sem botão do ponto, circula; no meio do card, o navegador segue (nada é focado à mão)', () => {
+    focoAgora = concluir;
+    expect(tabNoCard(botoes, concluir, null, false, agora)).toBe(x);
+    focoAgora = nunca;
+    expect(tabNoCard(botoes, nunca, pontoLigado, false, agora)).toBeNull();
+    expect(focoAgora).toBe(nunca);
+  });
+});
+
+describe('decisão 521 · tocar dentro da região do ponto', () => {
+  const t = (tag: string, extra: { temHref?: boolean; papel?: string | null } = {}) => ({ tag, temHref: extra.temHref ?? false, papel: extra.papel ?? null });
+
+  it('o que conta como campo, botão, link ou rótulo', () => {
+    for (const tag of ['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL', 'SUMMARY', 'OPTION']) expect(tocouEmControle([t(tag)]), tag).toBe(true);
+    expect(tocouEmControle([t('SPAN'), t('LABEL'), t('DIV')])).toBe(true);
+    expect(tocouEmControle([t('A', { temHref: true })])).toBe(true);
+    expect(tocouEmControle([t('A')])).toBe(false);
+    expect(tocouEmControle([t('DIV', { papel: 'button' })])).toBe(true);
+    expect(tocouEmControle([t('P'), t('DIV'), t('DL')])).toBe(false);
+    expect(tocouEmControle([])).toBe(false);
+  });
+
+  it('data-alvo e rótulo: a região toda mantém aberto; painel (cabeçalho) e grupo (legenda): só no que se usa', () => {
+    expect(toqueMantemAberto('alvo', false)).toBe(true);
+    expect(toqueMantemAberto('rotulo', false)).toBe(true);
+    expect(toqueMantemAberto('cabecalho', false)).toBe(false);
+    expect(toqueMantemAberto('legenda', false)).toBe(false);
+    expect(toqueMantemAberto('cabecalho', true)).toBe(true);
+    expect(toqueMantemAberto('legenda', true)).toBe(true);
+  });
+});
+
 describe('decisão 521 · a folga do fim depois de fechar', () => {
   it('sai a parte abaixo da tela; a que está à vista fica; página que não rola fica sem folga', () => {
     expect(folgaQueFica(0, 3000, 0, 844)).toBe(0);
@@ -383,10 +495,12 @@ describe('decisão 521 · o componente usa as regras (guardas)', () => {
   const pontos = readFileSync('src/components/erp/shell/pontos.tsx', 'utf8');
 
   it('o alvo é a região do data-alvo ou, sem ela, a da posição do botão; tocar nela não encerra', () => {
-    expect(pontos).toContain('const regiao = regiaoDoPonto(botao) ?? regiaoImplicita(botao);');
-    expect(pontos).toContain('const i = regiaoPelaPosicao(');
+    expect(pontos).toContain("const achada = doAlvo ? { regiao: doAlvo, por: 'alvo' as const } : regiaoImplicita(botao);");
+    expect(pontos).toContain('const achada = regiaoPelaPosicao(');
     expect(pontos).toContain('antesDoBotao: vemAntes<Node>(d, botao),');
-    expect(pontos).toMatch(/const fora = \(e: MouseEvent\) => \{[\s\S]{0,700}?const regiao = origem\.current\?\.isConnected \? regiaoParaVer\(origem\.current\) : null;/);
+    expect(pontos).toMatch(
+      /const fora = \(e: MouseEvent\) => \{[\s\S]{0,900}?if \(achada\?\.regiao\.contains\(alvo\) && toqueMantemAberto\(achada\.por, tocouEmControle\(cadeiaAte\(alvo, achada\.regiao\)\)\)\) return;[\s\S]{0,200}?encerrar\(false\);/,
+    );
   });
 
   it('rolagem sem animação para quem pediu menos movimento; folga para rolar com o card aberto, aparada ao fechar e ao rolar', () => {
@@ -403,9 +517,14 @@ describe('decisão 521 · o componente usa as regras (guardas)', () => {
     expect(pontos).toContain('role="dialog"');
     expect(pontos).toContain('aria-modal="false"');
     expect(pontos).toContain('onKeyDown={aoTeclar}');
-    expect(pontos).toContain('const { antes, depois } = antesEDepois<Node>(botoes, foco);');
-    expect(pontos).toContain('const i = proximoFocoNoCard(botoes.length, antes, depois, e.shiftKey, temOrigem);');
-    expect(pontos).toContain("if (i === 'origem') botaoDoPonto?.focus();");
+    // Botão do ponto num grupo desligado (parceiro bloqueado) não tem o atributo: `:disabled`; e o foco é conferido depois.
+    expect(pontos).toContain("!botaoDoPonto.matches(':disabled')");
+    expect(pontos).not.toMatch(/botaoDoPonto\.hasAttribute\('disabled'\)/);
+    expect(pontos).toContain('const focado = tabNoCard<HTMLElement>(botoes, foco as HTMLElement, podeReceber ? botaoDoPonto : null, e.shiftKey, () => document.activeElement);');
+    expect(pontos).toContain('if (focado) e.preventDefault();');
+    // O botão do mesmo ponto com o card aberto: só o foco vai ao título; a sequência não recomeça.
+    expect(pontos).toMatch(/if \(ativoAgora\.current\?\.id === id\) \{\s*setPedidoDeFoco\(\(n\) => n \+ 1\);\s*return;\s*\}/);
+    expect(pontos).toMatch(/if \(pedidoDeFoco !== pedidoAoAbrir\.current\) titulo\.current\?\.focus\(\{ preventScroll: true \}\);/);
     expect(pontos).toContain('tabIndex={rolavel ? 0 : undefined}');
     expect(pontos).toContain("role={rolavel ? 'region' : undefined}");
     expect(pontos).toContain('aria-label={rolavel ? `Texto da ajuda: ${ponto.titulo}` : undefined}');

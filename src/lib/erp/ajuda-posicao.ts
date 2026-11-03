@@ -131,6 +131,60 @@ export function ehCampo(d: Pick<Descendente, 'tag' | 'tipo'>): boolean {
   return d.tag === 'SELECT' || d.tag === 'TEXTAREA' || (d.tag === 'INPUT' && (d.tipo ?? '').toLowerCase() !== 'hidden');
 }
 
+/** Por onde veio a região do ponto: o `data-alvo` (480), o cabeçalho de um painel, a legenda de um grupo ou o rótulo. */
+export type OrigemDaRegiao = 'alvo' | 'cabecalho' | 'legenda' | 'rotulo';
+
+/** Um elemento entre o ponto tocado e a região (do tocado para cima), como o navegador o vê. */
+export interface Tocado {
+  tag: string;
+  /** Link de verdade (`a` com `href`). */
+  temHref: boolean;
+  /** O atributo `role`. */
+  papel: string | null;
+}
+
+const TAGS_DE_CONTROLE = new Set(['INPUT', 'SELECT', 'TEXTAREA', 'BUTTON', 'LABEL', 'SUMMARY', 'OPTION']);
+const PAPEIS_DE_CONTROLE = new Set(['button', 'link', 'checkbox', 'radio', 'switch', 'tab', 'menuitem', 'option']);
+
+/** O toque caiu num campo, botão, link ou rótulo (algum elemento da cadeia, do tocado até a região). */
+export function tocouEmControle(cadeia: readonly Tocado[]): boolean {
+  return cadeia.some((t) => TAGS_DE_CONTROLE.has(t.tag) || (t.tag === 'A' && t.temHref) || (t.papel !== null && PAPEIS_DE_CONTROLE.has(t.papel)));
+}
+
+/**
+ * Tocar dentro da região do ponto mantém o card aberto (decisão 521, revisão)? Na do `data-alvo` (480) e na do rótulo (o
+ * campo com o rótulo), sim: tocar nela é fazer o que o card pede. Na de um painel inteiro (cabeçalho) ou de um grupo
+ * (legenda), só no que se usa — campo, botão, link ou rótulo; o texto e o fundo do painel fecham, como tocar fora.
+ */
+export function toqueMantemAberto(por: OrigemDaRegiao, emControle: boolean): boolean {
+  return por === 'alvo' || por === 'rotulo' || emControle;
+}
+
+/** Um elemento que recebe foco (o `HTMLElement` do navegador). */
+export interface Focavel<T> extends NaOrdemDaPagina<T> {
+  focus(): void;
+}
+
+/**
+ * Leva o foco no Tab dentro do card (decisão 521, revisão): nas bordas, ao botão do ponto (`origem`, null quando ele não
+ * pode receber foco); se o foco não pegou nele (botão dentro de um grupo desligado, que não tem o atributo `disabled` mas não
+ * recebe foco), circula no card. `focoDeAgora`: quem está com o foco depois de tentar. Devolve quem recebeu o foco, ou null
+ * quando a tecla segue com o navegador (o próximo, na direção da tecla, ainda é do card).
+ */
+export function tabNoCard<T extends Focavel<T>>(botoes: readonly T[], foco: T, origem: T | null, paraTras: boolean, focoDeAgora: () => unknown): T | null {
+  const { antes, depois } = antesEDepois(botoes, foco);
+  const passo = proximoFocoNoCard(botoes.length, antes, depois, paraTras, origem !== null);
+  if (passo === null) return null;
+  if (passo === 'origem' && origem) {
+    origem.focus();
+    if (focoDeAgora() === origem) return origem;
+  }
+  const noCard = proximoFocoNoCard(botoes.length, antes, depois, paraTras, false);
+  if (typeof noCard !== 'number') return null;
+  botoes[noCard].focus();
+  return botoes[noCard];
+}
+
 /** Blocos que juntam vários campos: sendo um deles, ou com um deles dentro, o nível não é "o campo do rótulo". */
 const JUNTAM_VARIOS = new Set(['SECTION', 'FORM', 'TABLE', 'OL', 'UL']);
 /** Blocos que encerram a busca: subir além deles pegaria a tela inteira. */
@@ -138,7 +192,8 @@ const BLOCOS = new Set(['SECTION', 'FORM', 'FIELDSET', 'MAIN', 'TABLE', 'UL', 'O
 
 /**
  * A região que o ponto explica quando o botão não diz (`data-alvo`), pela posição dele (decisão 521). `subindo`: os níveis
- * acima do botão, do pai para cima (até quatro). Devolve o índice da região em `subindo`, ou null (vale só o botão):
+ * acima do botão, do pai para cima (até quatro). Devolve o índice da região em `subindo` e por onde ela veio, ou null (vale
+ * só o botão):
  *  - no cabeçalho de um painel: o painel (`header` dentro de `section`);
  *  - na legenda de um grupo de campos: o grupo (`legend` dentro de `fieldset`);
  *  - junto do rótulo de um campo: o primeiro nível, até o terceiro, que tem campo — se os campos dele vêm todos DEPOIS do
@@ -146,16 +201,16 @@ const BLOCOS = new Set(['SECTION', 'FORM', 'FIELDSET', 'MAIN', 'TABLE', 'UL', 'O
  *    lista dentro). Botão depois do campo (a frase embaixo de uma lista de etapas, a caixa de marcar): só o botão;
  *  - nada disso até um bloco (painel, formulário, lista): nenhuma.
  */
-export function regiaoPelaPosicao(subindo: readonly NivelAcima[]): number | null {
+export function regiaoPelaPosicao(subindo: readonly NivelAcima[]): { indice: number; por: OrigemDaRegiao } | null {
   for (let i = 0; i < Math.min(3, subindo.length); i++) {
     const nivel = subindo[i];
-    if (nivel.tag === 'HEADER') return subindo[i + 1]?.tag === 'SECTION' ? i + 1 : null;
-    if (nivel.tag === 'LEGEND') return subindo[i + 1]?.tag === 'FIELDSET' ? i + 1 : null;
+    if (nivel.tag === 'HEADER') return subindo[i + 1]?.tag === 'SECTION' ? { indice: i + 1, por: 'cabecalho' } : null;
+    if (nivel.tag === 'LEGEND') return subindo[i + 1]?.tag === 'FIELDSET' ? { indice: i + 1, por: 'legenda' } : null;
     const dentro = nivel.dentro();
     const campos = dentro.filter(ehCampo);
     if (campos.length > 0) {
       const juntaVarios = JUNTAM_VARIOS.has(nivel.tag) || dentro.some((d) => JUNTAM_VARIOS.has(d.tag) || d.outroPonto);
-      return juntaVarios || campos.some((c) => c.antesDoBotao) ? null : i;
+      return juntaVarios || campos.some((c) => c.antesDoBotao) ? null : { indice: i, por: 'rotulo' };
     }
     if (BLOCOS.has(nivel.tag)) return null;
   }

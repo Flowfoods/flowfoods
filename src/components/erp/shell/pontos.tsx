@@ -64,7 +64,7 @@ import {
   proximoPasso,
   type PontoNaTela,
 } from '@/lib/erp/ajuda-sequencia';
-import { antesEDepois, folgaQueFica, posicaoDoCard, proximoFocoNoCard, regiaoPelaPosicao, uniao, vemAntes, type Faixa, type MedidasDoCard } from '@/lib/erp/ajuda-posicao';
+import { folgaQueFica, posicaoDoCard, regiaoPelaPosicao, tabNoCard, tocouEmControle, toqueMantemAberto, uniao, vemAntes, type Faixa, type MedidasDoCard, type OrigemDaRegiao } from '@/lib/erp/ajuda-posicao';
 import { classeDeBotao } from '../ui/estilos';
 import { Selo } from '../ui/superficies';
 import type { AjudaDoShell } from './tipos';
@@ -209,6 +209,12 @@ export function ProvedorDosPontos({
     ordem.find((el) => el?.isConnected)?.focus();
   }, []);
 
+  // O card aberto agora (para `abrir` saber se o botão é o do mesmo card, sem refazer a função a cada etapa).
+  const ativoAgora = useRef(ativo);
+  ativoAgora.current = ativo;
+  // Pedido de foco no card aberto: o botão do mesmo ponto acionado de novo (Enter ou toque) leva o foco ao título do card.
+  const [pedidoDeFoco, setPedidoDeFoco] = useState(0);
+
   const abrir = useCallback(
     (ponto: string, el: HTMLElement) => {
       const id = idCompleto(ponto);
@@ -216,6 +222,12 @@ export function ProvedorDosPontos({
       origem.current = el;
       lugarDeTrabalho.current = el;
       inicioUsadoNestaVisita.current = true;
+      // O mesmo card já aberto (a pessoa voltou ao botão pelo Tab, revisão da 521): só o foco vai para o card; a sequência e
+      // o passo continuam onde estavam.
+      if (ativoAgora.current?.id === id) {
+        setPedidoDeFoco((n) => n + 1);
+        return;
+      }
       setAtivo({ id, automatico: false, rolar: true, passos: passosDaSequencia(visiveisNaOrdem(), id), sozinha: false });
     },
     [idCompleto, porId, visiveisNaOrdem],
@@ -388,12 +400,10 @@ export function ProvedorDosPontos({
       const alvo = e.target as Element | null;
       if (!alvo || !alvo.isConnected) return;
       if (alvo.closest('[data-ponto-de-ajuda], [data-ponto], dialog')) return;
-      // Tocar na região que a etapa explica (decisão 480: os botões da unidade, o campo; 521: também a região pela posição do
-      // botão, a que o card deixou à vista) é fazer o que o card pede: a
-      // sequência continua aberta, sem avançar. Depois, "Continuar" segue para o próximo ponto (inclusive o que acabou de
-      // aparecer, como "Quanto vem" depois de escolher a unidade).
-      const regiao = origem.current?.isConnected ? regiaoParaVer(origem.current) : null;
-      if (regiao?.contains(alvo)) return;
+      // Tocar na região que a etapa explica (480: o data-alvo; 521: a da posição do botão, mas num painel ou grupo inteiro só
+      // campo, botão, link ou rótulo) é fazer o que o card pede: segue aberta, sem avançar; "Continuar" leva ao próximo ponto.
+      const achada = origem.current?.isConnected ? regiaoParaVer(origem.current) : null;
+      if (achada?.regiao.contains(alvo) && toqueMantemAberto(achada.por, tocouEmControle(cadeiaAte(alvo, achada.regiao)))) return;
       // Tocar fora sai da sequência: nunca avança uma etapa sem querer.
       encerrar(false);
     };
@@ -428,6 +438,7 @@ export function ProvedorDosPontos({
             verTudo={ehTela}
             automatico={ativo.automatico}
             rolar={ativo.rolar}
+            pedidoDeFoco={pedidoDeFoco}
             origem={origem}
             nunca={nunca}
             progresso={progresso}
@@ -533,10 +544,10 @@ const CONTROLES = 'input:not([type=hidden]), select, textarea';
  * `regiaoPelaPosicao`; antes, sem `data-alvo`, só o botão contava e o card cobria o campo ao lado dele): o painel do
  * cabeçalho ("Conta a pagar", o primeiro canal do dia, o "Despesa" do detalhe), o grupo da legenda, ou o campo do rótulo.
  */
-function regiaoImplicita(botao: HTMLElement): HTMLElement | null {
+function regiaoImplicita(botao: HTMLElement): { regiao: HTMLElement; por: OrigemDaRegiao } | null {
   const subindo: HTMLElement[] = [];
   for (let el = botao.parentElement; el && subindo.length < 4; el = el.parentElement) subindo.push(el);
-  const i = regiaoPelaPosicao(
+  const achada = regiaoPelaPosicao(
     subindo.map((el) => ({
       tag: el.tagName,
       dentro: () =>
@@ -548,13 +559,21 @@ function regiaoImplicita(botao: HTMLElement): HTMLElement | null {
         })),
     })),
   );
-  return i === null ? null : subindo[i];
+  return achada ? { regiao: subindo[achada.indice], por: achada.por } : null;
 }
 
-/** O que o card deixa à vista ao abrir: a região do `data-alvo` (480) ou, sem ele, a da posição do botão. */
-function regiaoParaVer(botao: HTMLElement): HTMLElement | null {
-  const regiao = regiaoDoPonto(botao) ?? regiaoImplicita(botao);
-  return regiao && regiao.isConnected && regiao.getClientRects().length > 0 ? regiao : null;
+/** Do elemento tocado até a região (sem ela), para saber se o toque caiu num campo, botão, link ou rótulo. */
+function cadeiaAte(tocado: Element, regiao: Element) {
+  const cadeia: { tag: string; temHref: boolean; papel: string | null }[] = [];
+  for (let el: Element | null = tocado; el && el !== regiao; el = el.parentElement) cadeia.push({ tag: el.tagName, temHref: el.hasAttribute('href'), papel: el.getAttribute('role') });
+  return cadeia;
+}
+
+/** O que o card deixa à vista ao abrir, e por onde veio: a região do `data-alvo` (480) ou, sem ele, a da posição do botão. */
+function regiaoParaVer(botao: HTMLElement): { regiao: HTMLElement; por: OrigemDaRegiao } | null {
+  const doAlvo = regiaoDoPonto(botao);
+  const achada = doAlvo ? { regiao: doAlvo, por: 'alvo' as const } : regiaoImplicita(botao);
+  return achada && achada.regiao.isConnected && achada.regiao.getClientRects().length > 0 ? achada : null;
 }
 
 /**
@@ -599,7 +618,7 @@ interface Faixa2D extends Faixa {
  */
 function medirAlvo(botao: HTMLElement, card: DOMRect): Pick<MedidasDoCard, 'alvo' | 'botao' | 'naColuna' | 'comeco'> {
   const b = botao.getBoundingClientRect();
-  const regiao = regiaoParaVer(botao);
+  const regiao = regiaoParaVer(botao)?.regiao ?? null;
   const caixa = regiao?.getBoundingClientRect() ?? null;
   const alvo = uniao(caixa ? [b, caixa] : [b]) as Faixa;
   const pecas = [b, ...(regiao ? pecasDaRegiao(regiao) : [])];
@@ -624,6 +643,7 @@ function CardDeAjuda({
   verTudo,
   automatico,
   rolar,
+  pedidoDeFoco,
   origem,
   nunca,
   progresso,
@@ -642,6 +662,8 @@ function CardDeAjuda({
   automatico: boolean;
   /** A página pode subir para o botão do ponto ficar à vista. */
   rolar: boolean;
+  /** Muda quando o botão deste mesmo ponto é acionado com o card aberto: o foco vai para o título. */
+  pedidoDeFoco: number;
   origem: RefObject<HTMLElement | null>;
   nunca: FormularioNunca | null;
   /** "2 de 5" (só quando a tela tem mais de um ponto à vista). */
@@ -749,6 +771,13 @@ function CardDeAjuda({
     if (!automatico) titulo.current?.focus({ preventScroll: true });
   }, [automatico, rolar, posicionar]);
 
+  // O botão do mesmo ponto de novo (Enter nele depois de sair do card pelo Tab): o foco volta ao título, sem refazer nada.
+  // Só a mudança conta: o card que abre (inclusive sozinho, sem roubar o foco) não reage ao pedido de um card anterior.
+  const pedidoAoAbrir = useRef(pedidoDeFoco);
+  useEffect(() => {
+    if (pedidoDeFoco !== pedidoAoAbrir.current) titulo.current?.focus({ preventScroll: true });
+  }, [pedidoDeFoco]);
+
   // Girar o aparelho ou mudar a LARGURA da janela com o card aberto (3ª conferência da 479): o alvo volta para cima do card.
   // Só a altura mudando (a barra de endereço do celular recolhendo enquanto a pessoa rola, o teclado abrindo) não reposiciona:
   // a página não briga com o dedo (4ª conferência). Com alguém digitando, só se garante que o campo continue à vista.
@@ -830,14 +859,12 @@ function CardDeAjuda({
     const foco = document.activeElement;
     if (!foco) return;
     const botoes = Array.from(card.current.querySelectorAll<HTMLElement>(FOCAVEIS_DO_CARD)).filter((el) => el.getClientRects().length > 0);
-    const { antes, depois } = antesEDepois<Node>(botoes, foco);
     const botaoDoPonto = origem.current;
-    const temOrigem = !!botaoDoPonto?.isConnected && botaoDoPonto.getClientRects().length > 0 && !botaoDoPonto.hasAttribute('disabled');
-    const i = proximoFocoNoCard(botoes.length, antes, depois, e.shiftKey, temOrigem);
-    if (i === null) return;
-    e.preventDefault();
-    if (i === 'origem') botaoDoPonto?.focus();
-    else botoes[i].focus();
+    // `:disabled` pega também o botão dentro de um grupo desligado (parceiro bloqueado), que não tem o atributo; e, se o foco
+    // não pegar nele mesmo assim, `tabNoCard` circula no card (a tecla nunca fica parada).
+    const podeReceber = !!botaoDoPonto?.isConnected && botaoDoPonto.getClientRects().length > 0 && !botaoDoPonto.matches(':disabled');
+    const focado = tabNoCard<HTMLElement>(botoes, foco as HTMLElement, podeReceber ? botaoDoPonto : null, e.shiftKey, () => document.activeElement);
+    if (focado) e.preventDefault();
   }
 
   function aoEnviarNunca(e: FormEvent<HTMLFormElement>) {
