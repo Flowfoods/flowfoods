@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { limparRascunhos } from '@/components/erp/telas/cadastro/rascunho';
+import { CampoDeSenha } from '@/components/erp/ui/campo-senha';
 import { acaoEntrar, type EstadoEntrar } from './actions';
 import { EntrarComRosto } from './rosto';
 
@@ -59,10 +60,9 @@ export function FormEntrar({ aviso, rosto }: { aviso: string | null; rosto: bool
           <label htmlFor="senha" className={ROTULO}>
             Senha
           </label>
-          <input
+          <CampoDeSenha
             id="senha"
             name="senha"
-            type="password"
             required
             autoComplete="current-password"
             className={CAMPO}

@@ -19,6 +19,7 @@ import { Aviso, Painel, Selo } from '../../ui/superficies';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import type { AcaoDeCadastro } from '../cadastro/estado';
+import { Voltar } from '../cadastro/partes';
 import { inteiroDaUrl } from './executar-categorias';
 import { AvisoDaClassificacao } from './aviso-classificar';
 import { FormDaFila } from './form-classificar';
@@ -108,6 +109,8 @@ export function TelaClassificar({
   const de = (fila.pagina - 1) * 100 + 1;
   return (
     <div className="mx-auto max-w-5xl space-y-6">
+      {/* Fora das listas do shell: o retorno é sempre para os insumos do mesmo contexto (parceiro ou nível 1). */}
+      <Voltar href={base}>Voltar para os insumos</Voltar>
       <PageHeader
         icone="classificar"
         cor={COR.insumo}
@@ -245,10 +248,6 @@ export function TelaClassificar({
       <p className="text-[12px] text-suave">
         <Link href={`${base}/categorias`} className={LINK_DE_TEXTO}>
           Ver as categorias
-        </Link>
-        {' · '}
-        <Link href={base} className={LINK_DE_TEXTO}>
-          Voltar aos insumos
         </Link>
       </p>
     </div>

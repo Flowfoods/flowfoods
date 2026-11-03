@@ -21,7 +21,7 @@ import { Aviso, Painel, Selo, Vazio } from '../../ui/superficies';
 import { ListaHistorico } from '../historico/lista-historico';
 import type { AcaoDeCadastro } from '../cadastro/estado';
 import { FormSituacao } from '../cadastro/form-situacao';
-import { BotaoOuMotivo } from '../cadastro/partes';
+import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { fraseDoFeito, fraseDoSalvo } from './estado';
 import { FormConfirmarConservacao } from './form-confirmar-conservacao';
 import { AvisoDeSalvo } from '../cadastro/anuncio';
@@ -118,9 +118,7 @@ export function TelaDetalheInsumo({
   return (
     <div className="space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: i.nome }]} />
-      <Link href={voltar} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0 [@media(pointer:coarse)]:min-h-11`}>
-        Voltar para a lista
-      </Link>
+      <Voltar href={voltar}>Voltar para a lista</Voltar>
       <PageHeader
         icone="insumo"
         cor={COR.insumo}
