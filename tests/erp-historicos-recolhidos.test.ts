@@ -108,8 +108,10 @@ describe('Pedidos de impressão da etiqueta: recolhidos, sem esconder falha (dec
     solicitadaEm: new Date('2026-10-30T15:00:00Z'), solicitadaPorNome: 'Duda Lima', concluidaEm: null, confirmadaEm: null, confirmadaPorNome: null,
     ...p,
   });
-  const html = (pedidos: PedidoDeImpressao[]) =>
-    renderToStaticMarkup(createElement(PedidosDaEmissao, { chave: '/erp/etiquetas/loja-1/etiqueta-1', pedidos }));
+  /** Como vêm do banco: o mais recente primeiro (sequência decrescente). */
+  const recentesPrimeiro = (pedidos: PedidoDeImpressao[]) => pedidos.map((p, i) => ({ ...p, sequencia: pedidos.length - i }));
+  const html = (pedidos: PedidoDeImpressao[], bloqueada = false) =>
+    renderToStaticMarkup(createElement(PedidosDaEmissao, { chave: '/erp/etiquetas/loja-1/etiqueta-1', pedidos: recentesPrimeiro(pedidos), bloqueada }));
   const bloco = (h: string) => ({ ini: h.indexOf('<details'), fim: h.indexOf('</details>') });
 
   it('com falha e sem resultado: HTML inicial recolhido e a contagem à vista, fora do <details>; o motivo segue dentro', () => {
@@ -132,6 +134,33 @@ describe('Pedidos de impressão da etiqueta: recolhidos, sem esconder falha (dec
     expect(h.indexOf('Zebra sem papel')).toBeLessThan(fim);
     // O "Já imprimi" de um pedido da Zebra sem resposta tira ele da conta.
     expect(pendenciasDosPedidos([pedido('a', { situacao: 'PREPARADA', confirmadaEm: new Date() })])).toEqual({ falharam: 0, semResultado: 0 });
+  });
+
+  it('o que um pedido resolvido depois já resolveu não conta; falha depois do resolvido continua contando', () => {
+    const semAviso = (h: string) => {
+      expect(h.startsWith('<section')).toBe(true);
+      expect(h).not.toContain('role="status"');
+    };
+    // Mais recente primeiro. Reimpressão enviada depois da falha: nada a fazer.
+    const reimpressa = html([pedido('b', { situacao: 'ENVIADA' }), pedido('a', { situacao: 'FALHOU', erro: 'Zebra sem papel' })]);
+    semAviso(reimpressa);
+    expect(reimpressa.indexOf('Zebra sem papel')).toBeGreaterThan(reimpressa.indexOf('<details'));
+    // Zebra sem resposta, depois arquivo baixado e "Já imprimi": o "sem resultado" antigo não fica eterno.
+    semAviso(html([pedido('b', { transporte: 'ARQUIVO_ZPL', situacao: 'EXPORTADA', confirmadaEm: new Date(), confirmadaPorNome: 'Ana' }), pedido('a', { situacao: 'PREPARADA' })]));
+    // A reimpressão falhou DEPOIS de uma enviada: conta.
+    const depois = html([pedido('b', { situacao: 'FALHOU', erro: 'Sem resposta da impressora.' }), pedido('a', { situacao: 'ENVIADA' })]);
+    expect(depois.slice(0, depois.indexOf('<details'))).toContain('1 pedido de impressão falhou.');
+    // A ordem vem da sequência, não da posição na lista.
+    const fora = [pedido('x', { sequencia: 1, situacao: 'FALHOU' }), pedido('y', { sequencia: 2, situacao: 'ENVIADA' })];
+    expect(pendenciasDosPedidos(fora)).toEqual({ falharam: 0, semResultado: 0 });
+    expect(pendenciasDosPedidos([...fora].reverse())).toEqual({ falharam: 0, semResultado: 0 });
+  });
+
+  it('etiqueta bloqueada (vencida, lote estornado): sem aviso de falha, o motivo continua no histórico', () => {
+    const h = html([pedido('a', { situacao: 'FALHOU', erro: 'Zebra sem papel' }), pedido('b', { situacao: 'PREPARADA' })], true);
+    expect(h.startsWith('<section')).toBe(true);
+    expect(h).not.toContain('role="status"');
+    expect(h).toContain('Zebra sem papel');
   });
 
   it('só falhas, ou só sem resultado: a frase diz o que é, no singular ou no plural', () => {

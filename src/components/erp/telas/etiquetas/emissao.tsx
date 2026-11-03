@@ -92,7 +92,7 @@ export function TelaDaEmissao({
         </div>
       </div>
 
-      <PedidosDaEmissao chave={aqui} pedidos={d.pedidos} />
+      <PedidosDaEmissao chave={aqui} pedidos={d.pedidos} bloqueada={!!d.bloqueio} />
       <p className="text-[12px] text-suave">
         “Enviada à impressora” quer dizer que o Browser Print da Zebra recebeu: confira o papel. Baixar o arquivo ou abrir o papel não tira a etiqueta de “Esperando a impressora”: depois que sair, toque em “Já imprimi”.{' '}
         <Link href={hrefImpressora} className="inline-flex min-h-11 items-center underline decoration-linha-forte underline-offset-4">
@@ -105,10 +105,14 @@ export function TelaDaEmissao({
 
 /**
  * Visão C (decisão 516): o que deu errado não fica escondido no histórico recolhido. Conta pelo mesmo selo da linha:
- * "Falhou" e "Sem resultado" (a Zebra não respondeu); o que alguém confirmou com "Já imprimi" não conta.
+ * "Falhou" e "Sem resultado" (a Zebra não respondeu). Só o que veio DEPOIS do último pedido resolvido (a Zebra recebeu ou
+ * alguém disse "Já imprimi"): a falha que uma reimpressão já resolveu não tem mais o que fazer, e o "Já imprimi" não volta
+ * a confirmar pedido antigo. Uma falha depois do resolvido continua contando.
  */
-export function pendenciasDosPedidos(pedidos: readonly Pick<PedidoDeImpressao, 'transporte' | 'situacao' | 'confirmadaEm'>[]) {
-  const textos = pedidos.map((p) => seloDoPedido(p).texto);
+export function pendenciasDosPedidos(pedidos: readonly Pick<PedidoDeImpressao, 'sequencia' | 'transporte' | 'situacao' | 'confirmadaEm'>[]) {
+  const recentes = [...pedidos].sort((x, y) => y.sequencia - x.sequencia);
+  const resolvido = recentes.findIndex((p) => p.situacao === 'ENVIADA' || !!p.confirmadaEm);
+  const textos = (resolvido < 0 ? recentes : recentes.slice(0, resolvido)).map((p) => seloDoPedido(p).texto);
   return { falharam: textos.filter((t) => t === 'Falhou').length, semResultado: textos.filter((t) => t === 'Sem resultado').length };
 }
 
@@ -127,9 +131,12 @@ function avisoDosPedidos({ falharam, semResultado }: ReturnType<typeof pendencia
   return { tom: falharam > 0 ? 'erro' : 'alerta', titulo: `${partes.join(' e ')}.`, apoio };
 }
 
-/** Os pedidos desta etiqueta: histórico recolhido ao entrar; falha e falta de resposta ficam à vista, fora dele. */
-export function PedidosDaEmissao({ chave, pedidos }: { chave: string; pedidos: PedidoDeImpressao[] }) {
-  const aviso = avisoDosPedidos(pendenciasDosPedidos(pedidos));
+/**
+ * Os pedidos desta etiqueta: histórico recolhido ao entrar; falha e falta de resposta ficam à vista, fora dele. Etiqueta
+ * bloqueada (vencida, lote estornado) não se imprime mais: o aviso do bloqueio já diz o que fazer, e este sairia à toa.
+ */
+export function PedidosDaEmissao({ chave, pedidos, bloqueada = false }: { chave: string; pedidos: PedidoDeImpressao[]; bloqueada?: boolean }) {
+  const aviso = bloqueada ? null : avisoDosPedidos(pendenciasDosPedidos(pedidos));
   return (
     <>
       {aviso && <Aviso tom={aviso.tom} titulo={aviso.titulo}>{aviso.apoio}</Aviso>}

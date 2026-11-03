@@ -329,6 +329,15 @@ describe.skipIf(!URL_TESTE)('ERP 3.4 · telas de etiqueta (Postgres real)', { ti
     expect(comFalha.indexOf('Zebra sem papel')).toBeGreaterThan(b2.ini);
     expect(comFalha.indexOf('Zebra sem papel')).toBeLessThan(b2.fim);
     expect(comFalha).toContain('3 registros exibidos');
+    // A reimpressão saiu (a Zebra recebeu): a falha anterior já foi resolvida e o aviso some; o motivo segue no histórico.
+    const reimpressao = await daSessao.acaoPedirImpressao(ids.vp, ids.etiqueta, { copias: '1', transporte: 'BROWSER_PRINT', resolucao: '203', envio: chave() });
+    if (!reimpressao.ok) throw new Error(JSON.stringify(reimpressao));
+    expect(await daSessao.acaoResultadoDaImpressao(ids.vp, reimpressao.id, 'ENVIADA', '')).toMatchObject({ ok: true });
+    const resolvida = await pagina(ErpEmissaoPage({ params: { lojaId: ids.vp, etiquetaId: ids.etiqueta }, searchParams: {} }));
+    const b3 = blocoDosPedidos(resolvida);
+    expect(resolvida).not.toMatch(/pedidos? de impressão (falh|ficou sem|ficaram sem)/);
+    expect(resolvida.indexOf('Zebra sem papel')).toBeGreaterThan(b3.ini);
+    expect(resolvida).toContain('4 registros exibidos');
     // A impressora: a tela de configuração e o teste (nada gravado).
     expect(texto(await pagina(ErpImpressoraPage()))).toContain('Como ligar a Zebra');
     const teste = await daSessao.acaoZplDeTeste('E60X60', '300');
