@@ -3905,3 +3905,16 @@ Testes mockados, revisão independente, CI e nova tentativa de publicação fica
 **Validação local:** 2 testes puros em `erp-canais` e 2 de renderização: aviso só no canal repetido, com o botão de envio não desativado; sem repetição ou sem a lista, nada. Revisão independente sem P1/P2.
 
 **Limites e reversão:** não detecta embalagem dentro de pré-preparo nem decide se o uso é o mesmo. Reversão local à tela, ao formulário e à função.
+
+### 513. 2026-11-03 · Atalhos dos cards de módulos recolhidos por padrão
+
+**Fonte e recorte:** pedido de Rodolfo de 30/10/2026, especificação única “Opções complementares dos cards de módulos — recolhidas por padrão” (Visão C). Inventário: os cards com lista abaixo do divisor são os do hub do parceiro (`HubDoParceiro`, em `/erp` e `/rodolfo/erp/[slug]`), pelo componente compartilhado `CartaoModulo`; o hub do nível 1 não tem abas. Antes: 0 de 7 cards recolhidos (perfil Dono).
+
+1. **Recolhido por padrão:** a lista de abas da área fica numa região `hidden` controlada por um botão real, “Ver atalhos” / “Ocultar atalhos” (os itens são todos links reais), com nome acessível contextual (“Ver atalhos de Compras e Fornecedores”), `aria-expanded`, `aria-controls`, chevron e alvo de 44 px. Expandir não navega; vários cards abrem de forma independente.
+2. **O resto do card não muda:** ícone, título, descrição, cor e entrada principal visíveis e com o mesmo destino; o título continua sendo o link que cobre o card; o botão fica acima dessa camada, sem link dentro de botão ou botão dentro de link. Card sem atalhos ou “Em breve” não ganha botão. Abaixo de 600 px a área continua compacta, sem a lista, como já era.
+3. **Estado só da visita:** abrir, recarregar, voltar ou restaurar pelo cache começa recolhido (mesmo padrão do histórico recolhível); troca de contexto da consulta (pessoa, parceiro, loja) ou da lista de atalhos permitidos recolhe e devolve o foco ao botão se ele estava num atalho. Nada é guardado no navegador. Os links vêm do servidor já filtrados pelas permissões.
+4. **Altura natural:** a grade passa a alinhar os cards ao topo; abrir um card desloca a linha, mas não estica os vizinhos.
+
+**Validação local:** 5 testes novos de renderização (HTML inicial recolhido com a região ligada ao botão, links e destinos preservados, título intacto, nenhum controle aninhado, sem botão quando não há atalhos, grade alinhada ao topo com um botão por card) e 282 testes de navegação, identidade e Home sem regressão.
+
+**Limites e reversão:** a lista continua oculta abaixo de 600 px, como antes desta mudança. Sem schema, permissão, rota ou texto de ajuda alterados. Reversão local ao card e ao componente.

@@ -12,12 +12,16 @@
  * fina, raio 14 px; hover troca borda e fundo (sem pulo). Módulo do plano
  * ainda não construído: mesmo card, sem link, com o selo "Em breve" — nunca
  * leva a uma tela que não existe.
+ *
+ * 30/10/2026 (pedido de Rodolfo): as abas abaixo do divisor começam RECOLHIDAS e abrem por "Ver atalhos"
+ * (`AtalhosDoCartao`). Cards com altura natural e alinhados ao topo: abrir um não estica os vizinhos da linha.
  */
 
 import Link from 'next/link';
 import type { CSSProperties } from 'react';
 import type { ChaveIcone } from '@/lib/erp/modulos';
 import { IconeDoModulo } from './cabecalho';
+import { AtalhosDoCartao } from './atalhos-do-cartao';
 
 export interface CartaoDoHub {
   chave: string;
@@ -75,19 +79,8 @@ export function CartaoModulo({ c }: { c: CartaoDoHub }) {
         </Link>
         <span className="mt-0.5 line-clamp-3 block text-[13px] leading-snug text-suave [text-wrap:pretty] sm:line-clamp-none">{c.subtitulo}</span>
       </span>
-      <div className="relative z-10 mt-4 hidden w-full border-t border-linha pt-2 min-[600px]:block">
-        <ul aria-label={`Abas de ${c.nome}`} className="flex flex-wrap items-center gap-x-4 text-[13px] text-suave">
-          {c.abas.map((a) => (
-            <li key={a.href} className="flex items-center">
-              <Link
-                href={a.href}
-                className="ff-transicao inline-flex min-h-8 items-center rounded-[5px] hover:text-texto hover:underline hover:underline-offset-4 [@media(pointer:coarse)]:min-h-11"
-              >
-                {a.rotulo}
-              </Link>
-            </li>
-          ))}
-        </ul>
+      <div className="relative z-10 mt-4 hidden w-full border-t border-linha pt-1 min-[600px]:block">
+        <AtalhosDoCartao nome={c.nome} abas={c.abas} />
       </div>
     </div>
   );
@@ -102,7 +95,8 @@ export function HubDeModulos({ secoes }: { secoes: { rotulo: string; cartoes: Ca
           <section key={s.rotulo} aria-label={s.rotulo}>
             {/* avoid-ai-design-ignore: SD4 — rótulo de seção em caixa alta só no hub e nos grupos do menu (contrato do shell). */}
             <h2 className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-suave">{s.rotulo}</h2>
-            <ul className="grid grid-cols-2 gap-2.5 sm:gap-3 xl:grid-cols-4">
+            {/* items-start: altura natural; abrir os atalhos de um card não estica os vizinhos (pedido de 30/10). */}
+            <ul className="grid grid-cols-2 items-start gap-2.5 sm:gap-3 xl:grid-cols-4">
               {s.cartoes.map((c) => (
                 <li key={c.chave} className="min-w-0">
                   <CartaoModulo c={c} />
