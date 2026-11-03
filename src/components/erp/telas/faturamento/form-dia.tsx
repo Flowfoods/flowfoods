@@ -238,6 +238,21 @@ export function FormDoDia({
   );
 }
 
+/**
+ * O que acontece com o canal depois de remover (decisão 519, revisão): Remover apaga só o que a casa digitou ou importou.
+ *  - `integracao`: o canal tem número da integração valendo, que fica e continua contando como lançamento;
+ *  - `pode-faltar`: loja ativa que vende no canal: sem lançamento, o dia que já passou pode virar falta (a tela não sabe se a loja
+ *    ainda conta como "lançando": remover o único lançamento dela tira o início);
+ *  - `sem-lancamento`: canal desligado ou loja desativada, que não cobram falta.
+ */
+export type DepoisDeRemover = 'integracao' | 'pode-faltar' | 'sem-lancamento';
+
+const FRASE_DEPOIS_DE_REMOVER: Record<DepoisDeRemover, string> = {
+  integracao: 'Fica valendo o número da integração.',
+  'pode-faltar': 'O dia volta a ficar sem lançamento neste canal e, se o dia já passou, pode contar como falta.',
+  'sem-lancamento': 'O dia volta a ficar sem lançamento neste canal.',
+};
+
 /** Remover o lançamento de um canal (loja ou dia errado). Motivo obrigatório; o antes fica no histórico. */
 export function FormRemover({
   acao,
@@ -245,15 +260,15 @@ export function FormRemover({
   versao,
   voltar,
   volta,
-  contaComoFalta,
+  depois,
 }: {
   acao: AcaoDoDia;
   rotulo: string;
   versao: string;
   voltar: string;
   volta?: string;
-  /** Decisão 519: a loja está ativa e vende neste canal, então o dia sem lançamento vira falta depois que passa. */
-  contaComoFalta: boolean;
+  /** Decisão 519: a consequência dita antes de apagar. */
+  depois: DepoisDeRemover;
 }) {
   const [estado, enviar] = useFormState<EstadoDoDia, FormData>(acao, null);
   const erro = estado?.porCanal && Object.values(estado.porCanal)[0]?.geral;
@@ -276,8 +291,7 @@ export function FormRemover({
           <Erro id={`${id}-erro`} texto={erro || undefined} />
         </div>
         <p className="text-[12px] text-suave">
-          {contaComoFalta ? 'O dia volta a ficar sem lançamento neste canal e, se o dia já passou, conta como falta.' : 'O dia volta a ficar sem lançamento neste canal.'} O que estava
-          lançado e o motivo ficam em Alterações deste dia.
+          {FRASE_DEPOIS_DE_REMOVER[depois]} O que estava lançado e o motivo ficam em Alterações deste dia.
         </p>
         <BotaoEnviar variante="perigo" pendente="Removendo…">
           Remover lançamento

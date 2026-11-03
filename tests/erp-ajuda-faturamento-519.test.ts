@@ -151,13 +151,14 @@ const ONTEM = (() => {
 })();
 
 /** `primeiroDesligado`: a loja deixou de vender na Loja, que só aparece por ter lançamento antigo (o canal fica travado). */
-function diaLido(opcoes: { fechado?: string | null; primeiroDesligado?: boolean } = {}): DiaDaLojaLido {
+/** `integracao`: na Loja vale o número da integração; o que a casa digitou fica por baixo, como conferência. */
+function diaLido(opcoes: { fechado?: string | null; primeiroDesligado?: boolean; integracao?: boolean } = {}): DiaDaLojaLido {
   const humano = { id: 'f1', origem: 'MANUAL' as const, versao: '2026-10-16T12:00:00.000Z', atualizadoEm: new Date('2026-10-16T12:00:00Z'), atualizadoPorNome: 'Gil', valorCentavos: 100_000, pedidos: 20, clientes: 20 };
   return {
     loja: VP,
     data: ONTEM,
     canais: [
-      { canal: 'LOJA', ativo: !opcoes.primeiroDesligado, humano, valendo: grao(100_000, 20) },
+      { canal: 'LOJA', ativo: !opcoes.primeiroDesligado, humano, valendo: opcoes.integracao ? grao(98_000, 19, 'INTEGRACAO') : grao(100_000, 20) },
       { canal: 'IFOOD', ativo: true, humano: null, valendo: null },
     ],
     fechado: opcoes.fechado ?? null,
@@ -165,10 +166,10 @@ function diaLido(opcoes: { fechado?: string | null; primeiroDesligado?: boolean 
   };
 }
 
-function telaDoDia(raiz: string, opcoes: { podeLancar?: boolean; fechado?: string | null; primeiroDesligado?: boolean } = {}) {
+function telaDoDia(raiz: string, opcoes: { podeLancar?: boolean; fechado?: string | null; primeiroDesligado?: boolean; integracao?: boolean } = {}) {
   const acao = async () => null;
   return createElement(TelaDoDia, {
-    dia: diaLido({ fechado: opcoes.fechado, primeiroDesligado: opcoes.primeiroDesligado }),
+    dia: diaLido({ fechado: opcoes.fechado, primeiroDesligado: opcoes.primeiroDesligado, integracao: opcoes.integracao }),
     base: `${raiz}/faturamento`,
     acao,
     remover: () => acao,
@@ -339,7 +340,13 @@ describe('decisão 519 · o texto educativo sai do corpo e mora no card (não so
     expect(soVe).toContain('Lançar é com quem tem “lançar faturamento” nesta loja.');
     // A consequência do Remover continua junto do botão (aviso antes de apagar).
     const dia = await noShell(telaDoDia('/erp'), `/erp/faturamento/${VP.id}/${ONTEM}`, DONO, PREF);
-    expect(dia).toContain('O dia volta a ficar sem lançamento neste canal e, se o dia já passou, conta como falta.');
+    expect(dia).toContain('O dia volta a ficar sem lançamento neste canal e, se o dia já passou, pode contar como falta.');
+    // Com número da integração valendo, Remover tira só o que a casa digitou: o canal continua lançado, sem falta.
+    const comIntegracao = await noShell(telaDoDia('/erp', { integracao: true }), `/erp/faturamento/${VP.id}/${ONTEM}`, DONO, PREF);
+    expect(comIntegracao).toContain('Vale a integração:');
+    expect(comIntegracao).toContain('Fica valendo o número da integração. O que estava lançado e o motivo ficam em Alterações deste dia.');
+    expect(comIntegracao).not.toContain('pode contar como falta');
+    expect(comIntegracao).not.toContain('O dia volta a ficar sem lançamento neste canal');
     expect(dia).toContain('Não vendeu');
   });
 
@@ -443,7 +450,7 @@ describe.each(AREAS.map((a) => [a.nome, a]))('decisão 519 · âncoras na tela r
     }
     // Remover o canal que a loja não vende mais não cria falta: a consequência não promete o que não acontece.
     expect(h).toContain('O dia volta a ficar sem lançamento neste canal. O que estava');
-    expect(h).not.toContain('se o dia já passou, conta como falta');
+    expect(h).not.toContain('pode contar como falta');
   });
 
   it('dia de período fechado (só consulta): o porquê logo abaixo do aviso; os botões abrem, fora do bloco travado; sem Remover', async () => {

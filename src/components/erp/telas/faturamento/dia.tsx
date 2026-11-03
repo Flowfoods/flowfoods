@@ -138,7 +138,7 @@ export function TelaDoDia({
                 versao={c.humano!.versao}
                 voltar={voltar}
                 volta={volta?.href}
-                contaComoFalta={c.ativo && dia.loja.ativa}
+                depois={c.valendo?.fonte === 'INTEGRACAO' ? 'integracao' : c.ativo && dia.loja.ativa ? 'pode-faltar' : 'sem-lancamento'}
               />
             ))}
           </div>
