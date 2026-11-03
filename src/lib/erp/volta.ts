@@ -48,6 +48,20 @@ export function voltaDoRelatorio(valor: unknown, raiz: string): { href: string; 
   return href ? { href, rotulo: rotuloDaVolta(href) } : null;
 }
 
+/**
+ * Decisão 517: a composição de uma linha do DRE aberta pela Home ("Conferir este valor") recebe `?volta=` com a Home da área
+ * (`raiz`, exatamente: `/erp` ou `/rodolfo/erp/<slug>`). Também vale outro caminho interno da MESMA área conferido por
+ * `caminhoDeVolta`, menos a própria tela de despesas (lista, composição ou despesa: seria um laço). Nulo = a composição segue com
+ * o "Voltar para o DRE" de sempre. A loja da Home vem da visão escolhida (cookie), que a composição não toca.
+ */
+export function voltaDaComposicao(valor: unknown, raiz: string): { href: string; rotulo: string } | null {
+  if (typeof valor !== 'string' || !caminhoDeVolta(`${raiz}/`, `${raiz}/`)) return null;
+  if (valor === raiz) return { href: raiz, rotulo: 'o início' };
+  const href = caminhoDeVolta(valor, `${raiz}/`);
+  if (!href || /\/dre\/despesas(\/|$)/.test(href.split('?')[0])) return null;
+  return { href, rotulo: rotuloDaVolta(href) };
+}
+
 /** O caminho de volta com o insumo criado (a página de origem o lê para avisar e oferecer o insumo). */
 export function voltaComInsumo(caminho: string, insumoId: string): string {
   const u = new URL(caminho, ORIGEM_FALSA);

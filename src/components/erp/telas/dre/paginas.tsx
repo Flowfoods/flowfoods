@@ -24,7 +24,7 @@ import { avisoDePeriodos } from '@/lib/erp/periodo-aviso';
 import { fechadoNoIntervalo } from '@/lib/erp/periodo-fechado-campos';
 import { periodoDe, situacaoDosPeriodos } from '@/lib/erp/periodos';
 import { somarDias } from '@/lib/erp/contagem-campos';
-import { voltaDoRelatorio } from '@/lib/erp/volta';
+import { voltaDaComposicao, voltaDoRelatorio } from '@/lib/erp/volta';
 import { planoDoParceiro } from '@/lib/erp/plano';
 import { pode, type Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
@@ -86,7 +86,9 @@ export async function PaginaDasDespesas({ c, lojasDoAlcance, query }: { c: Conte
   const composicao = recorte ? await composicaoDaLinha(c.cliente, c.alcance, recorte, lojaId) : null;
   if (recorte && composicao) {
     const base = `${c.raiz}/dre/despesas`;
-    const aqui = `?linha=${recorte.linhaId}&de=${recorte.de}&ate=${recorte.ate}${lojaId ? `&loja=${lojaId}` : ''}`;
+    // Decisão 517: aberta pela Home, volta para a Home (caminho interno conferido); a volta viaja junto para o detalhe e de lá para cá.
+    const volta = voltaDaComposicao(um(query.volta), c.raiz);
+    const aqui = `?linha=${recorte.linhaId}&de=${recorte.de}&ate=${recorte.ate}${lojaId ? `&loja=${lojaId}` : ''}${volta ? `&volta=${encodeURIComponent(volta.href)}` : ''}`;
     const visaoDoDre = lojaId ? `&loja=${lojaId}` : c.alcance.lojas === 'todas' ? '&rede=1' : '';
     const periodo = await periodoDaComposicao(c.cliente, recorte, hoje);
     // Volta para o DRE na linha de onde veio (no celular ela fica a milhares de pixels do topo).
@@ -102,6 +104,7 @@ export async function PaginaDasDespesas({ c, lojasDoAlcance, query }: { c: Conte
           recorte={recorte}
           periodo={periodo}
           voltarDre={pode(c.alcance, 'dre.ver') ? `${c.raiz}/dre?periodo=${recorte.de}${visaoDoDre}#${ancora}` : null}
+          volta={volta}
           aqui={aqui}
         />
       </>

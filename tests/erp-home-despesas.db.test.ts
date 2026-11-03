@@ -3,7 +3,9 @@
  *  - Home (painelDoDia) igual aos subtotais do DRE da loja, com linha da casa e linha oculta com valor;
  *  - despesa da rede (sem loja) e dedução fora da loja; a rede é loja A + loja B + a despesa sem loja;
  *  - competência atravessando o mês (15/09 a 14/10): cada período leva só os seus dias;
- *  - período fechado lido da fotografia, que não muda quando a despesa muda depois.
+ *  - período fechado lido da fotografia, que não muda quando a despesa muda depois;
+ *  - decisão 517: cada linha do card abre a composição dela (mesmo recorte e loja) e a composição soma o MESMO valor da linha;
+ *    na fotografia não há link, porque a composição lê ao vivo (e diverge depois que a despesa muda).
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff npx vitest run tests/erp-home-despesas.db.test.ts
  */
@@ -15,8 +17,9 @@ import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { ALCANCE_FLOWFOODS, resolverAlcance, type Alcance } from '@/lib/erp/permissoes';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
 import { salvarCanaisDaLoja } from '@/lib/erp/faturamento';
-import { lancarDespesa } from '@/lib/erp/despesas';
-import type { TextosDaDespesa } from '@/lib/erp/despesa-campos';
+import { composicaoDaLinha, lancarDespesa } from '@/lib/erp/despesas';
+import { lerRecorteDaComposicao, type TextosDaDespesa } from '@/lib/erp/despesa-campos';
+import { voltaDaComposicao } from '@/lib/erp/volta';
 import { criarLinha, ocultarLinha, planoDoParceiro } from '@/lib/erp/plano';
 import { dreDoPeriodo, type DreDoPeriodo } from '@/lib/erp/dre';
 import { fecharPeriodo, situacaoDoFechamento } from '@/lib/erp/dre-fechamento';
@@ -62,6 +65,17 @@ describe.skipIf(!URL_TESTE)('Home · Despesas por competência iguais ao DRE da 
   const subtotal = (d: DreDoPeriodo, g: string) => d.resultado.linhas.find((l) => l.chave === `grupo:${g}`)!.valorCentavos!;
   const somaDosOito = (d: DreDoPeriodo) => GRUPOS_DAS_DESPESAS_DA_HOME.reduce((s, g) => s + subtotal(d, g), 0);
   const centavosDe = (w: WidgetDespesasHome, g: string) => w.composicaoPorGrupo!.grupos.find((x) => x.grupo === g)!.centavos;
+  const linhasDoCard = (w: WidgetDespesasHome) => w.composicaoPorGrupo!.grupos.flatMap((g) => g.linhas.map((l) => ({ grupo: g.grupo, ...l })));
+  const semLinks = (w: WidgetDespesasHome) => ({ ...w.composicaoPorGrupo!, grupos: w.composicaoPorGrupo!.grupos.map((g) => ({ ...g, linhas: g.linhas.map((l) => ({ ...l, conferir: null })) })) });
+  /** Abre o "Conferir este valor" como a rota faz: o mesmo leitor do recorte, a loja do endereço e o alcance de quem lê. */
+  const abrirConferir = async (href: string, alcance: Alcance, raiz: string) => {
+    const u = new URL(href, 'http://local.test');
+    expect(u.pathname).toBe(`${raiz}/dre/despesas`);
+    expect(voltaDaComposicao(u.searchParams.get('volta'), raiz)).toEqual({ href: raiz, rotulo: 'o início' });
+    const recorte = lerRecorteDaComposicao({ linha: u.searchParams.get('linha') ?? undefined, de: u.searchParams.get('de') ?? undefined, ate: u.searchParams.get('ate') ?? undefined });
+    expect(recorte).not.toBeNull();
+    return { recorte: recorte!, loja: u.searchParams.get('loja'), c: (await composicaoDaLinha(a, alcance, recorte!, u.searchParams.get('loja') ?? undefined))! };
+  };
   const projetar = (d: DreDoPeriodo, lojaId: string) => despesasDaHome({ estado: 'lido', dre: d }, { alcance: dono, loja: { id: lojaId, nome: 'Nome atual' }, raiz: '/erp', hoje: HOJE, consultadoEm: '2026-10-29T15:00:00.000Z' })!;
 
   beforeAll(async () => {
@@ -137,6 +151,35 @@ describe.skipIf(!URL_TESTE)('Home · Despesas por competência iguais ao DRE da 
     expect(painel.cmv?.escopo.lojaId).toBe(salao);
   });
 
+  it('decisão 517: cada linha do card abre a composição dela, que soma o MESMO valor da linha (dono, gerente com dre.ver e nível 1)', async () => {
+    const { despesas: w } = await daHome(salao, 'Loja com salão');
+    const d = (await dreDoPeriodo(a, dono, { tipo: 'loja', lojaId: salao }, HOJE, HOJE))!;
+    // Até ontem (28/10): Ocupação R$ 3.080,00 = Aluguel R$ 2.800,00 + IPTU (oculto) R$ 280,00; Utilidades e Administrativas uma linha cada.
+    expect(linhasDoCard(w!).map((l) => [l.grupo, l.nome, l.centavos])).toEqual([
+      ['OCUPACAO', 'Aluguel', 280_000], ['OCUPACAO', 'IPTU', 28_000], ['UTILIDADES', 'Internet e telefone', 14_000], ['ADMINISTRATIVA', 'Seguro do ponto', 12_000],
+    ]);
+    for (const g of w!.composicaoPorGrupo!.grupos) expect(g.linhas.reduce((s, l) => s + l.centavos, 0), g.grupo).toBe(g.centavos);
+    for (const l of linhasDoCard(w!)) {
+      const { recorte, loja, c } = await abrirConferir(l.conferir!, dono, '/erp');
+      expect(recorte).toEqual({ linhaId: d.resultado.linhas.find((x) => x.chave === l.chave)!.linhaId, de: '2026-10-01', ate: '2026-10-28' });
+      expect(loja).toBe(salao);
+      expect(c.linha.grupo, l.nome).toBe(l.grupo);
+      expect(c.totalCentavos, l.nome).toBe(l.centavos);
+    }
+    // O gerente da loja com dre.ver e o nível 1 (outra raiz) abrem a mesma composição, com o mesmo valor.
+    const gerente = propria(['dre.ver', 'lojas.ver'], [salao]);
+    const { despesas: doGerente } = await daHome(salao, 'Loja com salão', gerente);
+    const n1 = await painelDoDia(a, ALCANCE_FLOWFOODS, '/rodolfo/erp/casa-alfa', HOJE, visao(salao, 'Loja com salão'));
+    const doN1 = n1.analitico?.tipo === 'loja' ? (n1.analitico.widgets.find((x) => x.familia === 'despesas') as WidgetDespesasHome) : undefined;
+    for (const [quem, alcance, raiz] of [[doGerente!, gerente, '/erp'], [doN1!, ALCANCE_FLOWFOODS, '/rodolfo/erp/casa-alfa']] as const) {
+      expect(linhasDoCard(quem).map((l) => l.centavos)).toEqual([280_000, 28_000, 14_000, 12_000]);
+      for (const l of linhasDoCard(quem)) expect((await abrirConferir(l.conferir!, alcance, raiz)).c.totalCentavos, `${raiz} ${l.nome}`).toBe(l.centavos);
+    }
+    // Quem só lança despesas não recebe linha nem link.
+    const lancador = await daHome(salao, 'Loja com salão', propria(['despesas.lancar', 'lojas.ver'], [salao]));
+    expect(JSON.stringify(lancador.painel)).not.toMatch(/dre\/despesas\?linha|"linhas"/);
+  });
+
   it('despesa da rede sem loja fica fora da loja: rede = loja com salão + loja delivery + a despesa sem loja', async () => {
     const { despesas: wSalao } = await daHome(salao, 'Loja com salão');
     const { despesas: wDelivery } = await daHome(delivery, 'Loja só delivery');
@@ -174,14 +217,22 @@ describe.skipIf(!URL_TESTE)('Home · Despesas por competência iguais ao DRE da 
     const wFoto = projetar(foto, salao);
     expect(wFoto.origem).toMatchObject({ fonte: 'dre', modo: 'fotografia', fotografia: { id: foto.fechamento!.fotografiaId, versao: foto.fechamento!.versao } });
     expect(wFoto.valor).toEqual(wVivo.valor);
-    expect(wFoto.composicaoPorGrupo).toEqual(wVivo.composicaoPorGrupo);
+    // Mesmos grupos, linhas e valores; só a leitura ao vivo tem "Conferir este valor" (decisão 517).
+    expect(semLinks(wFoto)).toEqual(semLinks(wVivo));
+    expect(linhasDoCard(wVivo).every((l) => l.conferir !== null)).toBe(true);
+    expect(linhasDoCard(wFoto).every((l) => l.conferir === null)).toBe(true);
     expect(wFoto.estado).toBe('ok');
+    const internetVivo = linhasDoCard(wVivo).find((l) => l.chave === 'internet')!;
 
     // A despesa muda depois (direto no banco): outubro, ao vivo, acompanha; setembro, fotografado, não.
     await a.despesa.update({ where: { id: atravessa }, data: { valorCentavos: 60_000 } });
     const depois = projetar((await dreDoPeriodo(a, dono, { tipo: 'loja', lojaId: salao }, SETEMBRO, HOJE))!, salao);
     expect(depois.valor).toEqual(wFoto.valor);
     expect(depois.composicaoPorGrupo).toEqual(wFoto.composicaoPorGrupo);
+    // Por isso a fotografia não tem link: a composição da internet de setembro, ao vivo, agora dá R$ 320,00 (600 × 16/30);
+    // a fotografia continua com R$ 160,00.
+    expect(linhasDoCard(depois).find((l) => l.chave === 'internet')).toMatchObject({ centavos: 16_000, conferir: null });
+    expect((await abrirConferir(internetVivo.conferir!, dono, '/erp')).c.totalCentavos).toBe(32_000);
     const { despesas: outubro } = await daHome(salao, 'Loja com salão');
     expect(centavosDe(outubro!, 'UTILIDADES')).toBe(28_000); // 600 × 14/30
   });

@@ -13,10 +13,17 @@
  *
  * Sem `dre.ver` nenhum valor sai daqui: quem só lança despesas recebe o
  * marcador antigo, e quem não tem nenhuma das duas não recebe o card.
+ *
+ * "Conferir este valor" (decisão 517): cada grupo leva as suas linhas com valor
+ * (as mesmas do subtotal) e cada linha, na leitura ao vivo, o endereço da
+ * composição dela no DRE (`/dre/despesas?linha=…`) no MESMO recorte e na MESMA
+ * loja, com volta para a Home. A composição é por linha e lê as despesas de
+ * hoje: não há composição do grupo nem do total, e a fotografia fica sem link.
  */
 import type { DreDoPeriodo } from './dre';
 import type { LinhaDoDre } from './dre-campos';
 import { codigoDoSubtotal, ROTULO_DO_GRUPO, type GrupoDoDre } from './dre-plano';
+import { lerRecorteDaComposicao } from './despesa-campos';
 import type { LeituraDoDreParaHome } from './home-cmv';
 import type { AvisoDoWidgetHome, EstadoDoWidgetHome, WidgetHome } from './home-contratos';
 import { baseDoWidgetHome, contextoHomePermitido, despesasIndisponiveis, type ContextoHomeLoja } from './home-analitico';
@@ -29,6 +36,20 @@ export type GrupoDasDespesasHome = (typeof GRUPOS_DAS_DESPESAS_DA_HOME)[number];
 /** A linha que acompanha o total no card e no painel: a base e o que fica de fora. */
 export const RECORTE_DAS_DESPESAS_DA_HOME = 'No período do DRE · sem CMV e deduções';
 
+/** Uma linha do DRE com valor dentro de um grupo: a mesma que entra no subtotal, com o atalho para o que a forma. */
+export interface LinhaDaComposicaoDespesasHome {
+  /** A chave da linha no DRE (`aluguel`, ou `id:<id>` na linha criada pela casa). */
+  chave: string;
+  nome: string;
+  /** O valor da linha no DRE da loja, com o sinal; nunca zero (linha sem valor não entra). */
+  centavos: number;
+  /**
+   * "Conferir este valor": a composição desta linha no MESMO recorte (início do período até o último dia apurado) e na
+   * MESMA loja, com `volta` para a Home. Nulo na fotografia (a composição lê ao vivo e pode divergir dela).
+   */
+  conferir: string | null;
+}
+
 export interface GrupoDaComposicaoDespesasHome {
   grupo: GrupoDasDespesasHome;
   rotulo: string;
@@ -36,6 +57,8 @@ export interface GrupoDaComposicaoDespesasHome {
   centavos: number;
   /** Alguma linha do grupo tem valor. Sem lançamento não é R$ 0,00 informado. */
   comLancamento: boolean;
+  /** As linhas do grupo com valor, na ordem do DRE; somam `centavos`. Vazia quando o grupo não tem lançamento. */
+  linhas: LinhaDaComposicaoDespesasHome[];
 }
 
 export interface ComposicaoDespesasHome {
@@ -65,7 +88,7 @@ function centavosDaLinha(l: LinhaDoDre): bigint | null {
 type Conferencia = { ok: true; grupos: GrupoDaComposicaoDespesasHome[]; total: number } | { ok: false };
 
 /** Confere cada grupo: soma das linhas lançáveis === subtotal do próprio DRE. Não soma subtotal com linha. */
-function conferirGrupos(d: DreDoPeriodo): Conferencia {
+function conferirGrupos(d: DreDoPeriodo, conferirDaLinha: (l: LinhaDoDre) => string | null): Conferencia {
   const linhas = d.resultado.linhas;
   const grupos: GrupoDaComposicaoDespesasHome[] = [];
   const chaves = new Set<string>();
@@ -76,18 +99,19 @@ function conferirGrupos(d: DreDoPeriodo): Conferencia {
     const subtotal = centavosDaLinha(subtotais[0]);
     if (subtotal === null) return { ok: false };
     let soma = 0n;
-    let comLancamento = false;
+    const comValor: LinhaDaComposicaoDespesasHome[] = [];
     for (const l of linhas) {
       if (l.tipo !== 'linha' || l.grupo !== grupo) continue;
       const v = centavosDaLinha(l);
       if (v === null || chaves.has(l.chave)) return { ok: false };
       chaves.add(l.chave);
       soma += v;
-      if (v !== 0n) comLancamento = true;
+      // Só a linha com valor entra na lista: a sem valor é traço no DRE, não R$ 0,00.
+      if (v !== 0n) comValor.push({ chave: l.chave, nome: l.nome, centavos: Number(v), conferir: conferirDaLinha(l) });
     }
     if (soma !== subtotal) return { ok: false };
     total += subtotal;
-    grupos.push({ grupo, rotulo: ROTULO_DO_GRUPO[grupo], centavos: Number(subtotal), comLancamento });
+    grupos.push({ grupo, rotulo: ROTULO_DO_GRUPO[grupo], centavos: Number(subtotal), comLancamento: comValor.length > 0, linhas: comValor });
   }
   if (total > BigInt(Number.MAX_SAFE_INTEGER) || total < BigInt(Number.MIN_SAFE_INTEGER)) return { ok: false };
   return { ok: true, grupos, total: Number(total) };
@@ -138,7 +162,17 @@ export function despesasDaHome(leitura: LeituraDoDreParaHome, c: ContextoHomeLoj
     estado = 'sem_dados'; grupos = composicao('sem_dados');
     avisar('nenhum-dia-apurado', 'Nenhum dia deste período foi apurado ainda. O DRE em curso apura até ontem.');
   } else {
-    const conferencia = conferirGrupos(d);
+    // "Conferir este valor" só na leitura ao vivo: a composição lê as despesas de hoje e a fotografia não muda com elas.
+    // `dre.ver` (já exigido acima) abre a composição nas duas áreas; o recorte passa pelo MESMO leitor da rota.
+    const aoVivo = !d.fechamento && d.status !== 'FECHADO';
+    const ate = d.ate;
+    const conferirDaLinha = (l: LinhaDoDre): string | null => {
+      if (!aoVivo || !l.linhaId) return null;
+      const recorte = lerRecorteDaComposicao({ linha: l.linhaId, de: d.periodo.inicio, ate });
+      if (!recorte || recorte.linhaId !== l.linhaId || recorte.de !== d.periodo.inicio || recorte.ate !== ate) return null;
+      return c.raiz + '/dre/despesas?' + new URLSearchParams({ linha: recorte.linhaId, de: recorte.de, ate: recorte.ate, loja: loja.id, volta: c.raiz }).toString();
+    };
+    const conferencia = conferirGrupos(d, conferirDaLinha);
     if (!conferencia.ok) return vazio('indisponivel', 'despesas-divergentes', DIVERGENTE);
     if (!conferencia.grupos.some((g) => g.comLancamento)) {
       // Nenhuma linha com valor: ausência de lançamento, não R$ 0,00 apurado.
