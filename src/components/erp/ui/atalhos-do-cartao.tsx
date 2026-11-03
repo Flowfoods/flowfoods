@@ -72,11 +72,18 @@ export function AtalhosDoCartao({ nome, abas }: { nome: string; abas: { rotulo: 
         ref={regiao}
         id={id}
         hidden={!aberto}
-        className="pointer-events-auto"
         onFocus={() => (focoNosAtalhos.current = true)}
         onBlur={(e) => {
-          // Só sai quando o foco foi para outro elemento fora dos atalhos; sem destino (item removido), continua marcado.
-          if (e.relatedTarget && !regiao.current?.contains(e.relatedTarget as Node)) focoNosAtalhos.current = false;
+          if (e.relatedTarget) {
+            if (!regiao.current?.contains(e.relatedTarget as Node)) focoNosAtalhos.current = false;
+            return;
+          }
+          // Sem destino: ou a pessoa clicou numa área vazia (o atalho continua na página → saiu dos atalhos), ou o atalho
+          // focado foi removido (desconectado → o efeito devolve o foco ao botão).
+          const alvo = e.target;
+          setTimeout(() => {
+            if (alvo.isConnected) focoNosAtalhos.current = false;
+          }, 0);
         }}
       >
         <ul aria-label={`Abas de ${nome}`} className="flex flex-wrap items-center gap-x-4 pb-1 text-[13px] text-suave">
@@ -84,7 +91,7 @@ export function AtalhosDoCartao({ nome, abas }: { nome: string; abas: { rotulo: 
             <li key={a.href} className="flex items-center">
               <Link
                 href={a.href}
-                className="ff-transicao inline-flex min-h-8 items-center rounded-[5px] hover:text-texto hover:underline hover:underline-offset-4 [@media(pointer:coarse)]:min-h-11"
+                className="ff-transicao pointer-events-auto inline-flex min-h-8 items-center rounded-[5px] hover:text-texto hover:underline hover:underline-offset-4 [@media(pointer:coarse)]:min-h-11"
               >
                 {a.rotulo}
               </Link>
