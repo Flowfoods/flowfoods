@@ -16,6 +16,7 @@ import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { PageHeader } from '../../ui/cabecalho';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Linha, Painel, Selo, Vazio } from '../../ui/superficies';
+import { PainelComPonto, PontoDeAjuda } from '../../ui/ponto-de-ajuda';
 import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { ListaHistorico } from '../historico/lista-historico';
 import { FormPagar, FormRemoverDespesa, FormSimples } from './acoes-despesa';
@@ -80,7 +81,8 @@ export function TelaDaDespesa({
       {d.fechado && <AvisoDoPeriodoFechado periodo={d.fechado} href={periodosHref} frase="Esta despesa cai nele: dá para pagar e mudar o vencimento, mas valor, competência, linha e loja não mudam mais." />}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
-        <Painel titulo="Despesa">
+        {/* Decisão 520: em que linha e em que período ela conta (o que o início soma e o "Conferir este valor" abre). */}
+        <Painel titulo="Despesa" acessorio={<PontoDeAjuda ponto="como-conta" />}>
           <dl className="space-y-2.5 text-sm">
             <Linha rotulo="Valor">
               <span className="font-display text-xl font-bold tabular-nums">{formatarDinheiro(x.valorCentavos)}</span>
@@ -118,7 +120,13 @@ export function TelaDaDespesa({
           )}
         </Painel>
 
-        <Painel titulo="Conta a pagar" subtitulo="Não muda o DRE." acessorio={x.vencimento || x.pagaEm ? <Selo tom={d.pagamento === 'paga' ? 'ok' : d.pagamento === 'vencida' ? 'erro' : d.pagamento === 'vence-logo' ? 'alerta' : 'neutro'}>{ROTULO_DO_PAGAMENTO[d.pagamento]}</Selo> : undefined}>
+        {/* Decisão 520: "Não muda o DRE." mora no ponto "pagamento"; sem ele, o subtítulo de antes. */}
+        <PainelComPonto
+          ponto="pagamento"
+          titulo="Conta a pagar"
+          subtituloSemPonto="Não muda o DRE."
+          acessorio={x.vencimento || x.pagaEm ? <Selo tom={d.pagamento === 'paga' ? 'ok' : d.pagamento === 'vencida' ? 'erro' : d.pagamento === 'vence-logo' ? 'alerta' : 'neutro'}>{ROTULO_DO_PAGAMENTO[d.pagamento]}</Selo> : undefined}
+        >
           <dl className="space-y-2.5 text-sm">
             <Linha rotulo="Vencimento">{x.vencimento ? formatarData(x.vencimento) : 'Sem vencimento'}</Linha>
             <Linha rotulo="Pagamento">{x.pagaEm ? `Paga em ${formatarData(x.pagaEm)}` : x.vencimento ? frasePagamento(x, hoje) : 'Não anotado'}</Linha>
@@ -132,7 +140,7 @@ export function TelaDaDespesa({
               )}
             </div>
           )}
-        </Painel>
+        </PainelComPonto>
       </div>
 
       {podeLancar && (

@@ -154,7 +154,8 @@ describe('pontos · todo botão do código tem texto no registro', () => {
     });
   }
   const usados = arquivos(join(process.cwd(), 'src')).flatMap((f) =>
-    Array.from(readFileSync(f, 'utf8').matchAll(/<(?:PontoDeAjuda|ExplicacaoNoPonto)\s+ponto="([a-z0-9-]+)"/g)).map((m) => ({ f, id: m[1] })),
+    // `PainelComPonto` (decisão 519) também desenha o botão do ponto: entra na conferência desde a decisão 520.
+    Array.from(readFileSync(f, 'utf8').matchAll(/<(?:PontoDeAjuda|ExplicacaoNoPonto|PainelComPonto)\s+ponto="([a-z0-9-]+)"/g)).map((m) => ({ f, id: m[1] })),
   );
   const ids = new Set(ENTRADAS.flatMap((e) => (e.pontos ?? []).map((p) => p.id)));
 

@@ -19,10 +19,11 @@ import { GRUPOS_DE_DESPESA, ROTULO_DO_GRUPO, type GrupoDoDre } from '@/lib/erp/d
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CampoData } from '../../ui/campo-data';
-import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
+import { AJUDA, CAMPO, Erro, MARCAR, ROTULO, ROTULO_EM_LINHA } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import { Segmentos } from '../../ui/segmentos';
 import { Painel } from '../../ui/superficies';
+import { PainelComPonto, PontoDeAjuda } from '../../ui/ponto-de-ajuda';
 import { fechadoNoIntervalo, periodoDaFraseDeRecusa, type AvisoDePeriodos } from '@/lib/erp/periodo-fechado-campos';
 import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
@@ -138,9 +139,17 @@ export function FormDespesa({
         <Painel titulo="O que é">
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="desp-linha" className={ROTULO}>
-                Linha do DRE
-              </label>
+              {/*
+                Decisão 520: o grupo da linha (e o que o início soma) fica no card, junto do campo. `-my-3` em todo tamanho: ao lado de
+                "De qual loja" (duas colunas a partir de 640 px), o botão de 44 px do toque não pode deixar esta linha mais alta que a do
+                outro rótulo, ou os dois campos desalinham.
+              */}
+              <div className="mb-1.5 flex items-center gap-1">
+                <label htmlFor="desp-linha" className={ROTULO_EM_LINHA}>
+                  Linha do DRE
+                </label>
+                <PontoDeAjuda ponto="linha" className="-my-3" />
+              </div>
               <select id="desp-linha" name="linha" value={v.linha} onChange={(e) => mudar({ linha: e.target.value })} className={CAMPO} aria-invalid={!!erros.linha} aria-describedby="desp-linha-erro" disabled={periodoFechado}>
                 <option value="">Escolha a linha…</option>
                 {porGrupo.map(({ g, itens }) => (
@@ -195,7 +204,8 @@ export function FormDespesa({
           </div>
         </Painel>
 
-        <Painel titulo="A que período pertence" subtitulo="O DRE conta pela competência: a luz de outubro é de outubro, mesmo paga em novembro.">
+        {/* Decisão 520: "o DRE conta pela competência" mora no ponto "competencia"; sem ele, o subtítulo de antes. */}
+        <PainelComPonto ponto="competencia" titulo="A que período pertence" subtituloSemPonto="O DRE conta pela competência: a luz de outubro é de outubro, mesmo paga em novembro.">
           <div className="space-y-4">
             <Segmentos
               nome="tipo"
@@ -270,16 +280,21 @@ export function FormDespesa({
               {apoio}
             </p>
             {v.tipo === 'mes' && (
-              <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-texto">
-                <input type="checkbox" name="recorrente" checked={v.recorrente} onChange={(e) => mudar({ recorrente: e.target.checked })} className={MARCAR} />
-                Repete todo mês (aluguel, salário, luz)
-              </label>
+              // Decisão 520: o botão fica ao lado da caixa, fora do rótulo (botão dentro de label marcaria a caixa).
+              <span className="flex items-center gap-1">
+                <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-texto">
+                  <input type="checkbox" name="recorrente" checked={v.recorrente} onChange={(e) => mudar({ recorrente: e.target.checked })} className={MARCAR} />
+                  Repete todo mês (aluguel, salário, luz)
+                </label>
+                <PontoDeAjuda ponto="repete" className="-my-3 sm:-my-1.5" />
+              </span>
             )}
             <Erro id="desp-recorrente-erro" texto={erros.recorrente} />
           </div>
-        </Painel>
+        </PainelComPonto>
 
-        <Painel titulo="Conta a pagar" subtitulo="Opcional. O vencimento não muda o DRE; ele só põe a despesa no filtro “A pagar”.">
+        {/* Decisão 520: "Opcional." fica (é o que o campo pede); o que o vencimento não faz mora no ponto "vencimento". */}
+        <PainelComPonto ponto="vencimento" titulo="Conta a pagar" subtitulo="Opcional." subtituloSemPonto="Opcional. O vencimento não muda o DRE; ele só põe a despesa no filtro “A pagar”.">
           <div className="max-w-56">
             <label htmlFor="desp-vencimento" className={ROTULO}>
               Vence em
@@ -287,7 +302,7 @@ export function FormDespesa({
             <CampoData id="desp-vencimento" name="vencimento" value={v.vencimento} onChange={(e) => mudar({ vencimento: e.target.value })} aria-describedby="desp-vencimento-erro" />
             <Erro id="desp-vencimento-erro" texto={erros.vencimento} />
           </div>
-        </Painel>
+        </PainelComPonto>
       </fieldset>
 
       <div data-barra-fixa className="sticky bottom-0 z-20 -mx-4 flex flex-col gap-2 border-t border-linha bg-fundo px-4 py-3 sm:-mx-6 sm:flex-row sm:justify-end sm:px-6 lg:-mx-8 lg:px-8">

@@ -1939,10 +1939,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/despesas'],
     titulo: 'Despesas',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Aluguel, salário, luz e as outras despesas da casa, pela competência: o mês a que a despesa pertence, não o dia em que foi paga.' },
-      { texto: 'A pagar mostra as que têm vencimento e ainda não foram pagas: as vencidas e as que vencem em até 7 dias. Pagar não muda o DRE.' },
+      // Decisão 520 (revisão): o filtro é toda despesa com vencimento e sem pagamento, de qualquer mês; vencidas e 7 dias são as métricas do alto.
+      { texto: 'A pagar mostra todas as que têm vencimento e ainda não foram pagas, de qualquer mês, pela ordem de vencimento; no alto, quantas já venceram e quantas vencem em até 7 dias. Pagar não muda o DRE.' },
       { texto: 'Despesa da rede, que não é de uma loja, só aparece para quem tem a rede inteira.' },
       { texto: 'Lance cada despesa uma vez. As que repetem todo mês voltam em Lançar as do mês passado, com o valor para você conferir.', para: ['despesas.lancar'] },
     ],
@@ -1970,6 +1971,29 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Pagar, desfazer o pagamento e parar de repetir valem mesmo em período fechado, porque não mudam o DRE.', para: ['despesas.lancar'] },
       { texto: 'Lançou errado? Edite. Se foi a despesa que não devia existir, remova: o motivo é obrigatório e o que estava lançado fica no histórico.', para: ['despesas.lancar'] },
     ],
+    // Decisão 520: em que linha e em que período a despesa conta (o que o início soma e o Conferir este valor abre), e o
+    // "Não muda o DRE" da conta a pagar, que saiu do corpo. Na ordem da página.
+    pontos: [
+      {
+        id: 'como-conta',
+        titulo: 'Em que linha e em que período ela conta',
+        blocos: [
+          { texto: 'A linha decide o grupo do DRE em que a despesa entra, e a competência decide o período: cada período do DRE recebe só os dias dela que caem nele e, no período em curso, só até ontem.' },
+          { texto: 'Despesa de uma loja entra no DRE da loja e no da rede; a da rede entra só no DRE da rede, sem dividir entre as lojas.' },
+          { texto: 'No início, o card de Despesas de uma loja soma as despesas dela do mesmo jeito, sem as deduções da venda, como impostos e taxas de cartão.', para: ['dre.ver'] },
+        ],
+      },
+      {
+        // O subtítulo "Não muda o DRE." do painel Conta a pagar.
+        id: 'pagamento',
+        titulo: 'Pagamento e o DRE',
+        blocos: [
+          { texto: 'Vencimento e pagamento não mudam o DRE: a despesa conta pela competência, não pelo dia em que foi paga.' },
+          { texto: 'Com vencimento e sem pagamento, ela fica no filtro A pagar da lista de despesas.' },
+          { texto: 'Marque como paga com a data em que o dinheiro saiu, que não pode ser futura; desfazer o pagamento serve para o que foi marcado por engano.', para: ['despesas.lancar'] },
+        ],
+      },
+    ],
   },
   {
     chave: 'dre-despesa-nova',
@@ -1981,6 +2005,48 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Escolha a linha do DRE, a loja (ou a rede) e a competência: um dia, um mês ou um período de até 366 dias.' },
       { texto: 'O DRE espalha o valor pelos dias da competência, ao centavo; repete todo mês vale só para o mês inteiro.' },
       { texto: 'O vencimento é opcional e só põe a despesa em A pagar; mandou duas vezes sem querer, fica uma só.' },
+    ],
+    // Decisão 520: os subtítulos educativos de "A que período pertence" e de "Conta a pagar" saíram do corpo e moram aqui, com o
+    // que a aula não diz (o grupo da linha, o que o início soma, a cobrança da que repete). Na ordem da página; quem só lança
+    // despesa, sem ver o DRE, não recebe o bloco do card do início (que ele não vê).
+    pontos: [
+      {
+        id: 'linha',
+        titulo: 'Em que linha do DRE a despesa entra',
+        blocos: [
+          { texto: 'A linha decide o grupo do DRE em que a despesa entra: a lista mostra cada linha dentro do grupo dela, como Pessoal, Ocupação e Utilidades.' },
+          { texto: 'Os impostos sobre a venda e as taxas de cartão ficam em Deduções da venda, que descontam a receita.' },
+          { texto: 'No início, o card de Despesas de uma loja soma as despesas dela de todos estes grupos, menos as deduções da venda.', para: ['dre.ver'] },
+        ],
+      },
+      {
+        id: 'competencia',
+        titulo: 'Em que período a despesa conta',
+        blocos: [
+          { texto: 'O DRE conta pela competência, o período a que a despesa pertence: a luz de outubro é de outubro, mesmo paga em novembro.' },
+          { texto: 'Cada período do DRE recebe só os dias da despesa que caem nele e, no período em curso, só até ontem: o aluguel do mês entra aos poucos, dia a dia.' },
+          { texto: 'Período já fechado não recebe despesa nova nem muda valor, competência, linha ou loja das que caem nele: o fechamento guardou a fotografia do DRE daqueles dias.' },
+        ],
+      },
+      {
+        // Só com "Um mês" escolhido: é o único tipo que repete.
+        id: 'repete',
+        titulo: 'Repete todo mês',
+        blocos: [
+          { texto: 'No mês seguinte, ela aparece em Lançar as do mês passado com o mesmo valor, para você conferir e lançar: nada entra sozinho.' },
+          // A lista também avisa (quem só lança não abre o DRE); a cobrança olha os 12 meses anteriores (`recorrentesEmFalta`).
+          { texto: 'Enquanto o mês seguinte não for lançado, a lista de despesas e o DRE avisam Falta lançar, por até 12 meses. Para parar antes, use Não repete mais na despesa do último mês lançado.' },
+        ],
+      },
+      {
+        // O subtítulo de "Conta a pagar", menos o "Opcional.", que fica.
+        id: 'vencimento',
+        titulo: 'Vencimento e o DRE',
+        blocos: [
+          { texto: 'O vencimento não muda o DRE: a despesa conta pela competência, não pelo dia em que vence ou é paga.' },
+          { texto: 'Com vencimento, ela fica no filtro A pagar da lista de despesas até ser marcada como paga, na tela dela.' },
+        ],
+      },
     ],
   },
   {
