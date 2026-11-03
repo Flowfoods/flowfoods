@@ -411,26 +411,33 @@ describe('Despesas da Home · Conferir este valor (linha do DRE → composição
 });
 
 describe('Composição · volta da Home (voltaDaComposicao)', () => {
-  it('aceita a Home da MESMA área e caminhos internos dela conferidos por caminhoDeVolta', () => {
+  it('aceita só a Home exata da área de quem lê, nas duas áreas', () => {
     expect(voltaDaComposicao('/erp', '/erp')).toEqual({ href: '/erp', rotulo: 'o início' });
     expect(voltaDaComposicao('/rodolfo/erp/casa-alfa', '/rodolfo/erp/casa-alfa')).toEqual({ href: '/rodolfo/erp/casa-alfa', rotulo: 'o início' });
-    expect(voltaDaComposicao('/erp/dre?periodo=2026-10-01&loja=lojab', '/erp')).toEqual({ href: '/erp/dre?periodo=2026-10-01&loja=lojab', rotulo: 'o DRE' });
   });
 
   it.each([
-    'https://fora.test/erp', '//fora.test/erp', 'http:/erp', '/erp/../rodolfo/erp/x', '/erp/%2e%2e/rodolfo', '/erp\\dre', '/erp//dre',
-    '/rodolfo/erp/outro', '/rodolfo/erp/outro/dre', '/erpx', '/erp?loja=lojab', ' /erp', '/erp\u0000', 'javascript:alert(1)', '',
-    // A própria tela de despesas (lista, composição, detalhe) seria um laço.
+    // Outro caminho da área, mesmo interno e legítimo (revisão da 517): só a Home vale.
+    '/erp/insumos', '/erp/dre?periodo=2026-10-01&loja=lojab', '/erp/', '/erp?sem-acesso=1', '/erp?sem-modulo=integracao', '/erp#topo',
+    // Caminho codificado: o laço `/erp/dre/d%65spesas` e o controle `%09`.
+    '/erp/dre/d%65spesas?linha=laluguel&de=2026-10-01&ate=2026-10-28', '/erp/%09/x', '/%65rp', '/erp%2f', '/erp%3Fx=1',
+    // A própria tela de despesas seria um laço.
     '/erp/dre/despesas', '/erp/dre/despesas?linha=laluguel&de=2026-10-01&ate=2026-10-28', '/erp/dre/despesas/abc',
+    // Fora da área ou torto.
+    'https://fora.test/erp', '//fora.test/erp', 'http:/erp', '/erp/../rodolfo/erp/x', '/erp\\dre', '/erp//dre',
+    '/rodolfo/erp/outro', '/rodolfo/erp/outro/dre', '/erpx', ' /erp', '/erp ', '/erp\u0000', '/ERP', 'javascript:alert(1)', '',
   ])('recusa %j (cai no "Voltar para o DRE")', (volta) => {
     expect(voltaDaComposicao(volta, '/erp')).toBeNull();
   });
 
-  it('recusa valor que não é texto e Home de outra área', () => {
+  it('recusa valor que não é texto, Home de outra área e raiz fora da forma da Home', () => {
     for (const v of [undefined, null, 1, ['/erp'], { href: '/erp' }]) expect(voltaDaComposicao(v, '/erp')).toBeNull();
     expect(voltaDaComposicao('/erp', '/rodolfo/erp/casa-alfa')).toBeNull();
     expect(voltaDaComposicao('/rodolfo/erp/casa-alfa', '/erp')).toBeNull();
     expect(voltaDaComposicao('/rodolfo/erp/outro', '/rodolfo/erp/casa-alfa')).toBeNull();
+    expect(voltaDaComposicao('/rodolfo/erp/casa-alfa/insumos', '/rodolfo/erp/casa-alfa')).toBeNull();
+    expect(voltaDaComposicao('/rodolfo/erp/casa%2dalfa', '/rodolfo/erp/casa-alfa')).toBeNull();
+    for (const raiz of ['/erp/', '//erp', '/rodolfo/erp/', '/rodolfo/erp/Casa_Alfa', '/rodolfo/erp/casa-alfa/dre', 'https://fora.test/erp']) expect(voltaDaComposicao(raiz, raiz), raiz).toBeNull();
   });
 });
 

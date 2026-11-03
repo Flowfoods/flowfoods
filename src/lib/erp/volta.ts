@@ -48,18 +48,19 @@ export function voltaDoRelatorio(valor: unknown, raiz: string): { href: string; 
   return href ? { href, rotulo: rotuloDaVolta(href) } : null;
 }
 
+/** A Home de cada área: `/erp` (pessoa do parceiro) ou `/rodolfo/erp/<slug>` (nível 1), a mesma forma que a Home aceita. */
+const HOME_DA_AREA = /^(?:\/erp|\/rodolfo\/erp\/[a-z0-9]+(?:-[a-z0-9]+)*)$/;
+
 /**
- * Decisão 517: a composição de uma linha do DRE aberta pela Home ("Conferir este valor") recebe `?volta=` com a Home da área
- * (`raiz`, exatamente: `/erp` ou `/rodolfo/erp/<slug>`). Também vale outro caminho interno da MESMA área conferido por
- * `caminhoDeVolta`, menos a própria tela de despesas (lista, composição ou despesa: seria um laço). Nulo = a composição segue com
- * o "Voltar para o DRE" de sempre. A loja da Home vem da visão escolhida (cookie), que a composição não toca.
+ * Decisão 517 (revisão): a composição de uma linha do DRE aberta pela Home ("Conferir este valor") recebe `?volta=` com a Home
+ * da área, e SÓ ela: o valor tem de ser exatamente a `raiz` de quem lê (a da sessão), sem query (as únicas que a Home lê hoje
+ * são os avisos "sem acesso"/"sem módulo", que uma volta não pode trazer) e sem `%` (nada de caminho codificado, como
+ * `/erp/dre/d%65spesas`, que passaria por outra tela). Qualquer outro caminho: nulo, e a composição segue com o "Voltar para o
+ * DRE" de sempre. A loja da Home vem da visão escolhida (cookie), que a composição não toca.
  */
 export function voltaDaComposicao(valor: unknown, raiz: string): { href: string; rotulo: string } | null {
-  if (typeof valor !== 'string' || !caminhoDeVolta(`${raiz}/`, `${raiz}/`)) return null;
-  if (valor === raiz) return { href: raiz, rotulo: 'o início' };
-  const href = caminhoDeVolta(valor, `${raiz}/`);
-  if (!href || /\/dre\/despesas(\/|$)/.test(href.split('?')[0])) return null;
-  return { href, rotulo: rotuloDaVolta(href) };
+  if (typeof valor !== 'string' || !HOME_DA_AREA.test(raiz) || valor.includes('%') || valor !== raiz) return null;
+  return { href: raiz, rotulo: 'o início' };
 }
 
 /** O caminho de volta com o insumo criado (a página de origem o lê para avisar e oferecer o insumo). */

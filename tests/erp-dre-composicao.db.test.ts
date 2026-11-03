@@ -9,7 +9,7 @@
  *  - o DRE em HTML: despesa abre a composição, "pelas compras" abre o relatório de compras com volta, o CMV abre o CMV por
  *    categoria, a receita diz "Faturamento do mês inteiro: <mês>" (um por mês quando o período cruza meses); sem a permissão, sem o link;
  *  - CMV por categoria: o valor pelas compras, ao vivo, abre o relatório de compras da categoria; sem `compras.ver` ou fechado, não;
- *  - decisão 517: o "Conferir este valor" da Home abre esta composição com a mesma soma da linha do card e volta para a Home
+ *  - decisão 517: o "Conferir este valor" da Home abre esta composição com a mesma soma da linha do card e volta SÓ para a Home
  *    (a volta passa pelo detalhe e volta); volta de fora, de outra área ou para a própria composição cai no "Voltar para o DRE".
  *
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-dre-composicao.db.test.ts
@@ -398,9 +398,10 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     expect(detalhe.voltar).toEqual({ href: daComposicao, rotulo: 'Aluguel no DRE' });
     expect(((await despesas(consulta(detalhe.voltar.href))).props as Record<string, any>).volta).toEqual({ href: '/erp', rotulo: 'o início' });
 
-    // Volta de fora, de outra área, torta ou para a própria composição: ignorada, segue o "Voltar para o DRE" (e nada viaja).
+    // Volta de fora, de outra área, torta, codificada, outro caminho da área ou a própria composição: ignorada, segue o "Voltar para o DRE" (e nada viaja).
     const base = consulta(aluguel.conferir!);
-    for (const fora of ['https://mal.example/erp', '//mal.example/erp', '/rodolfo/erp/outro', '/erp/../rodolfo/erp/x', '/erp\\x', '/erpx', daComposicao, '/erp/dre/despesas']) {
+    for (const fora of ['https://mal.example/erp', '//mal.example/erp', '/rodolfo/erp/outro', '/erp/../rodolfo/erp/x', '/erp\\x', '/erpx', daComposicao, '/erp/dre/despesas',
+      `/erp/dre/d%65spesas?linha=${linha.aluguel}&de=2026-10-01&ate=2026-10-21`, '/erp/%09/x', '/erp/insumos', '/erp?sem-acesso=1']) {
       const e = await despesas({ ...base, volta: fora });
       const props = e.props as Record<string, any>;
       expect(props.volta, fora).toBeNull();
@@ -420,7 +421,7 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     const doN1 = await abreN1(consulta(n1.conferir!));
     expect(doN1.c.totalCentavos).toBe(n1.centavos);
     expect(doN1.volta).toEqual({ href: raiz, rotulo: 'o início' });
-    expect((await abreN1({ ...consulta(n1.conferir!), volta: '/erp' })).volta).toBeNull();
+    for (const fora of ['/erp', `${raiz}/insumos`, `${raiz}/dre`, `/rodolfo/erp/outro`]) expect((await abreN1({ ...consulta(n1.conferir!), volta: fora })).volta, fora).toBeNull();
   });
 
   it('o DRE: despesa abre a composição, "pelas compras" o relatório com volta, o CMV a tela por categoria, a receita os lançamentos do mês', async () => {
