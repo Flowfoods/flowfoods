@@ -21,7 +21,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'inicio',
     rotas: [''],
     titulo: 'Visão geral da operação',
-    versao: 7,
+    versao: 8,
     aula: [
       { texto: 'Escolha uma loja no alto para ver seus indicadores, a evolução do faturamento e os pontos de atenção. Cada número informa a loja e o período a que se refere.' },
       { texto: 'Sem dados não é zero: o painel avisa sobre ausências e falhas, e Atualizar resumo tenta carregar de novo.' },
@@ -45,6 +45,15 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'A composição de Compras reúne itens e frete das notas lançadas, pela data de entrada, no mesmo recorte do indicador.', para: ['compras.ver'] },
           { texto: 'Ela usa a categoria atual do insumo; mudar o cadastro pode redistribuir compras antigas.', para: ['compras.ver'] },
           { texto: 'Abra o relatório para conferir os valores de cada grupo e o que está reunido em Outros.', para: ['compras.ver'] },
+        ],
+      },
+      {
+        id: 'despesas-da-loja',
+        titulo: 'Despesas da loja',
+        blocos: [
+          { texto: 'O card de Despesas soma as despesas da loja pelo período a que elas se referem, com os mesmos valores do DRE da loja no mesmo período. CMV e deduções da venda ficam fora.', para: ['dre.ver'] },
+          { texto: 'Uma despesa de vários dias entra só com os dias deste período e, no período em curso, até ontem. Por isso o valor fica parcial até o fim do período.', para: ['dre.ver'] },
+          { texto: 'Grupo sem lançamento aparece com traço, não como zero. A despesa da rede, sem loja, fica fora do card da loja. Período fechado vem da fotografia do fechamento.', para: ['dre.ver'] },
         ],
       },
       {

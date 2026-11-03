@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { despesasIndisponiveis, estoqueAnalitico, faturamentoAnalitico, producaoAnalitica, type ContextoHomeLoja } from '@/lib/erp/home-analitico';
+import { despesasDaHome } from '@/lib/erp/home-despesas';
 import { serieDoMes } from '@/lib/erp/grafico';
 import { diasDoMes, totalizar, type GraoLido } from '@/lib/erp/faturamento-campos';
 import type { MesDoFaturamento, LojaNoMes } from '@/lib/erp/faturamento';
@@ -126,7 +127,7 @@ describe('H2 · estoque atual respeita a régua monetária sem repetir consulta'
   });
 });
 
-describe('H2 · famílias operacionais e lacuna de Despesas explícitas', () => {
+describe('H2 · famílias operacionais e marcador de Despesas para quem só lança', () => {
   it('Produção reaproveita apenas lista/sem lote de hoje, sem taxa/rendimento/custo', () => {
     const w = producaoAnalitica({ estado: 'lido', dados: [{ id: 'lojab', nome: 'Loja B', naLista: 4, semLote: 0 }] }, c(['producao.ver']))!;
     expect(w).toMatchObject({ familia: 'producao', valor: { unidade: 'contagem', valor: 4 }, naLista: 4, semLote: 0 });
@@ -140,5 +141,10 @@ describe('H2 · famílias operacionais e lacuna de Despesas explícitas', () => 
     expect(w.detalhe.href).toBe('/erp/dre/despesas?loja=lojab');
     expect(w.avisos[0].texto).not.toMatch(/composição|implement|definida/);
     expect(despesasIndisponiveis(c([]))).toBeNull();
+    // A Home usa este mesmo marcador sem `dre.ver`, sem olhar a leitura do DRE; com `dre.ver` o card vem do DRE.
+    const protegida = Object.defineProperty({ estado: 'lido' }, 'dre', { get() { throw new Error('NÃO LER'); } }) as Parameters<typeof despesasDaHome>[0];
+    expect(despesasDaHome(protegida, c(['despesas.lancar']))).toEqual(w);
+    expect(despesasDaHome(protegida, c([]))).toBeNull();
+    expect(despesasDaHome({ estado: 'erro' }, c(['dre.ver', 'despesas.lancar']))).toMatchObject({ estado: 'erro', detalhe: { href: '/erp/dre?loja=lojab' } });
   });
 });
