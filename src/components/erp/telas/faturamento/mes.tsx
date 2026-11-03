@@ -21,11 +21,15 @@ import { formatarDinheiro } from '@/lib/erp/unidades';
 import { PageHeader } from '../../ui/cabecalho';
 import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Aviso, Contagem, Metrica, Painel, Selo, Vazio } from '../../ui/superficies';
-import { BotaoOuMotivo } from '../cadastro/partes';
+import { BotaoOuMotivo, Voltar } from '../cadastro/partes';
 import { dataCurta } from './formato';
 import { FRASE_DO_ESTADO, serieDoMes } from '@/lib/erp/grafico';
 import { GraficoDeColunas, type PontoDoGrafico } from '../../ui/grafico-colunas';
 import { rotuloDoEscopo } from '@/lib/erp/visao';
+import { comVoltaParaAHome } from '@/lib/erp/volta';
+
+/** Decisão 518: a volta para a Home, já conferida pela página (`voltaParaAHome`); nula = a tela de sempre. */
+type VoltaDaHome = { href: string; rotulo: string } | null | undefined;
 
 const SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
 const inteiro = (n: number) => n.toLocaleString('pt-BR');
@@ -89,7 +93,7 @@ function Totais({ por, total }: { por: Record<CanalVenda, TotaisDoRecorte>; tota
 
 // ------------------------------------------------------------------ calendário de uma loja
 
-function CelulaDoDia({ d, lojaId, base, canais }: { d: DiaDaLojaNoMes; lojaId: string; base: string; canais: readonly CanalVenda[] }) {
+function CelulaDoDia({ d, lojaId, base, canais, volta }: { d: DiaDaLojaNoMes; lojaId: string; base: string; canais: readonly CanalVenda[]; volta: VoltaDaHome }) {
   const numero = Number(d.data.slice(8, 10));
   const falta = d.faltam.length > 0;
   const rotuloAcessivel = `${numero} de ${rotuloDoMes(d.data.slice(0, 7))}: ${d.total ? formatarDinheiro(d.total.valorCentavos) : 'sem lançamento'}${falta ? `, ${frasesDeFalta(d.faltam)}` : ''}${d.emAberto ? ', em aberto' : ''}`;
@@ -118,13 +122,13 @@ function CelulaDoDia({ d, lojaId, base, canais }: { d: DiaDaLojaNoMes; lojaId: s
   const classe = `flex min-h-[96px] min-w-0 flex-col justify-between gap-1 border-t-2 p-2 ${falta ? 'border-erro' : 'border-transparent'}`;
   if (d.futuro) return <div className={`${classe} text-suave`} aria-hidden>{miolo}</div>;
   return (
-    <Link href={`${base}/${lojaId}/${d.data}`} aria-label={rotuloAcessivel} className={`${classe} ff-transicao hover:bg-texto/[0.04]`}>
+    <Link href={comVoltaParaAHome(`${base}/${lojaId}/${d.data}`, volta)} aria-label={rotuloAcessivel} className={`${classe} ff-transicao hover:bg-texto/[0.04]`}>
       {miolo}
     </Link>
   );
 }
 
-function Calendario({ l, base, mes }: { l: LojaNoMes; base: string; mes: string }) {
+function Calendario({ l, base, mes, volta }: { l: LojaNoMes; base: string; mes: string; volta: VoltaDaHome }) {
   const primeiro = diaDaSemana(`${mes}-01`);
   return (
     <>
@@ -143,7 +147,7 @@ function Calendario({ l, base, mes }: { l: LojaNoMes; base: string; mes: string 
           ))}
           {l.dias.map((d) => (
             <li key={d.data} className="min-w-0">
-              <CelulaDoDia d={d} lojaId={l.loja.id} base={base} canais={l.loja.canais} />
+              <CelulaDoDia d={d} lojaId={l.loja.id} base={base} canais={l.loja.canais} volta={volta} />
             </li>
           ))}
         </ol>
@@ -157,7 +161,7 @@ function Calendario({ l, base, mes }: { l: LojaNoMes; base: string; mes: string 
             const falta = d.faltam.length > 0;
             return (
               <li key={d.data} className={falta ? 'border-l-2 border-erro' : ''}>
-                <Link href={`${base}/${l.loja.id}/${d.data}`} className="ff-transicao flex min-h-14 items-center justify-between gap-3 px-4 py-2.5 hover:bg-texto/[0.04]">
+                <Link href={comVoltaParaAHome(`${base}/${l.loja.id}/${d.data}`, volta)} className="ff-transicao flex min-h-14 items-center justify-between gap-3 px-4 py-2.5 hover:bg-texto/[0.04]">
                   <span className="min-w-0">
                     <span className="block text-sm font-medium text-texto">
                       {dataCurta(d.data)}
@@ -190,7 +194,7 @@ function Calendario({ l, base, mes }: { l: LojaNoMes; base: string; mes: string 
 
 // ------------------------------------------------------------------ rede: loja × canal
 
-function TabelaDaRede({ m, base }: { m: MesDoFaturamento; base: string }) {
+function TabelaDaRede({ m, base, volta }: { m: MesDoFaturamento; base: string; volta: VoltaDaHome }) {
   const faltas = (n: number) => (n > 0 ? <span className="font-semibold text-erro">{n} {n === 1 ? 'falta' : 'faltas'}</span> : <span className="text-suave">0 faltas</span>);
   return (
     <Painel titulo="Por loja" subtitulo="Soma do que cada loja do seu acesso lançou no mês. Falta é canal que a loja vende, sem lançamento, até ontem (cada canal em cada dia conta uma)." semRespiro acessorio={<Contagem>{m.lojas.length}</Contagem>}>
@@ -199,7 +203,7 @@ function TabelaDaRede({ m, base }: { m: MesDoFaturamento; base: string }) {
         {m.lojas.map((l) => (
           <li key={l.loja.id} className="px-4 py-3">
             <div className="flex items-baseline justify-between gap-3">
-              <Link href={`${base}?mes=${m.mes}&loja=${l.loja.id}`} className={`${LINK_DE_TEXTO} ff-toque min-w-0 truncate font-medium`}>
+              <Link href={comVoltaParaAHome(`${base}?mes=${m.mes}&loja=${l.loja.id}`, volta)} className={`${LINK_DE_TEXTO} ff-toque min-w-0 truncate font-medium`}>
                 {l.loja.nome}
               </Link>
               <span className="shrink-0 text-[15px] font-semibold tabular-nums">{formatarDinheiro(l.total.valorCentavos)}</span>
@@ -241,7 +245,7 @@ function TabelaDaRede({ m, base }: { m: MesDoFaturamento; base: string }) {
             {m.lojas.map((l) => (
               <tr key={l.loja.id} className="border-t border-linha">
                 <th scope="row" className="h-11 max-w-[14rem] px-4 text-left font-medium text-texto sm:px-5">
-                  <Link href={`${base}?mes=${m.mes}&loja=${l.loja.id}`} className={`${LINK_DE_TEXTO} block truncate py-3`}>
+                  <Link href={comVoltaParaAHome(`${base}?mes=${m.mes}&loja=${l.loja.id}`, volta)} className={`${LINK_DE_TEXTO} block truncate py-3`}>
                     {l.loja.nome}
                   </Link>
                 </th>
@@ -285,6 +289,7 @@ export function TelaDoMes({
   podeLancar,
   bloqueio,
   veRede,
+  volta,
 }: {
   m: MesDoFaturamento;
   base: string;
@@ -296,6 +301,8 @@ export function TelaDoMes({
   bloqueio: string | null;
   /** Quem tem a rede inteira volta à soma das lojas. */
   veRede: boolean;
+  /** Decisão 518: aberta pela pendência da Home, com a volta conferida; o shell cede e a tela desenha o Voltar. */
+  volta?: VoltaDaHome;
 }) {
   const anterior = mesVizinho(m.mes, -1);
   const seguinte = mesVizinho(m.mes, 1);
@@ -304,6 +311,8 @@ export function TelaDoMes({
   const faltas = lojaAberta ? lojaAberta.faltas : m.faltas;
   return (
     <div className="space-y-6">
+      {/* Leitura nova da Home (e não a guardada pelo roteador): a pendência só muda com a consulta seguinte à fonte. */}
+      {volta && <Voltar href={volta.href} recarregar>{`Voltar para ${volta.rotulo}`}</Voltar>}
       <PageHeader
         icone="dre"
         cor={COR.dre}
@@ -324,7 +333,7 @@ export function TelaDoMes({
       >
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
           <nav aria-label="Trocar de mês" className="flex items-center gap-1 rounded-[10px] border border-linha bg-painel p-1">
-            <Link href={`${base}?mes=${anterior}${lojaQuery}`} aria-label={`Mês anterior: ${rotuloDoMes(anterior)}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
+            <Link href={comVoltaParaAHome(`${base}?mes=${anterior}${lojaQuery}`, volta)} aria-label={`Mês anterior: ${rotuloDoMes(anterior)}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
               <ChevronLeft size={18} aria-hidden />
             </Link>
             <span className="min-w-36 px-2 text-center text-sm font-semibold tabular-nums" aria-current="date">
@@ -335,18 +344,18 @@ export function TelaDoMes({
                 <ChevronRight size={18} />
               </span>
             ) : (
-              <Link href={`${base}?mes=${seguinte}${lojaQuery}`} aria-label={`Mês seguinte: ${rotuloDoMes(seguinte)}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
+              <Link href={comVoltaParaAHome(`${base}?mes=${seguinte}${lojaQuery}`, volta)} aria-label={`Mês seguinte: ${rotuloDoMes(seguinte)}`} className="ff-transicao grid h-10 w-10 place-items-center rounded-[7px] text-suave hover:bg-texto/5 hover:text-texto [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11">
                 <ChevronRight size={18} aria-hidden />
               </Link>
             )}
           </nav>
           {!noMesAtual && (
-            <Link href={`${base}${lojaAberta ? `?loja=${lojaAberta.loja.id}` : ''}`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11`}>
+            <Link href={comVoltaParaAHome(`${base}${lojaAberta ? `?loja=${lojaAberta.loja.id}` : ''}`, volta)} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11`}>
               Voltar para este mês
             </Link>
           )}
           {lojaAberta && veRede && (
-            <Link href={`${base}?mes=${m.mes}&rede=1`} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11`}>
+            <Link href={comVoltaParaAHome(`${base}?mes=${m.mes}&rede=1`, volta)} className={`${LINK_DE_TEXTO} inline-flex items-center [@media(pointer:coarse)]:min-h-11`}>
               Ver a rede
             </Link>
           )}
@@ -392,10 +401,10 @@ export function TelaDoMes({
               acessorio={!lojaAberta.loja.ativa ? <Selo>Loja desativada</Selo> : undefined}
               semRespiro
             >
-              <Calendario l={lojaAberta} base={base} mes={m.mes} />
+              <Calendario l={lojaAberta} base={base} mes={m.mes} volta={volta} />
             </Painel>
           ) : (
-            <TabelaDaRede m={m} base={base} />
+            <TabelaDaRede m={m} base={base} volta={volta} />
           )}
           {m.temIntegracao && (
             <p className="text-[12px] text-suave">Dias com integração valem o número dela; o que a casa digitou fica como conferência na tela do dia.</p>

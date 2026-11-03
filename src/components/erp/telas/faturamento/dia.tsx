@@ -13,6 +13,7 @@ import { CANAIS } from '@/lib/erp/canal-campos';
 import { fraseDoNumero } from '@/lib/erp/faturamento-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro } from '@/lib/erp/unidades';
+import { comVoltaParaAHome } from '@/lib/erp/volta';
 import { TrilhaDaPagina } from '../../shell/trilha';
 import { AvisoDoPeriodoFechado } from '../../ui/aviso-periodo-fechado';
 import { PageHeader } from '../../ui/cabecalho';
@@ -33,6 +34,7 @@ export function TelaDoDia({
   podeLancar,
   verPeriodos,
   bloqueio,
+  volta,
 }: {
   dia: DiaDaLojaLido;
   base: string;
@@ -44,10 +46,15 @@ export function TelaDoDia({
   /** Abre a tela Períodos (`dre.ver`): o aviso de período fechado só leva até lá se levar a algum lugar. */
   verPeriodos: boolean;
   bloqueio: string | null;
+  /**
+   * Decisão 518: a volta para a Home, já conferida (`voltaParaAHome`). Viaja no Voltar para o mês, nos dias vizinhos e no
+   * formulário, para o mês continuar oferecendo "Voltar para o início" depois de salvar. Nula = a tela de sempre.
+   */
+  volta?: { href: string; rotulo: string } | null;
 }) {
   const hoje = hojeNoRio();
   const mes = dia.data.slice(0, 7);
-  const voltar = `${base}/${dia.loja.id}/${dia.data}`;
+  const voltar = comVoltaParaAHome(`${base}/${dia.loja.id}/${dia.data}`, volta);
   const canais: CanalParaATela[] = dia.canais.map((c) => {
     const h = c.humano;
     const zerado = h && h.valorCentavos === 0 && h.pedidos === 0 && h.clientes === 0;
@@ -78,14 +85,14 @@ export function TelaDoDia({
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <TrilhaDaPagina itens={[{ rotulo: `${dia.loja.nome} · ${dataLonga(dia.data)}` }]} />
-      <Voltar href={`${base}?mes=${mes}&loja=${dia.loja.id}`}>Voltar para o mês</Voltar>
+      <Voltar href={comVoltaParaAHome(`${base}?mes=${mes}&loja=${dia.loja.id}`, volta)}>Voltar para o mês</Voltar>
       <PageHeader icone="dre" cor={COR.dre} titulo={dia.loja.nome} subtitulo={`${dataLonga(dia.data)} · faturamento do dia`}>
         <nav aria-label="Outros dias" className="flex flex-wrap gap-x-5 gap-y-1">
-          <Link href={`${base}/${dia.loja.id}/${ontem}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+          <Link href={comVoltaParaAHome(`${base}/${dia.loja.id}/${ontem}`, volta)} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
             Dia anterior
           </Link>
           {amanha <= hoje && (
-            <Link href={`${base}/${dia.loja.id}/${amanha}`} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
+            <Link href={comVoltaParaAHome(`${base}/${dia.loja.id}/${amanha}`, volta)} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center sm:min-h-0`}>
               Dia seguinte
             </Link>
           )}
@@ -107,14 +114,14 @@ export function TelaDoDia({
       {canais.length === 0 ? (
         <Aviso titulo="Nenhum canal de venda nesta loja.">Quem cuida da rede escolhe os canais em Lojas e marcas.</Aviso>
       ) : (
-        <FormDoDia acao={acao} canais={canais} voltar={voltar} bloqueio={bloqueio} somenteLeitura={!podeLancar || !dia.loja.ativa} fechado={dia.fechado} />
+        <FormDoDia acao={acao} canais={canais} voltar={voltar} volta={volta?.href} bloqueio={bloqueio} somenteLeitura={!podeLancar || !dia.loja.ativa} fechado={dia.fechado} />
       )}
 
       {podeLancar && remover && !dia.fechado && !bloqueio && removiveis.length > 0 && (
         <Painel titulo="Lançou no dia ou na loja errada?" subtitulo="Para corrigir um número, é só salvar o dia de novo. Remover serve para o que não deveria existir.">
           <div className="space-y-3">
             {removiveis.map((c) => (
-              <FormRemover key={c.canal} acao={remover(c.canal)} rotulo={CANAIS[c.canal].rotulo} versao={c.humano!.versao} voltar={voltar} />
+              <FormRemover key={c.canal} acao={remover(c.canal)} rotulo={CANAIS[c.canal].rotulo} versao={c.humano!.versao} voltar={voltar} volta={volta?.href} />
             ))}
           </div>
         </Painel>

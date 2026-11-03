@@ -1,12 +1,14 @@
 /**
  * ERP, Faturamento do mês de um Parceiro Flow, pelo nível 1. A MESMA tela da
  * pessoa do parceiro; tudo passa pelo cliente de `exigirParceiro` (portão +
- * RLS). O nível 1 alcança todas as lojas; a visão do topo só filtra.
+ * RLS). O nível 1 alcança todas as lojas; a visão do topo só filtra. A volta da
+ * Home (decisão 518) só vale a Home exata deste parceiro, `/rodolfo/erp/<slug>`.
  */
 
 import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { carregarDoMes } from '@/components/erp/telas/faturamento/carregar';
 import { TelaDoMes } from '@/components/erp/telas/faturamento/mes';
+import { voltaParaAHome } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,6 +26,7 @@ export default async function ParceiroFaturamentoPage({ params, searchParams }: 
       podeLancar
       bloqueio={ctx.bloqueio}
       veRede
+      volta={voltaParaAHome(searchParams.volta, `/rodolfo/erp/${ctx.parceiro.slug}`)}
     />
   );
 }

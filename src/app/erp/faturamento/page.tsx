@@ -3,12 +3,14 @@
  * cliente do portão resolvido pela SESSÃO. Ver exige "ver faturamento"; só as
  * lojas do alcance entram (no calendário e na soma da rede), e a loja escolhida
  * no topo só FILTRA e nunca concede. "Lançar o dia" e "Importar planilha" só
- * com "lançar faturamento" (as actions conferem de novo, loja a loja).
+ * com "lançar faturamento" (as actions conferem de novo, loja a loja). Aberta
+ * pela pendência da Home (decisão 518), `?volta=` só vale a Home exata, `/erp`.
  */
 
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { carregarDoMes } from '@/components/erp/telas/faturamento/carregar';
 import { TelaDoMes } from '@/components/erp/telas/faturamento/mes';
+import { voltaParaAHome } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +27,7 @@ export default async function ErpFaturamentoPage({ searchParams }: { searchParam
       podeLancar={pode(ctx.alcance, 'faturamento.lancar')}
       bloqueio={ctx.bloqueio}
       veRede={ctx.alcance.lojas === 'todas'}
+      volta={voltaParaAHome(searchParams.volta, '/erp')}
     />
   );
 }

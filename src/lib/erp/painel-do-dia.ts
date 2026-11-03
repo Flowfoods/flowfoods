@@ -18,6 +18,7 @@ import { comprasAnaliticas, lerComprasDaHome } from './home-compras';
 import { lerXmlAguardandoDaHome, xmlAguardandoDaHome, type XmlAguardandoHome } from './home-xml-aguardando';
 import { estoqueAnalitico, faturamentoAnalitico, producaoAnalitica, type AnaliticoDaHome, type LeituraHome, type WidgetAnaliticoHome } from './home-analitico';
 import { hojeNoRio } from './compra-campos';
+import { comVoltaParaAHome, voltaParaAHome } from './volta';
 import type { ClienteDoParceiro } from './tenant';
 import type { Visao } from './visao';
 
@@ -36,6 +37,13 @@ export interface IndicadorDoDia {
   href: string;
 }
 
+/**
+ * Decisão 518: "completar dados" é registrar o que já aconteceu (venda do dia, preço do insumo); "resolver operação" é algo
+ * a fazer na casa (contar, produzir, conferir a nota). É agrupamento, não urgência nem nota: a ordem dentro de cada grupo é a
+ * de sempre. Ausente (painel do nível 1): lista única, como antes.
+ */
+export type NaturezaDaPendencia = 'completar_dados' | 'resolver_operacao';
+
 export interface PendenciaDoDia {
   chave: string;
   titulo: string;
@@ -43,6 +51,14 @@ export interface PendenciaDoDia {
   href: string;
   acao: string;
   escopo?: string;
+  natureza?: NaturezaDaPendencia;
+  /** O indicador que a pendência deixa incompleto (piloto: o faturamento do mês). */
+  indicador?: string;
+  /**
+   * Decisão 518 (piloto do faturamento): `confirmada` = a contagem veio de uma leitura válida da fonte nesta consulta;
+   * `nao_conferida` = a leitura falhou e nada foi confirmado, nem a falta nem a ausência dela. Ausente: as demais pendências.
+   */
+  leitura?: 'confirmada' | 'nao_conferida';
 }
 
 export interface PainelDoDia {
@@ -100,6 +116,8 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
   if (lojaId) queryFaturamento.set('loja', lojaId);
   else if (visao?.tipo === 'rede') queryFaturamento.set('rede', '1');
   const faturamentoHref = base + '/faturamento?' + queryFaturamento.toString();
+  // Decisão 518: a pendência do faturamento leva a volta para esta Home (só a Home exata da área, conferida do outro lado).
+  const faturamentoDaPendencia = comVoltaParaAHome(faturamentoHref, voltaParaAHome(base, base));
   const estoqueHref = lojaId ? base + '/estoque/' + encodeURIComponent(lojaId) : base + '/estoque';
   const producaoHref = lojaId ? `${base}/producao/lista/${encodeURIComponent(lojaId)}?dia=${hoje}` : '';
 
@@ -113,6 +131,10 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     compras: !!lojaId && pode(alcanceDaVisao, 'compras.ver', { lojaId }),
     xml: !!lojaId && pode(alcanceDaVisao, 'compras.ver', { lojaId }),
   };
+  // Decisão 518: "Lançar o que falta" só para quem a action deixaria lançar: ver E lançar faturamento (na loja da visão,
+  // ou na rede), com o parceiro aceitando escrita. Os outros recebem "Ver o faturamento", sem prometer o lançamento.
+  const lancaFaturamento = autorizado.faturamento && !cliente.somenteLeitura
+    && pode(alcanceDaVisao, 'faturamento.lancar', lojaId ? { lojaId } : {});
   const [leituraFat, leituraSaude, leituraEstoque, leituraProducao, leituraCmv, leituraCompras, leituraXml] = await Promise.allSettled([
     leituraAutorizada(autorizado.faturamento, () => obterMes(cliente, alcanceDaVisao, { mes, ...(lojaId ? { lojaId } : {}) }, hoje)),
     leituraAutorizada(autorizado.cardapio, () => saudeDoCardapio(cliente)),
@@ -173,27 +195,49 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     });
   }
 
+  const rotuloDoFaturamento = `Faturamento de ${MESES[Number(mes.slice(5, 7)) - 1]}`;
   if (fat && fat.lojas.length > 0) {
     indicadores.push({
       chave: 'faturamento',
       escopo,
-      rotulo: `Faturamento de ${MESES[Number(mes.slice(5, 7)) - 1]}`,
+      rotulo: rotuloDoFaturamento,
       // Nenhum lançamento não comprova faturamento zero. Um dia informado
       // como "Não vendeu" continua sendo um zero real, distinto de ausência.
       valor: { tipo: 'dinheiro', centavos: lancados.size ? fat.total.valorCentavos : null },
       contexto: lancados.size ? `${plural(lancados.size, 'dia lançado', 'dias lançados')} · ${plural(fat.total.pedidos, 'pedido', 'pedidos')}` : 'nenhum dia lançado ainda',
       href: faturamentoHref,
     });
+    // Decisão 518: a pendência existe enquanto ESTA leitura da fonte contar faltas. Clicar, visitar ou voltar não a tira;
+    // ela muda ou sai só quando uma consulta válida (a próxima abertura da Home, ou Atualizar resumo) contar menos.
     if (fat.faltas > 0) {
       pendencias.push({
         chave: 'faturamento-faltas',
         escopo,
+        natureza: 'completar_dados',
+        indicador: rotuloDoFaturamento,
+        leitura: 'confirmada',
         titulo: `${plural(fat.faltas, 'canal sem lançamento', 'canais sem lançamento')} neste mês`,
-        texto: 'Dia que a loja vendeu e ninguém lançou deixa o faturamento e o DRE incompletos.',
-        href: faturamentoHref,
-        acao: 'Lançar o que falta',
+        texto: 'Dia que a loja vendeu e ninguém lançou deixa o faturamento e o DRE incompletos.'
+          + (lancaFaturamento ? '' : cliente.somenteLeitura ? ' Os lançamentos estão bloqueados agora; o motivo aparece no faturamento.'
+            : ` Lançar é com quem tem “lançar faturamento” ${lojaId ? 'nesta loja' : 'nas lojas'}.`),
+        href: faturamentoDaPendencia,
+        acao: lancaFaturamento ? 'Lançar o que falta' : 'Ver o faturamento',
       });
     }
+  } else if (autorizado.faturamento && leituraFat.status === 'rejected') {
+    // Decisão 518: leitura que falhou não confirma nada. A pendência continua, sem número e sem "Lançar", em vez de sumir
+    // como se o mês estivesse completo. Sem estado guardado: a próxima consulta válida decide.
+    pendencias.push({
+      chave: 'faturamento-faltas',
+      escopo,
+      natureza: 'completar_dados',
+      indicador: rotuloDoFaturamento,
+      leitura: 'nao_conferida',
+      titulo: 'Canais sem lançamento: não deu para conferir agora',
+      texto: 'A consulta ao faturamento falhou. Isso não quer dizer que o mês esteja completo; Atualizar resumo consulta de novo.',
+      href: faturamentoDaPendencia,
+      acao: 'Ver o faturamento',
+    });
   }
 
   if (saude && saude.pratos > 0) {
@@ -209,6 +253,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
       pendencias.push({
         chave: 'cardapio-custo',
         escopo: 'Da rede',
+        natureza: 'completar_dados',
         titulo: `${plural(saude.custoIncompleto, 'prato', 'pratos')} com custo incompleto`,
         texto: 'Falta preço em algum insumo da receita: sem ele não há CMV nem sugestão de preço.',
         href: `${base}/fichas?custo=incompleto`,
@@ -218,6 +263,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
       pendencias.push({
         chave: 'cardapio-preco',
         escopo: 'Da rede',
+        natureza: 'completar_dados',
         titulo: `${plural(saude.pratos - saude.prontos, 'prato espera', 'pratos esperam')} meta ou preço`,
         texto: 'O custo está completo; falta a meta de CMV do canal ou o preço escolhido.',
         href: `${base}/fichas`,
@@ -244,6 +290,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
       pendencias.push({
         chave: 'estoque-contagem',
         escopo,
+        natureza: 'resolver_operacao',
         titulo: `Contagem de abertura em andamento${emContagem.length === 1 ? ` em ${emContagem[0].nome}` : ` em ${emContagem.length} lojas`}`,
         texto: c ? `${c.contados} de ${c.total} itens contados. Termine para o saldo começar a valer.` : 'Termine para o saldo começar a valer.',
         href: estoqueHref,
@@ -254,6 +301,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
       pendencias.push({
         chave: 'estoque-abrir',
         escopo,
+        natureza: 'resolver_operacao',
         titulo: `${plural(naoAbertas.length, 'loja', 'lojas')} sem estoque aberto`,
         texto: 'Sem saldo inicial, a compra não entra no estoque e o CMV real do mês fica sem base.',
         href: estoqueHref,
@@ -271,7 +319,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     });
     if (producao.semLote > 0) {
       pendencias.push({
-        chave: 'producao-sem-lote', escopo,
+        chave: 'producao-sem-lote', escopo, natureza: 'resolver_operacao',
         titulo: plural(producao.semLote, 'pré-preparo ainda sem lote ativo', 'pré-preparos ainda sem lote ativo'),
         texto: 'Confira na lista de hoje os pré-preparos que estão sem lote ativo.',
         href: producaoHref, acao: 'Ver a lista',

@@ -119,6 +119,14 @@ const EXCECOES: { rota: RegExp; motivo: string; prova: () => boolean }[] = [
   },
 ];
 
+/**
+ * Decisão 518: páginas que o shell cobre sem volta e que, abertas pela pendência da Home com a volta válida, desenham o próprio
+ * "Voltar para o início" (o shell cede, como no relatório de compras com origem). O teste prova as duas metades com
+ * `temVoltarNoShell`: com a Home exata da área o shell não desenha; com qualquer outra volta, desenha.
+ */
+const CEDEM_A_VOLTA_DA_HOME = [/^\/(erp|rodolfo\/erp\/alfa)\/faturamento$/];
+const raizDaRota = (rota: string) => (rota.startsWith('/erp') ? '/erp' : '/rodolfo/erp/alfa');
+
 const inventario = ARVORES.flatMap(({ pasta, prefixo }) =>
   paginas(pasta).sort().map((arquivo) => {
     const rota = rotaDa(arquivo, pasta, prefixo);
@@ -147,7 +155,25 @@ describe('Inventário do Voltar: toda página do ERP tem retorno (Visão C)', ()
   });
 
   it('nenhuma página desenha dois Voltar (o do shell e o da tela)', () => {
-    expect(inventario.filter((p) => p.shell && p.tela).map((p) => p.rota)).toEqual([]);
+    // Decisão 518: a tela que só desenha o Voltar com a volta da Home cede ao shell sem ela, e o shell cede a ela com a volta.
+    const cedem = inventario.filter((p) => p.shell && p.tela && CEDEM_A_VOLTA_DA_HOME.some((r) => r.test(p.rota)));
+    for (const p of cedem) expect(temVoltarNoShell(p.rota, 'volta=' + encodeURIComponent(raizDaRota(p.rota))), p.rota).toBe(false);
+    expect(inventario.filter((p) => p.shell && p.tela && !cedem.includes(p)).map((p) => p.rota)).toEqual([]);
+  });
+
+  it('decisão 518: o faturamento do mês tem o Voltar do shell sem volta, e o próprio "Voltar para o início" só com a Home exata', () => {
+    for (const rota of ['/erp/faturamento', '/rodolfo/erp/alfa/faturamento']) {
+      const p = inventario.find((x) => x.rota === rota);
+      expect(p, rota).toMatchObject({ shell: true, tela: true });
+      const raiz = raizDaRota(rota);
+      expect(temVoltarNoShell(rota, 'volta=' + encodeURIComponent(raiz))).toBe(false);
+      // Volta inválida (outra área, outra tela, codificada, externa, com query): o shell continua desenhando o Voltar de sempre.
+      for (const v of ['/erp/insumos', '/rodolfo/erp/outro', raiz === '/erp' ? '/rodolfo/erp/alfa' : '/erp', '%2Ferp', 'https://fora.test/erp', '//erp', raiz + '?sem-acesso=1']) {
+        expect(temVoltarNoShell(rota, 'volta=' + encodeURIComponent(v)), `${rota} ${v}`).toBe(true);
+      }
+    }
+    // Só o faturamento do mês cede: o dia tem o próprio "Voltar para o mês" e nunca esteve no shell.
+    expect(inventario.filter((p) => CEDEM_A_VOLTA_DA_HOME.some((r) => r.test(p.rota))).map((p) => p.rota).sort()).toEqual(['/erp/faturamento', '/rodolfo/erp/alfa/faturamento']);
   });
 
   it('classificar insumos tem o Voltar na própria tela, nas duas árvores, sem depender do shell', () => {

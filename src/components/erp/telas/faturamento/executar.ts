@@ -21,10 +21,20 @@ import {
 import { decodificarPlanilha, LIMITE_DA_PLANILHA } from '@/lib/erp/faturamento-planilha';
 import type { Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
+import { comVoltaParaAHome, voltaParaAHome } from '@/lib/erp/volta';
 import type { EstadoDaImportacao, EstadoDoDia, EstadoDosCanais } from './estado';
 
 const textoDe = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : '');
 const vezDe = (anterior: { vez: number } | null) => (anterior?.vez ?? 0) + 1;
+
+/**
+ * Decisão 518: a volta para a Home que veio no formulário é dado de fora. Vale só se for exatamente a Home da área DESTA action
+ * (a raiz sai da `base` do servidor, nunca do formulário); fora disso o redirecionamento segue como sempre. Não grava nada.
+ */
+function voltaDoFormulario(form: FormData, base: string) {
+  const raiz = base.endsWith('/faturamento') ? base.slice(0, -'/faturamento'.length) : '';
+  return voltaParaAHome(form.get('volta'), raiz);
+}
 
 export function recusadoNoDia(anterior: EstadoDoDia, motivo: string): EstadoDoDia {
   return { ok: false, erros: { geral: motivo }, porCanal: {}, vez: vezDe(anterior) };
@@ -61,7 +71,7 @@ export async function executarSalvarDia(
   if (!r.ok) return paraATela(r, anterior);
   revalidatePath(base, 'layout');
   const mudou = Object.values(r.canais).some((s) => s === 'criado' || s === 'alterado');
-  redirect(`${base}/${lojaId}/${data}?feito=${mudou ? 'salvo' : 'igual'}`);
+  redirect(comVoltaParaAHome(`${base}/${lojaId}/${data}?feito=${mudou ? 'salvo' : 'igual'}`, voltaDoFormulario(form, base)));
 }
 
 export async function executarRemover(
@@ -78,7 +88,7 @@ export async function executarRemover(
   const r = await removerLancamento(cliente, alcance, { lojaId, data, canal, motivo: form.get('motivo'), versao: textoDe(form.get('versao')) }, autorNome);
   if (!r.ok) return paraATela(r, anterior);
   revalidatePath(base, 'layout');
-  redirect(`${base}/${lojaId}/${data}?feito=removido`);
+  redirect(comVoltaParaAHome(`${base}/${lojaId}/${data}?feito=removido`, voltaDoFormulario(form, base)));
 }
 
 // ------------------------------------------------------------------ planilha

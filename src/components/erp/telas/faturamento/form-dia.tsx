@@ -158,6 +158,7 @@ export function FormDoDia({
   acao,
   canais,
   voltar,
+  volta,
   bloqueio,
   somenteLeitura,
   fechado,
@@ -165,6 +166,8 @@ export function FormDoDia({
   acao: AcaoDoDia;
   canais: CanalParaATela[];
   voltar: string;
+  /** Decisão 518: a Home de onde a pessoa veio (já conferida); a action confere de novo e a leva no redirecionamento. */
+  volta?: string;
   bloqueio: string | null;
   /** Sem "lançar faturamento" na loja, ou dia de período fechado: só mostra. */
   somenteLeitura: boolean;
@@ -176,6 +179,7 @@ export function FormDoDia({
   return (
     <form action={enviar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <ErroGeralDoDia estado={estado} recarregar={voltar} />
+      {volta && <input type="hidden" name="volta" value={volta} />}
       {estado?.erros.data && (
         <p role="alert" className="text-[13px] text-erro">
           {estado.erros.data}
@@ -199,7 +203,7 @@ export function FormDoDia({
 }
 
 /** Remover o lançamento de um canal (loja ou dia errado). Motivo obrigatório; o antes fica no histórico. */
-export function FormRemover({ acao, rotulo, versao, voltar }: { acao: AcaoDoDia; rotulo: string; versao: string; voltar: string }) {
+export function FormRemover({ acao, rotulo, versao, voltar, volta }: { acao: AcaoDoDia; rotulo: string; versao: string; voltar: string; volta?: string }) {
   const [estado, enviar] = useFormState<EstadoDoDia, FormData>(acao, null);
   const erro = estado?.porCanal && Object.values(estado.porCanal)[0]?.geral;
   const id = `remover-${rotulo.toLowerCase().replace(/[^a-z]/g, '')}`;
@@ -212,6 +216,7 @@ export function FormRemover({ acao, rotulo, versao, voltar }: { acao: AcaoDoDia;
       <form action={enviar} className="mt-3 space-y-3">
         <ErroGeralDoDia estado={estado} recarregar={voltar} />
         <input type="hidden" name="versao" value={versao} />
+        {volta && <input type="hidden" name="volta" value={volta} />}
         <div>
           <label htmlFor={id} className="mb-1.5 block text-[13px] font-medium text-texto">
             Por que está removendo? (de 3 a 200 letras)

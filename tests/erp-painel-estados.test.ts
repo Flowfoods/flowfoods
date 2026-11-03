@@ -58,10 +58,13 @@ describe('H1 · cada fonte tem estado independente e conserva o contexto autoriz
       ['estoque', chave === 'estoque' ? 'erro' : 'ok'],
     ]);
     expect(p.indicadores.map((i) => i.chave)).toEqual(['faturamento', 'cardapio', 'estoque'].filter((c) => c !== chave));
+    // Decisão 518: falha do faturamento deixa a pendência dele "não conferida" (não some como se o mês estivesse completo).
     expect(p.pendencias.map((p) => p.chave)).toEqual([
+      ...(chave === 'faturamento' ? ['faturamento-faltas'] : []),
       ...(chave !== 'cardapio' ? ['cardapio-preco'] : []),
       ...(chave !== 'estoque' ? ['estoque-abrir'] : []),
     ]);
+    if (chave === 'faturamento') expect(p.pendencias[0]).toMatchObject({ leitura: 'nao_conferida', acao: 'Ver o faturamento' });
     if (chave !== 'faturamento') expect(p.indicadores[0].valor).toEqual({ tipo: 'dinheiro', centavos: 700_000 });
     expect(JSON.stringify(p) + htmlDe(p)).not.toMatch(/Prisma|SQL|FaturamentoLancamento|tenant-segredo/);
   });
@@ -79,7 +82,7 @@ describe('H1 · cada fonte tem estado independente e conserva o contexto autoriz
     vi.mocked(situacaoDoEstoque).mockRejectedValueOnce('tenant-segredo');
     const p = await ler();
     expect(p.indicadores).toEqual([]);
-    expect(p.pendencias).toEqual([]);
+    expect(p.pendencias.map((x) => [x.chave, x.leitura])).toEqual([['faturamento-faltas', 'nao_conferida']]);
     expect(p.estados?.every((e) => e.estado === 'erro')).toBe(true);
     const html = htmlDe(p);
     expect(html).toContain('Não foi possível carregar o faturamento.');

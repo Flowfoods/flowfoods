@@ -13,6 +13,7 @@ import { LIMITES_DO_FATURAMENTO } from '@/lib/erp/faturamento-campos';
 import { obterDia } from '@/lib/erp/faturamento';
 import { fraseDoDia } from '@/components/erp/telas/faturamento/estado';
 import { TelaDoDia } from '@/components/erp/telas/faturamento/dia';
+import { voltaParaAHome } from '@/lib/erp/volta';
 import { acaoRemoverLancamento, acaoSalvarDia } from '../../actions';
 
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,7 @@ export default async function ErpFaturamentoDoDiaPage({ params, searchParams }: 
       podeLancar={pode(ctx.alcance, 'faturamento.lancar', { lojaId })}
       verPeriodos={pode(ctx.alcance, 'dre.ver')}
       bloqueio={ctx.bloqueio}
+      volta={voltaParaAHome(searchParams.volta, '/erp')}
     />
   );
 }
