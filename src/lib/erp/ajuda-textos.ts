@@ -1575,7 +1575,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Voltar para o início',
         blocos: [
           { texto: 'Voltar para o início lê o resumo de novo, na loja ou na rede escolhida no alto.' },
-          { texto: 'O aviso de lançamentos faltando só sai de lá quando essa nova leitura não achar mais falta: abrir, voltar ou só olhar não resolve.' },
+          { texto: 'O aviso de lançamentos faltando só sai de lá quando a nova consulta ao faturamento não encontrar mais falta: abrir, voltar ou só olhar não resolve.' },
         ],
       },
       {
@@ -1634,7 +1634,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       {
         id: 'atalhos',
         titulo: 'Ontem e hoje',
-        blocos: [{ texto: 'Cada atalho abre o dia da loja direto, com um bloco para cada canal que ela vende. Ontem já conta como falta se algum canal ficou sem lançamento; hoje ainda está em aberto.' }],
+        blocos: [{ texto: 'Cada atalho abre o dia da loja direto, com um bloco para cada canal que ela vende. Depois que a loja começou a lançar, ontem já conta como falta se algum canal ficou sem lançamento; hoje ainda está em aberto.' }],
       },
     ],
   },
@@ -1667,14 +1667,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         // Só no dia de período fechado, logo abaixo do aviso.
         id: 'periodo-fechado',
         titulo: 'Por que este dia não aceita lançamento',
-        blocos: [{ texto: 'Fechar o período guarda uma fotografia do DRE daqueles dias. Depois disso nada muda dentro das datas dele, nem o faturamento: lançar, corrigir ou remover aqui mudaria um resultado já fechado.' }],
+        blocos: [{ texto: 'Fechar o período guarda uma fotografia do DRE daqueles dias. Enquanto o período estiver fechado, o faturamento dessas datas não muda: lançar, corrigir ou remover aqui mudaria um resultado já fechado.' }],
         secao: 'periodo-fechado',
       },
       {
         id: 'numeros',
         titulo: 'Faturamento, pedidos e clientes do canal',
         blocos: [
-          { texto: 'Faturamento é a venda dos produtos dos pedidos concluídos no dia, sem a taxa de entrega e já sem o desconto que a casa pagou.' },
+          { texto: 'Faturamento é a venda dos produtos dos pedidos concluídos no dia, já sem o desconto que a casa pagou; não entram taxa de entrega, gorjeta, 10 % de serviço nem pedido cancelado.' },
           { texto: 'No iFood, entra o total dos itens menos o incentivo que a loja bancou; a comissão do iFood entra depois, no resultado.' },
           { texto: 'Clientes são atendimentos do dia, não pessoas diferentes.' },
         ],
@@ -1684,7 +1684,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Não vendeu ou em branco',
         blocos: [
           { texto: 'Não vendeu conta como lançado: o canal fecha o dia com zero e sai da falta.' },
-          { texto: 'Em branco, o canal continua sem lançamento e aparece como falta no mês, menos hoje, que ainda está em aberto.' },
+          { texto: 'Em branco, o canal continua sem lançamento e, depois que a loja começou a lançar, aparece como falta no mês; hoje ainda está em aberto.' },
         ],
       },
       {

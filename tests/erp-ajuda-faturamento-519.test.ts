@@ -21,7 +21,8 @@ vi.mock('next/navigation', () => ({
 vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, () => {}], useFormStatus: () => ({ pending: false }) }));
 
 import { ajudaParaATela, entradaPorChave, problemasDoRegistro } from '@/lib/erp/ajuda';
-import type { PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
+import { estadoDoPonto, itemDoPonto, type PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
+import { ATRIBUTO_POR_ULTIMO, marcadosAoComecarSozinha, ordemDaSequencia, passosDaSequencia, progressoDoPasso, proximoPasso } from '@/lib/erp/ajuda-sequencia';
 import type { DiaDaLojaLido, LojaDoFaturamento, LojaNoMes, MesDoFaturamento, DiaDaLojaNoMes } from '@/lib/erp/faturamento';
 import { CANAIS_EM_ORDEM, totalizar, type CanalVenda, type GraoLido } from '@/lib/erp/faturamento-campos';
 import { navegacaoDoParceiro } from '@/lib/erp/modulos';
@@ -149,13 +150,14 @@ const ONTEM = (() => {
   return d.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
 })();
 
-function diaLido(opcoes: { fechado?: string | null } = {}): DiaDaLojaLido {
+/** `primeiroDesligado`: a loja deixou de vender na Loja, que só aparece por ter lançamento antigo (o canal fica travado). */
+function diaLido(opcoes: { fechado?: string | null; primeiroDesligado?: boolean } = {}): DiaDaLojaLido {
   const humano = { id: 'f1', origem: 'MANUAL' as const, versao: '2026-10-16T12:00:00.000Z', atualizadoEm: new Date('2026-10-16T12:00:00Z'), atualizadoPorNome: 'Gil', valorCentavos: 100_000, pedidos: 20, clientes: 20 };
   return {
     loja: VP,
     data: ONTEM,
     canais: [
-      { canal: 'LOJA', ativo: true, humano, valendo: grao(100_000, 20) },
+      { canal: 'LOJA', ativo: !opcoes.primeiroDesligado, humano, valendo: grao(100_000, 20) },
       { canal: 'IFOOD', ativo: true, humano: null, valendo: null },
     ],
     fechado: opcoes.fechado ?? null,
@@ -163,10 +165,10 @@ function diaLido(opcoes: { fechado?: string | null } = {}): DiaDaLojaLido {
   };
 }
 
-function telaDoDia(raiz: string, opcoes: { podeLancar?: boolean; fechado?: string | null } = {}) {
+function telaDoDia(raiz: string, opcoes: { podeLancar?: boolean; fechado?: string | null; primeiroDesligado?: boolean } = {}) {
   const acao = async () => null;
   return createElement(TelaDoDia, {
-    dia: diaLido({ fechado: opcoes.fechado }),
+    dia: diaLido({ fechado: opcoes.fechado, primeiroDesligado: opcoes.primeiroDesligado }),
     base: `${raiz}/faturamento`,
     acao,
     remover: () => acao,
@@ -193,6 +195,14 @@ function telaDeLancar(raiz: string) {
 
 const ancora = (h: string, ponto: string) => h.indexOf(`data-ponto="${ponto}"`);
 const quantas = (h: string, ponto: string) => h.split(`data-ponto="${ponto}"`).length - 1;
+
+/** Os botões de ponto na ordem da página, com a marca "por último" de cada um (lida da própria tag). */
+function botoes(h: string): { id: string; porUltimo: boolean }[] {
+  return Array.from(h.matchAll(/<(?:button|summary)\b[^>]*\bdata-ponto="([a-z0-9-]+)"[^>]*>/g)).map((m) => ({ id: m[1], porUltimo: m[0].includes(`${ATRIBUTO_POR_ULTIMO}=""`) }));
+}
+
+/** A sequência como o provedor monta: a ordem da página, com os "por último" no fim (a mesma regra pura). */
+const sequencia = (h: string) => passosDaSequencia(ordemDaSequencia(botoes(h).map((b) => ({ ...b, optouFora: false })), (b) => b.porUltimo), null);
 
 /** O botão do ponto está no cabeçalho do painel com este título (entre o título e o fim do cabeçalho). */
 function noCabecalho(h: string, titulo: string, ponto: string) {
@@ -239,11 +249,16 @@ describe('decisão 519 · os pontos do Faturamento no registro', () => {
     const falta = card(DONO, 'faturamento', 'falta');
     for (const t of ['até ontem', 'de quando ela começou a lançar', 'Hoje ainda está em aberto', 'dois canais no mesmo dia são duas faltas', 'Não vendeu é lançamento']) expect(falta, t).toContain(t);
     expect(card(DONO, 'faturamento-dia', 'nao-vendeu')).toContain('Não vendeu conta como lançado');
-    expect(card(DONO, 'faturamento-dia', 'nao-vendeu')).toContain('menos hoje, que ainda está em aberto');
+    expect(card(DONO, 'faturamento-dia', 'nao-vendeu')).toContain('depois que a loja começou a lançar, aparece como falta no mês; hoje ainda está em aberto');
+    expect(card(DONO, 'faturamento-lancar', 'atalhos')).toContain('Depois que a loja começou a lançar, ontem já conta como falta');
     expect(card(DONO, 'faturamento', 'integracao')).toContain('Dia com integração vale o número dela');
+    // O card de onde se digita (o dia) diz tudo o que fica fora do número, como o do mês (P2-2 da revisão).
+    for (const t of ['taxa de entrega', 'gorjeta', '10 % de serviço', 'pedido cancelado']) {
+      expect(card(DONO, 'faturamento-dia', 'numeros'), `dia: ${t}`).toContain(t);
+      expect(card(DONO, 'faturamento', 'numeros'), `mês: ${t}`).toContain(t);
+    }
     expect(card(DONO, 'faturamento-dia', 'periodo-fechado')).toContain('fotografia do DRE');
     expect(card(DONO, 'faturamento', 'volta')).toContain('abrir, voltar ou só olhar não resolve');
-    expect(card(DONO, 'faturamento-lancar', 'atalhos')).toContain('Ontem já conta como falta');
   });
 });
 
@@ -324,7 +339,7 @@ describe('decisão 519 · o texto educativo sai do corpo e mora no card (não so
     expect(soVe).toContain('Lançar é com quem tem “lançar faturamento” nesta loja.');
     // A consequência do Remover continua junto do botão (aviso antes de apagar).
     const dia = await noShell(telaDoDia('/erp'), `/erp/faturamento/${VP.id}/${ONTEM}`, DONO, PREF);
-    expect(dia).toContain('O dia volta a ficar sem lançamento neste canal.');
+    expect(dia).toContain('O dia volta a ficar sem lançamento neste canal e, se o dia já passou, conta como falta.');
     expect(dia).toContain('Não vendeu');
   });
 
@@ -360,10 +375,27 @@ describe.each(AREAS.map((a) => [a.nome, a]))('decisão 519 · âncoras na tela r
     // Integração: o botão com título, depois do calendário.
     expect(ancora(h, 'integracao')).toBeGreaterThan(h.indexOf('>Dia a dia · Vila da Penha</h2>'));
     expect(h).toContain('Integração e o que a casa digitou');
-    // Um botão por ponto, e na ordem da página: volta → tela → números → falta → integração.
+    // Um botão por ponto. Na página, a volta vem antes do título; na sequência (P2-1 da revisão), ela é o último passo.
     for (const p of ['volta', 'numeros', 'falta', 'integracao']) expect(quantas(h, p), p).toBe(1);
-    const ordem = ['volta', 'tela', 'numeros', 'falta', 'integracao'].map((p) => ancora(h, p));
-    expect([...ordem].sort((x, y) => x - y)).toEqual(ordem);
+    const naPagina = botoes(h).map((b) => b.id);
+    expect(naPagina).toEqual(['volta', 'tela', 'numeros', 'falta', 'integracao']);
+    expect(botoes(h).filter((b) => b.porUltimo).map((b) => b.id)).toEqual(['volta']);
+    expect(sequencia(h)).toEqual(['tela', 'numeros', 'falta', 'integracao', 'volta']);
+  });
+
+  it('quem já viu a tela, os números e a falta e chega pela Home: a sequência sozinha abre na volta, o último passo, e fechar conclui', async () => {
+    const h = await noShell(telaDoMes(raiz, { comVolta: true }), `${raiz}/faturamento`, alcance, preferencia);
+    const ordem = sequencia(h).map((id) => `faturamento.${id}`);
+    const HOJE = 20_000;
+    const primeiroElegivel = (p: PreferenciaDeAjuda) => ordem.find((id) => estadoDoPonto(id, p, HOJE) === 'elegivel');
+    // 1ª visita: começa pela tela, não pela saída.
+    expect(primeiroElegivel(PREF)).toBe('faturamento.tela');
+    // Já viu os outros (entrando direto, ontem): só a volta é nova; ela não repete os outros passos.
+    const viu = { ...PREF, pontos: ['tela', 'numeros', 'falta'].map((id) => itemDoPonto(`faturamento.${id}`, HOJE - 1)) };
+    expect(primeiroElegivel(viu)).toBe('faturamento.volta');
+    expect(progressoDoPasso(ordem, 'faturamento.volta')).toEqual({ n: 4, de: 4 });
+    expect(proximoPasso(ordem, ordem, 'faturamento.volta')).toBeNull();
+    expect(marcadosAoComecarSozinha(ordem, 'faturamento.volta')).toEqual(['faturamento.volta']);
   });
 
   it('mês da rede, sem volta e sem integração: a falta no cabeçalho de "Por loja"; volta e integração nem aparecem', async () => {
@@ -389,6 +421,29 @@ describe.each(AREAS.map((a) => [a.nome, a]))('decisão 519 · âncoras na tela r
     for (const p of ['numeros', 'nao-vendeu']) foraDeFieldset(h, p);
     // A caixa diz o canal a quem usa leitor de tela (fora do grupo do canal agora).
     expect(h).toMatch(/Não vendeu<span class="sr-only">: Loja<\/span>/);
+  });
+
+  it('dia com o primeiro canal desligado: os botões vão para o primeiro canal ativo; a caixa do desligado trava sozinha; caixas dentro do formulário', async () => {
+    const h = await noShell(telaDoDia(raiz, { primeiroDesligado: true }), `${raiz}/faturamento/${VP.id}/${ONTEM}`, alcance, preferencia);
+    expect(h).toContain('Canal desligado na loja');
+    noCabecalho(h, 'iFood', 'numeros');
+    expect(quantas(h, 'numeros')).toBe(1);
+    expect(quantas(h, 'nao-vendeu')).toBe(1);
+    expect(ancora(h, 'nao-vendeu')).toBeGreaterThan(h.indexOf('name="naoVendeu_IFOOD"'));
+    // Quem lança: a caixa do canal desligado trava (o canal não se edita), a do ativo não.
+    expect(h).toMatch(/<input type="checkbox" name="naoVendeu_LOJA" disabled=""/);
+    expect(h).not.toMatch(/<input type="checkbox" name="naoVendeu_IFOOD" disabled=""/);
+    // As duas caixas continuam no formulário de salvar o dia (fora do fieldset, dentro do <form> que tem "Salvar o dia").
+    for (const c of ['LOJA', 'IFOOD']) {
+      const i = h.indexOf(`name="naoVendeu_${c}"`);
+      const form = h.lastIndexOf('<form', i);
+      const fim = h.indexOf('</form>', form);
+      expect(form > -1 && i < fim, `caixa de ${c} dentro de um formulário`).toBe(true);
+      expect(h.slice(form, fim), `o formulário da caixa de ${c} é o de salvar o dia`).toContain('Salvar o dia');
+    }
+    // Remover o canal que a loja não vende mais não cria falta: a consequência não promete o que não acontece.
+    expect(h).toContain('O dia volta a ficar sem lançamento neste canal. O que estava');
+    expect(h).not.toContain('se o dia já passou, conta como falta');
   });
 
   it('dia de período fechado (só consulta): o porquê logo abaixo do aviso; os botões abrem, fora do bloco travado; sem Remover', async () => {

@@ -32,6 +32,18 @@ export function passosDaSequencia(visiveis: readonly PontoNaTela[], manter: stri
   return passos;
 }
 
+/** Marca, no botão do ponto, que ele entra no fim da sequência (decisão 519). */
+export const ATRIBUTO_POR_ULTIMO = 'data-ponto-por-ultimo';
+
+/**
+ * A ordem da sequência (decisão 519): a da página, com os pontos marcados "por último" no fim (entre eles, a ordem da página).
+ * É para o ponto que mora no topo e fala de sair da tela, como "Voltar para o início": ele não abre a sequência antes do card
+ * da tela, e quem já viu os outros passos começa por ele sem repetir os demais (fechar conclui).
+ */
+export function ordemDaSequencia<T>(naOrdemDaPagina: readonly T[], porUltimo: (p: T) => boolean): T[] {
+  return [...naOrdemDaPagina.filter((p) => !porUltimo(p)), ...naOrdemDaPagina.filter((p) => porUltimo(p))];
+}
+
 /**
  * A próxima etapa depois de `atual`. `passos` é a sequência de agora; `anterior` é a sequência de quando a etapa atual abriu
  * (para achar o lugar quando o alvo da etapa atual sumiu). Sem próxima: null (fechar conclui).

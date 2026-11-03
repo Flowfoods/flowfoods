@@ -331,8 +331,9 @@ export function TelaDoMes({
       {volta && (
         <div className="flex items-center gap-1">
           <Voltar href={volta.href} recarregar>{`Voltar para ${volta.rotulo}`}</Voltar>
-          {/* Decisão 519: o que a volta faz com o aviso do início (abrir ou voltar não resolve). */}
-          <PontoDeAjuda ponto="volta" className="-my-3 sm:-my-1.5" />
+          {/* Decisão 519: o que a volta faz com o aviso do início (abrir ou voltar não resolve). O botão fica junto do link, mas o
+              card é o último da sequência: ela começa pela tela, não pela saída. */}
+          <PontoDeAjuda ponto="volta" porUltimo className="-my-3 sm:-my-1.5" />
         </div>
       )}
       <PageHeader

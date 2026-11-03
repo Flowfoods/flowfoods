@@ -6,7 +6,9 @@
 
 import type { ReactNode } from 'react';
 
-export const ROTULO = 'mb-1.5 block text-[13px] font-medium text-texto';
+/** Rótulo de campo numa linha com outra peça ao lado (o botão de ajuda): sem a margem de baixo, que fica na linha. */
+export const ROTULO_EM_LINHA = 'block text-[13px] font-medium text-texto';
+export const ROTULO = `mb-1.5 ${ROTULO_EM_LINHA}`;
 export const CAMPO =
   'ff-transicao block min-h-11 w-full rounded-[7px] border border-linha-forte bg-campo px-3 py-2 text-sm text-texto placeholder:text-suave/70 hover:border-texto/30 disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-erro sm:min-h-[42px]';
 /** Caixa de seleção nativa (checkbox/radio) na cor da ação. */

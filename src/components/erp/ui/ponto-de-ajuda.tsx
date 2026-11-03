@@ -79,8 +79,23 @@ export function PainelComPonto({
 /**
  * `alvo` (decisão 480): o id da região que o ponto explica (o campo, os botões de escolha). Com ela, o card abre deixando a
  * região à vista acima dele, e tocar dentro dela não encerra a sequência (é fazer o que o card pede).
+ *
+ * `porUltimo` (decisão 519): o botão continua onde está, mas o ponto entra no fim da sequência (`ordemDaSequencia`). É para o
+ * ponto do topo que fala de sair da tela, como a volta para o início.
  */
-export function PontoDeAjuda({ ponto, className = '', comRotulo = false, alvo }: { ponto: string; className?: string; comRotulo?: boolean; alvo?: string }) {
+export function PontoDeAjuda({
+  ponto,
+  className = '',
+  comRotulo = false,
+  alvo,
+  porUltimo = false,
+}: {
+  ponto: string;
+  className?: string;
+  comRotulo?: boolean;
+  alvo?: string;
+  porUltimo?: boolean;
+}) {
   const { tem, titulo, ativo, abrir, registrar, chave } = usePontos();
   const botao = useRef<HTMLButtonElement>(null);
   // Sem JavaScript o botão não abriria nada: nasce escondido e aparece depois de montar.
@@ -107,6 +122,7 @@ export function PontoDeAjuda({ ponto, className = '', comRotulo = false, alvo }:
         data-ponto={ponto}
         data-ponto-ativo={aberto ? '' : undefined}
         data-alvo={alvo}
+        data-ponto-por-ultimo={porUltimo ? '' : undefined}
         onClick={(e) => abrir(ponto, e.currentTarget)}
         className={`ff-transicao inline-flex min-h-11 items-center gap-2 rounded-[5px] text-left text-[13px] font-medium text-suave hover:text-texto sm:min-h-8 ${className}`}
       >
@@ -132,6 +148,7 @@ export function PontoDeAjuda({ ponto, className = '', comRotulo = false, alvo }:
       data-ponto={ponto}
       data-ponto-ativo={aberto ? '' : undefined}
       data-alvo={alvo}
+      data-ponto-por-ultimo={porUltimo ? '' : undefined}
       onClick={(e) => abrir(ponto, e.currentTarget)}
       className={`ff-transicao inline-grid h-11 w-11 shrink-0 place-items-center rounded-full align-middle text-suave hover:text-texto sm:h-7 sm:w-7 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 ${className}`}
     >

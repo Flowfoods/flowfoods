@@ -46,7 +46,16 @@
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type FormEvent, type ReactNode, type RefObject } from 'react';
 import { X } from 'lucide-react';
 import { estadoDoPonto, itemDoPonto, PONTO_DA_TELA, type PontoParaATela, type PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
-import { marcadosAoComecarSozinha, passosDaSequencia, pontosComOQueAAbaGravou, progressoDoPasso, proximoPasso, type PontoNaTela } from '@/lib/erp/ajuda-sequencia';
+import {
+  ATRIBUTO_POR_ULTIMO,
+  marcadosAoComecarSozinha,
+  ordemDaSequencia,
+  passosDaSequencia,
+  pontosComOQueAAbaGravou,
+  progressoDoPasso,
+  proximoPasso,
+  type PontoNaTela,
+} from '@/lib/erp/ajuda-sequencia';
 import { classeDeBotao } from '../ui/estilos';
 import { Selo } from '../ui/superficies';
 import type { AjudaDoShell } from './tipos';
@@ -165,14 +174,18 @@ export function ProvedorDosPontos({
     [preferencia, gravados],
   );
 
-  /** Os pontos com botão visível agora, na ordem da página, com o "não mostrar novamente" de cada um. */
+  /**
+   * Os pontos com botão visível agora, na ordem da página, com o "não mostrar novamente" de cada um. Os marcados "por último"
+   * (decisão 519, como a volta para o início) vão para o fim: a sequência começa pela tela, não pela saída.
+   */
   const visiveisNaOrdem = useCallback((): (PontoNaTela & { el: HTMLElement })[] => {
     const nunca = new Set((preferenciaComGravados?.pontos ?? []).filter((i) => i.endsWith('=x')).map((i) => i.slice(0, -2)));
-    return Array.from(registrados.current.entries())
+    const naPagina = Array.from(registrados.current.entries())
       .filter(([id]) => porId.has(id))
       .map(([id, els]) => ({ id, el: primeiroVisivel(els), optouFora: id === idDaTela ? !telaPendente : nunca.has(id) }))
       .filter((c): c is PontoNaTela & { el: HTMLElement } => c.el !== null)
       .sort((a, b) => (a.el.compareDocumentPosition(b.el) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1));
+    return ordemDaSequencia(naPagina, (c) => c.el.hasAttribute(ATRIBUTO_POR_ULTIMO));
   }, [porId, preferenciaComGravados, idDaTela, telaPendente]);
 
   /**

@@ -53,7 +53,7 @@ function BlocoDoCanal({
   erros: ErrosDoCanal;
   somenteLeitura: boolean;
   aoMudar: () => void;
-  /** Decisão 519: o primeiro bloco leva os pontos "numeros" e "nao-vendeu" (um botão por ponto na tela, não um por canal). */
+  /** Decisão 519: o primeiro canal ativo leva os pontos "numeros" e "nao-vendeu" (um botão por ponto na tela, não um por canal). */
   comAjuda: boolean;
 }) {
   const [v, setV] = useState(c.inicial);
@@ -210,6 +210,8 @@ export function FormDoDia({
   const [estado, enviar] = useFormState<EstadoDoDia, FormData>(acao, null);
   const saida = useAvisoDeSaida(estado);
   const travado = somenteLeitura || !!bloqueio || !!fechado;
+  // Decisão 519: os pontos ficam no primeiro canal que a loja vende (canal desligado só aparece porque tem lançamento antigo).
+  const comAjuda = (canais.find((c) => !c.desligado) ?? canais[0])?.canal;
   return (
     <form action={enviar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <ErroGeralDoDia estado={estado} recarregar={voltar} />
@@ -219,8 +221,8 @@ export function FormDoDia({
           {estado.erros.data}
         </p>
       )}
-      {canais.map((c, i) => (
-        <BlocoDoCanal key={c.canal} c={c} erros={estado?.porCanal[c.canal] ?? {}} somenteLeitura={travado} aoMudar={saida.aoMudar} comAjuda={i === 0} />
+      {canais.map((c) => (
+        <BlocoDoCanal key={c.canal} c={c} erros={estado?.porCanal[c.canal] ?? {}} somenteLeitura={travado} aoMudar={saida.aoMudar} comAjuda={c.canal === comAjuda} />
       ))}
       {!travado && (
         <div data-barra-fixa className="sticky bottom-0 z-20 -mx-4 flex flex-col gap-2 border-t border-linha bg-fundo px-4 py-3 sm:-mx-6 sm:flex-row sm:justify-end sm:px-6 lg:-mx-8 lg:px-8">
@@ -237,7 +239,22 @@ export function FormDoDia({
 }
 
 /** Remover o lançamento de um canal (loja ou dia errado). Motivo obrigatório; o antes fica no histórico. */
-export function FormRemover({ acao, rotulo, versao, voltar, volta }: { acao: AcaoDoDia; rotulo: string; versao: string; voltar: string; volta?: string }) {
+export function FormRemover({
+  acao,
+  rotulo,
+  versao,
+  voltar,
+  volta,
+  contaComoFalta,
+}: {
+  acao: AcaoDoDia;
+  rotulo: string;
+  versao: string;
+  voltar: string;
+  volta?: string;
+  /** Decisão 519: a loja está ativa e vende neste canal, então o dia sem lançamento vira falta depois que passa. */
+  contaComoFalta: boolean;
+}) {
   const [estado, enviar] = useFormState<EstadoDoDia, FormData>(acao, null);
   const erro = estado?.porCanal && Object.values(estado.porCanal)[0]?.geral;
   const id = `remover-${rotulo.toLowerCase().replace(/[^a-z]/g, '')}`;
@@ -258,7 +275,10 @@ export function FormRemover({ acao, rotulo, versao, voltar, volta }: { acao: Aca
           <input id={id} name="motivo" required minLength={3} maxLength={200} autoComplete="off" aria-invalid={!!erro} aria-describedby={`${id}-erro`} className={CAMPO} />
           <Erro id={`${id}-erro`} texto={erro || undefined} />
         </div>
-        <p className="text-[12px] text-suave">O dia volta a ficar sem lançamento neste canal. O que estava lançado e o motivo ficam em Alterações deste dia.</p>
+        <p className="text-[12px] text-suave">
+          {contaComoFalta ? 'O dia volta a ficar sem lançamento neste canal e, se o dia já passou, conta como falta.' : 'O dia volta a ficar sem lançamento neste canal.'} O que estava
+          lançado e o motivo ficam em Alterações deste dia.
+        </p>
         <BotaoEnviar variante="perigo" pendente="Removendo…">
           Remover lançamento
         </BotaoEnviar>

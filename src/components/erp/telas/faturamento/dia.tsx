@@ -131,7 +131,15 @@ export function TelaDoDia({
         >
           <div className="space-y-3">
             {removiveis.map((c) => (
-              <FormRemover key={c.canal} acao={remover(c.canal)} rotulo={CANAIS[c.canal].rotulo} versao={c.humano!.versao} voltar={voltar} volta={volta?.href} />
+              <FormRemover
+                key={c.canal}
+                acao={remover(c.canal)}
+                rotulo={CANAIS[c.canal].rotulo}
+                versao={c.humano!.versao}
+                voltar={voltar}
+                volta={volta?.href}
+                contaComoFalta={c.ativo && dia.loja.ativa}
+              />
             ))}
           </div>
         </PainelComPonto>

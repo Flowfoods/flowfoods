@@ -183,6 +183,9 @@ describe.skipIf(!URL_TESTE)('Decisão 519 · pontos de ajuda do Faturamento pela
       expect(h, area.nome).toContain('data-ajuda-tela="faturamento"');
       expect(h, area.nome).toContain('2 lançamentos faltando neste mês.');
       expect(ancora(h, 'volta'), area.nome).toBeGreaterThan(h.indexOf('>Voltar para o início</a>'));
+      // A volta é o último passo da sequência (o botão fica junto do link, com a marca "por último").
+      expect(h, area.nome).toMatch(/data-ponto="volta"[^>]*data-ponto-por-ultimo=""/);
+      expect((h.match(/data-ponto-por-ultimo=""/g) ?? []).length, area.nome).toBe(1);
       expect(noCabecalho(h, 'Por canal', 'numeros'), area.nome).toBe(true);
       expect(noCabecalho(h, 'Dia a dia · Vila da Penha', 'falta'), area.nome).toBe(true);
       expect(h, area.nome).toContain('Lançando desde 01/10/2026.');

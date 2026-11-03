@@ -7,7 +7,7 @@
 
 import Link from 'next/link';
 import { CampoData } from '../../ui/campo-data';
-import { CAMPO, ROTULO } from '../../ui/campos';
+import { CAMPO, ROTULO_EM_LINHA } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { PageHeader } from '../../ui/cabecalho';
 import { Painel, Vazio } from '../../ui/superficies';
@@ -57,7 +57,7 @@ export function TelaEscolherODia({
               <div>
                 {/* Decisão 519: o que a aula não diz fica no card, junto do campo. */}
                 <div className="mb-1.5 flex items-center gap-1">
-                  <label htmlFor="loja" className={ROTULO.replace('mb-1.5 ', '')}>
+                  <label htmlFor="loja" className={ROTULO_EM_LINHA}>
                     Loja
                   </label>
                   <PontoDeAjuda ponto="loja" className="-my-3 sm:-my-1.5" />
@@ -75,7 +75,7 @@ export function TelaEscolherODia({
               </div>
               <div>
                 <div className="mb-1.5 flex items-center gap-1">
-                  <label htmlFor="data" className={ROTULO.replace('mb-1.5 ', '')}>
+                  <label htmlFor="data" className={ROTULO_EM_LINHA}>
                     Data
                   </label>
                   <PontoDeAjuda ponto="data" className="-my-3 sm:-my-1.5" />
