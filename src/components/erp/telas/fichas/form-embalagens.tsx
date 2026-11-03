@@ -14,16 +14,18 @@ import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFormState } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import type { EmbalagemDoFormulario } from '@/lib/erp/canais';
-import { CANAIS, CANAIS_COM_EMBALAGEM, chaveDaEmbalagem, LIMITES_DO_CANAL, type CanalComEmbalagem } from '@/lib/erp/canal-campos';
-import { custoDoUso, custoPorUnidade, escalaDaSigla, formatarFracao, lerQuantidadeNa, SIGLAS_DIGITAVEIS, somar, ZERO, type Fracao } from '@/lib/erp/unidades';
+import { CANAIS, CANAIS_COM_EMBALAGEM, chaveDaEmbalagem, embalagensTambemNaReceita, lerEmbalagens, LIMITES_DO_CANAL, type CanalComEmbalagem, type EmbalagemDoCadastro } from '@/lib/erp/canal-campos';
+import { contaDoSugeridoPorCmv, porcentagemDoCmv, STATUS_DO_CMV } from '@/lib/erp/cmv-produto-campos';
+import { custoDoUso, custoPorUnidade, escalaDaSigla, formatarDinheiro, formatarFracao, formatarPontosBase, lerQuantidadeNa, SIGLAS_DIGITAVEIS, somar, ZERO, type Fracao } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
-import { Painel } from '../../ui/superficies';
+import { Painel, Selo } from '../../ui/superficies';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, ResumoDeErros, useAvisoDeSaida } from '../cadastro/erros';
 import { AvisoDeRascunho, AvisoDeRascunhoVelho, guardarRascunho, useRascunhoDaTela } from '../cadastro/rascunho';
 import { AtalhoNovoInsumo, AvisoInsumoCriado } from '../insumos/atalho-novo-insumo';
+import { contaDasEmbalagensNaTela, type ContaDasEmbalagens, type EmbalagemNaTela, type PrecosDasEmbalagens } from './conta-das-embalagens';
 
 export interface LinhaDaEmbalagem {
   canal: CanalComEmbalagem;
@@ -58,6 +60,7 @@ export function FormEmbalagens(props: PropsDoFormEmbalagens) {
         key={r.valores === undefined ? 'carregando' : descartou ? 'descartado' : 'pronto'}
       {...props}
       inicial={linhas}
+      gravadas={props.inicial}
       chaveDoRascunho={r.chave}
       avisos={
         <>
@@ -92,6 +95,10 @@ type PropsDoFormEmbalagens = {
   bloqueio: string | null;
   /** Link para cadastrar insumo (só para quem pode). */
   novoInsumo?: string;
+  /** Meta, preço escolhido e oferta de cada canal: sem isso, a tela não mostra sugestão nem CMV (compatível). */
+  precos?: PrecosDasEmbalagens | null;
+  /** Insumos que são itens diretos da receita salva: embalagem repetida no canal ganha um aviso (sem bloquear). */
+  naReceita?: readonly string[];
 };
 
 function FormEmbalagensBase({
@@ -106,9 +113,12 @@ function FormEmbalagensBase({
   podeConferirPrecos,
   bloqueio,
   novoInsumo,
+  precos,
+  gravadas,
+  naReceita,
   chaveDoRascunho,
   avisos,
-}: PropsDoFormEmbalagens & { chaveDoRascunho: string; avisos: ReactNode }) {
+}: PropsDoFormEmbalagens & { chaveDoRascunho: string; avisos: ReactNode; gravadas: readonly LinhaDaEmbalagem[] }) {
   const formRef = useRef<HTMLFormElement>(null);
   const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida(estado);
@@ -118,6 +128,12 @@ function FormEmbalagensBase({
   const porId = useMemo(() => new Map(opcoes.map((o) => [o.id, o])), [opcoes]);
   const custoDaPorcao: Fracao = useMemo(() => ({ num: BigInt(porcao.num), den: BigInt(porcao.den) }), [porcao]);
   const ativas = opcoes.filter((o) => o.embalagem && o.ativo);
+  // A mesma regra que o servidor aplica ao salvar (tipo, ativa, repetida, limites): linha que ele recusaria não acende farol.
+  const cadastro = useMemo(
+    () => new Map<string, EmbalagemDoCadastro>(opcoes.map((o) => [o.id, { id: o.id, nome: o.nome, unidade: o.unidade, tipo: o.embalagem ? 'EMBALAGEM' : 'OUTRO', ativo: o.ativo }])),
+    [opcoes],
+  );
+  const jaNoCanal = useMemo(() => new Set(gravadas.filter((l) => l.insumoId).map((l) => `${l.canal}:${l.insumoId}`)), [gravadas]);
 
   function mudar(chave: number, m: Partial<LinhaDaEmbalagem>) {
     setLinhas((ls) =>
@@ -143,15 +159,16 @@ function FormEmbalagensBase({
     chave: proxima.current++,
   });
 
-  /** Prévia de uma linha: o custo exato dela (null = sem preço ou número inválido). */
-  function contaDaLinha(l: LinhaDaEmbalagem): { valor: Fracao | null; semPreco: boolean } | null {
+  /** Prévia de uma linha: o custo exato dela (null = sem preço) e o que entra na conta do canal; null = linha incompleta. */
+  function contaDaLinha(l: LinhaDaEmbalagem): { valor: Fracao | null; semPreco: boolean; naTela: EmbalagemNaTela } | null {
     const o = porId.get(l.insumoId);
     if (!o) return null;
     const escala = escalaDaSigla(l.unidade, o.unidade);
     const q = escala ? lerQuantidadeNa(l.quantidade.trim(), o.unidade, escala) : null;
     if (!q) return null;
-    if (!o.custo) return { valor: null, semPreco: true };
-    return { valor: custoDoUso(custoPorUnidade(o.custo), q), semPreco: false };
+    const naTela: EmbalagemNaTela = { nome: o.nome, unidade: o.unidade, quantidadeMilesimos: q, custo: o.custo };
+    if (!o.custo) return { valor: null, semPreco: true, naTela };
+    return { valor: custoDoUso(custoPorUnidade(o.custo), q), semPreco: false, naTela };
   }
 
   // Erros do servidor vêm pela posição da linha PREENCHIDA no canal (linha em branco não vai).
@@ -164,6 +181,13 @@ function FormEmbalagensBase({
     guardarRascunho(chaveDoRascunho, linhas.map(({ chave: _c, ...l }) => l), impressao);
   }
   const idBase = 'embalagens';
+  const regraDoServidor = lerEmbalagens(
+    linhas.filter((l) => l.insumoId || l.quantidade.trim()),
+    cadastro,
+    jaNoCanal,
+  );
+  const recusaDoCanal = (canal: CanalComEmbalagem): string | null =>
+    regraDoServidor.ok ? null : (Object.entries(regraDoServidor.erros).find(([k]) => k === `emb-${canal}` || k.startsWith(`emb-${canal}-`))?.[1] ?? null);
   const rotuloDoErro = (campo: string) => {
     const m = /^emb-(DELIVERY_PROPRIO|IFOOD)-(\d+)$/.exec(campo);
     return m ? `${CANAIS[m[1] as CanalComEmbalagem].rotulo}, linha ${Number(m[2]) + 1}` : campo;
@@ -182,14 +206,21 @@ function FormEmbalagensBase({
           let total = ZERO;
           let semPreco = 0;
           let linhasPendentes = 0;
+          const naTela: EmbalagemNaTela[] = [];
           for (const l of doCanal) {
             const c = contaDaLinha(l);
             if (c?.valor) total = somar(total, c.valor);
             if (c?.semPreco) semPreco++;
+            if (c) naTela.push(c.naTela);
             if (!c && (l.insumoId || l.quantidade.trim())) linhasPendentes++;
           }
-          const incompleto = faltaPreco.length > 0 || semPreco > 0 || linhasPendentes > 0;
+          // Linha que o servidor recusaria (repetida, acima do limite…): nenhum total, nem parcial, conta com ela.
+          const recusa = linhasPendentes > 0 ? null : recusaDoCanal(canal);
+          const incompleto = faltaPreco.length > 0 || semPreco > 0 || linhasPendentes > 0 || recusa !== null;
           const fisico = somar(custoDaPorcao, total);
+          const repetidas = naReceita
+            ? embalagensTambemNaReceita(naReceita, doCanal.flatMap((l) => (porId.get(l.insumoId) ? [{ insumoId: l.insumoId, nome: porId.get(l.insumoId)!.nome }] : [])))
+            : [];
           const delivery = linhas.filter((l) => l.canal === 'DELIVERY_PROPRIO' && l.insumoId);
           return (
             <Painel
@@ -198,8 +229,8 @@ function FormEmbalagensBase({
               subtitulo={AJUDA_DO_CANAL[canal]}
               acessorio={
                 <span className="shrink-0 text-right text-[12px] tabular-nums text-suave">
-                  <span className="block text-[13px] font-semibold text-texto">{total.num === 0n && (semPreco > 0 || linhasPendentes > 0) ? '—' : formatarFracao(total)}</span>
-                  {semPreco > 0 || linhasPendentes > 0 ? <span className="text-atencao">Embalagens incompletas</span> : 'por porção'}
+                  <span className="block text-[13px] font-semibold text-texto">{recusa || (total.num === 0n && (semPreco > 0 || linhasPendentes > 0)) ? '—' : formatarFracao(total)}</span>
+                  {recusa ? <span className="text-atencao">Corrija as embalagens</span> : semPreco > 0 || linhasPendentes > 0 ? <span className="text-atencao">Embalagens incompletas</span> : 'por porção'}
                 </span>
               }
             >
@@ -331,12 +362,25 @@ function FormEmbalagensBase({
                 )}
               </div>
               <p className="mt-3 text-[12px] tabular-nums text-suave">
-                {incompleto ? 'Custo físico parcial conhecido' : 'Custo físico da receita e embalagens'}: {incompleto && fisico.num === 0n ? '—' : `${formatarFracao(fisico)} por porção`}
+                {incompleto ? 'Custo físico parcial conhecido' : 'Custo físico da receita e embalagens'}: {recusa || (incompleto && fisico.num === 0n) ? '—' : `${formatarFracao(fisico)} por porção`}
                 {canal === 'IFOOD' ? ', antes da taxa do iFood' : ''}.
               </p>
               {faltaPreco.length > 0 && <p className="mt-1 text-[12px] text-atencao">Custo da receita incompleto: falta o custo de {faltaPreco.join(', ')}.</p>}
               {semPreco > 0 && <p className="mt-1 text-[12px] text-atencao">Falta informar o custo de {semPreco} {semPreco === 1 ? 'embalagem' : 'embalagens'}.</p>}
               {linhasPendentes > 0 && <p className="mt-1 text-[12px] text-atencao">Complete as embalagens e quantidades para conferir o custo.</p>}
+              {repetidas.length > 0 && (
+                <p className="mt-1 text-[12px] text-atencao">
+                  {repetidas.map((n) => `“${n}”`).join(', ')} também {repetidas.length === 1 ? 'está' : 'estão'} na receita: se for o mesmo uso, o custo entra duas vezes no {CANAIS[canal].rotulo}. Usos diferentes do mesmo insumo podem ficar.
+                </p>
+              )}
+              {precos && (
+                <PrecoComEstasEmbalagens
+                  canal={canal}
+                  // Linha pela metade ou que o servidor recusaria não entra na conta: em vez de um canal "completo" falso, nada.
+                  recusa={recusa}
+                  conta={linhasPendentes > 0 || recusa ? null : contaDasEmbalagensNaTela({ canal, porcao: custoDaPorcao, faltaPreco, embalagens: naTela, preco: precos[canal] })}
+                />
+              )}
             </Painel>
           );
         })}
@@ -363,5 +407,77 @@ function FormEmbalagensBase({
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
     </form>
+  );
+}
+
+const TRACO = <span className="text-suave">—</span>;
+
+/** Sugestão pela meta, com a conta por extenso; sem número quando falta custo, meta ou custo (nunca R$ 0,00). */
+function SugestaoPelaMeta({ x }: { x: ContaDasEmbalagens }) {
+  const s = x.sugerido;
+  if (s.tipo === 'incompleto') return <Selo tom="alerta">Custo incompleto</Selo>;
+  if (s.tipo === 'semMeta') return TRACO;
+  if (s.tipo === 'semCusto') return <span className="text-suave">sem custo</span>;
+  if (s.tipo === 'acimaDoLimite') return <span className="text-atencao">acima do limite</span>;
+  return (
+    <>
+      <span className="font-semibold text-texto">{formatarDinheiro(s.centavos)}</span>
+      {/* Como no detalhe: o valor acima e a conta até o "÷". */}
+      <span className="block text-[12px] text-suave">{contaDoSugeridoPorCmv(x.fisico.valor, x.metaBp!, s).replace(/ = .*$/, '')}</span>
+    </>
+  );
+}
+
+/**
+ * Embalagens → preço sem sair da tela: meta, sugestão pela meta, preço escolhido e CMV a esse preço, pela mesma conta do
+ * detalhe e com as embalagens que estão na tela. Só leitura: o preço muda no passo de preços.
+ */
+function PrecoComEstasEmbalagens({ canal, conta: x, recusa }: { canal: CanalComEmbalagem; conta: ContaDasEmbalagens | null; recusa: string | null }) {
+  const st = x ? STATUS_DO_CMV[x.status] : null;
+  return (
+    // aria-live no grupo (não no dl, que entra e sai): a passagem de "Corrija"/"Complete" para os valores também é anunciada.
+    <div role="group" aria-live="polite" aria-label={`Preço e CMV do ${CANAIS[canal].rotulo} com estas embalagens`} className="mt-3 border-t border-linha pt-3">
+      <p className="text-[12px] font-semibold uppercase tracking-wide text-suave">Com estas embalagens</p>
+      {recusa ? (
+        <p className="mt-1 text-[13px] text-suave">Corrija antes de ver o preço sugerido e o CMV: {recusa}</p>
+      ) : !x ? (
+        <p className="mt-1 text-[13px] text-suave">Complete as embalagens para ver o preço sugerido e o CMV.</p>
+      ) : !x.ofertado ? (
+        <p className="mt-1 text-[13px] text-suave">
+          Não ofertado: este prato não está marcado como vendido neste canal. As embalagens continuam configuradas; sem sugestão nem farol.
+        </p>
+      ) : (
+        <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 text-[13px] tabular-nums sm:grid-cols-4">
+          <div className="min-w-0">
+            <dt className="text-[12px] text-suave">Meta de CMV</dt>
+            <dd className="text-texto">{x.metaBp === null ? <span className="text-suave">sem meta</span> : formatarPontosBase(x.metaBp)}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[12px] text-suave">Preço sugerido</dt>
+            <dd>
+              <SugestaoPelaMeta x={x} />
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[12px] text-suave">Seu preço</dt>
+            <dd>{x.precoCentavos === null ? <span className="text-suave">não definido</span> : <span className="font-semibold text-texto">{formatarDinheiro(x.precoCentavos)}</span>}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-[12px] text-suave">CMV ao seu preço</dt>
+            <dd>
+              {x.cmvBp ? <span className="font-semibold text-texto">{porcentagemDoCmv(x.cmvBp)}</span> : TRACO}
+              <span className="mt-1 block">
+                <Selo tom={st!.tom}>{st!.rotulo}</Selo>
+              </span>
+              {x.motivo && <span className="mt-1 block whitespace-normal break-words text-[12px] text-suave">{x.motivo}</span>}
+            </dd>
+          </div>
+        </dl>
+      )}
+      <p className="mt-2 text-[12px] text-suave">
+        Prévia com o que está na tela, antes de salvar. O preço muda só no passo de preços.
+        {canal === 'IFOOD' ? ' A taxa do iFood fica fora do custo físico e do CMV.' : ''}
+      </p>
+    </div>
   );
 }

@@ -882,10 +882,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/[id]/canais'],
     titulo: 'Embalagens por canal',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'O que vai no saco em cada canal: caixa, sacola, guardanapo.' },
       { texto: 'Delivery e iFood têm listas próprias. A loja não leva embalagem.' },
+      { texto: 'Em cada canal, a sugestão pela meta de CMV e o CMV ao seu preço acompanham as embalagens na tela; o preço muda só no passo de preços.', para: ['precos.ver'] },
     ],
   },
   {
