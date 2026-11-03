@@ -8,7 +8,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { marcadosAoComecarSozinha, passosDaSequencia, pontosComOQueAAbaGravou, progressoDoPasso, proximoPasso } from '@/lib/erp/ajuda-sequencia';
+import { ATRIBUTO_POR_ULTIMO, marcadosAoComecarSozinha, ordemDaSequencia, passosDaSequencia, pontosComOQueAAbaGravou, progressoDoPasso, proximoPasso } from '@/lib/erp/ajuda-sequencia';
 import { estadoDoPonto, itemDoPonto } from '@/lib/erp/ajuda-rota';
 
 const p = (id: string, optouFora = false) => ({ id, optouFora });
@@ -145,5 +145,35 @@ describe('decisão 479 · o card', () => {
     // O lote no servidor é tudo ou nada.
     const cred = readFileSync('src/lib/erp/credenciais.ts', 'utf8');
     expect(cred.slice(cred.indexOf("mudanca.tipo === 'pontos-vistos'"), cred.indexOf("mudanca.tipo === 'ponto-visto' ||"))).toContain('db.$transaction(');
+  });
+});
+
+describe('decisão 519 · ponto "por último" (a volta para o início no fim da sequência)', () => {
+  const b = (id: string, porUltimo = false) => ({ id, optouFora: false, porUltimo });
+
+  it('a ordem é a da página, com os marcados no fim e, entre eles, na ordem da página', () => {
+    const naPagina = [b('f.volta', true), b('f.tela'), b('f.numeros'), b('f.outro', true), b('f.falta')];
+    expect(ordemDaSequencia(naPagina, (x) => x.porUltimo).map((x) => x.id)).toEqual(['f.tela', 'f.numeros', 'f.falta', 'f.volta', 'f.outro']);
+    // Sem marca: igual à página (nenhuma outra tela muda).
+    const semMarca = [b('a'), b('b'), b('c')];
+    expect(ordemDaSequencia(semMarca, (x) => x.porUltimo)).toEqual(semMarca);
+    expect(ordemDaSequencia([], () => true)).toEqual([]);
+  });
+
+  it('com a marca, a sequência começa pela tela e termina na volta; começar pela volta conclui ao fechar', () => {
+    const ordem = passosDaSequencia(ordemDaSequencia([b('f.volta', true), b('f.tela'), b('f.falta')], (x) => x.porUltimo), null);
+    expect(ordem).toEqual(['f.tela', 'f.falta', 'f.volta']);
+    expect(proximoPasso(ordem, ordem, 'f.falta')).toBe('f.volta');
+    expect(proximoPasso(ordem, ordem, 'f.volta')).toBeNull();
+    expect(progressoDoPasso(ordem, 'f.volta')).toEqual({ n: 3, de: 3 });
+    expect(marcadosAoComecarSozinha(ordem, 'f.volta')).toEqual(['f.volta']);
+  });
+
+  it('o provedor ordena por ela, lendo a marca do botão; o botão de ajuda escreve a mesma marca', () => {
+    const pontos = readFileSync('src/components/erp/shell/pontos.tsx', 'utf8');
+    expect(pontos).toMatch(/return ordemDaSequencia\(naPagina, \(c\) => c\.el\.hasAttribute\(ATRIBUTO_POR_ULTIMO\)\);/);
+    expect(ATRIBUTO_POR_ULTIMO).toBe('data-ponto-por-ultimo');
+    const botao = readFileSync('src/components/erp/ui/ponto-de-ajuda.tsx', 'utf8');
+    expect(botao.match(/data-ponto-por-ultimo=\{porUltimo \? '' : undefined\}/g)).toHaveLength(2);
   });
 });

@@ -7,7 +7,7 @@
 
 import Link from 'next/link';
 import { CampoData } from '../../ui/campo-data';
-import { CAMPO, ROTULO } from '../../ui/campos';
+import { CAMPO, ROTULO_EM_LINHA } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
 import { PageHeader } from '../../ui/cabecalho';
 import { Painel, Vazio } from '../../ui/superficies';
@@ -16,6 +16,7 @@ import { COR } from '@/lib/erp/modulos';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { comVoltaParaAHome, type VoltaParaAHome } from '@/lib/erp/volta';
 import { Voltar } from '../cadastro/partes';
+import { PontoDeAjuda } from '../../ui/ponto-de-ajuda';
 
 export function TelaEscolherODia({
   base,
@@ -54,9 +55,13 @@ export function TelaEscolherODia({
             <form method="get" action={`${base}/lancar`} className="space-y-4">
               {volta && <input type="hidden" name="volta" value={volta.href} />}
               <div>
-                <label htmlFor="loja" className={ROTULO}>
-                  Loja
-                </label>
+                {/* Decisão 519: o que a aula não diz fica no card, junto do campo. */}
+                <div className="mb-1.5 flex items-center gap-1">
+                  <label htmlFor="loja" className={ROTULO_EM_LINHA}>
+                    Loja
+                  </label>
+                  <PontoDeAjuda ponto="loja" className="-my-3 sm:-my-1.5" />
+                </div>
                 <select id="loja" name="loja" defaultValue={lojaSugerida ?? ''} required className={CAMPO}>
                   <option value="" disabled>
                     Escolha a loja
@@ -69,9 +74,12 @@ export function TelaEscolherODia({
                 </select>
               </div>
               <div>
-                <label htmlFor="data" className={ROTULO}>
-                  Data
-                </label>
+                <div className="mb-1.5 flex items-center gap-1">
+                  <label htmlFor="data" className={ROTULO_EM_LINHA}>
+                    Data
+                  </label>
+                  <PontoDeAjuda ponto="data" className="-my-3 sm:-my-1.5" />
+                </div>
                 <CampoData id="data" name="data" defaultValue={dataDigitada ?? formatarData(hoje)} required aria-describedby="data-erro" />
                 {erro && (
                   <p id="data-erro" role="alert" className="mt-1.5 text-[13px] text-erro">
@@ -84,7 +92,7 @@ export function TelaEscolherODia({
               </button>
             </form>
           </Painel>
-          <Painel titulo="Atalhos" subtitulo="Hoje e ontem, direto na loja." semRespiro>
+          <Painel titulo="Atalhos" subtitulo="Hoje e ontem, direto na loja." semRespiro acessorio={<PontoDeAjuda ponto="atalhos" />}>
             <ul className="divide-y divide-linha">
               {lojas.map((l) => (
                 <li key={l.id} className="flex min-h-12 flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2 sm:px-5">
