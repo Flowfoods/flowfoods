@@ -71,8 +71,9 @@ export function TelaFormNota({
           nota ? (
             `${contexto} · ${nota.rotulo} · ${nota.fornecedorNome}`
           ) : (
-            // Decisão 522: o que a data decide no custo (a mais nova vale) mora no ponto "data"; sem ele, a frase de antes.
-            <TextoComPonto ponto="data" comPonto={contexto} semPonto={`${contexto} · o custo dos insumos passa a ser o desta compra`} />
+            // Decisão 522: o que a data decide no custo (a mais nova vale) mora no ponto "data"; sem ele, a frase no corpo. Decisão 523:
+            // a frase não promete o custo novo para todo insumo (só vale onde a nota é a compra mais recente dele).
+            <TextoComPonto ponto="data" comPonto={contexto} semPonto={`${contexto} · se esta for a compra mais recente do insumo, o custo dele passa a ser o dela`} />
           )
         }
       />

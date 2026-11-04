@@ -517,25 +517,26 @@ export async function lojasParaLancar(tx: ClienteDoParceiro, alcance: Alcance) {
 /**
  * Decisão 523: quem recebe o custo de agora dos insumos no formulário de nota e o que a nota muda nele e nas fichas na prévia. É R$
  * de compra, então a régua é `compras.ver` (decisões 390, 459 e 460; `insumos.ver` não serve de régua e lançar nota não dá custo).
- * Todo-ou-nada nas lojas em jogo (390): basta uma sem `compras.ver` para não ir. Sem loja em jogo, vale a permissão.
+ * Todo-ou-nada nas lojas em jogo (390), defensivo: hoje a permissão vale para o acesso inteiro e as lojas em jogo já vêm do acesso
+ * (`lojasParaLancar`, `lerNota`, `notaVisivel`), então a régua equivale a `compras.ver`.
  */
 export function veCustoDeCompra(alcance: Alcance, lojaIds: readonly string[]): boolean {
   return pode(alcance, 'compras.ver') && lojaIds.every((lojaId) => pode(alcance, 'compras.ver', { lojaId }));
 }
 
-/** O custo de agora de um insumo, para quem vê custo de compra. */
-interface CustoDeAgora {
-  /** Custo de agora (última compra ou preço cadastrado), exato; null = sem preço. */
-  custo: CustoExato | null;
-  /** Data da última compra lançada ("2026-10-14"): a nota de data anterior não muda o custo. */
-  ultimaCompraEm: string | null;
-}
-
 /**
- * Um insumo do seletor do formulário de nota. Decisão 523: para quem não vê custo de compra (`veCustoDeCompra`), `custo` e
- * `ultimaCompraEm` NÃO EXISTEM no objeto (nem como `undefined`): não saem do servidor, nem no que a página entrega ao navegador.
+ * Um insumo do seletor do formulário de nota. Decisão 523: para quem não vê custo de compra (`veCustoDeCompra`), `custo` NÃO EXISTE
+ * no objeto (nem como `undefined`): não sai do servidor, nem no que a página entrega ao navegador. A data da última compra não vai
+ * para ninguém (nenhuma tela a usa, e ela diz que houve compra em loja que a pessoa pode não ver).
  */
-export type InsumoDoFormularioDeNota = InsumoDaCompra & (CustoDeAgora | { custo?: never; ultimaCompraEm?: never });
+export type InsumoDoFormularioDeNota = InsumoDaCompra &
+  (
+    | {
+        /** Custo de agora (última compra da rede, de qualquer loja, ou preço cadastrado), exato; null = sem preço. */
+        custo: CustoExato | null;
+      }
+    | { custo?: never }
+  );
 
 export interface FormularioDeNota {
   lojas: { id: string; nome: string; ativa: boolean }[];
@@ -565,20 +566,18 @@ export async function dadosDoFormularioDeNota(
       orderBy: { nome: 'asc' },
       select: SELECAO_DO_INSUMO_DA_COMPRA,
     });
-    // Decisão 523: sem `compras.ver` nas lojas do formulário, as compras nem são lidas e o insumo vai sem custo e sem data.
+    // Decisão 523: sem `compras.ver` nas lojas do formulário, as compras nem são lidas e o insumo vai sem custo.
     if (!veCustoDeCompra(alcance, lojas.map((l) => l.id))) return { lojas, fornecedores, insumos: lidos.map(paraCompra) };
     const compras = await ultimasCompras(
       tx,
       lidos.map((i) => i.id),
     );
-    const insumos = lidos.map((i): InsumoDoFormularioDeNota => {
-      const c = compras.get(i.id);
-      return {
+    const insumos = lidos.map(
+      (i): InsumoDoFormularioDeNota => ({
         ...paraCompra(i),
-        custo: c?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
-        ultimaCompraEm: c?.entradaEm ?? null,
-      };
-    });
+        custo: compras.get(i.id)?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+      }),
+    );
     return { lojas, fornecedores, insumos };
   });
 }

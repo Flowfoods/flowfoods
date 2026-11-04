@@ -1207,11 +1207,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/nova', 'compras/[id]/editar'],
     titulo: 'Lançar nota',
-    versao: 4,
+    // Decisão 523 (versão 5): a prévia só mostra o custo a quem vê compras; a aula, que é de todos, não promete o custo nela.
+    versao: 5,
     aula: [
       { texto: 'Digite o valor total de cada linha, como está na nota.' },
       { texto: 'O frete é dividido entre os itens, e a soma tem que bater com o total da nota.' },
-      { texto: '“Conferir o impacto” mostra o que muda de custo e no orçamento de compra da loja antes de lançar: passar do orçamento é aviso, a nota entra igual.' },
+      { texto: '“Conferir o impacto” mostra o que a nota faz antes de lançar, sem gravar nada: passar do orçamento de compra da loja é aviso, a nota entra igual.' },
       { texto: 'A data da nota decide o período dela: se o DRE já fechou esse período, a nota não entra nem se edita. É também essa data que põe a nota no CMV de compra do período.', para: ['compras.lancar'] },
       { texto: 'Só lance como nota o que é comida e embalagem para vender. Limpeza e descartável da operação vão como despesa, e o pagamento ao fornecedor de uma nota já lançada não é despesa: a nota já é o custo.', para: ['compras.lancar'] },
     ],
@@ -1265,12 +1266,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/[id]'],
     titulo: 'Detalhe da nota',
-    versao: 5,
+    // Decisão 523 (versão 6): editar ou cancelar só muda o custo onde a nota é (ou era) a compra mais recente do insumo.
+    versao: 6,
     aula: [
       { texto: 'A nota, o frete de cada item e o que ela fez no estoque.' },
       { texto: 'Nota que veio do XML da nota fiscal não se edita: cancele e concilie a nota fiscal de novo.', para: ['compras.lancar'] },
       { texto: 'Nota do período em curso mostra como ficou o orçamento de compra da loja: quanto ainda cabe, ou quanto passou. É só aviso.' },
-      { texto: 'Errou? Edite ou cancele com o motivo: o custo e o estoque voltam.', para: ['compras.lancar'] },
+      { texto: 'Errou? Edite ou cancele com o motivo: o que a nota pôs no estoque é corrigido por estorno, e o custo só muda nos insumos em que ela é ou era a compra mais recente.', para: ['compras.lancar'] },
       { texto: 'Nota com data em período que o DRE já fechou não se edita nem se cancela.', para: ['compras.lancar'] },
     ],
     secoes: [

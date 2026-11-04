@@ -47,7 +47,7 @@ vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } 
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
-import { cadastrarFornecedor, lancarNota, type PreviaDaNota } from '@/lib/erp/compras';
+import { cadastrarFornecedor, lancarNota, obterNota, type PreviaDaNota } from '@/lib/erp/compras';
 import { cadastrarVariante } from '@/lib/erp/variantes';
 import { cadastrarFicha } from '@/lib/erp/fichas';
 import { formatarCusto, type CustoExato } from '@/lib/erp/unidades';
@@ -107,7 +107,7 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
       ],
       nova: () => ErpLancarNotaPage(),
       editar: (id: string) => ErpEditarNotaPage({ params: { id } }),
-      conferir: (form: FormData) => acoesDoParceiro.acaoSalvarNota('', null, form),
+      conferir: (form: FormData, notaId = '') => acoesDoParceiro.acaoSalvarNota(notaId, null, form),
     },
     {
       nome: 'nível 1',
@@ -115,7 +115,7 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
       quemVe: [{ nome: 'nível 1', alcance: ALCANCE_FLOWFOODS }],
       nova: () => Nivel1LancarNotaPage({ params: { slug: A.slug } }),
       editar: (id: string) => Nivel1EditarNotaPage({ params: { slug: A.slug, id } }),
-      conferir: (form: FormData) => acoesDoNivel1.acaoSalvarNota(A.slug, '', null, form),
+      conferir: (form: FormData, notaId = '') => acoesDoNivel1.acaoSalvarNota(A.slug, notaId, null, form),
     },
   ];
   const como = (alcance: Alcance) => {
@@ -143,9 +143,14 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
     return { form: form!, json, html: sp(renderToStaticMarkup(el)) };
   }
 
-  const formDaPrevia = () => {
+  /** "Conferir" de uma nota nova (3 caixas por R$ 300,00 = R$ 20,00/kg) ou, com `editar`, da nota de 14/10 da Penha. */
+  const formDaPrevia = (editar?: { versao: string }) => {
     const f = new FormData();
-    for (const [k, v] of Object.entries({ lojaId: ids.vp, fornecedorId: ids.fornecedor, numero: '000200', serie: '1', data: '2026-10-17', frete: '', total: '300,00', intencao: 'conferir' })) f.set(k, v);
+    const campos = editar
+      ? // A nota de 14/10 com a data de hoje e R$ 300,00 + R$ 6,00: passa a ser a mais nova (R$ 20,40/kg).
+        { lojaId: ids.vp, fornecedorId: ids.fornecedor, numero: '000123', serie: '1', data: '2026-10-17', frete: '6,00', total: '306,00', versao: editar.versao }
+      : { lojaId: ids.vp, fornecedorId: ids.fornecedor, numero: '000200', serie: '1', data: '2026-10-17', frete: '', total: '300,00' };
+    for (const [k, v] of Object.entries({ ...campos, intencao: 'conferir' })) f.set(k, v);
     f.append('item_insumo', ids.cheddar);
     f.append('item_embalagem', `v:${ids.caixa}`);
     f.append('item_quantidade', '3');
@@ -230,7 +235,7 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
     }
   });
 
-  it('quem vê compras, nas duas áreas: o custo de agora e a data da última compra chegam como antes, e o Editar diz "hoje R$ 18,78/kg"', async () => {
+  it('quem vê compras, nas duas áreas: o custo de agora chega como antes (a data da última compra, a ninguém), e o Editar diz "hoje R$ 18,78/kg"', async () => {
     for (const area of AREAS()) {
       for (const p of area.quemVe) {
         const onde = `${area.nome} · ${p.nome}`;
@@ -240,9 +245,10 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
         const nova = await doNavegador(area.nova());
         const porNome = new Map(nova.form.opcoes.insumos.map((i) => [i.nome, i]));
         expect(sp(formatarCusto(porNome.get('Cheddar')!.custo as CustoExato, 'KG')), onde).toBe('R$ 18,78/kg');
-        expect(porNome.get('Cheddar')!.ultimaCompraEm, onde).toBe('2026-10-16');
         expect(sp(formatarCusto(porNome.get('Bacon')!.custo as CustoExato, 'KG')), onde).toBe('R$ 37,13/kg');
-        expect(porNome.get('Bacon')!.ultimaCompraEm, onde).toBeNull();
+        // A data da última compra não vai para ninguém (nenhuma tela usa; diria que houve compra em loja que a pessoa pode não ver).
+        for (const i of nova.form.opcoes.insumos) expect(Object.keys(i), `${onde}: ${i.nome}`).not.toContain('ultimaCompraEm');
+        expect(nova.json, onde).not.toMatch(/"ultimaCompraEm"|2026-10-16/);
 
         atual.caminho = `${area.raiz}/compras/${ids.outubro}/editar`;
         const editar = await doNavegador(area.editar(ids.outubro));
@@ -289,6 +295,35 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
       }
     }
     expect(await a.notaEntrada.count()).toBe(notas);
+  });
+
+  it('"Conferir" na edição, nas duas áreas: quem só lança recebe a prévia sem custo nem fichas; quem vê compras, o custo de antes → depois e as fichas', async () => {
+    const versao = (await obterNota(a, DONA, ids.outubro))!.versao;
+    const antes = await a.notaEntrada.findUnique({ where: { id: ids.outubro }, select: { atualizadoEm: true, totalCentavos: true } });
+    for (const area of AREAS()) {
+      for (const p of SEM_CUSTO()) {
+        const onde = `${area.nome} · ${p.nome}`;
+        como(p.alcance);
+        const r = (await area.conferir(formDaPrevia({ versao }), ids.outubro)) as NonNullable<EstadoNota>;
+        expect(r.erros, onde).toEqual({});
+        const previa = r.previa!;
+        expect([previa.veCusto, previa.custos, previa.fichas, previa.maisFichas], onde).toEqual([false, [], [], 0]);
+        expect(previa.totalCentavos, onde).toBe(30_600);
+        expect(JSON.stringify(r), onde).not.toMatch(/18,78|40,00|Molho cheddar|"antes"|"depois"|"vale"/);
+      }
+      for (const p of area.quemVe) {
+        const onde = `${area.nome} · ${p.nome}`;
+        como(p.alcance);
+        const r = (await area.conferir(formDaPrevia({ versao }), ids.outubro)) as NonNullable<EstadoNota>;
+        const previa = r.previa! as Extract<PreviaDaNota, { veCusto: true }>;
+        expect(previa.veCusto, onde).toBe(true);
+        const ched = previa.custos.find((i) => i.nome === 'Cheddar')!;
+        expect([sp(ched.antes), sp(ched.depois), ched.efeito], onde).toEqual(['R$ 18,78/kg', 'R$ 20,40/kg', 'sobe']);
+        expect(previa.fichas.map((f) => f.nome), onde).toContain('Molho cheddar');
+      }
+    }
+    // "Conferir" não grava: a nota continua como estava.
+    expect(await a.notaEntrada.findUnique({ where: { id: ids.outubro }, select: { atualizadoEm: true, totalCentavos: true } })).toEqual(antes);
   });
 
   it('o detalhe da nota (só com `compras.ver`) diz, depois de lançar, que o custo vale onde a nota é a compra mais recente', async () => {

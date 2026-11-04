@@ -26,6 +26,7 @@ import { FormNota } from '@/components/erp/telas/compras/form-nota';
 import { PreviaDoImpacto } from '@/components/erp/telas/compras/previa';
 import { fraseDaNota } from '@/components/erp/telas/compras/estado';
 import { fraseDoDocumento } from '@/components/erp/telas/compras/documentos-estado';
+import { entradaPorChave } from '@/lib/erp/ajuda';
 import { relogioDoCenario } from './relogio-do-cenario';
 
 relogioDoCenario('2026-10-17T12:00:00-03:00');
@@ -43,7 +44,7 @@ const DONO = resolverAlcance(vinculo({ perfilBase: 'DONO' }));
 const SO_LANCA = resolverAlcance(vinculo({ perfilProprio: ['compras.lancar', 'lojas.ver'] }));
 const OPERADOR_QUE_LANCA = resolverAlcance(vinculo({ perfilBase: 'OPERADOR', permissoesExtras: ['compras.lancar'] }));
 const VE_E_LANCA = resolverAlcance(vinculo({ perfilProprio: ['compras.ver', 'compras.lancar', 'lojas.ver'] }));
-/** Gerente de uma loja só (vê compras na Penha; o Méier está fora do acesso). */
+/** Gerente de uma loja só (vê compras na Penha). */
 const GERENTE_DA_PENHA = resolverAlcance(vinculo({ perfilBase: 'GERENTE', redeInteira: false, lojaIds: ['loja-vp'] }));
 const sp = (t: string) => t.replace(/&nbsp;| | /g, ' ');
 const texto = (h: string) => sp(h.replace(/<[^>]+>/g, '')).replace(/\s+/g, ' ');
@@ -58,9 +59,11 @@ describe('Decisão 523 · a régua do custo de compra', () => {
     expect(veCustoDeCompra(ALCANCE_FLOWFOODS, ['loja-vp'])).toBe(true);
   });
 
-  it('todo-ou-nada nas lojas em jogo: uma loja fora do acesso basta para não ir', () => {
+  it('acesso de uma loja só: vale a permissão (as lojas em jogo já vêm do acesso: o todo-ou-nada é defensivo, hoje é `compras.ver`)', () => {
+    // Loja fora do acesso nunca chega à régua (`lojasParaLancar`, `lerNota` e `notaVisivel` filtram antes), e a permissão vale para
+    // o acesso inteiro: por isso não há caso real em que a checagem por loja dê outra resposta que `compras.ver`.
     expect(veCustoDeCompra(GERENTE_DA_PENHA, ['loja-vp'])).toBe(true);
-    expect(veCustoDeCompra(GERENTE_DA_PENHA, ['loja-vp', 'loja-meier'])).toBe(false);
+    expect(veCustoDeCompra(resolverAlcance(vinculo({ perfilProprio: ['compras.lancar', 'lojas.ver'], redeInteira: false, lojaIds: ['loja-vp'] })), ['loja-vp'])).toBe(false);
   });
 });
 
@@ -91,10 +94,10 @@ const formulario = (o: FormularioDeNota) =>
 
 describe('Decisão 523 · a linha do item do formulário', () => {
   it('com o custo de agora (quem vê compras): a conta do que se digita e o "hoje", como antes', () => {
-    const h = texto(formulario(opcoes({ ...CHEDDAR, custo: { centavos: 4000, milesimos: 1000 }, ultimaCompraEm: '2026-10-01' })));
+    const h = texto(formulario(opcoes({ ...CHEDDAR, custo: { centavos: 4000, milesimos: 1000 } })));
     expect(h).toContain('15 kg · R$ 18,38/kg com frete · hoje R$ 40,00/kg');
     // Sem preço nenhum (nem compra nem cadastro): diz que não há, para quem vê.
-    expect(texto(formulario(opcoes({ ...CHEDDAR, custo: null, ultimaCompraEm: null })))).toContain('com frete · hoje sem custo informado');
+    expect(texto(formulario(opcoes({ ...CHEDDAR, custo: null })))).toContain('com frete · hoje sem custo informado');
   });
 
   it('sem o custo de agora (o campo nem existe): só a conta do que se digita, sem "hoje" nem "sem custo informado"', () => {
@@ -169,5 +172,20 @@ describe('Decisão 523 · as frases depois de lançar, alterar, cancelar e conci
     }
     // "Ligada" já era exata (nada foi lançado de novo) e não muda.
     expect(fraseDoDocumento('ligada')).toBe('Nota ligada à que você já tinha lançado. Nada foi lançado de novo: o estoque e o custo ficaram como estavam.');
+  });
+});
+
+describe('Decisão 523 · a ajuda não promete o custo a quem não o vê nem o custo novo para todo insumo', () => {
+  it('a aula de "Lançar nota" para todos não fala de custo na prévia; a do detalhe diz onde editar e cancelar mudam o custo', () => {
+    const lancar = entradaPorChave('compra-nova')!;
+    expect(lancar.versao).toBe(5);
+    const paraTodos = lancar.aula.filter((b) => !b.para).map((b) => b.texto);
+    expect(paraTodos.join(' ')).not.toMatch(/custo/);
+    expect(paraTodos).toContain('“Conferir o impacto” mostra o que a nota faz antes de lançar, sem gravar nada: passar do orçamento de compra da loja é aviso, a nota entra igual.');
+    const detalhe = entradaPorChave('compra')!;
+    expect(detalhe.versao).toBe(6);
+    const errou = detalhe.aula.find((b) => b.texto.startsWith('Errou?'))!;
+    expect(errou.texto).toBe('Errou? Edite ou cancele com o motivo: o que a nota pôs no estoque é corrigido por estorno, e o custo só muda nos insumos em que ela é ou era a compra mais recente.');
+    expect(errou.para).toEqual(['compras.lancar']);
   });
 });

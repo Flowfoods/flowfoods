@@ -66,6 +66,7 @@ relogioDoCenario('2026-10-17T12:00:00-03:00');
 
 /** O que saiu do corpo (decisão 522): não pode estar na página com os pontos. */
 const SAIU = [
+  'se esta for a compra mais recente do insumo, o custo dele passa a ser o dela',
   'o custo dos insumos passa a ser o desta compra',
   'É ela que diz qual compra é a mais nova.',
   'O preço por kg, L ou un sai da conta, com o frete rateado.',
