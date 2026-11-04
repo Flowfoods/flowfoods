@@ -538,18 +538,12 @@ export type InsumoDoFormularioDeNota = InsumoDaCompra &
     | { custo?: never }
   );
 
-export interface FormularioDeNota {
-  lojas: { id: string; nome: string; ativa: boolean }[];
-  fornecedores: { id: string; nome: string; ativo: boolean; raizCnpj: string | null }[];
-  insumos: InsumoDoFormularioDeNota[];
-}
-
 /** O que o formulário de nota precisa: lojas, fornecedores e insumos comprados (com o custo de agora, para quem vê custo de compra). */
 export async function dadosDoFormularioDeNota(
   cliente: ClienteDoParceiro,
   alcance: Alcance,
   ja: { lojaId?: string; fornecedorId?: string; insumoIds?: string[] } = {},
-): Promise<FormularioDeNota> {
+) {
   return cliente.transacao(async (tx) => {
     const lojas = (await lojasParaLancar(tx, alcance)).filter((l) => l.ativa || l.id === ja.lojaId);
     // O navegador recebe só a raiz do CNPJ (a empresa, para o aviso "mesma empresa, outro estabelecimento"); nunca o documento
@@ -567,7 +561,11 @@ export async function dadosDoFormularioDeNota(
       select: SELECAO_DO_INSUMO_DA_COMPRA,
     });
     // Decisão 523: sem `compras.ver` nas lojas do formulário, as compras nem são lidas e o insumo vai sem custo.
-    if (!veCustoDeCompra(alcance, lojas.map((l) => l.id))) return { lojas, fornecedores, insumos: lidos.map(paraCompra) };
+    if (!veCustoDeCompra(alcance, lojas.map((l) => l.id))) {
+      // Forma curta de propósito: a guarda de tenant (tests/erp-tenant-portao) lê "nome da relação + dois-pontos" como include/select.
+      const insumos = lidos.map((i): InsumoDoFormularioDeNota => paraCompra(i));
+      return { lojas, fornecedores, insumos };
+    }
     const compras = await ultimasCompras(
       tx,
       lidos.map((i) => i.id),
@@ -581,6 +579,8 @@ export async function dadosDoFormularioDeNota(
     return { lojas, fornecedores, insumos };
   });
 }
+
+export type FormularioDeNota = Awaited<ReturnType<typeof dadosDoFormularioDeNota>>;
 
 interface Contexto {
   lojas: Map<string, { nome: string; ativa: boolean }>;
