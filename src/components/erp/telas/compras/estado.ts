@@ -20,11 +20,16 @@ export type EstadoNota = {
 
 export type AcaoDeNota = (anterior: EstadoNota, form: FormData) => Promise<EstadoNota>;
 
+/**
+ * Decisão 523: o custo de cada insumo é o da compra mais recente dele (data da nota; na mesma data, a lançada por último), de
+ * qualquer loja (`ultimasCompras`). A frase não promete que a nota mudou o custo: só muda onde ela é (ou era) a mais recente, e o
+ * detalhe diz item a item ("vale no custo" ou "vale a de …"). Aparece no detalhe, que é de `compras.ver`.
+ */
 const FEITO_DA_NOTA: Readonly<Record<string, string>> = {
-  lancada: 'Nota lançada. O custo dos insumos dela já vale nas fichas.',
-  editada: 'Nota alterada. O antes e o depois estão em Alterações; o custo já acompanha.',
+  lancada: 'Nota lançada. Onde ela é a compra mais recente do insumo, o custo dela já vale nas fichas.',
+  editada: 'Nota alterada. O antes e o depois estão em Alterações; o custo de cada insumo segue a compra mais recente dele.',
   igual: 'Nada mudou: a nota já estava assim.',
-  cancelada: 'Nota cancelada. Ela não vale mais para o custo: cada insumo voltou ao preço da compra anterior (ou ao preço cadastrado).',
+  cancelada: 'Nota cancelada. Ela não vale mais para o custo: onde era a compra mais recente do insumo, ele voltou à compra anterior (ou ao preço cadastrado).',
 };
 
 const FEITO_DO_FORNECEDOR: Readonly<Record<string, string>> = {

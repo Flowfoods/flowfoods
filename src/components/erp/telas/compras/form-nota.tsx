@@ -567,8 +567,13 @@ function FormNotaBase({
                           {conta.frete ? ' com frete' : ''}
                         </>
                       ) : null}
-                      {' · hoje '}
-                      {ins.custo ? formatarCusto(ins.custo, ins.unidade) : 'sem custo informado'}
+                      {/* Decisão 523: o custo de agora só chega a quem vê custo de compra; sem ele, a linha fica com a conta do que se digita. */}
+                      {ins.custo !== undefined && (
+                        <>
+                          {' · hoje '}
+                          {ins.custo ? formatarCusto(ins.custo, ins.unidade) : 'sem custo informado'}
+                        </>
+                      )}
                     </p>
                   )}
                   <Erro id={`${idBase}-item-${n}-erro`} texto={erro} />

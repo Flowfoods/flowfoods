@@ -514,8 +514,41 @@ export async function lojasParaLancar(tx: ClienteDoParceiro, alcance: Alcance) {
   return lojas.filter((l) => pode(alcance, 'compras.lancar', { lojaId: l.id }));
 }
 
-/** O que o formulário de nota precisa: lojas, fornecedores e insumos comprados (com o custo de agora). */
-export async function dadosDoFormularioDeNota(cliente: ClienteDoParceiro, alcance: Alcance, ja: { lojaId?: string; fornecedorId?: string; insumoIds?: string[] } = {}) {
+/**
+ * Decisão 523: quem recebe o custo de agora dos insumos no formulário de nota e o que a nota muda nele e nas fichas na prévia. É R$
+ * de compra, então a régua é `compras.ver` (decisões 390, 459 e 460; `insumos.ver` não serve de régua e lançar nota não dá custo).
+ * Todo-ou-nada nas lojas em jogo (390): basta uma sem `compras.ver` para não ir. Sem loja em jogo, vale a permissão.
+ */
+export function veCustoDeCompra(alcance: Alcance, lojaIds: readonly string[]): boolean {
+  return pode(alcance, 'compras.ver') && lojaIds.every((lojaId) => pode(alcance, 'compras.ver', { lojaId }));
+}
+
+/** O custo de agora de um insumo, para quem vê custo de compra. */
+interface CustoDeAgora {
+  /** Custo de agora (última compra ou preço cadastrado), exato; null = sem preço. */
+  custo: CustoExato | null;
+  /** Data da última compra lançada ("2026-10-14"): a nota de data anterior não muda o custo. */
+  ultimaCompraEm: string | null;
+}
+
+/**
+ * Um insumo do seletor do formulário de nota. Decisão 523: para quem não vê custo de compra (`veCustoDeCompra`), `custo` e
+ * `ultimaCompraEm` NÃO EXISTEM no objeto (nem como `undefined`): não saem do servidor, nem no que a página entrega ao navegador.
+ */
+export type InsumoDoFormularioDeNota = InsumoDaCompra & (CustoDeAgora | { custo?: never; ultimaCompraEm?: never });
+
+export interface FormularioDeNota {
+  lojas: { id: string; nome: string; ativa: boolean }[];
+  fornecedores: { id: string; nome: string; ativo: boolean; raizCnpj: string | null }[];
+  insumos: InsumoDoFormularioDeNota[];
+}
+
+/** O que o formulário de nota precisa: lojas, fornecedores e insumos comprados (com o custo de agora, para quem vê custo de compra). */
+export async function dadosDoFormularioDeNota(
+  cliente: ClienteDoParceiro,
+  alcance: Alcance,
+  ja: { lojaId?: string; fornecedorId?: string; insumoIds?: string[] } = {},
+): Promise<FormularioDeNota> {
   return cliente.transacao(async (tx) => {
     const lojas = (await lojasParaLancar(tx, alcance)).filter((l) => l.ativa || l.id === ja.lojaId);
     // O navegador recebe só a raiz do CNPJ (a empresa, para o aviso "mesma empresa, outro estabelecimento"); nunca o documento
@@ -532,26 +565,23 @@ export async function dadosDoFormularioDeNota(cliente: ClienteDoParceiro, alcanc
       orderBy: { nome: 'asc' },
       select: SELECAO_DO_INSUMO_DA_COMPRA,
     });
+    // Decisão 523: sem `compras.ver` nas lojas do formulário, as compras nem são lidas e o insumo vai sem custo e sem data.
+    if (!veCustoDeCompra(alcance, lojas.map((l) => l.id))) return { lojas, fornecedores, insumos: lidos.map(paraCompra) };
     const compras = await ultimasCompras(
       tx,
       lidos.map((i) => i.id),
     );
-    const insumos = lidos.map((i) => {
+    const insumos = lidos.map((i): InsumoDoFormularioDeNota => {
       const c = compras.get(i.id);
       return {
         ...paraCompra(i),
-        /** Custo de agora (última compra ou preço cadastrado), exato; null = sem preço. */
         custo: c?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
-        /** Data da última compra lançada ("2026-10-14"): a nota de data anterior não muda o custo. */
         ultimaCompraEm: c?.entradaEm ?? null,
       };
     });
     return { lojas, fornecedores, insumos };
   });
 }
-
-export type FormularioDeNota = Awaited<ReturnType<typeof dadosDoFormularioDeNota>>;
-export type InsumoDoFormularioDeNota = FormularioDeNota['insumos'][number];
 
 interface Contexto {
   lojas: Map<string, { nome: string; ativa: boolean }>;
@@ -971,27 +1001,40 @@ export interface ImpactoNaFicha {
   variacaoCentavos: number;
 }
 
-export interface PreviaDaNota {
+interface BaseDaPrevia {
   itens: {
     nome: string;
     embalagem: string;
     quantidade: string;
     valorCentavos: number;
     freteRateadoCentavos: number;
+    /** O custo por unidade desta linha, da conta do que foi digitado (valor + frete rateado ÷ quantidade). */
     custo: string;
   }[];
   somaItensCentavos: number;
   freteCentavos: number;
   totalCentavos: number;
-  custos: ImpactoNoInsumo[];
-  fichas: ImpactoNaFicha[];
-  /** Fichas afetadas que ficaram de fora da lista (teto da tela). */
-  maisFichas: number;
   /** 1.6: o que a nota faz no estoque da loja (entra, ou por que não). */
   estoque: { movimenta: boolean; frase: string };
   /** 2.5: o que a nota faz no orçamento de compra da loja (aviso, nunca bloqueio); nulo = a pessoa não vê o orçamento. */
   orcamento: OrcamentoNaNota | null;
 }
+
+/**
+ * Decisão 523: o custo de cada insumo antes → depois ("antes" é o custo de agora) e as fichas que mudam são R$ de compra
+ * (`veCustoDeCompra` na loja da nota). Sem a permissão, `veCusto: false`: as listas vêm vazias e nem são calculadas.
+ */
+export type PreviaDaNota = BaseDaPrevia &
+  (
+    | {
+        veCusto: true;
+        custos: ImpactoNoInsumo[];
+        fichas: ImpactoNaFicha[];
+        /** Fichas afetadas que ficaram de fora da lista (teto da tela). */
+        maisFichas: number;
+      }
+    | { veCusto: false; custos: []; fichas: []; maisFichas: 0 }
+  );
 
 /** Custo efetivo do insumo: a última compra (do mapa) ou o preço cadastrado. */
 const efetivo = (i: InsumoLido, compra: UltimaCompra | undefined) => compra?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos);
@@ -1018,38 +1061,47 @@ export async function previaDaNota(
     const { lido, ctx } = await lerNota(tx, alcance, entrada, false, atual ?? undefined);
     if (!lido.ok) return lido;
     const d = lido.dados;
-    const afetados = Array.from(new Set([...d.itens.map((i) => i.insumoId), ...(atual?.itens.map((i) => i.insumoId ?? '').filter(Boolean) ?? [])]));
-    const agora = await ultimasCompras(tx, afetados);
-    const semEsta = atual ? await ultimasCompras(tx, afetados, { semNota: atual.id }) : agora;
-    const candidata = { notaId: atual?.id ?? '~nova', entradaEm: d.entradaEm, lancadaEm: atual?.lancadaEm?.getTime() ?? Date.now() };
 
-    const novos = new Map<string, CustoExato | null>();
-    const custos: ImpactoNoInsumo[] = [];
-    for (const insumoId of afetados) {
-      const ins = ctx.cadastro.get(insumoId);
-      if (!ins) continue;
-      const antes = efetivo(ins, agora.get(insumoId));
-      const base = semEsta.get(insumoId);
-      const daNota = d.itens.filter((i) => i.insumoId === insumoId);
-      const vence =
-        daNota.length > 0 &&
-        (!base || compararCompras(candidata, { notaId: base.notaId, entradaEm: base.entradaEm, lancadaEm: base.lancadaEm.getTime() }) > 0);
-      const depois = vence ? custoDaCompra(daNota) : efetivo(ins, base);
-      novos.set(insumoId, depois);
-      const comparado = antes && depois ? compararCustos(depois, antes) : null;
-      custos.push({
-        insumoId,
-        nome: ins.nome,
-        antes: formatarCusto(antes, ins.unidade),
-        depois: formatarCusto(depois, ins.unidade),
-        efeito: !vence && daNota.length > 0 ? 'nao-muda' : !antes && depois ? 'primeira' : comparado === null || comparado === 0 ? 'igual' : comparado > 0 ? 'sobe' : 'desce',
-        ...(!vence && daNota.length > 0 && base ? { vale: formatarData(base.entradaEm) } : {}),
-      });
-    }
-    custos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+    /** O custo de cada insumo antes → depois e as fichas que mudam, em cascata (só para quem vê custo de compra). */
+    const impactoNoCusto = async () => {
+      const afetados = Array.from(new Set([...d.itens.map((i) => i.insumoId), ...(atual?.itens.map((i) => i.insumoId ?? '').filter(Boolean) ?? [])]));
+      const agora = await ultimasCompras(tx, afetados);
+      const semEsta = atual ? await ultimasCompras(tx, afetados, { semNota: atual.id }) : agora;
+      const candidata = { notaId: atual?.id ?? '~nova', entradaEm: d.entradaEm, lancadaEm: atual?.lancadaEm?.getTime() ?? Date.now() };
 
-    const mudaram = custos.filter((i) => i.efeito === 'sobe' || i.efeito === 'desce' || i.efeito === 'primeira').map((i) => i.insumoId);
-    const { fichas, mais } = await fichasAfetadas(tx, mudaram, novos, custos);
+      const novos = new Map<string, CustoExato | null>();
+      const custos: ImpactoNoInsumo[] = [];
+      for (const insumoId of afetados) {
+        const ins = ctx.cadastro.get(insumoId);
+        if (!ins) continue;
+        const antes = efetivo(ins, agora.get(insumoId));
+        const base = semEsta.get(insumoId);
+        const daNota = d.itens.filter((i) => i.insumoId === insumoId);
+        const vence =
+          daNota.length > 0 &&
+          (!base || compararCompras(candidata, { notaId: base.notaId, entradaEm: base.entradaEm, lancadaEm: base.lancadaEm.getTime() }) > 0);
+        const depois = vence ? custoDaCompra(daNota) : efetivo(ins, base);
+        novos.set(insumoId, depois);
+        const comparado = antes && depois ? compararCustos(depois, antes) : null;
+        custos.push({
+          insumoId,
+          nome: ins.nome,
+          antes: formatarCusto(antes, ins.unidade),
+          depois: formatarCusto(depois, ins.unidade),
+          efeito: !vence && daNota.length > 0 ? 'nao-muda' : !antes && depois ? 'primeira' : comparado === null || comparado === 0 ? 'igual' : comparado > 0 ? 'sobe' : 'desce',
+          ...(!vence && daNota.length > 0 && base ? { vale: formatarData(base.entradaEm) } : {}),
+        });
+      }
+      custos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+      const mudaram = custos.filter((i) => i.efeito === 'sobe' || i.efeito === 'desce' || i.efeito === 'primeira').map((i) => i.insumoId);
+      const { fichas, mais } = await fichasAfetadas(tx, mudaram, novos, custos);
+      return { veCusto: true as const, custos, fichas, maisFichas: mais };
+    };
+    // Decisão 523: na loja da nota (e, na edição, também na de antes). Sem `compras.ver`, o custo nem é lido.
+    const custo = veCustoDeCompra(alcance, atual ? [d.lojaId, atual.lojaId] : [d.lojaId])
+      ? await impactoNoCusto()
+      : { veCusto: false as const, custos: [] as [], fichas: [] as [], maisFichas: 0 as const };
 
     const somaItens = d.itens.reduce((s, i) => s + i.valorCentavos, 0);
     const estoque = await efeitoPrevistoDaNota(tx, { lojaId: d.lojaId, lojaNome: ctx.lojas.get(d.lojaId)?.nome ?? 'loja', lancadaEm: atual?.lancadaEm ?? null, entradaEm: d.entradaEm });
@@ -1069,9 +1121,7 @@ export async function previaDaNota(
         somaItensCentavos: somaItens,
         freteCentavos: d.freteCentavos,
         totalCentavos: d.totalCentavos,
-        custos,
-        fichas,
-        maisFichas: mais,
+        ...custo,
         estoque,
         orcamento,
       },

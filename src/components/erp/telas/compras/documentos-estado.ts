@@ -25,7 +25,8 @@ const FEITO_DO_DOCUMENTO: Readonly<Record<string, string>> = {
   recebida: 'Nota fiscal recebida. Nada foi lançado ainda: confira os itens, escolha o insumo de cada um e depois concilie.',
   'ja-recebida': 'Esta nota já tinha sido recebida: nada foi gravado de novo. Estas são as escolhas dela.',
   salva: 'Escolhas salvas. O sistema vai lembrar estes itens deste fornecedor nas próximas notas. A nota de compra ainda não foi lançada.',
-  conciliada: 'Nota conciliada: a nota de compra foi lançada e o custo dos insumos já vale nas fichas.',
+  // Decisão 523: a régua de `FEITO_DA_NOTA` (o custo só muda onde a nota é a compra mais recente do insumo).
+  conciliada: 'Nota conciliada: a nota de compra foi lançada. Onde ela é a compra mais recente do insumo, o custo dela já vale nas fichas.',
   ligada: 'Nota ligada à que você já tinha lançado. Nada foi lançado de novo: o estoque e o custo ficaram como estavam.',
   cancelada: 'Nota fiscal descartada. Ela não entra mais; a chave dela fica guardada para não ser recebida de novo.',
 };
