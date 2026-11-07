@@ -1207,14 +1207,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/nova', 'compras/[id]/editar'],
     titulo: 'Lançar nota',
-    // Decisão 523 (versão 5): a prévia só mostra o custo a quem vê compras; a aula, que é de todos, não promete o custo nela.
-    versao: 5,
+    // Decisões 523 e 275: prévia protegida; limpeza e descartáveis também entram no CMV gerencial.
+    versao: 6,
     aula: [
       { texto: 'Digite o valor total de cada linha, como está na nota.' },
       { texto: 'O frete é dividido entre os itens, e a soma tem que bater com o total da nota.' },
       { texto: '“Conferir o impacto” mostra o que a nota faz antes de lançar, sem gravar nada: passar do orçamento de compra da loja é aviso, a nota entra igual.' },
       { texto: 'A data da nota decide o período dela: se o DRE já fechou esse período, a nota não entra nem se edita. É também essa data que põe a nota no CMV de compra do período.', para: ['compras.lancar'] },
-      { texto: 'Só lance como nota o que é comida e embalagem para vender. Limpeza e descartável da operação vão como despesa, e o pagamento ao fornecedor de uma nota já lançada não é despesa: a nota já é o custo.', para: ['compras.lancar'] },
+      { texto: 'Lance também materiais de limpeza e descartáveis da operação como itens de compra: eles entram no CMV gerencial, na categoria do insumo. Não lance o pagamento da mesma nota como despesa, para não contar o custo duas vezes.', para: ['compras.lancar'] },
     ],
     // Decisão 522: o que cada campo muda no custo, no estoque e no DRE, junto do campo. Saíram do corpo e moram aqui: o "o custo
     // dos insumos passa a ser o desta compra" do cabeçalho e o "É ela que diz qual compra é a mais nova." da data (no `data`), o
@@ -1302,7 +1302,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Custo por unidade é o valor do item mais a parte do frete, dividido pela quantidade na unidade do insumo.' },
           // `valeNoCusto`/`valeOutra` em `obterNota`: a última compra da rede (`ultimasCompras`), de qualquer loja.
-          { texto: 'Vale no custo a compra mais recente do insumo pela data da nota, de qualquer loja da rede, e é esse custo que as fichas usam; se há uma mais nova, a linha diz a data dela.' },
+          { texto: 'Vale no custo a compra mais recente do insumo pela data da nota, de qualquer loja da rede, e é esse custo que as fichas usam; se há uma mais nova, a linha diz a data dela só quando seu acesso inclui essa compra.' },
           { texto: 'Editar ou cancelar a nota que vale refaz o custo: cancelada, volta a valer a compra anterior ou, sem ela, o preço do cadastro.', para: ['compras.lancar'] },
         ],
       },
@@ -1875,10 +1875,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['custo-medio'],
     titulo: 'Custo médio por loja',
-    versao: 1,
+    versao: 2,
     soNivel1: true,
     aula: [
-      { texto: 'Cada loja nasce valorizando o estoque pelo último preço da rede. Ligado aqui, o estoque e o CMV dela passam a valer pelo custo médio da própria loja.' },
+      { texto: 'Cada loja usa a referência da rede até o custo médio ser ligado aqui. Depois, o estoque e o CMV real seguem o valor acumulado na própria loja; as fichas e os preços sugeridos continuam pela referência da rede.' },
       { texto: 'Leia o impacto antes: o valor do livro, o valor pela regra antiga e a diferença de base, que fica guardada na troca.' },
       { texto: 'Vale daqui para a frente, sem volta, e nada já gravado muda.' },
     ],
@@ -1888,7 +1888,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre'],
     titulo: 'DRE',
-    versao: 9,
+    versao: 10,
     // A tela da reunião: a tabela fica à vista e a aula abre numa linha.
     recolhida: true,
     aula: [
@@ -1896,7 +1896,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Com meta definida, a linha mostra o desvio e o farol, uma de 5 faixas de bem melhor a muito pior que a meta, igual na rede e em cada loja.', para: ['dre.ver'] },
       { texto: 'Período fechado mostra a fotografia do fechamento, que nunca muda.' },
       { texto: 'A loja que definiu a própria meta do CMV a vê na linha do CMV dela; a rede segue a meta da rede.', para: ['dre.ver'] },
-      { texto: 'O CMV é o custo da comida: no período em curso é o que a casa comprou até ontem, e vira o real, o que ela consumiu, quando o período termina e a contagem de fechamento do estoque é aplicada.' },
+      { texto: 'O CMV gerencial inclui ingredientes, embalagens, limpeza e descartáveis: no período em curso mostra as compras até ontem; com o período terminado e os estoques de abertura e fechamento apurados, mostra o consumo real.' },
     ],
     secoes: [
       {
@@ -1957,8 +1957,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'CMV real é o estoque inicial mais as compras menos o estoque final. Só existe com o período terminado e o fechamento do estoque aplicado nas duas pontas: o do período e o do anterior (ou a abertura, no primeiro).' },
           { texto: 'Em cada loja entra o real, quando existe; senão a compra, com o motivo escrito ao lado. A rede soma o que vale em cada loja, e fica misto quando as fontes se misturam. Loja sem nota e sem estoque fica sem CMV, nunca com zero, e os resultados avisam que saem sem contar o CMV.' },
           { texto: 'O CMV que vale é descontado da receita líquida na margem de contribuição. No painel compra × real a diferença é o real menos a compra: estoque que sobe é dinheiro parado na prateleira; estoque que desce pede olho na próxima compra.' },
-          { texto: 'Com preço subindo, o estoque final vale mais e o real sai menor do que o consumo ao preço antigo. Insumo sem preço entra com zero no estoque, e a tela avisa quantos são.' },
-          { texto: 'Limpeza e descartável da operação não são nota de compra: lance como despesa, ou entram no CMV. O pagamento ao fornecedor de uma nota já lançada também não é despesa. Lojas que dividem estoque sem transferência distorcem o real de cada uma; o da rede continua certo.' },
+          { texto: 'Sem custo médio ligado, o estoque usa a última compra da rede ou o preço cadastrado; ligado, usa o valor acumulado na loja. Fichas e preços sugeridos seguem a referência da rede. Item sem preço fica fora da soma conhecida, com aviso; ausência de custo não é custo zero.' },
+          { texto: 'Limpeza e descartáveis entram no CMV gerencial pela compra e pelo estoque, cada insumo na sua categoria. O pagamento de uma nota já lançada não é outra despesa. Lojas que dividem estoque sem transferência podem distorcer o real por loja.' },
         ],
       },
       {
@@ -1989,7 +1989,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Incompleto e falta lançar',
         blocos: [
           { texto: 'Dia de canal sem lançamento de faturamento deixa a receita incompleta. O aviso conta quantos faltam, do mesmo jeito que o calendário do mês.' },
-          { texto: 'Despesa que repete todo mês e ainda não foi lançada neste mês aparece em Falta lançar. Nunca entra valor inventado. A cobrança continua nos meses seguintes até alguém lançar ou marcar que não repete mais.', para: ['despesas.lancar'] },
+          { texto: 'Despesa marcada para repetir, com último lançamento nos 12 meses anteriores, aparece em Falta lançar se o mês escolhido ainda não foi lançado. Nada entra sozinho; confira o valor ou use Não repete mais na última despesa lançada.', para: ['despesas.lancar'] },
         ],
       },
       {
@@ -2047,11 +2047,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/despesas/[id]'],
     titulo: 'Despesa',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Os dados da despesa, como o DRE a conta dia a dia e tudo o que mudou nela, com antes e depois.' },
-      { texto: 'Pagar, desfazer o pagamento e parar de repetir valem mesmo em período fechado, porque não mudam o DRE.', para: ['despesas.lancar'] },
-      { texto: 'Lançou errado? Edite. Se foi a despesa que não devia existir, remova: o motivo é obrigatório e o que estava lançado fica no histórico.', para: ['despesas.lancar'] },
+      { texto: 'Em período fechado, ainda dá para mudar descrição, vencimento e repetição, pagar ou desfazer pagamento, pois isso não muda o DRE.', para: ['despesas.lancar'] },
+      { texto: 'Lançou errado? Antes do fechamento, edite; se a despesa não devia existir, remova com motivo. Depois, valor, competência, linha e loja ficam travados e a despesa não pode ser removida.', para: ['despesas.lancar'] },
     ],
     // Decisão 520: em que linha e em que período a despesa conta (o que o início soma e o Conferir este valor abre), e o
     // "Não muda o DRE" da conta a pagar, que saiu do corpo. Na ordem da página.
@@ -2107,7 +2107,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'O DRE conta pela competência, o período a que a despesa pertence: a luz de outubro é de outubro, mesmo paga em novembro.' },
           { texto: 'Cada período do DRE recebe só os dias da despesa que caem nele e, no período em curso, só até ontem: o aluguel do mês entra aos poucos, dia a dia.' },
-          { texto: 'Período já fechado não recebe despesa nova nem muda valor, competência, linha ou loja das que caem nele: o fechamento guardou a fotografia do DRE daqueles dias.' },
+          { texto: 'Período fechado não recebe despesa nova nem muda valor, competência, linha ou loja das que caem nele: a fotografia do DRE fica guardada, e descrição, vencimento e repetição continuam editáveis.' },
         ],
       },
       {
@@ -2303,9 +2303,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/periodos/[inicio]'],
     titulo: 'Fechar o período',
-    versao: 4,
+    versao: 5,
     aula: [
-      { texto: 'Fechar guarda uma fotografia do DRE do período, e depois nada muda dentro das datas dele: nem faturamento, nem despesa, nem nota de compra, nem fechamento de estoque.' },
+      { texto: 'Fechar guarda uma fotografia do DRE e bloqueia o que muda o resultado dessas datas; pagamento, descrição, vencimento e repetição de despesa continuam editáveis.' },
       { texto: 'Faturamento faltando, taxa do iFood sem configurar, estoque em contagem de fechamento e rede sem lançamento travam, e não aceitam justificativa.' },
       { texto: 'Despesa que repete e não foi lançada, loja sem o estoque fechado e loja sem faturamento são ressalvas: marque cada uma e escreva uma justificativa.' },
       { texto: 'Só a FlowFoods reabre um período fechado, com o motivo; fechar de novo gera a versão seguinte.' },
@@ -2316,7 +2316,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'O que é uma ressalva',
         blocos: [
           { texto: 'É algo que a casa sabe que está faltando e decide fechar assim mesmo. A justificativa tem de 10 a 300 letras, vai para a fotografia e para o Histórico, e o DRE fechado mostra Fechado com ressalvas para sempre.' },
-          { texto: 'A despesa que repete e falta lançar pode ser lançada antes, com o valor do mês passado como ponto de partida.', para: ['despesas.lancar'] },
+          { texto: 'A despesa que repete e falta lançar pode ser lançada antes, com o valor do último mês lançado como ponto de partida, dentro da busca dos 12 meses anteriores.', para: ['despesas.lancar'] },
         ],
       },
       {

@@ -196,8 +196,8 @@
     "hash": "af3d80b11746fe21"
   },
   "compra-nova": {
-    "versao": 5,
-    "hash": "503793c60e866256"
+    "versao": 6,
+    "hash": "ea4e2fe5b1e5cb6d"
   },
   "compra": {
     "versao": 6,
@@ -320,20 +320,20 @@
     "hash": "9d803e531e0e9c5c"
   },
   "custo-medio": {
-    "versao": 1,
-    "hash": "92ed21dc1adb335e"
+    "versao": 2,
+    "hash": "784860a92993daf8"
   },
   "dre": {
-    "versao": 9,
-    "hash": "e97c5c382121711a"
+    "versao": 10,
+    "hash": "ac1372514d1f0e5a"
   },
   "dre-despesas": {
     "versao": 3,
     "hash": "6e7248e86c23524c"
   },
   "dre-despesa": {
-    "versao": 1,
-    "hash": "e6e0a0a996538291"
+    "versao": 2,
+    "hash": "8dc49b6f37942a3d"
   },
   "dre-despesa-nova": {
     "versao": 1,
@@ -356,7 +356,7 @@
     "hash": "70db086f5c14d56b"
   },
   "dre-periodo": {
-    "versao": 4,
-    "hash": "5974c7e84ebe10d8"
+    "versao": 5,
+    "hash": "320f331bd366f20a"
   }
 }

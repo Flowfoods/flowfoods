@@ -279,7 +279,7 @@ describe('decisão 522 · os pontos de Lançar nota e de Detalhe da nota no regi
     expect(ids('compra')).toEqual(['total', 'custo', 'estoque']);
     // Os pontos não entram no hash do lock: a caixa "Como funciona" não volta com "Mudou" para quem fechou.
     // Decisão 523: a aula das duas entradas mudou (o custo na prévia e o que editar e cancelar fazem no custo): versões 5 e 6.
-    expect(entradaPorChave('compra-nova')?.versao).toBe(5);
+    expect(entradaPorChave('compra-nova')?.versao).toBe(6);
     expect(entradaPorChave('compra')?.versao).toBe(6);
     expect(entradaPorChave('compra-nova')?.rotas).toEqual(['compras/nova', 'compras/[id]/editar']);
   });

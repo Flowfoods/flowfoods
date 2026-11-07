@@ -218,14 +218,14 @@ const DETALHE = '/dre/despesas/d1';
 // ================================================================== o registro
 
 describe('decisão 520 · os pontos de Lançar despesa e de Despesa no registro', () => {
-  it('o registro continua válido; 6 pontos nas duas telas, ids estáveis, na ordem da página; aula e versão iguais', () => {
+  it('o registro continua válido; 6 pontos nas duas telas, ids estáveis, na ordem da página; versões acompanham as aulas', () => {
     expect(problemasDoRegistro()).toEqual([]);
     const ids = (chave: string) => (entradaPorChave(chave)?.pontos ?? []).map((p) => p.id);
     expect(ids('dre-despesa-nova')).toEqual(['linha', 'competencia', 'repete', 'vencimento']);
     expect(ids('dre-despesa')).toEqual(['como-conta', 'pagamento']);
-    // Os pontos não entram no hash do lock: a caixa "Como funciona" não volta com "Mudou" para quem fechou.
+    // Pontos não mudam o hash; a aula do detalhe subiu para esclarecer as edições permitidas em período fechado.
     expect(entradaPorChave('dre-despesa-nova')?.versao).toBe(1);
-    expect(entradaPorChave('dre-despesa')?.versao).toBe(1);
+    expect(entradaPorChave('dre-despesa')?.versao).toBe(2);
   });
 
   it('em que linha e em que período a despesa conta: grupo, deduções, competência, até ontem, fotografia, rede × loja', () => {
