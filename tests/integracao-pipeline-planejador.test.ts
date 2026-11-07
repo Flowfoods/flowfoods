@@ -3,10 +3,14 @@ import { planejarAnalytics, type AgendaDaLoja } from '@/lib/integracoes/ifood/pi
 
 const loja: AgendaDaLoja = { moduloId: 'modulo', fuso: 'America/Sao_Paulo', unidade: 'REAL', ativo: true, historicosPendentes: 0 };
 describe('INT-1.6 · calendário e materialização limitada', () => {
-  it('a fronteira das 9h30 BRT não antecipa D1; depois são16 dias distintos e só um histórico', () => {
+  it('a fronteira das 9h30 BRT não antecipa D1; depois são16 dias e um histórico por perfil', () => {
     expect(planejarAnalytics(Date.parse('2026-11-07T12:29:59Z'), loja).map(j => j.tipo)).toEqual(['ACESSO']);
-    const j = planejarAnalytics(Date.parse('2026-11-07T12:30:00Z'), loja);
-    expect(j).toHaveLength(18);
+    const todas = planejarAnalytics(Date.parse('2026-11-07T12:30:00Z'), loja);
+    expect(todas).toHaveLength(35);
+    expect(todas.filter(x => x.tipo === 'ACESSO')).toHaveLength(1);
+    const j = todas.filter(x => x.perfil === 'diario');
+    expect(j).toHaveLength(17);
+    expect(todas.filter(x => x.perfil === 'pagamentos').map(x => ({ ...x, perfil: 'diario' }))).toEqual(j);
     expect(j.filter(x => x.tipo === 'D1').map(x => x.dia)).toEqual(['2026-11-06']);
     expect(j.filter(x => x.tipo === 'REVISAO').map(x => x.dia)).toEqual([
       '2026-11-05', '2026-11-04', '2026-11-03', '2026-11-02', '2026-11-01', '2026-10-31', '2026-10-30', '2026-10-29',
@@ -21,14 +25,26 @@ describe('INT-1.6 · calendário e materialização limitada', () => {
   });
   it('retoma histórico atrás do primeiro marco e não interpreta vazio como fim', () => {
     const j = planejarAnalytics(Date.parse('2026-11-07T14:00:00Z'), { ...loja, primeiroDiaPlanejado: '2026-10-01' });
-    expect(j.at(-1)).toMatchObject({ dia: '2026-09-30', tipo: 'HISTORICO' });
+    expect(j.find(x => x.perfil === 'diario' && x.tipo === 'HISTORICO')).toMatchObject({ dia: '2026-09-30', tipo: 'HISTORICO' });
+    expect(j.find(x => x.perfil === 'pagamentos' && x.tipo === 'HISTORICO')).toMatchObject({ dia: '2026-10-21', tipo: 'HISTORICO' });
   });
   it('limita a materialização pendente e respeita13 meses sem criar limpeza', () => {
     for (const extra of [{ historicosPendentes: 20 }, { primeiroDiaPlanejado: '2025-10-07' }]) {
       const j = planejarAnalytics(Date.parse('2026-11-07T14:00:00Z'), { ...loja, ...extra });
-      expect(j).toHaveLength(17);
-      expect(j.some(x => x.tipo === 'HISTORICO')).toBe(false);
+      expect(j).toHaveLength(34);
+      expect(j.some(x => x.perfil === 'diario' && x.tipo === 'HISTORICO')).toBe(false);
+      expect(j.filter(x => x.perfil === 'pagamentos' && x.tipo === 'HISTORICO')).toHaveLength(1);
     }
+  });
+  it('histórico marginal usa marco e teto próprios sem bloquear revisão nem diário', () => {
+    const agora = Date.parse('2026-11-07T14:00:00Z');
+    const completo = planejarAnalytics(agora, { ...loja, pagamentos: { historicosPendentes: 0, primeiroDiaPlanejado: '2026-10-01' } });
+    expect(completo.find(x => x.perfil === 'pagamentos' && x.tipo === 'HISTORICO')?.dia).toBe('2026-09-30');
+    const limitado = planejarAnalytics(agora, { ...loja, pagamentos: { historicosPendentes: 20 } });
+    expect(limitado.filter(x => x.perfil === 'pagamentos')).toHaveLength(16);
+    expect(limitado.filter(x => x.perfil === 'diario')).toHaveLength(17);
+    const fim = planejarAnalytics(agora, { ...loja, pagamentos: { historicosPendentes: 0, primeiroDiaPlanejado: '2025-10-07' } });
+    expect(fim.some(x => x.perfil === 'pagamentos' && x.tipo === 'HISTORICO')).toBe(false);
   });
   it('módulo autorizado mas não ativo apenas verifica acesso', () => {
     expect(planejarAnalytics(Date.parse('2026-11-07T14:00:00Z'), { ...loja, ativo: false }).map(j => j.tipo)).toEqual(['ACESSO']);

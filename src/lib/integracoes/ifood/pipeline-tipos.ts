@@ -1,4 +1,5 @@
 import type { IdentidadeAnalytics, UnidadeMonetariaAnalytics } from './analytics';
+import type { IdentidadePagamentos } from './analytics-pagamentos';
 import type { Classificacao } from './respostas';
 
 export type TipoJanela = 'D1' | 'REVISAO' | 'HISTORICO' | 'ACESSO';
@@ -10,8 +11,10 @@ export interface JanelaAnalytics {
   ciclo: string;
   fuso: string;
   unidade: UnidadeMonetariaAnalytics['unidade'];
+  /** Omissão conserva o planejamento diário legado. ACESSO não aceita outro perfil. */
+  perfil?: 'diario' | 'pagamentos';
 }
-export interface TarefaAnalytics {
+interface TarefaBase {
   id: string;
   parceiroId: string;
   moduloId: string;
@@ -19,18 +22,22 @@ export interface TarefaAnalytics {
   lojaId: string;
   geracao: number;
   dono: string;
-  perfil: 'diario' | 'acesso';
   tipo: TipoJanela;
-  identidade: IdentidadeAnalytics;
   fuso: string;
   unidade: UnidadeMonetariaAnalytics;
 }
+export type TarefaAnalytics = TarefaBase & (
+  | { perfil: 'diario' | 'acesso'; identidade: IdentidadeAnalytics }
+  | { perfil: 'pagamentos'; identidade: IdentidadePagamentos }
+);
 export interface PaginaDoTransporte {
   pagina: number;
   /** Corpo original do HTTP; o repositório faz JSON.parse e calcula o hash destes mesmos bytes. */
   corpoOriginal: string;
   http: number;
   requestId: string | null;
+  /** Somente o contrato marginal possui versão explícita; recibos antigos ficam NULL. */
+  versaoContrato?: 1;
 }
 export interface FalhaAnalytics {
   codigo: Classificacao['tipo'] | 'contrato' | 'limite-local' | 'posse-perdida';

@@ -8,6 +8,7 @@ import {
   type ResultadoDoPainelAnalytics,
 } from '../ifood/painel-campos';
 import { RecorteGrandeDoPainel, resumirPainelAnalytics, type LinhaAgregadaDoPainelAnalytics } from '../ifood/painel-resumo';
+import { lerPagamentosDoPainel } from './painel-pagamentos';
 
 const MAX_LINHAS_AGREGADAS = 20_000;
 class FotografiaInvalidaDoPainel extends Error {}
@@ -125,8 +126,13 @@ export async function lerPainelAnalytics(
         const grupo = linhasPorDia.get(l.dia);
         if (grupo) grupo.push(l); else linhasPorDia.set(l.dia, [l]);
       }
+      // A marginal compartilha a fotografia da TX, mas tem versões/cobertura próprias.
+      const pagamentos = await lerPagamentosDoPainel(tx, dias, selecionadas.map(chave => ({
+        chave, moduloId: porMerchant.get(chave)![0].modulos[0]?.id ?? null, ambigua: ambiguas.has(chave),
+      })));
       return { ok: true, lojas, filtros, ambiente, painel: {
         loja, ambiente, periodo: { inicio: filtros.inicio, fim: filtros.fim, fuso: FUSO_DO_PAINEL, ateOntem: ontem }, fontes, cobertura,
+        pagamentos,
         resumo: resumirPainelAnalytics(linhas, cobertura.completa, selecionadas.length > 0),
         serie: coberturaDias.map(d => ({ dia: d.dia, completo: d.completo, indicadores: resumirPainelAnalytics(linhasPorDia.get(d.dia) ?? [], d.completo, selecionadas.length > 0).indicadores })),
       } };

@@ -1,4 +1,4 @@
-# Coleta Analytics — INT-1.6
+# Coleta Analytics — diário e pagamentos
 
 O worker mantém uma rotina Analytics separada da prospecção. Ela não cadastra,
 autoriza nem ativa lojas. A automação atende somente conexões de PRODUCAO,
@@ -29,10 +29,12 @@ não revela URLs, identificadores da sessão, credenciais ou respostas.
 - D-1 a partir de 9h30 de Brasília; a data civil vem do fuso da janela. Hoje
   o cadastro de lojas usa o fuso da operação no Rio; o job o registra
   explicitamente. Alterar o fuso de uma janela existente é recusado.
-- Revisão dos16 dias anteriores. D-1 e revisão disputam a mesma identidade;
+- Revisão dos 16 dias anteriores em cada perfil, `diario` e `pagamentos`.
+  D-1 e revisão disputam a mesma identidade dentro do perfil;
   repetir o planejamento no mesmo ciclo não reexecuta uma janela concluída.
-- Histórico por dia, atrás do primeiro dia planejado, até13 meses. No máximo
-  uma janela histórica por loja/rodada e20 pendentes. Não supor que dia vazio
+- Histórico por dia, atrás do primeiro dia planejado, até 13 meses. Cada perfil
+  tem marco próprio, no máximo uma janela histórica por loja/rodada e 20
+  pendentes. Não supor que dia vazio
   encerra o histórico nem que a API garante essa retenção.
 - 429 respeita `naoAntesDe` integral no banco e bloqueia conservadoramente
   todas as chamadas Analytics até o prazo, inclusive depois de reinício;
@@ -42,8 +44,20 @@ não revela URLs, identificadores da sessão, credenciais ou respostas.
   administrativa. Rede/5xx e404 ficam para nova tentativa após4 h.
   Contrato inválido exige diagnóstico, não repetição imediata.
 
-Há rodízio por parceiro e módulo, com uma tarefa por rodada. Histórico tem
-prioridade inferior a D-1/revisão. A reserva Analytics persiste espaçamento
+Há rodízio por parceiro e módulo, com uma tarefa por rodada. Dentro do parceiro,
+os perfis elegíveis são ordenados pela última tentativa iniciada persistida;
+os nunca iniciados vêm antes, com desempate inicial acesso/diário/pagamentos.
+Isso preserva o rodízio após reinício e evita uma fila diária continuamente
+elegível monopolizar pagamentos. Não define prazo sob sobrecarga. Histórico tem
+prioridade inferior a D-1/revisão dentro de cada perfil.
+
+Após 9h30, módulo ATIVO planeja no máximo 35 upserts: um de acesso e até 17
+por perfil (16 dias recentes e uma janela histórica). Módulo AUTORIZADO
+continua somente com verificação de acesso. Uma rodada adquire uma tarefa,
+com `maxTentativas=1` no cliente HTTP. O perfil diário conserva sua paginação;
+a marginal solicita apenas página 1/tamanho 1. Cada emissão passa novamente
+pelo guard e pela cota, inclusive a renovação canônica após 401. OAuth conserva
+seu fluxo separado. A reserva Analytics persiste espaçamento
 de150 ms entre chamadas (teto local400/min); OAuth mantém seu limitador e
 cache coordenado próprios. A reserva pode desperdiçar uma posição em falha,
 mas não a reutiliza antecipadamente.
@@ -75,6 +89,38 @@ zero grupos. Falha ou ausência nunca se torna zero. O último snapshot válido
 é retornado junto com o estado/erro da coleta. Período fechado recebe versão
 PENDENTE_PERIODO, conservando o último PUBLICADO. Não há ponte para faturamento
 ou DRE nesta fatia; essa é a INT-1.7.
+
+## Marginal de pagamentos — INT-1.8C
+
+O perfil `pagamentos` tem recibos e snapshots próprios, contrato versão 1 e
+hash que inclui ambiente, merchant, dia, fuso e parcelas. O corpo original
+continua imutável. O recibo marginal exige versão 1; recibos legados mantêm
+versão NULL, sem backfill. O [contrato de pagamentos](IFOOD_ANALYTICS_CONTRATO.md#pagamentos--int-18c-versão-1)
+define o envelope e os limites. Não é usado o parser de grupos diários.
+
+`IntegracaoPagamentoSnapshot` conserva SQL NULL para agregado ausente e array
+vazio para mapa explícito sem ocorrências. Métodos e contagens exatas são
+persistidos como parcelas; não viram pedidos únicos, dinheiro ou lançamento
+de faturamento. Snapshot igual reutiliza a última PUBLICADO sem mudar sua
+data, mas o novo recibo permanece. Revisão em período fechado fica como
+PENDENTE_PERIODO e não substitui a versão disponível. O no-op também reconfere
+o raw atual; uma versão pendente não é elegível como anterior publicado.
+
+A publicação marginal preserva a ordem período/acesso/fence, relê os recibos
+sob trava e exige sessão da posse viva, geração e prazo também na validação
+diferida do COMMIT. Acrescentar página depois da validação ou perder a sessão
+não permite concluir a tentativa como válida. 403/429, pausa e espaçamento
+global são os mesmos dos outros perfis, sem cota ou autorização paralela.
+
+No painel autorizado por Integração e Faturamento, cobertura e timestamps da
+marginal são próprios. Diário completo não completa pagamentos ausentes, nem
+pagamentos completos completam o diário. O total e os percentuais marginais
+usam ocorrências de métodos. Todos os readers compartilham uma transação
+repetível e somente leitura, sem misturar versões durante a consulta.
+
+Não foi capturada resposta marginal real nesta entrega. A implementação e os
+testes sintéticos não ativam apps, lojas, segredos ou homologação. O rollout
+continua condicionado aos mesmos controles administrativos.
 
 ## Diagnóstico e retomada
 

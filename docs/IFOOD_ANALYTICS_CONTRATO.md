@@ -1,4 +1,4 @@
-# Analytics — contrato INT-1.5
+# Analytics — contrato diário e distribuição de pagamentos
 
 O contrato separa resposta agrupada válida, cobertura completa e compatibilidade
 com a consulta diária. Nenhum desses estados autoriza uma loja nem publica
@@ -37,9 +37,8 @@ O Blueprint privado foi consultado; seu conteúdo não foi copiado para o reposi
 - Montadores mínimo, diário e de distribuições usam datas civis reais, intervalo
   inclusivo/exclusivo, página 1–1000, tamanho 1–10000 e omitem sort. A guarda D-1
   continua no leitor, com a data atual de Brasília. `ontemNoFuso` serve outros
-  fusos explícitos. O retorno de distribuições marginais terá schema próprio
-  quando sua forma real for confirmada; o parser agrupado não aceita esse retorno
-  como se fosse uma linha diária.
+  fusos explícitos. A marginal de pagamentos tem contrato próprio versionado
+  descrito abaixo; o parser agrupado não aceita esse retorno como uma linha diária.
 - Enums novos são preservados, assim como dimensões adicionais no corpo validado.
   A compatibilidade diária exige exatamente as quatro dimensões pedidas e as
   seis somas solicitadas. Campo presente nulo continua nulo; ausente não vira zero.
@@ -55,6 +54,47 @@ O Blueprint privado foi consultado; seu conteúdo não foi copiado para o reposi
 - Normalização diária revalida os recibos. Não aceita um objeto previamente
   rotulado completo. Não calcula médias de médias, não mistura estados e não
   publica um dia parcial. Quantidade de pedidos vem de groupByKey.count.
+
+## Pagamentos — INT-1.8C, versão 1
+
+O perfil `pagamentos` solicita `terms.paymentMethod.count`, sem `groupBy`,
+recorte comercial ou métrica monetária. Usa o dia civil com fim exclusivo,
+página 1 e tamanho 1. Sua identidade inclui ambiente, merchant UUID canônico,
+dia, fuso persistido, perfil e versão 1. Não reutiliza recibos do perfil diário.
+
+O envelope aceito contém exatamente um item em `data`, `currentPage=1`,
+`size=1`, `totalItems=1` e `totalPages=1`. O item contém `paymentMethod`,
+com agregado nulo ou mapa `value` de método para contagem; `cardinality`,
+quando presente, não é denominador. Uma resposta agrupada parcial, como a
+fixture TEST acima, não demonstra cobertura desta marginal e é recusada.
+
+Contagens são ocorrências de métodos de pagamento, **não pedidos únicos**.
+O total marginal é a soma dessas ocorrências e serve de denominador à sua
+distribuição; não se usa o total de pedidos diário. Não há conversão monetária.
+Cada contagem precisa ser inteira, não negativa e até `Number.MAX_SAFE_INTEGER`.
+O texto JSON original é validado antes de aceitar números de `JSON.parse`,
+incluindo integralidade decimal exata e chaves duplicadas com escapes. Valores
+fracionários que o Number arredondaria para inteiro também são recusados.
+
+O normalizador devolve `parcelas: null | [{metodo, ocorrencias}]`, com contagens
+em strings inteiras canônicas. O agregado nulo fica como SQL NULL: falta dado.
+Mapa vazio vira array vazio: total explícito zero. Método com contagem zero
+continua presente. Métodos desconhecidos e nomes literais como `null` ou
+`__proto__` são preservados sem classificação implícita. Limites locais:
+2 MiB por corpo, 2.000 métodos e 800 bytes UTF-8 por nome; ultrapassá-los recusa
+o recorte inteiro, sem truncá-lo. O SQL reconfere o corpo e as parcelas.
+
+O snapshot marginal e sua versão não preenchem `KpiIfoodDia` nem faturamento.
+No painel, a cobertura exige uma versão PUBLICADO para cada fonte/dia
+selecionado e é independente da cobertura diária. Uma fonte ausente ou
+incompatível impede a soma parcial do período; NULL propagado continua ausência.
+Uma revisão PENDENTE_PERIODO é indicada sem substituir a última PUBLICADO.
+
+Este contrato foi implementado a partir da documentação oficial citada e de
+casos sintéticos. **Não há resposta marginal real completa capturada nesta
+entrega.** A fixture oficial agrupada não foi convertida em marginal, e nenhum
+valor TEST é preenchido no produto. A implementação não homologa apps nem
+autoriza ou ativa a coleta de uma loja.
 
 ## Dinheiro
 
@@ -90,5 +130,6 @@ requestId, sem corpo bruto. Aceita arquivo regular até 10 MiB.
 **A fixture oficial deve produzir saída 1.** Isso não desfaz os HTTP 200 da
 INT-1.4. Demonstra a proteção que a futura INT-1.6 deve respeitar. Testes de janela
 completa e de normalização usam massa sintética identificada, sem alegar cobertura
-oficial dos 91 grupos. A ponte com faturamento, distribuição por pagamento,
-jobs, persistência, homologação e acesso produtivo continuam em suas fatias.
+oficial dos 91 grupos. O diagnóstico acima permanece específico do contrato
+diário; não valida a distribuição de pagamentos. Jobs, ponte financeira,
+homologação e acesso produtivo têm gates próprios.

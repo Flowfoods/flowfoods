@@ -1,4 +1,5 @@
-/** INT-1.8B: contrato puro do painel financeiro. Strings decimais não passam por Number. */
+/** Contrato puro do painel. Strings decimais não passam por Number. */
+import type { PagamentosDoPainelAnalytics } from './painel-pagamentos';
 export type InteiroDecimalAnalytics = string;
 export type MotivoSemDadoAnalytics = 'cobertura-parcial' | 'sem-fontes' | 'valor-nao-informado' | 'sem-pedidos' | 'status-nao-classificado' | 'contrato-indisponivel';
 export type MedidaAnalytics<T> = { estado: 'disponivel'; valor: T } | { estado: 'sem-dado'; motivo: MotivoSemDadoAnalytics };
@@ -53,6 +54,7 @@ export interface PainelAnalytics {
   periodo: { inicio: string; fim: string; fuso: 'America/Sao_Paulo'; ateOntem: string };
   fontes: FonteDoPainelAnalytics[];
   cobertura: CoberturaDoPainelAnalytics;
+  pagamentos: PagamentosDoPainelAnalytics;
   resumo: ResumoDoPainelAnalytics;
   serie: Array<{ dia: string; completo: boolean; indicadores: IndicadoresAnalytics }>;
 }
