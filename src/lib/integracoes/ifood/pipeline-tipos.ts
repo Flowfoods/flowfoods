@@ -1,0 +1,50 @@
+import type { IdentidadeAnalytics, UnidadeMonetariaAnalytics } from './analytics';
+import type { Classificacao } from './respostas';
+
+export type TipoJanela = 'D1' | 'REVISAO' | 'HISTORICO' | 'ACESSO';
+export interface JanelaAnalytics {
+  moduloId: string;
+  dia: string;
+  tipo: TipoJanela;
+  /** Data civil do planejamento: repetir o mesmo ciclo não reagenda uma janela terminal. */
+  ciclo: string;
+  fuso: string;
+  unidade: UnidadeMonetariaAnalytics['unidade'];
+}
+export interface TarefaAnalytics {
+  id: string;
+  parceiroId: string;
+  moduloId: string;
+  appId: string;
+  lojaId: string;
+  geracao: number;
+  dono: string;
+  perfil: 'diario' | 'acesso';
+  tipo: TipoJanela;
+  identidade: IdentidadeAnalytics;
+  fuso: string;
+  unidade: UnidadeMonetariaAnalytics;
+}
+export interface PaginaDoTransporte {
+  pagina: number;
+  /** Corpo original do HTTP; o repositório faz JSON.parse e calcula o hash destes mesmos bytes. */
+  corpoOriginal: string;
+  http: number;
+  requestId: string | null;
+}
+export interface FalhaAnalytics {
+  codigo: Classificacao['tipo'] | 'contrato' | 'limite-local' | 'posse-perdida';
+  http?: number | null;
+  requestId?: string | null;
+  naoAntesDe?: string;
+}
+export class ErroPipelineAnalytics extends Error {
+  constructor(public readonly codigo: 'ACESSO' | 'POSSE' | 'ENTRADA' | 'LIMITE' | 'CORPO', mensagem: string) {
+    super(mensagem);
+    this.name = 'ErroPipelineAnalytics';
+  }
+}
+export const LIMITE_BYTES_JANELA = 32 * 1024 * 1024;
+export const LIMITE_GRUPOS_JANELA = 50_000;
+export const LEASE_SEGUNDOS = 120;
+export const PRIORIDADE: Record<TipoJanela, number> = { ACESSO: 0, D1: 1, REVISAO: 2, HISTORICO: 3 };

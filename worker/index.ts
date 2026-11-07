@@ -26,6 +26,7 @@ import { dispararProximo } from '../src/lib/rodolfo/lote';
 import { lerConfig } from '../src/lib/rodolfo/config';
 import { montarEstadoEnvio } from '../src/lib/rodolfo/estado';
 import { TransporteEvolutionHttp } from '../src/lib/whatsapp/evolution';
+import { executarRotinaAnalytics } from '../src/lib/integracoes/core/rotina-analytics';
 
 /** Quanto esperar quando não há nada a fazer (fora da janela, teto batido). */
 const ESPERA_OCIOSA_S = 300;
@@ -118,6 +119,8 @@ async function principal(): Promise<void> {
 
   let ultimaChecagem = 0;
   let parar = false;
+  const encerrarAnalytics = new AbortController();
+  const analytics = executarRotinaAnalytics(encerrarAnalytics.signal, (estado, detalhe) => log(estado === 'falha' ? 'aviso' : 'info', 'analytics', { estado, ...detalhe }));
 
   // Encerramento limpo: o Dokploy manda SIGTERM no redeploy. Terminar a volta
   // atual antes de sair evita deixar uma mensagem em PENDENTE sem dono.
@@ -125,6 +128,7 @@ async function principal(): Promise<void> {
     process.on(sinal, () => {
       log('info', 'sinal recebido, encerrando depois desta volta', { sinal });
       parar = true;
+      encerrarAnalytics.abort();
     });
   }
 
@@ -156,6 +160,8 @@ async function principal(): Promise<void> {
     await dormir(espera);
   }
 
+  encerrarAnalytics.abort();
+  await analytics;
   await prisma.$disconnect();
   log('info', 'worker encerrado');
 }

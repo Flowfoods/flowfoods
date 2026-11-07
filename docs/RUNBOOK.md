@@ -2,6 +2,8 @@
 
 O que fazer, na ordem, e o que fazer quando algo trava.
 
+Para a coleta Analytics do ERP, veja [pausa, retomada, concorrência e evidências](INTEGRACAO-ANALYTICS.md).
+
 ---
 
 ## 1. Primeira vez (uma vez só)

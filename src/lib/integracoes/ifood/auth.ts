@@ -23,7 +23,7 @@
 import { segredoCombinaComAmbiente } from '../core/campos';
 import { baseDaApiIfood, chaveDeCifragem, cifrar, decifrar, ErroDeCofre, integracaoIfoodAtiva, lerSegredo } from '../core/cofre';
 import type { Limitador } from './limitador';
-import { classificar, esperaDoBackoff, FRASE_DA_CLASSIFICACAO } from './respostas';
+import { classificar, esperaDoBackoff, FRASE_DA_CLASSIFICACAO, type Classificacao } from './respostas';
 import { FalhaDeRede, type Transporte } from './transporte';
 
 export type EstadoDeHomologacao = 'NAO_SE_APLICA' | 'PENDENTE' | 'EM_ANDAMENTO' | 'HOMOLOGADO' | 'RECUSADO';
@@ -67,10 +67,21 @@ export interface ArmazemDeToken extends OperacoesDoArmazem {
   comTrava<T>(appId: string, f: (a: OperacoesDoArmazem) => Promise<T>): Promise<T>;
 }
 
+export type ClassificacaoDeRetomada = Extract<Classificacao, { tipo: 'limite' | 'prazo-invalido' }>;
+export interface RetomadaDeAutenticacao { classificacao: ClassificacaoDeRetomada; requestId?: string | null }
+
 export class ErroDeAutenticacao extends Error {
-  constructor(mensagem: string) {
+  readonly classificacaoRetomada?: ClassificacaoDeRetomada;
+  readonly status?: 429;
+  readonly requestId?: string | null;
+  constructor(mensagem: string, retomada?: RetomadaDeAutenticacao) {
     super(mensagem);
     this.name = 'ErroDeAutenticacao';
+    if (retomada) {
+      this.classificacaoRetomada = retomada.classificacao;
+      this.status = 429;
+      this.requestId = retomada.requestId && /^[\w.:-]{1,120}$/.test(retomada.requestId) ? retomada.requestId : null;
+    }
   }
 }
 
@@ -197,10 +208,12 @@ export class ServicoDeToken {
     const corpo = new URLSearchParams({ grantType: 'client_credentials', clientId: app.clientId, clientSecret: segredo }).toString();
     const url = `${baseDaApiIfood(this.o.env)}/authentication/v1.0/oauth/token`;
     const prazo = this.relogio() + PRAZO_DO_PEDIDO_DE_TOKEN_MS;
+    let ultimaRetomada: RetomadaDeAutenticacao | undefined;
     for (let tentativa = 1; tentativa <= TENTATIVAS_DO_TOKEN; tentativa++) {
       await this.o.limitador.esperarVez('autenticacao');
       const restante = prazo - this.relogio();
-      if (restante < 1000) throw new ErroDeAutenticacao('O iFood não entregou o token dentro do prazo. Tente de novo.');
+      if (restante < 1000) throw new ErroDeAutenticacao('O iFood não entregou o token dentro do prazo. Tente de novo.', ultimaRetomada);
+      ultimaRetomada = undefined;
       let r;
       try {
         r = await this.o.transporte({
@@ -231,7 +244,9 @@ export class ServicoDeToken {
       if (c.tipo === 'nao-autenticado' || c.tipo === 'requisicao-invalida' || c.tipo === 'sem-permissao') {
         throw new ErroDeAutenticacao(`O iFood recusou a credencial do app (HTTP ${r.status}). Confira o Client ID do app e o segredo em ${app.nomeDoSegredo}; nada foi repetido.`);
       }
-      if (c.tipo === 'prazo-invalido') throw new ErroDeAutenticacao(FRASE_DA_CLASSIFICACAO[c.tipo]);
+      const retomada: RetomadaDeAutenticacao | undefined = c.tipo === 'limite' || c.tipo === 'prazo-invalido'
+        ? { classificacao: c, requestId: r.cabecalhos['x-request-id'] ?? r.cabecalhos['x-trace-id'] ?? null } : undefined;
+      if (c.tipo === 'prazo-invalido') throw new ErroDeAutenticacao(FRASE_DA_CLASSIFICACAO[c.tipo], retomada);
       if ((c.tipo === 'limite' || c.tipo === 'indisponivel') && tentativa < TENTATIVAS_DO_TOKEN) {
         const pedida = c.tipo === 'limite' ? c.prazo?.esperarMs ?? null : null;
         const espera = pedida ?? esperaDoBackoff(tentativa + 1, this.o.aleatorio);
@@ -239,17 +254,19 @@ export class ServicoDeToken {
           espera,
           prazo,
           c.tipo === 'limite' ? `O iFood pediu para esperar ${Math.ceil(espera / 1000)} s antes de outro token. Nada foi repetido agora; tente de novo depois.` : 'O iFood não respondeu ao pedido de token dentro do prazo. Tente de novo.',
+          retomada,
         );
+        ultimaRetomada = retomada;
         continue;
       }
-      throw new ErroDeAutenticacao(`O iFood não entregou o token (HTTP ${r.status}).`);
+      throw new ErroDeAutenticacao(`O iFood não entregou o token (HTTP ${r.status}).`, retomada);
     }
     throw new ErroDeAutenticacao('O iFood não entregou o token.');
   }
 
   /** Espera só se couber no prazo (com a trava presa, não se espera além dele). */
-  private async esperarDentroDoPrazo(ms: number, prazo: number, frase: string): Promise<void> {
-    if (this.relogio() + ms + 1000 > prazo) throw new ErroDeAutenticacao(frase);
+  private async esperarDentroDoPrazo(ms: number, prazo: number, frase: string, retomada?: RetomadaDeAutenticacao): Promise<void> {
+    if (this.relogio() + ms + 1000 > prazo) throw new ErroDeAutenticacao(frase, retomada);
     await this.dormir(ms);
   }
 }

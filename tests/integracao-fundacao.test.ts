@@ -145,8 +145,8 @@ describe('INT-1.1 · guardas', () => {
       for (const f of arquivos(raiz)) {
         if (f.startsWith(join('src', 'lib', 'integracoes') + sep)) continue;
         const txt = readFileSync(f, 'utf8');
-        if (/\.\s*integracao(App|Token)\s*\./.test(txt)) furos.push(`${f}: integracaoApp/integracaoToken`);
-        if (/\$(queryRaw|executeRaw)[\s\S]{0,400}"Integracao(App|Token)"/.test(txt)) furos.push(`${f}: SQL cru na tabela global`);
+        if (/\.\s*integracao(App|Token|Controle)\s*\./.test(txt)) furos.push(`${f}: tabela global da integração`);
+        if (/\$(queryRaw|executeRaw)[\s\S]{0,400}"Integracao(App|Token|Controle)"/.test(txt)) furos.push(`${f}: SQL cru na tabela global`);
       }
     }
     expect(furos).toEqual([]);
@@ -157,8 +157,8 @@ describe('INT-1.1 · guardas', () => {
     for (const raiz of [join('src', 'app', 'erp'), join('src', 'app', 'entrar'), join('src', 'components', 'erp'), join('src', 'lib', 'integracoes', 'core', 'do-parceiro.ts')]) {
       for (const f of raiz.endsWith('.ts') ? [raiz] : arquivos(raiz)) {
         const txt = readFileSync(f, 'utf8');
-        if (/(from\s+|import\s*\(\s*|require\s*\(\s*)['"][^'"]*\/(conexoes|apps)['"]/.test(txt)) furos.push(`${f}: importa a Central`);
-        if (/\.\s*integracao(App|Token)\b/.test(txt)) furos.push(`${f}: tabela global`);
+        if (/(from\s+|import\s*\(\s*|require\s*\(\s*)['"][^'"]*\/(conexoes|apps|controle-analytics|rotina-analytics|posse-analytics)['"]/.test(txt)) furos.push(`${f}: importa a Central`);
+        if (/\.\s*integracao(App|Token|Controle)\b/.test(txt)) furos.push(`${f}: tabela global`);
         if (/\b(mudarLiberacao|ligarConexao|desligarConexao|prepararModulo|mudarModulo|registrarApp)\b/.test(txt)) furos.push(`${f}: chama quem grava`);
       }
     }
