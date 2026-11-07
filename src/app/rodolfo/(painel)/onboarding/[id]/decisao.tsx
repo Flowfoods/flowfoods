@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Painel de decisão do pedido (0.5): mover de etapa, ativar (com o link de
  * primeiro acesso mostrado UMA vez) e recusar com motivo. Um componente só,
@@ -10,8 +12,17 @@
  * Funciona sem JavaScript: cada bloco é um formulário com a action.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Painel de decisão do pedido (0.5): mover de etapa, ativar (com o link de
+ * primeiro acesso mostrado UMA vez) e recusar com motivo. Um componente só,
+ * sempre montado na página: a ativação revalida a tela e o pedido vira
+ * "Ativado", mas o link que acabou de nascer precisa continuar à vista. O
+ * resto (resumo de ativado e de recusado) é da página.
+ *
+ * Funciona sem JavaScript: cada bloco é um formulário com a action.
+ */
+import { useState, useActionState } from 'react';
+
 import { ERRO_DONO_JA_TEM_ACESSO } from '@/lib/erp/pedido-textos';
 import { gerarSlug } from '@/lib/erp/slug';
 import { BotaoEnviar } from '@/components/erp/ui/botoes';
@@ -41,9 +52,9 @@ export function DecisaoDoPedido({
   mover: Acao;
   recusar: Acao;
 }) {
-  const [estAtivar, enviarAtivar] = useFormState<EstadoDoPedido, FormData>(ativar, null);
-  const [estMover, enviarMover] = useFormState<EstadoDoPedido, FormData>(mover, null);
-  const [estRecusar, enviarRecusar] = useFormState<EstadoDoPedido, FormData>(recusar, null);
+  const [estAtivar, enviarAtivar] = useActionState<EstadoDoPedido, FormData>(ativar, null);
+  const [estMover, enviarMover] = useActionState<EstadoDoPedido, FormData>(mover, null);
+  const [estRecusar, enviarRecusar] = useActionState<EstadoDoPedido, FormData>(recusar, null);
   const [nome, setNome] = useState(padrao.nomeParceiro);
   const [slug, setSlug] = useState('');
   const [slugEditado, setSlugEditado] = useState(false);
@@ -82,7 +93,7 @@ export function DecisaoDoPedido({
   return (
     <Painel titulo="Decisão" subtitulo="O pedido é seu: avance a conversa, ative ou recuse.">
       <div className="space-y-6">
-        <form action={enviarMover} className="space-y-2">
+        <FormularioComAcao action={enviarMover} className="space-y-2">
           <input type="hidden" name="versao" value={versao} />
           <input type="hidden" name="para" value={status === 'NOVO' ? 'EM_CONVERSA' : 'NOVO'} />
           <BotaoEnviar variante="secundario" className="w-full" pendente="Movendo…">
@@ -93,9 +104,9 @@ export function DecisaoDoPedido({
               {estMover.ok ? estMover.mensagem : estMover.erros?.geral}
             </p>
           )}
-        </form>
+        </FormularioComAcao>
 
-        <form action={enviarAtivar} className="space-y-4 border-t border-linha pt-5">
+        <FormularioComAcao action={enviarAtivar} className="space-y-4 border-t border-linha pt-5">
           <h3 className="text-[13px] font-semibold text-texto">Ativar</h3>
           <p className="text-[13px] text-suave">
             Cria o parceiro já ativo, o dono (com a rede inteira) e o link para ele criar a senha.
@@ -190,11 +201,11 @@ export function DecisaoDoPedido({
           <BotaoEnviar className="w-full" pendente="Ativando…" disabled={emConflito}>
             Ativar e criar acesso
           </BotaoEnviar>
-        </form>
+        </FormularioComAcao>
 
         <details className="border-t border-linha pt-5" open={!!estRecusar && !estRecusar.ok}>
           <summary className={`${classeDeBotao('perigo', 'w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden')}`}>Recusar este pedido</summary>
-          <form action={enviarRecusar} className="mt-3 space-y-3">
+          <FormularioComAcao action={enviarRecusar} className="mt-3 space-y-3">
             <input type="hidden" name="versao" value={versao} />
             <div>
               <label htmlFor="recusar-motivo" className={ROTULO}>
@@ -218,7 +229,7 @@ export function DecisaoDoPedido({
             <BotaoEnviar variante="perigo" className="w-full" pendente="Recusando…">
               Recusar pedido
             </BotaoEnviar>
-          </form>
+          </FormularioComAcao>
         </details>
       </div>
     </Painel>
@@ -227,12 +238,12 @@ export function DecisaoDoPedido({
 
 /** Excluir os dados pessoais de um pedido recusado (LGPD). A confirmação é abrir o bloco. */
 export function ExcluirDados({ excluir, jaExcluido }: { excluir: (anterior: EstadoDoPedido) => Promise<EstadoDoPedido>; jaExcluido: boolean }) {
-  const [estado, enviar] = useFormState<EstadoDoPedido, FormData>(excluir as unknown as Acao, null);
+  const [estado, enviar] = useActionState<EstadoDoPedido, FormData>(excluir as unknown as Acao, null);
   if (jaExcluido) return <p className="text-[13px] text-suave">Os dados pessoais deste pedido já foram excluídos.</p>;
   return (
     <details>
       <summary className={classeDeBotao('perigo', 'w-full cursor-pointer list-none [&::-webkit-details-marker]:hidden')}>Excluir dados pessoais</summary>
-      <form action={enviar} className="mt-3 space-y-3">
+      <FormularioComAcao action={enviar} className="mt-3 space-y-3">
         <p className="text-[13px] text-suave">
           Apaga nome, WhatsApp, e-mail e cidade deste pedido. O cartão e o histórico ficam, sem dado pessoal. Não dá para desfazer.
         </p>
@@ -244,7 +255,7 @@ export function ExcluirDados({ excluir, jaExcluido }: { excluir: (anterior: Esta
             {estado.ok ? estado.mensagem : estado.erros?.geral}
           </p>
         )}
-      </form>
+      </FormularioComAcao>
     </details>
   );
 }

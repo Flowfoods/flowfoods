@@ -16,7 +16,8 @@ vi.mock('next/navigation', () => ({
     throw new Error('NOT_FOUND');
   },
 }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
   return {
@@ -122,7 +123,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
 
   it('operador: detalhe e impressão sem nenhum valor de custo; as etapas, quantidades e o resto da operação continuam', async () => {
     atual.ctx = ctxDe('OPERADOR');
-    const det = (await ErpFichaPage({ params: { id: ids.ficha }, searchParams: {} })) as Props;
+    const det = (await ErpFichaPage({ params: Promise.resolve({ id: ids.ficha }), searchParams: Promise.resolve({}) })) as Props;
     expect(det.props.ficha.verCustos).toBe(false);
     expect(det.props.ficha.custo).toBeNull();
     expect(det.props.ficha.itens.every((i) => i.custo === null && i.custoDoInsumo === null)).toBe(true);
@@ -130,7 +131,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect(det.props.ficha.passosPreparo).toEqual(['Aquecer a chapa.', 'Tostar o pão.']);
     // Nem o número cru (737 centavos) nem fração de custo saem do servidor.
     expect(json(det.props.ficha)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
-    const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
+    const imp = (await ErpImprimirFichaPage({ params: Promise.resolve({ id: ids.ficha }) })) as Impressao;
     expect(imp.props.ficha.verCustos).toBe(false);
     expect(imp.props.podeFinanceiro).toBe(false);
     expect('canais' in imp.props).toBe(false);
@@ -144,7 +145,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
   it('operador: a lista vem sem custo em nenhuma linha e sem o filtro de custo', async () => {
     atual.ctx = ctxDe('OPERADOR');
     type El = { props: { children: El[] | El; linhas?: { custo: unknown }[]; verCustos?: boolean; filtros?: unknown } };
-    const pagina = (await ErpFichasPage({ searchParams: {} })) as El;
+    const pagina = (await ErpFichasPage({ searchParams: Promise.resolve({}) })) as El;
     const filhos = ([] as El[]).concat(pagina.props.children);
     const tela = filhos.find((c) => c && 'linhas' in c.props)!;
     expect(tela.props.linhas!.length).toBeGreaterThan(0);
@@ -157,12 +158,12 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
 
   it('gerente (vê preços): detalhe, lista e impressão com os custos e a área de preço por canal', async () => {
     atual.ctx = ctxDe('GERENTE');
-    const det = (await ErpFichaPage({ params: { id: ids.ficha }, searchParams: {} })) as Props;
+    const det = (await ErpFichaPage({ params: Promise.resolve({ id: ids.ficha }), searchParams: Promise.resolve({}) })) as Props;
     expect(det.props.ficha.verCustos).toBe(true);
     expect(det.props.ficha.custo).not.toBeNull();
     expect(det.props.canais).not.toBeNull();
     // Impressão (decisão de 31/10): a página sai SEM valores mesmo para quem vê preços; eles só vêm pela ação, sob escolha.
-    const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
+    const imp = (await ErpImprimirFichaPage({ params: Promise.resolve({ id: ids.ficha }) })) as Impressao;
     expect(imp.props.ficha.verCustos).toBe(false);
     expect(imp.props.podeFinanceiro).toBe(true);
     expect(json(imp.props.ficha)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
@@ -172,19 +173,19 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     expect(comValores.ficha.id).toBe(ids.ficha);
     expect(comValores.canais).toHaveLength(3);
     type El = { props: { children: El[] | El; linhas?: { custo: unknown }[] } };
-    const pagina = (await ErpFichasPage({ searchParams: {} })) as El;
+    const pagina = (await ErpFichasPage({ searchParams: Promise.resolve({}) })) as El;
     const tela = ([] as El[]).concat(pagina.props.children).find((c) => c && 'linhas' in c.props)!;
     expect(tela.props.linhas!.every((l) => l.custo !== null)).toBe(true);
   });
 
   it('ficha de outro parceiro na URL da impressão: 404', async () => {
     atual.ctx = ctxDe('DONO');
-    await expect(ErpImprimirFichaPage({ params: { id: 'naoexiste123' } })).rejects.toThrow(/NOT_FOUND/);
+    await expect(ErpImprimirFichaPage({ params: Promise.resolve({ id: 'naoexiste123' }) })).rejects.toThrow(/NOT_FOUND/);
   });
 
   it('impressão: o papel sem valores não tem título nem número financeiro; com valores, tem a área por canal', async () => {
     atual.ctx = ctxDe('GERENTE');
-    const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
+    const imp = (await ErpImprimirFichaPage({ params: Promise.resolve({ id: ids.ficha }) })) as Impressao;
     const html = renderToStaticMarkup(createElement(TelaImpressaoFicha, imp.props));
     expect(html).toContain('Tostar o pão.');
     expect(html).toContain('Imprimir ou salvar em PDF');
@@ -215,7 +216,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
       const r = await acaoImpressaoFinanceira(fb.id, versaoDeB);
       expect(r).toEqual({ ok: false, erro: 'Ficha não encontrada.' });
       expect(json(r)).not.toMatch(/913|737/);
-      await expect(ErpImprimirFichaPage({ params: { id: fb.id } })).rejects.toThrow(/NOT_FOUND/);
+      await expect(ErpImprimirFichaPage({ params: Promise.resolve({ id: fb.id }) })).rejects.toThrow(/NOT_FOUND/);
     } finally {
       await limparParceiros(db, perfil, [Q.id]);
     }
@@ -223,7 +224,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
 
   it('impressão: o navegador recebe só o que o papel usa (sem histórico, autores, usos ou composição do pré-preparo)', async () => {
     atual.ctx = ctxDe('GERENTE');
-    const imp = (await ErpImprimirFichaPage({ params: { id: ids.ficha } })) as Impressao;
+    const imp = (await ErpImprimirFichaPage({ params: Promise.resolve({ id: ids.ficha }) })) as Impressao;
     const campos = ['ativa', 'consumoImediato', 'custo', 'descricao', 'foto', 'id', 'itens', 'materiais', 'modoPreparo', 'nome', 'passosPreparo', 'rendimentoMilesimos', 'tipo', 'unidadeRendimento', 'validades', 'verCustos', 'versao', 'versaoOperacional'];
     expect(Object.keys(imp.props.ficha).sort()).toEqual(campos);
     expect(imp.props.ficha.materiais).toEqual([]);
@@ -237,7 +238,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
 
   it('nível 1: a página também sai sem valores e a ação do nível 1 devolve os valores da mesma versão', async () => {
     atual.ctx = ctxDe('DONO');
-    const imp = (await ParceiroImprimirFichaPage({ params: { slug: P.id, id: ids.ficha } })) as Impressao;
+    const imp = (await ParceiroImprimirFichaPage({ params: Promise.resolve({ slug: P.id, id: ids.ficha }) })) as Impressao;
     expect(imp.props.ficha.verCustos).toBe(false);
     expect(imp.props.podeFinanceiro).toBe(true);
     expect(json(imp.props.ficha)).not.toMatch(/[:,[]737(?!\d)|"737n"|porRendimento|"centavos"/);
@@ -260,7 +261,7 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
 
   it('editor sem ver preços: criar e editar recebem do servidor opções e pré-preparos sem nenhum custo', async () => {
     atual.ctx = editorSemCustos;
-    const paginas = [await ErpNovaFichaPage({}), await ErpEditarFichaPage({ params: { id: ids.ficha } })] as Formulario[];
+    const paginas = [await ErpNovaFichaPage({}), await ErpEditarFichaPage({ params: Promise.resolve({ id: ids.ficha }) })] as Formulario[];
     for (const pagina of paginas) {
       expect(pagina.props.verCustos).toBe(false);
       expect(pagina.props.opcoes.length).toBeGreaterThan(0);
@@ -306,9 +307,9 @@ describe.skipIf(!URL_TESTE)('ERP N.5 · visão operacional e gerencial da ficha 
     atual.ctx = ctxDe('GERENTE');
     const paginas = [
       await ErpNovaFichaPage({}),
-      await ErpEditarFichaPage({ params: { id: ids.ficha } }),
-      await ParceiroNovaFichaPage({ params: { slug: 'visoes' } }),
-      await ParceiroEditarFichaPage({ params: { slug: 'visoes', id: ids.ficha } }),
+      await ErpEditarFichaPage({ params: Promise.resolve({ id: ids.ficha }) }),
+      await ParceiroNovaFichaPage({ params: Promise.resolve({ slug: 'visoes' }) }),
+      await ParceiroEditarFichaPage({ params: Promise.resolve({ slug: 'visoes', id: ids.ficha }) }),
     ] as Formulario[];
     for (const pagina of paginas) {
       expect(pagina.props.verCustos).toBe(true);

@@ -29,15 +29,15 @@ import {
   type FiltrosDeFicha,
   type FiltroDoCmv,
 } from '@/lib/erp/ficha-campos';
-import { formatarDinheiro, formatarFracao } from '@/lib/erp/unidades';
+import { formatarDinheiro, formatarFracao, formatarPontosBase } from '@/lib/erp/unidades';
 import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { Miniatura } from './miniatura';
 import { CANAIS } from '@/lib/erp/canal-campos';
-import { STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
+import { porcentagemDoCmv, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
 import type { FiltroDaFaixaDoCmv } from '@/lib/erp/cmv-faixas-campos';
-import { APRESENTACAO_DA_FAIXA, AVISO_DO_ARREDONDAMENTO, FarolDeCmv, textoDoFarol } from './farol';
+import { APRESENTACAO_DA_FAIXA, AVISO_DO_ARREDONDAMENTO, FarolDeCmv } from './farol';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 import { TextoClassificacao } from './texto-classificacao';
 
@@ -54,10 +54,32 @@ function CmvNaLista({ x }: { x: CmvDoCanal }) {
   );
 }
 
-/** Celular e tablet: faixa e comparação com a meta têm rótulos próprios. */
-function cmvEmLinha(contas: readonly CmvDoCanal[]): string {
-  const partes = contas.map(x => `${CANAIS[x.canal].curto}: ${textoDoFarol(x)}`);
-  return `CMV: ${partes.join('; ')}`;
+/** Resumo por canal; só agrupa informações que são iguais em todos os canais. */
+function CmvPorCanal({ contas }: { contas: readonly CmvDoCanal[] }) {
+  if (!contas.length) return null;
+  const primeira = contas[0];
+  const faixaComum = contas.length > 1 && contas.every(x => x.farol.faixa === primeira.farol.faixa && !x.farol.motivo)
+    && primeira.farol.faixa !== 'semDados' && primeira.farol.faixa !== 'naoOfertado';
+  const metaComum = contas.length > 1 && contas.every(x => x.ofertado && x.metaBp === primeira.metaBp && x.status === primeira.status);
+  const meta = (x: CmvDoCanal) => x.metaBp === null ? 'Meta não definida' : `Meta: ${formatarPontosBase(x.metaBp)} · ${STATUS_DO_CMV[x.status].rotulo}`;
+  return <div className="mt-2 space-y-1.5 text-[12px] leading-snug tabular-nums text-suave">
+    <p className="font-medium text-texto">CMV por canal</p>
+    <dl className="grid grid-cols-1 gap-x-4 gap-y-2 min-[400px]:grid-cols-3">
+      {contas.map(x => <div key={x.canal} className="min-w-0">
+        <dt className="font-medium text-texto">{CANAIS[x.canal].curto}</dt>
+        <dd className="space-y-0.5 break-words">
+          {x.cmvBp && x.farol.faixa !== 'semDados' && x.farol.faixa !== 'naoOfertado' && <span className="block font-semibold text-texto">{porcentagemDoCmv(x.cmvBp)}</span>}
+          {!faixaComum && <span className="block">{APRESENTACAO_DA_FAIXA[x.farol.faixa].rotulo}</span>}
+          {x.farol.motivo && <span className="block">{x.farol.motivo}</span>}
+          {!metaComum && x.ofertado && <span className="block">{meta(x)}</span>}
+        </dd>
+      </div>)}
+    </dl>
+    {(metaComum || faixaComum) && <div className="space-y-0.5 border-t border-linha pt-1.5">
+      {metaComum && <p>{meta(primeira)} · todos os canais</p>}
+      {faixaComum && <p>{APRESENTACAO_DA_FAIXA[primeira.farol.faixa].rotulo} · todos os canais</p>}
+    </div>}
+  </div>;
 }
 
 function hrefCom(base: string, f: FiltrosDeFicha, mudar: Partial<FiltrosDeFicha>): string {
@@ -222,7 +244,7 @@ export function TelaListaFichas({
             {(l.classificacao.secao || l.classificacao.subsecao || precos?.has(l.id) || correspondenciasCmv?.get(l.id)?.length || correspondenciasFaixasCmv?.get(l.id)?.length) ? <div className="min-w-0 space-y-2 px-4 pb-3">
               <TextoClassificacao classificacao={l.classificacao} />
               <Correspondencias pares={correspondenciasCmv?.get(l.id)} faixas={correspondenciasFaixasCmv?.get(l.id)} />
-              {precos?.get(l.id)?.map(x => <p key={x.canal} className="break-words text-[12px] leading-snug tabular-nums text-suave"><strong className="font-semibold text-texto">{CANAIS[x.canal].curto}:</strong> {textoDoFarol(x)}</p>)}
+              {precos?.get(l.id) && <CmvPorCanal contas={precos.get(l.id)!} />}
             </div> : null}
           </li>
         ))}
@@ -302,7 +324,7 @@ export function TelaListaFichas({
                       <span className={precos ? '' : 'lg:hidden'}>{!l.ativa && ' · Desativada'}</span>
                     </div>
                     {(l.consumoImediato || validadesEmTexto(l.validades)) && <div className="text-[12px] leading-snug text-suave">{l.consumoImediato ? 'Consumo imediato' : validadesEmTexto(l.validades)}</div>}
-                    {precos?.get(l.id) && <div className="text-[12px] leading-snug tabular-nums text-suave 2xl:hidden">{cmvEmLinha(precos.get(l.id)!)}</div>}
+                    {precos?.get(l.id) && <div className="2xl:hidden"><CmvPorCanal contas={precos.get(l.id)!} /></div>}
                   </div>
                 </div>
               </td>

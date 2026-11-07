@@ -9,7 +9,11 @@ import { acaoExcluirInsumo, acaoSituacaoInsumo } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroRemoverInsumoPage({ params, searchParams }: { params: { slug: string; id: string }; searchParams: { de?: string } }) {
+export default async function ParceiroRemoverInsumoPage(
+  props: { params: Promise<{ slug: string; id: string }>; searchParams: Promise<{ de?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.editar');
   const insumo = await lerRemocao(ctx.cliente, params.id);

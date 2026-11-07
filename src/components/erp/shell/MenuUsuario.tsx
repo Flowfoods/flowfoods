@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Menu do usuário: nome, papel e iniciais; o tema (Claro / Escuro / Do
  * aparelho); links da conta; Sair. O tema muda na hora (atributo no wrapper)
@@ -107,7 +109,7 @@ export function MenuUsuario({
           )}
           <div className="pt-1">
             {sair ? (
-              <form action={sair} onSubmit={limparRascunhos}>
+              <FormularioComAcao action={sair} onSubmit={limparRascunhos}>
                 <EnvioComEstado
                   pendente={
                     <>
@@ -118,7 +120,7 @@ export function MenuUsuario({
                 >
                   <LogOut size={16} aria-hidden /> Sair
                 </EnvioComEstado>
-              </form>
+              </FormularioComAcao>
             ) : (
               <button
                 type="button"

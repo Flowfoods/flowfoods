@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Planejar o lote (3.1), celular primeiro: a cozinha planeja pelo celular. O pré-preparo e a quantidade já foram escolhidos
  * (a lista de insumos veio da receita, bruta e com o fator de correção); aqui a pessoa confere e muda a lista, diz para
@@ -7,8 +9,14 @@
  * volta) dá um lote só. Quem decide é o servidor.
  */
 
-import { useEffect, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Planejar o lote (3.1), celular primeiro: a cozinha planeja pelo celular. O pré-preparo e a quantidade já foram escolhidos
+ * (a lista de insumos veio da receita, bruta e com o fator de correção); aqui a pessoa confere e muda a lista, diz para
+ * quando e planeja. O envio leva uma chave sorteada na tela: planejar duas vezes o mesmo formulário (duplo clique, rede que
+ * volta) dá um lote só. Quem decide é o servidor.
+ */
+import { useEffect, useState, useActionState } from 'react';
+
 import type { OpcaoDeInsumo } from '@/lib/erp/requisicao';
 import type { LinhaDigitada } from '@/lib/erp/requisicao-campos';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -31,7 +39,7 @@ export function FormPlanejar({
   ficha: { id: string; nome: string; quantidade: string; texto: string; validade: string | null };
   bloqueio: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const lista = useLinhasDeInsumos(linhasIniciais);
   const [envio, setEnvio] = useState('');
   // A chave nasce no navegador (sem ela o envio ainda funciona, só não é protegido contra o duplo clique).
@@ -39,7 +47,7 @@ export function FormPlanejar({
   const erros = estado?.erros ?? {};
   const errosDeLinha = Object.keys(erros).filter((k) => k.startsWith('item:')).length;
   return (
-    <form action={enviar} className="space-y-5 pb-24 sm:pb-0">
+    <FormularioComAcao action={enviar} className="space-y-5 pb-24 sm:pb-0">
       <input type="hidden" name="fichaId" value={ficha.id} />
       <input type="hidden" name="quantidade_ficha" value={ficha.quantidade} />
       <input type="hidden" name="envio" value={envio} />
@@ -91,6 +99,6 @@ export function FormPlanejar({
           </BotaoEnviar>
         </div>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

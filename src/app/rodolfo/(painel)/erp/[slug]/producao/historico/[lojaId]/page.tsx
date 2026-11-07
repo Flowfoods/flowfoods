@@ -8,7 +8,11 @@ import { TelaHistoricoDaProducao } from '@/components/erp/telas/producao/histori
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroHistoricoDaProducaoDaLojaPage({ params, searchParams }: { params: { slug: string; lojaId: string }; searchParams: { periodo?: string; de?: string; ate?: string; pessoa?: string; ficha?: string } }) {
+export default async function ParceiroHistoricoDaProducaoDaLojaPage(
+  props: { params: Promise<{ slug: string; lojaId: string }>; searchParams: Promise<{ periodo?: string; de?: string; ate?: string; pessoa?: string; ficha?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'producao.ver');
   const h = await historicoDaProducao(ctx.cliente, ctx.alcance, params.lojaId, searchParams, await idsDaEquipe(ctx.parceiro.id));

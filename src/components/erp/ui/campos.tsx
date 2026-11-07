@@ -16,7 +16,7 @@ export const MARCAR = 'h-5 w-5 shrink-0 accent-[rgb(var(--ff-acao))]';
 /** Ajuda curta embaixo do campo. */
 export const AJUDA = 'mt-1.5 text-[12px] text-suave';
 
-/** Estado devolvido pelas actions do ERP para `useFormState`. */
+/** Estado devolvido pelas actions do ERP para `useActionState`. */
 export type EstadoForm = {
   ok: boolean;
   mensagem?: string;

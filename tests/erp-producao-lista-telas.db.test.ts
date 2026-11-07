@@ -41,7 +41,8 @@ vi.mock('@/lib/erp/contexto', async () => {
   };
 });
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
@@ -101,7 +102,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.2 · telas da lista do dia (Postgres real)', 
     for (const [k, v] of Object.entries(campos)) for (const x of Array.isArray(v) ? v : [v]) f.append(k, x);
     return f;
   };
-  const lista = (lojaId = ids.vp, dia?: string, feito?: string) => pagina(ErpListaDoDiaDaLojaPage({ params: { lojaId }, searchParams: { dia, feito } }));
+  const lista = (lojaId = ids.vp, dia?: string, feito?: string) => pagina(ErpListaDoDiaDaLojaPage({ params: Promise.resolve({ lojaId }), searchParams: Promise.resolve({ dia, feito }) }));
 
   beforeAll(async () => {
     const host = new URL(URL_TESTE!).hostname;
@@ -291,11 +292,11 @@ describe.skipIf(!URL_TESTE)('ERP 3.2 · telas da lista do dia (Postgres real)', 
 
   it('Histórico geral: a lista do dia entra no filtro Produção; quem não vê a produção não recebe nada dela', async () => {
     como(alcanceDe('DONO', 'rede'));
-    const dona = texto(await pagina(ErpHistoricoPage({ searchParams: { entidade: 'OrdemProducao' } })));
+    const dona = texto(await pagina(ErpHistoricoPage({ searchParams: Promise.resolve({ entidade: 'OrdemProducao' }) })));
     expect(dona).toMatch(/Gerou os lotes da lista do dia/);
     expect(dona).toMatch(/Criou lista do dia/);
     como(alcanceDe(null, 'rede', ['historico.ver', 'insumos.ver']));
-    const semProducao = texto(await pagina(ErpHistoricoPage({ searchParams: {} })));
+    const semProducao = texto(await pagina(ErpHistoricoPage({ searchParams: Promise.resolve({}) })));
     expect(semProducao).not.toMatch(/lista do dia/i);
     expect(semProducao).not.toMatch(/Lote/);
   });
@@ -329,13 +330,13 @@ describe.skipIf(!URL_TESTE)('ERP 3.2 · telas da lista do dia (Postgres real)', 
 
   it('o espelho do nível 1 abre a mesma lista, com as ações dele (salvar pelo espelho volta ao espelho)', async () => {
     como(ALCANCE_FLOWFOODS, A, a, 'Rodolfo');
-    const h = await pagina(ParceiroListaDoDiaDaLojaPage({ params: { slug: A.slug, lojaId: ids.vp }, searchParams: { dia: amanhaDe(hoje) } }));
+    const h = await pagina(ParceiroListaDoDiaDaLojaPage({ params: Promise.resolve({ slug: A.slug, lojaId: ids.vp }), searchParams: Promise.resolve({ dia: amanhaDe(hoje) }) }));
     expect(h).toContain('Lista do dia');
     expect(h).toContain('Telas Lista A');
     expect(h).toContain('Salvar a lista');
     const r = await rodar(() => doNivel1.acaoSalvarListaDoDia(A.slug, ids.vp, null, formDe({ dia: amanhaDe(hoje), versao: '', linhaId: [''], fichaId: [ids.base], quantidade: ['1'] })));
     expect(r).toMatchObject({ url: `/rodolfo/erp/${A.slug}/producao/lista/${ids.vp}?dia=${amanhaDe(hoje)}&feito=lista-salva` });
-    expect(await rodar(() => pagina(ParceiroListaDoDiaDaLojaPage({ params: { slug: A.slug, lojaId: 'outra' }, searchParams: {} })))).toMatchObject({ erro: 'NOT_FOUND' });
+    expect(await rodar(() => pagina(ParceiroListaDoDiaDaLojaPage({ params: Promise.resolve({ slug: A.slug, lojaId: 'outra' }), searchParams: Promise.resolve({}) })))).toMatchObject({ erro: 'NOT_FOUND' });
   });
 });
 

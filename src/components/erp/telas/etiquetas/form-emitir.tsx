@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Emitir a etiqueta (3.4), do lote produzido ou da embalagem aberta: o tamanho (60 × 40 ou 60 × 60), quantas etiquetas (uma
  * por pote), quanto em cada (só no lote, opcional) e se a hora aparece. A prévia redesenha ao vivo com a MESMA função do papel;
@@ -8,8 +10,15 @@
  * que não cabe na 60 × 40 diz "Não cabe: use 60 × 60" com o botão para trocar (rodada 1, UX 7 e 9).
  */
 
-import { useEffect, useMemo, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Emitir a etiqueta (3.4), do lote produzido ou da embalagem aberta: o tamanho (60 × 40 ou 60 × 60), quantas etiquetas (uma
+ * por pote), quanto em cada (só no lote, opcional) e se a hora aparece. A prévia redesenha ao vivo com a MESMA função do papel;
+ * o servidor lê tudo de novo e grava o retrato (a reimpressão usa o retrato: nada recalcula). A chave do envio faz o duplo
+ * clique virar a mesma emissão. A barra de ação fica presa embaixo no celular e no tablet (até o menu lateral aparecer); nome
+ * que não cabe na 60 × 40 diz "Não cabe: use 60 × 60" com o botão para trocar (rodada 1, UX 7 e 9).
+ */
+import { useEffect, useMemo, useState, useActionState } from 'react';
+
 import { MAX_ETIQUETAS, ORDEM_DOS_FORMATOS, FORMATOS, type Formato } from '@/lib/erp/etiqueta-campos';
 import { montarEtiqueta } from '@/lib/erp/etiqueta-zpl';
 import { formatarQuantidade, lerQuantidadeNa, UNIDADES, type Unidade } from '@/lib/erp/unidades';
@@ -46,7 +55,7 @@ export function FormEmitir({
   recarregar: string;
   bloqueio: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const [envio, setEnvio] = useState(envioInicial);
   useEffect(() => setEnvio(chaveNova()), []);
   const [formato, setFormato] = useState<Formato>(formatoInicial);
@@ -75,7 +84,7 @@ export function FormEmitir({
   const travado = !!bloqueio;
   const podeEnviar = !travado && nValido && !layout.erro && !quantoInvalido && !passa;
   return (
-    <form action={enviar} className="space-y-5 pb-28 min-[900px]:pb-0">
+    <FormularioComAcao action={enviar} className="space-y-5 pb-28 min-[900px]:pb-0">
       <input type="hidden" name="envio" value={envio} />
       <input type="hidden" name="escala" value={escala} />
       <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)]">
@@ -198,6 +207,6 @@ export function FormEmitir({
           </BotaoEnviar>
         </div>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

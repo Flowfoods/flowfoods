@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Importar faturamento por planilha (2.1), a MESMA tela para o nível 1 e para
  * a pessoa do parceiro. Dois passos, nada gravado no primeiro: enviar o CSV,
@@ -11,8 +13,8 @@
  */
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
+
 import { CANAIS } from '@/lib/erp/canal-campos';
 import { formatarData } from '@/lib/erp/compra-campos';
 import type { LinhaDaPrevia, SituacaoNaPrevia } from '@/lib/erp/faturamento';
@@ -81,7 +83,7 @@ export function TelaImportarFaturamento({
   const temPontoDoArquivo = useTemPonto('arquivo');
   // Um estado só: a prévia, e por cima dela o erro ou o resultado da importação
   // (um erro ao importar mantém a prévia na tela).
-  const [estado, enviar] = useFormState<EstadoDaImportacao, FormData>(
+  const [estado, enviar] = useActionState<EstadoDaImportacao, FormData>(
     async (anterior, form) => {
       const r = await (form.get('passo') === 'importar' ? acaoImportar(anterior, form) : acaoPrevia(anterior, form));
       // Erro ao importar mantém a prévia e o texto que a pessoa viu (menos quando o mundo mudou: aí a prévia é outra).
@@ -141,7 +143,7 @@ export function TelaImportarFaturamento({
       </Painel>
 
       <Painel titulo="Enviar a planilha">
-        <form action={enviar} className="space-y-3">
+        <FormularioComAcao action={enviar} className="space-y-3">
           <input type="hidden" name="passo" value="previa" />
           <fieldset disabled={!!bloqueio} className="min-w-0 space-y-3">
             <div>
@@ -165,7 +167,7 @@ export function TelaImportarFaturamento({
             </BotaoEnviar>
           </fieldset>
           {bloqueio && <p className="text-[13px] text-suave">{bloqueio}</p>}
-        </form>
+        </FormularioComAcao>
       </Painel>
 
       {estado?.erro && (
@@ -203,7 +205,7 @@ export function TelaImportarFaturamento({
               Mostrando {MOSTRAR_ATE} de {ordenadas.length.toLocaleString('pt-BR')} linhas: os erros e o que vai mudar vêm primeiro. Todas entram na importação.
             </p>
           )}
-          <form action={enviar} className="flex flex-col gap-2 border-t border-linha px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <FormularioComAcao action={enviar} className="flex flex-col gap-2 border-t border-linha px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <input type="hidden" name="passo" value="importar" />
             <input type="hidden" name="texto" value={estado?.texto ?? ''} />
             <input type="hidden" name="impressao" value={previa.impressao} />
@@ -216,7 +218,7 @@ export function TelaImportarFaturamento({
             <BotaoEnviar disabled={entram === 0 || !!bloqueio} pendente="Importando…" className="sm:min-w-44">
               {entram > 0 ? `Importar ${plural(entram, 'lançamento', 'lançamentos')}` : 'Importar'}
             </BotaoEnviar>
-          </form>
+          </FormularioComAcao>
         </Painel>
       )}
     </div>

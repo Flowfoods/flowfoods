@@ -12,7 +12,11 @@ import { acaoRemoverLancamento, acaoSalvarDia } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroFaturamentoDoDiaPage({ params, searchParams }: { params: { slug: string; lojaId: string; data: string }; searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ParceiroFaturamentoDoDiaPage(
+  props: { params: Promise<{ slug: string; lojaId: string; data: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'faturamento.ver');
   const data = lerData(params.data);

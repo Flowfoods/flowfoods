@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Outra embalagem de compra do insumo (caixa, fardo, outra marca): nome,
  * quanto vem na unidade DO insumo, preço, frete e código de barras. Mesma
@@ -8,7 +10,8 @@
  */
 
 import Link from 'next/link';
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
+
 import type { Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
@@ -51,13 +54,13 @@ export function FormEmbalagem({
   versao?: string;
   bloqueio?: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida(estado);
   const erros = estado?.erros ?? {};
   const idBase = 'embalagem';
 
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={(c) => ROTULOS[c] ?? c} />
       <ErroGeral estado={estado} recarregar={aqui} />
@@ -119,6 +122,6 @@ export function FormEmbalagem({
         </BotaoEnviar>
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
-    </form>
+    </FormularioComAcao>
   );
 }

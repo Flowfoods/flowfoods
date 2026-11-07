@@ -7,7 +7,8 @@ import { TelaLojasDoEstoque } from '@/components/erp/telas/requisicoes/lojas';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpNovaProducaoLojaPage({ searchParams }: { searchParams: { ficha?: string } }) {
+export default async function ErpNovaProducaoLojaPage(props: { searchParams: Promise<{ ficha?: string }> }) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'producao.registrar');
   const lojas = await lojasDaProducao(ctx.cliente, ctx.alcance, { permissao: 'producao.registrar' });

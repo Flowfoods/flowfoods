@@ -2,7 +2,8 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
-vi.mock('react-dom', async original => ({ ...await original<typeof import('react-dom')>(), useFormState: () => [null, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async original => ({ ...await original<typeof import('react-dom')>(), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: () => [null, undefined] }));
 import { taxaConfiguradaDaLinha } from '@/lib/erp/canal-campos';
 import { FormMetasDeCmv } from '@/components/erp/telas/fichas/form-metas-cmv';
 

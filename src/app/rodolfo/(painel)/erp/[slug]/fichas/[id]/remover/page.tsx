@@ -9,7 +9,11 @@ import { acaoSituacaoFicha } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroRemoverFichaPage({ params, searchParams }: { params: { slug: string; id: string }; searchParams: { de?: string } }) {
+export default async function ParceiroRemoverFichaPage(
+  props: { params: Promise<{ slug: string; id: string }>; searchParams: Promise<{ de?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.editar');
   const ficha = await lerRemocaoDaFicha(ctx.cliente, params.id);

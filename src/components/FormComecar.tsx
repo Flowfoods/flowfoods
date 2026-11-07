@@ -1,8 +1,12 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 // avoid-ai-design-ignore-file: SD4, SD5, K3, SD4d — site institucional, fora do shell do ERP: etiqueta em caixa alta e cantos retos são o estilo editorial FlowFoods (CLAUDE.md).
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { useActionState } from 'react';
+// avoid-ai-design-ignore-file: SD4, SD5, K3, SD4d — site institucional, fora do shell do ERP: etiqueta em caixa alta e cantos retos são o estilo editorial FlowFoods (CLAUDE.md).
+import { useFormStatus } from 'react-dom';
 import { CONTACT_INFO, whatsappUrl } from '@/lib/constants';
 import { CAMPO_ARMADILHA, CONSENTIMENTO } from '@/lib/erp/pedido-textos';
 import { enviarPedido, type EstadoDoComecar } from '@/app/comecar/actions';
@@ -51,7 +55,7 @@ const SAIDA_PELO_WHATSAPP = (
  * não recarrega. A resposta de sucesso é a mesma exista ou não o contato.
  */
 export default function FormComecar() {
-  const [estado, enviar] = useFormState<EstadoDoComecar, FormData>(enviarPedido, null);
+  const [estado, enviar] = useActionState<EstadoDoComecar, FormData>(enviarPedido, null);
   const erros = estado?.tipo === 'erros' ? (estado.erros ?? {}) : {};
   const v = estado?.valores ?? {};
 
@@ -80,7 +84,7 @@ export default function FormComecar() {
         </p>
       )}
 
-      <form action={enviar} className="mt-6 space-y-4" aria-describedby={estado?.tipo === 'erros' ? 'comecar-resumo' : undefined}>
+      <FormularioComAcao action={enviar} className="mt-6 space-y-4" aria-describedby={estado?.tipo === 'erros' ? 'comecar-resumo' : undefined}>
         {estado?.tipo === 'erros' && (
           <p id="comecar-resumo" role="alert" className="border border-ink/20 bg-papel px-4 py-3 text-sm font-semibold text-ink">
             {estado.mensagem}
@@ -265,7 +269,7 @@ export default function FormComecar() {
         </div>
 
         <Enviar />
-      </form>
+      </FormularioComAcao>
     </div>
   );
 }

@@ -13,7 +13,8 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/estoque';
 
-export default async function ErpConferirAberturaPage({ params }: { params: { lojaId: string } }) {
+export default async function ErpConferirAberturaPage(props: { params: Promise<{ lojaId: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'estoque.ver');
   const c = await conferenciaDaAbertura(ctx.cliente, ctx.alcance, params.lojaId);

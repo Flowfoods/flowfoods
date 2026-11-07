@@ -26,7 +26,11 @@ import { ACOES_NA_TELA, ehCodigoFeito, FEITO, QUANDO, TOM_DO_ESTADO } from '../r
 
 export const dynamic = 'force-dynamic';
 
-export default async function IntegracoesDoParceiroNoNivel1({ params, searchParams = {} }: { params: { slug: string }; searchParams?: { feito?: string } }) {
+export default async function IntegracoesDoParceiroNoNivel1(
+  props: { params: Promise<{ slug: string }>; searchParams?: Promise<{ feito?: string }> }
+) {
+  const searchParams = (await props.searchParams) ?? {};
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   const { parceiro, cliente } = ctx;
   const [liberacoes, conexoes, apps, lojas, marcas, historico] = await Promise.all([

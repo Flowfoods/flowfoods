@@ -11,7 +11,7 @@ import { lerFiltrosDeFicha, queryDosFiltrosDeFicha, temFiltroDeFicha } from '@/l
 import { FICHAS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtitulo';
 import { FiltrosDasFichas, linhasSemCusto, TelaListaFichas } from '@/components/erp/telas/fichas/lista';
 import { CabecalhoDasFichas, carregarClassificacaoDosFiltros } from '@/components/erp/telas/fichas/paginas';
-import { acaoBuscarClassificacao } from './actions';
+import { acaoBuscarClassificacao, acaoGerirClassificacao } from './actions';
 import { Aviso } from '@/components/erp/ui/superficies';
 import { AvisoDaListaDeFichas } from '@/components/erp/telas/fichas/aviso-da-lista';
 import { PainelDeSaude } from '@/components/erp/telas/fichas/saude';
@@ -21,7 +21,10 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/fichas';
 
-export default async function ErpFichasPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ErpFichasPage(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.ver');
   // N.2: preço e CMV por canal na lista só para quem vê preços (nem sai do servidor para os outros); o filtro pelo CMV também.
@@ -44,7 +47,7 @@ export default async function ErpFichasPage({ searchParams }: { searchParams: Re
         bloqueio={ctx.bloqueio}
         de={de}
       >
-        <FiltrosDasFichas key={de} base={BASE} filtros={filtros} verCustos={verPrecos} classificacao={classificacao} />
+        <FiltrosDasFichas key={de} base={BASE} filtros={filtros} verCustos={verPrecos} classificacao={{ ...classificacao, gerir: livre ? acaoGerirClassificacao : undefined }} />
       </CabecalhoDasFichas>
       <AvisoDaListaDeFichas cliente={ctx.cliente} base={BASE} filtros={filtros} feito={searchParams.feito} referencia={searchParams.ref} />
       {pagina.avisoFiltro && <Aviso tom="alerta" titulo={pagina.avisoFiltro} />}

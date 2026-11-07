@@ -25,7 +25,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
   return {
@@ -95,17 +96,17 @@ describe.skipIf(!URL_TESTE)('Decisão 522 · pontos de ajuda de Lançar nota e d
       alcance: alcanceDe('DONO'),
       preferencia: PREF as typeof PREF | null,
       nova: () => ErpLancarNotaPage({}),
-      editar: (id: string) => ErpEditarNotaPage({ params: { id } }),
-      nota: (id: string) => ErpNotaPage({ params: { id }, searchParams: {} }),
+      editar: (id: string) => ErpEditarNotaPage({ params: Promise.resolve({ id }) }),
+      nota: (id: string) => ErpNotaPage({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) }),
     },
     {
       nome: 'nível 1',
       raiz: `/rodolfo/erp/${A.slug}`,
       alcance: ALCANCE_FLOWFOODS,
       preferencia: null,
-      nova: () => Nivel1LancarNotaPage({ params: { slug: A.slug } }),
-      editar: (id: string) => Nivel1EditarNotaPage({ params: { slug: A.slug, id } }),
-      nota: (id: string) => Nivel1NotaPage({ params: { slug: A.slug, id }, searchParams: {} }),
+      nova: () => Nivel1LancarNotaPage({ params: Promise.resolve({ slug: A.slug }) }),
+      editar: (id: string) => Nivel1EditarNotaPage({ params: Promise.resolve({ slug: A.slug, id }) }),
+      nota: (id: string) => Nivel1NotaPage({ params: Promise.resolve({ slug: A.slug, id }), searchParams: Promise.resolve({}) }),
     },
   ];
   const como = (alcance: Alcance) => {
@@ -330,7 +331,7 @@ describe.skipIf(!URL_TESTE)('Decisão 522 · pontos de ajuda de Lançar nota e d
 
     const soVe = alcanceDe(null, ['compras.ver', 'lojas.ver']);
     como(soVe);
-    const d = await naTela(await ErpNotaPage({ params: { id: ids.outubro }, searchParams: {} }), `/erp/compras/${ids.outubro}`, soVe, PREF);
+    const d = await naTela(await ErpNotaPage({ params: Promise.resolve({ id: ids.outubro }), searchParams: Promise.resolve({}) }), `/erp/compras/${ids.outubro}`, soVe, PREF);
     expect(naOrdem(d)).toEqual(['tela', 'total', 'custo', 'estoque']);
     expect(d).not.toContain('Editar nota');
     expect(d).not.toContain('>Situação</h2>');

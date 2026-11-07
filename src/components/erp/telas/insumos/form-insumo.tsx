@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Formulário do insumo (novo e editar), a MESMA peça para o nível 1 e para a
  * pessoa do parceiro: a action vem de quem usa a tela. Tudo vai como texto; o
@@ -9,8 +11,8 @@
  */
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useMemo, useRef, useState, useActionState } from 'react';
+
 import { AJUDA_DO_TIPO, MARCA_MAXIMA, TIPOS, TIPOS_DO_FORM, type TipoInsumo } from '@/lib/erp/insumo-campos';
 import { rotuloDaVolta } from '@/lib/erp/volta';
 import { CHAVE_DO_SISTEMA } from '@/lib/erp/categoria-campos';
@@ -129,7 +131,7 @@ export function FormInsumo({
 }) {
   const inicial: ValoresDoInsumo = inicialDado ?? { ...INSUMO_NOVO, ...valoresLembrados(lembrado), nome: (nomeSugerido ?? '').slice(0, 80) };
   const acaoSegura = useAcaoSegura(acao);
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acaoSegura, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acaoSegura, null);
   const [nome, setNome] = useState(inicial.nome);
   const [unidade, setUnidade] = useState<Unidade | ''>(inicial.unidade);
   const [tipo, setTipo] = useState<TipoInsumo>(inicial.tipo);
@@ -184,7 +186,7 @@ export function FormInsumo({
   })();
 
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
       {modo === 'criar' && chaveDeEnvio && <input type="hidden" name="envio" value={chaveDeEnvio} />}
       {modo === 'criar' && volta && <input type="hidden" name="volta" value={volta} />}
@@ -412,6 +414,6 @@ export function FormInsumo({
         </BotaoEnviar>
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
-    </form>
+    </FormularioComAcao>
   );
 }

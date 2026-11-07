@@ -96,7 +96,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · telas do farol (Postgres real)', { timeo
     return x;
   };
   const html = async (query: Record<string, string> = { periodo: '2026-09-10' }) => {
-    const el = await ErpDrePage({ searchParams: query });
+    const el = await ErpDrePage({ searchParams: Promise.resolve(query) });
     return sp(renderToStaticMarkup(el as ReactElement));
   };
   const json = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? v.toString() : isValidElement(v) ? { tipo: typeof v.type === 'string' ? v.type : (v.type as { name?: string }).name, ...(v.props as object) } : v));
@@ -170,9 +170,9 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · telas do farol (Postgres real)', { timeo
 
   it('o operador e quem só vê o Histórico não abrem o DRE; quem tem dre.ver sem compras nem estoque vê o farol', async () => {
     como(alcanceDe('OPERADOR', [ids.vp]), { tipo: 'loja', lojaId: ids.vp });
-    expect(await rodar(() => ErpDrePage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpDrePage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     como(propria(['historico.ver', 'lojas.ver'], 'rede'));
-    expect(await rodar(() => ErpDrePage({ searchParams: { periodo: '2026-09-10', rede: '1' } }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpDrePage({ searchParams: Promise.resolve({ periodo: '2026-09-10', rede: '1' }) }))).toEqual({ erro: 'SEM_ACESSO' });
     como(propria(['dre.ver', 'lojas.ver'], 'rede'));
     expect(await html({ periodo: '2026-09-10', rede: '1' })).toContain('Faróis do período');
   });
@@ -202,7 +202,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.4 · telas do farol (Postgres real)', { timeo
     como(propria(['historico.ver', 'lojas.ver'], 'rede'));
     const sem = await listarHistorico(a, { verPrecos: false, verDre: false, limite: 50 });
     expect(json(sem)).not.toContain('crescimento');
-    const pagina = sp(renderToStaticMarkup((await resolver(await ErpHistoricoPage({ searchParams: {} }))) as ReactElement));
+    const pagina = sp(renderToStaticMarkup((await resolver(await ErpHistoricoPage({ searchParams: Promise.resolve({}) }))) as ReactElement));
     expect(pagina).not.toContain('crescimento');
     expect(pagina).not.toContain('Fechou');
   });

@@ -10,7 +10,11 @@ import { acaoPassarLote, acaoPegarDaLista, acaoPegarLote, acaoSoltarLote } from 
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroTarefasDaLojaPage({ params, searchParams }: { params: { slug: string; lojaId: string }; searchParams: { feito?: string; lote?: string } }) {
+export default async function ParceiroTarefasDaLojaPage(
+  props: { params: Promise<{ slug: string; lojaId: string }>; searchParams: Promise<{ feito?: string; lote?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'producao.registrar');
   const t = await tarefasDoDia(ctx.cliente, ctx.alcance, params.lojaId, null);

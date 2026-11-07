@@ -73,7 +73,7 @@ describe.skipIf(!URL_TESTE)('Decisão 518 (revisão) · virada do mês com falta
   const home = async () => {
     atual.ctx = () => ({ parceiro: V, alcance: gerente(), cliente: v, bloqueio: null, podeEscrever: true, sessao: { userId: 'u', autorNome: 'Gil Gerente' }, pessoa: { perfilRotulo: 'Gerente' } });
     atual.visao = visao();
-    return html(await ErpHomePage({ searchParams: {} }));
+    return html(await ErpHomePage({ searchParams: Promise.resolve({}) }));
   };
   const rodar = async <T,>(fn: () => Promise<T>): Promise<T | { redirect: string } | { erro: string }> => {
     try {
@@ -140,7 +140,7 @@ describe.skipIf(!URL_TESTE)('Decisão 518 (revisão) · virada do mês com falta
     expect(h).toContain('5 lançamentos faltando em outubro');
     expect(h).toContain(`href="/erp/faturamento?mes=2026-10&amp;loja=${lojaId}&amp;volta=%2Ferp">Lançar o que falta</a>`);
     // O mês de outubro aberto pelo link conta o mesmo e oferece "Voltar para o início".
-    const outubro = html(await ErpFaturamentoPage({ searchParams: { mes: '2026-10', loja: lojaId, volta: '/erp' } }));
+    const outubro = html(await ErpFaturamentoPage({ searchParams: Promise.resolve({ mes: '2026-10', loja: lojaId, volta: '/erp' }) }));
     expect(outubro).toContain('5 lançamentos faltando neste mês.');
     expect(outubro).toMatch(/<a\b(?=[^>]*\shref="\/erp")[^>]*>Voltar para o início<\/a>/);
   });

@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Lançar ou editar uma despesa (2.2a), a MESMA tela no nível 1 e na pessoa do
  * parceiro. Pensada para o celular: campos de 44 px, valor à direita, rodapé fixo.
@@ -11,8 +13,8 @@
  */
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useMemo, useState, useActionState } from 'react';
+
 import { rotuloDoMes } from '@/lib/erp/faturamento-campos';
 import { apropriar, diasDaCompetencia, lerCompetencia, lerValorDaDespesa, type TipoDeCompetencia } from '@/lib/erp/despesa-campos';
 import { GRUPOS_DE_DESPESA, ROTULO_DO_GRUPO, type GrupoDoDre } from '@/lib/erp/dre-plano';
@@ -101,7 +103,7 @@ export function FormDespesa({
   /** Os períodos fechados e o de agora: a competência que já cai num fechado é avisada antes de enviar. */
   periodos: AvisoDePeriodos;
 }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida(estado);
   const [v, setV] = useState(inicial);
   const mudar = (p: Partial<InicialDaDespesa>) => {
@@ -129,7 +131,7 @@ export function FormDespesa({
   const porGrupo = GRUPOS_DE_DESPESA.map((g) => ({ g, itens: linhas.filter((l) => l.grupo === g) })).filter((x) => x.itens.length > 0);
 
   return (
-    <form action={enviar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao action={enviar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="envio" value={envio} />
       <input type="hidden" name="versao" value={versao} />
       {volta && <input type="hidden" name="volta" value={volta} />}
@@ -313,6 +315,6 @@ export function FormDespesa({
           {rotuloDoBotao}
         </BotaoEnviar>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

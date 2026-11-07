@@ -1,6 +1,8 @@
 // Scanner avoid-ai-design, SD4d (P2) aceito: "Padrão · 2,27 kg" e "4,54 kg · R$ 65,54/kg" são a linha de apoio do item, no padrão "A · B" das telas da 1.1–1.4. (O ignore do scanner não aceita id com minúscula.)
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Formulário da nota de compra (lançar e editar), o MESMO no nível 1 e na
  * pessoa do parceiro: a action vem de quem usa a tela. Cabeçalho (loja,
@@ -14,8 +16,8 @@
  */
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useEffect, useMemo, useRef, useState, type ReactNode, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { Trash2 } from 'lucide-react';
 import type { FormularioDeNota } from '@/lib/erp/compras';
 import {
@@ -183,7 +185,7 @@ function FormNotaBase({
   avisos,
 }: PropsDoFormNota & { chaveDoRascunho: string; avisos: ReactNode }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [estado, enviar] = useFormState<EstadoNota, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoNota, FormData>(acao, null);
   // F.1a: esta mesma tela, sem os avisos de "criado" que a trouxeram, é para onde o cadastro do fornecedor volta.
   const pathname = usePathname() ?? '';
   const busca = useSearchParams();
@@ -282,7 +284,7 @@ function FormNotaBase({
   }, [vezDaPrevia]);
 
   return (
-    <form ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
       {avisos}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={rotuloDoCampo} />
@@ -683,6 +685,6 @@ function FormNotaBase({
         </Enviar>
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
-    </form>
+    </FormularioComAcao>
   );
 }

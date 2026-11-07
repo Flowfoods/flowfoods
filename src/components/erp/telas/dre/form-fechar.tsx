@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Fechar o período (2.2b, decisão 152). Cada ressalva é marcada uma a uma e a justificativa é UMA só
  * (de 10 a 300 letras); o formulário leva a impressão das condições que a pessoa viu, e o servidor confere
@@ -7,7 +9,8 @@
  */
 
 import Link from 'next/link';
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
+
 import { useAvisoDeSaida } from '../cadastro/erros';
 import { LIMITES_DO_FECHAMENTO, rotuloDaRessalva, type Ressalva } from '@/lib/erp/dre-fechamento-campos';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -29,12 +32,12 @@ export function FormFechar({
   raiz: string;
   bloqueio: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoLocal, FormData>(acao, null);
   const saida = useAvisoDeSaida(estado);
   const erros = estado?.erros ?? {};
   const comRessalva = ressalvas.length > 0;
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="impressao" value={impressao} />
       {erros.geral && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
@@ -96,6 +99,6 @@ export function FormFechar({
           <p className="text-[12px] text-suave">A fotografia não muda depois. Só a FlowFoods reabre.</p>
         </div>
       </fieldset>
-    </form>
+    </FormularioComAcao>
   );
 }

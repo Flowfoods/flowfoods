@@ -1,6 +1,6 @@
 /**
  * Estado que as actions de cadastro do ERP (insumos, fichas técnicas — nível 1
- * e pessoa do parceiro) devolvem para `useFormState`. Sucesso não volta por
+ * e pessoa do parceiro) devolvem para `useActionState`. Sucesso não volta por
  * aqui: a action leva para o detalhe com a frase do que mudou (`?feito=`).
  */
 export type EstadoCadastro = {

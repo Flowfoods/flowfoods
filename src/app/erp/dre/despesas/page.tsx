@@ -10,9 +10,12 @@ import { PaginaDasDespesas } from '@/components/erp/telas/dre/paginas';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpDespesasPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
-  const ctx = await exigirParceiroDaSessao();
-  if (!pode(ctx.alcance, 'dre.ver')) exigirPermissaoNaPagina(ctx, 'despesas.lancar');
-  const { visao, lojas } = await visaoDaRequisicao(ctx);
-  return <PaginaDasDespesas c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: rotuloDaVisao(visao), raiz: '/erp' }} lojasDoAlcance={lojas.map((l) => ({ id: l.id, nome: l.nome }))} query={searchParams} />;
+export default async function ErpDespesasPage(
+ props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+ const searchParams = await props.searchParams;
+ const ctx = await exigirParceiroDaSessao();
+ if (!pode(ctx.alcance, 'dre.ver')) exigirPermissaoNaPagina(ctx, 'despesas.lancar');
+ const { visao, lojas } = await visaoDaRequisicao(ctx);
+ return <PaginaDasDespesas c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: rotuloDaVisao(visao), raiz: '/erp' }} lojasDoAlcance={lojas.map((l) => ({ id: l.id, nome: l.nome }))} query={searchParams} />;
 }

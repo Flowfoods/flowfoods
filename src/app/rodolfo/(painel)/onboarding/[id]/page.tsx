@@ -50,7 +50,11 @@ const SITUACAO_DO_LEAD: Record<string, string> = {
 
 const TOM = { NOVO: 'alerta', EM_CONVERSA: 'neutro', ATIVADO: 'ok', RECUSADO: 'neutro' } as const;
 
-export default async function PedidoPage({ params, searchParams }: { params: { id: string }; searchParams: { feito?: string } }) {
+export default async function PedidoPage(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   await exigirNivel1();
   const p = await obterPedido(params.id);
   if (!p) notFound();

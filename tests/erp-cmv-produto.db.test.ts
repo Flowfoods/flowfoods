@@ -303,17 +303,17 @@ describe.skipIf(!URL_TESTE)('ERP N.2 · preço pela meta de CMV, cenário de ref
   it('operador: nem CMV, nem preço, nem custo no payload da ficha e da lista (o servidor nem lê)', async () => {
     atual.ctx = ctxDe('OPERADOR', 'Caio');
     const json = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
-    const ficha = (await ErpFichaPage({ params: { id: ids.ficha }, searchParams: {} })) as { props: { canais: unknown } };
+    const ficha = (await ErpFichaPage({ params: Promise.resolve({ id: ids.ficha }), searchParams: Promise.resolve({}) })) as { props: { canais: unknown } };
     expect(ficha.props.canais).toBeNull();
     // A tela da lista recebe `cmv` (um Map) só de quem vê preços; ao operador, nada sai do servidor.
     type El = { props: { children: El[] | El; cmv?: Map<string, unknown> } };
     const telaDaLista = (pagina: unknown) => ([] as El[]).concat((pagina as El).props.children).find((c) => c && 'total' in c.props && 'filtros' in c.props)!;
-    const doOperador = telaDaLista(await ErpFichasPage({ searchParams: {} }));
+    const doOperador = telaDaLista(await ErpFichasPage({ searchParams: Promise.resolve({}) }));
     expect(doOperador.props.cmv).toBeUndefined();
     expect(json(doOperador)).toMatch(/Prato de teste/);
     expect(json(doOperador)).not.toMatch(/cmvBp|metaBp|precoCentavos|"fisico"/);
     atual.ctx = ctxDe('DONO', 'Marina');
-    const daDona = telaDaLista(await ErpFichasPage({ searchParams: {} }));
+    const daDona = telaDaLista(await ErpFichasPage({ searchParams: Promise.resolve({}) }));
     expect(daDona.props.cmv).toBeInstanceOf(Map);
     expect(daDona.props.cmv!.has(ids.ficha)).toBe(true);
   });
@@ -336,7 +336,7 @@ describe.skipIf(!URL_TESTE)('ERP N.2 · preço pela meta de CMV, cenário de ref
     atual.ctx = ctxDe('OPERADOR', 'Caio');
     type El = { props: { children: El[] | El; total?: number; filtros?: { cmv: unknown } } };
     const telaDaLista = (pagina: unknown) => ([] as El[]).concat((pagina as El).props.children).find((c) => c && 'filtros' in c.props && 'total' in c.props)!;
-    const op = telaDaLista(await ErpFichasPage({ searchParams: { cmv: 'LOJA-acima' } }));
+    const op = telaDaLista(await ErpFichasPage({ searchParams: Promise.resolve({ cmv: 'LOJA-acima' }) }));
     expect(op.props.filtros!.cmv).toEqual([]);
     expect(op.props.total).toBe(semFiltro.total);
     atual.ctx = ctxDe('DONO', 'Marina');

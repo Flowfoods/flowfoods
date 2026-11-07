@@ -1,13 +1,20 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Formulários pequenos do detalhe da requisição (1.8): cancelar a pedida
  * (motivo na própria tela) e receber de volta o que voltou (devolução por
  * estorno no livro). O servidor decide; aqui só se mostra o que ele respondeu.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Formulários pequenos do detalhe da requisição (1.8): cancelar a pedida
+ * (motivo na própria tela) e receber de volta o que voltou (devolução por
+ * estorno no livro). O servidor decide; aqui só se mostra o que ele respondeu.
+ */
+import { useState, useActionState } from 'react';
+
 import type { ItemDoDetalhe } from '@/lib/erp/requisicao';
 import { formatarQuantidade, UNIDADES } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -30,7 +37,7 @@ function ErroGeral({ estado, recarregar }: { estado: EstadoEstoque; recarregar?:
 }
 
 export function FormCancelarRequisicao({ acao }: { acao: AcaoDeEstoque }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
   if (!aberto && !estado) {
     return (
@@ -40,7 +47,7 @@ export function FormCancelarRequisicao({ acao }: { acao: AcaoDeEstoque }) {
     );
   }
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <div>
         <label htmlFor="cancelar-motivo" className={ROTULO}>
           Por que a requisição sai?
@@ -71,12 +78,12 @@ export function FormCancelarRequisicao({ acao }: { acao: AcaoDeEstoque }) {
           Manter
         </button>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 export function FormDevolver({ acao, versao, itens, recarregar }: { acao: AcaoDeEstoque; versao: number; itens: ItemDoDetalhe[]; recarregar: string }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const comSaida = itens.filter((i) => i.atendidoMilesimos > 0);
   const [itemId, setItemId] = useState(comSaida[0]?.id ?? '');
   const [escala, setEscala] = useState<'base' | 'menor'>('base');
@@ -84,7 +91,7 @@ export function FormDevolver({ acao, versao, itens, recarregar }: { acao: AcaoDe
   const u = item ? UNIDADES[item.unidade] : null;
   const erro = estado?.erros.devolver;
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <input type="hidden" name="versao" value={versao} />
       <input type="hidden" name="escala" value={escala} />
       <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_200px]">
@@ -132,6 +139,6 @@ export function FormDevolver({ acao, versao, itens, recarregar }: { acao: AcaoDe
       <BotaoEnviar variante="secundario" pendente="Registrando…">
         Receber de volta
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }

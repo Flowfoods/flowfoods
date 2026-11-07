@@ -8,7 +8,11 @@ export const dynamic = 'force-dynamic';
 
 const um = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? '';
 
-export default async function ParceiroFornecedoresPage({ params, searchParams }: { params: { slug: string }; searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ParceiroFornecedoresPage(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'compras.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/compras`;

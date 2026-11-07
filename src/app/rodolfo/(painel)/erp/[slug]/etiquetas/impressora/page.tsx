@@ -6,7 +6,8 @@ import { acaoZplDeTeste } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroImpressoraPage({ params }: { params: { slug: string } }) {
+export default async function ParceiroImpressoraPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'etiquetas.imprimir');
   return <TelaDaImpressora contexto={ctx.parceiro.nome} zplDeTeste={acaoZplDeTeste.bind(null, ctx.parceiro.slug)} />;

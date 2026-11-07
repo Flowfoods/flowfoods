@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Pontos de ajuda (prioridade nº 1 de 23/10/2026): a explicação mora junto do
  * campo, seção ou ação, num card flutuante — no lugar do texto didático fixo.
@@ -961,12 +963,12 @@ function CardDeAjuda({
               </button>
             )}
             {nunca && (
-              <form action={nunca.acao} onSubmit={aoEnviarNunca}>
+              <FormularioComAcao action={nunca.acao} onSubmit={aoEnviarNunca}>
                 <input type="hidden" name={nunca.campo} value={nunca.valor} />
                 <button type="submit" className={classeDeBotao('fantasma')}>
                   Não mostrar novamente
                 </button>
-              </form>
+              </FormularioComAcao>
             )}
           </div>
         )}

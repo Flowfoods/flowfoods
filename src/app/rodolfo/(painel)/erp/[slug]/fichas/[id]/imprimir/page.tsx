@@ -12,7 +12,11 @@ import { acaoImpressaoFinanceira, acaoImpressaoOperacional } from '../../actions
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroImprimirFichaPage({ params, searchParams = {} }: { searchParams?: { de?: string | string[] }; params: { slug: string; id: string } }) {
+export default async function ParceiroImprimirFichaPage(
+  props: { searchParams?: Promise<{ de?: string | string[] }>; params: Promise<{ slug: string; id: string }> }
+) {
+  const searchParams = (await props.searchParams) ?? {};
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.ver');
   const ficha = await obterFichaParaImpressao(ctx.cliente, params.id);

@@ -1,18 +1,21 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * I.1b — "Confirmar a conservação": para o insumo antigo que está em Seco sem ninguém ter escolhido (o servidor assumia Seco).
  * Não muda a conservação nem o prazo: só grava que uma pessoa conferiu. Se a conservação for outra, o caminho é Editar.
  */
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 
 export function FormConfirmarConservacao({ acao, rotulo }: { acao: AcaoDeCadastro; /** A conservação gravada, por extenso ("Seco"). */ rotulo: string }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acao, null);
   return (
-    <form action={enviar} className="mt-2 space-y-2">
+    <FormularioComAcao action={enviar} className="mt-2 space-y-2">
       {estado?.erros.geral && (
         <p role="alert" className="text-[13px] text-erro">
           {estado.erros.geral}
@@ -21,6 +24,6 @@ export function FormConfirmarConservacao({ acao, rotulo }: { acao: AcaoDeCadastr
       <BotaoEnviar variante="secundario" pendente="Confirmando…">
         Confirmar que é {rotulo.toLowerCase()}
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }

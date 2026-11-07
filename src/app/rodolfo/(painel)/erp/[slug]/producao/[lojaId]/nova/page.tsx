@@ -8,7 +8,11 @@ import { acaoPlanejarProducao } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroNovaProducaoPage({ params, searchParams }: { params: { slug: string; lojaId: string }; searchParams: { ficha?: string; quantas?: string } }) {
+export default async function ParceiroNovaProducaoPage(
+  props: { params: Promise<{ slug: string; lojaId: string }>; searchParams: Promise<{ ficha?: string; quantas?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'producao.registrar');
   const o = await opcoesDaProducao(ctx.cliente, ctx.alcance, params.lojaId);

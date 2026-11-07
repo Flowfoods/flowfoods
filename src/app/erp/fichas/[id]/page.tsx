@@ -16,7 +16,11 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/fichas';
 
-export default async function ErpFichaPage({ params, searchParams }: { params: { id: string }; searchParams: { de?: string | string[]; feito?: string; volta?: string | string[] } }) {
+export default async function ErpFichaPage(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ de?: string | string[]; feito?: string; volta?: string | string[] }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.ver');
   // 1.9/1.10: o custo, o preço e a margem por canal — inclusive no histórico da ficha — só saem do servidor para quem vê a precificação.

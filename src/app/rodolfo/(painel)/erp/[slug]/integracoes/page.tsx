@@ -8,7 +8,8 @@ import { exigirParceiro } from '@/lib/erp/contexto';
 
 export const dynamic = 'force-dynamic';
 
-export default async function IntegracoesNoEspelhoDoParceiro({ params }: { params: { slug: string } }) {
-  const ctx = await exigirParceiro(params.slug);
-  redirect(`/rodolfo/integracoes/${encodeURIComponent(ctx.parceiro.slug)}`);
+export default async function IntegracoesNoEspelhoDoParceiro(props: { params: Promise<{ slug: string }> }) {
+ const params = await props.params;
+ const ctx = await exigirParceiro(params.slug);
+ redirect(`/rodolfo/integracoes/${encodeURIComponent(ctx.parceiro.slug)}`);
 }

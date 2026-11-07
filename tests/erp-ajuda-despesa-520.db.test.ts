@@ -24,7 +24,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
   return {
@@ -86,18 +87,18 @@ describe.skipIf(!URL_TESTE)('Decisão 520 · pontos de ajuda de Lançar despesa 
       raiz: '/erp',
       alcance: alcanceDe('DONO'),
       preferencia: PREF as typeof PREF | null,
-      nova: (sp: Record<string, string> = {}) => ErpNovaDespesaPage({ searchParams: sp }),
-      editar: (id: string) => ErpEditarDespesaPage({ params: { id }, searchParams: {} }),
-      despesa: (id: string) => ErpDespesaPage({ params: { id }, searchParams: {} }),
+      nova: (sp: Record<string, string> = {}) => ErpNovaDespesaPage({ searchParams: Promise.resolve(sp) }),
+      editar: (id: string) => ErpEditarDespesaPage({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) }),
+      despesa: (id: string) => ErpDespesaPage({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) }),
     },
     {
       nome: 'nível 1',
       raiz: `/rodolfo/erp/${A.slug}`,
       alcance: ALCANCE_FLOWFOODS,
       preferencia: null,
-      nova: (sp: Record<string, string> = {}) => Nivel1NovaDespesaPage({ params: { slug: A.slug }, searchParams: sp }),
-      editar: (id: string) => Nivel1EditarDespesaPage({ params: { slug: A.slug, id }, searchParams: {} }),
-      despesa: (id: string) => Nivel1DespesaPage({ params: { slug: A.slug, id }, searchParams: {} }),
+      nova: (sp: Record<string, string> = {}) => Nivel1NovaDespesaPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve(sp) }),
+      editar: (id: string) => Nivel1EditarDespesaPage({ params: Promise.resolve({ slug: A.slug, id }), searchParams: Promise.resolve({}) }),
+      despesa: (id: string) => Nivel1DespesaPage({ params: Promise.resolve({ slug: A.slug, id }), searchParams: Promise.resolve({}) }),
     },
   ];
   const como = (alcance: Alcance) => {
@@ -222,7 +223,7 @@ describe.skipIf(!URL_TESTE)('Decisão 520 · pontos de ajuda de Lançar despesa 
       expect(f, area.nome).toContain('O período Setembro de teste já foi fechado no DRE.');
       expect(f, area.nome).toContain('Esta despesa cai nele: valor, competência, linha e loja não mudam mais; descrição, vencimento e “repete todo mês” sim.');
       expect(f, area.nome).toMatch(/<select id="desp-linha" name="linha"[^>]*disabled=""/);
-      expect(f, area.nome).toMatch(/<input id="desp-valor" name="valor"[^>]*disabled=""/);
+      expect(f, area.nome).toMatch(/<input\b(?=[^>]*\bid="desp-valor")(?=[^>]*\bname="valor")(?=[^>]*\bdisabled="")[^>]*>/);
       expect(f, area.nome).not.toContain('<fieldset disabled=""');
       expect(naOrdem(f), area.nome).toEqual(['tela', 'linha', 'competencia', 'repete', 'vencimento']);
       for (const t of SAIU) expect(f, `${area.nome}: ${t}`).not.toContain(t);
@@ -255,7 +256,7 @@ describe.skipIf(!URL_TESTE)('Decisão 520 · pontos de ajuda de Lançar despesa 
     const soLanca = alcanceDe(null, ['despesas.lancar', 'lojas.ver']);
     como(soLanca);
     atual.visao = { tipo: 'rede' };
-    const h = await naTela(await ErpNovaDespesaPage({ searchParams: {} }), '/erp/dre/despesas/nova', soLanca, PREF);
+    const h = await naTela(await ErpNovaDespesaPage({ searchParams: Promise.resolve({}) }), '/erp/dre/despesas/nova', soLanca, PREF);
     expect(naOrdem(h)).toEqual(['tela', 'linha', 'competencia', 'repete', 'vencimento']);
     const ajudaDeQuemLanca = JSON.stringify(ajudaParaATela(soLanca).filter((e) => e.chave.startsWith('dre-despesa')));
     expect(ajudaDeQuemLanca).not.toContain('card de Despesas');
@@ -263,7 +264,7 @@ describe.skipIf(!URL_TESTE)('Decisão 520 · pontos de ajuda de Lançar despesa 
 
     const soVe = alcanceDe(null, ['dre.ver', 'lojas.ver']);
     como(soVe);
-    const d = await naTela(await ErpDespesaPage({ params: { id: ids.outubro }, searchParams: {} }), `/erp/dre/despesas/${ids.outubro}`, soVe, PREF);
+    const d = await naTela(await ErpDespesaPage({ params: Promise.resolve({ id: ids.outubro }), searchParams: Promise.resolve({}) }), `/erp/dre/despesas/${ids.outubro}`, soVe, PREF);
     expect(naOrdem(d)).toEqual(['tela', 'como-conta', 'pagamento']);
     expect(d).not.toContain('Marcar como paga');
     expect(d).not.toContain('Mudar ou tirar');

@@ -11,7 +11,8 @@ import { acaoSalvarEmbalagem, acaoSituacaoEmbalagem } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpEmbalagemPage({ params }: { params: { id: string; varianteId: string } }) {
+export default async function ErpEmbalagemPage(props: { params: Promise<{ id: string; varianteId: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.editar');
   const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);

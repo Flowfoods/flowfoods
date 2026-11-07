@@ -8,13 +8,14 @@ import { acaoAplicarClassificacao, acaoClassificarEmLote, acaoReverterLote } fro
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroClassificarPage({
-  params,
-  searchParams,
-}: {
-  params: { slug: string };
-  searchParams: { feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string; sem?: string; pagina?: string };
-}) {
+export default async function ParceiroClassificarPage(
+  props: {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<{ feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string; sem?: string; pagina?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.ver');
   exigirPermissao(ctx, 'insumos.editar');

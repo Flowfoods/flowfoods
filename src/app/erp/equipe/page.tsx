@@ -25,7 +25,8 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpEquipePage({ searchParams }: { searchParams: { ver?: string; setor?: string } }) {
+export default async function ErpEquipePage(props: { searchParams: Promise<{ ver?: string; setor?: string }> }) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'acessos.gerir');
   const rede = ctx.alcance.lojas === 'todas';

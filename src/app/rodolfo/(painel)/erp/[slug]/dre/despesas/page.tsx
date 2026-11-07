@@ -9,10 +9,14 @@ import { PaginaDasDespesas } from '@/components/erp/telas/dre/paginas';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroDespesasPage({ params, searchParams }: { params: { slug: string }; searchParams: Record<string, string | string[] | undefined> }) {
-  const ctx = await exigirParceiro(params.slug);
-  exigirPermissao(ctx, 'dre.ver');
-  const { visao, lojas } = await visaoDaRequisicao(ctx);
-  const raiz = `/rodolfo/erp/${ctx.parceiro.slug}`;
-  return <PaginaDasDespesas c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: `${ctx.parceiro.nome} · ${rotuloDaVisao(visao)}`, parceiro: ctx.parceiro.nome, raiz }} lojasDoAlcance={lojas.map((l) => ({ id: l.id, nome: l.nome }))} query={searchParams} />;
+export default async function ParceiroDespesasPage(
+ props: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+ const searchParams = await props.searchParams;
+ const params = await props.params;
+ const ctx = await exigirParceiro(params.slug);
+ exigirPermissao(ctx, 'dre.ver');
+ const { visao, lojas } = await visaoDaRequisicao(ctx);
+ const raiz = `/rodolfo/erp/${ctx.parceiro.slug}`;
+ return <PaginaDasDespesas c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: `${ctx.parceiro.nome} · ${rotuloDaVisao(visao)}`, parceiro: ctx.parceiro.nome, raiz }} lojasDoAlcance={lojas.map((l) => ({ id: l.id, nome: l.nome }))} query={searchParams} />;
 }

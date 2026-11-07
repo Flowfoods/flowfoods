@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useRef, useState, useActionState } from 'react';
+
 import { MENSAGEM_ENVIO_INDETERMINADO, type AcaoFichaUnificada, type EstadoFichaUnificada } from '@/lib/erp/ficha-unificada-campos';
 
 /** Só uma confirmação da tentativa ainda montada pode limpar o rascunho e navegar. */
@@ -13,7 +13,7 @@ export function useEnvioFicha(acao: AcaoFichaUnificada, antes: () => void, aoCon
     montado.current = true;
     return () => { montado.current = false; contador.current++; };
   }, []);
-  const [estado, enviar] = useFormState<EstadoFichaUnificada, FormData>(async (anterior, form) => {
+  const [estado, enviar] = useActionState<EstadoFichaUnificada, FormData>(async (anterior, form) => {
     const pedido = ++tentativa.current;
     antes();
     setPendente(true);

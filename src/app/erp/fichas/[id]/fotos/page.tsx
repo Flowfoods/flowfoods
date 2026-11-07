@@ -11,10 +11,11 @@ import { acaoFotosDaFicha } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpFotosDaFichaPage({ params }: { params: { id: string } }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'fichas.editar');
-  const fotos = await obterFotosDaFicha(ctx.cliente, params.id);
-  if (!fotos) notFound();
-  return <PaginaFotosDaFicha fotos={fotos} base="/erp/fichas" contexto={ctx.parceiro.nome} bloqueio={ctx.bloqueio} acao={acaoFotosDaFicha.bind(null, fotos.id)} />;
+export default async function ErpFotosDaFichaPage(props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'fichas.editar');
+ const fotos = await obterFotosDaFicha(ctx.cliente, params.id);
+ if (!fotos) notFound();
+ return <PaginaFotosDaFicha fotos={fotos} base="/erp/fichas" contexto={ctx.parceiro.nome} bloqueio={ctx.bloqueio} acao={acaoFotosDaFicha.bind(null, fotos.id)} />;
 }

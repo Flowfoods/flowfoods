@@ -98,7 +98,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · telas do CMV (Postgres real)', { timeout
     return x;
   };
   const html = async (query: Record<string, string> = { periodo: '2026-09-10' }) => {
-    const el = await ErpDrePage({ searchParams: query });
+    const el = await ErpDrePage({ searchParams: Promise.resolve(query) });
     return sp(renderToStaticMarkup(el as ReactElement));
   };
   const json = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? v.toString() : isValidElement(v) ? { tipo: typeof v.type === 'string' ? v.type : (v.type as { name?: string }).name, ...(v.props as object) } : v));
@@ -166,7 +166,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · telas do CMV (Postgres real)', { timeout
 
   it('o operador não abre o DRE; quem não tem compras nem estoque não recebe os links do painel', async () => {
     como(alcanceDe('OPERADOR', [ids.vp]), { tipo: 'loja', lojaId: ids.vp });
-    expect(await rodar(() => ErpDrePage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpDrePage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     como(propria(['dre.ver', 'lojas.ver'], 'rede'));
     const h = await html({ periodo: '2026-09-10', rede: '1' });
     expect(h).toContain('CMV: compra × real');
@@ -203,7 +203,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.3 · telas do CMV (Postgres real)', { timeout
     const sem = await listarHistorico(a, { entidade: 'PeriodoApuracao', verPrecos: false, verDre: false, limite: 20 });
     expect(json(sem)).not.toContain('misto');
     expect(json(sem)).not.toContain('CMV');
-    const pagina = sp(renderToStaticMarkup((await resolver(await ErpHistoricoPage({ searchParams: { entidade: 'PeriodoApuracao' } }))) as ReactElement));
+    const pagina = sp(renderToStaticMarkup((await resolver(await ErpHistoricoPage({ searchParams: Promise.resolve({ entidade: 'PeriodoApuracao' }) }))) as ReactElement));
     expect(pagina).not.toContain('misto');
     expect(pagina).not.toContain('Fechou');
   });

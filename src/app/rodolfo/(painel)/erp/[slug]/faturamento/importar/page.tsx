@@ -10,7 +10,8 @@ import { acaoImportarFaturamento, acaoPreviaDoFaturamento } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroImportarFaturamentoPage({ params }: { params: { slug: string } }) {
+export default async function ParceiroImportarFaturamentoPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'faturamento.lancar');
   const slug = ctx.parceiro.slug;

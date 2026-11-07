@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Ações de uma linha da equipe: editar o acesso (abre o formulário logo
  * abaixo), gerar link de senha, desativar/reativar e, só no nível 1, liberar
@@ -7,8 +9,14 @@
  * quem está vendo — e o servidor confere de novo.
  */
 
-import { useEffect, useState, type ReactNode } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+/**
+ * Ações de uma linha da equipe: editar o acesso (abre o formulário logo
+ * abaixo), gerar link de senha, desativar/reativar e, só no nível 1, liberar
+ * as tentativas de entrada. Cada botão só aparece se a action existir para
+ * quem está vendo — e o servidor confere de novo.
+ */
+import { useEffect, useState, type ReactNode, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import type { AcaoDeEquipe, EstadoEquipe } from './estado';
 import { Confirmacao } from './escolhas';
 import { LinkGerado } from './link-gerado';
@@ -48,9 +56,9 @@ export function AcoesDaPessoa({
 }) {
   const [aberto, setAberto] = useState(false);
   const [confirmando, setConfirmando] = useState(false);
-  const [link, pedirLink] = useFormState<EstadoEquipe, FormData>(gerarLink ?? sem, null);
-  const [situacao, mudar] = useFormState<EstadoEquipe, FormData>(mudarStatus ?? sem, null);
-  const [liberado, pedirLiberar] = useFormState<EstadoEquipe, FormData>(liberar ?? sem, null);
+  const [link, pedirLink] = useActionState<EstadoEquipe, FormData>(gerarLink ?? sem, null);
+  const [situacao, mudar] = useActionState<EstadoEquipe, FormData>(mudarStatus ?? sem, null);
+  const [liberado, pedirLiberar] = useActionState<EstadoEquipe, FormData>(liberar ?? sem, null);
   const erro = [link, situacao, liberado].map((e) => (e && !e.ok ? e.erros?.geral : null)).find(Boolean) ?? null;
   const certo = liberado?.ok ? liberado.mensagem : null;
   // Respondeu (deu certo ou não): a caixa de confirmação fecha.
@@ -65,14 +73,14 @@ export function AcoesDaPessoa({
           </button>
         )}
         {gerarLink && status === 'ATIVO' && (
-          <form action={pedirLink}>
+          <FormularioComAcao action={pedirLink}>
             <Botao>Gerar link de senha</Botao>
-          </form>
+          </FormularioComAcao>
         )}
         {mudarStatus && status === 'DESATIVADO' && (
-          <form action={mudar}>
+          <FormularioComAcao action={mudar}>
             <Botao>Reativar</Botao>
-          </form>
+          </FormularioComAcao>
         )}
         {mudarStatus && status === 'ATIVO' && (
           <button type="button" className={BOTAO} aria-expanded={confirmando} onClick={() => setConfirmando(true)}>
@@ -80,13 +88,13 @@ export function AcoesDaPessoa({
           </button>
         )}
         {liberar && (
-          <form action={pedirLiberar}>
+          <FormularioComAcao action={pedirLiberar}>
             <Botao>Liberar tentativas</Botao>
-          </form>
+          </FormularioComAcao>
         )}
       </div>
       {mudarStatus && status === 'ATIVO' && confirmando && (
-        <form action={mudar}>
+        <FormularioComAcao action={mudar}>
           <Confirmacao
             titulo={`Desativar ${nome}?`}
             detalhe="A pessoa sai na hora e não entra mais neste parceiro até ser reativada."
@@ -94,7 +102,7 @@ export function AcoesDaPessoa({
             tipoConfirmar="submit"
             onCancelar={() => setConfirmando(false)}
           />
-        </form>
+        </FormularioComAcao>
       )}
       {!gerarLink && avisoDeLink && status === 'ATIVO' && <p className="text-[12px] text-suave">{avisoDeLink}</p>}
       {erro && <p className="text-[12px] text-erro">{erro}</p>}

@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Concluir o lote (3.1), celular primeiro: o cozinheiro diz quanto saiu de verdade (kg|g, L|ml, un), o motivo quando a
  * diferença passa de 10% (ou o lote se perdeu) e em que conservação o lote vai (a validade nasce daí). A tela mostra ao vivo
@@ -7,8 +9,14 @@
  * Concluir duas vezes a mesma tela não põe duas entradas no estoque: vai com a versão lida.
  */
 
-import { useEffect, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Concluir o lote (3.1), celular primeiro: o cozinheiro diz quanto saiu de verdade (kg|g, L|ml, un), o motivo quando a
+ * diferença passa de 10% (ou o lote se perdeu) e em que conservação o lote vai (a validade nasce daí). A tela mostra ao vivo
+ * o rendimento e, para quem vê custos, o custo por unidade; o servidor lê os textos e refaz tudo (campo forjado não vale).
+ * Concluir duas vezes a mesma tela não põe duas entradas no estoque: vai com a versão lida.
+ */
+import { useEffect, useState, useActionState } from 'react';
+
 import { periodoDaFraseDeRecusa } from '@/lib/erp/periodo-fechado-campos';
 import { custoPorUnidadeDoLote, formatarRendimento, quandoVence, rendimentoDoLote, validadeDoLote } from '@/lib/erp/producao-campos';
 import { formatarDinheiro, formatarFracao, formatarQuantidade, lerQuantidadeNa, UNIDADES, type Unidade } from '@/lib/erp/unidades';
@@ -55,7 +63,7 @@ export function FormConcluir({
   hrefPeriodos: string | null;
   bloqueio: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const u = UNIDADES[unidade];
   const [texto, setTexto] = useState('');
   const [escala, setEscala] = useState<'base' | 'menor'>('base');
@@ -76,7 +84,7 @@ export function FormConcluir({
   const escolhida = conservacoes.find((c) => c.chave === conservacao);
   const idQ = 'concluir-produzido';
   return (
-    <form action={enviar} className="space-y-5 pb-28 sm:pb-0">
+    <FormularioComAcao action={enviar} className="space-y-5 pb-28 sm:pb-0">
       <input type="hidden" name="versao" value={versao} />
       <input type="hidden" name="escala" value={escala} />
       {voltar && <input type="hidden" name="voltar" value={voltar} />}
@@ -231,6 +239,6 @@ export function FormConcluir({
           </BotaoEnviar>
         </div>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

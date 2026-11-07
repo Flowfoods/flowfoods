@@ -25,7 +25,8 @@ function rostoNoSite(): boolean {
   }
 }
 
-export default async function EntrarPage({ searchParams }: { searchParams: { senha?: string; saiu?: string } }) {
+export default async function EntrarPage(props: { searchParams: Promise<{ senha?: string; saiu?: string }> }) {
+  const searchParams = await props.searchParams;
   const sessao = await sessaoDaRequisicao();
   if (sessao) redirect(sessao.parceiro ? '/erp' : '/entrar/escolher');
   const aviso = searchParams.senha === 'criada' ? AVISOS.criada : searchParams.saiu ? AVISOS.saiu : null;

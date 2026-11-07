@@ -1,13 +1,20 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * F4 — "Fotos da ficha": a principal (a capa) e as de apoio, com escolha explícita da principal, legenda, ordem e
  * remoção. Câmera ou galeria; a foto é redesenhada aqui (como no formulário) e enviada pela rota própria antes de
  * entrar na ficha. Cada botão é um formulário com a versão lida: tela velha dá conflito no servidor.
  */
 
-import { useEffect, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * F4 — "Fotos da ficha": a principal (a capa) e as de apoio, com escolha explícita da principal, legenda, ordem e
+ * remoção. Câmera ou galeria; a foto é redesenhada aqui (como no formulário) e enviada pela rota própria antes de
+ * entrar na ficha. Cada botão é um formulário com a versão lida: tela velha dá conflito no servidor.
+ */
+import { useEffect, useState, useActionState } from 'react';
+
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { FotosDaFicha } from '@/lib/erp/ficha-fotos';
 import { LEGENDA_MAX, MAXIMO_DE_APOIOS } from '@/lib/erp/ficha-fotos-campos';
@@ -24,7 +31,7 @@ type Acao = (anterior: EstadoDasFotos, form: FormData) => Promise<EstadoDasFotos
 const ICONE = 'ff-transicao inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[7px] border border-linha-forte text-texto hover:bg-texto/5 disabled:opacity-40';
 
 export function TelaFotosDaFicha({ fotos: f, base, acao, bloqueio }: { fotos: FotosDaFicha; base: string; acao: Acao; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoDasFotos, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoDasFotos, FormData>(acao, null);
   const [enviando, setEnviando] = useState(false);
   const [erroDoEnvio, setErroDoEnvio] = useState<string | null>(null);
   const url = (arquivo: string, apoio: boolean) => `${base}/${f.id}/foto?${apoio ? `apoio=${arquivo}` : `v=${arquivo.slice(0, 12)}`}`;
@@ -85,7 +92,7 @@ export function TelaFotosDaFicha({ fotos: f, base, acao, bloqueio }: { fotos: Fo
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
             {/* eslint-disable-next-line @next/next/no-img-element -- foto privada servida pelo portão do parceiro. */}
             <img src={url(f.principal.arquivo, false)} alt={`Foto principal de ${f.nome}`} className="aspect-[4/3] w-full rounded-[10px] border border-linha object-cover sm:w-72" />
-            <form action={enviar} className="min-w-0 flex-1 space-y-3">
+            <FormularioComAcao action={enviar} className="min-w-0 flex-1 space-y-3">
               {V}
               <input type="hidden" name="tipo" value="removerPrincipal" />
               <p className="text-sm text-suave">Para tirar a principal, diga qual fica no lugar dela. As fotos de apoio não são apagadas.</p>
@@ -109,7 +116,7 @@ export function TelaFotosDaFicha({ fotos: f, base, acao, bloqueio }: { fotos: Fo
               <BotaoEnviar variante="secundario" pendente="Tirando…" disabled={travado}>
                 Tirar a principal
               </BotaoEnviar>
-            </form>
+            </FormularioComAcao>
           </div>
         ) : (
           <p className="text-sm text-texto">
@@ -128,7 +135,7 @@ export function TelaFotosDaFicha({ fotos: f, base, acao, bloqueio }: { fotos: Fo
                 {/* eslint-disable-next-line @next/next/no-img-element -- foto privada servida pelo portão do parceiro. */}
                 <img src={url(a.arquivo, true)} alt={a.legenda ? `Foto de apoio ${n + 1}: ${a.legenda}` : `Foto de apoio ${n + 1} de ${f.nome}`} className="aspect-[4/3] w-full rounded-[8px] border border-linha object-cover sm:w-44" />
                 <div className="min-w-0 flex-1 space-y-2">
-                  <form action={enviar} className="flex gap-2">
+                  <FormularioComAcao action={enviar} className="flex gap-2">
                     {V}
                     <input type="hidden" name="tipo" value="legenda" />
                     <input type="hidden" name="arquivo" value={a.arquivo} />
@@ -139,9 +146,9 @@ export function TelaFotosDaFicha({ fotos: f, base, acao, bloqueio }: { fotos: Fo
                     <BotaoEnviar variante="secundario" pendente="Salvando…" disabled={travado}>
                       Salvar
                     </BotaoEnviar>
-                  </form>
+                  </FormularioComAcao>
                   <div className="flex flex-wrap items-center gap-2">
-                    <form action={enviar}>
+                    <FormularioComAcao action={enviar}>
                       {V}
                       <input type="hidden" name="tipo" value="mover" />
                       <input type="hidden" name="arquivo" value={a.arquivo} />
@@ -149,8 +156,8 @@ export function TelaFotosDaFicha({ fotos: f, base, acao, bloqueio }: { fotos: Fo
                       <button type="submit" className={ICONE} aria-label={`Subir a foto de apoio ${n + 1}`} title="Subir" disabled={travado || n === 0}>
                         <ArrowUp size={16} aria-hidden />
                       </button>
-                    </form>
-                    <form action={enviar}>
+                    </FormularioComAcao>
+                    <FormularioComAcao action={enviar}>
                       {V}
                       <input type="hidden" name="tipo" value="mover" />
                       <input type="hidden" name="arquivo" value={a.arquivo} />
@@ -158,23 +165,23 @@ export function TelaFotosDaFicha({ fotos: f, base, acao, bloqueio }: { fotos: Fo
                       <button type="submit" className={ICONE} aria-label={`Descer a foto de apoio ${n + 1}`} title="Descer" disabled={travado || n === f.apoios.length - 1}>
                         <ArrowDown size={16} aria-hidden />
                       </button>
-                    </form>
-                    <form action={enviar}>
+                    </FormularioComAcao>
+                    <FormularioComAcao action={enviar}>
                       {V}
                       <input type="hidden" name="tipo" value="principal" />
                       <input type="hidden" name="arquivo" value={a.arquivo} />
                       <BotaoEnviar variante="secundario" pendente="Trocando…" disabled={travado}>
                         Tornar principal
                       </BotaoEnviar>
-                    </form>
-                    <form action={enviar}>
+                    </FormularioComAcao>
+                    <FormularioComAcao action={enviar}>
                       {V}
                       <input type="hidden" name="tipo" value="remover" />
                       <input type="hidden" name="arquivo" value={a.arquivo} />
                       <BotaoEnviar variante="fantasma" pendente="Removendo…" disabled={travado}>
                         Remover
                       </BotaoEnviar>
-                    </form>
+                    </FormularioComAcao>
                   </div>
                 </div>
               </li>

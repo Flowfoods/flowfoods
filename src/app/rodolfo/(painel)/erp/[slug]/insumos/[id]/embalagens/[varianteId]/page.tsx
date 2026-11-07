@@ -8,7 +8,10 @@ import { acaoSalvarEmbalagem, acaoSituacaoEmbalagem } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroEmbalagemPage({ params }: { params: { slug: string; id: string; varianteId: string } }) {
+export default async function ParceiroEmbalagemPage(
+  props: { params: Promise<{ slug: string; id: string; varianteId: string }> }
+) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.editar');
   const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);

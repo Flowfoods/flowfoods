@@ -8,7 +8,8 @@ import { acaoConcluirAbertura } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroConferirAberturaPage({ params }: { params: { slug: string; lojaId: string } }) {
+export default async function ParceiroConferirAberturaPage(props: { params: Promise<{ slug: string; lojaId: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'estoque.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/estoque`;

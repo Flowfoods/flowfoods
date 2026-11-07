@@ -24,7 +24,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
   return {
@@ -95,18 +96,18 @@ describe.skipIf(!URL_TESTE)('Decisão 519 · pontos de ajuda do Faturamento pela
       raiz: '/erp',
       alcance: alcanceDe('DONO', 'rede'),
       preferencia: { dicasLigadas: true, escolhida: true, fechadas: [], pontos: [] },
-      mes: (sp: Record<string, string>) => ErpFaturamentoPage({ searchParams: sp }),
-      dia: (lojaId: string, data: string) => ErpDiaPage({ params: { lojaId, data }, searchParams: {} }),
-      lancar: () => ErpLancarPage({ searchParams: {} }),
+      mes: (sp: Record<string, string>) => ErpFaturamentoPage({ searchParams: Promise.resolve(sp) }),
+      dia: (lojaId: string, data: string) => ErpDiaPage({ params: Promise.resolve({ lojaId, data }), searchParams: Promise.resolve({}) }),
+      lancar: () => ErpLancarPage({ searchParams: Promise.resolve({}) }),
     },
     {
       nome: 'nível 1',
       raiz: `/rodolfo/erp/${A.slug}`,
       alcance: ALCANCE_FLOWFOODS,
       preferencia: null,
-      mes: (sp: Record<string, string>) => Nivel1FaturamentoPage({ params: { slug: A.slug }, searchParams: sp }),
-      dia: (lojaId: string, data: string) => Nivel1DiaPage({ params: { slug: A.slug, lojaId, data }, searchParams: {} }),
-      lancar: () => Nivel1LancarPage({ params: { slug: A.slug }, searchParams: {} }),
+      mes: (sp: Record<string, string>) => Nivel1FaturamentoPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve(sp) }),
+      dia: (lojaId: string, data: string) => Nivel1DiaPage({ params: Promise.resolve({ slug: A.slug, lojaId, data }), searchParams: Promise.resolve({}) }),
+      lancar: () => Nivel1LancarPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve({}) }),
     },
   ];
 
@@ -239,7 +240,7 @@ describe.skipIf(!URL_TESTE)('Decisão 519 · pontos de ajuda do Faturamento pela
   it('quem só vê abre o dia com números e Não vendeu (fora do bloco travado) e sem o Remover, nem o texto dele', async () => {
     const soVe = alcanceDe('OPERADOR', 'rede', ['faturamento.ver']);
     atual.ctx = () => ({ parceiro: A, alcance: soVe, cliente: a, bloqueio: null, podeEscrever: true, sessao: { userId: 'u', autorNome: 'Vera' } });
-    const h = await naTela(await ErpDiaPage({ params: { lojaId: ids.vp, data: DIA }, searchParams: {} }), `/erp/faturamento/${ids.vp}/${DIA}`, soVe, { dicasLigadas: true, escolhida: true, fechadas: [], pontos: [] });
+    const h = await naTela(await ErpDiaPage({ params: Promise.resolve({ lojaId: ids.vp, data: DIA }), searchParams: Promise.resolve({}) }), `/erp/faturamento/${ids.vp}/${DIA}`, soVe, { dicasLigadas: true, escolhida: true, fechadas: [], pontos: [] });
     expect(h).toContain('Você pode ver este dia.');
     expect([quantas(h, 'numeros'), quantas(h, 'nao-vendeu'), quantas(h, 'remover')]).toEqual([1, 1, 0]);
     for (const p of ['numeros', 'nao-vendeu']) expect(foraDeFieldset(h, p), p).toBe(true);

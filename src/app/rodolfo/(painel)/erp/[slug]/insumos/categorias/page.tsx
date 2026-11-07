@@ -14,7 +14,11 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroCategoriasPage({ params, searchParams }: { params: { slug: string }; searchParams: { feito?: string; cat?: string } }) {
+export default async function ParceiroCategoriasPage(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ feito?: string; cat?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.ver');
   await garantirCategoriasPadrao(ctx.cliente);

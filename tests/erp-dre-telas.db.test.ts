@@ -246,7 +246,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · telas e actions do DRE (Postgres real)'
 
   it('a página da despesa: 404 para a da rede (gerente de loja), de outra loja, de outro parceiro e inexistente; o operador não entra', async () => {
     como(alcanceDe('GERENTE', [ids.vp]), 'Gil');
-    const abre = (id: string) => rodar(() => ErpDespesaPage({ params: { id }, searchParams: {} }).then(resolver));
+    const abre = (id: string) => rodar(() => ErpDespesaPage({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) }).then(resolver));
     expect(await abre(ids.d_rede)).toEqual({ erro: 'NOT_FOUND' });
     expect(await abre(ids.d_meier)).toEqual({ erro: 'NOT_FOUND' });
     expect(await abre('cl0jainexistente0000000000')).toEqual({ erro: 'NOT_FOUND' });
@@ -255,10 +255,10 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · telas e actions do DRE (Postgres real)'
     expect(await abre(ids.d_vp)).toEqual({ erro: 'NOT_FOUND' }); // o id da A, dentro do parceiro B
     como(alcanceDe('OPERADOR', [ids.vp]), 'Caio');
     expect(await abre(ids.d_vp)).toEqual({ erro: 'SEM_ACESSO' });
-    expect(await rodar(() => ErpEditarDespesaPage({ params: { id: ids.d_vp } }))).toEqual({ erro: 'SEM_ACESSO' });
-    expect(await rodar(() => ErpNovaDespesaPage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
-    expect(await rodar(() => ErpDespesasPage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
-    expect(await rodar(() => ErpDrePage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpEditarDespesaPage({ params: Promise.resolve({ id: ids.d_vp }) }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpNovaDespesaPage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpDespesasPage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpDrePage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     expect(await rodar(() => ErpPeriodosPage())).toEqual({ erro: 'SEM_ACESSO' });
     expect(await rodar(() => ErpPlanoPage())).toEqual({ erro: 'SEM_ACESSO' });
   });
@@ -267,31 +267,31 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · telas e actions do DRE (Postgres real)'
     como(alcanceDe('GERENTE', [ids.vp]), 'Gil');
     atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
     atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }];
-    const lista = await props(await ErpDespesasPage({ searchParams: { mes: '2026-10' } }));
+    const lista = await props(await ErpDespesasPage({ searchParams: Promise.resolve({ mes: '2026-10' }) }));
     const nomes = (lista.lista.itens as { descricao: string }[]).map((i) => i.descricao);
     expect(nomes).toContain('Luz da Penha');
     expect(nomes).not.toContain('Contador do grupo');
     expect(nomes).not.toContain('Luz do Méier');
     expect(json(lista)).not.toContain('Contador do grupo');
     // Forjar ?loja= de outra loja não abre a de fora do alcance.
-    const forjada = await props(await ErpDespesasPage({ searchParams: { mes: '2026-10', loja: ids.meier } }));
+    const forjada = await props(await ErpDespesasPage({ searchParams: Promise.resolve({ mes: '2026-10', loja: ids.meier }) }));
     expect(json(forjada.lista)).not.toContain('Luz do Méier');
     atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }, { id: ids.meier, nome: 'Méier', ativa: true }];
     como(alcanceDe('DONO', 'rede'), 'Marina');
     atual.visao = { tipo: 'rede' };
-    const dona = await props(await ErpDespesasPage({ searchParams: { mes: '2026-10' } }));
+    const dona = await props(await ErpDespesasPage({ searchParams: Promise.resolve({ mes: '2026-10' }) }));
     expect((dona.lista.itens as { descricao: string }[]).map((i) => i.descricao)).toEqual(expect.arrayContaining(['Luz da Penha', 'Luz do Méier', 'Contador do grupo']));
   });
 
   it('critério 15: quem só lança despesa (sem ver o DRE) abre as despesas e a de lançar, e não abre o DRE nem o plano', async () => {
     como(propria(['despesas.lancar', 'lojas.ver'], 'rede'), 'Ana Administrativo');
     atual.visao = { tipo: 'rede' };
-    const lista = await props(await ErpDespesasPage({ searchParams: { mes: '2026-10' } }));
+    const lista = await props(await ErpDespesasPage({ searchParams: Promise.resolve({ mes: '2026-10' }) }));
     expect((lista.lista.itens as unknown[]).length).toBeGreaterThan(0);
     expect(lista.podeVerDre).toBe(false);
     expect(lista.podeLancar).toBe(true);
-    expect(await rodar(() => ErpNovaDespesaPage({ searchParams: {} }))).not.toEqual({ erro: 'SEM_ACESSO' });
-    expect(await rodar(() => ErpDrePage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpNovaDespesaPage({ searchParams: Promise.resolve({}) }))).not.toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpDrePage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     expect(await rodar(() => ErpPeriodosPage())).toEqual({ erro: 'SEM_ACESSO' });
     expect(await rodar(() => ErpPlanoPage())).toEqual({ erro: 'SEM_ACESSO' });
   });
@@ -300,13 +300,13 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · telas e actions do DRE (Postgres real)'
     como(alcanceDe('GERENTE', [ids.vp]), 'Gil');
     atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
     atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }];
-    const dre = await props(await ErpDrePage({ searchParams: {} }));
+    const dre = await props(await ErpDrePage({ searchParams: Promise.resolve({}) }));
     expect(dre.d.escopo).toMatchObject({ tipo: 'loja', lojaId: ids.vp });
     expect(dre.d.porLoja).toBeNull();
     expect(json(dre)).not.toContain('Contador do grupo');
     // Forjar ?rede=1 ou ?loja= de fora do acesso cai na loja dele.
     for (const q of [{ rede: '1' }, { loja: ids.meier }]) {
-      const f = await props(await ErpDrePage({ searchParams: q }));
+      const f = await props(await ErpDrePage({ searchParams: Promise.resolve(q) }));
       expect(f.d.escopo).toMatchObject({ tipo: 'loja', lojaId: ids.vp });
     }
     const periodos = await props(await ErpPeriodosPage());
@@ -315,12 +315,12 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · telas e actions do DRE (Postgres real)'
     como(alcanceDe('DONO', 'rede'), 'Marina');
     atual.visao = { tipo: 'rede' };
     atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }, { id: ids.meier, nome: 'Méier', ativa: true }];
-    const rede = await props(await ErpDrePage({ searchParams: {} }));
+    const rede = await props(await ErpDrePage({ searchParams: Promise.resolve({}) }));
     expect(rede.d.escopo).toEqual({ tipo: 'rede' });
     expect(rede.d.porLoja.map((l: { loja: { nome: string } }) => l.loja.nome).sort()).toEqual(['Méier', 'Vila da Penha']);
     expect((await props(await ErpPeriodosPage())).podeMudar).toBe(true);
     expect(await rodar(() => ErpPlanoPage())).not.toEqual({ erro: 'SEM_ACESSO' });
-    const n1 = await props(await NivelUmDrePage({ params: { slug: A.slug }, searchParams: {} }));
+    const n1 = await props(await NivelUmDrePage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve({}) }));
     expect(n1.raiz).toBe(`/rodolfo/erp/${A.slug}`);
   });
 
@@ -354,20 +354,20 @@ describe.skipIf(!URL_TESTE)('ERP 2.2a · telas e actions do DRE (Postgres real)'
   it('critério 15: perfil com historico.ver e sem dre.ver abre o Histórico sem uma despesa (HTML e payload); quem vê o DRE vê', async () => {
     const PROIBIDO = /Contador do grupo|Luz da Penha|Conserto da coifa|DRE e despesas|Linha do DRE|Período do DRE|"Despesa"/;
     como(alcanceDe('OPERADOR', 'rede', ['historico.ver']), 'Hugo');
-    const tudo = await ErpHistoricoPage({ searchParams: {} });
+    const tudo = await ErpHistoricoPage({ searchParams: Promise.resolve({}) });
     expect(json(tudo).match(PROIBIDO)?.[0] ?? null).toBeNull();
     expect(renderToStaticMarkup(createElement(() => tudo as never)).match(PROIBIDO)?.[0] ?? null).toBeNull();
-    const filtrado = await ErpHistoricoPage({ searchParams: { entidade: 'Despesa' } });
+    const filtrado = await ErpHistoricoPage({ searchParams: Promise.resolve({ entidade: 'Despesa' }) });
     expect(json(filtrado).match(PROIBIDO)?.[0] ?? null).toBeNull();
     expect(renderToStaticMarkup(createElement(() => filtrado as never))).not.toMatch(PROIBIDO);
     // Quem tem os dois vê as linhas e o filtro.
     como(alcanceDe('OPERADOR', 'rede', ['historico.ver', 'dre.ver']), 'Helena');
-    const comAcesso = await ErpHistoricoPage({ searchParams: { entidade: 'Despesa' } });
+    const comAcesso = await ErpHistoricoPage({ searchParams: Promise.resolve({ entidade: 'Despesa' }) });
     const htmlOk = renderToStaticMarkup(createElement(() => comAcesso as never)).replace(/ /g, ' ');
     expect(htmlOk).toContain('Contador do grupo');
     expect(htmlOk).toContain('DRE e despesas');
     como(alcanceDe('DONO', 'rede'), 'Marina');
-    const dona = await ErpHistoricoPage({ searchParams: {} });
+    const dona = await ErpHistoricoPage({ searchParams: Promise.resolve({}) });
     expect(renderToStaticMarkup(createElement(() => dona as never)).replace(/ /g, ' ')).toContain('R$ 900,00');
   });
 });

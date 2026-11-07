@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Cadastrar pedido manual (0.5): quem chegou por outro caminho (indicação,
  * WhatsApp, visita). Mesmos campos e mesmas regras do formulário do site, sem a
@@ -7,8 +9,8 @@
  */
 
 import Link from 'next/link';
-import { useFormState } from 'react-dom';
-import { useState } from 'react';
+
+import { useState, useActionState } from 'react';
 import { BotaoEnviar } from '@/components/erp/ui/botoes';
 import { CAMPO, Campo } from '@/components/erp/ui/campos';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
@@ -17,7 +19,7 @@ import { Segmentos } from '@/components/erp/ui/segmentos';
 import { acaoCadastrarPedidoManual, type EstadoDoPedido } from '../actions';
 
 export function FormManual() {
-  const [estado, enviar] = useFormState<EstadoDoPedido, FormData>(acaoCadastrarPedidoManual, null);
+  const [estado, enviar] = useActionState<EstadoDoPedido, FormData>(acaoCadastrarPedidoManual, null);
   const [etapa, setEtapa] = useState<'NOVO' | 'EM_CONVERSA'>('NOVO');
   const e = estado && !estado.ok ? (estado.erros ?? {}) : {};
   const campo = (id: string, nome: string, rotulo: string, extra: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
@@ -35,7 +37,7 @@ export function FormManual() {
     </Campo>
   );
   return (
-    <form action={enviar} className="space-y-4">
+    <FormularioComAcao action={enviar} className="space-y-4">
       <Painel titulo="Quem é" subtitulo="O mesmo que o site pergunta. Fica em “Aguardando liberação” até você ativar ou recusar.">
         <div className="space-y-4">
           {campo('m-grupo', 'nomeGrupo', 'Nome do grupo ou do restaurante', { maxLength: 80 })}
@@ -75,6 +77,6 @@ export function FormManual() {
         </Link>
         <BotaoEnviar pendente="Cadastrando…">Cadastrar pedido</BotaoEnviar>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

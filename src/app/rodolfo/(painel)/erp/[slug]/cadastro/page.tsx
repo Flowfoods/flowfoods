@@ -33,7 +33,8 @@ const EXPLICA = {
     'Dá para consultar tudo. Insumos, fichas técnicas, lojas e marcas ficam bloqueados até reativar; o nome ainda pode ser corrigido.',
 } as const;
 
-export default async function CadastroParceiroPage({ params }: { params: { slug: string } }) {
+export default async function CadastroParceiroPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const { parceiro, cliente } = await exigirParceiro(params.slug);
   const historico = await listarHistorico(cliente, { entidade: 'ParceiroFlow', limite: 6, verPrecos: false });
   const status = STATUS_DO_PARCEIRO[parceiro.status];

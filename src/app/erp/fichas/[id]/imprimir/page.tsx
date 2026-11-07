@@ -16,7 +16,11 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/fichas';
 
-export default async function ErpImprimirFichaPage({ params, searchParams = {} }: { searchParams?: { de?: string | string[] }; params: { id: string } }) {
+export default async function ErpImprimirFichaPage(
+  props: { searchParams?: Promise<{ de?: string | string[] }>; params: Promise<{ id: string }> }
+) {
+  const searchParams = (await props.searchParams) ?? {};
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.ver');
   const ficha = await obterFichaParaImpressao(ctx.cliente, params.id);

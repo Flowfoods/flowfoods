@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Importar fichas por planilha (1.2), a MESMA tela para o nível 1 e para a
  * pessoa do parceiro. Dois passos, nada gravado no primeiro: enviar o CSV, ver a
@@ -9,8 +11,8 @@
  */
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
+
 import type { FichaNaPrevia, SituacaoNaPrevia } from '@/lib/erp/ficha-importar';
 import { CABECALHO_DO_MODELO, LIMITE_DE_FICHAS } from '@/lib/erp/ficha-planilha';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -84,7 +86,7 @@ export function TelaImportarFichas({
 }) {
   // Um estado só: a prévia, e por cima dela o erro ou o resultado da importação
   // (um erro ao importar mantém a prévia na tela).
-  const [estado, enviar] = useFormState<EstadoImportacao, FormData>(
+  const [estado, enviar] = useActionState<EstadoImportacao, FormData>(
     (anterior, form) => (form.get('passo') === 'importar' ? acaoImportar(anterior, form) : acaoPrevia(anterior, form)),
     null,
   );
@@ -133,7 +135,7 @@ export function TelaImportarFichas({
       </Painel>
 
       <Painel titulo="Enviar a planilha">
-        <form action={enviar} className="space-y-3">
+        <FormularioComAcao action={enviar} className="space-y-3">
           <input type="hidden" name="passo" value="previa" />
           <fieldset disabled={!!bloqueio} className="min-w-0 space-y-3">
             <div>
@@ -166,7 +168,7 @@ export function TelaImportarFichas({
             </BotaoEnviar>
           </fieldset>
           {bloqueio && <p className="text-[13px] text-suave">{bloqueio}</p>}
-        </form>
+        </FormularioComAcao>
       </Painel>
 
       {estado?.erro && (
@@ -199,7 +201,7 @@ export function TelaImportarFichas({
               <LinhaDaPrevia key={f.nome} f={f} novoInsumo={novoInsumo} />
             ))}
           </ul>
-          <form action={enviar} className="flex flex-col gap-2 border-t border-linha px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+          <FormularioComAcao action={enviar} className="flex flex-col gap-2 border-t border-linha px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5">
             <input type="hidden" name="passo" value="importar" />
             <input type="hidden" name="texto" value={estado?.texto ?? ''} />
             <p className="text-[13px] text-suave">
@@ -210,7 +212,7 @@ export function TelaImportarFichas({
             <BotaoEnviar disabled={entram === 0 || !!bloqueio} pendente="Importando…" className="sm:min-w-44">
               {entram > 0 ? `Importar ${plural(entram, 'ficha', 'fichas')}` : 'Importar'}
             </BotaoEnviar>
-          </form>
+          </FormularioComAcao>
         </Painel>
       )}
     </div>

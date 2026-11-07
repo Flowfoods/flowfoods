@@ -12,7 +12,11 @@ import { acaoFecharPeriodo } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpPeriodoPage({ params, searchParams }: { params: { inicio: string }; searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ErpPeriodoPage(
+  props: { params: Promise<{ inicio: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'metas.editar');
   exigirPermissaoNaPagina(ctx, 'dre.ver');

@@ -171,5 +171,5 @@ const lojasDaRequisicao = cache((parceiroId: string, lojas: string) =>
 export async function visaoDaRequisicao(ctx: { parceiro: Pick<ParceiroFlow, 'id'>; alcance: Alcance }) {
   const chave = ctx.alcance.lojas === 'todas' ? '*' : [...ctx.alcance.lojas].sort().join(',');
   const lojas = await lojasDaRequisicao(ctx.parceiro.id, chave);
-  return { lojas, ...resolverVisao(ctx.parceiro.id, ctx.alcance, lojas, cookies().get(COOKIE_VISAO)?.value) };
+  return { lojas, ...resolverVisao(ctx.parceiro.id, ctx.alcance, lojas, (await cookies()).get(COOKIE_VISAO)?.value) };
 }

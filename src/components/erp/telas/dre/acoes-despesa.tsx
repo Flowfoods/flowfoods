@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Os botões da despesa (2.2a): pagar, desfazer o pagamento, "não repete mais" e
  * remover (com motivo). Pagar e as outras mudanças que não mexem na competência
@@ -7,7 +9,8 @@
  * que a tela leu (duas abas não se atropelam).
  */
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro } from '../../ui/campos';
 import { CampoData } from '../../ui/campo-data';
@@ -33,9 +36,9 @@ function CampoDaVolta({ volta }: { volta?: string }) {
 }
 
 export function FormPagar({ acao, versao, hoje, aqui, volta, bloqueio }: { acao: AcaoDeCadastro; versao: string; hoje: string; aqui: string; volta?: string; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acao, null);
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <input type="hidden" name="versao" value={versao} />
       <CampoDaVolta volta={volta} />
       <ErroDaAcao estado={estado} aqui={aqui} />
@@ -50,34 +53,34 @@ export function FormPagar({ acao, versao, hoje, aqui, volta, bloqueio }: { acao:
           Marcar como paga
         </BotaoEnviar>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 /** Um botão só (desfazer o pagamento, não repete mais). */
 export function FormSimples({ acao, versao, aqui, volta, bloqueio, rotulo, pendente, variante = 'secundario' }: { acao: AcaoDeCadastro; versao: string; aqui: string; volta?: string; bloqueio: string | null; rotulo: string; pendente: string; variante?: 'secundario' | 'perigo' | 'fantasma' }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acao, null);
   return (
-    <form action={enviar} className="space-y-2">
+    <FormularioComAcao action={enviar} className="space-y-2">
       <input type="hidden" name="versao" value={versao} />
       <CampoDaVolta volta={volta} />
       <ErroDaAcao estado={estado} aqui={aqui} />
       <BotaoEnviar variante={variante} pendente={pendente} disabled={!!bloqueio}>
         {rotulo}
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 export function FormRemoverDespesa({ acao, versao, aqui, bloqueio }: { acao: AcaoDeCadastro; versao: string; aqui: string; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acao, null);
   return (
     <details className="group rounded-[10px] border border-linha px-4 py-3">
       <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 text-sm font-medium text-texto">
         Remover esta despesa
         <span className="text-[12px] font-normal text-suave group-open:hidden">abrir</span>
       </summary>
-      <form action={enviar} className="mt-3 space-y-3">
+      <FormularioComAcao action={enviar} className="mt-3 space-y-3">
         <input type="hidden" name="versao" value={versao} />
         <ErroDaAcao estado={estado} aqui={aqui} />
         <div>
@@ -91,7 +94,7 @@ export function FormRemoverDespesa({ acao, versao, aqui, bloqueio }: { acao: Aca
         <BotaoEnviar variante="perigo" pendente="Removendo…" disabled={!!bloqueio}>
           Remover despesa
         </BotaoEnviar>
-      </form>
+      </FormularioComAcao>
     </details>
   );
 }

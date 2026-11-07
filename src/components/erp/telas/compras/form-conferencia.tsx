@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Conferir a nota recebida por XML (F.1b): para cada item da nota fiscal, a pessoa diz QUAL insumo é, em QUAL embalagem e QUANTAS
  * embalagens vêm em 1 unidade da nota ("1 PC = uma peça de 2 kg"; "1 CX = 10 pacotes de 1 kg"). A tela mostra a conta ao vivo
@@ -9,8 +11,8 @@
  */
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useEffect, useMemo, useRef, useState, type ReactNode, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import type { FormularioDeNota } from '@/lib/erp/compras';
 import { A_GRANEL, EMBALAGEM_PADRAO, embalagemDoItem, formatarData, formatarEmbalagens, PREFIXO_DA_EMBALAGEM } from '@/lib/erp/compra-campos';
 import type { DocumentoDetalhado, ItemDoDocumento } from '@/lib/erp/documentos-fiscais';
@@ -190,7 +192,7 @@ function FormConferenciaBase({
   avisos,
 }: PropsDaConferencia & { escolhasIniciais: Record<number, Escolha>; lojaInicial: string; fornecedorInicial: string; dataInformada: string; chaveDoRascunho: string; avisos: ReactNode }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [estado, enviar] = useFormState<EstadoDocumento, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoDocumento, FormData>(acao, null);
   const saida = useAvisoDeSaida(estado);
   const porId = useMemo(() => new Map(opcoesDeInsumos.map((i) => [i.id, i])), [opcoesDeInsumos]);
   const [escolhas, setEscolhas] = useState<Record<number, Escolha>>(escolhasIniciais);
@@ -247,7 +249,7 @@ function FormConferenciaBase({
   const temOutraNota = doc.notaParaLigar.some((n) => !n.mesmoFornecedor);
 
   return (
-    <form ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="versao" value={doc.versao} />
       {avisos}
       <ResumoDeErros erros={erros} idBase={idBase} rotulos={rotuloDoCampo} />
@@ -427,7 +429,7 @@ function FormConferenciaBase({
       <p id={`${idBase}-conciliar-motivo`} className="text-right text-[13px] text-suave" aria-live="polite">
         {bloqueio ?? (motivoDoConciliar ? `${motivoDoConciliar} Salvar o que escolhi já guarda o que você fez.` : '')}
       </p>
-    </form>
+    </FormularioComAcao>
   );
 }
 

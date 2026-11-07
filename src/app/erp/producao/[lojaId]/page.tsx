@@ -11,10 +11,14 @@ import { fraseDoEstoque } from '@/components/erp/telas/estoque/estado';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpProducaoDaLojaPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { feito?: string } }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'producao.ver');
-  const q = await quadroDaProducao(ctx.cliente, ctx.alcance, params.lojaId);
-  if (!q) notFound();
-  return <TelaQuadroDaProducao q={q} base="/erp/producao" feito={fraseDoEstoque(searchParams.feito)} pode={{ registrar: pode(ctx.alcance, 'producao.registrar', { lojaId: q.loja.id }), planejar: pode(ctx.alcance, 'producao.planejar', { lojaId: q.loja.id }) }} bloqueio={ctx.bloqueio} />;
+export default async function ErpProducaoDaLojaPage(
+ props: { params: Promise<{ lojaId: string }>; searchParams: Promise<{ feito?: string }> }
+) {
+ const searchParams = await props.searchParams;
+ const params = await props.params;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'producao.ver');
+ const q = await quadroDaProducao(ctx.cliente, ctx.alcance, params.lojaId);
+ if (!q) notFound();
+ return <TelaQuadroDaProducao q={q} base="/erp/producao" feito={fraseDoEstoque(searchParams.feito)} pode={{ registrar: pode(ctx.alcance, 'producao.registrar', { lojaId: q.loja.id }), planejar: pode(ctx.alcance, 'producao.planejar', { lojaId: q.loja.id }) }} bloqueio={ctx.bloqueio} />;
 }

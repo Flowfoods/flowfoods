@@ -1,7 +1,9 @@
 'use client';
 
-import { Suspense } from 'react';
-import { useFormState } from 'react-dom';
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
+import { Suspense, useActionState } from 'react';
+
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { definirSenha, type ResultadoSetup } from './actions';
@@ -14,7 +16,7 @@ const estadoInicial: ResultadoSetup = { ok: false };
 function Formulario() {
   const params = useSearchParams();
   const token = params.get('token') ?? '';
-  const [estado, acao] = useFormState(definirSenha, estadoInicial);
+  const [estado, acao] = useActionState(definirSenha, estadoInicial);
 
   if (estado.ok) {
     return (
@@ -40,7 +42,7 @@ function Formulario() {
   }
 
   return (
-    <form action={acao} className="space-y-4">
+    <FormularioComAcao action={acao} className="space-y-4">
       <input type="hidden" name="token" value={token} />
 
       <div>
@@ -93,7 +95,7 @@ function Formulario() {
       <p className="text-[13px] text-suave">
         A senha não é gravada em log, relatório ou mensagem. Só o hash vai para o banco.
       </p>
-    </form>
+    </FormularioComAcao>
   );
 }
 

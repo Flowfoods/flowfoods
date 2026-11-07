@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Formulários da tela de Categorias (I.1a): criar, e as ações de uma linha (subir, descer, renomear, desativar ou reativar,
  * excluir). Tudo vai como texto e o servidor decide (permissão `insumos.categorias`, nome único sem caixa nem acento, a do
@@ -7,8 +9,14 @@
  * por vez por linha, aberto por botão (`aria-expanded`), e os botões têm 44 px no toque.
  */
 
-import { createContext, useContext, useState, type ReactNode } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Formulários da tela de Categorias (I.1a): criar, e as ações de uma linha (subir, descer, renomear, desativar ou reativar,
+ * excluir). Tudo vai como texto e o servidor decide (permissão `insumos.categorias`, nome único sem caixa nem acento, a do
+ * sistema que não se mexe, excluir só sem uso). Erro volta ao lado do campo, sem apagar o que foi digitado. Um painel de ação
+ * por vez por linha, aberto por botão (`aria-expanded`), e os botões têm 44 px no toque.
+ */
+import { createContext, useContext, useState, type ReactNode, useActionState } from 'react';
+
 import { ArrowDown, ArrowUp } from 'lucide-react';
 import type { LinhaDeCategoria } from '@/lib/erp/categorias';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -43,10 +51,10 @@ function Ocultos() {
 
 export function FormNovaCategoria({ acao, bloqueio }: { acao: AcaoDeCadastro; bloqueio: string | null }) {
   const segura = useAcaoSegura(acao);
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(segura, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(segura, null);
   const erros = estado?.erros ?? {};
   return (
-    <form action={enviar} noValidate className="space-y-3">
+    <FormularioComAcao action={enviar} noValidate className="space-y-3">
       <Ocultos />
       <SalvandoAnunciado />
       <ErroGeral estado={estado} recarregar="" />
@@ -77,7 +85,7 @@ export function FormNovaCategoria({ acao, bloqueio }: { acao: AcaoDeCadastro; bl
         <Erro id="categoria-nome-erro" texto={erros.nome} />
       </fieldset>
       {bloqueio && <p className="text-[13px] text-suave">{bloqueio}</p>}
-    </form>
+    </FormularioComAcao>
   );
 }
 
@@ -87,7 +95,7 @@ type Painel = 'renomear' | 'situacao' | 'excluir' | null;
 function BotaoDeOrdem({ acao, sentido, nome, desabilitado }: { acao: (form: FormData) => Promise<void>; sentido: 'subir' | 'descer'; nome: string; desabilitado: boolean }) {
   const Seta = sentido === 'subir' ? ArrowUp : ArrowDown;
   return (
-    <form action={acao}>
+    <FormularioComAcao action={acao}>
       <Ocultos />
       <button
         type="submit"
@@ -97,17 +105,17 @@ function BotaoDeOrdem({ acao, sentido, nome, desabilitado }: { acao: (form: Form
       >
         <Seta size={16} aria-hidden />
       </button>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 function FormRenomear({ acao, nome, versao }: { acao: AcaoDeCadastro; nome: string; versao: string }) {
   const segura = useAcaoSegura(acao);
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(segura, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(segura, null);
   const erros = estado?.erros ?? {};
   const id = `renomear-${versao.replace(/\W/g, '')}`;
   return (
-    <form action={enviar} noValidate className="space-y-3">
+    <FormularioComAcao action={enviar} noValidate className="space-y-3">
       <input type="hidden" name="versao" value={versao} />
       <Ocultos />
       <SalvandoAnunciado />
@@ -135,15 +143,15 @@ function FormRenomear({ acao, nome, versao }: { acao: AcaoDeCadastro; nome: stri
         </div>
         <Erro id={`${id}-erro`} texto={erros.nome} />
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 function FormExcluir({ acao, nome }: { acao: AcaoDeCadastro; nome: string }) {
   const segura = useAcaoSegura(acao);
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(segura, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(segura, null);
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <Ocultos />
       <SalvandoAnunciado texto="Excluindo…" />
       <p className="text-sm text-suave">
@@ -154,7 +162,7 @@ function FormExcluir({ acao, nome }: { acao: AcaoDeCadastro; nome: string }) {
       <BotaoEnviar variante="perigo" pendente="Excluindo…">
         Excluir categoria
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }
 

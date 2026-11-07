@@ -25,7 +25,8 @@ const ALERTA: Record<AlertaDoImpacto, string> = {
 const comSinal = (c: number) => `${c < 0 ? '−' : c > 0 ? '+' : ''}${formatarDinheiro(Math.abs(c))}`;
 const LINHAS_A_MOSTRAR = 25;
 
-export default async function CustoMedioPage({ params }: { params: { slug: string } }) {
+export default async function CustoMedioPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const { parceiro, cliente, bloqueio } = await exigirParceiro(params.slug);
   const lojas = await impactoDoCustoMedio(cliente);
 

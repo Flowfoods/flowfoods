@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Formulários da cozinha (3.3), pequenos e de toque grande: pegar um lote (ou uma linha da lista de hoje), soltar o lote
  * (com o motivo) e, para a gerência, passar para outra pessoa (com o motivo). Cada um leva o que a tela mostrou (a versão
@@ -7,8 +9,14 @@
  * formulários servem a tela da cozinha (`voltar=tarefas`) e a tela do lote.
  */
 
-import { useId, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Formulários da cozinha (3.3), pequenos e de toque grande: pegar um lote (ou uma linha da lista de hoje), soltar o lote
+ * (com o motivo) e, para a gerência, passar para outra pessoa (com o motivo). Cada um leva o que a tela mostrou (a versão
+ * do lote; a linha com a ficha e a quantidade): o servidor decide e, se alguém mexeu antes, diz quem e o quê. Os mesmos
+ * formulários servem a tela da cozinha (`voltar=tarefas`) e a tela do lote.
+ */
+import { useId, useState, useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao, classeDeBotaoDaCozinha } from '../../ui/estilos';
@@ -61,9 +69,9 @@ export function FormPegar({
   cozinha?: boolean;
   variante?: 'primario' | 'secundario';
 }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   return (
-    <form action={enviar}>
+    <FormularioComAcao action={enviar}>
       <div className="space-y-2">
         {Object.entries(campos).map(([k, v]) => (
           <input key={k} type="hidden" name={k} value={v} />
@@ -78,13 +86,13 @@ export function FormPegar({
         )}
         <ErroGeral estado={estado} recarregar={recarregar} />
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 /** "Soltar": abre o motivo (obrigatório); o lote volta para pegar, sem ninguém. */
 export function FormSoltar({ acao, lote, versao, recarregar, voltar, deOutro, cozinha = true }: { acao: AcaoDeEstoque; lote: string; versao: number; recarregar: string; voltar?: 'tarefas'; deOutro?: string; cozinha?: boolean }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
   const [dispensado, setDispensado] = useState<EstadoEstoque>(null);
   const id = useId();
@@ -105,7 +113,7 @@ export function FormSoltar({ acao, lote, versao, recarregar, voltar, deOutro, co
     );
   }
   return (
-    <form action={enviar}>
+    <FormularioComAcao action={enviar}>
       <div className="space-y-3">
         <input type="hidden" name="lote" value={lote} />
         <input type="hidden" name="versao" value={versao} />
@@ -149,7 +157,7 @@ export function FormSoltar({ acao, lote, versao, recarregar, voltar, deOutro, co
           </button>
         </div>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }
 
@@ -178,7 +186,7 @@ export function FormPassar({
   voltar?: 'tarefas';
   cozinha?: boolean;
 }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
   const [dispensado, setDispensado] = useState<EstadoEstoque>(null);
   const id = useId();
@@ -195,7 +203,7 @@ export function FormPassar({
     );
   }
   return (
-    <form action={enviar}>
+    <FormularioComAcao action={enviar}>
       <div className="space-y-3">
         <input type="hidden" name="lote" value={lote} />
         <input type="hidden" name="versao" value={versao} />
@@ -254,6 +262,6 @@ export function FormPassar({
           </button>
         </div>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

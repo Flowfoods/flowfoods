@@ -51,7 +51,8 @@ vi.mock('@/lib/erp/contexto', async () => {
   };
 });
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
@@ -103,8 +104,8 @@ describe.skipIf(!URL_TESTE)('ERP I.2b · telas do CMV real por categoria (Postgr
     }
     return x;
   };
-  const painel = async (query: Record<string, string> = {}) => sp(renderToStaticMarkup(await resolver(await ErpCmvPorCategoriaPage({ searchParams: query }))));
-  const metas = async (query: Record<string, string> = {}) => sp(renderToStaticMarkup(await resolver(await ErpMetasPorCategoriaPage({ searchParams: query }))));
+  const painel = async (query: Record<string, string> = {}) => sp(renderToStaticMarkup(await resolver(await ErpCmvPorCategoriaPage({ searchParams: Promise.resolve(query) }))));
+  const metas = async (query: Record<string, string> = {}) => sp(renderToStaticMarkup(await resolver(await ErpMetasPorCategoriaPage({ searchParams: Promise.resolve(query) }))));
 
   beforeAll(async () => {
     const host = new URL(URL_TESTE!).hostname;
@@ -221,9 +222,9 @@ describe.skipIf(!URL_TESTE)('ERP I.2b · telas do CMV real por categoria (Postgr
 
   it('comprador sem `dre.ver` e operador não abrem as vistas', async () => {
     como(propria(['compras.ver', 'compras.lancar', 'lojas.ver'], 'rede'));
-    for (const vista of ['compra-real', 'evolucao', 'matriz']) expect(await rodar(() => ErpCmvPorCategoriaPage({ searchParams: { vista } }))).toEqual({ erro: 'SEM_ACESSO' });
+    for (const vista of ['compra-real', 'evolucao', 'matriz']) expect(await rodar(() => ErpCmvPorCategoriaPage({ searchParams: Promise.resolve({ vista }) }))).toEqual({ erro: 'SEM_ACESSO' });
     como(alcanceDe('OPERADOR', [ids.vp]), { tipo: 'loja', lojaId: ids.vp });
-    expect(await rodar(() => ErpCmvPorCategoriaPage({ searchParams: { vista: 'evolucao' } }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpCmvPorCategoriaPage({ searchParams: Promise.resolve({ vista: 'evolucao' }) }))).toEqual({ erro: 'SEM_ACESSO' });
   });
 
   it('a loja que personaliza ganha o campo da meta total própria; a que segue a rede só diz qual meta vale; a rede lista quem tem a própria', async () => {
@@ -247,13 +248,13 @@ describe.skipIf(!URL_TESTE)('ERP I.2b · telas do CMV real por categoria (Postgr
 
   it('a DRE diz de quem é a meta do CMV: na loja "a própria dela"; na rede, quem tem a própria; o gerente da VP não lê nada da DL', async () => {
     como(alcanceDe('DONO', 'rede'));
-    const dl = sp(renderToStaticMarkup(await resolver(await ErpDrePage({ searchParams: { loja: ids.dl, periodo: '2026-10-10' } }))));
+    const dl = sp(renderToStaticMarkup(await resolver(await ErpDrePage({ searchParams: Promise.resolve({ loja: ids.dl, periodo: '2026-10-10' }) }))));
     expect(dl).toContain('A meta do CMV desta loja é a própria dela');
-    const rede = sp(renderToStaticMarkup(await resolver(await ErpDrePage({ searchParams: { rede: '1', periodo: '2026-10-10' } }))));
+    const rede = sp(renderToStaticMarkup(await resolver(await ErpDrePage({ searchParams: Promise.resolve({ rede: '1', periodo: '2026-10-10' }) }))));
     expect(rede).toContain('A meta do CMV da rede é a da rede. Unidade Tijuca tem a própria (30,00%)');
     como(alcanceDe('GERENTE', [ids.vp]), { tipo: 'loja', lojaId: ids.vp });
     atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }];
-    const g = sp(renderToStaticMarkup(await resolver(await ErpDrePage({ searchParams: { periodo: '2026-10-10', rede: '1' } }))));
+    const g = sp(renderToStaticMarkup(await resolver(await ErpDrePage({ searchParams: Promise.resolve({ periodo: '2026-10-10', rede: '1' }) }))));
     expect(g).not.toContain('Unidade Tijuca');
     expect(g).not.toContain('tem a própria');
   });

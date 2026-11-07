@@ -1,12 +1,15 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Desativar ou reativar um cadastro (insumo, embalagem, ficha técnica), com
  * motivo opcional que vai para o histórico. Desativar não apaga: some da lista
  * padrão e o histórico fica. Recusa e conflito aparecem aqui mesmo.
  */
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, ROTULO } from '../../ui/campos';
 import type { AcaoDeCadastro, EstadoCadastro } from './estado';
@@ -38,11 +41,11 @@ export function FormSituacao({
   /** A frase de cada situação, quando a padrão não serve (a categoria mantém os insumos que já estão nela). */
   textos?: { desativar: string; reativar: string };
 }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acao, null);
   const { nome, fem } = O_QUE[oQue];
   const [o, este, desativ, ele] = fem ? ['a', 'Esta', 'desativada', 'ela'] : ['o', 'Este', 'desativado', 'ele'];
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <input type="hidden" name="ativo" value={ativo ? 'nao' : 'sim'} />
       {ocultos && Object.entries(ocultos).map(([k, v]) => <input key={k} type="hidden" name={k} value={v} />)}
       <p className="text-sm text-suave">
@@ -79,6 +82,6 @@ export function FormSituacao({
       <BotaoEnviar variante={ativo ? 'perigo' : 'secundario'} className="w-full" pendente={ativo ? 'Desativando…' : 'Reativando…'}>
         {ativo ? `Desativar ${nome}` : `Reativar ${nome}`}
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }

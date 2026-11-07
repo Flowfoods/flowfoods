@@ -3,7 +3,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next/navigation', () => ({ usePathname: () => null, useSearchParams: () => null }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 import { FormEmbalagens } from '@/components/erp/telas/fichas/form-embalagens';
 import { contaDasEmbalagensNaTela, precosDasEmbalagens, type EmbalagemNaTela, type PrecoDoCanalNaFicha } from '@/components/erp/telas/fichas/conta-das-embalagens';
 import { cmvDoCanal } from '@/lib/erp/cmv-produto-campos';

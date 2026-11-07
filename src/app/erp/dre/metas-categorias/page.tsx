@@ -10,7 +10,10 @@ import { acaoSalvarMetasPorCategoria } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpMetasPorCategoriaPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ErpMetasPorCategoriaPage(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'metas.editar');
   const { visao } = await visaoDaRequisicao(ctx);

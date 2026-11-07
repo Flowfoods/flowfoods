@@ -11,13 +11,14 @@ import { entidadeDoFiltro, entidadesDoFiltro, LIMITE_DO_HISTORICO, TelaHistorico
 
 export const dynamic = 'force-dynamic';
 
-export default async function HistoricoPage({
-  params,
-  searchParams,
-}: {
-  params: { slug: string };
-  searchParams: { entidade?: string };
-}) {
+export default async function HistoricoPage(
+  props: {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<{ entidade?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'historico.ver');
   const entidade = entidadeDoFiltro(searchParams.entidade);

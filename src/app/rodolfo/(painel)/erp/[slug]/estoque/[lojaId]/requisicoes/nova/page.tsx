@@ -8,7 +8,11 @@ import { acaoPedirRequisicao } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroNovaRequisicaoPage({ params, searchParams }: { params: { slug: string; lojaId: string }; searchParams: { ficha?: string; quantas?: string } }) {
+export default async function ParceiroNovaRequisicaoPage(
+  props: { params: Promise<{ slug: string; lojaId: string }>; searchParams: Promise<{ ficha?: string; quantas?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'requisicao.pedir');
   const o = await opcoesDoPedido(ctx.cliente, ctx.alcance, params.lojaId);

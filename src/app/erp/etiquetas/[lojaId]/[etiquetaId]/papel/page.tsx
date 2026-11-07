@@ -11,10 +11,14 @@ import { acaoConfirmarImpressao } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpPapelDaEtiquetaPage({ params, searchParams }: { params: { lojaId: string; etiquetaId: string }; searchParams: { pedido?: string } }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'etiquetas.imprimir');
-  const d = await papelDoPedido(ctx.cliente, ctx.alcance, params.lojaId, params.etiquetaId, searchParams.pedido);
-  if (!d) notFound();
-  return <TelaDoPapel d={d} base="/erp/etiquetas" confirmar={acaoConfirmarImpressao.bind(null, d.loja.id, d.etiqueta.id)} />;
+export default async function ErpPapelDaEtiquetaPage(
+ props: { params: Promise<{ lojaId: string; etiquetaId: string }>; searchParams: Promise<{ pedido?: string }> }
+) {
+ const searchParams = await props.searchParams;
+ const params = await props.params;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'etiquetas.imprimir');
+ const d = await papelDoPedido(ctx.cliente, ctx.alcance, params.lojaId, params.etiquetaId, searchParams.pedido);
+ if (!d) notFound();
+ return <TelaDoPapel d={d} base="/erp/etiquetas" confirmar={acaoConfirmarImpressao.bind(null, d.loja.id, d.etiqueta.id)} />;
 }

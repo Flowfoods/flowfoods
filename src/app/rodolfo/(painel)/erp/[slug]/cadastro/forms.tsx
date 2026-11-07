@@ -1,16 +1,19 @@
 'use client';
 
-import { useFormState } from 'react-dom';
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
+import { useActionState } from 'react';
+
 import { useAvisoDeSaida } from '@/components/erp/telas/cadastro/erros';
 import { BotaoEnviar } from '@/components/erp/ui/botoes';
 import { CAMPO, Erro, ROTULO, Resultado, type EstadoForm } from '@/components/erp/ui/campos';
 import { acaoMudarStatusParceiro, acaoRenomearParceiro } from '../../actions';
 
 export function FormRenomear({ slug, nome }: { slug: string; nome: string }) {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoRenomearParceiro.bind(null, slug), null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoRenomearParceiro.bind(null, slug), null);
   const saida = useAvisoDeSaida(estado);
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-1.5">
+    <FormularioComAcao action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-1.5">
       <label htmlFor="nome-parceiro" className={ROTULO}>
         Nome do parceiro
       </label>
@@ -30,17 +33,17 @@ export function FormRenomear({ slug, nome }: { slug: string; nome: string }) {
       </div>
       <Erro id="nome-parceiro-erro" texto={estado?.erros?.nome} />
       <Resultado estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 
 /** Uma ação por vez, a que o status atual permite. Suspender pede motivo. */
 export function FormStatus({ slug, novo }: { slug: string; novo: 'ATIVO' | 'SUSPENSO' }) {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoMudarStatusParceiro.bind(null, slug), null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoMudarStatusParceiro.bind(null, slug), null);
   const saida = useAvisoDeSaida(estado);
   const suspender = novo === 'SUSPENSO';
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-3">
+    <FormularioComAcao action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-3">
       <input type="hidden" name="status" value={novo} />
       {suspender && (
         <div>
@@ -64,6 +67,6 @@ export function FormStatus({ slug, novo }: { slug: string; novo: 'ATIVO' | 'SUSP
         {suspender ? 'Suspender parceiro' : 'Ativar parceiro'}
       </BotaoEnviar>
       <Resultado estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }

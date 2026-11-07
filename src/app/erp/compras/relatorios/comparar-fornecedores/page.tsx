@@ -10,7 +10,10 @@ export const dynamic = 'force-dynamic';
 
 const COMPRAS = '/erp/compras';
 
-export default async function ErpComparacaoDeFornecedoresPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ErpComparacaoDeFornecedoresPage(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'compras.ver');
   return (

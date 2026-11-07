@@ -8,7 +8,8 @@ import { acaoCadastrarFornecedor } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpNovoFornecedorPage({ searchParams }: { searchParams: { volta?: string } }) {
+export default async function ErpNovoFornecedorPage(props: { searchParams: Promise<{ volta?: string }> }) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fornecedores.editar');
   // A chave deste envio nasce aqui, a cada abertura do formulário: o servidor reconhece o reenvio e não cria outro fornecedor.

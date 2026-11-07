@@ -6,8 +6,8 @@
  * texto de 14 px). Raio 7 px; 40 px no desktop, 44 px no celular. Estados:
  * hover, foco (anel do tokens.css), desabilitado e "em voo".
  *
- * React 18 / Next 14: o estado do form vem de `useFormState`/`useFormStatus`
- * do `react-dom` (`useActionState` é do React 19).
+ * React 19: o estado da action vem de `useActionState` do `react`; o envio
+ * do formulário é acompanhado por `useFormStatus` do `react-dom`.
  */
 
 import { useState, useTransition, type ReactNode } from 'react';

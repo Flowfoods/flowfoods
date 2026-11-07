@@ -15,8 +15,9 @@ vi.mock('react', async original => ({
   useMemo: (calcular: () => unknown) => calcular(),
   useRef: (current: unknown) => ({ current }),
   useEffect: () => {},
+  useActionState: () => [null, vi.fn()]
 }));
-vi.mock('react-dom', async original => ({ ...await original<typeof import('react-dom')>(), useFormState: () => [null, vi.fn()], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async original => ({ ...await original<typeof import('react-dom')>(), useFormStatus: () => ({ pending: false }) }));
 vi.mock('@/components/erp/telas/cadastro/rascunho', () => ({
   useRascunhoDaTela: () => ({ valores: null, insumoCriado: null, chave: 'teste', versaoMudou: false, descartar: vi.fn() }),
   guardarRascunho: vi.fn(), AvisoDeRascunho: () => null, AvisoDeRascunhoVelho: () => null,

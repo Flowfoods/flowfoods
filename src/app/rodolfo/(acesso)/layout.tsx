@@ -10,9 +10,9 @@ import { COOKIE_TEMA, lerTema } from '@/lib/erp/tema';
 import '@/components/erp/tokens.css';
 import { Marca } from '@/components/erp/ui/Marca';
 
-export default function AcessoLayout({ children }: { children: React.ReactNode }) {
+export default async function AcessoLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="ff-app bg-fundo font-sans" data-tema={lerTema(cookies().get(COOKIE_TEMA)?.value)}>
+    <div className="ff-app bg-fundo font-sans" data-tema={lerTema((await cookies()).get(COOKIE_TEMA)?.value)}>
       <div aria-hidden className="h-[3px] bg-acento" />
       <div className="mx-auto max-w-5xl px-4">
         <header className="py-4">

@@ -28,7 +28,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
   return {
@@ -111,15 +112,15 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
         { nome: 'dona', alcance: DONA },
       ],
       nova: () => ErpLancarNotaPage({}),
-      editar: (id: string) => ErpEditarNotaPage({ params: { id } }),
+      editar: (id: string) => ErpEditarNotaPage({ params: Promise.resolve({ id }) }),
       conferir: (form: FormData, notaId = '') => acoesDoParceiro.acaoSalvarNota(notaId, null, form),
     },
     {
       nome: 'nível 1',
       raiz: `/rodolfo/erp/${A.slug}`,
       quemVe: [{ nome: 'nível 1', alcance: ALCANCE_FLOWFOODS }],
-      nova: () => Nivel1LancarNotaPage({ params: { slug: A.slug } }),
-      editar: (id: string) => Nivel1EditarNotaPage({ params: { slug: A.slug, id } }),
+      nova: () => Nivel1LancarNotaPage({ params: Promise.resolve({ slug: A.slug }) }),
+      editar: (id: string) => Nivel1EditarNotaPage({ params: Promise.resolve({ slug: A.slug, id }) }),
       conferir: (form: FormData, notaId = '') => acoesDoNivel1.acaoSalvarNota(A.slug, notaId, null, form),
     },
   ];
@@ -337,14 +338,14 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
 
   it('o detalhe da nota (só com `compras.ver`) diz, depois de lançar, que o custo vale onde a nota é a compra mais recente', async () => {
     como(DONA);
-    const h = sp(renderToStaticMarkup((await ErpNotaPage({ params: { id: ids.outubro }, searchParams: { feito: 'lancada' } })) as ReactElement));
+    const h = sp(renderToStaticMarkup((await ErpNotaPage({ params: Promise.resolve({ id: ids.outubro }), searchParams: Promise.resolve({ feito: 'lancada' }) })) as ReactElement));
     expect(h).toContain('Nota lançada. Onde ela é a compra mais recente do insumo, o custo dela já vale nas fichas.');
     expect(h).not.toContain('O custo dos insumos dela já vale nas fichas.');
     // A própria nota da Penha não é a mais recente do cheddar (a do Méier é), e o item diz isso.
     expect(h).toContain('vale a de 16/10/2026');
     // Quem só lança não abre o detalhe (é de `compras.ver`): a frase nunca chega a ele.
     como(SO_LANCA);
-    await expect(ErpNotaPage({ params: { id: ids.outubro }, searchParams: { feito: 'lancada' } })).rejects.toThrow('SEM_ACESSO');
+    await expect(ErpNotaPage({ params: Promise.resolve({ id: ids.outubro }), searchParams: Promise.resolve({ feito: 'lancada' }) })).rejects.toThrow('SEM_ACESSO');
   });
 
   const restrito = (ve: boolean) => resolverAlcance({ perfilBase: null, perfilProprio: ['compras.lancar', 'lojas.ver', ...(ve ? ['compras.ver'] : [])], permissoesExtras: [], permissoesRemovidas: [], redeInteira: false, lojaIds: [ids.vp] });
@@ -366,7 +367,7 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
     const nota = (await obterNota(a, restrito(true), ids.outubro))!;
     expect(nota.itens[0].valeNoCusto).toBe(false);
     expect(nota.itens[0].valeOutra).toBeNull();
-    const detalhe = await ErpNotaPage({ params: { id: ids.outubro }, searchParams: {} });
+    const detalhe = await ErpNotaPage({ params: Promise.resolve({ id: ids.outubro }), searchParams: Promise.resolve({}) });
     expect(renderToStaticMarkup(detalhe)).not.toContain('16/10/2026');
 
     como(DONA);
@@ -460,8 +461,8 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
     expect(nova.json).not.toMatch(/"custo"|ultimaCompraEm|987,65|Insumo privado B/);
     const r = (await acoesDoParceiro.acaoSalvarNota('', null, formDaPrevia()))!;
     expect(r.previa).toMatchObject({ veCusto: false, custos: [], fichas: [] });
-    await expect(ErpEditarNotaPage({ params: { id: ids.meier } })).rejects.toThrow('SEM_ACESSO');
-    await expect(ErpEditarNotaPage({ params: { id: ids.notaB } })).rejects.toThrow('SEM_ACESSO');
+    await expect(ErpEditarNotaPage({ params: Promise.resolve({ id: ids.meier }) })).rejects.toThrow('SEM_ACESSO');
+    await expect(ErpEditarNotaPage({ params: Promise.resolve({ id: ids.notaB }) })).rejects.toThrow('SEM_ACESSO');
     for (const lojaId of [ids.lojaOutra, ids.lojaB]) {
       const form = formDaPrevia();
       form.set('lojaId', lojaId);
@@ -475,7 +476,7 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
     expect((await acoesDoParceiro.acaoSalvarNota('', null, form))!.previa).toBeUndefined();
     como(DONA);
     expect(await obterNota(a, DONA, ids.notaB)).toBeNull();
-    await expect(ErpNotaPage({ params: { id: ids.notaB }, searchParams: {} })).rejects.toThrow('NOT_FOUND');
+    await expect(ErpNotaPage({ params: Promise.resolve({ id: ids.notaB }), searchParams: Promise.resolve({}) })).rejects.toThrow('NOT_FOUND');
   });
 
   it('sem permissão e parceiro suspenso: a action recusa antes de calcular ou gravar', async () => {
@@ -509,8 +510,8 @@ describe.skipIf(!URL_TESTE)('Decisão 523 · custo de agora no formulário de no
         expect(retorno.lojaId).toBe(ids.vp);
         expect(marcadores.has(retorno.chave)).toBe(false);
         marcadores.add(retorno.chave);
-        const pagina = area.nome === 'parceiro' ? ErpLancarNotaPage({ searchParams: query })
-          : Nivel1LancarNotaPage({ params: { slug: A.slug }, searchParams: query });
+        const pagina = area.nome === 'parceiro' ? ErpLancarNotaPage({ searchParams: Promise.resolve(query) })
+          : Nivel1LancarNotaPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve(query) });
         const navegador = await doNavegador(pagina);
         expect(navegador.html).toContain('Nota lançada.');
         expect(navegador.form.inicial).toMatchObject({ lojaId: ids.vp, numero: '', fornecedorId: '', frete: '', total: '', itens: [] });

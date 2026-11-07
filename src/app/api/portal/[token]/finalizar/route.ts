@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
  * resposta, e o que ficou em branco vira item do diagnóstico. A tela avisa
  * quantos faltam antes de confirmar.
  */
-export async function POST(_req: Request, { params }: { params: { token: string } }) {
+export async function POST(_req: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const c = await exigirCliente(params.token);
     const r = await finalizar(c, origemPublica());

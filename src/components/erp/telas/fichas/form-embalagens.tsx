@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Embalagens por canal da ficha (1.9), a MESMA peça no nível 1 e na pessoa
  * do parceiro. Dois painéis — Delivery próprio e iFood —, cada um com as suas
@@ -10,8 +12,8 @@
  */
 
 import Link from 'next/link';
-import { useRef, useState, type ReactNode } from 'react';
-import { useFormState } from 'react-dom';
+import { useRef, useState, type ReactNode, useActionState } from 'react';
+
 import type { EmbalagemDoFormulario } from '@/lib/erp/canais';
 import { CANAIS, type CanalComEmbalagem } from '@/lib/erp/canal-campos';
 import { SIGLAS_DIGITAVEIS } from '@/lib/erp/unidades';
@@ -110,7 +112,7 @@ function FormEmbalagensBase({
   avisos,
 }: PropsDoFormEmbalagens & { chaveDoRascunho: string; avisos: ReactNode; gravadas: readonly LinhaDaEmbalagem[] }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acao, null);
   const saida = useAvisoDeSaida(estado);
   const [linhas, setLinhas] = useState(() => inicial.map((l, i) => ({ ...l, chave: i })));
   const erros = estado?.erros ?? {};
@@ -134,7 +136,7 @@ function FormEmbalagensBase({
   };
 
   return (
-    <form ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="impressao" value={impressao} />
       {de && <input type="hidden" name="de" value={de} />}
       {avisos}
@@ -154,6 +156,6 @@ function FormEmbalagensBase({
         {podeConferirPrecos && <BotaoEnviar nome="continuar" valor="precos" disabled={!!bloqueio}>Salvar e conferir preços</BotaoEnviar>}
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
-    </form>
+    </FormularioComAcao>
   );
 }

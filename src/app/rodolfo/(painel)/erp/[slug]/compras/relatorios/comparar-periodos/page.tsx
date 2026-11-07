@@ -8,9 +8,13 @@ import { PaginaDosPeriodos } from '@/components/erp/telas/compras/comparacao-pag
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroComparacaoDePeriodosPage({ params, searchParams }: { params: { slug: string }; searchParams: Record<string, string | string[] | undefined> }) {
-  const ctx = await exigirParceiro(params.slug);
-  exigirPermissao(ctx, 'compras.ver');
-  const raiz = `/rodolfo/erp/${ctx.parceiro.slug}`;
-  return <PaginaDosPeriodos ctx={ctx} caminho={`${raiz}/compras/relatorios/comparar-periodos`} comprasBase={`${raiz}/compras`} searchParams={searchParams} />;
+export default async function ParceiroComparacaoDePeriodosPage(
+ props: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+ const searchParams = await props.searchParams;
+ const params = await props.params;
+ const ctx = await exigirParceiro(params.slug);
+ exigirPermissao(ctx, 'compras.ver');
+ const raiz = `/rodolfo/erp/${ctx.parceiro.slug}`;
+ return <PaginaDosPeriodos ctx={ctx} caminho={`${raiz}/compras/relatorios/comparar-periodos`} comprasBase={`${raiz}/compras`} searchParams={searchParams} />;
 }

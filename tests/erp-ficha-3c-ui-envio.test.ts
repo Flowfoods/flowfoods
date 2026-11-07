@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from 'vitest';
 import type { AcaoFichaUnificada, EstadoFichaUnificada } from '@/lib/erp/ficha-unificada-campos';
 type Ciclo = { estados: unknown[]; indice: number; refs: unknown[]; ref: number; efeito: boolean; limpar?: () => void; estado: EstadoFichaUnificada; acao?: AcaoFichaUnificada };
 const atual = vi.hoisted(() => ({ ciclo: null as Ciclo | null }));
-vi.mock('react', async original => ({ ...await original<typeof import('react')>(),
- useState: (inicial: unknown) => { const c=atual.ciclo!, n=c.indice++; if(!(n in c.estados)) c.estados[n]=inicial; return [c.estados[n], (valor: unknown) => { c.estados[n]=valor; }]; },
- useRef: (v: unknown) => { const c=atual.ciclo!, n=c.ref++; return c.refs[n] ?? (c.refs[n]={current:v}); },
- useEffect: (fn: () => (() => void)) => { const c=atual.ciclo!; if(!c.efeito) { c.efeito=true; c.limpar=fn(); } },
+vi.mock('react', async original => ({
+  ...await original<typeof import('react')>(),
+  useState: (inicial: unknown) => { const c=atual.ciclo!, n=c.indice++; if(!(n in c.estados)) c.estados[n]=inicial; return [c.estados[n], (valor: unknown) => { c.estados[n]=valor; }]; },
+  useRef: (v: unknown) => { const c=atual.ciclo!, n=c.ref++; return c.refs[n] ?? (c.refs[n]={current:v}); },
+  useEffect: (fn: () => (() => void)) => { const c=atual.ciclo!; if(!c.efeito) { c.efeito=true; c.limpar=fn(); } },
+  useActionState: (acao: AcaoFichaUnificada) => { const c=atual.ciclo!; c.acao=acao; return [c.estado, async (f: FormData) => { c.estado=await c.acao!(c.estado,f); }]; }
 }));
-vi.mock('react-dom', () => ({ useFormState: (acao: AcaoFichaUnificada) => { const c=atual.ciclo!; c.acao=acao; return [c.estado, async (f: FormData) => { c.estado=await c.acao!(c.estado,f); }]; } }));
+
 import { useEnvioFicha } from '@/components/erp/telas/fichas/use-envio-ficha';
 const adiado = () => { let resolver!: (r: EstadoFichaUnificada) => void; let recusar!: (e: Error) => void; const promessa=new Promise<EstadoFichaUnificada>((r,e)=>{resolver=r;recusar=e;}); return {promessa,resolver,recusar}; };
 const ack = (repetido=false): Extract<EstadoFichaUnificada,{ok:true}> => repetido ? {ok:true,vez:1,id:'f',mensagem:'Envio já confirmado',destino:'/erp',repetido:true} : {ok:true,vez:1,id:'f',mensagem:'Salva',destino:'/erp/fichas/f/editar',repetido:false,versao:'v2',versaoMateriais:'m2'};

@@ -42,10 +42,10 @@ function CampoDeClassificacao({ nivel, valor, aoMudar, contexto, secaoId, regist
     <input type="hidden" name={`${nivel}Modo`} value={valor.tipo} />
     {valor.tipo === 'nova' ? <>
       <input id={id} name={`${nivel}Nome`} value={valor.nome} onChange={(e) => aoMudar({ tipo: 'nova', nome: e.target.value })} maxLength={LIMITE_NOME_CLASSIFICACAO} className={CAMPO} autoComplete="off" disabled={desabilitado} aria-invalid={!!erros[nivel]} aria-describedby={`${id}-nova${erros[nivel] ? ` ${id}-erro` : ''}`} />
-      <p id={`${id}-nova`} className="text-[12px] text-suave">Será criada ao salvar a ficha.</p>
+      <p id={`${id}-nova`} className="text-[12px] text-suave">A nova {nome.toLowerCase()} será criada junto com a ficha ao salvar.</p>
     </> : <SeletorDeItem id={id} name={`${nivel}Id`} valor={valor.tipo === 'existente' ? valor.id : ''} opcoes={opcoes} selecionada={atual ? opcaoDaClassificacao(atual) : valor.tipo === 'existente' ? { valor: valor.id, nome: 'Seleção indisponível', grupo: nome, ordemDoGrupo: 0 } : null} aoEscolher={(id) => aoMudar({ tipo: 'existente', id })} rotulo={nome} placeholder={`Sem ${nome.toLowerCase()}`} vazio={`Nenhuma ${nome.toLowerCase()} encontrada.`} desabilitado={desabilitado || (nivel === 'subsecao' && !secaoId)} invalido={!!erros[nivel]} descritoPor={erros[nivel] ? `${id}-erro` : undefined} buscaExterna={dados.buscaExterna} />}
     <div className="flex flex-wrap gap-x-3 gap-y-1">
-      {valor.tipo !== 'nova' && <button type="button" disabled={desabilitado} className={classeDeBotao('fantasma', 'px-0 text-[13px]')} onClick={() => aoMudar({ tipo: 'nova', nome: '' })}>{nivel === 'secao' ? 'Nova seção' : 'Nova subseção'}</button>}
+      {valor.tipo !== 'nova' && <button type="button" disabled={desabilitado} className={classeDeBotao('secundario', 'text-[13px]')} onClick={() => aoMudar({ tipo: 'nova', nome: '' })}>{nivel === 'secao' ? 'Nova seção' : 'Nova subseção'}</button>}
       {valor.tipo !== 'nenhuma' && <button type="button" disabled={!podeLimpar} className={classeDeBotao('fantasma', 'px-0 text-[13px]')} onClick={() => aoMudar({ tipo: 'nenhuma' })}>Sem {nome.toLowerCase()}</button>}
     </div>
     <Erro id={`${id}-erro`} texto={erros[nivel]} />
@@ -71,5 +71,6 @@ export function CamposDeClassificacao({ valor, aoMudar, contexto, registros, exc
       <CampoDeClassificacao nivel="secao" valor={valor.secao} aoMudar={(secao) => aoMudar({ secao, subsecao: (secao.tipo === 'existente' && valor.secao.tipo === 'existente' && secao.id === valor.secao.id) || (secao.tipo === 'nova' && valor.secao.tipo === 'nova') ? valor.subsecao : { tipo: 'nenhuma' } })} contexto={contexto} registros={registros} excluidos={excluidos} erros={erros} desabilitado={bloqueio} podeLimpar={!bloqueio} />
       <CampoDeClassificacao nivel="subsecao" valor={valor.subsecao} aoMudar={(subsecao) => aoMudar({ ...valor, subsecao })} contexto={contexto} secaoId={secaoAtualId} registros={registros} excluidos={excluidos} erros={erros} desabilitado={bloqueio || valor.secao.tipo === 'nenhuma' || paiIndisponivel} podeLimpar={!bloqueio} />
     </div>
+    {valor.secao.tipo === 'nenhuma' && <p className="text-[12px] text-suave">Escolha ou crie uma seção para habilitar Nova subseção.</p>}
   </div>;
 }

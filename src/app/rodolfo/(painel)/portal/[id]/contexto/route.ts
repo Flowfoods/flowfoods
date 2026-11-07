@@ -8,7 +8,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 /** O `.md` de contexto do cliente, para guardar em `clientes/<slug>/`. Só com sessão. */
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const sessao = await getServerSession(authOptions);
   if (!sessao) return new Response('Sem sessão.', { status: 401 });
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * A lista do dia (3.2), celular primeiro: o gerente monta na cozinha, pelo celular. Cada linha = um pré-preparo (seletor em
  * largura cheia) e quanto produzir (campo numérico de 48 px, teclado de números, a unidade do rendimento ao lado); a partir
@@ -9,8 +11,16 @@
  * não apaga nem gera o que a pessoa não viu. O servidor lê os textos e decide; aqui só se mostra.
  */
 
-import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * A lista do dia (3.2), celular primeiro: o gerente monta na cozinha, pelo celular. Cada linha = um pré-preparo (seletor em
+ * largura cheia) e quanto produzir (campo numérico de 48 px, teclado de números, a unidade do rendimento ao lado); a partir
+ * de 640 px, tudo numa fileira. "Salvar a lista" refaz a conta de vai usar / tem / comprar; "Gerar os lotes" transforma as
+ * linhas em aberto em lotes da produção (só com a lista salva: com mudança por salvar o botão espera e diz por quê, e o
+ * "Pôr na lista" dos pré-preparos também). O formulário manda as linhas em aberto que mostrou (`vistas`, `linha`): o servidor
+ * não apaga nem gera o que a pessoa não viu. O servidor lê os textos e decide; aqui só se mostra.
+ */
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode, useActionState } from 'react';
+
 import { UNIDADES, type Unidade } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro } from '../../ui/campos';
@@ -84,8 +94,8 @@ export function FormListaDoDia({
   faltas?: string | null;
   bloqueio: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(salvar, null);
-  const [estadoGerar, enviarGerar] = useFormState<EstadoEstoque, FormData>(gerar, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(salvar, null);
+  const [estadoGerar, enviarGerar] = useActionState<EstadoEstoque, FormData>(gerar, null);
   // Com os lotes já gerados e nada em aberto, não se abre linha vazia: só "Mais um pré-preparo" (e "Salvar" fica secundário).
   const [linhas, setLinhas] = useState<Linha[]>(() => (abertas.length ? abertas.map((l) => nova(l)) : emLote > 0 ? [] : [nova()]));
   const porId = useMemo(() => new Map(opcoes.map((o) => [o.id, o])), [opcoes]);
@@ -109,7 +119,7 @@ export function FormListaDoDia({
     <div className="space-y-4">
       {/* O espaçamento mora numa div interna: o React põe os campos ocultos da action no começo do <form>, e um `space-y` no
           próprio formulário dava margem ao primeiro bloco visível (vão no topo do painel). Sem <legend> pelo mesmo motivo. */}
-      <form action={enviar} aria-label="Pré-preparos em aberto">
+      <FormularioComAcao action={enviar} aria-label="Pré-preparos em aberto">
         <div className="space-y-3">
           <fieldset disabled={!!bloqueio} className="space-y-3">
             {linhas.length > 0 && (
@@ -206,10 +216,10 @@ export function FormListaDoDia({
         <input type="hidden" name="versao" value={versao ?? ''} />
         {/* As linhas em aberto que esta tela mostrou: a que voltar de um lote cancelado em outra tela não some sem ser vista. */}
         <input type="hidden" name="vistas" value={abertas.map((l) => l.id).join(',')} />
-      </form>
+      </FormularioComAcao>
 
       {(salvas > 0 || emLote === 0) && (
-        <form action={enviarGerar} className="rounded-[10px] border border-linha p-3" aria-label="Gerar os lotes">
+        <FormularioComAcao action={enviarGerar} className="rounded-[10px] border border-linha p-3" aria-label="Gerar os lotes">
           <div className="space-y-2">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-[13px] text-suave">
@@ -237,7 +247,7 @@ export function FormListaDoDia({
           {abertas.map((l) => (
             <input key={l.id} type="hidden" name="linha" value={l.id} />
           ))}
-        </form>
+        </FormularioComAcao>
       )}
     </div>
   );
@@ -245,11 +255,11 @@ export function FormListaDoDia({
 
 /** "Pôr na lista": o pré-preparo que falta produzir entra na lista com o que falta (o servidor confere a versão). */
 export function FormPorNaLista({ acao, dia, versao, fichaId, quantidadeMilesimos, rotulo, bloqueio }: { acao: AcaoDeEstoque; dia: string; versao: number | null; fichaId: string; quantidadeMilesimos: number; rotulo: string; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const suja = useListaSuja();
   const motivo = bloqueio ?? (suja ? SALVE_ANTES : null);
   return (
-    <form action={enviar} className="flex flex-col items-stretch gap-1 sm:items-end">
+    <FormularioComAcao action={enviar} className="flex flex-col items-stretch gap-1 sm:items-end">
       <input type="hidden" name="dia" value={dia} />
       <input type="hidden" name="versao" value={versao ?? ''} />
       <input type="hidden" name="fichaId" value={fichaId} />
@@ -263,7 +273,7 @@ export function FormPorNaLista({ acao, dia, versao, fichaId, quantidadeMilesimos
           {estado.erros.geral}
         </p>
       )}
-    </form>
+    </FormularioComAcao>
   );
 }
 

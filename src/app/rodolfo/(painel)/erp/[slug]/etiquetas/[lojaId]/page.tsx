@@ -8,7 +8,11 @@ import { fraseDasEtiquetas } from '@/components/erp/telas/etiquetas/estado';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroEtiquetasDaLojaPage({ params, searchParams }: { params: { slug: string; lojaId: string }; searchParams: { lote?: string; feito?: string } }) {
+export default async function ParceiroEtiquetasDaLojaPage(
+  props: { params: Promise<{ slug: string; lojaId: string }>; searchParams: Promise<{ lote?: string; feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'etiquetas.imprimir');
   const p = await painelDeEtiquetas(ctx.cliente, ctx.alcance, params.lojaId, { lote: searchParams.lote });

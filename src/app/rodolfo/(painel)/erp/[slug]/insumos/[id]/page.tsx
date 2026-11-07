@@ -11,13 +11,14 @@ import { acaoConfirmarConservacao, acaoSituacaoInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroInsumoPage({
-  params,
-  searchParams,
-}: {
-  params: { slug: string; id: string };
-  searchParams: { de?: string; feito?: string };
-}) {
+export default async function ParceiroInsumoPage(
+  props: {
+    params: Promise<{ slug: string; id: string }>;
+    searchParams: Promise<{ de?: string; feito?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.ver');
   const insumo = await obterInsumo(ctx.cliente, params.id, ctx.alcance);

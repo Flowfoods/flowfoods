@@ -6,7 +6,8 @@ import Portal, { type EstadoInicial } from './Portal';
 
 export const dynamic = 'force-dynamic';
 
-export async function generateMetadata({ params }: { params: { token: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const c = await carregarPorToken(params.token);
   return { title: c ? `${c.cliente.nome} · Formulário inicial · FlowFoods` : 'FlowFoods' };
 }
@@ -17,7 +18,8 @@ export async function generateMetadata({ params }: { params: { token: string } }
  * O estado vem do banco a cada abertura — é isso que faz "fechar o navegador e
  * reabrir" devolver o texto: não depende de nada guardado no aparelho.
  */
-export default async function PortalPage({ params }: { params: { token: string } }) {
+export default async function PortalPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const c = await carregarPorToken(params.token);
   if (!c) notFound();
 

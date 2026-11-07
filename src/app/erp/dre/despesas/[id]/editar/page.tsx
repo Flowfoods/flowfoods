@@ -11,9 +11,13 @@ import { acaoEditarDespesa } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpEditarDespesaPage({ params, searchParams = {} }: { params: { id: string }; searchParams?: Record<string, string | string[] | undefined> }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'despesas.lancar');
-  const { visao } = await visaoDaRequisicao(ctx);
-  return <PaginaDeEditarDespesa c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: rotuloDaVisao(visao), raiz: '/erp' }} id={params.id} acao={acaoEditarDespesa.bind(null, params.id)} query={searchParams} />;
+export default async function ErpEditarDespesaPage(
+ props: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }
+) {
+ const searchParams = await props.searchParams;
+ const params = await props.params;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'despesas.lancar');
+ const { visao } = await visaoDaRequisicao(ctx);
+ return <PaginaDeEditarDespesa c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: rotuloDaVisao(visao), raiz: '/erp' }} id={params.id} acao={acaoEditarDespesa.bind(null, params.id)} query={searchParams} />;
 }

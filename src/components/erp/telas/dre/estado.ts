@@ -1,5 +1,5 @@
 /**
- * Estado que as actions do DRE (2.2a) devolvem para `useFormState`. Sucesso não
+ * Estado que as actions do DRE (2.2a) devolvem para `useActionState`. Sucesso não
  * volta por aqui: a action leva de volta à tela com a frase do que aconteceu
  * (`?feito=`). Erro volta com a frase no campo ou no topo; conflito pede para
  * recarregar (outra pessoa gravou antes).

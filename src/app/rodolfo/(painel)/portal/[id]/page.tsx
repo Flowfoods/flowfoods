@@ -39,13 +39,14 @@ const SELO: Record<EstadoItem, { tom: 'ok' | 'alerta' | 'neutro'; rotulo: string
   PENDENTE: { tom: 'neutro', rotulo: 'Pendente' },
 };
 
-export default async function PortalClientePage({
-  params,
-  searchParams = {},
-}: {
-  params: { id: string };
-  searchParams?: { estado?: string | string[]; feito?: string | string[] };
-}) {
+export default async function PortalClientePage(
+  props: {
+    params: Promise<{ id: string }>;
+    searchParams?: Promise<{ estado?: string | string[]; feito?: string | string[] }>;
+  }
+) {
+  const searchParams = (await props.searchParams) ?? {};
+  const params = await props.params;
   // O middleware já exige a sessão; a página confere de novo (o layout não substitui a checagem).
   await exigirNivel1();
   const cliente = await prisma.portalCliente.findUnique({

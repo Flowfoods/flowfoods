@@ -13,7 +13,11 @@ import { acaoRegistrarLote, acaoTirarLote } from '../../../etiquetas/actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpLotesDaNotaPage({ params, searchParams }: { params: { id: string }; searchParams: { feito?: string } }) {
+export default async function ErpLotesDaNotaPage(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'compras.ver');
   const n = await lotesDaNota(ctx.cliente, ctx.alcance, params.id);

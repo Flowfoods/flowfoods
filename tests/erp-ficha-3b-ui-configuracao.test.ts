@@ -12,14 +12,12 @@ vi.mock('react', async original => ({
     if (!(n in i.estados)) i.estados[n] = typeof inicial === 'function' ? inicial() : inicial;
     return [i.estados[n], (valor: unknown) => { i.estados[n] = typeof valor === 'function' ? valor(i.estados[n]) : valor; }];
   },
-}));
-vi.mock('react-dom', async original => ({
-  ...await original<typeof import('react-dom')>(),
-  useFormState: (acao: AcaoConfiguracao) => {
+  useActionState: (acao: AcaoConfiguracao) => {
     const i = render.atual!; i.acao = acao;
     return [i.estado, async (form: FormData) => { i.estado = await i.acao!(i.estado, form); }];
-  },
+  }
 }));
+
 vi.mock('@/components/erp/telas/cadastro/erros', async original => ({
   ...await original<typeof import('@/components/erp/telas/cadastro/erros')>(), useAvisoDeSaida: () => ({ aoMudar: vi.fn(), aoEnviar: vi.fn() }),
 }));

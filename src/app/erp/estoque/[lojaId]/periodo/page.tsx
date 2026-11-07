@@ -14,7 +14,11 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/estoque';
 
-export default async function ErpPeriodoDaLojaPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { feito?: string } }) {
+export default async function ErpPeriodoDaLojaPage(
+  props: { params: Promise<{ lojaId: string }>; searchParams: Promise<{ feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'estoque.ver');
   const s = await situacaoDoPeriodo(ctx.cliente, ctx.alcance, params.lojaId);

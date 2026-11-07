@@ -203,12 +203,12 @@ describe.skipIf(!URL_TESTE)('ERP 1.2 · ficha técnica (Postgres real)', { timeo
     expect(new Uint8Array(await okA.arrayBuffer())).toEqual(JPG);
     // A rota de verdade, com a sessão de B: o id de A não é achado pelo portão de B.
     atual.ctx = () => ctxDe(B, 'DONO');
-    const deB = await fotoDaSessao(new Request('http://x'), { params: { id: ids.xburger } });
+    const deB = await fotoDaSessao(new Request('http://x'), { params: Promise.resolve({ id: ids.xburger }) });
     expect(deB.status).toBe(404);
     atual.ctx = () => ({ ...ctxDe(A, 'DONO'), alcance: resolverAlcance({ perfilBase: null, perfilProprio: ['insumos.ver'], permissoesExtras: [], permissoesRemovidas: [], redeInteira: true, lojaIds: [] }) });
-    expect((await fotoDaSessao(new Request('http://x'), { params: { id: ids.xburger } })).status).toBe(403);
+    expect((await fotoDaSessao(new Request('http://x'), { params: Promise.resolve({ id: ids.xburger }) })).status).toBe(403);
     atual.ctx = () => ctxDe(A, 'OPERADOR');
-    expect((await fotoDaSessao(new Request('http://x'), { params: { id: ids.xburger } })).status).toBe(200);
+    expect((await fotoDaSessao(new Request('http://x'), { params: Promise.resolve({ id: ids.xburger }) })).status).toBe(200);
   });
 
   it('foto com tipo ou tamanho inválido é recusada: nada gravado, nada no disco', async () => {

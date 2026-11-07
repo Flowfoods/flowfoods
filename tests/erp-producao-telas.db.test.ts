@@ -43,8 +43,9 @@ vi.mock('@/lib/erp/contexto', async () => {
   };
 });
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
-// `useFormState` é do React do Next; o do vitest não o tem. O formulário sai com o estado inicial, como na primeira renderização.
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+// O estado da action é controlado no teste. O formulário sai com o estado inicial, como na primeira renderização.
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
@@ -184,7 +185,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     const de_novo = await rodar(() => daSessao.acaoPlanejarProducao(ids.vp, null, form));
     expect((de_novo as { url: string }).url.split('?')[0].split('/').pop()).toBe(LOTE);
     expect(await a.ordemProducao.count()).toBe(1);
-    const h = await pagina(ErpProducaoDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} }));
+    const h = await pagina(ErpProducaoDaLojaPage({ params: Promise.resolve({ lojaId: ids.vp }), searchParams: Promise.resolve({}) }));
     expect(h).toContain('Produção da Vila da Penha');
     expect(h).toContain('Molho cheddar');
     expect(h).toContain('Insumos: a entregar (requisição #1)');
@@ -197,31 +198,31 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
 
   it('a tela de planejar traz a lista da receita (bruta, 885 g de cebola) com a validade da ficha; a de lojas leva direto quando há uma só', async () => {
     como(OPERADOR());
-    const h = await pagina(ErpNovaProducaoPage({ params: { lojaId: ids.vp }, searchParams: { ficha: ids.molho, quantas: '5' } }));
+    const h = await pagina(ErpNovaProducaoPage({ params: Promise.resolve({ lojaId: ids.vp }), searchParams: Promise.resolve({ ficha: ids.molho, quantas: '5' }) }));
     expect(h).toContain('Molho cheddar');
     expect(h).toContain('0,885');
     expect(h).toContain('Validade da ficha: Refrigerado 3 dias · Congelado 30 dias');
     expect(h).toContain('Planejar o lote');
     // Só a ficha escolhida, sem quantidade: sem lista e sem erro vermelho.
-    const sem = await pagina(ErpNovaProducaoPage({ params: { lojaId: ids.vp }, searchParams: { ficha: ids.molho } }));
+    const sem = await pagina(ErpNovaProducaoPage({ params: Promise.resolve({ lojaId: ids.vp }), searchParams: Promise.resolve({ ficha: ids.molho }) }));
     expect(sem).not.toContain('Planejar o lote');
     expect(sem).not.toContain('Quanto vai produzir: número');
     // Quantidade absurda: a frase do servidor, sem o formulário.
-    const absurdo = await pagina(ErpNovaProducaoPage({ params: { lojaId: ids.vp }, searchParams: { ficha: ids.molho, quantas: '99999' } }));
+    const absurdo = await pagina(ErpNovaProducaoPage({ params: Promise.resolve({ lojaId: ids.vp }), searchParams: Promise.resolve({ ficha: ids.molho, quantas: '99999' }) }));
     expect(absurdo).toContain('Quanto vai produzir');
     expect(absurdo).not.toContain('Planejar o lote');
     expect(await rodar(() => ErpProducaoPage())).toMatchObject({ url: `/erp/producao/${ids.vp}` });
-    expect(await rodar(() => ErpNovaProducaoLojaPage({ searchParams: { ficha: ids.molho } }))).toMatchObject({ url: `/erp/producao/${ids.vp}/nova?ficha=${ids.molho}` });
+    expect(await rodar(() => ErpNovaProducaoLojaPage({ searchParams: Promise.resolve({ ficha: ids.molho }) }))).toMatchObject({ url: `/erp/producao/${ids.vp}/nova?ficha=${ids.molho}` });
   });
 
   it('concluir antes da entrega: a tela diz o que falta e não oferece o formulário; a requisição cita o lote e não oferece cancelar', async () => {
     como(OPERADOR());
-    const h = await pagina(ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: LOTE } }));
+    const h = await pagina(ErpConcluirLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }) }));
     expect(h).toMatch(/Faltam sair .*885 g de Cebola.* pela requisição #1: entregue ou encerre o resto\./);
     expect(h).not.toContain('Concluir e pôr no estoque');
     // A requisição de produção, vista pela dona: o aviso do lote e nenhum "Cancelar esta requisição".
     como(alcanceDe('DONO', 'rede'));
-    const rq = await pagina(ErpRequisicaoPage({ params: { lojaId: ids.vp, requisicaoId: REQ }, searchParams: {} }));
+    const rq = await pagina(ErpRequisicaoPage({ params: Promise.resolve({ lojaId: ids.vp, requisicaoId: REQ }), searchParams: Promise.resolve({}) }));
     expect(rq).toMatch(/Requisição do lote \d{6}-01 \(Molho cheddar, 5 kg\)/);
     expect(rq).toContain('Abrir o lote');
     expect(rq).not.toContain('Cancelar esta requisição');
@@ -232,7 +233,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     const r = (await obterRequisicao(a, alcanceDe('DONO', 'rede'), ids.vp, REQ))!;
     expect(await atenderRequisicao(a, GERENTE(), ids.vp, REQ, { versao: r.requisicao.versao, linhas: r.itens.map((i) => ({ itemId: i.id, quantidade: String(i.faltaMilesimos / 1000).replace('.', ','), escala: 'base' })), encerrar: false, confirmarNegativo: false }, 'Edu')).toMatchObject({ ok: true });
     como(OPERADOR());
-    const h = await pagina(ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: LOTE } }));
+    const h = await pagina(ErpConcluirLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }) }));
     expect(h).toContain('Concluir e pôr no estoque');
     expect(h).toContain('Quanto saiu de verdade');
     expect(h).toContain('Refrigerado');
@@ -247,12 +248,12 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     expect((await obterOrdem(a, GERENTE(), ids.vp, LOTE))!.custo).toMatchObject({ totalCentavos: 11781 });
     // O gerente da loja (vê custos e compras) recebe o custo ao vivo.
     como(GERENTE());
-    const ger = await pagina(ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: LOTE } }));
+    const ger = await pagina(ErpConcluirLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }) }));
     expect(ger).toContain('Custo do lote');
     expect(ger).toContain('R$ 117,81');
     // O perfil de cozinha sem "ver insumos e custos" conclui, mas não recebe o R$.
     como(COZINHA_SEM_CUSTO());
-    const sem = await pagina(ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: LOTE } }));
+    const sem = await pagina(ErpConcluirLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }) }));
     expect(sem).toContain('Concluir e pôr no estoque');
     expect(sem).not.toContain('Custo do lote');
     expect(sem).not.toContain('117,81');
@@ -267,12 +268,12 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     expect(de_novo).toMatchObject({ url: `/erp/producao/${ids.vp}/${LOTE}?feito=ja-concluido` });
     expect(await a.movimentoEstoque.count({ where: { tipo: 'PRODUCAO_ENTRADA' } })).toBe(1);
     // A tela de concluir de um lote concluído volta para o lote.
-    expect(await rodar(() => ErpConcluirLotePage({ params: { lojaId: ids.vp, ordemId: LOTE } }))).toMatchObject({ url: `/erp/producao/${ids.vp}/${LOTE}` });
+    expect(await rodar(() => ErpConcluirLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }) }))).toMatchObject({ url: `/erp/producao/${ids.vp}/${LOTE}` });
   });
 
   it('o lote concluído: R$ 25,61/kg, previsto R$ 23,56, 92%, diferença R$ 9,42 e a validade — para o gerente; o operador e a cozinha sem custos, sem R$', async () => {
     como(GERENTE());
-    const h = await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }));
+    const h = await pagina(ErpLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }), searchParams: Promise.resolve({}) }));
     expect(h).toContain('R$ 25,61/kg');
     expect(h).toContain('R$ 117,81 ÷ 4,6 kg');
     expect(h).toContain('R$ 23,56/kg');
@@ -286,7 +287,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     // quantidade, o rendimento e a validade continuam.
     for (const quem of [OPERADOR, COZINHA_SEM_CUSTO]) {
       como(quem());
-      const sem = await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }));
+      const sem = await pagina(ErpLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }), searchParams: Promise.resolve({}) }));
       for (const proibido of ['R$', '117,81', '25,61', '23,56', '9,42', 'Custo do lote']) expect(sem, proibido).not.toContain(proibido);
       expect(sem).toContain('4,6 kg');
       expect(sem).toContain('92%');
@@ -300,14 +301,14 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     }
     // E o operador não vê o botão de estornar (exige ajustar o saldo); a dona vê.
     como(OPERADOR());
-    expect(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }))).not.toContain('Estornar este lote');
+    expect(await pagina(ErpLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }), searchParams: Promise.resolve({}) }))).not.toContain('Estornar este lote');
     como(alcanceDe('DONO', 'rede'));
-    expect(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }))).toContain('Estornar este lote');
+    expect(await pagina(ErpLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }), searchParams: Promise.resolve({}) }))).toContain('Estornar este lote');
   });
 
   it('a requisição do lote concluído cita o lote e não oferece receber de volta nem cancelar', async () => {
     como(alcanceDe('DONO', 'rede'));
-    const rq = await pagina(ErpRequisicaoPage({ params: { lojaId: ids.vp, requisicaoId: REQ }, searchParams: {} }));
+    const rq = await pagina(ErpRequisicaoPage({ params: Promise.resolve({ lojaId: ids.vp, requisicaoId: REQ }), searchParams: Promise.resolve({}) }));
     expect(rq).toContain('o custo dele está fechado e esta requisição não recebe mais entrega nem devolução');
     expect(rq).not.toContain('Receber de volta');
     expect(rq).not.toContain('Cancelar esta requisição');
@@ -316,7 +317,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     // O operador abre a requisição pelo lote ("Abrir a requisição"): só quantidades. A soma das saídas é o custo do lote, então
     // o valor delas também não sai do servidor (decisões 459 e 460, a régua do estoque: `compras.ver` na loja).
     como(OPERADOR());
-    const doOperador = await pagina(ErpRequisicaoPage({ params: { lojaId: ids.vp, requisicaoId: REQ }, searchParams: {} }));
+    const doOperador = await pagina(ErpRequisicaoPage({ params: Promise.resolve({ lojaId: ids.vp, requisicaoId: REQ }), searchParams: Promise.resolve({}) }));
     expect(doOperador).toContain('o custo dele está fechado');
     for (const proibido of ['R$', '100,00', '117,81']) expect(doOperador, proibido).not.toContain(proibido);
     const dado = (await obterRequisicao(a, OPERADOR(), ids.vp, REQ))!;
@@ -331,22 +332,22 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
 
   it('Histórico geral (filtro Produção): o custo do lote só para quem vê custos E compras (decisão 460)', async () => {
     como(alcanceDe('DONO', 'rede'));
-    const dona = await pagina(ErpHistoricoPage({ searchParams: { entidade: 'OrdemProducao' } }));
+    const dona = await pagina(ErpHistoricoPage({ searchParams: Promise.resolve({ entidade: 'OrdemProducao' }) }));
     expect(dona).toContain('117,81');
     // Perfil próprio da rede com histórico, produção e custos, mas sem compras: vê o lote, não o R$.
     como(alcanceDe(null, 'rede', ['historico.ver', 'producao.ver', 'insumos.ver']));
-    const semCompras = await pagina(ErpHistoricoPage({ searchParams: { entidade: 'OrdemProducao' } }));
+    const semCompras = await pagina(ErpHistoricoPage({ searchParams: Promise.resolve({ entidade: 'OrdemProducao' }) }));
     expect(semCompras).toContain('Molho cheddar');
     for (const proibido of ['117,81', '25,61', '9,42']) expect(semCompras, proibido).not.toContain(proibido);
   });
 
   it('alcance: o gerente da Delivery recebe 404 no quadro e no lote da Penha; o parceiro B não vê o lote de A', async () => {
     como(GERENTE_DELIVERY());
-    expect(await rodar(() => ErpProducaoDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} }))).toEqual({ erro: 'NOT_FOUND' });
-    expect(await rodar(() => ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }))).toEqual({ erro: 'NOT_FOUND' });
+    expect(await rodar(() => ErpProducaoDaLojaPage({ params: Promise.resolve({ lojaId: ids.vp }), searchParams: Promise.resolve({}) }))).toEqual({ erro: 'NOT_FOUND' });
+    expect(await rodar(() => ErpLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }), searchParams: Promise.resolve({}) }))).toEqual({ erro: 'NOT_FOUND' });
     como(alcanceDe('DONO', 'rede'), B, b);
-    expect(await rodar(() => ErpLotePage({ params: { lojaId: ids.lojaB, ordemId: LOTE }, searchParams: {} }))).toEqual({ erro: 'NOT_FOUND' });
-    expect(await rodar(() => ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }))).toEqual({ erro: 'NOT_FOUND' });
+    expect(await rodar(() => ErpLotePage({ params: Promise.resolve({ lojaId: ids.lojaB, ordemId: LOTE }), searchParams: Promise.resolve({}) }))).toEqual({ erro: 'NOT_FOUND' });
+    expect(await rodar(() => ErpLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }), searchParams: Promise.resolve({}) }))).toEqual({ erro: 'NOT_FOUND' });
   });
 
   it('permissão nas actions: quem só vê produção não planeja nem conclui; estornar exige também ajustar o saldo', async () => {
@@ -368,7 +369,7 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     como(GERENTE(), A, a, 'Gil Gerente');
     const o = (await obterOrdem(a, GERENTE(), ids.vp, LOTE))!;
     expect(await rodar(() => daSessao.acaoEstornarProducao(ids.vp, LOTE, null, formDe({ versao: String(o.ordem.versao), motivo: 'Lote contaminado' })))).toMatchObject({ url: `/erp/producao/${ids.vp}/${LOTE}?feito=estornado` });
-    const depois = await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: { feito: 'estornado' } }));
+    const depois = await pagina(ErpLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }), searchParams: Promise.resolve({ feito: 'estornado' }) }));
     expect(depois).toContain('Estornado por Gil Gerente');
     expect(depois).toContain('Lote contaminado');
     expect(depois).toContain('Estornada');
@@ -376,20 +377,20 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
 
   it('a ficha do pré-preparo tem "Produzir" para quem registra produção, e só para ele', async () => {
     como(OPERADOR());
-    expect(await pagina(ErpFichaPage({ params: { id: ids.molho }, searchParams: {} }))).toContain('Produzir este pré-preparo');
+    expect(await pagina(ErpFichaPage({ params: Promise.resolve({ id: ids.molho }), searchParams: Promise.resolve({}) }))).toContain('Produzir este pré-preparo');
     como(alcanceDe(null, [ids.vp], ['fichas.ver', 'producao.ver']));
-    expect(await pagina(ErpFichaPage({ params: { id: ids.molho }, searchParams: {} }))).not.toContain('Produzir este pré-preparo');
+    expect(await pagina(ErpFichaPage({ params: Promise.resolve({ id: ids.molho }), searchParams: Promise.resolve({}) }))).not.toContain('Produzir este pré-preparo');
   });
 
   it('o espelho do nível 1 abre o quadro e o lote do parceiro e age pelo slug; loja de fora, 404', async () => {
     como(ALCANCE_FLOWFOODS);
-    const q = await pagina(ParceiroProducaoDaLojaPage({ params: { slug: A.slug, lojaId: ids.vp }, searchParams: {} }));
+    const q = await pagina(ParceiroProducaoDaLojaPage({ params: Promise.resolve({ slug: A.slug, lojaId: ids.vp }), searchParams: Promise.resolve({}) }));
     expect(q).toContain('Telas Produção A');
     expect(q).toContain('Molho cheddar');
-    const l = await pagina(ParceiroLotePage({ params: { slug: A.slug, lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }));
+    const l = await pagina(ParceiroLotePage({ params: Promise.resolve({ slug: A.slug, lojaId: ids.vp, ordemId: LOTE }), searchParams: Promise.resolve({}) }));
     expect(l).toContain('Estornada');
     expect(l).toContain(`/rodolfo/erp/${A.slug}/estoque/${ids.vp}/requisicoes/${REQ}`);
-    expect(await rodar(() => ParceiroProducaoDaLojaPage({ params: { slug: A.slug, lojaId: ids.lojaB }, searchParams: {} }))).toEqual({ erro: 'NOT_FOUND' });
+    expect(await rodar(() => ParceiroProducaoDaLojaPage({ params: Promise.resolve({ slug: A.slug, lojaId: ids.lojaB }), searchParams: Promise.resolve({}) }))).toEqual({ erro: 'NOT_FOUND' });
     // Planejar pelo nível 1 deixa o rastro no mesmo lugar (redirect para a base do parceiro).
     const lista = await listaDaProducao(a, ALCANCE_FLOWFOODS, ids.vp, ids.molho, '2');
     if (!lista.ok) throw new Error('lista');
@@ -428,29 +429,29 @@ describe.skipIf(!URL_TESTE)('ERP 3.1 · telas da produção (Postgres real)', { 
     const o = (await obterOrdem(a, dona, ids.vp, lote))!;
     expect(await concluirProducao(a, dona, ids.vp, lote, { versao: o.ordem.versao, produzido: '1,6', escala: 'base', motivo: 'faltou cebola', conservacao: 'REFRIGERADO' }, { nome: 'Marina' })).toMatchObject({ ok: true });
     como(OPERADOR());
-    const h = sp(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: lote }, searchParams: {} })));
+    const h = sp(await pagina(ErpLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: lote }), searchParams: Promise.resolve({}) })));
     expect(h).toContain('80%');
     expect(h).toContain('fora de ±10%');
     expect(h).toContain('Não saiu');
     expect(h).not.toContain('>Falta<');
-    const q = await pagina(ErpProducaoDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} }));
+    const q = await pagina(ErpProducaoDaLojaPage({ params: Promise.resolve({ lojaId: ids.vp }), searchParams: Promise.resolve({}) }));
     expect(q).toContain('fora de ±10%');
     // Lote cancelado (nada saiu): a requisição cancelada também mostra "Não saiu", sem o tom de alerta.
     const p2 = await planejarProducao(a, dona, ids.vp, { fichaId: ids.molho, quantidade: '2', paraDia: 'hoje', observacao: '', linhas: lista.linhas.map((l) => ({ insumoId: l.insumoId, quantidade: l.quantidade, escala: 'base' })), envio: 'env-cancelado-12345' }, { nome: 'Marina' });
     if (!p2.ok) throw new Error(JSON.stringify(p2));
     const o2 = (await obterOrdem(a, dona, ids.vp, p2.id))!;
     expect(await cancelarProducao(a, dona, ids.vp, p2.id, { versao: o2.ordem.versao, motivo: 'mudou o cardápio' }, { nome: 'Marina' })).toMatchObject({ ok: true });
-    const hc = await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: p2.id }, searchParams: {} }));
+    const hc = await pagina(ErpLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: p2.id }), searchParams: Promise.resolve({}) }));
     expect(hc).toContain('Não saiu');
     expect(hc).not.toMatch(/text-atencao[^>]*>[^<]*kg</);
     // O lote de 92% (dentro da faixa) não ganha a frase.
-    expect(await pagina(ErpLotePage({ params: { lojaId: ids.vp, ordemId: LOTE }, searchParams: {} }))).not.toContain('fora de ±10%');
+    expect(await pagina(ErpLotePage({ params: Promise.resolve({ lojaId: ids.vp, ordemId: LOTE }), searchParams: Promise.resolve({}) }))).not.toContain('fora de ±10%');
     // O quadro: para quem não planeja, a ação principal é Tarefas; para a dona, Nova produção.
     const botao = (html: string, href: string) => html.match(new RegExp(`<a[^>]*href="${href}"[^>]*>`))?.[0] ?? '';
     expect(botao(q, `/erp/producao/tarefas/${ids.vp}`)).toContain('bg-acao');
     expect(botao(q, `/erp/producao/${ids.vp}/nova`)).not.toContain('bg-acao');
     como(dona);
-    const daDona = await pagina(ErpProducaoDaLojaPage({ params: { lojaId: ids.vp }, searchParams: {} }));
+    const daDona = await pagina(ErpProducaoDaLojaPage({ params: Promise.resolve({ lojaId: ids.vp }), searchParams: Promise.resolve({}) }));
     expect(botao(daDona, `/erp/producao/${ids.vp}/nova`)).toContain('bg-acao');
     expect(botao(daDona, `/erp/producao/tarefas/${ids.vp}`)).not.toContain('bg-acao');
   });

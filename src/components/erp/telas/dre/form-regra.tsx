@@ -1,13 +1,20 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Mudar a regra do período (2.2a). A regra nova NUNCA é retroativa: vale a partir
  * do dia seguinte ao fim do período em que estamos, e o primeiro período dela nasce
  * cortado no início. A conta ao lado é prévia; o servidor decide a data de verdade.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Mudar a regra do período (2.2a). A regra nova NUNCA é retroativa: vale a partir
+ * do dia seguinte ao fim do período em que estamos, e o primeiro período dela nasce
+ * cortado no início. A conta ao lado é prévia; o servidor decide a data de verdade.
+ */
+import { useState, useActionState } from 'react';
+
 import { DIAS_DA_SEMANA, ROTULO_DO_TIPO, TIPOS_DE_REGRA, type TipoDePeriodo } from '@/lib/erp/periodo-campos';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
@@ -17,11 +24,11 @@ import type { AcaoLocal, EstadoLocal } from './estado';
 const DIAS_DO_MES = Array.from({ length: 28 }, (_, i) => i + 1);
 
 export function FormRegra({ acao, versao, inicial, valeDesde, periodoAtual, bloqueio }: { acao: AcaoLocal; versao: string; inicial: { tipo: TipoDePeriodo; diaInicio: number }; valeDesde: string; periodoAtual: string; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoLocal, FormData>(acao, null);
   const [tipo, setTipo] = useState<TipoDePeriodo>(inicial.tipo);
   const erros = estado?.erros ?? {};
   return (
-    <form action={enviar} noValidate className="space-y-4">
+    <FormularioComAcao action={enviar} noValidate className="space-y-4">
       <input type="hidden" name="versao" value={versao} />
       {erros.geral && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
@@ -79,6 +86,6 @@ export function FormRegra({ acao, versao, inicial, valeDesde, periodoAtual, bloq
           {estado?.ok && estado.mensagem && <span className="text-ok">{estado.mensagem}</span>}
         </p>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

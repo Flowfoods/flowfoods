@@ -10,13 +10,14 @@ import { acaoSalvarPrecos, acaoSituacaoFicha } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroFichaPage({
-  params,
-  searchParams,
-}: {
-  params: { slug: string; id: string };
-  searchParams: { de?: string | string[]; feito?: string; volta?: string | string[] };
-}) {
+export default async function ParceiroFichaPage(
+  props: {
+    params: Promise<{ slug: string; id: string }>;
+    searchParams: Promise<{ de?: string | string[]; feito?: string; volta?: string | string[] }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.ver');
   // O nível 1 vê a precificação (inclusive no histórico).

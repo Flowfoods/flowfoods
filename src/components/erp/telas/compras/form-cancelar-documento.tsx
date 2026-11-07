@@ -1,20 +1,27 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Descartar a nota fiscal recebida (F.1b): motivo obrigatório (vai para o histórico). Aguardando conferência: só marca como
  * cancelada. Já conciliada: cancela também a nota de compra pelo caminho oficial (o estoque e o custo voltam) e marca o documento.
  * O cancelado não volta; a chave de acesso continua guardada, então o mesmo arquivo não entra de novo.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Descartar a nota fiscal recebida (F.1b): motivo obrigatório (vai para o histórico). Aguardando conferência: só marca como
+ * cancelada. Já conciliada: cancela também a nota de compra pelo caminho oficial (o estoque e o custo voltam) e marca o documento.
+ * O cancelado não volta; a chave de acesso continua guardada, então o mesmo arquivo não entra de novo.
+ */
+import { useState, useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import type { AcaoDeDocumento, EstadoDocumento } from './documentos-estado';
 
 export function FormCancelarDocumento({ acao, versao, conciliado }: { acao: AcaoDeDocumento; versao: string; conciliado: boolean }) {
-  const [estado, enviar] = useFormState<EstadoDocumento, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoDocumento, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
   if (!aberto && !estado) {
     return (
@@ -31,7 +38,7 @@ export function FormCancelarDocumento({ acao, versao, conciliado }: { acao: Acao
     );
   }
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <input type="hidden" name="versao" value={versao} />
       <div>
         <label htmlFor="descartar-motivo" className={ROTULO}>
@@ -67,6 +74,6 @@ export function FormCancelarDocumento({ acao, versao, conciliado }: { acao: Acao
           Manter a nota fiscal
         </button>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

@@ -1,6 +1,8 @@
 // Scanner avoid-ai-design, SD4d (P2) aceito: "Prato · rende 1 porção" e "R$ 3,20 · R$ 1,60 por porção" seguem o subtítulo do contrato ("Rede Completa · N fichas") como linha de apoio, igual aos insumos da 1.1. (O ignore do scanner não aceita id com minúscula.)
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Formulário da ficha técnica (nova e editar), a MESMA peça para o nível 1 e
  * para a pessoa do parceiro: a action vem de quem usa a tela. Cada linha é um
@@ -381,7 +383,7 @@ function FormFichaBase({
 
   return (
     <>
-    <form ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={() => { guardarOQueFoiPreenchido(); }} noValidate className="space-y-4">
+    <FormularioComAcao ref={formRef} action={enviar} onChange={saida.aoMudar} onSubmit={() => { guardarOQueFoiPreenchido(); }} noValidate className="space-y-4">
       {modo === 'editar' && <input type="hidden" name="versao" value={origem.versao} />}
       {modo === 'criar' && <input type="hidden" name="chaveEnvio" value={chaveEnvio} />}
       {de && <input type="hidden" name="de" value={de} />}
@@ -743,7 +745,7 @@ function FormFichaBase({
       </div>
       {tipo === 'PRATO' && verCustos && <p className="text-right text-[13px] text-suave">Receita e embalagens são salvas juntas. O preço manual fica preservado.</p>}
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
-    </form>
+    </FormularioComAcao>
     {gerenciando && classificacao && <PainelClassificacao buscar={classificacao.buscar} gerir={classificacao.gerir} aoFechar={() => setGerenciando(false)} aoAlterar={(r) => {
       if (r.alterado) {
         const alterado = r.alterado;

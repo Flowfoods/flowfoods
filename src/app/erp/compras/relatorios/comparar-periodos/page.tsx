@@ -10,8 +10,11 @@ export const dynamic = 'force-dynamic';
 
 const COMPRAS = '/erp/compras';
 
-export default async function ErpComparacaoDePeriodosPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'compras.ver');
-  return <PaginaDosPeriodos ctx={ctx} caminho={`${COMPRAS}/relatorios/comparar-periodos`} comprasBase={COMPRAS} searchParams={searchParams} />;
+export default async function ErpComparacaoDePeriodosPage(
+ props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+ const searchParams = await props.searchParams;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'compras.ver');
+ return <PaginaDosPeriodos ctx={ctx} caminho={`${COMPRAS}/relatorios/comparar-periodos`} comprasBase={COMPRAS} searchParams={searchParams} />;
 }

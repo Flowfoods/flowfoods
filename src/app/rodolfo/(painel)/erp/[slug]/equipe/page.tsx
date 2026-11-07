@@ -26,13 +26,14 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-export default async function AcessosPage({
-  params,
-  searchParams,
-}: {
-  params: { slug: string };
-  searchParams: { ver?: string; setor?: string };
-}) {
+export default async function AcessosPage(
+  props: {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<{ ver?: string; setor?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'acessos.gerir');
   const { parceiro, cliente, alcance } = ctx;

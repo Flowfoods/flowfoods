@@ -6,7 +6,8 @@ import { acaoImportarPlanilha, acaoPreviaDaPlanilha } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroImportarFichasPage({ params }: { params: { slug: string } }) {
+export default async function ParceiroImportarFichasPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.editar');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;

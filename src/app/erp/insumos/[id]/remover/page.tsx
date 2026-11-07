@@ -13,7 +13,11 @@ import { acaoExcluirInsumo, acaoSituacaoInsumo } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpRemoverInsumoPage({ params, searchParams }: { params: { id: string }; searchParams: { de?: string } }) {
+export default async function ErpRemoverInsumoPage(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ de?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.editar');
   const insumo = await lerRemocao(ctx.cliente, params.id);

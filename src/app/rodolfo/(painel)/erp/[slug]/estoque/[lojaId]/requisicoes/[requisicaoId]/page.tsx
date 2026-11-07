@@ -10,7 +10,11 @@ import { voltaDoRelatorio } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroRequisicaoPage({ params, searchParams }: { params: { slug: string; lojaId: string; requisicaoId: string }; searchParams: { feito?: string; volta?: string } }) {
+export default async function ParceiroRequisicaoPage(
+  props: { params: Promise<{ slug: string; lojaId: string; requisicaoId: string }>; searchParams: Promise<{ feito?: string; volta?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'requisicao.pedir');
   const d = await obterRequisicao(ctx.cliente, ctx.alcance, params.lojaId, params.requisicaoId);

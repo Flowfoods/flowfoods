@@ -18,7 +18,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, refresh: () => {} }),
   useSearchParams: () => new URLSearchParams(),
 }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, () => {}], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, () => {}] }));
 
 import { ajudaParaATela, entradaPorChave, problemasDoRegistro } from '@/lib/erp/ajuda';
 import { ATRIBUTO_POR_ULTIMO, ordemDaSequencia, passosDaSequencia } from '@/lib/erp/ajuda-sequencia';
@@ -394,7 +395,7 @@ describe.each(AREAS.map((a) => [a.nome, a]))('decisão 520 · âncoras na tela r
     const h = await noShell(telaDoFormulario(raiz, { inicial: { mes: '2026-09' }, periodoFechado: true }), `${raiz}${EDITAR}`, alcance, preferencia);
     expect(h).toContain('data-ajuda-tela="dre-despesa-nova"');
     expect(h).toMatch(/<select id="desp-linha" name="linha"[^>]*disabled=""/);
-    expect(h).toMatch(/<input id="desp-valor" name="valor"[^>]*disabled=""/);
+    expect(h).toMatch(/<input\b(?=[^>]*\bid="desp-valor")(?=[^>]*\bname="valor")(?=[^>]*\bdisabled="")[^>]*>/);
     expect(h).not.toContain('<fieldset disabled=""');
     for (const p of ['linha', 'competencia', 'repete', 'vencimento']) expect(quantas(h, p), p).toBe(1);
   });

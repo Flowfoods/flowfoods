@@ -19,7 +19,8 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/insumos';
 
-export default async function ErpCategoriasPage({ searchParams }: { searchParams: { feito?: string; cat?: string } }) {
+export default async function ErpCategoriasPage(props: { searchParams: Promise<{ feito?: string; cat?: string }> }) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.ver');
   // A primeira vez numa casa nova: as dez padrão nascem aqui (idempotente; parceiro somente leitura não semeia).

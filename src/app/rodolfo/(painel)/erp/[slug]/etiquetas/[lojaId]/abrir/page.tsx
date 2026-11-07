@@ -9,7 +9,11 @@ import { acaoAbrirEmbalagem } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroAbrirEmbalagemDaLojaPage({ params, searchParams }: { params: { slug: string; lojaId: string }; searchParams: { insumo?: string } }) {
+export default async function ParceiroAbrirEmbalagemDaLojaPage(
+  props: { params: Promise<{ slug: string; lojaId: string }>; searchParams: Promise<{ insumo?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'etiquetas.imprimir');
   const d = await opcoesDeAbertura(ctx.cliente, ctx.alcance, params.lojaId, searchParams.insumo);

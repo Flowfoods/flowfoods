@@ -14,7 +14,10 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/insumos';
 
-export default async function ErpClassificarPage({ searchParams }: { searchParams: { feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string; sem?: string; pagina?: string } }) {
+export default async function ErpClassificarPage(
+  props: { searchParams: Promise<{ feito?: string; n?: string; outros?: string; mantidos?: string; iguais?: string; sem?: string; pagina?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.ver');
   exigirPermissaoNaPagina(ctx, 'insumos.editar');

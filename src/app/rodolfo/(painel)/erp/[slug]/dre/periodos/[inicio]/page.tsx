@@ -7,7 +7,11 @@ import { acaoFecharPeriodo, acaoReabrirPeriodo } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroPeriodoPage({ params, searchParams }: { params: { slug: string; inicio: string }; searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ParceiroPeriodoPage(
+  props: { params: Promise<{ slug: string; inicio: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'dre.ver');
   const { visao } = await visaoDaRequisicao(ctx);

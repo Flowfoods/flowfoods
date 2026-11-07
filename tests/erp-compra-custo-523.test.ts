@@ -17,7 +17,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, refresh: () => {} }),
   useSearchParams: () => new URLSearchParams(),
 }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, () => {}], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, () => {}] }));
 
 import { veCustoDeCompra, type FormularioDeNota, type InsumoDoFormularioDeNota, type PreviaDaNota } from '@/lib/erp/compras';
 import { ultimaCompraDaLista, type InsumoDaCompra } from '@/lib/erp/compra-campos';

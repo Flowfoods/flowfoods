@@ -10,7 +10,11 @@ import { acaoSalvarNota } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroLancarNotaPage({ params, searchParams = {} }: { params: { slug: string }; searchParams?: { feito?: string; loja?: string; nova?: string } }) {
+export default async function ParceiroLancarNotaPage(
+  props: { params: Promise<{ slug: string }>; searchParams?: Promise<{ feito?: string; loja?: string; nova?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'compras.lancar');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;

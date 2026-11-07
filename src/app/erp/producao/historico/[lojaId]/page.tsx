@@ -11,10 +11,14 @@ import { TelaHistoricoDaProducao } from '@/components/erp/telas/producao/histori
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpHistoricoDaProducaoDaLojaPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { periodo?: string; de?: string; ate?: string; pessoa?: string; ficha?: string } }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'producao.ver');
-  const h = await historicoDaProducao(ctx.cliente, ctx.alcance, params.lojaId, searchParams, await idsDaEquipe(ctx.parceiro.id));
-  if (!h) notFound();
-  return <TelaHistoricoDaProducao h={h} base="/erp/producao" />;
+export default async function ErpHistoricoDaProducaoDaLojaPage(
+ props: { params: Promise<{ lojaId: string }>; searchParams: Promise<{ periodo?: string; de?: string; ate?: string; pessoa?: string; ficha?: string }> }
+) {
+ const searchParams = await props.searchParams;
+ const params = await props.params;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'producao.ver');
+ const h = await historicoDaProducao(ctx.cliente, ctx.alcance, params.lojaId, searchParams, await idsDaEquipe(ctx.parceiro.id));
+ if (!h) notFound();
+ return <TelaHistoricoDaProducao h={h} base="/erp/producao" />;
 }

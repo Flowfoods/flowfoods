@@ -8,7 +8,8 @@ import { acaoBuscarClassificacao, acaoCadastrarFichaUnificada, acaoGerirClassifi
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpNovaFichaPage({ searchParams = {} }: { searchParams?: { de?: string | string[] } }) {
+export default async function ErpNovaFichaPage(props: { searchParams?: Promise<{ de?: string | string[] }> }) {
+  const searchParams = (await props.searchParams) ?? {};
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.editar');
   const verCustos = pode(ctx.alcance, 'precos.ver');

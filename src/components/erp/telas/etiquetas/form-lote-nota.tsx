@@ -1,13 +1,20 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * O lote do fornecedor de um insumo da nota (3.4): registrar como está na embalagem (lote, vencimento, fabricação, marca; pelo
  * menos o lote ou o vencimento), aceitar a sugestão do XML com um toque (nada entra sozinho) ou tirar um registrado por engano
  * (só se ninguém abriu embalagem dele). A nota não muda.
  */
 
-import { useEffect, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * O lote do fornecedor de um insumo da nota (3.4): registrar como está na embalagem (lote, vencimento, fabricação, marca; pelo
+ * menos o lote ou o vencimento), aceitar a sugestão do XML com um toque (nada entra sozinho) ou tirar um registrado por engano
+ * (só se ninguém abriu embalagem dele). A nota não muda.
+ */
+import { useEffect, useState, useActionState } from 'react';
+
 import { diaPorExtenso } from '@/lib/erp/etiqueta-campos';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro, ROTULO } from '../../ui/campos';
@@ -31,12 +38,12 @@ function ErroGeral({ estado }: { estado: EstadoEstoque }) {
 }
 
 export function FormLoteDaNota({ acao, insumoId, envioInicial, marcaReferencia }: { acao: AcaoDeEstoque; insumoId: string; envioInicial: string; marcaReferencia?: string | null }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const envio = useChave(envioInicial);
   const e = estado?.erros ?? {};
   const id = (c: string) => `lote-${insumoId}-${c}`;
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <input type="hidden" name="envio" value={envio} />
       <input type="hidden" name="insumo" value={insumoId} />
       <div className="grid gap-3 sm:grid-cols-2">
@@ -74,17 +81,17 @@ export function FormLoteDaNota({ acao, insumoId, envioInicial, marcaReferencia }
       <BotaoEnviar pendente="Registrando…" variante="secundario">
         Registrar o lote
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 export function FormUsarSugestao({ acao, insumoId, envioInicial, sugestao }: { acao: AcaoDeEstoque; insumoId: string; envioInicial: string; sugestao: { codigo: string; vencimento: string | null; fabricacao: string | null } }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const envio = useChave(envioInicial);
   const e = estado?.erros ?? {};
   const erro = e.geral ?? e.codigo ?? e.vencimento ?? e.fabricacao;
   return (
-    <form action={enviar} className="flex flex-col items-start gap-1.5">
+    <FormularioComAcao action={enviar} className="flex flex-col items-start gap-1.5">
       <input type="hidden" name="envio" value={envio} />
       <input type="hidden" name="insumo" value={insumoId} />
       <input type="hidden" name="codigo" value={sugestao.codigo} />
@@ -103,19 +110,19 @@ export function FormUsarSugestao({ acao, insumoId, envioInicial, sugestao }: { a
         Lote {sugestao.codigo}
         {sugestao.vencimento ? `, vence ${diaPorExtenso(sugestao.vencimento)}` : ''}
       </span>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 export function FormTirarLote({ acao, loteId, rotulo }: { acao: AcaoDeEstoque; loteId: string; rotulo: string }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   return (
-    <form action={enviar} className="flex flex-col items-end gap-1">
+    <FormularioComAcao action={enviar} className="flex flex-col items-end gap-1">
       <input type="hidden" name="lote" value={loteId} />
       <BotaoEnviar pendente="Tirando…" variante="fantasma" className="min-h-11">
         Tirar<span className="sr-only"> o {rotulo}</span>
       </BotaoEnviar>
       <ErroGeral estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }

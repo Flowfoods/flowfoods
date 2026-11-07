@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * O formulário do planejamento (1.7): a lista por lugar com a caixa de marcar
  * (linha inteira clicável, 48 px), "marcar o lugar todo", quantos estão
@@ -7,8 +9,14 @@
  * (`iniciarCiclo`): insumo noutra contagem aberta, lista vazia, permissão.
  */
 
-import { useMemo, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * O formulário do planejamento (1.7): a lista por lugar com a caixa de marcar
+ * (linha inteira clicável, 48 px), "marcar o lugar todo", quantos estão
+ * marcados e o "Começar a contagem". O servidor confere tudo de novo
+ * (`iniciarCiclo`): insumo noutra contagem aberta, lista vazia, permissão.
+ */
+import { useMemo, useState, useActionState } from 'react';
+
 import { CONSERVACOES, ORDEM_DAS_CONSERVACOES, type Conservacao } from '@/lib/erp/validade';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
@@ -30,7 +38,7 @@ export interface LinhaParaPlanejar {
 }
 
 export function FormPlanejarCiclo({ linhas, lugar, acao, bloqueio }: { linhas: LinhaParaPlanejar[]; lugar: Conservacao | ''; acao: AcaoDeEstoque; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const [marcados, setMarcados] = useState<Set<string>>(() => new Set(linhas.filter((l) => l.sugerido).map((l) => l.insumoId)));
   const visiveis = useMemo(() => linhas.filter((l) => !lugar || l.conservacao === lugar), [linhas, lugar]);
   const grupos = ORDEM_DAS_CONSERVACOES.map((c) => ({ c, linhas: visiveis.filter((l) => l.conservacao === c) })).filter((g) => g.linhas.length > 0);
@@ -55,7 +63,7 @@ export function FormPlanejarCiclo({ linhas, lugar, acao, bloqueio }: { linhas: L
   if (visiveis.length === 0) return <Vazio titulo="Nenhum insumo neste lugar.">Escolha outro lugar.</Vazio>;
 
   return (
-    <form action={enviar} className="space-y-4">
+    <FormularioComAcao action={enviar} className="space-y-4">
       {grupos.map((g) => {
         const livres = g.linhas.filter((l) => !l.emOutraContagem).map((l) => l.insumoId);
         const todosMarcados = livres.length > 0 && livres.every((id) => marcados.has(id));
@@ -138,6 +146,6 @@ export function FormPlanejarCiclo({ linhas, lugar, acao, bloqueio }: { linhas: L
           </p>
         )}
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Meta de CMV de cada canal (N.2): quanto o custo físico do prato (insumos + embalagens do canal) pode ser do preço.
  * É o que comanda o preço sugerido de todas as fichas (custo físico ÷ meta) e a comparação com a meta. A taxa do iFood fica fora
@@ -55,7 +57,7 @@ export function FormMetasDeCmv({
     );
   };
   return (
-    <form action={f.enviar} onChange={f.saida.aoMudar} onSubmit={f.saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao action={f.enviar} onChange={f.saida.aoMudar} onSubmit={f.saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="versao" value={f.versao} />
       <ErroGeral estado={f.erro} recarregar={aqui} />
       {f.estado?.ok && !f.alterado && <p role="status" className="text-sm text-ok">{f.estado.mensagem}</p>}
@@ -114,6 +116,6 @@ export function FormMetasDeCmv({
         </BotaoEnviar>
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
-    </form>
+    </FormularioComAcao>
   );
 }

@@ -15,7 +15,8 @@ import { acaoCadastrarLoja, acaoCadastrarMarca, acaoSalvarCanaisDaLoja, acaoSalv
 
 export const dynamic = 'force-dynamic';
 
-export default async function LojasDoParceiroPage({ params }: { params: { slug: string } }) {
+export default async function LojasDoParceiroPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'lojas.ver');
   const { lojas, marcas } = await listarEstrutura(ctx.cliente, ctx.alcance);

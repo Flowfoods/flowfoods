@@ -10,12 +10,12 @@ import { ipDaRequisicao, rotuloDoAparelho } from './acesso';
 import { validarSessao, type SessaoValida } from './credenciais';
 import { nomeDoCookie, sessaoSegura } from './sessao-cookie';
 
-export function tokenDoCookie(): string | undefined {
-  return cookies().get(nomeDoCookie())?.value;
+export async function tokenDoCookie(): Promise<string | undefined> {
+  return (await cookies()).get(nomeDoCookie())?.value;
 }
 
-export function gravarCookieDeSessao(token: string, expiraEm: Date): void {
-  cookies().set(nomeDoCookie(), token, {
+export async function gravarCookieDeSessao(token: string, expiraEm: Date): Promise<void> {
+  (await cookies()).set(nomeDoCookie(), token, {
     httpOnly: true,
     secure: sessaoSegura(),
     sameSite: 'lax',
@@ -24,26 +24,26 @@ export function gravarCookieDeSessao(token: string, expiraEm: Date): void {
   });
 }
 
-export function apagarCookieDeSessao(): void {
-  cookies().set(nomeDoCookie(), '', { httpOnly: true, secure: sessaoSegura(), sameSite: 'lax', path: '/', maxAge: 0 });
+export async function apagarCookieDeSessao(): Promise<void> {
+  (await cookies()).set(nomeDoCookie(), '', { httpOnly: true, secure: sessaoSegura(), sameSite: 'lax', path: '/', maxAge: 0 });
 }
 
 /** Sessão desta requisição (uma ida ao banco, mesmo com layout + página + action pedindo). */
-export const sessaoDaRequisicao = cache(async (): Promise<SessaoValida | null> => validarSessao(tokenDoCookie()));
+export const sessaoDaRequisicao = cache(async (): Promise<SessaoValida | null> => validarSessao(await tokenDoCookie()));
 
-export function ipAtual(): string {
-  return ipDaRequisicao(headers());
+export async function ipAtual(): Promise<string> {
+  return ipDaRequisicao(await headers());
 }
 
-export function aparelhoAtual(): string {
-  return rotuloDoAparelho(headers().get('user-agent'));
+export async function aparelhoAtual(): Promise<string> {
+  return rotuloDoAparelho((await headers()).get('user-agent'));
 }
 
 /**
  * Endereço do site para montar o link de primeiro acesso: o configurado
  * (NEXTAUTH_URL, o mesmo do login do /rodolfo); sem ele, o da requisição.
  */
-export function origemDoSite(): string {
+export async function origemDoSite(): Promise<string> {
   const conf = process.env.NEXTAUTH_URL?.trim();
   if (conf) {
     try {
@@ -52,12 +52,12 @@ export function origemDoSite(): string {
       /* cai para a requisição */
     }
   }
-  const h = headers();
+  const h = await headers();
   const host = h.get('x-forwarded-host') ?? h.get('host') ?? 'localhost:3000';
   const proto = h.get('x-forwarded-proto') ?? (host.startsWith('localhost') ? 'http' : 'https');
   return `${proto}://${host}`;
 }
 
-export function linkDePrimeiroAcesso(token: string): string {
-  return `${origemDoSite()}/entrar/primeiro-acesso/${token}`;
+export async function linkDePrimeiroAcesso(token: string): Promise<string> {
+  return `${await origemDoSite()}/entrar/primeiro-acesso/${token}`;
 }

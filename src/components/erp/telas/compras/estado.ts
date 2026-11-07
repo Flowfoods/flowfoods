@@ -1,5 +1,5 @@
 /**
- * Estado das actions de compras (1.5) para `useFormState`. A nota tem um passo
+ * Estado das actions de compras (1.5) para `useActionState`. A nota tem um passo
  * a mais que os cadastros: "Conferir" devolve a PRÉVIA (nada gravado); lançar
  * ou salvar leva ao detalhe com a frase do que mudou (`?feito=`).
  */

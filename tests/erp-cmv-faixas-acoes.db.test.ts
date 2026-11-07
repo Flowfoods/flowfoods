@@ -6,7 +6,8 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 const atual = vi.hoisted(() => ({ contexto: null as null | (() => unknown), slug: '', leituras: 0, auditoria: vi.fn(async () => ({})) }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 vi.mock('next/navigation', () => ({ usePathname: () => '/erp/fichas', useSearchParams: () => null, useRouter: () => ({ push: () => {}, refresh: () => {} }), redirect: (url: string) => { throw Object.assign(new Error('REDIRECT'), { url }); }, notFound: () => { throw new Error('NOT_FOUND'); } }));
-vi.mock('react-dom', async orig => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, estado: unknown) => [estado, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async orig => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, estado: unknown) => [estado, undefined] }));
 vi.mock('@/lib/erp/contexto', async () => {
   const permissoes = await import('@/lib/erp/permissoes');
   return { ...permissoes, exigirParceiroDaSessao: async () => { atual.leituras++; return atual.contexto!(); }, exigirParceiro: async (slug: string) => {
@@ -129,7 +130,7 @@ describe.skipIf(!URL_TESTE)('3B · actions reais, permissão atual e impressão 
     if (!f.ok) throw new Error(JSON.stringify(f));
     const p = await a.produtoVenda.create({ data: { parceiroId: parceiro.id, fichaId: f.id, nome: 'Prato de impressão' } });
     await a.produtoCanal.createMany({ data: canais.map(canal => ({ parceiroId: parceiro.id, produtoId: p.id, canal, precoManualCentavos: 1000 })) });
-    const pagina = await PaginaImpressao({ params: { id: f.id } }) as ReactElement<ComponentProps<typeof TelaImpressaoFicha>>;
+    const pagina = await PaginaImpressao({ params: Promise.resolve({ id: f.id }) }) as ReactElement<ComponentProps<typeof TelaImpressaoFicha>>;
     expect(pagina.props.podeFinanceiro).toBe(true); expect(pagina.props.ficha.verCustos).toBe(false);
     expect(json(pagina.props)).not.toMatch(/farol|aBp|bBp|cBp|dBp|confortavel|cmvBp|precoCentavos/);
     const operacional = renderToStaticMarkup(createElement(TelaImpressaoFicha, pagina.props));

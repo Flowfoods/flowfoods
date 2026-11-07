@@ -1,13 +1,20 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Formulário de acesso de uma pessoa: criar (nome, e-mail, perfil, lojas,
  * setores) e editar (perfil, lojas, setores e ajuste fino). A tela só ajuda a
  * escolher: quem confere o que o ator pode dar é o servidor.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Formulário de acesso de uma pessoa: criar (nome, e-mail, perfil, lojas,
+ * setores) e editar (perfil, lojas, setores e ajuste fino). A tela só ajuda a
+ * escolher: quem confere o que o ator pode dar é o servidor.
+ */
+import { useEffect, useMemo, useRef, useState, useActionState } from 'react';
+
 import { LISTA_DE_SETORES, SETORES } from '@/lib/erp/permissoes';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro, ROTULO, Resultado } from '../../ui/campos';
@@ -71,7 +78,7 @@ export function FormPessoa({
   /** Editar: hoje ela cuida da equipe? Tirar isso pede confirmação. */
   cuidavaDaEquipe?: boolean;
 }) {
-  const [estado, enviar] = useFormState<EstadoEquipe, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEquipe, FormData>(acao, null);
   const podeDar = useMemo(() => new Set(concediveis), [concediveis]);
   const cabe = (o: OpcaoDePerfil) => o.permissoes.every((p) => podeDar.has(p));
   const primeiroQueCabe =
@@ -134,7 +141,7 @@ export function FormPessoa({
 
   return (
     <div className="space-y-4">
-      <form
+      <FormularioComAcao
         key={chave}
         ref={formulario}
         action={enviar}
@@ -331,7 +338,7 @@ export function FormPessoa({
           </BotaoEnviar>
           <Resultado estado={estado} />
         </div>
-      </form>
+      </FormularioComAcao>
       {estado?.ok && estado.link && <LinkGerado link={estado.link} validade={estado.validade} />}
     </div>
   );

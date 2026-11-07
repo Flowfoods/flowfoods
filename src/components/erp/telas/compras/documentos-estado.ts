@@ -1,5 +1,5 @@
 /**
- * Estado das actions das notas recebidas por XML (F.1b) para `useFormState`. Receber, salvar, conciliar, ligar e cancelar levam à
+ * Estado das actions das notas recebidas por XML (F.1b) para `useActionState`. Receber, salvar, conciliar, ligar e cancelar levam à
  * tela do documento com a frase do que aconteceu (`?feito=`); o que volta por aqui é o erro (sem perder o que a pessoa escolheu) ou a
  * PRÉVIA do "Conferir o impacto" (nada foi gravado).
  */

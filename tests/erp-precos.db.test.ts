@@ -434,11 +434,11 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
     const json = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? v.toString() : v));
     // A dona vê tudo (controle: o filtro não esconde de quem pode).
     atual.ctx = ctxDe(a, A, 'DONO', 'Marina');
-    const dona = (await ErpFichaPage({ params: { id: ids.burger }, searchParams: {} })) as { props: { ficha: { historico: unknown[] }; canais: unknown } };
+    const dona = (await ErpFichaPage({ params: Promise.resolve({ id: ids.burger }), searchParams: Promise.resolve({}) })) as { props: { ficha: { historico: unknown[] }; canais: unknown } };
     expect(json(dona.props.ficha.historico)).toMatch(/preço no iFood/);
     // O operador abre o MESMO prato: o histórico da ficha vem sem preço, e a alteração que só tinha preço some inteira.
     atual.ctx = ctxDe(a, A, 'OPERADOR', 'Caio');
-    const op = (await ErpFichaPage({ params: { id: ids.burger }, searchParams: {} })) as typeof dona;
+    const op = (await ErpFichaPage({ params: Promise.resolve({ id: ids.burger }), searchParams: Promise.resolve({}) })) as typeof dona;
     expect(op.props.canais).toBeNull();
     const histOp = json(op.props.ficha.historico);
     expect(histOp.match(PROIBIDO)?.[0] ?? null).toBeNull();
@@ -458,15 +458,15 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
     expect(pode(alcanceDe('OPERADOR', extras), 'precos.ver')).toBe(false);
     atual.ctx = ctxDe(a, A, 'OPERADOR', 'Hugo', extras);
     // A rede inteira: nada da precificação (o R$ das compras e do preço do insumo é de outra permissão e fica).
-    const tudo = json(await ErpHistoricoPage({ searchParams: {} }));
+    const tudo = json(await ErpHistoricoPage({ searchParams: Promise.resolve({}) }));
     expect(tudo.match(DA_PRECIFICACAO)?.[0] ?? null).toBeNull();
     expect(tudo).not.toMatch(/CanalConfig/);
     // Só as fichas (e os canais): nem um "R$".
-    const fichas = json(await ErpHistoricoPage({ searchParams: { entidade: 'FichaTecnica' } }));
+    const fichas = json(await ErpHistoricoPage({ searchParams: Promise.resolve({ entidade: 'FichaTecnica' }) }));
     expect(fichas.match(PROIBIDO)?.[0] ?? null).toBeNull();
     expect(fichas).toMatch(/Burger cheddar/);
     // E a gerente (vê preços) em /erp/historico vê a taxa e os preços.
     atual.ctx = ctxDe(a, A, 'GERENTE', 'Gil', []);
-    expect(json(await ErpHistoricoPage({ searchParams: {} }))).toMatch(/preço no iFood/);
+    expect(json(await ErpHistoricoPage({ searchParams: Promise.resolve({}) }))).toMatch(/preço no iFood/);
   });
 });

@@ -12,7 +12,11 @@ import { acaoGerarLotesDaLista, acaoPorNaListaDoDia, acaoSalvarListaDoDia } from
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpListaDoDiaDaLojaPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { dia?: string; feito?: string } }) {
+export default async function ErpListaDoDiaDaLojaPage(
+  props: { params: Promise<{ lojaId: string }>; searchParams: Promise<{ dia?: string; feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'producao.ver');
   const d = await obterListaDoDia(ctx.cliente, ctx.alcance, params.lojaId, searchParams.dia);
