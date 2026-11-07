@@ -546,7 +546,7 @@ export const FUNCOES_DOS_PAGAMENTOS_ANALYTICS: readonly [string, string, string,
 export async function conferirPagamentosAnalytics(db: Pick<PrismaClient, '$queryRaw'>): Promise<string[]> {
   const erros: string[] = [], tabela = 'IntegracaoPagamentoSnapshot';
   const [marcas] = await db.$queryRaw<{ tabela: boolean; coluna: boolean; funcao: boolean; prisma: boolean }[]>`
-    SELECT to_regclass('"IntegracaoPagamentoSnapshot"') IS NOT NULL AS tabela,
+    SELECT to_regclass(${`"${tabela}"`}) IS NOT NULL AS tabela,
       EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name='IntegracaoPayload' AND column_name='versaoContrato') AS coluna,
       EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname=current_schema() AND p.proname='erp_integracao_pagamento_final') AS funcao,
       to_regclass('_prisma_migrations') IS NOT NULL AS prisma`;
