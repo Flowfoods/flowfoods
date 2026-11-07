@@ -146,6 +146,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
   it('liberado: o Dono vê as lojas ligadas e o estado em linguagem simples; nada técnico, nada desligado, nada do parceiro B', async () => {
     como(alcanceDe('DONO', 'rede'));
     const pagina = await html(ErpIntegracoesPage({ searchParams: Promise.resolve({ loja: lojaA1 }) }));
+    expect(pagina).toContain(`/erp/integracoes/analytics?loja=${encodeURIComponent(lojaA1)}`);
     expect(pagina).toContain(`Valentin Burger Penha ${sufixo}`);
     expect(pagina).toContain(`Valentin Gourmet Meier ${sufixo}`);
     expect(pagina).toContain('Números de venda');
@@ -177,6 +178,14 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     expect(recusada).toContain('Esta loja não está disponível no seu acesso.');
     expect(recusada).not.toContain(`Loja antiga desligada ${sufixo}`);
     expect(recusada).not.toContain(`Valentin Gourmet Meier ${sufixo}`);
+  });
+
+  it('acesso somente à integração mantém a situação operacional sem oferecer indicadores financeiros', async () => {
+    como({ nivel: 'LOJA', lojas: [lojaA1], permissoes: new Set(['integracao.ver']) });
+    const pagina = await html(ErpIntegracoesPage({ searchParams: Promise.resolve({ loja: lojaA1 }) }));
+    expect(pagina).toContain('Situação dos números de venda');
+    expect(pagina).not.toContain('/erp/integracoes/analytics');
+    expect(pagina).not.toContain('Ver painel iFood por período');
   });
 
   it('a migration do catálogo v4: só o "copiado do Dono" da v3 ganha integracao.ver; o parcial e o de versão antiga parcial não; rodar de novo não muda', async () => {

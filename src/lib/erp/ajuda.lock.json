@@ -304,8 +304,12 @@
     "hash": "fd7c1b48f168f693"
   },
   "integracoes": {
-    "versao": 4,
-    "hash": "acd3814e8b92122d"
+    "versao": 5,
+    "hash": "1c08237bd80df968"
+  },
+  "integracoes-analytics": {
+    "versao": 1,
+    "hash": "796c4137126501e2"
   },
   "equipe": {
     "versao": 1,
