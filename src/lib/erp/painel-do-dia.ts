@@ -269,6 +269,15 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     pendenciaDoFaturamento(mesAnterior, leituraFatAnterior.status === 'rejected' ? 'erro' : leituraFatAnterior.value ?? 0),
   ] : []) if (p) pendencias.push(p);
 
+  // Uma leitura que falhou não comprova ausência de pendências; a próxima consulta válida decide.
+  const naoConferido = (chave: string, indicador: string, natureza: NaturezaDaPendencia, href: string, acao: string, abrangencia = escopo) => {
+    pendencias.push({
+      chave: `${chave}-nao-conferido`, escopo: abrangencia, natureza, indicador, leitura: 'nao_conferida', href, acao,
+      titulo: `${indicador}: não deu para conferir agora`,
+      texto: 'A consulta falhou e as pendências desta fonte não foram verificadas. Use Atualizar resumo para consultar de novo.',
+    });
+  };
+  if (autorizado.cardapio && leituraSaude.status === 'rejected') naoConferido('cardapio', 'Situação do cardápio', 'completar_dados', `${base}/fichas`, 'Ver as fichas', 'Da rede');
   if (saude && saude.pratos > 0) {
     indicadores.push({
       chave: 'cardapio',
@@ -301,6 +310,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     }
   }
 
+  if (autorizado.estoque && leituraEstoque.status === 'rejected') naoConferido('estoque', 'Situação do estoque', 'resolver_operacao', estoqueHref, 'Ver o estoque');
   if (estoque && estoque.some((l) => l.ativa)) {
     const ativas = estoque.filter((l) => l.ativa);
     const abertas = ativas.filter((l) => l.estado === 'ABERTO').length;
@@ -339,6 +349,7 @@ export async function painelDoDia(cliente: ClienteDoParceiro, alcance: Alcance, 
     }
   }
 
+  if (autorizado.producao && leituraProducao.status === 'rejected') naoConferido('producao', 'Produção de hoje', 'resolver_operacao', producaoHref, 'Ver a lista');
   if (producao) {
     indicadores.push({
       chave: 'producao', escopo, rotulo: 'Pré-preparos na lista de hoje',
