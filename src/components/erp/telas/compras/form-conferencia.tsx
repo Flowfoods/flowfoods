@@ -212,8 +212,8 @@ function FormConferenciaBase({
     setEscolhas((e) => {
       const atual = e[n];
       const nova = { ...atual, ...m };
-      // Trocou o insumo: a embalagem volta para a padrão dele.
-      if (m.insumoId !== undefined && m.insumoId !== atual.insumoId) nova.embalagem = EMBALAGEM_PADRAO;
+      // A troca manual volta à padrão; a sugestão do código de barras já traz a embalagem correspondente.
+      if (m.insumoId !== undefined && m.insumoId !== atual.insumoId && m.embalagem === undefined) nova.embalagem = EMBALAGEM_PADRAO;
       return { ...e, [n]: nova };
     });
     saida.aoMudar();

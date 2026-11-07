@@ -83,6 +83,7 @@ const PALAVRA: Record<string, string> = {
   itens: 'insumos e quantidades',
   conservacao: 'conservação',
   validade: 'validade',
+  consumoImediato: 'consumo imediato',
 };
 
 const intervalo = (linhas: number[]) => {
@@ -191,6 +192,8 @@ function planejarUma(
     passosPreparo: atual?.passosPreparo ?? [],
     validades: entrada.validade === undefined ? (atual ? validadesDaLinha(atual) : null) : lido.dados.validades,
   };
+  // A planilha não traz essa marca; seguir a mesma preservação de editarFicha, inclusive quando informa uma guarda.
+  if (entrada.consumoImediato === undefined) dados.consumoImediato = (atual?.consumoImediato ?? false) && !dados.validades;
   const custo = custoDaFicha(
     dados.itens.map((i) => {
       const comum = { quantidadeMilesimos: i.quantidadeMilesimos, fatorCorrecaoMilesimos: i.fatorCorrecaoMilesimos };
