@@ -102,7 +102,7 @@ describe('arquivos no disco', () => {
   it('grava em <base>/<token>/<bloco>/<carimbo>-<nome>', () => {
     expect(
       caminhoDoArquivo({ base: '/data/portal', token, bloco: 'C', agora, nomeOriginal: 'Faturamento 2025.xlsx' }),
-    ).toBe(`/data/portal/${token}/C/20260925-150405-Faturamento-2025.xlsx`);
+    ).toBe(path.join('/data/portal', token, 'C', '20260925-150405-Faturamento-2025.xlsx'));
   });
 
   it('o carimbo é hora de São Paulo, mesmo com o servidor em UTC', () => {
@@ -115,7 +115,7 @@ describe('arquivos no disco', () => {
   it('nome com caminho não escapa da pasta do cliente', () => {
     for (const nome of ['../../etc/passwd', '..\\..\\win.ini', '/etc/shadow', '..', '.env']) {
       const c = caminhoDoArquivo({ base: '/data/portal', token, bloco: 'A', agora, nomeOriginal: nome });
-      expect(c.startsWith(`/data/portal/${token}/A/`), `falhou para "${nome}"`).toBe(true);
+      expect(c.startsWith(path.join('/data/portal', token, 'A') + path.sep), `falhou para "${nome}"`).toBe(true);
       expect(c).not.toContain('..');
     }
   });

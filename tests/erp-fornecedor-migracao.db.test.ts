@@ -17,6 +17,7 @@
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-fornecedor-migracao.db.test.ts
  */
 import { spawnSync } from 'node:child_process';
+import { executarPsqlDeTeste } from './erp-psql-apoio';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
@@ -40,8 +41,7 @@ function urlDe(banco: string, papel?: string): string {
 }
 
 function psql(url: string, args: string[]) {
-  const r = spawnSync('psql', [url, '-v', 'ON_ERROR_STOP=1', '-X', '-q', '-t', '-A', ...args], { encoding: 'utf8' });
-  return { ok: r.status === 0, saida: (r.stdout ?? '').trim(), aviso: r.stderr ?? '' };
+  return executarPsqlDeTeste(url, args);
 }
 
 const antes = (alvo: string) => readdirSync(MIGRACOES).filter((n) => /^\d{14}_/.test(n) && n < alvo).sort();
@@ -65,7 +65,7 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP F.1a · migration do cadastro do fo
 
   afterAll(() => {
     for (const b of criados) psql(urlDe('postgres'), ['-c', `DROP DATABASE IF EXISTS ${b} WITH (FORCE)`]);
-  });
+  }, 360_000);
 
   /** Banco até a migration anterior, com o que a 1.5 deixava gravado. `repetido`: dois fornecedores do mesmo parceiro com o mesmo CNPJ. */
   function prepararBanco(perfil: Perfil, nomeDoBanco: string, repetido: boolean) {

@@ -12,7 +12,8 @@ import { digitoDaChave } from '@/lib/erp/nfe-xml';
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarInsumoDeTeste as cadastrarInsumo } from './erp-db-apoio';
 
-export const BASE = readFileSync(join(process.cwd(), 'tests', 'fixtures', 'nfe-sintetica.xml'), 'utf8');
+// As trocas literais abaixo usam LF, independentemente da quebra de linha do checkout.
+export const BASE = readFileSync(join(process.cwd(), 'tests', 'fixtures', 'nfe-sintetica.xml'), 'utf8').replace(/\r\n/g, '\n');
 export const CHAVE = '33261011222333000181550010000045211123456784';
 export const bytes = (t: string) => new TextEncoder().encode(t);
 

@@ -7,7 +7,7 @@
  *    por rota nem tela do parceiro.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { ACOES_DO_MODULO, ESTADOS_DO_MODULO, podeSincronizar, porQueNao, transicao } from '@/lib/integracoes/core/estados';
 import { lerApp, lerConexao, lerIdDaLojaIfood, MODULOS_DA_CATEGORIA } from '@/lib/integracoes/core/campos';
@@ -143,7 +143,7 @@ describe('INT-1.1 · guardas', () => {
     const furos: string[] = [];
     for (const raiz of ['src', 'scripts', 'worker']) {
       for (const f of arquivos(raiz)) {
-        if (f.startsWith(join('src', 'lib', 'integracoes') + '/')) continue;
+        if (f.startsWith(join('src', 'lib', 'integracoes') + sep)) continue;
         const txt = readFileSync(f, 'utf8');
         if (/\.\s*integracao(App|Token)\s*\./.test(txt)) furos.push(`${f}: integracaoApp/integracaoToken`);
         if (/\$(queryRaw|executeRaw)[\s\S]{0,400}"Integracao(App|Token)"/.test(txt)) furos.push(`${f}: SQL cru na tabela global`);
@@ -181,7 +181,7 @@ describe('INT-1.1 · guardas', () => {
   });
 
   it('toda ação da Central abre conferindo a sessão do nível 1 (uma action responde a POST em qualquer rota)', () => {
-    const txt = readFileSync(join('src', 'app', 'rodolfo', '(painel)', 'integracoes', 'actions.ts'), 'utf8');
+    const txt = readFileSync(join('src', 'app', 'rodolfo', '(painel)', 'integracoes', 'actions.ts'), 'utf8').replace(/\r\n/g, '\n');
     const acoes = [...txt.matchAll(/export async function (\w+)\([^)]*\)[^{]*\{\n([^\n]*)/g)];
     expect(acoes.length).toBeGreaterThanOrEqual(7);
     for (const [, nome, primeira] of acoes) expect(primeira, nome).toMatch(/^\s+const (sessao|ctx) = await (exigirNivel1\(\)|exigirParceiro\(slug\));$/);
