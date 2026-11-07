@@ -1804,7 +1804,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['faturamento/[lojaId]/[data]'],
     titulo: 'Faturamento do dia',
-    versao: 5,
+    versao: 6,
     // Tela de lançar no celular: os campos ficam à vista, a aula abre numa linha (como nas telas de contar).
     recolhida: true,
     aula: [
@@ -1838,6 +1838,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'Faturamento é a venda dos produtos dos pedidos concluídos no dia, já sem o desconto que a casa pagou; não entram taxa de entrega, gorjeta, 10 % de serviço nem pedido cancelado.' },
           { texto: 'No iFood, entra o total dos itens menos o incentivo que a loja bancou; a comissão do iFood entra depois, no resultado.' },
           { texto: 'Clientes são atendimentos, não pessoas diferentes; se a integração não os informa, vale o lançamento da casa; sem ele ou após removê-lo, fica Sem dado.' },
+          { texto: 'Quando há aplicação do iFood Analytics, o selo informa quando ela entrou no faturamento. Uma atualização pendente preserva a aplicação anterior.' },
         ],
       },
       {
@@ -1908,11 +1909,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['integracoes'],
     titulo: 'Integrações',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'As lojas do iFood ligadas às suas lojas e o que está ativo em cada uma. Aqui só se consulta: ligar e ativar é com a FlowFoods.' },
       { texto: 'Esperando a loja aprovar quer dizer que quem administra a loja no Portal do Parceiro do iFood precisa aprovar o app da FlowFoods, na parte de integrações e aplicativos do portal.' },
-      { texto: 'Quando a busca automática começar, as vendas do iFood das lojas com Números de venda ativo entram sozinhas no faturamento, com os dados até ontem.' },
+      { texto: 'Escolha a loja e um dia até ontem para conferir o acesso, a tentativa de leitura, a versão disponível e a aplicação no faturamento.' },
+      { texto: 'Acesso ativo não confirma leitura nem aplicação. As datas são mostradas separadamente, no horário de Brasília; uma espera informa o limite mínimo, sem garantir a hora da próxima tentativa.' },
+      { texto: 'Se uma atualização fica pendente, a aplicação anterior permanece identificada. Sem leitura disponível não significa que a loja não vendeu.' },
+      { texto: 'A faixa Ambiente de teste identifica dados de teste, que não entram no faturamento. Os detalhes de aplicação não substituem os números da tela Faturamento.' },
     ],
   },
   {

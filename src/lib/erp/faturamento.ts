@@ -26,6 +26,8 @@
  */
 
 import { createHash } from 'node:crypto';
+import { lerOrigemAnalyticsNoFaturamento } from '@/lib/integracoes/core/situacao-analytics';
+import type { OrigemAnalyticsNoFaturamento } from '@/lib/integracoes/core/situacao-analytics-campos';
 import type { Prisma } from '@prisma/client';
 import { hojeNoRio, lerData } from './compra-campos';
 import { somarDias } from './contagem-campos';
@@ -122,6 +124,8 @@ export interface DiaDaLojaLido {
   /** Nome do período fechado que cobre o dia, se houver. */
   fechado: string | null;
   historico: Awaited<ReturnType<typeof listarHistorico>>;
+  /** Aplicação efetiva lida na mesma fotografia dos valores do dia. */
+  origemAnalytics?: OrigemAnalyticsNoFaturamento;
 }
 
 /** O dia de uma loja, para a tela de lançar. Loja de outro parceiro, fora do alcance ou inexistente = null (404). */
@@ -153,8 +157,10 @@ export async function obterDia(cliente: ClienteDoParceiro, alcance: Alcance, loj
         valendo: lerGrao(dele),
       };
     }).filter((c) => c.ativo || c.valendo);
-    return { loja, data, canais, fechado, historico };
-  });
+    const origemAnalytics = linhas.some(l => l.canal === 'IFOOD' && l.origem === 'INTEGRACAO' && l.chaveIdempotencia.startsWith('ifood-analytics:dia:'))
+      ? await lerOrigemAnalyticsNoFaturamento(tx, alcance, { lojaId, dia: data }) : null;
+    return { loja, data, canais, fechado, historico, ...(origemAnalytics ? { origemAnalytics } : {}) };
+  }, { repetivel: true, relatorio: {} });
 }
 
 // ================================================================ lançar o dia

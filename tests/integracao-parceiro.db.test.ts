@@ -79,8 +79,8 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
   let lojaA1 = '';
   let lojaA2 = '';
 
-  const como = (alcance: Alcance, cliente: ClienteDoParceiro = a) => {
-    atual.ctx = () => ({ alcance, cliente, bloqueio: null, podeEscrever: true, parceiro: { id: cliente.parceiroId } });
+  const como = (alcance: Alcance, cliente: ClienteDoParceiro = a, homologacaoDeIntegracao = false) => {
+    atual.ctx = () => ({ alcance, cliente, bloqueio: null, podeEscrever: true, parceiro: { id: cliente.parceiroId, homologacaoDeIntegracao } });
   };
 
   beforeAll(async () => {
@@ -145,7 +145,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
 
   it('liberado: o Dono vê as lojas ligadas e o estado em linguagem simples; nada técnico, nada desligado, nada do parceiro B', async () => {
     como(alcanceDe('DONO', 'rede'));
-    const pagina = await html(ErpIntegracoesPage());
+    const pagina = await html(ErpIntegracoesPage({ searchParams: Promise.resolve({ loja: lojaA1 }) }));
     expect(pagina).toContain(`Valentin Burger Penha ${sufixo}`);
     expect(pagina).toContain(`Valentin Gourmet Meier ${sufixo}`);
     expect(pagina).toContain('Números de venda');
@@ -163,6 +163,20 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     expect(pagina).toContain(`Valentin Burger Penha ${sufixo}`);
     expect(pagina).not.toContain(`Valentin Gourmet Meier ${sufixo}`);
     expect(pagina).toContain('1 loja do iFood ligada');
+  });
+
+  it('filtro GET mostra referências desligadas somente na loja alcançada e não aceita ampliar o alcance', async () => {
+    como(alcanceDe('DONO', 'rede'));
+    const historica = await html(ErpIntegracoesPage({ searchParams: Promise.resolve({ loja: lojaA2, dia: '2026-10-20' }) }));
+    expect(historica).toContain(`Loja antiga desligada ${sufixo}`);
+    expect(historica).toContain('Vínculo desligado');
+    expect(historica).toContain('Ainda sem leitura disponível');
+    expect(historica).not.toContain(`Loja do parceiro B ${sufixo}`);
+    como(alcanceDe('GERENTE', [lojaA1], ['integracao.ver']));
+    const recusada = await html(ErpIntegracoesPage({ searchParams: Promise.resolve({ loja: lojaA2, dia: '2026-10-20' }) }));
+    expect(recusada).toContain('Esta loja não está disponível no seu acesso.');
+    expect(recusada).not.toContain(`Loja antiga desligada ${sufixo}`);
+    expect(recusada).not.toContain(`Valentin Gourmet Meier ${sufixo}`);
   });
 
   it('a migration do catálogo v4: só o "copiado do Dono" da v3 ganha integracao.ver; o parcial e o de versão antiga parcial não; rodar de novo não muda', async () => {
@@ -237,7 +251,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     const r = await ligarConexao(h, { lojaId: lojaH.id, provedor: 'IFOOD', ambiente: 'TEST', idExterno: uuid(), nomeExterno: `Teste iFood ${sufixo}` }, { nome: 'teste' });
     if (!r.ok) throw new Error(JSON.stringify(r));
     await mudarLiberacao(h, 'integracao', true, 'teste');
-    como(alcanceDe('DONO', 'rede'), h);
+    como(alcanceDe('DONO', 'rede'), h, true);
     const pagina = await html(ErpIntegracoesPage());
     expect(pagina).toContain(`Teste iFood ${sufixo}`);
     expect(pagina).toContain('Loja de teste do iFood');

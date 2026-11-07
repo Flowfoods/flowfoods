@@ -3,7 +3,7 @@
  * marca de parceiro de testes, lojas do iFood ligadas às Lojas e marcas dele, o estado de cada módulo e o histórico. Tudo do
  * parceiro passa pelo portão dele (`exigirParceiro`); parceiro suspenso ou em rascunho só lê.
  *
- * Nada aqui chama o iFood: a única chamada é o comando da leitura de teste.
+ * Esta tela só lê o estado persistido. A coleta automática autorizada pertence ao worker.
  */
 
 import { HistoricoRecolhivel } from '@/components/erp/telas/historico/historico-recolhivel';
@@ -23,23 +23,28 @@ import { TrilhaDaPagina } from '@/components/erp/shell/trilha';
 import { AvisoDoFeito } from '../aviso-feito';
 import { FormAcoesDoModulo, FormDesligar, FormHomologacao, FormLiberacao, FormLigarLoja, FormPrepararModulo } from '../forms';
 import { ACOES_NA_TELA, ehCodigoFeito, FEITO, QUANDO, TOM_DO_ESTADO } from '../rotulos';
+import { lerSituacaoAnalyticsDaLoja } from '@/lib/integracoes/core/situacao-analytics';
+import { PainelSituacaoAnalytics } from '@/components/erp/telas/integracoes/painel-situacao-analytics';
 
 export const dynamic = 'force-dynamic';
 
 export default async function IntegracoesDoParceiroNoNivel1(
-  props: { params: Promise<{ slug: string }>; searchParams?: Promise<{ feito?: string }> }
+  props: { params: Promise<{ slug: string }>; searchParams?: Promise<{ feito?: string; loja?: string | string[]; dia?: string | string[] }> }
 ) {
   const searchParams = (await props.searchParams) ?? {};
   const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   const { parceiro, cliente } = ctx;
-  const [liberacoes, conexoes, apps, lojas, marcas, historico] = await Promise.all([
+  const [liberacoes, conexoes, apps, lojas, marcas, historico, situacao] = await Promise.all([
     liberacoesDoParceiro(cliente),
     conexoesDoParceiro(cliente),
     listarApps(),
     cliente.loja.findMany({ where: { ativa: true }, select: { id: true, nome: true }, orderBy: { nome: 'asc' } }),
     cliente.marca.findMany({ where: { ativa: true }, select: { id: true, nome: true }, orderBy: { nome: 'asc' } }),
     listarHistorico(cliente, { entidades: [...ENTIDADES_DE_INTEGRACAO], verIntegracao: true, verPrecos: false, limite: 20 }),
+    lerSituacaoAnalyticsDaLoja(cliente, ctx.alcance,
+      { parceiroId: parceiro.id, homologacaoDeIntegracao: parceiro.homologacaoDeIntegracao },
+      { lojaId: searchParams.loja, dia: searchParams.dia }),
   ]);
   const integracao = liberacoes.find((l) => l.modulo === 'integracao');
   const liberado = integracao?.liberado ?? false;
@@ -58,6 +63,7 @@ export default async function IntegracoesDoParceiroNoNivel1(
       <PageHeader icone="canais" cor={COR.parceiros} titulo={`Integrações · ${parceiro.nome}`} subtitulo="Nível 1 · lojas do iFood, módulos e liberação deste parceiro" />
 
       <AvisoDoFeito texto={feito} />
+      <PainelSituacaoAnalytics resultado={situacao} teste={parceiro.homologacaoDeIntegracao} base={`/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}`} baseFaturamento={`/rodolfo/erp/${encodeURIComponent(parceiro.slug)}/faturamento`} />
       {!podeEscrever && (
         <Aviso tom="alerta" titulo="Só leitura">
           Parceiro {parceiro.status === 'SUSPENSO' ? 'suspenso' : 'em rascunho'}: para ligar lojas, mudar módulos ou a liberação, reative o parceiro em Parceiros Flow.

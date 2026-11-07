@@ -29,7 +29,7 @@ export const SITUACAO_PARA_O_PARCEIRO: Record<EstadoDoModulo, { rotulo: string; 
     explicacao: 'Quem administra esta loja no Portal do Parceiro do iFood precisa aprovar o app da FlowFoods, na parte de integrações e aplicativos do portal.',
   },
   AUTORIZADO: { rotulo: 'Aprovado pela loja', tom: 'neutro', explicacao: 'A loja aprovou. A FlowFoods ativa em seguida.' },
-  ATIVO: { rotulo: 'Ativo', tom: 'ok', explicacao: 'Ligado. Os números entram sozinhos quando a busca diária começar.' },
+  ATIVO: { rotulo: 'Ativo', tom: 'ok', explicacao: 'O acesso está ativo. Confira a leitura e a aplicação do dia no acompanhamento.' },
   PAUSADO: { rotulo: 'Pausado', tom: 'alerta', explicacao: 'A FlowFoods pausou. Nada é buscado nesta loja até voltar.' },
   ERRO_PERMISSAO: {
     rotulo: 'O iFood recusou o acesso',

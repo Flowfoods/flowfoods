@@ -5,6 +5,7 @@
  */
 
 import { WHATSAPP_NUMERO } from '@/lib/constants';
+import type { ReactNode } from 'react';
 import type { IntegracaoParaOParceiro } from '@/lib/integracoes/core/do-parceiro';
 import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 import { Aviso, Contagem, Painel, Selo, Vazio } from '@/components/erp/ui/superficies';
@@ -14,12 +15,12 @@ const PEDIR_LIGACAO = `https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponen
 
 const DIA = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
 
-export function TelaIntegracoes({ integracoes }: { integracoes: IntegracaoParaOParceiro[] }) {
+export function TelaIntegracoes({ integracoes, painel }: { integracoes: IntegracaoParaOParceiro[]; painel?: ReactNode }) {
   return (
     <div className="space-y-4">
-      <Aviso titulo="A busca automática dos números ainda não começou.">
+      {painel === undefined ? <Aviso titulo="A busca automática dos números ainda não começou.">
         Quando começar, as vendas do iFood das lojas com Números de venda ativo entram sozinhas, com os dados até ontem.
-      </Aviso>
+      </Aviso> : painel}
       <Painel titulo="Lojas do iFood ligadas" acessorio={<Contagem>{integracoes.length}</Contagem>} semRespiro>
         {integracoes.length === 0 ? (
           <Vazio titulo="Nenhuma loja do iFood ligada ainda.">A FlowFoods liga cada loja do iFood à loja certa daqui. Para ligar uma loja, fale com a FlowFoods pelo WhatsApp, no link abaixo.</Vazio>

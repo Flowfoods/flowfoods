@@ -292,7 +292,7 @@
     "hash": "8bc5df4b7032ccbc"
   },
   "faturamento-dia": {
-    "versao": 5,
+    "versao": 6,
     "hash": "8e16b01d34c29c26"
   },
   "faturamento-importar": {
@@ -304,8 +304,8 @@
     "hash": "fd7c1b48f168f693"
   },
   "integracoes": {
-    "versao": 2,
-    "hash": "bbad88451ce0f77d"
+    "versao": 3,
+    "hash": "f0caab2e7ee1415e"
   },
   "equipe": {
     "versao": 1,

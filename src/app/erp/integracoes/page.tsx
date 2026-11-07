@@ -12,15 +12,23 @@ import { COR } from '@/lib/erp/modulos';
 import { integracoesParaOParceiro } from '@/lib/integracoes/core/do-parceiro';
 import { PageHeader } from '@/components/erp/ui/cabecalho';
 import { TelaIntegracoes } from '@/components/erp/telas/integracoes/tela-integracoes';
+import { PainelSituacaoAnalytics } from '@/components/erp/telas/integracoes/painel-situacao-analytics';
+import { lerSituacaoAnalyticsDaLoja } from '@/lib/integracoes/core/situacao-analytics';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpIntegracoesPage() {
+export default async function ErpIntegracoesPage(props: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'integracao.ver');
   // Módulo não liberado: o hub diz que é a FlowFoods quem libera (não "quem cuida da equipe").
   if (!(await moduloLiberado(ctx.cliente, 'integracao'))) redirect('/erp?sem-modulo=integracao');
-  const integracoes = await integracoesParaOParceiro(ctx.cliente, ctx.alcance);
+  const filtro = (await props.searchParams) ?? {};
+  const [integracoes, resultado] = await Promise.all([
+    integracoesParaOParceiro(ctx.cliente, ctx.alcance),
+    lerSituacaoAnalyticsDaLoja(ctx.cliente, ctx.alcance,
+      { parceiroId: ctx.parceiro.id, homologacaoDeIntegracao: ctx.parceiro.homologacaoDeIntegracao },
+      { lojaId: filtro.loja, dia: filtro.dia }),
+  ]);
   return (
     <div className="space-y-6">
       <PageHeader
@@ -29,7 +37,7 @@ export default async function ErpIntegracoesPage() {
         titulo="Integrações"
         subtitulo={`${ctx.alcance.lojas === 'todas' ? 'Rede Completa' : 'Suas lojas'} · ${integracoes.length} ${integracoes.length === 1 ? 'loja do iFood ligada' : 'lojas do iFood ligadas'}`}
       />
-      <TelaIntegracoes integracoes={integracoes} />
+      <TelaIntegracoes integracoes={integracoes} painel={<PainelSituacaoAnalytics resultado={resultado} teste={ctx.parceiro.homologacaoDeIntegracao} base="/erp/integracoes" baseFaturamento="/erp/faturamento" />} />
     </div>
   );
 }
