@@ -1804,7 +1804,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['faturamento/[lojaId]/[data]'],
     titulo: 'Faturamento do dia',
-    versao: 5,
+    versao: 7,
     // Tela de lançar no celular: os campos ficam à vista, a aula abre numa linha (como nas telas de contar).
     recolhida: true,
     aula: [
@@ -1820,6 +1820,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Quando o período do resultado é fechado, os dias dele não aceitam mais lançar, corrigir nem remover. Onde o período começa e termina fica em Períodos, na área Faturamento e DRE. Para mexer num dia fechado, peça à FlowFoods para reabrir o período: a tela já diz isso.' },
         ],
+      },
+      {
+        id: 'origem-ifood',
+        titulo: 'Origem dos valores do iFood',
+        blocos: [{ texto: 'Quando há aplicação do iFood Analytics, o selo informa quando ela entrou no faturamento. Uma atualização pendente preserva a aplicação anterior.' }],
       },
     ],
     // Decisão 519: os cards ficam fora do bloco que trava no dia só de consulta, para abrirem também para quem só vê.
@@ -1908,11 +1913,24 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['integracoes'],
     titulo: 'Integrações',
-    versao: 2,
+    versao: 4,
     aula: [
-      { texto: 'As lojas do iFood ligadas às suas lojas e o que está ativo em cada uma. Aqui só se consulta: ligar e ativar é com a FlowFoods.' },
-      { texto: 'Esperando a loja aprovar quer dizer que quem administra a loja no Portal do Parceiro do iFood precisa aprovar o app da FlowFoods, na parte de integrações e aplicativos do portal.' },
-      { texto: 'Quando a busca automática começar, as vendas do iFood das lojas com Números de venda ativo entram sozinhas no faturamento, com os dados até ontem.' },
+      { texto: 'Escolha a loja e um dia até ontem para conferir o acesso, a tentativa de leitura, a versão disponível e a aplicação no faturamento.' },
+      { texto: 'Aqui só se consulta: ligar e ativar é com a FlowFoods.' },
+      { texto: 'Acesso ativo não confirma leitura nem aplicação.' },
+      { texto: 'A faixa Ambiente de teste identifica dados de teste, que não entram no faturamento.' },
+    ],
+    secoes: [
+      {
+        id: 'acesso-e-leitura',
+        titulo: 'Acesso, datas e atualizações',
+        blocos: [
+          { texto: 'Esperando a loja aprovar quer dizer que quem administra a loja no Portal do Parceiro do iFood precisa aprovar o app da FlowFoods, na parte de integrações e aplicativos do portal.' },
+          { texto: 'As datas são mostradas separadamente, no horário de Brasília; uma espera informa o limite mínimo, sem garantir a hora da próxima tentativa.' },
+          { texto: 'Se uma atualização fica pendente, a aplicação anterior permanece identificada. Sem leitura disponível não significa que a loja não vendeu.' },
+          { texto: 'Os detalhes de aplicação não substituem os números da tela Faturamento.' },
+        ],
+      },
     ],
   },
   {

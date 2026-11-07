@@ -11,6 +11,7 @@ import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp
 import { hojeNoRio, lerData } from '@/lib/erp/compra-campos';
 import { LIMITES_DO_FATURAMENTO } from '@/lib/erp/faturamento-campos';
 import { obterDia } from '@/lib/erp/faturamento';
+import { moduloLiberado } from '@/lib/erp/liberacao';
 import { fraseDoDia } from '@/components/erp/telas/faturamento/estado';
 import { TelaDoDia } from '@/components/erp/telas/faturamento/dia';
 import { voltaParaAHome } from '@/lib/erp/volta';
@@ -30,9 +31,12 @@ export default async function ErpFaturamentoDoDiaPage(
   const dia = await obterDia(ctx.cliente, ctx.alcance, params.lojaId, data);
   if (!dia) notFound();
   const lojaId = dia.loja.id;
+  const hrefIntegracao = dia.origemAnalytics && pode(ctx.alcance, 'integracao.ver', { lojaId }) && await moduloLiberado(ctx.cliente, 'integracao')
+    ? `/erp/integracoes?loja=${encodeURIComponent(lojaId)}&dia=${data}` : undefined;
   return (
     <TelaDoDia
       dia={dia}
+      hrefIntegracao={hrefIntegracao}
       base="/erp/faturamento"
       feito={fraseDoDia(typeof searchParams.feito === 'string' ? searchParams.feito : undefined)}
       acao={acaoSalvarDia.bind(null, lojaId, data)}

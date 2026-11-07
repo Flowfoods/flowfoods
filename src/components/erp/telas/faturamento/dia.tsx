@@ -25,6 +25,7 @@ import { Voltar } from '../cadastro/partes';
 import type { AcaoDoDia } from './estado';
 import { FormDoDia, FormRemover, type CanalParaATela } from './form-dia';
 import { dataLonga, quemLancou, textoDoValor } from './formato';
+import { SeloOrigemAnalytics } from './selo-origem-analytics';
 
 export function TelaDoDia({
   dia,
@@ -36,6 +37,7 @@ export function TelaDoDia({
   verPeriodos,
   bloqueio,
   volta,
+  hrefIntegracao,
 }: {
   dia: DiaDaLojaLido;
   base: string;
@@ -52,6 +54,7 @@ export function TelaDoDia({
    * formulário, para o mês continuar oferecendo "Voltar para o início" depois de salvar. Nula = a tela de sempre.
    */
   volta?: VoltaParaAHome | null;
+  hrefIntegracao?: string;
 }) {
   const hoje = hojeNoRio();
   const mes = dia.data.slice(0, 7);
@@ -102,6 +105,7 @@ export function TelaDoDia({
           )}
         </nav>
       </PageHeader>
+      <SeloOrigemAnalytics origem={dia.origemAnalytics ?? null} hrefIntegracao={hrefIntegracao} />
       {feito && <Aviso tom="ok" titulo={feito} />}
       {bloqueio && (
         <Aviso tom="alerta" titulo="Somente leitura.">
