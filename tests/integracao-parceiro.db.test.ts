@@ -134,13 +134,13 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
 
   it('sem o módulo liberado, nem o Dono entra (volta com aviso); sem a permissão (Operador), também não', async () => {
     como(alcanceDe('DONO', 'rede'));
-    await expect(ErpIntegracoesPage()).rejects.toThrow(/REDIRECT \/erp\?sem-modulo=integracao/);
+    await expect(ErpIntegracoesPage({})).rejects.toThrow(/REDIRECT \/erp\?sem-modulo=integracao/);
     await mudarLiberacao(a, 'integracao', true, 'teste');
     como(alcanceDe('OPERADOR', [lojaA1]));
-    await expect(ErpIntegracoesPage()).rejects.toThrow('SEM_ACESSO');
+    await expect(ErpIntegracoesPage({})).rejects.toThrow('SEM_ACESSO');
     // O Gerente base não tem: só com a permissão extra (decisão 491).
     como(alcanceDe('GERENTE', [lojaA1]));
-    await expect(ErpIntegracoesPage()).rejects.toThrow('SEM_ACESSO');
+    await expect(ErpIntegracoesPage({})).rejects.toThrow('SEM_ACESSO');
   });
 
   it('liberado: o Dono vê as lojas ligadas e o estado em linguagem simples; nada técnico, nada desligado, nada do parceiro B', async () => {
@@ -159,7 +159,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
 
   it('o Gerente de uma loja (com a permissão extra) só vê a ligação da loja dele', async () => {
     como(alcanceDe('GERENTE', [lojaA1], ['integracao.ver']));
-    const pagina = await html(ErpIntegracoesPage());
+    const pagina = await html(ErpIntegracoesPage({}));
     expect(pagina).toContain(`Valentin Burger Penha ${sufixo}`);
     expect(pagina).not.toContain(`Valentin Gourmet Meier ${sufixo}`);
     expect(pagina).toContain('1 loja do iFood ligada');
@@ -252,7 +252,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Integrações do parceiro (Postgres real
     if (!r.ok) throw new Error(JSON.stringify(r));
     await mudarLiberacao(h, 'integracao', true, 'teste');
     como(alcanceDe('DONO', 'rede'), h, true);
-    const pagina = await html(ErpIntegracoesPage());
+    const pagina = await html(ErpIntegracoesPage({}));
     expect(pagina).toContain(`Teste iFood ${sufixo}`);
     expect(pagina).toContain('Loja de teste do iFood');
   });

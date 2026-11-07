@@ -17,7 +17,7 @@ import { lerSituacaoAnalyticsDaLoja } from '@/lib/integracoes/core/situacao-anal
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpIntegracoesPage(props: { searchParams?: Promise<Record<string, string | string[] | undefined>> } = {}) {
+export default async function ErpIntegracoesPage(props: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'integracao.ver');
   // Módulo não liberado: o hub diz que é a FlowFoods quem libera (não "quem cuida da equipe").
