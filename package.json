@@ -22,7 +22,8 @@
     "erp:semear-categorias": "tsx scripts/erp-semear-categorias.ts",
     "erp:classificar-insumos": "tsx scripts/erp-classificar-insumos.ts",
     "integracao:conferir": "tsx scripts/integracao-conferir.ts",
-    "integracao:ler-test": "tsx scripts/integracao-ler-test.ts"
+    "integracao:ler-test": "tsx scripts/integracao-ler-test.ts",
+    "integracao:validar-analytics-test": "tsx scripts/integracao-validar-analytics-test.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.120.0",

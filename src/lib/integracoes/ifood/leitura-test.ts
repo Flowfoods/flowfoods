@@ -16,6 +16,10 @@
  */
 
 import { lerIdDaLojaIfood, segredoCombinaComAmbiente } from '../core/campos';
+import { consultaDoDia, consultaMinima } from './analytics';
+import { diaSeguinte, ontemEmBrasilia } from './datas';
+export { consultaDoDia, consultaMinima } from './analytics';
+export { diaSeguinte, ontemEmBrasilia } from './datas';
 import type { ChamadaIfood, ResultadoIfood } from './http';
 import type { PrazoDeRetomada } from './respostas';
 
@@ -42,52 +46,6 @@ export class ErroDaLeitura extends Error {
 
 export const CAMINHO_DAS_LOJAS = '/merchant/v1.0/merchants';
 export const caminhoDosKpis = (loja: string) => `/analytics/v1.0/merchants/${loja}/orders/kpis`;
-
-const DIA = /^\d{4}-\d{2}-\d{2}$/;
-
-/** O dia seguinte (fim exclusivo do filtro), ou null se não for uma data de verdade. */
-export function diaSeguinte(dia: string): string | null {
-  if (!DIA.test(dia)) return null;
-  const d = new Date(`${dia}T00:00:00Z`);
-  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== dia) return null;
-  return new Date(d.getTime() + 86_400_000).toISOString().slice(0, 10);
-}
-
-/** "Ontem" no fuso de Brasília (o Analytics é D-1). */
-export function ontemEmBrasilia(agora: number): string {
-  const hoje = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(agora));
-  return new Date(Date.parse(`${hoje}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
-}
-
-/** O payload mínimo validado pela skill: GMV e contagem por status num dia. */
-export function consultaMinima(dia: string) {
-  return {
-    filter: { referenceDate: { gte: dia, lt: diaSeguinte(dia) } },
-    agg: { metrics: { gmv: ['sum'] }, terms: { orderStatus: ['count'] } },
-    page: 1,
-    size: 100,
-  };
-}
-
-/** A consulta diária do plano (seção 4): grupos por status, canal, modelo logístico e categoria, com os valores do faturamento. */
-export function consultaDoDia(dia: string) {
-  return {
-    filter: { referenceDate: { gte: dia, lt: diaSeguinte(dia) } },
-    agg: {
-      groupBy: { fields: ['orderStatus', 'salesChannel', 'deliveredBy', 'category'] },
-      metrics: {
-        gmv: ['sum'],
-        gmvWithoutDelivery: ['sum'],
-        netDeliveryFee: ['sum'],
-        paymentTotalValue: ['sum'],
-        benefitByTypePartnerTotalValue: ['sum'],
-        refundedTotalValue: ['sum'],
-      },
-    },
-    page: 1,
-    size: 500,
-  };
-}
 
 /** Por que este app não serve para a leitura TEST (null = serve). */
 export function porQueOAppNaoServe(app: AppDaLeitura): string | null {
