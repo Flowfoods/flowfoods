@@ -14,7 +14,10 @@ export const dynamic = 'force-dynamic';
 const BASE = '/erp/compras/fornecedores';
 const um = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? '';
 
-export default async function ErpFornecedoresPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ErpFornecedoresPage(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'compras.ver');
   const q = um(searchParams.q).slice(0, 80);

@@ -9,7 +9,11 @@ import { acaoBuscarClassificacao, acaoEditarFichaUnificada, acaoGerirClassificac
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpEditarFichaPage({ params, searchParams = {} }: { params: { id: string }; searchParams?: { de?: string | string[] } }) {
+export default async function ErpEditarFichaPage(
+  props: { params: Promise<{ id: string }>; searchParams?: Promise<{ de?: string | string[] }> }
+) {
+  const searchParams = (await props.searchParams) ?? {};
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.editar');
   const verCustos = pode(ctx.alcance, 'precos.ver');

@@ -15,7 +15,8 @@ import type { LinhaGravada } from '@/lib/erp/dre-fechamento-campos';
 import type { FotografiaLida } from '@/lib/erp/dre-fotografia';
 import type { FarolDaLinha } from '@/lib/erp/farol-dre-campos';
 
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_a: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_a: unknown, inicial: unknown) => [inicial, undefined] }));
 
 const html = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el).replace(/ /g, ' ');
 

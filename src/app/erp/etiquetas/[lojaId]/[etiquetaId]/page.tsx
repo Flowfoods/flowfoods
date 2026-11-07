@@ -12,7 +12,11 @@ import { acaoConfirmarImpressao, acaoPedirImpressao, acaoResultadoDaImpressao } 
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpEmissaoPage({ params, searchParams }: { params: { lojaId: string; etiquetaId: string }; searchParams: { feito?: string } }) {
+export default async function ErpEmissaoPage(
+  props: { params: Promise<{ lojaId: string; etiquetaId: string }>; searchParams: Promise<{ feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'etiquetas.imprimir');
   const d = await obterEmissao(ctx.cliente, ctx.alcance, params.lojaId, params.etiquetaId);

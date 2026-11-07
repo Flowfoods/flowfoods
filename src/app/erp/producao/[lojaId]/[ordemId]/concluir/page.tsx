@@ -14,13 +14,17 @@ import { acaoConcluirProducao } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpConcluirLotePage({ params, searchParams }: { params: { lojaId: string; ordemId: string }; searchParams?: { de?: string } }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'producao.registrar', { lojaId: params.lojaId });
-  const d = await obterOrdem(ctx.cliente, ctx.alcance, params.lojaId, params.ordemId, new Date(), ctx.sessao.userId);
-  if (!d) notFound();
-  const lojaId = d.loja.id;
-  if (!pendente(d.ordem.status) || ctx.bloqueio) redirect(`/erp/producao/${lojaId}/${d.ordem.id}`);
-  const veRequisicao = pode(ctx.alcance, 'requisicao.pedir', { lojaId }) || pode(ctx.alcance, 'requisicao.atender', { lojaId });
-  return <TelaConcluir d={d} base="/erp/producao" acao={acaoConcluirProducao.bind(null, lojaId, d.ordem.id)} hrefRequisicao={veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null} periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')} bloqueio={ctx.bloqueio} gerencia={pode(ctx.alcance, 'producao.planejar', { lojaId })} voltar={searchParams?.de === 'tarefas' ? 'tarefas' : undefined} />;
+export default async function ErpConcluirLotePage(
+ props: { params: Promise<{ lojaId: string; ordemId: string }>; searchParams?: Promise<{ de?: string }> }
+) {
+ const searchParams = await props.searchParams;
+ const params = await props.params;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'producao.registrar', { lojaId: params.lojaId });
+ const d = await obterOrdem(ctx.cliente, ctx.alcance, params.lojaId, params.ordemId, new Date(), ctx.sessao.userId);
+ if (!d) notFound();
+ const lojaId = d.loja.id;
+ if (!pendente(d.ordem.status) || ctx.bloqueio) redirect(`/erp/producao/${lojaId}/${d.ordem.id}`);
+ const veRequisicao = pode(ctx.alcance, 'requisicao.pedir', { lojaId }) || pode(ctx.alcance, 'requisicao.atender', { lojaId });
+ return <TelaConcluir d={d} base="/erp/producao" acao={acaoConcluirProducao.bind(null, lojaId, d.ordem.id)} hrefRequisicao={veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null} periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')} bloqueio={ctx.bloqueio} gerencia={pode(ctx.alcance, 'producao.planejar', { lojaId })} voltar={searchParams?.de === 'tarefas' ? 'tarefas' : undefined} />;
 }

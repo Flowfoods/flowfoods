@@ -7,7 +7,8 @@ import type { EstadoCadastro } from '@/components/erp/telas/cadastro/estado';
 const resposta = vi.hoisted(() => ({ estado: null as EstadoCadastro }));
 vi.mock('next/navigation', () => ({ usePathname: () => '/erp/fichas/canais', useSearchParams: () => new URLSearchParams(), redirect: (url: string) => { throw new Error(`REDIRECT:${url}`); } }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
-vi.mock('react-dom', async original => ({ ...await original<typeof import('react-dom')>(), useFormState: () => [resposta.estado, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async original => ({ ...await original<typeof import('react-dom')>(), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: () => [resposta.estado, undefined] }));
 import { FormFaixasDeCmv } from '@/components/erp/telas/fichas/form-faixas-cmv';
 import { FarolDeCmv, IntervalosDoFarol, SeloDaFaixa } from '@/components/erp/telas/fichas/farol';
 import { FiltrosDasFichas } from '@/components/erp/telas/fichas/filtros';
@@ -151,7 +152,10 @@ describe('3B: dois grupos explícitos e retorno completo', () => {
     const celular = h.slice(h.indexOf('<ul'), h.indexOf('<table'));
     expect(celular.indexOf('Corresponde:')).toBeGreaterThan(celular.indexOf('</a>'));
     const resumo = celular.slice(celular.indexOf('Corresponde:'));
-    expect(resumo).toContain('Loja:'); expect(resumo).toContain('Delivery:'); expect(resumo).toContain('iFood:');
+    expect(resumo).toMatch(/<dt[^>]*>Loja<\/dt>/); expect(resumo).toMatch(/<dt[^>]*>Delivery<\/dt>/); expect(resumo).toMatch(/<dt[^>]*>iFood<\/dt>/);
+    expect(resumo.match(/30,0%/g)).toHaveLength(3);
+    expect(resumo.match(/Meta: 25% · acima da meta · todos os canais/g)).toHaveLength(1);
+    expect(resumo.match(/Confortável · todos os canais/g)).toHaveLength(1);
     expect(resumo).not.toContain('<a ');
   });
   it.each(['/erp/fichas', '/rodolfo/erp/casa-a/fichas'])('retorno mantém os dois pares repetidos e seção nas continuações de %s', base => {

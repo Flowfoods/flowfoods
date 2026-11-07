@@ -1,12 +1,15 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * O CNPJ da loja (F.1a): o destinatário das notas fiscais de compra. Só quem cadastra lojas (rede inteira) vê o controle; o
  * servidor confere de novo (permissão, dígitos verificadores, versão lida) e guarda o antes e o depois no histórico. Em branco
  * remove. O mesmo CNPJ em duas lojas é permitido (as duas operam na mesma empresa): a frase de depois avisa.
  */
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, type EstadoForm } from '../../ui/campos';
 
@@ -22,7 +25,7 @@ export function FormCnpj({
   /** O CNPJ como está gravado (só dígitos) ou vazio; formatado na tela. */
   cnpj: string;
 }) {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acao, null);
   const id = `cnpj-${lojaId}`;
   const formatado = cnpj.length === 14 ? cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : cnpj;
   return (
@@ -30,7 +33,7 @@ export function FormCnpj({
       <summary className="inline-flex min-h-9 cursor-pointer list-none items-center text-suave underline decoration-linha-forte underline-offset-4 hover:text-texto [@media(pointer:coarse)]:min-h-11">
         CNPJ da loja
       </summary>
-      <form action={enviar} noValidate className="mt-2 space-y-2 rounded-[10px] border border-linha bg-campo p-3">
+      <FormularioComAcao action={enviar} noValidate className="mt-2 space-y-2 rounded-[10px] border border-linha bg-campo p-3">
         <input type="hidden" name="lido" value={cnpj} />
         <label htmlFor={id} className="block text-[12px] text-suave">
           CNPJ de {nome} (destinatário das notas fiscais)
@@ -60,7 +63,7 @@ export function FormCnpj({
             {estado && !estado.ok && estado.erros?.geral && <span className="text-erro">{estado.erros.geral}</span>}
           </p>
         </div>
-      </form>
+      </FormularioComAcao>
     </details>
   );
 }

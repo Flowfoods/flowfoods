@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
+
 import type { AcaoConfiguracao, EstadoConfiguracao } from '@/lib/erp/canal-config-campos';
 import { useAvisoDeSaida } from '../cadastro/erros';
 
@@ -9,7 +9,7 @@ import { useAvisoDeSaida } from '../cadastro/erros';
 export function useConfiguracaoConfirmada(acao: AcaoConfiguracao, versao: string, inicial: Record<string, string>) {
   const [origem, setOrigem] = useState(() => ({ versao, campos: inicial, baseCampos: inicial }));
   const [pendente, setPendente] = useState(false);
-  const [estado, enviar] = useFormState<EstadoConfiguracao, FormData>(async (anterior, form) => {
+  const [estado, enviar] = useActionState<EstadoConfiguracao, FormData>(async (anterior, form) => {
     setPendente(true);
     try {
       const resposta = await acao(anterior, form);

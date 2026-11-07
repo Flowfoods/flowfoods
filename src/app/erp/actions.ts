@@ -86,7 +86,7 @@ export async function acaoOpcoesDeAtivarRosto() {
 export async function acaoConfirmarRosto(resposta: RegistrationResponseJSON) {
   const pessoa = await exigirPessoa();
   if (!resposta || typeof resposta !== 'object') return { ok: false as const, erro: 'Resposta inválida do aparelho.' };
-  const r = await concluirRegistroDeRosto(pessoa, resposta, aparelhoAtual());
+  const r = await concluirRegistroDeRosto(pessoa, resposta, await aparelhoAtual());
   if (r.ok) revalidatePath('/erp/acesso');
   return r;
 }
@@ -136,7 +136,7 @@ export async function acaoEscolherVisao(valor: string): Promise<RespostaDaVisao>
   const ctx = await exigirParceiroDaSessao();
   const { lojas } = await visaoDaRequisicao(ctx);
   if (!escolhaPermitida(ctx.alcance, lojas, valor)) return { ok: false, mensagem: 'Essa loja não está no seu acesso.' };
-  cookies().set(COOKIE_VISAO, valorDoCookieDeVisao(ctx.parceiro.id, valor), {
+  (await cookies()).set(COOKIE_VISAO, valorDoCookieDeVisao(ctx.parceiro.id, valor), {
     path: '/',
     sameSite: 'lax',
     httpOnly: true,
@@ -157,7 +157,7 @@ export async function acaoEscolherVisao(valor: string): Promise<RespostaDaVisao>
 
 /** "Não mostrar novamente" do card da tela: fecha ESTA caixa nesta versão do texto. */
 export async function acaoAjudaFechar(form: FormData): Promise<void> {
-  await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'fechar', caixa: String(form.get('caixa') ?? '') });
+  await gravarPreferenciaDeAjuda(await tokenDoCookie(), { tipo: 'fechar', caixa: String(form.get('caixa') ?? '') });
   revalidatePath('/erp', 'layout');
 }
 
@@ -165,7 +165,7 @@ export async function acaoAjudaFechar(form: FormData): Promise<void> {
 export async function acaoAjudaDicas(form: FormData): Promise<void> {
   const v = String(form.get('dicas') ?? '');
   if (v === 'manter' || v === 'ligar' || v === 'desligar') {
-    await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'dicas', ligadas: v !== 'desligar' });
+    await gravarPreferenciaDeAjuda(await tokenDoCookie(), { tipo: 'dicas', ligadas: v !== 'desligar' });
   }
   revalidatePath('/erp', 'layout');
 }
@@ -176,21 +176,21 @@ export async function acaoAjudaDicas(form: FormData): Promise<void> {
  * a próxima navegação já lê a preferência nova junto com a sessão.
  */
 export async function acaoAjudaPontoVisto(ponto: string): Promise<void> {
-  await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'ponto-visto', ponto: String(ponto ?? '') });
+  await gravarPreferenciaDeAjuda(await tokenDoCookie(), { tipo: 'ponto-visto', ponto: String(ponto ?? '') });
 }
 
 /** Sequência guiada que começou sozinha (decisão 479): todos os passos dela numa chamada só. */
 export async function acaoAjudaPontosVistos(pontos: string[]): Promise<void> {
-  await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'pontos-vistos', pontos: Array.isArray(pontos) ? pontos.map((p) => String(p ?? '')) : [] });
+  await gravarPreferenciaDeAjuda(await tokenDoCookie(), { tipo: 'pontos-vistos', pontos: Array.isArray(pontos) ? pontos.map((p) => String(p ?? '')) : [] });
 }
 
 /** Ponto de ajuda: "Não mostrar novamente" (só corta a abertura automática; o botão do campo continua). */
 export async function acaoAjudaPontoNunca(form: FormData): Promise<void> {
-  await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'ponto-nunca', ponto: String(form.get('ponto') ?? '') });
+  await gravarPreferenciaDeAjuda(await tokenDoCookie(), { tipo: 'ponto-nunca', ponto: String(form.get('ponto') ?? '') });
 }
 
 /** "Mostrar de novo as que fechei": zera a lista. */
 export async function acaoAjudaReabrir(): Promise<void> {
-  await gravarPreferenciaDeAjuda(tokenDoCookie(), { tipo: 'reabrir' });
+  await gravarPreferenciaDeAjuda(await tokenDoCookie(), { tipo: 'reabrir' });
   revalidatePath('/erp', 'layout');
 }

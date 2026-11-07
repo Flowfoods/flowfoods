@@ -48,7 +48,8 @@ vi.mock('@/lib/erp/contexto', async () => {
   };
 });
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
@@ -101,8 +102,8 @@ describe.skipIf(!URL_TESTE)('ERP I.2a · telas do CMV por categoria e das metas 
     }
     return x;
   };
-  const painel = async (query: Record<string, string> = {}) => sp(renderToStaticMarkup(await resolver(await ErpCmvPorCategoriaPage({ searchParams: query }))));
-  const metas = async (query: Record<string, string> = {}) => sp(renderToStaticMarkup(await resolver(await ErpMetasPorCategoriaPage({ searchParams: query }))));
+  const painel = async (query: Record<string, string> = {}) => sp(renderToStaticMarkup(await resolver(await ErpCmvPorCategoriaPage({ searchParams: Promise.resolve(query) }))));
+  const metas = async (query: Record<string, string> = {}) => sp(renderToStaticMarkup(await resolver(await ErpMetasPorCategoriaPage({ searchParams: Promise.resolve(query) }))));
 
   beforeAll(async () => {
     const host = new URL(URL_TESTE!).hostname;
@@ -199,12 +200,12 @@ describe.skipIf(!URL_TESTE)('ERP I.2a · telas do CMV por categoria e das metas 
 
   it('comprador (sem `dre.ver`) e operador não abrem o painel nem as metas; o gerente não abre as metas (exigem a rede inteira)', async () => {
     como(propria(['compras.ver', 'compras.lancar', 'lojas.ver'], 'rede'));
-    expect(await rodar(() => ErpCmvPorCategoriaPage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
-    expect(await rodar(() => ErpMetasPorCategoriaPage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpCmvPorCategoriaPage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpMetasPorCategoriaPage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     como(alcanceDe('OPERADOR', [ids.vp]), { tipo: 'loja', lojaId: ids.vp });
-    expect(await rodar(() => ErpCmvPorCategoriaPage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpCmvPorCategoriaPage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     como(alcanceDe('GERENTE', [ids.vp]), { tipo: 'loja', lojaId: ids.vp });
-    expect(await rodar(() => ErpMetasPorCategoriaPage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpMetasPorCategoriaPage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     // Quem só tem `dre.ver` vê o painel mas não ganha o convite para as metas.
     como(propria(['dre.ver', 'lojas.ver'], 'rede'));
     const h = await painel({ rede: '1', periodo: '2026-10-10' });
@@ -239,7 +240,7 @@ describe.skipIf(!URL_TESTE)('ERP I.2a · telas do CMV por categoria e das metas 
     expect(h).toContain('name="segue"');
     expect(h).toContain(`name="usa_${cat.PROTEINA}"`);
     expect(h).not.toContain('name="total"');
-    expect(await rodar(async () => resolver(await ErpMetasPorCategoriaPage({ searchParams: { loja: 'nao-existe' } })))).toEqual({ erro: 'NOT_FOUND' });
+    expect(await rodar(async () => resolver(await ErpMetasPorCategoriaPage({ searchParams: Promise.resolve({ loja: 'nao-existe' }) })))).toEqual({ erro: 'NOT_FOUND' });
   });
 
   it('salvar pela action: a dona grava (e o aviso de soma vem na frase), o gerente e o operador são recusados e nada é gravado', async () => {

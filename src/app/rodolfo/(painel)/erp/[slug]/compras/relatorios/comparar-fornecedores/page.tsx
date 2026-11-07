@@ -8,9 +8,13 @@ import { PaginaDosFornecedores } from '@/components/erp/telas/compras/comparacao
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroComparacaoDeFornecedoresPage({ params, searchParams }: { params: { slug: string }; searchParams: Record<string, string | string[] | undefined> }) {
-  const ctx = await exigirParceiro(params.slug);
-  exigirPermissao(ctx, 'compras.ver');
-  const raiz = `/rodolfo/erp/${ctx.parceiro.slug}`;
-  return <PaginaDosFornecedores ctx={ctx} caminho={`${raiz}/compras/relatorios/comparar-fornecedores`} comprasBase={`${raiz}/compras`} insumosBase={`${raiz}/insumos`} searchParams={searchParams} />;
+export default async function ParceiroComparacaoDeFornecedoresPage(
+ props: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+ const searchParams = await props.searchParams;
+ const params = await props.params;
+ const ctx = await exigirParceiro(params.slug);
+ exigirPermissao(ctx, 'compras.ver');
+ const raiz = `/rodolfo/erp/${ctx.parceiro.slug}`;
+ return <PaginaDosFornecedores ctx={ctx} caminho={`${raiz}/compras/relatorios/comparar-fornecedores`} comprasBase={`${raiz}/compras`} insumosBase={`${raiz}/insumos`} searchParams={searchParams} />;
 }

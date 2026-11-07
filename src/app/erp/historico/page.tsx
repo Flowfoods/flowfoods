@@ -11,7 +11,8 @@ import { entidadeDoFiltro, entidadesDoFiltro, LIMITE_DO_HISTORICO, TelaHistorico
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpHistoricoPage({ searchParams }: { searchParams: { entidade?: string } }) {
+export default async function ErpHistoricoPage(props: { searchParams: Promise<{ entidade?: string }> }) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'historico.ver');
   const verFaturamento = pode(ctx.alcance, 'faturamento.ver');

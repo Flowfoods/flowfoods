@@ -22,7 +22,8 @@ const atual = vi.hoisted(() => ({
 }));
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
 // O react-dom estável do vitest não traz os ganchos de formulário do Next: o estado inicial basta para ler o HTML.
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
     throw Object.assign(new Error(`REDIRECT ${url}`), { url });
@@ -116,7 +117,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
   const props = async (el: unknown) => (await resolver(el)).props as Record<string, any>;
   /** A página do período devolve a trilha e a tela lado a lado: as props da tela. */
   const propsDaTela = async (el: unknown) => {
-    const filhos = (await resolver(el)).props.children as ReactElement | ReactElement[];
+    const filhos = ((await resolver(el)).props as { children: ReactElement | ReactElement[] }).children;
     return (Array.isArray(filhos) ? filhos[filhos.length - 1] : filhos).props as Record<string, any>;
   };
   const json = (x: unknown) => JSON.stringify(x, (_k, v) => (typeof v === 'bigint' ? v.toString() : isValidElement(v) ? { tipo: typeof v.type === 'string' ? v.type : (v.type as { name?: string }).name, ...(v.props as object) } : v));
@@ -229,7 +230,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     // Setembro com as ressalvas: sem marcar, a frase; marcando, fecha e volta à página do período.
     expect(await rodar(() => dreDaSessao.acaoFecharPeriodo('2026-09-01', null, form({})))).toMatchObject({ ok: false, erros: { geral: expect.stringContaining('Marque cada uma') } });
     const f = new FormData();
-    const s = await propsDaTela(await ErpPeriodoPage({ params: { inicio: '2026-09-01' }, searchParams: {} }));
+    const s = await propsDaTela(await ErpPeriodoPage({ params: Promise.resolve({ inicio: '2026-09-01' }), searchParams: Promise.resolve({}) }));
     const condicoes = s.s.condicoes as { ressalvas: { id: string }[]; impressao: string };
     expect(condicoes.ressalvas).toHaveLength(3);
     for (const r of condicoes.ressalvas) f.append('ressalva', r.id);
@@ -259,7 +260,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     expect((await avisoDePeriodos(b, dona, '/erp', HOJE)).fechados).toEqual([]);
 
     // As que repetem todo mês, em setembro (fechado): sem lista, sem botão; o aviso com a saída e o caminho para o mês de agora.
-    const recorrentes = nbsp(renderToStaticMarkup(await resolver(await ErpNovaDespesaPage({ searchParams: { modo: 'mes-passado', mes: '2026-09' } }))));
+    const recorrentes = nbsp(renderToStaticMarkup(await resolver(await ErpNovaDespesaPage({ searchParams: Promise.resolve({ modo: 'mes-passado', mes: '2026-09' }) }))));
     expect(recorrentes).toContain('O período Setembro de 2026 já foi fechado no DRE.');
     expect(recorrentes).toContain('peça à FlowFoods para reabrir o período');
     expect(recorrentes).toContain('Outubro de 2026, o período em aberto');
@@ -268,7 +269,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     expect(recorrentes).toContain('Lançar as deste mês');
 
     // O dia de faturamento num período fechado avisa no topo, com a saída.
-    const dia = nbsp(renderToStaticMarkup(await resolver(await ErpFaturamentoDoDiaPage({ params: { lojaId: ids.vp, data: '2026-09-12' }, searchParams: {} }))));
+    const dia = nbsp(renderToStaticMarkup(await resolver(await ErpFaturamentoDoDiaPage({ params: Promise.resolve({ lojaId: ids.vp, data: '2026-09-12' }), searchParams: Promise.resolve({}) }))));
     expect(dia).toContain('O período Setembro de 2026 já foi fechado no DRE.');
     expect(dia).toContain('Para mexer em Setembro de 2026, peça à FlowFoods para reabrir o período.');
     expect(dia).toContain('Este dia só pode ser consultado');
@@ -278,24 +279,24 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     // Quem lança faturamento mas não abre Períodos (gerente da loja sem dre.ver): o aviso sem o link.
     como(alcanceDe('OPERADOR', [ids.vp], ['faturamento.ver', 'faturamento.lancar']), 'Caio');
     atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
-    const semLink = nbsp(renderToStaticMarkup(await resolver(await ErpFaturamentoDoDiaPage({ params: { lojaId: ids.vp, data: '2026-09-12' }, searchParams: {} }))));
+    const semLink = nbsp(renderToStaticMarkup(await resolver(await ErpFaturamentoDoDiaPage({ params: Promise.resolve({ lojaId: ids.vp, data: '2026-09-12' }), searchParams: Promise.resolve({}) }))));
     expect(semLink).toContain('peça à FlowFoods para reabrir o período');
     expect(semLink).not.toContain('Ver os períodos');
   });
 
   it('a página do período: 404 para início forjado, SEM_ACESSO para quem não fecha; a dona não tem o formulário de reabrir e o nível 1 tem', async () => {
     como(alcanceDe('DONO', 'rede'), 'Marina');
-    for (const inicio of ['2026-09-15', '2027-01-01', 'lixo', '2019-01-01']) expect(await rodar(() => ErpPeriodoPage({ params: { inicio }, searchParams: {} }).then(resolver)), inicio).toEqual({ erro: 'NOT_FOUND' });
+    for (const inicio of ['2026-09-15', '2027-01-01', 'lixo', '2019-01-01']) expect(await rodar(() => ErpPeriodoPage({ params: Promise.resolve({ inicio }), searchParams: Promise.resolve({}) }).then(resolver)), inicio).toEqual({ erro: 'NOT_FOUND' });
     for (const al of [alcanceDe('GERENTE', 'rede'), alcanceDe('GERENTE', [ids.vp]), alcanceDe('OPERADOR', [ids.vp])]) {
       como(al, 'Fulano');
-      expect(await rodar(() => ErpPeriodoPage({ params: { inicio: '2026-09-01' }, searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+      expect(await rodar(() => ErpPeriodoPage({ params: Promise.resolve({ inicio: '2026-09-01' }), searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     }
     como(alcanceDe('DONO', 'rede'), 'Marina');
-    const dona = await propsDaTela(await ErpPeriodoPage({ params: { inicio: '2026-09-01' }, searchParams: {} }));
+    const dona = await propsDaTela(await ErpPeriodoPage({ params: Promise.resolve({ inicio: '2026-09-01' }), searchParams: Promise.resolve({}) }));
     expect(dona.acoes.reabrir).toBeUndefined();
     expect(dona.s.fotografia).toMatchObject({ versao: 1, ressalvas: expect.any(Array) });
     atual.ctx = () => ({ parceiro: A, alcance: ALCANCE_FLOWFOODS, cliente: a, bloqueio: null, podeEscrever: true, sessao: { userId: 'rodolfo', autorNome: 'Rodolfo' } });
-    const n1 = await propsDaTela(await NivelUmPeriodoPage({ params: { slug: A.slug, inicio: '2026-09-01' }, searchParams: {} }));
+    const n1 = await propsDaTela(await NivelUmPeriodoPage({ params: Promise.resolve({ slug: A.slug, inicio: '2026-09-01' }), searchParams: Promise.resolve({}) }));
     expect(n1.acoes.reabrir).toBeTypeOf('function');
     expect(n1.raiz).toBe(`/rodolfo/erp/${A.slug}`);
     // A porta do parceiro não tem action de reabrir.
@@ -308,7 +309,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     como(alcanceDe('GERENTE', [ids.vp]), 'Gil Gerente');
     atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
     atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }];
-    const pagina = await props(await ErpDrePage({ searchParams: { periodo: '2026-09-01' } }));
+    const pagina = await props(await ErpDrePage({ searchParams: Promise.resolve({ periodo: '2026-09-01' }) }));
     expect(pagina.d.status).toBe('FECHADO');
     expect(pagina.d.escopo).toMatchObject({ tipo: 'loja', lojaId: ids.vp });
     expect(pagina.d.porLoja).toBeNull();
@@ -322,24 +323,24 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     expect(html.match(PROIBIDO)?.[0] ?? null).toBeNull();
     // Forjar ?rede=1 ou ?loja= da outra loja cai na loja dele, também no fechado.
     for (const q of [{ rede: '1' }, { loja: ids.mei }]) {
-      const f = await props(await ErpDrePage({ searchParams: { periodo: '2026-09-01', ...q } }));
+      const f = await props(await ErpDrePage({ searchParams: Promise.resolve({ periodo: '2026-09-01', ...q }) }));
       expect(f.d.escopo).toMatchObject({ tipo: 'loja', lojaId: ids.vp });
       expect(json(f).match(PROIBIDO)?.[0] ?? null).toBeNull();
     }
     // O gerente não abre o fechamento nem as metas.
-    expect(await rodar(() => ErpPeriodoPage({ params: { inicio: '2026-09-01' }, searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpPeriodoPage({ params: Promise.resolve({ inicio: '2026-09-01' }), searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     // A dona vê tudo (controle positivo: o filtro é do gerente, não da tela).
     como(alcanceDe('DONO', 'rede'), 'Marina');
     atual.visao = { tipo: 'rede' };
     atual.lojas = [{ id: ids.vp, nome: 'Vila da Penha', ativa: true }, { id: ids.mei, nome: 'Loja Meier', ativa: true }];
-    const dona = await props(await ErpDrePage({ searchParams: { periodo: '2026-09-01' } }));
+    const dona = await props(await ErpDrePage({ searchParams: Promise.resolve({ periodo: '2026-09-01' }) }));
     expect(dona.d.fechamento).toMatchObject({ totalDeRessalvas: 3, justificativa: expect.stringContaining('planilha do contador') });
     const htmlDona = nbsp(renderToStaticMarkup(createElement(TelaDoDre, { d: dona.d as never, base: '/erp/dre', raiz: '/erp', pode: dona.pode as never, bloqueio: null })));
     for (const t of ['Loja Meier', 'Gás do Meier', 'Anuidade do contador', 'Internet da Penha', 'planilha do contador', 'Fechado com ressalvas', 'Por loja']) expect(htmlDona, t).toContain(t);
     expect(htmlDona).toContain('R$ 10.777,80'); // 3.000,00 + 7.777,80
     // Operador: nada.
     como(alcanceDe('OPERADOR', [ids.vp]), 'Caio');
-    expect(await rodar(() => ErpDrePage({ searchParams: { periodo: '2026-09-01' } }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpDrePage({ searchParams: Promise.resolve({ periodo: '2026-09-01' }) }))).toEqual({ erro: 'SEM_ACESSO' });
   });
 
   it('o DRE fechado mostra o período como fechado, com a versão e quem fechou, e o ao vivo de outubro não herda nada dele', async () => {
@@ -410,12 +411,12 @@ describe.skipIf(!URL_TESTE)('ERP 2.2b · telas e actions de metas e fechamento (
     const PROIBIDO = /Fechou|Reabriu|Meta do DRE|Fechamento do período|Fotografia do fechamento|Nota de agosto que ficou de fora|"PeriodoApuracao"|"DreMeta"/;
     como(alcanceDe('OPERADOR', 'rede', ['historico.ver']), 'Hugo');
     for (const q of [{}, { entidade: 'Despesa' }, { entidade: 'PeriodoApuracao' }, { entidade: 'DreMeta' }]) {
-      const pagina = await ErpHistoricoPage({ searchParams: q });
+      const pagina = await ErpHistoricoPage({ searchParams: Promise.resolve(q) });
       expect(json(pagina).match(PROIBIDO)?.[0] ?? null, JSON.stringify(q)).toBeNull();
       expect(nbsp(renderToStaticMarkup(createElement(() => pagina as never))).match(PROIBIDO)?.[0] ?? null, JSON.stringify(q)).toBeNull();
     }
     como(alcanceDe('OPERADOR', 'rede', ['historico.ver', 'dre.ver']), 'Helena');
-    const comAcesso = await ErpHistoricoPage({ searchParams: { entidade: 'Despesa' } });
+    const comAcesso = await ErpHistoricoPage({ searchParams: Promise.resolve({ entidade: 'Despesa' }) });
     const htmlOk = nbsp(renderToStaticMarkup(createElement(() => comAcesso as never)));
     expect(htmlOk).toMatch(/Reabriu|Fechou/);
     expect(htmlOk).toContain('Nota de agosto que ficou de fora');

@@ -10,7 +10,11 @@ import { acaoCadastrarInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroNovoInsumoPage({ params, searchParams }: { params: { slug: string }; searchParams: { nome?: string; tipo?: string; unidade?: string; volta?: string; de?: string } }) {
+export default async function ParceiroNovoInsumoPage(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ nome?: string; tipo?: string; unidade?: string; volta?: string; de?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.editar');
   const categorias = await categoriasDoFormulario(ctx.cliente);

@@ -11,7 +11,8 @@ import { FormSenha } from './form-senha';
 
 export const dynamic = 'force-dynamic';
 
-export default async function PrimeiroAcessoPage({ params }: { params: { token: string } }) {
+export default async function PrimeiroAcessoPage(props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const link = await consultarLink(params.token);
   const primeiroNome = link.valido ? link.nome.split(' ')[0] : '';
 

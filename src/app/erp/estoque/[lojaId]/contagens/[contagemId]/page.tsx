@@ -15,7 +15,11 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/estoque';
 
-export default async function ErpContagemDoDiaPage({ params, searchParams }: { params: { lojaId: string; contagemId: string }; searchParams: { feito?: string } }) {
+export default async function ErpContagemDoDiaPage(
+  props: { params: Promise<{ lojaId: string; contagemId: string }>; searchParams: Promise<{ feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'estoque.contar');
   const c = await obterContagem(ctx.cliente, ctx.alcance, params.lojaId, params.contagemId);

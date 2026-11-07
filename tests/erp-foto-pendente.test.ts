@@ -177,14 +177,14 @@ describe('3C · prévia protegida de foto pendente', () => {
   });
 
   it('N1 resolve o slug novamente e usa apenas o parceiro autorizado', async () => {
-    const primeiro = await fotoN1(pedido(token), { params: { slug: 'casa-a' } });
+    const primeiro = await fotoN1(pedido(token), { params: Promise.resolve({ slug: 'casa-a' }) });
     expect(primeiro.status).toBe(200);
     expect(new Uint8Array(await primeiro.arrayBuffer())).toEqual(PNG_LIMPO);
     expect(parceiroDoNivel1OuNada).toHaveBeenLastCalledWith('casa-a');
-    expect((await fotoN1(pedido(token, '&parceiroId=parceiro-a'), { params: { slug: 'casa-b' } })).status).toBe(404);
+    expect((await fotoN1(pedido(token, '&parceiroId=parceiro-a'), { params: Promise.resolve({ slug: 'casa-b' }) })).status).toBe(404);
     expect(parceiroDoNivel1OuNada).toHaveBeenLastCalledWith('casa-b');
     delete atual.n1['casa-a'];
-    expect((await fotoN1(pedido(token), { params: { slug: 'casa-a' } })).status).toBe(401);
+    expect((await fotoN1(pedido(token), { params: Promise.resolve({ slug: 'casa-a' }) })).status).toBe(401);
     expect(parceiroDoNivel1OuNada).toHaveBeenCalledTimes(3);
   });
 });

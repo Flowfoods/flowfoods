@@ -20,7 +20,8 @@ const URL_TESTE = process.env.ERP_DB_TESTE;
 const atual = vi.hoisted(() => ({ userId: '' }));
 
 vi.mock('next/cache', () => ({ revalidatePath: () => {} }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
     throw Object.assign(new Error(`REDIRECT ${url}`), { url });
@@ -264,12 +265,12 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     expect((await rodar(acoes.acaoPrepararModulo(H.slug, c, null, form({ appModulo: `${appTeste}|ANALYTICS` })))).feito).toBe('ja-preparado');
     const m = (await h.integracaoConexaoModulo.findFirstOrThrow({ where: { conexaoId: c } })).id;
 
-    let pagina = await html(ParceiroPage({ params: { slug: H.slug }, searchParams: { feito: 'preparou' } }));
+    let pagina = await html(ParceiroPage({ params: Promise.resolve({ slug: H.slug }), searchParams: Promise.resolve({ feito: 'preparou' }) }));
     expect(pagina).toContain('Módulo preparado.');
     expect(pagina).toContain('Marcar como autorizado');
     expect(pagina).not.toContain('Registrar pedido de acesso');
     expect(pagina).toContain('Todos os módulos dos apps cadastrados já estão preparados nesta loja.');
-    expect(await html(ParceiroPage({ params: { slug: H.slug }, searchParams: { feito: '<script>' } }))).not.toContain('&lt;script&gt;');
+    expect(await html(ParceiroPage({ params: Promise.resolve({ slug: H.slug }), searchParams: Promise.resolve({ feito: '<script>' }) }))).not.toContain('&lt;script&gt;');
 
     const forjada = await rodar(acoes.acaoMudarModulo(H.slug, m, null, form({ acao: 'erro-permissao' })));
     expect(forjada.estado?.erros?.geral).toBe('Ação desconhecida.');
@@ -279,7 +280,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     // A mesma ação de novo (dois cliques): recusada com a frase, sem estourar.
     expect((await rodar(acoes.acaoMudarModulo(H.slug, m, null, form({ acao: 'ativar' })))).estado?.erros?.geral).toMatch(/não dá para ativar agora/);
 
-    pagina = await html(ParceiroPage({ params: { slug: H.slug } }));
+    pagina = await html(ParceiroPage({ params: Promise.resolve({ slug: H.slug }) }));
     expect(pagina).toContain('Pausar');
     expect(pagina).toContain('Ambiente de teste');
     const hist = await h.historicoAlteracao.findMany({ where: { entidade: 'IntegracaoConexaoModulo', entidadeId: m }, orderBy: { ocorridoEm: 'asc' } });
@@ -294,14 +295,14 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     expect((await rodar(acoes.acaoMudarModulo(A.slug, m, null, form({ acao: 'autorizar' })))).estado?.erros?.geral).toMatch(/Portal do Parceiro/);
     expect((await rodar(acoes.acaoMudarModulo(A.slug, m, null, form({ acao: 'solicitar' })))).feito).toBe('solicitar');
     expect((await rodar(acoes.acaoMudarModulo(A.slug, m, null, form({ acao: 'autorizar' })))).feito).toBe('autorizar');
-    let pagina = await html(ParceiroPage({ params: { slug: A.slug } }));
+    let pagina = await html(ParceiroPage({ params: Promise.resolve({ slug: A.slug }) }));
     expect(pagina).toContain('só ativa depois que o iFood homologar o app');
     expect(pagina).not.toMatch(/>Ativar</);
     expect((await rodar(acoes.acaoMudarModulo(A.slug, m, null, form({ acao: 'ativar' })))).estado?.erros?.geral).toMatch(/homologado pelo iFood/);
     expect((await a.integracaoConexaoModulo.findUniqueOrThrow({ where: { id: m } })).estado).toBe('AUTORIZADO');
     // O serviço registra o 403 (não é ação de tela); a tela oferece só o novo pedido de acesso.
     expect((await mudarModulo(a, m, 'erro-permissao', 'serviço', { erro: '403 do iFood: a loja não autorizou o app' })).ok).toBe(true);
-    pagina = await html(ParceiroPage({ params: { slug: A.slug } }));
+    pagina = await html(ParceiroPage({ params: Promise.resolve({ slug: A.slug }) }));
     expect(pagina).toContain('403 do iFood: a loja não autorizou o app');
     expect(pagina).toContain('Registrar pedido de acesso');
     expect(pagina).not.toContain('Marcar como autorizado');
@@ -327,7 +328,7 @@ describe.skipIf(!URL_TESTE)('INT-1.8 · Central de Integrações do nível 1 (Po
     const s = doParceiro(S.id, db);
     const conexao = await s.integracaoConexao.findFirstOrThrow();
     const modulo = await s.integracaoConexaoModulo.findFirstOrThrow();
-    const pagina = await html(ParceiroPage({ params: { slug: S.slug } }));
+    const pagina = await html(ParceiroPage({ params: Promise.resolve({ slug: S.slug }) }));
     expect(pagina).toContain('Só leitura');
     expect(pagina).toContain('reative o parceiro em Parceiros Flow');
     expect(pagina).toContain('Loja suspensa no iFood');

@@ -7,7 +7,8 @@ import { acaoSalvarRegraDoPeriodo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroPeriodosPage({ params }: { params: { slug: string } }) {
+export default async function ParceiroPeriodosPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'dre.ver');
   const { visao } = await visaoDaRequisicao(ctx);

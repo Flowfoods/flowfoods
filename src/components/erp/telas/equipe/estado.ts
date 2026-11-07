@@ -1,6 +1,6 @@
 /**
  * Estado que as actions de equipe (nível 1 em /rodolfo/erp/<slug>/equipe e a
- * pessoa do parceiro em /erp/equipe) devolvem para `useFormState`. O link de
+ * pessoa do parceiro em /erp/equipe) devolvem para `useActionState`. O link de
  * senha aparece UMA vez, aqui: o banco guarda só o hash.
  */
 export type EstadoEquipe = {

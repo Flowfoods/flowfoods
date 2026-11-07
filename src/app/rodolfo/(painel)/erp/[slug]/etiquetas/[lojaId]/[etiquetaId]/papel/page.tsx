@@ -8,7 +8,11 @@ import { acaoConfirmarImpressao } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroPapelDaEtiquetaPage({ params, searchParams }: { params: { slug: string; lojaId: string; etiquetaId: string }; searchParams: { pedido?: string } }) {
+export default async function ParceiroPapelDaEtiquetaPage(
+  props: { params: Promise<{ slug: string; lojaId: string; etiquetaId: string }>; searchParams: Promise<{ pedido?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'etiquetas.imprimir');
   const d = await papelDoPedido(ctx.cliente, ctx.alcance, params.lojaId, params.etiquetaId, searchParams.pedido);

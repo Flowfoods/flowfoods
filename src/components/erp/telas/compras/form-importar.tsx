@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Importar o XML da nota (F.1b): um arquivo só. "Lendo…" enquanto o servidor confere; erro com a frase no lugar, sem perder nada
  * (a pessoa só escolhe outro arquivo). O limite de tamanho é conferido aqui antes de enviar (o servidor confere de novo, antes de
@@ -7,8 +9,8 @@
  */
 
 import Link from 'next/link';
-import { useRef, useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { useRef, useState, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { LIMITES_DO_XML } from '@/lib/erp/nfe-limites';
 import { AJUDA, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao, LINK_DE_TEXTO } from '../../ui/estilos';
@@ -27,14 +29,14 @@ function Ler({ desabilitado }: { desabilitado: boolean }) {
 const kb = (bytes: number) => Math.ceil(bytes / 1000).toLocaleString('pt-BR');
 
 export function FormImportarXml({ acao, base, bloqueio }: { acao: AcaoDeDocumento; base: string; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoDocumento, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoDocumento, FormData>(acao, null);
   const [nome, setNome] = useState<string | null>(null);
   const [grande, setGrande] = useState<string | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
   const erroDoServidor = estado?.erros.arquivo ?? estado?.erros.geral;
   const erro = grande ?? erroDoServidor;
   return (
-    <form action={enviar} noValidate className="space-y-4">
+    <FormularioComAcao action={enviar} noValidate className="space-y-4">
       <fieldset disabled={!!bloqueio} className="min-w-0 space-y-4">
         <Painel titulo="O arquivo da nota">
           <label htmlFor="importar-arquivo" className={ROTULO}>
@@ -76,6 +78,6 @@ export function FormImportarXml({ acao, base, bloqueio }: { acao: AcaoDeDocument
         <Ler desabilitado={!!bloqueio || !!grande} />
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
-    </form>
+    </FormularioComAcao>
   );
 }

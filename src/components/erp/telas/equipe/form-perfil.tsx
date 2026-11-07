@@ -1,13 +1,20 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Perfil próprio do parceiro: nasce copiando um perfil pronto (dono, gerente,
  * operador) e o dono marca/desmarca o que esse perfil pode fazer. Pode dizer
  * para quais setores ele foi pensado (vira sugestão no cadastro da pessoa).
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+/**
+ * Perfil próprio do parceiro: nasce copiando um perfil pronto (dono, gerente,
+ * operador) e o dono marca/desmarca o que esse perfil pode fazer. Pode dizer
+ * para quais setores ele foi pensado (vira sugestão no cadastro da pessoa).
+ */
+import { useEffect, useRef, useState, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { LISTA_DE_SETORES, ORDEM_DOS_PERFIS_BASE, PERFIS_BASE, SETORES, type PerfilBase } from '@/lib/erp/permissoes';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro, ROTULO, Resultado } from '../../ui/campos';
@@ -57,8 +64,8 @@ export function FormPerfil({
   const podeDar = new Set(concediveis);
   const partida = (b: PerfilBase) => PERFIS_BASE[b].permissoes.filter((p) => podeDar.has(p));
   const vazio: ValoresDoPerfil = { nome: '', base: 'OPERADOR', permissoes: partida('OPERADOR'), setores: [] };
-  const [estado, enviar] = useFormState<EstadoEquipe, FormData>(acao, null);
-  const [saiu, pedirExcluir] = useFormState<EstadoEquipe, FormData>(excluir ?? sem, null);
+  const [estado, enviar] = useActionState<EstadoEquipe, FormData>(acao, null);
+  const [saiu, pedirExcluir] = useActionState<EstadoEquipe, FormData>(excluir ?? sem, null);
   const [v, setV] = useState<ValoresDoPerfil>(inicial ?? vazio);
   const [chave, setChave] = useState(0);
   const [pedindo, setPedindo] = useState(false);
@@ -85,7 +92,7 @@ export function FormPerfil({
 
   return (
     <div className="space-y-3">
-      <form
+      <FormularioComAcao
         key={chave}
         ref={formulario}
         action={enviar}
@@ -201,15 +208,15 @@ export function FormPerfil({
           </BotaoEnviar>
           <Resultado estado={estado} />
         </div>
-      </form>
+      </FormularioComAcao>
       {excluir && (
-        <form
+        <FormularioComAcao
           action={pedirExcluir}
           className="flex flex-wrap items-center justify-between gap-2 border-t border-linha pt-3"
         >
           <span className="text-[12px] text-suave">Só dá para excluir perfil que ninguém usa.</span>
           <BotaoExcluir />
-        </form>
+        </FormularioComAcao>
       )}
       {saiu && !saiu.ok && saiu.erros?.geral && <p className="text-[12px] text-erro">{saiu.erros.geral}</p>}
       {saiu?.ok && <p className="text-[12px] text-ok">{saiu.mensagem}</p>}

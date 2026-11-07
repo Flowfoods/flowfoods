@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Taxa do iFood do parceiro (1.9): comissão do plano + taxa de pagamento
  * online, em % do preço. A conta ao lado é prévia ("26,2% do preço · a cada
@@ -69,7 +71,7 @@ export function FormTaxaDoIfood({
     </div>
   );
   return (
-    <form action={f.enviar} onChange={f.saida.aoMudar} onSubmit={f.saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao action={f.enviar} onChange={f.saida.aoMudar} onSubmit={f.saida.aoEnviar} noValidate className="space-y-4">
       <input type="hidden" name="versao" value={f.versao} />
       <ErroGeral estado={f.erro} recarregar={aqui} />
       {f.estado?.ok && !f.alterado && <p role="status" className="text-sm text-ok">{f.estado.mensagem}</p>}
@@ -98,6 +100,6 @@ export function FormTaxaDoIfood({
         </BotaoEnviar>
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
-    </form>
+    </FormularioComAcao>
   );
 }

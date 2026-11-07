@@ -10,7 +10,10 @@ import { acaoEmitirDoLote } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroEtiquetaDoLotePage({ params }: { params: { slug: string; lojaId: string; ordemId: string } }) {
+export default async function ParceiroEtiquetaDoLotePage(
+  props: { params: Promise<{ slug: string; lojaId: string; ordemId: string }> }
+) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'etiquetas.imprimir');
   const d = await loteParaEtiqueta(ctx.cliente, ctx.alcance, params.lojaId, params.ordemId, await idsDaEquipe(ctx.parceiro.id));

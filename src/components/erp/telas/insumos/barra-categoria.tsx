@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * F4 — "Alterar categoria" na própria lista de insumos. Marque um ou vários insumos DESTA página (as caixas ficam nas
  * linhas, ligadas a este formulário pelo atributo `form`), escolha o destino, revise o resumo e confirme. Nada se aplica
@@ -7,8 +9,14 @@
  * (a mesma regra da edição em lote da fila de revisão).
  */
 
-import { useEffect, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * F4 — "Alterar categoria" na própria lista de insumos. Marque um ou vários insumos DESTA página (as caixas ficam nas
+ * linhas, ligadas a este formulário pelo atributo `form`), escolha o destino, revise o resumo e confirme. Nada se aplica
+ * fora do que está marcado; o servidor confere a permissão, a categoria e cada insumo de novo, e registra no histórico
+ * (a mesma regra da edição em lote da fila de revisão).
+ */
+import { useEffect, useState, useActionState } from 'react';
+
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO } from '../../ui/campos';
@@ -36,7 +44,7 @@ function marcarTodos(marcar: boolean) {
 }
 
 export function BarraDeCategoria({ categorias, acao, de }: { categorias: OpcaoDeCategoria[]; acao: AcaoDeCadastro; de: string }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acao, null);
   const [marcados, setMarcados] = useState<Marcado[]>([]);
   const [destino, setDestino] = useState('');
   const [revisando, setRevisando] = useState(false);
@@ -58,7 +66,7 @@ export function BarraDeCategoria({ categorias, acao, de }: { categorias: OpcaoDe
   const erro = estado && !estado.ok ? (estado.erros?.geral ?? Object.values(estado.erros ?? {})[0]) : null;
 
   return (
-    <form id={FORM_DA_SELECAO} action={enviar} aria-label="Alterar a categoria dos insumos marcados">
+    <FormularioComAcao id={FORM_DA_SELECAO} action={enviar} aria-label="Alterar a categoria dos insumos marcados">
       <input type="hidden" name="de" value={de} />
       <input type="hidden" name="categoriaId" value={destino} />
       {marcados.length > 0 && (
@@ -109,7 +117,7 @@ export function BarraDeCategoria({ categorias, acao, de }: { categorias: OpcaoDe
           )}
         </div>
       )}
-    </form>
+    </FormularioComAcao>
   );
 }
 

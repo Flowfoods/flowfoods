@@ -11,7 +11,8 @@ import { PainelOndeEUsado } from '@/components/erp/telas/insumos/onde-e-usado';
 
 const atual = vi.hoisted(() => ({ ctx: null as unknown }));
 vi.mock('next/navigation', () => ({ usePathname: () => null, useSearchParams: () => null, notFound: () => { throw new Error('NOT_FOUND'); } }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { exigirPermissao, pode } = await import('@/lib/erp/permissoes');
   return { exigirParceiroDaSessao: async () => atual.ctx, exigirParceiro: async () => atual.ctx, exigirPermissao, exigirPermissaoNaPagina: exigirPermissao, pode };
@@ -135,10 +136,10 @@ describe('páginas reais de ficha e SSR: retorno e portões preservados', () => 
     // a transação real e o gate financeiro do helper têm cobertura DB própria.
     vi.mocked(obterFichaComCanais).mockResolvedValue({ ficha, canais: null });
   });
-  const abrir = (searchParams: Parameters<typeof ErpFichaPage>[0]['searchParams']) => ErpFichaPage({ params: { id: 'fichaA' }, searchParams });
+  const abrir = (searchParams: Parameters<typeof ErpFichaPage>[0]['searchParams']) => ErpFichaPage({ params: Promise.resolve({ id: 'fichaA' }), searchParams });
 
   it('operador volta ao insumo com filtros sem receber custo, preço ou consulta de canais', async () => {
-    const el = await abrir({ volta: origem });
+    const el = await abrir(Promise.resolve({ volta: origem }));
     expect(el.props.voltar).toBe(`${origem}#onde-e-usado`);
     expect(el.props.rotuloVoltar).toBe('Voltar para o insumo');
     expect(el.props.ficha.custo).toBeNull();
@@ -154,27 +155,27 @@ describe('páginas reais de ficha e SSR: retorno e portões preservados', () => 
   });
   it.each([undefined, 'https://fora.test/x', '/erp/fichas/fichaA', ['/erp/insumos/insumoA']])('origem %j mantém fallback com filtros de ficha', async (volta) => {
     const de = 'q=Ficha+A&tipo=PRATO&pagina=3&volta=externa';
-    const el = await abrir({ volta, de });
+    const el = await abrir(Promise.resolve({ volta, de }));
     expect(el.props.voltar).toBe(`/erp/fichas?${deSeguroDaFicha(de)}`);
     expect(renderToStaticMarkup(el)).toContain('Voltar para a lista');
   });
   it('perda de insumos.ver omite link e usa lista; de duplicado também não é reinterpretado', async () => {
     atual.ctx = { cliente: criarCliente().cliente, alcance: alcance('fichas.ver'), bloqueio: null };
-    const el = await abrir({ volta: origem, de: ['q=um', 'q=outro'] });
+    const el = await abrir(Promise.resolve({ volta: origem, de: ['q=um', 'q=outro'] }));
     expect(el.props.voltar).toBe('/erp/fichas');
     expect(el.props.linkDoInsumo).toBeUndefined();
     expect(renderToStaticMarkup(el)).not.toContain('href="/erp/insumos/');
   });
   it('id não encontrado no cliente do parceiro conserva lista sem expor a origem', async () => {
     atual.ctx = { cliente: criarCliente(null).cliente, alcance: podeVoltar, bloqueio: null };
-    const el = await abrir({ volta: origem });
+    const el = await abrir(Promise.resolve({ volta: origem }));
     expect(el.props.voltar).toBe('/erp/fichas');
     expect(el.props.rotuloVoltar).toBeUndefined();
   });
   it('N1 usa raiz do parceiro autorizado e conserva sua leitura gerencial', async () => {
     atual.ctx = { cliente: criarCliente().cliente, alcance: ALCANCE_FLOWFOODS, parceiro: { slug: 'casa-a', nome: 'Casa A' }, bloqueio: null };
     const volta = origem.replace('/erp/', '/rodolfo/erp/casa-a/');
-    const el = await ParceiroFichaPage({ params: { slug: 'casa-a', id: 'fichaA' }, searchParams: { volta } });
+    const el = await ParceiroFichaPage({ params: Promise.resolve({ slug: 'casa-a', id: 'fichaA' }), searchParams: Promise.resolve({ volta }) });
     expect(el.props.voltar).toBe(`${volta}#onde-e-usado`);
     expect(el.props.rotuloVoltar).toBe('Voltar para o insumo');
     expect(el.props.ficha.verCustos).toBe(true);
@@ -182,7 +183,7 @@ describe('páginas reais de ficha e SSR: retorno e portões preservados', () => 
     expect(obterFicha).not.toHaveBeenCalled();
     expect(custoPorCanal).not.toHaveBeenCalled();
     expect(renderToStaticMarkup(el)).toContain('Voltar para o insumo');
-    const outro = await ParceiroFichaPage({ params: { slug: 'casa-a', id: 'fichaA' }, searchParams: { volta: volta.replace('casa-a', 'casa-b'), de: 'q=Prato' } });
+    const outro = await ParceiroFichaPage({ params: Promise.resolve({ slug: 'casa-a', id: 'fichaA' }), searchParams: Promise.resolve({ volta: volta.replace('casa-a', 'casa-b'), de: 'q=Prato' }) });
     expect(outro.props.voltar).toBe('/rodolfo/erp/casa-a/fichas?q=Prato');
   });
 });

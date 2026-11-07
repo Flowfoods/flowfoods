@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * O formulário das metas por categoria (I.2a, decisões 270 a 273), da rede ou de uma loja.
  *
@@ -9,8 +11,16 @@
  * A loja segue a rede (campos só de leitura, com as metas dela) ou personaliza o conjunto INTEIRO.
  */
 
-import { useMemo, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * O formulário das metas por categoria (I.2a, decisões 270 a 273), da rede ou de uma loja.
+ *
+ * UMA gravação para o formulário inteiro, condicional à impressão do que foi lido (duas abas não se atropelam). Vazio é "sem
+ * meta"; "0" é uma meta de zero. "Usar o modelo de 32%" só PREENCHE os campos (nada é gravado); a soma e o aviso de diferença
+ * contra o total se atualizam enquanto a pessoa digita, mas quem decide o que vale é o servidor (a conta é refeita ao salvar).
+ * A loja segue a rede (campos só de leitura, com as metas dela) ou personaliza o conjunto INTEIRO.
+ */
+import { useMemo, useState, useActionState } from 'react';
+
 import { formatarData } from '@/lib/erp/compra-campos';
 import { aplicarModelo32, avisoDaSoma, percentualComDuasCasas, type CategoriaParaMeta } from '@/lib/erp/cmv-categorias-campos';
 import { lerMetaDigitada } from '@/lib/erp/dre-metas-campos';
@@ -58,7 +68,7 @@ export function FormMetasPorCategoria({
   valeDesde: string;
   bloqueio: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoLocal, FormData>(acao, null);
   const erros = estado?.erros ?? {};
   const [valores, setValores] = useState<Record<string, string>>(() => Object.fromEntries(categorias.map((c) => [c.id, c.campo])));
   const [usa, setUsa] = useState<Record<string, boolean>>(() => Object.fromEntries(categorias.map((c) => [c.id, c.usa])));
@@ -97,7 +107,7 @@ export function FormMetasPorCategoria({
   const valorDoCampo = (c: CategoriaNoFormulario) => (lendoARede ? c.campoDaRede : (valores[c.id] ?? ''));
 
   return (
-    <form action={enviar} noValidate>
+    <FormularioComAcao action={enviar} noValidate>
       <input type="hidden" name="versao" value={versao} />
       {erros.geral && (
         <div role="alert" className="mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm sm:mx-5">
@@ -285,6 +295,6 @@ export function FormMetasPorCategoria({
           {estado?.ok && estado.mensagem && <span className="text-ok">{estado.mensagem}</span>}
         </p>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

@@ -9,7 +9,10 @@ import { acaoAtenderRequisicao } from '../../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroEntregarRequisicaoPage({ params }: { params: { slug: string; lojaId: string; requisicaoId: string } }) {
+export default async function ParceiroEntregarRequisicaoPage(
+  props: { params: Promise<{ slug: string; lojaId: string; requisicaoId: string }> }
+) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'requisicao.atender');
   const d = await obterRequisicao(ctx.cliente, ctx.alcance, params.lojaId, params.requisicaoId);

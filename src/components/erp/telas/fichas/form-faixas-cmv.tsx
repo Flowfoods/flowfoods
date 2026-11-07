@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 import { CANAIS, ORDEM_DOS_CANAIS } from '@/lib/erp/canal-campos';
 import { CAMPOS_DO_FAROL, campoDaFaixa, lerCortesDoFarol, type CampoDoFarol, type ConfiguracaoDoFarol, type CortesDoFarol } from '@/lib/erp/cmv-faixas-campos';
 import { pontosBaseParaCampo } from '@/lib/erp/unidades';
@@ -19,7 +21,7 @@ const textoDosCortes = (c: CortesDoFarol | null): Record<CampoDoFarol, string> =
 export function FormFaixasDeCmv({ acao, aqui, versao, inicial, bloqueio }: { acao: AcaoConfiguracao; aqui: string; versao: string; inicial: ConfiguracaoDoFarol; bloqueio: string | null }) {
   const f = useConfiguracaoConfirmada(acao, versao, Object.fromEntries(ORDEM_DOS_CANAIS.flatMap(canal => Object.entries(textoDosCortes(inicial[canal])).map(([campo, valor]) => [campoDaFaixa(canal, campo as CampoDoFarol), valor]))));
   const erros = f.erro?.erros ?? {};
-  return <form action={f.enviar} onChange={f.saida.aoMudar} onSubmit={f.saida.aoEnviar} noValidate className="space-y-5">
+  return <FormularioComAcao action={f.enviar} onChange={f.saida.aoMudar} onSubmit={f.saida.aoEnviar} noValidate className="space-y-5">
     <input type="hidden" name="versao" value={f.versao} />
     <ErroGeral estado={f.erro} recarregar={aqui} />
     {f.estado?.ok && !f.alterado && <p role="status" className="text-sm text-ok">{f.estado.mensagem}</p>}
@@ -40,5 +42,5 @@ export function FormFaixasDeCmv({ acao, aqui, versao, inicial, bloqueio }: { aca
     })}
     <ExplicacaoNoPonto ponto="faixas-cmv"><p className="text-[12px] text-suave">O farol classifica o CMV sem arredondar. A meta continua separada e comanda a sugestão de preço. Alterar estes limites não muda preços definidos nem registros anteriores.</p></ExplicacaoNoPonto>
     <div className="flex flex-col gap-2 sm:items-end"><BotaoEnviar disabled={!!bloqueio || f.pendente} className="sm:min-w-44">Salvar faixas de CMV</BotaoEnviar>{bloqueio && <p className="text-[13px] text-suave">{bloqueio}</p>}</div>
-  </form>;
+  </FormularioComAcao>;
 }

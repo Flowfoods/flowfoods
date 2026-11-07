@@ -18,7 +18,11 @@ import { acaoRemoverLancamento, acaoSalvarDia } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpFaturamentoDoDiaPage({ params, searchParams }: { params: { lojaId: string; data: string }; searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ErpFaturamentoDoDiaPage(
+  props: { params: Promise<{ lojaId: string; data: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'faturamento.ver');
   const data = lerData(params.data);

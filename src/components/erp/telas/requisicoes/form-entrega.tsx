@@ -1,4 +1,6 @@
 'use client';
+
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
 // Scanner avoid-ai-design, SD4d (P2) aceito: "pedido 2 kg · já saiu · falta" é a linha de apoio do item, no padrão "A · B" das telas da 1.1–1.7.
 
 /**
@@ -10,8 +12,17 @@
  * Vai com a versão lida: entregar duas vezes a mesma tela não baixa duas vezes.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+// Scanner avoid-ai-design, SD4d (P2) aceito: "pedido 2 kg · já saiu · falta" é a linha de apoio do item, no padrão "A · B" das telas da 1.1–1.7.
+/**
+ * Entregar (1.8): o estoquista confere item a item e diz quanto sai AGORA
+ * (já vem o que falta). Ao lado, o que o livro diz da loja e em quanto fica;
+ * abaixo de zero aparece em vermelho com a palavra, e a entrega só passa com
+ * a confirmação (o produto está aí, o livro é que está errado: o negativo
+ * vira alarme). "Encerrar o resto" fecha a requisição com o corte à vista.
+ * Vai com a versão lida: entregar duas vezes a mesma tela não baixa duas vezes.
+ */
+import { useState, useActionState } from 'react';
+
 import type { ItemDoDetalhe } from '@/lib/erp/requisicao';
 import { quantidadeNegativa } from '@/lib/erp/requisicao-campos';
 import { formatarQuantidade, lerQuantidadeNa, UNIDADES } from '@/lib/erp/unidades';
@@ -21,7 +32,7 @@ import { CAMPO, Erro, MARCAR } from '../../ui/campos';
 import type { AcaoDeEstoque, EstadoEstoque } from '../estoque/estado';
 
 export function FormEntrega({ acao, versao, itens, recarregar }: { acao: AcaoDeEstoque; versao: number; itens: ItemDoDetalhe[]; recarregar: string }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const [valores, setValores] = useState<Record<string, { q: string; e: 'base' | 'menor' }>>(() => Object.fromEntries(itens.map((i) => [i.id, { q: i.faltaMilesimos > 0 ? textoDoCampo(i.faltaMilesimos) : '', e: 'base' }])));
   const [encerrar, setEncerrar] = useState(false);
   const erros = estado?.erros ?? {};
@@ -34,7 +45,7 @@ export function FormEntrega({ acao, versao, itens, recarregar }: { acao: AcaoDeE
   const saem = itens.filter((i) => saida(i) > 0).length;
   const sobraFalta = itens.some((i) => i.faltaMilesimos - saida(i) > 0);
   return (
-    <form action={enviar} className="space-y-4 pb-28 sm:pb-0">
+    <FormularioComAcao action={enviar} className="space-y-4 pb-28 sm:pb-0">
       <input type="hidden" name="versao" value={versao} />
       <ol className="space-y-3">
         {itens.map((i) => {
@@ -147,6 +158,6 @@ export function FormEntrega({ acao, versao, itens, recarregar }: { acao: AcaoDeE
           </BotaoEnviar>
         </div>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

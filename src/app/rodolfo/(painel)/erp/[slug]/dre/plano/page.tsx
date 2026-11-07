@@ -7,7 +7,8 @@ import { acaoCriarLinhaDoPlano, acaoOcultarLinhaDoPlano, acaoRenomearLinhaDoPlan
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroPlanoPage({ params }: { params: { slug: string } }) {
+export default async function ParceiroPlanoPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'metas.editar');
   const { visao } = await visaoDaRequisicao(ctx);

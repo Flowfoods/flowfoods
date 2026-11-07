@@ -53,7 +53,7 @@ export async function acaoEscolherVisaoDoParceiro(slug: string, valor: string): 
   const ctx = await exigirParceiro(String(slug));
   const { lojas } = await visaoDaRequisicao(ctx);
   if (!escolhaPermitida(ctx.alcance, lojas, valor)) return { ok: false, mensagem: 'Essa loja não é deste parceiro.' };
-  cookies().set(COOKIE_VISAO, valorDoCookieDeVisao(ctx.parceiro.id, valor), {
+  (await cookies()).set(COOKIE_VISAO, valorDoCookieDeVisao(ctx.parceiro.id, valor), {
     path: '/',
     sameSite: 'lax',
     httpOnly: true,

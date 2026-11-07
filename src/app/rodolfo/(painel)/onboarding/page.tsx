@@ -15,7 +15,8 @@ import { etapaDaAba, QuadroDePedidos } from './quadro';
 
 export const dynamic = 'force-dynamic';
 
-export default async function OnboardingPage({ searchParams }: { searchParams: { etapa?: string; feito?: string } }) {
+export default async function OnboardingPage(props: { searchParams: Promise<{ etapa?: string; feito?: string }> }) {
+  const searchParams = await props.searchParams;
   await exigirNivel1();
   const quadro = await listarQuadro();
   const abertos = quadro.NOVO.length + quadro.EM_CONVERSA.length;

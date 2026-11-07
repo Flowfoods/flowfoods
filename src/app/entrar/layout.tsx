@@ -19,9 +19,9 @@ export const metadata: Metadata = {
  * Entrada das pessoas dos parceiros: tokens do ERP e o tema que a pessoa
  * escolheu no app (cookie `ff_tema`, "do aparelho" por padrão).
  */
-export default function EntrarLayout({ children }: { children: React.ReactNode }) {
+export default async function EntrarLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="ff-app min-h-screen bg-fundo font-sans text-texto" data-tema={lerTema(cookies().get(COOKIE_TEMA)?.value)}>
+    <div className="ff-app min-h-screen bg-fundo font-sans text-texto" data-tema={lerTema((await cookies()).get(COOKIE_TEMA)?.value)}>
       <div aria-hidden className="h-[3px] bg-acento" />
       <div className="mx-auto flex min-h-[calc(100vh-3px)] max-w-5xl flex-col px-4 sm:px-6">
         <header className="py-5">

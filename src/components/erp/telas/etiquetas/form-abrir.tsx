@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Abrir uma embalagem (3.4), celular primeiro: de qual lote ela é (um da lista, lido agora na embalagem, ou "não informado"),
  * onde vai ficar (é daí que sai o prazo depois de aberto) e quanto foi aberto (opcional). A data e a hora NÃO se digitam: são
@@ -7,8 +9,14 @@
  * data) e recusa o lote vencido; o servidor refaz tudo com a hora dele.
  */
 
-import { useEffect, useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Abrir uma embalagem (3.4), celular primeiro: de qual lote ela é (um da lista, lido agora na embalagem, ou "não informado"),
+ * onde vai ficar (é daí que sai o prazo depois de aberto) e quanto foi aberto (opcional). A data e a hora NÃO se digitam: são
+ * as do registro. A tela mostra ao vivo a validade que isso dá (o menor entre o prazo e o vencimento do lote; sem prazo, sem
+ * data) e recusa o lote vencido; o servidor refaz tudo com a hora dele.
+ */
+import { useEffect, useState, useActionState } from 'react';
+
 import { diaPorExtenso, fraseDaValidadeDaAbertura, validadeDaAbertura } from '@/lib/erp/etiqueta-campos';
 import { lerData, mascararData } from '@/lib/erp/compra-campos';
 import { CONSERVACOES, formatarValidade, ORDEM_DAS_CONSERVACOES, type Conservacao } from '@/lib/erp/validade';
@@ -58,7 +66,7 @@ function descricaoDoLote(l: LoteNaTela): string {
 }
 
 export function FormAbrir({ acao, envioInicial, insumo, lotes, recarregar, bloqueio }: { acao: AcaoDeEstoque; envioInicial: string; insumo: InsumoParaAbrir; lotes: LoteNaTela[]; recarregar: string; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const [envio, setEnvio] = useState(envioInicial);
   useEffect(() => setEnvio(chaveNova()), []);
   const validos = lotes.filter((l) => !l.vencido && !l.notaCancelada);
@@ -83,7 +91,7 @@ export function FormAbrir({ acao, envioInicial, insumo, lotes, recarregar, bloqu
   const v = agoraMs !== null ? validadeDaAbertura({ abertoEm: new Date(agoraMs), prazoMin: prazo, vencimentoLote }) : null;
   const travado = !!bloqueio;
   return (
-    <form action={enviar} className="space-y-5 pb-28 min-[900px]:pb-0">
+    <FormularioComAcao action={enviar} className="space-y-5 pb-28 min-[900px]:pb-0">
       <input type="hidden" name="envio" value={envio} />
       <input type="hidden" name="insumo" value={insumo.id} />
       <input type="hidden" name="escala" value={escala} />
@@ -235,6 +243,6 @@ export function FormAbrir({ acao, envioInicial, insumo, lotes, recarregar, bloqu
           </BotaoEnviar>
         </div>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

@@ -7,7 +7,8 @@ import { TelaLojasDoEstoque } from '@/components/erp/telas/requisicoes/lojas';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroIndicadoresDaProducaoPage({ params }: { params: { slug: string } }) {
+export default async function ParceiroIndicadoresDaProducaoPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'producao.planejar');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/producao/indicadores`;

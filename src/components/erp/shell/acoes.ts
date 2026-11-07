@@ -22,10 +22,10 @@ const comSeguranca = () => ({ ...opcoes, secure: sessaoSegura() });
 
 export async function acaoTrocarTema(tema: Tema): Promise<Tema> {
   const valor = lerTema(tema);
-  cookies().set(COOKIE_TEMA, valor, comSeguranca());
+  (await cookies()).set(COOKIE_TEMA, valor, comSeguranca());
   return valor;
 }
 
 export async function acaoGuardarMenu(recolhido: boolean): Promise<void> {
-  cookies().set(COOKIE_MENU, recolhido ? 'recolhido' : 'aberto', comSeguranca());
+  (await cookies()).set(COOKIE_MENU, recolhido ? 'recolhido' : 'aberto', comSeguranca());
 }

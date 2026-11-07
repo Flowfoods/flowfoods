@@ -10,7 +10,11 @@ import { acaoEmitirDaAbertura } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpEmbalagemAbertaPage({ params, searchParams }: { params: { lojaId: string; aberturaId: string }; searchParams: { feito?: string } }) {
+export default async function ErpEmbalagemAbertaPage(
+  props: { params: Promise<{ lojaId: string; aberturaId: string }>; searchParams: Promise<{ feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'etiquetas.imprimir');
   const d = await aberturaParaEtiqueta(ctx.cliente, ctx.alcance, params.lojaId, params.aberturaId);

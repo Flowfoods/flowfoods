@@ -8,7 +8,11 @@ import { fraseDoEstoque } from '@/components/erp/telas/estoque/estado';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroRequisicoesDaLojaPage({ params, searchParams }: { params: { slug: string; lojaId: string }; searchParams: { feito?: string } }) {
+export default async function ParceiroRequisicoesDaLojaPage(
+  props: { params: Promise<{ slug: string; lojaId: string }>; searchParams: Promise<{ feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'requisicao.pedir');
   const q = await quadroDeRequisicoes(ctx.cliente, ctx.alcance, params.lojaId);

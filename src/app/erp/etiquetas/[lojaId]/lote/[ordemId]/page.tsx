@@ -13,7 +13,8 @@ import { acaoEmitirDoLote } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpEtiquetaDoLotePage({ params }: { params: { lojaId: string; ordemId: string } }) {
+export default async function ErpEtiquetaDoLotePage(props: { params: Promise<{ lojaId: string; ordemId: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'etiquetas.imprimir');
   const d = await loteParaEtiqueta(ctx.cliente, ctx.alcance, params.lojaId, params.ordemId, await idsDaEquipe(ctx.parceiro.id));

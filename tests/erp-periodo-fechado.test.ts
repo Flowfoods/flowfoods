@@ -17,7 +17,8 @@ import { FormNota } from '@/components/erp/telas/compras/form-nota';
 import { FormDespesa } from '@/components/erp/telas/dre/form-despesa';
 
 // O react-dom estável do vitest não traz os ganchos de formulário do Next: o estado inicial basta para ler o HTML.
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 
 const nbsp = (t: string) => t.replace(/ /g, ' ');
 const SETEMBRO = { nome: 'Setembro de 2026', inicio: '2026-09-01', fim: '2026-09-30' };

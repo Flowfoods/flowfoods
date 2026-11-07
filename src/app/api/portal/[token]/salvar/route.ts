@@ -11,7 +11,8 @@ export const dynamic = 'force-dynamic';
  * fechamento de aba às vezes manda, e perder o último parágrafo digitado
  * porque o cabeçalho veio diferente seria o pior tipo de bug.
  */
-export async function POST(req: Request, { params }: { params: { token: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const c = await exigirCliente(params.token);
     let corpo: Record<string, unknown>;

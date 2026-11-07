@@ -10,7 +10,8 @@ import { responderFoto } from '@/lib/erp/foto-resposta';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const ctx = await exigirParceiroDaSessao();
-  return responderFoto(ctx.cliente, params.id, pode(ctx.alcance, 'fichas.ver'), new URL(req.url).searchParams.get('apoio'));
+export async function GET(req: Request, props: { params: Promise<{ id: string }> }) {
+ const params = await props.params;
+ const ctx = await exigirParceiroDaSessao();
+ return responderFoto(ctx.cliente, params.id, pode(ctx.alcance, 'fichas.ver'), new URL(req.url).searchParams.get('apoio'));
 }

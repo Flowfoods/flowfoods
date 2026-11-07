@@ -8,7 +8,11 @@ import { acaoContarNaContagem } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroContagemDoDiaPage({ params, searchParams }: { params: { slug: string; lojaId: string; contagemId: string }; searchParams: { feito?: string } }) {
+export default async function ParceiroContagemDoDiaPage(
+  props: { params: Promise<{ slug: string; lojaId: string; contagemId: string }>; searchParams: Promise<{ feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'estoque.contar');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/estoque`;

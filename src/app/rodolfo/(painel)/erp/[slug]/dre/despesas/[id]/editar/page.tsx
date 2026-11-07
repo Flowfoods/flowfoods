@@ -7,7 +7,11 @@ import { acaoEditarDespesa } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroEditarDespesaPage({ params, searchParams = {} }: { params: { slug: string; id: string }; searchParams?: Record<string, string | string[] | undefined> }) {
+export default async function ParceiroEditarDespesaPage(
+  props: { params: Promise<{ slug: string; id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'despesas.lancar');
   const { visao } = await visaoDaRequisicao(ctx);

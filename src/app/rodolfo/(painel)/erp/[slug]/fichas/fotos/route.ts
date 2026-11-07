@@ -7,10 +7,12 @@ import { responderFotoPendente } from '@/lib/erp/foto-pendente';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function POST(req: Request, { params }: { params: { slug: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   return receberFotoDaFicha(req, await parceiroDoNivel1OuNada(params.slug));
 }
 
-export async function GET(req: Request, { params }: { params: { slug: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   return responderFotoPendente(req, await parceiroDoNivel1OuNada(params.slug));
 }

@@ -8,7 +8,11 @@ import { acaoBuscarClassificacao, acaoCadastrarFichaUnificada, acaoGerirClassifi
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroNovaFichaPage({ params, searchParams = {} }: { params: { slug: string }; searchParams?: { de?: string | string[] } }) {
+export default async function ParceiroNovaFichaPage(
+  props: { params: Promise<{ slug: string }>; searchParams?: Promise<{ de?: string | string[] }> }
+) {
+  const searchParams = (await props.searchParams) ?? {};
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.editar');
   const dados = await lerEdicaoDaFicha(ctx.cliente, null, { verPrecos: true });

@@ -119,7 +119,7 @@ describe.skipIf(!URL_TESTE)('Meta iFood antes da taxa (Postgres local)', { timeo
       expect(await acoes.acaoSalvarMetasDeCmv(null, await envio())).toMatchObject({ ok: false });
       expect(await acoesN1.acaoSalvarMetasDeCmv(p.slug, null, await envio())).toMatchObject({ ok: false });
     }
-    await expect(Pagina({ searchParams: {} })).rejects.toThrow();
+    await expect(Pagina({ searchParams: Promise.resolve({}) })).rejects.toThrow();
     expect(await a.canalConfig.count()).toBe(0);
     contexto([]);
     expect(await acoes.acaoSalvarMetasDeCmv(null, await envio())).toMatchObject({ ok: true, confirmacao: { versao: (await obterTaxaDoIfood(a)).versaoDasMetas } });

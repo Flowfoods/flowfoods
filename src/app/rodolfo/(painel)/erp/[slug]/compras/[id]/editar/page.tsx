@@ -9,7 +9,8 @@ import { acaoSalvarNota } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroEditarNotaPage({ params }: { params: { slug: string; id: string } }) {
+export default async function ParceiroEditarNotaPage(props: { params: Promise<{ slug: string; id: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'compras.lancar');
   exigirPermissao(ctx, 'compras.ver');

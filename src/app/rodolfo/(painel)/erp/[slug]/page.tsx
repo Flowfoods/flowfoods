@@ -15,7 +15,8 @@ import { rotuloDaVisao } from '@/lib/erp/visao';
 
 export const dynamic = 'force-dynamic';
 
-export default async function HubDoParceiroNoNivel1({ params }: { params: { slug: string } }) {
+export default async function HubDoParceiroNoNivel1(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const { parceiro, alcance, cliente } = await exigirParceiro(params.slug);
   const { visao } = await visaoDaRequisicao({ parceiro, alcance });
   const painel = await painelDoDia(cliente, alcance, `/rodolfo/erp/${parceiro.slug}`, undefined, visao);

@@ -14,7 +14,10 @@ import { Painel, Vazio } from '@/components/erp/ui/superficies';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpDrePage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ErpDrePage(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'dre.ver');
   const { visao, lojas } = await visaoDaRequisicao(ctx);

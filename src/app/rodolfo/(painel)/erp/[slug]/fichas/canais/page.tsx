@@ -7,7 +7,11 @@ import { acaoSalvarFaixasDeCmv, acaoSalvarMargensAlvo, acaoSalvarMetasDeCmv, aca
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroCanaisDeVendaPage({ params, searchParams }: { params: { slug: string }; searchParams: { feito?: string } }) {
+export default async function ParceiroCanaisDeVendaPage(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<{ feito?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'precos.ver');
   const t = await obterTaxaDoIfood(ctx.cliente);

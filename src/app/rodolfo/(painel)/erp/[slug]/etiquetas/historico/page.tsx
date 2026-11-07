@@ -7,7 +7,8 @@ import { TelaLojasDasEtiquetas } from '@/components/erp/telas/etiquetas/partes';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroHistoricoDeImpressoesPage({ params }: { params: { slug: string } }) {
+export default async function ParceiroHistoricoDeImpressoesPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'etiquetas.imprimir');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/etiquetas`;

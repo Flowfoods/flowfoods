@@ -15,7 +15,8 @@ import { acaoIniciarAbertura } from './actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpEstoquePage({ searchParams }: { searchParams: { feito?: string } }) {
+export default async function ErpEstoquePage(props: { searchParams: Promise<{ feito?: string }> }) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'estoque.ver');
   const { visao } = await visaoDaRequisicao(ctx);

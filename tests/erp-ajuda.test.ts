@@ -471,6 +471,6 @@ describe('0.6 · guardas estáticas', () => {
     const txt = readFileSync(join('src', 'app', 'erp', 'actions.ts'), 'utf8');
     const trecho = txt.slice(txt.indexOf('ajuda contextual (0.6)')).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
     expect(trecho).not.toMatch(/usuarioId|get\('usuario|get\("usuario/);
-    expect(trecho.match(/gravarPreferenciaDeAjuda\(tokenDoCookie\(\)/g)).toHaveLength(6); // fechar, dicas, reabrir + os dois dos pontos de ajuda (23/10) + o lote da sequência guiada (decisão 479)
+    expect(trecho.match(/gravarPreferenciaDeAjuda\(await tokenDoCookie\(\)/g)).toHaveLength(6); // fechar, dicas, reabrir + os dois dos pontos de ajuda (23/10) + o lote da sequência guiada (decisão 479)
   });
 });

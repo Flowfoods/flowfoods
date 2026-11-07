@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 // Scanner avoid-ai-design, SD4d (P2) aceito: "1 un · R$ 0,89" e "a cada R$ 10,00: R$ 2,62" são a linha de apoio da tabela densa (Kairu Corporativo), no padrão "A · B" das telas da 1.1–1.9. (O ignore do scanner não aceita id com minúscula.)
 /**
  * "Preço e CMV por canal" no detalhe da ficha de PRATO (1.9 → 1.10 → N.2), o MESMO no nível 1 e na pessoa do parceiro.
@@ -14,8 +16,8 @@
  */
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useMemo, useState, useActionState } from 'react';
+
 import { camadasDoCanal, CANAIS, contaDaTaxa, ORDEM_DOS_CANAIS, taxaACadaDezReais, taxaSobrePreco, type CamadasDoCanal, type CanalVenda } from '@/lib/erp/canal-campos';
 import {
   cmvDoCanal,
@@ -212,16 +214,16 @@ export function PrecoEMargemPorCanal(props: Props) {
 }
 
 function ComFormulario(props: Props & { acao: AcaoDeCadastro }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(props.acao, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(props.acao, null);
   const saida = useAvisoDeSaida(estado);
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className={props.className}>
+    <FormularioComAcao action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className={props.className}>
       <input type="hidden" name="impressao" value={props.dados.impressaoDosPrecos} />
       <input type="hidden" name="custos" value={props.dados.impressaoDosCustos} />
       <input type="hidden" name="ofertas" value="1" />
       {props.de && <input type="hidden" name="de" value={props.de} />}
       <Conteudo {...props} className="" estado={estado} editavel />
-    </form>
+    </FormularioComAcao>
   );
 }
 

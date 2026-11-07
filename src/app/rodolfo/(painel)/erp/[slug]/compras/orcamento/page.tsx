@@ -8,7 +8,8 @@ import { TelaOrcamento } from '@/components/erp/telas/compras/orcamento';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroOrcamentoPage({ params }: { params: { slug: string } }) {
+export default async function ParceiroOrcamentoPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'compras.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;

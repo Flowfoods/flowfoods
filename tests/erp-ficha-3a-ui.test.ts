@@ -8,7 +8,8 @@ import type { ValoresDaFicha } from '@/components/erp/telas/fichas/form-ficha';
 const estado = vi.hoisted(() => ({ rascunho: null as ValoresDaFicha | null, erros: null as { ok: false; vez: number; erros: Record<string, string> } | null }));
 vi.mock('next/navigation', () => ({ usePathname: () => '/erp/fichas/fichaA/editar', useSearchParams: () => new URLSearchParams(), redirect: (url: string) => { throw new Error(`REDIRECT:${url}`); } }));
 vi.mock('next/cache', () => ({ revalidatePath: vi.fn() }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: () => [estado.erros, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: () => [estado.erros, undefined] }));
 vi.mock('@/components/erp/telas/cadastro/rascunho', async (orig) => ({ ...(await orig<typeof import('@/components/erp/telas/cadastro/rascunho')>()), useRascunhoDaTela: () => ({ valores: estado.rascunho, chave: 'teste', descartar: vi.fn(), versaoMudou: false, insumoCriado: null }) }));
 
 import { FormFicha } from '@/components/erp/telas/fichas/form-ficha';
@@ -67,7 +68,7 @@ describe('3A formulário e rascunho', () => {
     expect(campo(h, 'secaoNome')).toContain('Vegetarianos');
     expect(campo(h, 'subsecaoNome')).toContain('Grelhados');
     expect(campo(h, 'secaoId')).toBeUndefined();
-    expect(h.match(/Será criada ao salvar a ficha/g)).toHaveLength(2);
+    expect(h.match(/será criada junto com a ficha ao salvar/g)).toHaveLength(2);
     expect(h).toContain('Já existe uma seção com este nome.');
     expect(h).toContain('Receita preenchida');
     expect(h).toContain('Misturar');

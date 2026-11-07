@@ -14,7 +14,10 @@ import { voltaParaAHome } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpFaturamentoPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ErpFaturamentoPage(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'faturamento.ver');
   const { visao } = await visaoDaRequisicao(ctx);

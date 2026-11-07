@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic';
 const FOLGA_MULTIPART = 1024 * 1024;
 
 /** Upload de um arquivo: multipart com `itemId` e `arquivo`. */
-export async function POST(req: Request, { params }: { params: { token: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const c = await exigirCliente(params.token);
 
@@ -34,7 +35,8 @@ export async function POST(req: Request, { params }: { params: { token: string }
 }
 
 /** Remove um arquivo enviado por engano: `?id=<arquivoId>`. */
-export async function DELETE(req: Request, { params }: { params: { token: string } }) {
+export async function DELETE(req: Request, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const c = await exigirCliente(params.token);
     const id = new URL(req.url).searchParams.get('id') ?? '';

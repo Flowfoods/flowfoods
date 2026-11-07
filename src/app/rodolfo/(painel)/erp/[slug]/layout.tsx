@@ -11,13 +11,18 @@ import { Aviso } from '@/components/erp/ui/superficies';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: { slug: string };
-}) {
+export default async function ParceiroLayout(
+  props: {
+    children: React.ReactNode;
+    params: Promise<{ slug: string }>;
+  }
+) {
+  const params = await props.params;
+
+  const {
+    children
+  } = props;
+
   const { parceiro, bloqueio } = await exigirParceiro(params.slug);
   const status = STATUS_DO_PARCEIRO[parceiro.status];
 

@@ -12,10 +12,14 @@ import { acaoAbrirEmbalagem } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpAbrirEmbalagemDaLojaPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { insumo?: string } }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'etiquetas.imprimir');
-  const d = await opcoesDeAbertura(ctx.cliente, ctx.alcance, params.lojaId, searchParams.insumo);
-  if (!d) notFound();
-  return <TelaAbrirEmbalagem d={d} base="/erp/etiquetas" acao={acaoAbrirEmbalagem.bind(null, d.loja.id)} envio={`env-${randomUUID()}`} podeAbrir motivoSemAbrir={null} bloqueio={ctx.bloqueio} />;
+export default async function ErpAbrirEmbalagemDaLojaPage(
+ props: { params: Promise<{ lojaId: string }>; searchParams: Promise<{ insumo?: string }> }
+) {
+ const searchParams = await props.searchParams;
+ const params = await props.params;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'etiquetas.imprimir');
+ const d = await opcoesDeAbertura(ctx.cliente, ctx.alcance, params.lojaId, searchParams.insumo);
+ if (!d) notFound();
+ return <TelaAbrirEmbalagem d={d} base="/erp/etiquetas" acao={acaoAbrirEmbalagem.bind(null, d.loja.id)} envio={`env-${randomUUID()}`} podeAbrir motivoSemAbrir={null} bloqueio={ctx.bloqueio} />;
 }

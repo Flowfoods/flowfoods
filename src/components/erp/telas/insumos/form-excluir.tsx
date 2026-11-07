@@ -1,12 +1,15 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * L.1 — "Excluir de vez": só aparece para insumo sem nenhum vínculo. A caixa de confirmação é obrigatória (a regra confere no
  * servidor também) e o botão diz o nome do insumo. Erro (inclusive "passou a ter vínculos agora há pouco") aparece aqui mesmo,
  * sem apagar nada; o botão não dispara duas vezes.
  */
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, Erro, MARCAR } from '../../ui/campos';
 import { ErroGeral } from '../cadastro/erros';
@@ -15,9 +18,9 @@ import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 
 export function FormExcluir({ acao, nome, de, recarregar }: { acao: AcaoDeCadastro; nome: string; de: string; recarregar: string }) {
   const acaoSegura = useAcaoSegura(acao);
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acaoSegura, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acaoSegura, null);
   return (
-    <form action={enviar} noValidate className="space-y-3">
+    <FormularioComAcao action={enviar} noValidate className="space-y-3">
       {de && <input type="hidden" name="de" value={de} />}
       <input type="hidden" name="origem" value="lista" />
       <SalvandoAnunciado texto="Excluindo…" />
@@ -46,6 +49,6 @@ export function FormExcluir({ acao, nome, de, recarregar }: { acao: AcaoDeCadast
       <BotaoEnviar variante="perigo" pendente="Excluindo…" className="w-full sm:w-auto">
         Excluir “{nome}” de vez
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }

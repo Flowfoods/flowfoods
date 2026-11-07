@@ -13,7 +13,11 @@ import { acaoCancelarNota } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroNotaPage({ params, searchParams }: { params: { slug: string; id: string }; searchParams: { de?: string; feito?: string; volta?: string } }) {
+export default async function ParceiroNotaPage(
+  props: { params: Promise<{ slug: string; id: string }>; searchParams: Promise<{ de?: string; feito?: string; volta?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'compras.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;

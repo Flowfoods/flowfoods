@@ -10,7 +10,8 @@ import { FormMetas, type LinhaDoCampoDeMeta } from '@/components/erp/telas/dre/f
 
 // O react-dom estável do vitest não traz os ganchos de formulário do Next: o estado inicial basta para ler o HTML.
 let erros: Record<string, string> = {};
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_a: unknown, inicial: unknown) => [Object.keys(erros).length ? { ok: false, erros } : inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_a: unknown, inicial: unknown) => [Object.keys(erros).length ? { ok: false, erros } : inicial, undefined] }));
 
 const linha = (chave: string, nome: string, nivel: 0 | 1, extra: Partial<LinhaDoCampoDeMeta> = {}): LinhaDoCampoDeMeta => ({ chave, nome, tipo: 'linha', nivel, aceita: true, oculta: false, campo: '', metaBp: null, desde: null, ...extra });
 const linhas: LinhaDoCampoDeMeta[] = [

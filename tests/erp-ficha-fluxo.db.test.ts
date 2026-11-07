@@ -11,7 +11,8 @@ vi.mock('next/navigation', () => ({
   redirect: (url: string) => { throw Object.assign(new Error(`REDIRECT ${url}`), { url }); },
   notFound: () => { throw new Error('NOT_FOUND'); },
 }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
   return {
@@ -99,7 +100,7 @@ describe.skipIf(!URL_TESTE)('Ficha: receita salva → embalagens → preço (Pos
     contexto();
     await expect(acoes.acaoCadastrarFicha(null, receita('Prato da jornada'))).rejects.toMatchObject({ url: expect.stringMatching(/\/canais\?feito=criada$/) });
     const id = (await cliente.fichaTecnica.findFirstOrThrow({ where: { nome: 'Prato da jornada' } })).id;
-    const pagina = await PaginaEmbalagens({ params: { id }, searchParams: { feito: 'criada' } });
+    const pagina = await PaginaEmbalagens({ params: Promise.resolve({ id }), searchParams: Promise.resolve({ feito: 'criada' }) });
     expect(renderToStaticMarkup(pagina)).toContain('Ficha cadastrada.');
     expect(sp(formatarFracao((await obterFicha(cliente, id))!.custo.porRendimento))).toBe('R$ 10,00');
     await expect(acoes.acaoSalvarEmbalagens(id, null, embalagens(''))).rejects.toMatchObject({ url: `/erp/fichas/${id}?feito=embalagens&etapa=precos#preco-por-canal` });
@@ -135,7 +136,7 @@ describe.skipIf(!URL_TESTE)('Ficha: receita salva → embalagens → preço (Pos
   it('custo parcial e embalagem sem custo não aparecem como total completo; ausência de embalagem é distinta', async () => {
     contexto();
     const id = await cadastrar('Receita incompleta', { item_insumo: ids['sem-custo'] });
-    const pagina = await PaginaEmbalagens({ params: { id } });
+    const pagina = await PaginaEmbalagens({ params: Promise.resolve({ id }) });
     const h = sp(renderToStaticMarkup(pagina));
     expect(h).toContain('Nenhuma embalagem neste canal.');
     expect(h).toContain('Custo da receita incompleto: falta o custo de sem-custo.');
@@ -143,7 +144,7 @@ describe.skipIf(!URL_TESTE)('Ficha: receita salva → embalagens → preço (Pos
     expect(h).not.toContain('Custo físico da receita e embalagens: R$ 0,00');
     const envio = form({ impressao: '', emb_canal: 'IFOOD', emb_insumo: ids['sacola-sem-custo'], emb_quantidade: '1', emb_unidade: 'un' });
     await expect(acoes.acaoSalvarEmbalagens(id, null, envio)).rejects.toThrow(/REDIRECT/);
-    const reaberta = sp(renderToStaticMarkup(await PaginaEmbalagens({ params: { id } })));
+    const reaberta = sp(renderToStaticMarkup(await PaginaEmbalagens({ params: Promise.resolve({ id }) })));
     expect(reaberta).toContain('Falta informar o custo de 1 embalagem.');
     expect(reaberta).toContain('Embalagens incompletas');
   });
@@ -152,17 +153,17 @@ describe.skipIf(!URL_TESTE)('Ficha: receita salva → embalagens → preço (Pos
     contexto(true);
     await expect(acoes.acaoCadastrarFicha(null, receita('Operação sem custos'))).rejects.toMatchObject({ url: expect.stringMatching(/\/[^/]+\?feito=criada$/) });
     const id = (await cliente.fichaTecnica.findFirstOrThrow({ where: { nome: 'Operação sem custos' } })).id;
-    const pagina = await PaginaEditar({ params: { id } }) as ReactElement<ComponentProps<typeof TelaFormFicha>>;
+    const pagina = await PaginaEditar({ params: Promise.resolve({ id }) }) as ReactElement<ComponentProps<typeof TelaFormFicha>>;
     expect(pagina.props.verCustos).toBe(false);
     expect(pagina.props.opcoes.every(o => o.custo === null)).toBe(true);
     expect(renderToStaticMarkup(createElement(TelaFormFicha, pagina.props))).not.toContain('Salvar e continuar para embalagens');
-    await expect(PaginaEmbalagens({ params: { id } })).rejects.toThrow('SEM_ACESSO');
+    await expect(PaginaEmbalagens({ params: Promise.resolve({ id }) })).rejects.toThrow('SEM_ACESSO');
     expect(await acoes.acaoSalvarEmbalagens(id, null, embalagens(''))).toMatchObject({ ok: false });
     contexto(false, outro);
-    await expect(PaginaEmbalagens({ params: { id } })).rejects.toThrow('NOT_FOUND');
+    await expect(PaginaEmbalagens({ params: Promise.resolve({ id }) })).rejects.toThrow('NOT_FOUND');
     expect(await acoes.acaoSalvarEmbalagens(id, null, embalagens(''))).toMatchObject({ ok: false });
     contexto();
-    const reaberta = await PaginaEmbalagens({ params: { id } }) as ReactElement<ComponentProps<typeof TelaEmbalagensDaFicha>>;
+    const reaberta = await PaginaEmbalagens({ params: Promise.resolve({ id }) }) as ReactElement<ComponentProps<typeof TelaEmbalagensDaFicha>>;
     expect(reaberta.props.ficha.id).toBe(id);
     expect(reaberta.props.podeConferirPrecos).toBe(true);
   });
@@ -185,7 +186,7 @@ describe.skipIf(!URL_TESTE)('Ficha: receita salva → embalagens → preço (Pos
     let c = await canais(id);
     await expect(acoes.acaoSalvarPrecos(id, null, form({ impressao: c.impressaoDosPrecos, custos: c.impressaoDosCustos, preco_LOJA: '30', preco_DELIVERY_PROPRIO: '40', preco_IFOOD: '50' }))).rejects.toThrow(/REDIRECT/);
     c = await canais(id);
-    const tela = sp(renderToStaticMarkup(await PaginaEmbalagens({ params: { id }, searchParams: {} })));
+    const tela = sp(renderToStaticMarkup(await PaginaEmbalagens({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) })));
     // Delivery: 12 ÷ 25% = 48; ao seu preço de 40, CMV 30% acima. iFood: 13 ÷ 25% = 52; a 50, 26% acima. Mesmos números do detalhe.
     expect(c.cmv.map((x) => x.sugerido.tipo === 'ok' && x.sugerido.centavos)).toEqual([4000, 4800, 5200]);
     for (const trecho of ['R$ 12,00 ÷ 25%', 'R$ 48,00', 'R$ 13,00 ÷ 25%', 'R$ 52,00', 'R$ 40,00', 'R$ 50,00', '30,0%', '26,0%', 'acima da meta']) expect(tela).toContain(trecho);
@@ -197,12 +198,12 @@ describe.skipIf(!URL_TESTE)('Ficha: receita salva → embalagens → preço (Pos
     expect(depois.cmv.map((x) => x.precoCentavos)).toEqual([3000, 4000, 5000]);
     expect(depois.cmv[2].sugerido).toMatchObject({ tipo: 'ok', centavos: 6400 });
     expect(porcentagemDoCmv(depois.cmv[2].cmvBp!)).toBe('32,0%');
-    const telaDepois = sp(renderToStaticMarkup(await PaginaEmbalagens({ params: { id }, searchParams: {} })));
+    const telaDepois = sp(renderToStaticMarkup(await PaginaEmbalagens({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) })));
     for (const trecho of ['R$ 16,00 ÷ 25%', 'R$ 64,00', 'R$ 50,00', '32,0%']) expect(telaDepois).toContain(trecho);
     expect(await cliente.movimentoEstoque.count()).toBe(0);
     // Quem não vê preços não chega à tela (e não recebe nenhum desses valores).
     contexto(true);
-    await expect(PaginaEmbalagens({ params: { id }, searchParams: {} })).rejects.toThrow('SEM_ACESSO');
+    await expect(PaginaEmbalagens({ params: Promise.resolve({ id }), searchParams: Promise.resolve({}) })).rejects.toThrow('SEM_ACESSO');
     contexto();
   });
 });

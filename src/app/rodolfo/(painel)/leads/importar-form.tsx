@@ -1,8 +1,10 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 import Link from 'next/link';
-import { useEffect, useRef } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useRef, useActionState } from 'react';
+
 import { BotaoEnviar, MensagemDeResposta } from '@/components/erp/ui/botoes';
 import { AJUDA, CAMPO, ROTULO } from '@/components/erp/ui/campos';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
@@ -11,7 +13,7 @@ import { acaoImportarJson, type Resposta } from '../actions';
 const inicial: Resposta | null = null;
 
 export function ImportarForm() {
-  const [estado, acao] = useFormState(acaoImportarJson, inicial);
+  const [estado, acao] = useActionState(acaoImportarJson, inicial);
   const form = useRef<HTMLFormElement>(null);
 
   // Importou: o formulário volta limpo. Um segundo toque com o mesmo conteúdo duplicaria as linhas sem telefone, que
@@ -21,7 +23,7 @@ export function ImportarForm() {
   }, [estado]);
 
   return (
-    <form ref={form} action={acao} className="space-y-4">
+    <FormularioComAcao ref={form} action={acao} className="space-y-4">
       <div>
         <label htmlFor="lote" className={ROTULO}>
           Nome do lote
@@ -47,6 +49,6 @@ export function ImportarForm() {
           Ver os leads
         </Link>
       )}
-    </form>
+    </FormularioComAcao>
   );
 }

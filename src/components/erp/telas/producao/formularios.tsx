@@ -1,13 +1,20 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Formulários pequenos do lote (3.1): cancelar o lote que ainda não saiu e estornar o lote concluído (começar virou "pegar"
  * na 3.3: `form-tarefas.tsx`).
  * Cada um leva a versão lida (duas abas não se atropelam). O servidor decide; aqui só se mostra o que ele respondeu.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Formulários pequenos do lote (3.1): cancelar o lote que ainda não saiu e estornar o lote concluído (começar virou "pegar"
+ * na 3.3: `form-tarefas.tsx`).
+ * Cada um leva a versão lida (duas abas não se atropelam). O servidor decide; aqui só se mostra o que ele respondeu.
+ */
+import { useState, useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
@@ -28,7 +35,7 @@ function ErroGeral({ estado, recarregar }: { estado: EstadoEstoque; recarregar?:
 }
 
 export function FormCancelarLote({ acao, versao, recarregar }: { acao: AcaoDeEstoque; versao: number; recarregar: string }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
   if (!aberto && !estado) {
     return (
@@ -38,7 +45,7 @@ export function FormCancelarLote({ acao, versao, recarregar }: { acao: AcaoDeEst
     );
   }
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <input type="hidden" name="versao" value={versao} />
       <div>
         <label htmlFor="cancelar-lote-motivo" className={ROTULO}>
@@ -70,12 +77,12 @@ export function FormCancelarLote({ acao, versao, recarregar }: { acao: AcaoDeEst
           Manter
         </button>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 export function FormEstornar({ acao, versao, recarregar, quantoEntrou }: { acao: AcaoDeEstoque; versao: number; recarregar: string; quantoEntrou: string | null }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
   if (!aberto && !estado) {
     return (
@@ -85,7 +92,7 @@ export function FormEstornar({ acao, versao, recarregar, quantoEntrou }: { acao:
     );
   }
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <input type="hidden" name="versao" value={versao} />
       <div>
         <label htmlFor="estornar-motivo" className={ROTULO}>
@@ -128,6 +135,6 @@ export function FormEstornar({ acao, versao, recarregar, quantoEntrou }: { acao:
           Manter
         </button>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

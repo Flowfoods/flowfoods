@@ -11,9 +11,12 @@ import { acaoLancarDespesa, acaoLancarDoMesPassado } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpNovaDespesaPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'despesas.lancar');
-  const { visao } = await visaoDaRequisicao(ctx);
-  return <PaginaDeNovaDespesa c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: rotuloDaVisao(visao), raiz: '/erp' }} visao={visao} query={searchParams} acoes={{ lancar: acaoLancarDespesa, mesPassado: acaoLancarDoMesPassado }} />;
+export default async function ErpNovaDespesaPage(
+ props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+ const searchParams = await props.searchParams;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'despesas.lancar');
+ const { visao } = await visaoDaRequisicao(ctx);
+ return <PaginaDeNovaDespesa c={{ cliente: ctx.cliente, alcance: ctx.alcance, bloqueio: ctx.bloqueio, contexto: rotuloDaVisao(visao), raiz: '/erp' }} visao={visao} query={searchParams} acoes={{ lancar: acaoLancarDespesa, mesPassado: acaoLancarDoMesPassado }} />;
 }

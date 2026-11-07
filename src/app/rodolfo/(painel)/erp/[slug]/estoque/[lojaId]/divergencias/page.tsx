@@ -7,7 +7,11 @@ import { TelaDivergencias } from '@/components/erp/telas/requisicoes/divergencia
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroDivergenciasDaLojaPage({ params, searchParams }: { params: { slug: string; lojaId: string }; searchParams: { de?: string; ate?: string } }) {
+export default async function ParceiroDivergenciasDaLojaPage(
+  props: { params: Promise<{ slug: string; lojaId: string }>; searchParams: Promise<{ de?: string; ate?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'estoque.ajustar');
   const d = await divergenciasDaLoja(ctx.cliente, ctx.alcance, params.lojaId, searchParams);

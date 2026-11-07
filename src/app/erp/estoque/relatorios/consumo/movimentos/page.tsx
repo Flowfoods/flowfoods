@@ -7,8 +7,11 @@ import { PaginaDosMovimentos } from '@/components/erp/telas/estoque/consumo-pagi
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpMovimentosDoConsumoPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'estoque.ver');
-  return <PaginaDosMovimentos ctx={ctx} bases={{ raiz: '/erp' }} searchParams={searchParams} />;
+export default async function ErpMovimentosDoConsumoPage(
+ props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+ const searchParams = await props.searchParams;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'estoque.ver');
+ return <PaginaDosMovimentos ctx={ctx} bases={{ raiz: '/erp' }} searchParams={searchParams} />;
 }

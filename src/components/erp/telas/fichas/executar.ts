@@ -21,7 +21,7 @@ import type { EstadoConfiguracao } from '@/lib/erp/canal-config-campos';
 import type { ResultadoDoCanal } from '@/lib/erp/canais';
 import { PREFIXO_DO_PREPARO } from './prefixo';
 import { classificacaoDoFormulario, type EstadoGestaoClassificacao } from '@/lib/erp/ficha-secoes-campos';
-import { gerirClassificacao } from '@/lib/erp/ficha-secoes';
+import { criarClassificacao, gerirClassificacao } from '@/lib/erp/ficha-secoes';
 import { materiaisDoFormulario, type EntradaFichaUnificada, type EstadoFichaUnificada, type ResultadoFichaUnificada } from '@/lib/erp/ficha-unificada-campos';
 import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 
@@ -126,6 +126,11 @@ export async function lerEnvioDaFicha(
 export async function executarGestaoClassificacao(cliente: ClienteDoParceiro, anterior: EstadoGestaoClassificacao, form: FormData, autorNome: string, base: string): Promise<EstadoGestaoClassificacao> {
   const vez = (anterior?.vez ?? 0) + 1;
   const nivel = textoDe(form.get('nivel')), intencao = textoDe(form.get('intencao'));
+  if (intencao === 'criar') {
+    const r = await criarClassificacao(cliente, { nivel, nome: form.get('nome'), secaoId: form.get('secaoId') }, autorNome);
+    if (r.ok) revalidatePath(base, 'layout');
+    return { vez, ...r };
+  }
   if ((nivel !== 'secao' && nivel !== 'subsecao') || (intencao !== 'renomear' && intencao !== 'arquivar' && intencao !== 'restaurar' && intencao !== 'excluir')) return { vez, ok: false, erros: { geral: 'Pedido inválido.' } };
   const r = await gerirClassificacao(cliente, { nivel, intencao, id: textoDe(form.get('id')), versao: textoDe(form.get('versao')), nome: form.get('nome') }, autorNome);
   if (r.ok) revalidatePath(base, 'layout');

@@ -8,7 +8,11 @@ import { TelaIndicadores } from '@/components/erp/telas/producao/indicadores';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroIndicadoresDaLojaPage({ params, searchParams }: { params: { slug: string; lojaId: string }; searchParams: { periodo?: string; de?: string; ate?: string } }) {
+export default async function ParceiroIndicadoresDaLojaPage(
+  props: { params: Promise<{ slug: string; lojaId: string }>; searchParams: Promise<{ periodo?: string; de?: string; ate?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'producao.planejar');
   const d = await indicadoresDaProducao(ctx.cliente, ctx.alcance, params.lojaId, searchParams, await idsDaEquipe(ctx.parceiro.id));

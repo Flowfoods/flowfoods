@@ -53,7 +53,7 @@ export async function classificacaoDaFicha(cliente: ClienteDoParceiro, par: Par)
   }, { repetivel: true });
 }
 
-/** Só é chamada na transação que salva a ficha: erro posterior desfaz nomes e histórico juntos. */
+/** A transação chamadora mantém a criação dos nomes e do histórico atômica. */
 export async function resolverClassificacao(tx: ClienteDoParceiro, entrada: unknown, atual: Par | null, autorNome: string) {
   await travarClassificacao(tx);
   const escolhas: ClassificacaoDigitada = entrada === undefined
@@ -102,6 +102,33 @@ export async function resolverClassificacao(tx: ClienteDoParceiro, entrada: unkn
 async function registrarCriacao(tx: ClienteDoParceiro, entidade: string, r: LinhaSecao, autorNome: string, secao?: LinhaSecao) {
   await tx.historicoAlteracao.create({ data: { parceiroId: tx.parceiroId, entidade, entidadeId: r.id, acao: 'CRIOU', autorNome,
     depois: { id: r.id, nome: r.nome, ativa: r.ativa, ...(secao ? { secaoId: secao.id, secao: secao.nome } : {}) } } });
+}
+
+/** Criação avulsa usa a mesma identidade, trava e auditoria da criação dentro da ficha. */
+export async function criarClassificacao(cliente: ClienteDoParceiro, pedido: { nivel: unknown; nome: unknown; secaoId?: unknown }, autorNome = 'Sistema'): Promise<ResultadoGestaoClassificacao> {
+  if (!pedido || (pedido.nivel !== 'secao' && pedido.nivel !== 'subsecao')) return { ok: false, erros: { geral: 'Pedido inválido.' } };
+  const nome = lerNomeDaClassificacao(pedido.nome);
+  if (!nome.ok) return nome;
+  let escolhas: ClassificacaoDigitada;
+  if (pedido.nivel === 'secao') escolhas = { secao: { tipo: 'nova', nome: nome.dados }, subsecao: { tipo: 'nenhuma' } };
+  else {
+    if (typeof pedido.secaoId !== 'string' || !idDeClassificacaoValido(pedido.secaoId)) return { ok: false, erros: { secaoId: 'Escolha uma seção ativa para criar a subseção.' } };
+    escolhas = { secao: { tipo: 'existente', id: pedido.secaoId }, subsecao: { tipo: 'nova', nome: nome.dados } };
+  }
+  try {
+    return await cliente.transacao(async tx => {
+      const { classificacao } = await resolverClassificacao(tx, escolhas, null, autorNome);
+      const alterado: RegistroDeClassificacao | null = pedido.nivel === 'secao'
+        ? classificacao.secao && { nivel: 'secao', registro: classificacao.secao }
+        : classificacao.subsecao && { nivel: 'subsecao', registro: classificacao.subsecao };
+      if (!alterado) throw new Error('A criação não retornou a classificação solicitada.');
+      return { ok: true, alterado, excluido: null, mensagem: pedido.nivel === 'secao' ? 'Seção pronta para usar.' : 'Subseção pronta para usar.' };
+    });
+  } catch (e) {
+    if (e instanceof ErroDeClassificacao) return { ok: false, erros: Object.fromEntries(Object.entries(e.erros).map(([campo, mensagem]) => [campo === 'secao' && pedido.nivel === 'subsecao' ? 'secaoId' : campo === 'secao' || campo === 'subsecao' ? 'nome' : campo, mensagem])) };
+    if (ehErroDeUnicidade(e)) return { ok: false, erros: { nome: 'Esse nome já existe. Atualize a busca.' }, conflito: true };
+    throw e;
+  }
 }
 
 export async function buscarClassificacao(cliente: ClienteDoParceiro, pedido: PedidoBuscaClassificacao): Promise<ResultadoBuscaClassificacao> {

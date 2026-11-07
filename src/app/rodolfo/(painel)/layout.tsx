@@ -40,7 +40,7 @@ export default async function PainelLayout({ children }: { children: React.React
     contarRespostasSemClassificar(),
     contarPedidosAbertos(),
   ]);
-  const c = cookies();
+  const c = await cookies();
 
   const notificacoes: Notificacao[] = [];
   if (pedidos.abertos > 0) {

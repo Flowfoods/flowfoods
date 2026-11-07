@@ -18,7 +18,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: () => {}, refresh: () => {} }),
   useSearchParams: () => new URLSearchParams(),
 }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, () => {}], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, () => {}] }));
 
 import { ajudaParaATela, entradaPorChave, problemasDoRegistro } from '@/lib/erp/ajuda';
 import { estadoDoPonto, itemDoPonto, type PreferenciaDeAjuda } from '@/lib/erp/ajuda-rota';
@@ -438,8 +439,8 @@ describe.each(AREAS.map((a) => [a.nome, a]))('decisão 519 · âncoras na tela r
     expect(quantas(h, 'nao-vendeu')).toBe(1);
     expect(ancora(h, 'nao-vendeu')).toBeGreaterThan(h.indexOf('name="naoVendeu_IFOOD"'));
     // Quem lança: a caixa do canal desligado trava (o canal não se edita), a do ativo não.
-    expect(h).toMatch(/<input type="checkbox" name="naoVendeu_LOJA" disabled=""/);
-    expect(h).not.toMatch(/<input type="checkbox" name="naoVendeu_IFOOD" disabled=""/);
+    expect(h).toMatch(/<input\b(?=[^>]*\btype="checkbox")(?=[^>]*\bname="naoVendeu_LOJA")(?=[^>]*\bdisabled="")[^>]*>/);
+    expect(h).toMatch(/<input\b(?=[^>]*\btype="checkbox")(?=[^>]*\bname="naoVendeu_IFOOD")(?![^>]*\bdisabled="")[^>]*>/);
     // As duas caixas continuam no formulário de salvar o dia (fora do fieldset, dentro do <form> que tem "Salvar o dia").
     for (const c of ['LOJA', 'IFOOD']) {
       const i = h.indexOf(`name="naoVendeu_${c}"`);
@@ -463,7 +464,7 @@ describe.each(AREAS.map((a) => [a.nome, a]))('decisão 519 · âncoras na tela r
     expect(h).toContain('<fieldset disabled=""');
     for (const p of ['periodo-fechado', 'numeros', 'nao-vendeu']) foraDeFieldset(h, p);
     // A caixa continua travada, agora por ela mesma.
-    expect(h).toMatch(/<input type="checkbox" name="naoVendeu_LOJA" disabled=""/);
+    expect(h).toMatch(/<input\b(?=[^>]*\btype="checkbox")(?=[^>]*\bname="naoVendeu_LOJA")(?=[^>]*\bdisabled="")[^>]*>/);
     expect(quantas(h, 'remover')).toBe(0);
   });
 

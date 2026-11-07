@@ -11,7 +11,8 @@ import { acaoSalvarFaixasDeCmv, acaoSalvarMargensAlvo, acaoSalvarMetasDeCmv, aca
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpCanaisDeVendaPage({ searchParams }: { searchParams: { feito?: string } }) {
+export default async function ErpCanaisDeVendaPage(props: { searchParams: Promise<{ feito?: string }> }) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'precos.ver');
   const t = await obterTaxaDoIfood(ctx.cliente);

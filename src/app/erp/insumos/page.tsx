@@ -32,7 +32,10 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/insumos';
 
-export default async function ErpInsumosPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ErpInsumosPage(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.ver');
   const filtros = lerFiltros(searchParams);

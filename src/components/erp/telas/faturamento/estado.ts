@@ -1,5 +1,5 @@
 /**
- * Estado que as actions de faturamento (2.1) devolvem para `useFormState`.
+ * Estado que as actions de faturamento (2.1) devolvem para `useActionState`.
  * Sucesso não volta por aqui: a action leva de volta à tela do dia com a frase
  * do que aconteceu (`?feito=`). Erro volta com a frase no campo (por canal) ou
  * no topo; conflito pede para recarregar (outra pessoa gravou antes).

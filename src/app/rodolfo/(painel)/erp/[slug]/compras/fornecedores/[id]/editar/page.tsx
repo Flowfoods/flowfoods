@@ -8,7 +8,8 @@ import { acaoEditarFornecedor } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroEditarFornecedorPage({ params }: { params: { slug: string; id: string } }) {
+export default async function ParceiroEditarFornecedorPage(props: { params: Promise<{ slug: string; id: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fornecedores.editar');
   const f = await obterFornecedor(ctx.cliente, ctx.alcance, params.id);

@@ -13,7 +13,10 @@ import { painelDoDia } from '@/lib/erp/painel-do-dia';
 
 export const dynamic = 'force-dynamic';
 
-export default async function HubDaRede({ searchParams }: { searchParams: { 'sem-acesso'?: string; 'sem-modulo'?: string } }) {
+export default async function HubDaRede(
+  props: { searchParams: Promise<{ 'sem-acesso'?: string; 'sem-modulo'?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   const [{ visao }, liberados] = await Promise.all([visaoDaRequisicao(ctx), modulosLiberados(ctx.cliente)]);
   const painel = await painelDoDia(ctx.cliente, ctx.alcance, '/erp', undefined, visao);

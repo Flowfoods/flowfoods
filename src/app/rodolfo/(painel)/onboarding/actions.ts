@@ -55,7 +55,7 @@ export async function acaoAtivarPedido(id: string, anterior: EstadoDoPedido, for
   if (!r.ok) return { ok: false, erros: r.erros, vez };
   await auditar(userId, 'erp_pedido_ativado', { pedidoId: id, parceiroId: r.parceiro.id, slug: r.parceiro.slug });
   refazer();
-  const link = r.link ? linkDePrimeiroAcesso(r.link.token) : null;
+  const link = r.link ? await linkDePrimeiroAcesso(r.link.token) : null;
   return {
     ok: true,
     mensagem: r.mensagem,

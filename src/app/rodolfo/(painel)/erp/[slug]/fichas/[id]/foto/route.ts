@@ -6,7 +6,8 @@ import { responderFoto } from '@/lib/erp/foto-resposta';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request, { params }: { params: { slug: string; id: string } }) {
+export async function GET(req: Request, props: { params: Promise<{ slug: string; id: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   return responderFoto(ctx.cliente, params.id, pode(ctx.alcance, 'fichas.ver'), new URL(req.url).searchParams.get('apoio'));
 }

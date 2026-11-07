@@ -10,11 +10,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { AJUDA_DE_ACESSO_ERP } from '@/lib/constants';
 
 let estadoDoForm: unknown = null;
-vi.mock('react-dom', async (orig) => ({
-  ...(await orig<typeof import('react-dom')>()),
-  useFormState: (_a: unknown, inicial: unknown) => [estadoDoForm ?? inicial, undefined],
-  useFormStatus: () => ({ pending: false }),
-}));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_a: unknown, inicial: unknown) => [estadoDoForm ?? inicial, undefined] }));
 // As actions de entrar não rodam aqui: só o que a tela mostra.
 vi.mock('@/app/entrar/actions', () => ({
   acaoEntrar: vi.fn(),
@@ -119,7 +116,7 @@ describe('515 · mostrar e ocultar a senha', () => {
 
 describe('515 · "Esqueci minha senha" assistido no /entrar', () => {
   it('diz quem gera o link novo, que não há e-mail automático e a validade; o pedido é o WhatsApp de sempre', async () => {
-    const h = html(await EntrarPage({ searchParams: {} }));
+    const h = html(await EntrarPage({ searchParams: Promise.resolve({}) }));
     expect(h).toContain('Esqueci minha senha');
     expect(h).toContain('A troca de senha é assistida: a FlowFoods ou quem administra a equipe da sua empresa no ERP gera um link novo para você definir outra senha.');
     expect(h).toContain('Não há envio automático por e-mail.');
@@ -133,7 +130,7 @@ describe('515 · "Esqueci minha senha" assistido no /entrar', () => {
   });
 
   it('/entrar?senha=criada mantém a confirmação que já existia', async () => {
-    const h = html(await EntrarPage({ searchParams: { senha: 'criada' } }));
+    const h = html(await EntrarPage({ searchParams: Promise.resolve({ senha: 'criada' }) }));
     expect(h).toContain('Senha criada. Agora entre com o seu e-mail e a senha nova.');
     expect(h).toContain('role="status"');
   });

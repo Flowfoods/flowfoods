@@ -14,13 +14,14 @@ import { acaoConcluirProducao } from '../../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpConcluirDasTarefasPage({ params }: { params: { lojaId: string; ordemId: string } }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'producao.registrar', { lojaId: params.lojaId });
-  const d = await obterOrdem(ctx.cliente, ctx.alcance, params.lojaId, params.ordemId, new Date(), ctx.sessao.userId);
-  if (!d) notFound();
-  const lojaId = d.loja.id;
-  if (!pendente(d.ordem.status) || ctx.bloqueio) redirect(`/erp/producao/${lojaId}/${d.ordem.id}`);
-  const veRequisicao = pode(ctx.alcance, 'requisicao.pedir', { lojaId }) || pode(ctx.alcance, 'requisicao.atender', { lojaId });
-  return <TelaConcluir d={d} base="/erp/producao" acao={acaoConcluirProducao.bind(null, lojaId, d.ordem.id)} hrefRequisicao={veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null} periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')} bloqueio={ctx.bloqueio} gerencia={pode(ctx.alcance, 'producao.planejar', { lojaId })} voltar="tarefas" />;
+export default async function ErpConcluirDasTarefasPage(props: { params: Promise<{ lojaId: string; ordemId: string }> }) {
+ const params = await props.params;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'producao.registrar', { lojaId: params.lojaId });
+ const d = await obterOrdem(ctx.cliente, ctx.alcance, params.lojaId, params.ordemId, new Date(), ctx.sessao.userId);
+ if (!d) notFound();
+ const lojaId = d.loja.id;
+ if (!pendente(d.ordem.status) || ctx.bloqueio) redirect(`/erp/producao/${lojaId}/${d.ordem.id}`);
+ const veRequisicao = pode(ctx.alcance, 'requisicao.pedir', { lojaId }) || pode(ctx.alcance, 'requisicao.atender', { lojaId });
+ return <TelaConcluir d={d} base="/erp/producao" acao={acaoConcluirProducao.bind(null, lojaId, d.ordem.id)} hrefRequisicao={veRequisicao ? `/erp/estoque/${lojaId}/requisicoes` : null} periodos={await avisoDePeriodos(ctx.cliente, ctx.alcance, '/erp')} bloqueio={ctx.bloqueio} gerencia={pode(ctx.alcance, 'producao.planejar', { lojaId })} voltar="tarefas" />;
 }

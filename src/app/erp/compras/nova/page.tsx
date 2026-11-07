@@ -14,7 +14,10 @@ import { acaoSalvarNota } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpLancarNotaPage({ searchParams = {} }: { searchParams?: { feito?: string; loja?: string; nova?: string } }) {
+export default async function ErpLancarNotaPage(
+  props: { searchParams?: Promise<{ feito?: string; loja?: string; nova?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'compras.lancar');
   const [opcoes, { visao }] = await Promise.all([dadosDoFormularioDeNota(ctx.cliente, ctx.alcance), visaoDaRequisicao(ctx)]);

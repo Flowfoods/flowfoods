@@ -123,7 +123,7 @@ describe('E5.1 · contagem e filtro por bloco (funções puras)', () => {
 });
 
 describe('E5.1 · a tela do cliente no painel', () => {
-  const pagina = (estado?: string) => PortalClientePage({ params: { id: 'c1' }, searchParams: estado === undefined ? {} : { estado } });
+  const pagina = (estado?: string) => PortalClientePage({ params: Promise.resolve({ id: 'c1' }), searchParams: Promise.resolve(estado === undefined ? {} : { estado }) });
 
   it('sem filtro: todos os blocos, cada um com a contagem; o filtro com o total de cada situação e descendo até a lista', async () => {
     banco.respostas = [{ itemId: a1.id, texto: 'ok', marcacao: null }];

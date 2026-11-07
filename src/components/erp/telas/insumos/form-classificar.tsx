@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * A fila de revisão com edição em lote (I.1a): os insumos sem categoria definitiva (sem nenhuma, ou em "Outros / a classificar"),
  * com o que o nome sugere hoje e quanto valem em estoque. Marca vários, escolhe a categoria, classifica de uma vez; cada
@@ -8,8 +10,8 @@
  */
 
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useMemo, useState, useActionState } from 'react';
+
 import type { LinhaDaFila, VisibilidadeDoValor } from '@/lib/erp/classificar';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
 import { formatarDinheiro } from '@/lib/erp/unidades';
@@ -78,7 +80,7 @@ export function FormDaFila({
   bloqueio: string | null;
 }) {
   const segura = useAcaoSegura(acao);
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(segura, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(segura, null);
   const [marcados, setMarcados] = useState<ReadonlySet<string>>(new Set());
   const [categoriaId, setCategoriaId] = useState('');
   // Depois de um envio que deu certo a página é refeita no servidor e a lista chega nova: a marcação recomeça vazia (não sobra
@@ -97,7 +99,7 @@ export function FormDaFila({
     });
 
   return (
-    <form action={enviar} noValidate>
+    <FormularioComAcao action={enviar} noValidate>
       <SalvandoAnunciado texto="Classificando…" />
       <input type="hidden" name="categoriaId" value={categoriaId} />
       {Array.from(marcados).map((id) => (
@@ -165,6 +167,6 @@ export function FormDaFila({
       <div className="border-t border-linha">
         <BarraDeAcao posicao="rodape" categorias={categorias} categoriaId={categoriaId} aoEscolher={setCategoriaId} marcados={marcados.size} bloqueio={bloqueio} />
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

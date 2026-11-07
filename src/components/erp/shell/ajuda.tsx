@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Ajuda contextual no shell (0.6): a ajuda da tela, o botão "?" e a gaveta.
  * Desde 24/10/2026 a explicação da tela abre no card flutuante (ver
@@ -61,7 +63,7 @@ export function PerguntaDasDicas({
     if (quem === 'manter' || quem === 'desligar') aoEscolher(quem);
   }
   return (
-    <form action={acoes.dicas} onSubmit={aoEnviarEscolha} className="mt-4 border-t border-linha pt-3">
+    <FormularioComAcao action={acoes.dicas} onSubmit={aoEnviarEscolha} className="mt-4 border-t border-linha pt-3">
       <p className="text-[14px] font-medium text-texto">Quer as dicas de como usar cada tela?</p>
       <p className="mt-0.5 text-[13px] text-suave">
         Dá para mudar depois em{' '}
@@ -78,7 +80,7 @@ export function PerguntaDasDicas({
           Desligar
         </button>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }
 
@@ -162,12 +164,12 @@ export function CaixaDeAula({
           </div>
           {estado?.perguntar && acoes && <PerguntaDasDicas acoes={acoes} aoEscolher={aoEscolher} />}
           {estado && acoes && (
-            <form action={acoes.fechar} onSubmit={() => aoFechar(caixa)} className="mt-4">
+            <FormularioComAcao action={acoes.fechar} onSubmit={() => aoFechar(caixa)} className="mt-4">
               <input type="hidden" name="caixa" value={caixa} />
               <button type="submit" className={classeDeBotao('fantasma')}>
                 Não mostrar novamente
               </button>
-            </form>
+            </FormularioComAcao>
           )}
         </div>
       </details>
@@ -270,12 +272,12 @@ export function GavetaDeAjuda({
             <span className="mt-0.5 block tabular-nums">WhatsApp {contato.display}</span>
           </p>
           {preferencia && !preferencia.dicasLigadas && acoes && (
-            <form action={acoes.dicas} onSubmit={aoReligar} className="flex flex-wrap items-center gap-x-2">
+            <FormularioComAcao action={acoes.dicas} onSubmit={aoReligar} className="flex flex-wrap items-center gap-x-2">
               <span>As dicas estão desligadas.</span>
               <button type="submit" name="dicas" value="ligar" className={`${LINK_DE_TEXTO} min-h-11 sm:min-h-8`}>
                 Religar
               </button>
-            </form>
+            </FormularioComAcao>
           )}
         </div>
       </div>

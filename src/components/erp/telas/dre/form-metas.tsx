@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * A tabela das metas (2.2b, decisão 149): uma meta em % da receita bruta por linha do DRE, a mesma
  * na rede e em cada loja. UMA gravação para a tabela inteira, condicional à impressão das metas lidas
@@ -7,8 +9,14 @@
  * e decide: o que a tela mostra aqui é só o campo.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * A tabela das metas (2.2b, decisão 149): uma meta em % da receita bruta por linha do DRE, a mesma
+ * na rede e em cada loja. UMA gravação para a tabela inteira, condicional à impressão das metas lidas
+ * (duas abas não se atropelam). Campo vazio é "sem meta"; "0" é uma meta de zero. O servidor lê o TEXTO
+ * e decide: o que a tela mostra aqui é só o campo.
+ */
+import { useState, useActionState } from 'react';
+
 import { formatarData } from '@/lib/erp/compra-campos';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO } from '../../ui/campos';
@@ -56,7 +64,7 @@ export function FormMetas({
   periodoAtual: string;
   bloqueio: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoLocal, FormData>(acao, null);
   const erros = estado?.erros ?? {};
   const blocos = blocosDe(linhas);
   // No celular as filhas ficam recolhidas atrás do grupo e abrem sob demanda; de tablet para cima aparecem sempre.
@@ -112,7 +120,7 @@ export function FormMetas({
     );
   };
   return (
-    <form action={enviar} noValidate>
+    <FormularioComAcao action={enviar} noValidate>
       <input type="hidden" name="versao" value={versao} />
       {erros.geral && (
         <div role="alert" className="mx-4 mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm sm:mx-5">
@@ -190,6 +198,6 @@ export function FormMetas({
           {estado?.ok && estado.mensagem && <span className="text-ok">{estado.mensagem}</span>}
         </p>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

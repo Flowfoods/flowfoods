@@ -1,20 +1,27 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Cancelar a nota (1.5): motivo obrigatório (vai para o histórico). Cancelar
  * não apaga: a nota sai do custo na hora e cada insumo volta ao preço da
  * compra anterior. Confirmação na própria tela antes de enviar.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Cancelar a nota (1.5): motivo obrigatório (vai para o histórico). Cancelar
+ * não apaga: a nota sai do custo na hora e cada insumo volta ao preço da
+ * compra anterior. Confirmação na própria tela antes de enviar.
+ */
+import { useState, useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, ROTULO } from '../../ui/campos';
 import { classeDeBotao } from '../../ui/estilos';
 import type { AcaoDeNota, EstadoNota } from './estado';
 
 export function FormCancelarNota({ acao }: { acao: AcaoDeNota }) {
-  const [estado, enviar] = useFormState<EstadoNota, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoNota, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
   if (!aberto && !estado) {
     return (
@@ -27,7 +34,7 @@ export function FormCancelarNota({ acao }: { acao: AcaoDeNota }) {
     );
   }
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <div>
         <label htmlFor="cancelar-motivo" className={ROTULO}>
           Por que a nota sai?
@@ -62,6 +69,6 @@ export function FormCancelarNota({ acao }: { acao: AcaoDeNota }) {
           Manter a nota
         </button>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

@@ -1,13 +1,20 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Peças do plano de contas (2.2a): criar linha, renomear e ocultar/reexibir. Cada
  * uma fica na própria tela e diz o resultado ali. O servidor decide (permissão, nome
  * único, versão lida): duas abas não se atropelam.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Peças do plano de contas (2.2a): criar linha, renomear e ocultar/reexibir. Cada
+ * uma fica na própria tela e diz o resultado ali. O servidor decide (permissão, nome
+ * único, versão lida): duas abas não se atropelam.
+ */
+import { useState, useActionState } from 'react';
+
 import { GRUPOS_DE_DESPESA, ROTULO_DO_GRUPO } from '@/lib/erp/dre-plano';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro, ROTULO } from '../../ui/campos';
@@ -36,9 +43,9 @@ function Retorno({ estado }: { estado: EstadoLocal }) {
 }
 
 export function FormNovaLinha({ acao, bloqueio }: { acao: AcaoLocal; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoLocal, FormData>(acao, null);
   return (
-    <form action={enviar} noValidate className="space-y-3">
+    <FormularioComAcao action={enviar} noValidate className="space-y-3">
       <fieldset disabled={!!bloqueio} className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_14rem_auto] sm:items-end">
         <div>
           <label htmlFor="nova-linha-nome" className={ROTULO}>
@@ -65,15 +72,15 @@ export function FormNovaLinha({ acao, bloqueio }: { acao: AcaoLocal; bloqueio: s
         </BotaoEnviar>
       </fieldset>
       <Retorno estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 
 export function FormRenomear({ acao, chave, nome, versao, bloqueio }: { acao: AcaoLocal; chave: string; nome: string; versao: string; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoLocal, FormData>(acao, null);
   const id = `renomear-${chave.replace(/[^a-z0-9]/gi, '-')}`;
   return (
-    <form action={enviar} noValidate className="flex flex-wrap items-start gap-2">
+    <FormularioComAcao action={enviar} noValidate className="flex flex-wrap items-start gap-2">
       <input type="hidden" name="linha" value={chave} />
       <input type="hidden" name="versao" value={versao} />
       <div className="min-w-0 flex-1">
@@ -89,14 +96,14 @@ export function FormRenomear({ acao, chave, nome, versao, bloqueio }: { acao: Ac
       <div className="basis-full">
         <Retorno estado={estado} />
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 export function FormOcultar({ acao, chave, ocultar, versao, bloqueio, nome }: { acao: AcaoLocal; chave: string; ocultar: boolean; versao: string; bloqueio: string | null; nome: string }) {
-  const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoLocal, FormData>(acao, null);
   return (
-    <form action={enviar} className="inline-flex flex-col items-start gap-1">
+    <FormularioComAcao action={enviar} className="inline-flex flex-col items-start gap-1">
       <input type="hidden" name="linha" value={chave} />
       <input type="hidden" name="versao" value={versao} />
       <input type="hidden" name="ocultar" value={ocultar ? '1' : '0'} />
@@ -105,7 +112,7 @@ export function FormOcultar({ acao, chave, ocultar, versao, bloqueio, nome }: { 
         <span className="sr-only"> {nome}</span>
       </BotaoEnviar>
       <Retorno estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 

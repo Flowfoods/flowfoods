@@ -1,6 +1,9 @@
 'use client';
 
-import { useFormState } from 'react-dom';
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
+import { useActionState } from 'react';
+
 import { useAvisoDeSaida } from '@/components/erp/telas/cadastro/erros';
 import { acaoSalvarConfig, type Resposta } from '../actions';
 import { BotaoEnviar, MensagemDeResposta } from '@/components/erp/ui/botoes';
@@ -36,11 +39,11 @@ function Campo({
 }
 
 export function ConfigForm({ config }: { config: ConfigBarney }) {
-  const [estado, acao] = useFormState(acaoSalvarConfig, inicial);
+  const [estado, acao] = useActionState(acaoSalvarConfig, inicial);
   const saida = useAvisoDeSaida(estado);
 
   return (
-    <form action={acao} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} className="space-y-5">
+    <FormularioComAcao action={acao} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} className="space-y-5">
       <label className="flex items-start gap-3 rounded-[7px] border border-linha bg-texto/[0.03] p-3">
         <input
           type="checkbox"
@@ -134,6 +137,6 @@ export function ConfigForm({ config }: { config: ConfigBarney }) {
       <BotaoEnviar pendente="Salvando…">Salvar ajustes</BotaoEnviar>
 
       <MensagemDeResposta resposta={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }

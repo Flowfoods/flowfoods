@@ -11,10 +11,14 @@ import { fraseDasEtiquetas } from '@/components/erp/telas/etiquetas/estado';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpEtiquetasDaLojaPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { lote?: string; feito?: string } }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'etiquetas.imprimir');
-  const p = await painelDeEtiquetas(ctx.cliente, ctx.alcance, params.lojaId, { lote: searchParams.lote });
-  if (!p) notFound();
-  return <TelaPainelDeEtiquetas p={p} base="/erp/etiquetas" feito={fraseDasEtiquetas(searchParams.feito)} podeAbrir />;
+export default async function ErpEtiquetasDaLojaPage(
+ props: { params: Promise<{ lojaId: string }>; searchParams: Promise<{ lote?: string; feito?: string }> }
+) {
+ const searchParams = await props.searchParams;
+ const params = await props.params;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'etiquetas.imprimir');
+ const p = await painelDeEtiquetas(ctx.cliente, ctx.alcance, params.lojaId, { lote: searchParams.lote });
+ if (!p) notFound();
+ return <TelaPainelDeEtiquetas p={p} base="/erp/etiquetas" feito={fraseDasEtiquetas(searchParams.feito)} podeAbrir />;
 }

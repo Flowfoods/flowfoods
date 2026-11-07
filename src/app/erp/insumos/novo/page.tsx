@@ -10,7 +10,10 @@ import { acaoCadastrarInsumo } from '../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpNovoInsumoPage({ searchParams }: { searchParams: { nome?: string; tipo?: string; unidade?: string; volta?: string; de?: string } }) {
+export default async function ErpNovoInsumoPage(
+  props: { searchParams: Promise<{ nome?: string; tipo?: string; unidade?: string; volta?: string; de?: string }> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'insumos.editar');
   const categorias = await categoriasDoFormulario(ctx.cliente);

@@ -1,23 +1,26 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Reabrir o período (2.2b, decisão 154): SÓ o nível 1. O motivo é obrigatório (de 3 a 200 letras) e vai
  * para o Histórico, com o antes e o depois. A fotografia que a pessoa viu vai junto: se outra a substituiu,
  * o servidor recusa. A regra confere o nível de novo; esconder o formulário é só conforto.
  */
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
+
 import { useAvisoDeSaida } from '../cadastro/erros';
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro } from '../../ui/campos';
 import type { AcaoLocal, EstadoLocal } from './estado';
 
 export function FormReabrir({ acao, fotografia, bloqueio }: { acao: AcaoLocal; fotografia: string; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoLocal, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoLocal, FormData>(acao, null);
   const saida = useAvisoDeSaida(estado);
   const erros = estado?.erros ?? {};
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-3">
+    <FormularioComAcao action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-3">
       <input type="hidden" name="fotografia" value={fotografia} />
       {erros.geral && !erros.motivo && (
         <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-[10px] border border-erro/40 px-4 py-3 text-sm">
@@ -40,6 +43,6 @@ export function FormReabrir({ acao, fotografia, bloqueio }: { acao: AcaoLocal; f
       <BotaoEnviar variante="perigo" pendente="Reabrindo…" disabled={!!bloqueio}>
         Reabrir o período
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }

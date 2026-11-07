@@ -10,7 +10,11 @@ import { acaoSalvarEmbalagens } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroEmbalagensDaFichaPage({ params, searchParams }: { params: { slug: string; id: string }; searchParams?: { feito?: string; de?: string | string[] } }) {
+export default async function ParceiroEmbalagensDaFichaPage(
+  props: { params: Promise<{ slug: string; id: string }>; searchParams?: Promise<{ feito?: string; de?: string | string[] }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.editar');
   exigirPermissao(ctx, 'precos.ver');

@@ -1,7 +1,9 @@
 'use client';
 
-import { useEffect } from 'react';
-import { useFormState, useFormStatus } from 'react-dom';
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
+import { useEffect, useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { limparRascunhos } from '@/components/erp/telas/cadastro/rascunho';
 import { CampoDeSenha } from '@/components/erp/ui/campo-senha';
 import { acaoEntrar, type EstadoEntrar } from './actions';
@@ -25,7 +27,7 @@ function Botao() {
 }
 
 export function FormEntrar({ aviso, rosto }: { aviso: string | null; rosto: boolean }) {
-  const [estado, enviar] = useFormState<EstadoEntrar, FormData>(acaoEntrar, null);
+  const [estado, enviar] = useActionState<EstadoEntrar, FormData>(acaoEntrar, null);
   // Quem chega à tela de entrar não herda o que a pessoa anterior deixou preenchido neste aparelho.
   useEffect(() => limparRascunhos(), []);
   return (
@@ -36,7 +38,7 @@ export function FormEntrar({ aviso, rosto }: { aviso: string | null; rosto: bool
           {aviso}
         </p>
       )}
-      <form action={enviar} className="space-y-4" noValidate>
+      <FormularioComAcao action={enviar} className="space-y-4" noValidate>
         <div>
           <label htmlFor="email" className={ROTULO}>
             E-mail
@@ -76,7 +78,7 @@ export function FormEntrar({ aviso, rosto }: { aviso: string | null; rosto: bool
           </p>
         )}
         <Botao />
-      </form>
+      </FormularioComAcao>
       {rosto && <EntrarComRosto />}
     </div>
   );

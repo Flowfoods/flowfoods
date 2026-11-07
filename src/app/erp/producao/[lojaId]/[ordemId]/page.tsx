@@ -15,7 +15,11 @@ import { voltaDoRelatorio } from '@/lib/erp/volta';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpLotePage({ params, searchParams }: { params: { lojaId: string; ordemId: string }; searchParams: { feito?: string; volta?: string } }) {
+export default async function ErpLotePage(
+  props: { params: Promise<{ lojaId: string; ordemId: string }>; searchParams: Promise<{ feito?: string; volta?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'producao.ver');
   const d = await obterOrdem(ctx.cliente, ctx.alcance, params.lojaId, params.ordemId, new Date(), ctx.sessao.userId);

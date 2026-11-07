@@ -11,7 +11,11 @@ import { acaoPlanejarProducao } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpNovaProducaoPage({ params, searchParams }: { params: { lojaId: string }; searchParams: { ficha?: string; quantas?: string } }) {
+export default async function ErpNovaProducaoPage(
+  props: { params: Promise<{ lojaId: string }>; searchParams: Promise<{ ficha?: string; quantas?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'producao.registrar');
   const o = await opcoesDaProducao(ctx.cliente, ctx.alcance, params.lojaId);

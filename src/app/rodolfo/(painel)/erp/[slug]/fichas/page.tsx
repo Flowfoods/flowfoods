@@ -10,7 +10,7 @@ import { lerFiltrosDeFicha, queryDosFiltrosDeFicha, temFiltroDeFicha } from '@/l
 import { FICHAS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtitulo';
 import { FiltrosDasFichas, TelaListaFichas } from '@/components/erp/telas/fichas/lista';
 import { CabecalhoDasFichas, carregarClassificacaoDosFiltros } from '@/components/erp/telas/fichas/paginas';
-import { acaoBuscarClassificacao } from './actions';
+import { acaoBuscarClassificacao, acaoGerirClassificacao } from './actions';
 import { Aviso } from '@/components/erp/ui/superficies';
 import { AvisoDaListaDeFichas } from '@/components/erp/telas/fichas/aviso-da-lista';
 import { PainelDeSaude } from '@/components/erp/telas/fichas/saude';
@@ -18,13 +18,14 @@ import { saudeDoCardapio } from '@/lib/erp/saude-do-cardapio';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroFichasPage({
-  params,
-  searchParams,
-}: {
-  params: { slug: string };
-  searchParams: Record<string, string | string[] | undefined>;
-}) {
+export default async function ParceiroFichasPage(
+  props: {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
@@ -42,7 +43,7 @@ export default async function ParceiroFichasPage({
         bloqueio={ctx.bloqueio}
         de={de}
       >
-        <FiltrosDasFichas key={de} base={base} filtros={filtros} classificacao={classificacao} />
+        <FiltrosDasFichas key={de} base={base} filtros={filtros} classificacao={{ ...classificacao, gerir: ctx.bloqueio ? undefined : acaoGerirClassificacao.bind(null, ctx.parceiro.slug) }} />
       </CabecalhoDasFichas>
       <AvisoDaListaDeFichas cliente={ctx.cliente} base={base} filtros={filtros} feito={searchParams.feito} referencia={searchParams.ref} />
       {pagina.avisoFiltro && <Aviso tom="alerta" titulo={pagina.avisoFiltro} />}

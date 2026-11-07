@@ -8,8 +8,11 @@ import { PaginaDoConsumo } from '@/components/erp/telas/estoque/consumo-pagina';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpConsumoDoEstoquePage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
-  const ctx = await exigirParceiroDaSessao();
-  exigirPermissaoNaPagina(ctx, 'estoque.ver');
-  return <PaginaDoConsumo ctx={ctx} bases={{ raiz: '/erp' }} searchParams={searchParams} />;
+export default async function ErpConsumoDoEstoquePage(
+ props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+ const searchParams = await props.searchParams;
+ const ctx = await exigirParceiroDaSessao();
+ exigirPermissaoNaPagina(ctx, 'estoque.ver');
+ return <PaginaDoConsumo ctx={ctx} bases={{ raiz: '/erp' }} searchParams={searchParams} />;
 }

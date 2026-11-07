@@ -15,7 +15,11 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/compras';
 
-export default async function ErpNotaRecebidaPage({ params, searchParams }: { params: { id: string }; searchParams: { feito?: string; volta?: string } }) {
+export default async function ErpNotaRecebidaPage(
+  props: { params: Promise<{ id: string }>; searchParams: Promise<{ feito?: string; volta?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'compras.ver');
   const doc = await obterDocumento(ctx.cliente, ctx.alcance, params.id);

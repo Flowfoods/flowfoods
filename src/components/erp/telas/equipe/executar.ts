@@ -37,7 +37,7 @@ export async function executarCriar(
   return {
     ok: true,
     mensagem: r.mensagem,
-    link: r.link ? linkDePrimeiroAcesso(r.link.token) : undefined,
+    link: r.link ? await linkDePrimeiroAcesso(r.link.token) : undefined,
     validade: r.link ? validadeDoLink(r.link.expiraEm) : undefined,
     vez: vezDe(anterior),
   };
@@ -67,7 +67,7 @@ export async function executarNovoLink(
   return {
     ok: true,
     mensagem: `Link novo de ${r.nome}. O anterior deixou de valer.`,
-    link: linkDePrimeiroAcesso(r.token),
+    link: await linkDePrimeiroAcesso(r.token),
     validade: validadeDoLink(r.expiraEm),
     vez: vezDe(anterior),
   };

@@ -7,7 +7,11 @@ import { acaoLancarDespesa, acaoLancarDoMesPassado } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroNovaDespesaPage({ params, searchParams }: { params: { slug: string }; searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ParceiroNovaDespesaPage(
+  props: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'despesas.lancar');
   const { visao } = await visaoDaRequisicao(ctx);

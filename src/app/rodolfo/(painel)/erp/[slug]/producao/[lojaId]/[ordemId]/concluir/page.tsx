@@ -10,7 +10,11 @@ import { acaoConcluirProducao } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroConcluirLotePage({ params, searchParams }: { params: { slug: string; lojaId: string; ordemId: string }; searchParams?: { de?: string } }) {
+export default async function ParceiroConcluirLotePage(
+  props: { params: Promise<{ slug: string; lojaId: string; ordemId: string }>; searchParams?: Promise<{ de?: string }> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'producao.registrar');
   const d = await obterOrdem(ctx.cliente, ctx.alcance, params.lojaId, params.ordemId);

@@ -8,7 +8,11 @@ import { acaoIniciarCiclo } from '../../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroPlanejarContagemPage({ params, searchParams }: { params: { slug: string; lojaId: string }; searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ParceiroPlanejarContagemPage(
+  props: { params: Promise<{ slug: string; lojaId: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'estoque.ajustar');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/estoque`;

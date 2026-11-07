@@ -50,7 +50,8 @@ vi.mock('@/lib/erp/contexto', async () => {
   };
 });
 vi.mock('@/lib/db', () => ({ prisma: { auditLog: { create: async () => ({}) } } }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 
 import { doParceiro, type ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cadastrarLoja } from '@/lib/erp/estrutura';
@@ -130,9 +131,9 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     const filhos = ([] as unknown[]).concat((el.props as { children: unknown }).children).filter(isValidElement) as ReactElement[];
     return filhos.find((f) => (f.type as { name?: string }).name === 'TelaDaComposicao') ?? filhos[filhos.length - 1];
   };
-  const despesas = async (query: Record<string, string>) => tela(await resolver(await ErpDespesasPage({ searchParams: query })));
-  const dre = async (query: Record<string, string>) => sp(renderToStaticMarkup((await ErpDrePage({ searchParams: query })) as ReactElement));
-  const categorias = async (query: Record<string, string>) => sp(renderToStaticMarkup(await resolver(await ErpCmvPorCategoriaPage({ searchParams: query }))));
+  const despesas = async (query: Record<string, string>) => tela(await resolver(await ErpDespesasPage({ searchParams: Promise.resolve(query) })));
+  const dre = async (query: Record<string, string>) => sp(renderToStaticMarkup((await ErpDrePage({ searchParams: Promise.resolve(query) })) as ReactElement));
+  const categorias = async (query: Record<string, string>) => sp(renderToStaticMarkup(await resolver(await ErpCmvPorCategoriaPage({ searchParams: Promise.resolve(query) }))));
   /** O href de um número (do HTML) e o total que o relatório de compras mostra para ele, como a página faz (loja do topo quando o link não marca nenhuma). */
   const hrefDe = (h: string, rotulo: string) => {
     const m = new RegExp(`aria-label="${rotulo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}[^"]*"[^>]*href="([^"]+)"`).exec(h) ?? new RegExp(`href="([^"]+)"[^>]*aria-label="${rotulo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).exec(h);
@@ -277,19 +278,19 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
       expect((await despesas(torto)).props, JSON.stringify(torto)).toHaveProperty('lista');
     }
     como(alcanceDe('OPERADOR', [ids.vp]), { tipo: 'loja', lojaId: ids.vp });
-    expect(await rodar(() => ErpDespesasPage({ searchParams: { linha: linha.aluguel, ...SET } }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpDespesasPage({ searchParams: Promise.resolve({ linha: linha.aluguel, ...SET }) }))).toEqual({ erro: 'SEM_ACESSO' });
   });
 
   it('o detalhe da despesa volta para a composição; volta de fora da área é ignorada', async () => {
     como(alcanceDe('DONO', 'rede'));
     const volta = `/erp/dre/despesas?linha=${linha.aluguel}&de=2026-09-01&ate=2026-09-30`;
-    const abre = async (v?: string) => tela(await resolver(await ErpDespesaPage({ params: { id: ids.d_aluguelVp }, searchParams: v ? { volta: v } : {} }))).props as Record<string, any>;
+    const abre = async (v?: string) => tela(await resolver(await ErpDespesaPage({ params: Promise.resolve({ id: ids.d_aluguelVp }), searchParams: Promise.resolve(v ? { volta: v } : {}) }))).props as Record<string, any>;
     expect((await abre(volta)).voltar).toEqual({ href: volta, rotulo: 'Aluguel no DRE' });
     for (const fora of ['https://mal.example/erp/dre', '//mal.example/x', '/rodolfo/erp/outro/dre', '/erp/../rodolfo/x', '/erp/%2e%2e/rodolfo/erp/x', '/erp/dre\\x']) expect((await abre(fora)).voltar, fora).toBeUndefined();
     expect((await abre()).voltar).toBeUndefined();
 
     // Decisão 474: editar e pagar levam o mesmo "voltar" (antes, depois de pagar ou editar, o voltar ia para a lista do mês).
-    const el = tela(await resolver(await ErpDespesaPage({ params: { id: ids.d_aluguelVp }, searchParams: { volta } })));
+    const el = tela(await resolver(await ErpDespesaPage({ params: Promise.resolve({ id: ids.d_aluguelVp }), searchParams: Promise.resolve({ volta }) })));
     const arvore: ReactElement[] = [];
     const juntar = (n: unknown) => {
       if (Array.isArray(n)) n.forEach(juntar);
@@ -307,7 +308,7 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     expect(formularios.length).toBeGreaterThan(0);
     for (const f of formularios) expect((f.props as { volta?: string }).volta).toBe(volta);
     // Sem volta, nada muda: "Editar" sem parâmetro e formulários sem o campo.
-    const sem = tela(await resolver(await ErpDespesaPage({ params: { id: ids.d_aluguelVp }, searchParams: {} })));
+    const sem = tela(await resolver(await ErpDespesaPage({ params: Promise.resolve({ id: ids.d_aluguelVp }), searchParams: Promise.resolve({}) })));
     const arvoreSem: ReactElement[] = [];
     arvore.length = 0;
     juntar((sem.type as (p: unknown) => unknown)(sem.props));
@@ -323,18 +324,18 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     expect(subtitulos(await dre({ periodo: SET.de, rede: '1' }))).toEqual(['Rede Completa · Setembro de 2026']);
     expect(subtitulos(await categorias({ periodo: SET.de, rede: '1' }))).toEqual(['Rede Completa · Setembro de 2026']);
     // A lista de despesas sem filtro mostra todas as lojas do acesso: diz a rede, não a loja do topo.
-    const lista = sp(renderToStaticMarkup(await resolver(await ErpDespesasPage({ searchParams: { mes: '2026-09' } }))));
+    const lista = sp(renderToStaticMarkup(await resolver(await ErpDespesasPage({ searchParams: Promise.resolve({ mes: '2026-09' }) }))));
     const cabecalho = lista.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '';
     expect(cabecalho).toContain('Rede Completa · setembro de 2026');
     // O cabeçalho também tem o filtro de lojas; o subtítulo é o que vem logo depois do título.
     expect(cabecalho.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).toMatch(/^ Despesas Rede Completa · setembro de 2026 /);
     // Quem alcança só algumas lojas: a lista diz as lojas do acesso.
     comoGerente();
-    const doGerente = sp(renderToStaticMarkup(await resolver(await ErpDespesasPage({ searchParams: { mes: '2026-09' } }))));
+    const doGerente = sp(renderToStaticMarkup(await resolver(await ErpDespesasPage({ searchParams: Promise.resolve({ mes: '2026-09' }) }))));
     expect((doGerente.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')).toMatch(/^ Despesas Vila da Penha · setembro de 2026 /);
     // Editar: a loja da despesa (como no detalhe), não a do topo.
     como(alcanceDe('DONO', 'rede'), { tipo: 'loja', lojaId: ids.dl });
-    const editar = sp(renderToStaticMarkup(await resolver(await ErpEditarDespesaPage({ params: { id: ids.d_aluguelVp }, searchParams: {} }))));
+    const editar = sp(renderToStaticMarkup(await resolver(await ErpEditarDespesaPage({ params: Promise.resolve({ id: ids.d_aluguelVp }), searchParams: Promise.resolve({}) }))));
     const cabecalhoEditar = editar.match(/<header[\s\S]*?<\/header>/)?.[0] ?? '';
     expect(cabecalhoEditar).toMatch(/Aluguel[^<]* · Vila da Penha/);
     expect(cabecalhoEditar).not.toContain('Unidade Tijuca');
@@ -354,11 +355,11 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     atual.lojas = todas();
     atual.ctx = () => ({ parceiro: A, alcance: ALCANCE_FLOWFOODS, cliente: a, bloqueio: null, podeEscrever: true, sessao: { userId: 'rodolfo', autorNome: 'Rodolfo' } });
     const raiz = `/rodolfo/erp/${A.slug}`;
-    const el = tela(await resolver(await NivelUmDespesasPage({ params: { slug: A.slug }, searchParams: { linha: linha.aluguel, de: SET.de, ate: SET.ate } })));
+    const el = tela(await resolver(await NivelUmDespesasPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve({ linha: linha.aluguel, de: SET.de, ate: SET.ate }) })));
     expect((el.props as Record<string, any>).voltarDre).toBe(`${raiz}/dre?periodo=2026-09-01&rede=1#linha-aluguel`);
     const h = sp(renderToStaticMarkup(el));
     expect(h).toContain(`${raiz}/dre/despesas/${ids.d_aluguelVp}?volta=${encodeURIComponent(`${raiz}/dre/despesas?linha=${linha.aluguel}&de=2026-09-01&ate=2026-09-30`)}`.replace(/&/g, '&amp;'));
-    const abre = async (v: string) => tela(await resolver(await NivelUmDespesaPage({ params: { slug: A.slug, id: ids.d_aluguelVp }, searchParams: { volta: v } }))).props as Record<string, any>;
+    const abre = async (v: string) => tela(await resolver(await NivelUmDespesaPage({ params: Promise.resolve({ slug: A.slug, id: ids.d_aluguelVp }), searchParams: Promise.resolve({ volta: v }) }))).props as Record<string, any>;
     const volta = `${raiz}/dre/despesas?linha=${linha.aluguel}&de=2026-09-01&ate=2026-09-30`;
     expect((await abre(volta)).voltar).toEqual({ href: volta, rotulo: 'Aluguel no DRE' });
     for (const fora of ['/erp/dre/despesas?linha=x&de=2026-09-01&ate=2026-09-30', '/rodolfo/erp/outro/dre', `${raiz}/../outro/dre`]) expect((await abre(fora)).voltar, fora).toBeUndefined();
@@ -394,7 +395,7 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     const daComposicao = `/erp/dre/despesas?linha=${linha.aluguel}&de=2026-10-01&ate=2026-10-21&loja=${ids.vp}&volta=%2Ferp`;
     expect((el.props as Record<string, any>).aqui).toBe(daComposicao.slice('/erp/dre/despesas'.length));
     expect(sp(renderToStaticMarkup(el))).toContain(`/erp/dre/despesas/${ids.d_outubro}?volta=${encodeURIComponent(daComposicao)}`.replace(/&/g, '&amp;'));
-    const detalhe = tela(await resolver(await ErpDespesaPage({ params: { id: ids.d_outubro }, searchParams: { volta: daComposicao } }))).props as Record<string, any>;
+    const detalhe = tela(await resolver(await ErpDespesaPage({ params: Promise.resolve({ id: ids.d_outubro }), searchParams: Promise.resolve({ volta: daComposicao }) }))).props as Record<string, any>;
     expect(detalhe.voltar).toEqual({ href: daComposicao, rotulo: 'Aluguel no DRE' });
     expect(((await despesas(consulta(detalhe.voltar.href))).props as Record<string, any>).volta).toEqual({ href: '/erp', rotulo: 'o início' });
 
@@ -417,7 +418,7 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     const wN1 = (pN1.analitico?.tipo === 'loja' ? pN1.analitico.widgets.find((x) => x.familia === 'despesas') : undefined) as WidgetDespesasHome;
     const n1 = wN1.composicaoPorGrupo!.grupos.flatMap((g) => g.linhas)[0];
     expect(n1.conferir).toBe(`${raiz}/dre/despesas?linha=${linha.aluguel}&de=2026-10-01&ate=2026-10-21&loja=${ids.vp}&volta=${encodeURIComponent(raiz)}`);
-    const abreN1 = async (q: Record<string, string>) => tela(await resolver(await NivelUmDespesasPage({ params: { slug: A.slug }, searchParams: q }))).props as Record<string, any>;
+    const abreN1 = async (q: Record<string, string>) => tela(await resolver(await NivelUmDespesasPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve(q) }))).props as Record<string, any>;
     const doN1 = await abreN1(consulta(n1.conferir!));
     expect(doN1.c.totalCentavos).toBe(n1.centavos);
     expect(doN1.volta).toEqual({ href: raiz, rotulo: 'o início' });
@@ -454,17 +455,17 @@ describe.skipIf(!URL_TESTE)('Jornada 4 · o número do DRE abre o que o forma (P
     expect(params.rede).toBe('1');
     como(alcanceDe('DONO', 'rede'));
     atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
-    const daRede = sp(renderToStaticMarkup(await resolver(await ErpRelatorioPage({ searchParams: params }))));
+    const daRede = sp(renderToStaticMarkup(await resolver(await ErpRelatorioPage({ searchParams: Promise.resolve(params) }))));
     expect(daRede).toContain('R$ 2.021,00');
     expect(daRede).toContain('Mostrando todas as suas lojas, não só <strong class="font-semibold text-texto">Vila da Penha</strong>, a loja escolhida no topo.');
     expect(daRede).toContain('<input type="hidden" name="rede" value="1"/>');
     const { rede: _rede, ...semRede } = params;
-    const soDoTopo = sp(renderToStaticMarkup(await resolver(await ErpRelatorioPage({ searchParams: semRede }))));
+    const soDoTopo = sp(renderToStaticMarkup(await resolver(await ErpRelatorioPage({ searchParams: Promise.resolve(semRede) }))));
     expect(soDoTopo).not.toContain('R$ 2.021,00');
     expect(soDoTopo).toContain('Mostrando só <strong class="font-semibold text-texto">Vila da Penha</strong>, a loja escolhida no topo.');
-    const comparacao = sp(renderToStaticMarkup(await resolver(await ErpComparacaoDePeriodosPage({ searchParams: { rede: '1' } }))));
+    const comparacao = sp(renderToStaticMarkup(await resolver(await ErpComparacaoDePeriodosPage({ searchParams: Promise.resolve({ rede: '1' }) }))));
     expect(comparacao).toContain('Mostrando todas as suas lojas, não só');
-    expect(sp(renderToStaticMarkup(await resolver(await ErpComparacaoDePeriodosPage({ searchParams: {} }))))).toContain('Mostrando só <strong');
+    expect(sp(renderToStaticMarkup(await resolver(await ErpComparacaoDePeriodosPage({ searchParams: Promise.resolve({}) }))))).toContain('Mostrando só <strong');
     como(alcanceDe('DONO', 'rede'));
 
     comoGerente();

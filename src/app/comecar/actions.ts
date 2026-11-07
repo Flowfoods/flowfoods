@@ -35,7 +35,7 @@ export async function enviarPedido(anterior: EstadoDoComecar, form: FormData): P
   });
 
   try {
-    const r = await receberPedidoDaLanding(entrada, ipDaRequisicao(headers()));
+    const r = await receberPedidoDaLanding(entrada, ipDaRequisicao(await headers()));
     if (r.tipo === 'recebido') return { tipo: 'recebido', mensagem: RESPOSTA_DO_ENVIO, vez };
     if (r.tipo === 'bloqueado') return { tipo: 'bloqueado', mensagem: RESPOSTA_BLOQUEADO, vez };
     return { tipo: 'erros', mensagem: 'Confira os campos marcados.', erros: r.erros, valores: r.valores, vez };

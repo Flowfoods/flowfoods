@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * O dia de uma loja (2.1), a MESMA tela no nível 1 e na pessoa do parceiro:
  * um bloco por canal que a loja vende, com faturamento, pedidos e clientes,
@@ -13,8 +15,8 @@
  */
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
+
 import { CANAIS } from '@/lib/erp/canal-campos';
 import { lerCanalDoDia, textoDoTicket, ticketMedio, type CanalVenda, type ErrosDoCanal } from '@/lib/erp/faturamento-campos';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -207,13 +209,13 @@ export function FormDoDia({
   somenteLeitura: boolean;
   fechado: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoDoDia, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoDoDia, FormData>(acao, null);
   const saida = useAvisoDeSaida(estado);
   const travado = somenteLeitura || !!bloqueio || !!fechado;
   // Decisão 519: os pontos ficam no primeiro canal que a loja vende (canal desligado só aparece porque tem lançamento antigo).
   const comAjuda = (canais.find((c) => !c.desligado) ?? canais[0])?.canal;
   return (
-    <form action={enviar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao action={enviar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       <ErroGeralDoDia estado={estado} recarregar={voltar} />
       {volta && <input type="hidden" name="volta" value={volta} />}
       {estado?.erros.data && (
@@ -234,7 +236,7 @@ export function FormDoDia({
           </BotaoEnviar>
         </div>
       )}
-    </form>
+    </FormularioComAcao>
   );
 }
 
@@ -270,7 +272,7 @@ export function FormRemover({
   /** Decisão 519: a consequência dita antes de apagar. */
   depois: DepoisDeRemover;
 }) {
-  const [estado, enviar] = useFormState<EstadoDoDia, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoDoDia, FormData>(acao, null);
   const erro = estado?.porCanal && Object.values(estado.porCanal)[0]?.geral;
   const id = `remover-${rotulo.toLowerCase().replace(/[^a-z]/g, '')}`;
   return (
@@ -279,7 +281,7 @@ export function FormRemover({
         Remover o lançamento de {rotulo}
         <span className="text-[12px] font-normal text-suave group-open:hidden">abrir</span>
       </summary>
-      <form action={enviar} className="mt-3 space-y-3">
+      <FormularioComAcao action={enviar} className="mt-3 space-y-3">
         <ErroGeralDoDia estado={estado} recarregar={voltar} />
         <input type="hidden" name="versao" value={versao} />
         {volta && <input type="hidden" name="volta" value={volta} />}
@@ -296,7 +298,7 @@ export function FormRemover({
         <BotaoEnviar variante="perigo" pendente="Removendo…">
           Remover lançamento
         </BotaoEnviar>
-      </form>
+      </FormularioComAcao>
     </details>
   );
 }

@@ -195,7 +195,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · telas e actions de faturamento (Postgres
 
   it('a página do dia: 404 para loja fora do alcance, de outro parceiro, inexistente, data futura ou inválida; o operador não entra', async () => {
     como(alcanceDe('GERENTE', [ids.meier]), 'Zé do Méier');
-    const abre = (lojaId: string, data: string) => rodar(() => ErpDiaPage({ params: { lojaId, data }, searchParams: {} }));
+    const abre = (lojaId: string, data: string) => rodar(() => ErpDiaPage({ params: Promise.resolve({ lojaId, data }), searchParams: Promise.resolve({}) }));
     expect(await abre(ids.vp, D)).toEqual({ erro: 'NOT_FOUND' });
     expect(await abre(ids.lojaB, D)).toEqual({ erro: 'NOT_FOUND' });
     expect(await abre('cl0jainexistente0000000000', D)).toEqual({ erro: 'NOT_FOUND' });
@@ -209,14 +209,14 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · telas e actions de faturamento (Postgres
     expect(ok.props.podeLancar).toBe(true);
     como(alcanceDe('OPERADOR', 'rede'), 'Caio Operador');
     expect(await abre(ids.vp, D)).toEqual({ erro: 'SEM_ACESSO' });
-    expect(await rodar(() => ErpFaturamentoPage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
-    expect(await rodar(() => ErpLancarPage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpFaturamentoPage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpLancarPage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     expect(await rodar(() => ErpImportarPage())).toEqual({ erro: 'SEM_ACESSO' });
   });
 
   it('quem lança e não vê não entra em lançar nem em importar (ver + lançar, as duas)', async () => {
     como(alcanceDe('OPERADOR', 'rede', ['faturamento.lancar']), 'Lia');
-    expect(await rodar(() => ErpLancarPage({ searchParams: {} }))).toEqual({ erro: 'SEM_ACESSO' });
+    expect(await rodar(() => ErpLancarPage({ searchParams: Promise.resolve({}) }))).toEqual({ erro: 'SEM_ACESSO' });
     expect(await rodar(() => ErpImportarPage())).toEqual({ erro: 'SEM_ACESSO' });
     const r = (await rodar(() => faturamentoDaSessao.acaoSalvarDia(ids.vp, D, null, form({ valor_LOJA: '1,00', pedidos_LOJA: '1' })))) as { erros: { geral: string } };
     expect(r.erros.geral).toContain('Seu acesso não inclui');
@@ -225,7 +225,7 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · telas e actions de faturamento (Postgres
 
   it('quem vê e não lança abre o dia só para consulta', async () => {
     como(alcanceDe('OPERADOR', 'rede', ['faturamento.ver']), 'Vera');
-    const p = (await ErpDiaPage({ params: { lojaId: ids.vp, data: D }, searchParams: {} })) as { props: { podeLancar: boolean } };
+    const p = (await ErpDiaPage({ params: Promise.resolve({ lojaId: ids.vp, data: D }), searchParams: Promise.resolve({}) })) as { props: { podeLancar: boolean } };
     expect(p.props.podeLancar).toBe(false);
     // E a action recusa mesmo com o formulário forjado.
     const r = (await rodar(() => faturamentoDaSessao.acaoSalvarDia(ids.vp, D, null, form({ valor_LOJA: '1,00', pedidos_LOJA: '1' })))) as { erros: { geral: string } };
@@ -235,31 +235,31 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · telas e actions de faturamento (Postgres
   it('a página do mês traz só as lojas do alcance; "Lançar o dia" vai direto ao dia com uma loja só', async () => {
     como(alcanceDe('GERENTE', [ids.vp]), 'Gil Gerente');
     atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
-    const mes = (await ErpFaturamentoPage({ searchParams: {} })) as { props: { m: { lojas: { loja: { id: string } }[] }; lojaAberta?: { loja: { id: string } } } };
+    const mes = (await ErpFaturamentoPage({ searchParams: Promise.resolve({}) })) as { props: { m: { lojas: { loja: { id: string } }[] }; lojaAberta?: { loja: { id: string } } } };
     expect(mes.props.m.lojas.map((l) => l.loja.id)).toEqual([ids.vp]);
     expect(mes.props.lojaAberta?.loja.id).toBe(ids.vp);
     // Forjar ?loja= de outra loja do mesmo parceiro não abre a loja de fora do alcance.
-    const forjada = (await ErpFaturamentoPage({ searchParams: { loja: ids.meier } })) as typeof mes;
+    const forjada = (await ErpFaturamentoPage({ searchParams: Promise.resolve({ loja: ids.meier }) })) as typeof mes;
     expect(forjada.props.lojaAberta?.loja.id).toBe(ids.vp);
-    expect(await rodar(() => ErpLancarPage({ searchParams: {} }))).toEqual({ redirect: `/erp/faturamento/${ids.vp}/${hojeNoRio()}` });
+    expect(await rodar(() => ErpLancarPage({ searchParams: Promise.resolve({}) }))).toEqual({ redirect: `/erp/faturamento/${ids.vp}/${hojeNoRio()}` });
     // Data futura no formulário: erro na tela, sem redirecionar.
-    const erro = (await ErpLancarPage({ searchParams: { loja: ids.vp, data: '31/12/2099' } })) as { props: { erro?: string } };
+    const erro = (await ErpLancarPage({ searchParams: Promise.resolve({ loja: ids.vp, data: '31/12/2099' }) })) as { props: { erro?: string } };
     expect(erro.props.erro).toContain('ainda não chegou');
     // A dona vê a rede.
     como(alcanceDe('DONO', 'rede'), 'Marina');
     atual.visao = { tipo: 'rede' };
-    const rede = (await ErpFaturamentoPage({ searchParams: {} })) as typeof mes;
+    const rede = (await ErpFaturamentoPage({ searchParams: Promise.resolve({}) })) as typeof mes;
     expect(rede.props.m.lojas.map((l) => l.loja.id).sort()).toEqual([ids.meier, ids.vp].sort());
     expect(rede.props.lojaAberta).toBeUndefined();
     // Duas lojas: o "Lançar o dia" pede a loja.
-    const escolher = (await ErpLancarPage({ searchParams: {} })) as { props: { lojas: unknown[] } };
+    const escolher = (await ErpLancarPage({ searchParams: Promise.resolve({}) })) as { props: { lojas: unknown[] } };
     expect(escolher.props.lojas).toHaveLength(2);
     // Decisão 474: com a Vila da Penha escolhida no topo e "Ver a rede", o subtítulo (e o gráfico) dizem a rede, não a loja do topo.
     atual.visao = { tipo: 'loja', lojaId: ids.vp, nome: 'Vila da Penha' };
     const html = (el: unknown) => renderToStaticMarkup(el as never).replace(/\u00a0/g, ' ');
-    const comLoja = html(await ErpFaturamentoPage({ searchParams: {} }));
+    const comLoja = html(await ErpFaturamentoPage({ searchParams: Promise.resolve({}) }));
     expect(comLoja).toMatch(/Vila da Penha · [a-zç]+ de \d{4}/);
-    const daRede = html(await ErpFaturamentoPage({ searchParams: { rede: '1' } }));
+    const daRede = html(await ErpFaturamentoPage({ searchParams: Promise.resolve({ rede: '1' }) }));
     expect(daRede).toMatch(/Rede Completa · [a-zç]+ de \d{4}/);
     // O gráfico do mês também diz a rede.
     expect(daRede).toMatch(/Rede Completa · \d+ dias? lançados?/);
@@ -270,23 +270,23 @@ describe.skipIf(!URL_TESTE)('ERP 2.1 · telas e actions de faturamento (Postgres
     const PROIBIDO = /Vila da Penha · (Loja|Delivery|iFood)|4\.350|FaturamentoLancamento|"Faturamento"|>Faturamento</;
     // O perfil do Hugo: operador + "ver o histórico", sem "ver faturamento".
     como(alcanceDe('OPERADOR', 'rede', ['historico.ver']), 'Hugo');
-    const tudo = await ErpHistoricoPage({ searchParams: {} });
+    const tudo = await ErpHistoricoPage({ searchParams: Promise.resolve({}) });
     expect(json(tudo).match(PROIBIDO)?.[0] ?? null).toBeNull();
     const html = renderToStaticMarkup(createElement(() => tudo as never));
     expect(html.match(PROIBIDO)?.[0] ?? null).toBeNull();
     // Pedir o filtro de faturamento na URL também não traz nada (a entidade nem entra no filtro).
-    const filtrado = await ErpHistoricoPage({ searchParams: { entidade: 'FaturamentoLancamento' } });
+    const filtrado = await ErpHistoricoPage({ searchParams: Promise.resolve({ entidade: 'FaturamentoLancamento' }) });
     expect(json(filtrado).match(PROIBIDO)?.[0] ?? null).toBeNull();
     expect(renderToStaticMarkup(createElement(() => filtrado as never))).not.toMatch(PROIBIDO);
     // Quem tem os dois vê as linhas e o filtro.
     como(alcanceDe('OPERADOR', 'rede', ['historico.ver', 'faturamento.ver']), 'Helena');
-    const comAcesso = await ErpHistoricoPage({ searchParams: { entidade: 'FaturamentoLancamento' } });
+    const comAcesso = await ErpHistoricoPage({ searchParams: Promise.resolve({ entidade: 'FaturamentoLancamento' }) });
     const htmlOk = renderToStaticMarkup(createElement(() => comAcesso as never)).replace(/ /g, ' ');
     expect(htmlOk).toContain('Vila da Penha · Loja · ');
     expect(htmlOk).toContain('R$ 4.350,00');
     // A dona também.
     como(alcanceDe('DONO', 'rede'), 'Marina');
-    const dona = await ErpHistoricoPage({ searchParams: {} });
+    const dona = await ErpHistoricoPage({ searchParams: Promise.resolve({}) });
     expect(renderToStaticMarkup(createElement(() => dona as never)).replace(/\u00a0/g, ' ')).toContain('R$ 4.350,00');
   });
 });

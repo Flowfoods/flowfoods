@@ -1,13 +1,20 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Cadastrar um cliente no Portal (decisão 477): o nome, o questionário e a confirmação da marca. Cada questionário é de uma
  * marca e cita a marca nas perguntas: nenhum vem marcado, e a tela pede para confirmar que o cliente é daquela marca. O
  * endereço e o link nascem no servidor; depois de cadastrar, abre a página do cliente com o link para copiar.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Cadastrar um cliente no Portal (decisão 477): o nome, o questionário e a confirmação da marca. Cada questionário é de uma
+ * marca e cita a marca nas perguntas: nenhum vem marcado, e a tela pede para confirmar que o cliente é daquela marca. O
+ * endereço e o link nascem no servidor; depois de cadastrar, abre a página do cliente com o link para copiar.
+ */
+import { useState, useActionState } from 'react';
+
 import { acaoCadastrarCliente } from './actions';
 import type { Resposta } from '../actions';
 import { BotaoEnviar, MensagemDeResposta } from '@/components/erp/ui/botoes';
@@ -16,11 +23,11 @@ import { AJUDA, CAMPO, MARCAR, ROTULO } from '@/components/erp/ui/campos';
 const inicial: Resposta | null = null;
 
 export function NovoCliente({ questionarios }: { questionarios: { chave: string; rotulo: string; marca: string }[] }) {
-  const [estado, acao] = useFormState(acaoCadastrarCliente, inicial);
+  const [estado, acao] = useActionState(acaoCadastrarCliente, inicial);
   const [escolhido, setEscolhido] = useState('');
   const marca = questionarios.find((q) => q.chave === escolhido)?.marca ?? null;
   return (
-    <form action={acao} className="space-y-4">
+    <FormularioComAcao action={acao} className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="novo-nome" className={ROTULO}>
@@ -58,6 +65,6 @@ export function NovoCliente({ questionarios }: { questionarios: { chave: string;
       )}
       <BotaoEnviar pendente="Cadastrando…">Cadastrar e gerar o link</BotaoEnviar>
       <MensagemDeResposta resposta={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }

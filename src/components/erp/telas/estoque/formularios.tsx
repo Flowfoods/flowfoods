@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Formulários pequenos do estoque (1.6): abrir o estoque da loja, descartar a
  * contagem em andamento (motivo obrigatório, na própria tela) e concluir a
@@ -9,8 +11,16 @@
  * respondeu.
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Formulários pequenos do estoque (1.6): abrir o estoque da loja, descartar a
+ * contagem em andamento (motivo obrigatório, na própria tela) e concluir a
+ * abertura (versão conferida + confirmação dos não contados). 1.7: aplicar a
+ * contagem do dia a dia / fechar o período, começar o fechamento e as regras
+ * da contagem da loja. O servidor decide; aqui só se mostra o que ele
+ * respondeu.
+ */
+import { useState, useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO } from '../../ui/campos';
 import { classeDeBotao, type Variante } from '../../ui/estilos';
@@ -27,20 +37,20 @@ function ErroGeral({ estado }: { estado: EstadoEstoque }) {
 
 /** "Abrir estoque": começa a contagem de abertura e leva para ela. */
 export function FormAbrirEstoque({ acao, variante = 'primario', rotulo = 'Abrir estoque', className = '' }: { acao: AcaoDeEstoque; variante?: Variante; rotulo?: string; className?: string }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   return (
-    <form action={enviar} className={`space-y-2 ${className}`}>
+    <FormularioComAcao action={enviar} className={`space-y-2 ${className}`}>
       <BotaoEnviar variante={variante} pendente="Abrindo…" className="w-full sm:w-auto">
         {rotulo}
       </BotaoEnviar>
       <ErroGeral estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 
 /** Descartar a contagem em andamento: nada foi para o estoque; dá para recomeçar. */
 export function FormDescartarContagem({ acao }: { acao: AcaoDeEstoque }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const [aberto, setAberto] = useState(false);
   if (!aberto && !estado) {
     return (
@@ -50,7 +60,7 @@ export function FormDescartarContagem({ acao }: { acao: AcaoDeEstoque }) {
     );
   }
   return (
-    <form action={enviar} className="space-y-3">
+    <FormularioComAcao action={enviar} className="space-y-3">
       <div>
         <label htmlFor="descartar-motivo" className={ROTULO}>
           Por que a contagem sai?
@@ -81,7 +91,7 @@ export function FormDescartarContagem({ acao }: { acao: AcaoDeEstoque }) {
           Continuar contando
         </button>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }
 
@@ -90,10 +100,10 @@ export function FormDescartarContagem({ acao }: { acao: AcaoDeEstoque }) {
  * salvou um número depois, o servidor recusa e pede para conferir de novo.
  */
 export function FormConcluirAbertura({ acao, versao, naoContados, recarregar }: { acao: AcaoDeEstoque; versao: number; naoContados: number; recarregar: string }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const erroConfirma = estado?.erros.confirmarNaoContados;
   return (
-    <form action={enviar} className="space-y-4">
+    <FormularioComAcao action={enviar} className="space-y-4">
       <input type="hidden" name="versao" value={versao} />
       {naoContados > 0 && (
         <div>
@@ -122,7 +132,7 @@ export function FormConcluirAbertura({ acao, versao, naoContados, recarregar }: 
       <BotaoEnviar pendente="Concluindo…" className="w-full sm:w-auto">
         Concluir a abertura
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }
 
@@ -146,10 +156,10 @@ export function FormConcluirContagem({
   recarregar: string;
   rotulo: string;
 }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const erroConfirma = estado?.erros.confirmarNaoContados;
   return (
-    <form action={enviar} className="space-y-4">
+    <FormularioComAcao action={enviar} className="space-y-4">
       <input type="hidden" name="versao" value={versao} />
       <input type="hidden" name="tipo" value={tipo} />
       {naoContados > 0 && (
@@ -179,27 +189,27 @@ export function FormConcluirContagem({
       <BotaoEnviar pendente={tipo === 'FECHAMENTO' ? 'Fechando…' : 'Aplicando…'} className="w-full sm:w-auto">
         {rotulo}
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }
 
 /** Começar o fechamento de um período (o de agora ou o anterior que ficou aberto). */
 export function FormIniciarFechamento({ acao, inicio, rotulo = 'Começar o fechamento', variante = 'primario' }: { acao: AcaoDeEstoque; inicio: string; rotulo?: string; variante?: Variante }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   return (
-    <form action={enviar} className="space-y-2">
+    <FormularioComAcao action={enviar} className="space-y-2">
       <input type="hidden" name="inicio" value={inicio} />
       <BotaoEnviar variante={variante} pendente="Começando…" className="w-full sm:w-auto">
         {rotulo}
       </BotaoEnviar>
       <ErroGeral estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 
 /** Regras da contagem da loja (só quem cadastra lojas, rede inteira). Vai com as regras lidas: outra aba mudou = recusa. */
 export function FormRegrasDaContagem({ acao, campos, lidas }: { acao: AcaoDeEstoque; campos: Record<'pisoValor' | 'pisoItens' | 'freqA' | 'freqB' | 'freqC' | 'tolerancia', string>; lidas: string }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const campo = (nome: keyof typeof campos, rotulo: string, sufixo: string, ajuda?: string) => (
     <div>
       <label htmlFor={`regra-${nome}`} className={ROTULO}>
@@ -227,7 +237,7 @@ export function FormRegrasDaContagem({ acao, campos, lidas }: { acao: AcaoDeEsto
     </div>
   );
   return (
-    <form action={enviar} className="space-y-5">
+    <FormularioComAcao action={enviar} className="space-y-5">
       <input type="hidden" name="lidas" value={lidas} />
       <fieldset className="grid gap-4 sm:grid-cols-2">
         <legend className="mb-2 text-[13px] font-semibold text-texto">Piso para fechar o período</legend>
@@ -245,6 +255,6 @@ export function FormRegrasDaContagem({ acao, campos, lidas }: { acao: AcaoDeEsto
       <BotaoEnviar variante="secundario" pendente="Salvando…" className="w-full sm:w-auto">
         Salvar as regras
       </BotaoEnviar>
-    </form>
+    </FormularioComAcao>
   );
 }

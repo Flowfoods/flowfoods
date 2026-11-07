@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Central de Integrações (INT-1.8, primeira parte) — formulários do nível 1. O servidor confere tudo de novo; aqui só se
  * escolhe e se confirma. O que tira acesso ou para a busca (bloquear, desligar, ativar, pausar) pede confirmação em dois
@@ -7,8 +9,14 @@
  * resposta); depois de um cadastro certo, o formulário limpa.
  */
 
-import { useEffect, useRef, useState, type RefObject } from 'react';
-import { useFormState } from 'react-dom';
+/**
+ * Central de Integrações (INT-1.8, primeira parte) — formulários do nível 1. O servidor confere tudo de novo; aqui só se
+ * escolhe e se confirma. O que tira acesso ou para a busca (bloquear, desligar, ativar, pausar) pede confirmação em dois
+ * passos; cancelar devolve o foco ao botão que abriu. Depois de um envio com erro, o foco vai ao primeiro campo com erro (ou à
+ * resposta); depois de um cadastro certo, o formulário limpa.
+ */
+import { useEffect, useRef, useState, type RefObject, useActionState } from 'react';
+
 import { BotaoEnviar } from '@/components/erp/ui/botoes';
 import { AJUDA, CAMPO, Erro, MARCAR, ROTULO, Resultado, type EstadoForm } from '@/components/erp/ui/campos';
 import { classeDeBotao } from '@/components/erp/ui/estilos';
@@ -31,7 +39,7 @@ const MODULOS = [
 ];
 
 /** A cada envio: com erro, foco no primeiro campo com erro (ou na resposta); com sucesso, limpa se for cadastro. */
-function useFocoDoEnvio(estado: EstadoForm, form: RefObject<HTMLFormElement>, limparNoSucesso = false) {
+function useFocoDoEnvio(estado: EstadoForm, form: RefObject<HTMLFormElement | null>, limparNoSucesso = false) {
   const vez = estado?.vez ?? 0;
   const ok = estado?.ok ?? false;
   useEffect(() => {
@@ -67,12 +75,12 @@ function useConfirmacao() {
 }
 
 export function FormCadastrarApp() {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoRegistrarApp, null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoRegistrarApp, null);
   const form = useRef<HTMLFormElement>(null);
   useFocoDoEnvio(estado, form, true);
   const erro = (c: string) => estado?.erros?.[c];
   return (
-    <form ref={form} action={enviar} noValidate className="space-y-4">
+    <FormularioComAcao ref={form} action={enviar} noValidate className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="app-ambiente" className={ROTULO}>
@@ -162,18 +170,18 @@ export function FormCadastrarApp() {
         Cadastrar app
       </BotaoEnviar>
       <Resposta estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 
 /** Liberar (um passo) ou bloquear (com confirmação). Quem usa passa `key={liberado}`: ao virar, a confirmação fecha. */
 export function FormLiberacao({ slug, liberado }: { slug: string; liberado: boolean }) {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoMudarLiberacao.bind(null, slug), null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoMudarLiberacao.bind(null, slug), null);
   const form = useRef<HTMLFormElement>(null);
   useFocoDoEnvio(estado, form);
   const c = useConfirmacao();
   return (
-    <form ref={form} action={enviar} className="space-y-3">
+    <FormularioComAcao ref={form} action={enviar} className="space-y-3">
       <input type="hidden" name="liberado" value={liberado ? 'nao' : 'sim'} />
       {liberado ? (
         c.aberta ? (
@@ -195,16 +203,16 @@ export function FormLiberacao({ slug, liberado }: { slug: string; liberado: bool
         </BotaoEnviar>
       )}
       <Resposta estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 
 export function FormHomologacao({ slug, marcado }: { slug: string; marcado: boolean }) {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoMarcarHomologacao.bind(null, slug), null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoMarcarHomologacao.bind(null, slug), null);
   const form = useRef<HTMLFormElement>(null);
   useFocoDoEnvio(estado, form);
   return (
-    <form ref={form} action={enviar} noValidate className="space-y-3">
+    <FormularioComAcao ref={form} action={enviar} noValidate className="space-y-3">
       <input type="hidden" name="valor" value={marcado ? 'nao' : 'sim'} />
       {!marcado && (
         <div>
@@ -219,7 +227,7 @@ export function FormHomologacao({ slug, marcado }: { slug: string; marcado: bool
         {marcado ? 'Tirar a marca de testes' : 'Marcar como parceiro de testes'}
       </BotaoEnviar>
       <Resposta estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 
@@ -234,12 +242,12 @@ export function FormLigarLoja({
   marcas: { id: string; nome: string }[];
   ambienteRotulo: string;
 }) {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoLigarConexao.bind(null, slug), null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoLigarConexao.bind(null, slug), null);
   const form = useRef<HTMLFormElement>(null);
   useFocoDoEnvio(estado, form, true);
   const erro = (c: string) => estado?.erros?.[c];
   return (
-    <form ref={form} action={enviar} noValidate className="space-y-4">
+    <FormularioComAcao ref={form} action={enviar} noValidate className="space-y-4">
       <p className="text-[13px] text-suave">
         Ambiente desta ligação: <span className="font-semibold text-texto">{ambienteRotulo}</span>. Ele vem da marca do parceiro, não se escolhe aqui.
       </p>
@@ -315,17 +323,17 @@ export function FormLigarLoja({
         Ligar loja
       </BotaoEnviar>
       <Resposta estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 
 export function FormDesligar({ slug, conexaoId, nome }: { slug: string; conexaoId: string; nome: string }) {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoDesligarConexao.bind(null, slug, conexaoId), null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoDesligarConexao.bind(null, slug, conexaoId), null);
   const form = useRef<HTMLFormElement>(null);
   useFocoDoEnvio(estado, form);
   const c = useConfirmacao();
   return (
-    <form ref={form} action={enviar} className="space-y-2">
+    <FormularioComAcao ref={form} action={enviar} className="space-y-2">
       {c.aberta ? (
         <Confirmacao
           titulo={`Desligar ${nome}?`}
@@ -340,18 +348,18 @@ export function FormDesligar({ slug, conexaoId, nome }: { slug: string; conexaoI
         </button>
       )}
       <Resposta estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 
 export function FormPrepararModulo({ slug, conexaoId, opcoes, semOpcao }: { slug: string; conexaoId: string; opcoes: { valor: string; rotulo: string }[]; semOpcao: string }) {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoPrepararModulo.bind(null, slug, conexaoId), null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoPrepararModulo.bind(null, slug, conexaoId), null);
   const form = useRef<HTMLFormElement>(null);
   useFocoDoEnvio(estado, form);
   const id = `preparar-${conexaoId}`;
   if (opcoes.length === 0) return <p className="text-[13px] text-suave">{semOpcao}</p>;
   return (
-    <form ref={form} action={enviar} noValidate className="space-y-2">
+    <FormularioComAcao ref={form} action={enviar} noValidate className="space-y-2">
       <label htmlFor={id} className={ROTULO}>
         Preparar módulo
       </label>
@@ -372,7 +380,7 @@ export function FormPrepararModulo({ slug, conexaoId, opcoes, semOpcao }: { slug
       </div>
       <Erro id={`${id}-erro`} texto={estado?.erros?.appModulo} />
       <Resposta estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }
 
@@ -386,7 +394,7 @@ const PEDE_CONFIRMACAO: Record<string, { titulo: string; detalhe: string; confir
  * aparece aqui). Dando certo, a página volta com o aviso no topo.
  */
 export function FormAcoesDoModulo({ slug, moduloId, acoes }: { slug: string; moduloId: string; acoes: readonly { acao: string; rotulo: string }[] }) {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acaoMudarModulo.bind(null, slug, moduloId), null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acaoMudarModulo.bind(null, slug, moduloId), null);
   const form = useRef<HTMLFormElement>(null);
   useFocoDoEnvio(estado, form);
   const [confirmando, setConfirmando] = useState<string | null>(null);
@@ -398,7 +406,7 @@ export function FormAcoesDoModulo({ slug, moduloId, acoes }: { slug: string; mod
   };
   const pede = confirmando ? PEDE_CONFIRMACAO[confirmando] : null;
   return (
-    <form ref={form} action={enviar} className="space-y-2">
+    <FormularioComAcao ref={form} action={enviar} className="space-y-2">
       {pede && confirmando ? (
         <>
           <input type="hidden" name="acao" value={confirmando} />
@@ -428,6 +436,6 @@ export function FormAcoesDoModulo({ slug, moduloId, acoes }: { slug: string; mod
         </div>
       )}
       <Resposta estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }

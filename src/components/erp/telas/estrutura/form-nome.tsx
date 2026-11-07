@@ -1,9 +1,12 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /** Cadastro de uma linha só (nome): loja ou marca. Campo e botão na mesma linha. */
 
-import { useEffect, useRef } from 'react';
-import { useFormState } from 'react-dom';
+/** Cadastro de uma linha só (nome): loja ou marca. Campo e botão na mesma linha. */
+import { useEffect, useRef, useActionState } from 'react';
+
 import { BotaoEnviar } from '../../ui/botoes';
 import { CAMPO, Erro, Resultado, type EstadoForm } from '../../ui/campos';
 
@@ -15,7 +18,7 @@ export function FormNome({
   acao: (anterior: EstadoForm, form: FormData) => Promise<EstadoForm>;
   tipo: 'loja' | 'marca';
 }) {
-  const [estado, enviar] = useFormState<EstadoForm, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoForm, FormData>(acao, null);
   const ref = useRef<HTMLInputElement>(null);
   const id = `nome-${tipo}`;
 
@@ -27,7 +30,7 @@ export function FormNome({
   }, [estado]);
 
   return (
-    <form action={enviar} noValidate className="space-y-1.5">
+    <FormularioComAcao action={enviar} noValidate className="space-y-1.5">
       <label htmlFor={id} className="sr-only">
         {tipo === 'loja' ? 'Nome da loja' : 'Nome da marca'}
       </label>
@@ -50,6 +53,6 @@ export function FormNome({
       </div>
       <Erro id={`${id}-erro`} texto={estado?.erros?.nome} />
       <Resultado estado={estado} />
-    </form>
+    </FormularioComAcao>
   );
 }

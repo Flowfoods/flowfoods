@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * "Lançar as do mês passado" (2.2a, decisão 139): as despesas que repetem todo
  * mês e ainda não têm o lançamento do mês escolhido. O valor do mês passado é só o
@@ -10,8 +12,8 @@
  */
 
 import Link from 'next/link';
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useState, useActionState } from 'react';
+
 import { formatarData } from '@/lib/erp/compra-campos';
 import { rotuloDoMes } from '@/lib/erp/faturamento-campos';
 import { dinheiroParaCampo, formatarDinheiro } from '@/lib/erp/unidades';
@@ -32,7 +34,7 @@ export interface ItemDoMesPassado {
 }
 
 export function FormMesPassado({ acao, itens, mes, envio, voltar, bloqueio }: { acao: AcaoMesPassado; itens: ItemDoMesPassado[]; mes: string; envio: string; voltar: string; bloqueio: string | null }) {
-  const [estado, enviar] = useFormState<EstadoMesPassado, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoMesPassado, FormData>(acao, null);
   const [marcadas, setMarcadas] = useState<Set<string>>(() => new Set(itens.filter((i) => !i.linhaOculta).map((i) => i.origemId)));
   const alternar = (id: string, on: boolean) =>
     setMarcadas((m) => {
@@ -42,7 +44,7 @@ export function FormMesPassado({ acao, itens, mes, envio, voltar, bloqueio }: { 
       return n;
     });
   return (
-    <form action={enviar} noValidate className="space-y-4">
+    <FormularioComAcao action={enviar} noValidate className="space-y-4">
       <input type="hidden" name="envio" value={envio} />
       <input type="hidden" name="mes" value={mes} />
       {estado?.erro && (
@@ -91,6 +93,6 @@ export function FormMesPassado({ acao, itens, mes, envio, voltar, bloqueio }: { 
           {marcadas.size === 1 ? 'Lançar 1 despesa' : `Lançar ${marcadas.size} despesas`}
         </BotaoEnviar>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

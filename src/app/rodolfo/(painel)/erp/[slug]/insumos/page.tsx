@@ -29,13 +29,14 @@ import { INSUMOS, subtituloDaLista } from '@/components/erp/telas/cadastro/subti
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroInsumosPage({
-  params,
-  searchParams,
-}: {
-  params: { slug: string };
-  searchParams: Record<string, string | string[] | undefined>;
-}) {
+export default async function ParceiroInsumosPage(
+  props: {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<Record<string, string | string[] | undefined>>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'insumos.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/insumos`;

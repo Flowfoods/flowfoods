@@ -1,6 +1,9 @@
 'use client';
 
-import { useFormState, useFormStatus } from 'react-dom';
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
+import { useActionState } from 'react';
+import { useFormStatus } from 'react-dom';
 import { CampoDeSenha } from '@/components/erp/ui/campo-senha';
 import { acaoDefinirSenha, type EstadoSenha } from '../../actions';
 
@@ -22,9 +25,9 @@ function Botao({ texto }: { texto: string }) {
 }
 
 export function FormSenha({ token, email, primeiraVez }: { token: string; email: string; primeiraVez: boolean }) {
-  const [estado, enviar] = useFormState<EstadoSenha, FormData>(acaoDefinirSenha.bind(null, token), null);
+  const [estado, enviar] = useActionState<EstadoSenha, FormData>(acaoDefinirSenha.bind(null, token), null);
   return (
-    <form action={enviar} className="space-y-4" noValidate>
+    <FormularioComAcao action={enviar} className="space-y-4" noValidate>
       {/* Para o gerenciador de senhas do celular guardar no lugar certo. */}
       <input type="email" name="email" value={email} autoComplete="username" readOnly hidden />
       <div>
@@ -65,6 +68,6 @@ export function FormSenha({ token, email, primeiraVez }: { token: string; email:
         </p>
       )}
       <Botao texto={primeiraVez ? 'Criar senha' : 'Salvar senha nova'} />
-    </form>
+    </FormularioComAcao>
   );
 }

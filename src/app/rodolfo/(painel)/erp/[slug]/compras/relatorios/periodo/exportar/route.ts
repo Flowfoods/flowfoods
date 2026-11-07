@@ -9,7 +9,8 @@ import { responderPlanilha } from '@/lib/erp/compras-relatorio-planilha';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request, { params }: { params: { slug: string } }) {
-  const ctx = await parceiroDoNivel1OuNada(params.slug);
-  return responderPlanilha(ctx?.cliente ?? null, ctx?.alcance ?? null, req);
+export async function GET(req: Request, props: { params: Promise<{ slug: string }> }) {
+ const params = await props.params;
+ const ctx = await parceiroDoNivel1OuNada(params.slug);
+ return responderPlanilha(ctx?.cliente ?? null, ctx?.alcance ?? null, req);
 }

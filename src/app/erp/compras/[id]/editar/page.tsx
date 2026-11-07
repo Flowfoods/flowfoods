@@ -12,7 +12,8 @@ import { acaoSalvarNota } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ErpEditarNotaPage({ params }: { params: { id: string } }) {
+export default async function ErpEditarNotaPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'compras.lancar');
   exigirPermissaoNaPagina(ctx, 'compras.ver');

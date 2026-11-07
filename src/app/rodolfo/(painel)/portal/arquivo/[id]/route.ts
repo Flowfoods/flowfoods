@@ -17,7 +17,8 @@ export const dynamic = 'force-dynamic';
  * áudio (gravado no formulário ou anexado), que vai com o tipo certo e
  * `inline` para o player do painel tocar — áudio não executa nada.
  */
-export async function GET(_req: Request, { params }: { params: { id: string } }) {
+export async function GET(_req: Request, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const sessao = await getServerSession(authOptions);
   if (!sessao) return new Response('Sem sessão.', { status: 401 });
 

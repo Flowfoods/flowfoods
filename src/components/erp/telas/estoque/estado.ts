@@ -1,5 +1,5 @@
 /**
- * Estado das actions de estoque (1.6) para `useFormState` e as frases do
+ * Estado das actions de estoque (1.6) para `useActionState` e as frases do
  * `?feito=`. Contar um item não passa por aqui: a tela chama a action direto
  * e recebe o item salvo (ou o conflito) — `ResultadoDoItem`.
  */

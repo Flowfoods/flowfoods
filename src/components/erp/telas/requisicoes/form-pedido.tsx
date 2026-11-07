@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Nova requisição (1.8), celular primeiro: a cozinha pede pelo celular, no
  * meio do serviço. Setor (o da pessoa já vem marcado), para quando (hoje,
@@ -8,7 +10,8 @@
  * Linhas vazias são ignoradas pelo servidor; quem decide é ele.
  */
 
-import { useFormState } from 'react-dom';
+import { useActionState } from 'react';
+
 import type { OpcaoDeInsumo } from '@/lib/erp/requisicao';
 import type { LinhaDigitada } from '@/lib/erp/requisicao-campos';
 import { LISTA_DE_SETORES, SETORES, type Setor } from '@/lib/erp/permissoes';
@@ -33,13 +36,13 @@ export function FormPedido({
   ficha: { id: string; nome: string; quantidadeMilesimos: number; texto: string } | null;
   bloqueio: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoEstoque, FormData>(acao, null);
+  const [estado, enviar] = useActionState<EstadoEstoque, FormData>(acao, null);
   const lista = useLinhasDeInsumos(linhasIniciais);
   const erros = estado?.erros ?? {};
   const errosDeLinha = Object.keys(erros).filter((k) => k.startsWith('item:')).length;
   // O servidor numera as linhas na ordem enviada (`item:<n>`), contando as vazias.
   return (
-    <form action={enviar} className="space-y-5 pb-24 sm:pb-0">
+    <FormularioComAcao action={enviar} className="space-y-5 pb-24 sm:pb-0">
       {ficha && (
         <>
           <input type="hidden" name="fichaId" value={ficha.id} />
@@ -104,6 +107,6 @@ export function FormPedido({
           </BotaoEnviar>
         </div>
       </div>
-    </form>
+    </FormularioComAcao>
   );
 }

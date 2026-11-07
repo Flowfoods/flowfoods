@@ -1,4 +1,5 @@
 import { CONTACT_INFO } from '@/lib/constants';
+import Link from 'next/link';
 
 /** Endereço que não existe (decisão 471): em português, com a identidade e uma saída (antes, o 404 padrão em inglês). */
 export default function NaoEncontrado() {
@@ -10,12 +11,12 @@ export default function NaoEncontrado() {
         <h1 className="mt-3 font-display text-3xl font-bold leading-tight md:text-4xl">Página não encontrada.</h1>
         <p className="mt-4 leading-relaxed text-ink-3">O endereço pode ter mudado ou estar com um pedaço faltando.</p>
         <div className="mt-6 flex flex-wrap gap-3">
-          <a
+          <Link
             href="/"
             className="inline-flex min-h-[48px] items-center bg-ink px-5 text-[13px] font-semibold uppercase tracking-[0.12em] text-surface transition-colors hover:bg-primary hover:text-white"
           >
             Ir para o site
-          </a>
+          </Link>
           <a
             href={CONTACT_INFO.whatsappUrl}
             target="_blank"

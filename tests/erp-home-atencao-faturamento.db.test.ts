@@ -26,7 +26,8 @@ vi.mock('next/navigation', () => ({
   useSearchParams: () => new URLSearchParams(),
   useRouter: () => ({ refresh: () => {}, push: () => {} }),
 }));
-vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormState: (_acao: unknown, inicial: unknown) => [inicial, undefined], useFormStatus: () => ({ pending: false }) }));
+vi.mock('react-dom', async (orig) => ({ ...(await orig<typeof import('react-dom')>()), useFormStatus: () => ({ pending: false }) }));
+vi.mock('react', async original => ({ ...await original<typeof import('react')>(), useActionState: (_acao: unknown, inicial: unknown) => [inicial, undefined] }));
 vi.mock('@/lib/erp/contexto', async () => {
   const { recusaDaAcao, exigirPermissao, pode } = await import('@/lib/erp/permissoes');
   return {
@@ -123,7 +124,7 @@ describe.skipIf(!URL_TESTE)('Decisão 518 · pendência de faturamento → lanç
   const homeDoGerente = async () => {
     como(alcanceDe('GERENTE', [ids.vp]), 'Gil Gerente');
     naLoja(ids.vp, 'Vila da Penha');
-    return html(await ErpHomePage({ searchParams: {} }));
+    return html(await ErpHomePage({ searchParams: Promise.resolve({}) }));
   };
 
   beforeAll(async () => {
@@ -213,30 +214,30 @@ describe.skipIf(!URL_TESTE)('Decisão 518 · pendência de faturamento → lanç
     expect(antes).toContain('2 lançamentos faltando neste mês');
     const href = `/erp/faturamento?mes=2026-10&loja=${ids.vp}&volta=%2Ferp`;
     // O mês aberto pelo link: o mesmo recorte, "Voltar para o início" (leitura nova da Home) e os dias com falta levando a volta.
-    const mes = html(await ErpFaturamentoPage({ searchParams: query(href) }));
+    const mes = html(await ErpFaturamentoPage({ searchParams: Promise.resolve(query(href)) }));
     expect(link(mes, '/erp', 'Voltar para o início')).toBe(1);
     expect(mes).toContain('2 lançamentos faltando neste mês.');
     expect(mes).toContain(`href="/erp/faturamento/${ids.vp}/2026-10-15?volta=%2Ferp"`);
     expect(mes).toContain(`href="/erp/faturamento/${ids.vp}/2026-10-16?volta=%2Ferp"`);
     expect(mes).not.toMatch(/Méier|Casa do B/);
     // O dia: Voltar para o mês com os filtros e a volta; o formulário leva a volta.
-    const dia = html(await ErpDiaPage({ params: { lojaId: ids.vp, data: '2026-10-15' }, searchParams: { volta: '/erp' } }));
+    const dia = html(await ErpDiaPage({ params: Promise.resolve({ lojaId: ids.vp, data: '2026-10-15' }), searchParams: Promise.resolve({ volta: '/erp' }) }));
     expect(dia).toContain(`href="/erp/faturamento?mes=2026-10&amp;loja=${ids.vp}&amp;volta=%2Ferp">Voltar para o mês</a>`);
     expect(dia).toContain('<input type="hidden" name="volta" value="/erp"/>');
     // Volta inválida: o mês e o dia ficam como sempre (sem "Voltar para o início" e sem levar volta adiante).
     for (const volta of ['https://fora.test/erp', '//fora.test', '/erp/insumos', '/erp?sem-acesso=1', '/%65rp', `/rodolfo/erp/${A.slug}`, '/erp/dre/despesas?linha=x']) {
-      const m = html(await ErpFaturamentoPage({ searchParams: { mes: '2026-10', loja: ids.vp, volta } }));
+      const m = html(await ErpFaturamentoPage({ searchParams: Promise.resolve({ mes: '2026-10', loja: ids.vp, volta }) }));
       expect(m, volta).not.toContain('Voltar para o início');
       expect(m, volta).not.toContain('volta=');
       expect(temVoltarNoShell('/erp/faturamento', new URLSearchParams({ volta }).toString()), volta).toBe(true);
-      const d = html(await ErpDiaPage({ params: { lojaId: ids.vp, data: '2026-10-15' }, searchParams: { volta } }));
+      const d = html(await ErpDiaPage({ params: Promise.resolve({ lojaId: ids.vp, data: '2026-10-15' }), searchParams: Promise.resolve({ volta }) }));
       expect(d, volta).not.toContain('volta=');
       expect(d, volta).not.toContain('name="volta"');
       expect(d, volta).toContain(`href="/erp/faturamento?mes=2026-10&amp;loja=${ids.vp}">Voltar para o mês</a>`);
     }
     // Loja de outro parceiro pela URL do mês: ignorada (fica a loja da visão); no dia, 404.
-    expect(html(await ErpFaturamentoPage({ searchParams: { mes: '2026-10', loja: ids.casaB, volta: '/erp' } }))).not.toContain('Casa do B');
-    expect(await rodar(() => ErpDiaPage({ params: { lojaId: ids.casaB, data: '2026-10-16' }, searchParams: { volta: '/erp' } }))).toEqual({ erro: 'NOT_FOUND' });
+    expect(html(await ErpFaturamentoPage({ searchParams: Promise.resolve({ mes: '2026-10', loja: ids.casaB, volta: '/erp' }) }))).not.toContain('Casa do B');
+    expect(await rodar(() => ErpDiaPage({ params: Promise.resolve({ lojaId: ids.casaB, data: '2026-10-16' }), searchParams: Promise.resolve({ volta: '/erp' }) }))).toEqual({ erro: 'NOT_FOUND' });
     expect(await homeDoGerente()).toContain('2 lançamentos faltando neste mês');
 
     // Salvar com erro: volta ao formulário, nada gravado, a Home igual.
@@ -262,7 +263,7 @@ describe.skipIf(!URL_TESTE)('Decisão 518 · pendência de faturamento → lanç
     como(alcanceDe('GERENTE', [ids.vp]), 'Gil Gerente');
     naLoja(ids.vp, 'Vila da Penha');
     const v = '&volta=%2Ferp';
-    const mes = html(await ErpFaturamentoPage({ searchParams: { mes: '2026-10', loja: ids.vp, volta: '/erp' } }));
+    const mes = html(await ErpFaturamentoPage({ searchParams: Promise.resolve({ mes: '2026-10', loja: ids.vp, volta: '/erp' }) }));
     // Troca de mês (outubro é o corrente: só o anterior tem link) e o botão principal "Lançar o dia".
     expect(link(mes, `/erp/faturamento?mes=2026-09&loja=${ids.vp}${v}`)).toBe(1);
     expect(link(mes, '/erp/faturamento/lancar?volta=%2Ferp')).toBe(1);
@@ -275,22 +276,22 @@ describe.skipIf(!URL_TESTE)('Decisão 518 · pendência de faturamento → lanç
     expect(link(celular, `/erp/faturamento/${ids.vp}/2026-10-01?volta=%2Ferp`)).toBe(1);
     expect(mes).not.toMatch(new RegExp(`href="/erp/faturamento/${ids.vp}/2026-10-\\d\\d"`));
     // Setembro: o mês seguinte e "Voltar para este mês" também levam a volta.
-    const setembro = html(await ErpFaturamentoPage({ searchParams: { mes: '2026-09', loja: ids.vp, volta: '/erp' } }));
+    const setembro = html(await ErpFaturamentoPage({ searchParams: Promise.resolve({ mes: '2026-09', loja: ids.vp, volta: '/erp' }) }));
     expect(link(setembro, `/erp/faturamento?mes=2026-10&loja=${ids.vp}${v}`)).toBe(1);
     expect(link(setembro, `/erp/faturamento?loja=${ids.vp}${v}`, 'Voltar para este mês')).toBe(1);
     expect(link(setembro, '/erp', 'Voltar para o início')).toBe(1);
     // A dona: "Ver a rede" e a tabela da rede (celular e desktop) com a volta; a conta é por canal em cada dia.
     como(alcanceDe('DONO', 'rede'), 'Marina');
-    const daLoja = html(await ErpFaturamentoPage({ searchParams: { mes: '2026-10', loja: ids.vp, volta: '/erp' } }));
+    const daLoja = html(await ErpFaturamentoPage({ searchParams: Promise.resolve({ mes: '2026-10', loja: ids.vp, volta: '/erp' }) }));
     expect(link(daLoja, `/erp/faturamento?mes=2026-10&rede=1${v}`, 'Ver a rede')).toBe(1);
-    const rede = html(await ErpFaturamentoPage({ searchParams: { mes: '2026-10', rede: '1', volta: '/erp' } }));
+    const rede = html(await ErpFaturamentoPage({ searchParams: Promise.resolve({ mes: '2026-10', rede: '1', volta: '/erp' }) }));
     expect(link(rede, `/erp/faturamento?mes=2026-10&loja=${ids.vp}${v}`)).toBe(2);
     expect(link(rede, `/erp/faturamento?mes=2026-10&loja=${ids.meier}${v}`)).toBe(2);
     expect(rede).toContain('4 lançamentos faltando neste mês.');
     expect(rede).toContain('Cada canal conta um por dia.');
     // O dia: vizinhos, "Voltar sem salvar" e os formulários renderizados (salvar e cada remover) com a volta.
     como(alcanceDe('GERENTE', [ids.vp]), 'Gil Gerente');
-    const dia = html(await ErpDiaPage({ params: { lojaId: ids.vp, data: '2026-10-15' }, searchParams: { volta: '/erp' } }));
+    const dia = html(await ErpDiaPage({ params: Promise.resolve({ lojaId: ids.vp, data: '2026-10-15' }), searchParams: Promise.resolve({ volta: '/erp' }) }));
     expect(link(dia, `/erp/faturamento/${ids.vp}/2026-10-14?volta=%2Ferp`, 'Dia anterior')).toBe(1);
     expect(link(dia, `/erp/faturamento/${ids.vp}/2026-10-16?volta=%2Ferp`, 'Dia seguinte')).toBe(1);
     expect(link(dia, `/erp/faturamento/${ids.vp}/2026-10-15?volta=%2Ferp`, 'Voltar sem salvar')).toBe(1);
@@ -300,24 +301,24 @@ describe.skipIf(!URL_TESTE)('Decisão 518 · pendência de faturamento → lanç
     expect(dia.match(/<input type="hidden" name="volta" value="\/erp"\/>/g)).toHaveLength(3);
 
     // Volta repetida: a página recusa e o shell também, então fica o Voltar do shell (nunca nenhum, nunca dois).
-    const repetida = html(await ErpFaturamentoPage({ searchParams: { mes: '2026-10', loja: ids.vp, volta: ['/erp', '/erp'] } }));
+    const repetida = html(await ErpFaturamentoPage({ searchParams: Promise.resolve({ mes: '2026-10', loja: ids.vp, volta: ['/erp', '/erp'] }) }));
     expect(link(repetida, '/erp', 'Voltar para o início')).toBe(0);
     expect(repetida).not.toContain('volta=');
     expect(temVoltarNoShell('/erp/faturamento', 'mes=2026-10&volta=%2Ferp&volta=%2Ferp')).toBe(true);
 
     // "Lançar o dia" com uma loja só vai direto ao dia de hoje com a volta; volta inválida não segue.
-    expect(await rodar(() => ErpLancarPage({ searchParams: { volta: '/erp' } }))).toEqual({ redirect: `/erp/faturamento/${ids.vp}/${HOJE}?volta=%2Ferp` });
-    expect(await rodar(() => ErpLancarPage({ searchParams: { volta: '/erp/insumos' } }))).toEqual({ redirect: `/erp/faturamento/${ids.vp}/${HOJE}` });
+    expect(await rodar(() => ErpLancarPage({ searchParams: Promise.resolve({ volta: '/erp' }) }))).toEqual({ redirect: `/erp/faturamento/${ids.vp}/${HOJE}?volta=%2Ferp` });
+    expect(await rodar(() => ErpLancarPage({ searchParams: Promise.resolve({ volta: '/erp/insumos' }) }))).toEqual({ redirect: `/erp/faturamento/${ids.vp}/${HOJE}` });
     // Com duas lojas: o formulário, os atalhos e o Voltar levam a volta; escolher leva ao dia com ela.
     como(alcanceDe('DONO', 'rede'), 'Marina');
-    const escolher = html(await ErpLancarPage({ searchParams: { volta: '/erp' } }));
-    expect(escolher).toMatch(/<form method="get" action="\/erp\/faturamento\/lancar"[^>]*><input type="hidden" name="volta" value="\/erp"\/>/);
+    const escolher = html(await ErpLancarPage({ searchParams: Promise.resolve({ volta: '/erp' }) }));
+    expect(escolher).toMatch(/<form\b(?=[^>]*\smethod="get")(?=[^>]*\saction="\/erp\/faturamento\/lancar")[^>]*><input type="hidden" name="volta" value="\/erp"\/>/);
     expect(link(escolher, '/erp/faturamento?volta=%2Ferp', 'Voltar para o faturamento')).toBe(1);
     expect(link(escolher, `/erp/faturamento/${ids.meier}/2026-10-16?volta=%2Ferp`, 'Ontem')).toBe(1);
     expect(link(escolher, `/erp/faturamento/${ids.meier}/${HOJE}?volta=%2Ferp`, 'Hoje')).toBe(1);
-    expect(await rodar(() => ErpLancarPage({ searchParams: { loja: ids.meier, data: '16/10/2026', volta: '/erp' } }))).toEqual({ redirect: `/erp/faturamento/${ids.meier}/2026-10-16?volta=%2Ferp` });
-    expect(await rodar(() => ErpLancarPage({ searchParams: { loja: ids.meier, data: '16/10/2026', volta: 'https://fora.test' } }))).toEqual({ redirect: `/erp/faturamento/${ids.meier}/2026-10-16` });
-    const semVolta = html(await ErpLancarPage({ searchParams: {} }));
+    expect(await rodar(() => ErpLancarPage({ searchParams: Promise.resolve({ loja: ids.meier, data: '16/10/2026', volta: '/erp' }) }))).toEqual({ redirect: `/erp/faturamento/${ids.meier}/2026-10-16?volta=%2Ferp` });
+    expect(await rodar(() => ErpLancarPage({ searchParams: Promise.resolve({ loja: ids.meier, data: '16/10/2026', volta: 'https://fora.test' }) }))).toEqual({ redirect: `/erp/faturamento/${ids.meier}/2026-10-16` });
+    const semVolta = html(await ErpLancarPage({ searchParams: Promise.resolve({}) }));
     expect(semVolta).not.toMatch(/name="volta"|volta=/);
   });
 
@@ -334,7 +335,7 @@ describe.skipIf(!URL_TESTE)('Decisão 518 · pendência de faturamento → lanç
     expect(uma).toContain('1 lançamento faltando neste mês');
     expect(uma).not.toContain('2 lançamentos faltando');
     // O mês, de volta pelo "Voltar para o mês", mostra o mesmo.
-    expect(html(await ErpFaturamentoPage({ searchParams: { mes: '2026-10', loja: ids.vp, volta: '/erp' } }))).toContain('1 lançamento faltando neste mês.');
+    expect(html(await ErpFaturamentoPage({ searchParams: Promise.resolve({ mes: '2026-10', loja: ids.vp, volta: '/erp' }) }))).toContain('1 lançamento faltando neste mês.');
     const ultimo = await rodar(() => faturamentoDaSessao.acaoSalvarDia(ids.vp, '2026-10-16', null, form({ DELIVERY_PROPRIO: { valor: '300,00', pedidos: '5' } }, '/erp')));
     expect(ultimo).toEqual({ redirect: `/erp/faturamento/${ids.vp}/2026-10-16?feito=salvo&volta=%2Ferp` });
     const visao = naLoja(ids.vp, 'Vila da Penha');
@@ -369,19 +370,19 @@ describe.skipIf(!URL_TESTE)('Decisão 518 · pendência de faturamento → lanç
     const p = await painelDoDia(a, ALCANCE_FLOWFOODS, raiz, HOJE, visao);
     const href = `${raiz}/faturamento?mes=2026-10&loja=${ids.meier}&volta=${encodeURIComponent(raiz)}`;
     expect(pendencia(p)).toMatchObject({ titulo: '2 lançamentos faltando neste mês', href, acao: 'Lançar o que falta' });
-    expect(html(await Nivel1HomePage({ params: { slug: A.slug } }))).toContain(`href="${href.replace(/&/g, '&amp;')}">Lançar o que falta</a>`);
-    const mes = html(await Nivel1FaturamentoPage({ params: { slug: A.slug }, searchParams: query(href) }));
+    expect(html(await Nivel1HomePage({ params: Promise.resolve({ slug: A.slug }) }))).toContain(`href="${href.replace(/&/g, '&amp;')}">Lançar o que falta</a>`);
+    const mes = html(await Nivel1FaturamentoPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve(query(href)) }));
     expect(link(mes, raiz, 'Voltar para o início')).toBe(1);
     expect(mes).toContain(`href="${raiz}/faturamento/${ids.meier}/2026-10-16?volta=${encodeURIComponent(raiz)}"`);
     expect(temVoltarNoShell(`${raiz}/faturamento`, `volta=${encodeURIComponent(raiz)}`)).toBe(false);
     // A Home do parceiro de fora, a do /erp ou outra tela do próprio parceiro não valem como volta.
     for (const volta of ['/erp', `/rodolfo/erp/${B.slug}`, `${raiz}/insumos`, '/rodolfo']) {
-      expect(html(await Nivel1FaturamentoPage({ params: { slug: A.slug }, searchParams: { mes: '2026-10', loja: ids.meier, volta } })), volta).not.toContain('Voltar para o início');
+      expect(html(await Nivel1FaturamentoPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve({ mes: '2026-10', loja: ids.meier, volta }) })), volta).not.toContain('Voltar para o início');
     }
     // "Lançar o dia" do espelho: a volta do nível 1 segue; a do /erp, não.
-    expect(html(await Nivel1LancarPage({ params: { slug: A.slug }, searchParams: { volta: raiz } }))).toContain(`<input type="hidden" name="volta" value="${raiz}"/>`);
-    expect(await rodar(() => Nivel1LancarPage({ params: { slug: A.slug }, searchParams: { loja: ids.meier, data: '16/10/2026', volta: raiz } }))).toEqual({ redirect: `${raiz}/faturamento/${ids.meier}/2026-10-16?volta=${encodeURIComponent(raiz)}` });
-    expect(await rodar(() => Nivel1LancarPage({ params: { slug: A.slug }, searchParams: { loja: ids.meier, data: '16/10/2026', volta: '/erp' } }))).toEqual({ redirect: `${raiz}/faturamento/${ids.meier}/2026-10-16` });
+    expect(html(await Nivel1LancarPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve({ volta: raiz }) }))).toContain(`<input type="hidden" name="volta" value="${raiz}"/>`);
+    expect(await rodar(() => Nivel1LancarPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve({ loja: ids.meier, data: '16/10/2026', volta: raiz }) }))).toEqual({ redirect: `${raiz}/faturamento/${ids.meier}/2026-10-16?volta=${encodeURIComponent(raiz)}` });
+    expect(await rodar(() => Nivel1LancarPage({ params: Promise.resolve({ slug: A.slug }), searchParams: Promise.resolve({ loja: ids.meier, data: '16/10/2026', volta: '/erp' }) }))).toEqual({ redirect: `${raiz}/faturamento/${ids.meier}/2026-10-16` });
     const r = await rodar(() => faturamentoDoNivel1.acaoSalvarDia(A.slug, ids.meier, '2026-10-16', null, form({ DELIVERY_PROPRIO: { valor: '100,00', pedidos: '2' }, IFOOD: { valor: '100,00', pedidos: '2' } }, raiz)));
     expect(r).toEqual({ redirect: `${raiz}/faturamento/${ids.meier}/2026-10-16?feito=salvo&volta=${encodeURIComponent(raiz)}` });
     // A volta da área do parceiro (/erp) no formulário do nível 1 não passa.

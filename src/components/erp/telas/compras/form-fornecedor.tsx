@@ -1,5 +1,7 @@
 'use client';
 
+import { FormularioComAcao } from '@/components/erp/ui/formulario-com-acao';
+
 /**
  * Cadastro do fornecedor (F.1a): quem vende, onde fica, como falar e quanto tempo de prazo. Obrigatórios ditos em palavras
  * ("obrigatório"): nome fantasia, razão social, CNPJ ou CPF, e-mail e WhatsApp com DDD. A única exceção é "Compras sem nota
@@ -9,8 +11,8 @@
  */
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
-import { useFormState } from 'react-dom';
+import { useEffect, useRef, useState, useActionState } from 'react';
+
 import { LIMITES_DO_FORNECEDOR, rotuloDoCampoDoFornecedor, UFS } from '@/lib/erp/compra-campos';
 import { rotuloDaVolta } from '@/lib/erp/volta';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -92,7 +94,7 @@ export function FormFornecedor({
   contatoAntigo?: string | null;
 }) {
   const acaoSegura = useAcaoSegura(acao);
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acaoSegura, null);
+  const [estado, enviar] = useActionState<EstadoCadastro, FormData>(acaoSegura, null);
   const [semNota, setSemNota] = useState(inicial.semNotaFiscal);
   // A chave do envio nasce na montagem e não muda enquanto o formulário estiver aberto.
   const [chaveDeEnvio] = useState(envio ?? '');
@@ -113,7 +115,7 @@ export function FormFornecedor({
   const obrigatorioSalvoSemNota = semNota ? OPCIONAL : OBRIGATORIO;
 
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
+    <FormularioComAcao action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
       {versao && <input type="hidden" name="versao" value={versao} />}
       {modo === 'criar' && chaveDeEnvio && <input type="hidden" name="envio" value={chaveDeEnvio} />}
       {modo === 'criar' && volta && <input type="hidden" name="volta" value={volta} />}
@@ -434,6 +436,6 @@ export function FormFornecedor({
         </BotaoEnviar>
       </div>
       {bloqueio && <p className="text-right text-[13px] text-suave">{bloqueio}</p>}
-    </form>
+    </FormularioComAcao>
   );
 }

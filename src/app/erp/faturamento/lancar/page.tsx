@@ -18,7 +18,10 @@ export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/faturamento';
 
-export default async function ErpLancarODiaPage({ searchParams }: { searchParams: Record<string, string | string[] | undefined> }) {
+export default async function ErpLancarODiaPage(
+  props: { searchParams: Promise<Record<string, string | string[] | undefined>> }
+) {
+  const searchParams = await props.searchParams;
   const ctx = await exigirParceiroDaSessao();
   // Lançar sem ver não existe: a tela do dia, o mês e o histórico são de quem vê.
   exigirPermissaoNaPagina(ctx, 'faturamento.ver');
