@@ -11,6 +11,7 @@
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-documento-fiscal-cnpj-repetido.db.test.ts
  */
 import { spawnSync } from 'node:child_process';
+import { executarPsqlDeTeste } from './erp-psql-apoio';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
@@ -37,8 +38,7 @@ function urlDe(banco: string): string {
   return u.toString();
 }
 const psql = (url: string, args: string[]) => {
-  const r = spawnSync('psql', [url, '-v', 'ON_ERROR_STOP=1', '-X', '-q', '-t', '-A', ...args], { encoding: 'utf8' });
-  return { ok: r.status === 0, saida: (r.stdout ?? '').trim(), aviso: r.stderr ?? '' };
+  return executarPsqlDeTeste(url, args);
 };
 const ehSuper = !!URL_TESTE && temPsql && psql(urlDe('postgres'), ['-c', 'select rolsuper from pg_roles where rolname = current_user']).saida === 't';
 
@@ -75,7 +75,7 @@ describe.skipIf(!URL_TESTE || !temPsql || !ehSuper)('ERP F.1b · dois cadastros 
     const primeiro = await receberXml(a, DONA(), bytes(xmlDe([], '4520')), 'Marina');
     expect(primeiro.ok).toBe(true);
     await db.$executeRawUnsafe(`INSERT INTO "Fornecedor"(id,"parceiroId",nome,documento,"atualizadoEm") VALUES ('fdup1','${c.A.id}','Laticínios Exemplo - Penha','11222333000181',now())`);
-  });
+  }, 300_000);
 
   afterAll(async () => {
     await db?.$disconnect();

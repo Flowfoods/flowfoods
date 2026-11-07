@@ -25,6 +25,8 @@ export default async function ErpHistoricoPage({ searchParams }: { searchParams:
     semEntidades: [...(pode(ctx.alcance, 'compras.ver') ? [] : ['NotaEntrada', 'Fornecedor', 'DocumentoFiscal', 'VinculoItemFornecedor']), ...(pode(ctx.alcance, 'producao.ver') ? [] : ['OrdemProducao', 'ListaProducao'])],
     // 1.10: taxa, margem-alvo, preço, margem e custo do canal só para quem vê preços.
     verPrecos: pode(ctx.alcance, 'precos.ver'),
+    // 3A: organização das fichas continua sujeita ao acesso operacional.
+    verFichas: pode(ctx.alcance, 'fichas.ver'),
     // 2.1: valores, pedidos e clientes do faturamento só para quem vê faturamento.
     verFaturamento,
     // 2.2a: despesas, plano de contas e período só para quem vê o DRE.

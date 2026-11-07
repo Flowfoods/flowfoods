@@ -19,8 +19,10 @@ export const FEITO_FICHA: Readonly<Record<string, string>> = {
   margens: 'Margens-alvo salvas. É registro antigo: o preço sugerido segue a meta de CMV.',
   'margens-igual': 'Nada mudou: as margens-alvo já eram essas.',
   // N.2
-  metas: 'Metas de CMV salvas. A sugestão e o farol de todas as fichas já usam as novas; nenhum preço foi mudado.',
+  metas: 'Metas de CMV salvas. A sugestão e a comparação com a meta já usam as novas; nenhum preço foi mudado.',
   'metas-igual': 'Nada mudou: as metas de CMV já eram essas.',
+  faixas: 'Faixas de CMV salvas. O farol já usa os novos limites; a meta e os preços não mudaram.',
+  'faixas-igual': 'Nada mudou: as faixas de CMV já eram essas.',
 };
 
 export function fraseDoFeitoDaFicha(feito: string | undefined): string | undefined {

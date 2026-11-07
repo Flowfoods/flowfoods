@@ -16,6 +16,7 @@
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff npx vitest run tests/erp-etiquetas-migracao.db.test.ts
  */
 import { spawnSync } from 'node:child_process';
+import { executarPsqlDeTeste } from './erp-psql-apoio';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
@@ -39,8 +40,7 @@ function urlDe(banco: string, papel?: string): string {
 }
 
 function psql(url: string, args: string[]) {
-  const r = spawnSync('psql', [url, '-v', 'ON_ERROR_STOP=1', '-X', '-q', '-t', '-A', ...args], { encoding: 'utf8' });
-  return { ok: r.status === 0, saida: (r.stdout ?? '').trim(), aviso: r.stderr ?? '' };
+  return executarPsqlDeTeste(url, args);
 }
 
 const antes = (alvo: string) => readdirSync(MIGRACOES).filter((n) => /^\d{14}_/.test(n) && n < alvo).sort();

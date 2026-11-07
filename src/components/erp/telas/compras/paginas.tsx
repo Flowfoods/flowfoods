@@ -31,6 +31,8 @@ export function TelaFormNota({
   periodos,
   novoFornecedor,
   novoInsumo,
+  retornoDoLancamento,
+  voltarParaInicio = false,
 }: {
   /** Ausente = lançar. */
   nota?: NotaDetalhada;
@@ -44,6 +46,8 @@ export function TelaFormNota({
   periodos: AvisoDePeriodos;
   novoFornecedor?: string;
   novoInsumo?: string;
+  retornoDoLancamento?: { lojaId: string; chave: string } | null;
+  voltarParaInicio?: boolean;
 }) {
   const hoje = hojeNoRio();
   const inicial: ValoresDaNota = nota
@@ -58,11 +62,12 @@ export function TelaFormNota({
         total: '',
         itens: [],
       };
-  const volta = nota ? `${base}/${nota.id}` : base;
+  const volta = nota ? `${base}/${nota.id}` : voltarParaInicio ? base.replace(/\/compras$/, '') : base;
+  const lancada = !nota && retornoDoLancamento && opcoes.lojas.some((l) => l.id === retornoDoLancamento.lojaId) ? retornoDoLancamento : null;
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <TrilhaDaPagina itens={nota ? [{ rotulo: nota.rotulo, href: volta }, { rotulo: 'Editar' }] : [{ rotulo: 'Lançar nota' }]} />
-      <Voltar href={volta}>{nota ? 'Voltar para a nota' : 'Voltar para as notas'}</Voltar>
+      <Voltar href={volta}>{nota ? 'Voltar para a nota' : voltarParaInicio ? 'Voltar para o início' : 'Voltar para as notas'}</Voltar>
       <PageHeader
         icone="compras"
         cor={COR.compras}
@@ -71,17 +76,20 @@ export function TelaFormNota({
           nota ? (
             `${contexto} · ${nota.rotulo} · ${nota.fornecedorNome}`
           ) : (
-            // Decisão 522: o que a data decide no custo (a mais nova vale) mora no ponto "data"; sem ele, a frase de antes.
-            <TextoComPonto ponto="data" comPonto={contexto} semPonto={`${contexto} · o custo dos insumos passa a ser o desta compra`} />
+            // Decisão 522: o que a data decide no custo (a mais nova vale) mora no ponto "data"; sem ele, a frase no corpo. Decisão 523:
+            // a frase não promete o custo novo para todo insumo (só vale onde a nota é a compra mais recente dele).
+            <TextoComPonto ponto="data" comPonto={contexto} semPonto={`${contexto} · se esta for a compra mais recente do insumo, o custo dele passa a ser o dela`} />
           )
         }
       />
+      {lancada && <Aviso tom="ok" titulo="Nota lançada.">Você já pode lançar outra compra.</Aviso>}
       {opcoes.fornecedores.length === 0 && (
         <Aviso tom="alerta" titulo="Nenhum fornecedor cadastrado.">
           {novoFornecedor ? 'Cadastre quem vende antes de lançar a nota.' : 'Peça a quem cuida das compras para cadastrar quem vende; depois a nota entra.'}
         </Aviso>
       )}
       <FormNota
+        key={lancada?.chave}
         acao={acao}
         modo={nota ? 'editar' : 'lancar'}
         base={base}

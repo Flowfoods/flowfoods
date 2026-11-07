@@ -8,7 +8,7 @@
  * conforto por tela (a chave é DE QUEM é — parceiro e pessoa, vindos do servidor — mais o caminho da página; sair, entrar e trocar de pessoa
  * apagam tudo), não um dado do ERP: se o navegador não deixar guardar, a tela funciona do
  * mesmo jeito, só sem recuperar. Ao voltar, o formulário abre com o que estava e diz que recuperou, com a opção de descartar.
- * Uma foto escolhida na ficha não é guardada (arquivos não cabem aqui): a ficha avisa.
+ * A ficha integrada guarda somente a intenção e o token de uma foto já enviada; File e URLs de blob nunca são guardados.
  */
 
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -41,13 +41,15 @@ export function limparRascunhos(): void {
   }
 }
 
-/** `versao` = a versão do que a tela leu (ficha, nota, impressão das embalagens): rascunho de versão velha não volta por cima. */
-export function guardarRascunho(chave: string, valores: unknown, versao?: string): void {
-  if (!chave) return;
+/** `versao` = a versão de origem, que o modo preservado mantém para o servidor detectar conflito. */
+export function guardarRascunho(chave: string, valores: unknown, versao?: string): boolean {
+  if (!chave) return false;
   try {
     window.sessionStorage.setItem(PREFIXO + chave, JSON.stringify({ em: Date.now(), versao: versao ?? null, valores }));
+    return true;
   } catch {
     // Sem armazenamento (janela privada, bloqueio): a tela segue sem recuperar.
+    return false;
   }
 }
 
@@ -60,7 +62,7 @@ export function descartarRascunho(chave: string): void {
   }
 }
 
-function lerRascunho<T>(chave: string, versaoAtual?: string): { valores: T | null; versaoMudou: boolean } {
+export function lerRascunho<T>(chave: string, versaoAtual?: string, preservar = false): { valores: T | null; versaoMudou: boolean; versaoDeOrigem?: string | null } {
   const nada = { valores: null, versaoMudou: false };
   if (!chave) return nada;
   try {
@@ -71,8 +73,10 @@ function lerRascunho<T>(chave: string, versaoAtual?: string): { valores: T | nul
       window.sessionStorage.removeItem(PREFIXO + chave);
       return nada;
     }
-    if (versaoAtual !== undefined && (lido.versao ?? null) !== versaoAtual) return { valores: null, versaoMudou: true };
-    return { valores: lido.valores as T, versaoMudou: false };
+    const versaoDeOrigem = typeof lido.versao === 'string' ? lido.versao : null;
+    const versaoMudou = versaoAtual !== undefined && versaoDeOrigem !== versaoAtual;
+    if (versaoMudou && !preservar) return { valores: null, versaoMudou: true };
+    return { valores: lido.valores as T, versaoMudou, versaoDeOrigem };
   } catch {
     return nada;
   }
@@ -85,6 +89,8 @@ export interface RascunhoDaTela<T> {
   valores: T | null | undefined;
   /** O rascunho existia, mas a tela mudou desde então (outra pessoa salvou): foi descartado. */
   versaoMudou: boolean;
+  /** Modo preservado: versão original, inclusive quando a leitura atual mudou. */
+  versaoDeOrigem?: string | null;
   /** O insumo que acabou de ser cadastrado e voltou na URL (`?insumoCriado=`), quando veio de lá. */
   insumoCriado: string | null;
   /** F.1a: o fornecedor que acabou de ser cadastrado e voltou na URL (`?fornecedorCriado=`), quando veio de lá. */
@@ -98,7 +104,7 @@ export interface RascunhoDaTela<T> {
  * consumido: ao recuperar, sai do armazenamento (se a pessoa sair de novo, o formulário guarda outro). `versaoAtual`: a versão que a
  * tela acabou de ler; se o rascunho foi guardado sobre outra, ele não volta.
  */
-export function useRascunhoDaTela<T>(versaoAtual?: string): RascunhoDaTela<T> {
+export function useRascunhoDaTela<T>(versaoAtual?: string, opcoes?: { preservar: boolean }): RascunhoDaTela<T> {
   const escopo = useContext(Escopo);
   // Sem o roteador montado (teste de renderização, pré-visualização) os dois vêm nulos: a tela funciona, só não recupera nada.
   const pathname = usePathname() ?? '';
@@ -109,17 +115,19 @@ export function useRascunhoDaTela<T>(versaoAtual?: string): RascunhoDaTela<T> {
   const [fornecedorCriado] = useState(() => busca?.get(PARAMETRO_FORNECEDOR_CRIADO) ?? null);
   const [valores, setValores] = useState<T | null | undefined>(undefined);
   const [versaoMudou, setVersaoMudou] = useState(false);
+  const [versaoDeOrigem, setVersaoDeOrigem] = useState<string | null | undefined>(undefined);
   // A leitura acontece UMA vez por visita: o React (modo estrito) pode rodar o efeito duas vezes no mesmo componente; a segunda
   // rodada acharia o armazenamento já vazio e apagaria o que a primeira recuperou. O ref guarda o que foi lido.
-  const lido = useRef<{ valores: T | null; versaoMudou: boolean } | null>(null);
+  const lido = useRef<ReturnType<typeof lerRascunho<T>> | null>(null);
   useEffect(() => {
     if (!lido.current) {
-      lido.current = lerRascunho<T>(chave, versaoAtual);
-      descartarRascunho(chave);
+      lido.current = lerRascunho<T>(chave, versaoAtual, opcoes?.preservar);
+      if (!opcoes?.preservar) descartarRascunho(chave);
     }
     const r = lido.current;
     setValores(r.valores);
     setVersaoMudou(r.versaoMudou);
+    setVersaoDeOrigem(r.versaoDeOrigem);
     // Limpa o parâmetro da barra de endereço: recarregar a página não repete o aviso nem a escolha.
     if (pathname && [PARAMETRO_INSUMO_CRIADO, PARAMETRO_FORNECEDOR_CRIADO].some((k) => new URLSearchParams(window.location.search).has(k))) {
       const p = new URLSearchParams(window.location.search);
@@ -130,7 +138,18 @@ export function useRascunhoDaTela<T>(versaoAtual?: string): RascunhoDaTela<T> {
     // Só no primeiro desenho da página: o rascunho é desta visita.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  return { chave, valores, versaoMudou, insumoCriado, fornecedorCriado, descartar: () => descartarRascunho(chave) };
+  return { chave, valores, versaoMudou, versaoDeOrigem, insumoCriado, fornecedorCriado, descartar: () => descartarRascunho(chave) };
+}
+
+/** A impressão só avisa: não consome nem envia o rascunho de edição ao servidor. */
+export function useTemRascunhoAlterado(caminho: string): boolean {
+  const escopo = useContext(Escopo);
+  const [tem, setTem] = useState(false);
+  useEffect(() => {
+    const r = lerRascunho<{ alterado?: boolean }>(escopo ? `${escopo}:${caminho}` : '', undefined, true);
+    setTem(!!r.valores && r.valores.alterado !== false);
+  }, [escopo, caminho]);
+  return tem;
 }
 
 /** A tela mudou desde o rascunho: ele foi descartado. */

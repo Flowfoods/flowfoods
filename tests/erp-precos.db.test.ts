@@ -232,16 +232,16 @@ describe.skipIf(!URL_TESTE)('ERP 1.10 · preço e margem por canal (Postgres rea
     expect(await a.canalConfig.count()).toBe(0);
     expect(await salvarTaxaDoIfood(a, { comissao: '23', pagamento: '3,2', versao: '' }, 'Marina')).toMatchObject({ ok: true });
     const v1 = (await obterTaxaDoIfood(a)).versaoDasMargens;
-    await expect(fichasDaSessao.acaoSalvarMargensAlvo(null, formDasMargens(v1, { LOJA: '70', DELIVERY_PROPRIO: '65', IFOOD: '60' }))).rejects.toMatchObject({
-      url: '/erp/fichas/canais?feito=margens',
+    expect(await fichasDaSessao.acaoSalvarMargensAlvo(null, formDasMargens(v1, { LOJA: '70', DELIVERY_PROPRIO: '65', IFOOD: '60' }))).toMatchObject({
+      ok: true, confirmacao: { versao: (await obterTaxaDoIfood(a)).versaoDasMargens, campos: { margem_LOJA: '70', margem_DELIVERY_PROPRIO: '65', margem_IFOOD: '60' } },
     });
     const o = await obterTaxaDoIfood(a);
     expect(o.margens).toEqual({ LOJA: 7000, DELIVERY_PROPRIO: 6500, IFOOD: 6000 });
     expect(o.taxa).toEqual({ comissaoBp: 2300, pagamentoBp: 320 });
     expect(o.historico.find((h) => h.alvo === 'Loja')?.mudancas).toEqual([{ campo: 'margem-alvo', antes: 'sem alvo', depois: '70%' }]);
     // Mesmas margens de novo: nada muda.
-    await expect(fichasDaSessao.acaoSalvarMargensAlvo(null, formDasMargens(o.versaoDasMargens, { LOJA: '70', DELIVERY_PROPRIO: '65', IFOOD: '60' }))).rejects.toMatchObject({
-      url: '/erp/fichas/canais?feito=margens-igual',
+    expect(await fichasDaSessao.acaoSalvarMargensAlvo(null, formDasMargens(o.versaoDasMargens, { LOJA: '70', DELIVERY_PROPRIO: '65', IFOOD: '60' }))).toMatchObject({
+      ok: true, confirmacao: { versao: o.versaoDasMargens, campos: { margem_LOJA: '70', margem_DELIVERY_PROPRIO: '65', margem_IFOOD: '60' } },
     });
   });
 

@@ -10,7 +10,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useFormState } from 'react-dom';
-import type { LinhaDaFila } from '@/lib/erp/classificar';
+import type { LinhaDaFila, VisibilidadeDoValor } from '@/lib/erp/classificar';
 import type { OpcaoDeCategoria } from '@/lib/erp/categorias';
 import { formatarDinheiro } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
@@ -65,12 +65,14 @@ function BarraDeAcao({
 export function FormDaFila({
   acao,
   linhas,
+  visibilidadeDoValor,
   categorias,
   base,
   bloqueio,
 }: {
   acao: AcaoDeCadastro;
   linhas: LinhaDaFila[];
+  visibilidadeDoValor?: VisibilidadeDoValor;
   categorias: readonly OpcaoDeCategoria[];
   base: string;
   bloqueio: string | null;
@@ -150,7 +152,7 @@ export function FormDaFila({
                     </p>
                     {mostraValor && (
                       <p className="text-[13px] tabular-nums text-suave lg:text-right">
-                        {l.valorCentavos ? `${formatarDinheiro(l.valorCentavos)} em estoque` : 'sem saldo'}
+                        {l.valorCentavos ? `${formatarDinheiro(l.valorCentavos)} em estoque nas lojas com acesso aos valores${visibilidadeDoValor === 'parcial' ? ' (valor parcial)' : ''}` : 'sem saldo nas lojas com acesso aos valores'}
                       </p>
                     )}
                   </div>

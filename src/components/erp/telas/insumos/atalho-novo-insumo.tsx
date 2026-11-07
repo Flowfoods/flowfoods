@@ -29,7 +29,7 @@ export function AtalhoNovoInsumo({
   /** O cadastro de insumo de quem usa a tela (`/erp/insumos/novo` ou `/rodolfo/erp/<slug>/insumos/novo`). */
   href: string;
   /** Guarda o que está preenchido, antes de sair. */
-  aoSair: () => void;
+  aoSair: () => boolean | void;
   /** Pré-escolhe o tipo no cadastro (as embalagens do prato pedem uma Embalagem). */
   tipo?: 'EMBALAGEM';
   rotulo?: string;
@@ -96,7 +96,7 @@ export function AtalhoNovoInsumo({
         className={`${CAMPO} sm:w-64`}
       />
       <div className="flex gap-2">
-        <Link ref={ir} href={destino} onClick={aoSair} className={classeDeBotao('secundario')}>
+        <Link ref={ir} href={destino} onClick={e => { if (aoSair() === false) e.preventDefault(); }} className={classeDeBotao('secundario')}>
           Ir para o cadastro
         </Link>
         <button type="button" onClick={() => setAberto(false)} className={classeDeBotao('fantasma')}>

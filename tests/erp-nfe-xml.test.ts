@@ -28,7 +28,8 @@ import {
   queryDosFiltrosDeDocumento,
 } from '@/lib/erp/documento-fiscal-campos';
 
-const FIXTURE = readFileSync(join(process.cwd(), 'tests', 'fixtures', 'nfe-sintetica.xml'), 'utf8');
+// As mutações do XML usam LF, independentemente da quebra de linha do checkout.
+const FIXTURE = readFileSync(join(process.cwd(), 'tests', 'fixtures', 'nfe-sintetica.xml'), 'utf8').replace(/\r\n/g, '\n');
 const CHAVE = '33261011222333000181550010000045211123456784';
 const HOJE = new Date('2026-10-22T12:00:00-03:00');
 const enc = (t: string) => new TextEncoder().encode(t);

@@ -7,6 +7,7 @@
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import {
   ALCANCE_FLOWFOODS,
@@ -333,6 +334,17 @@ describe('ERP 0.4 · formulários de pessoa e perfil', () => {
 
 // ------------------------------------------------------------- guarda
 
+function temJargaoNoTextoJsx(texto: string): boolean {
+  const fonte = ts.createSourceFile('tela.tsx', texto, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  let tem = false;
+  const visitar = (no: ts.Node) => {
+    if (ts.isJsxText(no) && /\b(RBAC|escopo|insumos\.editar|acessos\.gerir)\b/i.test(no.text)) tem = true;
+    ts.forEachChild(no, visitar);
+  };
+  visitar(fonte);
+  return tem;
+}
+
 function arquivos(dir: string): string[] {
   let out: string[] = [];
   for (const n of readdirSync(dir)) {
@@ -397,10 +409,16 @@ describe('ERP 0.4 · toda página e server action do /erp passa pela checagem', 
     const telas = [...arquivos(ERP), ...arquivos(join('src', 'components', 'erp', 'telas'))].filter((f) =>
       f.endsWith('.tsx'),
     );
-    const furos = telas.filter((f) =>
-      />[^<{]*\b(RBAC|escopo|insumos\.editar|acessos\.gerir)\b/i.test(readFileSync(f, 'utf8')),
-    );
+    const furos = telas.filter((f) => temJargaoNoTextoJsx(readFileSync(f, 'utf8')));
     expect(furos).toEqual([]);
+  });
+
+  it.each(['RBAC', 'escopo', 'insumos.editar', 'acessos.gerir'])('o guard detecta %s em texto JSX', (termo) => {
+    expect(temJargaoNoTextoJsx(`const tela = <section><p>Confira ${termo} antes de continuar.</p></section>;`)).toBe(true);
+  });
+
+  it('o guard não confunde argumento após genérico TypeScript com texto JSX', () => {
+    expect(temJargaoNoTextoJsx('const valor = lerRascunho<{ alterado?: boolean }>(escopo); const tela = <p>Rascunho salvo</p>;')).toBe(false);
   });
 });
 

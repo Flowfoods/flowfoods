@@ -22,6 +22,8 @@ const ENTIDADE: Record<string, string> = {
   // "Variante" é palavra de sistema; na tela é outra embalagem de compra do insumo.
   InsumoVariante: 'Embalagem',
   FichaTecnica: 'Ficha técnica',
+  SecaoFicha: 'Seção de ficha',
+  SubsecaoFicha: 'Subseção de ficha',
   // 1.5
   NotaEntrada: 'Nota de compra',
   Contagem: 'Estoque',
@@ -150,6 +152,8 @@ const CAMPO: Record<string, string> = {
   tipo: 'tipo',
   // I.1a
   categoria: 'categoria',
+  secao: 'seção',
+  subsecao: 'subseção',
   posicao: 'posição na lista',
   classificadoPor: 'como foi classificada',
   loteDaClassificacao: 'lote da classificação',
@@ -161,6 +165,7 @@ const CAMPO: Record<string, string> = {
   // I.1b
   marcaReferencia: 'marca de referência',
   ativo: 'situação',
+  ativa: 'situação',
   insumo: 'insumo',
   contado: 'contado',
   contados: 'contados',
@@ -303,6 +308,10 @@ const CAMPO: Record<string, string> = {
   resultadoDelivery: 'resultado após os custos informados no delivery',
   resultadoIfood: 'resultado após os custos informados no iFood',
   metaCmv: 'meta de CMV',
+  farolA: 'favorável a partir de',
+  farolB: 'confortável a partir de',
+  farolC: 'confortável até',
+  farolD: 'atenção até',
   fisicoLoja: 'custo físico da loja na hora',
   fisicoDelivery: 'custo físico do delivery na hora',
   fisicoIfood: 'custo físico do iFood na hora',
@@ -378,6 +387,10 @@ const ORDEM = [
   'pagamento',
   'margemAlvo',
   'metaCmv',
+  'farolA',
+  'farolB',
+  'farolC',
+  'farolD',
   'precoLoja',
   'cmvLoja',
   'resultadoLoja',
@@ -462,6 +475,7 @@ const ORDEM = [
   'cmv',
   'ressalvas',
   'ativo',
+  'ativa',
 ];
 const posicao = (c: string) => (ORDEM.includes(c) ? ORDEM.indexOf(c) : ORDEM.length);
 
@@ -502,6 +516,7 @@ function valor(campo: string, v: unknown): string {
   if (campo === 'conservacao' && typeof v === 'string') return CONSERVACOES[v as keyof typeof CONSERVACOES] ?? v;
   if (campo === 'unidade' && typeof v === 'string') return UNIDADES[v as Unidade]?.nome ?? v;
   if (campo === 'ativo' && typeof v === 'boolean') return v ? 'Ativo' : 'Desativado';
+  if (campo === 'ativa' && typeof v === 'boolean') return v ? 'Ativa' : 'Arquivada';
   if (campo === 'classificadoPor' && typeof v === 'string') return COMO_CLASSIFICOU[v] ?? v;
   if (campo === 'posicao' && typeof v === 'number') return `${v}ª`;
   if (campo === 'status' && typeof v === 'string') return STATUS[v] ?? v;
@@ -593,7 +608,7 @@ export function descreverMudancas(antesJ: Prisma.JsonValue | null, depoisJ: Pris
     // De quem é a embalagem (ou o lançamento de faturamento) já está no "alvo" da linha.
     if (c === 'insumo' || c === 'alvo' || c === 'faturamentoLojaId' || c === 'faturamentoDia') continue;
     // I.1a: o id da categoria é técnico (o "excluir categoria" o confere); a tela mostra o nome.
-    if (c === 'categoriaId') continue;
+    if (c === 'categoriaId' || c === 'secaoId' || c === 'subsecaoId' || (c === 'id' && (entidade === 'SecaoFicha' || entidade === 'SubsecaoFicha'))) continue;
     // Itens da nota (1.5): o que entrou e o que saiu (uma linha mudada sai e entra de novo).
     if (c === 'itensDaNota' && typeof depois[c] === 'string') {
       const a = new Set(criacao || typeof antes[c] !== 'string' ? [] : (antes[c] as string).split(SEPARADOR_DE_ITENS));
@@ -777,6 +792,8 @@ export async function listarHistorico(
      * leitor decide. false = sem taxa, alvo, preço, margem, custo do canal.
      */
     verPrecos: boolean;
+    /** 3A: nomes/gestão de seções só para quem pode ler fichas; ausente fecha a nova superfície. */
+    verFichas?: boolean;
     /**
      * 2.1: quem lê pode ver faturamento (`faturamento.ver`)? Sem isto, as
      * linhas de `FaturamentoLancamento` (valor, pedidos, clientes, quem lançou)
@@ -806,6 +823,7 @@ export async function listarHistorico(
     ...(filtro.verFaturamento === true ? [] : ENTIDADES_DE_FATURAMENTO),
     ...(filtro.verDre === true ? [] : ENTIDADES_DE_DRE),
     ...(filtro.verIntegracao === true ? [] : ENTIDADES_DE_INTEGRACAO),
+    ...(filtro.verFichas === true ? [] : ['SecaoFicha', 'SubsecaoFicha']),
   ];
   const limite = filtro.limite ?? 100;
   const where = {
@@ -831,10 +849,19 @@ export async function listarHistorico(
     pular += lote.length;
     for (const h of lote) {
       let r = filtro.verPrecos ? { antes: h.antes, depois: h.depois } : semPrecificacao(h.antes, h.depois);
+      if (r && filtro.verFichas !== true && h.entidade === 'FichaTecnica') {
+        const campos = new Set(['secaoId', 'secao', 'subsecaoId', 'subsecao']);
+        const retirar = (j: Prisma.JsonValue | null) => j === null ? null : Object.fromEntries(Object.entries(objeto(j)).filter(([k]) => !campos.has(k))) as Prisma.JsonObject;
+        const tinha = [...Object.keys(objeto(r.antes)), ...Object.keys(objeto(r.depois))].some(k => campos.has(k));
+        if (tinha) {
+          r = { antes: retirar(r.antes), depois: retirar(r.depois) };
+          if (!descreverMudancas(r.antes, r.depois, h.entidade).length) r = null;
+        }
+      }
       if (r && filtro.verCustos !== true && h.entidade === 'OrdemProducao') r = semCustoDaProducao(r.antes, r.depois);
       if (r && out.length < limite) out.push(paraTela(h, r.antes, r.depois));
     }
-    if (lote.length < limite || (filtro.verPrecos && filtro.verCustos === true)) break;
+    if (lote.length < limite || (filtro.verPrecos && filtro.verCustos === true && filtro.verFichas === true)) break;
   }
   return out;
 }

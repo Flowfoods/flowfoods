@@ -210,10 +210,12 @@ describe('0.6 · aula por permissão, não por perfil nem por setor', () => {
   };
 
   it('o operador não recebe nada sobre preço e margem; a dona e o gerente recebem', () => {
-    expect(texto(OPERADOR, 'ficha')).not.toMatch(/margem|iFood|preço|canal/i);
-    expect(ajudaParaATela(OPERADOR).find((x) => x.chave === 'ficha')!.secoes).toEqual([]);
+    expect(texto(OPERADOR, 'ficha')).not.toMatch(/margem|preço sugerido|CMV|custo físico|meta de CMV|faixa/i);
+    expect(texto(OPERADOR, 'ficha')).toMatch(/embalagens por porção/);
+    expect(ajudaParaATela(OPERADOR).find((x) => x.chave === 'ficha')!.secoes.map((s) => s.id)).toEqual(['impressao']);
     expect(texto(DONO, 'ficha')).toMatch(/meta de CMV/);
-    expect(ajudaParaATela(DONO).find((x) => x.chave === 'ficha')!.secoes.map((s) => s.id)).toEqual(['conta']);
+    expect(ajudaParaATela(DONO).find((x) => x.chave === 'ficha')!.secoes.map((s) => s.id)).toEqual(['conta', 'faixas', 'impressao']);
+    expect(ajudaParaATela(GERENTE).find((x) => x.chave === 'ficha')!.secoes.map((s) => s.id)).toEqual(['conta', 'faixas', 'impressao']);
     expect(texto(GERENTE, 'ficha')).toMatch(/meta de CMV/);
     // o mesmo vale para o que o operador não paga: bloco de compras no insumo
     expect(texto(OPERADOR, 'insumo')).not.toMatch(/nota/);

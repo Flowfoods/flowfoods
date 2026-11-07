@@ -1,0 +1,4 @@
+# Artefato aprovado por hash: o checkout deve preservar seus bytes LF.
+src/lib/portal/questionarios/valentins.json text eol=lf
+# Scripts copiados para shells Unix também preservam as quebras LF do Git.
+/scripts/*.sh text eol=lf

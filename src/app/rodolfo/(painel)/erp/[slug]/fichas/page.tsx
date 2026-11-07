@@ -6,11 +6,12 @@
 
 import { exigirParceiro, exigirPermissao, visaoDaRequisicao } from '@/lib/erp/contexto';
 import { listarFichas } from '@/lib/erp/fichas';
-import { cmvDaLista } from '@/lib/erp/canais';
-import { lerFiltrosDeFicha, temFiltroDeFicha } from '@/lib/erp/ficha-campos';
+import { lerFiltrosDeFicha, queryDosFiltrosDeFicha, temFiltroDeFicha } from '@/lib/erp/ficha-campos';
 import { FICHAS, subtituloDaLista } from '@/components/erp/telas/cadastro/subtitulo';
 import { FiltrosDasFichas, TelaListaFichas } from '@/components/erp/telas/fichas/lista';
-import { CabecalhoDasFichas } from '@/components/erp/telas/fichas/paginas';
+import { CabecalhoDasFichas, carregarClassificacaoDosFiltros } from '@/components/erp/telas/fichas/paginas';
+import { acaoBuscarClassificacao } from './actions';
+import { Aviso } from '@/components/erp/ui/superficies';
 import { AvisoDaListaDeFichas } from '@/components/erp/telas/fichas/aviso-da-lista';
 import { PainelDeSaude } from '@/components/erp/telas/fichas/saude';
 import { saudeDoCardapio } from '@/lib/erp/saude-do-cardapio';
@@ -27,9 +28,10 @@ export default async function ParceiroFichasPage({
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
-  const filtros = lerFiltrosDeFicha(searchParams);
-  const [pagina, { visao }] = await Promise.all([listarFichas(ctx.cliente, filtros, { verPrecos: true }), visaoDaRequisicao(ctx)]);
-  const precos = await cmvDaLista(ctx.cliente, pagina.linhas);
+  const [pagina, { visao }] = await Promise.all([listarFichas(ctx.cliente, lerFiltrosDeFicha(searchParams), { verPrecos: true }), visaoDaRequisicao(ctx)]);
+  const filtros = pagina.filtros;
+  const de = queryDosFiltrosDeFicha(filtros);
+  const classificacao = await carregarClassificacaoDosFiltros(acaoBuscarClassificacao.bind(null, ctx.parceiro.slug), filtros.secao, filtros.subsecao);
   const saude = !temFiltroDeFicha(filtros) && pagina.pagina === 1 ? await saudeDoCardapio(ctx.cliente) : null;
   return (
     <div className="space-y-6">
@@ -38,18 +40,18 @@ export default async function ParceiroFichasPage({
         base={base}
         podeEditar
         bloqueio={ctx.bloqueio}
+        de={de}
       >
-        <FiltrosDasFichas base={base} filtros={filtros} />
+        <FiltrosDasFichas key={de} base={base} filtros={filtros} classificacao={classificacao} />
       </CabecalhoDasFichas>
       <AvisoDaListaDeFichas cliente={ctx.cliente} base={base} filtros={filtros} feito={searchParams.feito} referencia={searchParams.ref} />
+      {pagina.avisoFiltro && <Aviso tom="alerta" titulo={pagina.avisoFiltro} />}
       {saude && <PainelDeSaude saude={saude} base={base} configuracaoHref={`${base}/canais`} />}
       <TelaListaFichas
         base={base}
-        filtros={filtros}
         {...pagina}
-        novaHref={ctx.bloqueio ? undefined : `${base}/nova`}
+        novaHref={ctx.bloqueio ? undefined : `${base}/nova${de ? `?de=${encodeURIComponent(de)}` : ''}`}
         importarHref={ctx.bloqueio ? undefined : `${base}/importar`}
-        cmv={precos}
         acoes={!ctx.bloqueio}
       />
     </div>

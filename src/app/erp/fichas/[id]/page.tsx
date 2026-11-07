@@ -6,8 +6,7 @@
 
 import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
-import { fichaNaTela, obterFicha } from '@/lib/erp/fichas';
-import { custoPorCanal } from '@/lib/erp/canais';
+import { fichaNaTela, obterFichaComCanais } from '@/lib/erp/fichas';
 import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import { voltaDaFichaAoInsumo } from '@/lib/erp/ficha-volta-insumo';
 import { TelaDetalheFicha } from '@/components/erp/telas/fichas/detalhe';
@@ -22,16 +21,17 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
   exigirPermissaoNaPagina(ctx, 'fichas.ver');
   // 1.9/1.10: o custo, o preço e a margem por canal — inclusive no histórico da ficha — só saem do servidor para quem vê a precificação.
   const verPrecos = pode(ctx.alcance, 'precos.ver');
-  const ficha = await obterFicha(ctx.cliente, params.id, { verPrecos });
-  if (!ficha) notFound();
-  const canais = verPrecos ? await custoPorCanal(ctx.cliente, ficha) : null;
-  const de = deSeguroDaFicha(searchParams.de);
+  const leitura = await obterFichaComCanais(ctx.cliente, params.id, { verPrecos });
+  if (!leitura) notFound();
+  const { ficha, canais } = leitura;
+  const de = deSeguroDaFicha(searchParams.de, verPrecos);
   const origem = await voltaDaFichaAoInsumo(searchParams.volta, '/erp', ctx.cliente, ctx.alcance);
   return (
     <TelaDetalheFicha
       // N.5: quem só opera recebe a ficha sem nenhum valor de custo (visão operacional automática).
       ficha={fichaNaTela(ficha, verPrecos)}
       base={BASE}
+      de={de}
       voltar={origem ?? (de ? `${BASE}?${de}` : BASE)}
       rotuloVoltar={origem ? 'Voltar para o insumo' : undefined}
       feito={searchParams.feito}
@@ -40,7 +40,7 @@ export default async function ErpFichaPage({ params, searchParams }: { params: {
       acaoSituacao={acaoSituacaoFicha.bind(null, ficha.id)}
       linkDoInsumo={pode(ctx.alcance, 'insumos.ver') ? '/erp/insumos' : undefined}
       canais={canais}
-      linkDasEmbalagens={pode(ctx.alcance, 'fichas.editar') && verPrecos && !ctx.bloqueio ? `${BASE}/${ficha.id}/canais` : undefined}
+      linkDasEmbalagens={pode(ctx.alcance, 'fichas.editar') && verPrecos && !ctx.bloqueio ? `${BASE}/${ficha.id}/editar${de ? `?de=${encodeURIComponent(de)}` : ''}#ficha-materiais` : undefined}
       linkDaTaxa={verPrecos ? `${BASE}/canais` : undefined}
       linkDoProduzir={pode(ctx.alcance, 'producao.registrar') && ficha.ativa && !ctx.bloqueio ? `/erp/producao/nova?ficha=${ficha.id}` : undefined}
       podeConfigurarTaxa={pode(ctx.alcance, 'precos.editar') && !ctx.bloqueio}

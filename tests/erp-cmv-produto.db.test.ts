@@ -184,8 +184,8 @@ describe.skipIf(!URL_TESTE)('ERP N.2 · preço pela meta de CMV, cenário de ref
     expect(await fichasDaSessao.acaoSalvarMetasDeCmv(null, formDasMetas(o.versaoDasMetas, { LOJA: '40', DELIVERY_PROPRIO: '25', IFOOD: '30' }))).toMatchObject({ ok: false });
     expect((await obterTaxaDoIfood(a)).metas.LOJA).toBe(2500);
     atual.ctx = ctxDe('DONO', 'Marina');
-    await expect(fichasDaSessao.acaoSalvarMetasDeCmv(null, formDasMetas(o.versaoDasMetas, { LOJA: '25', DELIVERY_PROPRIO: '25', IFOOD: '30' }))).rejects.toMatchObject({
-      url: '/erp/fichas/canais?feito=metas-igual',
+    expect(await fichasDaSessao.acaoSalvarMetasDeCmv(null, formDasMetas(o.versaoDasMetas, { LOJA: '25', DELIVERY_PROPRIO: '25', IFOOD: '30' }))).toMatchObject({
+      ok: true, confirmacao: { versao: o.versaoDasMetas, campos: { metaCmv_LOJA: '25', metaCmv_DELIVERY_PROPRIO: '25', metaCmv_IFOOD: '30' } },
     });
   });
 
@@ -307,7 +307,7 @@ describe.skipIf(!URL_TESTE)('ERP N.2 · preço pela meta de CMV, cenário de ref
     expect(ficha.props.canais).toBeNull();
     // A tela da lista recebe `cmv` (um Map) só de quem vê preços; ao operador, nada sai do servidor.
     type El = { props: { children: El[] | El; cmv?: Map<string, unknown> } };
-    const telaDaLista = (pagina: unknown) => ([] as El[]).concat((pagina as El).props.children).find((c) => c && 'cmv' in c.props)!;
+    const telaDaLista = (pagina: unknown) => ([] as El[]).concat((pagina as El).props.children).find((c) => c && 'total' in c.props && 'filtros' in c.props)!;
     const doOperador = telaDaLista(await ErpFichasPage({ searchParams: {} }));
     expect(doOperador.props.cmv).toBeUndefined();
     expect(json(doOperador)).toMatch(/Prato de teste/);
@@ -322,22 +322,22 @@ describe.skipIf(!URL_TESTE)('ERP N.2 · preço pela meta de CMV, cenário de ref
     const mapa = await cmvDaLista(a, (await listarFichas(a, {})).linhas);
     const doPrato = mapa.get(ids.ficha)!;
     for (const c of doPrato) {
-      const com = await listarFichas(a, { cmv: { canal: c.canal, status: c.status } }, { verPrecos: true });
+      const com = await listarFichas(a, { cmv: [{ canal: c.canal, status: c.status }] }, { verPrecos: true });
       expect(com.linhas.map((l) => l.id)).toContain(ids.ficha);
       expect(com.linhas.every((l) => l.tipo === 'PRATO')).toBe(true);
       const outro = c.status === 'acima' ? 'dentro' : 'acima';
-      expect((await listarFichas(a, { cmv: { canal: c.canal, status: outro } }, { verPrecos: true })).linhas.map((l) => l.id)).not.toContain(ids.ficha);
+      expect((await listarFichas(a, { cmv: [{ canal: c.canal, status: outro }] }, { verPrecos: true })).linhas.map((l) => l.id)).not.toContain(ids.ficha);
     }
     // sem `verPrecos`, o filtro é ignorado (a lista volta igual à sem filtro): o status não vaza pela contagem
     const semFiltro = await listarFichas(a, {});
-    const ignorado = await listarFichas(a, { cmv: { canal: 'LOJA', status: doPrato[0].status === 'acima' ? 'dentro' : 'acima' } });
+    const ignorado = await listarFichas(a, { cmv: [{ canal: 'LOJA', status: doPrato[0].status === 'acima' ? 'dentro' : 'acima' }] });
     expect(ignorado.total).toBe(semFiltro.total);
     // pela tela do operador: o parâmetro na URL não muda nada
     atual.ctx = ctxDe('OPERADOR', 'Caio');
     type El = { props: { children: El[] | El; total?: number; filtros?: { cmv: unknown } } };
     const telaDaLista = (pagina: unknown) => ([] as El[]).concat((pagina as El).props.children).find((c) => c && 'filtros' in c.props && 'total' in c.props)!;
     const op = telaDaLista(await ErpFichasPage({ searchParams: { cmv: 'LOJA-acima' } }));
-    expect(op.props.filtros!.cmv).toBeNull();
+    expect(op.props.filtros!.cmv).toEqual([]);
     expect(op.props.total).toBe(semFiltro.total);
     atual.ctx = ctxDe('DONO', 'Marina');
   });

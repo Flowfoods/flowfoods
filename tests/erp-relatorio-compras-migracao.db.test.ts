@@ -13,6 +13,7 @@
  *   ERP_DB_TESTE=postgresql://ff:ff@localhost:5432/ff_dev npx vitest run tests/erp-relatorio-compras-migracao.db.test.ts
  */
 import { spawnSync } from 'node:child_process';
+import { executarPsqlDeTeste } from './erp-psql-apoio';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
@@ -36,8 +37,7 @@ function urlDe(banco: string, papel?: string): string {
 }
 
 function psql(url: string, args: string[]) {
-  const r = spawnSync('psql', [url, '-v', 'ON_ERROR_STOP=1', '-X', '-q', '-t', '-A', ...args], { encoding: 'utf8' });
-  return { ok: r.status === 0, saida: (r.stdout ?? '').trim(), aviso: r.stderr ?? '' };
+  return executarPsqlDeTeste(url, args);
 }
 
 const antes = (alvo: string) => readdirSync(MIGRACOES).filter((n) => /^\d{14}_/.test(n) && n < alvo).sort();
@@ -61,7 +61,7 @@ describe.skipIf(!URL_TESTE || !temPsql)('ERP L.2 · migration dos relatórios de
 
   afterAll(() => {
     for (const b of criados) psql(urlDe('postgres'), ['-c', `DROP DATABASE IF EXISTS ${b} WITH (FORCE)`]);
-  });
+  }, 360_000);
 
   function prepararBanco(perfil: Perfil, nomeDoBanco: string) {
     const dono = urlDe(nomeDoBanco, perfil.papel);

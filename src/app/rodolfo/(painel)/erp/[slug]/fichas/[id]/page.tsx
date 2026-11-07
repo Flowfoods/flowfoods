@@ -2,8 +2,7 @@
 
 import { notFound } from 'next/navigation';
 import { exigirParceiro, exigirPermissao } from '@/lib/erp/contexto';
-import { fichaNaTela, obterFicha } from '@/lib/erp/fichas';
-import { custoPorCanal } from '@/lib/erp/canais';
+import { fichaNaTela, obterFichaComCanais } from '@/lib/erp/fichas';
 import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import { voltaDaFichaAoInsumo } from '@/lib/erp/ficha-volta-insumo';
 import { TelaDetalheFicha } from '@/components/erp/telas/fichas/detalhe';
@@ -21,10 +20,10 @@ export default async function ParceiroFichaPage({
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.ver');
   // O nível 1 vê a precificação (inclusive no histórico).
-  const ficha = await obterFicha(ctx.cliente, params.id, { verPrecos: true });
-  if (!ficha) notFound();
+  const leitura = await obterFichaComCanais(ctx.cliente, params.id, { verPrecos: true });
+  if (!leitura) notFound();
+  const { ficha, canais } = leitura;
   const base = `/rodolfo/erp/${ctx.parceiro.slug}`;
-  const canais = await custoPorCanal(ctx.cliente, ficha);
   const de = deSeguroDaFicha(searchParams.de);
   const origem = await voltaDaFichaAoInsumo(searchParams.volta, base, ctx.cliente, ctx.alcance);
   return (
@@ -32,6 +31,7 @@ export default async function ParceiroFichaPage({
       // N.5: quem só opera recebe a ficha sem nenhum valor de custo (visão operacional automática).
       ficha={fichaNaTela(ficha, true)}
       base={`${base}/fichas`}
+      de={de}
       voltar={origem ?? (de ? `${base}/fichas?${de}` : `${base}/fichas`)}
       rotuloVoltar={origem ? 'Voltar para o insumo' : undefined}
       feito={searchParams.feito}
@@ -41,7 +41,7 @@ export default async function ParceiroFichaPage({
       acaoSituacao={acaoSituacaoFicha.bind(null, ctx.parceiro.slug, ficha.id)}
       linkDoInsumo={`${base}/insumos`}
       canais={canais}
-      linkDasEmbalagens={ctx.bloqueio ? undefined : `${base}/fichas/${ficha.id}/canais`}
+      linkDasEmbalagens={ctx.bloqueio ? undefined : `${base}/fichas/${ficha.id}/editar${de ? `?de=${encodeURIComponent(de)}` : ''}#ficha-materiais`}
       linkDaTaxa={`${base}/fichas/canais`}
       linkDoProduzir={ficha.ativa && !ctx.bloqueio ? `/rodolfo/erp/${ctx.parceiro.slug}/producao/nova?ficha=${ficha.id}` : undefined}
       podeConfigurarTaxa={!ctx.bloqueio}

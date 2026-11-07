@@ -145,8 +145,13 @@ describe('Home · falha do DRE é isolada e nunca reconstitui fórmula ou perío
     const p = await painelDoDia(cliente, dono, '/erp', HOJE, visao);
     expect(p.cmv?.valor.valor).toBe(35_000);
     expect(p.indicadores).toEqual([]);
-    // Decisão 518: a falha do faturamento não some com a pendência; ela fica "não conferida", sem número e sem "Lançar".
-    expect(p.pendencias.map((x) => [x.chave, x.leitura, x.acao])).toEqual([['faturamento-faltas', 'nao_conferida', 'Ver o faturamento']]);
+    // Falhas das fontes autorizadas ficam "não conferidas", sem inventar números ou pendências operacionais.
+    expect(p.pendencias.map((x) => [x.chave, x.leitura, x.acao])).toEqual([
+      ['faturamento-faltas', 'nao_conferida', 'Ver o faturamento'],
+      ['cardapio-nao-conferido', 'nao_conferida', 'Ver as fichas'],
+      ['estoque-nao-conferido', 'nao_conferida', 'Ver o estoque'],
+      ['producao-nao-conferido', 'nao_conferida', 'Ver a lista'],
+    ]);
     expect(p.estados?.every((e) => e.estado === 'erro')).toBe(true);
   });
 

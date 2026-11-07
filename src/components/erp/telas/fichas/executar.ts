@@ -7,7 +7,8 @@
 
 import { revalidatePath } from 'next/cache';
 import type { EntradaDaFicha, ItemDigitado } from '@/lib/erp/ficha-campos';
-import type { EmbalagemDigitada } from '@/lib/erp/canal-campos';
+import { ORDEM_DOS_CANAIS, type EmbalagemDigitada } from '@/lib/erp/canal-campos';
+import { CAMPOS_DO_FAROL, campoDaFaixa, type EntradaDasFaixas } from '@/lib/erp/cmv-faixas-campos';
 import type { MudancaDeFoto } from '@/lib/erp/fichas';
 import { importarFichas, previaDaImportacao } from '@/lib/erp/ficha-importar';
 import { decodificarPlanilha, LIMITE_DA_PLANILHA } from '@/lib/erp/ficha-planilha';
@@ -15,10 +16,65 @@ import { NOME_DA_FOTO } from '@/lib/erp/foto';
 import { entradaDoFormulario } from '@/lib/erp/validade';
 import type { PedidoDeFoto } from '@/lib/erp/ficha-fotos';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
-import type { EstadoImportacao } from './estado';
+import { fraseDoFeitoDaFicha, type EstadoImportacao } from './estado';
+import type { EstadoConfiguracao } from '@/lib/erp/canal-config-campos';
+import type { ResultadoDoCanal } from '@/lib/erp/canais';
 import { PREFIXO_DO_PREPARO } from './prefixo';
+import { classificacaoDoFormulario, type EstadoGestaoClassificacao } from '@/lib/erp/ficha-secoes-campos';
+import { gerirClassificacao } from '@/lib/erp/ficha-secoes';
+import { materiaisDoFormulario, type EntradaFichaUnificada, type EstadoFichaUnificada, type ResultadoFichaUnificada } from '@/lib/erp/ficha-unificada-campos';
+import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 
 const textoDe = (v: FormDataEntryValue | null) => (typeof v === 'string' ? v : '');
+
+export function recusarFichaUnificada(anterior: EstadoFichaUnificada, motivo: string): EstadoFichaUnificada {
+  return { ok: false, vez: (anterior?.vez ?? 0) + 1, erros: { geral: motivo } };
+}
+
+/** Confirmação explícita do próprio envio, antes de limpar o rascunho e navegar. */
+export function concluirFichaUnificada(r: ResultadoFichaUnificada, anterior: EstadoFichaUnificada, base: string,
+  form: FormData, permissoes: { verFichas: boolean; verPrecos: boolean }, criando: boolean): EstadoFichaUnificada {
+  const vez = (anterior?.vez ?? 0) + 1;
+  if (!r.ok) return { ok: false, vez, erros: r.erros, conflito: r.conflito, indeterminado: r.indeterminado };
+  revalidatePath(base, 'layout');
+  const feito = criando ? 'criada' : r.mudou.length ? 'editada' : 'igual';
+  const busca = new URLSearchParams({ feito });
+  const de = deSeguroDaFicha(form.get('de'), permissoes.verPrecos);
+  if (de) busca.set('de', de);
+  const conferir = permissoes.verFichas && permissoes.verPrecos && form.get('tipo') === 'PRATO' && form.get('continuar') === 'precos';
+  if (conferir) busca.set('etapa', 'precos');
+  // Replay não afirma que o registro permanece ativo. Sem fichas.ver, o início é sempre um destino autorizado.
+  const destino = r.repetido && !permissoes.verFichas ? base.replace(/\/fichas$/, '')
+    : `${base}/${r.id}${permissoes.verFichas ? '' : '/editar'}?${busca}${conferir ? '#preco-por-canal' : ''}`;
+  const comum = { ok: true as const, vez, id: r.id, destino, mensagem: r.repetido ? 'Este cadastro já havia sido confirmado.' : 'Ficha salva.' };
+  return r.repetido ? { ...comum, repetido: true }
+    : { ...comum, repetido: false, versao: r.versao, versaoMateriais: permissoes.verPrecos ? r.versaoMateriais : null };
+}
+
+export async function lerEnvioDaFichaUnificada(form: FormData): Promise<{ ok: true; entrada: EntradaFichaUnificada; foto: MudancaDeFoto } | { ok: false; erros: Record<string, string> }> {
+  const materiais = materiaisDoFormulario(form);
+  if (!materiais.ok) return materiais as { ok: false; erros: Record<string, string> };
+  for (const nome of ['chaveEnvio', 'versao']) {
+    const valores = form.getAll(nome);
+    if (valores.length > 1 || valores.some(v => typeof v !== 'string')) return { ok: false, erros: { geral: 'Pedido de ficha inválido. Reabra o formulário.' } };
+  }
+  const lido = await lerEnvioDaFicha(form);
+  if ('erroDaFoto' in lido) return { ok: false, erros: { foto: lido.erroDaFoto } };
+  return { ok: true, entrada: { ...lido.entrada, chaveEnvio: form.get('chaveEnvio'), materiais: materiais.materiais }, foto: lido.foto };
+}
+
+export function recusarConfiguracao(anterior: EstadoConfiguracao, motivo: string): EstadoConfiguracao {
+  return { ok: false, erros: { geral: motivo }, vez: (anterior?.vez ?? 0) + 1 };
+}
+
+/** Sem redirect: o formulário adota somente a confirmação da sua própria gravação. */
+export function concluirConfiguracao(r: ResultadoDoCanal, anterior: EstadoConfiguracao, base: string, feito: { mudou: string; igual: string }): EstadoConfiguracao {
+  const vez = (anterior?.vez ?? 0) + 1;
+  if (!r.ok) return { ok: false, erros: r.erros, conflito: r.conflito, vez };
+  if (!r.confirmacao) throw new Error('Configuração salva sem confirmação transacional.');
+  revalidatePath(base, 'layout');
+  return { ok: true, vez, mensagem: fraseDoFeitoDaFicha(r.mudou.length ? feito.mudou : feito.igual) ?? 'Configuração salva.', confirmacao: r.confirmacao };
+}
 
 
 /** FormData → entrada da ficha (itens na ordem da tela) + o que fazer com a foto. */
@@ -40,6 +96,7 @@ export async function lerEnvioDaFicha(
     // Linha nova deixada em branco não é item (nem erro).
     .filter((i) => i.insumoId || i.subfichaId || i.quantidade.trim());
   const entrada = {
+    classificacao: classificacaoDoFormulario(form),
     nome: textoDe(form.get('nome')),
     tipo: textoDe(form.get('tipo')),
     descricao: textoDe(form.get('descricao')),
@@ -63,6 +120,16 @@ export async function lerEnvioDaFicha(
     foto = { tipo: 'enviada', arquivo: enviada };
   } else if (form.get('removerFoto') === 'sim') foto = { tipo: 'remover' };
   return { entrada, foto };
+}
+
+/** Gestão tem seu próprio estado: nunca conclui/redirect como se o ID fosse uma ficha. */
+export async function executarGestaoClassificacao(cliente: ClienteDoParceiro, anterior: EstadoGestaoClassificacao, form: FormData, autorNome: string, base: string): Promise<EstadoGestaoClassificacao> {
+  const vez = (anterior?.vez ?? 0) + 1;
+  const nivel = textoDe(form.get('nivel')), intencao = textoDe(form.get('intencao'));
+  if ((nivel !== 'secao' && nivel !== 'subsecao') || (intencao !== 'renomear' && intencao !== 'arquivar' && intencao !== 'restaurar' && intencao !== 'excluir')) return { vez, ok: false, erros: { geral: 'Pedido inválido.' } };
+  const r = await gerirClassificacao(cliente, { nivel, intencao, id: textoDe(form.get('id')), versao: textoDe(form.get('versao')), nome: form.get('nome') }, autorNome);
+  if (r.ok) revalidatePath(base, 'layout');
+  return { vez, ...r };
 }
 
 const vez = (a: EstadoImportacao) => (a?.vez ?? 0) + 1;
@@ -128,6 +195,14 @@ export function lerEnvioDasMetas(form: FormData) {
   return {
     versao: textoDe(form.get('versao')),
     metas: { LOJA: textoDe(form.get('metaCmv_LOJA')), DELIVERY_PROPRIO: textoDe(form.get('metaCmv_DELIVERY_PROPRIO')), IFOOD: textoDe(form.get('metaCmv_IFOOD')) },
+  };
+}
+
+/** Doze campos obrigatórios: null de campo omitido permanece inválido no parser, nunca vira retirada. */
+export function lerEnvioDasFaixas(form: FormData): { versao: unknown; faixas: EntradaDasFaixas } {
+  return {
+    versao: form.get('versao'),
+    faixas: Object.fromEntries(ORDEM_DOS_CANAIS.map(canal => [canal, Object.fromEntries(CAMPOS_DO_FAROL.map(campo => [campo, form.get(campoDaFaixa(canal, campo))]))])) as EntradaDasFaixas,
   };
 }
 

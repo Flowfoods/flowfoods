@@ -311,8 +311,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['insumos/classificar'],
     titulo: 'Classificar insumos',
-    versao: 1,
+    versao: 2,
     aula: [
+      { texto: 'Valores de estoque aparecem somente nas lojas em que você pode consultar compras; um valor parcial fica identificado.' },
       { texto: 'Insumos cadastrados antes das categorias ficam sem categoria; aqui ganham uma, pelo nome, sem mudar preço, unidade, saldo nem ficha.' },
       { texto: 'A prévia mostra para onde cada um iria, sem gravar nada; na dúvida, vai para “Outros / a classificar”, com o motivo.' },
       { texto: 'Na fila de revisão, marque vários e escolha a categoria: cada mudança fica no histórico, com o antes e o depois.' },
@@ -336,18 +337,24 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas'],
     titulo: 'Fichas técnicas',
-    versao: 4,
+    versao: 6,
     aula: [
       { texto: 'Cada receita da casa, com o que rende e o que leva.' },
       { texto: 'Pré-preparo (molho, base) entra dentro de outras fichas.' },
-      { texto: 'O custo por porção aparece para quem vê os preços. “Incompleto” quer dizer que falta preço em algum insumo.', para: ['precos.ver'] },
-      { texto: 'Ao lado, cada canal tem o seu preço, o CMV e o farol: dentro da meta, acima da meta, sem dados ou não ofertado. O filtro “CMV” mostra só os pratos de um farol num canal, contando a lista inteira.', para: ['precos.ver'] },
+      { texto: 'Seção agrupa as fichas e subseção refina o grupo; combine com nome, tipo e situação, ou use Sem seção para encontrar as fichas ainda sem classificação.' },
+      { texto: 'Para quem vê os preços, aparece o custo por porção ou “Incompleto” quando falta preço em algum insumo.', para: ['precos.ver'] },
+      { texto: 'Em “Comparação com a meta”, marque uma ou mais opções por canal: entram os pratos que atendem a qualquer opção marcada, uma vez cada, considerando a lista inteira.', para: ['precos.ver'] },
+      { texto: '“Faixa do farol” permite combinar as cinco faixas e os estados sem dados, não ofertado e faixas não configuradas; sem seleção, esse grupo não restringe a lista.', para: ['precos.ver'] },
+      { texto: 'Com os dois grupos marcados, o prato precisa corresponder a uma opção de cada grupo e aos demais filtros.', para: ['precos.ver'] },
     ],
     pontos: [
       {
         id: 'conta',
         titulo: 'Como o CMV é calculado',
-        blocos: [{ texto: 'CMV é o custo físico (insumos e embalagens do canal) dividido pelo preço que você definiu; a taxa do iFood fica fora. Cada canal tem o seu farol. Sem preço definido ou sem meta, fica sem dados: a sugestão não conta como preço.', para: ['precos.ver'] }],
+        blocos: [
+          { texto: 'CMV é o custo físico (insumos e embalagens do canal) dividido pelo preço que você definiu; a taxa do iFood fica fora. A sugestão não conta como preço definido.', para: ['precos.ver'] },
+          { texto: 'Meta e limites são independentes: sem meta não há comparação nem sugestão, e sem limites o número aparece com farol neutro.', para: ['precos.ver'] },
+        ],
       },
     ],
   },
@@ -356,10 +363,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/nova', 'fichas/[id]/editar'],
     titulo: 'Montar a ficha',
-    versao: 4,
+    versao: 6,
     aula: [
-      { texto: 'Monte a receita com a quantidade limpa, sem casca e sem osso. O fator de correção cobre a perda da limpeza: cebola 1,18 quer dizer que 354 g sujas dão 300 g limpas.' },
-      { texto: 'Pré-preparo diz quanto rende pronto. Diga também onde guarda e quanto dura, ou marque consumo imediato quando nada fica guardado.' },
+      { texto: 'Monte a receita com a quantidade limpa, sem casca e sem osso; o fator de correção cobre a perda da limpeza: cebola 1,18 quer dizer que 354 g sujas dão 300 g limpas.' },
+      { texto: 'Pré-preparo diz quanto rende pronto, onde guarda e quanto dura; marque consumo imediato quando nada fica guardado.' },
+      { texto: 'Seção e subseção são opcionais, para pratos e pré-preparos. Escolha uma existente ou escreva um nome novo; o nome novo só é criado ao salvar a ficha.' },
+      { texto: 'As embalagens ficam na mesma edição, em bloco separado da receita e do preparo. Delivery próprio e iFood têm quantidades por porção; Loja usa somente a receita.', para: ['precos.ver'] },
+      { texto: 'Salvar confirma receita e embalagens juntas; a prévia acompanha os ingredientes, o rendimento e as embalagens digitadas, sem mudar o preço manual.', para: ['precos.ver'] },
     ],
     secoes: [
       {
@@ -372,6 +382,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       },
     ],
     pontos: [
+      {
+        id: 'classificacao',
+        titulo: 'Seção e subseção',
+        blocos: [
+          { texto: 'A subseção pertence à seção escolhida; trocar a seção limpa a subseção anterior, sem mudar os ingredientes nem o preparo.' },
+          { texto: 'Em Gerenciar seções, renomear conserva os vínculos e arquivar retira a opção de novas escolhas. As fichas que já a usam continuam vinculadas, e só se exclui uma classificação vazia e sem vínculos.' },
+        ],
+      },
       {
         id: 'tipo',
         titulo: 'Prato ou pré-preparo',
@@ -388,7 +406,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       {
         id: 'foto',
         titulo: 'Foto da ficha',
-        blocos: [{ texto: 'Do prato pronto ou da montagem: quem opera bate o olho e sabe o que é. A foto é reduzida e guardada sem a localização do celular.' }],
+        blocos: [
+          { texto: 'Do prato pronto ou da montagem: quem opera bate o olho e sabe o que é. A foto é reduzida e guardada sem a localização do celular.' },
+          { texto: 'Espere o envio da foto terminar antes de cadastrar um insumo; se ela não estiver mais disponível ao voltar, escolha novamente, mantendo os outros campos do rascunho.' },
+        ],
       },
       {
         id: 'rendimento',
@@ -402,6 +423,24 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Etapas do preparo',
         blocos: [{ texto: 'Uma ação por etapa. A ordem aqui é a ordem na ficha e na impressão, e etapa em branco não é gravada.' }],
         secao: 'preparo',
+      },
+      {
+        id: 'embalagens',
+        titulo: 'Embalagens por canal',
+        blocos: [
+          { texto: 'Escolha embalagens cadastradas e a quantidade por porção de cada canal; copiar Delivery para iFood é opcional, e as listas podem ser ajustadas separadamente.', para: ['precos.ver'] },
+          { texto: 'Os canais são alternativas para o pedido; embalagem também presente na receita pede conferência para evitar contar o mesmo uso duas vezes.', para: ['precos.ver'] },
+          { texto: 'Cadastrar um insumo exige acesso próprio e não salva a ficha; a prévia usa referências da abertura e fica pendente com custo ausente ou entrada inválida.', para: ['precos.ver'] },
+        ],
+      },
+      {
+        id: 'rascunho',
+        titulo: 'Rascunho e confirmação',
+        blocos: [
+          { texto: 'O rascunho fica nesta aba por 20 minutos, separado por pessoa, parceiro e ficha; fechar a aba não guarda uma cópia para outra sessão.' },
+          { texto: 'Se alguém salvou antes, o rascunho continua disponível, mas a versão antiga não sobrescreve a nova; confira a ficha salva antes de refazer as alterações.' },
+          { texto: 'Sem resposta, confira a ficha antes de repetir: a edição pode indicar conflito mesmo quando a primeira tentativa foi gravada.' },
+        ],
       },
     ],
   },
@@ -875,14 +914,14 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/[id]', 'fichas/[id]/imprimir'],
     titulo: 'Detalhe da ficha',
-    versao: 5,
+    versao: 8,
     aula: [
-      { texto: 'Foto, descrição comercial, o que a receita leva e o modo de preparo em etapas.' },
+      { texto: 'Foto, descrição comercial, seção e subseção (com aviso quando arquivadas), o que a receita leva e o modo de preparo em etapas.' },
       { texto: 'O custo por porção e de cada item, com a conta à mostra.', para: ['precos.ver'] },
       { texto: 'Pré-preparo: “Produzir” planeja um lote dele, com os insumos tirados da receita.', para: ['producao.registrar'] },
-      { texto: 'Em “Preço e CMV por canal”: o custo físico de cada canal, a meta de CMV, o preço sugerido pela meta, o seu preço, o CMV e o resultado após os custos informados.', para: ['precos.ver'] },
+      { texto: 'Em “Preço e CMV por canal”: custo físico, meta, sugestão pela meta, seu preço, CMV com sua faixa e comparação com a meta, e resultado após os custos informados.', para: ['precos.ver'] },
       { texto: 'Preço em branco é preço não definido: o canal fica sem dados até você pôr o seu. A sugestão nunca muda o seu preço.', para: ['precos.ver'] },
-      { texto: 'Na página de impressão, o botão pergunta antes o que sai no papel; cancelar não imprime, e o Ctrl+P de lá sai sem valores.' },
+      { texto: 'A impressão usa a ficha salva, com ingredientes por rendimento e embalagens por porção; o botão confere alterações e pergunta o que sai no papel.' },
     ],
     secoes: [
       {
@@ -891,8 +930,26 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Custo físico = insumos da receita + embalagens do canal, pelo custo de referência (o último preço pago). A taxa do iFood fica fora do CMV: aparece à parte.', para: ['precos.ver'] },
           { texto: 'Preço sugerido = custo físico ÷ meta de CMV do canal, arredondado para cima no centavo. CMV = custo físico ÷ o seu preço.', para: ['precos.ver'] },
-          { texto: 'Farol: dentro da meta (CMV igual ou abaixo dela), acima da meta, ou sem dados quando falta custo, meta ou preço (a tela diz o quê). Canal que o prato não vende fica “não ofertado”.', para: ['precos.ver'] },
+          { texto: 'Comparação com a meta: dentro quando o CMV é igual ou abaixo dela, acima quando ultrapassa, ou sem dados quando falta custo, meta ou preço. Canal em que o prato não é vendido fica “não ofertado”.', para: ['precos.ver'] },
           { texto: 'Resultado após os custos informados = preço − custo físico − taxa do canal. Aluguel, equipe e impostos não entram: não é lucro líquido.', para: ['precos.ver'] },
+        ],
+      },
+      {
+        id: 'faixas',
+        titulo: 'A faixa do CMV',
+        blocos: [
+          { texto: 'Muito favorável, Favorável, Confortável, Atenção e Crítico usam os limites configurados para cada canal. São independentes da meta que orienta o preço sugerido.', para: ['precos.ver'] },
+          { texto: 'Sem custo completo, com custo zero ou sem preço definido, a faixa fica sem dados, com o motivo escrito. Não ofertado e Faixas não configuradas são estados separados.', para: ['precos.ver'] },
+          { texto: 'O percentual aparece com uma casa decimal; a faixa considera o CMV sem arredondar e mostra seu intervalo. A impressão com preços e custos inclui essa informação; a impressão sem valores não a recebe.', para: ['precos.ver'] },
+        ],
+      },
+      {
+        id: 'impressao',
+        titulo: 'Conferir o que sai no papel',
+        blocos: [
+          { texto: 'Delivery e iFood aparecem separados, com nome, unidade e quantidade por porção de cada embalagem; são alternativas, não uma soma para o mesmo pedido.' },
+          { texto: 'Rascunho não salvo não entra na impressão; se a ficha ou as embalagens mudaram, o botão pede recarga, e cancelar não imprime.' },
+          { texto: 'Ctrl+P sai sem valores e usa a versão já carregada, sem buscar alterações mais recentes.' },
         ],
       },
     ],
@@ -902,11 +959,12 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/[id]/canais'],
     titulo: 'Embalagens por canal',
-    versao: 2,
+    versao: 4,
     aula: [
       { texto: 'O que vai no saco em cada canal: caixa, sacola, guardanapo.' },
       { texto: 'Delivery e iFood têm listas próprias. A loja não leva embalagem.' },
-      { texto: 'Em cada canal, a sugestão pela meta de CMV e o CMV ao seu preço acompanham as embalagens na tela; o preço muda só no passo de preços.', para: ['precos.ver'] },
+      { texto: 'As embalagens também ficam na edição da ficha, em bloco separado; esta página continua disponível para ajustar somente as embalagens.' },
+      { texto: 'Em cada canal, a sugestão pela meta, o CMV e sua faixa acompanham as embalagens digitadas na tela. É uma prévia; o preço muda só no passo de preços.', para: ['precos.ver'] },
     ],
   },
   {
@@ -914,10 +972,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'cadastros',
     rotas: ['fichas/canais'],
     titulo: 'Precificação',
-    versao: 2,
+    versao: 3,
     aula: [
       { texto: 'Quanto o iFood leva e a meta de CMV de cada canal: quanto do preço o custo físico do prato pode ser.' },
       { texto: 'A meta comanda a sugestão de preço das fichas (custo físico ÷ meta), sem mudar preço já definido.' },
+      { texto: 'As cinco faixas do farol usam quatro limites próprios de cada canal, separados da meta. Mudar esses limites não altera preços, custos ou registros anteriores.', para: ['precos.ver'] },
       { texto: 'Sem a taxa do iFood, o resultado do iFood fica pendente; o CMV não depende dela.' },
       { texto: 'Confira os números no seu contrato com o iFood.', para: ['precos.editar'] },
     ],
@@ -931,6 +990,15 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         id: 'meta-cmv',
         titulo: 'Meta de CMV e preço sugerido',
         blocos: [{ texto: 'Meta de CMV é quanto do preço o custo físico pode ser, e o preço sugerido é o custo físico dividido pela meta. Pode ser igual ou diferente em cada canal. Mudar a meta não muda nenhum preço já definido.', para: ['precos.ver'] }],
+      },
+      {
+        id: 'faixas-cmv',
+        titulo: 'Limites das cinco faixas',
+        blocos: [
+          { texto: 'Preencha os quatro limites em ordem crescente, com até duas casas decimais e valores inclusive acima de 100%, conferindo os intervalos na prévia.', para: ['precos.ver'] },
+          { texto: 'Deixar os quatro campos de um canal vazios retira só as faixas desse canal; preenchimento parcial não é salvo.', para: ['precos.editar'] },
+          { texto: 'A faixa usa o CMV sem arredondar e independe da meta; sem limites, aparece Faixas não configuradas.', para: ['precos.ver'] },
+        ],
       },
     ],
   },
@@ -1207,14 +1275,23 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/nova', 'compras/[id]/editar'],
     titulo: 'Lançar nota',
-    versao: 4,
+    // Decisões 523 e 275: prévia protegida; limpeza e descartáveis também entram no CMV gerencial.
+    versao: 7,
     aula: [
       { texto: 'Digite o valor total de cada linha, como está na nota.' },
       { texto: 'O frete é dividido entre os itens, e a soma tem que bater com o total da nota.' },
-      { texto: '“Conferir o impacto” mostra o que muda de custo e no orçamento de compra da loja antes de lançar: passar do orçamento é aviso, a nota entra igual.' },
+      { texto: '“Conferir o impacto” mostra o que a nota faz antes de lançar, sem gravar nada: passar do orçamento de compra da loja é aviso, a nota entra igual.' },
       { texto: 'A data da nota decide o período dela: se o DRE já fechou esse período, a nota não entra nem se edita. É também essa data que põe a nota no CMV de compra do período.', para: ['compras.lancar'] },
-      { texto: 'Só lance como nota o que é comida e embalagem para vender. Limpeza e descartável da operação vão como despesa, e o pagamento ao fornecedor de uma nota já lançada não é despesa: a nota já é o custo.', para: ['compras.lancar'] },
+      { texto: 'Lance também materiais de limpeza e descartáveis da operação como itens de compra: eles entram no CMV gerencial, na categoria do insumo. Não lance o pagamento da mesma nota como despesa, para não contar o custo duas vezes.', para: ['compras.lancar'] },
     ],
+    secoes: [{
+      id: 'depois-de-lancar',
+      titulo: 'Depois de lançar',
+      blocos: [
+        { texto: 'Quem só lança não consulta, edita ou cancela notas já salvas, nem as próprias; depois de salvar, recebe a confirmação e pode lançar outra compra na mesma loja.' },
+        { texto: 'Editar ou cancelar exige ver e lançar compras na loja; com esses dois acessos, salvar continua abrindo o detalhe da nota.' },
+      ],
+    }],
     // Decisão 522: o que cada campo muda no custo, no estoque e no DRE, junto do campo. Saíram do corpo e moram aqui: o "o custo
     // dos insumos passa a ser o desta compra" do cabeçalho e o "É ela que diz qual compra é a mais nova." da data (no `data`), o
     // "O preço por kg, L ou un sai da conta, com o frete rateado." dos itens (no `itens`) e o apoio do frete (no `frete`). Na ordem
@@ -1265,12 +1342,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'compras',
     rotas: ['compras/[id]'],
     titulo: 'Detalhe da nota',
-    versao: 5,
+    // Decisão 523 (versão 6): editar ou cancelar só muda o custo onde a nota é (ou era) a compra mais recente do insumo.
+    versao: 7,
     aula: [
       { texto: 'A nota, o frete de cada item e o que ela fez no estoque.' },
       { texto: 'Nota que veio do XML da nota fiscal não se edita: cancele e concilie a nota fiscal de novo.', para: ['compras.lancar'] },
       { texto: 'Nota do período em curso mostra como ficou o orçamento de compra da loja: quanto ainda cabe, ou quanto passou. É só aviso.' },
-      { texto: 'Errou? Edite ou cancele com o motivo: o custo e o estoque voltam.', para: ['compras.lancar'] },
+      { texto: 'Com acesso para ver e lançar compras na loja, você pode editar ou cancelar com o motivo: o que a nota pôs no estoque é corrigido por estorno, e o custo só muda nos insumos em que ela é ou era a compra mais recente.', para: ['compras.lancar'] },
       { texto: 'Nota com data em período que o DRE já fechou não se edita nem se cancela.', para: ['compras.lancar'] },
     ],
     secoes: [
@@ -1300,7 +1378,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'Custo por unidade é o valor do item mais a parte do frete, dividido pela quantidade na unidade do insumo.' },
           // `valeNoCusto`/`valeOutra` em `obterNota`: a última compra da rede (`ultimasCompras`), de qualquer loja.
-          { texto: 'Vale no custo a compra mais recente do insumo pela data da nota, de qualquer loja da rede, e é esse custo que as fichas usam; se há uma mais nova, a linha diz a data dela.' },
+          { texto: 'Vale no custo a compra mais recente do insumo pela data da nota, de qualquer loja da rede, e é esse custo que as fichas usam; se há uma mais nova, a linha diz a data dela só quando seu acesso inclui essa compra.' },
           { texto: 'Editar ou cancelar a nota que vale refaz o custo: cancelada, volta a valer a compra anterior ou, sem ela, o preço do cadastro.', para: ['compras.lancar'] },
         ],
       },
@@ -1490,9 +1568,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'estoque',
     rotas: ['estoque/[lojaId]/contagens/nova'],
     titulo: 'Planejar a contagem',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'Escolha o lugar (seco, refrigerado...) e quais insumos contar: os vencidos, todos do lugar ou só os mais caros.' },
+      { texto: 'Escolha o lugar e marque os insumos para contar, um a um ou o lugar todo.' },
+      { texto: 'Com acesso a compras na loja, os filtros por valor e frequência também ficam disponíveis.', para: ['compras.ver'] },
       { texto: 'Um pedaço por vez. Um insumo só entra em uma contagem aberta.' },
     ],
   },
@@ -1601,10 +1680,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'estoque',
     rotas: ['estoque/divergencias', 'estoque/[lojaId]/divergencias'],
     titulo: 'Divergências',
-    versao: 1,
+    versao: 2,
     aula: [
-      { texto: 'O que a contagem acusa sem requisição, em reais.' },
-      { texto: '“Pequeno e repetido” é a diferença que passa despercebida. Por setor mostra onde olhar, não quem culpar.' },
+      { texto: 'O que a contagem acusa sem requisição, em quantidades.' },
+      { texto: 'Com acesso a compras na loja, você também vê valores, prioridade por custo e diferenças pequenas que se repetem.', para: ['compras.ver'] },
+      { texto: 'Por setor mostra os insumos que cada equipe pediu; confira a diferença antes de tirar conclusões.' },
     ],
     pontos: [
       {
@@ -1873,10 +1953,10 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['custo-medio'],
     titulo: 'Custo médio por loja',
-    versao: 1,
+    versao: 2,
     soNivel1: true,
     aula: [
-      { texto: 'Cada loja nasce valorizando o estoque pelo último preço da rede. Ligado aqui, o estoque e o CMV dela passam a valer pelo custo médio da própria loja.' },
+      { texto: 'Cada loja usa a referência da rede até o custo médio ser ligado aqui. Depois, o estoque e o CMV real seguem o valor acumulado na própria loja; as fichas e os preços sugeridos continuam pela referência da rede.' },
       { texto: 'Leia o impacto antes: o valor do livro, o valor pela regra antiga e a diferença de base, que fica guardada na troca.' },
       { texto: 'Vale daqui para a frente, sem volta, e nada já gravado muda.' },
     ],
@@ -1886,7 +1966,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre'],
     titulo: 'DRE',
-    versao: 9,
+    versao: 10,
     // A tela da reunião: a tabela fica à vista e a aula abre numa linha.
     recolhida: true,
     aula: [
@@ -1894,7 +1974,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
       { texto: 'Com meta definida, a linha mostra o desvio e o farol, uma de 5 faixas de bem melhor a muito pior que a meta, igual na rede e em cada loja.', para: ['dre.ver'] },
       { texto: 'Período fechado mostra a fotografia do fechamento, que nunca muda.' },
       { texto: 'A loja que definiu a própria meta do CMV a vê na linha do CMV dela; a rede segue a meta da rede.', para: ['dre.ver'] },
-      { texto: 'O CMV é o custo da comida: no período em curso é o que a casa comprou até ontem, e vira o real, o que ela consumiu, quando o período termina e a contagem de fechamento do estoque é aplicada.' },
+      { texto: 'O CMV gerencial inclui ingredientes, embalagens, limpeza e descartáveis: no período em curso mostra as compras até ontem; com o período terminado e os estoques de abertura e fechamento apurados, mostra o consumo real.' },
     ],
     secoes: [
       {
@@ -1955,8 +2035,8 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'CMV real é o estoque inicial mais as compras menos o estoque final. Só existe com o período terminado e o fechamento do estoque aplicado nas duas pontas: o do período e o do anterior (ou a abertura, no primeiro).' },
           { texto: 'Em cada loja entra o real, quando existe; senão a compra, com o motivo escrito ao lado. A rede soma o que vale em cada loja, e fica misto quando as fontes se misturam. Loja sem nota e sem estoque fica sem CMV, nunca com zero, e os resultados avisam que saem sem contar o CMV.' },
           { texto: 'O CMV que vale é descontado da receita líquida na margem de contribuição. No painel compra × real a diferença é o real menos a compra: estoque que sobe é dinheiro parado na prateleira; estoque que desce pede olho na próxima compra.' },
-          { texto: 'Com preço subindo, o estoque final vale mais e o real sai menor do que o consumo ao preço antigo. Insumo sem preço entra com zero no estoque, e a tela avisa quantos são.' },
-          { texto: 'Limpeza e descartável da operação não são nota de compra: lance como despesa, ou entram no CMV. O pagamento ao fornecedor de uma nota já lançada também não é despesa. Lojas que dividem estoque sem transferência distorcem o real de cada uma; o da rede continua certo.' },
+          { texto: 'Sem custo médio ligado, o estoque usa a última compra da rede ou o preço cadastrado; ligado, usa o valor acumulado na loja. Fichas e preços sugeridos seguem a referência da rede. Item sem preço fica fora da soma conhecida, com aviso; ausência de custo não é custo zero.' },
+          { texto: 'Limpeza e descartáveis entram no CMV gerencial pela compra e pelo estoque, cada insumo na sua categoria. O pagamento de uma nota já lançada não é outra despesa. Lojas que dividem estoque sem transferência podem distorcer o real por loja.' },
         ],
       },
       {
@@ -1987,7 +2067,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'Incompleto e falta lançar',
         blocos: [
           { texto: 'Dia de canal sem lançamento de faturamento deixa a receita incompleta. O aviso conta quantos faltam, do mesmo jeito que o calendário do mês.' },
-          { texto: 'Despesa que repete todo mês e ainda não foi lançada neste mês aparece em Falta lançar. Nunca entra valor inventado. A cobrança continua nos meses seguintes até alguém lançar ou marcar que não repete mais.', para: ['despesas.lancar'] },
+          { texto: 'Despesa marcada para repetir, com último lançamento nos 12 meses anteriores, aparece em Falta lançar se o mês escolhido ainda não foi lançado. Nada entra sozinho; confira o valor ou use Não repete mais na última despesa lançada.', para: ['despesas.lancar'] },
         ],
       },
       {
@@ -2045,11 +2125,11 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/despesas/[id]'],
     titulo: 'Despesa',
-    versao: 1,
+    versao: 2,
     aula: [
       { texto: 'Os dados da despesa, como o DRE a conta dia a dia e tudo o que mudou nela, com antes e depois.' },
-      { texto: 'Pagar, desfazer o pagamento e parar de repetir valem mesmo em período fechado, porque não mudam o DRE.', para: ['despesas.lancar'] },
-      { texto: 'Lançou errado? Edite. Se foi a despesa que não devia existir, remova: o motivo é obrigatório e o que estava lançado fica no histórico.', para: ['despesas.lancar'] },
+      { texto: 'Em período fechado, ainda dá para mudar descrição, vencimento e repetição, pagar ou desfazer pagamento, pois isso não muda o DRE.', para: ['despesas.lancar'] },
+      { texto: 'Lançou errado? Antes do fechamento, edite; se a despesa não devia existir, remova com motivo. Depois, valor, competência, linha e loja ficam travados e a despesa não pode ser removida.', para: ['despesas.lancar'] },
     ],
     // Decisão 520: em que linha e em que período a despesa conta (o que o início soma e o Conferir este valor abre), e o
     // "Não muda o DRE" da conta a pagar, que saiu do corpo. Na ordem da página.
@@ -2105,7 +2185,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         blocos: [
           { texto: 'O DRE conta pela competência, o período a que a despesa pertence: a luz de outubro é de outubro, mesmo paga em novembro.' },
           { texto: 'Cada período do DRE recebe só os dias da despesa que caem nele e, no período em curso, só até ontem: o aluguel do mês entra aos poucos, dia a dia.' },
-          { texto: 'Período já fechado não recebe despesa nova nem muda valor, competência, linha ou loja das que caem nele: o fechamento guardou a fotografia do DRE daqueles dias.' },
+          { texto: 'Período fechado não recebe despesa nova nem muda valor, competência, linha ou loja das que caem nele: a fotografia do DRE fica guardada, e descrição, vencimento e repetição continuam editáveis.' },
         ],
       },
       {
@@ -2301,9 +2381,9 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'dre',
     rotas: ['dre/periodos/[inicio]'],
     titulo: 'Fechar o período',
-    versao: 4,
+    versao: 5,
     aula: [
-      { texto: 'Fechar guarda uma fotografia do DRE do período, e depois nada muda dentro das datas dele: nem faturamento, nem despesa, nem nota de compra, nem fechamento de estoque.' },
+      { texto: 'Fechar guarda uma fotografia do DRE e bloqueia o que muda o resultado dessas datas; pagamento, descrição, vencimento e repetição de despesa continuam editáveis.' },
       { texto: 'Faturamento faltando, taxa do iFood sem configurar, estoque em contagem de fechamento e rede sem lançamento travam, e não aceitam justificativa.' },
       { texto: 'Despesa que repete e não foi lançada, loja sem o estoque fechado e loja sem faturamento são ressalvas: marque cada uma e escreva uma justificativa.' },
       { texto: 'Só a FlowFoods reabre um período fechado, com o motivo; fechar de novo gera a versão seguinte.' },
@@ -2314,7 +2394,7 @@ export const ENTRADAS: EntradaDeAjuda[] = [
         titulo: 'O que é uma ressalva',
         blocos: [
           { texto: 'É algo que a casa sabe que está faltando e decide fechar assim mesmo. A justificativa tem de 10 a 300 letras, vai para a fotografia e para o Histórico, e o DRE fechado mostra Fechado com ressalvas para sempre.' },
-          { texto: 'A despesa que repete e falta lançar pode ser lançada antes, com o valor do mês passado como ponto de partida.', para: ['despesas.lancar'] },
+          { texto: 'A despesa que repete e falta lançar pode ser lançada antes, com o valor do último mês lançado como ponto de partida, dentro da busca dos 12 meses anteriores.', para: ['despesas.lancar'] },
         ],
       },
       {

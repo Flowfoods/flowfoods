@@ -24,7 +24,7 @@ export interface LinhaParaPlanejar {
   apoio: string;
   vencido: boolean;
   quantidade: string;
-  valor: string;
+  valor: string | null;
   emOutraContagem: string | null;
   sugerido: boolean;
 }

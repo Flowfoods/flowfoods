@@ -56,6 +56,7 @@ import {
   quadroDeRequisicoes,
 } from '@/lib/erp/requisicao';
 import { listarHistorico } from '@/lib/erp/historico';
+import * as custosDaLeitura from '@/lib/erp/estoque';
 import { resolverAlcance, type Alcance, type Permissao } from '@/lib/erp/permissoes';
 import * as estoqueDaSessao from '@/app/erp/estoque/actions';
 import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apoio';
@@ -425,6 +426,34 @@ describe.skipIf(!URL_TESTE)('ERP 1.8 · requisição e cruzamento com a contagem
     // Gerente de outra loja e parceiro B não veem.
     expect(await divergenciasDaLoja(a, GERENTE_DELIVERY(), ids.vp, {})).toBeNull();
     expect(await divergenciasDaLoja(b, DONA(), ids.vp, {})).toBeNull();
+    const semCompras = resolverAlcance({ perfilBase: 'GERENTE', perfilProprio: null, permissoesExtras: [], permissoesRemovidas: ['compras.ver'], redeInteira: false, lojaIds: [ids.vp] });
+    const agora = new Date();
+    const preco = await a.insumo.findUniqueOrThrow({ where: { id: ids.bacon }, select: { precoEmbalagemCentavos: true } });
+    const regra = await a.loja.findUniqueOrThrow({ where: { id: ids.vp }, select: { contagemToleranciaCentavos: true } });
+    const custo = vi.spyOn(custosDaLeitura, 'custosDaLoja').mockImplementation(async () => { throw new Error('Custo protegido consultado'); });
+    const referencia = vi.spyOn(custosDaLeitura, 'custosDeReferencia').mockImplementation(async () => { throw new Error('Referência protegida consultada'); });
+    try {
+      const operacional = (await divergenciasDaLoja(a, semCompras, ids.vp, {}, agora))!;
+      expect(operacional).toMatchObject({ aberto: true, verValores: false, toleranciaCentavos: null });
+      if (!operacional.aberto) throw new Error('Fixture deve estar aberta');
+      for (const l of operacional.linhas) {
+        const autorizado = d.linhas.find((x) => x.insumoId === l.insumoId)!;
+        for (const campo of ['sumicoMilesimos', 'consumoMilesimos', 'requisitadoMilesimos', 'outrasSaidasMilesimos', 'trechos'] as const) expect(l[campo]).toEqual(autorizado[campo]);
+        expect(l).toMatchObject({ sumicoCentavos: null, pequenos: null });
+      }
+      expect(operacional.resumo).toMatchObject({ semPreco: null, pequenosRepetidos: null, pequenosCentavos: null });
+      expect(operacional.negativos.every((n) => n.valorCentavos === null)).toBe(true);
+      await a.insumo.update({ where: { id: ids.bacon }, data: { precoEmbalagemCentavos: 765432 } });
+      await a.loja.update({ where: { id: ids.vp }, data: { contagemToleranciaCentavos: 99999 } });
+      expect(await divergenciasDaLoja(a, semCompras, ids.vp, {}, agora)).toEqual(operacional);
+      expect(custo).not.toHaveBeenCalled();
+      expect(referencia).not.toHaveBeenCalled();
+      expect(await a.movimentoEstoque.count()).toBe(antes);
+    } finally {
+      custo.mockRestore(); referencia.mockRestore();
+      await a.insumo.update({ where: { id: ids.bacon }, data: preco });
+      await a.loja.update({ where: { id: ids.vp }, data: regra });
+    }
   });
 
   it('herança a da 1.8: duas entregas do MESMO insumo em requisições diferentes, juntas, não pulam a confirmação do negativo', async () => {

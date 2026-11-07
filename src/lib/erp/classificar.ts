@@ -48,6 +48,7 @@ export function nomeDoLote(agora = new Date(), sorteio = Math.random()): string 
 // ---------------------------------------------------------- contagem e valor
 
 export interface ResumoDoQueFalta {
+  visibilidadeDoValor: VisibilidadeDoValor;
   /** Insumos ativos ainda sem categoria nenhuma. */
   semCategoria: number;
   /** Insumos ativos em "Outros / a classificar". */
@@ -61,32 +62,35 @@ export interface ResumoDoQueFalta {
   valorCentavos: number | null;
 }
 
-/** Em quais lojas a pessoa vê o estoque (para o valor): 'todas' as da casa que o alcance cobre. */
-async function lojasComEstoque(cliente: ClienteDoParceiro, alcance: Alcance): Promise<string[]> {
+export type VisibilidadeDoValor = 'indisponivel' | 'parcial' | 'completa';
+
+/** Recorte aplicado antes de somar: estoque e compras na mesma loja. */
+async function recorteDoValor(cliente: ClienteDoParceiro, alcance: Alcance): Promise<{ lojas: string[]; visibilidade: VisibilidadeDoValor }> {
   const lojas = await cliente.loja.findMany({ select: { id: true } });
-  return lojas.map((l) => l.id).filter((id) => pode(alcance, 'estoque.ver', { lojaId: id }));
+  const estoque = lojas.map((l) => l.id).filter((id) => pode(alcance, 'estoque.ver', { lojaId: id }));
+  const valores = estoque.filter((id) => pode(alcance, 'compras.ver', { lojaId: id }));
+  return { lojas: valores, visibilidade: !valores.length ? 'indisponivel' : valores.length < estoque.length ? 'parcial' : 'completa' };
 }
 
 export async function resumoDoQueFalta(cliente: ClienteDoParceiro, alcance: Alcance): Promise<ResumoDoQueFalta> {
-  const [semCategoria, emOutros, lojas] = await Promise.all([
+  const [semCategoria, emOutros, recorte] = await Promise.all([
     cliente.insumo.count({ where: { ativo: true, categoriaId: null } }),
     cliente.insumo.count({ where: { ativo: true, ...DONO_DO_OUTROS } }),
-    lojasComEstoque(cliente, alcance),
+    recorteDoValor(cliente, alcance),
   ]);
   let valorCentavos: number | null = null;
-  if (lojas.length > 0) {
+  if (recorte.lojas.length > 0) {
     const soma = await cliente.saldoEstoque.aggregate({
       _sum: { valorCentavos: true },
-      where: { lojaId: { in: lojas }, quantidadeMilesimos: { gt: 0 }, valorCentavos: { gt: 0 }, insumo: { is: { ativo: true, OR: A_REVISAR } } },
+      where: { lojaId: { in: recorte.lojas }, quantidadeMilesimos: { gt: 0 }, valorCentavos: { gt: 0 }, insumo: { is: { ativo: true, OR: A_REVISAR } } },
     });
     valorCentavos = soma._sum.valorCentavos ?? 0;
   }
-  return { semCategoria, emOutros, total: semCategoria + emOutros, valorCentavos };
+  return { semCategoria, emOutros, total: semCategoria + emOutros, valorCentavos, visibilidadeDoValor: recorte.visibilidade };
 }
 
 /** O valor em estoque de cada insumo (centavos), nas lojas que a pessoa vê; vazio se ela não vê estoque. */
-async function valoresDeEstoque(cliente: ClienteDoParceiro, alcance: Alcance, ids: string[]): Promise<Map<string, number> | null> {
-  const lojas = await lojasComEstoque(cliente, alcance);
+async function valoresDeEstoque(cliente: ClienteDoParceiro, lojas: string[], ids: string[]): Promise<Map<string, number> | null> {
   if (lojas.length === 0) return null;
   const mapa = new Map<string, number>();
   for (let i = 0; i < ids.length; i += 500) {
@@ -116,6 +120,7 @@ export interface LinhaDaPrevia {
 }
 
 export interface PreviaDaClassificacao {
+  visibilidadeDoValor: VisibilidadeDoValor;
   /** Quantos insumos estão sem categoria (todos, ativos ou não). */
   total: number;
   linhas: LinhaDaPrevia[];
@@ -138,7 +143,8 @@ export async function previaDaClassificacao(cliente: ClienteDoParceiro, alcance:
   // Casa sem nenhuma categoria ainda: a prévia mostra as dez padrão, que é o que "aplicar" semeia antes de classificar.
   const categorias: { id: string | null; chave: string | null; nome: string; ativa: boolean; ordem: number }[] =
     daCasa.length > 0 ? daCasa : CATEGORIAS_PADRAO.map((p) => ({ id: null, chave: p.chave, nome: p.nome, ativa: true, ordem: p.ordem }));
-  const valores = await valoresDeEstoque(cliente, alcance, alvos.map((a) => a.id));
+  const recorte = await recorteDoValor(cliente, alcance);
+  const valores = await valoresDeEstoque(cliente, recorte.lojas, alvos.map((a) => a.id));
   const linhas: LinhaDaPrevia[] = alvos.map((a) => {
     const s = sugerirCategoria(a.nome, a.tipo);
     const destino = escolherDestino(categorias, s.chave);
@@ -161,6 +167,7 @@ export async function previaDaClassificacao(cliente: ClienteDoParceiro, alcance:
   const ordem = new Map(categorias.map((c, i) => [c.chave, i] as const));
   return {
     total: alvos.length,
+    visibilidadeDoValor: recorte.visibilidade,
     linhas,
     porCategoria: Array.from(contagem.values()).sort((a, b) => (ordem.get(a.chave) ?? 99) - (ordem.get(b.chave) ?? 99)),
     paraRevisar: linhas.filter((l) => l.chave === CHAVE_DO_SISTEMA).length,
@@ -341,13 +348,14 @@ export interface LinhaDaFila {
 }
 
 export interface FilaDeRevisao {
+  visibilidadeDoValor: VisibilidadeDoValor;
   linhas: LinhaDaFila[];
   total: number;
   pagina: number;
   paginas: number;
 }
 
-/** Os insumos sem categoria definitiva (sem nenhuma, ou em "Outros"), do que mais vale em estoque para o que menos, depois por nome. */
+/** Os insumos sem categoria definitiva (sem nenhuma, ou em "Outros"), por nome e ID, sem prioridade por valor. */
 export async function filaDeRevisao(cliente: ClienteDoParceiro, alcance: Alcance, paginaPedida = 1): Promise<FilaDeRevisao> {
   const where = { ativo: true, OR: A_REVISAR };
   const total = await cliente.insumo.count({ where });
@@ -360,7 +368,8 @@ export async function filaDeRevisao(cliente: ClienteDoParceiro, alcance: Alcance
     skip: (pagina - 1) * POR_PAGINA_DA_FILA,
     take: POR_PAGINA_DA_FILA,
   });
-  const valores = await valoresDeEstoque(cliente, alcance, lidos.map((i) => i.id));
+  const recorte = await recorteDoValor(cliente, alcance);
+  const valores = await valoresDeEstoque(cliente, recorte.lojas, lidos.map((i) => i.id));
   const linhas = lidos.map((i): LinhaDaFila => {
     const s = sugerirCategoria(i.nome, i.tipo);
     return {
@@ -373,7 +382,7 @@ export async function filaDeRevisao(cliente: ClienteDoParceiro, alcance: Alcance
       valorCentavos: valores ? (valores.get(i.id) ?? 0) : null,
     };
   });
-  return { linhas, total, pagina, paginas };
+  return { linhas, total, pagina, paginas, visibilidadeDoValor: recorte.visibilidade };
 }
 
 export type ResultadoEmLote = { ok: true; classificados: number; iguais: number; naoEncontrados: number } | { ok: false; erro: string };

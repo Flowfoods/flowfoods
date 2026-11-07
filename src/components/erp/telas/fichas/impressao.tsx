@@ -20,9 +20,11 @@ import { useEffect, useReducer, useRef } from 'react';
 import { flushSync } from 'react-dom';
 import { Printer } from 'lucide-react';
 import type { FichaNoPapel } from '@/lib/erp/ficha-papel';
-import type { ImpressaoFinanceira } from '@/lib/erp/ficha-impressao';
+import type { ImpressaoFinanceira, ImpressaoOperacional } from '@/lib/erp/ficha-impressao';
+import { useTemRascunhoAlterado } from '../cadastro/rascunho';
 import { CANAIS } from '@/lib/erp/canal-campos';
-import { parcelasEmTexto, porcentagemDoCmv, ROTULO_DO_RESULTADO, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
+import { parcelasEmTexto, porcentagemDoCmv, ROTULO_DO_RESULTADO, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
+import { AVISO_DO_ARREDONDAMENTO, FarolDeCmv } from './farol';
 import { custoIncompleto, formatarFator, formatarRendimento, porUnidadeDeRendimento, quantidadeBruta, TIPOS_DE_FICHA } from '@/lib/erp/ficha-campos';
 import { formatarData, hojeNoRio } from '@/lib/erp/compra-campos';
 import { formatarDinheiro, formatarFracao, formatarPontosBase, formatarQuantidade } from '@/lib/erp/unidades';
@@ -46,7 +48,7 @@ const TITULO = 'text-[11px] font-semibold uppercase tracking-wide text-suave pri
 
 type DadosFinanceiros = { ficha: FichaNoPapel; canais: CmvDoCanal[] | null };
 
-const FALHA_DE_REDE = 'Não foi possível carregar os preços e custos. Confira a conexão e tente de novo.';
+const FALHA_DE_REDE = 'Não foi possível conferir a versão salva da ficha. Confira a conexão e tente de novo.';
 
 const OPCOES: { valor: ConteudoDaImpressao; rotulo: string; ajuda: string }[] = [
   { valor: 'sem', rotulo: 'Sem preços e custos', ajuda: 'Ingredientes, quantidades, rendimento, preparo e foto. Nenhum valor em reais ou percentual financeiro.' },
@@ -57,6 +59,7 @@ export function TelaImpressaoFicha({
   ficha,
   podeFinanceiro,
   carregarFinanceiro,
+  carregarOperacional,
   contexto,
   base,
   voltar,
@@ -68,6 +71,7 @@ export function TelaImpressaoFicha({
   podeFinanceiro: boolean;
   /** Ação do servidor: confere `precos.ver` e devolve os valores da mesma versão da ficha. */
   carregarFinanceiro: (id: string, versao: string) => Promise<ImpressaoFinanceira>;
+  carregarOperacional: (id: string, versao: string) => Promise<ImpressaoOperacional>;
   contexto: string;
   base: string;
   voltar: string;
@@ -81,17 +85,22 @@ export function TelaImpressaoFicha({
   const marcador = useRef<MarcadorDeImpressao>({ nossa: false });
   /** Número do pedido em andamento: resposta de pedido cancelado é ignorada. */
   const pedido = useRef(0);
+  const temRascunho = useTemRascunhoAlterado(`${base}/${ficha.id}/editar`);
 
   useEffect(() => {
     // Impressão que não foi aberta por esta tela (Ctrl+P, menu) — inclusive depois de uma nossa que não terminou —
     // descarta qualquer valor ANTES de o navegador montar o papel.
     const antes = () => {
-      if (quemAbriuAImpressao(marcador.current) === 'navegador') flushSync(() => enviar({ tipo: 'impressaoNativa' }));
+      if (quemAbriuAImpressao(marcador.current) === 'navegador') {
+        pedido.current++;
+        flushSync(() => enviar({ tipo: 'impressaoNativa' }));
+      }
     };
     const depois = () => enviar({ tipo: 'terminouImpressao' });
     window.addEventListener('beforeprint', antes);
     window.addEventListener('afterprint', depois);
     return () => {
+      pedido.current++;
       window.removeEventListener('beforeprint', antes);
       window.removeEventListener('afterprint', depois);
     };
@@ -124,10 +133,12 @@ export function TelaImpressaoFicha({
   async function confirmar() {
     if (!escolhendo) return;
     enviar({ tipo: 'confirmar', podeFinanceiro });
-    if (escolhendo.escolha !== 'com' || !podeFinanceiro) return;
+    if (escolhendo.escolha === 'com' && !podeFinanceiro) return;
     const n = ++pedido.current;
     try {
-      const r = await carregarFinanceiro(ficha.id, ficha.versao);
+      const r = escolhendo.escolha === 'com'
+        ? await carregarFinanceiro(ficha.id, ficha.versaoOperacional)
+        : await carregarOperacional(ficha.id, ficha.versaoOperacional).then(r => r.ok ? { ...r, canais: null } : r);
       if (n !== pedido.current) return;
       enviar(r.ok ? { tipo: 'carregou', dados: { ficha: r.ficha, canais: r.canais } } : { tipo: 'falhou', erro: r.erro });
     } catch {
@@ -151,13 +162,13 @@ export function TelaImpressaoFicha({
         <Link href={voltar} className={classeDeBotao('secundario')}>
           Voltar para a ficha
         </Link>
-        {dados && (
+        {dados?.ficha.verCustos && (
           <button type="button" onClick={() => enviar({ tipo: 'descartar' })} className={classeDeBotao('secundario')}>
             Voltar à versão sem valores
           </button>
         )}
         <p className="w-full text-[13px] text-suave" aria-live="polite">
-          {dados
+          {dados?.ficha.verCustos
             ? 'Versão com preços e custos, carregada só para esta impressão. Fechada a janela de impressão, a tela volta à versão sem valores.'
             : 'Versão sem preços e custos. Ao imprimir, você escolhe se inclui preços e custos; a escolha vale só para aquela impressão.'}{' '}
           É a ficha como está salva; o que estiver sendo editado e não foi salvo não entra. Na janela de impressão, escolha “Salvar como PDF” para gerar o
@@ -165,6 +176,7 @@ export function TelaImpressaoFicha({
         </p>
       </div>
 
+      {temRascunho && <p role="status" className="ff-nao-imprime rounded-[10px] border border-atencao p-3 text-sm">Há um rascunho de edição nesta aba. Esta impressão usa somente a ficha salva; o rascunho foi mantido.</p>}
       <Dialogo aberto={aberto} aoFechar={cancelar} titulo="Imprimir a ficha" voltarPara={botao} className="ff-nao-imprime w-[min(32rem,calc(100vw-2rem))]">
         <form
           ref={formulario}
@@ -181,7 +193,7 @@ export function TelaImpressaoFicha({
             {OPCOES.map((o) => {
               const indisponivel = o.valor === 'com' && !podeFinanceiro;
               // Carregando só acontece depois de confirmar "Com preços e custos".
-              const marcado = (escolhendo?.escolha ?? 'com') === o.valor;
+              const marcado = (escolhendo?.escolha ?? (estado.fase === 'carregando' ? estado.escolha : 'sem')) === o.valor;
               return (
                 <label
                   key={o.valor}
@@ -211,7 +223,7 @@ export function TelaImpressaoFicha({
             </p>
           )}
           <p role="status" className="text-[13px] text-suave">
-            {carregando ? 'Preparando os preços e custos desta impressão…' : ''}
+            {carregando ? 'Conferindo a versão salva para esta impressão…' : ''}
           </p>
           <div className="flex flex-wrap gap-2">
             {/* aria-disabled em vez de disabled: o foco não se perde enquanto carrega; o envio repetido é ignorado. */}
@@ -331,6 +343,15 @@ export function DocumentoDaFicha({
           </table>
         </section>
 
+        {f.tipo === 'PRATO' && <section className={SECAO}>
+          <h2 className={TITULO}>Embalagens por canal · por porção</h2>
+          <p className="text-[12px] text-suave print:text-black">Loja usa somente a receita. Delivery próprio e iFood são alternativas; não some os dois canais.</p>
+          {(['DELIVERY_PROPRIO', 'IFOOD'] as const).map(canal => {
+            const linhas = f.materiais.filter(m => m.canal === canal);
+            return <div key={canal} className="break-inside-avoid space-y-1"><h3 className="text-[12px] font-semibold">{CANAIS[canal].rotulo}</h3>{linhas.length ? <ul className="space-y-1 text-[13px]">{linhas.map((m, n) => <li key={n}>{m.nome} · {formatarQuantidade(m.quantidadeMilesimos, m.unidade)} por porção</li>)}</ul> : <p className="text-[12px] text-suave print:text-black">Nenhuma embalagem vinculada.</p>}</div>;
+          })}
+        </section>}
+
         <section className="space-y-2">
           <h2 className={TITULO}>Modo de preparo</h2>
           {f.passosPreparo.length > 0 ? (
@@ -386,8 +407,7 @@ export function DocumentoDaFicha({
                         <td className={`${TD} text-right`}>{x.metaBp === null ? 'sem meta' : formatarPontosBase(x.metaBp)}</td>
                         <td className={`${TD} text-right`}>{x.precoCentavos === null ? 'não definido' : formatarDinheiro(x.precoCentavos)}</td>
                         <td className={`${TD} text-right`}>
-                          {x.cmvBp ? `${porcentagemDoCmv(x.cmvBp)} · ` : ''}
-                          {STATUS_DO_CMV[x.status].rotulo}
+                          <FarolDeCmv conta={x} modo="impressao" />
                         </td>
                         <td className={`${TD} text-right`}>
                           {x.resultado.tipo === 'ok' ? (
@@ -409,7 +429,7 @@ export function DocumentoDaFicha({
             </div>
             <p className="text-[11px] text-suave print:text-black">
               CMV teórico do prato ao preço definido, não o CMV real do estoque. O resultado desconta só o que está listado: aluguel, equipe, impostos e
-              outras despesas não entram. A taxa do iFood fica fora do CMV.
+              outras despesas não entram. A taxa do iFood fica fora do CMV. {AVISO_DO_ARREDONDAMENTO}
             </p>
           </section>
         )}

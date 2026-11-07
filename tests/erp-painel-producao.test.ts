@@ -124,7 +124,7 @@ describe('Home · produção de hoje de uma loja, sem consolidado ou custo', () 
     const p = await painelDoDia(cliente, acesso(['producao.ver', 'faturamento.ver']), '/erp', HOJE, visao);
     expect(p.indicadores).toEqual([expect.objectContaining({ chave: 'faturamento', valor: { tipo: 'dinheiro', centavos: 700_000 } })]);
     expect(p.estados?.find((e) => e.chave === 'producao')).toMatchObject({ estado: 'erro', mensagem: 'Não foi possível carregar a lista de produção de hoje.' });
-    expect(p.pendencias).toEqual([]);
+    expect(p.pendencias).toEqual([expect.objectContaining({ chave: 'producao-nao-conferido', leitura: 'nao_conferida', acao: 'Ver a lista' })]);
     const html = htmlDe(p);
     expect(html).toContain('role="group" aria-label="Pré-preparos na lista de hoje"');
     expect(html).toContain('Não foi possível carregar a lista de produção de hoje.');

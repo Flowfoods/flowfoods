@@ -18,7 +18,7 @@ const RECEITA = { num: 1000n, den: 1n }; // R$ 10,00 por porção
 const CAIXA = custoDaEmbalagem(200, 0, 1000)!; // R$ 2,00 a unidade
 const SACOLA = custoDaEmbalagem(300, 0, 1000)!; // R$ 3,00 a unidade
 const un = (nome: string, custo: EmbalagemNaTela['custo'], q = 1): EmbalagemNaTela => ({ nome, unidade: 'UN', quantidadeMilesimos: q * 1000, custo });
-const preco = (p: Partial<PrecoDoCanalNaFicha> = {}): PrecoDoCanalNaFicha => ({ metaBp: 2500, precoCentavos: 5000, ofertado: true, ...p });
+const preco = (p: Partial<PrecoDoCanalNaFicha> = {}): PrecoDoCanalNaFicha => ({ metaBp: 2500, precoCentavos: 5000, ofertado: true, cortesDoFarol: null, ...p });
 const conta = (canal: 'DELIVERY_PROPRIO' | 'IFOOD', embalagens: EmbalagemNaTela[], p: Partial<PrecoDoCanalNaFicha> = {}, faltaPreco: string[] = []) =>
   contaDasEmbalagensNaTela({ canal, porcao: RECEITA, faltaPreco, embalagens, preco: preco(p) });
 const reais = (f: { num: bigint; den: bigint }) => Number(f.num) / Number(f.den) / 100;
@@ -114,13 +114,13 @@ describe('embalagens → preço: a conta ao vivo é a mesma do detalhe', () => {
 
   it('precosDasEmbalagens: só Delivery e iFood, a partir da conta já lida; faltando canal, nada', () => {
     const cmv = [
-      { canal: 'LOJA' as const, metaBp: 3000, precoCentavos: 4000, ofertado: true },
-      { canal: 'DELIVERY_PROPRIO' as const, metaBp: 2500, precoCentavos: 5000, ofertado: true },
-      { canal: 'IFOOD' as const, metaBp: null, precoCentavos: null, ofertado: false },
+      { canal: 'LOJA' as const, metaBp: 3000, precoCentavos: 4000, ofertado: true, farol: { faixa: 'faixasNaoConfiguradas' as const, motivo: null, cortes: null } },
+      { canal: 'DELIVERY_PROPRIO' as const, metaBp: 2500, precoCentavos: 5000, ofertado: true, farol: { faixa: 'faixasNaoConfiguradas' as const, motivo: null, cortes: null } },
+      { canal: 'IFOOD' as const, metaBp: null, precoCentavos: null, ofertado: false, farol: { faixa: 'naoOfertado' as const, motivo: null, cortes: null } },
     ];
     expect(precosDasEmbalagens(cmv)).toEqual({
-      DELIVERY_PROPRIO: { metaBp: 2500, precoCentavos: 5000, ofertado: true },
-      IFOOD: { metaBp: null, precoCentavos: null, ofertado: false },
+      DELIVERY_PROPRIO: { metaBp: 2500, precoCentavos: 5000, ofertado: true, cortesDoFarol: null },
+      IFOOD: { metaBp: null, precoCentavos: null, ofertado: false, cortesDoFarol: null },
     });
     expect(precosDasEmbalagens(cmv.slice(0, 2))).toBeNull();
   });

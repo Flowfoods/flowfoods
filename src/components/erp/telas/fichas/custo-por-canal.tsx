@@ -5,12 +5,12 @@
  * "Preço e CMV por canal" no detalhe da ficha de PRATO (1.9 → 1.10 → N.2), o MESMO no nível 1 e na pessoa do parceiro.
  * Tabela densa com os canais nas colunas (Loja · Delivery · iFood): primeiro o CUSTO FÍSICO (insumos + embalagens do
  * canal: a base do CMV) e, separada, a taxa do iFood; depois a meta de CMV, o preço sugerido (custo físico ÷ meta), o
- * preço de venda (campo, só para quem muda preços), o CMV com o farol (dentro · acima · sem dados) e o resultado após
+ * preço de venda (campo, só para quem muda preços), o CMV com suas faixas e comparação com a meta e o resultado após
  * os custos informados (nunca "lucro líquido"). No celular, um bloco por canal.
  *
  * Ao vivo: cada tecla no preço refaz a conta com a MESMA função do servidor (`cmvDoCanal`). É prévia: o formulário
- * manda só o texto do preço, e o servidor recalcula tudo ao salvar. Faltar custo, meta ou preço nunca vira número nem
- * farol positivo: é "sem dados", com o motivo. A sugestão não é preço: vazio = preço não definido.
+ * manda só o texto do preço, e o servidor recalcula tudo ao salvar. Custo ou preço ausente não vira farol positivo.
+ * Meta ausente impede sugestão e comparação, mas não a faixa calculável. A sugestão não é preço praticado.
  */
 
 import Link from 'next/link';
@@ -23,7 +23,6 @@ import {
   parcelasEmTexto,
   porcentagemDoCmv,
   ROTULO_DO_RESULTADO,
-  STATUS_DO_CMV,
   type CmvDoCanal,
 } from '@/lib/erp/cmv-produto-campos';
 import { entradaDaTela, LIMITES_DO_PRECO, lerPrecos, type EntradaEmTexto } from '@/lib/erp/preco-campos';
@@ -35,12 +34,16 @@ import { LINK_DE_TEXTO } from '../../ui/estilos';
 import { Painel, Selo } from '../../ui/superficies';
 import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
 import { ErroGeral, useAvisoDeSaida } from '../cadastro/erros';
+import type { ConfiguracaoDoFarol } from '@/lib/erp/cmv-faixas-campos';
+import { AVISO_DO_ARREDONDAMENTO, FarolDeCmv } from './farol';
 
 /** O que o servidor manda (BigInt em texto). */
 export interface PrecosParaTela {
   entradas: EntradaEmTexto[];
   /** N.2: a meta de CMV de cada canal (null = sem meta). */
   metasDeCmv: Record<CanalVenda, number | null>;
+  /** Conjunto da mesma leitura do custo/preço; null por canal significa não configurado. */
+  faixas: ConfiguracaoDoFarol;
   precosProprios: Record<CanalVenda, number | null>;
   /** N.3: em que canais o prato é vendido (sem resposta gravada = vendido). */
   ofertados: Record<CanalVenda, boolean>;
@@ -60,6 +63,7 @@ interface Props {
   /** Só com `precos.editar`, ficha ativa e parceiro livre: o preço vira campo. */
   acao?: AcaoDeCadastro;
   aqui: string;
+  de?: string;
 }
 
 type Embalagem = CamadasDoCanal['embalagens'][number];
@@ -178,16 +182,7 @@ function Sugerido({ x, usar }: { x: CmvDoCanal; usar?: (centavos: number) => voi
 
 /** O CMV ao preço definido, com o farol em palavra (nunca só a cor); sem dados diz o que falta. */
 function Cmv({ x }: { x: CmvDoCanal }) {
-  const st = STATUS_DO_CMV[x.status];
-  return (
-    <>
-      {x.cmvBp ? <span className="text-[15px] font-semibold text-texto">{porcentagemDoCmv(x.cmvBp)}</span> : TRACO}
-      <span className="mt-1 block">
-        <Selo tom={st.tom}>{st.rotulo}</Selo>
-      </span>
-      {x.motivo && <span className="mt-1 block max-w-[12rem] whitespace-normal text-[12px] text-suave sm:ml-auto">{x.motivo}</span>}
-    </>
-  );
+  return <FarolDeCmv conta={x} />;
 }
 
 /** Resultado após os custos informados: R$ e %, e quais parcelas entraram. Pendente diz por quê. */
@@ -224,6 +219,7 @@ function ComFormulario(props: Props & { acao: AcaoDeCadastro }) {
       <input type="hidden" name="impressao" value={props.dados.impressaoDosPrecos} />
       <input type="hidden" name="custos" value={props.dados.impressaoDosCustos} />
       <input type="hidden" name="ofertas" value="1" />
+      {props.de && <input type="hidden" name="de" value={props.de} />}
       <Conteudo {...props} className="" estado={estado} editavel />
     </form>
   );
@@ -250,7 +246,7 @@ function Conteudo({
     const t = textos[e.canal].trim();
     // A MESMA leitura do servidor (e a mesma frase de erro).
     const lido = lerPrecos({ [e.canal]: t });
-    const x = cmvDoCanal(e, { metaBp: dados.metasDeCmv[e.canal], precoCentavos: lido.ok ? lido.dados[e.canal] : null, ofertado: ofertas[e.canal] });
+    const x = cmvDoCanal(e, { metaBp: dados.metasDeCmv[e.canal], precoCentavos: lido.ok ? lido.dados[e.canal] : null, ofertado: ofertas[e.canal], cortesDoFarol: dados.faixas[e.canal] });
     return { x, c: camadasDoCanal(e), erro: lido.ok ? undefined : lido.erros[`preco-${e.canal}`], digitado: !!t };
   });
   const cmvs = contas.map((k) => k.x);
@@ -479,12 +475,10 @@ function Conteudo({
       <ol className="divide-y divide-linha sm:hidden">
         {cmvs.map((x, i) => {
           const c = camadas[i];
-          const st = STATUS_DO_CMV[x.status];
           return (
             <li key={x.canal} className="px-4 py-4">
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="text-[15px] font-semibold text-texto">{CANAIS[x.canal].rotulo}</h3>
-                <Selo tom={st.tom}>{st.rotulo}</Selo>
               </div>
               <dl className="mt-2 space-y-1.5 text-[13px] tabular-nums">
                 <div className="flex justify-between gap-3">
@@ -566,6 +560,7 @@ function Conteudo({
           CMV aqui é o teórico do prato ao seu preço, não o CMV real do estoque nem o do DRE. A sugestão não vale como preço: sem preço definido, o canal fica
           sem dados. O resultado desconta só o que está listado; aluguel, equipe, impostos e outras despesas não entram.
         </p>
+        <p>{AVISO_DO_ARREDONDAMENTO}</p>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <LinkDeAjuda secao="conta">Como a conta é feita</LinkDeAjuda>
           {editavel && (
@@ -580,7 +575,7 @@ function Conteudo({
         {linkDosCanais && (
           <p>
             <Link href={linkDosCanais} className={LINK_DE_TEXTO}>
-              Metas de CMV e taxa em Precificação
+              Metas, faixas de CMV e taxa em Precificação
             </Link>
           </p>
         )}

@@ -514,8 +514,36 @@ export async function lojasParaLancar(tx: ClienteDoParceiro, alcance: Alcance) {
   return lojas.filter((l) => pode(alcance, 'compras.lancar', { lojaId: l.id }));
 }
 
-/** O que o formulário de nota precisa: lojas, fornecedores e insumos comprados (com o custo de agora). */
-export async function dadosDoFormularioDeNota(cliente: ClienteDoParceiro, alcance: Alcance, ja: { lojaId?: string; fornecedorId?: string; insumoIds?: string[] } = {}) {
+/**
+ * Decisão 523: quem recebe o custo de agora dos insumos no formulário de nota e o que a nota muda nele e nas fichas na prévia. É R$
+ * de compra, então a régua é `compras.ver` (decisões 390, 459 e 460; `insumos.ver` não serve de régua e lançar nota não dá custo).
+ * Todo-ou-nada nas lojas em jogo (390), defensivo: hoje a permissão vale para o acesso inteiro e as lojas em jogo já vêm do acesso
+ * (`lojasParaLancar`, `lerNota`, `notaVisivel`), então a régua equivale a `compras.ver`.
+ */
+export function veCustoDeCompra(alcance: Alcance, lojaIds: readonly string[]): boolean {
+  return pode(alcance, 'compras.ver') && lojaIds.every((lojaId) => pode(alcance, 'compras.ver', { lojaId }));
+}
+
+/**
+ * Um insumo do seletor do formulário de nota. Decisão 523: para quem não vê custo de compra (`veCustoDeCompra`), `custo` NÃO EXISTE
+ * no objeto (nem como `undefined`): não sai do servidor, nem no que a página entrega ao navegador. A data da última compra não vai
+ * para ninguém (nenhuma tela a usa, e ela diz que houve compra em loja que a pessoa pode não ver).
+ */
+export type InsumoDoFormularioDeNota = InsumoDaCompra &
+  (
+    | {
+        /** Custo de agora (última compra da rede, de qualquer loja, ou preço cadastrado), exato; null = sem preço. */
+        custo: CustoExato | null;
+      }
+    | { custo?: never }
+  );
+
+/** O que o formulário de nota precisa: lojas, fornecedores e insumos comprados (com o custo de agora, para quem vê custo de compra). */
+export async function dadosDoFormularioDeNota(
+  cliente: ClienteDoParceiro,
+  alcance: Alcance,
+  ja: { lojaId?: string; fornecedorId?: string; insumoIds?: string[] } = {},
+) {
   return cliente.transacao(async (tx) => {
     const lojas = (await lojasParaLancar(tx, alcance)).filter((l) => l.ativa || l.id === ja.lojaId);
     // O navegador recebe só a raiz do CNPJ (a empresa, para o aviso "mesma empresa, outro estabelecimento"); nunca o documento
@@ -532,26 +560,27 @@ export async function dadosDoFormularioDeNota(cliente: ClienteDoParceiro, alcanc
       orderBy: { nome: 'asc' },
       select: SELECAO_DO_INSUMO_DA_COMPRA,
     });
+    // Decisão 523: sem `compras.ver` nas lojas do formulário, as compras nem são lidas e o insumo vai sem custo.
+    if (!veCustoDeCompra(alcance, lojas.map((l) => l.id))) {
+      // Forma curta de propósito: a guarda de tenant (tests/erp-tenant-portao) lê "nome da relação + dois-pontos" como include/select.
+      const insumos = lidos.map((i): InsumoDoFormularioDeNota => paraCompra(i));
+      return { lojas, fornecedores, insumos };
+    }
     const compras = await ultimasCompras(
       tx,
       lidos.map((i) => i.id),
     );
-    const insumos = lidos.map((i) => {
-      const c = compras.get(i.id);
-      return {
+    const insumos = lidos.map(
+      (i): InsumoDoFormularioDeNota => ({
         ...paraCompra(i),
-        /** Custo de agora (última compra ou preço cadastrado), exato; null = sem preço. */
-        custo: c?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
-        /** Data da última compra lançada ("2026-10-14"): a nota de data anterior não muda o custo. */
-        ultimaCompraEm: c?.entradaEm ?? null,
-      };
-    });
+        custo: compras.get(i.id)?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos),
+      }),
+    );
     return { lojas, fornecedores, insumos };
   });
 }
 
 export type FormularioDeNota = Awaited<ReturnType<typeof dadosDoFormularioDeNota>>;
-export type InsumoDoFormularioDeNota = FormularioDeNota['insumos'][number];
 
 interface Contexto {
   lojas: Map<string, { nome: string; ativa: boolean }>;
@@ -806,6 +835,8 @@ export async function editarNota(
   entrada: EntradaDaNota & { versao?: unknown },
   autorNome = 'Sistema',
 ): Promise<ResultadoCompras> {
+  const acesso = recusa(alcance, 'compras.ver') ?? recusa(alcance, 'compras.lancar');
+  if (acesso) return { ok: false, erros: { geral: acesso } };
   const versao = new Date(typeof entrada.versao === 'string' ? entrada.versao : '');
   if (Number.isNaN(versao.getTime())) return { ok: false, erros: { geral: MENSAGEM_CONFLITO_NOTA }, conflito: true };
   try {
@@ -813,7 +844,7 @@ export async function editarNota(
       await travarParaEscrever(tx);
       const atual = await notaVisivel(tx, alcance, id);
       if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true });
-      const negadoAntes = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
+      const negadoAntes = recusa(alcance, 'compras.ver', { lojaId: atual.lojaId }) ?? recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
       if (negadoAntes) throw new Recusa({ ok: false, erros: { geral: negadoAntes } });
       if (atual.status !== 'LANCADA') throw new Recusa({ ok: false, erros: { geral: MENSAGEM_NOTA_CANCELADA } });
       // F.1b: a nota que veio do XML (ou foi ligada a ele) é o que o documento fiscal diz: não se edita, se cancela e se concilia de novo.
@@ -822,7 +853,7 @@ export async function editarNota(
       const { lido, ctx } = await lerNota(tx, alcance, entrada, true, atual);
       if (!lido.ok) throw new Recusa(lido);
       const d = lido.dados;
-      const negado = recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
+      const negado = recusa(alcance, 'compras.ver', { lojaId: d.lojaId }) ?? recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
       if (negado) throw new Recusa({ ok: false, erros: { lojaId: negado } });
       // 2.2b: a data de ANTES e a de DEPOIS não podem cair em período fechado (mover para dentro ou para fora).
       const dataAntes = atual.entradaEm.toISOString().slice(0, 10);
@@ -873,12 +904,14 @@ export async function editarNota(
  * transação: a chave fica livre para conciliar de novo e nunca há duas notas ativas com ela.
  */
 export async function cancelarNotaNaTransacao(tx: ClienteDoParceiro, alcance: Alcance, id: string, motivo: string, autorNome: string): Promise<void> {
+  const acesso = recusa(alcance, 'compras.ver') ?? recusa(alcance, 'compras.lancar');
+  if (acesso) throw new Recusa({ ok: false, erros: { geral: acesso } });
   await travarParaEscrever(tx);
   // F.1b: a ordem das travas é SEMPRE documento fiscal → nota (descartar o documento e cancelar a nota ao mesmo tempo não se esperam).
   await tx.sql`SELECT 1 FROM "DocumentoFiscal" WHERE "parceiroId" = ${tx.parceiroId} AND "notaEntradaId" = ${id} FOR UPDATE`;
   const atual = await notaVisivel(tx, alcance, id);
   if (!atual) throw new Recusa({ ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true });
-  const negado = recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
+  const negado = recusa(alcance, 'compras.ver', { lojaId: atual.lojaId }) ?? recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
   if (negado) throw new Recusa({ ok: false, erros: { geral: negado } });
   const dataDaNota = atual.entradaEm.toISOString().slice(0, 10);
   const fechado = (await datasEmPeriodoFechado(tx, [dataDaNota])).get(dataDaNota);
@@ -971,27 +1004,40 @@ export interface ImpactoNaFicha {
   variacaoCentavos: number;
 }
 
-export interface PreviaDaNota {
+interface BaseDaPrevia {
   itens: {
     nome: string;
     embalagem: string;
     quantidade: string;
     valorCentavos: number;
     freteRateadoCentavos: number;
+    /** O custo por unidade desta linha, da conta do que foi digitado (valor + frete rateado ÷ quantidade). */
     custo: string;
   }[];
   somaItensCentavos: number;
   freteCentavos: number;
   totalCentavos: number;
-  custos: ImpactoNoInsumo[];
-  fichas: ImpactoNaFicha[];
-  /** Fichas afetadas que ficaram de fora da lista (teto da tela). */
-  maisFichas: number;
   /** 1.6: o que a nota faz no estoque da loja (entra, ou por que não). */
   estoque: { movimenta: boolean; frase: string };
   /** 2.5: o que a nota faz no orçamento de compra da loja (aviso, nunca bloqueio); nulo = a pessoa não vê o orçamento. */
   orcamento: OrcamentoNaNota | null;
 }
+
+/**
+ * Decisão 523: o custo de cada insumo antes → depois ("antes" é o custo de agora) e as fichas que mudam são R$ de compra
+ * (`veCustoDeCompra` na loja da nota). Sem a permissão, `veCusto: false`: as listas vêm vazias e nem são calculadas.
+ */
+export type PreviaDaNota = BaseDaPrevia &
+  (
+    | {
+        veCusto: true;
+        custos: ImpactoNoInsumo[];
+        fichas: ImpactoNaFicha[];
+        /** Fichas afetadas que ficaram de fora da lista (teto da tela). */
+        maisFichas: number;
+      }
+    | { veCusto: false; custos: []; fichas: []; maisFichas: 0 }
+  );
 
 /** Custo efetivo do insumo: a última compra (do mapa) ou o preço cadastrado. */
 const efetivo = (i: InsumoLido, compra: UltimaCompra | undefined) => compra?.custo ?? custoDaEmbalagem(i.precoEmbalagemCentavos, i.taxaEntregaCentavos, i.conteudoMilesimos);
@@ -1012,44 +1058,67 @@ export async function previaDaNota(
   /** O dia de hoje para o orçamento (2.5); os testes fixam. */
   hoje?: string,
 ): Promise<{ ok: true; previa: PreviaDaNota } | Recusada> {
+  // Uma prévia de edição também acessa uma nota gravada; lançar não autoriza essa leitura.
+  if (notaId) {
+    const acesso = recusa(alcance, 'compras.ver') ?? recusa(alcance, 'compras.lancar');
+    if (acesso) return { ok: false, erros: { geral: acesso } };
+  }
   return cliente.transacao(async (tx) => {
     const atual = notaId ? await notaVisivel(tx, alcance, notaId) : null;
     if (notaId && !atual) return { ok: false, erros: { geral: 'Nota não encontrada.' }, naoEncontrado: true };
+    if (atual) {
+      const acesso = recusa(alcance, 'compras.ver', { lojaId: atual.lojaId }) ?? recusa(alcance, 'compras.lancar', { lojaId: atual.lojaId });
+      if (acesso) return { ok: false, erros: { geral: acesso } };
+    }
     const { lido, ctx } = await lerNota(tx, alcance, entrada, false, atual ?? undefined);
     if (!lido.ok) return lido;
     const d = lido.dados;
-    const afetados = Array.from(new Set([...d.itens.map((i) => i.insumoId), ...(atual?.itens.map((i) => i.insumoId ?? '').filter(Boolean) ?? [])]));
-    const agora = await ultimasCompras(tx, afetados);
-    const semEsta = atual ? await ultimasCompras(tx, afetados, { semNota: atual.id }) : agora;
-    const candidata = { notaId: atual?.id ?? '~nova', entradaEm: d.entradaEm, lancadaEm: atual?.lancadaEm?.getTime() ?? Date.now() };
-
-    const novos = new Map<string, CustoExato | null>();
-    const custos: ImpactoNoInsumo[] = [];
-    for (const insumoId of afetados) {
-      const ins = ctx.cadastro.get(insumoId);
-      if (!ins) continue;
-      const antes = efetivo(ins, agora.get(insumoId));
-      const base = semEsta.get(insumoId);
-      const daNota = d.itens.filter((i) => i.insumoId === insumoId);
-      const vence =
-        daNota.length > 0 &&
-        (!base || compararCompras(candidata, { notaId: base.notaId, entradaEm: base.entradaEm, lancadaEm: base.lancadaEm.getTime() }) > 0);
-      const depois = vence ? custoDaCompra(daNota) : efetivo(ins, base);
-      novos.set(insumoId, depois);
-      const comparado = antes && depois ? compararCustos(depois, antes) : null;
-      custos.push({
-        insumoId,
-        nome: ins.nome,
-        antes: formatarCusto(antes, ins.unidade),
-        depois: formatarCusto(depois, ins.unidade),
-        efeito: !vence && daNota.length > 0 ? 'nao-muda' : !antes && depois ? 'primeira' : comparado === null || comparado === 0 ? 'igual' : comparado > 0 ? 'sobe' : 'desce',
-        ...(!vence && daNota.length > 0 && base ? { vale: formatarData(base.entradaEm) } : {}),
-      });
+    if (atual) {
+      const acesso = recusa(alcance, 'compras.ver', { lojaId: d.lojaId }) ?? recusa(alcance, 'compras.lancar', { lojaId: d.lojaId });
+      if (acesso) return { ok: false, erros: { lojaId: acesso } };
     }
-    custos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
-    const mudaram = custos.filter((i) => i.efeito === 'sobe' || i.efeito === 'desce' || i.efeito === 'primeira').map((i) => i.insumoId);
-    const { fichas, mais } = await fichasAfetadas(tx, mudaram, novos, custos);
+    /** O custo de cada insumo antes → depois e as fichas que mudam, em cascata (só para quem vê custo de compra). */
+    const impactoNoCusto = async () => {
+      const afetados = Array.from(new Set([...d.itens.map((i) => i.insumoId), ...(atual?.itens.map((i) => i.insumoId ?? '').filter(Boolean) ?? [])]));
+      const agora = await ultimasCompras(tx, afetados);
+      const semEsta = atual ? await ultimasCompras(tx, afetados, { semNota: atual.id }) : agora;
+      const candidata = { notaId: atual?.id ?? '~nova', entradaEm: d.entradaEm, lancadaEm: atual?.lancadaEm?.getTime() ?? Date.now() };
+
+      const novos = new Map<string, CustoExato | null>();
+      const custos: ImpactoNoInsumo[] = [];
+      for (const insumoId of afetados) {
+        const ins = ctx.cadastro.get(insumoId);
+        if (!ins) continue;
+        const antes = efetivo(ins, agora.get(insumoId));
+        const base = semEsta.get(insumoId);
+        const daNota = d.itens.filter((i) => i.insumoId === insumoId);
+        const vence =
+          daNota.length > 0 &&
+          (!base || compararCompras(candidata, { notaId: base.notaId, entradaEm: base.entradaEm, lancadaEm: base.lancadaEm.getTime() }) > 0);
+        const depois = vence ? custoDaCompra(daNota) : efetivo(ins, base);
+        novos.set(insumoId, depois);
+        const comparado = antes && depois ? compararCustos(depois, antes) : null;
+        custos.push({
+          insumoId,
+          nome: ins.nome,
+          antes: formatarCusto(antes, ins.unidade),
+          depois: formatarCusto(depois, ins.unidade),
+          efeito: !vence && daNota.length > 0 ? 'nao-muda' : !antes && depois ? 'primeira' : comparado === null || comparado === 0 ? 'igual' : comparado > 0 ? 'sobe' : 'desce',
+          // O custo de referência é da rede; a data identifica uma nota de uma loja específica.
+          ...(!vence && daNota.length > 0 && base && pode(alcance, 'compras.ver', { lojaId: base.lojaId }) ? { vale: formatarData(base.entradaEm) } : {}),
+        });
+      }
+      custos.sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+      const mudaram = custos.filter((i) => i.efeito === 'sobe' || i.efeito === 'desce' || i.efeito === 'primeira').map((i) => i.insumoId);
+      const { fichas, mais } = await fichasAfetadas(tx, mudaram, novos, custos);
+      return { veCusto: true as const, custos, fichas, maisFichas: mais };
+    };
+    // Decisão 523: na loja da nota (e, na edição, também na de antes). Sem `compras.ver`, o custo nem é lido.
+    const custo = veCustoDeCompra(alcance, atual ? [d.lojaId, atual.lojaId] : [d.lojaId])
+      ? await impactoNoCusto()
+      : { veCusto: false as const, custos: [] as [], fichas: [] as [], maisFichas: 0 as const };
 
     const somaItens = d.itens.reduce((s, i) => s + i.valorCentavos, 0);
     const estoque = await efeitoPrevistoDaNota(tx, { lojaId: d.lojaId, lojaNome: ctx.lojas.get(d.lojaId)?.nome ?? 'loja', lancadaEm: atual?.lancadaEm ?? null, entradaEm: d.entradaEm });
@@ -1069,9 +1138,7 @@ export async function previaDaNota(
         somaItensCentavos: somaItens,
         freteCentavos: d.freteCentavos,
         totalCentavos: d.totalCentavos,
-        custos,
-        fichas,
-        maisFichas: mais,
+        ...custo,
         estoque,
         orcamento,
       },
@@ -1215,7 +1282,8 @@ export async function opcoesDosFiltrosDeNota(cliente: ClienteDoParceiro, alcance
 }
 
 /** Detalhe da nota (nas lojas do alcance): itens com o custo de cada um, se ela é a que vale no custo de cada insumo, alterações. */
-export async function obterNota(cliente: ClienteDoParceiro, alcance: Pick<Alcance, 'lojas'>, id: string) {
+export async function obterNota(cliente: ClienteDoParceiro, alcance: Alcance, id: string) {
+  if (!pode(alcance, 'compras.ver')) return null;
   return cliente.transacao(async (tx) => {
     if (!ID.test(id)) return null;
     const n = await tx.notaEntrada.findFirst({
@@ -1273,9 +1341,9 @@ export async function obterNota(cliente: ClienteDoParceiro, alcance: Pick<Alcanc
           valorCentavos: i.valorTotalCentavos,
           freteRateadoCentavos: i.freteRateadoCentavos,
           custo: custoDaCompra([{ valorCentavos: i.valorTotalCentavos, freteRateadoCentavos: i.freteRateadoCentavos, quantidadeMilesimos: i.quantidadeMilesimos }]),
-          /** Esta nota é a que dá o custo do insumo agora? Se não, a data da que vale. */
+          /** Esta nota dá o custo agora? A data da que vale só aparece se a pessoa pode consultar sua loja. */
           valeNoCusto: vale?.notaId === n.id,
-          valeOutra: vale && vale.notaId !== n.id ? formatarData(vale.entradaEm) : null,
+          valeOutra: vale && vale.notaId !== n.id && pode(alcance, 'compras.ver', { lojaId: vale.lojaId }) ? formatarData(vale.entradaEm) : null,
         };
       }),
       historico,

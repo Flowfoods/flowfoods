@@ -8,7 +8,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import type { Alcance } from '@/lib/erp/permissoes';
+import { randomUUID } from 'node:crypto';
+import { pode, type Alcance } from '@/lib/erp/permissoes';
 import type { ClienteDoParceiro } from '@/lib/erp/tenant';
 import { cancelarNota, editarNota, lancarNota, previaDaNota, type ResultadoCompras } from '@/lib/erp/compras';
 import type { EntradaDaNota } from '@/lib/erp/compra-campos';
@@ -22,7 +23,7 @@ export function recusadoNaNota(anterior: EstadoNota, motivo: string): EstadoNota
 }
 
 /** FormData → entrada da nota (itens na ordem da tela; linha em branco não é item). */
-export function lerEntradaDaNota(form: FormData): EntradaDaNota & { versao: string } {
+export function lerEntradaDaNota(form: FormData): EntradaDaNota & { lojaId: string; versao: string } {
   const insumos = form.getAll('item_insumo').map(textoDe);
   const embalagens = form.getAll('item_embalagem').map(textoDe);
   const quantidades = form.getAll('item_quantidade').map(textoDe);
@@ -73,6 +74,12 @@ export async function executarNota(
     return { ok: false, erros: {}, previa: p.previa, vez: vezDe(anterior) };
   }
   const r = notaId ? await editarNota(cliente, alcance, notaId, entrada, autorNome) : await lancarNota(cliente, alcance, entrada, autorNome);
+  if (r.ok && !notaId && !pode(alcance, 'compras.ver', { lojaId: entrada.lojaId })) {
+    revalidatePath(base, 'layout');
+    // Um marcador novo após CADA sucesso remonta a tela, inclusive no segundo lançamento seguido.
+    // Não é recibo ou chave de idempotência; nenhum dado/ID da nota vai para a URL.
+    redirect(`${base}/nova?${new URLSearchParams({ feito: 'lancada', loja: entrada.lojaId, nova: randomUUID() })}`);
+  }
   return concluirCompra(r, anterior, base, notaId ? { mudou: 'editada', igual: 'igual' } : { mudou: 'lancada' });
 }
 

@@ -36,6 +36,8 @@ async function auditar(ctx: Ctx, evento: string, r: ResultadoCompras) {
 export async function acaoSalvarNota(slug: string, notaId: string, anterior: EstadoNota, form: FormData): Promise<EstadoNota> {
   const { ctx, negado, notas } = await preparar(slug, 'compras.lancar');
   if (negado) return recusadoNaNota(anterior, negado);
+  const leitura = notaId ? recusaDaAcao(ctx, 'compras.ver') : null;
+  if (leitura) return recusadoNaNota(anterior, leitura);
   if (form.get('intencao') !== 'conferir') {
     await prisma.auditLog.create({ data: { userId: ctx.sessao.userId, evento: notaId ? 'erp_nota_editar' : 'erp_nota_lancar', dados: { parceiroId: ctx.parceiro.id, id: String(notaId) } } });
   }
@@ -45,6 +47,8 @@ export async function acaoSalvarNota(slug: string, notaId: string, anterior: Est
 export async function acaoCancelarNota(slug: string, notaId: string, anterior: EstadoNota, form: FormData): Promise<EstadoNota> {
   const { ctx, negado, notas } = await preparar(slug, 'compras.lancar');
   if (negado) return recusadoNaNota(anterior, negado);
+  const leitura = recusaDaAcao(ctx, 'compras.ver');
+  if (leitura) return recusadoNaNota(anterior, leitura);
   await prisma.auditLog.create({ data: { userId: ctx.sessao.userId, evento: 'erp_nota_cancelar', dados: { parceiroId: ctx.parceiro.id, id: String(notaId) } } });
   return executarCancelamento(ctx.cliente, ctx.alcance, ctx.sessao.autorNome, String(notaId), anterior, form, notas);
 }

@@ -6,10 +6,15 @@
 
 import { parceiroDaSessaoOuNada } from '@/lib/erp/contexto';
 import { receberFotoDaFicha } from '@/lib/erp/foto-envio';
+import { responderFotoPendente } from '@/lib/erp/foto-pendente';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: Request) {
   return receberFotoDaFicha(req, await parceiroDaSessaoOuNada());
+}
+
+export async function GET(req: Request) {
+  return responderFotoPendente(req, await parceiroDaSessaoOuNada());
 }

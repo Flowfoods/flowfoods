@@ -27,7 +27,7 @@
 
 import type { ClienteDoParceiro } from './tenant';
 import { ehErroDeUnicidade } from './tenant';
-import { alcancaLoja, recusa, type Alcance } from './permissoes';
+import { alcancaLoja, pode, recusa, type Alcance } from './permissoes';
 import { hojeNoRio } from './compra-campos';
 import { gravarRetrato, somaDoRetrato, type ItemDoRetrato } from './retrato-estoque';
 import { listarHistorico } from './historico';
@@ -269,11 +269,11 @@ export interface LinhaDoPlanejamento {
   unidade: Unidade;
   conservacao: Conservacao;
   ativo: boolean;
-  classe: Classe;
+  classe: Classe | null;
   saldoMilesimos: number;
   valorCentavos: number | null;
   ultima: Date | null;
-  situacao: SituacaoDoItem;
+  situacao: SituacaoDoItem | null;
   venceEm: string | null;
   /** Nome da outra contagem aberta em que o insumo está (não pode entrar nesta). */
   emOutraContagem: string | null;
@@ -293,7 +293,9 @@ export async function planejamentoDoCiclo(cliente: ClienteDoParceiro, alcance: A
     cliente.transacao(async (tx) => {
       const loja = await lojaDoAlcance(tx, alcance, lojaId, 'estoque.ver');
       const abertoEm = await exigirAberto(tx, loja);
-      const regras = await regrasDe(tx, lojaId);
+      const verValores = pode(alcance, 'compras.ver', { lojaId });
+      const regras = verValores ? await regrasDe(tx, lojaId) : null;
+      const filtroEfetivo = { ...filtro, quais: !verValores && filtro.quais !== 'todos' ? 'manual' as const : filtro.quais };
       const hoje = hojeNoRio(agora);
       const [insumos, saldos, ultimas, ocupados, fechamento] = await Promise.all([
         tx.insumo.findMany({ select: { id: true, nome: true, unidade: true, conservacao: true, ativo: true } }),
@@ -304,19 +306,19 @@ export async function planejamentoDoCiclo(cliente: ClienteDoParceiro, alcance: A
       ]);
       const saldoDe = new Map(saldos.map((s) => [s.insumoId, s.quantidadeMilesimos]));
       const universo = insumos.filter((i) => i.ativo || (saldoDe.get(i.id) ?? 0) !== 0);
-      const custos = await custosDaLoja(
+      const custos = verValores ? await custosDaLoja(
         tx,
         lojaId,
         universo.map((i) => i.id),
-      );
+      ) : new Map();
       const valores = universo.map((i) => ({ insumoId: i.id, valorCentavos: valorDaQuantidade(custos.get(i.id)?.porUnidade ?? null, saldoDe.get(i.id) ?? 0) }));
       const valorDe = new Map(valores.map((v) => [v.insumoId, v.valorCentavos]));
-      const classes = curvaAbc(valores);
+      const classes = verValores ? curvaAbc(valores) : new Map<string, Classe>();
       const linhas: LinhaDoPlanejamento[] = universo
         .map((i) => {
           const ultima = ultimas.get(i.id) ?? null;
-          const classe = classes.get(i.id) ?? 'C';
-          const s = situacaoDoItem(ultima ? hojeNoRio(ultima) : null, classe, regras, hoje);
+          const classe = verValores ? classes.get(i.id) ?? 'C' : null;
+          const s = classe && regras ? situacaoDoItem(ultima ? hojeNoRio(ultima) : null, classe, regras, hoje) : { situacao: null, venceEm: null };
           const emOutraContagem = ocupados.get(i.id) ?? null;
           const conservacao = i.conservacao as Conservacao;
           return {
@@ -332,11 +334,13 @@ export async function planejamentoDoCiclo(cliente: ClienteDoParceiro, alcance: A
             situacao: s.situacao,
             venceEm: s.venceEm,
             emOutraContagem,
-            sugerido: filtro.insumo ? filtro.insumo === i.id && !emOutraContagem : sugerido({ conservacao, classe, situacao: s.situacao, emOutraContagem: !!emOutraContagem }, filtro),
+            sugerido: filtro.insumo ? filtro.insumo === i.id && !emOutraContagem
+              : classe && s.situacao ? sugerido({ conservacao, classe, situacao: s.situacao, emOutraContagem: !!emOutraContagem }, filtro)
+                : filtroEfetivo.quais === 'todos' && !emOutraContagem && (!filtro.conservacao || conservacao === filtro.conservacao),
           };
         })
-        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
-      return { loja, regras, hoje, abertoEm, linhas, fechamentoAberto: fechamento };
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR') || a.insumoId.localeCompare(b.insumoId));
+      return { loja, regras, verValores, filtro: filtroEfetivo, hoje, abertoEm, linhas, fechamentoAberto: fechamento };
     }),
   );
   return 'ok' in r ? null : r;

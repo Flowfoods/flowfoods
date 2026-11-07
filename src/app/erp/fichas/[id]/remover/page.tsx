@@ -4,7 +4,7 @@
  */
 
 import { notFound } from 'next/navigation';
-import { exigirParceiroDaSessao, exigirPermissaoNaPagina } from '@/lib/erp/contexto';
+import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
 import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import { lerRemocaoDaFicha } from '@/lib/erp/fichas';
 import { TelaRemoverFicha } from '@/components/erp/telas/fichas/remover';
@@ -21,7 +21,7 @@ export default async function ErpRemoverFichaPage({ params, searchParams }: { pa
     <TelaRemoverFicha
       ficha={ficha}
       base="/erp/fichas"
-      de={deSeguroDaFicha(searchParams.de)}
+      de={deSeguroDaFicha(searchParams.de, pode(ctx.alcance, 'precos.ver'))}
       contexto={ctx.parceiro.nome}
       bloqueio={ctx.bloqueio}
       acaoSituacao={acaoSituacaoFicha.bind(null, ficha.id)}

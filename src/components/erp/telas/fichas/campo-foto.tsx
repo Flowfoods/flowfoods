@@ -16,6 +16,7 @@ import { PontoDeAjuda, useTemPonto } from '../../ui/ponto-de-ajuda';
 import { classeDeBotao } from '../../ui/estilos';
 
 const LADO_MAXIMO = 1600;
+export type IntencaoFotoDaFicha = { tipo: 'manter' } | { tipo: 'remover' } | { tipo: 'nova'; arquivo: string };
 
 /**
  * Redesenha no navegador (sempre: aplica a orientação do celular e já deixa o
@@ -53,15 +54,20 @@ export async function enviarFoto(url: string, foto: File, signal?: AbortSignal):
 
 export function CampoFoto({
   atual,
+  temFotoAtual = !!atual,
   nome,
   erro,
   idBase,
   envio,
   aoMudar,
   aoOcupar,
+  valor,
+  aoAlterar,
 }: {
   /** URL da foto gravada (edição), ou null. */
   atual: string | null;
+  /** Saber que há foto não autoriza ler sua imagem; troca e remoção continuam permitidas ao editor. */
+  temFotoAtual?: boolean;
   nome: string;
   erro?: string;
   idBase: string;
@@ -70,14 +76,19 @@ export function CampoFoto({
   aoMudar: () => void;
   /** Enquanto envia, o formulário não salva. */
   aoOcupar: (ocupado: boolean) => void;
+  /** O formulário integrado guarda a intenção e o token, nunca File/blob URL. */
+  valor?: IntencaoFotoDaFicha;
+  aoAlterar?: (valor: IntencaoFotoDaFicha) => void;
 }) {
   const temPontoDaFoto = useTemPonto('foto');
   const entrada = useRef<HTMLInputElement>(null);
   const escolha = useRef(0);
   const envioAtual = useRef<AbortController | null>(null);
   const [previa, setPrevia] = useState<string | null>(null);
-  const [enviada, setEnviada] = useState('');
-  const [remover, setRemover] = useState(false);
+  const [enviadaLocal, setEnviada] = useState('');
+  const [removerLocal, setRemover] = useState(false);
+  const enviada = valor ? valor.tipo === 'nova' ? valor.arquivo : '' : enviadaLocal;
+  const remover = valor ? valor.tipo === 'remover' : removerLocal;
   const [aviso, setAviso] = useState<string | null>(null);
   const [preparando, setPreparando] = useState(false);
 
@@ -116,12 +127,13 @@ export function CampoFoto({
       return;
     }
     setEnviada(r.arquivo);
+    aoAlterar?.({ tipo: 'nova', arquivo: r.arquivo });
     setPrevia(URL.createObjectURL(final));
     setRemover(false);
     aoMudar();
   }
 
-  const mostrada = remover ? null : (previa ?? atual);
+  const mostrada = remover ? null : (previa ?? (enviada ? `${envio}?arquivo=${encodeURIComponent(enviada)}` : atual));
   return (
     <div>
       <span className={ROTULO}>Foto</span>
@@ -129,9 +141,9 @@ export function CampoFoto({
         <div className="grid aspect-[4/3] w-40 shrink-0 place-items-center overflow-hidden rounded-[10px] border border-linha bg-forte text-[12px] text-suave">
           {mostrada ? (
             // eslint-disable-next-line @next/next/no-img-element -- prévia local (blob:) ou foto privada servida pelo portão; o otimizador do Next não serve nenhuma das duas.
-            <img src={mostrada} alt={`Foto de ${nome || 'a ficha'}`} className="h-full w-full object-cover" />
+            <img src={mostrada} alt={`Foto de ${nome || 'a ficha'}`} className="h-full w-full object-cover" onError={() => { if (enviada && !previa) setAviso('A foto pendente não está disponível. Escolha a foto novamente; os demais campos foram mantidos.'); }} />
           ) : (
-            <span>Sem foto</span>
+            <span className="px-3 text-center" role="status">{remover ? 'A foto será removida ao salvar.' : temFotoAtual ? 'Foto salva. A visualização não está disponível neste acesso.' : 'Sem foto'}</span>
           )}
         </div>
         <div className="min-w-0 flex-1 space-y-2">
@@ -149,7 +161,7 @@ export function CampoFoto({
               'secundario',
               'cursor-pointer peer-focus-visible:outline peer-focus-visible:outline-[3px] peer-focus-visible:outline-offset-2 peer-focus-visible:outline-acento',
             )}>
-            {preparando ? 'Enviando a foto…' : mostrada ? 'Trocar foto' : 'Escolher foto'}
+            {preparando ? 'Enviando a foto…' : mostrada || (temFotoAtual && !remover) ? 'Trocar foto' : 'Escolher foto'}
           </label>
           {temPontoDaFoto ? (
             <div className="mt-1.5 flex items-center gap-1">
@@ -163,7 +175,7 @@ export function CampoFoto({
               Do prato pronto ou da montagem: quem opera bate o olho e sabe o que é. JPG, PNG ou WebP. A foto é reduzida e guardada sem a localização do celular.
             </p>
           )}
-          {atual && (
+          {(temFotoAtual || enviada || remover) && (
             <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-texto sm:min-h-0">
               <input
                 type="checkbox"
@@ -178,6 +190,7 @@ export function CampoFoto({
                   aoOcupar(false);
                   setAviso(null);
                   setRemover(e.target.checked);
+                  aoAlterar?.(e.target.checked ? { tipo: 'remover' } : { tipo: 'manter' });
                   if (e.target.checked && entrada.current) entrada.current.value = '';
                   setPrevia(null);
                   setEnviada('');

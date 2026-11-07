@@ -97,7 +97,7 @@ describe('Históricos recolhidos por padrão', () => {
       }
     };
     varrer(join(process.cwd(), 'src'));
-    expect(achados.some((a) => a.includes('etiquetas/emissao.tsx'))).toBe(true);
+    expect(achados.some((a) => a.includes(join('etiquetas', 'emissao.tsx')))).toBe(true);
     expect(achados.filter((a) => !a.endsWith(': HistoricoRecolhivel'))).toEqual([]);
   });
 });

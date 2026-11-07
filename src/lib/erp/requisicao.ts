@@ -1,3 +1,4 @@
+import { divergenciasOperacionais } from './divergencias-operacionais';
 /**
  * Requisição (1.8) — com banco, sem tela. O setor pede (cozinha, salão…), o
  * estoque entrega e a baixa sai daqui: `REQUISICAO` (−) no livro, com o saldo
@@ -817,7 +818,8 @@ export async function divergenciasDaLoja(cliente: ClienteDoParceiro, alcance: Al
           aviso = `Janela de até ${JANELA_MAXIMA_DIAS} dias: começou em ${de.split('-').reverse().join('/')}.`;
         }
         const janela = { de: inicioDoDia(de), ate: inicioDoDia(somarDias(ate, 1)) };
-        const regras = regrasDaLoja((await tx.loja.findUnique({ where: { id: lojaId }, select: { contagemPisoValorBp: true, contagemPisoItensBp: true, contagemFreqADias: true, contagemFreqBDias: true, contagemFreqCDias: true, contagemToleranciaCentavos: true } }))!);
+        const verValores = pode(alcance, 'compras.ver', { lojaId });
+        const regras = verValores ? regrasDaLoja((await tx.loja.findUnique({ where: { id: lojaId }, select: { contagemPisoValorBp: true, contagemPisoItensBp: true, contagemFreqADias: true, contagemFreqBDias: true, contagemFreqCDias: true, contagemToleranciaCentavos: true } }))!) : null;
         // Contagens aplicadas que contaram o insumo: a abertura vale da conclusão; as outras, de quando foi contado.
         const marcos = await tx.sql<{ insumoId: string; instante: Date; contado: number }>`
           SELECT ci."insumoId", (CASE WHEN c."tipo" = 'ABERTURA' THEN c."fechadaEm" ELSE ci."contadoEm" END) AS "instante", ci."contadoMilesimos" AS "contado"
@@ -858,15 +860,24 @@ export async function divergenciasDaLoja(cliente: ClienteDoParceiro, alcance: Al
           ORDER BY i."nome"`;
         const [insumos, custos, negativos] = await Promise.all([
           tx.insumo.findMany({ where: { id: { in: ids } }, select: { id: true, nome: true, unidade: true } }),
-          custosDaLoja(tx, lojaId, ids),
+          verValores ? custosDaLoja(tx, lojaId, ids) : Promise.resolve(new Map()),
           tx.saldoEstoque.findMany({ where: { lojaId, quantidadeMilesimos: { lt: 0 } }, select: { insumoId: true, quantidadeMilesimos: true, insumo: { select: { nome: true, unidade: true } } } }),
         ]);
         const nomeDe = new Map(insumos.map((i) => [i.id, i]));
+        if (!verValores) {
+          const operacao = divergenciasOperacionais(comTrecho.map(([id, ms]) => ({ insumoId: id, nome: nomeDe.get(id)?.nome ?? '?', unidade: (nomeDe.get(id)?.unidade ?? 'UN') as Unidade, marcos: ms, fluxos: fluxosDe.get(id) ?? [] })), janela);
+          return {
+            loja, aberto: true as const, verValores: false as const, hoje, janela: { de, ate }, periodo, aviso,
+            toleranciaCentavos: null, ...operacao,
+            semContagem: semContagem.map((s) => ({ ...s, unidade: s.unidade as Unidade })),
+            negativos: negativos.map((n) => ({ insumoId: n.insumoId, nome: n.insumo.nome, unidade: n.insumo.unidade as Unidade, quantidadeMilesimos: n.quantidadeMilesimos, valorCentavos: null })).sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR') || x.insumoId.localeCompare(y.insumoId)),
+          };
+        }
         const porUnidade = new Map(ids.map((id) => [id, custos.get(id)?.porUnidade ?? null]));
         const linhas: DivergenciaDoInsumo[] = divergenciasDoPeriodo(
           comTrecho.map(([id, ms]) => ({ insumoId: id, nome: nomeDe.get(id)?.nome ?? '?', unidade: (nomeDe.get(id)?.unidade ?? 'UN') as Unidade, marcos: ms, fluxos: fluxosDe.get(id) ?? [], porUnidade: porUnidade.get(id) ?? null })),
           janela,
-          regras.toleranciaCentavos,
+          regras!.toleranciaCentavos,
         );
         const custoNeg = await custosDeReferencia(
           tx,
@@ -876,10 +887,11 @@ export async function divergenciasDaLoja(cliente: ClienteDoParceiro, alcance: Al
           loja,
           aberto: true as const,
           hoje,
+          verValores: true as const,
           janela: { de, ate },
           periodo,
           aviso,
-          toleranciaCentavos: regras.toleranciaCentavos,
+          toleranciaCentavos: regras!.toleranciaCentavos,
           linhas,
           resumo: resumoDasDivergencias(linhas),
           setores: porSetor(linhas, porUnidade),

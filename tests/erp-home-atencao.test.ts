@@ -89,6 +89,30 @@ describe('Volta da Home (decisão 518 reaproveita a regra da 517, sem afrouxar)'
 });
 
 describe('Classificação: completar dados ou resolver operação, sem mudar a regra de cada pendência', () => {
+  it.each(['cardapio', 'estoque', 'producao'] as const)('falha em %s fica não conferida até uma consulta válida; outras fontes continuam', async (fonte) => {
+    const leitura = { cardapio: vi.mocked(saudeDoCardapio), estoque: vi.mocked(situacaoDoEstoque), producao: vi.mocked(lojasDaListaDoDia) }[fonte];
+    leitura.mockRejectedValueOnce(new Error('SQL segredo-interno'));
+    const falhou = await painelDoDia(cliente, dono, '/erp', HOJE, visao);
+    const p = falhou.pendencias.find((p) => p.chave === `${fonte}-nao-conferido`)!;
+    expect(p).toMatchObject({ leitura: 'nao_conferida', escopo: fonte === 'cardapio' ? 'Da rede' : 'Loja B' });
+    expect(p.href).toMatch(/^\/erp\//);
+    expect(htmlDe(falhou.pendencias)).toContain('Não conferido');
+    expect(JSON.stringify(falhou) + htmlDe(falhou.pendencias)).not.toMatch(/SQL|segredo-interno/);
+    expect(falhou.indicadores.some((i) => i.chave === 'faturamento')).toBe(true);
+    const recuperou = await painelDoDia(cliente, dono, '/erp', HOJE, visao);
+    expect(recuperou.pendencias.some((p) => p.chave === `${fonte}-nao-conferido`)).toBe(false);
+    expect(recuperou.pendencias.some((p) => p.chave.startsWith(fonte))).toBe(true);
+  });
+
+  it('fonte operacional negada não é consultada e não gera alerta de erro ou link', async () => {
+    vi.mocked(saudeDoCardapio).mockRejectedValue(new Error('não ler'));
+    vi.mocked(situacaoDoEstoque).mockRejectedValue(new Error('não ler'));
+    vi.mocked(lojasDaListaDoDia).mockRejectedValue(new Error('não ler'));
+    const p = await painelDoDia(cliente, so('faturamento.ver'), '/erp', HOJE, visao);
+    for (const f of [saudeDoCardapio, situacaoDoEstoque, lojasDaListaDoDia]) expect(f).not.toHaveBeenCalled();
+    expect(p.pendencias.every((p) => p.chave.startsWith('faturamento'))).toBe(true);
+  });
+
   it('cada chave existente tem a sua natureza, na ordem de sempre', async () => {
     const loja = await painelDoDia(cliente, dono, '/erp', HOJE, visao);
     expect(loja.pendencias.map((p) => [p.chave, p.natureza])).toEqual([

@@ -13,7 +13,7 @@ import { LINK_DE_TEXTO } from '../../ui/estilos';
 const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
 
 /** Sem saldo é "sem saldo", nunca R$ 0,00 (igual à fila de classificar). */
-export const textoDoEstoque = (valorCentavos: number) => (valorCentavos > 0 ? `${formatarDinheiro(valorCentavos)} em estoque nas lojas que você acessa` : 'sem saldo');
+export const textoDoEstoque = (valorCentavos: number, visibilidade?: ResumoDoQueFalta['visibilidadeDoValor']) => (valorCentavos > 0 ? `${formatarDinheiro(valorCentavos)} em estoque nas lojas com acesso aos valores${visibilidade === 'parcial' ? ' (valor parcial)' : ''}` : 'sem saldo nas lojas com acesso aos valores');
 
 export function AvisoDaClassificacao({ resumo, href }: { resumo: ResumoDoQueFalta; /** Onde se classifica (só para quem edita insumos). */ href?: string }) {
   if (resumo.total === 0) return null;
@@ -24,7 +24,7 @@ export function AvisoDaClassificacao({ resumo, href }: { resumo: ResumoDoQueFalt
   return (
     <Aviso tom="alerta" titulo={`${plural(resumo.total, 'insumo ativo ainda sem categoria definitiva', 'insumos ativos ainda sem categoria definitiva')}.`}>
       {partes.join(' · ')}
-      {resumo.valorCentavos !== null && resumo.valorCentavos > 0 && ` · ${textoDoEstoque(resumo.valorCentavos)}`}
+      {resumo.valorCentavos !== null && resumo.valorCentavos > 0 && ` · ${textoDoEstoque(resumo.valorCentavos, resumo.visibilidadeDoValor)}`}
       {'. '}
       {href && (
         <Link href={href} className={LINK_DE_TEXTO}>
@@ -70,7 +70,7 @@ export function AvisosDaLista({
           <span className="block">
             {resumo.total > 0 && aConfirmar > 0 && `${plural(resumo.total, 'insumo ainda sem categoria definitiva', 'insumos ainda sem categoria definitiva')}: `}
             {partes.join(' · ')}
-            {resumo.valorCentavos !== null && resumo.valorCentavos > 0 && ` · ${textoDoEstoque(resumo.valorCentavos)}`}
+            {resumo.valorCentavos !== null && resumo.valorCentavos > 0 && ` · ${textoDoEstoque(resumo.valorCentavos, resumo.visibilidadeDoValor)}`}
             {'. '}
             {hrefClassificar && (
               <Link href={hrefClassificar} className={LINK_DE_TEXTO}>

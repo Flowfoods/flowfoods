@@ -4,6 +4,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -13,6 +14,7 @@ import { limparParceiros, perfilDoBanco, type PerfilDoBanco } from './erp-db-apo
 
 const URL_TESTE = process.env.ERP_DB_TESTE;
 const SCRIPT = join(process.cwd(), 'scripts', 'erp-semear-categorias.ts');
+const TSX = createRequire(import.meta.url).resolve('tsx/cli');
 
 describe.skipIf(!URL_TESTE)('ERP I.1a · script erp:semear-categorias (Postgres real)', { timeout: 120_000 }, () => {
   let db: PrismaClient;
@@ -20,8 +22,9 @@ describe.skipIf(!URL_TESTE)('ERP I.1a · script erp:semear-categorias (Postgres 
   let P: { id: string; slug: string };
 
   const rodar = (...args: string[]) => {
-    const r = spawnSync('npx', ['tsx', SCRIPT, '--parceiro', P.slug, ...args], { env: { ...process.env, DATABASE_URL: URL_TESTE }, encoding: 'utf8' });
-    expect(r.status, r.stdout + r.stderr).toBe(0);
+    // O npx é um .cmd no Windows e não é executável por spawnSync sem shell.
+    const r = spawnSync(process.execPath, [TSX, SCRIPT, '--parceiro', P.slug, ...args], { env: { ...process.env, DATABASE_URL: URL_TESTE }, encoding: 'utf8' });
+    expect(r.status, r.error?.message ?? r.stdout + r.stderr).toBe(0);
     return r.stdout;
   };
 

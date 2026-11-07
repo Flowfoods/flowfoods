@@ -14,6 +14,7 @@
 import type { CanalComEmbalagem } from '@/lib/erp/canal-campos';
 import { cmvDoCanal, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
 import type { CustoExato, Fracao, Unidade } from '@/lib/erp/unidades';
+import type { CortesDoFarol } from '@/lib/erp/cmv-faixas-campos';
 
 /** O que a ficha já tem para o canal: lido no servidor junto com as embalagens (quem chega aqui tem `precos.ver`). */
 export interface PrecoDoCanalNaFicha {
@@ -22,6 +23,8 @@ export interface PrecoDoCanalNaFicha {
   precoCentavos: number | null;
   /** N.3: o prato é vendido neste canal. */
   ofertado: boolean;
+  /** Null significa não configurado; ausência acidental do DTO não equivale a esse estado. */
+  cortesDoFarol: CortesDoFarol | null;
 }
 
 export type PrecosDasEmbalagens = Record<CanalComEmbalagem, PrecoDoCanalNaFicha>;
@@ -39,10 +42,10 @@ export interface EmbalagemNaTela {
 export type ContaDasEmbalagens = Omit<CmvDoCanal, 'resultado'>;
 
 /** Meta, preço e oferta dos dois canais com embalagem, a partir da conta que a página já leu. Faltou canal: null. */
-export function precosDasEmbalagens(cmv: readonly Pick<CmvDoCanal, 'canal' | 'metaBp' | 'precoCentavos' | 'ofertado'>[]): PrecosDasEmbalagens | null {
+export function precosDasEmbalagens(cmv: readonly Pick<CmvDoCanal, 'canal' | 'metaBp' | 'precoCentavos' | 'ofertado' | 'farol'>[]): PrecosDasEmbalagens | null {
   const de = (canal: CanalComEmbalagem): PrecoDoCanalNaFicha | null => {
     const x = cmv.find((c) => c.canal === canal);
-    return x ? { metaBp: x.metaBp, precoCentavos: x.precoCentavos, ofertado: x.ofertado } : null;
+    return x ? { metaBp: x.metaBp, precoCentavos: x.precoCentavos, ofertado: x.ofertado, cortesDoFarol: x.farol.cortes } : null;
   };
   const delivery = de('DELIVERY_PROPRIO');
   const ifood = de('IFOOD');
@@ -74,7 +77,7 @@ export function contaDasEmbalagensNaTela(p: {
       // resultado um dia escapar daqui, chegue pendente — nunca P − C sem a taxa.
       taxa: p.canal === 'IFOOD' ? 'naoConfigurada' : null,
     },
-    { metaBp: p.preco.metaBp, precoCentavos: p.preco.precoCentavos, ofertado: p.preco.ofertado },
+    { metaBp: p.preco.metaBp, precoCentavos: p.preco.precoCentavos, ofertado: p.preco.ofertado, cortesDoFarol: p.preco.cortesDoFarol },
   );
   return conta;
 }

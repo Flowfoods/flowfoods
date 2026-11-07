@@ -616,10 +616,13 @@ describe('UX.9 · guardas estáticas', () => {
     expect(excesso).toEqual([]);
   });
 
-  it('as abas moram em src/components/erp/ui/abas.tsx e o shell as usa (não há outro componente de abas)', () => {
+  it('o shell mantém as seções para a ajuda, sem repetir o menu lateral numa barra de abas', () => {
     expect(existsSync(join('src', 'components', 'erp', 'ui', 'abas.tsx'))).toBe(true);
     expect(existsSync(join('src', 'app', 'erp', 'abas.tsx'))).toBe(false);
-    expect(readFileSync(join('src', 'components', 'erp', 'shell', 'Shell.tsx'), 'utf8')).toMatch(/<Abas\b/);
+    const shell = readFileSync(join('src', 'components', 'erp', 'shell', 'Shell.tsx'), 'utf8');
+    expect(shell).not.toMatch(/<Abas\b/);
+    expect(shell).toContain('abasDaArea(nav, ativo)');
+    expect(shell).toContain('outras={outrasDaArea}');
   });
 
   it('a busca do ⌘K não seleciona custo, preço nem margem (achar não mostra dinheiro)', () => {

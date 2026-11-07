@@ -12,7 +12,7 @@
 
 import Link from 'next/link';
 import type { DivergenciasDaLoja } from '@/lib/erp/requisicao';
-import { PEQUENO_REPETIDO, quantidadeNegativa, rotuloDoSetor, type DivergenciaDoInsumo } from '@/lib/erp/requisicao-campos';
+import { PEQUENO_REPETIDO, quantidadeNegativa, rotuloDoSetor } from '@/lib/erp/requisicao-campos';
 import { formatarData } from '@/lib/erp/compra-campos';
 import { COR } from '@/lib/erp/modulos';
 import { formatarDinheiro, formatarQuantidade } from '@/lib/erp/unidades';
@@ -27,21 +27,23 @@ import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 const reais = (c: number) => (c < 0 ? `−${formatarDinheiro(-c)}` : formatarDinheiro(c));
 
-function Sumico({ d }: { d: DivergenciaDoInsumo }) {
+type Linha = Extract<DivergenciasDaLoja, { aberto: true }>['linhas'][number];
+
+function Sumico({ d, verValores }: { d: Linha; verValores: boolean }) {
   if (d.sumicoMilesimos === 0) return <span className="text-suave">bateu</span>;
   const falta = d.sumicoMilesimos > 0;
   return (
     <span>
       <span className={`block text-[15px] font-bold ${falta ? 'text-erro' : 'text-texto'}`}>{falta ? `−${formatarQuantidade(d.sumicoMilesimos, d.unidade)}` : `+${formatarQuantidade(-d.sumicoMilesimos, d.unidade)}`}</span>
-      <span className={`block text-[12px] ${d.sumicoCentavos === null ? 'text-atencao' : falta ? 'text-erro' : 'text-suave'}`}>
+      {verValores && <span className={`block text-[12px] ${d.sumicoCentavos === null ? 'text-atencao' : falta ? 'text-erro' : 'text-suave'}`}>
         {d.sumicoCentavos === null ? 'custo não informado' : falta ? `${formatarDinheiro(d.sumicoCentavos)} sem requisição` : `${formatarDinheiro(-d.sumicoCentavos)} requisitado a mais`}
-      </span>
+      </span>}
     </span>
   );
 }
 
-function Pequenos({ d, tolerancia }: { d: DivergenciaDoInsumo; tolerancia: number }) {
-  if (d.pequenos.vezes < PEQUENO_REPETIDO) return null;
+function Pequenos({ d, tolerancia }: { d: Linha; tolerancia: number | null }) {
+  if (!d.pequenos || tolerancia === null || d.pequenos.vezes < PEQUENO_REPETIDO) return null;
   return (
     <Selo tom="alerta">
       pequeno e repetido · {d.pequenos.vezes}× dentro de {formatarDinheiro(tolerancia)}
@@ -107,10 +109,10 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
         </p>
       </ExplicacaoNoPonto>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      {d.verValores ? <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
           <div className="text-[12px] font-medium text-suave">Sumiu sem requisição</div>
-          <div className={`mt-2 font-display text-[30px] font-bold leading-none tabular-nums ${r.sumicoCentavos > 0 ? 'text-erro' : ''}`}>{formatarDinheiro(r.sumicoCentavos)}</div>
+          <div className={`mt-2 font-display text-[30px] font-bold leading-none tabular-nums ${r.sumicoCentavos! > 0 ? 'text-erro' : ''}`}>{formatarDinheiro(r.sumicoCentavos!)}</div>
           <div className="mt-1.5 text-[12px] text-suave">
             {r.comSumico === 0 ? 'nenhum insumo' : r.comSumico === 1 ? 'em 1 insumo' : `em ${r.comSumico} insumos`}
             {r.semPreco ? ` · ${r.semPreco} sem custo informado fora da soma` : ''}
@@ -118,19 +120,23 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
         </div>
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
           <div className="text-[12px] font-medium text-suave">Pequeno e repetido</div>
-          <div className={`mt-2 font-display text-[30px] font-bold leading-none tabular-nums ${r.pequenosCentavos > 0 ? 'text-atencao' : ''}`}>{formatarDinheiro(r.pequenosCentavos)}</div>
+          <div className={`mt-2 font-display text-[30px] font-bold leading-none tabular-nums ${r.pequenosCentavos! > 0 ? 'text-atencao' : ''}`}>{formatarDinheiro(r.pequenosCentavos!)}</div>
           <div className="mt-1.5 text-[12px] text-suave">
-            {r.pequenosRepetidos === 0 ? 'nada se repetindo' : `${r.pequenosRepetidos} ${r.pequenosRepetidos === 1 ? 'insumo' : 'insumos'}`} · cada vez dentro de {formatarDinheiro(d.toleranciaCentavos)}
+            {r.pequenosRepetidos === 0 ? 'nada se repetindo' : `${r.pequenosRepetidos} ${r.pequenosRepetidos === 1 ? 'insumo' : 'insumos'}`} · cada vez dentro de {formatarDinheiro(d.toleranciaCentavos!)}
           </div>
         </div>
         <div className="rounded-[14px] border border-linha bg-painel px-4 py-3.5 sm:px-5">
           <div className="text-[12px] font-medium text-suave">Requisitado a mais</div>
-          <div className="mt-2 font-display text-[30px] font-bold leading-none tabular-nums">{formatarDinheiro(r.sobraCentavos)}</div>
+          <div className="mt-2 font-display text-[30px] font-bold leading-none tabular-nums">{formatarDinheiro(r.sobraCentavos!)}</div>
           <div className="mt-1.5 text-[12px] text-suave">{r.comSobra === 0 ? 'nenhum insumo' : `${r.comSobra} ${r.comSobra === 1 ? 'insumo' : 'insumos'}`} · devolução sem registro?</div>
         </div>
       </div>
 
-      <Painel titulo="Do maior sumiço para o menor" subtitulo="Valor pelo custo de referência de hoje" semRespiro>
+      : <div className="grid gap-3 sm:grid-cols-2">
+          <Painel titulo="Sumiu sem requisição">{r.comSumico} {r.comSumico === 1 ? 'insumo' : 'insumos'} com diferença física.</Painel>
+          <Painel titulo="Requisitado a mais">{r.comSobra} {r.comSobra === 1 ? 'insumo' : 'insumos'} para conferir.</Painel>
+        </div>}
+      <Painel titulo={d.verValores ? 'Do maior sumiço para o menor' : 'Diferenças por insumo'} subtitulo={d.verValores ? 'Valor pelo custo de referência de hoje' : 'Quantidades entre contagens, em ordem de nome'} semRespiro>
         {comSumico.length === 0 ? (
           <Vazio titulo={d.linhas.length ? 'Tudo bateu.' : 'Nenhum trecho fechado por contagem nesta janela.'}>
             {d.linhas.length ? 'O consumo apurado pelas contagens é o que saiu por requisição.' : 'O cruzamento precisa de duas contagens do mesmo insumo. Planeje uma contagem no estoque da loja.'}
@@ -143,7 +149,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
                   <div className="flex items-start justify-between gap-3">
                     <span className="min-w-0 font-medium text-texto">{l.nome}</span>
                     <span className="shrink-0 text-right tabular-nums">
-                      <Sumico d={l} />
+                      <Sumico d={l} verValores={d.verValores} />
                     </span>
                   </div>
                   <dl className="grid grid-cols-3 gap-2 text-[12px] tabular-nums">
@@ -160,7 +166,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
                       <dd className="font-semibold text-texto">{l.trechos + 1}</dd>
                     </div>
                   </dl>
-                  {l.pequenos.vezes >= PEQUENO_REPETIDO && (
+                  {l.pequenos && l.pequenos.vezes >= PEQUENO_REPETIDO && (
                     <div>
                       <Pequenos d={l} tolerancia={d.toleranciaCentavos} />
                     </div>
@@ -170,7 +176,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
             </ul>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[720px] table-fixed text-sm">
-                <caption className="sr-only">Consumo apurado pela contagem contra o requisitado, por insumo, do maior sumiço em reais para o menor.</caption>
+                <caption className="sr-only">{d.verValores ? 'Consumo apurado pela contagem contra o requisitado, por insumo, do maior sumiço em reais para o menor.' : 'Consumo apurado pela contagem contra o requisitado, por insumo, em ordem de nome.'}</caption>
                 <colgroup>
                   <col />
                   <col className="w-[120px]" />
@@ -214,7 +220,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
                       <td className="px-3 py-2.5 text-right">{formatarQuantidade(l.requisitadoMilesimos, l.unidade)}</td>
                       <td className="px-3 py-2.5 text-right text-suave">{l.outrasSaidasMilesimos ? formatarQuantidade(l.outrasSaidasMilesimos, l.unidade) : '—'}</td>
                       <td className="px-3 py-2.5 pr-5 text-right">
-                        <Sumico d={l} />
+                        <Sumico d={l} verValores={d.verValores} />
                       </td>
                     </tr>
                   ))}
@@ -235,7 +241,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
       </Painel>
 
       <div className="grid gap-5 lg:grid-cols-2">
-        <Painel titulo="Por setor" subtitulo="O que cada setor pediu e o sumiço nos insumos que ele usa: onde olhar primeiro, não culpa" semRespiro>
+        <Painel titulo="Por setor" subtitulo={d.verValores ? "O que cada setor pediu e o sumiço nos insumos que ele usa: onde olhar primeiro, não culpa" : "Insumos requisitados e com diferenças físicas, em ordem de setor"} semRespiro>
           {d.setores.length === 0 ? (
             <Vazio>Nenhuma requisição nos trechos desta janela.</Vazio>
           ) : (
@@ -261,10 +267,10 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
                       {rotuloDoSetor(s.setor || null)}
                       <span className="block whitespace-nowrap text-[12px] font-normal text-suave">{s.quantosInsumos === 1 ? '1 insumo' : `${s.quantosInsumos} insumos`}</span>
                     </td>
-                    <td className="px-3 py-2.5 text-right">{formatarDinheiro(s.requisitadoCentavos)}</td>
-                    <td className={`px-3 py-2.5 pr-5 text-right font-semibold ${s.sumicoNosSeusCentavos > 0 ? 'text-erro' : 'text-suave'}`}>
-                      {s.sumicoNosSeusCentavos > 0 ? formatarDinheiro(s.sumicoNosSeusCentavos) : '—'}
-                      {s.insumosComSumico > 0 && <span className="block text-[12px] font-normal text-suave">em {s.insumosComSumico === 1 ? '1 insumo' : `${s.insumosComSumico} insumos`}</span>}
+                    <td className="px-3 py-2.5 text-right">{d.verValores ? formatarDinheiro(s.requisitadoCentavos!) : `${s.quantosInsumos} insumos`}</td>
+                    <td className={`px-3 py-2.5 pr-5 text-right font-semibold ${s.insumosComSumico > 0 ? 'text-erro' : 'text-suave'}`}>
+                      {d.verValores ? (s.sumicoNosSeusCentavos! > 0 ? formatarDinheiro(s.sumicoNosSeusCentavos!) : '—') : `${s.insumosComSumico} insumos`}
+                      {d.verValores && s.insumosComSumico > 0 && <span className="block text-[12px] font-normal text-suave">em {s.insumosComSumico === 1 ? '1 insumo' : `${s.insumosComSumico} insumos`}</span>}
                     </td>
                   </tr>
                 ))}
@@ -283,7 +289,7 @@ export function TelaDivergencias({ d, base, contexto }: { d: DivergenciasDaLoja;
                     <span className="min-w-0 truncate font-medium text-texto">{n.nome}</span>
                     <span className="shrink-0 text-right tabular-nums">
                       <span className="block font-semibold text-erro">{quantidadeNegativa(n.quantidadeMilesimos, n.unidade)}</span>
-                      <span className="block text-[12px] text-suave">{n.valorCentavos === null ? 'custo não informado' : reais(n.valorCentavos)}</span>
+                      {d.verValores && <span className="block text-[12px] text-suave">{n.valorCentavos === null ? 'custo não informado' : reais(n.valorCentavos)}</span>}
                     </span>
                   </li>
                 ))}

@@ -12,9 +12,12 @@ export const dynamic = 'force-dynamic';
 export default async function ParceiroEditarNotaPage({ params }: { params: { slug: string; id: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'compras.lancar');
+  exigirPermissao(ctx, 'compras.ver');
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/compras`;
   const nota = await obterNota(ctx.cliente, ctx.alcance, params.id);
   if (!nota) notFound();
+  exigirPermissao(ctx, 'compras.lancar', { lojaId: nota.lojaId });
+  exigirPermissao(ctx, 'compras.ver', { lojaId: nota.lojaId });
   // F.1b: a nota que veio do XML não se edita (a tela da nota explica); cancelada também não.
   if (nota.cancelada || nota.chaveAcesso) redirect(`${base}/${nota.id}`);
   const opcoes = await dadosDoFormularioDeNota(ctx.cliente, ctx.alcance, {

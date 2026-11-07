@@ -2,20 +2,19 @@
 
 /**
  * Meta de CMV de cada canal (N.2): quanto o custo físico do prato (insumos + embalagens do canal) pode ser do preço.
- * É o que comanda o preço sugerido de todas as fichas (custo físico ÷ meta) e o farol de CMV. A taxa do iFood fica fora
+ * É o que comanda o preço sugerido de todas as fichas (custo físico ÷ meta) e a comparação com a meta. A taxa do iFood fica fora
  * do CMV: ela aparece no resultado, não na meta. Ao lado, a conta com um prato de exemplo, pela mesma função das fichas.
  * Quem decide é o servidor (permissão, versão lida, faixa da meta).
  */
 
-import { useState } from 'react';
-import { useFormState } from 'react-dom';
 import { CANAIS, ORDEM_DOS_CANAIS, type CanalVenda } from '@/lib/erp/canal-campos';
 import { LIMITES_DA_META_DE_CMV, sugeridoPorCmv } from '@/lib/erp/cmv-produto-campos';
 import { formatarDinheiro, lerPontosBase, pontosBaseParaCampo } from '@/lib/erp/unidades';
 import { BotaoEnviar } from '../../ui/botoes';
 import { AJUDA, CAMPO, Erro } from '../../ui/campos';
-import type { AcaoDeCadastro, EstadoCadastro } from '../cadastro/estado';
-import { ErroGeral, useAvisoDeSaida } from '../cadastro/erros';
+import type { AcaoConfiguracao } from '@/lib/erp/canal-config-campos';
+import { ErroGeral } from '../cadastro/erros';
+import { useConfiguracaoConfirmada } from './configuracao-confirmada';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 
 const AJUDA_DO_CANAL: Record<CanalVenda, string> = {
@@ -34,21 +33,17 @@ export function FormMetasDeCmv({
   inicial,
   bloqueio,
 }: {
-  acao: AcaoDeCadastro;
+  acao: AcaoConfiguracao;
   aqui: string;
   versao: string;
   inicial: Record<CanalVenda, number | null>;
   bloqueio: string | null;
 }) {
-  const [estado, enviar] = useFormState<EstadoCadastro, FormData>(acao, null);
-  const saida = useAvisoDeSaida(estado);
-  const [textos, setTextos] = useState<Record<CanalVenda, string>>(
-    () => Object.fromEntries(ORDEM_DOS_CANAIS.map((c) => [c, inicial[c] === null ? '' : pontosBaseParaCampo(inicial[c]!)])) as Record<CanalVenda, string>,
-  );
-  const erros = estado?.erros ?? {};
+  const f = useConfiguracaoConfirmada(acao, versao, Object.fromEntries(ORDEM_DOS_CANAIS.map(c => [`metaCmv_${c}`, inicial[c] === null ? '' : pontosBaseParaCampo(inicial[c]!)])));
+  const erros = f.erro?.erros ?? {};
   const exemplo = (canal: CanalVenda) => {
-    const t = textos[canal].trim();
-    if (!t) return <span className="text-suave">sem meta: sem sugestão, farol sem dados</span>;
+    const t = f.campos[`metaCmv_${canal}`].trim();
+    if (!t) return <span className="text-suave">sem meta: sem sugestão nem comparação com a meta</span>;
     const bp = lerPontosBase(t);
     if (bp === null || bp < LIMITES_DA_META_DE_CMV.minimoBp || bp > LIMITES_DA_META_DE_CMV.maximoBp) return <span className="text-suave">—</span>;
     const s = sugeridoPorCmv({ fisico: { valor: { num: BigInt(EXEMPLO), den: 1n }, embalagens: { num: 0n, den: 1n }, completo: true, falta: [] }, metaBp: bp });
@@ -60,10 +55,11 @@ export function FormMetasDeCmv({
     );
   };
   return (
-    <form action={enviar} onChange={saida.aoMudar} onSubmit={saida.aoEnviar} noValidate className="space-y-4">
-      <input type="hidden" name="versao" value={versao} />
-      <ErroGeral estado={estado} recarregar={aqui} />
-      <fieldset disabled={!!bloqueio} className="min-w-0">
+    <form action={f.enviar} onChange={f.saida.aoMudar} onSubmit={f.saida.aoEnviar} noValidate className="space-y-4">
+      <input type="hidden" name="versao" value={f.versao} />
+      <ErroGeral estado={f.erro} recarregar={aqui} />
+      {f.estado?.ok && !f.alterado && <p role="status" className="text-sm text-ok">{f.estado.mensagem}</p>}
+      <fieldset disabled={!!bloqueio || f.pendente} className="min-w-0">
         <legend className="sr-only">Meta de CMV de cada canal</legend>
         <ul className="divide-y divide-linha">
           {ORDEM_DOS_CANAIS.map((canal) => {
@@ -86,8 +82,8 @@ export function FormMetasDeCmv({
                       name={`metaCmv_${canal}`}
                       inputMode="decimal"
                       autoComplete="off"
-                      value={textos[canal]}
-                      onChange={(e) => setTextos((t) => ({ ...t, [canal]: e.target.value }))}
+                      value={f.campos[`metaCmv_${canal}`]}
+                      onChange={(e) => f.mudar(`metaCmv_${canal}`, e.target.value)}
                       className={`${CAMPO} min-h-11 text-right text-base font-semibold tabular-nums sm:text-sm`}
                       aria-invalid={!!erro}
                       aria-describedby={`${id}-ajuda ${id}-exemplo${erro ? ` ${id}-erro` : ''}`}
@@ -113,7 +109,7 @@ export function FormMetasDeCmv({
         </p>
       </ExplicacaoNoPonto>
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
-        <BotaoEnviar disabled={!!bloqueio} className="sm:min-w-44">
+        <BotaoEnviar disabled={!!bloqueio || f.pendente} className="sm:min-w-44">
           Salvar metas de CMV
         </BotaoEnviar>
       </div>

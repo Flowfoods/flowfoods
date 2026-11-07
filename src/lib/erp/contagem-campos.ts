@@ -178,9 +178,9 @@ export function situacaoDoItem(ultima: string | null, classe: Classe, r: RegrasD
 
 export const PARA_CONTAR: ReadonlySet<SituacaoDoItem> = new Set(['nunca', 'vencido', 'vence-hoje']);
 
-export type Quais = 'vencidos' | 'todos' | 'A';
+export type Quais = 'vencidos' | 'todos' | 'A' | 'manual';
 
-export const ROTULO_DE_QUAIS: Record<Quais, string> = { vencidos: 'Vencidos', todos: 'Todos daqui', A: 'Mais caros (A)' };
+export const ROTULO_DE_QUAIS: Record<Quais, string> = { vencidos: 'Vencidos', todos: 'Todos daqui', A: 'Mais caros (A)', manual: 'Escolher manualmente' };
 
 /** A classe ABC em palavras: "Mais caro (A)", "Médio (B)", "Menor (C)". */
 export const ROTULO_DA_CLASSE: Record<Classe, string> = { A: 'Mais caro (A)', B: 'Médio (B)', C: 'Menor (C)' };
@@ -188,6 +188,7 @@ export const ROTULO_DA_CLASSE: Record<Classe, string> = { A: 'Mais caro (A)', B:
 /** O que já vem marcado no planejamento: o lugar escolhido e "quais" (vencidos, todos ou curva A); quem está em outra contagem aberta, nunca. */
 export function sugerido(i: { conservacao: Conservacao; classe: Classe; situacao: SituacaoDoItem; emOutraContagem: boolean }, filtro: { conservacao: Conservacao | ''; quais: Quais }): boolean {
   if (i.emOutraContagem) return false;
+  if (filtro.quais === 'manual') return false;
   if (filtro.conservacao && i.conservacao !== filtro.conservacao) return false;
   if (filtro.quais === 'todos') return true;
   if (filtro.quais === 'A') return i.classe === 'A';

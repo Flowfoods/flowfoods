@@ -13,7 +13,7 @@
  */
 
 import { useState } from 'react';
-import { CONSERVACOES, ORDEM_DAS_CONSERVACOES, validadesParaCampos, type Conservacao, type EmQue, type Validades } from '@/lib/erp/validade';
+import { CONSERVACOES, ORDEM_DAS_CONSERVACOES, validadesParaCampos, type Conservacao, type EmQue, type Validades, type EntradaDeValidade } from '@/lib/erp/validade';
 import { AJUDA, CAMPO, Erro, MARCAR } from '../../ui/campos';
 import { IconeDaConservacao } from './validade';
 
@@ -25,20 +25,23 @@ export function CamposDeValidade({
   erros,
   idBase,
   aoMudar,
+  digitado,
 }: {
   para: 'ficha' | 'insumo';
   inicial: Validades | null;
   erros: Partial<Record<string, string>>;
   idBase: string;
   aoMudar?: () => void;
+  /** Rascunho da ficha: conserva inclusive um prazo ainda inválido. */
+  digitado?: EntradaDeValidade;
 }) {
   const campos = validadesParaCampos(inicial);
   const [linhas, setLinhas] = useState<Record<Conservacao, Linha>>(() => {
     const l = {} as Record<Conservacao, Linha>;
-    for (const c of ORDEM_DAS_CONSERVACOES) l[c] = campos[c];
+    for (const c of ORDEM_DAS_CONSERVACOES) l[c] = digitado?.linhas[c] ?? campos[c];
     return l;
   });
-  const [principal, setPrincipal] = useState<Conservacao | null>(campos.principal ?? (para === 'insumo' ? 'SECO' : null));
+  const [principal, setPrincipal] = useState<Conservacao | null>(digitado ? ORDEM_DAS_CONSERVACOES.find(c => c === digitado.principal) ?? null : campos.principal ?? (para === 'insumo' ? 'SECO' : null));
 
   function mudar(c: Conservacao, m: Partial<Linha>) {
     const novas = { ...linhas, [c]: { ...linhas[c], ...m } };

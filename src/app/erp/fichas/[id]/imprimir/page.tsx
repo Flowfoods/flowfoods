@@ -7,28 +7,31 @@
 
 import { notFound } from 'next/navigation';
 import { exigirParceiroDaSessao, exigirPermissaoNaPagina, pode } from '@/lib/erp/contexto';
-import { fichaNaTela, obterFicha } from '@/lib/erp/fichas';
-import { fichaNoPapel } from '@/lib/erp/ficha-papel';
+import { obterFichaParaImpressao } from '@/lib/erp/ficha-impressao';
+import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import { TelaImpressaoFicha } from '@/components/erp/telas/fichas/impressao';
-import { acaoImpressaoFinanceira } from '../../actions';
+import { acaoImpressaoFinanceira, acaoImpressaoOperacional } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
 const BASE = '/erp/fichas';
 
-export default async function ErpImprimirFichaPage({ params }: { params: { id: string } }) {
+export default async function ErpImprimirFichaPage({ params, searchParams = {} }: { searchParams?: { de?: string | string[] }; params: { id: string } }) {
   const ctx = await exigirParceiroDaSessao();
   exigirPermissaoNaPagina(ctx, 'fichas.ver');
-  const ficha = await obterFicha(ctx.cliente, params.id, { verPrecos: false });
+  const ficha = await obterFichaParaImpressao(ctx.cliente, params.id);
+  const de = deSeguroDaFicha(searchParams.de, pode(ctx.alcance, 'precos.ver'));
+  const busca = de ? '?de=' + encodeURIComponent(de) : '';
   if (!ficha) notFound();
   return (
     <TelaImpressaoFicha
-      ficha={fichaNoPapel(fichaNaTela(ficha, false))}
+      ficha={ficha}
       podeFinanceiro={pode(ctx.alcance, 'precos.ver')}
+      carregarOperacional={acaoImpressaoOperacional}
       carregarFinanceiro={acaoImpressaoFinanceira}
       contexto={ctx.parceiro.nome}
       base={BASE}
-      voltar={`${BASE}/${ficha.id}`}
+      voltar={`${BASE}/${ficha.id}${busca}`}
       geradoEm={new Date()}
     />
   );

@@ -14,7 +14,7 @@ export type EstadoDaImpressao<D> =
   | { fase: 'parado'; dados: null }
   | { fase: 'escolhendo'; escolha: ConteudoDaImpressao; erro: string | null; dados: null }
   /** "Com preços e custos" confirmado: esperando o servidor. */
-  | { fase: 'carregando'; dados: null }
+  | { fase: 'carregando'; escolha: ConteudoDaImpressao; dados: null }
   /** Pronto para chamar a janela de impressão uma vez (dados = null é a versão sem valores). */
   | { fase: 'imprimir'; dados: D | null }
   /** A janela de impressão que esta tela abriu está aberta. */
@@ -59,20 +59,19 @@ export function transicaoDaImpressao<D>(estado: EstadoDaImpressao<D>, evento: Ev
       return estado;
     case 'confirmar':
       if (estado.fase !== 'escolhendo') return estado;
-      if (estado.escolha === 'sem') return { fase: 'imprimir', dados: null };
-      if (!evento.podeFinanceiro) return { ...estado, escolha: 'sem', erro: SEM_PERMISSAO_FINANCEIRA };
-      return { fase: 'carregando', dados: null };
+      if (estado.escolha === 'com' && !evento.podeFinanceiro) return { ...estado, escolha: 'sem', erro: SEM_PERMISSAO_FINANCEIRA };
+      return { fase: 'carregando', escolha: estado.escolha, dados: null };
     case 'carregou':
       return estado.fase === 'carregando' ? { fase: 'imprimir', dados: evento.dados } : estado;
     case 'falhou':
-      return estado.fase === 'carregando' ? { fase: 'escolhendo', escolha: 'com', erro: evento.erro, dados: null } : estado;
+      return estado.fase === 'carregando' ? { fase: 'escolhendo', escolha: estado.escolha, erro: evento.erro, dados: null } : estado;
     case 'chamouImpressao':
       return estado.fase === 'imprimir' ? { fase: 'imprimindo', dados: estado.dados } : estado;
     case 'terminouImpressao':
       return estado.fase === 'imprimir' || estado.fase === 'imprimindo' ? parado() : estado;
     case 'impressaoNativa':
-      // Impressão que esta tela não abriu nunca leva valores: descarta antes de o navegador montar o papel.
-      return estado.dados === null ? estado : parado();
+      // Também cancela conferência em andamento: sua resposta não abre outra impressão depois do Ctrl+P.
+      return estado.fase === 'parado' ? estado : parado();
     case 'descartar':
       return estado.fase === 'carregando' ? estado : parado();
   }

@@ -5,27 +5,30 @@
 
 import { notFound } from 'next/navigation';
 import { exigirParceiro, exigirPermissao, pode } from '@/lib/erp/contexto';
-import { fichaNaTela, obterFicha } from '@/lib/erp/fichas';
-import { fichaNoPapel } from '@/lib/erp/ficha-papel';
+import { obterFichaParaImpressao } from '@/lib/erp/ficha-impressao';
+import { deSeguroDaFicha } from '@/lib/erp/ficha-campos';
 import { TelaImpressaoFicha } from '@/components/erp/telas/fichas/impressao';
-import { acaoImpressaoFinanceira } from '../../actions';
+import { acaoImpressaoFinanceira, acaoImpressaoOperacional } from '../../actions';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParceiroImprimirFichaPage({ params }: { params: { slug: string; id: string } }) {
+export default async function ParceiroImprimirFichaPage({ params, searchParams = {} }: { searchParams?: { de?: string | string[] }; params: { slug: string; id: string } }) {
   const ctx = await exigirParceiro(params.slug);
   exigirPermissao(ctx, 'fichas.ver');
-  const ficha = await obterFicha(ctx.cliente, params.id, { verPrecos: false });
+  const ficha = await obterFichaParaImpressao(ctx.cliente, params.id);
+  const de = deSeguroDaFicha(searchParams.de, pode(ctx.alcance, 'precos.ver'));
+  const busca = de ? '?de=' + encodeURIComponent(de) : '';
   if (!ficha) notFound();
   const base = `/rodolfo/erp/${ctx.parceiro.slug}/fichas`;
   return (
     <TelaImpressaoFicha
-      ficha={fichaNoPapel(fichaNaTela(ficha, false))}
+      ficha={ficha}
       podeFinanceiro={pode(ctx.alcance, 'precos.ver')}
+      carregarOperacional={acaoImpressaoOperacional.bind(null, ctx.parceiro.slug)}
       carregarFinanceiro={acaoImpressaoFinanceira.bind(null, ctx.parceiro.slug)}
       contexto={ctx.parceiro.nome}
       base={base}
-      voltar={`${base}/${ficha.id}`}
+      voltar={`${base}/${ficha.id}${busca}`}
       geradoEm={new Date()}
     />
   );

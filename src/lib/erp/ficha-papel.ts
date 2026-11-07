@@ -6,14 +6,17 @@
  */
 
 import type { FichaNaTela } from './fichas';
+import type { MaterialDaFichaNoPapel } from './ficha-unificada-campos';
 
-export function fichaNoPapel(f: FichaNaTela) {
+export function fichaNoPapel(f: FichaNaTela, materiais: MaterialDaFichaNoPapel[] = [], versaoOperacional = '') {
   return {
     id: f.id,
     nome: f.nome,
     tipo: f.tipo,
     ativa: f.ativa,
     versao: f.versao,
+    versaoOperacional,
+    materiais,
     descricao: f.descricao,
     rendimentoMilesimos: f.rendimentoMilesimos,
     unidadeRendimento: f.unidadeRendimento,

@@ -36,20 +36,20 @@
     "hash": "3fd4e67929b6dba1"
   },
   "insumo-classificar": {
-    "versao": 1,
-    "hash": "5c6cb0c4eec6fd8c"
+    "versao": 2,
+    "hash": "f98748a981ff749f"
   },
   "insumo-embalagem": {
     "versao": 2,
     "hash": "d6bbcf071f3e6faf"
   },
   "fichas": {
-    "versao": 4,
-    "hash": "fc363d302f725476"
+    "versao": 6,
+    "hash": "2ba19a51b9664164"
   },
   "ficha-nova": {
-    "versao": 4,
-    "hash": "53b7870fb1b4520b"
+    "versao": 6,
+    "hash": "00e2d1fd71afc1e8"
   },
   "ficha-importar": {
     "versao": 1,
@@ -156,16 +156,16 @@
     "hash": "83ece79d9848d788"
   },
   "ficha": {
-    "versao": 5,
-    "hash": "8b816ab566ed2105"
+    "versao": 8,
+    "hash": "9eb5a925f50f75e1"
   },
   "ficha-embalagens": {
-    "versao": 2,
-    "hash": "bedc68618c32593d"
+    "versao": 4,
+    "hash": "5154f1922d4d9555"
   },
   "precificacao": {
-    "versao": 2,
-    "hash": "ce95f4913104c383"
+    "versao": 3,
+    "hash": "967a58f6e95eb0f6"
   },
   "compras": {
     "versao": 3,
@@ -196,12 +196,12 @@
     "hash": "af3d80b11746fe21"
   },
   "compra-nova": {
-    "versao": 4,
-    "hash": "8a708c7d8d14f72f"
+    "versao": 7,
+    "hash": "b3475c270bafdfb1"
   },
   "compra": {
-    "versao": 5,
-    "hash": "e9820491c8ed4f07"
+    "versao": 7,
+    "hash": "4e3208df4cf1f12e"
   },
   "fornecedores": {
     "versao": 3,
@@ -248,8 +248,8 @@
     "hash": "5b8b21e22d9a0494"
   },
   "contagem-nova": {
-    "versao": 1,
-    "hash": "bf3797052faee1e3"
+    "versao": 2,
+    "hash": "052333cc87bf2f2e"
   },
   "contagem": {
     "versao": 1,
@@ -280,8 +280,8 @@
     "hash": "f32d94555c2aeedb"
   },
   "divergencias": {
-    "versao": 1,
-    "hash": "0c4f542d977505e3"
+    "versao": 2,
+    "hash": "d880692b6801b174"
   },
   "faturamento": {
     "versao": 1,
@@ -320,20 +320,20 @@
     "hash": "9d803e531e0e9c5c"
   },
   "custo-medio": {
-    "versao": 1,
-    "hash": "92ed21dc1adb335e"
+    "versao": 2,
+    "hash": "784860a92993daf8"
   },
   "dre": {
-    "versao": 9,
-    "hash": "e97c5c382121711a"
+    "versao": 10,
+    "hash": "ac1372514d1f0e5a"
   },
   "dre-despesas": {
     "versao": 3,
     "hash": "6e7248e86c23524c"
   },
   "dre-despesa": {
-    "versao": 1,
-    "hash": "e6e0a0a996538291"
+    "versao": 2,
+    "hash": "8dc49b6f37942a3d"
   },
   "dre-despesa-nova": {
     "versao": 1,
@@ -356,7 +356,7 @@
     "hash": "70db086f5c14d56b"
   },
   "dre-periodo": {
-    "versao": 4,
-    "hash": "5974c7e84ebe10d8"
+    "versao": 5,
+    "hash": "320f331bd366f20a"
   }
 }

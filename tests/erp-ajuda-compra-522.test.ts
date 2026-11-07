@@ -118,7 +118,6 @@ const OPCOES = {
       conteudoMilesimos: 1000,
       embalagens: [{ id: 'v-cx', nome: 'Caixa', conteudoMilesimos: 5000, ativo: true }],
       custo: { centavos: 4000, milesimos: 1000 },
-      ultimaCompraEm: '2026-10-01',
     },
   ],
 } as unknown as FormularioDeNota;
@@ -279,8 +278,9 @@ describe('decisão 522 · os pontos de Lançar nota e de Detalhe da nota no regi
     expect(ids('compra-nova')).toEqual(['loja', 'data', 'itens', 'frete']);
     expect(ids('compra')).toEqual(['total', 'custo', 'estoque']);
     // Os pontos não entram no hash do lock: a caixa "Como funciona" não volta com "Mudou" para quem fechou.
-    expect(entradaPorChave('compra-nova')?.versao).toBe(4);
-    expect(entradaPorChave('compra')?.versao).toBe(5);
+    // Decisão 523: a aula das duas entradas mudou (o custo na prévia e o que editar e cancelar fazem no custo): versões 5 e 6.
+    expect(entradaPorChave('compra-nova')?.versao).toBe(7);
+    expect(entradaPorChave('compra')?.versao).toBe(7);
     expect(entradaPorChave('compra-nova')?.rotas).toEqual(['compras/nova', 'compras/[id]/editar']);
   });
 
@@ -366,7 +366,7 @@ describe('decisão 522 · o texto educativo sai do corpo e mora no card (não so
   const MOVIDOS = [
     {
       onde: 'lançar · cabeçalho',
-      frase: 'o custo dos insumos passa a ser o desta compra',
+      frase: 'se esta for a compra mais recente do insumo, o custo dele passa a ser o dela',
       tela: (raiz: string) => telaDoFormulario(raiz),
       caminho: NOVA,
       ponto: ['compra-nova', 'data'],
