@@ -6,6 +6,7 @@
  * Esta tela só lê o estado persistido. A coleta automática autorizada pertence ao worker.
  */
 
+import Link from 'next/link';
 import { HistoricoRecolhivel } from '@/components/erp/telas/historico/historico-recolhivel';
 import { exigirParceiro } from '@/lib/erp/contexto';
 import { ENTIDADES_DE_INTEGRACAO, listarHistorico } from '@/lib/erp/historico';
@@ -25,6 +26,7 @@ import { FormAcoesDoModulo, FormDesligar, FormHomologacao, FormLiberacao, FormLi
 import { ACOES_NA_TELA, ehCodigoFeito, FEITO, QUANDO, TOM_DO_ESTADO } from '../rotulos';
 import { lerSituacaoAnalyticsDaLoja } from '@/lib/integracoes/core/situacao-analytics';
 import { PainelSituacaoAnalytics } from '@/components/erp/telas/integracoes/painel-situacao-analytics';
+import { LINK_DE_TEXTO } from '@/components/erp/ui/estilos';
 
 export const dynamic = 'force-dynamic';
 
@@ -48,6 +50,8 @@ export default async function IntegracoesDoParceiroNoNivel1(
   ]);
   const integracao = liberacoes.find((l) => l.modulo === 'integracao');
   const liberado = integracao?.liberado ?? false;
+  const lojaDaConsulta = situacao.ok ? situacao.situacao?.loja.id : undefined;
+  const painelHref = `/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}/analytics${lojaDaConsulta ? `?loja=${encodeURIComponent(lojaDaConsulta)}` : ''}`;
   const ambiente = parceiro.homologacaoDeIntegracao ? 'TEST' : 'PRODUCAO';
   const appPorId = new Map(apps.map((a) => [a.id, a]));
   const ligadas = conexoes.filter((c) => c.estado === 'ATIVA');
@@ -63,6 +67,7 @@ export default async function IntegracoesDoParceiroNoNivel1(
       <PageHeader icone="canais" cor={COR.parceiros} titulo={`Integrações · ${parceiro.nome}`} subtitulo="Nível 1 · lojas do iFood, módulos e liberação deste parceiro" />
 
       <AvisoDoFeito texto={feito} />
+      {liberado && <Link href={painelHref} className={`${LINK_DE_TEXTO} inline-flex min-h-11 items-center`}>Ver painel iFood por período</Link>}
       <PainelSituacaoAnalytics resultado={situacao} teste={parceiro.homologacaoDeIntegracao} base={`/rodolfo/integracoes/${encodeURIComponent(parceiro.slug)}`} baseFaturamento={`/rodolfo/erp/${encodeURIComponent(parceiro.slug)}/faturamento`} />
       {!podeEscrever && (
         <Aviso tom="alerta" titulo="Só leitura">

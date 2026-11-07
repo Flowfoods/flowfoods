@@ -1913,12 +1913,13 @@ export const ENTRADAS: EntradaDeAjuda[] = [
     area: 'rede',
     rotas: ['integracoes'],
     titulo: 'Integrações',
-    versao: 4,
+    versao: 5,
     aula: [
       { texto: 'Escolha a loja e um dia até ontem para conferir o acesso, a tentativa de leitura, a versão disponível e a aplicação no faturamento.' },
       { texto: 'Aqui só se consulta: ligar e ativar é com a FlowFoods.' },
       { texto: 'Acesso ativo não confirma leitura nem aplicação.' },
       { texto: 'A faixa Ambiente de teste identifica dados de teste, que não entram no faturamento.' },
+      { texto: 'Com acesso também ao Faturamento, abra o Painel iFood por período para consultar os indicadores da loja.', para: ['faturamento.ver'] },
     ],
     secoes: [
       {
@@ -1929,6 +1930,30 @@ export const ENTRADAS: EntradaDeAjuda[] = [
           { texto: 'As datas são mostradas separadamente, no horário de Brasília; uma espera informa o limite mínimo, sem garantir a hora da próxima tentativa.' },
           { texto: 'Se uma atualização fica pendente, a aplicação anterior permanece identificada. Sem leitura disponível não significa que a loja não vendeu.' },
           { texto: 'Os detalhes de aplicação não substituem os números da tela Faturamento.' },
+        ],
+      },
+    ],
+  },
+  {
+    chave: 'integracoes-analytics',
+    area: 'rede',
+    rotas: ['integracoes/analytics'],
+    titulo: 'Painel iFood',
+    versao: 1,
+    aula: [
+      { texto: 'Escolha uma loja, as fontes e um período até ontem; sem datas, são consultados os últimos 30 dias.' },
+      { texto: 'Os valores mostram vendas informadas pelo iFood, não repasse nem lucro.' },
+      { texto: 'Totais do período exigem leitura de todas as fontes selecionadas em cada dia; os dias completos continuam disponíveis na série.' },
+      { texto: 'Falta de leitura não equivale a zero.' },
+    ],
+    secoes: [
+      {
+        id: 'indicadores',
+        titulo: 'Como ler os indicadores',
+        blocos: [
+          { texto: 'O GMV de todos os status inclui cancelados. O ticket usa somente o GMV e os pedidos concluídos.' },
+          { texto: 'A taxa divide os cancelados pelo total observado; status não classificados deixam essa taxa sem dado.' },
+          { texto: 'Canal, status e logística descrevem os mesmos pedidos em distribuições separadas. A distribuição por pagamento ainda está indisponível.' },
         ],
       },
     ],
