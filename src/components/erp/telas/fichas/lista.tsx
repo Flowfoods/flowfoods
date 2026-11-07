@@ -8,6 +8,7 @@
  */
 
 import Link from 'next/link';
+import { Fragment } from 'react';
 import { Pencil, Trash2 } from 'lucide-react';
 import { validadesEmTexto } from '@/lib/erp/validade';
 import type { LinhaDeFicha } from '@/lib/erp/fichas';
@@ -29,58 +30,18 @@ import {
   type FiltrosDeFicha,
   type FiltroDoCmv,
 } from '@/lib/erp/ficha-campos';
-import { formatarDinheiro, formatarFracao, formatarPontosBase } from '@/lib/erp/unidades';
+import { formatarFracao } from '@/lib/erp/unidades';
 import { classeDeBotao } from '../../ui/estilos';
 import { Paginacao } from '../../ui/paginacao';
 import { Painel, Selo, Vazio } from '../../ui/superficies';
 import { Miniatura } from './miniatura';
 import { CANAIS } from '@/lib/erp/canal-campos';
-import { porcentagemDoCmv, STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
+import { STATUS_DO_CMV, type CmvDoCanal } from '@/lib/erp/cmv-produto-campos';
 import type { FiltroDaFaixaDoCmv } from '@/lib/erp/cmv-faixas-campos';
-import { APRESENTACAO_DA_FAIXA, AVISO_DO_ARREDONDAMENTO, FarolDeCmv } from './farol';
+import { APRESENTACAO_DA_FAIXA, AVISO_DO_ARREDONDAMENTO } from './farol';
 import { ExplicacaoNoPonto } from '../../ui/ponto-de-ajuda';
 import { TextoClassificacao } from './texto-classificacao';
-
-/**
- * N.2: o CMV de um canal na lista — o preço que a pessoa definiu, o CMV a esse preço e o farol EM PALAVRA (nunca só a
- * cor), independente em cada canal. Sem dados diz por quê; canal sem preço definido não ganha farol.
- */
-function CmvNaLista({ x }: { x: CmvDoCanal }) {
-  return (
-    <span className="block min-w-0">
-      <FarolDeCmv conta={x} modo="lista" />
-      {x.ofertado && <span className="mt-1 block text-[12px] text-suave">{x.precoCentavos !== null ? formatarDinheiro(x.precoCentavos) : 'sem preço'}</span>}
-    </span>
-  );
-}
-
-/** Resumo por canal; só agrupa informações que são iguais em todos os canais. */
-function CmvPorCanal({ contas }: { contas: readonly CmvDoCanal[] }) {
-  if (!contas.length) return null;
-  const primeira = contas[0];
-  const faixaComum = contas.length > 1 && contas.every(x => x.farol.faixa === primeira.farol.faixa && !x.farol.motivo)
-    && primeira.farol.faixa !== 'semDados' && primeira.farol.faixa !== 'naoOfertado';
-  const metaComum = contas.length > 1 && contas.every(x => x.ofertado && x.metaBp === primeira.metaBp && x.status === primeira.status);
-  const meta = (x: CmvDoCanal) => x.metaBp === null ? 'Meta não definida' : `Meta: ${formatarPontosBase(x.metaBp)} · ${STATUS_DO_CMV[x.status].rotulo}`;
-  return <div className="mt-2 space-y-1.5 text-[12px] leading-snug tabular-nums text-suave">
-    <p className="font-medium text-texto">CMV por canal</p>
-    <dl className="grid grid-cols-1 gap-x-4 gap-y-2 min-[400px]:grid-cols-3">
-      {contas.map(x => <div key={x.canal} className="min-w-0">
-        <dt className="font-medium text-texto">{CANAIS[x.canal].curto}</dt>
-        <dd className="space-y-0.5 break-words">
-          {x.cmvBp && x.farol.faixa !== 'semDados' && x.farol.faixa !== 'naoOfertado' && <span className="block font-semibold text-texto">{porcentagemDoCmv(x.cmvBp)}</span>}
-          {!faixaComum && <span className="block">{APRESENTACAO_DA_FAIXA[x.farol.faixa].rotulo}</span>}
-          {x.farol.motivo && <span className="block">{x.farol.motivo}</span>}
-          {!metaComum && x.ofertado && <span className="block">{meta(x)}</span>}
-        </dd>
-      </div>)}
-    </dl>
-    {(metaComum || faixaComum) && <div className="space-y-0.5 border-t border-linha pt-1.5">
-      {metaComum && <p>{meta(primeira)} · todos os canais</p>}
-      {faixaComum && <p>{APRESENTACAO_DA_FAIXA[primeira.farol.faixa].rotulo} · todos os canais</p>}
-    </div>}
-  </div>;
-}
+import { CmvCompacto, CmvPorCanalCompacto, LinkDosDetalhesDoCmv } from './cmv-compacto';
 
 function hrefCom(base: string, f: FiltrosDeFicha, mudar: Partial<FiltrosDeFicha>): string {
   const q = queryDosFiltrosDeFicha({ ...f, pagina: 1, ...mudar });
@@ -244,7 +205,7 @@ export function TelaListaFichas({
             {(l.classificacao.secao || l.classificacao.subsecao || precos?.has(l.id) || correspondenciasCmv?.get(l.id)?.length || correspondenciasFaixasCmv?.get(l.id)?.length) ? <div className="min-w-0 space-y-2 px-4 pb-3">
               <TextoClassificacao classificacao={l.classificacao} />
               <Correspondencias pares={correspondenciasCmv?.get(l.id)} faixas={correspondenciasFaixasCmv?.get(l.id)} />
-              {precos?.get(l.id) && <CmvPorCanal contas={precos.get(l.id)!} />}
+              {precos?.get(l.id) && <CmvPorCanalCompacto contas={precos.get(l.id)!} href={hrefDoDetalhe(base, l.id, f)} nome={l.nome} />}
             </div> : null}
           </li>
         ))}
@@ -286,7 +247,7 @@ export function TelaListaFichas({
             )}
             {precos &&
               (['LOJA', 'DELIVERY_PROPRIO', 'IFOOD'] as const).map((c) => (
-                <th key={c} scope="col" className="hidden h-10 px-3 text-right font-semibold 2xl:table-cell">
+                <th key={c} scope="col" className="hidden h-10 px-3 text-right font-semibold xl:table-cell">
                   <span className="sr-only">CMV no </span>
                   {CANAIS[c].curto}
                 </th>
@@ -303,7 +264,8 @@ export function TelaListaFichas({
         </thead>
         <tbody className="tabular-nums">
           {linhas.map((l) => (
-            <tr key={l.id} className="ff-transicao border-t border-linha hover:bg-texto/[0.03]">
+            <Fragment key={l.id}>
+            <tr className="ff-transicao border-t border-linha hover:bg-texto/[0.03]">
               <td className="py-2 pl-4 pr-3 sm:pl-5">
                 <div className="flex min-w-0 items-center gap-3">
                   <Miniatura base={base} id={l.id} foto={l.foto} />
@@ -324,7 +286,7 @@ export function TelaListaFichas({
                       <span className={precos ? '' : 'lg:hidden'}>{!l.ativa && ' · Desativada'}</span>
                     </div>
                     {(l.consumoImediato || validadesEmTexto(l.validades)) && <div className="text-[12px] leading-snug text-suave">{l.consumoImediato ? 'Consumo imediato' : validadesEmTexto(l.validades)}</div>}
-                    {precos?.get(l.id) && <div className="2xl:hidden"><CmvPorCanal contas={precos.get(l.id)!} /></div>}
+                    {precos?.get(l.id)?.length ? <div className="hidden xl:block"><LinkDosDetalhesDoCmv href={hrefDoDetalhe(base, l.id, f)} nome={l.nome} /></div> : null}
                   </div>
                 </div>
               </td>
@@ -352,12 +314,12 @@ export function TelaListaFichas({
               {precos &&
                 (precos.get(l.id) ? (
                   precos.get(l.id)!.map((x) => (
-                    <td key={x.canal} className="hidden px-2.5 py-2 text-right align-top last:pr-5 2xl:table-cell">
-                      <CmvNaLista x={x} />
+                    <td key={x.canal} className="hidden w-32 px-2.5 py-2 text-right align-top last:pr-5 xl:table-cell">
+                      <CmvCompacto conta={x} />
                     </td>
                   ))
                 ) : (
-                  <td colSpan={3} className="hidden px-3 py-2 pr-5 text-right text-[12px] text-suave 2xl:table-cell">
+                  <td colSpan={3} className="hidden px-3 py-2 pr-5 text-right text-[12px] text-suave xl:table-cell">
                     não se vende
                   </td>
                 ))}
@@ -370,6 +332,12 @@ export function TelaListaFichas({
                 </td>
               )}
             </tr>
+            {precos?.get(l.id)?.length ? <tr className="xl:hidden">
+              <td colSpan={2 + (acoes ? 1 : 0)} className="px-5 pb-3 pt-1">
+                <CmvPorCanalCompacto contas={precos.get(l.id)!} href={hrefDoDetalhe(base, l.id, f)} nome={l.nome} />
+              </td>
+            </tr> : null}
+            </Fragment>
           ))}
         </tbody>
       </table>
